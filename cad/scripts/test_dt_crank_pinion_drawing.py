@@ -465,7 +465,7 @@ def test_notes_carry_the_tooth_edge_override_not_an_obsolete_boss_shortfall() ->
     assert not any(line.startswith("BOSS WALL") for line in lines)
     # The cutter runout into the boss is a tooth fact, a gear-data row.
     assert (
-        "TEETH:  RUN FULL LENGTH THROUGH THE TURNED BAND; CUTTER RUNOUT INTO BOSS OK"
+        "TEETH:  FULL LENGTH OF TURNED BAND; CUTTER RUNOUT INTO BOSS OK"
         in notes.GEAR_DATA
     )
     # Four numbered notes, each a single line, numbered in order.

@@ -20,8 +20,10 @@ PEDESTAL_NUMBER = "MHA-DT-02"
 # MHA-DT-02 strap bores it fills, so the callout names both.  Its band is
 # narrower than the shop's turned-diameter row, so the callout also names the
 # fit route, purchased ground stock, at the feature (fan-out screen: the route
-# sat in an unlinked general note).
-SHAFT_DIA_CALLOUT = "RUNNING FIT IN MHA-DT-12 AND MHA-DT-02 BORES\n3/8 GROUND STOCK OK"
+# sat in an unlinked general note).  One row: SOLIDWORKS stores a multi-line
+# ABOVE callout but prints none of it (fan-out r1 57234c1d71 printed a bare
+# Ø; draw_dt_pinion_lift_rod), and the below lane sits on the .06 dome.
+SHAFT_DIA_CALLOUT = "RUNNING FIT IN MHA-DT-12 AND MHA-DT-02 BORES; 3/8 GROUND STOCK OK"
 
 # Part-specific facts a machinist cannot read off the views (rule 7).  A
 # 6.5:.375 slender bar is turned between centres, which may stay.  The length

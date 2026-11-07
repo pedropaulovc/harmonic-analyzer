@@ -34,5 +34,6 @@ SHOULDER_LENGTH_NOTE = "\n".join(
 # clears (rule 3's CLEARS form; KEEPS HEAD BELOW read as design rationale).
 HEAD_DIA_CALLOUT = "BEARS ON\nMHA-DT-35 FLOOR"
 HEAD_LENGTH_CALLOUT = "CLEARS MHA-DT-35 FACE"
-# The shoulder's running mate, at its band, by the standard fit name (rule 4).
-SHOULDER_FIT_CALLOUT = "RUNNING FIT IN MHA-DT-08\nREAMED BORE"
+# The shoulder's running mate, at its band, by the standard fit name (rule 4);
+# wrapped so the widest row (21 characters) clears the Ra 63 leader.
+SHOULDER_FIT_CALLOUT = "RUNNING FIT IN\nMHA-DT-08 REAMED BORE"

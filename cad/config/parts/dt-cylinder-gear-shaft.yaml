@@ -14,3 +14,9 @@ dt-cylinder-gear-shaft:
   fit_class: shaft_in_bushing
   process: "machined (steel)"
   drawing_unit: in
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "accept"
+      where: "front view: Ø.3750 +.0000/-.0008 shaft diameter, callout RUNNING FIT IN MHA-DT-12 AND MHA-DT-02 BORES; 3/8 GROUND STOCK OK"
+      finding: "band narrower than the turned-diameter row, or -.0008 a converted-millimetre deviation (rules 4, 26)"
+      reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144 (fan-out rulings F1/F5). The band is the fleet-shared _fit_shaft_h.SHAFT_H (shaft_in_bushing fit class), restated in inch steps at the next re-key of that family; the matched running fit to the MHA-DT-12 and MHA-DT-02 bores and the ground-stock route are printed at the callout. Accepts the -.0008 notation and band on this diameter only, no other band or callout departure."

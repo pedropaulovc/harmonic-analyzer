@@ -15,3 +15,8 @@ dt-pinion-lift-rod:
       where: "sheet 1, main (side) view: the body length from the flat end to the SR.19 / Ø.2500 crown rim, with the reference overall to the dome tip in parentheses"
       finding: "the toleranced length stops at the edge-broken crown rim and reads like an overall that is not one, while the true overall is only a reference (rules 10 and 11)"
       reason: "owner ruling, 2026-10-19: the rod's rim is set flush with the MHA-DT-18 back block's outer face, so the rig's worst fitted stacks (pinion_rig_layout lift_rod_seat_stack and lever_north_travel_stack) read the rim-to-flat-end length's band (.XX on the #290 inch sheet). Tolerancing the overall instead would stack the crown sagitta's band on both stacks. The body length stays the controlling size, and the overall stays a reference"
+    - id: "RV-02"
+      kind: "accept"
+      where: "main view: Ø.2500 +.0000/-.0008 rod diameter, callout RUNNING FIT IN MHA-DT-18 LIFT BORES, 1/4 IN GROUND STOCK OK"
+      finding: "band narrower than the turned-diameter row, or -.0008 a converted-millimetre deviation (rules 4, 26)"
+      reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144 (fan-out rulings F1/F5). The band is the fleet-shared _fit_shaft_h.SHAFT_H (shaft_in_bushing fit class), restated in inch steps at the next re-key of that family; the matched running fit to the MHA-DT-18 lift bores and the ground-stock route are printed at the callout. Accepts the -.0008 notation and band on this diameter only, no other band or callout departure."

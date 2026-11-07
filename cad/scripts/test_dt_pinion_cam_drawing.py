@@ -59,13 +59,13 @@ def test_drive_train_recipe_depends_on_geometry_not_drawing_notes() -> None:
     assert "dt_pinion_cam_spec.py" not in dependency_names
 
 
-def test_eccentricity_is_dimensioned_as_a_bare_location() -> None:
+def test_eccentricity_is_dimensioned_as_a_flagged_location() -> None:
     # The whole point of the cam: bore and OD are NOT concentric, so the offset
     # must be an explicit dimension, not implied by graphical alignment.  It is
-    # a location, so it carries its value and band only (rule 7; fan-out
-    # screen 20261107T081227004Z).
+    # a location, so it carries its value, band and the flag to the note that
+    # names what it sets (rules 4 and 7; fan-out r1).
     assert "CollarCy" in drawing.FRONT_KEEP
-    assert "CollarCy" not in drawing.DIMENSION_CALLOUTS
+    assert drawing.DIMENSION_CALLOUTS["CollarCy"] == "SEE NOTE 1"
     assert dt_pinion_cam_geometry.CAM_OD == 14.6
 
 
@@ -141,9 +141,10 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
 def test_cam_attachment_is_fully_released_for_manufacture() -> None:
     notes = dt_pinion_cam_spec.DRAWING_NOTES
     assert "RELEASE HOLD" not in notes
-    assert "ASME B18.3 #2-56 UNC X 3/16" in notes
-    assert "FLAT-POINT SOCKET SET SCREW LOOSE" in notes
-    assert len(notes.splitlines()) == 2
+    lines = notes.splitlines()
+    assert lines[1].startswith("2. SUPPLY ASME B18.3 #2-56 UNC X 3/16 FLAT-POINT SOCKET SET SCREW")
+    assert lines[2] == "   LOOSE; TIGHT ON MHA-DT-17, IT SITS BELOW THE OD."
+    assert len(lines) == 3
     tap = drawing.DIMENSION_CALLOUTS["TapDrillDia"]
     assert "#2-56 UNC" in tap
     assert "2B" not in tap  # Title block owns the default unified thread class.
@@ -152,15 +153,20 @@ def test_cam_attachment_is_fully_released_for_manufacture() -> None:
     assert "OPTIONAL" not in tap
 
 
-def test_the_od_names_the_follower_pin_its_bands_serve_once() -> None:
+def test_the_od_and_offset_flag_the_follower_pin_note_once() -> None:
     # Rule 4: the OD and eccentricity bands exist for the MHA-DT-25 follower
-    # pin that rides the OD (ENFORCE r1 blockers); the one reason sits on the
-    # OD's size callout, two lines of words (rule 7).
+    # pin that rides the OD (ENFORCE r1 blockers); the one reason sits in
+    # numbered note 1, which both dimensions flag (fan-out r1: on the OD's
+    # callout alone, the .079 named no mate).
     import _config
 
     pin = _config.parts("dt-pinion-cam-pin")["number"]
     assert dt_pinion_cam_spec.FOLLOWER_PIN_NUMBER == pin
-    assert drawing.DIMENSION_CALLOUTS["CollarOd"] == f"SETS {pin}\nFOLLOWER PIN LIFT"
+    for name in ("CollarOd", "CollarCy"):
+        assert drawing.DIMENSION_CALLOUTS[name] == "SEE NOTE 1"
+    assert dt_pinion_cam_spec.DRAWING_NOTES.splitlines()[0] == (
+        f"1. \N{LATIN CAPITAL LETTER O WITH STROKE}.575 AND .079 SET THE LIFT OF FOLLOWER PIN {pin}."
+    )
 
 
 def test_tap_callout_gives_the_tap_only() -> None:
@@ -290,7 +296,7 @@ def test_the_print_carries_no_gdt_and_dimensions_on_solid_edges() -> None:
     assert "BoreDia" in drawing.FRONT_KEEP
     assert "CollarOd" not in drawing.FRONT_KEEP
     assert drawing.DIMENSION_CALLOUTS["BoreDia"].startswith("REAM THRU")
-    assert "CollarCy" not in drawing.DIMENSION_CALLOUTS
+    assert drawing.DIMENSION_CALLOUTS["CollarCy"] == "SEE NOTE 1"
     assert "TapCz" not in drawing.DIMENSION_CALLOUTS
 
 

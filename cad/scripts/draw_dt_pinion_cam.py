@@ -53,10 +53,10 @@ import _telemetry
 from dt_pinion_cam_spec import (
     BORE_CALLOUT,
     CAM_OD,
-    COLLAR_OD_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     ECC,
+    LIFT_NOTE_CALLOUT,
     SURFACE_FINISHES,
     TAP_DRILL_CALLOUT,
     THIN_WALL_CALLOUT,
@@ -136,12 +136,12 @@ BOTTOM_KEEP = {
     "TapDrillDia": (0.215, 0.100),
     "TapCz": (BOTTOM_CENTER[0] + 0.036, BOTTOM_CENTER[1] + 0.007),
 }
-# The eccentricity is a location: value and band only (rule 7).  The reason
-# it and the OD are banded rides the OD's callout (fan-out screen
-# 20261107T081227004Z).
+# The eccentricity is a location: value and band, plus the flag to the note
+# naming the lift it sets with the OD (rules 4 and 7; fan-out r1).
 DIMENSION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
-    "CollarOd": COLLAR_OD_CALLOUT,
+    "CollarOd": LIFT_NOTE_CALLOUT,
+    "CollarCy": LIFT_NOTE_CALLOUT,
     "TapDrillDia": TAP_DRILL_CALLOUT,
     "ThinWallMin": THIN_WALL_CALLOUT,
 }

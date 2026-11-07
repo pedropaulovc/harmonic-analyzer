@@ -171,8 +171,11 @@ SIDE_KEEP = {
     "OverallLength": ((TIP_X + HEAD_FACE_X) / 2.0, _ROW_Y[2]),
     # Diameters on the side view (drawing-guidelines.md rule 11 (turned parts read like the lathe)).  The shoulder's dimension line
     # crosses the shoulder right of the relief Ø's callout below it; the
-    # head's stands clear of the head face, left of the end view.
-    "ShoulderDia": (SEAT_X + 0.075, SIDE_CENTER[1] + 0.030),
+    # head's stands clear of the head face, left of the end view.  Fan-out
+    # r1 (57234c1d71): at + 0.075 the 59-mm RUNNING FIT callout ended 3.6 mm
+    # under the Ra 63 leader, so the line stands 3 mm right of the relief
+    # callout's 46-mm block and the callout wraps at its 21-character row.
+    "ShoulderDia": (SEAT_X + 0.062, SIDE_CENTER[1] + 0.030),
     # Above the head, so the callout under the value stands clear of its
     # extension lines and of the slot depth's text left of it.
     "HeadDia": (HEAD_FACE_X + 0.014, SIDE_CENTER[1] + 0.032),
