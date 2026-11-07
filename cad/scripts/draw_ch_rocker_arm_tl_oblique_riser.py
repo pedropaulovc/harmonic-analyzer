@@ -75,10 +75,12 @@ SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 # each carrier-located station as a REFERENCE value and the two end-stop
 # holes' ordinary .XX stations (X stack below the view; row heights beside
 # it), one callout per hole size above it for the carrier-located holes (the
-# screw hole's size from the part's blanked ScrewHoleReference sketch, its
-# countersink in its below text) and the stop holes' below and right of it
-# (from the blanked StopHoleReference sketch on stop 2). Both #30 sizes print
-# the .128 design nominal over the actual .1285 cut. Section A-A cuts across
+# screw hole's and HUB relief's sizes from the part's blanked
+# ScrewHoleReference and HubHoleReference sketches, the screw's countersink
+# in its below text) and the stop holes' below and right of it (from the
+# blanked StopHoleReference sketch on stop 2). Both #30 sizes print the .128
+# design nominal over the actual .1285 cut, the HUB relief .472 over its
+# 12 mm drill. Section A-A cuts across
 # the width through screw hole 3 at 2:1 to show the thickness and the
 # countersink's form; its caption sits below it. The shaded isometric sits
 # bottom left.
@@ -249,7 +251,8 @@ requirement(
 _SCREW_SOURCES = ("SCREW_HOLES", "BLANK_ORIGIN", (_CALC, "RISER_SCREWS"))
 _SCREW_DIA_SOURCES = ("SCREW_DIA_PRINTED", "SCREW_DIA", "SCREW_SPEC", "SCREW_BODY_DIA")
 # (name, xy, cut dia, printed dia, station sources, dia sources): the wizard
-# cuts the unchanged #4 clearance (#30 drill) inside the design Ø.128 +.004/0 band.
+# cuts the unchanged #4 clearance (#30 drill) inside the design Ø.128 +.004/0
+# band, and the HUB's literal 12 mm drill lies inside its Ø.472 +.004/0.
 _HOLE_ROWS = (
     *(
         (
@@ -262,20 +265,24 @@ _HOLE_ROWS = (
         )
         for i, xy in enumerate(SCREW_HOLES, start=1)
     ),
+    (
+        "hub_hole",
+        HUB_HOLE,
+        part_spec.HUB_DIA,
+        part_spec.HUB_DIA_PRINTED,
+        ("HUB_HOLE", "BLANK_ORIGIN", (_CALC, "HUB")),
+        ("HUB_DIA_PRINTED", "HUB_DIA", "HUB_DRILL"),
+    ),
     *(
         (
             name,
             xy,
-            dia,
-            dia,
+            part_spec.CLAMP_DIA,
+            part_spec.CLAMP_DIA,
             (f"{calc}_HOLE", "BLANK_ORIGIN", (_CALC, calc)),
-            (dia_name,),
+            ("CLAMP_DIA",),
         )
-        for name, xy, dia, calc, dia_name in (
-            ("hub_hole", HUB_HOLE, part_spec.HUB_DIA, "HUB", "HUB_DIA"),
-            ("cl_hole", CL_HOLE, part_spec.CLAMP_DIA, "CL", "CLAMP_DIA"),
-            ("cr_hole", CR_HOLE, part_spec.CLAMP_DIA, "CR", "CLAMP_DIA"),
-        )
+        for name, xy, calc in (("cl_hole", CL_HOLE, "CL"), ("cr_hole", CR_HOLE, "CR"))
     ),
 )
 for name, (x, y), cut_dia, dia, sources, dia_sources in _HOLE_ROWS:

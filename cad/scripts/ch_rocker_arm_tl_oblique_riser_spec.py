@@ -155,7 +155,18 @@ CSK_FLANK_ANGLE = 90.0 - CSK_ANGLE / 2.0  # face to flank, the sketch's
 CSK_DIA = trammel.RISER_CSK_DIA  # .25 ⚙
 CSK_PLACES = trammel.RISER_CSK_PLACES  # 2 ⚙
 HUB_DIA = 12.0  # exact metric drill size; loose relief, not a fit
+HUB_DRILL = "12 MM"
 HUB_PLACES = 3
+# The owner's literal 12 mm relief is the model's cut. Like the #30 holes,
+# the inch sheet prints a three-place DESIGN nominal on a blanked reference
+# circle, floored (as SCREW_DIA_PRINTED) so DRILLED HOLES +.004/0 (.472-.476)
+# always contains the actual drill (.47244); the relief's clearance is the
+# drill's, not the printed floor's.
+HUB_DIA_PRINTED = (
+    math.floor(HUB_DIA / trammel.INCH * 10.0**HUB_PLACES + 1e-9)
+    / 10.0**HUB_PLACES
+    * trammel.INCH
+)
 CLAMP_DIA = 4.9784  # .196, #9 drill: clears #8 body AND underhead fillet
 CLAMP_PLACES = 3
 
@@ -171,6 +182,10 @@ if CSK_DEPTH_MAX >= THICKNESS - THICKNESS_BAND:
     raise AssertionError("riser countersink breaks through the blank")
 if HUB_DIA <= strap.HOLE_DIA:
     raise AssertionError("the relief must pass the product-hole reamer")
+if not HUB_DIA_PRINTED <= HUB_DIA <= HUB_DIA_PRINTED + DRILLED_BAND[0]:
+    raise AssertionError("the 12 mm relief drill falls outside its printed design limits")
+if HUB_DIA_PRINTED <= strap.HOLE_DIA:
+    raise AssertionError("the smallest printed relief does not pass the product-hole reamer")
 
 HOLES: dict[str, tuple[tuple[float, float], float]] = {
     **{f"screw {i}": (xy, SCREW_DIA) for i, xy in enumerate(SCREW_HOLES, start=1)},
@@ -266,7 +281,10 @@ GLOBALS: dict[str, float] = {
     "ClX": CL_HOLE[0],
     "CrX": CR_HOLE[0],
     "ClampY": CL_HOLE[1],
-    "HubDia": HUB_DIA,
+    # The cut is the actual 12 mm drill; HubDia is its printed design nominal
+    # on the blanked HubHoleReference circle.
+    "HubCutDia": HUB_DIA,
+    "HubDia": HUB_DIA_PRINTED,
     "ClampDia": CLAMP_DIA,
     "CskDia": CSK_DIA,
     # Native design nominal; the Wizard still cuts the actual #30 SCREW_DIA.
@@ -282,7 +300,8 @@ GLOBALS: dict[str, float] = {
 CIRCLES: tuple[
     tuple[tuple[float, float], float, tuple[str, str, str], tuple[str, str, str]], ...
 ] = (
-    (HUB_HOLE, HUB_DIA, ("HubX", "HubY", "HubDia"), ('"HubX"', '"HubY"', '"HubDia"')),
+    (HUB_HOLE, HUB_DIA, ("HubX", "HubY", "HubCutDia"),
+     ('"HubX"', '"HubY"', '"HubCutDia"')),
     (CL_HOLE, CLAMP_DIA, ("ClX", "ClampY", "ClampDia"),
      ('"ClX"', '"ClampY"', '"ClampDia"')),
     (CR_HOLE, CLAMP_DIA, ("CrX", "CrY", "ClampDia2"),
@@ -301,9 +320,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "ScrewOuterY",
     },
     "HoleProfile": {
-        "HubX", "HubY", "ClX", "CrX", "ClampY", "HubDia", "ClampDia",
+        "HubX", "HubY", "ClX", "CrX", "ClampY", "ClampDia",
     },
     "ScrewHoleReference": {"ScrewDia"},
+    "HubHoleReference": {"HubDia"},
     "StopHoles": {"Stop1X", "Stop2X", "StopY"},
     "StopHoleReference": {"StopDia"},
 }
@@ -336,7 +356,7 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 }
 for _name, _places in DRAWING_PRECISION_BY_NAME.items():
     # Reference stations display at 2 places without moving the model axes.
-    if _name in _STATIONS or _name == "HubDia":
+    if _name in _STATIONS:
         continue
     if not carrier.prints_exactly(GLOBALS[_name], _places):
         raise AssertionError(
@@ -369,7 +389,7 @@ if not set(ROW_COUNTS) <= set(DRAWING_PRECISION_BY_NAME):
 HOLE_CALLOUTS = ("ScrewDia", "HubDia", "ClampDia", "StopDia")
 CALLOUTS_BELOW = {
     "ScrewDia": f"{SCREW_DRILL} DRILL THRU\n{CSK_CALLOUT}\n{LOCATE_CALLOUT}",
-    "HubDia": f"DRILL THRU\nHUB HOLE\n{LOCATE_CALLOUT}",
+    "HubDia": f"{HUB_DRILL} DRILL THRU\nHUB REAMER RELIEF\n{LOCATE_CALLOUT}",
     "ClampDia": f"#9 DRILL THRU\nCL AND CR CLAMPS\n{LOCATE_CALLOUT}",
     "StopDia": f"#30 DRILL THRU\nLOOSE 1/8 STOP PINS\n{STOP_PIN_NUMBER}",
 }
