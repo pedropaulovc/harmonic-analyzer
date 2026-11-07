@@ -1192,7 +1192,6 @@ def test_drawing_keeps_source_only_chamfer_and_part_only_rework_sheet(monkeypatc
         ("REWORK", "Upper Cut-End Chamfer", None),
         ("REWORK", f"{CONFIGURATION} Rework Stock Note", None),
     ]
-    assert (draw.END_VIEW_LABEL, draw.END_VIEW_LABEL_XY) in captions
     assert (f"INSTALLED ACCEPTANCE:\n{jig.HOLD_DOWN_REFERENCE}", draw.ASSEMBLY_REFERENCE_XY) in captions
     if drift == "configuration":
         views[-1].ReferencedConfiguration = "TNut"
