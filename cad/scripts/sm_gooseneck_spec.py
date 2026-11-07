@@ -136,9 +136,10 @@ BEND_RADIUS_CALLOUT = "TUBE CENTERLINE"
 # 2026-10-27 on #1997, sm_gooseneck_spring_joint), printed in inches rounded
 # inward at four places.  It is the acceptance of a matched fit (fan-out
 # policy 1; machinist review 20261107T102825912Z: as REF beside a .XXX shank
-# it set no limit): the shank is turned to suit the tube's bore, and the
-# sleeve's stock is selected to suit the tube (owner ruling 2026-10-27:
-# select-fit from stock, no hone).
+# it set no limit): the shank is turned to the measured tube ID (its Ø a
+# reference, REFERENCE_DIMENSIONS; round 2: "TO SUIT" is a rule-26 private
+# phrase), and the sleeve's stock is selected on the tube (owner ruling
+# 2026-10-27: select-fit from stock, no hone).
 _BRAZE_WINDOW = "-".join(
     f"{inches:.4f}".removeprefix("0")
     for inches in (
@@ -250,11 +251,15 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # The overall height and reach are references too: the tangent stations
 # (16.4, 1.07) lay out the bend and govern; the overall sizes check the
 # finished bend from real faces (machinist review r5 of farm run
-# 20261101T004958072Z).
+# 20261101T004958072Z).  The braze shank's Ø is turned to the measured tube
+# ID (note 2), so its nominal is a reference and the clearance governs
+# (round 2, 20261107T110808280Z: a plain .363 beside the fit note was a
+# second controlling value, rule 7).
 REFERENCE_DIMENSIONS: dict[str, frozenset[str]] = {
     "TubeOdReference": frozenset({"TubeOdRef"}),
     "SleeveProfile": frozenset({"SleeveDia"}),
     "OverallReference": frozenset({"OverallHeight", "OverallReach"}),
+    "EndPieceProfile": frozenset({"PlugShankDia"}),
 }
 # Where TubeOdReference's line runs on the bare leg: TUBE_OD_REF_SPAN long,
 # centred mid-way between the sleeve's top and the bend's entry tangent.
@@ -316,7 +321,7 @@ DRAWING_NOTES = "\n".join(
     (
         f"{COUNTERBORE_NOTE}. C'BORE DIAMETER, DEPTH AND CORNER CLEAR "
         f"{SCREW_NUMBER} THREAD RUN-OUT",
-        f"{SHANK_FIT_NOTE}. TURN TO SUIT TUBE BORE, CLEARANCE {_BRAZE_WINDOW}; "
+        f"{SHANK_FIT_NOTE}. TURN TO MEASURED TUBE ID, CLEARANCE {_BRAZE_WINDOW}; "
         "BAg-7 FULL LAP OR LOCTITE 638",
         f"{SLEEVE_FIT_NOTE}. SELECT-FIT ON TUBE, CLEARANCE {_BRAZE_WINDOW}; "
         "LOWER ENDS FLUSH; BAg-7 FILLETS",

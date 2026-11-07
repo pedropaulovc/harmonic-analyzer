@@ -32,6 +32,6 @@ sm-knife-mount:
       reason: "owner preference 2026-10-27 (no FCF on face-milled seats): the knife-mount slip-tilt proof (build_sm_summing_assembly, #2016) charges an assumed .0004 seat conformity over the .540 minimum seat, which a face-milled seat drawn flat by the bolt holds; the fit binds only past about .0010 (with the hole and slot at ⊥ .001, delegated ruling sm Q1)"
     - id: "RV-05"
       kind: "accept"
-      where: "the datum-B slip hole Ø.1280 ±.0007 and the datum-C slot width .1280 ±.0007, each TO SUIT MHA-SM-VN-53: CLEARANCE .0020-.0036"
+      where: "the datum-B slip hole Ø.1280 ±.0007 and the datum-C slot width .1280 ±.0007, each MHA-SM-VN-53 SLIDING FIT, CLEARANCE .0020-.0036"
       finding: "converted-millimetre band, not a plain inch step (rule 4)"
-      reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144 (sm Q4): the bands are the MHA-SM-VN-53 dowel's slip budget, whose .0020 minimum clearance sets the slip-tilt allowance the ⊥ .001 refinements need (at ±.001 the allowance drops to 0.343 deg, under the 0.364 deg charged with the ⊥ Ø.001 crossbar reams of #2244); each callout names its matched route, cut to suit the dowel with the clearance as its acceptance"
+      reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144 (sm Q4): the bands are the MHA-SM-VN-53 dowel's slip budget, whose .0020 minimum clearance sets the slip-tilt allowance the ⊥ .001 refinements need (at ±.001 the allowance drops to 0.343 deg, under the 0.364 deg charged with the ⊥ Ø.001 crossbar reams of #2244); each callout names the dowel and its sliding fit with the clearance as its acceptance"
