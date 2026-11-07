@@ -185,6 +185,14 @@ BAR_FACE_THREAD_NOTE = f"{SCREW} Tapped Hole"
 # _require_bar_face_threads proves the edge each thread holds.
 _SW_BACK_VIEW = 2
 _EDGE_TOL_MM = 0.01
+# The thread's drawn diameter: native 4d782f88 made both threads with the
+# adapter's default diameter 0 and section A-A drew them visible with no
+# lines at all, while the wizard threads drew at the major. The SDK's own
+# InsertCosmeticThread3 examples pass the real diameter; for a hole edge
+# ICosmeticThreadFeatureData.Diameter is the major
+# (swCosmeticThreadDiameterType_e.swCosmeticThread_MajorDiameter, 2: "cut or
+# hole"), so the build passes and reads back THREAD_MAJOR.
+_MAJOR_DIAMETER_TYPE = 2
 
 
 @_telemetry.traced("feature.bar_face_cosmetic_threads")
@@ -212,6 +220,7 @@ async def _bar_face_cosmetic_threads(adapter) -> tuple[str, ...]:
                         size=SCREW,
                         end_type="blind",
                         depth=BAR_THREAD_DEPTH,
+                        diameter=THREAD_MAJOR,
                         note=BAR_FACE_THREAD_NOTE,
                     )
                 ),
@@ -286,6 +295,8 @@ def _require_bar_face_threads(adapter, names: tuple[str, ...]) -> None:
         readback[name] = (
             int(definition.EndCondition),
             float(definition.BlindDepth) * 1000.0,
+            int(definition.DiameterType),
+            float(definition.Diameter) * 1000.0,
             _thread_edge_circle(model, definition, label=f"bar-face thread {name}"),
         )
     wanted = {
@@ -298,11 +309,13 @@ def _require_bar_face_threads(adapter, names: tuple[str, ...]) -> None:
         or any(
             end != _BLIND
             or abs(depth - wizard_mm) > 0.005
+            or kind != _MAJOR_DIAMETER_TYPE
+            or abs(diameter - THREAD_MAJOR) > _EDGE_TOL_MM
             or any(
                 abs(got - want) > _EDGE_TOL_MM
                 for got, want in zip(circle, wanted[name], strict=True)
             )
-            for name, (end, depth, circle) in readback.items()
+            for name, (end, depth, kind, diameter, circle) in readback.items()
         )
     ):
         raise RuntimeError(
