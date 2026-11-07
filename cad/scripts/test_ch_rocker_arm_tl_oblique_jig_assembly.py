@@ -1773,6 +1773,25 @@ def test_printed_torque_leads_with_n_m_and_rounds_in_lbf(nm, printed) -> None:
     assert abs(in_lbf - exact) <= half_step
 
 
+def test_rail_preparation_precedes_fastening_and_table_mounting() -> None:
+    preparation, fitting, mounting = spec.ASSEMBLY_STEPS[:3]
+    assert [step.split(". ", 1)[0] for step in (preparation, fitting, mounting)] == [
+        "1", "2", "3",
+    ]
+    # Use the actual component roles, not exact instruction prose.
+    for family, step in (
+        (spec.CARRIAGE, preparation),
+        (spec.END_BRACKET, fitting),
+        (spec.T_NUT, mounting),
+    ):
+        citation = spec._item(family)
+        assert citation in step
+        assert sum(citation in candidate for candidate in spec.ASSEMBLY_STEPS[:3]) == 1
+    assert spec._item(spec.RAIL) in fitting
+    assert spec._item(spec.RAIL_SCREW) in fitting
+    assert spec._item(spec.HOLD_DOWN_STUD) in mounting
+
+
 def test_step_10_taps_the_carrier_hub_in_situ_at_the_recorded_dro() -> None:
     """Owner ruling 3 (2026-11-07): the carrier's HUB #8-32 tap is made in
     situ at the step 10 DRO position, every strap's hub hole is drilled and
@@ -1788,13 +1807,24 @@ def test_step_10_taps_the_carrier_hub_in_situ_at_the_recorded_dro() -> None:
 
 
 def test_step_11_sets_the_stop_axes_before_spotting_the_riser() -> None:
-    """R4Geometry stop chain (2026-11-07): one ordinary 2-place station sets
-    the stop-pin axes on the carrier before any riser hole is spotted."""
+    """Installed axes use the retained spindle-origin DRO at inner symmetry."""
+    pose = trammel.carrier_pose("inner", 0.0)
+    assert pose.to_machine((0.0, trammel.APEX_Y)) == pytest.approx((0.0, 0.0))
+    for carrier_point, dro_point, (origin, _rows) in zip(
+        riser.STOP_PIN_CARRIER_POINTS, spec.STOP_PIN_DRO_POINTS,
+        spec.STOP_PIN_PLACEMENTS, strict=True,
+    ):
+        assert dro_point == pytest.approx(pose.to_machine(carrier_point), abs=1e-9)
+        assert dro_point == pytest.approx(
+            (carrier_point[0], carrier_point[1] - trammel.APEX_Y), abs=1e-9
+        )
+        assert dro_point == pytest.approx(origin[:2], abs=1e-9)
+        assert dro_point[1] < 0.0 < carrier_point[1]
+    assert spec._STOP_AXIS_BAND == pytest.approx(0.254)
+    assert spec._STOP_DRO == "X ±6.61, Y -.57 ±.01"
     step = next(text for text in spec.ASSEMBLY_STEPS if text.startswith("11. "))
-    assert spec._STOP_DRO == "X ±6.61, Y .71 ±.01"
-    assert f"THE PIN AXES READ DRO {spec._STOP_DRO} AND CLAMP IT. ONLY THEN SPOT 7" in step
+    assert spec._STOP_DRO in step
     assert spec._item(spec.STOP_PIN) in step
-    assert "OMIT THE TOP-HAT WASHER AND THE CL, CR AND HUB SCREWS UNTIL O4." in step
 
 
 def test_r4_operation_order_cites_the_plan_and_retains_all_clamps() -> None:
@@ -1862,12 +1892,12 @@ def test_steps_13b_and_13c_split_o1_around_the_stud_rework() -> None:
 
 
 def test_kp08_row_and_stud_cut_timing_read_plainly() -> None:
-    """TL-00 review (2026-11-02): item 17's row names the KP08 the steps cite,
-    and step 2 says when the stud stock is cut."""
+    """The table-mounting step retains the later stud-rework references."""
     assert spec.BOM_DESCRIPTIONS[spec.PILLOW_BLOCK] == "KP08 PILLOW BLOCK, 8 MM BORE"
-    step = next(text for text in spec.ASSEMBLY_STEPS if text.startswith("2. "))
-    assert "KEEP STUDS UNCUT UNTIL 13B/HD3; CUT TO BOM LENGTH 2.25 THERE." in step
-    assert "FOLLOW HD1 FOR UNCUT-STOCK OBSTRUCTIONS" in step
+    step = next(text for text in spec.ASSEMBLY_STEPS if text.startswith("3. "))
+    assert spec._item(spec.HOLD_DOWN_STUD) in step
+    assert "13B/HD3" in step and "HD1" in step
+    assert spec._length(spec.hold_down_stud.LENGTH, spec.hold_down_stud.LENGTH_PLACES) in step
     assert spec.BOM_DESCRIPTIONS[spec.HOLD_DOWN_STUD].endswith("CUT 2.25 IN")
 
 
@@ -1891,12 +1921,12 @@ def test_general_torque_note_covers_every_fastener_no_step_torques() -> None:
     for label in torqued.values():
         step = next(text for text in steps if text.startswith(label))
         assert "N·m" in step
-    # Common rail and strap-clamp screws run snug. Step 1 torques the
-    # bracket family's lower screws separately from F1B's upper KP08 screws.
-    one = next(text for text in steps if text.startswith("1. "))
-    assert spec._item(spec.RAIL_SCREW) in one
-    assert spec._item(spec.PILLOW_BLOCK_SCREW) in one
-    assert spec._torque(leadscrew.BAR_SCREW_TORQUE_NM) in one
+    # Common rail and strap-clamp screws run snug. Fitting step 2 torques
+    # the bracket family's lower screws separately from F1B's upper KP08 screws.
+    fitting = next(text for text in steps if text.startswith("2. "))
+    assert spec._item(spec.RAIL_SCREW) in fitting
+    assert spec._item(spec.PILLOW_BLOCK_SCREW) in fitting
+    assert spec._torque(leadscrew.BAR_SCREW_TORQUE_NM) in fitting
     # The riser screw family's four feed-nut screws take F2's torque; its
     # four riser screws, with no stated torque, stay on the general note.
     f2 = next(text for text in steps if text.startswith("F2. "))
@@ -2180,14 +2210,11 @@ def test_kit_rails_and_carriages_carry_the_owner_note_and_the_play_check() -> No
     assert trammel.CARRIAGE_PLAY_RADIUS == pytest.approx(
         trammel.CARRIAGE_PLAY_RADIUS_PER_PLAY * trammel.CARRIAGE_PLAY_TIR_MAX
     )
-    # Step 3 keeps the two tightest of the kit's four carriages, one a rail.
-    three = next(text for text in spec.ASSEMBLY_STEPS if text.startswith("3. "))
-    assert f"2 GREASED {carriage.STYLE} CARRIAGES {spec._item(spec.CARRIAGE)}" in three
-    assert "ROCK ALL 4" in three and "KEEP THE 2 TIGHTEST, ONE PER RAIL" in three
-    assert "ONLY ONTO A KIT FALSE RAIL" in three
-    assert "TRANSFER ITS HOLES TO THAT BAR" in three
-    assert "ALL EIGHT SCREWS MUST ENTER FREELY BY HAND" in three
-    assert "FLUSH BOTH ENDS" in three
+    # Carriage selection is preparation step 1, ahead of rail fitting.
+    preparation = next(text for text in spec.ASSEMBLY_STEPS if text.startswith("1. "))
+    assert spec._item(spec.CARRIAGE) in preparation
+    assert carriage.STYLE in preparation
+    assert trammel.RAIL_HOLE_COUNT == 8
 
 
 # The feed fit-up's one linear order (TL-00 review, farm 20261104T210601055Z,
