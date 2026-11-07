@@ -205,7 +205,7 @@ ISO_SCALE_LADDER = (ASSEMBLED_SCALE, (1.0, 5.0))
 ISO_RING_LIMITS = (0.235, 0.069, 0.418, 0.267)
 ASSEMBLED_CAPTION_XY = (0.018, 0.120)
 
-# --- sheet 8: full qualified Numbers and two native BOM pieces ---------------
+# --- last sheet: full qualified Numbers and two native BOM pieces ------------
 # f353's 22 mm Number column wrapped the identities: the native audit measured
 # the unsplit table 437.2384 mm high, not the requested rows' nominal height.
 # Use the drive-train's proven column widths without changing table text size;
@@ -250,7 +250,7 @@ TRANSGEAR_VIEW_SCALE = (2.0, 3.0)
 TRANSGEAR_VIEW_CENTER = (0.346, 0.170)
 BALLOON_MARGIN = 0.012
 TRANSGEAR_CAPTION_XY = (0.222, 0.082)
-# Sheet 2 retains the established model fields when the BOM moves to sheet 8.
+# Sheet 2 retains the established model fields; the BOM has the last sheet.
 # Its balloon circles still clear the drawing border and caption fields.
 SHEET_TWO_RING_LIMITS = (0.185, 0.090, 0.415, 0.262)
 BALLOON_RING_REACH = BALLOON_MARGIN + 0.005
@@ -3108,7 +3108,7 @@ def _place_bom_sheet(
     ):
         raise RuntimeError(f"paper-drive BOM reference leaves its field: {outline!r}")
     _place_sheet_note(
-        adapter, SHEET_NAMES[7], BOM_SHEET_CAPTION, BOM_REFERENCE_CAPTION_XY,
+        adapter, SHEET_NAMES[-1], BOM_SHEET_CAPTION, BOM_REFERENCE_CAPTION_XY,
         label="BOM reference caption",
     )
     # Insert the complete model's BOM on its own sheet; view-only isolation
