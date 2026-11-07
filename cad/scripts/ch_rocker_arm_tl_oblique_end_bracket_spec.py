@@ -493,10 +493,10 @@ CALLOUTS_BELOW = {
     # the depth itself prints only through its native dimension.
     BAR_THREAD_DEPTH_DIMENSION: (
         "FULL THREAD FROM BOTTOM\nBOTH HOLES\n"
-        f"{leadscrew.BAR_SCREW_LENGTH} BAR SCREW TIP IN\n"
-        "FULL THREAD, TAP LEAD\n"
-        f"SHORT OF {leadscrew.KP08_SCREW_LENGTH} KP08 SCREW\n"
-        "TIP; TOP DEPTH SAME,\nSCREWS SWAPPED"
+        f"{leadscrew.BAR_SCREW_LENGTH} BAR SCREW;\n"
+        f"{leadscrew.KP08_SCREW_LENGTH} KP08 SCREW:\n"
+        "EACH TIP IN FULL THREAD;\n"
+        "EACH TAP LEAD SHORT OF\nTHE OPPOSED SCREW TIP"
     ),
 }
 # drawing-guidelines.md (units): an as-bought fraction is an untoleranced REF;
