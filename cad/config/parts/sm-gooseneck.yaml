@@ -20,6 +20,6 @@ sm-gooseneck:
       reason: "owner ruling 2026-10-27 (#1997, via coordinator Main, on codjiflo's shank-to-bend-tangent finding): the end piece is joined before the tube is bent, and the braze cools or the retaining compound fully cures first, so the solid shank, .046 short of the bend's exit tangent, supports the tube through the bend. The owner asked for this order and cool-down on the sheet, briefly, and nothing more."
     - id: "RV-03"
       kind: "accept"
-      where: "sheet 1, end view: the 1/4-28 tap ⌖ Ø.012 | A (A = the end piece's Ø.50 OD) and the counterbore ⌖ Ø.008 | B (B = the tap)"
+      where: "sheet 1, DETAIL C (the end face at 4:1): the 1/4-28 tap ⌖ Ø.012 | A (A = the end piece's Ø.50 OD) and the counterbore ⌖ Ø.008 | B (B = the tap)"
       finding: "location zones tighter than the title block's hole-position row, on a turned end piece located from its OD (rule 16/19)"
       reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144 (sm Q6): the two zones are the radial offsets MHA-SM-04's thread run-out clearance and the counterbore wall are budgeted with (sm_gooseneck_spring_joint.THREAD_AXIS_OFFSET_MAX .006 and COUNTERBORE_AXIS_OFFSET_MAX .004); at the row's Ø.014 zone the run-out's .0015 radial clearance (RUNOUT_RADIAL_CLEARANCE_MIN) goes negative and the stated C'BORE WALL .074 MIN (RV-01) no longer holds. Both are turned in one chucking on the end piece's OD before it is brazed, so the zones are lathe-routine; they print as standard position frames instead of the former prose radial limits"

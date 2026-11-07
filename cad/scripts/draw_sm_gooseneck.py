@@ -17,9 +17,11 @@ sheet carries, at 1:3:
   tube; the reference overall height and reach to real faces, from the
   part's hidden ``OverallReference``;
 * the END VIEW (``*Left``, third-angle left of the elevation): the end face,
-  carrying the native blind-tap callout with its depth datum, datum A on the
-  end piece's Ø.50 rim, and the tap's (datum B) and the counterbore's
-  position frames;
+  carrying the native blind-tap callout with its depth datum and DETAIL C's
+  boundary;
+* DETAIL C, the end face at 4:1: datum A on the end piece's Ø.50 rim, and
+  the tap's (datum B) and the counterbore's position frames, each on its own
+  rim;
 
 and at 3:1 SECTION A-A, a full section on the arm axis (cut faces only)
 cropped to the end piece, the tube's cut walls hatched across the end
@@ -50,7 +52,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 )
 
 from _check import check
-from _com import _early_bound
+from _com import _early_bound, _read_member
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -59,6 +61,7 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
+from _drawing_detail_projection import settle_detail_projection
 from _drawing_dimensions import assert_imported_precision
 from _drawing_edges import scan_view_edges
 from _drawing_gdt import add_datum_feature, add_feature_control_frame, add_frame_datum_feature
@@ -67,7 +70,6 @@ from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_prec
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
-from _drawing_scan import _zoomed_on
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
@@ -206,38 +208,59 @@ FRONT_KEEP = {
 # The end view (*Left) looks at the end face along +X: sheet x is model +Z.
 # The tap's native callout stands up and left of it, clear of the section's
 # upper dimensions and of the elevation's arm-straight text, its top inside
-# the border (at 0.266 it crossed it, farm run 20261027T224212504Z), its
-# three rows' bottom ~3 mm over the tap frame's top.
+# the border (at 0.266 it crossed it, farm run 20261027T224212504Z).
 TAP_CALLOUT_XY = (0.158, 0.254)
-# The end view's frames (delegated ruling sm Q6): datum A is the end face's
-# Ø.50 rim (the end piece's OD, flush with the tube's), tagged right of it
-# from a pick on its upper-right rim, its box clear of the elevation's arm
-# end (x 0.2365) and the end view's leg (x 0.205 +/- 0.0021, below the arm
-# axis).  Left of the arm's end circle, between section A-A (its crop's
-# right edge at x ~0.1554) and the end view: the tap's ⌖ Ø.012 | A
-# frame (~31 mm, one 7 mm row) under the tap callout, datum B's tag hung
-# under its middle, and the counterbore's ⌖ Ø.008 | B frame under that.
-# Each frame's leader leaves a 6.35 mm shoulder off its right end: the tap
-# frame's lands on the tap's upper-left rim, the counterbore frame's on the
-# counterbore's rim just under the arm axis, so the two never cross.
-END_GTOL_ROW = 0.007
-END_FRAME_WIDTH = 0.031
-END_DATUM_TAG_STEM = 0.003
-END_DATUM_TAG_BOX = 0.007
-TAP_FRAME_XY = (0.160, 0.2415)
-DATUM_B_XY = (
-    TAP_FRAME_XY[0] + END_FRAME_WIDTH / 2.0,
-    TAP_FRAME_XY[1] - END_GTOL_ROW - END_DATUM_TAG_STEM - END_DATUM_TAG_BOX,
+
+# DETAIL C: the end face at 4:1, its boundary and letter on the end view
+# (drawing-guidelines.md rule 9), carrying datum A and the two position
+# frames (delegated ruling sm Q6).  At 1:3 the end face's rims stand under a
+# millimetre apart, and both frames' leaders read as landing on the Ø.50 rim
+# beside datum A (round 6, farm run 20261107T205834939Z, 3/3 runs); section
+# A-A's cut walls are not model edges a frame can select (round 7, farm run
+# 20261107T230548003Z).  At 4:1 the tap drill's, the thread's and the
+# counterbore's rims stand 10.8, 12.7 and 14.1 mm from the axis, the Ø.50
+# rim 25.4 mm, each a real model circle.  The fence takes the whole end face
+# plus 1.65 mm, so on the end view its boundary stands 0.55 mm outside the
+# Ø.50 rim.  The detail fills the sheet's open left field, left of section
+# A-A's caption (x ~0.082 to 0.128, top y ~0.117) and under its counterbore
+# Ø block (bottom y ~0.184), its label under it, over the notes (top y
+# 0.062); the letter stands right of the end face, where nothing else is,
+# on a leader (the summing lever's detail D style).
+DETAIL_LETTER = "C"
+DETAIL_SCALE = (4.0, 1.0)
+_DETAIL_S = DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
+DETAIL_FENCE_R_MM = _TUBE_R + 1.65
+DETAIL_CENTER = (0.0465, 0.141)
+DETAIL_LABEL_XY = (
+    DETAIL_CENTER[0],
+    DETAIL_CENTER[1] - DETAIL_FENCE_R_MM * _DETAIL_S - 0.004,
 )
-COUNTERBORE_FRAME_XY = (0.160, 0.2195)
-TAP_FRAME_RIM_DEG = 135.0
-COUNTERBORE_FRAME_RIM_DEG = 200.0
-DATUM_A_RIM_DEG = 45.0
-DATUM_A_OFFSET = (0.008, -0.009)
-# The datum pick's zoom window half-span (_drawing_scan._HIT_ZOOM_HALF; the
-# FR-02 hanger datums' HANGER_DATUM_PICK_ZOOM_HALF): the aperture shrinks to
-# hundredths of a millimetre.
-DATUM_A_PICK_ZOOM_HALF = 0.0025
+DETAIL_LETTER_OFFSET = (0.011, -0.006)
+# Datum A is the end face's Ø.50 rim (the end piece's OD, flush with the
+# tube's), tagged up-left of the detail, clear of the leg's two silhouette
+# lines (they drop from the rim's 0 and 180 degree points).  Right of the
+# detail, under section A-A's Ø.50 block (bottom y ~0.153) and over its
+# caption: the tap's ⌖ Ø.012 | A frame (~31 mm, one 7 mm row), datum B's tag
+# hung under its middle, and the counterbore's ⌖ Ø.008 | B frame under that.
+# Each frame's leader runs left from the frame: the tap frame's to the tap
+# drill's rim up-right of the axis, the counterbore frame's to the
+# counterbore's rim just under it, so the two never cross and each ends on
+# its own circle.
+GTOL_ROW = 0.007
+FRAME_WIDTH = 0.031
+DATUM_TAG_STEM = 0.003
+DATUM_TAG_BOX = 0.007
+DETAIL_FRAME_X = 0.084
+TAP_FRAME_XY = (DETAIL_FRAME_X, 0.1505)
+DATUM_B_XY = (
+    TAP_FRAME_XY[0] + FRAME_WIDTH / 2.0,
+    TAP_FRAME_XY[1] - GTOL_ROW - DATUM_TAG_STEM - DATUM_TAG_BOX,
+)
+COUNTERBORE_FRAME_XY = (DETAIL_FRAME_X, 0.1285)
+TAP_FRAME_RIM_DEG = 35.0
+COUNTERBORE_FRAME_RIM_DEG = -10.0
+DATUM_A_RIM_DEG = 135.0
+DATUM_A_OFFSET = (-0.0085, 0.011)
 
 # Section A-A: a full section on the horizontal plane through the arm axis,
 # cut faces only, cropped to the end piece and the tube over its shank.  A
@@ -784,14 +807,123 @@ def _set_tap_callout_below(display: Any, text: str) -> None:
 def _rim_point(
     centre: tuple[float, float], radius_mm: float, degrees: float
 ) -> tuple[float, float]:
-    """The sheet point ``degrees`` round an end-view rim from the view's +x."""
+    """The sheet point ``degrees`` round a detail C rim from the view's +x."""
     angle = math.radians(degrees)
-    radius = radius_mm * _S
+    radius = radius_mm * _DETAIL_S
     return (centre[0] + radius * math.cos(angle), centre[1] + radius * math.sin(angle))
 
 
-def _add_axis_frames(adapter: Any, end: Any, tap_edge: Any) -> None:
-    """The tap's and the counterbore's axis limits as position frames.
+_END_FACE_CENTRE_MM = (ARM_END_X, ARM_Y, 0.0)
+_END_FACE_CENTRE_M = tuple(value / 1000.0 for value in _END_FACE_CENTRE_MM)
+
+
+def _end_face_detail(adapter: Any, end: Any) -> Any:
+    """DETAIL C of the end view: a fence round the end face's centre, the
+    view placed by its outline on DETAIL_CENTER, its label and the end view's
+    letter positioned and read back (draw_sm_summing_lever's detail D)."""
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    parent = _early_bound(end, "IView")
+    if not drawing.ActivateView(view_name(adapter, end)):
+        raise RuntimeError("failed to activate the end view for detail C")
+    draw.ClearSelection2(True)
+    centre = model_point_in_view(
+        adapter, end, _END_FACE_CENTRE_M, label="detail C fence centre"
+    )
+    # The fence is drawn in sheet space on the end view.
+    sketch = _early_bound(parent.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in (centre, (centre[0] + DETAIL_FENCE_R_MM * _S, centre[1])):
+        point = _early_bound(
+            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    # Direct to the database, so the fence cannot snap onto the end face's
+    # rims (the summing lever's detail fence snapped onto its hexagon's flats).
+    previous_add_to_db = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        fence = manager.CreateCircle(*points[0], *points[1])
+    finally:
+        manager.AddToDB = previous_add_to_db
+    if fence is None:
+        raise RuntimeError("failed to create the detail C fence")
+    arc = _early_bound(fence, "ISketchArc")
+    fence_centre = _early_bound(arc.GetCenterPoint2(), "ISketchPoint")
+    placed_centre = (float(fence_centre.X), float(fence_centre.Y))
+    if (
+        math.dist(placed_centre, points[0][:2]) > 1e-9
+        or abs(float(arc.GetRadius()) - math.dist(points[0][:2], points[1][:2])) > 1e-9
+    ):
+        raise RuntimeError(f"detail C fence moved off its authored circle: {placed_centre}")
+    draw.ClearSelection2(True)
+    selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    selection_data = selection.CreateSelectData()
+    selection_data.View = end
+    if not _early_bound(fence, "ISketchSegment").Select4(False, selection_data):
+        raise RuntimeError("failed to select the detail C fence")
+    if int(selection.GetSelectedObjectCount2(-1)) != 1:
+        raise RuntimeError("detail C fence is not the only selection")
+    detail = drawing.CreateDetailViewAt4(
+        *DETAIL_CENTER,
+        0.0,
+        2,  # swDetViewLEADER: a leader joins the letter to the fence
+        *DETAIL_SCALE,
+        DETAIL_LETTER,
+        1,  # swDetCircleCIRCLE
+        True,
+        False,
+        False,
+        5,
+    )
+    if detail is None:
+        raise RuntimeError("failed to create detail C")
+    detail = _early_bound(detail, "IView")
+    detail.ScaleRatio = double_array([float(value) for value in DETAIL_SCALE])
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    outline = tuple(float(value) for value in detail.GetOutline())
+    position = tuple(float(value) for value in detail.Position)
+    if len(outline) != 4 or len(position) != 2:
+        raise RuntimeError(f"detail C has invalid bounds: {outline!r}")
+    target = [
+        position[axis] + DETAIL_CENTER[axis] - (outline[axis] + outline[axis + 2]) / 2.0
+        for axis in range(2)
+    ]
+    if not detail.SetViewPosition(double_array(target), False):
+        raise RuntimeError("failed to position detail C")
+    draw.EditRebuild3()
+    notes = tuple(_read_member(detail, "GetNotes") or ())
+    if len(notes) != 1:
+        raise RuntimeError(f"expected one native detail C label, found {len(notes)}")
+    note = _early_bound(notes[0], "INote")
+    annotation = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
+    label_xyz = (*DETAIL_LABEL_XY, 0.0)
+    if not annotation.SetPosition2(*label_xyz):
+        raise RuntimeError("failed to position the detail C label")
+    circles = tuple(_read_member(parent, "GetDetailCircles") or ())
+    if len(circles) != 1:
+        raise RuntimeError(f"expected one detail C circle, found {len(circles)}")
+    circle = _early_bound(circles[0], "IDetailCircle")
+    letter_xy = tuple(centre[i] + DETAIL_LETTER_OFFSET[i] for i in range(2))
+    circle.SetLabelPosition(*letter_xy)  # VT_VOID: the read-back is the proof
+    draw.EditRebuild3()
+    actual = tuple(float(value) for value in _read_member(annotation, "GetPosition"))
+    if math.dist(actual, label_xyz) > 1e-8:
+        raise RuntimeError(f"detail C label position did not persist: {actual}")
+    placed = tuple(float(value) for value in circle.GetLabelPosition())
+    if len(placed) != 2 or math.dist(placed, letter_xy) > 1e-8:
+        raise RuntimeError(f"detail C letter position did not persist: {placed}")
+    set_hidden_lines_removed(adapter, detail)
+    return detail
+
+
+def _add_axis_frames(adapter: Any, detail: Any) -> None:
+    """Datum A and the tap's and the counterbore's axis limits, in DETAIL C.
 
     Delegated ruling sm Q6 (2026-11-07 (Main), no precedent; owner review
     #2144; pending owner confirmation): datum A is the end face's Ø.50 rim
@@ -799,41 +931,46 @@ def _add_axis_frames(adapter: Any, end: Any, tap_edge: Any) -> None:
     counterbore is ⌖ Ø.008 to B -- the radial offsets
     sm_gooseneck_spring_joint charges (THREAD_AXIS_OFFSET_MAX,
     COUNTERBORE_AXIS_OFFSET_MAX), as zones.  The rims are concentric on the
-    end face; the scan pins each by its own radius, the datum's hit-test must
-    resolve to the OD rim, and each frame selects its circle directly.  At
-    1:3 the OD rim stands ~1 mm from the counterbore's, inside a fit-zoom
-    pick aperture (round 3, farm run 20261107T121714736Z: the pick landed on
-    a neighbour), so the pick is made zoomed in (draw_fr_top_frame's hanger
-    datum precedent)."""
-    centre = model_point_in_view(
-        adapter, end, (ARM_END_X / 1000.0, ARM_Y / 1000.0, 0.0), label="end face centre"
+    end face; the detail's scan pins the OD's and the counterbore's by their
+    own radii on the end face, the tap drill's is the detail's visible Ø.213
+    circle, and the tag and each frame select their circle directly, landing
+    on it at their own angle (the summing lever's detail D datum).  The
+    detail's centre is read behind the projection barrier
+    (_drawing_detail_projection): its outline is the fence's, centred on the
+    end face's centre."""
+    centre = settle_detail_projection(
+        adapter,
+        detail,
+        _END_FACE_CENTRE_M,
+        ink_xy=DETAIL_CENTER,
+        tolerance_xy=(0.0003, 0.0003),
+        label="detail C end face centre",
     )
-    edges = scan_view_edges(end, label="gooseneck end view")
+    edges = scan_view_edges(detail, label="gooseneck end face detail C")
     axis = (1.0, 0.0, 0.0)
-    end_face_centre = (ARM_END_X, ARM_Y, 0.0)
     od_rim = edges.circle_at(
-        end_face_centre, _TUBE_R, axis=axis, label="end piece OD rim"
+        _END_FACE_CENTRE_MM, _TUBE_R, axis=axis, label="end piece OD rim"
     )
     counterbore_rim = edges.circle_at(
-        end_face_centre, COUNTERBORE_DIA / 2.0, axis=axis, label="counterbore rim"
+        _END_FACE_CENTRE_MM, COUNTERBORE_DIA / 2.0, axis=axis, label="counterbore rim"
     )
+    tap_edge = visible_circle_edge(adapter, detail, TAP_DRILL_DIA)
     datum_pick = _rim_point(centre, _TUBE_R, DATUM_A_RIM_DEG)
-    with _zoomed_on(adapter, datum_pick, DATUM_A_PICK_ZOOM_HALF):
-        add_datum_feature(
-            adapter,
-            end,
-            edge_xy=datum_pick,
-            expected_entity=od_rim.edge,
-            symbol_xy=(
-                datum_pick[0] + DATUM_A_OFFSET[0],
-                datum_pick[1] + DATUM_A_OFFSET[1],
-            ),
-            datum="A",
-            label="end piece OD datum A",
-        )
+    add_datum_feature(
+        adapter,
+        detail,
+        edge_entity=od_rim.edge,
+        leader_attach_xy=datum_pick,
+        symbol_xy=(
+            datum_pick[0] + DATUM_A_OFFSET[0],
+            datum_pick[1] + DATUM_A_OFFSET[1],
+        ),
+        datum="A",
+        label="end piece OD datum A",
+    )
     tap_frame = add_feature_control_frame(
         adapter,
-        end,
+        detail,
         edge_entity=tap_edge,
         leader_attach_xy=_rim_point(centre, TAP_DRILL_DIA / 2.0, TAP_FRAME_RIM_DEG),
         frame_xy=TAP_FRAME_XY,
@@ -844,11 +981,11 @@ def _add_axis_frames(adapter: Any, end: Any, tap_edge: Any) -> None:
         label="tap position",
     )
     add_frame_datum_feature(
-        adapter, end, tap_frame, datum="B", symbol_xy=DATUM_B_XY, label="tap datum B"
+        adapter, detail, tap_frame, datum="B", symbol_xy=DATUM_B_XY, label="tap datum B"
     )
     add_feature_control_frame(
         adapter,
-        end,
+        detail,
         edge_entity=counterbore_rim.edge,
         leader_attach_xy=_rim_point(
             centre, COUNTERBORE_DIA / 2.0, COUNTERBORE_FRAME_RIM_DEG
@@ -938,7 +1075,8 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # The end piece's blind tap, natively called out on the end face: the
     # title block's THREADS row owns the 2B class (drawing-guidelines.md
-    # rule 2), its depths print at two places, its axis limits on frames.
+    # rule 2), its depths print at two places, its axis limits on DETAIL C's
+    # frames.
     tap_edge = visible_circle_edge(adapter, end, TAP_DRILL_DIA)
     tap_callout = add_native_hole_callout(
         adapter,
@@ -953,7 +1091,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _set_tap_callout_below(tap_callout, TAP_CALLOUT_BELOW)
     rebuild_drawing(adapter, label="gooseneck tap callout")
-    _add_axis_frames(adapter, end, tap_edge)
+    _add_axis_frames(adapter, _end_face_detail(adapter, end))
 
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)

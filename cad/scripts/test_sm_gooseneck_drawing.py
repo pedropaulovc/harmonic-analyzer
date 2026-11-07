@@ -393,36 +393,73 @@ def test_tap_callout_states_geometry_and_its_mate_within_four_rows() -> None:
     assert "THREADLOCKER" not in printed  # spring-eye clamping belongs to the assembly
 
 
-def test_end_view_frames_stand_between_the_callout_and_the_views() -> None:
-    # The callout's three rows (r1, farm run 20261107T102825912Z: four rows
-    # inked ~23 mm, centred on the keep, ~5.75 mm a row) end over
-    # the tap frame; datum B's tag hangs between the two frames; each frame's
-    # right end plus its 6.35 mm shoulder stays left of the end view's
-    # Ø.50 rim, and the frames start right of section A-A's crop (x ~155.4
-    # mm) and its top dimension text (r8: to x ~153 mm).
-    centre = (drawing.END_CENTER[0], drawing.ARM_AXIS_Y)
-    od_r = geom.TUBE_DIA / 2.0 * drawing._S
-    callout_bottom = drawing.TAP_CALLOUT_XY[1] - 3 * 0.00575 / 2.0
-    row = drawing.END_GTOL_ROW
-    tap_top = drawing.TAP_FRAME_XY[1]
-    assert tap_top + 0.0025 <= callout_bottom
+def _crosses(a, b, c, d) -> bool:
+    def side(p, q, r) -> float:
+        return (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])
+
+    return side(a, b, c) * side(a, b, d) < 0.0 and side(c, d, a) * side(c, d, b) < 0.0
+
+
+def test_detail_c_frames_land_each_on_its_own_rim_in_the_open_field() -> None:
+    # At 1:3 both frame leaders read as landing on the Ø.50 rim beside datum
+    # A (round 6, 3/3 runs); at DETAIL C's 4:1 the tap drill's and the
+    # counterbore's rims stand over 3 mm apart, and the end view's boundary
+    # stands clear outside its Ø.50 rim.
+    assert (drawing.COUNTERBORE_DIA - drawing.TAP_DRILL_DIA) / 2.0 * drawing._DETAIL_S >= 0.003
+    assert (drawing.DETAIL_FENCE_R_MM - geom.TUBE_DIA / 2.0) * drawing._S >= 0.0005
+    centre = drawing.DETAIL_CENTER
+    radius = drawing.DETAIL_FENCE_R_MM * drawing._DETAIL_S
+    # The detail stands in the open left field: inside the border, left of
+    # section A-A's caption and the frames, under the counterbore Ø block
+    # (three rows ~5.75 mm each centred on its keep), its label over the notes.
+    caption_left = drawing.SECTION_CAPTION_XY[0] - 0.023
+    assert centre[0] - radius > 0.0125
+    assert centre[0] + radius + 0.003 < min(caption_left, drawing.DETAIL_FRAME_X)
+    counterbore_block_bottom = drawing.SECTION_KEEP["CounterboreDia"][1] - 3 * 0.00575 / 2.0
+    assert centre[1] + radius + 0.008 < counterbore_block_bottom
+    assert drawing.DETAIL_LABEL_XY[1] < centre[1] - radius
+    assert drawing.DETAIL_LABEL_XY[1] - 0.012 > drawing.NOTES_XY[1] + 0.005
+    # The frames stand under section A-A's Ø.50 block and over its caption,
+    # datum B's tag hung between them.
+    row = drawing.GTOL_ROW
+    plug_block_bottom = drawing.SECTION_KEEP["PlugDia"][1] - 3 * 0.00575 / 2.0
+    assert drawing.TAP_FRAME_XY[1] + 0.002 < plug_block_bottom
     tag_bottom = drawing.DATUM_B_XY[1]
     assert tag_bottom - 0.0015 >= drawing.COUNTERBORE_FRAME_XY[1]
-    assert tag_bottom + drawing.END_DATUM_TAG_BOX < tap_top - row
-    for frame in (drawing.TAP_FRAME_XY, drawing.COUNTERBORE_FRAME_XY):
-        assert frame[0] >= drawing._section_x(drawing.SECTION_CROP_X_MM[1]) + 0.004
-        assert frame[0] + drawing.END_FRAME_WIDTH + 0.00635 < centre[0] - od_r - 0.003
-    # The two leaders land on opposite sides of the arm axis, so they never
-    # cross; the counterbore's under it, the tap's over it.
-    assert math.sin(math.radians(drawing.TAP_FRAME_RIM_DEG)) > 0.0
-    assert math.sin(math.radians(drawing.COUNTERBORE_FRAME_RIM_DEG)) < 0.0
-    # Datum A's box (~7 mm) right of its upper-right rim pick and left of
-    # the elevation's end face, above the end view's leg.
-    angle = math.radians(drawing.DATUM_A_RIM_DEG)
-    pick = (centre[0] + od_r * math.cos(angle), centre[1] + od_r * math.sin(angle))
-    symbol_x = pick[0] + drawing.DATUM_A_OFFSET[0]
-    assert symbol_x - 0.0035 > centre[0] + od_r + 0.002
-    assert symbol_x + 0.0035 + 0.003 < drawing.END_FACE_X
+    assert drawing.COUNTERBORE_FRAME_XY[1] - row >= drawing.SECTION_CAPTION_XY[1] + 0.002
+    # Each leader runs left from its frame to its own rim, and the two never
+    # cross; both land on the upper face, clear of the leg's silhouettes.
+    tap_landing = drawing._rim_point(
+        centre, drawing.TAP_DRILL_DIA / 2.0, drawing.TAP_FRAME_RIM_DEG
+    )
+    counterbore_landing = drawing._rim_point(
+        centre, drawing.COUNTERBORE_DIA / 2.0, drawing.COUNTERBORE_FRAME_RIM_DEG
+    )
+    tap_start = (drawing.TAP_FRAME_XY[0], drawing.TAP_FRAME_XY[1] - row / 2.0)
+    counterbore_start = (
+        drawing.COUNTERBORE_FRAME_XY[0],
+        drawing.COUNTERBORE_FRAME_XY[1] - row / 2.0,
+    )
+    assert not _crosses(tap_start, tap_landing, counterbore_start, counterbore_landing)
+    assert tap_landing[1] > counterbore_landing[1]
+    # Datum A's box (~7 mm) stands outside the detail's boundary, up-left,
+    # inside the border.
+    datum_pick = drawing._rim_point(
+        centre, geom.TUBE_DIA / 2.0, drawing.DATUM_A_RIM_DEG
+    )
+    symbol = (
+        datum_pick[0] + drawing.DATUM_A_OFFSET[0],
+        datum_pick[1] + drawing.DATUM_A_OFFSET[1],
+    )
+    assert symbol[0] - 0.0035 > 0.0125
+    assert math.dist(symbol, centre) > radius
+    assert symbol[1] + drawing.DATUM_TAG_BOX + 0.005 < counterbore_block_bottom
+    # The end view's letter stands right of its boundary, left of the
+    # elevation's end face.
+    end_centre = (drawing.END_CENTER[0], drawing.ARM_AXIS_Y)
+    letter_x = end_centre[0] + drawing.DETAIL_LETTER_OFFSET[0]
+    assert letter_x > end_centre[0] + drawing.DETAIL_FENCE_R_MM * drawing._S + 0.004
+    assert letter_x + 0.006 < drawing.END_FACE_X
 
 
 def test_sheet_places_every_marked_dimension_at_its_places() -> None:
