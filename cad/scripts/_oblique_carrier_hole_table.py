@@ -487,6 +487,12 @@ def _hole_table_format(adapter: Any) -> None:
                 f"carrier hole-table {preference}@{option} did not take: "
                 f"expected={value!r} ({wanted!r}) actual={actual!r}"
             )
+    # Recorded, not set: an auto-updating table could re-add an unselected
+    # hole on a model change (DP_Tables-Hole.md); _rows/_tags refuse a HUB row.
+    automatic = extension.GetUserPreferenceToggle(
+        constant("swHoleTableAutomaticUpdate"), constant("swDetailingNoOptionSpecified")
+    )
+    _telemetry.info(f"carrier hole-table automatic update={automatic!r}")
 
 
 def _size_column_hidden(table: Any, stage: str) -> None:
@@ -617,8 +623,14 @@ def create_carrier_hole_table(
             raise RuntimeError("carrier flagged note differs from its model-owned limits")
         rows_total, columns = _inventory(table)
         height = sum(float(table.GetRowHeight(row)) for row in range(rows_total))
-        width = sum(float(table.GetColumnWidth(col)) for col in range(columns) if col != SIZE_COLUMN)
-        if TABLE_ANCHOR[1] - height < .015 or TABLE_ANCHOR[0] + width > .216:
+        # GetColumnWidth indexes VISIBLE positions, not the hidden-inclusive
+        # domain (native BOM evidence, _drawing_tables._bom_physical_columns):
+        # with SIZE hidden, positions 0..3 are TAG/X/Y/NOTE.
+        visible = tuple(width for column, width in enumerate(TABLE_WIDTHS) if column != SIZE_COLUMN)
+        widths = tuple(float(table.GetColumnWidth(position)) for position in range(columns - 1))
+        if any(abs(actual - expected) > 1e-6 for actual, expected in zip(widths, visible, strict=True)):
+            raise RuntimeError(f"carrier visible column widths {widths!r}, expected {visible!r}")
+        if TABLE_ANCHOR[1] - height < .015 or TABLE_ANCHOR[0] + sum(widths) > .216:
             raise RuntimeError("carrier table crosses the border or title-block lane")
         _owned_table(adapter, view, feature, table)
 

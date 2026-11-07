@@ -1031,6 +1031,8 @@ def _settled_harness(monkeypatch, *, fail_check=False):
         GetHoleLocationPrecision=lambda: spec.TABLE_LOCATION_PLACES,
     )
     notes = {}
+    # GetColumnWidth indexes visible positions: hidden SIZE is absent.
+    visible_widths = [width for column, width in enumerate(table.TABLE_WIDTHS) if column != table.SIZE_COLUMN]
     native = SimpleNamespace(
         HoleTable=feature, TotalRowCount=len(TABLED) + 1, TotalColumnCount=5,
         InsertColumn2=lambda *_: True, SetColumnTitle2=lambda *_: True,
@@ -1039,7 +1041,7 @@ def _settled_harness(monkeypatch, *, fail_check=False):
         Text2=lambda row, *_: notes[row], DisplayedText2=lambda row, *_: notes[row],
         SetColumnWidth=lambda _col, width, _style: width,
         SetColumnHidden=lambda col, state: hidden.append((col, state)),
-        GetRowHeight=lambda _row: .005, GetColumnWidth=lambda col: table.TABLE_WIDTHS[col],
+        GetRowHeight=lambda _row: .005, GetColumnWidth=lambda col: visible_widths[col],
     )
     rows = {tag: (row, (tag, ".000", ".000", "<MOD-DIAM>.38")) for row, tag in enumerate(TABLED, 1)}
     sheet_doc = SimpleNamespace(
@@ -1065,7 +1067,7 @@ def _settled_harness(monkeypatch, *, fail_check=False):
         "_size_column_hidden": lambda *_: None,
     }.items():
         monkeypatch.setattr(table, name, value)
-    state.update(edges=edges, inserted=inserted, hidden=hidden, notes=notes_added)
+    state.update(edges=edges, inserted=inserted, hidden=hidden, notes=notes_added, widths=visible_widths)
     return state, seen, lambda: table.create_carrier_hole_table(adapter, None, None, Path("carrier.SLDPRT"))
 
 
@@ -1084,6 +1086,18 @@ def test_table_selects_only_the_twelve_tabled_holes_and_hides_size(monkeypatch):
         '_size_column_hidden(table, "after its rebuild")'
     )
     assert '_size_column_hidden(table, "at settled readback")' in source
+
+
+def test_settled_widths_are_read_in_visible_positions(monkeypatch):
+    # Native BOM evidence: GetColumnWidth indexes visible positions. With
+    # SIZE hidden, physical-domain reads (0,1,2,4) would run past the end or
+    # read NOTE's width as SIZE's; the settled check reads 0..3 and refuses
+    # widths that are not TAG/X/Y/NOTE's.
+    state, _seen, create = _settled_harness(monkeypatch)
+    settled = create()
+    state["widths"][3] = table.TABLE_WIDTHS[table.SIZE_COLUMN]  # SIZE still showing
+    with pytest.raises(RuntimeError, match="visible column widths"):
+        settled()
 
 
 @pytest.mark.parametrize("fault", [None, "not_hidden", "wrong_column", "not_bool", "row_hidden", "header"])

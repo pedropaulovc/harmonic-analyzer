@@ -794,18 +794,19 @@ def test_hub_clamp_tap_has_its_own_sheet_callout_and_reference_position() -> Non
     )
 
 
-@pytest.mark.parametrize("fault", [None, "prefix", "suffix", "arc_end", "wrong_value"])
+@pytest.mark.parametrize("fault", [None, "prefix", "suffix", "show_parenthesis", "arc_end", "wrong_value"])
 def test_hub_reference_position_is_parenthesized_between_actual_edges(monkeypatch, fault):
     """Fake-driven (not native): the two dimensions run between the A1 and
     HUB edges, on both axes, measure HUB - A1, and their settled readback
-    refuses a lost parenthesis, centred end or value."""
+    refuses a lost or doubled parenthesis, centred end or value."""
     a1, hub, created, displays, measured = object(), object(), [], [], []
     settled = {"wrong": False}
 
     class Display:
         def __init__(self):
-            self.text, self.places = {}, 2  # the document's own places
-            self.model = SimpleNamespace(GetArcEndCondition=lambda _i: 1)
+            # Document "parentheses by default": ShowParenthesis starts True.
+            self.text, self.places, self.ShowParenthesis = {}, 2, True
+            self.model = SimpleNamespace(GetArcEndCondition=lambda _i: 1, DrivenState=1)
 
         def GetAnnotation(self):
             return self
@@ -824,6 +825,12 @@ def test_hub_reference_position_is_parenthesized_between_actual_edges(monkeypatc
 
         def GetPrimaryPrecision2(self):
             return self.places
+
+        def GetUseDocPrecision(self):
+            return True
+
+        def IsReferenceDim(self):
+            return True
 
     def add(_adapter, _view, **kwargs):
         created.append(kwargs)
@@ -847,6 +854,7 @@ def test_hub_reference_position_is_parenthesized_between_actual_edges(monkeypatc
     assert [item["orientation"] for item in created] == ["horizontal", "vertical"]
     assert all(item["entities"] == (a1, hub) for item in created)
     assert all(display.text == {1: "(", 2: ")"} for display in displays)
+    assert all(display.ShowParenthesis is False for display in displays)
     a1x, a1y = spec.PIN_HOLES["A1"]
     assert [expected for _label, expected, _entities in measured] == pytest.approx(
         [abs(spec.HUB[0] - a1x), abs(spec.HUB[1] - a1y)]
@@ -856,6 +864,8 @@ def test_hub_reference_position_is_parenthesized_between_actual_edges(monkeypatc
         displays[0].text[1] = ""
     elif fault == "suffix":
         displays[1].text[2] = ""
+    elif fault == "show_parenthesis":
+        displays[0].ShowParenthesis = True
     elif fault == "arc_end":
         displays[0].model = SimpleNamespace(GetArcEndCondition=lambda _i: 0)
     elif fault == "wrong_value":
@@ -865,7 +875,6 @@ def test_hub_reference_position_is_parenthesized_between_actual_edges(monkeypatc
         return
     with pytest.raises(RuntimeError):
         check()
-
 
 
 @pytest.fixture

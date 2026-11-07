@@ -1081,8 +1081,19 @@ def _hub_reference_position(adapter: Any, top: Any) -> Callable[[], None]:
         )
         set_arc_endpoints_to_center(adapter, dimension, label=label)
         display = _early_bound(dimension, "IDisplayDimension")
+        # ShowParenthesis can add a second pair (document "parentheses by
+        # default") or read True and render bare: clear it, then use the
+        # proven prefix/suffix form (_supplier_dimensions).
+        display.ShowParenthesis = False
+        if display.ShowParenthesis is not False:
+            raise RuntimeError(f"{label}: native ShowParenthesis did not clear")
         set_reference_dimension(adapter, display.GetAnnotation(), label=label)
-        _telemetry.info(f"{label}: {display.GetPrimaryPrecision2()} document places")
+        _telemetry.info(
+            f"{label}: places={display.GetPrimaryPrecision2()} "
+            f"use_doc_precision={display.GetUseDocPrecision()} "
+            f"is_reference={display.IsReferenceDim()} "
+            f"driven_state={_early_bound(display.GetDimension2(0), 'IDimension').DrivenState}"
+        )
         references.append((display, expected, label))
 
     def check() -> None:
@@ -1095,8 +1106,11 @@ def _hub_reference_position(adapter: Any, top: Any) -> Callable[[], None]:
                 adapter, display, expected_mm=expected, label=label, entities=current,
             )
             marks = (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
-            if marks != ("(", ")"):
-                raise RuntimeError(f"{label} is not a REFERENCE: prefix/suffix={marks!r}")
+            if marks != ("(", ")") or display.ShowParenthesis is not False:
+                raise RuntimeError(
+                    f"{label} is not one parenthesized REFERENCE: prefix/suffix={marks!r} "
+                    f"ShowParenthesis={display.ShowParenthesis!r}"
+                )
 
     check()
     return check
