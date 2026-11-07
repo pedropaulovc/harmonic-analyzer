@@ -44,20 +44,17 @@ from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
-from ch_rocker_arm_spec import inch_text
 from ch_rocker_arm_tl_oblique_hub_washer_spec import (
-    BORE_DRILL,
+    DIMENSION_CALLOUTS as SPEC_CALLOUTS,
+)
+from ch_rocker_arm_tl_oblique_hub_washer_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
-    FLANGE_EDGE_BREAK_MAX,
     FLANGE_WALL_CALLOUT,
     JIG_NUMBER,
     OD,
     SPIGOT_LENGTH,
-    SPIGOT_ROOT_RADIUS_MAX,
     STEM,
-    STRAP_HOLE_LIMITS,
-    STRAP_NUMBER,
     THICK,
 )
 
@@ -87,21 +84,18 @@ PNG = OUTPUTS.png
 # 20's plain fact).  The spigot's band names its mate, the strap hole's
 # limits REF (the strap's sheet controls them).  The spigot length carries
 # its two local edge limits, which override the title block's break and
-# inside corner.
+# inside corner.  The edge limits are the spec's own printed rows, less the
+# narration that followed them, so the sheet authors no limit of its own
+# (test_drawing_specification_purity); the spec's whole callouts are no
+# longer printed.
+_BREAK_ROW = SPEC_CALLOUTS["WasherThickness"].splitlines()[0].removesuffix(":")
+_END_ROW, _ROOT_ROW, _ = SPEC_CALLOUTS["SpigotLength"].splitlines()
 DIMENSION_CALLOUTS: dict[str, str] = {
-    "WasherBore": f"{BORE_DRILL} DRILL THRU",
+    "WasherBore": SPEC_CALLOUTS["WasherBore"],
     "WasherOd": f"CLEARS 3/8 CUTTER\nON {JIG_NUMBER}",
-    "WasherThickness": (
-        f"BREAK EDGES {inch_text(FLANGE_EDGE_BREAK_MAX, 3)} MAX\n{FLANGE_WALL_CALLOUT}"
-    ),
-    "SpigotDia": (
-        f"LOCATES IN STRAP {STRAP_NUMBER}\n"
-        f"HUB HOLE ({inch_text(STRAP_HOLE_LIMITS[0], 4)}-"
-        f"{inch_text(STRAP_HOLE_LIMITS[1], 4)} REF)"
-    ),
-    "SpigotLength": (
-        f"END EDGE SHARP, NO BURR\nROOT R{inch_text(SPIGOT_ROOT_RADIUS_MAX, 3)} MAX"
-    ),
+    "WasherThickness": f"{_BREAK_ROW}\n{FLANGE_WALL_CALLOUT}",
+    "SpigotDia": SPEC_CALLOUTS["SpigotDia"],
+    "SpigotLength": f"{_END_ROW.removesuffix(';')}\n{_ROOT_ROW.partition(':')[0]}",
 }
 
 # A Ø.433 x .074 top hat at 4:1 (44 mm across, 7.5 mm long): the face view,
