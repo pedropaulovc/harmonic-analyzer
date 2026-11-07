@@ -138,13 +138,19 @@ _XX = printed_band_mm(2, unit=UNIT)
 _XXX = printed_band_mm(3, unit=UNIT)
 # The title block's DRILLED HOLES row: a drilled hole cuts up to this oversize.
 DRILL_OVERSIZE = drilled_oversize_mm(unit=UNIT)
-# ASME B18.2.8 Table 2: #10 loose, .238 in = 6.0452 mm, rounded to the
-# repository's three-place clearance-table precision.
-HANGER_CLEARANCE_DIA = CLEARANCE_MM[("#10", "loose")]  # 6.045
+# Owner ruling 2026-11-06: the #10 hanger holes are a letter C drill, .242
+# in = 6.1468 mm, the next drill over the ASME B18.2.8 Table 2 #10 loose
+# .238: the larger hole's float takes the reams' A|D stack with margin
+# (``build_sm_summing_assembly.HANGER_SCREW_FLOAT_SPARE``).  The drawing
+# prints the letter (HANGER_HOLE_DRILL) as "C DRILL".
+HANGER_HOLE_DRILL = "C"
+HANGER_CLEARANCE_DIA = 0.242 * IN  # 6.1468
+if HANGER_CLEARANCE_DIA <= CLEARANCE_MM[("#10", "loose")]:
+    raise AssertionError("the C drill hanger hole must clear past the #10 loose row")
 HANGER_CLEARANCE_DIA_PLACES = 3
 # The title block's DRILLED HOLES row is the acceptance (+.004/0): it never
-# undersizes the ANSI loose minimum, so the callout restates no band
-# (machinist review: rule 2).
+# undersizes the drill, so the callout restates no band (machinist review:
+# rule 2).
 HANGER_CLEARANCE_DIA_BAND = (DRILL_OVERSIZE, 0.0)  # (upper, lower), title block
 HANGER_CLEARANCE_DIA_MIN = HANGER_CLEARANCE_DIA + min(HANGER_CLEARANCE_DIA_BAND)
 HANGER_CLEARANCE_DIA_MAX = HANGER_CLEARANCE_DIA + max(HANGER_CLEARANCE_DIA_BAND)
@@ -160,11 +166,13 @@ HANGER_CLEARANCE_DIA_MAX = HANGER_CLEARANCE_DIA + max(HANGER_CLEARANCE_DIA_BAND)
 HANGER_GRIP = RING_HEIGHT
 HANGER_GRIP_PLACES = 3
 HANGER_GRIP_TOL = printed_band_mm(HANGER_GRIP_PLACES, unit=UNIT)  # 0.127, title block .XXX
-# A plain native Hole Wizard clearance row, drilled through from the faced
-# underside. A plain hole ignores HoleFit, so _holes.wizard_holes writes the
-# pinned #10 loose 6.045 to both diameter knobs whenever the table seeds
-# another size; the build reads the exact cut diameter back.
-HANGER_HOLE_SPEC = HoleSpec("clearance", "#10", fit="loose")
+# A plain native Hole Wizard #10 clearance row, drilled through from the
+# faced underside, its cut pinned to the C drill: _holes.wizard_holes writes
+# HoleDiameter and ThruHoleDiameter from the override (and skips its pinned
+# loose-fit edit), and the build reads the exact cut diameter back.
+HANGER_HOLE_SPEC = HoleSpec(
+    "clearance", "#10", fit="loose", overrides_mm={"HoleDiameter": HANGER_CLEARANCE_DIA}
+)
 # Washer bounds are ASME B18.21.1 Table 11, owned by the purchased-part spec.
 # Full washer float uses the sourced UNC 2A minimum shank diameter, not
 # nominal thread-major geometry, charging the full washer eccentricity.
@@ -180,7 +188,7 @@ if HANGER_WASHER_CONCENTRIC_ANNULUS_MIN <= 0.0:
 # .0006-.0013 on the catalogue pin), four in all.
 HANGER_PIN_X = KNIFE_DOWEL.HANGER_OFFSET  # 7.62 (.300) either side of the bolt axis
 # The pair's stations from the screw axis in the dowel spec's order: the -X
-# ream, then the +X ream (datum B front, C rear).
+# ream, then the +X ream.
 HANGER_PIN_XS = (-HANGER_PIN_X, HANGER_PIN_X)
 # The hanger stations in part coordinates, which the builder cuts and the
 # drawing locates (AGENTS.md: drawings read pure providers, not the
@@ -195,6 +203,8 @@ STUD_Z_FRONT = SUMMING_Z - HEX_Z_MID  # -83.972
 STUD_Z_REAR = SUMMING_Z + HEX_Z_MID  # +90.148
 PIN_HOLE_NEG_X, PIN_HOLE_X = (HANGER_X + x for x in HANGER_PIN_XS)  # -22.62, -7.38
 HANGER_PIN_X_PLACES = KNIFE_DOWEL.HANGER_OFFSET_PLACES
+# Each ream's implied-zero offset across the dowel line from its #10 axis's
+# drawn line: the title block's .XXX.
 HANGER_PIN_X_TOL = KNIFE_DOWEL.HANGER_OFFSET_TOL  # 0.127
 HANGER_PIN_HOLE_DIA = KNIFE_DOWEL.PRESS_HOLE_DIA  # 3.1496
 HANGER_PIN_HOLE_DIA_BAND = KNIFE_DOWEL.PRESS_HOLE_DIA_BAND  # (0.0127, 0.0)
@@ -204,34 +214,29 @@ HANGER_PIN_HOLE_DIA_MAX = HANGER_PIN_HOLE_DIA + max(HANGER_PIN_HOLE_DIA_BAND)
 HANGER_PIN_HOLE_DEPTH = KNIFE_DOWEL.PRESS_DEPTH  # 11.938, from the underside
 HANGER_PIN_HOLE_DEPTH_PLACES = KNIFE_DOWEL.PRESS_DEPTH_PLACES
 HANGER_PIN_HOLE_DEPTH_TOL = KNIFE_DOWEL.PRESS_DEPTH_TOL  # 0.254
-# Each +X ream (datum B front, C rear) stands .XXX HANGER_PIN_X from its own
-# screw axis along the dowel line.  Each -X ream is located from the +X
-# ream beside it by a BASIC KNIFE_DOWEL.SPAN (.600) along the line, the
-# zero across it implied (both reams drawn on one line), and held there by
-# a cylindrical position zone (machinist review, farm run 4: a position
-# frame needs a BASIC locating its feature).  The knife mount fits turned
-# 180 deg too (its round hole on the -X ream), so that ream's worst station
-# from its screw axis is the +X band plus the zone's radius
-# (HANGER_NEG_PIN_X_TOL), and the knife mount's slot takes the span's zone
-# as travel (KNIFE_DOWEL.SPAN_TOL).
-# Manufacturing GD&T limits consumed by the part's drawing projection: each
-# -X ream's position, Ø.002, to the +X ream beside it (datum B front, C
-# rear) as primary, oriented by the other station's +X ream with its
-# location released (translation modifier: the stations' fore/aft spacing is
-# toleranced, not BASIC), so the two mounts' dowel lines stay square to the
-# B-C line.  All four reams are also perpendicular, Ø.0008, to the faced
-# underside (datum A) the knife mounts seat on, so each pressed dowel stands
-# square to its block's top seat (owner ruling 2026-10-27 (#2016), option A;
-# the block's hole and slot take ⊥Ø.0006|A).  The values stay literals (the
-# FCF provenance scan reads them): the inch strings print, the millimetres
-# derive from them.
+# Owner ruling 2026-11-06: at each station both reams stand BASIC
+# HANGER_PIN_X (.300) either side of datum D, the crossbar median plane, on
+# the #10 hole's drawn line (the zero across the line implied, the title
+# block's .XXX, HANGER_PIN_X_TOL), and are held there by a per-station
+# 2X ⌖Ø.004|A|D, SEP REQT: each pair is located and squared to D, and the
+# two stations float apart along D.  The #10 axes lie on D within the
+# crossbar centring zone (⌖.010|D), so a ream's X from its own screw axis is
+# the zone's radius plus that centring (HANGER_PIN_X_FROM_AXIS_TOL); from D
+# it is the zone's radius alone (HANGER_PIN_X_FROM_D_TOL).  The knife mount
+# fits either way round on the pair, and its slot takes the pair's spacing,
+# two opposite zone radii, as travel (KNIFE_DOWEL.SPAN_TOL).  All four reams
+# are also perpendicular, Ø.001, to the faced underside (datum A) the knife
+# mounts seat on, so each pressed dowel stands square to its block's top
+# seat (owner ruling 2026-10-27 (#2016), option A; the block's hole and slot
+# take ⊥Ø.0006|A).  The values stay literals (the FCF provenance scan reads
+# them): the inch strings print, the millimetres derive from them.
 # The keeper seats carry no frame: rule 5 names flatness on a clamp face
 # over-specification and no user ruling accepts one (codex review of
 # 06d0bbc59); the faced top (RV-03) carries them.
 GEOMETRIC_TOLERANCES_IN: dict[str, str] = {
-    "knife-hanger press ream position": ".002",
-    "knife-hanger crossbar centring": ".004",
-    "knife-hanger press ream perpendicularity": ".0008",
+    "knife-hanger press ream position": ".004",
+    "knife-hanger crossbar centring": ".010",
+    "knife-hanger press ream perpendicularity": ".001",
 }
 GEOMETRIC_TOLERANCES_MM: dict[str, float] = {
     key: float(value) * IN for key, value in GEOMETRIC_TOLERANCES_IN.items()
@@ -243,27 +248,22 @@ HANGER_CROSSBAR_CENTER_TOL = HANGER_CROSSBAR_CENTER_ZONE / 2.0
 HANGER_PRESS_HOLE_POSITION_TOL = float(
     GEOMETRIC_TOLERANCES_MM["knife-hanger press ream position"]
 )
-if not isclose(HANGER_PRESS_HOLE_POSITION_TOL / 2.0, KNIFE_DOWEL.SPAN_TOL):
+if not isclose(HANGER_PRESS_HOLE_POSITION_TOL, KNIFE_DOWEL.SPAN_TOL):
     raise AssertionError(
-        "the -X reams' position zone radius must be MHA-SM-VN-53's span band"
+        "the reams' position zone diameter must be MHA-SM-VN-53's span band"
     )
-HANGER_NEG_PIN_X_TOL = HANGER_PIN_X_TOL + HANGER_PRESS_HOLE_POSITION_TOL / 2.0  # 0.1524
-# The B-C datum line's yaw (codjiflo round 4): the front and rear +X reams'
-# own .XXX stations, at opposite limits, turn the line through B and C by
-# 2 x .005 over the stations' spacing; each -X ream is located to that line,
-# so the pin pair turns with it, and the block's tap, .300 from B along the
-# pair, moves across the dowel line by that turn times its reach.
-HANGER_DATUM_LINE_YAW_SHIFT = (
-    KNIFE_DOWEL.HANGER_OFFSET * 2.0 * HANGER_PIN_X_TOL / (STUD_Z_REAR - STUD_Z_FRONT)
-)  # 0.0111
+HANGER_PIN_X_FROM_D_TOL = HANGER_PRESS_HOLE_POSITION_TOL / 2.0  # 0.0508
+HANGER_PIN_X_FROM_AXIS_TOL = (
+    HANGER_PIN_X_FROM_D_TOL + HANGER_CROSSBAR_CENTER_TOL
+)  # 0.1778
 HANGER_PRESS_HOLE_PERPENDICULARITY_TOL = float(
     GEOMETRIC_TOLERANCES_MM["knife-hanger press ream perpendicularity"]
 )
 # An orientation refinement of a located feature is tighter than its
-# location zone (the -X reams' Ø.002 position).
+# location zone (the reams' Ø.004 position).
 if not HANGER_PRESS_HOLE_PERPENDICULARITY_TOL < HANGER_PRESS_HOLE_POSITION_TOL:
     raise AssertionError("the reams' perpendicularity must refine their position zone")
-# The drilled #10 hole's float about the bolt shank is 0.6095 radial.
+# The drilled #10 hole's float about the bolt shank is 0.6604 radial.
 # The assembly proves the tap/dowel mismatch plus underside-entry drill
 # drift stays inside that float.
 HANGER_SCREW_FLOAT = (HANGER_CLEARANCE_DIA - HANGER_SCREW.SHANK_DIA) / 2.0
@@ -334,11 +334,13 @@ HANGER_KNOCKOUT_PUNCH_REACH_MIN = HANGER_GRIP + HANGER_GRIP_TOL  # 36.6268, no r
 # Callouts on the model's own ream size and depth (drawing-guidelines.md
 # rule 4: a REAM names its mate and fit; rule 12: count, process and
 # purpose; the size and its band print natively).  The underside locator
-# carries the ream size, its count, mate and press on one row under it; F-F
-# the depth all four share, to a flat floor.  The knockouts' native callout
-# reads its drill above the native size and its purpose below
-# (dt_crankshaft_notes.KNOCKOUT_CALLOUT_*).
-HANGER_PIN_HOLE_CALLOUT = "4X REAM, PRESS MHA-SM-VN-53 DOWEL TO FLOOR"
+# carries the ream size, its count, mate and fit on one row under it; F-F
+# the depth all four share, to a flat floor.  Where the press stops (each
+# dowel to the ream floor) is MHA-SM-00's step 1, not this part's (rule 7:
+# an assembly instruction on a part sheet; farm run 20261106T234223948Z).
+# The knockouts' native callout reads its drill above the native size and
+# its purpose below (dt_crankshaft_notes.KNOCKOUT_CALLOUT_*).
+HANGER_PIN_HOLE_CALLOUT = "4X REAM, PRESS FIT MHA-SM-VN-53 DOWEL"
 # The flat floor's corner: the title block's inside-corner radius would
 # leave the dowel's end flat bearing on a fillet, so the depth's row limits
 # it (numbers in a native dimension's callout row: the knife mount's
@@ -463,8 +465,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     # measures from the origin -- mid-air on the print -- so sheet 3
     # dimensions those stations from the socket bore axes with sheet-derived
     # dimensions (DRAWING_REFERENCE_PRECISION below, drawing-guidelines.md rule 10 (dimension from a real feature)).  The
-    # dowel reams' stations (the +X ream from the screw axis, the -X ream
-    # from the +X ream) are sheet-derived the same way, on section F-F; the
+    # dowel reams' BASIC stations from datum D are sheet-derived the same
+    # way, on sheet 6; the
     # ream size is the model's, printed on the underside locator, and the
     # depth the model's, printed on F-F.  The knockouts print their native
     # Hole Wizard callout.
@@ -489,7 +491,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # and window widths on it).  Keeper positions are model-nominal references
 # only: the frame taps are transferred from the bench-pair-reamed,
 # fit-up-located keeper feet, not independently located to the general band.
-# The cap recess diameter and depth carry the bilateral bands above, the
+# The cap recess depth carries the bilateral band the build applies, its
+# diameter the title block's .XXX (owner ruling 2026-11-06), the
 # gooseneck bore prints the clearance a purchased post is set into, the
 # finished grip prints .XXX (the rail height, that same thickness, prints its
 # reference at the grip's places), and the dowel press ream holds its own
@@ -608,14 +611,14 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "set-screw thread length": 3,
     "set-screw boss face from bore axis": 2,
     # Sheet 6, UNDERSIDE: junction lands and knife-hanger section F-F.  The
-    # native finished-top grip and ream depth are imported; the +X ream's
-    # station and the -X ream's BASIC span from it are measured.
+    # native finished-top grip and ream depth are imported; each ream's
+    # BASIC station from datum D is measured.
     "land end from crossbar face": 2,
     "crossbar pocket length": 2,
     "crossbar pocket from front socket": 2,
     "underside gusset thickness": 2,
-    "dowel hole from hanger axis": HANGER_PIN_X_PLACES,
-    "-X dowel ream from +X dowel ream": HANGER_PIN_X_PLACES,
+    "+X dowel ream from D": HANGER_PIN_X_PLACES,
+    "-X dowel ream from D": HANGER_PIN_X_PLACES,
 }
 
 # Use the canonical printed-band reader, not the unrounded inch grades.
@@ -700,15 +703,18 @@ HANGER_PIN_FLOOR_FILLET_LIFT_MAX = KNIFE_DOWEL.PRESS_FLOOR_LIFT_MAX
 # place, 1.6) overrides the title block's 0.25 max break on the convex casting
 # edges the model chamfers; hole, bore, counterbore, tap and slot mouths keep
 # the title-block break (the counterbore and tap walls are proved without a
-# chamfer).  The edges too close to a feature, too short or on too narrow a
-# flange shelf at the print's limits, or under a knife seat, for it
-# (build_fr_top_frame._external_edge_breaks) are the "UNLESS NOTED": E-E's
-# note names the crossbar flange's underside, the hub side view's the hub
-# rib's inner bottom, its outer bottom beside the set-screw boss and the
-# V-gussets, the underside locator's the bar and gusset bottoms at the knife
-# seats; they keep the title block break.  The third row says what "SHARP"
-# on those notes means (machinist review r1: it read as cancelling the
-# title block's burr removal too).
+# chamfer).  The edges the model leaves sharp under a knife seat or beside
+# the hub boss (build_fr_top_frame._external_edge_breaks: the front crossbar
+# side bottoms, the four gusset hypotenuse bottoms, the hub rib's inner bottom
+# and the V-gusset ramp edges) are the "UNLESS NOTED": owner ruling
+# 2026-11-06 numbers the notes and makes the third a flag note, its flag (a
+# triangle round "3") on a leader to each of those edges on the UNDERSIDE
+# sheet (draw_fr_top_frame.SHARP_EDGE_FLAGS), replacing the prose under
+# the view labels the machinist review could not tie to an edge.  Flagged
+# edges keep the title block break, and the note says so (machinist review
+# r1: "SHARP" alone read as cancelling the burr removal too).  Each row
+# stays within the 64 characters the unnumbered first row printed on sheet 3
+# (EDGE_NOTE_XY): "HOLE/SLOT" pays for the "1. ".
 # Owner ruling 2026-10-18 (exception RV-02, #1625): the cast inside corners
 # the model leaves sharp (window corners, flange junctions) take the casting's
 # own root radius at most; the R.12 T-roots are dimensioned (the "UNLESS
@@ -721,12 +727,13 @@ INSIDE_CORNER_R_MAX = 3.048  # .12
 _EDGE_CHAMFER_TEXT = render_number(
     EDGE_CHAMFER / IN, UNIT, DRAWING_REFERENCE_PRECISION["top rim chamfer"]
 )
+DRAWING_NOTE_FLAG = 3
 DRAWING_NOTES = (
-    f"CONVEX EDGES {_EDGE_CHAMFER_TEXT}"
-    " X 45 DEG UNLESS NOTED; NOT HOLE OR SLOT MOUTHS.\n"
+    f"1. CONVEX EDGES {_EDGE_CHAMFER_TEXT}"
+    " X 45° UNLESS NOTED; NOT HOLE/SLOT MOUTHS.\n"
     # TODO(#1625): remove when the title block gains its inside-corner default
-    f"INSIDE CORNERS R{render_number(INSIDE_CORNER_R_MAX / IN, UNIT, 2)} MAX UNLESS NOTED.\n"
-    f"EDGES NOTED SHARP: NO {_EDGE_CHAMFER_TEXT}"
+    f"2. INSIDE CORNERS R{render_number(INSIDE_CORNER_R_MAX / IN, UNIT, 2)} MAX UNLESS NOTED.\n"
+    f"{DRAWING_NOTE_FLAG}. EDGES FLAGGED {DRAWING_NOTE_FLAG}: NO {_EDGE_CHAMFER_TEXT}"
     " CHAMFER; TITLE-BLOCK EDGE BREAK."
 )
 # User rulings 2026-10-11, 2026-10-14 and 2026-10-18 (cohesive appearance;

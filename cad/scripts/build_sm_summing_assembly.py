@@ -14,7 +14,7 @@ boss-hook / counter-spring / gooseneck chain.
 * knife-hanger-stud x2 -- McMaster 92314A253 #10-24 plain hex bolts from
   2 in stock, each cut at this assembly to the stack measured at its hole
   plus the .351 +/-.006 in fit-up reach (46.70 mm nominal under the head);
-  each passes the crossbar's #10 loose clearance hole and threads into the
+  each passes the crossbar's #10 clearance hole (C drill) and threads into the
   knife-mount tap.
 * knife-hanger-washer x2 -- new McMaster 96659A104 18-8 SAE washers,
   one beneath each hex head, seated on the crossbar's faced top.
@@ -43,7 +43,7 @@ boss-hook / counter-spring / gooseneck chain.
 Cross-subassembly fits (checked at the top level): the channel springs
 (ch-channel.SLDASM) thread the summing-lever plate's O4.5 holes -- gated
 analytically by build_ch_channel_assembly._assert_plate_threading; the knife-
-hanger bolts pass the top-frame crossbar's O6.045 clearance holes and clamp
+hanger bolts pass the top-frame crossbar's O6.147 clearance holes and clamp
 through their washers on its faced top; the knife-mount dowels press into
 its blind reams (fr-frame.SLDASM); the gooseneck's sleeve drops
 through the casting's rail-hub bore, gripped by its 1/4-20 set screw.
@@ -191,33 +191,34 @@ KNIFE_DOWEL_END_Y = KNIFE_DOWEL_Y - knife_dowel.LENGTH
 KNIFE_DOWEL_ROWS = [[1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, -1.0]]
 # Pair stations from the bolt axis, -X (slot) first: 7.632 along X.
 KNIFE_DOWEL_X_OFFSETS = (knife_mount.SLOT_X, knife_mount.PIN_HOLE_X)
-# The bolt must pass the crossbar's #10 clearance hole at the printed-band
-# worst case (drawing-guidelines.md rule 19 (absorb stacks)) when
-# every station sits at its limit (owner ruling 2026-10-24, T+H3: the pins
-# press into the crossbar and slip into the block), with the block fitted
-# either way round: each +X ream stands .XXX from its screw axis and each -X
-# ream BASIC 15.264 from it within a Ø0.05 zone, so B's round hole may sit on
-# either pin.  Along the dowel line (X): B's pin's ream station (.XXX, 0.13,
-# plus the -X ream's zone radius 0.025 when B sits on the -X pin), the tap's
-# position zone radius to the knife mount's A|B|C (0.07), B's round hole
-# across its loosest slip on its pin (0.046) and B's datum simulator off the
-# pin root (t/2 = 0.0075, below).  Across it (Z): the crossbar's
-# implied-zero offset of the +X ream from the screw hole (.XXX, 0.13), the -X
-# ream off the +X ream's line by its zone radius (0.025), the tap zone
-# radius (0.07), and the block's line, through B's hole and the slot's
-# centre (datum C, the slot itself), at the tap's mid-station: half the slot
-# centre's worst offset from B's, each hole across its loosest slip, the
-# two reams off one line by the zone radius and both datum simulators,
-# (0.046 + 0.046 + 0.025 + 0.015) / 2 = 0.066, and the B-C datum line's yaw
-# moving the tap across (0.0114, below).  hypot(0.27873, 0.30263) = 0.41143.
+# The bolt must pass the crossbar's #10 clearance hole (a C drill, owner
+# ruling 2026-11-06) at the printed-band worst case (drawing-guidelines.md
+# rule 19 (absorb stacks)) when every station sits at its limit (owner
+# ruling 2026-10-24, T+H3: the pins press into the crossbar and slip into
+# the block), with the block fitted either way round: at each station both
+# reams stand BASIC .300 either side of the crossbar median plane D under
+# 2X ⌖Ø.004|A|D, SEP REQT, and the #10 hole's axis lies on D within
+# ⌖.010|D, so B's round hole may sit on either pin.  Along the dowel line
+# (X): B's pin's ream off its BASIC station by the zone radius (0.05), D off
+# the screw axis by the centring (0.127), the tap's position zone radius to
+# the knife mount's A|B|C (0.064), B's round hole across its loosest slip on
+# its pin (0.046) and B's datum simulator off the pin root (t/2 = 0.008,
+# below).  Across it (Z): the pattern's implied-zero offset from the screw
+# hole's drawn line (.XXX, 0.127), the tap zone radius (0.064), and the
+# block's line, through B's hole and the slot's centre (datum C, the slot
+# itself), at the tap's mid-station: half the slot centre's worst offset
+# from B's, each hole across its loosest slip, the two reams off one line
+# by the whole zone (two radii, opposite) and both datum simulators,
+# (0.046 + 0.046 + 0.102 + 0.015) / 2 = 0.104.
+# hypot(0.2946, 0.2946) = 0.4167.
 _KNIFE_DOWEL_SLIP_MAX = knife_dowel.SLIP_CLEARANCE_MAX
 _KNIFE_DOWEL_PAIR_SHIFT = (
     _KNIFE_DOWEL_SLIP_MAX / 2.0
     + _KNIFE_DOWEL_SLIP_MAX / 2.0
-    + top_frame.HANGER_PRESS_HOLE_POSITION_TOL / 2.0
+    + top_frame.HANGER_PRESS_HOLE_POSITION_TOL
     + knife_mount.DOWEL_HOLE_PERPENDICULARITY_TOL / 2.0
     + knife_mount.DOWEL_SLOT_PERPENDICULARITY_TOL / 2.0
-)  # 0.132: the slot centre's worst offset across the dowel line from B's
+)  # 0.208: the slot centre's worst offset across the dowel line from B's
 # The last term is the datum simulators' (codjiflo round 5, wyUmn): within
 # ⊥0.015 to A, B's largest perpendicular inscribed cylinder and C's largest
 # perpendicular inscribed width each sit up to t/2 off their feature's own
@@ -234,32 +235,28 @@ _KNIFE_DOWEL_PAIR_SHIFT = (
 #   turns the block on the crossbar.  Only the gap between the slot's local
 #   centre at the pin and the fitted DRF plane is left, about
 #   e * (1 - 15.19 / 16.7) = 0.002 at e = 0.025, inside the slip terms' rounding.
-# - The crossbar's B-C datum line yaw, in the rock.  Both pin pairs are
-#   positioned to that line (⌖Ø0.05 to B|C▷ / C|B▷), so both mounts and the
-#   line through their bores turn together.  The lever's trunnion, which
-#   spans both bores, turns with them, so the bore-to-trunnion yaw that sets
-#   the rock is unchanged.  The bolt holes do not turn with that line, so
-#   the bolt float below charges it: the tap, 7.632 from B along the pair,
-#   moves across by HANGER_DATUM_LINE_YAW_SHIFT (codjiflo round 4).
+# - A datum-line yaw.  Both pin pairs are located and squared to D, the
+#   plane the #10 axes are centred on, so neither the pairs nor the tap turn
+#   off the bolt holes' line.  The two pairs' own X offsets along the line
+#   (each pair's +X ream within its zone radius of its BASIC station from D)
+#   do yaw the lever's ridge between the two bores: the rock below charges
+#   that as KNIFE_RIDGE_REAM_YAW_OFFSET.
 HANGER_SCREW_MISMATCH_X = (
-    top_frame.HANGER_PIN_X_TOL
-    + top_frame.HANGER_PRESS_HOLE_POSITION_TOL / 2.0
+    top_frame.HANGER_PIN_X_FROM_AXIS_TOL
     + knife_mount.STUD_TAP_POSITION_TOL / 2.0
     + _KNIFE_DOWEL_SLIP_MAX / 2.0
     + knife_mount.DOWEL_HOLE_PERPENDICULARITY_TOL / 2.0
-)  # 0.27873
+)  # 0.2946
 HANGER_SCREW_MISMATCH_Z = (
     top_frame.HANGER_PIN_X_TOL
-    + top_frame.HANGER_PRESS_HOLE_POSITION_TOL / 2.0
     + knife_mount.STUD_TAP_POSITION_TOL / 2.0
     + _KNIFE_DOWEL_PAIR_SHIFT / 2.0
-    + top_frame.HANGER_DATUM_LINE_YAW_SHIFT
-)
+)  # 0.2946
 HANGER_SCREW_MISMATCH = math.hypot(HANGER_SCREW_MISMATCH_X, HANGER_SCREW_MISMATCH_Z)
 # The hole is drilled from the finished underside. Prove drift over the FULL
 # crossbar body to the hole's top end at the faced top, at the longest
-# printed grip: tan(0.3 deg) * (36.50 + 0.51) = 0.19378568. The #10 loose
-# hole's 0.6095 radial float covers this plus the station mismatch
+# printed grip: tan(0.3 deg) * (36.50 + 0.127) = 0.1918. The #10 C drill
+# hole's 0.6604 radial float covers this plus the station mismatch
 # (HANGER_SCREW_FLOAT_SPARE).
 HANGER_SCREW_DRIFT = top_frame.DRILL_DRIFT_PER_MM * (
     top_frame.HANGER_GRIP + top_frame.HANGER_GRIP_TOL
@@ -269,21 +266,24 @@ HANGER_SCREW_FLOAT_SPARE = top_frame.HANGER_SCREW_FLOAT - (
 )
 # Free rock at the printed-band worst case (drawing-guidelines.md rule 19
 # (absorb stacks), and the 2026-10-09 ruling: >=5.0 deg).
-# The pair's worst transverse shift acts over the pins' shortest 15.239
-# span.  Across the deepest .X block (14.8) that yaw walks the bore's far
-# end.  The bore's ⌖Ø0.20 to A|B|C carries a composite Ø0.05 orientation
-# refinement to A|B|C (owner ruling 2026-10-27), which adds that whole
-# refinement zone.  The lever's ridge spans both mounts' bores, so its own
-# yaw adds too (codjiflo, PR #1978): the two bores' inner mouths, each up to
-# the position zone radius off nominal in opposite directions, turn the
-# ridge by the whole position zone over the shortest mouth-to-mouth run
-# (the hanger stations' spacing less the deepest .X block), and that turn
-# walks a further 14.8 * 0.20 / 159.3 = 0.0186 across a block.  Judge the
-# trunnion in
-# the smallest reamed bore at the shoulder its printed controls allow worst:
-# the ridge farthest from that side face, the flank at its flattest
-# (code review C09: ``sm_summing_lever_spec.KNIFE_SHOULDER_X_MAX`` and
-# ``KNIFE_SHOULDER_DROP_MIN``).
+# The pair's worst transverse shift acts over the pins' shortest span (the
+# BASIC .600 less the reams' zone diameter).  Across the deepest .X block
+# (14.8) that yaw walks the bore's far end.  The bore's ⌖Ø0.20 to A|B|C
+# carries a composite Ø0.05 orientation refinement to A|B|C (owner ruling
+# 2026-10-27), which adds that whole refinement zone.  The lever's ridge
+# spans both mounts' bores, so its own yaw adds too (codjiflo, PR #1978):
+# the two bores' inner mouths, each up to the position zone radius off
+# nominal in opposite directions, turn the ridge by the whole position zone
+# over the shortest mouth-to-mouth run (the hanger stations' spacing less
+# the deepest .X block), and that turn walks a further 14.8 * 0.20 / 159.3
+# = 0.0186 across a block.  The two mounts' round-hole pins also sit along
+# the line within their reams' zones of the same BASIC station from D (owner
+# ruling 2026-11-06), opposite at worst, so the ridge turns by the zone's
+# diameter over that run too (KNIFE_RIDGE_REAM_YAW_OFFSET).  Judge the
+# trunnion in the smallest reamed bore at the shoulder its printed controls
+# allow worst: the ridge farthest from that side face, the flank at its
+# flattest (code review C09: ``sm_summing_lever_spec.KNIFE_SHOULDER_X_MAX``
+# and ``KNIFE_SHOULDER_DROP_MIN``).
 KNIFE_DOWEL_SPAN_MIN = knife_dowel.SPAN - knife_dowel.SPAN_TOL
 KNIFE_MOUNT_YAW_DEG = math.degrees(
     math.atan(_KNIFE_DOWEL_PAIR_SHIFT / KNIFE_DOWEL_SPAN_MIN)
@@ -297,10 +297,16 @@ KNIFE_RIDGE_YAW_OFFSET = (
     * knife_mount.KNIFE_BORE_POSITION_TOL
     / KNIFE_RIDGE_MOUTH_SPAN_MIN
 )
+KNIFE_RIDGE_REAM_YAW_OFFSET = (
+    _KNIFE_BLOCK_DEPTH_MAX
+    * top_frame.HANGER_PRESS_HOLE_POSITION_TOL
+    / KNIFE_RIDGE_MOUTH_SPAN_MIN
+)
 KNIFE_BORE_FAR_END_OFFSET = (
     _KNIFE_BLOCK_DEPTH_MAX * math.tan(math.radians(KNIFE_MOUNT_YAW_DEG))
     + knife_mount.KNIFE_BORE_ORIENTATION_TOL
     + KNIFE_RIDGE_YAW_OFFSET
+    + KNIFE_RIDGE_REAM_YAW_OFFSET
 )
 KNIFE_FREE_ROCK_WORST_DEG = knife_mount.free_rock_deg(
     KNIFE_BORE_FAR_END_OFFSET,
@@ -311,7 +317,7 @@ KNIFE_FREE_ROCK_WORST_DEG = knife_mount.free_rock_deg(
 KNIFE_FREE_ROCK_FLOOR_DEG = spec.KNIFE_FREE_ROCK_FLOOR_DEG
 # The slip fit's angular contract (owner ruling 2026-10-27, #2016 option A).
 # The pressed pin and the block's hole are parallel only to within their
-# perpendicularity controls: the crossbar ream ⊥Ø0.02 to the faced underside
+# perpendicularity controls: the crossbar ream ⊥Ø0.025 to the faced underside
 # and the block's hole and slot ⊥Ø0.015 to A.  Each zone tilts its axis by
 # at most atan(zone / length) over the hole's straight wall: its shortest
 # printed depth less the floor's corner (the ream's CORNER R0.1 MAX, the
