@@ -346,13 +346,40 @@ def test_every_exported_band_endpoint_is_a_printed_value() -> None:
     assert checked
 
 
-def test_clamp_callout_stands_left_of_and_above_the_cutting_plane() -> None:
-    # Review r12: at model X -20 the CL block's shelf ended on the upper A-A
-    # arrow's tail and its leader crossed the plane at screw 3.
+def test_clamp_callout_has_border_air_and_clears_the_cutting_plane() -> None:
+    # Retained 0c3 native/PDF ink, in paper mm at the unchanged 1:2 scale.
+    # The old shelf started at 13.0891 against the 12.7 inner border.
+    # Translate the entire associative block, not only its diameter row.
     x, y, _ = drawing.PLAN_KEEP["ClampDia"]
-    assert x == -26.0
-    assert y == drawing._CALLOUT_Y + 10.0
+    dx = (x - (-26.0)) * _PLAN_SCALE
+    dy = (y - (drawing._CALLOUT_Y + 10.0)) * _PLAN_SCALE
+    assert (dx, dy) == pytest.approx((3.0, 1.5))
+    assert 13.0891 + dx - 12.7 >= _AIR_MM  # shelf, farther left than the ink
+    assert 266.7 - (262.7036 + dy) >= _AIR_MM  # top of the full seven-row block
+    assert 104.4326 - (87.2384 + dx) >= _AIR_MM  # upper section letter A
+    # Keep the leader's closest approach to the upper A-A tail clear too:
+    # shifting only X would repair the border but reintroduce review r12.
+    circle = (69.55255, 201.89715)
+    elbow = (87.2384 + dx, 224.8134 + dy)
+    cut_tail = (90.2203, 222.287)
+    vx, vy = elbow[0] - circle[0], elbow[1] - circle[1]
+    tx, ty = cut_tail[0] - circle[0], cut_tail[1] - circle[1]
+    assert 0.0 < (tx * vx + ty * vy) / (vx * vx + vy * vy) < 1.0
+    assert abs(vx * ty - vy * tx) / math.hypot(vx, vy) >= _AIR_MM
+    assert elbow[1] - cut_tail[1] >= _AIR_MM
     assert x < drawing.CUT_X
+
+
+def test_left_clamp_callout_keeps_its_complete_ink_inside_sheet_two() -> None:
+    # Retained 0c3: full ink top 273.6474, lower shelf 246.8696;
+    # the top border is 266.7 and the plan outline tops out at 215.287.
+    x, y, _ = drawing.PLAN_KEEP["LeftClampDia"]
+    assert x == 85.0
+    dy = (y - (drawing._CALLOUT_Y + 43.0)) * _PLAN_SCALE
+    assert dy == pytest.approx(-21.5)
+    assert 266.7 - (273.6474 + dy) >= _AIR_MM
+    assert 246.8696 + dy - 215.287 >= _AIR_MM
+    assert drawing.VIEW_SCALE == (1, 2)
 
 
 def test_left_clamp_clearance_has_complete_uncluttered_sheet_coverage() -> None:

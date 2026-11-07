@@ -49,7 +49,7 @@ from _document_units import apply_package_model_units
 from _part_properties import part_drawing_unit
 from _bore_axis import name_bore_axis
 from _check import check
-from _com import _early_bound
+from _com import _bind, _early_bound
 from _dimensions import drive_dimension, name_dimensions
 from _drawing_dimension_insert import (
     add_angular_reference_dimension,
@@ -663,6 +663,7 @@ def _pin_chamfer_min_limit(adapter) -> None:
     lower, upper = deviations(PIN_CHAMFER_BAND)
     label = f"PinChamferSize@{SECTION_REFERENCE}"
     _, dimension = _named_dimension(adapter, SECTION_REFERENCE, "PinChamferSize")
+    dimension = _early_bound(_bind(dimension, "IDimension"), "IDimension")
     value = float(dimension.SystemValue)
     if not math.isclose(value, PIN_CHAMFER / 1000.0, abs_tol=1e-9):
         raise RuntimeError(
@@ -711,13 +712,15 @@ def _left_clamp_thread_dimension(adapter):
                 matches.append((display, dimension))
     if len(matches) != 1:
         raise RuntimeError(f"LeftClampTap: expected one owned full-thread dimension, got {len(matches)}")
-    return tuple(_early_bound(value, interface) for value, interface in zip(
-        matches[0], ("IDisplayDimension", "IDimension"), strict=True
-    ))
+    # Keep the retained raw handles; each consumer binds its required interface.
+    # _early_bound alone treats a bare PyIDispatch (no _oleobj_) as a test double.
+    return matches[0]
 
 
 def _require_left_clamp_thread_min(adapter) -> None:
     display, dimension = _left_clamp_thread_dimension(adapter)
+    display = _early_bound(_bind(display, "IDisplayDimension"), "IDisplayDimension")
+    dimension = _early_bound(_bind(dimension, "IDimension"), "IDimension")
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
     if (int(tolerance.Type) != LEFT_CLAMP_THREAD_TOL_TYPE
             or abs(float(tolerance.GetMinValue())) > 1e-12
@@ -728,6 +731,8 @@ def _require_left_clamp_thread_min(adapter) -> None:
 
 def _author_left_clamp_thread_min(adapter) -> None:
     display, dimension = _left_clamp_thread_dimension(adapter)
+    display = _early_bound(_bind(display, "IDisplayDimension"), "IDisplayDimension")
+    dimension = _early_bound(_bind(dimension, "IDimension"), "IDimension")
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
     tolerance.Type = LEFT_CLAMP_THREAD_TOL_TYPE
     if not tolerance.SetValues(0.0, 0.0):
@@ -762,6 +767,7 @@ async def _finished_hub_bore(adapter, drive_jobs, volume: float) -> float:
     name_last_feature(adapter, "HubChamfer")
     name_dimensions(adapter, "HubChamfer", ["HubChamferSize"])
     _, size = _named_dimension(adapter, "HubChamfer", "HubChamferSize")
+    size = _early_bound(_bind(size, "IDimension"), "IDimension")
     if abs(float(size.SystemValue) * 1000.0 - HUB_CHAMFER) > 1e-6:
         raise RuntimeError("HUB underside chamfer leg did not read back")
     if int(_early_bound(size.Tolerance, "IDimensionTolerance").Type) != 0:
