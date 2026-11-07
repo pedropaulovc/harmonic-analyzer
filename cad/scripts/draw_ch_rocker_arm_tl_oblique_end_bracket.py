@@ -761,6 +761,65 @@ def _activate_view(adapter: Any, view: Any, *, label: str) -> None:
         raise RuntimeError(f"failed to activate the {label} view {name!r}")
 
 
+# SolidWorks pins its own "#8-32 Tapped Hole" note per tap feature and view,
+# and the cut's cosmetic-thread import regroups them: farm 0c3 swept two from
+# the plan, 84d (both faces' threads imported into A-A) one. The count is
+# SolidWorks' bookkeeping, not the sheet's contract; finalize bounds it by
+# the two tap features (BarTaps, KP08Taps). The contract is what the settled
+# sheet says: each hole's callout states its thread and points at A-A, and
+# no note anywhere repeats a thread.
+TAP_FEATURES = ("BarTaps", "KP08Taps")
+REDUNDANT_THREAD_NOTES = range(1, len(TAP_FEATURES) + 1)
+_THREAD_TEXT = part_spec.SCREW.lstrip("#")  # "8-32"
+
+
+def callout_states_its_thread(resolved: list[str]) -> bool:
+    """One hole's resolved callout rows: its thread and drill, and the one
+    pointer to section A-A."""
+    text = "\n".join(resolved)
+    return (
+        f"{_THREAD_TEXT} UNC" in text
+        and "THRU ALL" in text
+        and text.count(BOTTOM_THREAD_CALLOUT) == 1
+    )
+
+
+def stray_thread_notes(texts: list[str]) -> list[str]:
+    """Notes that state a thread: the callouts own every thread statement."""
+    return [
+        text
+        for text in texts
+        if "TAPPED HOLE" in text.upper() or _THREAD_TEXT in text
+    ]
+
+
+def _require_threads_stated_by_callouts_only(
+    adapter: Any, callouts: list[tuple[str, Any]]
+) -> None:
+    """After the final rebuild: both callouts still state their thread, and no
+    note on the sheet (any view, or the sheet itself) repeats one."""
+    for label, display in callouts:
+        native = _early_bound(display, "IDisplayDimension")
+        resolved = [
+            str(native.GetText(part) or "").replace("\r", "") for part in (1, 2, 3, 4)
+        ]
+        if not callout_states_its_thread(resolved):
+            raise RuntimeError(
+                f"{label}: settled callout lost its thread: {resolved!r}"
+            )
+    texts: list[str] = []
+    node = _early_bound(adapter.currentModel, "IDrawingDoc").GetFirstView()  # sheet
+    while node is not None:
+        view = _early_bound(node, "IView")
+        texts += [
+            str(_early_bound(note, "INote").GetText() or "")
+            for note in (view.GetNotes() or ())
+        ]
+        node = view.GetNextView()
+    if stray := stray_thread_notes(texts):
+        raise RuntimeError(f"the sheet still repeats a thread in notes: {stray!r}")
+
+
 _STOCK_SIZES = {"BracketWidth": BRACKET_WIDTH, "BracketThick": BRACKET_THICK}
 
 
@@ -899,6 +958,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     if not auto_center_marks(adapter, plan, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the plan")
+    callouts: list[tuple[str, Any]] = []
     for x, (text_x, text_y), side in TAP_CALLOUTS:
         label = f"screw hole at {x:.3f} mm"
         callout = add_native_hole_callout(
@@ -913,6 +973,7 @@ async def build(adapter: Any) -> dict[str, str]:
         )
         _omit_tap_thread_class(callout, label=label)
         set_callout_lengths_to_three_places(callout, label=label)
+        callouts.append((label, callout))
 
     # The property-linked blocks land in the active view: the plan.
     _activate_view(adapter, plan, label="plan")
@@ -924,12 +985,14 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Rocker Oblique Trammel End Bracket Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
-        # SolidWorks pins its own "... Tapped Hole" note to the plan for each
-        # tap feature in it (draw_fr_harmonic_base counts features x views),
-        # not per callout; each callout already states it. Two tap features
-        # (the two faces' threads, two callouts), two notes.
+        # SolidWorks' own "... Tapped Hole" notes repeat what each callout
+        # states: swept, at most one per tap feature (REDUNDANT_THREAD_NOTES),
+        # and the settled sheet proves none survives and both callouts do.
         redundant_note_substrings=("Tapped Hole",),
-        expected_redundant_notes=2,
+        expected_redundant_notes=REDUNDANT_THREAD_NOTES,
+        settled_checks=(
+            lambda: _require_threads_stated_by_callouts_only(adapter, callouts),
+        ),
     )
 
 

@@ -92,7 +92,6 @@ import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec
 from _inch_wall_limits import WALL_TARGET_MM
-from _printed_tolerance import drilled_oversize_mm
 
 INCH = trammel.INCH
 
@@ -509,14 +508,13 @@ BRACKET_OPENING_THRUST = (
 # is .1585 in (ASME B1.1, external class 3A). Disclosed beside it: the
 # basic-major (.164) figures, 0.368 a side and 0.737 reversal. The upper
 # joint (KP08 on TL-28, ``KP08_SCREW_FLOAT_MAX``) is not part of this bound.
-SHCS_8_MAJOR_MIN = 0.1585 * INCH  # 4.026
+SHCS_8_MAJOR_MIN = base_bar.BRACKET_SCREW_MAJOR_MIN  # 4.026
 BRACKET_STOP_FLOAT_BASIC = base_bar.BRACKET_SCREW_FLOAT_MAX  # 0.368 a side
-# Directly from the largest drilled hole: offsetting the basic figure by
-# SHCS_8_MAJOR (.164 exactly) against the table's 4.166 basic major dropped
-# 0.0002 of float.
-BRACKET_STOP_FLOAT_MAX = (
-    base_bar.BRACKET_HOLE_DIA + drilled_oversize_mm(unit=base_bar.UNIT) - SHCS_8_MAJOR_MIN
-) / 2.0  # 0.438
+# Directly from the largest drilled hole (base bar spec, which also proves
+# the counterbore keeps the head clear over this whole travel): offsetting
+# the basic figure by SHCS_8_MAJOR (.164 exactly) against the table's 4.166
+# basic major dropped 0.0002 of float.
+BRACKET_STOP_FLOAT_MAX = base_bar.BRACKET_SCREW_FLOAT_WORST  # 0.438
 BRACKET_REVERSAL_LOST_MOTION_BASIC = 2.0 * BRACKET_STOP_FLOAT_BASIC  # 0.737
 BRACKET_REVERSAL_LOST_MOTION = 2.0 * BRACKET_STOP_FLOAT_MAX  # 0.876
 BRACKET_REVERSAL_LOST_MOTION_ACCEPTED = 0.9  # the ruling's "up to ~.9 mm"

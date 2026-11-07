@@ -889,7 +889,7 @@ async def finalize_drawing(
     pdf_title: str,
     scale: tuple[float, float] = (1.0, 1.0),
     redundant_note_substrings: Sequence[str] = (),
-    expected_redundant_notes: int = 0,
+    expected_redundant_notes: int | range = 0,
     expected_sheet_names: tuple[str, ...] | None = None,
     sheet_layouts: Mapping[str, DrawingLayout] | None = None,
     sheet_scales: Mapping[str, tuple[float, float]] | None = None,
@@ -1088,7 +1088,14 @@ async def finalize_drawing(
             remove_notes_matching(adapter, substring)
             for substring in redundant_note_substrings
         )
-    if removed_notes != expected_redundant_notes:
+    # A range bounds a count SolidWorks itself varies (its auto notes group
+    # per feature and view); such a caller proves the notes' absence and its
+    # own callouts in ``settled_checks``.
+    if (
+        removed_notes not in expected_redundant_notes
+        if isinstance(expected_redundant_notes, range)
+        else removed_notes != expected_redundant_notes
+    ):
         raise RuntimeError(
             f"final drawing removed {removed_notes} redundant notes, "
             f"expected {expected_redundant_notes}: "
