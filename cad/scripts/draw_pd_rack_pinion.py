@@ -4,10 +4,12 @@ Follows the batch gear-drawing pattern (see ``draw_cylinder_gear``). Drawn 1:1;
 the 150 physical teeth use the finite 48DP stock #1/reference-135 master.
 The face view (``*Front``, the rear face) prints the controlling native
 17-tooth actual-flank span, supported blank and bore with its reamed limits.
-The fit note names the MHA-PD-17 hub's spigot, and the native #0-80 tap
-callout carries its unchanged mouth-break and assembly-transfer lines (no
-bolt-circle position). The edge view prints the disc thickness, the front
-(clamped) face as datum B and the rear face's parallelism to it.
+The bore's fit and the native #0-80 tap callout's assembly transfer are
+numbered notes their callouts link (``pd_rack_pinion_callouts``); the span
+and the blank link the GEAR DATA block, which names the mesh once with its
+backlash acceptance (no bolt-circle position). The edge view prints the disc
+thickness, the front (clamped) face as datum B and the rear face's
+parallelism to it.
 Decimal-inch sheet (#290); the model keeps its millimetre nominals.
 """
 
@@ -20,12 +22,14 @@ import sys
 from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     dimension_name,
     place_view,
 )
 
 from _check import check
+from _com import _early_bound
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -39,7 +43,6 @@ from _drawing_dimensions import assert_imported_precision, set_dimension_callout
 from _drawing_gdt import add_datum_feature, add_feature_control_frame
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leaders import set_near_side_diameter
-from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
@@ -50,25 +53,27 @@ from _part_properties import part_drawing_unit
 from _session import run_build
 import _telemetry
 from paper_drive_stock_drawing import add_toothspace_callout, require_source_control
+from pd_rack_pinion_callouts import (
+    BORE_CALLOUT,
+    DRAWING_NOTES,
+    GEAR_DATA_NOTE,
+    MESH_CALLOUT,
+    TAP_CALLOUT_QUALIFIER,
+)
 from pd_rack_pinion_spec import (
     CUTTER_NUMBER,
     CUTTER_REFERENCE_TEETH,
     DIAMETRAL_PITCH,
-    BORE_CALLOUT,
     BORE_DIA,
-    BORE_FIT_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FACE_WIDTH,
     FACE_WIDTH_CALLOUT,
     FRONT_FACE_DATUM,
     GEOMETRIC_TOLERANCES_IN,
-    MESH_CALLOUT,
-    MESH_CALLOUT_STACKED,
     OUTSIDE_DIA,
     PRESSURE_ANGLE_DEG,
     STOCK_PROFILE,
-    TAP_CALLOUT_QUALIFIER,
     TAP_CENTRES,
     TAP_DRILL_DIA,
     TEETH,
@@ -100,8 +105,15 @@ RIGHT_CENTER = (0.320, 0.175)
 ISO_CENTER = (0.383, 0.210)  # 0.388 clipped the zone border right by 1.4 mm
 # The bore is a static seat (clamped to the MHA-PD-17 flange): no finish
 # symbol (machinist review, rule 6).
+# The GEAR DATA block is the sheet's (pd_rack_pinion_callouts.GEAR_DATA_NOTE:
+# the part's cutting rows, the mate and its backlash acceptance), top-left.
 GEAR_DATA_XY = (0.018, 0.262)
 GEAR_DATA_CHAR_HEIGHT = 0.0022
+# The numbered notes the bore and tap callouts link stand in the clear
+# lower-left lane: under the tap callout's shoulder, left of the title
+# block (x 0.216), at the document's note font (about 2.6 mm a character,
+# 69 characters: x 0.020-0.200).
+NOTES_XY = (0.020, 0.080)
 # Three rows use the clear upper-right lane, above all physical gear views.
 # x 0.262, not 0.230: run 12's leader from 0.230 down to the gap-18 flank
 # (237.7, 201.5 mm) ran 3.6 mm through the ToothSpan text [228-245, 226-230
@@ -127,8 +139,8 @@ PARALLELISM_FRAME = (REAR_FACE_X + 0.012, RIGHT_CENTER[1] - HALF_OD * 0.45 - 0.0
 # the bore's leader at the bore).  Each leader leaves its block's lower
 # corner on the part's side (SolidWorks' shoulder), so each block is placed
 # by that corner; each *_TEXT_BLOCK is the block's estimated (width, height).
-BORE_TEXT_BLOCK = (0.076, 0.047)
-OD_TEXT_BLOCK = (0.035, 0.0184)
+BORE_TEXT_BLOCK = (0.032, 0.021)
+OD_TEXT_BLOCK = (0.035, 0.0138)
 # The bore's text stands left of the face view, its shoulder 15° above the
 # horizontal through the centre: its leader crosses the rim to the bore's
 # 165° point, clear of datum A below and the 120° tap above.
@@ -164,15 +176,15 @@ FRONT_KEEP = {
 RIGHT_KEEP = {
     "FaceWidth": (REAR_FACE_X + 0.028, RIGHT_CENTER[1] - HALF_OD - 0.012),
 }
-# The bore's fit stands under its size, on the bore dimension's own leader:
-# a separate fit-note leader converged on the small bore with the size,
-# datum, diameter and finish leaders (machinist review, stack6: clarity).
-# The tip and span bands name the mesh they serve at their dimensions; the
-# span's above its value, clear of the rim below.  The thickness names the
-# screw engagement its .XXX band holds.
+# The bore's process and its note link stand under its size, on the bore
+# dimension's own leader: a separate fit-note leader converged on the small
+# bore with the size, datum, diameter and finish leaders (machinist review,
+# stack6: clarity).  The tip and the span link the GEAR DATA block, which
+# names their one mate (rule 4); the span's above its value, clear of the rim
+# below.  The thickness names the screw engagement its .XXX band holds.
 DIMENSION_CALLOUTS = {
-    "BoreDia": f"{BORE_CALLOUT}\n{BORE_FIT_CALLOUT}",
-    "OutsideDia": MESH_CALLOUT_STACKED,
+    "BoreDia": BORE_CALLOUT,
+    "OutsideDia": MESH_CALLOUT,
 }
 DIMENSION_CALLOUTS_ABOVE = {"ToothSpan": MESH_CALLOUT}
 RIGHT_DIMENSION_CALLOUTS = {"FaceWidth": FACE_WIDTH_CALLOUT}
@@ -186,10 +198,10 @@ RIGHT_DIMENSION_CALLOUTS = {"FaceWidth": FACE_WIDTH_CALLOUT}
 # x < 0 centre drawn under the axis whichever way the view mirrors.
 # (19e33c6c2 let visible_circle_edge break the tie between the two x < 0
 # taps on float noise: it took the upper one and the leader crossed the bore.)
-# Seven rows (the native thread line and TAP_CALLOUT_LINES, the finished wall
-# last, #2167): the block grows upward from the fixed shoulder, its top
-# ~4.6 mm under the tip circle at the shoulder's x.
-TAP_TEXT_BLOCK = (0.084, 0.043)
+# Four rows (the native drill and thread lines and TAP_CALLOUT_LINES): the
+# block grows upward from the fixed shoulder, well under the tip circle; its
+# widest line, the mouth breaks', sets its width.
+TAP_TEXT_BLOCK = (0.100, 0.0215)
 _TAP_SHOULDER = (FRONT_CENTER[0] - 0.015, FRONT_CENTER[1] - 0.085)
 TAP_CALLOUT_XY = (
     _TAP_SHOULDER[0] - TAP_TEXT_BLOCK[0] / 2.0,
@@ -260,6 +272,33 @@ def _set_tap_callout_text(display: Any) -> None:
         )
 
 
+def _add_sheet_note(
+    adapter: Any,
+    text: str,
+    xy: tuple[float, float],
+    *,
+    label: str,
+    char_height: float | None = None,
+) -> None:
+    """Place one free note of the sheet's own text at ``xy`` (its top-left),
+    at ``char_height`` when given, and read its text back."""
+    note = add_note(adapter, text, *xy)
+    if note is None:
+        raise RuntimeError(f"failed to add the {label} note")
+    note = _early_bound(note, "INote")
+    if char_height is not None:
+        annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+        text_format = annotation.GetTextFormat(0)
+        if text_format is None:
+            raise RuntimeError(f"the {label} note has no text format")
+        text_format.CharHeight = float(char_height)
+        if annotation.SetTextFormat(0, False, text_format) is not True:
+            raise RuntimeError(f"failed to set the {label} note's text height")
+    printed = str(note.GetText() or "").replace("\r\n", "\n")
+    if printed != text:
+        raise RuntimeError(f"the {label} note reads {printed!r}, not {text!r}")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -274,7 +313,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Gear Data",
             TOOTH_SPACE_CALLOUT_PROPERTY,
         ),
         required=(
@@ -282,7 +320,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Gear Data",
             TOOTH_SPACE_CALLOUT_PROPERTY,
         ),
     )
@@ -392,7 +429,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     # The native thread and drill ride the callout; the mouth breaks and the
-    # assembly transfer are the spec's lines under it.
+    # link to the assembly-transfer note are the sheet's lines under it.
     tap_callout = add_native_hole_callout(
         adapter,
         front,
@@ -405,9 +442,14 @@ async def build(adapter: Any) -> dict[str, str]:
         tap_callout, {"hw-thrutapdrldia": 3}, label="#0-80 transferred disc taps"
     )
 
-    add_property_linked_note(
-        adapter, "Gear Data", *GEAR_DATA_XY, char_height=GEAR_DATA_CHAR_HEIGHT
+    _add_sheet_note(
+        adapter,
+        GEAR_DATA_NOTE,
+        GEAR_DATA_XY,
+        label="gear data",
+        char_height=GEAR_DATA_CHAR_HEIGHT,
     )
+    _add_sheet_note(adapter, DRAWING_NOTES, NOTES_XY, label="numbered")
     return await finalize_drawing(
         adapter,
         OUTPUTS,
