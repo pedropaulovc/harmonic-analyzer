@@ -48,7 +48,49 @@ def test_owner_pin_only_bounds_and_rounded_budget():
         name: max(abs(v) for v in spec.PIN_ROUNDED_BUDGET[name])
         for name in ("inner", "outer")
     }
-    assert max(spec.PIN_RELATIVE_ERROR.values()) < spec.PIN_RELATIVE_ALLOWANCE
+    assert spec.HUB_SHANK_RADIAL_FLOAT == pytest.approx(spec.HUB_SLIP_CLEARANCE_MAX / 2)
+    assert spec.HUB_SHANK_RADIAL_FLOAT / I == pytest.approx(.00075)
+    assert spec.HUB_NOSE_RADIAL_FLOAT == pytest.approx(spec.hub_stud.NOSE_CLEARANCE[1] / 2)
+    assert spec.PIN_RELATIVE_STACK == pytest.approx(
+        max(spec.PIN_RELATIVE_ERROR.values())
+        + spec.HUB_SHANK_RADIAL_FLOAT + spec.HUB_NOSE_RADIAL_FLOAT
+    )
+    assert spec.NOSE_FLOAT_ALLOWANCE == pytest.approx(
+        spec.PIN_RELATIVE_ALLOWANCE
+        - max(spec.PIN_RELATIVE_ERROR.values()) - spec.HUB_SHANK_RADIAL_FLOAT
+    )
+    assert spec.NOSE_FLOAT_ALLOWANCE / I == pytest.approx(.000379842556, abs=1e-9)
+    assert spec.PIN_RELATIVE_STACK <= spec.PIN_RELATIVE_ALLOWANCE
+    assert spec.PIN_RELATIVE_REMAINING == pytest.approx(
+        spec.PIN_RELATIVE_ALLOWANCE - spec.PIN_RELATIVE_STACK
+    )
+    assert spec.PIN_RELATIVE_REMAINING >= 0
+    assert spec.HUB_RADIAL_STACK <= .005 * I
+
+
+@pytest.mark.parametrize(
+    "nose_minus_in,radial_float_in,stack_in",
+    [
+        (.0001, .0003, .004920157444),
+        (.0002, .00035, .004970157444),
+        (.0005, .0005, .005120157444),
+    ],
+)
+def test_nose_fit_counterfactual_uses_the_complete_relative_half(
+    nose_minus_in, radial_float_in, stack_in,
+):
+    # Vary limits only, never the physical .4000 nominal or either .005 half.
+    nose_minimum = spec.hub_stud.DIA - nose_minus_in * I
+    nose_float = (spec.hub_stud.STRAP_HOLE_LIMITS[1] - nose_minimum) / 2
+    assert nose_float / I == pytest.approx(radial_float_in)
+    total = max(spec.PIN_RELATIVE_ERROR.values()) + spec.HUB_SHANK_RADIAL_FLOAT + nose_float
+    assert total / I == pytest.approx(stack_in, abs=1e-9)
+    if stack_in > .005:
+        with pytest.raises(AssertionError, match="relative .005 budget"):
+            spec.require_pin_relative_budget(nose_float)
+    else:
+        assert spec.require_pin_relative_budget(nose_float) == pytest.approx(total)
+    assert spec.PIN_RELATIVE_ALLOWANCE == pytest.approx(.005 * I)
     assert spec.HUB_RADIAL_STACK <= .005 * I
 
 

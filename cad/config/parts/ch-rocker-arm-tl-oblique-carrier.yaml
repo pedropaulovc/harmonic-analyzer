@@ -11,6 +11,10 @@ ch-rocker-arm-tl-oblique-carrier:
   finish: as machined
   quantity: 1
   tolerance_class: machined_block
+  # LEFT .310 MIN belongs to the saved model's IDimensionTolerance. Read back
+  # its type, zero deviations and explicit .XXX precision after save/reopen.
+  # The native callout's independent ICalloutVariable.ToleranceType presents
+  # that verified value; it must never repair a missing model control.
   process: >-
     saw a 21.3 in length from the 1/2 x 6 bar and mill it to width on edge
     in the vise, no bandsaw rip (the 6 in width does not fit the 5 3/4 in
