@@ -268,10 +268,12 @@ def test_stock_diameters_print_as_untoleranced_references() -> None:
         "TubeOdReference": frozenset({"TubeOdRef"}),
         "SleeveProfile": frozenset({"SleeveDia"}),
         "OverallReference": frozenset({"OverallHeight", "OverallReach"}),
+        # Turned to the measured tube ID (note 2): the fit governs.
+        "EndPieceProfile": frozenset({"PlugShankDia"}),
     }
     for feature, names in spec.REFERENCE_DIMENSIONS.items():
         assert names <= spec.DRAWING_DIMENSIONS[feature]
-        assert set(names) <= set(drawing.FRONT_KEEP)
+        assert set(names) <= set(drawing.FRONT_KEEP) | set(drawing.SECTION_KEEP)
     # The reference line runs on the bare leg, between the sleeve and the bend.
     low = spec.TUBE_OD_REF_Y - spec.TUBE_OD_REF_SPAN / 2.0
     high = spec.TUBE_OD_REF_Y + spec.TUBE_OD_REF_SPAN / 2.0
@@ -301,7 +303,7 @@ def test_only_the_reference_value_is_bracketed_when_a_callout_rides_it(
 
     monkeypatch.setattr(part, "_named_dimensions", named)
     part._author_reference_dimensions(None)
-    for name in ("SleeveDia", "TubeOdRef"):
+    for name in ("SleeveDia", "TubeOdRef", "PlugShankDia"):
         display = displays[name]
         assert (display.GetText(1), display.GetText(2)) == ("(<MOD-DIAM>", ")")
         assert not display.ShowParenthesis

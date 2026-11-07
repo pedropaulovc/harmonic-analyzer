@@ -353,15 +353,17 @@ TOP_KEEP = {
 # MHA-FR-02's and the frame assembly's import closure, which must not key on
 # the lever's registry row.  Datum B's slip hole and the slot are a matched
 # fit on the MHA-SM-VN-53 dowel (fan-out policy 1: their ±.0007 bands sit
-# under the shop rows, so each names the route, cut to suit the dowel, with
+# under the shop rows, so each names the dowel and its standard fit, with
 # the slip clearance as its acceptance; machinist review
-# 20261107T102825912Z); B's ream states its depth as REF, which the
+# 20261107T102825912Z; round 2, 20261107T110808280Z: "TO SUIT" is a rule-26
+# private phrase, and the slot's rows have ~24 characters left of their
+# dimension line); B's ream states its depth as REF, which the
 # section's floor depth controls for both (rule 26: a depth is never
 # deferred to a view).  These rows are drawing text, so the frame's import
 # closure keeps its key.
 LEVER_NUMBER = str(_config.parts("sm-summing-lever")["number"])
 BORE_CALLOUT = "\n".join(("BORE THRU", "RUNNING FIT ON", f"{LEVER_NUMBER} TRUNNION"))
-_SLIP_FIT = f"TO SUIT {DOWEL_NUMBER}:"
+_SLIP_FIT = f"{DOWEL_NUMBER} SLIDING FIT"
 _SLIP_CLEARANCE = "CLEARANCE {:.4f}-{:.4f}".format(*PIN_SLIP_PRINTED).replace("0.", ".")
 _PIN_DEPTH_REF = f"{PIN_HOLE_DEPTH / DOWEL.MM_PER_IN:.{PIN_HOLE_DEPTH_PLACES}f}".lstrip("0")
 PIN_HOLE_CALLOUT = "\n".join(

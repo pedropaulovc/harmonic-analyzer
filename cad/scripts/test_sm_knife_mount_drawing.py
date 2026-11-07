@@ -663,7 +663,8 @@ def test_the_sheet_carries_no_notes_block() -> None:
     slot = drawing.SLOT_WIDTH_CALLOUT
     for callout in (hole, slot):
         assert callout.count(window) == 1
-        assert callout.count(f"TO SUIT {dowel_number}") == 1
+        assert callout.count(f"{dowel_number} SLIDING FIT") == 1
+        assert "TO SUIT" not in callout  # rule 26 private phrase (round 2)
         assert "REF)" not in callout
     for callout in (hole, slot):
         assert 1 + len(callout.splitlines()) <= TEXT_ROW_LIMIT
