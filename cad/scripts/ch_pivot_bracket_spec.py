@@ -151,10 +151,13 @@ SET_SCREW_MAJOR_DIA = THREAD_MAJOR_MM[SET_SCREW_THREAD]
 # The cup end the flat must take: the vendor's 45 deg x one-pitch point
 # chamfer off the major (sh_vn_arbor_set_screw_spec.POINT_LENGTH).
 SET_SCREW_POINT_DIA = SET_SCREW_MAJOR_DIA - 2.0 * SET_SCREW_PITCH  # 1.575
-# The tap sits on the ear's mid-plane, held +/-.004 from the inboard face;
-# that face's mid-plane is itself half the thickness band off, so the tap
-# may stand this far off nominal along the shaft.
-SET_SCREW_STATION_BAND = 0.1016  # +/-.004
+# The tap sits on the ear's mid-plane, its drilled station printed plain
+# from the inboard face at the title block's .XXX row (+/-.005, the shop's
+# drilled-hole location row); that face's mid-plane is itself half the
+# thickness band off, so the tap may stand this far off nominal along the
+# shaft. Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144
+# (Q2-A) -- pending owner confirmation.
+SET_SCREW_STATION_BAND = printed_band_mm(3, unit=UNIT)  # +/-.005
 SET_SCREW_OFF_MID_MAX = SET_SCREW_STATION_BAND + EAR_T_BAND / 2.0
 # The thread's wall to each ear face at the worst case (target .080): the
 # inboard face at the tap's far limit, the outboard face also losing the

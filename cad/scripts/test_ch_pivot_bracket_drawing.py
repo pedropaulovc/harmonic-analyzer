@@ -124,10 +124,12 @@ def test_each_hole_keeps_one_centre_mark() -> None:
 def test_model_bands_come_from_named_spec_constants() -> None:
     assert model_toleranced_dimensions(part) == {
         ("Ear", "EarThick"): "EAR_T_BAND",
-        ("SetScrewReference", "SetScrewLocation"): "SET_SCREW_STATION_BAND",
         ("ShaftBoreProfile", "ShaftBoreDia"): "*deviations(BORE_DIA_BAND)",
     }
-    assert part.EAR_T_BAND == part.SET_SCREW_STATION_BAND == pytest.approx(0.1016)
+    assert part.EAR_T_BAND == pytest.approx(0.1016)
+    # The drilled apex tap's station prints plain at the title block's .XXX
+    # row (Q2-A).
+    assert spec.SET_SCREW_STATION_BAND == pytest.approx(0.127)
     # The hold-down station rides the title block's .XX too (#1371 review: a
     # band on a clearance hole's station holds nothing), as do the overall
     # and the bore heights the tap's thread is counted against.
@@ -402,7 +404,7 @@ def test_plan_stations_each_print_at_their_own_arrows_near_the_plan() -> None:
     plan_bottom = drawing._top_y(FOOT_Z1)
     tap_column = drawing.TOP_KEEP["SetScrewLocation"]
     foot_column = drawing.TOP_KEEP["FootLen"]
-    tap = _hanging_block(".160 ±.004", tap_column)
+    tap = _hanging_block(".160", tap_column)
     assert "EarThick" not in drawing.TOP_KEEP
     # Nested shortest first, each column clear of the plan and the one inside.
     assert drawing._EAST_X + 0.008 <= tap_column[0] < foot_column[0]

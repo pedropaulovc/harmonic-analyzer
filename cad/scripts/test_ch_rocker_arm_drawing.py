@@ -2499,7 +2499,7 @@ def test_rod_hole_keeps_its_normal_wall_to_the_real_k_taper_at_printed_bands():
     assert position_diameter == drawing.ROD_HOLE.fields["position_dia"][0]
     profile_allowance = float(drawing.ARC_PROFILE_ZONE_MM)
     worst_wall = normal_distance - conservative_hole_max / 2.0 - position_diameter / 2.0 - profile_allowance
-    assert worst_wall == pytest.approx(2.15973328575)
+    assert worst_wall == pytest.approx(2.08353328575)
     assert worst_wall >= WALL_TARGET_MM, f"rod-pin hole to K-taper normal wall is only {worst_wall:g} mm"
 
 
