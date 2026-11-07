@@ -141,9 +141,9 @@ KNIFE_BORE_ORIENTATION_TOL = GEOMETRIC_TOLERANCES_MM["knife-bore orientation"]
 # The #10-24 tap's position to A|B|C: the bolt axis the crossbar's #10
 # clearance hole must float round (``build_sm_summing_assembly``'s knife-hanger
 # stack).  Its zone radius is one term of HANGER_SCREW_MISMATCH inside
-# the hole's 0.6095 radial float with the drill drift's 0.192 over the
-# printed grip's thickest 36.627.  Ø.005 keeps 0.020 of that float spare
-# (the stack closes at Ø0.155 mm, so Ø.006 = 0.1524 would fit with 0.0018;
+# the C drill hole's 0.6604 radial float with the drill drift's 0.192 over
+# the printed grip's thickest 36.627.  Ø.005 keeps 0.052 of that float spare
+# (the stack closes at Ø0.200 mm, so Ø.007 = 0.1778 would fit with 0.016;
 # B's simulator may stand t/2 off
 # the pin root under its ⊥ to A).  A screw through a clearance hole needs no
 # tighter zone than that float admits (drawing-guidelines.md rule 5); plain
@@ -439,7 +439,8 @@ SLOT_POSITION_TOL = GEOMETRIC_TOLERANCES_MM["dowel slot position"]
 # The slot's inner end: its half-round end's centre stands SLOT_END_FROM_B
 # from B's axis along the line, printed .XX.  Its shortest limit keeps the
 # end clear of the tap's thread (below); its longest still puts the slot's
-# pin, at the crossbar's shortest span (BASIC .600 within its Ø.002 zone)
+# pin, at the crossbar's shortest span (two BASIC .300 stations from D, each
+# within its Ø.004 zone)
 # and B's slip, wholly between the slot's straight walls, so the walls bound
 # the pin across the line (clocking) at every limit.  The slot runs straight
 # out through the -X face.  The block may go on either way round: the pins
@@ -452,10 +453,10 @@ _SLIP_HALF = DOWEL.SLIP_CLEARANCE_MAX / 2.0  # B's float on its pin, 0.0457
 SLOT_PIN_FROM_B = (
     DOWEL.SPAN - DOWEL.SPAN_TOL - _SLIP_HALF,
     DOWEL.SPAN + DOWEL.SPAN_TOL + _SLIP_HALF,
-)  # (15.169, 15.311)
+)  # (15.093, 15.387)
 # Clocking: the pin's centre stands past the end's centre at the end's
 # longest limit, so the pin's full diameter bears on the straight walls:
-# 15.169 - 14.732 = 0.437.
+# 15.093 - 14.732 = 0.361.
 SLOT_PIN_LOCATION_MARGIN = SLOT_PIN_FROM_B[0] - (SLOT_END_FROM_B + SLOT_END_TOL)
 if SLOT_PIN_LOCATION_MARGIN <= 0.0:
     raise AssertionError(
@@ -494,7 +495,7 @@ _FACE_FROM_B_MAX = (2.0 * BLK_HALF_X + BLOCK_SIZE_TOL) - (
     PIN_HOLE_SIDE_DISTANCE - PIN_HOLE_SIDE_TOL
 )  # 20.828
 # The mouth: the slot's pin bears wholly inside the block, its far side short
-# of the -X face: 19.812 - 15.311 - 1.591 = 2.91.
+# of the -X face: 19.812 - 15.387 - 1.591 = 2.83.
 SLOT_MOUTH_PIN_MARGIN = _FACE_FROM_B_MIN - SLOT_PIN_FROM_B[1] - DOWEL.DIA_MAX / 2.0
 if SLOT_MOUTH_PIN_MARGIN <= 0.0:
     raise AssertionError(
