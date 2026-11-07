@@ -7,10 +7,9 @@ pin section outlines read as the diagram's edges.
 6261K171 is the configurable family; its 6261K401 graphic is an eleven-foot
 example. The inspected 6261K281 native/STEP is the family's ONE-foot selection,
 not this project's two-foot purchase. Only family cross-sections and pitch are
-used here. The 6261K108 connecting link carries the same family diagrams: its
-plate and overall-pin sections, laid beside the roller, read as a TOP view that
-projects nothing (machinist review, fan-out 2026-11-07), and ITEM already
-names the replacement.
+used here. The 6261K108 connecting link carries none: an outer link has no
+roller, and its diagrams contradicted its own pictorial (machinist review,
+fan-out 2026-11-07), so its sheet shows the link itself and ITEM names it.
 No downloaded body, reconstructed solid or chain purchase length is authored.
 """
 

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import importlib
 from types import SimpleNamespace
 
 import pytest
@@ -306,9 +305,8 @@ def test_chain_top_shelves_text_without_moving_native_lines(monkeypatch):
         settled()
 
 
-@pytest.mark.parametrize("module", ["draw_sh_vn_chain_link", "draw_pd_vn_chain_connecting_link"])
-def test_chain_top_fit_lane_accommodates_five_to_one_source_gauge(module):
-    chain_drawing = importlib.import_module(module)
+def test_chain_top_fit_lane_accommodates_five_to_one_source_gauge():
+    import draw_sh_vn_chain_link as chain_drawing
 
     cells = supplier_drawing.supplier_fit_cells(
         supplier_drawing.supplier_state_cells(0.08, maximum=False),
@@ -321,9 +319,9 @@ def test_chain_top_fit_lane_accommodates_five_to_one_source_gauge(module):
     assert chain_stock.ROLLER_WIDTH / 1000 * 8 > available_height
 
 
-@pytest.mark.parametrize("module", ["draw_sh_vn_chain_link", "draw_pd_vn_chain_connecting_link"])
-def test_chain_top_roller_square_projects_over_front_roller_circle(module):
-    chain_drawing = importlib.import_module(module)
+def test_chain_top_roller_square_projects_over_front_roller_circle():
+    import draw_sh_vn_chain_link as chain_drawing
+
     cells = {
         name: center
         for name, center, _box in supplier_drawing.supplier_fit_cells(
