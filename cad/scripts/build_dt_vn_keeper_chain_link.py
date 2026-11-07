@@ -47,7 +47,6 @@ from _sketch_rectangle import define_centered_rectangle
 from _drawing_marks import apply_drawing_properties
 from _saved_part_guard import require_saved_drawing_properties
 from dt_vn_keeper_chain_spec import (
-    LINK_DRAWING_NOTES,
     LINK_CRIMP_DEPTH,
     LINK_CRIMP_X,
     LINK_END_BEAD_X,
@@ -71,6 +70,12 @@ STOCK_PROPERTIES = {
 }
 
 CRIMP_R = 0.3  # the crimp tool's radius (dt_vn_keeper_chain_spec._link_solid)
+# The sheet's one note names the mate (rule 4); seating one end bead in each
+# dome is the MHA-DT-00 step that closes the chain (rule 7: no assembly
+# instruction on a part sheet). Owned here, not by dt_vn_keeper_chain_spec,
+# so the shared chain spec, MHA-DT-VN-65 and MHA-DT-00's drawing keep their
+# keys; the spec's LINK_DRAWING_NOTES is a follow-up removal.
+DRAWING_NOTES = "JOINS THE MHA-DT-VN-65 ENDS."
 
 
 async def _circle_on(adapter, plane: str, dia: float, label: str) -> None:
@@ -224,7 +229,7 @@ async def build(adapter) -> dict[str, str]:
     _telemetry.success(f"loop link: openings on +Y (centre of mass y {com_y:.4f})")
     await apply_material(adapter, MATERIAL)
     apply_custom_properties(adapter, STOCK_PROPERTIES)
-    apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": LINK_DRAWING_NOTES})
+    apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})
     await report_mass_properties(adapter)
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(
