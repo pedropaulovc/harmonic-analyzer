@@ -564,9 +564,17 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     # Decimal places (and so the general-tolerance row each dimension claims)
-    # are authored on the part; the sheet only proves the import kept them.
+    # are authored on the part; the sheet only proves the import kept them
+    # on the dimensions it prints (the half angle is curated away: the
+    # countersink callout states its 90°).
     assert_imported_precision(
-        adapter, [*face_annotations, *section_annotations], DRAWING_PRECISION_BY_NAME
+        adapter,
+        [*face_annotations, *section_annotations],
+        {
+            name: places
+            for name, places in DRAWING_PRECISION_BY_NAME.items()
+            if name in FACE_KEEP or name in SECTION_KEEP
+        },
     )
     set_dimension_callouts(
         adapter,
