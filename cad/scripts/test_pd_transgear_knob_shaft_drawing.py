@@ -397,7 +397,7 @@ def test_supported_certified_pin_inspects_all_actual_finite_corners() -> None:
 def test_indicator_grade_has_one_live_source_and_span_does_not_certify_eccentricity() -> None:
     from _gear_quality import toothspace_runout_tir_mm
 
-    assert spec.TOOTH_SPACE_RUNOUT_TIR_MM == toothspace_runout_tir_mm() == 0.05
+    assert spec.TOOTH_SPACE_RUNOUT_TIR_MM == toothspace_runout_tir_mm() == 0.0508
     assert spec.TOOTH_SPACE_CALLOUT.splitlines()[0].startswith("TOOTH SPACE RUNOUT ")
     assert spec.TOOTH_SPACE_CALLOUT_PROPERTY == "Tooth Space Inspection"
     assert all(word not in spec.TOOTH_SPACE_CALLOUT for word in ("CANDIDATE", "TODO", "GATE"))

@@ -44,12 +44,16 @@ DRAWING_PRECISION = {
         CENTRE_DIMENSION: PLACES,
     }
 }
-# The set band on S to N, as (lower, upper) deviations: +x/-0, floored onto
-# the sheet's .XXXX grid so the printed band stays inside the mesh window.
+# The set band on S to N, as (lower, upper) deviations: +x/-0. The band is
+# the .002 inch step (stock_form_quality.reducer_k_setting_diameter_mm / 2),
+# so it prints at three places, +.002/0, not as a converted .0019.
+TOLERANCE_PLACES = 3
 CENTRE_TOLERANCE_MM = (
     disc.CENTRE_DISTANCE_SET_BAND[1],
-    disc.inch_floor_mm(disc.CENTRE_DISTANCE_SET_BAND[0], PLACES),
+    disc.inch_floor_mm(disc.CENTRE_DISTANCE_SET_BAND[0], TOLERANCE_PLACES),
 )
+if abs(CENTRE_TOLERANCE_MM[1] - disc.CENTRE_DISTANCE_SET_BAND[0]) > 1e-9:
+    raise AssertionError("the VIEW K set band is off the .001 inch grid")
 
 # The installed mill DRO's display count in inch mode: its 5 um scale reads
 # .0002 (shop inventory machines.PM-30MV.resolution_mm;

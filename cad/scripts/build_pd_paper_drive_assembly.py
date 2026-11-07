@@ -2450,7 +2450,7 @@ async def _author_knob_setting_reference(adapter) -> None:
     # associative model dimension, never a note (#1388).
     set_dimension_bilateral_tolerance(
         adapter, spec.FEATURE, spec.CENTRE_DIMENSION, *KNOB_SETTING.CENTRE_TOLERANCE_MM,
-        places=spec.PLACES, display_unit=assembly_contract(ASM_NAME).drawing_unit,
+        places=spec.TOLERANCE_PLACES, display_unit=assembly_contract(ASM_NAME).drawing_unit,
     )
     for name in sorted(spec.REFERENCE_DIMENSIONS):
         # A reference value through the native prefix/suffix channel (the
