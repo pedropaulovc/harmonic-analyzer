@@ -1492,15 +1492,13 @@ def test_only_opted_in_drawings_are_submitter_only_build_and_release_leaves(
                         for task in queried
                         if task.startswith("check:machinist_review:")
                     ],
-                    "agent_identity": "fixture",
-                    "agent_version": "fixture",
                 }
             ),
         )
 
     monkeypatch.setattr(build.subprocess, "run", protocol_query)
     monkeypatch.setattr(build, "_pool_home", lambda: tmp_path)
-    dispatchable, _identity = build._require_leaf_admission(control)
+    dispatchable = build._require_leaf_admission(control)
     assert queried == dispatchable
     assert dispatchable
     assert not {f"check:{name}" for name in leaves} & set(dispatchable)
