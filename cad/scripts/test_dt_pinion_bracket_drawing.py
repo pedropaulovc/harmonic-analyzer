@@ -360,7 +360,10 @@ def test_fitted_bores_name_their_mates_and_fits() -> None:
         text = " ".join(callouts[name].splitlines())
         for word in words:
             assert word in text, (name, word)
-    assert not {"PinSeatCy", "PinSeatCz"} & set(callouts)
+    # The across-the-bar station is bare; the .XXX through-thickness station
+    # states the webs it holds (owner ruling (a)).
+    assert "PinSeatCy" not in callouts
+    assert "WEB" in callouts["PinSeatCz"]
     assert {c.key for c in dt_pinion_bracket_spec.SURFACE_FINISHES} == {"arbor_bore"}
     # #290: on the .36 strap the far-face wall clears the .080 target, so the
     # sheet prints no WALL minimum and the former RV-01 exception is retired.

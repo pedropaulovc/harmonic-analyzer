@@ -324,19 +324,22 @@ OVERALL_XY = (0.040, 0.150)
 ARBOR_FINISH_EDGE = (_front_x(-ARBOR_BORE / 2.0), _front_y(C2C))
 ARBOR_FINISH_XY = (0.155, 0.205)
 # A callout says only what a dimension cannot: how the feature is made, where
-# it stops, what it mates with and the fit it needs (rule 4).  A location
-# dimension carries its value and band and nothing else (rule 7): the seat's
+# it stops, what it mates with and the fit it needs (rule 4).  The seat's
 # mate rides its size callout.  The seat's depth rides its callout as REF
 # (rule 26: never deferred to a view) while Section B-B's .16 controls the
 # floor; the floor-corner allowance lets the builder pick a flat-bottom reamer
 # or end mill (rule 16).  The pivot bore is a sliding fit so the strap goes
 # onto the shaft for fit-up, then pinned (option E-a); the arbor runs in its
 # bore; the follower stud slips into its seat and is bonded (LOCTITE 638,
-# dt_pinion_cam_pin_spec's bond gap).
+# dt_pinion_cam_pin_spec's bond gap).  The seat's .XXX station from face A is
+# the owner's ruling (a) for the webs either side of the seat
+# (PIN_SEAT_WEB_WORST), so it states that function in three words (rule 4;
+# fan-out round 3: a bare .180 read as over-specified).
 DIMENSION_CALLOUTS = {
     "PivotBoreDia": "REAM THRU\nSLIDING FIT ON\nSHAFT MHA-DT-19",
     "ArborBoreDia": "REAM THRU\nRUNNING FIT ON\nARBOR MHA-DT-22",
     "PinSeatDia": PIN_SEAT_CALLOUT,
+    "PinSeatCz": "SETS SEAT WEBS",
     "CrossHoleDia": CROSS_HOLE_CALLOUT,
 }
 

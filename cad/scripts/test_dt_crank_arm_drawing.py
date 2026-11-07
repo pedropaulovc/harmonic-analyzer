@@ -93,12 +93,13 @@ def test_handle_end_is_a_semicircle_about_the_pivot() -> None:
 def test_punch_and_seam_operations_are_callouts_not_fake_dimensions() -> None:
     general = spec.DRAWING_NOTES
     assert "O'CLOCK" not in general
-    # The seam's pin, mate and permanent pair ride one numbered note, and the
-    # seam's own callout flags it (rule 7).
-    seam_notes = [line for line in general.splitlines() if line[:1].isdigit()
-                  and "SEAM" in line]
-    assert len(seam_notes) == 1
-    assert f"SEE NOTE {seam_notes[0].split('.')[0]}" in notes.SEAM_CALLOUT
+    # The pin hole's ream, mate, pin and permanent pair ride one numbered
+    # note, and its own callout flags it (rule 7), in plain words (rule 26).
+    pin_notes = [line for line in general.splitlines() if line[:1].isdigit()
+                 and "MHA-DT-31 AT ASSEMBLY" in line]
+    assert len(pin_notes) == 1
+    assert "MHA-DT-VN-59" in general and "SEAM" not in general
+    assert f"SEE NOTE {pin_notes[0].split('.')[0]}" in notes.SEAM_CALLOUT
     assert "DIMPLE" not in general
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     # The punch witness prints its location, never a size (machinist review
@@ -345,7 +346,9 @@ def test_fiducial_callout_attaches_on_the_punched_mark_rim() -> None:
     # Its right end stays left of the mark (iter 1 of the 2026-10-27 fix: a
     # wider block sent the leader down-left through the FiducialX text).
     char_w = 0.0027  # measured on the 5bca52e13 render
-    width = max(map(len, notes.FIDUCIAL_CALLOUT.splitlines())) * char_w
+    # A SolidWorks symbol token prints as one character.
+    rows = notes.FIDUCIAL_CALLOUT.replace("<MOD-DIAM>", "\u00d8").splitlines()
+    width = max(map(len, rows)) * char_w
     assert drawing.FIDUCIAL_CALLOUT_XY[0] + width + 0.005 < cx
     # Both ordinates draw their arrows inside their witnesses, so neither
     # line runs out under the punch-mark or hub-seat leader (farm iter 2).
