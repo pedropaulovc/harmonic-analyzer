@@ -487,17 +487,20 @@ CALLOUTS_BELOW = {
     # tip (BAR_REACH_MAX, 12.294) passes the full thread into the bottoming
     # tap's lead; at .50 that lead runs past the 5/8 KP08 screw's tip on the
     # least foot; at .45 the top lead does the same to the bar screw's tip.
-    # The sheet states the thread's scope and names its mates by catalogue
-    # length (the leadscrew spec's purchased 3/4 bar and 5/8 KP08 SHCS; farm
-    # 26bb: "the sheet shows no screw length or other mate"), at most
-    # DEPTH_NOTE_ROWS_MAX rows (machinist review a966: a seven-row note
-    # overruled its rule 7); the tip and tap-lead bounds above stay here and
-    # in the spec's windows, not on the print. The depth itself prints only
-    # through its native dimension.
+    # The sheet states the thread's scope, its mates by catalogue length (the
+    # leadscrew spec's purchased 3/4 bar and 5/8 KP08 SHCS; farm 26bb: "the
+    # sheet shows no screw length or other mate") and both limits' function,
+    # in at most DEPTH_NOTE_ROWS_MAX rows (machinist review a966: a seven-row
+    # note overruled its rule 7). Lower: the full thread holds the 3/4 bar
+    # screw's tip. Upper (machinist review 957 read .49 MIN as enough once the
+    # rows named only the mates): the bottoming tap's lead must clear the
+    # 5/8 KP08 screw's tip. The depth itself prints only through its native
+    # dimension.
     BAR_THREAD_DEPTH_DIMENSION: (
         "FULL THREAD FROM BOTTOM\n"
-        f"BOTH HOLES: {leadscrew.BAR_SCREW_LENGTH} BAR AND\n"
-        f"{leadscrew.KP08_SCREW_LENGTH} KP08 SCREWS"
+        f"HOLDS {leadscrew.BAR_SCREW_LENGTH} BAR SCREW TIP\n"
+        "TAP LEAD CLEARS THE\n"
+        f"{leadscrew.KP08_SCREW_LENGTH} KP08 TIP, EACH HOLE"
     ),
 }
 DEPTH_NOTE_ROWS_MAX = 4

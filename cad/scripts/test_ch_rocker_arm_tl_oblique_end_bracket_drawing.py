@@ -361,18 +361,22 @@ def test_three_place_depths_are_set_by_the_opposed_screws() -> None:
     assert bar_high + spec.TAP_LEAD > spec.THICK_MIN - spec.KP08_REACH_MAX
     # At .45 the top tap's lead passes the bar screw's tip.
     assert kp08_high + spec.TAP_LEAD > spec.THICK_MIN - spec.BAR_REACH_MAX
-    # The sheet names the thread's scope and its mates beside the depth: the
-    # catalogue screws (farm 26bb: no screw length or mate named), each on
-    # one row, in at most four short rows (machinist review a966), and no
-    # retyped depth (it prints from its native dimension).
+    # The sheet names the thread's scope, its mates and both limits' function
+    # beside the depth: the catalogue screws (farm 26bb: no screw length or
+    # mate named), each on one row; the lower limit's tip in full thread and
+    # the upper limit's tap lead clear of the opposed tip (machinist review
+    # 957 read a mates-only note as .49 MIN); at most four short rows
+    # (machinist review a966); no retyped depth (it prints natively).
     rows = spec.CALLOUTS_BELOW[spec.BAR_THREAD_DEPTH_DIMENSION].split("\n")
     assert spec.DEPTH_NOTE_ROWS_MAX == 4
     assert len(rows) <= spec.DEPTH_NOTE_ROWS_MAX
+    assert max(len(row) for row in rows) <= 23  # the section's text guard
     assert "FULL THREAD" in rows[0] and "BOTTOM" in rows[0]
-    assert any("BOTH HOLES" in row for row in rows)
+    assert any("HOLE" in row for row in rows)
     assert any(f"{leadscrew.BAR_SCREW_LENGTH} BAR" in row for row in rows)
     assert any(f"{leadscrew.KP08_SCREW_LENGTH} KP08" in row for row in rows)
-    assert any("SCREW" in row for row in rows)
+    assert sum("TIP" in row for row in rows) >= 2  # each screw's tip
+    assert any("TAP LEAD" in row for row in rows)  # the upper limit
     _assert_no_retyped_depth("\n".join(rows))
 
 
