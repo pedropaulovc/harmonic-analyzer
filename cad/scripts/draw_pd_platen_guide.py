@@ -139,26 +139,40 @@ FINISH_CHAR_HEIGHT = 0.0025
 # platen-screw taps are spotted through MHA-PD-02's holes at assembly, then
 # drilled and tapped (the PD-00 step); the lock taps are cut to the Ø.008 zone
 # (RV-03) and MHA-PD-12's holes are transferred from them, so the note names
-# only the platen taps. It stands right of the frame, under the overall
-# length's line and above the tags over the bar; one line fits there (a second
-# line would run into the A3/A7 tags).
+# only the platen taps. Its second line states the taps' finished wall to the
+# edges, at the floor (rule 20; delegated ruling RV-01 in
+# pd-platen-guide.yaml), at the frame rather than floating under the bar
+# (round 2, where datum B's box also struck it). The block's top-left stands
+# 2.5 mm right of the frame (x 0.097..0.1385) and right of the A3 tag (text
+# ends ~0.1435), 2.1 mm under the 10.62 line (~0.1321); its two lines (5.5 mm
+# pitch, ~0.121 bottom) end left of the 10.62's right extension line (x 0.325)
+# and, for the second, of the A7 tag (x ~0.246).
 PLATEN_TAP_TAGS = tuple(
     f"A{index}"
     for index, station in enumerate(HOLE_STATIONS_MM, start=1)
     if station in FRONT_X
 )
+PLATEN_NUMBER = _config.parts("pd-platen")["number"]
+LOCK_NUMBER = _config.parts("pd-guide-lock")["number"]
 FCF_MATE_NOTE = (
-    f"{', '.join(PLATEN_TAP_TAGS)}: SPOT THRU "
-    f"{_config.parts('pd-platen')['number']} AT ASSEMBLY, DRILL, TAP"
+    f"{', '.join(PLATEN_TAP_TAGS)}: SPOT THRU {PLATEN_NUMBER} AT ASSEMBLY, "
+    f"DRILL, TAP\n{TAP_EDGE_WALL_TEXT}"
 )
-FCF_MATE_NOTE_XY = (0.141, 0.1285)
-# The route's bench acceptance and the taps' finished wall to the edges, at
-# the floor (rule 20; delegated ruling RV-01 in pd-platen-guide.yaml): one
-# line under the bar, right of datum B's tag (box bottom ~0.0945) and over
-# the bar-slide finish's text (top ~0.087), left of the depth's text stack
-# (x 0.318), under the A5..A9 tags (bottom ~0.100).
-TAP_WALL_NOTE = f"SCREWS ENTER BY HAND; {TAP_EDGE_WALL_TEXT}"
-TAP_WALL_NOTE_XY = (0.155, 0.093)
+FCF_MATE_NOTE_XY = (0.146, 0.1300)
+# Rule 10 / rule 4: the tagged table names each tap's mate in its own column,
+# the platen's holes for the platen-screw taps and the guide lock's for the
+# lock taps (round 2). The column follows the fr_harmonic_base NOTE column:
+# inserted after SIZE, its cells written per row bound to its station; the
+# table may widen right (it ends ~0.165, the isometric starts ~0.305).
+HOLE_TABLE_MATE_COLUMN = "MATE"
+HOLE_TABLE_MATE_COLUMN_WIDTH = 0.030  # "MHA-PD-02" prints ~22 mm
+HOLE_TABLE_MATES: dict[float, str] = {
+    station: PLATEN_NUMBER if station in FRONT_X else LOCK_NUMBER
+    for station in HOLE_STATIONS_MM
+}
+_INSERT_COLUMN_AFTER = 3  # swTableItemInsertPosition_After
+_INSERT_COLUMN_DEFAULT_WIDTH = 0  # swInsertColumn_DefaultWidth
+_TABLE_SIZE_CAN_CHANGE = 0  # swTableRowColChange_TableSizeCanChange
 # The right view's depth: its text stack (keep = its centre) left of the
 # extension lines (x 0.365 and 0.375), its underline on its own dimension
 # line (~0.075), under the height's ".29" (bottom ~0.108) and datum A's tag
@@ -239,18 +253,91 @@ def _hole_rim_entities(
     return tuple(rims)
 
 
-def _place_hole_tags(view: Any, table: Any) -> None:
-    """Move each native hole tag beside its own hole, on a leader to its rim."""
-    stations_by_tag: dict[str, float] = {}
+def _table_cells(table: Any, columns: int) -> tuple[tuple[str, ...], ...]:
+    return tuple(
+        tuple(
+            str(table.DisplayedText2(row, column, False) or "").strip()
+            for column in range(columns)
+        )
+        for row in range(int(table.RowCount))
+    )
+
+
+def _hole_table_rows(table: Any) -> dict[float, tuple[int, str]]:
+    """Bind every native row to exactly one model station: station -> (row, tag)."""
+    if int(table.RowCount) != len(HOLE_STATIONS_MM) + 1:
+        raise RuntimeError(
+            f"platen-guide hole table has {int(table.RowCount)} rows; "
+            f"expected {len(HOLE_STATIONS_MM) + 1}"
+        )
+    rows: dict[float, tuple[int, str]] = {}
+    tags: set[str] = set()
     for row in range(1, int(table.RowCount)):
         tag = str(table.DisplayedText2(row, 0, False) or "").strip()
         x_mm = float(str(table.DisplayedText2(row, 1, False))) * 25.4
         station = min(HOLE_STATIONS_MM, key=lambda s: abs(s - x_mm))
-        if abs(station - x_mm) > 0.02 or station in stations_by_tag.values():
+        if not tag or tag in tags or abs(station - x_mm) > 0.02 or station in rows:
             raise RuntimeError(
-                f"hole-table row {tag!r} has no unique station: {x_mm:g}"
+                f"hole-table row {row} {tag!r} has no unique station: {x_mm:g}"
             )
-        stations_by_tag[tag] = station
+        tags.add(tag)
+        rows[station] = (row, tag)
+    return rows
+
+
+def _add_mate_column(table: Any) -> tuple[tuple[str, ...], ...]:
+    """Write HOLE_TABLE_MATES into a custom MATE column after SIZE.
+
+    Returns the generated TAG/X LOC/Y LOC/SIZE cells, which the column must
+    leave unchanged through the rebuild (``_check_mate_column``).
+    """
+    if int(table.ColumnCount) != 4:
+        raise RuntimeError("the MATE column expects the native four-column hole table")
+    rows = _hole_table_rows(table)
+    generated = _table_cells(table, 4)
+    inserted = table.InsertColumn2(
+        _INSERT_COLUMN_AFTER, 3, HOLE_TABLE_MATE_COLUMN, _INSERT_COLUMN_DEFAULT_WIDTH
+    )
+    if inserted is not True:
+        raise RuntimeError("native hole table refused the MATE column")
+    if table.SetColumnTitle2(4, HOLE_TABLE_MATE_COLUMN, False) is not True:
+        raise RuntimeError("native hole-table MATE column title did not set")
+    for station, (row, tag) in rows.items():
+        if table.IsCellTextEditable(row, 4) is not True:
+            raise RuntimeError(f"native hole-table MATE cell of {tag} is not editable")
+        table.SetText2(row, 4, False, HOLE_TABLE_MATES[station])
+    actual = float(
+        table.SetColumnWidth(4, HOLE_TABLE_MATE_COLUMN_WIDTH, _TABLE_SIZE_CAN_CHANGE)
+    )
+    if abs(actual - HOLE_TABLE_MATE_COLUMN_WIDTH) > 1e-6:
+        raise RuntimeError(f"hole-table MATE column width did not persist: {actual!r}")
+    return generated
+
+
+def _check_mate_column(table: Any, generated: tuple[tuple[str, ...], ...]) -> None:
+    """Only the MATE column changed: each row names its tap's mate."""
+    if int(table.ColumnCount) != 5:
+        raise RuntimeError("hole table lost or duplicated the MATE column")
+    cells = _table_cells(table, 5)
+    if tuple(row[:4] for row in cells) != generated:
+        raise RuntimeError(f"MATE column changed generated hole-table cells: {cells!r}")
+    rows = _hole_table_rows(table)
+    mates = {row: HOLE_TABLE_MATES[station] for station, (row, _tag) in rows.items()}
+    expected = tuple(
+        HOLE_TABLE_MATE_COLUMN if index == 0 else mates[index]
+        for index in range(len(cells))
+    )
+    if tuple(row[4] for row in cells) != expected:
+        raise RuntimeError(f"hole-table MATE cells differ: {cells!r}")
+    _telemetry.info(
+        "hole-table mates: "
+        f"{ {tag: HOLE_TABLE_MATES[station] for station, (_row, tag) in rows.items()}!r}"
+    )
+
+
+def _place_hole_tags(view: Any, table: Any) -> None:
+    """Move each native hole tag beside its own hole, on a leader to its rim."""
+    stations_by_tag = {tag: station for station, (_row, tag) in _hole_table_rows(table).items()}
     moved: set[str] = set()
     for raw in _early_bound(view, "IView").GetAnnotations() or ():
         annotation = _early_bound(raw, "IAnnotation")
@@ -421,6 +508,11 @@ async def build(adapter: Any) -> dict[str, str]:
     drawing_model.EditRebuild3()
     if int(hole_table.RowCount) != len(HOLE_STATIONS_MM) + 1:
         raise RuntimeError("combining the platen-guide tap sizes changed the table rows")
+    # Each tap's mate in its own column (rule 10), checked after a rebuild as
+    # draw_fr_harmonic_base checks its NOTE column.
+    generated = _add_mate_column(hole_table)
+    drawing_model.EditRebuild3()
+    _check_mate_column(hole_table, generated)
     _place_hole_tags(front, hole_table)
 
     # Datums A (platen-mating face), B (bottom edge) and C (left end) frame the
@@ -510,9 +602,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="guide hole-pattern position",
     )
     if add_note(adapter, FCF_MATE_NOTE, *FCF_MATE_NOTE_XY) is None:
-        raise RuntimeError("hole-pattern route note was not inserted")
-    if add_note(adapter, TAP_WALL_NOTE, *TAP_WALL_NOTE_XY) is None:
-        raise RuntimeError("tap acceptance and wall note was not inserted")
+        raise RuntimeError("hole-pattern route and wall note was not inserted")
     # The platen hangs by the top rail's bottom face (datum B) on the bar's top
     # edge and slides along it: the one running surface takes the part-owned
     # Ra symbol, landed on that face's edge in the front view.

@@ -41,20 +41,23 @@ length here stays physical millimetres.  How the sheet locates things:
 * the inside bend radius R.05 at the .XX row (INSIDE_BEND_R_MAX, R.06, the
   screw-head clearance reads); the 90 deg bend at the title block's angular
   row;
-* every formed arm feature (roll, tab) ±FORMED_TOL at .XX, the radii to
-  the inside surface; the straight's length (it carries the pin hole) and
-  the far face at the pin, located in X and Y from the origin, only as
-  references (REFERENCE_DIMENSIONS): a hand-rolled roll holds no tighter
-  band there, and the fit-up sets the strip on the pin (square, its face
-  at that station) before the pin's centre is transferred, so a banded
-  straight would be a second controlling value on the transferred hole
-  (round 1, 20261107T102905222Z).  The roll start and the tab end close on
-  the pin's station, so their model values sit off the grid; FORMED_BAND,
+* every formed arm feature (roll, tab) and the far face where the pin
+  crosses the strip (X and Y from the origin) ±FORMED_TOL at .XX, the
+  radii to the inside surface: with the flat pattern's developed length
+  they close the formed profile (round 2), so the straight's length and
+  the formed overall height print only as references
+  (REFERENCE_DIMENSIONS).  The far face is a point on the strip: the
+  fit-up sets the strip on the pin (square, its face at that station)
+  before the pin's centre is transferred, so the hole itself carries no
+  location.  The roll start, the tab end and the far face close on the
+  pin's station, so their model values sit off the grid; FORMED_BAND,
   what the assembly's checks read, is the band with that rounding counted;
 * the pin hole: size only, drilled (the title block's DRILLED HOLES row),
   its centre transferred at assembly from the MHA-PD-VN-58 latch pin (note
-  2; the model keeps it at the geometry's nominal); the far face's
-  reference station ends on the pin axis, which the front view draws as a
+  2; the model keeps it at the geometry's nominal), called out by
+  PIN_HOLE_NOTE on the side view, where the hole shows its outline (the
+  front view has it edge-on, in hidden lines only); the far face's
+  station ends on the pin axis, which the front view draws as a
   centreline, so the station needs no words;
 * the flat pattern (a hidden reference sketch beside the side view, under
   its own FLAT PATTERN label): the blank's length across the bend
@@ -98,6 +101,7 @@ from pd_latch_hook_geometry import (
     BASE_LENGTH,
     BBOX_Y,
     EAR_HEIGHT,
+    FAR_FACE_STATION,
     INNER_ROLL_R,
     INSIDE_BEND_R,
     LOW_W,
@@ -113,6 +117,8 @@ from pd_latch_hook_geometry import (
     SHEET_T,
     SHEET_T_PLUS,
     WIDTH,
+    on_arm,
+    to_local,
 )
 from pd_latch_hook_bracket_screw_spec import HEAD_DIA, MAJOR_DIA, MAJOR_DIA_MIN
 
@@ -141,14 +147,19 @@ WIDTH_TOL = printed_band_mm(WIDTH_PLACES, unit=UNIT)
 BASE_LENGTH_PLACES = 2
 EAR_HEIGHT_PLACES = 2
 ARM_WIDTH_PLACES = 2  # the arm's strip widths, from the ear's top edge
-FORMED_TOL = 0.508  # ±.020 printed on every formed arm feature (roll, tab)
+FORMED_TOL = 0.508  # ±.020 printed on every formed arm feature
 FORMED_PLACES = 2
+# The far face where the pin crosses the strip (the straight's split point,
+# build_pd_latch_hook's FAR_FACE_POINT), in the part's Front-plane sketch.
+FAR_FACE_POINT = to_local(*on_arm(FAR_FACE_STATION))
 # The formed dimensions' model values, as build_pd_latch_hook dimensions them.
 FORMED_VALUES = {
     "RollStart": -OUTER_ROLL_START[1],
     "RollR": INNER_ROLL_R,
     "TabR": OUTER_TAB_R,
     "TabEndX": -OUTER_TAB_END[0],
+    "FaceX": -FAR_FACE_POINT[0],
+    "FaceY": -FAR_FACE_POINT[1],
 }
 # How far the formed arm may lie off the model: the printed band at the
 # worst of the .XX roundings (0.6096, .024; the assembly's checks read it).
@@ -159,9 +170,18 @@ FORMED_BAND = max(
         value, FORMED_PLACES, (-FORMED_TOL, FORMED_TOL), unit=UNIT
     )
 )
-# The far face at the pin prints X and Y from the origin as references: the
-# fit-up sets the annealed arm square on the pin with the face at the drawn
-# station, so the formed band, not a printed coordinate band, is what the
+# The formed profile is closed by controlling values (round 2,
+# 20261107T113627364Z: with the far face and the straight both references,
+# the straight's angle and the tab's direction were open, so no bending
+# template could be checked).  The roll start, the two radii and the tab
+# end's X fix the roll and the tab; the far face where the pin crosses the
+# strip, X and Y from the origin at the same formed band, fixes the roll's
+# sweep and the straight's line through it; the flat pattern's developed
+# length (3.53, the blank) fixes how far the strip runs, so the straight's
+# length and the formed overall height would dimension the profile twice and
+# stay references.  The far face is a point on the strip, not the pin hole:
+# the hole is still transferred from the pin onto the strip wherever the
+# strip lies inside that band (note 2), and the formed band is what the
 # hanger joints' far-face margin spends along U.
 BEND_TOL_DEG = angular_band_deg(unit=UNIT)  # the ear's 90 deg bend, title block
 BEND_R_PLACES = 2  # the inside bend radius, the title block's .XX row
@@ -353,8 +373,13 @@ SCREW_HOLE_CALLOUT = "DRILL THRU"
 # Under the drill line: the taps the holes serve.  The holes are the master:
 # the bar's taps are spotted through them at assembly (MHA-PD-07's sheet).
 SCREW_HOLE_MATE = "FOR MHA-PD-07 #4-40 TAPS"
-# One line (an above-callout): note 2 names the process and the pin.
+# The pin hole's callout, size first (rule 26), then note 2, which names
+# the process and the pin.  It is a leadered note on the side view's rim
+# (round 2: the front view's edge-on Ø.128 ran to hidden lines), its size
+# the drilled hole's at the DRILLED HOLES row.
 PIN_HOLE_CALLOUT = "SEE NOTE 2"
+PIN_HOLE_SIZE_TEXT = f"Ø{PIN_HOLE_DIA / 25.4:.{HOLE_PLACES}f}".replace("Ø0.", "Ø.")
+PIN_HOLE_NOTE = f"{PIN_HOLE_SIZE_TEXT}\n{PIN_HOLE_CALLOUT}"
 ROUND_CALLOUT = "FULL ROUND"
 # drawing-guidelines.md rule 10 (dimension from a real feature): the formed overall height, the ear's top edge to the full round's
 # tip, a reference left of the side view (the front view's far-face Y to
@@ -372,11 +397,11 @@ REFERENCE_SKETCHES = (FLAT_SKETCH,)
 # (drawing-simplicity-policy.md `How the repository implements the guidelines`).  The second screw hole shares its size
 # and Y with the first (same globals) and prints once under "2X".
 FORMED_DIMENSIONS: dict[str, set[str]] = {
-    "ArmProfile": {"RollStart", "RollR", "TabR", "TabEndX"},
+    "ArmProfile": {"RollStart", "RollR", "TabR", "TabEndX", "FaceX", "FaceY"},
 }
-# The straight's length and the far face at the pin: printed in parentheses
-# (see the band comment; the pin hole in the straight is transferred).
-REFERENCE_DIMENSIONS = frozenset({"StraightLen", "FaceX", "FaceY"})
+# The straight's length: printed in parentheses (see the formed-profile
+# comment; the developed length already fixes it).
+REFERENCE_DIMENSIONS = frozenset({"StraightLen"})
 # The arm's strip widths, above and below the taper, on the flat pattern.
 ARM_WIDTH_DIMENSIONS = frozenset({"FlatArmW", "FlatLowW"})
 # The flat pattern's bend centrelines (the ear's bend, the roll, the tab):
@@ -394,7 +419,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ArmProfile": FORMED_DIMENSIONS["ArmProfile"] | REFERENCE_DIMENSIONS,
     "RootRelief": {"RootR"},
     "RoundProfile": {"RoundR"},
-    "PinHoleProfile": {"PinHoleDia"},
     FLAT_SKETCH: {"FlatLength", "DevTaper1", "DevTaper2", "DevRoundC"}
     | ARM_WIDTH_DIMENSIONS
     | BEND_LINE_DIMENSIONS,
@@ -417,7 +441,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     },
     "RootRelief": {"RootR": ROOT_R_PLACES},
     "RoundProfile": {"RoundR": ROUND_R_PLACES},
-    "PinHoleProfile": {"PinHoleDia": HOLE_PLACES},
     FLAT_SKETCH: {
         name: ARM_WIDTH_PLACES if name in ARM_WIDTH_DIMENSIONS else FLAT_PLACES
         for name in sorted(DRAWING_DIMENSIONS[FLAT_SKETCH])

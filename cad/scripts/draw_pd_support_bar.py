@@ -190,10 +190,14 @@ def _back_x(model_x: float) -> float:
 # shortest first (13 mm rows), the length outermost; their texts step right
 # so none crosses a longer row's extension line, and stand clear of the
 # pivot station's. The row's height (from the top face, its rise on the
-# right end) stands off the right end. The section line runs up through the
-# pivot, its arrows and letters left of it. Every location carries its value
-# and band alone (rule 7): the mate each row serves stands on its hole's
-# countersink callout.
+# right end) stands off the right end, its line HANGER_ROW_LINE_OUT out: the
+# hook taps' callout's bottom shoulder, ~6 mm over the top face, ends
+# BRACKET_SHOULDER_RIGHT right of its keep point (round 2 of the fan-out:
+# 312.4 mm on the sheet, with the spotting route's line) and the line's
+# upper tail rises to 234.8 mm, so 22 mm out (305.0) the shoulder crossed it.
+# The section line runs up through the pivot, its arrows and letters left of
+# it. Every location carries its value and band alone (rule 7): the mate
+# each row serves stands on its hole's countersink callout.
 # The pivot and the latch-hook pair each take ONE stacked callout on their
 # countersink's Ø (tap line, countersink, faces and mate; machinist review
 # round 5: a tap callout and a countersink callout per hole put two leaders
@@ -208,12 +212,14 @@ def _back_x(model_x: float) -> float:
 # rows ~53 mm, and ~82 mm for the pair's spotting route, at 2.64 mm a
 # character); it ends ~30 mm short of section A-A's .374.
 ROW_STEP = 0.013
+HANGER_ROW_LINE_OUT = 0.034
+BRACKET_SHOULDER_RIGHT = 0.0404
 FRONT_KEEP = {
     "PivotTapStation": (LEFT_END + 0.042, FACE_BOTTOM - ROW_STEP),
     "BracketTapStation1": (LEFT_END + 0.115, FACE_BOTTOM - 2.0 * ROW_STEP),
     "BracketTapStation2": (LEFT_END + 0.118, FACE_BOTTOM - 3.0 * ROW_STEP),
     "Length": (FACE_CENTER[0], FACE_BOTTOM - 4.0 * ROW_STEP),
-    "HangerRowHeight": (RIGHT_END + 0.022, FACE_BOTTOM - 0.010),
+    "HangerRowHeight": (RIGHT_END + HANGER_ROW_LINE_OUT, FACE_BOTTOM - 0.010),
     "PivotCskDia": (_face_x(PIVOT_TAP_X) + 0.059, FACE_TOP + 0.017),
     "BracketCskDia": (_face_x(BRACKET_TAP_X[1]) + 0.066, FACE_TOP + 0.017),
 }
