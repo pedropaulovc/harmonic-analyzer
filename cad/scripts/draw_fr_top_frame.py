@@ -278,14 +278,18 @@ GEOMETRY_FRONT_CENTER = (0.145, 0.090)
 # 1:2. The Ø25.5 sockets and Ø45 bosses are the setup features; the
 # smaller boss remains 22.5 mm across on paper, the socket 12.75 mm.
 # Its final centre below reserves room for the assembly-transfer callout.
-# The socket Ra symbol reads off the left rim of the rear east socket (180
-# deg on the sheet), from the left margin level with the bore's axis (y
-# 160.5 - 112.0 / 2 = 104.5 mm), so its leader runs straight in across the
-# boss.  Its "TUBE SOCKET BORES, 4X" row (about 38 mm from 5 mm right of the
-# symbol point, 9 mm above it) ends 20 mm left of the boss.  The band under
-# the plan belongs to the hole table (HOLE_TABLE_ANCHOR).
-SOCKET_FINISH_SYMBOL_XY = (0.020, 0.1045)
-SOCKET_FINISH_LANDING_DEG = 180.0
+# The socket Ra symbol reads off the upper-left rim of the rear east socket
+# (135 deg on the sheet, y 104.5 + 4.5 = 109.0 mm), from the left margin
+# 22 mm over its axis, so its leader descends across the boss over the
+# hole table origin mark's Y arrow (x 77.2, y 95.0..111.0 with its "Y"):
+# level with the axis, it ran through that arrow (farm run
+# 20261107T084432155Z, leader-crosses-leader); here it passes 3 mm over the
+# letter.  Its "TUBE SOCKET BORES, 4X" row (about 38 mm from 5 mm right of
+# the symbol point, 9 mm above it) stands in the empty margin left of the
+# rail.  The band under the plan belongs to the hole table
+# (HOLE_TABLE_ANCHOR).
+SOCKET_FINISH_SYMBOL_XY = (0.020, 0.131)
+SOCKET_FINISH_LANDING_DEG = 135.0
 FINISH_LEADER_TAIL = 0.042
 
 # Sheet 4: the cross-tap elevation across the sheet's upper band with
@@ -699,22 +703,26 @@ HUB_BOTTOM_TITLE_XY = (0.020, 0.122)
 # (``ViewEdges.exact_line_through`` picks that edge, ``model_point_in_view``
 # its sheet point), and the sheet point (m) the printed SHARP is centred on
 # (``_add_sharp_edge_note``).  The clearances below are from farm run
-# 20261106T222724559Z's layout-audit ink, for a SHARP of 3.5 mm text (five
-# glyphs, SHARP_EDGE_TEXT_HALF) with its leader leaving the side nearer its
-# landing at mid-height.
+# 20261106T222724559Z's layout-audit ink, for a SHARP of 3.5 mm text
+# (SHARP_EDGE_TEXT_INK) with its leader leaving the side nearer its landing
+# at mid-height.  Two SHARPs never share a column closer than the audit's
+# 5.66 mm row pitch (they would read as one block) nor stand closer than
+# a text height side by side.
 #
-# Locator, left window: the 5.42 POCKET and 1.70 dimensions' extension lines
-# (y 177.06 and 222.94 mm, x 23.7..100.3) fence the -X junctions, so each -X
-# leader crosses one of them once, far from its ends (RsTopFrame,
-# 2026-11-06): no other line, arrow, text or leader.  The -X bar side's
-# SHARP stands 2 mm over that line, so its leader runs shallow enough that
-# the arrow (tip 0.3 mm over the gusset's vertex, y 175.33) stays under it.
-# The -X gusset's SHARP stands left of it on the same row, 10 mm apart, its
-# leader passing more than 1.5 mm under the bar side's SHARP to the gusset's
-# lower end.  The rear -X gusset's leader climbs the channel between the F-F
-# left arrow and the bar, under the cutting line.  Right window: the +X bar
-# side's SHARP sits under the front frame's leader; the +X gusset's stands
-# right of it and 3 mm lower, so the two never stack.  The rear +X gusset's
+# Locator: each SHARP stands inside its window, half a text height (the
+# layout audit's text clearance) off the rails' and the crossbar's lines and
+# the gussets, never over them.  Left window: the 5.42 POCKET and 1.70
+# dimensions' extension lines (y 177.06 and 222.94 mm, x 23.7..100.3) fence
+# the -X junctions (RsTopFrame, 2026-11-06).  The -X bar side's SHARP
+# stands over the lower line and its leader crosses it once, shallow enough
+# that the arrow (tip 0.3 mm over the gusset's vertex, y 175.33) stays under
+# it.  The -X gusset's SHARP stands in the 8 mm band between that line and
+# the window's front edge, its short leader running right to the gusset's
+# lower end under the bar side's leader.  The rear -X gusset's leader
+# climbs the channel between the F-F left arrow and the bar, crossing the
+# upper line.  Right window: both front SHARPs stand low in the window,
+# the bar side's under the front frame's leader and the gusset's right of
+# it, its leader passing under the bar side's text.  The rear +X gusset's
 # leader climbs between the bar and the F-F right arrow, under the cutting
 # line.
 # Detail J: the rib's inner bottom SHARP stands in the window between that
@@ -746,30 +754,30 @@ def hub_gusset_ramp_point(side: float, dz: float) -> tuple[float, float, float]:
 
 SHARP_EDGE_LEADERS: dict[str, tuple[str, tuple[float, float, float], tuple[float, float]]] = {
     "front -X bar side": (
-        SHARP_EDGE_LOCATOR, (BAR_X0, -HALF_H, _SHARP_BAR_SIDE_Z), (0.080, 0.181),
+        SHARP_EDGE_LOCATOR, (BAR_X0, -HALF_H, _SHARP_BAR_SIDE_Z), (0.0725, 0.1835),
     ),
     "front -X gusset": (
         SHARP_EDGE_LOCATOR,
         (BAR_X0 - 0.85 * GUSSET, -HALF_H, -INNER_Z + 0.15 * GUSSET),
-        (0.057, 0.181),
+        (0.080, 0.1726),
     ),
     "rear -X gusset": (
         SHARP_EDGE_LOCATOR,
         (BAR_X0 - 0.5 * GUSSET, -HALF_H, INNER_Z - 0.5 * GUSSET),
-        (0.0935, 0.199),
+        (0.091, 0.199),
     ),
     "front +X bar side": (
-        SHARP_EDGE_LOCATOR, (BAR_X1, -HALF_H, _SHARP_BAR_SIDE_Z), (0.127, 0.180),
+        SHARP_EDGE_LOCATOR, (BAR_X1, -HALF_H, _SHARP_BAR_SIDE_Z), (0.126, 0.178),
     ),
     "front +X gusset": (
         SHARP_EDGE_LOCATOR,
         (BAR_X1 + 0.7 * GUSSET, -HALF_H, -INNER_Z + 0.3 * GUSSET),
-        (0.139, 0.1735),
+        (0.146, 0.173),
     ),
     "rear +X gusset": (
         SHARP_EDGE_LOCATOR,
         (BAR_X1 + 0.4 * GUSSET, -HALF_H, INNER_Z - 0.6 * GUSSET),
-        (0.117, 0.1995),
+        (0.119, 0.1995),
     ),
     "hub rib inner bottom": (
         SHARP_EDGE_DETAIL, (-INNER_X, -HALF_H, GOOSENECK_Z - 2.5), (0.3445, 0.160),
@@ -788,10 +796,11 @@ SHARP_EDGE_LEADERS: dict[str, tuple[str, tuple[float, float, float], tuple[float
     ),
 }
 SHARP_EDGE_TEXT = "SHARP"
-# The printed SHARP's half extent about its centre (sheet m): five glyphs
-# at the 2.5 mm a 3.5 mm capital measured on this sheet's hole tags
-# (_HOLE_TAG_HALF), rounded out.
-SHARP_EDGE_TEXT_HALF = (0.0065, 0.00175)
+# The printed SHARP's ink about its centre (sheet m: left, down, right,
+# up), from farm run 20261107T084432155Z: the text 14.6 mm wide and 3.5
+# tall about its measured centre, and the layout audit's box for the same
+# text (14.2 wide) 0.95 mm higher; the union, so both readings clear.
+SHARP_EDGE_TEXT_INK = (-0.0073, -0.00175, 0.0073, 0.0027)
 # A centred note's text (a SHARP, an iso caption) stands this close to
 # its planned centre once re-centred.
 NOTE_TEXT_CENTRE_TOL = 0.0005
