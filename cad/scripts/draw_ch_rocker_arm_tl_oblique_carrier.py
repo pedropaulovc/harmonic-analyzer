@@ -1,11 +1,10 @@
 r"""Create the drawing for the oblique-trammel jig's carrier plate (MHA-CH-06-TL-21).
 
-The top view at 1:2 carries the outline, the reamed pin holes, the CL
-centre-drill spot and every tap station (the HUB is drilled in situ at
-assembly, MHA-CH-06-TL-00 step 10). Position chains (rule 10, one datum per
+The top view at 1:2 carries the outline, the reamed pin holes and every tap
+station but the HUB clamp's. Position chains (rule 10, one datum per
 view): X from A1's axis, the left lower ream that carries the ±0.02 pair:
 the left end 34.9 from it, the lever taps' axis 225.07, B1 by the spacing
-and every spot and tap by its own baseline
+and every tap by its own baseline
 (the part's hidden StationReference); Y from the A1-B1 pin line (the reamed
 pair's own axes), 45.00 above the -Y edge. Every location dimension stands
 outside the outline in its own lane: X stations above and below, Y stations
@@ -14,8 +13,10 @@ Section A-A at 3:1 cuts along the pin line, is cropped to A1, and carries
 the finished thickness and underside chamfer. The shaded isometric stands
 above the title block.
 
-One sheet holds it: the left lanes need ~75 mm of the 79 between the outline
-and the border, the right lanes ~63 of 67.
+The CARRIER sheet holds it: the left lanes need ~75 mm of the 79 between the
+outline and the border, the right lanes ~63 of 67. The HUB CLAMP sheet
+carries the HUB tap's native callout alone: that tap is made in situ at the
+assembly's HUB setting (MHA-CH-06-TL-00 step 10) and prints no station.
 """
 
 from __future__ import annotations
@@ -62,6 +63,7 @@ from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
+from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
@@ -72,12 +74,10 @@ import ch_rocker_arm_tl_oblique_carrier_spec as part_spec
 from _feature_requirements import part_metadata, requirement
 from _part_properties import part_drawing_unit
 from _printed_limits import limits
-from _gtol_cone import ConeFace
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from ch_rocker_arm_tl_oblique_carrier_spec import (
     CALLOUT_PREFIXES,
-    CALLOUT_SUFFIXES,
     CALLOUTS_BELOW,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -101,6 +101,10 @@ SHEET_SCALE = (1.0, 2.0)
 VIEW_SCALE = (1, 2)
 ISO_SCALE = part_spec.ISOMETRIC_VIEW_SCALE
 TOP_CENTER = (0.222, 0.185)
+# The HUB clamp tap is made in situ at the assembly's HUB setting, so it
+# prints no station; its callout says where it is made. Its own sheet keeps
+# that callout off the crowded carrier sheet.
+SHEET_NAMES = ("CARRIER", "HUB CLAMP")
 # The iso (~58 x 34 mm at 1:8) right of section A-A and its note under it,
 # both above the title block (jig-r3: the note ran into it).
 ISO_CENTER = (0.386, 0.103)
@@ -183,19 +187,11 @@ TOP_KEEP: dict[str, tuple[float, float, float]] = {
     # The diameter approach may cross genuine witness extensions (rule 14),
     # but never a dimension line, another text row or the shoulder's text.
     "PinHoleDia": _xy(-339.0, -106.3),
-    # The spot: its own diameter callout outside the plate (rule 14). Its
-    # three rows (mr8: from above the 4.154 lane its leader crossed the 7.287
-    # dimension line), ~31 wide, centred at sheet (182.25, 228.2): its shelf
-    # ~2.8 over the +Y edge, its top ~2.3 under the 7.287 lane (238.5), ~4.4
-    # inside the RiserX2 (162.5) and RiserX1 (202.0) extension lines. Every
-    # route from above that lane crosses it (or, past its end, overruns the
-    # 10 mm leader detour); this leader runs down-left ~36 over the part
-    # (detour ~8), crossing extension lines only.
-    "SpotDia": _xy(-79.5, 106.4),
     "ClX": _xy(-193.0, -54.4),  # lane y 145
     "ClY": _xy(_LEFT[0], 14.0),
     # The taps: the riser stations above and below (A1-baseline note), their
-    # Y stations left; CR's X below, CR's Y and the levers right.
+    # Y stations left; CL's X below and Y left, CR's X below, CR's Y and the
+    # levers right.
     "CrX": _xy(141.0, -140.4),  # lane y 102
     "CrY": _xy(_RIGHT[2], 13.0),
     "RiserX1": _xy(-80.0, 138.2),  # lane y 238.5
@@ -296,19 +292,26 @@ SECTION_CAPTION_XY = (0.043, 0.052)
 
 # Sheet metres: each callout block's centre; its leader lands on the near end
 # of the first line. CR up-right into the margin above the right lanes, its
-# four rows (the native two and CR_TAP_CALLOUT's two, mr4) ~219..241; the
-# risers from the outermost +X screw straight up,
+# four rows (the native two and END_CLAMP_TAP_CALLOUT's two, mr4) ~219..241;
+# CL up-right into the free band over the +Y edge between the RiserX1
+# extension line (sheet x 202) and the riser leader, its four rows ~220..242
+# (x ~215..265), its leader crossing extension lines only; the risers from
+# the outermost +X screw straight up,
 # their four rows (the native two and RISER_TAP_CALLOUT's two) ~238..258,
 # under the border; the feed lever (the -Y hole) down-left, its three rows
 # (with LEVER_TAP_CALLOUT) between the CrX and ClX lanes.
 CR_CALLOUT_XY = (0.377, 0.230)
+CL_CALLOUT_XY = (0.240, 0.231)
 # The riser callout 2 mm right of jig-r10's 0.310: its leader from riser
-# screw 4 then passes clear right of the Ø3.00 spot text.
+# screw 4 then passes clear right of the CL callout.
 RISER_CALLOUT_XY = (0.312, 0.248)
 # The lever callout 2.5 mm right of 0.179 (round 8): its bottom row and
 # shoulder (sheet x ~147..218) then stand ~2.6 clear of LeverX's function
 # row (right end x 144.3), its shoulder ~4 short of LeverX's extension line.
 LEVER_CALLOUT_XY = (0.1815, 0.143)
+# The HUB CLAMP sheet: the HUB tap's callout up-right of it, above the plate
+# (sheet x ~237..291, y ~225..247), its leader from the tap (sheet ~222, 198).
+HUB_CALLOUT_XY = (0.264, 0.236)
 
 part_metadata(
     precision_sources=(
@@ -386,7 +389,7 @@ _LEVER_STATION = (part_spec.LEVER_STATION_BAND, -part_spec.LEVER_STATION_BAND)
 
 
 def _from_a1(x: float, places: int) -> float:
-    """A spot's or tap's printed X station: its baseline from A1's axis."""
+    """A tap's printed X station: its baseline from A1's axis."""
     return _printed(x - _A1[0], places)
 
 
@@ -453,44 +456,19 @@ for _key, (_x, _y) in part_spec.PIN_HOLES.items():
         },
     )
 
-_SPOT_DIA_PLACES = part_spec.DRAWING_PRECISION_BY_NAME["SpotDia"]
-for _prefix, (_x, _y) in part_spec.SPOTS.items():
-    _station_places = part_spec.DRAWING_PRECISION_BY_NAME[f"{_prefix}X"]
-    _height_places = part_spec.DRAWING_PRECISION_BY_NAME[f"{_prefix}Y"]
-    requirement(
-        f"{_prefix.lower()}_spot",
-        kind="seat",
-        faces=(ConeFace(part_spec.SPOT_ANGLE / 2.0, contains_x_mm=_x),),
-        # The printed stations are inspected too (Codex #1582).
-        requirements=("dia", "angle_deg", "station", "height"),
-        fields={
-            "at": ([_x, 0.0, -_y], ("SPOTS", "CL")),
-            "dia": (_limits(part_spec.SPOT_DIA, _SPOT_DIA_PLACES), ("SPOT_DIA",)),
-            "dia_nominal": (part_spec.SPOT_DIA, ("SPOT_DIA",)),
-            "angle_deg": (part_spec.SPOT_ANGLE, ("SPOT_ANGLE", "CALLOUT_SUFFIXES")),
-            "station": (_limits(_x - _A1[0], _station_places), ("SPOTS", "PIN_HOLES")),
-            "station_nominal": (_from_a1(_x, _station_places), ("SPOTS", "PIN_HOLES")),
-            "parent": ("pin_hole_a1", ("PIN_HOLES",)),
-            "height": (_limits(_y, _height_places), ("SPOTS",)),
-        },
-        precision={
-            "dia": _SPOT_DIA_PLACES,
-            "angle_deg": 0,
-            "station": _station_places,
-            "height": _height_places,
-        },
-    )
-
 # (stem, points, thread, tap drill, spec name, station places, height places)
 _TAPS = (
-    (
-        "cr_tap",
-        (part_spec.CR,),
-        part_spec.CR_THREAD,
-        part_spec.CR_TAP_DRILL,
-        "CR_SPEC",
-        part_spec.DRAWING_PRECISION_BY_NAME["CrX"],
-        part_spec.DRAWING_PRECISION_BY_NAME["CrY"],
+    *(
+        (
+            f"{_key.lower()}_tap",
+            (_point,),
+            part_spec.CLAMP_THREAD,
+            part_spec.CLAMP_TAP_DRILL,
+            "CLAMP_SPEC",
+            part_spec.DRAWING_PRECISION_BY_NAME[f"{_key.title()}X"],
+            part_spec.DRAWING_PRECISION_BY_NAME[f"{_key.title()}Y"],
+        )
+        for _key, _point in part_spec.END_CLAMPS.items()
     ),
     (
         "riser_tap",
@@ -512,8 +490,28 @@ _TAPS = (
         part_spec.DRAWING_PRECISION_BY_NAME["LeverY1"],
     ),
 )
+
+
+def _tap_fields(
+    x: float, y: float, thread: str, drill: float, spec_name: str
+) -> dict[str, tuple[Any, tuple[Any, ...]]]:
+    """The native Hole Wizard callout's own content: thread, tap drill, THRU."""
+    drill_printed = _printed(drill, _CALLOUT_PLACES)
+    return {
+        "at": ([x, 0.0, -y], (spec_name,)),
+        "axis": ([0.0, -1.0, 0.0], ("__frame__",)),
+        "thread": (f"{thread} UNC-2B", (spec_name,)),
+        "tap_drill_mm": (drill, (spec_name,)),
+        "dia": (
+            limits(drill_printed, _CALLOUT_PLACES, _DRILLED),
+            (spec_name, "DRILLED_BAND"),
+        ),
+        "dia_nominal": (drill_printed, (spec_name,)),
+        "thru": (True, (spec_name,)),
+    }
+
+
 for _stem, _points, _thread, _drill, _spec_name, _places, _y_places in _TAPS:
-    _drill_printed = _printed(_drill, _CALLOUT_PLACES)
     for _index, (_x, _y) in enumerate(_points, start=1):
         requirement(
             f"{_stem}_{_index}",
@@ -521,16 +519,7 @@ for _stem, _points, _thread, _drill, _spec_name, _places, _y_places in _TAPS:
             faces=(CylinderFace(_drill, contains_x_mm=_x, contains_z_mm=-_y),),
             requirements=("thread", "dia", "station", "height", "thru"),
             fields={
-                "at": ([_x, 0.0, -_y], (_spec_name,)),
-                "axis": ([0.0, -1.0, 0.0], ("__frame__",)),
-                "thread": (f"{_thread} UNC-2B", (_spec_name,)),
-                "tap_drill_mm": (_drill, (_spec_name,)),
-                "dia": (
-                    limits(_drill_printed, _CALLOUT_PLACES, _DRILLED),
-                    (_spec_name, "DRILLED_BAND"),
-                ),
-                "dia_nominal": (_drill_printed, (_spec_name,)),
-                "thru": (True, (_spec_name,)),
+                **_tap_fields(_x, _y, _thread, _drill, _spec_name),
                 "station": (
                     limits(
                         _from_a1(_x, _places),  # on its printed nominal, like _BAND
@@ -548,6 +537,28 @@ for _stem, _points, _thread, _drill, _spec_name, _places, _y_places in _TAPS:
             },
             precision={"dia": _CALLOUT_PLACES, "station": _places, "height": _y_places},
         )
+
+# The HUB clamp tap is made in situ at the assembly's HUB setting: no printed
+# station, its callout names where it is located.
+requirement(
+    "hub_tap_1",
+    kind="hole",
+    faces=(
+        CylinderFace(
+            part_spec.CLAMP_TAP_DRILL,
+            contains_x_mm=part_spec.HUB[0],
+            contains_z_mm=-part_spec.HUB[1],
+        ),
+    ),
+    requirements=("thread", "dia", "thru", "note"),
+    fields={
+        **_tap_fields(
+            *part_spec.HUB, part_spec.HUB_THREAD, part_spec.CLAMP_TAP_DRILL, "HUB_SPEC"
+        ),
+        "note": (" ".join(part_spec.HUB_TAP_CALLOUT.splitlines()), ("HUB_TAP_CALLOUT",)),
+    },
+    precision={"dia": _CALLOUT_PLACES},
+)
 
 
 # Copied from _trammel_block_drawing (the old trammel kit is being retired;
@@ -1098,6 +1109,36 @@ def _pin_section(adapter: Any, source_model: Any, top: Any) -> tuple[list[Any], 
     return annotations, section
 
 
+def _hub_sheet(adapter: Any) -> None:
+    """The HUB clamp tap's own sheet: its native callout, which names where
+    it is made (in situ at the assembly's HUB setting), and no station."""
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    if not drawing.ActivateSheet(SHEET_NAMES[1]):
+        raise RuntimeError("cannot activate the HUB clamp sheet")
+    top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=VIEW_SCALE)
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
+    for view in (top, iso):
+        set_hidden_lines_removed(adapter, view)
+    x, y = part_spec.HUB
+    label = "HUB clamp tap"
+    callout = add_native_hole_callout(
+        adapter, top, callout_xy=HUB_CALLOUT_XY, label=label,
+        edge=_circle_edge(
+            adapter, top, part_spec.CLAMP_TAP_DRILL, label,
+            center_x_mm=x, center_y_mm=y,
+        ),
+    )
+    _strip_thread_class(callout, label=f"{label} callout", thread=part_spec.HUB_THREAD)
+    set_callout_lengths_to_three_places(callout, label=f"{label} callout")
+    _append_callout_below(callout, part_spec.HUB_TAP_CALLOUT, label=f"{label} callout")
+    add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
+    import_cosmetic_threads(adapter, iso)
+    for view in (top, iso):
+        _hide_thread_labels(adapter, view)
+    if not drawing.ActivateSheet(SHEET_NAMES[0]):
+        raise RuntimeError("cannot restore the carrier sheet")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -1121,6 +1162,9 @@ async def build(adapter: Any) -> dict[str, str]:
         layout=SPEC.layout,
         unit=part_drawing_unit(PART_STEM),
     )
+    create_blank_drawing_sheets(adapter, SHEET_NAMES, label="carrier")
+    if not _early_bound(drawing_model, "IDrawingDoc").ActivateSheet(SHEET_NAMES[0]):
+        raise RuntimeError("cannot activate the carrier sheet")
     stamp_drawing_summary(
         adapter,
         drawing_model,
@@ -1148,9 +1192,9 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
 
     on_top = _view_mapper(adapter, top)
-    # The spot's height and Ø3 live on SpotReference and every X station from
-    # A1 on StationReference, sketches the part saves hidden:
-    # _drawing_hidden_sketches shows them in the view that imports them.
+    # Every X station from A1 lives on StationReference, a sketch the part
+    # saves hidden: _drawing_hidden_sketches shows it in the view that
+    # imports it.
     annotations = hidden_sketches.curate_view_dimensions(
         adapter,
         top,
@@ -1162,8 +1206,6 @@ async def build(adapter: Any) -> dict[str, str]:
     annotations.extend(section_annotations)
     set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
     _set_callout_texts(adapter, annotations, CALLOUT_PREFIXES, part=1)
-    _set_callout_texts(adapter, annotations, CALLOUT_SUFFIXES, part=2)
-    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _arrows_inside(adapter, annotations, "EdgeX")
     ream = [
         item for item in annotations if dimension_name(adapter, item) == "PinHoleDia"
@@ -1173,17 +1215,20 @@ async def build(adapter: Any) -> dict[str, str]:
     _assert_ream_control(adapter, ream[0])
 
     # Native Hole Wizard callouts, no process words (the base bar's TL-20
-    # convention: "4X Ø2.26 THRU ALL / #4-40 UNC THRU ALL"); the CR and riser
-    # taps add the function their 3-place stations serve (rule 4; machinist
+    # convention: "4X Ø2.26 THRU ALL / #4-40 UNC THRU ALL"); the CL/CR and
+    # riser taps add the function their stations serve (rule 4; machinist
     # review mr3 for CR), the lever taps their full-thread shortfall (rule 20).
     for label, xy, drill, (x, y), thread, function in (
-        (
-            "CR clamp tap",
-            CR_CALLOUT_XY,
-            part_spec.CR_TAP_DRILL,
-            part_spec.CR,
-            part_spec.CR_THREAD,
-            part_spec.CR_TAP_CALLOUT,
+        *(
+            (
+                f"{key} clamp tap",
+                xy,
+                part_spec.CLAMP_TAP_DRILL,
+                part_spec.END_CLAMPS[key],
+                part_spec.CLAMP_THREAD,
+                part_spec.END_CLAMP_TAP_CALLOUT,
+            )
+            for key, xy in (("CL", CL_CALLOUT_XY), ("CR", CR_CALLOUT_XY))
         ),
         (
             "riser screw taps",
@@ -1218,6 +1263,8 @@ async def build(adapter: Any) -> dict[str, str]:
     import_cosmetic_threads(adapter, iso)
     for view in (top, iso):
         _hide_thread_labels(adapter, view)
+    _hub_sheet(adapter)
+    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
 
     def pin_controls_settled() -> None:
         _assert_ream_control(adapter, ream[0])
@@ -1229,6 +1276,7 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=SHEET_SCALE,
         layout=SPEC.layout,
         settled_checks=(pin_controls_settled,),
+        expected_sheet_names=SHEET_NAMES,
     )
 
 

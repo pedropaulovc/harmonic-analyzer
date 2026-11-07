@@ -758,13 +758,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
-        name="ch_rocker_arm_tl_vn_oblique_cl_dowel",
-        part="ch_rocker_arm_tl_vn_oblique_cl_dowel",
-        artifact_stem="ch-rocker-arm-tl-vn-oblique-cl-dowel",
-        script_name="draw_ch_rocker_arm_tl_vn_oblique_cl_dowel.py",
-        layout=DrawingLayout.LANDSCAPE,
-    ),
-    DrawingSpec(
         name="ch_rocker_arm_tl_vn_oblique_leadscrew_kit",
         part="ch_rocker_arm_tl_vn_oblique_leadscrew_kit",
         artifact_stem="ch-rocker-arm-tl-vn-oblique-leadscrew-kit",
@@ -814,13 +807,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
-        name="ch_rocker_arm_tl_vn_oblique_clamp_screw",
-        part="ch_rocker_arm_tl_vn_oblique_clamp_screw",
-        artifact_stem="ch-rocker-arm-tl-vn-oblique-clamp-screw",
-        script_name="draw_ch_rocker_arm_tl_vn_oblique_clamp_screw.py",
-        layout=DrawingLayout.LANDSCAPE,
-    ),
-    DrawingSpec(
         name="ch_rocker_arm_tl_vn_oblique_lever_screw",
         part="ch_rocker_arm_tl_vn_oblique_lever_screw",
         artifact_stem="ch-rocker-arm-tl-vn-oblique-lever-screw",
@@ -856,10 +842,10 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
-        name="ch_rocker_arm_tl_vn_oblique_hub_pin",
-        part="ch_rocker_arm_tl_vn_oblique_hub_pin",
-        artifact_stem="ch-rocker-arm-tl-vn-oblique-hub-pin",
-        script_name="draw_ch_rocker_arm_tl_vn_oblique_hub_pin.py",
+        name="ch_rocker_arm_tl_oblique_hub_washer",
+        part="ch_rocker_arm_tl_oblique_hub_washer",
+        artifact_stem="ch-rocker-arm-tl-oblique-hub-washer",
+        script_name="draw_ch_rocker_arm_tl_oblique_hub_washer.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(

@@ -1,0 +1,17 @@
+ch-rocker-arm-tl-oblique-hub-washer:
+  title: Rocker Oblique Trammel Hub Washer
+  # Shop fixture: the parent MHA-CH-06 Number plus -TL-nn (subsystem-identities.md).
+  number: MHA-CH-06-TL-52
+  material: Brass
+  material_specification: C36000 free-machining brass
+  finish: as machined
+  quantity: 1
+  tolerance_class: machined_block
+  process: "turn from 1/2 in C360 brass round in one chucking: face the spigot end, drill 13/64 through, turn the spigot and the flange O.D., part off to flange thickness; break the flange edges, leave the spigot end sharp"
+  drawing_unit: in
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "minor"
+      where: "side view, the .06 flange thickness callout: WALL .040 MIN AT RIMS"
+      finding: "flange wall at its .005-broken rims below the .060 floor (rule 17)"
+      reason: "Owner ruling 2026-11-07 (#2249, option A; coordinator-approved): the .06 ±.01 flange is accepted at .040 MIN, the .050 least flange less its two .005 rim breaks. The .005 break keeps the seat ring on the strap outside its hub hole, and every thicker .XX flange either stays under the floor or costs the common #8-32 x 3/4 SHCS its 1.5D full thread in the carrier tap; clamped flat on the steel strap at 1 N·m"

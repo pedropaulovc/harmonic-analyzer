@@ -855,13 +855,6 @@
       "priorNumber": "MHA-CH-06-TL-VN-51"
     },
     {
-      "sourceStem": "ch-rocker-arm-tl-oblique-cl-dowel",
-      "sourceNumber": "MHA-CH-006-TL-33",
-      "parent": "ch-rocker-arm-tl-oblique-jig",
-      "stem": "ch-rocker-arm-tl-vn-oblique-cl-dowel",
-      "number": "MHA-CH-06-TL-VN-53"
-    },
-    {
       "sourceStem": "ch-rocker-arm-tl-oblique-leadscrew",
       "sourceNumber": "MHA-CH-006-TL-34",
       "parent": "ch-rocker-arm-tl-oblique-jig",
@@ -948,13 +941,6 @@
       "number": "MHA-CH-06-TL-VN-67"
     },
     {
-      "sourceStem": "ch-rocker-arm-tl-oblique-clamp-screw",
-      "sourceNumber": "MHA-CH-006-TL-48",
-      "parent": "ch-rocker-arm-tl-oblique-jig",
-      "stem": "ch-rocker-arm-tl-vn-oblique-clamp-screw",
-      "number": "MHA-CH-06-TL-VN-68"
-    },
-    {
       "sourceStem": "ch-rocker-arm-tl-oblique-lever-screw",
       "sourceNumber": "MHA-CH-006-TL-49",
       "parent": "ch-rocker-arm-tl-oblique-jig",
@@ -988,13 +974,6 @@
       "parent": "ch-rocker-arm-tl-oblique-jig",
       "stem": "ch-rocker-arm-tl-vn-oblique-pivot-shim",
       "number": "MHA-CH-06-TL-VN-79"
-    },
-    {
-      "sourceStem": "ch-rocker-arm-tl-vn-oblique-hub-pin",
-      "sourceNumber": null,
-      "parent": "ch-rocker-arm-tl-oblique-jig",
-      "stem": "ch-rocker-arm-tl-vn-oblique-hub-pin",
-      "number": "MHA-CH-06-TL-VN-80"
     },
     {
       "sourceStem": "ch-rocker-arm-tl-vn-oblique-feed-nut",
@@ -1054,7 +1033,7 @@
       "status": "archive-only"
     }
   ],
-  "currentRegistryMapSha256": "bf749cd855fb5640fb6d67de56320f050bd07f858fcece351ec4198d556e982f",
+  "currentRegistryMapSha256": "47e96074f70b6740d35d120feea6c837ae28258c0c9059d923adb9cf47fa92db",
   "nativeIdentities": [
     {
       "sourceStem": "ch-rocker-arm-tl-oblique-feed-lever",
@@ -2233,6 +2212,16 @@
         {
           "stem": "ch-rocker-arm-tl-oblique-feed-block",
           "number": "MHA-CH-06-TL-32"
+        }
+      ]
+    },
+    {
+      "sourceStem": "ch-rocker-arm-tl-oblique-hub-washer",
+      "sourceNumber": null,
+      "identities": [
+        {
+          "stem": "ch-rocker-arm-tl-oblique-hub-washer",
+          "number": "MHA-CH-06-TL-52"
         }
       ]
     },

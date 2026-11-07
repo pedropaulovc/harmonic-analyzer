@@ -52,8 +52,8 @@ Error sensitivity (printed next to the bands that carry it):
 
 * rail angle: 0.1 degree of pin-line angle changes R by
   ``RADIUS_PER_TENTH_DEG`` (about 4.7 mm) and moves the arc centre about as
-  far. That is why HUB and CL are reamed in place on the running jig, where
-  the real circle sits.
+  far. The strap HUB is therefore reamed in place on the running jig; the
+  carrier tap is made at the same DRO setting, not used as a precision locator.
 * pin-pair Y: a Y error between the A1/B1 and A2/B2 pairs moves the second
   circle's centre 1:1, so the 16.00 band moves 1:1. A2/B2 are therefore
   dimensioned from A1/B1, never from a plate edge.
@@ -78,7 +78,7 @@ Error sensitivity (printed next to the bands that carry it):
   term, and both together stay inside half the strap's .020 in (0.508) one-sided
   ``TOP_EDGE_BAND`` that the hub aims at the middle of. The rail/carriage
   pair's height and width tolerances do not apply: one carriage runs on each
-  rail, the selected shims set the carrier height, and HUB and CL are reamed
+  rail, the selected shims set the carrier height, and the strap HUB is reamed
   in place. So neither Z0 preload nor C accuracy is required of the pair.
 
 Sweep (Main, 2026-10-16). The brief swept the cutter over the whole 350
@@ -168,7 +168,7 @@ APEX_Y = R_C1 - H1  # the spindle on the carrier's +Y centreline (inner pass)
 HUB = (0.0, HUB_RADIUS - H1)
 HUB_OFFSET = HUB_RADIUS - R_C1
 
-# --- Riser (6 mm acetal, cut on the jig by the 9/16 in cutter) ⚙ ------------
+# --- Riser (6061, self-cut by the 9/16 in cutter before loading the strap) ------
 RISER_INNER_RADIUS = R_C1 + RISER_CUTTER_DIA / 2.0
 RISER_OUTER_RADIUS = R_C2 - RISER_CUTTER_DIA / 2.0
 # Acceptance on the riser: HUB pin to the riser's inner edge at the apex.
@@ -205,7 +205,7 @@ def at_arc_station(
 # are UNC (memory/fastener-policy-us-customary.md), and they are ASME B18.6.3
 # #4-40 x 5/8 82-degree flat-head machine screws (head Ø0.225 in max), not
 # the plan's M4: an M4 countersunk head (Ø8.96 max) would leave under 1.5 of
-# acetal to a self-cut edge. A B18.3 socket flat head (Ø0.255 in) does not fit
+# aluminium to a self-cut edge. A B18.3 socket flat head (Ø0.255 in) does not fit
 # the riser's countersink either (TrammelJig, jig-r5).
 RISER_SCREW = "#4-40"
 RISER_SCREW_HEAD_DIA = round(0.225 * INCH, 9)
@@ -245,18 +245,6 @@ RISER_SCREW_WALLS = (
     - _RISER_CSK_MOUTH_MAX
     - _RISER_RADIAL_SHIFT,
 )
-# The milled riser blank, 13.40 x 1.60 in, lies square on the carrier with its
-# corner at RISER_BLANK_ORIGIN (carrier frame, y .63). The self-cut band runs
-# from y 21.40 (inner edge at the blank's ends) to 50.90 (outer edge at the
-# apex), nominally at least 5 inside both long edges. Rule 17 reads the
-# blank's edges, so its size prints .XX (.X is for unread features only).
-RISER_BLANK_LENGTH = 340.36  # 13.40
-RISER_BLANK_WIDTH = 40.64  # 1.60
-RISER_BLANK_ORIGIN = (-RISER_BLANK_LENGTH / 2.0, 16.002)  # y .63
-RISER_BAND_Y = (
-    math.sqrt(RISER_INNER_RADIUS**2 - (RISER_BLANK_LENGTH / 2.0) ** 2) - H1,
-    RISER_OUTER_RADIUS - H1,
-)
 
 # --- Blank, tip lands, CL/CR ⚙ ------------------------------------------------
 # The strap blank is sawn from the 1/8 x 1-1/2 in 1018 cold-finish flat bought
@@ -273,17 +261,13 @@ TIP_ANGLE = (rocker.TOP_ARC_LEN / 2.0) / rocker.R_TOP
 # it with at least the .080 wall of waste beyond each edge.
 STRAP_SPAN_Y = (R_INNER * math.cos(TIP_ANGLE) - H1, R_OUTER - H1)
 BLANK_EDGE_WASTE = (BLANK_WIDTH - (STRAP_SPAN_Y[1] - STRAP_SPAN_Y[0])) / 2.0
-# CL (a 1/4 in dowel in a tooling hole) and CR (the clamp screw) sit in the
-# blank's end waste on the hub radius, angularly midway between the tip land
-# and the blank's square end, so the saw cut that drops the waste has room on
-# both sides of the hole.
+# Both common #8 clamps sit in the blank's end waste on the hub radius,
+# angularly midway between the tip land and square end, leaving room for the
+# final cut that removes the waste. Neither station is a locating dowel.
 _BLANK_END_ANGLE = math.asin((BLANK_LENGTH / 2.0) / HUB_RADIUS)
 CL_ANGLE = (TIP_ANGLE + _BLANK_END_ANGLE) / 2.0
 CR = on_hub_radius(HUB_RADIUS * math.sin(CL_ANGLE))
 CL = (-CR[0], CR[1])
-# The same points from the hub (the strap's own frame for the T1 setup):
-CL_FROM_HUB = (CL[0] - HUB[0], CL[1] - HUB[1])
-CR_FROM_HUB = (CR[0] - HUB[0], CR[1] - HUB[1])
 
 # --- Sweep and stops ⚙ --------------------------------------------------------
 # Each pass runs until the part cutter has passed the tip land by its own
@@ -441,9 +425,9 @@ PIVOT_SHIM_PACK = 1.016  # 5 x .008
 PIVOT_SPACER_LENGTH = 15.875  # .625 loose purchased spacer (TL-VN-78)
 PIVOT_SUPPORT_HEIGHT = PIVOT_SHIM_PACK + PIVOT_SPACER_LENGTH
 # Finished dimensions, not purchased stock: face 1/2 in 6061-T6511 bar to
-# CARRIER_THICK and 1/4 in acetal to RISER_THICK (#1619). Both native drawing
-# dimensions take their printed title-block band, not a supplier-stock
-# tolerance. CL locator height is set from the actual riser at assembly.
+# CARRIER_THICK and 1/4 in 6061 to RISER_THICK. Both native drawing dimensions
+# take their printed title-block band, not a supplier-stock tolerance.
+# CL locator height is set from the actual riser at assembly.
 CARRIER_THICK = 11.938  # .47
 CARRIER_THICK_PLACES = 2
 CARRIER_THICK_BAND = printed_band_mm(CARRIER_THICK_PLACES, unit=CARRIER_UNIT)
@@ -573,10 +557,5 @@ if abs((STUD_Y[0] - STUD_Y[1]) - 2.0 * TSLOT_PITCH) > 1e-9:
     raise AssertionError("the hold-down studs do not land two T-slot pitches apart")
 if min(RISER_SCREW_WALLS) < WALL_TARGET_MM:
     raise AssertionError("a riser countersink breaks rule 17's .080 wall target")
-if not (
-    RISER_BLANK_ORIGIN[1] + 5.0 <= RISER_BAND_Y[0]
-    and RISER_BAND_Y[1] <= RISER_BLANK_ORIGIN[1] + RISER_BLANK_WIDTH - 5.0
-):
-    raise AssertionError("the riser's nominal band runs within 5 of a blank edge")
 if BLANK_EDGE_WASTE < WALL_TARGET_MM:
     raise AssertionError("the strap blank leaves under .080 of waste beyond an edge")

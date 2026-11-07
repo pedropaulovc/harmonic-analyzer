@@ -144,15 +144,17 @@ _INSERTED_SOURCES = {
     "ch_rocker_arm_tl_oblique_end_bracket "
     "ch_rocker_arm_tl_oblique_pivot_block ch_rocker_arm_tl_oblique_riser "
     "ch_rocker_arm_tl_vn_oblique_rail_kit "
-    "ch_rocker_arm_tl_vn_oblique_cl_dowel ch_rocker_arm_tl_vn_oblique_leadscrew_kit "
+    "sm_vn_knife_mount_dowel "
+    "ch_rocker_arm_tl_vn_oblique_leadscrew_kit "
     "ch_rocker_arm_tl_vn_oblique_pillow_block "
     "ch_rocker_arm_tl_vn_oblique_handwheel sh_vn_clamping_kit_hardware "
     "ch_rocker_arm_tl_vn_oblique_rail_screw ch_rocker_arm_tl_vn_oblique_bracket_screw "
     "ch_rocker_arm_tl_vn_oblique_carriage_screw "
-    "ch_rocker_arm_tl_vn_oblique_riser_screw ch_rocker_arm_tl_vn_oblique_clamp_screw "
+    "ch_rocker_arm_tl_vn_oblique_riser_screw "
     "ch_rocker_arm_tl_vn_oblique_lever_screw ch_rocker_arm_tl_vn_oblique_lever_washer "
     "ch_rocker_arm_tl_vn_oblique_pivot_screw ch_rocker_arm_tl_vn_oblique_pivot_spacer "
-    "ch_rocker_arm_tl_vn_oblique_pivot_shim ch_rocker_arm_tl_vn_oblique_hub_pin",
+    "ch_rocker_arm_tl_vn_oblique_pivot_shim "
+    "ch_rocker_arm_tl_oblique_hub_washer",
     "dt_cone_gear_tl_indexing": "dt_cone_gear_tl_index_plate",
     "ha_harmonic_analyzer": "fr_frame dt_drive_train ch_channel sm_summing mg_magnifier pn_pen "
     "pd_paper_drive ms_measuring_stick",
@@ -265,7 +267,6 @@ def test_plain_pivot_components_are_first_class_jig_only_targets() -> None:
         "ch_rocker_arm_tl_vn_oblique_pivot_screw": ("MHA-CH-06-TL-VN-77", 2),
         "ch_rocker_arm_tl_vn_oblique_pivot_spacer": ("MHA-CH-06-TL-VN-78", 2),
         "ch_rocker_arm_tl_vn_oblique_pivot_shim": ("MHA-CH-06-TL-VN-79", 10),
-        "ch_rocker_arm_tl_vn_oblique_hub_pin": ("MHA-CH-06-TL-VN-80", 1),
     }
     jig = "ch_rocker_arm_tl_oblique_jig"
     contract = assembly_contract(jig.replace("_", "-"))
@@ -312,6 +313,7 @@ def test_plain_pivot_components_are_first_class_jig_only_targets() -> None:
         ("ch_rocker_arm_tl_vn_oblique_nut_washer", "MHA-CH-06-TL-VN-72"),
         ("ch_rocker_arm_tl_oblique_pivot_pin", "MHA-CH-06-TL-23"),
         ("ch_rocker_arm_tl_oblique_hub_pin", "MHA-CH-06-TL-25"),
+        ("ch_rocker_arm_tl_vn_oblique_hub_pin", "MHA-CH-06-TL-VN-80"),
         ("ch_rocker_arm_tl_oblique_nut_bracket", "MHA-CH-06-TL-29"),
         ("ch_rocker_arm_tl_oblique_pivot_cap", "MHA-CH-06-TL-30"),
         ("ch_rocker_arm_tl_oblique_pivot_retainer", "MHA-CH-06-TL-31"),
@@ -512,8 +514,8 @@ def test_tuple_member_manifests_track_physical_sources_not_logical_row_keys(
         "'sh-vn-clamping-kit-hardware--TNut'),\n"
         "    ('sh-vn-clamping-kit-hardware', "
         "'sh-vn-clamping-kit-hardware--FlangeNut'),\n"
-        "    ('ch-rocker-arm-tl-vn-oblique-cl-dowel', "
-        "'ch-rocker-arm-tl-vn-oblique-cl-dowel'),\n"
+        "    ('ch-rocker-arm-tl-vn-oblique-riser-screw', "
+        "'ch-rocker-arm-tl-vn-oblique-riser-screw'),\n"
         ")\n"
         "async def _place_family(adapter, physical, logical):\n"
         f"    {placement}\n"
@@ -524,10 +526,10 @@ def test_tuple_member_manifests_track_physical_sources_not_logical_row_keys(
         tmp_path, monkeypatch, source,
         (
             "sh_vn_clamping_kit_hardware",
-            "ch_rocker_arm_tl_vn_oblique_cl_dowel",
+            "ch_rocker_arm_tl_vn_oblique_riser_screw",
             "pd_vn_chain_connecting_link",
         ),
-    ) == {"sh_vn_clamping_kit_hardware", "ch_rocker_arm_tl_vn_oblique_cl_dowel"}
+    ) == {"sh_vn_clamping_kit_hardware", "ch_rocker_arm_tl_vn_oblique_riser_screw"}
 
 
 def test_ambiguous_dynamic_source_family_keeps_every_possible_producer(

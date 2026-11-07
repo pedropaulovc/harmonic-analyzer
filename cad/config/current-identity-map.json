@@ -119,28 +119,6 @@
       ]
     },
     {
-      "old_stem": "ch-rocker-arm-tl-oblique-cl-dowel",
-      "old_number": "MHA-CH-006-TL-33",
-      "new_identities": [
-        {
-          "parent": "ch-rocker-arm-tl-oblique-jig",
-          "stem": "ch-rocker-arm-tl-vn-oblique-cl-dowel",
-          "number": "MHA-CH-06-TL-VN-53"
-        }
-      ]
-    },
-    {
-      "old_stem": "ch-rocker-arm-tl-oblique-clamp-screw",
-      "old_number": "MHA-CH-006-TL-48",
-      "new_identities": [
-        {
-          "parent": "ch-rocker-arm-tl-oblique-jig",
-          "stem": "ch-rocker-arm-tl-vn-oblique-clamp-screw",
-          "number": "MHA-CH-06-TL-VN-68"
-        }
-      ]
-    },
-    {
       "old_stem": "ch-rocker-arm-tl-oblique-end-bracket",
       "old_number": "MHA-CH-006-TL-28",
       "new_identities": [
@@ -2275,18 +2253,6 @@
       ]
     },
     {
-      "old_stem": "ch-rocker-arm-tl-vn-oblique-hub-pin",
-      "old_number": null,
-      "introduced": "2026-10-23",
-      "new_identities": [
-        {
-          "parent": "ch-rocker-arm-tl-oblique-jig",
-          "stem": "ch-rocker-arm-tl-vn-oblique-hub-pin",
-          "number": "MHA-CH-06-TL-VN-80"
-        }
-      ]
-    },
-    {
       "old_stem": "pd-vn-transgear-cluster-shim",
       "old_number": null,
       "introduced": "2026-11-01",
@@ -2311,6 +2277,17 @@
           "prior_number": "MHA-CH-06-TL-VN-82",
           "configuration": "FeedNut",
           "role": "FeedNut"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-hub-washer",
+      "old_number": null,
+      "introduced": "2026-11-06",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-oblique-hub-washer",
+          "number": "MHA-CH-06-TL-52"
         }
       ]
     }
@@ -2716,6 +2693,43 @@
           "parent": "ch-rocker-arm-tl-oblique-jig",
           "stem": "ch-rocker-arm-tl-vn-oblique-kp08-screw",
           "number": "MHA-CH-06-TL-VN-65"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-cl-dowel",
+      "old_number": "MHA-CH-006-TL-33",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm-tl-oblique-jig",
+          "stem": "ch-rocker-arm-tl-vn-oblique-cl-dowel",
+          "number": "MHA-CH-06-TL-VN-53"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-clamp-screw",
+      "old_number": "MHA-CH-006-TL-48",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm-tl-oblique-jig",
+          "stem": "ch-rocker-arm-tl-vn-oblique-clamp-screw",
+          "number": "MHA-CH-06-TL-VN-68"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-vn-oblique-hub-pin",
+      "old_number": null,
+      "introduced": "2026-10-23",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm-tl-oblique-jig",
+          "stem": "ch-rocker-arm-tl-vn-oblique-hub-pin",
+          "number": "MHA-CH-06-TL-VN-80"
         }
       ],
       "status": "retired"

@@ -21,7 +21,6 @@ import _config
 import _drawing_balloons
 import _component_references
 import _drawing_tables
-import _drawing_dimensions
 import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
 import ch_rocker_arm_tl_oblique_jig_assembly_spec as spec
 import draw_ch_rocker_arm_tl_oblique_jig_assembly as drawing
@@ -142,6 +141,26 @@ def _pivot_cluster_extent():
     )
 
 
+def _hub_hardware_points():
+    """Actual R4 strap-holding envelopes, including their distinct explode
+    lifts: the top-hat washer, the stop pins and the common screw's CL, CR
+    and HUB clamp occurrences (keyed by instance)."""
+    boxes = spec._component_local_boxes()
+    points = {
+        family: _exploded_part_points(family, boxes[family])
+        for family in (spec.HUB_WASHER, spec.STOP_PIN)
+    }
+    screw = spec.rail_screw.DIMS
+    radius = max(screw.head_dia, screw.major_dia) / 2.0
+    for role, index in spec.STRAP_CLAMP_SCREW_INDICES.items():
+        points[spec.STRAP_CLAMP_SCREW_INSTANCES[role]] = _exploded_part_points(
+            spec.RAIL_SCREW,
+            ((-radius, radius), (-screw.length, screw.head_h), (-radius, radius)),
+            indices={index},
+        )
+    return points
+
+
 def _cluster_extent(sheet: str):
     """A cluster's exploded plan points and Z range (mm): its families' plan
     outlines where the spec draws them, each slid as its explode slides it,
@@ -201,10 +220,35 @@ def _cluster_extent(sheet: str):
             for p in outline
         ]
         z = (
-            spec.HUB_PIN_BOTTOM_Z + lift(spec.HUB_PIN),
+            spec.trammel.CARRIER_UNDERSIDE_Z + lift(spec.CARRIER),
             spec.MODEL_EXTENT[2][1] + lift(spec.LEVER_SCREW),
         )
+        hardware = [point for corners in _hub_hardware_points().values() for point in corners]
+        points.extend((x, y) for x, y, _z in hardware)
+        z = (min(z[0], *(point[2] for point in hardware)),
+             max(z[1], *(point[2] for point in hardware)))
     return points, z
+
+
+def test_carrier_exploded_extent_includes_all_new_hardware() -> None:
+    cluster = next(cluster for cluster in drawing.CLUSTERS if cluster.sheet == "CARRIER EXPLODED")
+    hardware = _hub_hardware_points()
+    clamps = set(spec.STRAP_CLAMP_SCREW_INSTANCES.values())
+    assert set(hardware) == {spec.HUB_WASHER, spec.STOP_PIN, *clamps}
+    assert {spec.HUB_WASHER, spec.STOP_PIN} <= set(cluster.stems)
+    # The clamps are the common rail screw, ballooned on the rail sheet; the
+    # carrier sheet shows them as context, never the whole common family.
+    assert clamps == set(cluster.context)
+    assert spec.RAIL_SCREW not in cluster.stems
+    assert not set(spec.RAIL_SCREW_INSTANCES + spec.BAR_SCREW_INSTANCES) & cluster.visible
+    points, (low, high) = _cluster_extent(cluster.sheet)
+    for name, corners in hardware.items():
+        assert spec.explode_lift(name) != 0.0
+        if name not in clamps:
+            assert name in drawing.BALLOON_ANCHORS
+        for x, y, z in corners:
+            assert (x, y) in points
+            assert low <= z <= high
 
 
 def _cluster_outline(cluster, center=(0.2, 0.15), *, scale=None):
@@ -219,8 +263,8 @@ def _cluster_outline(cluster, center=(0.2, 0.15), *, scale=None):
 
 def test_sheets_are_landscape_with_their_scales() -> None:
     assert len(drawing.SHEET_NAMES) == len(set(drawing.SHEET_NAMES))
-    assert drawing.SHEET_NAMES[7:] == (drawing.FIT_SHEET, drawing.OPERATION_SHEET)
-    assert len(drawing.SHEET_NAMES) == 9
+    assert drawing.SHEET_NAMES[7:] == (drawing.FIT_SHEET, drawing.OPERATION_SHEET, drawing.HOLDING_SHEET)
+    assert len(drawing.SHEET_NAMES) == 10
     assert set(drawing.SHEET_LAYOUTS.values()) == {drawing.DrawingLayout.LANDSCAPE}
     assert set(drawing.SHEET_SCALES) == set(drawing.SHEET_NAMES)
     assert drawing.SHEET_SCALES[drawing.ASSEMBLED_SHEET] == drawing.ASSEMBLED_SCALE
@@ -228,6 +272,7 @@ def test_sheets_are_landscape_with_their_scales() -> None:
     assert drawing.SHEET_SCALES[drawing.OPERATION_SHEET] == drawing.ISOMETRIC_SCALE
     assert drawing.SHEET_SCALES[drawing.STEPS_SHEET] == drawing.NOTES_REFERENCE_SCALE
     assert drawing.SHEET_SCALES[drawing.FIT_SHEET] == drawing.NOTES_REFERENCE_SCALE
+    assert drawing.SHEET_SCALES[drawing.HOLDING_SHEET] == drawing.NOTES_REFERENCE_SCALE
     assert all(
         drawing.SHEET_SCALES[cluster.sheet] in drawing.CLUSTER_SCALE_LADDER
         for cluster in drawing.CLUSTERS
@@ -260,6 +305,20 @@ def test_clusters_partition_the_bom() -> None:
     assert spec.LOCKED_TO[spec.CARRIAGE_SCREW] == (
         ((spec.FEED_BLOCK, 0),) * 4 + ((spec.PIVOT_BLOCK, 0),) * 4
     )
+    # R4: the common #8 rail screw is one BOM row over three joints: the
+    # rails into their bars, the TL-28 brackets up into Bar1, then the
+    # strap's CL, CR and HUB clamps, context on the carrier sheet.
+    rail_family = tuple(
+        spec.instance_name(spec.RAIL_SCREW, index)
+        for index in range(spec.QUANTITIES[spec.RAIL_SCREW])
+    )
+    assert rail_family == (
+        *spec.RAIL_SCREW_INSTANCES,
+        *spec.BAR_SCREW_INSTANCES,
+        *spec.STRAP_CLAMP_SCREW_INSTANCES.values(),
+    )
+    carrier_cluster = next(c for c in drawing.CLUSTERS if c.sheet == "CARRIER EXPLODED")
+    assert set(spec.STRAP_CLAMP_SCREW_INSTANCES.values()) <= set(carrier_cluster.context)
     # The feed nut's four flat heads are riser-screw instances (option B,
     # 2026-11-04): shown over the nut on the feed sheet, ballooned with the
     # riser's four on the carrier sheet.
@@ -326,6 +385,7 @@ def test_sheet_text_wraps_within_its_layout_width() -> None:
         assert drawing._STEP_LABEL.fullmatch(label)
     fit = drawing.FIT_LAYOUT
     operation = drawing.OPERATION_LAYOUT
+    holding = drawing.HOLDING_LAYOUT
     for text, width in (
         (drawing.ASSEMBLED_CAPTION, drawing.CAPTION_WIDTH),
         (drawing.ALIGNMENT_NOTE, drawing.ALIGNMENT_WIDTH),
@@ -337,14 +397,17 @@ def test_sheet_text_wraps_within_its_layout_width() -> None:
         (operation.steps, drawing.STEPS_LINE_WIDTH),
         (operation.continued, drawing.STEPS_LINE_WIDTH),
         (operation.checks, drawing.STEPS_LINE_WIDTH),
+        (holding.steps, drawing.STEPS_LINE_WIDTH),
+        (holding.continued, drawing.STEPS_LINE_WIDTH),
+        (holding.checks, drawing.STEPS_LINE_WIDTH),
     ):
         assert max(len(line) for line in text.split("\n")) <= width
     # Each alignment station and sweep-limit row prints whole on one line.
     for line in (*spec.ALIGNMENT_NOTE_LINES[1:], *spec.SWEEP_NOTE_LINES[1:]):
         assert line in drawing.ALIGNMENT_NOTE.split("\n")
     # The general torque note opens sheet 7's sequence, its items unbroken.
-    assert drawing.ASSEMBLY_STEPS.split("\n")[1].startswith("TORQUE WHERE NO STEP")
-    assert "(ITEMS 21, 22, 24, 26 AND 27)" in drawing.ASSEMBLY_STEPS.replace("\n", " ")
+    assert drawing.ASSEMBLY_STEPS.split("\n")[1].startswith("UNSPECIFIED TORQUES")
+    assert " ".join(spec.GENERAL_TORQUE_NOTE.split()) in " ".join(drawing.ASSEMBLY_STEPS.split())
 
 
 def test_a_blank_line_parts_each_top_level_step() -> None:
@@ -678,6 +741,7 @@ def _lines(text: str) -> int:
 def test_steps_sheet_regions_fit_apart() -> None:
     _assert_steps_sheet_fits(drawing.STEPS_LAYOUT)
     _assert_steps_sheet_fits(drawing.FIT_LAYOUT)
+    _assert_steps_sheet_fits(drawing.HOLDING_LAYOUT)
 
 
 @pytest.mark.parametrize(
@@ -685,6 +749,7 @@ def test_steps_sheet_regions_fit_apart() -> None:
     (
         (drawing.STEPS_SHEET, drawing.STEPS_LAYOUT),
         (drawing.FIT_SHEET, drawing.FIT_LAYOUT),
+        (drawing.HOLDING_SHEET, drawing.HOLDING_LAYOUT),
     ),
 )
 def test_instruction_reference_and_caption_fit_without_moving_notes(sheet, layout) -> None:
@@ -1077,7 +1142,7 @@ def _part_solids():
     for stem, fastener in (
         (spec.RAIL_SCREW, spec.rail_screw), (spec.CARRIAGE_SCREW, spec.carriage_screw),
         (spec.PILLOW_BLOCK_SCREW, spec.bracket_screw), (spec.RISER_SCREW, spec.riser_screw),
-        (spec.CLAMP_SCREW, spec.clamp_screw), (spec.LEVER_SCREW, spec.lever_screw),
+        (spec.LEVER_SCREW, spec.lever_screw),
     ):
         solids[stem] = _screw(fastener.DIMS)
     return solids
@@ -1522,6 +1587,7 @@ def test_steps_cite_every_screw_by_item_number() -> None:
         text
         for layout in (
             drawing.STEPS_LAYOUT, drawing.FIT_LAYOUT, drawing.OPERATION_LAYOUT,
+            drawing.HOLDING_LAYOUT,
         )
         for text in (layout.steps, layout.continued)
     )
@@ -1530,6 +1596,29 @@ def test_steps_cite_every_screw_by_item_number() -> None:
     # A citation never breaks across a line.
     for line in steps.split("\n"):
         assert not line.rstrip().endswith(("ITEM", "(ITEM"))
+
+
+def test_instruction_split_drops_or_duplicates_no_source_step() -> None:
+    layouts = (
+        drawing.STEPS_LAYOUT, drawing.FIT_LAYOUT,
+        drawing.OPERATION_LAYOUT, drawing.HOLDING_LAYOUT,
+    )
+    def content(layout):
+        return " ".join(" ".join((layout.steps, layout.continued, layout.checks)).split())
+
+    all_text = " ".join(content(layout) for layout in layouts)
+    source_steps = (
+        spec.GENERAL_TORQUE_NOTE, *spec.ASSEMBLY_STEPS, *spec.ASSEMBLY_CHECKS,
+        *spec.PIVOT_FIT_STEPS, *spec.FEED_FIT_STEPS,
+        *spec.OPERATION_STEPS, *spec.HOLD_DOWN_STEPS, *spec.CAPTURE_CHECKS,
+    )
+    for step in source_steps:
+        assert all_text.count(" ".join(step.split())) == 1, step
+    operation, holding = content(drawing.OPERATION_LAYOUT), content(drawing.HOLDING_LAYOUT)
+    for step in (*spec.OPERATION_STEPS[:2], *spec.HOLD_DOWN_STEPS, *spec.CAPTURE_CHECKS[:3], *spec.CAPTURE_CHECKS[4:]):
+        assert " ".join(step.split()) in operation
+    for step in (*spec.OPERATION_STEPS[2:], *spec.CAPTURE_CHECKS[3:4]):
+        assert " ".join(step.split()) in holding
 
 
 @pytest.fixture
@@ -1836,7 +1925,7 @@ def test_package_settled_checks_reread_native_bom_without_mutating_layout(
     seat._validate_bom.return_value = tuple(
         (stem, str(item)) for item, stem in enumerate(spec.BOM_ORDER, 1)
     )
-    seat._place_assembled_sheet.return_value = lambda: None
+    seat._place_assembled_sheet.return_value = None
     seat._place_kit_bom_note.return_value = lambda: None
     seat._place_bom_note.return_value = lambda: None
     seat._place_notes_reference_views.return_value = {
@@ -2312,6 +2401,8 @@ def test_bom_note_buys_the_worst_case_at_both_supports() -> None:
     assert "SELECTED PER P1" in note
     item = f"(ITEM {spec.ITEM_NUMBERS[spec.PIVOT_SHIM]})"
     assert item in spec.PIVOT_FIT_STEPS[0] and "BUY LIST UNDER THE BOM" in spec.PIVOT_FIT_STEPS[0]
+    # One purchase list, not a duplicate expanded inside the two-page fit-up.
+    assert all(sku not in spec.PIVOT_FIT_STEPS[0] for sku in spec.PIVOT_SHIM_BUY)
     description = spec.BOM_DESCRIPTIONS[spec.PIVOT_SHIM]
     assert "FITTING STOCK" in description
     assert len(description) <= drawing.BOM_DESCRIPTION_MAX_CHARS
@@ -2489,166 +2580,6 @@ def test_source_configuration_switch_is_read_back(monkeypatch) -> None:
             pass
 
 
-def test_cl_tip_reference_is_the_placed_dowel_over_the_riser() -> None:
-    """#1619: the elevation's (1.6) is the CL dowel's modelled round tip above
-    the riser top, up the dowel's axis, a reference inside the fitter's band."""
-    cl_dowel = spec.cl_dowel
-    (x, riser_top), (tip_x, tip_z) = spec.CL_TIP_LINE
-    origin, rows = spec.CL_DOWEL_PLACEMENTS[0]
-    assert rows[1] == pytest.approx((0.0, 0.0, 1.0))  # the dowel's axis up Z
-    assert (x, tip_x) == pytest.approx((origin[0], origin[0]))
-    assert riser_top == spec.trammel.CARRIER_TOP_Z + spec.trammel.RISER_THICK
-    assert tip_z == pytest.approx(origin[2] + cl_dowel.LENGTH)
-    assert tip_z - riser_top == pytest.approx(cl_dowel.TIP_HEIGHT)
-    assert cl_dowel.TIP_SET_MIN < cl_dowel.TIP_HEIGHT < cl_dowel.TIP_SET_MAX
-    assert spec.DRAWING_DIMENSIONS == {spec.CL_TIP_FEATURE: {spec.CL_TIP_DIMENSION}}
-    assert spec.DRAWING_PRECISION == {
-        spec.CL_TIP_FEATURE: {spec.CL_TIP_DIMENSION: spec.CL_TIP_PRECISION}
-    }
-
-
-def _elevation_xy(x_mm: float, z_mm: float) -> tuple[float, float]:
-    """Sheet metres of a machine X-Z point, the elevation centred on the extent."""
-    (x0, x1), _y, (z0, z1) = spec.MODEL_EXTENT
-    ratio = drawing.ASSEMBLED_SCALE[0] / drawing.ASSEMBLED_SCALE[1] / 1000.0
-    return (
-        drawing.ELEVATION_CENTER[0] + (x_mm - (x0 + x1) / 2.0) * ratio,
-        drawing.ELEVATION_CENTER[1] + (z_mm - (z0 + z1) / 2.0) * ratio,
-    )
-
-
-def test_cl_tip_text_stands_clear_outboard_of_the_riser() -> None:
-    """The parenthesised tip text, centred on its point: on the sheet, left of
-    the dowel and the riser's -X end, above the tip, clear of the plan and
-    every note."""
-    tx, _ty, tz = drawing.CL_TIP_TEXT_MODEL_MM
-    cx, cy = _elevation_xy(tx, tz)
-    printed = f"({spec._length(spec.cl_dowel.TIP_HEIGHT, spec.CL_TIP_PRECISION)})"
-    half_w, half_h = len(printed) * CHAR_M / 2.0, LINE_M / 2.0
-    text = (cx - half_w, cy - half_h, cx + half_w, cy + half_h)
-    (x, _riser_top), (_x, tip_z) = spec.CL_TIP_LINE
-    riser_end = spec.POSE.to_machine(spec.riser.BLANK_ORIGIN)[0]
-    assert riser_end < x
-    assert text[2] < _elevation_xy(riser_end, tip_z)[0]
-    assert text[1] > _elevation_xy(x, tip_z)[1]
-    (x0, x1), (y0, y1), _z = spec.MODEL_EXTENT
-    others = (
-        _view_box(drawing.PLAN_CENTER, x1 - x0, y1 - y0, drawing.ASSEMBLED_SCALE),
-        _note_box(spec.PLAN_VIEW_LABEL, drawing.PLAN_LABEL_XY),
-        _note_box(spec.ELEVATION_VIEW_LABEL, drawing.ELEVATION_LABEL_XY),
-        _note_box(drawing.ASSEMBLED_CAPTION, drawing.CAPTION_XY),
-        _note_box(drawing.ALIGNMENT_NOTE, drawing.ALIGNMENT_XY),
-    )
-    assert _inside_sheet(text)
-    for other in others:
-        assert not _overlap(text, other)
-
-
-@pytest.mark.parametrize("defect", (
-    None, "ignored-offset", "line-follows-text", "inherited-offset", "line-off-sheet-x",
-))
-def test_cl_tip_native_reference_offsets_without_replacing_its_model_value(
-    monkeypatch, defect,
-) -> None:
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(
-        _drawing_dimensions._sw_type_info, "early_bound_or_flag",
-        lambda value, *_interface: value,
-    )
-    monkeypatch.setattr(
-        _drawing_dimensions, "dimension_name", lambda *_args: spec.CL_TIP_DIMENSION
-    )
-    for module in (drawing, _drawing_dimensions):
-        monkeypatch.setattr(module, "rebuild_drawing", lambda *a, **kw: None)
-    line_target, text_target = (0.217, 0.1382), (0.206, 0.146)
-    # SetPosition2's z is not the sheet: the imported dimension kept its own
-    # z -0.03273 after curation and SetPosition2 asked 0.0 (farm source
-    # 9e0cccd61), so the double ignores the requested z the same way.
-    native_z = -0.03273400182554304
-    position = [0.220, 0.139, native_z]
-    line_position = position.copy()
-    dimension = SimpleNamespace(
-        SystemValue=spec.cl_dowel.TIP_HEIGHT / 1000.0,
-        Tolerance=SimpleNamespace(Type=0),
-    )
-    display = SimpleNamespace(
-        OffsetText=defect == "inherited-offset",
-        GetDimension2=lambda _configuration: dimension,
-        GetText=lambda part: "(" if part == 1 else ")",
-        GetPrimaryPrecision2=lambda: spec.CL_TIP_PRECISION,
-    )
-
-    def move(x, y, _z):
-        # A real sheet miss, unlike the native z, still refuses the placement.
-        miss = 0.0001 if defect == "line-off-sheet-x" and not display.OffsetText else 0.0
-        if not (display.OffsetText and defect == "ignored-offset"):
-            position[:] = (x + miss, y, native_z)
-        if not display.OffsetText or defect == "line-follows-text":
-            line_position[:] = (x + miss, y, native_z)
-        return True
-
-    annotation = SimpleNamespace(
-        SetPosition2=move, GetPosition=lambda: tuple(position),
-        GetSpecificAnnotation=lambda: display,
-    )
-    display.GetAnnotation = lambda: annotation
-    display.GetDisplayData = lambda: SimpleNamespace(
-        GetArrowHeadCount=lambda: 2,
-        GetArrowHeadAtIndex2=lambda index: (
-            line_position[0], line_position[1] + (-0.0002, 0.0002)[index], native_z,
-            0.0, 1.0, 0.0, 0.001, 0.003, 0.0, 0.0, 0.0, 1.0,
-        ),
-    )
-    imports = []
-
-    def curate(_adapter, _view, **kwargs):
-        imports.append(kwargs["keep"])
-        # Real curation moves the whole dimension while OffsetText is false.
-        # Returning an untouched annotation concealed the ordering regression.
-        move(*kwargs["keep"][spec.CL_TIP_DIMENSION], 0.0)
-        return [annotation]
-
-    monkeypatch.setattr(
-        drawing, "model_point_in_view",
-        lambda *a, label, **kw: line_target if label.endswith(" line") else text_target,
-    )
-    monkeypatch.setattr(
-        drawing, "model_points_in_view",
-        lambda *a, **kw: [(0.220, 0.138), (0.220, 0.1384)],
-    )
-    monkeypatch.setattr(drawing, "_show_base_view_sketches", lambda *a, **kw: None)
-    monkeypatch.setattr(drawing, "curate_view_dimensions", curate)
-    monkeypatch.setattr(drawing, "assert_imported_precision", lambda *a, **kw: None)
-    monkeypatch.setattr(drawing, "set_reference_dimension", lambda *a, **kw: display)
-    adapter = SimpleNamespace(
-        currentModel=_ADAPTER.currentModel, _attempt=lambda callback: callback()
-    )
-    refusal = {
-        "ignored-offset": "native offset text",
-        "line-follows-text": "native dimension line lost arrow",
-        "line-off-sheet-x": "native dimension-line anchor",
-    }.get(defect)
-    if refusal is not None:
-        with pytest.raises(RuntimeError, match=refusal):
-            drawing._cl_tip_setting(adapter, object())
-    else:
-        settled = drawing._cl_tip_setting(adapter, object())
-        assert imports == [{spec.CL_TIP_DIMENSION: line_target}]
-        assert position == [*text_target, native_z]
-        assert line_position == [*line_target, native_z]
-        assert dimension.SystemValue == spec.cl_dowel.TIP_HEIGHT / 1000.0
-        settled()
-        line_position[0] += 0.003
-        with pytest.raises(RuntimeError, match="native dimension line"):
-            settled()
-        line_position[:] = (*line_target, native_z)
-        position[1] -= 0.003
-        with pytest.raises(RuntimeError, match="native offset text"):
-            settled()
-
-
-
-
 def test_plain_pivot_geometry_sets_the_carrier_and_positive_head_capture() -> None:
     """Exercise placed solids' stack, not the wording of their fitter notes."""
     screw, spacer, shim = spec.pivot_screw, spec.pivot_spacer, spec.pivot_shim
@@ -2798,3 +2729,41 @@ def test_two_instruction_sheets_refuse_a_sequence_that_cannot_fit():
     steps = tuple(f"{index}. STEP." for index in range(1, 101))
     with pytest.raises(ValueError, match="exceed sheets"):
         drawing.assembly_and_fit_layouts(steps, (), ("P1. FIT.",))
+
+
+def test_complete_source_instructions_fit_existing_pages_at_normal_note_size():
+    assert drawing.NOTE_LINE_M == 0.004525
+    assert drawing.STEPS_LINE_WIDTH == 68
+    assert drawing.NOTES_REFERENCE_MIN_HEIGHT == 0.075
+    assert [step.split(". ", 1)[0] for step in spec.ASSEMBLY_STEPS] == [
+        "1", "2", "3", "4", "5", "6", "7", "8A", "8B", "9", "10", "11",
+        "12", "13A", "13B", "13C", "13D",
+    ]
+    # The integrated two-sheet budget was short by 1.075 mm: F3's fourth
+    # line. Preserve all checks while keeping that paragraph to three lines.
+    f3 = drawing._wrapped(
+        (spec.FEED_FIT_STEPS[-1],), width=drawing.STEPS_LINE_WIDTH, spaced=True,
+    )
+    assert len(f3.splitlines()) == 3
+    layouts = (drawing.STEPS_LAYOUT, drawing.FIT_LAYOUT)
+    printed = " ".join(" ".join(
+        text
+        for layout in layouts
+        for text in (layout.steps, layout.continued, layout.checks)
+    ).split())
+    for step in (
+        spec.GENERAL_TORQUE_NOTE, *spec.ASSEMBLY_STEPS,
+        *spec.PIVOT_FIT_STEPS, *spec.FEED_FIT_STEPS, *spec.ASSEMBLY_CHECKS,
+    ):
+        assert printed.count(" ".join(step.split())) == 1
+    for layout in layouts:
+        _assert_steps_sheet_fits(layout)
+        text_bottom = layout.checks_xy[1] - drawing._note_height(layout.checks)
+        reference_floor = (
+            drawing.TITLE_BLOCK[3] + drawing.BOM_SHEET_CLEARANCE
+            + drawing.NOTE_LINE_M + drawing.VIEW_LABEL_GAP
+        )
+        assert (
+            text_bottom - drawing.REGION_GAP - reference_floor
+            >= drawing.NOTES_REFERENCE_MIN_HEIGHT
+        )

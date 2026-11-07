@@ -55,13 +55,6 @@ from _drawing_balloons import (
     assert_balloon_landings,
     isolate_drawing_view_components,
 )
-from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import (
-    assert_imported_precision,
-    offset_dimension_text,
-    set_reference_dimension,
-)
-from _drawing_hidden_sketches import _show_base_view_sketches
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_tables import (
     bom_row_identities,
@@ -79,7 +72,7 @@ from _drawing_view_configuration import (
 )
 from _drawing_view_display import set_hidden_lines_removed
 from _drawing_leader_notes import add_leader_note
-from _drawing_projection import model_point_in_view, model_points_in_view
+from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_types import DRAWING_TEMPLATES, DrawingLayout
 from _drawing_ray_pick import ViewRayCaster
@@ -109,6 +102,7 @@ BOM_SHEET = "BILL OF MATERIALS"
 STEPS_SHEET = "ASSEMBLY STEPS"
 FIT_SHEET = "PIVOT AND FEED FIT"
 OPERATION_SHEET = "OPERATION AND HOLD DOWNS"
+HOLDING_SHEET = "STRAP HOLDING AND PREPARATION"
 PIVOT_SHEET = "PLAIN PIVOTS EXPLODED"
 
 
@@ -218,15 +212,17 @@ CLUSTERS = (
         (
             spec.CARRIER,
             spec.RISER,
-            spec.HUB_PIN,
+            spec.HUB_WASHER,
             spec.FEED_LEVER,
-            spec.CL_DOWEL,
+            spec.STOP_PIN,
             spec.RISER_SCREW,
-            spec.CLAMP_SCREW,
             spec.LEVER_SCREW,
             spec.LEVER_LOCK_WASHER,
         ),
         (1.0, 5.0),
+        # The CL, CR and HUB clamps are the common rail screw, ballooned on
+        # the rail sheet; here they explode out of the carrier unballooned.
+        context=tuple(spec.STRAP_CLAMP_SCREW_INSTANCES.values()),
         partial=((spec.RISER_SCREW, spec.RISER_SCREW_INSTANCES),),
     ),
 )
@@ -237,6 +233,7 @@ SHEET_NAMES = (
     STEPS_SHEET,
     FIT_SHEET,
     OPERATION_SHEET,
+    HOLDING_SHEET,
 )
 # The captions cite sheets by these numbers, never typed ones.
 BOM_SHEET_NUMBER = SHEET_NAMES.index(BOM_SHEET) + 1
@@ -286,6 +283,7 @@ def package_sheet_scales(
         STEPS_SHEET: NOTES_REFERENCE_SCALE,
         FIT_SHEET: NOTES_REFERENCE_SCALE,
         OPERATION_SHEET: ISOMETRIC_SCALE,
+        HOLDING_SHEET: NOTES_REFERENCE_SCALE,
     }
     return {
         name: cluster_scales[name] if name in cluster_scales else fixed[name]
@@ -322,7 +320,7 @@ TITLE_BLOCK = (
 PLAN_CENTER = (0.274, 0.205)
 ELEVATION_CENTER = (0.274, 0.113)
 CAPTION_XY = (0.018, 0.255)
-CAPTION_WIDTH = 46  # characters; default-format note text, left of the plan
+CAPTION_WIDTH = 45  # characters; default-format note text, clear left of the plan
 ALIGNMENT_XY = (0.018, 0.093)
 ALIGNMENT_WIDTH = 68  # characters; stops left of the title block
 # Default-format note text: about 2.9 mm a character on the farm's templates.
@@ -343,26 +341,6 @@ def _label_under(center: tuple[float, float], height_mm: float, text: str):
 PLAN_LABEL_XY = _label_under(PLAN_CENTER, _EY1 - _EY0, spec.PLAN_VIEW_LABEL)
 ELEVATION_LABEL_XY = _label_under(
     ELEVATION_CENTER, _EZ1 - _EZ0, spec.ELEVATION_VIEW_LABEL
-)
-
-# The elevation's one dimension: the CL dowel's round tip above the riser top
-# (``spec.CL_TIP_LINE``), imported from the builder's hidden CL_TIP_FEATURE
-# and parenthesised as a reference; step 11 sets the tip against the actual
-# riser. Its short line is under 1 mm on the sheet at 1:4, too short to hold its text.
-# Offset the imported text independently of its dimension/witness lines:
-# 80 model mm left and 28 above the tip gives it a clear lane above the
-# left pivot, below the plan, rather than across the shoulder-screw geometry.
-CL_TIP_TEXT_MODEL_MM = (
-    spec.CL_TIP_LINE[1][0] - 80.0,
-    0.0,
-    spec.CL_TIP_LINE[1][1] + 28.0,
-)
-# The dimension line stays near the dowel; only its value is carried into
-# the clear text lane. Curation places the whole dimension before offsetting.
-CL_TIP_LINE_MODEL_MM = (
-    spec.CL_TIP_LINE[1][0] - 12.0,
-    0.0,
-    sum(point[1] for point in spec.CL_TIP_LINE) / 2.0,
 )
 
 # Sheet 2: the full-height BOM left, its collapsed reference right. The table
@@ -488,8 +466,8 @@ PART_ROWS = {
         "ch-rocker-arm-tl-vn-oblique-pivot-shim"
     ),
     "ch-rocker-arm-tl-oblique-riser": _config.parts("ch-rocker-arm-tl-oblique-riser"),
-    "ch-rocker-arm-tl-vn-oblique-hub-pin": _config.parts(
-        "ch-rocker-arm-tl-vn-oblique-hub-pin"
+    "ch-rocker-arm-tl-oblique-hub-washer": _config.parts(
+        "ch-rocker-arm-tl-oblique-hub-washer"
     ),
     "ch-rocker-arm-tl-oblique-feed-lever": _config.parts(
         "ch-rocker-arm-tl-oblique-feed-lever"
@@ -506,9 +484,7 @@ PART_ROWS = {
     "ch-rocker-arm-tl-vn-oblique-rail-kit--Carriage": _config.parts(
         "ch-rocker-arm-tl-vn-oblique-rail-kit"
     ),
-    "ch-rocker-arm-tl-vn-oblique-cl-dowel": _config.parts(
-        "ch-rocker-arm-tl-vn-oblique-cl-dowel"
-    ),
+    "sm-vn-knife-mount-dowel": _config.parts("sm-vn-knife-mount-dowel"),
     "ch-rocker-arm-tl-vn-oblique-leadscrew-kit--LeadScrew": _config.parts(
         "ch-rocker-arm-tl-vn-oblique-leadscrew-kit"
     ),
@@ -541,9 +517,6 @@ PART_ROWS = {
     ),
     "ch-rocker-arm-tl-vn-oblique-riser-screw": _config.parts(
         "ch-rocker-arm-tl-vn-oblique-riser-screw"
-    ),
-    "ch-rocker-arm-tl-vn-oblique-clamp-screw": _config.parts(
-        "ch-rocker-arm-tl-vn-oblique-clamp-screw"
     ),
     "ch-rocker-arm-tl-vn-oblique-lever-screw": _config.parts(
         "ch-rocker-arm-tl-vn-oblique-lever-screw"
@@ -680,7 +653,7 @@ BALLOON_ANCHORS[spec.PILLOW_BLOCK] = BalloonAnchor(
 #   right;
 # - 8 (riser, sheet 6) landed on the riser's end corner on the carrier: it
 #   lands on the riser's back top long edge, 60 from its end, between its
-#   screws; straight up, right of the CL dowel's leader;
+#   screws; straight up;
 # - 10 (feed lever, sheet 6) crossed the riser to the lever's inner end: it
 #   lands on the lever's top front long edge near the grip end, where the
 #   lever stands past the carrier; out to the left.
@@ -731,6 +704,10 @@ BALLOON_ANCHORS[spec.PIVOT_SHIM] = BalloonAnchor(
 )
 BALLOON_ANCHORS[spec.RISER] = BalloonAnchor(
     point_mm=(60.0, spec.riser.BLANK_WIDTH, spec.riser.THICKNESS)
+)
+# The top-hat washer's flange: its outer top rim (seat face at z 0).
+BALLOON_ANCHORS[spec.HUB_WASHER] = BalloonAnchor(
+    point_mm=(spec.hub_washer.OD / 2.0, 0.0, spec.hub_washer.THICK)
 )
 BALLOON_ANCHORS[spec.FEED_LEVER] = BalloonAnchor(
     point_mm=(280.0, spec.feed_lever.LEVER_THICK, -spec.feed_lever.LEVER_WIDTH)
@@ -919,9 +896,15 @@ ASSEMBLY_STEPS_CONTINUED = STEPS_LAYOUT.continued
 ASSEMBLY_CHECKS = STEPS_LAYOUT.checks
 CHECKS_XY = STEPS_LAYOUT.checks_xy
 OPERATION_LAYOUT = steps_sheet_layout(
-    (*spec.OPERATION_STEPS, "HOLD-DOWN FIT:", *spec.HOLD_DOWN_STEPS),
-    spec.CAPTURE_CHECKS,
+    (*spec.OPERATION_STEPS[:2], "HOLD-DOWN FIT:", *spec.HOLD_DOWN_STEPS),
+    (*spec.CAPTURE_CHECKS[:3], *spec.CAPTURE_CHECKS[4:]),
     heading="OPERATION AND INSTALLED ACCEPTANCE",
+)
+HOLDING_LAYOUT = steps_sheet_layout(
+    spec.OPERATION_STEPS[2:],
+    spec.CAPTURE_CHECKS[3:4],
+    heading="STRAP PREPARATION AND THREE-POINT HOLDING",
+    reference_height=NOTES_REFERENCE_MIN_HEIGHT,
 )
 # Only this sheet has a finished view. Its room follows the filled right
 # column, keeping the actual native outline clear of its checks and title.
@@ -948,6 +931,7 @@ NOTES_REFERENCE_REGIONS = {
     for sheet, layout in (
         (STEPS_SHEET, STEPS_LAYOUT),
         (FIT_SHEET, FIT_LAYOUT),
+        (HOLDING_SHEET, HOLDING_LAYOUT),
     )
 }
 SHEET_LAYOUTS = {name: DrawingLayout.LANDSCAPE for name in SHEET_NAMES}
@@ -1594,149 +1578,9 @@ def _add_plan_tags(adapter: Any, plan: Any) -> None:
         )
 
 
-def _native_dimension_anchor(annotation: Any) -> tuple[float, float, float] | None:
-    """``IAnnotation::GetPosition`` of an imported display dimension as
-    (sheet x, sheet y, native z), or None when unreadable.
-
-    Only x and y are the documented sheet placement (``types/IAnnotation/
-    GetPosition.md``: relative to the sheet's lower-left corner; a display
-    dimension's x, y is its text box's bottom-border centre). An imported model
-    dimension keeps a native z the move does not set: on farm source 9e0cccd61
-    curation's two ``SetPosition(x, y, 0.0)`` passes (it deleted two unrequested
-    imports) and ``SetPosition2(x, y, 0.0)`` read back (0.23628, 0.1381095625,
-    -0.03273): the line midpoint's sheet y as the offline elevation mapping
-    computes it, with z 32.7 mm off the sheet plane. The
-    recipes compare ``position[:2]`` (``_reposition_rerun_reason``,
-    ``_section_axis``) and carry the native z through a move
-    (``_drawing_annotation_extent``).
-    """
-    position = tuple(float(value) for value in (annotation.GetPosition() or ()))
-    if len(position) != 3 or not all(math.isfinite(value) for value in position):
-        return None
-    return position
-
-
-def _cl_tip_setting(adapter: Any, elevation: Any) -> Callable[[], None]:
-    """Import the builder's CL tip-above-riser dimension into the elevation at
-    ``CL_TIP_TEXT_MODEL_MM``, parenthesise it as a reference and prove its
-    nominal, places and that it carries no band; returns the same proof for
-    the settled drawing. Every native anchor, arrow tip and requested point is
-    compared on the sheet plane (x, y); see ``_native_dimension_anchor``."""
-    label = "jig elevation CL tip above riser"
-    name = spec.CL_TIP_DIMENSION
-    line_xy = model_point_in_view(
-        adapter, elevation,
-        tuple(value / 1000.0 for value in CL_TIP_LINE_MODEL_MM),
-        label=f"{label} line",
-    )
-    text_xy = model_point_in_view(
-        adapter, elevation,
-        tuple(value / 1000.0 for value in CL_TIP_TEXT_MODEL_MM),
-        label=f"{label} text",
-    )
-    source_ends = model_points_in_view(
-        adapter, elevation,
-        [(x / 1000.0, 0.0, z / 1000.0) for x, z in spec.CL_TIP_LINE],
-        label=f"{label} native witness ends",
-    )
-    arrow_tips = tuple((line_xy[0], y) for _x, y in source_ends)
-    _show_base_view_sketches(adapter, elevation, (spec.CL_TIP_FEATURE,), label=label)
-    annotations = curate_view_dimensions(
-        adapter,
-        elevation,
-        keep={name: line_xy},
-        view_label=label,
-        dimensions_by_feature=spec.DRAWING_DIMENSIONS,
-    )
-    if len(annotations) != 1:
-        raise RuntimeError(f"{label} must import exactly one dimension")
-    assert_imported_precision(adapter, annotations, {name: spec.CL_TIP_PRECISION})
-    display = _early_bound(
-        set_reference_dimension(adapter, annotations[0], label=label),
-        "IDisplayDimension",
-    )
-    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
-    # Reset an inherited offset before positioning the dimension line. With
-    # OffsetText on, SetPosition2 moves only the text and cannot repair a line
-    # curation previously left in the text lane. The move keeps the native z.
-    display.OffsetText = False
-    anchor = _native_dimension_anchor(annotation)
-    if (
-        anchor is None
-        or bool(display.OffsetText)
-        or not annotation.SetPosition2(*line_xy, anchor[2])
-    ):
-        raise RuntimeError(f"failed to position {label} dimension line at {anchor!r}")
-    position = _native_dimension_anchor(annotation)
-    if position is None or math.dist(position[:2], line_xy) > 0.00005:
-        raise RuntimeError(
-            f"{label}: native dimension-line anchor at {position!r}, "
-            f"expected sheet {line_xy!r}"
-        )
-
-    def prove_dimension_line() -> None:
-        data = _early_bound(display.GetDisplayData(), "IDisplayData")
-        if data is None:
-            raise RuntimeError(f"{label}: missing native dimension-line display")
-        native_tips = []
-        for index in range(int(data.GetArrowHeadCount())):
-            raw = tuple(float(v) for v in (data.GetArrowHeadAtIndex2(index) or ()))
-            if len(raw) != 12 or not all(math.isfinite(value) for value in raw):
-                raise RuntimeError(f"{label}: unreadable native dimension-line arrow")
-            native_tips.append(raw[:2])
-        # Use the same 0.05 mm paper tolerance as native annotation positions.
-        for expected in arrow_tips:
-            match = next((
-                index for index, actual in enumerate(native_tips)
-                if math.dist(actual, expected) <= 0.00005
-            ), None)
-            if match is None:
-                raise RuntimeError(
-                    f"{label}: native dimension line lost arrow at {expected!r}; "
-                    f"native arrow tips {native_tips!r}"
-                )
-            native_tips.pop(match)
-
-    rebuild_drawing(adapter, label=f"{label} dimension-line anchor")
-    prove_dimension_line()
-    offset_dimension_text(adapter, annotations, {name: text_xy})
-
-    def proven(when: str) -> None:
-        dimension = _early_bound(display.GetDimension2(0), "IDimension")
-        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-        value_mm = abs(float(dimension.SystemValue)) * 1000.0
-        brackets = (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
-        places = int(display.GetPrimaryPrecision2())
-        if (
-            abs(value_mm - spec.cl_dowel.TIP_HEIGHT) > 1e-6
-            or brackets != ("(", ")")
-            or int(tolerance.Type) != 0  # swTolNONE: a reference carries no band
-            or places != spec.CL_TIP_PRECISION
-        ):
-            raise RuntimeError(
-                f"{when} {label}: {value_mm!r} mm, brackets {brackets!r}, "
-                f"tolerance type {int(tolerance.Type)}, {places} places"
-            )
-        position = _native_dimension_anchor(annotation)
-        if (
-            not bool(display.OffsetText)
-            or position is None
-            or math.dist(position[:2], text_xy) > 0.00005
-        ):
-            raise RuntimeError(
-                f"{when} {label}: native offset text at {position!r}, "
-                f"expected sheet {text_xy!r}"
-            )
-        prove_dimension_line()
-
-    proven("placed")
-    return lambda: proven("settled")
-
-
-def _place_assembled_sheet(adapter: Any) -> Callable[[], None]:
+def _place_assembled_sheet(adapter: Any) -> None:
     """Plan over the operator's elevation at the modelled pose, each titled,
-    the plan's tags, the pose caption, the rail-alignment targets, and the
-    elevation's CL tip reference; returns that reference's settled proof."""
+    the plan's tags, the pose caption and the rail-alignment targets."""
     _activate_sheet(adapter, SHEET_NAMES[0])
     plan = _place_named_view(
         adapter, spec.PLAN_VIEW, PLAN_CENTER, ASSEMBLED_SCALE, label="jig plan"
@@ -1768,7 +1612,6 @@ def _place_assembled_sheet(adapter: Any) -> Callable[[], None]:
         ALIGNMENT_XY,
         label="rail-alignment targets",
     )
-    return _cl_tip_setting(adapter, elevation)
 
 
 @contextmanager
@@ -2921,6 +2764,7 @@ def _place_operation_notes(adapter: Any) -> None:
     for sheet, layout, label in (
         (FIT_SHEET, FIT_LAYOUT, "pivot fit and KP08 alignment"),
         (OPERATION_SHEET, OPERATION_LAYOUT, "operation and installed-machine acceptance"),
+        (HOLDING_SHEET, HOLDING_LAYOUT, "strap preparation and holding"),
     ):
         _add_note_block(adapter, sheet, layout.steps, STEPS_XY, label=label)
         if layout.continued:
@@ -3024,7 +2868,7 @@ def _place_package(
     adapter: Any,
 ) -> tuple[dict[str, tuple[float, float]], tuple[Callable[[], None], ...]]:
     """Every sheet; returns the sheets' fitted scales and the checks that
-    prove the BOM, every balloon and the CL tip reference after the last rebuild.
+    prove the BOM and every balloon after the last rebuild.
 
     Every view is configured, then exploded or collapsed, before the BOM is
     inserted; after it only BOM links and balloons
@@ -3035,7 +2879,7 @@ def _place_package(
         scale = SHEET_SCALES[sheet_name]
         if not sheet.SetScale(float(scale[0]), float(scale[1]), False, False):
             raise RuntimeError(f"failed to set jig sheet scale: {sheet_name}")
-    cl_tip_settled = _place_assembled_sheet(adapter)
+    _place_assembled_sheet(adapter)
     reference = _place_reference_view(adapter)
     _place_finished_view(adapter)
     notes_scales = _place_notes_reference_views(adapter)
@@ -3102,7 +2946,6 @@ def _place_package(
     return scales, (
         bom_settled,
         lambda: assert_balloon_landings(adapter, landings),
-        cl_tip_settled,
         kit_note_settled,
         bom_note_settled,
     )
