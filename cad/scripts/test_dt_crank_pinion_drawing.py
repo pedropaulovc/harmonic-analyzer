@@ -355,9 +355,14 @@ def test_callouts_link_the_numbered_note_that_names_their_mate() -> None:
         f"3. SLIDING FIT ON CRANKSHAFT {spec.CRANKSHAFT_NUMBER} "
         f"(CLEARANCE {spec.inch_text(low, 4)}-{spec.inch_text(high, 4)})."
     )
-    # Each mate is named once among the notes.
-    for number in (spec.MESH_GEAR_NUMBER, spec.CONE_GEAR_NUMBER, spec.CRANKSHAFT_NUMBER):
+    # Each mate is named once among the notes, except the 120T cone gear:
+    # notes 1 (its clearance) and 2 (the feeler check the Ø.730 flags) each
+    # name it, since a mate must sit in the note its callout links (fan-out
+    # r2, rule 4).
+    for number in (spec.MESH_GEAR_NUMBER, spec.CRANKSHAFT_NUMBER):
         assert notes.DRAWING_NOTES.count(number) == 1, number
+    assert notes.DRAWING_NOTES.count(spec.CONE_GEAR_NUMBER) == 2
+    assert spec.CONE_GEAR_NUMBER in _note(notes.TURNED_DIA_NOTE_NUMBER)
     printed = (notes.DRAWING_NOTES, notes.GEAR_DATA, *callouts.values())
     for private in ("T120", "BORE LIMITS GOVERN", "DIA CLR", "MATE SHAFT"):
         assert not any(private in text for text in printed), private
@@ -479,9 +484,11 @@ def test_notes_carry_the_tooth_edge_override_not_an_obsolete_boss_shortfall() ->
         f"±{spec.inch_text(spec.TURNED_DIA_TOLERANCE_MM, spec.TURNED_DIA_PLACES)}"
     )
     floor = f"Ø{spec.inch_text(spec.TURNED_DIA_FITUP_MIN, spec.TURNED_DIA_PLACES)} MIN"
+    # Fan-out r2 (rule 4): the gear the feeler check reads against is named
+    # by its number in the note the Ø.730 flags.
     assert _note(notes.TURNED_DIA_NOTE_NUMBER) == (
-        f"2. SUPPLY {supply}; FITTED AT ASSEMBLY, {floor}, "
-        "TO PASS THE MHA-DT-00 FEELER CHECK TO THE 120T GEAR."
+        f"2. SUPPLY {supply}; FITTED AT ASSEMBLY TO {floor} "
+        "TO PASS MHA-DT-00 FEELER CHECK TO 120T GEAR MHA-DT-03."
     )
     assert not hasattr(spec, "BOSS_WALL_EXCEPTION")
     for internal in ("EXCEPTION", "ACCEPTED", "RULING", "POLICY", "RULE "):

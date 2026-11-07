@@ -290,15 +290,14 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
 # The tapped-hole requirement is attached to its tap-drill dimension.  Note 2
 # carries only loose hardware; the ASME source and stack above account for
 # the supplier's overall-length limits, not an invented SKU.  The thick-side
-# wall is deeper than the longest screw (SET_SCREW_SUBFLUSH_MIN_MM), so the
-# note says the tightened screw sits below the OD (fan-out r1: a reviewer
-# read the screw as flush and so short of the rod).
+# wall is deeper than the longest screw (SET_SCREW_SUBFLUSH_MIN_MM); saying
+# the tightened screw sits below the OD read as assembly narration (fan-out
+# r2, rule 7), so the sheet does not.
 DRAWING_NOTES = "\n".join(
     (
         f"{LIFT_NOTE_NUMBER}. \N{LATIN CAPITAL LETTER O WITH STROKE}{_OD_TEXT} AND "
         f"{_ECC_TEXT} SET THE LIFT OF FOLLOWER PIN {FOLLOWER_PIN_NUMBER}.",
-        f"{SCREW_NOTE_NUMBER}. SUPPLY ASME B18.3 #2-56 UNC X 3/16 FLAT-POINT SOCKET SET SCREW",
-        f"   LOOSE; TIGHT ON {LIFT_ROD_NUMBER}, IT SITS BELOW THE OD.",
+        f"{SCREW_NOTE_NUMBER}. SUPPLY ASME B18.3 #2-56 UNC X 3/16 FLAT-POINT SOCKET SET SCREW LOOSE.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"

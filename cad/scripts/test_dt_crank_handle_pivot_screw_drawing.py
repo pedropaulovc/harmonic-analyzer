@@ -256,13 +256,15 @@ def test_relief_lead_prints_its_model_band_with_words_only() -> None:
     # typed into a note, so a model-only edit left them behind.  The native
     # dimension prints the nominal and band; its callout carries words only.
     assert not hasattr(spec, "RELIEF_LEAD_NOTE")
-    assert spec.RELIEF_LEAD_CALLOUT.replace("\n", " ") == (
-        "X 45 DEG LEAD, INSIDE MHA-DT-06 THREAD"
-    )
-    assert not re.search(r"\.\d", spec.RELIEF_LEAD_CALLOUT)
+    # Fan-out r2: "LEAD, INSIDE" read as a private phrase (rule 26); the
+    # callout says in plain words what the lead stays inside.
+    callout = notes.RELIEF_LEAD_CALLOUT
+    assert callout.replace("\n", " ") == "X 45 DEG STAYS INSIDE MHA-DT-06 THREAD"
+    assert spec.SEAT_FLAT_INNER_DIA_MAX < spec.THREAD_MODEL_DIA
+    assert not re.search(r"\.\d", callout)
     for limit in spec.RELIEF_LEAD_LIMITS:
-        assert spec.inch_text(limit, 3) not in spec.RELIEF_LEAD_CALLOUT
-    assert max(map(len, spec.RELIEF_LEAD_CALLOUT.splitlines())) <= 18
+        assert spec.inch_text(limit, 3) not in callout
+    assert max(map(len, callout.splitlines())) <= 18
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert '"ReliefLead": RELIEF_LEAD_CALLOUT' in source
     assert "RELIEF_LEAD_NOTE" not in source
@@ -506,7 +508,7 @@ def test_fitted_shoulder_length_is_one_flagged_numbered_note() -> None:
     assert x + max(map(len, lines)) * 0.0027 < 0.4191
     # Standard fit name and forms on the other callouts (rules 3, 4, 7).
     assert notes.SHOULDER_FIT_CALLOUT == "RUNNING FIT IN\nMHA-DT-08 REAMED BORE"
-    assert notes.HEAD_LENGTH_CALLOUT == "CLEARS MHA-DT-35 FACE"
+    assert notes.HEAD_LENGTH_CALLOUT == "CLEARS\nMHA-DT-35 FACE"
     assert notes.HEAD_DIA_CALLOUT == "BEARS ON\nMHA-DT-35 FLOOR"
 
 

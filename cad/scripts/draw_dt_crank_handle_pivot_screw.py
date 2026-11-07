@@ -68,6 +68,7 @@ import _telemetry
 from dt_crank_handle_pivot_screw_notes import (
     HEAD_DIA_CALLOUT,
     HEAD_LENGTH_CALLOUT,
+    RELIEF_LEAD_CALLOUT,
     SHOULDER_FIT_CALLOUT,
     SHOULDER_LENGTH_CALLOUT,
     SHOULDER_LENGTH_NOTE,
@@ -83,7 +84,6 @@ from dt_crank_handle_pivot_screw_spec import (
     RELIEF_DIA,
     RELIEF_END_STATION,
     RELIEF_LEAD,
-    RELIEF_LEAD_CALLOUT,
     SEAT_EDGE_NOTE,
     SEAT_STATION,
     SHOULDER_DIA,
