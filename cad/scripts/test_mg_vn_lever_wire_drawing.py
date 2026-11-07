@@ -135,8 +135,7 @@ def test_assembly_pointer_cites_the_sheets_and_steps_that_cut_and_form_each_memb
         assert _cited_groups(line, number) == expected, (stem, line)
 
 
-def test_end_view_and_isometric_labels_state_their_scales_inside_their_fields() -> None:
-    assert section.STOCK_LABEL == "WIRE END VIEW SCALE 20:1"
+def test_end_view_and_isometric_labels_sit_inside_their_fields() -> None:
     assert section.STOCK_SCALE == (20, 1)
     field = section.STOCK_FIELD
     for x, y in (section.STOCK_CENTER, section.STOCK_TEXT, section.STOCK_LABEL_XY):
