@@ -64,11 +64,9 @@ from _sketch import (
 )
 from _sketch_chains import define_rectilinear_chain
 from pn_pen_frame_spec import (
-    BOTTOM_VIEW_NOTE,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     FRAME_DEPTH,
-    FRONT_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
     OUTER_HEIGHT,
     OUTER_WIDTH,
@@ -92,8 +90,6 @@ _SAVED_DRAWING_PROPERTIES = (
     "Material Specification",
     "Finish",
     "Quantity",
-    "Front View Note",
-    "Bottom View Note",
     "Isometric View Note",
 )
 
@@ -310,13 +306,7 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_properties(
-        adapter,
-        PART_NAME,
-        {
-            "Front View Note": FRONT_VIEW_NOTE,
-            "Bottom View Note": BOTTOM_VIEW_NOTE,
-            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
-        },
+        adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
     )
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)

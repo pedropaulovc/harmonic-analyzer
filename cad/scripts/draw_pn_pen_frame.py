@@ -16,7 +16,8 @@ from the outer faces, the
 hole's native Hole Wizard callout and the tap's stated far-wall minimum (the
 hidden TapWallReference sketch, shown in that view only).  No datums, no
 frames (drawing-guidelines.md rule 5), no note block.  The sheet runs 2:1 in
-decimal inch (the part's ``drawing_unit: in``); the isometric stays 2:1.
+decimal inch (the part's ``drawing_unit: in``); the isometric stays 2:1, so
+only the pictorial carries a caption, without a scale (rule 9).
 
 Run with SolidWorks open::
 
@@ -68,6 +69,7 @@ from pn_pen_frame_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FRAME_DEPTH,
+    ISOMETRIC_VIEW_NOTE,
     OUTER_HEIGHT,
     OUTER_WIDTH,
     RAIL_END,
@@ -192,7 +194,6 @@ TAP_WALL_TEXT_XY = (BOTTOM_LEFT_X - 0.036, BOTTOM_KEEP["TapWallMin"][1])
 _TEXT_SETTLE_M = 0.0005
 _CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
 HOLE_CALLOUT_XY = (0.165, 0.128)
-HOLE_CALLOUT_PROCESS = "TAP"
 # The through-next tap's drill diameter prints .XXX, under whichever
 # drill-size variable the native callout carries (_tap_drill_variable).
 TAP_DRILL_PLACES = 3
@@ -209,11 +210,9 @@ def _tap_drill_variable(definitions: dict[int, str]) -> str:
     return found[0]
 
 
-FRONT_VIEW_NOTE_XY = (0.175, 0.240)
-BOTTOM_VIEW_NOTE_XY = (0.070, 0.072)
-# The note's left end; its ~60 mm text centres under the isometric (x 0.320),
-# ~15 mm below the view's lowest corner (y 0.133).
-ISO_VIEW_NOTE_XY = (0.290, 0.116)
+# The note's left end: its text (~2.5 mm a character) centres under the
+# isometric, ~15 mm below the view's lowest corner (y 0.133).
+ISO_VIEW_NOTE_XY = (ISO_CENTER[0] - len(ISOMETRIC_VIEW_NOTE) * 0.0025 / 2.0, 0.116)
 
 
 def _offset_tap_wall_text(adapter: Any, annotations: list[Any]) -> None:
@@ -256,8 +255,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Front View Note",
-            "Bottom View Note",
             "Isometric View Note",
         ),
         required=(
@@ -265,8 +262,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Front View Note",
-            "Bottom View Note",
             "Isometric View Note",
         ),
     )
@@ -345,10 +340,10 @@ async def build(adapter: Any) -> dict[str, str]:
         edge=hole_rim.edge,
         callout_xy=HOLE_CALLOUT_XY,
         label="thumb-screw tapped hole",
-        process=HOLE_CALLOUT_PROCESS,
     )
-    # The title block's THREADS row owns the 2B class (drawing-guidelines.md
-    # rule 2): the callout reads TAP 4-40 UNC THRU.
+    # Size first (drawing-guidelines.md rule 26): no process prefix, and the
+    # title block's THREADS row owns the 2B class (rule 2), so the callout
+    # reads 4-40 UNC THRU.
     omit_title_block_thread_class(tap_callout, label="thumb-screw tapped hole")
     native = _early_bound(tap_callout, "IDisplayDimension")
     drill_variable = _tap_drill_variable(
@@ -358,8 +353,6 @@ async def build(adapter: Any) -> dict[str, str]:
         tap_callout, {drill_variable: TAP_DRILL_PLACES}, label="thumb-screw tapped hole"
     )
 
-    add_property_linked_note(adapter, "Front View Note", *FRONT_VIEW_NOTE_XY)
-    add_property_linked_note(adapter, "Bottom View Note", *BOTTOM_VIEW_NOTE_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_VIEW_NOTE_XY)
 
     return await finalize_drawing(
