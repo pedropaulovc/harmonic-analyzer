@@ -141,13 +141,15 @@ callback: a smaller early `GetOutline` does not prove the finished view fits.
 TL-00's last sheet, LINEAR MOTION FROM ABOVE (owner, PR4 #2227), is the
 arrangement's named plan of the same assembly with the TL-21 carrier and
 every occurrence locked to it (riser and its four screws, feed lever with its
-screws and wedge-lock washers, hub stud, sleeve, washer and screw, left and
-CR clamp screws, CL dowel) hidden in that one drawing view. The base bars,
-rails, carriages, both blocks, the shoulder screws with their spacers and
-shims, the leadscrew feed, the hold-downs and all of their fasteners stay
-drawn; ten BOM balloons name the slide and feed parts. No configuration,
-display state or model hide exists for it: the model, its BOM, interference,
-sweeps and every other sheet keep the full assembly.
+screws and wedge-lock washers, the TL-52 top-hat washer, the two loose
+SM-VN-53 stop pins and the common TL-VN-61 screw's CL, CR and HUB clamp
+occurrences) hidden in that one drawing view. The common screw is hidden by
+occurrence, not by stem: its rail and TL-28 bar occurrences stay drawn. The
+base bars, rails, carriages, both blocks, the shoulder screws with their
+spacers and shims, the leadscrew feed, the hold-downs and all of their
+fasteners stay drawn; ten BOM balloons name the slide and feed parts. No
+configuration, display state or model hide exists for it: the model, its BOM,
+interference, sweeps and every other sheet keep the full assembly.
 
 New purchases are TL-VN-77 shoulder screws (Huyett BLTS40-0375-1500188P,
 thread shop-cut), TL-VN-78 spacers (AluminumSpacers.com AS62-18-40) and TL-VN-79
