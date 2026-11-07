@@ -71,7 +71,7 @@ from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from ch_connecting_rod_notes import ISOMETRIC_VIEW_NOTE
-from ch_connecting_rod_notes import DRAWING_DIMENSIONS, DRAWING_PRECISION
+from ch_connecting_rod_notes import DRAWING_DIMENSIONS, DRAWING_NOTES, DRAWING_PRECISION
 from ch_connecting_rod_spec import (
     CENTER_DISTANCE,
     FORK_BASE_BELOW_PIN,
@@ -711,14 +711,17 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_properties(
         adapter,
         PART_NAME,
-        {"Isometric View Note": ISOMETRIC_VIEW_NOTE},
+        {
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+            "Manufacturing Notes": DRAWING_NOTES,
+        },
     )
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(
         adapter,
         (
             "Number", "Material Specification", "Finish", "Quantity",
-            "Isometric View Note",
+            "Isometric View Note", "Manufacturing Notes",
         ),
     )
     return artefacts
