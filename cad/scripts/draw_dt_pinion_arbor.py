@@ -94,12 +94,27 @@ JOURNAL_CLEARANCE = (
     STRAP_BORE + REAM_SLIDE[0] - (SHAFT_DIA + JOURNAL_DIA_BAND[1]),
 )
 JOURNAL_CALLOUT = "RUNNING FIT,\nSEE NOTE 1"
+# The drum (2.40-8.04 from the head rear face) rests on the inner ends of
+# both journals (1.82-2.61, 7.83-8.62) and is bonded on the span between
+# them (dt_pinion_arbor_spec.DRUM_*_END_ON_JOURNAL_MIN; the assembly step
+# wipes squeeze-out off the lands).  The span by the head, with the collar's
+# pin hole, and the one behind the back journal take the same -.0004/-.0038
+# band but carry no bond (local repeat review of 218c85b6: the old fragment
+# left the builder to guess which span the drum bonds on).  Each note is a
+# complete sentence naming the mate by number and name (rule 4).
+STRAP_NAME = "PINION BRACKET STRAP"
+DRUM_NAME = "ALIGNMENT PINION DRUM"
 BOND_ZONE_CALLOUT = f"BONDED FIT IN {DRUM_NUMBER},\n{RETAINING_COMPOUND}, SEE NOTE 2"
 CROSS_HOLE_CALLOUT = f"REAM THRU, BONDED FIT ON\n{CROSSROD_NUMBER}, {RETAINING_COMPOUND}"
+_DIA = f"<MOD-DIAM>{_inch(SHAFT_DIA)}"
+# Rule 7: the notes block stays at four short rows; the widest (66
+# characters, ~172 mm) ends ~24 mm left of the title block (x 0.216).
 SHEET_NOTES = (
-    f"1. JOURNALS (2X): RUNNING FIT IN {STRAP_NUMBER}, TURN TO MEASURED\n"
-    f"   BORE (CLEARANCE {_inch(JOURNAL_CLEARANCE[0])}-{_inch(JOURNAL_CLEARANCE[1])}).\n"
-    f"2. EVERY <MOD-DIAM>{_inch(SHAFT_DIA)} SPAN EXCEPT THE TWO JOURNALS."
+    f"1. JOURNALS (2X): RUNNING FIT IN {STRAP_NUMBER} {STRAP_NAME},\n"
+    f"   TURN TO MEASURED BORE (CLEARANCE {_inch(JOURNAL_CLEARANCE[0])}-"
+    f"{_inch(JOURNAL_CLEARANCE[1])}).\n"
+    f"2. {DRUM_NUMBER} {DRUM_NAME} BONDS ONLY ON THE SPAN BETWEEN\n"
+    f"   THE JOURNALS; THE OTHER {_DIA} SPANS TAKE THE SAME LIMITS."
 )
 # Under the property-linked inside-corner note (top-left at y 0.060).
 NOTES_XY = (0.020, 0.052)

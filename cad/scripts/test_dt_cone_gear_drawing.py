@@ -55,8 +55,25 @@ def test_every_configuration_has_one_complete_sheet_and_native_scale() -> None:
 
 
 def test_part_and_drawing_share_the_complete_native_dimension_contract() -> None:
-    assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
-    marked = set().union(*spec.DRAWING_DIMENSIONS.values())
+    assert part.DRAWING_DIMENSIONS is notes.DRAWING_DIMENSIONS
+    assert drawing.DRAWING_DIMENSIONS is notes.DRAWING_DIMENSIONS
+    assert part.DRAWING_PRECISION is notes.DRAWING_PRECISION
+    assert part.REFERENCE_SKETCHES is notes.REFERENCE_SKETCHES
+    # The print maps are the spec's with the tip diameter moved from the
+    # blank's driving circle to its side-view witness (rule 11), nothing else.
+    witness = notes.BLANK_DIA_REFERENCE_SKETCH
+    assert notes.DRAWING_DIMENSIONS[witness] == {"BlankDia"}
+    assert "BlankProfile" not in notes.DRAWING_DIMENSIONS
+    assert {
+        feature: names for feature, names in notes.DRAWING_DIMENSIONS.items()
+        if feature != witness
+    } == {
+        feature: names for feature, names in spec.DRAWING_DIMENSIONS.items()
+        if feature != "BlankProfile"
+    }
+    assert notes.DRAWING_PRECISION[witness] == spec.DRAWING_PRECISION["BlankProfile"]
+    assert notes.REFERENCE_SKETCHES == (*spec.REFERENCE_SKETCHES, witness)
+    marked = set().union(*notes.DRAWING_DIMENSIONS.values())
     assert marked == {
         "BlankDia",
         "FaceWidth",
@@ -80,6 +97,8 @@ def test_part_and_drawing_share_the_complete_native_dimension_contract() -> None
         assert sorted(kept) == sorted(expected)
         # The whole D-bore prints in the bore view, and only there.
         assert set(drawing.bore_view_keep(teeth)) == spec.DRAWING_DIMENSIONS["BoreProfile"]
+        # Diameters on the side view beside the face width (rule 11).
+        assert set(drawing.right_keep(teeth)) == {"FaceWidth", "BlankDia"}
 
 
 def test_model_owns_precision_for_every_printed_dimension() -> None:
@@ -108,7 +127,14 @@ def test_tip_diameter_carries_its_own_mesh_depth_band() -> None:
     assert spec.BLANK_DIA_BAND[0] < spec.MODULE_MM / 2.0
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert (
-        '"BlankProfile", "BlankDia", *deviations(BLANK_DIA_BAND)' in source
+        'BLANK_DIA_REFERENCE_SKETCH, "BlankDia", *deviations(BLANK_DIA_BAND)' in source
+    )
+    assert (
+        'set_dimension_prefix(adapter, BLANK_DIA_REFERENCE_SKETCH, "BlankDia", "<MOD-DIAM>")'
+        in source
+    )
+    assert readback._BANDED_DIMENSIONS[0] == (
+        notes.BLANK_DIA_REFERENCE_SKETCH, "BlankDia", spec.blank_dia_band
     )
     assert "_set_configuration_bands(adapter)" in source
 
@@ -331,17 +357,24 @@ def test_numbered_notes_state_the_bore_fit_from_both_parts_limits() -> None:
         )
         assert lines[0].startswith(f"1. SLIDING FIT ON {shaft} MHA-DT-04, {land}")
         assert lines[2].startswith(f"2. TEETH MESH WITH {notes.CYLINDER_MATE_NUMBER}")
+        # The teeth's do-not-cut rides the note flagged to them (rule 7).
+        assert lines[3].endswith(notes.TOOTH_EDGE_NOTE)
         clearance = (
             f"(CLEARANCE {spec.inch_text(round_min, 4)}-{spec.inch_text(round_max, 4)} ON \u00d8, "
             f"{spec.inch_text(flat_min, 4)}-{spec.inch_text(flat_max, 4)} ACROSS FLAT)"
         )
         assert clearance in text
-        # Under the manufacturing notes, above the tallest tip-diameter block
-        # and left of Gear Data (2.5 mm text: 3.51 mm a line, 1.79 mm a
-        # character).
+        # Under the manufacturing notes, above the front view and its root
+        # envelope's stack, and left of Gear Data (2.5 mm text: 3.51 mm a
+        # line, 1.79 mm a character).
         x, y = drawing.NUMBERED_NOTES_POS
-        assert y < drawing.MANUFACTURING_NOTES_POS[1] - 2 * 0.00351
-        assert y - len(lines) * 0.00351 > drawing.front_keep(teeth)["BlankDia"][1] + 0.010
+        general = len(notes.DRAWING_NOTES.splitlines())
+        assert y < drawing.MANUFACTURING_NOTES_POS[1] - general * 0.00351
+        top = max(
+            drawing.FRONT_CENTER[1] + drawing.rendered_half_od(teeth),
+            drawing.front_keep(teeth)["FloorDia"][1] + drawing.FLOOR_STACK_HALF_HEIGHT,
+        )
+        assert y - len(lines) * 0.00351 > top + 0.010
         assert x + max(map(len, lines)) * 0.00179 < drawing.GEAR_DATA_POS[0] - 0.005
 
 
@@ -671,7 +704,7 @@ def test_configuration_owned_bores_and_title_block_alloys_cover_the_family() -> 
     # Brass and manganese bronze take no coating; the field says so rather
     # than reading as a missing value.  "Gear teeth cut; polished" (before
     # e44791855) was a method, and polishing would round the tooth edges
-    # note 1 forbids breaking.
+    # sheet note 2 forbids breaking.
     assert registry["finish"] == "AS MACHINED, UNCOATED"
     assert str(registry["finish"]).strip().upper() not in {"", "NONE", "N/A"}
     for teeth in spec.CONFIGURATION_TEETH:
@@ -685,14 +718,15 @@ def test_configuration_owned_bores_and_title_block_alloys_cover_the_family() -> 
 def test_notes_state_no_bore_joint_method_or_review_record() -> None:
     # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): native D-bore dimensions carry its fit, and the Gear Data block
     # reports actual cutter/mesh facts separately. Every sheet keeps the same
-    # two short manufacturing notes, without review history or waived floors.
+    # one manufacturing note, without review history or waived floors; the
+    # teeth's do-not-cut moved to the note flagged to them (sheet note 2).
     # The quantity is plain words, and says the tooth-space sheet belongs to
     # T006 (round-1 review: "T-CONFIGURATION SHEET" was a private label).
     expected = notes.DRAWING_NOTES.splitlines()
-    assert expected[0] == "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
-    assert len(expected) == 2 and "T-CONFIGURATION" not in notes.DRAWING_NOTES
+    assert len(expected) == 1 and "T-CONFIGURATION" not in notes.DRAWING_NOTES
+    assert "EDGE" not in notes.DRAWING_NOTES
     sheet = len(spec.CONFIGURATION_TEETH) + 1
-    assert f"SHEET {sheet} CONTINUES {notes.T006_NUMBER}" in expected[1]
+    assert f"SHEET {sheet} CONTINUES {notes.T006_NUMBER}" in expected[0]
     assert notes.T006_NUMBER == spec.configuration_number(
         str(_config.parts("dt-cone-gear")["number"]), 6
     )
@@ -770,6 +804,14 @@ def test_no_gdt_and_no_surface_finish() -> None:
         assert "author_part_pmi" not in source
 
 
+# The tip diameter's block (SEE NOTE 2 over the value and its band) spans
+# 6.4 mm either side of its point (front-view ink, run 20261107T103503238Z);
+# the face width's block tops out 10.1 mm over its point (T120 ink, run
+# 20261107T121234299Z: "+.0010" at 110.9 mm, point 100.8 mm).
+_BLANK_DIA_TEXT_HALF_HEIGHT = 0.0064
+_FACE_WIDTH_TEXT_RISE = 0.0101
+
+
 def test_every_sheet_layout_keeps_views_dimensions_and_title_block_separate() -> None:
     for teeth in spec.CONFIGURATION_TEETH:
         half_od = drawing.rendered_half_od(teeth)
@@ -783,7 +825,17 @@ def test_every_sheet_layout_keeps_views_dimensions_and_title_block_separate() ->
             assert not (x > 0.216 and y < 0.070)
         assert drawing.FRONT_CENTER[0] + half_od < drawing.RIGHT_CENTER[0] - half_face
         assert drawing.RIGHT_CENTER[0] + half_face < drawing.ISO_CENTER[0] - half_od
-        assert front["BlankDia"][1] < drawing.GEAR_DATA_POS[1] - 0.035
+        # The tip diameter across the side view (rule 11): its text right of
+        # the face, between the arrows at the tip radius, clear of the iso
+        # view, and above the face width's block.
+        blank_x, blank_y = right["BlankDia"]
+        blank_half = drawing.BLANK_DIA_TEXT_HALF_WIDTH
+        assert blank_x - blank_half >= drawing.RIGHT_CENTER[0] + half_face + 0.003
+        assert blank_x + blank_half < drawing.ISO_CENTER[0] - half_od - 0.015
+        assert abs(blank_y - drawing.RIGHT_CENTER[1]) + _BLANK_DIA_TEXT_HALF_HEIGHT < half_od
+        assert right["FaceWidth"][1] + _FACE_WIDTH_TEXT_RISE < (
+            blank_y - _BLANK_DIA_TEXT_HALF_HEIGHT - 0.005
+        )
         # Third-angle projection: the side view shares the front bore axis.
         assert drawing.RIGHT_CENTER[1] == drawing.FRONT_CENTER[1]
         # The Gear Data block clears the largest side view, and the face-width
@@ -1066,7 +1118,9 @@ def test_enlarged_views_are_lettered_with_boundaries_on_the_front_view() -> None
     assert drawing.form_plot_labels()[0][0] == drawing.form_plot_label()
     source = inspect.getsource(drawing.build)
     assert "_mark_front_details(adapter, front, teeth" in source
-    assert 'for name in ("BlankDia", "FloorDia"):' in source
+    # The root envelope's leader stops on its near rim (the tip diameter
+    # left the front view for the side view).
+    assert 'set_near_side_diameter(found[0], f"{configuration} FloorDia")' in source
 
 
 def test_settled_clock_check_refuses_outside_arrow_stubs() -> None:
@@ -1349,7 +1403,7 @@ def test_the_part_saves_every_authoring_sketch_hidden() -> None:
     its first save and reads the blank back."""
     model = _FakePart(hides=True)
     part._blank_reference_sketches(_FakeAdapter(model))
-    sketches = [spec.TOOTH_REFERENCE_SKETCH, spec.GAP_FLOOR_SKETCH, spec.WEB_REFERENCE_SKETCH]
+    sketches = [*spec.REFERENCE_SKETCHES, notes.BLANK_DIA_REFERENCE_SKETCH]
     assert model.selected == [(sketch, "SKETCH") for sketch in sketches]
     assert model.blanked == sketches
     source = Path(part.__file__).read_text(encoding="utf-8")
@@ -1501,62 +1555,23 @@ def test_the_reopened_audit_reads_each_band_with_its_own_configuration_active(
     assert message.count("AttributeError") == 1
 
 
-def test_only_the_front_view_shows_the_authoring_sketches() -> None:
-    """Both sketches' dimensions live on the front view, which takes the
-    opt-in import; the side, iso and bore views show the part as saved."""
+def test_each_authoring_sketch_shows_in_one_view() -> None:
+    """The tooth and floor sketches' dimensions live on the front view, which
+    takes the sketches by the opt-in import; the tip-diameter witness's on
+    the side view (rule 11); the iso and bore views show the part as saved."""
     for sketch in (spec.TOOTH_REFERENCE_SKETCH, spec.GAP_FLOOR_SKETCH):
         owned = spec.DRAWING_DIMENSIONS[sketch]
         for teeth in spec.CONFIGURATION_TEETH:
             assert owned <= set(drawing.front_keep(teeth))
             assert not owned & set(drawing.right_keep(teeth))
             assert not owned & set(drawing.bore_view_keep(teeth))
-
-
-
-def test_t006_blank_dia_leader_lands_on_a_tooth_tip_clear_of_detail_b() -> None:
-    """Round-1 review of the fan-out: T006's leader, dropped at 12 o'clock,
-    ended in the tooth space inside DETAIL B's boundary. It lands on the 240
-    deg tip; its block stands down left, clear of the front view, the centre
-    mark and DETAIL A's dimensions."""
-    teeth = 6
-    arrow = drawing.blank_dia_arrow_deg(teeth)
-    profile = spec.stock_form_profile(teeth)
-    land = math.degrees(math.pi / teeth - profile.tip_half_angle_rad)
-    pitch = 360.0 / teeth
-    assert abs(math.remainder(arrow, pitch)) <= land / 2.0
-    centre = drawing.FRONT_CENTER
-    half_od = drawing.rendered_half_od(teeth)
-    tip = (
-        centre[0] + half_od * math.cos(math.radians(arrow)),
-        centre[1] + half_od * math.sin(math.radians(arrow)),
-    )
-    for detail in drawing.front_details(teeth):
-        ring_centre, ring = drawing.front_detail_on_sheet(teeth, detail)
-        assert math.dist(tip, ring_centre) > ring + 0.002, detail.letter
-    x, y = drawing.front_keep(teeth)["BlankDia"]
-    x0, y0, x1, y1 = drawing.BLANK_DIA_BLOCK
-    block = (x + x0, y + y0, x + x1, y + y1)
-    # Clear of the front view's outline box, both centre-mark arms and the
-    # zone band.
-    front_box = (
-        centre[0] - half_od - _FRONT_OUTLINE_PAD, centre[1] - half_od - _FRONT_OUTLINE_PAD,
-        centre[0] + half_od + _FRONT_OUTLINE_PAD, centre[1] + half_od + _FRONT_OUTLINE_PAD,
-    )
-    assert _drawing_annotation_extent.boxes_clear(block, front_box)
-    assert block[2] < centre[0] - 0.002 and block[3] < centre[1] - 0.002
-    assert block[0] > _ZONE_MARGIN + 0.002
-    # Over DETAIL A's flat-clock arc and its diameter's text, under the view.
-    vx, vy = drawing.bore_flat_vertex(teeth)
-    clock_x, clock_y = drawing.bore_view_keep(teeth)["BoreFlatClock"]
-    assert block[1] > vy + math.dist((vx, vy), (clock_x, clock_y)) + 0.003
-    dia_x, dia_y = drawing.bore_view_keep(teeth)["BoreCutDia"]
-    assert block[1] > dia_y + 2.0 * _BORE_TEXT_HALF_HEIGHT + 0.005
-    # Every other sheet keeps its block over the gear, left of the axis.
-    for other in spec.CONFIGURATION_TEETH[1:]:
-        assert drawing.front_keep(other)["BlankDia"] == pytest.approx((
-            centre[0] - drawing.BLANK_DIA_SHIFT_X,
-            centre[1] + drawing.rendered_half_od(other) + drawing.BLANK_DIA_LIFT,
-        ))
+    owned = notes.DRAWING_DIMENSIONS[notes.BLANK_DIA_REFERENCE_SKETCH]
+    for teeth in spec.CONFIGURATION_TEETH:
+        assert owned <= set(drawing.right_keep(teeth))
+        assert not owned & set(drawing.front_keep(teeth))
+        assert not owned & set(drawing.bore_view_keep(teeth))
+    source = inspect.getsource(drawing.build)
+    assert 'keep={"BlankDia": side_keep["BlankDia"]}' in source
 
 
 def test_invalid_family_member_is_rejected() -> None:

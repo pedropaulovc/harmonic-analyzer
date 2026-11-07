@@ -213,9 +213,13 @@ def test_only_the_two_journal_lands_carry_the_running_band_and_finish() -> None:
         assert drawing.DIMENSION_CALLOUTS[key] is drawing.JOURNAL_CALLOUT
     note_1 = " ".join(drawing.SHEET_NOTES.split("\n2. ")[0].split())
     assert note_1 == (
-        "1. JOURNALS (2X): RUNNING FIT IN MHA-DT-14, TURN TO MEASURED BORE "
-        "(CLEARANCE .0014-.0027)."
+        "1. JOURNALS (2X): RUNNING FIT IN MHA-DT-14 PINION BRACKET STRAP, "
+        "TURN TO MEASURED BORE (CLEARANCE .0014-.0027)."
     )
+    # Rule 7: four short rows at most, left of the title block (x 0.216).
+    rows = drawing.SHEET_NOTES.replace("<MOD-DIAM>", "Ø").splitlines()
+    assert len(rows) <= 4
+    assert drawing.NOTES_XY[0] + max(map(len, rows)) * 0.0026 < 0.216 - 0.010
     assert "MHA-DT-14" not in spec.DRAWING_NOTES
     assert not hasattr(spec, "PART_DATUMS")
     assert not hasattr(spec, "GEOMETRIC_CONTROLS")
@@ -534,9 +538,17 @@ def test_bond_zone_diameter_is_a_flank_dimension_on_the_drum() -> None:
     assert spec.DRAWING_DIMENSIONS["BondZoneReference"] == {"BondZoneDia"}
     assert drawing.DIMENSION_CALLOUTS["BondZoneDia"] is drawing.BOND_ZONE_CALLOUT
     assert drawing.BOND_ZONE_CALLOUT == "BONDED FIT IN MHA-DT-01,\nLOCTITE 638, SEE NOTE 2"
-    assert drawing.SHEET_NOTES.endswith(
-        "2. EVERY <MOD-DIAM>.3125 SPAN EXCEPT THE TWO JOURNALS."
+    # Local repeat review of 218c85b6: note 2 says, in complete sentences,
+    # which span the drum bonds on and that the other two take its limits.
+    note_2 = " ".join(drawing.SHEET_NOTES.split("\n2. ")[1].split())
+    assert note_2 == (
+        "MHA-DT-01 ALIGNMENT PINION DRUM BONDS ONLY ON THE SPAN BETWEEN THE "
+        "JOURNALS; THE OTHER <MOD-DIAM>.3125 SPANS TAKE THE SAME LIMITS."
     )
+    import _config
+
+    assert _config.parts("dt-alignment-pinion")["title"].upper() == drawing.DRUM_NAME
+    assert _config.parts("dt-pinion-bracket")["title"].upper() == drawing.STRAP_NAME
     # Machinist review r3 of #1685 (blocker): the drum station falls on the
     # front land; each drum end rests on its land at every printed limit.
     front_min = (
@@ -551,6 +563,12 @@ def test_bond_zone_diameter_is_a_flank_dimension_on_the_drum() -> None:
     assert spec.DRUM_FRONT_END_ON_JOURNAL_MIN == pytest.approx(front_min)
     assert spec.DRUM_BACK_END_ON_JOURNAL_MIN == pytest.approx(back_min)
     assert min(front_min, back_min) > 0.0
+    # So the drum covers exactly the span between the journals, and the
+    # collar's span by the head (its pin hole) lies outside the drum.
+    front_land_end = spec.FRONT_JOURNAL_FROM_HEAD_REAR + spec.JOURNAL_LEN
+    assert spec.DRUM_STATION < front_land_end
+    assert spec.DRUM_STATION + geometry.DRUM_LEN > spec.BACK_JOURNAL_FROM_HEAD_REAR
+    assert spec.PIN_STATION_FROM_HEAD_REAR < spec.FRONT_JOURNAL_FROM_HEAD_REAR
     station = spec.BOND_ZONE_DIA_FROM_HEAD_REAR
     clear = spec.BOND_ZONE_LAND_CLEARANCE
     assert spec.FRONT_JOURNAL_FROM_HEAD_REAR + spec.JOURNAL_LEN + clear <= station

@@ -89,7 +89,13 @@ from _pdf_ink import PageInk, read_pdf_ink
 from _session import run_build
 import _telemetry
 from cone_shaft_land_bands import FLAT_AF_BAND, SECTION_DIA_BANDS
-from dt_cone_gear_notes import CUTTER_DETAIL_SHEET, T006_NUMBER
+from dt_cone_gear_notes import (
+    CUTTER_DETAIL_SHEET,
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    T006_NUMBER,
+    TOOTH_EDGE_NOTE,
+)
 from dt_cone_gear_spec import (
     BORE_AF_BAND,
     BORE_AF_PLACES,
@@ -97,7 +103,6 @@ from dt_cone_gear_spec import (
     BORE_DIA_BAND,
     CUSTOM_SIX_FORM_TOLERANCE_NOTE,
     CONFIGURATION_TEETH,
-    DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FACE_WIDTH,
     FORM_PLACES,
@@ -282,11 +287,15 @@ GEAR_DATA_POS = (0.215, 0.263)
 # Rendered height budget of the Gear Data block, for the layout test.
 GEAR_DATA_HEIGHT = 0.056
 MANUFACTURING_NOTES_POS = (0.015, 0.263)
-# The numbered notes (``sheet_notes``) stand under the two manufacturing
-# notes (3.51 mm a line at the same 2.5 mm height) with a 2.5 mm gap; their
-# four lines end ~0.239, above the tallest tip-diameter callout (T084,
-# ~0.221), and their ~80 characters (1.79 mm each) end left of Gear Data.
-NUMBERED_NOTES_POS = (0.015, 0.263 - 2 * 0.00351 - 0.0025)
+# The numbered notes (``sheet_notes``) stand under the manufacturing notes
+# (3.51 mm a line at the same 2.5 mm height) with a 2.5 mm gap, above the
+# front view's dimensions, and their ~100 characters (1.79 mm each) end left
+# of Gear Data.
+_NOTE_LINE_PITCH = 0.00351
+NUMBERED_NOTES_POS = (
+    0.015,
+    MANUFACTURING_NOTES_POS[1] - len(DRAWING_NOTES.splitlines()) * _NOTE_LINE_PITCH - 0.0025,
+)
 CUTTER_DETAIL_POS = (0.015, 0.263)
 # Where the tooth-space sheet's hidden title-block source view stands (see
 # build): clear of the table, inside the border.
@@ -603,7 +612,8 @@ def sheet_notes(teeth: int) -> str:
     the shop's turned and milled rows, so the bore is made to the measured
     land, with the clearance both parts' limits give as REF. Note 2 names
     the mesh and the fit route of the tip, thickness and root bands: the
-    over-pins and assembly backlash acceptances in GEAR DATA.
+    over-pins and assembly backlash acceptances in GEAR DATA; it carries the
+    teeth's do-not-cut, flagged to them rather than in the general block.
     """
     (round_min, round_max), (flat_min, flat_max) = bore_clearances_mm(teeth)
     land = (
@@ -617,7 +627,7 @@ def sheet_notes(teeth: int) -> str:
         f"{_inch_limits(flat_min, flat_max)} ACROSS FLAT).",
         f"{TEETH_NOTE_NUMBER}. TEETH MESH WITH {CYLINDER_MATE}: ACCEPT OVER PINS, "
         "THEN BY BACKLASH AT ASSEMBLY,",
-        "   PER GEAR DATA.",
+        f"   PER GEAR DATA. {TOOTH_EDGE_NOTE}",
     ))
 
 
@@ -629,60 +639,6 @@ def rendered_half_od(teeth: int) -> float:
 def rendered_half_face_width(teeth: int) -> float:
     numerator, denominator = _SCALE_BY_TEETH[teeth]
     return FACE_WIDTH * numerator / (denominator * 2000.0)
-
-
-# BlankDia's value stands this far above the tip circle.  At 0.012 the T006
-# value (8:1) sat on the vertical centre-mark line, which reaches 26.3 mm
-# above the bore axis on that sheet (layout audit, 0.82 mm overlap); 0.0145
-# cleared it with the value alone. The block is centred on its point, so the
-# flag's line over the value lowers the shoulder ~2.5 mm: 0.0175 restores it.
-BLANK_DIA_LIFT = 0.0175
-# ...and this far left of the bore axis, so its leader drops from the
-# block's right end nearly straight onto the tip circle. Centred over the
-# axis (ENFORCE round 3, T006) the leader ran diagonally from x 134 mm down
-# through the root envelope's block, whose left edge stands at 121 mm.
-BLANK_DIA_SHIFT_X = 0.020
-# The near-side leader lands on the tip circle on the radial through its
-# shoulder's end, which stands this far from the block's centre (sheet
-# metres): right of and below it, the block left of its leader. Measured on
-# the T006 and T012 ink of farm run 20261107T103503238Z (shoulder end 17.3
-# mm right of and 7.3 mm under the point; the arrow on the same radial within
-# 0.1 deg); the block spans BLANK_DIA_BLOCK about its point.
-BLANK_DIA_SHOULDER_FROM_TEXT = (0.0173, -0.0073)
-BLANK_DIA_BLOCK = (-0.0122, -0.0064, 0.0156, 0.0063)
-# T006's six teeth leave a space at 12 o'clock, so its leader landed in air,
-# inside DETAIL B's boundary (round-1 review of the fan-out); the 60 and 120
-# deg tips sit on that boundary, 0 deg carries the thickness and 180 deg the
-# centre-mark line. Its leader lands on the 240 deg tip instead, the block
-# down left, under the front view's outline and over DETAIL A's flat-clock
-# arc, its shoulder end this far from the gear axis.
-T006_BLANK_DIA_TOOTH_DEG = 240.0
-T006_BLANK_DIA_SHOULDER_REACH = 0.046
-
-
-def blank_dia_keep(teeth: int) -> tuple[float, float]:
-    """Sheet point of the tip diameter's text block."""
-    if teeth != 6:
-        return (
-            FRONT_CENTER[0] - BLANK_DIA_SHIFT_X,
-            FRONT_CENTER[1] + rendered_half_od(teeth) + BLANK_DIA_LIFT,
-        )
-    angle = math.radians(T006_BLANK_DIA_TOOTH_DEG)
-    return (
-        FRONT_CENTER[0] + T006_BLANK_DIA_SHOULDER_REACH * math.cos(angle)
-        - BLANK_DIA_SHOULDER_FROM_TEXT[0],
-        FRONT_CENTER[1] + T006_BLANK_DIA_SHOULDER_REACH * math.sin(angle)
-        - BLANK_DIA_SHOULDER_FROM_TEXT[1],
-    )
-
-
-def blank_dia_arrow_deg(teeth: int) -> float:
-    """Angle round the gear axis where the tip diameter's arrow lands."""
-    x, y = blank_dia_keep(teeth)
-    return math.degrees(math.atan2(
-        y + BLANK_DIA_SHOULDER_FROM_TEXT[1] - FRONT_CENTER[1],
-        x + BLANK_DIA_SHOULDER_FROM_TEXT[0] - FRONT_CENTER[0],
-    ))
 
 
 # The functional root-envelope stack stands right of the tip circle,
@@ -796,7 +752,6 @@ def front_keep(teeth: int) -> dict[str, tuple[float, float]]:
     half_od = rendered_half_od(teeth)
     keep = {
         "FloorDia": (FRONT_CENTER[0] + half_od + FLOOR_DIA_GAP_X, floor_dia_y(teeth)),
-        "BlankDia": blank_dia_keep(teeth),
         # Vertical dimension on the +X tooth: the anchor's x places its
         # line just right of the tip circle. Its y is where the import first
         # hangs the text, below the gear; the text then leaves the line for
@@ -945,8 +900,7 @@ BORE_LETTER_ANGLE_DEG = -45.0
 # +X): its centre this far up the space's centreline, model mm, and its
 # radius the farther tip corner of the space plus FORM_DETAIL_MARGIN_MM, so
 # the boundary takes the whole space and stands clear of A's ring. Its
-# letter stands up and right, clear of the tip diameter's leader dropping
-# left of the axis and under the root envelope's text.
+# letter stands up and right, under the root envelope's text.
 FORM_DETAIL_CENTRE_MM = 1.80
 FORM_DETAIL_MARGIN_MM = 0.10
 FORM_LETTER_ANGLE_DEG = 45.0
@@ -1037,19 +991,34 @@ def face_width_text_inside(teeth: int) -> bool:
 # bottom 104.5 mm). The stack's two lines under the value would raise its top
 # ~5 mm, onto the view, so the point drops by as much.
 FACE_WIDTH_DROP = 0.017
+# The tip diameter goes across the side view, beside the face width (rule 11;
+# repeat review of 218c85b6: a leader on the end view). Its extension lines
+# leave the front face at the tip radius; the text stands right of the view
+# at mid-height, between the arrows, the dimension line through it. The
+# block -- SEE NOTE 2 over the value and its band, 31 mm wide on the round-2
+# T120 ink -- clears the face by the gap and the iso view by 20 mm or more.
+BLANK_DIA_TEXT_HALF_WIDTH = 0.016
+BLANK_DIA_TEXT_GAP = 0.004
 
 
 def right_keep(teeth: int) -> dict[str, tuple[float, float]]:
+    blank_dia = (
+        RIGHT_CENTER[0]
+        + rendered_half_face_width(teeth)
+        + BLANK_DIA_TEXT_GAP
+        + BLANK_DIA_TEXT_HALF_WIDTH,
+        RIGHT_CENTER[1],
+    )
     y = RIGHT_CENTER[1] - rendered_half_od(teeth) - FACE_WIDTH_DROP
     if face_width_text_inside(teeth):
-        return {"FaceWidth": (RIGHT_CENTER[0], y)}
+        return {"FaceWidth": (RIGHT_CENTER[0], y), "BlankDia": blank_dia}
     x = (
         RIGHT_CENTER[0]
         + rendered_half_face_width(teeth)
         + FACE_WIDTH_TEXT_CLEARANCE
         + FACE_WIDTH_TEXT_WIDTH / 2.0
     )
-    return {"FaceWidth": (x, y)}
+    return {"FaceWidth": (x, y), "BlankDia": blank_dia}
 
 
 _TOL_LIMIT = 3  # swTolType_e.swTolLIMIT
@@ -1983,10 +1952,11 @@ async def build(adapter: Any) -> dict[str, str]:
         )
         clocks.append((configuration, clock, teeth))
         _crop_bore_view(adapter, bore_view, configuration, teeth, set(bore_keep))
-        # The part saves both authoring sketches hidden; the front view shows
-        # them again for their dimensions (the side and iso views show the
-        # part as saved).  The targeted import still delivers the dimensions
-        # on every sheet after the first (probe 834-gapfloor-c301).
+        # The part saves its authoring sketches hidden; the front view shows
+        # the tooth and floor ones again for their dimensions, the side view
+        # the tip-diameter witness (the iso view shows the part as saved).
+        # The targeted import still delivers the dimensions on every sheet
+        # after the first (probe 834-gapfloor-c301).
         front_annotations = hidden_sketches.curate_view_dimensions(
             adapter,
             front,
@@ -1994,28 +1964,39 @@ async def build(adapter: Any) -> dict[str, str]:
             view_label=f"{configuration} front",
             dimensions_by_feature=DRAWING_DIMENSIONS,
         )
-        _assert_sheet_bands(adapter, front_annotations, configuration, teeth)
-        # ENFORCE round 4 of #971: the OD's and the root envelope's
-        # dimension lines crossed at the centre and over the bore; the OD
-        # leader stops on its near rim. The root envelope's does too: through
-        # the centre it crossed T012's web dimension line (screen of
+        # ENFORCE round 4 of #971: the root envelope's dimension line crossed
+        # the centre and the bore; its leader stops on its near rim. Through
+        # the centre it also crossed T012's web dimension line (screen of
         # f21dfcdd2ba7, rule 14) and ran through DETAIL A's boundary.
-        for name in ("BlankDia", "FloorDia"):
-            found = [
-                item for item in front_annotations
-                if dimension_name(adapter, item) == name
-            ]
-            if len(found) != 1:
-                raise RuntimeError(
-                    f"{configuration}: expected one {name} dimension, found {len(found)}"
-                )
-            set_near_side_diameter(found[0], f"{configuration} {name}")
-        rebuild_drawing(adapter, label=f"{configuration} near-side diameter leaders")
+        found = [
+            item for item in front_annotations
+            if dimension_name(adapter, item) == "FloorDia"
+        ]
+        if len(found) != 1:
+            raise RuntimeError(
+                f"{configuration}: expected one FloorDia dimension, found {len(found)}"
+            )
+        set_near_side_diameter(found[0], f"{configuration} FloorDia")
+        rebuild_drawing(adapter, label=f"{configuration} near-side diameter leader")
+        # The face width first: the whole-model import deletes whatever it
+        # does not keep, the witness's BlankDia included, which the targeted
+        # import then brings in with its sketch shown in this view.
+        side_keep = right_keep(teeth)
         right_annotations = _curate_repeated_dimensions(
             adapter,
             right,
-            keep=right_keep(teeth),
+            keep={"FaceWidth": side_keep["FaceWidth"]},
             view_label=f"{configuration} right",
+        )
+        right_annotations += hidden_sketches.curate_view_dimensions(
+            adapter,
+            right,
+            keep={"BlankDia": side_keep["BlankDia"]},
+            view_label=f"{configuration} side",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
+        )
+        _assert_sheet_bands(
+            adapter, [*front_annotations, *right_annotations], configuration, teeth
         )
         annotations = [*bore_annotations, *front_annotations, *right_annotations]
         # RV-03's web dimension shows on the T012 sheet only (front_keep).
