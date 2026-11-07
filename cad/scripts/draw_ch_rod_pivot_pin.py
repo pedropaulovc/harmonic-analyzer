@@ -8,7 +8,7 @@ diameter sits beside its length (drawing-guidelines.md rule 11 (turned parts rea
 stock fraction's REFERENCE (the drill rod's grind governs), its two fits
 named below it (rules 4 and 7: the mates are flagged where they apply), the
 installed length as the size set at assembly, flush with the MHA-CH-03 fork
-faces, under the title block's .XX band (rule 19), and the blank's cut length
+faces at MHA-CH-00, under the title block's .XX band (rule 19), and the blank's cut length
 as a single MIN limit from the part's blanked ``BlankReference`` sketch. An
 axis centerline, a bare end view with its center mark and the isometric. No
 note: pressing and dressing the pin are MHA-CH-00's step (rule 7). No

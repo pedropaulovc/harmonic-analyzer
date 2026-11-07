@@ -48,11 +48,11 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     for dimensions in DRAWING_PRECISION.values()
     for name, decimals in dimensions.items()
 }
-# The installed length's setting and acceptance, under its value (rule 19's
-# `SET AT ASSEMBLY`; the mate by number, rule 4), each line narrower than the
-# 10:1 pin between its extension lines (round 2, rule 14: a wider line was
-# struck by them).
-PIN_LENGTH_CALLOUT = "SET AT ASSEMBLY\nFLUSH WITH MHA-CH-03"
+# The installed length is set at assembly (rule 19's `SET AT ASSEMBLY`), its
+# limits the .XX band; how it is set, dressing the ends flush with the fork,
+# is MHA-CH-00's step, not this sheet's (rule 7: 'FLUSH WITH MHA-CH-03' read
+# as its END FLUSH WITH narration example, local repeat after round 3).
+PIN_LENGTH_CALLOUT = "SET AT ASSEMBLY"
 if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
     DRAWING_PRECISION_BY_NAME
 ):

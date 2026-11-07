@@ -96,10 +96,9 @@ def test_precision_and_band_are_authored_on_the_part() -> None:
     assert notes.DRAWING_PRECISION["PinProfile"]["PinLen"] == 2
     title_block_2pl = 0.01 * 25.4
     assert max(abs(d) for d in rod.FORK_THICKNESS_BAND) <= title_block_2pl
-    assert notes.PIN_LENGTH_CALLOUT.splitlines() == [
-        "SET AT ASSEMBLY",
-        "FLUSH WITH MHA-CH-03",
-    ]
+    # How it is set (dressed flush with the fork) is MHA-CH-00's step, not
+    # this sheet's (rule 7; local repeat after round 3).
+    assert notes.PIN_LENGTH_CALLOUT == "SET AT ASSEMBLY"
     assert '"PinLen": PIN_LENGTH_CALLOUT' in source
     # The blank's MIN still leaves stock over the longest set length.
     assert spec.PIN_BLANK_LENGTH > spec.PIN_INSTALLED_LENGTH + title_block_2pl
