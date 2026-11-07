@@ -663,6 +663,15 @@ def test_bottom_thread_is_a_native_cosmetic_thread_the_section_must_draw() -> No
     assert "edge_point=[x + TAP_DRILL / 2.0, 0.0, face_z]" in body
     assert "size=SCREW" in body and 'end_type="blind"' in body
     assert "depth=BAR_THREAD_DEPTH" in body
+    # Native 4d782f88: the adapter's default diameter 0 drew no lines; the
+    # thread is made at, and read back as, the #8-32 major (hole: type 2).
+    assert "diameter=THREAD_MAJOR" in body
+    assert part._MAJOR_DIAMETER_TYPE == 2
+    assert part.THREAD_MAJOR == spec.THREAD_MAJOR == THREAD_MAJOR_MM[spec.SCREW]
+    proof_text = builder[builder.index("def _require_bar_face_threads") :]
+    assert "int(definition.DiameterType)" in proof_text
+    assert "float(definition.Diameter) * 1000.0" in proof_text
+    assert "abs(diameter - THREAD_MAJOR) > _EDGE_TOL_MM" in proof_text
     assert spec.BAR_TAP_FACE == ((0.0, 0.0, -1.0), 0.0)
     # SelectByID2 picks at the screen projection: the picks run in the Back
     # view (swBackView 2, viewer on -Z, square to the bottom face), the
