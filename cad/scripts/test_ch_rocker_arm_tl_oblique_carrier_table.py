@@ -279,10 +279,55 @@ def test_native_table_renames_default_tags_and_reattaches_the_real_edge():
     # then rebuild before the generated rows are frozen.
     assert (source.index("origin.Reattach()") < source.index("_assign_tags(feature, table)")
             < source.index('label="carrier owner tags"') < source.index("rows = _rows(table)"))
-    assert "cells[:4] != generated[tag]" in source
+    # NOTE text goes into each tag's row as re-read AFTER the column rebuild,
+    # every void SetText2 put is read back, and settle compares whole rows.
+    assert (source.index('label="carrier NOTE column"')
+            < source.index('_frozen_rows(table, generated, notes=None')
+            < source.index("table.SetText2(row, 4, False, note)")
+            < source.index("table.Text2(row, 4, False)")
+            < source.index('_frozen_rows(table, generated, notes=spec.TABLE_ROW_NOTES'))
     assert "GetCorrespondingEntity2" in inspect.getsource(table._source_edges)
     assert "GetAttachedEntities3" in inspect.getsource(table._tags)
     assert "table_settled" in inspect.getsource(drawing.build)
+
+
+@pytest.mark.parametrize("fault", [None, "size", "note", "moved_note", "columns"])
+def test_frozen_rows_name_the_row_and_both_values(fault):
+    native = NativeCells()
+    generated = {tag: cells[:4] for tag, (_row, cells) in table._rows(native).items()}
+    if fault == "size":
+        native.cells[2][3] = "other size"
+    elif fault == "note":
+        native.cells[2][4] = ""
+    elif fault == "moved_note":
+        native.cells[1][4], native.cells[2][4] = native.cells[2][4], native.cells[1][4]
+    elif fault == "columns":
+        native.ColumnCount = 4
+    if fault is None:
+        rows = table._frozen_rows(native, generated, notes=spec.TABLE_ROW_NOTES, stage="now")
+        assert set(rows) == set(spec.TABLE_HOLES)
+        return
+    with pytest.raises(RuntimeError) as failure:
+        table._frozen_rows(native, generated, notes=spec.TABLE_ROW_NOTES, stage="now")
+    message = str(failure.value)
+    if fault == "columns":
+        assert "has 4 columns now" in message
+    else:
+        row = 1 if fault == "moved_note" else 2  # rows are checked in table order
+        tag = native.cells[row][0]
+        assert f"changed now: {tag} (row {row})" in message
+        assert "expected=" in message and "actual=" in message
+        assert repr(native.cells[row][3 if fault == "size" else 4]) in message
+
+
+def test_freshly_inserted_note_cells_must_be_empty_before_writing():
+    native = NativeCells()
+    generated = {tag: cells[:4] for tag, (_row, cells) in table._rows(native).items()}
+    with pytest.raises(RuntimeError, match="expected=.*actual="):
+        table._frozen_rows(native, generated, notes=None, stage="after the NOTE column")
+    for row in native.cells[1:]:
+        row[4] = ""
+    assert set(table._frozen_rows(native, generated, notes=None, stage="x")) == set(spec.TABLE_HOLES)
 
 
 class DefaultTagTable(NativeCells):
@@ -324,12 +369,20 @@ def test_default_tags_are_renamed_two_phase_by_each_rows_a1_cells(base):
     assert len(native.writes) == 2 * len(spec.TABLE_HOLES)
     assert all(name.startswith("TMP") for name in native.writes[:len(spec.TABLE_HOLES)])
     # A single-phase rename would be refused by the live default tags.
+    # Compare per row against the captured pre-state: a refused A1/A2 swap
+    # leaves the same SET of names, just on the wrong holes.
     direct = DefaultTagTable(base=base)
     holes = table._row_holes(direct)
+    before = {row: direct.cells[row][0] for row in holes}
     direct.EnableUpdate = False
     for row, tag in holes.items():
         direct.SetHoleTag(row - 1 + base, tag)
-    assert {cells[0] for cells in direct.cells[1:]} != set(spec.TABLE_HOLES)
+    after = {row: direct.cells[row][0] for row in holes}
+    refused = {row for row, tag in holes.items() if after[row] != tag}
+    assert refused, (before, after)
+    assert all(after[row] == before[row] for row in refused), (before, after)
+    with pytest.raises(RuntimeError, match="not measured from A1|extra/duplicate"):
+        table._rows(direct)
 
 
 @pytest.mark.parametrize("fault", ["refused", "unreadable", "ambiguous_row", "precision"])

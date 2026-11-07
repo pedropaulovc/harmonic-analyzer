@@ -142,6 +142,29 @@ def _rows(table: Any) -> dict[str, tuple[int, tuple[str, ...]]]:
     return rows
 
 
+def _frozen_rows(
+    table: Any, generated: dict[str, tuple[str, ...]], *,
+    notes: dict[str, str] | None, stage: str,
+) -> dict[str, tuple[int, tuple[str, ...]]]:
+    """TAG/X/Y/SIZE exactly as first generated, plus the NOTE column, by tag.
+
+    ``notes=None`` requires the freshly inserted NOTE cells to be empty.
+    Failures name the row and both the expected and the actual cells.
+    """
+    rows = _rows(table)
+    columns = int(table.ColumnCount)
+    if columns != 5:
+        raise RuntimeError(f"carrier table has {columns} columns {stage}; expected TAG/X/Y/SIZE/NOTE")
+    for tag, (row, cells) in rows.items():
+        expected = (*generated[tag], "" if notes is None else notes[tag])
+        if cells != expected:
+            raise RuntimeError(
+                f"carrier generated row or flag changed {stage}: {tag} (row {row}) "
+                f"expected={expected!r} actual={cells!r}"
+            )
+    return rows
+
+
 def _row_holes(table: Any) -> dict[int, str]:
     """Each generated row's physical hole, from its own native A1-baseline cells.
 
@@ -309,14 +332,28 @@ def create_carrier_hole_table(
         raise RuntimeError("carrier table refused the NOTE column")
     if not table.SetColumnTitle2(4, "NOTE", False):
         raise RuntimeError("carrier table refused the NOTE title")
+    rebuild_drawing(adapter, label="carrier NOTE column")
+    # Re-identify rows after the structural edit: a regenerated hole table may
+    # reorder them, so NOTE text is written by each tag's CURRENT row only.
+    rows = _frozen_rows(table, generated, notes=None, stage="after the NOTE column")
     for tag, (row, _cells) in rows.items():
         if not table.IsCellTextEditable(row, 4):
-            raise RuntimeError(f"carrier {tag} NOTE cell is not editable")
-        table.SetText2(row, 4, False, spec.TABLE_ROW_NOTES[tag])
+            raise RuntimeError(f"carrier {tag} NOTE cell (row {row}) is not editable")
+        note = spec.TABLE_ROW_NOTES[tag]
+        table.SetText2(row, 4, False, note)  # void put: read back below
+        written = (str(table.Text2(row, 4, False) or ""),
+                   str(table.DisplayedText2(row, 4, False) or "").strip())
+        if written != (note, note):
+            raise RuntimeError(
+                f"carrier {tag} NOTE (row {row}) did not take: expected={note!r} "
+                f"driving/displayed={written!r}"
+            )
     for column, width in enumerate(TABLE_WIDTHS):
         actual = float(table.SetColumnWidth(column, width, 0))
         if abs(actual - width) > 1e-6:
-            raise RuntimeError(f"carrier table column {column} rejected its width")
+            raise RuntimeError(
+                f"carrier table column {column} rejected its width: expected={width} actual={actual}"
+            )
     _tags(adapter, view, edges, place=True)
     # NOTE 1 is flagged in the A2/B2 rows; the exact owner text is linked to
     # the saved model property and checked against both native local controls.
@@ -329,7 +366,6 @@ def create_carrier_hole_table(
     def check_active_table() -> None:
         current = _source_edges(adapter, view, model, source)
         _outer_row_source(model)
-        rows_now = _rows(table)
         if (feature.CombineSameSize or feature.CombineTags
                 or bool(feature.GetHoleLocationUseDocPrecision())
                 or int(feature.GetHoleLocationPrecision()) != spec.TABLE_LOCATION_PLACES):
@@ -340,9 +376,7 @@ def create_carrier_hole_table(
                 or int(adapter.swApp.IsSame(attached[0], current["A1"])) != 1
                 or annotation.IsDangling()):
             raise RuntimeError("carrier table datum no longer owns A1's actual axis")
-        for tag, (_row, cells) in rows_now.items():
-            if cells[:4] != generated[tag] or cells[4] != spec.TABLE_ROW_NOTES[tag]:
-                raise RuntimeError(f"carrier generated row or flag changed: {tag}")
+        _frozen_rows(table, generated, notes=spec.TABLE_ROW_NOTES, stage="at settled readback")
         _tags(adapter, view, current, place=False)
         if str(_early_bound(flagged, "INote").GetText()).strip() != spec.OUTER_Y_NOTE:
             raise RuntimeError("carrier flagged note differs from its model-owned limits")
