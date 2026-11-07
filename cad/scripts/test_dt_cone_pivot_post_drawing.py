@@ -800,10 +800,13 @@ def test_journal_rims_print_the_thrust_ring_break() -> None:
     break_max = shaft.THRUST_EDGE_BREAK_MAX
     assert f"RIMS BREAK {shaft.inch_text(break_max, 3)} MAX" == shaft.POST_JOURNAL_RIM_BREAK
     # r16 (rules 4 and 7) gave the tighter break its reason at the callout;
-    # the novice rubric's two-line callout moved it, with the collar's part,
-    # into numbered note 2, which the bore's callout flags.
-    assert drawing.DIMENSION_CALLOUTS["JournalBoreDia"] == "REAM THRU, SEE NOTE 2"
-    assert _note(2).endswith(f"FACE. {shaft.POST_JOURNAL_RIM_BREAK}.")
+    # the novice rubric's two-line callout moved the collar's part into
+    # numbered note 2, which the bore's callout flags, and fan-out r1 put the
+    # short break back at the bore's leader (rule 7).
+    assert drawing.DIMENSION_CALLOUTS["JournalBoreDia"] == (
+        f"REAM THRU, SEE NOTE 2\n{shaft.POST_JOURNAL_RIM_BREAK}"
+    )
+    assert shaft.POST_JOURNAL_RIM_BREAK not in drawing.SHEET_NOTES
     assert "CONE SHAFT MHA-DT-04" in _note(2) and "ITS COLLAR" in _note(2)
     assert f"EDGE BREAK {shaft.inch_text(break_max, 3)} MAX" in shaft.COLLAR_STOCK_CALLOUT
     ring = shaft.THRUST_RING_MIN
@@ -993,7 +996,8 @@ def test_both_bores_read_size_then_ream_thru_and_flag_their_fit_note() -> None:
     caps the block above (FRONT_KEEP)."""
     for name, note in (("CrankBoreDia", 1), ("JournalBoreDia", 2)):
         assert name not in drawing.DIMENSION_SUFFIXES
-        assert drawing.DIMENSION_CALLOUTS[name] == f"REAM THRU, SEE NOTE {note}"
+        rows = drawing.DIMENSION_CALLOUTS[name].splitlines()
+        assert rows[0] == f"REAM THRU, SEE NOTE {note}"
     assert _note(1).startswith("1. RUNNING FIT ON CRANKSHAFT MHA-DT-11 (CLEARANCE ")
     assert _note(2).startswith("2. RUNNING FIT ON CONE SHAFT MHA-DT-04 (CLEARANCE ")
 
@@ -1038,13 +1042,14 @@ def test_mounting_hole_callout_says_drill_above_its_through_row() -> None:
     assert "_set_mount_hole_process(mount_callout)" in source
 
 
-def test_thrust_face_station_prints_bare_and_note_2_names_the_collar() -> None:
+def test_thrust_face_station_flags_note_2_which_names_the_collar() -> None:
     """r5 (rule 4) asked the ±.002 station to say whose collar it sets.  The
-    novice rubric (rule 7) prints a location's value and band only, so the
-    cone bore's note 2 names the MHA-DT-04 collar on the face at that station.
-    The face's Ra symbol keeps no text: the spec is shared by other slices'
-    parts, so the sheet does not re-key it."""
-    assert "ConeBossNorthZ" not in drawing.DIMENSION_CALLOUTS
+    novice rubric (rule 7) keeps a location to its value and band, so the
+    cone bore's note 2 names the MHA-DT-04 collar on the face at that station
+    and the station flags it (fan-out r1).  The face's Ra symbol keeps no
+    text: the spec is shared by other slices' parts, so the sheet does not
+    re-key it."""
+    assert drawing.DIMENSION_CALLOUTS["ConeBossNorthZ"] == "SEE NOTE 2"
     face = surface_finish_by_key(spec.SURFACE_FINISHES, "cone_boss_north_face")
     assert face.production_method == ""
     assert drawing._NORTH_BOSS_FINISH_OFFSET == (-0.006, 0.008)
@@ -1364,9 +1369,9 @@ def test_numbered_notes_state_each_bores_fit_and_its_locations_mates() -> None:
     assert drawing.SHEET_NOTES == "\n".join(
         (
             "1. RUNNING FIT ON CRANKSHAFT MHA-DT-11 (CLEARANCE .0010-.0023).",
-            "   1.697 AND .842 SET MESH OF PINION MHA-DT-10 WITH GEAR MHA-DT-07.",
             "2. RUNNING FIT ON CONE SHAFT MHA-DT-04 (CLEARANCE .0010-.0023);",
-            "   ITS COLLAR RUNS ON THE .827 FACE. RIMS BREAK .004 MAX.",
+            "   ITS COLLAR RUNS ON THE .827 FACE.",
+            "3. 1.697 AND .842 SET MESH OF PINION MHA-DT-10 WITH GEAR MHA-DT-07.",
         )
     )
     assert len(drawing.SHEET_NOTES.splitlines()) <= 4
@@ -1406,20 +1411,24 @@ def test_numbered_notes_state_each_bores_fit_and_its_locations_mates() -> None:
     assert "add_note(adapter, SHEET_NOTES, *NOTES_XY)" in source
 
 
-def test_locations_print_their_value_and_band_only() -> None:
+def test_locations_print_their_value_band_and_note_flag_only() -> None:
     """Novice-rubric screen (rule 7): a location carries its value and band
-    and nothing else; its mate sits once in its feature's numbered note."""
-    locations = (
-        "ConeBossNorthZ",
-        "CrankBossStartZ",
-        "JournalAxisY",
-        "CrankAboveCone",
-        "CrankAxisY",
-        "MountWestX",
-        "MountEastX",
-    )
-    for name in locations:
-        assert name not in drawing.DIMENSION_CALLOUTS
+    and nothing else; fan-out r1 (rules 4, 7): a tight location whose mate
+    sits in a numbered note flags that note, so the reader reaches it."""
+    flagged = {
+        "ConeBossNorthZ": "SEE NOTE 2",
+        "CrankBossStartZ": "SEE NOTE 3",
+        "CrankAboveCone": "SEE NOTE 3",
+    }
+    callouts = {**drawing.DIMENSION_CALLOUTS, **drawing.DIMENSION_CALLOUTS_ABOVE}
+    for name, flag in flagged.items():
+        assert callouts[name] == flag
+    assert set(drawing.DIMENSION_CALLOUTS_ABOVE) == {"CrankAboveCone"}
+    assert _note(2).endswith("ITS COLLAR RUNS ON THE .827 FACE.")
+    assert _note(3).startswith("3. 1.697 AND .842 SET MESH")
+    for name in ("JournalAxisY", "CrankAxisY", "MountWestX", "MountEastX"):
+        assert name not in callouts
+    for name in (*flagged, "JournalAxisY", "CrankAxisY", "MountWestX", "MountEastX"):
         assert name not in drawing.DIMENSION_SUFFIXES
         assert name not in drawing.DIMENSION_PREFIXES
 

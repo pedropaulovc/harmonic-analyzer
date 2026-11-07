@@ -97,10 +97,9 @@ def test_the_od_names_its_mates_and_its_stock_route_at_the_callout() -> None:
     """Fan-out screen 20261107T081227004Z: the .0008 band's only fit route,
     ground stock, sat in an unlinked general note; the set-screw spots named
     no mate."""
-    assert notes.SHAFT_DIA_CALLOUT.splitlines() == [
-        "RUNNING FIT IN MHA-DT-12 AND MHA-DT-02 BORES",
-        "3/8 GROUND STOCK OK",
-    ]
+    assert notes.SHAFT_DIA_CALLOUT == (
+        "RUNNING FIT IN MHA-DT-12 AND MHA-DT-02 BORES; 3/8 GROUND STOCK OK"
+    )
     assert "GROUND STOCK" not in notes.DRAWING_NOTES
     flat = " ".join(notes.DRAWING_NOTES.splitlines())
     assert "SPOTS FOR MHA-SH-VN-54 SET SCREWS DRILLED AT ASSEMBLY THROUGH MHA-DT-02 TAPS" in flat

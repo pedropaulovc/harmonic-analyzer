@@ -483,7 +483,9 @@ JOURNAL_KEEP = {
     # (screen of the novice rubric: the boss OD and the bore read as one
     # six-line callout), so its top stands ~11 mm under the boss OD's row and
     # the two read as separate callouts.  Its widest row, "REAM THRU, SEE
-    # NOTE 2", is about the boss OD row's width and stays inside 265.5..319.2.
+    # NOTE 2", is about the boss OD row's width and stays inside 265.5..319.2;
+    # the rim break's shorter row sits under it (fan-out r1: a short
+    # requirement goes at its leader, not behind a note).
     "JournalBoreDia": (0.292, 0.1525),
 }
 
@@ -561,9 +563,13 @@ JOURNAL_TEXT_OFFSETS = {
 # crank boss length keeps one reason, the mate its south face seats, on two
 # rows so its block stays inside the border at x=0.040.
 # The part carries no general note (cone_pivot_post_spec.DRAWING_NOTES); these
-# numbered fit notes are drawing text the bores' callouts flag.
+# numbered fit notes are drawing text the callouts flag.  Fan-out r1
+# (57234c1d71): a mate named only inside a note no flag at the dimension
+# points to is presentation (rules 4, 7), so the mesh pair gets its own note
+# flagged at both locations and the .827 flags the note naming its collar.
 CRANK_BORE_NOTE = 1
 CONE_BORE_NOTE = 2
+MESH_NOTE = 3
 
 
 def fit_clearance_text(clearance_mm: tuple[float, float]) -> str:
@@ -577,18 +583,19 @@ def _printed(value_mm: float, name: str) -> str:
     return cone_shaft.inch_text(value_mm, _P[name])
 
 
-# The sheet's numbered notes, one block (rule 7: at most four lines).
+# The sheet's numbered notes, one block (rule 7: at most four lines).  The
+# rim break is a short requirement, so it sits at the bore's callout.
 SHEET_NOTES = "\n".join(
     (
         f"{CRANK_BORE_NOTE}. RUNNING FIT ON CRANKSHAFT MHA-DT-11 (CLEARANCE "
         f"{fit_clearance_text(crankshaft.JOURNAL_DIAMETRAL_CLEARANCE_MM)}).",
-        f"   {_printed(cone.CRANK_ABOVE_CONE, 'CrankAboveCone')} AND "
-        f"{_printed(cone.CRANK_BOSS_NORTH_FACE, 'CrankBossStartZ')} SET MESH "
-        "OF PINION MHA-DT-10 WITH GEAR MHA-DT-07.",
         f"{CONE_BORE_NOTE}. RUNNING FIT ON CONE SHAFT MHA-DT-04 (CLEARANCE "
         f"{fit_clearance_text(cone_shaft.JOURNAL_DIAMETRAL_CLEARANCE_MM)});",
         f"   ITS COLLAR RUNS ON THE {_printed(cone.CONE_BOSS_NORTH_STATION, 'ConeBossNorthZ')} "
-        f"FACE. {POST_JOURNAL_RIM_BREAK}.",
+        "FACE.",
+        f"{MESH_NOTE}. {_printed(cone.CRANK_ABOVE_CONE, 'CrankAboveCone')} AND "
+        f"{_printed(cone.CRANK_BOSS_NORTH_FACE, 'CrankBossStartZ')} SET MESH "
+        "OF PINION MHA-DT-10 WITH GEAR MHA-DT-07.",
     )
 )
 # The notes' top-left corner: under the elevation's datum B frame (its
@@ -598,8 +605,16 @@ DIMENSION_CALLOUTS = {
     "CrankBossDia": "CRANK BOSS",
     "CrankBossLen": "SEATS\nMHA-DT-11 COLLAR",
     "CrankBoreDia": f"REAM THRU, SEE NOTE {CRANK_BORE_NOTE}",
-    "JournalBoreDia": f"REAM THRU, SEE NOTE {CONE_BORE_NOTE}",
+    "JournalBoreDia": f"REAM THRU, SEE NOTE {CONE_BORE_NOTE}\n{POST_JOURNAL_RIM_BREAK}",
     "ConeBossLen": "MHA-DT-04 BEARING LENGTH",
+    "ConeBossNorthZ": f"SEE NOTE {CONE_BORE_NOTE}",
+    "CrankBossStartZ": f"SEE NOTE {MESH_NOTE}",
+}
+# Over the value: under it, the flag row would stand beside the crank bore's
+# block (test_crank_bore_mate_line_stands_clear_of_the_head_height_extension);
+# a one-row ABOVE callout prints (a multi-row one prints nothing).
+DIMENSION_CALLOUTS_ABOVE = {
+    "CrankAboveCone": f"SEE NOTE {MESH_NOTE}",
 }
 # Text after the size and its band, on the same line: one row keeps the
 # head's Ø in the narrow band between View C's head and the A-A station,
@@ -1819,6 +1834,9 @@ async def build(adapter: Any) -> dict[str, str]:
         *section_annotations,
     ]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    set_dimension_callouts(
+        adapter, annotations, DIMENSION_CALLOUTS_ABOVE, location="above"
+    )
     _set_dimension_suffixes(adapter, annotations)
     _set_dimension_prefixes(adapter, annotations)
     near_side = {name: 0 for name in NEAR_SIDE_DIAMETERS}

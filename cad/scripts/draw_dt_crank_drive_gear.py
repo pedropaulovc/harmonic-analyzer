@@ -224,13 +224,14 @@ DIMENSION_CALLOUTS = {
     "BoreAF": AF_CALLOUT,
     "FaceWidth": FACE_WIDTH_CALLOUT,
     # The leg is native and prints under the title block's .XX band; the
-    # chamfer feature is 45° on the model. The callout says the chamfer is on
-    # one end only and why (the leader shows which end). SolidWorks sets the
-    # block's widest line against the leg's own dimension line, whose
-    # extension lines overrun it by 1 mm: two trailing spaces on every line
-    # keep that ink clear (r3 of #1641 printed RUNOUT's T on the line).
+    # chamfer feature is 45° on the model. The callout says why the chamfer
+    # is there; the leader shows which end (fan-out r1: "THIS END" made a
+    # third row of words, rule 7). SolidWorks sets the block's widest line
+    # against the leg's own dimension line, whose extension lines overrun it
+    # by 1 mm: two trailing spaces on every line keep that ink clear (r3 of
+    # #1641 printed RUNOUT's T on the line).
     "BoreSouthChamferSize": (
-        " X 45\N{DEGREE SIGN}, THIS END  \nCLEARS FLAT RUNOUT  \nOF MHA-DT-04  "
+        " X 45\N{DEGREE SIGN}  \nCLEARS FLAT RUNOUT  \nOF MHA-DT-04  "
     ),
 }
 

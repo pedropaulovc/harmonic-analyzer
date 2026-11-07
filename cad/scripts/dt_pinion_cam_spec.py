@@ -219,12 +219,17 @@ BORE_CALLOUT = "\n".join(
     )
 )
 # The OD and its .079 offset from the bore together set the follower pin's
-# lift, so the one reason sits once, on the OD's size callout (rule 7: a
-# location carries its value and band only, and a reason is one line of at
-# most six words).  The tap mouth stays 45 deg or more off the pin's track
+# lift, so the one reason sits once, in numbered note 1, and both dimensions
+# flag it (rules 4 and 7; fan-out r1 57234c1d71: the reason on the OD's
+# callout alone left the tight .079 with no mate at its callout).  The tap
+# mouth stays 45 deg or more off the pin's track
 # (test_cam_set_screw_hole_stays_clear_of_the_follower); saying so on the
 # sheet was design rationale (fan-out screen 20261107T081227004Z).
-COLLAR_OD_CALLOUT = f"SETS {FOLLOWER_PIN_NUMBER}\nFOLLOWER PIN LIFT"
+LIFT_NOTE_NUMBER = 1
+SCREW_NOTE_NUMBER = 2
+LIFT_NOTE_CALLOUT = f"SEE NOTE {LIFT_NOTE_NUMBER}"
+_OD_TEXT = f"{CAM_OD / 25.4:.{COLLAR_OD_PLACES}f}".removeprefix("0")
+_ECC_TEXT = f"{ECC / 25.4:.{ECC_PLACES}f}".removeprefix("0")
 # The stake over the set screw is MHA-DT-00's cam-collars-set step (rule 23:
 # the assembly step gives the method); the part sheet gives only the tap.
 TAP_DRILL_CALLOUT = "TAP DRILL THRU TO BORE\n#2-56 UNC"
@@ -282,8 +287,18 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
     raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
 
-# The tapped-hole requirement is attached to its tap-drill dimension. The
-# linked note carries only loose hardware; the ASME source and stack above
-# account for the supplier's overall-length limits, not an invented SKU.
-DRAWING_NOTES = "SUPPLY ASME B18.3 #2-56 UNC X 3/16\nFLAT-POINT SOCKET SET SCREW LOOSE."
+# The tapped-hole requirement is attached to its tap-drill dimension.  Note 2
+# carries only loose hardware; the ASME source and stack above account for
+# the supplier's overall-length limits, not an invented SKU.  The thick-side
+# wall is deeper than the longest screw (SET_SCREW_SUBFLUSH_MIN_MM), so the
+# note says the tightened screw sits below the OD (fan-out r1: a reviewer
+# read the screw as flush and so short of the rod).
+DRAWING_NOTES = "\n".join(
+    (
+        f"{LIFT_NOTE_NUMBER}. \N{LATIN CAPITAL LETTER O WITH STROKE}{_OD_TEXT} AND "
+        f"{_ECC_TEXT} SET THE LIFT OF FOLLOWER PIN {FOLLOWER_PIN_NUMBER}.",
+        f"{SCREW_NOTE_NUMBER}. SUPPLY ASME B18.3 #2-56 UNC X 3/16 FLAT-POINT SOCKET SET SCREW",
+        f"   LOOSE; TIGHT ON {LIFT_ROD_NUMBER}, IT SITS BELOW THE OD.",
+    )
+)
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"

@@ -88,8 +88,12 @@ def test_the_body_length_exception_names_the_rig_stacks() -> None:
     import pinion_rig_layout
     from machinist_exceptions import load_exceptions
 
-    (entry,) = load_exceptions(_config.CONFIG_DIR, "dt_pinion_lift_rod", "part")
-    assert (entry.id, entry.kind) == ("RV-01", "accept")
+    entries = load_exceptions(_config.CONFIG_DIR, "dt_pinion_lift_rod", "part")
+    assert [(e.id, e.kind) for e in entries] == [("RV-01", "accept"), ("RV-02", "accept")]
+    entry = entries[0]
+    # RV-02: the fleet-shared SHAFT_H band, kept with its route at the
+    # callout (fan-out delegated rulings F1/F5, owner review #2144).
+    assert "-.0008" in entries[1].where and "#2144" in entries[1].reason
     spec = dt_pinion_lift_rod_spec
     assert "body length" in entry.where and "reference overall" in entry.where
     assert spec.CAP_R == pytest.approx(0.19 * 25.4)

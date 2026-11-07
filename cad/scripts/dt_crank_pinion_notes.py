@@ -79,8 +79,9 @@ BACKLASH_LABEL = f"TRANSVERSE BACKLASH WITH {spec.MESH_GEAR_NUMBER}, ACCEPT AT A
 # width out over the boss, turned to the root (BOSS_DIA = ROOT_DIA_MIN), which
 # is where the form cutter runs out. The boss's .X band allows it above the
 # root, so a cutter mark on the boss is permitted, not a reject. A tooth fact,
-# so it reads with the teeth, as the tooth edges do.
-TOOTH_RUNOUT = "RUN FULL LENGTH THROUGH THE TURNED BAND; CUTTER RUNOUT INTO BOSS OK"
+# so it reads with the teeth, as the tooth edges do. Short enough to end
+# clear of the Ø.743 callout (fan-out r1 printed its OK under the Ø).
+TOOTH_RUNOUT = "FULL LENGTH OF TURNED BAND; CUTTER RUNOUT INTO BOSS OK"
 
 # The spur's normal and transverse sections coincide. Its physical tooth
 # count selects a different stock cutter from the helical mate's virtual count.
