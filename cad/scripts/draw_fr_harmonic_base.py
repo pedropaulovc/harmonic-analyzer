@@ -32,7 +32,6 @@ import sys
 from typing import Any, NamedTuple
 
 from solidworks_mcp.adapters.com_variant import dispatch_array
-from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     _note_text,
     add_note,
@@ -214,9 +213,6 @@ SERIAL_NOTE = (
 SERIAL_X_TEXT_XY = (0.137, 0.1315)
 SERIAL_Y_LINE_X = 0.2085
 SERIAL_Y_TEXT_XY = (SERIAL_Y_LINE_X, 0.1455)
-# Sheet point on the flange's rear edge (the table's Y0 line) clear of every
-# other plan edge, where the Y reference dimension picks it.
-SERIAL_Y_EDGE_PICK_X_MM = 100.0
 # The deck Ra symbol remains left of the plan and below the R22.2 callout.
 DECK_FINISH_XY = (0.040, 0.1855)
 DECK_FINISH_FACE_INSET_M = 0.004
@@ -2143,13 +2139,13 @@ def _add_serial_location(adapter: Any, view: Any) -> None:
         point_xy=(SERIAL_XZ[0] / 1000.0, -SERIAL_XZ[1] / 1000.0),
         label="stamped-ID station",
     )
+    # The flange's rear edge as an entity, the hole table's own X axis: a sheet
+    # pick at its line took the pad's rear edge 6.35 mm inboard (run
+    # 20261107T105311094Z measured 13.037 mm, not 19.387).
+    _rims, rear_edge, _west_edge = _visible_hole_table_entities(adapter, view, ())
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
     name = view_name(adapter, view)
-    rear_edge_pick = (
-        TOP_CENTER[0] + SERIAL_Y_EDGE_PICK_X_MM * VIEW_SCALE / 1000.0,
-        TOP_CENTER[1] - BOTTOM_REAR_Z * VIEW_SCALE / 1000.0,
-    )
     for label, first, text_xy, expected_mm in (
         ("stamped-ID X", corner, SERIAL_X_TEXT_XY, SERIAL_XZ[0] + BOTTOM_LENGTH / 2.0),
         ("stamped-ID Y", None, SERIAL_Y_TEXT_XY, BOTTOM_REAR_Z - SERIAL_XZ[1]),
@@ -2161,9 +2157,7 @@ def _add_serial_location(adapter: Any, view: Any) -> None:
         data = manager.CreateSelectData()
         data.View = view
         if first is None:
-            picked = draw.Extension.SelectByID2(
-                "", "EDGE", *rear_edge_pick, 0.0, False, 0, null_callout(), 0
-            )
+            picked = _early_bound(rear_edge, "IEntity").Select4(False, data)
         else:
             picked = first.Select4(False, data)
         if not picked or not serial.Select4(True, data):
