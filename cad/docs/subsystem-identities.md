@@ -121,6 +121,15 @@ station bands, not a no-slip assumption. KP08 axis height/foot thickness
 remain unverified (#2184). Native block bore/dimension readbacks, one-free-DOF
 proof and driven whole-assembly interference at both passes remain mandatory;
 analytic separating axes and generated sweep targets are not native results.
+Feed-tap cylinder radii are checked against the committed Hole Wizard
+`ThruTapDrillDiameter`, after checking its three-decimal catalogue identity;
+the rounded tap-drill table is not an exact native-radius oracle. Missing
+or displaced cylinders still refuse, reporting the observed axes and sizes.
+The centred-block sheets keep B-B on the -X M4 column, with its upper arrow
+above the X-dimension tiers and its lower arrow below the clearance-hole
+leader. Native dimensions and normal fonts remain; the .308 text sits clear
+of its narrow datum-witness span. Retained-PDF lane measurements guide this
+placement but do not replace the fresh native drawing/layout/review gates.
 
 TL-00's last sheet, LINEAR MOTION FROM ABOVE (owner, PR4 #2227), is the
 arrangement's named plan of the same assembly with the TL-21 carrier and
