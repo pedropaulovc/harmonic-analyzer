@@ -258,9 +258,10 @@ def test_only_views_dimensioning_hidden_sketches_opt_in() -> None:
 
 def test_every_marked_dimension_is_kept_in_exactly_one_view() -> None:
     """Every marked dimension lands on one view; the bottom view carries the
-    hold-down tap's two stations (2026-09-29).  The slit's depth runs to a
-    floor inside the bore that no view draws, so the part no longer marks it
-    (machinist review of e04fd60ab)."""
+    hold-down tap's two stations (2026-09-29) and the width of the foot that
+    stands on MHA-DT-20 (round-1 farm review, dt-fab-4).  The slit's depth
+    runs to a floor inside the bore that no view draws, so the part no longer
+    marks it (machinist review of e04fd60ab)."""
     adjuster_axis = {"AxisHeight", "PassageCenter"}
     kept = [
         *drawing.FRONT_KEEP,
@@ -280,7 +281,22 @@ def test_every_marked_dimension_is_kept_in_exactly_one_view() -> None:
     assert "SlitDepth" not in marked
     assert "SlitDepth" not in dt_cone_tip_block_spec.DRAWING_PRECISION_BY_NAME
     assert set(drawing.TOP_KEEP) == {"Depth"}
-    assert set(drawing.BOTTOM_KEEP) == {"FootTapX", "FootTapZ"}
+    assert set(drawing.BOTTOM_KEEP) == {"FootTapX", "FootTapZ", "Width"}
+    assert drawing.LEFT_KEEP == {}
+
+
+def test_view_b_locates_its_thread_with_its_own_driven_stations() -> None:
+    """Round-1 farm review (dt-fab-4, rule 7): VIEW B's far-jaw thread is
+    located in VIEW B, to the right view's stations and places."""
+    assert set(drawing.VIEW_B_DIMENSIONS) == {"ViewBPinchDepth", "ViewBPinchHeight"}
+    assert drawing.VIEW_B_DIMENSION_PLACES == {
+        "ViewBPinchDepth": dt_cone_tip_block_spec.PINCH_DEPTH_PLACES,
+        "ViewBPinchHeight": dt_cone_tip_block_spec.PINCH_HEIGHT_PLACES,
+    }
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    body = source[source.index("async def build(") :]
+    assert "_add_view_b_pinch_dimensions(adapter, left, pinch_thread_edge)" in body
+    assert "CreateCenterLine" not in source
 
 
 def test_slot_width_text_stands_right_of_its_outside_arrows() -> None:
@@ -292,7 +308,7 @@ def test_slot_width_text_stands_right_of_its_outside_arrows() -> None:
     right_wall = slot_x + part.SLIT_W * drawing._S / 2.0
     arrow_tail = right_wall + drawing.ARROW_LENGTH
     assert text_x - drawing.VALUE_TEXT_HALF_WIDTH >= arrow_tail + 0.001
-    passage_x = drawing._adjuster_axis_keep(drawing.FRONT_CENTER)["PassageCenter"][0]
+    passage_x = drawing._adjuster_axis_keep()["PassageCenter"][0]
     assert passage_x < slot_x < text_x
     assert "SlitW" in drawing.ARROWS_OUTSIDE
     # Machinist review of e04fd60ab: the width states the slit's extent, and
@@ -375,16 +391,16 @@ def test_sheet_ink_is_clear_and_the_build_places_what_it_audits() -> None:
     drawing.assert_sheet_ink_clear()
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     body = source[source.index("async def build(") :]
-    assert "assert_sheet_ink_clear(adjuster_center)" in body
-    assert body.index("assert_sheet_ink_clear(") < body.index("curate(")
+    assert "assert_sheet_ink_clear()" in body
+    assert body.index("assert_sheet_ink_clear(") < body.index("curate_view_dimensions(")
     for placed in (
-        "callout_xy=_adjuster_callout_xy(adjuster_center)",
+        "callout_xy=ADJUSTER_CALLOUT_XY",
         "callout_xy=PINCH_CLEARANCE_CALLOUT_XY",
         "callout_xy=PINCH_THREAD_CALLOUT_XY",
         "callout_xy=FOOT_TAP_CALLOUT_XY",
-        "for text, x, y in _sheet_notes(adjuster_center):",
-        "adjuster_axis_keep = _adjuster_axis_keep(adjuster_center)",
-        "[FOOT_FINISH_CENTER]",
+        "for text, x, y in _sheet_notes():",
+        "keep={**FRONT_KEEP, **_adjuster_axis_keep()}",
+        "foot_edge = _foot_edge(adapter, front)",
         "foot_symbol, foot_right = _foot_finish_placement()",
         "symbol_xy=foot_symbol",
         "leader_attach_xy=foot_right",
@@ -394,8 +410,11 @@ def test_sheet_ink_is_clear_and_the_build_places_what_it_audits() -> None:
     ):
         assert placed in body, placed
     assert body.count("add_note(adapter,") == 1
-    # The foot's Ra 3.2 sits on VIEW C, where nothing is dimensioned under it.
-    assert drawing.FOOT_FINISH_CENTER == drawing.BACK_CENTER
+    # Round-1 farm review (dt-fab-4): the rear view (VIEW C) is gone; the
+    # foot's finish sits on the front view, the width moved under the bottom
+    # view, so nothing is dimensioned under the front view's foot.
+    assert '"*Back"' not in body
+    assert "Width" not in drawing.FRONT_KEEP
     assert drawing.ARROWS_INSIDE == (
         "PinchHeight",
         "PinchDepthCenter",

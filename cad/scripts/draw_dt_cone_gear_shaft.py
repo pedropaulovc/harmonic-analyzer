@@ -226,7 +226,10 @@ STATION_TEXT_CLEARANCE = 0.002
 # 40 mm, so it stands 4.5 mm nearer the end again, clear of both A-A's box
 # and its "4 FLATS IN LINE" callout (#290 batch 0).
 SIDE_DIAMETERS = {
-    "Sec0Dia": (0.2615, 0.1715),
+    # Round 1 native proof: the fit line's box ended at x 0.3244, past
+    # section A-A's left edge (0.3141); the shorter line and a 4 mm nudge
+    # left keep ~5 mm of air.
+    "Sec0Dia": (0.2575, 0.1715),
     "Sec1Dia": (0.1600, 0.1800),
     "Sec2Dia": (BIG_END_X - (2.0 * SECTION_ENDS[2] + SECTION_ENDS[1]) / 3000.0, 0.1785),
     "Sec3Dia": (BIG_END_X - (2.0 * SECTION_ENDS[3] + SECTION_ENDS[2]) / 3000.0, 0.1905),

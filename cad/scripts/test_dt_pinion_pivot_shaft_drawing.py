@@ -94,8 +94,8 @@ def test_running_fit_names_its_mate_and_the_sheet_carries_no_gdt() -> None:
     # The band is narrower than the turned-diameter row, so the callout names
     # the matched-fit route with the clearance the printed limits give.
     assert drawing.DIMENSION_CALLOUTS["ShaftDia"].split("\n") == [
-        f"TURN TO MEASURED {block} BORES,",
-        "RUNNING FIT (CLEARANCE .0010-.0023)",
+        f"RUNNING FIT, MATCHED TO {block}",
+        "PIVOT BLOCK BORES (CLEARANCE .0010-.0023)",
     ]
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "add_feature_control_frame(" not in source
@@ -107,9 +107,12 @@ def test_running_fit_names_its_mate_and_the_sheet_carries_no_gdt() -> None:
     assert "leader_attach_xy=BEARING_FINISH_EDGE" in source
     assert drawing.BEARING_FINISH_EDGE[1] == drawing.SHAFT_UPPER_FLANK_Y
     assert "char_height=FINISH_CHAR_HEIGHT" in source
-    # The diameter's two fit lines stand under the front end, below the
-    # pin-hole callout (left of the back end it ran over the border, r3).
-    assert drawing.PROFILE_KEEP["ShaftDia"][1] < drawing.PROFILE_KEEP["PinHoleDia"][1]
+    # The diameter's two fit lines stand right of the front end, over DETAIL
+    # A, clear of the pin-hole leader (round 1) and the border (r3).
+    assert drawing.PROFILE_KEEP["ShaftDia"][0] > drawing.FRONT_END_X
+    assert drawing.DETAIL_CENTER[1] + drawing._DETAIL_FENCE_R < (
+        drawing.PROFILE_KEEP["ShaftDia"][1] - 0.008
+    )
     assert drawing.PROFILE_KEEP["PinHoleDia"][1] < drawing.SHAFT_LOWER_FLANK_Y
     assert drawing.PROFILE_KEEP["PinHoleDia"][0] < drawing.FRONT_PIN_X - 0.030
 
@@ -160,18 +163,14 @@ def test_set_pin_holes_print_only_size_and_the_match_drill() -> None:
     # at most two lines of words).
     import _config
 
-    assert dt_pinion_pivot_shaft_spec.PIN_HOLE_CALLOUT.split("\n") == [
-        "MATCH-DRILL THRU AT ASSEMBLY",
-        "IN MHA-DT-14 CROSS HOLES, 2 PL",
-    ]
     pin = _config.parts("dt-vn-pinion-strap-pin")["number"]
-    assert callout == (
-        f"{dt_pinion_pivot_shaft_spec.PIN_HOLE_CALLOUT},\n"
-        f"PRESS FIT ON {pin} SPRING PIN"
-    )
-    assert "dt_drive_train_steps" not in Path(
-        dt_pinion_pivot_shaft_spec.__file__
-    ).read_text(encoding="utf-8")
+    strap = _config.parts("dt-pinion-bracket")["number"]
+    assert callout.split("\n") == [
+        f"MATCH-DRILL THRU AT ASSEMBLY IN {strap}, 2 PL",
+        f"PRESS FIT ON {pin} SPRING PIN",
+    ]
+    # Sheet text: a wording edit never re-keys the part.
+    assert not hasattr(dt_pinion_pivot_shaft_spec, "PIN_HOLE_CALLOUT")
     assert dt_pinion_pivot_shaft_spec.PIN_HOLE_DIA == 25.4 / 16.0
     assert dt_pinion_pivot_shaft_spec.PIN_HOLE_BAND == pytest.approx(
         (0.0025 * 25.4, 0.0)
