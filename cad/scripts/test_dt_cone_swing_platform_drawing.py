@@ -515,19 +515,19 @@ def test_plate_thickness_text_sits_beside_section_a_a() -> None:
 
 
 
-def _notch_caption_box() -> tuple[float, float, float, float]:
-    """The lock-notch caption, 59.7 x 4.8 mm from its upper-left anchor."""
-    x, y = drawing.NOTCH_CAPTION_UPPER_LEFT
-    return (x, y - 0.0048, x + 0.0597, y)
-
-
-def test_lock_notch_caption_sits_under_its_own_view() -> None:
-    """Centred under the notch plan, under the 7.0 arrow tip (aa9766da:
-    y 0.1276), clear of the (6.35) stock text beside section A-A."""
-    box = _notch_caption_box()
-    assert (box[0] + box[2]) / 2.0 == pytest.approx(drawing.NOTCH_CENTER[0], abs=1e-4)
-    assert box[3] <= 0.1276 - 0.0015
-    assert not _boxes_overlap(box, _plate_thickness_text_box())
+def test_plan_copies_carry_standard_labels_centred_under_their_views() -> None:
+    """Rule 9: the profile is the principal plan (no label); the hole and
+    lock-notch copies carry VIEW D / VIEW E, and none prints the sheet's 1:2."""
+    for text, (x, _y), center in (
+        (drawing.FEATURE_VIEW_LABEL, drawing.FEATURE_LABEL_UPPER_LEFT, drawing.FEATURE_CENTER),
+        (drawing.NOTCH_VIEW_LABEL, drawing.NOTCH_LABEL_UPPER_LEFT, drawing.NOTCH_CENTER),
+    ):
+        assert text in ("VIEW D", "VIEW E")
+        assert x + drawing.VIEW_LABEL_HALF_WIDTH == pytest.approx(center[0])
+    assert drawing.NOTCH_LABEL_UPPER_LEFT[1] <= 0.1276 - 0.0015
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    for prose in ("Profile View Note", "Feature View Note", "Notch View Note"):
+        assert prose not in source
 
 
 def test_section_a_a_group_stays_inside_the_border() -> None:
@@ -622,15 +622,29 @@ def test_post_screw_engagement_note_states_the_computed_exception() -> None:
     # their callout (Main, 2026-11-01).
     assert spec.POST_MOUNT_TAP_EDGE_BREAK == post_mount.PLATE_TAP_EDGE_BREAK_MM
     assert not any("BREAK" in row for row in drawing.POST_MOUNT_CALLOUT_BELOW)
-    # The note sits in the empty band above the title block (2.5 mm text,
-    # ~1.93 mm a character, 4.4 mm a line).
-    x, y = drawing.ENGAGEMENT_NOTE_XY
-    lines = spec.POST_MOUNT_ENGAGEMENT_NOTE.split("\n")
-    note = (x, y - 0.0044 * len(lines), x + max(map(len, lines)) * 0.00193, y)
-    assert note[0] > 0.2185 + 0.002  # plan caption row
-    assert note[3] <= 0.0853 - 0.004  # A-A label bottom (aa9766da render)
-    assert note[1] >= 0.066 + 0.004  # title block top
-    assert note[2] <= 0.4189 - 0.010  # border
+    assert drawing.ENGAGEMENT_NOTE == (
+        f"{drawing.ENGAGEMENT_NOTE_NUMBER}. {spec.POST_MOUNT_ENGAGEMENT_NOTE}"
+    )
+    assert (
+        f"SEE NOTE {drawing.ENGAGEMENT_NOTE_NUMBER}" in drawing.POST_MOUNT_CALLOUT_BELOW
+    )
+    # The notes sit in the empty band above the title block (2.5 mm text,
+    # ~1.93 mm a character, 4.4 mm a line), note 1 over note 2.
+    def box(text: str, upper_left: tuple[float, float]) -> tuple[float, ...]:
+        rows = text.split("\n")
+        x, y = upper_left
+        return (x, y - 0.0044 * len(rows), x + max(map(len, rows)) * 0.00193, y)
+
+    engagement = box(drawing.ENGAGEMENT_NOTE, drawing.ENGAGEMENT_NOTE_XY)
+    relief = box(drawing.RELIEF_NOTE, drawing.RELIEF_NOTE_XY_UPPER_LEFT)
+    for note in (engagement, relief):
+        assert note[0] > 0.2185 + 0.002  # plan caption row
+        assert note[2] <= 0.342 - 0.002  # A-A label
+        assert note[1] >= 0.066 + 0.004  # title block top
+    assert relief[1] >= engagement[3] - 1e-9
+    # Under the pivot bore callout's bottom row (r11 0.0926, shifted).
+    shift = drawing.PIVOT_BORE_CALLOUT_XY[1] - 0.099
+    assert (0.0926 + shift) - relief[3] > 0.00357
 
 
 # Detail B's "10.45" (12 x 5 mm, 81788ce9's "11.00") hangs outward from its
@@ -801,7 +815,7 @@ def test_holddown_band_clears_border_title_block_and_captions() -> None:
         (0.1497, 0.0805, 0.2185, 0.0853),
     )
     x, y = drawing.ENGAGEMENT_NOTE_XY
-    lines = spec.POST_MOUNT_ENGAGEMENT_NOTE.split("\n")
+    lines = drawing.ENGAGEMENT_NOTE.split("\n")
     engagement = (x, y - 0.0044 * len(lines), x + max(map(len, lines)) * 0.00193, y)
     label_x, label_y = drawing.DETAIL_LABEL_LOWER_LEFT
     cx, cy = drawing.DETAIL_CENTER
@@ -1244,7 +1258,7 @@ def test_relief_width_text_sits_between_its_neighbours() -> None:
     edge (x 0.1679 at that height).  Short lines keep the block ~34 mm wide
     at most; five of them still clear the 13.12 row above.
     """
-    lines = ("10.50", *drawing.RELIEF_WIDTH_CALLOUT.split("\n"))
+    lines = (".42", *drawing.RELIEF_WIDTH_CALLOUT.split("\n"))
     line_195, west_edge, char_w = 0.1300, 0.1679, 0.0028
 
     def block(x: float, texts) -> tuple[float, float]:
@@ -1258,14 +1272,13 @@ def test_relief_width_text_sits_between_its_neighbours() -> None:
     old_left, old_right = block(0.150, ("10.50", "TOP RELIEF", "OPEN TO NORTH EDGE"))
     assert old_left < line_195 and old_right > west_edge
     # The block stands on its shelf and grows up (aa9766da render: shelf
-    # 0.1438, 5.6 mm a line); the five lines top out under the 13.12 row's
-    # dimension line (0.1821) with 5 mm to spare.
+    # 0.1438, 5.6 mm a line), under the 13.12 row's dimension line.
+    # Rule 7/26: the width carries the feature name only; its centring on
+    # the pivot and its open end are geometry the plan shows.
     shelf, pitch, row_13_12 = 0.1438, 0.0056, 0.1821
     top = shelf + len(lines) * pitch
-    assert len(lines) == 5 and top <= row_13_12 - 0.005
-    # No compass word: sheet-down is model north (codex B2 on 68565ace).
-    assert not any(word in drawing.RELIEF_WIDTH_CALLOUT for word in ("NORTH", "SOUTH"))
-    assert "PIVOT" in drawing.RELIEF_WIDTH_CALLOUT.split("\n")[-1]
+    assert len(lines) == 2 and top <= row_13_12 - 0.005
+    assert drawing.RELIEF_WIDTH_CALLOUT == "TOP RELIEF"
 
 
 def test_crank_axis_follows_the_actual_train() -> None:
@@ -1589,12 +1602,18 @@ def test_holddown_callout_drills_in_its_thru_row_and_names_face_and_mate() -> No
     and the +-0.1 stations of detail B named no mate (rule 4)."""
     updated = drawing.holddown_callout_definitions(dict(_CBORE_PARTS))
     assert updated[5] == _CBORE_PARTS[5]
-    assert updated[7] == "DRILL <MOD-DIAM><hw-diam> THRU ALL"
+    assert updated[7] == "<MOD-DIAM><hw-diam> DRILL THRU ALL"
     assert updated[8] == "FROM UNDERSIDE\nLOCATES MHA-DT-21"
     counted = drawing.holddown_callout_definitions(
         {**_CBORE_PARTS, 7: "<NUM_INST>X <MOD-DIAM><hw-diam> THRU ALL"}
     )
-    assert counted[7] == "<NUM_INST>X DRILL <MOD-DIAM><hw-diam> THRU ALL"
+    assert counted[7] == "<NUM_INST>X <MOD-DIAM><hw-diam> DRILL THRU ALL"
+    # Rule 26: the reamed pivot reads size, process, depth.
+    pivot = drawing.pivot_callout_definitions(
+        {5: "<MOD-DIAM><hw-diam> THRU ALL", 6: "", 7: "", 8: ""}
+    )
+    assert pivot[5] == "<MOD-DIAM><hw-diam> REAM THRU ALL"
+    assert pivot[8] == "RUNNING FIT ON MHA-DT-VN-52 SHOULDER"
     # Fail closed on a layout the rewrite was not written for.
     with pytest.raises(RuntimeError, match="already prints below"):
         drawing.holddown_callout_definitions({**_CBORE_PARTS, 8: "X"})
@@ -1726,7 +1745,8 @@ def test_relief_fit_note_stands_over_section_a_a_clear_of_its_neighbours() -> No
     """Rule 7: the relief fit is flagged by a leader at the relief on A-A
     (machinist review r1 read the note under C-C as C-C's)."""
     x, y = drawing.RELIEF_NOTE_XY
-    lines = spec.PIVOT_RELIEF_FIT_REQUIREMENT.split("\n")
+    lines = drawing.RELIEF_FLAG.split("\n")
+    assert drawing.RELIEF_FLAG == f"SEE NOTE {drawing.RELIEF_NOTE_NUMBER}"
     # r2 measured the note's rows at 2.8 mm a character, ~4.2 mm a row.
     right = x + max(map(len, lines)) * 0.0028
     bottom = y - len(lines) * 0.0042
@@ -1975,9 +1995,9 @@ def test_pivot_section_is_cropped_to_its_strip_after_its_dimensions(monkeypatch)
 @pytest.mark.parametrize(
     ("accepted", "persisted", "error"),
     (
-        (True, 1, None),
-        (False, 1, "failed to set"),
-        (True, 0, "did not persist"),
+        (True, 0, None),
+        (False, 0, "failed to set"),
+        (True, 1, "did not persist"),
     ),
 )
 def test_section_line_style_refuses_a_failed_native_setting(
@@ -1990,10 +2010,10 @@ def test_section_line_style_refuses_a_failed_native_setting(
     document = types.SimpleNamespace(Extension=extension)
     monkeypatch.setattr(drawing, "_early_bound", lambda item, _interface: item)
     if error is None:
-        drawing._set_end_only_section_lines(document)
+        drawing._set_connected_section_lines(document)
     else:
         with pytest.raises(RuntimeError, match=error):
-            drawing._set_end_only_section_lines(document)
+            drawing._set_connected_section_lines(document)
 
 
 @pytest.mark.parametrize(
@@ -2045,7 +2065,7 @@ def test_pivot_callout_has_a_full_text_height_between_the_identifier_and_caption
     assert (0.0926 + shift) - 0.085 > 0.00357
 
 
-def test_pivot_section_uses_profile_station_and_native_end_only_style():
+def test_pivot_section_uses_profile_station_and_native_connected_style():
     """Pin the actual A-A dataflow, not merely the presence of 'profile'."""
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
     build = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef) and node.name == "build")
@@ -2060,7 +2080,7 @@ def test_pivot_section_uses_profile_station_and_native_end_only_style():
         node for node in build.body
         if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call)
         and isinstance(node.value.func, ast.Name)
-        and node.value.func.id == "_set_end_only_section_lines"
+        and node.value.func.id == "_set_connected_section_lines"
     )
     assert style.lineno < aa.lineno < cc.lineno
     assert ast.unparse(cc.value.args[1]) == "profile"
@@ -2078,7 +2098,8 @@ def test_pivot_section_uses_profile_station_and_native_end_only_style():
     namespace = {
         "adapter": object(), "profile": profile,
         "model_point_in_view": project, "SECTION_CENTER": drawing.SECTION_CENTER,
-        "PROFILE_CENTER": drawing.PROFILE_CENTER,
+        "PROFILE_PIVOT_XY": drawing.PROFILE_PIVOT_XY,
+        "PIVOT_SECTION_HALF_SPANS": drawing.PIVOT_SECTION_HALF_SPANS,
         "create_section_view": lambda *args, **kwargs: (args, kwargs),
     }
     selected = [
@@ -2090,39 +2111,30 @@ def test_pivot_section_uses_profile_station_and_native_end_only_style():
     args, kwargs = namespace["section"]
     assert projections == [(profile, (0.0, 0.0, 0.0))]
     assert args[1] is profile
-    assert kwargs.pop("line_start") == pytest.approx((0.029, 0.126724))
-    assert kwargs.pop("line_end") == pytest.approx((0.094, 0.126724))
+    left = drawing.PROFILE_PIVOT_XY[0] - drawing.PIVOT_SECTION_HALF_SPANS[0]
+    right = drawing.PROFILE_PIVOT_XY[0] + drawing.PIVOT_SECTION_HALF_SPANS[1]
+    assert kwargs.pop("line_start") == pytest.approx((left, 0.126724))
+    assert kwargs.pop("line_end") == pytest.approx((right, 0.126724))
     assert kwargs == {
         "view_xy": drawing.SECTION_CENTER, "section_label": "A",
         "scale": (2, 1), "label": "pivot bearing section",
     }
 
 
-def test_profile_a_a_saved_envelope_clears_post_mount_witnesses():
-    """r13/90da07a1: place the saved 6 mm end-only stubs outside the radii.
+def test_profile_a_a_line_is_whole_and_its_letters_clear_c_c():
+    """Rule 9: one connected line across the pivot end only; its letters
+    (about 6 mm wide, centred on each end) stand clear of C-C's arrows at the
+    hold-down station (x 0.058049..0.059573 and 0.083049..0.084573).
 
-    Offline envelope arithmetic only; the new saved native drawing must
-    still prove the actual section line, arrows, and attachment geometry.
+    Offline envelope arithmetic only; the saved native drawing must still
+    prove the section line, arrows and letters.
     """
-    left = drawing.PROFILE_CENTER[0] - 0.046
-    right = drawing.PROFILE_CENTER[0] + 0.019
-    stubs = ((left, left + 0.006), (right - 0.006, right))
-    old_stubs = ((0.1574343, 0.1634343), (0.1965657, 0.2025657))
-    witnesses = ((0.129, 0.1806485), (0.1806485, 0.226))
-    for old_stub, witness in zip(old_stubs, witnesses):
-        assert min(old_stub[1], witness[1]) - max(old_stub[0], witness[0]) == pytest.approx(0.006)
-    for stub in stubs:
-        for start, end in witnesses:
-            assert stub[1] < start or stub[0] > end
-    # Looking south, each end's arrow rises to its letter (31547443 render:
-    # the left end at x 0.029 printed its A over x 0.0262..0.0322).  At x
-    # 0.123 the right letter stood beside HOLE LOCATIONS' 202.84 line
-    # (x 0.1294) and read as that view's cut (machinist review, confirmed);
-    # now it stands by the plate, clear of C-C's right arrow (x 0.0834).
-    letter = (right - 0.0028, right + 0.0032)
-    assert witnesses[0][0] - letter[1] > 0.02
-    assert letter[0] - 0.0834 > 0.005
-    assert 0.1294 - (0.123 + 0.0032) < 0.005  # positive control: old end
+    left = drawing.PROFILE_PIVOT_XY[0] - drawing.PIVOT_SECTION_HALF_SPANS[0]
+    right = drawing.PROFILE_PIVOT_XY[0] + drawing.PIVOT_SECTION_HALF_SPANS[1]
+    assert left + 0.003 < 0.058049 - 0.001
+    assert right - 0.003 > 0.084573 + 0.001
+    # Across the pivot end only, not across the profile (r13: 0.029..0.094).
+    assert right - left < 0.094 - 0.029 - 0.02
 
 
 def test_profile_radius_saved_envelopes_clear_a_a_and_c_c():
@@ -2134,15 +2146,16 @@ def test_profile_radius_saved_envelopes_clear_a_a_and_c_c():
     """
     r10 = drawing.PROFILE_KEEP["CornerNER"]
     r8 = drawing.PROFILE_KEEP["CornerNWR"]
-    assert r10 == pytest.approx((0.045, 0.130))
+    assert r10 == pytest.approx((0.045, 0.1135))
     assert r8 == pytest.approx((0.137, 0.101))
     r10_box = (r10[0] - 0.0072358, r10[1] - 0.0027781,
                r10[0] + 0.0072357, r10[1] + 0.0007219)
-    left = drawing.PROFILE_CENTER[0] - 0.046
-    right = drawing.PROFILE_CENTER[0] + 0.019
-    assert r10_box[0] - (left + 0.006) > 0.002
-    # Positive control: the original profile end would nearly touch R10.
-    assert 0.0524343 - r10_box[2] < 0.002
+    left = drawing.PROFILE_PIVOT_XY[0] - drawing.PIVOT_SECTION_HALF_SPANS[0]
+    right = drawing.PROFILE_PIVOT_XY[0] + drawing.PIVOT_SECTION_HALF_SPANS[1]
+    # R10's text stands under the A-A line (y 0.126724), clear of it.
+    assert r10_box[3] < 0.126724 - 0.002
+    # Positive control: at its old station its shelf lay on that line.
+    assert abs((0.130 - 0.0027781) - 0.126724) < 0.001
 
     def ray(center, knee, radius):
         dx, dy = knee[0] - center[0], knee[1] - center[1]
@@ -2161,12 +2174,12 @@ def test_profile_radius_saved_envelopes_clear_a_a_and_c_c():
     # Positive controls: elevated shelves put rays on the wrong quadrants.
     assert 0.136 - 0.0027781 > r10_center[1]
     assert 0.142 - 0.0027781 > r8_center[1]
-    # A-A looks south: r13's sheet-down arrow envelopes mirrored about the
-    # cutting line (y 0.126724) to sheet-up.
+    # A-A looks south: each end's arrow rises from the connected line to its
+    # letter (r13's sheet-up arrow envelope, about 1.5 mm wide).
     line_y = 0.126724
     foot, head = 2 * line_y - 0.127486, 2 * line_y - 0.108374
-    aa_left = (left - 0.000762, foot, left + 0.006, head)
-    aa_right = (right - 0.006, foot, right + 0.0032523, head)
+    aa_left = (left - 0.000762, foot, left + 0.000762, head)
+    aa_right = (right - 0.000762, foot, right + 0.000762, head)
     assert not _boxes_overlap(aa_left, r10_box)
     cc_left = (0.058049, 0.131949, 0.059573, 0.143949)
     cc_right = (0.083049, 0.131949, 0.084573, 0.143949)

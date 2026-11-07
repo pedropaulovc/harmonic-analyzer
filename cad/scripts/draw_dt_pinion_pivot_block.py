@@ -48,19 +48,21 @@ from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
+import _config
 import _telemetry
 from dt_pinion_pivot_block_spec import (
     BLOCK_DEPTH,
     BLOCK_HEIGHT,
     BLOCK_WEST,
     BLOCK_WIDTH as BLOCK_WIDTH,
-    BORE_CALLOUTS,
     BORE_DIA,
     BORE_UP,
     FRONT_BBOX_CX,
     FRONT_BBOX_CY,
     LIFT_BORE_RISE,
     LIFT_BORE_SPACING,
+    LIFT_ROD_MATE,
+    PIVOT_SHAFT_MATE,
     SCREW_HALF_SPACING,
     SCREW_HOLE_CALLOUT_PRECISION,
     SCREW_HOLE_DIA,
@@ -165,17 +167,27 @@ FRONT_KEEP = {
 }
 RIGHT_KEEP = {"Depth": (RIGHT_CENTER[0], FRONT_TOP_Y + 0.00925)}
 TOP_KEEP = {}
-DIMENSION_CALLOUTS = dict(BORE_CALLOUTS)
-# One line ABOVE the lift-bore spacing (a multi-line above-callout does not
-# print): machinist review r2 (#1014) asked the sheet to say why the
-# bore-to-bore spacing is held from the pivot bore instead of the edges -- the
-# lift rod's eccentric cam must clear the strap's pivot end cap (X) and hover
-# over the follower stud at park (Y) (dt_pinion_pivot_block_geometry).  The
-# rise prints three places too, so it names its function as well (#2106
-# final review: a bare .085 read as over-specified).
-ABOVE_CALLOUTS = {
-    "LiftBoreX": "SETS LIFT CAM CLEARANCE AND PARK GAP",
-    "LiftBoreCz": "SETS PARK GAP",
+# Each reamed bore: size, then process, then at most two rows of words
+# (rule 7; rule 26 size-process-depth order).  The lift bore's .728/.085
+# locations from the pivot bore carry value and band only; their one reason
+# and its mates ride the lift-bore callout by drawing number (rule 4): the
+# lift rod's eccentric cam MHA-DT-23 parks just clear of the follower pin
+# MHA-DT-25 (dt_pinion_pivot_block_geometry; build_dt_drive_train_assembly
+# park-gap band).  The rod's title gives way to that row: the drawing number
+# names the mate.
+CAM_NUMBER = _config.parts("dt-pinion-cam")["number"]
+FOLLOWER_PIN_NUMBER = _config.parts("dt-pinion-cam-pin")["number"]
+DIMENSION_CALLOUTS = {
+    "PivotBoreDia": "\n".join(
+        ("REAM THRU", f"RUNNING FIT ON {PIVOT_SHAFT_MATE[0]}", PIVOT_SHAFT_MATE[1])
+    ),
+    "LiftBoreDia": "\n".join(
+        (
+            "REAM THRU",
+            f"RUNNING FIT ON {LIFT_ROD_MATE[0]}",
+            f"PARK GAP {CAM_NUMBER} TO {FOLLOWER_PIN_NUMBER}",
+        )
+    ),
 }
 # Front-view locations that start at the pivot bore: name -> the sheet axis
 # each measures along (0 = x, 1 = y).
@@ -304,7 +316,6 @@ async def build(adapter: Any) -> dict[str, str]:
         [*front_annotations, *top_annotations, *right_annotations],
         DIMENSION_CALLOUTS,
     )
-    set_dimension_callouts(adapter, front_annotations, ABOVE_CALLOUTS, location="above")
     for name, axis in PIVOT_ORIGIN_DIMENSIONS.items():
         _set_dimension_origin(
             adapter,
@@ -354,13 +365,13 @@ async def build(adapter: Any) -> dict[str, str]:
         _front_x(SCREW_HALF_SPACING),
         TOP_CENTER[1] + SCREW_R_SHEET,
     )
+    # Size first, then depth (rule 26): no process prefix.
     screw_callout = add_native_hole_callout(
         adapter,
         top,
         edge_xy=east_screw_edge,
         callout_xy=(0.245, 0.250),
         label="hold-down screw hole",
-        process="DRILL",
     )
     # This render-time precision write is the declared exception RV-01 in
     # cad/config/parts/dt-pinion-pivot-block.yaml (delegated ruling
@@ -412,7 +423,7 @@ async def build(adapter: Any) -> dict[str, str]:
         char_height=0.0025,
     )
 
-    # The sheet carries no general notes (BORE_CALLOUTS); only the isometric's
+    # The sheet carries no general notes (DIMENSION_CALLOUTS); only the isometric's
     # scale override is labelled.
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
