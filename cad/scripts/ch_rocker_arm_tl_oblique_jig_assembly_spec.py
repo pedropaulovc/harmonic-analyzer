@@ -1808,8 +1808,12 @@ ASSEMBLY_STEPS = (
     "TIGHTEN THE HOLD-DOWN NUTS AND READ EACH STATION AGAIN. SET EACH SWEEP "
     "LIMIT (SHEET 1) THE SAME WAY, CENTRING IN X ONLY, AND WITNESS-MARK EACH "
     "BAR AT ITS CARRIAGE'S SPINDLE-END FACE, I OR O BY PASS.",
-    f"7. CHECK EACH KP08 {_item(PILLOW_BLOCK)} FOOT IS AT LEAST "
-    f"{_bound(end_bracket.KP08_FOOT_THICK_MIN, 3, up=True)} THICK AT ITS 2 HOLES. "
+    # The foot (UNVERIFIED, #2184) between TL-28's two bounds: no thinner,
+    # so the 5/8's tip stays clear of the bar screw's thread; no thicker, so
+    # its full thread holds 1.5 D (end_bracket.KP08_FOOT_THICK_MIN/MAX).
+    f"7. CHECK EACH KP08 {_item(PILLOW_BLOCK)} FOOT IS "
+    f"{_bound(end_bracket.KP08_FOOT_THICK_MIN, 3, up=True)} TO "
+    f"{_bound(end_bracket.KP08_FOOT_THICK_MAX, 3, up=False)} THICK AT ITS 2 HOLES. "
     f"FIT EACH KP08 WITH 2 {_KP08_SCREW} {_item(PILLOW_BLOCK_SCREW)}, LOOSE.",
     # TL-00 review (farm 20261104T210601055Z, blocker): one linear order,
     # every cross-reference one way: F1A, 8A, F1B, F2, 8B, F3.

@@ -20,7 +20,7 @@ import export_features
 from _drawing_contract import model_toleranced_dimensions
 from _hole_spec import THREAD_MAJOR_MM
 from _inch_wall_limits import WALL_TARGET_MM
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import printed_band_mm, printed_deviations
 
 STEM = "ch_rocker_arm_tl_oblique_end_bracket"
 ARTIFACT = "ch-rocker-arm-tl-oblique-end-bracket"
@@ -299,6 +299,98 @@ def test_least_kp08_foot_is_set_by_both_threads_and_rounded_up() -> None:
     assert spec.KP08_REACH_MAX + spec.BAR_THREAD_LIMITS[1] + spec.TAP_LEAD <= (
         spec.THICK_MIN
     )
+
+
+def test_thickest_kp08_foot_keeps_the_kp08_screw_at_one_and_a_half_d() -> None:
+    # Coordinator gate (post-cap #2237): the receipt check took any foot over
+    # .196. A thicker foot takes the 5/8's engagement off one for one, so the
+    # same check's upper bound is the foot at which its worst-case full thread
+    # is still 1.5 D, rounded DOWN to .001. #2184: the foot stays UNVERIFIED.
+    major = THREAD_MAJOR_MM[spec.SCREW]
+    exact = (
+        leadscrew.full_thread_min(leadscrew.KP08_SCREW_LENGTH, 0.0, spec.SCREW)
+        - 1.5 * major
+    )
+    printed = math.floor(exact / 25.4 * 1000.0 + 1e-9) / 1000.0
+    assert spec.KP08_FOOT_THICK_MAX == pytest.approx(printed * 25.4)
+    assert round(spec.KP08_FOOT_THICK_MAX / 25.4, 3) == 0.292
+    assert spec.KP08_FOOT_THICK_MAX <= exact
+    full = leadscrew.full_thread_min(
+        leadscrew.KP08_SCREW_LENGTH, spec.KP08_FOOT_THICK_MAX, spec.SCREW
+    )
+    assert full >= 1.5 * major
+    assert (
+        spec.KP08_FOOT_THICK_MIN
+        < leadscrew.KP08_FOOT_THICK
+        < spec.KP08_FOOT_THICK_MAX
+    )
+    # A thicker foot only shortens the 5/8's reach: the windows, taken on the
+    # least foot, still hold.
+    assert spec.KP08_SCREW_LENGTH_MM - spec.KP08_FOOT_THICK_MAX < spec.KP08_REACH_MAX
+
+
+def test_three_place_depths_are_set_by_the_opposed_screws() -> None:
+    # Machinist review 0c3ed35988 read .436/.491 as unexplained three places.
+    # Each window runs from its own screw's deepest reach (full thread) to
+    # the other face's thread and tap lead short of the other screw: the tip
+    # gap less one lead, .0125 wide. A .XX band spans .020, so no two-place
+    # depth fits; the central untapped band staying positive is not the test.
+    width = spec.SCREW_TIP_GAP_MIN - spec.TAP_LEAD
+    assert spec.DEPTH_WINDOW_WIDTH == pytest.approx(width)
+    assert width == pytest.approx(0.317, abs=1e-3)
+    for lo, hi in (spec.BAR_THREAD_WINDOW, spec.KP08_THREAD_WINDOW):
+        assert hi - lo == pytest.approx(width)
+    two = sum(abs(d) for d in printed_deviations(spec.BAR_THREAD_DEPTH, 2, unit=spec.UNIT))
+    three = sum(
+        abs(d) for d in printed_deviations(spec.BAR_THREAD_DEPTH, 3, unit=spec.UNIT)
+    )
+    assert two == pytest.approx(0.508) and three == pytest.approx(0.254)
+    assert three <= width < two
+    # The counterfactual roundings: .49 ±.01 and .44 ±.01 each leave their
+    # window (the bar's both ways, the KP08's past the bar screw's reach).
+    bar_low, bar_high = spec._limits(spec.BAR_THREAD_DEPTH, 2)
+    kp08_low, kp08_high = spec._limits(spec.KP08_THREAD_DEPTH, 2)
+    assert bar_low < spec.BAR_THREAD_WINDOW[0]
+    assert bar_high > spec.BAR_THREAD_WINDOW[1]
+    assert kp08_high > spec.KP08_THREAD_WINDOW[1]
+    # The sheet names that function beside the depth, in plain words.
+    text = spec.CALLOUTS_BELOW[spec.BAR_THREAD_DEPTH_DIMENSION]
+    assert text.split("\n") == [
+        "FULL THREAD FROM BOTTOM",
+        "BOTH HOLES",
+        "EACH SCREW TIP IN FULL",
+        "THREAD, SHORT OF THE",
+        "OTHER FACE'S TAP LEAD",
+    ]
+
+
+def test_section_draws_both_threads_solid_with_the_witness_on_the_thread() -> None:
+    # Machinist review 0c3ed35988: A-A drew only the top thread, dashed, and
+    # the .491's witness started in the plain bore. Both faces' threads on
+    # both holes are imported and moved to a thin continuous layer; the
+    # depth's reference points stand on the outer hole's major diameter.
+    assert drawing.SECTION_THREAD_INSTANCES == 2 * len(spec.HOLE_X) == 4
+    sheet = Path(drawing.__file__).read_text(encoding="utf-8")
+    body = sheet[sheet.index("async def build") :]
+    assert body.index("_require_bar_thread_depth(section)") < body.index(
+        "_section_threads_on_visible_layer(adapter, section)"
+    )
+    assert body.index("_section_threads_on_visible_layer(adapter, section)") < body.index(
+        "finalize_drawing("
+    )
+    assert spec.THREAD_MAJOR == THREAD_MAJOR_MM[spec.SCREW]
+    assert spec.BAR_THREAD_WITNESS_X == pytest.approx(
+        spec.HOLE_X[-1] + THREAD_MAJOR_MM[spec.SCREW] / 2.0
+    )
+    # On the outer-end side, where the depth's text stands.
+    assert spec.HOLE_X[-1] < spec.BAR_THREAD_WITNESS_X < spec.BRACKET_LENGTH
+    builder = Path(part.__file__).read_text(encoding="utf-8")
+    assert '("ThreadMajor", THREAD_MAJOR)' in builder
+    assert (
+        'thread_ref.record("BarThreadStation", f\'"HoleX{len(HOLE_X)}" + '
+        '"ThreadMajor" / 2\')'
+    ) in builder
+    assert "_add_point(adapter, (witness_x, -BAR_THREAD_DEPTH)" in builder
 
 
 def test_each_face_is_plug_started_bottoming_finished_with_a_bounded_tap_point() -> None:
