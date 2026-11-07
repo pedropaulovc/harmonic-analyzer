@@ -318,8 +318,23 @@ if HOLDDOWN_LEDGE_RANGE[0] < WALL_TARGET_MM:
 # hole's own +/-.004 band (HOLDDOWN_STATION_TOL_MM's), which the webs to the
 # counterbore here and to the block's +X face need (the general .XXX band
 # closes neither at the .080 wall target).
+#
+# Why the controlling station stays chained to the hold-down hole, with the
+# pivot-bore axis station printed only as a REF (machinist review of round
+# 6, #6; delegated ruling 2026-11-07, option A): the two webs that close on
+# the dowel-to-hold-down distance have almost no margin.  At print-worst
+# with the chained +/-.004, the plate's web to the Ø.219 hold-down
+# counterbore clears the .080 wall target by +.0003 in, and MHA-DT-21's web
+# from the foot ream to its +X face by +.0008 in (the foot's hole lands
+# within this band plus the screw's .006 float, .010, from its tap).
+# Located from the pivot at +/-.004 instead, with HoldDownX also +/-.004 from
+# the pivot, the dowel-to-hold-down distance takes both bands (+/-.008): the
+# counterbore web falls to -.0037 in, and the foot's landing band grows to
+# .014, its +X face web to about -.0032 in.  No DOWEL_FROM_TAP closes both
+# (the window is short by about .007 in), so the pivot-axis station prints
+# as a reference, TIP_DOWEL_LOCAL_X, and the chained station controls.
 TIP_DOWEL_FROM_HOLDDOWN = dt_cone_tip_block_spec.DOWEL_FROM_TAP  # .228
-TIP_DOWEL_LOCAL_X = HOLDDOWN_LOCAL_X + TIP_DOWEL_FROM_HOLDDOWN
+TIP_DOWEL_LOCAL_X = HOLDDOWN_LOCAL_X + TIP_DOWEL_FROM_HOLDDOWN  # .188 REF
 TIP_DOWEL_LOCAL_Z = HOLDDOWN_LOCAL_Z
 TIP_DOWEL_STATION_TOL_MM = 0.1016  # +/-.004
 # Slip fit over the pin, reamed: .0630 REAM_H7 (.0630/.0635) over the pin's

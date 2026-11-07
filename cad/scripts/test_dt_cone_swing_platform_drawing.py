@@ -833,6 +833,7 @@ def test_holddown_band_clears_border_title_block_and_captions() -> None:
         "10.45": _holddown_z_text_box(),
         "1.00 ±0.1": _holddown_x_text_box(),
         ".228 ±.004": _tip_dowel_x_text_box(),
+        "(.188)": _tip_dowel_pivot_x_text_box(),
         "tip dowel ream": _tip_dowel_callout_box(),
         "C-C strip": _holddown_strip(),
         "C-C label": _holddown_label(),
@@ -854,6 +855,7 @@ def test_holddown_band_clears_border_title_block_and_captions() -> None:
     own = {
         ("detail outline", "1.00 ±0.1"),
         ("detail outline", ".228 ±.004"),
+        ("detail outline", "(.188)"),
         ("detail outline", "tip dowel ream"),
         ("C-C strip", "C-C UNDERSIDE"),
     }
@@ -879,7 +881,15 @@ def test_holddown_band_clears_border_title_block_and_captions() -> None:
     inset = 0.002
     padded = _holddown_padded_outline()
     inner = (padded[0] + inset, padded[1] + inset, padded[2] - inset, padded[3] - inset)
-    for name in ("10.45", "1.00 ±0.1", ".228 ±.004", "tip dowel ream", "detail label", "C-C label"):
+    for name in (
+        "10.45",
+        "1.00 ±0.1",
+        ".228 ±.004",
+        "(.188)",
+        "tip dowel ream",
+        "detail label",
+        "C-C label",
+    ):
         assert not _boxes_overlap(ours[name], inner), name
     assert padded[2] < title_block[0] + 0.0015
     assert padded[0] > outline[2] - 0.0015
@@ -1318,53 +1328,135 @@ def test_tip_dowel_web_guard_refuses_a_dowel_that_crowds_the_counterbore(
         _exec_mutated(checks, {})
 
 
-def test_tip_dowel_ream_callout_says_it_is_made_at_assembly() -> None:
-    """The lift rod's precedent: modelled at its nominal station, located on
-    the part sheet; the callout stands alone for the assembly step's one
-    "PER THEIR CALLOUTS" line: reamed through with the block on, after
-    MHA-DT-21's ream, at that step."""
+def test_tip_dowel_ream_callout_flags_its_fit_note() -> None:
+    """Machinist review of round 6, #7: the slip ream states its fit and the
+    part it takes, by drawing number, and when it is match-reamed.  Under the
+    banded size the callout keeps two rows, the process and the flag to
+    note 1; the note carries the fit, MHA-DT-VN-69, and the match-ream at
+    the assembly step after MHA-DT-21's ream (the step's own "PER THEIR
+    CALLOUTS" points here)."""
     import dt_drive_train_steps
 
     callout = drawing.TIP_DOWEL_CALLOUT
     assert callout.split("\n") == [
         "MATCH-REAM THRU",
-        "AFTER MHA-DT-21,",
-        dt_drive_train_steps.step_ref("post-and-tip-block"),
+        f"SEE NOTE {drawing.TIP_DOWEL_NOTE_NUMBER}",
     ]
-    assert drawing_spec.DRAWING_DIMENSIONS["TipDowelProfile"] == {"TipDowelX", "TipDowelDia"}
-    assert drawing_spec.DRAWING_PRECISION["TipDowelProfile"] == {"TipDowelX": 3, "TipDowelDia": 4}
+    note = drawing.TIP_DOWEL_NOTE
+    rows = note.split("\n")
+    assert len(rows) == 2
+    assert rows[0].startswith(f"{drawing.TIP_DOWEL_NOTE_NUMBER}. ")
+    assert rows[1].startswith("   ")
+    assert max(map(len, rows)) <= drawing.TIP_DOWEL_NOTE_WIDTH
+    flat = " ".join(row.strip() for row in rows)
+    step = dt_drive_train_steps.step_ref("post-and-tip-block")
+    for phrase in (
+        "SLIP FIT FOR MHA-DT-VN-69",
+        f"MATCH-REAM THRU AT {step}, AFTER THE MHA-DT-21 REAM",
+    ):
+        assert phrase in flat, phrase
+    assert drawing_spec.DRAWING_DIMENSIONS["TipDowelProfile"] == {
+        "TipDowelX",
+        "TipDowelPivotX",
+        "TipDowelDia",
+    }
+    assert drawing_spec.DRAWING_PRECISION["TipDowelProfile"] == {
+        "TipDowelX": 3,
+        "TipDowelPivotX": 3,
+        "TipDowelDia": 4,
+    }
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert (
         'set_dimension_callouts(adapter, detail_annotations, {"TipDowelDia": TIP_DOWEL_CALLOUT})'
         in source
     )
-    # Each row fits the block the layout reserves, at this sheet's measured
-    # callout text (the relief callout: 2.8 mm a glyph, 5.6 mm a row).
-    rows = callout.split("\n")
-    assert max(map(len, rows)) * 0.0028 <= drawing.TIP_DOWEL_CALLOUT_SIZE[0]
-    assert (1 + len(rows)) * 0.0056 <= drawing.TIP_DOWEL_CALLOUT_SIZE[1] + 1e-9
+    assert "_add_sized_note(\n        adapter,\n        TIP_DOWEL_NOTE," in source
+    # Each row fits the block the layout reserves, at the r6 render's
+    # measured callout text (2.87 mm a glyph; 5.45 mm a row, the size row
+    # with its stacked band 8.4 mm, the underline 1.7 mm under the last row).
+    assert max(map(len, callout.split("\n"))) * 0.00287 <= drawing.TIP_DOWEL_CALLOUT_SIZE[0]
+    rows_height = 0.0017 + 0.0084 + (len(callout.split("\n")) - 1) * 0.00545 + 0.0036
+    assert rows_height <= drawing.TIP_DOWEL_CALLOUT_SIZE[1] + 1e-9
+
+
+def test_tip_dowel_note_stands_in_the_band_over_the_title_block() -> None:
+    """Measured on the r6 render: the title block's top line at 0.0648, the
+    engagement note's ink from 0.0760 up, and A-A's SCALE 2:1 from x 0.332.
+    The note's first row inks 3.47 mm (the engagement note's), each further
+    row 4.4 mm."""
+    x, y = drawing.TIP_DOWEL_NOTE_XY
+    rows = drawing.TIP_DOWEL_NOTE.split("\n")
+    bottom = y - 0.00347 - (len(rows) - 1) * drawing.TIP_DOWEL_NOTE_ROW_HEIGHT
+    right = x + max(map(len, rows)) * drawing.TIP_DOWEL_NOTE_GLYPH_WIDTH
+    assert x == drawing.ENGAGEMENT_NOTE_XY[0]
+    assert y <= 0.0760 - 0.0015
+    assert bottom >= 0.0648 + 0.0015
+    assert x > 0.2185 + 0.002  # plan caption row
+    assert right < 0.4191 - 0.002  # the sheet's inner border
+    # Under A-A's SCALE 2:1 (ink 0.0760..0.0795 from x 0.332) by the same air.
+    assert drawing.TIP_DOWEL_NOTE_CHAR_HEIGHT == 0.0025
 
 
 def test_build_cuts_the_tip_dowel_ream_on_a_named_axis() -> None:
     banded = model_toleranced_dimensions(part)
     assert banded[("TipDowelProfile", "TipDowelX")] == "TIP_DOWEL_STATION_TOL_MM"
     assert banded[("TipDowelProfile", "TipDowelDia")] == "*deviations(TIP_DOWEL_HOLE_BAND)"
+    # Round 6, #6: the pivot-axis station is a reference, no band.
+    assert ("TipDowelProfile", "TipDowelPivotX") not in banded
     source = Path(part.__file__).read_text(encoding="utf-8")
     for needed in (
         'name_last_feature(adapter, "TipDowelHole")',
         'name_last_feature(adapter, "tip dowel axis")',
         '("tip dowel axis", "AXIS")',
         'dims.record("TipDowelX", \'"TipDowelFromHoldDown"\')',
+        'dims.record("TipDowelPivotX", \'"TipDowelFromHoldDown" - "HoldDownLateral"\')',
+        'await anchor_point_to_origin(adapter, f"{circle}.center", *centre,',
     ):
         assert needed in source, needed
+    # The equations put the REF station where the spec does.
+    assert spec.TIP_DOWEL_FROM_HOLDDOWN - abs(spec.HOLDDOWN_LOCAL_X) == pytest.approx(
+        spec.TIP_DOWEL_LOCAL_X
+    )
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'dimension_name(adapter, item) == "TipDowelPivotX"' in drawing_source
+    assert "set_reference_dimension(\n        adapter, tip_dowel_pivot[0]" in drawing_source
+
+
+def test_tip_dowel_stays_chained_for_the_stack() -> None:
+    """Round 6, #6, delegated ruling 2026-11-07 (option A): from the pivot at
+    +/-.004, with HoldDownX's own +/-.004, the dowel-to-hold-down distance
+    takes both bands, and the plate's counterbore web and MHA-DT-21's +X
+    face web both fall under the wall target; the chained station holds
+    both, so it controls and the pivot-axis station is a reference."""
+    web = checks.TIP_DOWEL_WEBS["hold-down counterbore (underside)"]
+    assert web >= WALL_TARGET_MM
+    assert web - spec.HOLDDOWN_STATION_TOL_MM < WALL_TARGET_MM
+    from_pivot_band = (
+        spec.TIP_DOWEL_STATION_TOL_MM + spec.HOLDDOWN_STATION_TOL_MM + spec.TIP_HOLDDOWN_SCREW_FLOAT_MM
+    )
+    plus_x = block.WORST_DOWEL_WEBS_MM["+X face"]
+    assert plus_x >= WALL_TARGET_MM - 1e-6
+    assert plus_x - (from_pivot_band - block.DOWEL_X_TOL_MM) < WALL_TARGET_MM
+
+
+def _tip_dowel_pivot_x_text_box() -> tuple[float, float, float, float]:
+    """TipDowelPivotX's text frame, as HoldDownX's: centred on the keep x and
+    standing on its dimension line."""
+    x, y = drawing.DETAIL_KEEP["TipDowelPivotX"]
+    w, h = drawing.TIP_DOWEL_PIVOT_X_TEXT_SIZE
+    line_y = y - drawing.HOLDDOWN_X_LINE_DROP
+    return (x - w / 2.0, line_y, x + w / 2.0, line_y + h)
 
 
 def test_tip_dowel_texts_stand_off_detail_b_circle() -> None:
-    """Both new texts stand outside detail B's circle (HoldDownX's rule), and
-    the ream's leader from its value row reaches the rim east of TipDowelX's
-    dowel witness, so it crosses neither that witness nor the line."""
+    """The new texts stand outside detail B's circle (HoldDownX's rule).  The
+    pivot-axis REF station takes HoldDownX's former band under the hold-down
+    hole and HoldDownX drops a text height, so the REF's dowel witness ends
+    above HoldDownX's line and crosses no dimension line.  The ream's leader
+    leaves its underline's left end (r6 render) and reaches the rim east of
+    the dowel's witnesses, under TipDowelX's line and over the REF text."""
     cx, cy = drawing.DETAIL_CENTER
-    for box in (_tip_dowel_x_text_box(), _tip_dowel_callout_box()):
+    for box in (_tip_dowel_x_text_box(), _tip_dowel_callout_box(), _tip_dowel_pivot_x_text_box()):
         for corner_x in (box[0], box[2]):
             for corner_y in (box[1], box[3]):
                 assert (
@@ -1373,19 +1465,29 @@ def test_tip_dowel_texts_stand_off_detail_b_circle() -> None:
                 )
     assert _tip_dowel_x_text_box()[2] < drawing.DETAIL_HOLDDOWN_X
     assert _tip_dowel_x_text_box()[1] > _holddown_z_text_box()[3]
-    assert _tip_dowel_callout_box()[1] > _holddown_x_text_box()[3]
+    pivot_text = _tip_dowel_pivot_x_text_box()
+    assert _tip_dowel_callout_box()[1] >= pivot_text[3] + 0.0015 - 1e-9
+    assert pivot_text[1] >= _holddown_x_text_box()[3] + 0.0011 - 1e-9
     s = drawing._DETAIL_S
     dowel = (drawing.DETAIL_TIP_DOWEL_X, drawing.DETAIL_HOLDDOWN_Y)
     assert dowel[0] - cx == pytest.approx(spec.TIP_DOWEL_LOCAL_X * s)
-    box = _tip_dowel_callout_box()
-    start = (box[0], box[3] - drawing.TIP_DOWEL_CALLOUT_SIZE[1] / 8.0)
-    run = math.dist(start, dowel)
     r = spec.TIP_DOWEL_HOLE_DIA / 2.0 * s
+    # The REF's dowel witness overshoots its line by 1.3 mm and stops short
+    # of HoldDownX's line; HoldDownX's line clears the top relief's crown.
+    assert drawing.TIP_DOWEL_PIVOT_X_LINE_Y - 0.0013 > drawing.HOLDDOWN_X_LINE_Y + 0.001
+    crown = drawing.DETAIL_PIVOT_Y + spec.PIVOT_BEARING_RELIEF_DIAMETER / 2.0 * s
+    assert drawing.HOLDDOWN_X_LINE_Y > crown + 0.001
+    # The REF line passes 1.1 mm under the hold-down's rim, as HoldDownX's did.
+    rim = drawing.DETAIL_HOLDDOWN_Y - spec.HOLDDOWN_CLEARANCE_DIA / 2.0 * s
+    assert drawing.TIP_DOWEL_PIVOT_X_LINE_Y == pytest.approx(rim - 0.0011)
+    box = _tip_dowel_callout_box()
+    start = (box[0], box[1])
+    run = math.dist(start, dowel)
     tip = tuple(d + (a - d) / run * r for a, d in zip(start, dowel))
     assert tip[0] > dowel[0] + 0.0001
-    line_y = drawing.TIP_DOWEL_X_LINE_Y
-    at_line = start[0] + (tip[0] - start[0]) * (start[1] - line_y) / (start[1] - tip[1])
-    assert at_line > dowel[0] + 0.0034  # past an outside arrow's tail
+    assert max(start[1], tip[1]) < drawing.TIP_DOWEL_X_LINE_Y - 0.001
+    assert min(start[1], tip[1]) > pivot_text[3]
+    assert start[0] < pivot_text[0]
 
 
 def test_relief_width_text_sits_between_its_neighbours() -> None:

@@ -58,10 +58,7 @@ from _sketch import (
 from _sketch_circle import define_circle
 from _sketch_rectangle import define_centered_rectangle
 from _drawing_precision import apply_drawing_precision
-from _drawing_tolerances import (
-    set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
-)
+from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _fit_deviations import deviations
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from dt_cone_tip_block_spec import (
@@ -79,7 +76,7 @@ from dt_cone_tip_block_spec import (
     DOWEL_HOLE_DEPTH,
     DOWEL_HOLE_DIA,
     DOWEL_HOLE_PLACES,
-    DOWEL_X_TOL_MM,
+    DOWEL_X,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     FOOT_BORE_DIA,
@@ -599,21 +596,23 @@ async def build(adapter) -> dict[str, str]:
         dimension_name="FootTapZ",
         drive_expression='"FootTapZ"',
     )
-    # The locating dowel's station from the foot tap, on the tap's line
-    # (rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample,
-    # PR #2248)): the hole is drilled from MHA-DT-20, so this
-    # is where it lands, inside the explicit band set below.
+    # The locating dowel's station from the -X face, on the tap's line, a
+    # baseline from FootTapX's datum (rule-23 retention, owner ruling
+    # 2026-11-07 (MHA-DT-00 rubric sample, PR #2248); machinist review of
+    # round 6, #9).  The hole is match-drilled from MHA-DT-20, so the drawing
+    # prints it as a reference with no band; DOWEL_FROM_TAP stays the
+    # relation the cut is placed by.
     await _author_reference_dimension(
         adapter,
         plane="Top",
-        start=(FOOT_TAP_OFFSET_X, 0.0),
+        start=(DATUM_FACE_X, 0.0),
         end=(FOOT_TAP_OFFSET_X + DOWEL_FROM_TAP, 0.0),
         orientation="horizontal",
         dimension_type="horizontal_distance",
-        value_mm=DOWEL_FROM_TAP,
+        value_mm=DOWEL_X,
         feature_name="DowelXReference",
         dimension_name="DowelX",
-        drive_expression='"DowelFromTap"',
+        drive_expression='"FootTapX" + "DowelFromTap"',
     )
     # The width may only come in from its nominal (the +X face's containment
     # over the plate's west edge, dt_cone_tip_block_spec.BLOCK_WIDTH_BAND).
@@ -625,22 +624,13 @@ async def build(adapter) -> dict[str, str]:
         places=BLOCK_WIDTH_PLACES,
         display_unit=UNIT,
     )
-    # The dowel's press ream carries its REAM_H7 at four places, and its
-    # station from the tap the platform's band plus the hold-down screw's
-    # float (dt_cone_tip_block_spec.DOWEL_X_TOL_MM).
+    # The dowel's press ream carries its REAM_H7 at four places.
     set_dimension_bilateral_tolerance(
         adapter,
         "DowelProfile",
         "DowelHoleDia",
         *deviations(DOWEL_HOLE_BAND),
         places=DOWEL_HOLE_PLACES,
-        display_unit=UNIT,
-    )
-    set_dimension_symmetric_tolerance(
-        adapter,
-        "DowelXReference",
-        "DowelX",
-        DOWEL_X_TOL_MM,
         display_unit=UNIT,
     )
     # Model-owned places are applied only after the reference sketches exist.

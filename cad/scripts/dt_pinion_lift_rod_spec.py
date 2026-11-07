@@ -327,14 +327,8 @@ PIN_HOLE_CALLOUT = "\n".join(
     )
 )
 # drawing-guidelines.md rule 4: the three-place flat sizes name the mate, and
-# one AcrossFlat governs both flats in one plane (ch_pivot_shaft_spec's
-# "IN LINE, ONE SIDE"); the stations say which end they read from.
-ACROSS_FLAT_CALLOUT = "\n".join(
-    (
-        "SET SCREW FLATS FOR",
-        f"2X {CAM_NUMBER},",
-        "IN LINE, ONE SIDE",
-    )
-)
-FLAT_STATION_CALLOUT = "FROM CROWN RIM"
+# one AcrossFlat governs both flats in one plane.  One line under the value
+# (rule 7, round-6 review #2): VIEW B shows the flats in line on one side, and
+# the stations' extension lines land on the crown rim, so no words say either.
+ACROSS_FLAT_CALLOUT = f"SET SCREW FLATS FOR 2X {CAM_NUMBER}"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"

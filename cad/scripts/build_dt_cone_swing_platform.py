@@ -364,13 +364,22 @@ async def _sketch_tip_dowel(adapter, dims: SketchDims) -> None:
     """The tip-block locating dowel's slip ream, on the Top plane.
 
     Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
-    #2248).  A point on the hold-down hole's centre is
-    anchored to the pivot like the hole's own placement; the ream's centre is
-    dimensioned from that point (TipDowelX, the printed station: rule 10,
-    from a real feature) and held on the hold-down line by relation.  Sketch
-    (x, y) -> part (X, -Z).  Both entities go straight into the sketch DB, so
-    inference cannot snap the circle onto the point's line.
+    #2248).  The ream's centre is anchored to the pivot (the sketch origin):
+    TipDowelPivotX across, the drawing's REF station from the pivot-bore
+    axis (machinist review of round 6, #6), and the hold-down's own offset
+    along.  A point on the hold-down hole's centre is then held on the
+    ream's line by relation and dimensioned from it (TipDowelX, the
+    controlling printed station: rule 10, from a real feature; the stack
+    reason is at dt_cone_swing_platform_spec.TIP_DOWEL_STATION_TOL_MM).  Both
+    drive from the same globals, so the point lands on the hold-down hole's
+    centre.  Sketch (x, y) -> part (X, -Z).  Both entities go straight into
+    the sketch DB, so inference cannot snap the circle onto the point's line.
     """
+    # TipDowelPivotX drives as TipDowelFromHoldDown less HoldDownLateral (the
+    # hold-down's unsigned offset): true only with the hold-down east of the
+    # pivot and the ream west of it.
+    if not HOLDDOWN_LOCAL_X < 0.0 < TIP_DOWEL_LOCAL_X:
+        raise ValueError("the tip dowel's pivot-axis station no longer spans the pivot")
     hold_down = (HOLDDOWN_LOCAL_X, -HOLDDOWN_LOCAL_Z)
     centre = (TIP_DOWEL_LOCAL_X, -TIP_DOWEL_LOCAL_Z)
     sketch_manager = _early_bound(adapter.currentSketchManager, "ISketchManager")
@@ -387,8 +396,8 @@ async def _sketch_tip_dowel(adapter, dims: SketchDims) -> None:
     finally:
         sketch_manager.AddToDB = previous
     anchor = adapter._register_sketch_entity("Point", point)
-    await anchor_point_to_origin(adapter, anchor, *hold_down, "tip dowel hold-down point")
-    dims.record("TipDowelRefX", '"HoldDownLateral"')
+    await anchor_point_to_origin(adapter, f"{circle}.center", *centre, "tip dowel ream centre")
+    dims.record("TipDowelPivotX", '"TipDowelFromHoldDown" - "HoldDownLateral"')
     dims.record("TipDowelRefZ", '"HoldDownOffset"')
     await anchor_point_to_point(
         adapter,

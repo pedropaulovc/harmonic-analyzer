@@ -187,10 +187,15 @@ def test_the_flats_take_the_fulcrum_shafts_depth_and_name_their_mate() -> None:
     )
     assert spec.CAM_NUMBER == _config.parts("dt-pinion-cam")["number"]
     assert f"2X {spec.CAM_NUMBER}" in spec.ACROSS_FLAT_CALLOUT
-    assert "IN LINE, ONE SIDE" in spec.ACROSS_FLAT_CALLOUT
+    # Round-6 review #2 (rule 7): one line of words under the value; VIEW B
+    # shows the flats in line on one side.
+    assert spec.ACROSS_FLAT_CALLOUT == f"SET SCREW FLATS FOR 2X {spec.CAM_NUMBER}"
     assert drawing.DIMENSION_CALLOUTS["AcrossFlat"] == spec.ACROSS_FLAT_CALLOUT
-    for name in ("FrontFlatFromRim", "BackFlatFromRim"):
-        assert drawing.DIMENSION_CALLOUTS[name] == "FROM CROWN RIM"
+    # Round-6 review #3: location dimensions carry only value and band; their
+    # extension lines land on the crown rim and the flat end.
+    for name in ("FrontFlatFromRim", "BackFlatFromRim", "PinHoleZ"):
+        assert name not in drawing.DIMENSION_CALLOUTS
+    assert not hasattr(spec, "FLAT_STATION_CALLOUT")
     assert spec.DRAWING_PRECISION["FlatProfile"] == {
         "FrontFlatLen": 2,
         "BackFlatLen": 2,
@@ -246,8 +251,11 @@ def test_the_flats_are_the_angular_datum_the_pin_hole_follows() -> None:
     import dt_drive_train_steps as steps
 
     assert steps.step_number("cam-collars-set") < steps.step_number("lever-pin-set")
-    assert "VIEW B" in drawing.FLATS_LABEL
+    # Round-6 review #1: the letter alone, and the standard rotation note; no
+    # clocking angle to the pin hole.
+    assert drawing.FLATS_LABEL == "VIEW B\nROTATED 180°"
     assert "DEG" not in drawing.FLATS_LABEL
+    assert "EDGE" not in drawing.FLATS_LABEL
 
 
 def test_view_b_looks_square_at_the_flats() -> None:
@@ -271,3 +279,51 @@ def test_view_b_looks_square_at_the_flats() -> None:
         if name != "AcrossFlat":
             assert y_sheet > top
     assert drawing.FLATS_KEEP["AcrossFlat"][0] < drawing.FLATS_CENTER[0] - drawing.HALF_SPAN
+
+
+def test_view_b_arrow_lies_along_its_line_of_sight_in_the_end_view() -> None:
+    # Round-6 review #1: VIEW B's line of sight (FLATS_VIEW's third row) is
+    # square to the rod axis, so it lies in the plane of the end view from the
+    # flat front end (*Back: sheet x = model -X, sheet y = +Y), right of the
+    # side view at its height, and not in the side view's own plane.
+    rows = part.flats_view_rows()
+    z = rows[6:9]
+    assert z[2] == pytest.approx(0.0, abs=1e-12)
+    assert abs(z[0]) > 0.9  # within 10 deg of the side view's own line of sight
+    assert drawing.VIEW_B_EYE == pytest.approx((-z[0], z[1]))
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'place_view(adapter, str(SOURCE), "*Back", *END_CENTER' in source
+    assert "_view_b_arrow(adapter, end)" in source
+    assert drawing.END_CENTER[1] == drawing.RIGHT_CENTER[1]
+    assert drawing.END_CENTER[0] > drawing.RIGHT_CENTER[0] + drawing.HALF_SPAN + 0.03
+    # The arrow comes from the eye's side, points at the rod's centre and
+    # stops short of its outline.
+    tip, tail = drawing.VIEW_B_ARROW_TIP, drawing.VIEW_B_ARROW_TAIL
+    run = (tip[0] - tail[0], tip[1] - tail[1])
+    length = math.hypot(*run)
+    assert (run[0] / length, run[1] / length) == pytest.approx(
+        (-drawing.VIEW_B_EYE[0], -drawing.VIEW_B_EYE[1])
+    )
+    assert math.dist(tip, drawing.END_CENTER) > spec.ROD_DIA / 2000.0 + 0.001
+    assert drawing.VIEW_LETTER == "B"
+    # Inside the border, clear of DETAIL A's circle (x 0.300..0.370, y <= 0.167).
+    assert drawing.VIEW_B_LETTER_XY[0] + drawing.VIEW_LETTER_HEIGHT < 0.419 - 0.010
+    assert min(tip[1], tail[1]) - drawing.VIEW_LETTER_HEIGHT > 0.167 + 0.020
+
+
+def test_across_flat_text_leaves_its_lines() -> None:
+    # Round-6 review #4: the across-flat text sits below its lower witness and
+    # left of the dimension line on a leader; the .583 text ends short of the
+    # rim witness.
+    dim_x, _ = drawing.FLATS_KEEP["AcrossFlat"]
+    text_x, text_y = drawing.ACROSS_FLAT_TEXT_XY
+    lower_witness_y = drawing.FLATS_CENTER[1] - spec.ROD_DIA / 2000.0
+    assert text_y < lower_witness_y - 0.008
+    assert text_x < dim_x
+    # One callout line (~2.5 mm a glyph) under the value: inside the border and
+    # above the 1:2 isometric's top (y ~0.109).
+    half_width = len(spec.ACROSS_FLAT_CALLOUT) * 0.0025 / 2.0
+    assert text_x - half_width > 0.0127
+    assert text_y - 0.010 > 0.109
+    station_x, _ = drawing.FLATS_KEEP["BackFlatFromRim"]
+    assert station_x + 2 * 0.0025 + 0.005 < drawing._RIM_X

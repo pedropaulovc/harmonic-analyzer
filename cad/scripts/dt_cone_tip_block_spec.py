@@ -529,7 +529,10 @@ for _name, _web in WORST_FOOT_TAP_WEBS_MM.items():
 # drills and reams up through MHA-DT-20 into the foot to the pin's press size
 # (this hole's callout), opens the MHA-DT-20 hole to its slip size from below
 # (its callout; the block stays on), then presses the pin up through
-# MHA-DT-20 to this hole's floor.
+# MHA-DT-20 to this hole's floor (the step says so; machinist review of round
+# 6, #1: not this sheet).  Block and pin are a permanent pair (round 6, #0):
+# the pin stays pressed in the foot, slips in the plate, and the two lift off
+# MHA-DT-20 together, so the blind ream needs no knockout or extraction thread.
 #
 # Its station: on the foot tap's line (the block's mid-depth), DOWEL_FROM_TAP
 # toward +X from the tap, the same centre distance the platform prints from
@@ -537,15 +540,20 @@ for _name, _web in WORST_FOOT_TAP_WEBS_MM.items():
 # The value centres the window the two print-worst webs leave on the .001 in
 # grid: the platform's web to its hold-down counterbore and this foot's web to
 # the +X face at the width's lower limit (both checked below and in
-# dt_cone_swing_platform_checks).
+# dt_cone_swing_platform_checks).  DOWEL_FROM_TAP stays the internal
+# relation; the print states DOWEL_X, a baseline from the -X face (the
+# FootTapX datum), as a REFERENCE dimension (machinist review of round 6, #9):
+# the hole is match-drilled from MHA-DT-20, so it is wherever the plate puts
+# it, and the sheet gives the fitter the nominal to check against.
 DOWEL_FROM_TAP = 5.7912  # .228
-DOWEL_X = FOOT_TAP_X + DOWEL_FROM_TAP  # from the -X face, FOOT_TAP_X's frame
+DOWEL_X = FOOT_TAP_X + DOWEL_FROM_TAP  # .523 from the -X face, FOOT_TAP_X's frame
 DOWEL_Z = FOOT_TAP_Z
 DOWEL_X_PLACES = 3
 # The hole is drilled from the platform, so where it lands from the tap is the
 # platform's station band (+/-.004 from its hold-down hole) plus the hold-down
-# screw's float in its .120 close-clearance hole (.006): the print states that
-# sum as an explicit band (dt_cone_swing_platform_spec asserts it covers both).
+# screw's float in its .120 close-clearance hole (.006): the webs below take
+# that sum (dt_cone_swing_platform_spec asserts it covers both).  It does not
+# print: the REF station carries no band.
 DOWEL_X_TOL_MM = 0.254  # +/-.010
 # Off the tap's line the same float applies, plus the general .XX band of the
 # platform's in-line relation to its hold-down hole.
@@ -654,8 +662,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "FootTapZReference": {"FootTapZ"},
     # Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
     # #2248): the locating dowel's press ream on the bottom
-    # view, its size on the cut's sketch and its station from the foot tap on a
-    # hidden reference sketch.
+    # view, its size on the cut's sketch and its REF station from the -X face
+    # on a hidden reference sketch.
     "DowelProfile": {"DowelHoleDia"},
     "DowelXReference": {"DowelX"},
 }
@@ -728,12 +736,9 @@ def printed_value_text(name: str, nominal: float) -> str:
 
 
 # The two dowel values as the bottom view prints them, for the sheet's ink
-# estimate: the station with its symmetric band, and the ream's size with
-# its stacked band's upper row beside it.
-DOWEL_X_PRINTED_TEXT = (
-    f"{printed_value_text('DowelX', DOWEL_FROM_TAP)} "
-    f"±{length_text(DOWEL_X_TOL_MM, DOWEL_X_PLACES)}"
-)
+# estimate: the station in its reference parentheses, and the ream's size
+# with its stacked band's upper row beside it.
+DOWEL_X_PRINTED_TEXT = f"({printed_value_text('DowelX', DOWEL_X)})"
 DOWEL_HOLE_PRINTED_TEXT = (
     f"Ø{printed_value_text('DowelHoleDia', DOWEL_HOLE_DIA)} "
     f"+{length_text(max(DOWEL_HOLE_BAND), DOWEL_HOLE_PLACES)}"

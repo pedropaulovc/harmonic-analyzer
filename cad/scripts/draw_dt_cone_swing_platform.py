@@ -29,12 +29,14 @@ import argparse
 import math
 import re
 import sys
+import textwrap
 from collections.abc import Callable
 from typing import Any
 
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     dimension_name,
     place_view,
     view_name,
@@ -358,15 +360,38 @@ DETAIL_HOLDDOWN_X = DETAIL_CENTER[0] + HOLDDOWN_LOCAL_X * _DETAIL_S
 # it, and its dimension line runs out across the plate edge and the outline
 # (user ruling 2026-09-30).  On that run the audit read the text frame
 # (" 1.00 ±0.1 ", spaces included) 21.96 x 3.5 mm, centred on the keep x
-# and standing on the dimension line, 2.78 mm under the keep y.  Here the
-# line passes 1.1 mm under the hole's rim, the frame's lower-left corner
-# stands 1 mm off the circle and its right end 4 mm short of section C-C's
-# view box.
+# and standing on the dimension line, 2.78 mm under the keep y.  Its line
+# passed 1.1 mm under the hole's rim until round 7: that band now carries
+# the tip dowel's REF station from the pivot (TipDowelPivotX, below), so
+# HoldDownX's line runs a text height plus 1.1 mm lower, 1.3 mm over the top
+# relief's crown, and its outside arrow tails keep 1.5 mm over the relief's
+# arc.  Its frame's lower-left corner stands 1 mm off the circle and its
+# right end short of section C-C's padded box.
 HOLDDOWN_X_TEXT_SIZE = (0.02196, 0.0035)
 HOLDDOWN_X_LINE_DROP = 0.00278
-HOLDDOWN_X_LINE_Y = (
+# Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
+# #2248); machinist review of round 6, #6.  The tip dowel's REF station
+# from the pivot-bore axis (" (.188) ", 8 glyphs at HoldDownX's measured
+# 2.0 mm), on HoldDownX's former line 1.1 mm under the hold-down's rim.  Its
+# 9.6 mm span cannot hold its text, which hangs right, outside the circle,
+# where HoldDownX's stood.  Its pivot witness rises on HoldDownX's, and its
+# dowel witness drops from the ream only to this line, short of HoldDownX's
+# line under it, so neither witness crosses a dimension line.  The
+# controlling station stays TipDowelX from the hold-down hole (the stack
+# reason is at dt_cone_swing_platform_spec.TIP_DOWEL_STATION_TOL_MM).
+TIP_DOWEL_PIVOT_X_TEXT_SIZE = (0.0160, 0.0035)
+TIP_DOWEL_PIVOT_X_LINE_Y = (
     DETAIL_HOLDDOWN_Y - HOLDDOWN_CLEARANCE_DIA / 2.0 * _DETAIL_S - 0.0011
 )
+_TIP_DOWEL_PIVOT_X_TEXT_X = (
+    DETAIL_CENTER[0]
+    + math.sqrt(
+        (DETAIL_SHEET_RADIUS + 0.001) ** 2
+        - (TIP_DOWEL_PIVOT_X_LINE_Y - DETAIL_CENTER[1]) ** 2
+    )
+    + TIP_DOWEL_PIVOT_X_TEXT_SIZE[0] / 2.0
+)
+HOLDDOWN_X_LINE_Y = TIP_DOWEL_PIVOT_X_LINE_Y - HOLDDOWN_X_TEXT_SIZE[1] - 0.0011
 _HOLDDOWN_X_TEXT_X = (
     DETAIL_CENTER[0]
     + math.sqrt(
@@ -381,13 +406,15 @@ _HOLDDOWN_X_TEXT_X = (
 # at HoldDownX's measured 2.0 mm), so the line runs over both holes, 6.7 mm
 # above the hold-down's rim, and the text hangs LEFT, outside the circle
 # (1 mm off it at the frame's lower-right corner), above HoldDownZ's text.
-# The ream's value and three callout rows (at most 16 glyphs at the relief
-# callout's measured 2.8 mm on this sheet, four rows at its 5.6 mm pitch;
-# aa9766da render) stand right of the circle, 1.5 mm over HoldDownX's text,
-# left of the hold-down callout and under the plan captions; a fourth row
-# would reach into the captions.  The diameter's leader drops from the value
-# row to the ream's rim, east of TipDowelX's dowel witness.  Estimates until
-# a render measures them.
+# The ream's value and two callout rows stand right of the circle, 1.5 mm
+# over TipDowelPivotX's text, left of the hold-down callout and under the
+# plan captions.  Measured on the r6 render (run 20261107T030627004Z):
+# SolidWorks centres the whole block, from the underline under its last row
+# to the top of its stacked band, on the dimension's point; rows print
+# 2.87 mm a glyph at a 5.45 mm pitch, the size row with its stacked band
+# 8.4 mm tall, the underline 1.7 mm under the last row.  The diameter's
+# leader leaves that underline's near (left) end for the ream's rim, east of
+# TipDowelX's dowel witness.
 DETAIL_TIP_DOWEL_X = DETAIL_CENTER[0] + TIP_DOWEL_LOCAL_X * _DETAIL_S
 TIP_DOWEL_X_TEXT_SIZE = (0.0240, 0.0035)
 TIP_DOWEL_X_LINE_Y = (
@@ -402,25 +429,49 @@ _TIP_DOWEL_X_TEXT_X = (
 )
 # Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
 # #2248).  The tip-block locating dowel's slip ream, under its
-# banded diameter in detail B, standing alone for MHA-DT-00 step
-# post-and-tip-block ("DRILL AND REAM UP THRU MHA-DT-20 INTO MHA-DT-21 PER
-# THEIR CALLOUTS"): reamed through to this size, match-reamed with the block
-# on, after MHA-DT-21's press ream has been drilled and reamed up through this
-# plate (the lift rod's made-at-assembly precedent,
-# dt_pinion_lift_rod_spec.PIN_HOLE_CALLOUT).  Three rows of at most 16
-# characters: the block stands right of detail B's circle, between
-# HoldDownX's text, the hold-down callout and the plan captions (see
-# TIP_DOWEL_CALLOUT_SIZE).
+# banded diameter in detail B, for MHA-DT-00 step post-and-tip-block ("DRILL
+# AND REAM UP THRU MHA-DT-20 INTO MHA-DT-21 PER THEIR CALLOUTS"): the
+# process, then the flag to the numbered note that states the fit, the part
+# that goes in the hole and when it is match-reamed (machinist review of
+# round 6, #7; two rows under the size, rule 7).
 TIP_BLOCK_NUMBER = _config.parts("dt-cone-tip-block")["number"]
+TIP_DOWEL_PIN_NUMBER = _config.parts("dt-vn-locating-pin")["number"]
+TIP_DOWEL_NOTE_NUMBER = 1
 TIP_DOWEL_CALLOUT = "\n".join(
     (
         "MATCH-REAM THRU",
-        f"AFTER {TIP_BLOCK_NUMBER},",
-        step_ref("post-and-tip-block"),
+        f"SEE NOTE {TIP_DOWEL_NOTE_NUMBER}",
     )
 )
-TIP_DOWEL_CALLOUT_SIZE = (0.0475, 0.0224)
-_TIP_DOWEL_CALLOUT_BOTTOM = HOLDDOWN_X_LINE_Y + HOLDDOWN_X_TEXT_SIZE[1] + 0.0015
+# The note the callout flags (the lift rod's made-at-assembly precedent,
+# dt_pinion_lift_rod_spec.PIN_HOLE_CALLOUT): the hole slips over the dowel
+# MHA-DT-21 holds pressed, and is reamed to size through with the block on,
+# after MHA-DT-21's press ream has been drilled and reamed up through this
+# plate.  Two rows of at most TIP_DOWEL_NOTE_WIDTH characters under a hanging
+# indent; the step reference never breaks across rows.
+TIP_DOWEL_NOTE_WIDTH = 62
+_NBSP = "\u00a0"
+TIP_DOWEL_NOTE = textwrap.fill(
+    f"TIP DOWEL HOLE: SLIP FIT FOR {TIP_DOWEL_PIN_NUMBER}. MATCH-REAM THRU AT "
+    f"{step_ref('post-and-tip-block').replace(' ', _NBSP)}, AFTER THE "
+    f"{TIP_BLOCK_NUMBER} REAM.",
+    width=TIP_DOWEL_NOTE_WIDTH,
+    initial_indent=f"{TIP_DOWEL_NOTE_NUMBER}. ",
+    subsequent_indent="   ",
+    break_on_hyphens=False,
+).replace(_NBSP, " ")
+# The note's text height, the engagement note's (both stand in the band over
+# the title block), and its measured 1.93 mm a glyph and 4.4 mm a row.
+TIP_DOWEL_NOTE_CHAR_HEIGHT = 0.0025
+TIP_DOWEL_NOTE_GLYPH_WIDTH = 0.00193
+TIP_DOWEL_NOTE_ROW_HEIGHT = 0.0044
+# Upper-left, in the band between the title block (top 0.066) and the
+# engagement note (ink from 0.0760 on the r6 render), left-aligned with it.
+TIP_DOWEL_NOTE_XY = (0.222, 0.0745)
+TIP_DOWEL_CALLOUT_SIZE = (0.0475, 0.0210)
+_TIP_DOWEL_CALLOUT_BOTTOM = (
+    TIP_DOWEL_PIVOT_X_LINE_Y + TIP_DOWEL_PIVOT_X_TEXT_SIZE[1] + 0.0015
+)
 TIP_DOWEL_CALLOUT_LOWER_LEFT = (
     DETAIL_CENTER[0]
     + math.sqrt(
@@ -433,12 +484,14 @@ DETAIL_KEEP = {
     "HoldDownZ": (0.044, DETAIL_HOLDDOWN_Y + 0.0045),
     "HoldDownX": (_HOLDDOWN_X_TEXT_X, HOLDDOWN_X_LINE_Y + HOLDDOWN_X_LINE_DROP),
     "TipDowelX": (_TIP_DOWEL_X_TEXT_X, TIP_DOWEL_X_LINE_Y + HOLDDOWN_X_LINE_DROP),
-    # The value row's centre, on top of its rows.
+    "TipDowelPivotX": (
+        _TIP_DOWEL_PIVOT_X_TEXT_X,
+        TIP_DOWEL_PIVOT_X_LINE_Y + HOLDDOWN_X_LINE_DROP,
+    ),
+    # The whole block's centre (r6 render).
     "TipDowelDia": (
         TIP_DOWEL_CALLOUT_LOWER_LEFT[0] + TIP_DOWEL_CALLOUT_SIZE[0] / 2.0,
-        TIP_DOWEL_CALLOUT_LOWER_LEFT[1]
-        + TIP_DOWEL_CALLOUT_SIZE[1]
-        - TIP_DOWEL_CALLOUT_SIZE[1] / 8.0,
+        TIP_DOWEL_CALLOUT_LOWER_LEFT[1] + TIP_DOWEL_CALLOUT_SIZE[1] / 2.0,
     ),
 }
 # The native "DETAIL B / SCALE 2:1" label, moved by its measured extent:
@@ -511,11 +564,12 @@ HOLDDOWN_SECTION_LINE_X_MM = (-26.0, 24.0)
 HOLDDOWN_SECTION_SCALE = (3, 2)
 HOLDDOWN_CROP_MARGIN_MM = 0.25
 # The strip's lower-left (east underside) corner on the sheet, where the
-# view is moved once cropped.  Detail B's HoldDownX text (x ..0.1300, y
-# 0.0498..0.0533) clears C-C's padded box both ways: its inset left 0.1306
-# stands right of the text's end, its inset top 0.0496 under the text's
-# foot.  The padded box's foot (0.0283) stands 0.7 mm over the native
-# label's top (0.0291), inside the blocking audit's 1.5 mm.
+# view is moved once cropped.  Detail B's texts right of its circle clear
+# C-C's padded box (inset left 0.1306, inset top 0.0496): TipDowelPivotX's
+# (x ..0.1241, y 0.0496..0.0531) and HoldDownX's (x ..0.1305, y
+# 0.0450..0.0485) both end left of the inset.  The padded box's foot
+# (0.0283) stands 0.7 mm over the native label's top (0.0291), inside the
+# blocking audit's 1.5 mm.
 HOLDDOWN_STRIP_LOWER_LEFT = (0.1395, 0.0352)
 # The hold-down callout, above and right of the hole: DRILL Ø3.05 THRU ALL,
 # the Ø5.56 counterbore row and its 3.50 depth, then FROM UNDERSIDE and the
@@ -2050,6 +2104,24 @@ def _add_profile_virtual_sharps(adapter: Any, view: Any) -> None:
         _insert_profile_virtual_sharp(adapter, view, index)
 
 
+def _add_sized_note(
+    adapter: Any, text: str, x: float, y: float, *, char_height: float, label: str
+) -> Any:
+    """One free note, upper-left at (x, y), sized as add_property_linked_note
+    sizes the engagement note (its char_height recipe)."""
+    note = add_note(adapter, text, x, y)
+    if note is None:
+        raise RuntimeError(f"failed to add the {label}")
+    annotation = _early_bound(_early_bound(note, "INote").GetAnnotation(), "IAnnotation")
+    text_format = annotation.GetTextFormat(0)
+    if text_format is None:
+        raise RuntimeError(f"the {label} has no text format")
+    text_format.CharHeight = float(char_height)
+    if annotation.SetTextFormat(0, False, text_format) is not True:
+        raise RuntimeError(f"failed to set the {label}'s text height")
+    return note
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -2294,10 +2366,22 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="hold-down station detail",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    # The locating dowel's slip ream: made at assembly, say so under its
-    # banded size (rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00
-    # rubric sample, PR #2248)).
+    # The locating dowel's slip ream: made at assembly, its process under its
+    # banded size and the flag to note 1 (rule-23 retention, owner ruling
+    # 2026-11-07 (MHA-DT-00 rubric sample, PR #2248); round 6, #7).
     set_dimension_callouts(adapter, detail_annotations, {"TipDowelDia": TIP_DOWEL_CALLOUT})
+    # Its station from the pivot-bore axis is a reference (round 6, #6); the
+    # chained TipDowelX controls (dt_cone_swing_platform_spec.
+    # TIP_DOWEL_STATION_TOL_MM says why).
+    tip_dowel_pivot = [
+        item for item in detail_annotations
+        if dimension_name(adapter, item) == "TipDowelPivotX"
+    ]
+    if len(tip_dowel_pivot) != 1:
+        raise RuntimeError("expected one tip dowel pivot-axis station in detail B")
+    set_reference_dimension(
+        adapter, tip_dowel_pivot[0], label="tip dowel pivot-axis reference station"
+    )
     # U41: the thickness is the stock's, a reference with no band.
     thickness_annotations = [
         item for item in section_annotations
@@ -2404,6 +2488,13 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Isometric View Note", *ISO_CAPTION_UPPER_LEFT)
     add_property_linked_note(
         adapter, "Post Mount Engagement", *ENGAGEMENT_NOTE_XY, char_height=0.0025
+    )
+    _add_sized_note(
+        adapter,
+        TIP_DOWEL_NOTE,
+        *TIP_DOWEL_NOTE_XY,
+        char_height=TIP_DOWEL_NOTE_CHAR_HEIGHT,
+        label="tip dowel hole note",
     )
     add_leader_note(
         adapter,
