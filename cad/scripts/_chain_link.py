@@ -58,8 +58,9 @@ _ROWS = {
 LINKS_PER_KIND = LINK_COUNT // 2
 # The chain is sold by the foot; the loop is LINK_COUNT whole pitches of it.
 CHAIN_ORDER_FEET = math.ceil(LINK_COUNT * LINK_PITCH / 304.8)
-# One line each: the purchased sheet reserves ~0.21 m for the note. The
-# connecting link's clip orientation is an assembly fact (MHA-PD-00 step).
+# One line each: the purchased sheet reserves ~0.21 m for the note. Where the
+# connecting link goes and how its clip faces are assembly facts (MHA-PD-00
+# chain-closed step); its sheet says only what the stand-in leaves out.
 DRAWING_NOTES = {
     chain_spec.INNER_LINK_CONFIGURATION: (
         f"BREAK {CHAIN_ORDER_FEET} FT OF {CHAIN_SKU} TO {LINKS_PER_KIND} INNER + "
@@ -69,9 +70,7 @@ DRAWING_NOTES = {
     chain_spec.OUTER_LINK_CONFIGURATION: (
         f"{LINKS_PER_KIND - 1} PER LOOP, ALL IN THE CUT {CHAIN_SKU} CHAIN."
     ),
-    "pd-vn-chain-connecting-link": (
-        f"1 PER LOOP: JOINS THE TWO INNER-LINK ENDS OF THE CUT {CHAIN_SKU}."
-    ),
+    "pd-vn-chain-connecting-link": "SPRING CLIP NOT SHOWN.",
 }
 # Everything the purchased-part sheet reads from the saved part.
 DRAWING_PROPERTIES = (

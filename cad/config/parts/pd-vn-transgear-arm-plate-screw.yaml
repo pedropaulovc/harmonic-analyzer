@@ -12,7 +12,3 @@ pd-vn-transgear-arm-plate-screw:
   fit_class: fastener_clearance
   process: purchased
   drawing_unit: in
-  installation_notes: |-
-    CUT TO LENGTH AND BREAK THE CUT END AT ASSEMBLY (MHA-PD-00 CUT STEP,
-    BEFORE THE GUIDE-LOCK SWEEP), SO THE TIP CLEARS THE SWEEP AND THE
-    THREAD STAYS FULLY ENGAGED IN THE MHA-PD-18 ARM. VIEWS SHOW IT AS CUT.

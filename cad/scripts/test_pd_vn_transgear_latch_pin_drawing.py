@@ -86,13 +86,10 @@ def test_the_chamfered_end_is_the_pressed_end() -> None:
     assert (spec.DIA / 2.0, spec.CHAMFER_LEN) in section
 
 
-def test_the_installation_note_says_permanent_and_fits_the_sheet() -> None:
-    from _purchased_fastener_drawing import note_lines
-
-    notes = _config.parts(STEM)["installation_notes"]
-    # Owner ruling 2026-10-27 (#1379): the latch pin never comes out.
-    assert "PERMANENT" in notes
-    note_lines(notes, label=STEM)  # raises past the sheet's line budget
+def test_the_sheet_carries_no_installation_note() -> None:
+    # The press is MHA-PD-00's latch-pin-pressed step; the owner's permanence
+    # ruling (2026-10-27, #1379) is MHA-PD-18's RV exception.
+    assert "installation_notes" not in _config.parts(STEM)
 
 
 def test_purchased_sheet_documents_the_built_part() -> None:

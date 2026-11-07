@@ -41,7 +41,6 @@ import pd_transgear_knob_cup_spec as cup
 import pd_transgear_knob_shaft_spec as knob_shaft
 import pd_vn_transgear_arm_plate_locating_pin_spec as plate_locating_pin
 import _transgear_arm_plate_locating_interface as plate_locating_interface
-import pd_vn_transgear_arm_plate_screw_spec as plate_screw
 import pd_vn_transgear_knob_drive_pin_spec as drive_pin
 from _test_stubbed_build import stub_seat
 import pd_transgear_removable_spec as sprocket
@@ -1771,10 +1770,6 @@ def test_the_plate_screws_are_cut_to_the_limit_the_lock_sweep_clears() -> None:
     limit = f"FLUSH TO {disc.inch_text(joints.PLATE_SCREW_CUT_PROUD_MAX, 3)} PROUD"
     assert limit in body
     assert joints.PLATE_SCREW_TIP_PROUD_MAX == joints.PLATE_SCREW_CUT_PROUD_MAX
-    row = _config.parts("pd-vn-transgear-arm-plate-screw")
-    assert " ".join(row["installation_notes"].split()) == (
-        " ".join(plate_screw.PURCHASED_STOCK_NOTE.split())
-    )
     # Positive control: the fit step itself does not mention the cut.
     assert "CUT" not in _step_body("arm-plate-fitted")
 

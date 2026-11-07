@@ -7,10 +7,6 @@ pd-vn-transgear-knob-drive-pin:
   material: Alloy Steel
   material_specification: "Alloy steel dowel pin, 3/32 x 3/16, Round x Chamfer ends; McMaster-Carr 98381A433"
   finish: plain; no coating
-  installation_notes: |-
-    INSTALLATION - KNOB DRIVE COLLAR MHA-PD-22 SEAT FACE
-    PRESS IN FROM THE SEAT FACE TO A STOP:
-    .091-.098 PROUD OF THE SEAT FACE.
   quantity: 2
   tolerance_class: machined_block
   process: purchased
