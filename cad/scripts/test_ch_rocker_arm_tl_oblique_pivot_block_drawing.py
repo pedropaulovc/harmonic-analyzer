@@ -146,7 +146,7 @@ def test_native_block_readback_refuses_moved_or_missing_geometry(monkeypatch, fe
     import _drawing_precision
     import _gtol_face_read
     import _feature_tree
-    from _gtol_face import SURFACE_CYLINDER
+    from _gtol_face import SURFACE_CYLINDER, SURFACE_PLANE
     import ch_rocker_arm_tl_oblique_feed_block_spec as feed_spec
 
     part = feed_spec if feed else spec
@@ -183,6 +183,15 @@ def test_native_block_readback_refuses_moved_or_missing_geometry(monkeypatch, fe
         cylinder(0, (0.0, part.NUT_AXIS_Y, part.NUT_AXIS_Z), part.SCREW_CLEARANCE_DIA)
         for y, z in part.NUT_HOLES_YZ:
             cylinder(0, (0.0, y, z), native_drill_mm)
+        # The merged +X end (owner ruling 2026-11-07), read by vertices.
+        corners = [SimpleNamespace(GetPoint=lambda p=p: [v / 1000.0 for v in p])
+                   for p in ((part.BLOCK_X1, part.LUG_Y0, 0.0),
+                             (part.BLOCK_X1, part.BLOCK_WIDTH / 2, part.BLOCK_HEIGHT))]
+        edge = SimpleNamespace(GetStartVertex=lambda: corners[0], GetEndVertex=lambda: corners[1])
+        cylinders.append(SimpleNamespace(
+            identity=SURFACE_PLANE, outward_normal=(1.0, 0.0, 0.0),
+            parameters=(1.0, 0.0, 0.0, part.BLOCK_X1 / 1000.0, 0.0, 0.0), GetEdges=lambda: [edge],
+        ))
     if fault == "missing":
         cylinders.pop(0)
     if fault in ("axis", "diameter"):

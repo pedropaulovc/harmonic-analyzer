@@ -438,29 +438,59 @@ def _native_nut_tap_diameter(adapter, part) -> float:
     return diameter
 
 
-def _require_flush_lug_end(body, part) -> list[float]:
+@_telemetry.traced("part.readback.flush_lug_end")
+def _require_flush_lug_end(body, part) -> dict[str, list[float]]:
     """TL-32's +X end is ONE planar face from the lug end to the +Y edge,
     full height (owner ruling 2026-11-07): the lug's +X side and the block's
-    end merged, with no step and no seam between the two extrusions."""
+    end merged, with no step and no seam between the two extrusions.
+
+    Exact reads only; ``IFace2.GetBox`` is not a tight box. Members (both
+    tlbs SOLIDWORKS 3DEXPERIENCE R2026x, audited 2026-11-07), lengths in
+    metres:
+    ``IBody2.GetFaces() -> VARIANT`` (faces); ``face_geometry`` reads
+    ``IFace2.GetSurface() -> IDispatch``, ``ISurface.Identity() -> I4``
+    (swSurfaceTypes_e PLANE_TYPE = 4001), ``ISurface.PlaneParams`` (get,
+    ``VARIANT`` [normal xyz, root point xyz]) and
+    ``IFace2.FaceInSurfaceSense() -> BOOL`` (the outward normal);
+    ``IFace2.GetEdges() -> VARIANT`` (edges);
+    ``IEdge.GetStartVertex()/GetEndVertex() -> IDispatch`` (None on a closed
+    edge: the face's tap and clearance circles); ``IVertex.GetPoint() ->
+    VARIANT`` [x, y, z]."""
+    from _gtol_face import SURFACE_PLANE
+    from _gtol_face_read import face_geometry
     ends = []
-    for face in _early_bound(body, "IBody2").GetFaces() or ():
-        face = _early_bound(face, "IFace2")
-        normal = tuple(face.Normal or ())
-        box = [c * 1000.0 for c in face.GetBox() or ()]
-        if (len(normal) == 3 and len(box) == 6 and abs(abs(normal[0]) - 1.0) < 1e-9
-                and abs(box[0] - part.BLOCK_X1) < 1e-6 and abs(box[3] - part.BLOCK_X1) < 1e-6):
-            ends.append(box)
-    want = (part.LUG_Y0, 0.0, part.BLOCK_WIDTH / 2, part.BLOCK_HEIGHT)
-    if len(ends) != 1 or not all(
-        math.isclose(got, wanted, rel_tol=0.0, abs_tol=1e-3)
-        for got, wanted in zip((ends[0][1], ends[0][2], ends[0][4], ends[0][5]), want, strict=True)
+    for face in _com_invoke(body, "IBody2", "GetFaces") or ():
+        geometry = face_geometry(face, identities=frozenset({SURFACE_PLANE}))
+        if geometry is None or geometry.identity != SURFACE_PLANE:
+            continue
+        normal, plane_x = geometry.outward_normal, geometry.parameters[3] * 1000.0
+        if abs(normal[0] - 1.0) < 1e-9 and abs(plane_x - part.BLOCK_X1) < 1e-6:
+            ends.append(face)
+    if len(ends) != 1:
+        raise RuntimeError(f"{part.PART_NAME}: {len(ends)} planar +X faces at X {part.BLOCK_X1} mm, "
+                           "expected the one merged lug and block end")
+    corners = []
+    for edge in _com_invoke(ends[0], "IFace2", "GetEdges") or ():
+        for end in ("GetStartVertex", "GetEndVertex"):
+            vertex = _com_invoke(edge, "IEdge", end)
+            if vertex is not None:
+                corners.append([float(c) * 1000.0 for c in _com_invoke(vertex, "IVertex", "GetPoint")])
+    span = {
+        "x": [min(c[0] for c in corners), max(c[0] for c in corners)] if corners else [],
+        "y": [min(c[1] for c in corners), max(c[1] for c in corners)] if corners else [],
+        "z": [min(c[2] for c in corners), max(c[2] for c in corners)] if corners else [],
+    }
+    want = {"x": (part.BLOCK_X1, part.BLOCK_X1), "y": (part.LUG_Y0, part.BLOCK_WIDTH / 2),
+            "z": (0.0, part.BLOCK_HEIGHT)}
+    if not corners or not all(
+        math.isclose(got, wanted, rel_tol=0.0, abs_tol=1e-6)
+        for axis, limits in want.items() for got, wanted in zip(span[axis], limits, strict=True)
     ):
         raise RuntimeError(
-            f"{part.PART_NAME}: the +X end at X {part.BLOCK_X1} mm is not one face spanning "
-            f"Y {part.LUG_Y0}..{part.BLOCK_WIDTH / 2}, Z 0..{part.BLOCK_HEIGHT} mm; "
-            f"planar faces there (box mm): {ends!r}"
+            f"{part.PART_NAME}: the +X end face's vertices span {span!r} mm, "
+            f"expected {want!r}: the lug end does not run flush with the block end"
         )
-    return ends[0]
+    return span
 
 
 @_telemetry.traced("part.readback.oblique_block_geometry")
@@ -517,7 +547,7 @@ def require_block_geometry(adapter, part) -> None:
             )
         measured[label] = [list(parameters) for parameters in matches]
     if hasattr(part, "LUG_WIDTH"):
-        measured["flush +X end box"] = _require_flush_lug_end(bodies[0], part)
+        measured["flush +X end span"] = _require_flush_lug_end(bodies[0], part)
     dimensions = {}
     for feature, names in part.DRAWING_DIMENSIONS.items():
         wanted = set(names) & part.DRAWING_VALUES.keys()

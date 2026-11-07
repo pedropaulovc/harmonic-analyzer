@@ -4,6 +4,8 @@ from __future__ import annotations
 import ast
 import math
 from pathlib import Path
+from types import SimpleNamespace
+import pytest
 import _config
 import ch_rocker_arm_tl_oblique_feed_block_spec as spec
 import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot
@@ -68,10 +70,54 @@ def test_lug_runs_flush_with_the_block_end_as_one_face():
     assert ((spec.BLOCK_X1,spec.LUG_Y0),(spec.BLOCK_X1,spec.BLOCK_WIDTH/2)) in edges
     model=(FOLDER/'_oblique_pivot_block_model.py').read_text(encoding='utf-8')
     assert '["LugWidth","LugLength","LugCornerX","LugCornerY"], anchor=2)' in model
-    assert 'measured["flush +X end box"] = _require_flush_lug_end(bodies[0], part)' in model
+    assert 'measured["flush +X end span"] = _require_flush_lug_end(bodies[0], part)' in model
+    assert '@_telemetry.traced("part.readback.flush_lug_end")' in model
     drawing=(FOLDER/'_oblique_block_drawing.py').read_text(encoding='utf-8')
     assert 'LugWidth' not in drawing
     assert '.73 wide' not in _config.parts(spec.PART_NAME)['process']
+
+
+def _end_face(x,y0,y1,*,box_pad=0.0):
+    """A planar +X face double read through the real face_geometry: exact
+    PlaneParams and vertices, and a deliberately padded (untrustworthy) box."""
+    surface=SimpleNamespace(Identity=4001,PlaneParams=(1.0,0.0,0.0,x/1000.0,0.0,0.0))
+    points=((x,y0,0.0),(x,y1,0.0),(x,y1,spec.BLOCK_HEIGHT),(x,y0,spec.BLOCK_HEIGHT))
+    vertices=[SimpleNamespace(GetPoint=lambda p=p:[v/1000.0 for v in p]) for p in points]
+    edges=[SimpleNamespace(GetStartVertex=lambda a=a:a,GetEndVertex=lambda b=b:b)
+           for a,b in zip(vertices,vertices[1:]+vertices[:1])]
+    # A closed circle (the taps, the leadscrew clearance) has no vertices.
+    edges.append(SimpleNamespace(GetStartVertex=lambda:None,GetEndVertex=lambda:None))
+    pad=box_pad/1000.0
+    return SimpleNamespace(
+        GetSurface=lambda:surface,FaceInSurfaceSense=lambda:False,GetEdges=lambda:edges,
+        GetBox=lambda:(x/1000.0-pad,y0/1000.0-pad,-pad,x/1000.0+pad,y1/1000.0+pad,spec.BLOCK_HEIGHT/1000.0+pad),
+    )
+
+
+@pytest.mark.parametrize('case',('merged','padded_box','seam','step','short'))
+def test_flush_end_readback_reads_exact_plane_and_vertices(case):
+    import _oblique_pivot_block_model as model
+    x1,y0,y1=spec.BLOCK_X1,spec.LUG_Y0,spec.BLOCK_WIDTH/2
+    cylinder=SimpleNamespace(GetSurface=lambda:SimpleNamespace(Identity=4002,CylinderParams=(0.0,)*7),
+                             FaceInSurfaceSense=lambda:False,GetBox=lambda:(0.0,)*6)
+    faces={
+        'merged':[_end_face(x1,y0,y1)],
+        # A box padded well past any old 1e-3 mm guard changes nothing.
+        'padded_box':[_end_face(x1,y0,y1,box_pad=.05)],
+        # Two coplanar faces: the extrusions left a seam.
+        'seam':[_end_face(x1,y0,spec.LUG_Y1),_end_face(x1,spec.LUG_Y1,y1)],
+        # The c40296ac step: the lug end .04 short of the head.
+        'step':[_end_face(x1,spec.LUG_Y1,y1),_end_face(x1-.04*INCH,y0,spec.LUG_Y1)],
+        'short':[_end_face(x1,y0+.001,y1)],
+    }[case]
+    body=SimpleNamespace(GetFaces=lambda:[cylinder,*faces])
+    if case in ('merged','padded_box'):
+        span=model._require_flush_lug_end(body,spec)
+        for axis,limits in (('x',[x1,x1]),('y',[y0,y1]),('z',[0.0,spec.BLOCK_HEIGHT])):
+            assert span[axis]==pytest.approx(limits,abs=1e-9)
+    else:
+        with pytest.raises(RuntimeError,match='planar \\+X faces' if case=='seam' else 'vertices span'):
+            model._require_flush_lug_end(body,spec)
 
 
 def test_nut_face_carries_the_screw_clearance_and_four_through_taps_only():
