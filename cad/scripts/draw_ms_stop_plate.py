@@ -71,26 +71,21 @@ FRONT_KEEP = {
 }
 # Text left of the thin edge view, so neither witness line strikes it.
 RIGHT_KEEP = {"PlateThickness": (0.327, 0.225)}
-HOLE_STATION_FIT = f"LOCATES MS-STOP-BLOCK\n{_config.parts('ms-stop-block')['number']} TAPS"
+# Rule 7: the three hole locations carry their value and band only; the mate
+# they serve is named once, on the hole callout below.
 DIMENSION_CALLOUTS = {
-    # The +/-.004 hole stations become the block's tapped-hole stations.
-    **{name: HOLE_STATION_FIT for name in part.PLATE_LOCATION_DIMENSIONS},
     # The thickness band sets the plate screws' reach into the blind taps.
-    "PlateThickness": (
-        "SETS SCREW REACH IN\nMS-STOP-BLOCK\n"
-        f"{_config.parts('ms-stop-block')['number']} TAPS"
-    ),
+    "PlateThickness": f"SETS SCREW REACH IN\n{_config.parts('ms-stop-block')['number']} TAPS",
 }
 # The three-row callout is wider than the room between the .56 witnesses, so
 # it sits below the cover face, left of the hole-station texts.
 CLEARANCE_CALLOUT_XY = (0.075, 0.100)
-# Function and acceptance, not procedure (the sequence is the assembly
-# sheet's step 1): the pair, its alignment, and what the holes must pass
-# (rule 7 flags the pair at its match-drill callouts).
+# The matched pair, its alignment and its acceptance in two lines of words
+# (rule 7), under the native size; the pilot-and-open sequence is the
+# assembly sheet's step 1.
 CLEARANCE_FUNCTION = (
-    f"{part.MATCHED_PAIR_NOTE}\n"
-    f"{part.MATCH_DRILL_DATUM_ALIGNMENT}, {part.PLATE_SCREW_THREAD.lstrip('#')} SCREWS\n"
-    f"ENTER MS-STOP-BLOCK {_config.parts('ms-stop-block')['number']} TAPS FREELY"
+    f"MATCHED PAIR WITH {_config.parts('ms-stop-block')['number']}: LOCATING\n"
+    "ENDS AND EDGES FLUSH, SCREWS ENTER FREELY"
 )
 CLEARANCE_PRECISION = {"hw-diam": part.HOLE_CALLOUT_PRECISION}
 # Leadered labels name the X=0 end and Y=0 edge the match-drill clamp aligns.
@@ -191,9 +186,10 @@ async def build(adapter: Any) -> dict[str, str]:
             (part.PLATE_HOLE_XS[1] + rim) / 1000.0,
             (part.PLATE_HOLE_Y - rim) / 1000.0, part.PLATE_Z_MIN / 1000.0,
         ), label="plate clearance mouth")
-    # *Back reverses X: this is the left-sheet hole. Rule 12: say DRILL.
+    # *Back reverses X: this is the left-sheet hole. Rule 26: size first, so
+    # the native callout prints 2X Ø.094 THRU with no process word ahead of it.
     clearance = add_native_hole_callout(adapter, front, edge_xy=edge, callout_xy=CLEARANCE_CALLOUT_XY,
-                                        label="two cover clearance holes", process="DRILL")
+                                        label="two cover clearance holes")
     _append_callout_lines(clearance, CLEARANCE_FUNCTION)
     set_hole_callout_precision(clearance, CLEARANCE_PRECISION, label="two cover clearance holes")
     _outside_arrow(clearance)

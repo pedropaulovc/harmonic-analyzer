@@ -1,18 +1,20 @@
 r"""Four-sheet manufacturing package for the unchanged graduated brass stick.
 
-BAR gives the envelope and left-origin scale station. GRADUATIONS enlarges
-the full/minor pitch; TICK LENGTHS gives groove width and each length a local
-detail without cross-strip extension lines. ENGRAVING separates numeral
-dimensions from the open-edge Top detail for the square-bottom groove depth.
-The numeral detail and its dimensions leave air at the left border, with its
-placement note below the detail title and scale. Section G-G cuts the whole
-.315 x .118 bar across both strokes of the zero numeral, so the true V grooves read
-in profile, and imports NumeralDepth there; its callout names the V angle.
-Native probes import TickDepth in Top but not in a removed cut-only section,
-so G-G is a full section (with hidden lines removed only the cut face shows).
-All sizes, bands and places come from the part; scale is never shrunk to fit.
-Part-spec coordinates are millimetres; model-point projection takes metres.
-Drawing-sheet positions and projected fence coordinates are also metres.
+BAR gives the envelope, the left-origin scale station and the numbered notes
+its dimensions link. GRADUATIONS enlarges the full/minor pitch; TICK LENGTHS
+gives groove width and each length a local detail without cross-strip
+extension lines. ENGRAVING separates numeral dimensions (detail F at the 0,
+detail H at the 10) from the open-edge Top detail for the square-bottom
+groove depth. Each detail's parent on sheets 2-4 is a reduced copy of a
+sheet 1 view, labelled with that view's name and scale. Section G-G cuts the
+whole .315 x .118 bar across both strokes of the zero numeral, so the true V
+grooves read in profile, and imports NumeralDepth there; its callout names
+the V angle. Native probes import TickDepth in Top but not in a removed
+cut-only section, so G-G is a full section (with hidden lines removed only
+the cut face shows). All sizes, bands and places come from the part; scale
+is never shrunk to fit. Part-spec coordinates are millimetres; model-point
+projection takes metres. Drawing-sheet positions and projected fence
+coordinates are also metres.
 
 This replaces draw_ha_measuring_stick without a legacy entry point: its
 split-common check, path and session imports live here, while ruled-face
@@ -72,6 +74,17 @@ FRONT_CENTER = (0.155, 0.175)
 TOP_CENTER = (FRONT_CENTER[0], 0.110)
 # r2-r3 sheet 1: the 8.00 dimension line's tail touched the isometric at x 0.335.
 ISO_CENTER = (0.355, 0.145)
+# Upper-left of sheet 1's numbered notes: under the bottom view, its longest
+# line ending left of the title block.
+NOTES_XY = (0.020, 0.085)
+# Each detail's parent on sheets 2-4 is a 1:2 copy of a sheet 1 view: its
+# label's upper-left sits this far left of and below the copy's centre, so
+# the label centres under the bar, clear of its edge (rule 9).
+PARENT_LABEL_OFFSET = (-0.024, -0.004)
+# A detail letter's centre stands this far above whichever is higher, its
+# fence or the copy's upper edge, so it reads as the fence's letter (the
+# letters print about 7 mm tall).
+DETAIL_LETTER_GAP = 0.0045
 DETAIL_PARENT_CENTER = (0.230, 0.245)
 DETAIL_CENTER = (0.180, 0.140)
 DETAIL_SCALE = (6.0, 1.0)
@@ -87,7 +100,17 @@ NUMERAL_PARENT_CENTER = (0.130, 0.210)
 NUMERAL_CENTER = (0.165, 0.135)
 # The fence includes the real full-tick endpoint and both numeral gap anchors.
 NUMERAL_RADIUS_MM = 7.0
-NUMERAL_NOTE_XY = (0.045, 0.068)
+# Detail H, on the same parent: the 10 sits on the -X side of the last full
+# tick, so its tick-edge gap gets its own detail (rule 26: a location is a
+# dimension). The fence holds the whole 10, the tick's end and the gap; the
+# detail sits in the free corner under detail F's dimensions.
+NUMERAL_10_MODEL_CENTER = (
+    part.SCALE_START_X + part.SCALE_SPAN - 1.2,
+    part.BODY_WIDTH - part.TICK_LENGTH - part.NUMERAL_GAP_MM - 0.6,
+)
+NUMERAL_10_RADIUS_MM = 2.6
+NUMERAL_10_CENTER = (0.060, 0.052)
+NUMERAL_10_KEEP = {"Numeral10XGap": (0.050, 0.078)}
 # A 1:1 parent spreads the across-the-bar cutting line (and its two arrows)
 # over a readable 11 mm instead of a 1:2 nick.
 NUMERAL_PROFILE_PARENT_CENTER = (0.200, 0.250)
@@ -143,7 +166,7 @@ LENGTH_DETAILS = (
      (part.SCALE_START_X + part.DIVISION_SPACING / 2.0, part.BODY_WIDTH - part.HALF_TICK_LENGTH / 2.0),
      {"HalfTickLength": (0.300, 0.185)}, 4.0),
 )
-EXACT_FENCES = frozenset({"D"})
+EXACT_FENCES = frozenset({"D", "H"})
 NUMERAL_KEEP = {
     "NumeralHeight": (0.215, 0.183),
     "NumeralXGap": (0.100, 0.170),
@@ -166,14 +189,20 @@ def _rotate_ruled_face(adapter: Any, view: Any) -> None:
     adapter.currentModel.EditRebuild3()
 
 
+def _label_parent(adapter: Any, center: tuple[float, float], *,
+                  property_name: str = "Parent View Note") -> None:
+    """Name a reduced detail parent under its centre: view name and scale."""
+    add_property_linked_note(adapter, property_name, center[0] + PARENT_LABEL_OFFSET[0],
+                             center[1] + PARENT_LABEL_OFFSET[1])
+
 
 @_telemetry.traced("drawing.ms_engraving_detail", label_param="detail_label")
 def _engraving_detail(
     adapter: Any, parent: Any, *, model_center: tuple[float, float, float],
     view_xy: tuple[float, float], radius_mm: float, detail_label: str,
-    scale: tuple[float, float] = DETAIL_SCALE, exact: bool = False,
+    letter_clear_mm: float, scale: tuple[float, float] = DETAIL_SCALE, exact: bool = False,
 ) -> Any:
-    """Fence a useful-scale detail and move its parent letter off the strip.
+    """Fence a useful-scale detail and set its parent letter just above it.
 
     The fence's sheet radius is ``radius_mm / 2`` mm. With ``exact`` the
     circle is authored straight to the sketch database (no sketch inference,
@@ -181,6 +210,8 @@ def _engraving_detail(
     screen-pixel tolerance), read back, and selected for the detail, as in
     draw_ch_rocker_arm._create_detail; the fence then sits exactly on
     ``model_center`` with model radius ``radius_mm`` at the 1:2 parents.
+    ``letter_clear_mm`` is the model distance from the centre up to the
+    parent's upper edge: the letter clears both that edge and the fence.
     """
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
@@ -238,7 +269,8 @@ def _engraving_detail(
     ]
     if len(matching) != 1:
         raise RuntimeError(f"detail {detail_label}: expected one matching parent circle")
-    letter_xy = (center[0], center[1] + 0.015)
+    letter_xy = (center[0], center[1] + max(radius_mm, letter_clear_mm) * 0.5 / 1000.0
+                 + DETAIL_LETTER_GAP)
     matching[0].SetLabelPosition(*letter_xy)
     rebuild_drawing(adapter, label=f"place detail {detail_label} parent letter")
     actual = tuple(float(value) for value in matching[0].GetLabelPosition())
@@ -303,12 +335,12 @@ def _assert_numeral_depth_owner(annotation: Any) -> None:
 
 @_telemetry.traced("drawing.ms_stick.imported_text_and_limits")
 def _assert_imported_text_and_limits(adapter: Any, annotations: list[Any]) -> None:
-    """Every imported dimension prints the callout its part authored, and each
-    MIN-limit size still prints as a single MIN limit. The width ceiling and
-    the stock under the grooves print nowhere else, so a lost row or a changed
-    tolerance type must fail the drawing; the part, not the drawing, writes
-    the text (#1942)."""
-    names = {*callouts.CALLOUTS, *part.MIN_LIMIT_DEVIATIONS_MM}
+    """Every imported dimension prints the callout and count prefix its part
+    authored, and each MIN-limit size still prints as a single MIN limit. The
+    width ceiling and the stock under the grooves print nowhere else, so a
+    lost row or a changed tolerance type must fail the drawing; the part, not
+    the drawing, writes the text (#1942)."""
+    names = {*callouts.CALLOUTS, *callouts.PREFIXES, *part.MIN_LIMIT_DEVIATIONS_MM}
     displays: dict[str, list[Any]] = {name: [] for name in names}
     for annotation in annotations:
         name = dimension_name(adapter, annotation)
@@ -319,10 +351,12 @@ def _assert_imported_text_and_limits(adapter: Any, annotations: list[Any]) -> No
     if missing:
         raise RuntimeError(f"imported dimensions missing from the sheet: {missing}")
     wrong = {
-        name: printed
-        for name, text in callouts.CALLOUTS.items()
+        (name, part_id): printed
+        for part_id, texts in ((callouts.CALLOUT_BELOW, callouts.CALLOUTS),
+                               (callouts.PREFIX, callouts.PREFIXES))
+        for name, text in texts.items()
         for display in displays[name]
-        if callouts.callout_rows(printed := str(display.GetText(callouts.CALLOUT_BELOW) or ""))
+        if callouts.callout_rows(printed := str(display.GetText(part_id) or ""))
         != callouts.callout_rows(text)
     }
     if wrong:
@@ -361,8 +395,8 @@ async def build(adapter: Any) -> dict[str, str]:
     check("open measuring stick", await adapter.open_model(str(SOURCE)))
     source_model = adapter.currentModel
     properties = ("Number", "Revision", "Title", "Material Specification", "Finish",
-                  "Quantity", "Manufacturing Notes", "Front View Note", "Isometric View Note",
-                  "Numeral Placement Note", "Section Parent View Note")
+                  "Quantity", "Manufacturing Notes", "Isometric View Note", "Parent View Note",
+                  "Bottom Parent View Note", "Section Parent View Note")
     read_required_properties(source_model, properties, required=properties)
     drawing, _sheet = new_project_drawing(adapter, property_view=PART_STEM,
                                         scale=SHEET_SCALE, layout=SPEC.layout,
@@ -381,7 +415,7 @@ async def build(adapter: Any) -> dict[str, str]:
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=SHEET_SCALE)
     # Built-in *Isometric showed only the plain back face (machinist review,
     # run 20261027T054106110Z-752837f3): place the part's ruled-face octant
-    # and turn it like the RULED FACE view so ticks and numerals read.
+    # and turn it like the front view so ticks and numerals read.
     iso = place_view(adapter, str(SOURCE), octant_view_name(*callouts.RULED_FACE_ISOMETRIC_OCTANT),
                      *ISO_CENTER, scale=(1.0, 2.0))
     _rotate_ruled_face(adapter, front)
@@ -392,8 +426,7 @@ async def build(adapter: Any) -> dict[str, str]:
     for view, keep, label in ((front, FRONT_KEEP, "ruled bar"), (top, TOP_KEEP, "bar edge")):
         annotations += curate_view_dimensions(adapter, view, keep=keep, view_label=label,
                                                dimensions_by_feature=part.DRAWING_DIMENSIONS)
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.045, 0.075)
-    add_property_linked_note(adapter, "Front View Note", 0.055, 0.135)
+    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", 0.285, 0.095)
 
     if not ddoc.ActivateSheet(SHEET_NAMES[1]):
@@ -401,6 +434,7 @@ async def build(adapter: Any) -> dict[str, str]:
     parent = place_view(adapter, str(SOURCE), "*Back", *DETAIL_PARENT_CENTER, scale=(1.0, 2.0))
     _rotate_ruled_face(adapter, parent)
     set_hidden_lines_removed(adapter, parent)
+    _label_parent(adapter, DETAIL_PARENT_CENTER)
     owners = tuple(feature for feature, names in part.DRAWING_DIMENSIONS.items()
                    if feature in part.REFERENCE_DIMENSIONS and names & set(DETAIL_KEEP))
     with part_sketches_shown(adapter, source_model, owners,
@@ -409,7 +443,8 @@ async def build(adapter: Any) -> dict[str, str]:
             adapter, parent,
             model_center=((part.SCALE_START_X + part.DIVISION_SPACING / 2.0) / 1000.0,
                           part.BODY_WIDTH / 2000.0, 0.0),
-            view_xy=DETAIL_CENTER, radius_mm=DETAIL_RADIUS_MM, detail_label="A")
+            view_xy=DETAIL_CENTER, radius_mm=DETAIL_RADIUS_MM, detail_label="A",
+            letter_clear_mm=part.BODY_WIDTH / 2.0)
         set_hidden_lines_removed(adapter, detail)
         annotations += curate_view_dimensions(adapter, detail, keep=DETAIL_KEEP,
                                                view_label="graduation detail",
@@ -421,6 +456,7 @@ async def build(adapter: Any) -> dict[str, str]:
         length_parent = place_view(adapter, str(SOURCE), "*Back", *parent_xy, scale=(1.0, 2.0))
         _rotate_ruled_face(adapter, length_parent)
         set_hidden_lines_removed(adapter, length_parent)
+        _label_parent(adapter, parent_xy)
         owners = tuple(feature for feature, names in part.DRAWING_DIMENSIONS.items()
                        if feature in part.REFERENCE_DIMENSIONS and names & set(keep))
         with part_sketches_shown(adapter, source_model, owners,
@@ -428,7 +464,8 @@ async def build(adapter: Any) -> dict[str, str]:
             length_detail = _engraving_detail(
                 adapter, length_parent,
                 model_center=(model_xy[0] / 1000.0, model_xy[1] / 1000.0, 0.0),
-                view_xy=detail_xy, radius_mm=radius_mm, detail_label=label, exact=label in EXACT_FENCES)
+                view_xy=detail_xy, radius_mm=radius_mm, detail_label=label,
+                letter_clear_mm=model_xy[1], exact=label in EXACT_FENCES)
             set_hidden_lines_removed(adapter, length_detail)
             annotations += curate_view_dimensions(
                 adapter, length_detail, keep=keep, view_label=f"tick length {label}",
@@ -440,21 +477,33 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, str(SOURCE), "*Back", *NUMERAL_PARENT_CENTER, scale=(1.0, 2.0))
     _rotate_ruled_face(adapter, numeral_parent)
     set_hidden_lines_removed(adapter, numeral_parent)
+    _label_parent(adapter, NUMERAL_PARENT_CENTER)
     owners = tuple(feature for feature, names in part.DRAWING_DIMENSIONS.items()
-                   if feature in part.REFERENCE_DIMENSIONS and names & set(NUMERAL_KEEP))
+                   if feature in part.REFERENCE_DIMENSIONS
+                   and names & {*NUMERAL_KEEP, *NUMERAL_10_KEEP})
     with part_sketches_shown(adapter, source_model, owners,
                             label="numeral dimensions", base_view=numeral_parent):
+        numeral_y = part.BODY_WIDTH - part.TICK_LENGTH - part.NUMERAL_GAP_MM
         numeral = _engraving_detail(
             adapter, numeral_parent,
             model_center=((part.SCALE_START_X + part.TICK_WIDTH / 2.0
                            + part.NUMERAL_GAP_MM + part.NUMERAL_HEIGHT_MM / 2.0) / 1000.0,
-                          (part.BODY_WIDTH - part.TICK_LENGTH - part.NUMERAL_GAP_MM) / 1000.0, 0.0),
-            view_xy=NUMERAL_CENTER, radius_mm=NUMERAL_RADIUS_MM, detail_label="F")
+                          numeral_y / 1000.0, 0.0),
+            view_xy=NUMERAL_CENTER, radius_mm=NUMERAL_RADIUS_MM, detail_label="F",
+            letter_clear_mm=numeral_y)
         set_hidden_lines_removed(adapter, numeral)
         annotations += curate_view_dimensions(
             adapter, numeral, keep=NUMERAL_KEEP, view_label="numeral detail",
             dimensions_by_feature=part.DRAWING_DIMENSIONS)
-    add_property_linked_note(adapter, "Numeral Placement Note", *NUMERAL_NOTE_XY)
+        numeral_10 = _engraving_detail(
+            adapter, numeral_parent,
+            model_center=(NUMERAL_10_MODEL_CENTER[0] / 1000.0, NUMERAL_10_MODEL_CENTER[1] / 1000.0, 0.0),
+            view_xy=NUMERAL_10_CENTER, radius_mm=NUMERAL_10_RADIUS_MM, detail_label="H",
+            letter_clear_mm=NUMERAL_10_MODEL_CENTER[1], exact="H" in EXACT_FENCES)
+        set_hidden_lines_removed(adapter, numeral_10)
+        annotations += curate_view_dimensions(
+            adapter, numeral_10, keep=NUMERAL_10_KEEP, view_label="numeral 10 detail",
+            dimensions_by_feature=part.DRAWING_DIMENSIONS)
     # Unturned, unlike the other ruled-face parents: SolidWorks lays the
     # cutting-line letters out in the parent's own frame, so turned 180 degrees
     # each G printed back across its own arrowhead (v46 and 308 sheet 4).
@@ -474,11 +523,13 @@ async def build(adapter: Any) -> dict[str, str]:
     depth_parent = place_view(
         adapter, str(SOURCE), "*Top", *DEPTH_PARENT_CENTER, scale=(1.0, 2.0))
     set_hidden_lines_removed(adapter, depth_parent)
+    _label_parent(adapter, DEPTH_PARENT_CENTER, property_name="Bottom Parent View Note")
     depth = _engraving_detail(
         adapter, depth_parent,
         model_center=(part.SCALE_START_X / 1000.0, part.BODY_WIDTH / 1000.0,
                       part.BODY_THICKNESS / 2000.0),
-        view_xy=DEPTH_CENTER, radius_mm=DEPTH_RADIUS_MM, detail_label="B", scale=DEPTH_SCALE)
+        view_xy=DEPTH_CENTER, radius_mm=DEPTH_RADIUS_MM, detail_label="B",
+        letter_clear_mm=part.BODY_THICKNESS / 2.0, scale=DEPTH_SCALE)
     set_hidden_lines_removed(adapter, depth)
     annotations += curate_view_dimensions(adapter, depth, keep=DEPTH_KEEP,
                                            view_label="engraving depth detail",
