@@ -83,6 +83,7 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _part_properties import part_drawing_unit
 from _surface_finish import surface_finish_by_key
+import _config
 import _telemetry
 import build_dt_cone_swing_platform as _part
 from diagnostics.drawing_layout_audit import (
@@ -100,10 +101,10 @@ from dt_cone_swing_platform_drawing_spec import (
     PIVOT_PROCESS,
     POST_MOUNT_LOCATING_CALLOUT,
     RELIEF_WIDTH_CALLOUT,
-    TIP_DOWEL_CALLOUT,
     TOP_FACE_LABEL,
     UNDERSIDE_LABEL,
 )
+from dt_drive_train_steps import step_ref
 from dt_cone_swing_platform_spec import (
     HOLDDOWN_CBORE_DIA,
     HOLDDOWN_CLEARANCE_DIA,
@@ -398,6 +399,25 @@ _TIP_DOWEL_X_TEXT_X = (
         (DETAIL_SHEET_RADIUS + 0.001) ** 2 - (TIP_DOWEL_X_LINE_Y - DETAIL_CENTER[1]) ** 2
     )
     - TIP_DOWEL_X_TEXT_SIZE[0] / 2.0
+)
+# Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
+# #2248).  The tip-block locating dowel's slip ream, under its
+# banded diameter in detail B, standing alone for MHA-DT-00 step
+# post-and-tip-block ("DRILL AND REAM UP THRU MHA-DT-20 INTO MHA-DT-21 PER
+# THEIR CALLOUTS"): reamed through to this size, match-reamed with the block
+# on, after MHA-DT-21's press ream has been drilled and reamed up through this
+# plate (the lift rod's made-at-assembly precedent,
+# dt_pinion_lift_rod_spec.PIN_HOLE_CALLOUT).  Three rows of at most 16
+# characters: the block stands right of detail B's circle, between
+# HoldDownX's text, the hold-down callout and the plan captions (see
+# TIP_DOWEL_CALLOUT_SIZE).
+TIP_BLOCK_NUMBER = _config.parts("dt-cone-tip-block")["number"]
+TIP_DOWEL_CALLOUT = "\n".join(
+    (
+        "MATCH-REAM THRU",
+        f"AFTER {TIP_BLOCK_NUMBER},",
+        step_ref("post-and-tip-block"),
+    )
 )
 TIP_DOWEL_CALLOUT_SIZE = (0.0475, 0.0224)
 _TIP_DOWEL_CALLOUT_BOTTOM = HOLDDOWN_X_LINE_Y + HOLDDOWN_X_TEXT_SIZE[1] + 0.0015

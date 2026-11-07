@@ -1134,7 +1134,7 @@ def test_dowel_hole_callout_names_its_dowel_and_where_it_is_drilled() -> None:
     import dt_drive_train_steps
 
     spec = dt_cone_tip_block_spec
-    callout = spec.DOWEL_HOLE_CALLOUT
+    callout = drawing.DOWEL_HOLE_CALLOUT
     assert drawing.DIMENSION_CALLOUTS["DowelHoleDia"] == callout
     assert callout.split("\n") == [
         f"REAM {spec.length_text(spec.DOWEL_HOLE_DEPTH, 2)} DEEP, PRESS FIT",

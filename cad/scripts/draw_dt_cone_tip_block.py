@@ -46,6 +46,7 @@ from _paths import CAD_ROOT
 from _part_properties import part_drawing_unit
 from _session import run_build
 from _surface_finish import surface_finish_by_key
+import _config
 import _telemetry
 from dt_cone_tip_block_spec import (
     ADJUSTER_AXIS_HEIGHT,
@@ -54,7 +55,8 @@ from dt_cone_tip_block_spec import (
     BLOCK_HEIGHT,
     BLOCK_X,
     BLOCK_Z,
-    DOWEL_HOLE_CALLOUT,
+    DOWEL_HOLE_DEPTH,
+    DOWEL_HOLE_DEPTH_PLACES,
     DOWEL_HOLE_DIA,
     DOWEL_HOLE_PRINTED_TEXT,
     DOWEL_X,
@@ -77,6 +79,7 @@ from dt_cone_tip_block_spec import (
     length_text,
     printed_value_text,
 )
+from dt_drive_train_steps import step_ref
 
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -93,6 +96,26 @@ OUTPUTS = DrawingOutputs(
 SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
+
+# Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
+# #2248).  The press ream's callout, under its banded diameter on
+# the bottom view, standing alone for MHA-DT-00 step post-and-tip-block
+# ("DRILL AND REAM UP THRU MHA-DT-20 INTO MHA-DT-21 PER THEIR CALLOUTS"):
+# its depth, the dowel pressed to its floor, and the match-drilling from
+# below through MHA-DT-20 at that step (the lift rod's made-at-assembly
+# precedent, dt_pinion_lift_rod_spec.PIN_HOLE_CALLOUT).  No view shows the
+# blind hole's floor (hidden lines removed, and the sheet cuts no section),
+# so its depth rides the callout at its .XX, rendered from DOWEL_HOLE_DEPTH.
+DOWEL_PIN_NUMBER = _config.parts("dt-vn-locating-pin")["number"]
+PLATFORM_NUMBER = _config.parts("dt-cone-swing-platform")["number"]
+DOWEL_HOLE_CALLOUT = "\n".join(
+    (
+        f"REAM {length_text(DOWEL_HOLE_DEPTH, DOWEL_HOLE_DEPTH_PLACES)} DEEP, PRESS FIT",
+        f"DOWEL {DOWEL_PIN_NUMBER} TO FLOOR;",
+        f"MATCH-DRILL UP THRU {PLATFORM_NUMBER}",
+        f"AT {step_ref('post-and-tip-block')}",
+    )
+)
 
 # User ruling 2026-09-29 (eight-views-4.png, lower right): the block is a
 # plain straight prism standing on the swing platform, held down by one

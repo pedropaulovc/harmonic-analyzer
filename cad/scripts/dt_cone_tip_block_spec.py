@@ -11,7 +11,6 @@ from typing import Literal
 
 import _config
 import _printed_tolerance
-import dt_drive_train_steps
 import dt_vn_locating_pin_spec as locating_pin
 from _fit_deviations import deviations
 from _gtol_planar import PlanarFace
@@ -728,25 +727,6 @@ def printed_value_text(name: str, nominal: float) -> str:
     return length_text(nominal, DRAWING_PRECISION_BY_NAME[name])
 
 
-# Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
-# #2248).  The press ream's callout, under its banded diameter on
-# the bottom view, standing alone for MHA-DT-00 step post-and-tip-block
-# ("DRILL AND REAM UP THRU MHA-DT-20 INTO MHA-DT-21 PER THEIR CALLOUTS"):
-# its depth, the dowel pressed to its floor, and the match-drilling from
-# below through MHA-DT-20 at that step (the lift rod's made-at-assembly
-# precedent, dt_pinion_lift_rod_spec.PIN_HOLE_CALLOUT).  No view shows the
-# blind hole's floor (hidden lines removed, and the sheet cuts no section),
-# so its depth rides the callout at its .XX, rendered from DOWEL_HOLE_DEPTH.
-DOWEL_PIN_NUMBER = _config.parts("dt-vn-locating-pin")["number"]
-PLATFORM_NUMBER = _config.parts("dt-cone-swing-platform")["number"]
-DOWEL_HOLE_CALLOUT = "\n".join(
-    (
-        f"REAM {length_text(DOWEL_HOLE_DEPTH, DOWEL_HOLE_DEPTH_PLACES)} DEEP, PRESS FIT",
-        f"DOWEL {DOWEL_PIN_NUMBER} TO FLOOR;",
-        f"MATCH-DRILL UP THRU {PLATFORM_NUMBER}",
-        f"AT {dt_drive_train_steps.step_ref('post-and-tip-block')}",
-    )
-)
 # The two dowel values as the bottom view prints them, for the sheet's ink
 # estimate: the station with its symmetric band, and the ream's size with
 # its stacked band's upper row beside it.
