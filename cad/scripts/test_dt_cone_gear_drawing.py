@@ -185,7 +185,7 @@ def test_each_sheet_gets_its_own_actual_cutting_recipe() -> None:
         data = notes.gear_data(teeth)
         assert data.startswith("GEAR DATA\n")
         assert f"T{teeth:03d}" in data
-        assert f"{spec.DIAMETRAL_PITCH:.2f} / {spec.PRESSURE_ANGLE_DEG:.1f} DEG" in data
+        assert f"{spec.DIAMETRAL_PITCH:.2f} / {spec.PRESSURE_ANGLE_DEG:.1f}\u00b0" in data
         for physical_recipe in (
             "CUTTER", "CUTTER PLUNGE FROM BLANK OD", "WHOLE DEPTH",
             "TOOTH FORM", "BACKLASH WITH MATE", "ROOT RADIAL MIN/MAX", "WEB",
@@ -323,7 +323,13 @@ def test_numbered_notes_state_the_bore_fit_from_both_parts_limits() -> None:
         assert 0.0 < round_min < round_max and 0.0 < flat_min < flat_max
         text = drawing.sheet_notes(teeth)
         lines = text.splitlines()
-        assert lines[0].startswith("1. SLIDING FIT ON MHA-DT-04")
+        # The mate by name and number, and the land it fits (rule 4).
+        shaft = str(_config.parts("dt-cone-gear-shaft")["title"]).upper()
+        land = (
+            f"\u00d8{spec.inch_text(spec.bore_dia_mm(teeth), 4)} LAND, "
+            f"{spec.inch_text(spec.bore_flat_af_mm(teeth), 4)} ACROSS FLAT"
+        )
+        assert lines[0].startswith(f"1. SLIDING FIT ON {shaft} MHA-DT-04, {land}")
         assert lines[2].startswith(f"2. TEETH MESH WITH {notes.CYLINDER_MATE_NUMBER}")
         clearance = (
             f"(CLEARANCE {spec.inch_text(round_min, 4)}-{spec.inch_text(round_max, 4)} ON \u00d8, "
@@ -481,7 +487,9 @@ def test_custom_six_sheet_defines_the_tooth_space_point_by_point() -> None:
     template = profile.template
     data = drawing.cutter_grind_data()
     lines = data.splitlines()
-    assert lines[0] == "T006 TOOTH SPACE FORM, INCH"
+    # It reads as the second sheet of the T006 drawing, not a part of its own.
+    assert lines[0] == f"{notes.T006_NUMBER}, CONTINUED FROM SHEET 1:"
+    assert lines[1] == "T006 TOOTH SPACE FORM, INCH"
     assert drawing.SHEET_NAMES[0] == "T006"
     assert "OVER PINS PER SHEET 1 " in lines[-2]
     assert notes.CYLINDER_MATE_NUMBER in lines[-3]
@@ -678,11 +686,16 @@ def test_notes_state_no_bore_joint_method_or_review_record() -> None:
     # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): native D-bore dimensions carry its fit, and the Gear Data block
     # reports actual cutter/mesh facts separately. Every sheet keeps the same
     # two short manufacturing notes, without review history or waived floors.
-    expected = [
-        "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS.",
-        "MAKE ONE GEAR FROM EACH T-CONFIGURATION SHEET.",
-    ]
-    assert notes.DRAWING_NOTES.splitlines() == expected
+    # The quantity is plain words, and says the tooth-space sheet belongs to
+    # T006 (round-1 review: "T-CONFIGURATION SHEET" was a private label).
+    expected = notes.DRAWING_NOTES.splitlines()
+    assert expected[0] == "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
+    assert len(expected) == 2 and "T-CONFIGURATION" not in notes.DRAWING_NOTES
+    sheet = len(spec.CONFIGURATION_TEETH) + 1
+    assert f"SHEET {sheet} CONTINUES {notes.T006_NUMBER}" in expected[1]
+    assert notes.T006_NUMBER == spec.configuration_number(
+        str(_config.parts("dt-cone-gear")["number"]), 6
+    )
     assert not hasattr(notes, "ATTACHMENT")
     for teeth in spec.CONFIGURATION_TEETH:
         text = notes.drawing_notes(teeth)
@@ -1499,17 +1512,51 @@ def test_only_the_front_view_shows_the_authoring_sketches() -> None:
             assert not owned & set(drawing.bore_view_keep(teeth))
 
 
-# Measured by the layout audit on the T006 sheet (layoutcal2, cone-gear.json):
-# the vertical centre-mark line reaches y 0.1763, and the BlankDia value's text
-# box hangs 0.0036 below its anchor (anchor 0.1791, box bottom 0.1755).
-_T006_CENTRE_MARK_TOP = 0.1763
-_BLANK_DIA_TEXT_DESCENT = 0.0036
 
-
-def test_t006_blank_dia_value_clears_the_centre_mark_line() -> None:
-    """layoutcheck T006: the value sat 0.82 mm down over the centre-mark line."""
-    text_bottom = drawing.front_keep(6)["BlankDia"][1] - _BLANK_DIA_TEXT_DESCENT
-    assert text_bottom >= _T006_CENTRE_MARK_TOP + 0.001
+def test_t006_blank_dia_leader_lands_on_a_tooth_tip_clear_of_detail_b() -> None:
+    """Round-1 review of the fan-out: T006's leader, dropped at 12 o'clock,
+    ended in the tooth space inside DETAIL B's boundary. It lands on the 240
+    deg tip; its block stands down left, clear of the front view, the centre
+    mark and DETAIL A's dimensions."""
+    teeth = 6
+    arrow = drawing.blank_dia_arrow_deg(teeth)
+    profile = spec.stock_form_profile(teeth)
+    land = math.degrees(math.pi / teeth - profile.tip_half_angle_rad)
+    pitch = 360.0 / teeth
+    assert abs(math.remainder(arrow, pitch)) <= land / 2.0
+    centre = drawing.FRONT_CENTER
+    half_od = drawing.rendered_half_od(teeth)
+    tip = (
+        centre[0] + half_od * math.cos(math.radians(arrow)),
+        centre[1] + half_od * math.sin(math.radians(arrow)),
+    )
+    for detail in drawing.front_details(teeth):
+        ring_centre, ring = drawing.front_detail_on_sheet(teeth, detail)
+        assert math.dist(tip, ring_centre) > ring + 0.002, detail.letter
+    x, y = drawing.front_keep(teeth)["BlankDia"]
+    x0, y0, x1, y1 = drawing.BLANK_DIA_BLOCK
+    block = (x + x0, y + y0, x + x1, y + y1)
+    # Clear of the front view's outline box, both centre-mark arms and the
+    # zone band.
+    front_box = (
+        centre[0] - half_od - _FRONT_OUTLINE_PAD, centre[1] - half_od - _FRONT_OUTLINE_PAD,
+        centre[0] + half_od + _FRONT_OUTLINE_PAD, centre[1] + half_od + _FRONT_OUTLINE_PAD,
+    )
+    assert _drawing_annotation_extent.boxes_clear(block, front_box)
+    assert block[2] < centre[0] - 0.002 and block[3] < centre[1] - 0.002
+    assert block[0] > _ZONE_MARGIN + 0.002
+    # Over DETAIL A's flat-clock arc and its diameter's text, under the view.
+    vx, vy = drawing.bore_flat_vertex(teeth)
+    clock_x, clock_y = drawing.bore_view_keep(teeth)["BoreFlatClock"]
+    assert block[1] > vy + math.dist((vx, vy), (clock_x, clock_y)) + 0.003
+    dia_x, dia_y = drawing.bore_view_keep(teeth)["BoreCutDia"]
+    assert block[1] > dia_y + 2.0 * _BORE_TEXT_HALF_HEIGHT + 0.005
+    # Every other sheet keeps its block over the gear, left of the axis.
+    for other in spec.CONFIGURATION_TEETH[1:]:
+        assert drawing.front_keep(other)["BlankDia"] == pytest.approx((
+            centre[0] - drawing.BLANK_DIA_SHIFT_X,
+            centre[1] + drawing.rendered_half_od(other) + drawing.BLANK_DIA_LIFT,
+        ))
 
 
 def test_invalid_family_member_is_rejected() -> None:

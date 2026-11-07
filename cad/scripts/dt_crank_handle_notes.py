@@ -13,9 +13,10 @@ from dt_crank_handle_pivot_screw_spec import (
     DIAMETRAL_CLEARANCE_MIN,
 )
 from dt_crank_handle_spec import (
-    COUNTERBORE_DIA_MAX,
     COUNTERBORE_GLUE_LINE,
+    CUP_NAME,
     CUP_NUMBER,
+    FERRULE_NAME,
     FERRULE_NUMBER,
     SCREW_NUMBER,
     TENON_GLUE_LINE,
@@ -23,6 +24,8 @@ from dt_crank_handle_spec import (
     TENON_WALL_MIN,
     inch_text,
 )
+
+SCREW_NAME = "PIVOT SCREW"
 
 
 def _range(band: tuple[float, float], places: int) -> str:
@@ -36,37 +39,47 @@ def _floor_thou(value_mm: float) -> str:
 
 # Rule 7: each callout is its size/process line plus at most two lines of
 # words; anything longer is a numbered note its callout flags (SEE NOTE n).
-# Rule 4: each fit by its standard name and mate number, the clearance its
-# limits give as a reference.  The tenon and the counterbore are epoxied
-# (dt_crank_handle_ferrule_spec, dt_crank_handle_butt_cup_spec), so bonded.
-# The reamed bore runs on the MHA-DT-32 shoulder (#290 fit F12: .0050-.0075).
+# Rule 4: each fit by its standard name and its mate by name and full
+# number, the clearance its limits give as a reference.  The tenon and the
+# counterbore are epoxied (dt_crank_handle_ferrule_spec,
+# dt_crank_handle_butt_cup_spec), so bonded.  The reamed bore runs on the
+# MHA-DT-32 shoulder (#290 fit F12: .0050-.0075).
 PIVOT_BORE_CALLOUT = (
-    f"REAM THRU\nRUNNING FIT ON {SCREW_NUMBER}\n"
+    f"REAM THRU, RUNNING FIT ON\n{SCREW_NUMBER} {SCREW_NAME}\n"
     f"(CLEARANCE {_range((DIAMETRAL_CLEARANCE_MIN, DIAMETRAL_CLEARANCE_MAX), 4)})"
 )
 TENON_NOTE_NUMBER = 1
 COUNTERBORE_NOTE_NUMBER = 2
 TENON_CALLOUT = (
-    f"BONDED FIT IN {FERRULE_NUMBER}, EPOXY\n"
-    f"(CLEARANCE {_range(TENON_GLUE_LINE, 3)}) SEE NOTE {TENON_NOTE_NUMBER}"
+    f"BONDED FIT IN {FERRULE_NUMBER} {FERRULE_NAME}\n"
+    f"WITH EPOXY, SEE NOTE {TENON_NOTE_NUMBER}\n"
+    f"(CLEARANCE {_range(TENON_GLUE_LINE, 3)})"
 )
 COUNTERBORE_CALLOUT = (
-    f"BONDED FIT ON {CUP_NUMBER}, EPOXY\n"
-    f"(CLEARANCE {_range(COUNTERBORE_GLUE_LINE, 3)}) SEE NOTE {COUNTERBORE_NOTE_NUMBER}"
+    f"BONDED FIT ON {CUP_NUMBER} {CUP_NAME}\n"
+    f"WITH EPOXY, SEE NOTE {COUNTERBORE_NOTE_NUMBER}\n"
+    f"(CLEARANCE {_range(COUNTERBORE_GLUE_LINE, 3)})"
 )
-# The wall shortfalls stay exact (owner exceptions RV-01 and RV-02); the
-# counterbore's limit and the depth's acceptance (the depth is a reference).
+# The wall shortfalls stay exact (owner exceptions RV-01 and RV-02).  The
+# counterbore's diameter is controlled by its bonded-fit clearance alone:
+# the largest cup plus the widest glue line stays under the Ø.435 the butt
+# wall is budgeted at (dt_crank_handle_spec.COUNTERBORE_DIA_MAX keeps .002
+# of margin), so no second limit prints (round 1 f08277cd).  The depth is a
+# reference, so note 2 states its acceptance.
 TENON_NOTE = (
     f"{TENON_NOTE_NUMBER}. WALL {_floor_thou(TENON_STRAIGHT_WALL_MIN)} MIN; "
     f"WALL {_floor_thou(TENON_WALL_MIN)} MIN AT TENON END."
 )
 COUNTERBORE_NOTE = (
-    f"{COUNTERBORE_NOTE_NUMBER}. <MOD-DIAM>{inch_text(COUNTERBORE_DIA_MAX, 3)} MAX; "
-    f"DEPTH SETS {CUP_NUMBER} FACE\n   FLUSH WITH OAK END."
+    f"{COUNTERBORE_NOTE_NUMBER}. DEPTH SETS {CUP_NUMBER} FACE FLUSH WITH OAK END."
 )
 SHEET_NOTES = f"{TENON_NOTE}\n{COUNTERBORE_NOTE}"
-# The inside corners' single limits name the part seating on each by number;
-# the relief's band the ferrule seating outside it (rule 4).
+# The inside corners' single limits name the part seating on each by number.
+# The root relief's band keeps the root round behind the ferrule's seat face
+# and enough shoulder face for it (owner ruling 2026-10-24, #1900): the
+# shoulder seats the ferrule (rule 26: standard words, round 1 f08277cd).
+# Rows of 14 characters at most stand left of detail B, clear of the 2.20
+# row's extension line.
 TENON_ROOT_CALLOUT = f"{FERRULE_NUMBER}\nSEAT"
 COUNTERBORE_FLOOR_CALLOUT = f"{CUP_NUMBER}\nSEAT"
-TENON_ROOT_RELIEF_CALLOUT = f"X 45°\n{FERRULE_NUMBER}\nSEATS OUTSIDE"
+TENON_ROOT_RELIEF_CALLOUT = f"X 45°\nSHOULDER SEATS\n{FERRULE_NUMBER}"

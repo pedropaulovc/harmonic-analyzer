@@ -11,6 +11,7 @@ import re
 import textwrap
 from dataclasses import replace
 
+import _config
 import cone_set_stack
 import dt_cone_gear_spec as spec
 import dt_mesh_checks
@@ -76,7 +77,7 @@ def gear_data(teeth: int) -> str:
     pin = spec.over_pins_pin_dia_mm(teeth)
     rows = (
         ("CONFIGURATION / TEETH", f"T{teeth:03d} / {teeth}"),
-        ("DIAMETRAL PITCH / PRESSURE ANGLE", f"{spec.DIAMETRAL_PITCH:.2f} / {spec.PRESSURE_ANGLE_DEG:.1f} DEG"),
+        ("DIAMETRAL PITCH / PRESSURE ANGLE", f"{spec.DIAMETRAL_PITCH:.2f} / {spec.PRESSURE_ANGLE_DEG:.1f}\u00b0"),
         # The circle the circular tooth thickness is measured on (its callout
         # no longer names it: rule 7 allows two lines of words).
         ("PITCH DIAMETER (REF)", inch(teeth * spec.MODULE_MM, 4)),
@@ -167,9 +168,13 @@ def custom_cutter_detail() -> str:
     return "\n".join(lines)
 
 
+# The quantity in plain words (rule 26: "T-CONFIGURATION SHEET" was a private
+# label, and the tooth-space sheet, which makes no gear, muddled the count).
+T006_NUMBER = spec.configuration_number(str(_config.parts("dt-cone-gear")["number"]), 6)
 DRAWING_NOTES = "\n".join((
     "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS.",
-    "MAKE ONE GEAR FROM EACH T-CONFIGURATION SHEET.",
+    f"QTY 1 PER DRAWING NUMBER; SHEET {len(spec.CONFIGURATION_TEETH) + 1} "
+    f"CONTINUES {T006_NUMBER}.",
 ))
 
 

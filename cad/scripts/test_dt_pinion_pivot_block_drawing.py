@@ -153,6 +153,29 @@ def test_each_ream_callout_names_its_running_mate() -> None:
     assert "1/4 IN" not in callouts["PivotBoreDia"]
 
 
+def test_lift_bore_stations_reason_is_one_flagged_note() -> None:
+    """Farm round 1: the coined "PARK GAP" row (rule 26) ran through the
+    left border.  The callout flags note 1, which gives the stations' one
+    reason in standard words, mates by drawing number, six words or fewer."""
+    rows = drawing.DIMENSION_CALLOUTS["LiftBoreDia"].splitlines()
+    assert rows[-1] == f"SEE NOTE {drawing.LIFT_BORE_NOTE_NUMBER}"
+    note = drawing.LIFT_BORE_NOTE
+    assert note.startswith(f"{drawing.LIFT_BORE_NOTE_NUMBER}. .728 AND .085 ")
+    reason = note.split(".085 ", 1)[1].rstrip(".")
+    assert len(reason.split()) <= 6
+    for part in ("dt-pinion-cam", "dt-pinion-cam-pin"):
+        assert str(_config.parts(part)["number"]) in note
+    assert "PARK GAP" not in note
+    # Widest callout row (~2.6 mm a character), centred on its keep x, stays
+    # 5 mm inside the inner border (x 0.0124) and left of the .728 extension
+    # line (x ~0.1025); the note ends left of the title block (x 0.216).
+    x, _y = drawing.FRONT_KEEP["LiftBoreDia"]
+    half = max(len(row) for row in rows) * 0.0026 / 2.0
+    assert x - half > 0.0124 + 0.005
+    assert x + half < 0.1025 - 0.003
+    assert drawing.LIFT_BORE_NOTE_XY[0] + len(note) * 0.0026 < 0.216 - 0.005
+
+
 def test_sheet_carries_no_general_notes() -> None:
     # Every bore's fit is at its callout and the hold-downs at their DRILL
     # callout, so nothing is left for a general note; general tolerances live
