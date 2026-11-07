@@ -5,6 +5,7 @@ import ast
 import inspect
 import itertools
 import math
+import re
 from types import SimpleNamespace
 
 import pytest
@@ -318,6 +319,61 @@ def test_frozen_rows_name_the_row_and_both_values(fault):
         assert f"changed now: {tag} (row {row})" in message
         assert "expected=" in message and "actual=" in message
         assert repr(native.cells[row][3 if fault == "size" else 4]) in message
+
+
+def _strip_leading_zero(text):
+    return re.sub(r"^(-?)0\.", r"\1.", text)
+
+
+def test_location_value_is_the_exact_printed_three_place_number():
+    zero = {table._location_value(t) for t in (".000", "0.000", "-0.000", "-.000", "00.000")}
+    assert zero == {0}
+    assert table._location_value("-0.181") == table._location_value("-.181")
+    assert table._location_value("-0.181") != table._location_value("0.181")
+    assert table._location_value("1.250") != table._location_value("1.251")
+    for text in ("0.00", "0.0000", "1.25", "", "1,250", "+.181"):
+        with pytest.raises(RuntimeError, match="lost .XXX"):
+            table._location_value(text)
+
+
+@pytest.mark.parametrize("style", ["leading_zero", "zero_sign"])
+@pytest.mark.parametrize("side", ["table", "generated"])
+def test_frozen_location_cells_ignore_zero_style_only(side, style):
+    # Farm 957501d1: generated '.000' redisplayed as '0.000' after the column insert.
+    native = NativeCells()
+    assert native.cells[1][:3] == ["A1", "0.000", "0.000"]
+    generated = {tag: cells[:4] for tag, (_row, cells) in table._rows(native).items()}
+    if style == "leading_zero":
+        restyled = {tag: (cells[0], *map(_strip_leading_zero, cells[1:3]), cells[3])
+                    for tag, cells in generated.items()}
+        assert restyled["A1"][1:3] == (".000", ".000")
+    else:
+        restyled = {**generated, "A1": ("A1", "-0.000", "-.000", generated["A1"][3])}
+    if side == "table":
+        for row in native.cells[1:]:
+            row[:4] = restyled[row[0]]
+    else:
+        generated = restyled
+    assert set(table._frozen_rows(native, generated, notes=spec.TABLE_ROW_NOTES, stage="now")) \
+        == set(spec.TABLE_HOLES)
+
+
+@pytest.mark.parametrize("drift", ["last_place", "sign", "lost_place", "extra_place"])
+def test_frozen_location_cells_still_refuse_real_drift(drift):
+    native = NativeCells()
+    generated = {tag: cells[:4] for tag, (_row, cells) in table._rows(native).items()}
+    b1 = native.cells[2]
+    assert b1[0] == "B1" and table._location_value(b1[1]) != 0  # nonzero coordinate
+    if drift == "last_place":
+        generated["B1"] = ("B1", b1[1][:-1] + str((int(b1[1][-1]) + 1) % 10), *generated["B1"][2:])
+    elif drift == "sign":
+        flipped = b1[1][1:] if b1[1].startswith("-") else "-" + b1[1]
+        generated["B1"] = ("B1", flipped, *generated["B1"][2:])
+    else:
+        b1[1] = b1[1][:-1] if drift == "lost_place" else b1[1] + "0"
+    match = "changed now: B1 \\(row 2\\)" if drift in ("last_place", "sign") else "lost .XXX"
+    with pytest.raises(RuntimeError, match=match):
+        table._frozen_rows(native, generated, notes=spec.TABLE_ROW_NOTES, stage="now")
 
 
 def test_freshly_inserted_note_cells_must_be_empty_before_writing():

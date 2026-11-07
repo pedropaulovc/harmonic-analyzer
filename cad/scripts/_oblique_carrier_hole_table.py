@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import math
 import re
+from decimal import Decimal
 from pathlib import Path
 from typing import Any, Callable
 
@@ -142,14 +143,29 @@ def _rows(table: Any) -> dict[str, tuple[int, tuple[str, ...]]]:
     return rows
 
 
+def _location_value(text: str) -> Decimal:
+    """The exact printed number of a generated .XXX location cell.
+
+    SolidWorks redisplays ``.000`` as ``0.000`` after a column insert (farm
+    957501d1). Leading-zero and zero-sign styles (``.000``/``0.000``/
+    ``-0.000``) are one value; any other digit, a nonzero sign or a place
+    lost/gained is not. The three-place format itself is still required.
+    """
+    if not re.fullmatch(r"-?\d*\.\d{3}", text):
+        raise RuntimeError(f"carrier table location lost .XXX precision: {text!r}")
+    return Decimal(text)
+
+
 def _frozen_rows(
     table: Any, generated: dict[str, tuple[str, ...]], *,
     notes: dict[str, str] | None, stage: str,
 ) -> dict[str, tuple[int, tuple[str, ...]]]:
     """TAG/X/Y/SIZE exactly as first generated, plus the NOTE column, by tag.
 
-    ``notes=None`` requires the freshly inserted NOTE cells to be empty.
-    Failures name the row and both the expected and the actual cells.
+    ``notes=None`` requires the freshly inserted NOTE cells to be empty. X/Y
+    compare by exact printed decimal value (``_rows`` has already held them
+    to .XXX and to A1); TAG/SIZE/NOTE compare byte for byte. Failures name
+    the row, expected and actual cells.
     """
     rows = _rows(table)
     columns = int(table.ColumnCount)
@@ -157,7 +173,8 @@ def _frozen_rows(
         raise RuntimeError(f"carrier table has {columns} columns {stage}; expected TAG/X/Y/SIZE/NOTE")
     for tag, (row, cells) in rows.items():
         expected = (*generated[tag], "" if notes is None else notes[tag])
-        if cells != expected:
+        if (cells[0], *map(_location_value, cells[1:3]), *cells[3:]) != (
+                expected[0], *map(_location_value, expected[1:3]), *expected[3:]):
             raise RuntimeError(
                 f"carrier generated row or flag changed {stage}: {tag} (row {row}) "
                 f"expected={expected!r} actual={cells!r}"
