@@ -91,11 +91,14 @@ if not 0.0 < PRESS_INTERFERENCE[0] <= PRESS_INTERFERENCE[1]:
 # smallest flat the arm seats on (FACE_PERPENDICULARITY_ZONE_DIA); the
 # assembly's hanger-tilt stack reads all three.  The O.D.'s circular runout
 # to A bounds the bore's offset in the bar the shop may chuck as supplied
-# (coordinator ruling, #2014): it is what the wall below charges.
+# (coordinator ruling, #2014): it is what the wall below charges.  The faces
+# take the shop row, .001, faced on a mandrel after reaming (delegated ruling
+# 2026-11-07 (Main), no precedent; owner review #2144; pending owner
+# confirmation): every hanger-tilt stack still passes at it.
 BORE_DATUM = "A"
 GEOMETRIC_TOLERANCES_IN: dict[str, str] = {
-    "rear face perpendicularity to bore": ".0004",
-    "front face perpendicularity to bore": ".0004",
+    "rear face perpendicularity to bore": ".001",
+    "front face perpendicularity to bore": ".001",
     "o.d. circular runout to bore": ".016",
 }
 GEOMETRIC_TOLERANCES_MM: dict[str, float] = {
