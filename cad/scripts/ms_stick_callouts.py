@@ -33,9 +33,9 @@ RULED_FACE_ISOMETRIC_OCTANT = (1, -1, -1)
 REBATE_NOTE_NUMBER = 1
 STATION_NOTE_NUMBER = 2
 DRAWING_NOTES = (
-    f"{REBATE_NOTE_NUMBER}. SLIDING FIT IN {_config.parts('ms-stop-block')['number']} REBATE\n"
-    f"{STATION_NOTE_NUMBER}. SETS {_config.parts('ch-amplitude-bar')['number']} STATIONS; "
-    "TICKS NONCUMULATIVE FROM SCALE ZERO\n"
+    f"{REBATE_NOTE_NUMBER}. SLIDING FIT IN {_config.parts('ms-stop-block')['number']} STOP BLOCK REBATE\n"
+    f"{STATION_NOTE_NUMBER}. SETS {_config.parts('ch-amplitude-bar')['number']} AMPLITUDE BAR STATIONS;\n"
+    "    TICKS NONCUMULATIVE FROM SCALE ZERO\n"
     # The model's stroke shapes are representative; the shop's own
     # single-stroke sans font engraves the same V at the dimensioned height
     # and gaps.
@@ -69,14 +69,19 @@ CALLOUTS: dict[str, str] = {
     "FullTickPitch": STATION_LINK_FROM_SHEET_2,
     "MinorTickPitch": STATION_LINK_FROM_SHEET_2,
     "NumeralHeight": "NUMERAL HEIGHT",
-    # The section cuts the numerals, so the V's angle and the stock under it
-    # are the two lines; the block fits between detail F and G-G.
-    "NumeralDepth": f"{part.NUMERAL_V_INCLUDED_ANGLE_DEG:g}° INCLUDED V\n{part.NUMERAL_FLOOR_CALLOUT}",
+    # Section G-G cuts the zero, so the callout names the numerals and their V
+    # (rule 9), then the stock under it; the block fits between detail F and G-G.
+    "NumeralDepth": (f"NUMERALS: {part.NUMERAL_V_INCLUDED_ANGLE_DEG:g}° INCLUDED V\n"
+                     f"{part.NUMERAL_FLOOR_CALLOUT}"),
 }
-# dimension name -> its count prefix. Detail F's gaps hold for every numeral
+# dimension name -> its count prefix (rule 10: a regular pattern takes one nX
+# callout). The pitches count the equal spaces from scale zero: ten decades
+# and a hundred minor divisions. Detail F's gaps hold for every numeral
 # beside its tick: the tick-edge gap for 0-9 on the +X side (the 10 has its
 # own detail), the tick-end gap for all eleven.
 PREFIXES: dict[str, str] = {
+    "FullTickPitch": f"{part.DIVISION_COUNT - 1}X ",
+    "MinorTickPitch": f"{(part.DIVISION_COUNT - 1) * part.MINOR_PER_DIVISION}X ",
     "NumeralXGap": f"{part.DIVISION_COUNT - 1}X ",
     "NumeralYGap": f"{part.DIVISION_COUNT}X ",
 }

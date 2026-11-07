@@ -142,12 +142,14 @@ PLATE_DRAWING_DIMENSIONS = {
 # The PLATE is the match-drill master. Its three absolute location bands
 # transfer to the block only when the X=0 ends and Y=0 edges, both labelled on
 # each sheet, are flush; the block's nominal locations are reference-only.
-MATCH_DRILL_MASTER = "MS-STOP-PLATE"
 LOCATING_END_NOTE = "LOCATING END"
 LOCATING_EDGE_NOTE = "LOCATING EDGE"
 MATCH_DRILL_DATUM_ALIGNMENT = "LOCATING ENDS AND EDGES FLUSH"
 PLATE_THICKNESS_TOLERANCE_MM = 0.1016  # .004
-PLATE_HOLE_POSITION_TOLERANCE_MM = 0.1016  # .004
+# Plain THRU clearance holes: the match-drill, not a band, aligns the pair, so
+# the stations take the title block's .XXX (rule 4; delegated ruling L2,
+# 2026-11-07: every web below still clears the .080 target).
+PLATE_HOLE_POSITION_TOLERANCE_MM = printed_band_mm(3, unit=UNIT)
 PLATE_LOCATION_DIMENSIONS = frozenset({
     "PlateLeftFromEnd", "PlateRightFromEnd", "PlateFromHeadFace",
 })
@@ -156,10 +158,9 @@ PLATE_LOCATION_DIMENSIONS = frozenset({
 # from the rebate and the wall and prints as a reference "(.48)".
 BLOCK_REFERENCE_DIMENSIONS = frozenset({"BlockDepth"})
 # Sizes print the title block's .XX unless they need .XXX: the rebate (its
-# +.004/0 for the stick), the cover
-# thickness and the match-drill stations the cover masters (+/-.004); the
-# block repeats those stations at the cover's places as references. Angles
-# print whole degrees against the title block's +/-1 deg.
+# +.004/0 for the stick), the cover thickness and the match-drill stations
+# the cover masters; the block repeats those stations at the cover's places
+# as references. Angles print whole degrees against the title block's +/-1 deg.
 _THREE_PLACE = frozenset({
     "WindowWidth", "WindowHeight", "PlateThickness", *PLATE_LOCATION_DIMENSIONS,
 })
@@ -181,10 +182,7 @@ PLATE_DRAWING_PRECISION = {
 }
 BLOCK_DRAWING_PRECISION_BY_NAME = {name: places for dims in BLOCK_DRAWING_PRECISION.values() for name, places in dims.items()}
 PLATE_DRAWING_PRECISION_BY_NAME = {name: places for dims in PLATE_DRAWING_PRECISION.values() for name, places in dims.items()}
-BLOCK_MATING_FACE_NOTE = "STOP-PLATE MATING FACE"
-# Rule 7: the matched pair is flagged at both match-drill callouts, which
-# already name the mate, not in a loose general note.
-MATCHED_PAIR_NOTE = "MATCHED PAIR; NOT INTERCHANGEABLE"
+BLOCK_MATING_FACE_NOTE = f"{_config.parts('ms-stop-plate')['number']} MATING FACE"
 # Every native Hole Wizard length (drill diameters and depths) prints .XXX.
 HOLE_CALLOUT_PRECISION = 3
 WINDOW_SIZE_TOLERANCE_MM = (0.0, 0.1016)  # +.004/0
@@ -254,7 +252,7 @@ WINDOW_FLOOR_MIN = BLOCK_HEIGHT - BLOCK_PRINTED_BANDS_MM["BlockHeight"] - (
     + WINDOW_HEIGHT + WINDOW_SIZE_TOLERANCE_MM[1]
 )
 # Reference labels do not make the transferred axes float: retain the plate
-# master's absolute +/-.004 in both the receiver and cover worst-case proofs.
+# master's absolute .XXX band in both the receiver and cover worst-case proofs.
 # A 2B internal thread has no specified maximum major; the tap that cuts it
 # does. ASME/ANSI B94.9-1987 machine screw taps, #2-56: cut-thread major max
 # 0.0887 in (Table 7), ground-thread 0.0883 in (Table 6). The larger bounds

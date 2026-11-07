@@ -95,7 +95,7 @@ BOTTOM_KEEP = {
 # Rule 4: the rebate is one feature with two tight bands, so both carry only
 # SEE NOTE 1 and the one numbered note names the stick that slides in it.
 REBATE_NOTE_NUMBER = 1
-REBATE_NOTE = f"{REBATE_NOTE_NUMBER}. SLIDING FIT ON {_config.parts('ms-stick')['number']}"
+REBATE_NOTE = f"{REBATE_NOTE_NUMBER}. SLIDING FIT ON {_config.parts('ms-stick')['number']} MEASURING STICK"
 REBATE_NOTE_LINK = f"SEE NOTE {REBATE_NOTE_NUMBER}"
 # Upper-left corner of the note text: the empty field left of the .84 and
 # above the .56, clear of the cover-face view.
@@ -117,11 +117,12 @@ LOCATING_EDGE_X_MM = 5.0
 # variable definitions, not the resolved text that would freeze drill/depths.
 FINAL_SHEET_REMOVED_NOTES = ("Tapped Hole",)
 # Rule 7: two lines of words under the native size and thread rows: the
-# match-drill from its master and the clamp alignment. The ↧ depths run from
-# the entry face by the symbol's own meaning.
+# match-drill from its master, named by number and name as a matched pair
+# (rule 4), and the clamp alignment. The ↧ depths run from the entry face by
+# the symbol's own meaning.
 COVER_HOLE_MATCH_DRILL = (
-    f"MATCH-DRILL FROM {_config.parts('ms-stop-plate')['number']} WITH\n"
-    f"{part.MATCH_DRILL_DATUM_ALIGNMENT}"
+    f"MATCH-DRILL FROM {_config.parts('ms-stop-plate')['number']} STOP PLATE\n"
+    f"WITH {part.MATCH_DRILL_DATUM_ALIGNMENT}"
 )
 # The 4-40 runs from the underside through the floor and opens into the
 # rebate; THRU alone does not say which wall it stops at (rules 1, 12).
@@ -268,7 +269,7 @@ async def build(adapter: Any) -> dict[str, str]:
             part.PLATE_HOLE_Y / 1000.0, part.PLATE_Z_MAX / 1000.0,
         ), label="plate tap mouth")
     plate_callout = add_native_hole_callout(
-        adapter, front, edge_xy=plate_edge, callout_xy=(0.065, 0.127),
+        adapter, front, edge_xy=plate_edge, callout_xy=(0.072, 0.127),
         label="two cover blind taps",
     )
     _remove_general_thread_class(plate_callout, last_line=COVER_HOLE_MATCH_DRILL)
