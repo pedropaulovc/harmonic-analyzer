@@ -276,6 +276,62 @@ and the five separate native tap callouts still omit the duplicate class.
 The generated cells are not rewritten. This is not a general native-table
 exemption and accepts no other specification, geometry or numeric shortfall.
 
+### Oblique carrier: one native hole table (#2151)
+
+The owner's Option B ruling of **2026-11-06** applies only to
+**MHA-CH-06-TL-21**. Its native table includes all thirteen top-face holes
+(A1, B1, A2, B2, CL, CR, R1–R4, L1, L2 and HUB), with X/Y taken from A1's
+actual bore axis and +X along A1–B1. Coordinates print `.XXX` under the
+existing title-block `±.005`. HUB is the ordinary #8-32 clamp tap made in situ
+at TL-00 step 10, so its location cells are explicitly REF and it has no
+manufactured XY; its native callout stays on the HUB CLAMP sheet. The
+generated TAG/X/Y/SIZE cells are not replaced by typed values. Physical
+source-body correspondence, source/view configuration and units, all table
+rows and attached tags, the A1 origin and three-place location precision are
+read back after the final rebuild.
+
+Carrier **RV-02** permits exactly one flagged local-control note:
+`A2, B2: Y .964 ±.002 FROM THE A1-B1 AXIS LINE`. The builder stores those
+limits on both source-model Y dimensions without moving their nominal
+geometry, and saves the property-linked note; the drawing only reads the
+limits. This is not a general exception to rules 3 or 7. Section A-A identifies
+the cropped feature as A1. The rail-indicating `ALIGNMENT_BAND` belongs to
+the assembly and remains `.0008`, independent of the carrier table.
+
+[`correlated_pin_budget`](../scripts/ch_rocker_arm_tl_oblique_carrier_spec.py)
+bounds the whole tolerance box and continuous strap arc analytically. For a
+pin pair `a,b`, the cutter circle has
+`C=(a+b)/2 + cot(alpha)/2*(dy,-dx)` and `R=|b-a|/(2 sin(alpha))`.
+The same actual inner-pass apex sets HUB for both cuts. Affine corner extrema,
+analytic sine/cosine extrema and a bounded norm remainder retain that
+correlation; absolute radius errors are not added as independent edge errors.
+Pin-only enclosures in inches are approximately `R800 ±.0088333`,
+`R816 -.0176666/+.0176674`, top relative to HUB
+`-.0001468/+.0001481`, and bottom `-.0037853/+.0037857`.
+Including `.XXX` nominal rounding gives relative pin-shape bounds
+`-.0001507/+.0001442` and `-.0038702/+.0037023` (`PIN_RELATIVE_ERROR`).
+
+No stud, sleeve or nose locates the strap: every strap hole is reamed at the
+HUB DRO setting. `pin_relative_stack` therefore charges each edge the R4
+`HUB_RADIAL_STACK` (`.004956`: offset band, printed-offset rounding and pin
+shoulder clearance) plus that pass's correlated pin error, once, against half
+the strap's `0/-.020` radial limits. The top edge stacks to `.005107` and the
+bottom to `.008826`, both inside `.010`; the source guard refuses a larger
+HUB setting stack (for example `.0065`). The product band and these jig
+errors are never charged twice.
+
+The same correlated errors feed the tooling-clearance and riser-wall checks.
+The TL-52 washer keeps at least `1.813 mm` to each complete cutter sweep
+(OD and the #2249A spigot's `.14605 mm` float at their limits, each pass's own
+pin error), above the
+`1.5 mm` floor. The end-clamp heads and stop pins charge their table-row (or
+riser `.XX` station) error with the moved cut over the whole sweep. The TL-24
+CL/CR #9 clearances keep `.1218`/`.1018` to the self-cut edges and the riser
+taps `.0822`, so the riser needs no wall exception. Ref
+[#2151](https://github.com/pedropaulovc/harmonic-analyzer/issues/2151);
+its separate machinist-review rubric/eval work is not part of this change.
+
+
 ## The gate
 
 `uv run cad/scripts/machinist_review.py <name>... --before-pdf-dir <baseline>`

@@ -1,8 +1,10 @@
 """R4 workholding: common end clamps, loose stops and spigot-centred washer.
 
-Pure geometry, independent of the later carrier-table proof. Product geometry
-stays main's .4000 strap hole. Partial head bearing at 1 Nm is owner-accepted;
-there is no new bearing-strength or complete-annulus rejection gate.
+Pure geometry. Product geometry stays main's .4000 strap hole. Partial head
+bearing at 1 Nm is owner-accepted; there is no new bearing-strength or
+complete-annulus rejection gate. The carrier's #2151 hole table supplies the
+correlated pin errors: ``PIN_RELATIVE_ERROR`` against the in-situ HUB, and
+the table-row/sweep displacement for the end heads and stop pins.
 """
 from __future__ import annotations
 
@@ -15,6 +17,7 @@ import ch_rocker_arm_tl_oblique_riser_spec as riser
 import ch_rocker_arm_tl_oblique_hub_washer_spec as washer
 import ch_rocker_arm_tl_oblique_blank_spec as blank
 from _mcmaster_91251a197 import DIMS as COMMON_SCREW
+from _printed_tolerance import printed_band_mm
 
 # Actual printed product/washer interfaces, not duplicated conceptual sizes.
 PRODUCT_HOLE_LIMITS = washer.STRAP_HOLE_LIMITS
@@ -86,7 +89,7 @@ def cutter_gap(
 
 
 def washer_cutter_gaps(correlated_pin_error: float = 0.0) -> dict[str, float]:
-    """Spigot-centred full-sweep gaps; later table layer supplies its error.
+    """Spigot-centred full-sweep gaps less one correlated pin error.
 
     OD/spigot/bore are turned in one chucking. Screw/tap drift affects the
     fillet fit-up, not washer centring; no thread crest enters this stack.
@@ -101,14 +104,23 @@ def washer_cutter_gaps(correlated_pin_error: float = 0.0) -> dict[str, float]:
 
 
 WASHER_GAPS = {name: cutter_gap(trammel.HUB, washer.OD / 2.0, name) for name in trammel.SWEEP}
-WASHER_GAPS_MIN = washer_cutter_gaps()
+# Each pass charges its own correlated pin-shape error against the SAME
+# in-situ HUB once, beside the spigot float and HUB setting stack.
+WASHER_GAPS_MIN = {
+    name: washer_cutter_gaps(carrier.PIN_RELATIVE_ERROR[name])[name]
+    for name in trammel.SWEEP
+}
 # Even a zero-radius shank cannot put its centre beyond the clearance-hole
 # radius. This intentionally conservative head-offset bound needs no guessed
 # thread/root minimum or thread-centred washer assumption.
 END_HEAD_AXIS_FLOAT_MAX = blank.CLAMP_HOLE_LIMITS[1] / 2.0
-END_STATION_ERROR = math.hypot(
-    carrier.CLAMP_STATION_BAND + carrier.POSITION_BAND / 2.0,
-    carrier.CLAMP_STATION_BAND,
+# CL/CR are table rows from A1 (.XXX plus rounding). The blank registers on
+# stops set about the carrier centre, D1/2 from A1, so X also carries half
+# of B1's table error.
+_D1_HALF_ERROR = max(abs(v) for v in carrier.pin_coordinate_intervals()[0]) / 2.0
+END_STATION_ERROR = max(
+    math.hypot(ex + _D1_HALF_ERROR, ey)
+    for ex, ey in map(carrier.table_coordinate_errors, carrier.END_CLAMPS.values())
 )
 END_FILLET_CLEARANCE_MIN = (
     (blank.CLAMP_HOLE_LIMITS[0] - SCREW_FILLET_DIA_MAX) / 2.0
@@ -119,10 +131,16 @@ END_HEAD_GAPS = {
               for point in carrier.END_CLAMPS.values())
     for name in trammel.SWEEP
 }
+# CL/CR lie beyond the finite cutter arc: charge each head's complete
+# correlated table-row and cut displacement over the whole sweep.
 END_HEAD_GAPS_MIN = {
-    name: gap - END_STATION_ERROR - END_HEAD_AXIS_FLOAT_MAX
-    - SCREW_HEAD_RADIAL_RUNOUT_MAX - trammel.RADIUS_FROM_SHOULDER_CLEARANCE
-    for name, gap in END_HEAD_GAPS.items()
+    name: min(
+        cutter_gap(point, SCREW_HEAD_DIA_LIMITS[1] / 2.0, name)
+        - carrier.station_sweep_error(point, name)
+        for point in carrier.END_CLAMPS.values()
+    ) - END_HEAD_AXIS_FLOAT_MAX - SCREW_HEAD_RADIAL_RUNOUT_MAX
+    - trammel.RADIUS_FROM_SHOULDER_CLEARANCE
+    for name in trammel.SWEEP
 }
 
 
@@ -164,12 +182,16 @@ STOP_PIN_TOP_FLOAT_MAX = riser.STOP_PIN_FLOAT_MAX * (
     1.0 + 2.0 * (STOP_PIN_HEIGHT_MAX - riser.THICKNESS + riser.THICKNESS_BAND)
     / riser.STOP_PIN_SUPPORT_MIN
 )
+# The stop axes are set from the carrier at the riser's one ordinary .XX
+# station band; the same correlated pin errors move both self-cut sweeps.
+STOP_STATION_BAND = printed_band_mm(riser.STATION_PLACES, unit=riser.UNIT)
 STOP_PIN_GAPS_MIN = {
-    name: min(cutter_gap(point, riser.STOP_PIN_DIA_LIMITS[1] / 2.0, name,
-                         cutter_diameter=trammel.RISER_CUTTER_DIA)
-              for point in riser.STOP_PIN_CARRIER_POINTS)
-    - math.sqrt(2.0) * carrier.CLAMP_STATION_BAND - STOP_PIN_TOP_FLOAT_MAX
-    - trammel.RADIUS_FROM_SHOULDER_CLEARANCE
+    name: min(
+        cutter_gap(point, riser.STOP_PIN_DIA_LIMITS[1] / 2.0, name,
+                   cutter_diameter=trammel.RISER_CUTTER_DIA)
+        - carrier.station_sweep_error(point, name, (STOP_STATION_BAND,) * 2)
+        for point in riser.STOP_PIN_CARRIER_POINTS
+    ) - STOP_PIN_TOP_FLOAT_MAX - trammel.RADIUS_FROM_SHOULDER_CLEARANCE
     for name in trammel.SWEEP
 }
 END_HEAD_MATERIAL_MARGINS = end_head_material_margins(riser.STRAP_RAW_Y_MIN, 0.5, 0.6)

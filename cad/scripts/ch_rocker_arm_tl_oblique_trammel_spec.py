@@ -55,10 +55,15 @@ Error sensitivity (printed next to the bands that carry it):
   far. The strap HUB is therefore reamed in place on the running jig; the
   carrier tap is made at the same DRO setting, not used as a precision locator.
 * pin-pair Y: a Y error between the A1/B1 and A2/B2 pairs moves the second
-  circle's centre 1:1, so the 16.00 band moves 1:1. A2/B2 are therefore
-  dimensioned from A1/B1, never from a plate edge.
+  circle's centre 1:1, so the 16.00 band moves 1:1. A2/B2 Y is therefore the
+  carrier table's local .964 ±.002 from the A1-B1 axis line, never from a
+  plate edge; the other table coordinates are ordinary .XXX ±.005.
 * pin spacing: a D error changes R by ``RADIUS_PER_SPACING`` (1.77) per unit
-  of spacing error. The spacing is held by one DRO setting.
+  of spacing error. Those absolute radius errors are not independent of the
+  strap: its HUB is reamed in situ on the same pins, so only each pass's
+  correlated edge-to-pivot error counts, bounded by
+  ``carrier_spec.correlated_pin_budget``. Rail alignment keeps its
+  assembly-owned .0008.
 * shoulder/carrier clearance: the purchased Ø.375 shoulder (-.001/0) in the
   carrier's .3760-.3765 REAM_SLIDE hole gives .0010-.0025 (0.025-0.064 mm)
   diametral clearance. This can move the edge 1:1; it is not a

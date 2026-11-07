@@ -18,11 +18,13 @@ def test_three_ordinary_receivers_replace_precision_workholding() -> None:
     for spec in (carrier.CL_SPEC, carrier.CR_SPEC, carrier.HUB_SPEC):
         assert spec.kind == "tapped"
         assert spec.end == "through_all"
-    assert carrier.CLAMP_STATION_PLACES == 2
-    assert carrier.CLAMP_STATION_BAND == pytest.approx(0.254)
-    assert {"ClTap", "CrTap"} <= carrier.DRAWING_DIMENSIONS.keys()
-    assert "HubTap" not in carrier.DRAWING_DIMENSIONS  # in-situ, not manufactured XY
+    # #2151: every tap location is a native table row, none a printed station.
+    assert not {"ClTap", "CrTap", "HubTap"} & carrier.DRAWING_DIMENSIONS.keys()
+    for key in ("CL", "CR", "HUB"):
+        assert carrier.TABLE_HOLES[key][2] == carrier.CLAMP_TAP_DRILL
+    assert "LOCATIONS REF" in carrier.TABLE_ROW_NOTES["HUB"]  # in-situ, not manufactured XY
     assert not {"HubHoleProfile", "HubChamfer", "LeftClampTap"} & carrier.DRAWING_DIMENSIONS.keys()
+    assert not hasattr(carrier, "CLAMP_STATION_BAND")
     assert not hasattr(carrier, "HUB_HOLE_DIA")
     assert not hasattr(carrier, "CL_DOWEL_DIA")
     assert not hasattr(carrier, "LEFT_CLAMP_SPEC")
@@ -136,8 +138,9 @@ def test_spigot_centres_washer_and_free_seating_uses_available_clearance() -> No
         "outer": trammel.R_OUTER - trammel.HUB_RADIUS - washer.OD / 2.0,
     })
     assert min(holding.WASHER_GAPS_MIN.values()) >= holding.WASHER_CLEARANCE_MIN == 1.5
+    base = holding.washer_cutter_gaps()
     shifted = holding.washer_cutter_gaps(0.1)
-    for name, gap in holding.WASHER_GAPS_MIN.items():
+    for name, gap in base.items():
         assert gap - shifted[name] == pytest.approx(0.1)
     assert washer.OD == pytest.approx(0.433 * 25.4)
     assert washer.OD_LIMITS == pytest.approx((10.8712, 11.1252))
@@ -154,3 +157,42 @@ def test_guard_rejects_screw_protrusion_and_real_cutter_floor(monkeypatch) -> No
     monkeypatch.setattr(holding, "WASHER_GAPS_MIN", {"inner": 2.0, "outer": 1.499})
     with pytest.raises(AssertionError, match="1.5 mm"):
         holding.require_clearance()
+
+
+def test_table_layer_charges_each_correlated_pin_error_once() -> None:
+    # Washer: each pass's own correlated pin error against the in-situ HUB,
+    # beside R4's spigot float and HUB setting stack, never the product band.
+    base = holding.washer_cutter_gaps()
+    for name in trammel.SWEEP:
+        assert holding.WASHER_GAPS_MIN[name] == pytest.approx(
+            base[name] - carrier.PIN_RELATIVE_ERROR[name]
+        )
+    # #2249A spigot .391 ±.002: pilot float .14605 leaves ~1.813 (outer).
+    assert min(holding.WASHER_GAPS_MIN.values()) >= 1.81 > holding.WASHER_CLEARANCE_MIN
+    # End heads: each point's own table-row and cut displacement.
+    for name in trammel.SWEEP:
+        assert holding.END_HEAD_GAPS_MIN[name] == pytest.approx(min(
+            holding.cutter_gap(point, holding.SCREW_HEAD_DIA_LIMITS[1] / 2.0, name)
+            - carrier.station_sweep_error(point, name)
+            for point in carrier.END_CLAMPS.values()
+        ) - holding.END_HEAD_AXIS_FLOAT_MAX - holding.SCREW_HEAD_RADIAL_RUNOUT_MAX
+            - trammel.RADIUS_FROM_SHOULDER_CLEARANCE)
+        assert holding.END_HEAD_GAPS_MIN[name] < holding.END_HEAD_GAPS[name] - min(
+            carrier.station_sweep_error(point, name) for point in carrier.END_CLAMPS.values()
+        )
+    # End material: the table row plus half of B1's error along X.
+    half_d1 = max(map(abs, carrier.pin_coordinate_intervals()[0])) / 2.0
+    assert holding.END_STATION_ERROR == pytest.approx(max(
+        math.hypot(ex + half_d1, ey)
+        for ex, ey in map(carrier.table_coordinate_errors, carrier.END_CLAMPS.values())
+    ))
+    assert holding.END_STATION_ERROR > carrier.TABLE_LOCATION_BAND
+    # Stops: the riser's .XX station band, moved with the correlated cut.
+    assert holding.STOP_STATION_BAND == pytest.approx(0.254)
+    for name in trammel.SWEEP:
+        assert holding.STOP_PIN_GAPS_MIN[name] == pytest.approx(min(
+            holding.cutter_gap(point, riser.STOP_PIN_DIA_LIMITS[1] / 2.0, name,
+                               cutter_diameter=trammel.RISER_CUTTER_DIA)
+            - carrier.station_sweep_error(point, name, (holding.STOP_STATION_BAND,) * 2)
+            for point in riser.STOP_PIN_CARRIER_POINTS
+        ) - holding.STOP_PIN_TOP_FLOAT_MAX - trammel.RADIUS_FROM_SHOULDER_CLEARANCE)
