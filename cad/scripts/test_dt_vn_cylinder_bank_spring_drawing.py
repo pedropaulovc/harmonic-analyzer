@@ -495,9 +495,10 @@ def test_fixed_texts_fit_their_cells() -> None:
 def test_each_size_text_is_one_position_write_inside_one_span(
     monkeypatch, refused
 ) -> None:
-    """The free height enters offset mode and the diameters take the
-    near-side style before any write; each text then gets exactly one
-    SetPosition2, at its fixed position, with no rebuild or readback."""
+    """The free height enters offset mode and takes its local witness gaps,
+    and the diameters take the near-side style, before any write; each text
+    then gets exactly one SetPosition2, at its fixed position, with no
+    rebuild or readback."""
     import _telemetry
     import draw_dt_vn_cylinder_bank_spring as drawing
 
@@ -521,6 +522,14 @@ def test_each_size_text_is_one_position_write_inside_one_span(
 
         def GetAnnotation(self):
             return self
+
+        def SetWitnessLineGap(self, index, use_doc, gap):
+            calls.append(("gap", self.name, index, use_doc, gap))
+            self.__dict__.setdefault("gaps", {})[index] = gap
+            return True
+
+        def GetWitnessLineGap(self, index, _use_doc, _gap):
+            return True, False, self.gaps[index]
 
     def write(display):
         def set_position(x, y, _z):
@@ -568,6 +577,8 @@ def test_each_size_text_is_one_position_write_inside_one_span(
         == styles
         == [
             ("offset", "SupplierFreeHeight", True),
+            ("gap", "SupplierFreeHeight", 0, False, drawing.WITNESS_GAP_M),
+            ("gap", "SupplierFreeHeight", 1, False, drawing.WITNESS_GAP_M),
             ("near side", "SupplierID"),
             ("leaders", "SupplierID", drawing.LEADER_LINE_NONE),
             ("near side", "SupplierOD"),
@@ -578,3 +589,25 @@ def test_each_size_text_is_one_position_write_inside_one_span(
     expected = _positions()
     for _, label, xy, _ in writes:
         assert xy == pytest.approx(expected[label])
+
+
+@pytest.mark.parametrize(
+    ("written", "read", "match"),
+    [
+        (False, None, "was refused"),
+        (True, (True, True, 0.0015), "did not persist"),
+        (True, (True, False, 0.0), "did not persist"),
+        (True, (False, False, 0.0015), "did not persist"),
+    ],
+    ids=["refused", "document-gap", "lost", "unread"],
+)
+def test_witness_gap_refuses_a_lost_local_gap(monkeypatch, written, read, match) -> None:
+    import draw_dt_vn_cylinder_bank_spring as drawing
+
+    display = SimpleNamespace(
+        SetWitnessLineGap=lambda *_args: written,
+        GetWitnessLineGap=lambda *_args: read,
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    with pytest.raises(RuntimeError, match=match):
+        drawing._set_witness_gap(display, 0, label="test")

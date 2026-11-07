@@ -117,6 +117,10 @@ HEIGHT_TEXT_WIDTH_M = 0.0201493
 DIAMETER_TEXT_WIDTH_M = 0.0030139 + 0.0052784 + 0.0300417
 # swLeaderLineVisibility_e.swLeaderLineNone.
 LEADER_LINE_NONE = 3
+# The free height's witnesses start this far off the envelope's end, a local
+# native gap: at the document's zero gap they ran on from the ring's outline
+# in one unbroken line (round 2 review, run 20261107T130047431Z-91b02fb2).
+WITNESS_GAP_M = 0.0015
 
 
 def _centre(bounds: tuple[float, float, float, float]) -> tuple[float, float]:
@@ -244,6 +248,22 @@ def _view_scale(view: Any) -> float:
     return numerator / denominator
 
 
+def _set_witness_gap(display: Any, index: int, *, label: str) -> None:
+    """``WITNESS_GAP_M`` on one witness, local to this dimension, read back."""
+    typed = _early_bound(display, "IDisplayDimension")
+    if typed.SetWitnessLineGap(index, False, WITNESS_GAP_M) is not True:
+        raise RuntimeError(f"{label}: witness gap {index} was refused")
+    ok, use_doc, actual = typed.GetWitnessLineGap(index, False, 0.0)
+    if (
+        ok is not True or use_doc is not False
+        or type(actual) not in (int, float) or not math.isfinite(actual)
+        or not math.isclose(actual, WITNESS_GAP_M, rel_tol=0.0, abs_tol=1e-8)
+    ):
+        raise RuntimeError(
+            f"{label}: witness gap {index} did not persist: {(ok, use_doc, actual)!r}"
+        )
+
+
 @_telemetry.traced("drawing.cylinder_bank_spring.size_texts")
 def place_size_texts(
     adapter: Any,
@@ -255,7 +275,8 @@ def place_size_texts(
 
     The free height's annotation still sits at its station, which offset
     mode keeps as the dimension line's; the write then moves only the text.
-    The shared finaliser's rebuild settles all three.
+    Its witnesses take ``WITNESS_GAP_M`` off the envelope first. The shared
+    finaliser's rebuild settles all three.
     """
     displays = _size_displays(adapter, views)
     positions = size_text_positions(
@@ -264,6 +285,8 @@ def place_size_texts(
     )
     for name in TEXT_SIDES["free_front"]:
         displays[name].OffsetText = True
+        for index in (0, 1):
+            _set_witness_gap(displays[name], index, label=f"{supplier_spec.SKU} {name}")
     for name in TEXT_SIDES["free_top"]:
         set_near_side_diameter(
             displays[name].GetAnnotation(), f"{supplier_spec.SKU} {name}"
