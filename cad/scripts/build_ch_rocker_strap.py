@@ -140,9 +140,15 @@ async def build(adapter) -> dict[str, str]:
     check("create_sketch strap", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     entities = [
+        # Seeded with its centre 2 mm below the top arc's: two centres drawn
+        # on one point merge into a single sketch point (as the lines' ends
+        # merge with the arcs' here), which made the arcs concentric by
+        # construction and BottomRadius a driven dimension (r1 farm: the
+        # Equations feature refused it). The bottom-edge depth and the
+        # radius then solve it back onto the shared centre.
         check(
             "strap bottom arc",
-            await adapter.add_arc(0.0, CENTER_Y, *tail_b, *rod_b),
+            await adapter.add_arc(0.0, CENTER_Y - 2.0, *tail_b, *rod_b),
         ),
         check(
             "strap top arc",
