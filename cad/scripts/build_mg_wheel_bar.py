@@ -77,6 +77,7 @@ from _drawing_marks import (
 from _drawing_precision import _named_dimensions, apply_drawing_precision
 from _drawing_tolerances import (
     set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
 )
 from _fit_deviations import deviations
 from _column_clamp_interface import BAR_DEPTH
@@ -84,6 +85,7 @@ from mg_wheel_bar_geom import (
     AXLE_BORE_BAND,
     AXLE_BORE_DIA,
     AXLE_BORE_X,
+    BAR_DEPTH_BAND,
     BAR_LENGTH,
     BAR_SIDE,
     BAR_TOP_ABOVE_ROW,
@@ -491,11 +493,20 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
 
-    # Manufacturing drawing support: the native band, then mark exactly the
+    # Manufacturing drawing support: the native bands, then mark exactly the
     # print's dimensions and stamp the make-critical title-block properties.
-    # Only the reamed bore carries a band of its own; the depth, height, row
-    # and stations are the title block's (the clamp row and stations at .XXX,
-    # mg_wheel_bar_spec.CLAMP_POSITION_BAND).
+    # The depth carries its explicit band (it sets the axle-end stack and
+    # names it, mg_wheel_bar_callouts); the reamed bore its fit band; the
+    # height, row and stations are the title block's (the clamp row and
+    # stations at .XXX, mg_wheel_bar_spec.CLAMP_POSITION_BAND).
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "Bar",
+        "BarDepth",
+        BAR_DEPTH_BAND[0],
+        places=DRAWING_PRECISION["Bar"]["BarDepth"],
+        display_unit=UNIT,
+    )
     set_dimension_bilateral_tolerance(
         adapter,
         "AxleBoreProfile",

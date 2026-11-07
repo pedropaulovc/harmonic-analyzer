@@ -148,23 +148,23 @@ def test_the_sheet_carries_no_general_notes() -> None:
 
 def test_part_authored_callouts_name_each_band_s_mate() -> None:
     import _config
-    from mg_wheel_axle_spec import BACK_END_SUNK_MAX, BACK_END_SUNK_MIN
+    from mg_wheel_axle_spec import BACK_END_SUNK_MIN
 
     assert callouts.authored_by_name() == {
         "AxleBoreDia": {callouts.CALLOUT_BELOW: callouts.AXLE_BORE_CALLOUT},
         "BarDepth": {callouts.CALLOUT_BELOW: callouts.BAR_DEPTH_CALLOUT},
     }
-    # The literals keep the wheel group and the axle out of the part recipe;
-    # the mate is named by its number (rule 4), the stack's range from the
-    # axle's own spec.
+    # The literal keeps the wheel group and the axle out of the part recipe;
+    # the mate is named by its number (rule 4).
     axle = _config.parts("mg-wheel-axle")["number"]
     assert axle in callouts.AXLE_BORE_CALLOUT
-    sunk = [
-        render_number(v / IN, "in", 3) for v in (BACK_END_SUNK_MIN, BACK_END_SUNK_MAX)
-    ]
+    # The depth's explicit band sets the axle-end stack and names it once;
+    # the stack holds (the end stays sunk) at the band's limits.
     assert axle in callouts.BAR_DEPTH_CALLOUT
-    assert f"{sunk[0]}-{sunk[1]}" in callouts.BAR_DEPTH_CALLOUT
-    assert callouts.CLAMP_HOLE_CALLOUT == "LOCATE TO MHA-SH-02 TAPS\nWALL .070 MIN"
+    assert len(callouts.BAR_DEPTH_CALLOUT.replace(axle, "").split()) <= 6
+    assert BACK_END_SUNK_MIN >= 0.0
+    assert mg_wheel_bar_spec.BAR_DEPTH_BAND == pytest.approx((0.005 * IN, -0.005 * IN))
+    assert callouts.CLAMP_HOLE_CALLOUT == "CLEARS MHA-SH-02 TAPPED HOLES\nWALL .070 MIN"
     assert callouts.HANGER_HOLE_CALLOUT == "WALL .076 MIN"
     texts = [*callouts.authored_by_name().values()]
     for lanes in texts:
@@ -315,6 +315,7 @@ def test_axle_bore_is_a_marked_reamed_cut() -> None:
         "ClampStation2": 3,
     }
     assert model_toleranced_dimensions(part) == {
+        ("Bar", "BarDepth"): "BAR_DEPTH_BAND[0]",
         ("AxleBoreProfile", "AxleBoreDia"): "*deviations(AXLE_BORE_BAND)",
     }
     source = Path(part.__file__).read_text(encoding="utf-8")
