@@ -32,6 +32,9 @@ SUPPLIER_MARGINS = {
 def _supplier_dimensions(
     adapter: Any, views: dict[str, Any]
 ) -> Callable[[], None]:
+    # The bore prints bare, (Ø.219): a generic "FOR No. 10 SCREW SIZE" named
+    # no drawing number (rule 4), and the assembly step names the bolt. The
+    # bore is a drawing-authored REF, so the part's callout text is unused here.
     return supplier_washer_dimensions(
         adapter,
         views,
@@ -42,7 +45,6 @@ def _supplier_dimensions(
         units=part.SUPPLIER_UNITS,
         precision=part.DRAWING_REFERENCE_PRECISION,
         model_references=part.SUPPLIER_MODEL_REFERENCES,
-        bore_callout=part.SUPPLIER_BORE_CALLOUT,
     )
 
 

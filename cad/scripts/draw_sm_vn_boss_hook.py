@@ -19,7 +19,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import set_dimension_callouts, set_dimension_precision
+from _drawing_dimensions import set_dimension_precision
 from _drawing_hidden_sketches import (
     curate_view_dimensions as curate_reference_dimensions,
 )
@@ -28,7 +28,9 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _drawing_sheet_region import sheet_drawable_region
-from _purchased_fastener_drawing import _box, _inside, assert_supplier_view_fits
+from _purchased_fastener_drawing import (
+    _box, _inside, _literal_note, assert_supplier_view_fits,
+)
 from _rebuild import active_configuration_name
 from _supplier_dimensions import (
     assert_supplier_reference_dimension, supplier_reference_dimension,
@@ -79,10 +81,14 @@ FRONT_KEEP = {
     "ChamferAngle": (0.132, 0.106),
 }
 # The lead-in carries the title block's band: even its short leg brings the cut
-# end under the #25 tap drill, so the cut thread starts in the lever's tap.
-# The callout names that mate.
-CHAMFER_CALLOUT = {"ChamferWidth": "LEAD-IN TO MHA-SM-03 TAP"}
+# end under the #25 tap drill, so the cut thread starts in the lever's tap. A
+# plain chamfer callout needs no reason or mate under it (rule 7).
 NOTES_Y = 0.076
+# The footer's one general note, printed literally: the 1.59 overall is the
+# trimmed length by its own .XX band, so a note naming it the acceptance size
+# was narration (rule 7, novice-rubric screen). The source's Manufacturing
+# Notes property keeps the older text; the part is not re-keyed for it.
+GENERAL_NOTE = "UNDIMENSIONED PURCHASED GEOMETRY IS REFERENCE."
 EXPECTED_CONTROLS = {
     "FinishedOverall": (
         FINISHED_OVERALL_MM / 1000,
@@ -223,7 +229,6 @@ async def build(adapter: Any) -> dict[str, str]:
         "Stock Name",
         "Supplier",
         "Supplier SKUs",
-        "Manufacturing Notes",
         "Isometric View Note",
     )
     read_required_properties(adapter.currentModel, required, required=required)
@@ -258,7 +263,6 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     set_dimension_precision(adapter, annotations, DIMENSION_PRECISION)
-    set_dimension_callouts(adapter, annotations, CHAMFER_CALLOUT)
     _verify_controls(annotations)
     refs = _supplier_references(adapter, front)
     # Footer notes belong to the sheet. The curates leave the front view
@@ -274,9 +278,9 @@ async def build(adapter: Any) -> dict[str, str]:
             ("Supplier SKUs", 0.080, 0.060, {"char_height": 0.003}),
             ("Stock Name", 0.016, 0.049, {"char_height": 0.003}),
             ("Isometric View Note", 0.275, 0.163, {}),
-            ("Manufacturing Notes", 0.016, NOTES_Y, {"char_height": 0.003}),
         )
     ]
+    notes.append(("General note", _literal_note(adapter, GENERAL_NOTE, 0.016, NOTES_Y)))
     # Re-assert after annotating: a real mode change regenerates the edge set.
     for view in (front, iso):
         set_hidden_lines_removed(adapter, view)
