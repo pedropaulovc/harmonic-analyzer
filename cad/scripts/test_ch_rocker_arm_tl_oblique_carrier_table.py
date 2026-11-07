@@ -20,14 +20,14 @@ I = trammel.INCH
 
 
 def test_table_inventory_is_complete_and_replaces_location_dimensions():
-    assert len(spec.TABLE_HOLES) == 14
+    assert len(spec.TABLE_HOLES) == 13
     assert set(spec.TABLE_HOLES) == {
-        "A1", "B1", "A2", "B2", "CL", "CR", "LEFT", "HUB",
+        "A1", "B1", "A2", "B2", "CL", "CR", "HUB",
         "R1", "R2", "R3", "R4", "L1", "L2",
     }
     assert set(table.TAG_OFFSETS) == set(spec.TABLE_HOLES)
     assert set(drawing.TOP_KEEP) == {
-        "PlateLength", "PlateWidth", "PlateNearY", "EdgeX", "PinHoleDia", "SpotDia",
+        "PlateLength", "PlateWidth", "PlateNearY", "EdgeX", "PinHoleDia",
     }
     assert "A1 ONLY" in inspect.getsource(drawing._pin_section)
     assert "LOCATIONS REF" in spec.TABLE_ROW_NOTES["HUB"]
@@ -43,55 +43,43 @@ def test_owner_pin_only_bounds_and_rounded_budget():
     assert .01766 < max(abs(v) for v in pin["R816"]) / I < .0178
     assert .0001 < max(abs(v) for v in pin["inner"]) / I < .0002
     assert .0037 < max(abs(v) for v in pin["outer"]) / I < .0039
-    assert spec.PIN_RELATIVE_ALLOWANCE == pytest.approx(.005 * I)
     assert spec.PIN_RELATIVE_ERROR == {
         name: max(abs(v) for v in spec.PIN_ROUNDED_BUDGET[name])
         for name in ("inner", "outer")
     }
-    assert spec.HUB_SHANK_RADIAL_FLOAT == pytest.approx(spec.HUB_SLIP_CLEARANCE_MAX / 2)
-    assert spec.HUB_SHANK_RADIAL_FLOAT / I == pytest.approx(.00075)
-    assert spec.HUB_NOSE_RADIAL_FLOAT == pytest.approx(spec.hub_stud.NOSE_CLEARANCE[1] / 2)
-    assert spec.PIN_RELATIVE_STACK == pytest.approx(
-        max(spec.PIN_RELATIVE_ERROR.values())
-        + spec.HUB_SHANK_RADIAL_FLOAT + spec.HUB_NOSE_RADIAL_FLOAT
-    )
-    assert spec.NOSE_FLOAT_ALLOWANCE == pytest.approx(
-        spec.PIN_RELATIVE_ALLOWANCE
-        - max(spec.PIN_RELATIVE_ERROR.values()) - spec.HUB_SHANK_RADIAL_FLOAT
-    )
-    assert spec.NOSE_FLOAT_ALLOWANCE / I == pytest.approx(.000379842556, abs=1e-9)
-    assert spec.PIN_RELATIVE_STACK <= spec.PIN_RELATIVE_ALLOWANCE
-    assert spec.PIN_RELATIVE_REMAINING == pytest.approx(
-        spec.PIN_RELATIVE_ALLOWANCE - spec.PIN_RELATIVE_STACK
-    )
-    assert spec.PIN_RELATIVE_REMAINING >= 0
+    # R4: no stud or nose float locates the strap; the in-situ HUB setting
+    # stack and each pass's correlated pin error are each counted once.
+    for retired in ("PIN_RELATIVE_ALLOWANCE", "HUB_SHANK_RADIAL_FLOAT",
+                    "HUB_NOSE_RADIAL_FLOAT", "NOSE_FLOAT_ALLOWANCE",
+                    "require_pin_relative_budget", "hub_stud"):
+        assert not hasattr(spec, retired), retired
+    half = spec._TOP_EDGE_HALF_BAND
+    assert half == pytest.approx(.010 * I)
+    assert spec.PIN_RELATIVE_STACK == pytest.approx({
+        name: spec.HUB_RADIAL_STACK + error for name, error in spec.PIN_RELATIVE_ERROR.items()
+    })
+    assert spec.PIN_RELATIVE_STACK["inner"] / I == pytest.approx(.005107, abs=2e-6)
+    assert spec.PIN_RELATIVE_STACK["outer"] / I == pytest.approx(.008826, abs=2e-6)
+    assert spec.PIN_RELATIVE_REMAINING == pytest.approx({
+        name: half - stack for name, stack in spec.PIN_RELATIVE_STACK.items()
+    })
+    assert min(spec.PIN_RELATIVE_REMAINING.values()) > 0
     assert spec.HUB_RADIAL_STACK <= .005 * I
 
 
-@pytest.mark.parametrize(
-    "nose_minus_in,radial_float_in,stack_in",
-    [
-        (.0001, .0003, .004920157444),
-        (.0002, .00035, .004970157444),
-        (.0005, .0005, .005120157444),
-    ],
-)
-def test_nose_fit_counterfactual_uses_the_complete_relative_half(
-    nose_minus_in, radial_float_in, stack_in,
-):
-    # Vary limits only, never the physical .4000 nominal or either .005 half.
-    nose_minimum = spec.hub_stud.DIA - nose_minus_in * I
-    nose_float = (spec.hub_stud.STRAP_HOLE_LIMITS[1] - nose_minimum) / 2
-    assert nose_float / I == pytest.approx(radial_float_in)
-    total = max(spec.PIN_RELATIVE_ERROR.values()) + spec.HUB_SHANK_RADIAL_FLOAT + nose_float
-    assert total / I == pytest.approx(stack_in, abs=1e-9)
-    if stack_in > .005:
-        with pytest.raises(AssertionError, match="relative .005 budget"):
-            spec.require_pin_relative_budget(nose_float)
+@pytest.mark.parametrize("hub_stack_in,fits", [(.004956, True), (.0061, True), (.0065, False)])
+def test_pin_relative_stack_is_functional_in_the_hub_setting(hub_stack_in, fits):
+    if fits:
+        stack = spec.pin_relative_stack(hub_stack_in * I)
+        assert stack["outer"] == pytest.approx(
+            hub_stack_in * I + spec.PIN_RELATIVE_ERROR["outer"]
+        )
     else:
-        assert spec.require_pin_relative_budget(nose_float) == pytest.approx(total)
-    assert spec.PIN_RELATIVE_ALLOWANCE == pytest.approx(.005 * I)
-    assert spec.HUB_RADIAL_STACK <= .005 * I
+        with pytest.raises(AssertionError, match="radial band"):
+            spec.pin_relative_stack(hub_stack_in * I)
+    for bad in (-1e-9, math.inf, math.nan):
+        with pytest.raises(ValueError):
+            spec.pin_relative_stack(bad)
 
 
 def _circle(a, b):
@@ -128,7 +116,7 @@ def test_enclosure_covers_exact_correlated_circles_and_interior_boxes():
 
 def test_local_row_band_is_functional_not_an_unconditional_pass_constant():
     loose = spec.correlated_pin_budget(outer_y_band=.005 * I)
-    assert max(abs(v) for v in loose["outer"]) > spec.PIN_RELATIVE_ALLOWANCE
+    assert max(abs(v) for v in loose["outer"]) > spec._TOP_EDGE_HALF_BAND - spec.HUB_RADIAL_STACK
     zero = spec.correlated_pin_budget(0, 0, include_rounding=False)
     assert zero["inner"] == pytest.approx((0, 0), abs=1e-9)
     assert zero["outer"] == pytest.approx((0, 0), abs=1e-9)

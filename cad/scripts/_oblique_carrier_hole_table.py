@@ -1,7 +1,8 @@
 """Native carrier hole table: source/view/edge/tag/row identity, never typed XY.
 
 #2151 owner Option B. The generated HUB coordinates remain untouched and are
-explicitly REF in the NOTE column; TL-00 step 10 alone owns their acceptance.
+explicitly REF in the NOTE column: TL-00 step 10 taps that ordinary #8-32
+receiver in situ at the HUB DRO setting and alone owns its location.
 
 Creation and settled readback have separate operation-level tracing spans;
 individual hole/row traversal stays inside those spans.
@@ -30,7 +31,7 @@ TABLE_WIDTHS = (0.012, 0.019, 0.019, 0.078, 0.065)
 TAG_OFFSETS = {
     "A1": (-.012, -.008), "B1": (.008, -.008),
     "A2": (-.012, .009), "B2": (.008, .009),
-    "LEFT": (-.013, .012), "CL": (.006, -.010), "CR": (.009, .010),
+    "CL": (.006, -.010), "CR": (.009, .010),
     "R1": (-.008, .010), "R2": (.003, .010),
     "R3": (-.010, .009), "R4": (.005, .009),
     "L1": (.008, .003), "L2": (.008, -.005), "HUB": (.009, .009),
@@ -137,7 +138,7 @@ def _tags(adapter: Any, view: Any, edges: dict[str, Any], *, place: bool) -> Non
         note = _early_bound(annotation.GetSpecificAnnotation(), "INote")
         tag = str(note.GetText()).strip()
         if tag not in edges:
-            if re.fullmatch(r"(?:[A-Z]+\d+|LEFT|HUB|CL|CR)", tag):
+            if re.fullmatch(r"(?:[A-Z]+\d+|HUB|CL|CR)", tag):
                 raise RuntimeError(f"orphan native carrier hole tag: {tag}")
             continue
         if tag in found:
@@ -232,7 +233,7 @@ def create_carrier_hole_table(
     add_note(adapter, "1", .225, .163)
     flagged = add_property_linked_note(adapter, "Outer Pin Row Note", .235, .163)
     add_note(adapter, "HOLE LOCATIONS FROM A1; +X ALONG A1-B1", .225, .143)
-    add_note(adapter, "HUB LOCATIONS REF — FINISH AT TL-00 STEP 10", .225, .128)
+    add_note(adapter, "HUB LOCATION REF — TAP IN SITU AT TL-00 STEP 10", .225, .128)
     rebuild_drawing(adapter, label="carrier table and tags")
 
     def check_active_table() -> None:
