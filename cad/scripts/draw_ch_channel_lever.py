@@ -72,7 +72,6 @@ from ch_channel_lever_spec import (
     LEVER_SPRING_X,
     PIVOT_HOLE_BAND,
     PIVOT_HOLE_DIA,
-    PLATE_OFFSET,
     SPRING_EYE_HOLE_SPEC,
     SURFACE_FINISHES,
     TIP_END_X,
@@ -151,11 +150,10 @@ def _inch(value_mm: float) -> str:
 
 
 # The bar-to-hub roots are inside corners: the title block's INSIDE CORNERS
-# row controls them, so no callout repeats it (rule 2; review r1-r3). A
-# location dimension carries its value and band only (rule 7): the plate
-# offset's mate rides the plate thickness's callout, each drilled hole's its
-# own hole callout. The fulcrum bore names its standard fit and the clearance
-# range as REF (rule 4).
+# row controls them, so no callout repeats it (rule 2; review r1-r3). A hole
+# location carries its value and band only (rule 7): each drilled hole's mate
+# rides its own hole callout. The fulcrum bore names its standard fit and the
+# clearance range as REF (rule 4).
 FRONT_CALLOUTS = {
     "FulcrumDia": (
         f"REAM THRU\nRUNNING FIT ON {SHAFT_NUMBER}\n"
@@ -167,7 +165,8 @@ FRONT_CALLOUTS = {
 # on the arm's location it did not say the hole is a running bore).
 HOLE_MATES = {
     "bar-pin hole": f"RUNS ON PIN\n{PIN_NUMBER}",
-    "spring-eye hole": f"HOOKS SPRING\n{SPRING_NUMBER}",
+    # The two arms' ratio is the channel's lever ratio (error_budget gain).
+    "spring-eye hole": f"HOOKS {SPRING_NUMBER};\nSETS LEVER RATIO",
 }
 # Each drilled hole's native size prints the exact decimal of its named drill
 # (rule 3: #47 is .0785, #21 is .159).
@@ -176,16 +175,15 @@ HOLE_PRECISION = {"bar-pin hole": {"hw-diam": 4}, "spring-eye hole": {"hw-diam":
 # (+/-.001); it names the stack it sets (rule 4) and nothing more. The 20-hub
 # stack's length and end play between the MHA-CH-07 keepers are the channel
 # assembly's acceptance (MHA-CH-00), not this part's (machinist r1: a second
-# line here was assembly narration), and the band is accepted on RV-02.
-# The plate's thickness callout carries the reason for its .080 +/-.002
-# offset in the hub too (rule 7: a location carries its value and band only;
-# the mate sits on the feature's size callout): each bar rides its lever's
-# plate, so the offset spaces neighbouring bars (ch_bar_pivot_pin_spec).
+# line here was assembly narration), and the band is accepted on RV-03.
+# The plate's .080 +/-.002 offset in the hub is a tight band, so it names
+# what it serves at the dimension (rule 4; ch-fab-2 r2: 3/3 runs asked for
+# it there, and a second reason on the .118 read as narration): each bar
+# rides its lever's plate, so the offset spaces neighbouring bars in the
+# stack (ch_bar_pivot_pin_spec).
 TOP_CALLOUTS = {
-    "LeverThick": (
-        f"SLIDING FIT IN {BAR_NUMBER}\n"
-        f"NOTCH; {PLATE_OFFSET / 25.4:.3f} OFFSET SPACES BARS".replace(" 0.", " .")
-    ),
+    "LeverThick": f"SLIDING FIT IN NOTCH\nOF {BAR_NUMBER}",
+    "PlateOffset": f"SPACES {BAR_NUMBER} BARS",
     "HubLength": f"SETS PITCH OF {STATIONS}X\nSTACK ON {SHAFT_NUMBER}",
 }
 
@@ -208,7 +206,9 @@ TOP_KEEP = {
     # (r2 render), so the outer (right) line carries the lower text and
     # neither line runs through the other's text.
     "HubLength": (0.075, TOP_CENTER[1] + 0.032),
-    "PlateOffset": (0.095, TOP_CENTER[1] + 0.014),
+    # Lifted 4 mm from +0.014 so its one row of words clears its own arrows
+    # above the plate, still under the hub length's block.
+    "PlateOffset": (0.095, TOP_CENTER[1] + 0.018),
 }
 OVERALL_TEXT_XY = (FRONT_CENTER[0], 0.082)
 BAR_PIN_CALLOUT_XY = (0.170, 0.188)

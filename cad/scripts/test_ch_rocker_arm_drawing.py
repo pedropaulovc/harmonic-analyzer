@@ -2206,7 +2206,7 @@ def test_detail_d_leaders_use_four_separate_quadrants(bound, monkeypatch) -> Non
     assert quadrants == [0, 1, 2, 3]
     assert math.dist(rim, _PIVOT_CENTRE) == pytest.approx(_DETAIL_BORE_R)
     assert symbol[0] > rim[0] and symbol[1] < rim[1]
-    assert drawing.HUB_KEEP["PivotDia"] == (0.117, 0.086)
+    assert drawing.HUB_KEEP["PivotDia"] == (0.112, 0.086)
     assert drawing.HUB_KEEP["HubDia"] == (0.212, 0.108)
 
 

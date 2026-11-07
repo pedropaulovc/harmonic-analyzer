@@ -59,14 +59,16 @@ def test_bands_are_native_on_the_model_from_named_constants() -> None:
 
 def test_every_tight_band_names_its_mate_or_function() -> None:
     callouts = {**drawing.FRONT_CALLOUTS, **drawing.TOP_CALLOUTS}
-    for name in ("FulcrumDia", "LeverThick", "HubLength"):
+    for name in ("FulcrumDia", "LeverThick", "HubLength", "PlateOffset"):
         assert callouts[name]
     assert drawing.SHAFT_NUMBER in callouts["FulcrumDia"]
     assert "REAM" in callouts["FulcrumDia"]
     assert drawing.BAR_NUMBER in callouts["LeverThick"]
     assert drawing.SHAFT_NUMBER in callouts["HubLength"]
-    # Rule 7: a location dimension carries its value and band only.
-    for location in ("PlateOffset", "BarPinCx", "SpringCx"):
+    # The plate's tight offset names the bars it spaces (rule 4).
+    assert drawing.BAR_NUMBER in callouts["PlateOffset"]
+    # Rule 7: a hole location carries its value and band only.
+    for location in ("BarPinCx", "SpringCx"):
         assert location not in callouts
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     for label in drawing.HOLE_MATES:
