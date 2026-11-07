@@ -99,10 +99,11 @@ def test_the_tip_step_sets_the_collar_before_the_end_play() -> None:
     positions = [fitup.find(phrase) for phrase in order]
     assert -1 not in positions, positions
     assert positions == sorted(positions)
-    # The block is placed by its hold-down alone: nothing is set against it,
-    # and the post is left free to turn.
+    # The block is placed by its hold-down, squared and doweled (rule-23
+    # retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
+    # #2248)): nothing is set against it, and the post is left free to turn.
     placed = _step_body("post-and-tip-block")
-    assert "MHA-DT-VN-60 UP FROM UNDER THE PLATE" in placed
+    assert "RUN MHA-DT-VN-60 UP THRU THE MHA-DT-20 COUNTERBORE" in placed
     assert "FEELER" not in placed
     assert "RUN BOTH MHA-DT-VN-61 IN, LOOSE ENOUGH TO TURN MHA-DT-05" in placed
 

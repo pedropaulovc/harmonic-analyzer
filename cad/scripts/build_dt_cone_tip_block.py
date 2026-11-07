@@ -21,7 +21,10 @@ fit-up slide, fixes the block's station.
 Layout: block standing on the Top plane, plan centred on the origin,
 adjuster axis along Z at y = ADJUSTER_AXIS_HEIGHT (the assembly rotates the
 block about Y to align it with the cone axis). Named "adjuster axis" for the
-view-independent coaxial mate to the cup-ended screw.
+view-independent coaxial mate to the cup-ended screw, and "dowel axis"
+(vertical through the MHA-DT-VN-69 locating dowel's press ream; rule-23
+retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR #2248)) for
+the dowel's mate.
 
 Run (SolidWorks already open)::
 
@@ -52,9 +55,13 @@ from _sketch import (
     dimension_between,
     ensure_fully_defined,
 )
+from _sketch_circle import define_circle
 from _sketch_rectangle import define_centered_rectangle
 from _drawing_precision import apply_drawing_precision
-from _drawing_tolerances import set_dimension_bilateral_tolerance
+from _drawing_tolerances import (
+    set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
+)
 from _fit_deviations import deviations
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from dt_cone_tip_block_spec import (
@@ -67,6 +74,12 @@ from dt_cone_tip_block_spec import (
     BLOCK_WIDTH_PLACES,
     BLOCK_X,
     BLOCK_Z,
+    DOWEL_FROM_TAP,
+    DOWEL_HOLE_BAND,
+    DOWEL_HOLE_DEPTH,
+    DOWEL_HOLE_DIA,
+    DOWEL_HOLE_PLACES,
+    DOWEL_X_TOL_MM,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     FOOT_BORE_DIA,
@@ -106,6 +119,7 @@ REFERENCE_SKETCHES = (
     "PinchHeightReference",
     "FootTapXReference",
     "FootTapZReference",
+    "DowelXReference",
 )
 
 # Geometry envelope comes from dt_cone_tip_block_spec — the drawing's single
@@ -276,6 +290,11 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "FootTapOffsetX", f"{FOOT_TAP_OFFSET_X}mm")
     await set_global(adapter, "FootTapX", '"BlockX" / 2 + "FootTapOffsetX"')
     await set_global(adapter, "FootTapZ", '"BlockZ" / 2')
+    # Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
+    # #2248): the locating dowel's station and press ream.
+    await set_global(adapter, "DowelFromTap", f"{DOWEL_FROM_TAP}mm")
+    await set_global(adapter, "DowelHoleDia", f"{DOWEL_HOLE_DIA}mm")
+    await set_global(adapter, "DowelHoleDepth", f"{DOWEL_HOLE_DEPTH}mm")
     await set_global(
         adapter, "PinchBoreY", '"AdjusterAxisHeight" + "PinchRise"'
     )
@@ -426,6 +445,41 @@ async def build(adapter) -> dict[str, str]:
     v_foot = blind_hole_volume_mm3(FOOT_BORE_DIA, FOOT_BORE_SPEC.depth_mm)
     volume = await volume_check(adapter, "foot tap", volume - v_foot, 0.03 * v_foot)
 
+    # Locating dowel (rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00
+    # rubric sample, PR #2248)): a flat-bottomed press
+    # ream up into the foot, the MHA-DT-VN-69 pin pressed to its floor up
+    # through the platform, on the tap's line DOWEL_FROM_TAP toward +X.
+    # Match-drilled up through MHA-DT-20 at MHA-DT-00 step post-and-tip-block,
+    # modelled at its nominal station.  The Top plane IS the foot, so the cut
+    # runs up (+Y) into the block.
+    dowel = SketchDims()
+    check("create_sketch dowel ream", await adapter.create_sketch("Top"))
+    await define_circle(
+        adapter,
+        FOOT_TAP_OFFSET_X + DOWEL_FROM_TAP,
+        0.0,
+        DOWEL_HOLE_DIA / 2.0,
+        "dowel ream",
+        dims=dowel,
+        names=("DowelCx", None, "DowelHoleDia"),
+        drives=('"FootTapOffsetX" + "DowelFromTap"', None, '"DowelHoleDia"'),
+    )
+    await ensure_fully_defined(adapter, "dowel ream sketch")
+    check("exit_sketch dowel ream", await adapter.exit_sketch())
+    name_last_feature(adapter, "DowelProfile")
+    drive_jobs += dowel.apply(adapter, "DowelProfile")
+    check(
+        "cut dowel ream",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=DOWEL_HOLE_DEPTH, reverse_direction=True)
+        ),
+    )
+    name_last_feature(adapter, "DowelHole")
+    dowel_depth_dim = name_dimensions(adapter, "DowelHole", ["DowelDepth"])[0]
+    drive_jobs.append((dowel_depth_dim, '"DowelHoleDepth"'))
+    v_dowel = math.pi * (DOWEL_HOLE_DIA / 2.0) ** 2 * DOWEL_HOLE_DEPTH
+    volume = await volume_check(adapter, "dowel ream", volume - v_dowel, 0.03 * v_dowel)
+
     # Named bore axis for the view-independent coaxial mate: the shaft tip
     # positions this block (coaxial + axial distance), no face picks.
     await name_bore_axis(
@@ -438,6 +492,15 @@ async def build(adapter) -> dict[str, str]:
         adapter, "Top Plane", PINCH_BORE_Y, "Front Plane", 0.0, "pinch axis",
         drive_a='"PinchBoreY"', drive_jobs=drive_jobs,
     )
+    # Third axis, NAMED "dowel axis" (the platform's post-mount axes'
+    # pattern): the locating dowel's ream, vertical (Front Plane at the tap's
+    # mid-depth, Right Plane at its station) -- the assembly mates
+    # MHA-DT-VN-69 on it.
+    await name_bore_axis(
+        adapter, "Front Plane", 0.0, "Right Plane", FOOT_TAP_OFFSET_X + DOWEL_FROM_TAP,
+        "dowel axis", drive_b='"FootTapOffsetX" + "DowelFromTap"', drive_jobs=drive_jobs,
+    )
+    name_last_feature(adapter, "dowel axis")
 
     # Apply the deferred drive equations after the model + reference axes exist,
     # then re-check: every equation evaluates to the value just built, so geometry
@@ -536,6 +599,22 @@ async def build(adapter) -> dict[str, str]:
         dimension_name="FootTapZ",
         drive_expression='"FootTapZ"',
     )
+    # The locating dowel's station from the foot tap, on the tap's line
+    # (rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample,
+    # PR #2248)): the hole is drilled from MHA-DT-20, so this
+    # is where it lands, inside the explicit band set below.
+    await _author_reference_dimension(
+        adapter,
+        plane="Top",
+        start=(FOOT_TAP_OFFSET_X, 0.0),
+        end=(FOOT_TAP_OFFSET_X + DOWEL_FROM_TAP, 0.0),
+        orientation="horizontal",
+        dimension_type="horizontal_distance",
+        value_mm=DOWEL_FROM_TAP,
+        feature_name="DowelXReference",
+        dimension_name="DowelX",
+        drive_expression='"DowelFromTap"',
+    )
     # The width may only come in from its nominal (the +X face's containment
     # over the plate's west edge, dt_cone_tip_block_spec.BLOCK_WIDTH_BAND).
     set_dimension_bilateral_tolerance(
@@ -544,6 +623,24 @@ async def build(adapter) -> dict[str, str]:
         "Width",
         *deviations(BLOCK_WIDTH_BAND),
         places=BLOCK_WIDTH_PLACES,
+        display_unit=UNIT,
+    )
+    # The dowel's press ream carries its REAM_H7 at four places, and its
+    # station from the tap the platform's band plus the hold-down screw's
+    # float (dt_cone_tip_block_spec.DOWEL_X_TOL_MM).
+    set_dimension_bilateral_tolerance(
+        adapter,
+        "DowelProfile",
+        "DowelHoleDia",
+        *deviations(DOWEL_HOLE_BAND),
+        places=DOWEL_HOLE_PLACES,
+        display_unit=UNIT,
+    )
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "DowelXReference",
+        "DowelX",
+        DOWEL_X_TOL_MM,
         display_unit=UNIT,
     )
     # Model-owned places are applied only after the reference sketches exist.

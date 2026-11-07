@@ -9,6 +9,9 @@ its sheet, not the harmonic base or the drive train that read the spec.
 
 from __future__ import annotations
 
+import _config
+import dt_drive_train_steps
+
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  The pivot-hole centre is the layout origin: every plan corner,
@@ -37,6 +40,11 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     # The tip-block hold-down's two stations from the pivot bore; the native
     # Hole Wizard callout carries its sizes.
     "HoldDownHole": {"HoldDownX", "HoldDownZ"},
+    # Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
+    # #2248): the tip-block locating dowel's slip ream, its
+    # size and its station from the hold-down hole (on the hold-down line by
+    # relation), both in detail B with the hold-down's.
+    "TipDowelProfile": {"TipDowelX", "TipDowelDia"},
     "CornerNE": {"CornerNER"},
     "CornerNW": {"CornerNWR"},
     "CornerSW": {"CornerSWR"},
@@ -77,6 +85,9 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "LockNotchCapEProfile": {"CapECx": 2, "CapECz": 2, "CapEDia": 2},
     # Banded on the part (HOLDDOWN_STATION_TOL_MM).
     "HoldDownHole": {"HoldDownX": 2, "HoldDownZ": 3},
+    # Banded on the part: the station with the hold-down's +/-.004
+    # (TIP_DOWEL_STATION_TOL_MM), the ream with its REAM_H7 at four places.
+    "TipDowelProfile": {"TipDowelX": 3, "TipDowelDia": 4},
     "CornerNE": {"CornerNER": 2},
     "CornerNW": {"CornerNWR": 2},
     "CornerSW": {"CornerSWR": 2},
@@ -126,3 +137,22 @@ HOLDDOWN_PROCESS = "DRILL"
 PIVOT_PROCESS = "REAM"
 TOP_FACE_LABEL = "TOP FACE"
 UNDERSIDE_LABEL = "UNDERSIDE"
+# Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
+# #2248).  The tip-block locating dowel's slip ream, under its
+# banded diameter in detail B, standing alone for MHA-DT-00 step
+# post-and-tip-block ("DRILL AND REAM UP THRU MHA-DT-20 INTO MHA-DT-21 PER
+# THEIR CALLOUTS"): reamed through to this size, match-reamed with the block
+# on, after MHA-DT-21's press ream has been drilled and reamed up through this
+# plate (the lift rod's made-at-assembly precedent,
+# dt_pinion_lift_rod_spec.PIN_HOLE_CALLOUT).  Three rows of at most 16
+# characters: the block stands right of detail B's circle, between
+# HoldDownX's text, the hold-down callout and the plan captions (see
+# draw_dt_cone_swing_platform.TIP_DOWEL_CALLOUT_SIZE).
+TIP_BLOCK_NUMBER = _config.parts("dt-cone-tip-block")["number"]
+TIP_DOWEL_CALLOUT = "\n".join(
+    (
+        "MATCH-REAM THRU",
+        f"AFTER {TIP_BLOCK_NUMBER},",
+        dt_drive_train_steps.step_ref("post-and-tip-block"),
+    )
+)

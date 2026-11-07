@@ -1,0 +1,13 @@
+dt-vn-locating-pin:
+  title: Locating Pin
+  number: MHA-DT-VN-69
+  stock_name: Alloy Steel Dowel Pin
+  supplier: McMaster-Carr
+  supplier_skus: [98381A417]
+  material: Alloy Steel
+  material_specification: "Alloy steel dowel pin, 1/16 x 3/8, Round x Chamfer ends; McMaster-Carr 98381A417"
+  finish: plain; no coating
+  quantity: 1
+  tolerance_class: machined_block
+  drawing_unit: in
+  process: purchased

@@ -2290,6 +2290,18 @@
           "number": "MHA-CH-06-TL-52"
         }
       ]
+    },
+    {
+      "old_stem": "dt-vn-locating-pin",
+      "old_number": null,
+      "introduced": "2026-11-07",
+      "new_identities": [
+        {
+          "parent": "dt-drive-train",
+          "stem": "dt-vn-locating-pin",
+          "number": "MHA-DT-VN-69"
+        }
+      ]
     }
   ],
   "retired_identities": [

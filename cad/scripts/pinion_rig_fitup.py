@@ -137,13 +137,21 @@ TRANSFER_AFTER_RIG_SET = f"AFTER {RIG_SET_NAME};"
 # 45 deg or more off the follower contact (test_dt_drive_train_support_layout),
 # so the stakes stay off the follower's track. "CAMS", the BOM's name (machinist
 # review of 82158b1bb).
+# Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample,
+# PR #2248; owner question 2 option 2-A): each set screw bears on a
+# .012 flat on MHA-DT-17 (dt_pinion_lift_rod_spec), long enough for the
+# feeler-set range once the rod's rear rim is set flush with the back block,
+# so the reversing drive torque is carried by a flat, not a cup on round stock.
 COLLAR_SET_STEP = "\n".join(
     (
-        f"SET THE FRONT MHA-DT-23 CAM'S FRONT FACE {_leaf_setting(FRONT_COLLAR_LEAF)} "
+        "SET MHA-DT-17'S REAR END FLUSH WITH MHA-DT-18'S REAR FACE "
+        f"±{inch_max_text(FLUSH_SET_ERROR, 3)}.",
+        "TURN MHA-DT-17 UNTIL ITS TWO FLATS FACE THE CAM SET SCREWS.",
+        f"SET THE FRONT MHA-DT-23 {_leaf_setting(FRONT_COLLAR_LEAF)} "
         "OFF THE FRONT MHA-DT-18 ON A FEELER.",
-        f"SET THE BACK MHA-DT-23 CAM'S BACK FACE {_leaf_setting(BACK_COLLAR_LEAF_F)} "
+        f"SET THE BACK MHA-DT-23 {_leaf_setting(BACK_COLLAR_LEAF_F)} "
         "OFF THE BACK MHA-DT-18 ON A FEELER.",
-        "TIGHTEN THEIR SET SCREWS.",
+        "TIGHTEN EACH SET SCREW ON ITS MHA-DT-17 FLAT.",
         "STAKE EACH TAP MOUTH AT 2 POINTS.",
         # Rule 23 (rubric sample round 5): the bench acceptance.
         "CHECK THAT NEITHER CAM TURNS OR SLIDES ON MHA-DT-17 BY HAND.",

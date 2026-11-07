@@ -996,6 +996,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="dt_vn_locating_pin",
+        part="dt_vn_locating_pin",
+        artifact_stem="dt-vn-locating-pin",
+        script_name="draw_dt_vn_locating_pin.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="pd_transgear_knob_shaft",
         part="pd_transgear_knob_shaft",
         artifact_stem="pd-transgear-knob-shaft",

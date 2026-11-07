@@ -45,6 +45,9 @@ allowed_free_stems:
   - dt-vn-cone-tip-adjuster
   - dt-cone-tip-block
   - dt-vn-cone-tip-block-screw
+  # MHA-DT-VN-69 is pressed in the MHA-DT-21 foot and rides the swing (rule-23
+  # retention, owner ruling 2026-11-07, PR #2248).
+  - dt-vn-locating-pin
   - dt-vn-cone-tip-collar
   - dt-vn-cone-tip-pinch-screw
   - dt-crank-arm
@@ -122,3 +125,8 @@ machinist_exceptions:
     where: "sheet 12 check 4: VERIFY MHA-DT-VN-52 FULL-FORM THREAD ENGAGEMENT .190 MIN; SHOULDER FULLY SEATED."
     finding: "thread engagement below 1.5D (rule 18)"
     reason: "Owner ruling 2026-11-01: thread engagement below 1.5D with no geometry escape accepted as a minor exception. MHA-DT-VN-52 cone pivot shoulder screw in the MHA-FR-01 blind seat, 1.0D"
+  - id: "DT-05"
+    kind: "minor"
+    where: "sheet 10 steps 18A, 19B and 20: MHA-DT-24 pinion spring foot pad on one MHA-SH-VN-52 #4-40 fillister screw in its transferred MHA-FR-01 seat, the crest bearing on the parked back MHA-DT-14 flank"
+    finding: "one-screw part that can turn about its screw with no locating feature (rule 23 static clamp)"
+    reason: "Owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR #2248): no dowel, pin or second screw. The spring is very rarely used and any turning is inconsequential; the operator realigns the spring by eye and retorques the screw"

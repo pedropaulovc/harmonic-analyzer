@@ -113,7 +113,8 @@ _INSERTED_SOURCES = {
     "dt_vn_cylinder_bank_spring dt_cylinder_gear_shaft "
     "sh_vn_brass_fillister_screw sh_vn_fillister_screw_90280a108 dt_vn_keeper_chain dt_vn_keeper_chain_link dt_vn_pedestal_hold_down_screw dt_pinion_arbor dt_pinion_arbor_collar dt_pinion_bracket dt_pinion_cam "
     "dt_pinion_cam_pin dt_pinion_handle dt_pinion_lever dt_pinion_lever_pin dt_pinion_lift_rod "
-    "dt_pinion_pivot_block dt_pinion_pivot_shaft dt_pinion_spring dt_vn_pinion_strap_pin dt_vn_post_mount_screw dt_vn_slotted_screw",
+    "dt_pinion_pivot_block dt_pinion_pivot_shaft dt_pinion_spring dt_vn_pinion_strap_pin dt_vn_post_mount_screw dt_vn_slotted_screw "
+    "dt_vn_locating_pin",
     "ch_channel": "ch_amplitude_bar ch_bar_pivot_pin ch_channel_lever ch_vn_channel_spring_installed ch_connecting_rod "
     "ch_vn_frame_side_screw ch_fulcrum_keeper ch_vn_fulcrum_set_screw ch_fulcrum_shaft ch_vn_bracket_hold_down_screw ch_pivot_bracket "
     "ch_pivot_shaft ch_rocker_arm ch_vn_rocker_bank_spring ch_vn_rocker_thrust_washer ch_rod_pivot_pin ch_vn_spring_hook "
