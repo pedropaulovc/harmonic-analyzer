@@ -114,9 +114,11 @@ from ch_fulcrum_keeper_spec import (
     KEEPER_INNER_FACE_SPAN_MM,
     KEEPER_Z_OFF,
     LUG_HALF_T as KEEPER_LUG_HALF_T,
+    SHAFT_AXIS_H as KEEPER_SHAFT_AXIS_H,
 )
 from ch_pivot_bracket_sides import FOOT_Z1 as BRACKET_FOOT_Z1
 from ch_pivot_bracket_spec import (
+    APEX_ABOVE_BORE as BRACKET_APEX_ABOVE_BORE,
     FOOT_H as BRACKET_FOOT_H,
     FOOT_W as BRACKET_FOOT_W,
 )
@@ -904,6 +906,48 @@ DETAIL_POINTERS = tuple(
     )
 )
 LUG_KEEP = {asm.LUG_SPAN_DIMENSION: LEVER_BANK.sheet_xy(_LUG_MID, _FULCRUM_Y + 32.0)}
+# Rule 23: every stake is in a view (round 2 reviews: steps 30 and 59 staked
+# "AT 2 POINTS" and no view showed where). Each set screw's tap enters at the
+# top of its ear or keeper on the part's mid-plane; the two stake points sit
+# either side of the mouth along the shaft, on the flat top line the bank
+# view shows edge-on. The pointer lands on the right-hand (south) part's tap
+# mouth; its text stands above the view's settings callout, left of the steps
+# column.
+STAKE_POINTER_TEXT_XY = {"VIEW D": (0.145, 0.250), "VIEW E": (0.145, 0.262)}
+
+
+def stake_points(shaft: str) -> str:
+    """Where the two stake points go, as the step and the pointer say it."""
+    return f"2 POINTS, ONE EACH SIDE ALONG {item(shaft)}"
+
+
+def _stake_pointer(
+    view: BankView, set_screw: str, shaft: str, tip_zy: tuple[float, float]
+) -> tuple[str, tuple[float, float], tuple[float, float]]:
+    text = f"STAKE EACH {item(set_screw)} TAP\nMOUTH AT {stake_points(shaft)}"
+    text = text.replace(", ONE EACH SIDE ALONG", ", ONE\nEACH SIDE ALONG")
+    return (text, STAKE_POINTER_TEXT_XY[view.title], view.sheet_xy(*tip_zy))
+
+
+ROCKER_POINTERS = (
+    _stake_pointer(
+        ROCKER_BANK,
+        explode.BRACKET_SET_SCREW,
+        "ch-pivot-shaft",
+        (PIVOT_BRACKET_Z[0], _PIVOT_Y + BRACKET_APEX_ABOVE_BORE),
+    ),
+)
+LEVER_POINTERS = (
+    _stake_pointer(
+        LEVER_BANK,
+        explode.KEEPER_SET_SCREW,
+        "ch-fulcrum-shaft",
+        (
+            FULCRUM_KEEPER_CENTRE_Z - KEEPER_Z_OFF,
+            _FULCRUM_Y + KEEPER_CROWN_TOP_Y - KEEPER_SHAFT_AXIS_H,
+        ),
+    ),
+)
 # swDimensionTextParts_e compartments.
 CALLOUT_TEXT_PART = 3  # swDimensionTextCalloutAbove
 REFERENCE_PREFIX_PART = 1  # swDimensionTextPrefix
@@ -1192,7 +1236,8 @@ def _fitup_text() -> dict[str, str]:
             f"THE TOP OF EACH {bracket} EAR ONTO ITS FLAT, LEFT EAR FIRST."
         ),
         steps.PIVOT_SET_SCREWS_STAKED_KEY: (
-            f"STAKE THE MOUTH OF EACH {pivot_set_screw} TAP AT 2 POINTS."
+            f"STAKE THE MOUTH OF EACH {pivot_set_screw} TAP AT "
+            f"{stake_points('ch-pivot-shaft')} ({ROCKER_BANK.title})."
         ),
         "pivot-shaft-held": f"CHECK {shaft} DOES NOT TURN OR SLIDE BY HAND.",
         # The keepers are reamed as a pair at the bench, then each is finished
@@ -1284,7 +1329,8 @@ def _fitup_text() -> dict[str, str]:
             f"TIGHTEN ONE {fulcrum_set_screw} SET SCREW ONTO EACH FLAT."
         ),
         steps.SET_SCREWS_STAKED_KEY: (
-            f"STAKE THE MOUTH OF EACH {fulcrum_set_screw} TAP AT 2 POINTS."
+            f"STAKE THE MOUTH OF EACH {fulcrum_set_screw} TAP AT "
+            f"{stake_points('ch-fulcrum-shaft')} ({LEVER_BANK.title})."
         ),
         "fulcrum-shaft-held": f"CHECK {fulcrum_shaft} DOES NOT TURN OR SLIDE BY HAND.",
         steps.SPRINGS_HOOKED_KEY: (
@@ -2221,7 +2267,9 @@ def _place_fitup_sheets(adapter: Any) -> Callable[[], None]:
     """Sheets 3 to 5: the isolated banks with their settings, detail A, the
     steps."""
     _activate_sheet(adapter, SHEET_NAMES[2])
-    annotations = _dimensioned_bank(adapter, ROCKER_BANK, STACK_KEEP, detail=SOUTH_END)
+    annotations = _dimensioned_bank(
+        adapter, ROCKER_BANK, STACK_KEEP, detail=SOUTH_END, pointers=ROCKER_POINTERS
+    )
     _place_steps(adapter, SHEET_NAMES[2])
 
     _activate_sheet(adapter, DETAIL_SHEET)
@@ -2231,7 +2279,7 @@ def _place_fitup_sheets(adapter: Any) -> Callable[[], None]:
     _place_steps(adapter, DETAIL_SHEET)
 
     _activate_sheet(adapter, SHEET_NAMES[4])
-    annotations += _dimensioned_bank(adapter, LEVER_BANK, LUG_KEEP)
+    annotations += _dimensioned_bank(adapter, LEVER_BANK, LUG_KEEP, pointers=LEVER_POINTERS)
     annotations += _dimensioned_bank(
         adapter, KEEPER_PLAN, PLAN_KEEP, pointers=PLAN_POINTERS
     )

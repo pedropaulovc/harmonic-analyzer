@@ -1338,7 +1338,8 @@ JOINTS: tuple[Joint, ...] = (
         evidence=(
             "draw_ch_channel_assembly.py _fitup_text 'set-screws-driven' ('SNUG ONE ITEM 4 DOWN THE TAP AT THE TOP "
             "OF EACH ITEM 3 EAR ONTO ITS FLAT, LEFT EAR FIRST.') and 'pivot-set-screws-staked' "
-            "('STAKE THE MOUTH OF EACH ITEM 4 TAP AT 2 POINTS.'); build_ch_channel_assembly.py apex set screw "
+            "('STAKE THE MOUTH OF EACH ITEM 4 TAP AT 2 POINTS, ONE EACH SIDE ALONG ITEM 1 (VIEW D).'); "
+            "build_ch_channel_assembly.py apex set screw "
             "placement (SET_SCREW_TIP_Y); ch_pivot_bracket_spec.SET_SCREW_HOLE_SPEC (#4-40 tapped, through_next) "
             "and SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT; ch_pivot_shaft_spec flats (FLAT_DEPTH, FLAT_LENGTH)"
         ),
@@ -1460,7 +1461,8 @@ JOINTS: tuple[Joint, ...] = (
             "ch_fulcrum_keeper_spec.SET_SCREW_HOLE_SPEC (#1-72 tapped, through_next) + DRAWING_NOTES 2; "
             "draw_ch_fulcrum_keeper.SET_SCREW_QUALIFIER (stake at MHA-CH-00 assembly); "
             "draw_ch_channel_assembly.py steps fulcrum-set-screws-driven ('TIGHTEN ONE ITEM 10 SET SCREW ONTO EACH "
-            "FLAT.') and fulcrum-set-screws-staked ('STAKE THE MOUTH OF EACH ITEM 10 TAP AT 2 POINTS.'); "
+            "FLAT.') and fulcrum-set-screws-staked ('STAKE THE MOUTH OF EACH ITEM 10 TAP AT 2 POINTS, "
+            "ONE EACH SIDE ALONG ITEM 2 (VIEW E).'); "
             "ch_fulcrum_shaft_spec FLAT_DEPTH / FLAT_PITCH / "
             "FLAT_STATION_WINDOW_MM; config parts/ch-vn-fulcrum-set-screw.yaml (91375A942)"
         ),

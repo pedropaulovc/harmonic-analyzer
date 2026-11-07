@@ -284,6 +284,46 @@ def test_the_spring_set_and_its_preload_check_are_printed_from_the_layout() -> N
     assert f"{bank.STACK_L20_ACCEPT[0]:.2f}" not in _step_body("rocker-stack-measured")
 
 
+def test_each_stake_step_names_the_view_that_points_at_its_tap_mouth() -> None:
+    """Rule 23 (round 2 reviews): every stake is in a view. Each staking step
+    names the bank view whose pointer lands on a tap mouth and says where its
+    2 points go; the pointer text stands left of the steps column, above the
+    view's settings callout, inside the border."""
+    template = drawing._TEMPLATE
+    for key, view, pointers, keep, shaft in (
+        (
+            steps.PIVOT_SET_SCREWS_STAKED_KEY,
+            drawing.ROCKER_BANK,
+            drawing.ROCKER_POINTERS,
+            drawing.STACK_KEEP,
+            "ch-pivot-shaft",
+        ),
+        (
+            steps.SET_SCREWS_STAKED_KEY,
+            drawing.LEVER_BANK,
+            drawing.LEVER_POINTERS,
+            drawing.LUG_KEEP,
+            "ch-fulcrum-shaft",
+        ),
+    ):
+        body = _step_body(key)
+        assert drawing.stake_points(shaft) in body
+        assert f"({view.title})" in body
+        ((text, (tx, ty), (px, py)),) = pointers
+        assert " ".join(text.split()) == (
+            f"STAKE EACH {_step_body(key).split('EACH ')[1].split(' TAP')[0]} TAP "
+            f"MOUTH AT {drawing.stake_points(shaft)}"
+        )
+        lines = text.splitlines()
+        assert tx + max(map(len, lines)) * NOTE_CHAR_WIDTH < drawing.STEPS_RIGHT_X - 0.003
+        assert ty < template.height_m - drawing.BORDER
+        (_, callout_y), = keep.values()
+        assert ty - len(lines) * NOTE_LINE_PITCH > callout_y + 2 * NOTE_LINE_PITCH
+        # The tip is on the right-hand (south) part, below its text.
+        assert tx < px < drawing.STEPS_RIGHT_X - 0.010
+        assert view.centre[1] < py < ty - len(lines) * NOTE_LINE_PITCH
+
+
 def test_the_stack_step_says_which_way_and_where_to_re_face() -> None:
     """Machinist review (PR #1605): the hub band is upper-only, so the
     shortest stack meets the acceptance's low limit; the re-face loops back
