@@ -1325,7 +1325,7 @@ def test_tip_dowel_ream_callout_says_it_is_made_at_assembly() -> None:
     MHA-DT-21's ream, at that step."""
     import dt_drive_train_steps
 
-    callout = drawing_spec.TIP_DOWEL_CALLOUT
+    callout = drawing.TIP_DOWEL_CALLOUT
     assert callout.split("\n") == [
         "MATCH-REAM THRU",
         "AFTER MHA-DT-21,",
