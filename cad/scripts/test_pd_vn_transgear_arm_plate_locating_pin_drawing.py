@@ -26,10 +26,8 @@ def test_live_sourced_identity_is_registered_end_to_end() -> None:
     assert stock.supplier == row["supplier"] == "McMaster-Carr"
     assert row["number"] == spec.PART_NUMBER == "MHA-PD-VN-64"
     assert row["quantity"] == spec.ASSEMBLY_QUANTITY == 2
-    assert row["installation_notes"] == spec.PURCHASED_STOCK_NOTE
-    lines = row["installation_notes"].splitlines()
-    assert len(lines) <= 4
-    assert all(len(line) <= 70 for line in lines)
+    # Where the dowels go is MHA-PD-00's arm-plate-located step, not a part fact.
+    assert "installation_notes" not in row
     metadata = discovered_recipes()[spec.SKU]
     assert metadata.module == recipe.__name__
     assert getattr(recipe, metadata.callable_name) is recipe.build_98381A435

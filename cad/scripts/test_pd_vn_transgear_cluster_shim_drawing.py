@@ -107,16 +107,6 @@ def test_the_sheet_is_drawn_in_the_unit_the_model_reference_ink_names(
     assert seen["unit"] == _config.parts(STEM)["drawing_unit"] == "in"
 
 
-def test_installation_note_fits_the_sheet() -> None:
-    lines = _config.parts(STEM)["installation_notes"].splitlines()
-    assert len(lines) <= 4
-    assert all(len(line) <= 70 for line in lines), lines
-
-
-def test_installation_notes_fit_the_purchased_sheet() -> None:
-    # Farm run 20261103T093232922Z: four lines failed rule 7's budget.
-    from _purchased_fastener_drawing import note_lines
-
-    row = _config.parts("pd-vn-transgear-cluster-shim")
-    lines = note_lines(row["installation_notes"], label="cluster shim")
-    assert "SPARE T18'S BORE" in " ".join(lines)
+def test_the_sheet_carries_no_installation_note() -> None:
+    # The shimming and the spares' storage are MHA-PD-00's steps.
+    assert "installation_notes" not in _config.parts(STEM)

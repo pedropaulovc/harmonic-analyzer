@@ -213,7 +213,7 @@ if ENGAGEMENT_WORST_D < ENGAGEMENT_FLOOR_D - 1e-9:
 # The supplier's references less its stock length: the screw is drawn as
 # cut, so a .25 stock length landed in air below the drawn tip on a witness
 # line that belonged to no feature (machinist review r7, all runs).  The
-# ITEM row's "#0-80 x 1/4" names the stock; the installation note the cut.
+# ITEM row's "#0-80 x 1/4" names the stock; MHA-PD-00's step the cut.
 _STOCK_LENGTH = "SupplierStockLength"
 SUPPLIER_REFERENCE_DIMENSIONS = tuple(
     row for row in _supplier.SUPPLIER_REFERENCE_DIMENSIONS if row[0] != _STOCK_LENGTH

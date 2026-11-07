@@ -18,8 +18,8 @@ chamfer, and the recipe's analytic revolved-volume check follows the cut.
 MHA-DT-VN-61 (``build_dt_vn_post_mount_screw``) instead builds the supplied screw and
 trims it with a cut-extrude, a deburr revolve-cut, equation-driven reference
 sketches and B-rep rim reads, because its sheet dimensions the cut length
-and the break from model dimensions.  This sheet prints neither (the
-installation note states the cut), so that machinery buys nothing here and
+and the break from model dimensions.  This sheet prints neither (its general
+line points to the MHA-PD-00 cut step), so that machinery buys nothing here and
 every one of its COM calls would be unexercised native risk; the profile
 route adds no COM call to the stock build and leaves the supplied-screw
 catalog run unchanged.  The parameters ride ``StockComponent.parameters``

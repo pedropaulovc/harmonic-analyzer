@@ -102,18 +102,12 @@ def test_part_puts_the_rear_face_on_the_front_plane(monkeypatch) -> None:
         assert min(abs(moved[2]), abs(moved[2] - spec.THICKNESS)) == pytest.approx(0.0)
 
 
-_FORBIDDEN = re.compile(r"EXCEPTION|ACCEPTED|RULING|POLICY|BOOK FIDELITY|THREADLOCK")
-
-
-def test_installation_note_fits_the_sheet() -> None:
+def test_registry_names_carry_no_size_and_no_installation_note() -> None:
     row = _config.parts(STEM)
     for field in ("title", "supplier", "finish", "stock_name"):
         assert not re.search(r"\d", str(row[field])), (field, row[field])
-    lines = row["installation_notes"].splitlines()
-    assert 1 <= len(lines) <= 4
-    assert all(len(line) <= 70 for line in lines), lines
-    assert not _FORBIDDEN.search(row["installation_notes"].upper())
-    assert "MHA-PD-23" in lines[0] and "GROOVE" in lines[0]
+    # Where the ring goes is MHA-PD-00's disc-cluster-hung step.
+    assert "installation_notes" not in row
 
 
 def test_purchased_sheet_documents_the_built_part() -> None:
