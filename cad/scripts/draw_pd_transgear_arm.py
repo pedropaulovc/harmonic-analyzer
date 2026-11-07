@@ -31,6 +31,7 @@ from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     dimension_name,
     place_view,
@@ -99,23 +100,25 @@ from pd_transgear_arm_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
-    FLOOR_DEPTH_CALLOUT,
     ISO_VIEW_SCALE,
+    LATCH_PIN_NUMBER,
+    LATCH_PIN_PRESS_PRINTED,
+    LATCH_PIN_WALL_PRINTED,
+    LOCATOR_PRESS_INTERFERENCE,
     OVERALL_LENGTH,
-    PIN_BORE_CALLOUT,
-    LOCATOR_CALLOUT,
-    PIN_HOLE_CALLOUT,
     PIN_MOUTH_CALLOUT,
-    PIVOT_BORE_CALLOUT,
-    PLATE_TAP_EDGE_BREAK_CALLOUT,
+    PIN_PRESS_INTERFERENCE,
+    PIVOT_BORE_DIAMETRAL_CLEARANCE,
+    PIVOT_FIT_CLEARANCE_PLACES,
     PROJECTED_ZONE_DIRECTION,
     PROJECTED_ZONE_START_Z,
-    SPOT_FACE_CALLOUT,
     STOCK_TEXT_PREFIX,
     STOCK_TEXT_SUFFIX,
-    engagement_line,
 )
-import transgear_hanger_joints as joints
+import _transgear_arm_plate_locating_interface as LOCATING_PIN
+import pd_transgear_pin_spec as PIN
+import pd_vn_transgear_arm_plate_locating_pin_spec as LOCATOR_PIN
+from pd_rack_pinion_spec import inch_ceil_mm, inch_floor_mm, inch_text
 from pd_paper_drive_assembly_steps import knob_setting_ref
 
 
@@ -280,10 +283,10 @@ SECTION_KEEP = {
         SECTION_CENTER[1] - 0.016,
     ),
 }
-# Its left edge stands 12 mm right of the line, so the leader keeps 2 mm
-# off "SETS PRELOAD OF", the widest line; its top 2.7 mm under the plate
-# tap's frame (both 3 mm lower than before run 20261028T134941938Z).
-FLOOR_TEXT_XY = (0.075, 0.052)
+# Its left edge stands 12 mm right of the line.  SOLIDWORKS centres its two
+# lines (the value, and the link to note 4) on this point: ~5 mm under the
+# plate taps' frames, over the sheet's fit notes.
+FLOOR_TEXT_XY = (0.075, 0.059)
 # The top of both plate-tap frames in section A-A, 4.4 mm under its rear
 # face: the counterbore's extension lines run to its revolved profile's end,
 # 2 mm past that face, and at 1.5 mm under it they ran into tap 1's frame
@@ -406,8 +409,11 @@ _PIN_CAPTION_GAP_M = 0.006
 # off at 0.2 (a native caption's extent does not follow a move exactly).
 _CAPTION_SETTLE_M = 5e-4
 _CAPTION_MOVES = 4
-# A two-line caption (name over scale) is 16.2 mm tall; one line is ~7.
-_CAPTION_TWO_LINES_M = 0.012
+# Every section is drawn at the sheet's 2:1, so its caption is the name line
+# alone (ASME Y14.3, rule 9: a scale equal to the sheet's restates the title
+# block; draw_mg_magnifying_wheel's form).  One line is ~7 mm tall.
+SECTION_CAPTION_TEXT = "<VLNAME> <VLLABEL>"
+_CAPTION_ONE_LINE_MIN_M = 0.004
 
 
 def projected_zone_count(key: str) -> int:
@@ -432,49 +438,89 @@ _SW_TEXT_SUFFIX = 2  # swDimensionTextSuffix
 _SW_DIMENSION_DRIVEN = 1  # swDimensionDrivenState_e.swDimensionDriven
 
 
-# The match-drill rides the locating holes' own callout, pointing at the
-# assembly view whose native S-K dimension sets the pair's centres; the
-# callout carries no value of its own (rule 7; #1388 policy).
+def _inch_range(limits: tuple[float, float], places: int = 4) -> str:
+    """A clearance or interference range in inches, widened outward to
+    ``places`` so it holds every part the two bands accept."""
+    return (
+        f"{inch_text(inch_floor_mm(min(limits), places), places)}-"
+        f"{inch_text(inch_ceil_mm(max(limits), places), places)}"
+    )
+
+
+# Each fit callout keeps its size, its process and its mate; the fit's
+# acceptance and anything else it needs stand once in a numbered note on
+# this sheet, linked from the callout (rule 7: size and process lines plus at
+# most two lines of words; rule 4: a fit names its mate and its standard
+# name).  The counterbore is drawn in section A-A, so its Ø and floor carry
+# no words of their own, only the link to the spring they seat and preload.
 _PLATE = _config.parts("pd-transgear-arm-plate")
-LOCATOR_CALLOUT_TEXT = "\n".join((
-    LOCATOR_CALLOUT,
-    f"MATCH-DRILL WITH ARM PLATE {_PLATE['number']}",
-    f"AT ASSEMBLY, {knob_setting_ref()}",
+_SPRING = _config.parts("pd-vn-transgear-pivot-spring")
+_PIVOT_SCREW = _config.parts("pd-vn-transgear-pivot-screw")
+PIVOT_NOTE, LOCATOR_NOTE, LATCH_PIN_NOTE, SPRING_NOTE = 1, 2, 3, 4
+NOTES = (
+    f"{PIVOT_NOTE}. PIVOT BORE: RUNNING FIT ON PIVOT SCREW {_PIVOT_SCREW['number']}"
+    " SHOULDER, REAMED TO\n"
+    "   THE MEASURED SHOULDER (CLEARANCE "
+    f"{_inch_range(PIVOT_BORE_DIAMETRAL_CLEARANCE, PIVOT_FIT_CLEARANCE_PLACES)}).",
+    f"{LOCATOR_NOTE}. 2X DOWEL HOLES: PRESS FIT ON DOWEL {LOCATOR_PIN.PART_NUMBER}"
+    f" (INTERFERENCE {_inch_range(LOCATOR_PRESS_INTERFERENCE)}).\n"
+    "   MOUTH BREAKS "
+    f"{inch_text(inch_floor_mm(LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM, 3), 3)}"
+    f" MAX FOR DOWEL GRIP. MATCH-DRILL WITH ARM PLATE {_PLATE['number']}\n"
+    f"   AT ASSEMBLY, {knob_setting_ref()}.",
+    f"{LATCH_PIN_NOTE}. LATCH-PIN HOLE: PRESS FIT ON LATCH PIN {LATCH_PIN_NUMBER}\n"
+    f"   (INTERFERENCE {_inch_range(LATCH_PIN_PRESS_PRINTED)})."
+    f" PIN HOLE TO FACES {inch_text(LATCH_PIN_WALL_PRINTED, 3)} MIN.",
+    f"{SPRING_NOTE}. COUNTERBORE Ø AND FLOOR: SEAT AND PRELOAD PIVOT SPRING"
+    f" {_SPRING['number']}.",
+)
+NOTES_TEXT = "\n".join(NOTES)
+NOTE_HEIGHT = 0.0025
+# Under section A-A's floor-depth text, left of its caption, above the
+# lower border: the sheet's one open field.
+NOTES_XY = (0.016, 0.046)
+
+PIVOT_BORE_CALLOUT = f"REAM, SEE NOTE {PIVOT_NOTE}"
+PIN_BORE_CALLOUT = "\n".join((
+    "REAM THRU",
+    f"PRESS FIT ON PIN {PIN.PIN_NUMBER}",
+    f"(INTERFERENCE {_inch_range(PIN_PRESS_INTERFERENCE)})",
 ))
+LOCATOR_CALLOUT_TEXT = "\n".join((
+    f"2X REAM THRU, DOWEL {LOCATOR_PIN.PART_NUMBER}",
+    f"SEE NOTE {LOCATOR_NOTE}",
+))
+PIN_HOLE_CALLOUT = "\n".join((
+    "BLIND FLAT-BOTTOM REAM",
+    f"LATCH PIN {LATCH_PIN_NUMBER}, SEE NOTE {LATCH_PIN_NOTE}",
+))
+SPRING_CALLOUT = f"SEE NOTE {SPRING_NOTE}"
 
 DIMENSION_CALLOUTS = {
     "PivotBoreDia": PIVOT_BORE_CALLOUT,
     "PinBoreDia": PIN_BORE_CALLOUT,
-    "SpotFaceDia": SPOT_FACE_CALLOUT,
-    "FloorDepth": FLOOR_DEPTH_CALLOUT,
+    "SpotFaceDia": SPRING_CALLOUT,
+    "FloorDepth": SPRING_CALLOUT,
     "PinHoleDia": PIN_HOLE_CALLOUT,
     "LocatorDia1": LOCATOR_CALLOUT_TEXT,
 }
 
 # Native tap callout: arrow on the rear entry break's own edge, text above
-# the view with its top inside the upper border. It carries the ordinary
-# entry/exit edge-break limit and the mating cut screw's worst-case full-
-# thread engagement. The joint source pays entry loss and the overlapping
-# exit/cut-end loss separately; screws do not locate or centre this joint.
+# the view with its top inside the upper border.  The title block's edge
+# break governs the tap mouths (no band is tightened to rescue a
+# thread).  transgear_hanger_joints pays the model's .004 breaks; re-run
+# with both at the title block's .010 it still gives the plate screw 1.52D
+# (.2499), over 1.5D, so the callout states neither break nor engagement.
 _PLATE_DRILL_R = blind_cut_dia_mm(PLATE_TAP_SPEC) / 2.0
 _CALLOUT_Y = _front_y(PIVOT_END_R) + 0.0232
 # Between the pivot bore's callout and the locator's, above section label B.
 PLATE_CALLOUT_XY = (0.160, _CALLOUT_Y)
-PLATE_TAP_QUALIFIER = "\n".join(
-    (
-        PLATE_TAP_EDGE_BREAK_CALLOUT,
-        engagement_line(
-            joints.PLATE_SCREW_ENGAGEMENT_WORST, joints.PLATE_SCREW_ENGAGEMENT_WORST_D
-        ),
-    )
-)
 TAP_CALLOUTS = (
     (
         "plate taps",
         PLATE_TAP_STATIONS[0],
         _PLATE_DRILL_R,
         PLATE_CALLOUT_XY,
-        PLATE_TAP_QUALIFIER,
     ),
 )
 
@@ -586,12 +632,9 @@ def _locator_frame_xy(offset_mm: float) -> tuple[float, float]:
     return (_LOCATOR_MOUTH_X + _LOCATOR_FRAME_GAP, centre_y + _FRAME_HALF_HEIGHT)
 
 
-def tap_callout_definitions(
-    definitions: dict[int, str], qualifier: str
-) -> dict[int, str]:
-    """Drop the title-block thread class from the thread compartment and
-    append the qualifier lines under it; every other compartment and every
-    associative Hole Wizard variable stays."""
+def tap_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
+    """Drop the title-block thread class from the thread compartment; every
+    other compartment and every associative Hole Wizard variable stays."""
     if set(definitions) != {5, 6, 7, 8}:
         raise RuntimeError(f"unexpected tap callout parts: {definitions!r}")
     thread_parts = [
@@ -605,28 +648,21 @@ def tap_callout_definitions(
     without_class = re.sub(
         r"\s*(?:-\s*)?<hw-threadclass>\s*", " ", definitions[part], flags=re.IGNORECASE
     )
-    without_class = re.sub(r" {2,}", " ", without_class).rstrip()
     updated = dict(definitions)
-    updated[part] = f"{without_class}\n{qualifier}"
+    updated[part] = re.sub(r" {2,}", " ", without_class).rstrip()
     return updated
 
 
-def _set_tap_callout_text(display: Any, qualifier: str, *, label: str) -> None:
+def _set_tap_callout_text(display: Any, *, label: str) -> None:
     native = _early_bound(display, "IDisplayDimension")
     definitions = {part: str(native.GetText(part) or "") for part in (5, 6, 7, 8)}
-    updated = tap_callout_definitions(definitions, qualifier)
+    updated = tap_callout_definitions(definitions)
     for definition_part, writable_part in ((5, 1), (6, 2), (7, 3), (8, 4)):
         if updated[definition_part] != definitions[definition_part]:
             native.SetText(writable_part, updated[definition_part])
     persisted = {part: str(native.GetText(part) or "") for part in (5, 6, 7, 8)}
-    resolved = {part: str(native.GetText(part) or "") for part in (1, 2, 3, 4)}
-    if persisted != updated or not any(
-        text.rstrip().endswith(qualifier) for text in resolved.values()
-    ):
-        raise RuntimeError(
-            f"{label} qualifier lines did not persist: "
-            f"definitions={persisted!r}, resolved={resolved!r}"
-        )
+    if persisted != updated:
+        raise RuntimeError(f"{label} callout text did not persist: {persisted!r}")
 
 
 def _set_stock_text(adapter: Any, annotations: list[Any]) -> None:
@@ -883,20 +919,18 @@ def _section_caption(view: Any, label: str) -> tuple[Any, str]:
     return captions[0]
 
 
-@_telemetry.traced("drawing.transgear_arm.pin_section_caption_fields")
-def _match_pin_section_caption(adapter: Any, section: Any, section_a: Any) -> None:
-    """Give section D-D's native caption section A-A's linked view-label
-    fields, scale included, so the two sections' captions read alike (run
-    20261027T201320296Z: D-D's native caption carried no scale)."""
-    note, linked_text = _section_caption(section, "D-D")
-    _note_a, linked_a = _section_caption(section_a, "A-A")
-    if "<VLSCALEV>" not in linked_a:
-        raise RuntimeError(f"section A-A caption carries no scale field: {linked_a!r}")
-    if linked_text != linked_a:
-        note.PropertyLinkedText = linked_a
-        rebuild_drawing(adapter, label="section D-D caption fields")
-        if str(note.PropertyLinkedText or "") != linked_a:
-            raise RuntimeError("section D-D caption fields did not persist")
+@_telemetry.traced("drawing.transgear_arm.section_captions_without_scale")
+def _section_captions_without_scale(adapter: Any, sections: dict[str, Any]) -> None:
+    """Give each section's native caption the name line only (its scale is
+    the sheet's), so A-A, B-B and D-D read alike."""
+    for label, view in sections.items():
+        note, linked_text = _section_caption(view, label)
+        if linked_text != SECTION_CAPTION_TEXT:
+            note.PropertyLinkedText = SECTION_CAPTION_TEXT
+    rebuild_drawing(adapter, label="section captions without scale")
+    for label, view in sections.items():
+        if _section_caption(view, label)[1] != SECTION_CAPTION_TEXT:
+            raise RuntimeError(f"section {label} caption without scale did not persist")
 
 
 @_telemetry.traced("drawing.transgear_arm.pin_section_caption_settled")
@@ -904,9 +938,9 @@ def _pin_section_caption_settled(adapter: Any, section: Any) -> None:
     """After finalize_drawing's last sheet-scale reset and rebuild: hang
     section D-D's caption, centred, under its cut face (bounded measured
     moves, then one final check of the resolved extent), inside the sheet,
-    with its linked name and scale lines. ``INote.GetText`` reads the linked
-    fields blank even here (run 20261027T215106763Z: ' \\r\\n '), so the
-    resolved text is evidenced by its extent: two lines, as A-A's."""
+    with its linked name line. ``INote.GetText`` reads the linked fields
+    blank even here (run 20261027T215106763Z: ' \\r\\n '), so the resolved
+    text is evidenced by its extent: one line, as A-A's."""
     if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateSheet(SHEET_NAMES[1]):
         raise RuntimeError("cannot activate the pin-bore zone sheet")
     note, linked_text = _section_caption(section, "D-D")
@@ -930,7 +964,7 @@ def _pin_section_caption_settled(adapter: Any, section: Any) -> None:
     if max(map(abs, error)) >= _CAPTION_SETTLE_M:
         raise RuntimeError(f"section D-D caption stands at {extent}, its top centre asked at {target}")
     require_inside("section D-D caption", (extent[0], extent[1], extent[3], extent[4]), sheet_region(adapter))
-    if str(note.PropertyLinkedText or "") != linked_text or extent[4] - extent[1] < _CAPTION_TWO_LINES_M:
+    if str(note.PropertyLinkedText or "") != linked_text or extent[4] - extent[1] < _CAPTION_ONE_LINE_MIN_M:
         raise RuntimeError(f"section D-D caption {linked_text!r} resolved to {extent}")
     _telemetry.info(f"section D-D caption at {extent}")
 
@@ -1137,8 +1171,8 @@ async def build(adapter: Any) -> dict[str, str]:
             raise RuntimeError(f"failed to add ASME centre marks to the {label} view")
 
     # Thread and tap drill ride the native callouts; the class is the title
-    # block's; the countersink and engagement lines are the qualifiers'.
-    for label, station, radius, callout_xy, qualifier in TAP_CALLOUTS:
+    # block's.
+    for label, station, radius, callout_xy in TAP_CALLOUTS:
         callout = add_native_hole_callout(
             adapter,
             front,
@@ -1146,8 +1180,13 @@ async def build(adapter: Any) -> dict[str, str]:
             callout_xy=callout_xy,
             label=label,
         )
-        _set_tap_callout_text(callout, qualifier, label=label)
+        _set_tap_callout_text(callout, label=label)
         set_hole_callout_precision(callout, {"hw-thrutapdrldia": 3}, label=label)
+
+    # The fit notes the callouts link to, in sheet context.
+    ddoc.ActivateView("")
+    if add_note(adapter, NOTES_TEXT, *NOTES_XY, height=NOTE_HEIGHT) is None:
+        raise RuntimeError("failed to add the arm's fit notes")
 
     # Sheet 2: the pin bore's projected zone in section D-D, cut from a plan
     # on sheet 1's plan centre (rule 15: its own sheet, not a shrunk view).
@@ -1168,7 +1207,9 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, mouth, PIN_SECTION_PRECISION)
     set_dimension_callouts(adapter, mouth, {"PinMouthChamfer": PIN_MOUTH_CALLOUT})
     offset_dimension_text(adapter, mouth, {"PinMouthChamfer": PIN_MOUTH_TEXT_XY})
-    _match_pin_section_caption(adapter, pin_section, section)
+    _section_captions_without_scale(
+        adapter, {"A-A": section, "B-B": locator_section, "D-D": pin_section}
+    )
     if not auto_center_marks(adapter, pin_plan, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME centre marks to the pin-bore zone plan")
     iso = place_view(
