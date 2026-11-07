@@ -420,7 +420,10 @@ UNDERSIDE_SEAT_FINISH_XY = (
 # one, so it is named as shop equipment and declared (RV-02; Main's
 # delegated ruling 2026-11-07, the FoDtFab1 Q2 dividing-head pattern). Bar 2
 # is bar 1 turned over, so its two faces swap roles.
-_PARENT_PREFIX = _config.parts(part_spec.PART_NAME)["number"].rsplit("-TL-", 1)[0] + "-"
+# A literal row (check:recipe narrows a drawing's registry reads by it).
+_PARENT_PREFIX = _config.parts("ch-rocker-arm-tl-oblique-base-bar")["number"].rsplit("-TL-", 1)[0] + "-"
+if part_spec.PART_NAME != "ch-rocker-arm-tl-oblique-base-bar":
+    raise AssertionError("the base bar's registry row moved")
 RAIL_SHORT_NUMBER = part_spec.RAIL_NUMBER.removeprefix(_PARENT_PREFIX)
 if RAIL_SHORT_NUMBER == part_spec.RAIL_NUMBER:
     raise AssertionError("the rail kit is not under the base bar's parent number")
