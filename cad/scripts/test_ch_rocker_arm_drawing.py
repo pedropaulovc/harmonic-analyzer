@@ -321,7 +321,7 @@ def test_r20_local_requests_leave_views_geometry_and_strict_caption_air_unchange
     assert drawing.END_CENTER == (0.330, 0.110)
     assert drawing.HUB_SCALE == (4.0, 1.0)
     assert drawing.END_SCALE == (2.0, 1.0)
-    assert drawing.DETAIL_NO_OUTLINE == {"D": True, "E": False}
+    assert drawing.DETAIL_NO_OUTLINE == {"D": False, "E": False}
     assert drawing.DETAIL_STYLE == {"D": 2, "E": 2}  # swDetViewLEADER connects each source circle.
     assert drawing.DETAIL_LETTER_XY == {"D": (0.188, 0.161), "E": (0.264, 0.155)}
     assert drawing.ROD_CALLOUT_XY == (0.279, 0.115)
@@ -4143,7 +4143,7 @@ class _DetailCropCircle:
 
     def __init__(self, label, profile, *, style=None):
         self.label, self.profiles = label, (profile,)
-        self.NoOutline = label == "D"
+        self.NoOutline = drawing.DETAIL_NO_OUTLINE[label]
         self._jagged, self.full, self.display = False, True, 1
         self.style = drawing.DETAIL_STYLE[label] if style is None else style
         self.style_ok, self.style_writes = True, []
@@ -4324,7 +4324,7 @@ def test_native_detail_fences_parent_links_scale_and_settled_projection(bound, m
         if defect == "missing-profile":
             detail.crop_circle.profiles = ()
         elif defect == "outline-flags":
-            detail.crop_circle.NoOutline = label != "D"
+            detail.crop_circle.NoOutline = not drawing.DETAIL_NO_OUTLINE[label]
         elif defect == "refused-style":
             detail.crop_circle.style_ok = False
         elif defect == "lost-style":
@@ -4358,7 +4358,8 @@ def test_native_detail_fences_parent_links_scale_and_settled_projection(bound, m
         assert parent.transform.inverse_calls >= 2
         # Both letters lead to their source circles; E is not a floating label.
         assert calls[0][3] == drawing.DETAIL_STYLE[label] == 2
-        assert calls[0][7:] == (1, label == "E", False, label == "D", 5)
+        no_outline = drawing.DETAIL_NO_OUTLINE[label]
+        assert calls[0][7:] == (1, not no_outline, False, no_outline, 5)
         # The documented setter runs only when creation ignored the style.
         expected_writes = [drawing.DETAIL_STYLE[label]] if defect == "ignored-style" else []
         assert detail.crop_circle.style_writes == expected_writes
@@ -4427,27 +4428,21 @@ def test_detail_outline_mode_is_label_owned_and_identity_strict(
 ):
     adapter, view = _native_crop_fixture(monkeypatch, label)
     view.crop_circle.NoOutline = no_outline
-    if no_outline is (label == "D"):
+    if no_outline is drawing.DETAIL_NO_OUTLINE[label]:
         drawing._detail_crop(adapter, view, label=label)
     else:
         with pytest.raises(RuntimeError, match="NoOutline"):
             drawing._detail_crop(adapter, view, label=label)
 
 
+@pytest.mark.parametrize("label", ["D", "E"])
 @pytest.mark.parametrize("defect", ["jagged", "partial-outline"])
-def test_e_retains_full_outline_while_d_skips_undefined_flag_reads(
-    bound, monkeypatch, defect,
-):
-    adapter, end = _native_crop_fixture(monkeypatch, "E")
-    end.crop_circle.JaggedOutline = defect == "jagged"
-    end.crop_circle.full = defect != "partial-outline"
+def test_each_detail_retains_its_full_outline(bound, monkeypatch, label, defect):
+    adapter, view = _native_crop_fixture(monkeypatch, label)
+    view.crop_circle.JaggedOutline = defect == "jagged"
+    view.crop_circle.full = defect != "partial-outline"
     with pytest.raises(RuntimeError, match="outline flags"):
-        drawing._detail_crop(adapter, end, label="E")
-    adapter, hub = _native_crop_fixture(monkeypatch, "D")
-    # D's fake refuses these native reads altogether, per their documented scope.
-    hub.crop_circle.JaggedOutline = True
-    hub.crop_circle.full = False
-    drawing._detail_crop(adapter, hub, label="D")
+        drawing._detail_crop(adapter, view, label=label)
 
 
 
@@ -4556,7 +4551,7 @@ def test_native_crop_refuses_wrong_persisted_geometry_flags_or_coordinate_frame(
     elif defect == "missing-parent":
         view.parent = None
     elif defect == "no-outline":
-        circle.NoOutline = False
+        circle.NoOutline = True
     elif defect == "display":
         circle.display = 0
     elif defect == "label":
@@ -8211,7 +8206,7 @@ def test_center_mark_census_uses_actual_persisted_detail_crop_not_padded_outline
     counts = drawing._require_center_mark_census(adapter, view, label=label, required=1, detail=label)
     assert counts == {"NON_MARK": 0, "PRINTED": 1, "GHOST": 1, "FAIL": 0}
     assert native_view.outline_reads == 1  # The persisted crop's existing independent read.
-    assert native_view.crop_circle.NoOutline is (label == "D")
+    assert native_view.crop_circle.NoOutline is drawing.DETAIL_NO_OUTLINE[label]
     # Ink in the padding is outside the physical crop and must remain fatal.
     outside = x + native_view.radius + native_view.padding / 2.0
     case.datas[0].display["lines"] = [_native_line(x, y, outside, y)]

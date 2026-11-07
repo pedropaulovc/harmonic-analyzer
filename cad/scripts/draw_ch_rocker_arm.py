@@ -225,9 +225,9 @@ END_SCALE = (2.0, 1.0)
 # D's letter sits below-right of its small parent fence around A, clear of the
 # R800/R816 texts below the strap's left half; DETAIL_STYLE leads it to the fence.
 DETAIL_LETTER_XY = {"D": (0.188, 0.161), "E": (0.264, 0.155)}
-# D's crop is a view boundary, not a third concentric manufactured diameter.
-# Keep its persisted circular fence; omit only the printed detail-view outline.
-DETAIL_NO_OUTLINE = {"D": True, "E": False}
+# Both enlarged views print their boundary circle on the front (rule 9:
+# ch-fab-2 r3, 2/3 runs read D, a leader and letter alone, as unlabelled).
+DETAIL_NO_OUTLINE = {"D": False, "E": False}
 # swDetViewStyle_e. D's fence is close to the hub OD on the 1:2 front;
 # a free letter made it read as a third concentric circle. Both letters sit
 # away from their source circles to clear the profile controls (#1590/#1442).
@@ -555,8 +555,8 @@ def _detail_crop(adapter: Any, view: Any, *, label: str) -> tuple[float, float, 
     detail_circle = _early_bound(view.GetDetail(), "IDetailCircle")
     if detail_circle is None:
         raise RuntimeError(f"detail {label}: missing persisted detail circle")
-    # Full/jagged outline accessors are valid only when NoOutline is False.
-    # D uses the cone-gear-shaft non-feature boundary convention; E stays full.
+    # Full/jagged outline accessors are valid only when NoOutline is False;
+    # both D and E print a full outline.
     no_outline = detail_circle.NoOutline
     required_no_outline = DETAIL_NO_OUTLINE[label]
     if no_outline is not required_no_outline:

@@ -173,8 +173,9 @@ PIVOT_FIT_CALLOUT = (
 STRAP_FIT_CALLOUT = "SLIDING FIT IN\nMHA-CH-03 FORK"
 # Integral hub length, not spacers, sets channel pitch: the hubs stack face to
 # face on the pivot shaft (rocker_bank_layout). Below-text rows (above-text
-# line breaks print as one run).
-HUB_LENGTH_CALLOUT = "20X STACK PITCH\nON MHA-CH-05"
+# line breaks print as one run). No "20X" here: on one length it reads as a
+# feature count (rule 26; ch-fab-2 r3); the count is MHA-CH-00's.
+HUB_LENGTH_CALLOUT = "SETS STACK PITCH\nON MHA-CH-05"
 # The amplitude bar's foot rides the top edge (ch_rocker_arm_spec
 # TOP_EDGE_BAND): the one profile frame names it below the frame.
 TOP_EDGE_MATE_CALLOUT = "MHA-CH-01 FOOT TRACK"

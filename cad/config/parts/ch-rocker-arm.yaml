@@ -33,3 +33,8 @@ ch-rocker-arm:
       where: "strap position frame .004 to G, authored by draw_ch_rocker_arm._strap_position_frame from ch_rocker_arm_spec.STRAP_HUB_SYMMETRY; G is the hub minus-Z end face with BASIC .1389 to the strap centre"
       finding: "strap position frame and datum G over-specified on a channel part (rule 5)"
       reason: "retain the existing strap-to-hub registration: owner ruling 2026-10-19 (relayed by coordinator); this acceptance covers only the existing .004 (formerly 0.10 mm) to G frame and its hub-end-face BASIC registration, not another datum scheme or a tighter band"
+    - id: "RV-06"
+      kind: "accept"
+      where: "general note 2 'MAY BE HUB MHA-CH-12 JOINED TO STRAP MHA-CH-13 PER THEIR DWGS.'"
+      finding: "a process option (built-up route) on a part sheet (rule 7)"
+      reason: "user ruling 2026-10-16 (route v3): the arm may be the turned hub MHA-CH-12 pressed into the flat strap MHA-CH-13; the note is the owner's permission only, and the joint (its press fit, ch_rocker_hub_fit) is defined on those two details, which exist for this route. Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144"

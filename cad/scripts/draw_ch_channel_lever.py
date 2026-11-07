@@ -206,9 +206,10 @@ TOP_KEEP = {
     # (r2 render), so the outer (right) line carries the lower text and
     # neither line runs through the other's text.
     "HubLength": (0.075, TOP_CENTER[1] + 0.032),
-    # Lifted 4 mm from +0.014 so its one row of words clears its own arrows
-    # above the plate, still under the hub length's block.
-    "PlateOffset": (0.095, TOP_CENTER[1] + 0.018),
+    # Its value row sits under the hub length's shelf (ch-fab-2 r3: at +0.018
+    # that shelf struck the .080); its one row of words and its shelf still
+    # stand ~4 mm above its own arrows over the plate.
+    "PlateOffset": (0.095, TOP_CENTER[1] + 0.014),
 }
 OVERALL_TEXT_XY = (FRONT_CENTER[0], 0.082)
 BAR_PIN_CALLOUT_XY = (0.170, 0.188)
