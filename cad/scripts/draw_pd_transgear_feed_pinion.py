@@ -318,18 +318,30 @@ LEFT_KEEP: dict[str, tuple[float, float]] = {
     "FullDepth": (_left_of(_LEFT_REAR_X, _FULL_DEPTH_TEXT_WIDTH), _LEFT_BOTTOM - 0.0100),
     "CutterRunout": (_left_of(_LEFT_REAR_X, _CUTTER_TEXT_WIDTH), _LEFT_BOTTOM - 0.0250),
 }
-# The caption stands beside the cropped view, right of its own box (the crop
-# fence and the native margin round it) and level with the axis, the lane
-# right of the view being empty down to the title block.  Over the view it
-# read as one of B-B's callouts (round 2, run 20261107T121559938Z); at +7.5 mm
-# over it the native box, top 142.3 mm against the fence's 137.25, took the
-# caption's lower 4.8 mm (layout audit, round 1 run 20261107T103915122Z).
-_VIEW_BOX_MARGIN = 0.0051
-_CAPTION_VIEW_AIR = 0.003
-LEFT_CAPTION_HEIGHT = 0.0035
+# The caption stands beside the cropped view, right of the view's NATIVE box
+# and level with the axis, the lane right of the view being empty down to
+# the title block (over the view it read as one of B-B's callouts, round 2
+# run 20261107T121559938Z).  The native box is not the crop fence: round 3
+# (run 20261107T163331267Z) measured the fence (342.97, 94.75)-(388.94,
+# 137.25) mm become the box (337.18, 89.71)-(398.73, 142.29), its right side
+# 9.8 mm past the fence, and the caption 1.7 mm inside it failed the layout
+# audit.  The margins below are those, rounded up to 0.1 mm (left, bottom,
+# right, top), and the caption's native extent is round 3's 16.20 x 4.29 mm
+# with its upper left within 0.05 mm of the anchor.  The caption clears the
+# box by 3 mm and still ends ~1 mm inside the border.
+VIEW_C_NATIVE_MARGINS = (0.0058, 0.0051, 0.0098, 0.0051)
+VIEW_C_NATIVE_BOX = (
+    OUTSIDE_CROP_FENCE[0] - VIEW_C_NATIVE_MARGINS[0],
+    OUTSIDE_CROP_FENCE[1] - VIEW_C_NATIVE_MARGINS[1],
+    OUTSIDE_CROP_FENCE[2] + VIEW_C_NATIVE_MARGINS[2],
+    OUTSIDE_CROP_FENCE[3] + VIEW_C_NATIVE_MARGINS[3],
+)
+LEFT_CAPTION_EXTENT = (0.0163, 0.0043)  # native width, height
+# 3 mm plus the extent's 0.05 mm offset from its anchor.
+LEFT_CAPTION_VIEW_AIR = 0.0031
 LEFT_CAPTION_XY = (
-    OUTSIDE_CROP_FENCE[2] + _VIEW_BOX_MARGIN + _CAPTION_VIEW_AIR,
-    LEFT_CENTER[1] + LEFT_CAPTION_HEIGHT / 2.0,
+    VIEW_C_NATIVE_BOX[2] + LEFT_CAPTION_VIEW_AIR,
+    LEFT_CENTER[1] + LEFT_CAPTION_EXTENT[1] / 2.0,
 )
 
 # Viewing arrows (rule 9): a letter note whose straight leader is the arrow

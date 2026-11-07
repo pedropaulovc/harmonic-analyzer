@@ -1199,17 +1199,47 @@ def test_the_cropped_view_c_has_a_break_on_the_boss() -> None:
     assert (drawing.OUTSIDE_CROP_Z - spec.CUTTER_RUNOUT_MAX) * s >= 0.0005
 
 
-def test_view_c_caption_stands_beside_its_own_view() -> None:
+# Round 3 (run 20261107T163331267Z) as the log measured it: the crop fence,
+# VIEW C's native box after the crop, and the caption's native extent with
+# the anchor it was placed at (sheet m).
+_R3_FENCE = (0.3429663, 0.09474832, 0.3889429, 0.13725168)
+_R3_VIEW_BOX = (0.33718068, 0.08970559, 0.39872856, 0.14228562)
+_R3_CAPTION_EXTENT = (0.39699605, 0.11348873, 0.41319938, 0.11777785)
+_R3_CAPTION_ANCHOR = (0.3970429, 0.11775)
+
+
+def test_view_c_caption_clears_the_views_native_box() -> None:
     """Round 2 (run 20261107T121559938Z): over the view, the caption read as
-    one of B-B's callouts.  It stands right of VIEW C's native box (the crop
-    fence plus round 1's measured 5 mm margin), level with the view, inside
-    the border, and below the boss's callout."""
-    fence = drawing.OUTSIDE_CROP_FENCE
-    caption = _note_box(drawing.LEFT_CAPTION, drawing.LEFT_CAPTION_XY)
-    margin = 0.1423 - fence[3]  # round 1's native box top over the fence
-    assert caption.xmin > fence[2] + margin + 0.002
-    assert fence[1] < caption.ymin and caption.ymax < fence[3]
-    assert caption.xmax < drawing.SHEET_INNER_BORDER[2] - 0.002
+    one of B-B's callouts.  Round 3 (run 20261107T163331267Z): beside it, at
+    the crop fence plus round 1's top margin, the caption stood 1.7 mm inside
+    the view's native box, whose right side runs 9.8 mm past the fence, and
+    failed the layout audit.  Its native extent clears the native box,
+    re-derived from round 3's margins over the fence, by 3 mm; it stands
+    level with the view, inside the border, and below the boss's callout."""
+    margins = drawing.VIEW_C_NATIVE_MARGINS
+    measured = (
+        _R3_FENCE[0] - _R3_VIEW_BOX[0],
+        _R3_FENCE[1] - _R3_VIEW_BOX[1],
+        _R3_VIEW_BOX[2] - _R3_FENCE[2],
+        _R3_VIEW_BOX[3] - _R3_FENCE[3],
+    )
+    for margin, seen in zip(margins, measured, strict=True):
+        assert seen <= margin < seen + 0.0002, (margin, seen)
+    # The fence the drawing crops at is the one round 3 logged.
+    assert drawing.OUTSIDE_CROP_FENCE == pytest.approx(_R3_FENCE, abs=1e-6)
+    width, height = drawing.LEFT_CAPTION_EXTENT
+    assert _R3_CAPTION_EXTENT[2] - _R3_CAPTION_EXTENT[0] <= width
+    assert _R3_CAPTION_EXTENT[3] - _R3_CAPTION_EXTENT[1] <= height
+    # Round 3's extent stood within 0.05 mm of its anchor's upper left.
+    slack = 0.00005
+    assert abs(_R3_CAPTION_EXTENT[0] - _R3_CAPTION_ANCHOR[0]) <= slack
+    assert abs(_R3_CAPTION_EXTENT[3] - _R3_CAPTION_ANCHOR[1]) <= slack
+    x, y = drawing.LEFT_CAPTION_XY
+    caption = Box(x - slack, y - height - slack, x + width + slack, y + slack)
+    view = drawing.VIEW_C_NATIVE_BOX
+    assert caption.xmin - view[2] >= 0.003 - 1e-9
+    assert view[1] < caption.ymin and caption.ymax < view[3]
+    assert caption.xmax < drawing.SHEET_INNER_BORDER[2] - 0.0005
     boss = _printed_box("BossDia", drawing.RIGHT_KEEP["BossDia"])
     assert caption.ymax + TEXT_CLEARANCE_HEIGHTS * _CAP_M < boss.ymin
 
