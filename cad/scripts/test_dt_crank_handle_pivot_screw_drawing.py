@@ -11,6 +11,7 @@ import pytest
 import _config
 import build_dt_crank_handle_pivot_screw as part
 import dt_crank_handle_butt_cup_spec as cup
+import dt_crank_handle_pivot_screw_notes as notes
 import dt_crank_handle_pivot_screw_spec as spec
 import dt_crank_handle_spec as handle
 import dt_crank_hub_geometry as geometry
@@ -491,8 +492,8 @@ def test_head_end_view_is_the_third_angle_right_view() -> None:
 def test_fitted_shoulder_length_is_one_flagged_numbered_note() -> None:
     """Fan-out screen 20261107T081227004Z: the fit-up hung on the (2.08) as
     "FACED TO SUIT ..." (rule 26 private phrase; rule 7 linked flag note)."""
-    assert spec.SHOULDER_LENGTH_CALLOUT == "SEE NOTE 1"
-    lines = spec.SHOULDER_LENGTH_NOTE.splitlines()
+    assert notes.SHOULDER_LENGTH_CALLOUT == "SEE NOTE 1"
+    lines = notes.SHOULDER_LENGTH_NOTE.splitlines()
     assert lines[0].startswith("1. SHOULDER LENGTH")
     assert len(lines) <= 4
     flat = " ".join(line.strip() for line in lines)
@@ -504,9 +505,9 @@ def test_fitted_shoulder_length_is_one_flagged_numbered_note() -> None:
     x, _ = drawing.NOTES_XY
     assert x + max(map(len, lines)) * 0.0027 < 0.4191
     # Standard fit name and forms on the other callouts (rules 3, 4, 7).
-    assert spec.SHOULDER_FIT_CALLOUT == "RUNNING FIT IN MHA-DT-08\nREAMED BORE"
-    assert spec.HEAD_LENGTH_CALLOUT == "CLEARS MHA-DT-35 FACE"
-    assert spec.HEAD_DIA_CALLOUT == "BEARS ON\nMHA-DT-35 FLOOR"
+    assert notes.SHOULDER_FIT_CALLOUT == "RUNNING FIT IN MHA-DT-08\nREAMED BORE"
+    assert notes.HEAD_LENGTH_CALLOUT == "CLEARS MHA-DT-35 FACE"
+    assert notes.HEAD_DIA_CALLOUT == "BEARS ON\nMHA-DT-35 FLOOR"
 
 
 def test_sheet_placements_stay_inside_the_border() -> None:

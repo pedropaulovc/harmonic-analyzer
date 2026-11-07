@@ -390,32 +390,24 @@ ARM_STOCK_THICKNESS_MAX = 2.0 * ARM_STOCK_THICKNESS - ARM_STOCK_THICKNESS_MIN
 FILE_ALLOWANCE_MAX = round(THREAD_LENGTH_MAX - ARM_STOCK_THICKNESS_MIN, 6)
 FILE_ALLOWANCE_MIN = round(FULL_THREAD_REACH_MIN - ARM_STOCK_THICKNESS_MAX, 6)
 # The fitted shoulder, stated once (user ruling 2026-09-29, after the
-# MHA-DT-32 machinist review): under-head to seat face is the bonded handle's
-# ferrule outer face to cup floor plus the end play (#290 review of
-# b28d38a16).  The handle is measured, not the arm: the shoulder seats on the
-# arm face and the handle runs between it and the head (#290 review of
-# d72bdd039).  A fit-up requirement too long for a two-line callout, so the
-# length prints as a reference flagged to numbered note 1 (rule 7; fan-out
-# screen 20261107T081227004Z: "FACED TO SUIT" on the dimension, a private
-# phrase and a method word).
-SHOULDER_LENGTH_NOTE_NUMBER = 1
-SHOULDER_LENGTH_CALLOUT = f"SEE NOTE {SHOULDER_LENGTH_NOTE_NUMBER}"
-SHOULDER_LENGTH_NOTE = "\n".join(
-    (
-        f"{SHOULDER_LENGTH_NOTE_NUMBER}. SHOULDER LENGTH: MEASURED",
-        "   MHA-DT-34 OUTER FACE TO MHA-DT-35",
-        "   FLOOR ON BONDED HANDLE MHA-DT-08,",
-        f"   PLUS {inch_text(END_PLAY_RANGE[0], 3)}-"
-        f"{inch_text(END_PLAY_RANGE[1], 3)} END PLAY.",
-    )
+# MHA-DT-32 machinist review), on the shoulder length it sets: under-head to
+# seat face is the bonded handle's ferrule outer face to cup floor plus the
+# end play (#290 review of b28d38a16: in a general note the fit-up had no
+# leader and no dimension of its own).  The handle is measured, not the arm:
+# the shoulder seats on the arm face and the handle runs between it and the
+# head (#290 review of d72bdd039 read "ARM FACE" on the ferrule as a second
+# arm face).  The sheet carries no general note.
+SHOULDER_LENGTH_CALLOUT = (
+    "FACED TO SUIT BONDED MHA-DT-08: MHA-DT-34 OUTER\n"
+    f"FACE TO MHA-DT-35 FLOOR + {inch_text(END_PLAY_RANGE[0], 3)}-"
+    f"{inch_text(END_PLAY_RANGE[1], 3)} END PLAY"
 )
 # The head's bands: its diameter keeps a bearing annulus on the cup floor
-# outside the floor hole, its length keeps it below the cup's face, which it
-# clears (rule 3's CLEARS form; KEEPS HEAD BELOW read as design rationale).
-HEAD_DIA_CALLOUT = "BEARS ON\nMHA-DT-35 FLOOR"
-HEAD_LENGTH_CALLOUT = "CLEARS MHA-DT-35 FACE"
-# The shoulder's running mate, at its band, by the standard fit name (rule 4).
-SHOULDER_FIT_CALLOUT = "RUNNING FIT IN MHA-DT-08\nREAMED BORE"
+# outside the floor hole, its length keeps it below the cup's face.
+HEAD_DIA_CALLOUT = "BEARS ON\nMHA-DT-35\nFLOOR"
+HEAD_LENGTH_CALLOUT = "KEEPS HEAD BELOW\nMHA-DT-35 FACE"
+# The shoulder's running mate, at its band (rule 4).
+SHOULDER_FIT_CALLOUT = "RUNS IN MHA-DT-08\nREAMED BORE"
 # The seat edge's break, on a leader to that edge, names what seats there.
 SEAT_EDGE_NOTE = (
     f"SEAT EDGE BREAK {inch_text(SEAT_EDGE_BREAK_MAX, 3)} MAX;\n"

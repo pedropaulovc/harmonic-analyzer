@@ -60,9 +60,9 @@ from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from cylinder_bank_layout import ARBOR_DOME_HEIGHT, ARBOR_LENGTH
+from dt_cylinder_gear_shaft_notes import DRAWING_NOTES
 from dt_cylinder_gear_shaft_spec import (
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
     REFERENCE_SKETCHES,

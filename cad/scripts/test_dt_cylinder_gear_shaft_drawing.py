@@ -10,6 +10,7 @@ import _fit_deviations
 import _fit_shaft_h
 import dt_arbor_pedestal_spec
 import build_dt_cylinder_gear_shaft as part
+import dt_cylinder_gear_shaft_notes as notes
 import dt_cylinder_gear_shaft_spec as spec
 import draw_dt_cylinder_gear_shaft as drawing
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
@@ -85,7 +86,7 @@ def test_a_plain_drive_train_shaft_carries_no_gdt_and_no_end_view() -> None:
 
 
 def test_notes_are_short_specific_facts_with_no_dimension_in_them() -> None:
-    lines = spec.DRAWING_NOTES.splitlines()
+    lines = notes.DRAWING_NOTES.splitlines()
     assert 0 < len(lines) <= 4
     for line in lines:
         assert line == line.upper()
@@ -96,17 +97,18 @@ def test_the_od_names_its_mates_and_its_stock_route_at_the_callout() -> None:
     """Fan-out screen 20261107T081227004Z: the .0008 band's only fit route,
     ground stock, sat in an unlinked general note; the set-screw spots named
     no mate."""
-    assert spec.SHAFT_DIA_CALLOUT.splitlines() == [
+    assert notes.SHAFT_DIA_CALLOUT.splitlines() == [
         "RUNNING FIT IN MHA-DT-12 AND MHA-DT-02 BORES",
         "3/8 GROUND STOCK OK",
     ]
-    assert "GROUND STOCK" not in spec.DRAWING_NOTES
-    notes = " ".join(spec.DRAWING_NOTES.splitlines())
-    assert "SPOTS FOR MHA-SH-VN-54 SET SCREWS DRILLED AT ASSEMBLY THROUGH MHA-DT-02 TAPS" in notes
-    import _config
-
-    assert _config.parts("sh-vn-arbor-set-screw")["number"] == spec.SET_SCREW_NUMBER
-    assert _config.parts("dt-arbor-pedestal")["number"] == spec.PEDESTAL_NUMBER
+    assert "GROUND STOCK" not in notes.DRAWING_NOTES
+    flat = " ".join(notes.DRAWING_NOTES.splitlines())
+    assert "SPOTS FOR MHA-SH-VN-54 SET SCREWS DRILLED AT ASSEMBLY THROUGH MHA-DT-02 TAPS" in flat
+    assert _config.parts("sh-vn-arbor-set-screw")["number"] == notes.SET_SCREW_NUMBER
+    assert _config.parts("dt-arbor-pedestal")["number"] == notes.PEDESTAL_NUMBER
+    # The part stamps the notes module's text, and the sheet prints its callout.
+    assert part.DRAWING_NOTES is notes.DRAWING_NOTES
+    assert drawing.SHAFT_DIA_CALLOUT is notes.SHAFT_DIA_CALLOUT
 
 
 def test_the_isometric_note_states_the_only_off_sheet_scale() -> None:
@@ -152,4 +154,4 @@ def test_both_ends_are_domed_and_the_dome_form_is_model_owned() -> None:
     assert '_dome_end(adapter, SHAFT_LENGTH, "NorthDome")' in source
     assert "_hide_reference_sketches(adapter)" in source
     assert part.DOME_SPHERE_RADIUS > part.SHAFT_RADIUS
-    assert "NO FLATS" in spec.DRAWING_NOTES
+    assert "NO FLATS" in notes.DRAWING_NOTES
