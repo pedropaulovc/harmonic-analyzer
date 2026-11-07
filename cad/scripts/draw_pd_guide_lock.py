@@ -175,18 +175,18 @@ HOLE_CALLOUT_XY = (0.230, 0.185)
 # Size, then process, then depth (rule 26): the native through extent
 # becomes DRILL THRU.
 HOLE_EXTENT_TEXT = "DRILL THRU"
-# The hole coordinates' ±.001 bands exist for the mate (rule 4): the
-# pattern must land on the platen guide's #4-40 taps with the lock-screw
-# shanks clear in their holes (pd_vn_guide_lock_screw_spec.LOCK_SET_OFFSET).
-# Finer than the drilled-location row, so the pattern callout names the route
-# that holds them: the holes are transferred from the guide's taps at
-# assembly (MHA-PD-00 step; delegated ruling 2026-11-07 (Main), no precedent;
-# owner review #2144; pending owner confirmation).  It names that mate once
-# (rule 4: a mate serving several features is named on the pattern callout,
-# never on each location); its second row states the holes' finished wall to
-# the edges, under the .080 target (rule 20; pd-guide-lock.yaml RV-01).  Two
-# rows of words (rule 7), each at most 23 characters so the block keeps
-# between the plate and the right view.
+# The hole coordinates print plain at the title block's .XXX: the pattern
+# callout names the route that sets them, the holes transferred from the
+# platen guide's #4-40 taps at assembly (MHA-PD-00 step; delegated ruling
+# 2026-11-07 (Main), no precedent; owner review #2144; pending owner
+# confirmation), so the lock-screw shanks clear in their holes
+# (pd_vn_guide_lock_screw_spec.LOCK_SET_OFFSET) and the .XXX row only places
+# the holes from the plate's edges (pd_guide_lock_spec.HOLE_PLACEMENT_BAND).
+# It names that mate once (rule 4: a mate serving several features is named
+# on the pattern callout, never on each location); its second row states the
+# holes' finished wall to the edges, under the .080 target (rule 20;
+# pd-guide-lock.yaml RV-01).  Two rows of words (rule 7), each at most 23
+# characters so the block keeps between the plate and the right view.
 GUIDE_NUMBER = _config.parts("pd-platen-guide")["number"]
 HOLE_CALLOUT_BELOW = "\n".join((f"TRANSFER FROM {GUIDE_NUMBER}", HOLE_WALL_TEXT))
 
@@ -341,11 +341,11 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to hide the right view's tangent edges")
     right.UpdateViewDisplayGeometry()
 
-    # The places and the hole coordinates' explicit bands are authored on the
-    # part (the paper-drive lock-station sweep and the screw set window read
-    # the same spec); the sheet only proves the import kept the places. The
-    # sheet thickness prints as its stock fraction, REF. The hole size ships
-    # as a native wizard callout below.
+    # The places are authored on the part (the paper-drive lock-station sweep
+    # and the screw set window read the same spec); the sheet only proves the
+    # import kept them. The hole coordinates carry no band of their own (the
+    # title block's .XXX). The sheet thickness prints as its stock fraction,
+    # REF. The hole size ships as a native wizard callout below.
     annotations = [
         *curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front"),
         *curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right"),

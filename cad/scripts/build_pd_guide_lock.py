@@ -40,24 +40,18 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_tolerances import (
-    set_dimension_symmetric_tolerance,
-)
 from _hole_spec import blind_cut_dia_mm
 from _holes import wizard_holes
 from pd_guide_lock_spec import (
     CORNER_R,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
-    HOLE_LOCATION_BAND,
-    HOLE_LOCATION_DIMENSIONS,
     HOLE_SPEC,
     HOLE_XY,
     ISOMETRIC_VIEW_NOTE,
     LOCK_HEIGHT,
     LOCK_THICK,
     LOCK_WIDTH,
-    UNIT,
 )
 from pd_vn_guide_lock_screw_spec import SHANK_DIA as LOCK_SCREW_SHANK_DIA
 
@@ -78,9 +72,9 @@ MATERIAL = "Plain Carbon Steel"
 # hook).
 # Stock 91792A108 slotted pan head shanks (MHA-PD-VN-60, rulings R9-31, R9-48)
 # pass through the 1/16 sheet plates before threading into the guide's
-# rear-face #4-40 through taps. The part-owned 1/8 drill (R9-49) carries both
-# printed hole positions over the screw majors
-# (pd_vn_guide_lock_screw_spec.LOCK_SET_OFFSET).
+# rear-face #4-40 through taps. The part-owned 1/8 drill (R9-49), transferred
+# from those taps at assembly, carries the transfer's error over the screw
+# majors (pd_vn_guide_lock_screw_spec.LOCK_SET_OFFSET).
 HOLE_DIA = blind_cut_dia_mm(HOLE_SPEC)
 if HOLE_DIA < LOCK_SCREW_SHANK_DIA:
     raise AssertionError("stock guide-lock screw shank does not clear the guide lock")
@@ -202,22 +196,15 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven lock (equations neutral)", v_final, 0.005 * v_plate
     )
 
-    # Manufacturing drawing support: the hole coordinates' explicit bands and
-    # every printed dimension's places live on the model
-    # (drawing-simplicity-policy.md `How the repository implements the
-    # guidelines`; the paper-drive lock-station sweep and the screw set window
-    # read the same constants), then mark exactly the print's dimensions (the
-    # drawing recipe imports the marked set and must find every one of these),
-    # and stamp the make-critical title-block properties. The sheet thickness
-    # carries no band: it prints as its stock fraction, REF (#290).
-    for dimension_name in sorted(HOLE_LOCATION_DIMENSIONS):
-        set_dimension_symmetric_tolerance(
-            adapter,
-            "ScrewHoles",
-            dimension_name,
-            HOLE_LOCATION_BAND,
-            display_unit=UNIT,
-        )
+    # Manufacturing drawing support: every printed dimension's places live on
+    # the model (drawing-simplicity-policy.md `How the repository implements
+    # the guidelines`); the hole coordinates carry no band of their own, they
+    # print at the title block's .XXX (the holes are transferred from the
+    # guide's taps: pd_guide_lock_spec.HOLE_PLACEMENT_BAND). Then mark exactly
+    # the print's dimensions (the drawing recipe imports the marked set and
+    # must find every one of these), and stamp the make-critical title-block
+    # properties. The sheet thickness carries no band: it prints as its stock
+    # fraction, REF (#290).
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
