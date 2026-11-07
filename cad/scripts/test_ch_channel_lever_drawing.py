@@ -99,13 +99,6 @@ def test_twenty_long_hubs_still_float_between_the_keepers() -> None:
     growth = stations * upper
     assert spec.HUB_LENGTH_BAND[1] == 0.0  # ch_bar_pivot_pin_spec's pitch minimum
     assert growth < sum(assembly.KEEPER_HUB_FLOAT)
-    # The callout's stack acceptance is the printed limits times the stations,
-    # and its end play the keepers' float less the longest stack's growth.
-    stack = tuple(stations * (spec.HUB_LENGTH + d) / 25.4 for d in (lower, upper))
-    end_play = (sum(assembly.KEEPER_HUB_FLOAT) - growth) / 25.4
-    assert drawing.HUB_STACK_ACCEPTANCE == (
-        f"STACK {stack[0]:.3f}-{stack[1]:.3f}, END PLAY {end_play:.3f} MIN"
-    ).replace(" 0.", " .")
 
 
 def test_plate_band_is_the_notch_allowance() -> None:

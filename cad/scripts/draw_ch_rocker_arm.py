@@ -2448,8 +2448,10 @@ PIVOT_CENTRE_MARK_ARMS_MM = {
     2: PIVOT_MID_Y - PIVOT_HOLE_DIA / 2.0 + PIVOT_CENTRELINE_OVERRUN_MM,
     3: PIVOT_CENTRELINE_OVERRUN_MM,
 }
-# Sheet distance within which a centre mark's anchor is the pivot's.
-_MARK_MATCH_M = 0.0005
+# A centre mark's annotation anchor stands off its hole's centre (r1 farm:
+# 2.6 mm from A on the 1:2 front), so the pivot's mark is the one nearest A,
+# within this sheet distance; the rod-pin hole's stands ~66 mm away.
+_MARK_MATCH_M = 0.005
 
 
 @_telemetry.traced("drawing.rocker_pivot_centreline")

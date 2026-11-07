@@ -36,15 +36,16 @@ SET_SCREW_QUALIFIER = "FOR MHA-CH-VN-55 SET\nSCREW, AT ASSEMBLY"
 # callout's leader on its left and the crown radius on its right.
 FOOT_HOLE_MATE = "FOR MHA-CH-VN-52;\nCENTERS MHA-FR-02 TAP"
 # True free-text facts only; the material and finish are the title block's.
-# The second keeper is this part turned over, not an opposite hand. Note 2
-# states the tip wall shortfall rule 20 asks the sheet to print (Codjiflo
-# #2108; owner exception RV-04). The foot hole stays located off the foot tip
-# (owner ruling 2026-10-28, RV-03), and no note says why (MR-fleet r7: one
-# drew three findings of its own).
+# Note 1 is the quantity and that the two are one part, not handed; where
+# each goes and how the second is turned is MHA-CH-00's (machinist r1: that
+# placement on a part sheet is assembly narration). Note 2 states the tip
+# wall shortfall rule 20 asks the sheet to print (Codjiflo #2108; owner
+# exception RV-04). The foot hole stays located off the foot tip (owner
+# ruling 2026-10-28, RV-03), and no note says why (MR-fleet r7: one drew
+# three findings of its own).
 DRAWING_NOTES = "\n".join(
     (
-        "1. 2 REQUIRED, ONE PER MHA-CH-04 FULCRUM-SHAFT END (SECOND",
-        "   IS THIS PART FLIPPED 180\u00b0 ABOUT VERTICAL).",
+        "1. 2 REQUIRED, IDENTICAL.",
         f"2. FOOT-HOLE TIP WALL {FOOT_TIP_WALL_TEXT} MIN.",
     )
 )

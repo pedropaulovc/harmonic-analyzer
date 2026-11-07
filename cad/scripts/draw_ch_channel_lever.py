@@ -72,6 +72,7 @@ from ch_channel_lever_spec import (
     LEVER_SPRING_X,
     PIVOT_HOLE_BAND,
     PIVOT_HOLE_DIA,
+    PLATE_OFFSET,
     SPRING_EYE_HOLE_SPEC,
     SURFACE_FINISHES,
     TIP_END_X,
@@ -172,17 +173,20 @@ HOLE_MATES = {
 # (rule 3: #47 is .0785, #21 is .159).
 HOLE_PRECISION = {"bar-pin hole": {"hw-diam": 4}, "spring-eye hole": {"hw-diam": 3}}
 # The hub length's +.001/.000 is narrower than the shop's turned-length row
-# (+/-.001), so its callout names the fit route: the 20-hub stack on the
-# fulcrum shaft is the matched mate, accepted by its measured length and its
-# end play between the MHA-CH-07 keepers (test_ch_channel_lever_drawing
-# derives both from the printed limits and build_ch_channel_assembly's
-# KEEPER_HUB_FLOAT).
-HUB_STACK_ACCEPTANCE = "STACK 5.560-5.580, END PLAY .010 MIN"
+# (+/-.001); it names the stack it sets (rule 4) and nothing more. The 20-hub
+# stack's length and end play between the MHA-CH-07 keepers are the channel
+# assembly's acceptance (MHA-CH-00), not this part's (machinist r1: a second
+# line here was assembly narration), and the band is accepted on RV-02.
+# The plate's thickness callout carries the reason for its .080 +/-.002
+# offset in the hub too (rule 7: a location carries its value and band only;
+# the mate sits on the feature's size callout): each bar rides its lever's
+# plate, so the offset spaces neighbouring bars (ch_bar_pivot_pin_spec).
 TOP_CALLOUTS = {
-    "LeverThick": f"SLIDING FIT IN NOTCH\nOF {BAR_NUMBER}",
-    "HubLength": (
-        f"SETS PITCH OF {STATIONS}X STACK ON {SHAFT_NUMBER};\n{HUB_STACK_ACCEPTANCE}"
+    "LeverThick": (
+        f"SLIDING FIT IN {BAR_NUMBER}\n"
+        f"NOTCH; {PLATE_OFFSET / 25.4:.3f} OFFSET SPACES BARS".replace(" 0.", " .")
     ),
+    "HubLength": f"SETS PITCH OF {STATIONS}X\nSTACK ON {SHAFT_NUMBER}",
 }
 
 FRONT_KEEP = {
