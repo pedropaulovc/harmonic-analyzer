@@ -251,8 +251,15 @@ def test_every_tight_band_names_its_mate_and_fit_route():
     assert x > drawing.BIG_END_X
     widest = max(map(len, drawing.DIMENSION_CALLOUTS["Sec0Dia"].split("\n")))
     assert x + widest * 0.00217 <= 0.3141 - 0.003
-    assert set(drawing.DIMENSION_SUFFIXES) == {f"Sec{land}Dia" for land in (2, 3, 4)}
-    assert len(set(drawing.DIMENSION_SUFFIXES.values())) == 1
+    # Land diameters flag the land note; the stack's lengths flag the stack
+    # note, at every callout it serves (round 4).
+    land_suffixes = {f"Sec{land}Dia" for land in (2, 3, 4)}
+    assert set(drawing.DIMENSION_SUFFIXES) == land_suffixes | set(drawing.STACK_LENGTHS)
+    assert len({drawing.DIMENSION_SUFFIXES[name] for name in land_suffixes}) == 1
+    assert {drawing.DIMENSION_SUFFIXES[name] for name in drawing.STACK_LENGTHS} == {
+        drawing.STACK_FLAG_SUFFIX
+    }
+    assert str(spec.STACK_NOTE) in drawing.STACK_FLAG_SUFFIX
     notes = spec.DRAWING_NOTES.splitlines()
     land_note = " ".join(notes[:2])
     assert notes[0].startswith("1. ") and notes[1].startswith("   ")

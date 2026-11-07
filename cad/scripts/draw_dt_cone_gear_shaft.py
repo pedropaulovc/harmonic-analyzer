@@ -109,6 +109,7 @@ from dt_cone_gear_shaft_spec import (
     JOURNAL_DIA,
     SEAT_MATE_CALLOUTS,
     SEAT_MATE_SUFFIXES,
+    STACK_NOTE,
     SECTION_DIAS,
     SECTION_ENDS,
     SHAFT_LENGTH,
@@ -190,7 +191,10 @@ DONOR_CENTER = (0.360, 0.090)
 SIDE_KEEP = {
     "CollarWidth": (0.1740, 0.1355),
     "Sec0End": (0.2311, 0.1355),
-    "Sec1End": (0.1498, 0.1275),
+    # Its " SEE NOTE 2" flag (round 4) widens the text to ~37 mm; 6 mm right
+    # of the bare value's centre it starts right of section A's lower letter
+    # (x <= 0.1353), one tier above it.
+    "Sec1End": (0.1560, 0.1275),
     "Sec2End": (0.1464, 0.1195),
     "Sec3End": (0.1429, 0.1115),
     "Sec4End": (0.1314, 0.1035),
@@ -257,8 +261,15 @@ REFERENCE_DIAMETERS = ("CollarDia",)
 # Sheet width of one diameter text with its stacked band, for the layout test.
 DIAMETER_TEXT_WIDTH = 0.032
 # One-line suffixes after a dimension's value: the tip-end seats' flag to
-# the land note.  Lengths carry their value and band only (rule 7).
-DIMENSION_SUFFIXES = dict(SEAT_MATE_SUFFIXES)
+# the land note, and the stack's three-place lengths' flag to the stack note
+# (round 4 review: a note naming the mates must be linked at each callout it
+# serves, rule 7).  Other lengths carry their value and band only.
+STACK_FLAG_SUFFIX = f" SEE NOTE {STACK_NOTE}"
+STACK_LENGTHS = ("Sec1End", "Sec2End", "Sec3End", "CollarWidth")
+DIMENSION_SUFFIXES = {
+    **SEAT_MATE_SUFFIXES,
+    **{name: STACK_FLAG_SUFFIX for name in STACK_LENGTHS},
+}
 # The collar prints its reference diameter over the stock line with its edge
 # break and the roots line with its mates, lines as wide as "5/8 BAR AS
 # SUPPLIED" or wider.  At LENGTH_CHAR_WIDTH a line
