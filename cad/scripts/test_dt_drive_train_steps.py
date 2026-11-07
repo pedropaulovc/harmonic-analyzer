@@ -74,7 +74,7 @@ def test_the_cone_stack_step_prints_measured_limits() -> None:
     assert low <= first < low + 0.0254 and high - 0.0254 < last <= high
     # The remedy is its own sub-step after the check (rule 22).
     assert stack.index("ACCEPT") < stack.index("IF THE STACK IS LONG, RE-FACE ITS THICKEST GEAR")
-    assert "IF SHORT, REMAKE ITS THINNEST GEAR" in stack
+    assert "IF IT IS SHORT, REMAKE ITS THINNEST GEAR" in stack
 
 
 def test_the_tip_step_sets_the_collar_before_the_end_play() -> None:
@@ -104,7 +104,7 @@ def test_the_tip_step_sets_the_collar_before_the_end_play() -> None:
     placed = _step_body("post-and-tip-block")
     assert "MHA-DT-VN-60 UP FROM UNDER THE PLATE" in placed
     assert "FEELER" not in placed
-    assert "LEAVE MHA-DT-VN-61 LOOSE ENOUGH TO TURN MHA-DT-05" in placed
+    assert "RUN BOTH MHA-DT-VN-61 IN, LOOSE ENOUGH TO TURN MHA-DT-05" in placed
 
 
 def test_the_printed_shaft_end_play_is_the_band_the_stacks_book() -> None:
@@ -112,8 +112,7 @@ def test_the_printed_shaft_end_play_is_the_band_the_stacks_book() -> None:
     cone_stack_end_play.SHAFT_END_PLAY; the sheet prints that band, rounded
     inward to the thousandth."""
     match = re.search(
-        r"END PLAY WITH A DIAL INDICATOR ON THE SHAFT END, PUSHING THE SHAFT BACK AND "
-        r"FORTH ALONG ITS AXIS: (\.\d{3})-(\.\d{3})",
+        r"DIAL-INDICATE THE MHA-DT-04 END PLAY AT THE SHAFT END: (\.\d{3})-(\.\d{3})",
         _step_body("tip-adjuster-set"),
     )
     assert match is not None
@@ -141,7 +140,7 @@ def test_post_screws_keep_spec_owned_stock_and_cut_to_fit_acceptance() -> None:
     printed_short = float(re.search(r"FLUSH TO (\d*\.\d+) SHORT", fitup).group(1))
     assert printed_short * 25.4 == pytest.approx(screw.POST_SCREW_CUT_TO_FIT_SHORT, abs=1e-9)
     assert "CUT EACH MHA-DT-VN-61 TO FIT" in fitup and "UNDERSIDE, NEVER PROUD" in fitup
-    assert "DEBURR THE ENDS" in fitup
+    assert "DEBURR THE CUT ENDS" in fitup
     assert screw.FIXED_CUT_LENGTH_EXISTS is False
     assert screw.STOCK_LENGTH_MM >= screw.FIXED_LENGTH_ENGAGEMENT_MIN_MM
     assert (
@@ -171,13 +170,13 @@ def test_crank_fit_reads_t120_before_the_full_turn_and_retention_drilling() -> N
         f"A {sheet.T120_FITUP_FEELER_TEXT} FEELER PASSES ALL ROUND",
         "BETWEEN THE MHA-DT-10 BAND AND THE T120 TIPS",
         "BETWEEN THE MHA-DT-10 SHOULDER AND THE T120 FRONT FACE",
-        "IF THE FEELER STOPS AT THE BAND, TURN THE MHA-DT-10 BAND DOWN",
+        "IF IT STOPS AT THE BAND, TURN MHA-DT-10'S BAND DOWN",
         f"Ø{sheet.inch_min_text(pinion.TURNED_DIA_FITUP_MIN, 3)} MIN",
-        "AT THE SHOULDER, FACE THE MHA-DT-10 SHOULDER BACK",
+        "IF IT STOPS AT THE SHOULDER, FACE THE SHOULDER BACK",
         f"{sheet.inch_min_text(pinion.SHOULDER_LENGTH_FITUP_MIN, 3)} MIN",
-        "REPEAT 4C-4G",
+        "REPEAT 4E-4J",
         "TURN MHA-DT-07 ONE FULL REVOLUTION BY HAND: IT MUST NEVER BIND",
-        "MATCH-DRILL THROUGH THE MHA-DT-10",
+        "MATCH-DRILL THE MHA-DT-10",
         "TURN MHA-DT-07 ONE FULL REVOLUTION AGAIN: NO BINDING",
     )
     positions = [fitup.index(phrase) for phrase in order]
@@ -215,10 +214,10 @@ def test_step_four_holds_the_collar_on_the_boss_and_leaves_the_end_proud() -> No
     least, most = crankshaft.SHAFT_END_PROUD_RANGE
     assert least >= 0.0
     order = (
-        "MHA-DT-11 COLLAR REAR FACE HARD ON THE MHA-DT-05 BOSS FRONT FACE, NO WASHER",
+        "HOLD MHA-DT-11'S COLLAR HARD ON THE MHA-DT-05 BOSS, NO WASHER",
         f"SET MHA-DT-10 {sheet.inch_text(pinion.SEAT_FEELER_MM, sheet.FEELER_PLACES)} "
-        "OFF THE BOSS BACK FACE WITH A FEELER: END PLAY = THE FEELER",
-        "MATCH-DRILL THROUGH THE MHA-DT-10",
+        "OFF THE BOSS BACK FACE WITH A FEELER",
+        "MATCH-DRILL THE MHA-DT-10",
         f"END STANDS {drawing.inch_envelope((least, most), 3)} PROUD OF THE MHA-DT-10 BACK FACE",
         "DO NOT FACE",
     )
@@ -235,9 +234,9 @@ def test_step_four_holds_the_collar_on_the_boss_and_leaves_the_end_proud() -> No
 def test_step_four_holds_the_collar_before_the_feeler_and_the_pin() -> None:
     body = _step_body("crank-mesh-checked")
     positions = [
-        body.index("HOLD THE MHA-DT-11 COLLAR REAR FACE HARD ON THE MHA-DT-05 BOSS FRONT"),
+        body.index("HOLD MHA-DT-11'S COLLAR HARD ON THE MHA-DT-05 BOSS"),
         body.index("OFF THE BOSS BACK FACE WITH A FEELER"),
-        body.index("MATCH-DRILL THROUGH THE MHA-DT-10"),
+        body.index("MATCH-DRILL THE MHA-DT-10"),
     ]
     assert positions == sorted(positions)
 

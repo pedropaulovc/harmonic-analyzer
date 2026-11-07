@@ -576,7 +576,7 @@ def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
     t120 = f"{feeler(set_stack.feeler_gap_mm(120))} AT T120"
     order = [
         check.index("TO THE MHA-SH-VN-52 STOP, CLEAR OF EVERY MHA-DT-12"),
-        check.index("(MHA-DT-VN-62) TO SNUG-LOOSE"),
+        check.index("(MHA-DT-VN-62) UNTIL EACH PEDESTAL MOVES"),
         check.index(t012),
         check.index(t120),
         check.index("TIGHTEN MHA-DT-VN-62"),
@@ -656,7 +656,7 @@ def test_rig_is_located_by_its_parked_tip_gap() -> None:
     assert feeler in check
     assert (
         f"{tip_gap.TIP_GAP_ACCEPT_TEXT} (SHEET {drawing.CONTINUATION_SHEET}, "
-        f"STEP {steps.step_number('rig-located')}C)"
+        f"STEP {steps.step_number('rig-located')}D)"
     ) in check
     # The inch acceptance rounds inward, inside the spec's window.
     printed = re.search(r"ACCEPT (\.\d{3})-(\.\d{3})", tip_gap.TIP_GAP_ACCEPT_TEXT)
