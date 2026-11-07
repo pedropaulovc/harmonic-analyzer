@@ -1304,7 +1304,9 @@ CONE_CRANK_STEPS = _note_text(
         # round 10 (rule 22): one action, the correction.
         "4P. IF IT BINDS, CORRECT AS 4K-4M WHERE THE 4H-4J FEELER STOPS.",
         "4Q. MATCH-DRILL THE MHA-DT-10 BOSS AT MID-LENGTH INTO MHA-DT-11.",
-        f"4R. {pinion.PIN_FIT_LINES[0]}.",
+        # Rule 4 (8a1a516): a standard fit name; the part sheets' shared
+        # "LIGHT HAMMER FIT" (pinion.PIN_FIT_LINES) is a drive fit.
+        f"4R. REAM TO FIT PIN {pinion.PIN_NUMBER}, A DRIVE FIT.",
         f"4S. TAP {pinion.PIN_NUMBER} IN: {pinion.PIN_FIT_LINES[1]}.",
         "4T. TURN MHA-DT-07 ONE FULL REVOLUTION AGAIN: NO BINDING.",
         "4U. CHECK THAT THE MHA-DT-11 END STANDS "
@@ -1667,7 +1669,7 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
             # one thing each.  Round 9 (rule 23): the cross pin's bench check.
             f"{LEVER_PIN_SET_NAME}, GRIP PARKED: MATCH-DRILL {LEVER_PIN_HOLE_DRILL} THRU "
             f"{LEVER_NUMBER}'S HUB AT ITS PRINTED STATION AND {LIFT_ROD_NUMBER} TOGETHER.\n"
-            f"INSERT {LEVER_PIN_NUMBER}, A SLIP FIT.\n"
+            f"INSERT {LEVER_PIN_NUMBER}, A SLIDING FIT.\n"
             "TRIM BOTH ENDS.\n"
             f"PEEN BOTH ENDS FLUSH WITH THE HUB (SHEET {FULL_DETAIL_SHEET}).\n"
             f"CHECK THAT {LEVER_NUMBER} DOES NOT TURN OR SLIDE ON {LIFT_ROD_NUMBER} BY HAND.",
@@ -2085,6 +2087,11 @@ def cluster_ring_fit(
         balloon_radius=BALLOON_DIAMETER / 2.0,
         keep_out=keep_out,
     )
+    # The view's own box: its corners stand outside the ring's ellipse, so a
+    # ring clear of the block can still leave a corner on it (round 10,
+    # 20261107T084706335Z: the 1:2.5 cone set's box overlapped it 2.9 x 9.5).
+    if outline[1] + shift[1] < keep_out[3]:
+        x = min(x, keep_out[0] - outline[2])
     ring_left = outline[0] + x - CLUSTER_RING_REACH
     if ring_left < region[0]:
         overflows.append(

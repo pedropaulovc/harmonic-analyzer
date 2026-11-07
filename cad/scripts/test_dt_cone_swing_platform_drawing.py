@@ -1351,7 +1351,7 @@ def test_tip_dowel_ream_callout_flags_its_fit_note() -> None:
     flat = " ".join(row.strip() for row in rows)
     step = dt_drive_train_steps.step_ref("post-and-tip-block")
     for phrase in (
-        "SLIP FIT FOR MHA-DT-VN-69",
+        "SLIDING FIT ON MHA-DT-VN-69",
         f"MATCH-REAM THRU AT {step}.",
     ):
         assert phrase in flat, phrase

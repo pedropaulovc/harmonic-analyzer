@@ -456,7 +456,7 @@ TIP_DOWEL_CALLOUT = "\n".join(
 TIP_DOWEL_NOTE_WIDTH = 55
 _NBSP = "\u00a0"
 TIP_DOWEL_NOTE = textwrap.fill(
-    f"SLIP FIT FOR {TIP_DOWEL_PIN_NUMBER}. MATCH-REAM THRU AT "
+    f"SLIDING FIT ON {TIP_DOWEL_PIN_NUMBER}. MATCH-REAM THRU AT "
     f"{step_ref('post-and-tip-block').replace(' ', _NBSP)}.",
     width=TIP_DOWEL_NOTE_WIDTH,
     initial_indent=f"{TIP_DOWEL_NOTE_NUMBER}. ",

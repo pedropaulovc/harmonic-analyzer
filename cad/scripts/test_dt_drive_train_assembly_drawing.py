@@ -726,7 +726,7 @@ def test_lever_pin_step_states_existing_drill_size_and_slip_fit() -> None:
     step = _rig_step_body(pin.LEVER_PIN_SET_STEP_KEY)
     assert step.startswith(f"{pin.LEVER_PIN_SET_NAME}, GRIP PARKED: MATCH-DRILL #51 THRU")
     assert f"{pin.LEVER_NUMBER}'S HUB AT ITS PRINTED STATION AND {pin.LIFT_ROD_NUMBER} TOGETHER" in step
-    assert f"INSERT {pin.PIN_NUMBER}, A SLIP FIT." in step
+    assert f"INSERT {pin.PIN_NUMBER}, A SLIDING FIT." in step
     assert "TRIM BOTH ENDS." in step
     assert f"PEEN BOTH ENDS FLUSH WITH THE HUB (SHEET {drawing.FULL_DETAIL_SHEET})." in step
     # Round 9 (rule 23): the cross pin's own bench check, 22D.
@@ -1276,6 +1276,18 @@ def test_the_bank_and_crank_keep_their_proven_ring_region() -> None:
         assert drawing.CLUSTER_RING_REGIONS[cluster] == drawing.CLUSTER_RING_REGION
     assert set(drawing.CLUSTER_RING_REGIONS) == set(drawing.CLUSTER_SCALES)
 
+
+def test_a_lowered_view_box_slides_clear_of_the_title_block() -> None:
+    """Round 10 (20261107T084706335Z): the 1:2.5 cone set's view box
+    [76.1, 56.5, 218.9, 221.5] mm overlapped the title block 2.9 x 9.5 mm
+    while its balloon ring cleared it; the fit now slides the box too."""
+    outline = (0.0761, 0.0565, 0.2189, 0.2215)
+    shift, overflows, _slide = drawing.cluster_ring_fit(
+        outline, drawing.CLUSTER_RING_REGIONS["cone-set"]
+    )
+    assert overflows == []
+    left, _bottom, _right, top = _title_block_keep_out()
+    assert outline[2] + shift[0] <= left + 1e-9 or outline[1] + shift[1] >= top - 1e-9
 
 
 def test_the_sheet_scales_follow_the_chosen_cluster_and_full_detail_scales() -> None:
