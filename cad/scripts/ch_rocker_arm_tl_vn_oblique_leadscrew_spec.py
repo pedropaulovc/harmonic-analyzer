@@ -66,10 +66,12 @@ so the bracket slips at 1.34 kN (μ 0.2). It starts to open (F·h = n·P·w/6,
 w 12.7) at 352 N. Owner ruling 2026-11-06 (Main, option B of the PR2
 two-hole review, replacing the 2026-10-27 "slip governs" criterion for the
 TL-28/TL-20 joint): above that slip load the bracket may slip until the
-screws' threads bear on TL-20's clearance holes, a positive stop; the
-ruling accepts up to ~.9 mm lost motion on reversal. TL-20's #12 (.189)
-clearance holes hold this joint's worst case to 0.876 mm (the largest
-drilled hole over the #8 UNC-3A minimum major; 0.737 at its basic major).
+screws' threads bear on TL-20's clearance holes, a positive stop. The
+owner's R4 ruling (Main, relayed by the coordinator after farm 84d5991d45)
+keeps option B and accepts up to 1.06 mm lost motion on reversal (the
+option-B ruling's ~.9 mm superseded). TL-20's #12 (.189) clearance holes
+hold this joint's worst case to 0.876 mm (the largest drilled hole over the
+#8 UNC-3A minimum major; 0.737 at its basic major), unchanged.
 That bound is the TL-28-on-TL-20 joint alone; the KP08-on-TL-28 joint above
 it (Ø5 holes, UNVERIFIED #2184) was never slip-checked and is not included
 (``KP08_SCREW_FLOAT_MAX``, an open question). The joint must not slip under
@@ -495,8 +497,12 @@ BRACKET_OPENING_THRUST = (
 
 # Owner ruling 2026-11-06 (Main, option B of the PR2 two-hole review; it
 # replaces the 2026-10-27 no-slip criterion for TL-28 on TL-20): "slip to
-# positive thread stop acceptable above ~1344 N (handwheel abuse only); up to
-# ~.9 mm reversal lost motion accepted". The normal finish feed must not slip
+# positive thread stop acceptable above ~1344 N (handwheel abuse only)". Its
+# "up to ~.9 mm reversal lost motion accepted" is superseded by the owner's
+# R4 ruling (Main, relayed by the coordinator after farm 84d5991d45): option
+# B retained, reversal lost motion up to 1.06 mm accepted. The #12 geometry
+# is kept (a #9 would change the head-to-counterbore contact and the
+# engagement). The normal finish feed must not slip
 # the bracket (jig assembly spec, NORMAL_FEED_THRUST_N); above BRACKET_SLIP_THRUST
 # the bracket moves on TL-20 until each bar screw's thread bears on its
 # clearance hole's wall, and the abuse envelope is carried there.
@@ -517,7 +523,7 @@ BRACKET_STOP_FLOAT_BASIC = base_bar.BRACKET_SCREW_FLOAT_MAX  # 0.368 a side
 BRACKET_STOP_FLOAT_MAX = base_bar.BRACKET_SCREW_FLOAT_WORST  # 0.438
 BRACKET_REVERSAL_LOST_MOTION_BASIC = 2.0 * BRACKET_STOP_FLOAT_BASIC  # 0.737
 BRACKET_REVERSAL_LOST_MOTION = 2.0 * BRACKET_STOP_FLOAT_MAX  # 0.876
-BRACKET_REVERSAL_LOST_MOTION_ACCEPTED = 0.9  # the ruling's "up to ~.9 mm"
+BRACKET_REVERSAL_LOST_MOTION_ACCEPTED = 1.06  # the R4 ruling's "up to 1.06 mm"
 if BRACKET_REVERSAL_LOST_MOTION > BRACKET_REVERSAL_LOST_MOTION_ACCEPTED:
     raise AssertionError(
         f"TL-28 can shift {BRACKET_REVERSAL_LOST_MOTION:.3f} on TL-20 at a reversal, "

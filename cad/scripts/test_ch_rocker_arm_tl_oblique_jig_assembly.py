@@ -1594,7 +1594,9 @@ def test_bracket_slip_stop_and_lost_motion_follow_ruling_b() -> None:
     # 2.8 N·m, no washers. No slip under the normal cutting feed; above
     # ~1344 N (handwheel abuse) the bracket may slip onto its bar screws'
     # positive thread stop, which carries the abuse envelope in hole/thread
-    # bearing and screw shear; up to ~.9 mm reversal lost motion.
+    # bearing and screw shear. Reversal lost motion: the owner's R4 ruling
+    # (Main, via the coordinator after farm 84d5991d45) keeps option B and
+    # accepts up to 1.06 mm (was ~.9); the #12 geometry is unchanged.
     assert leadscrew.BAR_SCREW_TORQUE_NM == 2.8
     assert leadscrew.BAR_SCREW_PRELOAD == pytest.approx(3360.9, abs=0.1)
     assert leadscrew.BAR_SCREW_THRUST_ECCENTRICITY == pytest.approx(0.0)
@@ -1629,7 +1631,11 @@ def test_bracket_slip_stop_and_lost_motion_follow_ruling_b() -> None:
     # basic-major figure disclosed; the KP08 joint's float is separate.
     assert leadscrew.BRACKET_REVERSAL_LOST_MOTION == pytest.approx(0.876, abs=1e-3)
     assert leadscrew.BRACKET_REVERSAL_LOST_MOTION_BASIC == pytest.approx(0.737, abs=1e-3)
-    assert leadscrew.BRACKET_REVERSAL_LOST_MOTION <= 0.9
+    assert leadscrew.BRACKET_REVERSAL_LOST_MOTION_ACCEPTED == 1.06
+    assert (
+        leadscrew.BRACKET_REVERSAL_LOST_MOTION
+        <= leadscrew.BRACKET_REVERSAL_LOST_MOTION_ACCEPTED
+    )
     assert leadscrew.KP08_SCREW_FLOAT_MAX == pytest.approx(0.487, abs=1e-3)
     # Cross-check the chip load against the shop's cutting data.
     import tomllib
