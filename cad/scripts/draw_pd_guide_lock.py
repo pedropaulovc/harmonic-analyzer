@@ -172,38 +172,20 @@ HOLE_CALLOUT_PRECISION = {"hw-diam": HOLE_LOCATION_PLACES}
 # upper-right quadrant, crossing only the plate's right edge; the text stands
 # between that edge and the right view.
 HOLE_CALLOUT_XY = (0.230, 0.185)
-HOLE_CALLOUT_PROCESS = "DRILL"
+# Size, then process, then depth (rule 26): the native through extent
+# becomes DRILL THRU.
+HOLE_EXTENT_TEXT = "DRILL THRU"
 # The hole coordinates' ±.001 bands exist for the mate (rule 4): the
 # pattern must land on the platen guide's #4-40 taps with the lock-screw
-# shanks clear in their holes (pd_vn_guide_lock_screw_spec.LOCK_SET_OFFSET),
-# so the callout names both. Its last row states the holes' finished wall to
-# the edges, under the .080 target (rule 20; pd-guide-lock.yaml RV-01).
-# Rows stay at most 23 characters so the block keeps between the plate and
-# the right view.
+# shanks clear in their holes (pd_vn_guide_lock_screw_spec.LOCK_SET_OFFSET).
+# The pattern callout names that mate once (rule 4: a mate serving several
+# features is named on the pattern callout, never on each location); its
+# second row states the holes' finished wall to the edges, under the .080
+# target (rule 20; pd-guide-lock.yaml RV-01).  Two rows of words (rule 7),
+# each at most 23 characters so the block keeps between the plate and the
+# right view.
 GUIDE_NUMBER = _config.parts("pd-platen-guide")["number"]
-SCREW_NUMBER = _config.parts("pd-vn-guide-lock-screw")["number"]
-HOLE_CALLOUT_BELOW = "\n".join(
-    (
-        f"MATCHES {GUIDE_NUMBER} TAPS,",
-        "CLEARANCE FIT ON",
-        f"{SCREW_NUMBER} SCREWS",
-        HOLE_WALL_TEXT,
-    )
-)
-# The coordinates baseline both holes from the plate's corner, so the 4.000,
-# the 18.000 and the shared 2X Y are each the pattern: the holes' X's and
-# their common line are what land on the guide's tap row (the R9-49 set
-# window spends each coordinate's band, pd_vn_guide_lock_screw_spec
-# .POSITION_RADIAL; ±0.065 is refused). Each carries the mate at its own
-# value (machinist review ENFORCE at 2056e3344: the hole callout alone left
-# the edge locations without one; at eecbf880d the 18.000 still lacked it).
-# Two short rows keep each block inside its value's width, the hole Y's left
-# of the 4.000 and the 4.000's left of the plate's left-edge extension line.
-DIMENSION_CALLOUTS_BELOW = {
-    "Hole1X": f"MATCHES\n{GUIDE_NUMBER}",
-    "Hole2X": f"MATCHES\n{GUIDE_NUMBER}",
-    "Hole1Y": f"MATCHES\n{GUIDE_NUMBER}",
-}
+HOLE_CALLOUT_BELOW = "\n".join((f"MATCHES {GUIDE_NUMBER} TAPS", HOLE_WALL_TEXT))
 
 
 def _set_dimension_prefixes(
@@ -249,25 +231,51 @@ def _thickness_reference(adapter: Any, annotations: list[Any]) -> None:
     raise RuntimeError("guide-lock sheet thickness was not imported")
 
 
-@_telemetry.traced("drawing.hole_callout_below")
-def _set_hole_callout_below(display: Any, text: str) -> None:
-    """Write ``text`` under the native hole callout and read it back.
+def hole_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
+    """Swap the one native through extent for DRILL THRU and write the rows
+    below it.
 
-    swDimensionTextCalloutBelowDefinition (8) pairs with the writable
-    swDimensionTextCalloutBelow (4); the prefix, size and depth definitions
-    stay untouched, so the Hole Wizard variables stay associative
-    (draw_ch_channel_lever._name_hole_mate)."""
+    The plain through-hole format is ``<MOD-DIAM> <hw-diam> <hw-thru>``
+    (draw_fr_top_frame._hanger_hole_callout_definitions); the size stays the
+    Hole Wizard variable, so the printed order is size, process, depth.
+    swDimensionTextCalloutBelowDefinition (8) carries the words.
+    """
+    native = "\n".join(definitions.values())
+    if (
+        set(definitions) != {5, 6, 7, 8}
+        or native.count("<hw-diam>") != 1
+        or native.count("<hw-thru>") != 1
+        or any(token in native for token in ("<hw-thruholedia>", "<HOLE-SPOT>", "<HOLE-SINK>"))
+    ):
+        raise RuntimeError(f"unexpected native guide-lock hole callout: {definitions!r}")
+    updated = {
+        part: text.replace("<hw-thru>", HOLE_EXTENT_TEXT)
+        for part, text in definitions.items()
+    }
+    below = updated[8].replace("\r", "").rstrip()
+    updated[8] = f"{below}\n{HOLE_CALLOUT_BELOW}" if below else HOLE_CALLOUT_BELOW
+    return updated
+
+
+@_telemetry.traced("drawing.hole_callout_definitions")
+def _set_hole_callout(display: Any) -> None:
+    """Edit only native definition fields and require their exact readback."""
+    display = _early_bound(display, "IDisplayDimension")
     definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
-    # SolidWorks may store CRLF row breaks; compare both sides without CR.
-    below = definitions[8].replace("\r", "").rstrip()
-    updated = f"{below}\n{text}" if below else text
-    display.SetText(4, updated)
-    if str(display.GetText(8) or "").replace("\r", "") != updated or any(
-        str(display.GetText(part) or "") != definitions[part] for part in (5, 6, 7)
+    updated = hole_callout_definitions(definitions)
+    for definition, writable in ((5, 1), (6, 2), (7, 3), (8, 4)):
+        if updated[definition] != definitions[definition].replace("\r", ""):
+            display.SetText(writable, updated[definition])
+    persisted = {
+        part: str(display.GetText(part) or "").replace("\r", "") for part in (5, 6, 7, 8)
+    }
+    resolved = "\n".join(str(display.GetText(part) or "") for part in (1, 2, 3, 4))
+    if persisted != {part: text.replace("\r", "") for part, text in updated.items()} or (
+        resolved.count(HOLE_EXTENT_TEXT) != 1
     ):
         raise RuntimeError(
-            "guide-lock hole callout mate or native definitions did not persist: "
-            f"{[str(display.GetText(part) or '') for part in (5, 6, 7, 8)]!r}"
+            "guide-lock hole callout definitions did not persist: "
+            f"{persisted!r}, resolved {resolved!r}"
         )
 
 
@@ -343,9 +351,6 @@ async def build(adapter: Any) -> dict[str, str]:
     _set_dimension_prefixes(adapter, annotations, DIMENSION_PREFIXES)
     _thickness_reference(adapter, annotations)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS, location="above")
-    set_dimension_callouts(
-        adapter, annotations, DIMENSION_CALLOUTS_BELOW, location="below"
-    )
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
@@ -359,12 +364,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         callout_xy=HOLE_CALLOUT_XY,
         label="guide-lock screw holes",
-        process=HOLE_CALLOUT_PROCESS,
     )
+    _set_hole_callout(hole_callout)
     set_hole_callout_precision(
         hole_callout, HOLE_CALLOUT_PRECISION, label="guide-lock screw holes"
     )
-    _set_hole_callout_below(hole_callout, HOLE_CALLOUT_BELOW)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(
