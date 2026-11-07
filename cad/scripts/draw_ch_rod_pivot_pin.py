@@ -5,14 +5,13 @@ drill-rod cylinder pressed into the connecting rod's reamed fork pin hole and
 dressed flush with both tines (user ruling 2026-10-09, PR #1292 review F1) --
 on three native model dimensions, all on the side view where a turned part's
 diameter sits beside its length (drawing-guidelines.md rule 11 (turned parts read like the lathe)): the Ø as the 5/64
-stock fraction's REFERENCE (the drill rod's grind governs), the stock and its
-two fits named below it (rules 4 and 7: the
-mates are flagged where they apply), the installed length as REFERENCE
-(the fork's thickness; the MHA-CH-03 print owns it), and the blank's cut
-length as a single MIN limit from the part's blanked ``BlankReference``
-sketch. An axis centerline, a bare end view with its center mark, the
-isometric, and the property-linked note (installed state, flush ends,
-removable). No datums, no frames, no roughness symbol.
+stock fraction's REFERENCE (the drill rod's grind governs), its two fits
+named below it (rules 4 and 7: the mates are flagged where they apply), the
+installed length as REFERENCE (the fork's thickness; the MHA-CH-03 print
+owns it), and the blank's cut length as a single MIN limit from the part's
+blanked ``BlankReference`` sketch. An axis centerline, a bare end view with
+its center mark and the isometric. No note: pressing and dressing the pin
+are MHA-CH-00's step (rule 7). No datums, no frames, no roughness symbol.
 The decimal places are the PART's (``ch_rod_pivot_pin_notes.DRAWING_PRECISION``,
 applied natively by ``build_ch_rod_pivot_pin``); this script reads them back
 off the sheet and dresses the journal as its stock fraction. Decimal-inch
@@ -49,7 +48,6 @@ from _drawing_dimensions import (
     set_reference_dimension,
 )
 import _drawing_hidden_sketches as hidden_sketches
-from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
@@ -88,7 +86,6 @@ VIEW_SCALE = (10, 1)
 FRONT_CENTER = (0.080, 0.170)  # end view: a bare circle
 RIGHT_CENTER = (0.200, 0.170)  # side view: the pin along its axis
 ISO_CENTER = (0.330, 0.170)
-NOTES_XY = (0.020, 0.085)  # left of the title block, below the views
 
 # Printed half-sizes in sheet metres, which every dimension is placed clear of.
 HALF_DIA = PIN_DIA * VIEW_SCALE[0] / 2000.0  # 0.0099
@@ -96,9 +93,9 @@ HALF_LEN = PIN_INSTALLED_LENGTH * VIEW_SCALE[0] / 2000.0  # 0.0304
 
 # Side view: the diameter above the view, its text left of centre so the
 # axis-centerline pick at the view's middle lands on bare face, high enough
-# that its three callout lines below (stock, then the two fits) stay clear of
-# the pin's top edge; the installed length below, and the blank's cut length
-# below that, both two-line texts (value over word), spaced to stay apart.
+# that its two fit lines below stay clear of the pin's top edge; the
+# installed length below, and the blank's cut length below that, both
+# two-line texts (value over word), spaced to stay apart.
 RIGHT_KEEP = {
     "PinDia": (RIGHT_CENTER[0] - 0.020, RIGHT_CENTER[1] + HALF_DIA + 0.034),
     "PinLen": (RIGHT_CENTER[0], RIGHT_CENTER[1] - HALF_DIA - 0.016),
@@ -120,14 +117,12 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
         ),
         required=(
             "Number",
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -214,7 +209,6 @@ async def build(adapter: Any) -> dict[str, str]:
         face_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] + 0.004),
         label="rod pivot pin axis centerline",
     )
-    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
 
     return await finalize_drawing(
         adapter,

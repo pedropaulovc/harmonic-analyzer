@@ -153,29 +153,21 @@ def test_journal_fits_hold_at_the_drill_rod_grind() -> None:
     assert spec.BUDGET["running_clearance_min"] > 0.0
 
 
-def test_note_states_installed_state_and_flush_ends() -> None:
-    lines = notes.DRAWING_NOTES.splitlines()
-    assert len(lines) <= 4  # drawing-guidelines.md rule 7 (notes: few, flagged, never a method)
-    assert lines == [
-        "1. INSTALLED STATE SHOWN: BOTH ENDS DRESSED FLUSH WITH THE MHA-CH-03"
-        " FORK FACES AT ASSEMBLY, NEVER PROUD.",
+def test_sheet_carries_no_note_and_the_callout_names_both_fits() -> None:
+    """Fan-out screen 2026-11-07 (rule 7): dressing the ends flush is an
+    assembly step (CH-00 'rod-forks-pinned' states it), not part of making
+    the pin, so the sheet carries no note. The Ø callout names each fit by
+    its standard name and its mate (#1522), with no band and no material
+    (#2136 review: the title-block MATERIAL owns the stock)."""
+    assert not hasattr(notes, "DRAWING_NOTES")
+    assert "Manufacturing Notes" not in _build_source()
+    assert "Manufacturing Notes" not in _source()
+    assert notes.PIN_DIA_CALLOUT.splitlines() == [
+        "PRESS FIT IN MHA-CH-03 FORK HOLE",
+        "RUNNING FIT IN MHA-CH-06 #47 HOLE",
     ]
-    text = notes.DRAWING_NOTES
-    # drawing-simplicity-policy.md `How the repository implements the guidelines` and drawing-guidelines.md rule 7 (notes: few, flagged, never a method) (PR #1292 review N1): the blank's size and limit are the
-    # BlankLen model dimension's, so no limit may ride the note text.
-    for limit in (f"{spec.PIN_BLANK_LENGTH:g}", "MIN", "\u00b1", "+/-"):
-        assert limit not in text, limit
-    # The fits ride the Ø callout (#1522), so the note restates neither.
-    for fit in ("PRESS IN", "PRESSED", "RUNS", "#47", "BLANK"):
-        assert fit not in text, fit
-    assert "PEEN" not in text and "#746" not in text
-    assert "DRILL ROD" not in text  # the title-block MATERIAL owns the stock
-    # #2136 review: the bought rod's REF prints no band and no material.
     for row in notes.PIN_DIA_CALLOUT.splitlines():
         assert "\u00b1" not in row and "DRILL ROD" not in row
-    assert notes.PIN_DIA_CALLOUT.splitlines()[0] == "AS SUPPLIED"
-    assert '"Manufacturing Notes": DRAWING_NOTES' in _build_source()
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in _source()
 
 
 def test_mating_part_numbers_on_the_sheet_are_live() -> None:
@@ -195,7 +187,7 @@ def test_sheet_runs_at_10_to_1_and_lands_clear_of_the_title_block() -> None:
     assert dia_x < drawing.RIGHT_CENTER[0] - 0.015  # off the centerline pick
     assert drawing.RIGHT_KEEP["PinLen"][1] < drawing.RIGHT_CENTER[1] - drawing.HALF_DIA
     assert drawing.RIGHT_KEEP["BlankLen"][1] < drawing.RIGHT_KEEP["PinLen"][1] - 0.010
-    for x, y in (*drawing.RIGHT_KEEP.values(), drawing.NOTES_XY):
+    for x, y in drawing.RIGHT_KEEP.values():
         assert 0.012 < x < 0.420
         assert 0.012 < y < 0.267
         assert not (x > 0.216 and y < 0.070), (x, y)

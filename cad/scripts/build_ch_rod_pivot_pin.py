@@ -63,7 +63,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _saved_part_guard import require_saved_drawing_properties
-from ch_rod_pivot_pin_notes import DRAWING_DIMENSIONS, DRAWING_NOTES, DRAWING_PRECISION
+from ch_rod_pivot_pin_notes import DRAWING_DIMENSIONS, DRAWING_PRECISION
 from ch_rod_pivot_pin_spec import (
     PIN_BLANK_LENGTH,
     PIN_BLANK_LENGTH_TOL_TYPE,
@@ -78,7 +78,6 @@ _SAVED_DRAWING_PROPERTIES = (
     "Material Specification",
     "Finish",
     "Quantity",
-    "Manufacturing Notes",
 )
 
 PIN_R = PIN_DIA / 2.0
@@ -238,7 +237,7 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})
+    apply_drawing_properties(adapter, PART_NAME)
     blank_reference_sketches(adapter, ("BlankReference",))
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
