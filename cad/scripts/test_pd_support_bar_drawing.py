@@ -21,11 +21,8 @@ import pd_support_bar_spec as spec
 def test_printed_mating_numbers_resolve_to_the_registered_parts() -> None:
     registered = {row["number"] for row in _config.parts().values()}
     references = (
-        (
-            drawing.DIMENSION_CALLOUTS["ClampSlotCboreWidth"],
-            "sh-vn-clamp-screw",
-        ),
         (drawing.DIMENSION_CALLOUTS["ClampSlotWidth"], "sh-vn-clamp-screw"),
+        (drawing.DIMENSION_CALLOUTS["Depth"], "pd-vn-transgear-pivot-screw"),
         (drawing.CLAMP_CBORE_CALLOUT, "sh-vn-clamp-screw"),
         (drawing.DIMENSION_CALLOUTS["PivotCskDia"], "pd-vn-transgear-pivot-screw"),
         (drawing.DIMENSION_CALLOUTS["BracketCskDia"], "pd-latch-hook"),
@@ -273,8 +270,22 @@ def test_reference_rows_follow_the_bar_globals_onto_the_holes(
             f"{row.prefix}RiseY": height / 2.0,
             row.height_name: height / 2.0 - row_y,
             f"{row.prefix}StartX": length / 2.0,
-            # Each station runs from the moved left end to its unmoved hole.
+            # A row whose run starts off END A drops to it down END A's edge.
+            f"{row.prefix}StartY": height / 2.0,
+            f"{row.prefix}StartDrop": height / 2.0 - row_y,
+            # A height read off a run's end in the bar: a stub on the top
+            # face over it, at the run end's fixed offset from the centre.
+            f"{row.prefix}StubX": abs(row.runs[-1][1]),
+            f"{row.prefix}StubY": height / 2.0,
+            f"{row.prefix}StubLength": part.HEIGHT_STUB_LENGTH,
+            # Each station runs from the moved left end to its unmoved hole,
+            # and so does each run's end.
             **{name: x + length / 2.0 for name, (x, _y) in zip(names, holes)},
+            **{
+                f"{row.prefix}Run{index}{side}X": x + length / 2.0
+                for index, run in enumerate(row.runs)
+                for side, x in zip(("Start", "End"), run)
+            },
         }
         authored = _authored_row(monkeypatch, row)
         for name, value, drive in authored:
@@ -284,21 +295,78 @@ def test_reference_rows_follow_the_bar_globals_onto_the_holes(
             assert _evaluate(drive, globals_mm) == pytest.approx(expected[name]), name
 
 
-def test_hanger_row_line_clears_the_hook_taps_shoulder() -> None:
-    """Round 2 of the fan-out (layout audit, shoulder-crosses-line): the hook
-    taps' callout's bottom shoulder ran 230.1 -> 312.4 mm at 234.3, and the
-    .571 line, 22 mm off the right end (305.0), rose to 234.8 mm through it.
-    The line stands past the shoulder's measured right end with air, and its
-    one-row text (at 2.76 mm a character) still ends short of section A-A."""
-    bracket_x = drawing.FRONT_KEEP["BracketCskDia"][0]
-    assert bracket_x + drawing.BRACKET_SHOULDER_RIGHT == pytest.approx(0.3124, abs=2e-4)
+def test_each_row_draws_its_own_centreline() -> None:
+    """Round 4 machinist review (rule 26): one drawn line ran through the
+    .571 taps and the .551 clamp holes, .020 apart. Each row's sketch draws
+    runs through its own holes only, no stretch of the bar under both rows'
+    runs, every run clearing the other row's widest rings; the .551 reads off
+    the clamp run at the +X end, the .571 off the tap run's end."""
+    taps, clamps = part.HANGER_ROW, part.CLAMP_ROW
+    assert part.ROW_CENTRELINES == (taps, clamps)
+    for row in (taps, clamps):
+        on_runs = [name for run in row.runs for name, _ in part._run_holes(row, run)]
+        assert sorted(on_runs) == sorted(name for name, _ in row.holes)
+    # The other row's rings: the slot counterbores reach 5.75 off their
+    # centres, the round ones 4.25, the countersinks 2.15.
+    slot_reach = part.CLAMP_SLOT_RUN / 2.0 + part.CLAMP_CBORE_DIA / 2.0
+    csk_reach = spec.PIVOT_TAP_CSK_DIA / 2.0
+    for start, end in taps.runs:
+        for x in part.CLAMP_ROW_X:
+            assert x + slot_reach < start or end < x - slot_reach, x
+    for start, end in clamps.runs:
+        for _, x in taps.holes:
+            assert x + csk_reach < start or end < x - csk_reach, x
+    assert clamps.runs[-1][1] == part.BAR_LENGTH / 2.0
+    assert taps.runs[-1][1] == sheet_spec.HANGER_HEIGHT_X
     line_x = drawing.FRONT_KEEP["HangerRowHeight"][0]
-    assert line_x - (bracket_x + drawing.BRACKET_SHOULDER_RIGHT) >= 0.003
-    section_left = drawing.SECTION_CENTER[0] - BAR_DEPTH * (
-        drawing.SECTION_SCALE[0] / drawing.SECTION_SCALE[1]
-    ) / 2000.0
+    assert line_x == pytest.approx(
+        drawing._face_x(sheet_spec.HANGER_HEIGHT_X) + drawing.HANGER_ROW_LINE_SIDE
+    )
+    # The run's end stands clear past the hook taps' countersinks and short
+    # of the west slots' counterbores, the text's lane over the top face.
+    assert sheet_spec.HANGER_HEIGHT_X > spec.BRACKET_TAP_X[1] + 0.020 / drawing._S
+    assert sheet_spec.HANGER_HEIGHT_X < min(part.CLAMP_SLOT_X) - slot_reach
+
+
+def test_tap_row_height_text_clears_the_hook_leader_and_both_shoulders() -> None:
+    """The .571 reads off the tap run's end with its one-row text over the top
+    face. Round 2's native layout: each countersink callout's bottom shoulder
+    stands 11.1 mm under its keep and runs from 41.9 mm left of it to 40.4
+    right; the hook pair's leader runs from its right hole to that left end.
+    Both callouts rise together, so the hook leader still passes under the
+    pivot block's last row; the text (2.76 mm a character, 6.4 mm tall,
+    starting 1.5 mm right of its line) stands right of that leader, under the
+    shoulders and over the top face."""
+    shoulder_drop, shoulder_left = 0.0111, 0.0419
+    hook_x, hook_y = drawing.FRONT_KEEP["BracketCskDia"]
+    pivot_x, pivot_y = drawing.FRONT_KEEP["PivotCskDia"]
+    assert hook_y == pivot_y == drawing.FACE_TOP + drawing.CSK_CALLOUT_RISE
+    shoulder_y = hook_y - shoulder_drop
+    hole = (
+        drawing._face_x(spec.BRACKET_TAP_X[1]),
+        drawing.FACE_TOP - part.HANGER_ROW_HEIGHT * drawing._S,
+    )
+    knee = (hook_x - shoulder_left, shoulder_y)
+
+    def leader_x(y: float) -> float:
+        return hole[0] + (y - hole[1]) * (knee[0] - hole[0]) / (knee[1] - hole[1])
+
+    line_x, text_y = drawing.FRONT_KEEP["HangerRowHeight"]
     text = f"{part.HANGER_ROW_HEIGHT / 25.4:.3f} \u00b1.002".lstrip("0")
-    assert line_x + 0.002 + len(text) * 0.00276 < section_left - 0.010
+    box = (line_x + 0.0015, text_y - 0.0032, line_x + 0.0015 + len(text) * 0.00276, text_y + 0.0032)
+    assert box[1] - drawing.FACE_TOP >= 0.002
+    assert shoulder_y - box[3] >= 0.002
+    assert box[0] - leader_x(box[3]) >= 0.003
+    # Its line, from the row up to the text, stays right of the leader too.
+    assert line_x - leader_x(text_y) >= 0.003
+    # The hook leader passes under the pivot block's bottom row's right end.
+    pivot_row_right = pivot_x + len("LOCATES MHA-PD-VN-57") * 0.00264 / 2.0
+    assert knee[0] > pivot_row_right
+    assert (pivot_y - shoulder_drop) - (
+        hole[1] + (pivot_row_right - hole[0]) * (knee[1] - hole[1]) / (knee[0] - hole[0])
+    ) >= 0.0015
+    # Under the border.
+    assert hook_y + 0.0116 < 0.2667 - 0.002
 
 
 def test_rows_stack_shortest_nearest_the_bar() -> None:
@@ -1443,8 +1511,10 @@ def test_slot_profiles_run_along_the_bar_in_any_sketch_frame(
 
 def test_locations_and_overall_sizes_carry_no_words() -> None:
     """Rule 7 (screen 20261107T081227004Z): a location dimension carries its
-    value and band alone, and an overall or stock size with no band of its
-    own no reason; the mates stand on the holes' size callouts."""
+    value and band alone, and an overall size with no band of its own no
+    reason; the mates stand on the holes' size callouts. The .XXX height and
+    thickness each name the stack they set (rule 4; round 4 machinist
+    review)."""
     words = set(drawing.DIMENSION_CALLOUTS) | set(drawing.DIMENSION_CALLOUTS_ABOVE)
     locations = {
         "HangerRowHeight",
@@ -1452,9 +1522,21 @@ def test_locations_and_overall_sizes_carry_no_words() -> None:
         *sheet_spec.HANGER_STATION_NAMES,
         *sheet_spec.CLAMP_STATION_NAMES,
     }
-    assert not words & (locations | {"Height", "Depth", "Length"})
-    # The counterbore's reason prints once, on the round holes' callout.
+    assert not words & (locations | {"Length"})
+    assert _config.parts("pd-guide-lock")["number"] in drawing.DIMENSION_CALLOUTS["Height"]
+    assert (
+        _config.parts("pd-vn-transgear-pivot-screw")["number"]
+        in drawing.DIMENSION_CALLOUTS["Depth"]
+    )
+    # The counterbored slot names its mate once, on its width, in the
+    # standard clearance form; the counterbore says only whose centres it
+    # shares; the round holes name theirs once.
+    callouts = [*drawing.DIMENSION_CALLOUTS.values(), sheet_spec.CLAMP_CBORE_CALLOUT]
     assert "ClampSlotCboreDepth" not in words
+    assert "MHA-SH-VN-53" not in drawing.DIMENSION_CALLOUTS["ClampSlotCboreWidth"]
+    assert sum("CLEARANCE FOR MHA-SH-VN-53" in " ".join(text.split()) for text in callouts) == 2
+    for text in callouts:
+        assert not re.search(r"\b(LOCATE TO|SEATS|HEADS|SLIDING|TO SUIT)\b", text), text
     # At most two lines of words under each callout.
     assert all(
         len(text.splitlines()) <= 2 for text in drawing.DIMENSION_CALLOUTS.values()

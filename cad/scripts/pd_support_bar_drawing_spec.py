@@ -130,10 +130,38 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Bar": {"Depth": BAR_BAND_PLACES},
 }
 
+# The two hole rows stand .020 apart (the taps .571, the clamp holes .551
+# under the top face), so one drawn centreline read as both (round 4
+# machinist review; rule 26: holes in line share a drawn centreline, holes
+# not in line must not). Each row's reference sketch draws its own lines,
+# only where its holes are, and no two rows' lines share a stretch of the
+# bar (build_pd_support_bar.ROW_CENTRELINES): the taps' one line runs from
+# just short of the pivot to HANGER_HEIGHT_X, where the .571 reads off it;
+# the clamp holes' east line from END A past the round pair, its west line
+# from short of the slots to the +X end, where the .551 reads off it. Model
+# millimetres along the bar from its centre; each overrun clears the
+# widest ring round its end hole (a slot counterbore reaches 5.75).
+TAP_CENTRELINE_OVERRUN = 6.0
+CLAMP_CENTRELINE_OVERRUN = 8.0
+HANGER_HEIGHT_X = 120.0
+
 # Rule 7: a location dimension and an overall or stock size carry their value
 # and band alone; the mate a hole's location serves stands once, on that
 # hole's size callout, and a callout carries at most two lines of words.
 DIMENSION_CALLOUTS = {
+    # The height and thickness print .XXX for the stacks they set, so each
+    # names its stack (rule 4: "a width that sets a stack names the stack";
+    # round 4 machinist review): the bottom rail's running clearance under the
+    # bar and the MHA-PD-12 lock's overlap of it
+    # (build_pd_paper_drive_assembly._assert_lock_retention), and the
+    # MHA-PD-VN-57 pivot screw's thread engagement, which at .XX falls under
+    # rule 18's 1.5D at the thinnest bar (transgear_hanger_joints).  Keeping
+    # both bands leaves pd_support_bar_spec, and every part importing it,
+    # unkeyed.
+    # Two short lines: the height's text stands right of the round
+    # counterbores' callout (draw_pd_support_bar.BACK_KEEP).
+    "Height": "SETS MHA-PD-12\nRETENTION",
+    "Depth": "SETS MHA-PD-VN-57 ENGAGEMENT",
     # One stacked callout per hole or pattern, on its countersink's MAX Ø
     # (machinist review round 5: a separate tap callout per hole put two
     # leaders on one small hole, arrowheads stacked): the tap line above, the
@@ -152,15 +180,19 @@ DIMENSION_CALLOUTS = {
     # The slot width's upper limit is the head's: wider, the MHA-SH-VN-53
     # head bears on less floor than over a round hole (CLAMP_HEAD_BEARING_MIN)
     # and nears the counterbore's wall (clamp_slot_head_clearance). The
-    # counterbore's minimum clears the slid MHA-SH-VN-53 head; the reason
-    # names no limit word, which under the two-sided band read as ".335 MIN"
-    # (machinist review round 2). Short lines: detail C is 2:1 in a corner.
-    # The slot width's broken leader runs down its text's left end to the
-    # underline, so the widest row's first glyph rode that line (machinist
-    # review round 4). A no-break space each side of the widest row widens
-    # the block by a space past every glyph; the centred rows stand clear.
-    "ClampSlotWidth": "THRU, MAX SEATS\n\u00a0MHA-SH-VN-53 HEADS\u00a0",
-    "ClampSlotCboreWidth": "CLEARS SLIDING\nMHA-SH-VN-53",
+    # counterbored slot names its mate once, on the width (rule 4, one feature
+    # names its mate once; round 4 machinist review read "MAX SEATS ... HEADS"
+    # as rationale): the standard form, a clearance for the screw. Short
+    # lines: detail C is 2:1 in a corner. The slot width's broken leader runs
+    # down its text's left end to the underline, so the widest row's first
+    # glyph rode that line (machinist review round 4). A no-break space each
+    # side of the widest row widens the block by a space past every glyph;
+    # the centred rows stand clear.
+    "ClampSlotWidth": "\u00a0THRU, CLEARANCE FOR\u00a0\nMHA-SH-VN-53",
+    # The counterbore slot shares the through slot's radius centres, the one
+    # .118 detail C dimensions (rule 12; round 4 machinist review). Two short
+    # lines keep the block inside its old width, clear of section B-B.
+    "ClampSlotCboreWidth": "ON .118\nSLOT CENTRES",
 }
 # Above the countersinks' Ø: the tap each callout carries (DIMENSION_CALLOUTS).
 DIMENSION_CALLOUTS_ABOVE = {
@@ -178,14 +210,12 @@ DIMENSION_PREFIXES = {
     ("CountersinkReference", "PivotCskDia"): _COUNTERSINK_PREFIX,
     ("CountersinkReference", "BracketCskDia"): _COUNTERSINK_PREFIX,
 }
-# Under the round counterbores' native callout: the taps the clamp row's
-# banded height and stations locate to (rule 4: the tight band names its
-# mate, as the latch hook's SCREW_HOLE_MATE does), then the screws whose heads
-# they sink, and why the depth has a floor (the heads' worst case stays
-# sub-flush). The reason stands here once; the slot counterbores' depth in
-# section B-B carries none (rule 7).
-CLAMP_TAP_MATE = "LOCATE TO MHA-SH-02 TAPS"
-CLAMP_CBORE_CALLOUT = f"{CLAMP_TAP_MATE}\nMHA-SH-VN-53 HEADS BELOW SLIDE FACE"
+# Under the round counterbores' native callout: the mate in the standard
+# clearance form, the screw and the taps it threads into (round 4 machinist
+# review: "LOCATE TO" read as an instruction). The holes are drilled at the
+# printed row and stations, whose title-block ±.005 closes the MHA-SH-02
+# taps' fixed-fastener stack (build_pd_support_bar.CLAMP_POSITION_BAND).
+CLAMP_CBORE_CALLOUT = "CLEARANCE FOR MHA-SH-VN-53\nINTO MHA-SH-02 TAPS"
 # The round holes' drill, written after their size in the native THRU row
 # (rule 26: size, then process, then depth; the counterbore is its symbol).
 CLAMP_HOLE_PROCESS = "DRILL"

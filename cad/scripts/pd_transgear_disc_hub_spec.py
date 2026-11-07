@@ -511,8 +511,9 @@ COLLAR_NUMBER = _config.parts("pd-transgear-drive-collar")["number"]
 # boring bar would cut the flat away, so the D is the shop's to make.  The
 # flat is blind: the D-bore runs from the hub front face back to the
 # flange's rear face (the model's Front plane), where the round spigot bore
-# takes over, so the flat's own callout states where it stops (rule 9: a
-# blind depth a callout states), on the face the spigot length locates.
+# takes over.  That internal step is drawn in solid lines on SECTION A-A,
+# cut through the bore's axis square to the flat (rule 9), level with the
+# flange's rear face the edge view's spigot length locates.
 BORE_FIT_NOTE = 1
 BORE_FIT_TEXT = (
     f"SLIDING FIT ON {SLEEVE_NAME} {SLEEVE_NUMBER} BOSS AND FLAT: FIT TO THE "
@@ -521,7 +522,15 @@ BORE_FIT_TEXT = (
     f"{inch_text(FLAT_CLEARANCE[0], 4)}-{inch_text(FLAT_CLEARANCE[1], 4)} "
     "ON THE FLAT."
 )
-FLAT_STOP_TEXT = "FLAT STOPS AT FLANGE REAR FACE"
+# The section gives the flat's length from the hub front face, a faced end,
+# as a reference: the overall less the spigot length, both already printed
+# stack terms, so it adds no band to any stack (FLAT_END_CLEARANCE_WORST and
+# FLAT_DRIVE_LENGTH_MIN read the spigot's).  It prints at the places of the
+# two lengths it is the difference of.
+FLAT_LENGTH_REF = HUB_LENGTH - SPIGOT_LENGTH
+DRAWING_REFERENCE_PRECISION = HUB_LENGTH_PLACES
+if SPIGOT_LENGTH_PLACES != HUB_LENGTH_PLACES:
+    raise AssertionError("the flat's reference length mixes two printed rows")
 # The overall and the spigot's length both print the disc cluster's band and
 # serve one stack (rule 4): one note, named once, linked from both.
 STACK_NOTE = 2

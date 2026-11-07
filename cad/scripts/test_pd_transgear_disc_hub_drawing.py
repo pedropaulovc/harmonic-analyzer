@@ -20,6 +20,7 @@ import _config
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 import _drawing_edges
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DRAWING_TEMPLATES
 import _gtol_face
 from _layout_geometry import Box, estimate_text_box
 import _part_properties
@@ -194,7 +195,9 @@ def test_the_d_bore_slides_on_the_sleeve_boss_and_flat_at_every_printed_limit() 
     assert flat_fit == pytest.approx(spec.FLAT_CLEARANCE, abs=1e-6)
     link = f"SEE NOTE {spec.BORE_FIT_NOTE}"
     assert link in drawing.DIMENSION_CALLOUTS_BELOW["BoreDia"].splitlines()
-    assert drawing.DIMENSION_CALLOUTS_BELOW["FlatToAxis"].splitlines()[0] == link
+    # The flat's callout is the link alone: where the flat ends is drawn on
+    # SECTION A-A, never worded on its location dimension.
+    assert drawing.DIMENSION_CALLOUTS_BELOW["FlatToAxis"] == link
     note = " ".join(spec.BORE_FIT_TEXT.split())
     printed = re.findall(r"(\d*\.\d+-\d*\.\d+) ON THE (ROUND|FLAT)", note)
     assert [kind for _, kind in printed] == ["ROUND", "FLAT"]
@@ -922,6 +925,156 @@ def test_turned_diameters_print_inline_beside_their_own_step_on_the_edge_view() 
         if boxes[a].overlaps(boxes[b], tol=0.0)
     ]
     assert clashes == []
+
+
+def test_section_a_a_cuts_the_flat_square_through_the_bore_axis() -> None:
+    """drawing-guidelines.md rule 9: the flat's blind end on the flange's
+    rear face is internal shape, so SECTION A-A draws it in solid lines.  Its
+    cutting plane is the model's x = 0: through the bore's axis and along the
+    flat's normal (local -Y), square to the flat through its middle; it
+    misses every screw hole and runs past the flange's rim each side, so the
+    whole cut closes and each letter stands off the rim."""
+    (x0, y0, z0), (x1, y1, z1) = drawing.SECTION_LINE_MODEL
+    assert x0 == x1 == 0.0
+    assert z0 == z1
+    # From the flat's side (-Y) across the axis to the oil hole's (+Y).
+    flange_r = spec.FLANGE_DIA / 2.0
+    assert y0 < -flange_r < -spec.FLAT_TO_AXIS < 0.0 < flange_r < y1
+    for index in range(spec.SCREW_COUNT):
+        angle = 2.0 * math.pi * index / spec.SCREW_COUNT  # 0 deg on local +X
+        hole_x = joint.BOLT_CIRCLE_DIA / 2.0 * math.cos(angle)
+        assert abs(hole_x) - spec.SCREW_HOLE_DIA / 2.0 > 1.0, index
+
+    # The face view lays model +Y right and +X up, so the plane is the
+    # horizontal through the bore's centre, the flat's end on the left.
+    assert drawing.END_VIEW_ANGLE == pytest.approx(-math.pi / 2.0)
+    (sx0, sy0), (sx1, sy1) = drawing.SECTION_LINE
+    assert sy0 == sy1 == pytest.approx(drawing.AXIS_Y)
+    assert (sx0 + sx1) / 2.0 == pytest.approx(drawing.END_CENTER[0])
+    assert drawing._face_view_xy((0.0, -spec.FLAT_TO_AXIS, 0.0))[0] < (
+        drawing.END_CENTER[0]
+    )
+    # Drawn left to right, its arrows point down, away from datum A's tag.
+    assert sx0 < sx1
+    assert drawing.DATUM_A_SYMBOL[1] > drawing.AXIS_Y
+    overshoot = min(
+        drawing.END_CENTER[0] - flange_r * drawing._S - sx0,
+        sx1 - drawing.END_CENTER[0] - flange_r * drawing._S,
+    )
+    assert overshoot >= 0.005
+    assert sx0 > 0.0127 + 0.005  # inside the sheet's inner border
+
+
+def test_the_flat_reference_length_is_the_overall_less_the_spigot() -> None:
+    """The section dimensions the flat's end from the hub front face as a
+    REFERENCE: the overall less the spigot length, the two printed stack
+    terms that already locate the flange's rear face, so no band enters any
+    stack, and it prints at their places."""
+    assert spec.FLAT_LENGTH_REF == pytest.approx(spec.HUB_LENGTH - spec.SPIGOT_LENGTH)
+    assert spec.FLAT_LENGTH_REF == pytest.approx(0.395 * IN)
+    assert spec.DRAWING_REFERENCE_PRECISION == _places("HubLength")
+    assert spec.DRAWING_REFERENCE_PRECISION == _places("SpigotLength")
+    assert spec.REFERENCE_DIMENSIONS == frozenset()
+    # The picks lie on the cut's boundary lines on the flat's side: the hub
+    # front face between the flat and the body's O.D., the flange's rear
+    # face (the flat's end, z = 0) between the spigot's O.D. and the rim.
+    front, rear = drawing.FLAT_REF_PICKS_MM
+    assert front[0] == rear[0] == 0.0
+    assert front[2] == spec.HUB_FRONT_Z and rear[2] == 0.0
+    assert rear[2] - front[2] == pytest.approx(spec.FLAT_LENGTH_REF)
+    assert -spec.HUB_DIA / 2.0 < front[1] < -spec.FLAT_TO_AXIS
+    assert -spec.FLANGE_DIA / 2.0 < rear[1] < -spec.SPIGOT_DIA / 2.0
+
+
+# Ink outside the recipe's own constants, measured on the r4 render (run
+# 20261107T180459203Z): the isometric's shaded ink and the end of the
+# Ø1.05's lower extension line.
+_ISO_INK = Box(0.335, 0.147, 0.408, 0.224)
+_FLANGE_DIA_EXTENSION_END = (0.3355, 0.1248)
+_INNER_BORDER = Box(0.0127, 0.0127, 0.4191, 0.2667)
+# The native section caption's "SECTION" caps, 5.1 mm on the feed pinion's
+# B-B (run 20261107T121559938Z), its 11 characters 44 mm wide.
+_CAPTION_CAP_M = 0.0055
+
+
+def test_section_a_a_stands_in_the_free_field_clear_of_every_other_ink() -> None:
+    """The removed section, its REF and its caption stand right of the edge
+    view's Ø1.05, under the isometric and over the title block, inside the
+    border; the REF's text stands off the part, inline beside the hub body
+    under the flange."""
+    s = drawing._S
+    xy = drawing._section_xy
+    flange_top = xy(0.0, 0.0)[1]
+    flange_bottom = xy(0.0, -spec.FLANGE_THICK)[1]
+    front = xy(0.0, spec.HUB_FRONT_Z)[1]
+    spigot_end = xy(0.0, spec.SPIGOT_LENGTH)[1]
+    flange = Box(
+        xy(-spec.FLANGE_DIA / 2.0, 0.0)[0], flange_bottom,
+        xy(spec.FLANGE_DIA / 2.0, 0.0)[0], flange_top,
+    )
+    body = Box(
+        xy(-spec.HUB_DIA / 2.0, 0.0)[0], front,
+        xy(spec.HUB_DIA / 2.0, 0.0)[0], flange_bottom,
+    )
+    spigot = Box(
+        xy(-spec.SPIGOT_DIA / 2.0, 0.0)[0], flange_top,
+        xy(spec.SPIGOT_DIA / 2.0, 0.0)[0], spigot_end,
+    )
+    overrun = drawing.SECTION_AXIS_OVERRUN_MM * s
+    axis = Box(
+        drawing.SECTION_CENTER[0], front - overrun,
+        drawing.SECTION_CENTER[0], spigot_end + overrun,
+    )
+    ref_value = f"({spec.FLAT_LENGTH_REF / IN:.{spec.DRAWING_REFERENCE_PRECISION}f})"
+    ref_text = estimate_text_box(
+        ref_value.replace("(0.", "(.", 1),
+        anchor=drawing.FLAT_REF_TEXT_XY,
+        height=_CAP_M,
+        reference=2,
+        advance_ratio=_ADVANCE,
+    )
+    caption = estimate_text_box(
+        "SECTION A-A",
+        anchor=drawing.SECTION_CAPTION_XY,
+        height=_CAPTION_CAP_M,
+        reference=5,
+        advance_ratio=_ADVANCE,
+    )
+    assert ref_text is not None and caption is not None
+    # The dimension line through the text, its extension lines out from the
+    # body's and the flange's left ends past it.
+    ref_ink = ref_text.union(
+        Box(drawing.FLAT_REF_TEXT_XY[0] - 0.002, front, flange.xmin, flange_top)
+    )
+    section_ink = [flange, body, spigot, axis, ref_ink, caption]
+
+    # The section's centre is the axis's mid-length.
+    assert (flange.xmin + flange.xmax) / 2.0 == pytest.approx(drawing.SECTION_CENTER[0])
+    assert (front + spigot_end) / 2.0 == pytest.approx(drawing.SECTION_CENTER[1])
+    title_top = DRAWING_TEMPLATES[drawing.SPEC.layout].title_block_top_m
+    for box in section_ink:
+        assert box.xmin >= _INNER_BORDER.xmin + 0.003, box
+        assert box.xmax <= _INNER_BORDER.xmax - 0.003, box
+        assert box.ymin >= title_top + 0.003, box
+        assert box.gap(_ISO_INK) >= 0.010, box
+        if box.xmin < _FLANGE_DIA_EXTENSION_END[0]:
+            assert box.ymax <= _FLANGE_DIA_EXTENSION_END[1] - 0.005, box
+    kept = {
+        name: _printed_box(name, anchor)
+        for keep in (drawing.END_KEEP, drawing.SIDE_KEEP)
+        for name, anchor in keep.items()
+    }
+    for name, box in kept.items():
+        for ink in section_ink:
+            assert box.gap(ink) >= 0.005, (name, ink)
+    # Text off the part: the REF beside the hub body, under the flange,
+    # left of the rim; the caption under the axis line's end.
+    for part_box in (flange, body, spigot):
+        assert ref_text.gap(part_box) >= 0.002
+        assert caption.gap(part_box) >= 0.003
+    assert ref_text.xmax < flange.xmin
+    assert flange_bottom > ref_text.ymax and ref_text.ymin > front
+    assert caption.ymax < axis.ymin
 
 
 class _FakeSketchManager:

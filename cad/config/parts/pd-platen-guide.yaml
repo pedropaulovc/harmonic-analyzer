@@ -2,7 +2,7 @@ pd-platen-guide:
   number: MHA-PD-11
   material: Plain Carbon Steel
   material_specification: AISI 1018 cold-rolled steel
-  finish: black oxide
+  finish: black oxide + oil; oil the taps cut at assembly
   quantity: 2
   tolerance_class: machined_block
   process: "machined (steel)"

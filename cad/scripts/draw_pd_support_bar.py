@@ -77,6 +77,7 @@ from _drawing_dimensions import (
 )
 from _drawing_edges import scan_view_edges
 from _drawing_finish import add_surface_finish
+import _drawing_dimension_import
 import _drawing_hidden_sketches as hidden_sketches
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_layout_audit import annotation_display
@@ -101,8 +102,10 @@ from build_pd_support_bar import (
     CLAMP_CBORE_DEPTH,
     CLAMP_CBORE_DIA,
     CLAMP_ROUND_X,
+    CLAMP_ROW,
     CLAMP_SLOT_WIDTH,
     CLAMP_SLOT_X,
+    HANGER_ROW,
     MAX_SUFFIX,
 )
 from _column_clamp_interface import BAR_DEPTH
@@ -126,6 +129,7 @@ from pd_support_bar_drawing_spec import (
     DRAWING_PRECISION,
     FRONT_FACE_VIEW_LETTER,
     FRONT_FINISH_REASON,
+    HANGER_HEIGHT_X,
     HOOK_TAP_REFERENCE_NAMES,
     STATION_END_LABEL,
     SURFACE_FINISHES,
@@ -194,12 +198,14 @@ def _back_x(model_x: float) -> float:
 # The hanger stations are baselines from the left end, stacked under the bar
 # shortest first (13 mm rows), the length outermost; their texts step right
 # so none crosses a longer row's extension line, and stand clear of the
-# pivot station's. The row's height (from the top face, its rise on the
-# right end) stands off the right end, its line HANGER_ROW_LINE_OUT out: the
-# hook taps' callout's bottom shoulder, ~6 mm over the top face, ends
-# BRACKET_SHOULDER_RIGHT right of its keep point (round 2 of the fan-out:
-# 312.4 mm on the sheet, with the spotting route's line) and the line's
-# upper tail rises to 234.8 mm, so 22 mm out (305.0) the shoulder crossed it.
+# pivot station's. Each row draws its own centreline, only where its holes
+# are (build_pd_support_bar.ROW_CENTRELINES; round 4 machinist review: one
+# line through the .571 taps and the .551 clamp holes read as one row), and
+# both views show both rows' lines. The taps' height reads off their line's
+# right end (pd_support_bar_drawing_spec.HANGER_HEIGHT_X), between the hook
+# taps and the west slots: its line HANGER_ROW_LINE_SIDE right of that end,
+# its one-row text over the top face (HANGER_ROW_TEXT_RISE, centre), right
+# of the hook taps' leader and under both callouts' shoulders.
 # The section line runs up through the pivot, its arrows and letters left of
 # it. Every location carries its value and band alone (rule 7; the hook
 # taps' stations REF, their callout's spotting route sets them): the mate
@@ -209,25 +215,29 @@ def _back_x(model_x: float) -> float:
 # round 5: a tap callout and a countersink callout per hole put two leaders
 # and stacked arrowheads on each small hole, the pair's both on the left
 # hole, the pivot's on the A-A line). Each four-row block (keep = its centre)
-# stands right of its hole, its bottom shelf ~6 mm over the top face, ~13 mm
-# over the hole: the pivot's left end 25 mm right of its hole, so the leader
-# meets the countersink ~62 deg off the A-A line; the pair's, on the right
-# hole (the reference circle's, build_pd_support_bar), 66 mm right of it to
-# its centre, so its leader never crosses the left hole and passes ~3 mm
-# under the pivot block, whose right end its block starts ~5 mm past (widest
-# rows ~53 mm, and ~82 mm for the pair's spotting route, at 2.64 mm a
-# character); it ends ~30 mm short of section A-A's .374.
+# stands right of its hole, its bottom shelf ~11 mm over the top face (over
+# the .571 text), ~18 mm over the hole: the pivot's left end 25 mm right of
+# its hole, so the leader meets the countersink well off the A-A line; the
+# pair's, on the right hole (the reference circle's, build_pd_support_bar),
+# 66 mm right of it to its centre, so its leader never crosses the left hole
+# and passes ~2 mm under the pivot block, whose right end its block starts
+# ~5 mm past (widest rows ~53 mm, and ~82 mm for the pair's spotting route,
+# at 2.64 mm a character); it ends ~30 mm short of section A-A's .374.
 ROW_STEP = 0.013
-HANGER_ROW_LINE_OUT = 0.034
-BRACKET_SHOULDER_RIGHT = 0.0404
+CSK_CALLOUT_RISE = 0.022
+HANGER_ROW_LINE_SIDE = 0.003
+HANGER_ROW_TEXT_RISE = 0.0055
 FRONT_KEEP = {
     "PivotTapStation": (LEFT_END + 0.042, FACE_BOTTOM - ROW_STEP),
     "BracketTapStation1": (LEFT_END + 0.115, FACE_BOTTOM - 2.0 * ROW_STEP),
     "BracketTapStation2": (LEFT_END + 0.118, FACE_BOTTOM - 3.0 * ROW_STEP),
     "Length": (FACE_CENTER[0], FACE_BOTTOM - 4.0 * ROW_STEP),
-    "HangerRowHeight": (RIGHT_END + HANGER_ROW_LINE_OUT, FACE_BOTTOM - 0.010),
-    "PivotCskDia": (_face_x(PIVOT_TAP_X) + 0.059, FACE_TOP + 0.017),
-    "BracketCskDia": (_face_x(BRACKET_TAP_X[1]) + 0.066, FACE_TOP + 0.017),
+    "HangerRowHeight": (
+        _face_x(HANGER_HEIGHT_X) + HANGER_ROW_LINE_SIDE,
+        FACE_TOP + HANGER_ROW_TEXT_RISE,
+    ),
+    "PivotCskDia": (_face_x(PIVOT_TAP_X) + 0.059, FACE_TOP + CSK_CALLOUT_RISE),
+    "BracketCskDia": (_face_x(BRACKET_TAP_X[1]) + 0.066, FACE_TOP + CSK_CALLOUT_RISE),
 }
 # The top face's slide roughness on its edge, left of the section line.
 TOP_FINISH_MODEL_X = -178.0
@@ -581,6 +591,21 @@ def _activate(adapter: Any, view: Any, *, label: str) -> None:
     if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateView(name):
         raise RuntimeError(f"failed to activate the {label} {name!r}")
     adapter.currentModel.ClearSelection2(True)
+
+
+def _show_row_centrelines(adapter: Any, view: Any, sketch: str, *, label: str) -> None:
+    """Show the other hole row's reference sketch in ``view`` for its drawn
+    centrelines alone (rule 26: each row its own line; round 4 machinist
+    review), as the hidden-owner import shows a sketch it dimensions
+    (_drawing_hidden_sketches): its dimensions stay in the other view."""
+    _activate(adapter, view, label=label)
+    hidden_sketches._show_view_sketches(
+        adapter.currentModel,
+        (sketch,),
+        paths=_drawing_dimension_import._model_item_paths(adapter, view),
+        label=label,
+    )
+    _telemetry.info(f"{label}: showing {sketch} for its centrelines")
 
 
 def _sketch_circle(
@@ -1608,6 +1633,10 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="section B-B",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    # Both face views draw both rows' centrelines, each row its own lines
+    # (rule 26): each view's import showed the row it dimensions.
+    _show_row_centrelines(adapter, face, CLAMP_ROW.feature, label="back face")
+    _show_row_centrelines(adapter, back, HANGER_ROW.feature, label="front face")
 
     annotations = [
         *face_annotations,
