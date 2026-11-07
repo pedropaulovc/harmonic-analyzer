@@ -95,21 +95,22 @@ from sm_knife_mount_spec import (
     BLK_HALF_X,
     BLK_TOP,
     BORE_CY,
+    DOWEL_NUMBER,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
     GEOMETRIC_TOLERANCES_IN,
     HOLE_ROW_FACE_DISTANCE,
     PIN_DEPTH_CALLOUT,
-    PIN_HOLE_CALLOUT,
     PIN_HOLE_DEPTH,
+    PIN_HOLE_DEPTH_PLACES,
     PIN_HOLE_DIA,
     PIN_HOLE_SIDE_DISTANCE,
     PIN_HOLE_X,
+    PIN_SLIP_PRINTED,
     R_BORE,
     SLOT_END_FROM_B,
     SLOT_WIDTH,
-    SLOT_WIDTH_CALLOUT,
     STUD_TAP_DIA,
     STUD_TAP_DRILL_DEPTH,
     STUD_TAP_DRILL_DEPTH_BAND,
@@ -125,6 +126,7 @@ from sm_knife_mount_spec import (
     TAP_CALLOUT_REASON,
     TAP_DRILL_CALLOUT,
 )
+import sm_vn_knife_mount_dowel_spec as DOWEL
 
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
@@ -283,11 +285,12 @@ TOP_HALF_Z = SUPPORT_Z_THICK / 2.0 * SHEET_SCALE[0] / 1000.0
 # shoulder at (146.4, 222.2) mm landed the arrow at -38.6 deg).  The dda9a33a8
 # render measured a 5-row label at 84.5 mm wide, its shoulder 1.6 mm past it
 # and 12.86 mm under the text position; four rows stand a half row (~2.1 mm)
-# less.  The widest row, "0.047-0.093 DIAMETRAL CLEARANCE", is 31 capitals
-# at ~2.52 mm (78 mm).  The shoulder starts 22 mm under the hole row, so the
-# leader rises at ~-58 deg into the hole across the front-face edge inside
-# the block (x 139.1 mm), under the B row's 7.0 and its witness line.
-PIN_CALLOUT_HALF_WIDTH = 0.039
+# less.  The widest rows, "SLIDING FIT ON MHA-SM-VN-53" and "(CLEARANCE
+# .0020-.0036 REF)", are 27 characters at ~2.52 mm (68 mm).  The shoulder
+# starts 22 mm under the hole row, so the leader rises at ~-58 deg into the
+# hole across the front-face edge inside the block (x 139.1 mm), under the B
+# row's 7.0 and its witness line.
+PIN_CALLOUT_HALF_WIDTH = 0.034
 PIN_CALLOUT_SHOULDER_OVERHANG = 0.0016
 PIN_CALLOUT_SHOULDER_DROP = 0.0105
 PIN_CALLOUT_SHOULDER_START = (_sheet_x(BLK_HALF_X) + 0.0165, TOP_CENTER[1] - 0.036)
@@ -323,12 +326,13 @@ ROW_FACE_TEXT_XY = (
 )
 # The slot's width (SlotWidth, a model dimension) stands left of the block.
 # SolidWorks prints a vertical dimension's text left of its dimension line,
-# so the line stands at the text position's x and the three rows (the width,
-# OPEN-END SLOT, the mate, ~59 mm) end just left of it.  At 43.6 mm off the
-# -X face the rows ran 25.8 mm past the left border (layout audit, farm run
-# 20261027T030041319Z: box x -13.1..82.1 mm, its right end the extension
-# lines from the slot's sides).  At 11.6 mm off the face the line stands
-# 6.6 mm left of the A-A cutting line's end (84.6 mm) and the rows ~17..76.
+# so the line stands at the text position's x and the three rows (the width
+# and its two fit rows, ~59 mm at the widest) end just left of it.  At 43.6
+# mm off the -X face the rows ran 25.8 mm past the left border (layout
+# audit, farm run 20261027T030041319Z: box x -13.1..82.1 mm, its right end
+# the extension lines from the slot's sides).  At 11.6 mm off the face the
+# line stands 6.6 mm left of the A-A cutting line's end (84.6 mm) and the
+# rows ~17..76.
 SLOT_WIDTH_TEXT_XY = (_sheet_x(-BLK_HALF_X) - 0.0116, TOP_CENTER[1] + 0.017)
 TOP_KEEP = {
     "PinHoleDia": (
@@ -341,17 +345,30 @@ TOP_KEEP = {
     "SlotEndFromB": SLOT_END_TEXT_XY,
     "HoleRowFace": ROW_FACE_TEXT_XY,
 }
-# The knife bore is reamed (Ra 1.6, +0.03/0 band): the process is stated
+# The knife bore is bored (Ra 63 µin, +.0012/0 band): the process is stated
 # (blind machinist review, 2026-10-09: a bare THRU left drill or ream open),
-# and the band's mate under it (ENFORCE review, 2026-10-24, rule 4): the
-# summing lever's hex trunnion, whose top ridge rocks on the bore's crown,
-# the knife seat.  The mate's number is drawing text only, read here, not in
-# sm_knife_mount_spec: the spec is in MHA-FR-02's and the frame assembly's
-# import closure, which must not key on the lever's registry row.  Datum
-# B's slip band and the slot's name their mate (owner ruling 2026-10-24,
-# T+H3); the floor depth states it holds for both.
+# and the band's mate and fit under it (rule 4): the summing lever's hex
+# trunnion, whose top ridge rocks on the bore's crown.  The mate's number is
+# drawing text only, read here, not in sm_knife_mount_spec: the spec is in
+# MHA-FR-02's and the frame assembly's import closure, which must not key on
+# the lever's registry row.  Datum B's slip band and the slot's name their
+# fit on the MHA-SM-VN-53 dowel with the slip clearance as REF (owner ruling
+# 2026-10-24, T+H3; novice rubric: standard fit names, no DIAMETRAL
+# CLEARANCE wording); B's ream states its depth as REF, which the section's
+# floor depth controls for both (rule 26: a depth is never deferred to a
+# view).  These rows are drawing text, so the frame's import closure keeps
+# its key.
 LEVER_NUMBER = str(_config.parts("sm-summing-lever")["number"])
-BORE_CALLOUT = "\n".join(("BORE THRU", "KNIFE SEAT FOR", f"{LEVER_NUMBER} TRUNNION"))
+BORE_CALLOUT = "\n".join(("BORE THRU", "RUNNING FIT ON", f"{LEVER_NUMBER} TRUNNION"))
+_SLIP_FIT = f"SLIDING FIT ON {DOWEL_NUMBER}"
+_SLIP_CLEARANCE_REF = "(CLEARANCE {:.4f}-{:.4f} REF)".format(*PIN_SLIP_PRINTED).replace(
+    "0.", "."
+)
+_PIN_DEPTH_REF = f"{PIN_HOLE_DEPTH / DOWEL.MM_PER_IN:.{PIN_HOLE_DEPTH_PLACES}f}".lstrip("0")
+PIN_HOLE_CALLOUT = "\n".join(
+    (f"REAM <HOLE-DEPTH> ({_PIN_DEPTH_REF}) FLAT BOTTOM", _SLIP_FIT, _SLIP_CLEARANCE_REF)
+)
+SLOT_WIDTH_CALLOUT = "\n".join(("SLIDING FIT ON", DOWEL_NUMBER))
 DIMENSION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
     "PinHoleDia": PIN_HOLE_CALLOUT,
