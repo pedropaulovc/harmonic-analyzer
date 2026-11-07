@@ -142,9 +142,10 @@ def test_cam_attachment_is_fully_released_for_manufacture() -> None:
     notes = dt_pinion_cam_spec.DRAWING_NOTES
     assert "RELEASE HOLD" not in notes
     lines = notes.splitlines()
-    assert lines[1].startswith("2. SUPPLY ASME B18.3 #2-56 UNC X 3/16 FLAT-POINT SOCKET SET SCREW")
-    assert lines[2] == "   LOOSE; TIGHT ON MHA-DT-17, IT SITS BELOW THE OD."
-    assert len(lines) == 3
+    assert lines[1] == (
+        "2. SUPPLY ASME B18.3 #2-56 UNC X 3/16 FLAT-POINT SOCKET SET SCREW LOOSE."
+    )
+    assert len(lines) == 2
     tap = drawing.DIMENSION_CALLOUTS["TapDrillDia"]
     assert "#2-56 UNC" in tap
     assert "2B" not in tap  # Title block owns the default unified thread class.

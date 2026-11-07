@@ -7,7 +7,7 @@ editing them re-keys only this sheet.
 
 from __future__ import annotations
 
-from dt_crank_handle_pivot_screw_spec import END_PLAY_RANGE, inch_text
+from dt_crank_handle_pivot_screw_spec import CHAMFER_CALLOUT, END_PLAY_RANGE, inch_text
 
 # The fitted shoulder, stated once (user ruling 2026-09-29, after the
 # MHA-DT-32 machinist review): under-head to seat face is the bonded handle's
@@ -32,8 +32,15 @@ SHOULDER_LENGTH_NOTE = "\n".join(
 # The head's bands: its diameter keeps a bearing annulus on the cup floor
 # outside the floor hole, its length keeps it below the cup's face, which it
 # clears (rule 3's CLEARS form; KEEPS HEAD BELOW read as design rationale).
+# Two rows: on one the 52-mm block's left end ran into the head face's
+# extension line (fan-out r2 5065c806b3, rule 14).
 HEAD_DIA_CALLOUT = "BEARS ON\nMHA-DT-35 FLOOR"
-HEAD_LENGTH_CALLOUT = "CLEARS MHA-DT-35 FACE"
+HEAD_LENGTH_CALLOUT = "CLEARS\nMHA-DT-35 FACE"
+# The relief's 45-degree lead keeps the seat annulus flat by staying inside
+# the arm's tapped thread (dt_crank_handle_pivot_screw_spec), said in plain
+# words (fan-out r2: "LEAD, INSIDE" is a private phrase, rule 26).  Rows of
+# 18 characters at most, as the spec's callouts.
+RELIEF_LEAD_CALLOUT = f"{CHAMFER_CALLOUT}\nSTAYS INSIDE\nMHA-DT-06 THREAD"
 # The shoulder's running mate, at its band, by the standard fit name (rule 4);
 # wrapped so the widest row (21 characters) clears the Ra 63 leader.
 SHOULDER_FIT_CALLOUT = "RUNNING FIT IN\nMHA-DT-08 REAMED BORE"
