@@ -1050,6 +1050,17 @@ earlier judge accepted the off-sheet centre as a note; the fresh judge holds
 rule 7 (state it at the feature). This change claims no native acceptance
 and reran no review; Detail D's faceting stays the shared, non-gating #1141.
 
+The novice-rubric fan-out (ch-fab-2) then removed both below-text rows: a
+location is a dimension or a drawn line, never words (rule 26). Each arc is
+located from A on the mirror axis by its own BASIC (`TopAbovePivot`, and the
+new `BottomEdgeReference` sketch's `BottomBelowPivot`, the lower arc's
+midpoint ArmDepth under the top edge), and the pivot bore's centre mark is
+extended through both edges as the drawn symmetry line
+(`_extend_pivot_centreline`, after the centre-mark census because its arms
+cross the view outline). The rocker strap (MHA-CH-13) prints the same scheme:
+each arc's centre on its mirror axis, its own radius, and the hub hole's
+extended centre mark.
+
 **b. `IView::SetDisplayMode4` refusing HLR on a native detail view.**
 Don't: read `False` as "detail views can't do HLR". Two causes, both documented
 in `types/IView/SetDisplayMode4.md`: (1) `UseParent = True` — "If UseParent is

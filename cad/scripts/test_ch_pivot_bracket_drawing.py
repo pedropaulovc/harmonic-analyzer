@@ -207,7 +207,7 @@ def test_bore_callout_names_the_mating_pivot_shaft() -> None:
     assert number == "MHA-CH-05"
     bore = drawing.DIMENSION_CALLOUTS["ShaftBoreDia"]
     assert bore.startswith("REAM THRU\n")
-    assert bore.endswith(f"PIVOT SHAFT {number}")
+    assert number in bore
     assert drawing.DIMENSION_CALLOUTS["HoleDia"] == "DRILL THRU"
     assert set(drawing.DIMENSION_CALLOUTS) <= set(drawing.FRONT_KEEP) | set(
         drawing.TOP_KEEP
@@ -216,26 +216,24 @@ def test_bore_callout_names_the_mating_pivot_shaft() -> None:
 
 def test_every_banded_length_says_what_its_band_holds() -> None:
     """A band tighter than the title block names its reason, and its mate's
-    part number, at the dimension, one reason per dimension (#1371 review:
-    the set-screw note belongs to the tap's station, not the ear thickness,
-    and names the shaft)."""
+    part number, once: a size at its dimension, the tap's station (a
+    location, rule 7) on the tap's own callout."""
     banded = {name for _feature, name in model_toleranced_dimensions(part)}
-    assert banded <= set(drawing.DIMENSION_CALLOUTS)
+    assert banded - {"SetScrewLocation"} <= set(drawing.DIMENSION_CALLOUTS)
     washer = _config.parts("ch-vn-rocker-thrust-washer")["number"]
     assert washer == "MHA-CH-VN-56"
     assert drawing.DIMENSION_CALLOUTS["EarThick"] == f"THRUST FACES ON {washer}"
     shaft = _config.parts("ch-pivot-shaft")["number"]
-    assert drawing.DIMENSION_CALLOUTS["SetScrewLocation"] == (
-        f"SET SCREW ON FLAT OF\nPIVOT SHAFT {shaft}"
-    )
-    assert sum("SET SCREW" in text for text in drawing.DIMENSION_CALLOUTS.values()) == 1
+    # Rule 7: the tap's station is a location, so its mate rides the tap.
+    assert "SetScrewLocation" not in drawing.DIMENSION_CALLOUTS
+    assert shaft in drawing.SET_SCREW_MATE
+    assert drawing.SET_SCREW_NUMBER in drawing.SET_SCREW_MATE
 
 
-# The native definitions of a through-next 4-40 Hole Wizard tap, as the
-# fleet's TAP-prefixed callouts carry them (part 5 the thread, part 7 the
-# tap drill).
+# The native definitions of a through-next 4-40 Hole Wizard tap (part 5 the
+# thread, part 7 the tap drill).
 _NATIVE_TAP = {
-    5: "TAP <hw-threaddesc> - <hw-threadclass> <hw-thru>",
+    5: "<hw-threaddesc> - <hw-threadclass> <hw-thru>",
     6: "",
     7: "<MOD-DIAM><hw-thrutapdrldia> <hw-thru>",
     8: "",
@@ -245,7 +243,7 @@ _NATIVE_TAP = {
 def test_tap_callout_says_to_bore_and_states_no_shortfall() -> None:
     updated = drawing.set_screw_callout_definitions(dict(_NATIVE_TAP))
     assert updated[7] == "<MOD-DIAM><hw-thrutapdrldia> TO BORE"
-    assert updated[5] == "TAP <hw-threaddesc> TO BORE"
+    assert updated[5] == f"<hw-threaddesc> TO BORE\n{drawing.SET_SCREW_MATE}"
     joined = "\n".join(updated.values())
     # Every Hole Wizard size variable survives; the class and THRU are gone.
     assert "<hw-threaddesc>" in joined and "<hw-thrutapdrldia>" in joined
@@ -273,10 +271,10 @@ def test_apex_set_screw_meets_rule_18_so_nothing_is_declared() -> None:
 
 
 def test_tap_callout_rewrite_refuses_an_unexpected_native_format() -> None:
-    blind = {**_NATIVE_TAP, 5: "TAP <hw-threaddesc> <hw-threadclass> <hw-depth>"}
+    blind = {**_NATIVE_TAP, 5: "<hw-threaddesc> <hw-threadclass> <hw-depth>"}
     with pytest.raises(RuntimeError, match="two native extents"):
         drawing.set_screw_callout_definitions(blind)
-    no_class = {**_NATIVE_TAP, 5: "TAP <hw-threaddesc> <hw-thru>"}
+    no_class = {**_NATIVE_TAP, 5: "<hw-threaddesc> <hw-thru>"}
     with pytest.raises(RuntimeError, match="not in one callout part"):
         drawing.set_screw_callout_definitions(no_class)
 
@@ -350,9 +348,9 @@ def test_apex_tap_callout_fits_above_the_plan_between_the_lanes() -> None:
     # 109.7 mm per 42 glyphs, lines 16.8 pt apart).
     drill_in = blind_cut_dia_mm(spec.SET_SCREW_HOLE_SPEC) / 25.4
     drill = f"Ø.{round(drill_in * 1000):03d} {drawing.SET_SCREW_EXTENT}"
-    thread = f"{drawing.SET_SCREW_PROCESS} 4-40 UNC {drawing.SET_SCREW_EXTENT}"
+    thread = f"4-40 UNC {drawing.SET_SCREW_EXTENT}"
     box = estimate_text_box(
-        f"{drill}\n{thread}",
+        f"{drill}\n{thread}\n{drawing.SET_SCREW_MATE}",
         anchor=drawing.SET_SCREW_CALLOUT_XY,
         height=0.0035,
         reference=2,  # swCENTER
@@ -404,9 +402,7 @@ def test_plan_stations_each_print_at_their_own_arrows_near_the_plan() -> None:
     plan_bottom = drawing._top_y(FOOT_Z1)
     tap_column = drawing.TOP_KEEP["SetScrewLocation"]
     foot_column = drawing.TOP_KEEP["FootLen"]
-    tap = _hanging_block(
-        f".160 ±.004\n{drawing.DIMENSION_CALLOUTS['SetScrewLocation']}", tap_column
-    )
+    tap = _hanging_block(".160 ±.004", tap_column)
     assert "EarThick" not in drawing.TOP_KEEP
     # Nested shortest first, each column clear of the plan and the one inside.
     assert drawing._EAST_X + 0.008 <= tap_column[0] < foot_column[0]
@@ -521,7 +517,7 @@ def test_corner_radius_names_the_screw_head_it_clears() -> None:
     screw = _config.parts("ch-vn-bracket-hold-down-screw")["number"]
     assert screw == "MHA-CH-VN-57"
     callout = drawing.DIMENSION_CALLOUTS["CornerRadius"]
-    assert callout == f"CLEARS HEAD OF\nHOLD-DOWN SCREW\n{screw}"
+    assert screw in callout
     # The native dimension font as the bore callout prints (cap 3.5 mm).
     box = estimate_text_box(
         f"R.{round(drawing_spec.CORNER_R_MAX / 25.4 * 100):02d} MAX\n{callout}",

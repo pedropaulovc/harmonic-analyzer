@@ -127,6 +127,8 @@ if abs(HUB_LENGTH - _config.machine("channels", "station_pitch_mm")) > 1e-6:
 HUB_PROUD = (HUB_LENGTH - ARM_THICKNESS) / 2.0  # 2.278 each face
 if ARM_THICKNESS != SPEC_ARM_THICKNESS:
     raise AssertionError("ch_rocker_arm_spec.ARM_THICKNESS drifted from the build")
+# The lower arc's midpoint below the pivot axis: ArmDepth under the top edge.
+BOTTOM_EDGE_BELOW_PIVOT = ARM_DEPTH - TOP_EDGE_ABOVE_PIVOT  # 8.0, .315
 # The rod-pin native drill identity is part-owned by ch_rocker_arm_spec.
 # The interface's rod-pin position follows the bottom-arc end (132.76): solved
 # so the pin sits DIRECTLY ABOVE the phased cam
@@ -627,6 +629,43 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "TopEdgeReference")
     drive_jobs += top_ref.apply(adapter, "TopEdgeReference")
 
+    # REFERENCE sketch for the lower arc, the top one's mirror: the sheet
+    # locates the R816 arc by its own BASIC from A down the mirror axis
+    # (drawing-guidelines rule 26: a location is a dimension, not words), no
+    # "concentric" prose. A construction line from the pivot centre down to
+    # the lower arc's midpoint, the part origin.
+    bottom_ref = SketchDims()
+    check("create_sketch bottom edge reference", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    bottom_line = check(
+        "bottom edge reference line",
+        await adapter.add_line(0.0, PIVOT_MID_Y, 0.0, PIVOT_MID_Y - BOTTOM_EDGE_BELOW_PIVOT),
+    )
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, bottom_line)
+    check(
+        "bottom edge reference vertical",
+        await adapter.add_sketch_constraint(bottom_line, None, "vertical"),
+    )
+    await anchor_point_to_origin(
+        adapter, f"{bottom_line}.start", 0.0, PIVOT_MID_Y, "bottom edge reference foot"
+    )
+    bottom_ref.record("PivotY", '"ArmDepth" / 2')
+    await dimension_between(
+        adapter,
+        f"{bottom_line}.start",
+        f"{bottom_line}.end",
+        "vertical_distance",
+        BOTTOM_EDGE_BELOW_PIVOT,
+        "bottom edge below the pivot",
+    )
+    # The lower arc's midpoint sits ArmDepth below the top edge.
+    bottom_ref.record("BottomBelowPivot", '"ArmDepth" - "TopAbovePivot"')
+    await ensure_fully_defined(adapter, "bottom edge reference sketch")
+    check("exit_sketch bottom edge reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "BottomEdgeReference")
+    drive_jobs += bottom_ref.apply(adapter, "BottomEdgeReference")
+
     # Connecting-rod pin hole near the rod-side tip, low in the strap.
     rod_cut = wizard_holes(
         adapter,
@@ -733,6 +772,7 @@ async def build(adapter) -> dict[str, str]:
     # so no assembly instance renders it (#880). The drawing shows it in its
     # view through _drawing_hidden_sketches to import its dimension.
     blank_sketch(adapter, "TopEdgeReference")
+    blank_sketch(adapter, "BottomEdgeReference")
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(
         adapter,
