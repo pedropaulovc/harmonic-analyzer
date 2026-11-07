@@ -98,9 +98,9 @@ Pivot pin offset (owner-approved 2026-10-23). Keep ``PIN_OFFSET`` 32 toward
 the spindle along the rail, preserving both pass stations and the carrier
 hole layout. The plain .375 reamed shoulder seat replaces the former bearing
 cartridge. The carriage centre still runs 107.2 to 421.4 against the rail's
-45.7 to 424.228 support range on the nominal trimmed rail. The near cut
-sets the fixed first-hole station; the far cut matches the actual 17.32 bar.
-Equal 5.036 end removals are nominal only. Both ends are fitted flush.
+45.7 to 424.228 support range on the nominal trimmed rail. Both rail ends
+match the actual 17.32 bar; nominal end removals are 5.036 each. The actual
+rail transfers its mounting pattern to its own bar; printed stations are REF.
 """
 
 from __future__ import annotations
@@ -373,8 +373,8 @@ CARRIAGE_PLAY_RADIUS = CARRIAGE_PLAY_RADIUS_PER_PLAY * CARRIAGE_PLAY_TIR_MAX
 TOP_EDGE_HALF_BAND = (max(rocker.TOP_EDGE_BAND) - min(rocker.TOP_EDGE_BAND)) / 2.0
 
 # --- Bought hardware (catalogue values; not modelled in detail) --------------
-# HGR15 kit rails arrive 450 long. Set the near trim from the first hole's
-# fixed station, then trim the far end to the actual existing 17.32 in bar.
+# HGR15 kit rails arrive 450 long. Trim to the actual existing 17.32 in bar,
+# flush both ends with safe end walls, then transfer the actual hole pattern.
 RAIL_SUPPLY_LENGTH = 450.0
 BASE_BAR_LENGTH = 439.928  # 17.32; retain the existing bar blanks
 RAIL_LENGTH = BASE_BAR_LENGTH

@@ -1879,6 +1879,9 @@ def test_kit_rails_and_carriages_carry_the_owner_note_and_the_play_check() -> No
     assert f"2 GREASED {carriage.STYLE} CARRIAGES {spec._item(spec.CARRIAGE)}" in three
     assert "ROCK ALL 4" in three and "KEEP THE 2 TIGHTEST, ONE PER RAIL" in three
     assert "ONLY ONTO A KIT FALSE RAIL" in three
+    assert "TRANSFER ITS HOLES TO THAT BAR" in three
+    assert "ALL EIGHT SCREWS MUST ENTER FREELY BY HAND" in three
+    assert "FLUSH BOTH ENDS" in three
 
 
 # The feed fit-up's one linear order (TL-00 review, farm 20261104T210601055Z,

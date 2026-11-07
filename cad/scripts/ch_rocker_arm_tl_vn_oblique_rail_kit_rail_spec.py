@@ -35,16 +35,12 @@ HG Series > Rail, HGR15R440C, downloaded 2026-10-17 ~03:55 UTC; sha256
 FreeCAD 1.1.4 harvest: volume 81085.4038 mm^3, one solid, bbox 440 x 15 x 15;
 profile read from its analytic faces (``vendor-cad/HGR15R.dims.md``).
 
-UNVERIFIED for the kit rail, checked at receipt (``DRAWING_NOTES``, the kit
-drawing's ``RECEIPT_SHEET``): the eight hole stations from the end fitted
-flush. The base bar is drilled to its own printed stations, never to measured
-ones, so a received rail is accepted only if every station lies within the
-base bar's ``RAIL_RECEIPT_BAND`` (±0.08 mm, the fit's own allowance) of
-nominal; otherwise the fitter stops and reports before the bar is tapped. Also
-UNVERIFIED: the
-HIWIN reference profile and hole sizes the kit rail is assumed to share; the
-counterbored holes are proved when the rail is laid on the tapped bar and all
-eight #8-32 screws start by hand (base-bar process plan, inspect op 40).
+UNVERIFIED for the kit rail: its hole stations, profile and hole sizes.
+The model is nominal HIWIN reference geometry, not a supplier accuracy
+certificate. Trim the actual rail to its bar, flush both ends, and transfer
+its eight mounting holes to that bar. Keep each pair identified. Accept
+free hand insertion of all eight screws without moving or forcing the rail;
+inspect actual retained walls and full-travel carriage support.
 
 Source of each number:
 
@@ -122,7 +118,7 @@ WIDTH = trammel.RAIL_WIDTH  # WR 15
 HEIGHT = trammel.RAIL_HEIGHT  # HR 15
 HOLE_PITCH = trammel.RAIL_HOLE_PITCH  # P 60
 HOLE_COUNT = trammel.RAIL_HOLE_COUNT  # 8, the kit photos
-HOLE_END = trammel.RAIL_HOLE_END  # fixed near-end station; receipt checked
+HOLE_END = trammel.RAIL_HOLE_END  # nominal reference, not a receipt limit
 HOLE_X: tuple[float, ...] = tuple(HOLE_END + k * HOLE_PITCH for k in range(HOLE_COUNT))
 CBORE_DEPTH = HEIGHT - trammel.RAIL_SCREW_SEAT_ABOVE_BASE  # h 5.3
 
@@ -283,15 +279,8 @@ CENTROID = (
 # mass-property evaluation (well under one through hole, 154 mm^3).
 VOLUME_TOL_MM3 = 5e-4 * VOLUME_MM3
 
-# The receipt check of the kit rail: the received rail must land on the
-# TL-20 base bar's tapped holes. The receipt sheet states it as native model
-# dimensions on the hole face. The hole sketch places every hole from the -X
-# end face (rule 10: baseline from one datum, never chained), so each station
-# prints with its own receipt band, the acceptance itself: a chained pitch
-# band would let the stations walk (farm run 20261104T210601055Z: the band
-# lived only in the note, the plain (15) and 7X (60) did not carry it). The
-# length is the Rail extrusion's depth, parenthesised as a matched-bar
-# reference; set the near trim by the first hole, then match the actual bar.
+# Nominal reference stations, not independent manufacturing/receipt limits.
+# The actual trimmed rail is the template for its own base bar's taps.
 STATION_DIMENSIONS: tuple[str, ...] = tuple(
     f"Station{k}" for k in range(1, HOLE_COUNT + 1)
 )
@@ -300,42 +289,33 @@ DRAWING_DIMENSIONS = {
     "BoltHoleProfile": set(STATION_DIMENSIONS),
 }
 # Three places preserve the exact nominal metric station after trimming.
-RECEIPT_PLACES = base_bar.RAIL_HOLE_PLACES
+REFERENCE_PLACES = base_bar.RAIL_HOLE_PLACES
 DRAWING_PRECISION = {
     "Rail": {"Length": 3},
-    "BoltHoleProfile": dict.fromkeys(STATION_DIMENSIONS, RECEIPT_PLACES),
+    "BoltHoleProfile": dict.fromkeys(STATION_DIMENSIONS, REFERENCE_PLACES),
 }
-# The listing gives no pattern, so the received rail is measured before the
-# base bar's taps go in. The bar is drilled to its print; the rail is accepted
-# only inside the base bar's receipt band, the fit's own allowance (Codjiflo
-# P2, PR #2187: "tap the bar to the received rail" accepted E 17/13, the last
-# tap 0.85 from the bar's end; farm review 20261104T203420333Z: following the
-# rail contradicted the bar's printed ±0.08). The bar is named by its drawing
-# number (machinist review mr1: a bare "TL-20" named no drawing).
-RECEIPT_BAND = base_bar.RAIL_RECEIPT_BAND
-RECEIPT_TEXT = f"±{RECEIPT_BAND:.{RECEIPT_PLACES}f}"
+# No supplier pitch precision is published or assumed. The matched pair is
+# accepted by free screw insertion with both ends flush, not a station band.
 # The kit drawing's sheet that prints the receipt check; citations name it.
 RECEIPT_SHEET = 2
 # The flag, a note of its own under the station stack, names the note's check.
-RECEIPT_FLAG = "RECEIPT CHECK: STATIONS MATCH BASE BAR MHA-CH-06-TL-20 TAPPED HOLES"
+RECEIPT_FLAG = "MATCH-TRANSFER TO BASE BAR MHA-CH-06-TL-20; STATIONS REF"
 DRAWING_NOTES = "\n".join(
     (
-        "CHECK STATIONS FROM TRIMMED END BEFORE TAPPING MHA-CH-06-TL-20.",
-        "ANY OUT OF BAND: STOP AND REPORT. THE BAR IS DRILLED AS DRAWN.",
-        "RAIL MATCHES ACTUAL BASE BAR, FLUSH BOTH ENDS.",
+        "TRANSFER ACTUAL RAIL HOLES TO ITS OWN MHA-CH-06-TL-20 BASE BAR.",
+        "ALL SCREWS MUST ENTER FREELY BY HAND; BOTH ENDS FLUSH.",
+        "KEEP EACH PAIR IDENTIFIED; CHECK ACTUAL WALLS AND FULL TRAVEL.",
     )
 )
 # The member's native BOM row under the kit's one Number.
 BOM_DESCRIPTION = f"{STYLE} RAIL, {LENGTH:.3f} MM, KIT, TRIMMED"
 if abs(LENGTH - (2.0 * HOLE_END + (HOLE_COUNT - 1) * HOLE_PITCH)) > 1e-9:
     raise AssertionError("the nominal trimmed rail's hole pattern is not symmetric")
-# The near datum is fixed by the first hole's receipt band. The far end
-# follows the actual bar length, independently of the last accepted station.
-# No mounting hole is lost or opened, including the shortest allowed bar.
+# Nominal-model end walls at the shortest bar. Actual supplier holes have
+# no assumed band: inspect both end ligaments before transfer/cutting.
 CBORE_END_WALLS_WORST = (
-    HOLE_X[0] - RECEIPT_BAND - CBORE_DIA / 2.0,
-    LENGTH - trammel.RAIL_LENGTH_BAND - (HOLE_X[-1] + RECEIPT_BAND)
-    - CBORE_DIA / 2.0,
+    HOLE_X[0] - CBORE_DIA / 2.0,
+    LENGTH - trammel.RAIL_LENGTH_BAND - HOLE_X[-1] - CBORE_DIA / 2.0,
 )
 CBORE_END_WALL_WORST = min(CBORE_END_WALLS_WORST)
 if CBORE_END_WALL_WORST < base_bar.WALL_TARGET_MM:

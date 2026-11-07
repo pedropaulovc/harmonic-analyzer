@@ -44,7 +44,7 @@ from _drawing_common import (
     read_required_properties,
     stamp_drawing_summary,
 )
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import assert_imported_precision, set_dimension_callouts, set_reference_dimensions
 from _drawing_edges import visible_view_entities
 from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import curate_view_dimensions
@@ -397,11 +397,9 @@ _SEAT_REASON_HALF = 0.026  # "TABLE AND RAIL SEATS", 20 glyphs
 SEAT_REASON_XY = (END_CENTER[0] - _SEAT_REASON_HALF, _END_TOP + 0.026)  # top-left
 # One slot's sizes count both slots; the width says they go through (r5).
 DIMENSION_TEXT = {"SlotWidth": ("2X ", " THRU"), "SlotRun": ("2X ", "")}
-# The width is milled to size (owner ruling #2083) and the thickness faced:
-# both take the title block's .XX band. The rail-hole stations' tight band
-# names its mate under the outermost station, the row, at the title block's
-# band since c3-r7, keeps its reason (r3: every hole in line with the rail's
-# row, which the one DRO setting gives).
+# Width/thickness retain the ordinary title-block bands. Rail station REFs
+# name the matched rail and free-screw-insertion acceptance under the last
+# station; the ordinary row-height callout retains its locating purpose.
 CALLOUTS_BELOW = {
     f"RailHole{_LAST_HOLE}X": RAIL_MATE_CALLOUT,
     "RailRowY": RAIL_ROW_CALLOUT,
@@ -437,8 +435,6 @@ def _printed(model: float, places: int) -> float:
 _CALLOUT_PLACES = 3  # every Hole Wizard length prints .XXX
 _TAP_DRILL_PRINTED = _printed(part_spec.TAP_DRILL, _CALLOUT_PLACES)
 _DRILLED = (drilled_oversize_mm(unit=_UNIT), 0.0)
-_PLACES = part_spec.RAIL_HOLE_PLACES
-_BAND = (part_spec.RAIL_HOLE_BAND, -part_spec.RAIL_HOLE_BAND)
 _FROM_LOW_SIDE = (
     "bar_low_side",
     (("draw_ch_rocker_arm_tl_oblique_base_bar", "build"),),
@@ -618,15 +614,8 @@ for _name, _x, _y, _rise, _x_source, _y_source, _rise_source in (
     )
 
 for _index, _x in enumerate(part_spec.RAIL_HOLE_X, start=1):
-    # Baseline from the spindle-end face (the frame's x 0), in the rail
-    # screws' clearance band, and from the faced -Y side at the title block's
-    # band (c3-r7: the row's height has no mate; one DRO setting lines the
-    # holes up).
+    # Actual rail transfers this nominal reference station to its own bar.
     _station: dict[str, tuple[Any, tuple[Any, ...]]] = {
-        "station": (
-            limits(_x, _PLACES, _BAND),
-            ("RAIL_HOLE_X", "RAIL_HOLE_BAND"),
-        ),
         "station_nominal": (_x, ("RAIL_HOLE_X",)),
         "height": (
             _limits(part_spec.RAIL_ROW_Y, part_spec.RAIL_ROW_PLACES),
@@ -639,7 +628,7 @@ for _index, _x in enumerate(part_spec.RAIL_HOLE_X, start=1):
         f"rail_hole_{_index}",
         kind="threaded_hole",
         faces=(CylinderFace(part_spec.TAP_DRILL, contains_x_mm=_x),),
-        requirements=("thread", "dia", "station", "height", "thru", "note"),
+        requirements=("thread", "dia", "height", "thru", "note"),
         fields={
             "at": ([_x, 0.0, part_spec.BAR_THICK], ("RAIL_HOLE_X", "BAR_THICK")),
             "axis": _INTO_BAR,
@@ -658,12 +647,11 @@ for _index, _x in enumerate(part_spec.RAIL_HOLE_X, start=1):
             # The matched-fit callout names the mate (RAIL_MATE_CALLOUT).
             "note": (
                 RAIL_MATE_CALLOUT,
-                ("RAIL_MATE_CALLOUT", "RAIL_SCREW_CLEARANCE", "RAIL_HOLE_BAND"),
+                ("RAIL_MATE_CALLOUT", "RAIL_SCREW_CLEARANCE"),
             ),
         },
         precision={
             "dia": _CALLOUT_PLACES,
-            "station": _PLACES,
             "height": part_spec.RAIL_ROW_PLACES,
         },
     )
@@ -911,8 +899,12 @@ async def build(adapter: Any) -> dict[str, str]:
         {
             name: places
             for (_feature, name), (places, _band) in METRIC_DIMENSIONS.items()
+        } | {
+            name: places
+            for (_feature, name), places in part_spec.RAIL_REFERENCE_DIMENSIONS.items()
         },
     )
+    set_reference_dimensions(adapter, annotations, DRAWING_DIMENSIONS["RailHoles"])
     _set_dimension_text(adapter, annotations, DIMENSION_TEXT)
     set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
 

@@ -7,11 +7,11 @@ CARRIAGE`` in four native views; each member's installed quantity, the kit
 as the purchase unit, and the carriage's note (the owner's kit description
 and the fit-up play acceptance in MHA-CH-06-TL-00).
 
-Sheet 2, RAIL RECEIPT, checks the datum-trimmed installed rail. Set the near
-cut from the first hole station, then fit the far end to the actual bar.
-Each station is the Rail member's native dimension from the trimmed -X end (rule 10,
-baseline), each carrying the unchanged receipt band. The matched-bar overall
-length is a three-place parenthesised reference, not the purchase length.
+Sheet 2 shows nominal REF geometry for the matched rail/bar route. Trim the
+actual rail flush with its actual bar and transfer its eight mounting holes.
+Every printed station remains model-linked but is parenthesised and
+untoleranced; no supplier pitch accuracy or transfer-tool accuracy is claimed.
+Free screw insertion, retained actual walls and full travel accept the pair.
 Each value sits on its own dimension line, clear of every other line; a note
 under the stack flags them as the note's check, and the note says what to
 do when one is out of band. FRONT (the hole face) and TOP stand
@@ -237,7 +237,7 @@ _DIM_ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
 STATION_ARROW_SIDES = dict.fromkeys(rail.STATION_DIMENSIONS, _DIM_ARROWS_INSIDE)
 STATION_ARROW_SIDES[rail.STATION_DIMENSIONS[0]] = _DIM_ARROWS_OUTSIDE
 _CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
-_TOL_SYMMETRIC = 4  # swTolType_e.swTolSYMMETRIC
+_TOL_NONE = 0  # swTolType_e.swTolNONE
 FRONT_DIMENSION_PRECISION = {
     name: places
     for places_by_name in rail.DRAWING_PRECISION.values()
@@ -359,9 +359,9 @@ def _display(annotation: Any) -> Any:
 
 
 def assert_receipt_controls(adapter: Any, annotations: list[Any]) -> None:
-    """Every station reads its nominal, the receipt band at the receipt
-    places, no reference brackets and no callout (the flag is its own note);
-    the length reads parenthesised. Never repairs native state."""
+    """Every nominal model reference is untoleranced and parenthesised.
+
+    Matching actual hardware is accepted by the fitting instructions."""
     found = {}
     for annotation in annotations:
         found[dimension_name(adapter, annotation)] = _display(annotation)
@@ -369,41 +369,26 @@ def assert_receipt_controls(adapter: Any, annotations: list[Any]) -> None:
         raise RuntimeError(
             f"receipt dimensions {sorted(found)} != {sorted(RECEIPT_DIMENSIONS)}"
         )
-    band = rail.RECEIPT_BAND / 1000.0
     for name, display in found.items():
         dimension = _early_bound(display.GetDimension2(0), "IDimension")
         tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
         brackets = (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
         callout = str(display.GetText(_CALLOUT_BELOW) or "").replace("\r\n", "\n")
         value = abs(float(dimension.SystemValue))
-        if name == "Length":
-            if (
-                abs(value - rail.LENGTH / 1000.0) > 1e-8
-                or brackets != ("(", ")")
-                or callout
-            ):
-                raise RuntimeError(
-                    f"rail length: value {value!r}, brackets {brackets!r}, "
-                    f"callout {callout!r}"
-                )
-            continue
+        expected = rail.LENGTH if name == "Length" else STATION_NOMINALS[name]
         if (
-            abs(value - STATION_NOMINALS[name] / 1000.0) > 1e-8
-            or int(tolerance.Type) != _TOL_SYMMETRIC
-            or abs(float(tolerance.GetMaxValue()) - band) > 1e-9
-            or abs(float(tolerance.GetMinValue()) + band) > 1e-9
-            or int(display.GetPrimaryTolPrecision2()) != rail.RECEIPT_PLACES
-            or "(" in brackets[0]
-            or ")" in brackets[1]
+            abs(value - expected / 1000.0) > 1e-8
+            or int(tolerance.Type) != _TOL_NONE
+            or brackets != ("(", ")")
             or callout
         ):
             raise RuntimeError(
-                f"rail {name}: value {value!r} (nominal {STATION_NOMINALS[name]!r}), "
-                f"tolerance type {int(tolerance.Type)} "
-                f"{float(tolerance.GetMinValue())!r}..{float(tolerance.GetMaxValue())!r}"
-                f" (band {band!r}), tol places {int(display.GetPrimaryTolPrecision2())}, "
-                f"brackets {brackets!r}, callout {callout!r}"
+                f"rail reference {name}: value {value!r}, expected {expected!r}, "
+                f"tolerance type {int(tolerance.Type)}, brackets {brackets!r}, "
+                f"callout {callout!r}"
             )
+        if name == "Length":
+            continue
         if int(display.ArrowSide) != STATION_ARROW_SIDES[name]:
             raise RuntimeError(f"rail {name} did not keep its authored arrow side")
 
@@ -421,8 +406,8 @@ def _receipt_dimensions(adapter: Any, front: Any) -> list[Any]:
     assert_imported_precision(adapter, annotations, FRONT_DIMENSION_PRECISION)
     for annotation in annotations:
         name = dimension_name(adapter, annotation)
+        set_reference_dimension(adapter, annotation, label=name)
         if name == "Length":
-            set_reference_dimension(adapter, annotation, label=name)
             continue
         display = _display(annotation)
         display.ArrowSide = STATION_ARROW_SIDES[name]

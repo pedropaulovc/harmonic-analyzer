@@ -320,49 +320,25 @@ def test_rail_volume_mass_and_centroid_match_the_reference() -> None:
     assert 0.4 * rail.HEIGHT < rail.CENTROID[2] < rail.SECTION_CENTROID_Z
 
 
-def test_rail_receipt_stations_carry_the_base_bars_band() -> None:
-    """Farm run 20261104T210601055Z: the band must sit on the stations, each
-    from the flush end (rule 10 baseline), not in a chained pitch."""
+def test_rail_stations_are_unbanded_model_references() -> None:
+    """Actual hardware transfers the pattern; nominal stations are REF only."""
     assert rail.STATION_DIMENSIONS == tuple(f"Station{k}" for k in range(1, 9))
     assert rail.DRAWING_DIMENSIONS == {
         "Rail": {"Length"},
         "BoltHoleProfile": set(rail.STATION_DIMENSIONS),
     }
-    assert rail.RECEIPT_BAND == base_bar.RAIL_RECEIPT_BAND == 0.08
-    assert rail.RECEIPT_PLACES == base_bar.RAIL_HOLE_PLACES == 3
-    assert rail.RECEIPT_TEXT == "±0.080"
+    assert rail.REFERENCE_PLACES == base_bar.RAIL_HOLE_PLACES == 3
     assert rail.DRAWING_PRECISION == {
         "Rail": {"Length": 3},
         "BoltHoleProfile": dict.fromkeys(rail.STATION_DIMENSIONS, 3),
     }
-    # The band is authored natively on exactly the stations, in the Rail
-    # member's own sketch, never on the length or a carriage feature.
     tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
-    tolerance_calls = [
-        node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
+    assert not any(
+        isinstance(node, ast.Call)
         and isinstance(node.func, ast.Name)
         and node.func.id == "set_dimension_symmetric_tolerance"
-    ]
-    assert len(tolerance_calls) == 1
-    (call,) = tolerance_calls
-    assert [ast.unparse(arg) for arg in call.args] == [
-        "adapter", "'BoltHoleProfile'", "name", "rail.RECEIPT_BAND",
-    ]
-    assert {kw.arg: ast.unparse(kw.value) for kw in call.keywords} == {
-        "places": "rail.RECEIPT_PLACES"
-    }
-    loop = next(
-        node for node in ast.walk(tree)
-        if isinstance(node, ast.For) and call in ast.walk(node)
+        for node in ast.walk(tree)
     )
-    assert ast.unparse(loop.iter) == "rail.STATION_DIMENSIONS"
-    author = next(
-        node for node in ast.walk(tree)
-        if isinstance(node, ast.AsyncFunctionDef) and node.name == "_author_rail"
-    )
-    assert call in ast.walk(author)
     assert "BoltHoleProfile" in part.MEMBER_FEATURES["Rail"]
 
 
@@ -446,46 +422,29 @@ def test_rail_receipt_note_points_at_the_stations() -> None:
     assert all(len(line) <= 70 for line in lines), lines
     note = " ".join(lines)
     assert bar["number"] in note
-    # The band lives on the stations now: the note carries no number but the
-    # bar's drawing number.
     assert not re.search(r"\d", note.replace(bar["number"], ""))
-    assert rail.RECEIPT_TEXT not in note
-    assert "CHECK STATIONS" in note and "RECEIPT CHECK" in rail.RECEIPT_FLAG
-    assert f"BASE BAR {bar['number']} TAPPED HOLES" in rail.RECEIPT_FLAG
-    assert "STOP AND REPORT" in note and "THE BAR IS DRILLED AS DRAWN" in note
-    assert "RAIL MATCHES ACTUAL BASE BAR, FLUSH BOTH ENDS" in note
+    assert "TRANSFER ACTUAL RAIL HOLES" in note
+    assert f"BASE BAR {bar['number']}" in rail.RECEIPT_FLAG
+    assert "STATIONS REF" in rail.RECEIPT_FLAG
+    assert "FREELY BY HAND" in note and "BOTH ENDS FLUSH" in note
+    assert "ACTUAL WALLS AND FULL TRAVEL" in note
     assert rail.CBORE_END_WALL_WORST >= base_bar.WALL_TARGET_MM
-    assert math.isclose(rail.CBORE_END_WALL_WORST, 5.88, abs_tol=1e-9)
-    assert rail.CBORE_END_WALLS_WORST == pytest.approx((6.134, 5.88))
+    assert rail.CBORE_END_WALLS_WORST == pytest.approx((6.214, 5.96))
 
 
 @pytest.mark.parametrize("bar_deviation", (-trammel.RAIL_LENGTH_BAND, trammel.RAIL_LENGTH_BAND))
-@pytest.mark.parametrize("station_deviation", (-rail.RECEIPT_BAND, rail.RECEIPT_BAND))
-def test_datum_led_trim_absorbs_bar_length_without_moving_stations(
-    bar_deviation: float, station_deviation: float
+@pytest.mark.parametrize("near_station", (8.0, 9.964, 12.0))
+def test_actual_station_can_differ_from_reference_with_safe_walls(
+    bar_deviation: float, near_station: float
 ) -> None:
     actual_bar = rail.LENGTH + bar_deviation
-    first_station = rail.HOLE_END + station_deviation
-    supplied_first = (
-        trammel.RAIL_SUPPLY_LENGTH - (rail.HOLE_COUNT - 1) * rail.HOLE_PITCH
-    ) / 2.0
-    near_trim = supplied_first - first_station
-    far_trim = trammel.RAIL_SUPPLY_LENGTH - near_trim - actual_bar
-    assert near_trim > 0.0 and far_trim > 0.0
-    assert near_trim + actual_bar + far_trim == pytest.approx(trammel.RAIL_SUPPLY_LENGTH)
-    stations = tuple(
-        supplied_first + k * rail.HOLE_PITCH - near_trim
-        for k in range(rail.HOLE_COUNT)
+    # These deliberately do not fit the retired +/-0.080 station envelope.
+    stations = tuple(near_station + 60.0 * k for k in range(8))
+    base_bar.require_matched_rail_walls(
+        counterbore_end_wall=min(stations[0], actual_bar - stations[-1]) - rail.CBORE_DIA / 2.0,
+        tap_end_wall=min(stations[0], actual_bar - stations[-1]) - 2.1,
+        tap_slot_wall=3.0, tap_bracket_wall=3.0,
     )
-    assert all(
-        abs(actual - nominal) <= rail.RECEIPT_BAND + 1e-9
-        for actual, nominal in zip(stations, rail.HOLE_X, strict=True)
-    )
-    walls = (
-        stations[0] - rail.CBORE_DIA / 2.0,
-        actual_bar - stations[-1] - rail.CBORE_DIA / 2.0,
-    )
-    assert min(walls) >= rail.CBORE_END_WALL_WORST - 1e-9
 
 
 # --- Carriage member ----------------------------------------------------------------
@@ -759,7 +718,7 @@ def _stack_ink(*, pitch=None, lift=None):
         if name == "Length":
             text = f"({rail.LENGTH:.3f})"
         else:
-            text = f"{end:.{rail.RECEIPT_PLACES}f} {rail.RECEIPT_TEXT}"
+            text = f"({end:.{rail.REFERENCE_PLACES}f})"
         box = estimate_text_box(
             text, anchor=(x, y), height=draw.DIMENSION_TEXT_HEIGHT, reference=2
         )
@@ -973,15 +932,14 @@ class _Annotation:
 
 
 def _receipt_annotations():
-    band = rail.RECEIPT_BAND / 1000.0
     annotations = [
         _Annotation(
             name,
             _Display(
                 x,
-                {},
-                _Tolerance(4, -band, band),
-                places=rail.RECEIPT_PLACES,
+                {1: "(", 2: ")"},
+                _Tolerance(0, 0, 0),
+                places=rail.REFERENCE_PLACES,
             ),
         )
         for name, x in zip(rail.STATION_DIMENSIONS, rail.HOLE_X, strict=True)
@@ -1000,8 +958,7 @@ def _receipt_annotations():
         None,
         "widened",
         "bilateral",
-        "places",
-        "parenthesised",
+        "bare",
         "callout",
         "length-bare",
         "missing",
@@ -1015,15 +972,12 @@ def test_receipt_controls_readback_refuses_every_drift(monkeypatch, fault) -> No
     monkeypatch.setattr(draw, "dimension_name", lambda _adapter, annotation: annotation.name)
     annotations = _receipt_annotations()
     by_name = {annotation.name: annotation.display for annotation in annotations}
-    band = rail.RECEIPT_BAND / 1000.0
     if fault == "widened":
-        by_name["Station4"].dimension.Tolerance = _Tolerance(4, -band, band + 1e-5)
+        by_name["Station4"].dimension.Tolerance = _Tolerance(4, -1e-5, 1e-5)
     elif fault == "bilateral":
-        by_name["Station2"].dimension.Tolerance = _Tolerance(2, -band, band)
-    elif fault == "places":
-        by_name["Station3"].places = 1
-    elif fault == "parenthesised":
-        by_name["Station5"].texts = {1: "(", 2: ")"}
+        by_name["Station2"].dimension.Tolerance = _Tolerance(2, -1e-5, 1e-5)
+    elif fault == "bare":
+        by_name["Station5"].texts = {}
     elif fault == "callout":
         by_name["Station8"].texts = {4: rail.RECEIPT_FLAG}
     elif fault == "length-bare":

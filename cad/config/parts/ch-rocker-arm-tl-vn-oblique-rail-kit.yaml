@@ -8,8 +8,8 @@ ch-rocker-arm-tl-vn-oblique-rail-kit:
   # both rails and the 2 carriages with the least play, one per rail. Replaces TL-VN-50
   # (rail) and TL-VN-51 (carriage). cad/process/shop/inventory.toml
   # fixtures.trammel-hgr15-rails holds the listing read and the receipt checks.
-  # Installed Rail: set near trim by first hole at 9.964 ±0.080 mm; trim far
-  # end to actual 17.32 in base bar, flush both ends. Equal trims nominal only.
+  # Installed Rail: trim to actual 17.32 in base bar, flush both ends with
+  # safe end walls. Transfer actual holes to its own bar; stations are REF.
   stock_name: HIWIN-style HGR15 rail, 450 mm, NUIBBYED kit (2 rails + 4 HGH15CA)
   supplier: Amazon (sold by XIQI)
   supplier_skus: ["B0C4DJNL33"]

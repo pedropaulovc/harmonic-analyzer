@@ -80,6 +80,7 @@ from ch_rocker_arm_tl_oblique_base_bar_spec import (
     ISOMETRIC_VIEW_NOTE,
     LOW_SIDE_Y,
     METRIC_DIMENSIONS,
+    RAIL_REFERENCE_DIMENSIONS,
     NEAR_SLOT_RISE,
     NEAR_SLOT_X,
     NEAR_SLOT_Y,
@@ -500,6 +501,8 @@ async def build(adapter) -> dict[str, str]:
         set_dimension_symmetric_tolerance(
             adapter, feature_name, dimension_name, band, display_unit="mm"
         )
+        set_metric_vendor_units(adapter, feature_name, dimension_name, places=places)
+    for (feature_name, dimension_name), places in RAIL_REFERENCE_DIMENSIONS.items():
         set_metric_vendor_units(adapter, feature_name, dimension_name, places=places)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

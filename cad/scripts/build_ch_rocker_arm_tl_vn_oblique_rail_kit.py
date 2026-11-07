@@ -48,7 +48,6 @@ from _dimensions import name_dimensions
 from _document_units import apply_package_model_units
 from _drawing_marks import apply_drawing_properties, mark_dimensions_for_drawing
 from _drawing_precision import apply_drawing_precision
-from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _feature_tree import name_last_feature
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
 from _part_properties import part_drawing_unit
@@ -346,17 +345,8 @@ async def _author_rail(adapter: Any) -> None:
     )
     await _rail_checks(adapter)
 
-    # The receipt sheet's check of the kit rail (the spec's DRAWING_DIMENSIONS):
-    # the stations and matched-bar length at three metric places.
+    # Nominal supplier/matched-layout references carry no fabrication band.
     apply_drawing_precision(adapter, rail.DRAWING_PRECISION)
-    for name in rail.STATION_DIMENSIONS:
-        set_dimension_symmetric_tolerance(
-            adapter,
-            "BoltHoleProfile",
-            name,
-            rail.RECEIPT_BAND,
-            places=rail.RECEIPT_PLACES,
-        )
     for feature_name, names in rail.DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, names)
 
