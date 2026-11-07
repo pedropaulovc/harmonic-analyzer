@@ -1351,25 +1351,30 @@ CONE_CRANK_STEPS = _note_text(
         # Rule 23 (rubric sample round 13, #3): the press's slip-fit remedy.
         "6A. CHECK THAT MHA-DT-31 DOES NOT SLIDE IN MHA-DT-06 BY HAND.",
         "6B. IF IT DOES, BOND IT IN WITH LOCTITE 638 PER THE SHEET 1 NOTE.",
-        "6C. MATCH-DRILL AND REAM THE MHA-DT-31/MHA-DT-06 JOINT-LINE PIN HOLE",
-        "   PER THE MHA-DT-31 HOLE CALLOUT.",
+        "6C. MATCH-REAM THE MHA-DT-31/MHA-DT-06 SEAM PIN HOLE PER MHA-DT-31.",
         "6D. DRIVE MHA-DT-VN-59 INTO IT FLUSH.",
         "6E. SLIDE THE ARM ONTO MHA-DT-11: HUB FRONT FACE FLUSH WITH THE",
         f"   {HUB_FRONT_FACE_DATUM}, PUNCH MARKS ALIGNED.",
-        "6F. ONLY THEN TAPER-REAM 1:48 THROUGH THE HUB AND SHAFT.",
-        "6G. DRIVE MHA-DT-09, REMOVABLE BY A TAP ON ITS SMALL END.",
-        "6H. HANG MHA-DT-27 FROM THE MHA-DT-09 HEAD: CLEAR OF THE HUB.",
-        "6J. CLAMP MHA-DT-28 UNDER MHA-SH-VN-51.",
-        f"6K. CUT MHA-DT-VN-65 TO {KEEPER_CHAIN_BEADS} BEADS.",
-        "6L. THREAD IT THROUGH THE MHA-DT-28 LOOP AND MHA-DT-27.",
-        "6M. SNAP ONE END BEAD INTO EACH DOME OF MHA-DT-VN-66.",
+        # Rule 23 (rubric sample round 14, #0): the step 5 wheel is captured
+        # between the MHA-DT-11 seat collar and the MHA-DT-31 hub rear face
+        # (build_dt_drive_train_assembly CRANK_HUB_SPROCKET_AIR, open at the
+        # SeatCollar band); this is its bench acceptance (Main's wording).
+        f"6F. CHECK THAT {CRANK_CHAIN_WHEEL} TURNS AND SLIDES FREELY WITH END PLAY BETWEEN",
+        "   THE MHA-DT-11 COLLAR AND THE MHA-DT-31 HUB.",
+        "6G. ONLY THEN TAPER-REAM 1:48 THROUGH THE HUB AND SHAFT.",
+        "6H. DRIVE MHA-DT-09, REMOVABLE BY A TAP ON ITS SMALL END.",
+        "6J. HANG MHA-DT-27 FROM THE MHA-DT-09 HEAD: CLEAR OF THE HUB.",
+        "6K. CLAMP MHA-DT-28 UNDER MHA-SH-VN-51.",
+        f"6L. CUT MHA-DT-VN-65 TO {KEEPER_CHAIN_BEADS} BEADS.",
+        "6M. THREAD IT THROUGH THE MHA-DT-28 LOOP AND MHA-DT-27.",
+        "6N. SNAP ONE END BEAD INTO EACH DOME OF MHA-DT-VN-66.",
         # Rule 23 (rubric sample round 7, #1): the anchor eye's bench check.
         # Its turning changes no setting, so a seated screw and this check
         # retain it (rule 23 static clamp, owner ruling 2026-11-07).
-        "6N. CHECK THAT MHA-DT-28 DOES NOT TURN UNDER MHA-SH-VN-51 BY HAND.",
+        "6P. CHECK THAT MHA-DT-28 DOES NOT TURN UNDER MHA-SH-VN-51 BY HAND.",
         # Rule 23 (rubric sample round 12, #1): the taper-pinned crank arm's
         # bench acceptance.
-        "6P. CHECK THAT MHA-DT-06 DOES NOT TURN OR SLIDE ON MHA-DT-11 BY HAND.",
+        "6Q. CHECK THAT MHA-DT-06 DOES NOT TURN OR SLIDE ON MHA-DT-11 BY HAND.",
         # Local review of 747487c71 and owner ruling 2026-10-24 (#1900): the
         # ferrule cures centred on the pivot bore.  Rule 23: the handle spins
         # on the MHA-DT-32 shoulder, so the screw is staked in the arm's
@@ -1426,8 +1431,8 @@ BANK_STEPS = _note_text(
         f"   ROCKER ARM PAIR ({RODS_PINNED_REF}) ON ITS CAM.",
         "8C. REPEAT 8A-8B FOR GEARS 1 TO 19 IN ORDER, ALL ALIKE.",
         "8D. CLAMP THE STACK LIGHTLY END TO END.",
-        "8E. MEASURE GEAR 0 CAM FACE TO GEAR 19 BACK FACE WITH A 5-6 IN MICROMETER:",
-        f"   ACCEPT {STACK_WINDOW}.",
+        "8E. MEASURE GEAR 0 CAM FACE TO GEAR 19 BACK FACE WITH A 5-6 IN",
+        f"   MICROMETER: ACCEPT {STACK_WINDOW}.",
         "8F. IF LONG, RE-FACE THE THICKEST GEAR'S CAM FACE.",
         "8G. IF SHORT, REMAKE THE THINNEST GEAR.",
         "8H. REPEAT 8D-8E UNTIL THE STACK READS IN ITS WINDOW.",
@@ -1886,7 +1891,10 @@ INTERFACE_NOTES = _note_text(
         "BASE MHA-FR-01 (FRAME ASSEMBLY MHA-FR-00) RECEIVES MHA-DT-VN-52, MHA-DT-VN-51,",
         "MHA-SH-VN-52 ({stop} SWING STOP + {foot} SPRING FOOT), {slotted}X MHA-DT-VN-57 AND",
         "{hold_down}X MHA-DT-VN-62.",
-        f"PAPER DRIVE MHA-PD-00: {CRANK_CHAIN_WHEEL} T12 CHAIN WHEEL ON MHA-DT-11.",
+        f"PAPER DRIVE MHA-PD-00: {CRANK_CHAIN_WHEEL} T12 CHAIN WHEEL ON MHA-DT-11,",
+        # Rubric sample round 14 (rule 23): its retention and acceptance.
+        "   PINNED BY 2X MHA-DT-VN-67, HELD ENDWISE BY MHA-DT-31 (STEP "
+        f"{steps.step_number('crank-hub-fitted')}F).",
         # Rubric sample round 13 (rule 4): check 5's feed sense names it.
         f"   ITS {PLATEN_NUMBER} PLATEN FEEDS AS CHECK 5 STATES.",
         "FRAME ASSEMBLY MHA-FR-00: ITS MHA-FR-05 RAIL TAKES THE BACK MHA-CH-08 "
