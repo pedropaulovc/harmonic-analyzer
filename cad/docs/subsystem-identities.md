@@ -193,11 +193,16 @@ Do not cut an engaged thread, insert a stud deeper to rescue the cut, add a
 hold-down washer or force the assembly; reject an incompatible setup.
 Measure the actual complete-thread setback separately: the cut-end chamfer
 limit alone does not bound incomplete threads or establish nut engagement.
-The complete installed authority is **TL-00, HD1–HD4, sheet 9**. The stud's
-single REWORK sheet cites that authority rather than duplicating it. HD1/HD2
-retain actual B/D/H/N/W/U intervals and finished L limits; HD3 is the stud
-rework and realignment; HD4 repeats the installed checks after final
-clamping. Missing readings reject the setup.
+The complete installed authority is **TL-00, steps 13A–13F, sheet 9**. The
+stud's single REWORK sheet cites that authority rather than duplicating it.
+The studs are cut to the kit sheet's length at step 3 and accepted directly
+in place: 13A gauges .119 MIN under every moving block over both passes,
+13B–13D cut a replacement stud shorter by the missing clearance plus .010
+and refit it, 13E checks one complete pitch beyond each seated nut, and 13F
+stops the setup for the designer when a stud cannot pass (delegated ruling
+2026-11-07 (Main), no precedent; owner review #2144; pending owner
+confirmation). The earlier HD1/HD2 prediction from measured stack intervals
+is retired.
 
 These are actual fit-up requirements, not invented PM kit tolerance bands.
 The 22 mm insertion stack (assumed 14 mm throat + 8 mm foot), 28 mm nominal

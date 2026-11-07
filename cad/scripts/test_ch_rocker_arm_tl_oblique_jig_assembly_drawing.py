@@ -25,6 +25,7 @@ import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
 import ch_rocker_arm_tl_oblique_jig_assembly_spec as spec
 import draw_ch_rocker_arm_tl_oblique_jig_assembly as drawing
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
+from _test_assembly_steps import step_structure_violations
 
 
 # Default-format note text: about 2.8 mm a character and 4.5 mm a line on the
@@ -267,7 +268,6 @@ def test_sheets_are_landscape_with_their_scales() -> None:
     # The owner's linear-motion sheet is appended: no cited sheet number moves.
     assert drawing.SHEET_NAMES[10:] == (drawing.LINEAR_MOTION_SHEET,)
     assert len(drawing.SHEET_NAMES) == 11
-    assert drawing.SHEET_NAMES.index(drawing.OPERATION_SHEET) + 1 == spec.OPERATION_SHEET_NUMBER
     assert set(drawing.SHEET_LAYOUTS.values()) == {drawing.DrawingLayout.LANDSCAPE}
     assert set(drawing.SHEET_SCALES) == set(drawing.SHEET_NAMES)
     assert drawing.SHEET_SCALES[drawing.ASSEMBLED_SHEET] == drawing.ASSEMBLED_SCALE
@@ -385,62 +385,78 @@ def test_clusters_partition_the_bom() -> None:
 
 
 
-def test_instruction_heading_moves_with_first_step_at_column_boundary(monkeypatch) -> None:
-    # Three lines fit on the left, but the four-line group does not. Without
-    # heading co-location, FEED CHECKS would be left behind its first step.
-    monkeypatch.setattr(
-        drawing, "STEPS_FLOOR",
-        drawing.STEPS_XY[1] - 3.5 * drawing.NOTE_LINE_M,
-    )
-    layout = drawing.steps_sheet_layout(
+def test_instruction_heading_moves_with_first_step_at_column_boundary() -> None:
+    # Three lines fit, but the heading's group does not: the heading moves
+    # with its first step rather than ending the column.
+    text, count = drawing._column_fit(
         ("1. INSTALL.", "FEED CHECKS:", "F1. CHECK FEED."),
-        (),
+        3.5 * drawing.NOTE_LINE_M,
         heading="BUILD ORDER",
     )
-    assert layout.steps.splitlines() == ["BUILD ORDER", "1. INSTALL."]
-    assert layout.continued.splitlines() == ["FEED CHECKS:", "F1. CHECK FEED."]
+    assert text.splitlines() == ["BUILD ORDER", "1. INSTALL."]
+    assert count == 1
 
 
 def test_exploded_captions_fit_their_text_region() -> None:
     for cluster in drawing.CLUSTERS:
-        scale = drawing.cluster_ring_scale(
-            _cluster_outline(cluster), cluster.scale, label=cluster.sheet
-        )
-        caption = drawing.exploded_caption(cluster, scale)
+        caption = drawing.exploded_caption(cluster)
         assert max(map(len, caption.split("\n"))) <= drawing.EXPLODED_CAPTION_WIDTH
         assert _inside_sheet(_note_box(caption, drawing.EXPLODED_CAPTION_XY))
 
 
 def test_sheet_text_wraps_within_its_layout_width() -> None:
-    # Split only between complete labelled steps or sub-steps.
-    if drawing.ASSEMBLY_STEPS_CONTINUED:
-        label = drawing.ASSEMBLY_STEPS_CONTINUED.split(". ", 1)[0]
-        assert drawing._STEP_LABEL.fullmatch(label)
-    fit = drawing.FIT_LAYOUT
-    operation = drawing.OPERATION_LAYOUT
-    holding = drawing.HOLDING_LAYOUT
     for text, width in (
         (drawing.ASSEMBLED_CAPTION, drawing.CAPTION_WIDTH),
-        (drawing.ALIGNMENT_NOTE, drawing.ALIGNMENT_WIDTH),
-        (drawing.ASSEMBLY_STEPS, drawing.STEPS_LINE_WIDTH),
-        (drawing.ASSEMBLY_STEPS_CONTINUED, drawing.STEPS_LINE_WIDTH),
-        (drawing.ASSEMBLY_CHECKS, drawing.STEPS_LINE_WIDTH),
-        (fit.steps, drawing.STEPS_LINE_WIDTH),
-        (fit.continued, drawing.STEPS_LINE_WIDTH),
-        (operation.steps, drawing.STEPS_LINE_WIDTH),
-        (operation.continued, drawing.STEPS_LINE_WIDTH),
-        (operation.checks, drawing.STEPS_LINE_WIDTH),
-        (holding.steps, drawing.STEPS_LINE_WIDTH),
-        (holding.continued, drawing.STEPS_LINE_WIDTH),
-        (holding.checks, drawing.STEPS_LINE_WIDTH),
+        (drawing.SETTING_TABLE_TITLE, drawing.SETTING_TITLE_WIDTH),
+        *(
+            (column, drawing.STEPS_LINE_WIDTH)
+            for layout in drawing.STEPS_SHEETS
+            for column in (layout.left, layout.right)
+        ),
     ):
         assert max(len(line) for line in text.split("\n")) <= width
-    # Each alignment station and sweep-limit row prints whole on one line.
-    for line in (*spec.ALIGNMENT_NOTE_LINES[1:], *spec.SWEEP_NOTE_LINES[1:]):
-        assert line in drawing.ALIGNMENT_NOTE.split("\n")
     # The general torque note opens sheet 7's sequence, its items unbroken.
-    assert drawing.ASSEMBLY_STEPS.split("\n")[1].startswith("UNSPECIFIED TORQUES")
-    assert " ".join(spec.GENERAL_TORQUE_NOTE.split()) in " ".join(drawing.ASSEMBLY_STEPS.split())
+    first = drawing.STEPS_SHEETS[0].left
+    assert first.split("\n")[1].startswith("UNSPECIFIED TORQUES")
+    assert " ".join(spec.GENERAL_TORQUE_NOTE.split()) in " ".join(first.split())
+
+
+def test_every_instruction_prints_once_in_order_across_sheets_7_to_10() -> None:
+    assert tuple(layout.sheet for layout in drawing.STEPS_SHEETS) == drawing.SHEET_NAMES[6:10]
+    printed = " ".join(
+        " ".join(column.split())
+        for layout in drawing.STEPS_SHEETS
+        for column in (layout.left, layout.right)
+    )
+    position = 0
+    for line in drawing.INSTRUCTION_LINES:
+        found = printed.find(" ".join(line.split()), position)
+        assert found >= position, line
+        position = found
+    # Each column starts on a whole step or heading.
+    for layout in drawing.STEPS_SHEETS:
+        for column in (layout.left, layout.right):
+            for line in column.split("\n")[:1]:
+                assert not line.startswith(" ")
+
+
+def _setting_table_box() -> tuple[float, float, float, float]:
+    """The title and the native table at the BOM row height (sheet metres)."""
+    x, top = drawing.SETTING_TABLE_XY
+    rows = len(spec.SETTING_TABLE_ROWS) + 1
+    return (
+        x,
+        drawing.SETTING_TABLE_TOP - rows * drawing.BOM_ROW_HEIGHT,
+        x + max(sum(drawing.SETTING_TABLE_WIDTHS), _note_box(drawing.SETTING_TABLE_TITLE, (x, top))[2] - x),
+        top,
+    )
+
+
+def test_setting_table_box_violations_reports_each_overrun() -> None:
+    assert drawing.setting_table_box_violations(_setting_table_box()) == []
+    x0, y0, x1, y1 = _setting_table_box()
+    assert drawing.setting_table_box_violations((x0, 0.001, x1, y1))
+    assert drawing.setting_table_box_violations((x0, 0.02, drawing.TITLE_BLOCK[2], 0.05))
 
 
 def test_a_blank_line_parts_each_top_level_step() -> None:
@@ -462,10 +478,8 @@ def test_assembled_sheet_regions_fit_apart() -> None:
         drawing.ELEVATION_CENTER, x1 - x0, z1 - z0, drawing.ASSEMBLED_SCALE
     )
     caption = _note_box(drawing.ASSEMBLED_CAPTION, drawing.CAPTION_XY)
-    alignment = _note_box(drawing.ALIGNMENT_NOTE, drawing.ALIGNMENT_XY)
-    plan_title = _note_box(spec.PLAN_VIEW_LABEL, drawing.PLAN_LABEL_XY)
-    elevation_title = _note_box(spec.ELEVATION_VIEW_LABEL, drawing.ELEVATION_LABEL_XY)
-    regions = (plan, elevation, caption, alignment, plan_title, elevation_title)
+    table = _setting_table_box()
+    regions = (plan, elevation, caption, table)
     assert all(_inside_sheet(box) for box in regions)
     for index, a in enumerate(regions):
         for b in regions[index + 1 :]:
@@ -473,14 +487,6 @@ def test_assembled_sheet_regions_fit_apart() -> None:
     # Third-angle: the plan above the elevation on one vertical.
     assert drawing.PLAN_CENTER[0] == drawing.ELEVATION_CENTER[0]
     assert plan[1] > elevation[3]
-    # Each title centred under its own view.
-    for title, view in ((plan_title, plan), (elevation_title, elevation)):
-        assert (title[0] + title[2]) / 2.0 == pytest.approx((view[0] + view[2]) / 2.0)
-        assert title[3] < view[1]
-    assert plan_title[1] > elevation[3]
-    # Review jig-asm r1: the plan's title reads as the plan's, with clearly
-    # more air below it to the elevation than above it to the plan.
-    assert plan_title[1] - elevation[3] >= 3.0 * (plan[1] - plan_title[3])
 
 
 def _plan_xy(x_mm: float, y_mm: float) -> tuple[float, float]:
@@ -497,8 +503,7 @@ def test_plan_tags_stand_apart_inside_the_sheet() -> None:
     boxes = [_note_box(tag.text, _plan_xy(*tag.text_xy)) for tag in spec.PLAN_TAGS]
     others = (
         _note_box(drawing.ASSEMBLED_CAPTION, drawing.CAPTION_XY),
-        _note_box(drawing.ALIGNMENT_NOTE, drawing.ALIGNMENT_XY),
-        _note_box(spec.PLAN_VIEW_LABEL, drawing.PLAN_LABEL_XY),
+        _setting_table_box(),
     )
     assert all(_inside_sheet(box) for box in boxes)
     for index, a in enumerate(boxes):
@@ -652,7 +657,7 @@ def test_each_cluster_rings_inside_its_sheet() -> None:
         )
         assert _inside(ring, drawing.CLUSTER_RING_REGION)
         caption = _note_box(
-            drawing.exploded_caption(cluster, scale),
+            drawing.exploded_caption(cluster),
             drawing.EXPLODED_CAPTION_XY,
         )
         assert _inside_sheet(caption)
@@ -748,11 +753,9 @@ def test_keep_out_overshoot_measures_the_low_balloons() -> None:
 
 
 def _steps_sheet_boxes(layout):
-    boxes = [_note_box(layout.steps, drawing.STEPS_XY)]
-    if layout.checks:
-        boxes.append(_note_box(layout.checks, layout.checks_xy))
-    if layout.continued:
-        boxes.append(_note_box(layout.continued, drawing.STEPS_CONTINUED_XY))
+    boxes = [_note_box(layout.left, drawing.STEPS_XY)]
+    if layout.right:
+        boxes.append(_note_box(layout.right, drawing.STEPS_CONTINUED_XY))
     return boxes
 
 
@@ -764,33 +767,29 @@ def _assert_steps_sheet_fits(layout) -> None:
             assert not _overlap(a, b)
     # The left column's ink ends over its floor at the layout pitch and at
     # the farm-measured ink height.
-    assert drawing.STEPS_XY[1] - _ink_height(layout.steps) >= drawing.STEPS_FLOOR
+    assert drawing.STEPS_XY[1] - _ink_height(layout.left) >= drawing.STEPS_FLOOR
 
 
 def _lines(text: str) -> int:
     return text.count("\n") + 1 if text else 0
 
 
-def test_steps_sheet_regions_fit_apart() -> None:
-    _assert_steps_sheet_fits(drawing.STEPS_LAYOUT)
-    _assert_steps_sheet_fits(drawing.FIT_LAYOUT)
-    _assert_steps_sheet_fits(drawing.HOLDING_LAYOUT)
+@pytest.mark.parametrize("layout", drawing.STEPS_SHEETS, ids=lambda layout: layout.sheet)
+def test_steps_sheet_regions_fit_apart(layout) -> None:
+    _assert_steps_sheet_fits(layout)
 
 
 @pytest.mark.parametrize(
-    "sheet,layout",
-    (
-        (drawing.STEPS_SHEET, drawing.STEPS_LAYOUT),
-        (drawing.FIT_SHEET, drawing.FIT_LAYOUT),
-        (drawing.HOLDING_SHEET, drawing.HOLDING_LAYOUT),
-    ),
+    "layout",
+    [layout for layout in drawing.STEPS_SHEETS if layout.sheet != drawing.OPERATION_SHEET],
+    ids=lambda layout: layout.sheet,
 )
-def test_instruction_reference_and_caption_fit_without_moving_notes(sheet, layout) -> None:
-    region = drawing.NOTES_REFERENCE_REGIONS[sheet]
+def test_instruction_reference_and_caption_fit_without_moving_notes(layout) -> None:
+    region = drawing.NOTES_REFERENCE_REGIONS[layout.sheet]
     view = _view_box(
         _center(region), *_iso_size(0.0), drawing.NOTES_REFERENCE_SCALE
     )
-    text = "REFERENCE 1:20"
+    text = "REFERENCE"
     caption = _note_box(
         text,
         ((view[0] + view[2] - len(text) * CHAR_M) / 2.0,
@@ -807,10 +806,8 @@ def test_instruction_reference_and_caption_fit_without_moving_notes(sheet, layou
 
 
 def test_operation_notes_and_finished_view_fit_their_sheet() -> None:
-    layout = drawing.OPERATION_LAYOUT
+    layout = drawing.STEPS_BY_SHEET[drawing.OPERATION_SHEET]
     _assert_steps_sheet_fits(layout)
-    assert drawing.OPERATION_SHEET != drawing.STEPS_SHEET
-    assert drawing.OPERATION_SHEET in drawing.SHEET_NAMES
     # Retain the finished view's specified readable scale, using only this
     # sheet's filled text bounds to determine its available room.
     assert drawing.ISOMETRIC_SCALE == (1.0, 15.0)
@@ -885,7 +882,7 @@ def test_finished_native_view_belongs_to_operation_sheet_and_must_fit(
         assert detail_checks
         [(sheet, caption, xy)] = captions
         assert sheet == drawing.OPERATION_SHEET
-        assert caption.endswith("1:17")  # measured native scale, not a typed 1:15
+        assert caption == "FINISHED ASSEMBLY"  # the sheet's scale is not repeated
         assert _inside_sheet(_note_box(caption, xy))
         assert not _overlap(_note_box(caption, xy), outline)
     assert sheets == [drawing.OPERATION_SHEET]
@@ -1867,16 +1864,18 @@ def test_bom_identity_is_the_registry() -> None:
     assert set(drawing.BOM_COLUMN_WIDTHS) == {"item", "part", "description", "quantity"}
 
 
+def _printed_steps() -> list[str]:
+    return [
+        column
+        for layout in drawing.STEPS_SHEETS
+        for column in (layout.left, layout.right)
+        if column
+    ]
+
+
 def test_steps_cite_every_screw_by_item_number() -> None:
     screws = [stem for stem in spec.BOM_ORDER if stem.endswith("-screw")]
-    steps = "\n".join(
-        text
-        for layout in (
-            drawing.STEPS_LAYOUT, drawing.FIT_LAYOUT, drawing.OPERATION_LAYOUT,
-            drawing.HOLDING_LAYOUT,
-        )
-        for text in (layout.steps, layout.continued)
-    )
+    steps = "\n".join(_printed_steps())
     for stem in screws:
         assert f"(ITEM {drawing.BOM_ITEM_NUMBERS[stem]})" in steps
     # A citation never breaks across a line.
@@ -1885,26 +1884,31 @@ def test_steps_cite_every_screw_by_item_number() -> None:
 
 
 def test_instruction_split_drops_or_duplicates_no_source_step() -> None:
-    layouts = (
-        drawing.STEPS_LAYOUT, drawing.FIT_LAYOUT,
-        drawing.OPERATION_LAYOUT, drawing.HOLDING_LAYOUT,
+    all_text = " ".join(" ".join(" ".join(_printed_steps()).split()).split())
+    source = (
+        spec.GENERAL_TORQUE_NOTE, *spec.ASSEMBLY_STEPS, *spec.OPERATION_STEPS,
+        spec.REFERENCE_HEIGHTS,
     )
-    def content(layout):
-        return " ".join(" ".join((layout.steps, layout.continued, layout.checks)).split())
-
-    all_text = " ".join(content(layout) for layout in layouts)
-    source_steps = (
-        spec.GENERAL_TORQUE_NOTE, *spec.ASSEMBLY_STEPS, *spec.ASSEMBLY_CHECKS,
-        *spec.PIVOT_FIT_STEPS, *spec.FEED_FIT_STEPS,
-        *spec.OPERATION_STEPS, *spec.HOLD_DOWN_STEPS, *spec.CAPTURE_CHECKS,
-    )
-    for step in source_steps:
+    for step in source:
         assert all_text.count(" ".join(step.split())) == 1, step
-    operation, holding = content(drawing.OPERATION_LAYOUT), content(drawing.HOLDING_LAYOUT)
-    for step in (*spec.OPERATION_STEPS[:2], *spec.HOLD_DOWN_STEPS, *spec.CAPTURE_CHECKS[:3], *spec.CAPTURE_CHECKS[4:]):
-        assert " ".join(step.split()) in operation
-    for step in (*spec.OPERATION_STEPS[2:], *spec.CAPTURE_CHECKS[3:4]):
-        assert " ".join(step.split()) in holding
+
+
+def test_printed_steps_pass_the_shared_rule_22_lint() -> None:
+    # Sheet 1 defines A1/B1/A2/B2 (the carrier hole pairs) and the setting
+    # table; M4, B18(.6.3), S0-S3 and OP10-OP40 are callouts and the
+    # MHA-CH-06 plan's own section and operation numbers.
+    assert step_structure_violations(
+        {"STEP": _printed_steps()},
+        reference_kinds={"STEP": "STEP", "CHECK": "STEP"},
+        defined_codes=[r"[AB][12]", r"M\d+", r"B18", r"S\d", r"OP\d+"],
+    ) == []
+
+
+def test_stud_acceptance_reference_names_the_sheet_that_prints_it() -> None:
+    first = spec.HOLD_DOWN_STEPS_REFERENCE.split("-")[0]
+    layout = drawing.STEPS_SHEETS[spec.HOLD_DOWN_SHEET_NUMBER - 7]
+    assert drawing.SHEET_NAMES.index(layout.sheet) + 1 == spec.HOLD_DOWN_SHEET_NUMBER
+    assert f"\n{first}. " in f"\n{layout.left}\n{layout.right}"
 
 
 @pytest.fixture
@@ -2700,11 +2704,8 @@ def test_bom_note_buys_the_worst_case_at_both_supports() -> None:
     assert note.startswith(f"ITEM {spec.ITEM_NUMBERS[spec.PIVOT_SHIM]}:")
     for sku, (_thickness, count) in spec.PIVOT_SHIM_BUY.items():
         assert f"{sku} " in note and f"X{count}" in note
-    assert "SELECTED PER P1" in note
-    item = f"(ITEM {spec.ITEM_NUMBERS[spec.PIVOT_SHIM]})"
-    assert item in spec.PIVOT_FIT_STEPS[0] and "BUY LIST UNDER THE BOM" in spec.PIVOT_FIT_STEPS[0]
-    # One purchase list, not a duplicate expanded inside the two-page fit-up.
-    assert all(sku not in spec.PIVOT_FIT_STEPS[0] for sku in spec.PIVOT_SHIM_BUY)
+    # One purchase list, not a duplicate expanded inside the fit-up steps.
+    assert all(sku not in step for step in spec.ASSEMBLY_STEPS for sku in spec.PIVOT_SHIM_BUY)
     description = spec.BOM_DESCRIPTIONS[spec.PIVOT_SHIM]
     assert "FITTING STOCK" in description
     assert len(description) <= drawing.BOM_DESCRIPTION_MAX_CHARS
@@ -2986,89 +2987,40 @@ def test_pivot_balloon_recipe_requests_each_new_family_once_and_refuses_missing(
     assert calls == [tuple((stem, item) for stem, item in spec.ITEM_NUMBERS.items() if stem in cluster.stems)]
 
 
-def test_assembly_overflow_moves_whole_steps_to_fit_sheet_without_losing_checks():
+def test_steps_flow_whole_and_in_order_over_every_sheet_keeping_the_view_room():
     # Spaced, each one-line step takes two lines (pitch and blank).
-    steps = tuple(f"{index}. STEP-{index}." for index in range(1, 49))
-    checks = ("CHECK: COMPLETE.",)
-    fit = ("P1. FIT THE PIVOT.", "F1. ALIGN THE FEED.")
-    sequence, fitting = drawing.assembly_and_fit_layouts(steps, checks, fit)
-    assert "CONTINUED ON SHEET 8" in sequence.steps
-    assert fitting.steps.startswith("ASSEMBLY CONTINUED AND FIT-UP\n")
-    texts = (
-        sequence.steps, sequence.continued, sequence.checks,
-        fitting.steps, fitting.continued, fitting.checks,
+    steps = tuple(f"{index}. STEP-{index}." for index in range(1, 121))
+    sheets = drawing.steps_sheets(steps)
+    assert sheets[0].left.startswith(drawing.STEPS_HEADING + "\n")
+    assert all(
+        layout.left.startswith(drawing.STEPS_CONTINUED_HEADING + "\n") for layout in sheets[1:]
     )
-    combined = "\n".join(texts)
+    combined = "\n".join(t for layout in sheets for t in (layout.left, layout.right))
     positions = []
     for step in steps:
         assert combined.count(step + "\n") + int(combined.endswith(step)) == 1
         positions.append(combined.index(step))
     assert positions == sorted(positions)
-    assert combined.index(steps[-1]) < combined.index("P1. FIT THE PIVOT.")
-    assert combined.count(checks[0]) == 1
-    assert sequence.checks == ""
-    assert fitting.checks == checks[0]
-    for layout in (sequence, fitting):
+    for layout in sheets:
         _assert_steps_sheet_fits(layout)
-        bottom = layout.checks_xy[1] - drawing._note_height(layout.checks)
-        reference_floor = (
-            drawing.TITLE_BLOCK[3] + drawing.BOM_SHEET_CLEARANCE
-            + drawing.NOTE_LINE_M + drawing.VIEW_LABEL_GAP
-        )
-        assert bottom - drawing.REGION_GAP - reference_floor >= drawing.NOTES_REFERENCE_MIN_HEIGHT
+        region = layout.view_region
+        assert region[3] - region[1] >= drawing.NOTES_REFERENCE_MIN_HEIGHT
 
 
-def test_reference_reservation_refuses_text_that_only_fits_without_the_live_view():
-    steps = tuple(f"{index}. STEP." for index in range(1, 41))
-    drawing.steps_sheet_layout(steps, ())
-    with pytest.raises(ValueError, match="instruction checks overrun"):
-        drawing.steps_sheet_layout(
-            steps, (), reference_height=drawing.NOTES_REFERENCE_MIN_HEIGHT,
-        )
-
-
-def test_two_instruction_sheets_refuse_a_sequence_that_cannot_fit():
-    steps = tuple(f"{index}. STEP." for index in range(1, 101))
-    with pytest.raises(ValueError, match="exceed sheets"):
-        drawing.assembly_and_fit_layouts(steps, (), ("P1. FIT.",))
+def test_the_instruction_sheets_refuse_a_sequence_that_cannot_fit():
+    steps = tuple(f"{index}. STEP." for index in range(1, 201))
+    with pytest.raises(ValueError, match="overrun sheets"):
+        drawing.steps_sheets(steps)
 
 
 def test_complete_source_instructions_fit_existing_pages_at_normal_note_size():
     assert drawing.NOTE_LINE_M == 0.004525
     assert drawing.STEPS_LINE_WIDTH == 68
     assert drawing.NOTES_REFERENCE_MIN_HEIGHT == 0.075
-    assert [step.split(". ", 1)[0] for step in spec.ASSEMBLY_STEPS] == [
-        "1", "2", "3", "4", "5", "6", "7", "8A", "8B", "9", "10", "11",
-        "12", "13A", "13B", "13C", "13D",
-    ]
-    # The integrated two-sheet budget was short by 1.075 mm: F3's fourth
-    # line. Preserve all checks while keeping that paragraph to three lines.
-    f3 = drawing._wrapped(
-        (spec.FEED_FIT_STEPS[-1],), width=drawing.STEPS_LINE_WIDTH, spaced=True,
-    )
-    assert len(f3.splitlines()) == 3
-    layouts = (drawing.STEPS_LAYOUT, drawing.FIT_LAYOUT)
-    printed = " ".join(" ".join(
-        text
-        for layout in layouts
-        for text in (layout.steps, layout.continued, layout.checks)
-    ).split())
-    for step in (
-        spec.GENERAL_TORQUE_NOTE, *spec.ASSEMBLY_STEPS,
-        *spec.PIVOT_FIT_STEPS, *spec.FEED_FIT_STEPS, *spec.ASSEMBLY_CHECKS,
-    ):
-        assert printed.count(" ".join(step.split())) == 1
-    for layout in layouts:
+    for layout in drawing.STEPS_SHEETS:
         _assert_steps_sheet_fits(layout)
-        text_bottom = layout.checks_xy[1] - drawing._note_height(layout.checks)
-        reference_floor = (
-            drawing.TITLE_BLOCK[3] + drawing.BOM_SHEET_CLEARANCE
-            + drawing.NOTE_LINE_M + drawing.VIEW_LABEL_GAP
-        )
-        assert (
-            text_bottom - drawing.REGION_GAP - reference_floor
-            >= drawing.NOTES_REFERENCE_MIN_HEIGHT
-        )
+        region = layout.view_region
+        assert region[3] - region[1] >= drawing.NOTES_REFERENCE_MIN_HEIGHT
 
 
 def _family_instances(*stems: str) -> set[str]:
@@ -3359,12 +3311,10 @@ def test_linear_motion_plan_ring_and_caption_fit_their_sheet() -> None:
         outline, drawing.LINEAR_MOTION_SCALE, label=drawing.LINEAR_MOTION_SHEET
     )
     assert scale in drawing.CLUSTER_SCALE_LADDER
-    for fitted in drawing.CLUSTER_SCALE_LADDER:
-        caption = drawing.linear_motion_caption(fitted)
-        assert caption.startswith(f"{drawing.LINEAR_MOTION_SHEET} {fitted[0]:g}:{fitted[1]:g}")
-        assert max(map(len, caption.split("\n"))) <= drawing.EXPLODED_CAPTION_WIDTH
-        assert _inside_sheet(_note_box(caption, drawing.EXPLODED_CAPTION_XY))
-        flat = " ".join(caption.split())
-        assert f"CARRIER (ITEM {spec.ITEM_NUMBERS[spec.CARRIER]})" in flat
-        assert f"BOM ON SHEET {drawing.BOM_SHEET_NUMBER}" in flat
-        assert f"ASSEMBLY SEQUENCE ON SHEET {drawing.STEPS_SHEET_NUMBER}" in flat
+    caption = drawing.linear_motion_caption()
+    assert max(map(len, caption.split("\n"))) <= drawing.EXPLODED_CAPTION_WIDTH
+    assert _inside_sheet(_note_box(caption, drawing.EXPLODED_CAPTION_XY))
+    flat = " ".join(caption.split())
+    assert f"CARRIER (ITEM {spec.ITEM_NUMBERS[spec.CARRIER]})" in flat
+    assert f"BOM ON SHEET {drawing.BOM_SHEET_NUMBER}" in flat
+    assert f"ASSEMBLY SEQUENCE ON SHEET {drawing.STEPS_SHEET_NUMBER}" in flat
