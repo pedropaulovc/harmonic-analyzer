@@ -284,11 +284,14 @@ async def save_member_part(
     *,
     material: str | Mapping[str, str],
     readback: Callable[[Any, str], Awaitable[None]],
+    hide_model_annotations: bool = False,
 ) -> dict[str, str]:
     """Publish only a saved part whose actual member caches and metadata read clean.
 
     ``material`` is one library material for every member, or a mapping that
     names each member's own (a screw and its brass nut in one kit).
+    ``hide_model_annotations`` renders the member PNGs without the part's model
+    annotations (export_member_configurations); the saved part keeps them.
     """
     names = require_member_configurations(part_name, configurations)
     materials = _member_materials(names, material)
@@ -316,7 +319,9 @@ async def save_member_part(
         await readback(adapter, name)
     _require_member_materials(adapter, part_name, materials)
     await activate_member(adapter, names[0])
-    await export_member_configurations(adapter, part_name, names)
+    await export_member_configurations(
+        adapter, part_name, names, hide_model_annotations=hide_model_annotations
+    )
     return artefacts
 
 

@@ -571,8 +571,16 @@ async def build(adapter) -> dict[str, str]:
             {},
         )
         await report_mass_properties(adapter)
+    # The faced seats' Ra PMI floats past the isometric's right border in 3D:
+    # the member PNGs render with model annotations hidden; the saved part,
+    # and so the drawing, keeps them.
     artefacts = await save_member_part(
-        adapter, PART_NAME, CONFIGURATIONS, material=MATERIAL, readback=_readback
+        adapter,
+        PART_NAME,
+        CONFIGURATIONS,
+        material=MATERIAL,
+        readback=_readback,
+        hide_model_annotations=True,
     )
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts

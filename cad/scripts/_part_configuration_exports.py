@@ -255,10 +255,30 @@ def _show_member(doc: Any, stem: str, configuration: str) -> None:
         )
 
 
+_SW_DISPLAY_ANNOTATIONS = 31  # swUserPreferenceToggle_e.swDisplayAnnotations
+_SW_DETAILING_NO_OPTION = 0  # swUserPreferenceOption_e.swDetailingNoOptionSpecified
+
+
+def _set_model_annotations_displayed(doc: Any, shown: bool) -> bool:
+    """Show or hide the part's model annotations, prove it, return the prior state."""
+    from _com import _early_bound
+
+    extension = _early_bound(doc.Extension, "IModelDocExtension")
+    toggle = (_SW_DISPLAY_ANNOTATIONS, _SW_DETAILING_NO_OPTION)
+    previous = bool(extension.GetUserPreferenceToggle(*toggle))
+    extension.SetUserPreferenceToggle(*toggle, shown)
+    if bool(extension.GetUserPreferenceToggle(*toggle)) != shown:
+        raise RuntimeError(f"model annotations did not set displayed={shown}")
+    return previous
+
+
+
 async def export_member_configurations(
     adapter: Any,
     part_name: str,
     configurations: Iterable[str],
+    *,
+    hide_model_annotations: bool = False,
 ) -> None:
     """Produce all member STEP/PNG outputs on the verified reopened native part.
 
@@ -268,6 +288,12 @@ async def export_member_configurations(
     Export failures remain primary if default restoration or the native SHA guard
     also fails; cleanup errors are attached as notes. Cleanup-only failures raise
     and likewise prevent certification.
+
+    ``hide_model_annotations`` (opt-in, per part) renders the member PNGs with
+    the part's model annotations (its PMI, e.g. surface finishes) hidden, as
+    build_fr_harmonic_base's annotation-free render does: in 3D they float off
+    the solid and past the image border. The document's display toggle is
+    restored in the cleanup; nothing is saved, so the saved part keeps them.
     """
     from _check import check
     from _part_save import set_isometric_view
@@ -297,6 +323,9 @@ async def export_member_configurations(
     before = _sha256(native)
     enforce_preferences(adapter, step_export_preferences())
     records: dict[str, dict[str, Any]] = {}
+    annotations_shown = (
+        _set_model_annotations_displayed(doc, False) if hide_model_annotations else None
+    )
     try:
         for configuration, paths in members.items():
             _show_member(doc, part_name, configuration)
@@ -343,6 +372,17 @@ async def export_member_configurations(
                 primary_error.add_note(
                     f"Default member restoration failed: {type(cleanup_error).__name__}: {cleanup_error}"
                 )
+        if annotations_shown is not None:
+            try:
+                _set_model_annotations_displayed(doc, annotations_shown)
+            except Exception as cleanup_error:
+                if primary_error is None and restoration_error is None:
+                    restoration_error = cleanup_error
+                else:
+                    (primary_error or restoration_error).add_note(
+                        "Model annotation display restoration failed: "
+                        f"{type(cleanup_error).__name__}: {cleanup_error}"
+                    )
         try:
             if _sha256(native) != before:
                 raise RuntimeError(

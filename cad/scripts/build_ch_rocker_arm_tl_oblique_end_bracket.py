@@ -17,8 +17,8 @@ reference sketch, ``HoleRowReference`` (build_ch_rocker_arm_tl_oblique_base_bar'
 ``RailRowReference``); the stock thickness the end view prints lives on another,
 ``BracketThickReference`` (a drawing view cannot attach the extrusion's depth);
 the bar-face thread's depth section A-A prints lives on a third,
-``BarThreadReference`` (two points on a hole's axis), which the build proves
-equals ``BarTaps``' own thread depth.
+``BarThreadReference`` (two points on the outer hole's thread major
+diameter), which the build proves equals ``BarTaps``' own thread depth.
 
 Run (SolidWorks already open)::
 
@@ -70,6 +70,7 @@ from ch_rocker_arm_tl_oblique_end_bracket_spec import (
     BAR_THREAD_DEPTH,
     BAR_THREAD_DEPTH_DIMENSION,
     BAR_THREAD_REFERENCE,
+    BAR_THREAD_WITNESS_X,
     BRACKET_LENGTH,
     BRACKET_THICK,
     BRACKET_WIDTH,
@@ -84,6 +85,7 @@ from ch_rocker_arm_tl_oblique_end_bracket_spec import (
     KP08_THREAD_DEPTH,
     METRIC_DIMENSIONS,
     TAP_DRILL,
+    THREAD_MAJOR,
 )
 
 PART_NAME = "ch-rocker-arm-tl-oblique-end-bracket"
@@ -179,13 +181,13 @@ def _add_point(adapter, point: tuple[float, float], label: str) -> str:
 def _require_bar_thread_reference(adapter) -> None:
     """The depth section A-A prints is the bar-face wizard's own thread
     depth: ``BarThreadReference``'s dimension and ``BarTaps``' committed
-    ``ThreadDepth`` both read ``BAR_THREAD_DEPTH``."""
-    sketch = [
-        row["value_mm"]
+    ``ThreadDepth`` both read ``BAR_THREAD_DEPTH``; its station stands on the
+    outer hole's thread major diameter (``BAR_THREAD_WITNESS_X``)."""
+    rows = {
+        row["full_name"].split("@")[0]: row["value_mm"]
         for row in dump_dimensions(adapter, BAR_THREAD_REFERENCE)
-        if row["full_name"].split("@")[:2]
-        == [BAR_THREAD_DEPTH_DIMENSION, BAR_THREAD_REFERENCE]
-    ]
+        if row["full_name"].split("@")[1:2] == [BAR_THREAD_REFERENCE]
+    }
     raw = _early_bound(adapter.currentModel, "IPartDoc").FeatureByName("BarTaps")
     if raw is None:
         raise RuntimeError("bar thread reference: no feature 'BarTaps'")
@@ -193,14 +195,19 @@ def _require_bar_thread_reference(adapter) -> None:
         _early_bound(raw, "IFeature").GetDefinition(), "IWizardHoleFeatureData2"
     )
     wizard = float(definition.ThreadDepth) * 1000.0
+    depth = rows.get(BAR_THREAD_DEPTH_DIMENSION)
+    station = rows.get("BarThreadStation")
     if (
-        len(sketch) != 1
-        or abs(sketch[0] - wizard) > 1e-4
+        depth is None
+        or abs(depth - wizard) > 1e-4
         or abs(wizard - BAR_THREAD_DEPTH) > 1e-4
+        or station is None
+        or abs(station - BAR_THREAD_WITNESS_X) > 1e-4
     ):
         raise RuntimeError(
-            f"bar thread reference {sketch!r} mm disagrees with BarTaps' thread "
-            f"{wizard:.4f} mm or the spec's {BAR_THREAD_DEPTH:.4f} mm"
+            f"bar thread reference {rows!r} mm disagrees with BarTaps' thread "
+            f"{wizard:.4f} mm, the spec's {BAR_THREAD_DEPTH:.4f} mm or the "
+            f"witness station {BAR_THREAD_WITNESS_X:.4f} mm"
         )
 
 
@@ -220,6 +227,7 @@ async def build(adapter) -> dict[str, str]:
         ("HoleX1", HOLE_X[0]),
         ("HoleX2", HOLE_X[1]),
         ("BarThreadDepth", BAR_THREAD_DEPTH),
+        ("ThreadMajor", THREAD_MAJOR),
     ):
         await set_global(adapter, name, f"{value}mm")
 
@@ -375,21 +383,23 @@ async def build(adapter) -> dict[str, str]:
     # --- The bar-face thread's depth: a reference sketch ---------------------
     # Section A-A cuts the hole row (y 0) and prints the bar-face thread's
     # depth from the bottom face, which no wizard dimension carries into a
-    # view. Two points on the outer hole's axis, on the Top plane through the
-    # row, sketch (u, v) = model (X, -Z) (build_fr_nameplate's
-    # SectionReference): one on the bottom face at the hole's station, one
-    # BAR_THREAD_DEPTH above it. Points, not a line: a line on the axis would
-    # print across the cut hole. _require_bar_thread_reference proves the
-    # depth equals BarTaps' committed thread depth.
+    # view. Two points on the outer hole's thread major diameter, outer-end
+    # side (BAR_THREAD_WITNESS_X, where the section draws that thread's side
+    # line), on the Top plane through the row, sketch (u, v) = model (X, -Z)
+    # (build_fr_nameplate's SectionReference): one on the bottom face, one
+    # BAR_THREAD_DEPTH above it, at the drawn thread's end. Points, not a
+    # line: a line would print over the thread. _require_bar_thread_reference
+    # proves the depth equals BarTaps' committed thread depth and the
+    # station the hole's plus half the major diameter.
     thread_ref = SketchDims()
     check("create_sketch bar thread reference", await adapter.create_sketch("Top"))
-    hole_x = HOLE_X[-1]
-    face_point = _add_point(adapter, (hole_x, 0.0), "bar thread face")
+    witness_x = BAR_THREAD_WITNESS_X
+    face_point = _add_point(adapter, (witness_x, 0.0), "bar thread face")
     await anchor_point_to_origin(
-        adapter, face_point, hole_x, 0.0, "bar thread face station"
+        adapter, face_point, witness_x, 0.0, "bar thread face station"
     )
-    thread_ref.record("BarThreadStation", f'"HoleX{len(HOLE_X)}"')
-    end_point = _add_point(adapter, (hole_x, -BAR_THREAD_DEPTH), "bar thread end")
+    thread_ref.record("BarThreadStation", f'"HoleX{len(HOLE_X)}" + "ThreadMajor" / 2')
+    end_point = _add_point(adapter, (witness_x, -BAR_THREAD_DEPTH), "bar thread end")
     await anchor_point_to_point(
         adapter,
         face_point,
