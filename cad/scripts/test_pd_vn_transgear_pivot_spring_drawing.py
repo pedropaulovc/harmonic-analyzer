@@ -264,26 +264,24 @@ def test_installation_lives_in_the_assembly_steps_not_on_the_sheet() -> None:
     assert "installation_notes" not in _config.parts(STEM)
 
 
-def test_the_sheet_shows_no_application_gauges(monkeypatch) -> None:
-    """Neither the 8:1 compressed-height gauge view nor the 'FOR SHAFT' circle:
-    the sheet keeps the four replacement sizes; the part keeps its sketches."""
+def test_the_sheet_prints_the_catalogue_sizes_as_reference_data(monkeypatch) -> None:
+    """The installed views carry no diagrams; the four replacement sizes print
+    as REF data, and the application gauges (working height, shaft) do not."""
     import asyncio
 
     import draw_pd_vn_transgear_pivot_spring as drawing
 
-    assert spec.SUPPLIER_APPLICATION_DIMENSIONS == ("WORKING_HEIGHT", "SHAFT_DIA")
-    assert drawing.SHEET_SPEC.SUPPLIER_APPLICATION_DIMENSIONS == ()
+    assert drawing.SUPPLIER_DATA == (
+        "ID (Ø.200), OD (Ø.423).",
+        "FREE HEIGHT (.047), THICKNESS (.011).",
+    )
     seen = {}
 
     async def capture(*_args, **kwargs):
         seen.update(kwargs)
         return {}
 
-    monkeypatch.setattr(drawing, "build_supplier_spring_drawing", capture)
+    monkeypatch.setattr(drawing, "build_purchased_fastener_drawing", capture)
     asyncio.run(drawing.build(None))
-    assert seen["include_right"] is False
-    assert seen["supplier_reference_features"] == {
-        "free_front": ("DiscSupplierHeight", "DiscSupplierStrip"),
-        "free_top": ("DiscSupplierPlan",),
-    }
-    assert set(seen["supplier_margins"]) == {"free_front", "free_top"}
+    assert seen["supplier_data"] == drawing.SUPPLIER_DATA
+    assert "supplier_dimensions" not in seen
