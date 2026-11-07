@@ -92,8 +92,11 @@ HALF_LEN = SUPPLY_LENGTH_MIN / 2.0 * _S  # 0.0163
 # value and two rows up-right of the circles; the land is a donor there
 # (parked left, clear of the bore's leader) and moves onto the side view,
 # right of the hub, where its callout block (~115 mm wide at its route row)
-# clears both the hub and the isometric. The supply length hangs under the
-# side view.
+# clears both the hub and the isometric. Its text stands above the land's
+# upper extension line, so the dimension line runs up to the block instead of
+# through it (fan-out local repeat after round 5: between the arrows the
+# lower half of the line struck the '(' of the REF row). The supply length
+# hangs under the side view.
 FRONT_KEEP = {
     "SupplyBore": (FRONT_CENTER[0] + 0.040, FRONT_CENTER[1] + HALF_DIA + 0.022),
     "LandDia": (FRONT_CENTER[0] - 0.030, FRONT_CENTER[1] - HALF_DIA - 0.020),
@@ -108,7 +111,7 @@ RIGHT_KEEP = {
         RIGHT_CENTER[1] - HALF_DIA - 0.016,
     ),
 }
-LAND_ON_SIDE = (RIGHT_CENTER[0] + HALF_LEN + 0.075, RIGHT_CENTER[1])
+LAND_ON_SIDE = (RIGHT_CENTER[0] + HALF_LEN + 0.075, RIGHT_CENTER[1] + HALF_DIA + 0.022)
 DIMENSION_CALLOUTS = {
     "LandDia": LAND_CALLOUT,
     "SupplyBore": SUPPLY_BORE_CALLOUT,
