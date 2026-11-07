@@ -28,17 +28,19 @@ from __future__ import annotations
 # 5/64 drill rod: the sheet prints it as the stock fraction, a REFERENCE whose
 # supplier grind (+/-.0002) governs (#290 ruling: fractions only on as-bought
 # stock, shown as REF). The installed length is set at assembly, flush with
-# the fork's outer faces, so it carries the fork thickness's worst-case
-# band natively at three places (fan-out round 1, rule 19: a set size needs
-# limits). The blank's cut length lives on the blanked ``BlankReference``
-# sketch on the same plane as a single MIN limit at two places (the dressing
-# stock in ch_rod_pivot_pin_spec.joint_budget is judged at it).
+# the fork's outer faces, so it prints at two places under the title block's
+# .XX band, a plain inch step that holds the fork thickness's +/-.006
+# worst case (fan-out round 1, rule 19: a set size needs limits; round 2,
+# rule 4: a converted +/-.006 read as a precision nobody chose). The blank's
+# cut length lives on the blanked ``BlankReference`` sketch on the same plane
+# as a single MIN limit at two places (the dressing stock in
+# ch_rod_pivot_pin_spec.joint_budget is judged at it).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinProfile": {"PinDia", "PinLen"},
     "BlankReference": {"BlankLen"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "PinProfile": {"PinDia": 3, "PinLen": 3},
+    "PinProfile": {"PinDia": 3, "PinLen": 2},
     "BlankReference": {"BlankLen": 2},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
@@ -46,9 +48,11 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     for dimensions in DRAWING_PRECISION.values()
     for name, decimals in dimensions.items()
 }
-# The installed length's setting and acceptance, under its band (rule 19's
-# `SET AT ASSEMBLY`; the mate by number, rule 4).
-PIN_LENGTH_CALLOUT = "SET AT ASSEMBLY\nFLUSH WITH MHA-CH-03 FORK FACES"
+# The installed length's setting and acceptance, under its value (rule 19's
+# `SET AT ASSEMBLY`; the mate by number, rule 4), each line narrower than the
+# 10:1 pin between its extension lines (round 2, rule 14: a wider line was
+# struck by them).
+PIN_LENGTH_CALLOUT = "SET AT ASSEMBLY\nFLUSH WITH MHA-CH-03"
 if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
     DRAWING_PRECISION_BY_NAME
 ):

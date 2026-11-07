@@ -79,9 +79,10 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
 def test_precision_and_band_are_authored_on_the_part() -> None:
     # The journal is the as-bought drill rod: no model band (its stock
     # fraction prints as a REFERENCE; the supplier's grind governs). The
-    # installed length is set at assembly flush with the fork's outer faces,
-    # so it carries the fork thickness's worst-case band (fan-out round 1,
-    # rule 19: a set-at-assembly size has limits and its acceptance).
+    # installed length is set at assembly flush with the fork's outer faces
+    # (fan-out round 1, rule 19: a set-at-assembly size has limits and its
+    # acceptance): at two places the title block's .XX band, a plain inch
+    # step (round 2), holds the fork thickness's worst case.
     assert "draw_ch_rod_pivot_pin.py" in PRECISION_MIGRATED_DRAWINGS
     source = _source()
     assert "set_dimension_precision" not in source
@@ -91,18 +92,21 @@ def test_precision_and_band_are_authored_on_the_part() -> None:
     assert "hidden_sketches.curate_view_dimensions(" in source
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in _build_source()
     assert "require_saved_drawing_properties(" in _build_source()
-    assert model_toleranced_dimensions(part) == {
-        ("PinProfile", "PinLen"): "*deviations(FORK_THICKNESS_BAND)",
-    }
-    assert rod.FORK_THICKNESS_BAND == pytest.approx((0.006 * 25.4, -0.006 * 25.4))
+    assert model_toleranced_dimensions(part) == {}
+    assert notes.DRAWING_PRECISION["PinProfile"]["PinLen"] == 2
+    title_block_2pl = 0.01 * 25.4
+    assert max(abs(d) for d in rod.FORK_THICKNESS_BAND) <= title_block_2pl
     assert notes.PIN_LENGTH_CALLOUT.splitlines() == [
         "SET AT ASSEMBLY",
-        "FLUSH WITH MHA-CH-03 FORK FACES",
+        "FLUSH WITH MHA-CH-03",
     ]
     assert '"PinLen": PIN_LENGTH_CALLOUT' in source
     # The blank's MIN still leaves stock over the longest set length.
-    assert spec.PIN_BLANK_LENGTH > spec.PIN_INSTALLED_LENGTH + rod.FORK_THICKNESS_BAND[0]
-
+    assert spec.PIN_BLANK_LENGTH > spec.PIN_INSTALLED_LENGTH + title_block_2pl
+    # Each setting line stays narrower than the 10:1 pin between its
+    # extension lines (round 2, rule 14).
+    for line in notes.PIN_LENGTH_CALLOUT.splitlines():
+        assert len(line) * 0.0026 < 2.0 * drawing.HALF_LEN - 0.004, line
 
 def test_blank_length_is_a_model_dimension_with_its_min_limit() -> None:
     """PR #1292 review N1 and machinist review #1522 (rule 4 (tighten only

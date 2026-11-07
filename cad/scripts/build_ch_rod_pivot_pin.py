@@ -228,10 +228,10 @@ async def build(adapter) -> dict[str, str]:
 
     # The journal is the as-bought 5/64 drill rod: untoleranced, the sheet
     # prints it as the stock fraction's REFERENCE (the supplier's grind
-    # governs); the installed length is the fork's, parenthesized as
-    # REFERENCE on the sheet; the blank's cut length is a single MIN limit (it
-    # only has to leave dressing stock, ch_rod_pivot_pin_spec.joint_budget
-    # blank_excess_min).
+    # governs); the installed length is set at assembly and prints at two
+    # places under the title block's .XX band; the blank's cut length is a
+    # single MIN limit (it only has to leave dressing stock,
+    # ch_rod_pivot_pin_spec.joint_budget blank_excess_min).
     _blank_min_limit(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

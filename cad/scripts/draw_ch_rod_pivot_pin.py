@@ -8,7 +8,7 @@ diameter sits beside its length (drawing-guidelines.md rule 11 (turned parts rea
 stock fraction's REFERENCE (the drill rod's grind governs), its two fits
 named below it (rules 4 and 7: the mates are flagged where they apply), the
 installed length as the size set at assembly, flush with the MHA-CH-03 fork
-faces, with the fork thickness's band (rule 19), and the blank's cut length
+faces, under the title block's .XX band (rule 19), and the blank's cut length
 as a single MIN limit from the part's blanked ``BlankReference`` sketch. An
 axis centerline, a bare end view with its center mark and the isometric. No
 note: pressing and dressing the pin are MHA-CH-00's step (rule 7). No
@@ -161,8 +161,8 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     assert_imported_precision(adapter, right_annotations, DRAWING_PRECISION_BY_NAME)
-    # Descriptive text only; the values, the installed length's band and the
-    # blank's MIN limit are the model's. The installed length states how it
+    # Descriptive text only; the values, places and the blank's MIN limit
+    # are the model's. The installed length states how it
     # is set and accepted (rule 19); the blank says what it is.
     set_dimension_callouts(
         adapter,
