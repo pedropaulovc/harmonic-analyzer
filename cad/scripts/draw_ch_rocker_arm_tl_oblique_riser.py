@@ -7,13 +7,15 @@ centre). The R, HUB, CL and CR tags repeat the TL-21 carrier's own table
 tags, because each riser hole is spotted through that carrier hole at
 assembly: their LOC cells are REF (one note), and each row's MATE cell names
 the TL-21 hole it is spotted from. The P1/P2 stop holes are drilled at their
-ordinary .XX table locations. The SIZE column prints each hole's design size
-first, then its process (rule 26): both #30 sizes print the .128 design
-nominal over the actual .1285 cut and the HUB relief .472 over its 12 mm cut,
-all under the title block's DRILLED HOLES +.004/0; the screw rows carry the
-countersink's symbol. The plan keeps the two overalls; section A-A (2:1, its
-cutting plane a whole line across the width at R3) the thickness and the
-countersink's form.
+ordinary .XX table locations. The SIZE column is SolidWorks' own, never
+edited (farm r1: generated cells refuse SetText2): each cell must print an
+inch rounding of the actual cut (the #30 .1285, the 12 mm relief's .4724,
+the #9 .196) or the #30 drill number, under the title block's DRILLED HOLES
++.004/0; a plain cut's blank SIZE is given in its NOTE cell instead. The
+inserted NOTE column carries the screw rows' countersink by its symbol, the
+inserted MATE column each row's mate. The plan keeps the two overalls;
+section A-A (2:1, its cutting plane a whole line across the width at R3)
+the thickness and the countersink's form.
 """
 
 from __future__ import annotations
@@ -222,36 +224,86 @@ if STRAP_NUMBER.startswith(_PARENT_PREFIX) or part_spec.STOP_PIN_NUMBER.startswi
 ):
     raise AssertionError("an outside mate would print as a short form")
 
-# SIZE: design size first, then process (rule 26), the title block's DRILLED
-# HOLES +.004/0 its band. The #9 drill is the clamp clearance's .196 exactly.
+# SIZE is the native column: each cell prints the actual cut, rounded to
+# three or four places (an inch value, never millimetres), or the wizard's
+# #30 drill number on the #30 rows. The title block's DRILLED HOLES +.004/0
+# is its band. The HUB, CL and CR holes are plain sketch cuts, not wizard
+# holes: a table may leave their SIZE blank (MHA-FR-01's plain A1-A4 bores
+# print none), and then the NOTE cell carries the design size instead.
 _DIAM = "\u00d8"
-CLAMP_DRILL = "#9"
-if abs(part_spec.CLAMP_DIA - 0.196 * INCH) > 1e-9:
-    raise AssertionError("the CL/CR clearance is no longer the #9 drill")
+NATIVE_DRILL_NUMBERS: dict[str, str] = {
+    **{f"R{i}": part_spec.SCREW_DRILL for i in range(1, 5)},
+    "P1": part_spec.STOP_DRILL,
+    "P2": part_spec.STOP_DRILL,
+}
+# The inch cut each SIZE cell rounds: the wizard rows' exact #30 drill
+# (.1285; the spec's 3.264 mm is its 3-decimal pin), the plain cuts' own
+# diameters (12 mm, the #9's .196).
+NATIVE_SIZE_CUTS_IN: dict[str, float] = {
+    tag: (part_spec.SCREW_DRILL_DIA if tag in NATIVE_DRILL_NUMBERS else diameter) / INCH
+    for tag, (_xy, diameter) in TABLE_HOLES.items()
+}
+if part_spec.STOP_DRILL != part_spec.SCREW_DRILL:
+    raise AssertionError("the stop and screw holes no longer share the #30 drill")
+
+
+def native_size_problem(tag: str, text: str) -> str | None:
+    """Why a generated SIZE cell misstates its hole, or None when it is an
+    inch rounding of the actual cut (or the wizard's drill number) THRU, or a
+    plain cut's blank cell."""
+    plain = text.replace("<MOD-DIAM>", _DIAM).replace("\u2300", _DIAM).upper()
+    if not plain.strip() and tag in PLAIN_CUT_SIZES:
+        return None
+    if "THRU" not in plain:
+        return "no THRU"
+    if re.search(r"\d\s*MM\b", plain):
+        return "millimetres on the inch sheet"
+    drill = re.search(r"#(\d+)", plain)
+    if drill is not None:
+        if NATIVE_DRILL_NUMBERS.get(tag) != f"#{drill.group(1)}":
+            return f"drill #{drill.group(1)} is not this hole's"
+        return None
+    size = re.search(r"(?<![\d.])(\d*)\.(\d+)", plain)
+    if size is None:
+        return "no decimal size"
+    places = len(size.group(2))
+    if places < 3:
+        return f"{places}-place size cannot carry the drilled cut"
+    value = float(size.group(0))
+    if abs(value - NATIVE_SIZE_CUTS_IN[tag]) > 0.5 * 10.0**-places + 1e-9:
+        return f"{size.group(0)} is not the cut {NATIVE_SIZE_CUTS_IN[tag]:.4f}"
+    return None
+
+
+# NOTE: the screw rows' countersink by its symbol (rule 26); the flat head's
+# own 82 degrees. A plain cut whose native SIZE is blank prints its design
+# size and process here, size first (rule 26).
 CSK_TEXT = (
     f"<HOLE-SINK> {_DIAM}{_inch(part_spec.CSK_DIA, part_spec.CSK_PLACES)}"
     f" X {part_spec.CSK_ANGLE:.0f}\u00b0"
 )
-SCREW_SIZE_TEXT = (
-    f"{_DIAM}{_inch(SCREW_DIA_PRINTED, part_spec.SCREW_DIA_PLACES)} "
-    f"{part_spec.SCREW_DRILL} DRILL THRU\n{CSK_TEXT}"
-)
-HUB_SIZE_TEXT = f"{_DIAM}{_inch(part_spec.HUB_DIA_PRINTED, part_spec.HUB_PLACES)} DRILL THRU"
-CLAMP_SIZE_TEXT = (
-    f"{_DIAM}{_inch(part_spec.CLAMP_DIA, part_spec.CLAMP_PLACES)} {CLAMP_DRILL} DRILL THRU"
-)
-STOP_SIZE_TEXT = (
-    f"{_DIAM}{_inch(STOP_HOLE_DIA, part_spec.STOP_HOLE_PLACES)} "
-    f"{part_spec.STOP_DRILL} DRILL THRU"
-)
-ROW_SIZES: dict[str, str] = {
-    **{f"R{i}": SCREW_SIZE_TEXT for i in range(1, 5)},
-    "HUB": HUB_SIZE_TEXT,
-    "CL": CLAMP_SIZE_TEXT,
-    "CR": CLAMP_SIZE_TEXT,
-    "P1": STOP_SIZE_TEXT,
-    "P2": STOP_SIZE_TEXT,
+PLAIN_CUT_SIZES: dict[str, str] = {
+    "HUB": f"{_DIAM}{_inch(part_spec.HUB_DIA_PRINTED, part_spec.HUB_PLACES)} DRILL THRU",
+    "CL": f"{_DIAM}{_inch(part_spec.CLAMP_DIA, part_spec.CLAMP_PLACES)} DRILL THRU",
+    "CR": f"{_DIAM}{_inch(part_spec.CLAMP_DIA, part_spec.CLAMP_PLACES)} DRILL THRU",
 }
+NOTE_HEADING = "NOTE"
+
+
+def row_notes(native_sizes: dict[str, str]) -> dict[str, str]:
+    """Each row's NOTE cell, given the table's generated SIZE cells."""
+    return {
+        tag: CSK_TEXT
+        if tag.startswith("R")
+        else (
+            PLAIN_CUT_SIZES[tag]
+            if tag in PLAIN_CUT_SIZES and not native_sizes[tag].strip()
+            else ""
+        )
+        for tag in TABLE_HOLES
+    }
+
+
 # MATE: the TL-21 hole each spotted hole is transferred from, the part the
 # HUB relief clears, and the pin each stop hole takes (rules 4, 10).
 MATE_HEADING = "MATE"
@@ -261,8 +313,8 @@ ROW_MATES: dict[str, str] = {
     "P1": f"LOOSE {part_spec.STOP_PIN_NUMBER} STOP PIN",
     "P2": f"LOOSE {part_spec.STOP_PIN_NUMBER} STOP PIN",
 }
-if set(ROW_SIZES) != set(TABLE_HOLES) or set(ROW_MATES) != set(TABLE_HOLES):
-    raise AssertionError("every riser table row needs its SIZE and MATE")
+if set(ROW_MATES) != set(TABLE_HOLES):
+    raise AssertionError("every riser table row needs its MATE")
 # The table's two notes: the spotted rows' REF locations and their route
 # (rule 4 L1: the pattern shows as REF with its transfer named), then the
 # origin.
@@ -276,9 +328,10 @@ TABLE_NOTES = (SPOT_NOTE, ORIGIN_NOTE)
 # Sheet metres: the table's top-left corner, left under the plan (the
 # length's dimension line stands at 0.180, the lower tags' text ends 0.185).
 TABLE_ANCHOR = (0.020, 0.172)
-TABLE_WIDTHS = (0.012, 0.016, 0.016, 0.050, 0.058)
+TABLE_WIDTHS = (0.012, 0.016, 0.016, 0.034, 0.036, 0.058)
 _TABLE_SIZE_COLUMN = 3
-_TABLE_MATE_COLUMN = 4
+_TABLE_NOTE_COLUMN = 4
+_TABLE_MATE_COLUMN = 5
 # Each note's top 4 mm under the one above (or under the table).
 _NOTE_PITCH = 0.008
 # Above the title block (y 65 mm) with air.
@@ -319,7 +372,7 @@ part_metadata(
     precision_sources=(
         "DRAWING_PRECISION_BY_NAME",
         (_DRAW, "TABLE_LOCATION_PLACES"),
-        (_DRAW, "ROW_SIZES"),
+        (_DRAW, "native_size_problem"),
     )
 )
 
@@ -380,7 +433,7 @@ _SCREW_DIA_SOURCES = (
     "SCREW_DIA",
     "SCREW_SPEC",
     "SCREW_BODY_DIA",
-    (_DRAW, "SCREW_SIZE_TEXT"),
+    (_DRAW, "NATIVE_SIZE_CUTS_IN"),
 )
 # (name, xy, cut dia, printed dia, station sources, dia sources): the wizard
 # cuts the unchanged #4 clearance (#30 drill) inside the design Ø.128 +.004/0
@@ -403,7 +456,12 @@ _HOLE_ROWS = (
         part_spec.HUB_DIA,
         part_spec.HUB_DIA_PRINTED,
         ("HUB_HOLE", "BLANK_ORIGIN", (_CALC, "HUB")),
-        ("HUB_DIA_PRINTED", "HUB_DIA", (_DRAW, "HUB_SIZE_TEXT")),
+        (
+            "HUB_DIA_PRINTED",
+            "HUB_DIA",
+            (_DRAW, "NATIVE_SIZE_CUTS_IN"),
+            (_DRAW, "PLAIN_CUT_SIZES"),
+        ),
     ),
     *(
         (
@@ -412,7 +470,7 @@ _HOLE_ROWS = (
             part_spec.CLAMP_DIA,
             part_spec.CLAMP_DIA,
             (f"{calc}_HOLE", "BLANK_ORIGIN", (_CALC, calc)),
-            ("CLAMP_DIA", (_DRAW, "CLAMP_SIZE_TEXT")),
+            ("CLAMP_DIA", (_DRAW, "NATIVE_SIZE_CUTS_IN"), (_DRAW, "PLAIN_CUT_SIZES")),
         )
         for name, xy, calc in (("cl_hole", CL_HOLE, "CL"), ("cr_hole", CR_HOLE, "CR"))
     ),
@@ -455,7 +513,7 @@ _STOP_DIA_SOURCES = (
     "STOP_DIA",
     "STOP_SPEC",
     "STOP_DRILL",
-    (_DRAW, "STOP_SIZE_TEXT"),
+    (_DRAW, "NATIVE_SIZE_CUTS_IN"),
 )
 for index, (x, y) in enumerate(STOP_PIN_HOLES, start=1):
     dia_places = DRAWING_PRECISION_BY_NAME["StopDia"]
@@ -718,18 +776,46 @@ def _write_cell(table: Any, row: int, column: int, text: str, *, label: str) -> 
         )
 
 
-def _check_rows(table: Any) -> None:
-    """Every row: its tag, its corner locations, its SIZE and its MATE."""
+def _native_sizes(table: Any) -> dict[str, str]:
+    """Each tag's generated SIZE cell, refused unless it states its hole."""
+    sizes = {
+        tag: str(table.DisplayedText2(row, _TABLE_SIZE_COLUMN, False) or "").strip()
+        for tag, row in _rows_by_tag(table).items()
+    }
+    _telemetry.info(f"riser hole-table native SIZE cells: {sizes!r}")
+    problems = {
+        tag: problem
+        for tag, text in sizes.items()
+        if (problem := native_size_problem(tag, text)) is not None
+    }
+    if problems:
+        raise RuntimeError(
+            f"riser hole-table SIZE cells misstate their holes: {problems!r}; "
+            f"cells={sizes!r}"
+        )
+    return sizes
+
+
+def _check_rows(table: Any, generated: dict[str, str]) -> None:
+    """Every row: its tag, its corner locations, its generated SIZE as first
+    read, and its NOTE and MATE."""
     if int(table.ColumnCount) != len(TABLE_WIDTHS):
         raise RuntimeError(
-            f"riser table has {int(table.ColumnCount)} columns; expected TAG/X/Y/SIZE/MATE"
+            f"riser table has {int(table.ColumnCount)} columns; "
+            "expected TAG/X/Y/SIZE/NOTE/MATE"
         )
-    heading = str(table.DisplayedText2(0, _TABLE_MATE_COLUMN, False) or "").strip()
-    if heading.upper() != MATE_HEADING:
-        raise RuntimeError(f"riser table MATE heading reads {heading!r}")
+    for column, title in (
+        (_TABLE_NOTE_COLUMN, NOTE_HEADING),
+        (_TABLE_MATE_COLUMN, MATE_HEADING),
+    ):
+        heading = str(table.DisplayedText2(0, column, False) or "").strip()
+        if heading.upper() != title:
+            raise RuntimeError(f"riser table column {column} heading reads {heading!r}")
+    if _native_sizes(table) != generated:
+        raise RuntimeError("riser table's generated SIZE cells changed")
     for tag, row in _rows_by_tag(table).items():
         for column, expected in (
-            (_TABLE_SIZE_COLUMN, ROW_SIZES[tag]),
+            (_TABLE_NOTE_COLUMN, row_notes(generated)[tag]),
             (_TABLE_MATE_COLUMN, ROW_MATES[tag]),
         ):
             written = _cell_text(table, row, column)
@@ -794,8 +880,9 @@ def _hole_table(
     plan: Any,
     on_plan: Callable[[tuple[float, float, float]], tuple[float, float]],
 ) -> Callable[[], None]:
-    """The native table from the blank's lower-left corner, its MATE column,
-    SIZE rows, tags and notes; returns its settled readback."""
+    """The native table from the blank's lower-left corner, its NOTE and MATE
+    columns, tags and notes; returns its settled readback. Generated cells
+    are only read, never written."""
     plan = _early_bound(plan, "IView")
     edges = _hole_edges(plan)
     _drop_hole_table_leading_zeros(adapter)
@@ -823,15 +910,24 @@ def _hole_table(
     origin = _early_bound(feature.DatumOrigin, "IDatumOrigin")
     _assign_tags(feature, table)
     rebuild_drawing(adapter, label="riser table tags")
-    if not table.InsertColumn2(3, _TABLE_SIZE_COLUMN, MATE_HEADING, 0):  # after SIZE
-        raise RuntimeError("riser table refused the MATE column")
-    if not table.SetColumnTitle2(_TABLE_MATE_COLUMN, MATE_HEADING, False):
-        raise RuntimeError("riser table refused the MATE title")
-    rebuild_drawing(adapter, label="riser table MATE column")
+    generated = _native_sizes(table)
+    # Custom columns after SIZE (swTableItemInsertPosition_After): NOTE, then
+    # MATE after NOTE.
+    for after, column, title in (
+        (_TABLE_SIZE_COLUMN, _TABLE_NOTE_COLUMN, NOTE_HEADING),
+        (_TABLE_NOTE_COLUMN, _TABLE_MATE_COLUMN, MATE_HEADING),
+    ):
+        if not table.InsertColumn2(3, after, title, 0):
+            raise RuntimeError(f"riser table refused the {title} column")
+        if not table.SetColumnTitle2(column, title, False):
+            raise RuntimeError(f"riser table refused the {title} title")
+        rebuild_drawing(adapter, label=f"riser table {title} column")
     # A regenerated table may reorder its rows: each cell is written to its
-    # tag's CURRENT row.
+    # tag's CURRENT row; the generated columns are only read.
+    notes = row_notes(generated)
     for tag, row in _rows_by_tag(table).items():
-        _write_cell(table, row, _TABLE_SIZE_COLUMN, ROW_SIZES[tag], label=f"{tag} SIZE")
+        if notes[tag]:
+            _write_cell(table, row, _TABLE_NOTE_COLUMN, notes[tag], label=f"{tag} NOTE")
         _write_cell(table, row, _TABLE_MATE_COLUMN, ROW_MATES[tag], label=f"{tag} MATE")
     for column, width in enumerate(TABLE_WIDTHS):
         actual = float(table.SetColumnWidth(column, width, 0))
@@ -841,7 +937,7 @@ def _hole_table(
                 f"expected={width} actual={actual}"
             )
     rebuild_drawing(adapter, label="riser table cells")
-    _check_rows(table)
+    _check_rows(table, generated)
     _tags(adapter, plan, edges, on_plan, place=True)
     _width, height = _table_size(table)
     note_y = TABLE_ANCHOR[1] - height - 0.004
@@ -871,7 +967,7 @@ def _hole_table(
             or annotation.IsDangling()
         ):
             raise RuntimeError("riser table datum left its corner vertex")
-        _check_rows(table)
+        _check_rows(table, generated)
         _tags(adapter, plan, current, on_plan, place=False)
         width, table_height = _table_size(table)
         notes_bottom = (

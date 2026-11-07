@@ -146,8 +146,13 @@ def test_hub_relief_cuts_the_12_mm_drill_and_prints_its_design_nominal() -> None
     assert lo <= spec.HUB_DIA <= hi
     assert feature["dia_nominal"] == spec.HUB_DIA_PRINTED
     assert lo > strap.HOLE_DIA
-    assert drawing.HUB_SIZE_TEXT == "\u00d8.472 DRILL THRU"
-    assert "MM" not in drawing.HUB_SIZE_TEXT
+    assert drawing.PLAIN_CUT_SIZES["HUB"] == "\u00d8.472 DRILL THRU"
+    # The native SIZE may print the cut's inch rounding, never millimetres.
+    assert drawing.native_size_problem("HUB", "\u00d8.472 THRU ALL") is None
+    assert drawing.native_size_problem("HUB", "<MOD-DIAM>.4724 THRU ALL") is None
+    assert drawing.native_size_problem("HUB", "\u00d812 MM THRU ALL") is not None
+    assert drawing.native_size_problem("HUB", "\u00d812.00 THRU ALL") is not None
+    assert drawing.native_size_problem("HUB", "\u00d8.47 THRU ALL") is not None
 
 
 def test_blank_sizes_are_finished_native_dimensions_not_stock() -> None:
@@ -188,11 +193,10 @@ def test_the_screw_hole_has_one_callout_naming_its_countersink() -> None:
     assert lo <= spec.SCREW_DIA <= hi
     assert (lo, hi) == pytest.approx((0.128 * INCH, 0.132 * INCH))
     assert round(spec.SCREW_DIA / INCH, 3) * INCH > spec.SCREW_DIA
-    assert drawing.SCREW_SIZE_TEXT.split("\n") == [
-        "\u00d8.128 #30 DRILL THRU",
-        "<HOLE-SINK> \u00d8.25 X 82\u00b0",
-    ]
-    assert "CSK" not in drawing.SCREW_SIZE_TEXT
+    assert drawing.CSK_TEXT == "<HOLE-SINK> \u00d8.25 X 82\u00b0"
+    notes = drawing.row_notes({tag: "\u00d8.129 THRU ALL" for tag in drawing.TABLE_HOLES})
+    assert {tag for tag, note in notes.items() if note} == {"R1", "R2", "R3", "R4"}
+    assert all(notes[f"R{i}"] == drawing.CSK_TEXT for i in range(1, 5))
     assert "CskDia" not in set().union(*spec.DRAWING_DIMENSIONS.values())
 
 
@@ -238,7 +242,11 @@ def test_stop_holes_cut_the_actual_30_drill_and_print_the_design_nominal() -> No
     source = inspect.getsource(part.build)
     assert 'name="StopHoles"' in source and "STOP_SPEC" in source
     assert "SharedCoordinate(0)" in source[source.index('name="StopHoles"') :]
-    assert drawing.STOP_SIZE_TEXT == "\u00d8.128 #30 DRILL THRU"
+    # The wizard's native SIZE: the actual #30 rounded, or its drill number.
+    for text in ("\u00d8.129 THRU ALL", "\u00d8.1285 THRU ALL", "\u00d8.128 THRU", "#30 THRU ALL"):
+        assert drawing.native_size_problem("P1", text) is None, text
+    for text in ("\u00d8.13 THRU ALL", "#29 THRU ALL", "\u00d83.26 THRU ALL", "", "\u00d8.129"):
+        assert drawing.native_size_problem("P1", text) is not None, text
     assert spec.WALLS_MM["stop 1 to edges"] >= WALL_TARGET_MM
     assert spec.WALLS_MM["stop 2 to edges"] >= WALL_TARGET_MM
 
@@ -335,6 +343,18 @@ def test_row_identity_refuses_a_wrong_table(fault: str) -> None:
         drawing._row_holes(_FakeTable(rows))
 
 
+def test_generated_table_cells_are_only_read() -> None:
+    """Farm r1: generated hole-table cells refuse SetText2. Only the inserted
+    NOTE and MATE columns are written; SIZE is read, checked and frozen."""
+    source = inspect.getsource(drawing._hole_table)
+    writes = re.findall(r"_write_cell\(table, row, (\w+)", source)
+    assert set(writes) == {"_TABLE_NOTE_COLUMN", "_TABLE_MATE_COLUMN"}
+    assert drawing._TABLE_SIZE_COLUMN == 3
+    assert (drawing._TABLE_NOTE_COLUMN, drawing._TABLE_MATE_COLUMN) == (4, 5)
+    assert len(drawing.TABLE_WIDTHS) == 6
+    assert source.index("generated = _native_sizes(table)") < source.index("InsertColumn2")
+
+
 def test_view_circles_identify_their_holes_by_centre_axis_and_size() -> None:
     for tag, ((x, y), dia) in drawing.TABLE_HOLES.items():
         circle = (x / 1000.0, y / 1000.0, spec.THICKNESS / 1000.0, 0.0, 0.0, 1.0, dia / 2000.0)
@@ -365,7 +385,11 @@ def test_clamp_holes_pass_their_mates_and_meet_the_band_wall_target() -> None:
     assert inner == pytest.approx(radius - hole_r - error - trammel.RISER_INNER_RADIUS)
     assert outer == pytest.approx(trammel.RISER_OUTER_RADIUS - radius - hole_r - error)
     assert min(inner, outer) >= WALL_TARGET_MM
-    assert drawing.CLAMP_SIZE_TEXT == "\u00d8.196 #9 DRILL THRU"
+    assert drawing.PLAIN_CUT_SIZES["CL"] == drawing.PLAIN_CUT_SIZES["CR"] == (
+        "\u00d8.196 DRILL THRU"
+    )
+    assert drawing.native_size_problem("CL", "\u00d8.196 THRU ALL") is None
+    assert drawing.native_size_problem("CL", "\u00d8.20 THRU ALL") is not None
     assert drawing.ROW_MATES["CL"] == "TL-21 CL" and drawing.ROW_MATES["CR"] == "TL-21 CR"
     riser = _config.parts("ch-rocker-arm-tl-oblique-riser")
     assert not riser.get("machinist_exceptions")
@@ -431,9 +455,21 @@ def test_table_cells_and_notes_stay_short_and_name_mates_by_number() -> None:
     assert drawing.ROW_MATES["HUB"].split("\n")[1] == "CLEARS MHA-CH-13 HUB REAMER"
     assert drawing.STRAP_NUMBER == _config.parts("ch-rocker-strap")["number"]
     assert drawing.ROW_MATES["P1"] == "LOOSE MHA-SM-VN-53 STOP PIN"
-    for tag, size in drawing.ROW_SIZES.items():
-        assert size.startswith("\u00d8."), tag
-        assert " MM" not in size and "CSK" not in size, tag
+    # A plain cut's blank native SIZE moves to its NOTE cell, size first; a
+    # wizard row never prints a blank SIZE.
+    blank = {tag: "" for tag in drawing.TABLE_HOLES}
+    notes = drawing.row_notes(blank)
+    for tag in ("HUB", "CL", "CR"):
+        assert drawing.native_size_problem(tag, "") is None
+        assert notes[tag] == drawing.PLAIN_CUT_SIZES[tag]
+        assert notes[tag].startswith("\u00d8.") and notes[tag].endswith("DRILL THRU")
+    for tag in ("R1", "P1"):
+        assert drawing.native_size_problem(tag, "") is not None
+    assert not notes["P1"] and not notes["P2"]
+    for note in notes.values():
+        assert " MM" not in note and "CSK" not in note
+        glyphs = len(note.replace("<HOLE-SINK>", "V"))
+        assert glyphs * _CHAR_MM <= drawing.TABLE_WIDTHS[drawing._TABLE_NOTE_COLUMN] * 1000.0
     for text in (*drawing.TABLE_NOTES, *drawing.ROW_MATES.values()):
         for line in text.split("\n"):
             assert len(line) <= 60, line
