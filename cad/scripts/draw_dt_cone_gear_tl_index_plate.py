@@ -87,13 +87,17 @@ FACE_KEEP = {
     part.PRINTED_HOLE: (_FX + 0.110, _FY + 0.098),
     "Ring57Pcd": (_FX + 0.115, _FY + 0.050),
     "Ring51Pcd": (_FX + 0.115, _FY + 0.008),
-    "Ring24Pcd": (_FX + 0.110, _FY - 0.040),
+    # Its diametral line runs at -12.8 degrees, so the far end (167 deg)
+    # passes 1.8 mm outside the 150-degree countersink: at -20 degrees it
+    # crossed the 3X leader's arrowhead there (round 2, rule 14).
+    "Ring24Pcd": (_FX + 0.110, _FY - 0.025),
     "MountHoleDia": (_FX - 0.095, _FY + 0.030),
     # Above the plate, right of the Ø3.94's leader and left of the vertical
     # centreline, so its leader drops steeply onto the bore's upper left:
     # from the lower left it crossed datum A's leader, which SolidWorks
-    # places on the bore's lower left (round 1, rule 14).
-    "BoreDia": (_FX - 0.030, _FY + 0.108),
+    # places on the bore's lower left (round 1, rule 14).  At +0.108 its
+    # stacked +.003 met the top border (round 2 render).
+    "BoreDia": (_FX - 0.030, _FY + 0.100),
     "MountPcd": (_FX - 0.020, _FY - 0.100),
 }
 # Above the edge view's top, clear of its witness lines.

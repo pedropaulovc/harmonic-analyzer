@@ -34,13 +34,16 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     dimension_name,
     place_view,
+    view_name,
 )
 
 from _check import check
@@ -76,6 +79,7 @@ from dt_pinion_bracket_spec import (
     ARBOR_BORE,
     C2C,
     CROSS_HOLE_CALLOUT,
+    CROSS_HOLE_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
@@ -84,6 +88,7 @@ from dt_pinion_bracket_spec import (
     PIN_SEAT_CALLOUT,
     R_END,
     SURFACE_FINISHES,
+    THICKNESS,
 )
 
 
@@ -131,7 +136,63 @@ def _flank_y(model_y_mm: float) -> float:
 
 _CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
 FRONT_CENTER_MARKS = 2  # the pivot and arbor bores
-LEFT_CENTER_MARKS = 1  # the follower-seat mouth
+LEFT_CENTER_MARKS = 1  # the follower-seat mouth (the cross hole's comes after)
+# swCenterMarkStyle_e.swCenterMark_Single; swCenterMarkHandle_e Up/Left/Down/Right.
+_CENTER_MARK_SINGLE = 2
+_HANDLE_UP, _HANDLE_LEFT, _HANDLE_DOWN, _HANDLE_RIGHT = range(4)
+# The flank arms run this far past the bar's broad faces (model mm).
+_CROSS_ARM_OVERRUN_MM = 1.5
+
+
+def _centre_mark_cross_hole(adapter: Any, view: Any) -> None:
+    """Give the set-pin cross hole its own centre mark, its arms run out.
+
+    Fan-out round 2 (blocker, rule 10): no printed line tied the hole to
+    anything.  Its vertical arm runs up into the follower seat's centreline,
+    which the .180 from broad face A locates for both holes; its horizontal
+    arm draws the pivot-bore axis across the flank, the line the seat's .276
+    runs to.
+    """
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    name = view_name(adapter, view)
+    if not ddoc.ActivateView(name):
+        raise RuntimeError(f"failed to activate the seat flank view {name!r}")
+    draw.ClearSelection2(True)
+    # A rim point 60 degrees up from the hole's centre, clear of the bar's
+    # tangent edge through its centre and of the seat's centreline above.
+    rim = CROSS_HOLE_DIA * SHEET_SCALE[0] / 2000.0
+    pick = (
+        LEFT_CENTER[0] + rim * math.cos(math.radians(60.0)),
+        _flank_y(0.0) + rim * math.sin(math.radians(60.0)),
+    )
+    extension = _early_bound(draw.Extension, "IModelDocExtension")
+    if not extension.SelectByID2(
+        "", "EDGE", pick[0], pick[1], 0.0, False, 0, null_callout(), 0
+    ):
+        raise RuntimeError("failed to select the cross hole's rim")
+    mark = ddoc.InsertCenterMark3(_CENTER_MARK_SINGLE, False, False)
+    draw.ClearSelection2(True)
+    if mark is None:
+        raise RuntimeError("failed to centre-mark the cross hole")
+    mark = _early_bound(mark, "ICenterMark")
+    mark.UseDocDisplaySettings = False
+    mark.ShowLines = True
+    hole_r = CROSS_HOLE_DIA / 2.0
+    flank = THICKNESS / 2.0 - hole_r + _CROSS_ARM_OVERRUN_MM
+    arms = {
+        _HANDLE_UP: abs(PIN_DROP) - hole_r,
+        _HANDLE_LEFT: flank,
+        _HANDLE_DOWN: _CROSS_ARM_OVERRUN_MM,
+        _HANDLE_RIGHT: flank,
+    }
+    for handle, arm_mm in arms.items():
+        if not mark.SetExtendedLength(0, handle, arm_mm / 1000.0):
+            raise RuntimeError(f"cross hole centre mark arm {handle} did not extend")
+    if bool(mark.UseDocDisplaySettings) or not bool(mark.ShowLines):
+        raise RuntimeError("cross hole centre mark lost its extended lines")
+    if _center_mark_count(view) != LEFT_CENTER_MARKS + 1:
+        raise RuntimeError("the seat flank view does not carry the cross hole's mark")
 
 
 def _center_mark_count(view: Any) -> int:
@@ -435,6 +496,7 @@ async def build(adapter: Any) -> dict[str, str]:
             raise RuntimeError(
                 f"expected {expected} centre marks in the {label} view, found {found}"
             )
+    _centre_mark_cross_hole(adapter, left)
     add_surface_finish(
         adapter,
         front,

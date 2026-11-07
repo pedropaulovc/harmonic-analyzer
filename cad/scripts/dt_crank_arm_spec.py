@@ -196,5 +196,15 @@ SEAT_PRESS_NOTE = (
     f"2. HUB SEAT: {_PRESS_LOW_IN}-{_PRESS_HIGH_IN} DIAMETRAL INTERFERENCE"
     " ON MHA-DT-31."
 )
-DRAWING_NOTES = "\n".join((STOCK_NOTE, SEAT_PRESS_NOTE))
+# The MHA-DT-VN-59 seam, flagged from its ream callout (SEE NOTE 3): the
+# callout keeps size, process and depth; the assembly-made ream, its pin and
+# fit, and the owner's permanent pair (rulings 2026-11-01, as the hub's
+# sheet prints it) are two rows too many for the callout (rule 7).
+# The rows stay short of the title block (x 0.216 at the render's 2.67 mm
+# per character).
+SEAM_NOTE = (
+    "3. SEAM REAMED WITH CRANK HUB MHA-DT-31 AT ASSEMBLY;\n"
+    "   SEAM PIN MHA-DT-VN-59, LIGHT DRIVE FIT; PERMANENT PAIR."
+)
+DRAWING_NOTES = "\n".join((STOCK_NOTE, SEAT_PRESS_NOTE, SEAM_NOTE))
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

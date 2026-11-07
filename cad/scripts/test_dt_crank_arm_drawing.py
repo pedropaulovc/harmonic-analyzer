@@ -92,8 +92,13 @@ def test_handle_end_is_a_semicircle_about_the_pivot() -> None:
 
 def test_punch_and_seam_operations_are_callouts_not_fake_dimensions() -> None:
     general = spec.DRAWING_NOTES
-    assert "MHA-DT-VN-59" not in general and "O'CLOCK" not in general
-    assert "MHA-DT-09" not in general
+    assert "O'CLOCK" not in general
+    # The seam's pin, mate and permanent pair ride one numbered note, and the
+    # seam's own callout flags it (rule 7).
+    seam_notes = [line for line in general.splitlines() if line[:1].isdigit()
+                  and "SEAM" in line]
+    assert len(seam_notes) == 1
+    assert f"SEE NOTE {seam_notes[0].split('.')[0]}" in notes.SEAM_CALLOUT
     assert "DIMPLE" not in general
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     # The punch witness prints its location, never a size (machinist review

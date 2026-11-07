@@ -18,18 +18,17 @@ from dt_crank_hub_notes import inch_text as _inch
 # Rows <= 24 characters: the block is centred under the diameter, so its
 # widest row sets how close to the left border the hub-end dimension stands.
 HUB_SEAT_CALLOUT = "PRESS FIT ON CRANK HUB\nMHA-DT-31, SEE NOTE 2"
-# The MHA-DT-VN-59 seam is reamed with the hub at assembly: size, process and
-# depth on the first line (rule 26: a depth is never deferred), then two
-# lines of words naming the mate and the pin's fit (rules 4 and 7), as the
-# hub's own sheet prints it.  The depth is the model's SeamDepth global, from
-# the front face the front view shows.  Its station from the bore axis is a
-# reference dimension on the view (rule 26: a location is a dimension).
+# The MHA-DT-VN-59 seam: size, process and depth (rule 26: a depth is never
+# deferred), then the flag to note 3, which carries the assembly-made ream,
+# its mate, pin and fit and the permanent pair (rules 4 and 7).  The depth
+# is the model's SeamDepth global, from the front face the front view shows.
+# Its station from the bore axis is a reference dimension on the view (rule
+# 26: a location is a dimension).
 SEAM_CALLOUT = "\n".join(
     (
         f"(<MOD-DIAM>{_inch(AXIAL_PIN_DIA, 3)}) REAM <HOLE-DEPTH> "
-        f"{_inch(SEAM_DEPTH, 2)} AT ASSEMBLY",
-        "WITH CRANK HUB MHA-DT-31 FOR",
-        "DOWEL PIN MHA-DT-VN-59, LIGHT DRIVE FIT",
+        f"{_inch(SEAM_DEPTH, 2)}",
+        "SEE NOTE 3",
     )
 )
 # The handle-pivot tap's mouth limit rides its own callout, under the native
@@ -49,4 +48,4 @@ PIVOT_TAP_ROWS = (
 # (rule 7; machinist review 2026-10-27: "LOCATE BY EYE" placed it in words).
 # Short lines keep the block's right end left of the mark, so its leader
 # descends away from the block and the FiducialX ordinate.
-FIDUCIAL_CALLOUT = "MATCH MARK\nTO MHA-DT-11"
+FIDUCIAL_CALLOUT = "CENTER PUNCH\nMATCH MARK\nTO MHA-DT-11"
