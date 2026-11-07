@@ -479,12 +479,18 @@ CALLOUTS_BELOW = {
     # both depths (this one and the plan's top depth) do. Machinist review
     # 0c3ed35988 read the .436/.491 three places as unexplained: each window
     # (BAR_/KP08_THREAD_WINDOW) is its own screw's deepest reach in full
-    # thread (low) to the other face's tap lead short of the other screw
+    # thread (low) to its own tap lead short of the opposed screw's tip
     # (high), SCREW_TIP_GAP_MIN - TAP_LEAD = .0125 wide, under a .XX band's
-    # .020 (DEPTH_WINDOW_WIDTH; the test proves no .XX depth fits).
+    # .020 (DEPTH_WINDOW_WIDTH; the test proves no .XX depth fits). Farm 26bb
+    # (2 of 3) asked for .44/.49 on the untapped stock left between the two
+    # threads; that gap is not what bounds them. At .48 the 3/4 bar screw's
+    # tip (BAR_REACH_MAX, 12.294) passes the full thread into the bottoming
+    # tap's lead; at .50 that lead runs past the 5/8 KP08 screw's tip on the
+    # least foot; at .45 the top lead does the same to the bar screw's tip.
+    # The rows name the screws' tips and the tap leads, the true bounds.
     BAR_THREAD_DEPTH_DIMENSION: (
-        "FULL THREAD FROM BOTTOM\nBOTH HOLES\nEACH SCREW TIP IN FULL\n"
-        "THREAD, SHORT OF THE\nOTHER FACE'S TAP LEAD"
+        "FULL THREAD FROM BOTTOM\nBOTH HOLES\nBOTH DEPTHS: EACH SCREW\n"
+        "TIP IN FULL THREAD AND\nEACH TAP LEAD SHORT OF\nTHE OPPOSED SCREW TIP"
     ),
 }
 # drawing-guidelines.md (units): an as-bought fraction is an untoleranced REF;
