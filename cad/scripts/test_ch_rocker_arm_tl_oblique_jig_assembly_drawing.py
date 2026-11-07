@@ -1282,7 +1282,7 @@ def test_declared_approaches_are_the_re_routed_balloons() -> None:
     assert set(drawing.BALLOON_APPROACH_DEG) == {
         spec.PIVOT_BLOCK, spec.HOLD_DOWN_STUD, spec.PIVOT_SHIM,
         spec.FEED_BLOCK, spec.LEADSCREW, spec.PILLOW_BLOCK,
-        spec.PILLOW_BLOCK_SCREW, spec.END_BRACKET,
+        spec.PILLOW_BLOCK_SCREW, spec.END_BRACKET, spec.CARRIAGE_SCREW,
         spec.RISER, spec.FEED_LEVER,
     }
     for stem in drawing.BALLOON_APPROACH_DEG:
@@ -1297,8 +1297,8 @@ def test_declared_approaches_clear_every_other_occurrence(stem) -> None:
     declared leader crosses no other instance on its sheet, and none is drawn
     within LANDING_CLEARANCE_M of the landing (the nearest at the farm's
     scales: 4 riser screw 5.2 mm, 15 KP08 screw 4.2, 17 bracket 2.5, 11 KP08
-    2.7, 25 none within 6; 3 none, 19 bar 2 2.2; 7 the next shim 2.9; 8 riser
-    screw 5.3, 10 none)."""
+    2.7, 25 none within 6; 3 none, 19 bar 2 2.2, the rail sheet's carriage
+    screw none within 3; 7 the next shim 2.9; 8 riser screw 5.3, 10 none)."""
     anchor = drawing.BALLOON_ANCHORS[stem]
     drawn, crossed, beside = _approach_replay(stem)
     assert drawn in {anchor.instance or spec.instance_name(stem, 0), None}
@@ -1335,6 +1335,160 @@ def test_the_replay_refuses_a_landing_beside_another_part(monkeypatch) -> None:
     assert _approach_replay(spec.PIVOT_BLOCK)[2] == {
         spec.instance_name(spec.BASE_BAR_2, 0), spec.instance_name(spec.CARRIAGE, 1),
     }
+
+
+# Farm 26bb68f31f5e, sheet 3, read back from App Insights
+# (drawing.balloon_anchor, drawing.balloon_ring): each landing in sheet
+# metres at 1:5 after the ring view's slide. Seven were frozen and are
+# unchanged since that run. Two are walked. The carriage screw's walked
+# landing (on the pivot block's first screw) is the one that run refused.
+_RAIL_26BB_FROZEN = {
+    spec.BASE_BAR_1: (0.123488, 0.162384),
+    spec.BASE_BAR_2: (0.181620, 0.128821),
+    spec.PIVOT_BLOCK: (0.196952, 0.151907),
+    spec.RAIL: (0.096935, 0.182889),
+    spec.HOLD_DOWN_STUD: (0.174146, 0.154303),
+    spec.T_NUT: (0.204778, 0.102058),
+    spec.RAIL_SCREW: (0.092184, 0.191197),
+}
+_RAIL_26BB_WALKED = {
+    spec.CARRIAGE: (0.134437, 0.179260),
+    spec.FLANGE_NUT: (0.163237, 0.168748),
+}
+_RAIL_26BB_CARRIAGE_SCREW_WALKED = (0.187411, 0.163963)
+_RAIL_26BB_SCALE = (1.0, 5.0)
+
+
+def _rail_26bb_frame():
+    """The rail sheet's model-to-sheet map at the farm's 1:5: (sheet metres
+    of an occurrence's part-frame point, the cluster)."""
+    cluster = next(c for c in drawing.CLUSTERS if c.sheet == "RAIL BARS EXPLODED")
+    occurrences = _sheet_occurrences(cluster)
+    right, up, _toward = _iso_axes()
+    ratio = _RAIL_26BB_SCALE[0] / _RAIL_26BB_SCALE[1] / 1000.0
+
+    def project(name, point):
+        moved = np.array(_exploded(name, *occurrences[name], point))
+        return np.array([moved @ right, moved @ up]) * ratio
+
+    def anchored(stem):
+        anchor = drawing.BALLOON_ANCHORS[stem]
+        return project(anchor.instance or spec.instance_name(stem, 0), anchor.point_mm)
+
+    offsets = np.array(
+        [np.array(farm) - anchored(stem) for stem, farm in _RAIL_26BB_FROZEN.items()]
+    )
+    # The offline projection is the native one: every frozen landing the farm
+    # read agrees with it to within 0.01 mm of a single sheet offset.
+    assert np.ptp(offsets, axis=0).max() < 1e-5
+    offset = offsets.mean(axis=0)
+    landings = {
+        stem: tuple(anchored(stem) + offset)
+        for stem in drawing.BALLOON_ANCHORS
+        if stem in cluster.stems and drawing.BALLOON_ANCHORS[stem].point_mm is not None
+    }
+    landings.update(_RAIL_26BB_WALKED)
+    assert set(landings) == set(cluster.stems)
+    vertices = np.vstack([body[3] for body in _sheet_bodies(cluster.sheet)])
+    xs = vertices @ right * ratio + offset[0]
+    ys = vertices @ up * ratio + offset[1]
+    return landings, (xs.min(), ys.min(), xs.max(), ys.max())
+
+
+def _lane_clearance(start, degrees, point) -> float:
+    """How far ``point`` is from the ray leaving ``start`` at ``degrees``."""
+    dx, dy = math.cos(math.radians(degrees)), math.sin(math.radians(degrees))
+    vx, vy = point[0] - start[0], point[1] - start[1]
+    if vx * dx + vy * dy <= 0.0:
+        return math.hypot(vx, vy)
+    return abs(vx * dy - vy * dx)
+
+
+def _spread_ring(outline, attachments):
+    """_spread_balloons' circle centres: each balloon at its attachment's
+    angle about the outline centre, BALLOON_MARGIN outside it, pushed apart."""
+    x0, y0, x1, y1 = outline
+    cx, cy = (x0 + x1) / 2.0, (y0 + y1) / 2.0
+    rx = (x1 - x0) / 2.0 + drawing.BALLOON_MARGIN
+    ry = (y1 - y0) / 2.0 + drawing.BALLOON_MARGIN
+    thetas = [math.atan2(y - cy, x - cx) for x, y in attachments]
+    order = sorted(range(len(attachments)), key=lambda i: (thetas[i], *attachments[i]))
+    angles = _drawing_balloons._push_apart_on_ring(
+        [thetas[i] for i in order],
+        min_gap=_drawing_balloons._min_angular_gap(
+            min(rx, ry), drawing.BALLOON_RADIUS,
+            clearance=_drawing_balloons._BALLOON_CLEARANCE_M,
+        ),
+    )
+    centres = [None] * len(attachments)
+    for angle, index in zip(angles, order):
+        centres[index] = (cx + rx * math.cos(angle), cy + ry * math.sin(angle))
+    return centres
+
+
+def test_rail_sheet_declared_lanes_clear_every_other_landing() -> None:
+    """Farm 26bb68f31f5e refused sheet 3: the walked carriage-screw balloon
+    sat on the hold-down stud's declared route, inside the ring's leader
+    run-on, so the uncrossing could not keep the stud on its approach. Every
+    declared route now passes every other landing by more than that run-on."""
+    landings, _outline = _rail_26bb_frame()
+    stud = landings[spec.HOLD_DOWN_STUD]
+    run_on = drawing._UNCROSS_END_CLEARANCE_M
+    assert _lane_clearance(
+        stud, drawing.BALLOON_APPROACH_DEG[spec.HOLD_DOWN_STUD], _RAIL_26BB_CARRIAGE_SCREW_WALKED
+    ) < run_on
+    for stem, degrees in drawing.BALLOON_APPROACH_DEG.items():
+        if stem not in landings:
+            continue
+        for other, point in landings.items():
+            if other != stem:
+                assert _lane_clearance(landings[stem], degrees, point) > run_on, (stem, other)
+
+
+def test_rail_sheet_ring_keeps_every_declared_approach() -> None:
+    """The rail sheet's ring as _ring_balloons builds it, over the estimated
+    native outline grown up to 15 mm a side: the 26bb landings refuse some,
+    the frozen carriage-screw landing none."""
+    landings, outline = _rail_26bb_frame()
+    stems = sorted(landings)
+    names = list(stems)
+    approaches = {
+        index: drawing.BALLOON_APPROACH_DEG[stem]
+        for index, stem in enumerate(stems)
+        if stem in drawing.BALLOON_APPROACH_DEG
+    }
+    assert {stems[index] for index in approaches} == {
+        spec.PIVOT_BLOCK, spec.HOLD_DOWN_STUD, spec.CARRIAGE_SCREW,
+    }
+    current = [landings[stem] for stem in stems]
+    farm = list(current)
+    farm[stems.index(spec.CARRIAGE_SCREW)] = _RAIL_26BB_CARRIAGE_SCREW_WALKED
+    farm_approaches = {
+        index: degrees for index, degrees in approaches.items()
+        if stems[index] != spec.CARRIAGE_SCREW
+    }
+    grows = (0.0, 0.005, 0.010, 0.015)
+    refused = 0
+    for left in grows:
+        for bottom in grows:
+            for right in grows:
+                for top in grows:
+                    grown = (
+                        outline[0] - left, outline[1] - bottom,
+                        outline[2] + right, outline[3] + top,
+                    )
+                    drawing.approached_ring_slots(
+                        _spread_ring(grown, current), current, approaches,
+                        outline=grown, radius=drawing.BALLOON_RADIUS, names=names,
+                    )
+                    try:
+                        drawing.approached_ring_slots(
+                            _spread_ring(grown, farm), farm, farm_approaches,
+                            outline=grown, radius=drawing.BALLOON_RADIUS, names=names,
+                        )
+                    except RuntimeError:
+                        refused += 1
+    assert refused
 
 
 def _ring_outline():

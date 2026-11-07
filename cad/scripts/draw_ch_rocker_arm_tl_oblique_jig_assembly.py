@@ -832,6 +832,20 @@ BALLOON_ANCHORS[spec.HOLD_DOWN_STUD] = BalloonAnchor(
     ),
     instance=spec.instance_name(spec.HOLD_DOWN_STUD, 2),
 )
+# Farm 26bb68f31f5e (2026-11-07, sheet 3): the centred pivot block put its
+# carriage screws on the hold-down stud's route. The walked carriage-screw
+# balloon landed on the block's first screw, its (-X, -Y) bolt, at sheet
+# (187.4, 164.0) mm. That is 1.1 mm off the stud's 40 degree approach and
+# under the ring's 2.4 mm leader run-on (_UNCROSS_END_CLEARANCE_M), so the
+# uncrossing had to move the stud's balloon off its approach and the ring
+# refused. The carriage-screw balloon now lands on the block's last screw,
+# its (+X, +Y) bolt nearest the block's ballooned corner, on its head's top
+# rim at part +X. That is 7.2 mm off the stud's route. Its leader leaves to
+# the right, between the pivot block's (-20) and the stud's (40).
+BALLOON_ANCHORS[spec.CARRIAGE_SCREW] = BalloonAnchor(
+    point_mm=(spec.carriage_screw.DIMS.head_dia / 2.0, spec.carriage_screw.DIMS.head_h, 0.0),
+    instance=spec.instance_name(spec.CARRIAGE_SCREW, len(spec.CARRIAGE_SCREW_PLACEMENTS) - 1),
+)
 SHIM_RIM_DEG = 150.0
 BALLOON_ANCHORS[spec.PIVOT_SHIM] = BalloonAnchor(
     point_mm=(
@@ -859,6 +873,7 @@ BALLOON_APPROACH_DEG = {
     # Sheet 3.
     spec.PIVOT_BLOCK: -20.0,
     spec.HOLD_DOWN_STUD: 40.0,
+    spec.CARRIAGE_SCREW: 10.0,
     # Sheet 4.
     spec.PIVOT_SHIM: 35.0,
     # Sheet 5.
