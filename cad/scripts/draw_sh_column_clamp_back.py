@@ -150,7 +150,7 @@ TOP_KEEP = {
     "GripOffset": (0.236, 0.104),
     "Width": (0.140, TOP_CENTER[1]),
     "AnchorZ": (0.215, 0.151),
-    "BoreDia": (0.240, 0.205),
+    "BoreDia": (0.232, 0.205),
 }
 FACE_KEEP = {
     "Height": (FACE_CENTER[0], 0.090),
@@ -171,8 +171,14 @@ DIMENSION_PREFIXES = {"EarHole1Z": "2X ", "EarHoleHeight": "2X "}
 # (draw_dt_cone_gear_shaft._printable_above_callouts).
 GRIP_NOTE = 1
 COLUMN_NUMBER = _config.parts("fr-tube-frame")["number"]
+# A matched pair names its mate by number and name and says which clearance
+# (rule 4).  Its ~76 mm widest row centres between the plan (right edge x
+# 0.190) and the split-face view (left edge x 0.274).
 DIMENSION_CALLOUTS = {
-    "BoreDia": f"SLIDING FIT ON {COLUMN_NUMBER}\nCLEARANCE {BORE_CLEARANCE_TEXT}",
+    "BoreDia": (
+        f"SLIDING FIT ON {COLUMN_NUMBER} COLUMN\n"
+        f"CLEARANCE {BORE_CLEARANCE_TEXT} DIAMETRAL"
+    ),
     "GripOffset": f"SEE NOTE {GRIP_NOTE}",
 }
 # Note 1 stands in the open lower-left field, left of the title block (x

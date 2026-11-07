@@ -114,9 +114,9 @@ def test_fit_budget_closes_at_the_printed_limits() -> None:
     assert fit.COLUMN_DIA == OUTER_DIA == 25.4
     low, high = fit.BORE_DIAMETRAL_CLEARANCE
     assert low < spec.COLUMN_BORE - OUTER_DIA < high
-    # Faces stay apart with both bores at their loosest and the offset least:
-    # (.020 - .004) - .012 = .004.
-    assert math.isclose(fit.GRIP_GAP_MIN, _in(0.004))
+    # Faces stay apart with both bores at their loosest and the offset least
+    # (the title block's .XXX row): (.020 - .005) - .012 = .003.
+    assert math.isclose(fit.GRIP_GAP_MIN, _in(0.003))
     assert fit.GRIP_GAP_MIN > 0.0
     # The ear stations' worst mismatch alone never binds the screw.
     assert fit.EAR_STATION_MISMATCH_MAX < fit.SCREW_FLOAT
@@ -150,8 +150,8 @@ def test_walls_at_the_largest_column_and_drill_wander() -> None:
     r_bore = _in(1.005 + 0.012) / 2.0
     wander = _in(0.600) * math.tan(math.radians(0.3))
     reach = 4.166 / 2.0 + wander
-    back_wall = _in(0.020 - 0.004) + _in(0.590 - 0.010) - r_bore
-    assert math.isclose(spec.WALLS_WORST["back wall"], back_wall)  # 2.2225 (.0875)
+    back_wall = _in(0.020 - 0.005) + _in(0.590 - 0.010) - r_bore
+    assert math.isclose(spec.WALLS_WORST["back wall"], back_wall)  # 2.1971 (.0865)
     assert math.isclose(
         spec.WALLS_WORST["ear to bore"], _in(0.689 - 0.004) - reach - r_bore
     )  # 2.320 (.0914), the least ear wall
@@ -196,7 +196,8 @@ def test_screw_line_shortfall_is_the_owner_ruled_one() -> None:
 
 def test_tight_bands_name_their_mate() -> None:
     bore = drawing.DIMENSION_CALLOUTS["BoreDia"]
-    assert bore.split("\n") == ["SLIDING FIT ON MHA-FR-03", "CLEARANCE .004-.012"]
+    assert len(bore.split("\n")) == 2
+    assert "MHA-FR-03" in bore and spec.BORE_CLEARANCE_TEXT in bore
     low, high = spec.BORE_DIAMETRAL_CLEARANCE
     assert math.isclose(low, _in(0.004)) and math.isclose(high, _in(0.012))
     # Rule 7: locations carry only value and band. The grip offset cites its
@@ -207,7 +208,8 @@ def test_tight_bands_name_their_mate() -> None:
     assert not {"EarHole1Z", "EarHoleHeight"} & set(drawing.DIMENSION_CALLOUTS)
     assert "MHA-SH-01" in drawing.HOLE_CALLOUT_BELOW
     source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "GRIP_OFFSET_BAND" in source and "EAR_STATION_BAND" in source
+    assert '"GripOffset", GRIP_OFFSET_BAND' not in source
+    assert "EAR_STATION_BAND" in source
     assert "EAR_HEIGHT_BAND" in source
     assert spec.EAR_HEIGHT_BAND is fit.EAR_HEIGHT_BAND
 

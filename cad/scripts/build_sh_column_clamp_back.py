@@ -37,7 +37,6 @@ from sh_column_clamp_back_spec import (
     EAR_STATION_BAND,
     EAR_STATION_DIMENSIONS,
     GRIP_OFFSET,
-    GRIP_OFFSET_BAND,
     HOLE_SPEC,
     ISOMETRIC_VIEW_NOTE,
     UNIT,
@@ -56,14 +55,12 @@ async def build(adapter) -> dict[str, str]:
         grip_offset=GRIP_OFFSET,
     )
     # Manufacturing drawing support, applied to the unsaved model the shared
-    # builder leaves behind and saved ONCE below: the explicit bands (the grip
-    # offset, the bore's lateral locator, the ear stations and the ears'
-    # height, sh_column_clamp_fit) and every printed dimension's places live
-    # on the model, then mark exactly the print's dimensions and stamp the
-    # make-critical title-block properties.
-    set_dimension_symmetric_tolerance(
-        adapter, "BlockProfile", "GripOffset", GRIP_OFFSET_BAND, display_unit=UNIT
-    )
+    # builder leaves behind and saved ONCE below: the explicit bands (the bore's
+    # lateral locator, the ear stations and the ears' height,
+    # sh_column_clamp_fit) and every printed dimension's places live on the
+    # model, then mark exactly the print's dimensions and stamp the
+    # make-critical title-block properties.  The grip offset takes the title
+    # block's .XXX row (sh_column_clamp_fit.GRIP_OFFSET_BAND), so no band.
     # The band prints at the nominal's three places (.945 +/-.010).
     set_dimension_symmetric_tolerance(
         adapter,
