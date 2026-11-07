@@ -798,7 +798,7 @@ def test_clamped_sheet_places_section_clear_of_setting(monkeypatch, defect) -> N
 
         def GetUserPreferenceInteger(self, preference, option):
             assert (preference, option) == (542, 0)
-            return 0 if defect == "style-readback" else 1
+            return 1 if defect == "style-readback" else 0
 
     adapter = SimpleNamespace(currentModel=SimpleNamespace(Extension=Extension()))
     monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
@@ -829,7 +829,7 @@ def test_clamped_sheet_places_section_clear_of_setting(monkeypatch, defect) -> N
     monkeypatch.setattr(drawing, "_add_assembly_dimensions", lambda *a: settled)
     if defect is not None:
         message = {
-            "style-set": "failed to set end-only",
+            "style-set": "failed to set connected",
             "style-readback": "style did not persist",
             "alignment": "thumbscrew axes are not aligned",
         }[defect]
@@ -838,7 +838,7 @@ def test_clamped_sheet_places_section_clear_of_setting(monkeypatch, defect) -> N
         assert not cut
         return
     assert drawing._place_clamped_sheet(adapter) is settled
-    assert style == [(542, 0, 1)]
+    assert style == [(542, 0, 0)]
     axis_point = tuple(value / 1000.0 for value in spec.THUMB_ORIGIN)
     assert projected == [(front, axis_point), (underside, axis_point)]
     assert cut["line_start"] == pytest.approx((0.1199, 0.2240755))

@@ -909,12 +909,14 @@ def _place_clamped_sheet(adapter: Any) -> Callable[[], None]:
     underside) and clamp section, the near-face reference of the drawn pose
     and the note that the pose is an example."""
     _activate_sheet(adapter, SHEET_NAMES[0])
-    # Native StandardWithoutConnector, as in draw_fr_rocker_arm_support:
-    # retain the full cutting plane and both arrows, not a hidden section line.
+    # Native StandardWithConnector, as in draw_fr_top_frame: one whole
+    # cutting-plane line joins both arrows (drawing guidelines: arrows standing
+    # alone are not a cutting plane). It runs across the clamp only, at the
+    # thumbscrew axis, because section A shows that one clamp.
     extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
-    if not extension.SetUserPreferenceInteger(542, 0, 1):
-        raise RuntimeError("failed to set end-only section cutting line")
-    if extension.GetUserPreferenceInteger(542, 0) != 1:
+    if not extension.SetUserPreferenceInteger(542, 0, 0):
+        raise RuntimeError("failed to set connected section cutting line")
+    if extension.GetUserPreferenceInteger(542, 0) != 0:
         raise RuntimeError("section cutting-line style did not persist")
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=SHEET_SCALE)
     underside = place_view(
