@@ -58,17 +58,20 @@ def test_length_is_flagged_cut_to_fit_from_a_longer_supply() -> None:
     # The supply is the next .01 in above the cut plus its allowance.
     assert supply - 0.254 < cut + fr_tube_frame_spec.SUPPLY_LENGTH_ALLOWANCE
     assert math.isclose(supply, 40.51 * 25.4, abs_tol=1e-9)
-    assert "CUT TO FIT" in fr_tube_frame_spec.LENGTH_FIT_CALLOUT
-    for mate in ("MHA-FR-01", "MHA-FR-02", "MHA-FR-VN-54"):
-        assert mate in fr_tube_frame_spec.LENGTH_FIT_CALLOUT
 
 
-def test_cross_hole_callout_names_each_station_mate_on_single_line_lanes() -> None:
-    callout = fr_tube_frame_spec.CROSS_HOLE_CALLOUT
-    mates = fr_tube_frame_spec.CROSS_HOLE_MATES_SUFFIX
-    assert "MATCH-DRILL" in callout
-    stations = dict(
-        clause.strip().split(" WITH ") for clause in mates.split(",")
-    )
-    assert stations == {"UPPER": "MHA-FR-02", "LOWER": "MHA-FR-01"}
-    assert "\n" not in callout + mates
+def test_callouts_link_numbered_notes_and_view_a_has_room() -> None:
+    import draw_fr_tube_frame as drawing
+
+    assert drawing.BELOW_CALLOUTS["Length"] == f"SEE NOTE {drawing.LENGTH_FIT_NOTE_NUMBER}"
+    assert drawing.OD_REFERENCE_SUFFIX.endswith(f"SEE NOTE {drawing.OD_FIT_NOTE_NUMBER}")
+    for number in (drawing.OD_FIT_NOTE_NUMBER, drawing.LENGTH_FIT_NOTE_NUMBER):
+        assert f"\n{number}. " in f"\n{drawing.NOTES}"
+    assert "\n" not in drawing.CROSS_HOLE_SUFFIX + drawing.CROSS_HOLE_MATES
+    # The arrow's letter stands under VIEW A's caption and over the tube top.
+    text_xy, tip_xy = drawing.VIEW_A_ARROW
+    caption_bottom = drawing.VIEW_A_CAPTION_XY[1] - 2 * 0.0045
+    assert tip_xy[1] < text_xy[1] - drawing.VIEW_LETTER_HEIGHT
+    assert text_xy[1] < caption_bottom or text_xy[0] > drawing.VIEW_A_CAPTION_XY[0] + 0.035
+    end_view_right = drawing.END_CENTER[0] + drawing._END_VIEW_RADIUS + 0.005
+    assert text_xy[0] > end_view_right

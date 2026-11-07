@@ -34,11 +34,13 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 
 from _check import check
 from _com import _early_bound
+import _config
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
@@ -52,7 +54,8 @@ from _drawing_edges import (
     scan_view_edges,
     visible_view_entities,
 )
-from _drawing_notes import add_property_linked_note, property_link
+from _drawing_leader_notes import add_leader_note
+from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
@@ -64,15 +67,11 @@ from _session import run_build
 import _telemetry
 from fr_tube_frame_spec import (
     COLUMN_LENGTH,
-    CROSS_HOLE_CALLOUT as CROSS_HOLE_CALLOUT_TEXT,
     CROSS_HOLE_DIAMETER,
-    CROSS_HOLE_MATES_SUFFIX,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
-    LENGTH_FIT_CALLOUT,
     LENGTH_SUPPLY_CALLOUT,
     LOWER_CROSS_HOLE_Y,
-    OD_FIT_SUFFIX,
     OUTER_DIA,
     TOP_END_CHAMFER,
 )
@@ -96,17 +95,58 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (1.0, 5.0)  # 1:5 whole sheet (40.109 in cut tube)
 END_VIEW_SCALE = 2.0
 ISO_VIEW_SCALE = (1, 10)
-# The aligned length/end views occupy the left-centre of the portrait sheet;
-# fitting notes and the pictorial view fill the upper-right field.
+# The length view is the principal view at the sheet's 1:5. The 2:1 end view
+# is not a projection at that scale, so it is VIEW A (rule 9): labelled under
+# itself, named by a letter arrow looking down on the length view's top end,
+# and moved left of the length view's axis so that arrow has room under it.
 LENGTH_CENTER = (0.110, 0.220)
-END_CENTER = (LENGTH_CENTER[0], 0.360)
+END_CENTER = (0.060, 0.372)
 ISO_CENTER = (0.220, 0.280)
+_TUBE_TOP_Y = LENGTH_CENTER[1] + COLUMN_LENGTH / 10000.0
+_END_VIEW_RADIUS = OUTER_DIA / 2.0 * END_VIEW_SCALE / 1000.0
+VIEW_A_CAPTION = "VIEW A\nSCALE 2:1"
+# The caption's upper-left, under the end view's centre marks (they reach
+# about 4.7 mm past the circle).
+VIEW_A_CAPTION_XY = (END_CENTER[0] - 0.012, END_CENTER[1] - _END_VIEW_RADIUS - 0.008)
+# The letter matches draw_fr_rocker_arm_support's VIEW B arrow (5 mm, square
+# above its tip). The tip sits on the top face just left of the axis, so the
+# chamfer dimension's leader, which leaves the right flank, stays clear.
+VIEW_LETTER_HEIGHT = 0.005
+_VIEW_A_TIP = (LENGTH_CENTER[0] - 0.0015, _TUBE_TOP_Y)
+VIEW_A_ARROW = (
+    (_VIEW_A_TIP[0] - 0.36 * VIEW_LETTER_HEIGHT, _TUBE_TOP_Y + 0.013),
+    _VIEW_A_TIP,
+)
+
+# Numbered notes (rule 7): each callout links its note by SEE NOTE n, so the
+# callouts stay within two lines of words. Note 1 is the OD's matched fit
+# (rule 4: both mates by name and number, and the acceptance); note 2 the
+# cut length's fit-up at assembly (rule 19).
+_BASE_ROW = _config.parts("fr-harmonic-base")
+_TOP_ROW = _config.parts("fr-top-frame")
+OD_FIT_NOTE_NUMBER = 1
+LENGTH_FIT_NOTE_NUMBER = 2
+OD_REFERENCE_SUFFIX = f")\nSEE NOTE {OD_FIT_NOTE_NUMBER}"
+LENGTH_FIT_CALLOUT = f"SEE NOTE {LENGTH_FIT_NOTE_NUMBER}"
+NOTES = "\n".join(
+    (
+        f"{OD_FIT_NOTE_NUMBER}. MATCHED FIT: {_BASE_ROW['number']} "
+        f"{str(_BASE_ROW['title']).upper()} AND",
+        f"    {_TOP_ROW['number']} TOP FRAME SOCKETS ARE FITTED TO THIS TUBE;",
+        "    IT SLIDES IN BY HAND, NO PERCEPTIBLE ROCK.",
+        f"{LENGTH_FIT_NOTE_NUMBER}. CUT TO FIT AT ASSEMBLY TO THE {_BASE_ROW['number']} /",
+        f"    {_TOP_ROW['number']} / {_config.parts('fr-vn-tube-frame-cap')['number']} STACK.",
+    )
+)
+# Upper-left of the note block: under the length view and the cross-hole
+# callout, above the title block (top 65.8 mm).
+NOTES_XY = (0.020, 0.100)
 
 # Per-view survivors of the marked-dimension import.
 END_KEEP: dict[str, tuple[float, float]] = {}
 # The cut length parks left of the tube; the cross-hole callout stands right
 # of it at the lower station. Neither station prints: each is match-drilled
-# with its mate (CROSS_HOLE_MATES_SUFFIX).
+# with its mate (CROSS_HOLE_MATES).
 LENGTH_KEEP = {
     "Length": (LENGTH_CENTER[0] - 0.050, LENGTH_CENTER[1]),
     "CrossHoleDia": (
@@ -114,6 +154,13 @@ LENGTH_KEEP = {
         LENGTH_CENTER[1] - COLUMN_LENGTH / 10000.0 + LOWER_CROSS_HOLE_Y / 5000.0,
     ),
 }
+# The cross holes' one callout (rule 26: count and size, then process, then
+# depth), its stations' match-drill mates on the line under it (rule 7).
+CROSS_HOLE_PREFIX = "2X <MOD-DIAM>"
+CROSS_HOLE_SUFFIX = " MATCH-DRILL AT ASSEMBLY THRU BOTH WALLS"
+CROSS_HOLE_MATES = (
+    f"UPPER WITH {_TOP_ROW['number']}, LOWER WITH {_BASE_ROW['number']}"
+)
 # The top-end break is a native chamfer dimension (``AddChamferDim``) whose
 # leader lands on the chamfer itself. The part's ``TopChamfer`` is a linear
 # distance: imported, it drew opposed arrows on the top face's extension well
@@ -141,12 +188,9 @@ _CHAMFER_TEXT_DIST_ANG = 2
 _CHAMFER_LENGTH = 0  # IDisplayDimension.ChamferPrecision index: length
 _CHAMFER_ANGLE = 1  # IDisplayDimension.ChamferPrecision index: angle
 # The cut length is set at assembly: the supply size rides above the (40.109)
-# reference and the cut-to-fit stack below it (rule 19), so the requirement
-# is flagged on the length itself rather than in the note block.
-ABOVE_CALLOUTS = {
-    "CrossHoleDia": CROSS_HOLE_CALLOUT_TEXT,
-    "Length": LENGTH_SUPPLY_CALLOUT,
-}
+# reference and SEE NOTE 2 below it (rule 19), so the requirement is flagged
+# on the length itself.
+ABOVE_CALLOUTS = {"Length": LENGTH_SUPPLY_CALLOUT}
 BELOW_CALLOUTS = {"Length": LENGTH_FIT_CALLOUT}
 _CALLOUT_ABOVE = 3  # swDimensionTextParts_e.swDimensionTextCalloutAbove
 _CALLOUT_BELOW = 4  # swDimensionTextParts_e.swDimensionTextCalloutBelow
@@ -278,10 +322,9 @@ def _add_outer_diameter_reference(
         label="outer diameter reference",
         diameter=True,
     )
-    od_suffix = OD_FIT_SUFFIX
-    display.SetText(2, od_suffix)
-    if str(display.GetText(2) or "") != od_suffix:
-        raise RuntimeError("OD reference fit text did not persist")
+    display.SetText(2, OD_REFERENCE_SUFFIX)
+    if str(display.GetText(2) or "").replace("\r\n", "\n") != OD_REFERENCE_SUFFIX:
+        raise RuntimeError("OD reference note link did not persist")
     draw.EditRebuild3()
     return annotation
 
@@ -414,12 +457,38 @@ def _add_top_chamfer_dimension(
     return settled
 
 
+def _add_view_a_arrow(adapter: Any, length: Any) -> None:
+    """The letter arrow on the length view's top end that names VIEW A."""
+    text_xy, tip_xy = VIEW_A_ARROW
+    note = add_leader_note(
+        adapter,
+        "A",
+        text_xy=text_xy,
+        attach_xy=tip_xy,
+        view=length,
+        label="view A viewing arrow",
+    )
+    # add_note leaves text at the document height; size the letter here and
+    # prove the leader tip did not move with it.
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    text_format = annotation.GetTextFormat(0)
+    if text_format is None:
+        raise RuntimeError("view A arrow note has no text format")
+    text_format.CharHeight = VIEW_LETTER_HEIGHT
+    if not annotation.SetTextFormat(0, False, text_format):
+        raise RuntimeError("failed to size the view A arrow letter")
+    rebuild_drawing(adapter, label="view A arrow letter")
+    points = list(annotation.GetLeaderPointsAtIndex(0) or ())
+    if len(points) < 6 or math.dist((points[-3], points[-2]), tip_xy) > 0.001:
+        raise RuntimeError("view A arrow tip moved when its letter was sized")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
     check("open tube-frame source", await adapter.open_model(str(SOURCE)))
-    source_properties = read_required_properties(
+    read_required_properties(
         adapter.currentModel,
         (
             "Number",
@@ -428,20 +497,14 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "End View Note",
             "Isometric View Note",
-            "Length View Note",
-            "Top End Callout",
         ),
         required=(
             "Number",
             "Material Specification",
             "Finish",
             "Quantity",
-            "End View Note",
             "Isometric View Note",
-            "Length View Note",
-            "Top End Callout",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -515,15 +578,19 @@ async def build(adapter: Any) -> dict[str, str]:
         display = _sw_type_info.early_bound_or_flag(
             display, "IDisplayDimension", "SetText", "GetText"
         )
-        display.SetText(4, "")
-        if str(display.GetText(4) or ""):
-            raise RuntimeError("failed to clear underlined below-dimension callout")
-        # Each station's match-drill mate, on the value line (rule 7).
-        display.SetText(2, CROSS_HOLE_MATES_SUFFIX)
-        if str(display.GetText(2) or "") != CROSS_HOLE_MATES_SUFFIX:
-            raise RuntimeError("cross-hole mates suffix did not persist")
-        if str(display.GetText(_CALLOUT_ABOVE) or "") != CROSS_HOLE_CALLOUT_TEXT:
-            raise RuntimeError("cross-hole match-drill callout did not persist")
+        # One callout for both stations: count and size, process, depth on
+        # the value line, each station's mate on the line under it (rule 26).
+        lanes = {
+            1: CROSS_HOLE_PREFIX,
+            2: CROSS_HOLE_SUFFIX,
+            _CALLOUT_ABOVE: "",
+            _CALLOUT_BELOW: CROSS_HOLE_MATES,
+        }
+        for part, text in lanes.items():
+            display.SetText(part, text)
+        applied = {part: str(display.GetText(part) or "") for part in lanes}
+        if applied != lanes:
+            raise RuntimeError(f"cross-hole callout lanes did not persist: {applied!r}")
         display = _early_bound(display, "IDisplayDimension")
         hole_dimension = _early_bound(display.GetDimension2(0), "IDimension")
         if "CrossHoleProfile" not in str(hole_dimension.FullName):
@@ -605,18 +672,20 @@ async def build(adapter: Any) -> dict[str, str]:
         _CALLOUT_BELOW: LENGTH_FIT_CALLOUT,
     }:
         raise RuntimeError(f"length supply/cut-to-fit callouts did not persist: {lanes!r}")
-    # Single line: the property is the cap's fit requirement (rule 4 names
-    # the mate) riding above the native chamfer value.
-    cap_acceptance = " ".join(source_properties["Top End Callout"].splitlines())
+    # The chamfer prints its size alone: the cap's seating is the assembly's
+    # check, not this part's (rule 7).
     chamfer_settled = _add_top_chamfer_dimension(
-        adapter, length, text_xy=CHAMFER_TEXT_XY, callout_above=cap_acceptance
+        adapter, length, text_xy=CHAMFER_TEXT_XY, callout_above=""
     )
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the annulus end view")
 
-    add_note(adapter, f"TOP {property_link('End View Note')}", 0.060, 0.400)
+    if add_note(adapter, VIEW_A_CAPTION, *VIEW_A_CAPTION_XY) is None:
+        raise RuntimeError("failed to caption VIEW A")
+    _add_view_a_arrow(adapter, length)
     add_property_linked_note(adapter, "Isometric View Note", 0.175, 0.215)
-    add_property_linked_note(adapter, "Length View Note", 0.075, 0.083)
+    if add_note(adapter, NOTES, *NOTES_XY) is None:
+        raise RuntimeError("failed to add the tube's numbered notes")
     # The end view's hidden lines carry the cross-hole through both walls
     # (rule 9).
     set_hidden_lines_visible(adapter, end)
