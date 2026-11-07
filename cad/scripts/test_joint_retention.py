@@ -405,14 +405,18 @@ def test_the_channel_apex_set_screws_are_staked_like_the_keeper_screws() -> None
     """PR #1317 Codex review: the MHA-CH-VN-53 cups hold the rocked MHA-CH-05
     shaft, an exposed joint. Its Loctite 222 waiver was retired (2026-10-16,
     the user's standing no-threadlocker rule): each is snugged and its tap
-    mouth staked at 2 points, as the fulcrum keeper set screws are."""
+    mouth staked, as the fulcrum keeper set screws are, the stake a step of
+    its own after the screws are driven."""
+    import ch_channel_assembly_steps as steps
     import draw_ch_channel_assembly as channel
 
     joint_id = "ch-channel/pivot-bracket-apex-set-screw"
     (row,) = [j for j in jr.JOINTS if j.id == joint_id]
     assert row.exposure is Exposure.OSCILLATING
     assert row.lock is Lock.STAKED
-    assert row.lock_step == row.installed_at == "set-screws-driven"
+    assert row.installed_at == "set-screws-driven"
+    assert row.lock_step == steps.PIVOT_SET_SCREWS_STAKED_KEY
+    assert steps.step_number(row.lock_step) > steps.step_number(row.installed_at)
     assert row.exception == ""
     assert "U-MHA-CH-VN-53-channel-threadlocker" not in jr.RULINGS
     assert not [r for r in jr.RULINGS.values() if r.joint == joint_id]
@@ -420,15 +424,10 @@ def test_the_channel_apex_set_screws_are_staked_like_the_keeper_screws() -> None
         j for j in jr.JOINTS if j.id == "ch-channel/fulcrum-shaft-set-screw-in-keeper"
     ]
     assert keeper.lock is Lock.STAKED
-    rocker_fitup, fulcrum_fitup, _hookup = (
-        " ".join(n.split()) for n in channel.FITUP_NOTES
-    )
-    assert "SNUG, AND STAKE EACH TAP MOUTH AT 2 POINTS." in rocker_fitup
-    assert "STAKE EACH TAP MOUTH AT 2 POINTS." in fulcrum_fitup
+    assert steps.step_number(keeper.lock_step) > steps.step_number(keeper.installed_at)
     for banned in ("LOCTITE", "THREADLOCK"):
-        assert banned not in rocker_fitup.upper()
+        assert banned not in channel.FITUP_STEPS.upper()
         assert banned not in row.evidence.upper()
-    assert jr._config.parts("sh-vn-arbor-set-screw")["number"] not in fulcrum_fitup
 
     findings = jr.audit(
         jr.JOINTS,

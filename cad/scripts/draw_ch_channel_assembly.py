@@ -1,26 +1,32 @@
-r"""Create the MHA-CH-00 channel assembly fitter package (four sheets).
+r"""Create the MHA-CH-00 channel assembly fitter package (six sheets).
 
 1. ASSEMBLED VIEWS: Front and Right at 1:5 and the full-detail isometric at
-   1:7.
+   1:7. The Front carries the viewing arrows of views D, E and F, the Right
+   that of view G.
 2. EXPLODED VIEW + BOM: the builder-owned CHANNEL_EXPLODED isometric
    (ch_channel_explode_spec), the native BOM with the registry's part
    numbers, vendor SKUs and ch_channel_assembly_sheet's descriptions, and one
    balloon per BOM row.
-3. ROCKER BANK FIT-UP: the bank isolated at 1:1 with the closed-up stack
-   length, a cropped 4:1 detail of the south end with the spring set, and
-   steps 1-8. The south bracket is set off a wave disc spring that preloads
-   the bank north, and the plain pivot shaft is cut to fit and held by a set
-   screw in each ear (#948 ruling R, PR #1292; user, 2026-10-10).
-4. LEVER BANK FIT-UP: the keepers, fulcrum shaft and levers isolated at 1:1
-   with the keeper lug span, the 1:2 keeper plan view with the keepers'
-   three settings off the top frame's datums, and the remaining steps: the
-   keepers' bench pair-ream and DRO fit-up on the top frame, the bars pinned
-   to the levers, the lever bank threaded, the set screws staked and the
-   springs hooked.
+3. ROCKER BANK FIT-UP: view D, the bank isolated at 1:1 with the stack
+   length, and the first rocker-bank steps. The right bracket is set off a
+   wave disc spring that preloads the bank left, and the plain pivot shaft is
+   held by a set screw in each ear (#948 ruling R, PR #1292; user,
+   2026-10-10).
+4. ROCKER BANK FIT-UP (CONT.): detail A, the cropped 4:1 right end with the
+   spring set, and the rest of the rocker-bank steps.
+5. LEVER BANK FIT-UP: view E, the keepers, fulcrum shaft and levers isolated
+   at 1:1 with the keeper lug span, view F, the 1:2 keeper plan with the
+   keepers' three settings off the top frame's datums, and the first
+   lever-bank steps.
+6. LEVER BANK FIT-UP (CONT.): view G, the spring hook-up at 1:2, and the rest
+   of the lever-bank steps.
 
-The settings are the assembly's own model dimensions (the hidden rocker-bank,
-lever-bank and keeper-plan settings sketches, build_ch_channel_assembly), not
-numbers in note text; the steps are numbered by ``ch_channel_assembly_steps``.
+Ends and sides are named as the right side views (D, E) draw them: left and
+right, never a compass (drawing-guidelines.md rule 26). Steps name parts by
+BOM item (rule 22). The settings are the assembly's own model dimensions (the
+hidden rocker-bank, lever-bank and keeper-plan settings sketches,
+build_ch_channel_assembly), not numbers in note text; the steps are numbered
+by ``ch_channel_assembly_steps``.
 """
 
 from __future__ import annotations
@@ -29,6 +35,7 @@ import argparse
 from collections import Counter
 from dataclasses import dataclass
 import math
+import re
 import sys
 import textwrap
 from pathlib import Path
@@ -125,6 +132,8 @@ from rocker_bank_layout import (
     COUNT,
     PIVOT_BRACKET_Z,
     PIVOT_SHAFT_FLAT_STATIONS,
+    ROCKER_SPRING_SET,
+    ROCKER_SPRING_SET_BAND,
     SHAFT_TIP_SET_BAND,
     STACK_L20_ACCEPT,
     STACK_MID_Z,
@@ -149,6 +158,7 @@ SHEET_NAMES = (
     "ASSEMBLED VIEWS",
     "EXPLODED VIEW + BOM",
     "ROCKER BANK FIT-UP",
+    "ROCKER BANK FIT-UP (CONT.)",
     "LEVER BANK FIT-UP",
     "LEVER BANK FIT-UP (CONT.)",
 )
@@ -164,9 +174,7 @@ FITUP_SCALE = (1.0, 1.0)
 SHEET_SCALES = {
     SHEET_NAMES[0]: ASSEMBLED_SCALE,
     SHEET_NAMES[1]: SHEET_SCALE,
-    SHEET_NAMES[2]: FITUP_SCALE,
-    SHEET_NAMES[3]: FITUP_SCALE,
-    SHEET_NAMES[4]: FITUP_SCALE,
+    **{name: FITUP_SCALE for name in SHEET_NAMES[2:]},
 }
 _TEMPLATE = DRAWING_TEMPLATES[DrawingLayout.LANDSCAPE]
 BORDER = 0.0127
@@ -187,11 +195,19 @@ ISO_LABEL_XY = (ISO_CENTER[0] - 0.022, 0.089)
 ASSEMBLED_CAPTION_XY = (0.272, 0.250)
 ASSEMBLED_CAPTION = "\n".join(
     (
-        "RIGHT VIEW: NORTH (HUB 19) LEFT, SOUTH (HUB 0) RIGHT.",
         "SHEET 2: EXPLODED VIEW AND BILL OF MATERIALS.",
         f"SHEETS 3 TO {len(SHEET_NAMES)}: FIT-UP, STEPS 1 TO {len(steps.SEQUENCE)}.",
     )
 )
+# The lettered views D-G are partial views of the assembly in principal
+# directions on the fit-up sheets (drawing-guidelines.md rule 9): each has a
+# viewing arrow on a sheet-1 view, a letter note whose straight leader is the
+# arrow (draw_ch_rocker_arm's view F recipe), its tip VIEW_ARROW_TIP_GAP
+# outside the parent's outline and level with (or, for a top view, above) the
+# part it looks at.
+VIEW_ARROW_LETTER_HEIGHT = 0.005
+VIEW_ARROW_TIP_GAP = 0.002
+VIEW_ARROW_RUN = 0.010
 
 # --- sheet 2: exploded isometric, BOM, balloons ------------------------------
 # 10 mm below the sheet's middle, so the ring can grow at the top.
@@ -269,14 +285,6 @@ BOM_ROW_HEIGHT = 0.006
 # Follow its rebuilt bottom, then prove the caption's actual gap again at save.
 EXPLODED_CAPTION_OFFSET = 0.006
 EXPLODED_CAPTION_MIN_GAP = 0.004
-EXPLODED_CAPTION = "\n".join(
-    (
-        f"EXPLODED: ALL {COUNT} CHANNELS ALIKE, THE NORTH-MOST PULLED OUT",
-        "NORTH; ONE BALLOON PER BOM ROW, ON THE NORTH-MOST INSTANCE.",
-        "THE NORTH KEEPER AND ITS SCREWS ARE BALLOONED IN DETAIL C.",
-        f"QTY IS PER {steps.DRAWING_NUMBER} (ALL {COUNT} CHANNELS).",
-    )
-)
 
 # Spring variants: one per distinct amplitude among the built channels, named
 # as build_ch_channel_assembly names them (first-occurrence order).
@@ -378,6 +386,39 @@ BOM_IDENTITY_ALIASES = {number: stem for stem, number in BOM_PART_NUMBERS.items(
 BOM_NORMALIZED_ALIASES = {
     alias.casefold(): stem for alias, stem in BOM_IDENTITY_ALIASES.items()
 }
+# The BOM's item numbers: the native table numbers the families in component
+# order, which is BOM_COMPONENTS (_validate_bom proves the table prints
+# exactly these). Steps name parts by item (drawing-guidelines.md rule 22).
+ITEM_NUMBERS = {stem: index for index, stem in enumerate(BOM_COMPONENTS, start=1)}
+
+
+def item(stem: str) -> str:
+    """``ITEM 3``: a part as the steps and labels name it."""
+    return f"ITEM {ITEM_NUMBERS[stem]}"
+
+
+def items_text(stems: frozenset[str] | tuple[str, ...], *, compact: bool = False) -> str:
+    """``ITEMS 3, 4, 5 AND 7``: several parts, in item order; ``compact``
+    (``ITEMS 3,4,5,7``) for a label in the narrow column right of the BOM."""
+    numbers = [str(number) for number in sorted(ITEM_NUMBERS[stem] for stem in stems)]
+    if compact:
+        return f"ITEMS {','.join(numbers)}"
+    return f"ITEMS {', '.join(numbers[:-1])} AND {numbers[-1]}"
+
+
+_KEEPER_DETAIL_STEMS = (
+    explode.KEEPER,
+    explode.KEEPER_SET_SCREW,
+    explode.KEEPER_FOOT_SCREW,
+)
+EXPLODED_CAPTION = "\n".join(
+    (
+        f"EXPLODED: ALL {COUNT} CHANNELS ALIKE. ONE CHANNEL IS PULLED",
+        "OUT; ONE BALLOON PER BOM ROW, ON THAT CHANNEL.",
+        f"{items_text(_KEEPER_DETAIL_STEMS)} ARE BALLOONED IN DETAIL C.",
+        f"QTY IS PER {steps.DRAWING_NUMBER} (ALL {COUNT} CHANNELS).",
+    )
+)
 EXPLODED_VIEW_NAMES = {
     ASSEMBLY_VIEW_CONFIGURATION: explode.EXPLODED_VIEW_NAME,
     SIMPLIFIED_VIEW_CONFIGURATION: simplified_name(explode.EXPLODED_VIEW_NAME),
@@ -385,16 +426,23 @@ EXPLODED_VIEW_NAMES = {
 if explode.SOURCE_CONFIGURATION != ASSEMBLY_VIEW_CONFIGURATION:
     raise AssertionError("the channel explode is authored in Default")
 
-# --- sheets 3 and 4: isolated 1:1 bank views, the south-end detail, steps ----
-# On a Right view sheet x runs with machine -z (north left, south right) and
+# --- sheets 3 to 6: isolated bank views, the right-end detail, steps --------
+# On a Right view sheet x runs with machine -z (machine north, +z, left) and
 # sheet y with machine y.
 CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 VIEW_POSITION_TOL_M = 1e-4
-STEPS_XY = (0.214, 0.258)
 STEPS_LINE_WIDTH = 64  # characters; default-format note text
-# The layout audit proves the blocks clear the title block; the line width
-# keeps them inside the right border (test_ch_channel_assembly_drawing).
-END_LABEL_DROP_MM = 52.0  # end labels this far under the shaft axis
+# Default-format note text, measured on r743-rocker-fix3's render (leaf
+# 20260926T112244Z-1-a884759d): the step columns are sized from these.
+NOTE_CHAR_WIDTH = 0.00276
+NOTE_LINE_PITCH = 0.0045
+# A step is at most six printed lines (drawing-guidelines.md rule 22).
+STEP_MAX_LINES = 6
+STEPS_LEFT_X = 0.018
+STEPS_RIGHT_X = 0.214
+STEPS_TOP_Y = 0.258
+# Columns stop this far above the title block or the bottom border.
+STEPS_FOOT_CLEARANCE = 0.005
 
 
 @dataclass(frozen=True)
@@ -417,6 +465,9 @@ class BankView:
     letter: str = ""  # a detail's letter, at its boundary in the parent
     letter_corner: tuple[int, int] = (1, 1)  # letter_xy's corner for it
     label_xy: tuple[float, float] | None = None  # caption point, if not under it
+    # The scale of the sheet the view is placed on: a view at that scale
+    # prints none (drawing-guidelines.md rule 9).
+    sheet_scale: tuple[int, int] = (1, 1)
 
     @property
     def mm(self) -> float:
@@ -448,8 +499,12 @@ class BankView:
 
     @property
     def label_text(self) -> str:
-        lines = (self.title, self.parts, f"SCALE {self.scale[0]} : {self.scale[1]}")
-        return "\n".join(line for line in lines if line)
+        scale = (
+            f"SCALE {self.scale[0]} : {self.scale[1]}"
+            if self.scale != self.sheet_scale
+            else ""
+        )
+        return "\n".join(line for line in (self.title, self.parts, scale) if line)
 
     @property
     def crop_label_xy(self) -> tuple[float, float]:
@@ -465,7 +520,7 @@ class BankView:
 _PIVOT_X, _PIVOT_Y = ROCKER_PIVOT_XY
 _FULCRUM_X, _FULCRUM_Y = LEVER_FULCRUM_XY
 ROCKER_BANK = BankView(
-    "ROCKER BANK",
+    "VIEW D",
     (1, 1),
     (_PIVOT_X, _PIVOT_Y, STACK_MID_Z),
     # 188 mm wide at 1:1 (r5 outline 0.0111-0.1995 about x 0.105): centred
@@ -482,13 +537,16 @@ ROCKER_BANK = BankView(
             "ch-rocker-arm",
         }
     ),
+    parts="ROCKER BANK",
 )
-# The south end at 4:1: the ear's inner face, the spring, the washer and hub 0
-# about the circle's centre on the pivot axis.
+# The right end at 4:1: the ear's inner face, the spring, the washer and the
+# end hub about the circle's centre on the pivot axis. It prints on sheet 4,
+# its boundary on view D (sheet 3).
 DETAIL_LETTER = "A"
+DETAIL_SHEET = SHEET_NAMES[3]
 _DETAIL_CENTRE_Z = (asm.PIVOT_CHAIN_Z[0] + asm.PIVOT_CHAIN_Z[2]) / 2.0
 SOUTH_END = BankView(
-    f"DETAIL {DETAIL_LETTER}, SOUTH END",
+    f"DETAIL {DETAIL_LETTER}",
     (4, 1),
     (_PIVOT_X, _PIVOT_Y, _DETAIL_CENTRE_Z),
     (0.072, 0.098),
@@ -503,7 +561,7 @@ SOUTH_END = BankView(
         }
     ),
     crop_radius_mm=8.0,
-    parts="EAR, SPRING, WASHER, HUB 0",
+    parts="FROM VIEW D (SHEET 3)",
     letter=DETAIL_LETTER,
 )
 # The letter sits this far (sheet m) outside the parent's boundary circle, up
@@ -534,7 +592,7 @@ def letter_xy(
 
 
 LEVER_BANK = BankView(
-    "LEVER BANK",
+    "VIEW E",
     (1, 1),
     (_FULCRUM_X, _FULCRUM_Y, FULCRUM_KEEPER_CENTRE_Z),
     (0.111, 0.195),
@@ -548,6 +606,7 @@ LEVER_BANK = BankView(
             explode.BAR_PIN,
         }
     ),
+    parts="LEVER BANK",
 )
 # The keepers on MHA-FR-02 in plan at 1:2, machine front up as the frame's
 # own plan prints it (b9ae machinist review: step 10's settings had no view,
@@ -566,7 +625,7 @@ KEEPER_PLAN_SOCKET_Y = 0.120
 _PLAN_CENTRE_Y = 0.070
 _TOP_FRAME_NUMBER = str(_config.parts("fr-top-frame")["number"])
 KEEPER_PLAN = BankView(
-    "KEEPER PLAN VIEW",
+    "VIEW F",
     (1, 2),
     (
         asm.KEEPER_LUG_X,
@@ -582,34 +641,31 @@ KEEPER_PLAN = BankView(
             explode.KEEPER_SET_SCREW,
         }
     ),
-    # The frame's front is the bank's south end (machine -z: the front
-    # socket line, and the south end of every Right view); the Z callouts
-    # name the faces by end, as the steps do (042726e review).
-    parts=f"ON {_TOP_FRAME_NUMBER}, FRONT (SOUTH) UP",
+    # A standard top view (machine front up); the Z settings name the faces
+    # by what they are, the view's own projection says which is which.
+    parts=f"KEEPERS ON {_TOP_FRAME_NUMBER}",
     orientation="*Top",
     label_xy=(0.020, 0.090),
 )
 
-# --- sheet 5: the lever-bank step that overflows sheet 4 ---------------------
-# A blank line between steps (user request, asm-steps spacing) ran sheet 4's
-# block two lines into the title block, so its last step prints whole here,
-# with the front view it describes: the fulcrum shaft, a lever, its spring,
-# anchor and jam nut, the 20 channels in line behind the nearest. The summing
-# plate the anchor threads into belongs to MHA-HA-00, not this assembly. At
-# 1:2 (farm leaf on 06616793e) the view outline ran from model x 7.4 to 217.1
-# and y 955.6 to 1078.6: 210 x 123 mm, so at 1:1 it spans sheet x 0.035-0.245
-# and y 0.089-0.212 about (0.140, 0.150), under the step block (bottom
-# 0.2355) and above the title block (top 0.066).
+# --- sheet 6: view G and the rest of the lever-bank steps --------------------
+# The front view of the spring hook-up: the fulcrum shaft, a lever, its
+# spring, anchor and jam nut, the 20 channels in line behind the nearest. The
+# summing plate the anchor threads into belongs to MHA-HA-00, not this
+# assembly. The view outline ran from model x 7.4 to 217.1 and y 955.6 to
+# 1078.6 (farm leaf on 06616793e): 210 x 123 mm, so at 1:2 it spans sheet x
+# 0.0475-0.1525 and y 0.054-0.116 about (0.100, 0.085), under the sheet's
+# left step column and above its own label.
 HOOKUP_DROP_MM = 44.0
 HOOKUP = BankView(
-    "SPRING HOOK-UP, FRONT",
-    (int(FITUP_SCALE[0]), int(FITUP_SCALE[1])),
+    "VIEW G",
+    (1, 2),
     (
         _FULCRUM_X - LEVER_SPRING_X / 2.0,
         _FULCRUM_Y - HOOKUP_DROP_MM,
         FULCRUM_KEEPER_CENTRE_Z,
     ),
-    (0.140, 0.150),
+    (0.100, 0.085),
     frozenset(
         {
             "ch-fulcrum-shaft",
@@ -619,9 +675,11 @@ HOOKUP = BankView(
             explode.ANCHOR_NUT,
         }
     ),
-    parts="SUMMING PLATE NOT SHOWN",
+    parts="SPRING HOOK-UP\nSUMMING PLATE NOT SHOWN",
     orientation="*Front",
 )
+# The outline's top (sheet m) at 1:2, from the measured model outline.
+HOOKUP_TOP_Y = HOOKUP.centre[1] + (1078.6 - HOOKUP.centre_xyz[1]) * HOOKUP.mm
 
 _PLAN_LUG = KEEPER_PLAN.plan_xy(asm.KEEPER_LUG_X, asm.KEEPER_SOCKET_XZ[1])
 _PLAN_FACES = tuple(
@@ -645,7 +703,7 @@ PLAN_KEEP = {
     ),
 }
 # The two frame datums the sketch draws, named where they are drawn (owner
-# ruling: the web centre reads as the split of both web faces), the texts
+# ruling: the web centre is midway between both web faces), the texts
 # east of the view: the socket line's leader lands past the boss, the web
 # centre's inside the boss annulus, between the bore and the web faces.
 PLAN_POINTERS = (
@@ -659,7 +717,7 @@ PLAN_POINTERS = (
         ),
     ),
     (
-        f"{_TOP_FRAME_NUMBER} WEB CENTRE,\nSPLIT OF BOTH WEB FACES",
+        f"{_TOP_FRAME_NUMBER} RAIL WEB CENTRE,\nMIDWAY BETWEEN ITS FACES",
         (0.020, 0.114),
         KEEPER_PLAN.plan_xy(
             asm.KEEPER_SOCKET_XZ[0],
@@ -690,8 +748,9 @@ def _exploded(
 
 
 # At 1:7 the exploded view shows the small hardware at the bracket and keeper
-# ends too small and dark to tell apart (r7 machinist review), so each north
-# end (the instances the balloons pin) is enlarged, exploded, beside the BOM.
+# ends too small and dark to tell apart (r7 machinist review), so the pulled
+# out channel's end hardware (the instances the balloons pin) is enlarged,
+# exploded, beside the BOM.
 # Each detail is centred on its exploded bore centre; the radii hold the
 # exploded set screw, hold-down or foot screw and (the bracket's) the north
 # washer, 29 to 40 mm from those centres in the isometric (estimated from the
@@ -712,7 +771,11 @@ NORTH_BRACKET_DETAIL = BankView(
         }
     ),
     crop_radius_mm=44.0,
-    parts="NORTH BRACKET",
+    parts=items_text(
+        (explode.BRACKET, explode.BRACKET_SET_SCREW, explode.BRACKET_HOLD_DOWN, explode.WASHER),
+        compact=True,
+    ),
+    sheet_scale=(1, 7),
     orientation="*Isometric",
     exploded=True,
     letter="B",
@@ -740,9 +803,10 @@ NORTH_KEEPER_DETAIL = BankView(
         "north",
     ),
     (EXPLODED_DETAIL_X, 0.150),
-    frozenset({explode.KEEPER, explode.KEEPER_SET_SCREW, explode.KEEPER_FOOT_SCREW}),
+    frozenset(_KEEPER_DETAIL_STEMS),
     crop_radius_mm=36.0,
-    parts="NORTH KEEPER",
+    parts=items_text(_KEEPER_DETAIL_STEMS, compact=True),
+    sheet_scale=(1, 7),
     orientation="*Isometric",
     exploded=True,
     letter="C",
@@ -752,6 +816,9 @@ NORTH_KEEPER_DETAIL = BankView(
     letter_corner=(1, -1),
 )
 EXPLODED_DETAILS = (NORTH_BRACKET_DETAIL, NORTH_KEEPER_DETAIL)
+# The partial views with a viewing arrow on sheet 1, and every lettered view.
+ARROWED_VIEWS = (ROCKER_BANK, LEVER_BANK, KEEPER_PLAN, HOOKUP)
+LETTERED_VIEWS = (*EXPLODED_DETAILS, SOUTH_END, *ARROWED_VIEWS)
 KEEPER_DETAIL_BALLOON_STEMS = NORTH_KEEPER_DETAIL.stems
 # Inside the 56 mm column: a 10 mm ring margin keeps a right-hand balloon
 # inside the border and the upper-left one 10 mm clear of the BOM.
@@ -805,7 +872,7 @@ DETAIL_POINTERS = tuple(
     (text, xy, SOUTH_END.sheet_xy(z, _PIVOT_Y + dy))
     for text, xy, z, dy in (
         (
-            f"{BOM_PART_NUMBERS['ch-rocker-arm']}\nHUB 0",
+            f"{BOM_PART_NUMBERS['ch-rocker-arm']}\nHUB",
             (0.018, 0.131),
             asm.PIVOT_CHAIN_Z[2] + 1.0,
             3.0,
@@ -840,124 +907,143 @@ if any("\n" in text for text in notes.DIMENSION_CALLOUTS.values()):
     raise AssertionError("an above-callout with a line break does not print")
 
 
-def _end_labels(
-    view: BankView,
-    north_z: float,
-    south_z: float,
-    y: float,
-    names: tuple[str, str],
-    *,
-    drop_mm: float = END_LABEL_DROP_MM,
-    x_offsets: tuple[float, float] = (0.0, -0.034),
-) -> tuple[tuple[str, tuple[float, float]], ...]:
-    """NORTH/SOUTH end labels under a bank's ends (a review asked which end is
-    which): ``drop_mm`` under the axis, each label's note point ``x_offsets``
-    (sheet m) from its end's station."""
-    drop = y - drop_mm
-    north = view.sheet_xy(north_z, drop)
-    south = view.sheet_xy(south_z, drop)
-    return (
-        (names[0], (north[0] + x_offsets[0], north[1])),
-        (names[1], (south[0] + x_offsets[1], south[1])),
-    )
-
-
-ROCKER_END_LABELS = _end_labels(
-    ROCKER_BANK,
-    asm.PIVOT_CHAIN_Z[3],
-    asm.PIVOT_CHAIN_Z[0],
-    _PIVOT_Y,
-    ("NORTH END, HUB 19", "SOUTH END, HUB 0"),
-)
-# Inside the lever bank, between the lever band (6 mm under the axis) and
-# the keeper feet, each label inboard of its keeper's inner face: at 52 mm
-# down they sat under the view, on the keeper plan's LUG CENTRE line, and
-# read as that view's labels (042726e review). The south label's note
-# point is its 0.045 width plus 3 mm inboard of the south lug inner face.
-LEVER_END_LABELS = _end_labels(
-    LEVER_BANK,
-    asm.LUG_INNER_FACE_Z[1],
-    asm.LUG_INNER_FACE_Z[0],
-    _FULCRUM_Y,
-    ("NORTH END, LEVER 19", "SOUTH END, LEVER 0"),
-    drop_mm=14.0,
-    x_offsets=(0.003, -0.049),
-)
 if not asm.KEEPER_SOCKET_XZ[1] < asm.LUG_INNER_FACE_Z[0] < asm.LUG_INNER_FACE_Z[1]:
-    raise AssertionError("the keeper plan's front face is not the south end's")
+    raise AssertionError("the keeper plan's front face is not the right end's")
 
-ROCKER_KEYS = tuple(
-    steps.SEQUENCE[: steps.SEQUENCE.index(steps.KEEPERS_PAIR_REAMED_KEY)]
+
+@dataclass(frozen=True)
+class StepColumn:
+    """One column a step group flows into: its sheet, its top-left note
+    point (sheet m) and the lowest y a printed line may reach."""
+
+    sheet: str
+    xy: tuple[float, float]
+    bottom: float
+
+    @property
+    def capacity(self) -> int:
+        """Printed lines the column holds."""
+        return int((self.xy[1] - self.bottom) / NOTE_LINE_PITCH)
+
+
+_RIGHT_FOOT = _TEMPLATE.title_block_top_m + STEPS_FOOT_CLEARANCE
+_BORDER_FOOT = BORDER + STEPS_FOOT_CLEARANCE
+# Sheet 3: under view D's label (its outline ends ~0.169, the two-line label
+# ~0.156) and right of the view. Sheet 4: above detail A's spring-set callout
+# (~0.145) and right of the detail. Sheet 5: right of views E and F. Sheet 6:
+# above view G and right of it.
+ROCKER_COLUMNS = (
+    StepColumn(SHEET_NAMES[2], (STEPS_LEFT_X, 0.148), _BORDER_FOOT),
+    StepColumn(SHEET_NAMES[2], (STEPS_RIGHT_X, STEPS_TOP_Y), _RIGHT_FOOT),
+    StepColumn(SHEET_NAMES[3], (STEPS_LEFT_X, STEPS_TOP_Y), 0.155),
+    StepColumn(SHEET_NAMES[3], (STEPS_RIGHT_X, STEPS_TOP_Y), _RIGHT_FOOT),
 )
-# The last lever-bank step prints whole on sheet 5 (HOOKUP).
-LEVER_CONTINUED_KEYS = (steps.SPRINGS_HOOKED_KEY,)
-LEVER_KEYS = tuple(steps.SEQUENCE[len(ROCKER_KEYS) : -len(LEVER_CONTINUED_KEYS)])
-if (
-    LEVER_KEYS[0] != steps.KEEPERS_PAIR_REAMED_KEY
-    or steps.SEQUENCE[-len(LEVER_CONTINUED_KEYS) :] != LEVER_CONTINUED_KEYS
-):
-    raise AssertionError("the lever-bank steps close the sequence")
+LEVER_COLUMNS = (
+    StepColumn(SHEET_NAMES[4], (STEPS_RIGHT_X, STEPS_TOP_Y), _RIGHT_FOOT),
+    StepColumn(SHEET_NAMES[5], (STEPS_LEFT_X, STEPS_TOP_Y), HOOKUP_TOP_Y + 0.008),
+    StepColumn(SHEET_NAMES[5], (STEPS_RIGHT_X, STEPS_TOP_Y), _RIGHT_FOOT),
+)
 
 
-def _block(
-    heading: str, keys: tuple[str, ...], text: dict[str, str], width: int
-) -> str:
+# A reference word and its number or letter (ITEM 10, STEP 5, VIEW D) print
+# on one line: wrapped with a placeholder space textwrap never breaks at.
+_REFERENCE_SPACE = re.compile(r"\b(ITEM|STEP|SHEET|VIEW|DETAIL) (?=\w)")
+_UNBROKEN_SPACE = "\x00"
+
+
+def _wrapped_step(key: str, text: str) -> list[str]:
+    lines = textwrap.wrap(
+        _REFERENCE_SPACE.sub(rf"\1{_UNBROKEN_SPACE}", text),
+        width=STEPS_LINE_WIDTH,
+        initial_indent=f"{steps.step_number(key)}. ",
+        subsequent_indent="   ",
+        # A part number never splits at its hyphens across two lines.
+        break_on_hyphens=False,
+    )
+    if len(lines) > STEP_MAX_LINES:
+        raise AssertionError(f"step {key!r} prints {len(lines)} lines, over six")
+    return [line.replace(_UNBROKEN_SPACE, " ") for line in lines]
+
+
+def flow_steps(
+    heading: str,
+    keys: tuple[str, ...],
+    text: dict[str, str],
+    columns: tuple[StepColumn, ...],
+) -> tuple[tuple[StepColumn, str], ...]:
+    """Flow ``keys``' wrapped steps down ``columns`` in order: one blank line
+    between consecutive steps (user request), a step never split, each
+    column headed by ``heading`` (its continuations ``heading (CONT.)``).
+    Columns left over stay empty."""
+    blocks: list[tuple[StepColumn, str]] = []
+    remaining = iter(columns)
+    column = next(remaining)
     lines = [heading]
-    for index, key in enumerate(keys):
-        if index:
-            lines.append("")  # one blank line between consecutive steps
-        lines += textwrap.wrap(
-            text[key],
-            width=width,
-            initial_indent=f"{steps.step_number(key)}. ",
-            subsequent_indent="   ",
-            # A part number never splits at its hyphens across two lines.
-            break_on_hyphens=False,
-        )
-    return "\n".join(lines)
+    for key in keys:
+        step = _wrapped_step(key, text[key])
+        gap = [""] if len(lines) > 1 else []
+        if len(lines) + len(gap) + len(step) > column.capacity:
+            if len(lines) == 1:
+                raise AssertionError(f"step {key!r} does not fit an empty column")
+            blocks.append((column, "\n".join(lines)))
+            column = next(remaining, None)  # type: ignore[arg-type]
+            if column is None:
+                raise AssertionError(f"{heading} overflows its columns at {key!r}")
+            lines, gap = [f"{heading} (CONT.)"], []
+        lines += gap + step
+    blocks.append((column, "\n".join(lines)))
+    return tuple(blocks)
 
 
-# The pivot shaft's north tip setting prints .XXX (.050 TO .070).
+# The pivot shaft's tip setting prints .XXX (.050 TO .070).
 TIP_SET_PLACES = 3
+# The feeler leaf the right bracket is set on: the spring set's nominal
+# snapped to the .001 grid a feeler set is sold in, proved inside the
+# detail A band (the band, not the leaf, is the acceptance).
+FEELER_LEAF_PLACES = 3
+FEELER_LEAF = round(ROCKER_SPRING_SET / LENGTH_UNITS[asm.UNIT], FEELER_LEAF_PLACES)
+if abs(FEELER_LEAF * LENGTH_UNITS[asm.UNIT] - ROCKER_SPRING_SET) > ROCKER_SPRING_SET_BAND:
+    raise AssertionError("the feeler leaf is outside the detail A spring-set band")
+FEELER_LEAF_TEXT = render_number(FEELER_LEAF, asm.UNIT, FEELER_LEAF_PLACES)
 
 
-def _fitup_notes() -> tuple[str, str, str]:
+def _fitup_text() -> dict[str, str]:
+    """Every step's text, keyed as ``ch_channel_assembly_steps.SEQUENCE``."""
     # Literal stems, so the config-dependency analysis reads exactly these rows.
-    arm = _config.parts("ch-rocker-arm")["number"]
-    rod = _config.parts("ch-connecting-rod")["number"]
-    pin = _config.parts("ch-rod-pivot-pin")["number"]
-    shaft = _config.parts("ch-pivot-shaft")["number"]
-    bracket = _config.parts("ch-pivot-bracket")["number"]
-    washer = _config.parts("ch-vn-rocker-thrust-washer")["number"]
-    spring = _config.parts("ch-vn-rocker-bank-spring")["number"]
-    pivot_set_screw = _config.parts("sh-vn-arbor-set-screw")["number"]
+    arm_number = _config.parts("ch-rocker-arm")["number"]
+    keeper_number = _config.parts("ch-fulcrum-keeper")["number"]
     support = _config.parts("fr-rocker-arm-support")["number"]
-    hold_down = _config.parts("ch-vn-bracket-hold-down-screw")["number"]
-    keeper = _config.parts("ch-fulcrum-keeper")["number"]
-    fulcrum_shaft = _config.parts("ch-fulcrum-shaft")["number"]
-    fulcrum_set_screw = _config.parts("ch-vn-fulcrum-set-screw")["number"]
-    foot_screw = _config.parts("ch-vn-frame-side-screw")["number"]
     top_frame = _config.parts("fr-top-frame")["number"]
-    bar = _config.parts("ch-amplitude-bar")["number"]
-    lever = _config.parts("ch-channel-lever")["number"]
-    bar_pin = _config.parts("ch-bar-pivot-pin")["number"]
-    channel_spring = _config.parts("ch-vn-channel-spring-installed")["number"]
-    anchor = _config.parts("ch-vn-spring-hook")["number"]
-    anchor_nut = _config.parts("ch-anchor-jam-nut")["number"]
-    last = COUNT - 1
-    # Step 1 prints that the stack is never short (machinist review, PR
-    # #1605): every hub comes at or over its print length, so the shortest
-    # stack the part band allows must still meet the acceptance's low limit.
-    # A long stack is then re-faced on the longest hubs' south faces, each
-    # kept at or over its print, and never on the datum face the strap is
-    # dimensioned from.
+    shaft, fulcrum_shaft = item("ch-pivot-shaft"), item("ch-fulcrum-shaft")
+    bracket, pivot_set_screw = item(explode.BRACKET), item(explode.BRACKET_SET_SCREW)
+    washer, spring = item(explode.WASHER), item(explode.BANK_SPRING)
+    hold_down, keeper = item(explode.BRACKET_HOLD_DOWN), item(explode.KEEPER)
+    foot_screw = item(explode.KEEPER_FOOT_SCREW)
+    fulcrum_set_screw = item(explode.KEEPER_SET_SCREW)
+    arm, rod, bar = item("ch-rocker-arm"), item(explode.ROD), item(explode.BAR)
+    lever, pin = item("ch-channel-lever"), item("ch-rod-pivot-pin")
+    bar_pin, channel_spring = item(explode.BAR_PIN), item(SPRING_STEM)
+    anchor, anchor_nut = item(explode.HOOK), item(explode.ANCHOR_NUT)
+    rocker_view, lever_view = ROCKER_BANK.title, LEVER_BANK.title
+    plan_view, hookup_view = KEEPER_PLAN.title, HOOKUP.title
+    detail = f"{SOUTH_END.title}, SHEET {SHEET_NAMES.index(DETAIL_SHEET) + 1}"
+
+    def n(key: str) -> int:
+        return steps.step_number(key)
+
+    # Every hub comes at or over its print length (its band is upper-only),
+    # so the shortest stack the part band allows still meets the acceptance's
+    # low limit: the stack can only be long, and the re-face step covers that.
+    # It faces the longest hubs on the end away from datum G, the face each
+    # arm registers on in the stack (draw_ch_rocker_arm), keeping each at or
+    # over its print.
     if COUNT * (HUB_LENGTH + HUB_LENGTH_BAND[1]) < STACK_L20_ACCEPT[0] - 1e-9:
         raise AssertionError(
-            "step 1 says the stack is never short, but the hub band allows "
-            "a stack under the acceptance's low limit"
+            "the re-face step covers only a long stack, but the hub band "
+            "allows a stack under the acceptance's low limit"
         )
     # The pivot shaft comes finished, domed both ends to its overall length
-    # (ch_pivot_shaft_spec): its north tip set DOME_HEIGHT proud of the north
+    # (ch_pivot_shaft_spec): its left tip set DOME_HEIGHT proud of the left
     # ear, within SHAFT_TIP_SET_BAND, puts both flats under their screws
     # (rocker_bank_layout checks the worst case).
     tip_low, tip_high = (
@@ -972,154 +1058,235 @@ def _fitup_notes() -> tuple[str, str, str]:
     # socket axis) in X and off the frame's hole-station origin line, the
     # upper socket centres, in Z (Main's ruling): the lug centre on the
     # fulcrum line, its inner face off the front socket line. The frame is not
-    # in this assembly, so the keeper plan view draws both datums and prints
-    # the three settings, each banded (owner ruling X1+B1, b9ae review).
+    # in this assembly, so view F draws both datums and prints the three
+    # settings, each banded (owner ruling X1+B1, b9ae review).
     if abs(LEVER_FULCRUM_XY[0] - COLUMN_X - KEEPER_FITUP_X_FROM_WEB_MM) > 1e-9:
         raise AssertionError("KEEPER_FITUP_X_FROM_WEB_MM is off the fulcrum line")
     front_face, rear_face = KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM
     # The pair is reamed at the spacing KEEPERS_SET_KEY sets it to (Main's
-    # ruling): the lever-bank view's reference lug span.
+    # ruling): view E's reference lug span.
     if abs(rear_face - front_face - KEEPER_INNER_FACE_SPAN_MM) > 1e-9:
         raise AssertionError("the pair-ream span is not the fit-up span")
-    # The crown and its tap centre on the bore this step makes, so each
-    # keeper is finished here, but to its own print: MHA-CH-07 sizes the
-    # crown (CrownRadius, "FULL ROUND TANGENT TO BOTH SIDES, CENTER AT BORE
-    # HEIGHT, PER" this step) and sizes and places the crown tap ("ON BORE
-    # AXIS AFTER REAM", its station in the plan). The step carries none of
-    # that part data (rule 24; #1660 r2 confirmed it on the assembly sheet).
     # The lever bank is never fitted like the rocker stack: the bars on the
-    # straps locate it, and twenty hubs at the top of their band still leave
-    # end play between the lugs at the extremes of both inner-face bands
-    # (#1660 r2: the step says so and gauges it as the bank sliding).
+    # arms locate it, and twenty hubs at the top of their band still leave end
+    # play between the lugs at the extremes of both inner-face bands, which
+    # the lever-bank-slides check gauges (#1660 r2).
     lever_stack_max = COUNT * (LEVER_HUB_LENGTH + LEVER_HUB_LENGTH_BAND[0])
     lug_span_min = KEEPER_INNER_FACE_SPAN_MM - 2.0 * KEEPER_FITUP_LOCATION_BAND_MM
     if lug_span_min - lever_stack_max <= 0.0:
         raise AssertionError(
-            "step 12 says the lever bank has end play, but the longest hubs "
+            "the lever bank must slide between the lugs, but the longest hubs "
             "fill the shortest lug span"
         )
-    text = {
-        # The rings are captured in the closed cam slots as the cylinder stack
-        # goes together, and the pressed pin needs its far tine backed on the
-        # press, so each rod + arm pair is pinned at the bench before that step -- and
-        # after the hub stack is proved on the shaft, while the arms are loose.
+    return {
+        # The hub stack is proved on the shaft first, while the arms are
+        # loose; each rod + arm pair is then pinned at the bench, before the
+        # drive-train cylinder stack captures the rod rings in their cams.
         "rocker-stack-accepted": (
-            f"STACK THE {COUNT} {arm} ROCKERS ON THE {shaft} SHAFT, CLOSED UP. "
-            f"HUB 0 SOUTH FACE TO HUB {last} NORTH FACE TO THE ROCKER BANK "
-            f"VIEW'S STACK DIMENSION. EVERY {arm} HUB COMES AT OR OVER PRINT "
-            "LENGTH, SO THE STACK IS NEVER SHORT. RE-FACE A LONG STACK ON THE "
-            "SOUTH FACES OF THE LONGEST HUBS AS STACKED, NEVER THE DATUM FACE, "
-            "NO HUB UNDER PRINT LENGTH. SLIDE THE ROCKERS OFF IN ORDER AND KEEP "
-            "THAT ORDER."
+            f"STACK THE {COUNT} {arm} ROCKERS ON {shaft} AS {rocker_view} SHOWS, "
+            "HUBS IN CONTACT."
         ),
-        "rod-forks-pinned": (
-            f"BEFORE {steps.CYLINDER_STACK_REF}, AT THE BENCH: PIN EACH {rod} "
-            f"ROD FORK TO ITS {arm} ARM WITH ONE {pin}. PRESS IT IN, FAR TINE "
-            "BACKED; DRESS BOTH ENDS FLUSH. PIN REMOVABLE WITH PUNCH. "
-            "ACCEPT IF THE ARM SWINGS FREE UNDER ITS OWN WEIGHT."
+        "rocker-stack-measured": (
+            "MEASURE THE STACK OVER ITS END HUB FACES WITH A CALIPER: IT MUST "
+            f"MEET THE {rocker_view} STACK DIMENSION."
         ),
+        "rocker-stack-refaced": (
+            "IF IT IS LONG, FACE THE LONGEST HUBS ON THEIR ENDS AWAY FROM DATUM "
+            f"G ({arm_number} DRAWING), NONE BELOW ITS PRINTED LENGTH, AND "
+            f"RETURN TO STEP {n('rocker-stack-measured')}."
+        ),
+        "rockers-kept-in-order": (
+            f"SLIDE THE ROCKERS OFF {shaft} IN ORDER AND KEEP THAT ORDER."
+        ),
+        steps.RODS_PINNED_KEY: (
+            f"BEFORE {steps.CYLINDER_STACK_REF}, AT THE BENCH: PRESS ONE {pin} "
+            f"PIN THROUGH EACH {rod} ROD FORK AND THE PIVOT HOLE OF ONE {arm}, "
+            "FAR TINE BACKED."
+        ),
+        "rod-pins-dressed": f"DRESS BOTH ENDS OF EACH {pin} FLUSH WITH THE TINES.",
+        "rod-pins-held": f"CHECK EACH {pin} DOES NOT SLIDE IN ITS FORK BY HAND.",
+        "rod-arms-swing": (
+            f"CHECK EACH {arm} SWINGS FREE ON ITS PIN UNDER ITS OWN WEIGHT."
+        ),
+        # A press whose part slides in by hand is a slip fit (rule 23): the
+        # press-fit ruling (ch_rod_pivot_pin_spec) is kept by a new pin.
+        "rod-pin-remade": (
+            f"IF AN {pin} SLID IN BY HAND, PRESS IT OUT, REMAKE IT TO THE PRESS "
+            f"SIZE ON ITS DRAWING AND RETURN TO STEP {n(steps.RODS_PINNED_KEY)}."
+        ),
+        "north-bracket-held": (
+            f"CHECK THE LEFT {bracket} OF {rocker_view}, SET AT "
+            f"{steps.NORTH_BRACKET_SET_REF}, DOES NOT TURN BY HAND."
+        ),
+        "arms-swung-up": f"SWING EACH {arm} UP ON ITS {rod}.",
         "north-ear-datum": (
-            f"NORTH {bracket} SET AND SCREWED DOWN WITH ONE {hold_down} AT "
-            f"{steps.NORTH_BRACKET_SET_REF}: SWING "
-            f"EACH ARM UP ON ITS ROD; PUSH THE {shaft} SHAFT, FLATS UP, "
-            "SOUTH THROUGH THE EAR, THE "
-            f"{washer} WASHER MEASURED AT THAT STEP, THEN HUBS {last} TO 0."
+            f"PUSH {shaft}, FLATS UP, THROUGH THE LEFT {bracket} EAR, THEN THROUGH "
+            f"THE {washer} WASHER MEASURED AT {steps.NORTH_BRACKET_SET_REF}."
         ),
-        "south-washer-fitted": f"SLIP THE OTHER {washer} ON AGAINST HUB 0.",
+        "rocker-hubs-threaded": (
+            f"PUSH {shaft} ON THROUGH THE {arm} HUBS, LEFT TO RIGHT IN THE ORDER "
+            f"KEPT AT STEP {n('rockers-kept-in-order')}."
+        ),
+        "south-washer-fitted": (
+            f"SLIP THE OTHER {washer} ONTO {shaft} AGAINST THE RIGHT-HAND HUB."
+        ),
+        # Machinist review (#2108): the BOM carries one spring, so its run
+        # along the shaft is a check, with its own remedy.
+        "bank-spring-checked": (
+            f"CHECK THE {spring} WAVE SPRING SLIDES FREE ALONG {shaft}."
+        ),
+        "bank-spring-replaced": (
+            f"IF IT BINDS, REPLACE THAT {spring} AND REPEAT STEP "
+            f"{n('bank-spring-checked')}."
+        ),
+        "bank-spring-fitted": f"FIT {spring} ON {shaft} AGAINST THAT {washer}.",
         # The spring-back check runs while the bracket is only clamped, so a
         # failed check is re-set before anything is drilled, tapped or staked
         # (machinist review, PR #1605).
         "south-bracket-spring-set": (
-            f"RUN THE {spring} WAVE SPRING ALONG THE {shaft}: ACCEPT IF IT "
-            f"SLIDES FREE. FIT IT ON. SET THE SOUTH {bracket} OFF THE WASHER ON A "
-            f"SPRING-SET BLADE (DETAIL {DETAIL_LETTER}) BESIDE THE SPRING, "
-            "BANK PUSHED NORTH. CLAMP AND PULL THE BLADE. ACCEPT: PUSHED "
-            "SOUTH, THE BANK SPRINGS BACK ONTO THE NORTH WASHER; ELSE UNCLAMP "
-            "AND REPEAT THIS STEP."
+            f"WITH THE BANK PUSHED LEFT, STAND THE RIGHT {bracket} ON {support} "
+            f"WITH {shaft} IN ITS EAR AND A {FEELER_LEAF_TEXT} FEELER GAUGE LEAF "
+            f"BETWEEN THE EAR AND {washer}, BESIDE {spring} ({detail})."
+        ),
+        "south-bracket-clamped": (
+            f"CLAMP THE RIGHT {bracket} TO {support} AND PULL OUT THE LEAF."
+        ),
+        "spring-back-checked": (
+            "CHECK THE BANK, PUSHED RIGHT AND RELEASED, SPRINGS BACK AGAINST "
+            f"THE LEFT {washer}."
+        ),
+        "south-bracket-reset": (
+            f"IF IT DOES NOT, UNCLAMP THE RIGHT {bracket} AND RETURN TO STEP "
+            f"{n('south-bracket-spring-set')}."
+        ),
+        "south-foot-transferred": (
+            f"STILL CLAMPED, TRANSFER-DRILL THE RIGHT {bracket} FOOT HOLE INTO "
+            f"THE {support} RAIL AND TAP IT TO THE {support} DRAWING."
         ),
         "south-bracket-screwed": (
-            f"STILL CLAMPED AS ACCEPTED, TRANSFER THE SOUTH {bracket} FOOT HOLE "
-            f"INTO THE {support} RAIL, TAP AS {support}, SCREW DOWN ONE "
-            f"{hold_down}."
+            f"SCREW THE RIGHT {bracket} DOWN WITH ONE {hold_down} AND REMOVE "
+            "THE CLAMP."
         ),
+        "south-bracket-held": f"CHECK THE RIGHT {bracket} DOES NOT TURN BY HAND.",
         "shaft-set": (
-            f"SLIDE THE {shaft} SHAFT UNTIL ITS NORTH TIP STANDS "
-            f"{tip_low} TO {tip_high} PROUD OF THE NORTH EAR'S OUTER FACE."
+            f"SLIDE {shaft} UNTIL ITS LEFT TIP STANDS {tip_low} TO {tip_high} "
+            "PROUD OF THE LEFT EAR'S OUTER FACE (CALIPER DEPTH ROD)."
         ),
         # drawing-guidelines.md rule 23: staked like the keeper set screws
         # (fulcrum-set-screws-staked). The Loctite waiver was retired on
         # 2026-10-16 under the user's standing no-threadlocker rule.
         "set-screws-driven": (
-            "SHAFT HELD AS SET, FLATS UP, WITH THE CUP-POINT SET SCREWS: "
-            f"RUN ONE {pivot_set_screw} DOWN EACH "
-            "APEX TAP ONTO ITS FLAT, NORTH FIRST; SNUG, AND STAKE EACH TAP "
-            "MOUTH AT 2 POINTS."
+            f"WITH {shaft} FLATS UP, RUN ONE {pivot_set_screw} DOWN THE TAP AT "
+            f"THE TOP OF EACH {bracket} EAR ONTO ITS FLAT, LEFT EAR FIRST, AND "
+            "SNUG IT."
+        ),
+        steps.PIVOT_SET_SCREWS_STAKED_KEY: (
+            f"STAKE THE MOUTH OF EACH {pivot_set_screw} TAP AT 2 POINTS."
+        ),
+        "pivot-shaft-held": f"CHECK {shaft} DOES NOT TURN OR SLIDE BY HAND.",
+        # The keepers are reamed as a pair at the bench, then each is finished
+        # to its own print on the bore this makes: MHA-CH-07 sizes the
+        # full-radius top and places the set-screw tap on the bore axis. The
+        # steps carry none of that part data (rule 24; #1660 r2).
+        "keepers-clamped": (
+            f"CLAMP BOTH {keeper} KEEPERS ON ONE FLAT, FEET OUTWARD, INNER LUG "
+            f"FACES AT THE {lever_view} LUG SPAN, BORE AXES PARALLEL TO THE FLAT."
         ),
         steps.KEEPERS_PAIR_REAMED_KEY: (
-            f"CLAMP BOTH {keeper}, FEET OUTBOARD ON ONE FLAT, INNER LUG FACES "
-            "AT THE LEVER BANK VIEW'S LUG SPAN, BORE AXIS PARALLEL TO THE "
-            f"FLAT. STILL CLAMPED, MAKE BOTH {keeper} BORES TO THEIR DRAWING, "
-            f"IN LINE: THE {fulcrum_shaft} SHAFT SLIDES FREELY THROUGH BOTH. "
-            "THEN, ON EACH BORE'S AXIS, FINISH THAT KEEPER'S CROWN AND CROWN "
-            f"TAP TO THE {keeper} DRAWING."
+            f"STILL CLAMPED, MAKE BOTH {keeper} BORES TO THEIR DRAWING IN ONE "
+            "SETUP, IN LINE."
+        ),
+        "keeper-bores-checked": (
+            f"CHECK {fulcrum_shaft} SLIDES FREELY THROUGH BOTH BORES."
+        ),
+        "keeper-tops-finished": (
+            f"FINISH EACH {keeper}'S FULL-RADIUS TOP AND ITS {fulcrum_set_screw} "
+            f"TAP ON ITS BORE AXIS, TO THE {keeper_number} DRAWING."
+        ),
+        "keepers-on-frame": (
+            f"WITH {top_frame} ON THE MILL, STAND BOTH {keeper} ON ITS RAIL AS "
+            f"{plan_view} SHOWS, FEET OUTWARD, {fulcrum_shaft} THROUGH BOTH BORES."
         ),
         steps.KEEPERS_SET_KEY: (
-            f"{top_frame} ON THE MILL: SHAFT THROUGH BOTH KEEPERS, FEET "
-            "OUTBOARD ON THE RAIL. SET EACH LUG CENTRE OFF THE RAIL WEB CENTRE "
-            "BELOW IT AND THE LUG INNER FACES OFF THE LINE OF THE UPPER SOCKET "
-            "CENTRES, TO THE KEEPER PLAN VIEW. THE LUG CENTRE'S BAND KEEPS EACH "
-            "FOOT HOLE, TRANSFERRED BELOW, OVER THE RAIL WEB WITH A FULL WALL "
-            "ROUND ITS TAP; THE SOUTH FACE'S BAND KEEPS THE "
-            f"SOUTH FOOT CLEAR OF THE {top_frame} FRONT SOCKET BOSS. THE "
-            f"{fulcrum_shaft} FLATS ARE A FIXED PITCH APART, AND THE TWO "
-            "INNER-FACE BANDS TOGETHER LEAVE ONE STEP "
-            f"{steps.step_number(steps.SET_SCREWS_STAKED_KEY)} SHAFT POSITION "
-            "WITH BOTH FLATS UNDER THEIR CROWN TAPS AND NO LEVER HUB ON A FLAT. "
-            f"CLAMP; TRANSFER EACH FOOT HOLE INTO THE RAIL, TAP AS {top_frame}, "
-            f"SCREW DOWN ONE {foot_screw}."
+            "BY DRO, SET EACH LUG CENTRE OFF THE RAIL WEB CENTRE AND THE LUG "
+            "INNER FACES OFF THE LINE OF THE UPPER SOCKET CENTRES, TO "
+            f"{plan_view}."
         ),
+        "keepers-clamped-on-frame": f"CLAMP BOTH {keeper} TO THE RAIL.",
+        "keeper-feet-transferred": (
+            f"TRANSFER-DRILL EACH {keeper} FOOT HOLE INTO THE RAIL AND TAP IT TO "
+            f"THE {top_frame} DRAWING."
+        ),
+        steps.KEEPERS_SCREWED_KEY: (
+            f"SCREW EACH {keeper} DOWN WITH ONE {foot_screw} AND REMOVE THE "
+            "CLAMPS."
+        ),
+        "keepers-held": f"CHECK EACH {keeper} DOES NOT TURN BY HAND.",
         steps.BARS_PINNED_KEY: (
-            f"AT THE BENCH: PIN EACH {bar} BAR TO ITS {lever} LEVER WITH ONE "
-            f"{bar_pin}, THE BAR'S TOP NOTCH ASTRIDE THE LEVER. PRESS THE PIN "
-            "THROUGH BOTH CHEEKS AND THE LEVER HOLE, FAR CHEEK BACKED; DRESS "
-            "BOTH ENDS FLUSH. ACCEPT IF THE BAR SWINGS FREE UNDER ITS OWN WEIGHT."
+            f"AT THE BENCH, SET THE TOP NOTCH OF EACH {bar} BAR ASTRIDE ONE "
+            f"{lever} LEVER AND PRESS ONE {bar_pin} PIN THROUGH BOTH BAR CHEEKS "
+            "AND THE LEVER HOLE, FAR CHEEK BACKED."
+        ),
+        "bar-pins-dressed": (
+            f"DRESS BOTH ENDS OF EACH {bar_pin} FLUSH WITH THE CHEEKS."
+        ),
+        "bar-pins-held": f"CHECK EACH {bar_pin} DOES NOT SLIDE IN ITS BAR BY HAND.",
+        "bars-swing": f"CHECK EACH {bar} SWINGS FREE ON ITS PIN UNDER ITS OWN WEIGHT.",
+        "bar-pin-remade": (
+            f"IF AN {bar_pin} SLID IN BY HAND, PRESS IT OUT, REMAKE IT TO THE "
+            "PRESS SIZE ON ITS DRAWING AND RETURN TO STEP "
+            f"{n(steps.BARS_PINNED_KEY)}."
+        ),
+        "fulcrum-shaft-withdrawn": (
+            f"DRAW {fulcrum_shaft} OUT OF BOTH {keeper} TO THE LEFT ({lever_view})."
         ),
         steps.LEVER_BANK_THREADED_KEY: (
-            f"DRAW THE {fulcrum_shaft} SHAFT OUT NORTH. PUSH IT BACK SOUTH "
-            f"THROUGH THE NORTH {keeper}, LEVERS {last} TO 0 IN CHANNEL ORDER "
-            f"AND THE SOUTH {keeper}, EACH BAR'S FOOT NOTCH ASTRIDE ITS {arm} "
-            "STRAP. THE BARS ON THE STRAPS LOCATE THE LEVER BANK; EVEN AT "
-            f"THEIR LONGEST THE {COUNT} LEVER HUBS ARE SHORTER THAN THE LUG "
-            "SPAN. ACCEPT IF EVERY LEVER SWINGS FREE AND THE BANK SLIDES ALONG "
-            "THE SHAFT BETWEEN THE LUGS."
+            f"PUSH {fulcrum_shaft} BACK THROUGH THE LEFT {keeper}, THEN THROUGH "
+            f"THE {COUNT} {lever} LEVERS, ONE ABOVE EACH {arm}, THEN THROUGH THE "
+            f"RIGHT {keeper}."
+        ),
+        "bar-feet-seated": (
+            f"SEAT THE FOOT NOTCH OF EACH {bar} ASTRIDE THE ARM OF THE {arm} "
+            "BELOW IT."
+        ),
+        "levers-swing": f"CHECK EVERY {lever} SWINGS FREE ON {fulcrum_shaft}.",
+        "lever-bank-slides": (
+            f"CHECK THE LEVERS SLIDE TOGETHER ALONG {fulcrum_shaft} BETWEEN THE "
+            f"{keeper} LUGS."
+        ),
+        "fulcrum-flats-aligned": (
+            f"SLIDE {fulcrum_shaft} UNTIL EACH OF ITS FLATS LIES UP, UNDER THE "
+            f"{fulcrum_set_screw} TAP OF ITS {keeper}."
+        ),
+        steps.FULCRUM_SET_SCREWS_DRIVEN_KEY: (
+            f"TIGHTEN ONE {fulcrum_set_screw} SET SCREW ONTO EACH FLAT."
         ),
         steps.SET_SCREWS_STAKED_KEY: (
-            f"WITH THE LEVER BANK ON IT, SLIDE THE {fulcrum_shaft} SHAFT UNTIL "
-            f"EACH FLAT LIES UNDER ITS CROWN TAP; TIGHTEN ONE {fulcrum_set_screw} SET "
-            "SCREW ONTO EACH FLAT AND STAKE EACH TAP MOUTH AT 2 POINTS."
+            f"STAKE THE MOUTH OF EACH {fulcrum_set_screw} TAP AT 2 POINTS."
+        ),
+        "fulcrum-shaft-held": f"CHECK {fulcrum_shaft} DOES NOT TURN OR SLIDE BY HAND.",
+        steps.SPRINGS_HOOKED_KEY: (
+            f"HOOK THE TOP LOOP OF EACH {channel_spring} SPRING THROUGH THE "
+            f"SPRING HOLE OF ITS {lever} ({hookup_view})."
         ),
         # The anchors thread into the summing plate and are jammed by their
-        # nuts at MHA-HA-00, which owns that joint, its lock and its
-        # setting. This sheet only hooks the spring; the pointer is
-        # steps.HA_ANCHORS_SET_REF.
-        steps.SPRINGS_HOOKED_KEY: (
-            f"HOOK EACH {channel_spring} SPRING'S TOP LOOP THROUGH ITS {lever} "
-            f"LEVER'S SPRING HOLE. ITS BOTTOM LOOP TAKES ITS {anchor} ANCHOR, "
-            f"THREADED AND JAMMED BY ITS {anchor_nut} PER "
-            f"{steps.HA_ANCHORS_SET_REF}."
+        # nuts at MHA-HA-00, which owns that joint, its lock and its setting
+        # (rule 23 at the package boundary: cited by its step).
+        "spring-bottom-loops-left": (
+            f"LEAVE EACH BOTTOM LOOP FREE: {steps.HA_ANCHORS_SET_REF} THREADS "
+            f"EACH {anchor} ANCHOR, JAMS IT WITH ITS {anchor_nut} NUT AND HOOKS "
+            "THE LOOP INTO IT."
         ),
     }
-    return (
-        _block("ROCKER BANK FIT-UP", ROCKER_KEYS, text, STEPS_LINE_WIDTH),
-        _block("LEVER BANK FIT-UP", LEVER_KEYS, text, STEPS_LINE_WIDTH),
-        _block(
-            "LEVER BANK FIT-UP (CONT.)", LEVER_CONTINUED_KEYS, text, STEPS_LINE_WIDTH
-        ),
-    )
 
 
-FITUP_NOTES = _fitup_notes()
-FITUP_STEPS = "\n".join(FITUP_NOTES)
+FITUP_TEXT = _fitup_text()
+if tuple(FITUP_TEXT) != steps.SEQUENCE:
+    raise AssertionError("the step text must follow ch_channel_assembly_steps.SEQUENCE")
+FITUP_NOTES = flow_steps(
+    "ROCKER BANK FIT-UP", steps.ROCKER_SEQUENCE, FITUP_TEXT, ROCKER_COLUMNS
+) + flow_steps("LEVER BANK FIT-UP", steps.LEVER_SEQUENCE, FITUP_TEXT, LEVER_COLUMNS)
+FITUP_STEPS = "\n".join(text for _column, text in FITUP_NOTES)
 
 
 def _activate_sheet(adapter: Any, name: str) -> Any:
@@ -1327,6 +1494,16 @@ def _validate_bom(adapter: Any, table: Any) -> tuple[tuple[str, str], ...]:
         raise RuntimeError(
             f"channel BOM item numbers {sorted(items)!r} are not contiguous"
         )
+    # The steps and detail labels name parts by ITEM_NUMBERS.
+    misnumbered = {
+        stem: values[1]
+        for stem, values in actual.items()
+        if values[1] != str(ITEM_NUMBERS[stem])
+    }
+    if misnumbered:
+        raise RuntimeError(
+            f"channel BOM item numbers {misnumbered!r} differ from ITEM_NUMBERS"
+        )
     for stem, (row_index, _item, description, quantity) in actual.items():
         number = BOM_PART_NUMBERS[stem]
         if contents[row_index][part_column] != number:
@@ -1440,6 +1617,7 @@ def _assert_exploded_caption(adapter: Any, table: Any, note: Any) -> None:
 
 def _place_assembled_sheet(adapter: Any) -> None:
     _activate_sheet(adapter, SHEET_NAMES[0])
+    views: dict[str, Any] = {}
     for orientation, center, scale in (
         ("*Front", FRONT_CENTER, ASSEMBLED_SCALE),
         ("*Right", RIGHT_CENTER, ASSEMBLED_SCALE),
@@ -1459,6 +1637,7 @@ def _place_assembled_sheet(adapter: Any) -> None:
             label=f"channel {orientation}",
         )
         _assert_view_on_sheet(view, label=f"channel {orientation}")
+        views[orientation] = view
     assert_full_detail_view(adapter, label="channel assembly")
     _add_note_block(
         adapter,
@@ -1470,6 +1649,65 @@ def _place_assembled_sheet(adapter: Any) -> None:
     _add_note_block(
         adapter, SHEET_NAMES[0], ISO_LABEL, ISO_LABEL_XY, label="isometric label"
     )
+    _add_view_arrows(adapter, views["*Front"], views["*Right"])
+
+
+def _add_view_arrows(adapter: Any, front: Any, right: Any) -> None:
+    """Viewing arrows for views D-G. D and E (*Right views) look at the
+    front view from its right, level with the pivot and fulcrum axes; F (a
+    *Top view) looks down on it at the keeper lugs; G (a *Front view) looks
+    at the right view from its left, level with the spring hook-up."""
+    _, _, front_right, front_top = _view_outline(front, label="channel *Front")
+    right_left = _view_outline(right, label="channel *Right")[0]
+
+    def sheet(view: Any, xyz_mm: tuple[float, float, float], bank: BankView):
+        xyz = (xyz_mm[0] / 1000.0, xyz_mm[1] / 1000.0, xyz_mm[2] / 1000.0)
+        return model_point_in_view(adapter, view, xyz, label=f"{bank.title} arrow")
+
+    pivot_y = sheet(front, ROCKER_BANK.centre_xyz, ROCKER_BANK)[1]
+    fulcrum_y = sheet(front, LEVER_BANK.centre_xyz, LEVER_BANK)[1]
+    lug_x = sheet(
+        front, (asm.KEEPER_LUG_X, _FULCRUM_Y, FULCRUM_KEEPER_CENTRE_Z), KEEPER_PLAN
+    )[0]
+    hookup_y = sheet(right, HOOKUP.centre_xyz, HOOKUP)[1]
+    height, gap, run = VIEW_ARROW_LETTER_HEIGHT, VIEW_ARROW_TIP_GAP, VIEW_ARROW_RUN
+    # (bank, parent view, arrow tip, letter's note point: upper left).
+    arrows = (
+        (
+            ROCKER_BANK,
+            front,
+            (front_right + gap, pivot_y),
+            (front_right + gap + run, pivot_y + height / 2.0),
+        ),
+        (
+            LEVER_BANK,
+            front,
+            (front_right + gap, fulcrum_y),
+            (front_right + gap + run, fulcrum_y + height / 2.0),
+        ),
+        (
+            KEEPER_PLAN,
+            front,
+            (lug_x, front_top + gap),
+            (lug_x - height / 3.0, front_top + gap + run + height),
+        ),
+        (
+            HOOKUP,
+            right,
+            (right_left - gap, hookup_y),
+            (right_left - gap - run - height, hookup_y + height / 2.0),
+        ),
+    )
+    for bank, view, tip, text_xy in arrows:
+        add_leader_note(
+            adapter,
+            bank.title.removeprefix("VIEW "),
+            text_xy=text_xy,
+            attach_xy=tip,
+            label=f"{bank.title} viewing arrow",
+            view=view,
+            height=height,
+        )
 
 
 def _place_exploded_sheet(
@@ -1948,34 +2186,34 @@ def _assert_settings(displays: dict[str, Any]) -> None:
             raise RuntimeError(f"{name}: callout reads {text!r}")
 
 
-def _place_labels(
-    adapter: Any, sheet: str, labels: tuple[tuple[str, tuple[float, float]], ...]
-) -> None:
-    for text, xy in labels:
-        _add_note_block(adapter, sheet, text, xy, label=f"{text} label")
-
-
-def _place_steps(adapter: Any, sheet: str, text: str, *, label: str) -> None:
-    _add_note_block(adapter, sheet, text, STEPS_XY, label=label)
+def _place_steps(adapter: Any, sheet: str) -> None:
+    """The step columns ``FITUP_NOTES`` flowed onto ``sheet``."""
+    for index, (column, text) in enumerate(FITUP_NOTES):
+        if column.sheet == sheet:
+            _add_note_block(
+                adapter, sheet, text, column.xy, label=f"fit-up steps, column {index}"
+            )
 
 
 def _place_fitup_sheets(adapter: Any) -> Callable[[], None]:
-    """Sheets 3 and 4: the isolated banks with their settings, the steps."""
+    """Sheets 3 to 5: the isolated banks with their settings, detail A, the
+    steps."""
     _activate_sheet(adapter, SHEET_NAMES[2])
     annotations = _dimensioned_bank(adapter, ROCKER_BANK, STACK_KEEP, detail=SOUTH_END)
+    _place_steps(adapter, SHEET_NAMES[2])
+
+    _activate_sheet(adapter, DETAIL_SHEET)
     annotations += _dimensioned_bank(
         adapter, SOUTH_END, SPRING_KEEP, pointers=DETAIL_POINTERS
     )
-    _place_labels(adapter, SHEET_NAMES[2], ROCKER_END_LABELS)
-    _place_steps(adapter, SHEET_NAMES[2], FITUP_NOTES[0], label="rocker-bank steps")
+    _place_steps(adapter, DETAIL_SHEET)
 
-    _activate_sheet(adapter, SHEET_NAMES[3])
+    _activate_sheet(adapter, SHEET_NAMES[4])
     annotations += _dimensioned_bank(adapter, LEVER_BANK, LUG_KEEP)
     annotations += _dimensioned_bank(
         adapter, KEEPER_PLAN, PLAN_KEEP, pointers=PLAN_POINTERS
     )
-    _place_labels(adapter, SHEET_NAMES[3], LEVER_END_LABELS)
-    _place_steps(adapter, SHEET_NAMES[3], FITUP_NOTES[1], label="lever-bank steps")
+    _place_steps(adapter, SHEET_NAMES[4])
 
     for name, text in notes.DIMENSION_CALLOUTS.items():
         set_dimension_callouts(adapter, annotations, {name: text}, location="above")
@@ -2001,19 +2239,23 @@ def _place_fitup_sheets(adapter: Any) -> Callable[[], None]:
 
 
 def _place_hookup_sheet(adapter: Any) -> None:
-    """Sheet 5: the lever-bank step sheet 4 has no room for, by the front
-    view of the spring it hooks up."""
-    _activate_sheet(adapter, SHEET_NAMES[4])
+    """Sheet 6: view G, the spring hook-up, and the rest of the lever-bank
+    steps."""
+    _activate_sheet(adapter, SHEET_NAMES[5])
     view = _placed_bank_view(adapter, HOOKUP)
     _assert_view_on_sheet(view, label=HOOKUP.title)
     _activate_view(adapter, view, label=HOOKUP.title)
-    bottom = _view_outline(view, label=HOOKUP.title)[1]
-    label_xy = (HOOKUP.centre[0] - 0.016, bottom - 0.004)
+    outline = _view_outline(view, label=HOOKUP.title)
+    column_foot = LEVER_COLUMNS[1].bottom
+    if outline[3] > column_foot:
+        raise RuntimeError(
+            f"{HOOKUP.title} top {outline[3]:.4f} runs over the step column "
+            f"above it (foot {column_foot:.4f})"
+        )
+    label_xy = (HOOKUP.centre[0] - 0.016, outline[1] - 0.004)
     if add_note(adapter, HOOKUP.label_text, *label_xy) is None:
         raise RuntimeError(f"failed to label {HOOKUP.title}")
-    _place_steps(
-        adapter, SHEET_NAMES[4], FITUP_NOTES[2], label="lever-bank steps, continued"
-    )
+    _place_steps(adapter, SHEET_NAMES[5])
 
 
 def _break_line_at_text(display: Any, *, label: str) -> None:

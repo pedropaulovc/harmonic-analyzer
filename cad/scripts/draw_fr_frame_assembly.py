@@ -14,8 +14,10 @@ from dataclasses import dataclass
 import hashlib
 import math
 from pathlib import Path
+import re
 import sys
-from typing import Any, Callable, Sequence
+import textwrap
+from typing import Any, Callable, NamedTuple, Sequence
 
 from solidworks_mcp.adapters.com_variant import dispatch_array, double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
@@ -71,7 +73,7 @@ from _drawing_ray_pick import (
     _to_part,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _drawing_types import DrawingLayout
+from _drawing_types import DRAWING_TEMPLATES, DrawingLayout
 from _drawing_scan import _zoomed_on
 from _drawing_selection import _select_view_entity
 from _drawing_sections import create_section_view
@@ -93,6 +95,8 @@ from _simplified_names import simplified_name
 import _telemetry
 from _assembly_contract import assembly_contract
 from _title_block_units import render_number
+from build_fr_top_frame import TOP_CROSS_SCREW_FAR_WALL_START_MAX
+import fr_frame_assembly_steps as steps
 from fr_frame_attachment_spec import (
     BASE_SCREW_Y,
     CAP_TOP_Y,
@@ -103,7 +107,8 @@ from fr_frame_attachment_spec import (
     TOP_SCREW_Y,
     TUBE_CROSS_HOLE_DIAMETER,
 )
-from fr_frame_cross_screw import CROSS_SCREW_ENGAGEMENT_CHECK
+from fr_frame_cross_screw import FAR_WALL_ENGAGEMENT_FLOOR_MM
+from fr_harmonic_base_fasteners import base_cross_screw_far_wall_start_max_mm
 from fr_harmonic_base_spec import BOTTOM_WIDTH, DECK_HALF_X, STACK_HEIGHT
 import fr_frame_explode_spec as explode
 from fr_frame_setting_bands import TOP_AXIS_HEIGHT_BAND_MM
@@ -122,6 +127,7 @@ from fr_vn_frame_cross_screw_spec import (
     SHANK_LEN as CROSS_SCREW_SHANK_LEN,
     THREAD as CROSS_SCREW_THREAD,
 )
+import ha_harmonic_analyzer_assembly_steps as ha_steps
 
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -139,11 +145,12 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# Step 9 sets MHA-FR-04 before its base seats are spotted through it (#628):
-# the plate's lower edge as lettered (plate y = 0) lies at machine x =
-# MOUNT_POS[0], parallel to the deck's MHA-FR-04 end at DECK_HALF_X. Section
-# B-B looks down on both edges and dimensions the inset between them; step 9
-# points to that dimension instead of repeating its value.
+# The nameplate step (NAMEPLATE_SET_KEY) sets MHA-FR-04 before its base seats
+# are spotted through it (#628): the plate's lower edge as lettered (plate
+# y = 0) lies at machine x = MOUNT_POS[0], parallel to the base top face's
+# MHA-FR-04 end at DECK_HALF_X. Section B-B looks down on both edges and
+# dimensions the inset between them; the step points to that dimension
+# instead of repeating its value.
 NAMEPLATE_END_INSET = DECK_HALF_X - NAMEPLATE_MOUNT_POS[0]
 # The fitter sheets print decimal inch (fr-frame.yaml ``drawing_unit``).
 UNIT = assembly_contract("fr-frame").drawing_unit
@@ -152,14 +159,41 @@ UNIT = assembly_contract("fr-frame").drawing_unit
 HEIGHT_PLACES = 3
 INSET_PLACES = 2
 # The top cross-bore axis height (fr_frame_attachment_spec TOP_AXIS_*) prints
-# three places, 40.075, with its .XX-grade band (+/-.010). Step 3 sets all
-# four corners' axes to this one absolute height from the base underside
-# before step 5 match-drills the tubes, so the frame's own .72 tap station off
-# its rail top cannot carry it. MHA-FR-02's faced underside sits on the
-# inch-grid plane (top_frame_plane, 39.358) the summing knife mounts clamp to,
-# which puts its rail top (40.795) and this axis on the .001 grid.
-# The tube match holes' finished drill, as steps 2 and 5 print it (.197).
+# three places, 40.075, with its .XX-grade band (+/-.010). TOP_AXIS_SET_KEY
+# sets all four corners' axes to this one absolute height from the base
+# underside before the upper tube holes are match-drilled, so the frame's own
+# .72 tap station off its rail top cannot carry it. MHA-FR-02's faced
+# underside sits on the inch-grid plane (top_frame_plane, 39.358) the summing
+# knife mounts clamp to, which puts its rail top (40.795) and this axis on the
+# .001 grid. The setting step names the height and its band itself: the
+# sheet-1 dimension carries its value and band and nothing else (rule 7).
+TOP_AXIS_HEIGHT_TEXT = (
+    f"{render_number(TOP_SCREW_Y / 25.4, UNIT, TOP_AXIS_HEIGHT_PLACES)} "
+    f"±{render_number(TOP_AXIS_HEIGHT_BAND_MM / 25.4, UNIT, TOP_AXIS_HEIGHT_PLACES)}"
+)
+# The tube match holes' finished drill, as the hole steps print it (.197).
 CROSS_HOLE_TEXT = render_number(TUBE_CROSS_HOLE_DIAMETER / 25.4, UNIT, 3)
+# The installed cross screw's far-wall engagement (rule 18), made checkable at
+# the bench before the screw goes in (delegated ruling, machinist review
+# 20261107T081227004Z): each MHA-FR-VN-53's full thread must reach from under
+# its head past the print-worst start of full far-wall thread in either
+# casting by the 1.5D floor. The base governs (its front pad chain); the
+# limit rounds UP to the printed .001, so a screw that passes it engages at
+# least 1.5D however its tip is chamfered.
+CROSS_SCREW_FAR_WALL_START_MAX_MM = max(
+    TOP_CROSS_SCREW_FAR_WALL_START_MAX,
+    *(base_cross_screw_far_wall_start_max_mm(front=front) for front in (True, False)),
+)
+CROSS_SCREW_FULL_THREAD_MIN_IN = (
+    math.ceil(
+        (CROSS_SCREW_FAR_WALL_START_MAX_MM + FAR_WALL_ENGAGEMENT_FLOOR_MM) / 25.4 * 1000.0
+        - 1e-9
+    )
+    / 1000.0
+)
+CROSS_SCREW_FULL_THREAD_MIN_TEXT = render_number(CROSS_SCREW_FULL_THREAD_MIN_IN, UNIT, 3)
+if CROSS_SCREW_FULL_THREAD_MIN_IN * 25.4 >= CROSS_SCREW_SHANK_LEN:
+    raise AssertionError("the cross-screw thread check exceeds the stock screw's length")
 # Machine z stations each inset edge's ray is cast at, in turn: on both
 # edges, clear of the plate's corner screw heads (z +/-42) and the deck's
 # centre line (z 0). The first station whose ray meets an edge chooses it; the
@@ -180,25 +214,15 @@ NAMEPLATE_INSET_TEXT_Z_M = (BOTTOM_WIDTH / 2.0 + 17.0) / 1000.0
 # line: the 1:3 gap is too narrow to hold it between the edges.
 NAMEPLATE_INSET_TEXT_OFFSET_M = 0.005
 
-# The controlling setup height names itself on its own native dimension, not
-# in a free note the reader must pair with it.
-TOP_AXIS_HEIGHT_SUFFIX = " TOP CROSS-BORE AXIS HEIGHT FROM BASE UNDERSIDE"
-_DIMENSION_TEXT_SUFFIX = 2  # swDimensionTextParts_e.swDimensionTextSuffix
-
-
-# With a blank line between steps, the sequence fills sheet 3's note column,
-# so the assembly-only checks take their own sheet after it.
-SHEET_NAMES = (
-    "ASSEMBLED + JOINT SECTIONS",
-    "EXPLODED VIEW + BOM",
-    "FITTING + ASSEMBLY",
-    "ASSEMBLY CHECKS",
-)
+# The sequence flows down the left of sheets 3-5 (STEP_COLUMNS), each beside
+# a finished isometric: every sheet needs a view for its title-block property
+# links (finalize_drawing refuses a sheet without one).
+STEP_SHEET_NAMES = ("FITTING + ASSEMBLY", "ASSEMBLY (CONT.)", "ASSEMBLY (CONT. 2)")
+SHEET_NAMES = ("ASSEMBLED + JOINT SECTIONS", "EXPLODED VIEW + BOM", *STEP_SHEET_NAMES)
 SHEET_LAYOUTS = {
     SHEET_NAMES[0]: DrawingLayout.LANDSCAPE,
     SHEET_NAMES[1]: DrawingLayout.PORTRAIT,
-    SHEET_NAMES[2]: DrawingLayout.LANDSCAPE,
-    SHEET_NAMES[3]: DrawingLayout.LANDSCAPE,
+    **dict.fromkeys(STEP_SHEET_NAMES, DrawingLayout.LANDSCAPE),
 }
 if SPEC.layout is not SHEET_LAYOUTS[SHEET_NAMES[0]]:
     raise AssertionError("the frame package primary sheet must remain landscape")
@@ -235,11 +259,13 @@ EXPLODED_ISO_CENTER = (0.140, 0.198)
 EXPLODED_ISO_SCALE = (1.0, 8.0)
 ASSEMBLY_ISO_CENTER = (0.345, 0.172)
 ASSEMBLY_ISO_SCALE = (1.0, 7.0)
+# The isometric's caption: the sheet's title block prints its scale.
+ASSEMBLY_ISO_CAPTION = "FINISHED ASSEMBLY"
+ASSEMBLY_ISO_CAPTION_XY = (0.300, 0.074)
 SHEET_SCALES = {
     SHEET_NAMES[0]: SHEET_SCALE,
     SHEET_NAMES[1]: EXPLODED_ISO_SCALE,
-    SHEET_NAMES[2]: ASSEMBLY_ISO_SCALE,
-    SHEET_NAMES[3]: ASSEMBLY_ISO_SCALE,
+    **dict.fromkeys(STEP_SHEET_NAMES, ASSEMBLY_ISO_SCALE),
 }
 BOM_ANCHOR = (0.018, 0.414)
 # Keep the complete set-screw balloon below the measured BOM, not its nominal
@@ -436,85 +462,356 @@ EXPLODED_VIEW_NAMES = {
     SIMPLIFIED_VIEW_CONFIGURATION: simplified_name(EXPLODED_VIEW_NAME),
 }
 
-# These instructions carry only requirements that exist at assembly: matched
-# fits, transfer-drilled tube holes (guided by both castings' near-wall
-# clearances; only their far walls are threaded), fitted stock caps, and
-# checks against the actual purchased components. Part drawings still define
-# the other manufacturing features.
-ASSEMBLY_STEPS = "\n".join(
-    (
-        "MATCH-FIT AND ASSEMBLY SEQUENCE",
-        "1. ROUGH-CUT MHA-FR-03 OVERSIZE. DECK UP; FIT EACH MHA-FR-01 SOCKET",
-        "   TO ITS ASSIGNED ACTUAL TUBE: CLOSE HAND-SLIP, NO PERCEPTIBLE ROCK,",
-        "   FULL SHOULDER SEATING. RETAIN COLUMN/CORNER/ORIENTATION MATCH",
-        "   MARKS.",
-        "",
-        "2. RESEAT EACH MATCHED COLUMN. THROUGH THE MHA-FR-01 NEAR-WALL",
-        "   CLEARANCE, PILOT-TRANSFER THE LOWER AXIS THROUGH BOTH TUBE WALLS WITH",
-        "   A DRILL BELOW THE #10-32 THREAD MINOR; PROTECT THE FAR-WALL THREAD.",
-        f"   REMOVE COLUMN; ENLARGE BOTH WALLS TO DIA {CROSS_HOLE_TEXT} "
-        "AND DEBURR. THE ACTUAL",
-        "   MHA-FR-VN-53 SHANK MUST PASS FREELY WITHOUT THREAD CONTACT.",
-        "",
-        "3. RESEAT EACH MATCHED COLUMN IN ITS BASE SOCKET. FIT MHA-FR-02 OVER",
-        "   THE COLUMNS, HUB OPPOSITE THE MHA-FR-04 END. FIT EACH TOP SOCKET",
-        "   TO ITS ASSIGNED ACTUAL MHA-FR-03 TUBE: CLOSE HAND-SLIP WITH NO",
-        "   PERCEPTIBLE ROCK. SET EVERY FRONT/REAR CROSS-BORE AXIS TO THE",
-        "   CONTROLLING TOP-AXIS HEIGHT ON SHEET 1; COMPARE GAUGE-PIN CENTRES",
-        "   FROM THE BASE UNDERSIDE. CLAMP; RETAIN EACH TOP CORNER/COLUMN",
-        "   ORIENTATION MATCH MARK.",
-        "",
-        "4. AT THAT HEIGHT, FINAL MATCH-CUT EACH IDENTIFIED COLUMN TO THE",
-        "   ACTUAL BASE/TOP/CAP STACK: MHA-FR-VN-54 FULLY ON ITS INSIDE SEAT,",
-        "   SKIRT CLEAR OF THE RECESS FLOOR. DO NOT TRIM THE STOCK CAPS. FINISH",
-        "   THE TOP CHAMFER; RESEAT COLUMNS AND RESET THE TOP-AXIS HEIGHT.",
-        "",
-        "5. THROUGH THE MHA-FR-02 NEAR-WALL CLEARANCES, PILOT-TRANSFER EACH",
-        "   TOP AXIS THROUGH BOTH TUBE WALLS AS STEP 2; PROTECT THE FAR-WALL",
-        "   THREAD. REMOVE MHA-FR-02/COLUMNS; ENLARGE BOTH WALLS TO",
-        f"   DIA {CROSS_HOLE_TEXT}, DEBURR, AND VERIFY FREE PASSAGE "
-        "OF THE ACTUAL MHA-FR-VN-53",
-        "   SHANK.",
-        "",
-        "6. REASSEMBLE MATCHED FRAME. INSTALL EIGHT MHA-FR-VN-53 FROM THE SIDES",
-        "   USED FOR PILOT-DRILLING; TIGHTEN ONLY UNTIL EVERY HEAD SEATS.",
-        "",
-        "7. VERIFY EACH MHA-FR-02 CAP RECESS CLEARS ITS ACTUAL MHA-FR-VN-54",
-        "   SKIRT. AFTER MATCH MARKS ALIGN AND MHA-FR-VN-53 HEADS SEAT, PUSH EACH",
-        "   CAP OVER THE CHAMFERED OPEN END UNTIL THE TUBE REACHES THE CAP'S",
-        "   INSIDE SEAT.",
-        "",
-        "8. SEAT MHA-FR-05 ON DECK, WINDOWS FACING THE SHORT ENDS; INSTALL FOUR",
-        "   MHA-FR-VN-51 TOP-DOWN AND DRAW DOWN EVENLY UNTIL ALL HEADS SEAT.",
-        "",
-        # Owner-accepted fit-up, declared as fr-frame RV-01 (#1468).
-        "9. SET MHA-FR-04 DECORATED FACE UP, CENTRED FRONT TO REAR, PARALLEL TO",
-        "   AND INSET FROM THE NEAR DECK END PER SECTION B-B, SHEET 1; CLAMP.",
-        "   SPOT MHA-FR-01 THROUGH ITS FOUR HOLES; DRILL AND TAP EACH PER ITS",
-        "   MHA-FR-01 TRANSFER CALLOUT. SEAT ALL FOUR MHA-SH-VN-51 HEADS.",
-        "",
-        "10. START MHA-FR-VN-52 IN THE GOOSENECK HUB; LEAVE ITS CUP POINT CLEAR.",
-    )
+# The BOM's item numbers, as the native table numbers the families (component
+# order in the source assembly); _validate_frame_bom proves the inserted table
+# prints exactly these. Steps name parts by item (drawing-guidelines.md rule
+# 22); parts outside this BOM keep their drawing numbers.
+BASE = "fr-harmonic-base"
+COLUMN = "fr-tube-frame"
+SUPPORT = "fr-rocker-arm-support"
+SUPPORT_SCREW = "fr-vn-lag-screw"
+TOP_FRAME = "fr-top-frame"
+CAP = "fr-vn-tube-frame-cap"
+NAMEPLATE = "fr-nameplate"
+NAMEPLATE_SCREW = "sh-vn-brass-fillister-screw"
+CROSS_SCREW = "fr-vn-frame-cross-screw"
+SET_SCREW = "fr-vn-gooseneck-set-screw"
+ITEM_NUMBERS = {
+    BASE: 1,
+    COLUMN: 2,
+    SUPPORT: 3,
+    SUPPORT_SCREW: 4,
+    TOP_FRAME: 5,
+    CAP: 6,
+    NAMEPLATE: 7,
+    NAMEPLATE_SCREW: 8,
+    CROSS_SCREW: 9,
+    SET_SCREW: 10,
+}
+if set(ITEM_NUMBERS) != set(BOM_COMPONENTS) or sorted(ITEM_NUMBERS.values()) != list(
+    range(1, len(BOM_COMPONENTS) + 1)
+):
+    raise AssertionError("every BOM family needs exactly one contiguous item number")
+# The summing gooseneck (cad/config/parts/sm-gooseneck.yaml): its post drops
+# into the top frame's post bore, where item 10 grips it at MHA-HA-00.
+GOOSENECK_POST_NUMBER = "MHA-SM-01"
+# The MHA-HA-00 step that slides the post to level and tightens item 10 on it.
+HA_SET_SCREW_TIGHTENED_REF = ha_steps.step_ref("summing-levelled")
+
+
+def _item(stem: str) -> str:
+    return f"ITEM {ITEM_NUMBERS[stem]}"
+
+
+def _step(key: str) -> str:
+    return f"STEP {steps.step_number(key)}"
+
+
+_BASE, _COLUMN, _SUPPORT = _item(BASE), _item(COLUMN), _item(SUPPORT)
+_SUPPORT_SCREW, _TOP, _CAP = _item(SUPPORT_SCREW), _item(TOP_FRAME), _item(CAP)
+_PLATE, _PLATE_SCREW = _item(NAMEPLATE), _item(NAMEPLATE_SCREW)
+_CROSS, _SET = _item(CROSS_SCREW), _item(SET_SCREW)
+_POST_BORE = f"THE {GOOSENECK_POST_NUMBER} POST BORE OF {_TOP}"
+_LIFT_OFF = f"TAKE {_TOP} AND THE COLUMNS OFF {_BASE}."
+
+# One entry per step key (fr_frame_assembly_steps.SEQUENCE). Only what exists
+# at assembly: matched socket fits, tube cross holes match-drilled through
+# each casting's clearance hole (only the casting wall opposite is tapped),
+# the columns match-cut to the cap stack, and checks against the actual
+# purchased parts. Each step does one thing; a check and its remedy are their
+# own steps (rule 22). Sides and ends name physical features or a lettered
+# view, never a compass or the machine's front and back (rule 26).
+STEP_TEXT = {
+    steps.COLUMNS_ROUGH_CUT_KEY: (
+        f"CUT FOUR {_COLUMN} COLUMNS LONG; {_step(steps.COLUMNS_CUT_KEY)} CUTS THEM "
+        "TO LENGTH."
+    ),
+    "base-sockets-fitted": (
+        f"WITH {_BASE} TOP FACE UP, FIT EACH OF ITS SOCKETS TO ITS OWN {_COLUMN}: "
+        "IT SLIDES IN BY HAND TO FULL DEPTH, NO ROCK."
+    ),
+    "base-match-marked": (
+        f"MATCH-MARK EACH {_COLUMN} AND ITS {_BASE} SOCKET ACROSS THE JOINT, SO IT "
+        "GOES BACK IN THE SAME CORNER, TURNED THE SAME WAY."
+    ),
+    steps.LOWER_HOLES_PILOTED_KEY: (
+        f"WITH THE COLUMNS SEATED, PILOT-DRILL BOTH TUBE WALLS THROUGH EACH {_BASE} "
+        "SOCKET CROSS HOLE, GUIDED BY THE CLEARANCE HOLE IN THE SOCKET WALL, WITH "
+        "A DRILL UNDER THE #10-32 MINOR SO THE TAPPED HOLE OPPOSITE IS NOT CUT."
+    ),
+    "lower-columns-lifted": f"LIFT THE COLUMNS OUT OF {_BASE}.",
+    steps.LOWER_HOLES_OPENED_KEY: (
+        f"OPEN EVERY PILOT HOLE IN THE COLUMNS TO Ø{CROSS_HOLE_TEXT} AND DEBURR IT."
+    ),
+    steps.LOWER_HOLES_CHECKED_KEY: (
+        f"CHECK ONE {_CROSS} PASSES FREELY THROUGH BOTH Ø{CROSS_HOLE_TEXT} HOLES OF "
+        "EACH COLUMN, ITS THREAD NOT CATCHING."
+    ),
+    "lower-holes-reworked": (
+        "IF IT CATCHES, DEBURR THAT HOLE AGAIN AND REPEAT "
+        f"{_step(steps.LOWER_HOLES_CHECKED_KEY)}."
+    ),
+    steps.COLUMNS_RESEATED_KEY: f"RESEAT EACH {_COLUMN} IN {_BASE} ON ITS MATCH MARK.",
+    "top-frame-lowered": (
+        f"LOWER {_TOP} OVER THE COLUMNS, TURNED AS SECTION B-B (SHEET 1) SHOWS."
+    ),
+    "top-sockets-fitted": (
+        f"FIT EACH {_TOP} SOCKET TO ITS OWN {_COLUMN}: IT SLIDES ON BY HAND, NO ROCK."
+    ),
+    "top-match-marked": f"MATCH-MARK EACH {_COLUMN} AND ITS {_TOP} SOCKET THE SAME WAY.",
+    steps.TOP_AXIS_SET_KEY: (
+        f"SET EACH {_TOP} SOCKET CROSS-HOLE AXIS TO THE {TOP_AXIS_HEIGHT_TEXT} HEIGHT "
+        f"ABOVE THE UNDERSIDE OF {_BASE} (SHEET 1): READ AT THE CENTRE OF A GAUGE "
+        f"PIN IN THE HOLE WITH A HEIGHT GAUGE, {_BASE} ON A SURFACE PLATE."
+    ),
+    steps.TOP_FRAME_CLAMPED_KEY: f"CLAMP {_TOP} TO THE COLUMNS AT THAT HEIGHT.",
+    "columns-marked": (
+        f"MARK EACH {_COLUMN} FOR LENGTH, SO AN {_CAP} PUSHED ONTO ITS TOP END "
+        f"REACHES ITS INSIDE SEAT WITH ITS SKIRT CLEAR OF THE RECESS FLOOR IN {_TOP}."
+    ),
+    "frame-lifted-for-cut": _LIFT_OFF,
+    steps.COLUMNS_CUT_KEY: f"CUT EACH {_COLUMN} AT ITS MARK. DO NOT TRIM THE {_CAP} CAPS.",
+    "columns-chamfered": f"CHAMFER THE CUT END OF EACH {_COLUMN}.",
+    steps.FRAME_RESEATED_KEY: (
+        f"RESEAT THE COLUMNS IN {_BASE}, THEN {_TOP} ON THEM, ALL ON THEIR MATCH "
+        "MARKS."
+    ),
+    "top-axis-reset": (
+        f"REPEAT STEPS {steps.step_number(steps.TOP_AXIS_SET_KEY)} AND "
+        f"{steps.step_number(steps.TOP_FRAME_CLAMPED_KEY)}."
+    ),
+    "upper-holes-piloted": (
+        f"PILOT-DRILL BOTH TUBE WALLS THROUGH EACH {_TOP} SOCKET CROSS HOLE AS "
+        f"{_step(steps.LOWER_HOLES_PILOTED_KEY)}."
+    ),
+    "frame-lifted-for-drill": _LIFT_OFF,
+    "upper-holes-opened": (
+        f"OPEN THE NEW PILOT HOLES AS {_step(steps.LOWER_HOLES_OPENED_KEY)}."
+    ),
+    steps.UPPER_HOLES_CHECKED_KEY: (
+        f"REPEAT THE {_step(steps.LOWER_HOLES_CHECKED_KEY)} CHECK ON THE NEW HOLES."
+    ),
+    "upper-holes-reworked": (
+        "IF IT FAILS, DEBURR THAT HOLE AGAIN AND REPEAT "
+        f"{_step(steps.UPPER_HOLES_CHECKED_KEY)}."
+    ),
+    "frame-reassembled": (
+        f"RESEAT THE COLUMNS AND {_TOP} AS {_step(steps.FRAME_RESEATED_KEY)}."
+    ),
+    # The far-wall engagement accepted at the bench, before the screw goes in
+    # (CROSS_SCREW_FULL_THREAD_MIN_IN): the installed thread is out of sight.
+    "cross-screws-measured": (
+        f"CHECK EACH {_CROSS} WITH A CALIPER: ITS FULL THREAD RUNS "
+        f"{CROSS_SCREW_FULL_THREAD_MIN_TEXT} MIN FROM UNDER THE HEAD."
+    ),
+    "cross-screws-replaced": f"REPLACE ANY {_CROSS} THAT READS SHORT.",
+    steps.CROSS_SCREWS_DRIVEN_KEY: (
+        f"DRIVE THE EIGHT {_CROSS} SCREWS, EACH FROM THE SIDE ITS HOLE WAS "
+        "PILOT-DRILLED FROM, ONLY UNTIL ITS HEAD SEATS."
+    ),
+    "cross-screw-heads-checked": f"CHECK EVERY {_CROSS} HEAD SEATS.",
+    "cross-screw-taps-chased": (
+        "IF ONE DOES NOT, TAKE IT OUT, CHASE ITS TAPPED HOLE WITH A #10-32 "
+        f"BOTTOMING TAP AND REPEAT {_step(steps.CROSS_SCREWS_DRIVEN_KEY)} FOR IT."
+    ),
+    "cap-recesses-checked": (
+        f"CHECK EACH CAP RECESS IN {_TOP} CLEARS THE SKIRT OF ITS {_CAP}."
+    ),
+    "caps-pushed-on": (
+        f"PUSH AN {_CAP} ONTO EACH CHAMFERED COLUMN END UNTIL THE TUBE REACHES THE "
+        "CAP'S INSIDE SEAT."
+    ),
+    "caps-checked": (
+        f"CHECK EACH {_CAP} SITS ON ITS INSIDE SEAT, ITS SKIRT CLEAR OF THE RECESS "
+        "FLOOR."
+    ),
+    "column-ends-checked": f"CHECK NO {_COLUMN} END IS DISTORTED BY ITS CAP.",
+    "support-seated": (
+        f"SEAT {_SUPPORT} ON THE TOP FACE OF {_BASE}, ITS WINDOWS FACING THE SHORT "
+        f"ENDS OF {_BASE}."
+    ),
+    steps.SUPPORT_SCREWED_KEY: (
+        f"DRIVE THE FOUR {_SUPPORT_SCREW} SCREWS DOWN THROUGH {_SUPPORT} INTO "
+        f"{_BASE}, EVENLY, UNTIL EVERY HEAD SEATS."
+    ),
+    "support-flat-checked": f"CHECK {_SUPPORT} LIES FLAT ON {_BASE}.",
+    "support-heads-checked": f"CHECK EVERY {_SUPPORT_SCREW} HEAD BEARS ON {_SUPPORT}.",
+    # Owner-accepted fit-up, declared as fr-frame RV-01 (#1468).
+    steps.NAMEPLATE_SET_KEY: (
+        f"SET {_PLATE} ENGRAVED FACE UP ON THE TOP FACE OF {_BASE}, CENTRED ACROSS "
+        "ITS WIDTH, PARALLEL TO THE NEAREST END OF THAT FACE AND INSET FROM IT BY "
+        "THE SECTION B-B DIMENSION (SHEET 1)."
+    ),
+    "nameplate-clamped": f"CLAMP {_PLATE} THERE.",
+    steps.NAMEPLATE_SPOTTED_KEY: f"SPOT {_BASE} THROUGH THE FOUR HOLES OF {_PLATE}.",
+    "nameplate-lifted": f"UNCLAMP AND LIFT OFF {_PLATE}.",
+    steps.NAMEPLATE_SEATS_TAPPED_KEY: (
+        f"DRILL AND TAP EACH SPOT PER THE TRANSFER CALLOUT ON DRAWING "
+        f"{BOM_PART_NUMBERS[BASE]}."
+    ),
+    steps.NAMEPLATE_SCREWED_KEY: (
+        f"SCREW {_PLATE} DOWN WITH THE FOUR {_PLATE_SCREW} SCREWS UNTIL EVERY HEAD "
+        "SEATS."
+    ),
+    "nameplate-flat-checked": f"CHECK {_PLATE} LIES FLAT ON {_BASE}.",
+    "nameplate-heads-checked": f"CHECK EVERY {_PLATE_SCREW} HEAD BEARS ON {_PLATE}.",
+    # Rule 23 at the package boundary: the set screw's only job is to grip the
+    # summing post, which MHA-HA-00 slides to level and tightens it on.
+    steps.GOOSENECK_STARTED_KEY: (
+        f"START {_SET} IN THE TAP INTO {_POST_BORE}, CUP POINT CLEAR OF THE BORE; "
+        f"{HA_SET_SCREW_TIGHTENED_REF} TIGHTENS IT ON THE POST."
+    ),
+    "post-bore-checked": f"CHECK {_POST_BORE} IS CLEAR OF THE CUP POINT OF {_SET}.",
+    "columns-seated-checked": f"CHECK EVERY {_COLUMN} IS FULLY SEATED IN {_BASE}.",
+    "match-marks-checked": "CHECK EVERY MATCH MARK ALIGNS.",
+    "top-axis-checked": (
+        f"CHECK EVERY {_TOP} SOCKET CROSS-HOLE AXIS STILL MEETS THE "
+        f"{_step(steps.TOP_AXIS_SET_KEY)} HEIGHT."
+    ),
+}
+if tuple(STEP_TEXT) != steps.SEQUENCE:
+    raise AssertionError("STEP_TEXT must follow fr_frame_assembly_steps.SEQUENCE")
+# The sequence prints in titled groups, each opening at its first key.
+STEP_GROUPS = (
+    (f"COLUMNS IN {_BASE}", steps.COLUMNS_ROUGH_CUT_KEY),
+    (f"{_TOP} ON THE COLUMNS", steps.COLUMNS_RESEATED_KEY),
+    ("COLUMNS CUT TO LENGTH", "columns-marked"),
+    (f"TUBE HOLES AT {_TOP}", "upper-holes-piloted"),
+    ("FASTENING AND CAPS", "frame-reassembled"),
+    ("SUPPORT AND NAMEPLATE", "support-seated"),
+    ("SET SCREW AND FINAL CHECKS", steps.GOOSENECK_STARTED_KEY),
 )
-ASSEMBLY_CHECKS = "\n".join(
-    (
-        "ASSEMBLY-ONLY CHECKS",
-        "1. ALL BASE/TOP MATCH MARKS ALIGN; COLUMNS ARE FULLY SEATED.",
-        "   EACH FRONT/REAR TOP AXIS MEETS THE HEIGHT FROM THE BASE UNDERSIDE.",
-        "",
-        "2. ALL EIGHT MHA-FR-VN-53 HEADS SEAT WITHOUT TIPS BOTTOMING. EACH SHANK",
-        "   CLEARS BOTH TUBE WALLS. VERIFY EACH SCREW HAS",
-        f"   {CROSS_SCREW_ENGAGEMENT_CHECK}",
-        "   IN THE FAR WALL OF ITS MHA-FR-01 OR MHA-FR-02 CASTING.",
-        "",
-        "3. ALL FOUR MHA-FR-VN-54 CAPS REACH THEIR INSIDE SEATS; SKIRTS CLEAR THE",
-        "   MHA-FR-02 RECESSES AND TUBE ENDS ARE NOT DISTORTED.",
-        "",
-        "4. MHA-FR-05 AND MHA-FR-04 LIE FLAT; ALL EIGHT OF THEIR SCREW HEADS",
-        "   BEAR.",
-        "",
-        "5. GOOSENECK BORE IS UNOBSTRUCTED WITH MHA-FR-VN-52 BACKED CLEAR.",
+if STEP_GROUPS[0][1] != steps.SEQUENCE[0] or [
+    steps.step_number(key) for _title, key in STEP_GROUPS
+] != sorted({steps.step_number(key) for _title, key in STEP_GROUPS}):
+    raise AssertionError("the step groups must open the sequence in order")
+
+# Default-format note text as printed: 4.5 mm a line, 2.76 mm a character.
+STEPS_LINE_PITCH = 0.0045
+STEPS_CHAR_WIDTH = 0.00276
+STEPS_LINE_WIDTH = 66  # characters
+STEP_MAX_LINES = 6  # rule 22
+STEPS_HANG = "   "
+STEPS_XY = (0.018, 0.263)
+# Every column stays 5 mm above the bottom border (or the title block) and
+# inside the right border.
+_LANDSCAPE = DRAWING_TEMPLATES[DrawingLayout.LANDSCAPE]
+SHEET_INNER_BORDER = (0.0127, 0.0127, _LANDSCAPE.width_m - 0.0127, 0.2667)
+STEPS_FLOOR_CLEARANCE = 0.005
+
+
+class StepColumn(NamedTuple):
+    """One note column of the sequence: its sheet, top-left and line capacity."""
+
+    sheet: str
+    xy: tuple[float, float]
+    max_lines: int
+
+
+def _column_capacity(top: float, floor: float) -> int:
+    return int((top - floor - STEPS_FLOOR_CLEARANCE) / STEPS_LINE_PITCH + 1e-9)
+
+
+# The left of each steps sheet, beside its isometric, down to the bottom
+# border: the title block stands right of the sheet's centre.
+STEP_COLUMNS = tuple(
+    StepColumn(sheet, STEPS_XY, _column_capacity(STEPS_XY[1], SHEET_INNER_BORDER[1]))
+    for sheet in STEP_SHEET_NAMES
+)
+
+
+# A wrap never parts a reference from its number ("ITEM 6", "STEP 13") nor a
+# value from its band or limit word ("40.075 ±.010", "1.658 MIN").
+_GLUED_SPACE = re.compile(
+    r"(?<=\bITEM) (?=\d)|(?<=\bSTEP) (?=\d)|(?<=\bSTEPS) (?=\d)| (?=±)|(?<=\d) (?=MIN\b)"
+)
+_GLUE = "\x00"
+
+
+def numbered_step(key: str) -> tuple[str, ...]:
+    """``key``'s printed lines: its number, then the text wrapped under a hang."""
+    glued = _GLUED_SPACE.sub(_GLUE, f"{steps.step_number(key)}. {STEP_TEXT[key]}")
+    lines = tuple(
+        line.replace(_GLUE, " ")
+        for line in textwrap.wrap(
+            glued,
+            width=STEPS_LINE_WIDTH,
+            subsequent_indent=STEPS_HANG,
+            break_on_hyphens=False,
+            break_long_words=False,
+        )
     )
+    if len(lines) > STEP_MAX_LINES:
+        raise ValueError(f"step {key!r} prints {len(lines)} lines, over {STEP_MAX_LINES}")
+    return lines
+
+
+def flow_steps(
+    groups: Sequence[tuple[str, Sequence[tuple[str, ...]]]],
+    columns: Sequence[StepColumn],
+    *,
+    line_width: int = STEPS_LINE_WIDTH,
+) -> tuple[tuple[StepColumn, str], ...]:
+    """Flow titled groups of wrapped steps into ``columns``, in order.
+
+    One blank line separates consecutive steps and precedes a group title; a
+    step never splits across columns, and a column that continues a group
+    opens with its title and `` (CONT.)``. Raises when a line is wider than
+    ``line_width``, a column runs past its border or capacity, or a column
+    stays empty."""
+    placed: list[list[str]] = [[] for _ in columns]
+    index = 0
+    for title, group_steps in groups:
+        opened = False
+        for lines in group_steps:
+            if any(len(line) > line_width for line in lines):
+                raise ValueError(f"a step line runs over {line_width} characters: {lines!r}")
+            while True:
+                if index >= len(columns):
+                    raise ValueError("the assembly steps overflow the last column")
+                column = placed[index]
+                head = [] if opened and column else [f"{title} (CONT.)" if opened else title]
+                block = ([""] if column else []) + head + list(lines)
+                if len(column) + len(block) <= columns[index].max_lines:
+                    column.extend(block)
+                    opened = True
+                    break
+                if not column:
+                    raise ValueError(f"{title!r} step does not fit an empty column")
+                index += 1
+    for column, lines in zip(columns, placed, strict=True):
+        if not lines:
+            raise ValueError(f"no steps reach the {column.sheet!r} column: drop it")
+        width = max(map(len, lines))
+        if column.xy[0] + width * STEPS_CHAR_WIDTH > SHEET_INNER_BORDER[2]:
+            raise ValueError(f"the {column.sheet!r} column runs past the right border")
+        if (
+            column.xy[1] - len(lines) * STEPS_LINE_PITCH
+            < SHEET_INNER_BORDER[1] + STEPS_FLOOR_CLEARANCE - 1e-9
+        ):
+            raise ValueError(f"the {column.sheet!r} column runs into the bottom border")
+    return tuple(
+        (column, "\n".join(lines)) for column, lines in zip(columns, placed, strict=True)
+    )
+
+
+def _grouped_steps() -> tuple[tuple[str, tuple[tuple[str, ...], ...]], ...]:
+    starts = [steps.step_number(key) - 1 for _title, key in STEP_GROUPS]
+    ends = [*starts[1:], len(steps.SEQUENCE)]
+    return tuple(
+        (title, tuple(numbered_step(key) for key in steps.SEQUENCE[start:end]))
+        for (title, _key), start, end in zip(STEP_GROUPS, starts, ends, strict=True)
+    )
+
+
+# Each steps sheet's note column, flowed at import: an overflow fails here.
+STEP_NOTES = flow_steps(_grouped_steps(), STEP_COLUMNS)
+# Every step as printed, in order (other sheets' pointer tests read it).
+ASSEMBLY_STEPS = "\n\n".join("\n".join(numbered_step(key)) for key in steps.SEQUENCE)
+EXPLODED_CAPTION = (
+    "EXPLODED VIEW - ASSEMBLY ORDER ON SHEETS "
+    f"{SHEET_NAMES.index(STEP_SHEET_NAMES[0]) + 1}-"
+    f"{SHEET_NAMES.index(STEP_SHEET_NAMES[-1]) + 1}"
 )
 
 
@@ -612,21 +909,6 @@ def _checked_linear_dimension(
         raise RuntimeError(f"{label} did not retain {places}-place precision")
     if set_precision:
         adapter.currentModel.EditRebuild3()
-    return display
-
-
-def _set_dimension_suffix(
-    adapter: Any, display: Any, suffix: str, *, label: str
-) -> Any:
-    """Write ``suffix`` after a dimension's value and read the native text back."""
-    display = _early_bound(display, "IDisplayDimension")
-    display.SetText(_DIMENSION_TEXT_SUFFIX, suffix)
-    actual = str(display.GetText(_DIMENSION_TEXT_SUFFIX) or "")
-    if actual != suffix:
-        raise RuntimeError(
-            f"{label}: suffix {suffix!r} did not persist, read {actual!r}"
-        )
-    adapter.currentModel.EditRebuild3()
     return display
 
 
@@ -822,12 +1104,6 @@ def _add_frame_height_dimensions(adapter: Any, front: Any) -> tuple[Any, Any]:
         or int(screw_axis.GetPrimaryTolPrecision2()) != TOP_AXIS_HEIGHT_PLACES
     ):
         raise RuntimeError("installed top cross-screw axis height lost its band")
-    screw_axis = _set_dimension_suffix(
-        adapter,
-        screw_axis,
-        TOP_AXIS_HEIGHT_SUFFIX,
-        label="installed top cross-screw axis height",
-    )
     overall = _add_entity_height_dimension(
         adapter,
         front,
@@ -1219,7 +1495,7 @@ def _pick_inset_edge(
 
 @_telemetry.traced("drawing.nameplate_inset")
 def _add_nameplate_inset_dimension(adapter: Any, section: Any) -> _InsetDimensionProof:
-    """Dimension step 9's inset with source-verified, section-owned edges.
+    """Dimension the nameplate step's inset with source-verified, section-owned edges.
 
     The model rays identify the two real edges without screen hit-testing.
     Their section correspondences, native dimension attachments and measured
@@ -1423,12 +1699,15 @@ def _validate_frame_bom(adapter: Any, table: Any) -> tuple[tuple[str, str], ...]
         raise RuntimeError(
             f"frame BOM identities {sorted(actual)!r} != {sorted(BOM_COMPONENTS)!r}"
         )
-    expected_items = {str(item) for item in range(1, len(BOM_COMPONENTS) + 1)}
-    actual_items = {values[1] for values in actual.values()}
-    if actual_items != expected_items:
+    # The steps name parts by item: the table must number them ITEM_NUMBERS.
+    misnumbered = {
+        stem: (values[1], ITEM_NUMBERS[stem])
+        for stem, values in actual.items()
+        if values[1] != str(ITEM_NUMBERS[stem])
+    }
+    if misnumbered:
         raise RuntimeError(
-            f"frame BOM item numbers {sorted(actual_items)!r} != "
-            f"{sorted(expected_items)!r}"
+            f"frame BOM item numbers (printed, cited by the steps): {misnumbered!r}"
         )
 
     for stem, (row_index, _item, description, quantity) in actual.items():
@@ -1570,7 +1849,7 @@ def _append_template_sheet(
 
 
 def _create_mixed_package_sheets(adapter: Any) -> None:
-    """Create landscape/portrait/landscape/landscape sheets from the project templates."""
+    """Create the SHEET_LAYOUTS sheets, in order, from the project templates."""
     target, initial = new_project_drawing(
         adapter,
         layout=SHEET_LAYOUTS[SHEET_NAMES[0]],
@@ -2380,19 +2659,6 @@ def _place_package(adapter: Any) -> Callable[[], None]:
     _, top_section = _create_joint_sections(adapter, front)
     inset = _add_nameplate_inset_dimension(adapter, top_section)
 
-    _add_note_block(
-        adapter,
-        "WORKING POSITION - A-A BASE JOINT / B-B TOP JOINT",
-        (0.130, 0.263),
-        label="working-view heading",
-    )
-    _add_note_block(
-        adapter,
-        "SCALE 1:8",
-        (0.030, 0.065),
-        label="working-view scale",
-    )
-
     _activate_sheet(adapter, SHEET_NAMES[1])
     exploded = place_view(
         adapter,
@@ -2437,11 +2703,7 @@ def _place_package(adapter: Any) -> Callable[[], None]:
     )
     _assert_frame_bom_balloon_clearance(adapter, table, landings, set_screw_proof)
     _add_note_block(
-        adapter,
-        f"EXPLODED VIEW {EXPLODED_ISO_SCALE[0]:g}:{EXPLODED_ISO_SCALE[1]:g}"
-        " - SEE SHEET 3 FOR INSTALLATION ORDER",
-        (0.045, 0.075),
-        label="exploded-view caption",
+        adapter, EXPLODED_CAPTION, (0.045, 0.075), label="exploded-view caption"
     )
     # The enlarged deck details, lettered in the 1:8 view after its balloons.
     _mark_deck_details(adapter, exploded)
@@ -2451,52 +2713,30 @@ def _place_package(adapter: Any) -> Callable[[], None]:
         _place_deck_detail(adapter, detail, items, label=f"frame {detail.title}")
         _activate_sheet(adapter, SHEET_NAMES[1])
 
-    _activate_sheet(adapter, SHEET_NAMES[2])
-    instruction_iso = place_view(
-        adapter,
-        str(SOURCE),
-        "*Isometric",
-        *ASSEMBLY_ISO_CENTER,
-        scale=ASSEMBLY_ISO_SCALE,
-    )
-    # The drawing's full-detail view: every modeled tooth and thread.
-    _configure_view(
-        adapter,
-        instruction_iso,
-        exploded=False,
-        role=ViewRole.FULL_DETAIL,
-        label="assembly instruction isometric",
-    )
-    assert_full_detail_view(adapter, label="frame assembly")
-    # A blank line between steps gives the sequence 48 rows. At the ~4.5 mm
-    # pitch measured on the printed sheet they end near y=46 mm, clear of the
-    # bottom border and left of the title block; the checks cannot follow.
-    _add_note_block(adapter, ASSEMBLY_STEPS, (0.018, 0.263), label="assembly sequence")
-    _add_note_block(
-        adapter,
-        "FINISHED ASSEMBLY 1:7",
-        (0.300, 0.074),
-        label="assembly isometric caption",
-    )
-
-    _activate_sheet(adapter, SHEET_NAMES[3])
-    checks_iso = place_view(
-        adapter,
-        str(SOURCE),
-        "*Isometric",
-        *ASSEMBLY_ISO_CENTER,
-        scale=ASSEMBLY_ISO_SCALE,
-    )
-    _configure_view(
-        adapter, checks_iso, exploded=False, label="assembly checks isometric"
-    )
-    _add_note_block(adapter, ASSEMBLY_CHECKS, (0.018, 0.263), label="assembly checks")
-    _add_note_block(
-        adapter,
-        "FINISHED ASSEMBLY 1:7",
-        (0.300, 0.074),
-        label="assembly checks isometric caption",
-    )
+    notes = {column.sheet: (column, text) for column, text in STEP_NOTES}
+    for sheet_name in STEP_SHEET_NAMES:
+        _activate_sheet(adapter, sheet_name)
+        label = f"{sheet_name} isometric"
+        finished = place_view(
+            adapter,
+            str(SOURCE),
+            "*Isometric",
+            *ASSEMBLY_ISO_CENTER,
+            scale=ASSEMBLY_ISO_SCALE,
+        )
+        if sheet_name == STEP_SHEET_NAMES[0]:
+            # The drawing's full-detail view: every modeled tooth and thread.
+            _configure_view(
+                adapter, finished, exploded=False, role=ViewRole.FULL_DETAIL, label=label
+            )
+            assert_full_detail_view(adapter, label="frame assembly")
+        else:
+            _configure_view(adapter, finished, exploded=False, label=label)
+        column, text = notes[sheet_name]
+        _add_note_block(adapter, text, column.xy, label=f"{sheet_name} assembly steps")
+        _add_note_block(
+            adapter, ASSEMBLY_ISO_CAPTION, ASSEMBLY_ISO_CAPTION_XY, label=f"{label} caption"
+        )
 
     def settled() -> None:
         _assert_frame_balloons_settled(adapter, landings, proof)
