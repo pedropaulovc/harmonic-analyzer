@@ -18,8 +18,10 @@ from __future__ import annotations
 import math
 
 import _config
+from _fit_deviations import deviations
+from _fit_ream_h7 import REAM_H7
 from _gtol_planar import PlanarFace
-from _hole_spec import CLEARANCE_MM, HoleSpec, blind_cut_dia_mm
+from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
 from _printed_tolerance import (
@@ -34,6 +36,7 @@ from _title_block_units import render_number
 import _cone_axis_constants as cone_axis
 import dt_cone_post_envelope as post_envelope
 import dt_cone_tip_block_spec
+import dt_vn_locating_pin_spec as locating_pin
 import dt_cone_gear_shaft_spec as cone_shaft
 import dt_cone_pivot_post_spec
 import dt_crank_drive_gear_spec as gear64
@@ -295,6 +298,92 @@ if HOLDDOWN_LEDGE_RANGE[0] < WALL_TARGET_MM:
     raise AssertionError("hold-down counterbore ledge is below the .080 in wall target")
 # The webs from this hole to the pivot bore/relief, the post taps and the plate
 # outline are asserted in dt_cone_swing_platform_geometry, which owns the outline.
+
+
+# --- tip-block locating dowel -------------------------------------------------
+# Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
+# #2248).  The one hold-down screw lets the adjuster's thrust turn
+# the block on the plate, so a 1/16 x 3/8 dowel (MHA-DT-VN-69) locates it:
+# pressed into a blind ream in the block's foot, it slips through this plate.
+# At MHA-DT-00 step post-and-tip-block, with the block squared and snug, the
+# fitter drills and reams up through this plate into the foot to the pin's
+# press size (dt_cone_tip_block_spec.DOWEL_HOLE_*), opens this hole to the
+# slip size below from underneath with the block still on, then presses the
+# pin up through it to the foot's hole floor.
+#
+# On the hold-down line (the block's mid-depth), TIP_DOWEL_FROM_HOLDDOWN
+# toward +x (machine west) of the hold-down hole: the block's own c-c from its
+# foot tap, since the screw is that tap's axis.  Same plate-local frame as
+# HOLDDOWN_LOCAL_X/Z.  The station prints from the hold-down hole with the
+# hole's own +/-.004 band (HOLDDOWN_STATION_TOL_MM's), which the webs to the
+# counterbore here and to the block's +X face need (the general .XXX band
+# closes neither at the .080 wall target).
+#
+# Why the controlling station stays chained to the hold-down hole, with the
+# pivot-bore axis station printed only as a REF (machinist review of round
+# 6, #6; delegated ruling 2026-11-07, option A): the two webs that close on
+# the dowel-to-hold-down distance have almost no margin.  At print-worst
+# with the chained +/-.004, the plate's web to the Ø.219 hold-down
+# counterbore clears the .080 wall target by +.0003 in, and MHA-DT-21's web
+# from the foot ream to its +X face by +.0008 in (the foot's hole lands
+# within this band plus the screw's .006 float, .010, from its tap).
+# Located from the pivot at +/-.004 instead, with HoldDownX also +/-.004 from
+# the pivot, the dowel-to-hold-down distance takes both bands (+/-.008): the
+# counterbore web falls to -.0037 in, and the foot's landing band grows to
+# .014, its +X face web to about -.0032 in.  No DOWEL_FROM_TAP closes both
+# (the window is short by about .007 in), so the pivot-axis station prints
+# as a reference, TIP_DOWEL_LOCAL_X, and the chained station controls.
+TIP_DOWEL_FROM_HOLDDOWN = dt_cone_tip_block_spec.DOWEL_FROM_TAP  # .228
+TIP_DOWEL_LOCAL_X = HOLDDOWN_LOCAL_X + TIP_DOWEL_FROM_HOLDDOWN  # .188 REF
+TIP_DOWEL_LOCAL_Z = HOLDDOWN_LOCAL_Z
+TIP_DOWEL_STATION_TOL_MM = 0.1016  # +/-.004
+# Slip fit over the pin, reamed: .0630 REAM_H7 (.0630/.0635) over the pin's
+# .0626/.0628 (dt_vn_locating_pin_spec.DIA_BAND_IN).
+TIP_DOWEL_HOLE_DIA = 0.0630 * 25.4  # 1.6002
+TIP_DOWEL_HOLE_BAND = REAM_H7  # +.0005/-.0000
+_tip_dowel_lower, _tip_dowel_upper = deviations(TIP_DOWEL_HOLE_BAND)
+TIP_DOWEL_HOLE_LIMITS = (
+    TIP_DOWEL_HOLE_DIA + _tip_dowel_lower,
+    TIP_DOWEL_HOLE_DIA + _tip_dowel_upper,
+)
+_pin_dia_limits = tuple(
+    locating_pin.DIA + band * locating_pin.MM_PER_IN for band in locating_pin.DIA_BAND_IN
+)
+TIP_DOWEL_SLIP_CLEARANCE_MM = (
+    TIP_DOWEL_HOLE_LIMITS[0] - max(_pin_dia_limits),
+    TIP_DOWEL_HOLE_LIMITS[1] - min(_pin_dia_limits),
+)  # (.0002, .0009) in
+if TIP_DOWEL_SLIP_CLEARANCE_MM[0] <= 0.0:
+    raise AssertionError("the plate's dowel ream grips MHA-DT-VN-69 at its extremes")
+if TIP_DOWEL_HOLE_LIMITS[0] <= dt_cone_tip_block_spec.DOWEL_HOLE_LIMITS[1]:
+    raise AssertionError("the plate's slip ream does not open the foot's press ream")
+# The pin's lower end above this plate's underside (its range never proud of
+# the sliding underside): the block's press depth owns them, and its copy of
+# this plate's mill band must agree.
+TIP_DOWEL_END_ABOVE_UNDERSIDE = dt_cone_tip_block_spec.DOWEL_END_ABOVE_UNDERSIDE
+TIP_DOWEL_END_ABOVE_UNDERSIDE_RANGE_MM = (
+    dt_cone_tip_block_spec.DOWEL_END_ABOVE_UNDERSIDE_RANGE_MM
+)
+if dt_cone_tip_block_spec.PLATE_STOCK_BAND_MM != PLATE_STOCK_BAND:
+    raise AssertionError("MHA-DT-21's copy of the plate's mill band drifted")
+# The foot's hole is drilled from this one with the block on its screw, so
+# it lands from the foot tap within this hole's station band plus the
+# screw's float in its close-clearance hole: MHA-DT-21 prints that sum.
+TIP_HOLDDOWN_SCREW_FLOAT_MM = (
+    HOLDDOWN_CLEARANCE_DIA
+    + _DRILL_OVERSIZE
+    - THREAD_MAJOR_MM[dt_cone_tip_block_spec.HOLDDOWN_THREAD]
+) / 2.0
+if (
+    TIP_DOWEL_STATION_TOL_MM + TIP_HOLDDOWN_SCREW_FLOAT_MM
+    > dt_cone_tip_block_spec.DOWEL_X_TOL_MM + 1e-9
+):
+    raise AssertionError(
+        "MHA-DT-21's dowel station band does not cover this plate's station "
+        "band and the hold-down screw's float"
+    )
+# Its webs to the hold-down counterbore, the pivot relief/bore and the
+# outline are asserted in dt_cone_swing_platform_checks with the hold-down's.
 
 
 # Only functional sliding/locating surfaces carry roughness.  The existing

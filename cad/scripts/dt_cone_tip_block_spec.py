@@ -11,6 +11,7 @@ from typing import Literal
 
 import _config
 import _printed_tolerance
+import dt_vn_locating_pin_spec as locating_pin
 from _fit_deviations import deviations
 from _gtol_planar import PlanarFace
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
@@ -18,7 +19,7 @@ from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
 from _surface_finish import SEAT_UM, SurfaceFinishControl
 from _title_block_units import LENGTH_UNITS, render_number
-from _cone_axis_constants import CONE_AXIS_HEIGHT_MM
+from _cone_axis_constants import CONE_AXIS_HEIGHT_MM, PLATFORM_THICKNESS_MM
 from cone_stations import PIVOT_STATION
 
 # The sheet unit the registry row declares; every band below is read for it.
@@ -517,6 +518,124 @@ for _name, _web in WORST_FOOT_TAP_WEBS_MM.items():
             "(< the .080 in wall target)"
         )
 
+# --- locating dowel ------------------------------------------------------------
+# Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
+# #2248).  One hold-down screw alone lets the adjuster's thrust,
+# acting off the screw, turn the block on the plate (rule 23: retain every
+# fixed joint).  A 1/16 x 3/8 dowel (MHA-DT-VN-69, dt_vn_locating_pin_spec)
+# stands on the hold-down line beside the screw, pressed into a blind ream in
+# this foot and slipping through MHA-DT-20.  At MHA-DT-00 step
+# post-and-tip-block, with the block squared and snug on its screw, the fitter
+# drills and reams up through MHA-DT-20 into the foot to the pin's press size
+# (this hole's callout), opens the MHA-DT-20 hole to its slip size from below
+# (its callout; the block stays on), then presses the pin up through
+# MHA-DT-20 to this hole's floor (the step says so; machinist review of round
+# 6, #1: not this sheet).  Block and pin are a permanent pair (round 6, #0):
+# the pin stays pressed in the foot, slips in the plate, and the two lift off
+# MHA-DT-20 together, so the blind ream needs no knockout or extraction thread.
+#
+# Its station: on the foot tap's line (the block's mid-depth), DOWEL_FROM_TAP
+# toward +X from the tap, the same centre distance the platform prints from
+# its hold-down hole (dt_cone_swing_platform_spec.TIP_DOWEL_FROM_HOLDDOWN).
+# The value centres the window the two print-worst webs leave on the .001 in
+# grid: the platform's web to its hold-down counterbore and this foot's web to
+# the +X face at the width's lower limit (both checked below and in
+# dt_cone_swing_platform_checks).  DOWEL_FROM_TAP stays the internal
+# relation; the print states DOWEL_X, a baseline from the -X face (the
+# FootTapX datum), as a REFERENCE dimension (machinist review of round 6, #9):
+# the hole is match-drilled from MHA-DT-20, so it is wherever the plate puts
+# it, and the sheet gives the fitter the nominal to check against.
+DOWEL_FROM_TAP = 5.7912  # .228
+DOWEL_X = FOOT_TAP_X + DOWEL_FROM_TAP  # .523 from the -X face, FOOT_TAP_X's frame
+DOWEL_Z = FOOT_TAP_Z
+DOWEL_X_PLACES = 3
+# The hole is drilled from the platform, so where it lands from the tap is the
+# platform's station band (+/-.004 from its hold-down hole) plus the hold-down
+# screw's float in its .120 close-clearance hole (.006): the webs below take
+# that sum (dt_cone_swing_platform_spec asserts it covers both).  It does not
+# print: the REF station carries no band.
+DOWEL_X_TOL_MM = 0.254  # +/-.010
+# Off the tap's line the same float applies, plus the general .XX band of the
+# platform's in-line relation to its hold-down hole.
+DOWEL_Z_TOL_MM = DOWEL_X_TOL_MM + printed_band_mm(2)
+# The pin's press: the shared .0620 REAM_H7 light-press contract
+# (dt_vn_locating_pin_spec.PRESS_HOLE_DIA/BAND, interference checked there).
+DOWEL_HOLE_DIA = locating_pin.PRESS_HOLE_DIA  # 1.5748, .0620
+DOWEL_HOLE_BAND = locating_pin.PRESS_HOLE_BAND  # +.0005/-.0000
+DOWEL_HOLE_PLACES = 4
+_dowel_hole_lower, _dowel_hole_upper = deviations(DOWEL_HOLE_BAND)
+DOWEL_HOLE_LIMITS = (
+    DOWEL_HOLE_DIA + _dowel_hole_lower,
+    DOWEL_HOLE_DIA + _dowel_hole_upper,
+)
+DOWEL_PRESS_INTERFERENCE_MM = locating_pin.PRESS_INTERFERENCE_MM
+# Reamed full diameter to a flat floor this deep from the foot (.XX); the pin
+# is pressed up to the floor, so the depth is its stand above the plate top
+# and its grip in the foot.  The depth's lower limit keeps the longest pin's
+# lower end inside the thinnest plate (the underside slides on the base deck),
+# and grips 1.5 pin diameters.
+DOWEL_HOLE_DEPTH = 4.064  # .16
+DOWEL_HOLE_DEPTH_PLACES = 2
+DOWEL_HOLE_DEPTH_LIMITS = (
+    DOWEL_HOLE_DEPTH - printed_band_mm(DOWEL_HOLE_DEPTH_PLACES),
+    DOWEL_HOLE_DEPTH + printed_band_mm(DOWEL_HOLE_DEPTH_PLACES),
+)  # (.15, .17)
+if DOWEL_HOLE_DEPTH_LIMITS[0] < 1.5 * locating_pin.DIA:
+    raise AssertionError("MHA-DT-VN-69 grips under 1.5D in the foot's press ream")
+# The pin's lower end above the plate's underside: the plate less the pin's
+# reach below the plate top (its length less the depth it stands in the
+# foot).  The range takes the pin's +/-.010 length grade, this depth's .XX
+# and the plate's mill band (a copy of dt_cone_swing_platform_spec.
+# PLATE_STOCK_BAND, asserted equal there, so this part does not re-key on the
+# platform's print).
+PLATE_STOCK_BAND_MM = 0.127  # +/-.005
+DOWEL_END_ABOVE_UNDERSIDE = (
+    PLATFORM_THICKNESS_MM + DOWEL_HOLE_DEPTH - locating_pin.LENGTH
+)  # .035
+DOWEL_END_ABOVE_UNDERSIDE_RANGE_MM = (
+    PLATFORM_THICKNESS_MM
+    - PLATE_STOCK_BAND_MM
+    + DOWEL_HOLE_DEPTH_LIMITS[0]
+    - locating_pin.LENGTH_LIMITS_MM[1],
+    PLATFORM_THICKNESS_MM
+    + PLATE_STOCK_BAND_MM
+    + DOWEL_HOLE_DEPTH_LIMITS[1]
+    - locating_pin.LENGTH_LIMITS_MM[0],
+)  # (.010, .060)
+if DOWEL_END_ABOVE_UNDERSIDE_RANGE_MM[0] < 0.0:
+    raise AssertionError("MHA-DT-VN-69 can stand proud of MHA-DT-20's underside")
+# Its length in the plate's slip hole, which locates the block: the shortest
+# pin less the deepest ream, at least 1.5 pin diameters.
+DOWEL_IN_PLATE_MIN_MM = locating_pin.LENGTH_LIMITS_MM[0] - DOWEL_HOLE_DEPTH_LIMITS[1]
+if DOWEL_IN_PLATE_MIN_MM < 1.5 * locating_pin.DIA:
+    raise AssertionError("MHA-DT-VN-69 engages MHA-DT-20 under 1.5D")
+# Webs round the hole at the printed limits: its station band from the tap,
+# the tap's own band from the faces, the width's lower limit, the depth's
+# .XX, the hole at its upper limit; the drill's 118-degree point past the
+# deepest ream stays far under the adjuster thread.
+_dowel_r = DOWEL_HOLE_LIMITS[1] / 2.0
+_dowel_top_max = DOWEL_HOLE_DEPTH_LIMITS[1] + _dowel_r / math.tan(
+    math.radians(DRILL_POINT_ANGLE_DEG / 2.0)
+)
+WORST_DOWEL_WEBS_MM = {
+    "+X face": _width_limits[0]
+    - (FOOT_TAP_X + FOOT_TAP_STATION_TOL_MM)
+    - (DOWEL_FROM_TAP + DOWEL_X_TOL_MM)
+    - _dowel_r,
+    "foot tap": DOWEL_FROM_TAP - DOWEL_X_TOL_MM - _tap_r - _dowel_r,
+    "north face": DOWEL_Z - FOOT_TAP_STATION_TOL_MM - DOWEL_Z_TOL_MM - _dowel_r,
+    "south face": _depth_limits[0]
+    - (DOWEL_Z + FOOT_TAP_STATION_TOL_MM + DOWEL_Z_TOL_MM)
+    - _dowel_r,
+    "adjuster thread": _axis_limits[0] - ADJUSTER_ROOT_REF_DIA / 2.0 - _dowel_top_max,
+}
+for _name, _web in WORST_DOWEL_WEBS_MM.items():
+    if round(_web, 6) < MIN_WEB_MM:
+        raise AssertionError(
+            f"locating dowel {_name} web is {_web:.3f} at the printed limits "
+            "(< the .080 in wall target)"
+        )
+
 SURFACE_FINISHES = (
     # This face locates the adjuster block on the swing platform. Everything
     # else remains governed by the title-block CAST/MACHINED process row.
@@ -541,6 +660,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     # sketches; the tap's size and depths print on its Hole Wizard callout).
     "FootTapXReference": {"FootTapX"},
     "FootTapZReference": {"FootTapZ"},
+    # Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
+    # #2248): the locating dowel's press ream on the bottom
+    # view, its size on the cut's sketch and its REF station from the -X face
+    # on a hidden reference sketch.
+    "DowelProfile": {"DowelHoleDia"},
+    "DowelXReference": {"DowelX"},
 }
 
 # Decimal places carry the general tolerance and therefore live on the model.
@@ -561,6 +686,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "SlitProfile": {"SlitW": SLIT_W_PLACES},
     "FootTapXReference": {"FootTapX": FOOT_TAP_X_PLACES},
     "FootTapZReference": {"FootTapZ": FOOT_TAP_Z_PLACES},
+    "DowelProfile": {"DowelHoleDia": DOWEL_HOLE_PLACES},
+    "DowelXReference": {"DowelX": DOWEL_X_PLACES},
 }
 # The stacks above read these grades; the print must carry exactly them.  The
 # width's stacks read its own band (BLOCK_WIDTH_LIMITS), not a grade.
@@ -606,3 +733,13 @@ def length_text(value_mm: float, places: int) -> str:
 def printed_value_text(name: str, nominal: float) -> str:
     """The text a marked dimension prints: the value at its model places."""
     return length_text(nominal, DRAWING_PRECISION_BY_NAME[name])
+
+
+# The two dowel values as the bottom view prints them, for the sheet's ink
+# estimate: the station in its reference parentheses, and the ream's size
+# with its stacked band's upper row beside it.
+DOWEL_X_PRINTED_TEXT = f"({printed_value_text('DowelX', DOWEL_X)})"
+DOWEL_HOLE_PRINTED_TEXT = (
+    f"Ø{printed_value_text('DowelHoleDia', DOWEL_HOLE_DIA)} "
+    f"+{length_text(max(DOWEL_HOLE_BAND), DOWEL_HOLE_PLACES)}"
+)

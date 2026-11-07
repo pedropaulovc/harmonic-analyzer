@@ -6,6 +6,7 @@ import re
 from fractions import Fraction
 
 from _assembly_contract import assembly_contract
+from _test_assembly_steps import step_structure_violations
 import _config
 import dt_cone_gear_stack
 import cone_stack_end_play
@@ -54,9 +55,9 @@ def test_a_key_resolves_to_its_position_and_prints_a_pointer() -> None:
 def test_each_typed_step_cite_names_the_step_that_does_it(
     text: str, key: str, phrase: str
 ) -> None:
-    """Until the drawing's cites read the registry, each typed "STEP n" must
-    be the step that sets the condition it points at."""
-    assert f"STEP {steps.step_number(key)})" in " ".join(text.split())
+    """Until the drawing's cites read the registry, each typed "STEP n" (or
+    its lettered sub-step) must be the step that sets the condition it points at."""
+    assert re.search(rf"STEP {steps.step_number(key)}[A-HJ-NP-Z]?\)", " ".join(text.split()))
     assert phrase in _step_body(key)
 
 
@@ -68,12 +69,13 @@ def test_the_cone_stack_step_prints_measured_limits() -> None:
     assert "T120 FIRST THROUGH T006" in stack
     assert "EACH FLAT TO FLAT AND AGAINST THE LAST" in stack
     # The decimal-inch window rounds inward, a thousandth inside each limit.
-    printed = re.search(r"T006 NORTH FACE: (\d*\.\d{3})-(\d*\.\d{3})\.", stack)
+    printed = re.search(r"T006 BACK FACE: ACCEPT (\d*\.\d{3})-(\d*\.\d{3})\.", stack)
     assert printed is not None
     first, last = (float(value) * 25.4 for value in printed.groups())
     assert low <= first < low + 0.0254 and high - 0.0254 < last <= high
-    assert "RE-FACE A LONG STACK" in stack
-    assert "REMAKE THE THINNEST GEAR OF A SHORT ONE" in stack
+    # The remedy is its own sub-step after the check (rule 22).
+    assert stack.index("ACCEPT") < stack.index("IF THE STACK IS LONG, RE-FACE ITS THICKEST GEAR")
+    assert "IF IT IS SHORT, REMAKE ITS THINNEST GEAR" in stack
 
 
 def test_the_tip_step_sets_the_collar_before_the_end_play() -> None:
@@ -98,19 +100,23 @@ def test_the_tip_step_sets_the_collar_before_the_end_play() -> None:
     positions = [fitup.find(phrase) for phrase in order]
     assert -1 not in positions, positions
     assert positions == sorted(positions)
-    # The block is placed by its hold-down alone: nothing is set against it,
-    # and the post is left free to turn.
+    # The block is placed by its hold-down, squared and doweled (rule-23
+    # retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
+    # #2248)): nothing is set against it, and the post is left free to turn.
     placed = _step_body("post-and-tip-block")
-    assert "MHA-DT-VN-60 UP FROM UNDER THE PLATE" in placed
+    assert "RUN MHA-DT-VN-60 UP THRU THE MHA-DT-20 COUNTERBORE" in placed
     assert "FEELER" not in placed
-    assert "LEAVE MHA-DT-VN-61 LOOSE ENOUGH TO TURN MHA-DT-05" in placed
+    assert "RUN BOTH MHA-DT-VN-61 IN, LOOSE ENOUGH TO TURN MHA-DT-05" in placed
 
 
 def test_the_printed_shaft_end_play_is_the_band_the_stacks_book() -> None:
     """The collar-to-block air and the adjuster's embed window book
     cone_stack_end_play.SHAFT_END_PLAY; the sheet prints that band, rounded
     inward to the thousandth."""
-    match = re.search(r"END PLAY (\.\d{3})-(\.\d{3})", _step_body("tip-adjuster-set"))
+    match = re.search(
+        r"DIAL-INDICATE THE MHA-DT-04 END PLAY AT THE SHAFT END: (\.\d{3})-(\.\d{3})",
+        _step_body("tip-adjuster-set"),
+    )
     assert match is not None
     low, high = (float(value) * 25.4 for value in match.groups())
     least, most = cone_stack_end_play.SHAFT_END_PLAY
@@ -125,18 +131,19 @@ def test_post_screws_keep_spec_owned_stock_and_cut_to_fit_acceptance() -> None:
     fitup = _step_body("post-and-tip-block")
     assert row["number"] == drawing.BOM_PART_NUMBERS["dt-vn-post-mount-screw"]
     assert row["supplier_skus"][0] == screw.SKU
-    assert f"MSC {screw.SKU}" in drawing.BOM_DESCRIPTIONS["dt-vn-post-mount-screw"]
+    # Rubric sample round 6 (rule 22): the stock is the BOM row's, not step 2's.
     assert (
-        f"MSC {screw.SKU}, {screw.THREAD} X {screw.STOCK_LENGTH_MM / 25.4:g} IN STOCK"
-        in fitup
+        f"{screw.THREAD} X {screw.STOCK_LENGTH_MM / 25.4:g} FILLISTER STOCK, MSC {screw.SKU}"
+        == drawing.BOM_DESCRIPTIONS["dt-vn-post-mount-screw"]
     )
+    assert f"MSC {screw.SKU}" not in fitup
     places = screw.DRAWING_PRECISION_BY_NAME[screw.CUT_LENGTH_DIMENSION]
-    assert f"({sheet.inch_text(screw.CUT_LENGTH_MM, places)}) REF CUT LENGTH" in fitup
+    assert f"({sheet.inch_text(screw.CUT_LENGTH_MM, places)}) REF LONG" in fitup
     # The step prints the part sheet's exact maximum short, never a wider one.
     printed_short = float(re.search(r"FLUSH TO (\d*\.\d+) SHORT", fitup).group(1))
     assert printed_short * 25.4 == pytest.approx(screw.POST_SCREW_CUT_TO_FIT_SHORT, abs=1e-9)
-    assert "CUT TO FIT" in fitup and "UNDERSIDE, NEVER PROUD" in fitup
-    assert "DEBURR ENDS" in fitup
+    assert "CUT EACH MHA-DT-VN-61 TO FIT" in fitup and "UNDERSIDE, NEVER PROUD" in fitup
+    assert "DEBURR THE CUT ENDS" in fitup
     assert screw.FIXED_CUT_LENGTH_EXISTS is False
     assert screw.STOCK_LENGTH_MM >= screw.FIXED_LENGTH_ENGAGEMENT_MIN_MM
     assert (
@@ -160,20 +167,20 @@ def test_crank_fit_reads_t120_before_the_full_turn_and_retention_drilling() -> N
 
     fitup = _step_body("crank-mesh-checked")
     order = (
-        "SLIDE MHA-DT-10 ON UNPINNED",
+        "SLIDE MHA-DT-10 ON WITHOUT ITS PIN",
         f"SET MHA-DT-10 {sheet.inch_text(pinion.SEAT_FEELER_MM, sheet.FEELER_PLACES)} OFF",
         "PUSH MHA-DT-10 AND T120 TOWARD EACH OTHER",
-        f"READING A {sheet.T120_FITUP_FEELER_TEXT} FEELER ALL ROUND",
-        "MHA-DT-10 BAND TO T120 TIPS: IF THE FEELER STOPS",
-        "TURN THE MHA-DT-10 BAND DOWN",
+        f"A {sheet.T120_FITUP_FEELER_TEXT} FEELER PASSES ALL ROUND",
+        "BETWEEN THE MHA-DT-10 BAND AND THE T120 TIPS",
+        "BETWEEN THE MHA-DT-10 SHOULDER AND THE T120 FRONT FACE",
+        "IF IT STOPS AT THE BAND, TURN MHA-DT-10'S BAND DOWN",
         f"Ø{sheet.inch_min_text(pinion.TURNED_DIA_FITUP_MIN, 3)} MIN",
-        "MHA-DT-10 SHOULDER TO T120 SOUTH FACE: IF THE FEELER STOPS",
-        "FACE THE MHA-DT-10 SHOULDER BACK",
+        "IF IT STOPS AT THE SHOULDER, FACE THE SHOULDER BACK",
         f"{sheet.inch_min_text(pinion.SHOULDER_LENGTH_FITUP_MIN, 3)} MIN",
-        "RESET, RECHECK",
-        "TURN MHA-DT-07 ONE FULL REVOLUTION; IT MUST NEVER BIND",
-        "THEN MATCH-DRILL THROUGH THE MHA-DT-10",
-        "RE-CHECK NO BINDING",
+        "REPEAT 4E-4J",
+        "TURN MHA-DT-07 ONE FULL REVOLUTION BY HAND: IT MUST NEVER BIND",
+        "MATCH-DRILL THE MHA-DT-10",
+        "TURN MHA-DT-07 ONE FULL REVOLUTION AGAIN: NO BINDING",
     )
     positions = [fitup.index(phrase) for phrase in order]
     assert positions == sorted(positions)
@@ -190,30 +197,36 @@ def test_full_turn_checks_use_the_spec_ratio_and_clear_the_unrelieved_platform()
     ratio = Fraction(pinion.TEETH, gear64.TEETH)
     assert f"CONE SET {ratio} TURN ({pinion.TEETH}T:{gear64.TEETH}T)" in checks
     assert "WITHOUT BINDING THROUGH ONE FULL MHA-DT-07 TURN" in checks
-    assert "MHA-DT-07 CLEAR OF THE UNRELIEVED MHA-DT-20 TOP THROUGHOUT" in checks
+    assert "MHA-DT-07 CLEARS THE UNRELIEVED MHA-DT-20 TOP THROUGH THAT TURN" in checks
     assert "RELIEF THROUGHOUT" not in checks
-    assert "FINISHING IN THE CYLINDERS' RUNNING DIRECTION TO TAKE UP PLAY" in checks
-    assert "BINDING THROUGH ONE FULL MHA-DT-07 TURN" in " ".join(
-        drawing.FIT_PLACEHOLDER.split()
+    # Owner ruling 2026-11-07 (engineerguy video 4): forward is clockwise in
+    # the FRONT view, the platen feeds away from the crank, and the sine notch
+    # stops on the MHA-DT-01 side.
+    assert "THE MHA-DT-12 FINISHING CLOCKWISE TO TAKE UP PLAY" in checks
+    assert "CRANK FORWARD IS CLOCKWISE IN THE SHEET 1 FRONT VIEW" in checks
+    assert "THE PLATEN FEEDS AWAY FROM THE CRANK" in checks
+    assert "LEVEL ON THE MHA-DT-01 SIDE (LEFT IN THE FRONT VIEW)" in checks
+    # The crank mesh's free turn is check 2; the step-4 turn is the same test.
+    assert "TURN MHA-DT-07 ONE FULL REVOLUTION BY HAND: IT MUST NEVER BIND" in _step_body(
+        "crank-mesh-checked"
     )
 
 
-def test_crank_end_fit_holds_the_collar_on_the_boss_and_leaves_the_end_proud() -> None:
+def test_step_four_holds_the_collar_on_the_boss_and_leaves_the_end_proud() -> None:
     # Owner ruling D1 (2026-10-15): no crank-seat washer.  The collar bears on
     # the boss, the feeler is the end play, and the shaft end is left proud.
     import dt_crank_pinion_spec as pinion
     import dt_crankshaft_spec as crankshaft
 
-    fitup = " ".join(drawing.CRANK_END_FIT_NOTES.split())
+    fitup = _step_body("crank-mesh-checked")
     least, most = crankshaft.SHAFT_END_PROUD_RANGE
     assert least >= 0.0
     order = (
-        "MHA-DT-11 COLLAR REAR FACE HARD ON THE MHA-DT-05 BOSS SOUTH FACE",
-        f"MHA-DT-10 ON THE {sheet.inch_text(pinion.SEAT_FEELER_MM, sheet.FEELER_PLACES)} "
-        "FEELER OFF THE BOSS NORTH FACE",
-        "MATCH-DRILL AND REAM FOR MHA-DT-29",
-        "END PLAY = THE FEELER",
-        f"END STANDS {drawing.inch_envelope((least, most), 3)} PROUD OF MHA-DT-10 NORTH FACE",
+        "HOLD MHA-DT-11'S COLLAR HARD ON THE MHA-DT-05 BOSS, NO WASHER",
+        f"SET MHA-DT-10 {sheet.inch_text(pinion.SEAT_FEELER_MM, sheet.FEELER_PLACES)} "
+        "OFF THE BOSS BACK FACE WITH A FEELER",
+        "MATCH-DRILL THE MHA-DT-10",
+        f"END STANDS {drawing.inch_envelope((least, most), 3)} PROUD OF MHA-DT-10.",
         "DO NOT FACE",
     )
     positions = [fitup.index(phrase) for phrase in order]
@@ -223,16 +236,15 @@ def test_crank_end_fit_holds_the_collar_on_the_boss_and_leaves_the_end_proud() -
     printed = fitup.split("END STANDS ", 1)[1].split(" PROUD", 1)[0]
     low, high = (float(limit) * 25.4 for limit in printed.split("-"))
     assert low <= least and most <= high
-    assert f"(STEP {steps.step_number('crank-mesh-checked')})" in fitup
     assert "SHIM" not in fitup and "MHA-CH-VN-57" not in fitup
 
 
 def test_step_four_holds_the_collar_before_the_feeler_and_the_pin() -> None:
     body = _step_body("crank-mesh-checked")
     positions = [
-        body.index("HOLD THE MHA-DT-11 COLLAR HARD ON THE BOSS SOUTH FACE"),
-        body.index("OFF THE MHA-DT-05 BOSS NORTH FACE WITH A FEELER"),
-        body.index("MATCH-DRILL THROUGH THE MHA-DT-10"),
+        body.index("HOLD MHA-DT-11'S COLLAR HARD ON THE MHA-DT-05 BOSS"),
+        body.index("OFF THE BOSS BACK FACE WITH A FEELER"),
+        body.index("MATCH-DRILL THE MHA-DT-10"),
     ]
     assert positions == sorted(positions)
 
@@ -241,5 +253,54 @@ def test_a_cite_to_the_wrong_step_is_caught() -> None:
     """Positive control: RIG SET sets the rig along the bank, not its tip gap."""
     assert TIP_GAP_FEELER not in _step_body("rig-set")
 
+
+
+def _defined_codes() -> list[str]:
+    """The short codes MHA-DT-00 defines: each cone gear's configuration
+    (the BOM's "T006-T120 BY 6") and the chain wheel the interface notes name."""
+    cone = re.search(r"\bT(\d+)-T(\d+) BY (\d+)\b", drawing.BOM_DESCRIPTIONS["dt-cone-gear"])
+    assert cone, drawing.BOM_DESCRIPTIONS["dt-cone-gear"]
+    first, last, step = (int(value) for value in cone.groups())
+    gears = {f"T{teeth:03d}" for teeth in range(first, last + 1, step)}
+    named = set(re.findall(r"\bT\d+\b", drawing.INTERFACE_NOTES))
+    assert named, "the interface notes name the T12 chain wheel"
+    return [re.escape(code) for code in sorted(gears | named)]
+
+
+def _direction_key() -> str:
+    """The sheet's direction definitions: the direction notes and check 5's
+    running sense."""
+    checks = " ".join(drawing.CHECKS.split())
+    forward = re.search(r"CRANK FORWARD IS CLOCKWISE IN THE SHEET 1 FRONT VIEW", checks)
+    assert forward, "check 5 defines the running sense"
+    return f"{drawing.DIRECTION_NOTES}\n{forward.group(0)}"
+
+
+def test_every_step_and_check_is_one_short_action_with_its_codes_defined() -> None:
+    """Drawing-guidelines rule 22, offline (rubric sample round 9: the review
+    re-sampled chained steps every round): each printed step or check is at
+    most six lines and one action, a check and its remedy are separate steps,
+    every lettered or numbered cite names a printed head, and every short code
+    and direction word is defined on the sheet.  No step is allowlisted."""
+    violations = step_structure_violations(
+        {"STEP": SEQUENCE_BLOCKS, "CHECK": (drawing.CHECKS,)},
+        reference_kinds={"STEP": "STEP", "CHECK": "CHECK"},
+        defined_codes=_defined_codes(),
+        direction_key=_direction_key(),
+    )
+    assert violations == [], "\n".join(violations)
+
+
+def test_the_fits_are_named_never_a_diametral_band() -> None:
+    """Rule 4 (d870c66): a fit is named; any clearance or interference band
+    prints only as REF."""
+    printed = "\n".join((*SEQUENCE_BLOCKS, drawing.CHECKS))
+    assert "DIAMETRAL" not in printed
+    # The standard names only (running, sliding, locational, press, drive,
+    # bonded); a private name such as SLIP or LIGHT HAMMER is refused.
+    named = re.findall(r"\b(?!TO\b)([A-Z]+) FIT\b", " ".join(printed.split()))
+    assert set(named) <= {"RUNNING", "SLIDING", "CLEARANCE", "INTERFERENCE", "PRESS", "DRIVE"}, named
+    for band in re.findall(r"(?:CLEARANCE|INTERFERENCE)[^()]*\)?", " ".join(printed.split())):
+        assert band.endswith("REF)"), band
 
 

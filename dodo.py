@@ -3878,6 +3878,8 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         SCRIPTS_DIR / "test_supplier_native_repair.py",
         SCRIPTS_DIR / "test_supplier_top_text_shelves.py",
         SCRIPTS_DIR / "test_dt_drive_train_steps.py",
+        # The shared rule-22 step-structure lint's positive controls.
+        SCRIPTS_DIR / "test_assembly_step_lint.py",
         SCRIPTS_DIR / "test_drive_train_tip_adjuster_seat.py",
         # Supplier pose facts must stay independent of native replica recipes.
         SCRIPTS_DIR / "test_dt_vn_cone_pose_specs.py",

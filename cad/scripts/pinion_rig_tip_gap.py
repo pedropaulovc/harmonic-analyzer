@@ -27,7 +27,7 @@ from dt_pinion_cam_geometry import CAM_OD
 from dt_pinion_cam_geometry import ECC as CAM_ECC
 from dt_pinion_cam_pin_geometry import PIN_DIA as FPIN_DIA
 from dt_drive_train_assembly_sheet import FEELER_PLACES, inch_text, inch_window
-from pinion_rig_fitup import FEELER_GAGE_LEAVES_MM, FEELER_GAGE_NAME
+from pinion_rig_fitup import FEELER_GAGE_LEAVES_MM
 from pinion_rig_layout import FEELER_LEAF_STEP
 
 
@@ -101,12 +101,12 @@ def leaf_stack(setting: float) -> tuple[float, ...]:
 
 TIP_GAP_LEAVES = leaf_stack(TIP_GAP_FEELER)
 TIP_GAP_LEAVES_TEXT = " + ".join(f"{leaf:.2f}" for leaf in TIP_GAP_LEAVES)
-# MHA-DT-00 prints decimal inch (#290): the setting to the thousandth, its
-# leaves by their stamped metric size, the acceptance rounded inward.
+# MHA-DT-00 prints decimal inch (#290): the setting to the thousandth, the
+# acceptance rounded inward.  Its leaves print once, by their stamped metric
+# size, in the drawing's feeler-stack table mm column (an inch sheet prints
+# inch values only, drawing-guidelines rule 26).
 TIP_GAP_SETTING_TEXT = inch_text(TIP_GAP_FEELER, FEELER_PLACES)
-TIP_GAP_FEELER_TEXT = (
-    f"{TIP_GAP_SETTING_TEXT} FEELER ({TIP_GAP_LEAVES_TEXT} MM {FEELER_GAGE_NAME} LEAVES)"
-)
+TIP_GAP_FEELER_TEXT = f"{TIP_GAP_SETTING_TEXT} FEELER"
 TIP_GAP_ACCEPT_TEXT = f"ACCEPT {inch_window(TIP_GAP_ACCEPT, FEELER_PLACES)}"
 
 __all__ = [

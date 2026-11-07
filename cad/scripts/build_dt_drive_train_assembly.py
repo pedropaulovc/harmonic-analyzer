@@ -1050,6 +1050,8 @@ from dt_cone_swing_platform_spec import (  # noqa: E402
     POST_MOUNT_STATION_TOL_MM as PLAT_POST_MOUNT_STATION_TOL_MM,
     POST_MOUNT_TAP_EDGE_BREAK,
     POST_MOUNT_THREAD_DIA,
+    TIP_DOWEL_LOCAL_X as PLAT_TIP_DOWEL_LOCAL_X,
+    TIP_DOWEL_LOCAL_Z as PLAT_TIP_DOWEL_LOCAL_Z,
     UNIT as PLAT_UNIT,
 )
 from dt_cone_swing_platform_pivot_spec import (  # noqa: E402
@@ -1308,6 +1310,8 @@ from dt_cone_tip_block_spec import (  # noqa: E402
     BLOCK_WIDTH_LIMITS as TIP_BLOCK_WIDTH_LIMITS,
     BLOCK_X as TIP_BLOCK_X,
     BLOCK_Z as TIP_BLOCK_Z,
+    DOWEL_FROM_TAP as TIP_DOWEL_FROM_TAP,
+    DOWEL_HOLE_DEPTH as TIP_DOWEL_HOLE_DEPTH,
     DRAWING_PRECISION_BY_NAME as TIP_DRAWING_PRECISION,
     FOOT_BORE_SPEC as TIP_FOOT_BORE_SPEC,
     FOOT_TAP_STATION_TOL_MM as TIP_FOOT_TAP_STATION_TOL_MM,
@@ -1417,6 +1421,21 @@ if (
     or abs(SHAFT_TIP_COLLAR_END - SHAFT_TIP_COLLAR_START - COLLAR_WIDTH) > 1e-9
 ):
     raise AssertionError("cone_line tip-end stack drifted from the platform/collar/block parts")
+# MHA-DT-VN-69 (rule-23 retention, owner ruling 2026-11-07, PR #2248):
+# the plate's dowel ream and the block foot's stand on the hold-down line, one
+# DOWEL_FROM_TAP along the plate's local x from the hold-down/foot tap.
+if (
+    abs(PLAT_TIP_DOWEL_LOCAL_Z - PLAT_HOLDDOWN_LOCAL_Z) > 1e-9
+    or abs(PLAT_TIP_DOWEL_LOCAL_X - (PLAT_HOLDDOWN_LOCAL_X + TIP_DOWEL_FROM_TAP)) > 1e-9
+):
+    raise AssertionError("tip dowel ream left the hold-down line or its foot station")
+# Pressed to the floor of the foot's blind ream: its lower end sits one pin
+# length under that floor, inside the plate's slip ream.
+from dt_vn_locating_pin_spec import LENGTH as TIP_DOWEL_LENGTH  # noqa: E402
+
+TIP_DOWEL_BOTTOM_Y = Y_BASE_TOP + PLAT_T + TIP_DOWEL_HOLE_DEPTH - TIP_DOWEL_LENGTH
+if not Y_BASE_TOP < TIP_DOWEL_BOTTOM_Y < Y_BASE_TOP + PLAT_T:
+    raise AssertionError("tip dowel's lower end left the plate's slip ream")
 # One journal drive height across the platform and both riders: plate
 # thickness under each foot + bore height = 54 above the base top.  The block
 # stands straight on PlateTop (no shim).
@@ -4465,6 +4484,27 @@ LIFT_ROD_PARK_DEG = math.degrees(math.acos(LIFT_ROD_ROWS[1][0]))
 CAM_ROD_PHASE_DEG = math.degrees(
     math.acos(sum(a * b for a, b in zip(PINION_CAM_ROWS[0], LIFT_ROD_ROWS[0])))
 )
+# Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample,
+# PR #2248; owner question 2 option 2-A): each cam's set screw bears
+# on a MHA-DT-17 flat.  The rod part cuts both flats square to its local
+# FLAT_NORMAL_LOCAL; that must be each cam's tap axis carried into the rod's
+# frame through these rows, at the rod's own authored phase.
+import dt_pinion_lift_rod_spec as _LIFT_ROD  # noqa: E402
+
+_CAM_TAP_WORLD = [
+    sum(_LIFT_ROD.CAM_SET_SCREW_AXIS_LOCAL[i] * PINION_CAM_ROWS[i][j] for i in range(3))
+    for j in range(3)
+]
+_CAM_TAP_IN_ROD = [
+    sum(LIFT_ROD_ROWS[i][j] * _CAM_TAP_WORLD[j] for j in range(3)) for i in range(3)
+]
+if abs(_LIFT_ROD.ROD_PHASE_DEG - LEVER_TILT_DEG) > 1e-9 or any(
+    abs(a - b) > 1e-9 for a, b in zip(_CAM_TAP_IN_ROD, _LIFT_ROD.FLAT_NORMAL_LOCAL, strict=True)
+):
+    raise AssertionError(
+        f"MHA-DT-17 flat normal {_LIFT_ROD.FLAT_NORMAL_LOCAL} is not the cams' tap axis "
+        f"{_CAM_TAP_IN_ROD} in the rod's frame"
+    )
 
 
 def _org(adapter, name: str) -> list[float]:
@@ -4926,6 +4966,26 @@ async def build(adapter) -> dict[str, str]:
         ROT_X_180,
         ground=False,
         label="cone-tip-block-screw (MHA-DT-VN-60 up through the plate into the block foot)",
+    )
+    # MHA-DT-VN-69 tip dowel (rule-23 retention, owner ruling 2026-11-07;
+    # MHA-DT-00 rubric sample, PR #2248): match-drilled from under
+    # the plate on the hold-down line, PLAT_TIP_DOWEL_LOCAL_X along the plate's
+    # local x, and pressed up to the floor of the block foot's blind .0620
+    # ream; its lower end is a slip fit in the plate's opened ream, so the
+    # block cannot turn about MHA-DT-VN-60.  Stock frame: axis +Y, one end
+    # face on y = 0.
+    tip_dowel_xz = (
+        ptip[0] + PLAT_TIP_DOWEL_LOCAL_X * ROT_Y_INCLINE[0][0],
+        ptip[2] + PLAT_TIP_DOWEL_LOCAL_X * ROT_Y_INCLINE[0][2],
+    )
+    tip_dowel = await place_component(
+        adapter,
+        "dt-vn-locating-pin",
+        [tip_dowel_xz[0], TIP_DOWEL_BOTTOM_Y, tip_dowel_xz[1]],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        ground=False,
+        label="locating-pin tip dowel (MHA-DT-VN-69 pressed in the block foot, slip in the plate)",
     )
     # Tip end-play stack (item 5, v4_t00471): the MHA-DT-VN-54 stack collar on the
     # tip land, the axial adjuster screw in the block's tapped bore, and the
@@ -5960,6 +6020,30 @@ async def build(adapter) -> dict[str, str]:
         raise AssertionError(
             f"hold-down screw at {_hd_o} is not on the counterbore floor under the "
             f"tip block's foot tap (x, z) {_tap}"
+        )
+    # MHA-DT-VN-69 (rule-23 retention, owner ruling 2026-11-07) is pressed in the
+    # block foot: locked to it, its axis must stand on the foot's dowel ream
+    # (DOWEL_FROM_TAP past the foot tap), its upper end on the ream's floor.
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{tip_dowel}", "PLANE"),
+        named_ref(f"Front Plane@{tip_block}", "PLANE"),
+        label=f"{tip_dowel} pressed in the tip block foot's dowel ream",
+    )
+    _dw_o = _org(adapter, tip_dowel)
+    _dw_off = TIP_FOOT_TAP_OFFSET_X + TIP_DOWEL_FROM_TAP
+    _dw_want = (
+        _tb_o[0] + _dw_off * ROT_Y_INCLINE[0][0],
+        _tb_o[2] + _dw_off * ROT_Y_INCLINE[0][2],
+    )
+    if (
+        abs(_dw_o[0] - _dw_want[0]) > 1e-4
+        or abs(_dw_o[2] - _dw_want[1]) > 1e-4
+        or abs(_dw_o[1] - TIP_DOWEL_BOTTOM_Y) > 1e-4
+    ):
+        raise AssertionError(
+            f"tip dowel at {_dw_o} is not on the floor of the tip block's dowel ream "
+            f"(x, z) {_dw_want}"
         )
     # --- tip end-play stack (item 5): collar | adjuster | pinch screw ---------
     # MHA-DT-VN-54 is locked one unchanged feeler off T006. Its FINISHED round

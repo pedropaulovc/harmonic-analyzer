@@ -305,7 +305,7 @@ def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None
     import draw_dt_drive_train_assembly as package
 
     hub_step = _flat(package.CONE_CRANK_STEPS.split("\n6. ")[1].split("\n7. ")[0])
-    assert "MHA-DT-27 FROM THE PIN HEAD, CLEAR OF THE HUB" in hub_step
+    assert "HANG MHA-DT-27 FROM THE MHA-DT-09 HEAD, CLEAR OF THE HUB" in hub_step
     assert re.search(r"\d\.\d", cross_hole.split("1:48", 1)[1]) is None
     assert "PinProudReference" not in dt_crank_hub_spec.DRAWING_DIMENSIONS
     assert "PinProud" not in drawing.END_KEEP
