@@ -7,7 +7,8 @@ the row's station from the -Y side face (left), the stock width (right) and
 one native callout per hole over it, each leader on its own hole; the end
 view, projected right of the plan, carries the stock thickness and section
 A-A's cutting line; section A-A, cut along the hole row and placed under the
-plan, carries the bottom thread's depth; the shaded isometric rides top
+plan, draws both faces' threads solid and carries the bottom thread's depth
+and what both depths do; the shaded isometric rides top
 right at 1:1, clear of the title block. No datums (drawing-guidelines.md
 rule 5). The two hole stations (the KP08's 42 mm span) print exact
 millimetres, labelled mm (owner ruling 4, 2026-11-01). Each hole is drilled
@@ -49,6 +50,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_detail_projection import settle_detail_projection
+from _drawing_dimension_import import import_cosmetic_threads
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_hidden_sketches import curate_view_dimensions, part_sketches_shown
 from _drawing_projection import model_point_in_view, model_points_in_view
@@ -612,6 +614,71 @@ def _require_bar_thread_depth(section: Any) -> None:
     _telemetry.info(f"section A-A bottom thread depth: {found[0]!r}")
 
 
+# Section A-A draws both faces' threads (machinist review 0c3ed35988: it drew
+# only the top thread, dashed, and no bottom thread). SolidWorks prints a
+# section's thread annotation dashed, as a hidden thread, so every thread in
+# the cut moves onto a visible thin continuous layer of its own
+# (draw_pn_pen_v_block._section_thread_on_visible_layer). The cut runs on
+# both holes' axes, so each hole shows its top and its bottom thread.
+SECTION_THREAD_LAYER = "TAP-THREAD-SECTION"
+SECTION_THREAD_INSTANCES = len(HOLE_X) * len(("BarTaps", "KP08Taps"))
+_COSMETIC_THREAD_ANNOTATION = 1  # swAnnotationType_e.swCosmeticThread
+
+
+def _section_threads_on_visible_layer(adapter: Any, section: Any) -> None:
+    """Import section A-A's cosmetic threads, both faces' on both holes, and
+    print them thin and solid; the layer's state and every thread
+    annotation's layer are read back."""
+    seeds, instances = import_cosmetic_threads(adapter, section)
+    if instances < SECTION_THREAD_INSTANCES:
+        raise RuntimeError(
+            f"section A-A shows {instances} cosmetic-thread instances ({seeds} "
+            f"seeds), not both faces' threads on both holes "
+            f"({SECTION_THREAD_INSTANCES})"
+        )
+    draw = adapter.currentModel
+    manager = _early_bound(draw.GetLayerManager(), "ILayerMgr")
+    layer = manager.GetLayer(SECTION_THREAD_LAYER)
+    if layer is None:
+        # COLORREF black, swLineCONTINUOUS (0), swLW_THIN (0).
+        if (
+            int(
+                manager.AddLayer(
+                    SECTION_THREAD_LAYER, "section A-A tap threads", 0, 0, 0
+                )
+            )
+            != 1
+        ):
+            raise RuntimeError(f"failed to add layer {SECTION_THREAD_LAYER}")
+        layer = manager.GetLayer(SECTION_THREAD_LAYER)
+    layer = _early_bound(layer, "ILayer")
+    layer.Visible = True
+    if not bool(layer.Visible) or int(layer.Style) != 0 or int(layer.Width) != 0:
+        raise RuntimeError(
+            f"layer {SECTION_THREAD_LAYER} reads visible={layer.Visible!r}, style "
+            f"{layer.Style!r}, width {layer.Width!r}; wanted visible thin continuous"
+        )
+    moved = 0
+    for raw_annotation in _early_bound(section, "IView").GetAnnotations() or ():
+        annotation = _early_bound(raw_annotation, "IAnnotation")
+        if int(annotation.GetType()) != _COSMETIC_THREAD_ANNOTATION:
+            continue
+        annotation.Layer = SECTION_THREAD_LAYER
+        if str(annotation.Layer or "") != SECTION_THREAD_LAYER:
+            raise RuntimeError(f"a cosmetic thread refused layer {SECTION_THREAD_LAYER}")
+        moved += 1
+    if moved < 2:
+        raise RuntimeError(
+            f"section A-A lists {moved} cosmetic-thread annotations to layer, "
+            "not one for each face's thread"
+        )
+    rebuild_drawing(adapter, label=f"cosmetic threads to {SECTION_THREAD_LAYER}")
+    _telemetry.info(
+        f"section A-A cosmetic threads: seeds/instances={(seeds, instances)!r}, "
+        f"{moved} on {SECTION_THREAD_LAYER}"
+    )
+
+
 def _omit_tap_thread_class(display: Any, *, label: str) -> None:
     """The title block's THREADS row owns the UNC class (rule 2): the thread
     row reads ``8-32 UNC ▽.436``, not ``... - 2B ...``."""
@@ -813,6 +880,9 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, section, SECTION_CAPTION_XY, label="end bracket section A-A"
     )
     _require_bar_thread_depth(section)
+    # Both faces' threads drawn solid in the cut; the depth's witness leaves
+    # the bottom thread's drawn end (BAR_THREAD_WITNESS_X).
+    _section_threads_on_visible_layer(adapter, section)
     # Places are authored on the part; the sheet only proves the import kept
     # them, then writes the mate callouts and the stock references.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
