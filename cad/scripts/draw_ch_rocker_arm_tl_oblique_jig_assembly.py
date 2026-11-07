@@ -311,10 +311,12 @@ if not {
 } <= set(LINEAR_MOTION_SHOWN):
     raise AssertionError("the linear-motion view must keep every rail, block and feed part")
 # Sparse: one balloon for each moving or guiding member of the slide and its
-# feed, no fasteners. The rail, carriage and shoulder screw are ballooned on
-# rail 2's (pivot block's) side and the feed's six on rail 1's, so the ring
-# draws on both. The base bars and hold-downs show unballooned; sheet 3
-# balloons them.
+# feed, no fasteners. The rail and carriage are ballooned on rail 2's (pivot
+# block's) side and the feed's six on rail 1's, so the ring draws on both.
+# The base bars and hold-downs show unballooned; sheet 3 balloons them. The
+# shoulder screw is not ballooned here: its head is lost in its counterbore
+# with the carrier gone (TL-00 review 62753c5e, Main 2026-11-07); sheet 4
+# balloons it.
 LINEAR_MOTION_BALLOONED = tuple(
     stem
     for stem in spec.BOM_ORDER
@@ -322,7 +324,6 @@ LINEAR_MOTION_BALLOONED = tuple(
     in {
         spec.PIVOT_BLOCK,
         spec.FEED_BLOCK,
-        spec.PIVOT_SCREW,
         spec.END_BRACKET,
         spec.RAIL,
         spec.CARRIAGE,
@@ -332,14 +333,13 @@ LINEAR_MOTION_BALLOONED = tuple(
         spec.HANDWHEEL,
     }
 )
-_PIVOT_SIDE = 1  # rail 2, its carriage and the pivot block's shoulder screw
+_PIVOT_SIDE = 1  # rail 2 and its carriage, under the pivot block
 if (
     spec.RAILS[_PIVOT_SIDE] != 2
     or spec.LOCKED_TO[spec.PIVOT_BLOCK] != ((spec.CARRIAGE, _PIVOT_SIDE),)
-    or spec.LOCKED_TO[spec.PIVOT_SCREW][_PIVOT_SIDE] != (spec.PIVOT_BLOCK, 0)
 ):
-    raise AssertionError("the pivot side's rail, carriage or shoulder screw moved")
-_PIVOT_SIDE_FAMILIES = (spec.RAIL, spec.CARRIAGE, spec.PIVOT_SCREW)
+    raise AssertionError("the pivot side's rail or carriage moved")
+_PIVOT_SIDE_FAMILIES = (spec.RAIL, spec.CARRIAGE)
 
 
 def _linear_motion_anchor(stem: str) -> BalloonAnchor:

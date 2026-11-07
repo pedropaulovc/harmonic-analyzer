@@ -2220,7 +2220,8 @@ def test_kit_rails_and_carriages_carry_the_owner_note_and_the_play_check() -> No
     # bought for its 2 rails and 2 of its carriages; Z0 preload and C
     # accuracy are not required, the fit-up play check replaces them.
     assert spec.QUANTITIES[spec.RAIL] == spec.QUANTITIES[spec.CARRIAGE] == 2
-    assert spec.BOM_DESCRIPTIONS[spec.RAIL] == f"{guide_rail.STYLE} RAIL, 439.928 MM, KIT, TRIMMED"
+    # TL-00 review 62753c5e: the trimmed rail's length is a reference.
+    assert spec.BOM_DESCRIPTIONS[spec.RAIL] == f"{guide_rail.STYLE} RAIL, 440 MM REF, TRIM TO BAR"
     assert trammel.RAIL_LENGTH == trammel.BASE_BAR_LENGTH == 439.928
     assert spec.BOM_DESCRIPTIONS[spec.CARRIAGE] == f"{carriage.STYLE} CARRIAGE, KIT"
     for description in spec.BOM_DESCRIPTIONS.values():
@@ -2233,7 +2234,7 @@ def test_kit_rails_and_carriages_carry_the_owner_note_and_the_play_check() -> No
         f"ITEMS {rail_item}-{carriage_item}: HIWIN-STYLE "
         f"{guide_rail.STYLE} RAIL / {carriage.STYLE} CARRIAGE, A MATCHED KIT,"
     )
-    assert note[kit + 1:] == [
+    assert note[kit + 1:kit + 3] == [
         "NUIBBYED-BRANDED, NOT GENUINE HIWIN. Z0 PRELOAD AND C ACCURACY NOT",
         f"REQUIRED; ACCEPT BY FIT-UP PLAY CHECK ({tir} AT THE PIVOT).",
     ]
@@ -2256,6 +2257,37 @@ def test_kit_rails_and_carriages_carry_the_owner_note_and_the_play_check() -> No
     assert "ONLY ONTO A KIT FALSE RAIL" in preparation
     assert "IF NONE MEETS 0.02 MM, FIT A PRELOADED (Z0/ZA) HGH15CA CARRIAGE." in preparation
     assert trammel.RAIL_HOLE_COUNT == 8
+
+
+def test_rail_preparation_cites_numbered_documents_and_the_stated_wall() -> None:
+    # TL-00 review 62753c5e: every document step 1 uses is cited by Number
+    # and sheet, and the trimmed rail's wall check names its stated minimum.
+    preparation = next(text for text in spec.ASSEMBLY_STEPS if text.startswith("1. "))
+    assert spec.BASE_BAR_NUMBER == "MHA-CH-06-TL-20"
+    assert spec.RAIL_RECEIPT_REFERENCE == "MHA-CH-06-TL-VN-83 SHEET 2"
+    assert preparation.startswith(
+        "1. PREPARE RAILS PER THE MHA-CH-06-TL-20 PROCESS PLAN AND MHA-CH-06-TL-VN-83 SHEET 2. "
+    )
+    assert "CHECK EACH END COUNTERBORE WALL 2.0 MM MIN (MHA-CH-06-TL-VN-83 SHEET 2 NOTE [A])." in preparation
+    assert f"[A] WALL FROM EACH END COUNTERBORE TO RAIL END: {guide_rail.WALL_ACCEPTANCE_MM:.1f} MIN." in (
+        guide_rail.DRAWING_NOTES
+    )
+    for unnumbered in ("BASE-BAR PLAN", "BASE-BAR PROCESS PLAN", "RAIL SHEET", "RETAINED WALLS"):
+        assert unnumbered not in preparation
+
+
+def test_bom_note_names_the_base_bar_rows_as_two_configurations() -> None:
+    # TL-00 review 62753c5e: items 1 and 2 share TL-20's Number; the note
+    # names them as its two configurations, each on its own sheet.
+    note = spec.BOM_NOTE.split("\n")
+    line = (
+        f"ITEMS {spec.ITEM_NUMBERS[spec.BASE_BAR_1]}-{spec.ITEM_NUMBERS[spec.BASE_BAR_2]}: "
+        "ONE NUMBER, TWO CONFIGURATIONS (MHA-CH-06-TL-20 SHEETS 1, 2)."
+    )
+    assert note[-1] == line
+    assert spec.base_bar.CONFIGURATIONS == (spec.base_bar.BAR1, spec.base_bar.BAR2)
+    buy = next(text for text in note if text.startswith("SHIM-"))
+    assert len(line) <= len(buy)
 
 
 # The feed fit-up's one linear order (TL-00 review, farm 20261104T210601055Z,

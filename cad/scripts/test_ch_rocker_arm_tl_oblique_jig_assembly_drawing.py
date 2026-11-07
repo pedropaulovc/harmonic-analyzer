@@ -3044,10 +3044,16 @@ def test_linear_motion_balloons_are_a_sparse_set_on_shown_parts() -> None:
     ballooned = drawing.LINEAR_MOTION_BALLOONED
     assert ballooned == tuple(stem for stem in spec.BOM_ORDER if stem in set(ballooned))
     assert set(ballooned) == {
-        spec.PIVOT_BLOCK, spec.FEED_BLOCK, spec.PIVOT_SCREW, spec.END_BRACKET,
+        spec.PIVOT_BLOCK, spec.FEED_BLOCK, spec.END_BRACKET,
         spec.RAIL, spec.CARRIAGE, spec.LEADSCREW, spec.FEED_NUT,
         spec.PILLOW_BLOCK, spec.HANDWHEEL,
     }
+    # TL-00 review 62753c5e (Main 2026-11-07): with the carrier hidden the
+    # shoulder screw's head reads as an empty counterbore, so sheet 11 does
+    # not balloon it; its exploded sheet does.
+    assert spec.PIVOT_SCREW not in ballooned
+    [screw_sheet] = [cluster.sheet for cluster in drawing.CLUSTERS if spec.PIVOT_SCREW in cluster.stems]
+    assert screw_sheet != drawing.LINEAR_MOTION_SHEET
     assert all(_family_instances(stem) <= set(drawing.LINEAR_MOTION_SHOWN) for stem in ballooned)
     assert set(drawing.LINEAR_MOTION_ANCHORS) == set(ballooned)
     # Walked, never the exploded sheets' frozen points.
@@ -3055,7 +3061,6 @@ def test_linear_motion_balloons_are_a_sparse_set_on_shown_parts() -> None:
     assert {stem: anchor.instance for stem, anchor in drawing.LINEAR_MOTION_ANCHORS.items()} == {
         spec.PIVOT_BLOCK: None,
         spec.FEED_BLOCK: None,
-        spec.PIVOT_SCREW: spec.instance_name(spec.PIVOT_SCREW, 1),
         spec.END_BRACKET: None,
         spec.RAIL: "@Rail:2",
         spec.CARRIAGE: "@Carriage:2",
@@ -3064,8 +3069,7 @@ def test_linear_motion_balloons_are_a_sparse_set_on_shown_parts() -> None:
         spec.PILLOW_BLOCK: None,
         spec.HANDWHEEL: None,
     }
-    # The pivot side's three are rail 2's and the pivot block's.
-    assert spec.lock_parent(spec.PIVOT_SCREW, 1) == spec.instance_name(spec.PIVOT_BLOCK, 0)
+    # The pivot side's two are rail 2's, under the pivot block.
     assert spec.lock_parent(spec.PIVOT_BLOCK, 0) == spec.instance_name(spec.CARRIAGE, 1)
 
 

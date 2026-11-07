@@ -88,6 +88,7 @@ import math
 from collections.abc import Iterator
 from dataclasses import dataclass
 
+import _config
 from _assembly_contract import assembly_contract
 from _hole_spec import NUMBER_DRILL_MM
 from _printed_tolerance import printed_band_mm
@@ -1076,7 +1077,8 @@ COVER_Y = trammel.THROAT_TO_COVER  # the column's pleated cover, 7.5 in from the
 
 # --- BOM ------------------------------------------------------------------------------
 # DESCRIPTION cells, one printed line each; no vendor or brand (the yaml owns
-# each source). Shared kit members use the producer's native Description authority.
+# each source). Shared kit members use the producer's native Description
+# authority, except the trimmed rail's reference length below.
 # The TL-VN-83 kit rail and carriages carry the owner's description note
 # under the BOM (BOM_NOTE, #2177). Screws by their fastener-table callout.
 BOM_DESCRIPTIONS = {
@@ -1094,7 +1096,10 @@ BOM_DESCRIPTIONS = {
     FEED_LEVER: "FEED LEVER",
     END_BRACKET: "END BRACKET",
     # Kit members print their native per-configuration descriptions.
-    RAIL: guide_rail.BOM_DESCRIPTION,
+    # The kit's own row is the fitted 439.928 (TL-VN-83); here it is a
+    # reference, each rail trimmed to its bar in step 1 (TL-00 review
+    # 62753c5e), labelled mm on the inch sheet (#290).
+    RAIL: f"{guide_rail.STYLE} RAIL, {trammel.RAIL_LENGTH:.0f} MM REF, TRIM TO BAR",
     CARRIAGE: carriage.BOM_DESCRIPTION,
     STOP_PIN: "DOWEL PIN 1/8 X 3/4, LOOSE END STOP",
     # Vendor-metric rows keep their millimetres, labelled (#290).
@@ -1830,17 +1835,25 @@ GENERAL_TORQUE_NOTE = (
 )
 # Keep sheets 7–8 at the normal note size and paragraph spacing. The BOM owns
 # the shim SKU/thickness buy list; P1 cites it rather than printing it twice.
+# Step 1 cites its documents by Number (TL-00 review 62753c5e): the base
+# bar's process plan and the rail kit's receipt sheet, whose note [A] states
+# the counterbore-to-end wall each trimmed rail keeps.
+BASE_BAR_NUMBER = _config.parts(base_bar.PART_NAME)["number"]
+RAIL_RECEIPT_REFERENCE = f"{base_bar.RAIL_NUMBER} SHEET {guide_rail.RECEIPT_SHEET}"
 ASSEMBLY_STEPS = (
     # Select carriages and finish all rail/bar preparation before fastening
     # the rails/brackets or putting the bars on the machine table.
-    "1. PREPARE RAILS PER BASE-BAR PLAN AND RAIL SHEET 2. "
+    f"1. PREPARE RAILS PER THE {BASE_BAR_NUMBER} PROCESS PLAN AND "
+    f"{RAIL_RECEIPT_REFERENCE}. "
     f"EACH RAIL ARRIVES WITH 2 GREASED {carriage.STYLE} CARRIAGES "
     f"{_item(CARRIAGE)}: ROCK ALL 4 SIDEWAYS UNDER AN INDICATOR; KEEP THE 2 "
     "TIGHTEST, ONE PER RAIL. A CARRIAGE LEAVES A RAIL ONLY ONTO A KIT FALSE RAIL. "
     f"IF NONE MEETS {trammel.CARRIAGE_PLAY_TIR_MAX:.2f} MM, FIT A PRELOADED (Z0/ZA) "
     f"{carriage.STYLE} CARRIAGE. "
-    "TRIM EACH RAIL TO ITS ACTUAL BAR, FLUSH BOTH ENDS; CHECK RETAINED WALLS. "
-    "TRANSFER ITS HOLES TO THAT BAR PER THE BASE-BAR PROCESS PLAN; "
+    "TRIM EACH RAIL TO ITS ACTUAL BAR, FLUSH BOTH ENDS; CHECK EACH END "
+    f"COUNTERBORE WALL {guide_rail.WALL_ACCEPTANCE_MM:.1f} MM MIN "
+    f"({RAIL_RECEIPT_REFERENCE} NOTE [A]). "
+    "TRANSFER ITS HOLES TO THAT BAR PER THAT PLAN; "
     "KEEP EACH PAIR IDENTIFIED. ALL EIGHT SCREWS MUST ENTER FREELY BY HAND "
     "WITHOUT MOVING THE RAIL. CLEAN ALL CUTTING GRIT BEFORE RELOADING.",
     f"2. FIT EACH {guide_rail.STYLE} RAIL {_item(RAIL)} WITH "
@@ -1962,9 +1975,14 @@ PIVOT_FIT_STEPS = (
 # Sheet 2, under the BOM: what item 7's QTY counts and the fitting stock to
 # buy, and the owner's description note for the kit rails and carriages
 # (#2177, 2026-11-04), in three lines; the rail and carriage registry
-# records and inventory entries carry it word for word. No line is longer
-# than the shim buy list's 75 characters, the widest the field under the BOM
-# already prints.
+# records and inventory entries carry it word for word. Then one line names
+# the two base-bar rows' shared Number as two configurations, each on its own
+# TL-20 sheet in configuration order (TL-00 review 62753c5e). No line is
+# longer than the shim buy list's 75 characters, the widest the field under
+# the BOM already prints.
+_BASE_BAR_SHEETS = tuple(
+    base_bar.CONFIGURATIONS.index(configuration) + 1 for configuration in (base_bar.BAR1, base_bar.BAR2)
+)
 BOM_NOTE = "\n".join((
     f"ITEM {ITEM_NUMBERS[PIVOT_SHIM]}: SHIM FITTING STOCK, SELECTED PER P1.",
     f"BOM QTY. {pivot_shim.QUANTITY} IS THE NOMINAL PACK, {pivot_shim.PER_SUPPORT} X "
@@ -1979,9 +1997,13 @@ BOM_NOTE = "\n".join((
     "NUIBBYED-BRANDED, NOT GENUINE HIWIN. Z0 PRELOAD AND C ACCURACY NOT",
     "REQUIRED; ACCEPT BY FIT-UP PLAY CHECK "
     f"({trammel.CARRIAGE_PLAY_TIR_MAX:.2f} MM TIR MAX AT THE PIVOT).",
+    f"ITEMS {ITEM_NUMBERS[BASE_BAR_1]}-{ITEM_NUMBERS[BASE_BAR_2]}: ONE NUMBER, TWO CONFIGURATIONS "
+    f"({BASE_BAR_NUMBER} SHEETS {_BASE_BAR_SHEETS[0]}, {_BASE_BAR_SHEETS[1]}).",
 ))
 if int(ITEM_NUMBERS[CARRIAGE]) != int(ITEM_NUMBERS[RAIL]) + 1:
     raise AssertionError("the BOM note's kit items are no longer consecutive")
+if int(ITEM_NUMBERS[BASE_BAR_2]) != int(ITEM_NUMBERS[BASE_BAR_1]) + 1:
+    raise AssertionError("the BOM note's base-bar items are no longer consecutive")
 # F2's transfer drills, by the names the fitter asks for; TL-32's spec owns
 # their sizes (TRANSFER_SPOT_DIA, NUT_TAP_DRILL).
 _SPOT_DRILL = "#29"
