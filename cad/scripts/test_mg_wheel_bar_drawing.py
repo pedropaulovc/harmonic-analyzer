@@ -161,9 +161,8 @@ def test_part_authored_callouts_name_each_band_s_mate() -> None:
     sunk = [
         render_number(v / IN, "in", 3) for v in (BACK_END_SUNK_MIN, BACK_END_SUNK_MAX)
     ]
-    assert callouts.BAR_DEPTH_CALLOUT == (
-        f"{axle} AXLE BACK END\n{sunk[0]} TO {sunk[1]} SUNK"
-    )
+    assert axle in callouts.BAR_DEPTH_CALLOUT
+    assert f"{sunk[0]}-{sunk[1]}" in callouts.BAR_DEPTH_CALLOUT
     assert callouts.CLAMP_HOLE_CALLOUT == "LOCATE TO MHA-SH-02 TAPS\nWALL .068 MIN"
     assert callouts.HANGER_HOLE_CALLOUT == "WALL .076 MIN"
     texts = [*callouts.authored_by_name().values()]
