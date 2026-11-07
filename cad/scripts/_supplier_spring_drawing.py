@@ -1243,7 +1243,10 @@ async def build_supplier_spring_drawing(
     placed = []
     for key, center, cell in cells:
         ratio = scales[key]
-        text = f"{captions[key]}  {ratio[0]}:{ratio[1]}"
+        text = captions[key]
+        # ASME Y14.3: only a view scale that differs from the sheet's prints.
+        if ratio != scale:
+            text += f"  {ratio[0]}:{ratio[1]}"
         y = cell[1] - (0.016 if key == "free_right" else 0.012)
         # A small pictorial or thin diagram centred in a tall cell left its
         # caption far below it: hang each caption just under everything its
