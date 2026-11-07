@@ -42,17 +42,19 @@ SHEET_SCALE = (1.0,1.0)
 # SolidWorks' own descriptive note for TL-32's Hole Wizard nut taps; the native
 # tap callout already states the thread.
 TAPPED_HOLE_NOTE = '#4-40 Tapped Hole'
-# Sheet metres. Keep the existing external annotation lanes while the block
-# shrinks symmetrically about its now-centred pivot. Both removed sections
-# run 4 mm past the actual block edges and look away from the plan.
-# B-B cuts the -X M4 column, avoiding the integral +X lug. X ordinates
-# remain baseline dimensions from the finished -X edge; Y starts at the
-# pivot axis. The counterbore callout points to a different hole from the
-# clearance callout. Final native layout and machinist-review gates own fit.
+# Sheet metres. B-B still cuts the -X M4 column, avoiding the integral +X
+# lug. Its upper arrow stands ABOVE all X-dimension tiers; its lower arrow
+# stands below the clearance-hole leader. Do not shrink the existing fonts.
+# The retained 0c3ed359 pivot PDF put B at x148.225..151.669 mm, directly on
+# the x149.172 datum witnesses. At y259 its bottom is y256.310, above the
+# highest witness (y254.500), and its top y264.512 clears the y266.7 border.
+# Keep dimension text right of the x157 cutting line, not on that line.
+# X ordinates remain native baseline dimensions from the finished -X edge;
+# Y starts at the pivot axis. Native layout and machinist-review own fit.
 PLAN_XY = (.170,.205)
 PLAN_KEEP = {
-    'BlockLength':(.170,.259),'PlanHole2X':(.1665,.250),'PlanHole1X':(.1535,.241),
-    'PlanBoreX':(.157,.232),
+    'BlockLength':(.170,.2535),'PlanHole2X':(.1665,.248),'PlanHole1X':(.171,.2395),
+    'PlanBoreX':(.1635,.231),
     'BlockWidth':(.2595,.203),'BlockSideY':(.231,.220),
     'CarriageDrills3Y':(.222,.1985),'CarriageDrills4Y':(.222,.2115),
     'BoreDia':(.078,.196),'CarriageDrills1Dia':(.085,.168),'CarriageCounterbores3Dia':(.245,.150),
@@ -94,6 +96,12 @@ SEAT_DEPTH_TEXT_XY = (.078,.104)
 FLOOR_XY = (.335,.1225)
 FLOOR_KEEP = {'CboreFloor':(.380,.156)}
 FEED_FLOOR_KEEP = FLOOR_KEEP | {'SectionBlockHeight':(.335,.172)}
+# A-A retains its short overrun. B-B needs independent physical lanes:
+# the top is a paper ordinate, the bottom is 16 mm past the block edge.
+# The latter puts B's top at y174.446 on TL-22, below the drill leader's
+# y178.287 at B's left edge. The -X cut never enters TL-32's +X lug.
+FLOOR_CUT_TOP_Y = .259
+FLOOR_CUT_BOTTOM_OVERRUN_MM = 16.0
 # The section letters print smaller than the document default, and the
 # cutting-line arrows shorter, so A's right letter, past the block's +X edge,
 # ends under row 4Y's extension line (y 218): at the template's arrows its
@@ -348,8 +356,7 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
     plan = place_view(adapter,str(source),'*Front',*plan_xy,scale=SHEET_SCALE)
     # Each cutting line runs so its arrows point away from the section it
     # names (third-angle): A-A below the plan looks up, B-B right of it looks
-    # left, and the plan's top face prints toward the plan in both. The lines
-    # run past the block (layout notes above), with short arrows.
+    # left. A-A stays short; B-B's ends use the reserved annotation lanes.
     _set_section_arrows(adapter)
     side = create_section_view(adapter,plan,
         line_start=_project(adapter,plan,(part.BLOCK_X1+4,0,contract.BLOCK_HEIGHT),'pivot cut start'),
@@ -368,8 +375,11 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
     offset_dimension_text(adapter, plan_annotations, {'BlockLength': BLOCK_LENGTH_TEXT_XY})
     annotations = plan_annotations + side_annotations
     x = part.CBORE_SECTION_X
-    start = _project(adapter,plan,(x,part.BLOCK_WIDTH/2+4,contract.BLOCK_HEIGHT),'floor cut start')
-    end_y = -part.BLOCK_WIDTH/2-4
+    cut_axis = _project(adapter,plan,(x,part.BLOCK_WIDTH/2,contract.BLOCK_HEIGHT),'floor cut axis')
+    if cut_axis[1] + .004 > FLOOR_CUT_TOP_Y:
+        raise RuntimeError('B-B top arrow lane does not clear the block')
+    start = (cut_axis[0], FLOOR_CUT_TOP_Y)
+    end_y = -part.BLOCK_WIDTH/2-FLOOR_CUT_BOTTOM_OVERRUN_MM
     end = _project(adapter,plan,(x,end_y,contract.BLOCK_HEIGHT),'floor cut end')
     floor = create_section_view(adapter,plan,line_start=start,line_end=end,view_xy=FLOOR_XY,
                                 section_label='B',scale=(1,1),partial=True,
