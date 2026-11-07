@@ -93,14 +93,13 @@ MANUFACTURING_NOTES_XY = (0.018, 0.060)
 # stack into one vertical chain right of the teeth.  Each one's text sits
 # beyond its own hole, above the chain for +Y and below it for -Y: printed
 # inside the chain, each text was struck by the other's outside arrow tail.
-# Each carries its mate callout in the below lane (a linear dimension's above
-# lane does not print), so the +Y text stands high enough for its callout
-# rows to clear its hole's extension line; the bore callout drops below the
-# -Y rows.
+# The locations carry only value and band (rule 7); the 2X pin-hole callout
+# names the pins' parts, its widest row 23 characters, so it stands 10 mm
+# further right than the one-row DRILL THRU did, inside the left border.
 _PIN_CHAIN_X = FRONT_CENTER[0] + 0.070
 FRONT_KEEP = {
     "BoreDiaDim": (FRONT_CENTER[0] + 0.070, FRONT_CENTER[1] - 0.060),
-    "PinPosDia": (FRONT_CENTER[0] - 0.075, FRONT_CENTER[1] + 0.060),
+    "PinPosDia": (FRONT_CENTER[0] - 0.065, FRONT_CENTER[1] + 0.060),
     "PinPosY": (_PIN_CHAIN_X, FRONT_CENTER[1] + 0.040),
     "PinNegY": (_PIN_CHAIN_X, FRONT_CENTER[1] - 0.021),
 }
