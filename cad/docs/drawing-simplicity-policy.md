@@ -306,10 +306,28 @@ correlation; absolute radius errors are not added as independent edge errors.
 Pin-only enclosures in inches are approximately `R800 ±.0088333`,
 `R816 -.0176666/+.0176674`, top relative to HUB
 `-.0001468/+.0001481`, and bottom `-.0037853/+.0037857`.
-Including `.XXX` nominal rounding gives relative bounds
-`-.0001507/+.0001442` and `-.0038702/+.0037023`: both below `.005`,
-the `.010` strap half-band less the reserved `.005` HUB setting/clearance
-stack. These are analytic design bounds, not native-build evidence.
+Including `.XXX` nominal rounding gives relative pin-shape bounds
+`-.0001507/+.0001442` and `-.0038702/+.0037023`. Those are not the complete
+relative stack: `PIN_RELATIVE_STACK` also includes the carrier/stud radial
+slip (`HUB_SLIP_CLEARANCE_MAX/2 = .000750`) and the actual strap/nose radial
+float (`hub_stud.NOSE_CLEARANCE[1]/2`). Its independent `.005` allocation
+is enforced alongside the separate `.005` HUB setting/pin-shoulder half;
+unused setting allowance is never transferred to the relative half.
+`NOSE_FLOAT_ALLOWANCE` exports the remaining allowance before nose float,
+approximately `.000379843`; `PIN_RELATIVE_REMAINING` exports the residual
+after the actual nose fit. The stud drawing appends the remaining allowance
+to the source-owned actual-float callout, flooring it to five inch places:
+`OF .00037 LEFT IN TL-21'S / .005 PIN-RELATIVE BUDGET`. This drawing-only
+composition adds no reverse stud-spec dependency on the carrier.
+
+At the `.4000 -.0001/0` nose limits, the radial float is `.000300` and the
+aggregate is `.004920157`, leaving `.000079843`. A `-.0002/0` counterfactual
+gives `.000350` float and `.004970157` aggregate; these figures establish
+budget feasibility, not permission to change the owner's nose limits.
+The proposed `-.0005/0` counterfactual gives `.000500` float and `.005120157`
+aggregate, so the same source guard refuses it. Neither nominal geometry
+nor either `.005` allocation is widened. These are analytic design bounds,
+not native-build evidence.
 
 The same correlated errors feed the tooling-clearance and riser-wall checks.
 TL-24 **RV-01** was extended from `.074` to **`.071 MIN`** by
