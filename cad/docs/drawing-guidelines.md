@@ -171,7 +171,12 @@ a chamfer gets the loosest title-block band that serves it.
   size given a function, or any REAM callout (REAM marks a fit bore even when
   its band matches DRILLED HOLES). The reason for it is the mating part, so
   the callout, or a flagged note attached to it (rule 7), names the mate and
-  the fit it needs: running, sliding, press, bonded or locating. A gear centre
+  the fit it needs: running, sliding, press, bonded or locating. The fit is
+  set by the printed limits of size; the callout names it with one of those
+  standard fit names (`RUNNING FIT ON MHA-CH-06-TL-VN-77`), and the resulting
+  clearance or interference range may follow as REF (`(CLEARANCE
+  .0010-.0025)`). `DIAMETRAL CLEARANCE` or `DIAMETRAL INTERFERENCE` as the
+  stated requirement repeats the limits in private words. A gear centre
   distance names the mesh; a width that sets a stack names the stack. Where
   the mate alone does not show why the band is tight, add a few words of
   reason (`SETS MESH BACKLASH`, `KNIFE-EDGE SEAT`); see rule 7. The shop can
@@ -666,7 +671,7 @@ one adequate method over another is not a defect.
 
 | load at the joint | counts | never counts on its own |
 |---|---|---|
-| static clamp: nothing moves, no torque about the fastener | seated screws; a one-screw part that could turn about its screw is located by a dowel, tongue, step or second screw | a lock in place of a locating feature |
+| static clamp: nothing moves, no torque about the fastener | seated screws; a one-screw part that could turn about its screw is located by a dowel, tongue, step or second screw when its turning would change a setting or function, and needs only a seated screw and a bench check (`DOES NOT TURN BY HAND`) when it would not | a lock in place of a locating feature |
 | axial: a pin, rod, stud or bushing must not pull out or walk | press fit; bonded slip fit; thread to a shoulder; cross-pin; set screw into a spot; peened or staked end | set screw on a plain round; solder |
 | friction torque: a member turns or rocks on a stationary shaft or screw | press or bonded fit; cross-pin; set screws bearing on a flat or spot (the member's light rubbing drag needs no further lock); jam nut; staked or peened tail; red threadlocker on a seated thread | a plain seated thread; `SNUG`; a set screw on a plain round |
 | drive torque: the joint transmits working torque, usually reversing | key or flat with axial capture; cross- or taper pin; press or bonded fit; pressed drive pins; set screw on a flat, staked, for light torque only | set screw on a plain round; solder; threadlocker |
