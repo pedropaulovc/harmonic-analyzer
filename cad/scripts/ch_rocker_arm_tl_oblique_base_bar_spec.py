@@ -373,10 +373,11 @@ BRACKET_ROW_BAND = BRACKET_STATION_BAND
 #   .31 ±.01 the .300 bore leaves the .270 head 0.381 a side against the
 #   screw's 0.438: the head would bear first.
 # - ↧ .189 ±.005: the depth sets how far the 3/4 screw reaches into TL-28's
-#   bottom thread (bracket_screw_under_head; TL-28's BAR_REACH_MAX 12.294).
-#   At .19 ±.01 the .200 depth lets it reach 12.446, past that thread's
-#   least full depth (12.344) and into the top thread's tap lead.
-# The test proves both counterfactuals.
+#   THRU thread (bracket_screw_under_head; TL-28's BAR_REACH_MAX 12.294),
+#   the reach TL-28's tip gap to the KP08 screw is taken on
+#   (SCREW_TIP_GAP_MIN). It prints at the callout's one precision, which
+#   the diameter needs.
+# The test proves the diameter's counterfactual and the depth's reach.
 BRACKET_CBORE_PLACES = 3
 BRACKET_CALLOUT_PRECISION = {
     "hw-thruholedia": 3,

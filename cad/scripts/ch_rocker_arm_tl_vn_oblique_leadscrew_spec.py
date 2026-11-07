@@ -34,7 +34,7 @@ underside.
 Each bracket stands wholly on bar 1 (the user's 2026-10-17 ruling A′: the
 bar widened, now 5.50 wide, its column-side edge at lateral 88.9 ⚙), its outer
 end flush with that edge. TL-28 has only two through holes, at the KP08's
-42 bolt spacing about the screw axis, each tapped #8-32 from both faces: a
+42 bolt spacing about the screw axis, each tapped #8-32 THRU from the top: a
 #8-32 x 3/4 SHCS (the jig's common screw) comes up into each from TL-20's
 underside and a #8-32 x 5/8 SHCS comes down into it through the KP08's
 Ø5 hole. Both 3/4 cannot fit: their tips would meet (TL-28 spec).
@@ -182,7 +182,7 @@ KP08_SCREW_FULL_THREAD_MIN = full_thread_min(
 )  # 8.67, 2.08 D
 # The KP08 screw's reach past TL-28's top face on the nominal foot: its
 # length (B18.3: no plus length tolerance) less the UNVERIFIED 5.0. A thinner
-# foot reaches deeper; TL-28's spec takes its windows on the least foot.
+# foot reaches deeper; TL-28's spec takes its tip gap on the least foot.
 KP08_SCREW_REACH = float(Fraction(KP08_SCREW_LENGTH)) * INCH - KP08_FOOT_THICK
 KP08_MARGIN = 3.0  # clearance-check envelope margin, all round (Main)
 # HARFINGTON handwheel (Amazon B0DJ3DZT86, read 2026-11-04), along the screw
@@ -263,7 +263,7 @@ BRACKET_INNER_LATERAL = 20.066  # .79: 3 clear of the carriage's side (lateral 1
 # so the bracket stands wholly on the bar (it cantilevered past the 1/2 x 4).
 BRACKET_LENGTH = trammel.BASE_BAR_COLUMN_EDGE - BRACKET_INNER_LATERAL  # 2.71
 # The two through holes: at the KP08's 42 centres about the screw axis, each
-# tapped #8-32 from both faces. Each takes the KP08 screw from the top and a
+# tapped #8-32 THRU from the top. Each takes the KP08 screw from the top and a
 # bar screw from below, so the pair's centroid stands under the thrust
 # (LOAD_CASES: e = 0).
 BRACKET_HOLES_X = tuple(

@@ -166,7 +166,7 @@ BRACKET_TO_BAR = Fastener(
     leadscrew.BAR_SCREW_LENGTH,
     len(leadscrew.BASE_BAR_HOLES),
     leadscrew.BAR_SCREW_GRIP,  # head recessed in TL-20's 4.80 counterbore
-    end_bracket.BAR_THREAD_DEPTH,  # drilled THRU, threaded .491 from the bar face
+    end_bracket.BRACKET_THICK,  # tapped THRU from the top; tips apart
 )
 BLOCK_TO_CARRIAGE = Fastener(
     "TL-32 feed block / TL-22 pivot block to HGH15CA carriage",
@@ -187,7 +187,7 @@ KP08_TO_BRACKET = Fastener(
     leadscrew.KP08_SCREW_LENGTH,
     len(end_bracket.HOLE_X) * leadscrew.END_BRACKET_QUANTITY,
     leadscrew.KP08_FOOT_THICK,  # UNVERIFIED foot thickness
-    end_bracket.KP08_THREAD_DEPTH,  # the same holes, threaded .436 from the KP08 face
+    end_bracket.BRACKET_THICK,  # the same THRU thread, from the KP08 face
 )
 NUT_TO_FEED_BLOCK = Fastener(
     "TL-VN-84 FeedNut to TL-32 feed block",

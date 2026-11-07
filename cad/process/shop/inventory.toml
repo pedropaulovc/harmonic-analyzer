@@ -5563,6 +5563,18 @@ purchase = "PROPOSED, awaiting Pedro: Tap America T/A57097 10-24 HSS 2-flute spi
 source = "DrillsandCutters.com $6.24 (https://drillsandcutters.com/10-24-hss-2-flute-spiral-point-tap-tap-america/); Bolt Depot 8474 $0.10 each search listing (https://boltdepot.com/Product-Details?product=8474); Bolt Depot 5008 $7.89/100 search listing (https://boltdepot.com/Product-Details?product=5008)"
 note = "Taps the trammel block set-screw and clamp holes (#25 tap drill)."
 
+# Required for the TL-28 end bracket's two #8-32 THRU threads, tapped from the
+# top face through the 1 in stock (Main's R4 ruling). The #8-32
+# hand taps on file (taps-unc-hand: .75 in flute on a .168 shank, wider than
+# the #29 tap drill; the ordered OSG hand taps are the same style) cannot pass
+# through. No SKU is named until one is verified live.
+[tools.tap-8-32-extension-spiral-point]
+name = "#8-32 UNC long-shank (extension) spiral-point tap (REQUIRED purchase)"
+kind = "tap"
+present = false
+purchase = "REQUIRED, not owned, no SKU chosen: 1 x #8-32 UNC HSS spiral-point (plug) tap on a long or extension shank whose thread and neck reach at least 1.168 in past its point, the neck under the #29 (.136) tap drill (end bracket spec TAP_REACH_MIN: thickest 1 in stock plus a 5-thread plug lead). Verify the SKU live before ordering."
+note = "Taps the TL-28 end bracket's two #8-32 holes THRU from the top face; receipt prerequisite before machining TL-28."
+
 # Formerly for the shop-made TL-27 feed nut's Tr8x2 RH thread (owner ruling 2026-11-01, item 4).
 [tools.tap-tr8x2-rh]
 name = "Tr8x2 right-hand HSS trapezoidal tap (purchase)"

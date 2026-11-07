@@ -1382,12 +1382,12 @@ def test_sweep_table_edge_margins(report) -> None:
 # (blind tap). Engagement is never more than the receiving thread's depth.
 FASTENER_TABLE = {
     "RAIL_TO_BAR": ("#8-32 X 3/4 SHCS", 16, 9.35, 9.35 - trammel.BASE_BAR_THICK),  # tip short of the faced bar's underside
-    # The jig's common #8-32 x 3/4 up through Bar1 into TL-28's bar-face
-    # thread (.491 deep), two a bracket (owner ruling Main 2026-11-06, B).
+    # The jig's common #8-32 x 3/4 up through Bar1 into TL-28's THRU thread
+    # (tapped from the top), two a bracket (owner ruling Main 2026-11-06, B).
     "BRACKET_TO_BAR": (
         "#8-32 X 3/4 SHCS", 4,
         leadscrew.BAR_SCREW_ENGAGEMENT,
-        leadscrew.BAR_SCREW_ENGAGEMENT - end_bracket.BAR_THREAD_DEPTH,
+        leadscrew.BAR_SCREW_ENGAGEMENT - end_bracket.BRACKET_THICK,
     ),
     "BLOCK_TO_CARRIAGE": (
         "M4 X 20 SHCS", 8,
@@ -1395,9 +1395,10 @@ FASTENER_TABLE = {
         pivot_block.SCREW_REACH - pivot_block.CARRIAGE_THREAD_DEPTH,
     ),
     # The approved second length down through the KP08's foot (5.0,
-    # UNVERIFIED #2184) into TL-28's top-face thread (.436 deep).
+    # UNVERIFIED #2184) into the same THRU thread, its tip clear of the bar
+    # screw's (end_bracket.SCREW_TIP_GAP_MIN).
     "KP08_TO_BRACKET": (
-        "#8-32 X 5/8 SHCS", 4, 10.875, 10.875 - end_bracket.KP08_THREAD_DEPTH,
+        "#8-32 X 5/8 SHCS", 4, 10.875, 10.875 - end_bracket.BRACKET_THICK,
     ),
     # The 5/8 screw past the TL-VN-84 FeedNut flange (its head seated in the
     # countersink) into the lug's THRU tap, the tip stopping inside it.

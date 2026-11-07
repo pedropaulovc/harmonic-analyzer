@@ -4,15 +4,15 @@ PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure.  Shop fixture hardware (cad/docs/subsystem-identities.md), modelled
 so the jig assembly can mate it and run native interference: the
 ``#8-32 X 5/8 SHCS`` that holds a KP08 pillow block to its TL-28 end bracket,
-down through the block's Ø5 foot hole into the bracket's KP08-face thread
-(.436 deep, ``end_bracket.KP08_THREAD_DEPTH``); the head seats on the KP08's
-foot (its thickness is UNVERIFIED, #2184).  It is the C4 fastener table's
+down through the block's Ø5 foot hole into the bracket's #8-32 THRU thread,
+its tip clear of the bar screw's (``end_bracket.SCREW_TIP_GAP_MIN``); the head
+seats on the KP08's foot (its thickness is UNVERIFIED, #2184).  It is the C4 fastener table's
 ``KP08_TO_BRACKET`` row, four in the jig.  It is its own row on the jig's
 BOM; the shop inventory carries no screw stock (no ``INVENTORY_ID``), and the
 assembly steps cite it by item and callout (``fasteners.callout``).
 
 Oblique simplification PR2 (owner ruling 2026-11-06, Main, option B): TL-28
-has two holes, each tapped from both faces; the bar screws below are the
+has two holes, each tapped #8-32 THRU from the top; the bar screws below are the
 jig's common #8-32 x 3/4 (TL-VN-61), and this 5/8 is the owner-approved
 second length (the 3/4 from the top would meet the bar screw's tip). The
 same SKU held TL-28 to TL-20 before PR2; it replaces the #6-32 button heads

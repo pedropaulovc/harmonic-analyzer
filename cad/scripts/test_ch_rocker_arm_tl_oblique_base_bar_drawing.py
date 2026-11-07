@@ -692,7 +692,8 @@ def test_bracket_hole_float_bounds_the_lost_motion_on_reversal() -> None:
 def test_counterbore_three_places_hold_the_head_float_and_the_screw_reach() -> None:
     """Machinist review 84d5991d45: ⌴ Ø.313 ↧ .189 at .XXX with no stated
     function. Both sizes hold a load-path control, so they keep ±.005 and
-    the callout names each; the review's .31/.19 at ±.01 breaks both."""
+    the callout names each; the review's .31 at ±.01 breaks the head float,
+    and the depth bounds the reach TL-28's tip gap is taken on."""
     head = spec.BRACKET_SCREW_HEAD_DIA  # .270, ASME B18.3 max
     hole_max = spec.BRACKET_HOLE_DIA + drilled_oversize_mm(unit=spec.UNIT)
     travel = (hole_max - 0.1585 * 25.4) / 2.0  # the 3A screw's whole float
@@ -708,21 +709,18 @@ def test_counterbore_three_places_hold_the_head_float_and_the_screw_reach() -> N
     assert clearance >= travel
     assert (0.31 * 25.4 - two - head) / 2.0 < travel
     # Depth: .189 ±.005 lets the 3/4 screw reach at most 12.294 past the
-    # bar's top, inside TL-28's bottom thread and short of the top thread's
-    # tap lead; .19 ±.01 lets it reach 12.446, past both.
+    # bar's top into TL-28's THRU thread; TL-28's tip gap to the 5/8 KP08
+    # screw is taken on that reach. The depth prints at the callout's one
+    # precision, the diameter's.
     screw = leadscrew.BAR_SCREW_LENGTH_MM
     reach_max = spec.bracket_screw_under_head(screw)[1]
     assert reach_max == pytest.approx(end_bracket.BAR_REACH_MAX)
-    two_place = screw - (
-        spec.BAR_THICK - printed_band_mm(spec.THICK_PLACES, unit=spec.UNIT)
-        - (0.19 * 25.4 + two)
+    assert end_bracket.SCREW_TIP_GAP_MIN == pytest.approx(
+        end_bracket.THICK_MIN - reach_max - end_bracket.KP08_REACH_MAX
     )
-    assert two_place == pytest.approx(12.446, abs=1e-3)
-    assert reach_max <= end_bracket.BAR_THREAD_LIMITS[0]
-    assert two_place > end_bracket.BAR_THREAD_LIMITS[0]
-    assert (
-        end_bracket.THICK_MIN - two_place - end_bracket.TAP_LEAD
-        < end_bracket.KP08_THREAD_LIMITS[1]
+    assert end_bracket.SCREW_TIP_GAP_MIN > 0.0
+    assert spec.BRACKET_CALLOUT_PRECISION["hw-cbdepth"] == (
+        spec.BRACKET_CALLOUT_PRECISION["hw-cbdia"]
     )
     # The callout names both functions, right above the counterbore's row.
     lines = spec.BRACKET_CALLOUT_PROCESS.split("\n")

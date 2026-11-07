@@ -41,9 +41,9 @@ Source of each number:
   axis height is set by it), and ``FOOT_THICK`` 5 (check: the foot under the
   bolt holes is .196 to .292 thick: no thicker, so the #8-32 x 5/8 screw's
   worst-case full thread in TL-28 holds rule 18's 1.5 D,
-  ``end_bracket.KP08_FOOT_THICK_MAX``; no thinner, so its tip stays in
-  TL-28's top thread and clear of the bottom thread and its tap's lead,
-  ``end_bracket.KP08_FOOT_THICK_MIN``).
+  ``end_bracket.KP08_FOOT_THICK_MAX``; no thinner, so its tip stays clear of
+  the bar screw's tip in TL-28's shared THRU thread,
+  ``end_bracket.KP08_FOOT_THICK_MIN`` and ``SCREW_TIP_GAP_MIN``).
 - DERIVED (shape ESTIMATED from the photographs): the boss is round and
   concentric with the bore, its crown the overall height, so
   ``BOSS_RADIUS`` = ``HEIGHT`` - ``AXIS_HEIGHT``; its sides drop straight to

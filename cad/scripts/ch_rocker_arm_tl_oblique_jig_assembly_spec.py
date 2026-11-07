@@ -1811,8 +1811,9 @@ ASSEMBLY_STEPS = (
     "LIMIT (SHEET 1) THE SAME WAY, CENTRING IN X ONLY, AND WITNESS-MARK EACH "
     "BAR AT ITS CARRIAGE'S SPINDLE-END FACE, I OR O BY PASS.",
     # The foot (UNVERIFIED, #2184) between TL-28's two bounds: no thinner,
-    # so the 5/8's tip stays clear of the bar screw's thread; no thicker, so
-    # its full thread holds 1.5 D (end_bracket.KP08_FOOT_THICK_MIN/MAX).
+    # so the 5/8's tip stays clear of the bar screw's in the shared THRU
+    # thread; no thicker, so its full thread holds 1.5 D
+    # (end_bracket.KP08_FOOT_THICK_MIN/MAX).
     f"7. CHECK EACH KP08 {_item(PILLOW_BLOCK)} FOOT IS "
     f"{_bound(end_bracket.KP08_FOOT_THICK_MIN, 3, up=True)} TO "
     f"{_bound(end_bracket.KP08_FOOT_THICK_MAX, 3, up=False)} THICK AT ITS 2 HOLES. "

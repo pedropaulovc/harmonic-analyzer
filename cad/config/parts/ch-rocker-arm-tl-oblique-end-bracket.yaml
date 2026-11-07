@@ -11,16 +11,14 @@ ch-rocker-arm-tl-oblique-end-bracket:
   finish: as machined
   quantity: 2
   tolerance_class: machined_block
-  # Owner ruling 2026-11-05: the CAD follows the 2026-11-02 hand traveler (issue
-  # #2154): a hand tap cannot thread the 1 in height, so each tap drill runs
-  # through. Owner ruling Main 2026-11-06 (option B): two holes on the KP08's
-  # 42 mm pitch, each tapped #8-32 from both faces, the bar screw up from the
-  # bottom and the KP08 screw down from the top, their tips apart in the
-  # shared hole. Each thread has a printed window (.491 ±.005 from the bottom,
-  # .436 ±.005 from the top) and each tap point a depth it must not pass
-  # (end bracket spec BAR_TAP_TIP_MAX .558, KP08_TAP_TIP_MAX .503): the
-  # bottoming tap finishes each thread; the plug tap only starts it.
-  process: "saw and face to length; drill the two #8-32 tap holes #29 through; mark both 8-32 hand taps (plug and bottoming) at .558 and at .503 from the point; from the bottom face, start each hole with the plug tap and finish with the bottoming tap to full thread .491 ±.005 deep, neither tap past its .558 mark; from the top face, the same to full thread .436 ±.005 deep, neither tap past its .503 mark; break edges"
+  # Owner ruling Main 2026-11-06 (option B): two holes on the KP08's 42 mm
+  # pitch, the bar screw up from the bottom and the KP08 screw down from the
+  # top. Main's R4 ruling: each hole tapped #8-32 THRU from the top face, one
+  # thread both screws share, their tips apart (end bracket spec
+  # SCREW_TIP_GAP_MIN). The owned #8-32 hand taps cannot pass the 1 in
+  # height; the long-shank spiral-point tap is a receipt prerequisite, not
+  # owned (inventory tools.tap-8-32-extension-spiral-point, spec TAP_TOOL).
+  process: "saw and face to length; drill the two #8-32 tap holes #29 through from the top face; receive the long-shank #8-32 spiral-point tap (tools.tap-8-32-extension-spiral-point, required, not owned) before tapping; from the top face, tap both holes 8-32 UNC through the full height; break edges"
   # KP08 axial width 13 is the uxcell listing's (55 x 13 x 28, read 2026-11-04); nominal overhang is 0.15 each side.
   # Reallocate bought 1165 leftover after TL-26; 1164 half-by-three-quarter is spare.
   machinist_exceptions:
