@@ -150,7 +150,7 @@ TOP_KEEP = {
     "GripOffset": (0.236, 0.104),
     "Width": (0.140, TOP_CENTER[1]),
     "AnchorZ": (0.215, 0.151),
-    "BoreDia": (0.240, 0.210),
+    "BoreDia": (0.228, 0.210),
 }
 FACE_KEEP = {
     "Height": (FACE_CENTER[0], 0.090),
@@ -166,28 +166,29 @@ DIMENSION_PREFIXES = {"EarHole1Z": "2X ", "EarHoleHeight": "2X "}
 # the purchased column, its clearance the acceptance (sh_column_clamp_fit);
 # the ear stations and height name the front arc's holes once, on the tap
 # callout (HOLE_CALLOUT_BELOW); the grip offset, a location, carries only its
-# value and band and cites note 1 for its mate.  All under the value:
+# value and cites note 1 for its mate.  The bore's fit names its mate by
+# number and name and says which clearance (rule 4); that is more than two
+# lines of words in the narrow lane between the plan and the split-face view
+# (rule 7; farm rounds 2 and 3), so the bore cites flag note 2.  Its short
+# block keeps its left end right of the split face, so the diameter line
+# through the bore centre runs diagonally (farm round 2, 20261107T123928892Z:
+# a 31-character row ran it down the split face).  All under the value:
 # SOLIDWORKS prints nothing of an above-callout holding a line break
 # (draw_dt_cone_gear_shaft._printable_above_callouts).
 GRIP_NOTE = 1
+BORE_NOTE = 2
 COLUMN_NUMBER = _config.parts("fr-tube-frame")["number"]
-# A matched pair names its mate by number and name and says which clearance
-# (rule 4).  Three rows no wider than round 1's 24 characters keep the block
-# between the plan (right edge x 0.190) and the split-face view (left edge x
-# 0.274) with its left end far enough right that the diameter line through
-# the bore centre runs diagonally, clear of the split face (farm round 2,
-# 20261107T123928892Z: at x 0.232 it ran down the split face).
 DIMENSION_CALLOUTS = {
-    "BoreDia": (
-        f"SLIDING FIT ON {COLUMN_NUMBER}\n"
-        "COLUMN, DIAMETRAL\n"
-        f"CLEARANCE {BORE_CLEARANCE_TEXT}"
-    ),
+    "BoreDia": f"SEE NOTE {BORE_NOTE}",
     "GripOffset": f"SEE NOTE {GRIP_NOTE}",
 }
-# Note 1 stands in the open lower-left field, left of the title block (x
+# The notes stand in the open lower-left field, left of the title block (x
 # 0.216, up to y 0.070), where the front arc's notes stand.
-DRAWING_NOTES = f"{GRIP_NOTE}. KEEPS A GAP TO {FRONT_ARC_MATE} WHEN CLAMPED."
+DRAWING_NOTES = (
+    f"{GRIP_NOTE}. KEEPS A GAP TO {FRONT_ARC_MATE} WHEN CLAMPED.\n"
+    f"{BORE_NOTE}. SLIDING FIT ON {COLUMN_NUMBER} COLUMN, "
+    f"DIAMETRAL CLEARANCE {BORE_CLEARANCE_TEXT}."
+)
 NOTES_XY = (0.020, 0.070)
 HOLE_CALLOUT_BELOW = f"MATCHES {FRONT_ARC_MATE} EAR HOLES"
 
@@ -369,7 +370,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hole_callout_below(ear_taps, HOLE_CALLOUT_BELOW, label="ear taps")
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
     if add_note(adapter, DRAWING_NOTES, *NOTES_XY) is None:
-        raise RuntimeError("failed to add the grip-gap note")
+        raise RuntimeError("failed to add the flag notes")
 
     return await finalize_drawing(
         adapter,
