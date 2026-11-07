@@ -171,15 +171,15 @@ if THRUST_RING_MIN - 2.0 * THRUST_EDGE_BREAK_MAX < THRUST_RING_FLOOR - 1e-9:
 COLLAR_ROOT_RADIUS_MAX = 0.0508  # .002
 # The callout under the collar's reference diameter: the stock statement in
 # the U41 plate's form ("1/4 PLATE AS SUPPLIED"), so the bar size stays out
-# of the MATERIAL cell, and one line naming both faces' mates once by drawing
-# number (rule 7: at most two lines of words, one reason).  The tight OD edge
-# break (it keeps the MHA-DT-05 thrust ring above its floor, above) and the
-# sharp-root limit (both faces seat) are flag note COLLAR_NOTE.
-COLLAR_NOTE = 2
+# of the MATERIAL cell, with the collar's two limits tighter than the title
+# block at the feature they govern (rule 3: never in a note) and their one
+# reason naming both faces' mates once by drawing number.  The OD edge break
+# keeps the MHA-DT-05 thrust ring above its floor (above); the sharp roots
+# let both faces seat.  Two lines of words (rule 7).
 COLLAR_STOCK_CALLOUT = "\n".join(
     (
-        f"5/8 BAR AS SUPPLIED, SEE NOTE {COLLAR_NOTE}",
-        "SEATS MHA-DT-05 AND MHA-DT-07",
+        f"5/8 BAR AS SUPPLIED, EDGE BREAK {inch_text(THRUST_EDGE_BREAK_MAX, 3)} MAX",
+        f"ROOTS R{inch_text(COLLAR_ROOT_RADIUS_MAX, 3)} MAX, SEATS MHA-DT-05 AND MHA-DT-07",
     )
 )
 # The same break on the post's journal rims, the ring's other bounding edge;
@@ -198,28 +198,20 @@ def _gear(teeth: int) -> str:
     return f"T{teeth:03d}"
 
 
-def _gears(land: int) -> str:
-    teeth = SECTION_CONE_GEAR_TEETH[land]
-    if len(teeth) > 2:
-        return f"{_gear(min(teeth))}-{_gear(max(teeth))}"
-    return ", ".join(_gear(t) for t in teeth)
-
-
-# Each tight band names its mate and fit (drawing-guidelines.md rule 4).  The
-# journal runs in the MHA-DT-05 bore: a matched running fit whose diametral
-# clearance is the printed limits' (JOURNAL_DIAMETRAL_CLEARANCE_MM).  Every
-# gear land and its flat slide in the D-bores of the gears it carries; those
-# mates (members of MHA-DT-03, and MHA-DT-07 on land 1) and the across-flat
-# clearance are flag note LAND_NOTE, linked from each land's diameter and
-# across-flat: the stepped tip's texts climb over each other and have no room
-# for a member name, and one note names each mate once.
+# Each tight band names its mate and fit route (drawing-guidelines.md rule
+# 4).  The journal's .0008 band is under the turned-diameter row, so it is a
+# matched running fit to the MHA-DT-05 bore, the form the reviewer accepted
+# on MHA-DT-19's pivot shaft, its clearance the printed limits'
+# (JOURNAL_DIAMETRAL_CLEARANCE_MM).  Every gear land and its flat slide in
+# the bores of the gears it carries; those mates (MHA-DT-03, MHA-DT-07 on
+# land 1, MHA-DT-VN-54 on the terminal land) and the flats' matched fit are
+# flag note LAND_NOTE, linked from each land's diameter and across-flat: the
+# stepped tip's texts climb over each other and have no room for the names.
 LAND_NOTE = 1
 LAND_FLAG = f"SEE NOTE {LAND_NOTE}"
-# "BORE" is dropped: the 29-character line crowded section A-A (round 1
-# native proof), and MHA-DT-05's only fit with the journal is its bore.
 JOURNAL_FIT_CALLOUT = (
-    "RUNNING FIT IN MHA-DT-05\n"
-    f"(CLEARANCE {inch_text(JOURNAL_DIAMETRAL_CLEARANCE_MM[0], 4)}"
+    "RUNNING FIT, MATCHED TO MHA-DT-05\n"
+    f"BORE (CLEARANCE {inch_text(JOURNAL_DIAMETRAL_CLEARANCE_MM[0], 4)}"
     f"-{inch_text(JOURNAL_DIAMETRAL_CLEARANCE_MM[1], 4)})"
 )
 SEAT_MATE_CALLOUTS = {
@@ -454,29 +446,35 @@ SURFACE_FINISHES = (
     ),
 )
 
-# The sheet's numbered flag notes (drawing-guidelines.md rule 7: few,
-# flagged, never a method).  Note LAND_NOTE is linked from every land's
+# The sheet's numbered flag notes, four lines (drawing-guidelines.md rule 7:
+# few, flagged, never a method).  Note LAND_NOTE is linked from every land's
 # diameter and across-flat: it names each land's mates once by drawing number
-# (rule 4), the sliding fit and its across-flat clearance from the printed
-# limits, and the flats' one shared clock (each flat turns every gear on its
-# land; its tolerance is the title block's angle, which error_budget.yaml
-# books per land as cone_land_clock).  Sections A-A to D-D cut lands 1 to 4.
-# Note COLLAR_NOTE holds the collar's two limits tighter than the title block.
-# The tailstock line is the one process word, by user ruling (U40,
-# 2026-09-23): the slender terminal land cannot be turned unsupported, so the
-# support IS the requirement (exception RV-02 in
-# cad/config/parts/dt-cone-gear-shaft.yaml).  Lines stay short: the note
-# block starts 58 mm in and the title block begins at 216 mm.
+# (rule 4; sections A-A to D-D cut lands 1 to 4), and gives the flats' .0004
+# bands, under the milled-width row, their fit route: each flat is milled
+# matched to its gears' measured D-bores, with the acceptance and the
+# printed limits' across-flat clearance as REF.  The flats' common clock is
+# the aligned sections' and the title block's angle (error_budget.yaml books
+# it per land as cone_land_clock).  Note STACK_NOTE names, once, the stack the
+# three-place lengths set (rule 4): each step stands SEAT_STEP_SETBACK behind
+# the smaller gear's south face (the proof below) and the collar web is the
+# MHA-DT-07 station and the stack's origin.  The tailstock line is the one
+# process word, by user ruling (U40, 2026-09-23): the slender terminal land
+# cannot be turned unsupported, so the support IS the requirement (exception
+# RV-02 in cad/config/parts/dt-cone-gear-shaft.yaml).  Lines stay short: the
+# note block starts 20 mm in and the title block begins at 216 mm.
+STACK_NOTE = 2
 TAILSTOCK_NOTE = 3
+# The printed step lengths (from the collar's thrust face, the journal end)
+# and the collar web, as their dimensions print them.
+STACK_LENGTHS_TEXT = ", ".join(
+    inch_text(SECTION_ENDS[land] - SECTION_ENDS[0], 3) for land in (1, 2, 3)
+) + f" AND {inch_text(COLLAR_THICKNESS, 3)}"
 DRAWING_NOTES = "\n".join(
     (
-        f"{LAND_NOTE}. 4X FLATS PARALLEL, SAME SIDE. LANDS A-A TO D-D:",
-        f"   SLIDING FIT, ACROSS-FLAT CLEARANCE {FLAT_AF_CLEARANCE_TEXT}, IN",
-        f"   A-A MHA-DT-07 AND {_gears(1)} GEARS OF MHA-DT-03;",
-        f"   B-B {_gears(2)}, C-C {_gears(3)}, D-D {_gears(4)} OF MHA-DT-03;",
-        "   D-D ALSO MHA-DT-VN-54 ON THE ROUND.",
-        f"{COLLAR_NOTE}. COLLAR EDGE BREAK {inch_text(THRUST_EDGE_BREAK_MAX, 3)} MAX,"
-        f" ROOTS R{inch_text(COLLAR_ROOT_RADIUS_MAX, 3)} MAX.",
+        f"{LAND_NOTE}. SLIDING FIT IN MHA-DT-03, A-A ALSO MHA-DT-07, D-D ALSO MHA-DT-VN-54;",
+        "   MILL FLATS TO MEASURED D-BORES: NO ROCK "
+        f"(CLEARANCE {FLAT_AF_CLEARANCE_TEXT} REF).",
+        f"{STACK_NOTE}. {STACK_LENGTHS_TEXT} SET THE MHA-DT-07 AND MHA-DT-03 STACK.",
         f"{TAILSTOCK_NOTE}. TURN THE TIP LAND WITH TAILSTOCK SUPPORT.",
     )
 )

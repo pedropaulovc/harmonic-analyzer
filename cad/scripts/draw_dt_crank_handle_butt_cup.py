@@ -67,6 +67,7 @@ from dt_crank_handle_butt_cup_notes import (
     HANDLE_NUMBER,
     POCKET_FIT_CALLOUT,
     POCKET_FLAG,
+    POCKET_NOTE,
     POCKET_NOTE_TEXT,
 )
 from dt_crank_handle_butt_cup_spec import (
@@ -166,24 +167,30 @@ SECTION_KEEP = {
         SECTION_CENTER[1] + BODY_R + 0.041,
     ),
 }
-# The body is bonded in the MHA-DT-08 counterbore, which is bored to the
-# measured body for an epoxy line: a bonded fit whose diametral clearance is
-# the handle's glue line, REF (rules 4 and 26; rule 23: epoxy, wood to metal).
+# The body is bonded in the MHA-DT-08 counterbore: a matched bonded fit,
+# turned to the measured counterbore, whose diametral clearance is the
+# handle's glue line, REF (rules 4 and 26; rule 23: epoxy, wood to metal).
+# The fit lives on flag note 2: printed on the dimension (round 2) its two
+# lines ran into the floor-hole dimension line, and the .XXX grade alone
+# cannot give a .004-wide clearance, so the matched route must be printed.
 _MM_PER_IN = 25.4
-BODY_FIT_CALLOUT = "\n".join(
+BODY_NOTE = POCKET_NOTE + 1
+BODY_FLAG = f"SEE NOTE {BODY_NOTE}"
+BODY_NOTE_TEXT = "\n".join(
     (
-        f"BONDED FIT IN {HANDLE_NUMBER}, EPOXY",
-        "(CLEARANCE "
+        f"{BODY_NOTE}. BODY: BONDED FIT IN {HANDLE_NUMBER} CRANK HANDLE, EPOXY:",
+        "   TURN TO THE MEASURED COUNTERBORE (CLEARANCE "
         + "-".join(
             f"{value / _MM_PER_IN:.3f}".removeprefix("0")
             for value in COUNTERBORE_GLUE_LINE
         )
-        + ")",
+        + ").",
     )
 )
+NOTES_TEXT = f"{POCKET_NOTE_TEXT}\n{BODY_NOTE_TEXT}"
 DIMENSION_CALLOUTS = {
     "BodyChamfer": BODY_CHAMFER_CALLOUT,
-    "BodyDia": BODY_FIT_CALLOUT,
+    "BodyDia": BODY_FLAG,
     "FloorHoleDia": FLOOR_HOLE_CALLOUT,
     "PocketDepth": POCKET_FLAG,
     "PocketDia": POCKET_FIT_CALLOUT,
@@ -364,8 +371,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_POS)
-    if add_note(adapter, POCKET_NOTE_TEXT, *POCKET_NOTE_POS) is None:
-        raise RuntimeError("failed to add the pocket's flag note")
+    if add_note(adapter, NOTES_TEXT, *POCKET_NOTE_POS) is None:
+        raise RuntimeError("failed to add the pocket and body flag notes")
     rebuild_drawing(adapter, label="crank-handle-butt-cup layout audit")
     check_drawing_layout(adapter, layout=SPEC.layout, stem=PART_STEM)
     return await finalize_drawing(

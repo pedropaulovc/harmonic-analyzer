@@ -232,25 +232,35 @@ def test_the_d_sections_print_the_corner_limit_clock_and_mates(monkeypatch):
     ]
 
 
-def test_every_tight_band_names_its_mate_and_fit():
-    """Rule 4: the journal names its matched running fit with the clearance of
-    the printed limits; every land and flat links the numbered land note,
-    which names each mate by drawing number.  Lengths carry no words."""
+def test_every_tight_band_names_its_mate_and_fit_route():
+    """Rule 4: a band under its shop row names a fit route at the feature.
+    The journal is a matched running fit to the MHA-DT-05 bore with the
+    printed limits' clearance; every land and flat links the numbered land
+    note, which names each mate by drawing number and mills the flats matched
+    to the measured D-bores with an acceptance.  Lengths carry no words."""
     spec = dt_cone_gear_shaft_spec
-    assert drawing.DIMENSION_CALLOUTS["Sec0Dia"] == (
-        "RUNNING FIT IN MHA-DT-05\n(CLEARANCE .0010-.0023)"
-    )
+    assert drawing.DIMENSION_CALLOUTS["Sec0Dia"].split("\n") == [
+        "RUNNING FIT, MATCHED TO MHA-DT-05",
+        "BORE (CLEARANCE .0010-.0023)",
+    ]
     assert drawing.DIMENSION_CALLOUTS["Sec1Dia"] == "SEE NOTE 1"
     assert drawing.DIMENSION_SUFFIXES == {
         f"Sec{land}Dia": " SEE NOTE 1" for land in (2, 3, 4)
     }
     notes = spec.DRAWING_NOTES.splitlines()
-    assert notes[0].startswith("1. ") and "PARALLEL, SAME SIDE" in notes[0]
-    land_note = " ".join(notes[:5])
-    assert "ACROSS-FLAT CLEARANCE .0004-.0012" in land_note
-    for mate in ("MHA-DT-07", "T030-T120", "B-B T024", "C-C T018", "D-D T006, T012",
-                 "MHA-DT-VN-54"):
-        assert mate in land_note
+    land_note = " ".join(notes[:2])
+    assert notes[0].startswith("1. ") and notes[1].startswith("   ")
+    for words in (
+        "SLIDING FIT IN MHA-DT-03",
+        "A-A ALSO MHA-DT-07",
+        "D-D ALSO MHA-DT-VN-54",
+        "MILL FLATS TO MEASURED D-BORES: NO ROCK",
+        "(CLEARANCE .0004-.0012 REF)",
+    ):
+        assert words in land_note
+    # The three-place lengths name the stack they set once (rule 4), with the
+    # values their dimensions print.
+    assert notes[2] == "2. 4.701, 4.972, 5.243 AND .125 SET THE MHA-DT-07 AND MHA-DT-03 STACK."
     # Every suffix is one line; every below callout fits two.
     assert not any("\n" in text for text in drawing.DIMENSION_SUFFIXES.values())
     assert not any("\n" in text for text in spec.FLAT_MATE_SUFFIXES.values())
@@ -494,7 +504,10 @@ def _pivot_finish_ink() -> tuple[tuple[float, float, float, float], list]:
     its leader from PIVOT_FINISH_XY down onto the journal land's top flank."""
     spec = dt_cone_gear_shaft_spec
     big_end = drawing.SIDE_CENTER[0] + spec.SHAFT_LENGTH / 2000.0
-    top = (big_end - 0.020, drawing.SIDE_CENTER[1] + spec.SECTION_DIAS[0] / 2000.0)
+    top = (
+        big_end - drawing.PIVOT_FINISH_ATTACH_INSET,
+        drawing.SIDE_CENTER[1] + spec.SECTION_DIAS[0] / 2000.0,
+    )
     return _PIVOT_FINISH_BOX, [(drawing.PIVOT_FINISH_XY, top)]
 
 
@@ -526,7 +539,7 @@ def test_the_collar_callout_lifts_clear_of_the_pivot_finish() -> None:
     high = [((0.2300, finish[3] + 0.003), (0.2326, 0.1564))]
     assert drawing._collar_callout_dy(text, finish, high) == pytest.approx(dy + 0.003)
     # ink outside the block's span does not
-    aside = [((0.3000, 0.2500), (0.3100, 0.2400))]
+    aside = [((text[2] + 0.010, 0.2500), (text[2] + 0.020, 0.2400))]
     assert drawing._collar_callout_dy(text, finish, aside) == pytest.approx(dy)
 
 
@@ -1318,6 +1331,8 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
     )
     numbered = [line.split(".")[0] for line in notes.splitlines() if not line.startswith(" ")]
     assert numbered == ["1", "2", "3"]
+    # Rule 7: at most four short lines, the RV-02 tailstock line included.
+    assert len(notes.splitlines()) <= 4
     tailstock = [line for line in notes.splitlines() if "TAILSTOCK" in line.upper()]
     assert tailstock == ["3. TURN THE TIP LAND WITH TAILSTOCK SUPPORT."]
     for forbidden in (
@@ -1667,18 +1682,14 @@ def test_the_sheet_states_the_collar_as_stock_with_its_break() -> None:
     spec = dt_cone_gear_shaft_spec
     assert drawing.REFERENCE_DIAMETERS == ("CollarDia",)
     assert drawing.DIMENSION_CALLOUTS["CollarDia"] is spec.COLLAR_STOCK_CALLOUT
-    # Rule 7: the size/stock line and one mate line; the tight break and
-    # root limits are linked flag note COLLAR_NOTE.
+    # Rule 3: the tight break and root limits sit at the collar, never in a
+    # note; rule 7: two lines of words, the mates named once by number.
     assert spec.COLLAR_STOCK_CALLOUT.split("\n") == [
-        f"5/8 BAR AS SUPPLIED, SEE NOTE {spec.COLLAR_NOTE}",
+        f"5/8 BAR AS SUPPLIED, EDGE BREAK {spec.inch_text(spec.THRUST_EDGE_BREAK_MAX, 3)} MAX",
+        f"ROOTS R{spec.inch_text(spec.COLLAR_ROOT_RADIUS_MAX, 3)} MAX, "
         "SEATS MHA-DT-05 AND MHA-DT-07",
     ]
-    collar_note = next(
-        line for line in spec.DRAWING_NOTES.splitlines()
-        if line.startswith(f"{spec.COLLAR_NOTE}. ")
-    )
-    assert f"EDGE BREAK {spec.inch_text(spec.THRUST_EDGE_BREAK_MAX, 3)} MAX" in collar_note
-    assert f"ROOTS R{spec.inch_text(spec.COLLAR_ROOT_RADIUS_MAX, 3)} MAX" in collar_note
+    assert "BREAK" not in spec.DRAWING_NOTES and "ROOTS" not in spec.DRAWING_NOTES
     assert spec.COLLAR_ROOT_RADIUS_MAX < spec.THRUST_EDGE_BREAK_MAX
     assert spec.DRAWING_PRECISION["CollarProfile"]["CollarDia"] == 3
     assert spec.COLLAR_DIA == pytest.approx(0.625 * 25.4)
