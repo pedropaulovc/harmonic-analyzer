@@ -157,12 +157,15 @@ def test_every_cross_sheet_step_pointer_lands_on_the_step_it_names() -> None:
         for head, text in sheets[fitup_number].items()
         if re.fullmatch(rf"{north_label}[A-Z]?", head)
     )
-    assert "SET THE EAR INNER FACE TO ITS Y" in north and "8N DRO ZERO" in north
+    assert "SET THE EAR INNER FACE TO ITS Y" in north
+    assert f"{drive_train.DRO_ZERO_STEP} ZERO" in north
     # The plain shaft threads through the set ear: the bracket stays down,
     # and the channel sheet threads the shaft and the washer measured there
     # from the north.
     assert "LIFT IT OFF" not in north
-    assert "MIC THE MHA-CH-VN-56; RECORD IT AS W" in north
+    assert "MIC THE MHA-CH-VN-56: ITS THICKNESS IS W" in north
+    # Rule 23 (rubric sample round 9): the one-screw bracket's bench check.
+    assert "CHECK THAT THE MHA-CH-08 DOES NOT TURN ON MHA-FR-05 BY HAND" in north
     north_ear = _step_body("north-ear-datum")
     washer = _config.parts("ch-vn-rocker-thrust-washer")["number"]
     assert "FLATS UP" in north_ear and "SOUTH THROUGH THE EAR" in north_ear
