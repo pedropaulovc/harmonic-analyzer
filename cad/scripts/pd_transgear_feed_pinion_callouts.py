@@ -1,11 +1,6 @@
 """Text the MHA-PD-10 part authors: its marked dimensions' lanes and its sheet
 properties (the gear data block and the tooth-space inspection callout).
 
-The spec's former sheet texts (``GEAR_DATA``, ``BORE_CALLOUT``,
-``TOOTH_SPACE_CALLOUT`` and their parts) are superseded by the ones here and
-read by nothing; they go when the spec next changes for its own reasons
-(deleting them alone would re-key 16 builders, the top assembly among them).
-
 The part builder writes every lane below on its source dimension; the
 drawing imports them verbatim and only reads them back.  Setting dimension
 text from the drawing writes through to the imported source dimension, and
@@ -26,9 +21,11 @@ acceptance that is the span band's fit route.
 
 from __future__ import annotations
 
+import math
+
 import pd_transgear_disc_hub_spec as HUB
 from pd_cluster_stack_band import STACK_NAME
-from pd_rack_pinion_spec import inch_ceil_mm, inch_floor_mm, inch_text
+from pd_rack_pinion_spec import inch_floor_mm, inch_text
 from pd_transgear_feed_pinion_spec import (
     BORE_DATUM,
     BORE_DIAMETRAL_CLEARANCE,
@@ -36,6 +33,7 @@ from pd_transgear_feed_pinion_spec import (
     CUTTER_TOOTH_RANGE,
     DIAMETRAL_PITCH,
     HUB_NUMBER,
+    MM_PER_IN,
     PIN_NUMBER,
     PITCH_DIA,
     PRESSURE_ANGLE_DEG,
@@ -45,7 +43,6 @@ from pd_transgear_feed_pinion_spec import (
     TOOTHSPACE_GAUGE_DIA_MM,
     TOOTH_SPACE_RUNOUT_TIR_MM,
     WHOLE_DEPTH,
-    gear_data_note,
 )
 from pd_transgear_pin_spec import FRONT_BUSHING_NUMBER
 
@@ -127,11 +124,17 @@ CALLOUTS: dict[int, dict[tuple[str, str], str]] = {
 
 # The rack mesh's datum backlash band (pd_transgear_feed_pinion_spec, the
 # band paper_drive_mesh_check.feed_rack_mesh gates and MHA-PD-00 sets as
-# platen shake on a dial), rounded inward onto the .0001 in grid so the
-# printed window never admits a backlash the mesh check refuses.
+# platen shake on a dial), rounded inward onto the plain .0005 in dial step
+# (MHA-PD-00 prints the same window) so the printed window never admits a
+# backlash the mesh check refuses.
+_BACKLASH_STEP_IN = 0.0005
 BACKLASH_ACCEPT_MM = (
-    inch_ceil_mm(RACK_BACKLASH_RANGE[0], 4),
-    inch_floor_mm(RACK_BACKLASH_RANGE[1], 4),
+    math.ceil(RACK_BACKLASH_RANGE[0] / MM_PER_IN / _BACKLASH_STEP_IN - 1e-9)
+    * _BACKLASH_STEP_IN
+    * MM_PER_IN,
+    math.floor(RACK_BACKLASH_RANGE[1] / MM_PER_IN / _BACKLASH_STEP_IN + 1e-9)
+    * _BACKLASH_STEP_IN
+    * MM_PER_IN,
 )
 if not (
     RACK_BACKLASH_RANGE[0] <= BACKLASH_ACCEPT_MM[0]
@@ -141,6 +144,16 @@ if not (
         f"MHA-PD-10 backlash acceptance {BACKLASH_ACCEPT_MM} leaves the mesh "
         f"band {RACK_BACKLASH_RANGE}"
     )
+
+
+def _step_text(value_mm: float) -> str:
+    """A .0005-step inch value without a padding zero: ``.005``, ``.0055``."""
+    return inch_text(value_mm, 4).rstrip("0")
+
+
+def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> str:
+    """Render an aligned gear data block for a property-linked note."""
+    return "\n".join([title] + [f"{label}:  {value}" for label, value in rows])
 
 
 # What a machinist needs to cut and check the teeth; design parameters stay
@@ -159,19 +172,15 @@ GEAR_DATA = gear_data_note(
         ("MATES WITH", f"PLATEN RACK {RACK_NUMBER}"),
         (
             "BACKLASH WITH MATE (DIAL)",
-            "-".join(inch_text(value, 4) for value in BACKLASH_ACCEPT_MM),
+            "-".join(_step_text(value) for value in BACKLASH_ACCEPT_MM),
         ),
     ]
 )
 
-# The tooth-space runout limit on the plain .001 in grid, rounded UP from the
-# shared 0.050 mm grade (fits.stock_form_quality.toothspace_runout_tir_mm):
-# .0019 read as a converted millimetre value (2026-11-07 screen).  PROVISIONAL
-# pending owner confirmation: .002 (0.0508 mm) exceeds the booked grade by
-# 0.0008 mm; the paper-drive gates (rack mesh, engaged-feed window, the
-# platen-rack closing against the 0.12 backlash) pass with the grade at
-# 0.0508, so the shared grade can follow.
-TOOTH_SPACE_RUNOUT_TIR_TEXT = inch_text(inch_ceil_mm(TOOTH_SPACE_RUNOUT_TIR_MM, 3), 3)
+# The tooth-space runout limit: the shared grade
+# (fits.stock_form_quality.toothspace_runout_tir_mm, the .002 inch step), at
+# three places and floored, so the print never exceeds the booked grade.
+TOOTH_SPACE_RUNOUT_TIR_TEXT = inch_text(inch_floor_mm(TOOTH_SPACE_RUNOUT_TIR_MM, 3), 3)
 TOOTH_SPACE_CALLOUT = "\n".join(
     (
         f"TOOTH SPACE RUNOUT {TOOTH_SPACE_RUNOUT_TIR_TEXT} TIR TO {BORE_DATUM}",
