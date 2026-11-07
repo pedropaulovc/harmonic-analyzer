@@ -248,11 +248,14 @@ HOLDDOWN_LOCAL_Z = -dt_cone_tip_block_spec.TIP_BLOCK_PIVOT_OFFSET
 HOLDDOWN_LOCAL_X = -1.016  # -.04
 # The explicit band on both printed stations from the pivot bore (HoldDownX,
 # HoldDownZ): the block's lateral and axial stacks need it rather than the
-# general grade.  It stays tighter than the shop's +/-.005 drilled-hole row,
-# so the hole is spotted from MHA-DT-21 at assembly (its callout names the
-# route).  Delegated ruling 2026-11-07 (Main), no precedent; owner review
-# #2144.
-HOLDDOWN_STATION_TOL_MM = 0.1016  # +/-.004
+# general .XX grade.  The shop's +/-.005 drilled-hole row (delegated ruling
+# 2026-11-07 (Main), no precedent; owner review #2144: was +/-.004 with a
+# spot from MHA-DT-21; a sheet cannot print an imported banded station as
+# REF, so the band went to the row).  At +/-.005 with the post taps also at
+# +/-.005: pivot-head air 0.375 >= 0.20, tip lateral error 6.445 <= 6.541
+# take-up, adjuster embed 5.685..8.768 in 5.309..9.042, hold-down webs
+# >= .1269 in.
+HOLDDOWN_STATION_TOL_MM = 0.127  # +/-.005
 # The same stacks run through the post-mount taps, whose placement dimensions
 # (PostMountWestX/WestZ/EastX/EastZ) carry this band instead of the grade:
 # the shop's +/-.005 drilled-hole row.  Delegated ruling 2026-11-07 (Main),
