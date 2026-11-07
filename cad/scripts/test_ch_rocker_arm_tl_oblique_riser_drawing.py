@@ -121,6 +121,34 @@ def test_blank_and_holes_are_the_part_sheet() -> None:
     assert part.MATERIAL == "6061 Alloy"
 
 
+def test_hub_relief_cuts_the_12_mm_drill_and_prints_its_design_nominal() -> None:
+    """The owner's literal 12 mm relief stays the model's cut (its reamer
+    clearance is the drill's); the inch sheet prints the floored three-place
+    design nominal .472 from a blanked reference circle, as the #30 holes do,
+    so the DRILLED HOLES +.004/0 band contains the actual drill and every
+    exported endpoint is a printed value."""
+    assert spec.HUB_DIA_PRINTED == pytest.approx(0.472 * INCH)
+    assert _on_inch_grid(spec.HUB_DIA_PRINTED, spec.HUB_PLACES)
+    assert spec.DRAWING_PRECISION_BY_NAME["HubDia"] == spec.HUB_PLACES == 3
+    assert spec.GLOBALS["HubDia"] == spec.HUB_DIA_PRINTED
+    assert spec.GLOBALS["HubCutDia"] == spec.HUB_DIA
+    assert spec.CIRCLES[0][2][2] == "HubCutDia" and spec.CIRCLES[0][3][2] == '"HubCutDia"'
+    assert spec.DRAWING_DIMENSIONS["HubHoleReference"] == {"HubDia"}
+    assert "HubDia" not in spec.DRAWING_DIMENSIONS["HoleProfile"]
+    assert "HubCutDia" not in set().union(*spec.DRAWING_DIMENSIONS.values())
+    rows = {row[0]: row for row in part._REFERENCE_CIRCLES}
+    _sketch, centre, dia, names, drives = rows["HubHoleReference"]
+    assert (centre, dia) == (spec.HUB_HOLE, spec.HUB_DIA_PRINTED)
+    assert names[2] == "HubDia" and drives == ('"HubX"', '"HubY"', '"HubDia"')
+    feature = _features()["hub_hole"]
+    lo, hi = feature["dia"]
+    assert (lo, hi) == pytest.approx((0.472 * INCH, 0.476 * INCH))
+    assert lo <= spec.HUB_DIA <= hi
+    assert feature["dia_nominal"] == spec.HUB_DIA_PRINTED
+    assert lo > strap.HOLE_DIA
+    assert spec.CALLOUTS_BELOW["HubDia"].split("\n")[0] == "12 MM DRILL THRU"
+
+
 def test_blank_sizes_are_finished_native_dimensions_not_stock() -> None:
     dimensions = {"BlankLength", "BlankWidth", "BlankThick"}
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
@@ -188,7 +216,11 @@ def test_stop_holes_cut_the_actual_30_drill_and_print_the_design_nominal() -> No
     assert spec.DRAWING_PRECISION_BY_NAME["StopDia"] == 3
     assert spec.DRAWING_DIMENSIONS["StopHoles"] == _STOP_STATIONS
     assert spec.DRAWING_DIMENSIONS["StopHoleReference"] == {"StopDia"}
-    assert part.REFERENCE_SKETCHES == ("ScrewHoleReference", "StopHoleReference")
+    assert part.REFERENCE_SKETCHES == (
+        "ScrewHoleReference",
+        "HubHoleReference",
+        "StopHoleReference",
+    )
     rows = {row[0]: row for row in part._REFERENCE_CIRCLES}
     _sketch, centre, dia, names, drives = rows["StopHoleReference"]
     assert (centre, dia) == (spec.STOP_PIN_HOLES[1], spec.STOP_HOLE_DIA)
