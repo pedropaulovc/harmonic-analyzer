@@ -578,9 +578,3 @@ def test_each_size_text_is_one_position_write_inside_one_span(
     expected = _positions()
     for _, label, xy, _ in writes:
         assert xy == pytest.approx(expected[label])
-
-
-def test_installation_note_fits_the_sheet() -> None:
-    lines = _config.parts(STEM)["installation_notes"].splitlines()
-    assert len(lines) <= 4
-    assert all(len(line) <= 70 for line in lines), lines

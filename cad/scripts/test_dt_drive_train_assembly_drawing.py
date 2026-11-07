@@ -271,12 +271,6 @@ def test_sheet_numbers_are_pinned_where_the_sheets_cite_them() -> None:
     assert all(text.count(",") <= 1 for text in drawing.BOM_DESCRIPTIONS.values())
 
 
-def test_the_bank_spring_print_cites_the_settings_sheet() -> None:
-    notes = _config.parts("dt-vn-cylinder-bank-spring")["installation_notes"]
-    cited = re.findall(r"MHA-DT-00 SHEET (\d+)", " ".join(notes.split()))
-    assert cited == [str(drawing.BANK_SETTINGS_SHEET)]
-
-
 def test_grouped_parts_stamp_the_description_the_bom_prints() -> None:
     """A grouped part's configurations carry UseDescriptionInBOM, and that
     wins over the drawing's written cell: cascade-2 (2026-09-27) read back

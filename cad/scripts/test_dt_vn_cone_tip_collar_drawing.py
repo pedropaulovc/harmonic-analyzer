@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import math
-import re
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -804,10 +803,9 @@ def test_part_sheet_carries_no_assembly_procedure() -> None:
     from cone_stack_end_play import COLLAR_FEELER
     from dt_drive_train_assembly_sheet import FEELER_PLACES, inch_text
 
-    printed = f"{spec.DRAWING_NOTES}\n{spec.INSTALLATION_NOTES}"
+    printed = f"{drawing.NOTES_TEXT}\n{drawing.BORE_CALLOUT}"
     for word in ("FEELER", "LEAF", "SNUG", "SWING", "SEAT", "T006"):
         assert word not in printed
-    assert spec.INSTALLATION_NOTES.count("\n") == 1
     step = (
         f"PUSH MHA-DT-VN-54 ONTO A {inch_text(COLLAR_FEELER, FEELER_PLACES)} FEELER ON T006; "
         "LOCK ITS SET SCREW ON THE FLAT."
@@ -820,15 +818,6 @@ def test_stock_line_is_a_supply_size_the_turned_od_comes_from() -> None:
     19.05 while the sheet prints a turned Ø17.48."""
     assert spec.DRAWING_NOTES == "SUPPLY 3/4 ROUND BAR."
     assert spec.OUTER_DIA + spec.ROUTINE_BAND_MM < spec.STOCK_DIA
-
-
-def test_ream_callout_carries_the_bore_fit_statement() -> None:
-    """Main's machinist review: the REAM band's mate was named only in the
-    unattached note block. Its fit lines now ride the callout, unchanged."""
-    assert spec.BORE_CALLOUT == f"REAM THRU\n{spec.INSTALLATION_NOTES}"
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert '{"BoreDia": spec.BORE_CALLOUT}' in source
-    assert '"Installation Notes"' not in source
 
 
 @pytest.mark.parametrize("keeps", [True, False])
@@ -876,12 +865,12 @@ def test_nose_dia_moves_from_the_end_view_onto_the_turning_view(monkeypatch) -> 
         drawing._nose_dia_onto_side(object(), marks[:1], "end", "side")
 
 
-def test_nose_length_function_line_reads_above_its_value() -> None:
-    """r4 review: 3.500's extension lines struck its function line."""
+def test_nose_length_flag_reads_above_its_value() -> None:
+    """r4 review: 3.500's extension lines struck the words under it."""
     below, above = drawing._side_callouts()
-    assert above == {"NoseLength": spec.AXIAL_FUNCTION_CALLOUTS["NoseLength"]}
+    assert above == {"NoseLength": drawing.WALL_FLAG}
     assert "NoseLength" not in below
-    assert below.keys() == drawing._function_callouts(drawing.SIDE_KEEP).keys() - {"NoseLength"}
+    assert below.keys() == drawing._wall_flags(drawing.SIDE_KEEP).keys() - {"NoseLength"}
 
 
 def test_nose_dia_on_the_turning_view_clears_its_neighbours() -> None:
@@ -895,21 +884,22 @@ def test_nose_dia_on_the_turning_view_clears_its_neighbours() -> None:
     assert not 0.165 + 0.0183 < 0.182 - 0.00178
 
 
-def test_three_place_lengths_state_their_function() -> None:
-    """Main's machinist review: 11.500, 3.500 and 7.500 had no stated function.
-    They hold the tap's walls; at .XX those walls fall below the floor."""
+def test_three_place_lengths_flag_their_function_once() -> None:
+    """Main's machinist review: 11.500, 3.500 and 7.500 had no stated function;
+    the fan-out screen: one reason on three dimensions is narration. They
+    hold the tap's walls, stated once in note 1 that each flags; at .XX those
+    walls fall below the target."""
     three_place = {
         name
         for name, places in spec.DRAWING_PRECISION_BY_NAME.items()
         if places == 3 and name != "BoreDia"
     }
-    assert three_place == {"NoseLength", "CollarWidth", "TapStation"}
-    assert set(spec.AXIAL_FUNCTION_CALLOUTS) == three_place
-    for text in spec.AXIAL_FUNCTION_CALLOUTS.values():
-        assert not re.search(r"\d", text) and "\n" not in text
-    side = drawing._function_callouts(drawing.SIDE_KEEP)
-    tap = drawing._function_callouts(drawing.TAP_KEEP)
+    assert three_place == set(drawing.WALL_FLAGGED)
+    side = drawing._wall_flags(drawing.SIDE_KEEP)
+    tap = drawing._wall_flags(drawing.TAP_KEEP)
     assert side.keys() | tap.keys() == three_place
+    assert set(side.values()) == set(tap.values()) == {drawing.WALL_FLAG}
+    assert drawing.WALL_FLAG == f"SEE NOTE {drawing.WALL_NOTE.split('.')[0]}"
     # At .XX on the inch sheet (each mm nominal with its own rounding) the
     # two tap walls fall below the wall target.
     south = spec.WORST_WALLS_MM["tap to south shoulder"] - (
@@ -923,35 +913,35 @@ def test_three_place_lengths_state_their_function() -> None:
     assert south < spec.WALL_TARGET_MM and north < spec.WALL_TARGET_MM
 
 
-def test_installation_notes_name_the_journal_and_its_clearance() -> None:
-    """Machinist review of the round-2 build: the Ø0.849 bore named neither
-    the journal it slides on nor the fit. It names MHA-DT-04's terminal
-    journal at that drawing's finished limits, and the diametral clearance
-    the two bands give, which is the retention float the collar is sized on."""
+def test_wall_note_states_the_least_booked_tap_wall() -> None:
+    least = min(
+        spec.WORST_WALLS_MM["tap to south shoulder"], spec.WORST_WALLS_MM["tap to north face"]
+    )
+    printed = math.floor(least / 25.4 * 1000.0 + 1e-9) / 1000.0
+    assert f"WALL {printed:.3f} MIN".replace("0.", ".", 1) in drawing.WALL_NOTE
+    # Rule 17's .080 in target.
+    assert printed >= 0.080
+
+
+def test_bore_callout_states_the_journal_fit() -> None:
+    """Rule 4: the REAM bore names its mate by number with a standard fit,
+    and the clearance the two printed limits give follows as REF; that
+    clearance is the retention float the collar is sized on."""
     shaft = _config.parts("dt-cone-gear-shaft")["number"]
     land_low, land_high = lands.TERMINAL_FINISHED_DIA_LIMITS_MM
     bore_low, bore_high = spec.BORE_FINISHED_DIA_LIMITS_MM
-    assert shaft == "MHA-DT-04"
     assert (bore_low - land_high, bore_high - land_low) == pytest.approx(
         (2.0 * lands.TIP_COLLAR_MIN_RADIAL_FLOAT_MM, 2.0 * lands.TIP_COLLAR_MAX_RADIAL_FLOAT_MM)
     )
-    lines = spec.INSTALLATION_NOTES.splitlines()
+    assert bore_low - land_high > 0.0
 
     def inch(value_mm: float) -> str:
         return f"{value_mm / 25.4:.4f}".removeprefix("0")
 
-    assert lines[:2] == [
-        f"FITS {shaft} TERMINAL JOURNAL \u00d8{inch(land_low)} TO {inch(land_high)};",
-        f"DIAMETRAL CLEARANCE {inch(bore_low - land_high)} TO "
-        f"{inch(bore_high - land_low)}.",
-    ]
-    assert lines == [
-        "FITS MHA-DT-04 TERMINAL JOURNAL \u00d8.0302 TO .0310;",
-        "DIAMETRAL CLEARANCE .0010 TO .0038.",
-    ]
-    assert bore_low - land_high > 0.0
-    # The longest line the notes box has printed (the old supply line).
-    assert max(map(len, lines)) <= 55
+    process, fit, clearance = drawing.BORE_CALLOUT.splitlines()
+    assert process == "REAM THRU"
+    assert fit.endswith(f"FIT ON {shaft} TERMINAL JOURNAL")
+    assert clearance == f"(CLEARANCE {inch(bore_low - land_high)}-{inch(bore_high - land_low)})"
 
 
 def test_final_stock_set_screw_references_accept_an_unlabelled_native_length(monkeypatch):
@@ -961,7 +951,7 @@ def test_final_stock_set_screw_references_accept_an_unlabelled_native_length(mon
     monkeypatch.setattr(drawing, "view_name", lambda _adapter, view: view.Name)
     monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, annotation: annotation.name)
     monkeypatch.setattr(drawing, "_sheet_notes", lambda *_args: {"title": ("", object())})
-    monkeypatch.setattr(drawing, "_note_text", lambda _annotation: spec.SET_SCREW_SUPPLIER_TITLE)
+    monkeypatch.setattr(drawing, "_note_text", lambda _annotation: drawing.STOCK_TITLE)
     monkeypatch.setattr(
         drawing, "_is_same_attachment",
         lambda _adapter, actual, expected, _kind: actual is expected,
