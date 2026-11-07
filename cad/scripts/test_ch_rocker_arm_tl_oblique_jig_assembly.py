@@ -1451,15 +1451,14 @@ def test_sweep_table_edge_margins(report) -> None:
     assert feed["handwheel"]["-X end"] < 0.0
     assert feed["screw"]["-X end"] < 0.0
     # The body is mirrored, but the column-side integral lug is not:
-    # its +X/+lateral corner sets rail 1's outer table-edge margin.
+    # its +X/+lateral corner sets rail 1's outer table-edge margin. The lug
+    # runs flush with the block's +X end (owner ruling 2026-11-07).
     lo, hi = trammel.CARRIAGE_TRAVEL
     outline = (
         (feed_block.BLOCK_X0, feed_block.LUG_Y1),
         (feed_block.LUG_X0, feed_block.LUG_Y1),
         (feed_block.LUG_X0, feed_block.LUG_Y0),
-        (feed_block.LUG_X1, feed_block.LUG_Y0),
-        (feed_block.LUG_X1, feed_block.LUG_Y1),
-        (feed_block.BLOCK_X1, feed_block.LUG_Y1),
+        (feed_block.BLOCK_X1, feed_block.LUG_Y0),
         (feed_block.BLOCK_X1, feed_block.BLOCK_WIDTH / 2.0),
         (feed_block.BLOCK_X0, feed_block.BLOCK_WIDTH / 2.0),
     )

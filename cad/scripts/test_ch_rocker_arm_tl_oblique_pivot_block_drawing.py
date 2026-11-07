@@ -292,3 +292,35 @@ def test_b_letters_clear_upper_witnesses_border_and_lower_drill_leader():
     # The lower arrow shaft/head is also below that leader, not just B.
     leader_at_arrow_left = y0 + (153.5 - x0) * (y1 - y0) / (x1 - x0)
     assert leader_at_arrow_left - (lower_end + 1.25) - .175 >= 3.0
+
+
+def test_block_length_reason_rides_its_value_row_clear_of_the_dimension():
+    """TL-22 printed the same top tier as TL-32 (c40296ac PDFs: the 1.64 over
+    SETS COUNTERBORE END WALL centred at (240, 258.5) mm, its underline on
+    the y253.5 dimension line), so its leader ran along the line too. Both
+    sheets now print the reason on the value's row, over the span. Text
+    metrics come from those PDFs: 2.74 mm a character, a 6.38 mm row box,
+    and a centre-anchored block."""
+    import _oblique_block_drawing as drawing
+
+    reason = spec.CALLOUTS_BELOW['BlockLength']
+    assert reason == 'SETS COUNTERBORE END WALL' and 'BlockLength' not in spec.CALLOUTS_SUFFIX
+    char_mm, row_mm = (274.22 - 205.78) / len(reason), 258.90 - 252.52
+    width = (len('1.64 ') + len(reason)) * char_mm
+    x, y = (value * 1000 for value in drawing.BLOCK_LENGTH_TEXT_XY)
+    left, right, bottom, top = x - width / 2, x + width / 2, y - row_mm / 2, y + row_mm / 2
+    span_left = drawing.PLAN_XY[0] * 1000 - spec.BLOCK_LENGTH / 2
+    span_right = span_left + spec.BLOCK_LENGTH
+    cut_x = drawing.PLAN_XY[0] * 1000 + spec.CBORE_SECTION_X
+    line_y = drawing.PLAN_KEEP['BlockLength'][1] * 1000
+    assert left - cut_x >= 4.0
+    assert span_left < left < (span_left + span_right) / 2 < right
+    assert 266.7 - top >= 2.0
+    # The underline (~0.7 under the box) clears the extension lines' 1 mm
+    # overrun by 3 mm; the old block's underline was under it.
+    assert bottom + .7 - (line_y + 1.0) >= 3.0
+    assert 258.5 - (264.46 - 252.52) / 2 + .7 - (line_y + 1.0) < 0.0
+    source = (Path(drawing.__file__)).read_text(encoding='utf-8')
+    body = source[source.index('def draw_block'):]
+    call = "\n    _inline_below_callout(adapter, plan_annotations, 'BlockLength', contract.CALLOUTS_BELOW['BlockLength'])\n"
+    assert call in body and 'if is_feed:' + call not in body

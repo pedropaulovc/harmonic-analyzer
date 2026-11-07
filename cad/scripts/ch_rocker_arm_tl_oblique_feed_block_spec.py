@@ -2,8 +2,9 @@
 
 The bought brass flange nut supplied with the lead screw (the FeedNut of
 leadscrew kit MHA-CH-06-TL-VN-84, ``ch_rocker_arm_tl_vn_oblique_leadscrew_kit_feed_nut_spec``; owner
-ruling 2026-11-04, #2177 option B) seats flat on the lug's +X face, its
-spigot faced off, so the lug needs no recess. Four #4-40 X 5/8 flat heads
+ruling 2026-11-04, #2177 option B) seats flat on the lug's +X face, flush
+with the block's +X end, its spigot faced off, so the lug needs no recess.
+Four #4-40 X 5/8 flat heads
 (MHA-CH-06-TL-VN-67) pass through the nut's countersunk flange holes into
 the lug's four #4-40 taps, tapped THRU, on the nut's 16 mm PCD at 45° to the
 lug's faces; all coordinates are block-local. The taps are transferred
@@ -13,8 +14,9 @@ locates them only by that transfer callout, as it located the retired
 dowel hole. The nut face's print locates the leadscrew clearance from the
 lug end and the carriage face (``NutPatternReference``).
 
-Issue #290: the sheet prints decimal inch. The lug outline and the screw
-clearance sit on the inch grid; the axis closes on the leadscrew's
+Issue #290: the sheet prints decimal inch. The lug outline (its -X face
+from the -X edge, its end from the +Y edge; its +X face is the block's end)
+and the screw clearance sit on the inch grid; the axis closes on the leadscrew's
 (``NUT_AXIS_Y`` from its lateral, ``NUT_AXIS_Z`` = its height over the
 carriage top). The axis height belongs to the metric-only KP08 vendor line,
 so it prints exact millimetres, labelled mm (owner ruling 4, 2026-11-01;
@@ -44,13 +46,34 @@ QUANTITY = 1
 BLOCK_X0, BLOCK_X1 = pivot.BLOCK_X0, pivot.BLOCK_X1
 BLOCK_LENGTH, BLOCK_WIDTH, BLOCK_HEIGHT = pivot.BLOCK_LENGTH, pivot.BLOCK_WIDTH, pivot.BLOCK_HEIGHT
 PLAN_LUG_X = 22.098  # .87, the lug's -X face from the block's -X edge
-LUG_WIDTH = 18.542  # .73
 PLAN_OVERALL_Y = 88.138  # 3.47, +Y edge to the lug end
+# Owner ruling 2026-11-07 (via Main): the lug runs flush with the block's
+# +X end, one continuous face. The c40296ac sheet's .87 + .73 = 1.60 lug end
+# stood .04 short of the 1.64 head, a useless step. The lug's width is the
+# remainder (.77), not a printed size: 1.64 and .87 locate both its faces.
 LUG_X0 = BLOCK_X0 + PLAN_LUG_X
-LUG_X1 = LUG_X0 + LUG_WIDTH
+LUG_X1 = BLOCK_X1
+LUG_WIDTH = LUG_X1 - LUG_X0  # 19.558, .77
 LUG_Y1 = -BLOCK_WIDTH / 2
 LUG_Y0 = BLOCK_WIDTH / 2 - PLAN_OVERALL_Y
 LUG_LENGTH = LUG_Y1 - LUG_Y0
+# The block-local plan outline, an L with no step: the lug's +X face and the
+# block's +X end are one edge from the lug end to the +Y edge.
+PLAN_OUTLINE = (
+    (BLOCK_X0, LUG_Y1), (LUG_X0, LUG_Y1), (LUG_X0, LUG_Y0),
+    (BLOCK_X1, LUG_Y0), (BLOCK_X1, BLOCK_WIDTH / 2), (BLOCK_X0, BLOCK_WIDTH / 2),
+)
+# Every edge axis-aligned and of real length, and every vertex a real
+# corner: no zero-length step, no collinear split of the +X face.
+_EDGE_VERTICAL = []
+for _i, _start in enumerate(PLAN_OUTLINE):
+    _end = PLAN_OUTLINE[(_i + 1) % len(PLAN_OUTLINE)]
+    _flat = (abs(_end[0] - _start[0]) < 1e-9, abs(_end[1] - _start[1]) < 1e-9)
+    if _flat not in ((True, False), (False, True)):
+        raise AssertionError(f"TL-32 plan outline edge {_start} -> {_end} is not a real side")
+    _EDGE_VERTICAL.append(_flat[0])
+if any(_EDGE_VERTICAL[_i - 1] == _vertical for _i, _vertical in enumerate(_EDGE_VERTICAL)):
+    raise AssertionError("TL-32 plan outline has a collinear split (a step or a seam)")
 NUT_FACE_X = LUG_X1
 NUT_AXIS_Y = -lead.SCREW_LATERAL
 NUT_AXIS_Z = 12.4  # the leadscrew axis over the carriage top (checked below)
@@ -90,7 +113,7 @@ CBORE_FLOOR_REFERENCE = pivot.CBORE_FLOOR_REFERENCE
 # standard Right view).
 DRAWING_VALUES = {k: v for k, v in pivot.DRAWING_VALUES.items() if k != "BlockHeight"} | {
     "SectionBlockHeight": BLOCK_HEIGHT,
-    "LugWidth": LUG_WIDTH, "PlanLugX": LUG_X0 - BLOCK_X0,
+    "PlanLugX": LUG_X0 - BLOCK_X0,
     "PlanOverallY": BLOCK_WIDTH / 2 - LUG_Y0,
     "NutClearanceDia": SCREW_CLEARANCE_DIA,
     "NutCentreZ": NUT_AXIS_Z, "NutCentreY": NUT_AXIS_Y - LUG_Y0,
@@ -101,7 +124,6 @@ NUT_PATTERN_PRINTED = ("NutCentreZ", "NutCentreY", NUT_CLOCK_DIMENSION)
 DRAWING_DIMENSIONS = {k: v for k, v in pivot.DRAWING_DIMENSIONS.items() if k != "Block"} | {
     CBORE_FLOOR_REFERENCE: pivot.DRAWING_DIMENSIONS[CBORE_FLOOR_REFERENCE] + ("SectionBlockHeight",),
     PLAN_DATUM_REFERENCE: pivot.DRAWING_DIMENSIONS[PLAN_DATUM_REFERENCE] + ("PlanLugX", "PlanOverallY"),
-    "LugProfile": ("LugWidth",),
     "NutClearanceProfile": ("NutClearanceDia",),
     "NutPatternReference": NUT_PATTERN_PRINTED,
 }
@@ -124,7 +146,7 @@ DRAWING_PRECISION = {k: v for k, v in pivot.DRAWING_PRECISION.items() if k != "B
         )
         for name in DRAWING_DIMENSIONS[feature]
     }
-    for feature in (CBORE_FLOOR_REFERENCE, PLAN_DATUM_REFERENCE, "LugProfile",
+    for feature in (CBORE_FLOOR_REFERENCE, PLAN_DATUM_REFERENCE,
                     "NutClearanceProfile", "NutPatternReference")
 }
 DRAWING_PRECISION_BY_NAME = {
@@ -268,8 +290,8 @@ NUT_WALL_MIN = math.floor(NUT_WALL_MIN_MM / 25.4 * 1000.0 + 1e-9) / 1000.0 * 25.
 NUT_WALL_MIN_TEXT = f"WALL {carrier.inch_text(NUT_WALL_MIN, 3)} MIN TO TAPS"
 # The nut screws' tips stop inside the THRU tap.
 assert feed_nut.SCREW_TIP_REACH_MAX < LUG_WIDTH
-# The round flange stands within the lug's face at the leadscrew's offset,
-# clear of the lug end, the bottom and top faces, and the block body.
+# The round flange stands within the lug's span of the +X face at the
+# leadscrew's offset, clear of the lug end and the bottom and top faces.
 NUT_Y = (
     NUT_AXIS_Y - _AXIS_Y_BAND - LEADSCREW_OFFSET_Y - feed_nut.FLANGE_DIA_MAX / 2,
     NUT_AXIS_Y + _AXIS_Y_BAND + LEADSCREW_OFFSET_Y + feed_nut.FLANGE_DIA_MAX / 2,
@@ -305,20 +327,21 @@ FEED_GAPS = {
     for station in trammel.CARRIAGE_TRAVEL
 }
 assert min(FEED_GAPS.values()) >= lead.FEED_GAP, FEED_GAPS
-# The block bore and lug ordinate each carry .XX; the far end also carries
-# LugWidth. The support envelope includes both mounting-hole floats and
-# their printed stations, including the permitted lower-joint slip.
-LUG_POSITION_BAND = printed_band_mm(2, unit=UNIT) + printed_band_mm(
-    pivot.DRAWING_PRECISION_BY_NAME["PlanBoreX"], unit=pivot.UNIT
-)
+# The block bore and lug ordinate each carry .XX. The nut face is the block's
+# +X end, so the far end carries the bore and BlockLength instead. The
+# support envelope includes both mounting-hole floats and their printed
+# stations, including the permitted lower-joint slip.
+_PLAN_BORE_BAND = printed_band_mm(pivot.DRAWING_PRECISION_BY_NAME["PlanBoreX"], unit=pivot.UNIT)
+LUG_POSITION_BAND = printed_band_mm(2, unit=UNIT) + _PLAN_BORE_BAND
+NUT_FACE_POSITION_BAND = printed_band_mm(
+    pivot.DRAWING_PRECISION_BY_NAME["BlockLength"], unit=pivot.UNIT
+) + _PLAN_BORE_BAND
 FEED_GAPS_WORST = {
     "near": trammel.CARRIAGE_TRAVEL[0] + NUT_REACH_X[0]
     - lead.KP08_BOXES["KP08 near"][1] - LUG_POSITION_BAND - lead.KP08_STATION_ENVELOPE,
     "far": lead.KP08_BOXES["KP08 far"][0]
     - (trammel.CARRIAGE_TRAVEL[1] + NUT_REACH_X[1])
-    - LUG_POSITION_BAND - printed_band_mm(2, unit=UNIT) - lead.KP08_STATION_ENVELOPE,
+    - NUT_FACE_POSITION_BAND - lead.KP08_STATION_ENVELOPE,
 }
 if min(FEED_GAPS_WORST.values()) < lead.FEED_GAP:
     raise AssertionError(f"centred feed reaches a displaced KP08: {FEED_GAPS_WORST}")
-if BLOCK_LENGTH - PLAN_LUG_X - LUG_WIDTH < 3 * printed_band_mm(2, unit=UNIT) - 1e-9:
-    raise AssertionError("lug can extend beyond the dimensioned block end")

@@ -2487,17 +2487,7 @@ def moving_outlines(
     })
     stations = carriage_stations(pass_name, theta)
     out["feed block"] = [
-        trammel.rail_point(1, stations[1] + x, -y)
-        for x, y in (
-            (pivot_block.BLOCK_X0, feed_block.LUG_Y1),
-            (feed_block.LUG_X0, feed_block.LUG_Y1),
-            (feed_block.LUG_X0, feed_block.LUG_Y0),
-            (feed_block.LUG_X1, feed_block.LUG_Y0),
-            (feed_block.LUG_X1, feed_block.LUG_Y1),
-            (pivot_block.BLOCK_X1, feed_block.LUG_Y1),
-            (pivot_block.BLOCK_X1, pivot_block.BLOCK_WIDTH / 2.0),
-            (pivot_block.BLOCK_X0, pivot_block.BLOCK_WIDTH / 2.0),
-        )
+        trammel.rail_point(1, stations[1] + x, -y) for x, y in feed_block.PLAN_OUTLINE
     ]
     out["pivot block 2"] = _rail_rect(
         2, stations[2] + pivot_block.BLOCK_X0,

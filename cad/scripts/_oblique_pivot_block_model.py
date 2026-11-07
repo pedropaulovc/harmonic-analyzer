@@ -438,6 +438,31 @@ def _native_nut_tap_diameter(adapter, part) -> float:
     return diameter
 
 
+def _require_flush_lug_end(body, part) -> list[float]:
+    """TL-32's +X end is ONE planar face from the lug end to the +Y edge,
+    full height (owner ruling 2026-11-07): the lug's +X side and the block's
+    end merged, with no step and no seam between the two extrusions."""
+    ends = []
+    for face in _early_bound(body, "IBody2").GetFaces() or ():
+        face = _early_bound(face, "IFace2")
+        normal = tuple(face.Normal or ())
+        box = [c * 1000.0 for c in face.GetBox() or ()]
+        if (len(normal) == 3 and len(box) == 6 and abs(abs(normal[0]) - 1.0) < 1e-9
+                and abs(box[0] - part.BLOCK_X1) < 1e-6 and abs(box[3] - part.BLOCK_X1) < 1e-6):
+            ends.append(box)
+    want = (part.LUG_Y0, 0.0, part.BLOCK_WIDTH / 2, part.BLOCK_HEIGHT)
+    if len(ends) != 1 or not all(
+        math.isclose(got, wanted, rel_tol=0.0, abs_tol=1e-3)
+        for got, wanted in zip((ends[0][1], ends[0][2], ends[0][4], ends[0][5]), want, strict=True)
+    ):
+        raise RuntimeError(
+            f"{part.PART_NAME}: the +X end at X {part.BLOCK_X1} mm is not one face spanning "
+            f"Y {part.LUG_Y0}..{part.BLOCK_WIDTH / 2}, Z 0..{part.BLOCK_HEIGHT} mm; "
+            f"planar faces there (box mm): {ends!r}"
+        )
+    return ends[0]
+
+
 @_telemetry.traced("part.readback.oblique_block_geometry")
 def require_block_geometry(adapter, part) -> None:
     """Read physical bore axes and model dimensions; never certify a nominal box."""
@@ -491,6 +516,8 @@ def require_block_geometry(adapter, part) -> None:
                 f"observed solid cylinders: {observations!r}"
             )
         measured[label] = [list(parameters) for parameters in matches]
+    if hasattr(part, "LUG_WIDTH"):
+        measured["flush +X end box"] = _require_flush_lug_end(bodies[0], part)
     dimensions = {}
     for feature, names in part.DRAWING_DIMENSIONS.items():
         wanted = set(names) & part.DRAWING_VALUES.keys()
@@ -517,9 +544,13 @@ async def build_block_model(adapter, part) -> None:
     name_dimensions(adapter,"Block",["BlockHeight"])
     expected = part.BLOCK_LENGTH * part.BLOCK_WIDTH * part.BLOCK_HEIGHT
     if hasattr(part,"LUG_WIDTH"):
-        # The shared edge at Y=-20 joins the two full-height extrusions.
+        # Owner ruling 2026-11-07: the lug's +X side is the block's +X end.
+        # Anchored on BlockProfile's anchor corner (+X/-Y), the lug's +X edge
+        # lies on the block's, and the union leaves one face (readback,
+        # _require_flush_lug_end); the shared edge at Y=-20 joins the two
+        # full-height extrusions.
         await _rectangle(adapter,"LugProfile",(part.LUG_X0,part.LUG_X1,part.LUG_Y0,part.LUG_Y1),
-                         ["LugWidth","LugLength","LugEndX","LugEndY"])
+                         ["LugWidth","LugLength","LugCornerX","LugCornerY"], anchor=2)
         check("integral lug",await adapter.create_extrusion(ExtrusionParameters(depth=part.BLOCK_HEIGHT)))
         name_last_feature(adapter,"Lug")
         expected += part.LUG_WIDTH * part.LUG_LENGTH * part.BLOCK_HEIGHT

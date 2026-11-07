@@ -67,7 +67,20 @@ PLAN_KEEP = {
     # 20261103T190306489Z).
     'TapDrillDia':(.071,.2455),
 }
-BLOCK_LENGTH_TEXT_XY = (.240,.2585)
+# TL-22 and TL-32 share this top tier (machinist review of c40296ac, TL-32
+# sheet 1; TL-22's PDF placed it identically). With the value over its
+# reason, the two rows were centred at (240, 258.5) mm, right of the 1.64 at
+# its own height. Their underline sat on the y253.5 dimension line, so the
+# leader ran from mid-span along the line, through its right arrowhead and
+# across the right extension line. The 13 mm under the border cannot hold two
+# rows plus a clear rise, so the reason prints on the value's row
+# ("1.64 SETS COUNTERBORE END WALL": about 82 mm at that PDF's 2.74 mm a
+# character, in a 6.38 mm row). The row is centred so it spans x 162..244
+# and y 257.8..264.2: 5 mm right of the x157 cutting line, 2.5 mm under the
+# border, and its underline about 5 mm over the dimension line. The leader
+# then rises steeply above the span, clear of both extension lines and the
+# arrowheads.
+BLOCK_LENGTH_TEXT_XY = (.203,.261)
 ROW_DIMENSIONS = ('CarriageDrills3Y','CarriageDrills4Y')
 # A-A remains below the plan, top face up. Its depth text stays outboard
 # left of the dimension line; the baseline and actual section span come
@@ -115,13 +128,14 @@ _PREF_OPTION_NONE = 0
 # The 1:1 pictorial's top vertex touched the border at y .235 (review of farm
 # run 20261027T181901497Z); 7 mm lower it stays clear of B-B's 24.30 (y 175).
 ISO_XY, ISO_SCALE = (.355,.228), SHEET_SCALE
-# TL-32's plan drops to allow its column-side lug below the block. LugWidth
-# and PlanLugX occupy separate baseline lanes; B-B stops beyond the block
+# TL-32's plan drops to allow its column-side lug below the block. PlanLugX
+# has its own baseline lane; the lug's +X side is the block's end (owner
+# ruling 2026-11-07), so no lug width prints. B-B stops beyond the block
 # because its -X column no longer crosses the lug. The taller pictorial
 # retains its own 1:2 scale.
 FEED_PLAN_XY = (.170,.181)
 FEED_PLAN_KEEP = PLAN_KEEP | {
-    'LugWidth':(.181,.1305),'PlanLugX':(.1554,.1225),'PlanOverallY':(.285,.181),
+    'PlanLugX':(.1554,.1225),'PlanOverallY':(.285,.181),
     # 84d's counterbore leader crossed VIEW D at y160.934; its text also
     # met D's sheet reference. Raise only this callout: its bottom row starts
     # y165.219 and its top ends y182.765, below the y184.937 width witness.
@@ -181,6 +195,36 @@ def _set_arrow_side(adapter, annotations, names, side) -> None:
         if int(display.ArrowSide) != side:
             raise RuntimeError(f'{name}: arrows did not move to side {side}')
     rebuild_drawing(adapter, label=f'arrow side {side}')
+
+
+# swDimensionTextParts_e (swconst.tlb, SOLIDWORKS 3DEXPERIENCE R2026x, read
+# 2026-11-07): swDimensionTextSuffix = 2, swDimensionTextCalloutBelow = 4.
+_TEXT_SUFFIX = 2
+_TEXT_CALLOUT_BELOW = 4
+
+
+@_telemetry.traced("drawing.block_callout_to_value_row", label_param="name")
+def _inline_below_callout(adapter, annotations, name: str, text: str) -> None:
+    """Move the model's below-callout ``text`` of dimension ``name`` onto its
+    value's row as a suffix. The words and the native value are unchanged;
+    only the row moves. Refuses a callout other than the spec's.
+
+    COM contract (sldworks.tlb R2026x, IDisplayDimension, audited
+    2026-11-07): ``GetText(WhichText: VT_I4) -> VT_BSTR`` and
+    ``SetText(WhichText: VT_I4, Text: VT_BSTR) -> VT_VOID``. SetText reports
+    nothing and replaces (never appends to) the part, so both parts are read
+    back and the move is accepted only on the exact pair."""
+    display = _displays(adapter, annotations, (name,))[name]
+    below = str(display.GetText(_TEXT_CALLOUT_BELOW) or '')
+    if below != text:
+        raise RuntimeError(f'{name}: below-callout reads {below!r}, expected {text!r}')
+    suffix = f' {text}'
+    display.SetText(_TEXT_SUFFIX, suffix)
+    display.SetText(_TEXT_CALLOUT_BELOW, '')
+    read = (str(display.GetText(_TEXT_SUFFIX) or ''), str(display.GetText(_TEXT_CALLOUT_BELOW) or ''))
+    if read != (suffix, ''):
+        raise RuntimeError(f'{name}: callout did not move onto the value row, reads {read!r}')
+    rebuild_drawing(adapter, label=f'{name} callout on its value row')
 
 
 def _size_note(adapter, note, height: float, *, label: str) -> None:
@@ -369,12 +413,13 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
     set_hidden_lines_removed(adapter,plan)
     plan_annotations = curate_view_dimensions(adapter,plan,keep=plan_keep,view_label='plan',
                      dimensions_by_feature=contract.DRAWING_DIMENSIONS)
-    _set_arrow_side(adapter, plan_annotations, ROW_DIMENSIONS + (('LugWidth',) if is_feed else ()), _ARROWS_INSIDE)
+    _set_arrow_side(adapter, plan_annotations, ROW_DIMENSIONS, _ARROWS_INSIDE)
     set_hidden_lines_removed(adapter,side)
     side_annotations = curate_view_dimensions(adapter,side,keep=side_keep,view_label='pivot section direction',
                      dimensions_by_feature=contract.DRAWING_DIMENSIONS)
     _set_arrow_side(adapter, side_annotations, ('TopBoreDepth',), _ARROWS_INSIDE)
     offset_dimension_text(adapter, side_annotations, {'TopBoreDepth': seat_text_xy})
+    _inline_below_callout(adapter, plan_annotations, 'BlockLength', contract.CALLOUTS_BELOW['BlockLength'])
     offset_dimension_text(adapter, plan_annotations, {'BlockLength': BLOCK_LENGTH_TEXT_XY})
     annotations = plan_annotations + side_annotations
     x = part.CBORE_SECTION_X
