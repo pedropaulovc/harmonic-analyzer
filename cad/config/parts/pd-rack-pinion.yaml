@@ -16,11 +16,6 @@ pd-rack-pinion:
   # accuracy are unpublished. The 2.25-module master depth is Main's design premise.
   process: "150T 48DP PA20 teeth cut with stock #1 form cutter (135T master), with radial setting and tooth-span limits from the part specification; indicate the disc to the actual feed running-bore datum before transferring, drilling and tapping the #0-80 holes at assembly; inspect assembled tooth-space runout and the retained matched reducer clock"
   machinist_exceptions:
-    - id: "RV-01"
-      kind: "accept"
-      where: "the rear-face parallelism frame to the clamp face (datum B)"
-      finding: "parallelism frame over-specified (rule 5)"
-      reason: "the clamped disc rim wobble must stay inside the disc-to-platen air (owner-ruled disc-cluster control)"
     - id: "RV-02"
       kind: "accept"
       where: "the tooth-space radial runout callout to the actual running bore"
@@ -28,6 +23,6 @@ pd-rack-pinion:
       reason: "tooth-space radial runout to the actual running bore, measured with a calibrated pin in each space, is the owner gear-tooth critical class; the assembled running datum is the feed pinion bore (owner-accepted)"
     - id: "RV-03"
       kind: "minor"
-      where: "the #0-80 tap callout's last line: WALL .066 MIN TO BORE (the front-face web; the rear .071)"
+      where: "the #0-80 taps' note 2, its last sentence: WALL .063 MIN TO BORE (the front-face web; the rear .068)"
       finding: "tap-to-bore web below the .080 target at the finished worst case (rules 17, 20)"
-      reason: "Main delegated ruling 2026-11-04 on #2167 (option A, the existing geometry kept), following the owner's approved band for thin walls between .060 and .080 (DT-35 .060, DT-08 .0602; #989), RV-04 on MHA-PD-18 (#1379) and RV-01 on MHA-PD-11 (#2124); owner review on #2144. The Ø.501 bore pilots on the MHA-PD-17 spigot and the taps transfer from its Ø.75 flange bolt circle; a Ø.78 circle restores .080 but moves the hub's holes and grows its flange from Ø1.05 to Ø1.08. The .0856 unbroken web pays the bore's .015 front chamfer leg and the tap's .004 mouth break and lands at .0666"
+      reason: "Main delegated ruling 2026-11-04 on #2167 (option A, the existing geometry kept), following the owner's approved band for thin walls between .060 and .080 (DT-35 .060, DT-08 .0602; #989), RV-04 on MHA-PD-18 (#1379) and RV-01 on MHA-PD-11 (#2124); owner review on #2144. The taps transfer from the MHA-PD-17 flange's Ø.75 bolt circle; a Ø.78 circle restores .080 but moves the hub's holes and grows its flange from Ø1.05 to Ø1.08. Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144 (pending owner confirmation): the bore opens from Ø.501 to Ø.504 so MHA-PD-00 can set the disc central (Q-PD06-1 option B), which costs the web .003 (the bore's radius and the disc's float on the spigot while the taps are spotted). The .0826 unbroken worst web pays the bore's .015 front chamfer leg and the tap's .004 mouth break and lands at .0636"

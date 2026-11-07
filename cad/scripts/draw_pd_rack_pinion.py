@@ -8,8 +8,7 @@ The bore's fit and the native #0-80 tap callout's assembly transfer are
 numbered notes their callouts link (``pd_rack_pinion_callouts``); the span
 and the blank link the GEAR DATA block, which names the mesh once with its
 backlash acceptance (no bolt-circle position). The edge view prints the disc
-thickness, the front (clamped) face as datum B and the rear face's
-parallelism to it.
+thickness; its size envelope holds the faces parallel, so no frame prints.
 Decimal-inch sheet (#290); the model keeps its millimetre nominals.
 """
 
@@ -40,7 +39,6 @@ from _drawing_common import (
 )
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
-from _drawing_gdt import add_datum_feature, add_feature_control_frame
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leaders import set_near_side_diameter
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -56,6 +54,7 @@ from paper_drive_stock_drawing import add_toothspace_callout, require_source_con
 from pd_rack_pinion_callouts import (
     BORE_CALLOUT,
     DRAWING_NOTES,
+    FACE_WIDTH_CALLOUT,
     GEAR_DATA_NOTE,
     MESH_CALLOUT,
     TAP_CALLOUT_QUALIFIER,
@@ -68,9 +67,6 @@ from pd_rack_pinion_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FACE_WIDTH,
-    FACE_WIDTH_CALLOUT,
-    FRONT_FACE_DATUM,
-    GEOMETRIC_TOLERANCES_IN,
     OUTSIDE_DIA,
     PRESSURE_ANGLE_DEG,
     STOCK_PROFILE,
@@ -123,15 +119,7 @@ TOOTH_SPACE_CALLOUT_CHAR_HEIGHT = 0.0035  # standard note font
 TOOTH_SPACE_GAP_INDEX = 18  # actual upper-right flank under the control-note lane
 
 HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / 2000.0
-FRONT_FACE_X = RIGHT_CENTER[0] - FACE_WIDTH * VIEW_SCALE[0] / 2000.0
 REAR_FACE_X = RIGHT_CENTER[0] + FACE_WIDTH * VIEW_SCALE[0] / 2000.0
-# Datum B tags the front face upper left of the edge view, in the lane the
-# face view leaves; the parallelism frame hangs lower right of it, under the
-# isometric, its leader on the rear face, so neither crosses the disc.
-DATUM_B_EDGE = (FRONT_FACE_X, RIGHT_CENTER[1] + HALF_OD * 0.55)
-DATUM_B_SYMBOL = (FRONT_FACE_X - 0.016, RIGHT_CENTER[1] + HALF_OD * 0.55)
-PARALLELISM_EDGE = (REAR_FACE_X, RIGHT_CENTER[1] - HALF_OD * 0.45)
-PARALLELISM_FRAME = (REAR_FACE_X + 0.012, RIGHT_CENTER[1] - HALF_OD * 0.45 - 0.012)
 
 # The bore's and the blank's diameters print near-side: one arrow on the rim
 # nearest the text, no line through the centre (machinist review: their
@@ -168,7 +156,7 @@ FRONT_KEEP = {
     ),
     "ToothSpan": (FRONT_CENTER[0], FRONT_CENTER[1] + 0.050),
 }
-# Below the edge-on disc, clear of datum B above and the frame to the right;
+# Below the edge-on disc, clear of the isometric to the right;
 # the whole text block (value and its ~.046-wide callout) stands right of
 # the rear face's extension line, so neither extension line nor the
 # dimension line strikes it (machinist review, r3: centred on the line, the
@@ -391,12 +379,12 @@ async def build(adapter: Any) -> dict[str, str]:
         source_path=SOURCE,
         radius_m=BORE_DIA / 2000.0,
         datum="A",
-        label="disc locating pilot bore axis",
+        label="disc bore axis",
         shoulder=True,
         stability_tolerance_m=0.0001,
     )
-    # The tooth-space control reads datum A above, the .501 pilot, at the
-    # cutting setup; the assembled control is MHA-PD-00's transfer step.
+    # The tooth-space control reads datum A above, the bore, at the shop row;
+    # the assembled limit is MHA-PD-00's centring at the transfer step.
     add_toothspace_callout(
         adapter,
         front,
@@ -406,26 +394,6 @@ async def build(adapter: Any) -> dict[str, str]:
         axial_station_mm=FACE_WIDTH,
         property_name=TOOTH_SPACE_CALLOUT_PROPERTY,
         note_xy=TOOTH_SPACE_CALLOUT_XY,
-    )
-    # Datum B: a vertical edge with no neighbour inside the pick radius at
-    # this height (the rear face stands .118 off), so the hit-test form.
-    add_datum_feature(
-        adapter,
-        right,
-        edge_xy=DATUM_B_EDGE,
-        symbol_xy=DATUM_B_SYMBOL,
-        datum=FRONT_FACE_DATUM,
-        label="disc front (clamped) face",
-    )
-    add_feature_control_frame(
-        adapter,
-        right,
-        edge_xy=PARALLELISM_EDGE,
-        frame_xy=PARALLELISM_FRAME,
-        characteristic="parallelism",
-        tolerance=GEOMETRIC_TOLERANCES_IN["disc rear face parallelism to front"],
-        datums=(FRONT_FACE_DATUM,),
-        label="disc rear face parallelism to front",
     )
 
     # The native thread and drill ride the callout; the mouth breaks and the

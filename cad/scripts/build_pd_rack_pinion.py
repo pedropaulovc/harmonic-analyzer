@@ -4,8 +4,9 @@ The large thin brass reducer disc carries 150 physical teeth (#2034: 15:150
 replaced the narrated 12:120 at the same 1:10 feed), cut by the finite PA20
 48DP stock #1/reference-135 master. It does not touch the rack: the finite
 stock #7/reference-14 knob pinion drives it 15:150.
-Its bore pilots on the brass hub's Ø.501 spigot, and three #0-80 fillister
-screws (MHA-PD-VN-55) clamp it to that hub's flange (MHA-PD-17).
+Its Ø.504 bore clears the brass hub's Ø.501 spigot (the disc is set central
+at assembly), and three #0-80 fillister screws (MHA-PD-VN-55) clamp it to
+that hub's flange (MHA-PD-17).
 
 Every size is ``pd_rack_pinion_spec``'s; the screw pattern is
 ``pd_transgear_disc_hub_geometry``'s (the one authority the flange shares).
@@ -64,7 +65,6 @@ from pd_rack_pinion_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     FACE_WIDTH,
-    GEAR_DATA,
     OUTSIDE_DIA_BAND,
     OUTSIDE_DIA_PLACES,
     PRESSURE_ANGLE_DEG,  # noqa: F401 - the drawing test reads it off the part
@@ -267,10 +267,7 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_properties(
         adapter,
         PART_NAME,
-        {
-            "Gear Data": GEAR_DATA,
-            TOOTH_SPACE_CALLOUT_PROPERTY: TOOTH_SPACE_CALLOUT,
-        },
+        {TOOTH_SPACE_CALLOUT_PROPERTY: TOOTH_SPACE_CALLOUT},
     )
     return await save_simplified_part(adapter, PART_NAME, disc.tooth_features)
 
