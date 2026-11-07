@@ -42,16 +42,18 @@ def test_required_drawing_paths() -> None:
 def test_every_marked_dimension_is_kept_once_with_part_authored_places() -> None:
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    kept = [*drawing.FRONT_KEEP, *drawing.RIGHT_KEEP]
+    kept = [*drawing.FRONT_KEEP, *drawing.SECTION_KEEP, *drawing.DETAIL_KEEP_NAMES]
     assert sorted(kept) == sorted(marked) == [
-        "BoreDia", "FaceWidth", "OutsideDia", "ToothSpan"
+        "BoreDia", "BoreFrontChamferSize", "FaceWidth", "OutsideDia", "ToothSpan"
     ]
-    # Bore and blank print four places, the face three (inch sheet).
+    # Bore and blank print four places, the face and the chamfer's leg three
+    # (inch sheet).
     assert spec.DRAWING_PRECISION_BY_NAME == {
         "FaceWidth": 3,
         "OutsideDia": 4,
         "BoreDia": 4,
         "ToothSpan": 4,
+        "BoreFrontChamferSize": 3,
     }
     assert "draw_pd_rack_pinion.py" in PRECISION_MIGRATED_DRAWINGS
     assert model_toleranced_dimensions(part) == {
@@ -221,6 +223,46 @@ def test_the_bore_front_chamfer_clears_the_spigot_corner() -> None:
     assert spec.BORE_FRONT_CHAMFER_LIMITS[0] >= hub.CORNER_RADIUS_MAX
 
 
+def test_the_bore_chamfer_is_modelled_and_dimensioned_in_detail_b() -> None:
+    """Round-2 review: the far-side chamfer shows and is sized on a view.
+    The part models it (its leg a marked .XXX dimension, so the title
+    block's row gives .005-.015), section A-A cuts it on the bore axis where
+    the edge view stood, and 10:1 detail B carries its leg with the 45° and
+    the root it clears; note 1 keeps only the fit."""
+    assert spec.DRAWING_DIMENSIONS["BoreFrontChamfer"] == {"BoreFrontChamferSize"}
+    assert spec.DRAWING_PRECISION_BY_NAME["BoreFrontChamferSize"] == 3
+    assert part.V_BORE_FRONT_CHAMFER == pytest.approx(
+        math.pi
+        * spec.BORE_FRONT_CHAMFER**2
+        * (spec.BORE_DIA / 2.0 + spec.BORE_FRONT_CHAMFER / 3.0)
+    )
+    assert drawing.DETAIL_KEEP_NAMES == ("BoreFrontChamferSize",)
+    assert drawing.DETAIL_DIMENSION_CALLOUTS == {
+        "BoreFrontChamferSize": f"CLEARS {spec.HUB_NUMBER}\nSPIGOT ROOT"
+    }
+    assert drawing.DETAIL_DIMENSION_SUFFIXES == {"BoreFrontChamferSize": " X 45\u00b0"}
+    # The cut runs on the bore axis past the tooth tips each end.
+    (low, high) = drawing.SECTION_LINE_MODEL_M
+    assert low[0] == high[0] == 0.0 == low[2] == high[2]
+    assert -low[1] == high[1] > spec.OUTSIDE_DIA / 2000.0
+    # The detail's fence holds both chamfer ends; the circle stands in the
+    # clear left lane: under GEAR DATA, left of the bore's text and over the
+    # tap's callout block.
+    radius = drawing.DETAIL_CROP_RADIUS
+    cx, cy = drawing.DETAIL_CENTER
+    assert cx - radius > 0.0127
+    assert cy + radius < drawing.GEAR_DATA_XY[1] - 9 * 0.0035
+    bore_shoulder = drawing.FRONT_KEEP["BoreDia"][0] - drawing.BORE_TEXT_BLOCK[0] / 2.0
+    corner_x = cx + (0.0 - drawing.DETAIL_FOCUS_MM[2]) * -drawing._DS
+    text_right = corner_x + drawing.CHAMFER_TEXT_OFFSET + 0.021
+    assert text_right < bore_shoulder
+    assert drawing.DETAIL_LABEL_XY[1] - 0.010 > drawing.TAP_CALLOUT_XY[1]
+    # The section's caption hangs under the thickness's text, clear of the
+    # title block's top edge.
+    assert 0.066 < drawing.SECTION_CAPTION_XY[1] - 0.006
+    assert drawing.SECTION_CAPTION_XY[1] < drawing.SECTION_KEEP["FaceWidth"][1] - 0.010
+
+
 def test_thickness_band_is_the_printed_xxx_band() -> None:
     band = printed_band_mm(3, unit="in")
     assert (spec.FACE_WIDTH_MIN, spec.FACE_WIDTH_MAX) == pytest.approx(
@@ -258,18 +300,9 @@ def test_bore_callout_links_its_fit_note() -> None:
     assert f"SEE NOTE {callouts.BORE_NOTE}" in lines
     bore_note = callouts.DRAWING_NOTES.split(f"\n{callouts.TAP_NOTE}. ")[0]
     assert bore_note.startswith(f"{callouts.BORE_NOTE}. ")
-    # The face view looks at the rear face: the chamfered front edge is its
-    # far side (no datum letter names that face since the frame went).  It is
-    # a feature, not the title block's break: both limits print, with the
-    # spigot root its least clears.
-    chamfer = re.search(
-        r"CHAMFER (\d*\.\d+)-(\d*\.\d+) X 45\u00b0 FAR SIDE,\s+CLEARS SPIGOT ROOT\.",
-        bore_note,
-    )
-    assert chamfer is not None
-    assert [float(v) * 25.4 for v in chamfer.groups()] == pytest.approx(
-        spec.BORE_FRONT_CHAMFER_LIMITS
-    )
+    # The note is the fit and its mate only: the chamfer is sized on detail B.
+    assert "CHAMFER" not in callouts.DRAWING_NOTES
+    assert len(bore_note.splitlines()) == 2
 
 
 def test_sheet_gear_data_names_the_mesh_once_with_its_backlash_acceptance() -> None:
@@ -319,16 +352,19 @@ def test_sheet_gear_data_names_the_mesh_once_with_its_backlash_acceptance() -> N
             callouts.TAP_CALLOUT_QUALIFIER,
             *drawing.DIMENSION_CALLOUTS.values(),
             *drawing.DIMENSION_CALLOUTS_ABOVE.values(),
-            *drawing.RIGHT_DIMENSION_CALLOUTS.values(),
+            *drawing.SECTION_DIMENSION_CALLOUTS.values(),
+            *drawing.DETAIL_DIMENSION_CALLOUTS.values(),
         )
     )
     assert sheet_text.count(callouts.KNOB_NUMBER) == 1
     assert drawing.DIMENSION_CALLOUTS["OutsideDia"] == "SEE GEAR DATA"
     # The span's .0007 band is under the milled row and still controls (the
-    # mesh gates read its translation corners): its callout names the route.
-    assert drawing.DIMENSION_CALLOUTS_ABOVE == {
-        "ToothSpan": "MATCHED FIT,\nSEE GEAR DATA"
-    }
+    # mesh gates read its translation corners): its callout names the route
+    # on ONE line (round 2 printed nothing of a two-line above-callout), no
+    # wider than the 22 characters that keep it left of the tooth-space
+    # control's leader.
+    assert drawing.DIMENSION_CALLOUTS_ABOVE == {"ToothSpan": "MATCHED, SEE GEAR DATA"}
+    assert len(drawing.DIMENSION_CALLOUTS_ABOVE["ToothSpan"]) <= 22
     assert spec.SPAN_LIMITS[1] - spec.SPAN_LIMITS[0] < 2 * 0.001 * 25.4  # milled ±.001
 
 
@@ -666,7 +702,7 @@ def test_model_and_drawing_consume_the_spec_geometry() -> None:
         "OutsideDia": callouts.MESH_CALLOUT,
     }
     assert drawing.DIMENSION_CALLOUTS_ABOVE == {"ToothSpan": callouts.SPAN_CALLOUT}
-    assert drawing.RIGHT_DIMENSION_CALLOUTS == {"FaceWidth": callouts.FACE_WIDTH_CALLOUT}
+    assert drawing.SECTION_DIMENSION_CALLOUTS == {"FaceWidth": callouts.FACE_WIDTH_CALLOUT}
 
 
 def test_part_config_properties() -> None:
