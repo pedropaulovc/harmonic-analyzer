@@ -18,3 +18,8 @@ dt-crank-handle:
       where: "tenon callout: WALL .040 MIN AT TENON END"
       finding: "oak tenon wall .0402 at the tenon's free end, where the outside edge and the pivot-bore mouth each take the .010 edge break, below the .060 floor (rule 17)"
       reason: "Main delegated ruling 2026-11-04 (#2171, option C; listed for owner review on #2144): the end ring is oak bonded inside the MHA-DT-34 ferrule, its edges carry no load (the bore runs on the MHA-DT-32 shoulder along its length), and restoring .060 needs a larger ferrule against the user's 2026-09-30 ring size; precedent owner ruling 2026-10-26 (#1900, MHA-DT-34 arm face, both edges broken)"
+    - id: "RV-03"
+      kind: "accept"
+      where: "DETAIL B: the tenon-root relief chamfer .039 ±.010 X 45°, flagged SEE NOTE 3 (MHA-DT-34 FERRULE SEATS ON TENON SHOULDER)"
+      finding: "a three-place nominal on a ±.010 chamfer; the chamfer could print at a two-place title-block grade (rule 3)"
+      reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144 (fan-out rule L3). The relief's limits are owner-ruled (2026-10-24, #1900): .029 keeps the R.012 root round (reach .0290) behind the MHA-DT-34 seat face, and .049 leaves the ferrule's 0.5 mm seat floor. .04 X 45° at the .XX grade (.030-.050) fails that seat floor by about .0007, so .039 ±.010 is the widest band that holds both. Accepts these places only, no other band or callout departure."

@@ -36,3 +36,8 @@ dt-crankshaft:
       where: "end view, 2X REAM Ø.0930 drive-pin holes: the depth ↧ .1555 ±.0040"
       finding: "the four-place depth nominal .1555 is off the .001 in grid and reads as a converted millimetre value (rule 3)"
       reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144 (fan-out ruling on Q-DT11-2: the depth stays as is). The depth is the press depth shared with drive pin MHA-DT-VN-67 (dt_vn_crank_seat_drive_pin_spec.PRESS_DEPTH), which sets the pins' projection into sprocket MHA-PD-09; restating it re-keys the seat geometry across slices and is deferred to its next re-key. Accepts this depth's places only, no other departure."
+    - id: "RV-06"
+      kind: "accept"
+      where: "front view: the 2X Ø.375 ±.010 callout, with its one leader on the neck at the Ø.3125 seat step; its second neck lies between the Ø.81 collar and the left Ø.4490 journal"
+      finding: "the 2X callout has a leader to one of its two necks only (rules 10, 26)"
+      reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144 (fan-out rule L3). Both necks are one Ø.375 ±.010 turned diameter identified by the 2X count, ASME practice for identical features. Every diameter on this sheet is authored in the end-profile sketch and reaches the side view only by dragging one dimension, and the collar-side land has no free text position (the collar spigot, journal and station dimensions fence it), so a second leader or a detail would need a new model witness and a re-layout. Accepts the single leader only, no other band or callout departure."
