@@ -3,7 +3,7 @@ module: M06
 title: "Mill I — tramming, squaring, edge finding"
 status: in progress      # not started | in progress | competent | applied
 hours_estimated: 24
-hours_actual: 6.5
+hours_actual: 21.75
 ---
 
 # M06 — Mill I — tramming, squaring, edge finding

@@ -17,7 +17,8 @@ Continues [2026-11-05](2026-11-05-base-bar-on-the-table.md).
 - **Workholding:** I redid the setup so both long edges can be faced without
   unclamping. The 1-2-3 blocks are joined with the Taytools attachment
   hardware and stand 2 in tall, staggered like a Z tetromino from Tetris. The
-  same screw jack sits under the middle, with strap clamps from the Little
+  same screw jack sits under the middle on a 1-2-3 block riser (height not
+  recorded), with strap clamps from the Little
   Machine Shop 1268 kit.
 - **Tooling:** the same 1/2 in 2-flute HSS end mill.
 - **Control:** CNCjs macros on the FluidNC controller.

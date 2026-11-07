@@ -35,7 +35,7 @@ hours: 5.25
 |---|---|---|---|---|---|---|
 | 1 | indicate fixed jaw in X | Grizzly dial indicator, mag base | — | — | — | under 0.001 in over 4 in |
 | 2 | find X edge with paper | 1/2 in 2-fl HSS end mill, newspaper | 1500 | by hand | — | failed: DRO zero was off the edge |
-| 3 | lay out length | height gauge, 2 in gauge block, on the mill table | — | — | — | never checked: part scrapped |
+| 3 | lay out length | height gauge, 2 in gauge block, on the bench | — | — | — | never checked: part scrapped |
 | 4 | find X edge | 0.200 in edge finder | 900 | by hand | — | found; radius sign by trial |
 | 5 | face blank 1 | 1/2 in 2-fl HSS end mill | 1500 | handwheel at 0.010 in/step (meant 0.001) | 0.050 in | cutter hit blank 2 and pulled it up: **scrapped** |
 | 6 | drill six holes in blank 1 | #29 and #36 jobber drills, drill chuck | 1500 | by hand | — | one hole 1/4 in short, one crooked: **scrapped** |
@@ -67,7 +67,7 @@ it was farther from the edge than the DRO said.
 
 **I laid out the length with a height gauge and gauge blocks,** the 2 in block
 plus the gauge's dial for the rest. I know that's overkill, and I set it on
-the mill table, not on a granite plate as I should have. I never got to compare
+the bench table, not on a granite plate as I should have. I never got to compare
 the scribed line with the DRO, because
 the part was scrapped first.
 

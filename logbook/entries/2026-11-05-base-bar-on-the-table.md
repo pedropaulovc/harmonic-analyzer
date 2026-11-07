@@ -22,7 +22,8 @@ entry's advice for op 10.
 - **Workholding:** flat on the PM-30MV table on all five 1-2-3 blocks I have:
   the two new Taytools blocks, and three from the makerspace that I found
   rusty and soaked overnight in Evapo-Rust (about 12 h). There's an HHIP
-  3901-0076 23–30 mm screw jack under the middle, with strap clamps on step
+  3901-0076 23–30 mm screw jack under the middle, standing on one of the 1-2-3
+  blocks (riser height not recorded), with strap clamps on step
   blocks from the small clamping kit (Little Machine Shop 1268). I didn't use
   the work stop.
 - **Tooling:** 1/2 in 2-flute HSS end mill.
