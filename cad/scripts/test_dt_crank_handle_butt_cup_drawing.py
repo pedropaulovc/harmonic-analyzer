@@ -61,9 +61,24 @@ def test_bottom_chamfer_clears_the_handle_counterbore_corner() -> None:
 
     assert spec.BODY_CHAMFER_MIN >= handle.INSIDE_CORNER_R_MAX
     assert notes.BODY_CHAMFER_CALLOUT.splitlines() == [
-        "X 45 DEG",
+        "X 45°",
         "CLEARS MHA-DT-08",
         "COUNTERBORE CORNER",
+    ]
+
+
+def test_pocket_names_its_mate_once_on_one_flag_note() -> None:
+    # Rule 4: the pocket's diameter, depth and floor corner share one flag.
+    for name in ("PocketDia", "PocketDepth", "PocketFloorRadius"):
+        assert drawing.DIMENSION_CALLOUTS[name].splitlines()[0] == "SEE NOTE 1"
+    assert notes.POCKET_NOTE_TEXT.splitlines() == [
+        "1. POCKET FOR MHA-DT-32 PIVOT SCREW HEAD: BORE TO THE",
+        "   MEASURED HEAD, RUNNING FIT (CLEARANCE .008-.016).",
+    ]
+    # The body's bond names its standard fit and the handle's glue line.
+    assert drawing.BODY_FIT_CALLOUT.splitlines() == [
+        "BONDED FIT IN MHA-DT-08, EPOXY",
+        "(CLEARANCE .002-.006)",
     ]
 
 

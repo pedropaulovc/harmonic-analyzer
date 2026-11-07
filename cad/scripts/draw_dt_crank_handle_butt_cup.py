@@ -27,6 +27,7 @@ import sys
 from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     dimension_name,
     place_view,
@@ -61,11 +62,11 @@ from _session import run_build
 import _telemetry
 from dt_crank_handle_butt_cup_notes import (
     BODY_CHAMFER_CALLOUT,
-    BODY_FIT_CALLOUT,
     FLOOR_HOLE_CALLOUT,
-    POCKET_DEPTH_CALLOUT,
+    HANDLE_NUMBER,
     POCKET_FIT_CALLOUT,
-    POCKET_FLOOR_RADIUS_CALLOUT,
+    POCKET_FLAG,
+    POCKET_NOTE_TEXT,
 )
 from dt_crank_handle_butt_cup_spec import (
     BODY_DIA,
@@ -79,6 +80,7 @@ from dt_crank_handle_butt_cup_spec import (
     REFERENCE_DIMENSIONS,
 )
 from _fit_deviations import deviations
+from dt_crank_handle_spec import COUNTERBORE_GLUE_LINE
 
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -110,6 +112,9 @@ ISO_CENTER = (0.368, 0.215)
 # Below the floor end, clear of the floor-hole callout.
 CAPTION_XY = (0.160, 0.114)
 ISO_NOTE_POS = (0.335, 0.170)
+# The pocket's numbered flag note: under the end view, left of the section's
+# caption and above the title block.
+POCKET_NOTE_POS = (0.030, 0.090)
 
 _S = VIEW_SCALE[0] / 1000.0
 BODY_R = BODY_DIA * _S / 2.0  # 0.0268
@@ -160,13 +165,27 @@ SECTION_KEEP = {
         SECTION_CENTER[1] + BODY_R + 0.041,
     ),
 }
+# The body is bonded in the MHA-DT-08 counterbore, which is bored to the
+# measured body for an epoxy line: a bonded fit whose diametral clearance is
+# the handle's glue line, REF (rules 4 and 26; rule 23: epoxy, wood to metal).
+_MM_PER_IN = 25.4
+BODY_FIT_CALLOUT = "\n".join(
+    (
+        f"BONDED FIT IN {HANDLE_NUMBER}, EPOXY",
+        "(CLEARANCE "
+        + "-".join(
+            f"{value / _MM_PER_IN:.3f}".removeprefix("0") for value in COUNTERBORE_GLUE_LINE
+        )
+        + ")",
+    )
+)
 DIMENSION_CALLOUTS = {
     "BodyChamfer": BODY_CHAMFER_CALLOUT,
     "BodyDia": BODY_FIT_CALLOUT,
     "FloorHoleDia": FLOOR_HOLE_CALLOUT,
-    "PocketDepth": POCKET_DEPTH_CALLOUT,
+    "PocketDepth": POCKET_FLAG,
     "PocketDia": POCKET_FIT_CALLOUT,
-    "PocketFloorRadius": POCKET_FLOOR_RADIUS_CALLOUT,
+    "PocketFloorRadius": POCKET_FLAG,
 }
 # *Left reverses *Right's horizontal basis.  Reverse the cut as well to
 # retain the section's physical viewing direction and +X-right orientation.
@@ -218,6 +237,23 @@ def _dress_pocket_floor_radius(annotation: Any) -> None:
         or bool(display.SolidLeader)
     ):
         raise RuntimeError(f"{label}: radial leader style did not persist")
+
+
+def _use_sheet_scale(adapter: Any, section: Any) -> None:
+    """Tie section A-A to the sheet's 5:1, so its caption prints no scale.
+
+    ASME Y14.3 (drawing-guidelines.md rule 9): a view states its scale only
+    when it differs from the sheet's; the screen review found the section's
+    own 5:1 printed under its label.
+    """
+    bound = _early_bound(section, "IView")
+    bound.UseSheetScale = 1
+    rebuild_drawing(adapter, label="butt cup section at sheet scale")
+    ratio = tuple(float(value) for value in bound.ScaleRatio)
+    if int(bound.UseSheetScale) != 1 or not math.isclose(
+        ratio[0] / ratio[1], SHEET_SCALE[0] / SHEET_SCALE[1]
+    ):
+        raise RuntimeError(f"butt cup section: sheet scale did not persist: {ratio}")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -273,6 +309,7 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=VIEW_SCALE,
         label="butt cup longitudinal section",
     )
+    _use_sheet_scale(adapter, section)
     position_section_caption(adapter, section, CAPTION_XY, label="butt cup")
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
     for view in (end, section, iso):
@@ -300,6 +337,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_POS)
+    if add_note(adapter, POCKET_NOTE_TEXT, *POCKET_NOTE_POS) is None:
+        raise RuntimeError("failed to add the pocket's flag note")
     rebuild_drawing(adapter, label="crank-handle-butt-cup layout audit")
     check_drawing_layout(adapter, layout=SPEC.layout, stem=PART_STEM)
     return await finalize_drawing(

@@ -24,18 +24,13 @@ import dt_vn_keeper_chain_spec as chain
 
 def test_mating_part_numbers_are_live() -> None:
     registered = {row["number"] for row in _config.parts().values()}
-    references = (
-        (
-            notes.DRAWING_NOTES,
-            ("dt-crank-arm", "sh-vn-brass-fillister-screw"),
-        ),
-        (notes.DIMENSION_CALLOUTS["LoopID"], ("dt-vn-keeper-chain",)),
-    )
-    for text, mates in references:
-        printed = set(re.findall(r"\bMHA-[A-Z0-9]+(?:-[A-Z0-9]+)+\b", text))
-        assert printed <= registered, printed - registered
-        for mate in mates:
-            assert _config.parts(mate)["number"] in printed
+    # The clamping under the anchor screw is MHA-DT-00's step: the part
+    # sheet's notes name no mate (rule 7: no assembly instruction).
+    assert not re.findall(r"\bMHA-", notes.DRAWING_NOTES)
+    text = notes.DIMENSION_CALLOUTS["LoopID"]
+    printed = set(re.findall(r"\bMHA-[A-Z0-9]+(?:-[A-Z0-9]+)+\b", text))
+    assert printed <= registered, printed - registered
+    assert _config.parts("dt-vn-keeper-chain")["number"] in printed
 
 
 def test_printed_sizes_derive_from_the_eye_spec() -> None:
