@@ -148,33 +148,18 @@ def test_the_sheet_carries_no_general_notes() -> None:
 
 def test_part_authored_callouts_name_each_band_s_mate() -> None:
     import _config
-    from mg_wheel_axle_spec import BACK_END_SUNK_MAX, BACK_END_SUNK_MIN
-    from mg_wheel_group import BAR_PRESS
 
     assert callouts.authored_by_name() == {
         "AxleBoreDia": {callouts.CALLOUT_BELOW: callouts.AXLE_BORE_CALLOUT},
-        "BarDepth": {callouts.CALLOUT_BELOW: callouts.BAR_DEPTH_CALLOUT},
-        "ClampRowFromTop": {callouts.CALLOUT_BELOW: callouts.CLAMP_ROW_CALLOUT},
     }
-    # The literals keep the wheel group and the axle out of the part recipe;
+    # The depth prints at the title block's .XXX with no reason: a reason on
+    # a stock size without its own band is narration (rule 7).
+    assert not hasattr(callouts, "BAR_DEPTH_CALLOUT")
+    # The literal keeps the wheel group and the axle out of the part recipe;
     # the mate is named by its number (rule 4).
     axle = _config.parts("mg-wheel-axle")["number"]
-    press = "-".join(render_number(value / IN, "in", 4) for value in BAR_PRESS)
-    assert callouts.AXLE_BORE_CALLOUT == (
-        f"REAM THRU\nPRESS FIT {axle} AXLE\n"
-        f"{press} DIAMETRAL\nINTERFERENCE\n"
-        "WALL .074 MIN"
-    )
-    sunk = [
-        render_number(v / IN, "in", 3) for v in (BACK_END_SUNK_MIN, BACK_END_SUNK_MAX)
-    ]
-    assert callouts.BAR_DEPTH_CALLOUT == (
-        f"{axle} AXLE BACK END\n{sunk[0]} TO {sunk[1]} SUNK"
-    )
-    assert callouts.CLAMP_ROW_CALLOUT.startswith("2X CLAMP HOLES")
-    assert "MHA-SH-02" in callouts.CLAMP_ROW_CALLOUT
-    assert "DIAMETRAL INTERFERENCE" in callouts.AXLE_BORE_CALLOUT.replace("\n", " ")
-    assert callouts.CLAMP_HOLE_CALLOUT == "LOCATE TO MHA-SH-02 TAPS\nWALL .068 MIN"
+    assert axle in callouts.AXLE_BORE_CALLOUT
+    assert callouts.CLAMP_HOLE_CALLOUT == "LOCATE TO MHA-SH-02 TAPS\nWALL .070 MIN"
     assert callouts.HANGER_HOLE_CALLOUT == "WALL .076 MIN"
     texts = [*callouts.authored_by_name().values()]
     for lanes in texts:
@@ -203,9 +188,10 @@ def test_clamp_position_band_is_the_mha_sh_02_tap_stack() -> None:
     def bar_zone(b: float) -> float:
         return 2.0 * math.hypot(b, b)
 
-    # The widest .XXX band whose zone, with the taps', stays inside the float.
+    # The title block's .XXX row: its zone, with the taps', stays inside the
+    # float.
+    assert band == pytest.approx(0.005 * IN)
     assert bar_zone(band) + tap_zone <= hole_float
-    assert bar_zone(band + 0.001 * IN) + tap_zone > hole_float
     assert mg_wheel_bar_spec.CLAMP_POSITION_PLACES == 3
     assert round(band / IN, 3) * IN == pytest.approx(band)
     # The row and stations keep millimetre nominals: the band holds at the
@@ -232,15 +218,15 @@ def test_every_wall_is_stated_at_the_full_worst_case() -> None:
     )
     # The height prints .43 (+/-.01). The hanger hole and the axle bore sit at
     # the title block's .XX from the top face: their 5.0 prints .20, so the
-    # row lies 4.826-5.334; the clamp pair's prints .197 at the taps' +/-.007.
-    # Each wall also loses 0.3 deg run-off over the deepest bar (.374 + .004;
+    # row lies 4.826-5.334; the clamp pair's prints .197 at the title block's
+    # .XXX. Each wall also loses 0.3 deg run-off over the deepest bar (.374 + .005;
     # the holes are drilled on the mill into faces cut earlier) and an R.010
     # break on each of its two exposed edges.
     side_min = (0.43 - 0.01) * IN
     row = ((0.20 - 0.01) * IN, (0.20 + 0.01) * IN)
-    clamp_row = ((0.197 - 0.007) * IN, (0.197 + 0.007) * IN)
+    clamp_row = ((0.197 - 0.005) * IN, (0.197 + 0.005) * IN)
     assert mg_wheel_bar_spec.BORE_ROW_FROM_TOP == geom.BAR_TOP_ABOVE_ROW
-    runoff = (0.374 + 0.004) * IN * math.tan(math.radians(0.3))
+    runoff = (0.374 + 0.005) * IN * math.tan(math.radians(0.3))
     losses = runoff + 2 * 0.010 * IN
     bores = {
         "axle bore": ((0.1865 + 0.0005) * IN / 2.0, row),
@@ -271,7 +257,7 @@ def test_every_wall_is_stated_at_the_full_worst_case() -> None:
     assert mg_wheel_bar_spec.WALL_CALLOUT_MIN_IN == {
         "axle bore": 0.074,
         "hanger hole": 0.076,
-        "clamp holes": 0.068,
+        "clamp holes": 0.070,
     }
     # The photographed 10 mm bar would leave the walls under the bores under
     # the floor: the height grew rather than a band tightening.
@@ -324,11 +310,7 @@ def test_axle_bore_is_a_marked_reamed_cut() -> None:
         "ClampStation2": 3,
     }
     assert model_toleranced_dimensions(part) == {
-        ("Bar", "BarDepth"): "BAR_DEPTH_BAND[0]",
         ("AxleBoreProfile", "AxleBoreDia"): "*deviations(AXLE_BORE_BAND)",
-        ("BoreRowReference", "ClampRowFromTop"): "CLAMP_POSITION_BAND",
-        ("BoreRowReference", "ClampStation1"): "CLAMP_POSITION_BAND",
-        ("BoreRowReference", "ClampStation2"): "CLAMP_POSITION_BAND",
     }
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert 'name_last_feature(adapter, "AxleBoreProfile")' in source

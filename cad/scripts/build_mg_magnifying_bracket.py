@@ -37,7 +37,7 @@ from _rebuild import force_rebuild
 from _session import run_build
 from _sketch import SketchDims, add_line_chain, anchor_point_to_origin, anchor_point_to_point, blank_reference_sketches, dimension_between, ensure_fully_defined, set_sketch_direct_db
 from _sketch_chains import define_rectilinear_chain
-from magnifying_bracket_joint_layout import BRACKET_HOLE_POINTS, CLEARANCE_DIA, CLEARANCE_SPEC, POSITION_BAND, SIDE_PLATE_X as FLANGE_X, SIDE_PLATE_Y as FLANGE_Y, SIDE_PLATE_Z as FLANGE_Z, SIDE_PLATE_THICKNESS
+from magnifying_bracket_joint_layout import BRACKET_HOLE_POINTS, CLEARANCE_DIA, CLEARANCE_SPEC, SIDE_PLATE_X as FLANGE_X, SIDE_PLATE_Y as FLANGE_Y, SIDE_PLATE_Z as FLANGE_Z, SIDE_PLATE_THICKNESS
 from mg_lever_thread_joint import HOLE_LOCATION_TOL, MOUTH_CHAMFER, MOUTH_CHAMFER_BAND, MOUTH_CHAMFER_MAX, NECK_HALF_X, NECK_THICKNESS, NOSE_R, NOSE_R_TOL, TAP_DRILL_DIA, TAP_SPEC
 from mg_magnifying_bracket_spec import DIMENSION_CALLOUTS, DRAWING_DIMENSIONS, DRAWING_PRECISION, FOOT_CORNER_R, ISOMETRIC_VIEW_NOTE, UNIT
 from mg_magnifying_bracket_finish_spec import SURFACE_FINISHES
@@ -117,8 +117,9 @@ async def _coordinates(adapter, jobs) -> None:
     check("exit mounting coordinates", await adapter.exit_sketch())
     name_last_feature(adapter, "MountingCoordinates")
     jobs.extend(dims.apply(adapter, "MountingCoordinates"))
-    for name in ("MountingX0", "MountingX1", "MountingY0", "MountingY1"):
-        set_dimension_symmetric_tolerance(adapter, "MountingCoordinates", name, POSITION_BAND, display_unit=UNIT)
+    # No explicit band: the holes drill to the title block's .XXX row and the
+    # MHA-SM-03 taps are spotted through them at assembly
+    # (magnifying_bracket_joint_layout.BRACKET_POSITION_BAND).
 
     # Nonzero, inspectable hole locations from the nose TIP and a neck SIDE.
     # Right coordinates (u,v)=(-Z,Y): (R,-R) is their theoretical intersection.

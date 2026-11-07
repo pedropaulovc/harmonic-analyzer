@@ -28,13 +28,9 @@ SINGLE_LIMITS = {("ThreadExtent", "IncompleteLength"): (INCOMPLETE_THREAD_MAX, 6
 ROD_DIA_FRACTION_DENOMINATOR = 4
 
 
-def _inch(mm: float) -> str:
-    return f"{mm / 25.4:.3f}".replace("0.", ".", 1)
-
-
-# The rod's REF fraction is untoleranced (the supplier's band governs); the
-# callout states the sliding fit it makes: the stock band against the clamp
-# sheet's printed drilled lever bore.
+# The rod's REF fraction is untoleranced (the supplier's band governs); its
+# sliding fit in the clamp is the stock band against the clamp sheet's
+# printed drilled lever bore.
 _BORE_LIMITS = tuple(
     clamp.LEVER_BORE_DIA + deviation
     for deviation in printed_deviations(
@@ -45,10 +41,6 @@ _BORE_LIMITS = tuple(
 ROD_BORE_CLEARANCE = (
     _BORE_LIMITS[0] - (ROD_DIA + ROD_DIA_BAND[0]),
     _BORE_LIMITS[1] - (ROD_DIA + ROD_DIA_BAND[1]),
-)
-ROD_DIA_CALLOUT = (
-    "ROD STOCK\n"
-    f"{_inch(ROD_BORE_CLEARANCE[0])}-{_inch(ROD_BORE_CLEARANCE[1])} DIAMETRAL CLEARANCE IN MHA-MG-02 CLAMP BORE"
 )
 # Retain the model's cosmetic-thread metadata; only drawing instances omit the
 # class already supplied by the title block. The tip chamfer is the
