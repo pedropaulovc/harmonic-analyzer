@@ -50,7 +50,7 @@ from _drawing_dimensions import (
     set_dimension_callouts,
     set_reference_dimension,
 )
-from _drawing_edge_dimensions import add_edge_dimension
+from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leader_notes import add_attached_note
@@ -271,6 +271,22 @@ SEAM_EDGE_PICK = (
     FRONT_CENTER[1]
     + AXIAL_PIN_DIA / 2.0 * math.sin(math.pi / 4.0) * SHEET_SCALE[0] / 1000.0,
 )
+# The seam's station from the bore axis, a horizontal reference between the
+# bore rim (picked lower left, clear of every leader) and the seam arc
+# (lower flank): SolidWorks measures circle to arc centre to centre.  Its
+# text stands under the arm, above the .79 anchor station's row.
+_DIAG = math.cos(math.pi / 4.0)
+SEAM_STATION_PICKS = (
+    (
+        _sheet_x(-HUB_SEAT_DIA / 2.0 * _DIAG),
+        FRONT_CENTER[1] - HUB_SEAT_DIA / 2.0 * _DIAG * SHEET_SCALE[0] / 1000.0,
+    ),
+    (
+        _sheet_x(AXIAL_PIN_X + AXIAL_PIN_DIA / 2.0 * _DIAG),
+        FRONT_CENTER[1] - AXIAL_PIN_DIA / 2.0 * _DIAG * SHEET_SCALE[0] / 1000.0,
+    ),
+)
+SEAM_STATION_TEXT_XY = (_sheet_x(AXIAL_PIN_X / 2.0), 0.111)
 SEAM_CALLOUT_XY = (0.104, 0.250)
 # The punched fiducial's rim, picked on its upper-left flank toward the
 # callout standing above the boss end, clear of the hub seat's leader.
@@ -521,8 +537,30 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _set_reference_precision(adapter, overall, "overall length reference")
 
-    # MHA-DT-VN-59's axial seam is match-drilled in the assembled arm and hub; its
-    # callout names the mate, the fit and the pin's nominal size and depth.
+    seam_station = add_edge_dimension(
+        adapter,
+        front,
+        p0=SEAM_STATION_PICKS[0],
+        p1=SEAM_STATION_PICKS[1],
+        text_xy=SEAM_STATION_TEXT_XY,
+        label="seam station reference",
+        orientation="horizontal",
+    )
+    assert_dimension_measures(
+        adapter,
+        seam_station,
+        expected_mm=AXIAL_PIN_X,
+        label="seam station reference",
+    )
+    set_reference_dimension(
+        adapter,
+        _early_bound(seam_station, "IDisplayDimension").GetAnnotation(),
+        label="seam station reference",
+    )
+    _set_reference_precision(adapter, seam_station, "seam station reference")
+
+    # MHA-DT-VN-59's axial seam is reamed with the hub at assembly; its callout
+    # names the mate, the fit and the pin's nominal size and depth.
     add_attached_note(
         adapter,
         front,

@@ -168,11 +168,16 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     for name, places in dimensions.items()
 }
 
-# The one sheet-derived dimension: the parenthesised extreme-to-extreme
-# overall, a read-only sum of the two end radii and the pivot station with no model
-# dimension to import. Its places are still specification, so the sheet
-# reads them here instead of typing a literal (drawing-simplicity-policy.md `How the repository implements the guidelines`).
-DRAWING_REFERENCE_PRECISION: dict[str, int] = {"overall length reference": 2}
+# The sheet-derived reference dimensions: the parenthesised extreme-to-extreme
+# overall, a read-only sum of the two end radii and the pivot station, and the
+# MHA-DT-VN-59 seam's station from the bore axis (the seat radius), neither
+# with a model dimension to import.  Their places are still specification,
+# so the sheet reads them here instead of typing a literal
+# (drawing-simplicity-policy.md `How the repository implements the guidelines`).
+DRAWING_REFERENCE_PRECISION: dict[str, int] = {
+    "overall length reference": 2,
+    "seam station reference": 2,
+}
 
 # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): one
 # short line.  The section line is a requirement, not a convenience: the U29

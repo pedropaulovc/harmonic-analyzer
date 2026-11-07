@@ -78,21 +78,22 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 1.0)
-FRONT_SCALE = (2, 1)
+# Both projected views print at the sheet scale, so neither carries a label
+# (rule 9: a view scale equal to the sheet's restates the title block; an
+# enlarged end view named only in prose read as unlabelled).
+FRONT_SCALE = (1, 1)
 PROFILE_SCALE = (1, 1)
 # The actual 1:1 trial struck the border and tooth note. At 1:2 the complete
 # pictorial fits the upper-right field. Owner-approved fine model-edge ink
 # across all three views keeps the full-length teeth and brass shading readable.
 ISO_SCALE = (1, 2)
-# The side view is the lathe view at the sheet scale; the end view projects
-# to its left (third angle) at 2:1 so the teeth and bore read, and says so
-# under itself (machinist review r1: an unlabelled 2:1 projected view).
+# The side view is the lathe view; the end view projects to its left (third
+# angle).
 FRONT_CENTER = (0.085, 0.150)
 RIGHT_CENTER = (0.255, 0.150)
 ISO_CENTER = (0.350, 0.230)
 GEAR_DATA_POS = (0.018, 0.262)
 ISOMETRIC_NOTE_POS = (0.330, 0.262)
-END_VIEW_NOTE_POS = (0.066, 0.124)
 
 _SIDE_SCALE = PROFILE_SCALE[0] / PROFILE_SCALE[1]
 _SIDE_HALF_OD = OUTSIDE_DIA / 2000.0 * _SIDE_SCALE
@@ -120,7 +121,7 @@ RIGHT_KEEP = {
 }
 DIMENSION_CALLOUTS = {
     "ArborBoreDia": ARBOR_BORE_CALLOUT,
-    "FaceWidth": "OVERALL; TEETH FULL LENGTH",
+    "FaceWidth": "TEETH FULL LENGTH",
     "OutsideDia": OUTSIDE_DIA_CALLOUT,
 }
 
@@ -342,7 +343,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Gear Data",
             "Manufacturing Notes",
             "Isometric View Note",
-            "End View Note",
         ),
         required=(
             "Number",
@@ -352,7 +352,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Gear Data",
             "Manufacturing Notes",
             "Isometric View Note",
-            "End View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -447,12 +446,6 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         "Isometric View Note",
         *ISOMETRIC_NOTE_POS,
-        char_height=0.0025,
-    )
-    add_property_linked_note(
-        adapter,
-        "End View Note",
-        *END_VIEW_NOTE_POS,
         char_height=0.0025,
     )
     add_leader_note(
