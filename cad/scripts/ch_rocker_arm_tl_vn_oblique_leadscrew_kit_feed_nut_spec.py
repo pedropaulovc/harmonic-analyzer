@@ -12,7 +12,7 @@ both retired and never reissued. Owner ruling 2026-11-04 (#2187): the screw
 and the nut are one native model, MHA-CH-06-TL-VN-84, with ``LeadScrew`` and
 ``FeedNut`` configurations; the nut's own TL-VN-82 was never released and
 stays reserved. Before the TL-00 feed fit-up (step F1A) the nut's 1.5 spigot
-is faced off, so the flange seats flat on the lug's -X face with no recess,
+is faced off, so the flange seats flat on the lug's +X face with no recess,
 and the four flange holes are countersunk 82° for four
 #4-40 X 5/8 flat heads (MHA-CH-06-TL-VN-67, McMaster 91771A112; owner ruling
 relayed by Main 2026-11-04: a screw the repo already uses). The lug's four

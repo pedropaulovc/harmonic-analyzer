@@ -110,6 +110,47 @@ the seated nut at TL-00 assembly (Main ruling 2026-11-03). Both blocks use new 6
 owned OnlineMetals 1165 1/2 × 1 in bar on edge, raising the screw axis to
 Z52.4. The owned 1164 1/2 × 3/4 in stock is spare.
 
+The 2026-11-06 centred-block relayout puts each pivot bore and the
+1.64 × 1.58 in block on its HGH15CA carriage centre. The carrier's pin holes
+and cutter circles stay unchanged; carriage travel is 75.215–389.366 mm on
+the retained 439.928 mm rails. The feed nut now seats on the lug's +X face,
+body away from the spindle. Near KP08 station is 62.484 mm (2.46 in);
+the far station remains 443 mm. The native LeadScrew cut is 419.5 mm.
+Clearance stacks include both #8 mounting joints' full hole float and their
+station bands, not a no-slip assumption. KP08 axis height/foot thickness
+remain unverified (#2184). Native block bore/dimension readbacks, one-free-DOF
+proof and driven whole-assembly interference at both passes remain mandatory;
+analytic separating axes and generated sweep targets are not native results.
+Feed-tap cylinder radii are checked against the committed Hole Wizard
+`ThruTapDrillDiameter`, after checking its three-decimal catalogue identity;
+the rounded tap-drill table is not an exact native-radius oracle. Missing
+or displaced cylinders still refuse, reporting the observed axes and sizes.
+The centred-block sheets keep B-B on the -X M4 column, with its upper arrow
+above the X-dimension tiers and its lower arrow below the clearance-hole
+leader. Native dimensions and normal fonts remain; the .308 text sits clear
+of its narrow datum-witness span. Retained-PDF lane measurements guide this
+placement but do not replace the fresh native drawing/layout/review gates.
+TL-32 keeps its VIEW D sheet reference beneath that direction letter, separate
+from the counterbore callout. The counterbore leader stays above the direction
+arrow and identifies its floor through B-B, not through the nut-face sheet.
+TL-VN-84 retains its associative 3:1 end details and normal text; the detail
+bank reserves the settled native frames as well as the geometric fences.
+Containment is read again after projection settlement and in the final sheet
+callback: a smaller early `GetOutline` does not prove the finished view fits.
+
+TL-00's last sheet, LINEAR MOTION FROM ABOVE (owner, PR4 #2227), is the
+arrangement's named plan of the same assembly with the TL-21 carrier and
+every occurrence locked to it (riser and its four screws, feed lever with its
+screws and wedge-lock washers, the TL-52 top-hat washer, the two loose
+SM-VN-53 stop pins and the common TL-VN-61 screw's CL, CR and HUB clamp
+occurrences) hidden in that one drawing view. The common screw is hidden by
+occurrence, not by stem: its rail and TL-28 bar occurrences stay drawn. The
+base bars, rails, carriages, both blocks, the shoulder screws with their
+spacers and shims, the leadscrew feed, the hold-downs and all of their
+fasteners stay drawn; ten BOM balloons name the slide and feed parts. No
+configuration, display state or model hide exists for it: the model, its BOM,
+interference, sweeps and every other sheet keep the full assembly.
+
 New purchases are TL-VN-77 shoulder screws (Huyett BLTS40-0375-1500188P,
 thread shop-cut), TL-VN-78 spacers (AluminumSpacers.com AS62-18-40) and TL-VN-79
 shims (Huyett SHIM-0375-008 nominal; SHIM-0375-004/-020 fitting stock);

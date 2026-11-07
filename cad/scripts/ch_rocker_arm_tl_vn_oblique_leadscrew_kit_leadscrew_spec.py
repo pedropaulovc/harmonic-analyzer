@@ -24,15 +24,15 @@ Sources:
 
 - FROM C4 (imported from ``ch_rocker_arm_tl_vn_oblique_leadscrew_spec``, never
   retyped): the Ø8 major diameter, the lead 2, the 600 stock length and the
-  installed length ``SCREW_LENGTH`` 410.
+  installed length ``SCREW_LENGTH``.
 - SOURCED, https://www.amazon.com/dp/B085DDHJTW (read 2026-11-04): "ReliaBot
   600mm T8 Tr8x2 Lead Screw and Brass Nut (Acme Thread, 2mm Pitch, 1 Start,
   2mm Lead)"; "Lead screw diameter 8mm, length 600mm, SUS304 stainless
   steel"; "Screw pitch: 2mm; Number of Thread/Start:1; Lead: 2mm"; packing
   list 1 x T8x2 600mm lead screw, 1 x T8x2 brass nut. The listing states no
   thread hand, straightness or length tolerance.
-- DECIDED (owner/C4 layout decision 2026-10-16): cut to 410, deburr and
-  lightly chamfer the cut end. The print uses the title block's .X band
+- DECIDED (centred-block relayout authorized 2026-11-06): cut to the layout's
+  derived length, deburr and chamfer. The print uses the title block's .X band
   (``LENGTH_TOLERANCE``): the self-checks below show the feed absorbs it,
   and the handwheel flat runs out through the cut end, so no land on it
   depends on the cut. The cut needs no band of its own.
@@ -112,9 +112,9 @@ DRAWING_NOTES = f"CUT AND MILL FLATS PER SHEET {MODIFIED_STOCK_SHEET}."
 MAJOR_DIA = feed.SCREW_MAJOR_DIA  # 8
 LEAD = feed.SCREW_LEAD  # 2
 STOCK_LENGTH = feed.SCREW_STOCK_LENGTH  # 600, as bought
-LENGTH = feed.SCREW_LENGTH  # 410, installed (shop-cut)
-# The member's native BOM description under the kit's one Number.
-BOM_DESCRIPTION = f"TR8X2 LEADSCREW, {LENGTH:.0f} MM LONG"
+LENGTH = feed.SCREW_LENGTH  # installed, shop-cut from the layout
+# Preserve the cut sheet's one-place nominal in the native BOM.
+BOM_DESCRIPTION = f"TR8X2 LEADSCREW, {LENGTH:.1f} MM LONG"
 
 # --- SOURCED: listing / layout decision / contract --------------------------------
 PITCH = 2.0  # single start: the pitch equals the lead
@@ -125,7 +125,7 @@ HAND = "right"  # UNVERIFIED: not stated on the listing; receipt check
 # the SKU identify the stock (review: a gauge sketch, then a numeric note row).
 SUPPLIER_PRODUCT_URL = "https://www.amazon.com/dp/B085DDHJTW"
 
-# The cut length prints as a native one-place dimension (410.0) under the
+# The cut length prints as a native one-place dimension under the
 # title block's .X row: the handwheel flat runs out through the cut end
 # (``OPEN_FLAT``), so no flat's land depends on the cut.
 LENGTH_PLACES = 1
@@ -190,10 +190,10 @@ HANDWHEEL_SET_SCREW_MAJOR = float(feed.HANDWHEEL_GRUB.removeprefix("M"))  # 5
 # Each set screw's station, part frame (from the near end), from C4's layout.
 FLAT_STATIONS = {
     "NearKP08": feed.KP08_S[0] - feed.SCREW_NEAR_END_S,  # 8.5
-    "FarKP08": feed.KP08_S[1] - feed.SCREW_NEAR_END_S,  # 379.5
+    "FarKP08": feed.KP08_S[1] - feed.SCREW_NEAR_END_S,
     "Handwheel": (
         feed.HUB_END_S + feed.HANDWHEEL_GRUB_FROM_HUB - feed.SCREW_NEAR_END_S
-    ),  # 404.0
+    ),
 }
 # The flat that runs out through the cut end (owner ruling 2026-11-05).
 OPEN_FLAT = "Handwheel"
@@ -202,7 +202,7 @@ OPEN_FLAT = "Handwheel"
 # centred FLAT_LENGTH flat did.
 FLAT_STARTS = {
     name: station - FLAT_LENGTH / 2.0 for name, station in FLAT_STATIONS.items()
-}  # 4.5, 375.5, 400.0
+}
 # The open flat's profile runs this far past the cut end, as every flat's
 # runs past the screw's round, so the cut leaves no far wall.
 FLAT_RUNOUT = 1.0
@@ -372,6 +372,10 @@ def control_si(name: str) -> tuple[float, float]:
 # --- Self-checks ----------------------------------------------------------------
 if not LENGTH + LENGTH_TOLERANCE <= STOCK_LENGTH:
     raise AssertionError("the installed screw is longer than the stock")
+# The open rectangle must remove material through even the longest allowed
+# cut. Its end follows LENGTH, never the former installation's end station.
+if FLAT_ENDS[OPEN_FLAT] <= LENGTH + LENGTH_TOLERANCE:
+    raise AssertionError("the handwheel flat stops before the longest cut end")
 # A short cut: the fitter keeps the handwheel's minimum engagement at the far
 # end and gives up near stub, so the two margins together must cover the band.
 if (feed.NEAR_STUB - feed.NEAR_STUB_MIN) + (

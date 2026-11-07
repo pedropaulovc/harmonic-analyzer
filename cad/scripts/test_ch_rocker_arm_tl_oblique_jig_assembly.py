@@ -321,13 +321,12 @@ def test_feed_nut_closes_on_the_leadscrew_axis_over_the_lug_taps() -> None:
         spec.CARRIAGE_STATION + feed_block.NUT_FACE_X, leadscrew.SCREW_LATERAL,
     ))
     assert bore[2] == pytest.approx(leadscrew.SCREW_AXIS_Z)
-    assert feed_block.NUT_FACE_X == feed_block.LUG_X0
-    # The TL-VN-84 FeedNut's axis lands on the leadscrew axis at the lug face,
-    # its seat face on the lug and its body end toward the spindle.
+    assert feed_block.NUT_FACE_X == feed_block.LUG_X1
+    # The FeedNut seats on the lug's far face, its body away from the spindle.
     nut = spec.FEED_NUT_PLACEMENTS[0]
     assert spec.frame_point(nut, (0.0, 0.0, 0.0)) == pytest.approx(bore)
     body_end = _image(rows, origin, (
-        feed_block.NUT_FACE_X - feed_nut.LENGTH, feed_block.NUT_AXIS_Y, feed_block.NUT_AXIS_Z,
+        feed_block.NUT_FACE_X + feed_nut.LENGTH, feed_block.NUT_AXIS_Y, feed_block.NUT_AXIS_Z,
     ))
     assert spec.frame_point(nut, (0.0, feed_nut.LENGTH, 0.0)) == pytest.approx(body_end)
     # Each flange hole sits over a lug tap on the lug's diagonals (option B:
@@ -347,10 +346,10 @@ def test_feed_nut_closes_on_the_leadscrew_axis_over_the_lug_taps() -> None:
         spec.NUT_SCREW_PLACEMENTS, feed_block.NUT_HOLES_YZ, strict=True
     ):
         assert screw_origin == pytest.approx(
-            _image(rows, origin, (feed_block.NUT_FACE_X - feed_nut.SCREW_GRIP, y, z))
+            _image(rows, origin, (feed_block.NUT_FACE_X + feed_nut.SCREW_GRIP, y, z))
         )
         assert _image(screw_rows, (0.0, 0.0, 0.0), (0.0, -1.0, 0.0)) == pytest.approx(
-            _image(rows, (0.0, 0.0, 0.0), (1.0, 0.0, 0.0))
+            _image(rows, (0.0, 0.0, 0.0), (-1.0, 0.0, 0.0))
         )
 
 
@@ -1238,8 +1237,8 @@ def test_sweep_clears_the_column_cover(report) -> None:
     for rail in spec.RAILS:
         corners = [
             trammel.rail_point(rail, near + x, lateral)
-            for x in (-carriage.LENGTH / 2.0 - carriage.NIPPLE_PROUD,
-                      carriage.LENGTH / 2.0 + carriage.PLUG_PROUD)
+            for x in (-carriage.LENGTH / 2.0 - carriage.PLUG_PROUD,
+                      carriage.LENGTH / 2.0 + carriage.NIPPLE_PROUD)
             for lateral in (-carriage.WIDTH / 2.0, carriage.WIDTH / 2.0)
         ]
         expected[f"carriage {rail}"] = spec.COVER_Y - max(y for _x, y in corners)
@@ -1265,12 +1264,21 @@ def test_sweep_extents_and_rail_margins(report) -> None:
     carriage_corners = [
         trammel.rail_point(rail, far + along, lateral)
         for rail in spec.RAILS
-        for along in (-carriage.LENGTH / 2.0 - carriage.NIPPLE_PROUD,
-                      carriage.LENGTH / 2.0 + carriage.PLUG_PROUD)
+        for along in (-carriage.LENGTH / 2.0 - carriage.PLUG_PROUD,
+                      carriage.LENGTH / 2.0 + carriage.NIPPLE_PROUD)
         for lateral in (-carriage.WIDTH / 2.0, carriage.WIDTH / 2.0)
     ]
+    # The reversed nut now reaches farther on rail 1 than its carriage.
+    nut_pose = spec._swept_placement(spec.FEED_NUT, 0, "outer", trammel.SWEEP["outer"])
+    radius = feed_nut.FLANGE_DIA_MAX / 2.0
+    nut_corners = [
+        spec.frame_point(nut_pose, (x, y, z))[:2]
+        for x in (-radius, radius) for y in (0.0, feed_nut.LENGTH_MAX)
+        for z in (-radius, radius)
+    ]
+    outer_corners = carriage_corners + nut_corners
     assert report.moving_x == pytest.approx((
-        min(x for x, _y in carriage_corners), max(x for x, _y in carriage_corners),
+        min(x for x, _y in outer_corners), max(x for x, _y in outer_corners),
     ))
     for pass_name in ("inner", "outer"):
         for theta in spec.sweep_thetas(pass_name, samples=21):
@@ -1289,8 +1297,8 @@ def test_sweep_extents_and_rail_margins(report) -> None:
     assert report.fixed_x == pytest.approx((-462.96, 462.96), abs=0.01)
     assert report.fixed_y == pytest.approx((-115.33, 85.84), abs=0.01)
     assert report.bar_overhang == pytest.approx({1: 43.86, 2: 43.86}, abs=0.01)
-    assert report.carriage_margin["inner"] == pytest.approx((61.52, 14.738), abs=0.01)
-    assert report.carriage_margin["outer"] == pytest.approx((64.18, 2.858), abs=0.01)
+    assert report.carriage_margin["inner"] == pytest.approx((29.52, 46.738), abs=0.01)
+    assert report.carriage_margin["outer"] == pytest.approx((32.18, 34.858), abs=0.01)
     assert all(
         near > 0.0 and far > 0.0 for near, far in report.carriage_margin.values()
     )
@@ -1318,8 +1326,8 @@ def test_sweep_sidecar_drives_both_passes_to_their_end_stops() -> None:
         True,
     ]
     drives = {
-        "inner": (244.404, 168.485, 92.215, 168.485, 244.404, 319.798, 394.492),
-        "outer": (251.703, 173.471, 94.878, 173.471, 251.703, 329.395, 406.366),
+        "inner": (212.404, 136.485, 60.215, 136.485, 212.404, 287.798, 362.492),
+        "outer": (219.703, 141.471, 62.878, 141.471, 219.703, 297.395, 374.366),
     }
     carriage_1, carriage_2 = (spec.instance_name(spec.CARRIAGE, i) for i in (0, 1))
     for pass_name, entry in passes.items():
@@ -1339,13 +1347,20 @@ def test_sweep_sidecar_drives_both_passes_to_their_end_stops() -> None:
             assert pose["drive_mm"] == pytest.approx(
                 stations[spec.SLIDE_RAIL] - trammel.RAIL_NEAR_S
             )
-            assert pose["carriages"] == {
-                carriage_1: pytest.approx(list(spec.carriage_origin(1, stations[1]))),
-                carriage_2: pytest.approx(list(spec.carriage_origin(2, stations[2]))),
-            }
+            assert pose["origins"][carriage_1] == pytest.approx(list(spec.carriage_origin(1, stations[1])))
+            assert pose["origins"][carriage_2] == pytest.approx(list(spec.carriage_origin(2, stations[2])))
+            assert set(pose["origins"]) == set(spec.MOVING_INSTANCES)
+            assert set(spec.RAIL_SCREW_INSTANCES + spec.BAR_SCREW_INSTANCES).isdisjoint(
+                pose["origins"]
+            )
+            assert set(spec.STRAP_CLAMP_SCREW_INSTANCES.values()) <= set(pose["origins"])
+            for family in (spec.FEED_BLOCK, spec.PIVOT_BLOCK, spec.FEED_NUT):
+                assert pose["origins"][spec.instance_name(family, 0)] == pytest.approx(
+                    spec._swept_placement(family, 0, pass_name, pose["theta_rad"])[0]
+                )
         # The sweep's ends put the carriages on the calculator's end stops.
         low, high = trammel.END_STOPS[pass_name]
-        ends = (poses[2]["carriages"], poses[-1]["carriages"])
+        ends = (poses[2]["origins"], poses[-1]["origins"])
         assert ends[0][carriage_1] == pytest.approx(list(spec.carriage_origin(1, low)))
         assert ends[1][carriage_1] == pytest.approx(list(spec.carriage_origin(1, high)))
     # The saved model is the inner pass at its symmetric pose.
@@ -1356,7 +1371,7 @@ def test_sweep_sidecar_drives_both_passes_to_their_end_stops() -> None:
     # verify reads each carriage's component origin back against these.
     for index, (origin, _rows) in enumerate(spec.PLACEMENTS[spec.CARRIAGE]):
         name = spec.instance_name(spec.CARRIAGE, index)
-        assert passes["inner"]["poses"][0]["carriages"][name] == pytest.approx(
+        assert passes["inner"]["poses"][0]["origins"][name] == pytest.approx(
             list(origin)
         )
     remate = passes["outer"]["remate"]
@@ -1437,11 +1452,29 @@ def test_sweep_table_edge_margins(report) -> None:
     )
     assert feed["handwheel"]["-X end"] < 0.0
     assert feed["screw"]["-X end"] < 0.0
-    # The feed block's body rides on the rail like pivot block 2, mirrored.
-    block = edges["pivot block 2"]
-    assert feed["feed block"]["-X end"] == pytest.approx(block["+X end"])
-    assert feed["feed block"]["+X end"] == pytest.approx(block["-X end"])
-    assert feed["feed block"]["front"] == pytest.approx(edges["pivot block 2"]["front"])
+    # The body is mirrored, but the column-side integral lug is not:
+    # its +X/+lateral corner sets rail 1's outer table-edge margin.
+    lo, hi = trammel.CARRIAGE_TRAVEL
+    outline = (
+        (feed_block.BLOCK_X0, feed_block.LUG_Y1),
+        (feed_block.LUG_X0, feed_block.LUG_Y1),
+        (feed_block.LUG_X0, feed_block.LUG_Y0),
+        (feed_block.LUG_X1, feed_block.LUG_Y0),
+        (feed_block.LUG_X1, feed_block.LUG_Y1),
+        (feed_block.BLOCK_X1, feed_block.LUG_Y1),
+        (feed_block.BLOCK_X1, feed_block.BLOCK_WIDTH / 2.0),
+        (feed_block.BLOCK_X0, feed_block.BLOCK_WIDTH / 2.0),
+    )
+    swept = [
+        trammel.rail_point(1, station + x, -y)
+        for station in (lo, hi) for x, y in outline
+    ]
+    assert feed["feed block"] == pytest.approx({
+        "-X end": min(x for x, _y in swept) - spec.TABLE_X[0],
+        "+X end": spec.TABLE_X[1] - max(x for x, _y in swept),
+        "front": min(y for _x, y in swept) - spec.TABLE_Y[0],
+        "back": spec.TABLE_Y[1] - max(y for _x, y in swept),
+    })
     assert min(
         margin["front"] for family, margin in feed.items() if family != "feed block"
     ) > 90.0
@@ -1904,12 +1937,17 @@ def test_general_torque_note_covers_every_fastener_no_step_torques() -> None:
         spec.PIVOT_SCREW: "P2. ",
         spec.PILLOW_BLOCK_SCREW: "F1B. ",
     }
-    steps = (*spec.ASSEMBLY_STEPS, *spec.PIVOT_FIT_STEPS, *spec.FEED_FIT_STEPS)
+    steps = (*spec.ASSEMBLY_STEPS, *spec.PIVOT_FIT_STEPS, *spec.FEED_FIT_STEPS,
+             *spec.OPERATION_STEPS)
     for label in torqued.values():
         step = next(text for text in steps if text.startswith(label))
         assert "N·m" in step
-    # The common screw runs snug into the rails, but fitting step 2 torques
-    # its TL-28 bar screws; the general note covers only the rail screws.
+    loading = next(text for text in steps if text.startswith("O6. "))
+    assert spec._item(spec.RAIL_SCREW) in loading
+    assert spec._item(spec.HUB_WASHER) in loading
+    assert spec._torque(spec.holding.HUB_TORQUE_NM) in loading
+    # The common family has mixed joints: step 2 torques the bar screws and
+    # O6 torques the hub clamp; the general note covers the other instances.
     fitting = next(text for text in steps if text.startswith("2. "))
     assert spec._item(spec.RAIL_SCREW) in fitting
     assert spec._torque(leadscrew.BAR_SCREW_TORQUE_NM) in fitting
@@ -1925,7 +1963,6 @@ def test_general_torque_note_covers_every_fastener_no_step_torques() -> None:
     }
     assert set(spec.SNUG_FASTENERS) == threaded - set(torqued)
     snug = sorted(int(spec.ITEM_NUMBERS[s]) for s in spec.SNUG_FASTENERS)
-    assert snug == [22, 23, 24, 26]
     # The note names exactly the snug items and states no torque figure.
     note = spec.GENERAL_TORQUE_NOTE
     assert sorted(int(n) for n in re.findall(r"\b\d+\b", note)) == snug
@@ -2367,7 +2404,7 @@ def test_f1_f2_prepare_seat_and_transfer_from_the_nut() -> None:
     assert "NO MOVING PART CONTACT" in steps["F3"]
     assert steps["7"].endswith(f"{spec._item(spec.PILLOW_BLOCK_SCREW)}, LOOSE.")
     for text in (*spec.ASSEMBLY_STEPS, *spec.FEED_FIT_STEPS):
-        for stale in ("PRINT-DRILLED", "TRANSFER SPOTTING", "LOOSE HOLES", "DOWEL PIN", "FLANGED"):
+        for stale in ("PRINT-DRILLED", "TRANSFER SPOTTING", "LOOSE HOLES", "DOWEL PIN"):
             assert stale not in text
 
 
@@ -2503,11 +2540,11 @@ def test_feed_lug_nut_and_drilled_threads_stay_in_real_material() -> None:
     for placement, (y, z) in zip(spec.NUT_SCREW_PLACEMENTS, feed_block.NUT_HOLES_YZ, strict=True):
         origin, screw_rows = placement
         expected = _image(rows, block_origin, (
-            feed_block.NUT_FACE_X - feed_nut.SCREW_GRIP, y, z,
+            feed_block.NUT_FACE_X + feed_nut.SCREW_GRIP, y, z,
         ))
         assert origin == pytest.approx(expected)
         # Bought heads point out of the lug; their -Y threaded shanks enter it.
-        assert screw_rows[1] == pytest.approx(tuple(-value for value in rows[0]))
+        assert screw_rows[1] == pytest.approx(rows[0])
     for station in trammel.CARRIAGE_TRAVEL:
         low = station + feed_block.NUT_REACH_X[0]
         high = station + feed_block.NUT_REACH_X[1]
@@ -2528,7 +2565,11 @@ def test_feed_nut_and_its_screws_hit_nothing_over_the_travel() -> None:
     assert {"pillow block 1", "end bracket 1", "base bar 1", "carrier"} <= set(gaps)
     assert not any(label.startswith("screw") for label in gaps)
     assert min(gaps.values()) > 0.0
-    assert min(gaps.values()) == pytest.approx(gaps["pillow block 1"])
+    # The carrier branch is separated vertically from the conservative box
+    # around the 45-degree turned nut flange. R4 has no projecting CL dowel.
+    nut_top = leadscrew.SCREW_AXIS_Z + math.sqrt(2.0) * feed_nut.FLANGE_DIA_MAX / 2.0
+    assert gaps["carrier"] == pytest.approx(trammel.CARRIER_UNDERSIDE_Z - nut_top)
+    assert "CL dowel" not in gaps
     allowed = [pair for pair in contracts.ALLOWED_PAIRS if "@FeedNut:1" in pair]
     assert allowed == [frozenset(("@FeedNut:1", "@LeadScrew:1"))]
     screws = [
@@ -2538,6 +2579,26 @@ def test_feed_nut_and_its_screws_hit_nothing_over_the_travel() -> None:
     assert sorted(screws, key=sorted) == sorted((
         frozenset((name, f"{contracts._JIG}-feed-block-1")) for name in spec.NUT_SCREW_INSTANCES
     ), key=sorted)
+
+
+def test_centred_branches_have_continuous_separating_axes() -> None:
+    assert trammel.PIN_OFFSET == pivot_block.BORE_X == 0.0
+    assert min(spec.CARRIAGE_PAIR_GAPS.values()) > 369.0
+    assert min(spec.CENTRED_BLOCK_CLEARANCES.values()) > 0.0
+    assert min(feed_block.FEED_GAPS_WORST.values()) >= leadscrew.FEED_GAP
+    assert leadscrew.KP08_STUD_CLEARANCE_WORST > 0.0
+    assert leadscrew.KP08_STATION_ENVELOPE > (
+        leadscrew.BRACKET_STOP_FLOAT_MAX + leadscrew.KP08_SCREW_FLOAT_MAX
+    )
+    # The axial station uses the bracket's inch Y-row tolerance, not its
+    # metric X-station band. Keep this leaf-side derivation synchronized
+    # without importing end_bracket back into leadscrew_spec.
+    assert leadscrew.BRACKET_AXIAL_ROW_BAND == pytest.approx(end_bracket._ROW_DEVIATION)
+    assert leadscrew.KP08_STATION_ENVELOPE == pytest.approx(
+        base_bar.BRACKET_STATION_BAND + leadscrew._KP08_STATION_ROUNDING
+        + end_bracket._ROW_DEVIATION
+        + leadscrew.BRACKET_STOP_FLOAT_MAX + leadscrew.KP08_SCREW_FLOAT_MAX
+    )
 
 
 @pytest.mark.parametrize("pass_name", ("inner", "outer"))

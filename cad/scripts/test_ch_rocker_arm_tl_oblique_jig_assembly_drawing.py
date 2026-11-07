@@ -263,8 +263,11 @@ def _cluster_outline(cluster, center=(0.2, 0.15), *, scale=None):
 
 def test_sheets_are_landscape_with_their_scales() -> None:
     assert len(drawing.SHEET_NAMES) == len(set(drawing.SHEET_NAMES))
-    assert drawing.SHEET_NAMES[7:] == (drawing.FIT_SHEET, drawing.OPERATION_SHEET, drawing.HOLDING_SHEET)
-    assert len(drawing.SHEET_NAMES) == 10
+    assert drawing.SHEET_NAMES[7:10] == (drawing.FIT_SHEET, drawing.OPERATION_SHEET, drawing.HOLDING_SHEET)
+    # The owner's linear-motion sheet is appended: no cited sheet number moves.
+    assert drawing.SHEET_NAMES[10:] == (drawing.LINEAR_MOTION_SHEET,)
+    assert len(drawing.SHEET_NAMES) == 11
+    assert drawing.SHEET_NAMES.index(drawing.OPERATION_SHEET) + 1 == spec.OPERATION_SHEET_NUMBER
     assert set(drawing.SHEET_LAYOUTS.values()) == {drawing.DrawingLayout.LANDSCAPE}
     assert set(drawing.SHEET_SCALES) == set(drawing.SHEET_NAMES)
     assert drawing.SHEET_SCALES[drawing.ASSEMBLED_SHEET] == drawing.ASSEMBLED_SCALE
@@ -273,6 +276,8 @@ def test_sheets_are_landscape_with_their_scales() -> None:
     assert drawing.SHEET_SCALES[drawing.STEPS_SHEET] == drawing.NOTES_REFERENCE_SCALE
     assert drawing.SHEET_SCALES[drawing.FIT_SHEET] == drawing.NOTES_REFERENCE_SCALE
     assert drawing.SHEET_SCALES[drawing.HOLDING_SHEET] == drawing.NOTES_REFERENCE_SCALE
+    assert drawing.SHEET_SCALES[drawing.LINEAR_MOTION_SHEET] == drawing.LINEAR_MOTION_SCALE
+    assert drawing.LINEAR_MOTION_SCALE in drawing.CLUSTER_SCALE_LADDER
     assert all(
         drawing.SHEET_SCALES[cluster.sheet] in drawing.CLUSTER_SCALE_LADDER
         for cluster in drawing.CLUSTERS
@@ -319,12 +324,21 @@ def test_clusters_partition_the_bom() -> None:
     )
     carrier_cluster = next(c for c in drawing.CLUSTERS if c.sheet == "CARRIER EXPLODED")
     assert set(spec.STRAP_CLAMP_SCREW_INSTANCES.values()) <= set(carrier_cluster.context)
+    assert len(spec.RAIL_SCREW_INSTANCES) == len(spec.RAILS) * len(spec.guide_rail.HOLE_X)
+    assert len(spec.BAR_SCREW_INSTANCES) == len(spec.leadscrew.BASE_BAR_HOLES)
     # The feed nut's four flat heads are riser-screw instances (option B,
     # 2026-11-04): shown over the nut on the feed sheet, ballooned with the
-    # riser's four on the carrier sheet.
+    # riser's four on the carrier sheet. The bracket screws show under their
+    # brackets there too, ballooned with the rail occurrences on the rail sheet.
     assert feed.context == (
-        spec.instance_name(spec.CARRIAGE, 0), *feed_screws, *spec.NUT_SCREW_INSTANCES,
+        *spec.BAR_SCREW_INSTANCES,
+        spec.instance_name(spec.CARRIAGE, 0),
+        *feed_screws,
+        *spec.NUT_SCREW_INSTANCES,
     )
+    assert spec.RAIL_SCREW not in feed.visible
+    assert set(spec.BAR_SCREW_INSTANCES) <= feed.visible
+    assert not set(spec.RAIL_SCREW_INSTANCES) & feed.visible
     assert spec.CARRIAGE_SCREW not in feed.visible
     assert set(feed_screws) | set(spec.NUT_SCREW_INSTANCES) <= feed.visible
     assert spec.FEED_NUT in feed.stems and spec.RISER_SCREW not in feed.stems
@@ -338,10 +352,15 @@ def test_clusters_partition_the_bom() -> None:
     assert not set(spec.NUT_SCREW_INSTANCES) & carrier_sheet.visible
     rails = next(c for c in drawing.CLUSTERS if c.sheet == "RAIL BARS EXPLODED")
     assert spec.CARRIAGE_SCREW in rails.stems
-    assert rails.partial == ((spec.CARRIAGE_SCREW, pivot_screws),)
-    assert rails.visible == frozenset(
-        {*rails.stems, *pivot_screws} - {spec.CARRIAGE_SCREW}
+    assert rails.partial == (
+        (spec.CARRIAGE_SCREW, pivot_screws),
+        (spec.RAIL_SCREW, spec.RAIL_SCREW_INSTANCES),
     )
+    assert rails.visible == frozenset(
+        {*rails.stems, *pivot_screws, *spec.RAIL_SCREW_INSTANCES}
+        - {spec.CARRIAGE_SCREW, spec.RAIL_SCREW}
+    )
+    assert not set(spec.BAR_SCREW_INSTANCES) & rails.visible
     assert rails.title == "BASE BARS, RAILS, CARRIAGES AND PIVOT BLOCK"
     pivot = next(c for c in drawing.CLUSTERS if c.sheet == drawing.PIVOT_SHEET)
     assert set(pivot.stems) == {spec.PIVOT_SCREW, spec.PIVOT_SPACER, spec.PIVOT_SHIM}
@@ -1254,7 +1273,7 @@ def test_declared_approaches_are_the_re_routed_balloons() -> None:
     assert set(drawing.BALLOON_APPROACH_DEG) == {
         spec.PIVOT_BLOCK, spec.HOLD_DOWN_STUD, spec.PIVOT_SHIM,
         spec.FEED_BLOCK, spec.LEADSCREW, spec.PILLOW_BLOCK,
-        spec.PILLOW_BLOCK_SCREW, spec.END_BRACKET,
+        spec.PILLOW_BLOCK_SCREW, spec.END_BRACKET, spec.CARRIAGE_SCREW,
         spec.RISER, spec.FEED_LEVER,
     }
     for stem in drawing.BALLOON_APPROACH_DEG:
@@ -1269,8 +1288,8 @@ def test_declared_approaches_clear_every_other_occurrence(stem) -> None:
     declared leader crosses no other instance on its sheet, and none is drawn
     within LANDING_CLEARANCE_M of the landing (the nearest at the farm's
     scales: 4 riser screw 5.2 mm, 15 KP08 screw 4.2, 17 bracket 2.5, 11 KP08
-    2.7, 25 none within 6; 3 none, 19 bar 2 2.2; 7 the next shim 2.9; 8 riser
-    screw 5.3, 10 none)."""
+    2.7, 25 none within 6; 3 none, 19 bar 2 2.2, the rail sheet's carriage
+    screw none within 3; 7 the next shim 2.9; 8 riser screw 5.3, 10 none)."""
     anchor = drawing.BALLOON_ANCHORS[stem]
     drawn, crossed, beside = _approach_replay(stem)
     assert drawn in {anchor.instance or spec.instance_name(stem, 0), None}
@@ -1307,6 +1326,160 @@ def test_the_replay_refuses_a_landing_beside_another_part(monkeypatch) -> None:
     assert _approach_replay(spec.PIVOT_BLOCK)[2] == {
         spec.instance_name(spec.BASE_BAR_2, 0), spec.instance_name(spec.CARRIAGE, 1),
     }
+
+
+# Farm 26bb68f31f5e, sheet 3, read back from App Insights
+# (drawing.balloon_anchor, drawing.balloon_ring): each landing in sheet
+# metres at 1:5 after the ring view's slide. Seven were frozen and are
+# unchanged since that run. Two are walked. The carriage screw's walked
+# landing (on the pivot block's first screw) is the one that run refused.
+_RAIL_26BB_FROZEN = {
+    spec.BASE_BAR_1: (0.123488, 0.162384),
+    spec.BASE_BAR_2: (0.181620, 0.128821),
+    spec.PIVOT_BLOCK: (0.196952, 0.151907),
+    spec.RAIL: (0.096935, 0.182889),
+    spec.HOLD_DOWN_STUD: (0.174146, 0.154303),
+    spec.T_NUT: (0.204778, 0.102058),
+    spec.RAIL_SCREW: (0.092184, 0.191197),
+}
+_RAIL_26BB_WALKED = {
+    spec.CARRIAGE: (0.134437, 0.179260),
+    spec.FLANGE_NUT: (0.163237, 0.168748),
+}
+_RAIL_26BB_CARRIAGE_SCREW_WALKED = (0.187411, 0.163963)
+_RAIL_26BB_SCALE = (1.0, 5.0)
+
+
+def _rail_26bb_frame():
+    """The rail sheet's model-to-sheet map at the farm's 1:5: (sheet metres
+    of an occurrence's part-frame point, the cluster)."""
+    cluster = next(c for c in drawing.CLUSTERS if c.sheet == "RAIL BARS EXPLODED")
+    occurrences = _sheet_occurrences(cluster)
+    right, up, _toward = _iso_axes()
+    ratio = _RAIL_26BB_SCALE[0] / _RAIL_26BB_SCALE[1] / 1000.0
+
+    def project(name, point):
+        moved = np.array(_exploded(name, *occurrences[name], point))
+        return np.array([moved @ right, moved @ up]) * ratio
+
+    def anchored(stem):
+        anchor = drawing.BALLOON_ANCHORS[stem]
+        return project(anchor.instance or spec.instance_name(stem, 0), anchor.point_mm)
+
+    offsets = np.array(
+        [np.array(farm) - anchored(stem) for stem, farm in _RAIL_26BB_FROZEN.items()]
+    )
+    # The offline projection is the native one: every frozen landing the farm
+    # read agrees with it to within 0.01 mm of a single sheet offset.
+    assert np.ptp(offsets, axis=0).max() < 1e-5
+    offset = offsets.mean(axis=0)
+    landings = {
+        stem: tuple(anchored(stem) + offset)
+        for stem in drawing.BALLOON_ANCHORS
+        if stem in cluster.stems and drawing.BALLOON_ANCHORS[stem].point_mm is not None
+    }
+    landings.update(_RAIL_26BB_WALKED)
+    assert set(landings) == set(cluster.stems)
+    vertices = np.vstack([body[3] for body in _sheet_bodies(cluster.sheet)])
+    xs = vertices @ right * ratio + offset[0]
+    ys = vertices @ up * ratio + offset[1]
+    return landings, (xs.min(), ys.min(), xs.max(), ys.max())
+
+
+def _lane_clearance(start, degrees, point) -> float:
+    """How far ``point`` is from the ray leaving ``start`` at ``degrees``."""
+    dx, dy = math.cos(math.radians(degrees)), math.sin(math.radians(degrees))
+    vx, vy = point[0] - start[0], point[1] - start[1]
+    if vx * dx + vy * dy <= 0.0:
+        return math.hypot(vx, vy)
+    return abs(vx * dy - vy * dx)
+
+
+def _spread_ring(outline, attachments):
+    """_spread_balloons' circle centres: each balloon at its attachment's
+    angle about the outline centre, BALLOON_MARGIN outside it, pushed apart."""
+    x0, y0, x1, y1 = outline
+    cx, cy = (x0 + x1) / 2.0, (y0 + y1) / 2.0
+    rx = (x1 - x0) / 2.0 + drawing.BALLOON_MARGIN
+    ry = (y1 - y0) / 2.0 + drawing.BALLOON_MARGIN
+    thetas = [math.atan2(y - cy, x - cx) for x, y in attachments]
+    order = sorted(range(len(attachments)), key=lambda i: (thetas[i], *attachments[i]))
+    angles = _drawing_balloons._push_apart_on_ring(
+        [thetas[i] for i in order],
+        min_gap=_drawing_balloons._min_angular_gap(
+            min(rx, ry), drawing.BALLOON_RADIUS,
+            clearance=_drawing_balloons._BALLOON_CLEARANCE_M,
+        ),
+    )
+    centres = [None] * len(attachments)
+    for angle, index in zip(angles, order):
+        centres[index] = (cx + rx * math.cos(angle), cy + ry * math.sin(angle))
+    return centres
+
+
+def test_rail_sheet_declared_lanes_clear_every_other_landing() -> None:
+    """Farm 26bb68f31f5e refused sheet 3: the walked carriage-screw balloon
+    sat on the hold-down stud's declared route, inside the ring's leader
+    run-on, so the uncrossing could not keep the stud on its approach. Every
+    declared route now passes every other landing by more than that run-on."""
+    landings, _outline = _rail_26bb_frame()
+    stud = landings[spec.HOLD_DOWN_STUD]
+    run_on = drawing._UNCROSS_END_CLEARANCE_M
+    assert _lane_clearance(
+        stud, drawing.BALLOON_APPROACH_DEG[spec.HOLD_DOWN_STUD], _RAIL_26BB_CARRIAGE_SCREW_WALKED
+    ) < run_on
+    for stem, degrees in drawing.BALLOON_APPROACH_DEG.items():
+        if stem not in landings:
+            continue
+        for other, point in landings.items():
+            if other != stem:
+                assert _lane_clearance(landings[stem], degrees, point) > run_on, (stem, other)
+
+
+def test_rail_sheet_ring_keeps_every_declared_approach() -> None:
+    """The rail sheet's ring as _ring_balloons builds it, over the estimated
+    native outline grown up to 15 mm a side: the 26bb landings refuse some,
+    the frozen carriage-screw landing none."""
+    landings, outline = _rail_26bb_frame()
+    stems = sorted(landings)
+    names = list(stems)
+    approaches = {
+        index: drawing.BALLOON_APPROACH_DEG[stem]
+        for index, stem in enumerate(stems)
+        if stem in drawing.BALLOON_APPROACH_DEG
+    }
+    assert {stems[index] for index in approaches} == {
+        spec.PIVOT_BLOCK, spec.HOLD_DOWN_STUD, spec.CARRIAGE_SCREW,
+    }
+    current = [landings[stem] for stem in stems]
+    farm = list(current)
+    farm[stems.index(spec.CARRIAGE_SCREW)] = _RAIL_26BB_CARRIAGE_SCREW_WALKED
+    farm_approaches = {
+        index: degrees for index, degrees in approaches.items()
+        if stems[index] != spec.CARRIAGE_SCREW
+    }
+    grows = (0.0, 0.005, 0.010, 0.015)
+    refused = 0
+    for left in grows:
+        for bottom in grows:
+            for right in grows:
+                for top in grows:
+                    grown = (
+                        outline[0] - left, outline[1] - bottom,
+                        outline[2] + right, outline[3] + top,
+                    )
+                    drawing.approached_ring_slots(
+                        _spread_ring(grown, current), current, approaches,
+                        outline=grown, radius=drawing.BALLOON_RADIUS, names=names,
+                    )
+                    try:
+                        drawing.approached_ring_slots(
+                            _spread_ring(grown, farm), farm, farm_approaches,
+                            outline=grown, radius=drawing.BALLOON_RADIUS, names=names,
+                        )
+                    except RuntimeError:
+                        refused += 1
+    assert refused
 
 
 def _ring_outline():
@@ -1941,14 +2114,24 @@ def test_package_settled_checks_reread_native_bom_without_mutating_layout(
             for stem in cluster.stems
         ]
     )
+    linear_view, linear_landing = object(), SimpleNamespace(stem=spec.RAIL)
+    seat._place_linear_motion_view.return_value = (linear_view, (1.0, 3.0))
+    seat._balloon_linear_motion.return_value = [linear_landing]
     monkeypatch.setattr(drawing, "_bom_feature_name", lambda _table: "offline BOM")
-    _scales, checks = drawing._place_package(object())
+    scales, checks = drawing._place_package(object())
+    assert tuple(scales) == drawing.SHEET_NAMES
+    assert scales[drawing.LINEAR_MOTION_SHEET] == (1.0, 3.0)
+    seat._place_linear_motion_view.assert_called_once()
+    assert seat._balloon_linear_motion.call_args.args[1] is linear_view
     expected_configurations = [reference.ReferencedConfiguration] * len(spec.BOM_ORDER)
     assert table.association_configurations == expected_configurations
     table.association_configurations.clear()
     for check in checks:
         check()
     assert table.association_configurations == expected_configurations
+    assert linear_landing in seat.assert_balloon_landings.call_args.args[1]
+    seat._assert_linear_motion_visibility.assert_called_once()
+    assert seat._assert_linear_motion_visibility.call_args.args[1] is linear_view
 
     if fault == "native-column":
         column_types[-1] = (204, "", 0)
@@ -2058,7 +2241,13 @@ def test_bom_refuses_items_numbered_off_the_steps(native_bom_bindings) -> None:
 
 def test_bom_refuses_a_wrong_quantity(native_bom_bindings) -> None:
     table = _Table(spec.BOM_ORDER)
-    table.cells[1][3] = "1"  # the base bar row grouped per configuration
+    # Each base-bar configuration is its own row, one off (Bar1, Bar2); the
+    # regression is both bars counted on Bar1's row.
+    row = int(spec.ITEM_NUMBERS[spec.BASE_BAR_1])
+    assert table.cells[row][3] == str(spec.QUANTITIES[spec.BASE_BAR_1]) == "1"
+    table.cells[row][3] = str(
+        spec.QUANTITIES[spec.BASE_BAR_1] + spec.QUANTITIES[spec.BASE_BAR_2]
+    )
     with pytest.raises(RuntimeError, match="quantity"):
         drawing._validate_bom(_ADAPTER, table)
 
@@ -2767,3 +2956,286 @@ def test_complete_source_instructions_fit_existing_pages_at_normal_note_size():
             text_bottom - drawing.REGION_GAP - reference_floor
             >= drawing.NOTES_REFERENCE_MIN_HEIGHT
         )
+
+
+def _family_instances(*stems: str) -> set[str]:
+    return {
+        spec.instance_name(stem, index)
+        for stem in stems
+        for index in range(spec.QUANTITIES[stem])
+    }
+
+
+def test_linear_motion_view_hides_only_the_carrier_and_its_load() -> None:
+    hidden, shown = set(drawing.LINEAR_MOTION_HIDDEN), set(drawing.LINEAR_MOTION_SHOWN)
+    # Every modelled occurrence, each in exactly one list, none twice.
+    assert len(hidden) == len(drawing.LINEAR_MOTION_HIDDEN)
+    assert len(shown) == len(drawing.LINEAR_MOTION_SHOWN)
+    assert not hidden & shown
+    assert hidden | shown == spec.INSTANCE_NAMES
+    # The owner's hide list, reproduced by the builder's locks to the carrier.
+    assert hidden == {
+        spec.instance_name(spec.CARRIER, 0),
+        *spec.RISER_SCREW_INSTANCES,
+        *spec.STRAP_CLAMP_SCREW_INSTANCES.values(),
+        *_family_instances(
+            spec.RISER, spec.HUB_WASHER, spec.FEED_LEVER, spec.STOP_PIN,
+            spec.LEVER_SCREW, spec.LEVER_LOCK_WASHER,
+        ),
+    }
+    assert hidden == {spec.instance_name(spec.CARRIER, 0), *spec.CARRIER_RIDERS}
+    assert all(
+        spec.lock_parent(stem, index) == spec.instance_name(spec.CARRIER, 0)
+        for stem, parents in spec.LOCKED_TO.items()
+        for index in range(len(parents))
+        if spec.instance_name(stem, index) in hidden
+    )
+    # The common screw is hidden by occurrence, never by stem: its three strap
+    # clamps (CL, CR, HUB: 0-based 20, 21, 22, native -21..-23) leave with the
+    # carrier, its rail and TL-28 bar screws stay on the bars.
+    assert spec.STRAP_CLAMP_SCREW_INSTANCES == {
+        role: spec.instance_name(spec.RAIL_SCREW, index)
+        for role, index in (("CL", 20), ("CR", 21), ("HUB", 22))
+    }
+    clamps = set(spec.STRAP_CLAMP_SCREW_INSTANCES.values())
+    assert len(clamps) == 3
+    assert _family_instances(spec.RAIL_SCREW) & hidden == clamps
+    assert set(spec.RAIL_SCREW_INSTANCES) | set(spec.BAR_SCREW_INSTANCES) <= shown
+    assert _family_instances(spec.RAIL_SCREW) - clamps == (
+        set(spec.RAIL_SCREW_INSTANCES) | set(spec.BAR_SCREW_INSTANCES)
+    )
+    # The riser-screw family splits: the feed nut's four stay on the lug.
+    assert set(spec.NUT_SCREW_INSTANCES) <= shown
+    assert _family_instances(
+        *spec.BASE_BARS, spec.RAIL, spec.CARRIAGE, spec.PIVOT_BLOCK,
+        spec.FEED_BLOCK, spec.PIVOT_SCREW, spec.PIVOT_SPACER, spec.PIVOT_SHIM,
+        spec.LEADSCREW, spec.FEED_NUT, spec.PILLOW_BLOCK, spec.END_BRACKET,
+        spec.HANDWHEEL, spec.HOLD_DOWN_STUD, spec.T_NUT, spec.FLANGE_NUT,
+        spec.CARRIAGE_SCREW, spec.PILLOW_BLOCK_SCREW,
+    ) <= shown
+    # Drawing-only: no cluster, BOM or model inventory changes for it.
+    assert sorted(stem for c in drawing.CLUSTERS for stem in c.stems) == sorted(spec.BOM_ORDER)
+    assert drawing.LINEAR_MOTION_SHEET not in {c.sheet for c in drawing.CLUSTERS}
+
+
+def test_linear_motion_balloons_are_a_sparse_set_on_shown_parts() -> None:
+    ballooned = drawing.LINEAR_MOTION_BALLOONED
+    assert ballooned == tuple(stem for stem in spec.BOM_ORDER if stem in set(ballooned))
+    assert set(ballooned) == {
+        spec.PIVOT_BLOCK, spec.FEED_BLOCK, spec.PIVOT_SCREW, spec.END_BRACKET,
+        spec.RAIL, spec.CARRIAGE, spec.LEADSCREW, spec.FEED_NUT,
+        spec.PILLOW_BLOCK, spec.HANDWHEEL,
+    }
+    assert all(_family_instances(stem) <= set(drawing.LINEAR_MOTION_SHOWN) for stem in ballooned)
+    assert set(drawing.LINEAR_MOTION_ANCHORS) == set(ballooned)
+    # Walked, never the exploded sheets' frozen points.
+    assert all(anchor.point_mm is None for anchor in drawing.LINEAR_MOTION_ANCHORS.values())
+    assert {stem: anchor.instance for stem, anchor in drawing.LINEAR_MOTION_ANCHORS.items()} == {
+        spec.PIVOT_BLOCK: None,
+        spec.FEED_BLOCK: None,
+        spec.PIVOT_SCREW: spec.instance_name(spec.PIVOT_SCREW, 1),
+        spec.END_BRACKET: None,
+        spec.RAIL: "@Rail:2",
+        spec.CARRIAGE: "@Carriage:2",
+        spec.LEADSCREW: "@LeadScrew:1",
+        spec.FEED_NUT: "@FeedNut:1",
+        spec.PILLOW_BLOCK: None,
+        spec.HANDWHEEL: None,
+    }
+    # The pivot side's three are rail 2's and the pivot block's.
+    assert spec.lock_parent(spec.PIVOT_SCREW, 1) == spec.instance_name(spec.PIVOT_BLOCK, 0)
+    assert spec.lock_parent(spec.PIVOT_BLOCK, 0) == spec.instance_name(spec.CARRIAGE, 1)
+
+
+def _linear_leaf(name: str, *, visible: bool, path: str | None = None):
+    """A drawing-view leaf as _drawing_balloons._component_leaf reads it."""
+    identities = {name.casefold()}
+    if name.startswith("@"):
+        role = name[1:].split(":", 1)[0]
+        physical, member = _component_references.REFERENCE_IDENTITIES[role]
+        identities |= {physical, f"{physical}--{member}".casefold()}
+    else:
+        identities.add(name.rsplit("-", 1)[0])
+    return SimpleNamespace(
+        name=f"{name}@Drawing View11",
+        path=path or name,
+        identities=frozenset(identities),
+        visible=visible,
+    )
+
+
+def _linear_leaves() -> list[SimpleNamespace]:
+    return [
+        *(_linear_leaf(name, visible=True) for name in drawing.LINEAR_MOTION_SHOWN),
+        *(_linear_leaf(name, visible=False) for name in drawing.LINEAR_MOTION_HIDDEN),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("fault", "message"),
+    (
+        (None, None),
+        ("carrier drawn", "drawn but must be hidden"),
+        ("nut screw hidden", "hidden but must be drawn"),
+        ("missing handwheel", "occurs 0 times"),
+        ("duplicate rail screw", "occurs 2 times"),
+        ("unknown component", "not one occurrence"),
+        ("hub clamp drawn", "drawn but must be hidden"),
+        ("stop pin drawn", "drawn but must be hidden"),
+        ("bar screw hidden", "hidden but must be drawn"),
+        ("common stem hidden", "hidden but must be drawn"),
+    ),
+)
+def test_linear_motion_readback_refuses_any_departure(fault, message) -> None:
+    leaves = _linear_leaves()
+    carrier = spec.instance_name(spec.CARRIER, 0)
+    handwheel = spec.instance_name(spec.HANDWHEEL, 0)
+
+    def drawn(names: set[str], visible: bool) -> list[SimpleNamespace]:
+        return [
+            _linear_leaf(leaf.path, visible=visible) if leaf.path in names else leaf
+            for leaf in leaves
+        ]
+
+    if fault == "carrier drawn":
+        leaves = drawn({carrier}, True)
+    elif fault == "nut screw hidden":
+        leaves = drawn({spec.NUT_SCREW_INSTANCES[0]}, False)
+    elif fault == "missing handwheel":
+        leaves = [leaf for leaf in leaves if leaf.path != handwheel]
+    elif fault == "duplicate rail screw":
+        leaves.append(_linear_leaf(spec.RAIL_SCREW_INSTANCES[0], visible=True))
+    elif fault == "unknown component":
+        leaves.append(_linear_leaf("ch-rocker-arm-tl-oblique-strap-1", visible=False))
+    elif fault == "hub clamp drawn":
+        leaves = drawn({spec.STRAP_CLAMP_SCREW_INSTANCES["HUB"]}, True)
+    elif fault == "stop pin drawn":
+        leaves = drawn({spec.instance_name(spec.STOP_PIN, 0)}, True)
+    elif fault == "bar screw hidden":
+        leaves = drawn({spec.BAR_SCREW_INSTANCES[-1]}, False)
+    elif fault == "common stem hidden":
+        # Hiding the whole common stem would take its 20 rail and bar
+        # screws with the three strap clamps.
+        leaves = drawn(_family_instances(spec.RAIL_SCREW), False)
+    failures = drawing.linear_motion_visibility_failures(leaves)
+    if fault is None:
+        assert failures == []
+        return
+    assert any(message in failure for failure in failures), failures
+
+
+def test_linear_motion_isolation_matches_common_screws_by_occurrence() -> None:
+    # isolate_drawing_view_components draws a leaf exactly when its file and
+    # instance identities match a shown occurrence; the common screw's strap
+    # clamps (native -21..-23) must match none, never by the bare stem or a
+    # shorter instance such as -2.
+    shown = frozenset(drawing.LINEAR_MOTION_SHOWN)
+    assert spec.RAIL_SCREW not in shown
+    for name in spec.STRAP_CLAMP_SCREW_INSTANCES.values():
+        identities = _linear_leaf(name, visible=False).identities
+        assert spec.RAIL_SCREW in identities
+        assert _drawing_balloons._stems_matching(identities, shown) == set()
+    for name in (*spec.RAIL_SCREW_INSTANCES, *spec.BAR_SCREW_INSTANCES):
+        identities = _linear_leaf(name, visible=True).identities
+        assert _drawing_balloons._stems_matching(identities, shown) == {name}
+
+
+def test_linear_motion_recipe_hides_reads_back_then_fits_collapsed(monkeypatch) -> None:
+    view, adapter = object(), object()
+    events = []
+    monkeypatch.setattr(drawing, "_activate_sheet", lambda a, s: events.append(("sheet", s)))
+
+    def place(a, name, center, scale, *, label):
+        events.append(("place", name, center, scale))
+        return view
+
+    monkeypatch.setattr(drawing, "_place_named_view", place)
+    monkeypatch.setattr(drawing, "set_hidden_lines_removed", lambda a, v: events.append(("hlr",)))
+    monkeypatch.setattr(
+        drawing, "apply_view_configuration",
+        lambda a, v, **kw: events.append(("configuration",)) or "Default Simplified",
+    )
+    monkeypatch.setattr(
+        drawing, "set_view_exploded_state",
+        lambda a, v, exploded, **kw: events.append(("explode", exploded, kw["configuration"])),
+    )
+    monkeypatch.setattr(
+        drawing, "isolate_drawing_view_components",
+        lambda a, v, **kw: events.append(("isolate", kw["visible_stems"])),
+    )
+    monkeypatch.setattr(
+        drawing, "_assert_linear_motion_visibility",
+        lambda a, v, **kw: events.append(("readback", v)),
+    )
+
+    def fit(a, placed, scale, configuration, *, exploded, label):
+        events.append(("fit", scale, configuration, exploded))
+        return (1.0, 3.0)
+
+    monkeypatch.setattr(drawing, "_fit_ring_view", fit)
+    assert drawing._place_linear_motion_view(adapter, label="linear") == (view, (1.0, 3.0))
+    assert events == [
+        ("sheet", drawing.LINEAR_MOTION_SHEET),
+        ("place", spec.PLAN_VIEW, drawing.CLUSTER_CENTER, drawing.LINEAR_MOTION_SCALE),
+        ("hlr",),
+        ("configuration",),
+        ("explode", False, "Default Simplified"),
+        ("isolate", frozenset(drawing.LINEAR_MOTION_SHOWN)),
+        ("readback", view),
+        ("fit", drawing.LINEAR_MOTION_SCALE, "Default Simplified", False),
+    ]
+
+
+@pytest.mark.parametrize("missing", (False, True))
+def test_linear_motion_balloons_request_the_sparse_set_without_approaches(
+    monkeypatch, missing,
+) -> None:
+    calls, rings = [], []
+    monkeypatch.setattr(drawing, "_activate_sheet", lambda *a: None)
+    monkeypatch.setattr(drawing, "_link_view_to_bom", lambda *a, **kw: None)
+    monkeypatch.setattr(
+        drawing, "_ring_balloons", lambda a, v, landings, **kw: rings.append(kw["approach_deg"])
+    )
+    monkeypatch.setattr(drawing, "_relax_cluster_slide", lambda a, v, landings, **kw: landings)
+
+    def create(a, v, *, items, anchors, **kwargs):
+        calls.append((tuple(items), anchors))
+        return [
+            SimpleNamespace(stem=stem)
+            for stem, _item in items
+            if not (missing and stem == spec.FEED_NUT)
+        ]
+
+    monkeypatch.setattr(drawing, "add_component_bom_balloons", create)
+    items = tuple(spec.ITEM_NUMBERS.items())
+    if missing:
+        with pytest.raises(RuntimeError, match="expected one for each"):
+            drawing._balloon_linear_motion(object(), object(), items, "BOM", label="linear")
+    else:
+        landings = drawing._balloon_linear_motion(object(), object(), items, "BOM", label="linear")
+        assert [landing.stem for landing in landings] == list(drawing.LINEAR_MOTION_BALLOONED)
+    assert calls == [(
+        tuple((stem, spec.ITEM_NUMBERS[stem]) for stem in drawing.LINEAR_MOTION_BALLOONED),
+        drawing.LINEAR_MOTION_ANCHORS,
+    )]
+    assert rings == [{}]
+
+
+def test_linear_motion_plan_ring_and_caption_fit_their_sheet() -> None:
+    (x0, x1), (y0, y1), _z = spec.MODEL_EXTENT
+    width = (x1 - x0) * OUTLINE_GROWTH[0]
+    height = (y1 - y0) * OUTLINE_GROWTH[1]
+    outline = _view_box((0.2, 0.15), width, height, drawing.LINEAR_MOTION_SCALE)
+    scale = drawing.cluster_ring_scale(
+        outline, drawing.LINEAR_MOTION_SCALE, label=drawing.LINEAR_MOTION_SHEET
+    )
+    assert scale in drawing.CLUSTER_SCALE_LADDER
+    for fitted in drawing.CLUSTER_SCALE_LADDER:
+        caption = drawing.linear_motion_caption(fitted)
+        assert caption.startswith(f"{drawing.LINEAR_MOTION_SHEET} {fitted[0]:g}:{fitted[1]:g}")
+        assert max(map(len, caption.split("\n"))) <= drawing.EXPLODED_CAPTION_WIDTH
+        assert _inside_sheet(_note_box(caption, drawing.EXPLODED_CAPTION_XY))
+        flat = " ".join(caption.split())
+        assert f"CARRIER (ITEM {spec.ITEM_NUMBERS[spec.CARRIER]})" in flat
+        assert f"BOM ON SHEET {drawing.BOM_SHEET_NUMBER}" in flat
+        assert f"ASSEMBLY SEQUENCE ON SHEET {drawing.STEPS_SHEET_NUMBER}" in flat

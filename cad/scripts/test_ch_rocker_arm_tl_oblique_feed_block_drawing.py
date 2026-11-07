@@ -49,7 +49,7 @@ def test_identity_stock_and_common_pivot_interface():
 
 
 def test_nut_face_carries_the_screw_clearance_and_four_through_taps_only():
-    assert spec.NUT_FACE_X==spec.LUG_X0
+    assert spec.NUT_FACE_X==spec.LUG_X1
     assert math.isclose(spec.NUT_AXIS_Y,-lead.SCREW_LATERAL)
     assert math.isclose(trammel.CARRIAGE_TOP_Z+spec.NUT_AXIS_Z,lead.SCREW_AXIS_Z)
     assert math.isclose(spec.SCREW_CLEARANCE_DIA,.351*INCH)
@@ -95,7 +95,7 @@ def test_four_taps_sit_on_the_nut_pcd_on_the_lug_diagonals_and_are_transferred()
     assert set(drawing.NUT_KEEP)=={'NutCentreY','NutCentreZ','NutClearanceDia','NutClock'}
     source=(FOLDER/'_oblique_block_drawing.py').read_text(encoding='utf-8')
     assert source.count('process=contract.TRANSFER_PROCESS')==1
-    # The callout lands on the tap at the view's upper right (+Y, +Z).
+    # The callout lands on the Right view's upper-left tap (+Y, +Z).
     tree=ast.parse(source)
     [index]=[n.slice.value for n in ast.walk(tree) if isinstance(n,ast.Subscript)
              and ast.unparse(n.value)=='contract.NUT_HOLES_YZ']
@@ -184,7 +184,7 @@ def test_every_tap_is_bound_by_the_native_clocking_band_the_walls_charge():
     assert spec.CALLOUTS_PREFIX=={'NutClock':f'{feed_nut.SCREW_COUNT}X '}
     assert spec.LUG_WALLS_MM==spec.lug_walls_mm(spec.NUT_CLOCK_TOL_DEG)
     y,z=spec.NUT_HOLES_YZ[spec.NUT_CLOCK_TAP]
-    assert (y<spec.NUT_AXIS_Y,z>spec.NUT_AXIS_Z)==(True,True)  # VIEW D's lower right
+    assert (y<spec.NUT_AXIS_Y,z>spec.NUT_AXIS_Z)==(True,True)  # VIEW D's lower left
     assert math.isclose(math.degrees(math.atan2(spec.NUT_AXIS_Y-y,z-spec.NUT_AXIS_Z)),spec.NUT_CLOCK_DEG)
     assert math.isclose(spec.NUT_CLOCK_RAY,feed_nut.HOLE_PCD/2)
     # Negative control: a tap free to sit 10° off its diagonal, as an
@@ -250,15 +250,19 @@ def test_reference_lines_on_the_printed_outline_are_plain_sketch_lines():
 
 
 def test_nut_and_lug_clear_both_end_blocks_at_both_travel_limits():
-    assert math.isclose(spec.NUT_REACH_X[0],spec.NUT_FACE_X-feed_nut.REACH)
+    assert math.isclose(spec.NUT_REACH_X[1],spec.NUT_FACE_X+feed_nut.REACH)
     assert feed_nut.REACH==feed_nut.LENGTH_MAX
     for station in trammel.CARRIAGE_TRAVEL:
         lo,hi=(station+v for v in spec.NUT_REACH_X)
         for box in lead.KP08_BOXES.values():
             assert max(box[0]-hi,lo-box[1])>=lead.FEED_GAP
-    # The -X gap to the near KP08 at the longest faced nut (13.8).
+    # Near clearance is the lug, not a nut projecting toward the spindle.
     near=min(gap for (name,_station),gap in spec.FEED_GAPS.items() if name=='KP08 near')
-    assert round(near,1)==2.8
+    assert round(near,1)==4.5
+    assert min(spec.FEED_GAPS_WORST.values()) >= lead.FEED_GAP
+    assert pivot.CBORE_SECTION_X < spec.LUG_X0
+    source=(FOLDER/'_oblique_block_drawing.py').read_text(encoding='utf-8')
+    assert "'*Right',*NUT_XY" in source
 
 
 def test_feed_entrypoints_use_the_native_shared_geometry_and_not_a_separate_bracket():
@@ -276,3 +280,27 @@ def test_only_the_kp08_axis_height_prints_exact_millimetres():
     # Owner ruling 4 (2026-11-01): the KP08 vendor line prints exact mm; the
     # nut's taps print nothing (transferred).
     assert spec.METRIC_DIMENSIONS=={('NutPatternReference','NutCentreZ'):(3,printed_band_mm(3,unit='mm'))}
+
+
+def test_counterbore_callout_and_view_d_reference_use_separate_lanes():
+    import _oblique_block_drawing as drawing
+
+    name = "CarriageCounterbores3Dia"
+    assert spec.CALLOUTS_ABOVE[name] == "4X COUNTERBORE"
+    assert spec.CALLOUTS_BELOW[name] == "FLOOR: SECTION B-B"
+    assert drawing.VIEW_SHEET_REF == "(SHEET 2)"
+    assert drawing.FEED_PLAN_KEEP[name] != drawing.PLAN_KEEP[name]
+    # Retained 84d PDF rectangles, translated by the authored lane changes.
+    # These are predictions, not native results; the fresh PDF is still gated.
+    rise = (drawing.FEED_PLAN_KEEP[name][1] - .150) * 1000
+    bottom_leader = 141.6389 + rise
+    top_text = 158.7648 + rise
+    assert bottom_leader - 160.934 - .065 >= 4.0
+    assert 184.937 - .065 - top_text >= 2.0
+    dx = (drawing.VIEW_SHEET_REF_OFFSET[0] - .010) * 1000
+    dy = (drawing.VIEW_SHEET_REF_OFFSET[1] + .008) * 1000
+    ref_left, ref_right = 214.812 + dx, 234.6405 + dx
+    ref_top = 156.8682 + dy
+    assert abs((ref_left + ref_right) / 2 - (204.812 + 209.7703) / 2) < .1
+    assert 156.3695 - ref_top >= 2.0
+    assert 141.2195 + rise - ref_top >= 10.0
