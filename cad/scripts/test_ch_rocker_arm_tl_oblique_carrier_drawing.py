@@ -163,9 +163,12 @@ def test_walls_hold_rule_17_at_worst_case() -> None:
 
 
 def test_no_skid_sag_is_negligible() -> None:
+    """The plate spans D1 between its pins; its sag under self-weight and the
+    cutting load stays a small fraction of the strap's radial band, so no
+    skid or mid-span support is needed."""
     assert round(spec.SAG_SELF_WEIGHT, 2) == 0.02
     assert round(spec.SAG_CUTTING_LOAD, 3) == 0.015
-    assert "No skid" in spec.__doc__
+    assert spec.SAG_SELF_WEIGHT + spec.SAG_CUTTING_LOAD < 0.25 * trammel.TOP_EDGE_HALF_BAND
 
 
 def test_every_marked_dimension_prints_once_at_its_model_places() -> None:

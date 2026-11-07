@@ -116,7 +116,7 @@ def test_carrier_stock_and_new_riser_blank_requirements() -> None:
     assert 1.75 * 25.4 > riser_spec.BLANK_WIDTH
     assert 0.25 * 25.4 > riser_spec.THICKNESS
     assert riser_spec.BLANK_LENGTH == 13.80 * 25.4
-    assert riser_spec.BLANK_WIDTH == 1.69 * 25.4
+    assert riser_spec.BLANK_WIDTH == pytest.approx(1.69 * 25.4, rel=0.0, abs=1e-12)
 
 
 def test_strap_blank_is_the_bought_one_and_a_half_inch_strap_stock() -> None:
