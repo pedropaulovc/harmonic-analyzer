@@ -357,9 +357,10 @@ def hanger_center_landing() -> tuple[float, float, float]:
 # is (rule 7; farm runs 20261106T214613300Z and T221139403Z).  The Z
 # stations are the table's rows.
 HANGER_CENTER_QUALIFIER = "2X"
-# The 182.0 locates D itself -- the crossbar's median, the native centreline
-# between its two side faces -- from the upper-left socket axis under the
-# general .X band; it carries its value only (drawing-guidelines.md rule 7).
+# The 199.2 locates D itself -- the crossbar's median, the native centreline
+# between its two side faces -- from the left rail's outer face (sheet 3's
+# corner origin) under the .XXX band; it carries its value only
+# (drawing-guidelines.md rule 7).
 CROSSBAR_MEDIAN_DATUM_XY = (0.142, 0.095)
 # Transfer fit-up owns these locations; the nominal model holes and their
 # sheet coordinates are references, not independent inspection requirements.
@@ -4442,12 +4443,16 @@ async def build(adapter: Any) -> dict[str, str]:
         datums=("D",), quantity=HANGER_CENTER_QUALIFIER,
         label="hanger axes on crossbar median plane",
     )
-    # D's own station: the crossbar median from the upper-left socket axis,
-    # the plain .X band the seat-footprint stack charges.  The median is the
+    # D's own station: the crossbar median from the left rail's outer face,
+    # the Y edge of the hole table's corner origin, so the view keeps one
+    # origin (farm run 20261107T105312645Z, machinist review r1+r3: the old
+    # 7.165 from the upper-left socket axis gave the view a second origin),
+    # in the .XXX band the seat-footprint stack charges.  The median is the
     # native centreline between the two side-face edges (sheet 2's flange
     # width picks), so it follows the faces.  The dimension picks it by the
     # documented CENTERLINE select type at its mid-bar point, clear of both
-    # holes; the socket end re-anchors to its arc centre.
+    # holes; the face end picks the rail's outer edge between the upper-left
+    # boss and the set-screw boss.
     crossbar_median_x = (BAR_X0 + BAR_X1) / 2.0
     _insert_crossbar_median(
         adapter, detail_top,
@@ -4457,13 +4462,13 @@ async def build(adapter: Any) -> dict[str, str]:
             label="crossbar sides for median D",
         )),
     )
-    upper_left_rim = (-COLUMN_X, HALF_H + BOSS_ABOVE, FRONT_COLUMN_Z + BORE_DIA/2)
+    left_rail_face = (-OUTER_X, HALF_H, FRONT_COLUMN_Z + BOSS_DIA / 2.0 + 10.0)
     _checked_dimension(
         adapter, detail_top,
-        p0=upper_left_rim, p1=(crossbar_median_x, HALF_H, 0.0),
-        text_xy=(0.162, 0.240), label="hanger x from left sockets",
-        expected_mm=COLUMN_X + crossbar_median_x, orientation="horizontal",
-        center=True, entity_types=("EDGE", "CENTERLINE"),
+        p0=left_rail_face, p1=(crossbar_median_x, HALF_H, 0.0),
+        text_xy=(0.162, 0.240), label="crossbar median D from left rail face",
+        expected_mm=OUTER_X + crossbar_median_x, orientation="horizontal",
+        entity_types=("EDGE", "CENTERLINE"),
     )
     # #946: RD4 reads off the rear keeper tap, from the rail's outer side.
     rear_keeper = (KEEPER_TAP_X, HALF_H, KEEPER_TAP_Z_REAR)
