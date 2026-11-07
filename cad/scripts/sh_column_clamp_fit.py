@@ -36,7 +36,7 @@ import _config
 from _hole_spec import blind_cut_dia_mm
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _package_units import drawing_unit
-from _printed_tolerance import printed_deviations
+from _printed_tolerance import printed_band_mm, printed_deviations
 from fr_tube_frame_spec import MM_PER_IN, OUTER_DIA as COLUMN_DIA
 from sh_column_clamp_back_geom import BLOCK_DEPTH, GRIP_OFFSET
 from _column_clamp_interface import ARC_DEPTH
@@ -109,8 +109,11 @@ BORE_DIAMETRAL_CLEARANCE = (0.1016, 0.3048)
 BORE_CLEARANCE_TEXT = "-".join(
     note_text(limit / MM_PER_IN) for limit in BORE_DIAMETRAL_CLEARANCE
 )
-# +/- on the back arc's mating-face offset from its bore axis, .004.
-GRIP_OFFSET_BAND = 0.1016
+# +/- on the back arc's mating-face offset from its bore axis: the title
+# block's .XXX row, .005 (delegated ruling L2, 2026-11-07: the converted
+# +/-.004 loosened to the row, with the grip gap and the back wall still
+# closing below). The part prints it at three places with no band of its own.
+GRIP_OFFSET_BAND = printed_band_mm(3, unit=UNIT)
 # +/- on each ear-hole station from its arc's bore axis (both arcs), .004.
 EAR_STATION_BAND = 0.1016
 # +/- on each ear-hole height off its arc's bottom face (both arcs), .004: the

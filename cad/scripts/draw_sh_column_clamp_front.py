@@ -175,8 +175,14 @@ DIMENSION_PREFIXES = {"EarHole1Z": "2X ", "EarHoleHeight": "2X "}
 # SOLIDWORKS prints nothing of an above-callout holding a line break
 # (draw_dt_cone_gear_shaft._printable_above_callouts).
 COLUMN_NUMBER = _config.parts("fr-tube-frame")["number"]
+# A matched pair names its mate by number and name and says which clearance
+# (rule 4); the ~76 mm widest row stays between the split-face view (right
+# edge x 0.111) and the plan (left edge x 0.205).
 DIMENSION_CALLOUTS = {
-    "BoreDia": f"SLIDING FIT ON {COLUMN_NUMBER}\nCLEARANCE {BORE_CLEARANCE_TEXT}",
+    "BoreDia": (
+        f"SLIDING FIT ON {COLUMN_NUMBER} COLUMN\n"
+        f"CLEARANCE {BORE_CLEARANCE_TEXT} DIAMETRAL"
+    ),
     "Depth": f"SETS SCREW ENGAGEMENT\nIN {BACK_ARC_MATE}",
 }
 HOLE_CALLOUT_BELOW = f"MATCHES {BACK_ARC_MATE} TAPS"

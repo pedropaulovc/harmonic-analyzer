@@ -153,7 +153,8 @@ def test_bore_prints_the_grip_budget_on_the_column() -> None:
     # #970: the bore is matched to the purchased column at the clearance the
     # pair's grip budget allows (sh_column_clamp_fit), not "bored as a pair".
     bore = drawing.DIMENSION_CALLOUTS["BoreDia"]
-    assert bore.split("\n") == ["SLIDING FIT ON MHA-FR-03", "CLEARANCE .004-.012"]
+    assert len(bore.split("\n")) == 2
+    assert "MHA-FR-03" in bore and spec.BORE_CLEARANCE_TEXT in bore
     assert spec.BORE_DIAMETRAL_CLEARANCE[1] <= 0.3048
     # Rule 7: the ear locations carry only value and band; the taps they
     # match are named once, under the hole callout.

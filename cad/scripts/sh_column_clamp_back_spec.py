@@ -70,8 +70,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 EAR_STATION_DIMENSIONS = ("EarHole1Z", "EarHole2Z")
 
 # Places and explicit bands on those dimensions.
-# * GripOffset .020 +/-.004 (GRIP_OFFSET_BAND): the grip budget in
-#   sh_column_clamp_fit; the face gap stays open at its least.
+# * GripOffset .020 at the title block's .XXX (GRIP_OFFSET_BAND, .005): the
+#   grip budget in sh_column_clamp_fit; the face gap stays open at its least.
 # * Depth .59 at the title block's .XX: the back wall (bore to back face) is
 #   GripOffset + Depth less the largest seated bore radius (WALLS_WORST
 #   below), and the tap's wander runs its deepest .60.
