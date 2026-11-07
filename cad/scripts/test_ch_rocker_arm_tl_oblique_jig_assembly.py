@@ -2589,12 +2589,11 @@ def test_feed_nut_and_its_screws_hit_nothing_over_the_travel() -> None:
     assert {"pillow block 1", "end bracket 1", "base bar 1", "carrier"} <= set(gaps)
     assert not any(label.startswith("screw") for label in gaps)
     assert min(gaps.values()) > 0.0
-    # The CL dowel, not the carrier underside, is now the lowest carrier
-    # rider. The report conservatively boxes the 45-degree turned nut flange.
+    # The carrier branch is separated vertically from the conservative box
+    # around the 45-degree turned nut flange. R4 has no projecting CL dowel.
     nut_top = leadscrew.SCREW_AXIS_Z + math.sqrt(2.0) * feed_nut.FLANGE_DIA_MAX / 2.0
-    cl_bottom = trammel.CARRIER_TOP_Z + trammel.RISER_THICK + cl_dowel.TIP_HEIGHT - cl_dowel.LENGTH
-    assert gaps["CL dowel"] == pytest.approx(cl_bottom - nut_top)
-    assert min(gaps.values()) == pytest.approx(cl_bottom - nut_top)
+    assert gaps["carrier"] == pytest.approx(trammel.CARRIER_UNDERSIDE_Z - nut_top)
+    assert "CL dowel" not in gaps
     allowed = [pair for pair in contracts.ALLOWED_PAIRS if "@FeedNut:1" in pair]
     assert allowed == [frozenset(("@FeedNut:1", "@LeadScrew:1"))]
     screws = [
