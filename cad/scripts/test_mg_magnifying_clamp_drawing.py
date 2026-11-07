@@ -212,11 +212,6 @@ def test_stock_hex_needs_no_custom_wall_or_envelope_inspection_note() -> None:
     # The REF is untoleranced: the supplier's band governs and only the walls
     # charge it.
     assert spec.HEX_AF_CALLOUT == "HEX STOCK"
-    assert spec.LEVER_BORE_CALLOUT.splitlines() == [
-        "DRILL THRU CORNERS", "SLIP ON 1/4 IN LEVER MHA-MG-03",
-    ]
-    assert spec.SEAT_NOTE.startswith("MHA-MG-04 SHOULDER SEAT")
-    assert "NO CHAMFER OR SPOTFACE AT TAP" in spec.SEAT_NOTE
 
 
 @pytest.mark.parametrize(
@@ -339,8 +334,8 @@ def test_front_layout_moves_native_dimensions_and_clears_height_qualifier_only(m
         )
         assert set(item.text) == {4}
     assert state.annotations["Height"].display.GetText(4) == ""
-    assert state.annotations["LeverBoreDiaDim"].display.GetText(4) == spec.LEVER_BORE_CALLOUT
-    assert state.annotations["LeverBoreFromZFlat"].display.GetText(4) == "BORE AND BOTH\nTAP ENTRY AXES"
+    assert state.annotations["LeverBoreDiaDim"].display.GetText(4) == drawing.LEVER_BORE_CALLOUT
+    assert state.annotations["LeverBoreFromZFlat"].display.GetText(4) == ""
     for name in spec.GROUPED_HIDDEN_DIMENSIONS:
         assert state.annotations[name].display.GetText(4) == ""
 
@@ -350,7 +345,7 @@ def test_front_layout_moves_native_dimensions_and_clears_height_qualifier_only(m
 def test_common_flat_witness_station_clears_the_frozen_native_A_stroke(monkeypatch) -> None:
     state = _front_drawing_layout(monkeypatch)
     # R21's actual A stroke and old flat witness prove the original crossing.
-    # The new 3X caption has different ink: only its native settled audit can
+    # The grouped value has different ink: only its native settled audit can
     # certify that new text, not a translated old single-value glyph box.
     a_ink = Box(0.0652137, 0.1761622, 0.0710726, 0.1823344)
     original = Segment(0.06595, 0.17245, 0.06595, 0.1862219, "ext-line")
@@ -397,7 +392,7 @@ def test_r27_group_text_moves_clear_of_actual_neighbor_ink_without_raising_witne
     )
     assert min(box.gap(neighbor) for box in moved for neighbor in neighbors) > 0.004
     assert all(segment_box_distance(line, box) > 0.004 for line in (height_witness, front_edge) for box in moved)
-    assert state.annotations["LeverBoreFromZFlat"].display.GetText(4) == "BORE AND BOTH\nTAP ENTRY AXES"
+    assert state.annotations["LeverBoreFromZFlat"].display.GetText(4) == ""
 
 
 def test_no_gdt_one_section_and_native_tap_callouts() -> None:
@@ -2808,7 +2803,7 @@ def test_grouping_retains_three_distinct_source_measurements_and_one_real_visibl
     states = {drawing.dimension_name(fixture.adapter, a): a.Visible for a in annotations}
     assert states == {"LeverBoreFromZFlat": 1, "ThumbTapFromZFlat": 3, "RodTapFromZFlat": 3}
     leader = next(a for a in annotations if drawing.dimension_name(fixture.adapter, a) == "LeverBoreFromZFlat")
-    assert leader.GetSpecificAnnotation().GetText(1) == "3X "
+    assert leader.GetSpecificAnnotation().GetText(1) == ""
     assert all(a.GetSpecificAnnotation().GetDimension2(0).SystemValue == pytest.approx(0.00635) for a in annotations)
     assert len(spec.DRAWING_PRECISION_BY_NAME) == 9 and len(spec.VISIBLE_DIMENSIONS) == 7
     assert spec.DIMENSION_GROUPS == {"LeverBoreFromZFlat": spec.Z_FLAT_DIMENSIONS}
@@ -3175,7 +3170,7 @@ def test_group_correspondence_is_read_again_after_rebuild_without_cached_keys(mo
     assert fixture.inverse_calls == []
 
 
-@pytest.mark.parametrize("failure", ("hide-refused", "unknown-visible", "prefix-lost", "source-constraint-lost"))
+@pytest.mark.parametrize("failure", ("hide-refused", "unknown-visible", "prefix-printed", "source-constraint-lost"))
 def test_group_visibility_and_source_proof_remain_strict_after_native_rebuild(monkeypatch, failure) -> None:
     fixture, view, annotations = _flat_group_fixture(monkeypatch)
     if failure == "hide-refused":
@@ -3201,9 +3196,9 @@ def test_group_visibility_and_source_proof_remain_strict_after_native_rebuild(mo
     drawing._group_flat_locations(fixture.adapter, view, annotations)
     if failure == "unknown-visible":
         annotations[0].Visible = 0
-    elif failure == "prefix-lost":
+    elif failure == "prefix-printed":
         leader = next(a for a in annotations if drawing.dimension_name(fixture.adapter, a) == "LeverBoreFromZFlat")
-        leader.GetSpecificAnnotation().SetText(1, "")
+        leader.GetSpecificAnnotation().SetText(1, "3X ")
     else:
         fixture.lines[0].GetStartPoint2().relations.clear()
     with pytest.raises(RuntimeError):

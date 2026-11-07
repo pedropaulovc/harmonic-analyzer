@@ -106,21 +106,17 @@ from mg_magnifying_clamp_spec import (
     HEX_AF,
     HEX_AF_CALLOUT,
     HEX_AF_FRACTION_DENOMINATOR,
-    LEVER_BORE_CALLOUT,
     LEVER_BORE_DIA,
     LEVER_BORE_Y,
     PREF_MATERIAL_HATCH_PATTERN,
     PREF_MATERIAL_HATCH_STYLE,
     PREF_NO_OPTION,
     ROD_TAP_DRILL_DIA,
-    ROD_TAP_PROCESS,
-    SEAT_NOTE,
     SECTION_HATCH_PATTERN,
     STOCK_REFERENCE_DIMENSION,
     TAP_CALLOUT_PRECISION,
     TAP_DRILL_DEPTH_VARIABLE,
     TAP_THREAD_DEPTH_VARIABLE,
-    THUMB_TAP_PROCESS,
 )
 
 
@@ -208,11 +204,22 @@ BOTTOM_KEEP = {
     )
 }
 
+# Process and mate belong to the actual bore diameter; the common-flat .25
+# carries its value only (rule 7), its leader's line the hex axis the bore
+# and both taps share.
+LEVER_BORE_CALLOUT = "DRILL THRU CORNERS\nSLIDING FIT ON MHA-MG-03 LEVER"
 DIMENSION_CALLOUTS = {
     "Height": "",
     "LeverBoreDiaDim": LEVER_BORE_CALLOUT,
-    "LeverBoreFromZFlat": "BORE AND BOTH\nTAP ENTRY AXES",
 }
+# Under the thumb tap's native size rows (rule 26: size, then depth); the rod
+# tap's rows stand alone.
+THUMB_TAP_MATE = "MATES MHA-SH-VN-55"
+# The MHA-MG-04 shoulder's face, flagged on Section A-A's bottom line.
+SEAT_NOTE = "MHA-MG-04 SHOULDER SEAT: NO CHAMFER OR SPOTFACE AT TAP"
+# Section A-A is drawn at the sheet scale, so its caption states no scale
+# (rule 9; draw_dt_cone_pivot_post._show_section_scale_in_caption).
+SECTION_CAPTION_TEXT = "<VLNAME> <VLLABEL>"
 
 # The tap callouts (their text centres) out to the right of each end view,
 # low enough that each leader crosses the right-hand flat, under the flat's
@@ -297,6 +304,35 @@ def _reference_thread_depth(display: Any) -> None:
             f"read {after!r}"
         )
     _telemetry.success(f"thumb tap thread depth bracketed REF: {wanted[part]!r}")
+
+
+def _name_thumb_tap_mate(display: Any) -> None:
+    """Hang the thumb screw's number under the native tap rows, keeping every
+    native variable (draw_mg_wheel_bar._add_below_rows)."""
+    display = _early_bound(display, "IDisplayDimension")
+    definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7)}
+    below = str(display.GetText(8) or "").rstrip()
+    updated = f"{below}\n{THUMB_TAP_MATE}" if below else THUMB_TAP_MATE
+    display.SetText(4, updated)
+    if (
+        str(display.GetText(8) or "") != updated
+        or {part: str(display.GetText(part) or "") for part in definitions} != definitions
+    ):
+        raise RuntimeError("thumb tap mate row or native definitions did not persist")
+
+
+def _section_caption_without_scale(view: Any) -> None:
+    """Drop the scale from Section A-A's linked native caption."""
+    captions = [
+        note
+        for note in (_early_bound(raw, "INote") for raw in (_early_bound(view, "IView").GetNotes() or ()))
+        if all(token in str(note.PropertyLinkedText or "") for token in ("<VLNAME>", "<VLLABEL>"))
+    ]
+    if len(captions) != 1:
+        raise RuntimeError(f"expected one native section A-A caption, found {len(captions)}")
+    captions[0].PropertyLinkedText = SECTION_CAPTION_TEXT
+    if str(captions[0].PropertyLinkedText or "") != SECTION_CAPTION_TEXT:
+        raise RuntimeError("section A-A caption without scale did not persist")
 
 
 def _axis_direction(
@@ -836,17 +872,15 @@ def _assert_grouped_flat_locations(group: dict[str, Any]) -> None:
     wanted = {name: 3 if name in GROUPED_HIDDEN_DIMENSIONS else 1 for name in group}
     if any(type(value) is not int for value in visibility.values()) or visibility != wanted:
         raise RuntimeError(f"common-flat group native visibility differs: {visibility!r}")
-    for leader, members in DIMENSION_GROUPS.items():
+    for leader in DIMENSION_GROUPS:
         display = _early_bound(group[leader].GetSpecificAnnotation(), "IDisplayDimension")
-        if display.GetText(1) != f"{len(members)}X ":
-            raise RuntimeError("common-flat group lost its actual member-count prefix")
+        if display.GetText(1):
+            raise RuntimeError("common-flat group printed a member-count prefix")
     _telemetry.info("clamp common-flat group: three measured sources, one visible native dimension", source_dimension_count=len(group), visible_dimension_count=sum(value == 1 for value in visibility.values()), native_visibility=repr(visibility))
 
 
 def _group_flat_locations(adapter: Any, view: Any, annotations: list[Any]) -> None:
     group = _flat_group_annotations(adapter, view, annotations)
-    for leader, members in DIMENSION_GROUPS.items():
-        _early_bound(group[leader].GetSpecificAnnotation(), "IDisplayDimension").SetText(1, f"{len(members)}X ")
     for name, annotation in group.items():
         annotation.Visible = 3 if name in GROUPED_HIDDEN_DIMENSIONS else 1
     _early_bound(adapter.currentModel, "IModelDoc2").GraphicsRedraw2()
@@ -930,6 +964,8 @@ async def build(adapter: Any) -> dict[str, str]:
         label="hex-axis section through the corners",
     )
     set_hidden_lines_removed(adapter, section)
+    _section_caption_without_scale(section)
+    rebuild_drawing(adapter, label="section A-A caption without scale")
     _assert_material_hatch(section)
     shown = _show_section_cosmetic_threads(adapter, section, label="section A-A")
     _telemetry.info(f"showed {shown} cosmetic thread(s) in section A-A")
@@ -1001,27 +1037,27 @@ async def build(adapter: Any) -> dict[str, str]:
     for view, label in ((top, "top"), (bottom, "bottom")):
         _require_one_center_mark(view, label)
     # Each end view shows one visible tap-drill circle: its native callout
-    # prints the drill and thread rows with the process ahead of the thread.
+    # prints the drill and thread rows, size first; the thumb tap names its
+    # screw under them.
     thumb_callout = add_native_hole_callout(
         adapter,
         top,
         edge=visible_circle_edge(adapter, top, ROD_TAP_DRILL_DIA),
         callout_xy=THUMB_TAP_CALLOUT_XY,
         label="#4-40 thumb-screw tap",
-        process=THUMB_TAP_PROCESS,
     )
     _omit_tap_thread_class(thumb_callout, label="#4-40 thumb-screw tap")
     _reference_thread_depth(thumb_callout)
     set_hole_callout_precision(
         thumb_callout, TAP_CALLOUT_PRECISION, label="#4-40 thumb-screw tap depths"
     )
+    _name_thumb_tap_mate(thumb_callout)
     rod_callout = add_native_hole_callout(
         adapter,
         bottom,
         edge=visible_circle_edge(adapter, bottom, ROD_TAP_DRILL_DIA),
         callout_xy=ROD_TAP_CALLOUT_XY,
         label="#4-40 vertical-rod tap",
-        process=ROD_TAP_PROCESS,
     )
     _omit_tap_thread_class(rod_callout, label="#4-40 vertical-rod tap")
     set_hole_callout_precision(

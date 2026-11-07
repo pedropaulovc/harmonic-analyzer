@@ -44,7 +44,7 @@ from _surface_finish import surface_finish_by_key
 import _telemetry
 from _transgear_zone_line import require_placed, sketch_lines
 from mg_lever_thread_joint import INCOMPLETE_THREAD_MAX, PITCH, ROD_DIA, ROD_LENGTH, THREAD_LENGTH, THREAD_ROOT_X, TIP_CHAMFER
-from mg_magnifying_lever_spec import DRAWING_DIMENSIONS, DRAWING_PRECISION, FREE_END_CALLOUT, LEAD_CALLOUT, PRINT_THREAD_CALLOUT, ROD_DIA_CALLOUT, ROD_DIA_FRACTION_DENOMINATOR, SCREW_SEAT_CALLOUT, SURFACE_FINISHES, THREAD_CALLOUT
+from mg_magnifying_lever_spec import DRAWING_DIMENSIONS, DRAWING_PRECISION, FREE_END_CALLOUT, LEAD_CALLOUT, PRINT_THREAD_CALLOUT, ROD_BORE_CLEARANCE, ROD_DIA_FRACTION_DENOMINATOR, SCREW_SEAT_CALLOUT, SURFACE_FINISHES, THREAD_CALLOUT
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
@@ -83,6 +83,19 @@ THREAD_LINES_MM = (
     ((THREAD_ROOT_X, -THREAD_MINOR_R), (ROD_LENGTH, -THREAD_MINOR_R)),
 )
 CALLOUTS = {"IncompleteLength": LEAD_CALLOUT}
+
+
+def _inch(mm: float) -> str:
+    return f"{mm / 25.4:.3f}".replace("0.", ".", 1)
+
+
+# The stock fraction's callout names its standard fit in the clamp, the
+# clearance as REF (rule 4).
+ROD_DIA_CALLOUT = (
+    "ROD STOCK\n"
+    f"SLIDING FIT IN MHA-MG-02 CLAMP (CLEARANCE {_inch(ROD_BORE_CLEARANCE[0])}"
+    f"-{_inch(ROD_BORE_CLEARANCE[1])})"
+)
 
 
 def _rod_stock_reference(adapter: Any, annotations: list[Any]) -> None:

@@ -234,11 +234,6 @@ GROUPED_HIDDEN_DIMENSIONS = frozenset(Z_FLAT_DIMENSIONS[1:])
 VISIBLE_DIMENSIONS = frozenset(DRAWING_PRECISION_BY_NAME) - GROUPED_HIDDEN_DIMENSIONS
 
 # --- Sheet text ----------------------------------------------------------------
-# Process and mate belong to the actual bore diameter.
-LEVER_BORE_CALLOUT = "DRILL THRU CORNERS\nSLIP ON 1/4 IN LEVER MHA-MG-03"
-# Ahead of each native thread row.
-THUMB_TAP_PROCESS = "TAP INTO BORE; MHA-SH-VN-55"
-ROD_TAP_PROCESS = "TAP"
 # Native Hole Wizard variables: both taps print the tap drill's Ø at .XXX and
 # their depths at .XX, the thumb tap's thread depth bracketed REF (the bore
 # ends the thread).
@@ -250,8 +245,6 @@ TAP_CALLOUT_PRECISION = {
     TAP_DRILL_DEPTH_VARIABLE: HOLE_DEPTH_PLACES,
     TAP_THREAD_DEPTH_VARIABLE: HOLE_DEPTH_PLACES,
 }
-# The MHA-MG-04 shoulder's face, flagged on Section A-A's bottom line.
-SEAT_NOTE = "MHA-MG-04 SHOULDER SEAT: NO CHAMFER OR SPOTFACE AT TAP"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
 
 # --- Section hatch ----------------------------------------------------------------
