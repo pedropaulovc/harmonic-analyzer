@@ -2237,6 +2237,57 @@ def test_details_letters_stand_off_the_screw() -> None:
     assert all(math.dist(a, b) > 0.010 for a in letters for b in letters if a != b)
 
 
+def test_settled_detail_frames_fit_after_translating_the_whole_bank() -> None:
+    # Final native 0c3 frames, not the smaller nominal fences. C's box is
+    # also the 84d failure: the earlier placement check was not a settled one.
+    measured = (
+        (.008517633303345734, .047647259642392935, .0772935907769218, .11642314838436299),
+        (.0638121, .0548120, .1181879, .1091880),
+        (.1307121, .0512121, .1922879, .1127879),
+    )
+    old_x = (.043, .091, .1615)
+    translations = [detail.centre[0] - x for detail, x in zip(draw.END_DETAILS, old_x, strict=True)]
+    assert translations == pytest.approx([.008] * 3)
+    for detail, box, dx in zip(draw.END_DETAILS, measured, translations, strict=True):
+        moved = (box[0] + dx, box[1], box[2] + dx, box[3])
+        draw._require_detail_bounds(SimpleNamespace(GetOutline=lambda box=moved: box), detail)
+        assert moved[0] - draw.BORDER[0] > .003
+        assert draw.TITLE_BLOCK[0] - moved[2] > .015
+
+
+def test_detail_containment_is_rechecked_when_the_native_outline_settles() -> None:
+    detail = draw.END_DETAILS[0]._replace(centre=(.043, draw.DETAIL_ROW_Y))
+    outline = _fence_box(detail)
+    view = SimpleNamespace(GetOutline=lambda: outline)
+    draw._require_detail_bounds(view, detail)
+    # Same centre, expanded native frame: this must refuse even if the
+    # geometric-fence check already passed, as it did in the old build.
+    outline = (.008517633303345734, .047647259642392935, .0772935907769218, .11642314838436299)
+    with pytest.raises(RuntimeError, match="leaves the drawable sheet"):
+        draw._require_detail_bounds(view, detail)
+    # A displaced frame still inside the border must not silently move the
+    # detail away from the authored dimension and caption lanes.
+    detail = draw.END_DETAILS[0]
+    outline = tuple(v + (.001 if i in (0, 2) else 0)
+                    for i, v in enumerate(_fence_box(detail)))
+    with pytest.raises(RuntimeError, match="moved from its reserved centre"):
+        draw._require_detail_bounds(view, detail)
+
+
+def test_detail_bounds_are_read_after_projection_and_in_the_final_callback() -> None:
+    tree = ast.parse((SCRIPTS / "draw_ch_rocker_arm_tl_vn_oblique_leadscrew_kit.py").read_text())
+    functions = {node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)}
+    create = functions["_create_end_detail"]
+    calls = [node.value.func.id for node in create.body
+             if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call)
+             and isinstance(node.value.func, ast.Name)]
+    assert calls.index("_require_detail_bounds") > calls.index("settle_detail_projection")
+    [settled] = [node for node in functions["_append_leadscrew_sheet"].body
+                 if isinstance(node, ast.FunctionDef) and node.name == "settled"]
+    assert any(isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+               and node.func.id == "_require_detail_bounds" for node in ast.walk(settled))
+
+
 def test_thread_is_called_out_on_the_main_view() -> None:
     """The bought thread is named by a leadered callout touching the screw,
     a designation and its extent, no size or method (rule 7)."""
