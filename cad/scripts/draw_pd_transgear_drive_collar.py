@@ -49,28 +49,30 @@ from _paths import CAD_ROOT
 from _part_properties import part_drawing_unit
 from _section_axis import position_section_caption
 from _session import run_build
+import _config
 import _telemetry
 from pd_paper_drive_assembly_steps import step_ref
+from pd_rack_pinion_spec import inch_ceil_mm, inch_floor_mm, inch_text
 from pd_transgear_drive_collar_spec import (
     BODY_SUPPLY_NOTE,
-    BORE_CALLOUT,
+    BORE_CORE_CLEARANCE,
     BORE_DIA,
-    BORE_ENTRY_BREAK_CALLOUT,
+    BORE_ENTRY_BREAK_ANGLE_DEG,
+    DOWEL_NUMBER,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
-    FLAT_CALLOUT,
+    FLAT_CLEARANCE,
     LENGTH,
     OD,
-    OD_CALLOUT,
     OVERALL_LENGTH,
-    PILOT_DIA_CALLOUT,
     PILOT_SUPPLY_NOTE,
     PILOT_DIA,
     PILOT_LENGTH,
     PIN_CIRCLE_RADIUS,
-    PIN_HOLE_CALLOUT,
-    PIN_LOCATION_CALLOUT,
+    SHAFT_NAME,
+    SHAFT_NUMBER,
+    SPROCKET_NUMBER,
 )
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -157,7 +159,9 @@ SIDE_KEEP = {
     "CollarLength": (_REAR_X - 0.018, _LENGTH_ROW_Y),
     "CollarDia": (_PILOT_X + 0.069, SIDE_CENTER[1]),
     "PilotDia": (_PILOT_X + 0.022, SIDE_CENTER[1]),
-    "BoreEntryBreak": (_REAR_X - 0.031, _BORE_EDGE_Y + 0.0068),
+    # Three callout rows now, not six: the text drops the 11 mm the three
+    # removed rows took, so its dimension line keeps running in the bore's air.
+    "BoreEntryBreak": (_REAR_X - 0.031, _BORE_EDGE_Y + 0.0068 - 0.011),
 }
 OVERALL_TEXT_XY = ((_REAR_X + _SEAT_X) / 2.0, SIDE_CENTER[1] + HALF_OD + 0.010)
 # Physical annular end-face picks, outside the actual rear entry relief and
@@ -185,28 +189,60 @@ def _numbered(number: int, text: str) -> str:
 
 PILOT_NOTE = 2
 BODY_NOTE = 3
+# Rule 4 (one feature with several tight dimensions names its mate once, on
+# one numbered flag note linked to each) and the shop table: the flat's
+# .0006 band is narrower than the milled-step row, so the note names the fit
+# route, the D-bore made to the measured shaft, with both clearances as REF
+# (machinist review, rubric v2: the bore callout carried six lines of words
+# and the private TRUE D / D-CORE).
+D_BORE_NOTE = 4
+
+
+def _clearance(limits: tuple[float, float]) -> str:
+    """A clearance range rounded outward onto the four-place inch grid."""
+    return (
+        f"{inch_text(inch_floor_mm(min(limits), 4), 4)}-"
+        f"{inch_text(inch_ceil_mm(max(limits), 4), 4)}"
+    )
+
+
+D_BORE_FIT = (
+    f"D-BORE Ø AND FLAT: SLIDING FIT ON {SHAFT_NUMBER} {SHAFT_NAME}, MADE TO "
+    f"THE MEASURED SHAFT (CLEARANCE {_clearance(BORE_CORE_CLEARANCE)} ON Ø, "
+    f"{_clearance(FLAT_CLEARANCE)} ON FLAT)."
+)
 FIT_NOTES = "\n".join(
     (
         _numbered(PILOT_NOTE, f"{PILOT_SUPPLY_NOTE}, PER {step_ref(FIT_STEP_KEY)}."),
         _numbered(BODY_NOTE, f"{BODY_SUPPLY_NOTE}, PER {step_ref(BODY_FIT_STEP_KEY)}."),
+        _numbered(D_BORE_NOTE, D_BORE_FIT),
     )
 )
-# Every tight band names its mate and fit where it prints (rule 4).  The
-# flat's rows start at its jogged dimension line; two leading spaces stop
-# their ink short of it (review of farm run 20261101T130334243Z: the line
-# struck the S of SLIDES; draw_ch_fulcrum_shaft's trailing-space form).
+# The #25 chain the O.D. clears, by its drawing number (rule 4).
+CHAIN_NUMBER = _config.parts("sh-vn-chain-link")["number"]
+# Rule 7: a callout carries its size and process lines plus at most two lines
+# of words, and a location dimension carries only its value and band.  The
+# dowel pattern names the dowel and the sprocket its pins locate once, on its
+# 2X callout; each mate is named by drawing number (rule 4).  The flat's rows
+# start at its jogged dimension line; two leading spaces stop their ink short
+# of it (review of farm run 20261101T130334243Z: the line struck the S of
+# SLIDES; draw_ch_fulcrum_shaft's trailing-space form).
 DIMENSION_CALLOUTS_BELOW = {
-    "BoreDia": BORE_CALLOUT,
-    "FlatToAxis": "\n".join(f"  {row}" for row in FLAT_CALLOUT.splitlines()),
-    "PinPosDia": PIN_HOLE_CALLOUT,
-    "PinPosY": PIN_LOCATION_CALLOUT,
-    "PinNegY": PIN_LOCATION_CALLOUT,
-    "PilotDia": PILOT_DIA_CALLOUT,
-    "CollarDia": OD_CALLOUT,
+    "BoreDia": f"THRU\nSEE NOTE {D_BORE_NOTE}",
+    "FlatToAxis": f"  SEE NOTE {D_BORE_NOTE}",
+    "PinPosDia": f"2X REAM THRU\nPRESS FIT, DOWEL {DOWEL_NUMBER}\nPINS LOCATE {SPROCKET_NUMBER}",
+    "PilotDia": f"CLEARS BORE\nOF {SPROCKET_NUMBER}",
+    "CollarDia": f"CLEARS CHAIN {CHAIN_NUMBER}\nON 12-TOOTH {SPROCKET_NUMBER}",
     "PilotLength": f"SEE NOTE {PILOT_NOTE}",
     "CollarLength": f"SEE NOTE {BODY_NOTE}",
-    "BoreEntryBreak": BORE_ENTRY_BREAK_CALLOUT,
+    # The chamfer callout: its form line, then one reason (rule 7), each row
+    # within the 21 characters that end left of the section's bore edge.
+    "BoreEntryBreak": (
+        f"X {BORE_ENTRY_BREAK_ANGLE_DEG:g}°\n"
+        f"CLEARS {SHAFT_NUMBER}\nSHAFT ROOT CORNER"
+    ),
 }
+
 ISO_NOTE_XY = (ISO_CENTER[0] - 0.030, ISO_CENTER[1] - 0.040)
 # The part's note, then the drawing's two fitted-length notes, in one
 # block; the actual fit procedure is linked to its assembly step.
