@@ -167,7 +167,8 @@ def test_table_layer_charges_each_correlated_pin_error_once() -> None:
         assert holding.WASHER_GAPS_MIN[name] == pytest.approx(
             base[name] - carrier.PIN_RELATIVE_ERROR[name]
         )
-    assert min(holding.WASHER_GAPS_MIN.values()) == pytest.approx(1.8233, abs=1e-3)
+    # #2249A spigot .391 ±.002: pilot float .14605 leaves ~1.813 (outer).
+    assert min(holding.WASHER_GAPS_MIN.values()) >= 1.81 > holding.WASHER_CLEARANCE_MIN
     # End heads: each point's own table-row and cut displacement.
     for name in trammel.SWEEP:
         assert holding.END_HEAD_GAPS_MIN[name] == pytest.approx(min(

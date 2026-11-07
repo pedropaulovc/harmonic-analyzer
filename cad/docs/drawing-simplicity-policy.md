@@ -321,8 +321,9 @@ HUB setting stack (for example `.0065`). The product band and these jig
 errors are never charged twice.
 
 The same correlated errors feed the tooling-clearance and riser-wall checks.
-The TL-52 washer keeps at least `1.823 mm` to each complete cutter sweep
-(OD and spigot float at their limits, each pass's own pin error), above the
+The TL-52 washer keeps at least `1.813 mm` to each complete cutter sweep
+(OD and the #2249A spigot's `.14605 mm` float at their limits, each pass's own
+pin error), above the
 `1.5 mm` floor. The end-clamp heads and stop pins charge their table-row (or
 riser `.XX` station) error with the moved cut over the whole sweep. The TL-24
 CL/CR #9 clearances keep `.1218`/`.1018` to the self-cut edges and the riser
