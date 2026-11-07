@@ -2536,10 +2536,6 @@ def test_vendor_warning_capture_restores_jsonl_sink(tmp_path, monkeypatch, faile
         pytest.param("pn_pen_rod", "local", (False, False), False, False, id="ordinary-part"),
         pytest.param("dt_vn_bearing", "drawing", (False, False), False, False, id="vendor-drawing"),
         pytest.param(
-            "ch_rocker_arm_tl_vn_oblique_cl_dowel", "local", (False, False),
-            False, True, id="tooling-vendor-build",
-        ),
-        pytest.param(
             "ch_rocker_arm_tl_oblique_carrier", "local", (False, False),
             False, False, id="fabricated-tooling-build",
         ),

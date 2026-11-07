@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import math
 import re
 
@@ -12,15 +13,16 @@ import build_ch_rocker_arm_tl_oblique_riser as part
 import ch_rocker_arm_tl_oblique_carrier_spec as carrier_spec
 import ch_rocker_arm_tl_oblique_riser_spec as spec
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
-import ch_rocker_arm_tl_oblique_hub_stud_spec as hub_stud
-import ch_rocker_arm_tl_oblique_hub_sleeve_spec as hub_sleeve
+import ch_rocker_strap_spec as strap
 import draw_ch_rocker_arm_tl_oblique_riser as drawing
 import export_features
 from _drawing_contract import model_toleranced_dimensions
-from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
+from _hole_spec import THREAD_MAJOR_MM
+from _inch_wall_limits import WALL_TARGET_MM
 
 STEM = "ch_rocker_arm_tl_oblique_riser"
 INCH = 25.4
+_STOP_STATIONS = {"Stop1X", "Stop2X", "StopY"}
 
 
 def _on_inch_grid(value_mm: float, places: int) -> bool:
@@ -33,10 +35,7 @@ def _features() -> dict:
 
 
 def _carrier(xy: tuple[float, float]) -> tuple[float, float]:
-    return (
-        xy[0] + trammel.RISER_BLANK_ORIGIN[0],
-        xy[1] + trammel.RISER_BLANK_ORIGIN[1],
-    )
+    return (xy[0] + spec.BLANK_ORIGIN[0], xy[1] + spec.BLANK_ORIGIN[1])
 
 
 def _close(a: tuple[float, float], b: tuple[float, float], tol: float) -> bool:
@@ -52,20 +51,26 @@ def test_hole_positions_map_back_to_the_calculator() -> None:
     assert _close(_carrier(spec.HUB_HOLE), trammel.HUB, tol)
     assert _close(_carrier(spec.CL_HOLE), trammel.CL, tol)
     assert _close(_carrier(spec.CR_HOLE), trammel.CR, tol)
-    assert _close(_carrier(spec.LEFT_CLAMP_HOLE), trammel.LEFT_CLAMP, tol)
+    for riser, carrier in zip(
+        spec.STOP_PIN_HOLES, spec.STOP_PIN_CARRIER_POINTS, strict=True
+    ):
+        assert _close(_carrier(riser), carrier, tol)
     features = _features()
-    for name, carrier in (
+    for name, carrier, y_field in (
         *(
-            (f"screw_hole_{i}", xy)
+            (f"screw_hole_{i}", xy, "width_nominal")
             for i, xy in enumerate(trammel.RISER_SCREWS, start=1)
         ),
-        ("hub_hole", trammel.HUB),
-        ("cl_hole", trammel.CL),
-        ("cr_hole", trammel.CR),
-        ("left_clamp_hole", trammel.LEFT_CLAMP),
+        ("hub_hole", trammel.HUB, "width_nominal"),
+        ("cl_hole", trammel.CL, "width_nominal"),
+        ("cr_hole", trammel.CR, "width_nominal"),
+        *(
+            (f"stop_hole_{i}", xy, "height_nominal")
+            for i, xy in enumerate(spec.STOP_PIN_CARRIER_POINTS, start=1)
+        ),
     ):
         feature = features[name]
-        exported = (feature["station_nominal"], feature["width_nominal"])
+        exported = (feature["station_nominal"], feature[y_field])
         assert _close(_carrier(exported), carrier, tol), name
         assert feature["thru"] is True
 
@@ -78,32 +83,41 @@ def test_the_model_globals_are_the_spec_stations() -> None:
     assert (g["HubX"], g["HubY"]) == spec.HUB_HOLE
     assert (g["ClX"], g["ClampY"]) == spec.CL_HOLE
     assert (g["CrX"], g["ClampY"]) == spec.CR_HOLE
-    assert (g["LeftClampX"], g["LeftClampY"]) == spec.LEFT_CLAMP_HOLE
-    for xy, dia, _names, _drives in spec.CIRCLES:
-        assert xy in (spec.HUB_HOLE, spec.CL_HOLE, spec.CR_HOLE, spec.LEFT_CLAMP_HOLE)
-        assert dia in (spec.HUB_DIA, spec.CLAMP_DIA, spec.LEFT_CLAMP_DIA)
+    assert [(g["Stop1X"], g["StopY"]), (g["Stop2X"], g["StopY"])] == list(
+        spec.STOP_PIN_HOLES
+    )
+    # The plain sketch circles are the carrier-spotted HUB, CL and CR only:
+    # the stop holes are a native #30 wizard feature (actual cut).
+    assert [xy for xy, _dia, _n, _d in spec.CIRCLES] == [
+        spec.HUB_HOLE,
+        spec.CL_HOLE,
+        spec.CR_HOLE,
+    ]
+    assert [dia for _xy, dia, _n, _d in spec.CIRCLES] == [
+        spec.HUB_DIA,
+        spec.CLAMP_DIA,
+        spec.CLAMP_DIA,
+    ]
 
 
 def test_blank_and_holes_are_the_part_sheet() -> None:
-    assert (spec.BLANK_LENGTH, spec.BLANK_WIDTH, spec.THICKNESS) == (
-        trammel.RISER_BLANK_LENGTH,
-        trammel.RISER_BLANK_WIDTH,
-        trammel.RISER_THICK,
-    )
+    assert spec.THICKNESS == trammel.RISER_THICK
     for name, value in (
         ("BlankLength", spec.BLANK_LENGTH),
         ("BlankWidth", spec.BLANK_WIDTH),
         ("BlankThick", spec.THICKNESS),
-        ("HubDia", spec.HUB_DIA),
         ("ClampDia", spec.CLAMP_DIA),
-        ("LeftClampDia", spec.LEFT_CLAMP_DIA),
+        ("StopDia", spec.STOP_HOLE_DIA),
+        ("Stop1X", spec.STOP_PIN_HOLES[0][0]),
+        ("Stop2X", spec.STOP_PIN_HOLES[1][0]),
+        ("StopY", spec.STOP_PIN_HOLES[0][1]),
     ):
         assert _on_inch_grid(value, spec.DRAWING_PRECISION_BY_NAME[name]), name
     assert spec.SCREW_SPEC.kind == "clearance" and spec.SCREW_SPEC.size == "#4"
     assert trammel.RISER_SCREW == "#4-40"
-    # The enlarged HUB hole passes the full-wall sleeve, not just the stud.
-    assert spec.HUB_DIA > hub_sleeve.OD + 0.005 * INCH
-    assert hub_sleeve.ID >= hub_stud.DIA + max(hub_stud.DIA_BAND)
+    # The literal metric HUB relief passes the in-place product-hole reamer.
+    assert spec.HUB_DIA == 12.0
+    assert spec.HUB_DIA > strap.HOLE_DIA
     assert part.MATERIAL == "6061 Alloy"
 
 
@@ -152,76 +166,102 @@ def test_the_screw_hole_has_one_callout_naming_its_countersink() -> None:
     assert "CskDia" not in set().union(*spec.DRAWING_DIMENSIONS.values())
 
 
-def test_native_screw_cut_readback_requires_both_design_limits() -> None:
-    lo = spec.SCREW_DIA_PRINTED
-    hi = lo + spec.DRILLED_BAND[0]
-    for diameter in (lo, spec.SCREW_DRILL_DIA, spec.SCREW_DIA, hi):
-        part._require_screw_cut_in_printed_band(diameter)
-    for diameter in (lo - 0.001, hi + 0.001):
-        with pytest.raises(RuntimeError, match="outside the printed"):
-            part._require_screw_cut_in_printed_band(diameter)
+def test_native_cut_readback_requires_both_design_limits() -> None:
+    for printed in (spec.SCREW_DIA_PRINTED, spec.STOP_HOLE_DIA):
+        lo, hi = printed, printed + spec.DRILLED_BAND[0]
+        for diameter in (lo, spec.SCREW_DRILL_DIA, spec.SCREW_DIA, hi):
+            part._require_cut_in_printed_band(diameter, printed, "holes")
+        for diameter in (lo - 0.001, hi + 0.001):
+            with pytest.raises(RuntimeError, match="outside the printed"):
+                part._require_cut_in_printed_band(diameter, printed, "holes")
+
+
+def test_stop_holes_cut_the_actual_30_drill_and_print_the_design_nominal() -> None:
+    """The two loose end-stop pin holes follow the screw holes' prior fix: the
+    native wizard cuts the actual #30 (.1285); a blanked reference circle on
+    stop 2 prints the .128 design nominal under DRILLED HOLES +.004/0."""
+    assert spec.STOP_DRILL == spec.SCREW_DRILL == "#30"
+    assert spec.STOP_SPEC == spec.SCREW_SPEC
+    assert spec.STOP_DIA == spec.SCREW_DIA
+    assert spec.STOP_HOLE_DIA == pytest.approx(0.128 * INCH)
+    assert spec.GLOBALS["StopDia"] == spec.STOP_HOLE_DIA
+    assert spec.DRAWING_PRECISION_BY_NAME["StopDia"] == 3
+    assert spec.DRAWING_DIMENSIONS["StopHoles"] == _STOP_STATIONS
+    assert spec.DRAWING_DIMENSIONS["StopHoleReference"] == {"StopDia"}
+    assert part.REFERENCE_SKETCHES == ("ScrewHoleReference", "StopHoleReference")
+    rows = {row[0]: row for row in part._REFERENCE_CIRCLES}
+    _sketch, centre, dia, names, drives = rows["StopHoleReference"]
+    assert (centre, dia) == (spec.STOP_PIN_HOLES[1], spec.STOP_HOLE_DIA)
+    assert names[2] == "StopDia" and drives == ('"Stop2X"', '"StopY"', '"StopDia"')
+    for index in (1, 2):
+        feature = _features()[f"stop_hole_{index}"]
+        lo, hi = feature["dia"]
+        assert (lo, hi) == pytest.approx((0.128 * INCH, 0.132 * INCH))
+        assert lo <= spec.STOP_DIA <= hi
+        assert lo <= spec.SCREW_DRILL_DIA <= hi
+        # Loose: the largest supplier pin slips in the smallest hole.
+        assert lo > spec.STOP_PIN_DIA_LIMITS[1]
+    source = inspect.getsource(part.build)
+    assert 'name="StopHoles"' in source and "STOP_SPEC" in source
+    assert "SharedCoordinate(0)" in source[source.index('name="StopHoles"') :]
+    assert spec.CALLOUTS_ABOVE["StopDia"] == "2X"
+    assert spec.CALLOUTS_BELOW["StopDia"].split("\n")[0] == "#30 DRILL THRU"
+    assert spec.WALLS_MM["stop 1 to edges"] >= WALL_TARGET_MM
+    assert spec.WALLS_MM["stop 2 to edges"] >= WALL_TARGET_MM
 
 
 def test_hole_locations_are_reference_values_from_the_carrier() -> None:
-    """TrammelJig ruling: every hole is spotted from TL-21 at assembly, so its
-    stations print as parenthesised 2-place references and each hole callout
-    ends in the location rows (review r7: not a general note); only the sizes
-    stay banded."""
+    """TrammelJig ruling: the carrier-located holes are spotted from TL-21 at
+    assembly, so their stations print as parenthesised 2-place references and
+    each such callout ends in the location rows (review r7: not a general
+    note). The end-stop holes are drilled at ordinary .XX stations that keep
+    the title block's band, and their callout names the pins instead."""
     stations = set().union(*spec.DRAWING_DIMENSIONS.values()) - {
         "BlankLength",
         "BlankWidth",
         "BlankThick",
         *spec.HOLE_CALLOUTS,
+        *_STOP_STATIONS,
     }
     assert spec.REFERENCE_DIMENSIONS == stations
+    assert not _STOP_STATIONS & spec.REFERENCE_DIMENSIONS
     assert all(spec.DRAWING_PRECISION_BY_NAME[n] == 2 for n in stations)
     carrier_number = _config.parts("ch-rocker-arm-tl-oblique-carrier")["number"]
     rows = [f"LOCATE FROM {carrier_number}", "AT ASSEMBLY"]
-    assert set(spec.HOLE_CALLOUTS) == {"ScrewDia", "HubDia", "ClampDia", "LeftClampDia"}
-    for name in spec.HOLE_CALLOUTS:
+    assert set(spec.HOLE_CALLOUTS) == {"ScrewDia", "HubDia", "ClampDia", "StopDia"}
+    for name in set(spec.HOLE_CALLOUTS) - {"StopDia"}:
         assert spec.CALLOUTS_BELOW[name].split("\n")[-2:] == rows, name
+    assert "LOCATE" not in spec.CALLOUTS_BELOW["StopDia"]
     assert spec.DRAWING_NOTES == ""
     assert not any("Location" in p for p in part._SAVED_DRAWING_PROPERTIES)
     for name, feature in _features().items():
-        if name.endswith("_hole") or re.fullmatch(r"screw_hole_\d", name):
+        if name.startswith("stop_hole_"):
+            assert {"station", "height"} <= set(feature["requirements"]), name
+        elif name.endswith("_hole") or re.fullmatch(r"screw_hole_\d", name):
             assert "station" not in feature and "width" not in feature, name
 
 
-def test_clamp_holes_pass_their_mates_and_state_the_band_wall_shortfall() -> None:
-    """Owner ruling 6 (2026-11-01): the CL/CR holes are spotted through
-    TL-21's, so the band walls take the carrier stations' error about the
-    cut's centre; the outer wall falls under the .080 target, over the .060
-    floor, and the CL/CR callout states it as plain fact (RV-01)."""
+def test_clamp_holes_pass_their_mates_and_meet_the_band_wall_target() -> None:
+    """R4: the #9 CL/CR clearances, spotted through TL-21's ordinary #8-32
+    taps, keep the .080 target to both self-cut edges with the carrier
+    stations' error about the cut's centre. The owner Option B RV-01
+    exception (.071 MIN, 2026-11-06) belonged to the retired .257 holes and
+    is not carried: no below-target statement or exception remains."""
     lo, _hi = _features()["cl_hole"]["dia"]
-    assert spec.CL_DOWEL_MAX == carrier_spec.CL_DOWEL_DIA + max(
-        carrier_spec.CL_DOWEL_BAND
-    )
-    assert lo > spec.CL_DOWEL_MAX
-    assert lo > spec.CR_SCREW_MAJOR
-    # The carrier's 3-place CL station (±.005 each way, X also half the D1
-    # band from A1 to the cut's centre), resolved along the radius to CL.
+    assert lo > THREAD_MAJOR_MM[carrier_spec.CLAMP_THREAD]
     centre = trammel.ARC_CENTRE
     radius = math.dist(trammel.CL, centre)
-    cos_x = abs(trammel.CL[0] - centre[0]) / radius
-    cos_y = abs(trammel.CL[1] - centre[1]) / radius
-    station = 0.005 * INCH
-    error = cos_x * (station + carrier_spec.POSITION_BAND / 2.0) + cos_y * station
-    assert spec.CLAMP_STATION_ERROR == pytest.approx(error)
-    assert 0.14 < spec.CLAMP_STATION_ERROR < 0.16
     hole_r = (spec.CLAMP_DIA + spec.DRILLED_BAND[0]) / 2.0
+    error = spec.CLAMP_STATION_ERROR
     inner, outer = spec.CLAMP_BAND_WALLS
     assert inner == pytest.approx(radius - hole_r - error - trammel.RISER_INNER_RADIUS)
     assert outer == pytest.approx(trammel.RISER_OUTER_RADIUS - radius - hole_r - error)
-    assert inner >= WALL_TARGET_MM
-    assert WALL_FLOOR_MM < outer < WALL_TARGET_MM
-    # Stated floored to three places: a MIN never rounds up.
-    assert outer / INCH == pytest.approx(0.0747, abs=0.0001)
-    assert spec.CLAMP_WALL_MIN_TEXT == "WALL .074 MIN TO CUT EDGE"
-    rows = spec.CALLOUTS_BELOW["ClampDia"].split("\n")
-    assert rows[:3] == ["DRILL THRU", "CL AND CR HOLES", spec.CLAMP_WALL_MIN_TEXT]
-    exceptions = _config.parts("ch-rocker-arm-tl-oblique-riser")["machinist_exceptions"]
-    assert [(e["id"], e["kind"]) for e in exceptions] == [("RV-01", "minor")]
-    assert spec.CLAMP_WALL_MIN_TEXT in exceptions[0]["where"]
+    assert min(inner, outer) >= WALL_TARGET_MM
+    assert not any("WALL" in row for row in spec.CALLOUTS_BELOW["ClampDia"].split("\n"))
+    riser = _config.parts("ch-rocker-arm-tl-oblique-riser")
+    assert not riser.get("machinist_exceptions")
+    # The self-cut stays the approved 9/16 cutter on the strap cutter's centres.
+    assert trammel.RISER_CUTTER_IN == "9/16"
 
 
 def test_each_row_count_matches_the_holes_on_that_row() -> None:
@@ -236,8 +276,16 @@ def test_each_row_count_matches_the_holes_on_that_row() -> None:
             xy for xy in spec.SCREW_HOLES if xy[1] == spec.GLOBALS["ScrewOuterY"]
         ],
         "ClampY": [spec.CL_HOLE, spec.CR_HOLE],
+        "StopY": list(spec.STOP_PIN_HOLES),
     }
-    all_holes = [*spec.SCREW_HOLES, spec.HUB_HOLE, spec.CL_HOLE, spec.CR_HOLE, spec.LEFT_CLAMP_HOLE]
+    all_holes = [
+        *spec.SCREW_HOLES,
+        spec.HUB_HOLE,
+        spec.CL_HOLE,
+        spec.CR_HOLE,
+        *spec.STOP_PIN_HOLES,
+    ]
+    assert set(rows) == set(spec.ROW_COUNTS)
     for name, holes in rows.items():
         on_row = [xy for xy in all_holes if xy[1] == spec.GLOBALS[name]]
         assert on_row == holes and len(holes) == 2, name
@@ -246,6 +294,8 @@ def test_each_row_count_matches_the_holes_on_that_row() -> None:
     assert [xy for xy in all_holes if xy[1] == spec.GLOBALS["HubY"]] == [spec.HUB_HOLE]
     assert "HubY" not in spec.ROW_COUNTS
     assert not set(spec.ROW_COUNTS) & set(spec.CALLOUTS_ABOVE)
+    # The ordinary stop row is counted in the drawing, not parenthesised.
+    assert "StopY" not in spec.REFERENCE_DIMENSIONS
 
 
 # Sheet text at the template's height: about 2.05 mm a character, 4.5 mm tall
@@ -271,27 +321,65 @@ def test_row_heights_stand_a_text_width_apart() -> None:
         assert spec.GLOBALS[name] * _PLAN_SCALE > _TEXT_MM + 1.0, name
 
 
+def test_stop_row_text_stands_below_the_edge_clear_of_its_neighbours() -> None:
+    """The stops' "2X .19" span is too short for its text, which stands below
+    the bottom edge, nearest the outline: clear of the right end's extension
+    line, of the CL/CR row's dimension line and of the bottom edge."""
+    x, y, _ = drawing.PLAN_KEEP["StopY"]
+    text = f"2X .{round(spec.GLOBALS['StopY'] / INCH * 100):02d}"
+    half = len(text) * _CHAR_MM / 2.0
+    assert spec.GLOBALS["StopY"] * _PLAN_SCALE < _TEXT_MM
+    assert (x - spec.BLANK_LENGTH) * _PLAN_SCALE - half >= _AIR_MM
+    assert x < drawing.PLAN_KEEP["ClampY"][0]
+    assert y * _PLAN_SCALE + _TEXT_MM / 2.0 <= -_AIR_MM
+
+
+def test_stop_callout_block_stands_below_right_of_stop_two() -> None:
+    """The stop holes' block hangs off stop 2 (the reference circle's hole),
+    right of every X-stack extension line and left of section A-A."""
+    x, y, _ = drawing.PLAN_KEEP["StopDia"]
+    stop_x, stop_y = spec.STOP_PIN_HOLES[1]
+    assert x > spec.BLANK_LENGTH > stop_x and y < drawing.PLAN_KEEP["StopY"][1]
+    block_half = (
+        max(len(row) for row in spec.CALLOUTS_BELOW["StopDia"].split("\n"))
+        * _CHAR_MM
+        / 2.0
+    )
+    plan_left = drawing.PLAN_CENTER[0] * 1000.0 - spec.BLANK_LENGTH * _PLAN_SCALE / 2.0
+    block_left = plan_left + x * _PLAN_SCALE - block_half
+    block_right = plan_left + x * _PLAN_SCALE + block_half
+    assert block_left - (plan_left + spec.BLANK_LENGTH * _PLAN_SCALE) >= _AIR_MM
+    section_left = (
+        drawing.SECTION_CENTER[0] * 1000.0
+        - spec.BLANK_WIDTH * drawing.SECTION_SCALE[0] / drawing.SECTION_SCALE[1] / 2.0
+    )
+    assert section_left - block_right >= _AIR_MM
+    assert stop_y > 0.0
+
+
 def test_x_stack_rows_leave_air_and_the_section_letters_clear() -> None:
     """jig-r6: the X stack's texts stood 0.48 mm apart, CL's text sat on the
     baseline extension, and the section letter sat on HubX's extension."""
-    rows = [
-        drawing.PLAN_KEEP[n][1] * _PLAN_SCALE
-        for n in (
-            "ClX",
-            "Screw3X",
-            "Screw1X",
-            "HubX",
-            "Screw2X",
-            "Screw4X",
-            "CrX",
-            "BlankLength",
-        )
-    ]
-    assert all(a - b - _TEXT_MM >= 4.52 for a, b in zip(rows, rows[1:]))
-    cl_text_right = (
-        drawing.PLAN_KEEP["ClX"][0] * _PLAN_SCALE + len("(9.11)") * _CHAR_MM / 2.0
+    order = (
+        "Stop1X",
+        "ClX",
+        "Screw3X",
+        "Screw1X",
+        "HubX",
+        "Screw2X",
+        "Screw4X",
+        "CrX",
+        "Stop2X",
+        "BlankLength",
     )
-    assert cl_text_right <= -_AIR_MM
+    rows = [drawing.PLAN_KEEP[n][1] * _PLAN_SCALE for n in order]
+    assert all(a - b - _TEXT_MM >= 4.52 for a, b in zip(rows, rows[1:]))
+    # Nearest the part first, length last.
+    lengths = [spec.GLOBALS[n] for n in order]
+    assert lengths == sorted(lengths)
+    for name, text in (("Stop1X", ".29"), ("ClX", "(9.11)")):
+        right = drawing.PLAN_KEEP[name][0] * _PLAN_SCALE + len(text) * _CHAR_MM / 2.0
+        assert right <= -_AIR_MM, name
     # Review r7: the HUB row height's dimension line and arrows ran down
     # through "(9.11)"; its line and its own text stand left of CL's text.
     cl_text_left = (
@@ -303,7 +391,13 @@ def test_x_stack_rows_leave_air_and_the_section_letters_clear() -> None:
     cut = drawing.CUT_X * _PLAN_SCALE
     stations = sorted(
         x * _PLAN_SCALE
-        for x, _y in (*spec.SCREW_HOLES, spec.HUB_HOLE, spec.CL_HOLE, spec.CR_HOLE)
+        for x, _y in (
+            *spec.SCREW_HOLES,
+            spec.HUB_HOLE,
+            spec.CL_HOLE,
+            spec.CR_HOLE,
+            *spec.STOP_PIN_HOLES,
+        )
     )
     assert not [s for s in stations if cut + 12.0 < s < cut + 22.0]
     assert -drawing.CUT_Y[0] * _PLAN_SCALE >= 6.0
@@ -362,6 +456,13 @@ def test_every_exported_band_endpoint_is_a_printed_value() -> None:
     assert checked
 
 
+# The retained 0c3 native/PDF ink below was measured on the 41.148 wide blank.
+# The plan view centres on its outline, so the 42.926 blank lifts everything
+# above the outline's centre by a quarter of the growth on paper at 1:2.
+_RETAINED_0C3_WIDTH = 41.148
+_WIDTH_LIFT = (spec.BLANK_WIDTH - _RETAINED_0C3_WIDTH) / 2.0 * _PLAN_SCALE
+
+
 def test_clamp_callout_has_border_air_and_clears_the_cutting_plane() -> None:
     # Retained 0c3 native/PDF ink, in paper mm at the unchanged 1:2 scale.
     # The old shelf started at 13.0891 against the 12.7 inner border.
@@ -369,15 +470,17 @@ def test_clamp_callout_has_border_air_and_clears_the_cutting_plane() -> None:
     x, y, _ = drawing.PLAN_KEEP["ClampDia"]
     dx = (x - (-26.0)) * _PLAN_SCALE
     dy = (y - (drawing._CALLOUT_Y + 10.0)) * _PLAN_SCALE
-    assert (dx, dy) == pytest.approx((3.0, 1.5))
+    assert (dx, dy) == pytest.approx((3.0, 1.0))
+    lift = dy + _WIDTH_LIFT
     assert 13.0891 + dx - 12.7 >= _AIR_MM  # shelf, farther left than the ink
-    assert 266.7 - (262.7036 + dy) >= _AIR_MM  # top of the full seven-row block
+    assert 266.7 - (262.7036 + lift) >= _AIR_MM  # top of the full block
     assert 104.4326 - (87.2384 + dx) >= _AIR_MM  # upper section letter A
     # Keep the leader's closest approach to the upper A-A tail clear too:
     # shifting only X would repair the border but reintroduce review r12.
-    circle = (69.55255, 201.89715)
-    elbow = (87.2384 + dx, 224.8134 + dy)
-    cut_tail = (90.2203, 222.287)
+    # The CL hole and the cut's tail rise with the outline's top half.
+    circle = (69.55255, 201.89715 + _WIDTH_LIFT)
+    elbow = (87.2384 + dx, 224.8134 + lift)
+    cut_tail = (90.2203, 222.287 + _WIDTH_LIFT)
     vx, vy = elbow[0] - circle[0], elbow[1] - circle[1]
     tx, ty = cut_tail[0] - circle[0], cut_tail[1] - circle[1]
     assert 0.0 < (tx * vx + ty * vy) / (vx * vx + vy * vy) < 1.0
@@ -386,24 +489,11 @@ def test_clamp_callout_has_border_air_and_clears_the_cutting_plane() -> None:
     assert x < drawing.CUT_X
 
 
-def test_left_clamp_callout_keeps_its_complete_ink_inside_sheet_two() -> None:
-    # Retained 0c3: full ink top 273.6474, lower shelf 246.8696;
-    # the top border is 266.7 and the plan outline tops out at 215.287.
-    x, y, _ = drawing.PLAN_KEEP["LeftClampDia"]
-    assert x == 85.0
-    dy = (y - (drawing._CALLOUT_Y + 43.0)) * _PLAN_SCALE
-    assert dy == pytest.approx(-21.5)
-    assert 266.7 - (273.6474 + dy) >= _AIR_MM
-    assert 246.8696 + dy - 215.287 >= _AIR_MM
-    assert drawing.VIEW_SCALE == (1, 2)
-
-
-def test_left_clamp_clearance_has_complete_uncluttered_sheet_coverage() -> None:
-    assert drawing.SHEET_NAMES == ("RISER", "LEFT CLAMP CLEARANCE")
-    assert drawing.LEFT_CLAMP_DIMENSIONS == {"LeftClampX", "LeftClampY", "LeftClampDia"}
-    assert drawing.LEFT_CLAMP_DIMENSIONS <= set(drawing.PLAN_KEEP)
-    assert spec.CALLOUTS_BELOW["LeftClampDia"].startswith("DRILL THRU")
-    feature = _features()["left_clamp_hole"]
-    assert feature["thru"] is True
-    assert feature["dia"][0] > 4.826
-    assert len(spec.HOLES) == 8
+def test_one_sheet_and_no_left_clamp_remnants() -> None:
+    """R4 omits LEFT: no second sheet, hole, dimension or spec name survives."""
+    assert not hasattr(drawing, "SHEET_NAMES")
+    assert not hasattr(drawing, "LEFT_CLAMP_DIMENSIONS")
+    assert not [n for n in dir(spec) if n.startswith("LEFT")]
+    assert not [n for n in drawing.PLAN_KEEP if n.startswith("LeftClamp")]
+    assert not [n for n in _features() if n.startswith("left_clamp")]
+    assert len(spec.HOLES) == 9

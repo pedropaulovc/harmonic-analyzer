@@ -1,10 +1,13 @@
-r"""Create the manufacturing drawing for the oblique-trammel hub washer (MHA-CH-06-TL-35).
+r"""Create the manufacturing drawing for the oblique-trammel hub washer (MHA-CH-06-TL-52).
 
-The face view carries the #9 drilled bore with its DRILL THRU callout; the
-O.D. moves onto the side view with the thickness (drawing-guidelines.md
-rule 11) and states the cutter clearance its .XXX row protects (rule 4).
-Places are authored on the part (``ch_rocker_arm_tl_oblique_hub_washer_spec``);
-every size takes the title block's rows.
+The face view carries the 13/64 drilled bore with its DRILL THRU callout; the
+side view reads like the lathe (drawing-guidelines.md rule 11): both turned
+diameters and both lengths from the seat face, with the flange's O.D.
+stating the cutter clearance its .XXX row protects and the owner's edge
+break, the spigot's band naming the strap hole it locates in (rule 4), and
+the spigot length carrying the local edge limits that keep its locating
+land.  Places and bands are authored on the part
+(``ch_rocker_arm_tl_oblique_hub_washer_spec``).
 
 Run with SolidWorks open::
 
@@ -17,7 +20,7 @@ import argparse
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.solidworks.drawing import dimension_name, place_view
+from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 import _telemetry
 from _check import check
@@ -31,7 +34,6 @@ from _drawing_common import (
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
-    move_model_dimension,
     offset_dimension_text,
     set_dimension_callouts,
 )
@@ -46,6 +48,7 @@ from ch_rocker_arm_tl_oblique_hub_washer_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     OD,
+    SPIGOT_LENGTH,
     STEM,
     THICK,
 )
@@ -65,33 +68,56 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A Ø.433 x .06 washer at 4:1 (44 mm across, 6 mm thick): the face view, the
-# side view and the isometric on one row midway between the top border and
-# the title block (the mg-wheel-axle-spacer sheet's layout), no general note.
+# A Ø.433 x .074 top hat at 4:1 (44 mm across, 7.5 mm long): the face view,
+# the side view and the isometric on one row midway between the top border
+# and the title block (the mg-wheel-axle-spacer sheet's layout), no general
+# note.
 SHEET_SCALE = (4.0, 1.0)
 VIEW_SCALE = (4, 1)
 FRONT_CENTER = (0.090, 0.160)
 RIGHT_CENTER = (0.215, 0.160)
-ISO_CENTER = (0.340, 0.160)
+ISO_CENTER = (0.345, 0.160)
 _S = VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0
+# The side view (*Right) draws the Right-plane profile, sheet X = model -Z,
+# centred on the part's z span -SPIGOT_LENGTH..THICK.
+_U_MID = (SPIGOT_LENGTH - THICK) / 2.0
 
-# Both diameters import on the face view, where every diameter line runs
-# through the centre: two would cross there.  The bore keeps the face view,
-# its callout up and right of it; the O.D. is a donor there and moves onto
-# the side view, right of the washer, its three-row function callout clear of
-# the washer's edge.  The thickness hangs under the side view; its .06 is
-# wider than the 6 mm span at 4:1 (review r1-r3: both extension lines touched
-# it), so its text leaves on a leader right of the right extension line.
+
+def _side_x(u_mm: float) -> float:
+    """Sheet X of a profile station u = -z (mm) on the side view."""
+    return RIGHT_CENTER[0] + (u_mm - _U_MID) * _S
+
+
+HEAD_FACE_X = _side_x(-THICK)
+SEAT_FACE_X = _side_x(0.0)
+SPIGOT_END_X = _side_x(SPIGOT_LENGTH)
+_OD_TOP_Y = RIGHT_CENTER[1] + OD / 2.0 * _S
+
+# Face view: the bore alone, its callout up and right of it.
 FRONT_KEEP = {
-    "WasherOd": (0.050, 0.100),
     "WasherBore": (0.130, 0.215),
 }
-_THICKNESS_Y = RIGHT_CENTER[1] - OD / 2.0 * _S - 0.016
+# Side view.  The profile's sketch corners lie on its +Y side, so both
+# lengths chain on one row above the part, from the seat face: the
+# thickness's text left of the head-side face, the spigot length's right of
+# the spigot's end (each span is narrower than its text at 4:1), the length
+# row high enough that the spigot length's three callout rows stay above the
+# spigot Ø's upper extension line.  The flange Ø stands left of the
+# head-side face, where its extension lines leave the rims into open air
+# and its four rows sit between the face view and the part; the spigot Ø
+# right of the spigot's end.  Each Ø's value sits a little high so its
+# callout rows end above its lower extension line.
+_LENGTH_ROW_Y = _OD_TOP_Y + 0.020
 RIGHT_KEEP = {
-    "WasherThickness": (RIGHT_CENTER[0], _THICKNESS_Y),
+    "WasherOd": (HEAD_FACE_X - 0.035, RIGHT_CENTER[1] + 0.010),
+    "SpigotDia": (SPIGOT_END_X + 0.040, RIGHT_CENTER[1] + 0.010),
+    "WasherThickness": ((HEAD_FACE_X + SEAT_FACE_X) / 2.0, _LENGTH_ROW_Y),
+    "SpigotLength": ((SEAT_FACE_X + SPIGOT_END_X) / 2.0, _LENGTH_ROW_Y),
 }
-OD_ON_SIDE = (RIGHT_CENTER[0] + THICK / 2.0 * _S + 0.040, RIGHT_CENTER[1])
-THICKNESS_TEXT_XY = (RIGHT_CENTER[0] + THICK / 2.0 * _S + 0.012, _THICKNESS_Y)
+LENGTH_TEXT_XY = {
+    "WasherThickness": (HEAD_FACE_X - 0.012, _LENGTH_ROW_Y),
+    "SpigotLength": (SPIGOT_END_X + 0.036, _LENGTH_ROW_Y),
+}
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -118,7 +144,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Oblique Trammel Hub Washer Manufacturing Drawing",
             1: "Harmonic Analyzer shop fixture drawing",
             2: "Harmonic Analyzer Project",
-            3: "hub clamp washer; turned brass",
+            3: "hub clamp top-hat washer; turned brass",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -143,24 +169,13 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="right",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    od_donors = [a for a in front_annotations if dimension_name(adapter, a) == "WasherOd"]
-    if len(od_donors) != 1:
-        raise RuntimeError("expected one hub washer O.D. donor dimension")
-    moved_od = move_model_dimension(
-        adapter, od_donors[0], right, OD_ON_SIDE, source_view=front
-    )
-    annotations = [
-        *(a for a in front_annotations if dimension_name(adapter, a) != "WasherOd"),
-        *right_annotations,
-        moved_od,
-    ]
+    annotations = [*front_annotations, *right_annotations]
     # Decimal places (and so the general-tolerance row each dimension claims)
-    # are authored on the part; the sheet only proves the import kept them.
+    # and the spigot's band are authored on the part; the sheet only proves
+    # the import kept the places.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    offset_dimension_text(
-        adapter, right_annotations, {"WasherThickness": THICKNESS_TEXT_XY}
-    )
+    offset_dimension_text(adapter, right_annotations, LENGTH_TEXT_XY)
 
     return await finalize_drawing(
         adapter,

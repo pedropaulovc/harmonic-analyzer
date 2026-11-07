@@ -17,6 +17,13 @@ import test_pd_transgear_adapter_contract as sdk
 
 
 SCRIPTS = Path(__file__).resolve().parent
+# Census classes in RECIPES order (nine recipes, one class each):
+#   CARRIER   carrier: native build, covered by the parametrized census only.
+#   JOINT     pivot and feed blocks: sketch and cut-extrude, shared helper module.
+#   HARDWARE  pivot screw, spacer, shim and hub washer: create_part, create_sketch,
+#             create_extrusion (HARDWARE_RECIPES below).
+#   ASSEMBLY  jig assembly: reached by the parametrized census; not a hardware part.
+#   KIT       shared SH-VN-57 clamping kit: a single-unit census of its own.
 RECIPES = (
     "build_ch_rocker_arm_tl_oblique_carrier.py",
     "build_ch_rocker_arm_tl_oblique_pivot_block.py",
@@ -24,13 +31,16 @@ RECIPES = (
     "build_ch_rocker_arm_tl_vn_oblique_pivot_screw.py",
     "build_ch_rocker_arm_tl_vn_oblique_pivot_spacer.py",
     "build_ch_rocker_arm_tl_vn_oblique_pivot_shim.py",
-    "build_ch_rocker_arm_tl_oblique_hub_stud.py",
-    "build_ch_rocker_arm_tl_oblique_hub_sleeve.py",
     "build_ch_rocker_arm_tl_oblique_hub_washer.py",
     "build_ch_rocker_arm_tl_oblique_jig_assembly.py",
     "build_sh_vn_clamping_kit_hardware.py",
 )
-HARDWARE_RECIPES = RECIPES[3:9]
+HARDWARE_RECIPES = (
+    "build_ch_rocker_arm_tl_vn_oblique_pivot_screw.py",
+    "build_ch_rocker_arm_tl_vn_oblique_pivot_spacer.py",
+    "build_ch_rocker_arm_tl_vn_oblique_pivot_shim.py",
+    "build_ch_rocker_arm_tl_oblique_hub_washer.py",
+)
 
 
 def _local_nodes(scope: ast.AST):
@@ -255,15 +265,17 @@ def test_all_affected_native_recipe_calls_exist_and_bind_to_initialized_sdk(reci
 
 
 def test_census_covers_every_new_physical_interface() -> None:
-    assert len(RECIPES) == len(set(RECIPES)) == 11
+    assert len(RECIPES) == len(set(RECIPES)) == 9
+    assert "build_ch_rocker_arm_tl_oblique_jig_assembly.py" in RECIPES
+    assert "build_ch_rocker_arm_tl_oblique_jig_assembly.py" not in HARDWARE_RECIPES
     for recipe in RECIPES[1:3]:
         calls = {call.func.attr for path in _census_units(recipe) for call in sdk._adapter_calls(sdk._tree(path))}
         assert {"create_sketch", "create_cut_extrude"} <= calls
     for recipe in HARDWARE_RECIPES:
         calls = {call.func.attr for call in sdk._adapter_calls(sdk._tree(SCRIPTS / recipe))}
         assert {"create_part", "create_sketch", "create_extrusion"} <= calls
-    stud = "build_sh_vn_clamping_kit_hardware.py"
-    assert _census_units(stud) == (SCRIPTS / stud,)
+    kit = "build_sh_vn_clamping_kit_hardware.py"
+    assert _census_units(kit) == (SCRIPTS / kit,)
     helper = SCRIPTS / "_oblique_pivot_block_model.py"
     for recipe in RECIPES[1:3]:
         assert helper in _census_units(recipe)
@@ -310,7 +322,9 @@ def test_actual_call_with_wrong_keyword_is_rejected_by_sdk_signature(recipe: str
 
 
 def test_projected_tuple_arity_mutation_is_not_skipped() -> None:
-    path = SCRIPTS / "build_ch_rocker_arm_tl_oblique_jig_assembly.py"
+    # The carrier's section reference: a mapper-projected add_line (the jig's
+    # CL tip line, the former fixture, retired with the CL dowel in R4).
+    path = SCRIPTS / "build_ch_rocker_arm_tl_oblique_carrier.py"
     tree = copy.deepcopy(sdk._tree(path))
     actual = next(call for call in sdk._adapter_calls(tree) if call.func.attr == "add_line" and any(isinstance(arg, ast.Starred) for arg in call.args))
     starred = next(arg for arg in actual.args if isinstance(arg, ast.Starred))

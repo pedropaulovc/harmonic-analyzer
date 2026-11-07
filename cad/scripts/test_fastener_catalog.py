@@ -59,12 +59,10 @@ _STOCK_REQUIREMENTS = {
     "mg-vn-wheel-axle-front-washer": (("92916A250",), "MHA-MG-VN-55", 1),
     "ch-vn-spring-hook": (("9489T111",), "MHA-CH-VN-51", 20),
     "fr-vn-tube-frame-cap": (("9275K141",), "MHA-FR-VN-54", 4),
-    "ch-rocker-arm-tl-vn-oblique-cl-dowel": (("98381A542",), "MHA-CH-06-TL-VN-53", 1),
-    "ch-rocker-arm-tl-vn-oblique-rail-screw": (("91251A197",), "MHA-CH-06-TL-VN-61", 16),
+    "ch-rocker-arm-tl-vn-oblique-rail-screw": (("91251A197",), "MHA-CH-06-TL-VN-61", 19),
     "ch-rocker-arm-tl-vn-oblique-bracket-screw": (("91251A196",), "MHA-CH-06-TL-VN-62", 8),
     "ch-rocker-arm-tl-vn-oblique-carriage-screw": (("91290A168",), "MHA-CH-06-TL-VN-64", 8),
     "ch-rocker-arm-tl-vn-oblique-riser-screw": (("91771A112",), "MHA-CH-06-TL-VN-67", 8),
-    "ch-rocker-arm-tl-vn-oblique-clamp-screw": (("91251A541",), "MHA-CH-06-TL-VN-68", 1),
     "ch-rocker-arm-tl-vn-oblique-lever-screw": (("91251A583",), "MHA-CH-06-TL-VN-69", 2),
     "ch-rocker-arm-tl-vn-oblique-lever-washer": (
         ("91812A230",), "MHA-CH-06-TL-VN-71", 2,
@@ -74,10 +72,6 @@ _STOCK_REQUIREMENTS = {
     ),
     "ch-rocker-arm-tl-vn-oblique-pivot-spacer": (("AS62-18-40",), "MHA-CH-06-TL-VN-78", 2),
     "ch-rocker-arm-tl-vn-oblique-pivot-shim": (("SHIM-0375-008",), "MHA-CH-06-TL-VN-79", 10),
-    "ch-rocker-arm-tl-vn-oblique-hub-screw": (("92220A163",), "MHA-CH-06-TL-VN-85", 1),
-    "ch-rocker-arm-tl-vn-oblique-left-clamp-screw": (
-        ("92220A165",), "MHA-CH-06-TL-VN-86", 1,
-    ),
 }
 # The post-mount screw's 1/4-20 x 4 in stock is sourced from MSC.
 _SUPPLIERS = {

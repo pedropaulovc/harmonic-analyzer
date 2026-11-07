@@ -1,10 +1,11 @@
 """Bandsaw preform in carrier XY; pure geometry, no native CAD calls.
 
-The retained material is the region between two symmetric chord chains,
-clipped to the purchased 350 x 38.1 flat. Chord vertices lie on the cutter
-CENTRE circles, not the finished edges. The raw rolled edges remain wherever
-an extrapolated chord leaves the bar. This matters at both blank ends: a
-38.1-wide bar cannot contain both complete circles over +/-175.
+The retained material lies between five inner and two outer straight chords,
+clipped to the procured 350 x 38.1 flat at its existing raw-edge datum.
+Roughing anchors use R795.080/R821.210 rather than the cutter-centre circles
+R795.2375/R820.7625. This roughing-layout bias preserves 4 mm stock to R800,
+0.30 mm stock to R816 and 3 mm scrap-side overlap after ordinary setup.
+Neither finished product radius nor its hub interface changes.
 
 ``proof()`` evaluates continuous domains, not a sampling grid: half-plane
 clipping limits each boundary to the relevant angular wedge, and the exact
@@ -13,8 +14,8 @@ is the exact disk/polygon intersection area (line integrals of triangles and
 circular sectors). Both stops are checked, including all polygon corners.
 The kerf margin is to the SCRAP-facing edge of the swept cutter annulus:
 no strip can survive between the bandsawn edge and that edge of the kerf.
-The 4 mm finishing stock requirement applies to the finished tip-ray domain,
-not to the sacrificial run-out tails.
+The 4 mm finishing-stock floor applies to R800 inside the finished tip rays;
+R816 requires 0.30 mm skim stock. Sacrificial run-out tails need neither floor.
 """
 
 from __future__ import annotations
@@ -23,19 +24,54 @@ import math
 from dataclasses import dataclass
 
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
+import ch_rocker_arm_tl_oblique_riser_spec as riser
+from _printed_tolerance import printed_band_mm
 
 Point = tuple[float, float]
 BLANK_HALF_LENGTH = trammel.BLANK_LENGTH / 2.0
-RAW_Y_MIN = trammel.STRAP_SPAN_Y[0] - trammel.BLANK_EDGE_WASTE
-RAW_Y_MAX = RAW_Y_MIN + trammel.BLANK_WIDTH
-# Four inner and seven outer full-edge cuts. Extra cuts avoid demanding a
-# precision bandsaw result: the retained saw edge has a +/-0.5 normal strip.
-# The end segments continue through their circle anchor to the blank ends.
-INNER_STATIONS = (0.0, 75.0, 148.0)
-OUTER_STATIONS = (20.0, 60.0, 100.0, 140.0)
-SAW_EDGE_TOLERANCE = 0.5  # inspected normal edge corridor, NOT machine accuracy
+BLANK_WIDTH = riser.STRAP_STOCK_WIDTH
+RAW_Y_MIN = riser.STRAP_RAW_Y_MIN
+RAW_Y_MAX = RAW_Y_MIN + BLANK_WIDTH
+# Five inner and two outer full-edge straight cuts. Extend end segments to
+# the square ends; rolled-edge portions are not additional cuts.
+INNER_STATIONS = (30.0, 90.0, 150.0)
+OUTER_STATIONS = (0.0, 160.0)
+INNER_ANCHOR_RADIUS = 795.080
+OUTER_ANCHOR_RADIUS = 821.210
+# TOTAL layout-plus-saw corridor relative to the PRINTED chord, not .5 mm
+# added to independently toleranced layout marks. Inch .XXX coordinate
+# rounding is charged separately against the exact design geometry.
+SAW_EDGE_TOLERANCE = 0.5
+LAYOUT_PLACES = 3
+LAYOUT_ROUNDING_ERROR = math.sqrt(2.0) * 0.0005 * trammel.INCH
+ACCEPTED_EDGE_CORRIDOR = SAW_EDGE_TOLERANCE + LAYOUT_ROUNDING_ERROR
+LONGITUDINAL_SETUP_ERROR = 0.5
+_STOP_SPAN_MIN = (
+    riser.STOP_PIN_CARRIER_POINTS[1][0] - riser.STOP_PIN_CARRIER_POINTS[0][0]
+    - 2.0 * printed_band_mm(riser.STATION_PLACES, unit=riser.UNIT)
+)
+YAW_SLOPE_MAX = (riser.STOP_RAW_Y_LIMITS[1] - riser.STOP_RAW_Y_LIMITS[0]) / _STOP_SPAN_MIN
+LONGITUDINAL_ERROR = LONGITUDINAL_SETUP_ERROR + BLANK_WIDTH * YAW_SLOPE_MAX
+_YAW_Y_ERROR = BLANK_WIDTH * (1.0 - math.cos(math.atan(YAW_SLOPE_MAX)))
+REGISTRATION_Y_ERROR = (
+    riser.STOP_RAW_Y_LIMITS[0] - RAW_Y_MIN - _YAW_Y_ERROR,
+    riser.STOP_RAW_Y_LIMITS[1] - RAW_Y_MIN + _YAW_Y_ERROR,
+)
 SLIVER_MARGIN_MIN = 3.0
-FINISH_STOCK_MIN = 4.0
+FINISH_STOCK_MIN = 4.0  # inner R800 only
+FINISH_STOCK_MIN_BY_PASS = {"inner": FINISH_STOCK_MIN, "outer": 0.30}
+
+# Transfer from the ACTUAL carrier taps after edge registration, lift and
+# drill off-jig, then refit to the same registration. Predrilling nominal
+# stations from a separately displaced raw blank would add an invalid stack.
+CLAMP_TRANSFER_POINTS = (trammel.CL, trammel.CR)
+CLAMP_TRANSFER_BAND = printed_band_mm(2, unit=riser.UNIT)
+CLAMP_DRILL = "7/32"
+CLAMP_DRILL_DIA = 7.0 / 32.0 * trammel.INCH
+CLAMP_HOLE_DIA = 0.218 * trammel.INCH
+CLAMP_HOLE_LIMITS = (CLAMP_HOLE_DIA, CLAMP_HOLE_DIA + riser.DRILLED_BAND[0])
+if not CLAMP_HOLE_LIMITS[0] <= CLAMP_DRILL_DIA <= CLAMP_HOLE_LIMITS[1]:
+    raise AssertionError("the end-clamp drill leaves its printed hole limits")
 
 
 def _vertices(radius: float, stations: tuple[float, ...]) -> tuple[Point, ...]:
@@ -43,8 +79,20 @@ def _vertices(radius: float, stations: tuple[float, ...]) -> tuple[Point, ...]:
     return tuple((x, math.sqrt(radius * radius - x * x) - trammel.H1) for x in xs)
 
 
-INNER_ANCHORS = _vertices(trammel.R_C1, INNER_STATIONS)
-OUTER_ANCHORS = _vertices(trammel.R_C2, OUTER_STATIONS)
+INNER_ANCHORS = _vertices(INNER_ANCHOR_RADIUS, INNER_STATIONS)
+OUTER_ANCHORS = _vertices(OUTER_ANCHOR_RADIUS, OUTER_STATIONS)
+# Layout from the blank's end midpoint X0 and registered raw edge Y0, not
+# from a pre-existing HUB hole. Values stay physical mm; the plan prints
+# these exact rounded coordinates as .XXX inch reference stations.
+LAYOUT_DATUM = (0.0, RAW_Y_MIN)
+LAYOUT_MARKS = {
+    name: tuple(
+        (round(x / trammel.INCH, LAYOUT_PLACES) * trammel.INCH,
+         round((y - RAW_Y_MIN) / trammel.INCH, LAYOUT_PLACES) * trammel.INCH)
+        for x, y in anchors
+    )
+    for name, anchors in (("inner", INNER_ANCHORS), ("outer", OUTER_ANCHORS))
+}
 
 
 def _extend(anchors: tuple[Point, ...]) -> tuple[Point, ...]:
@@ -162,20 +210,58 @@ class PassProof:
     entry_air_fraction: tuple[float, float]
 
 
-def proof() -> dict[str, PassProof]:
-    """Continuous nominal bounds and conservative accepted-edge bounds.
+def _convex_hull(points: tuple[Point, ...]) -> tuple[Point, ...]:
+    """Boundary of a segment translated over the rectangular setup corridor."""
+    ordered = sorted(set(points))
 
-    Only the sawn line has a +/-SAW_EDGE_TOLERANCE normal corridor, including
-    radius-0.5 corner caps; rolled edges are unchanged. A corridor point's
-    radius differs from its nearest nominal point by at most 0.5 (the norm
-    is 1-Lipschitz). Expand the angular domain by the maximum possible ray
-    shift too, so nearest points across a tip/stop ray are not omitted.
-    Bound the FULL untrimmed chord chains before clipping to stock: this
-    covers moving intersections with rolled edges. An accepted edge is
-    unchanged raw stock or in that corridor, so take the lesser bound.
-    Entry fractions describe the final faced blank at each stop before feed.
-    The mill is lowered in the already-open scrap side before traversing into
-    this engagement, never plunged at a stop or through solid bar.
+    def cross(a: Point, b: Point, c: Point) -> float:
+        return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+
+    lower: list[Point] = []
+    upper: list[Point] = []
+    for sequence, half in ((ordered, lower), (reversed(ordered), upper)):
+        for point in sequence:
+            while len(half) > 1 and cross(half[-2], half[-1], point) <= 0.0:
+                half.pop()
+            half.append(point)
+    return tuple(lower[:-1] + upper[:-1])
+
+
+def directional_radial_bounds(chain: tuple[Point, ...], half_angle: float) -> tuple[float, float]:
+    """Continuous extrema including every directional placement, not samples.
+
+    Each edge plus the X/Y setup rectangle is a convex polygon. Clip that
+    polygon to the actual angular domain, then inspect every vertex and exact
+    line projection. Convexity puts a maximum at a vertex; a minimum is a
+    projected edge point (the arc centre is outside these material polygons).
+    """
+    extrema: list[tuple[float, float]] = []
+    tangent = math.tan(half_angle)
+    for a, b in zip(chain, chain[1:]):
+        polygon = _convex_hull(tuple(
+            (p[0] + dx, p[1] + dy)
+            for p in (a, b)
+            for dx in (-LONGITUDINAL_ERROR, LONGITUDINAL_ERROR)
+            for dy in REGISTRATION_Y_ERROR
+        ))
+        polygon = _clip(_clip(polygon, 1.0, tangent, tangent * trammel.H1),
+                        -1.0, tangent, tangent * trammel.H1)
+        if polygon:
+            extrema.append(_radial_bounds(polygon + (polygon[0],), half_angle))
+    if not extrema:
+        raise ValueError("the edge has no material inside the requested angular domain")
+    return min(lo for lo, _hi in extrema), max(hi for _lo, hi in extrema)
+
+
+def proof() -> dict[str, PassProof]:
+    """Continuous nominal and accepted envelopes with no pre-made hub datum.
+
+    Exact directional setup rectangles include stop play/tilt, ordinary
+    longitudinal placement and two-stop yaw. Only the layout/saw corridor
+    and coordinate rounding use a radial Lipschitz bound; expand the angular
+    domain too, so no tip/stop-ray caps are missed. Raw edges translate with
+    the blank but have neither a saw corridor nor coordinate-rounding error.
+    Entry fractions describe nominal side engagement, not a plunge route.
     """
     result = {}
     cutter = trammel.PART_CUTTER_DIA / 2.0
@@ -186,14 +272,23 @@ def proof() -> dict[str, PassProof]:
         margin = swept[0] - (radius - cutter) if name == "inner" else radius + cutter - swept[1]
         stock = trammel.R_INNER - finished[1] if name == "inner" else finished[0] - trammel.R_OUTER
         full_chain = INNER_VERTICES if name == "inner" else OUTER_VERTICES
-        minimum_radius = _radial_bounds(full_chain, math.pi / 4.0)[0]
-        angular_guard = math.asin(SAW_EDGE_TOLERANCE / minimum_radius)
-        full_finished = _radial_bounds(full_chain, trammel.TIP_ANGLE + angular_guard)
-        full_swept = _radial_bounds(full_chain, sweep + angular_guard)
-        sawn_margin = full_swept[0] - (radius - cutter) if name == "inner" else radius + cutter - full_swept[1]
-        sawn_stock = trammel.R_INNER - full_finished[1] if name == "inner" else full_finished[0] - trammel.R_OUTER
-        accepted_margin = min(margin, sawn_margin - SAW_EDGE_TOLERANCE)
-        accepted_stock = min(stock, sawn_stock - SAW_EDGE_TOLERANCE)
+        minimum_radius = directional_radial_bounds(full_chain, math.pi / 4.0)[0]
+        angular_guard = math.asin(ACCEPTED_EDGE_CORRIDOR / minimum_radius)
+        full_finished = directional_radial_bounds(full_chain, trammel.TIP_ANGLE + angular_guard)
+        full_swept = directional_radial_bounds(full_chain, sweep + angular_guard)
+        raw_y = RAW_Y_MIN if name == "inner" else RAW_Y_MAX
+        raw_chain = ((-BLANK_HALF_LENGTH, raw_y), (BLANK_HALF_LENGTH, raw_y))
+        raw_finished = directional_radial_bounds(raw_chain, trammel.TIP_ANGLE)
+        if name == "inner":
+            accepted_stock = trammel.R_INNER - max(
+                full_finished[1] + ACCEPTED_EDGE_CORRIDOR, raw_finished[1])
+            # Clipping the lower saw edge upward to raw stock cannot reduce
+            # its scrap-side clearance.
+            accepted_margin = full_swept[0] - ACCEPTED_EDGE_CORRIDOR - (radius - cutter)
+        else:
+            accepted_stock = min(full_finished[0] - ACCEPTED_EDGE_CORRIDOR,
+                                 raw_finished[0]) - trammel.R_OUTER
+            accepted_margin = radius + cutter - (full_swept[1] + ACCEPTED_EDGE_CORRIDOR)
         air = tuple(
             1.0 - disk_material_area((sign * radius * math.sin(sweep), radius * math.cos(sweep) - trammel.H1), cutter) / (math.pi * cutter * cutter)
             for sign in (-1.0, 1.0)

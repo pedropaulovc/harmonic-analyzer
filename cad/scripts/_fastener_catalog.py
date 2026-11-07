@@ -365,19 +365,10 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "Metal Round Cap",
         "9275K141",
     ),
-    # MHA-CH-06-TL-VN-53: the oblique trammel jig's CL locator, press-set above
-    # the actual riser in the carrier's in-place-finished CL hole (shop
-    # fixture hardware modelled for native mates and interference).
-    "ch-rocker-arm-tl-vn-oblique-cl-dowel": _stock(
-        "ch-rocker-arm-tl-vn-oblique-cl-dowel",
-        "Alloy Steel Dowel Pin, 1/4 x 1 in",
-        "98381A542",
-        material="Alloy Steel",
-    ),
     # MHA-CH-06-TL-VN-61: the oblique trammel jig's common #8-32 X 3/4 SHCS
-    # (the fastener table's RAIL_TO_BAR and BRACKET_TO_BAR rows); shop fixture
-    # hardware, modelled so the jig assembly can mate it and run native
-    # interference.
+    # (the fastener table's COMMON_SCREW_ROWS: RAIL_TO_BAR, BRACKET_TO_BAR,
+    # END_CLAMP and HUB_CLAMP, 23 in all); shop fixture hardware, modelled so
+    # the jig assembly can mate it and run native interference.
     "ch-rocker-arm-tl-vn-oblique-rail-screw": _stock(
         "ch-rocker-arm-tl-vn-oblique-rail-screw",
         "Black-Oxide Alloy Steel Socket Head Screw",
@@ -411,16 +402,6 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "Stainless Steel Phillips Flat Head Screw",
         "91771A112",
         material="AISI 304",
-    ),
-    # MHA-CH-06-TL-VN-68: the oblique trammel jig's 1/4-20 X 7/8 SHCS (the
-    # fastener table's CR_CLAMP row), used full length; shop fixture
-    # hardware, modelled so the jig assembly can mate it and run native
-    # interference.
-    "ch-rocker-arm-tl-vn-oblique-clamp-screw": _stock(
-        "ch-rocker-arm-tl-vn-oblique-clamp-screw",
-        "Black-Oxide Alloy Steel Socket Head Screw",
-        "91251A541",
-        material="Alloy Steel",
     ),
     # MHA-CH-06-TL-VN-69: the oblique trammel jig's 5/16-18 X 1 SHCS (the
     # fastener table's LEVER_TO_CARRIER row); shop fixture hardware, modelled
@@ -466,26 +447,6 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "Steel Shim, 3/8 ID x 5/8 OD x .008 in",
         "SHIM-0375-008",
         supplier="Huyett",
-    ),
-    # MHA-CH-06-TL-VN-85: the oblique trammel jig's #10-24 X 1/2 low-head SHCS
-    # (the fastener table's HUB_CLAMP row), used full length; shop fixture
-    # hardware, modelled so the jig assembly can mate it and run native
-    # interference.
-    "ch-rocker-arm-tl-vn-oblique-hub-screw": _stock(
-        "ch-rocker-arm-tl-vn-oblique-hub-screw",
-        "Black-Oxide Alloy Steel Low-Profile Socket Head Screw",
-        "92220A163",
-        material="Alloy Steel",
-    ),
-    # MHA-CH-06-TL-VN-86: the oblique trammel jig's #10-24 X 3/4 low-head SHCS
-    # (the fastener table's LEFT_CLAMP row), cut to fit at assembly; shop
-    # fixture hardware, modelled so the jig assembly can mate it and run
-    # native interference.
-    "ch-rocker-arm-tl-vn-oblique-left-clamp-screw": _stock(
-        "ch-rocker-arm-tl-vn-oblique-left-clamp-screw",
-        "Black-Oxide Alloy Steel Low-Profile Socket Head Screw",
-        "92220A165",
-        material="Alloy Steel",
     ),
 }
 

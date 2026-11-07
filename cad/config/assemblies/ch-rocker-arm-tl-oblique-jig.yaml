@@ -5,7 +5,11 @@ number: MHA-CH-06-TL-00
 # The free stems are native files (the spec's MOVING_STEMS): the rail kit
 # (MHA-CH-06-TL-VN-83) for its Carriage members and the leadscrew kit
 # (MHA-CH-06-TL-VN-84) for its FeedNut; their Rail and LeadScrew stay fixed,
-# and the build requires each moving kit occurrence itself to read free.
+# and the build requires each moving kit occurrence itself to read free. The
+# common #8-32 screw (TL-VN-61) is listed for its CL, CR and HUB strap clamps,
+# which ride the carrier; its rail and TL-28 bar occurrences stay fixed, and
+# the build requires each clamp occurrence itself to read free. The loose
+# 98381A473 stop pins are the reused MHA-SM-VN-53 native.
 flip_invert: []
 allowed_free_stems:
   - ch-rocker-arm-tl-oblique-carrier
@@ -15,18 +19,14 @@ allowed_free_stems:
   - ch-rocker-arm-tl-vn-oblique-pivot-spacer
   - ch-rocker-arm-tl-vn-oblique-pivot-shim
   - ch-rocker-arm-tl-oblique-riser
-  - ch-rocker-arm-tl-oblique-hub-stud
-  - ch-rocker-arm-tl-oblique-hub-sleeve
   - ch-rocker-arm-tl-oblique-hub-washer
-  - ch-rocker-arm-tl-vn-oblique-hub-screw
-  - ch-rocker-arm-tl-vn-oblique-left-clamp-screw
   - ch-rocker-arm-tl-oblique-feed-lever
   - ch-rocker-arm-tl-vn-oblique-rail-kit
-  - ch-rocker-arm-tl-vn-oblique-cl-dowel
+  - sm-vn-knife-mount-dowel
   - ch-rocker-arm-tl-vn-oblique-leadscrew-kit
+  - ch-rocker-arm-tl-vn-oblique-rail-screw
   - ch-rocker-arm-tl-vn-oblique-carriage-screw
   - ch-rocker-arm-tl-vn-oblique-riser-screw
-  - ch-rocker-arm-tl-vn-oblique-clamp-screw
   - ch-rocker-arm-tl-vn-oblique-lever-screw
   - ch-rocker-arm-tl-vn-oblique-lever-washer
 required_free_stems:
@@ -37,18 +37,14 @@ required_free_stems:
   - ch-rocker-arm-tl-vn-oblique-pivot-spacer
   - ch-rocker-arm-tl-vn-oblique-pivot-shim
   - ch-rocker-arm-tl-oblique-riser
-  - ch-rocker-arm-tl-oblique-hub-stud
-  - ch-rocker-arm-tl-oblique-hub-sleeve
   - ch-rocker-arm-tl-oblique-hub-washer
-  - ch-rocker-arm-tl-vn-oblique-hub-screw
-  - ch-rocker-arm-tl-vn-oblique-left-clamp-screw
   - ch-rocker-arm-tl-oblique-feed-lever
   - ch-rocker-arm-tl-vn-oblique-rail-kit
-  - ch-rocker-arm-tl-vn-oblique-cl-dowel
+  - sm-vn-knife-mount-dowel
   - ch-rocker-arm-tl-vn-oblique-leadscrew-kit
+  - ch-rocker-arm-tl-vn-oblique-rail-screw
   - ch-rocker-arm-tl-vn-oblique-carriage-screw
   - ch-rocker-arm-tl-vn-oblique-riser-screw
-  - ch-rocker-arm-tl-vn-oblique-clamp-screw
   - ch-rocker-arm-tl-vn-oblique-lever-screw
   - ch-rocker-arm-tl-vn-oblique-lever-washer
 free_dof: 1

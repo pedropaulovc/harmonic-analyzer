@@ -1,5 +1,4 @@
-"""Offline contracts for the held bandsaw-before-jig route; no COM imports."""
-
+"""Pure contracts for the R4 raw-edge-referenced preform and full envelopes."""
 from __future__ import annotations
 
 import math
@@ -10,65 +9,87 @@ import pytest
 
 import ch_rocker_arm_tl_oblique_blank_spec as blank
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
+import ch_rocker_arm_tl_oblique_riser_spec as riser
+from _mcmaster_91251a197 import DIMS as common_screw
 
 
-def test_circle_anchors_and_clipped_purchased_stock() -> None:
-    assert blank.INNER_STATIONS == (0.0, 75.0, 148.0)
-    assert blank.OUTER_STATIONS == (20.0, 60.0, 100.0, 140.0)
-    for anchors, radius in ((blank.INNER_ANCHORS, trammel.R_C1), (blank.OUTER_ANCHORS, trammel.R_C2)):
+def test_roughing_bias_preserves_product_and_real_stock() -> None:
+    assert blank.INNER_STATIONS == (30.0, 90.0, 150.0)
+    assert blank.OUTER_STATIONS == (0.0, 160.0)
+    assert blank.INNER_ANCHOR_RADIUS == 795.080
+    assert blank.OUTER_ANCHOR_RADIUS == 821.210
+    assert trammel.R_C1 == 795.2375
+    assert trammel.R_C2 == 820.7625
+    for anchors, radius in ((blank.INNER_ANCHORS, blank.INNER_ANCHOR_RADIUS),
+                            (blank.OUTER_ANCHORS, blank.OUTER_ANCHOR_RADIUS)):
         for x, y in anchors:
             assert math.hypot(x, y + trammel.H1) == pytest.approx(radius)
     assert trammel.BLANK_LENGTH == 350.0
-    assert trammel.BLANK_WIDTH == 38.1
+    assert blank.BLANK_WIDTH == 38.1
+    assert (blank.RAW_Y_MIN, blank.RAW_Y_MAX) == pytest.approx((19.5791335401, 57.6791335401))
+    assert blank.RAW_Y_MAX - trammel.STRAP_SPAN_Y[1] == pytest.approx(4.4026799405)
     for x, y in blank.BLANK_OUTLINE:
         assert -175.0 <= x <= 175.0
         assert blank.RAW_Y_MIN - 1e-9 <= y <= blank.RAW_Y_MAX + 1e-9
     assert min(x for x, _ in blank.BLANK_OUTLINE) == -175.0
     assert max(x for x, _ in blank.BLANK_OUTLINE) == 175.0
-    # Complete circles to the ends need >45 mm, so treating the unclipped
-    # virtual anchors as physical stock would silently invent material.
-    assert trammel.R_C2 - math.sqrt(trammel.R_C1**2 - 175.0**2) > trammel.BLANK_WIDTH
 
 
-def test_continuous_radial_allowance_and_sliver_margin() -> None:
-    for name, evidence in blank.proof().items():
-        assert evidence.accepted_sliver_margin >= blank.SLIVER_MARGIN_MIN
-        assert evidence.accepted_finish_stock >= blank.FINISH_STOCK_MIN
-        low, high = evidence.swept_radius_bounds
-        radius, cutter = trammel.PASS_RADIUS[name], trammel.PART_CUTTER_DIA / 2.0
-        # Both sides of the pre-sawn edge stay inside the full swept annulus.
-        assert radius - cutter < low - blank.SAW_EDGE_TOLERANCE
-        assert high + blank.SAW_EDGE_TOLERANCE < radius + cutter
-    inner, outer = blank.proof()["inner"], blank.proof()["outer"]
-    assert inner.finished_radius_bounds == pytest.approx((794.350861016, 795.522918577), abs=1e-8)
-    assert inner.accepted_sliver_margin == pytest.approx(3.375861016, abs=1e-8)
-    assert inner.accepted_finish_stock == pytest.approx(4.2625, abs=1e-8)
-    assert outer.accepted_sliver_margin == pytest.approx(3.648211261, abs=1e-8)
-    assert outer.accepted_finish_stock == pytest.approx(4.013460462, abs=1e-8)
-
-
-def test_cut_counts_and_no_redundant_interior_anchor() -> None:
-    # Counts are full-edge straight cuts; rolled stock portions are NOT cuts.
-    assert len(blank.INNER_ANCHORS) - 1 == 4
-    assert len(blank.OUTER_ANCHORS) - 1 == 7
-    assert blank.SAW_EDGE_TOLERANCE == 0.5
+def test_layout_uses_raw_edge_and_end_midpoint_not_hub() -> None:
+    assert blank.LAYOUT_DATUM == (0.0, blank.RAW_Y_MIN)
+    assert blank.SAW_EDGE_TOLERANCE == 0.5  # total layout + saw, not separate .5 errors
+    assert blank.LAYOUT_ROUNDING_ERROR == pytest.approx(math.sqrt(2.0) * 0.0127)
+    assert blank.ACCEPTED_EDGE_CORRIDOR == pytest.approx(0.5 + math.sqrt(2.0) * 0.0127)
     for name, anchors in (("inner", blank.INNER_ANCHORS), ("outer", blank.OUTER_ANCHORS)):
+        for mark, (x, y) in zip(blank.LAYOUT_MARKS[name], anchors, strict=True):
+            assert math.dist(mark, (x, y - blank.RAW_Y_MIN)) <= blank.LAYOUT_ROUNDING_ERROR + 1e-9
+            for coordinate in mark:
+                assert coordinate / 25.4 == pytest.approx(round(coordinate / 25.4, 3))
+
+
+def test_continuous_directional_allowances_include_yaw_and_rounding() -> None:
+    assert blank.LONGITUDINAL_SETUP_ERROR == 0.5
+    assert 0.57 < blank.LONGITUDINAL_ERROR < 0.59
+    assert blank.REGISTRATION_Y_ERROR[0] < riser.STOP_RAW_Y_LIMITS[0] - blank.RAW_Y_MIN
+    assert blank.REGISTRATION_Y_ERROR[1] > riser.STOP_RAW_Y_LIMITS[1] - blank.RAW_Y_MIN
+    evidence = blank.proof()
+    for name, result in evidence.items():
+        assert result.accepted_sliver_margin >= blank.SLIVER_MARGIN_MIN == 3.0
+        assert result.accepted_finish_stock > blank.FINISH_STOCK_MIN_BY_PASS[name]
+    assert 4.03 < evidence["inner"].accepted_finish_stock < 4.05
+    assert 0.30 < evidence["outer"].accepted_finish_stock < 0.32
+    assert 3.49 < evidence["outer"].accepted_sliver_margin < 3.52
+
+
+def test_each_chord_is_required_by_the_accepted_envelope() -> None:
+    for name, anchors in (("inner", blank.INNER_ANCHORS), ("outer", blank.OUTER_ANCHORS)):
+        assert len(anchors) - 1 == {"inner": 5, "outer": 2}[name]
         for index in range(1, len(anchors) - 1):
             pruned = blank._extend(anchors[:index] + anchors[index + 1:])
-            low, high = blank._radial_bounds(pruned, trammel.TIP_ANGLE)
+            low, high = blank.directional_radial_bounds(pruned, trammel.TIP_ANGLE)
             if name == "inner":
-                margin = low - (trammel.R_C1 - trammel.PART_CUTTER_DIA / 2.0) - 0.5
+                margin = low - (trammel.R_C1 - trammel.PART_CUTTER_DIA / 2.0) - blank.ACCEPTED_EDGE_CORRIDOR
                 assert margin < blank.SLIVER_MARGIN_MIN
             else:
-                assert low - trammel.R_OUTER - 0.5 < blank.FINISH_STOCK_MIN
+                assert low - trammel.R_OUTER - blank.ACCEPTED_EDGE_CORRIDOR < 0.0
+
+
+def test_directional_extrema_contain_every_translated_segment_sample() -> None:
+    chain = blank.INNER_VERTICES
+    low, high = blank.directional_radial_bounds(chain, trammel.TIP_ANGLE)
+    for a, b in zip(chain, chain[1:]):
+        for dx in (-blank.LONGITUDINAL_ERROR, 0.0, blank.LONGITUDINAL_ERROR):
+            for dy in (*blank.REGISTRATION_Y_ERROR, sum(blank.REGISTRATION_Y_ERROR) / 2.0):
+                for i in range(21):
+                    t = i / 20.0
+                    x, y = a[0] + t * (b[0] - a[0]) + dx, a[1] + t * (b[1] - a[1]) + dy
+                    if abs(math.atan2(x, y + trammel.H1)) <= trammel.TIP_ANGLE:
+                        assert low - 1e-9 <= math.hypot(x, y + trammel.H1) <= high + 1e-9
 
 
 def test_exact_extremum_finds_between_station_minimum() -> None:
-    # Endpoints both radius 10, interior radius 8: endpoint-only or sparse
-    # station checking cannot be the implementation of the radial proof.
     chain = ((-6.0, 8.0 - trammel.H1), (6.0, 8.0 - trammel.H1))
     assert blank._radial_bounds(chain, math.pi / 4.0) == pytest.approx((8.0, 10.0))
-    # Tight wedge must clip the segment at rays rather than keep its endpoints.
     assert blank._radial_bounds(chain, math.atan(0.25)) == pytest.approx((8.0, math.sqrt(68.0)))
 
 
@@ -78,46 +99,21 @@ def test_exact_disk_polygon_area_controls(centre, expected) -> None:
     assert blank.disk_material_area(centre, 1.0, square) == pytest.approx(expected, abs=1e-10)
 
 
-def test_entry_is_side_engagement_at_either_stop() -> None:
-    evidence = blank.proof()
-    for name, expected in (("inner", 0.7257136568), ("outer", 0.4212195013)):
-        assert evidence[name].entry_air_fraction == pytest.approx((expected, expected), abs=1e-8)
-        # A 0.5 mm normal corridor can change disk occupancy by at most
-        # a 2r-wide strip plus end caps; still comfortably >30% open at entry.
-        cutter = trammel.PART_CUTTER_DIA / 2.0
-        error_area = 2.0 * cutter * blank.SAW_EDGE_TOLERANCE + math.pi * blank.SAW_EDGE_TOLERANCE**2
-        assert min(evidence[name].entry_air_fraction) - error_area / (math.pi * cutter**2) > 0.3
+def test_entry_fraction_is_nominal_side_engagement_not_a_false_accepted_percentage() -> None:
+    for result in blank.proof().values():
+        left, right = result.entry_air_fraction
+        assert 0.0 < left < 1.0
+        assert left == pytest.approx(right)
+    # Accepted side entry is certified by the scrap-side overlap, not the
+    # retired R3 >30% statement which omitted registration and longitudinal error.
+    assert min(p.accepted_sliver_margin for p in blank.proof().values()) >= 3.0
 
 
-def test_locator_and_hold_down_bearing_are_actual_stock() -> None:
-    import ch_rocker_arm_tl_vn_oblique_clamp_screw_spec as cr_screw
-    import ch_rocker_arm_tl_vn_oblique_left_clamp_screw_spec as left_screw
-
-    # CR stays as bought; LEFT uses its supplier head, HUB its 11 mm brass
-    # washer. CL remains a separate 1/4 locator. Not a clearance certificate.
-    footprints = (
-        (trammel.LEFT_CLAMP, left_screw.DIMS.head_dia / 2.0),
-        (trammel.CR, cr_screw.DIMS.head_dia / 2.0),
-        (trammel.HUB, 11.0 / 2.0),
-        (trammel.CL, 3.175),
-    )
-    for point, radius in footprints:
+def test_two_common_heads_and_hub_washer_have_real_stock_under_them() -> None:
+    for point, radius in ((trammel.CL, common_screw.head_dia / 2.0),
+                          (trammel.CR, common_screw.head_dia / 2.0),
+                          (trammel.HUB, 11.0 / 2.0)):
         assert blank.disk_material_area(point, radius) == pytest.approx(math.pi * radius**2, abs=1e-8)
-    assert trammel.LEFT_CLAMP[0] == -169.5
-    assert trammel.LEFT_CLAMP != trammel.CL
-    x, y = trammel.LEFT_CLAMP
-    head_radius = left_screw.DIMS.head_dia / 2.0
-    left, bottom = trammel.RISER_BLANK_ORIGIN
-    assert left <= x - head_radius < x + head_radius <= left + trammel.RISER_BLANK_LENGTH
-    assert bottom <= y - head_radius < y + head_radius <= bottom + trammel.RISER_BLANK_WIDTH
-    # sin(theta) is monotone throughout each +/-11 degree pass, so its stop
-    # is the exact maximum X of the riser's self-cut swept disk. The entire
-    # LEFT bearing pad is outboard of both sweeps, on uncut riser stock.
-    self_cut_x_max = max(
-        radius * math.sin(trammel.SWEEP[name]) + trammel.RISER_CUTTER_DIA / 2.0
-        for name, radius in trammel.PASS_RADIUS.items()
-    )
-    assert abs(x) - head_radius > self_cut_x_max
 
 
 def test_held_process_layout_matches_geometry_without_chain_drilling() -> None:
@@ -127,22 +123,64 @@ def test_held_process_layout_matches_geometry_without_chain_drilling() -> None:
     assert text.startswith("# HELD REFERENCE ROUTE")
     assert plan["construction"] == "built_up"
     assert plan["stock"]["length_mm"] == trammel.BLANK_LENGTH
-    assert plan["stock"]["section_mm"] == [trammel.BLANK_WIDTH, 3.175]
+    assert plan["stock"]["section_mm"] == [blank.BLANK_WIDTH, 3.175]
     assert plan["stock"]["origin_mm"] == pytest.approx((-175.0, blank.RAW_Y_MIN, 0.0))
     layout = plan["bandsaw_preform"]
     assert layout["retained_edge_normal_error_max_mm"] == blank.SAW_EDGE_TOLERANCE
     for key, anchors in (("inner_anchors_mm", blank.INNER_ANCHORS), ("outer_anchors_mm", blank.OUTER_ANCHORS)):
         assert len(layout[key]) == len(anchors)
-        for actual, expected in zip(layout[key], anchors):
+        for actual, expected in zip(layout[key], anchors, strict=True):
             assert actual == pytest.approx(expected)
     assert layout["raw_y_limits_mm"] == pytest.approx((blank.RAW_Y_MIN, blank.RAW_Y_MAX))
     assert all(op.get("contour", {}).get("method") != "chain_drill" for setup in plan["setups"] for op in setup["ops"])
-    assert [setup["id"] for setup in plan["setups"]] == ["S0", "S1", "S2", "S3", "S4", "S5"]
-    setup = next(setup for setup in plan["setups"] if setup["id"] == "S2")
-    holes = next(op["note"] for op in setup["ops"] if op["op"] == 20)
-    assert "Ø.206 in (5.2324 mm) THRU" in holes
-    assert "(-169.5,27.557592509)" in holes
-    assert "pointed #10-24 transfer screw" in holes
-    assert "retained CL dowel" in holes
-    assert "lift the work off before drilling" in holes
-    assert "Remove the transfer screw" in holes
+    assert layout["inner_anchor_radius_mm"] == blank.INNER_ANCHOR_RADIUS
+    assert layout["outer_anchor_radius_mm"] == blank.OUTER_ANCHOR_RADIUS
+    assert layout["inner_centre_radius_mm"] == trammel.R_C1
+    assert layout["outer_centre_radius_mm"] == trammel.R_C2
+    # Marks print on the exact .XXX inch grid from the end midpoint/raw edge.
+    assert layout["layout_datum_mm"] == pytest.approx(blank.LAYOUT_DATUM)
+    for name in ("inner", "outer"):
+        printed = layout[f"{name}_layout_marks_in"]
+        assert len(printed) == len(blank.LAYOUT_MARKS[name])
+        for marks_in, marks_mm in zip(printed, blank.LAYOUT_MARKS[name], strict=True):
+            assert [v * trammel.INCH for v in marks_in] == pytest.approx(marks_mm, abs=1e-9)
+            assert all(round(v, blank.LAYOUT_PLACES) == v for v in marks_in)
+    assert "no hub datum" in layout["layout"]
+    assert "TOTAL layout-plus-saw" in layout["cutting"]
+    # Entry rests on the charged scrap-side overlap, never the retired % claim.
+    assert "%" not in layout["entry"]
+    assert "NEVER plunge" in layout["entry"]
+    for retired in ("72.57", "42.12", "30% air", "FOUR inner", "SEVEN"):
+        assert retired not in text
+    # Retired R3 hub stud/sleeve/CL dowel/LEFT workholding.
+    for retired in ("#10-24", "Ø.206", "-169.5", "transfer screw in the carrier's blind LEFT", "retained CL dowel",
+                    "HUB and CL locating holes", "stud root"):
+        assert retired not in text
+    setups = {setup["id"]: {op["op"]: op for op in setup["ops"]} for setup in plan["setups"]}
+    clamp_holes = setups["S2"][20]
+    assert clamp_holes["do"] == "drill"
+    # Real inventory refs: the drill index's declared 64ths coverage selects the bit.
+    assert clamp_holes["tool"] == f"drill-index-115/{blank.CLAMP_DRILL.replace('/', '-')}in"
+    assert f"{blank.CLAMP_DRILL} THRU" in clamp_holes["note"]
+    assert "two common 91251A197" in clamp_holes["note"]
+    assert "thread one screw up into each CL/CR carrier tap" in clamp_holes["note"]
+    assert "never hand-held under power" in clamp_holes["note"]
+    assert "Do not pre-drill nominal CL/CR" in clamp_holes["note"]
+    import ch_rocker_arm_tl_oblique_holding_spec as holding
+
+    hub_drill, ream = setups["S2"][30], setups["S2"][40]
+    assert (hub_drill["do"], hub_drill["feature"], hub_drill["tool"]) == ("drill", "hub_joint", "drill-index-115/25-64in")
+    assert "TL-00 step 10 DRO position" in hub_drill["note"]
+    assert "91251A197" in hub_drill["note"]
+    assert (ream["do"], ream["feature"], ream["tool"]) == ("ream", "hub_joint", "reamers-inch-purchases/0.4000in")
+    for value in (holding.REAMER_LEAD_MAX, holding.TOOL_OVERTRAVEL_BUDGET,
+                  holding.TOOL_BREAKTHROUGH_SPACE_MIN, holding.REAMER_DEPTH_RESERVE):
+        assert f"{value:.5f}".rstrip("0").lstrip("0") in ream["note"]
+    assert "same locked DRO position" in ream["note"]
+    assert "SHARP" in ream["note"]
+    washer = setups["S3"][10]
+    assert f"{holding.HUB_TORQUE_NM:g} N m" in washer["note"]
+    import ch_rocker_arm_tl_oblique_hub_washer_spec as hub_washer
+
+    assert hub_washer.NUMBER in washer["note"]
+    assert "no measured centring gate" in washer["note"]
