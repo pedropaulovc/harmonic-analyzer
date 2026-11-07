@@ -37,13 +37,14 @@ OD_PLACES = 2
 BORE_DIA = PIN.DIA
 BORE_DIA_BAND = FIT.BORE_DIA_BAND  # (upper, lower), the sleeve's running band
 BORE_PLACES = 4
-# The running fit on the pin, named on the bore callout (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)).
+# The running fit on the pin, named on the bore callout by its standard fit
+# name with the clearance the printed limits give as REF
+# (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)).
 BORE_CALLOUT = (
     "REAM THRU\n"
-    f"({PIN.inch_text(FIT.BORE_DIAMETRAL_CLEARANCE[0], 4)}-"
-    f"{PIN.inch_text(FIT.BORE_DIAMETRAL_CLEARANCE[1], 4)}"
-    " DIAMETRAL CLEARANCE\n"
-    f"ON TRANSGEAR PIN {PIN.PIN_NUMBER})"
+    f"RUNNING FIT ON {PIN.PIN_NUMBER} PIN\n"
+    f"(CLEARANCE {PIN.inch_text(FIT.BORE_DIAMETRAL_CLEARANCE[0], 4)}-"
+    f"{PIN.inch_text(FIT.BORE_DIAMETRAL_CLEARANCE[1], 4)} REF)"
 )
 
 WALL_NOMINAL = (OD - BORE_DIA) / 2.0

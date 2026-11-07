@@ -43,13 +43,14 @@ OD_PLACES = 2
 BORE_DIA = PIN.DIA
 BORE_DIA_BAND = FIT.BORE_DIA_BAND  # (upper, lower), the sleeve's running band
 BORE_PLACES = 4
-# The running fit on the pin, named on the bore callout (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)).
+# The running fit on the pin, named on the bore callout by its standard fit
+# name with the clearance the printed limits give as REF
+# (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)).
 BORE_CALLOUT = (
     "REAM THRU\n"
-    f"({PIN.inch_text(FIT.BORE_DIAMETRAL_CLEARANCE[0], 4)}-"
-    f"{PIN.inch_text(FIT.BORE_DIAMETRAL_CLEARANCE[1], 4)}"
-    " DIAMETRAL CLEARANCE\n"
-    f"ON TRANSGEAR PIN {PIN.PIN_NUMBER})"
+    f"RUNNING FIT ON {PIN.PIN_NUMBER} PIN\n"
+    f"(CLEARANCE {PIN.inch_text(FIT.BORE_DIAMETRAL_CLEARANCE[0], 4)}-"
+    f"{PIN.inch_text(FIT.BORE_DIAMETRAL_CLEARANCE[1], 4)} REF)"
 )
 # 45 deg, on the ring face's O.D. edge: a single MAX limit (the MHA-160
 # precedent).  Only its largest size matters: it must leave the MHA-PD-VN-61
@@ -89,8 +90,11 @@ if HUB_FACE_OVERLAP_WORST < HUB_FACE_OVERLAP_MIN:
 LENGTH = FIT.FRONT_BUSHING_LENGTH  # .222
 LENGTH_BAND = FIT.LENGTH_BAND
 LENGTH_PLACES = FIT.LENGTH_PLACES
-# Rule 4: the band names the stack it serves and what it sets.
-LENGTH_CALLOUT = f"{STACK_NAME},\nSETS COLLAR TO DISC AIR"
+# Rule 4: the band names the stack it serves, by the drawing numbers of the
+# drive collar and the disc whose clearance it sets.
+COLLAR_NUMBER = _config.parts("pd-transgear-drive-collar")["number"]
+DISC_NUMBER = _config.parts("pd-rack-pinion")["number"]
+LENGTH_CALLOUT = f"{STACK_NAME}:\n{COLLAR_NUMBER} TO {DISC_NUMBER} CLEARANCE"
 
 # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the bore runs on the pin and both faces bear, so all three carry
 # the machined grade, the bore as the sleeve's bore on the same pin does.
