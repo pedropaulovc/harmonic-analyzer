@@ -21,7 +21,7 @@ import math
 import paper_drive_mesh_check as mesh_check
 import pd_transgear_knob_shaft_spec as knob
 from pd_rack_pinion_spec import (
-    BORE_FRONT_CHAMFER,
+    BORE_FRONT_CHAMFER_LIMITS,
     CENTRE_DISTANCE_WINDOW,
     CUTTER_NUMBER,
     CUTTER_TOOTH_RANGE,
@@ -58,7 +58,13 @@ TAP_CALLOUT_LINES = (
 )
 TAP_CALLOUT_QUALIFIER = "\n".join(TAP_CALLOUT_LINES)
 # The span and the tip serve the one mesh: each links the GEAR DATA block,
-# which names the mate once with its backlash acceptance.
+# which names the mate once.  The span's .0007 band is under the milled row
+# and still controls (paper_drive_mesh_check reads the span-inverted cutter
+# translations for backlash, root clearance and contact ratio), so its
+# callout names its fit route, a matched fit with MHA-PD-08 accepted by the
+# block's backlash row (rule 4: matching does not waive the limits).  Two
+# short lines keep the block narrow under the tooth-space control's leader.
+SPAN_CALLOUT = "MATCHED FIT,\nSEE GEAR DATA"
 MESH_CALLOUT = "SEE GEAR DATA"
 # The .XXX thickness is the screw engagement's: its least is the tapped
 # length (pd_vn_transgear_disc_screw_spec), and .XX would cut that below
@@ -66,14 +72,18 @@ MESH_CALLOUT = "SEE GEAR DATA"
 FACE_WIDTH_CALLOUT = f"SETS {SCREW_NUMBER}\nENGAGEMENT"
 
 _CLEARANCE = "-".join(inch_text(value, 4) for value in SPIGOT_DIAMETRAL_CLEARANCE)
+_CHAMFER = "-".join(inch_text(value, 3) for value in BORE_FRONT_CHAMFER_LIMITS)
 # The face view looks at the rear face, so the chamfered front (clamped)
-# edge is its far side.  Rule 20: the tap-to-bore web's stated shortfall
-# (RV-03) ends the tap note.
+# edge is its far side, drawn in no view.  The chamfer is a feature, not the
+# title block's edge break: its least must pass the spigot root's R.004 (the
+# disc rides on the spigot's side while it is centred), its most is what the
+# tap web pays, so both limits print with the root it clears.  Rule 20: the
+# tap-to-bore web's stated shortfall (RV-03) ends the tap note.
 DRAWING_NOTES = "\n".join(
     (
         f"{BORE_NOTE}. LOCATIONAL CLEARANCE FIT ON {HUB_NUMBER} SPIGOT",
-        f"   (CLEARANCE {_CLEARANCE} REF). CHAMFER "
-        f"{inch_text(BORE_FRONT_CHAMFER, 3)} X 45\u00b0 FAR SIDE.",
+        f"   (CLEARANCE {_CLEARANCE} REF). CHAMFER {_CHAMFER} X 45\u00b0 FAR SIDE,",
+        "   CLEARS SPIGOT ROOT.",
         f"{TAP_NOTE}. MATCH-DRILL AT ASSEMBLY WITH {HUB_NUMBER}: SPOT THRU ITS FLANGE",
         f"   HOLES, THEN DRILL AND TAP; MATCH-MARK BOTH. {TAP_WALL_TEXT}.",
     )
@@ -136,8 +146,10 @@ _GEAR_DATA_ROWS = (
     ),
     ("MATES WITH", f"KNOB SHAFT {KNOB_NUMBER}, {MESH_PINION_TEETH}T"),
     (
-        "BACKLASH WITH MATE (FEELER)",
-        "-".join(inch_text(value, 3) for value in BACKLASH_ACCEPT_MM),
+        "SPAN MATCHED FIT",
+        "BACKLASH WITH MATE "
+        + "-".join(inch_text(value, 3) for value in BACKLASH_ACCEPT_MM)
+        + ", FEELER",
     ),
 )
 GEAR_DATA_NOTE = "\n".join(

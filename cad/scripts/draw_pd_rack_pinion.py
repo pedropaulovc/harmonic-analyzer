@@ -57,6 +57,7 @@ from pd_rack_pinion_callouts import (
     FACE_WIDTH_CALLOUT,
     GEAR_DATA_NOTE,
     MESH_CALLOUT,
+    SPAN_CALLOUT,
     TAP_CALLOUT_QUALIFIER,
 )
 from pd_rack_pinion_spec import (
@@ -174,7 +175,7 @@ DIMENSION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
     "OutsideDia": MESH_CALLOUT,
 }
-DIMENSION_CALLOUTS_ABOVE = {"ToothSpan": MESH_CALLOUT}
+DIMENSION_CALLOUTS_ABOVE = {"ToothSpan": SPAN_CALLOUT}
 RIGHT_DIMENSION_CALLOUTS = {"FaceWidth": FACE_WIDTH_CALLOUT}
 # Lower-left of the face view, off the rim: the leader rises almost straight
 # to the lower-left tap from the block's lower-right corner, left of the
