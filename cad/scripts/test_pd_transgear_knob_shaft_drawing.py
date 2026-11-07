@@ -219,25 +219,36 @@ def test_each_chucking_dimensions_from_its_faced_end() -> None:
     rows = [drawing.SIDE_KEEP[name][1] for name in ("ThreadEndFromTip", "CoreFromTip", "TipStation")]
     assert rows == sorted(rows, reverse=True)
     assert drawing.F_X < drawing.CORE_END_X < drawing.THREAD_END_X < drawing.TIP_X
-    # Round 2: each .XXX length names what it serves, by its link on the
+    # Round 2: each .XXX tip station names what it serves, by its link on the
     # value's line to the stations note, which quotes the printed values and
-    # names the mates whose stacks need .XXX.
+    # names the mates whose stacks need .XXX.  Round 3: the overall prints
+    # .XXX plain (the title block's ±.005 is the knob cup's pin-wall band),
+    # with no reason text.
     note = dict(drawing.NOTE_TEXTS)[drawing.STATIONS_NOTE]
     for name, value in (
         ("TipStation", spec.TIP_STATION),
         ("CoreFromTip", spec.CORE_FRONT_FROM_TIP),
         ("ThreadEndFromTip", spec.THREAD_END_FROM_TIP),
-        ("OverallLength", spec.OVERALL_LENGTH),
     ):
         assert drawing.DIMENSION_SUFFIXES[name] == f" {drawing.STATIONS_LINK}", name
         assert spec.inch_text(value, 3) in note, name
+    assert "OverallLength" not in drawing.DIMENSION_SUFFIXES
+    assert "OverallLength" not in drawing.DIMENSION_CALLOUTS_BELOW
+    assert "OverallLength" not in drawing.DIMENSION_CALLOUTS_ABOVE
     assert spec.inch_text(spec.OVERALL_LENGTH, 3) == "2.792"
-    for key in ("pd-transgear-drive-collar", "pd-transgear-thumbnut", "pd-transgear-knob-cup"):
+    assert "2.792" not in drawing.NOTES
+    for key in ("pd-transgear-drive-collar", "pd-transgear-thumbnut"):
         assert _config.parts(key)["number"] in note, key
-    # Rule 7: each note runs to four short lines; no coined tool words.
+    # Rule 7: each note runs to four short lines; no process or coined
+    # tool words.
     assert drawing.NOTE_LINES_MAX == 4
     assert all(len(lines) <= 4 for lines in drawing.NOTE_LINES)
-    assert "TOOL" not in drawing.NOTES
+    assert "TOOL" not in drawing.NOTES and "FACED" not in drawing.NOTES
+    # Round 3: the overall's text stands clear of the face width's outside
+    # arrow left of F, with margin.
+    x, _y = drawing.SIDE_KEEP["OverallLength"]
+    assert x + len("2.792") * 0.00275 / 2 < drawing.F_X - 0.015 - 0.005
+    assert x - len("2.792") * 0.00275 / 2 > drawing.REAR_X + 0.010
 
 
 def test_d_flat_uses_signed_physical_round_tool_end_and_real_neck() -> None:
@@ -272,7 +283,7 @@ def test_neck_diameter_prints_limits_and_one_reason() -> None:
     assert spec.FRONT_RELIEF_DIA + lo == pytest.approx(spec.FRONT_RELIEF_DIA_MIN)
     assert spec.FRONT_RELIEF_AREA_MIN == pytest.approx(math.pi * 3.81**2 / 4.0)
     neck = dict(drawing.NOTE_TEXTS)[drawing.NECK_NOTE]
-    assert neck.startswith(f"NECK UNDER DRIVE COLLAR {spec.DRIVE_COLLAR_NUMBER}:")
+    assert neck == f"NECK UNDER DRIVE COLLAR {spec.DRIVE_COLLAR_NUMBER}."
     for name in ("FrontReliefDia", "FlatEnd"):
         assert drawing.DIMENSION_SUFFIXES[name] == f" {drawing.NECK_LINK}", name
     assert drawing.NECK_LINK == f"SEE NOTE {drawing.NECK_NOTE}"

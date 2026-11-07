@@ -97,7 +97,6 @@ from pd_transgear_knob_shaft_spec import (
     GEOMETRIC_CONTROLS,
     GEOMETRIC_TOLERANCES_IN,
     GEOMETRIC_TOLERANCES_MM,
-    OVERALL_LENGTH,
     PART_DATUMS,
     REAR_END_Z,
     PITCH_DIA,
@@ -186,10 +185,10 @@ _ROW_Y = tuple(SIDE_CENTER[1] - HALF_OD - 0.016 - i * _ROW_PITCH for i in range(
 THUMBNUT_NUMBER = _config.parts("pd-transgear-thumbnut")["number"]
 
 
-def _mate_name(key: str) -> str:
+def _mate_name(part: dict) -> str:
     """A mate as the shop reads it: its config title, less the family word
-    every part on the sheet shares, and its part number."""
-    part = _config.parts(key)
+    every part on the sheet shares, and its part number. Callers read the row
+    by a literal key, so the drawing's config inputs stay per-row."""
     title = part["title"].upper().removeprefix("TRANSGEAR ")
     return f"{title} {part['number']}"
 
@@ -207,11 +206,12 @@ JOURNAL_CLEARANCE_MM = (
 )
 # The numbered notes the bands link by "SEE NOTE n": the journal's running
 # fit; the D-section's one sliding fit, which its Ø and its flat's distance
-# from the axis link; the .XXX lengths' stacks (round 2: printed .XXX with
-# no stated function), which the tip stations and the overall link; and the
-# neck's mate and reasons, which its Ø limits and the D-flat tool end's
-# limits link (round 2: the tool end's .005 band named no mate).  They stand
-# in the open field right of the overall's tip witness line, over the title
+# from the axis link; the tip stations' stacks (round 2: printed .XXX with
+# no stated function), which those stations link; and the neck's mate,
+# which its Ø limits and the flat's end limits link (round 2: the flat end's
+# .005 band named no mate).  The overall prints .XXX plain: the title
+# block's ±.005 is the band the knob cup's pin wall needs.  They stand in
+# the open field right of the overall's tip witness line, over the title
 # block; at 2.2 mm a line runs ~1.5 mm a character, so no line runs past 70
 # characters (~105 mm).
 JOURNAL_FIT_NOTE = 1
@@ -219,27 +219,22 @@ D_SECTION_FIT_NOTE = 2
 STATIONS_NOTE = 3
 NECK_NOTE = 4
 NOTES_LINE_CHARS_MAX = 70
-_COLLAR = _mate_name("pd-transgear-drive-collar")
+_COLLAR = _mate_name(_config.parts("pd-transgear-drive-collar"))
 NOTE_TEXTS = (
     (
         JOURNAL_FIT_NOTE,
-        f"RUNNING FIT IN {_mate_name('pd-transgear-arm-plate')}: TURN TO MEASURED "
+        f"RUNNING FIT IN {_mate_name(_config.parts('pd-transgear-arm-plate'))}: "
+        "TURN TO MEASURED "
         f"BORE (CLEARANCE {_fit_range_text(*JOURNAL_CLEARANCE_MM)}).",
     ),
     (D_SECTION_FIT_NOTE, f"SLIDING FIT ON {_COLLAR}: SLIDES IN, NO ROCK."),
     (
         STATIONS_NOTE,
-        f"TIP FACED FIRST. {inch_text(TIP_STATION, 3)}/"
-        f"{inch_text(CORE_FRONT_FROM_TIP, 3)} SET THE D-CORE UNDER {_COLLAR}, "
-        f"{inch_text(THREAD_END_FROM_TIP, 3)} THE FULL THREAD FOR "
-        f"{_mate_name('pd-transgear-thumbnut')}; {inch_text(OVERALL_LENGTH, 3)} SETS "
-        f"THE PIN WALL IN {_mate_name('pd-transgear-knob-cup')}.",
+        f"{inch_text(TIP_STATION, 3)}/{inch_text(CORE_FRONT_FROM_TIP, 3)} SET THE "
+        f"D-CORE UNDER {_COLLAR}, {inch_text(THREAD_END_FROM_TIP, 3)} THE FULL "
+        f"THREAD FOR {_mate_name(_config.parts('pd-transgear-thumbnut'))}.",
     ),
-    (
-        NECK_NOTE,
-        f"NECK UNDER {_COLLAR}: MAX DIA CLEARS ITS D-BORE, MIN DIA CARRIES THE "
-        "DRIVE; THE FLAT ENDS IN THE NECK.",
-    ),
+    (NECK_NOTE, f"NECK UNDER {_COLLAR}."),
 )
 # Rule 7: a note runs to four short lines at most.
 NOTE_LINES_MAX = 4
@@ -302,7 +297,7 @@ GEAR_DATA_ROWS = (
     ("PITCH DIAMETER (REF)", inch_text(PITCH_DIA, 4)),
     ("WHOLE DEPTH (REF)", inch_text(WHOLE_DEPTH, 4)),
     ("CUTTER", f"#{CUTTER_NUMBER}, {CUTTER_TOOTH_RANGE[0]}-{CUTTER_TOOTH_RANGE[1]}T"),
-    ("MATES WITH", _mate_name("pd-rack-pinion")),
+    ("MATES WITH", _mate_name(_config.parts("pd-rack-pinion"))),
     ("SPAN MATCHED FIT", f"BACKLASH WITH MATE\n   {BACKLASH_ACCEPT_TEXT}, FEELER"),
 )
 GEAR_DATA_NOTE = "\n".join(
@@ -356,10 +351,12 @@ SIDE_KEEP: dict[str, tuple[float, float]] = {
     "TipStation": ((F_X + TIP_X) / 2.0, _ROW_Y[2]),
     # The journal, the rest of the overall, as a reference.
     "JournalLength": ((PINION_REAR_X + REAR_X) / 2.0, _ROW_Y[0]),
-    # The controlled overall, tip face to rear face, that the rear chucking
-    # faces to, on the last row: under the face width's callout, its rear
-    # witness line right of the gear data block.
-    "OverallLength": ((REAR_X + TIP_X) / 2.0, _ROW_Y[5]),
+    # The controlled overall, tip face to rear face, on the last row, its
+    # rear witness line right of the gear data block.  Its text stands 20 mm
+    # left of the line's middle (round 3: centred, "2.792 SEE NOTE 3" ran
+    # into the face width's outside arrow left of F), well short of that
+    # arrow and of the journal's (1.62) text on row 0.
+    "OverallLength": ((REAR_X + TIP_X) / 2.0 - 0.020, _ROW_Y[5]),
 }
 END_KEEP: dict[str, tuple[float, float]] = {
     # The flat's distance from the axis, where the flat shows true (machinist
@@ -397,18 +394,24 @@ DIMENSION_CALLOUTS_BELOW = {
     "FlatToAxis": D_SECTION_FIT_LINK,
     "ToothSpan": SPAN_CALLOUT,
 }
-# Each .XXX tip station and the overall links the stacks note on its value's
-# line; detail B's neck Ø (LIMITS) and the D-flat tool end's limits link the
-# neck note, which names MHA-PD-22 once.  (A row under the neck Ø would top
-# out past the border, and the side rows stand 10 mm apart.)
+# Each .XXX tip station links the stacks note on its value's line; detail
+# B's neck Ø (LIMITS) and the flat end's limits link the neck note, which
+# names MHA-PD-22 once.  (A row under the neck Ø would top out past the
+# border, and the side rows stand 10 mm apart.)
 DIMENSION_SUFFIXES = {
     "ThreadEndFromTip": f" {STATIONS_LINK}",
     "CoreFromTip": f" {STATIONS_LINK}",
     "TipStation": f" {STATIONS_LINK}",
-    "OverallLength": f" {STATIONS_LINK}",
     "FrontReliefDia": f" {NECK_LINK}",
     "FlatEnd": f" {NECK_LINK}",
 }
+# The face width's outside arrow left of F runs ~15 mm along its line
+# (round-3 render); the overall's text, at ~2.75 mm a character centred on
+# its keep, ends that far plus 5 mm short of F.
+FACE_WIDTH_ARROW_RUN = 0.015
+OVERALL_TEXT_RIGHT = SIDE_KEEP["OverallLength"][0] + len("2.792") * 0.00275 / 2.0
+if OVERALL_TEXT_RIGHT > F_X - FACE_WIDTH_ARROW_RUN - 0.005:
+    raise AssertionError("the overall's text runs into the face width's arrow")
 # Reference sizes (parenthesized): the journal (the rest of the controlled
 # overall), and the thread blank the #8-32 UNC-2A class governs.  Name ->
 # diameter glyph.
