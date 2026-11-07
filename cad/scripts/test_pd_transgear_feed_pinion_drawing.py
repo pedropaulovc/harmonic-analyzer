@@ -205,14 +205,35 @@ def test_boss_and_flat_take_the_hub_bore() -> None:
 
 def test_step_face_is_square_to_the_bore() -> None:
     """The hub's spigot seats on the step, so the step face is held square
-    to the bore (datum A) over the tip circle; the frame prints the spec's
-    value."""
+    to the bore (datum A) over the tip circle at the shop's .001 row; the
+    frame prints the spec's value."""
     assert spec.BORE_DATUM == "A"
-    assert spec.STEP_FACE_PERPENDICULARITY == pytest.approx(0.0002 * 25.4)
+    assert spec.STEP_FACE_PERPENDICULARITY == pytest.approx(0.001 * 25.4)
     assert spec.STEP_FACE_PERPENDICULARITY_ZONE_DIA == spec.OUTSIDE_DIA
     assert spec.GEOMETRIC_TOLERANCES_IN == {
-        "step face perpendicularity to bore": ".0002"
+        "step face perpendicularity to bore": ".001"
     }
+
+
+def test_step_face_air_is_accepted_at_assembly_at_the_floor() -> None:
+    """Delegated ruling 2026-11-07 (Main, #2144): the collar-to-disc air the
+    step face's squareness closes is felt at MHA-PD-00, at the same floor the
+    collar stack keeps for every other source; the platen stack still charges
+    the face."""
+    import build_pd_paper_drive_assembly as assembly
+    import pd_cluster_air as air
+    import pd_transgear_drive_collar_spec as collar
+
+    label = "sleeve step face perpendicularity"
+    assert air.ASSEMBLY_ACCEPTED_COLLAR_SOURCES == {label}
+    assert label not in air.COLLAR_AIR.terms
+    assert air.COLLAR_AIR.statistical_mm >= air.COLLAR_AIR_MIN
+    assert air.COLLAR_AIR_MIN == collar.COLLAR_DISC_AIR_MIN
+    assert "ONE FULL TURN" in collar.COLLAR_DISC_AIR_PHRASE
+    assert assembly.PLATEN_AIR.terms[label] > 0.0
+
+
+def test_step_frame_lands_on_the_step_face() -> None:
     # The frame's leader lands on the step face's edge-on line in the
     # section, between the boss and the tip on the +Y tooth.
     s = drawing.VIEW_SCALE[0] / 1000.0
@@ -891,13 +912,21 @@ def test_finite_gear_data_and_model_consume_one_tooth_system() -> None:
     # The span prints once, on the end view with its limits.
     assert "SPAN" not in callouts.GEAR_DATA
     # The span band's fit route (rule 4): the rack mesh's datum backlash band
-    # as the dial reads it at assembly, rounded inward on the .0001 in grid.
+    # as the dial reads it at assembly, rounded inward on the plain .0005 in
+    # dial step.
     low, high = spec.RACK_BACKLASH_RANGE
     accept = callouts.BACKLASH_ACCEPT_MM
     assert low <= accept[0] < accept[1] <= high
-    assert accept[0] - low < 0.0001 * 25.4 and high - accept[1] < 0.0001 * 25.4
+    step = 0.0005 * 25.4
+    assert accept[0] - low < step and high - accept[1] < step
+    for value in accept:
+        assert value / step == pytest.approx(round(value / step))
     (row,) = [line for line in callouts.GEAR_DATA.splitlines() if "BACKLASH" in line]
-    assert row.endswith(f"{_inch(accept[0], 4)}-{_inch(accept[1], 4)}")
+    printed = re.search(r"(\.\d+)-(\.\d+)$", row)
+    assert printed is not None
+    for text, value in zip(printed.groups(), accept):
+        assert float(text) * 25.4 == pytest.approx(value)
+        assert not text.endswith("0"), text
     assert len(callouts.GEAR_DATA.splitlines()) == 9
     assert "PROFILE SHIFT" not in callouts.GEAR_DATA
     # A form-cut tooth is a translated involute: its pitch thickness does
@@ -978,12 +1007,11 @@ def test_toothspace_control_is_source_owned_and_feature_local() -> None:
         f"TOOTH SPACE RUNOUT {callouts.TOOTH_SPACE_RUNOUT_TIR_TEXT} TIR TO {spec.BORE_DATUM}",
         f"\u00d8{_inch(spec.TOOTHSPACE_GAUGE_DIA_MM, 4)} PIN, ALL {spec.TEETH} SPACES",
     ]
-    # The printed TIR is the grade on the plain .001 in grid, rounded up
-    # (2026-11-07 screen: .0019 read as converted millimetres): PROVISIONAL
-    # pending owner confirmation of the shared grade at .002.
+    # The printed TIR is the shared grade at three places, floored: never
+    # over the booked grade, and not a converted millimetre value.
     printed = float(callouts.TOOTH_SPACE_RUNOUT_TIR_TEXT)
     assert printed == pytest.approx(round(printed, 3))
-    assert 0.0 <= printed * 25.4 - grade < 0.001 * 25.4
+    assert -1e-9 <= grade - printed * 25.4 < 0.001 * 25.4
     # Indexing is held by the dividing head; no index inspection is printed.
     assert max(map(len, callouts.TOOTH_SPACE_CALLOUT.splitlines())) <= 70
     assert "CANDIDATE" not in callouts.TOOTH_SPACE_CALLOUT

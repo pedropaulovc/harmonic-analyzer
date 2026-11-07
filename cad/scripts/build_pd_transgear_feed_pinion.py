@@ -768,7 +768,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # Bands (pd_transgear_feed_pinion_spec), printed in inches: the reamed
-    # bore, the boss's SHAFT_H under the hub's bore, the flat's 0/-.0006
+    # bore, the boss's SHAFT_H under the hub's bore, the flat's 0/-.001
     # under the hub's flat, the standard tip class, the root as a physical
     # MIN floor, the flat's end wall as LIMITS between the step and the hub's
     # flat; the cutter's full depth as a MIN (it covers the rack) and its
