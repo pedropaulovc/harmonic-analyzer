@@ -74,7 +74,9 @@ table (see [2026-11-06](2026-11-06-base-bar-both-edges-and-a-controller-reset.md
 ## Open
 
 - Face both ends.
-- Bring a ground rod for squaring in the vise.
+- Bring a ground rod for squaring in the vise. Bought afterwards: POWERTEC
+  71476 hardened, ground steel dowel pins, 1/4 × 2 in, 10 pack (Amazon
+  B086DCHYQK), due 2026-11-07.
 - Shop inventory: mark the JB Tools and Taytools orders received (there's one
   3900-0070 jack, not two) and add the three makerspace 1-2-3 blocks:
   [#2288](https://github.com/pedropaulovc/harmonic-analyzer/issues/2288).
