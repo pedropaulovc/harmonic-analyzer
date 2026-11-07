@@ -69,7 +69,7 @@ FRONT_CENTER = (0.095, 0.180)
 RIGHT_CENTER = (0.225, 0.180)
 ISO_CENTER = (0.355, 0.180)
 HALF_DIA = PIN_DIA * VIEW_SCALE[0] / 2000.0
-# The diameter's three-line fit callout hangs under its value, so the value
+# The diameter's two-line fit callout hangs under its value, so the value
 # sits high enough for the block to clear the side view's top edge.
 RIGHT_KEEP = {
     "PinDia": (RIGHT_CENTER[0] - 0.030, RIGHT_CENTER[1] + HALF_DIA + 0.030),
