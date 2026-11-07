@@ -389,6 +389,19 @@ BRACKET_ROW_PLACES = 3
 BRACKET_STATION_PLACES = 2
 BRACKET_STATION_BAND = printed_band_mm(3, unit=METRIC_UNIT)  # 0.13
 BRACKET_ROW_BAND = BRACKET_STATION_BAND
+# The counterbore prints three places with its function named at the
+# callout (machinist review 84d5991d45: ⌴ Ø.313 ↧ .189 read as unexplained
+# .XXX). Neither size is a mere head pocket:
+# - Ø.313 ±.005: the head clears the counterbore wall over the screw's whole
+#   float in its hole, so the thread, not the head, is TL-28's positive stop
+#   (BRACKET_HEAD_FLOAT_CLEARANCE_MIN against BRACKET_SCREW_FLOAT_WORST). At
+#   .31 ±.01 the .300 bore leaves the .270 head 0.381 a side against the
+#   screw's 0.438: the head would bear first.
+# - ↧ .189 ±.005: the depth sets how far the 3/4 screw reaches into TL-28's
+#   bottom thread (bracket_screw_under_head; TL-28's BAR_REACH_MAX 12.294).
+#   At .19 ±.01 the .200 depth lets it reach 12.446, past that thread's
+#   least full depth (12.344) and into the top thread's tap lead.
+# The test proves both counterfactuals.
 BRACKET_CBORE_PLACES = 3
 BRACKET_CALLOUT_PRECISION = {
     "hw-thruholedia": 3,
@@ -398,9 +411,11 @@ BRACKET_CALLOUT_PRECISION = {
 BRACKET_MATE = "MHA-CH-06-TL-28"
 # The plan looks at the top face; the counterbores open on the underside.
 # The sheet draws Bar1; the callout says the holes are its alone and that
-# bar 2 (the Bar2 configuration, same Number) has none.
+# bar 2 (the Bar2 configuration, same Number) has none, and names what the
+# counterbore's diameter and depth hold, right above its row.
 BRACKET_CALLOUT_PROCESS = (
     f"BAR 1 ONLY; NONE ON BAR 2\nMATCHES {BRACKET_MATE}\nDRILL, C'BORE FAR SIDE\n"
+    "HEAD CLEAR AT FULL FLOAT\nDEPTH SETS SCREW REACH\n"
 )
 _CB = printed_band_mm(BRACKET_CBORE_PLACES, unit=UNIT)
 _THICK_BAND = printed_band_mm(THICK_PLACES, unit=UNIT)
@@ -410,6 +425,18 @@ BRACKET_CBORE_RADIUS_MAX = (BRACKET_CBORE_DIA + _CB) / 2.0
 BRACKET_SCREW_FLOAT_MAX = (
     BRACKET_HOLE_DIA + drilled_oversize_mm(unit=UNIT) - THREAD_MAJOR_MM["#8-32"]
 ) / 2.0
+# The stop's true worst travel: the largest drilled hole over the bought
+# UNC-3A screw's least major (ASME B1.1 #8-32 3A: .1585; leadscrew spec's
+# reversal lost motion reads it from here).
+BRACKET_SCREW_MAJOR_MIN = 0.1585 * INCH  # 4.026
+BRACKET_SCREW_FLOAT_WORST = (
+    BRACKET_HOLE_DIA + drilled_oversize_mm(unit=UNIT) - BRACKET_SCREW_MAJOR_MIN
+) / 2.0  # 0.438
+# The head's room to the counterbore wall, a side, at the smallest bore and
+# the largest head (ASME B18.3 .270).
+BRACKET_HEAD_FLOAT_CLEARANCE_MIN = (
+    BRACKET_CBORE_DIA - _CB - BRACKET_SCREW_HEAD_DIA
+) / 2.0  # 0.483
 BRACKET_HEAD_RECESS_MIN = BRACKET_CBORE_DEPTH - _CB - BRACKET_SCREW_HEAD_HEIGHT
 BRACKET_HEAD_CLEARANCE_MIN = BRACKET_CBORE_DIA - _CB - BRACKET_SCREW_HEAD_DIA
 BRACKET_HEAD_BEARING_MIN = (
@@ -420,6 +447,11 @@ if BRACKET_HEAD_RECESS_MIN < 0.1:
     raise AssertionError("a bracket screw head can stand proud of the underside")
 if BRACKET_HEAD_CLEARANCE_MIN < 0.25:
     raise AssertionError("the bracket counterbore does not clear the screw head")
+if BRACKET_HEAD_FLOAT_CLEARANCE_MIN < BRACKET_SCREW_FLOAT_WORST:
+    raise AssertionError(
+        "a bracket screw head bears on its counterbore wall before the thread "
+        "bears on the hole"
+    )
 if BRACKET_HEAD_BEARING_MIN < 0.5:
     raise AssertionError("the bracket screw head bears on under 0.5 a side")
 if BRACKET_CBORE_FLOOR_MIN < WALL_TARGET_MM:
