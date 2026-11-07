@@ -48,8 +48,11 @@ Pass 1 — detection. Find every candidate item; classify nothing yet.
    does any location dimension carry words, any callout carry more than two
    lines of words, or any reason exceed six words or repeat (rule 7); does a
    view locate eight or more hole axes or cross location dimensions without
-   a hole table (rule 10); does every section and
-   detail say what it shows (rule 9); is every word, symbol and label one the
+   a hole table, and does every hole table or ordinate zero start at a
+   picked-up corner, never a hole centre (rule 10); does every section and
+   detail say what it shows, is each cutting plane a whole line joining its
+   arrows and only as long as the feature it shows, and does the plane cut
+   so solid reads as solid (rule 9); is every word, symbol and label one the
    builder can look up (rule 26). Record the count or values you applied.
 Record each candidate with its where, the defect, its evidence (text layer
 line or crop), and the fix.
