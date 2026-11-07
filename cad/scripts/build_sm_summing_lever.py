@@ -1952,18 +1952,25 @@ async def _knife_stub_reference(adapter, drive_jobs: list[tuple[str, str]]) -> N
     blank_reference_sketches(adapter, ("KnifeStubReference",))
 
 
-def _hex_width_reference(adapter) -> None:
-    """HexWidth prints as a reference, "2X (8.080)": untoleranced, the
-    parentheses its native prefix (DIMENSION_PREFIXES) and suffix."""
-    display, dimension = _named_dimension(adapter, "KnifeEnvelopeReference", "HexWidth")
-    label = "HexWidth@KnifeEnvelopeReference"
-    if int(dimension.DrivenState) != 1:
-        raise RuntimeError(f"{label}: a reference dimension must be driven")
+def _reference_display(adapter, feature_name: str, name: str) -> None:
+    """Print ``name@feature_name`` as a reference, "(8.080)": untoleranced,
+    in parentheses (its prefix and suffix)."""
+    display, dimension = _named_dimension(adapter, feature_name, name)
+    label = f"{name}@{feature_name}"
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
     tolerance.Type = 0  # swTolType_e.swTolNONE
     display.SetText(2, ")")  # swDimensionTextParts_e.swDimensionTextSuffix
     if int(tolerance.Type) != 0 or str(display.GetText(2) or "") != ")":
         raise RuntimeError(f"{label}: reference display did not persist")
+
+
+def _hex_width_reference(adapter) -> None:
+    """HexWidth prints as a reference, "2X (8.080)": a driven dimension, the
+    opening parenthesis its native prefix (DIMENSION_PREFIXES)."""
+    _, dimension = _named_dimension(adapter, "KnifeEnvelopeReference", "HexWidth")
+    if int(dimension.DrivenState) != 1:
+        raise RuntimeError("HexWidth@KnifeEnvelopeReference: a reference dimension must be driven")
+    _reference_display(adapter, "KnifeEnvelopeReference", "HexWidth")
 
 
 def _drawing_dimension_contract(adapter) -> None:
@@ -2003,7 +2010,6 @@ async def _receiver_coordinate_dimensions(adapter) -> None:
     through the plate-top corner over each tap drew a line across the end
     rib's face at the plate top, read as a face 2.54 over the taps
     (machinist review r11); the rib's slants wall the taps there."""
-    from magnifying_bracket_joint_layout import POSITION_BAND
     from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
     check("receiver coordinate sketch", await adapter.create_sketch("Front"))
@@ -2077,12 +2083,15 @@ async def _receiver_coordinate_dimensions(adapter) -> None:
     check("exit receiver coordinate sketch", await adapter.exit_sketch())
     name_last_feature(adapter, "ReceiverCoordinates")
     dimensions.apply(adapter, "ReceiverCoordinates")
+    # Reference stations (delegated ruling sm Q7, 2026-11-07 (Main), no
+    # precedent; owner review #2144; pending owner confirmation): the taps
+    # are spotted through MHA-MG-01's holes at assembly (MHA-SM-00), so the
+    # print gives the stations in parentheses, untoleranced; the receiver
+    # walls still charge joint.POSITION_BAND as the bracket's placement.
     names = ["ReceiverX0", "ReceiverX1", "ReceiverY0"]
     for name in names + ["ReceiverY1"]:
-        set_dimension_symmetric_tolerance(
-            adapter, "ReceiverCoordinates", name, POSITION_BAND,
-            places=RECEIVER_COORDINATE_PLACES, display_unit=UNIT,
-        )
+        set_dimension_prefix(adapter, "ReceiverCoordinates", name, "(")
+        _reference_display(adapter, "ReceiverCoordinates", name)
         set_dimension_display_precision(
             adapter, "ReceiverCoordinates", name, RECEIVER_COORDINATE_PLACES
         )

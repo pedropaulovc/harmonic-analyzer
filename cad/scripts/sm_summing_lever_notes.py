@@ -112,9 +112,13 @@ DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
     "AnchorOuterDia": "WEB ARCS RUN\nFROM QUADRANTS\nTO AXIS A AT ENDS",
 }
 
-# The two blind taps fasten the magnifying bracket. Their native callout owns
-# the pilot and full-thread depths; no additional cavity or wall limit prints.
-BRACKET_TAP_CALLOUT_PROCESS = f"FASTENS {BRACKET_NUMBER}\n"
+# The two blind taps fasten the magnifying bracket and are spotted through
+# its holes at assembly (delegated ruling sm Q7, 2026-11-07 (Main), no
+# precedent; owner review #2144; MHA-SM-00 carries the step): their stations
+# print REF (build_sm_summing_lever._receiver_coordinate_dimensions).  Their
+# native callout owns the pilot and full-thread depths; no additional cavity
+# or wall limit prints.
+BRACKET_TAP_CALLOUT_PROCESS = f"SPOT THRU {BRACKET_NUMBER} AT ASSEMBLY\n"
 
 # --- Decimal places, #290. ---
 # The spring pattern's BASIC row X, start Z and pitch are calibrated stations
@@ -140,7 +144,7 @@ BRACKET_TAP_PRECISION = {
     "hw-tapdrldepth": 2,
     "hw-threaddepth": 3,
 }
-# The receiver coordinates (1.120 / .581 / .128) sit on the .001 grid; the
+# The receiver stations (1.120 / .581 / .128, REF) sit on the .001 grid; the
 # lever's taps are modelled there (magnifying_bracket_joint_layout).
 RECEIVER_COORDINATE_PLACES = 3
 
