@@ -112,10 +112,22 @@ def test_every_band_is_native_and_named() -> None:
     # The supply length's single MIN limit (build_ch_rod_pivot_pin precedent).
     assert "tolerance.Type = SUPPLY_LENGTH_TOL_TYPE" in build
     assert "tolerance.SetValues(0.0, 0.0)" in build
+    # Fan-out screen 2026-11-07 (rule 7): the bore's and the length's
+    # supply-matched sizes link the note that states them.
     assert notes.SUPPLY_BORE_CALLOUT.splitlines() == [
         "DRILL THRU",
-        "SUPPLY SIZE",
+        "SUPPLY SIZE, SEE NOTE 1",
         "WALL .075 MIN",
+    ]
+    assert notes.SUPPLY_LENGTH_CALLOUT == "SEE NOTE 1"
+    assert drawing.DIMENSION_CALLOUTS["SupplyLength"] == notes.SUPPLY_LENGTH_CALLOUT
+    assert notes.DRAWING_NOTES.startswith("1. ")
+    # The land's band is narrower than the turned-diameter row: the callout
+    # routes it to the measured strap hole (pending owner confirmation,
+    # fan-out Q2) with its interference as reference.
+    assert notes.LAND_CALLOUT.splitlines() == [
+        "PRESS FIT IN MHA-CH-13 STRAP HOLE",
+        "TURN TO MEASURED HOLE (INTERFERENCE .0004-.0013)",
     ]
     # The stated wall is the spec's worst case, rounded down (rule 20).
     assert 0.075 <= spec.SUPPLY_WALL_MIN / 25.4 < 0.076

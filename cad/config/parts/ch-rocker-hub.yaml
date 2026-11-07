@@ -19,3 +19,8 @@ ch-rocker-hub:
       where: "face view, the \u00d8.246 supply bore callout: WALL .075 MIN"
       finding: "wall from the largest supply bore to the smallest press-fit land below the .080 target (rule 17)"
       reason: "Owner ruling 2026-11-01: thin walls above the .060 floor but under the .080 target, with no geometry escape, are accepted as package-specific minor exceptions. .075 MIN between the \u00d8.4009 least land and the \u00d8.250 largest letter-D drill (DRILLED HOLES +.004) stays above the .060 floor; the bore is a supply size reamed to its finished size after joining (MHA-CH-06), and the letter-D drill leaves the stock the ream needs"
+    - id: "RV-02"
+      kind: "accept"
+      where: "side view, the \u00d8.4000 +.0013/+.0009 land, PRESS FIT IN MHA-CH-13 STRAP HOLE, TURN TO MEASURED HOLE (INTERFERENCE .0004-.0013)"
+      finding: "the +.0013 and +.0009 deviations are not plain inch steps: they read as converted millimetre values (rule 4)"
+      reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144 (fan-out Q2, pending owner confirmation; F5 applied by analogy). The land's limits are the owner's press fit (route v3, 2026-10-16): with MHA-CH-13's .4000 +.0005/.0000 reamed hole they give .0004-.0013 interference, and a .0000 least is refused as line-to-line. The band lives in ch_rocker_hub_fit, shared with MHA-CH-13 and the oblique-jig hub washer, so restating it re-keys those parts for print text alone. The land is turned to the measured strap hole at the callout. Accepts the printed steps only, no other band or fit departure."

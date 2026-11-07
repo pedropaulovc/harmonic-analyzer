@@ -55,6 +55,7 @@ from ch_rocker_hub_notes import (
     DRAWING_PRECISION_BY_NAME,
     LAND_CALLOUT,
     SUPPLY_BORE_CALLOUT,
+    SUPPLY_LENGTH_CALLOUT,
 )
 from ch_rocker_hub_spec import LAND_DIA, SUPPLY_LENGTH_MIN
 
@@ -90,25 +91,28 @@ HALF_LEN = SUPPLY_LENGTH_MIN / 2.0 * _S  # 0.0163
 # through the centre: two would cross there. The bore keeps the face view, its
 # value and two rows up-right of the circles; the land is a donor there
 # (parked left, clear of the bore's leader) and moves onto the side view,
-# right of the hub, where its callout block (~83 mm wide at two rows) clears
-# both the hub and the isometric. The supply length hangs under the side view.
+# right of the hub, where its callout block (~115 mm wide at its route row)
+# clears both the hub and the isometric. The supply length hangs under the
+# side view.
 FRONT_KEEP = {
     "SupplyBore": (FRONT_CENTER[0] + 0.040, FRONT_CENTER[1] + HALF_DIA + 0.022),
     "LandDia": (FRONT_CENTER[0] - 0.030, FRONT_CENTER[1] - HALF_DIA - 0.020),
 }
 # "SUPPLY .32 MIN" outruns the 33 mm hub: centred (r1) it sat on
 # both extension lines, so it stands right of the right one, the dimension
-# line carried out to it, below the land's lower extension line.
+# line carried out to it, below the land's lower extension line; its note
+# link hangs under it.
 RIGHT_KEEP = {
     "SupplyLength": (
         RIGHT_CENTER[0] + HALF_LEN + 0.028,
         RIGHT_CENTER[1] - HALF_DIA - 0.016,
     ),
 }
-LAND_ON_SIDE = (RIGHT_CENTER[0] + HALF_LEN + 0.060, RIGHT_CENTER[1])
+LAND_ON_SIDE = (RIGHT_CENTER[0] + HALF_LEN + 0.075, RIGHT_CENTER[1])
 DIMENSION_CALLOUTS = {
     "LandDia": LAND_CALLOUT,
     "SupplyBore": SUPPLY_BORE_CALLOUT,
+    "SupplyLength": SUPPLY_LENGTH_CALLOUT,
 }
 
 
