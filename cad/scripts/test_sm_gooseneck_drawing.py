@@ -235,8 +235,10 @@ def test_notes_state_stock_process_and_intent_without_sizes() -> None:
     for name, text in spec.DIMENSION_CALLOUTS_BY_NAME.items():
         if name != "CounterboreFloorCornerR":  # its axis rows: owner question
             assert len(text.splitlines()) <= 2, name
-    # Both fit windows print as REF after their fit (rule 4).
-    assert notes.count(f"(CLEARANCE {window} REF)") == 2
+    # Both fit windows print as the acceptance of a matched fit (fan-out
+    # policy 1): the shank turned to suit the tube, the sleeve selected.
+    assert notes.count(f"CLEARANCE {window};") == 2
+    assert "REF" not in notes
     assert "DIAMETRAL" not in notes
     # Both blocks sit beside the narrow end view: the shank's leader shoulder
     # ends left of it and the sleeve fits between it and the elevation's leg

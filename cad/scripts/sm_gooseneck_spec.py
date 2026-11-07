@@ -132,11 +132,17 @@ if max(map(len, _COUNTERBORE_ROWS.splitlines())) > COUNTERBORE_ROW_MAX_CHARS:
 PLUG_DIA_CALLOUT = f"FLUSH WITH TUBE OD\n{COUNTERBORE_WALL_CALLOUT}"
 # The bend radius is the tube's centreline radius; the arrowhead lands on the
 # outer arc, so the value says which in plain words (machinist review of
-# e487a1bb4; "CLR" read as clearance, novice-rubric screen).
-BEND_RADIUS_CALLOUT = "TO TUBE CENTERLINE"
+# e487a1bb4; "CLR" read as clearance, novice-rubric screen).  One short row
+# keeps the block clear of the bend's inner edge (farm run
+# 20261107T102825912Z).
+BEND_RADIUS_CALLOUT = "TUBE CENTERLINE"
 # The window is the joint's, braze or retaining compound (owner ruling
 # 2026-10-27 on #1997, sm_gooseneck_spring_joint), printed in inches rounded
-# inward at four places, as REF after the fit it results from (rule 4).
+# inward at four places.  It is the acceptance of a matched fit (fan-out
+# policy 1; machinist review 20261107T102825912Z: as REF beside a .XXX shank
+# it set no limit): the shank is turned to suit the tube's bore, and the
+# sleeve's stock is selected to suit the tube (owner ruling 2026-10-27:
+# select-fit from stock, no hone).
 _BRAZE_WINDOW = "-".join(
     f"{inches:.4f}".removeprefix("0")
     for inches in (
@@ -295,21 +301,23 @@ if (set(DIMENSION_CALLOUTS_BY_NAME) | set(DIMENSION_CALLOUTS_ABOVE_BY_NAME)) - s
 
 # Four lines (drawing-guidelines.md rule 7), each linked from its features
 # by SEE NOTE n except the last: the counterbore's run-out clearance (its
-# MIN Ø and depth, its floor corner's MAX), the shank's joint in the tube and
-# the sleeve's on it (the joint's window, braze or retaining compound, owner
-# ruling 2026-10-27 on #1997), then the order the owner ruled (2026-10-27,
-# #1997: join the end piece before bending, cooled or fully cured; recorded
-# as RV-02 in sm-gooseneck.yaml) with the bend's acceptance.  Sizes are on
-# the features and the bend radius is native, so no line names a tool.  Each
-# line ends left of the title block.
+# MIN Ø and depth, its floor corner's MAX), the shank's matched fit in the
+# tube and the sleeve's on it (the joint's window, braze or retaining
+# compound, owner ruling 2026-10-27 on #1997; the sleeve's lower end flush
+# with the tube's, LEG_BOTTOM in sm_gooseneck_geom, which no view shows
+# inside the sleeve), then the order the owner ruled (2026-10-27, #1997: join
+# the end piece before bending, cooled or fully cured; recorded as RV-02 in
+# sm-gooseneck.yaml) with the bend's acceptance.  Sizes are on the features
+# and the bend radius is native, so no line names a tool.  Each line ends
+# left of the title block.
 DRAWING_NOTES = "\n".join(
     (
         f"{COUNTERBORE_NOTE}. C'BORE DIAMETER, DEPTH AND CORNER CLEAR "
         f"{SCREW_NUMBER} THREAD RUN-OUT",
-        f"{SHANK_FIT_NOTE}. BRAZED FIT IN TUBE, BAg-7 FULL LAP, OR LOCTITE 638 "
-        f"(CLEARANCE {_BRAZE_WINDOW} REF)",
-        f"{SLEEVE_FIT_NOTE}. BRAZED FIT ON TUBE (CLEARANCE {_BRAZE_WINDOW} REF), "
-        "BAg-7 FILLET EACH END",
+        f"{SHANK_FIT_NOTE}. TURN TO SUIT TUBE BORE, CLEARANCE {_BRAZE_WINDOW}; "
+        "BAg-7 FULL LAP OR LOCTITE 638",
+        f"{SLEEVE_FIT_NOTE}. SELECT-FIT ON TUBE, CLEARANCE {_BRAZE_WINDOW}; "
+        "LOWER ENDS FLUSH; BAg-7 FILLETS",
         "4. JOIN END PIECE, COOL OR FULLY CURE, THEN BEND: OVALITY 5% MAX, NO KINKS",
     )
 )

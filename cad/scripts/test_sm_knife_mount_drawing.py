@@ -718,16 +718,19 @@ def test_the_sheet_carries_no_notes_block() -> None:
     assert sm_knife_mount_spec.PIN_SLIP_PRINTED == pytest.approx((low, high))
     assert low * 25.4 - 1e-9 <= dowel.SLIP_CLEARANCE_MIN < (low + 0.0001) * 25.4
     assert (high - 0.0001) * 25.4 < dowel.SLIP_CLEARANCE_MAX <= high * 25.4 + 1e-9
-    # B's hole names its process and REF depth, its mate and the clearance
-    # as REF; the slot its mate.  Each fact once, and each callout few
-    # enough rows for the layout audit's limit with its value row.
+    # B's hole and the slot are a matched fit: each names its route on the
+    # dowel and the clearance as its acceptance, once; B's hole also its
+    # process and REF depth.  Each callout few enough rows for the layout
+    # audit's limit with its value row.
     from _layout_audit import TEXT_ROW_LIMIT
 
+    window = f"CLEARANCE {low:.4f}-{high:.4f}".replace("0.", ".")
     hole = drawing.PIN_HOLE_CALLOUT
-    assert hole.count(f"{low:.4f}-{high:.4f} REF)".replace("0.", ".")) == 1
-    assert hole.count(dowel_number) == 1
     slot = drawing.SLOT_WIDTH_CALLOUT
-    assert slot.count(dowel_number) == 1
+    for callout in (hole, slot):
+        assert callout.count(window) == 1
+        assert callout.count(f"TO SUIT {dowel_number}") == 1
+        assert "REF)" not in callout
     for callout in (hole, slot):
         assert 1 + len(callout.splitlines()) <= TEXT_ROW_LIMIT
         assert "DIAMETRAL" not in callout

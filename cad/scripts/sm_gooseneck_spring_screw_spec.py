@@ -119,6 +119,7 @@ DIMENSION_CALLOUTS: dict[str, dict[str, str]] = {
         "TipChamfer": CHAMFER_CALLOUT,
         "UnderHeadCornerR": LOOP_NOTE_LINK,
     },
+    "StationReference": {"PlainLength": f"PLAIN BODY;\n{LOOP_NOTE_LINK}"},
 }
 # Above the value: the full-thread limit's span is wider than its ".225 max."
 # but narrower than any callout, so the value takes the dimension line and
