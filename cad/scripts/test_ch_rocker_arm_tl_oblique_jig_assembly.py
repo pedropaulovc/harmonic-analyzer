@@ -1926,14 +1926,53 @@ def test_rail_preparation_precedes_fastening_and_table_mounting() -> None:
 def test_step_10_taps_the_carrier_hub_in_situ_at_the_recorded_dro() -> None:
     """Owner ruling 3 (2026-11-07): the carrier's HUB #8-32 tap is made in
     situ at the step 10 DRO position, every strap's hub hole is drilled and
-    reamed at the same setting, and there is no counterbore or precision bore."""
+    reamed at the same setting, and there is no counterbore or precision bore.
+    Q7: the setting is checked from the set position on both pivot heads."""
     steps = {text.split(". ", 1)[0]: text for text in (*spec.ASSEMBLY_STEPS, *spec.OPERATION_STEPS)}
     assert "X 0, Y .5125 ±.0005" in steps["10C"]
-    assert "RECORD" in steps["10D"] and "STEP 20" in steps["10D"]
-    assert carrier.HUB_THREAD in steps["10E"] and "NO COUNTERBORE" in steps["10E"]
-    assert "STEP 10D" in steps["20"]
-    assert all("REAM" not in steps[head] for head in ("10C", "10D", "10E"))
+    assert steps["10D"].startswith("10D. CHECK THE A1 AND B1 HEADS")
+    assert "-1.2801" in steps["10D"] and "FROM THIS SETTING" in steps["10D"]
+    assert steps["10E"].startswith("10E. IF ONE FAILS")
+    assert "RECORD" in steps["10G"] and "STEP 20" in steps["10G"]
+    assert carrier.HUB_THREAD in steps["10H"] and "NO COUNTERBORE" in steps["10H"]
+    assert "STEP 10G" in steps["20"]
+    assert all("REAM" not in steps[head] for head in ("10C", "10D", "10G", "10H"))
     assert spec.carrier.HUB_RADIAL_STACK < 0.25
+
+
+def test_head_check_band_covers_the_hub_band_and_the_rail_chain() -> None:
+    """Q7: a head inside its rails' bands, read from a hub setting inside its
+    band, passes step 10D: the hub band plus the chain's lateral error at the
+    symmetric station (4.3 thou), rounded up to .001."""
+    inch = spec.trammel.INCH
+    assert spec.HEAD_CHECK_BAND == pytest.approx(0.006 * inch)
+    assert spec.HEAD_CHECK_BAND > spec.carrier.HUB_OFFSET_BAND + 0.004 * inch
+
+
+def test_rail_setting_chain_holds_the_6_in_row_and_closes_the_stack() -> None:
+    """Q6: stations 4.00, 10.00 and 15.00, each link 6.0 in or less from the
+    head set before, at the shop table's ±.002; the chain's computed radial
+    error (0.082 mm) closes with the shoulder and printed play."""
+    inch = spec.trammel.INCH
+    assert spec.CHAIN_STATIONS == pytest.approx((4.0 * inch, 10.0 * inch, 15.0 * inch))
+    assert spec.STATION_BAND == pytest.approx(0.002 * inch)
+    assert spec.CHAIN_STATION_RADIUS == pytest.approx(0.0824, abs=0.0005)
+    assert spec.CHAIN_RADIAL_STACK == pytest.approx(0.2454, abs=0.0005)
+    assert spec.CHAIN_RADIAL_STACK <= spec.trammel.TOP_EDGE_HALF_BAND
+    references = [row[1] for row in spec.RAIL_SETTING_ROWS]
+    assert references == ["ORIGIN", "S 4.00", "S 10.00"]
+    for (near, far), row in zip(spec._CHAIN_LINKS, spec.RAIL_SETTING_ROWS, strict=True):
+        for rail, (x_cell, y_cell) in zip((1, 2), (row[2:4], row[4:6]), strict=True):
+            fx, fy = spec.trammel.rail_point(rail, far)
+            nx, ny = spec.trammel.rail_point(rail, near) if near else (0.0, 0.0)
+            assert math.hypot(float(x_cell), float(y_cell)) <= 6.0 + 1e-4  # printed rounding
+            assert float(x_cell) == pytest.approx((fx - nx) / inch, abs=5e-5)
+            assert float(y_cell) == pytest.approx((fy - ny) / inch, abs=5e-5)
+        assert row[6:] == ("±.002", "6G")
+    steps = {text.split(". ", 1)[0]: text for text in spec.ASSEMBLY_STEPS}
+    assert steps["6G"].startswith("6G. CHECK")
+    assert "INCREMENTAL" in steps["6B"] and "INCREMENTAL" in steps["6D"]
+    assert "ABSOLUTE" in steps["6M"]
 
 
 def test_step_11_sets_the_stop_axes_before_spotting_the_riser() -> None:
@@ -2064,8 +2103,8 @@ def test_general_torque_note_covers_every_fastener_no_step_torques() -> None:
 
 
 def test_sweep_limits_are_witness_marked_and_every_pass_runs_mark_to_mark() -> None:
-    """Review jig-asm r2: each sweep limit is a setting-table row, set in X as
-    only and witness-marked (step 6E-6F); every complete pass runs mark to mark."""
+    """Review jig-asm r2: each sweep limit is a pass-table row, set in X
+    only and witness-marked (step 6N-6P); every complete pass runs mark to mark."""
     hundredth = spec.trammel.INCH / 100.0
     gap = spec.leadscrew.FEED_GAP
     for name, (lo, hi) in spec.SWEEP_LIMITS.items():
@@ -2078,17 +2117,17 @@ def test_sweep_limits_are_witness_marked_and_every_pass_runs_mark_to_mark() -> N
             assert lo_s <= centre <= hi_s
             travel = spec.trammel.CARRIAGE_TRAVEL
             assert travel[0] - gap < centre < travel[1] + gap
-    limits = [row for row in spec.SETTING_TABLE_ROWS if row[0].endswith(" LIMIT")]
+    limits = [row for row in spec.PASS_TABLE_ROWS if row[0].endswith(" LIMIT")]
     assert sorted(float(row[1]) for row in limits) == sorted(
         round(s / spec.trammel.INCH, 2) for pair in spec.SWEEP_LIMITS.values() for s in pair
     )
-    # A limit row is set in X only; its Y is the bar's result, printed REF.
-    for row in limits:
+    # A pass row is set in X only at the long-travel row; its Y is REF.
+    for row in spec.PASS_TABLE_ROWS:
         assert row[3].startswith("(") and row[5].startswith("(")
-        assert row[6].startswith("X ")
+        assert row[6] == "X ±.004"
     steps = {text.split(". ", 1)[0]: text for text in spec.ASSEMBLY_STEPS}
-    assert "LIMIT ROW" in steps["6E"] and "X" in steps["6E"]
-    assert "WITNESS-MARK" in steps["6F"]
+    assert "LIMIT ROW" in steps["6N"] and "X ONLY" in steps["6N"]
+    assert "WITNESS-MARK" in steps["6P"]
     assert "MARK TO MARK" in steps["9N"] and "MARK TO MARK" in steps["13A"]
 
 

@@ -1452,26 +1452,63 @@ PLAN_TAGS: tuple[PlanTag, ...] = (
 )
 
 # --- Fitter package text -------------------------------------------------------------
-# Rail-angle setting is an assembly control, independent of the carrier's
-# .XXX hole-table locations. Q1 (Delegated ruling 2026-11-07 (Main), no
-# precedent; owner review #2144; pending owner confirmation): the converted
-# .0008 becomes the plain inch step ±.001, read with a .0001 spindle test
-# indicator (TL-00 rubric review ce83/c752). Only the print reads this band.
-ALIGNMENT_BAND = 0.001 * trammel.INCH
+# Rail setting is an assembly control, independent of the carrier's .XXX
+# hole-table locations. Q6 (Delegated ruling 2026-11-07 (Main), no precedent;
+# owner review #2144; pending owner confirmation): no setting reads a DRO
+# move longer than 6 in. Each rail is chained from the spindle origin through
+# stations 4.00, 10.00 and 15.00 (each link 6.0 in or less), the DRO zeroed
+# on the head set before, so every link holds the guidelines' "up to 6 in
+# from its datum" row, ±.002 (TL-00 round 1 review: the ±.001 stations were
+# DRO distances up to 14.85 in). The station error this leaves in the cut,
+# relative to the hub, is computed and charged below (CHAIN_STATION_RADIUS).
+STATION_BAND = 0.002 * trammel.INCH
+STATION_LINK_MAX = 6.0 * trammel.INCH
+CHAIN_STATIONS = tuple(s * trammel.INCH for s in (4.0, 10.0, 15.0))
+_CHAIN_LINKS = tuple(zip((0.0, *CHAIN_STATIONS[:-1]), CHAIN_STATIONS))
+if max(far - near for near, far in _CHAIN_LINKS) > STATION_LINK_MAX + 1e-9:
+    raise AssertionError("a rail-setting link is longer than 6 in")
+for _s in CHAIN_STATIONS:
+    if not (
+        trammel.CARRIAGE_TRAVEL[0] <= _s - trammel.PIN_OFFSET <= trammel.CARRIAGE_TRAVEL[1]
+        and trammel.CARRIAGE_S_RANGE[0] <= _s - trammel.PIN_OFFSET <= trammel.CARRIAGE_S_RANGE[1]
+    ):
+        raise AssertionError(f"rail-setting station {_s / trammel.INCH:g} is out of reach")
+# The stations are setting points, not supports: each rail is carried by its
+# bar on its 8 screws at the 60 mm hole pitch, and each bar by its 2 studs,
+# whatever the station count (Q6, same delegated ruling).
+if (trammel.RAIL_HOLE_PITCH, trammel.RAIL_HOLE_COUNT) != (60.0, 8):
+    raise AssertionError("the rail's support pitch moved; recheck the 3-station setting")
+# The pass positions (the symmetric row and the witness-marked pass limits)
+# are DRO moves from the spindle origin up to 15.33 in: the "more than 6 in"
+# row, ±.004, set in X only; their Y is the rails' result (REF).
+LONG_TRAVEL_BAND = 0.004 * trammel.INCH
+# A limit mark short by the whole band still runs the cutter past each tip
+# land: the pin's station moves the cutter centre about 1:1 along its arc.
+if LONG_TRAVEL_BAND >= trammel.RUN_OUT:
+    raise AssertionError("a pass-limit mark within its band can stop short of the land")
 ALIGNMENT_PLACES = 4
 ALIGNMENT_INDICATOR = ".0001 SPINDLE TEST INDICATOR"
+# The tables print on the last instruction sheet (the drawing asserts it).
+SETTING_SHEET_NUMBER = 10
 ASSEMBLED_CAPTION = (
     "SHOWN: INNER PASS, SHOULDER SCREWS IN A1/B1, AT THE SYMMETRIC POSITION "
-    "(SETTING TABLE). OUTER PASS: A2/B2. MACHINE ORIGIN, DRO X 0, Y 0: "
-    "SPINDLE AXIS AT TABLE TOP; +Y TOWARD THE COLUMN. NO STRAP SHOWN."
+    f"(PASS TABLE, SHEET {SETTING_SHEET_NUMBER}). OUTER PASS: A2/B2. MACHINE "
+    "ORIGIN, DRO X 0, Y 0: SPINDLE AXIS AT TABLE TOP; +Y TOWARD THE COLUMN. "
+    "NO STRAP SHOWN."
+)
+# The carrier's pivot-hole names the steps use, defined where they are read
+# (rules 22 and 26; TL-00 round 1 review: A1-B2 were only leader labels).
+PIVOT_HOLE_KEY = (
+    "CARRIER PIVOT HOLES (SHEET 1): A1 AND B1 FOR THE INNER PASS, A2 AND B2 FOR "
+    "THE OUTER PASS."
 )
 
 
 # Review bought-tl000-r1: the checks' "sweep of each pass" gets its range,
 # each pin's station over ±trammel.SWEEP, rounded outward. Review jig-asm r2
-# (2026-11-02): no stop ends a pass, so step 6 sets a pin at each limit as at
-# a station and witness-marks its bar at the carriage; every complete pass
-# runs mark to mark. Rounded outward to .01, a limit stays well inside the
+# (2026-11-02): no stop ends a pass, so step 6 sets a pin at each limit and
+# witness-marks its bar at the carriage; every complete pass runs mark to
+# mark. Rounded outward to .01, a limit stays well inside the
 # leadscrew.FEED_GAP the feed lug keeps to its KP08 at the exact travel end.
 SWEEP_LIMIT_PLACES = 2
 SWEEP_LIMITS = {
@@ -1483,54 +1520,79 @@ SWEEP_LIMITS = {
 }
 # The symmetric position (step 10): the inner pass's pins at their
 # zero-sweep station, where the carrier's HUB is set (owner ruling 3,
-# 2026-11-07). Its row's range is the HUB setting's own band, so the step
-# 10 indicator check of the A1/B1 heads reads the HUB setting's reference at
-# that band (Q2, Delegated ruling 2026-11-07 (Main), no precedent; owner
-# review #2144; pending owner confirmation).
+# 2026-11-07).
 SYMMETRIC_STATION = trammel.SYMMETRIC_PIN_STATION["inner"]
 _SYMMETRIC_A1 = trammel.carrier_pose("inner", 0.0).to_machine(trammel.A1)
 if math.dist(_SYMMETRIC_A1, trammel.rail_point(1, SYMMETRIC_STATION)) > 1e-9:
     raise AssertionError("A1 at the symmetric position is not rail 1's pin")
 
 
-def _station_cells(station: float) -> tuple[str, str, str, str, str]:
-    """S and each rail's pin X/Y at ``station``, machine X/Y."""
-    (x1, y1), (x2, y2) = (trammel.rail_point(rail, station) for rail in (1, 2))
-    return (
-        _length(station, SWEEP_LIMIT_PLACES),
-        *(_length(v, ALIGNMENT_PLACES) for v in (x1, y1, x2, y2)),
-    )
+def _xy_cells(points: tuple[tuple[float, float], ...], *, ref_y: bool = False) -> tuple[str, ...]:
+    """Each point's X and Y at the DRO's places; Y in parentheses (REF)."""
+    cells: list[str] = []
+    for x, y in points:
+        y_text = _length(y, ALIGNMENT_PLACES)
+        cells += [_length(x, ALIGNMENT_PLACES), f"({y_text})" if ref_y else y_text]
+    return tuple(cells)
 
 
-def _limit_cells(station: float) -> tuple[str, str, str, str, str]:
-    """A sweep-limit row: set in X only, its Y the bar's result (REF)."""
-    s, x1, y1, x2, y2 = _station_cells(station)
-    return s, x1, f"({y1})", x2, f"({y2})"
+def _rail_points(station: float) -> tuple[tuple[float, float], ...]:
+    return tuple(trammel.rail_point(rail, station) for rail in (1, 2))
 
 
-_BAND_TEXT = f"±{_length(ALIGNMENT_BAND, ALIGNMENT_PLACES - 1)}"
+_STATION_BAND_TEXT = f"±{_length(STATION_BAND, 3)}"
+_LONG_BAND_TEXT = f"X ±{_length(LONG_TRAVEL_BAND, 3)}"
 _HUB_BAND_TEXT = f"±{_length(carrier.HUB_OFFSET_BAND, carrier.HUB_OFFSET_PLACES)}"
-SETTING_TABLE_TITLE = (
-    "SETTING TABLE: PIVOT PIN AXIS AT STATION S ALONG EACH RAIL, DRO X/Y FROM "
-    f"THE SPINDLE ORIGIN, READ ON THE SHOULDER-SCREW HEAD WITH A {ALIGNMENT_INDICATOR}. "
-    "LIMIT ROWS ARE THE WITNESS MARKS ENDING EACH PASS, SET IN X ONLY. ( ) = REF."
+RAIL_SETTING_CHECK = "6G"  # the step that rechecks every row as set
+RAIL_SETTING_TITLE = (
+    "RAIL SETTING TABLE (STEP 6): PIVOT PIN AXIS AT STATION S ALONG EACH RAIL, "
+    f"READ ON ITS SHOULDER-SCREW HEAD WITH THE {ALIGNMENT_INDICATOR}. X/Y: THE DRO "
+    "READING FROM THE REFERENCE, THE ORIGIN ON THE ABSOLUTE DISPLAY OR THAT "
+    "RAIL'S HEAD AT THE STATION NAMED ON THE INCREMENTAL DISPLAY ZEROED THERE."
 )
-SETTING_TABLE_HEADER = ("ROW", "S", "RAIL 1 X", "RAIL 1 Y", "RAIL 2 X", "RAIL 2 Y", "RANGE")
-SETTING_ROW_STATION = "STATION"
-SETTING_ROW_SYMMETRIC = "SYMMETRIC"
-SETTING_TABLE_ROWS: tuple[tuple[str, ...], ...] = (
-    *(
-        (SETTING_ROW_STATION, *_station_cells(station), _BAND_TEXT)
-        for station in trammel.ALIGNMENT_TARGETS
+_CHAIN_TEXT = tuple(_length(s, SWEEP_LIMIT_PLACES) for s in CHAIN_STATIONS)
+RAIL_SETTING_HEADER = ("S", "REFERENCE", "RAIL 1 X", "RAIL 1 Y", "RAIL 2 X", "RAIL 2 Y", "RANGE", "CHECK")
+RAIL_SETTING_ROWS: tuple[tuple[str, ...], ...] = tuple(
+    (
+        _length(far, SWEEP_LIMIT_PLACES),
+        "ORIGIN" if near == 0.0 else f"S {_length(near, SWEEP_LIMIT_PLACES)}",
+        *_xy_cells(tuple(
+            (fx - nx, fy - ny)
+            for (fx, fy), (nx, ny) in zip(
+                _rail_points(far),
+                _rail_points(near) if near else ((0.0, 0.0), (0.0, 0.0)),
+                strict=True,
+            )
+        )),
+        _STATION_BAND_TEXT,
+        RAIL_SETTING_CHECK,
+    )
+    for near, far in _CHAIN_LINKS
+)
+PASS_TABLE_TITLE = (
+    "PASS TABLE (STEPS 6, 10): PIVOT PIN AXIS AT STATION S, DRO X/Y FROM THE "
+    "SPINDLE ORIGIN, SET IN X ONLY. LIMIT ROWS: THE WITNESS MARKS ENDING EACH "
+    "PASS. ( ) = REF."
+)
+PASS_TABLE_HEADER = ("ROW", "S", "RAIL 1 X", "RAIL 1 Y", "RAIL 2 X", "RAIL 2 Y", "RANGE")
+PASS_ROW_SYMMETRIC = "SYMMETRIC"
+PASS_TABLE_ROWS: tuple[tuple[str, ...], ...] = (
+    (
+        PASS_ROW_SYMMETRIC, _length(SYMMETRIC_STATION, SWEEP_LIMIT_PLACES),
+        *_xy_cells(_rail_points(SYMMETRIC_STATION), ref_y=True), _LONG_BAND_TEXT,
     ),
-    (SETTING_ROW_SYMMETRIC, *_station_cells(SYMMETRIC_STATION), _HUB_BAND_TEXT),
     *(
-        (f"{name.upper()} LIMIT", *_limit_cells(s), f"X {_BAND_TEXT}")
+        (
+            f"{name.upper()} LIMIT", _length(s, SWEEP_LIMIT_PLACES),
+            *_xy_cells(_rail_points(s), ref_y=True), _LONG_BAND_TEXT,
+        )
         for s, name in sorted(
             (s, name) for name, limits in SWEEP_LIMITS.items() for s in limits
         )
     ),
 )
+# The step 10 hub check reads each head's symmetric-row Y from the table.
+_SYMMETRIC_HEAD_Y = _length(_SYMMETRIC_A1[1], ALIGNMENT_PLACES)
 
 # Every screw by its fastener-table callout (fasteners.FASTENERS) and every
 # bought item by its BOM item number.
@@ -1949,6 +2011,10 @@ _STUD_PITCH = (
 # The kit's registry number, pinned by test; its second sheet cuts the stud.
 CLAMPING_KIT_NUMBER = "MHA-SH-VN-57"
 STUD_REWORK_SHEET = f"{CLAMPING_KIT_NUMBER} SHEET 2"
+_STUD_STOCK = f"{hold_down_stud.STOCK_LENGTH} IN KIT STUD STOCK"
+# The stud acceptance the kit drawing's stud sheet points to: the outer-pass
+# checks and remedies, repeated over the inner pass.
+HOLD_DOWN_STEPS_REFERENCE = "13A-13H"
 
 # Carriage play (#2177) prints as the plain inch step .002 TIR (0.0508 mm), the
 # F3 pattern (Q5, Delegated ruling 2026-11-07 (Main), no precedent; owner
@@ -1961,6 +2027,111 @@ if _PRINTED_PLAY_RADIUS > trammel.RADIUS_FROM_SHOULDER_CLEARANCE:
 if trammel.RADIUS_FROM_SHOULDER_CLEARANCE + _PRINTED_PLAY_RADIUS > trammel.TOP_EDGE_HALF_BAND:
     raise AssertionError("the printed carriage play breaks the strap's top-edge budget")
 _PLAY_TIR = f"{_length(CARRIAGE_PLAY_TIR_PRINTED, 3)} TIR MAX"
+
+
+# The rail-setting chain's error in the cut, relative to the hub (Q6,
+# Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144;
+# pending owner confirmation). Each station is set inside an X/Y box of
+# ±STATION_BAND per link, so square to the rail it errs by up to the band
+# times (sin + cos) of the half angle; the near station (one link from the
+# origin) and the far station (two links on) fix the rail's line. On those
+# perturbed rails the carrier is posed through each pass, the hub is placed as
+# step 10 does (A1 at its symmetric-row X, the hub at the DRO setting from the
+# same origin), and the spindle's path is compared with the nominal circle
+# about the arc centre, hub on hub. The largest normal deviation over every
+# sign combination and both passes is the term charged.
+def _rail_line(rail: int, near: float, far: float) -> tuple[tuple[float, float], tuple[float, float]]:
+    p0 = trammel.rail_point(rail, CHAIN_STATIONS[0], near)
+    p1 = trammel.rail_point(rail, CHAIN_STATIONS[-1], far)
+    length = math.dist(p0, p1)
+    return p0, ((p1[0] - p0[0]) / length, (p1[1] - p0[1]) / length)
+
+
+def _carrier_point(
+    lines: tuple, pins: tuple, along: float, guess: tuple[float, float], point: tuple[float, float]
+) -> tuple[float, float]:
+    """``point`` (machine) in the carrier frame with pin A ``along`` its
+    perturbed rail from the near station and pin B on the other, nearest
+    ``guess``."""
+    (p0, u), (q0, v) = lines
+    a, b = pins
+    pa = (p0[0] + along * u[0], p0[1] + along * u[1])
+    spacing = math.dist(a, b)
+    qx, qy = q0[0] - pa[0], q0[1] - pa[1]
+    half_b = qx * v[0] + qy * v[1]
+    root = math.sqrt(half_b * half_b - (qx * qx + qy * qy - spacing * spacing))
+    pb = min(
+        ((q0[0] + t * v[0], q0[1] + t * v[1]) for t in (-half_b + root, -half_b - root)),
+        key=lambda p: math.dist(p, guess),
+    )
+    turn = math.atan2(pb[1] - pa[1], pb[0] - pa[0]) - math.atan2(b[1] - a[1], b[0] - a[0])
+    c, s = math.cos(turn), math.sin(turn)
+    ox, oy = pa[0] - (c * a[0] - s * a[1]), pa[1] - (s * a[0] + c * a[1])
+    dx, dy = point[0] - ox, point[1] - oy
+    return (c * dx + s * dy, -s * dx + c * dy)
+
+
+def _station_deviation(errors: tuple[float, float, float, float], samples: int = 41) -> float:
+    lines = (_rail_line(1, *errors[:2]), _rail_line(2, *errors[2:]))
+    (p0, u), _ = lines
+    a1x = trammel.rail_point(1, SYMMETRIC_STATION)[0]
+    hub = _carrier_point(
+        lines, (trammel.A1, trammel.B1), (a1x - p0[0]) / u[0],
+        trammel.rail_point(2, SYMMETRIC_STATION), (0.0, trammel.HUB_OFFSET),
+    )
+    shift = (trammel.HUB[0] - hub[0], trammel.HUB[1] - hub[1])
+    worst = 0.0
+    for name, radius in trammel.PASS_RADIUS.items():
+        sweep = trammel.SWEEP[name]
+        for index in range(samples):
+            theta = -sweep + 2.0 * sweep * index / (samples - 1)
+            s_a, s_b = trammel.pin_station(radius, theta)
+            x, y = _carrier_point(
+                lines, trammel.pin_pair(name), s_a - CHAIN_STATIONS[0],
+                trammel.rail_point(2, s_b), (0.0, 0.0),
+            )
+            centre = trammel.ARC_CENTRE
+            deviation = math.hypot(x + shift[0] - centre[0], y + shift[1] - centre[1]) - radius
+            worst = max(worst, abs(deviation))
+    return worst
+
+
+_SQUARE_ERROR = STATION_BAND * (math.sin(trammel.HALF_ALPHA) + math.cos(trammel.HALF_ALPHA))
+_FAR_LINKS = len(CHAIN_STATIONS) - 1
+_RAIL_ERRORS = tuple(
+    (near, near + far)
+    for near in (-_SQUARE_ERROR, _SQUARE_ERROR)
+    for far in (-_FAR_LINKS * _SQUARE_ERROR, _FAR_LINKS * _SQUARE_ERROR)
+)
+CHAIN_STATION_RADIUS = max(
+    _station_deviation((*rail_1, *rail_2)) for rail_1 in _RAIL_ERRORS for rail_2 in _RAIL_ERRORS
+)
+CHAIN_RADIAL_STACK = (
+    trammel.RADIUS_FROM_SHOULDER_CLEARANCE + _PRINTED_PLAY_RADIUS + CHAIN_STATION_RADIUS
+)
+if CHAIN_RADIAL_STACK > trammel.TOP_EDGE_HALF_BAND:
+    raise AssertionError(
+        f"the rail-setting chain breaks the strap's top-edge budget: {CHAIN_RADIAL_STACK:.4f} mm"
+    )
+# The step 10 bench acceptance of the hub setting: each A1/B1 head read from
+# the hub setting against its symmetric-row Y. Its range is the hub's band
+# plus what the rails may carry the head off its table Y while inside their
+# own bands: the chain's lateral error at the symmetric station, with A1's X
+# set within the long-travel band (Q7, Delegated ruling 2026-11-07 (Main),
+# no precedent; owner review #2144; pending owner confirmation).
+def _head_y_error(rail: int) -> float:
+    x_nominal, y_nominal = trammel.rail_point(rail, SYMMETRIC_STATION)
+    worst = 0.0
+    for near, far in _RAIL_ERRORS:
+        (x0, y0), (ux, uy) = _rail_line(rail, near, far)
+        for x in (x_nominal - LONG_TRAVEL_BAND, x_nominal + LONG_TRAVEL_BAND):
+            worst = max(worst, abs(y0 + (x - x0) * uy / ux - y_nominal))
+    return worst
+
+
+HEAD_CHECK_BAND = _outward(
+    carrier.HUB_OFFSET_BAND + max(_head_y_error(rail) for rail in (1, 2)), 3, up=True
+)
 # The top-hat washer's flank clearance, inch at .XXX, rounded up: the
 # conservative side of holding.WASHER_CLEARANCE_MIN.
 WASHER_CLEARANCE_PRINTED = _outward(holding.WASHER_CLEARANCE_MIN, 3, up=True)
@@ -1975,6 +2146,16 @@ _PIVOT_GAP = f"{_length(PIVOT_RUNNING_GAP[0], 3)}-{_length(PIVOT_RUNNING_GAP[1],
 _PILLOW = f"PILLOW BLOCK {_item(PILLOW_BLOCK)}"
 _FEELER = "FEELER GAUGE"
 
+# The rail kit as bought (registry stock name: "... (2 rails + 4 HGH15CA)",
+# its carriages shipped on plastic loading arbors): step 1 rocks all four,
+# keeps the two tightest, and the BOM note lists what the kit supplies.
+KIT_RAILS_SUPPLIED = 2
+KIT_CARRIAGES_SUPPLIED = 4
+if (
+    f"({KIT_RAILS_SUPPLIED} rails + {KIT_CARRIAGES_SUPPLIED} {carriage.STYLE})"
+    not in _config.parts("ch-rocker-arm-tl-vn-oblique-rail-kit")["stock_name"]
+):
+    raise AssertionError("the rail kit's supplied contents moved")
 # Rule 22 (TL-00 rubric review ce83/c752): one linear sequence in the order
 # the work is done, each step one action of six lines or fewer, every check
 # and its remedy separate steps, and every cross-reference a printed step
@@ -1982,10 +2163,11 @@ _FEELER = "FEELER GAUGE"
 # and the carriage screw's sheet cite steps 5 and 10); the former P, F, HD
 # and O series are folded in where they are done.
 ASSEMBLY_STEPS = (
-    f"1. ROCK EACH OF THE 4 CARRIAGES {_item(CARRIAGE)} SIDEWAYS ON ITS RAIL "
-    "UNDER A TEST INDICATOR.",
-    "1A. KEEP THE 2 TIGHTEST CARRIAGES, ONE PER RAIL.",
-    "1B. MOVE A CARRIAGE OFF ITS RAIL ONLY ONTO THE KIT'S DUMMY RAIL.",
+    f"1. ROCK EACH OF THE KIT'S {KIT_CARRIAGES_SUPPLIED} CARRIAGES {_item(CARRIAGE)} "
+    "SIDEWAYS ON ITS RAIL UNDER A TEST INDICATOR.",
+    f"1A. KEEP THE {QUANTITIES[CARRIAGE]} TIGHTEST CARRIAGES, ONE PER RAIL.",
+    "1B. MOVE A CARRIAGE OFF ITS RAIL ONLY ONTO A PLASTIC LOADING ARBOR FROM "
+    "THE KIT.",
     f"1C. TRIM EACH RAIL {_item(RAIL)} TO ITS BASE BAR PER THE {BASE_BAR_NUMBER} "
     "PROCESS PLAN: BOTH ENDS FLUSH WITH THE BAR.",
     "1D. CHECK THE END COUNTERBORE WALLS OF EACH TRIMMED RAIL TO "
@@ -2024,15 +2206,29 @@ ASSEMBLY_STEPS = (
     f"{_length(pivot_block.REACH_MIN, 3)}-{_length(pivot_block.REACH_MAX, 3)} "
     "OF THE CARRIAGE'S M4 X 5 TAP AND NEVER BOTTOMS.",
     f"5D. SEAT BOTH SHOULDER SCREWS {_item(PIVOT_SCREW)} TEMPORARILY FOR INDICATING.",
+    # Q6 (Delegated ruling 2026-11-07 (Main), no precedent; owner review
+    # #2144; pending owner confirmation): each rail chained from the origin,
+    # every DRO move 6 in or less from the head set before; the absolute
+    # display keeps the origin for the pass table and the hub.
     "6. ZERO THE DRO X AND Y AT THE SPINDLE ORIGIN (SHEET 1).",
-    "6A. SET EACH STATION ROW OF THE SHEET 1 SETTING TABLE: CENTRE THE "
-    f"SHOULDER-SCREW HEAD UNDER THE {ALIGNMENT_INDICATOR} BY SLIDING THE "
-    "CARRIAGE IN X AND TAPPING THE BAR IN Y.",
-    f"6B. TIGHTEN THE 4 HOLD-DOWN NUTS {_item(FLANGE_NUT)}.",
-    f"6C. CHECK EVERY STATION ROW AGAIN: {_BAND_TEXT}.",
-    "6D. IF A ROW FAILS, REDO STEPS 6A-6C.",
-    "6E. SET EACH LIMIT ROW OF THE SETTING TABLE AS IN STEP 6A, IN X ONLY.",
-    "6F. WITNESS-MARK THE BAR AT THE CARRIAGE'S SPINDLE-END FACE AT EACH LIMIT "
+    f"6A. SET RAIL 1'S S {_CHAIN_TEXT[0]} ROW OF THE RAIL SETTING TABLE (SHEET "
+    f"{SETTING_SHEET_NUMBER}): CENTRE ITS SHOULDER-SCREW HEAD UNDER THE "
+    f"{ALIGNMENT_INDICATOR} BY SLIDING THE CARRIAGE IN X AND TAPPING THE BAR IN Y.",
+    "6B. ZERO THE DRO'S INCREMENTAL X AND Y ON THAT HEAD.",
+    f"6C. SET RAIL 1'S S {_CHAIN_TEXT[1]} ROW FROM THAT ZERO AS IN STEP 6A.",
+    f"6D. ZERO THE DRO'S INCREMENTAL X AND Y ON THE S {_CHAIN_TEXT[1]} HEAD.",
+    f"6E. SET RAIL 1'S S {_CHAIN_TEXT[2]} ROW FROM THAT ZERO AS IN STEP 6A.",
+    "6F. REPEAT STEPS 6A-6E FOR RAIL 2 FROM THE ORIGIN.",
+    f"{RAIL_SETTING_CHECK}. CHECK EVERY ROW AGAIN, EACH RAIL IN ROW ORDER, FROM ITS "
+    f"REFERENCE ZEROED AS IN STEPS 6B AND 6D: {_STATION_BAND_TEXT}.",
+    "6H. IF A ROW FAILS, REDO STEPS 6A-6G FOR THAT RAIL.",
+    f"6J. TIGHTEN THE 4 HOLD-DOWN NUTS {_item(FLANGE_NUT)}.",
+    f"6K. CHECK EVERY ROW AGAIN AS IN STEP {RAIL_SETTING_CHECK}.",
+    "6L. IF A ROW FAILS, REDO STEPS 6A-6K WITH THE HOLD-DOWN NUTS LOOSENED.",
+    "6M. RETURN THE DRO TO ITS ABSOLUTE DISPLAY (THE STEP 6 ZERO).",
+    f"6N. SET EACH LIMIT ROW OF THE PASS TABLE (SHEET {SETTING_SHEET_NUMBER}) AS "
+    "IN STEP 6A, IN X ONLY.",
+    "6P. WITNESS-MARK THE BAR AT THE CARRIAGE'S SPINDLE-END FACE AT EACH LIMIT "
     "ROW, WITH THE PASS NAME, INNER OR OUTER.",
     # The foot (UNVERIFIED, #2184) between TL-28's two bounds: no thinner,
     # so the 5/8's tip stays clear of the bar screw's in the shared THRU
@@ -2113,15 +2309,23 @@ ASSEMBLY_STEPS = (
     # The carrier stays on its A1/B1 seats from step 9 to 13: its HUB tap is
     # made in place on the running jig. The HUB is set from the spindle
     # origin (the apex) by the printed offset, so the pin spacing moves it
-    # with the cut (owner ruling 3, 2026-11-07).
-    "10. FEED THE CARRIAGES BY HANDWHEEL TO THE SYMMETRIC ROW OF THE SHEET 1 "
-    "SETTING TABLE: A1 HEAD AT ITS RAIL 1 X.",
-    f"10A. CHECK THE A1 AND B1 HEADS WITH THE {ALIGNMENT_INDICATOR}: EACH READS "
-    f"ITS SYMMETRIC-ROW X AND Y WITHIN {_HUB_BAND_TEXT}.",
-    "10B. IF ONE FAILS, REDO STEP 6 AND STEPS 10-10A.",
+    # with the cut (owner ruling 3, 2026-11-07), in the same DRO frame the
+    # rails were chained from (Q7, Delegated ruling 2026-11-07 (Main), no
+    # precedent; owner review #2144; pending owner confirmation; RV-06). The
+    # heads are then read from the set position as its bench acceptance.
+    f"10. FEED THE CARRIAGES BY HANDWHEEL TO THE SYMMETRIC ROW OF THE PASS "
+    f"TABLE (SHEET {SETTING_SHEET_NUMBER}): A1 HEAD AT ITS RAIL 1 X.",
+    f"10A. CHECK THE A1 HEAD UNDER THE {ALIGNMENT_INDICATOR}: ITS "
+    f"SYMMETRIC-ROW {_LONG_BAND_TEXT} BY DRO.",
+    "10B. IF IT FAILS, REDO STEP 10.",
     f"10C. MOVE THE TABLE UNTIL THE DRO READS {_HUB_DRO}.",
-    "10D. RECORD THIS DRO SETTING FOR STEP 20.",
-    f"10E. DRILL AND TAP THE CARRIER'S HUB {carrier.HUB_THREAD} THRU AT THIS "
+    f"10D. CHECK THE A1 AND B1 HEADS UNDER THE {ALIGNMENT_INDICATOR} FROM THIS "
+    f"SETTING: EACH AT ITS SYMMETRIC-ROW Y, {_SYMMETRIC_HEAD_Y} "
+    f"±{_length(HEAD_CHECK_BAND, 3)} BY DRO.",
+    f"10E. IF ONE FAILS, REDO STEPS {RAIL_SETTING_CHECK} AND 10-10D.",
+    "10F. RETURN THE TABLE TO THE STEP 10C SETTING.",
+    "10G. RECORD THIS DRO SETTING FOR STEP 20.",
+    f"10H. DRILL AND TAP THE CARRIER'S HUB {carrier.HUB_THREAD} THRU AT THIS "
     "SETTING, SPOT FIRST, SPINDLE-GUIDED, NO COUNTERBORE.",
     f"11. STAND THE {QUANTITIES[STOP_PIN]} STOP PINS {_item(STOP_PIN)} CHAMFERED "
     f"END DOWN IN THE STOP HOLES OF THE RISER {_item(RISER)} (DRILLED FIRST TO "
@@ -2138,7 +2342,7 @@ ASSEMBLY_STEPS = (
     "CLAMP SCREWS UNTIL STEPS 19-21.",
     f"12. FIT THE FEED LEVER {_item(FEED_LEVER)} WITH 2 {_LEVER_SCREW} "
     f"{_item(LEVER_SCREW)} AND WEDGE-LOCK PAIRS {_item(LEVER_LOCK_WASHER)}: "
-    f"{_LEVER_TORQUE}, GRIP TOWARD THE OPERATOR.",
+    f"{_LEVER_TORQUE}, GRIP TOWARD -Y.",
     "12A. TURN THE HANDWHEEL TO FEED: NEVER FORCE THE LEVER AGAINST THE "
     "ENGAGED NUT.",
     "13. MOVE THE CARRIER TO A2 AND B2 AS IN STEPS 15-15H.",
@@ -2149,14 +2353,22 @@ ASSEMBLY_STEPS = (
     f"PLUS {_STUD_REMEDY_EXTRA}.",
     "13C. IF A STUD WAS CUT, FIT IT IN PLACE OF THE OLD ONE AS IN STEPS 3A AND "
     "3C, ONE STUD AT A TIME WITH THE OTHER HOLD-DOWN NUTS TIGHT.",
-    "13D. IF A STUD WAS REPLACED, REDO STEPS 6C AND 13A.",
+    "13D. IF A STUD WAS REPLACED, REDO STEPS 6K AND 13A.",
     f"13E. CHECK EACH STUD AT ITS SEATED FLANGE NUT: {_STUD_PITCH} MIN BEYOND "
     "THE NUT, EVERY NUT THREAD ENGAGED.",
-    "13F. IF A STUD FAILS, STOP AND REFER THE SETUP TO THE DESIGNER.",
-    "13G. RETURN THE CARRIER TO A1 AND B1 AS IN STEPS 15-15H.",
-    "13H. REPEAT STEPS 13A-13F OVER THE INNER PASS.",
-    "14. CHECK EVERY STATION ROW OF THE SETTING TABLE AFTER FINAL TIGHTENING: "
-    f"{_BAND_TEXT}.",
+    # Q8 A (Delegated ruling 2026-11-07 (Main), no precedent; owner review
+    # #2144; pending owner confirmation): a stud short of its projection is
+    # replaced by a longer one cut from the kit's stud stock; 13A's
+    # clearance and 13E's projection then bound it from both sides.
+    f"13F. IF A STUD FAILS, CUT A NEW STUD FROM THE {_STUD_STOCK} LONGER BY "
+    f"THE MISSING PROJECTION PLUS {_STUD_REMEDY_EXTRA}.",
+    "13G. IF A STUD WAS CUT LONGER, FIT IT IN PLACE OF THE OLD ONE AS IN STEPS "
+    "3A AND 3C, ONE STUD AT A TIME WITH THE OTHER HOLD-DOWN NUTS TIGHT.",
+    "13H. IF A STUD WAS REPLACED, REDO STEPS 6K AND 13A-13E.",
+    "13J. RETURN THE CARRIER TO A1 AND B1 AS IN STEPS 15-15H.",
+    f"13K. REPEAT STEPS {HOLD_DOWN_STEPS_REFERENCE} OVER THE INNER PASS.",
+    "14. CHECK EVERY ROW OF THE RAIL SETTING TABLE AFTER FINAL TIGHTENING AS "
+    f"IN STEP {RAIL_SETTING_CHECK}: {_STATION_BAND_TEXT}.",
     "14A. IF A ROW FAILS, REDO STEP 6 WITH THE CARRIER OFF AS IN STEPS 15-15C.",
     "14B. CHECK THAT THE HANDWHEEL FEEDS BOTH PASSES MARK TO MARK WITHOUT "
     "BINDING: CARRIAGES ON THEIR RAILS, NO CONTACT WITH THE STUDS, NUTS OR "
@@ -2168,7 +2380,6 @@ ASSEMBLY_STEPS = (
 )
 # The stud acceptance the kit drawing's stud sheet points to, and the sheet
 # the drawing prints it on (the drawing asserts the sheet).
-HOLD_DOWN_STEPS_REFERENCE = "13A-13F"
 HOLD_DOWN_SHEET_NUMBER = 9
 HOLD_DOWN_REFERENCE = (
     f"{DRAWING_NUMBER}, STEPS {HOLD_DOWN_STEPS_REFERENCE} (SHEET {HOLD_DOWN_SHEET_NUMBER})"
@@ -2205,7 +2416,7 @@ OPERATION_STEPS = (
     "STOP PINS, ALONG THE STRAP TO ITS END MARK.",
     f"19B. TIGHTEN 2 {_STRAP_CLAMPS} DIRECTLY ON THE STRAP INTO THE CARRIER'S "
     "2 END-CLAMP TAPS.",
-    "20. MOVE THE TABLE TO THE DRO SETTING RECORDED IN STEP 10D.",
+    "20. MOVE THE TABLE TO THE DRO SETTING RECORDED IN STEP 10G.",
     f"20A. DRILL AND REAM THE STRAP'S HUB HOLE THRU PER {PROCESS_PLAN} S2 "
     "OP30-OP40, SPINDLE-GUIDED, INTO THE RISER'S RELIEF: NEVER INTO THE "
     "CARRIER.",
@@ -2255,16 +2466,16 @@ _BASE_BAR_SHEETS = tuple(
     base_bar.CONFIGURATIONS.index(configuration) + 1 for configuration in (base_bar.BAR1, base_bar.BAR2)
 )
 BOM_NOTE = "\n".join((
-    f"ITEM {ITEM_NUMBERS[PIVOT_SHIM]}: SHIM FITTING STOCK, FITTED AT STEP 9G.",
-    f"BOM QTY. {pivot_shim.QUANTITY} IS THE MODELLED PACK, {pivot_shim.PER_SUPPORT} X "
-    f"{_length(pivot_shim.THICKNESS, 3)} A SUPPORT.",
-    "BUY, COVERING THE WORST CASE AT BOTH SUPPORTS:",
+    f"ITEM {ITEM_NUMBERS[PIVOT_SHIM]}: SHIMS, STACKED AT STEP 9G. BUY BY THICKNESS FOR BOTH SUPPORTS:",
     ", ".join(
         f"{sku} ({_length(thickness, 3)}) X{count}"
         for sku, (thickness, count) in PIVOT_SHIM_BUY.items()
     ) + ".",
-    f"ITEMS {ITEM_NUMBERS[RAIL]}-{ITEM_NUMBERS[CARRIAGE]}: ONE MATCHED RAIL AND CARRIAGE KIT,",
-    "ACCEPTED BY THE CARRIAGE PLAY CHECK, STEP 14C.",
+    f"BOM QTY. {pivot_shim.QUANTITY}: {pivot_shim.PER_SUPPORT} X "
+    f"{_length(pivot_shim.THICKNESS, 3)} PER SUPPORT, THE NOMINAL PACK.",
+    f"ITEMS {ITEM_NUMBERS[RAIL]}-{ITEM_NUMBERS[CARRIAGE]}: ONE KIT OF {KIT_RAILS_SUPPLIED} RAILS AND "
+    f"{KIT_CARRIAGES_SUPPLIED} CARRIAGES ON PLASTIC LOADING ARBORS;",
+    f"{QUANTITIES[CARRIAGE]} CARRIAGES FITTED (STEP 1A), ACCEPTED AT STEP 14C.",
     f"ITEMS {ITEM_NUMBERS[BASE_BAR_1]}-{ITEM_NUMBERS[BASE_BAR_2]}: ONE NUMBER, TWO CONFIGURATIONS "
     f"({BASE_BAR_NUMBER} SHEETS {_BASE_BAR_SHEETS[0]}, {_BASE_BAR_SHEETS[1]}).",
 ))

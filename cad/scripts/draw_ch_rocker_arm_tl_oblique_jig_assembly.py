@@ -469,21 +469,19 @@ TITLE_BLOCK = (
 
 # Sheet 1: the plan over the operator's elevation, third-angle and on one
 # vertical (projected principal views, so unlabelled: rule 9; TL-00 rubric
-# review ce83), right of the pose caption; the setting table under the
-# elevation, left of the title block. At 1:4 the plan is about 241 x 106 and
-# the elevation 241 x 31 (the handwheel and the screw heads included).
+# review ce83), right of the pose caption. At 1:4 the plan is about 241 x 106
+# and the elevation 241 x 31 (the handwheel and the screw heads included).
 PLAN_CENTER = (0.274, 0.205)
 ELEVATION_CENTER = (0.274, 0.113)
 CAPTION_XY = (0.018, 0.255)
 CAPTION_WIDTH = 45  # characters; default-format note text, clear left of the plan
-# The setting table's title, then the native general table under it
-# (draw_dt_drive_train_assembly's setting tables: rule 22's reference,
-# target, range and check in columns).
-SETTING_TABLE_XY = (0.018, 0.093)
-SETTING_TITLE_WIDTH = 68  # characters; stops left of the title block
+# The setting tables (spec.SETTING_SHEET_NUMBER): each title, then its native
+# general table under it (draw_dt_drive_train_assembly's setting tables: rule
+# 22's reference, target, range and check in columns).
 TABLE_CHAR_WIDTH = 0.0028
 TABLE_CELL_PAD = 0.004
 TABLE_TITLE_GAP = 0.0015
+TABLE_GAP = 0.004  # between one table's last row and the next table's title
 # Default-format note text: about 2.9 mm a character on the farm's templates.
 NOTE_CHAR_M = 0.0029
 VIEW_LABEL_GAP = 0.003
@@ -1011,10 +1009,6 @@ def _wrapped(
 
 
 ASSEMBLED_CAPTION = _wrapped((spec.ASSEMBLED_CAPTION,), width=CAPTION_WIDTH)
-SETTING_TABLE_TITLE = _wrapped((spec.SETTING_TABLE_TITLE,), width=SETTING_TITLE_WIDTH)
-SETTING_TABLE_WIDTHS = table_column_widths(spec.SETTING_TABLE_HEADER, spec.SETTING_TABLE_ROWS)
-if SETTING_TABLE_XY[0] + sum(SETTING_TABLE_WIDTHS) > TITLE_BLOCK[0] - BOM_SHEET_CLEARANCE:
-    raise AssertionError("the setting table runs into the title block")
 
 
 def _note_height(text: str) -> float:
@@ -1027,29 +1021,53 @@ def note_ink_height(text: str) -> float:
     return NOTE_INK_FIRST_LINE_M + (lines - 1) * NOTE_INK_PITCH_M if lines else 0.0
 
 
-SETTING_TABLE_TOP = SETTING_TABLE_XY[1] - note_ink_height(SETTING_TABLE_TITLE) - TABLE_TITLE_GAP
-# Its rows at the BOM's row height, which this package's BOM holds natively.
-if (
-    SETTING_TABLE_TOP - (len(spec.SETTING_TABLE_ROWS) + 1) * BOM_ROW_HEIGHT
-    < SHEET_INNER_BORDER[1] + BOM_SHEET_CLEARANCE
+# The setting tables atop the last instruction sheet's right column, in
+# place of continued steps: the rail setting table, then the pass table.
+SETTING_SHEET = HOLDING_SHEET
+if SHEET_NAMES.index(SETTING_SHEET) + 1 != spec.SETTING_SHEET_NUMBER:
+    raise AssertionError("the setting tables moved off the sheet the steps cite")
+SETTING_TABLES = tuple(
+    (
+        _wrapped((title,), width=STEPS_LINE_WIDTH),
+        header,
+        rows,
+        table_column_widths(header, rows),
+        label,
+    )
+    for title, header, rows, label in (
+        (spec.RAIL_SETTING_TITLE, spec.RAIL_SETTING_HEADER, spec.RAIL_SETTING_ROWS, "rail setting table"),
+        (spec.PASS_TABLE_TITLE, spec.PASS_TABLE_HEADER, spec.PASS_TABLE_ROWS, "pass table"),
+    )
+)
+if any(
+    STEPS_CONTINUED_XY[0] + sum(widths) > SHEET_INNER_BORDER[2] - BOM_SHEET_CLEARANCE
+    for _, _, _, widths, _ in SETTING_TABLES
 ):
-    raise AssertionError("the setting table runs below the border")
+    raise AssertionError("a setting table runs past the right border")
+# Their rows at the BOM's row height, which this package's BOM holds natively.
+SETTING_TABLES_BOTTOM = STEPS_CONTINUED_XY[1] - sum(
+    note_ink_height(title) + TABLE_TITLE_GAP + (len(rows) + 1) * BOM_ROW_HEIGHT
+    for title, _, rows, _, _ in SETTING_TABLES
+) - TABLE_GAP * (len(SETTING_TABLES) - 1)
 
 
 @dataclass(frozen=True)
 class StepsSheet:
-    """One instruction sheet: its left column, its right column over its
-    source view, and that view's room."""
+    """One instruction sheet: its left column, its right column (or the
+    setting tables) over its source view, and that view's room."""
 
     sheet: str
     left: str  # the heading and the lines the left column holds
     right: str  # the rest, atop the right column; "" when none
+    tables: bool = False  # the setting tables hold the right column's top
 
     @property
     def view_region(self) -> tuple[float, float, float, float]:
         """The source view's room under the right column, over its caption."""
         top = STEPS_CONTINUED_XY[1]
-        if self.right:
+        if self.tables:
+            top = SETTING_TABLES_BOTTOM - REGION_GAP
+        elif self.right:
             top -= _note_height(self.right) + REGION_GAP
         return (
             STEPS_CONTINUED_XY[0],
@@ -1077,11 +1095,13 @@ def _first_index(lines: Sequence[str], head: str) -> int:
 
 _OPERATION_START = _first_index(spec.OPERATION_STEPS, "15")
 _CUTTING_START = _first_index(spec.OPERATION_STEPS, "17")
-# The one sequence, in print order: the general torque note, the assembly,
-# then the pass change and service and the tooling and cutting groups, each
-# under its heading; the reference heights stand under the cutting heading.
+# The one sequence, in print order: the general torque note, the pivot-hole
+# key, the assembly, then the pass change and service and the tooling and
+# cutting groups, each under its heading; the reference heights stand under
+# the cutting heading.
 INSTRUCTION_LINES = (
     spec.GENERAL_TORQUE_NOTE,
+    spec.PIVOT_HOLE_KEY,
     *spec.ASSEMBLY_STEPS,
     "PASS CHANGE AND SERVICE:",
     *spec.OPERATION_STEPS[_OPERATION_START:_CUTTING_START],
@@ -1107,13 +1127,17 @@ def _column_fit(
 
 def steps_sheets(lines: Sequence[str]) -> tuple[StepsSheet, ...]:
     """Flow whole ``lines`` down each instruction sheet's left column, then
-    its right column over the source view, in sheet order."""
+    its right column over the source view (the setting sheet's holds the
+    setting tables instead), in sheet order."""
     sheets = []
     rest = tuple(lines)
     for index, sheet in enumerate(INSTRUCTION_SHEETS):
         heading = STEPS_HEADING if index == 0 else STEPS_CONTINUED_HEADING
         left, count = _column_fit(rest, STEPS_XY[1] - STEPS_FLOOR, heading=heading)
         rest = rest[count:]
+        if sheet == SETTING_SHEET:
+            sheets.append(StepsSheet(sheet, left, "", tables=True))
+            continue
         right, count = _column_fit(rest, STEPS_CONTINUED_XY[1] - _RIGHT_FLOOR, heading=None)
         rest = rest[count:]
         sheets.append(StepsSheet(sheet, left, right))
@@ -1124,6 +1148,9 @@ def steps_sheets(lines: Sequence[str]) -> tuple[StepsSheet, ...]:
 
 STEPS_SHEETS = steps_sheets(INSTRUCTION_LINES)
 STEPS_BY_SHEET = {layout.sheet: layout for layout in STEPS_SHEETS}
+_SETTING_ROOM = STEPS_BY_SHEET[SETTING_SHEET].view_region
+if _SETTING_ROOM[3] - _SETTING_ROOM[1] < NOTES_REFERENCE_MIN_HEIGHT:
+    raise AssertionError("the setting tables leave too little room for the reference view")
 # The stud acceptance (spec.HOLD_DOWN_REFERENCE, cited by the kit drawing) is
 # printed on the sheet the spec names.
 _STUD_CHECK_HEAD = f"{spec.HOLD_DOWN_STEPS_REFERENCE.split('-')[0]}. "
@@ -1265,16 +1292,18 @@ def _place_general_table(
 
 
 def setting_table_box_violations(box: tuple[float, float, float, float]) -> list[str]:
-    """The sheet 1 setting table stays inside the border, left of the title
-    block."""
-    x0, y0, x1, y1 = box
+    """A setting table stays in the setting sheet's right column: right of
+    the left steps column, inside the right border, over the reference
+    view's room."""
+    x0, y0, x1, _ = box
     findings = []
-    if y0 < SHEET_INNER_BORDER[1] + BOM_SHEET_CLEARANCE:
-        findings.append(f"runs {(SHEET_INNER_BORDER[1] + BOM_SHEET_CLEARANCE - y0) * 1000.0:.1f} mm below the border")
-    if x1 > TITLE_BLOCK[0] - BOM_SHEET_CLEARANCE and y0 < TITLE_BLOCK[3] + BOM_SHEET_CLEARANCE:
-        findings.append("runs into the title block")
-    if x0 < SHEET_INNER_BORDER[0]:
-        findings.append("runs past the left border")
+    floor = STEPS_BY_SHEET[SETTING_SHEET].view_region[3] + REGION_GAP
+    if y0 < floor - 1e-6:
+        findings.append(f"runs {(floor - y0) * 1000.0:.1f} mm into the reference view's room")
+    if x1 > SHEET_INNER_BORDER[2] - BOM_SHEET_CLEARANCE:
+        findings.append("runs past the right border")
+    if x0 < STEPS_XY[0] + STEPS_LINE_WIDTH * NOTE_CHAR_M:
+        findings.append("runs into the left steps column")
     return findings
 
 
@@ -1874,7 +1903,7 @@ def _add_plan_tags(adapter: Any, plan: Any) -> None:
 
 def _place_assembled_sheet(adapter: Any) -> None:
     """Plan over the operator's elevation at the modelled pose, the plan's
-    tags, the pose caption and the setting table."""
+    tags and the pose caption."""
     _activate_sheet(adapter, SHEET_NAMES[0])
     plan = _place_named_view(
         adapter, spec.PLAN_VIEW, PLAN_CENTER, ASSEMBLED_SCALE, label="jig plan"
@@ -1894,20 +1923,6 @@ def _place_assembled_sheet(adapter: Any) -> None:
     _add_note_block(
         adapter, SHEET_NAMES[0], ASSEMBLED_CAPTION, CAPTION_XY, label="pose caption"
     )
-    _add_note_block(
-        adapter, SHEET_NAMES[0], SETTING_TABLE_TITLE, SETTING_TABLE_XY,
-        label="setting table title",
-    )
-    box = _place_general_table(
-        adapter,
-        header=spec.SETTING_TABLE_HEADER,
-        rows=spec.SETTING_TABLE_ROWS,
-        widths=SETTING_TABLE_WIDTHS,
-        top_left=(SETTING_TABLE_XY[0], SETTING_TABLE_TOP),
-        label="jig setting table",
-    )
-    if findings := setting_table_box_violations(box):
-        raise RuntimeError(f"jig setting table: {'; '.join(findings)}")
 
 
 @contextmanager
@@ -3180,7 +3195,8 @@ def _balloon_linear_motion(
 
 
 def _place_steps_notes(adapter: Any) -> None:
-    """Each instruction sheet's left column, then its right column."""
+    """Each instruction sheet's left column, then its right column or the
+    setting tables."""
     for layout in STEPS_SHEETS:
         label = f"{layout.sheet.lower()} steps"
         _add_note_block(adapter, layout.sheet, layout.left, STEPS_XY, label=label)
@@ -3189,6 +3205,27 @@ def _place_steps_notes(adapter: Any) -> None:
                 adapter, layout.sheet, layout.right, STEPS_CONTINUED_XY,
                 label=f"{label}, continued",
             )
+        if layout.tables:
+            _place_setting_tables(adapter, layout.sheet)
+
+
+def _place_setting_tables(adapter: Any, sheet_name: str) -> None:
+    """Each setting table's title, then the table under it; the next title
+    under the table's read-back bottom."""
+    x, top = STEPS_CONTINUED_XY
+    for title, header, rows, widths, label in SETTING_TABLES:
+        _add_note_block(adapter, sheet_name, title, (x, top), label=f"{label} title")
+        box = _place_general_table(
+            adapter,
+            header=header,
+            rows=rows,
+            widths=widths,
+            top_left=(x, top - note_ink_height(title) - TABLE_TITLE_GAP),
+            label=f"jig {label}",
+        )
+        if findings := setting_table_box_violations(box):
+            raise RuntimeError(f"jig {label}: {'; '.join(findings)}")
+        top = box[1] - TABLE_GAP
 
 
 def _activate_package(adapter: Any, target: Any) -> None:

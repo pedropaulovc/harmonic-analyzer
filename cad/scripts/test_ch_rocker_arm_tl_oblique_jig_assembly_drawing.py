@@ -407,7 +407,7 @@ def test_exploded_captions_fit_their_text_region() -> None:
 def test_sheet_text_wraps_within_its_layout_width() -> None:
     for text, width in (
         (drawing.ASSEMBLED_CAPTION, drawing.CAPTION_WIDTH),
-        (drawing.SETTING_TABLE_TITLE, drawing.SETTING_TITLE_WIDTH),
+        *((title, drawing.STEPS_LINE_WIDTH) for title, *_ in drawing.SETTING_TABLES),
         *(
             (column, drawing.STEPS_LINE_WIDTH)
             for layout in drawing.STEPS_SHEETS
@@ -440,23 +440,41 @@ def test_every_instruction_prints_once_in_order_across_sheets_7_to_10() -> None:
                 assert not line.startswith(" ")
 
 
-def _setting_table_box() -> tuple[float, float, float, float]:
-    """The title and the native table at the BOM row height (sheet metres)."""
-    x, top = drawing.SETTING_TABLE_XY
-    rows = len(spec.SETTING_TABLE_ROWS) + 1
-    return (
-        x,
-        drawing.SETTING_TABLE_TOP - rows * drawing.BOM_ROW_HEIGHT,
-        x + max(sum(drawing.SETTING_TABLE_WIDTHS), _note_box(drawing.SETTING_TABLE_TITLE, (x, top))[2] - x),
-        top,
-    )
+def _setting_table_boxes() -> list[tuple[float, float, float, float]]:
+    """Each setting table's title and native table at the BOM row height,
+    stacked down the setting sheet's right column (sheet metres)."""
+    x, top = drawing.STEPS_CONTINUED_XY
+    boxes = []
+    for title, _header, rows, widths, _label in drawing.SETTING_TABLES:
+        table_top = top - drawing.note_ink_height(title) - drawing.TABLE_TITLE_GAP
+        bottom = table_top - (len(rows) + 1) * drawing.BOM_ROW_HEIGHT
+        boxes.append((x, bottom, x + max(sum(widths), _note_box(title, (x, top))[2] - x), top))
+        top = bottom - drawing.TABLE_GAP
+    return boxes
 
 
 def test_setting_table_box_violations_reports_each_overrun() -> None:
-    assert drawing.setting_table_box_violations(_setting_table_box()) == []
-    x0, y0, x1, y1 = _setting_table_box()
-    assert drawing.setting_table_box_violations((x0, 0.001, x1, y1))
-    assert drawing.setting_table_box_violations((x0, 0.02, drawing.TITLE_BLOCK[2], 0.05))
+    for box in _setting_table_boxes():
+        x0, y0, x1, y1 = box
+        assert drawing.setting_table_box_violations((x0, y0, x0 + 0.19, y1)) == []
+        assert drawing.setting_table_box_violations((x0, 0.05, x1, y1))
+        assert drawing.setting_table_box_violations((x0, y0, drawing.SHEET_INNER_BORDER[2], y1))
+        assert drawing.setting_table_box_violations((0.1, y0, x1, y1))
+
+
+def test_setting_tables_stand_over_the_setting_sheets_reference_view() -> None:
+    """The rail setting and pass tables hold sheet 10's right column, the
+    reference view's room under them and no steps beside them."""
+    layout = drawing.STEPS_BY_SHEET[drawing.SETTING_SHEET]
+    assert layout.tables and not layout.right
+    assert drawing.SHEET_NAMES.index(drawing.SETTING_SHEET) + 1 == spec.SETTING_SHEET_NUMBER
+    room = layout.view_region
+    boxes = _setting_table_boxes()
+    assert boxes[-1][1] == pytest.approx(drawing.SETTING_TABLES_BOTTOM)
+    assert all(box[1] >= room[3] + drawing.REGION_GAP - 1e-9 for box in boxes)
+    assert all(_inside_sheet(box) for box in boxes)
+    assert not _overlap(*boxes)
+    assert room[3] - room[1] >= drawing.NOTES_REFERENCE_MIN_HEIGHT
 
 
 def test_a_blank_line_parts_each_top_level_step() -> None:
@@ -478,8 +496,7 @@ def test_assembled_sheet_regions_fit_apart() -> None:
         drawing.ELEVATION_CENTER, x1 - x0, z1 - z0, drawing.ASSEMBLED_SCALE
     )
     caption = _note_box(drawing.ASSEMBLED_CAPTION, drawing.CAPTION_XY)
-    table = _setting_table_box()
-    regions = (plan, elevation, caption, table)
+    regions = (plan, elevation, caption)
     assert all(_inside_sheet(box) for box in regions)
     for index, a in enumerate(regions):
         for b in regions[index + 1 :]:
@@ -501,10 +518,7 @@ def _plan_xy(x_mm: float, y_mm: float) -> tuple[float, float]:
 
 def test_plan_tags_stand_apart_inside_the_sheet() -> None:
     boxes = [_note_box(tag.text, _plan_xy(*tag.text_xy)) for tag in spec.PLAN_TAGS]
-    others = (
-        _note_box(drawing.ASSEMBLED_CAPTION, drawing.CAPTION_XY),
-        _setting_table_box(),
-    )
+    others = (_note_box(drawing.ASSEMBLED_CAPTION, drawing.CAPTION_XY),)
     assert all(_inside_sheet(box) for box in boxes)
     for index, a in enumerate(boxes):
         for b in boxes[index + 1 :] + list(others):
