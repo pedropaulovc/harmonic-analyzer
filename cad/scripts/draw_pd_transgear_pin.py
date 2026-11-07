@@ -2,9 +2,10 @@ r"""Create the MHA-PD-23 transgear pin manufacturing drawing.
 
 The SLDPRT remains authoritative.  A turned pin carries no datum and no
 geometric-control frame (drawing-guidelines.md rule 5 (avoid excessive GD&T)): the turned shank keeps its native
-fit band, named at its Ø with both fits it serves, and one bearing-surface
-finish, the MHA-PD-VN-61 ring groove its catalogue Ø and width bands, and
-every other size is an ordinary model dimension at its part-authored places.
+fit band, linked by SEE NOTE 1 to the numbered note naming both fits it
+serves, and one bearing-surface finish; the MHA-PD-VN-61 ring groove its
+catalogue Ø and width bands, and every other size is an ordinary model
+dimension at its part-authored places.
 
 The pin axis is model +Z, so the ``*Right`` view lays it horizontal as it
 sits in the lathe: model +Z runs to paper-LEFT, putting the domed tip on the
@@ -133,9 +134,9 @@ HEAD_LAND_MID_X = (HEAD_BACK_X + SEAT_X) / 2.0
 # line (at +0.016 that line struck the 0.737, run 20261024T022718524Z) and of
 # the station's load-wall extension line; the head dome's reference height
 # sits at the same height right of the head.  The diameters
-# stand above the profile, each on its own section: the shank Ø's three-line
-# fit callout under its value, the groove Ø above it with the ring's name
-# above its value.  The tip dome's reference height stands above the tip.
+# stand above the profile, each on its own section: the shank Ø's SEE NOTE 1
+# under its value, the groove Ø above it with the ring's name above its
+# value.  The tip dome's reference height stands above the tip.
 _ROW_Y = SIDE_CENTER[1] - 0.036
 SIDE_KEEP = {
     "GrooveStation": ((SEAT_X + LOAD_WALL_X) / 2.0, _ROW_Y),
