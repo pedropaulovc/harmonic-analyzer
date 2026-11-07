@@ -1,8 +1,9 @@
 r"""Reproduction script: oblique-trammel hub clamp washer (MHA-CH-06-TL-52).
 
 The turned brass top-hat washer under the common #8-32 x 3/4 SHCS at HUB
-(``ch_rocker_arm_tl_oblique_hub_washer_spec``): the owner's Ø11 flange, .06
-thick, over a Ø9.95 ±.05 mm spigot about .35 mm long that locates in the
+(``ch_rocker_arm_tl_oblique_hub_washer_spec``): the owner's Ø11 flange (Ø.433
+on the sheet's grid), .06 thick, over a Ø.391 ±.002 spigot about .35 mm long
+that locates in the
 strap's hub hole, and a 13/64 drilled bore through both.
 
 Layout (the spec's frame): the flange and spigot are one turned profile on

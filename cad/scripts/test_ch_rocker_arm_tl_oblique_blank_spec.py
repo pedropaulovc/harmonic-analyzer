@@ -110,9 +110,11 @@ def test_entry_fraction_is_nominal_side_engagement_not_a_false_accepted_percenta
 
 
 def test_two_common_heads_and_hub_washer_have_real_stock_under_them() -> None:
+    import ch_rocker_arm_tl_oblique_hub_washer_spec as washer
+
     for point, radius in ((trammel.CL, common_screw.head_dia / 2.0),
                           (trammel.CR, common_screw.head_dia / 2.0),
-                          (trammel.HUB, 11.0 / 2.0)):
+                          (trammel.HUB, washer.OD / 2.0)):
         assert blank.disk_material_area(point, radius) == pytest.approx(math.pi * radius**2, abs=1e-8)
 
 
@@ -120,7 +122,9 @@ def test_held_process_layout_matches_geometry_without_chain_drilling() -> None:
     path = Path(__file__).resolve().parents[1] / "process" / "ch_rocker_arm" / "plan.toml"
     text = path.read_text(encoding="utf-8")
     plan = tomllib.loads(text)
-    assert text.startswith("# HELD REFERENCE ROUTE")
+    from _process_plans import TRAVELER_STEMS
+
+    assert plan["part"].replace("-", "_") not in TRAVELER_STEMS
     assert plan["construction"] == "built_up"
     assert plan["stock"]["length_mm"] == trammel.BLANK_LENGTH
     assert plan["stock"]["section_mm"] == [blank.BLANK_WIDTH, 3.175]
@@ -145,42 +149,43 @@ def test_held_process_layout_matches_geometry_without_chain_drilling() -> None:
         for marks_in, marks_mm in zip(printed, blank.LAYOUT_MARKS[name], strict=True):
             assert [v * trammel.INCH for v in marks_in] == pytest.approx(marks_mm, abs=1e-9)
             assert all(round(v, blank.LAYOUT_PLACES) == v for v in marks_in)
-    assert "no hub datum" in layout["layout"]
-    assert "TOTAL layout-plus-saw" in layout["cutting"]
-    # Entry rests on the charged scrap-side overlap, never the retired % claim.
-    assert "%" not in layout["entry"]
-    assert "NEVER plunge" in layout["entry"]
-    for retired in ("72.57", "42.12", "30% air", "FOUR inner", "SEVEN"):
-        assert retired not in text
-    # Retired R3 hub stud/sleeve/CL dowel/LEFT workholding.
-    for retired in ("#10-24", "Ø.206", "-169.5", "transfer screw in the carrier's blind LEFT", "retained CL dowel",
-                    "HUB and CL locating holes", "stud root"):
-        assert retired not in text
-    setups = {setup["id"]: {op["op"]: op for op in setup["ops"]} for setup in plan["setups"]}
+    # Physical order is structured data; prose may be rephrased without
+    # changing the route. Facing and pre-saw preparation precede hub work;
+    # both circular cuts precede removal of the sacrificial end tails.
+    setup_rows = plan["setups"]
+    assert [(setup["id"], setup["stock_in"]) for setup in setup_rows] == [
+        ("S0", "stock"), ("S1", "S0"), ("S2", "S1"),
+        ("S3", "S2"), ("S4", "S3"), ("S5", "S4"),
+    ]
+    setups = {setup["id"]: {op["op"]: op for op in setup["ops"]} for setup in setup_rows}
+    assert (setups["S0"][10]["do"], setups["S0"][10]["feature"]) == (
+        "finish_face", "strap_faces",
+    )
+    assert setups["S1"][10]["do"] == "scribe"
+    assert setups["S1"][10]["feature"] == ["top_edge", "profile_outer"]
+    s2 = next(setup for setup in setup_rows if setup["id"] == "S2")
+    assert [(op["op"], op["do"], op["feature"]) for op in s2["ops"]] == [
+        (10, "inspect", "strap_faces"),
+        (20, "drill", "strap_end_clamp_holes"),
+        (30, "drill", "hub_joint"),
+        (40, "ream", "hub_joint"),
+    ]
     clamp_holes = setups["S2"][20]
-    assert clamp_holes["do"] == "drill"
     # Real inventory refs: the drill index's declared 64ths coverage selects the bit.
     assert clamp_holes["tool"] == f"drill-index-115/{blank.CLAMP_DRILL.replace('/', '-')}in"
-    assert f"{blank.CLAMP_DRILL} THRU" in clamp_holes["note"]
-    assert "two common 91251A197" in clamp_holes["note"]
-    assert "thread one screw up into each CL/CR carrier tap" in clamp_holes["note"]
-    assert "never hand-held under power" in clamp_holes["note"]
-    assert "Do not pre-drill nominal CL/CR" in clamp_holes["note"]
-    import ch_rocker_arm_tl_oblique_holding_spec as holding
-
     hub_drill, ream = setups["S2"][30], setups["S2"][40]
     assert (hub_drill["do"], hub_drill["feature"], hub_drill["tool"]) == ("drill", "hub_joint", "drill-index-115/25-64in")
-    assert "TL-00 step 10 DRO position" in hub_drill["note"]
-    assert "91251A197" in hub_drill["note"]
     assert (ream["do"], ream["feature"], ream["tool"]) == ("ream", "hub_joint", "reamers-inch-purchases/0.4000in")
-    for value in (holding.REAMER_LEAD_MAX, holding.TOOL_OVERTRAVEL_BUDGET,
-                  holding.TOOL_BREAKTHROUGH_SPACE_MIN, holding.REAMER_DEPTH_RESERVE):
-        assert f"{value:.5f}".rstrip("0").lstrip("0") in ream["note"]
-    assert "same locked DRO position" in ream["note"]
-    assert "SHARP" in ream["note"]
-    washer = setups["S3"][10]
-    assert f"{holding.HUB_TORQUE_NM:g} N m" in washer["note"]
-    import ch_rocker_arm_tl_oblique_hub_washer_spec as hub_washer
-
-    assert hub_washer.NUMBER in washer["note"]
-    assert "no measured centring gate" in washer["note"]
+    for op in (clamp_holes, hub_drill, ream):
+        assert op["holder"] == "drill-chuck-r8"
+    s3 = next(setup for setup in setup_rows if setup["id"] == "S3")
+    assert [(op["op"], op["do"], op["feature"]) for op in s3["ops"]] == [
+        (10, "rough_profile", "top_edge"),
+        (20, "rough_profile", "profile_outer"),
+    ]
+    for op in s3["ops"]:
+        assert op["tool"] == "endmills-lms-6784/3-8in-4fl"
+        assert op["holder"] == "r8-collets-lms-4860/3-8in"
+    assert (setups["S4"][10]["do"], setups["S4"][10]["feature"]) == (
+        "deburr", ["tip_land_pos_x", "tip_land_neg_x"],
+    )

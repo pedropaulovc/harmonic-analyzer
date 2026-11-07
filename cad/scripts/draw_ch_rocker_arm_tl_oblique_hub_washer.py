@@ -3,10 +3,12 @@ r"""Create the manufacturing drawing for the oblique-trammel hub washer (MHA-CH-
 The face view carries the 13/64 drilled bore with its DRILL THRU callout; the
 side view reads like the lathe (drawing-guidelines.md rule 11): both turned
 diameters and both lengths from the seat face, with the flange's O.D.
-stating the cutter clearance its .XXX row protects and the owner's edge
-break, the spigot's band naming the strap hole it locates in (rule 4), and
-the spigot length carrying the local edge limits that keep its locating
-land.  Places and bands are authored on the part
+stating the cutter clearance its .XXX row's upper limit protects, the
+flange thickness carrying the owner's edge break with its function and the
+floored wall it leaves at the rims (machinist exception RV-01), the spigot's
+band naming the strap hole it locates in (rule 4), and the spigot length
+carrying the local edge limits that keep its locating land.  Places and
+bands are authored on the part
 (``ch_rocker_arm_tl_oblique_hub_washer_spec``).
 
 Run with SolidWorks open::
@@ -93,29 +95,34 @@ SEAT_FACE_X = _side_x(0.0)
 SPIGOT_END_X = _side_x(SPIGOT_LENGTH)
 _OD_TOP_Y = RIGHT_CENTER[1] + OD / 2.0 * _S
 
-# Face view: the bore alone, its callout up and right of it.
+# Face view: the bore alone, its callout up and left of the side view's
+# flange-thickness rows.
 FRONT_KEEP = {
-    "WasherBore": (0.130, 0.215),
+    "WasherBore": (0.105, 0.225),
 }
 # Side view.  The profile's sketch corners lie on its +Y side, so both
 # lengths chain on one row above the part, from the seat face: the
-# thickness's text left of the head-side face, the spigot length's right of
-# the spigot's end (each span is narrower than its text at 4:1), the length
-# row high enough that the spigot length's three callout rows stay above the
-# spigot Ø's upper extension line.  The flange Ø stands left of the
+# thickness's text and its three rows well left of the head-side face, clear
+# of its extension line and above the flange Ø's upper extension line; the
+# spigot length's right of the spigot's end (each span is narrower than its
+# text at 4:1), the length row high enough that every length row stays above
+# the Ø extension lines.  The flange Ø stands left of the
 # head-side face, where its extension lines leave the rims into open air
-# and its four rows sit between the face view and the part; the spigot Ø
-# right of the spigot's end.  Each Ø's value sits a little high so its
-# callout rows end above its lower extension line.
-_LENGTH_ROW_Y = _OD_TOP_Y + 0.020
+# and its rows sit between the face view and the part; the spigot Ø right
+# of the spigot's end.  SolidWorks centres each Ø's whole text block (value
+# and callout rows) on its requested point, so each block centres on the
+# axis, midway between its arrows: set higher (run 9a1aa3a10e36) the Ø.433
+# value sat on its upper extension line and the spigot's upper arrowhead
+# struck its value.
+_LENGTH_ROW_Y = _OD_TOP_Y + 0.030
 RIGHT_KEEP = {
-    "WasherOd": (HEAD_FACE_X - 0.035, RIGHT_CENTER[1] + 0.010),
-    "SpigotDia": (SPIGOT_END_X + 0.040, RIGHT_CENTER[1] + 0.010),
+    "WasherOd": (HEAD_FACE_X - 0.035, RIGHT_CENTER[1]),
+    "SpigotDia": (SPIGOT_END_X + 0.040, RIGHT_CENTER[1]),
     "WasherThickness": ((HEAD_FACE_X + SEAT_FACE_X) / 2.0, _LENGTH_ROW_Y),
     "SpigotLength": ((SEAT_FACE_X + SPIGOT_END_X) / 2.0, _LENGTH_ROW_Y),
 }
 LENGTH_TEXT_XY = {
-    "WasherThickness": (HEAD_FACE_X - 0.012, _LENGTH_ROW_Y),
+    "WasherThickness": (HEAD_FACE_X - 0.040, _LENGTH_ROW_Y),
     "SpigotLength": (SPIGOT_END_X + 0.036, _LENGTH_ROW_Y),
 }
 
