@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import math
+import re
 import sys
 from typing import Any
 
@@ -174,7 +175,8 @@ BODY_FIT_CALLOUT = "\n".join(
         f"BONDED FIT IN {HANDLE_NUMBER}, EPOXY",
         "(CLEARANCE "
         + "-".join(
-            f"{value / _MM_PER_IN:.3f}".removeprefix("0") for value in COUNTERBORE_GLUE_LINE
+            f"{value / _MM_PER_IN:.3f}".removeprefix("0")
+            for value in COUNTERBORE_GLUE_LINE
         )
         + ")",
     )
@@ -239,21 +241,46 @@ def _dress_pocket_floor_radius(annotation: Any) -> None:
         raise RuntimeError(f"{label}: radial leader style did not persist")
 
 
-def _use_sheet_scale(adapter: Any, section: Any) -> None:
-    """Tie section A-A to the sheet's 5:1, so its caption prints no scale.
+_CAPTION_SCALE_LINE = re.compile(r"[^\r\n]*<VLSCALE[^\r\n]*")
+
+
+def _drop_section_caption_scale(adapter: Any, section: Any) -> None:
+    """Remove the scale line from section A-A's native caption.
 
     ASME Y14.3 (drawing-guidelines.md rule 9): a view states its scale only
-    when it differs from the sheet's; the screen review found the section's
-    own 5:1 printed under its label.
+    when it differs from the sheet's.  The section is drawn at the sheet's
+    5:1 (asserted here), yet its native caption printed SCALE 5 : 1 (fan-out
+    screen); tying the view to the sheet scale read back 4:1 on the farm.
+    So the caption keeps its label fields and loses only the scale line.
     """
     bound = _early_bound(section, "IView")
-    bound.UseSheetScale = 1
-    rebuild_drawing(adapter, label="butt cup section at sheet scale")
     ratio = tuple(float(value) for value in bound.ScaleRatio)
-    if int(bound.UseSheetScale) != 1 or not math.isclose(
-        ratio[0] / ratio[1], SHEET_SCALE[0] / SHEET_SCALE[1]
+    if not math.isclose(ratio[0] / ratio[1], SHEET_SCALE[0] / SHEET_SCALE[1]):
+        raise RuntimeError(f"butt cup section is not at the sheet scale: {ratio}")
+    notes = [_early_bound(raw, "INote") for raw in (bound.GetNotes() or ())]
+    captions = [
+        note for note in notes if "<VLLABEL>" in str(note.PropertyLinkedText or "")
+    ]
+    if len(captions) != 1:
+        raise RuntimeError(
+            f"butt cup section: expected one caption, found {len(captions)}"
+        )
+    note = captions[0]
+    linked = str(note.PropertyLinkedText or "")
+    if "<VLSCALE" not in linked:
+        return
+    stripped = _CAPTION_SCALE_LINE.sub("", linked).strip("\r\n")
+    note.PropertyLinkedText = stripped
+    rebuild_drawing(adapter, label="butt cup section caption without scale")
+    after = str(note.PropertyLinkedText or "")
+    if (
+        after != stripped
+        or "<VLLABEL>" not in after
+        or "SCALE" in str(note.GetText() or "")
     ):
-        raise RuntimeError(f"butt cup section: sheet scale did not persist: {ratio}")
+        raise RuntimeError(
+            f"butt cup section caption kept its scale: {after!r} / {note.GetText()!r}"
+        )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -309,7 +336,7 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=VIEW_SCALE,
         label="butt cup longitudinal section",
     )
-    _use_sheet_scale(adapter, section)
+    _drop_section_caption_scale(adapter, section)
     position_section_caption(adapter, section, CAPTION_XY, label="butt cup")
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
     for view in (end, section, iso):

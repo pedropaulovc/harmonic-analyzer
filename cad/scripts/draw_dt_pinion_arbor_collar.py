@@ -98,11 +98,13 @@ END_KEEP = {
     "BoreDia": (0.040, 0.210),
     "CollarOd": (0.040, 0.120),  # moved onto the profile below
 }
-# Length under the profile, pin station over it from the right end face, the
-# pin hole's leader up-left to its circle, and the OD right of the part.
+# Length and pin station under the profile, the shorter station nearer the
+# part, both from the right end face; the pin hole's leader runs up-left to
+# its circle (round 1 review: with the station above the profile the leader
+# crossed its dimension line); the OD right of the part.
 PROFILE_KEEP = {
     "Depth": (PROFILE_CENTER[0], _PROFILE_BOTTOM - 0.022),
-    "PinHoleCz": (_PROFILE_RIGHT - 0.012, _PROFILE_TOP + 0.020),
+    "PinHoleCz": (_PROFILE_RIGHT - 0.012, _PROFILE_BOTTOM - 0.010),
     "PinHoleDia": (0.160, _PROFILE_TOP + 0.030),
 }
 OD_ON_PROFILE = (_PROFILE_RIGHT + 0.025, PROFILE_CENTER[1])

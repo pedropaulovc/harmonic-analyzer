@@ -238,7 +238,7 @@ def test_every_tight_band_names_its_mate_and_fit():
     which names each mate by drawing number.  Lengths carry no words."""
     spec = dt_cone_gear_shaft_spec
     assert drawing.DIMENSION_CALLOUTS["Sec0Dia"] == (
-        "RUNNING FIT IN MHA-DT-05 BORE\n(CLEARANCE .0010-.0023)"
+        "RUNNING FIT IN MHA-DT-05\n(CLEARANCE .0010-.0023)"
     )
     assert drawing.DIMENSION_CALLOUTS["Sec1Dia"] == "SEE NOTE 1"
     assert drawing.DIMENSION_SUFFIXES == {

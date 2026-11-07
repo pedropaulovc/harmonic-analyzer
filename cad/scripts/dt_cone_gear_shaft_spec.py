@@ -215,8 +215,10 @@ def _gears(land: int) -> str:
 # for a member name, and one note names each mate once.
 LAND_NOTE = 1
 LAND_FLAG = f"SEE NOTE {LAND_NOTE}"
+# "BORE" is dropped: the 29-character line crowded section A-A (round 1
+# native proof), and MHA-DT-05's only fit with the journal is its bore.
 JOURNAL_FIT_CALLOUT = (
-    "RUNNING FIT IN MHA-DT-05 BORE\n"
+    "RUNNING FIT IN MHA-DT-05\n"
     f"(CLEARANCE {inch_text(JOURNAL_DIAMETRAL_CLEARANCE_MM[0], 4)}"
     f"-{inch_text(JOURNAL_DIAMETRAL_CLEARANCE_MM[1], 4)})"
 )
