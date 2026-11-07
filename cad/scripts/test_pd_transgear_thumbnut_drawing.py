@@ -193,23 +193,40 @@ def test_the_dish_ends_on_its_floor_at_every_printed_size() -> None:
 
 
 def test_the_dish_dimensions_stack_clear_of_each_other_and_the_rim() -> None:
-    """The rim's diameters nest (each one's extension lines inside the next
-    one's dimension line), and the dish depth's text stands above its rim
-    extension line rather than on it, as the 6de7230aa 1.2 did."""
+    """The rim's diameters nest left of the rim (each one's extension lines
+    inside the next one's dimension line), and the dish depth's text stands
+    clear of its rim extension line rather than on it, as the 6de7230aa 1.2
+    did."""
     from _layout_geometry import estimate_text_box
 
     keep = drawing.SECTION_KEEP
-    rim_y = drawing._section_y(spec.OVERALL_LENGTH)
-    assert keep["HeadDia"][1] > keep["DishDia"][1] > keep["DishFloorDia"][1] > rim_y
+    rim_x = drawing._section_x(spec.OVERALL_LENGTH)
+    assert rim_x == pytest.approx(drawing.RIM_X)
+    assert keep["HeadDia"][0] < keep["DishDia"][0] < keep["DishFloorDia"][0] < rim_x
 
-    def bottom(anchor: tuple[float, float]) -> float:
-        box = estimate_text_box("1.0", anchor=anchor, height=0.0035, reference=2)
-        assert box is not None
-        return box.ymin
+    def box(text: str, anchor: tuple[float, float], reference: int = 2):
+        found = estimate_text_box(text, anchor=anchor, height=0.0035, reference=reference)
+        assert found is not None
+        return found
 
-    assert bottom(keep["DishDepth"]) > rim_y
-    # Negative control: the 6de7230aa anchor at the rim's height.
-    assert bottom((keep["DishDepth"][0], rim_y)) < rim_y
+    # The knurl's text, widest row, ends left of the dish diameter's line and
+    # clear of the face view; the dish values clear each other's lines.
+    knurl = box(drawing.KNURL_CALLOUT, keep["HeadDia"], reference=5)
+    assert 1.15 * (knurl.xmax - keep["HeadDia"][0]) < keep["DishDia"][0] - keep["HeadDia"][0]
+    face_right = drawing.FACE_CENTER[0] + drawing.HALF_HEAD
+    assert keep["HeadDia"][0] - 1.15 * (keep["HeadDia"][0] - knurl.xmin) > face_right + 0.003
+    assert box("Ø.59", keep["DishDia"]).xmax < keep["DishFloorDia"][0] - 0.002
+    assert box("Ø.35", keep["DishFloorDia"]).xmin > keep["DishDia"][0] + 0.002
+    # The stagger keeps the dish values off the axis centreline and inside
+    # their own spans.
+    for name, dia in (("DishDia", spec.DISH_DIA), ("DishFloorDia", spec.DISH_FLOOR_DIA)):
+        offset = abs(keep[name][1] - drawing.SECTION_CENTER[1])
+        assert 0.004 < offset < dia * drawing._S / 2000.0 - 0.003, name
+
+    assert box("1.0", keep["DishDepth"]).xmax < rim_x
+    assert keep["DishDepth"][1] < drawing.HEAD_BOTTOM - 0.010
+    # Negative control: the 6de7230aa anchor on the rim face.
+    assert box("1.0", (rim_x, keep["DishDepth"][1])).xmax > rim_x
 
 
 def test_thread_callout_is_native_and_is_not_rewritten_for_countersinks(monkeypatch) -> None:
@@ -493,54 +510,60 @@ def test_the_shortest_nut_keeps_full_thread_for_the_stud() -> None:
     assert full >= 1.5 * spec.THREAD_MAJOR
 
 
-def _section_station(y: float) -> float:
-    """Model station (from the seat face) of sheet height ``y`` on A-A."""
-    return (y - drawing.SECTION_CENTER[1]) * 1000.0 / drawing._S + (
-        spec.OVERALL_LENGTH / 2.0
+def _section_station(x: float) -> float:
+    """Model station (from the seat face) of sheet ``x`` on A-A (seat right)."""
+    return spec.OVERALL_LENGTH / 2.0 - (x - drawing.SECTION_CENTER[0]) * 1000.0 / drawing._S
+
+
+def test_the_section_lies_axis_horizontal_beside_the_face_view() -> None:
+    """Round 4 of run 20261107T201806645Z (rule 11): A-A stood axis-vertical.
+    It lies as in the lathe, rim left and seat right, on the face view's
+    horizontal centreline (third angle), cut on the face view's vertical
+    centreline."""
+    assert drawing.SECTION_CENTER[1] == drawing.FACE_CENTER[1]
+    assert drawing.FACE_VIEW_ANGLE == pytest.approx(math.pi / 2.0)
+    (x0, y0), (x1, y1) = drawing.SECTION_LINE
+    assert x0 == x1 == drawing.FACE_CENTER[0]
+    assert y1 - y0 > 2.0 * drawing.HALF_HEAD
+    assert drawing.RIM_X < drawing.SEAT_X
+    assert drawing.SEAT_X - drawing.RIM_X == pytest.approx(
+        spec.OVERALL_LENGTH * drawing._S / 1000.0
     )
+    assert _section_station(drawing.SEAT_X) == pytest.approx(0.0)
+    assert drawing.FACE_CENTER[0] + drawing.HALF_HEAD < drawing.SECTION_KEEP["HeadDia"][0]
+    # The isometric stays right of everything A-A prints.
+    assert max(x for x, _ in drawing.SECTION_KEEP.values()) + 0.035 < drawing.ISO_CENTER[0] - 0.035
 
 
 def test_the_stem_diameters_print_across_their_own_cut() -> None:
-    """Codex on 19e33c6c2: the Ø12.40 and Ø11.00 extension lines ran through
-    the head's hatching to a stack below the seat face, on the SECTION A-A
-    caption.  Each now prints at its own feature's height, text right of
-    the knurl, so no extension line crosses another feature's cut."""
-    head_right = drawing._section_x(spec.HEAD_DIA / 2.0)
-    for name, (lo, hi) in {
-        "FlangeDia": (0.0, spec.FLANGE_LENGTH),
-        "WaistDia": (spec.FLANGE_LENGTH, spec.FLANGE_LENGTH + spec.WAIST_LENGTH),
-    }.items():
+    """Codex on 19e33c6c2: the stem's extension lines ran through the head's
+    hatching.  Each diameter's line runs at its own feature's middle, its
+    text below the part, so no extension line crosses another feature's
+    cut; round 4's Ø.43 line on the Ø.49 shoulder stays fixed."""
+    flange_bottom = drawing._section_y(-spec.FLANGE_DIA / 2.0)
+    for name, (lo, hi), floor in (
+        ("FlangeDia", (0.0, spec.FLANGE_LENGTH), flange_bottom),
+        ("WaistDia", (spec.FLANGE_LENGTH, spec.HEAD_REAR_Y), drawing.HEAD_BOTTOM),
+    ):
         x, y = drawing.SECTION_KEEP[name]
-        # Round 4: the printed LINE, which runs DIM_LINE_BELOW_TEXT under the
-        # anchor, sits at the feature's mid-height, clear of both its ends.
-        line = _section_station(y - drawing.DIM_LINE_BELOW_TEXT)
-        assert line == pytest.approx((lo + hi) / 2.0), name
-        assert x > head_right, name
-    # Negative control: round 4's Ø.43 anchored at the waist's middle drew
-    # its line within 0.2 mm (model) of the Ø.49 shoulder.
-    old_anchor = drawing._section_y(spec.FLANGE_LENGTH + spec.WAIST_LENGTH / 2.0)
-    old_line = _section_station(old_anchor - drawing.DIM_LINE_BELOW_TEXT)
-    assert old_line - spec.FLANGE_LENGTH < 0.2
-    # The text clears the overall length's dimension line beyond it.
-    assert drawing.SECTION_KEEP["OverallLength"][0] - drawing._STEM_TEXT_X > 0.004
-    # All nine turned/dished sizes remain above the seat. The cone diameter
-    # has a left caption lane under the seat.
-    seat_y = drawing._section_y(0.0)
+        assert _section_station(x) == pytest.approx((lo + hi) / 2.0), name
+        assert y < floor - 0.008, name
+    # The waist's line stands clear of the flange's shoulder and the head.
+    waist_x = drawing.SECTION_KEEP["WaistDia"][0]
+    gap = spec.WAIST_LENGTH * drawing._S / 2000.0
+    assert gap > 0.003
+    assert waist_x - drawing._section_x(spec.HEAD_REAR_Y) == pytest.approx(gap)
+    # The two values stagger: the waist's text below the flange's.
+    assert drawing.SECTION_KEEP["WaistDia"][1] < drawing.SECTION_KEEP["FlangeDia"][1] - 0.008
+    # The cone diameter's line stands right of the seat face, its two rows
+    # below the waist's value and above the caption.
+    dia = drawing.SECTION_KEEP["CountersinkDia"]
+    assert drawing.SEAT_X < dia[0] < drawing.SEAT_X + 0.012
+    assert dia[1] < drawing.SECTION_KEEP["WaistDia"][1] - 0.008
     turned = set().union(
         *(spec.DRAWING_DIMENSIONS[feature] for feature in ("HeadProfile", "StemProfile", "DishProfile"))
     )
     assert len(turned) == 9
-    assert all(drawing.SECTION_KEEP[name][1] >= seat_y for name in turned)
-    dia = drawing.SECTION_KEEP["CountersinkDia"]
-    assert dia[0] < drawing.SECTION_CENTER[0] - drawing.HALF_HEAD - 0.020
-    assert dia[1] < seat_y
-    assert dia[1] > SHEET_INNER_LEFT + 0.020
-    # The rim's diameters print above the rim, the knurl outermost.
-    rim_y = drawing._section_y(spec.OVERALL_LENGTH)
-    assert drawing.SECTION_KEEP["HeadDia"][1] > drawing.SECTION_KEEP["DishDia"][1]
-    assert drawing.SECTION_KEEP["DishDia"][1] > rim_y
-    # Negative control: the 19e33c6c2 stack sat under the seat face.
-    assert _section_station(seat_y - 0.014) < 0.0
 
 
 def test_lengths_read_from_the_seat_face() -> None:
@@ -553,32 +576,42 @@ def test_lengths_read_from_the_seat_face() -> None:
     assert "FlangeLength" in stem and "WaistLength" not in stem
     assert (spec.FLANGE_LENGTH, spec.HEAD_REAR_Y) == pytest.approx((5.08, 7.366))
     assert spec.HEAD_REAR_Y - spec.FLANGE_LENGTH == pytest.approx(spec.WAIST_LENGTH)
-    # Two left lanes, the flange inner and the head's rear face outer, each
-    # text inside its own span from the seat.
-    for name, top, lane in (
-        ("FlangeLength", spec.FLANGE_LENGTH, 0.016),
-        ("HeadRearY", spec.HEAD_REAR_Y, 0.026),
+    # Three lanes above the knurl, flange inner, overall outer, each text
+    # mid-span from the seat and its line on its lane.
+    lines = []
+    for name, end, lane in zip(
+        ("FlangeLength", "HeadRearY", "OverallLength"),
+        (spec.FLANGE_LENGTH, spec.HEAD_REAR_Y, spec.OVERALL_LENGTH),
+        drawing.LENGTH_LANES,
+        strict=True,
     ):
         x, y = drawing.SECTION_KEEP[name]
-        assert x == pytest.approx(drawing._section_x(-spec.HEAD_DIA / 2.0) - lane)
-        assert 0.0 < _section_station(y) < top
-    # Run 20261024T025840809Z: an outside arrow hung below the seat into
+        assert _section_station(x) == pytest.approx(end / 2.0), name
+        line = y - drawing.DIM_LINE_BELOW_TEXT
+        assert line == pytest.approx(drawing.HEAD_TOP + lane), name
+        lines.append(line)
+    assert all(b - a >= 0.009 for a, b in zip(lines, lines[1:]))
+    assert lines[0] - drawing.HEAD_TOP >= 0.008
+    # Run 20261024T025840809Z: an outside arrow hung past the seat into
     # the cone diameter's "max."; both spans hold their arrows inside, and
     # round 3's knurl diameter, whose outside tail ran under its callout.
     assert drawing.ARROWS_INSIDE == ("FlangeLength", "HeadRearY", "HeadDia")
 
 
 def test_the_section_axis_is_sketched_at_the_sheet_scale() -> None:
-    """Round 3's gating finding: the projected axis (sheet x 0.110) passed
-    straight into the 3:1 sheet sketch printed at x 0.330, from the top
-    border down onto the isometric.  Sketch points are sheet points over
-    the sheet scale, so the printed line lands back on the section."""
-    end = (drawing.SECTION_CENTER[0], drawing._section_y(-drawing.AXIS_OVERSHOOT_MM))
+    """Round 3's gating finding: the projected axis passed straight into the
+    3:1 sheet sketch printed three times out, from the top border down onto
+    the isometric.  Sketch points are sheet points over the sheet scale, so
+    the printed line lands back on the section."""
+    end = (
+        drawing._section_x(-drawing.AXIS_OVERSHOOT_MM),
+        drawing.SECTION_CENTER[1],
+    )
     sketch = drawing._sheet_sketch_point(end)
     printed = (sketch[0] * drawing._S, sketch[1] * drawing._S)
     assert printed == pytest.approx(end)
-    # Negative control: the unscaled point prints three times out.
-    assert end[0] * drawing._S == pytest.approx(0.330)
+    # Negative control: the unscaled point prints off the 431.8 mm sheet.
+    assert end[0] * drawing._S > 0.4318
 
 
 def test_the_waist_keeps_a_length_at_every_printed_corner(monkeypatch) -> None:
@@ -606,12 +639,21 @@ def test_the_waist_keeps_a_length_at_every_printed_corner(monkeypatch) -> None:
 
 def test_the_section_caption_hangs_below_the_cone_diameter() -> None:
     """Machinist review: the cone diameter's line and extension lines struck the
-    default caption's letters.  Run 20261024T025840809Z measured that line
-    13.5 mm under the seat face; the caption's top stands 6.5 mm under it."""
-    seat_y = drawing._section_y(0.0)
+    default caption's letters.  The caption's top stands below the cone
+    diameter's two rows (value and BOTH ENDS) and the dish depth."""
+    from _layout_geometry import estimate_text_box
+
     caption = drawing.SECTION_CAPTION_XY
     assert caption[0] == drawing.SECTION_CENTER[0]
-    assert seat_y - caption[1] - 0.0135 >= 0.005
+    cone = estimate_text_box(
+        "Ø.18 MAX X 90°\nBOTH ENDS",
+        anchor=drawing.SECTION_KEEP["CountersinkDia"],
+        height=0.0035,
+        reference=2,
+    )
+    assert cone is not None
+    assert cone.ymin - caption[1] >= 0.004
+    assert drawing.SECTION_KEEP["DishDepth"][1] - caption[1] >= 0.010
     # The caption (one row now that it states no scale) stays above the
     # inner border, 12.7 mm up.
     assert caption[1] - 0.008 > 0.0127 + 0.005
@@ -659,113 +701,65 @@ def test_the_sheet_is_pinned_at_its_printed_scale_before_the_section(monkeypatch
         drawing._pin_sheet_scale(adapter)
 
 
-def test_the_section_stands_rim_up_or_is_refused() -> None:
-    assert drawing._rim_is_up((0.2, 0.15), (0.2, 0.198))
-    assert not drawing._rim_is_up((0.2, 0.198), (0.2, 0.15))
-    with pytest.raises(RuntimeError, match="not vertical"):
-        drawing._rim_is_up((0.2, 0.15), (0.248, 0.15))
-
-
 class _SectionView:
-    """Section A-A as run 20261001T142942518Z saw it: Position reads where the
-    view was put, ``SetViewPosition`` moves the ink by the difference from it,
-    and reversing the cut swings the ink about the seat face while Position
-    stays put.  It starts as created: rim down, outline on SECTION_CENTER."""
+    """Section A-A as cut from the quarter-turned face view: the axis lies
+    horizontal through Position, ``Angle`` turns the ink about it, and
+    ``SetViewPosition`` moves the ink with Position (run 20261001T142942518Z).
+    It starts rim right, off the place SECTION_KEEP assumes."""
 
-    MARGIN = 0.005588  # the 19e33c6c2 views' outline padding
-
-    def __init__(self, *, moves: bool = True) -> None:
-        half = spec.OVERALL_LENGTH * drawing._S / 2000.0
-        self.seat = (drawing.SECTION_CENTER[0], drawing.SECTION_CENTER[1] + half)
-        self.up = -1.0
-        self.Position = drawing.SECTION_CENTER
-        self.Angle = 0.0
+    def __init__(self, *, moves: bool = True, angle: float = 0.0) -> None:
+        self.Position = (0.180, 0.140)
+        self.Angle = angle
         self.moves = moves
-        self.reversed = False
 
     def project(self, xyz: tuple[float, float, float]) -> tuple[float, float]:
+        along = (xyz[1] * 1000.0 - spec.OVERALL_LENGTH / 2.0) * drawing._S / 1000.0
+        across = xyz[0] * drawing._S
+        c, s = math.cos(self.Angle), math.sin(self.Angle)
         return (
-            self.seat[0] + xyz[0] * drawing._S,
-            self.seat[1] + self.up * xyz[1] * drawing._S,
-        )
-
-    def GetOutline(self) -> tuple[float, float, float, float]:
-        rim_y = self.project((0.0, spec.OVERALL_LENGTH / 1000.0, 0.0))[1]
-        half = drawing.HALF_HEAD
-        return (
-            self.seat[0] - half - self.MARGIN,
-            min(self.seat[1], rim_y) - self.MARGIN,
-            self.seat[0] + half + self.MARGIN,
-            max(self.seat[1], rim_y) + self.MARGIN,
+            self.Position[0] + along * c - across * s,
+            self.Position[1] + along * s + across * c,
         )
 
     def SetViewPosition(self, xy, _update: bool = False) -> bool:
         if self.moves:
-            dx, dy = xy[0] - self.Position[0], xy[1] - self.Position[1]
-            self.seat = (self.seat[0] + dx, self.seat[1] + dy)
-        self.Position = tuple(xy)
+            self.Position = tuple(xy)
         return True
 
-    def GetSection(self):
-        view = self
 
-        class Cut:
-            def GetReversedCutDirection(self) -> bool:
-                return view.reversed
-
-            def SetReversedCutDirection(self, reversed_cut: bool) -> None:
-                view.reversed = reversed_cut
-                view.up = -view.up
-
-        return Cut()
-
-
-def _stand(monkeypatch, view: _SectionView) -> None:
+def _orient(monkeypatch, view: _SectionView) -> None:
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
     monkeypatch.setattr(drawing, "double_array", list)
     monkeypatch.setattr(
         drawing, "model_point_in_view", lambda _a, v, xyz, label: v.project(xyz)
     )
-    drawing._stand_section_rim_up(object(), view)
+    drawing._orient_section(object(), view)
 
 
-def test_the_reversed_section_is_centred_by_its_outline(monkeypatch) -> None:
-    """Run 20261001T142942518Z: re-centred on its stale Position, the
-    reversed section projected its seat at y 0.18915, one nut length above
-    the 0.14085 every SECTION_KEEP place assumes."""
+def test_the_section_is_laid_seat_right_on_its_centre(monkeypatch) -> None:
     view = _SectionView()
-    _stand(monkeypatch, view)
-    assert view.reversed
-    assert view.project((0.0, 0.0, 0.0)) == pytest.approx(
-        (drawing.SECTION_CENTER[0], drawing._section_y(0.0))
+    # As created, the rim lies right: half a turn from where it belongs.
+    assert drawing._axis_turn(view.project((0, 0, 0)), view.project((0, 0.016, 0))) == (
+        pytest.approx(math.pi)
     )
-    rim = view.project((0.0, spec.OVERALL_LENGTH / 1000.0, 0.0))
-    assert rim[1] == pytest.approx(drawing._section_y(spec.OVERALL_LENGTH))
-    # Negative control: the stale Position the run re-centred on.
-    run = _SectionView()
-    run.GetSection().SetReversedCutDirection(True)
-    run.SetViewPosition(drawing.SECTION_CENTER)
-    assert run.project((0.0, 0.0, 0.0))[1] == pytest.approx(
-        drawing.SECTION_CENTER[1] + spec.OVERALL_LENGTH * drawing._S / 2000.0
+    _orient(monkeypatch, view)
+    assert view.project((0.0, 0.0, 0.0)) == pytest.approx(
+        (drawing.SEAT_X, drawing.SECTION_CENTER[1])
+    )
+    assert view.project((0.0, spec.OVERALL_LENGTH / 1000.0, 0.0)) == pytest.approx(
+        (drawing.RIM_X, drawing.SECTION_CENTER[1])
     )
 
 
 def test_a_section_whose_ink_will_not_move_is_refused(monkeypatch) -> None:
-    with pytest.raises(RuntimeError, match="outline centre stayed"):
-        _stand(monkeypatch, _SectionView(moves=False))
+    with pytest.raises(RuntimeError, match="axis ends at seat"):
+        _orient(monkeypatch, _SectionView(moves=False, angle=math.pi))
 
 
-def test_the_outline_must_be_the_nut_on_its_axis() -> None:
-    view = _SectionView()
-    outline = view.GetOutline()
-    assert drawing._outline_is_the_nut_on_end(outline)
-    # The same nut lying on its side.
-    x0, y0, x1, y1 = outline
-    centre = ((x0 + x1) / 2.0, (y0 + y1) / 2.0)
-    w, h = (x1 - x0) / 2.0, (y1 - y0) / 2.0
-    turned = (centre[0] - h, centre[1] - w, centre[0] + h, centre[1] + w)
-    assert not drawing._outline_is_the_nut_on_end(turned)
+def test_a_section_off_the_horizontal_is_refused(monkeypatch) -> None:
+    with pytest.raises(RuntimeError, match="off the sheet's horizontal"):
+        _orient(monkeypatch, _SectionView(angle=math.pi / 2.0))
 
 
 def test_the_thread_callout_stays_inside_the_left_border() -> None:

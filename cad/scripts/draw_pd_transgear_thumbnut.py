@@ -1,9 +1,11 @@
 r"""Create the manufacturing drawing for the transgear thumbnut (MHA-PD-13).
 
-The face view is the ``*Top`` orientation, looking at the dished front face:
-it carries the native #8-32 UNC-2B through-thread callout, and stands
-directly above section A-A on one vertical centreline, top view over front
-(third angle; machinist review round 2). Both entry cones print as one
+The nut lies as it sits in the lathe, axis horizontal (drawing-guidelines.md
+rule 11; machinist review round 4).  The face view is the ``*Top``
+orientation turned a quarter, looking at the dished front face: it carries
+the native #8-32 UNC-2B through-thread callout and the cutting line, and
+stands left of section A-A on one horizontal centreline, the rim end's view
+beside the rim end (third angle; knob-cup layout). Both entry cones print as one
 countersink callout in symbol form (``⌵ Ø.18 MAX X 90°  BOTH ENDS``,
 rule 26): the model-owned MAX diameter and the included angle.
 Section A-A uses the Front plane through the axis and two knurl crests, so the
@@ -61,6 +63,7 @@ from pd_transgear_thumbnut_spec import (
     CSK_INCLUDED_ANGLE_DEG,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    FLANGE_DIA,
     FLANGE_LENGTH,
     HEAD_DIA,
     HEAD_REAR_Y,
@@ -69,7 +72,6 @@ from pd_transgear_thumbnut_spec import (
     OVERALL_LENGTH,
     TAP_DRILL_DIA,
     TAP_SPEC,
-    WAIST_LENGTH,
     THREAD,
 )
 
@@ -94,99 +96,117 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (3.0, 1.0)
 VIEW_SCALE = (3, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
-# Top over front: the face view stands over section A-A on its centreline;
-# the isometric keeps its place right of them.
-FACE_CENTER = (0.110, 0.190)
-SECTION_CENTER = (FACE_CENTER[0], 0.085)
+# Rule 11: the nut lies as it sits in the lathe, axis horizontal.  The face
+# view (``*Top``, the dished rim face) stands left of section A-A on one
+# horizontal centreline: third angle, the left view shows the left end, so
+# the rim is A-A's left end and the seat face its right (machinist review
+# round 4 of run 20261107T201806645Z; the draw_pd_transgear_knob_cup
+# layout).  The isometric keeps its place right of them.
+FACE_CENTER = (0.066, 0.150)
+SECTION_CENTER = (0.209, FACE_CENTER[1])
 ISO_CENTER = (0.345, 0.165)
 # Half the knurl diameter on the sheet, and the cutting line's overrun past it.
 HALF_HEAD = HEAD_DIA * _S / 2000.0
 SECTION_LINE_OVERRUN = 0.005
-# Across the face view on the nut axis: sheet X is model X in *Top, so the
-# cut is the Front plane, the plane of the turned profiles.
+# The face view turned a quarter: sheet Y is then model X, so a vertical cut
+# on the nut axis is the Front plane, the plane of the turned profiles, and
+# A-A projects to the right with the axis horizontal.
+FACE_VIEW_ANGLE = math.pi / 2.0
 SECTION_LINE = (
-    (FACE_CENTER[0] - HALF_HEAD - SECTION_LINE_OVERRUN, FACE_CENTER[1]),
-    (FACE_CENTER[0] + HALF_HEAD + SECTION_LINE_OVERRUN, FACE_CENTER[1]),
+    (FACE_CENTER[0], FACE_CENTER[1] - HALF_HEAD - SECTION_LINE_OVERRUN),
+    (FACE_CENTER[0], FACE_CENTER[1] + HALF_HEAD + SECTION_LINE_OVERRUN),
 )
 
 
-def _section_x(model_x_mm: float) -> float:
-    """Sheet X of a model-X offset from the axis on the section."""
-    return SECTION_CENTER[0] + model_x_mm * _S / 1000.0
+def _section_x(station_mm: float) -> float:
+    """Sheet X of a model-Y station (from the seat face) on the section,
+    seat face right."""
+    return SECTION_CENTER[0] + (OVERALL_LENGTH / 2.0 - station_mm) * _S / 1000.0
 
 
-def _section_y(model_y_mm: float) -> float:
-    """Sheet Y of a model-Y station on the section (rim up)."""
-    return SECTION_CENTER[1] + (model_y_mm - OVERALL_LENGTH / 2.0) * _S / 1000.0
+def _section_y(radius_mm: float) -> float:
+    """Sheet Y of a model-X offset from the axis on the section."""
+    return SECTION_CENTER[1] + radius_mm * _S / 1000.0
 
 
-# The rim's diameters stack above it (knurl outermost, the dish floor
-# innermost, so each one's extension lines stay inside the next one's) with
-# only air below their extension lines; the overall length stands off the
-# right of the silhouette and the dish depth off the left.  The flange
-# length (inner lane) and the head's rear face (outer lane) read from the
-# seat face on the left, baseline with the overall length, arrows inside;
-# the waist length is the remainder and does not print.  The
-# dish depth's text stands above its rim extension line: at 3:1 the depth is
-# shorter than the text is tall.  The waist and the flange are dimensioned
-# across their own cut, each dimension line at its feature's height and its
-# text out to the right: an extension line run past the rim or seat would
-# cross another feature's hatching. The cone diameter sits below the seat,
-# left of the caption; the half-angle prints on its own arc below the cone.
-_STEM_TEXT_X = _section_x(HEAD_DIA / 2.0) + 0.021
-# A horizontal diameter's line prints this far below its text anchor (run
-# 20261101T070124857Z: anchored at mid-height, the Ø.43 and Ø.49 lines
-# printed 3.0 and 2.8 mm lower), so the anchor stands that much above the
-# feature's mid-height to put the LINE there: Ø.43 anchored at the waist's
-# middle drew its line on the Ø.49 shoulder (machinist review round 4).
+SEAT_X = _section_x(0.0)
+RIM_X = _section_x(OVERALL_LENGTH)
+HEAD_TOP = _section_y(HEAD_DIA / 2.0)
+HEAD_BOTTOM = _section_y(-HEAD_DIA / 2.0)
+
+# A horizontal dimension's line prints this far below its text anchor (run
+# 20261101T070124857Z: the then-horizontal Ø.43 and Ø.49 lines printed 3.0
+# and 2.8 mm under their anchors), so a length's anchor stands that much
+# above the lane its line should take.
 DIM_LINE_BELOW_TEXT = 0.0029
+# The baseline lengths' lines above the knurl, from the seat face: flange
+# (inner), the head's rear face, the overall length (outer).
+LENGTH_LANES = (0.009, 0.019, 0.029)
 
 
-def _stem_dia_anchor(bottom_mm: float, top_mm: float) -> tuple[float, float]:
-    """Text anchor whose dimension line runs mid-way up a stem feature."""
-    return (_STEM_TEXT_X, _section_y((bottom_mm + top_mm) / 2.0) + DIM_LINE_BELOW_TEXT)
+def _length_anchor(station_mm: float, lane: float) -> tuple[float, float]:
+    """Text anchor of a seat-face length to ``station_mm``, its text mid-span
+    and its line ``lane`` above the knurl."""
+    return (
+        (SEAT_X + _section_x(station_mm)) / 2.0,
+        HEAD_TOP + lane + DIM_LINE_BELOW_TEXT,
+    )
 
 
-# Section A-A's caption hangs under the cone diameter's dimension line and
-# its BOTH ENDS row, 13.5 mm and one text line under the seat face (run
-# 20261024T025840809Z).
-CAPTION_BELOW_SEAT = 0.026
+# The rim's diameters stand left of the rim, the knurl outermost, so each
+# one's extension lines stay inside the next one's; the knurl's two-row
+# text sits inside its own span, left of the dish's lines, and the dish's
+# two values stagger about the axis.  A vertical diameter's line runs
+# through its text's centre (the .63 on run 20261107T201806645Z).  The
+# flange and the waist are dimensioned across their own cut, each line at its
+# feature's middle and its text below the part: an extension line run past
+# the seat or the head would cross another feature's hatching.  The cone
+# diameter's line stands just right of the seat face, its text below the
+# waist's; the dish depth hangs under the rim.
+HEAD_DIA_LINE_X = RIM_X - 0.054
+DISH_DIA_LINE_X = RIM_X - 0.018
+DISH_FLOOR_DIA_LINE_X = RIM_X - 0.008
+FLANGE_TEXT_Y = _section_y(-FLANGE_DIA / 2.0) - 0.010
+WAIST_TEXT_Y = HEAD_BOTTOM - 0.010
+CSK_LINE_X = SEAT_X + 0.008
+CSK_TEXT_Y = HEAD_BOTTOM - 0.021
+
+
+def _stem_dia_anchor(lo_mm: float, hi_mm: float, text_y: float) -> tuple[float, float]:
+    """Text anchor whose vertical dimension line runs mid-way along a stem
+    feature, its text below the part at ``text_y``."""
+    return (_section_x((lo_mm + hi_mm) / 2.0), text_y)
+
+
+# Section A-A's caption hangs under the cone diameter's two rows.
+CAPTION_BELOW_HEAD = 0.035
 
 
 SECTION_KEEP = {
-    "HeadDia": (SECTION_CENTER[0], _section_y(OVERALL_LENGTH) + 0.030),
-    "DishDia": (SECTION_CENTER[0], _section_y(OVERALL_LENGTH) + 0.014),
-    "DishFloorDia": (SECTION_CENTER[0], _section_y(OVERALL_LENGTH) + 0.006),
-    "DishDepth": (
-        _section_x(-HEAD_DIA / 2.0) - 0.016,
-        _section_y(OVERALL_LENGTH) + 0.004,
-    ),
-    "HeadRearY": (
-        _section_x(-HEAD_DIA / 2.0) - 0.026,
-        _section_y(HEAD_REAR_Y / 2.0),
-    ),
-    "OverallLength": (_section_x(HEAD_DIA / 2.0) + 0.032, SECTION_CENTER[1]),
-    "FlangeLength": (
-        _section_x(-HEAD_DIA / 2.0) - 0.016,
-        _section_y(FLANGE_LENGTH / 2.0),
-    ),
-    "FlangeDia": _stem_dia_anchor(0.0, FLANGE_LENGTH),
-    "WaistDia": _stem_dia_anchor(FLANGE_LENGTH, FLANGE_LENGTH + WAIST_LENGTH),
-    "CountersinkDia": (_section_x(-HEAD_DIA / 2.0) - 0.025, _section_y(0.0) - 0.008),
+    "HeadDia": (HEAD_DIA_LINE_X, SECTION_CENTER[1]),
+    "DishDia": (DISH_DIA_LINE_X, SECTION_CENTER[1] - 0.006),
+    "DishFloorDia": (DISH_FLOOR_DIA_LINE_X, SECTION_CENTER[1] + 0.006),
+    "DishDepth": (RIM_X - 0.004, HEAD_BOTTOM - 0.016),
+    "FlangeLength": _length_anchor(FLANGE_LENGTH, LENGTH_LANES[0]),
+    "HeadRearY": _length_anchor(HEAD_REAR_Y, LENGTH_LANES[1]),
+    "OverallLength": _length_anchor(OVERALL_LENGTH, LENGTH_LANES[2]),
+    "FlangeDia": _stem_dia_anchor(0.0, FLANGE_LENGTH, FLANGE_TEXT_Y),
+    "WaistDia": _stem_dia_anchor(FLANGE_LENGTH, HEAD_REAR_Y, WAIST_TEXT_Y),
+    "CountersinkDia": (CSK_LINE_X, CSK_TEXT_Y),
 }
-# The baseline lengths' spans hold their text and arrows: inside, so no arrow
-# hangs below the seat face into the cone diameter's "max." (run
-# 20261024T025840809Z).  The knurl diameter's too: arrows outside, its line
-# ran on past the left extension line under the wide knurl callout
-# (machinist review round 3); the Ø.81 span holds its arrows.
+# The baseline lengths' spans hold their text and arrows: inside, so no
+# arrow hangs past the seat face (run 20261024T025840809Z).  The knurl
+# diameter's too: arrows outside, its line ran on past the extension line
+# under the wide knurl callout (machinist review round 3); the Ø.81 span
+# holds its arrows.
 ARROWS_INSIDE = ("FlangeLength", "HeadRearY", "HeadDia")
 _DIM_ARROWS_INSIDE = 0  # swDimensionArrowsSide_e.swDimArrowsInside
 # The native caption's top centre, under the countersink callout.
-SECTION_CAPTION_XY = (SECTION_CENTER[0], _section_y(0.0) - CAPTION_BELOW_SEAT)
+SECTION_CAPTION_XY = (SECTION_CENTER[0], HEAD_BOTTOM - CAPTION_BELOW_HEAD)
 # The face view prints only the native thread callout.
 FACE_KEEP: dict[str, tuple[float, float]] = {}
-# Above the knurl diameter, the outermost of the rim's stack: the below lane
-# would run into the dish chord.  "OVER KNURL" is the value's suffix.
+# Above the knurl diameter's value: one row of the knurl designation.
+# "OVER KNURL" is the value's suffix.
 DIMENSION_CALLOUTS_ABOVE = {"HeadDia": KNURL_CALLOUT}
 # The countersink in symbol form (rule 26): size, then the included angle;
 # the cone half-angle the part marks is not printed separately.  A custom
@@ -217,129 +237,85 @@ def _printable_above_callouts(callouts: dict[str, str]) -> dict[str, str]:
 
 
 # Up and left of the face view, so its leader runs in diagonally to the hole
-# rather than along the vertical centreline (machinist review round 2), and
+# rather than along the vertical cutting line (machinist review round 2), and
 # its widest line stays inside the left border.
-THREAD_CALLOUT_XY = (FACE_CENTER[0] - 0.050, FACE_CENTER[1] + 0.048)
+THREAD_CALLOUT_XY = (FACE_CENTER[0] - 0.020, FACE_CENTER[1] + 0.062)
 # How far the section's axis centreline runs past the seat face and the rim
-# (model mm): it clears the cone diameter's dimension line under the seat.
+# (model mm).
 AXIS_OVERSHOOT_MM = 1.0
 _SW_LINE_CENTER = 4  # swLineStyles_e.swLineCENTER
 
-# How far the section's seat-face point may land from where SECTION_KEEP
-# assumes it (sheet metres).
-_SEAT_PLACEMENT_TOL = 0.001
-# How far the section's outline centre may land from SECTION_CENTER, and its
-# extent from the nut's silhouette stood on end (sheet metres).
-_OUTLINE_TOL = 0.0002
+# How far A-A's axis may sit from where SECTION_KEEP assumes it, or off
+# level, before it is moved or refused (sheet metres).
+_SECTION_POSITION_TOL = 1e-4
 
 
-def _rim_is_up(seat: tuple[float, float], rim: tuple[float, float]) -> bool:
-    """Whether a section whose seat and rim project at ``seat`` and ``rim``
-    stands the rim straight above the seat; refuses a tilted axis."""
-    dx, dy = rim[0] - seat[0], rim[1] - seat[1]
-    if abs(dx) > 1e-3 * abs(dy):
-        raise RuntimeError(f"thumbnut section axis is not vertical: {dx=}, {dy=}")
-    return dy > 0.0
+def _turn_face_view(adapter: Any, face: Any) -> None:
+    """Turn the face view a quarter so the cut on its vertical centreline is
+    the Front plane (``FACE_VIEW_ANGLE``; draw_pd_transgear_knob_cup)."""
+    native = _early_bound(face, "IView")
+    native.Angle = FACE_VIEW_ANGLE
+    if abs(math.remainder(float(native.Angle) - FACE_VIEW_ANGLE, 2.0 * math.pi)) > 1e-9:
+        raise RuntimeError("failed to turn the thumbnut face view a quarter")
+    rebuild_drawing(adapter, label="thumbnut face view turned")
 
 
-def _outline_centre(outline: tuple[float, ...]) -> tuple[float, float]:
-    return ((outline[0] + outline[2]) / 2.0, (outline[1] + outline[3]) / 2.0)
+def _axis_turn(seat: tuple[float, float], rim: tuple[float, float]) -> float:
+    """The sheet angle of the rim-to-seat direction: 0 when the axis lies
+    horizontal with the seat face right."""
+    return math.atan2(seat[1] - rim[1], seat[0] - rim[0])
 
 
-def _outline_is_the_nut_on_end(outline: tuple[float, ...]) -> bool:
-    """Whether ``outline`` boxes the nut's silhouette with its axis vertical.
+def _orient_section(adapter: Any, section: Any) -> None:
+    """Lay A-A axis-horizontal, seat face right, its axis on SECTION_CENTER.
 
-    SolidWorks pads a view's outline by one margin all round (5.588 mm on
-    both axes of the 19e33c6c2 section and face views), so the margin drops
-    out of height minus width: that is the overall length less the knurl
-    diameter, at the sheet scale, exactly when the axis stands vertical.
-    """
-    width, height = outline[2] - outline[0], outline[3] - outline[1]
-    expected = (OVERALL_LENGTH - HEAD_DIA) * _S / 1000.0
-    return abs((height - width) - expected) <= _OUTLINE_TOL
-
-
-def _centre_section_outline(adapter: Any, view: Any) -> tuple[float, ...]:
-    """Move section A-A until its outline (the ink) is centred on SECTION_CENTER.
-
-    Reversing the cut swings the section's ink without moving the Position
-    that ``SetViewPosition`` measures its move from: on run
-    20261001T142942518Z, ``SetViewPosition(SECTION_CENTER)`` after the
-    reversal left the seat projected at y 0.18915 -- where it sat rim-down,
-    and one nut length (48.3 mm at 3:1) above where a centred rim-up section
-    puts it.  As for a fresh detail view (layout-tuning catalogue j), the
-    view is placed by its outline: ``SetViewPosition`` moves the ink by the
-    difference from the Position it reads.
-    """
-    for attempt in range(4):
-        outline = tuple(float(value) for value in view.GetOutline())
-        position = tuple(float(value) for value in view.Position)
-        centre = _outline_centre(outline)
-        _telemetry.info(
-            f"thumbnut section pass {attempt}: position={position} "
-            f"outline={outline} outline_centre={centre}"
-        )
-        if math.dist(centre, SECTION_CENTER) <= _OUTLINE_TOL:
-            break
-        moved = [
-            position[axis] + SECTION_CENTER[axis] - centre[axis] for axis in (0, 1)
-        ]
-        if not view.SetViewPosition(double_array(moved), False):
-            raise RuntimeError("failed to re-centre thumbnut section A-A")
-        rebuild_drawing(adapter, label="thumbnut section re-centred")
-    else:
-        raise RuntimeError(
-            f"thumbnut section A-A outline centre stayed at {centre}, "
-            f"requested {SECTION_CENTER}"
-        )
-    if not _outline_is_the_nut_on_end(outline):
-        raise RuntimeError(
-            f"thumbnut section A-A outline {outline} is not the nut standing on its axis"
-        )
-    return outline
-
-
-def _stand_section_rim_up(adapter: Any, section: Any) -> None:
-    """Turn section A-A so the dished rim is up and the seat face down.
-
-    The 19e33c6c2 render hung the rim at the bottom, under every dimension
-    placed for a rim-up section and with the stem's diameters below the seat
-    face on the SECTION A-A caption.  Looking from the other side of the cut
-    should stand the nut up; if it does not, the view turns 180° instead.
-    The rim test reads only the projection's direction; the section is then
-    centred by its ink, and its projection re-read until the seat lands
-    where SECTION_KEEP puts it.
+    Cut from the quarter-turned face view, A-A lies axis-horizontal; which
+    end the seat takes is read, not assumed, and a half turn (no change to a
+    solid of revolution's section) puts it on the right.  Any other turn
+    means the cut is not the expected projection: refuse it.  The view is
+    then moved by the axis's miss from where SECTION_KEEP puts it:
+    ``SetViewPosition`` moves the ink by the difference from the Position it
+    reads (run 20261001T142942518Z), so each pass moves by the measured miss
+    and re-reads.
     """
     native = _early_bound(section, "IView")
-
-    def rim_is_up() -> bool:
-        return _rim_is_up(*_seat_and_rim(adapter, native))
-
-    if not rim_is_up():
-        cut = _early_bound(native.GetSection(), "IDrSection")
-        reversed_cut = not bool(cut.GetReversedCutDirection())
-        cut.SetReversedCutDirection(reversed_cut)
-        rebuild_drawing(adapter, label="thumbnut section reversed")
-        if bool(cut.GetReversedCutDirection()) != reversed_cut:
-            raise RuntimeError("thumbnut section cut direction did not persist")
-        if not rim_is_up():
-            native.Angle = float(native.Angle) + math.pi
-            rebuild_drawing(adapter, label="thumbnut section turned")
-    outline = _centre_section_outline(adapter, native)
-    expected = (SECTION_CENTER[0], _section_y(0.0))
-    for attempt in range(3):
+    seat, rim = _seat_and_rim(adapter, native)
+    turn = _axis_turn(seat, rim)
+    if abs(turn) > 1e-6:
+        if abs(abs(turn) - math.pi) > 1e-6:
+            raise RuntimeError(
+                f"thumbnut A-A axis runs {math.degrees(turn):.3f} deg off the "
+                f"sheet's horizontal (seat {seat}, rim {rim})"
+            )
+        native.Angle = float(native.Angle) - turn
+        rebuild_drawing(adapter, label="thumbnut section turned")
         seat, rim = _seat_and_rim(adapter, native)
-        if _rim_is_up(seat, rim) and math.dist(seat, expected) <= _SEAT_PLACEMENT_TOL:
+    expected = ((SEAT_X, SECTION_CENTER[1]), (RIM_X, SECTION_CENTER[1]))
+    for attempt in range(4):
+        if all(
+            math.dist(actual, wanted) <= _SECTION_POSITION_TOL
+            for actual, wanted in zip((seat, rim), expected, strict=True)
+        ):
             break
-        rebuild_drawing(adapter, label=f"settle thumbnut section, read {attempt}")
+        middle = ((seat[0] + rim[0]) / 2.0, (seat[1] + rim[1]) / 2.0)
+        position = tuple(float(value) for value in native.Position)
+        moved = [
+            position[axis] + SECTION_CENTER[axis] - middle[axis] for axis in (0, 1)
+        ]
+        _telemetry.info(
+            f"thumbnut section pass {attempt}: position={position} seat={seat} rim={rim}"
+        )
+        if not native.SetViewPosition(double_array(moved), False):
+            raise RuntimeError("failed to centre thumbnut section A-A")
+        rebuild_drawing(adapter, label="thumbnut section centred")
+        seat, rim = _seat_and_rim(adapter, native)
     else:
         raise RuntimeError(
-            f"thumbnut section A-A is not rim up on its centre: seat={seat} "
-            f"(expected {expected}), rim={rim}, outline={outline}"
+            f"thumbnut A-A axis ends at seat {seat}, rim {rim}; wanted {expected}"
         )
     _telemetry.info(
-        f"thumbnut section rim up: angle={float(native.Angle):.6f} rad, "
-        f"seat={seat}, rim={rim}, outline={outline}"
+        f"thumbnut A-A axis horizontal: angle={float(native.Angle):.6f} rad, "
+        f"turn={turn:.6f}, seat={seat}, rim={rim}"
     )
 
 
@@ -461,18 +437,18 @@ def _add_section_axis(adapter: Any, section: Any) -> None:
     the cone's reference (machinist review round 2).  The ends are the model
     axis projected through the section's own transform
     (draw_dt_cone_pivot_post's section axis), so the line is the axis itself
-    whichever way the section was turned rim up.
+    whichever way the section was turned to lie seat right.
     """
     overshoot = AXIS_OVERSHOOT_MM / 1000.0
     ends = [
         model_point_in_view(adapter, section, (0.0, y, 0.0), label=f"thumbnut axis {name}")
         for name, y in (
-            ("below the seat", -overshoot),
-            ("above the rim", OVERALL_LENGTH / 1000.0 + overshoot),
+            ("past the seat", -overshoot),
+            ("past the rim", OVERALL_LENGTH / 1000.0 + overshoot),
         )
     ]
-    if abs(ends[0][0] - ends[1][0]) > 1e-6 or ends[1][1] <= ends[0][1]:
-        raise RuntimeError(f"thumbnut section axis is not vertical rim up: {ends!r}")
+    if abs(ends[0][1] - ends[1][1]) > 1e-6 or ends[0][0] <= ends[1][0]:
+        raise RuntimeError(f"thumbnut section axis is not horizontal seat right: {ends!r}")
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
     # EditSheet makes the line sheet-owned.
     drawing.EditSheet()
@@ -533,6 +509,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     face = place_view(adapter, str(SOURCE), "*Top", *FACE_CENTER, scale=VIEW_SCALE)
+    _turn_face_view(adapter, face)
     _pin_sheet_scale(adapter)
     section = create_section_view(
         adapter,
@@ -544,7 +521,7 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=VIEW_SCALE,
         label="thumbnut axial section",
     )
-    _stand_section_rim_up(adapter, section)
+    _orient_section(adapter, section)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
     for view in (face, section, iso):
         set_hidden_lines_removed(adapter, view)
