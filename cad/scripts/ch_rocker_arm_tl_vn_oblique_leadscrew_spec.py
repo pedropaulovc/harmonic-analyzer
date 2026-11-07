@@ -467,7 +467,7 @@ if min(_bar_walls.values()) < base_bar.BRACKET_WALL_MIN:
     raise AssertionError(f"a TL-20 bracket hole wall is under rule 17: {_bar_walls}")
 
 # --- LOAD_CASES: one TL-28 on its 2 x #8 bar screws ---------------------------------
-# The #8 bracket screws' torque: one TL-00 figure (step 1), 25 in·lbf, set by
+# The #8 bracket screws' torque: one TL-00 figure (step 2), 25 in·lbf, set by
 # the head's bearing on TL-20's counterbore floor (BRACKET_HEAD_BEARING_MIN),
 # printed as 2.8 N·m.
 BAR_SCREW_TORQUE_IN_LBF = 25

@@ -1785,10 +1785,10 @@ _HUB_DRO = (
     f"±{_length(carrier.HUB_OFFSET_BAND, carrier.HUB_OFFSET_PLACES)}"
 )
 _STRAP_CLAMPS = f"{_CLAMP_SCREW} {_item(RAIL_SCREW)}"
-# The riser's installed stop-pin axes (R4Geometry, 2026-11-07): ONE ordinary
-# 2-place station on the carrier, read on the DRO at the step 10 symmetric
-# position, set before any riser hole is spotted from the carrier, so no
-# second riser-placement band stacks on it (riser.STOP_RAW_Y_LIMITS).
+# ONE ordinary stop-axis station band applies in the carrier frame, before
+# spotting the other riser holes (riser.STOP_RAW_Y_LIMITS). Steps 6/10 retain
+# spindle-origin DRO zero: transform the targets at the symmetric inner pose,
+# rather than printing carrier coordinates as machine readings.
 _STOP_AXIS_PLACES = 2
 _STOP_AXIS_BAND = printed_band_mm(_STOP_AXIS_PLACES, unit=UNIT)
 if abs(
@@ -1796,8 +1796,12 @@ if abs(
     - riser.STOP_PIN_DIA_LIMITS[1] / 2.0 - riser.STOP_PIN_TILT_RADIUS - _STOP_AXIS_BAND
 ) > 1e-9:
     raise AssertionError("the stop-axis band is not the riser's stop-chain band")
-_STOP_X = {abs(x) for x, _y in riser.STOP_PIN_CARRIER_POINTS}
-_STOP_Y = {y for _x, y in riser.STOP_PIN_CARRIER_POINTS}
+_STOP_SYMMETRIC_POSE = trammel.carrier_pose("inner", 0.0)
+STOP_PIN_DRO_POINTS = tuple(
+    _STOP_SYMMETRIC_POSE.to_machine(point) for point in riser.STOP_PIN_CARRIER_POINTS
+)
+_STOP_X = {abs(x) for x, _y in STOP_PIN_DRO_POINTS}
+_STOP_Y = {y for _x, y in STOP_PIN_DRO_POINTS}
 if len(_STOP_X) != 1 or len(_STOP_Y) != 1:
     raise AssertionError("the stop pins no longer stand symmetric on one Y")
 _STOP_DRO = (
@@ -1826,30 +1830,29 @@ GENERAL_TORQUE_NOTE = (
 # Keep sheets 7–8 at the normal note size and paragraph spacing. The BOM owns
 # the shim SKU/thickness buy list; P1 cites it rather than printing it twice.
 ASSEMBLY_STEPS = (
-    "1. COMPLETE RAIL PREPARATION PER BASE-BAR PLAN AND RAIL SHEET 2. "
-    f"FIT EACH {guide_rail.STYLE} RAIL {_item(RAIL)} WITH "
-    f"{trammel.RAIL_HOLE_COUNT} {_RAIL_SCREW} {_item(RAIL_SCREW)}, NEAR ENDS FLUSH. "
-    f"BASE BAR 1 {_item(BASE_BAR_1)}: AS DRAWN, RAIL 1. BASE BAR 2 "
-    f"{_item(BASE_BAR_2)}: TURNED OVER, RAIL 2; PLAN MIRROR OF BAR 1. "
-    f"AT EACH KP08 STATION ON BAR 1, FIT AN END BRACKET {_item(END_BRACKET)} "
-    f"WITH {len(leadscrew.BAR_SCREW_LATERALS)} {_BAR_SCREW} {_item(RAIL_SCREW)} "
-    f"FROM BELOW, NO WASHERS, {_torque(leadscrew.BAR_SCREW_TORQUE_NM)}.",
-    "2. SET BARS ON THE TABLE, NEAR ENDS TOWARD THE SPINDLE. PER BAR, FIT "
-    f"2 UNCUT {fasteners.HOLD_DOWN_STUD_THREAD} STUDS {_item(HOLD_DOWN_STUD)} "
-    f"IN OUTER T-SLOT T-NUTS {_item(T_NUT)}, FLANGE NUTS {_item(FLANGE_NUT)} FINGER-TIGHT. "
-    "KEEP STUDS UNCUT UNTIL 13B/HD3; CUT TO BOM LENGTH "
-    f"{_length(hold_down_stud.LENGTH, hold_down_stud.LENGTH_PLACES)} THERE. "
-    "FOLLOW HD1 FOR UNCUT-STOCK OBSTRUCTIONS.",
-    # Owner decisions on #2177: the kit's rails each arrive with two
-    # carriages; the play check picks the pair the jig keeps, and a carriage
-    # off a rail only ever rides the kit's plastic false rail (loading arbor).
-    f"3. EACH RAIL ARRIVES WITH 2 GREASED {carriage.STYLE} CARRIAGES "
+    # Select carriages and finish all rail/bar preparation before fastening
+    # the rails/brackets or putting the bars on the machine table.
+    "1. PREPARE RAILS PER BASE-BAR PLAN AND RAIL SHEET 2. "
+    f"EACH RAIL ARRIVES WITH 2 GREASED {carriage.STYLE} CARRIAGES "
     f"{_item(CARRIAGE)}: ROCK ALL 4 SIDEWAYS UNDER AN INDICATOR; KEEP THE 2 "
     "TIGHTEST, ONE PER RAIL. A CARRIAGE LEAVES A RAIL ONLY ONTO A KIT FALSE RAIL. "
     "TRIM EACH RAIL TO ITS ACTUAL BAR, FLUSH BOTH ENDS; CHECK RETAINED WALLS. "
     "TRANSFER ITS HOLES TO THAT BAR PER THE BASE-BAR PROCESS PLAN; "
     "KEEP EACH PAIR IDENTIFIED. ALL EIGHT SCREWS MUST ENTER FREELY BY HAND "
     "WITHOUT MOVING THE RAIL. CLEAN ALL CUTTING GRIT BEFORE RELOADING.",
+    f"2. FIT EACH {guide_rail.STYLE} RAIL {_item(RAIL)} WITH "
+    f"{trammel.RAIL_HOLE_COUNT} {_RAIL_SCREW} {_item(RAIL_SCREW)}, NEAR ENDS FLUSH. "
+    f"BASE BAR 1 {_item(BASE_BAR_1)}: AS DRAWN, RAIL 1. BASE BAR 2 "
+    f"{_item(BASE_BAR_2)}: TURNED OVER, RAIL 2; PLAN MIRROR OF BAR 1. "
+    f"AT EACH KP08 STATION ON BAR 1, FIT AN END BRACKET {_item(END_BRACKET)} "
+    f"WITH {len(leadscrew.BAR_SCREW_LATERALS)} {_BAR_SCREW} {_item(RAIL_SCREW)} "
+    f"FROM BELOW, NO WASHERS, {_torque(leadscrew.BAR_SCREW_TORQUE_NM)}.",
+    "3. SET BARS ON THE TABLE, NEAR ENDS TOWARD THE SPINDLE. PER BAR, FIT "
+    f"2 UNCUT {fasteners.HOLD_DOWN_STUD_THREAD} STUDS {_item(HOLD_DOWN_STUD)} "
+    f"IN OUTER T-SLOT T-NUTS {_item(T_NUT)}, FLANGE NUTS {_item(FLANGE_NUT)} FINGER-TIGHT. "
+    "KEEP STUDS UNCUT UNTIL 13B/HD3; CUT TO BOM LENGTH "
+    f"{_length(hold_down_stud.LENGTH, hold_down_stud.LENGTH_PLACES)} THERE. "
+    "FOLLOW HD1 FOR UNCUT-STOCK OBSTRUCTIONS.",
     f"4. FIT THE FEED BLOCK {_item(FEED_BLOCK)} ON RAIL 1'S CARRIAGE, "
     f"THE PLAIN PIVOT BLOCK {_item(PIVOT_BLOCK)} ON RAIL 2'S, "
     "PIVOT COUNTERBORES TOWARD THE SPINDLE AND FEED LUG TOWARD THE COLUMN.",
