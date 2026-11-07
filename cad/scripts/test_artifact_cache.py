@@ -351,6 +351,90 @@ def archive_tree(tmp_path, fake, real_unpack, monkeypatch):
     return root
 
 
+@pytest.mark.skipif(os.name != "nt", reason="Windows path spelling aliases")
+@pytest.mark.parametrize("root_prefix", [False, True])
+@pytest.mark.parametrize("target_prefix", [False, True])
+@pytest.mark.parametrize("existing", [False, True])
+@pytest.mark.parametrize("different_case", [False, True])
+def test_restore_path_accepts_windows_spelling_not_filesystem_aliases(
+    archive_tree, monkeypatch, root_prefix, target_prefix, existing, different_case
+):
+    root = archive_tree
+    target = root / "pdf" / "leaf.pdf"
+    target.parent.mkdir()
+    if existing:
+        target.write_bytes(b"control")
+    # Vary one spelling dimension at a time; the plain/plain case is the
+    # positive control, including when the target does not yet exist.
+    configured_root = Path("\\\\?\\" + str(root)) if root_prefix else root
+    monkeypatch.setattr(cache, "_CACHE_OUTPUT_ROOT", configured_root)
+    spelling = str(target).swapcase() if different_case else str(target)
+    candidate = Path("\\\\?\\" + spelling) if target_prefix else Path(spelling)
+
+    restored = cache._restore_path(candidate)
+
+    assert restored.resolve() == (configured_root / "pdf" / "leaf.pdf").resolve()
+    assert restored.relative_to(configured_root) == Path("pdf/leaf.pdf")
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows extended-length paths")
+@pytest.mark.parametrize("root_prefix", [False, True])
+@pytest.mark.parametrize("target_prefix", [False, True])
+def test_restore_replaces_outputs_across_windows_path_namespaces(
+    archive_tree, fake, monkeypatch, root_prefix, target_prefix
+):
+    native = archive_tree / "leaf.SLDPRT"
+    native.write_bytes(b"winner")
+    fake.blobs["winner"] = _packed([native])
+    native.write_bytes(b"loser")
+    if root_prefix:
+        monkeypatch.setattr(cache, "REPO_ROOT", Path("\\\\?\\" + str(cache.REPO_ROOT)))
+        monkeypatch.setattr(
+            cache, "_CACHE_OUTPUT_ROOT", Path("\\\\?\\" + str(archive_tree))
+        )
+    candidate = Path("\\\\?\\" + str(native)) if target_prefix else native
+
+    assert cache.restore("winner", [candidate], "part:leaf")
+    assert native.read_bytes() == b"winner"
+
+
+@pytest.mark.parametrize("invalid", ["root", "outside", "parent-traversal"])
+def test_restore_path_rejects_non_children_and_parent_traversal(archive_tree, invalid):
+    root = archive_tree
+    candidate = {
+        "root": root,
+        "outside": root.parent / "outside.txt",
+        "parent-traversal": root / "pdf" / ".." / "leaf.pdf",
+    }[invalid]
+    with pytest.raises(RuntimeError, match="unsafe cache output path"):
+        cache._restore_path(candidate)
+
+
+@pytest.mark.parametrize("escape", [False, True])
+def test_restore_path_rejects_directory_aliases(archive_tree, tmp_path, escape):
+    destination = tmp_path / "outside" if escape else archive_tree / "sibling"
+    destination.mkdir()
+    alias = archive_tree / "alias"
+    try:
+        alias.symlink_to(destination, target_is_directory=True)
+    except OSError:
+        if os.name != "nt":
+            raise
+        subprocess.run(
+            ["cmd", "/c", "mklink", "/J", str(alias), str(destination)],
+            check=True, capture_output=True, text=True,
+        )
+    try:
+        for candidate in (alias, alias / "absent.pdf"):
+            with pytest.raises(RuntimeError, match="unsafe cache output path"):
+                cache._restore_path(candidate)
+    finally:
+        if alias.is_symlink():
+            alias.unlink()
+        else:
+            alias.rmdir()
+
+
 @pytest.mark.parametrize("optional_directory", [False, True])
 def test_restore_replaces_absent_outputs_and_whole_owned_directories(
     archive_tree, fake, optional_directory
