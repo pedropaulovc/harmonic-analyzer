@@ -694,6 +694,9 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "dt_crank_pin",  # 1:48 taper pin, light drive
         "dt_crank_pin_eye",  # formed brass eye, clamped under fillister_screw (no thread of its own)
         "dt_vn_crank_seat_drive_pin",  # MHA-DT-VN-67 dowel pressed into match-drilled holes, no thread
+        # MHA-DT-VN-69 dowel (rule-23 retention, owner ruling 2026-11-07; MHA-DT-00
+        # rubric sample, PR #2248): pressed into a ream made at assembly, no thread
+        "dt_vn_locating_pin",
         "dt_crank_pin_ring",  # brass wire keeper ring
         "dt_crank_pinion",  # pinned by crank_pinion_pin
         "dt_crank_pinion_pin",  # plain 1/8 drill-rod drive pin
@@ -772,6 +775,7 @@ UNTHREADED_STOCK: dict[str, str] = {
     "pd_vn_chain_connecting_link": "clip-retained roller-chain link; pins only, no thread",
     "dt_vn_keeper_chain": "chain; its end links hang on screws and eyes, carrying no thread",
     "dt_vn_crank_seat_drive_pin": "dowel pin pressed into a plain hole",
+    "dt_vn_locating_pin": "dowel pin pressed into a plain reamed hole",
     "dt_vn_keeper_chain_link": "plain chain link",
     "sm_vn_knife_mount_dowel": "dowel pin pressed into a blind reamed hole",
     "sm_vn_knife_hanger_washer": "plain SAE washer under the knife-hanger hex head; no thread",
@@ -908,27 +912,32 @@ JOINTS: tuple[Joint, ...] = (
         thread="#4-40",
         quantity=1,
         installed_at="post-and-tip-block",
-        exposure=Exposure.ROTATING_DRAG,
+        # Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample,
+        # PR #2248; owner question 2 option 0-A): the dowel
+        # takes the turning moment, so the screw is a static clamp.
+        exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
-            "The one screw is MHA-DT-21's only anchor, and MHA-DT-21 carries the running MHA-DT-04 tip "
-            "in the MHA-DT-VN-55 cup: the shaft's end-play thrust acts 1.0 off the screw axis "
-            "(dt_cone_tip_block_spec.FOOT_TAP_OFFSET_X) and the radial tip load acts off it along "
-            "the shaft, so a moment about the vertical screw axis varies with mesh load every "
-            "crank turn (and reverses with the crank); a single screw lets the block turn about "
-            "it, and the build's 'tip-block anti-spin' parallel mate has no physical "
-            "counterpart (no dowel, key, pocket or second screw)"
+            "MHA-DT-21 carries the running MHA-DT-04 tip in the MHA-DT-VN-55 cup: the shaft's "
+            "end-play thrust acts 1.0 off the screw axis (dt_cone_tip_block_spec.FOOT_TAP_OFFSET_X), "
+            "a moment about the vertical screw axis that varies every crank turn. The MHA-DT-VN-69 "
+            "dowel pressed in the foot and slip-fitted in MHA-DT-20, .228 from the screw, takes "
+            "that moment, so the block cannot turn about the screw and the screw only clamps "
+            "the foot down"
         ),
         axial_capture=(
             "SHCS head on the MHA-DT-20 underside counterbore floor, thread up into the blind #4-40 "
-            "tap in the MHA-DT-21 foot; tightened 'SNUG'"
+            "tap in the MHA-DT-21 foot; run in 'HELD SQUARE' (general note: snug); located against "
+            "turning by MHA-DT-VN-69"
         ),
         lock=Lock.NONE,
         evidence=(
             "build_dt_drive_train_assembly.py tip_holddown placement + lock_mate 'clamped in the "
-            "platform hold-down counterbore', parallel_mate 'tip-block anti-spin (rides the "
-            "plate)'; cone_tip_block_spec HOLDDOWN_THREAD / FOOT_TAP_OFFSET_X (user ruling "
+            "platform hold-down counterbore', tip dowel (dt-vn-locating-pin) lock_mate and station "
+            "assert; dt_cone_swing_platform_spec TIP_DOWEL_LOCAL_X/Z, dt_cone_tip_block_spec "
+            "DOWEL_X; cone_tip_block_spec HOLDDOWN_THREAD / FOOT_TAP_OFFSET_X (user ruling "
             "2026-09-29: one #4-40 SHCS); draw_dt_drive_train_assembly.py CONE_CRANK_STEPS 2 "
-            "(post-and-tip-block '... INTO THE MHA-DT-21 FOOT, SNUG')"
+            "(post-and-tip-block: square, run in, match-drill and ream, press MHA-DT-VN-69 to the "
+            "foot ream's floor; 'CHECK THAT MHA-DT-21 DOES NOT TURN ON MHA-DT-20 BY HAND')"
         ),
     ),
     Joint(
@@ -1198,8 +1207,10 @@ JOINTS: tuple[Joint, ...] = (
             "back to park, so the torque the screw carries reverses every engage/park cycle"
         ),
         axial_capture=(
-            "flat point clamped on the plain round Ø6.35 rod (slip-fit Ø.2510 reamed bore, no flat or spot); the collars "
-            "are set on 66MA leaves 0.25/0.90 off the MHA-DT-18 blocks and also carry the rod's axial location"
+            "flat point clamped on a .012-deep flat on the Ø6.35 rod (slip-fit Ø.2510 reamed bore; rule-23 "
+            "retention, owner ruling 2026-11-07, MHA-DT-00 rubric sample, PR #2248), the flats long enough for the "
+            "feeler-set range with the rod's rear rim set flush; the collars are set on 66MA leaves 0.25/0.90 off the "
+            "MHA-DT-18 blocks and also carry the rod's axial location"
         ),
         # Rule 23 staked tap mouth (#1176), as the channel's fulcrum set screws
         # (fulcrum-set-screws-staked); no threadlocker on any thread.
@@ -1209,7 +1220,8 @@ JOINTS: tuple[Joint, ...] = (
         lock_step="cam-collars-set",
         evidence=(
             "draw_dt_drive_train_assembly.py rig_steps 'cams-and-lever-fitted' (set screw loose) and 'cam-collars-set' "
-            "(pinion_rig_fitup COLLAR_SET_STEP: 'TIGHTEN THEIR SET SCREWS.' / 'STAKE EACH TAP MOUTH AT 2 POINTS.'); "
+            "(pinion_rig_fitup COLLAR_SET_STEP: 'TIGHTEN EACH SET SCREW ON ITS MHA-DT-17 FLAT.' / 'STAKE EACH TAP MOUTH AT 2 POINTS.'); "
+            "dt_pinion_lift_rod_spec flats; "
             "dt_pinion_cam_spec.DRAWING_NOTES; dt_pinion_cam_geometry SET_SCREW_Z/SET_SCREW_MAJOR_DIA (tap 45 deg or more "
             "off the follower contact, test_cam_set_screw_hole_stays_clear_of_the_follower); "
             "build_dt_drive_train_assembly.py cam-on-rod concentric, axial and CAM_ROD_PHASE_DEG anti-spin mates"

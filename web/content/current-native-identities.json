@@ -592,6 +592,17 @@
       ]
     },
     {
+      "sourceStem": "dt-vn-locating-pin",
+      "sourceNumber": null,
+      "identities": [
+        {
+          "parent": "dt-drive-train",
+          "stem": "dt-vn-locating-pin",
+          "number": "MHA-DT-VN-69"
+        }
+      ]
+    },
+    {
       "sourceStem": "vn-magnifying-bracket-screw",
       "sourceNumber": "MHA-VN-050",
       "identities": [
@@ -1033,7 +1044,7 @@
       "status": "archive-only"
     }
   ],
-  "currentRegistryMapSha256": "47e96074f70b6740d35d120feea6c837ae28258c0c9059d923adb9cf47fa92db",
+  "currentRegistryMapSha256": "24eb3cb226ad55e2d89181efb96a7511f5cc428860e6c596df3ba565346e0eda",
   "nativeIdentities": [
     {
       "sourceStem": "ch-rocker-arm-tl-oblique-feed-lever",

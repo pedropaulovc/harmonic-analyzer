@@ -39,8 +39,10 @@ pose -- the west flare and notch are authored at +x (constants note below).
 Named refs for the assembly: "swing pivot" (Axis1, vertical through the
 origin), the CRANK AXIS (Axis2 -- the machine-z crank line the
 crankshaft mates to, built from an angled plane so it swings WITH the
-plate), and "PlateTop" (datum plane on the top face -- the riders'
-seat mate).
+plate), "PlateTop" (datum plane on the top face -- the riders'
+seat mate), and "tip dowel axis" (vertical through the MHA-DT-VN-69
+locating dowel's ream; rule-23 retention, owner ruling 2026-11-07
+(MHA-DT-00 rubric sample, PR #2248)).
 
 Run (SolidWorks already open)::
 
@@ -69,6 +71,7 @@ from _sketch import (
     SketchDims,
     add_line_chain,
     anchor_point_to_origin,
+    anchor_point_to_point,
     dimension_between,
     ensure_fully_defined,
     set_sketch_direct_db,
@@ -77,7 +80,11 @@ from _sketch_chains import define_polygon_chain
 from _sketch_circle import define_circle
 from _drawing_precision import apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
-from _drawing_tolerances import set_dimension_symmetric_tolerance
+from _drawing_tolerances import (
+    set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
+)
+from _fit_deviations import deviations
 from _holes import wizard_holes
 from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
@@ -137,6 +144,12 @@ from dt_cone_swing_platform_spec import (
     POST_MOUNT_STATION_TOL_MM,
     POST_MOUNT_TAP_DIA,
     SURFACE_FINISHES,
+    TIP_DOWEL_FROM_HOLDDOWN,
+    TIP_DOWEL_HOLE_BAND,
+    TIP_DOWEL_HOLE_DIA,
+    TIP_DOWEL_LOCAL_X,
+    TIP_DOWEL_LOCAL_Z,
+    TIP_DOWEL_STATION_TOL_MM,
     UNIT,
 )
 from dt_cone_swing_platform_pivot_spec import (
@@ -347,6 +360,52 @@ def _corner_fillet_area(label: str, r: float) -> float:
     return r * r * (1.0 / math.tan(theta / 2.0) - (math.pi - theta) / 2.0)
 
 
+async def _sketch_tip_dowel(adapter, dims: SketchDims) -> None:
+    """The tip-block locating dowel's slip ream, on the Top plane.
+
+    Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
+    #2248).  A point on the hold-down hole's centre is
+    anchored to the pivot like the hole's own placement; the ream's centre is
+    dimensioned from that point (TipDowelX, the printed station: rule 10,
+    from a real feature) and held on the hold-down line by relation.  Sketch
+    (x, y) -> part (X, -Z).  Both entities go straight into the sketch DB, so
+    inference cannot snap the circle onto the point's line.
+    """
+    hold_down = (HOLDDOWN_LOCAL_X, -HOLDDOWN_LOCAL_Z)
+    centre = (TIP_DOWEL_LOCAL_X, -TIP_DOWEL_LOCAL_Z)
+    sketch_manager = _early_bound(adapter.currentSketchManager, "ISketchManager")
+    previous = bool(sketch_manager.AddToDB)
+    sketch_manager.AddToDB = True
+    try:
+        point = sketch_manager.CreatePoint(hold_down[0] / 1000.0, hold_down[1] / 1000.0, 0.0)
+        if point is None:
+            raise RuntimeError("cannot create the tip dowel's hold-down point")
+        circle = check(
+            "tip dowel ream circle",
+            await adapter.add_circle(centre[0], centre[1], TIP_DOWEL_HOLE_DIA / 2.0),
+        )
+    finally:
+        sketch_manager.AddToDB = previous
+    anchor = adapter._register_sketch_entity("Point", point)
+    await anchor_point_to_origin(adapter, anchor, *hold_down, "tip dowel hold-down point")
+    dims.record("TipDowelRefX", '"HoldDownLateral"')
+    dims.record("TipDowelRefZ", '"HoldDownOffset"')
+    await anchor_point_to_point(
+        adapter,
+        anchor,
+        f"{circle}.center",
+        TIP_DOWEL_FROM_HOLDDOWN,
+        0.0,
+        "tip dowel station",
+    )
+    dims.record("TipDowelX", '"TipDowelFromHoldDown"')
+    check(
+        "tip dowel ream diameter",
+        await adapter.add_sketch_dimension(circle, None, "diameter", TIP_DOWEL_HOLE_DIA),
+    )
+    dims.record("TipDowelDia", '"TipDowelDia"')
+
+
 # The fixed crank axis (dt_cone_swing_platform_crank_axis) is construction for
 # mates only. The drawing keeps exactly DRAWING_DIMENSIONS.
 _CRANK_AXIS_FEATURES = frozenset(
@@ -404,6 +463,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "HoldDownOffset", f"{-HOLDDOWN_LOCAL_Z}mm")
     # Unsigned: the placement point keeps its authored -x side.
     await set_global(adapter, "HoldDownLateral", f"{abs(HOLDDOWN_LOCAL_X)}mm")
+    await set_global(adapter, "TipDowelFromHoldDown", f"{TIP_DOWEL_FROM_HOLDDOWN}mm")
+    await set_global(adapter, "TipDowelDia", f"{TIP_DOWEL_HOLE_DIA}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -620,6 +681,30 @@ async def build(adapter) -> dict[str, str]:
         adapter, "tip-block hold-down hole", volume - v_holddown, 0.01 * v_holddown
     )
 
+    # Tip-block locating dowel (rule-23 retention, owner ruling 2026-11-07
+    # (MHA-DT-00 rubric sample, PR #2248)): the .0630 slip ream
+    # through the plate, match-drilled with MHA-DT-21 at assembly and modelled
+    # at its nominal station, as the lift rod's pin hole is.  Through both
+    # ways from the Top plane like the notch cap.
+    tip_dowel = SketchDims()
+    check("create_sketch tip dowel", await adapter.create_sketch("Top"))
+    await _sketch_tip_dowel(adapter, tip_dowel)
+    await ensure_fully_defined(adapter, "tip dowel sketch")
+    check("exit_sketch tip dowel", await adapter.exit_sketch())
+    name_last_feature(adapter, "TipDowelProfile")
+    drive_jobs += tip_dowel.apply(adapter, "TipDowelProfile")
+    check(
+        "cut tip dowel ream",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "TipDowelHole")
+    v_tip_dowel = math.pi * (TIP_DOWEL_HOLE_DIA / 2.0) ** 2 * PLATE_T
+    volume = await volume_check(
+        adapter, "tip-block locating dowel ream", volume - v_tip_dowel, 0.02 * v_tip_dowel
+    )
+
     # Lock notch: open-ended channel = rotated rectangle cut (engaged seat ->
     # past the west edge, opening the mouth) + ONE end-cap circle cut at the
     # closed engaged end. The mouth crossing is a straight line, so the
@@ -787,6 +872,18 @@ async def build(adapter) -> dict[str, str]:
             adapter, "Front Plane", mount_z, "Right Plane", mount_x, axis_name
         )
         name_last_feature(adapter, axis_name)
+    # The tip-block locating dowel's axis: the assembly mates MHA-DT-VN-69
+    # on it (rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric
+    # sample, PR #2248)).
+    await name_bore_axis(
+        adapter,
+        "Front Plane",
+        TIP_DOWEL_LOCAL_Z,
+        "Right Plane",
+        TIP_DOWEL_LOCAL_X,
+        "tip dowel axis",
+    )
+    name_last_feature(adapter, "tip dowel axis")
 
     # Rounded plan corners LAST (they consume the sharp corner edges; the
     # notch-mouth edges and the axis construction are already in place).
@@ -838,6 +935,24 @@ async def build(adapter) -> dict[str, str]:
             POST_MOUNT_STATION_TOL_MM,
             display_unit=UNIT,
         )
+    # The tip-block locating dowel's station carries the hold-down's band
+    # (the webs to its counterbore here and to MHA-DT-21's +X face close on
+    # it); the slip ream its REAM_H7, at the nominal's four places.
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "TipDowelProfile",
+        "TipDowelX",
+        TIP_DOWEL_STATION_TOL_MM,
+        display_unit=UNIT,
+    )
+    set_dimension_bilateral_tolerance(
+        adapter,
+        "TipDowelProfile",
+        "TipDowelDia",
+        *deviations(TIP_DOWEL_HOLE_BAND),
+        places=DRAWING_PRECISION["TipDowelProfile"]["TipDowelDia"],
+        display_unit=UNIT,
+    )
     await volume_check(
         adapter, "driven platform (equations neutral)", volume, 0.01 * v_hole
     )
@@ -887,12 +1002,15 @@ async def build(adapter) -> dict[str, str]:
             ("Plane8", "PLANE"),
             ("Plane9", "PLANE"),
             ("Plane10", "PLANE"),
+            ("Plane11", "PLANE"),
+            ("Plane12", "PLANE"),
             ("PlateTop", "PLANE"),
             (swing_axis, "AXIS"),
             (anchor_axis, "AXIS"),
             ("crank axis", "AXIS"),
             ("post mount west", "AXIS"),
             ("post mount east", "AXIS"),
+            ("tip dowel axis", "AXIS"),
         ),
     )
     return await save_part_and_images(adapter, PART_NAME)

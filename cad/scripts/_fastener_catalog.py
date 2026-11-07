@@ -91,6 +91,15 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "98381A434",
         material="Alloy Steel",
     ),
+    # MHA-DT-VN-69: rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00
+    # rubric sample, PR #2248); one, the tip-block locating dowel, locates
+    # the MHA-DT-21 tip block on MHA-DT-20.
+    "dt-vn-locating-pin": _stock(
+        "dt-vn-locating-pin",
+        "Alloy Steel Dowel Pin",
+        "98381A417",
+        material="Alloy Steel",
+    ),
     "sh-vn-brass-fillister-screw": _stock(
         "sh-vn-brass-fillister-screw",
         "Brass Fillister Head Slotted Screw",

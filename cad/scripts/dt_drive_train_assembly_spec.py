@@ -65,6 +65,7 @@ CLUSTERS: dict[Cluster, tuple[str, ...]] = {
         "dt-vn-cone-tip-adjuster",
         "dt-vn-cone-tip-pinch-screw",
         "dt-vn-cone-tip-block-screw",
+        "dt-vn-locating-pin",
         "dt-vn-post-mount-screw",
         "dt-vn-cone-lock-knob",
         "dt-vn-cone-pivot-screw",
@@ -197,9 +198,16 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     # 11.5 width sat on the last 18.4 of the stub, the block 3.7 past it, so 20
     # puts the collar 1.6 past the tip and the block 18.7 past the collar.
     ExplodeStep("tip collar slips off", ("dt-vn-cone-tip-collar",), "cone", 20.0),
+    # MHA-DT-VN-69 (rule-23 retention, owner ruling 2026-11-07) is pressed into
+    # the block foot's blind ream, so it leaves with the block.
     ExplodeStep(
         "tip block slides off",
-        ("dt-cone-tip-block", "dt-vn-cone-tip-adjuster", "dt-vn-cone-tip-pinch-screw"),
+        (
+            "dt-cone-tip-block",
+            "dt-vn-cone-tip-adjuster",
+            "dt-vn-cone-tip-pinch-screw",
+            "dt-vn-locating-pin",
+        ),
         "cone",
         85.0,
     ),

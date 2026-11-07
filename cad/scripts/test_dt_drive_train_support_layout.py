@@ -1771,8 +1771,8 @@ def test_every_fit_up_setting_is_a_gage_leaf_and_the_prints_name_it() -> None:
     # The prints give the inch setting; the leaves are in sheet 14's table.
     back = FITUP.inch_text(FITUP.BACK_COLLAR_LEAF_F, FITUP.FEELER_PLACES)
     front = FITUP.inch_text(FITUP.FRONT_COLLAR_LEAF, FITUP.FEELER_PLACES)
-    assert f"BACK FACE {back} OFF THE BACK MHA-DT-18 ON A FEELER" in FITUP.COLLAR_SET_STEP
-    assert f"FRONT FACE {front} OFF THE FRONT MHA-DT-18 ON A FEELER" in FITUP.COLLAR_SET_STEP
+    assert f"BACK MHA-DT-23 {back} OFF THE BACK MHA-DT-18 ON A FEELER" in FITUP.COLLAR_SET_STEP
+    assert f"FRONT MHA-DT-23 {front} OFF THE FRONT MHA-DT-18 ON A FEELER" in FITUP.COLLAR_SET_STEP
     # The fit-up module no longer claims MHA-DT-00 prints the feeler band.
     assert "MHA-DT-00 prints" not in (FITUP.__doc__ or "")
 

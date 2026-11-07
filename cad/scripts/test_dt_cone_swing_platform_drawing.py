@@ -27,8 +27,9 @@ import dt_post_mount_stack as post_mount
 from dt_cone_post_envelope import BLOCK_DIA
 import draw_dt_cone_swing_platform as drawing
 import pytest
+from _drawing_contract import model_toleranced_dimensions
 from _gtol_planar import PlanarFace
-from _hole_spec import CLEARANCE_MM, blind_cut_dia_mm
+from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, blind_cut_dia_mm
 from _inch_wall_limits import WALL_TARGET_MM
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from _surface_finish import MACHINED_UM, SEAT_UM
@@ -51,7 +52,7 @@ def test_every_marked_model_dimension_has_one_view_and_native_precision() -> Non
     assert sum(len(names) for names in view_sets) == len(kept)
     assert set(drawing_spec.DRAWING_PRECISION_BY_NAME) == marked
     assert drawing_spec.DRAWING_PRECISION_BY_NAME["PlateLenDim"] == 2
-    assert set(drawing_spec.DRAWING_PRECISION_BY_NAME.values()) == {2, 3}
+    assert set(drawing_spec.DRAWING_PRECISION_BY_NAME.values()) == {2, 3, 4}
 
 
 def test_pivot_is_the_reamed_h7_bore_on_the_stock_shoulder() -> None:
@@ -652,6 +653,23 @@ def _holddown_x_text_box() -> tuple[float, float, float, float]:
     return (x - w / 2.0, line_y, x + w / 2.0, line_y + h)
 
 
+def _tip_dowel_x_text_box() -> tuple[float, float, float, float]:
+    """TipDowelX's text frame, as HoldDownX's: centred on the keep x and
+    standing on its dimension line (rule-23 retention, owner ruling
+    2026-11-07)."""
+    x, y = drawing.DETAIL_KEEP["TipDowelX"]
+    w, h = drawing.TIP_DOWEL_X_TEXT_SIZE
+    line_y = y - drawing.HOLDDOWN_X_LINE_DROP
+    return (x - w / 2.0, line_y, x + w / 2.0, line_y + h)
+
+
+def _tip_dowel_callout_box() -> tuple[float, float, float, float]:
+    """The ream's value and its callout rows."""
+    x0, y0 = drawing.TIP_DOWEL_CALLOUT_LOWER_LEFT
+    w, h = drawing.TIP_DOWEL_CALLOUT_SIZE
+    return (x0, y0, x0 + w, y0 + h)
+
+
 # The hold-down callout's widest row: DRILL Ø3.05 THRU ALL at 50.0 mm (r8),
 # or the mate row LOCATES MHA-DT-21, not yet printed (~47..52 mm).  The
 # underline's left end, where the leader leaves, stands 1.6 mm before it.
@@ -814,6 +832,8 @@ def test_holddown_band_clears_border_title_block_and_captions() -> None:
         "detail outline": outline,
         "10.45": _holddown_z_text_box(),
         "1.00 ±0.1": _holddown_x_text_box(),
+        ".228 ±.004": _tip_dowel_x_text_box(),
+        "tip dowel ream": _tip_dowel_callout_box(),
         "C-C strip": _holddown_strip(),
         "C-C label": _holddown_label(),
         "hold-down callout": _holddown_callout_box(),
@@ -833,6 +853,8 @@ def test_holddown_band_clears_border_title_block_and_captions() -> None:
     # face labels are its own notes, standing in its padding beside the ink.
     own = {
         ("detail outline", "1.00 ±0.1"),
+        ("detail outline", ".228 ±.004"),
+        ("detail outline", "tip dowel ream"),
         ("C-C strip", "C-C UNDERSIDE"),
     }
     for i, first in enumerate(names):
@@ -857,7 +879,7 @@ def test_holddown_band_clears_border_title_block_and_captions() -> None:
     inset = 0.002
     padded = _holddown_padded_outline()
     inner = (padded[0] + inset, padded[1] + inset, padded[2] - inset, padded[3] - inset)
-    for name in ("10.45", "1.00 ±0.1", "detail label", "C-C label"):
+    for name in ("10.45", "1.00 ±0.1", ".228 ±.004", "tip dowel ream", "detail label", "C-C label"):
         assert not _boxes_overlap(ours[name], inner), name
     assert padded[2] < title_block[0] + 0.0015
     assert padded[0] > outline[2] - 0.0015
@@ -1234,6 +1256,136 @@ def test_holddown_web_guard_refuses_a_station_that_crowds_a_neighbour(
     monkeypatch.setitem(sys.modules, spec.__name__, mutated)
     with pytest.raises(AssertionError, match="hold-down leaves a web"):
         _exec_mutated(checks, {})
+
+
+# --- the tip-block locating dowel (rule-23 retention, owner ruling 2026-11-07
+# (MHA-DT-00 rubric sample, PR #2248)) ----------------------------------------
+def test_tip_dowel_slip_ream_clears_the_pin_on_the_hold_down_line() -> None:
+    """The slip ream is .0630 REAM_H7, clear of the pin at both extremes and
+    opening the foot's .0620 press ream; it stands on the hold-down line at
+    MHA-DT-21's own centre distance from its foot tap, and its station band
+    plus the screw's float fits MHA-DT-21's print."""
+    import dt_vn_locating_pin_spec as pin
+    from _fit_ream_h7 import REAM_H7
+
+    assert spec.TIP_DOWEL_HOLE_DIA == pytest.approx(0.0630 * 25.4)
+    assert spec.TIP_DOWEL_HOLE_BAND == REAM_H7
+    hole_min, hole_max = spec.TIP_DOWEL_HOLE_LIMITS
+    assert (hole_min, hole_max) == pytest.approx((0.0630 * 25.4, 0.0635 * 25.4))
+    pin_min, pin_max = (pin.DIA + band * 25.4 for band in pin.DIA_BAND_IN)
+    assert hole_min - pin_max > 0.0
+    assert spec.TIP_DOWEL_SLIP_CLEARANCE_MM == pytest.approx(
+        (hole_min - pin_max, hole_max - pin_min)
+    )
+    assert hole_min > block.DOWEL_HOLE_LIMITS[1]
+    assert block.DOWEL_HOLE_DIA == pin.PRESS_HOLE_DIA
+    assert spec.TIP_DOWEL_FROM_HOLDDOWN == block.DOWEL_FROM_TAP
+    assert spec.TIP_DOWEL_LOCAL_X == pytest.approx(spec.HOLDDOWN_LOCAL_X + block.DOWEL_FROM_TAP)
+    assert spec.TIP_DOWEL_LOCAL_Z == spec.HOLDDOWN_LOCAL_Z
+    assert spec.TIP_DOWEL_STATION_TOL_MM == spec.HOLDDOWN_STATION_TOL_MM
+    major = THREAD_MAJOR_MM[block.HOLDDOWN_THREAD]
+    drilled = drilled_oversize_mm(unit=spec.UNIT)
+    float_mm = (spec.HOLDDOWN_CLEARANCE_DIA + drilled - major) / 2.0
+    assert spec.TIP_HOLDDOWN_SCREW_FLOAT_MM == pytest.approx(float_mm)
+    assert spec.TIP_DOWEL_STATION_TOL_MM + float_mm <= block.DOWEL_X_TOL_MM + 1e-9
+    # The pin's lower end, pressed to the foot's floor, stays inside the
+    # sliding underside at every limit.
+    assert block.PLATE_STOCK_BAND_MM == spec.PLATE_STOCK_BAND
+    assert spec.TIP_DOWEL_END_ABOVE_UNDERSIDE == block.DOWEL_END_ABOVE_UNDERSIDE
+    assert spec.TIP_DOWEL_END_ABOVE_UNDERSIDE_RANGE_MM == block.DOWEL_END_ABOVE_UNDERSIDE_RANGE_MM
+    assert spec.TIP_DOWEL_END_ABOVE_UNDERSIDE_RANGE_MM[0] >= 0.0
+
+
+def test_tip_dowel_webs_meet_the_wall_target_at_print_worst() -> None:
+    """Recomputed for the tightest web: the counterbore under the plate, at
+    the dowel's station band and both holes' upper limits."""
+    cbore_r = (spec.HOLDDOWN_CBORE_DIA + printed_band_mm(3, unit=spec.UNIT)) / 2.0
+    ream_r = (spec.TIP_DOWEL_HOLE_DIA + max(spec.TIP_DOWEL_HOLE_BAND)) / 2.0
+    web = spec.TIP_DOWEL_FROM_HOLDDOWN - spec.TIP_DOWEL_STATION_TOL_MM - cbore_r - ream_r
+    assert checks.TIP_DOWEL_WEBS["hold-down counterbore (underside)"] == pytest.approx(web)
+    assert web >= WALL_TARGET_MM
+    assert min(checks.TIP_DOWEL_WEBS.values()) >= WALL_TARGET_MM
+
+
+def test_tip_dowel_web_guard_refuses_a_dowel_that_crowds_the_counterbore(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _exec_mutated(checks, {})  # positive control: the shipped station passes
+    mutated = _exec_mutated(spec, {})
+    mutated.TIP_DOWEL_FROM_HOLDDOWN = 5.0  # 0.79 mm toward the hold-down hole
+    monkeypatch.setitem(sys.modules, spec.__name__, mutated)
+    with pytest.raises(AssertionError, match="tip-block locating dowel leaves a web"):
+        _exec_mutated(checks, {})
+
+
+def test_tip_dowel_ream_callout_says_it_is_made_at_assembly() -> None:
+    """The lift rod's precedent: modelled at its nominal station, located on
+    the part sheet; the callout stands alone for the assembly step's one
+    "PER THEIR CALLOUTS" line: reamed through with the block on, after
+    MHA-DT-21's ream, at that step."""
+    import dt_drive_train_steps
+
+    callout = drawing_spec.TIP_DOWEL_CALLOUT
+    assert callout.split("\n") == [
+        "MATCH-REAM THRU",
+        "AFTER MHA-DT-21,",
+        dt_drive_train_steps.step_ref("post-and-tip-block"),
+    ]
+    assert drawing_spec.DRAWING_DIMENSIONS["TipDowelProfile"] == {"TipDowelX", "TipDowelDia"}
+    assert drawing_spec.DRAWING_PRECISION["TipDowelProfile"] == {"TipDowelX": 3, "TipDowelDia": 4}
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert (
+        'set_dimension_callouts(adapter, detail_annotations, {"TipDowelDia": TIP_DOWEL_CALLOUT})'
+        in source
+    )
+    # Each row fits the block the layout reserves, at this sheet's measured
+    # callout text (the relief callout: 2.8 mm a glyph, 5.6 mm a row).
+    rows = callout.split("\n")
+    assert max(map(len, rows)) * 0.0028 <= drawing.TIP_DOWEL_CALLOUT_SIZE[0]
+    assert (1 + len(rows)) * 0.0056 <= drawing.TIP_DOWEL_CALLOUT_SIZE[1] + 1e-9
+
+
+def test_build_cuts_the_tip_dowel_ream_on_a_named_axis() -> None:
+    banded = model_toleranced_dimensions(part)
+    assert banded[("TipDowelProfile", "TipDowelX")] == "TIP_DOWEL_STATION_TOL_MM"
+    assert banded[("TipDowelProfile", "TipDowelDia")] == "*deviations(TIP_DOWEL_HOLE_BAND)"
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    for needed in (
+        'name_last_feature(adapter, "TipDowelHole")',
+        'name_last_feature(adapter, "tip dowel axis")',
+        '("tip dowel axis", "AXIS")',
+        'dims.record("TipDowelX", \'"TipDowelFromHoldDown"\')',
+    ):
+        assert needed in source, needed
+
+
+def test_tip_dowel_texts_stand_off_detail_b_circle() -> None:
+    """Both new texts stand outside detail B's circle (HoldDownX's rule), and
+    the ream's leader from its value row reaches the rim east of TipDowelX's
+    dowel witness, so it crosses neither that witness nor the line."""
+    cx, cy = drawing.DETAIL_CENTER
+    for box in (_tip_dowel_x_text_box(), _tip_dowel_callout_box()):
+        for corner_x in (box[0], box[2]):
+            for corner_y in (box[1], box[3]):
+                assert (
+                    math.dist((corner_x, corner_y), (cx, cy))
+                    >= drawing.DETAIL_SHEET_RADIUS + 0.001 - 1e-9
+                )
+    assert _tip_dowel_x_text_box()[2] < drawing.DETAIL_HOLDDOWN_X
+    assert _tip_dowel_x_text_box()[1] > _holddown_z_text_box()[3]
+    assert _tip_dowel_callout_box()[1] > _holddown_x_text_box()[3]
+    s = drawing._DETAIL_S
+    dowel = (drawing.DETAIL_TIP_DOWEL_X, drawing.DETAIL_HOLDDOWN_Y)
+    assert dowel[0] - cx == pytest.approx(spec.TIP_DOWEL_LOCAL_X * s)
+    box = _tip_dowel_callout_box()
+    start = (box[0], box[3] - drawing.TIP_DOWEL_CALLOUT_SIZE[1] / 8.0)
+    run = math.dist(start, dowel)
+    r = spec.TIP_DOWEL_HOLE_DIA / 2.0 * s
+    tip = tuple(d + (a - d) / run * r for a, d in zip(start, dowel))
+    assert tip[0] > dowel[0] + 0.0001
+    line_y = drawing.TIP_DOWEL_X_LINE_Y
+    at_line = start[0] + (tip[0] - start[0]) * (start[1] - line_y) / (start[1] - tip[1])
+    assert at_line > dowel[0] + 0.0034  # past an outside arrow's tail
 
 
 def test_relief_width_text_sits_between_its_neighbours() -> None:

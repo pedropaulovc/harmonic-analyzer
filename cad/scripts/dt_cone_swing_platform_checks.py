@@ -54,6 +54,12 @@ from dt_cone_swing_platform_spec import (
     POST_MOUNT_STATION_TOL_MM,
     POST_MOUNT_TAP_DIA,
     POST_MOUNT_THREAD_DIA,
+    TIP_DOWEL_FROM_HOLDDOWN,
+    TIP_DOWEL_HOLE_BAND,
+    TIP_DOWEL_HOLE_DIA,
+    TIP_DOWEL_LOCAL_X,
+    TIP_DOWEL_LOCAL_Z,
+    TIP_DOWEL_STATION_TOL_MM,
     UNIT,
 )
 from dt_cone_swing_platform_pivot_spec import PIVOT_HOLE_DIA
@@ -160,6 +166,53 @@ for _edge in ("north edge", "east edge", "west edge"):
 if min(HOLDDOWN_WEBS.values()) < WALL_TARGET_MM:
     raise AssertionError(
         f"tip-block hold-down leaves a web under the .080 in wall target: {HOLDDOWN_WEBS}"
+    )
+
+# Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
+# #2248): webs round the tip-block locating dowel's slip ream, at
+# print worst like the hold-down's.  Its station prints from the hold-down
+# hole (TipDowelX, +/-.004), so the webs to that hole's counterbore (the
+# underside) and clearance (the top) take only that band; it lies on the
+# hold-down line by relation, at the general .XX band.  Located from the
+# pivot, it also takes the hold-down's own stations.  The ream at its upper
+# limit (REAM_H7).
+_DOWEL_R = (TIP_DOWEL_HOLE_DIA + max(TIP_DOWEL_HOLE_BAND)) / 2.0
+_DOWEL_XZ = (TIP_DOWEL_LOCAL_X, TIP_DOWEL_LOCAL_Z)
+_DOWEL_SHIFT = math.hypot(
+    HOLDDOWN_STATION_TOL_MM + TIP_DOWEL_STATION_TOL_MM,
+    HOLDDOWN_STATION_TOL_MM + _XX_MM,
+)
+_DOWEL_PIVOT_DIST = math.hypot(*_DOWEL_XZ)
+TIP_DOWEL_WEBS = {
+    "hold-down counterbore (underside)": TIP_DOWEL_FROM_HOLDDOWN
+    - TIP_DOWEL_STATION_TOL_MM
+    - _HOLDDOWN_CBORE_R
+    - _DOWEL_R,
+    "hold-down clearance (top)": TIP_DOWEL_FROM_HOLDDOWN
+    - TIP_DOWEL_STATION_TOL_MM
+    - _HOLDDOWN_THRU_R
+    - _DOWEL_R,
+    "pivot relief (top)": _DOWEL_PIVOT_DIST
+    - _DOWEL_SHIFT
+    - (PIVOT_BEARING_RELIEF_DIAMETER + _XX_MM) / 2.0
+    - _DOWEL_R,
+    "pivot bore (underside)": _DOWEL_PIVOT_DIST
+    - _DOWEL_SHIFT
+    - (PIVOT_HOLE_DIA + _DRILL_OVERSIZE_MM) / 2.0
+    - _DOWEL_R,
+    "north edge": NORTH_OVERHANG - TIP_DOWEL_LOCAL_Z,
+    "east edge": _edge_normal_distance(
+        _DOWEL_XZ, (-HALF_WIDTH_N, NORTH_OVERHANG), (-EAST_HALF_S, _SOUTH_Z)
+    ),
+    "west edge": _edge_normal_distance(
+        _DOWEL_XZ, (WEST_HALF_N, NORTH_OVERHANG), (WEST_HALF_S, _SOUTH_Z)
+    ),
+}
+for _edge in ("north edge", "east edge", "west edge"):
+    TIP_DOWEL_WEBS[_edge] -= _DOWEL_SHIFT + _DOWEL_R + _XX_MM
+if min(TIP_DOWEL_WEBS.values()) < WALL_TARGET_MM:
+    raise AssertionError(
+        f"tip-block locating dowel leaves a web under the .080 in wall target: {TIP_DOWEL_WEBS}"
     )
 
 

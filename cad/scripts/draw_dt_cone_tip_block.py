@@ -54,6 +54,11 @@ from dt_cone_tip_block_spec import (
     BLOCK_HEIGHT,
     BLOCK_X,
     BLOCK_Z,
+    DOWEL_HOLE_CALLOUT,
+    DOWEL_HOLE_DIA,
+    DOWEL_HOLE_PRINTED_TEXT,
+    DOWEL_X,
+    DOWEL_X_PRINTED_TEXT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FOOT_BORE_DIA,
@@ -146,6 +151,8 @@ def _right_x(model_z: float) -> float:
 # these sizes rather than centred on a feature.
 VALUE_TEXT_HALF_WIDTH = 0.0046
 VALUE_TEXT_HALF_HEIGHT = 0.0019
+# A value's glyph, from the four-character value's measured width.
+_VALUE_GLYPH_WIDTH = 2.0 * VALUE_TEXT_HALF_WIDTH / 4.0
 ARROW_LENGTH = 0.0034
 # An inside arrowhead is about 0.6 mm across (287c).
 ARROW_HALF_WIDTH = 0.0003
@@ -240,6 +247,10 @@ DIMENSION_CALLOUTS = {
     # stack).  Separate the full number at the existing font size; the whole
     # value/mate block sits on a native offset shelf right of the plan.
     "Depth": "SETS\nMHA-DT-VN-55\nENGAGEMENT",
+    # Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
+    # #2248): the locating dowel's press ream -- its depth,
+    # the dowel pressed to its floor and the match-drilling through MHA-DT-20.
+    "DowelHoleDia": DOWEL_HOLE_CALLOUT,
 }
 DIMENSION_CALLOUTS_ABOVE = {
     # The +X face stands over the platform's narrow west edge
@@ -321,6 +332,7 @@ ARROWS_INSIDE = (
     "PinchDepthCenter",
     "Width",
     "FootTapX",
+    "DowelX",
     "Depth",
 )
 _DIM_ARROWS_OUTSIDE = 1
@@ -370,6 +382,42 @@ _BOTTOM_RIGHT = BOTTOM_CENTER[0] + BLOCK_X * _S / 2.0
 FOOT_TAP_CENTER = (_BOTTOM_LEFT + FOOT_TAP_X * _S, _bottom_y(Z_NORTH - FOOT_TAP_Z))
 FOOT_TAP_X_RISE = 0.0078
 FOOT_TAP_Z_LINE_X = _BOTTOM_LEFT - 0.013
+# Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
+# #2248): the locating dowel's press ream, on the tap's line
+# DOWEL_FROM_TAP toward +X.  Its station from the tap prints under the view,
+# its value right of the view (".228 ±.010" outruns the 11.6 mm span) with its
+# line 1.5 mm under the view's south edge, so the arrows keep 2 mm off the
+# BOTTOM VIEW caption below.  The ream's banded size and its four callout
+# rows stand right of that value, their top under the hold-down tap's
+# callout, and its leader drops from the value row to the hole's rim through
+# the view's +X face.  Estimates until a render measures them.
+DOWEL_CENTER = (_BOTTOM_LEFT + DOWEL_X * _S, FOOT_TAP_CENTER[1])
+DOWEL_X_EXTENT = (
+    len(DOWEL_X_PRINTED_TEXT) * _VALUE_GLYPH_WIDTH / 2.0,
+    VALUE_TEXT_HALF_HEIGHT,
+    len(DOWEL_X_PRINTED_TEXT) * _VALUE_GLYPH_WIDTH / 2.0,
+    VALUE_TEXT_HALF_HEIGHT,
+)
+_DOWEL_HOLE_HALF_WIDTH = max(
+    len(DOWEL_HOLE_PRINTED_TEXT) * _VALUE_GLYPH_WIDTH / 2.0,
+    _callout_half_width(DOWEL_HOLE_CALLOUT),
+)
+_DOWEL_HOLE_HALF_HEIGHT = (1 + len(DOWEL_HOLE_CALLOUT.split("\n"))) * TEXT_ROW_HEIGHT / 2.0
+DOWEL_HOLE_EXTENT = (
+    _DOWEL_HOLE_HALF_WIDTH,
+    _DOWEL_HOLE_HALF_HEIGHT,
+    _DOWEL_HOLE_HALF_WIDTH,
+    _DOWEL_HOLE_HALF_HEIGHT,
+)
+# 0.5 mm outline clearance plus round-out off the view's +X face; the value
+# stands 1.3 mm over the south edge, so its line runs 1.5 mm under it.
+DOWEL_X_TEXT_LEFT = _BOTTOM_RIGHT + 0.0010
+DOWEL_X_TEXT_RISE = 0.0013
+# The ream's block: left of it the value's text clearance, its top 0.5 mm
+# under the view's north edge, so 1.9 mm under the hold-down tap's callout.
+DOWEL_HOLE_TEXT_LEFT = (
+    DOWEL_X_TEXT_LEFT + 2.0 * DOWEL_X_EXTENT[0] + TEXT_CLEARANCE + ROUND_OUT
+)
 BOTTOM_KEEP = {
     "FootTapX": (
         (_BOTTOM_LEFT + FOOT_TAP_CENTER[0]) / 2.0,
@@ -378,6 +426,14 @@ BOTTOM_KEEP = {
     "FootTapZ": (
         FOOT_TAP_Z_LINE_X,
         (_bottom_y(Z_NORTH) + FOOT_TAP_CENTER[1]) / 2.0,
+    ),
+    "DowelX": (
+        DOWEL_X_TEXT_LEFT + DOWEL_X_EXTENT[0],
+        _bottom_y(Z_SOUTH) + DOWEL_X_TEXT_RISE,
+    ),
+    "DowelHoleDia": (
+        DOWEL_HOLE_TEXT_LEFT + DOWEL_HOLE_EXTENT[0],
+        _bottom_y(Z_NORTH) - 0.0005 - DOWEL_HOLE_EXTENT[1],
     ),
 }
 # The bottom-row captions sit just under the views' feet.
@@ -541,8 +597,6 @@ _VALUE_EXTENT = (
     VALUE_TEXT_HALF_WIDTH,
     VALUE_TEXT_HALF_HEIGHT,
 )
-# A value's glyph, from the four-character value's measured width.
-_VALUE_GLYPH_WIDTH = 2.0 * VALUE_TEXT_HALF_WIDTH / 4.0
 
 
 def _value_extent(name: str, nominal: float) -> tuple[float, float, float, float]:
@@ -565,6 +619,9 @@ def _value_and_rows_extent(
 _VALUE_EXTENTS = {
     # "5.9": three characters, 5.8 mm wide (I31's "6.0").
     "PinchDepthCenter": (0.0033, 0.0019, 0.0033, 0.0019),
+    # The locating dowel's station and its ream's banded size with rows.
+    "DowelX": DOWEL_X_EXTENT,
+    "DowelHoleDia": DOWEL_HOLE_EXTENT,
     **{
         name: _value_extent(name, nominal)
         for name, nominal in (
@@ -946,6 +1003,17 @@ def sheet_dimension_ink(
         set_sides["FootTapZ"],
         texts["FootTapZ"],
     )
+    # The locating dowel's station from the tap: both witnesses leave the
+    # holes' centres, the value right of the span (rule-23 retention, owner
+    # ruling 2026-11-07 (MHA-DT-00 rubric sample, PR #2248)).
+    ink["DowelX"] = _dimension_ink(
+        h,
+        (tap_x, DOWEL_CENTER[0]),
+        (tap_y, tap_y),
+        drop("DowelX"),
+        set_sides["DowelX"],
+        texts["DowelX"],
+    )
     return ink
 
 
@@ -994,6 +1062,16 @@ def sheet_leaders(adjuster_center: tuple[float, float] = FRONT_CENTER) -> dict[s
             FOOT_TAP_CALLOUT_EXTENT,
             FOOT_TAP_CENTER,
             FOOT_BORE_DIA * _S / 2.0,
+        ),
+        # The ream's diameter: SolidWorks runs its leader from the value row's
+        # near end through the hole's centre to the rim.
+        "DowelHoleDia": _leader_to_circle(
+            (
+                BOTTOM_KEEP["DowelHoleDia"][0] - DOWEL_HOLE_EXTENT[0],
+                BOTTOM_KEEP["DowelHoleDia"][1] + DOWEL_HOLE_EXTENT[3] - TEXT_ROW_HEIGHT / 2.0,
+            ),
+            DOWEL_CENTER,
+            DOWEL_HOLE_DIA * _S / 2.0,
         ),
         "foot finish": Leader((finish[0] + FOOT_FINISH_LEADER_DX, finish[1]), finish_tip),
         "view B letter": Leader((view_b_text[0] + VIEW_B_LEADER_DX, view_b_tip[1]), view_b_tip),

@@ -547,10 +547,12 @@ ISO_RIGHT_FIELD = (
     REFERENCE_ISO_CENTER[1] + REFERENCE_ISO_HALF_OUTLINE + REFERENCE_ISO_GAP,
 )
 # Sheet 7's reference view sits under the left column's steps 1-3 (they end
-# near y=104 mm), so the right field runs to NOTE_FIELD_RIGHT's foot; its
-# caption prints ~9 mm under the outline, clear of the zone border.
-SEQUENCE_ISO_CENTER = (0.115, 0.056)
-SEQUENCE_ISO_GAP = 0.006
+# near y=81 mm), so the right field runs to NOTE_FIELD_RIGHT's foot; its
+# caption prints ~9 mm under the outline (~19 mm up), clear of the zone border.
+# The rule-23 tip dowel steps (owner ruling 2026-11-07, PR #2248)
+# lowered it 3 mm and closed its gap to the other sheets' REFERENCE_ISO_GAP.
+SEQUENCE_ISO_CENTER = (0.115, 0.053)
+SEQUENCE_ISO_GAP = REFERENCE_ISO_GAP
 REFERENCE_ISO_CAPTION_XY = (0.330, 0.082)
 SEQUENCE_LEFT_FIELD = (
     NOTE_FIELD_LEFT[0],
@@ -639,6 +641,7 @@ BOM_PART_NUMBERS = {
     "dt-vn-cone-tip-adjuster": "MHA-DT-VN-55",
     "dt-vn-cone-tip-pinch-screw": "MHA-DT-VN-56",
     "dt-vn-cone-tip-block-screw": "MHA-DT-VN-60",
+    "dt-vn-locating-pin": "MHA-DT-VN-69",
     "dt-vn-post-mount-screw": str(_config.parts("dt-vn-post-mount-screw")["number"]),
     "dt-vn-cone-lock-knob": "MHA-DT-VN-51",
     "dt-vn-cone-pivot-screw": "MHA-DT-VN-52",
@@ -694,6 +697,7 @@ BOM_DESCRIPTIONS = {
     "dt-vn-cone-tip-adjuster": f"{ADJUSTER_THREAD} CUP SET SCREW, MCMASTER 94025A164",
     "dt-vn-cone-tip-pinch-screw": "#4-40 FILLISTER SCREW, MCMASTER 91794A112",
     "dt-vn-cone-tip-block-screw": "#4-40 X 3/8 SHCS, MCMASTER 91251A108",
+    "dt-vn-locating-pin": "1/16 X 3/8 DOWEL PIN, MCMASTER 98381A417",
     "dt-vn-post-mount-screw": f"{post_screw.THREAD} FILLISTER SCREW, MSC {post_screw.SKU}",
     "dt-vn-cone-lock-knob": f"{lock_knob.THREAD} THUMB SCREW, MCMASTER 93585A190",
     "dt-vn-cone-pivot-screw": f"{pivot_screw.THREAD} SHOULDER SCREW, MCMASTER 91829A560",
@@ -1166,9 +1170,18 @@ CONE_CRANK_STEPS = _note_text(
         # User ruling 2026-09-29 (eight-views-4 photo): MHA-DT-21 is a prism
         # standing directly on MHA-DT-20, held by one #4-40 socket head cap
         # screw up from under the plate through its counterbored hole.
-        "2F. STAND MHA-DT-21 ON MHA-DT-20 AT ITS HOLE.",
-        "2G. RUN MHA-DT-VN-60 UP FROM UNDER THE PLATE THROUGH THE COUNTERBORE",
-        "   INTO THE MHA-DT-21 FOOT, SNUG.",
+        # Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample,
+        # PR #2248; owner question 2 option 0-A): one Ø1/16
+        # MHA-DT-VN-69 dowel, match-drilled from under the plate with the block
+        # squared and snug, pressed in the foot's blind ream and a slip fit in
+        # the plate's opened ream, stops the block turning about its one screw.
+        # The block never comes off: the dowel goes in from below.
+        "2F. STAND MHA-DT-21 ON MHA-DT-20 AT ITS HOLE, RIGHT FACE SQUARE TO THE",
+        "   MHA-DT-20 BACK EDGE.",
+        "2G. RUN MHA-DT-VN-60 UP THRU THE MHA-DT-20 COUNTERBORE, HELD SQUARE.",
+        "2H. DRILL AND REAM UP THRU MHA-DT-20 INTO MHA-DT-21 PER BOTH CALLOUTS.",
+        "2J. PRESS MHA-DT-VN-69 UP THRU MHA-DT-20 TO THE MHA-DT-21 HOLE FLOOR.",
+        "2K. CHECK THAT MHA-DT-21 DOES NOT TURN ON MHA-DT-20 BY HAND.",
         # User ruling 2026-09-29: the stack's back float is held on the
         # shaft by MHA-DT-VN-54, set off T006 by one feeler and locked on the
         # D-flat; the cup screw alone then sets MHA-DT-04's end play
@@ -1756,7 +1769,7 @@ def _split_sequence_chain(
 # splits keep every field full once the one-thing lines grew the sequence
 # (rubric sample rounds 2 and 4); test_every_note_field_holds_its_stacked_blocks
 # proves each fits.
-CONE_CONTINUED_FROM = f"{steps.step_number('tip-adjuster-set')}F"
+CONE_CONTINUED_FROM = f"{steps.step_number('tip-adjuster-set')}E"
 CRANK_CONTINUED_FROM = str(steps.step_number("crank-hub-fitted"))
 _CRANK_CONTINUED_HEADING = "ASSEMBLY SEQUENCE CONT. - CRANK"
 CONE_CRANK_PRIMARY, CONE_CRANK_CONTINUED, CRANK_CONTINUED = _split_sequence_chain(

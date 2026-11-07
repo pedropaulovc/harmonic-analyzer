@@ -100,6 +100,7 @@ from dt_cone_swing_platform_drawing_spec import (
     PIVOT_PROCESS,
     POST_MOUNT_LOCATING_CALLOUT,
     RELIEF_WIDTH_CALLOUT,
+    TIP_DOWEL_CALLOUT,
     TOP_FACE_LABEL,
     UNDERSIDE_LABEL,
 )
@@ -113,6 +114,7 @@ from dt_cone_swing_platform_spec import (
     PLATE_THICKNESS,
     POST_MOUNT_SPEC,
     SURFACE_FINISHES,
+    TIP_DOWEL_LOCAL_X,
     UNIT,
 )
 from dt_cone_swing_platform_pivot_spec import PIVOT_HOLE_DIA
@@ -371,9 +373,53 @@ _HOLDDOWN_X_TEXT_X = (
     )
     + HOLDDOWN_X_TEXT_SIZE[0] / 2.0
 )
+# Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
+# #2248): the tip-block locating dowel's slip ream, on the
+# hold-down line TipDowelX west (sheet-right) of the hold-down hole, also in
+# detail B.  Its 11.6 mm span at 2:1 cannot hold " .228 ±.004 " (12 glyphs
+# at HoldDownX's measured 2.0 mm), so the line runs over both holes, 6.7 mm
+# above the hold-down's rim, and the text hangs LEFT, outside the circle
+# (1 mm off it at the frame's lower-right corner), above HoldDownZ's text.
+# The ream's value and three callout rows (at most 16 glyphs at the relief
+# callout's measured 2.8 mm on this sheet, four rows at its 5.6 mm pitch;
+# aa9766da render) stand right of the circle, 1.5 mm over HoldDownX's text,
+# left of the hold-down callout and under the plan captions; a fourth row
+# would reach into the captions.  The diameter's leader drops from the value
+# row to the ream's rim, east of TipDowelX's dowel witness.  Estimates until
+# a render measures them.
+DETAIL_TIP_DOWEL_X = DETAIL_CENTER[0] + TIP_DOWEL_LOCAL_X * _DETAIL_S
+TIP_DOWEL_X_TEXT_SIZE = (0.0240, 0.0035)
+TIP_DOWEL_X_LINE_Y = (
+    DETAIL_HOLDDOWN_Y + HOLDDOWN_CLEARANCE_DIA / 2.0 * _DETAIL_S + 0.0067
+)
+_TIP_DOWEL_X_TEXT_X = (
+    DETAIL_CENTER[0]
+    - math.sqrt(
+        (DETAIL_SHEET_RADIUS + 0.001) ** 2 - (TIP_DOWEL_X_LINE_Y - DETAIL_CENTER[1]) ** 2
+    )
+    - TIP_DOWEL_X_TEXT_SIZE[0] / 2.0
+)
+TIP_DOWEL_CALLOUT_SIZE = (0.0475, 0.0224)
+_TIP_DOWEL_CALLOUT_BOTTOM = HOLDDOWN_X_LINE_Y + HOLDDOWN_X_TEXT_SIZE[1] + 0.0015
+TIP_DOWEL_CALLOUT_LOWER_LEFT = (
+    DETAIL_CENTER[0]
+    + math.sqrt(
+        (DETAIL_SHEET_RADIUS + 0.001) ** 2
+        - (_TIP_DOWEL_CALLOUT_BOTTOM - DETAIL_CENTER[1]) ** 2
+    ),
+    _TIP_DOWEL_CALLOUT_BOTTOM,
+)
 DETAIL_KEEP = {
     "HoldDownZ": (0.044, DETAIL_HOLDDOWN_Y + 0.0045),
     "HoldDownX": (_HOLDDOWN_X_TEXT_X, HOLDDOWN_X_LINE_Y + HOLDDOWN_X_LINE_DROP),
+    "TipDowelX": (_TIP_DOWEL_X_TEXT_X, TIP_DOWEL_X_LINE_Y + HOLDDOWN_X_LINE_DROP),
+    # The value row's centre, on top of its rows.
+    "TipDowelDia": (
+        TIP_DOWEL_CALLOUT_LOWER_LEFT[0] + TIP_DOWEL_CALLOUT_SIZE[0] / 2.0,
+        TIP_DOWEL_CALLOUT_LOWER_LEFT[1]
+        + TIP_DOWEL_CALLOUT_SIZE[1]
+        - TIP_DOWEL_CALLOUT_SIZE[1] / 8.0,
+    ),
 }
 # The native "DETAIL B / SCALE 2:1" label, moved by its measured extent:
 # lower left of its box, in the band's lower-left corner.  0.5 mm under r1's
@@ -2228,6 +2274,10 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="hold-down station detail",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    # The locating dowel's slip ream: made at assembly, say so under its
+    # banded size (rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00
+    # rubric sample, PR #2248)).
+    set_dimension_callouts(adapter, detail_annotations, {"TipDowelDia": TIP_DOWEL_CALLOUT})
     # U41: the thickness is the stock's, a reference with no band.
     thickness_annotations = [
         item for item in section_annotations

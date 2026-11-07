@@ -855,6 +855,9 @@ def test_explode_plan_resolves_every_step_on_the_built_census() -> None:
     assert not any(i.name == "dt-cylinder-end-disc-2" for i in _instances())
     assert moved["spring foot screw lifts"] == (FOOT_NAME,)
     assert moved["spring steps east"] == ("dt-pinion-spring-1", FOOT_NAME)
+    # The MHA-DT-VN-69 tip dowel is pressed in the block foot (owner ruling
+    # 2026-11-07, PR #2248), so it leaves with the block.
+    assert "dt-vn-locating-pin-1" in moved["tip block slides off"]
     assert moved["block screws lift"] == tuple(f"dt-vn-slotted-screw-{i}" for i in range(1, 5))
     # The rig sheet's MHA-DT-VN-57 balloon is pinned to the front block's west screw.
     rig_anchors = drawing.DRIVE_TRAIN_BALLOON_ANCHORS["pinion-rig"]
