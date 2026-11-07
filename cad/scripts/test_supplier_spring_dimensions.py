@@ -133,121 +133,6 @@ def _readback_environment(monkeypatch, module, views):
     monkeypatch.setattr(module, "curate_view_dimensions", curate)
 
 
-def _extension_views(spec):
-    views = {
-        "free_front": _View("free", refs.SUPPLIER_FREE_CONFIGURATION),
-        "free_right": _View("section", refs.SUPPLIER_FREE_CONFIGURATION),
-        "max_front": _View("maximum", refs.SUPPLIER_MAX_CONFIGURATION),
-        "installed_iso": _View("installed", "OriginalInstalled"),
-    }
-    values = {
-        extension.FREE_LENGTH: spec.FREE_LENGTH_MM,
-        extension.MAX_LENGTH: spec.MAX_LENGTH_MM,
-        extension.COIL_OD: spec.SUPPLIER_COIL_OD_MM,
-        extension.WIRE_DIA: spec.SUPPLIER_WIRE_DIA_MM,
-    }
-    for key, names in (
-        ("free_front", (extension.FREE_LENGTH,)),
-        ("free_right", (extension.COIL_OD, extension.WIRE_DIA)),
-        ("max_front", (extension.MAX_LENGTH,)),
-    ):
-        for name in names:
-            owner = next(
-                owner
-                for owner, owned in extension.DIMENSIONS_BY_FEATURE.items()
-                if name in owned
-            )
-            views[key].annotations.append(
-                _native_annotation(name, owner, values[name], None)
-            )
-    return views
-
-
-def _extension_checks(spec, views):
-    return layout.extension_spring_dimensions(
-        object(),
-        views,
-        free_length_mm=spec.FREE_LENGTH_MM,
-        max_length_mm=spec.MAX_LENGTH_MM,
-        reference_bounds=_captured_reference_bounds(views),
-        coil_od_mm=spec.SUPPLIER_COIL_OD_MM,
-        wire_dia_mm=spec.SUPPLIER_WIRE_DIA_MM,
-        precision=spec.SUPPLIER_PRECISION,
-    )
-
-
-@pytest.mark.parametrize("spec", [channel, counter], ids=["9432K31", "1330K524"])
-@pytest.mark.parametrize(
-    "corruption",
-    [
-        "owner",
-        "config",
-        "exact_value",
-        "missing",
-        "duplicate",
-        "installed_dimension",
-        "unexpected_band",
-    ],
-)
-def test_extension_final_checks_reacquire_actual_annotations(
-    monkeypatch, spec, corruption
-):
-    views = _extension_views(spec)
-    _readback_environment(monkeypatch, layout, views)
-    checks = _extension_checks(spec, views)
-    for check in checks:
-        check()
-    view = views["max_front"]
-    annotation = view.annotations[0]
-    native = annotation.GetSpecificAnnotation().GetDimension2(0)
-    if corruption == "owner":
-        native.FullName = f"{extension.MAX_LENGTH}@InstalledGeometry@Source"
-    elif corruption == "config":
-        view.ReferencedConfiguration = "OriginalInstalled"
-    elif corruption == "exact_value":
-        native.value = round(spec.MAX_LENGTH_MM / 25.4, 2) * 25.4 + 0.01
-    elif corruption == "missing":
-        view.annotations.clear()
-    elif corruption == "duplicate":
-        view.annotations.append(annotation)
-    elif corruption == "installed_dimension":
-        views["installed_iso"].annotations.append(annotation)
-    else:
-        native.Tolerance.Type = 4
-    with pytest.raises(RuntimeError):
-        for check in checks:
-            check()
-
-
-@pytest.mark.parametrize("spec", [channel, counter], ids=["9432K31", "1330K524"])
-def test_extension_section_diameters_each_take_one_near_side_arrow(monkeypatch, spec):
-    views = _extension_views(spec)
-    _readback_environment(monkeypatch, layout, views)
-    near_side = []
-    monkeypatch.setattr(
-        layout,
-        "set_near_side_diameter",
-        lambda annotation, label: near_side.append(label),
-    )
-    _extension_checks(spec, views)
-    # A line through the small wire circle crossed the section it sizes.
-    assert sorted(near_side) == sorted((extension.COIL_OD, extension.WIRE_DIA))
-
-
-def test_channel_source_od_prints_without_a_supplier_band(monkeypatch):
-    views = _extension_views(channel)
-    _readback_environment(monkeypatch, layout, views)
-    checks = _extension_checks(channel, views)
-    for check in checks:
-        check()
-    # The catalogue tolerance governs; a band on the printed OD is refused.
-    display = views["free_right"].annotations[0].GetSpecificAnnotation()
-    display.GetDimension2(0).Tolerance.Type = 4
-    with pytest.raises(RuntimeError, match="gained a tolerance"):
-        for check in checks:
-            check()
-
-
 def _disc_views(spec):
     rows = {"free_front": ("THICKNESS", "FREE_HEIGHT"), "free_top": ("ID", "OD")}
     application = spec.SUPPLIER_APPLICATION_DIMENSIONS
@@ -408,41 +293,6 @@ def test_disc_segments_are_construction_only_and_exact(monkeypatch):
         )
     )
     assert all(segment.ConstructionGeometry for segment in segments)
-
-
-@pytest.mark.parametrize("spec", [channel, counter], ids=["9432K31", "1330K524"])
-@pytest.mark.parametrize("scale", [(1, 1), (3, 2)])
-def test_extension_dimension_positions_follow_actual_one_dimensional_native_ink(
-    monkeypatch, spec, scale
-):
-    views = _extension_views(spec)
-    for key, length, position in (
-        ("free_front", spec.FREE_LENGTH_MM, (0.12, 0.17)),
-        ("max_front", spec.MAX_LENGTH_MM, (0.19, 0.08)),
-    ):
-        views[key].source_points = ((-length / 2000, 0.0), (length / 2000, 0.0))
-        views[key].Position = position
-        views[key].ScaleRatio = scale
-    radius = spec.SUPPLIER_COIL_OD_MM / 2000
-    views["free_right"].source_points = ((-radius, -radius), (radius, radius))
-    views["free_right"].Position = (0.30, 0.21)
-    views["free_right"].ScaleRatio = scale
-    _readback_environment(monkeypatch, layout, views)
-    _extension_checks(spec, views)
-    assert views["free_front"].kept_positions[extension.FREE_LENGTH] == pytest.approx(
-        (0.12, 0.18)
-    )
-    assert views["max_front"].kept_positions[extension.MAX_LENGTH] == pytest.approx(
-        (0.19, 0.09)
-    )
-    projected_radius = radius * scale[0] / scale[1]
-    # Coil OD text above-right, wire text below-left: opposite leader landings.
-    assert views["free_right"].kept_positions[extension.COIL_OD] == pytest.approx(
-        (0.30 + projected_radius + 0.037, 0.21 + projected_radius + 0.005)
-    )
-    assert views["free_right"].kept_positions[extension.WIRE_DIA] == pytest.approx(
-        (0.30 - projected_radius - 0.042, 0.21 - projected_radius - 0.009)
-    )
 
 
 @pytest.mark.parametrize(
@@ -673,40 +523,47 @@ def test_disc_preparation_defers_capture_then_reuses_it_for_fitted_annotations(
     )
 
 
-@pytest.mark.parametrize("spec", [channel, counter], ids=["9432K31", "1330K524"])
-def test_extension_preparation_only_shows_owners_before_capture(monkeypatch, spec):
-    views = _extension_views(spec)
-    shown = {}
-
-    def show_owners(adapter, view, owners, *, view_label):
-        shown[view_label] = tuple(owners)
-        return list(owners)
-
-    def unavailable_bounds(key):
-        raise AssertionError("preparation must not project before capture")
-
-    monkeypatch.setattr(layout, "_show_hidden_owners", show_owners)
-    fonts = []
-
-    def line_font(adapter):
-        fonts.append(adapter)
-        return readback
-
-    def readback():
-        return None
-
-    monkeypatch.setattr(layout, "_construction_curves_as_outline", line_font)
-    adapter = object()
-    # The coil OD prints closed, not as construction dash-gap arcs, and its
-    # readback runs with the other settled checks.
-    assert layout.prepare_extension_spring_diagrams(
-        adapter,
-        views,
-        reference_bounds=unavailable_bounds,
-    ) == (readback,)
-    assert fonts == [adapter]
-    assert shown == {
-        "free_front": ("SupplierFreeLengthReference",),
-        "free_right": ("SupplierNominalSections",),
-        "max_front": ("SupplierMaximumLengthReference",),
+@pytest.mark.parametrize(
+    "spec,ends,expected",
+    [
+        (
+            counter,
+            "LOOPS",
+            (
+                "FREE LENGTH INSIDE LOOPS (10.00)",
+                "MAXIMUM EXTENDED LENGTH INSIDE LOOPS (16.60)",
+                "COIL OD (Ø.500), WIRE (Ø.063)",
+            ),
+        ),
+        (
+            channel,
+            "HOOKS",
+            (
+                "FREE LENGTH INSIDE HOOKS (1.948)",
+                "MAXIMUM EXTENDED LENGTH INSIDE HOOKS (5.448)",
+                "COIL OD (Ø.25), WIRE (Ø.026)",
+            ),
+        ),
+    ],
+    ids=["1330K524", "9432K31"],
+)
+def test_extension_supplier_sizes_print_as_ref_data_at_catalogue_places(
+    spec, ends, expected
+):
+    # No gauge view draws a dimension over no spring: the catalogue sizes are
+    # parenthesized inch REF data lines beside the ITEM row.
+    lines = layout.extension_spring_data(
+        free_length_mm=spec.FREE_LENGTH_MM,
+        max_length_mm=spec.MAX_LENGTH_MM,
+        coil_od_mm=spec.SUPPLIER_COIL_OD_MM,
+        wire_dia_mm=spec.SUPPLIER_WIRE_DIA_MM,
+        precision=spec.SUPPLIER_PRECISION,
+        ends=ends,
+    )
+    assert lines == expected
+    assert set(spec.SUPPLIER_PRECISION) == {
+        extension.FREE_LENGTH,
+        extension.MAX_LENGTH,
+        extension.COIL_OD,
+        extension.WIRE_DIA,
     }

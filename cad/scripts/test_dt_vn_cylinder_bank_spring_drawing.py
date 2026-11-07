@@ -483,7 +483,7 @@ def test_fixed_texts_fit_their_cells() -> None:
     import draw_dt_vn_cylinder_bank_spring as drawing
     from _supplier_spring_drawing import supplier_state_cells
 
-    cells = {key: cell for key, _, cell in supplier_state_cells(0.0, maximum=False)}
+    cells = {key: cell for key, _, cell in supplier_state_cells(0.0)}
     for key, sides in drawing.TEXT_SIDES.items():
         x0, _y0, x1, _y1 = cells[key]
         for name in sides:
