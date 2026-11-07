@@ -301,15 +301,17 @@ RECEIPT_SHEET = 2
 # The flag, a note of its own under the station stack, names the note's check.
 RECEIPT_FLAG = "MATCH-TRANSFER TO BASE BAR MHA-CH-06-TL-20; STATIONS REF"
 END_FIT_CALLOUT = (
-    "RAIL ENDS FLUSH WITH BASE BAR ENDS [A]\n"
+    "RAIL ENDS FLUSH WITH BASE BAR ENDS\n"
     "PASSES: MHA-CH-06-TL-00 SHEET 1 LIMITS; SEALS ON RAIL, NO BIND."
 )
-WALL_ACCEPTANCE_IN = f"{base_bar.WALL_TARGET_MM / trammel.INCH:.3f}".removeprefix("0")
+# Main's explicit 2026-11-07 sheet ruling prints the metric wall as 2.0 MIN.
+# The existing conservative 2.032 mm source-envelope guard remains unchanged.
+WALL_ACCEPTANCE_MM = 2.0
 DRAWING_NOTES = "\n".join(
     (
-        f"[A] WALL FROM EACH RAIL COUNTERBORE TO RAIL END: {WALL_ACCEPTANCE_IN} IN MIN.",
-        f"MHA-CH-06-TL-20: TAP WALL TO ENDS, SLOTS, COUNTERBORES {WALL_ACCEPTANCE_IN} IN MIN.",
-        "TRANSFER TO MHA-CH-06-TL-20; KEEP PAIRS; ALL SCREWS FREE BY HAND.",
+        f"[A] WALL FROM EACH END COUNTERBORE TO RAIL END: {WALL_ACCEPTANCE_MM:.1f} MIN.",
+        "KEEP EACH RAIL WITH ITS MATCHED BASE BAR.",
+        "ALL SCREWS MUST ENTER FREELY BY HAND.",
     )
 )
 # The member's native BOM row under the kit's one Number.

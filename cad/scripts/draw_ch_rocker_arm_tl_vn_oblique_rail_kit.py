@@ -47,6 +47,7 @@ from _drawing_dimensions import (
     set_dimension_callouts,
     set_reference_dimension,
 )
+from _drawing_leader_notes import add_attached_note
 from _drawing_layout_check import LeaderSegment, _segment_crosses_box
 from _drawing_leaders import Box, Segment, dimension_segments
 from _drawing_projection import model_points_in_view
@@ -266,6 +267,23 @@ RECEIPT_FLAG_CELL = (
     RECEIPT_FLAG_XY[1] + 0.001,
 )
 
+# Two short feature flags at each end: one on the counterbore rim and one
+# on the rail end. Their lanes stay outside the Length callout's native ink.
+_NEAR_END_X = FRONT_CENTER[0] - _FRONT_HALF[0]
+_FAR_END_X = FRONT_CENTER[0] + _FRONT_HALF[0]
+WALL_FLAGS = (
+    ("near end", (_NEAR_END_X, FRONT_CENTER[1]), (0.024, 0.179)),
+    ("near counterbore", (
+        _NEAR_END_X + rail.HOLE_X[0] * _sheet_mm(SHEET_SCALE),
+        FRONT_CENTER[1] + rail.CBORE_DIA / 2.0 * _sheet_mm(SHEET_SCALE),
+    ), (0.044, 0.190)),
+    ("far end", (_FAR_END_X, FRONT_CENTER[1]), (0.302, 0.179)),
+    ("far counterbore", (
+        _NEAR_END_X + rail.HOLE_X[-1] * _sheet_mm(SHEET_SCALE),
+        FRONT_CENTER[1] + rail.CBORE_DIA / 2.0 * _sheet_mm(SHEET_SCALE),
+    ), (0.296, 0.190)),
+)
+
 # View captions (3 mm text, top edge at y, centred on the view): each under
 # its view's outline, FRONT's under its stack's flag.
 _CAPTION_GAP = 0.0027
@@ -301,7 +319,8 @@ RECEIPT_NOTE_CELL = (0.015, _NOTES_BOTTOM - 0.001, _FOOTER_RIGHT, RECEIPT_NOTE_T
 
 
 def caption_text(label: str, scale: tuple[int, int]) -> str:
-    return f"{label}  {scale[0]}:{scale[1]}"
+    printed_label = "VIEW A" if label == "RIGHT" else label
+    return f"{printed_label}  {scale[0]}:{scale[1]}"
 
 
 def _center_outline(view: Any, name: str, center: tuple[float, float]) -> None:
@@ -626,6 +645,14 @@ def append_rail_receipt_sheet(adapter: Any) -> tuple[Callable[[], None], ...]:
             notes.append((note, text, text, box))
         flag_note = notes[-1][0]
         note = _literal_note(adapter, ITEM_LABEL, *ITEM_LABEL_XY)
+        for label, edge_xy, note_xy in WALL_FLAGS:
+            wall_note = add_attached_note(
+                adapter, front, text="[A]", entity_xy=edge_xy,
+                note_xy=note_xy, label=f"rail wall {label}",
+            )
+            box = (note_xy[0] - 0.001, note_xy[1] - 0.007,
+                   note_xy[0] + 0.012, note_xy[1] + 0.002)
+            notes.append((wall_note, "[A]", "[A]", box))
         notes.append((note, ITEM_LABEL, ITEM_LABEL, ITEM_LABEL_CELL))
         note = _literal_note(adapter, rail.DRAWING_NOTES, _NOTE_X, RECEIPT_NOTE_TOP)
         notes.append((note, rail.DRAWING_NOTES, rail.DRAWING_NOTES, RECEIPT_NOTE_CELL))

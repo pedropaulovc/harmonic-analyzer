@@ -421,18 +421,23 @@ def test_rail_receipt_note_points_at_the_stations() -> None:
     assert len(lines) == 3
     assert all(len(line) <= 70 for line in lines), lines
     note = " ".join(lines)
-    assert bar["number"] in note
-    assert rail.WALL_ACCEPTANCE_IN == ".080"
-    assert f"WALL FROM EACH RAIL COUNTERBORE TO RAIL END: {rail.WALL_ACCEPTANCE_IN} IN MIN." in note
-    assert f"MHA-CH-06-TL-20: TAP WALL TO ENDS, SLOTS, COUNTERBORES {rail.WALL_ACCEPTANCE_IN} IN MIN." in note
+    assert rail.WALL_ACCEPTANCE_MM == 2.0
+    assert "WALL FROM EACH END COUNTERBORE TO RAIL END: 2.0 MIN." in note
+    assert "TAP WALL" not in note
+    assert "TRANSFER TO" not in note
     assert "MHA-CH-06-TL-00 SHEET 1 LIMITS; SEALS ON RAIL, NO BIND" in rail.END_FIT_CALLOUT
-    assert "KEEP PAIRS; ALL SCREWS FREE BY HAND" in note
+    assert "KEEP EACH RAIL WITH ITS MATCHED BASE BAR" in note
+    assert "ALL SCREWS MUST ENTER FREELY BY HAND" in note
     assert f"BASE BAR {bar['number']}" in rail.RECEIPT_FLAG
     assert "STATIONS REF" in rail.RECEIPT_FLAG
-    assert rail.END_FIT_CALLOUT.splitlines()[0] == "RAIL ENDS FLUSH WITH BASE BAR ENDS [A]"
+    assert rail.END_FIT_CALLOUT.splitlines()[0] == "RAIL ENDS FLUSH WITH BASE BAR ENDS"
     assert len(rail.END_FIT_CALLOUT.splitlines()) == 2
     assert rail.CBORE_END_WALL_WORST >= base_bar.WALL_TARGET_MM
     assert rail.CBORE_END_WALLS_WORST == pytest.approx((6.214, 5.96))
+    assert {label for label, _, _ in draw.WALL_FLAGS} == {
+        "near end", "far end", "near counterbore", "far counterbore",
+    }
+    assert draw.caption_text("RIGHT", (2, 1)) == "VIEW A  2:1"
 
 
 @pytest.mark.parametrize("bar_deviation", (-trammel.RAIL_LENGTH_BAND, trammel.RAIL_LENGTH_BAND))
@@ -885,7 +890,8 @@ def test_receipt_sheet_views_captions_and_notes_fit() -> None:
         cell = cells[f"*{label.title()}"]
         assert y < cell[1] and cell[0] < x < cell[2], label
         assert y - 0.006 > footer, label
-        assert draw.caption_text(label, scale).startswith(label)
+        expected_label = "VIEW A" if label == "RIGHT" else label
+        assert draw.caption_text(label, scale).startswith(expected_label)
         box = (x - draw._CAPTION_HALF_WIDTH, y - 0.006, x + draw._CAPTION_HALF_WIDTH, y + 0.001)
         caption_boxes[label] = box
         for text_name, text in texts.items():
