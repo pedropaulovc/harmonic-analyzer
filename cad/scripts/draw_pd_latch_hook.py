@@ -18,7 +18,7 @@ edge -- lands where the layout puts it):
   the full round; left of it the formed overall height, a reference from
   the ear's top edge to the full round's tip; beside it the flat pattern,
   the part's hidden ``FlatBlank`` reference sketch shown in this view only
-  (labelled VIEW A (FLAT PATTERN); its outline black at the visible-edge
+  (labelled FLAT PATTERN; its outline black at the visible-edge
   weight, its bend centrelines black chain lines): the blank across the
   bend, the arm's two strip widths (its controlling widths), its developed
   stations of the taper and the round's centre (centre-marked), and the
@@ -212,8 +212,9 @@ def _on(point: tuple[float, float], u: float, n: float = 0.0) -> tuple[float, fl
 # The screws' size and its five-row callout stand far left and low, ~3 mm
 # over the roll radius's break: SolidWorks centres the block on this point
 # and runs the leader from the last row's underline, 1/16 in past the widest
-# row (LOCATE ... TAPS), straight at the far hole's centre.  From (-25, -8)
-# that line climbed 25 deg off vertical through the S of TAPS (farm run
+# row (FOR ... TAPS; LOCATE ... TAPS in that run), straight at the far
+# hole's centre.  From (-25, -8) that line climbed 25 deg off vertical
+# through the S of TAPS (farm run
 # 20261105T023327427Z, layout audit dim-line-through-own-text); here it
 # rises 7 deg off vertical, ~0.7 mm clear of TAPS, the block's left end
 # 3 mm inside the border and its 2X 18 mm under ScrewY's extension.

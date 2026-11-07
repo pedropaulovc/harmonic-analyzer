@@ -69,13 +69,13 @@ from pd_transgear_disc_hub_geometry import BOLT_CIRCLE_DIA
 from pd_transgear_disc_hub_spec import (
     BORE_DATUM,
     BORE_DIA,
+    BORE_FIT_NOTE,
+    BORE_FIT_TEXT,
     BORE_WALL_TEXT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FLANGE_DIA,
     FLANGE_THICK_CALLOUT,
-    FLAT_FIT_NOTE,
-    FLAT_FIT_TEXT,
     GEOMETRIC_TOLERANCES_IN,
     HUB_FRONT_Z,
     HUB_LENGTH_CALLOUT,
@@ -83,13 +83,12 @@ from pd_transgear_disc_hub_spec import (
     OIL_HOLE_STATION,
     SCREW_HOLE_CALLOUT_ABOVE,
     SCREW_HOLE_CALLOUT_BELOW,
-    SLEEVE_NUMBER,
     SPIGOT_CALLOUT_BELOW,
     SPIGOT_DIA,
-    SPIGOT_FIT_NOTE,
-    SPIGOT_FIT_TEXT,
     SPIGOT_LENGTH,
     SPIGOT_LENGTH_CALLOUT,
+    STACK_NOTE,
+    STACK_TEXT,
 )
 
 
@@ -138,24 +137,23 @@ SPIGOT_END_X = _side_x(SPIGOT_LENGTH)
 _FLANGE_R = FLANGE_DIA / 2.0 * _S
 _SPIGOT_R = SPIGOT_DIA / 2.0 * _S
 
-# The round bore is reamed (the owned .3135 reamer) before the flat is cut,
-# so its band is the shop table's reamed row; REAM marks the fit, and the
-# callout names it and its mate (rule 4).  Its last line states the finished
-# wall over it, the body's and the spigot's (#2168, rule 20).  The flat's
-# location carries only its value and band: its matched fit is the numbered
-# note it links (rule 7).
+# The D-bore takes no process word: a reamer or boring bar would cut the
+# flat away.  Its round and its flat are one feature whose matched fit to
+# the sleeve is the numbered note both link (rule 4, named once; rule 7).
+# The bore's last line states the finished wall over it, the body's and the
+# spigot's (#2168, rule 20).
 BORE_CALLOUT = "\n".join(
     (
-        "REAM THRU",
-        f"SLIDING FIT ON {SLEEVE_NUMBER}",
+        "THRU",
+        f"SEE NOTE {BORE_FIT_NOTE}",
         BORE_WALL_TEXT,
     )
 )
-FLAT_CALLOUT = f"SEE NOTE {FLAT_FIT_NOTE}"
-# The two matched fits, numbered in the order their callouts link them;
-# top-left anchored in the empty field above the face view, left of the
-# overall's stack callout.
-_NOTE_WIDTH = 60
+FLAT_CALLOUT = f"SEE NOTE {BORE_FIT_NOTE}"
+# The numbered notes, in the order their callouts link them; top-left
+# anchored in the empty field above the face view, left of the overall's
+# callout.
+_NOTE_WIDTH = 92
 
 
 def _numbered(number: int, text: str) -> str:
@@ -170,9 +168,12 @@ def _numbered(number: int, text: str) -> str:
 
 
 NOTES_TEXT = "\n".join(
-    (
-        _numbered(SPIGOT_FIT_NOTE, SPIGOT_FIT_TEXT),
-        _numbered(FLAT_FIT_NOTE, FLAT_FIT_TEXT),
+    _numbered(number, text)
+    for number, text in sorted(
+        (
+            (BORE_FIT_NOTE, BORE_FIT_TEXT),
+            (STACK_NOTE, STACK_TEXT),
+        )
     )
 )
 NOTES_XY = (0.020, 0.262)
@@ -221,12 +222,12 @@ NOTES_XY = (0.020, 0.262)
 #   flange's extension lines; the spigot end's inside the spigot's, between
 #   its upper extension line and its diameter's text, left of that
 #   dimension's line.
-# Estimated (width, height) of the bore's block: the two size rows, REAM,
-# the fit and the wall row (5.3 mm a row, 2.4 mm a character, as run
+# Estimated (width, height) of the bore's block: the two size rows, THRU,
+# the note link and the wall row (5.3 mm a row, 2.4 mm a character, as run
 # 20261101T054343686Z printed the seven-row block).  The shoulder sits on
 # the bore's -60° ray, the block's top under the oil hole's block and its
 # right end left of the title block.
-BORE_TEXT_BLOCK = (0.058, 0.027)
+BORE_TEXT_BLOCK = (0.040, 0.027)
 _BORE_SHOULDER_DROP = 0.108
 _BORE_SHOULDER = (
     END_CENTER[0] + _BORE_SHOULDER_DROP / math.tan(math.radians(60.0)),

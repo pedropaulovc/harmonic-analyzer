@@ -42,9 +42,9 @@ from pd_support_bar_spec import (
     UNIT,
 )
 
-# The clamp holes' row height and stations print .XXX: their position band
-# (build_pd_support_bar.CLAMP_POSITION_BAND) is the MHA-SH-02 back-arc taps'
-# fixed-fastener stack, which the title block's .XX ±.01 would overrun.
+# The clamp holes' row height and stations print .XXX alone: the title
+# block's ±.005 (build_pd_support_bar.CLAMP_POSITION_BAND) holds the MHA-SH-02
+# back-arc taps' fixed-fastener stack, which the .XX row's ±.01 would overrun.
 CLAMP_POSITION_PLACES = 3
 # The clamp counterbores' depth prints .XX: under its band the shallowest
 # depth still sinks the clamp-screw head below the front face the platen
@@ -136,8 +136,11 @@ DIMENSION_CALLOUTS = {
     # thread class is the title block's (rule 2). The pivot is one hole
     # countersunk on both faces: no "2X", which on the hook taps' callout
     # counts holes (r6 machinist review, rule 12).
+    # The hook taps' route under their ±.002 (delegated ruling 2026-11-07,
+    # FoPdFab2 Q1): spotted through the MHA-PD-14 base's holes at assembly.
+    # The pivot's ±.002 is an owner exception (pd-support-bar.yaml RV-01).
     "PivotCskDia": "BOTH FACES\nLOCATES MHA-PD-VN-57",
-    "BracketCskDia": "BOTH FACES\nLOCATE MHA-PD-14",
+    "BracketCskDia": "BOTH FACES\nSPOT THRU MHA-PD-14 AT ASSEMBLY",
     # The slot width's upper limit is the head's: wider, the MHA-SH-VN-53
     # head bears on less floor than over a round hole (CLAMP_HEAD_BEARING_MIN)
     # and nears the counterbore's wall (clamp_slot_head_clearance). The

@@ -1,10 +1,10 @@
 r"""MHA-PD-17 transgear-disc-hub: the brass hub and flange in front of the reducer disc.
 
-The retained Ø.52 turned hub has a .313 +.0010/+.0005 bore (an owned .3135
-reamer) on the pinion sleeve's (MHA-PD-10) .313 +.0005/.0000 boss and drives
-through its D-flat, with a Ø1.05 × .094 flange and a Ø.501 SHAFT_H rear
-spigot.  The spigot passes the reducer disc's (MHA-PD-06)
-bore, which pilots on it, and its end seats on the sleeve's step face (the
+The retained Ø.52 turned hub has a .313 +.0010/+.0005 D-bore (fitted to the
+measured boss) on the pinion sleeve's (MHA-PD-10) .313 +.0005/.0000 boss and drives
+through its D-flat, with a Ø1.05 × .094 flange and a Ø.501 +.000/-.001 rear
+spigot.  The spigot passes the reducer disc's (MHA-PD-06) bore, which it
+clears (the disc is centred at assembly), and its end seats on the sleeve's step face (the
 12T's tooth ends); the flange's rear face clamps the disc's front face, the
 spigot's length ahead of the step.  Three #0-80 fillister screws (MHA-PD-VN-55)
 pass the flange's #51 holes on the Ø.75 circle into the disc's taps
@@ -92,7 +92,7 @@ MM_PER_IN = 25.4
 
 # The mating parts the sheet names, by name and number (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)): the
 # feed pinion whose boss and flat the hub's bore slides on, the disc that
-# pilots on the spigot, and the disc screws.
+# the spigot clears, and the disc screws.
 SLEEVE_NUMBER = "MHA-PD-10"
 SLEEVE_NAME = "FEED PINION"
 DISC_NUMBER = "MHA-PD-06"
@@ -125,7 +125,7 @@ FLANGE_THICK = 2.3876  # .094
 FLANGE_THICK_PLACES = 3  # the screw-tip-to-platen stack reads it (R9-5)
 HUB_DIA = 13.208  # .52
 HUB_DIA_PLACES = 2
-# The spigot (``pd_transgear_disc_hub_geometry``): its SHAFT_H band is the
+# The spigot (``pd_transgear_disc_hub_geometry``): its turned-row band is the
 # model's, its length the cluster's printed band.
 SPIGOT_DIA_DEVIATIONS = deviations(SPIGOT_DIA_BAND)
 SPIGOT_DIA_MIN = SPIGOT_DIA + SPIGOT_DIA_BAND[1]
@@ -153,10 +153,10 @@ HUB_FRONT_Z = SPIGOT_LENGTH - HUB_LENGTH
 
 # --- bore on the sleeve's boss and flat (MHA-PD-10) ---------------------------
 # Round over the whole length: it locates on the boss's +.0005/.0000 band,
-# .313 +.0010/+.0005, cut by the owned .3135 reamer (the shop table's reamed
-# row).  The flat at local -Y only drives the disc's torque; its plane sits
-# FLAT_TO_AXIS from the axis, printed +.0015/+.0005 above the sleeve flat's
-# 0/-.0006 for a .0005-.0021 clearance, fitted to the measured flat.
+# .313 +.0010/+.0005, fitted to the measured boss (BORE_FIT_TEXT).  The flat
+# at local -Y only drives the disc's torque; its plane sits FLAT_TO_AXIS from
+# the axis, printed +.0015/+.0005 above the sleeve flat's band, fitted to the
+# measured flat.
 BORE_DIA = SLEEVE.BOSS_DIA
 BORE_PLACES = 4
 BORE_BAND = (0.0254, 0.0127)  # (upper, lower) deviations: +.0010/+.0005
@@ -502,38 +502,38 @@ BORE_WALL_TEXT = f"WALL {inch_text(DISC.inch_floor_mm(BORE_WALL_FINISHED_MIN, 3)
 
 # --- sheet --------------------------------------------------------------------
 # Each requirement is flagged at its feature (rule 7): a callout carries at
-# most two lines of words, and the two matched fits whose bands are finer
-# than the shop table's rows are numbered notes their callouts link.
-# The two printed stack lengths name the stack they serve (rule 4): the
-# overall by the drive collar and the disc whose clearance it sets.
+# most two lines of words, and the requirements several dimensions share are
+# numbered notes their callouts link, each stated once.
 COLLAR_NUMBER = _config.parts("pd-transgear-drive-collar")["number"]
-HUB_LENGTH_CALLOUT = f"{STACK_NAME}:\n{COLLAR_NUMBER} TO {DISC_NUMBER} CLEARANCE"
-SPIGOT_LENGTH_CALLOUT = STACK_NAME
+# The D-bore is one feature with two bands finer than their rows (the round's
+# .0005, the flat's .0010): one matched fit to the measured sleeve boss and
+# flat, named once and linked from both.  No process word: a reamer or a
+# boring bar would cut the flat away, so the D is the shop's to make.
+BORE_FIT_NOTE = 1
+BORE_FIT_TEXT = (
+    f"SLIDING FIT ON {SLEEVE_NAME} {SLEEVE_NUMBER} BOSS AND FLAT: FIT TO THE "
+    f"MEASURED BOSS, CLEARANCE {inch_text(BOSS_CLEARANCE_LIMITS[0], 4)}-"
+    f"{inch_text(BOSS_CLEARANCE_LIMITS[1], 4)} ON THE ROUND AND "
+    f"{inch_text(FLAT_CLEARANCE[0], 4)}-{inch_text(FLAT_CLEARANCE[1], 4)} "
+    "ON THE FLAT."
+)
+# The overall and the spigot's length both print the disc cluster's band and
+# serve one stack (rule 4): one note, named once, linked from both.
+STACK_NOTE = 2
+STACK_TEXT = f"{STACK_NAME}: SETS {COLLAR_NUMBER} TO {DISC_NUMBER} CLEARANCE."
+HUB_LENGTH_CALLOUT = f"SEE NOTE {STACK_NOTE}"
+SPIGOT_LENGTH_CALLOUT = f"SEE NOTE {STACK_NOTE}"
 # The flange's .XXX thickness sets the disc screws' reach (the cut window
 # in pd_vn_transgear_disc_screw_spec reads it).
 FLANGE_THICK_CALLOUT = f"SETS {SCREW_NAME}\n{SCREW_NUMBER} REACH"
-# The spigot's native SHAFT_H band (.0008 wide) is finer than the turned
-# diameter's row, so it is a matched fit to the measured disc bore, stated in
-# its numbered note; the callout links it and names the sharp root.
-SPIGOT_FIT_NOTE = 1
-SPIGOT_FIT_TEXT = (
-    f"LOCATING FIT IN {DISC_NAME} {DISC_NUMBER} BORE: TURN TO THE MEASURED "
-    f"BORE, CLEARANCE {inch_text(DISC.SPIGOT_DIAMETRAL_CLEARANCE[0], 4)}-"
-    f"{inch_text(DISC.SPIGOT_DIAMETRAL_CLEARANCE[1], 4)}."
-)
+# The spigot only clears the disc's bore (the disc is centred at assembly);
+# its turned-row band keeps it clear at the bore's least size.  The callout
+# names the bore it clears and the sharp root the disc's face seats past.
 SPIGOT_CALLOUT_BELOW = "\n".join(
     (
-        f"SEE NOTE {SPIGOT_FIT_NOTE}",
+        f"CLEARS {DISC_NUMBER} BORE",
         f"SPIGOT ROOT R{inch_text(CORNER_RADIUS_MAX, 3)} MAX",
     )
-)
-# The bore flat's band is finer than the milled step's row, so it too is a
-# matched fit, to the measured sleeve flat.
-FLAT_FIT_NOTE = 2
-FLAT_FIT_TEXT = (
-    f"SLIDING FIT ON {SLEEVE_NAME} {SLEEVE_NUMBER} FLAT: CUT THE BORE FLAT TO "
-    f"THE MEASURED FLAT, CLEARANCE {inch_text(FLAT_CLEARANCE[0], 4)}-"
-    f"{inch_text(FLAT_CLEARANCE[1], 4)}."
 )
 
 # Callouts the sheet hangs on the native dimensions.  The holes are drilled

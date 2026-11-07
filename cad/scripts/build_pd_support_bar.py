@@ -177,8 +177,10 @@ CLAMP_STATIONS = tuple(x - CLAMP_ROW_START_X for x in CLAMP_ROW_X)
 # the basic major by CLAMP_HOLE_FLOAT. A coordinate ±band is a diametral zone of
 # 2·√2·band (the rounding to the printed places included), and the bar's
 # zone plus the tap's must stay inside the float. The row height and
-# stations, at .XXX, take the widest band that does: ±.006 (the .XX row's
-# ±.01 would need more than the whole float).
+# stations print .XXX with no band of their own: the title block's ±.005
+# holds the stack (delegated ruling 2026-11-07, FoPdFab2 Q2, as on the MHA-MG
+# wheel bar; the ±.007 it replaces was the widest .XXX band that fit). The
+# .XX row's ±.01 would need more than the whole float.
 CLAMP_HOLE_FLOAT = CLAMP_HOLE_DIA - CLAMP_SCREW_MAJOR
 BACK_ARC_TAP_ZONE = 2.0 * math.hypot(
     BACK_ARC_TAP_STATION_BAND, BACK_ARC_TAP_HEIGHT_BAND
@@ -201,21 +203,12 @@ def clamp_position_zone(band: float) -> float:
     )
 
 
-# One step of the printed places, in millimetres.
-_CLAMP_POSITION_STEP = 25.4 * 10.0**-CLAMP_POSITION_PLACES
-CLAMP_POSITION_BAND = _CLAMP_POSITION_STEP * max(
-    (
-        k
-        for k in range(1, math.ceil(CLAMP_HOLE_FLOAT / _CLAMP_POSITION_STEP))
-        if clamp_position_zone(k * _CLAMP_POSITION_STEP) + BACK_ARC_TAP_ZONE
-        <= CLAMP_HOLE_FLOAT + 1e-9
-    ),
-    default=0,
-)
-if CLAMP_POSITION_BAND <= 0.0:
+CLAMP_POSITION_BAND = printed_band_mm(CLAMP_POSITION_PLACES, unit=UNIT)
+if clamp_position_zone(CLAMP_POSITION_BAND) + BACK_ARC_TAP_ZONE > CLAMP_HOLE_FLOAT:
     raise AssertionError(
-        "MHA-SH-VN-53 screws in the MHA-SH-02 taps through the support bar: no "
-        f".XXX clamp-hole position band fits the {CLAMP_HOLE_FLOAT:.4f} float"
+        "MHA-SH-VN-53 screws in the MHA-SH-02 taps through the support bar: the "
+        f".XXX title-block clamp-hole position over-runs the {CLAMP_HOLE_FLOAT:.4f} "
+        "float"
     )
 
 # --- West clamp slots: owner ruling 2026-10-15, option A (PR #1471 r3) -------
@@ -965,9 +958,10 @@ async def build(adapter) -> dict[str, str]:
     # The rest of the print's places, then its bands and limits: the hanger
     # holes' row and stations carry the pivot and hook positions' ±.002
     # (HOLE_POSITION_TOL; paper_drive_geom and transgear_hanger_joints read
-    # HOLE_POSITION_BAND, its printed reach), the clamp holes' row and
-    # stations the MHA-SH-02 taps' CLAMP_POSITION_BAND; the countersinks their
-    # single MAX limits. The bands are millimetres; UNIT prints them in inches.
+    # HOLE_POSITION_BAND, its printed reach); the clamp holes' row and
+    # stations print .XXX alone, under the title block's CLAMP_POSITION_BAND;
+    # the countersinks their single MAX limits. The bands are millimetres;
+    # UNIT prints them in inches.
     apply_drawing_precision(adapter, SHEET_PRECISION)
     for name in ("HangerRowHeight", *HANGER_STATION_NAMES):
         set_dimension_symmetric_tolerance(
@@ -975,14 +969,6 @@ async def build(adapter) -> dict[str, str]:
             "HangerRowReference",
             name,
             HOLE_POSITION_TOL,
-            display_unit=UNIT,
-        )
-    for name in ("ClampRowHeight", *CLAMP_STATION_NAMES):
-        set_dimension_symmetric_tolerance(
-            adapter,
-            "ClampRowReference",
-            name,
-            CLAMP_POSITION_BAND,
             display_unit=UNIT,
         )
     _max_limit(adapter, "CountersinkReference", "PivotCskDia", PIVOT_TAP_CSK_DIA)

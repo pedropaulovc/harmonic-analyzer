@@ -131,10 +131,10 @@ def test_the_overall_and_the_spigot_are_terms_of_the_disc_cluster_stack() -> Non
     )
     assert "HubLength" not in spec.REFERENCE_DIMENSIONS
     callouts = drawing.DIMENSION_CALLOUTS_BELOW
-    assert callouts["HubLength"] == spec.HUB_LENGTH_CALLOUT
-    assert callouts["SpigotLength"] == spec.SPIGOT_LENGTH_CALLOUT
-    assert STACK_NAME in callouts["HubLength"]
-    assert STACK_NAME in callouts["SpigotLength"]
+    assert callouts["HubLength"] == callouts["SpigotLength"] == (
+        f"SEE NOTE {spec.STACK_NOTE}"
+    )
+    assert STACK_NAME in spec.STACK_TEXT
 
 
 def test_the_bore_the_spigot_and_the_stack_lengths_carry_model_bands() -> None:
@@ -192,12 +192,14 @@ def test_the_d_bore_slides_on_the_sleeve_boss_and_flat_at_every_printed_limit() 
     assert round_fit == pytest.approx(spec.BOSS_CLEARANCE_LIMITS, abs=1e-6)
     assert spec.BOSS_CLEARANCE == spec.BOSS_CLEARANCE_LIMITS[1]
     assert flat_fit == pytest.approx(spec.FLAT_CLEARANCE, abs=1e-6)
-    assert spec.SLEEVE_NUMBER in drawing.DIMENSION_CALLOUTS_BELOW["BoreDia"]
-    assert drawing.DIMENSION_CALLOUTS_BELOW["FlatToAxis"] == f"SEE NOTE {spec.FLAT_FIT_NOTE}"
-    flat_note = " ".join(spec.FLAT_FIT_TEXT.split())
-    printed = re.search(r"CLEARANCE (\d*\.\d+-\d*\.\d+)\.", flat_note)
-    assert printed is not None
-    assert _clr(printed.group(1)) == pytest.approx(flat_fit, abs=0.00005 * IN)
+    link = f"SEE NOTE {spec.BORE_FIT_NOTE}"
+    assert link in drawing.DIMENSION_CALLOUTS_BELOW["BoreDia"].splitlines()
+    assert drawing.DIMENSION_CALLOUTS_BELOW["FlatToAxis"] == link
+    note = " ".join(spec.BORE_FIT_TEXT.split())
+    printed = re.findall(r"(\d*\.\d+-\d*\.\d+) ON THE (ROUND|FLAT)", note)
+    assert [kind for _, kind in printed] == ["ROUND", "FLAT"]
+    assert _clr(printed[0][0]) == pytest.approx(round_fit, abs=0.00005 * IN)
+    assert _clr(printed[1][0]) == pytest.approx(flat_fit, abs=0.00005 * IN)
 
 
 def test_boss_round_engagement_and_available_flat_face_follow_the_live_sleeve() -> None:
@@ -256,14 +258,14 @@ def test_boss_round_engagement_and_available_flat_face_follow_the_live_sleeve() 
 
 
 def test_the_spigot_seats_on_the_step_square_and_clear_of_the_disc() -> None:
-    """R9-68: the spigot pilots the disc's bore and seats on the 12T's step.
+    """R9-68: the spigot clears the disc's bore and seats on the 12T's step.
     Its end and the flange's rear face are square to the bore (datum A) on
     the sheet; the disc's tilt reads both, the step's and the hub's rock on
     the boss, and its rear face stays in air ahead of the step."""
     import pd_rack_pinion_spec as disc
     import pd_transgear_feed_pinion_spec as sleeve
 
-    # The spigot pilots the disc: the two printed bands never bind.
+    # The spigot clears the disc's bore: the two printed bands never bind.
     spigot = (
         spec.SPIGOT_DIA + spec.SPIGOT_DIA_BAND[1],
         spec.SPIGOT_DIA + spec.SPIGOT_DIA_BAND[0],
@@ -272,13 +274,7 @@ def test_the_spigot_seats_on_the_step_square_and_clear_of_the_disc() -> None:
     fit = (disc_bore[0] - spigot[1], disc_bore[1] - spigot[0])
     assert fit == pytest.approx(disc.SPIGOT_DIAMETRAL_CLEARANCE)
     assert fit[0] >= 0.0
-    assert drawing.DIMENSION_CALLOUTS_BELOW["SpigotDia"].splitlines()[0] == (
-        f"SEE NOTE {spec.SPIGOT_FIT_NOTE}"
-    )
-    note = " ".join(spec.SPIGOT_FIT_TEXT.split())
-    printed = re.search(r"CLEARANCE (\d*\.\d+-\d*\.\d+)\.", note)
-    assert printed is not None
-    assert _clr(printed.group(1)) == pytest.approx(fit, abs=0.00005 * IN)
+    assert spec.DISC_NUMBER in drawing.DIMENSION_CALLOUTS_BELOW["SpigotDia"].splitlines()[0]
     # The common seat annulus at the actual partial-depth cutter end, with
     # every printed radial/tip/step/full-depth corner bounded by its owner.
     assert spec.SEAT_CONTACT_R == pytest.approx(
@@ -577,8 +573,7 @@ def test_every_mate_the_sheet_cites_is_named_with_its_own_number() -> None:
     printed = " ".join(_sheet_text().split())
     cited = re.findall(r"MHA-(?!VN-)[A-Z]{2}-(?:[0-9]{2}(?:-TL-(?:[0-9]{2}|VN-[5-9][0-9]))?|VN-[5-9][0-9])(?:-T[0-9]{3})?(?![A-Z0-9-])", printed)
     assert set(cited) == cited_mates
-    assert f"{spec.DISC_NAME} {spec.DISC_NUMBER}" in spec.SPIGOT_FIT_TEXT
-    assert f"{spec.SLEEVE_NAME} {spec.SLEEVE_NUMBER}" in spec.FLAT_FIT_TEXT
+    assert f"{spec.SLEEVE_NAME} {spec.SLEEVE_NUMBER}" in spec.BORE_FIT_TEXT
 
 
 def test_walls_hold_at_the_worst_case_the_sheet_prints() -> None:
@@ -654,7 +649,7 @@ def test_finished_walls_over_the_bore_pay_both_end_breaks() -> None:
         }
     )
     assert finished["hub wall over the bore"] == pytest.approx(0.078 * IN, abs=1e-3)
-    assert finished["spigot wall over the bore"] == pytest.approx(0.0731 * IN, abs=1e-3)
+    assert finished["spigot wall over the bore"] == pytest.approx(0.0730 * IN, abs=1e-3)
     for wall in finished.values():
         assert 0.060 * IN - 1e-9 <= wall < WALL_FLOOR
     assert spec.FLAT_WALL_FINISHED == pytest.approx(spec.FLAT_WALL_WORST - breaks)
