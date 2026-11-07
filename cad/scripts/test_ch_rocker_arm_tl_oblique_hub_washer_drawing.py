@@ -180,10 +180,13 @@ def test_every_callout_keeps_to_two_lines_of_words() -> None:
 
 def test_every_marked_dimension_has_one_view_and_model_places() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    assert set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) == marked
-    assert not set(drawing.FRONT_KEEP) & set(drawing.RIGHT_KEEP)
+    views = (drawing.FRONT_KEEP, drawing.RIGHT_KEEP, drawing.DETAIL_KEEP)
+    assert set().union(*views) == marked
+    assert sum(len(view) for view in views) == len(marked)
     assert set(drawing.FRONT_KEEP) == spec.DRAWING_DIMENSIONS["BoreProfile"]
-    assert set(drawing.RIGHT_KEEP) == spec.DRAWING_DIMENSIONS["WasherProfile"]
+    assert set(drawing.RIGHT_KEEP) | set(drawing.DETAIL_KEEP) == (
+        spec.DRAWING_DIMENSIONS["WasherProfile"]
+    )
     assert spec.DRAWING_PRECISION_BY_NAME == {
         "WasherOd": 3,
         "WasherThickness": 2,
@@ -216,25 +219,55 @@ def test_turned_profile_frame_and_volume() -> None:
     assert part.BORE_CUT_DEPTH / 2.0 > max(spec.THICK, spec.SPIGOT_LENGTH)
 
 
-def test_side_view_dimensions_sit_clear_of_the_part() -> None:
+def test_side_view_diameters_sit_clear_of_the_part() -> None:
     s = drawing._S
-    top = drawing.RIGHT_CENTER[1] + spec.OD / 2.0 * s
     assert drawing.HEAD_FACE_X < drawing.SEAT_FACE_X < drawing.SPIGOT_END_X
     assert drawing.SPIGOT_END_X - drawing.HEAD_FACE_X == pytest.approx(spec.HEIGHT * s)
+    assert set(drawing.RIGHT_KEEP) == {"WasherOd", "SpigotDia"}
     # Flange Ø left of the head-side face, spigot Ø right of the spigot end.
     assert drawing.HEAD_FACE_X - drawing.RIGHT_KEEP["WasherOd"][0] >= 0.030
     assert drawing.RIGHT_KEEP["SpigotDia"][0] - drawing.SPIGOT_END_X >= 0.030
-    # Both lengths chain on one row above the part, text off the narrow spans.
-    rows = {drawing.RIGHT_KEEP[name][1] for name in ("WasherThickness", "SpigotLength")}
-    assert rows == {drawing._LENGTH_ROW_Y}
-    assert drawing._LENGTH_ROW_Y - top >= 0.025
-    # The thickness's three callout rows stand well left of the head-side
-    # face's extension line.
-    assert drawing.LENGTH_TEXT_XY["WasherThickness"][0] < drawing.HEAD_FACE_X - 0.035
-    assert drawing.LENGTH_TEXT_XY["SpigotLength"][0] > drawing.SPIGOT_END_X + 0.030
     # Each Ø's text block centres on the axis, midway between its arrows.
     assert drawing.RIGHT_KEEP["WasherOd"][1] == drawing.RIGHT_CENTER[1]
     assert drawing.RIGHT_KEEP["SpigotDia"][1] == drawing.RIGHT_CENTER[1]
+
+
+def test_detail_a_carries_both_lengths_on_separate_rows() -> None:
+    # Farm r1: at 4:1 the chained .06 and .014 piled their arrowheads on the
+    # shared seat-face extension line; detail A reads them at 20:1.
+    assert set(drawing.DETAIL_KEEP) == {"WasherThickness", "SpigotLength"}
+    assert drawing.DETAIL_SCALE == (20, 1)
+    ds = drawing._DS
+    assert drawing.DETAIL_SPIGOT_X - drawing.DETAIL_SEAT_X == pytest.approx(
+        spec.SPIGOT_LENGTH * ds
+    )
+    assert drawing.DETAIL_SEAT_X - drawing.DETAIL_HEAD_X == pytest.approx(spec.THICK * ds)
+    assert drawing.DETAIL_SPIGOT_X - drawing.DETAIL_SEAT_X > 0.006
+    # The fence takes in every length corner and stays above the axis, so
+    # neither Ø (measured from the axis) comes into the detail.
+    for corner in (drawing._HEAD_CORNER, drawing._SEAT_CORNER, drawing._SPIGOT_CORNER):
+        assert math.dist(drawing.DETAIL_FOCUS_MM, corner) < drawing.DETAIL_RADIUS_MM
+    assert drawing.DETAIL_FOCUS_MM[1] - drawing.DETAIL_RADIUS_MM > spec.ID / 2.0
+    # Two rows, both above the profile, so the arrowheads on the shared
+    # extension line stand apart.
+    thick_row = drawing.DETAIL_KEEP["WasherThickness"][1]
+    spigot_row = drawing.DETAIL_KEEP["SpigotLength"][1]
+    assert spigot_row > drawing.DETAIL_OD_TOP_Y
+    assert thick_row - spigot_row >= 0.008
+    # Each text block on its own side, off the circle.
+    cx, cy = drawing.DETAIL_CENTER
+    r = drawing.DETAIL_CROP_RADIUS
+    assert drawing.DETAIL_TEXT_XY["WasherThickness"][0] < drawing.DETAIL_HEAD_X - 0.025
+    assert drawing.DETAIL_TEXT_XY["SpigotLength"][0] > drawing.DETAIL_SPIGOT_X + 0.030
+    for name, (x, y) in drawing.DETAIL_TEXT_XY.items():
+        assert math.dist((x, y), (cx, cy)) > r + 0.020, name
+    # Clear of the bottom border (0.0127), the title block (x 0.216) and the
+    # face view (its bottom near y 0.128).
+    assert drawing.DETAIL_LABEL_XY[1] - 0.010 > 0.0127
+    assert drawing.DETAIL_TEXT_XY["SpigotLength"][0] + 0.030 < 0.216
+    assert max(thick_row, spigot_row) + 0.015 < drawing.FRONT_CENTER[1] - spec.OD / 2.0 * drawing._S
+    # The parent's letter above the flange Ø's upper extension line.
+    assert drawing.DETAIL_LETTER_XY[1] > drawing._OD_TOP_Y + 0.005
 
 
 def _calls(path: str) -> dict[str, ast.Call]:
