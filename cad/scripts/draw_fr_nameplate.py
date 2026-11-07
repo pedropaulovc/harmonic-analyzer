@@ -130,10 +130,14 @@ MINIMUM_NOTES = "\n".join(
     (FLOOR_MINIMUM_NOTE, f"{_SCREW_NUMBER} {SCREW_ENGAGEMENT_NOTE} IN {_BASE_NUMBER}")
 )
 MINIMUM_NOTES_XY = (0.030, 0.055)
-# The thickness is stock with no band of its own, so it carries no reason;
-# the field depth names its feature only (rule 7: no design narration).
+# The thickness is stock with no band of its own, so it carries no reason.
+# The field depth states its function (run 20261107T191011860Z, 2/3: a
+# three-place depth with no band and no stated function, rule 3): its floor
+# stays above the .028 engraving's, which a two-place ±.01 depth could pass.
+# 21 glyphs at ~2.45 mm from the 364.4 mm shelf end 3 mm inside the border;
+# the reviewer's 'SHALLOWER THAN ENGRAVING' would cross it.
 SECTION_CALLOUTS = {
-    "FieldDepth": "SUNK FIELD DEPTH",
+    "FieldDepth": "SUNK FIELD DEPTH\nABOVE ENGRAVING FLOOR",
     "EngravingDepth": ENGRAVING_DEPTH_CALLOUT,
 }
 SECTION_CENTER = (0.350, 0.115)

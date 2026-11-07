@@ -483,8 +483,11 @@ def test_sunk_field_depth_names_why_it_holds_three_places() -> None:
         "FieldDepth": 3,
         "EngravingDepth": 3,
     }
-    rows = print_spec.FIELD_DEPTH_CALLOUT.split("\n")
-    assert rows == ["SUNK FIELD DEPTH", "ENGRAVING BELOW IT"]
+    rows = drawing.SECTION_CALLOUTS["FieldDepth"].split("\n")
+    assert rows == ["SUNK FIELD DEPTH", "ABOVE ENGRAVING FLOOR"]
+    # Left-aligned at the shelf; ~2.45 mm a glyph on the r5 render, the
+    # widest row stays 3 mm inside the 419.1 mm right border.
+    assert drawing.SECTION_KEEP["FieldDepth"][0] + max(map(len, rows)) * 0.00245 < 0.4191 - 0.003
     # The three-row block (value and two callout rows, 4.5 mm each) keeps its
     # leader shelf above the field's outside arrow, ~5.7 mm long on the r4
     # render, at the decorated face.
