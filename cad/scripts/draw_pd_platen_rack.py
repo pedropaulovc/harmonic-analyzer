@@ -295,10 +295,22 @@ async def build(adapter: Any) -> dict[str, str]:
             dimensions_by_feature=DRAWING_DIMENSIONS,
         ),
     ]
-    # Above the value, outside its parentheses: the end view's outline sits
-    # just under both REF lines.
+    # Outside the values' parentheses: the depth's one-line limit above its
+    # value (the end view's outline sits just under it), the height's
+    # two-line limit below its value, right of the rack (an above-callout
+    # holding a line break never prints).
     _parenthesize_values_only(adapter, annotations)
-    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS, location="above")
+    for location in ("above", "below"):
+        set_dimension_callouts(
+            adapter,
+            annotations,
+            {
+                name: text
+                for name, text in DIMENSION_CALLOUTS.items()
+                if ("\n" in text) == (location == "below")
+            },
+            location=location,
+        )
     # Showing EndStockProfile prints the section's real stock outline and seam;
     # it remains hidden in the source part and in the isometric/assembly views.
     for property_name, position in (

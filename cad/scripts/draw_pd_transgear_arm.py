@@ -280,10 +280,10 @@ END_KEEP = {
     "Depth": (END_CENTER[0], _end_y(PIVOT_END_R) + 0.017),
     # Between the end view and the stock text, right of the front face.
     "PinHoleZ": (_end_x(0.0) + 0.017, _end_y(PIVOT_END_R) + 0.006),
-    # Below the end view, above section B-B, right edge inside the border;
-    # half a line lower than the 4-line block so its top stays put with the
-    # ligament fact as a fifth line.
-    "PinHoleDia": (0.384, 0.1593),
+    # Below the end view, above section B-B, right edge inside the border:
+    # 12 mm left of round 2's spot, so the size line's depth (round 2: a
+    # depth is never deferred to a view) still ends inside the border.
+    "PinHoleDia": (0.372, 0.1593),
 }
 # The stock text is far wider than the 15.9 between its extension lines,
 # which ran up into the "7" and the "O" of GROUND, with the dimension line
@@ -393,6 +393,9 @@ _CALLOUT_Y = _front_y(PIVOT_END_R) + 0.0232
 PLATE_CALLOUT_XY = (0.160, _CALLOUT_Y)
 # Their stations print as references: the plate's holes set them.
 TAP_STATION_REFERENCES = ("PlateTapStation1", "PlateTapStation2")
+# The latch-pin hole's depth is its callout's (round 2: a depth is never
+# deferred to a view); section A-A keeps the .33 as a reference.
+LINEAR_REFERENCES = (*TAP_STATION_REFERENCES, "PinHoleDepth")
 TAP_CALLOUTS = (
     (
         "plate taps",
@@ -557,19 +560,21 @@ def _set_tap_callout_text(display: Any, qualifier: str, *, label: str) -> None:
         )
 
 
-def _reference_tap_stations(adapter: Any, annotations: list[Any]) -> None:
-    """Print the plate-tap stations in parentheses, as references: the taps
-    are transferred from MHA-PD-19's holes, so the stations control nothing.
-    Linear dimensions, so no diameter glyph (``set_reference_dimension``)."""
+def _reference_linear_dimensions(adapter: Any, annotations: list[Any]) -> None:
+    """Print the plate-tap stations and the latch-pin hole's depth in
+    parentheses, as references: the taps are transferred from MHA-PD-19's
+    holes, so the stations control nothing, and the depth is the hole
+    callout's.  Linear dimensions, so no diameter glyph
+    (``set_reference_dimension``)."""
     found = set()
     for annotation in annotations:
         name = dimension_name(adapter, annotation)
-        if name in TAP_STATION_REFERENCES:
+        if name in LINEAR_REFERENCES:
             set_reference_dimension(adapter, annotation, label=name)
             found.add(name)
-    missing = set(TAP_STATION_REFERENCES) - found
+    missing = set(LINEAR_REFERENCES) - found
     if missing:
-        raise RuntimeError(f"tap station references never reached the sheet: {sorted(missing)}")
+        raise RuntimeError(f"linear references never reached the sheet: {sorted(missing)}")
 
 
 @_telemetry.traced("drawing.transgear_arm.dowel_group_frame")
@@ -880,7 +885,7 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, annotations, ARM_SHEET_PRECISION)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     set_reference_dimensions(adapter, annotations, ("PivotBoreDia",))
-    _reference_tap_stations(adapter, annotations)
+    _reference_linear_dimensions(adapter, annotations)
     _set_stock_text(adapter, annotations)
     _end_radius_to_arc(adapter, annotations)
     offset_dimension_text(adapter, annotations, {"FloorDepth": FLOOR_TEXT_XY})

@@ -251,16 +251,89 @@ def test_views_and_annotations_stay_in_the_field():
     for xy in points:
         assert _inside(xy, BORDER), xy
         assert not _inside(xy, TITLE_BLOCK), xy
-    # The hole table stands inside the border, left of the title block, clear
-    # of every view and every placed text point, under the width's text.
+    # The hole table stands inside the border, right of VIEW B and above the
+    # title block, clear of every view and every placed text point, under the
+    # thickness's two-row function text over VIEW B (centred on its point).
     table = draw.HOLE_TABLE_BOX
-    assert _inside(table[:2], BORDER) and _inside(table[2:], BORDER)
-    assert table[2] < TITLE_BLOCK[0] and table[1] > BORDER[1] + 0.005
+    gap = 0.002
+    assert table[0] >= BORDER[0] + gap and table[1] >= BORDER[1] + gap
+    assert table[2] <= BORDER[2] - gap and table[3] <= BORDER[3] - gap
+    assert table[1] >= TITLE_BLOCK[3] + gap or table[2] <= TITLE_BLOCK[0] - gap
     for name, box in boxes.items():
         assert not _overlap(table, box), name
     for xy in points:
         assert not _inside(xy, table), xy
-    assert table[3] < draw.FRONT_KEEP["Width"][1] - 2.0 * TEXT_HALF_H - 0.010
+    assert table[0] > boxes["right"][2] + 0.010
+    assert table[3] < draw.RIGHT_KEEP["Depth"][1] - 0.008
+    # VIEW B's caption ("SCALE 1:1", ~23 mm from its top-left point) and the
+    # table keep more than the clear gap between them.
+    assert draw.RIGHT_CAPTION_XY[0] + 0.023 + gap < table[0]
+
+
+def test_hole_table_plans_its_natural_rows_with_margin():
+    # Rows print at their natural ~11 mm (round 2 read 15 rows back at
+    # 0.1644 m; a forced 6 mm never took), so the planned box is 15 x 11 mm and
+    # still stands at least 5 mm over the title block's clearance line.
+    assert draw.HOLE_TABLE_ROW_PITCH >= 0.011
+    assert draw.HOLE_TABLE_BOX[3] - draw.HOLE_TABLE_BOX[1] == pytest.approx(
+        draw.HOLE_TABLE_ROWS * draw.HOLE_TABLE_ROW_PITCH
+    )
+    assert draw.HOLE_TABLE_ROWS * 0.01096 < draw.HOLE_TABLE_BOX[3] - draw.HOLE_TABLE_BOX[1]
+    assert draw.HOLE_TABLE_BOX[1] - (TITLE_BLOCK[3] + 0.002) >= 0.005
+    assert draw.HOLE_TABLE_BOX[2] - draw.HOLE_TABLE_BOX[0] == pytest.approx(
+        sum(draw.HOLE_TABLE_WIDTHS.values())
+    )
+
+
+def test_isometric_and_section_share_the_field_under_the_front_view():
+    # Estimated ink (sheet m) from the v48 render and round 2 telemetry: the
+    # 1:4 isometric ~50 x 57 mm round its centre and its ~60 mm note row; the
+    # section's caption (~46 mm, two rows from its top centre), its cropped
+    # outline and its floor value's three rows hanging under the cut.
+    iso = (
+        draw.ISO_CENTER[0] - 0.025,
+        draw.ISO_CENTER[1] - 0.0285,
+        draw.ISO_CENTER[0] + 0.025,
+        draw.ISO_CENTER[1] + 0.0285,
+    )
+    iso_note = (
+        draw.ISO_NOTE_XY[0],
+        draw.ISO_NOTE_XY[1] - 0.005,
+        draw.ISO_NOTE_XY[0] + 0.060,
+        draw.ISO_NOTE_XY[1],
+    )
+    cx, cy = draw.SECTION_CENTER
+    caption = (
+        draw.SECTION_CAPTION_XY[0] - 0.023,
+        draw.SECTION_CAPTION_XY[1] - 0.016,
+        draw.SECTION_CAPTION_XY[0] + 0.023,
+        draw.SECTION_CAPTION_XY[1],
+    )
+    cut = (cx - 0.010, cy - 0.018, cx + 0.010, cy + 0.018)
+    floor = (
+        draw.SECTION_TEXT_RIGHT - 2.0 * draw._SECTION_TEXT_HALF_WIDTH,
+        cy - 0.040,
+        draw.SECTION_TEXT_RIGHT,
+        cy - 0.018,
+    )
+    assert iso[1] > iso_note[3] and caption[1] > cut[1]
+    groups = {
+        "isometric": (iso[0], iso_note[1], max(iso[2], iso_note[2]), iso[3]),
+        "section A-A": (
+            min(caption[0], cut[0], floor[0]),
+            floor[1],
+            max(caption[2], cut[2], floor[2]),
+            caption[3],
+        ),
+    }
+    width_text_bottom = draw.FRONT_KEEP["Width"][1] - 2.0 * TEXT_HALF_H
+    front = _view_boxes()["front"]
+    for name, box in groups.items():
+        assert box[0] > BORDER[0] + 0.010 and box[1] > BORDER[1] + 0.010, name
+        assert box[2] < TITLE_BLOCK[0] - 0.010, name
+        assert box[3] < width_text_bottom - 0.010 and box[3] < front[1], name
+        assert not _overlap(box, draw.HOLE_TABLE_BOX), name
+    assert groups["isometric"][2] + 0.010 < groups["section A-A"][0]
 
 
 def test_hole_table_replaces_every_hole_location_dimension():
@@ -304,23 +377,26 @@ def test_hole_table_locations_print_every_station_at_the_part_places():
 
 
 def test_hole_table_mates_match_the_registered_patterns_and_callouts():
+    # Every row's MATE cell is its group's mate part number alone, which the
+    # group's size callout names too; the guide screw stays on that callout.
     registered = {row["number"] for row in _config.parts().values()}
-    guide = {
-        _config.parts("pd-platen-guide")["number"],
-        _config.parts("sh-vn-brass-fillister-screw")["number"],
-    }
+    guide = _config.parts("pd-platen-guide")["number"]
     clip = _config.parts("pd-platen-clip")["number"]
     pattern = r"\bMHA-[A-Z0-9]+(?:-[A-Z0-9]+)+\b"
     for station, mate in draw.HOLE_TABLE_MATES.items():
-        named = set(re.findall(pattern, mate))
-        assert named <= registered, mate
+        assert mate in registered, mate
         if station in spec.SOCKET_XY:
-            assert named == {clip}
-            # The size callout of the same group names the same mate.
-            assert named <= set(re.findall(pattern, draw.SOCKET_CALLOUT_PROCESS))
+            assert mate == clip
+            assert mate in re.findall(pattern, draw.SOCKET_CALLOUT_PROCESS)
         else:
-            assert named == guide
-            assert named <= set(re.findall(pattern, draw.GUIDE_CALLOUT_PROCESS))
+            assert mate == guide
+            assert mate in re.findall(pattern, draw.GUIDE_CALLOUT_PROCESS)
+    assert _config.parts("sh-vn-brass-fillister-screw")["number"] in (
+        draw.GUIDE_CALLOUT_PROCESS
+    )
+    # A number fits its MATE cell at ~2.55 mm a character plus the cell's air.
+    widest = max(len(mate) for mate in draw.HOLE_TABLE_MATES.values())
+    assert widest * 0.00255 + 0.004 <= draw.HOLE_TABLE_WIDTHS[draw._HOLE_TABLE_MATE_INDEX]
 
 
 def _tag_box(station, width=0.008, height=0.0035):

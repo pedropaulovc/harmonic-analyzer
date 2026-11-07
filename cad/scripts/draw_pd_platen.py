@@ -5,9 +5,9 @@ standing proud of its back face round the #2-56 clip-screw through taps and
 ten counterbored #4 loose through holes for the guide screws.  The sheet
 prints decimal inch (the part's ``drawing_unit: in``) and runs at 1:2: the
 front view carries the outline, the bosses, one native callout per hole size
-and a tag at every hole; a native hole table under it locates all fourteen
-holes from the plate's lower-left corner and names each group's mate (rule
-10).  VIEW B, the 1:1 right side its lettered arrow looks at, carries the
+and a tag at every hole; a native hole table right of VIEW B locates all
+fourteen holes from the plate's lower-left corner and names each group's mate
+(rule 10).  VIEW B, the 1:1 right side its lettered arrow looks at, carries the
 thickness on a native text shelf clear of its witnesses and the boss height,
 a 2:1 partial section A-A through one counterbore the user-accepted
 counterbore floor as a reference dimension with its worst case, and a 1:4
@@ -45,8 +45,10 @@ import _config
 from _drawing_annotation_extent import (
     CLEAR_GAP_M,
     PLACE_SETTLE_M,
+    Box,
     callout_ink,
     move_annotation,
+    require_clear,
     require_inside,
     sheet_region,
 )
@@ -132,15 +134,22 @@ _S = SHEET_SCALE[0] / SHEET_SCALE[1] / 1000.0  # sheet m per model mm, 1:2
 _RIGHT_S = 1.0 / 1000.0  # VIEW B, 1:1
 
 # Sheet layout (meters; the B-size field is x 0.0127..0.4191, y 0.0127..0.2667
-# and the title block holds x >= 0.216, y <= 0.066).  The front view's hole
-# table stands under it, in the field the old baseline stack held; VIEW B (the
-# 1:1 right side) and the isometric stand right of the front view, section
-# A-A under the isometric, right of VIEW B's caption: its floor reference
-# below it, its caption between it and the isometric's note.
+# and the title block holds x >= 0.216, y <= 0.066).  The front view stands top
+# left (x 0.0726..0.2074, y 0.1563..0.2237) with VIEW B (the 1:1 right side,
+# x 0.297..0.303, y 0.108..0.242) right of it.  The hole table (15 rows of
+# ~11 mm, 165 mm tall) fits only the field right of VIEW B, above the title
+# block (HOLE_TABLE_ANCHOR), so the isometric and section A-A share the field
+# under the front view, left of the title block, 34 mm and more under the
+# width's text (y 0.148): the isometric on the left, its body about 50 x 57 mm
+# at 1:4 round ISO_CENTER and its one-row note (~60 mm) 32 mm left of and
+# 34 mm under that centre (the v48 render's iso and note); the group spans
+# x 0.033..0.093, y 0.046..0.113.  Section A-A stands right of it (its group
+# x 0.121..0.188, y 0.038..0.111: SECTION_CENTER's comment), 28 mm short of the
+# title block and 27 mm clear of the isometric's note.
 FRONT_CENTER = (0.140, 0.190)
 RIGHT_CENTER = (0.300, 0.175)
-ISO_CENTER = (0.370, 0.202)
-ISO_NOTE_XY = (0.338, 0.168)
+ISO_CENTER = (0.065, 0.084)
+ISO_NOTE_XY = (ISO_CENTER[0] - 0.032, ISO_CENTER[1] - 0.034)
 # Section A-A: a partial cut down the top row's middle guide hole (x =
 # CBORE_SECTION_X, its cutting plane the part's CBORE_SECTION_PLANE) from
 # SECTION_SPAN below the hole's centre to as far above, at 2:1 (40 mm tall
@@ -181,8 +190,16 @@ _SECTION_S = SECTION_SCALE[0] / SECTION_SCALE[1] / 1000.0
 SECTION_SPAN = 10.0
 SECTION_CROP_HALF = 5.0
 _SECTION_FENCE_MARGIN = 1.0
-SECTION_CENTER = (0.390, 0.114)
-SECTION_CAPTION_XY = (0.385, 0.147)
+# The section's group about SECTION_CENTER (sheet m): the cropped cut's outline
+# +-10 x +-18 mm (r2 Crop2 telemetry), the native caption's top centre 5 mm left
+# of and 33 mm over the centre (the v48 render's "SECTION A-A / SCALE 2:1",
+# ~46 mm wide, down to ~17 mm over the centre), the floor value's three rows
+# 47 mm wide ending at SECTION_TEXT_RIGHT and hanging to ~40 mm under the
+# centre: x -49..+18 mm, y -40..+33 mm.  At (0.170, 0.078), under the front
+# view's right half, that is x 0.121..0.188, y 0.038..0.111: 37 mm under the
+# width's text, 25 mm over the border, 28 mm short of the title block.
+SECTION_CENTER = (0.170, 0.078)
+SECTION_CAPTION_XY = (SECTION_CENTER[0] - 0.005, SECTION_CENTER[1] + 0.033)
 # The floor value's top row stands 14 mm of sheet under the cut's lower end.
 _SECTION_TEXT_DROP_M = 0.014
 # The value's widest row (".027 MIN WORST CASE", ~47 mm) ends 2.5
@@ -267,8 +284,9 @@ _SOCKET_LOW_Y, _SOCKET_HIGH_Y = sorted({y for _, y in SOCKET_XY})
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
 # position.  The hole table locates every hole (HOLE_TABLE_LOCATED), so the
 # front view keeps the overall size and the bosses: the width 8 mm under the
-# plate, clear above the table; the height right of it, beyond VIEW B's arrow;
-# the upper left boss carries the bosses' Ø up-left over the plate's corner.
+# plate, clear above the isometric and section A-A; the height right of it,
+# beyond VIEW B's arrow; the upper left boss carries the bosses' Ø up-left
+# over the plate's corner.
 # VIEW B carries the plate's thickness above it and the boss height beside
 # the lower boss (the dimension attaches there, so its extension lines stay on
 # the boss); section A-A the counterbore floor (SECTION_TEXT_MODEL_MM, placed
@@ -346,12 +364,14 @@ REDUNDANT_NOTE = "Tapped Hole"
 # accepts the taps' three-place stations), checked back against the model's
 # stations so a mis-anchored origin fails the build.  No position frame on
 # this part, so the locations are ordinary toleranced dimensions, not basic.
-# Each row names the mate its group's pattern matches in a MATE column; the
+# Each row names the mate its group's pattern matches in a MATE column, by
+# that part's number alone: the guide holes the guide (the guide screw they
+# take is named on the guide callout's C'BORE row), the sockets the clip.  The
 # generated SIZE column is hidden, because each group's one native callout on
 # the view prints its size at the part's callout places (GUIDE_CALLOUT_PRECISION:
 # a table SIZE cell takes the document's places and cannot be edited).
 HOLE_TABLE_LOCATED = DRAWING_DIMENSIONS["Sockets"] | DRAWING_DIMENSIONS["GuideHoles"]
-GUIDE_MATE = f"{GUIDE_NUMBER} / {GUIDE_SCREW_NUMBER}"
+GUIDE_MATE = GUIDE_NUMBER
 SOCKET_MATE = CLIP_NUMBER
 HOLE_TABLE_MATES: dict[tuple[float, float], str] = {
     **dict.fromkeys(GUIDE_HOLE_XY, GUIDE_MATE),
@@ -368,24 +388,31 @@ _TABLE_SIZE_CAN_CHANGE = 0  # swTableRowColChange_TableSizeCanChange
 _HOLE_TABLE_TOLERANCE_MM = 0.02
 _RIM_RADIUS_TOLERANCE_MM = 0.005
 _NOTE_ANNOTATION = 6  # swAnnotationType_e.swNote
-_BORDER_BOTTOM = 0.0127
+# ASME B title block (sheet m): x >= 0.216, y <= 0.066.
 _TITLE_BLOCK_LEFT = 0.216
-# TAG, X LOC, Y LOC and MATE widths (sheet m; "10.446" prints ~15 mm, the
-# guide mate ~59 mm) and one row pitch, so the table's extent is the recipe's:
-# 15 rows x 6 mm stand 90 mm tall, 118 mm wide.
-HOLE_TABLE_WIDTHS = {0: 0.012, 1: 0.020, 2: 0.020, _HOLE_TABLE_MATE_INDEX: 0.066}
-HOLE_TABLE_ROW_HEIGHT = 0.006
+_TITLE_BLOCK_TOP = 0.066
+# TAG, X LOC, Y LOC and MATE widths (sheet m; "10.446" prints ~15 mm, at
+# ~2.55 mm a character: v48's 23-character guide mate filled 59 mm of a
+# 66 mm cell).  A mate number ("MHA-PD-11", nine characters) prints ~23 mm,
+# so its cell is 30 mm; the table stands 82 mm wide.
+HOLE_TABLE_WIDTHS = {0: 0.012, 1: 0.020, 2: 0.020, _HOLE_TABLE_MATE_INDEX: 0.030}
+# The rows keep their natural height: SetRowHeight(row, 0.006) never took
+# (round 2 read 15 rows back at 0.1644 m, ~0.01096 each), so the layout plans
+# an 11 mm pitch, 165 mm for the header and fourteen holes, and the build reads
+# the real heights back (_check_hole_table).
+HOLE_TABLE_ROW_PITCH = 0.011
 HOLE_TABLE_ROWS = 1 + len(HOLE_TABLE_MATES)
-# Top-left corner, under the front view in the field the baseline stack
-# held: its left edge on the plate's left edge (x 0.0726), its top 26 mm
-# under the plate's bottom edge (y 0.1303: the width's text at -8 mm and the
-# hole-table origin's native X axis between them), its bottom (y 0.0403)
-# 27 mm over the border, its right edge (x 0.1906) 25 mm short of the title
-# block.
-HOLE_TABLE_ANCHOR = (LEFT_EDGE_X, BOTTOM_EDGE_Y - 0.026)
+# Top-left corner, in the field right of VIEW B and above the title block,
+# the one field on the sheet 165 mm tall.  Its left edge (x 0.320) stands
+# 17 mm right of VIEW B's far face (x 0.303) and ~9 mm right of its caption
+# (RIGHT_CAPTION_XY, "SCALE 1:1" ~23 mm from x 0.2885), its right edge
+# (x 0.402) 17 mm short of the border.  Its top (y 0.241) stands 4.4 mm under
+# the thickness's function text over VIEW B (round 2 ink y 0.2454..0.2566
+# across x 0.311..0.396), its bottom (y 0.076) 10 mm over the title block.
+HOLE_TABLE_ANCHOR = (0.320, 0.241)
 HOLE_TABLE_BOX = (
     HOLE_TABLE_ANCHOR[0],
-    HOLE_TABLE_ANCHOR[1] - HOLE_TABLE_ROWS * HOLE_TABLE_ROW_HEIGHT,
+    HOLE_TABLE_ANCHOR[1] - HOLE_TABLE_ROWS * HOLE_TABLE_ROW_PITCH,
     HOLE_TABLE_ANCHOR[0] + sum(HOLE_TABLE_WIDTHS.values()),
     HOLE_TABLE_ANCHOR[1],
 )
@@ -480,12 +507,13 @@ def _set_dimension_prefixes(
         raise RuntimeError(f"dimension prefixes not applied: {sorted(remaining)}")
 
 
-def _place_thickness_text(adapter: Any, annotations: list[Any]) -> None:
+def _place_thickness_text(adapter: Any, annotations: list[Any]) -> Box:
     """Keep the 3.850 line fixed and shelf its complete function/value block.
 
     The native review crop shows both witnesses striking the digits.  Offset
     only the text, then measure its full native shoulder rather than sizing
-    the move from the number alone (the function row is much wider).
+    the move from the number alone (the function row is much wider).  Returns
+    the placed text block (sheet m): the hole table stands under it.
     """
     matches = [
         _early_bound(annotation, "IAnnotation")
@@ -522,6 +550,7 @@ def _place_thickness_text(adapter: Any, annotations: list[Any]) -> None:
             f"platen thickness text {ink.text} still crowds its native line at {right}"
         )
     require_inside("platen thickness text", ink.text, sheet_region(adapter))
+    return ink.text
 
 
 def _set_whole_cutting_lines(drawing_model: Any) -> None:
@@ -655,8 +684,11 @@ def _assert_no_leading_zero_locations(table: Any) -> None:
 
 
 def _name_hole_table_mates(
-    adapter: Any, table: Any, rows: dict[str, tuple[int, tuple[float, float]]]
-) -> None:
+    adapter: Any,
+    table: Any,
+    rows: dict[str, tuple[int, tuple[float, float]]],
+    neighbours: dict[str, Box],
+) -> Box:
     """Add the MATE column, size the table and hide the generated SIZE column.
 
     The generated cells are not text-editable (only the header row and custom
@@ -664,7 +696,9 @@ def _name_hole_table_mates(
     mate is a custom column after SIZE, written row by row, and SIZE is then
     hidden: each group's size is its one native callout on the view.  Hiding
     comes last, after every index-based write, and the readback counts hidden
-    columns (``IncludeHidden``), so no index shifts under it.
+    columns (``IncludeHidden``), so no index shifts under it.  The rows keep
+    their natural height (HOLE_TABLE_ROW_PITCH).  Returns the table's
+    measured box (sheet m).
     """
     if int(table.ColumnCount) != 4:
         raise RuntimeError("platen hole-table mates expect the native four columns")
@@ -686,8 +720,8 @@ def _name_hole_table_mates(
         if table.IsCellTextEditable(row, _HOLE_TABLE_MATE_INDEX) is not True:
             raise RuntimeError(f"platen hole-table MATE cell of {tag} is not editable")
         table.SetText2(row, _HOLE_TABLE_MATE_INDEX, False, HOLE_TABLE_MATES[station])
-    for row in range(int(table.RowCount)):
-        table.SetRowHeight(row, HOLE_TABLE_ROW_HEIGHT, _TABLE_SIZE_CAN_CHANGE)
+    # No SetRowHeight: a row will not print shorter than its text (round 2
+    # asked 6 mm and read ~11 mm back), so the check measures what stands.
     for column, width in HOLE_TABLE_WIDTHS.items():
         actual = float(table.SetColumnWidth(column, width, _TABLE_SIZE_CAN_CHANGE))
         if abs(actual - width) > 1e-6:
@@ -700,17 +734,20 @@ def _name_hole_table_mates(
         raise RuntimeError(f"platen hole-table widths drifted: {widths!r}")
     table.SetColumnHidden(_HOLE_TABLE_SIZE_COLUMN, True)  # VT_VOID, not success.
     rebuild_drawing(adapter, label="platen hole-table mates")
-    _check_hole_table(table, generated, rows)
+    return _check_hole_table(adapter, table, generated, rows, neighbours)
 
 
 def _check_hole_table(
+    adapter: Any,
     table: Any,
     generated: tuple[tuple[str, ...], ...],
     rows: dict[str, tuple[int, tuple[float, float]]],
-) -> None:
+    neighbours: dict[str, Box],
+) -> Box:
     """Only the MATE column changed: generated cells kept, SIZE hidden, every
     mate on its row, the recipe's widths, and the table, grown down and right
-    from its top-left anchor, clear of the border and the title block."""
+    from its top-left anchor by its rows' read-back heights, inside the border
+    and clear of the title block and of ``neighbours`` by CLEAR_GAP_M."""
     columns = int(table.TotalColumnCount)
     if columns != _HOLE_TABLE_MATE_INDEX + 1:
         raise RuntimeError(f"platen hole table has {columns} columns, expected 5")
@@ -727,7 +764,7 @@ def _check_hole_table(
         table.ColumnHidden(column) for column in HOLE_TABLE_WIDTHS
     ):
         raise RuntimeError("platen hole table shows SIZE or hides a printed column")
-    # Widths are read only in the all-visible window (_check_hole_table_widths,
+    # Widths are read only in the all-visible window (_name_hole_table_mates,
     # before SIZE is hidden): with a column hidden, GetColumnWidth's index
     # domain no longer matches ColumnHidden's (round 1 read the MATE column's
     # width as 0.0 at index 4), as on the paper-drive BOM.
@@ -735,32 +772,55 @@ def _check_hole_table(
         raise RuntimeError(
             f"platen hole table shows {int(table.ColumnCount)} of {columns} columns, expected {columns - 1}"
         )
-    widths = HOLE_TABLE_WIDTHS
-    height = sum(float(table.GetRowHeight(row)) for row in range(int(table.RowCount)))
-    left, top = HOLE_TABLE_ANCHOR
-    box = (left, top - height, left + sum(widths.values()), top)
-    position = tuple(_early_bound(table.GetAnnotation(), "IAnnotation").GetPosition())
-    _telemetry.info(
-        f"platen hole table: box {box!r}, annotation position {position!r}, "
-        f"rows {rows!r}"
+    heights = [float(table.GetRowHeight(row)) for row in range(int(table.RowCount))]
+    position = tuple(
+        float(value)
+        for value in _early_bound(table.GetAnnotation(), "IAnnotation").GetPosition()
     )
-    if (
-        box[1] < _BORDER_BOTTOM + CLEAR_GAP_M
-        or box[2] > _TITLE_BLOCK_LEFT - CLEAR_GAP_M
-    ):
+    # The annotation's position is the table's top-left anchor (round 2 read
+    # it back at HOLE_TABLE_ANCHOR exactly).
+    left, top = position[:2]
+    box = (left, top - sum(heights), left + sum(HOLE_TABLE_WIDTHS.values()), top)
+    region = sheet_region(adapter)
+    _telemetry.info(
+        f"platen hole table: box {box!r} (planned {HOLE_TABLE_BOX!r}), annotation "
+        f"position {position!r}, row heights {heights!r}, rows {rows!r}"
+    )
+    inside = (
+        box[0] >= region.xmin + CLEAR_GAP_M
+        and box[1] >= region.ymin + CLEAR_GAP_M
+        and box[2] <= region.xmax - CLEAR_GAP_M
+        and box[3] <= region.ymax - CLEAR_GAP_M
+    )
+    clear_of_title_block = (
+        box[1] >= _TITLE_BLOCK_TOP + CLEAR_GAP_M
+        or box[2] <= _TITLE_BLOCK_LEFT - CLEAR_GAP_M
+    )
+    if not (inside and clear_of_title_block):
         raise RuntimeError(
             f"platen hole table crosses the border or title block: {box!r}"
         )
+    require_clear("platen hole table", box, neighbours)
+    return box
+
+
+def _note_box(note: Any, *, label: str) -> Box:
+    """A note's text box on the sheet (INote.GetExtent: two corners, sheet m)."""
+    extent = [float(value) for value in _early_bound(note, "INote").GetExtent()]
+    if len(extent) != 6:
+        raise RuntimeError(f"{label} extent is unreadable: {extent!r}")
+    xs = sorted((extent[0], extent[3]))
+    ys = sorted((extent[1], extent[4]))
+    return (xs[0], ys[0], xs[1], ys[1])
 
 
 def _tag_corner(note: Any, quadrant: tuple[int, int]) -> tuple[float, float]:
     """The corner of a tag's text box nearest its hole."""
-    extent = [float(value) for value in _early_bound(note, "INote").GetExtent()]
-    if len(extent) != 6:
-        raise RuntimeError(f"platen hole tag extent is unreadable: {extent!r}")
-    xs = sorted((extent[0], extent[3]))
-    ys = sorted((extent[1], extent[4]))
-    return (xs[0] if quadrant[0] > 0 else xs[1], ys[0] if quadrant[1] > 0 else ys[1])
+    box = _note_box(note, label="platen hole tag")
+    return (
+        box[0] if quadrant[0] > 0 else box[2],
+        box[1] if quadrant[1] > 0 else box[3],
+    )
 
 
 def _place_hole_tags(
@@ -820,8 +880,9 @@ def _size_note(adapter: Any, note: Any, height: float, *, label: str) -> None:
     rebuild_drawing(adapter, label=label)
 
 
-def _label_view_b(adapter: Any, front: Any) -> None:
-    """VIEW B's lettered viewing arrow on the front view and its caption."""
+def _label_view_b(adapter: Any, front: Any, hole_table: Box) -> None:
+    """VIEW B's lettered viewing arrow on the front view and its caption, the
+    caption read back clear of the hole table right of it."""
     label = f"view {VIEW_LETTER} viewing arrow"
     arrow = add_leader_note(
         adapter,
@@ -832,8 +893,15 @@ def _label_view_b(adapter: Any, front: Any) -> None:
         label=label,
     )
     _size_note(adapter, arrow, VIEW_LETTER_HEIGHT, label=f"{label} letter")
-    if add_note(adapter, RIGHT_CAPTION, *RIGHT_CAPTION_XY) is None:
+    caption = add_note(adapter, RIGHT_CAPTION, *RIGHT_CAPTION_XY)
+    if caption is None:
         raise RuntimeError(f"failed to insert the VIEW {VIEW_LETTER} caption")
+    rebuild_drawing(adapter, label=f"view {VIEW_LETTER} caption")
+    caption_box = _note_box(caption, label=f"view {VIEW_LETTER} caption")
+    _telemetry.info(f"view {VIEW_LETTER} caption: box {caption_box!r}")
+    require_clear(
+        f"view {VIEW_LETTER} caption", caption_box, {"platen hole table": hole_table}
+    )
 
 
 def _metres(point_mm: tuple[float, float, float]) -> tuple[float, float, float]:
@@ -1164,7 +1232,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, annotations, DIMENSION_CALLOUTS_ABOVE, location="above"
     )
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS_BELOW)
-    _place_thickness_text(adapter, right_annotations)
+    thickness_text = _place_thickness_text(adapter, right_annotations)
 
     marks = (
         _early_bound(front, "IView").GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ()
@@ -1220,9 +1288,19 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     rows = _hole_table_rows(hole_table)
     _assert_no_leading_zero_locations(hole_table)
-    _name_hole_table_mates(adapter, hole_table, rows)
+    table_box = _name_hole_table_mates(
+        adapter,
+        hole_table,
+        rows,
+        {
+            "VIEW B": tuple(
+                float(value) for value in _early_bound(right, "IView").GetOutline()
+            ),
+            "VIEW B thickness text": thickness_text,
+        },
+    )
     _place_hole_tags(adapter, front, rows)
-    _label_view_b(adapter, front)
+    _label_view_b(adapter, front, table_box)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
     _telemetry.info("platen sheet: views, dimensions, callouts and hole table placed")
 

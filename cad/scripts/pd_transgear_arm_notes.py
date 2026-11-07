@@ -13,6 +13,7 @@ import _transgear_arm_plate_locating_interface as LOCATING_PIN
 import pd_transgear_pin_spec as PIN
 import pd_vn_transgear_arm_plate_locating_pin_spec as LOCATOR_PIN
 from pd_paper_drive_assembly_steps import knob_setting_ref
+from pd_transgear_arm_geometry import PIN_HOLE_DEPTH, PIN_HOLE_DEPTH_PLACES
 from pd_rack_pinion_spec import inch_ceil_mm, inch_floor_mm, inch_text
 from pd_transgear_arm_spec import (
     LATCH_PIN_NUMBER,
@@ -69,14 +70,15 @@ PIN_BORE_CALLOUT = "\n".join((
     f"PRESS FIT ON PIN {PIN.PIN_NUMBER}",
     f"(INTERFERENCE {_inch_range(PIN_PRESS_INTERFERENCE)})",
 ))
-LOCATOR_CALLOUT_TEXT = "\n".join((
-    f"2X REAM THRU, DOWEL {LOCATOR_PIN.PART_NUMBER}",
-    f"SEE NOTE {LOCATOR_NOTE}",
-))
-# Note 3 names the latch pin; the callout stays inside the right border
-# (round 1: its mate line ran past it).
+# Note 2 names the dowel and its press; the callout links it (round 2: the
+# dowel named on both was named twice for one pattern).
+LOCATOR_CALLOUT_TEXT = f"2X REAM THRU, SEE NOTE {LOCATOR_NOTE}"
+# Size, process and depth at the callout (round 2: a depth is never deferred
+# to a view; section A-A keeps it as a reference); note 3 names the latch
+# pin, so the callout stays inside the right border.
 PIN_HOLE_CALLOUT = "\n".join((
-    "BLIND FLAT-BOTTOM REAM",
+    "BLIND FLAT-BOTTOM REAM "
+    f"<HOLE-DEPTH> {inch_text(PIN_HOLE_DEPTH, PIN_HOLE_DEPTH_PLACES)}",
     f"SEE NOTE {LATCH_PIN_NOTE}",
 ))
 SPRING_CALLOUT = f"SEE NOTE {SPRING_NOTE}"

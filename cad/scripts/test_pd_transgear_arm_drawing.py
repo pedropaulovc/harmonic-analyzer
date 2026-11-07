@@ -480,7 +480,7 @@ def test_each_import_phase_proves_the_precision_of_the_dimensions_it_imports(
     for name in (
         "check", "read_required_properties", "create_blank_drawing_sheets",
         "stamp_drawing_summary", "set_hidden_lines_removed", "set_dimension_callouts",
-        "set_reference_dimensions", "_reference_tap_stations", "_set_stock_text",
+        "set_reference_dimensions", "_reference_linear_dimensions", "_set_stock_text",
         "_end_radius_to_arc", "offset_dimension_text", "project_part_pmi",
         "_one_frame_per_dowel_group", "_overall_reference", "_set_tap_callout_text",
         "set_hole_callout_precision", "_section_captions_without_scale",
@@ -984,20 +984,23 @@ def test_the_plate_taps_are_transferred_from_the_plate_with_no_frame() -> None:
     assert joints.PLATE_TAP_LOCATION_RADIUS_MAX_MM <= geometry.PLATE_TAP_LOCATION_RADIUS_MM
 
 
-def test_the_tap_stations_print_as_linear_references(monkeypatch) -> None:
+def test_the_tap_stations_and_pin_hole_depth_print_as_linear_references(monkeypatch) -> None:
     """Parenthesised without a diameter glyph (``set_reference_dimension``,
-    not the diameter form); a station the import lost fails the build."""
+    not the diameter form); a reference the import lost fails the build.
+    The latch-pin hole's depth is its callout's, so A-A's depth is a
+    reference too."""
+    assert drawing.LINEAR_REFERENCES == (*drawing.TAP_STATION_REFERENCES, "PinHoleDepth")
     marked: list[tuple[str, dict]] = []
     monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, annotation: annotation)
     monkeypatch.setattr(
         drawing, "set_reference_dimension",
         lambda _adapter, annotation, **kwargs: marked.append((annotation, kwargs)),
     )
-    drawing._reference_tap_stations(object(), ["PinStation", *drawing.TAP_STATION_REFERENCES])
-    assert [name for name, _kwargs in marked] == list(drawing.TAP_STATION_REFERENCES)
+    drawing._reference_linear_dimensions(object(), ["PinStation", *drawing.LINEAR_REFERENCES])
+    assert [name for name, _kwargs in marked] == list(drawing.LINEAR_REFERENCES)
     assert all(not kwargs.get("diameter", False) for _name, kwargs in marked)
     with pytest.raises(RuntimeError, match="never reached the sheet"):
-        drawing._reference_tap_stations(object(), ["PinStation", drawing.TAP_STATION_REFERENCES[0]])
+        drawing._reference_linear_dimensions(object(), ["PinStation", drawing.TAP_STATION_REFERENCES[0]])
 
 
 def test_the_dowel_group_prints_one_frame_with_its_count() -> None:
