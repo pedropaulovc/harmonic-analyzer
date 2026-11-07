@@ -93,12 +93,13 @@ _XXX = printed_band_mm(3, unit=_FRAME_UNIT)
 # (c)), and slip
 # into the hardened knife mount, one into its round hole (datum B) and the
 # other into its slot (datum C), open to the block's -X face.  The crossbar
-# prints each +X ream's station .XXX from its screw axis (HANGER_OFFSET_TOL)
-# and each -X ream BASIC SPAN from its +X ream under a ⌖Ø.002 frame (fr-top-
-# frame ENFORCE review, farm run 20261027T030041319Z: a frame needs BASIC
-# locations), so a mount fitted turned end for end, its round hole on the
-# -X pin, still floats inside the crossbar's #10 clearance hole; the block's
-# slot takes up the spacing (``fr_top_frame_spec``, ``sm_knife_mount_spec``,
+# stands both reams of a pair BASIC HANGER_OFFSET either side of its median
+# plane (datum D) under 2X ⌖Ø.004|A|D, SEP REQT, each on its
+# #10 axis's drawn line at the title block's .XXX across it
+# (HANGER_OFFSET_TOL; owner ruling 2026-11-06), so a mount fitted turned end
+# for end, its round hole on the -X pin, still floats inside the crossbar's
+# #10 clearance hole; the block's slot takes up the spacing
+# (``fr_top_frame_spec``, ``sm_knife_mount_spec``,
 # ``build_sm_summing_assembly``).
 PER_MOUNT = 2
 MOUNTS = 2
@@ -120,12 +121,13 @@ QUANTITY = PER_MOUNT * MOUNTS
 HANGER_OFFSET = 7.62  # .300 (#290: was 7.632, off the inch grid)
 HANGER_OFFSET_PLACES = 3
 HANGER_OFFSET_TOL = _XXX  # 0.127
-# The pair's centre-to-centre span along the dowel line: BASIC on the
-# crossbar, within the -X ream's Ø.002 position zone radius
+# The pair's centre-to-centre span along the dowel line: two BASIC .300
+# stations either side of D on the crossbar, each within a Ø.004 position
+# zone, so the span varies by two opposite zone radii, the zone's diameter
 # (``fr_top_frame_spec.HANGER_PRESS_HOLE_POSITION_TOL``, which asserts it);
 # the knife mount's slot takes that variation as travel.
 SPAN = 2.0 * HANGER_OFFSET  # 15.24, .600
-SPAN_TOL = 0.0254
+SPAN_TOL = 0.1016
 
 # --- The press: the crossbar's blind reams (owner ruling 2026-10-24, T+H3) --
 # Reamed from the faced underside to a flat floor, printed .XX, the pin
