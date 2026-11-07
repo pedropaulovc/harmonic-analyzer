@@ -296,6 +296,10 @@ def test_the_fits_are_named_never_a_diametral_band() -> None:
     prints only as REF."""
     printed = "\n".join((*SEQUENCE_BLOCKS, drawing.CHECKS))
     assert "DIAMETRAL" not in printed
+    # The standard names only (running, sliding, locational, press, drive,
+    # bonded); a private name such as SLIP or LIGHT HAMMER is refused.
+    named = re.findall(r"\b(?!TO\b)([A-Z]+) FIT\b", " ".join(printed.split()))
+    assert set(named) <= {"RUNNING", "SLIDING", "CLEARANCE", "INTERFERENCE", "PRESS", "DRIVE"}, named
     for band in re.findall(r"(?:CLEARANCE|INTERFERENCE)[^()]*\)?", " ".join(printed.split())):
         assert band.endswith("REF)"), band
 
