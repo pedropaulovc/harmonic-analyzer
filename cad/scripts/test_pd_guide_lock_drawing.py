@@ -131,14 +131,15 @@ def test_the_drill_callout_stands_between_the_plate_and_the_right_view() -> None
 
 def test_the_drill_callout_prints_size_then_process_then_its_two_rows() -> None:
     """Rule 26: size, then process, then depth.  Rule 7: two rows of words,
-    the mate the pattern lands on (named once, on the pattern callout) and
-    the finished wall to the edges (Codjiflo, #2124: both .010 breaks
-    charged, RV-01)."""
+    the route that holds the ±.001 pattern (transferred from the mate's taps
+    at assembly; the mate named once, on the pattern callout) and the
+    finished wall to the edges (Codjiflo, #2124: both .010 breaks charged,
+    RV-01)."""
     import _config
 
     rows = drawing.HOLE_CALLOUT_BELOW.split("\n")
     assert rows == [
-        f"MATCHES {_config.parts('pd-platen-guide')['number']} TAPS",
+        f"TRANSFER FROM {_config.parts('pd-platen-guide')['number']}",
         "WALL .069 MIN TO EDGES",
     ]
     # Each row is no wider than the native row the plate and right view

@@ -183,12 +183,12 @@ def test_both_end_faces_hold_square_to_the_bore_datum() -> None:
     faces' perpendicularity to A over the smallest face it seats on."""
     assert spec.BORE_DATUM == "A"
     assert spec.GEOMETRIC_TOLERANCES_IN == {
-        "rear face perpendicularity to bore": ".0004",
-        "front face perpendicularity to bore": ".0004",
+        "rear face perpendicularity to bore": ".001",
+        "front face perpendicularity to bore": ".001",
         "o.d. circular runout to bore": ".016",
     }
-    assert spec.REAR_FACE_PERPENDICULARITY == pytest.approx(0.0004 * 25.4)
-    assert spec.FRONT_FACE_PERPENDICULARITY == pytest.approx(0.0004 * 25.4)
+    assert spec.REAR_FACE_PERPENDICULARITY == pytest.approx(0.001 * 25.4)
+    assert spec.FRONT_FACE_PERPENDICULARITY == pytest.approx(0.001 * 25.4)
     # The arm seats on the face's flat inside the O.D. rim's break.
     assert spec.FACE_PERPENDICULARITY_ZONE_DIA == pytest.approx(
         spec.OD - spec.OD_BAND - 2.0 * spec.EDGE_BREAK
