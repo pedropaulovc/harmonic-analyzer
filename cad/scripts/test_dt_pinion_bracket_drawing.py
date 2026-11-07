@@ -360,17 +360,19 @@ def test_fitted_bores_name_their_mates_and_fits() -> None:
         text = " ".join(callouts[name].splitlines())
         for word in words:
             assert word in text, (name, word)
-    # The across-the-bar station is bare; the .XXX through-thickness station
-    # states the webs it holds (owner ruling (a)).
-    assert "PinSeatCy" not in callouts
-    assert "WEB" in callouts["PinSeatCz"]
+    # Both seat stations are locations: value and band only (rule 7); their
+    # .XXX bands ride the part's exception accepts.
+    assert not {"PinSeatCy", "PinSeatCz"} & set(callouts)
     assert {c.key for c in dt_pinion_bracket_spec.SURFACE_FINISHES} == {"arbor_bore"}
     # #290: on the .36 strap the far-face wall clears the .080 target, so the
-    # sheet prints no WALL minimum and the former RV-01 exception is retired.
+    # sheet prints no WALL minimum and the former WALL exception is retired;
+    # the two accepts left are the seat stations' .XXX bands (rule 7 bare).
     from _inch_wall_limits import WALL_TARGET_MM
 
     assert dt_pinion_bracket_spec.PIN_SEAT_WEB_WORST >= WALL_TARGET_MM
-    assert not load_exceptions(_config.CONFIG_DIR, "dt_pinion_bracket", "part")
+    exceptions = load_exceptions(_config.CONFIG_DIR, "dt_pinion_bracket", "part")
+    assert [(e.id, e.kind) for e in exceptions] == [("RV-01", "accept"), ("RV-02", "accept")]
+    assert all("WALL" not in e.finding.upper() for e in exceptions)
     # The (43.0) stands left of the flank, so no leader to the follower seat
     # (callouts right of the view) crosses its dimension line.
     face_a = drawing.LEFT_CENTER[0] - (

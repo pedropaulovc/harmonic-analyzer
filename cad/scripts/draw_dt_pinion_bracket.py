@@ -331,15 +331,15 @@ ARBOR_FINISH_XY = (0.155, 0.205)
 # or end mill (rule 16).  The pivot bore is a sliding fit so the strap goes
 # onto the shaft for fit-up, then pinned (option E-a); the arbor runs in its
 # bore; the follower stud slips into its seat and is bonded (LOCTITE 638,
-# dt_pinion_cam_pin_spec's bond gap).  The seat's .XXX station from face A is
-# the owner's ruling (a) for the webs either side of the seat
-# (PIN_SEAT_WEB_WORST), so it states that function in three words (rule 4;
-# fan-out round 3: a bare .180 read as over-specified).
+# dt_pinion_cam_pin_spec's bond gap).  Both seat stations print bare (rule 7):
+# their .XXX bands (the follower height on the MHA-DT-23 cam, and owner
+# ruling (a) for the seat's webs to the broad faces) are accepted in the
+# part's machinist_exceptions (RV-01, RV-02), since neither has a mate to
+# name and the .XX row would thin a web under its floor (fan-out round 4).
 DIMENSION_CALLOUTS = {
     "PivotBoreDia": "REAM THRU\nSLIDING FIT ON\nSHAFT MHA-DT-19",
     "ArborBoreDia": "REAM THRU\nRUNNING FIT ON\nARBOR MHA-DT-22",
     "PinSeatDia": PIN_SEAT_CALLOUT,
-    "PinSeatCz": "SETS SEAT WEBS",
     "CrossHoleDia": CROSS_HOLE_CALLOUT,
 }
 

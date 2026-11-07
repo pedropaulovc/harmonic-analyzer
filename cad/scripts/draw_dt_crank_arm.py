@@ -558,6 +558,13 @@ async def build(adapter: Any) -> dict[str, str]:
         label="seam station reference",
     )
     _set_reference_precision(adapter, seam_station, "seam station reference")
+    # Its arrows inside its witnesses too: drawn outside, the left tail ran
+    # past the bore-axis witness under the boss R.50's leader (fan-out round
+    # 4, rule 14).
+    seam_display = _early_bound(seam_station, "IDisplayDimension")
+    seam_display.ArrowSide = _DIM_ARROWS_INSIDE
+    if int(seam_display.ArrowSide) != _DIM_ARROWS_INSIDE:
+        raise RuntimeError("seam station reference did not keep its arrows inside")
 
     # MHA-DT-VN-59's axial seam is reamed with the hub at assembly; its callout
     # names the mate, the fit and the pin's nominal size and depth.

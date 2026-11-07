@@ -8,3 +8,14 @@ dt-pinion-bracket:
   tolerance_class: machined_block
   process: "machined (steel)"
   drawing_unit: in
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "accept"
+      where: "left side view: the .276 location of the Ø.1570 follower seat from the pivot-bore axis"
+      finding: ".XXX location band tighter than the .XX row with no mate named (rules 4, 7)"
+      reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144. L3: no mating part carries this location (the MHA-DT-25 stud is bonded into the seat; the station sets its height above the pivot on the MHA-DT-23 cam), and at the .XX row the seat-to-pivot-bore web falls to .0591 in, under the .060 floor (rule 17); the spec stack (test_dt_pinion_bracket_drawing webs) holds it at .064 on ±.005"
+    - id: "RV-02"
+      kind: "accept"
+      where: "left side view: the .180 station of the Ø.1570 follower seat and Ø.0625 cross hole from broad face A"
+      finding: ".XXX location band tighter than the .XX row with no mate named (rules 4, 7)"
+      reason: "owner ruling (a) 2026-09-25 (Codex #858 P2): the seat's station prints from face A at .XXX for the seat's web to the far broad face; at the .XX row that web is .0793 in, under the .080 target (rule 17, PIN_SEAT_WEB_WORST). Recorded as an exception under Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144"
