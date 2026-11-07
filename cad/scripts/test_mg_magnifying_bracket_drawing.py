@@ -591,7 +591,7 @@ def test_mounting_callout_reflows_native_size_clear_of_the_current_title_block(m
     assert state.edge is edge and state.view is view
     assert state.value == mounting.CLEARANCE_DIA / 1000.0
     assert state.position == (0.166, 0.054)
-    assert state.definition == "DRILL " + native_definition + "\n" + spec.MOUNTING_HOLE_PROCESS
+    assert state.definition == native_definition.replace("<hw-thru>", "DRILL <hw-thru>") + "\n" + spec.MOUNTING_HOLE_PROCESS
     assert precision == [(display, {"hw-diam": 3})]
 
 
@@ -619,7 +619,7 @@ def test_native_process_rows_preserve_all_hole_variables_and_mate(monkeypatch, t
         drawing._set_hole_process(display, mate=mate, tapped=tapped)
         text = "\n".join(definitions.values())
         assert re.findall(r"<hw-[^>]+>", text) == re.findall(r"<hw-[^>]+>", "\n".join(original.values()))
-        assert text.count("DRILL") == 1 and len(re.findall(r"\bTAP\b", text)) == int(tapped)
+        assert text.count("DRILL") == 1 and "DRILL <hw-thru>" in text and not re.findall(r"\bTAP\b", text)
         assert text.count(mate) == 1
         assert "THRU" not in text.splitlines()  # No standalone literal repeat.
 
