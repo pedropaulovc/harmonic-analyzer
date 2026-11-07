@@ -230,8 +230,8 @@ NOTE_TEXTS = (
     (D_SECTION_FIT_NOTE, f"SLIDING FIT ON {_COLLAR}: SLIDES IN, NO ROCK."),
     (
         STATIONS_NOTE,
-        f"{inch_text(TIP_STATION, 3)}/{inch_text(CORE_FRONT_FROM_TIP, 3)} SET THE "
-        f"D-CORE UNDER {_COLLAR}, {inch_text(THREAD_END_FROM_TIP, 3)} THE FULL "
+        f"{inch_text(TIP_STATION, 3)}/{inch_text(CORE_FRONT_FROM_TIP, 3)} LOCATE THE "
+        f"D-FLAT SEAT UNDER {_COLLAR}, {inch_text(THREAD_END_FROM_TIP, 3)} THE FULL "
         f"THREAD FOR {_mate_name(_config.parts('pd-transgear-thumbnut'))}.",
     ),
     (NECK_NOTE, f"NECK UNDER {_COLLAR}."),
@@ -395,15 +395,19 @@ DIMENSION_CALLOUTS_BELOW = {
     "ToothSpan": SPAN_CALLOUT,
 }
 # Each .XXX tip station links the stacks note on its value's line; detail
-# B's neck Ø (LIMITS) and the flat end's limits link the neck note, which
-# names MHA-PD-22 once.  (A row under the neck Ø would top out past the
-# border, and the side rows stand 10 mm apart.)
+# B's neck Ø (LIMITS) links the neck note, which names MHA-PD-22 once.  The
+# flat end's limits name the feature they locate: at nominal the flat's end
+# stands on the neck corner's R.004 tangent, and linked to the neck note the
+# limits read as locating that tangent (round-4 repeat review).  The label
+# is shorter than the link it replaces.  (A row under the neck Ø would top
+# out past the border, and the side rows stand 10 mm apart.)
+FLAT_END_LABEL = "FLAT END"
 DIMENSION_SUFFIXES = {
     "ThreadEndFromTip": f" {STATIONS_LINK}",
     "CoreFromTip": f" {STATIONS_LINK}",
     "TipStation": f" {STATIONS_LINK}",
     "FrontReliefDia": f" {NECK_LINK}",
-    "FlatEnd": f" {NECK_LINK}",
+    "FlatEnd": f" {FLAT_END_LABEL}",
 }
 # The face width's outside arrow left of F runs ~15 mm along its line
 # (round-3 render); the overall's text, at ~2.75 mm a character centred on
