@@ -175,7 +175,7 @@ def test_crank_fit_reads_t120_before_the_full_turn_and_retention_drilling() -> N
         f"Ø{sheet.inch_min_text(pinion.TURNED_DIA_FITUP_MIN, 3)} MIN",
         "AT THE SHOULDER, FACE THE MHA-DT-10 SHOULDER BACK",
         f"{sheet.inch_min_text(pinion.SHOULDER_LENGTH_FITUP_MIN, 3)} MIN",
-        "REPEAT 4B AND 4C",
+        "REPEAT 4C-4G",
         "TURN MHA-DT-07 ONE FULL REVOLUTION BY HAND: IT MUST NEVER BIND",
         "MATCH-DRILL THROUGH THE MHA-DT-10",
         "TURN MHA-DT-07 ONE FULL REVOLUTION AGAIN: NO BINDING",
@@ -205,22 +205,21 @@ def test_full_turn_checks_use_the_spec_ratio_and_clear_the_unrelieved_platform()
     )
 
 
-def test_crank_end_fit_holds_the_collar_on_the_boss_and_leaves_the_end_proud() -> None:
+def test_step_four_holds_the_collar_on_the_boss_and_leaves_the_end_proud() -> None:
     # Owner ruling D1 (2026-10-15): no crank-seat washer.  The collar bears on
     # the boss, the feeler is the end play, and the shaft end is left proud.
     import dt_crank_pinion_spec as pinion
     import dt_crankshaft_spec as crankshaft
 
-    fitup = " ".join(drawing.CRANK_END_FIT_NOTES.split())
+    fitup = _step_body("crank-mesh-checked")
     least, most = crankshaft.SHAFT_END_PROUD_RANGE
     assert least >= 0.0
     order = (
-        "MHA-DT-11 COLLAR REAR FACE HARD ON THE MHA-DT-05 BOSS FRONT FACE",
-        f"MHA-DT-10 ON THE {sheet.inch_text(pinion.SEAT_FEELER_MM, sheet.FEELER_PLACES)} "
-        "FEELER OFF THE BOSS BACK FACE",
-        "MATCH-DRILL AND REAM FOR MHA-DT-29",
-        "END PLAY = THE FEELER",
-        f"END STANDS {drawing.inch_envelope((least, most), 3)} PROUD OF MHA-DT-10 BACK FACE",
+        "MHA-DT-11 COLLAR REAR FACE HARD ON THE MHA-DT-05 BOSS FRONT FACE, NO WASHER",
+        f"SET MHA-DT-10 {sheet.inch_text(pinion.SEAT_FEELER_MM, sheet.FEELER_PLACES)} "
+        "OFF THE BOSS BACK FACE WITH A FEELER: END PLAY = THE FEELER",
+        "MATCH-DRILL THROUGH THE MHA-DT-10",
+        f"END STANDS {drawing.inch_envelope((least, most), 3)} PROUD OF THE MHA-DT-10 BACK FACE",
         "DO NOT FACE",
     )
     positions = [fitup.index(phrase) for phrase in order]
@@ -230,14 +229,13 @@ def test_crank_end_fit_holds_the_collar_on_the_boss_and_leaves_the_end_proud() -
     printed = fitup.split("END STANDS ", 1)[1].split(" PROUD", 1)[0]
     low, high = (float(limit) * 25.4 for limit in printed.split("-"))
     assert low <= least and most <= high
-    assert f"(STEP {steps.step_number('crank-mesh-checked')})" in fitup
     assert "SHIM" not in fitup and "MHA-CH-VN-57" not in fitup
 
 
 def test_step_four_holds_the_collar_before_the_feeler_and_the_pin() -> None:
     body = _step_body("crank-mesh-checked")
     positions = [
-        body.index("HOLD THE MHA-DT-11 COLLAR HARD ON THE MHA-DT-05 BOSS FRONT FACE"),
+        body.index("HOLD THE MHA-DT-11 COLLAR REAR FACE HARD ON THE MHA-DT-05 BOSS FRONT"),
         body.index("OFF THE BOSS BACK FACE WITH A FEELER"),
         body.index("MATCH-DRILL THROUGH THE MHA-DT-10"),
     ]
