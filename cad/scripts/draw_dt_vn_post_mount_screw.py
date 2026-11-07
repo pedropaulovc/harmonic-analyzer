@@ -9,11 +9,11 @@ screw sits in the lathe and as sheet 2 draws the supplied stock, so neither
 sheet shows a rotated view (drawing-guidelines.md rules 9 and 11). No single
 length suits every in-band post and plate (dt_vn_post_mount_screw_spec's U27
 check), so the length prints as a REFERENCE at CUT_LENGTH_MM, with no band and
-two word lines beneath it (rule 7, CUT_LENGTH_CALLOUT): the cut end's
+'SEE NOTE 1' beneath it (rule 7): note 1 (CUT_LENGTH_NOTE) gives the cut end's
 acceptance, flush to the spec band's allowance short of the MHA-DT-20
 underside, and the engagement minimum as a plain fact (rule 20). The cut
 end's break is the title block's general edge break; the sheet carries no
-part-local break limit (Main's ruling on the run-7 sheet).  The only note
+part-local break limit (Main's ruling on the run-7 sheet).  The other note
 says the undimensioned purchased geometry is reference.  No installation
 sequence or rule number is printed: the sequence is an MHA-DT-00 assembly
 step (rule 7 (notes: few, flagged, never a method)); the spec's asserts
@@ -157,20 +157,24 @@ FRONT_CENTER = (0.115, 0.190)
 FRONT_AXIS_MID = (0.118, 0.190)
 ISO_CENTER = (0.270, 0.185)
 # The cut length reads below the shank, its text under the span's midpoint,
-# its two word lines beneath it, clear of the notes block below.
+# its one word line beneath it, between its own extension lines.
 FRONT_KEEP = {
     CUT_LENGTH_DIMENSION: (FRONT_AXIS_MID[0], FRONT_AXIS_MID[1] - 0.024),
 }
-# Two word lines (rule 7): the cut end's acceptance against its mate and the
-# engagement minimum as a plain fact (rule 20). The spec's band prints at its
-# own places; the fact is the spec's floored worst case.
-CUT_LENGTH_CALLOUT = (
-    "CUT END FLUSH TO "
-    f"{inch_text(POST_SCREW_CUT_TO_FIT_SHORT, CUT_TO_FIT_SHORT_PLACES)} "
-    "SHORT OF MHA-DT-20 UNDERSIDE\n"
-    f"ENGAGEMENT {POST_MOUNT_ENGAGEMENT_PRINTED:.2f}D MIN"
-)
+# Rule 7: the acceptance does not fit between the extension lines in two
+# word lines (round 1: the lines struck the text, rule 14), so it is a
+# numbered note the callout links to. The note gives the cut end's
+# acceptance against its mate, at the spec band's own places, and the
+# engagement minimum as a plain fact (rule 20, the spec's floored worst case).
+CUT_LENGTH_NOTE_NUMBER = 1
+CUT_LENGTH_CALLOUT = f"SEE NOTE {CUT_LENGTH_NOTE_NUMBER}"
 DIMENSION_CALLOUTS = {CUT_LENGTH_DIMENSION: CUT_LENGTH_CALLOUT}
+CUT_LENGTH_NOTE = (
+    f"{CUT_LENGTH_NOTE_NUMBER}. CUT END FLUSH TO "
+    f"{inch_text(POST_SCREW_CUT_TO_FIT_SHORT, CUT_TO_FIT_SHORT_PLACES)} "
+    "SHORT OF MHA-DT-20 UNDERSIDE.\n"
+    f"    ENGAGEMENT {POST_MOUNT_ENGAGEMENT_PRINTED:.2f}D MIN."
+)
 
 # A sheet circle (the source head's crop fence) must land within this of its
 # ask, in sheet metres; a snapped circle misses by a millimetre.
@@ -180,7 +184,9 @@ _CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 FRONT_PRECISION = {
     CUT_LENGTH_DIMENSION: DRAWING_PRECISION_BY_NAME[CUT_LENGTH_DIMENSION]
 }
-# Below the Front's cut-length callout, above the stock rows.
+# Below the Front's cut-length callout, above the stock rows: note 1 first,
+# then the general reference note.
+CUT_LENGTH_NOTE_XY = (0.016, 0.118)
 NOTES_XY = (0.016, 0.100)
 STOCK_ROWS = (
     ("Supplier", 0.016, 0.060),
@@ -1475,6 +1481,9 @@ async def _build_read_only_source(adapter, source_model, source_sha256):
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
 
     activate_front_for_notes(adapter, front)
+    cut_note = _literal_note(adapter, CUT_LENGTH_NOTE, *CUT_LENGTH_NOTE_XY)
+    if str(cut_note.GetText()).split() != CUT_LENGTH_NOTE.split():
+        raise RuntimeError("cut-length note 1 did not keep its text")
     add_property_linked_note(
         adapter, "Manufacturing Notes", *NOTES_XY, char_height=0.003
     )

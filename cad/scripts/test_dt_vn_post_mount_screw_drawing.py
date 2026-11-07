@@ -122,22 +122,23 @@ def test_cut_to_fit_acceptance_prints_on_the_delegating_callout() -> None:
     """Codex P1 on #857: the callout delegated the cut to assembly, but no
     MHA-DT-00 step stated the acceptance the 0.90D worst case depends on.  The
     acceptance is a spec band -- upper 0 (flush), lower the most a screw may
-    be cut short -- and the callout prints it, generated from that band at
-    its own places, not a literal.  Rule 7 (novice rubric): the callout
-    carries at most two lines of words, so the acceptance is one line and the
-    engagement fact the other; NEVER PROUD only restated the flush limit."""
+    be cut short -- and the sheet prints it, generated from that band at its
+    own places, not a literal.  Rule 7 (novice rubric): a callout carries at
+    most two lines of words, and round 1 showed the acceptance cannot sit
+    between the extension lines (rule 14), so the callout links to numbered
+    note 1 and the note carries it; NEVER PROUD only restated the flush limit."""
     lower, upper = deviations(spec.POST_SCREW_CUT_TO_FIT_BAND)
     assert upper == 0.0
     assert spec.POST_SCREW_CUT_TO_FIT_SHORT == -lower
     places = spec.CUT_TO_FIT_SHORT_PLACES
     callout = drawing.DIMENSION_CALLOUTS["CutLength"]
-    assert callout == drawing.CUT_LENGTH_CALLOUT
-    lines = callout.splitlines()
+    assert callout == drawing.CUT_LENGTH_CALLOUT == "SEE NOTE 1"
+    lines = drawing.CUT_LENGTH_NOTE.splitlines()
     assert len(lines) == 2
     assert lines[0] == (
-        f"CUT END FLUSH TO {spec.inch_text(-lower, places)} SHORT OF MHA-DT-20 UNDERSIDE"
+        f"1. CUT END FLUSH TO {spec.inch_text(-lower, places)} SHORT OF MHA-DT-20 UNDERSIDE."
     )
-    assert "NEVER PROUD" not in callout
+    assert "NEVER PROUD" not in drawing.CUT_LENGTH_NOTE
     # The printed allowance is the one the named exception's worst case
     # spends: thinnest plate, full allowance, both breaks at their maximum.
     assert spec.POST_MOUNT_ENGAGEMENT_WORST == pytest.approx(
@@ -152,22 +153,20 @@ def test_cut_to_fit_acceptance_prints_on_the_delegating_callout() -> None:
     assert not any(ch.isdigit() for ch in spec.MANUFACTURING_NOTES)
 
 
-def test_engagement_minimum_prints_on_the_cut_length_callout() -> None:
+def test_engagement_minimum_prints_on_the_cut_length_note() -> None:
     """Codex P2 on #857 (PRRT_kwDOPHDy386mOxdw): MHA-DT-VN-61 stated its 0.90D
     engagement shortfall nowhere, yet the policy's named-exceptions section
-    wants every affected sheet to state it.  The callout that delegates the
-    cut carries the worst-case minimum as a plain fact, floored from the
-    spec's worst case -- never a literal."""
-    callout = drawing.DIMENSION_CALLOUTS["CutLength"]
+    wants every affected sheet to state it.  Note 1, which the cut length's
+    callout links to, carries the worst-case minimum as a plain fact,
+    floored from the spec's worst case -- never a literal."""
     printed = spec.POST_MOUNT_ENGAGEMENT_PRINTED
     assert printed == math.floor(
         spec.POST_MOUNT_ENGAGEMENT_WORST / spec.THREAD_DIA_MM * 100.0
     ) / 100.0
     assert printed >= spec.MIN_ENGAGEMENT_DIAMETERS
-    fact = f"ENGAGEMENT {printed:.2f}D MIN"
-    assert fact in callout.splitlines()
+    fact = f"ENGAGEMENT {printed:.2f}D MIN."
     # It closes the acceptance the cut delegates to assembly.
-    assert callout.splitlines()[-1] == fact
+    assert drawing.CUT_LENGTH_NOTE.splitlines()[-1].strip() == fact
 
 
 def test_engagement_shortfall_is_declared_for_the_blind_reviewer() -> None:
@@ -193,6 +192,7 @@ def _mha142_printed_strings() -> dict[str, str]:
     config = _config.parts("dt-vn-post-mount-screw")
     printed = {
         "CutLength callout": drawing.DIMENSION_CALLOUTS["CutLength"],
+        "cut-length note": drawing.CUT_LENGTH_NOTE,
         "manufacturing notes": spec.MANUFACTURING_NOTES,
     }
     for index, text in drawing.DRAWING_SUMMARY.items():
@@ -328,8 +328,8 @@ def test_cut_end_features_are_driven_by_the_model_dimensions() -> None:
 
 def _printed_cut_short_allowance() -> float:
     """The acceptance the sheet prints: "END FLUSH TO <x> SHORT"."""
-    match = re.search(r"END FLUSH TO (\d*\.\d+) SHORT", drawing.CUT_LENGTH_CALLOUT)
-    assert match, drawing.CUT_LENGTH_CALLOUT
+    match = re.search(r"END FLUSH TO (\d*\.\d+) SHORT", drawing.CUT_LENGTH_NOTE)
+    assert match, drawing.CUT_LENGTH_NOTE
     return round(float(match.group(1)) * IN, 9)
 
 
@@ -370,26 +370,34 @@ def test_engagement_exception_is_held_by_the_model() -> None:
 
 def test_sheet_layout_keeps_notes_clear_of_the_view() -> None:
     """The 1:1 Front lies head left on a horizontal axis (as sheet 2 draws
-    the supplied stock); the cut length and its two word lines read below
-    the shank, above the note block, inside the border and clear of the
-    isometric."""
+    the supplied stock); the cut length and its one word line read below the
+    shank between its own extension lines (round 1: a wider callout was
+    struck by them, rule 14), above note 1 and the reference note."""
     head_r = part.HEAD_DIA / 2000.0
     assert drawing.FRONT_AXIS_MID[1] == drawing.FRONT_CENTER[1]
     x, y = drawing.FRONT_KEEP["CutLength"]
     assert x == drawing.FRONT_AXIS_MID[0]
     assert y + 0.004 < drawing.FRONT_AXIS_MID[1] - head_r
     lines = drawing.DIMENSION_CALLOUTS["CutLength"].splitlines()
-    # Value line plus the callout's lines, ~4.5 mm each, then the notes.
+    # The widest callout line (~2.85 mm per capital, warm-c486) fits well
+    # inside the extension lines, which stand CUT_LENGTH_MM apart.
+    widest = max(len(line) for line in lines)
+    assert widest * 0.00285 < spec.CUT_LENGTH_MM / 1000.0 - 0.020
+    # Value line plus the callout's lines, ~4.5 mm each, then note 1 (two
+    # lines), then the reference note, then the stock rows.
     callout_bottom = y - (1 + len(lines)) * 0.0045
+    note_x, note_y = drawing.CUT_LENGTH_NOTE_XY
+    assert note_x == drawing.NOTES_XY[0]
+    assert note_y + 0.004 < callout_bottom
+    note_lines = len(drawing.CUT_LENGTH_NOTE.splitlines())
     notes_y = drawing.NOTES_XY[1]
-    assert notes_y + 0.004 < callout_bottom
+    assert notes_y + 0.003 < note_y - note_lines * 0.0045
     notes = len(spec.MANUFACTURING_NOTES.splitlines())
     assert notes_y - notes * 0.0045 > max(y for _, _, y in drawing.STOCK_ROWS) + 0.003
-    # The widest callout line (~2.85 mm per capital, warm-c486) stays inside
-    # the border and left of the isometric's cell.
-    widest = max(len(line) for line in lines)
-    assert x - widest * 0.00285 / 2.0 > 0.015
-    assert x + widest * 0.00285 / 2.0 < drawing.ISO_CENTER[0] - 0.020
+    # Note 1's long line (~2.2 mm per capital at 3 mm) stays left of the
+    # title block.
+    longest = max(len(line) for line in drawing.CUT_LENGTH_NOTE.splitlines())
+    assert note_x + longest * 0.0025 < drawing.ISO_CENTER[0]
     # The head, ~6 mm left of the under-head face, stays inside the border.
     left = drawing.FRONT_AXIS_MID[0] - spec.CUT_LENGTH_MM / 2000.0 - part.HEAD_H / 1000.0
     assert left > 0.015
@@ -2901,6 +2909,11 @@ def _readonly_msc_build(monkeypatch, tmp_path):
         state.events.append(("front-turn",))
 
     monkeypatch.setattr(drawing, "_lay_front_head_left", turn_front)
+    monkeypatch.setattr(
+        drawing,
+        "_literal_note",
+        lambda _adapter, text, *_xy: SimpleNamespace(GetText=lambda: text.replace("\n", "\r\n")),
+    )
     monkeypatch.setattr(drawing, "_present_supplier_stock_sheet", supplier_presentation)
     monkeypatch.setattr(
         drawing,
