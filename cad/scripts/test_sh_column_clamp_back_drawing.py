@@ -165,9 +165,12 @@ def test_walls_at_the_largest_column_and_drill_wander() -> None:
         _in(1.880) - _in(0.955) - _in(0.693) - reach,
     )
     # Every wall meets the .080 target, so the back wall's old shortfall
-    # (sh-column-clamp-back RV-01) is retired and nothing is declared.
+    # (sh-column-clamp-back RV-01) is retired and no shortfall is declared;
+    # the one entry accepts the ±.004 tap locations (delegated ruling L3).
     assert min(spec.WALLS_WORST.values()) >= _in(0.080)
-    assert not load_exceptions(CAD_ROOT / "config", "sh_column_clamp_back", "part")
+    entries = load_exceptions(CAD_ROOT / "config", "sh_column_clamp_back", "part")
+    assert [(entry.id, entry.kind) for entry in entries] == [("RV-02", "accept")]
+    assert "#2144" in entries[0].reason
 
 
 def test_screw_line_shortfall_is_the_owner_ruled_one() -> None:
@@ -193,14 +196,16 @@ def test_screw_line_shortfall_is_the_owner_ruled_one() -> None:
 
 def test_tight_bands_name_their_mate() -> None:
     bore = drawing.DIMENSION_CALLOUTS["BoreDia"]
-    assert "DIAMETRAL" in bore and "MHA-FR-03" in bore
+    assert bore.split("\n") == ["SLIDING FIT ON MHA-FR-03", "CLEARANCE .004-.012"]
     low, high = spec.BORE_DIAMETRAL_CLEARANCE
     assert math.isclose(low, _in(0.004)) and math.isclose(high, _in(0.012))
-    assert "MHA-SH-01" in drawing.DIMENSION_CALLOUTS["GripOffset"]
-    assert "MHA-SH-01" in drawing.DIMENSION_CALLOUTS["EarHole1Z"]
-    assert "MHA-SH-01" in drawing.DIMENSION_CALLOUTS["EarHoleHeight"]
-    # The grip offset says what it locates: the bore axis, off the split face.
-    assert "BORE AXIS" in drawing.DIMENSION_CALLOUTS["GripOffset"]
+    # Rule 7: locations carry only value and band. The grip offset cites its
+    # numbered note; the tap locations' mate is named once, under the tap.
+    assert drawing.DIMENSION_CALLOUTS["GripOffset"] == f"SEE NOTE {drawing.GRIP_NOTE}"
+    assert drawing.DRAWING_NOTES.startswith(f"{drawing.GRIP_NOTE}. ")
+    assert "MHA-SH-01" in drawing.DRAWING_NOTES
+    assert not {"EarHole1Z", "EarHoleHeight"} & set(drawing.DIMENSION_CALLOUTS)
+    assert "MHA-SH-01" in drawing.HOLE_CALLOUT_BELOW
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "GRIP_OFFSET_BAND" in source and "EAR_STATION_BAND" in source
     assert "EAR_HEIGHT_BAND" in source
@@ -244,7 +249,7 @@ def test_ear_height_text_stands_outside_its_witnesses() -> None:
     ear_x = drawing._face_xy(0.0, spec.EAR_HOLE_Z)[0]
     text_x = drawing.FACE_KEEP["EarHoleHeight"][0]
     outward = math.copysign(1.0, bottom_x - ear_x)
-    lines = ["2X .315 ±.004", *drawing.DIMENSION_CALLOUTS["EarHoleHeight"].split("\n")]
+    lines = ["2X .315 ±.004"]
     half_block = max(len(line) for line in lines) * 0.00265 / 2.0
     assert outward * (text_x - bottom_x) >= half_block + 0.003
 

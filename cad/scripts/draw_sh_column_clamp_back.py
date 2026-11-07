@@ -32,15 +32,18 @@ from typing import Any
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     place_view,
     view_name,
 )
 
+import _config
 from _check import check
 from _column_clamp_drawing import (
     add_bore_axis_centerline,
     set_dimension_prefixes,
+    set_hole_callout_below,
 )
 from _com import _early_bound
 from _drawing_common import (
@@ -70,7 +73,6 @@ from sh_column_clamp_back_spec import (
     ARC_HEIGHT,
     BORE_CLEARANCE_TEXT,
     COLUMN_BORE,
-    COLUMN_MATE,
     DEPTH,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -133,8 +135,8 @@ def _face_xy(y_mm: float, z_mm: float) -> tuple[float, float]:
 # bore's reference Ø leadered in through the upper half of the open mouth
 # from above right, clear of both (the axis witnesses run right and down from
 # the axis, so nothing crosses the leader).  Split-face view: the ear-hole
-# station from the bore centerline right of it, its mate callout under the
-# value; under the view, the ears' shared height off the bottom face
+# station from the bore centerline right of it; under the view, the ears'
+# shared height off the bottom face
 # (EarHoleHeight, from the part's hidden EarHeightReference sketch: its
 # witnesses leave the bottom face and ear 1's centre), and the height below
 # it.  The ears' height spans only 16 mm of sheet between its witnesses, far
@@ -159,19 +161,25 @@ FACE_KEEP = {
 # Both ear holes stand on the one station and the one height the part prints
 # (EarHole1Z, EarHoleHeight).
 DIMENSION_PREFIXES = {"EarHole1Z": "2X ", "EarHoleHeight": "2X "}
-# The bands that are tighter than the title block name their mate and why
-# (drawing-guidelines.md rule 4): the bore is matched to the purchased column
-# (sh_column_clamp_fit), the bore axis stands off the split face so the clamp
-# faces stay apart once both bores seat, and the ear stations and height line
-# up with the front arc's clearance holes.  All under the value: SOLIDWORKS
-# prints nothing of an above-callout holding a line break
+# The bands that are tighter than the title block name their mate once
+# (drawing-guidelines.md rules 4 and 7): the bore is a sliding fit matched to
+# the purchased column, its clearance the acceptance (sh_column_clamp_fit);
+# the ear stations and height name the front arc's holes once, on the tap
+# callout (HOLE_CALLOUT_BELOW); the grip offset, a location, carries only its
+# value and band and cites note 1 for its mate.  All under the value:
+# SOLIDWORKS prints nothing of an above-callout holding a line break
 # (draw_dt_cone_gear_shaft._printable_above_callouts).
+GRIP_NOTE = 1
+COLUMN_NUMBER = _config.parts("fr-tube-frame")["number"]
 DIMENSION_CALLOUTS = {
-    "BoreDia": f"{BORE_CLEARANCE_TEXT} DIAMETRAL\nCLEARANCE ON\n{COLUMN_MATE}",
-    "GripOffset": f"BORE AXIS OUTSIDE\nSPLIT FACE\nGRIP GAP TO {FRONT_ARC_MATE}",
-    "EarHole1Z": f"ALIGNS WITH\n{FRONT_ARC_MATE} EARS",
-    "EarHoleHeight": f"ALIGNS WITH\n{FRONT_ARC_MATE} EARS",
+    "BoreDia": f"SLIDING FIT ON {COLUMN_NUMBER}\nCLEARANCE {BORE_CLEARANCE_TEXT}",
+    "GripOffset": f"SEE NOTE {GRIP_NOTE}",
 }
+# Note 1 stands in the open lower-left field, left of the title block (x
+# 0.216, up to y 0.070), where the front arc's notes stand.
+DRAWING_NOTES = f"{GRIP_NOTE}. KEEPS A GAP TO {FRONT_ARC_MATE} WHEN CLAMPED."
+NOTES_XY = (0.020, 0.070)
+HOLE_CALLOUT_BELOW = f"MATCHES {FRONT_ARC_MATE} EAR HOLES"
 
 # Model points (mm) the sheet picks project from, on the split face (X =
 # -GRIP_OFFSET).  The tap callout lands on ear 2's rim up and right of its
@@ -348,7 +356,10 @@ async def build(adapter: Any) -> dict[str, str]:
         label="ear taps",
     )
     set_hole_callout_precision(ear_taps, HOLE_CALLOUT_PRECISION, label="ear taps")
+    set_hole_callout_below(ear_taps, HOLE_CALLOUT_BELOW, label="ear taps")
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
+    if add_note(adapter, DRAWING_NOTES, *NOTES_XY) is None:
+        raise RuntimeError("failed to add the grip-gap note")
 
     return await finalize_drawing(
         adapter,

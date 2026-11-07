@@ -5,6 +5,8 @@ from __future__ import annotations
 import math
 from pathlib import Path
 
+import pytest
+
 from _column_clamp_interface import ARC_DEPTH
 import sh_column_clamp_front_spec as spec
 import sh_column_clamp_fit as fit
@@ -142,7 +144,7 @@ def test_ear_height_text_stands_outside_its_witnesses() -> None:
     ear_x = drawing._face_xy(0.0, spec.EAR_HOLE_Z)[0]
     text_x = drawing.FACE_KEEP["EarHoleHeight"][0]
     outward = math.copysign(1.0, bottom_x - ear_x)
-    lines = ["2X .315 ±.004", *drawing.DIMENSION_CALLOUTS["EarHoleHeight"].split("\n")]
+    lines = ["2X .315 ±.004"]
     half_block = max(len(line) for line in lines) * 0.00265 / 2.0
     assert outward * (text_x - bottom_x) >= half_block + 0.003
 
@@ -151,14 +153,26 @@ def test_bore_prints_the_grip_budget_on_the_column() -> None:
     # #970: the bore is matched to the purchased column at the clearance the
     # pair's grip budget allows (sh_column_clamp_fit), not "bored as a pair".
     bore = drawing.DIMENSION_CALLOUTS["BoreDia"]
-    assert "DIAMETRAL" in bore and "MHA-FR-03" in bore
+    assert bore.split("\n") == ["SLIDING FIT ON MHA-FR-03", "CLEARANCE .004-.012"]
     assert spec.BORE_DIAMETRAL_CLEARANCE[1] <= 0.3048
-    assert "MHA-SH-02" in drawing.DIMENSION_CALLOUTS["EarHole1Z"]
-    assert "MHA-SH-02" in drawing.DIMENSION_CALLOUTS["EarHoleHeight"]
-    # The three-place depth says what it sets; the bore says where its axis is.
+    # Rule 7: the ear locations carry only value and band; the taps they
+    # match are named once, under the hole callout.
+    assert not {"EarHole1Z", "EarHoleHeight"} & set(drawing.DIMENSION_CALLOUTS)
+    assert "MHA-SH-02" in drawing.HOLE_CALLOUT_BELOW
+    # The three-place depth says what it sets.
     assert spec.DRAWING_PRECISION["BlockProfile"]["Depth"] == 3
     assert "MHA-SH-02" in drawing.DIMENSION_CALLOUTS["Depth"]
-    assert "AXIS ON SPLIT FACE" in bore
+
+
+def test_ear_hole_callout_reads_size_then_drill_thru() -> None:
+    native = {5: "2X <MOD-DIAM><hw-diam> <hw-thru>", 6: "", 7: "", 8: ""}
+    assert _column_clamp_drawing.drill_thru_definitions(native)[5] == (
+        "2X <MOD-DIAM><hw-diam> DRILL THRU"
+    )
+    with pytest.raises(RuntimeError, match="unexpected native through-hole"):
+        _column_clamp_drawing.drill_thru_definitions(
+            {**native, 6: "<hw-cbdia>"}
+        )
 
 
 def test_walls_at_the_largest_column_and_drill_wander() -> None:
@@ -208,12 +222,16 @@ def test_owner_ruled_shortfalls_are_declared_and_stated() -> None:
             CAD_ROOT / "config", "sh_column_clamp_front", "part"
         )
     }
-    assert set(entries) == {"RV-01", "RV-02"}
-    for entry in entries.values():
+    assert set(entries) == {"RV-01", "RV-02", "RV-03"}
+    for entry in (entries["RV-01"], entries["RV-02"]):
         assert entry.kind == "minor"
         assert entry.reason.endswith("(owner-ruled shortfall)")
     assert entries["RV-01"].where.endswith(spec.EAR_WALL_NOTE)
     assert entries["RV-02"].where.endswith(spec.SCREW_LINE_NOTE)
+    # The ±.004 ear locations, narrower than the drilled-hole row, are
+    # accepted (delegated ruling L3, 2026-11-07, owner review #2144).
+    assert entries["RV-03"].kind == "accept"
+    assert "#2144" in entries["RV-03"].reason
     # The printed values, from the computed worst cases at the sheet's three
     # inch places, rounded never in the part's favour: the least wall down,
     # the screw line's excess up, inside the owner's ruled 0.053 mm.
