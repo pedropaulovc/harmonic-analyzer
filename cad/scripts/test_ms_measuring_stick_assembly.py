@@ -401,13 +401,42 @@ def test_fitter_package_covers_rule_9() -> None:
     assert drawing.BOM_PART_NUMBERS[spec.PLATE_SCREW] == "MHA-MS-VN-51"
     for stem in spec.QUANTITIES:
         assert drawing.BOM_PART_NUMBERS[stem] == _config.parts(stem)["number"]
-    for text in (drawing.ASSEMBLY_STEPS, drawing.ASSEMBLY_CHECKS, drawing.SETUP_NOTE):
+    for text in (drawing.ASSEMBLY_STEPS, drawing.ASSEMBLY_CHECKS):
         assert all(len(line) <= drawing.STEPS_LINE_WIDTH for line in text.splitlines())
     assert drawing.ASSEMBLY_STEPS.count("\n") >= len(sheet.ASSEMBLY_STEPS)
-    for instruction in (sheet.ASSEMBLY_STEPS[-1], sheet.CLAMPED_SETUP_NOTE):
-        assert "NEAR-FACE REFERENCE DIMENSION" in instruction
-        assert f"STICK GRADUATION {stop.STOP_MARK:.1f} ON THUMBSCREW AXIS" in instruction
-        assert "±" not in instruction  # the reference carries no band
+    # Rule 22: one action a step, at most six printed lines, parts by item.
+    for step in sheet.ASSEMBLY_STEPS:
+        assert len(drawing._wrapped((step,), width=drawing.STEPS_LINE_WIDTH).splitlines()) <= 6
+        assert "ITEM " in step
+    # Owner ruling 2026-11-06 (option C): no as-shipped setting. The clamp
+    # step sets no position, and sheet 1 labels its drawn pose an example.
+    clamp = sheet.ASSEMBLY_STEPS[-1]
+    assert clamp.startswith("10. WITH ITEM 1 AT ANY POSITION ALONG ITEM 3")
+    assert "THUMBSCREW" in clamp
+    for gone in ("NEAR_FACE_MARK", "NEAR_FACE_WINDOW"):
+        assert not hasattr(sheet, gone)
+    for text in (*sheet.ASSEMBLY_STEPS, *sheet.ASSEMBLY_CHECKS):
+        assert "GRADUATION" not in text and "±" not in text
+    assert "EXAMPLE POSITION" in sheet.EXAMPLE_POSE_NOTE
+    assert "SHEET 3, STEP 10" in sheet.EXAMPLE_POSE_NOTE
+    assert all(
+        len(line) <= drawing.EXAMPLE_NOTE_WIDTH for line in drawing.EXAMPLE_NOTE.splitlines()
+    )
+    # Each check is one acceptance (rule 22: a step does one thing).
+    assert all(" AND " not in check for check in sheet.ASSEMBLY_CHECKS[2:])
+    # Step 2 names the match-drill faces by view; the part sheets' labels follow.
+    align = sheet.ASSEMBLY_STEPS[1]
+    assert "LEFT ENDS AND TOP EDGES FLUSH AS IN THE SHEET 1 FRONT VIEW" in align
+    assert stop.LOCATING_END_NOTE in align and stop.LOCATING_EDGE_NOTE in align
+    # Rules 9 and 26: the projected bottom view carries no prose caption, and
+    # no private phrase or sheet-1 note restates the steps.
+    for gone in ("UNDERSIDE_CAPTION", "CLAMPED_SETUP_NOTE"):
+        assert not hasattr(sheet, gone)
+    for gone in ("UNDERSIDE_CAPTION_XY", "SETUP_NOTE", "SETUP_NOTE_XY", "SETUP_NOTE_WIDTH"):
+        assert not hasattr(drawing, gone)
+    for text in (*sheet.ASSEMBLY_STEPS, *sheet.ASSEMBLY_CHECKS):
+        for phrase in ("NEAR-FACE", "SAVED POSE", "PLATE IS MASTER", "DIA "):
+            assert phrase not in text
     assert drawing.EXPLODED_CAPTION == sheet.EXPLODED_CAPTION == (
         "EXPLODED VIEW - ASSEMBLY SEQUENCE ON SHEET 3"
     )
@@ -432,7 +461,8 @@ def test_bom_prints_registry_identity_and_vendor_sku_only() -> None:
         "sku",
         "quantity",
     }
-    assert drawing.BOM_COLUMN_WIDTHS["part"] > 0.026
+    # The longest drawing number (12 glyphs, ~2.9 mm each) prints on one line.
+    assert drawing.BOM_COLUMN_WIDTHS["part"] >= 12 * 0.0029 + 0.003
     assert drawing.BOM_COLUMN_WIDTHS["sku"] > 0.024
     assert drawing.BOM_COLUMN_WIDTHS["description"] < 0.080
     template = drawing.DRAWING_TEMPLATES[drawing.SHEET_LAYOUTS[drawing.SHEET_NAMES[1]]]
@@ -456,8 +486,8 @@ def test_portrait_group_translation_balances_visible_ink() -> None:
     assert lower_air == pytest.approx(upper_air)
     assert lower_air > 0.05
     assert drawing.EXPLODED_ISO_CENTER == pytest.approx((0.1397, 0.235 + shift))
-    assert drawing.BOM_ANCHOR == pytest.approx((0.0627, 0.405 + shift))
-    assert drawing.EXPLODED_CAPTION_XY == pytest.approx((0.0627, 0.415 + shift))
+    assert drawing.BOM_ANCHOR == pytest.approx((0.0577, 0.405 + shift))
+    assert drawing.EXPLODED_CAPTION_XY == pytest.approx((0.0577, 0.415 + shift))
 
 
 def test_bom_removes_material_without_changing_native_items(monkeypatch) -> None:
@@ -768,7 +798,7 @@ def test_clamped_sheet_places_section_clear_of_setting(monkeypatch, defect) -> N
 
         def GetUserPreferenceInteger(self, preference, option):
             assert (preference, option) == (542, 0)
-            return 0 if defect == "style-readback" else 1
+            return 1 if defect == "style-readback" else 0
 
     adapter = SimpleNamespace(currentModel=SimpleNamespace(Extension=Extension()))
     monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
@@ -799,7 +829,7 @@ def test_clamped_sheet_places_section_clear_of_setting(monkeypatch, defect) -> N
     monkeypatch.setattr(drawing, "_add_assembly_dimensions", lambda *a: settled)
     if defect is not None:
         message = {
-            "style-set": "failed to set end-only",
+            "style-set": "failed to set connected",
             "style-readback": "style did not persist",
             "alignment": "thumbscrew axes are not aligned",
         }[defect]
@@ -808,7 +838,7 @@ def test_clamped_sheet_places_section_clear_of_setting(monkeypatch, defect) -> N
         assert not cut
         return
     assert drawing._place_clamped_sheet(adapter) is settled
-    assert style == [(542, 0, 1)]
+    assert style == [(542, 0, 0)]
     axis_point = tuple(value / 1000.0 for value in spec.THUMB_ORIGIN)
     assert projected == [(front, axis_point), (underside, axis_point)]
     assert cut["line_start"] == pytest.approx((0.1199, 0.2240755))
@@ -853,18 +883,18 @@ def test_fitter_text_tracks_mutated_setting_and_depth_specs(
     assert changed.SETTING_NEAR_FACE_MM == pytest.approx(
         changed.STICK_MARK_X - stop.THUMB_AXIS_X
     )
-    for text in (changed.CLAMPED_SETUP_NOTE, changed.ASSEMBLY_STEPS[-1]):
-        assert f"STICK GRADUATION {mark:.1f} ON THUMBSCREW AXIS" in text
-        assert "±" not in text
-    assert "PLATE IS MASTER" in changed.ASSEMBLY_STEPS[0]
-    assert stop.MATCH_DRILL_DATUM_ALIGNMENT in changed.ASSEMBLY_STEPS[0]
-    pilot = changed.ASSEMBLY_STEPS[0]
-    assert "PILOT DIA .070 THROUGH PLATE" in pilot
-    assert "OPEN ITS HOLES TO DIA .096" in pilot
-    # The block's tapped-hole callout carries the depths; the step names it.
-    assert drill_depth not in pilot and thread_depth not in pilot
-    assert "DEPTH EXCLUDES PLATE" in pilot
-    assert "BOTTOMING-TAP" in pilot
+    # Option C: whatever mark the saved pose uses, no step or note prints it.
+    for text in (*changed.ASSEMBLY_STEPS, changed.EXAMPLE_POSE_NOTE):
+        assert f"{mark:.1f}" not in text and "±" not in text
+    pilot = changed.ASSEMBLY_STEPS[2]
+    assert "DRILL Ø.070 THROUGH ITEM 2 PLATE AND INTO ITEM 1 BLOCK" in pilot
+    assert "OPEN ITS TWO HOLES TO Ø.096 THRU" in changed.ASSEMBLY_STEPS[3]
+    # The block's tapped-hole callout carries the depths; the steps name it.
+    tap = changed.ASSEMBLY_STEPS[4]
+    for text in (pilot, tap):
+        assert drill_depth not in text and thread_depth not in text
+    assert "MEASURED FROM THE ITEM 1 FACE UNDER ITEM 2" in pilot
+    assert "BOTTOMING TAP" in tap
     assert changed.PLATE_SCREW_TAP_RESERVE == pytest.approx(
         float(thread_depth) * 25.4 - changed.PLATE_SCREW_ENGAGED
     )
@@ -872,26 +902,38 @@ def test_fitter_text_tracks_mutated_setting_and_depth_specs(
 
 
 def _assert_fitter_text_spacing(fitter) -> None:
-    """Conservative offline text envelopes; the parent owns native ink review."""
-    line_pitch = 0.0035  # default note cap height plus interline allowance
+    """Offline text envelopes at the measured note pitch; the parent owns
+    native ink review."""
+    line_pitch = drawing.NOTE_LINE_PITCH
     steps = drawing._wrapped(
         fitter.ASSEMBLY_STEPS, width=drawing.STEPS_LINE_WIDTH,
         heading="ASSEMBLY SEQUENCE",
     )
-    setup = drawing._wrapped(
-        (fitter.CLAMPED_SETUP_NOTE,), width=drawing.SETUP_NOTE_WIDTH
-    )
+    checks = drawing._wrapped(fitter.ASSEMBLY_CHECKS, width=drawing.STEPS_LINE_WIDTH)
     assert all(len(line) <= drawing.STEPS_LINE_WIDTH for line in steps.splitlines())
-    assert all(len(line) <= drawing.SETUP_NOTE_WIDTH for line in setup.splitlines())
-    assert (
-        drawing.STEPS_XY[1] - len(steps.splitlines()) * line_pitch
-        > drawing.CHECKS_XY[1] + line_pitch
+    assert drawing.STEPS_XY[1] - len(steps.splitlines()) * line_pitch >= (
+        drawing.CHECKS_XY[1] + line_pitch - 1e-9
     )
     assert (
-        drawing.SETUP_NOTE_XY[1] - len(setup.splitlines()) * line_pitch
+        drawing.CHECKS_XY[1] - len(checks.splitlines()) * line_pitch
         > drawing.SHEET_INNER_BORDER[1] + line_pitch
     )
-    assert drawing.SETUP_NOTE_XY[1] < drawing.UNDERSIDE_CENTER[1] - 0.020
+    # The left text column stays left of the title block.
+    assert drawing.STEPS_XY[0] + drawing.STEPS_LINE_WIDTH * 0.00276 < drawing.TITLE_BLOCK[0]
+    # Sheet 1's example-pose note sits under the bottom view, above the
+    # border and left of the title block.
+    example = drawing._wrapped(
+        (fitter.EXAMPLE_POSE_NOTE,), width=drawing.EXAMPLE_NOTE_WIDTH
+    )
+    assert drawing.EXAMPLE_NOTE_XY[1] < drawing.UNDERSIDE_CENTER[1] - 0.020
+    assert (
+        drawing.EXAMPLE_NOTE_XY[1] - len(example.splitlines()) * line_pitch
+        > drawing.SHEET_INNER_BORDER[1] + line_pitch
+    )
+    assert (
+        drawing.EXAMPLE_NOTE_XY[0] + drawing.EXAMPLE_NOTE_WIDTH * 0.00276
+        < drawing.TITLE_BLOCK[0]
+    )
     # Initial native outline top: 206.0755 mm. The old 4 mm cut overhang
     # left the upper arrow below the setting dimension line.
     # At text Y220 the native setting line is Y211.6656; its witness ends
