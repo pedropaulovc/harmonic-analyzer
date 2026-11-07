@@ -161,7 +161,7 @@ def test_pin_hole_is_the_reamed_press_hole_for_the_rod_pivot_pin() -> None:
     assert 'name_last_feature(adapter,"PinHoleProfile")' in build
     assert 'name_last_feature(adapter,"PinHole")' in build
     assert drawing.PIN_NUMBER == _config.parts("ch-rod-pivot-pin")["number"]
-    assert drawing.ARM_NUMBER == _config.parts("ch-rocker-arm")["number"]
+    assert ch_connecting_rod_notes.ARM_NUMBER == _config.parts("ch-rocker-arm")["number"]
     assert drawing.CAM_NUMBER == _config.parts("dt-cylinder-gear")["number"]
 
 
@@ -206,7 +206,10 @@ def test_sheet_runs_at_1_to_1_with_1_to_2_isometric() -> None:
     assert ch_connecting_rod_notes.DRAWING_NOTES.splitlines() == [
         "1. MATCHED PRESS FIT ON ROD PIVOT PIN MHA-CH-10:",
         "    REAM .0002-.0008 UNDER THE MEASURED PIN.",
+        "2. FORK SLOT: RUNNING FIT ON ARM MHA-CH-06.",
+        "3. RING AND SHANK: SLIDING FIT IN MHA-DT-12 CAM SLOT.",
     ]
+    assert ch_connecting_rod_notes.CAM_NUMBER == drawing.CAM_NUMBER
     assert max(y for _, y in drawing.DETAIL_KEEP.values()) < 0.260
     assert ch_connecting_rod_notes.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:2"
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
@@ -236,19 +239,16 @@ def test_every_tight_band_names_its_mate() -> None:
     assert drawing.FRONT_CALLOUTS["PinHoleDia"] == (
         f"REAM THRU\nPRESS FIT ON {drawing.PIN_NUMBER}\nSEE NOTE 1"
     )
-    assert drawing.ARM_NUMBER in drawing.DETAIL_CALLOUTS["SlotWidth"]
-    # Rule 7: the tine's band states its function in one line, with the
-    # arm its slot serves (rule 4, fan-out round 1).
-    assert drawing.DETAIL_CALLOUTS["TineNear"] == (
-        f"2X TINE WALL\nLOCATES SLOT FOR {drawing.ARM_NUMBER}"
-    )
-    # Fan-out round 1: the plate face's tight band names the mate it locates.
-    assert drawing.DETAIL_CALLOUTS["RingFaceNear"] == (
-        f"LOCATES RING IN\n{drawing.CAM_NUMBER} CAM SLOT"
-    )
-    assert drawing.LEFT_CALLOUTS["RingThick"] == (
-        f"SLIDING FIT IN CAM\nSLOT OF {drawing.CAM_NUMBER}"
-    )
+    # Fan-out rounds 1-2 (rule 4): two tight bands serving one mate link one
+    # note naming it, so the mate prints once and each band reaches it: the
+    # slot and the tine walls that locate it (note 2, the arm), the ring and
+    # shank's thickness and its centring offset (note 3, the cam's slot).
+    assert drawing.DETAIL_CALLOUTS == {
+        "TineNear": "2X TINE WALL\nSEE NOTE 2",
+        "SlotWidth": "SEE NOTE 2",
+        "RingFaceNear": "SEE NOTE 3",
+    }
+    assert drawing.LEFT_CALLOUTS["RingThick"] == "RING AND SHANK\nSEE NOTE 3"
     assert set(drawing.DETAIL_CALLOUTS) <= set(drawing.DETAIL_KEEP)
     assert set(drawing.LEFT_CALLOUTS) <= set(drawing.LEFT_KEEP)
     assert set(drawing.FRONT_CALLOUTS) <= set(drawing.FRONT_KEEP)

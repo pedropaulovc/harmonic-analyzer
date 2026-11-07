@@ -70,9 +70,11 @@ from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from ch_connecting_rod_notes import (
+    CAM_SLOT_NOTE_NUMBER,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     PIN_FIT_NOTE_NUMBER,
+    SLOT_FIT_NOTE_NUMBER,
 )
 from ch_connecting_rod_spec import (
     CENTER_DISTANCE,
@@ -132,7 +134,6 @@ NOTES_XY = (0.110, 0.262)
 
 # The mates the tight bands name (drawing-guidelines.md rule 7).
 CAM_NUMBER = str(_config.parts("dt-cylinder-gear")["number"])
-ARM_NUMBER = str(_config.parts("ch-rocker-arm")["number"])
 PIN_NUMBER = str(_config.parts("ch-rod-pivot-pin")["number"])
 
 
@@ -196,10 +197,11 @@ FRONT_CALLOUTS = {
 LEFT_KEEP = {
     "RingThick": (0.045, _left_xy(0.0, RING_BOTTOM_Y)[1] - 0.007),
 }
-# Two short lines: the plate's fit in its cam slot, named once here (rule 7;
+# Two short lines: the plate's name and the flag of the note that gives its
+# fit in the cam slot, shared with the plate face's offset (fan-out round 2;
 # long lines ran into the sheet border, r2).
 LEFT_CALLOUTS = {
-    "RingThick": f"SLIDING FIT IN CAM\nSLOT OF {CAM_NUMBER}",
+    "RingThick": f"RING AND SHANK\nSEE NOTE {CAM_SLOT_NOTE_NUMBER}",
 }
 # The overall length, ring bottom to crown top, as a reference: the side
 # view's ring-bottom silhouette and the far tine's crown-top silhouette,
@@ -264,31 +266,32 @@ DETAIL_KEEP = {
     # Over the tines, nearest first: the near tine (text wholly left of the
     # datum face's witness), the slot (text right of the far face), the
     # reference thickness centred over the fork.
-    "TineNear": (_FACE_X - 0.038, _TINE_TOP_Y + 0.012),
+    "TineNear": (_FACE_X - 0.030, _TINE_TOP_Y + 0.012),
     "SlotWidth": (_FAR_X + 0.030, _TINE_TOP_Y + 0.016),
     "ForkThick": (DETAIL_CENTER[0], _TINE_TOP_Y + 0.028),
     # Down the right-hand side from the crown top: the slot depth inside, the
     # boss length outside.
     "SlotDepth": (_FAR_X + 0.016, (_TINE_TOP_Y + _ROOT_Y) / 2.0 + 0.004),
     "ForkBossLength": (_FAR_X + 0.034, (_TINE_TOP_Y + _ROOT_Y) / 2.0),
-    # Under the fork, from the datum face: the plate's near face, its one
-    # reason and mate under its band, text left of the datum face.
+    # Under the fork, from the datum face: the plate's near face, its note's
+    # flag under its band, text left of the datum face.
     "RingFaceNear": (_FACE_X - 0.036, _REF_END_Y - 0.010),
 }
 # The near tine's band locates the slot from the datum face (the channel's
 # axial budget) and, with the far tine's, holds the gap to the next channel's
 # rod (#982 review r2: a clearance alone would not need it); one short reason
-# says so (rule 7) and names the arm the slot serves (rule 4: a tight band
-# names its mate at its own callout, fan-out round 1). Its printed lower
-# limit is the tines' known shortfall against the .080 wall target, named
-# TINE WALL (rule 20; MHA-CH-03 RV-02). The slot names its fit on the arm by
-# the standard name (rule 4). The plate's near face locates the ring in the
-# cam's slot: its tight band names that mate (fan-out round 1: a bare
-# .077 +/-.002 named none); the slot's fit itself is the .086 thickness's.
+# Each tight band links the note naming the mate it serves (rule 4; fan-out
+# rounds 1-2: the arm named at both the slot and the tine wall printed twice,
+# named at one the other band had none). The tine wall's printed lower limit
+# is the tines' known shortfall against the .080 wall target, named TINE
+# WALL (rule 20; MHA-CH-03 RV-02). The slot and the walls that locate it link
+# note 2 (running fit on the arm); the plate face's offset, which centres the
+# ring and shank on the fork, links note 3 with the .086 thickness (sliding
+# fit in the cam's slot).
 DETAIL_CALLOUTS = {
-    "TineNear": f"2X TINE WALL\nLOCATES SLOT FOR {ARM_NUMBER}",
-    "SlotWidth": f"RUNNING FIT ON\nARM {ARM_NUMBER}",
-    "RingFaceNear": f"LOCATES RING IN\n{CAM_NUMBER} CAM SLOT",
+    "TineNear": f"2X TINE WALL\nSEE NOTE {SLOT_FIT_NOTE_NUMBER}",
+    "SlotWidth": f"SEE NOTE {SLOT_FIT_NOTE_NUMBER}",
+    "RingFaceNear": f"SEE NOTE {CAM_SLOT_NOTE_NUMBER}",
 }
 
 BORE_FINISH_EDGE = _sheet_xy(RING_BORE_DIA / 2.0, 0.0)
