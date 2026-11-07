@@ -784,6 +784,58 @@ def test_receipt_stack_keeps_each_value_on_its_own_line_clear_of_the_others() ->
     assert _inside_box(flag, draw.RECEIPT_FLAG_CELL)
 
 
+def test_native_short_station_ink_uses_the_outside_witness_lane() -> None:
+    """Pinned native text/line extents, 20261107T002231Z-1-4eb76c9d.
+
+    Unlike the font estimator, these include the entire native tolerance
+    block. Translate only the authored text targets and the FRONT origin;
+    keep measured widths, heights, row lines and witness overruns unchanged.
+    """
+    native_x = (
+        (0.0222, 0.0525), (0.0614, 0.0939), (0.0751, 0.1098),
+        (0.0901, 0.1248), (0.1051, 0.1398), (0.1201, 0.1548),
+        (0.1351, 0.1698), (0.1501, 0.1848),
+    )
+    _, _, inks, flag = _stack_ink()
+    old_inks = {}
+    view_shift = draw.FRONT_CENTER[0] - 0.170
+    old_end = 0.170 - draw._FRONT_HALF[0]
+    new_end = old_end + view_shift
+    front_cell = draw.view_cell(draw.FRONT_CENTER, draw._FRONT_HALF)
+    for index, (name, (left, right)) in enumerate(zip(rail.STATION_DIMENSIONS, native_x, strict=True)):
+        line_y = 0.1492 - index * 0.0085
+        witness_end = 0.065 + index * 0.030
+        old_box = (left, line_y, right, line_y + 0.0035)
+        old_segments = [
+            ((0.060, 0.159), (0.060, line_y - 0.001)),
+            ((witness_end, 0.159), (witness_end, line_y - 0.001)),
+            ((0.060, line_y), (witness_end, line_y)),
+        ]
+        if index == 0:
+            old_segments.append(((left, line_y), (0.060, line_y)))
+        old_inks[name] = (old_box, old_segments)
+        station = draw.STATION_NOMINALS[name]
+        old_target = old_end - 0.023 if index == 0 else old_end + station * 0.00025
+        new_target, _ = draw.receipt_text_point(
+            name, (new_end, 0.160), (new_end + station * 0.0005, 0.160), 0.0
+        )
+        dx = new_target - old_target
+        box = (left + dx, line_y, right + dx, line_y + 0.0035)
+        segments = [
+            ((a[0] + view_shift, a[1]), (b[0] + view_shift, b[1]))
+            for a, b in old_segments[:3]
+        ]
+        if name in draw.TEXT_OUTSIDE_START:
+            segments.append(((box[0], line_y), (0.060 + view_shift, line_y)))
+            assert box[2] + draw.CLEAR_GAP_M <= front_cell[0], name
+            assert box[0] >= BORDER[0] + 0.005, name
+        inks[name] = (box, segments)
+    old_findings = draw.receipt_stack_findings(old_inks, flag)
+    for index in range(3, 9):
+        assert f"Station{index} line runs within 2 mm of Station2 text" in old_findings
+    assert draw.receipt_stack_findings(inks, flag) == []
+
+
 def test_receipt_stack_rule_refuses_run_20261104T222143958Z() -> None:
     """The farm's FIX: the callout under 435.00 lifted that value 2.5 mm,
     onto 375.00's text and its line, off its own (5.5 mm rows)."""
@@ -821,17 +873,15 @@ def _inside_box(inner, outer) -> bool:
 def test_receipt_texts_fit_their_spans_rows_and_the_border() -> None:
     end_face_x, per_mm, inks, _ = _stack_ink()
     boxes = {name: text for name, (text, _) in inks.items()}
-    first = boxes["Station1"]
-    # The trimmed first station's text stands left of the view's padded
-    # outline cell, clear of it and inside the border with air.
-    assert rail.HOLE_X[0] * per_mm < first[2] - first[0]
-    assert first[2] + 0.002 <= end_face_x
-    assert first[0] >= BORDER[0] + 0.005
     front_cell = draw.view_cell(draw.FRONT_CENTER, draw._FRONT_HALF)
-    assert first[2] + draw.CLEAR_GAP_M <= front_cell[0]
-    for name, x in zip(rail.STATION_DIMENSIONS[1:], rail.HOLE_X[1:], strict=True):
+    for name in rail.STATION_DIMENSIONS:
         box = boxes[name]
-        # Between its own extension lines, clear of the end face's.
+        if name in draw.TEXT_OUTSIDE_START:
+            assert box[2] + draw.CLEAR_GAP_M <= front_cell[0], name
+            assert box[0] >= BORDER[0] + 0.005, name
+            continue
+        x = draw.STATION_NOMINALS[name]
+        # Long stations fit between their own extension lines.
         assert end_face_x + 0.002 <= box[0] and box[2] + 0.002 <= end_face_x + x * per_mm, name
 
 

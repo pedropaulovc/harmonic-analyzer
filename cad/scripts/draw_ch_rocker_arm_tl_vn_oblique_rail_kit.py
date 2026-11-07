@@ -158,14 +158,14 @@ _RIGHT_HALF = (
 )
 _ISO_HALF = (0.045, 0.028)
 
-# View centres. FRONT spans x 57.5..282.5 mm: its -X end stands 45 mm in
-# from the border so the first station's text fits left of the end face. Its
-# eight station rows, the receipt flag and the FRONT caption stand under it,
+# FRONT/TOP leave a left-hand text lane for the two shortest stations.
+# Its extra 2 mm border reserve accommodates the measured native text widths.
+# Eight station rows, the receipt flag and the FRONT caption stand under it,
 # down to the footer, the length row over it; TOP stands over FRONT, in
 # projection with it. RIGHT stands level with FRONT, right of its end; the
 # isometric fills the upper right, clear of TOP's end and over RIGHT's
 # outline.
-FRONT_CENTER = (0.170, 0.160)
+FRONT_CENTER = (0.172, 0.160)
 TOP_CENTER = (FRONT_CENTER[0], 0.203)
 RIGHT_CENTER = (0.340, FRONT_CENTER[1])
 ISO_CENTER = (0.345, 0.230)
@@ -223,11 +223,13 @@ RECEIPT_DIMENSIONS = {
 }
 RECEIPT_DIMENSIONS["Length"] = (0.0, rail.LENGTH, LENGTH_ROW_RISE)
 STATION_NOMINALS = dict(zip(rail.STATION_DIMENSIONS, rail.HOLE_X, strict=True))
-# The first station is narrower than its three-place banded text. Keep the
-# text left of FRONT's padded outline cell, not just the physical end face:
-# at 20 mm offset its ink reached 0.61 mm into that cell (8a1a gate).
-# Moving the label 3 mm left retains normal text and over 11 mm to the border.
-TEXT_OUTSIDE_START = {rail.STATION_DIMENSIONS[0]: 0.023}
+# Native run 20261107T002231Z-1-4eb76c9d measured Station2's text
+# x=61.4..93.9 mm: only 1.4 mm from the common x=60 mm witnesses of
+# Stations3..8. Both short dimensions therefore use the OUTSIDE witness lane.
+# The widest short text is 32.5 mm. Half width + padded-cell reach + gap
+# is 16.25 + 7.59 + 2 = 25.84 mm; a 27 mm offset clears that whole cell.
+# The 2 mm FRONT/TOP shift also leaves the native text >6 mm inside the border.
+TEXT_OUTSIDE_START = dict.fromkeys(rail.STATION_DIMENSIONS[:2], 0.027)
 # Smart arrows put the 75 span's arrows outside, over the 15 row (run
 # 20261104T222143958Z); every station keeps its arrows inside, under its text.
 ARROWS_INSIDE = rail.STATION_DIMENSIONS
