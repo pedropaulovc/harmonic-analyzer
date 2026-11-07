@@ -19,18 +19,12 @@ import _reference_source_lifecycle as source_lifecycle
 import _supplier_chain_dimensions as chain_dimensions
 import _supplier_spring_drawing as supplier_drawing
 from _supplier_reference_geometry import NativeSketchGeometry
-from _supplier_spring_drawing import supplier_state_cells
+from _supplier_spring_drawing import extension_spring_cells, supplier_state_cells
 import ch_vn_channel_spring_installed_spec as channel_installed
-import ch_vn_channel_spring_stock_geom as channel
 import sm_vn_counter_spring_spec as counter_installed
 
 
 # Representative annotation requirements, independent of the layout coordinates.
-_EXTENSION_MARGINS = {
-    "free_front": (0.0, 0.0, 0.0, 0.018),
-    "free_right": (0.0, 0.018, 0.045, 0.018),
-    "max_front": (0.0, 0.0, 0.0, 0.018),
-}
 _DIAGRAM_MARGINS = {
     "free_front": (0.035, 0.0, 0.035, 0.0),
     "free_top": (0.040, 0.0, 0.040, 0.0),
@@ -56,24 +50,15 @@ def _contains(outer, inner):
 
 
 @pytest.mark.parametrize(
-    "maximum,margins",
-    [
-        pytest.param(True, _EXTENSION_MARGINS, id="extension-free-and-maximum"),
-        pytest.param(False, _DIAGRAM_MARGINS, id="nominal-diagrams"),
-    ],
-)
-@pytest.mark.parametrize(
     "notes", ["", "FIRST\nSECOND\nTHIRD"], ids=["bare-footer", "full-footer"]
 )
-def test_state_cells_leave_positive_geometry_and_all_annotation_budgets(
-    maximum, margins, notes
-):
+def test_state_cells_leave_positive_geometry_and_all_annotation_budgets(notes):
+    margins = _DIAGRAM_MARGINS
     caption_y = purchased.view_band_bottom(notes, label="supplier layout")
-    cells = supplier_state_cells(caption_y, maximum=maximum)
+    cells = supplier_state_cells(caption_y)
     fitted = purchased.supplier_fit_cells(cells, margins, label="supplier layout")
     originals = {name: (center, bounds) for name, center, bounds in cells}
-    expected_names = {"free_front", "free_right", "installed_iso"}
-    expected_names.add("max_front" if maximum else "free_top")
+    expected_names = {"free_front", "free_top", "free_right", "installed_iso"}
     assert {name for name, _, _ in fitted} == set(originals) == expected_names
 
     for name, center, inner in fitted:
@@ -105,13 +90,28 @@ def test_state_cells_leave_positive_geometry_and_all_annotation_budgets(
             )
         ), name
 
-    # Insets cannot hide overlapping outer view/caption plans. In particular,
-    # the maximum-state Right and installed Iso need separate sheet regions.
+    # Insets cannot hide overlapping outer view/caption plans.
     for (name_a, _, a), (name_b, _, b) in combinations(cells, 2):
         assert a[2] <= b[0] or b[2] <= a[0] or a[3] <= b[1] or b[3] <= a[1], (
             name_a,
             name_b,
         )
+
+
+def _installed_run_mm(spec) -> float:
+    """Inside-end installed length plus both end wires and one coil OD."""
+    return spec.INSTALLED_LENGTH_MM + 2.0 * spec.SUPPLIER_WIRE_DIA_MM + spec.SUPPLIER_COIL_OD_MM
+
+
+def _full_footer_caption_y(spec) -> float:
+    import draw_ch_vn_channel_spring_installed as channel_drawing
+    import draw_sm_vn_counter_spring as counter_drawing
+
+    drawing = counter_drawing if spec is counter_installed else channel_drawing
+    # Three note lines, the most rule 7 allows, plus the supplier data list.
+    return purchased.view_band_bottom(
+        "FIRST\nSECOND\nTHIRD", label="installed scale", supplier_data=drawing.SUPPLIER_DATA
+    )
 
 
 @pytest.mark.parametrize(
@@ -121,65 +121,43 @@ def test_state_cells_leave_positive_geometry_and_all_annotation_budgets(
         pytest.param(channel_installed, (2, 1), id="9432K31-2:1"),
     ],
 )
-def test_extension_installed_cell_holds_the_pictorial_at_a_legible_scale(
-    spec, scale
-):
+def test_extension_cells_hold_front_and_pictorial_at_a_legible_scale(spec, scale):
     # At 1:8 the counter spring's turns merged into a solid bar. A box around
-    # the installed coil (axis +X, loops/hooks inside the OD) bounds its
-    # standard isometric: X projects (sqrt(1/2), -1/sqrt(6)), Y (0, sqrt(2/3)).
-    caption_y = purchased.view_band_bottom("", label="installed scale")
-    cell = next(
-        bounds
-        for name, _, bounds in supplier_state_cells(caption_y, maximum=True)
-        if name == "installed_iso"
-    )
+    # the installed coil (axis +X, loops/hooks inside the OD) bounds the Front
+    # and its standard isometric: X projects (sqrt(1/2), -1/sqrt(6)),
+    # Y (0, sqrt(2/3)).
+    cells = {
+        name: bounds
+        for name, _, bounds in extension_spring_cells(_full_footer_caption_y(spec))
+    }
+    assert set(cells) == {"installed_front", "installed_iso"}
+    front, iso = cells["installed_front"], cells["installed_iso"]
+    assert front[2] <= iso[0] or iso[2] <= front[0]
+    run = _installed_run_mm(spec)
     diameter = spec.SUPPLIER_COIL_OD_MM
-    run = spec.INSTALLED_LENGTH_MM + 2.0 * spec.SUPPLIER_WIRE_DIA_MM + diameter
     ratio = scale[0] / scale[1] / 1000.0
+    assert run * ratio <= front[2] - front[0]
+    assert diameter * ratio <= front[3] - front[1]
+    # The next larger standard scale does not fit the Front: it sets the sheet.
+    larger = purchased._SCALES[purchased._SCALES.index(scale) - 1]
+    assert run * larger[0] / larger[1] / 1000.0 > front[2] - front[0]
     width = math.sqrt(0.5) * run * ratio
     height = (run / math.sqrt(6.0) + math.sqrt(2.0 / 3.0) * diameter) * ratio
-    assert width <= cell[2] - cell[0]
-    assert height <= cell[3] - cell[1]
+    assert width <= iso[2] - iso[0]
+    assert height <= iso[3] - iso[1]
 
 
 @pytest.mark.parametrize(
-    "spec,scale",
+    "legacy_width,margins",
     [
-        pytest.param(counter_installed, (2, 1), id="1330K524-2:1"),
-        pytest.param(channel_installed, (4, 1), id="9432K31-4:1"),
-    ],
-)
-def test_extension_sections_print_the_coil_od_at_a_legible_scale(spec, scale):
-    # At 1:1 (9432K31) and 1:2 (1330K524) the wire section was a dot on the
-    # coil OD's rim under its own arrowhead. The sections view's geometry
-    # lane, inside its text lanes, holds the coil OD at the larger scale and
-    # no larger standard one.
-    caption_y = purchased.view_band_bottom("", label="sections scale")
-    cells = supplier_state_cells(caption_y, maximum=True)
-    fitted = purchased.supplier_fit_cells(
-        cells, _EXTENSION_MARGINS, label="sections scale"
-    )
-    inner = next(bounds for name, _, bounds in fitted if name == "free_right")
-    span = min(inner[2] - inner[0], inner[3] - inner[1])
-    fitting = [
-        (numerator, denominator)
-        for numerator, denominator in purchased._SCALES
-        if spec.SUPPLIER_COIL_OD_MM / 1000.0 * numerator / denominator <= span
-    ]
-    assert max(fitting, key=lambda ratio: ratio[0] / ratio[1]) == scale
-
-@pytest.mark.parametrize(
-    "maximum,legacy_width,margins",
-    [
-        pytest.param(True, 0.032, _EXTENSION_MARGINS, id="old-32mm-extension-right"),
-        pytest.param(False, 0.042, _DIAGRAM_MARGINS, id="old-42mm-diagram-right"),
+        pytest.param(0.042, _DIAGRAM_MARGINS, id="old-42mm-diagram-right"),
     ],
 )
 def test_old_right_widths_cannot_reserve_the_requested_annotation_room(
-    maximum, legacy_width, margins
+    legacy_width, margins
 ):
     caption_y = purchased.view_band_bottom("", label="legacy supplier layout")
-    cells = supplier_state_cells(caption_y, maximum=maximum)
+    cells = supplier_state_cells(caption_y)
     old_cells = []
     for name, center, bounds in cells:
         if name == "free_right":
@@ -198,77 +176,6 @@ def test_old_right_widths_cannot_reserve_the_requested_annotation_room(
         purchased.supplier_fit_cells(
             tuple(old_cells), margins, label="legacy supplier layout"
         )
-
-
-class _CoilEndView:
-    """A real coil's circular end span plus fixed synthetic native padding.
-
-    The outline is calculated from the supplier model diameter and candidate
-    scale, never from a target cell or a remembered outline. A 1 mm per-edge
-    sheet-space pad stays fixed while the model scales, as in nearby fit tests.
-    """
-
-    PADDING_M = 0.001
-
-    def __init__(self, center):
-        self.Position = center
-        self.ScaleRatio = (1.0, 1.0)
-        self.UseSheetScale = 1
-
-    def UpdateViewDisplayGeometry(self):
-        return None  # Native VT_VOID; the fake outline already uses current scale.
-
-    def GetOutline(self):
-        ratio = self.ScaleRatio[0] / self.ScaleRatio[1]
-        radius = channel.COIL_OD_MM / 2000.0 * ratio + self.PADDING_M
-        x, y = self.Position
-        return (x - radius, y - radius, x + radius, y + radius)
-
-    def SetViewPosition(self, position, _update):
-        self.Position = tuple(position)
-        return True
-
-
-def test_largest_scale_is_chosen_with_annotation_room_not_the_bare_outer_cell(
-    monkeypatch,
-):
-    monkeypatch.setattr(purchased, "double_array", tuple)
-    caption_y = purchased.view_band_bottom("", label="extension scale")
-    cells = supplier_state_cells(caption_y, maximum=True)
-    fitted = purchased.supplier_fit_cells(
-        cells, _EXTENSION_MARGINS, label="extension scale"
-    )
-    outer_cell = next(cell for cell in cells if cell[0] == "free_right")
-    inner_cell = next(cell for cell in fitted if cell[0] == "free_right")
-    draw = SimpleNamespace(EditRebuild3=lambda: True)
-    bare_view = _CoilEndView(outer_cell[1])
-    annotated_view = _CoilEndView(outer_cell[1])
-
-    bare_scale = purchased._fit_group(draw, [(bare_view, outer_cell)])
-    annotated_scale = purchased._fit_group(draw, [(annotated_view, inner_cell)])
-    ratio = annotated_scale[0] / annotated_scale[1]
-    assert bare_scale[0] / bare_scale[1] > ratio
-
-    # Prove maximality from model geometry and fixed padding independently of
-    # the fake's GetOutline and the fitter's position/scale readback checks.
-    inner = inner_cell[2]
-    available_span = min(inner[2] - inner[0], inner[3] - inner[1])
-    fitting_ratios = [
-        numerator / denominator
-        for numerator, denominator in purchased._SCALES
-        if channel.COIL_OD_MM / 1000.0 * numerator / denominator
-        + 2.0 * _CoilEndView.PADDING_M
-        <= available_span
-    ]
-    assert ratio == max(fitting_ratios)
-    assert _contains(inner, annotated_view.GetOutline())
-    margins = _EXTENSION_MARGINS["free_right"]
-    assert _contains(
-        outer_cell[2], _annotation_envelope(annotated_view.GetOutline(), margins)
-    )
-    assert not _contains(
-        outer_cell[2], _annotation_envelope(bare_view.GetOutline(), margins)
-    )
 
 
 class _ReferenceFeature:
@@ -608,10 +515,9 @@ def _sibling_view(first, name, configuration="SupplierReference"):
 
 @pytest.mark.parametrize("outline", ["padded", "stale"])
 @pytest.mark.parametrize(
-    "maximum,key,margins,points,cell_size",
+    "key,margins,points,cell_size",
     [
         pytest.param(
-            False,
             "free_top",
             # A 4 mm TOP lane (the connecting link's margins before it moved
             # to a 2:1 fit): shorter than the native outline floor.
@@ -623,10 +529,10 @@ def _sibling_view(first, name, configuration="SupplierReference"):
     ],
 )
 def test_actual_reference_ink_fits_current_cells_that_native_outline_floor_cannot(
-    reference_scene, outline, maximum, key, margins, points, cell_size
+    reference_scene, outline, key, margins, points, cell_size
 ):
     cells = supplier_state_cells(
-        purchased.view_band_bottom("", label="supplier reference"), maximum=maximum
+        purchased.view_band_bottom("", label="supplier reference")
     )
     fitted = purchased.supplier_fit_cells(cells, margins, label="supplier reference")
     cell = next(cell for cell in fitted if cell[0] == key)
@@ -681,9 +587,7 @@ def test_actual_reference_ink_fits_current_cells_that_native_outline_floor_canno
 def test_validated_one_dimensional_reference_ink_is_fitted_and_centered(
     reference_scene, points
 ):
-    cells = supplier_state_cells(
-        purchased.view_band_bottom("", label="1D reference"), maximum=False
-    )
+    cells = supplier_state_cells(purchased.view_band_bottom("", label="1D reference"))
     fitted = purchased.supplier_fit_cells(
         cells, chain_dimensions.SUPPLIER_MARGINS, label="1D reference"
     )
@@ -725,10 +629,10 @@ def test_reference_fit_refreshes_each_projection_without_source_switch_or_live_c
     native.source.GetSketchSegments = forbidden
     native.source.points = ((400.0, 500.0), (600.0, 700.0))
     cells = supplier_state_cells(
-        purchased.view_band_bottom("", label="refresh reference"), maximum=True
+        purchased.view_band_bottom("", label="refresh reference")
     )
     fitted = purchased.supplier_fit_cells(
-        cells, _EXTENSION_MARGINS, label="refresh reference"
+        cells, _DIAGRAM_MARGINS, label="refresh reference"
     )
     cell = next(cell for cell in fitted if cell[0] == "free_right")
     scale = purchased._fit_group(
@@ -1692,7 +1596,7 @@ def test_supplier_builder_enables_dirty_allowance_only_at_annotation_callback(
                 item="1",
                 supplier_dimensions=dimensions,
                 prepare_views=prepare,
-                supplier_margins={"free_front": _EXTENSION_MARGINS["free_front"]},
+                supplier_margins={"free_front": (0.0, 0.0, 0.0, 0.018)},
                 supplier_reference_features={"free_front": ("SupplierSection",)},
                 stock_configuration="SupplierReference",
                 include_right=False,
