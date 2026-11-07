@@ -144,6 +144,7 @@ _INSERTED_SOURCES = {
     "ch_rocker_arm_tl_oblique_end_bracket "
     "ch_rocker_arm_tl_oblique_pivot_block ch_rocker_arm_tl_oblique_riser "
     "ch_rocker_arm_tl_vn_oblique_rail_kit "
+    "sm_vn_knife_mount_dowel "
     "ch_rocker_arm_tl_vn_oblique_leadscrew_kit "
     "ch_rocker_arm_tl_vn_oblique_pillow_block "
     "ch_rocker_arm_tl_vn_oblique_handwheel sh_vn_clamping_kit_hardware "
