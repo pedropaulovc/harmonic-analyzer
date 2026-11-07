@@ -895,6 +895,7 @@ def test_receipt_sheet_views_captions_and_notes_fit() -> None:
     # The full two-line fit callout, not just the nominal length value,
     # must clear TOP's caption. The a966 layout overlapped by 1.54 mm.
     assert caption_boxes["TOP"][1] >= texts["Length"][3] + draw.CLEAR_GAP_M
+
     # The flag stands between the stack and FRONT's caption, in the run of
     # the end face and last station's extension lines.
     end_face_x = draw.FRONT_CENTER[0] - draw._FRONT_HALF[0]
@@ -906,6 +907,36 @@ def test_receipt_sheet_views_captions_and_notes_fit() -> None:
     note = draw.RECEIPT_NOTE_CELL
     assert note[3] == pytest.approx(footer + 0.001)
     assert not _overlaps(note, TITLE_BLOCK)
+
+
+def test_native_multiline_length_ink_clears_witnesses_and_top_caption() -> None:
+    """Native 957501d1 geometry, not a centred-font approximation."""
+    _, _, inks, flag = _stack_ink()
+    old_text = (0.0506, 0.1704, 0.1873, 0.1830)
+    old_lines = [
+        ((0.062, 0.1644), (0.062, 0.1714)),
+        ((0.282, 0.1644), (0.282, 0.1714)),
+        ((0.062, 0.1704), (0.0557, 0.1704)),
+        ((0.062, 0.1704), (0.282, 0.1704)),
+        ((0.282, 0.1704), (0.2883, 0.1704)),
+    ]
+    assert "Length text sits on its own extension line" in draw.receipt_stack_findings(
+        {"Length": (old_text, old_lines)}, flag
+    )
+    dx = draw.LENGTH_TEXT_SHIFT
+    dy = draw.LENGTH_ROW_RISE - 0.016
+    text = (old_text[0] + dx, old_text[1] + dy, old_text[2] + dx, old_text[3] + dy)
+    lines = [
+        ((a[0], a[1] if index < 2 else a[1] + dy), (b[0], b[1] + dy))
+        for index, (a, b) in enumerate(old_lines)
+    ]
+    inks["Length"] = (text, lines)
+    assert draw.receipt_stack_findings(inks, flag) == []
+    assert text[0] >= 0.062 + draw.CLEAR_GAP_M
+    assert text[2] <= 0.282 - draw.CLEAR_GAP_M
+    assert text[1] >= draw.view_cell(draw.FRONT_CENTER, draw._FRONT_HALF)[3] + draw.CLEAR_GAP_M
+    top_caption_y = next(y for label, _x, y, _scale in draw.CAPTIONS if label == "TOP")
+    assert top_caption_y - 0.006 >= text[3] + draw.CLEAR_GAP_M
 
 
 class _Tolerance:

@@ -167,9 +167,9 @@ _ISO_HALF = (0.045, 0.028)
 # isometric fills the upper right, clear of TOP's end and over RIGHT's
 # outline.
 FRONT_CENTER = (0.172, 0.160)
-# The two-line Length fit callout reaches Y=184.50 mm (a966 recipe evidence).
-# TOP's caption reserve extends 20.04 mm below its view centre; Y=211 mm
-# leaves 6.46 mm above that callout, without moving the eight station lanes.
+# TOP's caption reserve starts at Y=190.96 mm. After the native Length
+# placement correction, its full callout tops out at 188.50 mm in the
+# conservative text fixture (187.0 mm from the translated native bounds).
 TOP_CENTER = (FRONT_CENTER[0], 0.211)
 RIGHT_CENTER = (0.340, FRONT_CENTER[1])
 ISO_CENTER = (0.345, 0.230)
@@ -217,8 +217,11 @@ TEXT_ON_LINE_MAX = 0.002
 # that, the next row's line 4.15 mm.
 STATION_FIRST_DROP = 0.008
 STATION_ROW_PITCH = 0.0085
-# The overall length, a reference, over the part.
-LENGTH_ROW_RISE = 0.016
+# Native 957501d1 Length ink was X=50.6..187.3, Y=170.4..183.0 mm,
+# intersecting its X=62 mm witness. Move its existing text target right
+# 20 mm and up 4 mm: ink then clears both witnesses and TOP's caption.
+LENGTH_ROW_RISE = 0.020
+LENGTH_TEXT_SHIFT = 0.020
 RECEIPT_DIMENSIONS = {
     name: (0.0, x, -(STATION_FIRST_DROP + index * STATION_ROW_PITCH))
     for index, (name, x) in enumerate(
@@ -320,14 +323,17 @@ def receipt_text_point(
     end: tuple[float, float],
     offset: float,
 ) -> tuple[float, float]:
-    """A receipt dimension's text point from the sheet points of the two
-    stations it spans: centred between them, or ``TEXT_OUTSIDE_START`` left
-    of the start, ``offset`` off the rail's centreline (negative: under it)."""
+    """A dimension's text target: short stations outside the near witness,
+    long stations centred, Length shifted to keep its measured multiline
+    callout inside its witnesses. ``offset`` is normal to the rail."""
     y = (start[1] + end[1]) / 2.0 + offset
     outside = TEXT_OUTSIDE_START.get(name)
     if outside is not None:
         return start[0] - outside, y
-    return (start[0] + end[0]) / 2.0, y
+    x = (start[0] + end[0]) / 2.0
+    if name == "Length":
+        x += LENGTH_TEXT_SHIFT
+    return x, y
 
 
 def _receipt_positions(adapter: Any, front: Any) -> dict[str, tuple[float, float]]:
