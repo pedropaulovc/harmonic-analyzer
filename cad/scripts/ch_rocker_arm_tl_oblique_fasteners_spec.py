@@ -35,14 +35,17 @@ flat heads seat in 82° countersinks cut in the brass nut's flange at fit-up.
 Hold-down studs retain their loaded lower ends when shortened. These nominal
 fit contracts do not certify the jig.
 
-One common screw (oblique simplification PR2): McMaster 91251A197, #8-32 x
-3/4 SHCS (``COMMON_SCREW``), wherever its head and engagement fit: the rail
-screws and the TL-28 bar screws, 20 in all, one BOM row
-(``ch-rocker-arm-tl-vn-oblique-rail-screw``). Every other screw or stud is
-in ``COMMON_SCREW_EXCEPTIONS`` with the reason it cannot be the common one.
-The KP08 screws are the owner-approved second length, 91251A196 #8-32 x 5/8
-(owner ruling 2026-11-06, Main, relayed on PR2): the 3/4 from the top would
-meet the bar screw's tip in TL-28's shared hole.
+One common screw (oblique simplification PR2; R4 owner rulings 2026-11-07):
+McMaster 91251A197, #8-32 x 3/4 SHCS (``COMMON_SCREW``), wherever its head
+and engagement fit: the rail screws, the TL-28 bar screws and the strap's
+CL, CR and HUB clamps into TL-21's ordinary #8-32 THRU taps, 23 in all, one
+BOM row (``ch-rocker-arm-tl-vn-oblique-rail-screw``). The HUB clamp bears on
+the brass top-hat washer (TL-52); the end clamps bear directly on the strap.
+Every other screw or stud is in ``COMMON_SCREW_EXCEPTIONS`` with the reason
+it cannot be the common one. The KP08 screws are the owner-approved second
+length, 91251A196 #8-32 x 5/8 (owner ruling 2026-11-06, Main, relayed on
+PR2): the 3/4 from the top would meet the bar screw's tip in TL-28's shared
+hole.
 """
 
 from __future__ import annotations
@@ -61,7 +64,6 @@ import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
 import ch_rocker_arm_tl_oblique_riser_spec as riser
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import ch_rocker_arm_tl_vn_oblique_pivot_screw_spec as pivot_screw
-import ch_rocker_arm_tl_oblique_hub_stud_spec as hub_stud
 import ch_rocker_arm_tl_oblique_hub_washer_spec as hub_washer
 from _hole_spec import THREAD_MAJOR_MM
 from _mcmaster_91771a112 import DIMS as _RISER_SCREW
@@ -211,42 +213,29 @@ RISER_TO_CARRIER = Fastener(
     riser.THICKNESS - _RISER_SCREW.seated_recess(riser.CSK_DIA, riser.CSK_ANGLE),
     carrier.THICKNESS,  # tapped THRU
 )
-CR_CLAMP = Fastener(
-    "CR clamp: rocker-arm strap and riser to TL-21 carrier",
-    carrier.CR_THREAD,
+# R4 strap holding (owner rulings 2026-11-07): the common screw through the
+# strap's loose end-waste holes and the riser's #9 clearances into TL-21's
+# ordinary #8-32 THRU taps at CL and CR, its head directly on the strap.
+END_CLAMP = Fastener(
+    "CL and CR end clamps: strap end waste and riser to TL-21 carrier",
+    carrier.CLAMP_THREAD,
     SHCS,
-    "7/8",
-    1,
-    trammel.RISER_THICK + trammel.STRAP_THICK,
+    "3/4",
+    len(carrier.END_CLAMPS),
+    riser.THICKNESS + trammel.STRAP_THICK,
     carrier.THICKNESS,  # tapped THRU
-    # the full bought screw: its tip stands into the free space above the rail
-    tip_clearance_mm=trammel.CARRIER_TO_RAIL_GAP,
 )
+# The HUB clamp: the same screw through the brass top-hat washer, whose
+# flange alone adds to the grip (its spigot sits in the strap's reamed hole),
+# the strap and the riser's relief into TL-21's in-situ #8-32 THRU tap.
 HUB_CLAMP = Fastener(
-    "hub clamp: strap to TL-33 stud nose",
-    "#10-24",
-    LOW_HEAD,
-    "1/2",
-    1,
-    hub_washer.THICK + trammel.STRAP_THICK - hub_stud.TIP_SET,
-    hub_stud.TAP_FULL_DEPTH,
-)
-LEFT_CLAMP_INSERTION = (8.40, 8.62)
-LEFT_CLAMP_TIP_CHAMFER = (0.762, 0.889)  # AXIAL length, .030–.035 at the restored 45° tip
-LEFT_CLAMP_CUT_LENGTH = (
-    trammel.RISER_THICK + trammel.STRAP_THICK + sum(LEFT_CLAMP_INSERTION) / 2.0
-)
-LEFT_CLAMP = Fastener(
-    "left clamp: strap and riser to TL-21 blind receiver",
-    carrier.LEFT_CLAMP_THREAD,
-    LOW_HEAD,
+    "HUB clamp: top-hat washer, strap and riser to TL-21 carrier",
+    carrier.HUB_THREAD,
+    SHCS,
     "3/4",
     1,
-    trammel.RISER_THICK + trammel.STRAP_THICK,
-    carrier.LEFT_CLAMP_THREAD_DEPTH,
-    tip_clearance_mm=carrier.LEFT_CLAMP_DRILL_DEPTH - carrier.LEFT_CLAMP_THREAD_DEPTH,
-    cut_length_mm=LEFT_CLAMP_CUT_LENGTH,
-    note="cut to actual grip plus 8.40–8.62; chamfer the cut tip 45° x .030–.035 AXIAL (0.76–0.89)",
+    hub_washer.THICK + trammel.STRAP_THICK + riser.THICKNESS,
+    carrier.THICKNESS,  # tapped THRU
 )
 LEVER_TO_CARRIER = Fastener(
     "TL-26 feed lever to TL-21 carrier",
@@ -267,9 +256,8 @@ FASTENERS: tuple[Fastener, ...] = (
     KP08_TO_BRACKET,
     NUT_TO_FEED_BLOCK,
     RISER_TO_CARRIER,
-    CR_CLAMP,
+    END_CLAMP,
     HUB_CLAMP,
-    LEFT_CLAMP,
     LEVER_TO_CARRIER,
 )
 LEVER_LOCK_WASHER = Washer(
@@ -279,26 +267,21 @@ LEVER_LOCK_WASHER = Washer(
     LEVER_TO_CARRIER.count,
     LEVER_LOCK_STACK,
 )
-HUB_WASHER = Washer(HUB_CLAMP.joint, "#10", "BRASS WASHER", 1, hub_washer.THICK)
+HUB_WASHER = Washer(HUB_CLAMP.joint, "#8", "BRASS TOP-HAT WASHER", 1, hub_washer.THICK)
 WASHERS: tuple[Washer, ...] = (LEVER_LOCK_WASHER, HUB_WASHER)
 
 # --- The common screw and its exceptions ---------------------------------------
 # One SKU wherever its head and engagement fit (module docstring): these
 # rows are its, and their count is the one BOM row's.
 COMMON_SCREW = ("#8-32", "3/4", SHCS)  # McMaster 91251A197
-COMMON_SCREW_ROWS: tuple[Fastener, ...] = (RAIL_TO_BAR, BRACKET_TO_BAR)
-COMMON_SCREW_COUNT = sum(row.count for row in COMMON_SCREW_ROWS)  # 20
+COMMON_SCREW_ROWS: tuple[Fastener, ...] = (RAIL_TO_BAR, BRACKET_TO_BAR, END_CLAMP, HUB_CLAMP)
+COMMON_SCREW_COUNT = sum(row.count for row in COMMON_SCREW_ROWS)  # 16 + 4 + 2 + 1
 # Every other screw or stud the jig consumes, and why it is not the common
 # #8-32 x 3/4 SHCS. Keys: the fitter's name for the item.
 COMMON_SCREW_EXCEPTIONS: dict[str, str] = {
     "M4 SHCS, carriage": (
         "the bought HGH15CA carriage is tapped M4 x 5; its thread fixes the size, "
         "and each screw is cut to its counterbore at assembly"
-    ),
-    "1/4-20 SHCS, CR clamp": (
-        "screws into TL-21's existing 1/4-20 THRU tap (carrier.CR_THREAD) through "
-        "the strap and riser grip, the bought 7/8 standing into the free space "
-        "above the rail; a #8-32 does not mate that thread"
     ),
     "5/16-18 shoulder screw, pivot": (
         "the pivot's 3/8 shoulder is the bearing journal the carrier turns on, "
@@ -324,12 +307,6 @@ COMMON_SCREW_EXCEPTIONS: dict[str, str] = {
         "the 3/4 from the top would meet the bar screw's tip in TL-28's shared "
         "hole (end bracket spec COMMON_SCREW_TIP_GAP); the 5/8 is the "
         "owner-approved second length (owner ruling 2026-11-06, Main)"
-    ),
-    "#10-24 low-head SHCS, HUB and left clamp": (
-        "the HUB and LEFT receivers are #10-24; low heads keep both clamps below "
-        "the CR head. HUB uses 92220A163 at its purchased 1/2 length; LEFT uses "
-        "92220A165 cut to the actual grip and blind-tap insertion. The common "
-        "#8-32 screw mates neither receiver nor the required head/grip geometry"
     ),
 }
 

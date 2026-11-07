@@ -1,25 +1,28 @@
 r"""Build the oblique-trammel jig's 6061 riser (MHA-CH-06-TL-24; shop fixture).
 
-The faced and milled aluminium blank with its eight through holes
+The faced and milled aluminium blank with its nine through holes
 (``ch_rocker_arm_tl_oblique_riser_spec``). The self-cut band is not modelled.
 
 Layout (the spec's model frame, +Z up): the blank is a Front-plane rectangle
-from the origin, extruded +Z by the thickness; HUB, CL, CR and the left clamp
-are circles cut through, and the four #4 screw holes are one native
-Hole Wizard clearance feature from the top face. The 82 degree countersinks
-are revolved cuts
+from the origin, extruded +Z by the thickness; the Ø12 HUB relief and the #9
+CL and CR clearances are circles cut through, the four #4 screw holes are one
+native Hole Wizard clearance feature from the top face, and the two loose
+end-stop pin holes are a second one (the #4 clearance is the #30 drill). The
+82 degree countersinks are revolved cuts
 sketched on planes through the screw rows (offsets of the Top plane at each
 row's Y), each a triangle from the top face to its cone's apex, as the
 rocker trammel pivot plate's; its few helpers are copied here as private
 functions, since that kit is being retired.
 
-The printed screw-hole size lives in the blanked ``ScrewHoleReference``
-sketch on ``TopFace``, as build_pd_transgear_arm_plate's
-``CountersinkReference``; its callout carries the countersink. The plan
-cannot carry a native hole callout, because the only visible edges of the
-screw holes there belong to the revolved countersinks
-(``GetHoleCalloutVariables`` raised DISP_E_BADVARTYPE, farm run jig-r3; the
-wizard's own bottom rims are hidden, jig-r4).
+Both #30 sizes print their three-place design nominal (.128), not the
+wizard's actual .1285 cut, from blanked reference sketches on ``TopFace``
+(``ScrewHoleReference``, ``StopHoleReference``), as
+build_pd_transgear_arm_plate's ``CountersinkReference``; the screw hole's
+callout carries the countersink. The plan cannot carry a native hole callout
+for the screws, because the only visible edges of the screw holes there
+belong to the revolved countersinks (``GetHoleCalloutVariables`` raised
+DISP_E_BADVARTYPE, farm run jig-r3; the wizard's own bottom rims are hidden,
+jig-r4), and a native #30 callout would print the cut's .129.
 
 Run (SolidWorks already open)::
 
@@ -80,6 +83,10 @@ from ch_rocker_arm_tl_oblique_riser_spec import (
     SCREW_DIA_PRINTED,
     SCREW_HOLES,
     SCREW_SPEC,
+    STOP_DIA,
+    STOP_HOLE_DIA,
+    STOP_PIN_HOLES,
+    STOP_SPEC,
     THICKNESS,
 )
 
@@ -180,20 +187,30 @@ _ROW_PLANES = (
     ("ScrewInnerPlane", SCREW_HOLES[0][1], '"ScrewInnerY"'),
     ("ScrewOuterPlane", SCREW_HOLES[2][1], '"ScrewOuterY"'),
 )
-# The printed size's reference circle: (screw index, dia, names, drives),
-# round screw 2, where the one hole callout's leader lands.
+# The printed sizes' reference circles, one blanked sketch each on TopFace:
+# (sketch, centre, printed dia, (x, y, size) names, (x, y, size) drives).
+# Each rounds the hole its one callout's leader lands on: screw 2, and stop 2
+# by the right end (its block stands below and right of the view).
 _REFERENCE_CIRCLES = (
     (
-        1,
+        "ScrewHoleReference",
+        SCREW_HOLES[1],
         SCREW_DIA_PRINTED,
         ("ScrewRefX", "ScrewRefY", "ScrewDia"),
-        '"Screw2X"',
-        '"ScrewDia"',
+        ('"Screw2X"', '"ScrewInnerY"', '"ScrewDia"'),
+    ),
+    (
+        "StopHoleReference",
+        STOP_PIN_HOLES[1],
+        STOP_HOLE_DIA,
+        ("StopRefX", "StopRefY", "StopDia"),
+        ('"Stop2X"', '"StopY"', '"StopDia"'),
     ),
 )
-REFERENCE_SKETCH = "ScrewHoleReference"
-# Blanked before the save; the drawing shows it in the plan only.
-REFERENCE_SKETCHES = ("ScrewHoleReference",)
+# Blanked before the save; the drawing shows them in the plan only.
+REFERENCE_SKETCHES = ("ScrewHoleReference", "StopHoleReference")
+if tuple(row[0] for row in _REFERENCE_CIRCLES) != REFERENCE_SKETCHES:
+    raise AssertionError("_REFERENCE_CIRCLES and REFERENCE_SKETCHES disagree")
 
 
 def _add_flank_reference(
@@ -388,12 +405,14 @@ async def _countersink(
     return jobs
 
 
-def _require_screw_cut_in_printed_band(diameter_mm: float) -> None:
-    """Check the native Wizard cut against the reference's design limits."""
-    if not SCREW_DIA_PRINTED <= round(diameter_mm, 6) <= SCREW_DIA_PRINTED + DRILLED_BAND[0]:
+def _require_cut_in_printed_band(
+    diameter_mm: float, printed_mm: float, label: str
+) -> None:
+    """Check a native Wizard cut against its reference's design limits."""
+    if not printed_mm <= round(diameter_mm, 6) <= printed_mm + DRILLED_BAND[0]:
         raise RuntimeError(
-            f"wizard cut Ø{diameter_mm:.4f} is outside the printed "
-            f"Ø{SCREW_DIA_PRINTED} +{DRILLED_BAND[0]}/0"
+            f"{label}: wizard cut Ø{diameter_mm:.4f} is outside the printed "
+            f"Ø{printed_mm} +{DRILLED_BAND[0]}/0"
         )
 
 
@@ -441,7 +460,7 @@ async def build(adapter) -> dict[str, str]:
     )
     volume = await volume_check(adapter, "blank", V_BLANK, 0.002 * V_BLANK)
 
-    # --- HUB, CL and CR plain clearance holes at the calculator stations ----
+    # --- HUB relief, CL and CR plain clearances at the calculator stations --
     holes = SketchDims()
     check("create_sketch holes", await adapter.create_sketch("Front"))
     to_front = _sketch_mapper(adapter, u_axis=0, v_axis=1, label="holes")
@@ -492,7 +511,29 @@ async def build(adapter) -> dict[str, str]:
     )
     # ScrewDia owns the three-place design nominal, not a measurement of
     # the #30 drill. Preserve readback on BOTH sides of its +.004/0 band.
-    _require_screw_cut_in_printed_band(screws.hole_dia_mm)
+    _require_cut_in_printed_band(screws.hole_dia_mm, SCREW_DIA_PRINTED, "screw holes")
+
+    # --- Two loose end-stop pin holes: ONE native #30 wizard feature -------
+    # Ordinary .XX stations from the blank's left end and lower edge; stop 2
+    # shares stop 1's row (one printed StopY). The cut is the actual #30.
+    stops = wizard_holes(
+        adapter,
+        STOP_SPEC,
+        [[x, y, THICKNESS] for x, y in STOP_PIN_HOLES],
+        (0.0, 0.0, 1.0),
+        "riser end-stop pin holes (#30 drill through)",
+        name="StopHoles",
+        expect_dia_mm=STOP_DIA,
+        placement_dims=[
+            (("Stop1X", '"Stop1X"'), ("StopY", '"StopY"')),
+            (("Stop2X", '"Stop2X"'), SharedCoordinate(0)),
+        ],
+    )
+    drive_jobs += stops.placement_drive_jobs
+    v_stops = len(STOP_PIN_HOLES) * math.pi * (stops.hole_dia_mm / 2.0) ** 2 * THICKNESS
+    volume = await volume_check(adapter, "stop holes", volume - v_stops, 0.01 * v_stops)
+    # StopDia, like ScrewDia, prints the .128 design nominal over the .1285 cut.
+    _require_cut_in_printed_band(stops.hole_dia_mm, STOP_HOLE_DIA, "stop holes")
 
     # --- Planes through the two screw rows ----------------------------------
     for plane, y, y_drive in _ROW_PLANES:
@@ -526,7 +567,7 @@ async def build(adapter) -> dict[str, str]:
         )
     _require_one_solid_body(adapter, label="riser")
 
-    # --- REFERENCE sketch: the printed hole and countersink Ø on the top face -
+    # --- REFERENCE sketches: the printed #30 sizes on the top face ----------
     check(
         "create_plane TopFace",
         await adapter.create_plane(
@@ -540,11 +581,10 @@ async def build(adapter) -> dict[str, str]:
         (name_dimensions(adapter, "TopFace", ["TopFaceOffset"])[0], '"BlankThick"')
     )
     blank_reference_geometry(adapter, (("TopFace", "PLANE"),))
-    reference = SketchDims()
-    check(f"create_sketch {REFERENCE_SKETCH}", await adapter.create_sketch("TopFace"))
-    to_top = _sketch_mapper(adapter, u_axis=0, v_axis=1, label=REFERENCE_SKETCH)
-    for screw, dia, names, x_drive, dia_drive in _REFERENCE_CIRCLES:
-        x, y = SCREW_HOLES[screw]
+    for sketch, (x, y), dia, names, drives in _REFERENCE_CIRCLES:
+        reference = SketchDims()
+        check(f"create_sketch {sketch}", await adapter.create_sketch("TopFace"))
+        to_top = _sketch_mapper(adapter, u_axis=0, v_axis=1, label=sketch)
         await define_circle(
             adapter,
             *to_top((x, y, THICKNESS)),
@@ -552,12 +592,12 @@ async def build(adapter) -> dict[str, str]:
             f"{names[2]} reference",
             dims=reference,
             names=names,
-            drives=(x_drive, '"ScrewInnerY"', dia_drive),
+            drives=drives,
         )
-    await ensure_fully_defined(adapter, f"{REFERENCE_SKETCH} sketch")
-    check(f"exit_sketch {REFERENCE_SKETCH}", await adapter.exit_sketch())
-    name_last_feature(adapter, REFERENCE_SKETCH)
-    drive_jobs += reference.apply(adapter, REFERENCE_SKETCH)
+        await ensure_fully_defined(adapter, f"{sketch} sketch")
+        check(f"exit_sketch {sketch}", await adapter.exit_sketch())
+        name_last_feature(adapter, sketch)
+        drive_jobs += reference.apply(adapter, sketch)
 
     await force_rebuild(adapter)
     for dimension_name, expression in drive_jobs:

@@ -21,15 +21,14 @@ ch-rocker-arm-tl-oblique-carrier:
     vise jaws flat); face to .47 drawing thickness and mill to 20.5 x 5.1;
     drill and ream the four pivot-pin holes
     with the .3760 reamer; chamfer each pin hole's underside edge .012 min x
-    45 deg; spot-drill the CL spot; drill and tap the CR, riser and
-    feed-lever holes. End-mill the added left-clamp flat-bottom pilot .37 deep;
-    bottoming-tap #10-24 to .310 MIN from the entry face, with at most .010
-    entry break and a bottoming lead no longer than one pitch. Do not drill
-    through the carrier. Break edges. The unchanged .4000 HUB bore is
-    match-drilled and reamed in situ on the assembled jig (TL-00 step 10);
-    chamfer that bore's underside .02 x 45 degrees, ordinary .XX tolerance,
-    to clear the TL-33 root fillet. The CAD shows the finished assembly-machined
-    bore and chamfer, not a predrilling operation or a separate hole location.
+    45 deg; drill and tap the CL and CR end-clamp holes #8-32 THRU, then the
+    riser and feed-lever holes. Break edges. At the assembled jig's HUB DRO
+    setting (TL-00 step 10), spindle-guide the tap drill and tap for the
+    ordinary #8-32 THRU HUB receiver. Each strap is drilled and reamed at
+    that same setting through the riser's relief; there is no precision
+    carrier HUB bore, underside hub chamfer, or carrier counterbore.
+    The CAD shows the finished assembly-machined HUB tap, not a separate
+    manufactured hole-location requirement.
     The pivot bores turn on TL-VN-77 shoulder screws; the underside seats on
     TL-VN-78 spacers.
   machinist_exceptions:

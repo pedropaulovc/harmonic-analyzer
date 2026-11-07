@@ -11,17 +11,16 @@ it imports only what its own pairs need.
 
 from __future__ import annotations
 
-import math
 from collections.abc import Mapping
 
 from _interference_common import numbered_pairs, smooth_annulus_limit_mm3
 
-# Oblique shop fixture: the in-situ CL receiver envelope and smooth-thread
-# overlaps only. The carrier now models its finished HUB bore and underside
-# chamfer; neither its slip shank nor its flange needs an overlap allowance.
+# Oblique shop fixture: smooth-thread overlaps only. The R4 strap holding
+# fits nothing tight: the loose stop pins stand in the riser's #30 holes on
+# the carrier top, the top-hat washer's 13/64 bore clears its #8-32 neck and
+# its spigot hangs in the (unmodelled) strap's hub hole.
 _JIG = "ch-rocker-arm-tl-oblique"
 _JIG_VENDOR = "ch-rocker-arm-tl-vn-oblique"
-JIG_CL_DOWEL_PRESS = (6.35, 11.938)  # (diameter, carrier thickness)
 JIG_RAIL_SCREW_THREAD = (4.1656, 3.454, 9.35)  # #8-32 into each base bar
 # The common #8-32 x 3/4 (rail screw family, occurrences 17-20) up through
 # Bar1 into an end bracket's bar-face thread: 19.05 less the 7.137 grip.
@@ -32,9 +31,11 @@ JIG_PILLOW_BLOCK_SCREW_THREAD = (4.1656, 3.454, 10.875)  # #8-32 x 5/8 SHCS past
 # TL-VN-84 kit FeedNut's 3.5 flange and their heads' 0.45 stand-proud into the lug.
 JIG_NUT_SCREW_THREAD = (2.8448, 2.261, 11.923595)
 JIG_RISER_SCREW_THREAD = (2.8448, 2.261, 10.334168)  # #4-40 into the carrier past the .24 riser's Ø.25 CSK
-JIG_CLAMP_SCREW_THREAD = (6.35, 5.105, 11.938)  # 1/4-20 through the .47 carrier
-JIG_HUB_SCREW_THREAD = (4.826, 3.797, 10.7188)  # #10-24, washer/strap/nose stack
-JIG_LEFT_CLAMP_THREAD = (4.826, 3.797, 8.51)  # cut-to-fit, blind pilot
+# The common #8-32 x 3/4 (rail screw family) as the strap clamps, into the
+# carrier's #8-32 THRU taps: occurrences 21-22 (CL, CR) under 19.05 less the
+# riser and strap grip; occurrence 23 (HUB) also less the washer flange.
+JIG_END_CLAMP_THREAD = (4.1656, 3.454, 10.4648)
+JIG_HUB_CLAMP_THREAD = (4.1656, 3.454, 8.9408)
 JIG_LEVER_SCREW_THREAD = (7.9375, 6.528, 10.414)  # 5/16-18 into the carrier
 JIG_PIVOT_SCREW_THREAD = (7.9375, 6.528, 14.478)  # 5/16-18 cut to .570 below shoulder-end floor
 JIG_T_NUT_THREAD = (12.7, 10.716, 14.0)  # 1/2-13 stud in its T-nut
@@ -45,15 +46,6 @@ JIG_FLANGE_NUT_THREAD = (12.7, 10.716, 13.0)  # 1/2-13 stud in its flange nut
 # are TL-VN-84 kit members, named by their role references.
 JIG_FEED_NUT_THREAD = (8.0, 6.0, 13.5)
 ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
-    frozenset((f"{_JIG_VENDOR}-hub-screw-1", f"{_JIG}-hub-stud-1")): (
-        smooth_annulus_limit_mm3(*JIG_HUB_SCREW_THREAD)
-    ),
-    frozenset((f"{_JIG_VENDOR}-left-clamp-screw-1", f"{_JIG}-carrier-1")): (
-        smooth_annulus_limit_mm3(*JIG_LEFT_CLAMP_THREAD)
-    ),
-    frozenset((f"{_JIG_VENDOR}-cl-dowel-1", f"{_JIG}-carrier-1")): (
-        1.10 * math.pi * JIG_CL_DOWEL_PRESS[0] ** 2 * JIG_CL_DOWEL_PRESS[1] / 4.0
-    ),
     # Base bar members are role references (Bar1 under rail 1, Bar2 under 2).
     **numbered_pairs(
         f"{_JIG_VENDOR}-rail-screw",
@@ -119,10 +111,16 @@ ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
         smooth_annulus_limit_mm3(*JIG_NUT_SCREW_THREAD),
     ),
     **numbered_pairs(
-        f"{_JIG_VENDOR}-clamp-screw",
-        range(1, 2),
+        f"{_JIG_VENDOR}-rail-screw",
+        range(21, 23),
         f"{_JIG}-carrier",
-        smooth_annulus_limit_mm3(*JIG_CLAMP_SCREW_THREAD),
+        smooth_annulus_limit_mm3(*JIG_END_CLAMP_THREAD),
+    ),
+    **numbered_pairs(
+        f"{_JIG_VENDOR}-rail-screw",
+        range(23, 24),
+        f"{_JIG}-carrier",
+        smooth_annulus_limit_mm3(*JIG_HUB_CLAMP_THREAD),
     ),
     **numbered_pairs(
         f"{_JIG_VENDOR}-lever-screw",

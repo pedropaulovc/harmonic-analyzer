@@ -68,8 +68,12 @@ retiredTooling.push(...[
   // Oblique simplification PR2 (owner ruling Main 2026-11-06, option B): the
   // KP08 screws are TL-VN-62's #8-32 X 5/8 SHCS; the 91255A150 button head retires.
   ['kp08-screw', '45', '65', true],
-  // 2026-11-06 R3 hold-down: the turned TL-33 hub stud retires the bonded
-  // gauge pin.
+  // R4 cutover (owner rulings 2026-11-07): the CL dowel and the CR clamp screw
+  // leave the jig; the common #8-32 screw holds both end clamps.
+  ['cl-dowel', '33', '53', true],
+  ['clamp-screw', '48', '68', true],
+  // 2026-11-06 R3 hold-down: the bonded gauge pin retired; its turned hub-stud
+  // replacement was removed before release.
   ['hub-pin', null, '80', true, '2026-10-23'],
 ].map(([suffix, previousSequence, sequence, vendor, introduced]) => ({
   old_stem: `ch-rocker-arm-tl-${vendor && previousSequence === null ? 'vn-' : ''}oblique-${suffix}`,
