@@ -518,6 +518,68 @@ def test_plate_thickness_text_sits_beside_section_a_a() -> None:
     assert _boxes_overlap(old, witness_205)
 
 
+def _plan_annotations(*, thread_layer: str, note_layer: str, tap_callouts: int):
+    hidden = drawing._COSMETIC_THREAD_LAYER
+    note = types.SimpleNamespace(
+        GetAnnotation=lambda: types.SimpleNamespace(Layer=note_layer)
+    )
+    thread = types.SimpleNamespace(
+        GetType=lambda: 1,
+        Layer=thread_layer,
+        GetSpecificAnnotation=lambda: types.SimpleNamespace(ThreadCallout=note),
+    )
+
+    def callout(text: str, layer: str = ""):
+        display = types.SimpleNamespace(
+            IsHoleCallout=lambda: True,
+            GetText=lambda part: text if part == 1 else "",
+        )
+        return types.SimpleNamespace(
+            GetType=lambda: 4, Layer=layer, GetSpecificAnnotation=lambda: display
+        )
+
+    return [
+        thread,
+        callout("<MOD-DIAM> .2500 REAM THRU ALL"),
+        callout("2X 1/4-20 UNC THRU ALL", layer=hidden),
+        *(callout("2X 1/4-20 UNC THRU ALL") for _ in range(tap_callouts)),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("thread_layer", "note_layer", "tap_callouts", "error"),
+    (
+        ("hidden", "hidden", 1, None),
+        ("", "hidden", 1, "a cosmetic thread prints"),
+        ("hidden", "", 1, "cosmetic thread callout prints"),
+        ("hidden", "hidden", 0, "0 visible 1/4-20 tap callouts"),
+        ("hidden", "hidden", 2, "2 visible 1/4-20 tap callouts"),
+    ),
+)
+def test_plan_prints_the_post_taps_exactly_once(
+    monkeypatch, thread_layer, note_layer, tap_callouts, error
+) -> None:
+    """Farm round 3: sheet 2's plan printed the model's "1/4-20 Tapped Hole"
+    thread callout beside the 2X Hole Wizard callout.  Both plans hide the
+    cosmetic threads, and the readback refuses any second tap callout."""
+    hidden = drawing._COSMETIC_THREAD_LAYER
+    layers = {"hidden": hidden, "": ""}
+    annotations = _plan_annotations(
+        thread_layer=layers[thread_layer],
+        note_layer=layers[note_layer],
+        tap_callouts=tap_callouts,
+    )
+    view = types.SimpleNamespace(GetAnnotations=lambda: annotations)
+    monkeypatch.setattr(drawing, "_early_bound", lambda item, _interface: item)
+    if error is None:
+        drawing._assert_one_post_tap_callout(view, label="plan")
+    else:
+        with pytest.raises(RuntimeError, match=error):
+            drawing._assert_one_post_tap_callout(view, label="plan")
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert '_hide_cosmetic_threads(adapter, plan, label="hole-pattern plan")' in source
+    assert '_hide_cosmetic_threads(adapter, profile, label="profile")' in source
+
 
 def test_hole_pattern_and_notch_share_one_plan_on_sheet_two() -> None:
     """Rule 9: no prose-named or VIEW-labelled copies of the plan.  Sheet 2's
@@ -2159,19 +2221,28 @@ def test_pivot_section_uses_profile_station_and_native_connected_style():
 
 
 def test_profile_a_a_line_is_whole_and_its_letters_clear_c_c():
-    """Rule 9: one connected line across the pivot end only; its letters
-    (about 6 mm wide, centred on each end) stand clear of C-C's arrows at the
-    hold-down station (x 0.058049..0.059573 and 0.083049..0.084573).
+    """Rule 9: one connected line across the pivot end only.  Each A letter
+    (5.9 mm wide, centred on its end) keeps the layout audit's 3.09 mm of air
+    from its C neighbour; round 3 printed C's texts [55.8,61.7] and, on the
+    west side, centred 12 mm right of the pivot.
 
     Offline envelope arithmetic only; the saved native drawing must still
     prove the section line, arrows and letters.
     """
-    left = drawing.PROFILE_PIVOT_XY[0] - drawing.PIVOT_SECTION_HALF_SPANS[0]
-    right = drawing.PROFILE_PIVOT_XY[0] + drawing.PIVOT_SECTION_HALF_SPANS[1]
-    assert left + 0.003 < 0.058049 - 0.001
-    assert right - 0.003 > 0.084573 + 0.001
+    pivot_x = drawing.PROFILE_PIVOT_XY[0]
+    left = pivot_x - drawing.PIVOT_SECTION_HALF_SPANS[0]
+    right = pivot_x + drawing.PIVOT_SECTION_HALF_SPANS[1]
+    half_letter, air = 0.00295, 0.00309
+    c_east = (0.0558, 0.0617)
+    c_west_left = pivot_x + 0.012 - half_letter
+    c_west_right = pivot_x + 0.012 + half_letter
+    assert c_east[0] - (left + half_letter) > air
+    assert (right - half_letter) - c_west_right > air
+    assert c_west_left > c_east[1]
+    # Positive control: round 3's ends left 0.07 mm.
+    assert c_east[0] - (pivot_x - 0.019 + half_letter) < air
     # Across the pivot end only, not across the profile (r13: 0.029..0.094).
-    assert right - left < 0.094 - 0.029 - 0.02
+    assert right - left < 0.094 - 0.029 - 0.015
 
 
 def test_profile_radius_saved_envelopes_clear_a_a_and_c_c():

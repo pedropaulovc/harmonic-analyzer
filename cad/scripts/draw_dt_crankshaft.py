@@ -87,7 +87,6 @@ from dt_crankshaft_notes import (
     JOURNAL_FIT,
     KNOCKOUT_CALLOUT_ABOVE,
     KNOCKOUT_CALLOUT_BELOW,
-    NECK_LANDS,
     NECKS,
     PINION_PIN_CALLOUT,
     SHAFT_LENGTH_MATE,
@@ -284,9 +283,11 @@ UNPRINTED_DIMENSIONS = frozenset({"PinionPinHoleDia"})
 # has climbed 2.8 mm past its landing line's end (machinist review, #290
 # batch 0).
 # The one model witness NeckDiaDim prints the core's Ø.375 ±.010 as 2X over
-# the Ø9.000's block, its callout naming both bare necks: the collar-side
-# land is 2.7 mm on the sheet, and its own 27 mm callout found no clear spot
-# (farm run 10: on the collar, or across the outboard journal's leaders).
+# the Ø9.000's block, the count naming both bare necks (no prose locator:
+# round-3 machinist review): the collar-side land is 2.7 mm on the sheet,
+# and its own 27 mm callout found no clear spot (farm run 10: on the collar,
+# or across the outboard journal's leaders; a detail view cannot take the
+# dragged diameter, draw_dt_cone_gear_shaft).
 # The Ø9.000's line stays 2 mm past its step, clear of the retention-pin note.
 DIAMETER_POSITIONS = {
     "ShaftDiaDim": (PIN_X - 0.016, 0.2235),
@@ -322,7 +323,6 @@ CALLOUTS_BELOW = {
     "JournalDiaDim": FIT_CALLOUT,
     "PinionSeatDiaDim": FIT_CALLOUT,
     "SpigotDiaDim": SPIGOT_CALLOUT,
-    "NeckDiaDim": NECK_LANDS,
 }
 # The banded far-end stations name their stack on their own row: a callout
 # below would lift the value into the row above.
@@ -508,28 +508,37 @@ def _set_dimension_suffixes(
 _DEFINITION_TO_WRITABLE = {5: 1, 6: 2, 7: 3, 8: 4}
 
 
-def _depth_banded_definition(definitions: dict[int, str], band: str) -> tuple[int, str]:
-    """The one format part ending on the callout's depth, with ``band`` after it.
+def _depth_banded_definition(
+    definitions: dict[int, str], band: str, process: str
+) -> tuple[int, str]:
+    """The one format part ending on the callout's depth: ``process`` before
+    the depth, ``band`` after it.
 
     A native hole callout splits its text across the prefix, suffix and
     callout compartments; on the farm the drive-pin callout's prefix read
-    ``REAM <MOD-DIAM>`` and its depth sat in another part (run
+    ``2X <MOD-DIAM>`` and its depth sat in another part (run
     20261001T011714683Z).  Exactly one part may carry ``<HOLE-DEPTH>``, once,
     followed by the depth alone; anything else (no depth, two, text after it,
-    a band already there) fails loud.
+    a band or the process already there) fails loud.  Rule 26 orders a hole
+    callout size, process, depth (``2X Ø.0930 +.0005/.0000 REAM ↧ .1555``;
+    round-3 machinist review: REAM before the size), so the process joins the
+    depth's part, after the native size and its band (draw_dt_cone_swing_
+    platform.process_after_size, the same order before THRU).
     """
     if set(definitions) != set(_DEFINITION_TO_WRITABLE):
         raise RuntimeError(f"unexpected hole callout parts: {definitions!r}")
     holders = [part for part, text in definitions.items() if "<HOLE-DEPTH>" in text]
     joined = "\n".join(definitions.values())
-    if len(holders) != 1 or band in joined:
+    if len(holders) != 1 or band in joined or re.search(rf"\b{re.escape(process)}\b", joined):
         raise RuntimeError(f"hole callout has no single closing depth: {definitions!r}")
     part = holders[0]
     definition = definitions[part]
     head, _marker, tail = definition.rpartition("<HOLE-DEPTH>")
     if "<HOLE-DEPTH>" in head or len(tail.split()) != 1:
         raise RuntimeError(f"hole callout has no single closing depth: {definitions!r}")
-    return part, f"{definition.rstrip()} {band}"
+    # The leading space keeps the process off the native size's stacked band
+    # when the depth opens its own part.
+    return part, f"{head.rstrip()} {process} <HOLE-DEPTH>{tail.rstrip()} {band}"
 
 
 def _drop_coaxial_step(display: Any, step_dia: float, label: str) -> None:
@@ -610,8 +619,9 @@ def _require_inch_sheet(draw: Any, label: str) -> None:
         )
 
 
-def _band_hole_depth(display: Any, band: str, draw: Any, label: str) -> None:
-    """Print the part's depth band after the native callout's depth.
+def _band_hole_depth(display: Any, band: str, process: str, draw: Any, label: str) -> None:
+    """Print the hole's process before, and the part's depth band after, the
+    native callout's depth (``_depth_banded_definition``).
 
     The cut's depth carries the band in the part, but the callout prints the
     depth bare; the band joins the format text of the part holding the depth,
@@ -625,7 +635,7 @@ def _band_hole_depth(display: Any, band: str, draw: Any, label: str) -> None:
     definitions = {
         part: str(display.GetText(part) or "") for part in _DEFINITION_TO_WRITABLE
     }
-    part, updated = _depth_banded_definition(definitions, band)
+    part, updated = _depth_banded_definition(definitions, band, process)
     if part == 8:
         raise RuntimeError(
             f"{label}: depth is in the callout-below text: {definitions!r}"
@@ -634,7 +644,7 @@ def _band_hole_depth(display: Any, band: str, draw: Any, label: str) -> None:
     applied = str(display.GetText(part) or "")
     if applied.replace("\r", "") != updated.replace("\r", ""):
         raise RuntimeError(f"{label}: depth band did not persist: {applied!r}")
-    _telemetry.info(f"{label}: depth band joined format part {part}: {updated!r}")
+    _telemetry.info(f"{label}: process and depth band joined format part {part}: {updated!r}")
 
 
 Box = tuple[float, float, float, float]
@@ -1234,12 +1244,14 @@ async def build(adapter: Any) -> dict[str, str]:
             view_label="end",
             accept=_is_upper_seat_rim,
         ),
-        process=f"2X {DRIVE_PIN_HOLE_PROCESS}",
+        # Only the count leads; REAM follows the size (_band_hole_depth).
+        process="2X",
     )
     _drop_coaxial_step(drive_pins, DRIVE_PIN_KNOCKOUT_DIA, "seat-collar drive-pin holes")
     _band_hole_depth(
         drive_pins,
         DRIVE_PIN_DEPTH_BAND,
+        DRIVE_PIN_HOLE_PROCESS,
         drawing_model,
         "seat-collar drive-pin holes",
     )

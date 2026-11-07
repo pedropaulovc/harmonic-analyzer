@@ -227,10 +227,6 @@ def test_both_sheets_carry_the_same_pin_fit_facts() -> None:
     assert "BOSS MID-LENGTH" in spec.CRANKSHAFT_PIN_HOLE_PROCESS
     assert drawing.DIMENSION_CALLOUTS["PinHoleDia"] == spec.PIN_HOLE_PROCESS
     assert drawing.REFERENCE_DIMENSIONS == ("PinHoleDia",)
-    crankshaft_drawing = Path(drawing.__file__).with_name("draw_dt_crankshaft.py").read_text(
-        encoding="utf-8"
-    )
-    assert "text=CRANKSHAFT_PIN_HOLE_PROCESS," in crankshaft_drawing
     assert "add_leader_note(\n        adapter,\n        PIN_HOLE" not in _source().replace(
         "\r\n", "\n"
     )

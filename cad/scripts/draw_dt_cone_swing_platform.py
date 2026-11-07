@@ -558,9 +558,12 @@ POST_MOUNT_CALLOUT_XY = (0.105, 0.2545)
 # text-height of separation without crowding the plan caption.
 PIVOT_BORE_CALLOUT_XY = (0.215, 0.097)
 # Section A-A's cutting plane on the profile, sheet metres either side of
-# the pivot (east, west): 38/36 model mm, ~5 mm of sheet outside C-C's
-# ends at the hold-down station, so the A and C letters stand apart.
-PIVOT_SECTION_HALF_SPANS = (0.019, 0.018)
+# the pivot (east, west).  Farm round 3 at (0.019, 0.018) printed each A
+# letter 0.07 mm from its C neighbour (layout audit text-clearance, gating:
+# 3.09 mm of air needed; A's text [49.8,55.7] mm against C's [55.8,61.7],
+# letters ~5.9 mm wide centred on each end).  Ends 23.5 / 22.5 mm out put
+# ~4.5 mm of air on both sides, still across the pivot end only.
+PIVOT_SECTION_HALF_SPANS = (0.0235, 0.0225)
 
 
 def plate_edge_mm(z_mm: float, side: int) -> float:
@@ -641,8 +644,12 @@ def _place_detail_parent_letter(adapter: Any, parent: Any) -> None:
 _COSMETIC_THREAD_LAYER = "COSMETIC-THREADS-HIDDEN"
 
 
-def _hide_profile_cosmetic_threads(adapter: Any, view: Any) -> None:
-    """Hide the redundant model cosmetic-thread callout in the profile view."""
+def _hide_cosmetic_threads(adapter: Any, view: Any, *, label: str) -> None:
+    """Hide a plan view's redundant model cosmetic-thread ink and its native
+    "1/4-20 Tapped Hole" callout note: the 2X Hole Wizard callout states the
+    taps.  SolidWorks shows the model's thread callout in the first view of
+    the part on EACH sheet, so both plans need it (farm round 3 printed it on
+    sheet 2's plan, a second leader to the west tap)."""
     draw = adapter.currentModel
     manager = _early_bound(draw.GetLayerManager(), "ILayerMgr")
     layer = manager.GetLayer(_COSMETIC_THREAD_LAYER)
@@ -674,7 +681,7 @@ def _hide_profile_cosmetic_threads(adapter: Any, view: Any) -> None:
             continue
         annotation.Layer = _COSMETIC_THREAD_LAYER
         if str(annotation.Layer or "") != _COSMETIC_THREAD_LAYER:
-            raise RuntimeError("profile cosmetic thread refused the hidden layer")
+            raise RuntimeError(f"{label} cosmetic thread refused the hidden layer")
         thread = _early_bound(annotation.GetSpecificAnnotation(), "ICThread")
         raw_callout = _read_member(thread, "ThreadCallout")
         if raw_callout is not None:
@@ -684,14 +691,97 @@ def _hide_profile_cosmetic_threads(adapter: Any, view: Any) -> None:
             )
             callout_annotation.Layer = _COSMETIC_THREAD_LAYER
             if str(callout_annotation.Layer or "") != _COSMETIC_THREAD_LAYER:
-                raise RuntimeError("profile thread callout refused the hidden layer")
+                raise RuntimeError(f"{label} thread callout refused the hidden layer")
             hidden_callouts += 1
         hidden += 1
     if not hidden:
-        raise RuntimeError("profile view has no cosmetic thread to hide")
+        raise RuntimeError(f"{label} has no cosmetic thread to hide")
     if not hidden_callouts:
-        raise RuntimeError("profile cosmetic threads have no callout note to hide")
-    rebuild_drawing(adapter, label="hide profile cosmetic threads")
+        raise RuntimeError(f"{label} cosmetic threads have no callout note to hide")
+    rebuild_drawing(adapter, label=f"hide {label} cosmetic threads")
+
+
+def _assert_one_post_tap_callout(view: Any, *, label: str) -> None:
+    """Readback: the plan prints the post taps exactly once, through the 2X
+    Hole Wizard callout.  Every cosmetic thread and its callout note stays on
+    the hidden layer, and exactly one visible hole callout names the thread."""
+    thread = POST_MOUNT_SPEC.size
+    tap_callouts = 0
+    for raw_annotation in _early_bound(view, "IView").GetAnnotations() or ():
+        annotation = _early_bound(raw_annotation, "IAnnotation")
+        kind = int(annotation.GetType())
+        if kind == 1:  # swCThread
+            if str(annotation.Layer or "") != _COSMETIC_THREAD_LAYER:
+                raise RuntimeError(f"{label}: a cosmetic thread prints")
+            raw_callout = _read_member(
+                _early_bound(annotation.GetSpecificAnnotation(), "ICThread"),
+                "ThreadCallout",
+            )
+            if raw_callout is not None:
+                note = _early_bound(
+                    _read_member(_early_bound(raw_callout, "INote"), "GetAnnotation"),
+                    "IAnnotation",
+                )
+                if str(note.Layer or "") != _COSMETIC_THREAD_LAYER:
+                    raise RuntimeError(f"{label}: a cosmetic thread callout prints")
+        elif kind == 4:  # swDisplayDimension
+            if str(annotation.Layer or "") == _COSMETIC_THREAD_LAYER:
+                continue
+            display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+            if not display.IsHoleCallout():
+                continue
+            if any(thread in str(display.GetText(part) or "") for part in (1, 2, 3, 4)):
+                tap_callouts += 1
+    if tap_callouts != 1:
+        raise RuntimeError(f"{label}: {tap_callouts} visible {thread} tap callouts, expected 1")
+
+
+# Sheet 2's .28 (NorthEdgeZ) extension line runs along the plate's north
+# edge from its sheet-left end to the dimension line (round 3: x 169.8..206.0
+# mm at y 123.2); the pivot ream's callout leader rises from the lower left
+# through that edge to the bore (x ~175.7 there), a gating leader crossing.
+# The extension line starts this far (sheet metres) right of the pivot axis,
+# past the leader and the bore rim, still collinear with the edge it names.
+NORTH_EDGE_WITNESS_START_PAST_PIVOT = 0.003
+
+
+def _start_witness_past(
+    adapter: Any, annotation: Any, *, witness_y: float, start_x: float, label: str
+) -> None:
+    """Widen the gap of the one extension line of ``annotation`` lying along
+    sheet ``witness_y`` until it starts at ``start_x`` (the PlateThk witness
+    recipe above).  Which of the two gaps owns that line is read back, never
+    assumed: the other is restored if the first did not move it."""
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+
+    def witness_start() -> float:
+        starts = [
+            min(segment.x0, segment.x1)
+            for segment in _display_lines(adapter, _display_data(adapter, annotation))
+            if abs(segment.y0 - segment.y1) < 1e-8 and abs(segment.y0 - witness_y) < 0.0005
+        ]
+        if len(starts) != 1:
+            raise RuntimeError(f"{label}: expected one extension line at y {witness_y}, read {starts}")
+        return starts[0]
+
+    widen = start_x - witness_start()
+    if widen <= 0.0:
+        return
+    for index in (0, 1):
+        ok, _use_doc, old_gap = display.GetWitnessLineGap(index, False, 0.0)
+        if ok is not True:
+            raise RuntimeError(f"{label}: witness gap {index} could not be read")
+        if display.SetWitnessLineGap(index, False, float(old_gap) + widen) is not True:
+            raise RuntimeError(f"{label}: witness gap {index} was refused")
+        rebuild_drawing(adapter, label=f"{label} witness gap {index}")
+        if abs(witness_start() - start_x) < 0.0003:
+            print(f"{label}: witness {index} now starts at {start_x}")
+            return
+        if display.SetWitnessLineGap(index, False, float(old_gap)) is not True:
+            raise RuntimeError(f"{label}: witness gap {index} could not be restored")
+        rebuild_drawing(adapter, label=f"{label} witness gap {index} restored")
+    raise RuntimeError(f"{label}: neither witness gap moved the line at y {witness_y}")
+
 
 
 def _position_section_label(adapter: Any, section: Any) -> None:
@@ -2088,6 +2178,7 @@ def _place_holes_sheet(adapter: Any) -> list[Any]:
         view_label="hole-pattern plan",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    _hide_cosmetic_threads(adapter, plan, label="hole-pattern plan")
     # Name the relief so the reader ties the width to note 1's depth; its
     # open end and round end show in the plan (rule 17 W18).
     set_dimension_callouts(
@@ -2101,6 +2192,23 @@ def _place_holes_sheet(adapter: Any) -> list[Any]:
         keep=DETAIL_KEEP,
         view_label="hold-down station detail",
         dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    north_edge = [a for a in plan_annotations if dimension_name(adapter, a) == "NorthEdgeZ"]
+    if len(north_edge) != 1:
+        raise RuntimeError("expected one NorthEdgeZ on the hole-pattern plan")
+    plan_pivot = model_point_in_view(adapter, plan, (0.0, 0.0, 0.0), label="plan pivot")
+    north_edge_point = model_point_in_view(
+        adapter,
+        plan,
+        (0.0, PLATE_THICKNESS / 1000.0, _part.NORTH_OVERHANG / 1000.0),
+        label="plan north edge",
+    )
+    _start_witness_past(
+        adapter,
+        north_edge[0],
+        witness_y=north_edge_point[1],
+        start_x=plan_pivot[0] + NORTH_EDGE_WITNESS_START_PAST_PIVOT,
+        label="NorthEdgeZ north-edge witness",
     )
     # No explicit AutoInsertCenterMarks2: the template centre-marks every
     # hole as the plan is placed, and r1's explicit call printed each of the
@@ -2152,6 +2260,7 @@ def _place_holes_sheet(adapter: Any) -> list[Any]:
         DETAIL_LABEL_LOWER_LEFT,
         label="detail B label",
     )
+    _assert_one_post_tap_callout(plan, label="hole-pattern plan")
     return [*plan_annotations, *detail_annotations]
 
 
@@ -2295,7 +2404,7 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     _add_profile_virtual_sharps(adapter, profile)
-    _hide_profile_cosmetic_threads(adapter, profile)
+    _hide_cosmetic_threads(adapter, profile, label="profile")
     section_annotations = curate_view_dimensions(
         adapter,
         section,

@@ -125,9 +125,10 @@ SHEET_NOTES = "\n".join((CROSS_HOLE_NOTE, SPIGOT_NOTE, FIT_NOTE))
 COLLAR_REAR_MATE = " BEARS ON MHA-DT-05"
 COLLAR_SEAT_MATE = " MHA-PD-09 SEAT"
 SHAFT_LENGTH_MATE = " SETS CLEARANCE MHA-DT-31 TO MHA-PD-09"
-# The one Ø.375 ±.010 covers both bare necks; the callout names where they are.
+# The one Ø.375 ±.010 covers both bare necks by its count alone: a location
+# phrase (BEHIND COLLAR AND AT SEAT STEP) is a prose locator (round-3
+# machinist review), and nX names identical features (ASME Y14.5).
 NECKS = "2X"
-NECK_LANDS = "BEHIND COLLAR\nAND AT SEAT STEP"
 
 # The thinnest wall round the drive-pin holes, to the seat spigot's rim, at
 # the printed worst case (crankshaft_spec rounds it down): stated as the fact
@@ -178,20 +179,21 @@ FIDUCIAL_NOTE = "PUNCH MARK,\nLOCATION NOT CRITICAL"
 # route (rule 4: transferring through the mate; rule 26: a location is never
 # a sentence such as AT BOSS MID-LENGTH).  The size line carries the pin's
 # REF diameter (the hole is reamed to fit the pin), so no dimension stands on
-# the hole's hidden edges (rule 9).  Two lines of words (rule 7): the route,
-# then the fit by its standard name with its bench acceptance (rule 4: a
-# matched fit states its acceptance; round-2 review).  Both match the
-# MHA-DT-10 sheet's own wording for this pin (DRIVE FIT ON PIN MHA-DT-29; NOT
-# REMOVABLE BY HAND), so the two sheets agree.  The pin's flush ends are the
-# MHA-DT-00 step 4 setting, not this sheet's (rule 7).  The fit row is last
-# and the longest: SolidWorks starts the note's leader at the end of its last
-# row, so it leaves the text's right end and drops right of the Ø.3125's
-# block (farm round 1: from a short last row it ran through that block).
+# the hole's hidden edges (rule 9).  Two lines in all (rule 7; round 3: the
+# REF size line counts as words): the route through the pinion's pin hole
+# (MATCH-REAM THRU, the fleet's match-at-assembly form), then the fit by its
+# standard name with its bench acceptance (rule 4: a matched fit states its
+# acceptance; round-2 review).  Both match the MHA-DT-10 sheet's own wording
+# for this pin (DRIVE FIT ON PIN MHA-DT-29; NOT REMOVABLE BY HAND), so the two
+# sheets agree.  The pin's flush ends are the MHA-DT-00 step 4 setting, not
+# this sheet's (rule 7).  The fit row is last and the longest: SolidWorks
+# starts the note's leader at the end of its last row, so it leaves the
+# text's right end and drops right of the Ø.3125's block (farm round 1: from
+# a short last row it ran through that block).
 PINION_PIN_CALLOUT = "\n".join(
     (
         f"(<MOD-DIAM>{inch_text(pinion.PIN_DIA, pinion.PIN_HOLE_DIA_PLACES)})"
-        " MATCH DRILL, REAM AT ASSEMBLY",
-        f"THRU THE RADIAL HOLE OF PINION {pinion.PINION_NUMBER},",
+        f" MATCH-REAM THRU {pinion.PINION_NUMBER} PIN HOLE,",
         f"DRIVE FIT ON PIN {pinion.PIN_NUMBER}, NOT REMOVABLE BY HAND",
     )
 )

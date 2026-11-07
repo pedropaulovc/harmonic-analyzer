@@ -185,29 +185,37 @@ def test_drive_pin_depth_prints_its_band_after_the_native_depth() -> None:
     )
     assert floor >= spec.WALL_FLOOR_MM
     band = notes.DRIVE_PIN_DEPTH_BAND
-    # The farm's native split: the process and diameter modifier in the
-    # prefix, the depth in a later compartment.
+    process = spec.DRIVE_PIN_HOLE_PROCESS
+    # The farm's native split: the count and diameter modifier in the
+    # prefix, the depth in a later compartment.  Rule 26: size, process,
+    # depth (round-3 machinist review), so REAM joins the depth's part.
     depth = "<HOLE-DEPTH> <hw-depth>"
 
-    def parts(prefix: str = "REAM <MOD-DIAM>", suffix: str = depth) -> dict:
+    def parts(prefix: str = "2X <MOD-DIAM>", suffix: str = depth) -> dict:
         return {5: prefix, 6: suffix, 7: "", 8: ""}
 
-    assert drawing._depth_banded_definition(parts(), band) == (6, f"{depth} {band}")
-    whole = "REAM <MOD-DIAM><hw-diam> <HOLE-DEPTH> <hw-depth>"
-    assert drawing._depth_banded_definition(parts(prefix=whole, suffix=""), band) == (
+    assert drawing._depth_banded_definition(parts(), band, process) == (
+        6,
+        f" {process} {depth} {band}",
+    )
+    whole = "2X <MOD-DIAM><hw-diam> <HOLE-DEPTH> <hw-depth>"
+    assert drawing._depth_banded_definition(
+        parts(prefix=whole, suffix=""), band, process
+    ) == (
         5,
-        f"{whole} {band}",
+        f"2X <MOD-DIAM><hw-diam> {process} <HOLE-DEPTH> <hw-depth> {band}",
     )
     for broken in (
         parts(suffix="THRU ALL"),
         parts(suffix=f"{depth} {band}"),
         parts(suffix=f"{depth} PRESS FIT"),
         parts(suffix=f"<HOLE-DEPTH> 1.0 {depth}"),
-        parts(prefix=f"REAM {depth}"),
-        {5: "REAM <MOD-DIAM>", 6: depth},
+        parts(prefix=f"2X {depth}"),
+        parts(prefix=f"2X {process} <MOD-DIAM>"),
+        {5: "2X <MOD-DIAM>", 6: depth},
     ):
         with pytest.raises(RuntimeError):
-            drawing._depth_banded_definition(broken, band)
+            drawing._depth_banded_definition(broken, band, process)
 
 
 class _Sheet:
@@ -237,7 +245,7 @@ def test_typed_depth_band_refuses_a_non_inch_sheet() -> None:
 
     with pytest.raises(RuntimeError, match="typed depth band is inches"):
         drawing._band_hole_depth(
-            _Callout(), notes.DRIVE_PIN_DEPTH_BAND, _Sheet(0), "mm sheet"
+            _Callout(), notes.DRIVE_PIN_DEPTH_BAND, "REAM", _Sheet(0), "mm sheet"
         )
 
 

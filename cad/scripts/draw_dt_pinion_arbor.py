@@ -58,8 +58,6 @@ from dt_pinion_arbor_spec import (
     BACK_JOURNAL_Z,
     BOND_ZONE_DIA_Z,
     CROSSROD_NUMBER,
-    DRAWING_DIMENSIONS,
-    DRAWING_PRECISION_BY_NAME,
     DRUM_NUMBER,
     FRONT_JOURNAL_Z,
     HEAD_CAP_SAG,
@@ -72,10 +70,24 @@ from dt_pinion_arbor_spec import (
     PIN_Z,
     RETAINING_COMPOUND,
     SHAFT_DIA,
+    SHAFT_DIA_BAND,
     STRAP_NUMBER,
     SURFACE_FINISHES,
 )
+from dt_pinion_arbor_notes import (
+    BACK_STUB_DIA_Z,
+    BOND_ZONE_WITNESS_LEN,
+    COLLAR_SPAN_DIA_Z,
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION_BY_NAME,
+    SPAN_WITNESS_LEN,
+)
 from _fit_ream_slide import REAM_SLIDE
+from dt_pinion_arbor_collar_spec import (
+    BORE as COLLAR_BORE,
+    BORE_BAND as COLLAR_BORE_BAND,
+    COLLAR_NUMBER,
+)
 from dt_pinion_bracket_geometry import ARBOR_BORE as STRAP_BORE
 
 
@@ -94,27 +106,34 @@ JOURNAL_CLEARANCE = (
     STRAP_BORE + REAM_SLIDE[0] - (SHAFT_DIA + JOURNAL_DIA_BAND[1]),
 )
 JOURNAL_CALLOUT = "RUNNING FIT,\nSEE NOTE 1"
-# The drum (2.40-8.04 from the head rear face) rests on the inner ends of
-# both journals (1.82-2.61, 7.83-8.62) and is bonded on the span between
-# them (dt_pinion_arbor_spec.DRUM_*_END_ON_JOURNAL_MIN; the assembly step
-# wipes squeeze-out off the lands).  The span by the head, with the collar's
-# pin hole, and the one behind the back journal take the same -.0004/-.0038
-# band but carry no bond (local repeat review of 218c85b6: the old fragment
-# left the builder to guess which span the drum bonds on).  Each note is a
-# complete sentence naming the mate by number and name (rule 4).
+# Every Ø5/16 span prints its own diameter on the view (round 3 of fan-out
+# dt-fab-3).  The drum's span between the journals (the drum, 2.40-8.04
+# from the head rear face, rests on both lands' inner ends:
+# dt_pinion_arbor_spec.DRUM_*_END_ON_JOURNAL_MIN) is its bonded fit, reason
+# once at its callout.  The span by the head (the collar's, with its pin
+# hole) and the back stub take the same -.0004/-.0038: MHA-DT-33 slides
+# over both from the back crown to its pin station, the band's upper limit
+# its slide-on clearance (dt_pinion_arbor_collar_spec.SLIDE_CLEARANCE_MIN),
+# so both flag note 2, the sliding fit with that collar.  The title block's
+# .XX or .XXX on the back stub (Ø.32 or Ø.317 max) would stop the collar
+# (bore .3125 min) and the drum (.3135 min) passing it, so it keeps the band.
 STRAP_NAME = "PINION BRACKET STRAP"
-DRUM_NAME = "ALIGNMENT PINION DRUM"
-BOND_ZONE_CALLOUT = f"BONDED FIT IN {DRUM_NUMBER},\n{RETAINING_COMPOUND}, SEE NOTE 2"
+COLLAR_NAME = "PINION ARBOR RETENTION COLLAR"
+COLLAR_CLEARANCE = (
+    COLLAR_BORE + COLLAR_BORE_BAND[1] - (SHAFT_DIA + SHAFT_DIA_BAND[0]),
+    COLLAR_BORE + COLLAR_BORE_BAND[0] - (SHAFT_DIA + SHAFT_DIA_BAND[1]),
+)
+BOND_ZONE_CALLOUT = f"BONDED FIT IN {DRUM_NUMBER},\n{RETAINING_COMPOUND}"
+SPAN_CALLOUT = "SEE NOTE 2"
 CROSS_HOLE_CALLOUT = f"REAM THRU, BONDED FIT ON\n{CROSSROD_NUMBER}, {RETAINING_COMPOUND}"
-_DIA = f"<MOD-DIAM>{_inch(SHAFT_DIA)}"
 # Rule 7: the notes block stays at four short rows; the widest (66
 # characters, ~172 mm) ends ~24 mm left of the title block (x 0.216).
 SHEET_NOTES = (
     f"1. JOURNALS (2X): RUNNING FIT IN {STRAP_NUMBER} {STRAP_NAME},\n"
     f"   TURN TO MEASURED BORE (CLEARANCE {_inch(JOURNAL_CLEARANCE[0])}-"
     f"{_inch(JOURNAL_CLEARANCE[1])}).\n"
-    f"2. {DRUM_NUMBER} {DRUM_NAME} BONDS ONLY ON THE SPAN BETWEEN\n"
-    f"   THE JOURNALS; THE OTHER {_DIA} SPANS TAKE THE SAME LIMITS."
+    f"2. SPANS (2X): SLIDING FIT IN {COLLAR_NUMBER} {COLLAR_NAME}\n"
+    f"   (CLEARANCE {_inch(COLLAR_CLEARANCE[0])}-{_inch(COLLAR_CLEARANCE[1])})."
 )
 # Under the property-linked inside-corner note (top-left at y 0.060).
 NOTES_XY = (0.020, 0.052)
@@ -304,13 +323,24 @@ BOND_ZONE_TEXT_XY = (_sheet_x(BOND_ZONE_DIA_Z), 0.1474 + 0.0028)
 # groove or relief to a machinist (Main, 5471a6ef), so it is re-coloured in
 # the view to the outline's black; the model sketch and its dimension are
 # untouched.  The drum station's sketch stays hidden: its dimension does not
-# print (UNPRINTED_DIMENSIONS).  The span (model z, mm) mirrors
-# build_pinion_arbor's BOND_ZONE_WITNESS_LEN, pinned by test.
+# print (UNPRINTED_DIMENSIONS).  The spans (model z, mm) are the builder's,
+# both read from dt_pinion_arbor_notes: the bond zone's and, round 3 of
+# fan-out dt-fab-3, the collar span's and the back stub's.
 REFERENCE_WITNESS_COLOR = 0  # COLORREF black, the outline's colour.
-BOND_ZONE_WITNESS_LEN = 4.0
 REFERENCE_WITNESSES = {
     "BondZoneReference": (BOND_ZONE_DIA_Z, BOND_ZONE_DIA_Z + BOND_ZONE_WITNESS_LEN),
+    "CollarSpanReference": (COLLAR_SPAN_DIA_Z, COLLAR_SPAN_DIA_Z + SPAN_WITNESS_LEN),
+    "BackStubReference": (BACK_STUB_DIA_Z, BACK_STUB_DIA_Z + SPAN_WITNESS_LEN),
 }
+# The collar span's diameter (line at x ~0.266, 2.2 mm clear of the pin
+# hole and 5 mm right of the front land's head-end witness at x 0.2608)
+# hangs its one-row block below the shaft, over the 1.82's text (y ~0.140)
+# and left of the neck-end witness (x 0.2966).  The back stub's (line at x
+# ~0.086, 2 mm inside the back land's crown-end witness at x 0.0881 and
+# right of the (.05)'s right arrow tail) rises above the shaft, past the
+# back land's diameter block (top y ~0.208) and the (.05) row (y ~0.222).
+COLLAR_SPAN_TEXT_XY = (_sheet_x(COLLAR_SPAN_DIA_Z), 0.1540)
+BACK_STUB_TEXT_XY = (_sheet_x(BACK_STUB_DIA_Z), 0.2360)
 SW_SEL_EXT_SKETCH_SEGS = 24  # swSelectType_e.swSelEXTSKETCHSEGS
 REFERENCE_WITNESS_LEN_TOL = 0.01  # mm; the witnesses are fully defined sketch lengths
 # Exported-raster proof that the outline stays unbroken over each witness:
@@ -376,6 +406,8 @@ PRINCIPAL_KEEP = {
     # station's text.
     "FrontJournalDia": (FRONT_JOURNAL_DIA_X, 0.1515),
     "BondZoneDia": BOND_ZONE_TEXT_XY,
+    "CollarSpanDia": COLLAR_SPAN_TEXT_XY,
+    "BackStubDia": BACK_STUB_TEXT_XY,
     "BackJournalDia": (BACK_JOURNAL_TEXT_X, BACK_JOURNAL_DIA_Y),
     # y 0.140, not 0.130: lifts the dimension line to y ~0.1372 so its head-end
     # witness stops at ~0.1362, leaving room for the front Ra's shoulder to
@@ -489,6 +521,8 @@ DIMENSION_CALLOUTS = {
     "FrontJournalDia": JOURNAL_CALLOUT,
     "BackJournalDia": JOURNAL_CALLOUT,
     "BondZoneDia": BOND_ZONE_CALLOUT,
+    "CollarSpanDia": SPAN_CALLOUT,
+    "BackStubDia": SPAN_CALLOUT,
     "PinHoleDia": PIN_HOLE_CALLOUT,
 }
 # Printed in parentheses as references (dimension name -> native label).
@@ -501,7 +535,7 @@ REFERENCE_LENGTHS = {
     "BackCapSagDim": "back-crown descriptive reference",
     "OverallLen": "overall length reference",
 }
-# Marked in the model (dt_pinion_arbor_spec.DRAWING_DIMENSIONS) but not
+# Marked in the model (dt_pinion_arbor_notes.DRAWING_DIMENSIONS) but not
 # imported: the drum station is MHA-DT-00's setting, not this part's.  Its
 # feature owns nothing else, so the targeted import never brings it in, and
 # its sketch stays as the part saved it, hidden.  The precision readback

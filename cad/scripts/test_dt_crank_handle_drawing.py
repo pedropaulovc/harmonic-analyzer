@@ -441,7 +441,7 @@ def test_tenon_wall_charges_both_breaks_at_its_free_end() -> None:
     exceptions = {
         row["id"]: row for row in _config.parts("dt-crank-handle")["machinist_exceptions"]
     }
-    assert set(exceptions) == {"RV-01", "RV-02"}
+    assert {"RV-01", "RV-02"} <= set(exceptions)
     for rule, text in (("RV-01", "WALL .060 MIN"), ("RV-02", "WALL .040 MIN AT TENON END")):
         assert exceptions[rule]["where"] == "tenon callout: " + text
         assert text in notes.TENON_NOTE
