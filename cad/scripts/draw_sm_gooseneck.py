@@ -17,8 +17,9 @@ sheet carries, at 1:3:
   tube; the reference overall height and reach to real faces, from the
   part's hidden ``OverallReference``;
 * the END VIEW (``*Left``, third-angle left of the elevation): the end face,
-  carrying the native blind-tap callout with its depth datum and datum A on
-  the end piece's Ø.50 rim;
+  carrying the native blind-tap callout with its depth datum, datum A on the
+  end piece's Ø.50 rim, and the tap's (datum B) and the counterbore's
+  position frames;
 
 and at 3:1 SECTION A-A, a full section on the arm axis (cut faces only)
 cropped to the end piece, the tube's cut walls hatched across the end
@@ -103,7 +104,6 @@ from sm_gooseneck_spec import (
     TUBE_OD_REF_Y,
 )
 from sm_gooseneck_spring_joint import (
-    COUNTERBORE_DEPTH,
     COUNTERBORE_DIA,
     TAP_DRILL_DEPTH_FROM_FLOOR,
     TAP_DRILL_DIA,
@@ -206,15 +206,32 @@ FRONT_KEEP = {
 # The end view (*Left) looks at the end face along +X: sheet x is model +Z.
 # The tap's native callout stands up and left of it, clear of the section's
 # upper dimensions and of the elevation's arm-straight text, its top inside
-# the border (at 0.266 it crossed it, farm run 20261027T224212504Z).
+# the border (at 0.266 it crossed it, farm run 20261027T224212504Z), its
+# three rows' bottom ~3 mm over the tap frame's top.
 TAP_CALLOUT_XY = (0.158, 0.254)
-# Datum A (delegated ruling sm Q6) is the end face's Ø.50 rim (the end
-# piece's OD, flush with the tube's), tagged right of it from a pick on its
-# upper-right rim, its box clear of the elevation's arm end (x 0.2365) and
-# the end view's leg (x 0.205 +/- 0.0021, below the arm axis).  The axis
-# frames stand on section A-A (SECTION_FRAME_* below): at 1:3 the end face's
-# rims are ~15 px apart and both frames' leaders read as landing on the OD
-# next to datum A (rounds 5-6, farm run 20261107T205834939Z).
+# The end view's frames (delegated ruling sm Q6): datum A is the end face's
+# Ø.50 rim (the end piece's OD, flush with the tube's), tagged right of it
+# from a pick on its upper-right rim, its box clear of the elevation's arm
+# end (x 0.2365) and the end view's leg (x 0.205 +/- 0.0021, below the arm
+# axis).  Left of the arm's end circle, between section A-A (its crop's
+# right edge at x ~0.1554) and the end view: the tap's ⌖ Ø.012 | A
+# frame (~31 mm, one 7 mm row) under the tap callout, datum B's tag hung
+# under its middle, and the counterbore's ⌖ Ø.008 | B frame under that.
+# Each frame's leader leaves a 6.35 mm shoulder off its right end: the tap
+# frame's lands on the tap's upper-left rim, the counterbore frame's on the
+# counterbore's rim just under the arm axis, so the two never cross.
+END_GTOL_ROW = 0.007
+END_FRAME_WIDTH = 0.031
+END_DATUM_TAG_STEM = 0.003
+END_DATUM_TAG_BOX = 0.007
+TAP_FRAME_XY = (0.160, 0.2415)
+DATUM_B_XY = (
+    TAP_FRAME_XY[0] + END_FRAME_WIDTH / 2.0,
+    TAP_FRAME_XY[1] - END_GTOL_ROW - END_DATUM_TAG_STEM - END_DATUM_TAG_BOX,
+)
+COUNTERBORE_FRAME_XY = (0.160, 0.2195)
+TAP_FRAME_RIM_DEG = 135.0
+COUNTERBORE_FRAME_RIM_DEG = 200.0
 DATUM_A_RIM_DEG = 45.0
 DATUM_A_OFFSET = (0.008, -0.009)
 # The datum pick's zoom window half-span (_drawing_scan._HIT_ZOOM_HALF; the
@@ -261,10 +278,8 @@ def _section_x(model_x: float) -> float:
 # lower, the shank's longer fit callout lower.  The Ø's block centres on its
 # keep, 0.45 mm high: r8 (farm run 20261101T035809796Z) inked the pair and two
 # rows y 190.4-209.6 between the extension lines at 189.5 and 210.5.  The
-# head's block, value and two rows (r5, farm run 20261107T180948342Z: inked
-# y ~153-168, its last row x ~87-138), now stands 25 mm lower, level with the
-# shank's block (x 144.7 on) but left of the shank's line (x ~144.5), so
-# datum B's tag and the tap frame fit over it (SECTION_FRAME_* below).
+# head's block, value and four rows, inked y 148.9-174.8, 6 mm under the part
+# (180.95), its last row x 94.8-129.9, left of the shank's line (x 146.2).
 # Each Ø's text
 # starts at its dimension line and runs right, so the head's line stands
 # near the end face and its text ends short of the shank's line (at
@@ -295,7 +310,7 @@ SECTION_KEEP = {
     "CounterboreDepth": (_SX0 - 0.012, _SY0 + _SECTION_HALF + 0.032),
     "CounterboreDia": (_SX0 - 0.030, _SY0 - 0.0005),
     "CounterboreFloorCornerR": (_SX0 - 0.032, _SY0 + _SECTION_HALF + 0.0116),
-    "PlugDia": (_section_x(ARM_END_X + 4.0), _SY0 - _SECTION_HALF - 0.044),
+    "PlugDia": (_section_x(ARM_END_X + 4.0), _SY0 - _SECTION_HALF - 0.019),
     # 1.5 mm left of the shank's centre: the four-place braze window ran
     # the text 0.26 mm onto the elevation (#290 batch 0).
     "PlugShankDia": (
@@ -307,43 +322,6 @@ if set(FRONT_KEEP) | set(SECTION_KEEP) != {
     name for names in DRAWING_DIMENSIONS.values() for name in names
 }:
     raise AssertionError("the gooseneck sheet does not place every marked dimension")
-
-# The axis frames on SECTION A-A (delegated ruling sm Q6), under the part,
-# each leader entering the end piece's lower wall from below to land on the
-# cut wall of the feature it controls.  The counterbore's ⌖ Ø.008 | B frame
-# stands left-below, under the counterbore Ø's block (its lowest ink ~y
-# 0.184), its 6.35 mm shoulder ending right of the end face so its leader
-# rises nearly straight to the counterbore's lower wall, left of the head
-# Ø's dimension line (x _section_x(ARM_END_X + 4.0)).  The tap's ⌖ Ø.012 | A
-# frame stands right of that line, its leader rising off its right end to
-# the tap's lower wall inside the thread length (a split at the thread's end
-# cannot move it), left of the shank Ø's line; datum B's tag hangs under its
-# middle, over the head Ø's block (PlugDia, lowered for it).
-SECTION_GTOL_ROW = 0.007
-SECTION_FRAME_WIDTH = 0.031
-SECTION_FRAME_SHOULDER = 0.00635
-SECTION_DATUM_TAG_STEM = 0.003
-SECTION_DATUM_TAG_BOX = 0.007
-COUNTERBORE_FRAME_XY = (0.040, _SY0 - _SECTION_HALF - 0.005)
-COUNTERBORE_FRAME_LANDING_X_MM = ARM_END_X + COUNTERBORE_DEPTH / 2.0
-TAP_FRAME_XY = (_section_x(ARM_END_X + 4.0) + 0.005, _SY0 - _SECTION_HALF - 0.011)
-TAP_FRAME_LANDING_X_MM = ARM_END_X + COUNTERBORE_DEPTH + 13.7
-DATUM_B_XY = (
-    TAP_FRAME_XY[0] + SECTION_FRAME_WIDTH / 2.0,
-    TAP_FRAME_XY[1] - SECTION_GTOL_ROW - SECTION_DATUM_TAG_STEM - SECTION_DATUM_TAG_BOX,
-)
-if not (
-    COUNTERBORE_DEPTH + 1.0
-    < TAP_FRAME_LANDING_X_MM - ARM_END_X
-    < COUNTERBORE_DEPTH + TAP_THREAD_DEPTH_FROM_FLOOR - 1.0
-):
-    raise AssertionError("the tap frame's landing leaves the threaded wall")
-
-
-def _section_xy(model_x: float, model_z: float) -> tuple[float, float]:
-    """Sheet point of model (x, ARM_Y, z) mm in section A-A (model -Z up)."""
-    return (_section_x(model_x), _SY0 - model_z * _SECTION_S)
-
 
 # The four note lines run long, so they sit in the bottom left, under the
 # end view's foot (y ~0.067) and left of the title block (x 0.216); the
@@ -812,21 +790,32 @@ def _rim_point(
     return (centre[0] + radius * math.cos(angle), centre[1] + radius * math.sin(angle))
 
 
-def _add_datum_a(adapter: Any, end: Any) -> None:
-    """Datum A on the end face's Ø.50 rim (delegated ruling sm Q6,
-    2026-11-07 (Main), no precedent; owner review #2144; pending owner
-    confirmation).  The rims are concentric on the end face; the scan pins
-    the OD by its radius and the hit-test must resolve to it.  At 1:3 the
-    OD rim stands ~1 mm from the counterbore's, inside a fit-zoom pick
-    aperture (round 3, farm run 20261107T121714736Z: the pick landed on a
-    neighbour), so the pick is made zoomed in (draw_fr_top_frame's hanger
+def _add_axis_frames(adapter: Any, end: Any, tap_edge: Any) -> None:
+    """The tap's and the counterbore's axis limits as position frames.
+
+    Delegated ruling sm Q6 (2026-11-07 (Main), no precedent; owner review
+    #2144; pending owner confirmation): datum A is the end face's Ø.50 rim
+    (the end piece's OD), the tap is ⌖ Ø.012 to A and is datum B, and the
+    counterbore is ⌖ Ø.008 to B -- the radial offsets
+    sm_gooseneck_spring_joint charges (THREAD_AXIS_OFFSET_MAX,
+    COUNTERBORE_AXIS_OFFSET_MAX), as zones.  The rims are concentric on the
+    end face; the scan pins each by its own radius, the datum's hit-test must
+    resolve to the OD rim, and each frame selects its circle directly.  At
+    1:3 the OD rim stands ~1 mm from the counterbore's, inside a fit-zoom
+    pick aperture (round 3, farm run 20261107T121714736Z: the pick landed on
+    a neighbour), so the pick is made zoomed in (draw_fr_top_frame's hanger
     datum precedent)."""
     centre = model_point_in_view(
         adapter, end, (ARM_END_X / 1000.0, ARM_Y / 1000.0, 0.0), label="end face centre"
     )
     edges = scan_view_edges(end, label="gooseneck end view")
+    axis = (1.0, 0.0, 0.0)
+    end_face_centre = (ARM_END_X, ARM_Y, 0.0)
     od_rim = edges.circle_at(
-        (ARM_END_X, ARM_Y, 0.0), _TUBE_R, axis=(1.0, 0.0, 0.0), label="end piece OD rim"
+        end_face_centre, _TUBE_R, axis=axis, label="end piece OD rim"
+    )
+    counterbore_rim = edges.circle_at(
+        end_face_centre, COUNTERBORE_DIA / 2.0, axis=axis, label="counterbore rim"
     )
     datum_pick = _rim_point(centre, _TUBE_R, DATUM_A_RIM_DEG)
     with _zoomed_on(adapter, datum_pick, DATUM_A_PICK_ZOOM_HALF):
@@ -842,59 +831,11 @@ def _add_datum_a(adapter: Any, end: Any) -> None:
             datum="A",
             label="end piece OD datum A",
         )
-
-
-def _section_lower_wall(edges: Any, radius_mm: float, x_mm: float, *, label: str) -> Any:
-    """The longest cut-face line of section A-A at model z = +``radius_mm``
-    (the sheet's lower side) that runs 0.5 mm past ``x_mm`` both ways, so a
-    leader landing set there lies on the very line selected."""
-    candidates = [
-        item
-        for item in edges.lines
-        if all(
-            abs(point[1] - ARM_Y) <= 0.01 and abs(point[2] - radius_mm) <= 0.02
-            for point in item.line
-        )
-        and min(item.line[0][0], item.line[1][0]) <= x_mm - 0.5
-        and max(item.line[0][0], item.line[1][0]) >= x_mm + 0.5
-    ]
-    if not candidates:
-        nearest = sorted(
-            (
-                abs(item.midpoint_mm[2] - radius_mm) + abs(item.midpoint_mm[1] - ARM_Y),
-                tuple(round(value, 3) for value in item.midpoint_mm),
-            )
-            for item in edges.lines
-        )[:5]
-        raise RuntimeError(f"section A-A has no {label} line at x {x_mm:.3f}: {nearest}")
-    return max(candidates, key=lambda item: item.length_mm).edge
-
-
-def _add_axis_frames(adapter: Any, section: Any) -> None:
-    """The tap's and the counterbore's axis limits as position frames on
-    section A-A, where each cut wall stands apart at 3:1.
-
-    Delegated ruling sm Q6 (2026-11-07 (Main), no precedent; owner review
-    #2144; pending owner confirmation): the tap is ⌖ Ø.012 to A and is datum
-    B, and the counterbore is ⌖ Ø.008 to B -- the radial offsets
-    sm_gooseneck_spring_joint charges (THREAD_AXIS_OFFSET_MAX,
-    COUNTERBORE_AXIS_OFFSET_MAX), as zones.  Each frame selects its own cut
-    wall directly (draw_fr_top_frame's F-F reams)."""
-    edges = scan_view_edges(section, label="gooseneck section A-A")
-    tap_wall = _section_lower_wall(
-        edges, TAP_DRILL_DIA / 2.0, TAP_FRAME_LANDING_X_MM, label="tap lower wall"
-    )
-    counterbore_wall = _section_lower_wall(
-        edges,
-        COUNTERBORE_DIA / 2.0,
-        COUNTERBORE_FRAME_LANDING_X_MM,
-        label="counterbore lower wall",
-    )
     tap_frame = add_feature_control_frame(
         adapter,
-        section,
-        edge_entity=tap_wall,
-        leader_attach_xy=_section_xy(TAP_FRAME_LANDING_X_MM, TAP_DRILL_DIA / 2.0),
+        end,
+        edge_entity=tap_edge,
+        leader_attach_xy=_rim_point(centre, TAP_DRILL_DIA / 2.0, TAP_FRAME_RIM_DEG),
         frame_xy=TAP_FRAME_XY,
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_IN["tap position"],
@@ -903,14 +844,14 @@ def _add_axis_frames(adapter: Any, section: Any) -> None:
         label="tap position",
     )
     add_frame_datum_feature(
-        adapter, section, tap_frame, datum="B", symbol_xy=DATUM_B_XY, label="tap datum B"
+        adapter, end, tap_frame, datum="B", symbol_xy=DATUM_B_XY, label="tap datum B"
     )
     add_feature_control_frame(
         adapter,
-        section,
-        edge_entity=counterbore_wall,
-        leader_attach_xy=_section_xy(
-            COUNTERBORE_FRAME_LANDING_X_MM, COUNTERBORE_DIA / 2.0
+        end,
+        edge_entity=counterbore_rim.edge,
+        leader_attach_xy=_rim_point(
+            centre, COUNTERBORE_DIA / 2.0, COUNTERBORE_FRAME_RIM_DEG
         ),
         frame_xy=COUNTERBORE_FRAME_XY,
         characteristic="position",
@@ -1012,8 +953,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _set_tap_callout_below(tap_callout, TAP_CALLOUT_BELOW)
     rebuild_drawing(adapter, label="gooseneck tap callout")
-    _add_datum_a(adapter, end)
-    _add_axis_frames(adapter, section)
+    _add_axis_frames(adapter, end, tap_edge)
 
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)

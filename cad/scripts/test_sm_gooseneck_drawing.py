@@ -393,51 +393,31 @@ def test_tap_callout_states_geometry_and_its_mate_within_four_rows() -> None:
     assert "THREADLOCKER" not in printed  # spring-eye clamping belongs to the assembly
 
 
-def test_axis_frames_stand_under_section_a_a_on_their_own_walls() -> None:
-    # Rounds 5-6 (farm run 20261107T205834939Z): on the 1:3 end view both
-    # frames' leaders read as landing on the OD next to datum A, so the
-    # frames moved to section A-A, each leader landing on its own cut wall.
-    part_bottom = drawing._SY0 - drawing._SECTION_HALF
-    head_line_x = drawing._section_x(geom.ARM_END_X + 4.0)
-    shank_line_x = drawing.SECTION_KEEP["PlugShankDia"][0]
-    width = drawing.SECTION_FRAME_WIDTH
-    shoulder = drawing.SECTION_FRAME_SHOULDER
-    row = drawing.SECTION_GTOL_ROW
-    # The counterbore frame: under the counterbore Ø's block (lowest ink ~y
-    # 0.184), its shoulder ending right of the end face and left of its
-    # landing, which lies on the counterbore's wall left of the head Ø's line.
-    cb_x, cb_top = drawing.COUNTERBORE_FRAME_XY
-    cb_landing = drawing._section_xy(
-        drawing.COUNTERBORE_FRAME_LANDING_X_MM, joint.COUNTERBORE_DIA / 2.0
-    )
-    assert cb_top <= 0.184 - 0.006
-    assert cb_top < part_bottom
-    assert drawing._SX0 < cb_x + width + shoulder < cb_landing[0] < head_line_x - 0.004
-    assert cb_landing[0] < drawing._section_x(geom.ARM_END_X + joint.COUNTERBORE_DEPTH)
-    # The tap frame: right of the head Ø's line, its shoulder past its
-    # landing on the tap's threaded wall and left of the shank Ø's line.
-    tap_x, tap_top = drawing.TAP_FRAME_XY
-    tap_landing = drawing._section_xy(
-        drawing.TAP_FRAME_LANDING_X_MM, joint.TAP_DRILL_DIA / 2.0
-    )
-    assert tap_x >= head_line_x + 0.004
-    assert tap_top < part_bottom - 0.008
-    assert tap_x + width < tap_landing[0] < tap_x + width + shoulder + 0.002
-    assert tap_x + width + shoulder < shank_line_x - 0.010
-    assert joint.COUNTERBORE_DEPTH < (
-        drawing.TAP_FRAME_LANDING_X_MM - geom.ARM_END_X
-    ) < joint.TAP_THREAD_DEPTH
-    # Datum B's tag hangs under the tap frame, over the head Ø's lowered
-    # block (its first row's top ~6 mm over the keep).
-    tag_bottom = drawing.DATUM_B_XY[1]
-    assert tag_bottom + drawing.SECTION_DATUM_TAG_BOX < tap_top - row
-    assert tag_bottom >= drawing.SECTION_KEEP["PlugDia"][1] + 0.006 + 0.005
-    # The frames never share a height band across the head Ø's line.
-    assert cb_top - row > tap_top or cb_x + width + shoulder < head_line_x
-    # Datum A stays on the end view: its box (~7 mm) right of its upper-right
-    # rim pick and left of the elevation's end face, above the end view's leg.
+def test_end_view_frames_stand_between_the_callout_and_the_views() -> None:
+    # The callout's three rows (r1, farm run 20261107T102825912Z: four rows
+    # inked ~23 mm, centred on the keep, ~5.75 mm a row) end over
+    # the tap frame; datum B's tag hangs between the two frames; each frame's
+    # right end plus its 6.35 mm shoulder stays left of the end view's
+    # Ø.50 rim, and the frames start right of section A-A's crop (x ~155.4
+    # mm) and its top dimension text (r8: to x ~153 mm).
     centre = (drawing.END_CENTER[0], drawing.ARM_AXIS_Y)
     od_r = geom.TUBE_DIA / 2.0 * drawing._S
+    callout_bottom = drawing.TAP_CALLOUT_XY[1] - 3 * 0.00575 / 2.0
+    row = drawing.END_GTOL_ROW
+    tap_top = drawing.TAP_FRAME_XY[1]
+    assert tap_top + 0.0025 <= callout_bottom
+    tag_bottom = drawing.DATUM_B_XY[1]
+    assert tag_bottom - 0.0015 >= drawing.COUNTERBORE_FRAME_XY[1]
+    assert tag_bottom + drawing.END_DATUM_TAG_BOX < tap_top - row
+    for frame in (drawing.TAP_FRAME_XY, drawing.COUNTERBORE_FRAME_XY):
+        assert frame[0] >= drawing._section_x(drawing.SECTION_CROP_X_MM[1]) + 0.004
+        assert frame[0] + drawing.END_FRAME_WIDTH + 0.00635 < centre[0] - od_r - 0.003
+    # The two leaders land on opposite sides of the arm axis, so they never
+    # cross; the counterbore's under it, the tap's over it.
+    assert math.sin(math.radians(drawing.TAP_FRAME_RIM_DEG)) > 0.0
+    assert math.sin(math.radians(drawing.COUNTERBORE_FRAME_RIM_DEG)) < 0.0
+    # Datum A's box (~7 mm) right of its upper-right rim pick and left of
+    # the elevation's end face, above the end view's leg.
     angle = math.radians(drawing.DATUM_A_RIM_DEG)
     pick = (centre[0] + od_r * math.cos(angle), centre[1] + od_r * math.sin(angle))
     symbol_x = pick[0] + drawing.DATUM_A_OFFSET[0]
