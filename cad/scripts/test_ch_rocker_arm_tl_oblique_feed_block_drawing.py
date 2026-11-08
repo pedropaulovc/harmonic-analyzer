@@ -356,9 +356,10 @@ def test_plan_ordinates_start_on_the_left_edge():
 
 def test_reference_lines_on_the_printed_outline_are_plain_sketch_lines():
     # Shown in the plan and VIEW D, the reference sketches' lines lie on the
-    # -X edge, the lug's -X face and the lug end; as construction lines their
-    # dash font printed over those outlines (machinist review, farm run
-    # 20261105T054045952Z). The circles on the holes stay construction.
+    # -X edge, the +X end (the plan's Y baseline), the lug's -X face and the
+    # lug end; as construction lines their dash font printed over those
+    # outlines (machinist review, farm run 20261105T054045952Z). The circles
+    # on the holes stay construction.
     tree=ast.parse((FOLDER/'_oblique_pivot_block_model.py').read_text(encoding='utf-8'))
     functions={node.name:node for node in tree.body if isinstance(node,ast.AsyncFunctionDef)}
 
@@ -372,7 +373,7 @@ def test_reference_lines_on_the_printed_outline_are_plain_sketch_lines():
     assert '_as_construction' not in {call.func.id for call in calls(functions['_drawn'])}
     assert '_as_construction' in {call.func.id for call in calls(functions['_construction'])}
     # NutClock's two rays are construction lines off every outline.
-    for name,expected in (('_plan_datum_reference',['_drawn']*2),
+    for name,expected in (('_plan_datum_reference',['_drawn']*3),
                           ('_nut_pattern_reference',['_drawn','_construction','_construction'])):
         wrappers=[call.func.id for call in calls(functions[name]) if creates(call,'add_line')]
         assert wrappers==expected, (name,wrappers)

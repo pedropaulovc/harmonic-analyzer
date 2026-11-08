@@ -86,8 +86,74 @@ def test_outline_bands_keep_the_counterbore_walls_at_target():
     assert math.isclose(spec.BLOCK_LENGTH / INCH, 1.64)
     assert math.isclose(spec.PLAN_BORE_X / INCH, .82)
     assert spec.BLOCK_X0 == -spec.BLOCK_X1
-    assert min(spec.CBORE_NEAR_END_WALL_MIN, spec.BORE_CBORE_WEB_MIN,
+    assert min(spec.CBORE_NEAR_END_WALL_MIN, spec.CBORE_NEAR_SIDE_WALL_MIN, spec.BORE_CBORE_WEB_MIN,
                spec.SHIM_CBORE_GAP_MIN, spec.BORE_END_WALL_MIN) >= WALL_TARGET_MM
+
+
+def test_plan_locates_every_hole_from_the_minus_x_and_minus_y_edges():
+    """Farm r3 20261108T014606685Z (rule 10): the rows printed .512 either
+    side of the seat axis while the seat stood .79 from the -Y edge. Every
+    plan Y now runs from the -Y edge, every X from the -X edge, at three
+    places for the vendor pattern; the stacks charge the edge, not the seat."""
+    import _oblique_block_drawing as drawing
+
+    printed = set().union(*spec.DRAWING_DIMENSIONS.values())
+    assert not {'CarriageDrills3Y', 'CarriageDrills4Y'} & (printed | set(drawing.PLAN_KEEP))
+    assert spec.DRAWING_DIMENSIONS['CarriageDrillProfile'] == ('CarriageDrills1Dia',)
+    half = spec.BLOCK_WIDTH / 2
+    rows = {name: spec.DRAWING_VALUES[name] for name in spec.PLAN_ROW_HOLES}
+    assert rows == {'PlanHole2Y': half + spec.BOLT_Y, 'PlanHole3Y': half - spec.BOLT_Y}
+    assert [round(v / INCH, 3) for v in rows.values()] == [1.302, .278]
+    assert spec.DRAWING_VALUES['BlockSideY'] == half
+    assert all(spec.DRAWING_PRECISION_BY_NAME[name] == 3 for name in rows)
+    assert set(spec.PLAN_ROW_HOLES) <= set(spec.DRAWING_DIMENSIONS[spec.PLAN_DATUM_REFERENCE])
+    # The model names the row hole after the column holes (PlanHole3).
+    assert list(spec.PLAN_ROW_HOLES) == ['PlanHole2Y', f'PlanHole{len(spec.PLAN_DATUM_HOLES) + 1}Y']
+    assert spec.PLAN_ROW_HOLES['PlanHole3Y'] == spec.PLAN_DATUM_ROW_HOLE
+    assert spec.PLAN_DATUM_ROW_HOLE[0] in {x for x, _y in spec.PLAN_DATUM_HOLES}
+    assert {y for _x, y in spec.PLAN_ROW_HOLES.values()} == {spec.BOLT_Y, -spec.BOLT_Y}
+    model = Path(__file__).with_name('_oblique_pivot_block_model.py').read_text(encoding='utf-8')
+    body = model[model.index('async def _plan_datum_reference'):model.index('async def _driving_angle')]
+    assert 'x_base, y_base = (f"{edge}.end", edge_end), (f"{end}.start", end_start)' in body
+    assert 'spec.PLAN_DATUM_ROW_HOLE' in body
+
+
+@pytest.mark.parametrize("feed", [False, True])
+def test_y_baseline_lanes_keep_each_text_off_the_other_lines(feed):
+    """The four Y dims stand shortest nearest right of the plan; no text box
+    meets another dimension's line or witness. Text metrics from the
+    retained pivot PDFs (3.0 mm a character, a 6.38 mm row box)."""
+    import _oblique_block_drawing as drawing
+    import ch_rocker_arm_tl_oblique_feed_block_spec as feed_spec
+
+    keep = drawing.FEED_PLAN_KEEP if feed else drawing.PLAN_KEEP
+    centre_y = (drawing.FEED_PLAN_XY if feed else drawing.PLAN_XY)[1] * 1000
+    # TL-32's view centres the L (block plus lug), TL-22's the block.
+    top = centre_y + (feed_spec.PLAN_OVERALL_Y if feed else spec.BLOCK_WIDTH) / 2
+    base = top - spec.BLOCK_WIDTH
+    right = drawing.PLAN_XY[0] * 1000 + spec.BLOCK_LENGTH / 2
+    dims = {name: base + spec.DRAWING_VALUES[name]
+            for name in ('PlanHole3Y', 'BlockSideY', 'PlanHole2Y', 'BlockWidth')}
+    lanes = [keep[name][0] * 1000 for name in dims]
+    assert lanes == sorted(lanes) and lanes[0] - right >= 10.0
+    text = {'PlanHole3Y': '.278', 'BlockSideY': '.79', 'PlanHole2Y': '1.302', 'BlockWidth': '1.58'}
+    boxes = {}
+    for name in dims:
+        x, y = (v * 1000 for v in keep[name])
+        half_w = len(text[name]) * 3.0 / 2
+        boxes[name] = (x - half_w, y - 3.19, x + half_w, y + 3.19)
+    for name, (x0, y0, x1, y1) in boxes.items():
+        for other, feature_y in dims.items():
+            if other == name:
+                continue
+            lane = keep[other][0] * 1000
+            # Its dimension line (lane, base..feature) and its feature witness.
+            assert not (x0 <= lane <= x1 and y0 <= feature_y and base <= y1), (name, other)
+            assert not (y0 <= feature_y <= y1 and x0 <= lane + 1.0), (name, other, 'witness')
+            ox0, oy0, ox1, oy1 = boxes[other]
+            assert x1 <= ox0 or ox1 <= x0 or y1 <= oy0 or oy1 <= y0
+        # Its own witness at the feature: the text clears it (or rides its span).
+        assert y0 > base
 
 
 def test_native_builder_owns_real_solids_dimensions_and_final_volume():

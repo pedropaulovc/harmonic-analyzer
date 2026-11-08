@@ -257,23 +257,41 @@ async def _offset_point(adapter, dims, base, point, du, dv, names, label) -> Non
             dims.record(name)
 
 
-async def _construction_circle(adapter, dims, base, base_uv, uv, dia, names, label) -> str:
-    """A construction circle on a real hole, centred by offsets from
-    ``base`` (a sketch point at ``base_uv``), then sized."""
+async def _construction_circle(adapter, dims, x_base, y_base, uv, dia, names, label) -> str:
+    """A construction circle on a real hole: its centre's X from the sketch
+    point ``x_base`` and its Y from ``y_base`` (each a ``(point, uv)`` pair),
+    a zero offset an alignment relation instead of a dimension; then sized.
+    ``names`` are the X, Y and diameter names; only emitted dims are recorded."""
     circle = await _construction(adapter, adapter.add_circle(uv[0], uv[1], dia / 2), label)
-    await _offset_point(adapter, dims, base, f"{circle}.center",
-                        abs(uv[0] - base_uv[0]), abs(uv[1] - base_uv[1]), names[:2], label)
+    centre = f"{circle}.center"
+    for (base, base_uv), axis, kind, align, name in (
+        (x_base, 0, "horizontal_distance", "vertical_points", names[0]),
+        (y_base, 1, "vertical_distance", "horizontal_points", names[1]),
+    ):
+        offset = abs(uv[axis] - base_uv[axis])
+        if offset < 1e-9:
+            check(f"{label} {align}", await adapter.add_sketch_constraint(base, centre, align))
+        else:
+            await dimension_between(adapter, base, centre, kind, offset, f"{label} {name}")
+            dims.record(name)
     check(f"{label} diameter", await adapter.add_sketch_dimension(circle, None, "diameter", dia))
     dims.record(names[2])
     return circle
 
 
 async def _plan_datum_reference(adapter, part) -> None:
-    """The hidden top-face sketch that carries the plan's X ordinates from
-    the -X edge (rule 10): a plain line ON that edge, construction circles ON
-    the shoulder seat and one carriage hole per column, and on TL-32 a plain
-    line ON the lug's -X face, which also carries the overall from the top
-    (+Y) edge. Shown in the plan view, every entity overlies a real edge."""
+    """The hidden top-face sketch that carries the plan's ordinates (rule 10):
+    every X from the -X edge, every Y from the -Y edge, so the plan has one
+    origin (machinist review, farm r3 20261108T014606685Z: the hole rows were
+    chained .512 through the seat axis while the seat stood .79 from the -Y
+    edge). Plain lines ON the -X edge and the +X end, construction circles ON
+    the shoulder seat, one carriage hole per column and one per row, and on
+    TL-32 a plain line ON the lug's -X face, which also carries the overall
+    from the top (+Y) edge. Shown in the plan view, every entity overlies a
+    real edge. X dims leave the -X edge's +Y end, above the plan's X tiers;
+    Y dims leave the +X end's -Y corner, BlockSideY's own witness point
+    (from the -X corner a witness ran the whole -Y edge and, on TL-32, across
+    the lug's top face: round-5 review)."""
     feature = spec.PLAN_DATUM_REFERENCE
     z = part.BLOCK_HEIGHT
     check(f"create_sketch {feature}", await adapter.create_sketch("TopFace"))
@@ -289,13 +307,32 @@ async def _plan_datum_reference(adapter, part) -> None:
     await dimension_between(adapter, f"{edge}.start", f"{edge}.end", "vertical_distance",
                             part.BLOCK_WIDTH, f"{feature} -X edge length")
     dims.record("PlanEdgeLength")
-    corner = f"{edge}.end"
-    await _construction_circle(adapter, dims, corner, edge_end, at(spec.BORE_X, spec.BORE_Y), spec.BORE_DIA,
+    end_start, end_end = at(part.BLOCK_X1, -part.BLOCK_WIDTH / 2), at(part.BLOCK_X1, part.BLOCK_WIDTH / 2)
+    end = await _drawn(adapter, adapter.add_line(end_start[0], end_start[1], end_end[0], end_end[1]),
+                       f"{feature} +X end")
+    check(f"{feature} +X end vertical", await adapter.add_sketch_constraint(end, None, "vertical"))
+    await _offset_point(adapter, dims, f"{edge}.start", f"{end}.start", abs(end_start[0] - edge_start[0]), 0.0,
+                        ("PlanEndX", "PlanEndY"), f"{feature} +X end from -X edge")
+    await dimension_between(adapter, f"{end}.start", f"{end}.end", "vertical_distance",
+                            part.BLOCK_WIDTH, f"{feature} +X end length")
+    dims.record("PlanEndLength")
+    x_base, y_base = (f"{edge}.end", edge_end), (f"{end}.start", end_start)
+    await _construction_circle(adapter, dims, x_base, y_base, at(spec.BORE_X, spec.BORE_Y), spec.BORE_DIA,
                                ("PlanBoreX", "PlanBoreY", "PlanBoreDia"), f"{feature} seat")
+    columns = {}
     for i, (x, y) in enumerate(spec.PLAN_DATUM_HOLES, 1):
-        await _construction_circle(adapter, dims, corner, edge_end, at(x, y), spec.HOLE_DIA,
-                                   (f"PlanHole{i}X", f"PlanHole{i}Y", f"PlanHole{i}Dia"),
-                                   f"{feature} carriage hole column {i}")
+        columns[x] = (await _construction_circle(
+            adapter, dims, x_base, y_base, at(x, y), spec.HOLE_DIA,
+            (f"PlanHole{i}X", f"PlanHole{i}Y", f"PlanHole{i}Dia"), f"{feature} carriage hole column {i}",
+        ), at(x, y))
+    # The other row's hole stands under a column's: aligned to it, so only
+    # its Y is dimensioned.
+    i = len(spec.PLAN_DATUM_HOLES) + 1
+    x, y = spec.PLAN_DATUM_ROW_HOLE
+    above, above_uv = columns[x]
+    await _construction_circle(adapter, dims, (f"{above}.center", above_uv), y_base, at(x, y), spec.HOLE_DIA,
+                               (f"PlanHole{i}X", f"PlanHole{i}Y", f"PlanHole{i}Dia"),
+                               f"{feature} carriage hole row")
     if hasattr(part, "LUG_WIDTH"):
         lug_top, lug_end = at(part.LUG_X0, part.LUG_Y1), at(part.LUG_X0, part.LUG_Y0)
         lug = await _drawn(adapter, adapter.add_line(lug_top[0], lug_top[1], lug_end[0], lug_end[1]),
@@ -304,7 +341,7 @@ async def _plan_datum_reference(adapter, part) -> None:
         await _offset_point(adapter, dims, f"{edge}.start", f"{lug}.start",
                             abs(lug_top[0] - edge_start[0]), abs(lug_top[1] - edge_start[1]),
                             ("PlanLugX", "PlanLugY"), f"{feature} lug face from -X edge")
-        await dimension_between(adapter, corner, f"{lug}.end", "vertical_distance",
+        await dimension_between(adapter, f"{edge}.end", f"{lug}.end", "vertical_distance",
                                 part.BLOCK_WIDTH / 2 - part.LUG_Y0, f"{feature} overall from +Y edge")
         dims.record("PlanOverallY")
     await ensure_fully_defined(adapter, feature)

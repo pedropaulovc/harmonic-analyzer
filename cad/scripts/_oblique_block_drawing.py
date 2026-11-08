@@ -7,8 +7,8 @@ Manufacturing sheets for the plain shoulder-screw pivot blocks.
 
 Both sheets print decimal inch (each part's ``drawing_unit``). All sizes
 import native model dimensions; no bearing/cartridge sheets survive.
-Plan X locations run from the -X (left) edge through the hidden
-``PlanDatumReference`` sketch; Y from the shoulder seat's axis. Section B-B
+Plan X locations run from the -X (left) edge and Y locations from the -Y
+edge through the hidden ``PlanDatumReference`` sketch. Section B-B
 shows the floor from the carriage seat, not a competing counterbore-depth
 tolerance chain. TL-32's nut face is VIEW D on its own 2:1 sheet, its arrow on
 the plan. The layout notes below give sheet millimetres.
@@ -60,20 +60,29 @@ TAPPED_HOLE_NOTE = '#4-40 Tapped Hole'
 # highest witness (y254.500), and its top y264.512 clears the y266.7 border.
 # Keep dimension text right of the x157 cutting line, not on that line.
 # X ordinates remain native baseline dimensions from the finished -X edge;
-# Y starts at the pivot axis. Native layout and machinist-review own fit.
+# Y ordinates are a baseline from the -Y edge (rule 10, one origin: farm r3
+# 20261108T014606685Z read the rows chained .512 through the seat axis).
+# Native layout and machinist-review own fit.
 PLAN_XY = (.170,.205)
+# The Y baseline, right of the plan (block y 184.9..225.1, rows at 192.0 and
+# 218.0, seat at 205.0 on both sheets: TL-32's plan centres the L, its block
+# lands on the same band), shortest nearest: .278 (x 204.5), .79 (217.5),
+# 1.302 (230.5), 1.58 (259.5), every witness leaving the +X/-Y corner. The
+# .278's 7 mm span cannot hold its text between arrows: the text stands
+# just over the span, under the A arrow (y 205 up), left of the .79 line,
+# and above TL-32's counterbore leader (y ~180 at x 204.5). The others
+# print inside their spans, clear of each other's witnesses.
 PLAN_KEEP = {
     'BlockLength':(.170,.2535),'PlanHole2X':(.1665,.248),'PlanHole1X':(.171,.2395),
     'PlanBoreX':(.1635,.231),
-    'BlockWidth':(.2595,.203),'BlockSideY':(.231,.220),
-    'CarriageDrills3Y':(.222,.1985),'CarriageDrills4Y':(.222,.2115),
+    'PlanHole3Y':(.2045,.1965),'BlockSideY':(.2175,.199),'PlanHole2Y':(.2305,.2115),
+    'BlockWidth':(.2595,.203),
     'BoreDia':(.078,.196),'CarriageDrills1Dia':(.085,.168),'CarriageCounterbores3Dia':(.245,.150),
     # TL-32 still prints this separate native tap dimension in its established
     # upper-left lane. TL-22 imports it at the same source position, then
     # hides only the display after the spec-generated note passes readback.
     'TapDrillDia':(.071,.2455),
 }
-ROW_DIMENSIONS = ('CarriageDrills3Y','CarriageDrills4Y')
 # A-A remains below the plan, top face up. Its depth text stays outboard
 # left of the dimension line; the baseline and actual section span come
 # from the model, not the retired asymmetric block's sheet coordinates.
@@ -749,7 +758,8 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None, ca
     plan_annotations = curate_view_dimensions(adapter,plan,keep=plan_keep,view_label='plan',
                      dimensions_by_feature=contract.DRAWING_DIMENSIONS)
     settled_checks = ()
-    _set_arrow_side(adapter, plan_annotations, ROW_DIMENSIONS, _ARROWS_INSIDE)
+    if not is_feed:
+        settled_checks = (_place_pivot_tap_arrow_inside(adapter, plan, plan_annotations, contract),)
     set_hidden_lines_removed(adapter,side)
     side_annotations = curate_view_dimensions(adapter,side,keep=side_keep,view_label='pivot section direction',
                      dimensions_by_feature=contract.DRAWING_DIMENSIONS)
