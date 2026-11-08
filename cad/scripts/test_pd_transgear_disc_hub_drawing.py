@@ -298,7 +298,7 @@ def test_the_spigot_seats_on_the_step_square_and_clear_of_the_disc() -> None:
     assert spec.BORE_DATUM == sleeve.BORE_DATUM == "A"
     assert spec.GEOMETRIC_TOLERANCES_IN == {
         "flange rear face perpendicularity to bore": ".001",
-        "spigot end perpendicularity to bore": ".0002",
+        "spigot end perpendicularity to bore": ".001",
     }
     tilt = (
         sleeve.STEP_FACE_PERPENDICULARITY / sleeve.STEP_FACE_PERPENDICULARITY_ZONE_DIA
@@ -670,7 +670,7 @@ def test_the_package_declares_the_bore_wall_the_callout_prints() -> None:
     (entry,) = [entry for entry in exceptions if entry["id"] == "RV-02"]
     assert entry["kind"] == "minor"
     assert spec.BORE_WALL_TEXT in entry["where"]
-    assert "delegated ruling 2026-11-04" in entry["reason"]
+    assert entry["reason"].startswith("Owner ruling 2026-11-08 (Pedro)")
     assert "#2144" in entry["reason"]
     assert drawing.DIMENSION_CALLOUTS_BELOW["BoreDia"].split("\n")[-1] == (
         spec.BORE_WALL_TEXT

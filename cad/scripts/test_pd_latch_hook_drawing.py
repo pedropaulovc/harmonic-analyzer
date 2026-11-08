@@ -169,7 +169,7 @@ def test_the_package_declares_the_screw_hole_wall_the_callout_prints() -> None:
     (entry,) = [entry for entry in exceptions if entry["id"] == "RV-01"]
     assert entry["kind"] == "minor"
     assert spec.SCREW_HOLE_WALL_TEXT in entry["where"]
-    assert "delegated ruling 2026-11-04" in entry["reason"]
+    assert entry["reason"].startswith("Owner ruling 2026-11-08 (Pedro)")
     assert "Delegated ruling 2026-11-07" in entry["reason"]
     assert "#2144" in entry["reason"]
     assert drawing.CALLOUTS_BELOW["ScrewDia"].split("\n")[-1] == (

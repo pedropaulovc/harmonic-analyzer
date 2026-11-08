@@ -163,9 +163,9 @@ BORE_BAND = (0.0254, 0.0127)  # (upper, lower) deviations: +.0010/+.0005
 BORE_DEVIATIONS = deviations(BORE_BAND)
 FLAT_TO_AXIS = SLEEVE.FLAT_TO_AXIS
 FLAT_TO_AXIS_PLACES = 4
-# PROVISIONAL, pending owner confirmation: +.0015/+.0005, the plain inch
-# steps that loosen the former converted +.0014/+.0008 (coordinator fan-out
-# policy 2, 2026-11-07; the clearance and the flat wall still hold).
+# Owner ruling 2026-11-08 (Pedro, #2144 item 3.2): +.0015/+.0005, the plain
+# inch steps that loosen the former converted +.0014/+.0008 (the clearance
+# and the flat wall still hold).
 FLAT_TO_AXIS_BAND = (0.0381, 0.0127)  # (upper, lower) deviations: +.0015/+.0005
 FLAT_TO_AXIS_DEVIATIONS = deviations(FLAT_TO_AXIS_BAND)
 if not 0.0 < FLAT_TO_AXIS < BORE_DIA / 2.0:
@@ -313,12 +313,16 @@ SEAT_ISLAND_FRACTION = SEAT_CONTACT_AREA / SEAT_ANNULUS_AREA
 # step, so both are held square to A: the paper-drive assembly's disc tilt
 # reads each value over its zone (the flange's diameter; the seat's contact
 # circle) plus the hub's rock on the boss, the greatest clearance over the
-# shortest round engagement, unpreloaded on the step.
+# shortest round engagement, unpreloaded on the step.  Both print at the
+# shop's .001 row (owner ruling 2026-11-08 (Pedro), #2144 item 3.2, for the
+# spigot end): the collar-to-disc air the spigot end's squareness closes is
+# felt at MHA-PD-00 and recovered there if short (pd_cluster_air.
+# ASSEMBLY_ACCEPTED_COLLAR_SOURCES); the platen air still charges it.
 BORE_DATUM = "A"
 # The frame prints GEOMETRIC_TOLERANCES_IN; readers take the derived mm.
 GEOMETRIC_TOLERANCES_IN: dict[str, str] = {
     "flange rear face perpendicularity to bore": ".001",
-    "spigot end perpendicularity to bore": ".0002",
+    "spigot end perpendicularity to bore": ".001",
 }
 GEOMETRIC_TOLERANCES_MM: dict[str, float] = {
     key: float(value) * MM_PER_IN for key, value in GEOMETRIC_TOLERANCES_IN.items()
