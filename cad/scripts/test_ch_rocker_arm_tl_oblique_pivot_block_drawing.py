@@ -449,21 +449,14 @@ def _stacked_pivot_fixture(monkeypatch):
             GetPrimaryTolPrecision2=lambda row=row: row.tolerance_places,
             GetAnnotation=lambda annotation=annotation: annotation,
         )
-    # Exact e4a597af whole-note extent includes the outside leader. The text
-    # runs below are synthetic measured COM data, not a native-pass claim.
-    note = SimpleNamespace(text=_PIVOT_GENERATED_TEXT, extent=(
-        0.0247960066889632, 0.20546646153846154, -1.4542750301607925e-15,
-        0.1649071638795986, 0.22500577257525084, -1.5907173098783955e-15,
-    ))
+    # Synthetic COM geometry, not a claim about the next native sheet.
+    note = SimpleNamespace(text=_PIVOT_GENERATED_TEXT)
     native = SimpleNamespace(
         Visible=1, OwnerType=0, Owner=plan, position=(*drawing.PIVOT_STACK_XY, 0.0),
         leaders=1, attached=outer, dangling=False,
         points=(.130, origin[1], 0.0, *landing, 0.0),
         arrow=(*landing, 0.0, -1.0, 0.0, 0.0, .002, .001, 0.0, 0.0, 0.0, 1.0),
         arrow_count=1, font=SimpleNamespace(CharHeight=.005),
-        text_rows=_PIVOT_GENERATED_TEXT.splitlines(),
-        text_widths=[.0852, .080, .060, .100],
-        text_positions=[(.025, .2215 - index * .0052, 0.0) for index in range(4)],
     )
     native.GetPosition = lambda: native.position
     native.GetLeaderCount = lambda: native.leaders
@@ -476,17 +469,9 @@ def _stacked_pivot_fixture(monkeypatch):
     native.SetTextFormat = lambda index, use_doc, value: True
     native.GetDisplayData = lambda: SimpleNamespace(
         GetArrowHeadCount=lambda: native.arrow_count, GetArrowHeadAtIndex2=lambda index: native.arrow,
-        GetTextCount=lambda: len(native.text_rows),
-        GetTextAtIndex=lambda index: native.text_rows[index],
-        GetTextInBoxWidthAtIndex=lambda index: native.text_widths[index],
-        GetTextHeightAtIndex=lambda index: native.font.CharHeight,
-        GetTextPositionAtIndex=lambda index: native.text_positions[index],
-        GetTextRefPositionAtIndex=lambda index: 1,
-        GetTextAngleAtIndex=lambda index: 0.0,
     )
     note.GetAnnotation = lambda: native
     note.GetText = lambda: note.text
-    note.GetExtent = lambda: note.extent
     inserted = []
 
     def add_note(adapter, view, **kwargs):
@@ -505,10 +490,6 @@ def _stacked_pivot_fixture(monkeypatch):
                  circle=(spec.BORE_X, spec.BORE_Y, spec.BLOCK_HEIGHT, 0.0, 0.0, 1.0, spec.BORE_DIA / 2)),
     ]
     monkeypatch.setattr(drawing, '_early_bound', lambda obj, interface: obj)
-    import draw_sh_vn_clamping_kit_hardware as hardware
-    # Exercise the imported helper itself, including its native-width refusal.
-    assert drawing._note_text_box is hardware._note_text_box
-    monkeypatch.setattr(hardware, '_early_bound', lambda obj, interface: obj)
     monkeypatch.setattr(drawing, '_displays',
                         lambda adapter, annotations, names: {name: displays[name] for name in names})
     monkeypatch.setattr(drawing, 'scan_view_edges',
@@ -541,8 +522,7 @@ def _stacked_pivot_fixture(monkeypatch):
     'source_identity', 'source_feature', 'source_value', 'source_precision', 'source_band', 'source_tokens',
     'source_position', 'source_shown', 'depth_hidden', 'wrong_owner', 'hidden_note', 'note_position',
     'two_leaders', 'wrong_attachment', 'inner_tip', 'centre_crossing', 'upper_left_crossing',
-    'arrow_inside', 'two_arrows', 'malformed_arrow', 'text_outside',
-    'missing_text', 'zero_text_width', 'nan_text_width', 'nan_text_position',
+    'arrow_inside', 'two_arrows', 'malformed_arrow',
 ))
 def test_generated_pivot_callout_preserves_native_sources_and_outside_route(monkeypatch, fault):
     case = _stacked_pivot_fixture(monkeypatch)
@@ -550,9 +530,6 @@ def test_generated_pivot_callout_preserves_native_sources_and_outside_route(monk
     assert len(case.inserted) == 1 and len(case.rebuilds) == 2
     assert case.native.font.CharHeight == case.drawing.PIVOT_NOTE_HEIGHT
     assert case.reports[0]['estimated_text_bounds_mm'] == pytest.approx((24.0, 203.7, 141.5, 226.0))
-    assert case.note.extent[3] > case.drawing.PIVOT_STACK_LANE[2]
-    assert case.reports[0]['note_extent_m'] == list(case.note.extent)
-    assert case.reports[0]['text_extent_m'] == pytest.approx((.025, .2059, .125, .225))
     tap = case.rows['TapDrillDia']
     if fault == 'unicode_crlf':
         case.note.text = case.note.text.replace('<MOD-DIAM>', 'Ø').replace('<HOLE-DEPTH>', '↧').replace('\n', '\r\n')
@@ -617,31 +594,12 @@ def test_generated_pivot_callout_preserves_native_sources_and_outside_route(monk
         case.native.arrow_count = 2
     elif fault == 'malformed_arrow':
         case.native.arrow = case.native.arrow[:6]
-    elif fault == 'text_outside':
-        case.native.text_positions[0] = (.150, .2215, 0.0)
-    elif fault == 'missing_text':
-        case.native.text_rows = []
-    elif fault == 'zero_text_width':
-        case.native.text_widths[0] = 0.0
-    elif fault == 'nan_text_width':
-        case.native.text_widths[0] = float('nan')
-    elif fault == 'nan_text_position':
-        case.native.text_positions[0] = (float('nan'), .2215, 0.0)
     if fault in (None, 'unicode_crlf'):
         proof()
         assert len(case.rebuilds) == 2 and len(case.reports) == 2
     else:
         with pytest.raises(RuntimeError):
             proof()
-
-
-def test_pivot_text_bounds_refuse_missing_native_width(monkeypatch):
-    case = _stacked_pivot_fixture(monkeypatch)
-    proof = case.drawing._stack_pivot_callout(case.adapter, case.plan, [], spec)
-    case.native.text_widths[0] = None
-    # No estimated-width fallback when the COM accessor returns no value.
-    with pytest.raises(TypeError):
-        proof()
 
 
 @pytest.mark.parametrize('fault', ('feature', 'value', 'precision', 'band'))
@@ -701,3 +659,110 @@ def test_stacked_callout_keeps_imported_precision_gate_and_is_pivot_only(feed):
                      and isinstance(node.func, ast.Name) and node.func.id == 'finalize_drawing')
     assert ast.unparse(next(keyword.value for keyword in finalizer.keywords
                            if keyword.arg == 'settled_checks')) == 'settled_checks'
+    pdf_guard = next(node for node in build.body if isinstance(node, ast.If)
+                     and any(isinstance(child, ast.Call) and isinstance(child.func, ast.Name)
+                             and child.func.id == '_assert_pivot_pdf_text' for child in ast.walk(node)))
+    export = next(node for node in build.body if isinstance(node, ast.Assign)
+                  and isinstance(node.value, ast.Await)
+                  and node.value.value is finalizer)
+    assert build.body.index(export) < build.body.index(pdf_guard)
+    pdf_calls = []
+    outputs = SimpleNamespace(pdf=Path('pivot.pdf'))
+    report_path = Path('pivot-layout.json')
+    env.update(outputs=outputs, spec=SimpleNamespace(artifact_stem='pivot'),
+               layout_report_path=lambda stem: report_path,
+               _assert_pivot_pdf_text=lambda *args: pdf_calls.append(args))
+    exec(compile(ast.Module(body=[pdf_guard], type_ignores=[]), '<pivot-pdf-routing>', 'exec'), env)
+    assert pdf_calls == ([] if feed else [(outputs.pdf, report_path, env['contract'])])
+
+
+@pytest.mark.parametrize('fault', (
+    None, 'split_symbols', 'unordered_display', 'missing_page', 'extra_page',
+    'wrong_report', 'missing_row', 'missing_display', 'wrong_value', 'text_outside',
+    'other_text', 'model_edge', 'duplicate_note',
+))
+def test_pivot_exported_pdf_rows_gate_real_text_not_leader_extent(monkeypatch, fault):
+    import json
+    from dataclasses import replace
+    import _oblique_block_drawing as drawing
+    from _layout_audit import LayoutAuditMode, audit_report, ink_key
+    from _pdf_ink import PageInk, Span, Stroke, page_ink
+
+    rows = drawing._pivot_stack_text(spec).splitlines()
+    texts = [{'t': row, 'pos': [.025, .225 - index * .0056, 0.0],
+              'h': .0035, 'ref': 0}
+             for index, row in enumerate(rows)]
+    spans = [
+        Span(ink_key(row), .025, .2215 - index * .0056,
+             .125, .225 - index * .0056, ())
+        for index, row in enumerate(rows)
+    ]
+    # Exact e4a597af whole-note extent is outside the text lane. It contains
+    # the leader, and must not replace the exported glyph measurement.
+    note = {
+        'type': 6, 'name': 'PivotStack', 'visible': 1, 'owner_type': 0,
+        'note': {'text': '\n'.join(rows), 'balloon': False, 'extent': [
+            .0247960066889632, .20546646153846154, -1.4542750301607925e-15,
+            .1649071638795986, .22500577257525084, -1.5907173098783955e-15,
+        ]},
+        'display': {'texts': texts},
+        'leaders': [[.130, .205, 0.0, .1652375, .205, 0.0]],
+    }
+    annotations = [note]
+    strokes = [Stroke(.130, .205, .1652375, .205, .00013, (0, 0, 0), False, False, True)]
+    if fault == 'split_symbols':
+        first = spans.pop(0)
+        spans[:0] = [
+            replace(first, text='REAM', xmax=.034),
+            replace(first, text='.3750+.0015/+.0010', xmin=.037, xmax=.083),
+            replace(first, text='.359', xmin=.086, xmax=.098),
+        ]
+    elif fault == 'unordered_display':
+        texts.reverse()
+    elif fault == 'missing_row':
+        spans.pop()
+    elif fault == 'missing_display':
+        texts.pop()
+    elif fault == 'wrong_value':
+        spans[0] = replace(spans[0], text=spans[0].text.replace('.3750', '.3751'))
+    elif fault == 'text_outside':
+        spans[0] = replace(spans[0], xmax=.150)
+    elif fault == 'other_text':
+        spans.append(replace(spans[0], text='FOREIGN TEXT'))
+        annotations.append({
+            'type': 6, 'name': 'Other', 'visible': 1,
+            'note': {'text': 'FOREIGN TEXT', 'balloon': False},
+            'display': {'texts': [{**texts[0], 't': 'FOREIGN TEXT'}]},
+        })
+    elif fault == 'model_edge':
+        strokes.append(Stroke(.020, .223, .130, .223, .00035, (0, 0, 0), False, False, True))
+    elif fault == 'duplicate_note':
+        annotations.append({**note, 'name': 'DuplicatePivot'})
+    page = PageInk(.4318, .2794, (), tuple(spans), tuple(strokes))
+    dump = {
+        'schema': 1, 'stem': 'pivot', 'sheet': 'Sheet1', 'page': 0,
+        'width': page.width, 'height': page.height,
+        'zone': dict.fromkeys(('left', 'right', 'bottom', 'top'), .0127),
+        'title_block': [.216, 0.0, page.width, .066],
+        'views': [{'name': 'Plan', 'outline': [.015, .170, .195, .240],
+                   'annotations': annotations}],
+        'sheet_annotations': [], 'tables': [], 'read_errors': {},
+        'ink': page_ink(page),
+    }
+    report, _ = audit_report('pivot', LayoutAuditMode.REPORT, [dump])
+    if fault == 'wrong_report':
+        report['stem'] = 'other'
+    report_path = SimpleNamespace(read_text=lambda **kwargs: json.dumps(report))
+    pages = [] if fault == 'missing_page' else [page, page] if fault == 'extra_page' else [page]
+    pdf = Path('pivot.pdf')
+
+    def read_pdf(path):
+        assert path == pdf
+        return pages
+
+    monkeypatch.setattr(drawing, 'read_pdf_ink', read_pdf)
+    if fault in (None, 'split_symbols', 'unordered_display'):
+        drawing._assert_pivot_pdf_text(pdf, report_path, spec)
+    else:
+        with pytest.raises(RuntimeError):
+            drawing._assert_pivot_pdf_text(pdf, report_path, spec)

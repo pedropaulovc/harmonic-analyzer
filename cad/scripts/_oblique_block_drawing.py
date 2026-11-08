@@ -14,6 +14,7 @@ tolerance chain. TL-32's nut face is VIEW D on its own 2:1 sheet, its arrow on
 the plan. The layout notes below give sheet millimetres.
 """
 from __future__ import annotations
+import json
 import math
 from typing import Any
 from _check import check
@@ -29,21 +30,23 @@ from _drawing_leader_notes import add_attached_note, add_leader_note
 from _drawing_projection import model_point_in_view
 from _drawing_sections import create_section_view
 from _drawing_sheets import create_blank_drawing_sheets
+from _drawing_types import layout_report_path
 from _drawing_view_display import set_hidden_lines_removed
 from _fit_deviations import deviations
 from _hole_callout_thread_class import omit_title_block_thread_class
 from _paths import CAD_ROOT
 from _drawing_metric_vendor import print_imported_metric_dimensions
 from _part_properties import part_drawing_unit
-from _layout_audit import arrowhead_segments
+from _layout_audit import (arrowhead_segments, assign_sheet_text, audited_annotations,
+                           group_rows, ink_key, ink_spans, printed_dump, span_box, text_items)
 from _layout_geometry import Box, estimate_text_box
 from _title_block_units import MM_PER_INCH, render_number
+from _pdf_ink import page_ink, read_pdf_ink
 import _telemetry
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 import ch_rocker_arm_tl_oblique_pivot_block_spec as part
 from ch_rocker_arm_tl_oblique_callouts import set_callout_lengths_to_three_places
-from draw_sh_vn_clamping_kit_hardware import _note_text_box
 
 SHEET_SCALE = (1.0,1.0)
 # SolidWorks' own descriptive note for TL-32's Hole Wizard nut taps; the native
@@ -228,7 +231,7 @@ def _pivot_stack_text(contract):
 
 
 def _pivot_stack_estimate(text):
-    """Conservative offline bound, not a substitute for the unchanged native extent gate.
+    """Conservative offline bound, not a substitute for the exported PDF glyph gate.
 
     One full cap-height per glyph (versus the shared 0.62 average), 1.6-height
     row pitch and 1 mm all-round bearing/ink padding. Symbols count as one
@@ -377,21 +380,75 @@ def _stack_pivot_callout(adapter, plan, annotations, contract):
             raise RuntimeError('pivot stacked callout leader/arrow crosses the bore interior')
         if any(_segment_distance(obstacle, start, end) < obstacle_radius + .001 for start, end in strokes):
             raise RuntimeError('pivot stacked callout leader/arrow crowds the upper-left counterbore')
-        # GetExtent includes the fixed leader, which must reach beyond the
-        # text lane. Measure only rendered text; prove the leader above.
-        extent = _note_text_box(ann, label='pivot stacked callout')
-        left, bottom, right, top = PIVOT_STACK_LANE
-        if (len(extent) != 4 or not all(math.isfinite(v) for v in extent)
-                or not (left <= extent[0] < extent[2] <= right and bottom <= extent[1] < extent[3] <= top)):
-            raise RuntimeError(f'pivot stacked callout text left its reserved lane: {extent!r}')
         _telemetry.info('pivot stacked native callout readback', generated=text, resolved=str(note.GetText()),
                         note_height_m=PIVOT_NOTE_HEIGHT, estimated_text_bounds_mm=estimate.mm(),
                         source_names=[state[0] for _, state in sources.values()],
-                        leader_points_m=list(points), arrow_sheet_data=list(arrow), text_extent_m=list(extent),
-                        note_extent_m=list(note.GetExtent() or ()))
+                        leader_points_m=list(points), arrow_sheet_data=list(arrow))
 
     settled()
     return settled
+
+
+@_telemetry.traced("drawing.pivot_callout_pdf_text")
+def _assert_pivot_pdf_text(pdf, report_path, contract) -> None:
+    """Reuse the finished sheet's text assignment; only PDF glyphs bound the note."""
+    report = json.loads(report_path.read_text(encoding='utf-8'))
+    pages = read_pdf_ink(pdf)
+    if (len(pages) != 1 or len(report['sheets']) != 1
+            or report['stem'] != pdf.stem or report['sheets'][0]['page'] != 0):
+        raise RuntimeError('pivot callout PDF/report must describe its one finished sheet')
+    dump = printed_dump({**report['sheets'][0], 'ink': page_ink(pages[0])})
+    annotations = audited_annotations(dump)
+    expected = _pivot_stack_text(contract)
+    notes = [item for item in annotations if item.get('type') == 6
+             and not (item.get('note') or {}).get('balloon')
+             and _pivot_stack_semantics(str((item.get('note') or {}).get('text', '')))
+             == _pivot_stack_semantics(expected)]
+    if len(notes) != 1 or not notes[0].get('name'):
+        raise RuntimeError('pivot callout PDF report lacks its unique four-line note')
+    note = notes[0]
+    items = text_items(note.get('display') or {})
+    if ink_key(''.join(item.text for row in group_rows(items) for item in row)) != ink_key(expected):
+        raise RuntimeError('pivot callout display rows are missing or changed')
+    spans = ink_spans(dump)
+    # Use the audit's one sheet-wide assignment, including competing
+    # dimensions, notes, section letters and detail captions. No guessed
+    # row positions, second matcher or estimated symbol bounds.
+    matches = assign_sheet_text(dump, annotations, spans)
+    boxes = []
+    for index, item in enumerate(items):
+        if not ink_key(item.text):
+            continue
+        key = (id(note), index)
+        if key not in matches:
+            raise RuntimeError('pivot callout text is missing from the exported PDF')
+        boxes.append(span_box(spans, matches[key]))
+    if not boxes:
+        raise RuntimeError('pivot callout PDF has no measured text')
+    left, bottom, right, top = PIVOT_STACK_LANE
+    for box in boxes:
+        if (not all(math.isfinite(v) for v in (box.xmin, box.ymin, box.xmax, box.ymax))
+                or not (left <= box.xmin < box.xmax <= right
+                        and bottom <= box.ymin < box.ymax <= top)):
+            raise RuntimeError(f'pivot printed callout text left its reserved lane: {box!r}')
+    # REPORT does not enforce these fleet-wide. Reuse its already-computed
+    # findings for this note only, rather than inventing another collision audit.
+    label = f"note {note['name']}"
+    kinds = {'outside-border', 'keep-out', 'text-clearance', 'text-on-view', 'text-on-line'}
+    failures = []
+    for finding in report['findings']:
+        labelled = any(str(finding.get(side, '')) == label
+                       or str(finding.get(side, '')).startswith(label + ' ')
+                       for side in ('a', 'b'))
+        unmatched = (finding['kind'] == 'text-unmatched'
+                     and finding.get('a') == note['name']
+                     and finding.get('b') in {item.text for item in items})
+        if (finding['kind'] in kinds and labelled) or unmatched:
+            failures.append(finding)
+    if failures:
+        raise RuntimeError(f'pivot printed callout text audit failed: {failures!r}')
+    _telemetry.info('pivot printed callout text readback',
+                    rows=expected.splitlines(), text_bounds_mm=[box.mm() for box in boxes])
 
 
 def _set_arrow_side(adapter, annotations, names, side) -> None:
@@ -706,7 +763,10 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
         _telemetry.info(f'removed automatic {TAPPED_HOLE_NOTE!r} notes by sheet: {removed}')
     drawing.ActivateSheet(sheets[0])
     outputs = DrawingOutputs(slddrw=spec.outputs['slddrw'],pdf=spec.outputs['pdf'],png=spec.outputs['png'])
-    return await finalize_drawing(adapter,outputs,pdf_title='Rocker Oblique Trammel Block Manufacturing Drawing',
-                                  scale=SHEET_SCALE,layout=spec.layout,sheet_scales=sheet_scales,
-                                  redundant_note_substrings=(TAPPED_HOLE_NOTE,) if is_feed else (),
-                                  expected_redundant_notes=0, settled_checks=settled_checks)
+    artifacts = await finalize_drawing(adapter,outputs,pdf_title='Rocker Oblique Trammel Block Manufacturing Drawing',
+                                       scale=SHEET_SCALE,layout=spec.layout,sheet_scales=sheet_scales,
+                                       redundant_note_substrings=(TAPPED_HOLE_NOTE,) if is_feed else (),
+                                       expected_redundant_notes=0, settled_checks=settled_checks)
+    if not is_feed:
+        _assert_pivot_pdf_text(outputs.pdf, layout_report_path(spec.artifact_stem), contract)
+    return artifacts
