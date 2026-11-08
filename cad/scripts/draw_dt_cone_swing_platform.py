@@ -1246,8 +1246,8 @@ def _print_pivot_band_exactly(display: Any) -> None:
     band's four places.
 
     This render-time precision write is the declared exception RV-01 in
-    ``cad/config/parts/dt-cone-swing-platform.yaml`` (delegated ruling
-    2026-11-02, owner review #2144): a hole callout does not inherit the
+    ``cad/config/parts/dt-cone-swing-platform.yaml`` (Owner ruling
+    2026-11-08 (Pedro), #2144 item 1.2): a hole callout does not inherit the
     part's places.  With the Hole Wizard diameter's tolerance precision
     authored as 4 on the part (read back 4), the callout's ``<hw-diam>``
     still reported -1, the document default (farm run 20261102T230110877Z).
@@ -1270,8 +1270,8 @@ def _print_pivot_band_exactly(display: Any) -> None:
 
 # Hole Wizard callouts print three inch places (#290). Both maps are written
 # at render time, the declared exception RV-03 in
-# cad/config/parts/dt-cone-swing-platform.yaml (delegated ruling 2026-11-02,
-# owner review #2144): a part-authored precision does not reach the callout
+# cad/config/parts/dt-cone-swing-platform.yaml (Owner ruling 2026-11-08
+# (Pedro), #2144 item 1.2): a part-authored precision does not reach the callout
 # (run 20261102T230110877Z).
 HOLDDOWN_CALLOUT_PRECISION = {"hw-thruholedia": 3, "hw-cbdia": 3, "hw-cbdepth": 3}
 # The through taps' drill prints .201, not .20 (rule 3; machinist review of

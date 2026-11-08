@@ -25,4 +25,4 @@ machinist_exceptions:
     kind: "accept"
     where: "fitting steps 1-4, exploded view and parts list: the PM BS-0 dividing head and its three #8 flat head plate screws"
     finding: "the dividing head and its plate screws have no drawing number and no parts-list row (rules 4 and 22)"
-    reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144 (FoDtFab1 Q2: name the head as shop equipment, PM BS-0 DIVIDING HEAD (SHOP EQUIPMENT); no new identity). The head and the screws it already carries are the owner's shop equipment, not kit items: the sheet names them as shop equipment and shows them in the exploded view, and the parts list holds only item 1, the one part the kit supplies."
+    reason: "Owner ruling 2026-11-08 (Pedro), #2144 item 1.3 (FoDtFab1 Q2: name the head as shop equipment, PM BS-0 DIVIDING HEAD (SHOP EQUIPMENT); no new identity). The head and the screws it already carries are the owner's shop equipment, not kit items: the sheet names them as shop equipment and shows them in the exploded view, and the parts list holds only item 1, the one part the kit supplies."

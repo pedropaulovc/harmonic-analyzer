@@ -242,7 +242,7 @@ def test_tap_walls_to_the_edges_pay_both_breaks_and_print_at_the_floor() -> None
     assert guide.TAP_EDGE_WALL_MIN == pytest.approx(unbroken - 2.0 * 0.010 * 25.4)
     assert guide.TAP_EDGE_WALL_MIN >= WALL_FLOOR_MM - 0.0005
     # Rule 20: the sheet states the shortfall at the tap pattern's note, and
-    # the package declares it (delegated ruling RV-01).
+    # the package declares it (Owner ruling 2026-11-08 (Pedro), #2144 item 2.1).
     assert guide.TAP_EDGE_WALL_TEXT == "WALL .060 MIN, TAPS TO EDGES"
     assert drawing.FCF_MATE_NOTE.endswith(guide.TAP_EDGE_WALL_TEXT)
     exceptions = _config.parts("pd-platen-guide")["machinist_exceptions"]

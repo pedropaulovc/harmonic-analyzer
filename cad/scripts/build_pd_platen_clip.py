@@ -488,7 +488,7 @@ if (
     )
 # Finished, each ligament also pays the title block's outside edge break and
 # the hole's mouth break (Codjiflo, #2124): the edge and slit ligaments land
-# at the .060 floor, the delegated minor ruling RV-02 in pd-platen-clip.yaml,
+# at the .060 floor, Owner ruling 2026-11-08 (Pedro), #2144 item 2.2,
 # and the screw rail's callout states it (rule 20).
 _EDGE_BREAK = max(edge_break_radius_mm(unit=UNIT), edge_break_chamfer_mm(unit=UNIT))
 HOLE_LIGAMENT_FINISHED_MIN = (
