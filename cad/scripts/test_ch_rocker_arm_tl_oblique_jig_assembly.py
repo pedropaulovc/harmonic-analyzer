@@ -2383,11 +2383,14 @@ def test_kit_rails_and_carriages_carry_the_owner_note_and_the_play_check() -> No
     from _paths import CAD_ROOT
     from machinist_exceptions import load_exceptions
 
-    [accept] = [
-        row for row in load_exceptions(CAD_ROOT / "config", "ch_rocker_arm_tl_oblique_jig_assembly", "assembly")
-        if row.id == "RV-06"
-    ]
+    rows = {
+        row.id: row
+        for row in load_exceptions(CAD_ROOT / "config", "ch_rocker_arm_tl_oblique_jig_assembly", "assembly")
+    }
+    accept = rows["RV-06"]
     assert ".0008" in accept.where and "P1-A" in accept.reason and "4504212381" in accept.reason
+    alternate = rows["RV-07"]
+    assert spec.PRELOADED_CARRIAGE in alternate.where and "P1-A" in alternate.reason
     assert play <= trammel.RADIUS_FROM_SHOULDER_CLEARANCE
     assert trammel.CARRIAGE_PLAY_RADIUS == pytest.approx(
         trammel.CARRIAGE_PLAY_RADIUS_PER_PLAY * trammel.CARRIAGE_PLAY_TIR_MAX
