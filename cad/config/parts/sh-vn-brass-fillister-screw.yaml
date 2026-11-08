@@ -7,7 +7,7 @@ sh-vn-brass-fillister-screw:
   material: Brass
   material_specification: Brass, McMaster-Carr 90114A511
   finish: plain
-  quantity: 15
+  quantity: 14
   default_configuration: Default
   tolerance_class: machined_block
   fit_class: fastener_clearance

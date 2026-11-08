@@ -114,10 +114,11 @@ _ADJUSTER_THRUST_GATE_LIMIT_MM3 = 0.13 * 8.0 * 1.10
 ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
     frozenset(("dt-crank-pin-1", "dt-crank-hub-1")): 1.10 * _CRANK_PIN_HUB_MM3,
     frozenset(("dt-crank-pin-1", "dt-crankshaft-1")): 1.10 * _CRANK_PIN_SHAFT_MM3,
-    # Stock 6.35 shank minus the 1.0 eye wire and 0.02 face clearance.
+    # MHA-DT-VN-70 #2-56 major in the arm's #50 tap drill: the stock 6.35
+    # shank minus the 1.194 jack-chain wire under its head and 0.02 face air.
     frozenset(
-        ("sh-vn-brass-fillister-screw-1", "dt-crank-arm-1")
-    ): smooth_annulus_limit_mm3(2.8448, 2.261, 5.33),
+        ("dt-vn-keeper-chain-screw-1", "dt-crank-arm-1")
+    ): smooth_annulus_limit_mm3(THREAD_MAJOR_MM["#2-56"], TAP_DRILL_MM["#2-56"], 5.14),
     # MHA-DT-32 #6-32 major in the arm's #36 tap drill: the full thread past the
     # 1.5 relief (6.5 of the 8.0 arm) plus its 0.5 lead cone.  The size is
     # named here, not imported from dt_crank_handle_pivot_screw_spec, so this

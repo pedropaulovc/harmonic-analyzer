@@ -1323,33 +1323,12 @@
       ]
     },
     {
-      "old_stem": "vn-keeper-chain-link",
-      "old_number": "MHA-VN-036",
-      "new_identities": [
-        {
-          "parent": "dt-drive-train",
-          "stem": "dt-vn-keeper-chain-link",
-          "number": "MHA-DT-VN-66"
-        }
-      ]
-    },
-    {
       "old_stem": "dt-crank-hub",
       "old_number": "MHA-DT-031",
       "new_identities": [
         {
           "stem": "dt-crank-hub",
           "number": "MHA-DT-31"
-        }
-      ]
-    },
-    {
-      "old_stem": "dt-crank-pin-eye",
-      "old_number": "MHA-DT-028",
-      "new_identities": [
-        {
-          "stem": "dt-crank-pin-eye",
-          "number": "MHA-DT-28"
         }
       ]
     },
@@ -2290,6 +2269,18 @@
           "number": "MHA-CH-06-TL-52"
         }
       ]
+    },
+    {
+      "old_stem": "dt-vn-keeper-chain-screw",
+      "old_number": null,
+      "introduced": "2026-11-08",
+      "new_identities": [
+        {
+          "parent": "dt-drive-train",
+          "stem": "dt-vn-keeper-chain-screw",
+          "number": "MHA-DT-VN-70"
+        }
+      ]
     }
   ],
   "retired_identities": [
@@ -2754,6 +2745,29 @@
           "parent": "pd-paper-drive",
           "stem": "pd-vn-transgear-pivot-shim",
           "number": "MHA-PD-VN-67"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "vn-keeper-chain-link",
+      "old_number": "MHA-VN-036",
+      "new_identities": [
+        {
+          "parent": "dt-drive-train",
+          "stem": "dt-vn-keeper-chain-link",
+          "number": "MHA-DT-VN-66"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "dt-crank-pin-eye",
+      "old_number": "MHA-DT-028",
+      "new_identities": [
+        {
+          "stem": "dt-crank-pin-eye",
+          "number": "MHA-DT-28"
         }
       ],
       "status": "retired"

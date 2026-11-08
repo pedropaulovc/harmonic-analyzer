@@ -458,8 +458,10 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(("dt-vn-cone-tip-block-screw-1", "dt-cone-tip-block-1")): 6.22435,
             # 1/16 in tip land: 0.13 observed at Ø0.79, scaled by r^3 (x8).
             frozenset(("dt-vn-cone-tip-adjuster-1", "dt-cone-gear-shaft-1")): 1.144,
-            frozenset(("sh-vn-brass-fillister-screw-1", "dt-crank-arm-1")): _annulus_limit(
-                2.8448, 2.261, 5.33
+            # MHA-DT-VN-70 #2-56 major 2.184 in the #50 tap drill 1.778: the
+            # 6.35 shank less the 1.194 chain wire and 0.02 air, within 5.14.
+            frozenset(("dt-vn-keeper-chain-screw-1", "dt-crank-arm-1")): _annulus_limit(
+                2.184, 1.778, 5.14
             ),
             # MHA-DT-32 #4-40 major 2.845 in the #43 tap drill 2.261: 6.5 of
             # full thread past the 1.5 relief plus the lead cone, within 7.0.

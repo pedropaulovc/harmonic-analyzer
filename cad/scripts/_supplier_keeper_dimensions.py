@@ -1,7 +1,9 @@
-"""Native catalogue bead reference on the actual keeper-chain seed semicircle.
+"""Native catalogue wire reference on the keeper chain's neck-section circle.
 
-The rod/bead intersection is smaller than the sphere and cannot carry this
-size. No pitch, rod, sag or coupler value has supplier numeric authority.
+The swept links carry no sketch dimension of their own; the blanked
+``CatalogueReference`` circle at the part origin is the end link's neck
+section and carries the 3603T354 2-D drawing's wire diameter. No pitch, eye
+or drape value has supplier numeric authority here.
 """
 
 from __future__ import annotations
@@ -17,48 +19,49 @@ from _supplier_dimensions import (
 )
 import dt_vn_keeper_chain_spec as chain
 
+# The neck section lies in the part's Right plane: it reads true in the
+# right view only.
+VIEW = "*Right"
 
-def annotate_keeper_bead(adapter: Any, views: Mapping[str, Any]) -> Callable[[], None]:
-    """Import the true diameter driving the unchanged revolved seed bead."""
-    view = _early_bound(views["*Front"], "IView")
+
+def annotate_keeper_wire(adapter: Any, views: Mapping[str, Any]) -> Callable[[], None]:
+    """Import the true diameter of the reference circle on the neck section."""
+    view = _early_bound(views[VIEW], "IView")
     source = _early_bound(view.ReferencedDocument, "IModelDoc2")
     source_path = str(source.GetPathName())
     configuration = str(view.ReferencedConfiguration)
     if not source_path or not configuration:
-        raise RuntimeError("keeper catalogue bead size has no native owner/configuration")
+        raise RuntimeError("keeper catalogue wire size has no native owner/configuration")
     outline = tuple(float(value) for value in view.GetOutline())
-    name = chain.CATALOGUE_BEAD_DIMENSION
-    # The seed bead is the chain's first, at the bottom of the front view's
-    # V with the strand rising above it and the other arm of the V to its
-    # right; only from the left does a leader reach it without running over
-    # other beads (machinist review of farm run 20261102T154950540Z: from
-    # the view's top-right it ran down a dozen beads of the left strand).
-    # The text stands left of the view, low, its leader rising gently to the
-    # bead; draw_dt_vn_keeper_chain reserves this lane.
+    name = chain.CATALOGUE_WIRE_DIMENSION
+    feature = chain.CATALOGUE_REFERENCE
+    # The end link's centre, the reference circle's, sits at the right view's
+    # right-hand edge (the strand runs off to -Y and +Z, the view's left):
+    # the text stands right of the view at mid-height, in the lane
+    # draw_dt_vn_keeper_chain reserves, its leader running left to the link.
     annotations = curate_view_dimensions(
         adapter,
         view,
-        keep={name: (outline[0] - 0.034, outline[1] + 0.030)},
-        view_label="keeper catalogue bead diameter",
+        keep={name: (outline[2] + 0.028, (outline[1] + outline[3]) / 2.0)},
+        view_label="keeper catalogue wire diameter",
         dimensions_by_feature=chain.DRAWING_DIMENSIONS,
     )
     if len(annotations) != 1:
-        raise RuntimeError("keeper catalogue bead diameter: expected one native source dimension")
+        raise RuntimeError("keeper catalogue wire diameter: expected one native source dimension")
     display = _early_bound(
         _early_bound(annotations[0], "IAnnotation").GetSpecificAnnotation(),
         "IDisplayDimension",
     )
     if int(display.Type2) != 6:  # swDimensionType_e.swDiameterDimension
-        raise RuntimeError("keeper catalogue bead size is not a native diameter")
+        raise RuntimeError("keeper catalogue wire size is not a native diameter")
     presentation = {
-        "label": f"{name}@SeedProfile",
+        "label": f"{name}@{feature}",
         "units": "in",
         "configuration": configuration,
         "precision": chain.DRAWING_REFERENCE_PRECISION[name],
-        "expected_mm": chain.BEAD_DIA,
+        "expected_mm": chain.WIRE_DIA,
         "presentation": "diameter",
-        "fraction_denominator": 32,
-        "callout": "CATALOGUE BEAD SIZE",
+        "callout": "CATALOGUE WIRE SIZE",
     }
     supplier_reference_dimension(adapter, display, **presentation)
 
@@ -76,16 +79,16 @@ def annotate_keeper_bead(adapter: Any, views: Mapping[str, Any]) -> Callable[[],
         for orientation, raw_view in views.items():
             final_view = _early_bound(raw_view, "IView")
             count = int(final_view.GetDisplayDimensionCount())
-            if count != (1 if orientation == "*Front" else 0):
-                raise RuntimeError("keeper catalogue bead reference inventory changed")
-            if orientation != "*Front":
+            if count != (1 if orientation == VIEW else 0):
+                raise RuntimeError("keeper catalogue wire reference inventory changed")
+            if orientation != VIEW:
                 continue
             final_source = _early_bound(final_view.ReferencedDocument, "IModelDoc2")
             if (
                 str(final_source.GetPathName()) != source_path
                 or str(final_view.ReferencedConfiguration) != configuration
             ):
-                raise RuntimeError("keeper catalogue bead size changed native owner/configuration")
+                raise RuntimeError("keeper catalogue wire size changed native owner/configuration")
             for raw_annotation in final_view.GetAnnotations() or ():
                 annotation = _early_bound(raw_annotation, "IAnnotation")
                 if int(annotation.GetType()) != 4:  # swAnnotationType_e.swDisplayDimension
@@ -95,30 +98,30 @@ def annotate_keeper_bead(adapter: Any, views: Mapping[str, Any]) -> Callable[[],
                 if (
                     int(final_display.Type2) != 6
                     or str(native.Name) != name
-                    or str(native.FullName).split("@")[1:2] != ["SeedProfile"]
+                    or str(native.FullName).split("@")[1:2] != [feature]
                 ):
-                    raise RuntimeError("keeper catalogue bead size lost its native source diameter")
-                source_dimension = final_source.Parameter(f"{name}@SeedProfile")
+                    raise RuntimeError("keeper catalogue wire size lost its native source diameter")
+                source_dimension = final_source.Parameter(f"{name}@{feature}")
                 if source_dimension is None:
-                    raise RuntimeError("keeper catalogue bead source dimension disappeared")
+                    raise RuntimeError("keeper catalogue wire source dimension disappeared")
                 owner_dimension = _early_bound(source_dimension, "IDimension")
                 if str(owner_dimension.FullName) != str(native.FullName):
-                    raise RuntimeError("keeper catalogue bead dimension is not owned by the viewed source")
+                    raise RuntimeError("keeper catalogue wire dimension is not owned by the viewed source")
                 values = owner_dimension.GetSystemValue3(3, configuration)  # swSpecifyConfiguration
                 if (
                     not isinstance(values, (tuple, list))
                     or len(values) != 1
-                    or not abs(float(values[0]) * 1000.0 - chain.BEAD_DIA) <= 1e-5
+                    or not abs(float(values[0]) * 1000.0 - chain.WIRE_DIA) <= 1e-5
                 ):
                     raise RuntimeError(
-                        "keeper catalogue bead source value changed in the viewed configuration "
+                        "keeper catalogue wire source value changed in the viewed configuration "
                         f"{configuration!r}: {values!r}"
                     )
                 if int(_early_bound(native.Tolerance, "IDimensionTolerance").Type) != 0:
-                    raise RuntimeError("keeper catalogue bead size acquired an unprovided tolerance")
+                    raise RuntimeError("keeper catalogue wire size acquired an unprovided tolerance")
                 assert_supplier_reference_dimension(adapter, final_display, **presentation)
                 found.append(final_display)
         if len(found) != 1:
-            raise RuntimeError("keeper catalogue bead diameter: final native inventory is not one")
+            raise RuntimeError("keeper catalogue wire diameter: final native inventory is not one")
 
     return settled

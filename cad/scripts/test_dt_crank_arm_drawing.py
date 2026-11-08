@@ -16,8 +16,8 @@ import draw_dt_crank_arm as drawing
 import _sprocket_seat_geometry as seat_geometry
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
-from _hole_spec import drill_process
-from _inch_wall_limits import WALL_TARGET_MM
+from _hole_spec import THREAD_MAJOR_MM, drill_process
+from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 
 
 def test_required_drawing_paths() -> None:
@@ -72,7 +72,7 @@ def test_reference_dimensions_remain_model_owned() -> None:
         "Width",
     }
     assert spec.DRAWING_DIMENSIONS["HubSeatProfile"] == {"HubSeatDia"}
-    assert spec.HALF_WIDTH - spec.ANCHOR_SCREW_Y == pytest.approx(8.128)  # .32
+    assert spec.HALF_WIDTH - spec.ANCHOR_SCREW_Y == pytest.approx(2.794)  # .110
     assert spec.ARM_END_X + spec.HALF_WIDTH == pytest.approx(100.33)  # 3.95
 
 
@@ -105,9 +105,13 @@ def test_sheet_uses_imported_part_precision_and_no_gdt() -> None:
     assert set(spec.DRAWING_PRECISION_BY_NAME) == set().union(
         *spec.DRAWING_DIMENSIONS.values()
     )
-    assert set(spec.DRAWING_PRECISION_BY_NAME.values()) == {2}
+    assert {
+        name: places
+        for name, places in spec.DRAWING_PRECISION_BY_NAME.items()
+        if places != 2
+    } == {"AnchorOffset": 3}
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
-    # Every dimension takes the title block's .XX; none carries its own band.
+    # Every other dimension takes the title block's .XX; none carries its own band.
     assert model_toleranced_dimensions(arm) == {}
     assert spec.SURFACE_FINISHES == ()
     assert not hasattr(spec, "GEOMETRIC_TOLERANCES_MM")
@@ -157,21 +161,59 @@ def test_assembly_keeps_common_face_and_established_inboard_stations() -> None:
     assert shaft_end > drive.PINION_PIN_Z + dt_crank_pinion_spec.PIN_DIA / 2.0
 
 
-def test_stock_anchor_still_clamps_eye_without_bottoming() -> None:
-    import dt_crank_pin_eye_spec as eye
-    import sh_vn_brass_fillister_screw_spec as screw
+def test_stock_anchor_clamps_the_chain_end_link_without_bottoming() -> None:
+    import _mcmaster_3603t354 as jack_chain
+    import dt_vn_keeper_chain_screw_spec as screw
+    import dt_vn_keeper_chain_spec as chain
 
-    wire_front = drive.EYE_Z - eye.WIRE_DIA / 2.0
-    wire_back = drive.EYE_Z + eye.WIRE_DIA / 2.0
+    wire_front = drive.ANCHOR_EYE_Z - jack_chain.WIRE_DIA / 2.0
+    wire_back = drive.ANCHOR_EYE_Z + jack_chain.WIRE_DIA / 2.0
     assert drive.ANCHOR_HEAD_Z == pytest.approx(wire_front)
-    assert drive.CRANK_ARM_Z0 - wire_back == pytest.approx(0.02)
+    assert drive.CRANK_ARM_Z0 - wire_back == pytest.approx(chain.ANCHOR_AIR)
+    assert chain.ANCHOR_AIR >= 0.0
     insertion = drive.ANCHOR_HEAD_Z + screw.SHANK_LEN - drive.CRANK_ARM_Z0
-    assert insertion == pytest.approx(screw.SHANK_LEN - eye.WIRE_DIA - 0.02)
+    assert insertion == pytest.approx(
+        screw.SHANK_LEN - jack_chain.WIRE_DIA - chain.ANCHOR_AIR
+    )
+    assert drive.ANCHOR_THREAD_ENGAGEMENT == pytest.approx(insertion)
     # Tapped THRU the stock bar (drawing-guidelines.md rule 17 (walls and webs), W7): no drill point, no bottom, and
     # the tip stays inside the inboard face.
     assert spec.ANCHOR_HOLE_SPEC.end == "through_all"
-    assert screw.SHANK_DIA < insertion < spec.ARM_THICKNESS
+    assert spec.ANCHOR_HOLE_SPEC.size == screw.THREAD == "#2-56"
+    assert 1.5 * screw.SHANK_DIA < insertion < spec.ARM_THICKNESS
     assert drive.ANCHOR_TIP_RESERVE == pytest.approx(spec.ARM_THICKNESS - insertion)
+
+
+def test_anchor_tap_holds_the_wall_floor_to_its_edge() -> None:
+    # Owner ruling 2026-11-08 (#2144 item 9.2): the screw stands .110 from the
+    # edge; its .XXX offset band and the bar's mill minus each take the edge
+    # in, and the #2-56 major's wall holds the .060 floor at the lesser.
+    band = 0.005 * 25.4
+    mill = spec.ARM_WIDTH_STOCK_MINUS / 2.0
+    assert spec.ANCHOR_EDGE_DIST_MIN == pytest.approx(spec.ANCHOR_EDGE_DIST - max(band, mill))
+    assert spec.ANCHOR_EDGE_DIST_MAX == pytest.approx(spec.ANCHOR_EDGE_DIST + band)
+    wall = spec.ANCHOR_EDGE_DIST_MIN - THREAD_MAJOR_MM["#2-56"] / 2.0
+    assert spec.ANCHOR_TAP_WALL_MIN == pytest.approx(wall)
+    assert WALL_FLOOR_MM <= wall < WALL_TARGET_MM
+    # Under the target, the tap states its wall (rule 20) on its callout.
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "_append_callout_rows(anchor_callout, ANCHOR_TAP_ROWS)" in source
+
+
+def test_chain_end_link_stays_on_the_face_and_its_standing_eye_past_the_edge() -> None:
+    import _mcmaster_3603t354 as jack_chain
+
+    # The modelled eye's outer radius stays inside the nearest printed edge.
+    assert jack_chain.EYE_ID / 2.0 + jack_chain.WIRE_DIA <= spec.ANCHOR_EDGE_DIST_MIN
+    # The standing eye's wire meets the face plane past the farthest edge,
+    # for the modelled eye and the largest published one.
+    for eye_id in (jack_chain.EYE_ID, jack_chain.EYE_ID_MAX):
+        outer_r = eye_id / 2.0 + jack_chain.WIRE_DIA
+        reach = (jack_chain.INSIDE_LENGTH - eye_id) - math.sqrt(
+            outer_r**2 - (jack_chain.WIRE_DIA / 2.0) ** 2
+        )
+        assert reach == pytest.approx(spec.standing_eye_face_reach(eye_id))
+        assert reach >= spec.ANCHOR_EDGE_DIST_MAX
 
 
 def test_part_registry_retains_make_critical_properties() -> None:

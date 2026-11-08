@@ -1,14 +1,14 @@
 dt-vn-keeper-chain:
-  title: Brass Bead Chain, Trade Size 3
+  title: Brass Jack Chain, Trade Size 18
   number: MHA-DT-VN-65
-  stock_name: Bead Chain, Trade Size 3
+  stock_name: Jack Chain, Trade Size 18
   supplier: McMaster-Carr
-  supplier_skus: [3606T118]
+  supplier_skus: [3603T354]
   material: Brass
-  material_specification: Brass
+  material_specification: Solid Brass
   finish: unfinished
   quantity: 1
   tolerance_class: visual_noncritical
   process: purchased
   drawing_unit: in
-  # Cut to dt_vn_keeper_chain_spec.BEAD_COUNT beads; 3/32 in beads, 20 lbf.
+  # Cut to dt_vn_keeper_chain_spec.LINK_COUNT links; #18 single jack, .047 in wire, .39 in inside length.

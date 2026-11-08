@@ -6,6 +6,9 @@ Imported ONLY by ``draw_crank_arm`` and its offline test (codex #361; see
 
 from __future__ import annotations
 
+import math
+
+from dt_crank_arm_spec import ANCHOR_TAP_WALL_MIN
 from dt_crank_handle_pivot_screw_spec import TAPPED_MOUTH_DIA_MAX
 from dt_crank_hub_geometry import SEAT_PRESS_INTERFERENCE
 from dt_crank_hub_notes import inch_text as _inch
@@ -40,6 +43,11 @@ PIVOT_TAP_ROWS = (
     "FOR MHA-DT-32 HANDLE PIVOT;\n"
     f"MOUTH <MOD-DIAM>{_inch(TAPPED_MOUTH_DIA_MAX, 3)} MAX, NEAR SIDE"
 )
+# The keeper-chain anchor tap's wall to its near edge is under the .080
+# target, so its callout states it (drawing-guidelines.md rule 20), floored to
+# .001; the AnchorOffset prints .XXX to hold it.
+_ANCHOR_WALL_IN = math.floor(round(ANCHOR_TAP_WALL_MIN / 25.4, 4) * 1000) / 1000
+ANCHOR_TAP_ROWS = f"WALL {_ANCHOR_WALL_IN:.3f} MIN".replace(" 0.", " .")
 # The punched fiducial is flagged at the mark, not in the general notes
 # (#984 machinist review r2/r3: an unlabelled crosshair could read as an
 # undimensioned hole).  Its location is the two imported ordinates from the

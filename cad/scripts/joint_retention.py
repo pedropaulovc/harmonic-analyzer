@@ -609,9 +609,10 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "dt_vn_cone_tip_block_screw",  # #4-40 SHCS (91251A108), member into cone_tip_block foot
         "dt_vn_cone_tip_collar",  # custom collar + stock #2-56 94355A213 flat-point screw on the shaft D-flat
         "dt_vn_cone_tip_pinch_screw",  # #4-40 fillister (91794A112), member into cone_tip_block far jaw; lock of cone_tip_adjuster
-        "dt_crank_arm",  # #4-40 through-taps, receiver of crank_handle_pivot_screw and MHA-SH-VN-51
+        "dt_crank_arm",  # #4-40 and #2-56 through-taps, receiver of crank_handle_pivot_screw and MHA-DT-VN-70
         "dt_crank_handle_pivot_screw",  # #4-40 made shoulder screw (MHA-DT-32), member into crank_arm
-        "sh_vn_brass_fillister_screw",  # #4-40 brass (90114A511), keeper eye, nameplate and paper guides
+        "sh_vn_brass_fillister_screw",  # #4-40 brass (90114A511), nameplate and paper guides
+        "dt_vn_keeper_chain_screw",  # #2-56 x 1/4 brass binding head (92443A077, MHA-DT-VN-70), member into crank_arm
         "sh_vn_fillister_screw_90280a108",  # #4-40 (90280A108), spring foot, swing stop and latch-hook bracket
         "fr_vn_frame_cross_screw",  # #10-32 UNF-2A x 1-3/4 (McMaster 90280A837), member: 4 into harmonic_base, 4 into top_frame
         "ch_vn_frame_side_screw",  # #2-56 fillister (McMaster 91794A080, MHA-CH-VN-52); member, x2 into top_frame KeeperTaps (top-level row)
@@ -692,7 +693,6 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "dt_crank_hub",  # pressed into crank_arm, seam-pinned, taper-pinned to crankshaft
         "dt_vn_crank_hub_pin",  # 5/32 dowel (McMaster 98381A487), driven into the blind seam
         "dt_crank_pin",  # 1:48 taper pin, light drive
-        "dt_crank_pin_eye",  # formed brass eye, clamped under fillister_screw (no thread of its own)
         "dt_vn_crank_seat_drive_pin",  # MHA-DT-VN-67 dowel pressed into match-drilled holes, no thread
         "dt_crank_pin_ring",  # brass wire keeper ring
         "dt_crank_pinion",  # pinned by crank_pinion_pin
@@ -703,8 +703,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "dt_cylinder_gear_shaft",  # plain 3/8 arbor; MHA-SH-VN-54 cups bear in drilled spots, no thread ("NO FLATS; SET-SCREW SPOTS ARE DRILLED AT ASSEMBLY")
         "ch_fulcrum_shaft",  # plain Ø6.35 shaft with two set-screw flats, no threads
         "pd_guide_lock",  # 1/8 drill holes (R9-49) only; clamped by guide_lock_screw
-        "dt_vn_keeper_chain",  # bead chain
-        "dt_vn_keeper_chain_link",  # snap loop link
+        "dt_vn_keeper_chain",  # #18 brass jack chain, clamped under keeper_chain_screw
         "sm_vn_knife_mount_dowel",  # MHA-SM-VN-53 1/8 dowels, two pressed into the crossbar's blind underside reams per knife mount, slip in the knife mount's round hole and slot
         "sm_vn_knife_hanger_washer",  # new 18-8 SAE washer (McMaster 96659A104), hex-head bearing on the faced crossbar top; no thread
         "pd_latch_hook",  # MHA-PD-14 formed spring-steel hook: screw holes drilled thru, latch-pin hole match-drilled at assembly; no thread
@@ -770,9 +769,8 @@ UNTHREADED_STOCK: dict[str, str] = {
     "sm_vn_counter_spring": "extension spring; its hook ends hang in plain holes and eyes",
     "sh_vn_chain_link": "InnerLink and OuterLink roller-chain members; pins/rollers only, no thread",
     "pd_vn_chain_connecting_link": "clip-retained roller-chain link; pins only, no thread",
-    "dt_vn_keeper_chain": "chain; its end links hang on screws and eyes, carrying no thread",
+    "dt_vn_keeper_chain": "jack chain; its end link is clamped under a screw head and its far link threads a ring, carrying no thread",
     "dt_vn_crank_seat_drive_pin": "dowel pin pressed into a plain hole",
-    "dt_vn_keeper_chain_link": "plain chain link",
     "sm_vn_knife_mount_dowel": "dowel pin pressed into a blind reamed hole",
     "sm_vn_knife_hanger_washer": "plain SAE washer under the knife-hanger hex head; no thread",
     "dt_vn_pinion_strap_pin": "slotted spring pin pressed into a plain hole",
@@ -1216,29 +1214,30 @@ JOINTS: tuple[Joint, ...] = (
         ),
     ),
     Joint(
-        id="dt-drive-train/keeper-eye-anchor-screw",
+        id="dt-drive-train/keeper-chain-anchor-screw",
         assembly="dt_drive_train",
-        member="sh_vn_brass_fillister_screw",
+        member="dt_vn_keeper_chain_screw",
         receiver="dt_crank_arm",
-        thread="#4-40 UNC",
+        thread="#2-56 UNC",
         quantity=1,
         installed_at="crank-hub-fitted",
         exposure=Exposure.OSCILLATING,
         exposure_reason=(
-            "The screw alone clamps the straight tail of the MHA-DT-28 keeper eye on the continuously turning crank "
-            "arm; the MHA-DT-VN-65 chain hangs from the eye loop beside the screw, and as the arm turns, gravity on "
-            "the chain swings round the arm frame, so its pull on the loop puts a moment about the screw axis "
+            "The screw alone clamps the end link of the MHA-DT-VN-65 jack chain flat on the continuously turning "
+            "crank arm; the chain hangs from that link past the arm's edge, and as the arm turns, gravity on the "
+            "chain swings round the arm frame, so its pull on the clamped eye puts a moment about the screw axis "
             "that reverses once per crank turn"
         ),
-        axial_capture="fillister head clamps the 1.0 brass eye tail on the arm's outboard face; shank in the arm's #4-40 through tap, tip short of the inboard face",
+        axial_capture="binding head clamps the 1.19 jack-chain end link's eye on the arm's outboard face; shank in the arm's #2-56 through tap, tip short of the inboard face",
         lock=Lock.NONE,
         lock_part="",
         lock_binds=(),
         lock_step="",
         evidence=(
-            "draw_dt_drive_train_assembly.py CONE_CRANK_STEPS 6 ('CLAMP MHA-DT-28 UNDER MHA-SH-VN-51'); "
-            "build_dt_drive_train_assembly.py anchor block (~L722-766: ANCHOR_THREAD_ENGAGEMENT, through tap) and "
-            "placement (~L4400-4414); crank_pin_eye_spec docstring (tail clamped under the screw); CONSUMABLES_NOTES"
+            "draw_dt_drive_train_assembly.py CONE_CRANK_STEPS 6 ('SCREW THE END LINK OF MHA-DT-VN-65 FLAT TO "
+            "MHA-DT-06 WITH MHA-DT-VN-70'); build_dt_drive_train_assembly.py anchor block (ANCHOR_THREAD_ENGAGEMENT, "
+            "through tap) and dt-vn-keeper-chain-screw placement; dt_vn_keeper_chain_spec (end link clamped under "
+            "the screw); CONSUMABLES_NOTES"
         ),
     ),
     Joint(
@@ -2399,7 +2398,7 @@ REQUIRED_JOINTS: dict[str, Occurrence] = {
     "dt-drive-train/pinion-cam-set-screw": Occurrence(
         "dt_drive_train", "draw_dt_drive_train_assembly.py", "cam-collars-set"
     ),
-    "dt-drive-train/keeper-eye-anchor-screw": Occurrence(
+    "dt-drive-train/keeper-chain-anchor-screw": Occurrence(
         "dt_drive_train", "build_dt_drive_train_assembly.py", "ANCHOR_THREAD_ENGAGEMENT"
     ),
     "ha-harmonic-analyzer/cone-pivot-screw-in-base": Occurrence(

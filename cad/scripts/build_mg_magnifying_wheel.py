@@ -836,8 +836,8 @@ async def build(adapter) -> dict[str, str]:
 
     # Pen-wire U-groove, revolve-cut on the Right plane: two quarter arcs meet
     # at the groove bottom (a vertex the bottom diameter dimensions to), then
-    # straight walls run out past the OD. The axis is the crimp idiom
-    # (build_dt_vn_keeper_chain_link): a short centerline from the origin.
+    # straight walls run out past the OD. The revolve axis is a short unit
+    # centerline from the origin along the sketch's horizontal.
     groove_sd = SketchDims()
     check("create_sketch groove", await adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)

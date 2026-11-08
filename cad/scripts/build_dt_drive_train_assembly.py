@@ -857,14 +857,10 @@ from dt_crank_pin_ring_spec import (  # noqa: E402
     PIN_PROUD,
     WIRE_DIA as CRANK_RING_WIRE_DIA,
 )
-from dt_crank_pin_eye_spec import (  # noqa: E402
-    ANCHOR_AIR,
-    TAIL_LEN as EYE_TAIL_LEN,
-    WIRE_DIA as EYE_WIRE_DIA,
-)
-from sh_vn_brass_fillister_screw_spec import (  # noqa: E402
+from dt_vn_keeper_chain_screw_spec import (  # noqa: E402
     SHANK_DIA as ANCHOR_SCREW_SHANK_DIA,
     SHANK_LEN as ANCHOR_SCREW_SHANK_LEN,
+    THREAD as ANCHOR_SCREW_THREAD,
 )
 import dt_vn_keeper_chain_spec  # noqa: E402
 
@@ -883,30 +879,38 @@ if abs((CRANKSHAFT_Z0 + PIN_HOLE_HEIGHT) - CRANK_PIN_Z) > 1e-6:
     raise AssertionError("shaft and hub MHA-DT-09 stations do not coincide")
 if CRANK_PIN_X0 + CRANK_PIN_LENGTH < X_CRANK + HUB_BARREL_DIA / 2.0 + 2.0:
     raise AssertionError("crank pin does not run out the far side of the hub")
-# Keeper-ring anchor (ch11 p.14): the arm's front (south, machine -z) face is
-# CRANK_ARM_Z0; arm local (x, y) -> machine (X_CRANK - y, Y_CRANK - x) (the
-# placed rows: local +x -> -Y, local +y -> -X). The brass eyelet's tail lies
-# flat on that face (wire centre a wire radius + air south of it), pointing UP
-# the arm at the screw and ending at the shank; its loop stands off the face
-# below the tail. The fillister-screw's under-head plane rides on the wire
-# (one wire diameter + air off the face), shank pointing +z into the arm's
-# #4-40 tap.
+# Keeper-chain anchor (ch11 p.14; owner ruling 2026-11-08, #2144 item 9.2): the
+# arm's front (south, machine -z) face is CRANK_ARM_Z0; arm local (x, y) ->
+# machine (X_CRANK - y, Y_CRANK - x) (the placed rows: local +x -> -Y, local
+# +y -> -X). The jack chain's end link lies flat on that face round the
+# screw, its eye's wire centre half a wire + air south of it. The
+# MHA-DT-VN-70 binding head's under-head plane rides on the wire (one wire
+# diameter + air off the face), shank pointing +z into the arm's #2-56 tap.
 ANCHOR_SCREW_XY = (X_CRANK - ANCHOR_SCREW_Y, Y_CRANK - ANCHOR_SCREW_X)
-ANCHOR_HEAD_Z = CRANK_ARM_Z0 - EYE_WIRE_DIA - ANCHOR_AIR
-EYE_Z = CRANK_ARM_Z0 - EYE_WIRE_DIA / 2.0 - ANCHOR_AIR
-# the tail's end touches the shank: the eye's origin (the tail root, where it
-# runs tangent into the loop) sits TAIL_LEN + shank radius + air below the
-# screw axis
-EYE_ROOT_Y = ANCHOR_SCREW_XY[1] - (
-    ANCHOR_SCREW_SHANK_DIA / 2.0 + ANCHOR_AIR + EYE_TAIL_LEN
+ANCHOR_HEAD_Z = (
+    CRANK_ARM_Z0 - dt_vn_keeper_chain_spec.WIRE_DIA - dt_vn_keeper_chain_spec.ANCHOR_AIR
 )
-# Keeper chain (MHA-DT-VN-65) + loop link (MHA-DT-VN-66): authored in the crank
-# frame, whose origin is the crank axis on the arm's outboard face. The spec
-# derives the eye and ring poses from the part specs alone; they must be the
-# ones placed here.
+ANCHOR_EYE_Z = (
+    CRANK_ARM_Z0
+    - dt_vn_keeper_chain_spec.WIRE_DIA / 2.0
+    - dt_vn_keeper_chain_spec.ANCHOR_AIR
+)
+# Keeper chain (MHA-DT-VN-65) and its screw: authored in the crank frame,
+# whose origin is the crank axis on the arm's outboard face. The spec derives
+# the screw, end-eye and ring poses from the part specs alone; they must be
+# the ones placed here.
 CRANK_FRAME_ORIGIN = (X_CRANK, Y_CRANK, CRANK_ARM_Z0)
 for _got, _want, _what in (
-    (dt_vn_keeper_chain_spec.EYE_ROOT, (ANCHOR_SCREW_XY[0], EYE_ROOT_Y, EYE_Z), "eye root"),
+    (
+        (*dt_vn_keeper_chain_spec.SCREW_XY, dt_vn_keeper_chain_spec.SCREW_HEAD_Z),
+        (*ANCHOR_SCREW_XY, ANCHOR_HEAD_Z),
+        "screw under-head point",
+    ),
+    (
+        dt_vn_keeper_chain_spec.ANCHOR_EYE_CENTRE,
+        (*ANCHOR_SCREW_XY, ANCHOR_EYE_Z),
+        "end-link screw eye centre",
+    ),
     (
         (dt_vn_keeper_chain_spec.RING_X, 0.0, dt_vn_keeper_chain_spec.PIN_Z),
         (CRANK_PIN_X0 + PIN_RING_HOLE_X, CRANK_RING_Y, CRANK_PIN_Z),
@@ -923,14 +927,21 @@ if tuple(CRANK_RING_ROWS[0]) != dt_vn_keeper_chain_spec.RING_HANG:
     )
 if min(dt_vn_keeper_chain_spec.clearance_report().values()) < 0.0:
     raise AssertionError("keeper chain touches a part it must clear")
+# The 1/4 screw, less the clamped wire and the air under it, threads into the
+# arm: .25 - .047 - air.
 ANCHOR_THREAD_ENGAGEMENT = ANCHOR_HEAD_Z + ANCHOR_SCREW_SHANK_LEN - CRANK_ARM_Z0
-# The #4-40 is tapped THRU the arm (drawing-guidelines.md rule 17 (walls and webs), W7): nothing to bottom on; the
-# screw tip must stay short of the inboard face.
+# The #2-56 is tapped THRU the arm (drawing-guidelines.md rule 17 (walls and
+# webs), W7): nothing to bottom on; the screw tip must stay short of the
+# inboard face.
 ANCHOR_TIP_RESERVE = ARM_THICKNESS - ANCHOR_THREAD_ENGAGEMENT
 if ANCHOR_HOLE_SPEC.end != "through_all":
     raise AssertionError("crank-arm anchor tap is no longer through the arm")
-if ANCHOR_THREAD_ENGAGEMENT < 2.0:
-    raise AssertionError("anchor screw has under 2.0 thread engagement in the arm")
+if ANCHOR_HOLE_SPEC.size != ANCHOR_SCREW_THREAD:
+    raise AssertionError("crank-arm anchor tap does not match the keeper-chain screw")
+# drawing-guidelines.md rule 18: 1.5D of the #2-56's full thread (the screw
+# is threaded to the head).
+if ANCHOR_THREAD_ENGAGEMENT < 1.5 * ANCHOR_SCREW_SHANK_DIA:
+    raise AssertionError("anchor screw has under 1.5D thread engagement in the arm")
 if ANCHOR_TIP_RESERVE < 0.5:
     raise AssertionError("anchor screw tip stands within 0.5 of the arm's inboard face")
 # The plate origin is its inboard face (-175): the Ry(180)-composed pose maps
@@ -5428,31 +5439,18 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Front Plane@{pinion}", "PLANE"),
         label="pinion retention pin locked to the pinion",
     )
-    # Keeper-ring anchor screw + brass eyelet on the arm's front face (ch11
-    # p.14); both lock to the arm so they turn with the crank.
-    eye = await place_component(
-        adapter,
-        "dt-crank-pin-eye",
-        [ANCHOR_SCREW_XY[0], EYE_ROOT_Y, EYE_Z],
-        [0.0, 0.0, 0.0],
-        IDENTITY,
-        ground=False,
-        label="keeper-ring anchor eyelet",
-    )
-    await lock_mate(
-        adapter,
-        named_ref(f"Front Plane@{eye}", "PLANE"),
-        named_ref(f"Front Plane@{arm}", "PLANE"),
-        label="anchor eyelet locked to the arm",
-    )
+    # Keeper-chain anchor screw (MHA-DT-VN-70) on the arm's front face (ch11
+    # p.14; owner ruling 2026-11-08): authored head toward -z with its
+    # under-head plane at z = 0, so it seats on the end link's wire. It locks
+    # to the arm so it turns with the crank.
     anchor = await place_component(
         adapter,
-        "sh-vn-brass-fillister-screw",
+        "dt-vn-keeper-chain-screw",
         [ANCHOR_SCREW_XY[0], ANCHOR_SCREW_XY[1], ANCHOR_HEAD_Z],
         [0.0, 0.0, 0.0],
         IDENTITY,
         ground=False,
-        label="keeper-ring anchor screw",
+        label="keeper-chain anchor screw",
     )
     await lock_mate(
         adapter,
@@ -5460,10 +5458,10 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Front Plane@{arm}", "PLANE"),
         label="anchor screw locked to the arm",
     )
-    # Keeper chain (MHA-DT-VN-65): one loop through the eye and the pin's ring,
-    # closed by the MHA-DT-VN-66 loop link. Both lock to the arm: the eye, the pin
-    # and the ring all turn with the crank, so the loop's rest drape rides
-    # with it.
+    # Keeper chain (MHA-DT-VN-65): one open strand of jack chain, its end link
+    # screwed flat to the arm, the pin's ring closed through its far link's
+    # eye. It locks to the arm: the screw, the pin and the ring all turn with
+    # the crank, so the strand's rest drape rides with it.
     chain = await place_component(
         adapter,
         "dt-vn-keeper-chain",
@@ -5478,26 +5476,6 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Front Plane@{chain}", "PLANE"),
         named_ref(f"Front Plane@{arm}", "PLANE"),
         label="keeper chain locked to the arm",
-    )
-    # The link is authored along local X; its axis runs along machine z
-    # beside the arm edge (ROT_Y_POS90: local X -> machine -Z; the link is
-    # symmetric end for end, and its +Y seam stays up).
-    if dt_vn_keeper_chain_spec.LINK_AXIS != (0.0, 0.0, 1.0):
-        raise AssertionError("keeper-chain link placement assumes an axis along machine z")
-    link = await place_component(
-        adapter,
-        "dt-vn-keeper-chain-link",
-        [o + c for o, c in zip(dt_vn_keeper_chain_spec.LINK_ORIGIN, CRANK_FRAME_ORIGIN)],
-        [0.0, 90.0, 0.0],
-        ROT_Y_POS90,
-        ground=False,
-        label="keeper chain loop link",
-    )
-    await lock_mate(
-        adapter,
-        named_ref(f"Front Plane@{link}", "PLANE"),
-        named_ref(f"Front Plane@{arm}", "PLANE"),
-        label="keeper chain loop link locked to the arm",
     )
     # Handle pivot rides the arm tip, now ARM_C2C below the crankshaft. Its grip
     # axis stays parallel to the crankshaft (ROT_Y_POS90 -> assembly -Z).

@@ -445,13 +445,13 @@
       ]
     },
     {
-      "sourceStem": "vn-keeper-chain-link",
-      "sourceNumber": "MHA-VN-036",
+      "sourceStem": "dt-vn-keeper-chain-screw",
+      "sourceNumber": null,
       "identities": [
         {
           "parent": "dt-drive-train",
-          "stem": "dt-vn-keeper-chain-link",
-          "number": "MHA-DT-VN-66"
+          "stem": "dt-vn-keeper-chain-screw",
+          "number": "MHA-DT-VN-70"
         }
       ]
     },
@@ -1031,9 +1031,19 @@
       "registry": null,
       "builder": null,
       "status": "archive-only"
+    },
+    {
+      "sourceStem": "vn-keeper-chain-link",
+      "sourceNumber": "MHA-VN-036",
+      "parent": "dt-drive-train",
+      "stem": "dt-vn-keeper-chain-link",
+      "number": null,
+      "registry": null,
+      "builder": null,
+      "status": "archive-only"
     }
   ],
-  "currentRegistryMapSha256": "47e96074f70b6740d35d120feea6c837ae28258c0c9059d923adb9cf47fa92db",
+  "currentRegistryMapSha256": "84de88c95135414f1e2db22fed7c5a68a78ebd53d356490b9aea1076173559d0",
   "nativeIdentities": [
     {
       "sourceStem": "ch-rocker-arm-tl-oblique-feed-lever",
@@ -1772,16 +1782,6 @@
         {
           "stem": "dt-crank-hub",
           "number": "MHA-DT-31"
-        }
-      ]
-    },
-    {
-      "sourceStem": "dt-crank-pin-eye",
-      "sourceNumber": "MHA-DT-028",
-      "identities": [
-        {
-          "stem": "dt-crank-pin-eye",
-          "number": "MHA-DT-28"
         }
       ]
     },

@@ -191,13 +191,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
-        name="dt_crank_pin_eye",
-        part="dt_crank_pin_eye",
-        artifact_stem="dt-crank-pin-eye",
-        script_name="draw_dt_crank_pin_eye.py",
-        layout=DrawingLayout.LANDSCAPE,
-    ),
-    DrawingSpec(
         name="pn_pen_rod",
         part="pn_pen_rod",
         artifact_stem="pn-pen-rod",
@@ -408,10 +401,10 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
-        name="dt_vn_keeper_chain_link",
-        part="dt_vn_keeper_chain_link",
-        artifact_stem="dt-vn-keeper-chain-link",
-        script_name="draw_dt_vn_keeper_chain_link.py",
+        name="dt_vn_keeper_chain_screw",
+        part="dt_vn_keeper_chain_screw",
+        artifact_stem="dt-vn-keeper-chain-screw",
+        script_name="draw_dt_vn_keeper_chain_screw.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(

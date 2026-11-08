@@ -16,8 +16,9 @@ recipes:
 | part number | production part stem(s) | stock item |
 |---|---|---|
 | 3088A429 | `ch-vn-rocker-thrust-washer` (MHA-CH-VN-56; catalogue-only, vendor model refused) | Carbon Steel Round Shim, 1/4" ID x 3/8" OD, 0.031" Thick |
-| 3606T118 | `dt-vn-keeper-chain` (catalogue-only; no vendor model) | Bead Chain, Unfinished Brass, Trade Size 3 |
-| 3606T811 | `dt-vn-keeper-chain-link` (catalogue-only; no vendor model) | Loop Link for Brass Trade Size 3 Bead Chain |
+| 3603T354 | `dt-vn-keeper-chain` (MHA-DT-VN-65; modelled from the catalogue, the reference STEP is evidence only) | Jack Chain, Brass, Trade Size 18 |
+| 3606T118 | — (`dt-vn-keeper-chain` until 2026-11-08; replaced by 3603T354) | Bead Chain, Unfinished Brass, Trade Size 3 |
+| 3606T811 | — (`dt-vn-keeper-chain-link` MHA-DT-VN-66 until 2026-11-08; retired) | Loop Link for Brass Trade Size 3 Bead Chain |
 | 5972K41 | — (retired TL-VN-52, 2026-10-23; owned 6200-2RS shop stock, no jig identity) | Steel Ball Bearing |
 | 6261K108 | `pd-vn-chain-connecting-link` (installed clearance stand-in; separate native supplier reference diagram) | Connecting Link for ANSI Number 25 Single Strand Roller Chain |
 | 6261K171 | `sh-vn-chain-link` (MHA-SH-VN-50; `InnerLink` and `OuterLink` installed configurations; separate family reference diagram) | Roller Chain, Single Strand, ANSI Number 25, 1/4" Pitch |
@@ -77,6 +78,7 @@ recipes:
 | 92240A540 | `fr-vn-lag-screw` | 18-8 Stainless Steel Hex Head Screw |
 | 91829A560 | `dt-vn-cone-pivot-screw` | Slotted 18-8 Stainless Steel Precision Shoulder Screw |
 | 92314A253 | `sm-vn-knife-hanger-stud` (modified stock; catalogue-only, no vendor model) | 18-8 Stainless Steel Hex Head Screw, #10-24 × 2 in, cut to length |
+| 92443A077 | `dt-vn-keeper-chain-screw` (MHA-DT-VN-70; catalogue-only, no vendor model) | Brass Binding Head Slotted Screw |
 | 92446A077 | `pd-vn-platen-clip-screw` (catalogue-only; no vendor model) | Brass Pan Head Slotted Screw |
 | 91882A221 | `sh-vn-thumb-screw` (MHA-SH-VN-55; shared by mg and ms) | Steel Raised Knurled-Head Thumb Screw |
 | 91882A425 | — (diagnostic recipe; `dt-vn-cone-lock-knob` until 2026-09-29) | Steel Raised Knurled-Head Thumb Screw |
@@ -580,6 +582,33 @@ Live catalog verification on October 11, 2026:
   of `diag_mcmaster_fillister.py`, as 91792A108 does [INFERENCE]. It is
   catalogue-only: the SLDPRT download is not harvested, so it has no replica
   gate.
+- [92443A077](https://www.mcmaster.com/92443A077/) (`dt-vn-keeper-chain-screw`,
+  MHA-DT-VN-70, one) clamps the end link of the MHA-DT-VN-65 jack chain
+  flat to the MHA-DT-06 crank arm's #2-56 tap, through the link's eye (owner
+  ruling 2026-11-08, #2144 item 9.2). It replaces the MHA-SH-VN-51 fillister
+  that clamped the retired MHA-DT-28 anchor eye. The live page, titled “Brass
+  Binding Head Slotted Screws, 2-56 Thread Size, 1/4" Long”, and its 2-D
+  drawing were read on November 8, 2026: brass, Rockwell B40, 50,000 psi
+  tensile strength, #2-56 UNC class 2A, fully threaded, flat tip,
+  ASME B18.6.3, slotted binding head 0.181 in (4.5974 mm) across and
+  0.05 in (1.27 mm) high, 0.25 in (6.35 mm) under the head, screw size
+  decimal 0.086 in, $8.37 per pack of 100. The page states no head band.
+  The STEP files were downloaded for measurement only: threaded
+  `92443A077_Brass Binding Head Slotted Screws.STEP` (SHA-256
+  `8ed25d4841466b73574958efbd1f25206d927f810bfc04cdb434257af98571da`) and
+  no-threads STEP (SHA-256
+  `b199cfaad793fda844fc6b655b831ad9dc959ba0ec486c426e737949263592a8`). The
+  no-threads STEP measures the head at Ø0.1797 × 0.0493 in and the shank at
+  Ø0.086, and `_mcmaster_92443a077.py` uses the Ø0.1797 head as its least
+  head. The 2-D drawing was saved as a GIF (SHA-256
+  `a56c54cb271af20a505cae5d2a308176cd16a873cc0c9a3d1e46ac32148acaab`), but
+  its CAD2 address could not be read back: a direct request returned 404,
+  and the browser capture lists only the STEP and SLDPRT paths. So the
+  catalogue module names no `SUPPLIER_DRAWING_URL`. The drawing sizes no
+  crown, slot, undercut or tip, so `diag_build_92443A077.py` builds the head
+  on the shared slotted-head laws of `diag_mcmaster_fillister.py` at the
+  catalogue diameter and height, as 92446A077 does [INFERENCE]. It is
+  catalogue-only: no vendor model is committed, so it has no replica gate.
 
 Live catalogue verification on October 9, 2026:
 
@@ -1589,21 +1618,31 @@ Catalog specifications checked on September 10, 2026:
   details are family assumptions, not measurements of a vendor solid.
   No vendor solid was downloaded and no replica equivalence is claimed.
 
-- [3606T118](https://www.mcmaster.com/3606T118/) (`dt-vn-keeper-chain`, MHA-DT-VN-65)
-  and [3606T811](https://www.mcmaster.com/3606T811/) (`dt-vn-keeper-chain-link`,
-  MHA-DT-VN-66) tie the crank's taper pin to the arm as one loop through the eye
-  and the ring. Both product pages were read on September 29, 2026. 3606T118 is
-  unfinished brass bead chain, trade size 3, 3/32 in beads, 20 lbf, not for
-  lifting. 3606T811 is the brass loop link that joins the cut ends into a loop.
-  The October 19 source audit found no engineering drawing/CAD for either
-  item and no numeric supplier size beyond the bead diameter. The sheet
-  imports the exact 3/32-in native diameter driving `SeedProfile`, not the
-  smaller sphere/rod intersection circle. The 3.2426-mm pitch is a trade-size-3
-  average of 94 beads per foot (Ball Chain Mfg. and Frank Winne size charts),
-  not a McMaster manufacturing dimension. The 9-mm generic capsule, rod, wall,
-  crimps and mouths are project clearance assumptions in
-  `dt_vn_keeper_chain_spec.py`, not verified dimensions of 3606T811's pictured
-  loop link. Its supplier numeric coverage correctly remains empty.
+- [3603T354](https://www.mcmaster.com/3603T354/) (`dt-vn-keeper-chain`,
+  MHA-DT-VN-65) ties the crank's taper pin to the arm as one open strand (owner
+  ruling 2026-11-08, #2144 item 9.2): the end link's eye is screwed flat to the
+  arm by `dt-vn-keeper-chain-screw` (92443A077) and the keeper ring MHA-DT-27
+  is threaded through the far link's eye and closed with pliers. The product
+  page and 2-D PDF were read live on November 8, 2026: #18 single jack chain,
+  brass (solid, not plated), listed thickness 0.05 in, wire 0.047 in on the
+  2-D PDF, inside length 0.39 in, sold per foot ($0.73/ft) in 10 ft and
+  longer lengths, cut to `dt_vn_keeper_chain_spec.LINK_COUNT` links.
+  McMaster publishes no eye inside diameter. The modelled .115 in is the
+  Peco Fasteners #18 single-jack sheet's minimum eye; the Eastools #18 table
+  gives .110 in, and McMaster's reference STEP
+  (`3603T354_Jack Chain.STEP`, SHA-256
+  `d8396f4e411f91cf8e9198d30bdf8b7a4e1346b97d022d81a2f007995f24152d`) has one
+  .1535 in round eye and one .138 × .0715 in lens eye. The spec asserts every
+  fit at the limit that governs it and flags a sample to gauge before
+  purchase; an eye over .134 in needs a #2 washer under the screw head. No
+  vendor solid is used: each link is two perpendicular tori and a neck. The
+  sheet imports only the 0.047 in wire, from the native diameter of the
+  `CatalogueReference` circle on the end link's neck section. Evidence:
+  `C:/farm-runs/owner-rulings/dt28-vendor-findings.md`.
+- [3606T118](https://www.mcmaster.com/3606T118/) bead chain and
+  [3606T811](https://www.mcmaster.com/3606T811/) loop link were the keeper
+  chain and its joint (one loop through the retired MHA-DT-28 wire eye and
+  the ring) until the 2026-11-08 ruling replaced both with 3603T354.
 
 - [6261K171](https://www.mcmaster.com/6261K171/) (`sh-vn-chain-link`,
   MHA-SH-VN-50, in its `InnerLink` and `OuterLink` configurations; the

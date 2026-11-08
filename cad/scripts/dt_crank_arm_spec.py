@@ -26,9 +26,10 @@ without SolidWorks in ~1 s.
 from __future__ import annotations
 
 import _config
+import _mcmaster_3603t354 as jack_chain
 import dt_crank_hub_geometry
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec
-from _inch_wall_limits import WALL_TARGET_MM
+from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _package_units import drawing_unit
 from _printed_tolerance import edge_break_chamfer_mm, printed_deviations
 from _surface_finish import SurfaceFinishControl
@@ -36,6 +37,7 @@ from dt_crank_handle_pivot_screw_spec import THREAD_SIZE as PIVOT_SCREW_THREAD_S
 from dt_crank_hub_geometry import (
     ARM_THICKNESS,
     ARM_WIDTH,
+    ARM_WIDTH_STOCK_MINUS,
     AXIAL_PIN_DIA,  # noqa: F401 -- re-exported to the build and drawing
     AXIAL_PIN_RADIUS_FROM_AXIS,
     FIDUCIAL_MODEL_DEPTH,  # noqa: F401 -- re-exported to the build
@@ -112,14 +114,17 @@ if not (
         f"off the worst-case flat face {FIDUCIAL_FACE_RADII}"
     )
 
-# Keeper-ring anchor (ch11 p.14): a small slotted screw in the arm's outboard
-# face clamps the brass eyelet that once tethered removable pin MHA-DT-09.
+# Keeper-chain anchor (ch11 p.14; owner ruling 2026-11-08, #2144 item 9.2): a
+# #2-56 brass binding-head screw (MHA-DT-VN-70) clamps the end link of the
+# MHA-DT-VN-65 jack chain flat on the outboard face through the link's eye.
 # Tapped THRU the 5/16 bar (drawing-guidelines.md rule 17 (walls and webs),
 # audit W7): through, the screw has the whole bar of thread and nothing to
-# bottom on.
+# bottom on.  The screw stands .11 from the arm's +Y edge (the crank frame's
+# -X edge), so the link's standing eye hangs past that edge instead of
+# cutting into the face.
 ANCHOR_SCREW_X = 20.066  # .79
-ANCHOR_SCREW_Y = 4.572  # .18
-ANCHOR_HOLE_SPEC = HoleSpec("tapped", "#4-40")
+ANCHOR_SCREW_Y = 9.906  # .39
+ANCHOR_HOLE_SPEC = HoleSpec("tapped", "#2-56")
 
 # MHA-DT-31 is a light press in MHA-DT-06 and pinned; nothing runs in this part.
 SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
@@ -127,6 +132,68 @@ SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 # Derived spans.
 ARM_END_X = ARM_C2C + END_RADIUS
 HALF_WIDTH = ARM_WIDTH / 2.0
+
+# The anchor is located from its near edge (AnchorOffset), printed .XXX: at
+# .XX its band takes the tap wall under the rule 17 floor (drawing-guidelines.md
+# "a size or location whose .XX band would take a wall below the rule 17
+# target takes .XXX and states the wall it holds").  Read from the centreline
+# instead, the bar's mill minus takes ARM_WIDTH_STOCK_MINUS / 2 off the edge
+# distance; the wall is judged at the lesser of the two readings.
+ANCHOR_OFFSET_PLACES = 3
+ANCHOR_EDGE_DIST = HALF_WIDTH - ANCHOR_SCREW_Y  # 2.794 (.110)
+_ANCHOR_OFFSET_DEV = printed_deviations(ANCHOR_EDGE_DIST, ANCHOR_OFFSET_PLACES, unit=UNIT)
+ANCHOR_EDGE_DIST_MIN = ANCHOR_EDGE_DIST + min(
+    _ANCHOR_OFFSET_DEV[0], -ARM_WIDTH_STOCK_MINUS / 2.0
+)  # 2.667 (.105)
+ANCHOR_EDGE_DIST_MAX = ANCHOR_EDGE_DIST + _ANCHOR_OFFSET_DEV[1]  # 2.921 (.115)
+# Owner ruling 2026-11-08 (#2144 item 9.2; Main: the edge move and its wall
+# are "minor, within the #989 band"): the #2-56 major's wall to the edge holds
+# the .060 floor, under the .080 target, so the tap states it (rule 20).
+ANCHOR_TAP_WALL_MIN = (
+    ANCHOR_EDGE_DIST_MIN - THREAD_MAJOR_MM[ANCHOR_HOLE_SPEC.size] / 2.0
+)  # 1.575 (.062)
+if ANCHOR_TAP_WALL_MIN < WALL_FLOOR_MM:
+    raise AssertionError(
+        f"keeper-chain anchor tap leaves {ANCHOR_TAP_WALL_MIN:.3f} mm to the arm edge, "
+        f"under the {WALL_FLOOR_MM} mm floor"
+    )
+# The modelled end link (owner ruling 2026-11-08): its screw eye lies flat
+# round the screw, its standing eye c = A - ID along the link toward the edge.
+# The screw eye's outer radius stays on the face at the nearest printed edge;
+# the standing eye's wire meets the face plane past the edge at the farthest.
+# Measured in the face plane, the wire centre stands off it at least w/2 (the
+# assembly adds air, which only moves it further past), so the eye's reach
+# toward the screw at the face is sqrt(R^2 - (w/2)^2), R = ID/2 + w.
+
+
+def standing_eye_face_reach(eye_id: float) -> float:
+    """How far from the screw axis the standing eye's wire meets the face plane."""
+    outer_r = eye_id / 2.0 + jack_chain.WIRE_DIA
+    return jack_chain.eye_centre_spacing(eye_id) - (
+        outer_r**2 - (jack_chain.WIRE_DIA / 2.0) ** 2
+    ) ** 0.5
+
+
+ANCHOR_EYE_OUTER_R = jack_chain.EYE_ID / 2.0 + jack_chain.WIRE_DIA  # 2.654 (.1045)
+if ANCHOR_EYE_OUTER_R > ANCHOR_EDGE_DIST_MIN:
+    raise AssertionError("the keeper chain's screw eye overhangs the arm edge")
+ANCHOR_STANDING_EYE_AIR = standing_eye_face_reach(jack_chain.EYE_ID) - ANCHOR_EDGE_DIST_MAX
+if ANCHOR_STANDING_EYE_AIR <= 0.0:
+    raise AssertionError("the keeper chain's standing eye reaches the arm face")
+# At the largest published eye (EYE_ID_MAX, .1535) the screw eye overhangs
+# the nearest edge by about .019 (harmless: it is clamped on the face inside
+# it) and the standing eye just meets the face plane at the farthest edge
+# (0.0000 in, before the assembly's air under the link).
+ANCHOR_EYE_MAX_OVERHANG = (
+    jack_chain.EYE_ID_MAX / 2.0 + jack_chain.WIRE_DIA - ANCHOR_EDGE_DIST_MIN
+)
+ANCHOR_STANDING_EYE_AIR_AT_EYE_MAX = (
+    standing_eye_face_reach(jack_chain.EYE_ID_MAX) - ANCHOR_EDGE_DIST_MAX
+)
+if ANCHOR_STANDING_EYE_AIR_AT_EYE_MAX < 0.0:
+    raise AssertionError(
+        "at the largest published eye the keeper chain's standing eye reaches the arm face"
+    )
 
 # Width and thickness are the bar's as rolled, printed as the supplier's
 # fractions under the stock line's "AS SUPPLIED": the mill tolerance governs
@@ -157,11 +224,13 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 }
 
 # Decimal places are authored on the model: every arm dimension takes the
-# title block's .XX.  The hub seat bore is made first at that band, and
-# MHA-DT-31 is turned to suit it.
+# title block's .XX but the anchor's offset from its edge, .XXX for the tap
+# wall (above).  The hub seat bore is made first at that band, and MHA-DT-31
+# is turned to suit it.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     feature: dict.fromkeys(names, 2) for feature, names in DRAWING_DIMENSIONS.items()
 }
+DRAWING_PRECISION["StationReference"]["AnchorOffset"] = ANCHOR_OFFSET_PLACES
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
     for dimensions in DRAWING_PRECISION.values()

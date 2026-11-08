@@ -16,7 +16,8 @@ _STOCK_REQUIREMENTS = {
     "dt-vn-cone-tip-block-screw": (("91251A108",), "MHA-DT-VN-60", 1),
     "dt-vn-cone-tip-pinch-screw": (("91794A112",), "MHA-DT-VN-56", 1),
     "dt-vn-crank-seat-drive-pin": (("98381A434",), "MHA-DT-VN-67", 2),
-    "sh-vn-brass-fillister-screw": (("90114A511",), "MHA-SH-VN-51", 15),
+    "dt-vn-keeper-chain-screw": (("92443A077",), "MHA-DT-VN-70", 1),
+    "sh-vn-brass-fillister-screw": (("90114A511",), "MHA-SH-VN-51", 14),
     "sh-vn-fillister-screw-90280a108": (("90280A108",), "MHA-SH-VN-52", 4),
     "pd-vn-guide-lock-screw": (("91792A108",), "MHA-PD-VN-60", 8),
     "ch-vn-frame-side-screw": (("91794A080",), "MHA-CH-VN-52", 2),
@@ -162,13 +163,16 @@ def test_fillister_stock_is_shared_across_the_fleet() -> None:
     # x 1/4 (MHA-PD-VN-65), whose head fits inside the clip's rail, and then
     # the #2-56 fillister for the pan head, whose least head bears on the
     # clip around its loose hole; the measuring stick's stop plate keeps the
-    # brass #2-56 fillister (MHA-MS-VN-51).
+    # brass #2-56 fillister (MHA-MS-VN-51). The crank's keeper anchor left
+    # MHA-SH-VN-51 for the MHA-DT-VN-70 binding head (owner ruling
+    # 2026-11-08), so 90114A511 is fr 4 + pd 10.
     assert fleet_quantity("90280A199") == 0
     assert fleet_quantity("90280A108") == 4
     assert fleet_quantity("91794A078") == 2
     assert fleet_quantity("90280A201") == 6
     assert fleet_quantity("90280A203") == 4
-    assert fleet_quantity("90114A511") == 15
+    assert fleet_quantity("90114A511") == 14
+    assert fleet_quantity("92443A077") == 1
     assert fleet_quantity("90114A124") == 2
     assert fleet_quantity("92446A077") == 4
     assert fleet_quantity("91375A106") == 5
