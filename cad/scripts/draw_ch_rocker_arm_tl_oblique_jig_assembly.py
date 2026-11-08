@@ -395,6 +395,8 @@ SHEET_NAMES = (
 )
 # The captions cite sheets by these numbers, never typed ones.
 BOM_SHEET_NUMBER = SHEET_NAMES.index(BOM_SHEET) + 1
+if BOM_SHEET_NUMBER != spec.BOM_SHEET_NUMBER:
+    raise AssertionError("the BOM moved off the sheet step 1A cites")
 STEPS_SHEET_NUMBER = SHEET_NAMES.index(STEPS_SHEET) + 1
 if SPEC.layout is not DrawingLayout.LANDSCAPE:
     raise AssertionError("the jig's primary sheet must remain landscape")
@@ -1181,6 +1183,20 @@ def _scale_text(scale: tuple[float, float]) -> str:
     return f"{scale[0]:g}:{scale[1]:g}"
 
 
+# The pivot sheet explodes each support's screw, spacer and shims over its
+# block; the carrier between them is exploded on its own sheet, so the
+# caption states the stack in order by item (jig-asm restack r1: no view
+# showed it). One line: the caption region holds three.
+PIVOT_STACK_NOTE = (
+    f"ITEMS BOTTOM UP: BLOCK {BOM_ITEM_NUMBERS[spec.PIVOT_BLOCK]}/"
+    f"{BOM_ITEM_NUMBERS[spec.FEED_BLOCK]}, SHIMS {BOM_ITEM_NUMBERS[spec.PIVOT_SHIM]}, "
+    f"SPACER {BOM_ITEM_NUMBERS[spec.PIVOT_SPACER]}, CARRIER "
+    f"{BOM_ITEM_NUMBERS[spec.CARRIER]}, SCREW {BOM_ITEM_NUMBERS[spec.PIVOT_SCREW]}."
+)
+if len(PIVOT_STACK_NOTE) > EXPLODED_CAPTION_WIDTH:
+    raise AssertionError("the pivot stack note wraps past the caption's three lines")
+
+
 # Every view's scale is its sheet's scale (finalize_drawing sets each sheet to
 # its fitted view), so no caption prints one (rule 9; TL-00 rubric review
 # ce83/c752).
@@ -1192,6 +1208,8 @@ def exploded_caption(cluster: Cluster) -> str:
         steps_sheet=STEPS_SHEET_NUMBER,
     )
     lines = [f"{cluster.title} {reference}"]
+    if cluster.sheet == PIVOT_SHEET:
+        lines.append(PIVOT_STACK_NOTE)
     return _wrapped(lines, width=EXPLODED_CAPTION_WIDTH)
 
 

@@ -381,6 +381,9 @@ def test_clusters_partition_the_bom() -> None:
     assert set(pivot.context) == {
         spec.instance_name(spec.FEED_BLOCK, 0), spec.instance_name(spec.PIVOT_BLOCK, 0)
     }
+    assert drawing.exploded_caption(pivot).endswith(
+        "\nITEMS BOTTOM UP: BLOCK 4/5, SHIMS 8, SPACER 7, CARRIER 3, SCREW 6."
+    )
     assert all(stem in spec.BOM_ORDER for c in drawing.CLUSTERS for stem in c.stems)
 
 

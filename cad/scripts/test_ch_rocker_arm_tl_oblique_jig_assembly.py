@@ -2013,14 +2013,16 @@ def test_r4_operation_order_cites_the_plan_and_retains_all_clamps() -> None:
     assert "BEFORE THE FIRST STRAP" in steps["18"]
     assert "PLAN S0-S1 AND S2 OP20" in steps["19"]
     assert "PLAN S2 OP30-OP40" in steps["20A"]
-    assert "PLAN S3 OP10-OP20" in steps["21E"]
+    assert "PLAN S3 OP10-OP20" in steps["21F"]
     assert spec._torque(spec.holding.HUB_TORQUE_NM) in steps["21A"]
+    assert "HEAD SEATED ON THE FLANGE" in steps["21A"]
+    assert steps["21B"] == "21B. CHECK THE WASHER AND STRAP BY HAND: NEITHER TURNS NOR LIFTS."
     assert spec._item(spec.HUB_WASHER) in steps["21"]
     for text in steps.values():
         # The plan prints the blank, chords and the hub tool envelope.
         assert "350 MM" not in text and "REAMER" not in text
     assert f"{spec._CLAMP_SCREW} {spec._item(spec.RAIL_SCREW)}" in steps["19B"]
-    assert "ALL 3 CLAMP SCREWS" in steps["21E"]
+    assert "ALL 3 CLAMP SCREWS" in steps["21F"]
 
 
 def test_riser_groove_has_a_depth_and_a_bench_acceptance() -> None:
@@ -2038,12 +2040,12 @@ def test_riser_groove_has_a_depth_and_a_bench_acceptance() -> None:
 
 def test_clamp_screw_clearance_is_checked_once_they_are_fitted() -> None:
     """TL-00 round 2: 17A ran before the strap clamp screws and washer were
-    fitted; their closest approach is checked at 21B, after 21A."""
+    fitted; their closest approach is checked at 21C, after 21A-21B."""
     steps = {text.split(". ", 1)[0]: text for text in spec.OPERATION_STEPS}
     assert "CLAMP" not in steps["17A"] and "WASHER" not in steps["17A"]
-    assert "STEPS 17-17A" in steps["21B"] and "3 CLAMP SCREWS FITTED" in steps["21B"]
+    assert "STEPS 17-17A" in steps["21C"] and "3 CLAMP SCREWS FITTED" in steps["21C"]
     order = list(steps)
-    assert order.index("21A") < order.index("21B") < order.index("21E")
+    assert order.index("21A") < order.index("21C") < order.index("21F")
 
 
 def test_r4_holding_hardware_placements_close_on_actual_seats() -> None:
@@ -2392,11 +2394,15 @@ def test_kit_rails_and_carriages_carry_the_owner_note_and_the_play_check() -> No
     )
     # Carriage selection is preparation step 1, ahead of rail fitting.
     assert spec._item(spec.CARRIAGE) in _step_groups()["1"]
-    # Owner P1-A: a rail with no tight-enough kit carriage takes a preloaded one.
+    # Owner P1-A: a rail with no tight-enough kit carriage takes a preloaded
+    # one, named by maker part number and preload class and listed on the BOM.
     check = next(text for text in spec.ASSEMBLY_STEPS if text.startswith("1. "))
     remedy = next(text for text in spec.ASSEMBLY_STEPS if text.startswith("1A. "))
     assert check.endswith(f"{spec._PLAY_TIR}.")
-    assert remedy.startswith("1A. IF ") and "PRELOADED" in remedy
+    assert spec.PRELOADED_CARRIAGE == "HIWIN HGH15CAZ0C"
+    assert remedy.startswith("1A. IF ") and f"{spec.PRELOADED_CARRIAGE} CARRIAGE (LIGHT PRELOAD)" in remedy
+    assert f"ITEM {spec.ITEM_NUMBERS[spec.CARRIAGE]}'S ALTERNATE ON SHEET 2" in remedy
+    assert f"ALTERNATE (STEP 1A ONLY): {spec.PRELOADED_CARRIAGE}, LIGHT PRELOAD." in spec.BOM_NOTE
     assert trammel.RAIL_HOLE_COUNT == 8
 
 
@@ -2771,7 +2777,7 @@ def test_stop_pins_govern_the_tooling_top_and_the_holding_check_prints_it() -> N
     # #2144; pending owner confirmation): the washer clearance prints inch,
     # rounded up from the holding proof's minimum, every designed gap above it.
     printed = f"{spec._length(spec.WASHER_CLEARANCE_PRINTED, 3)} MIN"
-    assert printed == ".060 MIN" and printed in steps["21C"]
+    assert printed == ".060 MIN" and printed in steps["21D"]
     assert spec.WASHER_CLEARANCE_PRINTED >= spec.holding.WASHER_CLEARANCE_MIN
     assert min(spec.holding.WASHER_GAPS_MIN.values()) >= spec.WASHER_CLEARANCE_PRINTED
 

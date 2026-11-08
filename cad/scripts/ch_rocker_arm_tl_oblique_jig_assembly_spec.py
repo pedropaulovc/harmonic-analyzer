@@ -2173,10 +2173,11 @@ WASHER_CLEARANCE_PRINTED = _outward(holding.WASHER_CLEARANCE_MIN, 3, up=True)
 if min(holding.WASHER_GAPS_MIN.values()) < WASHER_CLEARANCE_PRINTED:
     raise AssertionError("the designed washer gaps do not meet the printed minimum")
 # The leadscrew's settings close its metric cut along the KP08 stations
-# (owner ruling 4, 2026-11-01): each prints its inch value with the exact
-# millimetres as REF.
-_NEAR_STUB = f"{_length(leadscrew.NEAR_STUB, 3)} ({leadscrew.NEAR_STUB:.1f} MM REF)"
-_HUB_GAP = f"{_length(leadscrew.HUB_GAP, 3)} ({leadscrew.HUB_GAP:.1f} MM REF)"
+# (owner ruling 4, 2026-11-01, option B, prints those stations in mm on the
+# bracket and bar). The steps are settings on an inch sheet, so they print
+# inch only (rule 26; jig-asm restack r1 gated the millimetre REFs).
+_NEAR_STUB = _length(leadscrew.NEAR_STUB, 3)
+_HUB_GAP = _length(leadscrew.HUB_GAP, 3)
 _PIVOT_GAP = f"{_length(PIVOT_RUNNING_GAP[0], 3)}-{_length(PIVOT_RUNNING_GAP[1], 3)}"
 _PILLOW = f"PILLOW BLOCK {_item(PILLOW_BLOCK)}"
 _FEELER = "FEELER GAUGE"
@@ -2191,6 +2192,15 @@ if (
     not in _config.parts("ch-rocker-arm-tl-vn-oblique-rail-kit")["stock_name"]
 ):
     raise AssertionError("the rail kit's supplied contents moved")
+# Owner P1-A, 2026-11-07 (the stack's step 1): a rail with no kit carriage
+# tight enough takes a preloaded one. Restack r1 asked for a part number
+# and preload class: HIWIN's Z0 (light preload), C (normal accuracy) block,
+# the model the reference geometry was built from (carriage spec).
+PRELOADED_CARRIAGE = f"HIWIN {carriage.STYLE}Z0C"
+# The BOM and its kit note print on sheet 2 (the drawing asserts it).
+BOM_SHEET_NUMBER = 2
+if f"{carriage.STYLE}Z0C" not in (carriage.__doc__ or ""):
+    raise AssertionError("the preloaded alternate is no longer the reference model")
 # Rule 22 (TL-00 rubric review ce83/c752): one linear sequence in the order
 # the work is done, each step one action of six lines or fewer, every check
 # and its remedy separate steps, and every cross-reference a printed step
@@ -2200,10 +2210,9 @@ if (
 ASSEMBLY_STEPS = (
     f"1. CHECK EACH OF THE KIT'S {KIT_CARRIAGES_SUPPLIED} CARRIAGES {_item(CARRIAGE)} "
     f"ROCKED SIDEWAYS ON ITS RAIL UNDER A TEST INDICATOR: {_PLAY_TIR}.",
-    # Owner P1-A, 2026-11-07 (the stack's step 1): a rail with no kit
-    # carriage tight enough takes a preloaded one.
-    f"1A. IF NO CARRIAGE ON A RAIL PASSES, FIT A PRELOADED {carriage.STYLE} "
-    "CARRIAGE ON THAT RAIL.",
+    f"1A. IF NO CARRIAGE ON A RAIL PASSES, FIT A {PRELOADED_CARRIAGE} CARRIAGE "
+    f"(LIGHT PRELOAD) ON THAT RAIL, ITEM {ITEM_NUMBERS[CARRIAGE]}'S ALTERNATE ON SHEET "
+    f"{BOM_SHEET_NUMBER}.",
     f"1B. KEEP THE {QUANTITIES[CARRIAGE]} TIGHTEST CARRIAGES, ONE PER RAIL.",
     "1C. MOVE A CARRIAGE OFF ITS RAIL ONLY ONTO A PLASTIC LOADING ARBOR FROM "
     "THE KIT.",
@@ -2484,15 +2493,16 @@ OPERATION_STEPS = (
     "HOLE: FLANGE FLAT ON THE STRAP.",
     f"21A. TORQUE THE HUB CLAMP SCREW, A {_STRAP_CLAMPS}, TO "
     f"{_torque(holding.HUB_TORQUE_NM)} THROUGH THE WASHER INTO THE CARRIER'S "
-    "HUB TAP: ITS HEAD NEED NOT BEAR FULLY ON THE FLANGE.",
-    "21B. REPEAT STEPS 17-17A WITH THE WASHER AND 3 CLAMP SCREWS FITTED.",
-    "21C. CHECK THE TOP-HAT WASHER TO BOTH CUTTER FLANKS WITH THE WASHER AND "
+    "HUB TAP: HEAD SEATED ON THE FLANGE.",
+    "21B. CHECK THE WASHER AND STRAP BY HAND: NEITHER TURNS NOR LIFTS.",
+    "21C. REPEAT STEPS 17-17A WITH THE WASHER AND 3 CLAMP SCREWS FITTED.",
+    "21D. CHECK THE TOP-HAT WASHER TO BOTH CUTTER FLANKS WITH THE WASHER AND "
     f"ALL 3 CLAMP SCREWS FITTED: {_length(WASHER_CLEARANCE_PRINTED, 3)} MIN.",
-    "21D. SET THE CUTTING DEPTH FROM THE ACTUAL SEATED STRAP, NOT FROM THE "
+    "21E. SET THE CUTTING DEPTH FROM THE ACTUAL SEATED STRAP, NOT FROM THE "
     "REFERENCE HEIGHTS.",
-    f"21E. CUT THE STRAP PER {PROCESS_PLAN} S3 OP10-OP20 OVER BOTH PASSES WITH "
+    f"21F. CUT THE STRAP PER {PROCESS_PLAN} S3 OP10-OP20 OVER BOTH PASSES WITH "
     "ALL 3 CLAMP SCREWS IN PLACE.",
-    "21F. START EACH CUT AT AN EDGE WITH CLEARANCE BESIDE THE CUTTER, NEVER AS "
+    "21G. START EACH CUT AT AN EDGE WITH CLEARANCE BESIDE THE CUTTER, NEVER AS "
     "A FULL-WIDTH SLOT OR A PLUNGE.",
 )
 # The fixture's highest point over the strap: the uncut stock stop pins at
@@ -2537,6 +2547,7 @@ BOM_NOTE = "\n".join((
     f"ITEMS {ITEM_NUMBERS[RAIL]}-{ITEM_NUMBERS[CARRIAGE]}: ONE KIT OF {KIT_RAILS_SUPPLIED} RAILS AND "
     f"{KIT_CARRIAGES_SUPPLIED} CARRIAGES ON PLASTIC LOADING ARBORS;",
     f"{QUANTITIES[CARRIAGE]} CARRIAGES FITTED (STEP 1B), PLAY CHECKED AT STEP 14C.",
+    f"ITEM {ITEM_NUMBERS[CARRIAGE]} ALTERNATE (STEP 1A ONLY): {PRELOADED_CARRIAGE}, LIGHT PRELOAD.",
     f"ITEMS {ITEM_NUMBERS[BASE_BAR_1]}-{ITEM_NUMBERS[BASE_BAR_2]}: ONE NUMBER, TWO CONFIGURATIONS "
     f"({BASE_BAR_NUMBER} SHEETS {_BASE_BAR_SHEETS[0]}, {_BASE_BAR_SHEETS[1]}).",
 ))
