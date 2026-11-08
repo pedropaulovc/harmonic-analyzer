@@ -10,7 +10,7 @@ pd-guide-lock:
   # 1388K196 stays the example source.
   material: LOW-CARBON STEEL SHEET 1/16 in
   material_specification: Low-carbon steel sheet (ASTM A36, AISI 1008/1010 or 1018), 1/16 in, thickness as supplied within +/-.005 in (e.g. McMaster-Carr 1388K196 A36 precision-ground)
-  finish: black oxide + oil; oil holes drilled at assembly
+  finish: black oxide + oil; screw holes bare, oiled
   quantity: 4
   tolerance_class: machined_block
   process: "cut from 1/16 in sheet: saw and file the outline, file the four corner radii, black oxide; the screw holes are transferred from MHA-PD-11 and drilled at assembly (steel)"
