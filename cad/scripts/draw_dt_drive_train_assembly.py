@@ -1687,13 +1687,13 @@ def _numbered_step(key: str, text: str) -> str:
     )
 
 
-# The cone set's pivot seat (owner 2026-11-08): transferred, drilled and
-# tapped, then checked, all in step 23 (key other-base-mounting).  A seat out
-# of its band is opened to a larger tap, plugged and transferred again.
+# The cone set's pivot seat (owner 2026-11-08), all in step 23 (key
+# other-base-mounting): transfer-punched, the mark checked before any
+# drilling (Main, round 20: the remedy is one re-punch, not a plug), then
+# spot-drilled, drilled and tapped from the accepted mark.
 PIVOT_SEAT_STEP_NUMBER = steps.step_number("other-base-mounting")
-PIVOT_SEAT_STEP = f"{PIVOT_SEAT_STEP_NUMBER}D"
-PIVOT_SEAT_CHECK = f"{PIVOT_SEAT_STEP_NUMBER}E"
-PIVOT_SEAT_PLUG = "1/4-20"
+PIVOT_SEAT_CHECK = f"{PIVOT_SEAT_STEP_NUMBER}D"
+PIVOT_SEAT_STEP = f"{PIVOT_SEAT_STEP_NUMBER}G"
 
 
 def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
@@ -1749,7 +1749,7 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
             f"STAND MHA-DT-24 ON THE BASE WITH ITS {SPRING_EAST_WEST}.\n"
             "TURN MHA-DT-24 ABOUT ITS FOOT HOLE UNTIL ITS CREST BEARS ON THE PARKED BACK "
             "MHA-DT-14 FLANK.\n"
-            "PARK MHA-DT-16: THE MHA-DT-25 PINS REST ON THE CAMS UNDER THE SPRING.\n"
+            "PARK MHA-DT-16: THE MHA-DT-25 PINS ON THE CAMS UNDER THE SPRING.\n"
             "TURN MHA-DT-01 SO A TOOTH TIP FACES A MHA-DT-12 TOOTH TIP ON THE LEVEL "
             "LINE OF CENTRES.\n"
             f"SLIDE THE RIG IN UNTIL A {TIP_GAP.TIP_GAP_FEELER_TEXT} IS SNUG "
@@ -1796,22 +1796,23 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
             f"PEEN BOTH ENDS FLUSH WITH THE HUB (SHEET {FULL_DETAIL_SHEET}).\n"
             f"CHECK THAT {LEVER_NUMBER} DOES NOT TURN OR SLIDE ON {LIFT_ROD_NUMBER} BY HAND.",
         ),
-        # Owner, 2026-11-08 (FoFr #2261, rubric sample round 18 #0): the
-        # pivot seat is transferred from the MHA-DT-20 reamed pivot bore with
-        # the cone set at its working position (the check 4D leaves), then
-        # drilled and tapped and checked from the back MHA-DT-02 seat alone,
-        # at the band cone_set_stack books.  The stop and lock seats are
-        # MHA-FR-01 print holes.  Check 4 then sets the swing and clamps it.
+        # Owner, 2026-11-08 (FoFr #2261, rubric sample rounds 18-19): the
+        # pivot seat is transfer-punched through the MHA-DT-20 reamed pivot
+        # bore with the cone set at its working position (the check 4D
+        # leaves); the mark is checked from the back MHA-DT-02 seat alone, at
+        # the band cone_set_stack books, before it is drilled, so an out mark
+        # costs one re-punch.  The stop and lock seats are MHA-FR-01 print
+        # holes.  Check 4 then sets the swing and clamps it.
         (
             "other-base-mounting",
             "CONE SET ON THE BASE: SET MHA-DT-20 ON THE CHECK 4D FEELER LEAVES.\n"
             "CLAMP MHA-DT-20 TO MHA-FR-01.\n"
             "TRANSFER-PUNCH MHA-FR-01 THRU THE MHA-DT-20 PIVOT BORE.\n"
             "LIFT MHA-DT-20 AND THE LEAVES OFF.\n"
-            f"DRILL AND TAP {pivot_screw.THREAD} AT THE PUNCH MARK PER MHA-FR-01.\n"
-            f"CHECK THAT ITS CENTRE IS {pivot_seat_acceptance()}.\n"
-            f"IF IT IS OUT, REDO {PIVOT_SEAT_STEP_NUMBER}-{PIVOT_SEAT_CHECK} OVER A "
-            f"{PIVOT_SEAT_PLUG} PLUG IN LOCTITE 638.\n"
+            f"CHECK THAT THE PUNCH MARK IS {pivot_seat_acceptance()}.\n"
+            f"IF IT IS OUT, REDO {PIVOT_SEAT_STEP_NUMBER}-{PIVOT_SEAT_CHECK} ONCE.\n"
+            "SPOT-DRILL THE ACCEPTED PUNCH MARK.\n"
+            f"DRILL AND TAP {pivot_screw.THREAD} THERE PER MHA-FR-01.\n"
             "RUN THE OILED MHA-DT-VN-52 DOWN THRU THE MHA-DT-20 PIVOT BORE UNTIL ITS "
             "SHOULDER SEATS HARD ON THE BASE.\n"
             "CHECK THAT MHA-DT-20 SWINGS FREELY UNDER THE HEAD.\n"
@@ -2057,13 +2058,13 @@ BANK_PRIMARY, BANK_CONTINUED, BANK_LAST = _split_sequence_chain(
     (BANK_CONTINUED_FROM, _BANK_CONTINUED_HEADING),
     (BANK_LAST_FROM, _BANK_CONTINUED_HEADING),
 )
-# Round 19: step 23's pivot-seat transfer moves each rig split two to four
-# lines on (11B, 16E, 21E), the bank having handed 9R's lines to sheet 9.
+# Rounds 19-20: step 23's pivot-seat transfer moves each rig split on
+# (11B, 16E, 21F), the bank having handed 9R's lines to sheet 9.
 RIG_SPLITS = (
     (f"{steps.step_number('arbor-collar-pinned')}B", RIG_SEQUENCE_HEADING),
     (f"{steps.step_number('straps-pinned-to-torque-shaft')}E", RIG_SEQUENCE_HEADING),
     (
-        f"{steps.step_number('cam-collars-set')}E",
+        f"{steps.step_number('cam-collars-set')}F",
         "ASSEMBLY SEQUENCE CONT. - PINION RIG AND CONE SET ON THE BASE",
     ),
 )

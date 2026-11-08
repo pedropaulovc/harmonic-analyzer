@@ -795,12 +795,13 @@ def test_every_set_feeler_the_steps_and_checks_print_has_a_leaf_row() -> None:
     assert drawing.SETTING_TABLE_LEFT + sum(widths) <= drawing.STATION_TABLE_FIELD[0]
 
 
-def test_the_pivot_seat_is_transferred_from_the_cone_set_then_checked() -> None:
-    """Owner 2026-11-08 (FoFr #2261; rubric sample round 18 #0): D1 is
+def test_the_pivot_seat_mark_is_transferred_and_checked_before_drilling() -> None:
+    """Owner 2026-11-08 (FoFr #2261; rubric sample rounds 18-19): D1 is
     transfer-punched through the MHA-DT-20 pivot bore with the cone set at
-    its working position, drilled and tapped, then checked from the back
-    MHA-DT-02 seat alone (no DRO zero) at the band cone_set_stack books, the
-    offsets read from the base's model constants, not typed."""
+    its working position; the mark is checked from the back MHA-DT-02 seat
+    alone (no DRO zero) at the band cone_set_stack books, before drilling, so
+    an out mark costs one re-punch, never a plug (Main, round 20).  The
+    offsets are read from the base's model constants, not typed."""
     import build_fr_harmonic_base as base_build
     import cone_set_stack
     import dt_vn_cone_pivot_screw_spec as pivot_screw
@@ -809,19 +810,22 @@ def test_the_pivot_seat_is_transferred_from_the_cone_set_then_checked() -> None:
     step = _rig_step_body("other-base-mounting")
     number = drawing.PIVOT_SEAT_STEP_NUMBER
     x_mm, y_mm = base_build.PIVOT_SEAT_OFFSETS_MM
+    band = base_spec.PIVOT_SEAT_POSITION_BAND_MM
     expected = (
-        f"{drawing.PIVOT_SEAT_CHECK}. CHECK THAT ITS CENTRE IS "
-        f"{drawing.inch_text(abs(x_mm), 3)} RIGHT, {drawing.inch_text(abs(y_mm), 3)} BACK "
-        f"OF THE BACK MHA-DT-02 SEAT ±{drawing.inch_text(base_spec.PIVOT_SEAT_POSITION_BAND_MM, 3)}."
+        f"{drawing.PIVOT_SEAT_CHECK}. CHECK THAT THE PUNCH MARK IS "
+        f"{drawing.inch_text(abs(x_mm), 3)} RIGHT, {drawing.inch_text(abs(y_mm), 3)} "
+        f"BACK OF THE BACK MHA-DT-02 SEAT ±{drawing.inch_text(band, 3)}."
     )
     route = [
         f"{number}A. CLAMP MHA-DT-20 TO MHA-FR-01.",
         f"{number}B. TRANSFER-PUNCH MHA-FR-01 THRU THE MHA-DT-20 PIVOT BORE.",
         f"{number}C. LIFT MHA-DT-20 AND THE LEAVES OFF.",
-        f"{drawing.PIVOT_SEAT_STEP}. DRILL AND TAP {pivot_screw.THREAD} AT THE PUNCH MARK",
         expected,
-        f"{number}F. IF IT IS OUT, REDO {number}-{drawing.PIVOT_SEAT_CHECK} OVER A",
+        f"{number}E. IF IT IS OUT, REDO {number}-{drawing.PIVOT_SEAT_CHECK} ONCE.",
+        f"{number}F. SPOT-DRILL THE ACCEPTED PUNCH MARK.",
+        f"{drawing.PIVOT_SEAT_STEP}. DRILL AND TAP {pivot_screw.THREAD} THERE",
     ]
+    assert "PLUG" not in step
     assert step.startswith(
         "CONE SET ON THE BASE: SET MHA-DT-20 ON THE CHECK 4D FEELER LEAVES."
     )
