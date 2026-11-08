@@ -767,7 +767,9 @@ def test_package_is_the_registered_configured_reference_with_a_receipt_sheet(
     assert tuple(configuration for configuration, _ in draw.VARIANTS) == part.CONFIGURATIONS
     assert draw.SHEET_NAMES == ("RAIL RECEIPT",)
     assert draw.SHEET_NAMES.index(draw.RECEIPT_SHEET_NAME) + 2 == rail.RECEIPT_SHEET
-    assert f"{rail.ITEM_TAG} RECEIPT CHECK PER SHEET {rail.RECEIPT_SHEET}" in draw.GENERAL_TEXT
+    assert f"{rail.ITEM_TAG} TRIM PER SHEET {rail.RECEIPT_SHEET}" in draw.GENERAL_TEXT
+    assert "RECEIPT CHECK" not in draw.GENERAL_TEXT
+    assert draw.ITEM_LABEL.endswith(": REFERENCE VIEWS AND TRIM")
     assert check_item(draw.ITEM, label=NAME) == draw.ITEM
     assert rail.STYLE in draw.ITEM and carriage.STYLE in draw.ITEM
     assert "GENERIC" in draw.ITEM and "Z0" not in draw.ITEM

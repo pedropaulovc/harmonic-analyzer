@@ -103,8 +103,12 @@ if SHEET_NAMES.index(RECEIPT_SHEET_NAME) + 2 != rail.RECEIPT_SHEET:
     raise AssertionError("the rail's receipt citations name the wrong sheet")
 # Sheet 2 draws the rail's orthographic views; sheet 1 shows its isometric.
 ISOMETRIC_ONLY = {rail.CONFIGURATION: rail.RECEIPT_SHEET}
+# Sheet 2 holds the rail's reference views and its trim requirement (note 1),
+# not a receipt check: every value there is REF, so "RECEIPT CHECK" asked the
+# builder for an acceptance the package never states (machinist review, farm
+# run 20261108T063332282Z, 2 of 3 runs; Main's ruling 2026-11-08, option a).
 GENERAL_TEXT = (
-    f"REFERENCE VIEWS; {rail.ITEM_TAG} RECEIPT CHECK PER SHEET {rail.RECEIPT_SHEET}; "
+    f"REFERENCE VIEWS; {rail.ITEM_TAG} TRIM PER SHEET {rail.RECEIPT_SHEET}; "
     f"{carriage.ITEM_TAG} AS SUPPLIED."
 )
 # Sheet 1's footer note is the carriage's: the rail's prints on its sheet.
@@ -336,7 +340,7 @@ def assert_leader_note_landing(
     note: Any, edge_xy: tuple[float, float], text_cell: Box, *, what: str,
 ) -> None:
     """Read the settled text anchor and both leader endpoints independently:
-    the leader runs from inside ``text_cell`` to within 1 mm of ``edge_xy``."""
+    the leader runs from inside ``text_cell`` to no more than 1 mm from ``edge_xy``."""
     annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
     anchor = tuple(float(v) for v in annotation.GetPosition() or ())[:2]
     if len(anchor) != 2 or not _inside((*anchor, *anchor), text_cell):
@@ -381,8 +385,8 @@ CAPTIONS = (
     ),
 )
 _CAPTION_HALF_WIDTH = 0.022  # "ISOMETRIC  1:4" at 3 mm is about 33 mm wide
-# The member this sheet checks, in the top band; sheet 1 carries its quantity.
-ITEM_LABEL = f"{VARIANTS[0][1]}: RECEIPT CHECK"
+# The member this sheet draws, in the top band; sheet 1 carries its quantity.
+ITEM_LABEL = f"{VARIANTS[0][1]}: REFERENCE VIEWS AND TRIM"
 ITEM_LABEL_XY = (0.050, 0.262)
 ITEM_LABEL_CELL = (0.045, 0.252, 0.200, 0.264)
 # Note 1 (the trim and its end-wall minimum), upper-left anchored under
