@@ -2102,4 +2102,9 @@ def _parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     _parse_args()
     _telemetry.set_service("drawing-export")
-    sys.exit(run_build(build))
+    from _visibility_native_proof import run as run_visibility_proof
+
+    async def proof(adapter):
+        return await run_visibility_proof(adapter, sys.modules[__name__], build)
+
+    sys.exit(run_build(proof))

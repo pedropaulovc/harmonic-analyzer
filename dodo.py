@@ -2002,7 +2002,12 @@ def _drawing_cache_outputs(stem: str) -> list[Path]:
     layout-audit report -- which rides the remote cache with the sheet, so a
     restored leaf still carries its findings and sheet dumps."""
     spec = DRAWINGS_BY_NAME[stem]
-    return [_resolved(path) for path in (*spec.outputs.values(), spec.layout_report)]
+    outputs = [_resolved(path) for path in (*spec.outputs.values(), spec.layout_report)]
+    if stem == "ch_channel_assembly":
+        from _visibility_native_proof import output_paths
+
+        outputs.extend(output_paths())
+    return outputs
 
 
 # --- Inputs of the whole-machine COM stages (verify gates, preflight, neutral
@@ -3714,6 +3719,7 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         # Drawing infrastructure and cross-sheet contracts do not follow the
         # per-sheet test_*_drawing.py suffix, so enroll them explicitly.
         SCRIPTS_DIR / "test_drawing_marks.py",
+        SCRIPTS_DIR / "test_drawing_visibility.py",
         SCRIPTS_DIR / "test_cone_drawing_batch_contract.py",
         # The two cone tip screws' supplier reference lines lie under their
         # own extension lines (one file for both sheets' shared builders).
