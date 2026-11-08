@@ -139,9 +139,9 @@ whole-groove-floor applicability alongside the numeric width/depth bands. Each
 register note carries the boss root-radius maximum, cited to
 `REGISTER_ROOT_RADIUS_MAX`, the value charged to the register assembly and
 engagement proof; the native root stays sharp.
-Installed `prechips==0.2.0` accepts these authored note requirements but does
-not select text notes for automated tolerance inspection or its traveler
-tolerance table. Schema validation therefore proves representation and
+Authored note requirements are represented by the consumer but are not selected
+for automated tolerance inspection or its traveler tolerance table. Schema
+validation therefore proves representation and
 provenance, not fitted-head or every-point floor acceptance; the part's
 native/spec geometry and actual-fit guards remain separate and unchanged.
 
@@ -285,12 +285,23 @@ files, CAD-tagged fixture spec modules, the locked consumer and executed wrapper
 closure. It runs locally on the submitter without a SolidWorks seat, including
 under the farm executor, and needs FreeCAD 1.1 (see
 [`DEVELOPING.md`](../../../DEVELOPING.md#process-traveler-prerequisites)).
-The consumer remains pinned to PyPI `prechips==0.2.0`, with the lockfile unchanged;
-no upstream examples are run by this task family. The new shaft/cone proposals
-are unsupported by that pin and remain **HELD / UNENROLLED**. A Prechips release
-carrying the new contracts, the HA pin bump and traveler activation are deferred.
-The new PC contracts alone do not establish full consumer or native execution,
-nor resolve the plans' physical setup, retained-stock, inspection or finish holds.
+The dependency upgrade targets PyPI `prechips==0.3.0`; the pin and lockfile remain
+at `0.2.0` until publication and the explicit upgrade. No upstream examples are
+run by this task family. The release adds bounded contracts for qualified
+tailstock tool mounting, relative-coordinate inspection readings and shared-axis
+native placement, not complete route consumption or machining qualification.
+The shaft/cone proposals remain **HELD / UNENROLLED**, as do the rocker and base
+bar. The strict revision guard still refuses authored v48 plans against v47
+exports before invoking the consumer or kernel. Do not rewrite those exports
+or enroll a plan merely because its new fields parse.
+
+Full consumer migration, general traveler rendering and native retained-stock/
+motion replay remain deferred. The rocker preform is still unconsumable; the
+shaft's support and pickups remain unqualified. The cone's rotary, manual-root,
+honing, inspection and finish holds remain unresolved. Relative-reading
+qualification does not yet produce printed physical reading bands or an
+executable inspection procedure. Native shared-axis placement proof is a
+bounded geometry result, not proof of these operations or of a measured part.
 
 | prechips exit | build/release gate | interpretation |
 |---|---|---|
@@ -310,7 +321,7 @@ record matching SHA-256 hashes for every render under `inputs["render:…"]`,
 declare `expected_exit == 0`, and match the manifest's `step_sha256`.
 Its `hash` must equal `prechips.report.report_hash(report)`, so editing report
 metadata without regenerating its canonical content hash also invalidates it.
-prechips 0.2.0 does not record an HTML digest itself. After a successful default
+The consumer does not record an HTML digest itself. After a successful default
 run, the wrapper adds `inputs["traveler:html"]` with the exact HTML path,
 SHA-256 and original `source_report_hash`, then recomputes the report's canonical
 hash. The HTML's `prechips-report` meta tag keeps that original upstream hash,
