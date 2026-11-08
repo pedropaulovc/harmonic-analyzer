@@ -417,8 +417,8 @@ UNDERSIDE_SEAT_FINISH_XY = (
 # table and did not say which face seats which). The rail is the kit's
 # member by its same-parent number (rule 4). The mill table is shop
 # equipment with no drawing number: farm r1 (20261107T221729532Z) asked for
-# one, so it is named as shop equipment and declared (RV-02; Main's
-# delegated ruling 2026-11-07, the FoDtFab1 Q2 dividing-head pattern). Bar 2
+# one, so it is named as shop equipment and declared (RV-02; Owner ruling
+# 2026-11-08 (Pedro), #2144 item 1.3, the FoDtFab1 Q2 dividing-head pattern). Bar 2
 # is bar 1 turned over, so its two faces swap roles.
 # A literal row (check:recipe narrows a drawing's registry reads by it).
 _PARENT_PREFIX = _config.parts("ch-rocker-arm-tl-oblique-base-bar")["number"].rsplit("-TL-", 1)[0] + "-"
