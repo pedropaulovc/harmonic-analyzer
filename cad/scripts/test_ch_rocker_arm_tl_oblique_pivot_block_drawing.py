@@ -337,7 +337,8 @@ def test_block_length_reason_rides_its_value_row_clear_of_the_dimension():
 
 @pytest.mark.parametrize('fault', (
     None, 'tap_outer', 'ream_inner', 'missing_inner', 'wrong_depth', 'wrong_radius',
-    'wrong_axis', 'nan_arrow', 'short_arrow', 'zero_arrows', 'two_arrows',
+    'wrong_axis', 'nan_arrow', 'short_arrow', 'zero_arrows', 'two_inside_arrows',
+    'second_tip_outer', 'second_body_outside', 'two_ream_arrows', 'second_ream_tip_inner',
     'source_name', 'source_identity', 'value', 'thread', 'definition', 'dangling',
     'body_outside', 'body_wings_outside', 'body_zero_width', 'body_zero_direction',
     'body_hidden', 'side_drift', 'ream_side', 'text_position',
@@ -372,7 +373,7 @@ def test_pivot_inside_arrow_proves_body_and_tip_without_changing_source(monkeypa
         annotation = SimpleNamespace(IsDangling=lambda row=row: row['dangling'],
                                      GetPosition=lambda row=row: row['position'])
         data = SimpleNamespace(GetArrowHeadCount=lambda row=row: row['count'],
-                               GetArrowHeadAtIndex2=lambda index, row=row: row['arrow'])
+                               GetArrowHeadAtIndex2=lambda index, row=row: row['arrow'] if index == 0 else row['second_arrow'])
         displays[name] = SimpleNamespace(
             ArrowSide=1,
             GetDimension2=lambda index, row=row: row['dimension'],
@@ -429,8 +430,24 @@ def test_pivot_inside_arrow_proves_body_and_tip_without_changing_source(monkeypa
         tap['arrow'] = (float('nan'), *tap['arrow'][1:])
     elif fault == 'short_arrow':
         tap['arrow'] = tap['arrow'][:6]
-    elif fault in ('zero_arrows', 'two_arrows'):
-        tap['count'] = 0 if fault == 'zero_arrows' else 2
+    elif fault == 'zero_arrows':
+        tap['count'] = 0
+    elif fault in ('two_inside_arrows', 'second_tip_outer', 'second_body_outside',
+                   'two_ream_arrows', 'second_ream_tip_inner'):
+        is_ream = fault in ('two_ream_arrows', 'second_ream_tip_inner')
+        name = 'BoreDia' if is_ream else 'TapDrillDia'
+        row = state[name]
+        radius = radii[1 if is_ream else 0]
+        row['count'] = 2
+        second = [origin[0] + radius / 1000, origin[1], 0.0,
+                  1.0 if is_ream else -1.0, 0.0, 0.0, .002, .001, 0.0, 0.0, 0.0, 1.0]
+        if fault == 'second_tip_outer':
+            second[0] = origin[0] + radii[1] / 1000
+        elif fault == 'second_body_outside':
+            second[3] = 1.0
+        elif fault == 'second_ream_tip_inner':
+            second[0] = origin[0] + radii[0] / 1000
+        row['second_arrow'] = tuple(second)
     elif fault == 'source_name':
         tap['dimension'].FullName = 'TapDrillDia@TopBoreProfile@block.Part'
     elif fault == 'source_identity':
@@ -462,9 +479,12 @@ def test_pivot_inside_arrow_proves_body_and_tip_without_changing_source(monkeypa
         displays['BoreDia'].ArrowSide = 0
     elif fault == 'text_position':
         tap['position'] = (tap['position'][0] + .001, *tap['position'][1:])
-    if fault is None:
+    if fault in (None, 'two_inside_arrows', 'two_ream_arrows'):
         settled()
         assert len(reports) == 2 and rebuilds == ['arrow side 0']
+        if fault is not None:
+            name = 'BoreDia' if fault == 'two_ream_arrows' else 'TapDrillDia'
+            assert len(reports[-1]['rims'][name]['arrows_sheet_data']) == 2
     else:
         with pytest.raises(RuntimeError):
             settled()

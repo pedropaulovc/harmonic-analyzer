@@ -263,28 +263,32 @@ def _place_pivot_tap_arrow_inside(adapter, plan, annotations, contract):
             rim = _project(adapter, plan, (cx + radius, cy, cz), f'{name} rim')
             sheet_radius = math.dist(centre, rim)
             data = _early_bound(display.GetDisplayData(), 'IDisplayData')
-            if data is None or int(data.GetArrowHeadCount()) != 1:
-                raise RuntimeError(f'{name}: expected one native diameter arrow')
-            arrow = tuple(float(v) for v in (data.GetArrowHeadAtIndex2(0) or ()))
-            # 0.01 paper mm rejects the neighbouring concentric circle
-            # (1.499 mm away at 1:1), while allowing native display roundoff.
-            if (len(arrow) != 12 or not all(math.isfinite(v) for v in arrow)
-                    or not all(math.isfinite(v) for v in centre)
-                    or not math.isfinite(sheet_radius) or sheet_radius <= 0
-                    or abs(math.dist(arrow[:2], centre) - sheet_radius) > 1e-5):
-                raise RuntimeError(f'{name}: native arrow missed its own rim: {arrow!r}')
-            triangle = arrowhead_segments(arrow)
-            if name == 'TapDrillDia':
-                # A disk is convex: containing the three native vertices
-                # contains the complete open (0) or filled (1) triangle
-                # (swArrowStyle_e), not just its rim tip.
-                if (arrow[8] not in (0, 1) or arrow[6] <= 0 or arrow[7] <= 0 or len(triangle) != 3
-                        or any(math.dist((edge.x0, edge.y0), centre) > sheet_radius + 1e-5
-                               for edge in triangle)):
-                    raise RuntimeError('TapDrillDia: native arrow body is not inside the drill circle')
+            count = int(data.GetArrowHeadCount()) if data is not None else 0
+            if count <= 0:
+                raise RuntimeError(f'{name}: expected native diameter arrows')
+            arrows = []
+            for index in range(count):
+                arrow = tuple(float(v) for v in (data.GetArrowHeadAtIndex2(index) or ()))
+                # 0.01 paper mm rejects the neighbouring concentric circle
+                # (1.499 mm away at 1:1), while allowing native display roundoff.
+                if (len(arrow) != 12 or not all(math.isfinite(v) for v in arrow)
+                        or not all(math.isfinite(v) for v in centre)
+                        or not math.isfinite(sheet_radius) or sheet_radius <= 0
+                        or abs(math.dist(arrow[:2], centre) - sheet_radius) > 1e-5):
+                    raise RuntimeError(f'{name}: native arrow {index} missed its own rim: {arrow!r}')
+                triangle = arrowhead_segments(arrow)
+                if name == 'TapDrillDia':
+                    # A disk is convex: containing the three native vertices
+                    # contains the complete open (0) or filled (1) triangle
+                    # (swArrowStyle_e), not just its rim tip.
+                    if (arrow[8] not in (0, 1) or arrow[6] <= 0 or arrow[7] <= 0 or len(triangle) != 3
+                            or any(math.dist((edge.x0, edge.y0), centre) > sheet_radius + 1e-5
+                                   for edge in triangle)):
+                        raise RuntimeError(f'TapDrillDia: native arrow {index} body is not inside the drill circle')
+                arrows.append(list(arrow))
             measured[name] = {
                 'source': full_name, 'mouth_circle_mm': list(circle),
-                'arrow_sheet_data': list(arrow), 'sheet_radius_m': sheet_radius,
+                'arrows_sheet_data': arrows, 'sheet_radius_m': sheet_radius,
             }
         _telemetry.info('pivot callout native rim readback', rims=measured)
 
