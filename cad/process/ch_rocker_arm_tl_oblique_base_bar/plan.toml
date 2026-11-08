@@ -1282,10 +1282,10 @@ do = "counterbore"
 feature = "bracket_hole_1_counterbore"
 tool = "endmills-lms-6784/5-16in-2fl"
 holder = "r8-collets-lms-4860/5-16in"
-depth_mm = 4.8
+depth_mm = 5.08
 rpm = 2000.0
 approach_mm = 3.0
-note = "Bar 1 only. Quill stop at 4.80 deep (4.67 to 4.93); plunge slowly with oil, then straight up. After this one a #8 socket head must sit below the surface: a steel rule laid across it must not rock."
+note = "Bar 1 only. Quill stop at 5.08 deep (4.953 to 5.207); plunge slowly with oil, then straight up. After this one a #8 socket head must sit below the surface: a steel rule laid across it must not rock."
 note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 A11"]
 
 [[setups.ops]]
@@ -1294,10 +1294,10 @@ do = "counterbore"
 feature = "bracket_hole_2_counterbore"
 tool = "endmills-lms-6784/5-16in-2fl"
 holder = "r8-collets-lms-4860/5-16in"
-depth_mm = 4.8
+depth_mm = 5.08
 rpm = 2000.0
 approach_mm = 3.0
-note = "Quill stop at 4.80 deep (4.67 to 4.93); plunge slowly with oil, then straight up."
+note = "Quill stop at 5.08 deep (4.953 to 5.207); plunge slowly with oil, then straight up."
 note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 A11"]
 
 [[setups.ops]]
@@ -1306,10 +1306,10 @@ do = "counterbore"
 feature = "bracket_hole_3_counterbore"
 tool = "endmills-lms-6784/5-16in-2fl"
 holder = "r8-collets-lms-4860/5-16in"
-depth_mm = 4.8
+depth_mm = 5.08
 rpm = 2000.0
 approach_mm = 3.0
-note = "Quill stop at 4.80 deep (4.67 to 4.93); plunge slowly with oil, then straight up."
+note = "Quill stop at 5.08 deep (4.953 to 5.207); plunge slowly with oil, then straight up."
 note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 A11"]
 
 [[setups.ops]]
@@ -1318,10 +1318,10 @@ do = "counterbore"
 feature = "bracket_hole_4_counterbore"
 tool = "endmills-lms-6784/5-16in-2fl"
 holder = "r8-collets-lms-4860/5-16in"
-depth_mm = 4.8
+depth_mm = 5.08
 rpm = 2000.0
 approach_mm = 3.0
-note = "Quill stop at 4.80 deep (4.67 to 4.93); plunge slowly with oil, then straight up."
+note = "Quill stop at 5.08 deep (4.953 to 5.207); plunge slowly with oil, then straight up."
 note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 A11"]
 
 # Slots: a 1/2 in (12.7) cutter is smaller than the 13.462 (.53) slot, so its R6.35 cannot

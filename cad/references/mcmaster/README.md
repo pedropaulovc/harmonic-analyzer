@@ -42,8 +42,8 @@ recipes:
 | 91251A108 | `dt-vn-cone-tip-block-screw` (catalogue-only; no vendor model) | Black-Oxide Alloy Steel Socket Head Screw |
 | 91251A157 | — (catalogue-only diagnostic recipe; former `sm-vn-knife-hanger-stud`) | Black-Oxide Alloy Steel Socket Head Screw |
 | 91251A188 | — (retired TL-VN-63, 2026-10-23; former catalogue-only diagnostic recipe removed) | Black-Oxide Alloy Steel Socket Head Screw |
-| 91251A196 | `ch-rocker-arm-tl-vn-oblique-bracket-screw` (MHA-CH-06-TL-VN-62, the 4 KP08 screws since 2026-11-06; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
-| 91251A197 | `ch-rocker-arm-tl-vn-oblique-rail-screw` (MHA-CH-06-TL-VN-61, the jig's 23 common screws since 2026-11-07, 20 from 2026-11-06: rails, TL-28 bar screws, CL/CR/HUB clamps; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
+| 91251A196 | `ch-rocker-arm-tl-vn-oblique-bracket-screw` (MHA-CH-06-TL-VN-62, 8 in the final A″ stack: 4 KP08-to-bracket + 4 bracket-to-bar; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
+| 91251A197 | `ch-rocker-arm-tl-vn-oblique-rail-screw` (MHA-CH-06-TL-VN-61, 19 in the final A″ stack: 16 rail + 3 CL/CR/HUB clamps; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
 | 91251A541 | — (retired TL-VN-68, 2026-11-07: the CR clamp takes the common 91251A197; catalogue-only diagnostic removed) | Socket Head Screw |
 | 91251A583 | `ch-rocker-arm-tl-vn-oblique-lever-screw` (MHA-CH-06-TL-VN-69; shop fixture; catalogue-only, product page login-walled, the 7/8 in sibling's vendor model read for dimensions, not replica-gated) | Socket Head Screw |
 | 91812A215 | — (retired TL-VN-70, 2026-10-23; jig-only diagnostic recipe removed) | Extreme-Vibration-Resistant Wedge Lock Washer |
@@ -228,9 +228,9 @@ its dimension provider and diagnostic recipe have also been removed.
   It also supplied `fixtures.trammel-cl-dowel`; length tolerance unstated.
   Both purchases remain unconfirmed in `cad/process/shop/inventory.toml`.
 - [91251A197](https://www.mcmaster.com/91251A197/)
-  (`ch-rocker-arm-tl-vn-oblique-rail-screw`, MHA-CH-06-TL-VN-61, 23 in the oblique
-  trammel jig since November 7, 2026 (20 from November 6), the jig's common screw: the fastener
-  table's `RAIL_TO_BAR`, `BRACKET_TO_BAR`, `END_CLAMP` and `HUB_CLAMP` rows) was read live on October
+  (`ch-rocker-arm-tl-vn-oblique-rail-screw`, MHA-CH-06-TL-VN-61, 19 in the oblique
+  trammel jig's final A″ stack: 16 rail screws + 3 CL/CR/HUB clamp screws, the fastener
+  table's `RAIL_TO_BAR`, `END_CLAMP` and `HUB_CLAMP` rows) was read live on October
   17, 2026: #8-32 UNC class 3A, 3/4 in under the head, fully threaded, head
   Ø0.27 x 0.164 in, 9/64 in hex, Rockwell C37, ASTM A574, $18.68 per pack of
   100.
@@ -250,10 +250,10 @@ its dimension provider and diagnostic recipe have also been removed.
   standalone run is catalogue-only (it builds the recipe, checks the solid and
   saves it under `cad/out/reference`).
 - [91251A196](https://www.mcmaster.com/91251A196/)
-  (`ch-rocker-arm-tl-vn-oblique-bracket-screw`, MHA-CH-06-TL-VN-62, 4 in the oblique
-  trammel jig since November 6, 2026 (owner ruling, option B): the fastener
-  table's `KP08_TO_BRACKET` row, two down through each KP08's Ø5 holes at
-  1.0 N·m; until then the 8 bracket-to-bar screws) was read live on
+  (`ch-rocker-arm-tl-vn-oblique-bracket-screw`, MHA-CH-06-TL-VN-62, 8 in the oblique
+  trammel jig's final A″ stack: 4 `KP08_TO_BRACKET` screws, two down through each
+  KP08's Ø5 holes at 1.0 N·m, + 4 `BRACKET_TO_BAR` screws;
+  the KP08 screws joined this family on November 6, 2026, owner option B) was read live on
   October 17, 2026: #8-32 UNC class 3A, 5/8 in under the head, fully threaded,
   head Ø0.27 x 0.164 in, 9/64 in hex, Rockwell C37, ASTM A574, $15.24 per pack
   of 100.
@@ -1663,8 +1663,9 @@ nut's four screws are TL-VN-67's 91771A112, and TL-VN-65 became 91255A150
 4473182209) the screw and nut became one leadscrew kit, TL-VN-84, with
 `LeadScrew` and `FeedNut` configurations (TL-VN-54 retired, TL-VN-82 never
 released). The ZYLtech and 91251A150 rows are historical. On 2026-11-06
-(owner ruling, option B) TL-VN-65 retired: the KP08 screws are TL-VN-62's
-91251A196 and the bar screws TL-VN-61's 91251A197.
+(owner ruling, option B) TL-VN-65 retired: the KP08 screws became TL-VN-62's
+91251A196. The final A″ stack uses that same SKU for the four bracket-to-bar
+screws; TL-VN-61's 91251A197 serves only the 16 rail and three CL/CR/HUB clamp screws.
 
 | target suffix at source date | exact SKU at source date | primary size coverage |
 |---|---|---|
