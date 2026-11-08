@@ -74,10 +74,5 @@ machinist_exceptions:
     where: "Steps 1 and 14C: carriage play .0008 TIR MAX, each kit carriage rocked sideways on its rail and the carrier rocked at the shoulder-screw head"
     finding: ".0008 is a millimetre value converted to inch, not a plain inch step (rule 4)"
     reason: "Owner P1-A, 2026-11-07 (PR #2236 comment 4504212381): the carriage play acceptance is 0.02 mm TIR (trammel CARRIAGE_PLAY_TIR_MAX), the #2177 shoulder-head sideways check. The inch sheet prints it converted to four places, .0008; .001 would accept carriages the owner rejects and .0005 would reject carriages the owner accepts. The radial stack charges the printed .0008 (0.020 mm)."
-  - id: "RV-07"
-    kind: "accept"
-    where: "Step 1A and the sheet 2 BOM note: the contingency carriage HIWIN HGH15CAZ0C (light preload), item 14's alternate, fitted only on a rail where no kit carriage passes step 1"
-    finding: "the alternate carriage has no drawing number of its own, only its maker and catalogue code (rule 4)"
-    reason: "Owner P1-A, 2026-11-07 (PR #2236, response to comment 4504212381): '.02 MM carriage acceptance with preloaded Z0/ZA fallback and no purchase'. The fallback is a contingency bought only if no kit carriage passes, so it is named by maker and catalogue code; HGH15CAZ0C is the HIWIN Z0 block the kit carriage's reference geometry was built from. Delegated ruling 2026-11-08 (Main): option (c), accept with the part named by maker and catalogue code."
 # drawing_unit: the jig sheet, its TOL_* rows and the saved model's units (#290).
 drawing_unit: in

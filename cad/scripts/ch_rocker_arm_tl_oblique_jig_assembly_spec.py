@@ -2201,15 +2201,9 @@ if (
     not in _config.parts("ch-rocker-arm-tl-vn-oblique-rail-kit")["stock_name"]
 ):
     raise AssertionError("the rail kit's supplied contents moved")
-# Owner P1-A, 2026-11-07 (the stack's step 1): a rail with no kit carriage
-# tight enough takes a preloaded one. Restack r1 asked for a part number
-# and preload class: HIWIN's Z0 (light preload), C (normal accuracy) block,
-# the model the reference geometry was built from (carriage spec).
-PRELOADED_CARRIAGE = f"HIWIN {carriage.STYLE}Z0C"
-# The BOM and its kit note print on sheet 2 (the drawing asserts it).
-BOM_SHEET_NUMBER = 2
-if f"{carriage.STYLE}Z0C" not in (carriage.__doc__ or ""):
-    raise AssertionError("the preloaded alternate is no longer the reference model")
+# Owner ruling 2026-11-08 (Pedro): kit carriages only. If no kit carriage on
+# a rail passes step 1, the whole rail kit is replaced; there is no fallback
+# carriage.
 # Rule 22 (TL-00 rubric review ce83/c752): one linear sequence in the order
 # the work is done, each step one action of six lines or fewer, every check
 # and its remedy separate steps, and every cross-reference a printed step
@@ -2219,9 +2213,7 @@ if f"{carriage.STYLE}Z0C" not in (carriage.__doc__ or ""):
 ASSEMBLY_STEPS = (
     f"1. CHECK EACH OF THE KIT'S {KIT_CARRIAGES_SUPPLIED} CARRIAGES {_item(CARRIAGE)} "
     f"ROCKED SIDEWAYS ON ITS RAIL UNDER A TEST INDICATOR: {_PLAY_TIR}.",
-    f"1A. IF NO CARRIAGE ON A RAIL PASSES, FIT A {PRELOADED_CARRIAGE} CARRIAGE "
-    f"(LIGHT PRELOAD) ON THAT RAIL, ITEM {ITEM_NUMBERS[CARRIAGE]}'S ALTERNATE ON SHEET "
-    f"{BOM_SHEET_NUMBER}.",
+    f"1A. IF NO CARRIAGE ON A RAIL PASSES, REPLACE THE {base_bar.RAIL_NUMBER} KIT.",
     f"1B. KEEP THE {QUANTITIES[CARRIAGE]} TIGHTEST CARRIAGES, ONE PER RAIL.",
     "1C. MOVE A CARRIAGE OFF ITS RAIL ONLY ONTO A PLASTIC LOADING ARBOR FROM "
     "THE KIT.",
@@ -2563,7 +2555,6 @@ BOM_NOTE = "\n".join((
     f"ITEMS {ITEM_NUMBERS[RAIL]}-{ITEM_NUMBERS[CARRIAGE]}: ONE KIT OF {KIT_RAILS_SUPPLIED} RAILS AND "
     f"{KIT_CARRIAGES_SUPPLIED} CARRIAGES ON PLASTIC LOADING ARBORS;",
     f"{QUANTITIES[CARRIAGE]} CARRIAGES FITTED (STEP 1B), PLAY CHECKED AT STEP 14C.",
-    f"ITEM {ITEM_NUMBERS[CARRIAGE]} ALTERNATE (STEP 1A ONLY): {PRELOADED_CARRIAGE}, LIGHT PRELOAD.",
     f"ITEMS {ITEM_NUMBERS[BASE_BAR_1]}-{ITEM_NUMBERS[BASE_BAR_2]}: ONE NUMBER, TWO CONFIGURATIONS "
     f"({BASE_BAR_NUMBER} SHEETS {_BASE_BAR_SHEETS[0]}, {_BASE_BAR_SHEETS[1]}).",
 ))

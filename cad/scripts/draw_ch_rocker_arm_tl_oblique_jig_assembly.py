@@ -400,8 +400,6 @@ SHEET_NAMES = (
 )
 # The captions cite sheets by these numbers, never typed ones.
 BOM_SHEET_NUMBER = SHEET_NAMES.index(BOM_SHEET) + 1
-if BOM_SHEET_NUMBER != spec.BOM_SHEET_NUMBER:
-    raise AssertionError("the BOM moved off the sheet step 1A cites")
 STEPS_SHEET_NUMBER = SHEET_NAMES.index(STEPS_SHEET) + 1
 if SPEC.layout is not DrawingLayout.LANDSCAPE:
     raise AssertionError("the jig's primary sheet must remain landscape")

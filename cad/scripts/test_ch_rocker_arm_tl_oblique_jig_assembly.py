@@ -2404,23 +2404,20 @@ def test_kit_rails_and_carriages_carry_the_owner_note_and_the_play_check() -> No
     }
     accept = rows["RV-06"]
     assert ".0008" in accept.where and "P1-A" in accept.reason and "4504212381" in accept.reason
-    alternate = rows["RV-07"]
-    assert spec.PRELOADED_CARRIAGE in alternate.where and "P1-A" in alternate.reason
+    assert "RV-07" not in rows
     assert play <= trammel.RADIUS_FROM_SHOULDER_CLEARANCE
     assert trammel.CARRIAGE_PLAY_RADIUS == pytest.approx(
         trammel.CARRIAGE_PLAY_RADIUS_PER_PLAY * trammel.CARRIAGE_PLAY_TIR_MAX
     )
     # Carriage selection is preparation step 1, ahead of rail fitting.
     assert spec._item(spec.CARRIAGE) in _step_groups()["1"]
-    # Owner P1-A: a rail with no tight-enough kit carriage takes a preloaded
-    # one, named by maker part number and preload class and listed on the BOM.
+    # Owner ruling 2026-11-08 (Pedro): kit carriages only; a rail with no
+    # passing kit carriage gets a new rail kit, never another carriage.
     check = next(text for text in spec.ASSEMBLY_STEPS if text.startswith("1. "))
     remedy = next(text for text in spec.ASSEMBLY_STEPS if text.startswith("1A. "))
     assert check.endswith(f"{spec._PLAY_TIR}.")
-    assert spec.PRELOADED_CARRIAGE == "HIWIN HGH15CAZ0C"
-    assert remedy.startswith("1A. IF ") and f"{spec.PRELOADED_CARRIAGE} CARRIAGE (LIGHT PRELOAD)" in remedy
-    assert f"ITEM {spec.ITEM_NUMBERS[spec.CARRIAGE]}'S ALTERNATE ON SHEET 2" in remedy
-    assert f"ALTERNATE (STEP 1A ONLY): {spec.PRELOADED_CARRIAGE}, LIGHT PRELOAD." in spec.BOM_NOTE
+    assert remedy == "1A. IF NO CARRIAGE ON A RAIL PASSES, REPLACE THE MHA-CH-06-TL-VN-83 KIT."
+    assert "HIWIN" not in spec.BOM_NOTE and "ALTERNATE" not in spec.BOM_NOTE
     assert trammel.RAIL_HOLE_COUNT == 8
 
 
