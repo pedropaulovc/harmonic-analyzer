@@ -187,6 +187,7 @@ def test_fit_up_adjustments_are_complete_and_ordered_before_installation() -> No
     )
     assert tip_window is not None
     _inside(_inch_window(tip_window.group(1)), screw.TIP_BELOW_REAR_FACE, 0.001 * IN)
-    # The cut end's break is the title block's edge break, so no limit here.
-    assert re.search(r"\bBREAK THE CUT ENDS\.", cut_step)
+    # The cut end's break is the title block's edge break, which no step
+    # restates (rule 2).
+    assert "BREAK" not in cut_step
     assert " IN " not in f" {cut_step} " and " IN " not in f" {lock_step} "

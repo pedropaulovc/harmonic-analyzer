@@ -617,14 +617,22 @@ KNOB_SETTING_PIVOT_LINES = (
     "ALONG: S TO PIVOT BORE",
     "ACROSS: SQUARE TO IT",
 )
+# Rule 4: the S-K band is the knob pinion's centre distance on the disc, so
+# the key names that mesh (two lines, to stay left of the circle).
+KNOB_SETTING_MESH_LINES = (
+    f"S-K SETS {_config.parts('pd-transgear-knob-shaft')['number']} "
+    f"{knob_shaft.TEETH}T",
+    f"TO {_config.parts('pd-rack-pinion')['number']} {disc.TEETH}T MESH",
+)
 KNOB_SETTING_CAPTION = "\n".join(
     (
         f"{KNOB_SETTING_VIEW_NAME}, 1:1 (STEP {steps.step_number('arm-plate-located')})",
+        *KNOB_SETTING_MESH_LINES,
         *(f"{letter}: {name}" for letter, name in KNOB_SETTING_LEGEND.items()),
         *KNOB_SETTING_PIVOT_LINES,
     )
 )
-KNOB_SETTING_CAPTION_XY = (0.213, 0.122)
+KNOB_SETTING_CAPTION_XY = (0.213, 0.131)
 # Each letter's centre stands this far off its circle's centre (sheet m): S
 # inward and away from Q (at 15:150 S-K spans most of the crop, so S's
 # letter past the pin would leave it), T diagonally away from both chain
@@ -673,7 +681,8 @@ CLUSTER_FLOAT_ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
 CLUSTER_FLOAT_CAPTION = "\n".join(
     (
         f"{CLUSTER_FLOAT_VIEW_NAME}, 5:1 (STEP {steps.step_number('disc-cluster-shimmed')})",
-        "RING TO FRONT BUSHING, CLUSTER REARWARD",
+        f"RING TO FRONT BUSHING, {_config.parts('pd-transgear-feed-pinion')['number']} "
+        "SLEEVE REARWARD",
     )
 )
 CLUSTER_FLOAT_CAPTION_XY = (
@@ -712,10 +721,11 @@ CLUSTER_FLOAT_PARENT_RADIUS = max(
     CLUSTER_FLOAT_RADIUS / _CLUSTER_FLOAT_M_PER_MM * _ASSEMBLED_M_PER_MM,
 )
 # Each boundary's letter stands in clear sheet, pointing back to the circle's
-# rim: VIEW K's up and right, above the arm; VIEW E's left of the right view,
-# beyond the knob's thumbnut (round 2: letters set just past the circle
-# landed on the chain and the sprocket and read as no letter at all).
-KNOB_SETTING_LETTER_OFFSET = (0.008, 0.010)
+# rim: VIEW K's right of the circle, under the MHA-PD-07 bar and right of the
+# chain's top run; VIEW E's left of the right view, beyond the knob's
+# thumbnut (round 2: letters set just past the circle landed on the chain and
+# the sprocket; round 3: K at (8, 10) mm sat on the bar's lower edge).
+KNOB_SETTING_LETTER_OFFSET = (0.019, 0.0058)
 CLUSTER_FLOAT_LETTER_OFFSET = (-0.012, 0.004)
 VIEWING_ARROW_LENGTH = 0.010
 VIEWING_ARROW_STANDOFF = 0.002
@@ -1739,10 +1749,12 @@ def _step_text(
             f"{steps.RACK_CREST_TEXT} BELOW ITS BOTTOM EDGE, SET WITH A HEIGHT "
             "GAUGE.",
             "SOFT-SOLDER THE RACK TO THE PLATEN (60/40 TIN-LEAD, ROSIN FLUX).",
+            "CHECK: PUSHED FIRMLY BY HAND ALONG AND ACROSS ITS TEETH, THE RACK "
+            "DOES NOT SHIFT ON THE PLATEN.",
             "CHECK: SIGHTED ALONG THE RACK, THE TEETH ARE STRAIGHT AND NO SOLDER "
             "LIES IN THE GAPS.",
-            "IF NOT, UNSOLDER, CLEAN AND REPEAT "
-            f"{s('rack-soldered', 0)}-{s('rack-soldered', 2)}.",
+            "IF EITHER CHECK FAILS, UNSOLDER, CLEAN AND REPEAT "
+            f"{s('rack-soldered', 0)}-{s('rack-soldered', 3)}.",
         ),
         "guides-screwed": (
             f"CLAMP THE {guides} {n['pd-platen-guide']} GUIDES TO THE PLATEN BACK, "
@@ -1781,7 +1793,6 @@ def _step_text(
             "DRILL EACH LOCK "
             f"\u00d8{steps.inch_text(blind_cut_dia_mm(guide_lock.HOLE_SPEC), 3)} THRU "
             "AT ITS MARKS.",
-            "DEBURR THE LOCK HOLES.",
             "MATCH-MARK EACH LOCK TO ITS TAP PAIR.",
             "REMOVE THE TRANSFER SCREWS.",
             "TRIAL-HANG THE PLATEN ON THE BAR, THE TOP GUIDE ON THE BAR TOP.",
@@ -1851,8 +1862,7 @@ def _step_text(
             "REMOVE THE PLATE.",
             f"DRILL EACH SPOT {TAP_8_32_DRILL_TEXT} THRU {n['pd-transgear-arm']}.",
             "TAP EACH HOLE #8-32 UNC THRU.",
-            # The title block's edge break (.010 max) is the mouths' limit.
-            "BREAK BOTH TAP MOUTHS.",
+            # The title block's edge break (.010 max) breaks the tap mouths.
         ),
         "arm-plate-fitted": (
             f"FIT THE {n['pd-transgear-arm-plate']} PLATE ON ITS LOCATING DOWELS, "
@@ -1904,10 +1914,11 @@ def _step_text(
             f"FIT THE {n['pd-rack-pinion']} DISC ON THE {n['pd-transgear-disc-hub']} "
             "HUB'S SPIGOT.",
             f"FIT THE HUB'S D-BORE ON THE {n['pd-transgear-feed-pinion']} D-FLAT, "
-            "SPIGOT TO THE STEP.",
+            f"SPIGOT TO THE {n['pd-transgear-feed-pinion']} STEP FACE.",
         ),
         "disc-taps-transferred": (
-            "MOUNT THE CLUSTER ON A MANDREL IN THE "
+            f"MOUNT THE {n['pd-transgear-feed-pinion']} SLEEVE, HUB AND DISC ON IT, "
+            "ON A MANDREL IN THE "
             f"{n['pd-transgear-feed-pinion']} BORE, BETWEEN CENTRES.",
             "WITH A DIAL INDICATOR ON A "
             f"\u00d8{steps.inch_text(disc.TOOTH_SPACE_GAUGE_PIN_DIA_MM, 3)} GAUGE PIN "
@@ -1928,25 +1939,26 @@ def _step_text(
         "disc-screws-cut": (
             f"CUT THE {n['pd-vn-transgear-disc-screw']} TIPS "
             f"{disc_screw.TIP_BELOW_REAR_FACE_TEXT} BELOW THE DISC REAR FACE.",
-            "BREAK THE CUT ENDS.",
         ),
         "oil-hole-drilled": (
             f"DRILL THE \u00d8{steps.inch_text(hub.OIL_HOLE_DIA, hub.OIL_HOLE_PLACES)} "
             "OIL HOLE CENTRED ON THE HUB BODY, THROUGH HUB AND SLEEVE IN ONE "
             f"SETUP, AS {n['pd-transgear-disc-hub']} SHOWS.",
-            "DEBURR THE BORE.",
         ),
         "disc-cluster-hung": (
             "OIL THE PIN WITH LIGHT MACHINE OIL.",
             f"FIT THE {n['pd-transgear-rear-bushing']} BUSHING ON THE PIN.",
-            "FIT THE CLUSTER ON THE PIN, PINION REARWARD.",
-            f"FIT THE {n['pd-transgear-front-bushing']} BUSHING ON THE NOSE, "
+            f"FIT THE {n['pd-transgear-feed-pinion']} SLEEVE, HUB AND DISC ON IT, "
+            "ON THE PIN, PINION REARWARD.",
+            f"FIT THE {n['pd-transgear-front-bushing']} BUSHING ON THE SLEEVE'S "
+            "FRONT END, "
             f"TRAPPING THE {n['pd-transgear-disc-hub']} HUB AND THE DISC.",
             f"PUSH THE {n['pd-vn-transgear-retaining-ring']} RING SIDEWAYS INTO THE "
             "PIN GROOVE, SEATED ON THE GROOVE'S FRONT WALL.",
         ),
         "disc-cluster-shimmed": (
-            f"PUSH THE CLUSTER REARWARD, THE {n['pd-vn-transgear-retaining-ring']} "
+            f"PUSH THE {n['pd-transgear-feed-pinion']} SLEEVE REARWARD, THE "
+            f"{n['pd-vn-transgear-retaining-ring']} "
             "RING ON ITS GROOVE'S FRONT WALL.",
             f"READ THE GAP BETWEEN THE {n['pd-transgear-front-bushing']} BUSHING AND "
             f"THE {n['pd-vn-transgear-retaining-ring']} RING WITH FEELERS.",
@@ -1966,7 +1978,8 @@ def _step_text(
             ),
         ),
         "pilot-faced-to-fit": (
-            f"FACE THE COLLAR'S PILOT {collar.PILOT_PROUD_TEXT} PROUD OF EACH "
+            f"FACE THE {n['pd-transgear-drive-collar']} COLLAR'S FRONT PILOT "
+            f"{collar.PILOT_PROUD_TEXT} PROUD OF EACH "
             f"{n['pd-transgear-removable']} WHEEL LAID FLAT ON THE PINS, READ WITH "
             "A STRAIGHTEDGE AND FEELERS.",
             "IF THE PILOT FACES BELOW THE WINDOW, MAKE A NEW "
@@ -1981,15 +1994,17 @@ def _step_text(
             f"FIT THE {n['pd-transgear-knob-cup']} CUP ON THE SHAFT'S REAR JOURNAL "
             f"ON A {steps.inch_text(knob_shaft.END_FLOAT, 3)} FEELER AT THE PLATE'S "
             "REAR BOSS.",
-            f"MATCH-DRILL {cup_pin.HOLE_TEXT} THROUGH CUP AND SHAFT, "
+            f"MATCH-DRILL {cup_pin.HOLE_TEXT} THROUGH CUP AND SHAFT FOR THE "
+            f"{n['pd-vn-transgear-knob-cup-pin']} PIN (PRESS FIT), "
             f"{steps.inch_text(knob_cup.PIN_HOLE_FROM_FRONT, 3)} FROM THE CUP "
             "FRONT.",
             f"PRESS THE {n['pd-vn-transgear-knob-cup-pin']} PIN IN, CENTRED.",
             f"IF THE PIN SLIDES IN BY HAND, MAKE A NEW {n['pd-transgear-knob-cup']} "
             f"CUP AND {n['pd-transgear-knob-shaft']} SHAFT AND REPEAT FROM "
             f"{s('knob-stack-fitted', 0)}.",
-            f"SLIDE THE {n['pd-transgear-drive-collar']} COLLAR ON THE SHAFT CORE, "
-            "UNPINNED, PINS FORWARD.",
+            f"SLIDE THE {n['pd-transgear-drive-collar']} COLLAR ON THE "
+            f"{n['pd-transgear-knob-shaft']} SHAFT'S D-CORE, ITS DOWELS FORWARD, "
+            "NOT YET FIXED TO THE SHAFT.",
             "TURN THE KNOB ONLY BY THE COLLAR UNTIL STEP "
             f"{steps.step_number('chain-closed')}; FROM THEN ON, TURN THE CRANK.",
         ),
@@ -2041,16 +2056,16 @@ def _step_text(
             f"HARDEN AND TEMPER THE HOOK PER {n['pd-latch-hook']}.",
             "REFIT THE HOOK WITH ITS PIN HOLE'S LOWER EDGE ON THE PIN.",
             "TIGHTEN THE HOOK SCREWS.",
-            "UNCLAMP THE ARM.",
-            "LATCH THE ARM.",
+            "UNCLAMP THE ARM. IT STAYS LATCHED: THE "
+            f"{n['pd-vn-transgear-latch-pin']} PIN STANDS THROUGH THE "
+            f"{n['pd-latch-hook']} HOOK'S PIN HOLE.",
             "CHECK: THE ENGAGED FEED RUNS WITH NO TIGHT SPOT AND THE PLATEN SHAKES "
             f"{shake} AT THE DATUM, READ WITH A DIAL INDICATOR ON THE PLATEN END.",
             f"IF NOT, REPEAT {s('hanger-meshed', 2)}-"
-            f"{s('hook-pin-hole-match-drilled', 8)} WITH A NEW {n['pd-latch-hook']} "
+            f"{s('hook-pin-hole-match-drilled', 7)} WITH A NEW {n['pd-latch-hook']} "
             "HOOK.",
         ),
         "loaded-rack-geometry-checked": (
-            "LATCH THE ARM.",
             "LOAD THE PAPER.",
             "TURN THE KNOB TO RUN THE PLATEN THROUGH THE WHOLE ENGAGED FEED.",
             "CHECK: NO TIGHT SPOT; ARM, HOOK AND PLATEN STAY SEATED.",
@@ -2059,11 +2074,12 @@ def _step_text(
             "IF EITHER CHECK FAILS, RE-SEAT THE RACK OR GUIDES (STEPS "
             f"{steps.step_number('rack-soldered')} AND "
             f"{steps.step_number('guides-screwed')}) AND REPEAT "
-            f"{s('loaded-rack-geometry-checked', 2)}-"
-            f"{s('loaded-rack-geometry-checked', 4)}.",
+            f"{s('loaded-rack-geometry-checked', 1)}-"
+            f"{s('loaded-rack-geometry-checked', 3)}.",
         ),
         "fitup-pose-set": (
-            "LATCH THE ARM.",
+            f"CHECK: THE ARM IS LATCHED, THE {n['pd-vn-transgear-latch-pin']} PIN "
+            f"THROUGH THE {n['pd-latch-hook']} HOOK'S PIN HOLE.",
             "PULL THE CRANK SHAFT FORWARD.",
             f"PUSH THE KNOB SHAFT REARWARD, {teeth} ON THE "
             f"{n['pd-transgear-knob-thrust-ring']} RING, THE RING ON THE "
@@ -2071,7 +2087,7 @@ def _step_text(
             f"SLIDE THE COLLAR BACK AGAINST THE {teeth}.",
             f"FIT THE {knob} AND THE THUMBNUT FINGER-TIGHT, "
             f"{steps.KNOB_HELD_BACK_TEXT}.",
-            "TURN THE DISC UNTIL, ON THE LINE THROUGH THE KNOB AND CLUSTER AXES, "
+            "TURN THE DISC UNTIL, ON THE LINE THROUGH THE KNOB AND DISC AXES, "
             f"A {disc.TEETH}T TOOTH STANDS CENTRED IN A {teeth} GAP WITHIN {clock} "
             "AT THE PITCH CIRCLE, READ WITH A TEST INDICATOR ON A GAUGE PIN IN "
             "THE GAP.",
@@ -2112,6 +2128,7 @@ def _step_text(
             "FACE.",
             f"FIT THE {knob} ON THE DRIVE DOWELS.",
             f"TIGHTEN THE {n['pd-transgear-thumbnut']} THUMBNUT BY HAND ON THE "
+            f"{n['pd-transgear-drive-collar']} COLLAR'S "
             "PILOT. IT CLAMPS ONLY: NEVER TURN IT TO DRIVE THE KNOB.",
         ),
         "stud-end-cut": (
@@ -2135,18 +2152,22 @@ def _step_text(
             "SQUARE ON A MANDREL AND REPEAT FROM STEP "
             f"{steps.step_number('disc-cluster-assembled')}.",
             "REFIT THE PLATEN.",
-            "LATCH THE ARM.",
             f"REPEAT {s('collar-disc-air-inspected', 1)}-"
             f"{s('collar-disc-air-inspected', 2)} AND "
-            f"{s('loaded-rack-geometry-checked', 2)}-"
-            f"{s('loaded-rack-geometry-checked', 4)}.",
+            f"{s('loaded-rack-geometry-checked', 1)}-"
+            f"{s('loaded-rack-geometry-checked', 3)}.",
         ),
         "fitup-accepted": (
             f"CHECK, IN STEP {pose}'S POSE: THE {knob} FRONT FACE STANDS "
             f"{steps.OFFSET_ACCEPT_TEXT} FORWARD OF THE {crank} FRONT FACE "
             "(STRAIGHTEDGE AND FEELERS).",
             f"CHECK: KNOB END FLOAT {knob_window}, READ WITH FEELERS AT THE CUP.",
-            f"CHECK: THE {knob} TURNS FREE UNDER THE NUT AND THE ARM SWINGS FREE.",
+            f"CHECK: THE {knob} TURNS FREE UNDER THE NUT.",
+            f"UNLATCH THE ARM: PULL THE {n['pd-latch-hook']} HOOK'S FINGER TAB ALONG "
+            "THE ARM UNTIL THE HOOK CLEARS THE PIN, AND LOWER THE ARM.",
+            "CHECK: RAISED AND RELEASED, THE ARM SWINGS FREE ON ITS PIVOT.",
+            f"LATCH THE ARM: LIFT IT UNTIL THE {n['pd-vn-transgear-latch-pin']} PIN "
+            f"SNAPS INTO THE {n['pd-latch-hook']} HOOK'S PIN HOLE.",
             f"CHECK: THE RING GAP READS {CLUSTER_FLOAT_VIEW_NAME} ON FEELERS AND THE "
             "DISC TURNS FREE.",
             "CHECK: COLLAR TO DISC CLEARANCE "
@@ -2158,18 +2179,21 @@ def _step_text(
             f"{s('fitup-accepted', 1)} STEP {steps.step_number('knob-stack-fitted')}, "
             f"{s('fitup-accepted', 2)} STEP "
             f"{steps.step_number('collar-shoulder-seated')}, "
-            f"{s('fitup-accepted', 3)} STEP "
-            f"{steps.step_number('disc-cluster-shimmed')}, "
             f"{s('fitup-accepted', 4)} STEP "
+            f"{steps.step_number('hanger-pivoted')}, "
+            f"{s('fitup-accepted', 6)} STEP "
+            f"{steps.step_number('disc-cluster-shimmed')}, "
+            f"{s('fitup-accepted', 7)} STEP "
             f"{steps.step_number('collar-disc-air-inspected')}.",
         ),
         "chain-closed": (
-            f"LOOP {chain.LINK_COUNT} PITCHES OF ANSI #25 CHAIN "
+            f"LOOP {chain.LINK_COUNT - 1} PITCHES OF ANSI #25 CHAIN "
             f"({CHAIN_QUANTITIES['sh-vn-chain-link--InnerLink']} "
             f"{n['sh-vn-chain-link--InnerLink']} INNER AND "
             f"{CHAIN_QUANTITIES['sh-vn-chain-link--OuterLink']} "
             f"{n['sh-vn-chain-link--OuterLink']} OUTER LINKS) OVER THE {knob} AND "
-            f"THE {crank}, SLACK RUN HANGING FREE; NO TENSIONING.",
+            f"THE {crank}, SLACK RUN HANGING FREE; NO TENSIONING. THE CONNECTING "
+            f"LINK MAKES THE LOOP {chain.LINK_COUNT} PITCHES.",
             f"JOIN THE ENDS WITH THE {n['pd-vn-chain-connecting-link']} #25 "
             f"CONNECTING LINK (MCMASTER {_SKU['pd-vn-chain-connecting-link']}), "
             "ITS CLIP'S CLOSED END LEADING IN THE DIRECTION OF TRAVEL.",
@@ -2180,6 +2204,12 @@ def _step_text(
             "CLIMBING OR A TIGHT SPOT, AND THE SLACK RUN TOUCHES NOTHING.",
             "IF IT CLIMBS OR BINDS, REPEAT STEP "
             f"{steps.step_number('collar-rear-faced-to-fit')}.",
+            # As shipped: latched, the feed in mesh (delegated ruling
+            # 2026-11-07 (Main), no precedent; owner review #2144; pending
+            # owner confirmation).
+            "LEAVE THE ARM LATCHED FOR SHIPPING.",
+            f"CHECK: THE {n['pd-vn-transgear-latch-pin']} PIN STANDS THROUGH THE "
+            f"{n['pd-latch-hook']} HOOK'S PIN HOLE AND THE FEED IS IN MESH.",
         ),
     }
 
@@ -2273,9 +2303,24 @@ def pack_step_columns(text: dict[str, tuple[str, ...]]) -> tuple[StepColumn, ...
 
     A section's heading leads its first step; a column that opens mid-section
     leads with the section's title and "(CONT.)". Every slot must take steps,
-    so no sheet is left without them."""
+    so no sheet is left without them. The columns are balanced: each holds at
+    most the smallest line count that still fits every step into the slots,
+    so no sheet ends as a short block beside an empty field (rule 15; round 3
+    found the last sheet's 12 lines bunched in one corner)."""
     if set(text) != set(steps.SEQUENCE):
         raise AssertionError("paper-drive step text must cover exactly the sequence")
+    for cap in range(1, max(slot.capacity for slot in STEP_SLOTS) + 1):
+        columns = _packed_columns(text, cap)
+        if columns is not None:
+            return columns
+    raise RuntimeError("the paper-drive steps overflow STEP_SLOTS")
+
+
+def _packed_columns(
+    text: dict[str, tuple[str, ...]], cap: int
+) -> tuple[StepColumn, ...] | None:
+    """The steps packed with each slot holding at most ``cap`` lines, or None
+    when they do not fit or leave a slot empty."""
     columns: list[StepColumn] = []
     slots = iter(STEP_SLOTS)
     slot = next(slots)
@@ -2298,22 +2343,19 @@ def pack_step_columns(text: dict[str, tuple[str, ...]]) -> tuple[StepColumn, ...
                 return ([""] if open_lines and starts_step else []) + heading
 
             added = lead(lines) + unit
-            if lines and len(lines) + len(added) > slot.capacity:
+            if lines and len(lines) + len(added) > min(slot.capacity, cap):
                 columns.append(StepColumn(slot.sheet, slot.xy, "\n".join(lines)))
                 slot = next(slots, None)
                 if slot is None:
-                    raise RuntimeError(f"the paper-drive steps overflow STEP_SLOTS at {key}")
+                    return None
                 lines = []
                 added = lead(lines) + unit
-            if len(added) > slot.capacity:
-                raise RuntimeError(f"step {key} does not fit an empty {slot.sheet} column")
+            if len(added) > min(slot.capacity, cap):
+                return None
             lines += added
     columns.append(StepColumn(slot.sheet, slot.xy, "\n".join(lines)))
     if len(columns) != len(STEP_SLOTS):
-        raise RuntimeError(
-            f"the paper-drive steps fill {len(columns)} of {len(STEP_SLOTS)} step "
-            "columns: drop the empty slots"
-        )
+        return None
     return tuple(columns)
 
 

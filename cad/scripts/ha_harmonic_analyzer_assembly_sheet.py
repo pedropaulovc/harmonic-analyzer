@@ -187,8 +187,8 @@ _STEP_TEXT: dict[str, tuple[str, ...]] = {
     "channel-anchors-set": (
         f"MAKE A FORKED DRIVER FOR THE {_ANCHOR_NUT} NUTS: GRIND A FLAT "
         f"SCREWDRIVER BLADE TO {render_number(DRIVER_BLADE_WIDTH, 'in', 2)} WIDE AND "
-        f"{render_number(DRIVER_BLADE_THICK_MAX, 'in', 3)} THICK MAX, THEN SLOT ITS "
-        f"MIDDLE {render_number(DRIVER_SLOT_WIDTH, 'in', 2)} WIDE X "
+        f"{render_number(DRIVER_BLADE_THICK_MAX, 'in', 3)} THICK MAX.",
+        f"SLOT THE BLADE'S MIDDLE {render_number(DRIVER_SLOT_WIDTH, 'in', 2)} WIDE X "
         f"{render_number(DRIVER_SLOT_DEPTH, 'in', 2)} DEEP.",
         f"DISCARD THE HEX NUT SUPPLIED WITH EACH OF THE {CHANNEL_ANCHORS} {_ANCHOR} "
         "ANCHORS.",
@@ -203,7 +203,7 @@ _STEP_TEXT: dict[str, tuple[str, ...]] = {
         f"CHECK EACH {_ANCHOR}: ITS EYE CANNOT BE TURNED BY HAND.",
         f"CHECK EACH {_ANCHOR_NUT}: FULL THREAD SHOWS BELOW IT.",
         "IF AN EYE TURNS OR NO THREAD SHOWS, SLACKEN THAT NUT AND REPEAT "
-        f"{_n('channel-anchors-set')}D-{_n('channel-anchors-set')}E.",
+        f"{_n('channel-anchors-set')}E-{_n('channel-anchors-set')}F.",
         "HOOK EACH SPRING'S BOTTOM LOOP INTO ITS ANCHOR EYE.",
     ),
     "summing-levelled": (
@@ -258,8 +258,8 @@ _STEP_TEXT: dict[str, tuple[str, ...]] = {
         f"PEN WIRE, WITH THE PLATE TOP LEVEL ({_n('summing-levelled')}D): LEAD "
         "THE UPPER END OF MHA-SH-VN-56 (SUPPLIED WITH MHA-PN-00) INTO THE "
         "MHA-MG-05 RIM GROOVE AT ITS RIGHT-HAND TANGENT (FRONT VIEW).",
-        "WRAP THE WIRE COUNTERCLOCKWISE (FRONT VIEW) UP OVER THE TOP, UNDER ONE "
-        "TURN, TO THE RADIAL WIRE TIE HOLE IN THE MHA-MG-05 RIM.",
+        "WRAP THE WIRE COUNTERCLOCKWISE (FRONT VIEW) UP OVER THE TOP, LESS THAN "
+        "ONE FULL TURN, TO THE RADIAL WIRE TIE HOLE IN THE MHA-MG-05 RIM.",
         "PASS THE WIRE THROUGH THE HOLE AND DRAW IT UNTIL THE MHA-PN-07 STUD "
         "HEAD TOP HANGS THE SHEET 1 DROP BELOW THE MHA-MG-08 BAR TOP.",
         "TIE THE WIRE OFF INSIDE THE RIM AT THAT DROP.",

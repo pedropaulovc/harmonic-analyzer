@@ -1494,7 +1494,7 @@ def test_the_rear_cup_is_pinned_and_the_nut_seats_on_the_faced_pilot() -> None:
     assert seq.index("pilot-faced-to-fit") < seq.index("collar-shoulder-seated")
     assert f"{collar.PILOT_PROUD_TEXT} PROUD" in _step_body("pilot-faced-to-fit")
     seated = _step_body("collar-shoulder-seated")
-    assert "ON THE PILOT" in seated
+    assert "COLLAR'S PILOT" in seated
     # The nut is a static clamp (the D-flat and dowels drive): rule 23's
     # U-MHA-PD-13-no-lock holds only while nobody turns it to drive.
     assert "NEVER TURN IT TO DRIVE" in seated
@@ -2035,7 +2035,9 @@ def test_the_chain_is_closed_and_run_after_the_collar_is_accepted() -> None:
         "chain-run-accepted",
     )
     closed = _step_body("chain-closed")
-    assert f"LOOP {chain.LINK_COUNT} PITCHES" in closed
+    # The loose links loop one pitch short; the connecting link closes it.
+    assert f"LOOP {chain.LINK_COUNT - 1} PITCHES" in closed
+    assert f"THE LOOP {chain.LINK_COUNT} PITCHES" in closed
     assert "ANSI #25" in closed
     assert f"OVER THE {sprocket.KNOB_CONFIG} AND THE {sprocket.CRANK_CONFIG}" in closed
     assert chain.LINK_COUNT % 2 == 0
