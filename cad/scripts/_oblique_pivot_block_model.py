@@ -281,17 +281,22 @@ async def _construction_circle(adapter, dims, x_base, y_base, uv, dia, names, la
 
 async def _plan_datum_reference(adapter, part) -> None:
     """The hidden top-face sketch that carries the plan's ordinates (rule 10):
-    every X from the -X edge, every Y from the -Y edge, so the plan has one
-    origin (machinist review, farm r3 20261108T014606685Z: the hole rows were
-    chained .512 through the seat axis while the seat stood .79 from the -Y
-    edge). Plain lines ON the -X edge and the +X end, construction circles ON
-    the shoulder seat, one carriage hole per column and one per row, and on
-    TL-32 a plain line ON the lug's -X face, which also carries the overall
-    from the top (+Y) edge. Shown in the plan view, every entity overlies a
+    every X from the -X edge, every Y from one full-width edge, so the plan has
+    one origin (machinist review, farm r3 20261108T014606685Z: the hole rows
+    were chained .512 through the seat axis). Plain lines ON the -X edge and
+    the +X end, construction circles ON the shoulder seat, one carriage hole
+    per column and one per row, and on TL-32 a plain line ON the lug's -X
+    face, which also carries the overall from the top (+Y) edge and the lug's
+    length from the step. Shown in the plan view, every entity overlies a
     real edge. X dims leave the -X edge's +Y end, above the plan's X tiers;
-    Y dims leave the +X end's -Y corner, BlockSideY's own witness point
-    (from the -X corner a witness ran the whole -Y edge and, on TL-32, across
-    the lug's top face: round-5 review)."""
+    Y dims leave a +X end corner, BlockSideY's own witness point (from the -X
+    corner a witness ran the whole edge and, on TL-32, across the lug's top
+    face: round-5 review). TL-22 measures Y from its -Y edge (+X/-Y corner).
+    TL-32 measures from its full-width +Y edge (+X/+Y corner): its -Y edge is
+    only the step left of the lug, and the +X/-Y point lies on the lug's
+    right edge, where no -Y edge exists (restack farm r4
+    20261108T055431582Z; Main-approved 2026-11-08, dimensioning only)."""
+    feed = hasattr(part, "LUG_WIDTH")
     feature = spec.PLAN_DATUM_REFERENCE
     z = part.BLOCK_HEIGHT
     check(f"create_sketch {feature}", await adapter.create_sketch("TopFace"))
@@ -316,7 +321,8 @@ async def _plan_datum_reference(adapter, part) -> None:
     await dimension_between(adapter, f"{end}.start", f"{end}.end", "vertical_distance",
                             part.BLOCK_WIDTH, f"{feature} +X end length")
     dims.record("PlanEndLength")
-    x_base, y_base = (f"{edge}.end", edge_end), (f"{end}.start", end_start)
+    x_base = (f"{edge}.end", edge_end)
+    y_base = (f"{end}.end", end_end) if feed else (f"{end}.start", end_start)
     await _construction_circle(adapter, dims, x_base, y_base, at(spec.BORE_X, spec.BORE_Y), spec.BORE_DIA,
                                ("PlanBoreX", "PlanBoreY", "PlanBoreDia"), f"{feature} seat")
     columns = {}
@@ -333,17 +339,26 @@ async def _plan_datum_reference(adapter, part) -> None:
     await _construction_circle(adapter, dims, (f"{above}.center", above_uv), y_base, at(x, y), spec.HOLE_DIA,
                                (f"PlanHole{i}X", f"PlanHole{i}Y", f"PlanHole{i}Dia"),
                                f"{feature} carriage hole row")
-    if hasattr(part, "LUG_WIDTH"):
+    if feed:
         lug_top, lug_end = at(part.LUG_X0, part.LUG_Y1), at(part.LUG_X0, part.LUG_Y0)
         lug = await _drawn(adapter, adapter.add_line(lug_top[0], lug_top[1], lug_end[0], lug_end[1]),
                            f"{feature} lug -X face")
         check(f"{feature} lug face vertical", await adapter.add_sketch_constraint(lug, None, "vertical"))
-        await _offset_point(adapter, dims, f"{edge}.start", f"{lug}.start",
-                            abs(lug_top[0] - edge_start[0]), abs(lug_top[1] - edge_start[1]),
-                            ("PlanLugX", "PlanLugY"), f"{feature} lug face from -X edge")
+        # The lug face's X from the -X edge; its top's Y is set by the lug's
+        # length from its end (not aligned to the -X edge's foot, which
+        # PlanLugLength would make redundant).
+        await dimension_between(adapter, f"{edge}.start", f"{lug}.start", "horizontal_distance",
+                                abs(lug_top[0] - edge_start[0]), f"{feature} lug face from -X edge")
+        dims.record("PlanLugX")
         await dimension_between(adapter, f"{edge}.end", f"{lug}.end", "vertical_distance",
                                 part.BLOCK_WIDTH / 2 - part.LUG_Y0, f"{feature} overall from +Y edge")
         dims.record("PlanOverallY")
+        # The lug's length, step face to lug end: printed in the pocket left
+        # of the lug, its upper arrow on the step face itself (the 1.58 has
+        # no -Y end to leave on the +X side of an L).
+        await dimension_between(adapter, f"{lug}.start", f"{lug}.end", "vertical_distance",
+                                part.LUG_LENGTH, f"{feature} lug length from step")
+        dims.record("PlanLugLength")
     await ensure_fully_defined(adapter, feature)
     check(f"exit_sketch {feature}", await adapter.exit_sketch())
     name_last_feature(adapter, feature)
@@ -602,19 +617,22 @@ async def build_block_model(adapter, part) -> None:
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
     check("create part", await adapter.create_part())
     apply_package_model_units(adapter, part_drawing_unit(part.PART_NAME), label=part.PART_NAME)
-    # Anchored at the +X/-Y corner, where the printed BlockSideY's witness
-    # starts: from the -X corner its extension line ran the whole -Y edge and,
-    # on TL-32, across the lug's top face (round-5 review).
+    # BlockSideY's witness leaves the anchor corner. TL-22 anchors at +X/-Y
+    # (from the -X corner its extension line ran the whole -Y edge: round-5
+    # review). TL-32 anchors at +X/+Y: its -Y edge is only the step left of
+    # the lug, so a +X/-Y witness left the lug's right edge where no -Y edge
+    # exists (restack farm r4 20261108T055431582Z; Main-approved 2026-11-08).
     await _rectangle(adapter,"BlockProfile",(part.BLOCK_X0,part.BLOCK_X1,-part.BLOCK_WIDTH/2,part.BLOCK_WIDTH/2),
-                     ["BlockLength","BlockWidth","BlockEndX","BlockSideY"], anchor=1)
+                     ["BlockLength","BlockWidth","BlockEndX","BlockSideY"],
+                     anchor=2 if hasattr(part,"LUG_WIDTH") else 1)
     check("block",await adapter.create_extrusion(ExtrusionParameters(depth=part.BLOCK_HEIGHT)))
     name_last_feature(adapter,"Block")
     name_dimensions(adapter,"Block",["BlockHeight"])
     expected = part.BLOCK_LENGTH * part.BLOCK_WIDTH * part.BLOCK_HEIGHT
     if hasattr(part,"LUG_WIDTH"):
         # Owner ruling 2026-11-07: the lug's +X side is the block's +X end.
-        # Anchored on BlockProfile's anchor corner (+X/-Y), the lug's +X edge
-        # lies on the block's, and the union leaves one face (readback,
+        # Anchored on BlockProfile's +X/-Y corner, the lug's +X edge lies on
+        # the block's, and the union leaves one face (readback,
         # _require_flush_lug_end); the shared edge at Y=-20 joins the two
         # full-height extrusions.
         await _rectangle(adapter,"LugProfile",(part.LUG_X0,part.LUG_X1,part.LUG_Y0,part.LUG_Y1),

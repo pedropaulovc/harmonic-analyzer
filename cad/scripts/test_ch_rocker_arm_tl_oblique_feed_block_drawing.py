@@ -330,6 +330,72 @@ def test_plan_ordinates_start_on_the_left_edge():
     assert not {'BlockEndX','BoreX','LugWidth','LugCornerX','LugCornerY','LugLength'}&set(spec.DRAWING_PRECISION_BY_NAME)
 
 
+def test_plan_y_ordinates_leave_the_full_width_plus_y_edge():
+    """Restack farm r4 20261108T055431582Z: from the +X/-Y corner the Y
+    baseline's witnesses left the lug's right edge, where the L has no -Y
+    edge. Main-approved 2026-11-08 (dimensioning only): TL-32's Y ordinates
+    run from the +Y edge, its witnesses leaving the +X/+Y corner; the 1.58
+    gives way to the lug's 1.89 from the step face; TL-22 is unchanged."""
+    import _oblique_block_drawing as drawing
+
+    half=spec.BLOCK_WIDTH/2
+    values=spec.DRAWING_VALUES
+    assert values['PlanHole2Y']==half-pivot.BOLT_Y and values['PlanHole3Y']==half+pivot.BOLT_Y
+    assert [round(values[name]/INCH,3) for name in ('PlanHole2Y','PlanHole3Y')]==[.278,1.302]
+    assert values['BlockSideY']==half
+    # TL-22 keeps its -Y edge values.
+    assert pivot.DRAWING_VALUES['PlanHole2Y']==half+pivot.BOLT_Y
+    assert pivot.DRAWING_VALUES['PlanHole3Y']==half-pivot.BOLT_Y
+    # The lug's length from the step: 3.47 - 1.89 locates the step at 1.58.
+    assert math.isclose(values['PlanLugLength'],spec.LUG_LENGTH)
+    assert math.isclose(spec.PLAN_OVERALL_Y-values['PlanLugLength'],spec.BLOCK_WIDTH)
+    assert round(values['PlanLugLength']/INCH,2)==1.89
+    assert 'PlanLugLength' in spec.DRAWING_DIMENSIONS[spec.PLAN_DATUM_REFERENCE]
+    assert spec.DRAWING_PRECISION_BY_NAME['PlanLugLength']==2
+    # BlockWidth still drives BlockProfile but prints nowhere on TL-32.
+    assert 'BlockWidth' in pivot.DRAWING_DIMENSIONS['BlockProfile']
+    assert spec.DRAWING_DIMENSIONS['BlockProfile']==('BlockLength','BlockSideY')
+    assert 'BlockWidth' not in set(spec.DRAWING_PRECISION_BY_NAME)|set(spec.CALLOUTS_BELOW)
+    assert 'BlockWidth' not in drawing.FEED_PLAN_KEEP and 'BlockWidth' in drawing.PLAN_KEEP
+    model=(FOLDER/'_oblique_pivot_block_model.py').read_text(encoding='utf-8')
+    assert '["BlockLength","BlockWidth","BlockEndX","BlockSideY"],\n' in model
+    assert 'anchor=2 if hasattr(part,"LUG_WIDTH") else 1)' in model
+    body=model[model.index('async def _plan_datum_reference'):model.index('async def _driving_angle')]
+    assert 'dims.record("PlanLugLength")' in body
+    # The lug face's top is not also aligned to the -X edge's foot: with the
+    # lug length that would over-define the sketch.
+    assert '"PlanLugY"' not in body
+    # .278's span carries its arrows inside on each sheet.
+    assert drawing.FEED_PLAN_ARROWS_INSIDE==('PlanHole2Y',)
+    assert drawing.PLAN_ARROWS_INSIDE==('PlanHole3Y',)
+    keep={name:tuple(v*1000 for v in xy) for name,xy in drawing.FEED_PLAN_KEEP.items()}
+    top=drawing.FEED_PLAN_XY[1]*1000+spec.PLAN_OVERALL_Y/2
+    step=top-spec.BLOCK_WIDTH
+    lug_end=top-spec.PLAN_OVERALL_Y
+    left=drawing.FEED_PLAN_XY[0]*1000+pivot.BLOCK_X0
+    lug_face=left+spec.PLAN_LUG_X
+    right=drawing.FEED_PLAN_XY[0]*1000+pivot.BLOCK_X1
+    # .278's text (3.0 mm a character) clears A's right letter, which ends
+    # at x ~197.6 in the r4 render (20261108T055431582Z).
+    assert keep['PlanHole2Y'][0]-2*3.0-197.6>=2.0
+    assert keep['PlanHole2Y'][0]-right>=10.0
+    # 3.47 stands beyond the 1.302, its line clear of the counterbore
+    # callout's text (x ~221..269.4 at y ~171.6..176.3 in the r4 render).
+    assert keep['PlanOverallY'][0]-keep['PlanHole3Y'][0]>=20.0 and keep['PlanOverallY'][0]-269.4>=10.0
+    # The 1.89 stands in the pocket left of the lug: its line right of B-B's
+    # cutting line (x 157), its text (four characters) inside the pocket
+    # between the -X edge and the lug's -X face, mid-span between the step
+    # and the lug end, wholly under B-B's lower end.
+    lug_x,lug_y=keep['PlanLugLength']
+    cut=drawing.FEED_PLAN_XY[0]*1000+pivot.CBORE_SECTION_X
+    assert lug_x-cut>=5.0
+    assert left+1.0<=lug_x-2*3.0 and lug_x+2*3.0<=lug_face-1.0
+    assert lug_end+10.0<=lug_y<=step-10.0
+    b_end=step-drawing.FLOOR_CUT_BOTTOM_OVERRUN_MM
+    assert b_end-(lug_y+3.19)>=5.0
+
+
+
 def test_reference_lines_on_the_printed_outline_are_plain_sketch_lines():
     # Shown in the plan and VIEW D, the reference sketches' lines lie on the
     # -X edge, the +X end (the plan's Y baseline), the lug's -X face and the

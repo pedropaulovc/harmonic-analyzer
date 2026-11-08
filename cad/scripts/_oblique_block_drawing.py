@@ -7,8 +7,9 @@ Manufacturing sheets for the plain shoulder-screw pivot blocks.
 
 Both sheets print decimal inch (each part's ``drawing_unit``). All sizes
 import native model dimensions; no bearing/cartridge sheets survive.
-Plan X locations run from the -X (left) edge and Y locations from the -Y
-edge through the hidden ``PlanDatumReference`` sketch. Section B-B
+Plan X locations run from the -X (left) edge and Y locations from one
+full-width edge (TL-22's -Y, TL-32's +Y) through the hidden
+``PlanDatumReference`` sketch. Section B-B
 shows the floor from the carriage seat, not a competing counterbore-depth
 tolerance chain. TL-32's nut face is VIEW D on its own 2:1 sheet, its arrow on
 the plan. The layout notes below give sheet millimetres.
@@ -60,18 +61,19 @@ TAPPED_HOLE_NOTE = '#4-40 Tapped Hole'
 # highest witness (y254.500), and its top y264.512 clears the y266.7 border.
 # Keep dimension text right of the x157 cutting line, not on that line.
 # X ordinates remain native baseline dimensions from the finished -X edge;
-# Y ordinates are a baseline from the -Y edge (rule 10, one origin: farm r3
-# 20261108T014606685Z read the rows chained .512 through the seat axis).
+# Y ordinates are a baseline from one full-width edge (rule 10, one origin:
+# farm r3 20261108T014606685Z read the rows chained .512 through the seat
+# axis): TL-22's -Y edge, TL-32's +Y edge (FEED_PLAN_KEEP).
 # Native layout and machinist-review own fit.
 PLAN_XY = (.170,.205)
-# The Y baseline, right of the plan (block y 184.9..225.1, rows at 192.0 and
-# 218.0, seat at 205.0 on both sheets: TL-32's plan centres the L, its block
-# lands on the same band), shortest nearest, 20 mm apart: .278 (x 204.5),
-# .79 (224.5), 1.302 (244.5), 1.58 (264.5), every witness leaving the +X/-Y
-# corner. The .278's 7 mm span cannot hold its text between arrows: the text
-# stands just over the span, under the A arrow (y 205 up), and above TL-32's
-# counterbore leader (y ~180 at x 204.5). The others print mid-span, clear
-# of their own arrowheads and of each other's witnesses.
+# TL-22's Y baseline, right of the plan (block y 184.9..225.1, rows at 192.0
+# and 218.0, seat at 205.0 on both sheets: TL-32's plan centres the L, its
+# block lands on the same band), shortest nearest, 20 mm apart: .278 (x
+# 204.5), .79 (224.5), 1.302 (244.5), 1.58 (264.5), every witness leaving the
+# +X/-Y corner. The .278's 7 mm span cannot hold its text between arrows: the
+# text stands just over the span, under the A arrow (y 205 up), and above
+# TL-32's counterbore leader (y ~180 at x 204.5). The others print mid-span,
+# clear of their own arrowheads and of each other's witnesses.
 PLAN_KEEP = {
     'BlockLength':(.170,.2535),'PlanHole2X':(.1665,.248),'PlanHole1X':(.171,.2395),
     'PlanBoreX':(.1635,.231),
@@ -141,13 +143,32 @@ ISO_XY, ISO_SCALE = (.355,.228), SHEET_SCALE
 # because its -X column no longer crosses the lug. The taller pictorial
 # retains its own 1:2 scale.
 FEED_PLAN_XY = (.170,.181)
-FEED_PLAN_KEEP = PLAN_KEEP | {
-    'PlanLugX':(.1554,.1225),'PlanOverallY':(.285,.181),
+# TL-32's Y baseline is its full-width +Y edge, every witness leaving the
+# +X/+Y corner: the L's -Y edge is only the step left of the lug, and from
+# the +X/-Y corner the witnesses left the lug's right edge, where no -Y edge
+# exists (restack farm r4 20261108T055431582Z; Main-approved 2026-11-08).
+# TL-22's lanes mirrored about the seat (y 205), shortest nearest, 20 mm
+# apart, 3 mm further right than TL-22's: .278 (x 207.5), .79 (227.5),
+# 1.302 (247.5). The .278's text stands just under its 7 mm span (arrows
+# inside), clear of the +Y edge's X witnesses above, and 3 mm right so it
+# clears A's right letter, which ends under row 218 at x ~192..198. The
+# others print mid-span. The 3.47 keeps its lane at x 285: at 267.5 its
+# line would cross the counterbore callout (x ~220..270, y ~171..177). No
+# 1.58 prints (it has no -Y end at the +X side of the L); the lug's 1.89
+# from the step face prints in the pocket left of the lug (step y 184.9,
+# lug end y 137.0, lug -X face x 171.3), right of B-B's x 157 line and
+# under its lower arrow (y ~169).
+FEED_PLAN_KEEP = {name: xy for name, xy in PLAN_KEEP.items() if name != 'BlockWidth'} | {
+    'PlanHole2Y':(.2075,.2135),'BlockSideY':(.2275,.2150),'PlanHole3Y':(.2475,.2085),
+    'PlanLugX':(.1554,.1225),'PlanOverallY':(.285,.181),'PlanLugLength':(.163,.155),
     # 84d's counterbore leader crossed VIEW D at y160.934; its text also
     # met D's sheet reference. Raise only this callout: its bottom row starts
-    # y165.219 and its top ends y182.765, below the y184.937 width witness.
+    # y165.219 and its top ends y182.765, below the y184.937 -Y edge.
     'CarriageCounterbores3Dia':(.245,.174),
 }
+# The span under its text with its arrows inside, by sheet: the .278.
+PLAN_ARROWS_INSIDE = ('PlanHole3Y',)
+FEED_PLAN_ARROWS_INSIDE = ('PlanHole2Y',)
 FEED_SIDE_XY = (.170,.060)
 FEED_SIDE_KEEP = {'TopBoreDepth':(.120,.068)}
 FEED_SEAT_DEPTH_TEXT_XY = (.078,.084)
@@ -757,10 +778,13 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None, ca
     create_blank_drawing_sheets(adapter,sheets,label='block sheets')
     drawing = _early_bound(drawing,'IDrawingDoc')
     drawing.ActivateSheet(sheets[0])
-    plan_xy, plan_keep, side_xy, side_keep, seat_text_xy, iso_xy, iso_scale, floor_keep = (
-        (FEED_PLAN_XY, FEED_PLAN_KEEP, FEED_SIDE_XY, FEED_SIDE_KEEP, FEED_SEAT_DEPTH_TEXT_XY, FEED_ISO_XY, FEED_ISO_SCALE,
-         FEED_FLOOR_KEEP)
-        if is_feed else (PLAN_XY, PLAN_KEEP, SIDE_XY, SIDE_KEEP, SEAT_DEPTH_TEXT_XY, ISO_XY, ISO_SCALE, FLOOR_KEEP))
+    plan_xy, plan_keep, plan_arrows_inside, side_xy, side_keep, seat_text_xy, iso_xy, iso_scale, floor_keep = (
+        (FEED_PLAN_XY, FEED_PLAN_KEEP, FEED_PLAN_ARROWS_INSIDE, FEED_SIDE_XY, FEED_SIDE_KEEP, FEED_SEAT_DEPTH_TEXT_XY,
+         FEED_ISO_XY, FEED_ISO_SCALE, FEED_FLOOR_KEEP)
+        if is_feed else (PLAN_XY, PLAN_KEEP, PLAN_ARROWS_INSIDE, SIDE_XY, SIDE_KEEP, SEAT_DEPTH_TEXT_XY, ISO_XY,
+                         ISO_SCALE, FLOOR_KEEP))
+    if is_feed:
+        del printed['BlockWidth']  # TL-32 prints no 1.58 (FEED_PLAN_KEEP)
     plan = place_view(adapter,str(source),'*Front',*plan_xy,scale=SHEET_SCALE)
     # Each cutting line runs so its arrows point away from the section it
     # names (third-angle): A-A below the plan looks up, B-B right of it looks
@@ -776,7 +800,7 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None, ca
     set_hidden_lines_removed(adapter,plan)
     plan_annotations = curate_view_dimensions(adapter,plan,keep=plan_keep,view_label='plan',
                      dimensions_by_feature=contract.DRAWING_DIMENSIONS)
-    _set_arrow_side(adapter, plan_annotations, ('PlanHole3Y',), _ARROWS_INSIDE)
+    _set_arrow_side(adapter, plan_annotations, plan_arrows_inside, _ARROWS_INSIDE)
     set_hidden_lines_removed(adapter,side)
     side_annotations = curate_view_dimensions(adapter,side,keep=side_keep,view_label='pivot section direction',
                      dimensions_by_feature=contract.DRAWING_DIMENSIONS)

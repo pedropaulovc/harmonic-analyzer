@@ -111,10 +111,19 @@ CBORE_FLOOR_REFERENCE = pivot.CBORE_FLOOR_REFERENCE
 # B-B prints the block height from the floor sketch's interior line (TL-22,
 # whose sections never imported it, prints the Block extrusion's depth on a
 # standard Right view).
-DRAWING_VALUES = {k: v for k, v in pivot.DRAWING_VALUES.items() if k != "BlockHeight"} | {
+# The plan's Y ordinates run from the full-width +Y edge, BlockSideY's and
+# the hole rows' witnesses leaving the +X/+Y corner: the L's -Y edge is only
+# the step left of the lug, and a +X/-Y witness left the lug's right edge,
+# where no -Y edge exists (restack farm r4 20261108T055431582Z). The 1.58
+# has no -Y end on the +X side either, so the plan prints the lug's length
+# from the step face instead (3.47 - 1.89 locates the step); BlockWidth
+# still drives BlockProfile. Main-approved 2026-11-08, dimensioning only.
+PLAN_ROW_HOLES_FROM_TOP = {name: BLOCK_WIDTH / 2 - y for name, (_x, y) in pivot.PLAN_ROW_HOLES.items()}
+DRAWING_VALUES = {k: v for k, v in pivot.DRAWING_VALUES.items() if k != "BlockHeight"} | PLAN_ROW_HOLES_FROM_TOP | {
     "SectionBlockHeight": BLOCK_HEIGHT,
     "PlanLugX": LUG_X0 - BLOCK_X0,
     "PlanOverallY": BLOCK_WIDTH / 2 - LUG_Y0,
+    "PlanLugLength": LUG_LENGTH,
     "NutClearanceDia": SCREW_CLEARANCE_DIA,
     "NutCentreZ": NUT_AXIS_Z, "NutCentreY": NUT_AXIS_Y - LUG_Y0,
 }
@@ -122,8 +131,10 @@ DRAWING_VALUES = {k: v for k, v in pivot.DRAWING_VALUES.items() if k != "BlockHe
 # taps' clocking band; the taps' transfer callout locates them.
 NUT_PATTERN_PRINTED = ("NutCentreZ", "NutCentreY", NUT_CLOCK_DIMENSION)
 DRAWING_DIMENSIONS = {k: v for k, v in pivot.DRAWING_DIMENSIONS.items() if k != "Block"} | {
+    "BlockProfile": tuple(name for name in pivot.DRAWING_DIMENSIONS["BlockProfile"] if name != "BlockWidth"),
     CBORE_FLOOR_REFERENCE: pivot.DRAWING_DIMENSIONS[CBORE_FLOOR_REFERENCE] + ("SectionBlockHeight",),
-    PLAN_DATUM_REFERENCE: pivot.DRAWING_DIMENSIONS[PLAN_DATUM_REFERENCE] + ("PlanLugX", "PlanOverallY"),
+    PLAN_DATUM_REFERENCE: pivot.DRAWING_DIMENSIONS[PLAN_DATUM_REFERENCE] + ("PlanLugX", "PlanOverallY",
+                                                                            "PlanLugLength"),
     "NutClearanceProfile": ("NutClearanceDia",),
     "NutPatternReference": NUT_PATTERN_PRINTED,
 }
@@ -145,6 +156,9 @@ THREE_PLACE_DIMENSIONS = pivot.THREE_PLACE_DIMENSIONS | {
     "NutClearanceDia", "NutCentreZ", "NutCentreY",
 }
 DRAWING_PRECISION = {k: v for k, v in pivot.DRAWING_PRECISION.items() if k != "Block"} | {
+    "BlockProfile": {name: places for name, places in pivot.DRAWING_PRECISION["BlockProfile"].items()
+                     if name in DRAWING_DIMENSIONS["BlockProfile"]},
+} | {
     feature: {
         name: (
             0 if name == NUT_CLOCK_DIMENSION
@@ -332,7 +346,9 @@ CALLOUTS_ABOVE = dict(pivot.CALLOUTS_ABOVE) | {
     "CarriageCounterbores3Dia": "4X COUNTERBORE",
     "NutClearanceDia": "DRILL THRU",
 }
-CALLOUTS_BELOW = dict(pivot.CALLOUTS_BELOW) | {
+# BlockWidth prints nowhere on TL-32 (PlanLugLength replaces it), so it
+# carries no callout.
+CALLOUTS_BELOW = {k: v for k, v in pivot.CALLOUTS_BELOW.items() if k != "BlockWidth"} | {
     "NutClearanceDia": f"LEADSCREW CLEARANCE\n{NUT_WALL_MIN_TEXT}",
     # r2 review: "BOTTOM" named no face a view defines; the face the
     # counterbored screws pull onto the HGH15CA-style carriage does.

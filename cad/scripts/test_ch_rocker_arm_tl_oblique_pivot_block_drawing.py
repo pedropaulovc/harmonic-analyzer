@@ -114,29 +114,42 @@ def test_plan_locates_every_hole_from_the_minus_x_and_minus_y_edges():
     assert {y for _x, y in spec.PLAN_ROW_HOLES.values()} == {spec.BOLT_Y, -spec.BOLT_Y}
     model = Path(__file__).with_name('_oblique_pivot_block_model.py').read_text(encoding='utf-8')
     body = model[model.index('async def _plan_datum_reference'):model.index('async def _driving_angle')]
-    assert 'x_base, y_base = (f"{edge}.end", edge_end), (f"{end}.start", end_start)' in body
+    assert 'x_base = (f"{edge}.end", edge_end)' in body
+    # TL-22 keeps the -Y edge's +X corner; TL-32 (feed) flips to the +Y one.
+    assert 'y_base = (f"{end}.end", end_end) if feed else (f"{end}.start", end_start)' in body
+    assert drawing.PLAN_ARROWS_INSIDE == ('PlanHole3Y',)
     assert 'spec.PLAN_DATUM_ROW_HOLE' in body
 
 
 @pytest.mark.parametrize("feed", [False, True])
 def test_y_baseline_lanes_keep_each_text_off_the_other_lines(feed):
-    """The four Y dims stand shortest nearest right of the plan; no text box
-    meets another dimension's line or witness. Text metrics from the
-    retained pivot PDFs (3.0 mm a character, a 6.38 mm row box)."""
+    """The Y dims stand shortest nearest right of the plan; no text box meets
+    another dimension's line or witness, nor its own witnesses. TL-22's run
+    from its -Y edge; TL-32's from its full-width +Y edge (restack farm r4
+    20261108T055431582Z: the L has no -Y edge at its +X end). Text metrics
+    from the retained pivot PDFs (3.0 mm a character, a 6.38 mm row box)."""
     import _oblique_block_drawing as drawing
     import ch_rocker_arm_tl_oblique_feed_block_spec as feed_spec
 
     keep = drawing.FEED_PLAN_KEEP if feed else drawing.PLAN_KEEP
+    values = (feed_spec if feed else spec).DRAWING_VALUES
     centre_y = (drawing.FEED_PLAN_XY if feed else drawing.PLAN_XY)[1] * 1000
     # TL-32's view centres the L (block plus lug), TL-22's the block.
     top = centre_y + (feed_spec.PLAN_OVERALL_Y if feed else spec.BLOCK_WIDTH) / 2
     base = top - spec.BLOCK_WIDTH
     right = drawing.PLAN_XY[0] * 1000 + spec.BLOCK_LENGTH / 2
-    dims = {name: base + spec.DRAWING_VALUES[name]
-            for name in ('PlanHole3Y', 'BlockSideY', 'PlanHole2Y', 'BlockWidth')}
+    if feed:
+        edge, names = top, ('PlanHole2Y', 'BlockSideY', 'PlanHole3Y')
+        dims = {name: top - values[name] for name in names}
+    else:
+        edge, names = base, ('PlanHole3Y', 'BlockSideY', 'PlanHole2Y', 'BlockWidth')
+        dims = {name: base + values[name] for name in names}
     lanes = [keep[name][0] * 1000 for name in dims]
     assert lanes == sorted(lanes) and lanes[0] - right >= 10.0
-    text = {'PlanHole3Y': '.278', 'BlockSideY': '.79', 'PlanHole2Y': '1.302', 'BlockWidth': '1.58'}
+    assert all(math.isclose(b - a, 20.0) for a, b in zip(lanes, lanes[1:]))
+    text = {name: f'{values[name] / INCH:.3f}'.lstrip('0') if name in spec.PLAN_ROW_HOLES
+            else f'{values[name] / INCH:.2f}'.lstrip('0') for name in dims}
+    assert sorted(text.values()) == sorted(['.278', '.79', '1.302'] + ([] if feed else ['1.58']))
     boxes = {}
     for name in dims:
         x, y = (v * 1000 for v in keep[name])
@@ -147,14 +160,17 @@ def test_y_baseline_lanes_keep_each_text_off_the_other_lines(feed):
             if other == name:
                 continue
             lane = keep[other][0] * 1000
-            # Its dimension line (lane, base..feature) and its feature witness.
-            assert not (x0 <= lane <= x1 and y0 <= feature_y and base <= y1), (name, other)
+            low, high = sorted((edge, feature_y))
+            # Its dimension line (lane, edge..feature) and its feature witness.
+            assert not (x0 <= lane <= x1 and y0 <= high and low <= y1), (name, other)
             assert not (y0 <= feature_y <= y1 and x0 <= lane + 1.0), (name, other, 'witness')
             ox0, oy0, ox1, oy1 = boxes[other]
             assert x1 <= ox0 or ox1 <= x0 or y1 <= oy0 or oy1 <= y0
-        # Its own witness at the edge: the text rides its span, or (.278,
-        # farm r4) stands wholly under the -Y edge with air.
-        assert y0 > base or y1 < base - 1.0, name
+        # Its own witnesses: the text never straddles the edge's or its
+        # feature's line, and (.278, 7 mm span) stands clear past the
+        # feature, toward the block's middle, not over the edge.
+        assert not y0 <= edge <= y1 and not y0 <= dims[name] <= y1, name
+        assert (y1 < edge) if feed else (y0 > edge), name
 
 
 def test_native_builder_owns_real_solids_dimensions_and_final_volume():
@@ -379,10 +395,13 @@ def test_printed_callouts_read_size_process_depth_and_name_each_mate_once():
 
     printed = drawing.BLOCK_CALLOUTS
     # Every printed dimension is imported on both sheets, so the applier
-    # finds it; each exists in the part's own dimension set.
-    for keep in (drawing.PLAN_KEEP | drawing.SIDE_KEEP | drawing.FLOOR_KEEP,
-                 drawing.FEED_PLAN_KEEP | drawing.FEED_SIDE_KEEP | drawing.FEED_FLOOR_KEEP):
-        assert set(printed) <= set(keep)
+    # finds it; each exists in the part's own dimension set. TL-32 prints no
+    # 1.58 (no -Y end at the L's +X side): draw_block drops its text.
+    assert set(printed) <= set(drawing.PLAN_KEEP | drawing.SIDE_KEEP | drawing.FLOOR_KEEP)
+    assert set(printed) - set(drawing.FEED_PLAN_KEEP | drawing.FEED_SIDE_KEEP | drawing.FEED_FLOOR_KEEP) == {
+        'BlockWidth'}
+    source = Path(drawing.__file__).read_text(encoding='utf-8')
+    assert "    if is_feed:\n        del printed['BlockWidth']" in source
     assert set(printed) <= set(spec.DRAWING_PRECISION_BY_NAME)
     assert all(set(parts) <= set(drawing.TEXT_PARTS) for parts in printed.values())
     # No process or count stands above a size.
