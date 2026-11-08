@@ -1848,14 +1848,15 @@ CHECKS = _note_text(
         # up with the cone line before the pedestals tighten (Main ruling:
         # pedestal term booked at zero), then T120 is set on its feeler.  The
         # shims may move each pedestal only inside its setting-table range, so
-        # step 10 (set from the DRO zero) and the rig (re-proved by check 7)
-        # stand (#1691 review r4).  Stoning is T012's only remedy: backing the
-        # swing off would undo the T120 set (#1691 review r2).
+        # stand (#1691 review r4).  Backing the swing off would undo the T120
+        # set (#1691 review r2), so a T012 bind is cleared at the tip that
+        # governs it: the MHA-DT-12 tip reaching the T012 flank below its base
+        # circle (dt_mesh_checks interference margin; owner choice A,
+        # 2026-11-08, pending owner confirmation).
         "4. CONE SWING SET: LOOSEN MHA-DT-VN-51.",
         "4A. SWING THE CONE SET ON MHA-DT-VN-52 OUT TO THE MHA-SH-VN-52 STOP.",
         "4B. ZERO DIAL INDICATORS: EACH MHA-DT-02 IN X, THE FRONT ONE IN Y.",
-        "4C. EASE THE MHA-DT-02 SCREWS (MHA-DT-VN-62) UNTIL EACH PEDESTAL MOVES",
-        "   UNDER LIGHT TAPS.",
+        "4C. EASE MHA-DT-VN-62 UNTIL EACH MHA-DT-02 MOVES UNDER LIGHT TAPS.",
         "4D. SWING IN ON FEELER LEAVES, TIP TO MHA-DT-12 ROOT: "
         f"{inch_text(set_stack.feeler_gap_mm(12), FEELER_PLACES)} AT T012, "
         f"{_T120_SET_FEELER} AT T120.",
@@ -1879,10 +1880,12 @@ CHECKS = _note_text(
         "4R. REDO CHECKS 4-7 AFTER ANY LATER LOOSENING OF MHA-DT-02.",
         # User ruling 2026-10-10: T012's arithmetic worst-corner overlap is a
         # REF fit-up note, never a gate (dt_mesh_checks; the RSS corner is gated).
+        # It is involute interference, not tip-to-root: the radial tip-to-root
+        # clearance stays positive at that corner.
         f"4S. TURN THE CRANK {gear64.TEETH // pinion.TEETH} FULL TURNS: T012 MUST RUN FREE IN ITS "
-        "MHA-DT-12 (TIP-TO-ROOT INTERFERENCE UP TO "
-        f"{inch_text(-mesh_checks.cone_check(12).interference_margin_worst_mm, 3)} REF).",
-        "4T. IF IT BINDS, STONE THE T012 TIP UNTIL IT TURNS FREE.",
+        "MHA-DT-12 (THE MHA-DT-12 TIP MAY REACH THE T012 FLANK BELOW ITS BASE "
+        f"CIRCLE, UP TO {inch_text(-mesh_checks.cone_check(12).interference_margin_worst_mm, 3)} REF).",
+        "4T. IF IT BINDS, STONE THE MHA-DT-12 TIP WHERE IT MARKS.",
         "4U. VERIFY MHA-DT-VN-52 FULL-FORM THREAD ENGAGEMENT "
         f"{pivot_screw.MIN_USEFUL_ENGAGEMENT_TEXT}.",
         "4V. CHECK THAT MHA-DT-20 AND THE MHA-DT-VN-52 SHOULDER STAY SEATED.",

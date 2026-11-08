@@ -578,7 +578,7 @@ def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
     t120 = f"{feeler(set_stack.feeler_gap_mm(120))} AT T120"
     order = [
         check.index("OUT TO THE MHA-SH-VN-52 STOP"),
-        check.index("(MHA-DT-VN-62) UNTIL EACH PEDESTAL MOVES"),
+        check.index("EASE MHA-DT-VN-62 UNTIL EACH MHA-DT-02 MOVES"),
         check.index(t012),
         check.index(t120),
         check.index("TIGHTEN MHA-DT-VN-62"),
