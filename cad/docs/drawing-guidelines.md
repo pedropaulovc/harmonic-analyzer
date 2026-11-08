@@ -133,7 +133,16 @@ HOLES row.
   wall or fit check needs `.XX` or tighter. A clearance whose `.XX` band
   would leave too little room to the part it clears takes `.XXX` and names
   that part (`Ø1.083 CAP RECESS, CLEARS MHA-FR-VN-54 SKIRT`); that third
-  place is not over-specification.
+  place is not over-specification. Two more cases follow the same form:
+  - a size or location whose `.XX` band would take a wall below the rule 17
+    target takes `.XXX` and states the wall it holds, once, on the feature
+    (`.138, HOLDS WALL .080 MIN`);
+  - a depth whose `.XX` band would let its floor meet a neighbouring floor
+    or face takes `.XXX`, measured from the face it is cut from, and names
+    what it stays clear of (`↧ .016, CLEARS .028 ENGRAVING`).
+  That stated wall or clearance is the feature's function under this rule
+  and its one reason under rule 7; it is neither narration nor a second
+  datum.
 - Inch drill diameters, including native Hole Wizard callouts, use three
   decimal places. Their tolerance still comes from DRILLED HOLES, not the
   three-place linear grade. Keep the exact decimal of a named number, letter
@@ -175,9 +184,12 @@ a chamfer gets the loosest title-block band that serves it.
   set by the printed limits of size; the callout names it with one of those
   standard fit names (`RUNNING FIT ON MHA-CH-06-TL-VN-77`), and the resulting
   clearance or interference range may follow as REF (`(CLEARANCE
-  .0010-.0025)`). `DIAMETRAL CLEARANCE` or `DIAMETRAL INTERFERENCE` as the
-  stated requirement repeats the limits in private words. A gear centre
-  distance names the mesh; a width that sets a stack names the stack. Where
+  .0010-.0025)`). Beside printed limits of size, `DIAMETRAL CLEARANCE` or
+  `DIAMETRAL INTERFERENCE` as the stated requirement repeats the limits in
+  private words. A matched pair whose nominal is REF has no limits to repeat;
+  there the stated clearance or interference range is the requirement (below).
+  A gear centre distance names the mesh; a width that sets a stack names the
+  stack. Where
   the mate alone does not show why the band is tight, add a few words of
   reason (`SETS MESH BACKLASH`, `KNIFE-EDGE SEAT`); see rule 7. The shop can
   then make the hole to the shaft instead of chasing a number. A tight band
@@ -215,8 +227,10 @@ a chamfer gets the loosest title-block band that serves it.
 - **Matched or selectively fitted pairs.** For a one-off pair, the callout
   identifies the mate by name and full drawing number, and states
   the required clearance, interference or an unambiguous functional
-  acceptance. Give diametral or radial clearance where applicable. "MATCH FIT"
-  alone is incomplete. When the nominal is reference-only, the finished mate
+  acceptance. A clearance or interference range is diametral unless it says
+  `RADIAL`; `DIAMETRAL CLEARANCE .004-.012 ON MHA-SH-VN-53` is a complete
+  statement here. "MATCH FIT" alone is incomplete. When the nominal is
+  reference-only, the finished mate
   and the stated acceptance define the fit, and a reference nominal does not
   mean purchased stock. Where both parts carry controlled limits, those limits
   still apply and must produce the required fit; matching does not waive them.
@@ -625,7 +639,10 @@ sub-assembly, never on part fabrication.
   pose, at a scale where every part is identifiable, plus the isometric
   (rule 8).
 - An exploded view, or a sequence of them, showing order, orientation and
-  which face mates to which.
+  which face mates to which. Each exploded part is drawn clear of its mates,
+  moved along the axis it goes in on; a part still overlapping or hidden by
+  its mate in the exploded view does not show its order or face. Every
+  balloon lands on a visible face of its own part.
 - A parts list with item number, part number, description and quantity, and
   balloons tying every visible part to it. Every row is ballooned somewhere;
   every balloon has a row.
@@ -638,9 +655,13 @@ sub-assembly, never on part fabrication.
   range and check in columns; a check with three or more measured variables
   uses a labelled sketch and a table, not equations in prose. Steps name
   parts by item number (with the BOM supplying the full drawing number) and
-  directions by view names (rule 26), never a compass or a code the sheet
-  does not define in a labelled table (`HD1`, `F1A`, `P1–P3`). A setting
-  finer than `.XXX` names the indicator or gauge that reads it. A fit made at
+  directions by view names (rule 26), never a compass or a code the package
+  does not define in a labelled table (`HD1`, `F1A`, `P1–P3`). One labelled
+  code key may serve the whole package when it sits on a named sheet and
+  every sheet that uses its codes points to it by sheet number
+  (`CODES: SHEET 14 KEY`); a code with no key on its sheet and no pointer
+  to one is undefined. A setting finer than `.XXX` names the indicator or
+  gauge that reads it. A fit made at
   assembly (match-drill, ream in place, shim, adjust) names the mating parts
   as rule 4 requires; an item reference is enough when the BOM supplies the
   item's name and number unambiguously.
@@ -782,8 +803,9 @@ beside them. Every symbol, abbreviation and phrase is one they can look up.
 - **Project labels.** Name a feature by what it is when a plain name fits
   (`WIRE TIE HOLE`, `2X WIRE TIE HOLE`) rather than coining a label
   (`TIE 1`) and defining it in a note. A label that is still needed (`R816`,
-  `CL`, `CR`) is defined where it first appears or in one linked key on the
-  same sheet, or replaced by a hole-table tag or a standard numbered flag
+  `CL`, `CR`) is defined where it first appears, in one linked key on the
+  same sheet, or in a package code key that the sheet points to (rule 22),
+  or replaced by a hole-table tag or a standard numbered flag
   note. A symbol followed by a number (`R816`) is either a dimension with its
   unit or a defined label; the reader never has to choose.
 - **Geometric symbols** (rule 5): position, perpendicularity, parallelism,
