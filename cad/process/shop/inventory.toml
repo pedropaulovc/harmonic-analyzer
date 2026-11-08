@@ -4893,6 +4893,16 @@ oal_mm = { value = 101.52, measured = { status = "measured", by = "placeholder (
 # note, not a certificate; range_mm/sizes_mm/resolution_mm/pieces are plain
 # numbers in the schema.
 
+# Owned by the shop (Pedro, 2026-11-08): a Mitutoyo shop-grade gauge block set, for
+# setting DRO stations and indicator zeros against a wrung stack. The set's model,
+# composition and units are not yet recorded, so no range or sizes are claimed here.
+[gauges.gauge-blocks-mitutoyo]
+name = "Mitutoyo gauge block set, shop grade"
+kind = "gauge_block_set"
+make = "Mitutoyo"
+present = true
+note = "owner-confirmed 2026-11-08; model number, piece count and inch/metric composition to be recorded"
+
 # --- pivot-bracket additions ---
 [gauges.radius-gauge]
 kind = "radius_gauge"
