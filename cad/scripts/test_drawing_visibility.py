@@ -646,3 +646,66 @@ def test_failed_post_command_clear_is_not_retried(monkeypatch):
         )
     assert clear_count == 2 and ("rebuild",) not in calls
     assert any(name == "drawing.visibility.timings" for name, _ in events)
+
+
+@pytest.mark.parametrize("entrypoint", ["instances", "families"])
+def test_section_releases_all_transient_component_proxies_before_reresolution(monkeypatch, entrypoint):
+    import weakref
+
+    adapter, view, components, _, selected, hidden, _ = section_fixture()
+    references = []
+    events = []
+    monkeypatch.setattr(visibility, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(visibility._telemetry, "event", lambda name, **fields: events.append((name, fields)))
+
+    class OwnerProxy:
+        def __init__(self, native):
+            self.__dict__.update(vars(native))
+            self._oleobj_ = native
+            references.append(weakref.ref(self))
+
+    class DrawingProxy:
+        def __init__(self, native):
+            self.native = native
+            references.append(weakref.ref(self))
+
+        def __getattr__(self, name):
+            return getattr(self.native, name)
+
+        @property
+        def Component(self):
+            return OwnerProxy(self.native.Component)
+
+    view.RootDrawingComponent2 = lambda resolve: SimpleNamespace(
+        GetChildren=tuple(DrawingProxy(component) for component in components)
+    )
+    adapter.currentModel.SelectionManager.GetSelectedObjectsComponent4 = (
+        lambda index, mark: DrawingProxy(selected[index - 1])
+    )
+    original_resolve = visibility._resolve_section_visibility_view
+    resolutions = []
+
+    def resolve(app, identity, *, label):
+        resolutions.append(identity)
+        if len(resolutions) == 2:
+            # Do not collect garbage: the helper must release its own references.
+            alive = [reference() for reference in references if reference() is not None]
+            assert alive == [], [type(value).__name__ for value in alive]
+        return original_resolve(app, identity, label=label)
+
+    monkeypatch.setattr(visibility, "_resolve_section_visibility_view", resolve)
+    if entrypoint == "instances":
+        returned = visibility.set_drawing_view_instance_visibility(
+            adapter, view, frozenset({"item-1"}), mode="show", label="lifetime"
+        )
+    else:
+        monkeypatch.setattr(
+            visibility, "_drawing_component_stems",
+            lambda adapter, component, stems: {"family"} if component.Name == components[1].Name else set(),
+        )
+        returned = visibility.isolate_drawing_view_components(
+            adapter, view, visible_stems=frozenset({"family"}), label="lifetime"
+        )
+    assert returned is view and hidden == {0, 2} and len(resolutions) == 2
+    timing = next(fields for name, fields in events if name == "drawing.visibility.timings")
+    assert (timing["enumerated"], timing["changed"], timing["unchanged"], timing["show"], timing["hide"]) == (3, 2, 1, 1, 1)
