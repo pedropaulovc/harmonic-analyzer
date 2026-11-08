@@ -352,11 +352,12 @@ SIDE_KEEP: dict[str, tuple[float, float]] = {
     # The journal, the rest of the overall, as a reference.
     "JournalLength": ((PINION_REAR_X + REAR_X) / 2.0, _ROW_Y[0]),
     # The controlled overall, tip face to rear face, on the last row, its
-    # rear witness line right of the gear data block.  Its text stands 20 mm
-    # left of the line's middle (round 3: centred, "2.792 SEE NOTE 3" ran
-    # into the face width's outside arrow left of F), well short of that
-    # arrow and of the journal's (1.62) text on row 0.
-    "OverallLength": ((REAR_X + TIP_X) / 2.0 - 0.020, _ROW_Y[5]),
+    # rear witness line right of the gear data block.  Its text, with its
+    # function on the value's line, centres between the rear witness line
+    # and the pinion's rear witness line (round 3: "2.792 SEE NOTE 3" left
+    # of F ran into the face width's left witness line and arrow, which drop
+    # to the overall text's height); OVERALL_TEXT_* below check both ends.
+    "OverallLength": ((REAR_X + PINION_REAR_X) / 2.0, _ROW_Y[5]),
 }
 END_KEEP: dict[str, tuple[float, float]] = {
     # The flat's distance from the axis, where the flat shows true (machinist
@@ -407,14 +408,28 @@ DIMENSION_SUFFIXES = {
     "TipStation": f" {STATIONS_LINK}",
     "FrontReliefDia": f" {NECK_LINK}",
     "FlatEnd": f" {NECK_LINK}",
+    # Round 6: the overall keeps .XXX (the knob cup's pin wall fails at .XX)
+    # and states that function once, at the dimension, not in a note (r3).
+    "OverallLength": (
+        f" SETS PIN WALL IN {_config.parts('pd-transgear-knob-cup')['number']}"
+    ),
 }
-# The face width's outside arrow left of F runs ~15 mm along its line
-# (round-3 render); the overall's text, at ~2.75 mm a character centred on
-# its keep, ends that far plus 5 mm short of F.
-FACE_WIDTH_ARROW_RUN = 0.015
-OVERALL_TEXT_RIGHT = SIDE_KEEP["OverallLength"][0] + len("2.792") * 0.00275 / 2.0
-if OVERALL_TEXT_RIGHT > F_X - FACE_WIDTH_ARROW_RUN - 0.005:
-    raise AssertionError("the overall's text runs into the face width's arrow")
+# The overall's one-line text (~2.75 mm a character, centred on its keep;
+# the round-6 render's digits ran 2.32 mm) ends 5 mm short of the face
+# width's left witness line (the pinion's rear face, which drops to the
+# text's height with its arrow) and starts 5 mm right of the rear witness
+# line.  It sits over the overall's line; SPAN 2 TEETH and the GEAR DATA
+# block stand under that line and left of the rear witness line.
+OVERALL_TEXT_CHARS = len(inch_text(REAR_END_Z - TIP_Z, 3)) + len(
+    DIMENSION_SUFFIXES["OverallLength"]
+)
+_OVERALL_HALF = OVERALL_TEXT_CHARS * 0.00275 / 2.0
+OVERALL_TEXT_LEFT = SIDE_KEEP["OverallLength"][0] - _OVERALL_HALF
+OVERALL_TEXT_RIGHT = SIDE_KEEP["OverallLength"][0] + _OVERALL_HALF
+if OVERALL_TEXT_RIGHT > PINION_REAR_X - 0.005:
+    raise AssertionError("the overall's text runs into the face width's witness line")
+if OVERALL_TEXT_LEFT < REAR_X + 0.005:
+    raise AssertionError("the overall's text runs over the rear witness line")
 # Reference sizes (parenthesized): the journal (the rest of the controlled
 # overall), and the thread blank the #8-32 UNC-2A class governs.  Name ->
 # diameter glyph.

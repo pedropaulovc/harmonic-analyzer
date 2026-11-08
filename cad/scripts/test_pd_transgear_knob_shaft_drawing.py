@@ -221,9 +221,9 @@ def test_each_chucking_dimensions_from_its_faced_end() -> None:
     assert drawing.F_X < drawing.CORE_END_X < drawing.THREAD_END_X < drawing.TIP_X
     # Round 2: each .XXX tip station names what it serves, by its link on the
     # value's line to the stations note, which quotes the printed values and
-    # names the mates whose stacks need .XXX.  Round 3: the overall prints
-    # .XXX plain (the title block's ±.005 is the knob cup's pin-wall band),
-    # with no reason text.
+    # names the mates whose stacks need .XXX.  Round 6: the overall keeps
+    # .XXX (the knob cup's pin wall fails at .XX) and states that function
+    # once at the dimension, never in a note (r3).
     note = dict(drawing.NOTE_TEXTS)[drawing.STATIONS_NOTE]
     for name, value in (
         ("TipStation", spec.TIP_STATION),
@@ -232,11 +232,20 @@ def test_each_chucking_dimensions_from_its_faced_end() -> None:
     ):
         assert drawing.DIMENSION_SUFFIXES[name] == f" {drawing.STATIONS_LINK}", name
         assert spec.inch_text(value, 3) in note, name
-    assert "OverallLength" not in drawing.DIMENSION_SUFFIXES
+    cup = _config.parts("pd-transgear-knob-cup")["number"]
+    assert drawing.DIMENSION_SUFFIXES["OverallLength"] == f" SETS PIN WALL IN {cup}"
     assert "OverallLength" not in drawing.DIMENSION_CALLOUTS_BELOW
     assert "OverallLength" not in drawing.DIMENSION_CALLOUTS_ABOVE
     assert spec.inch_text(spec.OVERALL_LENGTH, 3) == "2.792"
-    assert "2.792" not in drawing.NOTES
+    assert "2.792" not in drawing.NOTES and cup not in drawing.NOTES
+    # At .XX the journal band would leave the cup's pin-hole end wall under
+    # its floor: the third place is the function the suffix states.
+    import pd_transgear_knob_cup_spec as cup_spec
+
+    xx_band = printed_band_mm(2, unit=spec.UNIT) + printed_band_mm(3, unit=spec.UNIT) + spec.FACE_WIDTH_BAND
+    xx_wall = cup_spec.END_PIN_WALL_WORST - (xx_band - spec._JOURNAL_LENGTH_BAND)
+    assert cup_spec.END_PIN_WALL_WORST >= cup_spec.WALL_FLOOR
+    assert xx_wall < cup_spec.WALL_FLOOR
     for key in ("pd-transgear-drive-collar", "pd-transgear-thumbnut"):
         assert _config.parts(key)["number"] in note, key
     # Rule 7: each note runs to four short lines; no process or coined
@@ -244,11 +253,17 @@ def test_each_chucking_dimensions_from_its_faced_end() -> None:
     assert drawing.NOTE_LINES_MAX == 4
     assert all(len(lines) <= 4 for lines in drawing.NOTE_LINES)
     assert "TOOL" not in drawing.NOTES and "FACED" not in drawing.NOTES
-    # Round 3: the overall's text stands clear of the face width's outside
-    # arrow left of F, with margin.
+    # Round 3/6: the overall's one-line text stands 5 mm clear of the face
+    # width's left witness line (the pinion's rear face, which drops with its
+    # arrow to the text's height) and of the rear witness line.
     x, _y = drawing.SIDE_KEEP["OverallLength"]
-    assert x + len("2.792") * 0.00275 / 2 < drawing.F_X - 0.015 - 0.005
-    assert x - len("2.792") * 0.00275 / 2 > drawing.REAR_X + 0.010
+    chars = len("2.792 SETS PIN WALL IN MHA-PD-16")
+    assert drawing.OVERALL_TEXT_CHARS == chars
+    half = chars * 0.00275 / 2
+    assert x + half <= drawing.PINION_REAR_X - 0.005
+    assert x - half >= drawing.REAR_X + 0.005
+    # Left of it the GEAR DATA block ends before the rear witness line.
+    assert drawing.GEAR_DATA_RIGHT < drawing.REAR_X
 
 
 def test_d_flat_uses_signed_physical_round_tool_end_and_real_neck() -> None:
