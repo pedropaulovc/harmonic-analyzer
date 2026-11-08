@@ -1,11 +1,10 @@
-"""Matched, unsaved three-case discriminator on the exact final PD drawing.
+"""Matched transient-reference split on the exact final PD drawing.
 
 No production source changes. Each case reopens identical native bytes and closes
-without saving. Cases vary raw-frame retention or the saved-document lookup only.
+without saving. Only the explicitly retained proxy subset differs between cases.
 """
 from __future__ import annotations
 
-import gc
 import sys
 
 if __package__:
@@ -13,24 +12,9 @@ if __package__:
 else:
     import probe_pd_section_visibility as probe
 
-visibility = probe.visibility
 FINAL_DRAWING_SHA = "3478420c8e40265ba4691cbcefe8d352f7f7ddcb8441af92325ecf682e4143e8"
 SENTINEL = "pd-vn-guide-lock-screw-5"
-CASES = ("raw_frame_ended", "raw_retained", "production_direct_lookup")
-
-
-def direct_saved_resolver(app, identity, *, label):
-    """The sole production override: document acquisition, not view enumeration."""
-    if not identity.document_path:
-        raise RuntimeError("this discriminator only qualifies a saved drawing")
-    document = probe._early_bound(app.GetOpenDocumentByName(identity.document_path), "IModelDoc2")
-    if document is None or int(document.GetType()) != 3 or (document.GetPathName(), document.GetTitle()) != (identity.document_path, identity.document_title):
-        raise RuntimeError(f"{label}: direct saved drawing identity mismatch")
-    views = [candidate for sheet, candidate in visibility._section_views(document, label=label)
-             if sheet == identity.sheet_name and candidate.GetName2() == identity.view_name]
-    if len(views) != 1:
-        raise RuntimeError(f"{label}: expected one exact current section; found {len(views)}")
-    return document, views[0]
+CASES = ("raw_frame_ended", "doc_view_retained", "components_retained", "selection_retained")
 
 
 def capture_before(app, journal, record, persist):
@@ -71,38 +55,15 @@ def raw_show(app, journal, record, persist):
         raise RuntimeError("rebuild failed")
     record["command_completed"] = True
     persist()
-    if record["case"] == "raw_retained":
-        return {"model": model, "view": view, "components": components, "owners": owners,
-                "manager": manager, "data": data, "selected": selected,
-                "selected_view": selected_view, "selected_owner": selected_owner}
+    if record["case"] == "doc_view_retained":
+        return {"model": model, "view": view}
+    if record["case"] == "components_retained":
+        return {"components": components, "owners": owners,
+                "selected": selected, "selected_owner": selected_owner}
+    if record["case"] == "selection_retained":
+        return {"manager": manager, "data": data, "selected_view": selected_view}
     return None
 
-
-def production_show(adapter, journal, record, persist):
-    model, view, components, owners, _ = capture_before(adapter.swApp, journal, record, persist)
-    del components, owners
-    adapter.currentModel = model
-    original = visibility._resolve_section_visibility_view
-    visibility._resolve_section_visibility_view = direct_saved_resolver
-    try:
-        current = journal.call(
-            "production_direct_lookup.helper.show",
-            lambda: visibility.set_drawing_view_instance_visibility(
-                adapter, view, frozenset(probe.recipe.PIVOT_VIEW_INSTANCES | {probe.TARGET_NAME}),
-                mode="show", label="lookup discriminator show"),
-            lambda value: value is not None,
-        )
-        record["helper_outcome"] = "returned"
-        persist()
-        return {"returned_view": current}
-    except Exception as error:
-        record["helper_outcome"] = "refused"
-        record["helper_error"] = repr(error)
-        persist()
-        # Match the previous negative capture: its exception kept native frames alive.
-        return {"exception_with_traceback": error}
-    finally:
-        visibility._resolve_section_visibility_view = original
 
 
 def sparse_after(app, journal, record, persist):
@@ -178,16 +139,13 @@ async def build(adapter):
                     raise RuntimeError("read-only fixture open refused")
                 title = journal.call(case + ".GetTitle", lambda document=document: probe._early_bound(document, "IModelDoc2").GetTitle())
                 del document, opened
-                retained = production_show(adapter, journal, record, persist) if case == "production_direct_lookup" else raw_show(adapter.swApp, journal, record, persist)
+                retained = raw_show(adapter.swApp, journal, record, persist)
                 record["retained_proxy_groups"] = sorted(retained) if retained else []
                 persist()
                 sparse_after(adapter.swApp, journal, record, persist)
             finally:
-                if retained and "exception_with_traceback" in retained:
-                    retained["exception_with_traceback"].__traceback__ = None
                 retained = None
                 adapter.currentModel = None
-                gc.collect()
                 if title is not None:
                     journal.call(case + ".CloseDoc without saving", lambda: adapter.swApp.CloseDoc(title), lambda value: None)
                 record["input_sha256_after"] = {name: probe.digest(probe.OUT / name) for name in probe.INPUT_NAMES}

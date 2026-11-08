@@ -1,4 +1,4 @@
-"""Offline controls for the disposable three-case lifetime discriminator."""
+"""Offline controls for the disposable reference-subset discriminator."""
 import asyncio
 import json
 from pathlib import Path
@@ -11,7 +11,7 @@ from diagnostics import probe_pd_section_lifetime as experiment
 from test_drawing_visibility import visibility_fixture
 
 
-@pytest.mark.parametrize("case", ["raw_frame_ended", "raw_retained"])
+@pytest.mark.parametrize("case", experiment.CASES)
 def test_raw_show_only_varies_retained_graph(tmp_path, monkeypatch, case):
     probe = experiment.probe
     adapter, view, components, calls, selected = visibility_fixture()
@@ -28,27 +28,13 @@ def test_raw_show_only_varies_retained_graph(tmp_path, monkeypatch, case):
         if case == "raw_frame_ended":
             assert retained is None
         else:
-            assert retained["view"] is view and retained["components"] is components
-            assert retained["selected_owner"] is components[2].Component
+            assert set(retained) == {
+                "doc_view_retained": {"model", "view"},
+                "components_retained": {"components", "owners", "selected", "selected_owner"},
+                "selection_retained": {"manager", "data", "selected_view"},
+            }[case]
     finally:
         journal.close()
-
-
-@pytest.mark.parametrize("fault", ["none", "missing", "wrong-path", "duplicate-view"])
-def test_direct_resolver_never_enumerates_documents(monkeypatch, fault):
-    probe = experiment.probe
-    monkeypatch.setattr(probe, "_early_bound", lambda value, interface: value)
-    monkeypatch.setattr(experiment.visibility, "_early_bound", lambda value, interface: value)
-    view = SimpleNamespace(Type=2, GetName2=lambda: "Section")
-    sheet = SimpleNamespace(GetName2=lambda: "Sheet")
-    model = SimpleNamespace(GetType=lambda: 3, GetPathName=lambda: "wrong" if fault == "wrong-path" else "C:/drawing.SLDDRW", GetTitle=lambda: "drawing.SLDDRW", GetViews=lambda: ((sheet, view, view) if fault == "duplicate-view" else (sheet, view),))
-    app = SimpleNamespace(GetOpenDocumentByName=lambda path: None if fault == "missing" else model)
-    identity = experiment.visibility._SectionVisibilityIdentity("C:/drawing.SLDDRW", "drawing.SLDDRW", "Sheet", "Section")
-    if fault == "none":
-        assert experiment.direct_saved_resolver(app, identity, label="test") == (model, view)
-    else:
-        with pytest.raises(RuntimeError):
-            experiment.direct_saved_resolver(app, identity, label="test")
 
 
 def test_sparse_capture_limits_owner_reads_when_names_alias(tmp_path, monkeypatch):
@@ -103,12 +89,7 @@ def test_cases_reopen_identical_bytes_and_release_graph_before_close(tmp_path, m
     def raw(app, journal, record, persist):
         token = Token()
         refs.append(weakref.ref(token))
-        return {"token": token} if record["case"] == "raw_retained" else None
-
-    def production(adapter, journal, record, persist):
-        token = Token()
-        refs.append(weakref.ref(token))
-        return {"token": token}
+        return {"token": token} if record["case"] != "raw_frame_ended" else None
 
     def sparse(app, journal, record, persist):
         events.append(record["case"])
@@ -122,12 +103,11 @@ def test_cases_reopen_identical_bytes_and_release_graph_before_close(tmp_path, m
         events.append("closed")
 
     monkeypatch.setattr(experiment, "raw_show", raw)
-    monkeypatch.setattr(experiment, "production_show", production)
     monkeypatch.setattr(experiment, "sparse_after", sparse)
     app = SimpleNamespace(OpenDoc6=lambda *args: (SimpleNamespace(GetTitle=lambda: "drawing.SLDDRW"), 0, 0), CloseDoc=close)
     if outcome == "complete":
         asyncio.run(experiment.build(SimpleNamespace(swApp=app)))
-        assert events == ["raw_frame_ended", "closed", "raw_retained", "closed", "production_direct_lookup", "closed"]
+        assert events == [event for case in experiment.CASES for event in (case, "closed")]
     else:
         with pytest.raises(RuntimeError, match="native getter failed"):
             asyncio.run(experiment.build(SimpleNamespace(swApp=app)))
