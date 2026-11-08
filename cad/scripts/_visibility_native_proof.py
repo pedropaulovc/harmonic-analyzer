@@ -24,6 +24,7 @@ from _drawing_common import rebuild_drawing
 from solidworks_mcp.adapters.solidworks.drawing import view_name
 import _seat_forensics
 import _telemetry
+from _visibility_raw_capture import observed_call, raw_snapshot
 
 ROOT = Path(__file__).resolve().parents[2]
 PROOF = ROOT / "cad/out/reports/visibility-proof"
@@ -357,8 +358,27 @@ async def section_roundtrip(adapter, recipe, original, report, checkpoint):
             for raw in tuple(sheet)[1:]
         ]
         view = next(view for view in views if int(view.Type) == 2)
-        rows = visibility._visibility_components(view, label="section control initial")
-        target = next(row for row in rows if not row.visible and not row.parent and not row.ancestors)
+        try:
+            rows = visibility._visibility_components(view, label="section control initial")
+        except Exception:
+            control["initial_raw"] = raw_snapshot(adapter, view, None)
+            checkpoint()
+            raise
+        targets = []
+        for row in rows:
+            if row.visible or row.parent or row.ancestors:
+                continue
+            native = _early_bound(row.component.Component, "IComponent2")
+            if str(native.Name2) != "sh-vn-chain-link-11":
+                continue
+            if (str(native.ReferencedConfiguration) != "InnerLink"
+                    or Path(str(native.GetPathName())).relative_to(ROOT).as_posix()
+                    != "cad/out/sldprt/sh-vn-chain-link.SLDPRT"):
+                raise RuntimeError("proof: previously failing chain-link occurrence identity changed")
+            targets.append((row, native))
+        if len(targets) != 1:
+            raise RuntimeError(f"proof: expected exactly the original hidden chain-link-11; got {len(targets)}")
+        target, retained_target = targets[0]
         initial = {row.name: row.visible for row in rows}
         shown = frozenset(visibility._instance_name(row.name) for row in rows if row.visible and not row.ancestors)
         target_name = visibility._instance_name(target.name)
@@ -370,7 +390,12 @@ async def section_roundtrip(adapter, recipe, original, report, checkpoint):
             entry = {"phase": phase, "before": section_inventory(adapter, view)}
             control["phases"].append(entry)
             checkpoint()
-            original(adapter, view, frozenset(names), mode="show", label=f"section control {phase}")
+            observed_call(
+                entry,
+                lambda: original(adapter, view, frozenset(names), mode="show", label=f"section control {phase}"),
+                lambda: raw_snapshot(adapter, view, retained_target),
+                checkpoint,
+            )
             entry["after"] = section_inventory(adapter, view)
             after_state = {"view": view_state(view), "siblings": siblings(adapter, view), "source": source_state(view)}
             entry.update(state_before=before_state, state_after=after_state)

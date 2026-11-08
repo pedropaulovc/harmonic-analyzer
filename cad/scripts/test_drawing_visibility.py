@@ -490,3 +490,98 @@ def test_section_hidden_inventory_rejects_two_proved_representations():
     view.GetHiddenComponents = lambda: (wrapped,)
     with pytest.raises(RuntimeError, match="2 exact view matches"):
         visibility._visibility_components(view, label="ambiguous hidden owner")
+
+
+def test_raw_after_state_survives_duplicate_name_readback_failure(monkeypatch, tmp_path):
+    import json
+    import dodo
+    import _visibility_native_proof as proof
+    import _visibility_raw_capture as raw
+
+    adapter, view, components, _, _, _, wrapper = section_fixture()
+    monkeypatch.setattr(raw, "_early_bound", lambda value, interface: value)
+    base = view.GetBaseView()
+    source = base.ReferencedDocument
+    assembly = tmp_path / "assembly.SLDASM"
+    assembly.write_bytes(b"unchanged native source")
+    source.GetPathName = lambda: str(assembly)
+    wrapper.GetPathName = lambda: str(assembly)
+    source.GetSaveFlag = lambda: False
+    source.ConfigurationManager = SimpleNamespace(ActiveConfiguration=SimpleNamespace(Name="Default"))
+    source.GetComponents = lambda top: tuple(component.Component for component in components)
+    wrapper.Visible = 1
+    for index, component in enumerate(components):
+        path = tmp_path / f"part-{index}.SLDPRT"
+        path.write_bytes(f"part {index}".encode())
+        component.Component.GetPathName = lambda path=path: str(path)
+        component.Component.Visible = 1
+    for item in (view, base):
+        item.GetUseParentDisplayMode = lambda: False
+        item.GetDisplayMode2 = lambda: 3
+        item.GetFacettedHlrDisplay = lambda: False
+        item.GetDisplayEdgesInShadedMode = lambda: True
+        item.GetCThreadQuality = lambda: True
+        item.Position = (0.1, 0.2)
+        item.ScaleDecimal = 1.0
+        item.ReferencedConfiguration = "Default"
+    base.RootDrawingComponent2 = lambda resolve: SimpleNamespace(GetChildren=())
+    base.GetHiddenComponents = lambda: None
+    adapter.currentModel.GetViews = lambda: ((None, view, base),)
+    failures = tmp_path / "cad/out/reports/failures"
+    monkeypatch.setattr(proof, "PROOF", tmp_path / "cad/out/reports/visibility-proof")
+    monkeypatch.setattr(proof._seat_forensics, "OUT_FAILURES", failures)
+    monkeypatch.setattr(dodo, "FAILURES", failures)
+
+    def failed_inventory(*args, **kwargs):
+        raise RuntimeError("production duplicate-name readback")
+
+    monkeypatch.setattr(visibility, "_visibility_components", failed_inventory)
+    monkeypatch.setattr(visibility, "_drawing_component_children", failed_inventory)
+    monkeypatch.setattr(visibility, "_section_source_document", failed_inventory)
+    record = {"phase": "show"}
+    report = {"section_roundtrip": {"phases": [record]}}
+
+    def operation():
+        components[1].Name = components[0].Name
+        visibility._visibility_components(view, label="failed readback")
+
+    with pytest.raises(RuntimeError, match="production duplicate-name readback"):
+        raw.observed_call(
+            record, operation, lambda: raw.raw_snapshot(adapter, view, components[1].Component),
+            lambda: proof.persist_report("pd-observations.json", report),
+        )
+    exported = failures / "visibility-proof/pd-observations.json"
+    stored = json.loads(exported.read_text(encoding="utf-8"))
+    entry = stored["section_roundtrip"]["phases"][0]
+    assert len(entry["before_raw"]["target"]["occurrences"]) == 3
+    assert len(entry["after_raw"]["target"]["occurrences"]) == 3
+    duplicate = entry["after_raw"]["target"]["duplicate_drawing_names"][0]
+    assert len(duplicate["indices"]) == 2
+    assert duplicate["pairs"] == [{"left": 1, "right": 2, "owner_same": 0, "drawing_same": 0}]
+    assert not duplicate["pairs_truncated"]
+    assert len(entry["after_raw"]["target"]["hidden_owners"]) == 2
+    assert len(entry["after_raw"]["source"]["owners"]) == 3
+    assert entry["after_raw"]["source"]["file_hashes"] == entry["before_raw"]["source"]["file_hashes"]
+    assert len(entry["after_raw"]["siblings"]) == 1
+    assert "production duplicate-name readback" in entry["operation_error"]
+    assert dodo._artefact_record(exported).startswith("visibility-proof/pd-observations.json:")
+    assert json.loads((proof.PROOF / "pd-observations.json").read_text(encoding="utf-8")) == stored
+
+
+def test_raw_owner_keeps_other_fields_when_one_getter_fails(monkeypatch):
+    import _visibility_raw_capture as raw
+    monkeypatch.setattr(raw, "_early_bound", lambda value, interface: value)
+
+    def unreadable_path():
+        raise RuntimeError("path unavailable")
+
+    owner = SimpleNamespace(
+        Name2="sh-vn-chain-link-11", GetPathName=unreadable_path,
+        ReferencedConfiguration="InnerLink", Visible=1, GetParent=lambda: None,
+    )
+    record = raw.raw_owner(owner)["chain"][0]
+    assert record["name"] == "sh-vn-chain-link-11"
+    assert record["configuration"] == "InnerLink"
+    assert record["visible"] == 1
+    assert record["parent_present"] is False
+    assert record["errors"] == {"path": "RuntimeError('path unavailable')"}
