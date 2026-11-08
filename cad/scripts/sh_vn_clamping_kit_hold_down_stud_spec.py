@@ -134,7 +134,7 @@ LOWER_END_NOTE = "LOWER FACTORY END UNMODIFIED"
 # The kit reference sheet owns this one-line installation legend. The separate
 # REWORK sheet reads STOCK_NOTE and LOWER_END_NOTE through their own properties.
 DRAWING_NOTES = (
-    "THREAD NOT MODELLED; BOTTOMS IN THE T-NUT, FLUSH WITH ITS FOOT; "
+    "THREAD AS SUPPLIED; BOTTOMS IN THE T-NUT, FLUSH WITH ITS FOOT; "
     "CUT UPPER END PER SHEET 2."
 )
 

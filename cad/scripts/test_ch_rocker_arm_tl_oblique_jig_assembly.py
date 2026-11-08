@@ -1925,54 +1925,58 @@ def test_rail_preparation_precedes_fastening_and_table_mounting() -> None:
 
 def test_step_10_taps_the_carrier_hub_in_situ_at_the_recorded_dro() -> None:
     """Owner ruling 3 (2026-11-07): the carrier's HUB #8-32 tap is made in
-    situ at the step 10 DRO position, every strap's hub hole is drilled and
+    situ at the step 10 position, every strap's hub hole is drilled and
     reamed at the same setting, and there is no counterbore or precision bore.
-    Q7: the setting is checked from the set position on both pivot heads."""
+    A3 option C (owner, 2026-11-08): the hub is set from the origin stops by a
+    gauge stack in Y, so its ±.0005 needs no exception."""
     steps = {text.split(". ", 1)[0]: text for text in (*spec.ASSEMBLY_STEPS, *spec.OPERATION_STEPS)}
-    assert "X 0, Y .5125 ±.0005" in steps["10C"]
-    assert steps["10D"].startswith("10D. CHECK THE A1 AND B1 HEADS")
-    assert "-1.2801" in steps["10D"] and "FROM THIS SETTING" in steps["10D"]
-    assert steps["10E"].startswith("10E. IF ONE FAILS")
-    assert "RECORD" in steps["10G"] and "STEP 20" in steps["10G"]
-    assert carrier.HUB_THREAD in steps["10H"] and "NO COUNTERBORE" in steps["10H"]
-    assert "STEP 10G" in steps["20"]
-    assert all("REAM" not in steps[head] for head in ("10C", "10D", "10G", "10H"))
+    assert "ORIGIN" in steps["10C"] and "STEP 6F" in steps["10C"]
+    assert "X 0, Y .5125 ±.0005" in steps["10D"] and "GAUGE STACK" in steps["10D"]
+    assert spec.gauge_stack(spec._HUB_Y_TEXT) == (1005, 1120, 3000)
+    assert "RECORD" in steps["10E"] and "STEP 20" in steps["10E"]
+    assert carrier.HUB_THREAD in steps["10F"] and "NO COUNTERBORE" in steps["10F"]
+    assert "STEP 10E" in steps["20"]
+    assert all("REAM" not in steps[head] for head in ("10C", "10D", "10E", "10F"))
+    assert "STEP 10D" in steps["6A"]
     assert spec.carrier.HUB_RADIAL_STACK < 0.25
+    from _paths import CAD_ROOT
+    from machinist_exceptions import load_exceptions
+
+    exceptions = load_exceptions(CAD_ROOT / "config", "ch_rocker_arm_tl_oblique_jig_assembly", "assembly")
+    assert not any("HUB" in row.where for row in exceptions)
 
 
-def test_head_check_band_covers_the_hub_band_and_the_rail_chain() -> None:
-    """Q7: a head inside its rails' bands, read from a hub setting inside its
-    band, passes step 10D: the hub band plus the chain's lateral error at the
-    symmetric station (4.3 thou), rounded up to .001."""
+def test_rail_setting_chain_uses_the_gauge_block_set_and_closes_the_stack() -> None:
+    """A3 option C (owner, 2026-11-08): the stack's stations 4.00, 8.00,
+    12.00 and 15.00, each table move one stack from the shop's 81-piece inch
+    set (none over 4 in) at the alignment row's ±.0005; the chain's computed
+    radial error (0.026 mm) closes with the shoulder and printed play."""
     inch = spec.trammel.INCH
-    assert spec.HEAD_CHECK_BAND == pytest.approx(0.006 * inch)
-    assert spec.HEAD_CHECK_BAND > spec.carrier.HUB_OFFSET_BAND + 0.004 * inch
-
-
-def test_rail_setting_chain_holds_the_6_in_row_and_closes_the_stack() -> None:
-    """Q6: stations 4.00, 10.00 and 15.00, each link 6.0 in or less from the
-    head set before, at the shop table's ±.002; the chain's computed radial
-    error (0.082 mm) closes with the shoulder and printed play."""
-    inch = spec.trammel.INCH
-    assert spec.CHAIN_STATIONS == pytest.approx((4.0 * inch, 10.0 * inch, 15.0 * inch))
-    assert spec.STATION_BAND == pytest.approx(0.002 * inch)
-    assert spec.CHAIN_STATION_RADIUS == pytest.approx(0.0824, abs=0.0005)
-    assert spec.CHAIN_RADIAL_STACK == pytest.approx(0.2454, abs=0.0005)
+    assert spec.CHAIN_STATIONS == pytest.approx(tuple(s * inch for s in (4.0, 8.0, 12.0, 15.0)))
+    assert spec.STATION_BAND == pytest.approx(0.0005 * inch)
+    assert len(spec.GAUGE_BLOCKS_TENTHS) == len(set(spec.GAUGE_BLOCKS_TENTHS)) == 81
+    assert spec.GAUGE_STACK_MAX == pytest.approx(4.0 * inch)
+    assert spec.CHAIN_STATION_RADIUS == pytest.approx(0.0258, abs=0.0005)
+    assert spec.CHAIN_RADIAL_STACK == pytest.approx(0.1583, abs=0.0005)
     assert spec.CHAIN_RADIAL_STACK <= spec.trammel.TOP_EDGE_HALF_BAND
-    references = [row[1] for row in spec.RAIL_SETTING_ROWS]
-    assert references == ["ORIGIN", "S 4.00", "S 10.00"]
+    assert [row[1] for row in spec.RAIL_SETTING_ROWS] == ["ORIGIN", "S 4.00", "S 8.00", "S 12.00"]
     for (near, far), row in zip(spec._CHAIN_LINKS, spec.RAIL_SETTING_ROWS, strict=True):
         for rail, (x_cell, y_cell) in zip((1, 2), (row[2:4], row[4:6]), strict=True):
             fx, fy = spec.trammel.rail_point(rail, far)
             nx, ny = spec.trammel.rail_point(rail, near) if near else (0.0, 0.0)
-            assert math.hypot(float(x_cell), float(y_cell)) <= 6.0 + 1e-4  # printed rounding
             assert float(x_cell) == pytest.approx((fx - nx) / inch, abs=5e-5)
             assert float(y_cell) == pytest.approx((fy - ny) / inch, abs=5e-5)
-        assert row[6:] == ("±.002", "6G")
+            for cell in (x_cell, y_cell):
+                blocks = spec.gauge_stack(cell)
+                assert sum(blocks) == round(abs(float(cell)) * 10000) <= 40000
+                assert set(blocks) <= set(spec.GAUGE_BLOCKS_TENTHS)
+        assert row[6:] == ("±.0005", "6H")
+    with pytest.raises(AssertionError, match="no gauge-block stack"):
+        spec.gauge_stack("11.0000")
     steps = {text.split(". ", 1)[0]: text for text in spec.ASSEMBLY_STEPS}
-    assert steps["6G"].startswith("6G. CHECK")
-    assert "INCREMENTAL" in steps["6B"] and "INCREMENTAL" in steps["6D"]
-    assert "ABSOLUTE" in steps["6M"]
+    assert steps["6H"].startswith("6H. CHECK") and "±.0005" in steps["6H"]
+    assert "GAUGE-BLOCK STACK" in spec.RAIL_SETTING_TITLE
+    assert "INCREMENTAL" not in " ".join(spec.ASSEMBLY_STEPS)
 
 
 def test_step_11_sets_the_stop_axes_before_spotting_the_riser() -> None:
@@ -2364,16 +2368,24 @@ def test_kit_rails_and_carriages_carry_the_owner_note_and_the_play_check() -> No
 
     rail_item, carriage_item = spec.ITEM_NUMBERS[spec.RAIL], spec.ITEM_NUMBERS[spec.CARRIAGE]
     assert int(carriage_item) == int(rail_item) + 1
-    # The printed check reads the trammel's budgeted play (Q5, Delegated
-    # ruling 2026-11-07 (Main), no precedent; owner review #2144; pending
-    # owner confirmation): .002 TIR, its radius inside the shoulder allowance
-    # and, with it, the half band.
+    # The printed check reads the owner's play (P1-A, 2026-11-07: 0.02 mm)
+    # converted to four places, .0008 TIR, accepted by RV-06; its radius
+    # sits inside the shoulder allowance and, with it, the half band.
     steps = {text.split(". ", 1)[0]: text for text in spec.ASSEMBLY_STEPS}
     check = steps["14C"]
-    assert check.endswith(f"{spec._PLAY_TIR}.") and spec._PLAY_TIR == ".002 TIR MAX"
+    assert check.endswith(f"{spec._PLAY_TIR}.") and spec._PLAY_TIR == ".0008 TIR MAX"
     assert "SHOULDER-SCREW HEAD" in check and "SIDEWAYS" in check
     play = trammel.CARRIAGE_PLAY_RADIUS_PER_PLAY * spec.CARRIAGE_PLAY_TIR_PRINTED
-    assert play == pytest.approx(0.0508, abs=1e-9)
+    assert play == pytest.approx(0.02032, abs=1e-9)
+    assert abs(spec.CARRIAGE_PLAY_TIR_PRINTED - trammel.CARRIAGE_PLAY_TIR_MAX) <= 0.00005 * trammel.INCH
+    from _paths import CAD_ROOT
+    from machinist_exceptions import load_exceptions
+
+    [accept] = [
+        row for row in load_exceptions(CAD_ROOT / "config", "ch_rocker_arm_tl_oblique_jig_assembly", "assembly")
+        if row.id == "RV-06"
+    ]
+    assert ".0008" in accept.where and "P1-A" in accept.reason and "4504212381" in accept.reason
     assert play <= trammel.RADIUS_FROM_SHOULDER_CLEARANCE
     assert trammel.CARRIAGE_PLAY_RADIUS == pytest.approx(
         trammel.CARRIAGE_PLAY_RADIUS_PER_PLAY * trammel.CARRIAGE_PLAY_TIR_MAX

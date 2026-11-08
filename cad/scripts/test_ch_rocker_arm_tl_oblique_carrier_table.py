@@ -44,7 +44,7 @@ def test_table_inventory_is_complete_and_replaces_location_dimensions():
     assert set(table.ROW_NOTES) == set(TABLED) and "AT ASSEMBLY" in table.ROW_NOTES["HUB"]
     assert table.ORIGIN_NOTE.endswith("; HUB X/Y REF")
     assert "parent" not in drawing._PIN_ROWS["A1"]
-    assert assembly.STATION_BAND == pytest.approx(.002 * I)
+    assert assembly.STATION_BAND == pytest.approx(.0005 * I)
     assert "carrier.POSITION_BAND" not in inspect.getsource(assembly)
     assert drawing.MACHINIST_REVIEW.name == "ENFORCE"
 
