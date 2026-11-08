@@ -184,3 +184,19 @@ def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> No
     missing = [name for name in required if not str(carried.get(name) or "").strip()]
     assert missing == []
     assert set(required) <= set(part._SAVED_DRAWING_PROPERTIES)
+
+
+def test_land_callout_stands_above_the_hub_clear_of_the_isometric() -> None:
+    """Fan-out rounds 5-6 (rule 14): between the arrows the land's dimension
+    line struck its REF row, so the text stands above the upper extension
+    line; outside the arrows it hangs east of the dimension line (~120 mm at
+    the route row), so the isometric sits below the block."""
+    x, y = drawing.LAND_ON_SIDE
+    line = 0.0052  # one text row at the sheet's dimension font
+    rows = 1 + len(notes.LAND_CALLOUT.splitlines())
+    assert y - (rows - 1) * line > drawing.RIGHT_CENTER[1] + drawing.HALF_DIA + 0.004
+    assert y + line < 0.2667
+    iso_half = 0.026  # the 4:1 pictorial's half-extent
+    assert drawing.ISO_CENTER[1] + iso_half < y - rows * line - 0.005
+    assert drawing.ISO_CENTER[1] - iso_half > 0.065  # over the title block
+    assert drawing.ISO_CENTER[0] - iso_half > x + 0.005

@@ -81,7 +81,10 @@ SHEET_SCALE = (4.0, 1.0)
 VIEW_SCALE = (4, 1)
 FRONT_CENTER = (0.065, 0.175)  # face view: the land and bore circles
 RIGHT_CENTER = (0.160, 0.175)  # side view: the hub along its axis
-ISO_CENTER = (0.360, 0.205)
+# Lower right, between the title block and the land's callout, which hangs
+# east of its dimension line above the side view (round 6: at y .205 the
+# pictorial sat under that block).
+ISO_CENTER = (0.360, 0.125)
 NOTES_XY = (0.020, 0.090)  # left of the title block, below the views
 _S = VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0
 HALF_DIA = LAND_DIA / 2.0 * _S  # 0.0203
