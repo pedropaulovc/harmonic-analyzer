@@ -274,7 +274,17 @@ def qualify(adapter, journal, report, persist):
         record["adapter_document_path"] = journal.call(
             phase + ".adapter.currentModel.GetPathName", lambda: adapter.currentModel.GetPathName()
         )
+        manager = journal.call(
+            phase + ".adapter.currentModel.SelectionManager",
+            lambda: _early_bound(adapter.currentModel.SelectionManager, "ISelectionMgr"),
+            lambda value: value is not None,
+        )
+        record["selected_count_after"] = journal.call(
+            phase + ".GetSelectedObjectCount2", lambda: manager.GetSelectedObjectCount2(-1)
+        )
         persist()
+        if record["selected_count_after"] != 0:
+            raise RuntimeError(f"{phase}: selection remained after helper rebuild/readback")
         record["duplicate_owner_identity"] = duplicate_owner_identity(app, journal, after, owners)
         del components, owners
         persist()

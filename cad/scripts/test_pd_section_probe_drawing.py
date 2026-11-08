@@ -136,9 +136,10 @@ def test_build_pins_source_and_models_and_exports_refusal(tmp_path, monkeypatch,
         assert canonical["phases"][0]["witness"] == "persisted before refusal"
 
 
-@pytest.mark.parametrize("fault", ["none", "ineffective-show", "bad-return", "helper-error"])
+@pytest.mark.parametrize("fault", ["none", "ineffective-show", "bad-return", "helper-error", "selection-left"])
 def test_final_control_uses_returned_view_and_independent_raw_sets(tmp_path, monkeypatch, fault):
     import copy
+    monkeypatch.setattr(probe, "_early_bound", lambda value, interface: value)
 
     monkeypatch.setattr(probe._telemetry, "info", lambda message: None)
     monkeypatch.setattr(probe._telemetry, "event", lambda name, **fields: None)
@@ -152,7 +153,10 @@ def test_final_control_uses_returned_view_and_independent_raw_sets(tmp_path, mon
     ]
     hidden = set(names) - probe.recipe.PIVOT_VIEW_INSTANCES
     current = [object()]
-    model = SimpleNamespace(GetPathName=lambda: "C:/fixture/drawing.SLDDRW")
+    model = SimpleNamespace(
+        GetPathName=lambda: "C:/fixture/drawing.SLDDRW",
+        SelectionManager=SimpleNamespace(GetSelectedObjectCount2=lambda mark: int(fault == "selection-left")),
+    )
     adapter = SimpleNamespace(swApp=object(), currentModel=None)
     identity = {"sheet": "Sheet1", "view": "Section A-A"}
     monkeypatch.setattr(probe, "fresh_section", lambda *args, **kwargs: (model, current[0], identity, "Sheet1"))
