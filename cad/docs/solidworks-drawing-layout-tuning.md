@@ -676,6 +676,20 @@ calls completed without a getter error. This is evidence for fresh-reference
 readback, not permission to loosen uniqueness or a guarantee about other
 SOLIDWORKS versions.
 
+Fresh lookup alone was insufficient. A
+[matched lifetime experiment](https://github.com/user-attachments/files/34539300/pd-section-component-lifetime-proof.zip)
+reopened the same final drawing bytes for every case: retaining only document
+and view handles, or only selection-manager/data/view handles, preserved correct
+part owners; retaining drawing/native component proxies alone changed the
+generated names to angle form and made both sampled owners report the source
+assembly with empty configuration. The hidden set still changed correctly.
+There were no forced collections, sleeps, saves or visibility-oracle fallbacks.
+The section mutation operation therefore owns its component-bearing row list:
+release that list, batch groups, planned native owners and component loop/
+selection aliases before re-enumerating the rebuilt tree. Preserve only plain
+desired identities, flags and counts across that boundary. The family caller's
+last loop row is an alias too; merely dropping one local list is insufficient.
+
 For changed sections, capture and prove a unique plain drawing/path/title,
 sheet-view name and view name before mutation. After rebuilding, stop using the
 old section wrapper. Enumerate `ISldWorks.GetDocuments` and `IDrawingDoc.GetViews`

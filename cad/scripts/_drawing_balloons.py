@@ -895,6 +895,8 @@ def _apply_drawing_visibility(
     IModelDoc2 HideComponent2/ShowComponent2 commands support drawing documents.
     Both return void, so exact post-rebuild readback is the success criterion.
     Return the usable view: a changed section must be reacquired after rebuild.
+    Own the component-bearing ``rows`` list: a changed section consumes it before
+    re-resolution. Callers must not retain individual row/component aliases.
     """
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     if int(model.GetType()) != 3:  # swDocDRAWING
@@ -906,6 +908,8 @@ def _apply_drawing_visibility(
         for visible in (False, True)
     }
     changed = sum(map(len, groups.values()))
+    enumerated = len(rows)
+    show_count, hide_count = len(groups[True]), len(groups[False])
     untouched_flags = {
         row.name: row.tree_visible for row in rows if desired[row.name] == row.visible
     }
@@ -994,8 +998,14 @@ def _apply_drawing_visibility(
             rebuild_seconds = perf_counter() - tick
         tick = perf_counter()
         if changed and section_identity is not None:
-            # SOLIDWORKS 2026 SP4 exposed alias names through the retained
-            # section wrapper after ShowComponent2. Never inspect it again.
+            # Retained drawing/native component proxies change SW 34.4.0's
+            # generated section context. Release every transient component
+            # reference before asking for the rebuilt tree; no GC or retry.
+            rows.clear()
+            for group in groups.values():
+                group.clear()
+            planned_owners.clear()
+            row = planned = owner = selected_component = None
             model, view = _resolve_section_visibility_view(app, section_identity, label=label)
             adapter.currentModel = model
         after = _visibility_components(view, label=label)
@@ -1038,8 +1048,8 @@ def _apply_drawing_visibility(
                     primary_error.add_note(f"{label}: selection cleanup also failed: {error!r}")
         _telemetry.event(
             "drawing.visibility.timings", label=label, strategy="batch_commands", outcome=outcome,
-            enumerated=len(rows), changed=changed, unchanged=len(rows) - changed,
-            show=len(groups[True]), hide=len(groups[False]),
+            enumerated=enumerated, changed=changed, unchanged=enumerated - changed,
+            show=show_count, hide=hide_count,
             enumerate_seconds=enumerate_seconds, selection_seconds=selection_seconds,
             apply_seconds=apply_seconds, rebuild_seconds=rebuild_seconds,
             readback_seconds=readback_seconds, total_seconds=enumerate_seconds + perf_counter() - started,
@@ -1081,6 +1091,8 @@ def isolate_drawing_view_components(
     for row in rows:
         if not row.parent and desired[row.name] and any(not desired[name] for name in row.ancestors):
             raise RuntimeError(f"{label}: requested component {row.name!r} has a hidden ancestor")
+    # The loop variable otherwise keeps its last component alive in this frame.
+    del row
     view = _apply_drawing_visibility(
         adapter, view, rows, desired,
         enumerate_seconds=perf_counter() - started, label=label,
