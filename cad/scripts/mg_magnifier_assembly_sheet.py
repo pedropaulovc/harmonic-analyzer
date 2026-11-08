@@ -30,6 +30,7 @@ from mg_magnifier_assembly_spec import (
 )
 from _title_block_units import LENGTH_UNITS, render_number
 from sh_vn_music_wire_lever_spec import BOM_DESCRIPTION as _WIRE_BOM_DESCRIPTION
+from mg_magnifying_wheel_geom import DRUM_RECESS as _DRUM_RECESS
 from mg_magnifying_wheel_geom import SPOKE_COUNT as _SPOKE_COUNT
 from mg_magnifying_wheel_geom import TIE1_X as _TIE1_X
 from mg_magnifying_wheel_geom import TIE1_Y as _TIE1_Y
@@ -74,6 +75,15 @@ ENDSHAKE_NO_GO_TEXT = render_number((ENDSHAKE + ENDSHAKE_TOL) / _INCH, UNIT, 3)
 BACK_END_SUNK_TEXT = (
     f"{render_number(_axle.BACK_END_SUNK_MIN / _INCH, UNIT, 3)}-"
     f"{render_number(_axle.BACK_END_SUNK_MAX / _INCH, UNIT, 3)}"
+)
+# The pressed drum's front face below the wheel's spigot face, hard against
+# the boss: the window the printed spigot and drum lengths prove
+# (mg_magnifying_wheel_geom.DRUM_RECESS). Delegated ruling (assembly-step
+# moves): MHA-MG-00's press step accepts it.
+# The geom asserts the near limit >= -1e-9 mm; rounding (and + 0.0, for -0.0)
+# drops float residue that render_number would reject as a negative magnitude.
+DRUM_RECESS_TEXT = "-".join(
+    render_number(round(limit / _INCH, 6) + 0.0, UNIT, 3) for limit in _DRUM_RECESS
 )
 
 # The summing lever (cad/config/parts/sm-summing-lever.yaml), the mate the
@@ -242,7 +252,9 @@ WIRE_TIE_HOLE = "WIRE TIE HOLE"
 _TIE_HOLE = f"THE {WIRE_TIE_HOLE}"
 STEP_TEXT = {
     _steps.DRUM_PRESSED_KEY: (
-        f"PRESS {_DRUM} ONTO THE SPIGOT OF {_WHEEL}, HARD AGAINST THE BOSS."
+        f"PRESS {_DRUM} ONTO THE SPIGOT OF {_WHEEL} UNTIL IT IS HARD AGAINST THE "
+        f"BOSS, ITS OUTER FACE {DRUM_RECESS_TEXT} BELOW THE END OF THE SPIGOT "
+        "(CALIPER DEPTH ROD)."
     ),
     _steps.DRUM_HELD_KEY: f"CHECK {_DRUM} DOES NOT TURN OR SLIDE BY HAND.",
     # A press that goes on by hand is a slip fit (rule 23). Owner ruling
@@ -255,9 +267,12 @@ STEP_TEXT = {
     ),
     # The press stop is the plain end's window below the bar's far face (the
     # bar's depth stack, which MHA-MG-08 names; the spec proves the window),
-    # read with a depth rod. The thread end past the second nut (the DETAIL A
-    # ACCEPT note, owner ruling 2026-11-06 Q1) governs any further press
-    # (local review of round 1: two limits, neither said which governs).
+    # read with a depth rod. The thread end past the second nut governs any
+    # further press (local review of round 1: two limits, neither said which
+    # governs). Its limits are the DETAIL A gauge's ACCEPT callout (owner
+    # ruling 2026-11-06 Q1); DETAIL B is the view that draws the nuts and the
+    # thread end, so the check points there for where to read (farm rounds 1
+    # and 2: DETAIL A draws no nut).
     _steps.AXLE_PRESSED_KEY: (
         f"PRESS {_AXLE} INTO {_BAR}, THREADED END OUT, UNTIL ITS PLAIN END IS "
         f"{BACK_END_SUNK_TEXT} BELOW THE FAR FACE OF {_BAR} (CALIPER DEPTH ROD)."
@@ -273,9 +288,9 @@ STEP_TEXT = {
         f"JAM BOTH {_NUT} NUTS ON {_AXLE} WITH {_WHEEL} JUST FREE."
     ),
     _steps.AXLE_CHECKED_KEY: (
-        "CHECK THE THREAD END PAST THE SECOND NUT AGAINST THE ACCEPT NOTE IN "
-        f"{PRESS_DETAIL_TITLE} (CALIPER DEPTH ROD): IT GOVERNS OVER THE "
-        f"{_step(_steps.AXLE_PRESSED_KEY)} DEPTH."
+        f"CHECK THE THREAD END PAST THE SECOND NUT, AS {ENDSHAKE_DETAIL_TITLE} "
+        f"SHOWS IT, AGAINST THE {PRESS_DETAIL_TITLE} ACCEPT LIMITS (CALIPER DEPTH "
+        f"ROD): THEY GOVERN OVER THE {_step(_steps.AXLE_PRESSED_KEY)} DEPTH."
     ),
     "trial-parts-removed-to-press": (
         f"IF IT FAILS, REMOVE THE TRIAL NUTS AND PARTS FROM {_AXLE}."
@@ -340,8 +355,8 @@ STEP_TEXT = {
         f"IF THE SECOND NUT WAS LOOSENED, RETURN TO {_step(_steps.ENDSHAKE_SET_KEY)}."
     ),
     _steps.AXLE_ACCEPTED_KEY: (
-        "CHECK THE THREAD END PAST THE SECOND NUT AGAINST THE ACCEPT NOTE IN "
-        f"{PRESS_DETAIL_TITLE} AGAIN, AS IN {_step(_steps.AXLE_CHECKED_KEY)}."
+        "CHECK THE THREAD END PAST THE SECOND NUT AGAIN, AS IN "
+        f"{_step(_steps.AXLE_CHECKED_KEY)}."
     ),
     # The final reading's own remedy: strip the stack back to the bare axle
     # and take the trial-fit loop again (machinist review, stab-split s2).

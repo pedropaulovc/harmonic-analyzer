@@ -18,6 +18,7 @@ import mg_magnifier_assembly_sheet as notes
 import mg_magnifier_assembly_spec as stack
 import mg_magnifier_assembly_steps as steps
 import mg_magnifier_explode_spec as explode
+import mg_magnifying_wheel_geom
 import mg_wheel_axle_spacer_spec
 import mg_wheel_axle_spec
 import mg_wheel_group
@@ -219,9 +220,21 @@ def test_the_axle_press_stops_at_the_plain_end_window_the_axle_spec_proves() -> 
     pressed = notes.STEP_TEXT[steps.AXLE_PRESSED_KEY]
     assert f"UNTIL ITS PLAIN END IS {notes.BACK_END_SUNK_TEXT} BELOW THE FAR FACE OF ITEM " in pressed
     assert "CALIPER DEPTH ROD" in pressed
-    assert notes.STEP_TEXT[steps.AXLE_CHECKED_KEY].endswith(
-        f"GOVERNS OVER THE STEP {steps.step_number(steps.AXLE_PRESSED_KEY)} DEPTH."
+    checked = notes.STEP_TEXT[steps.AXLE_CHECKED_KEY]
+    assert f"AS {notes.ENDSHAKE_DETAIL_TITLE} SHOWS IT" in checked
+    assert checked.endswith(
+        f"GOVERN OVER THE STEP {steps.step_number(steps.AXLE_PRESSED_KEY)} DEPTH."
     )
+
+
+def test_the_drum_press_accepts_the_recess_window_the_wheel_lengths_prove() -> None:
+    """Delegated ruling (assembly-step moves): the drum press step carries
+    the drum face's window below the spigot end (DRUM_RECESS)."""
+    low, high = (float(text) * 25.4 for text in notes.DRUM_RECESS_TEXT.split("-"))
+    assert (low, high) == pytest.approx(mg_magnifying_wheel_geom.DRUM_RECESS, abs=0.0127)
+    pressed = notes.STEP_TEXT[steps.DRUM_PRESSED_KEY]
+    assert "HARD AGAINST THE BOSS" in pressed
+    assert f"ITS OUTER FACE {notes.DRUM_RECESS_TEXT} BELOW THE END OF THE SPIGOT" in pressed
 
 
 def test_each_hand_set_clamp_is_checked_to_hold_its_setting() -> None:
