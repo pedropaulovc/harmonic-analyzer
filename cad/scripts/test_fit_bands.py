@@ -50,6 +50,8 @@ _SETTER = "set_dimension_bilateral_tolerance"
 # the imported module) must say here which module-level expression build()
 # derives it from. "each" checks a tuple of bands; "values" checks a band mapping.
 LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
+    # The compact note is pivot-only; its contract is the imported pivot spec.
+    ("_oblique_block_drawing", "contract.BORE_BAND"): ("(part.BORE_BAND,)", "each"),
     # for section, band in enumerate(SECTION_DIA_BANDS): ... deviations(band)
     ("build_dt_cone_gear_shaft", "band"): ("SECTION_DIA_BANDS", "each"),
     # def gear_tip_band_mm(grade): band = ...; deviations(band)
