@@ -19,8 +19,10 @@ PART_STEM = SPEC.artifact_stem
 # location dimensions carry their value and band only (rule 7); the mm unit
 # is RV-02's.
 LEADSCREW_MATE = f"{part.feed_nut.NUMBER.removeprefix(part.NUMBER.rsplit('-TL-', 1)[0] + '-')} LEADSCREW"
+# The Ø.351 is bored at its ±.002 station (owner ruling 2026-11-08 (Pedro),
+# A2 option (i); the shop table holds ±.002 only for a bored or reamed hole).
 CALLOUTS = {
-    'NutClearanceDia': {'suffix': ' DRILL THRU', 'above': '',
+    'NutClearanceDia': {'suffix': f' {part.NUT_CLEARANCE_PROCESS} THRU', 'above': '',
                         'below': f'FOR {LEADSCREW_MATE}\n{part.NUT_WALL_MIN_TEXT}'},
     'NutCentreY': {'above': '', 'below': ''},
     'NutCentreZ': {'above': '', 'below': ''},

@@ -14,7 +14,7 @@ import ch_rocker_arm_tl_vn_oblique_leadscrew_kit_feed_nut_spec as feed_nut
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as lead
 from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _printed_tolerance import printed_band_mm
 
 INCH = 25.4
 FOLDER = Path(__file__).parent
@@ -240,12 +240,14 @@ def test_clearance_to_tap_wall_is_the_stated_shortfall_and_every_face_wall_meets
     a=math.radians(spec.NUT_CLOCK_DEG+spec.NUT_CLOCK_TOL_DEG)
     toward=spec.LEADSCREW_OFFSET_Y*math.cos(a)+spec.LEADSCREW_OFFSET_Z*math.sin(a)
     radius=feed_nut.HOLE_PCD/2-feed_nut.HOLE_STATION_BAND-spec.FIT_UP_RESIDUAL
-    clearance_r=(spec.SCREW_CLEARANCE_DIA+drilled_oversize_mm(unit=spec.UNIT))/2
+    # Bored at its ±.002 station: the size takes the title block's ±.005.
+    assert spec.NUT_CLEARANCE_PROCESS=='BORE'
+    clearance_r=(spec.SCREW_CLEARANCE_DIA+printed_band_mm(3,unit=spec.UNIT))/2
     wander=spec.LUG_WIDTH*math.tan(math.radians(.3))
     assert math.isclose(spec.NUT_TAP_WANDER,wander)
     expected=radius-toward-THREAD_MAJOR_MM['#4-40']/2-wander-clearance_r
     assert math.isclose(clearance,expected)
-    assert round(clearance/INCH,4)==.0606
+    assert round(clearance/INCH,4)==.0601
     assert spec.NUT_WALL_MIN_TEXT=='WALL .060 MIN TO TAPS'
     assert spec.NUT_WALL_MIN<=clearance
     # Negative control: at the title block's ±.005 / ±.13 mm stations the
@@ -263,7 +265,7 @@ def test_view_d_prints_size_then_process_names_the_leadscrew_and_bare_locations(
     assert draw.LEADSCREW_MATE=='TL-VN-84 LEADSCREW'
     assert f'MHA-CH-06-{draw.LEADSCREW_MATE}'.startswith(feed_nut.NUMBER)
     assert draw.CALLOUTS=={
-        'NutClearanceDia':{'suffix':' DRILL THRU','above':'',
+        'NutClearanceDia':{'suffix':' BORE THRU','above':'',
                            'below':f'FOR TL-VN-84 LEADSCREW\n{spec.NUT_WALL_MIN_TEXT}'},
         'NutCentreY':{'above':'','below':''},
         'NutCentreZ':{'above':'','below':''},

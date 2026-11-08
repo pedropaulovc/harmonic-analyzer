@@ -34,7 +34,7 @@ import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as lead
 from _hole_spec import HoleSpec, TAP_DRILL_MM, THREAD_MAJOR_MM
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _package_units import drawing_unit
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _printed_tolerance import printed_band_mm
 
 PART_NAME = "ch-rocker-arm-tl-oblique-feed-block"
 UNIT = drawing_unit(
@@ -248,7 +248,12 @@ if HEAD_TO_BODY_SHARP_CENTRED >= 0.0:
 # below from Y: the band is symmetric about 45°, so the two are the same
 # set, and |cos|, |sin| put the same set in every quadrant.
 NUT_TAP_MAJOR = THREAD_MAJOR_MM[feed_nut.SCREW_THREAD]
-_CLEARANCE_R = (SCREW_CLEARANCE_DIA + drilled_oversize_mm(unit=UNIT)) / 2
+# The ±.002 station is a bored hole's (drawing-guidelines' shop table: a
+# drilled hole holds ±.005; restack farm r1 20261108T040030048Z asked for the
+# route), so the Ø.351 is bored at its station and its size takes the title
+# block's .XXX ±.005, not DRILLED HOLES' +.004.
+NUT_CLEARANCE_PROCESS = "BORE"
+_CLEARANCE_R = (SCREW_CLEARANCE_DIA + printed_band_mm(3, unit=UNIT)) / 2
 _TAP_RADIUS = feed_nut.HOLE_PCD / 2 + feed_nut.HOLE_STATION_BAND + FIT_UP_RESIDUAL
 _TAP_RADIUS_MIN = feed_nut.HOLE_PCD / 2 - feed_nut.HOLE_STATION_BAND - FIT_UP_RESIDUAL
 _CLOCK_STEPS = 100  # 0.1° across the ±5° band; both limits included

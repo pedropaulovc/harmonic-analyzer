@@ -75,9 +75,13 @@ PLAN_XY = (.170,.205)
 PLAN_KEEP = {
     'BlockLength':(.170,.2535),'PlanHole2X':(.1665,.248),'PlanHole1X':(.171,.2395),
     'PlanBoreX':(.1635,.231),
-    # .278's text under the -Y edge, outside its 7 mm span: beside its span
-    # it read '.278.79' with the seat's text (farm r4 20261108T022716612Z).
-    'PlanHole3Y':(.2045,.1795),'BlockSideY':(.2175,.199),'PlanHole2Y':(.2305,.2115),
+    # .278's text rides just over its 7 mm span with its arrows inside, so
+    # nothing of it reaches under the -Y edge, where both sheets' counterbore
+    # leader runs (under the edge, TL-32's leader struck it: restack farm r1
+    # 20261108T040030048Z). The .79 and 1.302 texts stand high in their
+    # spans, each a row clear of the one before (beside .278 the seat's text
+    # read '.278.79': farm r4 20261108T022716612Z).
+    'PlanHole3Y':(.2045,.1965),'BlockSideY':(.2175,.2045),'PlanHole2Y':(.2305,.2145),
     'BlockWidth':(.2595,.203),
     'BoreDia':(.078,.196),'CarriageDrills1Dia':(.085,.168),'CarriageCounterbores3Dia':(.245,.150),
     # TL-32 still prints this separate native tap dimension in its established
@@ -762,6 +766,7 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None, ca
     settled_checks = ()
     if not is_feed:
         settled_checks = (_place_pivot_tap_arrow_inside(adapter, plan, plan_annotations, contract),)
+    _set_arrow_side(adapter, plan_annotations, ('PlanHole3Y',), _ARROWS_INSIDE)
     set_hidden_lines_removed(adapter,side)
     side_annotations = curate_view_dimensions(adapter,side,keep=side_keep,view_label='pivot section direction',
                      dimensions_by_feature=contract.DRAWING_DIMENSIONS)

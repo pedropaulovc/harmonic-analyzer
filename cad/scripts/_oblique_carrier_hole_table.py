@@ -43,7 +43,11 @@ import ch_rocker_arm_tl_oblique_carrier_spec as spec
 # y 164 mm (old-base farm r3, 20261108T014606685Z: it ran through the first
 # row at a .175 top), so the table's top sits under it.
 TABLE_ANCHOR = (0.020, 0.158)
-TABLE_WIDTHS = (0.012, 0.019, 0.019, 0.078, 0.065)
+# NOTE at 88: 'R816 / MHA-CH-13; NOTES 1, 2' (29 glyphs, ~2.7 mm each, plus
+# cell margins) and 'LOCATES TL-24 RISER; NOTE 2' wrapped in 65, and the
+# doubled rows ran the table past the border at a .158 top (restack farm
+# r1 20261108T040030048Z).
+TABLE_WIDTHS = (0.012, 0.019, 0.019, 0.078, 0.088)
 # The physical columns, in the IncludeHidden=True index domain every read
 # and write below uses: SIZE stays generated (and compared) while hidden.
 COLUMNS = ("TAG", "X LOC", "Y LOC", "SIZE", "NOTE")

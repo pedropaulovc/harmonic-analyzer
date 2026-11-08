@@ -454,7 +454,7 @@ def test_table_cells_and_notes_stay_short_and_name_mates_by_number() -> None:
         assert "CLAMPS" not in mate and "RELIEF" not in mate, tag
     assert drawing.ROW_MATES["HUB"].split("\n")[1] == "CLEARS MHA-CH-13 HUB REAMER"
     assert drawing.STRAP_NUMBER == _config.parts("ch-rocker-strap")["number"]
-    assert drawing.ROW_MATES["P1"] == "LOOSE MHA-SM-VN-53 STOP PIN"
+    assert drawing.ROW_MATES["P1"] == "CLEARS MHA-SM-VN-53 STOP PIN"
     # A plain cut's blank native SIZE moves to its NOTE cell, size first; a
     # wizard row never prints a blank SIZE.
     blank = {tag: "" for tag in drawing.TABLE_HOLES}

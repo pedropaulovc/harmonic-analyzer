@@ -310,8 +310,10 @@ MATE_HEADING = "MATE"
 ROW_MATES: dict[str, str] = {
     **{tag: f"{CARRIER_SHORT} {tag}" for tag in SPOTTED if tag != "HUB"},
     "HUB": f"{CARRIER_SHORT} HUB\nCLEARS {STRAP_NUMBER} HUB REAMER",
-    "P1": f"LOOSE {part_spec.STOP_PIN_NUMBER} STOP PIN",
-    "P2": f"LOOSE {part_spec.STOP_PIN_NUMBER} STOP PIN",
+    # Rule 26: 'LOOSE' is no standard fit name (restack farm r1
+    # 20261108T040030048Z); the pin drops through its clearance.
+    "P1": f"CLEARS {part_spec.STOP_PIN_NUMBER} STOP PIN",
+    "P2": f"CLEARS {part_spec.STOP_PIN_NUMBER} STOP PIN",
 }
 if set(ROW_MATES) != set(TABLE_HOLES):
     raise AssertionError("every riser table row needs its MATE")
