@@ -452,7 +452,7 @@ def test_table_cells_and_notes_stay_short_and_name_mates_by_number() -> None:
         assert len(lines) <= 2, tag
         assert lines[0].startswith("TL-21 ") or _DRAWING_NUMBER.search(lines[0]), tag
         assert "CLAMPS" not in mate and "RELIEF" not in mate, tag
-    assert drawing.ROW_MATES["HUB"].split("\n")[1] == "CLEARS MHA-CH-13 HUB REAMER"
+    assert drawing.ROW_MATES["HUB"].split("\n")[1] == "PASSES MHA-CH-13 REAMER"
     assert drawing.STRAP_NUMBER == _config.parts("ch-rocker-strap")["number"]
     assert drawing.ROW_MATES["P1"] == "CLEARS MHA-SM-VN-53 STOP PIN"
     # A plain cut's blank native SIZE moves to its NOTE cell, size first; a

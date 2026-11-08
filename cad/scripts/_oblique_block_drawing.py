@@ -66,23 +66,24 @@ TAPPED_HOLE_NOTE = '#4-40 Tapped Hole'
 PLAN_XY = (.170,.205)
 # The Y baseline, right of the plan (block y 184.9..225.1, rows at 192.0 and
 # 218.0, seat at 205.0 on both sheets: TL-32's plan centres the L, its block
-# lands on the same band), shortest nearest: .278 (x 204.5), .79 (217.5),
-# 1.302 (230.5), 1.58 (259.5), every witness leaving the +X/-Y corner. The
-# .278's 7 mm span cannot hold its text between arrows: the text stands
-# just over the span, under the A arrow (y 205 up), left of the .79 line,
-# and above TL-32's counterbore leader (y ~180 at x 204.5). The others
-# print inside their spans, clear of each other's witnesses.
+# lands on the same band), shortest nearest, 20 mm apart: .278 (x 204.5),
+# .79 (224.5), 1.302 (244.5), 1.58 (264.5), every witness leaving the +X/-Y
+# corner. The .278's 7 mm span cannot hold its text between arrows: the text
+# stands just over the span, under the A arrow (y 205 up), and above TL-32's
+# counterbore leader (y ~180 at x 204.5). The others print mid-span, clear
+# of their own arrowheads and of each other's witnesses.
 PLAN_KEEP = {
     'BlockLength':(.170,.2535),'PlanHole2X':(.1665,.248),'PlanHole1X':(.171,.2395),
     'PlanBoreX':(.1635,.231),
     # .278's text rides just over its 7 mm span with its arrows inside, so
     # nothing of it reaches under the -Y edge, where both sheets' counterbore
     # leader runs (under the edge, TL-32's leader struck it: restack farm r1
-    # 20261108T040030048Z). The .79 and 1.302 texts stand high in their
-    # spans, each a row clear of the one before (beside .278 the seat's text
-    # read '.278.79': farm r4 20261108T022716612Z).
-    'PlanHole3Y':(.2045,.1965),'BlockSideY':(.2175,.2045),'PlanHole2Y':(.2305,.2145),
-    'BlockWidth':(.2595,.203),
+    # 20261108T040030048Z). At 13 mm lanes the .79 and 1.302 texts stood
+    # high in their spans and their own arrowheads struck them (restack r2
+    # 20261108T045159962Z, 3/3 on both blocks); beside .278 the seat's text
+    # read '.278.79' (farm r4 20261108T022716612Z).
+    'PlanHole3Y':(.2045,.1965),'BlockSideY':(.2245,.1950),'PlanHole2Y':(.2445,.2015),
+    'BlockWidth':(.2645,.205),
     'BoreDia':(.078,.196),'CarriageDrills1Dia':(.085,.168),'CarriageCounterbores3Dia':(.245,.150),
     # TL-32 still prints this separate native tap dimension in its established
     # upper-left lane. TL-22 imports it at the same source position, then

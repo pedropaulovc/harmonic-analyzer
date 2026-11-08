@@ -43,11 +43,13 @@ import ch_rocker_arm_tl_oblique_carrier_spec as spec
 # y 164 mm (old-base farm r3, 20261108T014606685Z: it ran through the first
 # row at a .175 top), so the table's top sits under it.
 TABLE_ANCHOR = (0.020, 0.158)
-# NOTE at 88: 'R816 / MHA-CH-13; NOTES 1, 2' (29 glyphs, ~2.7 mm each, plus
-# cell margins) and 'LOCATES TL-24 RISER; NOTE 2' wrapped in 65, and the
-# doubled rows ran the table past the border at a .158 top (restack farm
-# r1 20261108T040030048Z).
-TABLE_WIDTHS = (0.012, 0.019, 0.019, 0.078, 0.088)
+# NOTE at 105: 'R816 / MHA-CH-13; NOTES 1, 2' and 'LOCATES TL-24 RISER;
+# NOTE 2' (27-29 glyphs) wrapped at 65 and still at 88 (the table font runs
+# ~3.3 mm a glyph with its margins), and the doubled rows ran the table past
+# the border at a .158 top (restack farm r1 20261108T040030048Z, r2
+# 20261108T045159962Z). Right edge 20 + 155 = 175 mm, the title block's lane
+# at 216.
+TABLE_WIDTHS = (0.012, 0.019, 0.019, 0.078, 0.105)
 # The physical columns, in the IncludeHidden=True index domain every read
 # and write below uses: SIZE stays generated (and compared) while hidden.
 COLUMNS = ("TAG", "X LOC", "Y LOC", "SIZE", "NOTE")
@@ -681,7 +683,10 @@ def create_carrier_hole_table(
         if any(abs(actual - expected) > 1e-6 for actual, expected in zip(widths, visible, strict=True)):
             raise RuntimeError(f"carrier visible column widths {widths!r}, expected {visible!r}")
         if TABLE_ANCHOR[1] - height < .015 or TABLE_ANCHOR[0] + sum(widths) > .216:
-            raise RuntimeError("carrier table crosses the border or title-block lane")
+            raise RuntimeError(
+                f"carrier table crosses the border or title-block lane: "
+                f"{sum(widths) * 1000:.1f} x {height * 1000:.1f} mm from {TABLE_ANCHOR}"
+            )
         _owned_table(adapter, view, feature, table)
 
     @_telemetry.traced("drawing.carrier_hole_table.settled")

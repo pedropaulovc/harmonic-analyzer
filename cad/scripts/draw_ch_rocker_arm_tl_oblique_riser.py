@@ -309,7 +309,10 @@ def row_notes(native_sizes: dict[str, str]) -> dict[str, str]:
 MATE_HEADING = "MATE"
 ROW_MATES: dict[str, str] = {
     **{tag: f"{CARRIER_SHORT} {tag}" for tag in SPOTTED if tag != "HUB"},
-    "HUB": f"{CARRIER_SHORT} HUB\nCLEARS {STRAP_NUMBER} HUB REAMER",
+    # Rule 7: two lines; 'CLEARS ... HUB REAMER' wrapped a lone REAMER onto a
+    # third that read as an instruction (restack r2 20261108T045159962Z).
+    # The relief passes the reamer that sizes the strap's product hole.
+    "HUB": f"{CARRIER_SHORT} HUB\nPASSES {STRAP_NUMBER} REAMER",
     # Rule 26: 'LOOSE' is no standard fit name (restack farm r1
     # 20261108T040030048Z); the pin drops through its clearance.
     "P1": f"CLEARS {part_spec.STOP_PIN_NUMBER} STOP PIN",
@@ -332,7 +335,9 @@ TABLE_NOTES = (SPOT_NOTE, ORIGIN_NOTE)
 TABLE_ANCHOR = (0.020, 0.172)
 # SIZE at 38: SolidWorks holds the native cell to its text, and farm r3
 # (20261108T014606685Z, 1850057757) measured "Ø.129 THRU ALL" at 37.4 mm.
-TABLE_WIDTHS = (0.012, 0.016, 0.016, 0.038, 0.036, 0.058)
+# MATE at 66: 'PASSES MHA-CH-13 REAMER' (23 glyphs) on one line; right edge
+# 20 + 184 = 204 mm, short of the isometric's note at 240.
+TABLE_WIDTHS = (0.012, 0.016, 0.016, 0.038, 0.036, 0.066)
 _TABLE_SIZE_COLUMN = 3
 _TABLE_NOTE_COLUMN = 4
 _TABLE_MATE_COLUMN = 5
