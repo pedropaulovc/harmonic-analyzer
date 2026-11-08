@@ -541,43 +541,70 @@ def test_fence_judges_an_unread_or_misread_dimension_as_all_extension_lines() ->
     )
 
 
+# The (.05) back-crown sag REF, measured on the round-6 sheet (text position
+# y 0.220): its dimension line ran 2.8 mm under its text position, from its
+# text tail at x 48.8 mm to a right arrow tail ending at x 86.0, 6.4 mm past
+# the rim witness (x 79.6); its two witnesses (x 78.4, 79.6) rise from the
+# crown (y 171.0) 1.0 mm past the line; its "(.05)" text spans x 50.0-60.0
+# from 3.2 mm under its text position to 3.2 mm over.
+_SAG_LINE_BELOW_TEXT_MM = 2.8
+_SAG_TAIL_END_X_MM = 86.0
+_SAG_TEXT_X_MM = (50.0, 60.0)
+_SAG_TEXT_HALF_HEIGHT_MM = 3.2
+_SAG_LINE_Y_MM = drawing.BACK_CAP_SAG_TEXT_XY[1] * 1000.0 - _SAG_LINE_BELOW_TEXT_MM
 # Sheet obstacles near the principal view's plain-span diameters, in sheet mm
-# as (x0, y0, x1, y1): read off the round-3 PDF and the round-4/5 layout audits
-# (fan-out dt-fab-3).  The neck-end witness, the 1.82's head-end witness, the
-# front land's diameter line, the front Ra's leader, the (.05)'s two
-# witnesses and detail A's fence edge.
+# as (x0, y0, x1, y1): read off the round-3/6 PDFs and the round-4/5 layout
+# audits (fan-out dt-fab-3).  The neck-end witness, the 1.82's head-end
+# witness, the front land's diameter line, the front Ra's leader, the
+# (.05)'s two witnesses and its dimension line, and detail A's fence edge.
 _PRINCIPAL_LINES_MM = (
     (296.0, 96.2, 296.0, 163.8),
     (260.2, 136.2, 260.2, 165.0),
     (241.8, 141.4, 241.8, 166.0),
     (253.2, 124.0, 259.3, 166.0),
-    (78.4, 171.0, 78.4, 218.2),
-    (79.6, 171.0, 79.6, 218.2),
+    (78.4, 171.0, 78.4, _SAG_LINE_Y_MM + 1.0),
+    (79.6, 171.0, 79.6, _SAG_LINE_Y_MM + 1.0),
+    (48.8, _SAG_LINE_Y_MM, _SAG_TAIL_END_X_MM, _SAG_LINE_Y_MM),
     (133.6, 227.6, 133.6, 243.0),
 )
 # A "Ø.3125 -.0004/-.0038" block over a "SEE NOTE 2" row, measured from its
-# dimension line on the round-4/5 farm sheets: 32.3 mm long whichever side
+# dimension line on the round-4/5/6 farm sheets: 32.3 mm long whichever side
 # SolidWorks runs it, from 7.3 mm under its text position to 6.3 mm over;
 # a "2X " prefix adds 6.7 mm (draw_dt_cone_pivot_post, farm run
-# 20261101T115401213Z).
+# 20261101T115401213Z).  Its leader rises at its dimension line from the
+# shaft's upper outline (y 174.0) to the block's shoulder.
 _DIA_BLOCK_RUN_MM = 32.3
 _COUNT_PREFIX_MM = 6.7
 _DIA_BLOCK_BELOW_MM, _DIA_BLOCK_ABOVE_MM = 7.3, 6.3
+_SHAFT_TOP_Y_MM = 174.0
+# What reads as a separate line: a gap a print shows (rule 14).
+_VISIBLE_GAP_MM = 1.5
+
+
+def _block_sides(xy: tuple[float, float], run_mm: float) -> dict[str, tuple[float, float, float, float]]:
+    """The text block (x0, y0, x1, y1, sheet mm) on each side of the
+    dimension line at ``xy`` (sheet metres), with 1 mm of margin."""
+    x, y = xy[0] * 1000.0, xy[1] * 1000.0
+    y0, y1 = y - _DIA_BLOCK_BELOW_MM - 1.0, y + _DIA_BLOCK_ABOVE_MM + 1.0
+    return {
+        "left": (x - run_mm - 1.0, y0, x + 1.0, y1),
+        "right": (x - 1.0, y0, x + run_mm + 1.0, y1),
+    }
+
+
+def _box_meets_line(box: tuple[float, float, float, float], line: tuple[float, ...]) -> bool:
+    lx0, ly0, lx1, ly1 = line
+    x0, y0, x1, y1 = box
+    return max(lx0, lx1) >= x0 and min(lx0, lx1) <= x1 and max(ly0, ly1) >= y0 and min(ly0, ly1) <= y1
 
 
 def _crossed_either_side(xy: tuple[float, float], run_mm: float) -> list[str]:
-    """Which side's text block (left or right of the dimension line at ``xy``,
-    sheet metres) meets a known line, with 1 mm of margin."""
-    x, y = xy[0] * 1000.0, xy[1] * 1000.0
-    y0, y1 = y - _DIA_BLOCK_BELOW_MM - 1.0, y + _DIA_BLOCK_ABOVE_MM + 1.0
-    sides = {"left": (x - run_mm - 1.0, x + 1.0), "right": (x - 1.0, x + run_mm + 1.0)}
-    crossed = []
-    for side, (x0, x1) in sides.items():
-        for lx0, ly0, lx1, ly1 in _PRINCIPAL_LINES_MM:
-            if max(lx0, lx1) >= x0 and min(lx0, lx1) <= x1 and max(ly0, ly1) >= y0 and min(ly0, ly1) <= y1:
-                crossed.append(side)
-                break
-    return crossed
+    """Which side's text block meets a known line."""
+    return [
+        side
+        for side, box in _block_sides(xy, run_mm).items()
+        if any(_box_meets_line(box, line) for line in _PRINCIPAL_LINES_MM)
+    ]
 
 
 def test_either_side_check_catches_the_collar_span_flips() -> None:
@@ -588,6 +615,40 @@ def test_either_side_check_catches_the_collar_span_flips() -> None:
     round_5 = (drawing._sheet_x(spec.FRONT_JOURNAL_Z) + 0.0012, 0.154)
     assert "right" in _crossed_either_side(round_4, _DIA_BLOCK_RUN_MM)
     assert "left" in _crossed_either_side(round_5, _DIA_BLOCK_RUN_MM)
+
+
+def _sag_tail_to_stub_leader_gap(sag_text_y: float) -> float:
+    """Gap (mm) from the (.05)'s right arrow tail end to the 2X block's
+    leader, for the (.05) text position ``sag_text_y`` (sheet metres)."""
+    stub_x, stub_y = (v * 1000.0 for v in drawing.PRINCIPAL_KEEP["BackStubDia"])
+    leader_top = stub_y - _DIA_BLOCK_BELOW_MM
+    tail_y = sag_text_y * 1000.0 - _SAG_LINE_BELOW_TEXT_MM
+    dy = max(_SHAFT_TOP_Y_MM - tail_y, tail_y - leader_top, 0.0)
+    dx = max(stub_x - _SAG_TAIL_END_X_MM, 0.0)
+    return math.hypot(dx, dy)
+
+
+def test_back_crown_sag_tail_stands_apart_from_the_2x_leader() -> None:
+    """Round 6 machinist review C1 (rule 14): the (.05)'s right arrow tail
+    ended on the 2X Ø.3125 block's vertical leader, so the two read as one
+    line.  The (.05) row now rises over the 2X block."""
+    # The check flags round 6's placement.
+    assert _sag_tail_to_stub_leader_gap(0.220) < _VISIBLE_GAP_MM
+    assert _sag_tail_to_stub_leader_gap(drawing.BACK_CAP_SAG_TEXT_XY[1]) >= _VISIBLE_GAP_MM
+    assert drawing.PRINCIPAL_KEEP["BackCapSagDim"] == drawing.BACK_CAP_SAG_TEXT_XY
+    # Its text and line stay clear of the 2X block on the side SolidWorks
+    # runs it (right, rounds 4-6), and its text under the zone border (y ~267).
+    block = _block_sides(drawing.PRINCIPAL_KEEP["BackStubDia"], _DIA_BLOCK_RUN_MM + _COUNT_PREFIX_MM)[
+        "right"
+    ]
+    sag_y = drawing.BACK_CAP_SAG_TEXT_XY[1] * 1000.0
+    sag_text = (
+        _SAG_TEXT_X_MM[0], sag_y - _SAG_TEXT_HALF_HEIGHT_MM,
+        _SAG_TEXT_X_MM[1], sag_y + _SAG_TEXT_HALF_HEIGHT_MM,
+    )
+    assert sag_text[1] - block[3] >= _VISIBLE_GAP_MM or sag_text[2] < block[0]
+    assert _SAG_LINE_Y_MM - block[3] >= _VISIBLE_GAP_MM
+    assert sag_text[3] <= 262.0
 
 
 def test_spans_outside_the_journals_share_one_2x_diameter_and_mate() -> None:
@@ -628,11 +689,12 @@ def test_spans_outside_the_journals_share_one_2x_diameter_and_mate() -> None:
     for title_block_max_in in (0.31 + 0.01, 0.312 + 0.005):
         assert title_block_max_in * 25.4 > smallest_bore
     # Placement: the stub's line inside the back land's crown end, and its
-    # 2X block clear of every known line whichever side SolidWorks runs it.
+    # 2X block, which SolidWorks runs right of its line (rounds 4-6), clear
+    # of every known line.
     stub_xy = drawing.PRINCIPAL_KEEP["BackStubDia"]
     land_crown_x = drawing._sheet_x(spec.BACK_JOURNAL_Z + spec.JOURNAL_LEN)
     assert land_crown_x - stub_xy[0] >= 0.0015
-    assert _crossed_either_side(stub_xy, _DIA_BLOCK_RUN_MM + _COUNT_PREFIX_MM) == []
+    assert "right" not in _crossed_either_side(stub_xy, _DIA_BLOCK_RUN_MM + _COUNT_PREFIX_MM)
     rows = drawing.SHEET_NOTES.replace("<MOD-DIAM>", "Ø").splitlines()
     assert len(rows) <= 4
     assert max(map(len, rows)) <= 66

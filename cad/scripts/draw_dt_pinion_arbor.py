@@ -335,14 +335,22 @@ REFERENCE_WITNESSES = {
     "BondZoneReference": (BOND_ZONE_DIA_Z, BOND_ZONE_DIA_Z + BOND_ZONE_WITNESS_LEN),
     "BackStubReference": (BACK_STUB_DIA_Z, BACK_STUB_DIA_Z + SPAN_WITNESS_LEN),
 }
-# The back stub's 2X diameter (line at x ~0.086, 2 mm inside the back land's
-# crown-end witness at x 0.0881 and right of the (.05)'s right arrow tail)
-# rises above the shaft, past the back land's diameter block (top y ~0.208)
-# and the (.05) row (y ~0.222), into sheet left open on both sides of its
-# line (round-3 PDF: no line in x 0.040-0.133 over y 0.225-0.250), so the
-# block is clear whichever side SolidWorks runs it (round 4 ran the collar
-# span's right of its line, round 5 left).
+# The back stub's 2X diameter (line at x ~0.086, between the back crown's
+# rim witness at x 0.0796 and the back land's crown end at x 0.0875) rises
+# above the shaft, past the back land's diameter block (top y ~0.210), into
+# open sheet (round-3/6 PDFs: no line in x 0.040-0.133 over y 0.225-0.260).
+# SolidWorks ran it right of its line in rounds 4, 5 and 6 (x 86.1-124.2 mm,
+# y 228.7-244.7 mm in round 6).
 BACK_STUB_TEXT_XY = (_sheet_x(BACK_STUB_DIA_Z), 0.2360)
+# The (.05) back-crown sag REF sits over that block.  At y 0.220 (round 6)
+# its dimension line ran at y 217.2 mm and its right arrow tail, 6.4 mm past
+# the rim witness, ended on the 2X block's vertical leader (x 86.1, y
+# 174.0-228.7 mm), so the two read as one line (machinist review C1, rule
+# 14).  Any row under the block's shoulder meets that leader, so the row
+# rises over the block: the line ~2.8 mm under the text position runs at
+# ~250 mm, ~10 mm over the block's "2X" and 21 mm over the leader's top,
+# its text ~11 mm under the sheet's zone border.
+BACK_CAP_SAG_TEXT_XY = (0.055, 0.253)
 SW_SEL_EXT_SKETCH_SEGS = 24  # swSelectType_e.swSelEXTSKETCHSEGS
 REFERENCE_WITNESS_LEN_TOL = 0.01  # mm; the witnesses are fully defined sketch lengths
 # Exported-raster proof that the outline stays unbroken over each witness:
@@ -418,7 +426,7 @@ PRINCIPAL_KEEP = {
     "NeckLen": (0.340, 0.100),
     "BackRimFromHeadRear": (0.205, 0.095),
     "OverallLen": (0.205, 0.080),
-    "BackCapSagDim": (0.055, 0.220),
+    "BackCapSagDim": BACK_CAP_SAG_TEXT_XY,
     # Radial leader down-left from the back crown, below the shaft axis and
     # clear of the (1.2) sag reference above it and the overall witnesses.
     "BackCapR": (0.045, 0.140),

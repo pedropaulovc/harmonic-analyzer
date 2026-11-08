@@ -37,6 +37,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -74,6 +75,7 @@ from _drawing_leaders import (
     dimension_segments,
     set_near_side_diameter,
 )
+from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -293,15 +295,31 @@ GEAR_DATA_HEIGHT = 0.056
 # sheet 1's GEAR DATA already sends the cutter and the relief to sheet 21,
 # whose table opens with T006's number, and the title block gives quantity.
 NUMBERED_NOTES_POS = (0.015, 0.263)
-CUTTER_DETAIL_POS = (0.015, 0.263)
+# Sheet 21 (round 6 of the fan-out, rule 7: the form was a 29-line free-text
+# block, its 17 rows unruled and untagged): a one-line title, the points in a
+# native general table (POINT | R | X | Y) under it, and two note lines under
+# the table, all at the gear sheets' 2.5 mm note height.
+FORM_TEXT_HEIGHT = 0.0025
+FORM_TITLE_POS = (0.015, 0.263)
+FORM_TABLE_POS = (0.015, 0.257)
+FORM_TABLE_HEADINGS = ("POINT", "R", "X", "Y")
+FORM_TABLE_COLUMN_WIDTHS = (0.013, 0.015, 0.015, 0.015)
+FORM_TABLE_ROW_HEIGHT = 0.0045
+FORM_NOTES_GAP = 0.004
+# swBOMConfigurationAnchorType_e.swBOMConfigurationAnchor_TopLeft: the anchor
+# is the table's top-left corner, as the layout audit boxes tables
+# (_drawing_layout_collect._table_element).
+_TABLE_ANCHOR_TOP_LEFT = 1
+_TABLE_HEADER_TOP = 1  # swTableHeaderPosition_e.swTableHeader_Top
+_TABLE_SIZE_CAN_CHANGE = 0  # swTableRowColSizeChangeBehavior_e
 # Where the tooth-space sheet's hidden title-block source view stands (see
 # build): clear of the table, inside the border.
 CUTTER_SOURCE_VIEW_CENTER = (0.325, 0.155)
 # The tooth-space plot beside the table (ENFORCE round 4 of #971: a table
 # alone left the sheet bunched in one corner, rule 15). The table governs; the
-# plot draws the same rows at FORM_PLOT_SCALE with Y0 on the CL at
+# plot draws the same rows at FORM_PLOT_SCALE with P1 (X0 Y0) on the CL at
 # FORM_PLOT_ORIGIN. At 75:1 the space spans x 0.207-0.353 and y 0.139-0.202,
-# right of the table (x <= ~0.125) and above the title block (y 0.064).
+# right of the table (x <= 0.073) and above the title block (y 0.064).
 FORM_PLOT_SCALE = 75.0
 FORM_PLOT_ORIGIN = (0.280, 0.140)
 # The CL runs this far below Y0 and above the blank OD; the X axis this far
@@ -313,7 +331,6 @@ FORM_PLOT_X_AXIS_LENGTH = 0.085
 FORM_PLOT_STATION_REACH_MM = {"junction": 1.10, "blank": 1.25}
 FORM_PLOT_INVOLUTE_SAMPLES = 16
 FORM_PLOT_TITLE_POS = (0.205, 0.240)
-FORM_PLOT_ORIGIN_NOTE_OFFSET = (0.004, -0.008)
 # A station label's top-left, from its arc's left end: wholly left of the end,
 # where the arc only rises away to the right.
 FORM_PLOT_STATION_LABEL_OFFSET = (-0.019, 0.002)
@@ -371,12 +388,6 @@ def form_plot_labels() -> list[tuple[str, tuple[float, float]]]:
             (FORM_PLOT_ORIGIN[0] + FORM_PLOT_X_AXIS_LENGTH + 0.002,
              FORM_PLOT_ORIGIN[1] + 0.002),
         ),
-        (
-            f"X0 Y0 ON CL AT ROOT R{inch_text(template.root_radius_mm, 4)}\n"
-            f"GEAR AXIS {inch_text(template.root_radius_mm, 4)} BELOW Y0 ON CL",
-            (FORM_PLOT_ORIGIN[0] + FORM_PLOT_ORIGIN_NOTE_OFFSET[0],
-             FORM_PLOT_ORIGIN[1] + FORM_PLOT_ORIGIN_NOTE_OFFSET[1]),
-        ),
     ]
     for key, radius in (("junction", junction), ("blank", blank)):
         x, y = form_plot_xy(
@@ -386,6 +397,91 @@ def form_plot_labels() -> list[tuple[str, tuple[float, float]]]:
             f"R{inch_text(radius, 4)}",
             (x + FORM_PLOT_STATION_LABEL_OFFSET[0], y + FORM_PLOT_STATION_LABEL_OFFSET[1]),
         ))
+    return labels
+
+
+# Each tag's text top-left from the point its leader lands on (sheet m). The
+# root and relief rows P3-P11 stand 1.3-7.7 mm apart at 75:1, too close to
+# tag one by one; their zone label names them (P2-P12). P1 and P2 hang under
+# the X axis, clear of each other; the involute rows P12-P17, 4-16 mm apart,
+# are tagged inside the space, up and left of the flank.
+FORM_TAG_TEXT_OFFSETS = {
+    1: (0.010, -0.012),
+    2: (0.002, -0.0037),
+    12: (-0.011, 0.005),
+    13: (-0.010, 0.007),
+    14: (-0.012, 0.007),
+    15: (-0.012, 0.007),
+    16: (-0.011, 0.007),
+    17: (-0.011, 0.0075),
+}
+# The zone labels' text top-left from their leaders' landings: the root arc's
+# on the -X half (the +X half carries P1's and P2's tags), the straight lines'
+# right of the relief, the involute's right of and below its flank.
+FORM_ZONE_TEXT_OFFSETS = {
+    "root": (-0.0466, -0.0049),
+    "straight": (0.0123, 0.0007),
+    "involute": (0.011, -0.007),
+}
+
+
+def form_point_tags() -> list[tuple[str, tuple[float, float], tuple[float, float]]]:
+    """(text, text top-left, leader landing) of each point tag on DETAIL B."""
+    points = custom_six_form_points_mm()
+    tags = []
+    for number, (dx, dy) in FORM_TAG_TEXT_OFFSETS.items():
+        _radius, x, y = points[number - 1]
+        tip = form_plot_xy(x, y)
+        text = f"P{number} (X0 Y0)" if number == 1 else f"P{number}"
+        tags.append((text, (tip[0] + dx, tip[1] + dy), tip))
+    return tags
+
+
+def form_zones() -> tuple[int, int]:
+    """(last root-arc point, junction point), 1-based: the root arc runs
+    P1-P2, straight lines row to row up to the junction row (the row at the
+    junction radius, rounded outward a fraction of a print step), then the
+    involute to the blank OD."""
+    points = custom_six_form_points_mm()
+    junction = stock_form_profile(6).template.relief_junction_radius_mm
+    nearest = min(
+        range(len(points)), key=lambda index: abs(points[index][0] - junction)
+    )
+    return 2, nearest + 1
+
+
+def form_zone_labels() -> list[tuple[str, tuple[float, float], tuple[float, float]]]:
+    """(text, text top-left, leader landing) of DETAIL B's three zone labels."""
+    template = stock_form_profile(6).template
+    root = template.root_radius_mm
+    points = custom_six_form_points_mm()
+    root_end, straight_end = form_zones()
+    # Half way round the root arc from P1 to P2, on the -X half.
+    _r, x2, y2 = points[root_end - 1]
+    half = math.atan2(x2, y2 + root) / 2.0
+    root_tip = form_plot_xy(-root * math.sin(half), root * math.cos(half) - root)
+    # Half way along the relief's straight lines, on a row-to-row line.
+    middle = (root_end + straight_end) // 2
+    (_ra, xa, ya), (_rb, xb, yb) = points[middle - 1], points[middle]
+    straight_tip = form_plot_xy((xa + xb) / 2.0, (ya + yb) / 2.0)
+    # On the involute half way up it.
+    radius = (points[straight_end - 1][0] + points[-1][0]) / 2.0
+    angle = custom_six_gap_half_angle_rad(radius)
+    involute_tip = form_plot_xy(radius * math.sin(angle), radius * math.cos(angle) - root)
+    zones = (
+        ("root", f"ROOT ARC R{inch_text(root, FORM_PLACES)}, P1-P{root_end}", root_tip),
+        ("straight", f"STRAIGHT LINES P{root_end}-P{straight_end}", straight_tip),
+        (
+            "involute",
+            f"INVOLUTE, BASE R{inch_text(template.base_radius_mm, FORM_PLACES)}, "
+            f"P{straight_end}-P{len(points)}",
+            involute_tip,
+        ),
+    )
+    labels = []
+    for key, text, tip in zones:
+        dx, dy = FORM_ZONE_TEXT_OFFSETS[key]
+        labels.append((text, (tip[0] + dx, tip[1] + dy), tip))
     return labels
 
 
@@ -454,37 +550,41 @@ def _draw_form_plot(adapter: Any) -> None:
     for text, position in form_plot_labels():
         if add_note(adapter, text, *position) is None:
             raise RuntimeError(f"failed to add the tooth-space plot note {text!r}")
+    # Point tags and zone labels: pointers to the plot's sheet geometry, not
+    # attachments (the plot's lines are sheet sketch entities).
+    for text, text_xy, tip in (*form_point_tags(), *form_zone_labels()):
+        note = add_leader_note(
+            adapter, text, text_xy=text_xy, attach_xy=tip, label=f"DETAIL B {text}"
+        )
+        _set_note_height(note, FORM_TEXT_HEIGHT, label=f"DETAIL B {text}")
     _telemetry.info(
         f"T006 tooth-space plot: {len(created)} sheet sketch entities at "
-        f"{FORM_PLOT_SCALE:.0f}:1, Y0 at "
+        f"{FORM_PLOT_SCALE:.0f}:1, P1 at "
         f"{tuple(round(value * 1000, 1) for value in FORM_PLOT_ORIGIN)} mm"
     )
 
 
-
-
-def cutter_grind_data() -> str:
-    """The T006 tooth space, point by point, and how the cut gear is accepted.
+def form_table_rows() -> list[tuple[str, str, str, str]]:
+    """The T006 tooth space, point by point: the heading, then P1-P17.
 
     The sheet once printed the part's "Cutter Profile" property: parametric
     equations with 17-digit floats, which no shop grinds to (eye pass of
     run 20261010T051729717Z). Then it printed reference chords, which left
-    the relief undefined (machinist review of the stack build). It gives the
-    form point by point at four inch places, read from the same profile the native
-    cut uses (dt_cone_gear_spec.custom_six_form_points_mm), says how the
-    points connect (the round-2 review: points alone let templates differ
-    between them), and gives a one-sided form tolerance.
+    the relief undefined (machinist review of the stack build), then the rows
+    as a 29-line free-text block (round 6 of the fan-out, rule 7). It gives
+    the form point by point at four inch places in a native table, read from
+    the same profile the native cut uses
+    (dt_cone_gear_spec.custom_six_form_points_mm); DETAIL B's zone labels say
+    how the points connect (the round-2 review: points alone let templates
+    differ between them).
 
     It is T006 geometry, not a tool drawing: as "DT6-FORM1 GROUND FORM
     TOOL" it carried the gear's title block (part, number, brass) and no tool
     material, and told the shop how to inspect the tool (ENFORCE round 1 of
     #971; #1427). T006 cuts at T=0 on a spur (helix 0) gear, so its tooth
     space IS the custom cutter's edge: the shop grinds its own tool to this
-    space, in whatever tool steel it uses, and accepts the cut gear over pins
-    on the T006 sheet. The form tolerance names what it sets (rule 4,
-    ENFORCE round 3); its one-sided band already says the form may only be
-    wide ("WIDE ONLY" was a private phrase, rule 26), and its fit route is
-    the cut gear's acceptance over pins and by backlash at assembly.
+    space, in whatever tool steel it uses, and accepts the cut gear by sheet
+    1's note 2.
     """
     profile = stock_form_profile(6)
     template = profile.template
@@ -492,31 +592,103 @@ def cutter_grind_data() -> str:
         raise ValueError("T006 must use the specified DT6-FORM1 custom cutter")
     if profile.radial_translation_mm != 0.0 or profile.helix_angle_deg != 0.0:
         raise ValueError("the T006 tooth space is DT6-FORM1's form only at T=0, helix 0")
-    root = template.root_radius_mm
-    junction = template.relief_junction_radius_mm
-    return "\n".join((
-        f"{T006_NUMBER}, CONTINUED FROM SHEET {SHEET_NAMES.index('T006') + 1}:",
-        "T006 TOOTH SPACE FORM, INCH",
-        "SYMMETRIC ABOUT THE SPACE CENTERLINE (CL):",
-        "X ACROSS CL, Y ALONG CL FROM THE ROOT,",
-        "AT RADIUS R FROM THE GEAR AXIS",
+    return [
+        FORM_TABLE_HEADINGS,
         *(
-            f"R{inch_text(radius, FORM_PLACES)}   X{inch_text(x, FORM_PLACES)}"
-            f"   Y{inch_text(y, FORM_PLACES)}"
-            for radius, x, y in custom_six_form_points_mm()
+            (
+                f"P{number}",
+                inch_text(radius, FORM_PLACES),
+                inch_text(x, FORM_PLACES),
+                inch_text(y, FORM_PLACES),
+            )
+            for number, (radius, x, y) in enumerate(custom_six_form_points_mm(), 1)
         ),
-        f"ROOT: ARC R{inch_text(root, FORM_PLACES)} ABOUT GEAR AXIS",
-        f"ROOT ARC TO R{inch_text(junction, FORM_PLACES)}: STRAIGHT LINES ROW TO ROW",
-        f"ABOVE R{inch_text(junction, FORM_PLACES)}: INVOLUTE, "
-        f"BASE R{inch_text(template.base_radius_mm, FORM_PLACES)}",
-        CUSTOM_SIX_FORM_TOLERANCE_NOTE,
-        f"SETS BACKLASH WITH {CYLINDER_MATE}",
-        # The space depth is the root and blank rows' difference, and Gear
-        # Data prints it as the plunge; no third copy here. Two lines keep
-        # the table as narrow as before, clear of the plot.
-        f"ACCEPT OVER PINS PER SHEET {SHEET_NAMES.index('T006') + 1} (T006 GEAR DATA),",
-        "THEN BY BACKLASH AT ASSEMBLY",
+    ]
+
+
+def form_sheet_title() -> str:
+    """The one line over the table: whose space this is, in which unit."""
+    return (
+        f"{T006_NUMBER} TOOTH SPACE, INCH "
+        f"(CONTINUED FROM SHEET {SHEET_NAMES.index('T006') + 1})"
+    )
+
+
+def form_sheet_notes() -> str:
+    """The two lines under the table: what R, X and Y are measured from, and
+    the form band with its route to the mate. The band's mesh and acceptance
+    are sheet 1's note 2; no second copy here (rule 4: a mate once)."""
+    return "\n".join((
+        "R FROM GEAR AXIS; X FROM CL, EACH SIDE; Y ALONG CL FROM P1.",
+        f"{CUSTOM_SIX_FORM_TOLERANCE_NOTE}, SEE SHEET "
+        f"{SHEET_NAMES.index('T006') + 1} NOTE {TEETH_NOTE_NUMBER}.",
     ))
+
+
+def form_notes_pos(table_height: float | None = None) -> tuple[float, float]:
+    """Top-left of the notes under the table: under the rows as set, or as
+    the seat measured them (a row grows to fit its text)."""
+    if table_height is None:
+        table_height = len(form_table_rows()) * FORM_TABLE_ROW_HEIGHT
+    return (FORM_TABLE_POS[0], FORM_TABLE_POS[1] - table_height - FORM_NOTES_GAP)
+
+
+def _insert_form_table(adapter: Any) -> Any:
+    """The P1-P17 table: a native general table (IDrawingDoc
+    InsertTableAnnotation2, no template), top-left anchored at
+    FORM_TABLE_POS, one heading row, read back cell by cell."""
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    rows = form_table_rows()
+    columns = len(FORM_TABLE_HEADINGS)
+    draw.ClearSelection2(True)
+    raw = ddoc.InsertTableAnnotation2(
+        False, *FORM_TABLE_POS, _TABLE_ANCHOR_TOP_LEFT, "", len(rows), columns
+    )
+    if raw is None:
+        raise RuntimeError("InsertTableAnnotation2 refused the T006 point table")
+    # Indexed COM properties (Text2) need the generated early-bound wrapper
+    # (_drawing_tables.insert_hole_table).
+    table = _sw_type_info.early_bound(raw, "ITableAnnotation")
+    if not _sw_type_info.is_early_bound(table, "ITableAnnotation"):
+        raise RuntimeError("ITableAnnotation early-bound wrapper is unavailable")
+    shape = (int(table.RowCount), int(table.ColumnCount))
+    if shape != (len(rows), columns):
+        raise RuntimeError(f"T006 point table is {shape}, expected {(len(rows), columns)}")
+    if int(table.GetHeaderCount()) != 1:
+        table.SetHeader(_TABLE_HEADER_TOP, 1)
+        if int(table.GetHeaderCount()) != 1:
+            raise RuntimeError("T006 point table refused its one heading row")
+    text_format = _early_bound(table.GetTextFormat(), "ITextFormat")
+    text_format.CharHeight = FORM_TEXT_HEIGHT
+    if table.SetTextFormat(False, text_format) is not True:
+        raise RuntimeError("T006 point table refused its text height")
+    for row, cells in enumerate(rows):
+        for column, text in enumerate(cells):
+            table.SetText2(row, column, False, text)
+    for column, width in enumerate(FORM_TABLE_COLUMN_WIDTHS):
+        actual = float(table.SetColumnWidth(column, width, _TABLE_SIZE_CAN_CHANGE))
+        if abs(actual - width) > 1e-6:
+            raise RuntimeError(f"T006 point table column {column} width reads {actual!r}")
+    for row in range(len(rows)):
+        table.SetRowHeight(row, FORM_TABLE_ROW_HEIGHT, _TABLE_SIZE_CAN_CHANGE)
+    rebuild_drawing(adapter, label="T006 point table")
+    printed = [
+        tuple(str(table.DisplayedText2(row, column, False) or "") for column in range(columns))
+        for row in range(len(rows))
+    ]
+    if printed != [tuple(cells) for cells in rows]:
+        raise RuntimeError(f"T006 point table reads {printed!r}, expected {rows!r}")
+    heights = [float(table.GetRowHeight(row)) for row in range(len(rows))]
+    if any(height < FORM_TABLE_ROW_HEIGHT - 1e-4 for height in heights):
+        raise RuntimeError(f"T006 point table row heights read {heights!r}")
+    annotation = _early_bound(table.GetAnnotation(), "IAnnotation")
+    position = tuple(float(value) for value in (annotation.GetPosition() or ()))
+    if len(position) < 2 or math.dist(position[:2], FORM_TABLE_POS) > 1e-4:
+        raise RuntimeError(f"T006 point table anchor reads {position!r}")
+    draw.ClearSelection2(True)
+    _telemetry.success(f"T006 point table: {len(rows) - 1} points, {columns} columns")
+    return table
 
 
 # Each tight band names its mate and fit (drawing-guidelines rule 4; ENFORCE
@@ -2040,11 +2212,26 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _configure_views(adapter, "T006", (source_view,))
     _hide_title_block_source(adapter, source_view)
-    # The form table, not the model's "Cutter Profile" equations (see
-    # cutter_grind_data).
-    if add_note(adapter, cutter_grind_data(), *CUTTER_DETAIL_POS) is None:
-        raise RuntimeError("failed to add the T006 tooth-space table")
+    # The plot first: it puts the sheet in edit mode (EditSheet), so the
+    # table and notes below belong to the sheet, not the hidden source view.
     _draw_form_plot(adapter)
+    # The form table, not the model's "Cutter Profile" equations (see
+    # form_table_rows), between its title and its two notes.
+    table = _insert_form_table(adapter)
+    table_height = sum(
+        float(table.GetRowHeight(row)) for row in range(int(table.RowCount))
+    )
+    notes_xy = form_notes_pos(table_height)
+    if notes_xy[1] - len(form_sheet_notes().splitlines()) * 0.00351 < 0.100:
+        raise RuntimeError(f"T006 point table runs {table_height * 1000:.1f} mm tall")
+    for text, position, label in (
+        (form_sheet_title(), FORM_TITLE_POS, "T006 tooth-space title"),
+        (form_sheet_notes(), notes_xy, "T006 tooth-space notes"),
+    ):
+        note = add_note(adapter, text, *position)
+        if note is None:
+            raise RuntimeError(f"failed to add the {label}")
+        _set_note_height(note, FORM_TEXT_HEIGHT, label=label)
     sheet = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
     if not sheet.SetScale(*SHEET_SCALES[CUTTER_DETAIL_SHEET], False, False):
         raise RuntimeError("failed to pin the DT6-FORM1 detail sheet scale")

@@ -510,40 +510,57 @@ def test_custom_six_detail_reproduces_complete_finite_core_grinding_curves() -> 
 
 
 def test_custom_six_sheet_defines_the_tooth_space_point_by_point() -> None:
-    """The last sheet defines the T006 tooth space (3 places, one-sided form
-    tolerance), which is DT6-FORM1's edge; the gear is accepted over pins.
-    ENFORCE round 1 of #971: as a tool drawing it carried the gear's title
-    block and told the shop how to inspect its tool. Round 3: the form
-    tolerance names the mesh it sets, and the acceptance names its sheet."""
+    """The last sheet defines the T006 tooth space (one-sided form
+    tolerance), which is DT6-FORM1's edge; the gear is accepted by sheet 1's
+    note 2. ENFORCE round 1 of #971: as a tool drawing it carried the gear's
+    title block and told the shop how to inspect its tool. Round 6 of the
+    fan-out (rule 7): the rows sat in a 29-line free-text block; they are a
+    headed table, P1-P17, with at most four note lines on the sheet."""
     profile = spec.stock_form_profile(6)
     template = profile.template
-    data = drawing.cutter_grind_data()
-    lines = data.splitlines()
+    table = drawing.form_table_rows()
+    assert table[0] == ("POINT", "R", "X", "Y")
+    title = drawing.form_sheet_title()
+    notes_text = drawing.form_sheet_notes()
+    lines = [title, *notes_text.splitlines()]
+    assert len(lines) <= 4
     # It reads as the second sheet of the T006 drawing, not a part of its own.
-    assert lines[0] == f"{notes.T006_NUMBER}, CONTINUED FROM SHEET 1:"
-    assert lines[1] == "T006 TOOTH SPACE FORM, INCH"
+    assert title.startswith(f"{notes.T006_NUMBER} TOOTH SPACE, INCH")
+    assert "CONTINUED FROM SHEET 1" in title
     assert drawing.SHEET_NAMES[0] == "T006"
-    assert "OVER PINS PER SHEET 1 " in lines[-2]
-    assert notes.CYLINDER_MATE_NUMBER in lines[-3]
+    # The band, flagged to the note naming its mate and acceptance, once.
+    assert notes_text.splitlines()[-1] == (
+        f"{spec.CUSTOM_SIX_FORM_TOLERANCE_NOTE}, SEE SHEET 1 NOTE {drawing.TEETH_NOTE_NUMBER}."
+    )
+    assert drawing.sheet_notes(6).splitlines()[2].startswith(
+        f"{drawing.TEETH_NOTE_NUMBER}. TEETH MESH WITH {notes.CYLINDER_MATE_NUMBER}"
+    )
+    data = "\n".join([*lines, *(" ".join(row) for row in table)])
+    assert notes.CYLINDER_MATE_NUMBER not in data and "BACKLASH" not in data
     assert "WIDE ONLY" not in data
     assert "(REF)" not in data
     assert "COMPARATOR" not in data and "TIF" not in data
     assert "INSPECT" not in data and "TOOL" not in data and "GRIND" not in data
-    assert "SYMMETRIC ABOUT THE SPACE CENTERLINE (CL):" in lines
-    assert "ROOT: ARC R.0433 ABOUT GEAR AXIS" in lines
-    assert "ROOT ARC TO R.0603: STRAIGHT LINES ROW TO ROW" in lines
-    assert "ABOVE R.0603: INVOLUTE, BASE R.0587" in lines
+    # How the points connect is labelled on DETAIL B, by zone.
+    zones = [text for text, _xy, _tip in drawing.form_zone_labels()]
+    assert zones == [
+        "ROOT ARC R.0433, P1-P2",
+        "STRAIGHT LINES P2-P12",
+        "INVOLUTE, BASE R.0587, P12-P17",
+    ]
     # Wide, never narrow (the one-sided band), by half the T006 thinning
     # band (0/-.0016 on thickness).
     assert spec.CUSTOM_SIX_FORM_TOLERANCE_MM == pytest.approx(0.02032)
-    assert "FORM TOLERANCE: X +.0008 / -.0000" in lines
+    assert spec.CUSTOM_SIX_FORM_TOLERANCE_NOTE == "FORM TOLERANCE: X +.0008 / -.0000"
     points = spec.custom_six_form_points_mm()
-    rows = [line for line in lines if line.startswith("R") and "   X" in line]
 
     def inch(value: float) -> str:
         return spec.inch_text(value, drawing.FORM_PLACES)
 
-    assert rows == [f"R{inch(r)}   X{inch(x)}   Y{inch(y)}" for r, x, y in points]
+    assert table[1:] == [
+        (f"P{number}", inch(r), inch(x), inch(y))
+        for number, (r, x, y) in enumerate(points, 1)
+    ]
     root = template.root_radius_mm
     junction = template.relief_junction_radius_mm
     assert points[0] == (root, 0.0, 0.0)
@@ -600,9 +617,17 @@ def test_custom_six_sheet_defines_the_tooth_space_point_by_point() -> None:
     # Every decimal prints at 4 inch places.
     for number in re.findall(r"\d*\.\d+", data):
         assert len(number.split(".")[1]) == 4, number
-    # The note stays clear of the title block (4.6 mm a line, run
-    # 20261011T114502461Z render of this sheet).
-    assert drawing.CUTTER_DETAIL_POS[1] - len(lines) * 0.0046 > 0.100
+    # Title over the table, the table's rows, then the two notes under it,
+    # all above the title block (2.5 mm text, 3.51 mm a line).
+    assert drawing.FORM_TITLE_POS[1] - 0.00351 > drawing.FORM_TABLE_POS[1]
+    table_bottom = drawing.FORM_TABLE_POS[1] - len(table) * drawing.FORM_TABLE_ROW_HEIGHT
+    notes_x, notes_y = drawing.form_notes_pos()
+    assert notes_x == drawing.FORM_TABLE_POS[0] and notes_y < table_bottom - 0.002
+    assert notes_y - len(notes_text.splitlines()) * 0.00351 > 0.100
+    # Every cell fits its column (1.79 mm a character at 2.5 mm).
+    for row in table:
+        for text, width in zip(row, drawing.FORM_TABLE_COLUMN_WIDTHS, strict=True):
+            assert len(text) * 0.00179 + 0.002 < width, text
 
 
 def test_over_pins_acceptance_matches_the_closed_form_involute() -> None:
@@ -677,22 +702,59 @@ def test_tooth_space_sheet_plots_the_table_beside_it() -> None:
             (radius * math.sin(half), radius * math.cos(half) - rows[0][0]), abs=1.5e-3
         )
     assert flank[-1] == pytest.approx(rows[-1][1:], abs=1.5e-3)
-    # The table at the default note height: 2.4 mm a character, measured on
-    # the run-20261010T051729717Z render of this sheet (113 mm, 47 characters).
-    widest = max(map(len, drawing.cutter_grind_data().splitlines()))
-    table_right = drawing.CUTTER_DETAIL_POS[0] + widest * 0.0024
+    # The table and its title and notes at 2.5 mm (1.79 mm a character).
+    texts = [drawing.form_sheet_title(), *drawing.form_sheet_notes().splitlines()]
+    table_right = max(
+        drawing.FORM_TABLE_POS[0] + sum(drawing.FORM_TABLE_COLUMN_WIDTHS),
+        drawing.FORM_TITLE_POS[0] + max(map(len, texts)) * 0.00179,
+    )
     plotted = [drawing.form_plot_xy(side * x, y) for x, y in flank for side in (1, -1)]
     for key, reach in drawing.FORM_PLOT_STATION_REACH_MM.items():
         radius = rows[-1][0] if key == "blank" else spec.stock_form_profile(6).template.relief_junction_radius_mm
         plotted.append(drawing.form_plot_xy(*drawing.form_plot_station_mm(radius, reach)))
+    boxes = []
     for text, (left, top) in drawing.form_plot_labels():
         width = max(map(len, text.splitlines())) * 0.0026
-        plotted += [(left, top), (left + width, top - 0.005 * len(text.splitlines()))]
+        boxes.append((text, (left, top - 0.0046 * len(text.splitlines()), left + width, top), None))
+    # Point tags and zone labels at 2.5 mm, each with a leader to its point.
+    for text, (left, top), tip in (*drawing.form_point_tags(), *drawing.form_zone_labels()):
+        boxes.append((text, (left, top - 0.0025, left + len(text) * 0.00179, top), tip))
+    for _text, (x0, y0, x1, y1), _tip in boxes:
+        plotted += [(x0, y0), (x1, y1)]
     xs, ys = zip(*plotted)
     assert min(xs) > table_right + 0.020
     assert max(xs) < 0.415
     # Above the title block (top 0.064) and below the border (0.267).
     assert min(ys) > 0.070 and max(ys) < 0.262
+    # No two labels touch, no leader runs through another label, and no
+    # label sits on the drawn flank.
+    for index, (text, box, tip) in enumerate(boxes):
+        for other, other_box, _ in boxes[index + 1:]:
+            gap = 0.001
+            assert (
+                box[2] + gap <= other_box[0] or other_box[2] + gap <= box[0]
+                or box[3] + gap <= other_box[1] or other_box[3] + gap <= box[1]
+            ), (text, other)
+    flank_points = plotted[: 2 * len(flank)]
+    for text, (x0, y0, x1, y1), tip in boxes:
+        assert not any(
+            x0 - 0.001 < x < x1 + 0.001 and y0 - 0.001 < y < y1 + 0.001
+            for x, y in flank_points
+        ), text
+        if tip is None:
+            continue
+        start = (min(max(tip[0], x0), x1), (y0 + y1) / 2.0)
+        leader = Segment(*start, *tip)
+        for other, other_box, _ in boxes:
+            if other != text:
+                assert segment_box_distance(leader, Box(*other_box)) > 0.0005, (text, other)
+    # Every point is tagged or inside a labelled zone's range.
+    tagged = {int(text.split()[0][1:]) for text, _xy, _tip in drawing.form_point_tags()}
+    root_end, junction_row = drawing.form_zones()
+    assert {1, root_end, junction_row, len(rows)} <= tagged
+    assert junction_row == min(
+        range(1, len(rows) + 1), key=lambda number: abs(rows[number - 1][0] - junction)
+    )
 
 
 def test_configuration_owned_bores_and_title_block_alloys_cover_the_family() -> None:
@@ -731,7 +793,7 @@ def test_notes_state_no_bore_joint_method_or_review_record() -> None:
     assert '"Manufacturing Notes"' not in build
     sheet = f"SHEET {len(spec.CONFIGURATION_TEETH) + 1}"
     assert notes.gear_data(6).count(sheet) == 2
-    assert drawing.cutter_grind_data().splitlines()[0].startswith(notes.T006_NUMBER)
+    assert drawing.form_sheet_title().startswith(notes.T006_NUMBER)
     for teeth in spec.CONFIGURATION_TEETH:
         text = notes.drawing_notes(teeth)
         assert text.splitlines() == expected
