@@ -70,6 +70,7 @@ from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_prec
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_scan import _zoomed_on
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
@@ -260,6 +261,14 @@ COUNTERBORE_FRAME_XY = (DETAIL_FRAME_X, 0.1285)
 TAP_FRAME_RIM_DEG = 35.0
 COUNTERBORE_FRAME_RIM_DEG = -10.0
 DATUM_A_RIM_DEG = 135.0
+# Datum A is picked by a hit-test on its rim, zoomed in (the window's
+# half-span: _drawing_scan._HIT_ZOOM_HALF; the FR-02 hanger datums'
+# HANGER_DATUM_PICK_ZOOM_HALF), not landed by selection point: a tag landed
+# on the 4:1 Ø.50 circle re-solved 0.26 mm along it, past
+# assert_datum_landing's 0.05 mm (round 8, farm run 20261108T002403318Z),
+# as a frame's leader on a bore circle re-solves (_drawing_attachment's
+# 1 mm bound).
+DATUM_A_PICK_ZOOM_HALF = 0.0025
 DATUM_A_OFFSET = (-0.0085, 0.011)
 
 # Section A-A: a full section on the horizontal plane through the arm axis,
@@ -933,8 +942,8 @@ def _add_axis_frames(adapter: Any, detail: Any) -> None:
     COUNTERBORE_AXIS_OFFSET_MAX), as zones.  The rims are concentric on the
     end face; the detail's scan pins the OD's and the counterbore's by their
     own radii on the end face, the tap drill's is the detail's visible Ø.213
-    circle, and the tag and each frame select their circle directly, landing
-    on it at their own angle (the summing lever's detail D datum).  The
+    circle.  Datum A's zoomed hit-test must resolve to the OD rim, and each
+    frame selects its circle directly, landing on it at its own angle.  The
     detail's centre is read behind the projection barrier
     (_drawing_detail_projection): its outline is the fence's, centred on the
     end face's centre."""
@@ -956,18 +965,19 @@ def _add_axis_frames(adapter: Any, detail: Any) -> None:
     )
     tap_edge = visible_circle_edge(adapter, detail, TAP_DRILL_DIA)
     datum_pick = _rim_point(centre, _TUBE_R, DATUM_A_RIM_DEG)
-    add_datum_feature(
-        adapter,
-        detail,
-        edge_entity=od_rim.edge,
-        leader_attach_xy=datum_pick,
-        symbol_xy=(
-            datum_pick[0] + DATUM_A_OFFSET[0],
-            datum_pick[1] + DATUM_A_OFFSET[1],
-        ),
-        datum="A",
-        label="end piece OD datum A",
-    )
+    with _zoomed_on(adapter, datum_pick, DATUM_A_PICK_ZOOM_HALF):
+        add_datum_feature(
+            adapter,
+            detail,
+            edge_xy=datum_pick,
+            expected_entity=od_rim.edge,
+            symbol_xy=(
+                datum_pick[0] + DATUM_A_OFFSET[0],
+                datum_pick[1] + DATUM_A_OFFSET[1],
+            ),
+            datum="A",
+            label="end piece OD datum A",
+        )
     tap_frame = add_feature_control_frame(
         adapter,
         detail,
