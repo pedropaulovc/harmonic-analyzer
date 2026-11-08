@@ -1960,8 +1960,8 @@ GENERAL_TORQUE_NOTE = (
     "SNUG BY HAND WITH A STANDARD-LENGTH HEX KEY OR WRENCH; NO EXTENSION."
 )
 # Step 1 cites its documents by Number (TL-00 review 62753c5e): the base
-# bar's process plan and the rail kit's receipt sheet, whose note [A] states
-# the counterbore-to-end wall each trimmed rail keeps.
+# bar's process plan and the rail kit's receipt sheet, whose END WALL callout
+# states the counterbore-to-end wall each trimmed rail keeps.
 # A literal row (base_bar_spec's convention): drawing closures track this
 # concrete registry row, not a dynamic read of another part's.
 BASE_BAR_NUMBER = _config.parts("ch-rocker-arm-tl-oblique-base-bar")["number"]
@@ -2171,7 +2171,7 @@ ASSEMBLY_STEPS = (
     f"1C. TRIM EACH RAIL {_item(RAIL)} TO ITS BASE BAR PER THE {BASE_BAR_NUMBER} "
     "PROCESS PLAN: BOTH ENDS FLUSH WITH THE BAR.",
     "1D. CHECK THE END COUNTERBORE WALLS OF EACH TRIMMED RAIL TO "
-    f"{RAIL_RECEIPT_REFERENCE} NOTE [A].",
+    f"{RAIL_RECEIPT_REFERENCE}, END WALL.",
     "1E. TRANSFER EACH RAIL'S HOLES TO ITS BAR PER THAT PLAN: RAIL AND BAR "
     "MARKED AS A PAIR.",
     f"1F. CHECK THAT ALL {trammel.RAIL_HOLE_COUNT} SCREWS ENTER EACH BAR FREELY "
