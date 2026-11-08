@@ -1937,7 +1937,10 @@ def test_step_10_taps_the_carrier_hub_in_situ_at_the_recorded_dro() -> None:
     assert carrier.HUB_THREAD in steps["10F"] and "NO COUNTERBORE" in steps["10F"]
     assert "STEP 10E" in steps["20"]
     assert all("REAM" not in steps[head] for head in ("10C", "10D", "10E", "10F"))
-    assert "STEP 10D" in steps["6A"]
+    # The origin stops hold through step 14's recheck (as in step 6H, which
+    # returns by them); every move uses its own setting stop and indicator.
+    assert "UNTIL STEP 14 PASSES" in steps["6A"]
+    assert "SETTING STOP" in spec.RAIL_SETTING_TITLE and "SETTING INDICATOR" in spec.RAIL_SETTING_TITLE
     assert spec.carrier.HUB_RADIAL_STACK < 0.25
     from _paths import CAD_ROOT
     from machinist_exceptions import load_exceptions
