@@ -298,14 +298,16 @@ def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None
     assert "FLUSH" not in cross_hole and "MHA-DT-27" not in cross_hole
     assert len(cross_hole.splitlines()) == 2
     # The ream's acceptance is the driven pin's fit-up, its keeper ring
-    # MHA-DT-27 clear of the hub, stated once on the hub step.  No MIN
-    # dimensioned to an outline of the pin, another part (Opus reviews at
-    # 7fe9d97bd, c7115c2c3 and 7e2f876c7), and no spec number typed into the
-    # text (Codjiflo P2 on #2095).
+    # MHA-DT-27 clear of the hub, stated on the hub step: 6G reams until the
+    # hand-pushed pin leaves the ring hole clear (rubric sample round 17, #2)
+    # and 6J hangs the ring there.  No MIN dimensioned to an outline of the
+    # pin, another part (Opus reviews at 7fe9d97bd, c7115c2c3 and 7e2f876c7),
+    # and no spec number typed into the text (Codjiflo P2 on #2095).
     import draw_dt_drive_train_assembly as package
 
     hub_step = _flat(package.CONE_CRANK_STEPS.split("\n6. ")[1].split("\n7. ")[0])
-    assert "HANG MHA-DT-27 FROM THE MHA-DT-09 HEAD, CLEAR OF THE HUB" in hub_step
+    assert "LEAVES ITS MHA-DT-27 RING HOLE CLEAR OF THE HUB" in hub_step
+    assert "HANG MHA-DT-27 FROM THE MHA-DT-09 HEAD: CLEAR OF THE HUB" in hub_step
     assert re.search(r"\d\.\d", cross_hole.split("1:48", 1)[1]) is None
     assert "PinProudReference" not in dt_crank_hub_spec.DRAWING_DIMENSIONS
     assert "PinProud" not in drawing.END_KEEP

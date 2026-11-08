@@ -795,6 +795,27 @@ def test_every_set_feeler_the_steps_and_checks_print_has_a_leaf_row() -> None:
     assert drawing.SETTING_TABLE_LEFT + sum(widths) <= drawing.STATION_TABLE_FIELD[0]
 
 
+def test_the_pivot_seat_step_prints_mha_fr_01s_offsets_from_the_nearer_seat() -> None:
+    """Owner 2026-11-08 (FoFr #2261): MHA-FR-01 prints D1's X/Y as reference,
+    so 9R carries the offsets from the nearer MHA-DT-02 seat and their band,
+    read from the base's model constants, not typed."""
+    import build_fr_harmonic_base as base_build
+    import fr_harmonic_base_spec as base_spec
+
+    step = " ".join(drawing.BANK_STEPS.split())
+    x_mm, y_mm = base_build.PIVOT_SEAT_OFFSETS_MM
+    expected = (
+        f"CENTRE {drawing.inch_text(abs(x_mm), 3)} RIGHT, {drawing.inch_text(abs(y_mm), 3)} BACK "
+        f"OF THE BACK MHA-DT-02 SEAT ±{drawing.inch_text(base_spec.PIVOT_SEAT_POSITION_BAND_MM, 3)}"
+    )
+    assert f"{drawing.PIVOT_SEAT_STEP}. DRILL AND TAP THE MHA-FR-01 PIVOT SEAT" in step
+    assert expected in step
+    assert "CENTRE 1.030 RIGHT, .482 BACK OF THE BACK MHA-DT-02 SEAT ±.002" in step
+    # The nearer seat is the back one; model -X is the FRONT view's RIGHT.
+    assert base_build.PIVOT_NEAR_PEDESTAL_XZ == base_build.PEDESTAL_SCREW_XZ[1]
+    assert x_mm < 0.0 and y_mm < 0.0
+
+
 @pytest.mark.parametrize("setting", (0.05, 0.95, 1.0, 1.05, 2.0, 2.5, 2.95))
 def test_a_leaf_stack_sums_to_its_setting_from_gage_leaves(setting: float) -> None:
     import pinion_rig_fitup as fitup

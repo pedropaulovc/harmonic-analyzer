@@ -158,6 +158,7 @@ from dt_pinion_arbor_geometry import (
     HEAD_REAR_Z as ARBOR_HEAD_REAR_Z,
 )
 from dt_pinion_spring_section import SCREW_EAST_OF_PIVOT as SPRING_SCREW_EAST_OF_PIVOT
+import build_fr_harmonic_base as BASE_BUILD
 import fr_harmonic_base_spec as base
 import pinion_rig_fitup as FITUP
 from pinion_rig_park_geometry import APINION_X
@@ -1382,8 +1383,9 @@ CONE_CRANK_STEPS = _note_text(
         # the faced cut end stays flush, the supplier's chamfer leads in
         # (dt_vn_crank_hub_pin_spec).
         "6D. DRIVE MHA-DT-VN-59 INTO IT FLUSH, FACED END OUT.",
-        "6E. SLIDE THE ARM ONTO MHA-DT-11: HUB FRONT FACE FLUSH WITH THE",
-        f"   {HUB_FRONT_FACE_DATUM}, PUNCH MARKS ALIGNED.",
+        # Round 17 (#0): the fit's parts by drawing number.
+        "6E. SLIDE MHA-DT-06 ONTO MHA-DT-11: MHA-DT-31 FRONT FACE FLUSH WITH",
+        f"   THE {HUB_FRONT_FACE_DATUM}, PUNCH MARKS ALIGNED.",
         # Rule 23 (rubric sample round 14, #0): the step 5 wheel is captured
         # between the MHA-DT-11 seat collar and the MHA-DT-31 hub rear face
         # (build_dt_drive_train_assembly CRANK_HUB_SPROCKET_AIR, open at the
@@ -1391,7 +1393,11 @@ CONE_CRANK_STEPS = _note_text(
         # runs): the 2X MHA-DT-VN-67 stop it turning, so it only slides.
         f"6F. CHECK THAT {CRANK_CHAIN_WHEEL} SLIDES FREELY ON THE 2X MHA-DT-VN-67 WITH END",
         "   PLAY BETWEEN THE MHA-DT-11 COLLAR AND THE MHA-DT-31 HUB.",
-        "6G. ONLY THEN TAPER-REAM 1:48 THROUGH THE HUB AND SHAFT.",
+        # Round 17 (#2): the ream's functional stop (Main's ruling): the
+        # driven pin's MHA-DT-27 ring clears the hub (dt_crank_hub_notes,
+        # dt_crank_pin_ring_spec.PIN_PROUD), stated without a typed number.
+        "6G. TAPER-REAM 1:48 THRU MHA-DT-31 AND MHA-DT-11 UNTIL MHA-DT-09",
+        "   PUSHED IN BY HAND LEAVES ITS MHA-DT-27 RING HOLE CLEAR OF THE HUB.",
         "6H. DRIVE MHA-DT-09, REMOVABLE BY A TAP ON ITS SMALL END.",
         "6J. HANG MHA-DT-27 FROM THE MHA-DT-09 HEAD: CLEAR OF THE HUB.",
         "6K. CLAMP MHA-DT-28 UNDER MHA-SH-VN-51.",
@@ -1444,12 +1450,32 @@ CONE_CRANK_STEPS = _note_text(
 # The DRO zero every later bank, pivot-seat and back-ear setting reads from.
 DRO_ZERO_STEP = "8P"
 PIVOT_SEAT_STEP = "9R"
+
+
+def pivot_seat_acceptance() -> str:
+    """9R's acceptance: the pivot seat's centre from the nearer transferred
+    MHA-DT-02 seat, as MHA-FR-01's model places it (build_fr_harmonic_base
+    PIVOT_SEAT_OFFSETS_MM, signed table X and table Y = machine -Z), at
+    fr_harmonic_base_spec's band.  Owner, 2026-11-08: the offsets print only
+    here; MHA-FR-01 sheet 2 calls its D1 X/Y reference (FoFr #2261).  The
+    FRONT view looks from the crank (-Z) end, so its RIGHT is model -X and
+    BACK is +Z (DIRECTION_NOTES)."""
+    table_x, table_y = BASE_BUILD.PIVOT_SEAT_OFFSETS_MM
+    nearer = BASE_BUILD.PEDESTAL_SCREW_XZ.index(BASE_BUILD.PIVOT_NEAR_PEDESTAL_XZ)
+    seat = ("FRONT", "BACK")[nearer]
+    side = "RIGHT" if table_x < 0.0 else "LEFT"
+    along = "BACK" if table_y < 0.0 else "FRONT"
+    return (
+        f"CENTRE {inch_text(abs(table_x), 3)} {side}, {inch_text(abs(table_y), 3)} "
+        f"{along} OF THE {seat} MHA-DT-02 SEAT ±{inch_text(base.PIVOT_SEAT_POSITION_BAND_MM, 3)}"
+    )
+
+
 BANK_STEPS = _note_text(
     (
         "ASSEMBLY SEQUENCE - CYLINDER BANK",
         # Rubric sample round 4: GEAR 0 / GEAR 19 are defined where first used.
-        "GEARS: THE 20 MHA-DT-12 ARE NUMBERED GEAR 0 (FRONT, ON MHA-DT-26) TO",
-        "GEAR 19 (BACK), IN THEIR ORDER ON THE MANDREL.",
+        "GEARS: MHA-DT-12 ARE GEAR 0 (FRONT, ON MHA-DT-26) TO GEAR 19 (BACK).",
         "8. WRITE DOWN EACH MHA-DT-12'S MICED THICKNESS, CAM FACE TO BACK FACE.",
         # Each connecting rod comes pinned to its rocker arm (MHA-CH-00's
         # bench pinning step, cited by key): its ring is captured in the closed
@@ -1511,13 +1537,15 @@ BANK_STEPS = _note_text(
         "9N. TIGHTEN MHA-DT-VN-62.",
         "9P. REMOVE THE FEELER.",
         "9Q. WRITE THE DRO X IN THE PEDESTAL RECHECK TABLE.",
-        f"{PIVOT_SEAT_STEP}. DRILL AND TAP THE MHA-FR-01 PIVOT SEAT PER ITS PRINT ({DRO_ZERO_STEP} ZERO).",
+        f"{PIVOT_SEAT_STEP}. DRILL AND TAP THE MHA-FR-01 PIVOT SEAT PER ITS PRINT ({DRO_ZERO_STEP} ZERO):",
+        f"   {pivot_seat_acceptance()}.",
         "9S. MEASURE MHA-DT-02 OUTER FACE TO OUTER FACE.",
         # Round 11: the length plainly, both domes counted.
         f"9T. TURN MHA-DT-13 TO THE 9S SPAN + {inch_text(2.0 * bank.ARBOR_DOME_HEIGHT, 2)} "
         f"({inch_text(bank.ARBOR_DOME_HEIGHT, 2)} DOME EACH END).",
-        "9U. PUSH MHA-DT-13 IN FROM THE BACK, AGAINST THE MANDREL, UNTIL EACH DOME",
-        f"   STANDS {inch_text(bank.ARBOR_DOME_HEIGHT, 2)} PROUD (DEPTH GAUGE).",
+        # Round 18: one line, so sheet 9's left field keeps 9R's D1 acceptance.
+        "9U. PUSH MHA-DT-13 IN FROM THE BACK UNTIL EACH DOME STANDS "
+        f"{inch_text(bank.ARBOR_DOME_HEIGHT, 2)} PROUD.",
         "9V. SPOT MHA-DT-13 THROUGH EACH CROWN TAP WITH A #43 DRILL, .02 DEEP.",
         "9W. BLOW OUT THE CHIPS.",
         "9X. RUN THE FRONT MHA-SH-VN-54 IN TIGHT, THEN THE BACK ONE.",
@@ -1813,7 +1841,8 @@ CHECKS = _note_text(
         "2. MHA-DT-10/MHA-DT-07 TURNS WITHOUT BINDING THROUGH ONE FULL MHA-DT-07",
         "   TURN.",
         "2A. MHA-DT-07 CLEARS THE UNRELIEVED MHA-DT-20 TOP THROUGH THAT TURN.",
-        "2B. EACH CONE GEAR MESHES ITS MHA-DT-12 PER THE MHA-DT-03 PRINT.",
+        # Round 17 (#3): the mesh is set and accepted in check 4.
+        "2B. EACH CONE GEAR MESHES ITS MHA-DT-12 PER CHECKS 4D, 4M AND 4S.",
         "3. EACH MHA-DT-12 TURNS FREELY ON MHA-DT-13 WITHOUT AXIAL BINDING.",
         # Prove the reversed preload seats on the front disc.
         "3A. PUSH GEAR 0 TOWARD THE BACK BY HAND AND RELEASE: THE BANK SPRINGS",
