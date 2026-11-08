@@ -1448,6 +1448,15 @@ def test_the_actual_collar_disc_overlap_is_checked_before_final_platen_installat
     assert f"({disc.TEETH / knob_shaft.TEETH:g} KNOB TURNS)" in inspected
     assert f"CLEARANCE {steps.COLLAR_DISC_AIR_TEXT}" in inspected
     assert "REFIT THE PLATEN." in inspected
+    # The feeler carries the MHA-PD-10 step face (Q1 C) and the MHA-PD-17
+    # spigot end ⊥ .001 (owner ruling 2026-11-08 (Pedro), #2144 item 3.2):
+    # the remedy re-faces only the step, setting hub and disc back.
+    flat = " ".join(inspected.split())
+    assert (
+        f"THE {_number('pd-transgear-disc-hub')} SPIGOT END SEATS ON IT, SO HUB AND "
+        "DISC SET BACK BY THAT AMOUNT." in flat
+    )
+    assert "RE-FACE THE " + _number("pd-transgear-disc-hub") not in flat
     assert steps.COLLAR_DISC_AIR_MIN == collar.COLLAR_DISC_AIR_MIN
     assert steps.COLLAR_DISC_AIR_TEXT in _step_body("fitup-accepted")
     keys = (
