@@ -44,14 +44,23 @@ def test_catalogue_row_is_the_registered_mcmaster_screw() -> None:
 
 
 def test_quantity_thread_and_length_are_the_fastener_tables() -> None:
+    # R4 and A″: rails and CL/CR/HUB clamps; lower TL-28 screws use TL-VN-62.
     row = fasteners.RAIL_TO_BAR
     assert spec.ROW is row
-    assert int(_config.parts(STEM)["quantity"]) == spec.QUANTITY == row.count
-    assert (dims.THREAD, dims.LENGTH_TEXT, fasteners.SHCS) == (
-        row.thread,
-        row.length,
-        row.head,
+    assert spec.ROWS == fasteners.COMMON_SCREW_ROWS == (
+        fasteners.RAIL_TO_BAR,
+        fasteners.END_CLAMP,
+        fasteners.HUB_CLAMP,
     )
+    assert int(_config.parts(STEM)["quantity"]) == spec.QUANTITY == sum(
+        r.count for r in spec.ROWS
+    ) == 19
+    for each in spec.ROWS:
+        assert (dims.THREAD, dims.LENGTH_TEXT, fasteners.SHCS) == (
+            each.thread,
+            each.length,
+            each.head,
+        )
     assert dims.DIMS.length == pytest.approx(row.length_mm)
     assert dims.DIMS.major_dia == pytest.approx(row.major_mm, abs=1e-3)
     assert spec.CALLOUT == fasteners.callout(row) == "#8-32 X 3/4 SHCS"

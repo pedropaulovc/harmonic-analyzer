@@ -276,6 +276,83 @@ and the five separate native tap callouts still omit the duplicate class.
 The generated cells are not rewritten. This is not a general native-table
 exemption and accepts no other specification, geometry or numeric shortfall.
 
+### Oblique carrier: one native hole table (#2151)
+
+The owner's Option B ruling of **2026-11-06** applies only to
+**MHA-CH-06-TL-21**. Its native table includes all thirteen top-face holes
+(A1, B1, A2, B2, CL, CR, R1–R4, L1, L2 and HUB), with X/Y taken from A1's
+actual bore axis and +X along A1–B1. Coordinates print `.XXX` under the
+existing title-block `±.005`. HUB is the ordinary #8-32 clamp tap made in situ
+at TL-00 step 10, so its location cells are explicitly REF and it has no
+manufactured XY; its native callout stays on the HUB CLAMP sheet. The
+generated TAG/X/Y/SIZE cells are not replaced by typed values. Physical
+source-body correspondence, source/view configuration and units, all table
+rows and attached tags, the A1 origin and three-place location precision are
+read back after the final rebuild.
+
+Carrier **RV-02** permits exactly one flagged local-control note:
+`A2, B2: Y .964 ±.002 FROM THE A1-B1 AXIS LINE`. The builder stores those
+limits on both source-model Y dimensions without moving their nominal
+geometry, and saves the property-linked note; the drawing only reads the
+limits. This is not a general exception to rules 3 or 7. Section A-A identifies
+the cropped feature as A1. The rail-indicating `ALIGNMENT_BAND` belongs to
+the assembly and remains `.0008`, independent of the carrier table.
+
+[`correlated_pin_budget`](../scripts/ch_rocker_arm_tl_oblique_carrier_spec.py)
+bounds the whole tolerance box and continuous strap arc analytically. For a
+pin pair `a,b`, the cutter circle has
+`C=(a+b)/2 + cot(alpha)/2*(dy,-dx)` and `R=|b-a|/(2 sin(alpha))`.
+The same actual inner-pass apex sets HUB for both cuts. Affine corner extrema,
+analytic sine/cosine extrema and a bounded norm remainder retain that
+correlation; absolute radius errors are not added as independent edge errors.
+Pin-only enclosures in inches are approximately `R800 ±.0088333`,
+`R816 -.0176666/+.0176674`, top relative to HUB
+`-.0001468/+.0001481`, and bottom `-.0037853/+.0037857`.
+Including `.XXX` nominal rounding gives relative pin-shape bounds
+`-.0001507/+.0001442` and `-.0038702/+.0037023` (`PIN_RELATIVE_ERROR`).
+
+No stud, sleeve or nose locates the strap: every strap hole is reamed at the
+HUB DRO setting. `pin_relative_stack` therefore charges each edge the R4
+`HUB_RADIAL_STACK` (`.12588 mm`: offset band, printed-offset rounding and pin
+shoulder clearance, including the `.11218 mm` shoulder term), that pass's
+correlated pin error and `trammel.CARRIAGE_PLAY_RADIUS`, each once, against
+half the strap's unchanged `0/-.020` radial limits. Owner **P1-A, 2026-11-07**,
+approved tightening carriage acceptance from `.05` to `.02 mm TIR` with the
+existing `1.0` radius factor to close
+[PR #2236 P1](https://github.com/pedropaulovc/harmonic-analyzer/pull/2236#discussion_r4504212381)
+(thread `PRRT_kwDOPHDy386074XU`). The resulting top/inner stack is about
+`.14971 mm` (`.005894 in`) and bottom/outer `.24419 mm` (`.009614 in`),
+both inside `.254 mm` (`.010 in`). The source guard rejects the original
+`.05 mm` play allowance and an oversized HUB setting stack (for example
+`.0061 in`). Shoulder clearance is already in `HUB_RADIAL_STACK`, not added
+again; product bands and nominal geometry are unchanged.
+
+The procedure still indicates the shoulder-screw head while rocking the
+carrier sideways to the rail by hand, checks all four kit carriages, and
+keeps the two tightest, one per rail. The rail-kit footer already uses its
+three permitted note lines beside the general line. Consequently TL-00
+preparation step 1 carries the owner's conditional fallback: if none meets
+`.02`, fit a preloaded `(Z0/ZA) HGH15CA` carriage. No new inventory purchase,
+quantity, SKU or cost is recorded. Printed play acceptance remains sourced
+from `CARRIAGE_PLAY_TIR_MAX` in the rail-kit note, TL-00 BOM note and final
+shoulder-head check.
+
+The same correlated errors feed the tooling-clearance and riser-wall checks.
+The TL-52 washer keeps about `1.793 mm` to the limiting complete cutter sweep
+(OD and the #2249A spigot's `.14605 mm` float at their limits, each pass's own
+pin error and `.020 mm` carriage play), above the unchanged `1.5 mm` floor.
+The end-clamp heads and stop pins charge their table-row (or riser `.XX`
+station) error and accepted carriage play with the moved cut over the whole
+sweep. The self-cut riser-wall bounds likewise include carriage play once:
+CL/CR #9 clearances retain about `.1210`/`.1010`, and the riser taps `.0814`,
+above `.080`; no wall exception is introduced. Ref
+[#2151](https://github.com/pedropaulovc/harmonic-analyzer/issues/2151);
+its separate machinist-review rubric/eval work is not part of this change.
+The trailing-zero issue [#2293](https://github.com/pedropaulovc/harmonic-analyzer/issues/2293)
+and stale thirteen-row prose issue [#2294](https://github.com/pedropaulovc/harmonic-analyzer/issues/2294)
+remain deferred; this P1 correction does not change those sections.
+
+
 ## The gate
 
 `uv run cad/scripts/machinist_review.py <name>... --before-pdf-dir <baseline>`

@@ -4,6 +4,8 @@ from __future__ import annotations
 import ast
 import math
 from pathlib import Path
+from types import SimpleNamespace
+import pytest
 import _config
 import ch_rocker_arm_tl_oblique_feed_block_spec as spec
 import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot
@@ -42,19 +44,89 @@ def test_identity_stock_and_common_pivot_interface():
     assert (spec.BLOCK_X0,spec.BLOCK_X1,spec.BLOCK_WIDTH)==(pivot.BLOCK_X0,pivot.BLOCK_X1,pivot.BLOCK_WIDTH)
     assert math.isclose(spec.LUG_X0-spec.BLOCK_X0,spec.PLAN_LUG_X)
     assert math.isclose(spec.LUG_X1-spec.LUG_X0,spec.LUG_WIDTH)
-    assert spec.BLOCK_X0<spec.LUG_X0<spec.LUG_X1<spec.BLOCK_X1
+    assert spec.BLOCK_X0<spec.LUG_X0<spec.LUG_X1==spec.BLOCK_X1
     assert math.isclose(spec.BLOCK_WIDTH/2-spec.LUG_Y0,spec.PLAN_OVERALL_Y)
     assert spec.PLAN_OVERALL_Y<pivot.STOCK_WIDTH
     assert spec.LUG_Y1==-spec.BLOCK_WIDTH/2
 
 
+def test_lug_runs_flush_with_the_block_end_as_one_face():
+    # Owner ruling 2026-11-07: .87 + .73 = 1.60 stood .04 short of the 1.64
+    # head, a useless step. The lug's +X side IS the block's +X end; its
+    # width is the remainder, never a printed size.
+    assert spec.LUG_X1==spec.BLOCK_X1==spec.NUT_FACE_X
+    assert math.isclose(spec.LUG_WIDTH,spec.BLOCK_LENGTH-spec.PLAN_LUG_X)
+    assert round(spec.LUG_WIDTH/INCH,3)==.77
+    assert 'LugWidth' not in spec.DRAWING_VALUES and 'LugWidth' not in spec.DRAWING_PRECISION_BY_NAME
+    assert 'LugProfile' not in spec.DRAWING_DIMENSIONS and 'LugProfile' not in spec.DRAWING_PRECISION
+    # The plan outline is a six-corner L: every edge real and axis-aligned,
+    # no zero-length step and no collinear split of the +X face.
+    outline=spec.PLAN_OUTLINE
+    assert len(outline)==6 and len(set(outline))==6
+    edges=list(zip(outline,outline[1:]+outline[:1]))
+    vertical=[a[0]==b[0] for a,b in edges]
+    assert all((a[0]==b[0])!=(a[1]==b[1]) for a,b in edges)
+    assert all(vertical[i-1]!=vertical[i] for i in range(len(edges)))
+    assert ((spec.BLOCK_X1,spec.LUG_Y0),(spec.BLOCK_X1,spec.BLOCK_WIDTH/2)) in edges
+    model=(FOLDER/'_oblique_pivot_block_model.py').read_text(encoding='utf-8')
+    assert '["LugWidth","LugLength","LugCornerX","LugCornerY"], anchor=2)' in model
+    assert 'measured["flush +X end span"] = _require_flush_lug_end(bodies[0], part)' in model
+    assert '@_telemetry.traced("part.readback.flush_lug_end")' in model
+    drawing=(FOLDER/'_oblique_block_drawing.py').read_text(encoding='utf-8')
+    assert 'LugWidth' not in drawing
+    assert '.73 wide' not in _config.parts(spec.PART_NAME)['process']
+
+
+def _end_face(x,y0,y1,*,box_pad=0.0):
+    """A planar +X face double read through the real face_geometry: exact
+    PlaneParams and vertices, and a deliberately padded (untrustworthy) box."""
+    surface=SimpleNamespace(Identity=4001,PlaneParams=(1.0,0.0,0.0,x/1000.0,0.0,0.0))
+    points=((x,y0,0.0),(x,y1,0.0),(x,y1,spec.BLOCK_HEIGHT),(x,y0,spec.BLOCK_HEIGHT))
+    vertices=[SimpleNamespace(GetPoint=lambda p=p:[v/1000.0 for v in p]) for p in points]
+    edges=[SimpleNamespace(GetStartVertex=lambda a=a:a,GetEndVertex=lambda b=b:b)
+           for a,b in zip(vertices,vertices[1:]+vertices[:1])]
+    # A closed circle (the taps, the leadscrew clearance) has no vertices.
+    edges.append(SimpleNamespace(GetStartVertex=lambda:None,GetEndVertex=lambda:None))
+    pad=box_pad/1000.0
+    return SimpleNamespace(
+        GetSurface=lambda:surface,FaceInSurfaceSense=lambda:False,GetEdges=lambda:edges,
+        GetBox=lambda:(x/1000.0-pad,y0/1000.0-pad,-pad,x/1000.0+pad,y1/1000.0+pad,spec.BLOCK_HEIGHT/1000.0+pad),
+    )
+
+
+@pytest.mark.parametrize('case',('merged','padded_box','seam','step','short'))
+def test_flush_end_readback_reads_exact_plane_and_vertices(case):
+    import _oblique_pivot_block_model as model
+    x1,y0,y1=spec.BLOCK_X1,spec.LUG_Y0,spec.BLOCK_WIDTH/2
+    cylinder=SimpleNamespace(GetSurface=lambda:SimpleNamespace(Identity=4002,CylinderParams=(0.0,)*7),
+                             FaceInSurfaceSense=lambda:False,GetBox=lambda:(0.0,)*6)
+    faces={
+        'merged':[_end_face(x1,y0,y1)],
+        # A box padded well past any old 1e-3 mm guard changes nothing.
+        'padded_box':[_end_face(x1,y0,y1,box_pad=.05)],
+        # Two coplanar faces: the extrusions left a seam.
+        'seam':[_end_face(x1,y0,spec.LUG_Y1),_end_face(x1,spec.LUG_Y1,y1)],
+        # The c40296ac step: the lug end .04 short of the head.
+        'step':[_end_face(x1,spec.LUG_Y1,y1),_end_face(x1-.04*INCH,y0,spec.LUG_Y1)],
+        'short':[_end_face(x1,y0+.001,y1)],
+    }[case]
+    body=SimpleNamespace(GetFaces=lambda:[cylinder,*faces])
+    if case in ('merged','padded_box'):
+        span=model._require_flush_lug_end(body,spec)
+        for axis,limits in (('x',[x1,x1]),('y',[y0,y1]),('z',[0.0,spec.BLOCK_HEIGHT])):
+            assert span[axis]==pytest.approx(limits,abs=1e-9)
+    else:
+        with pytest.raises(RuntimeError,match='planar \\+X faces' if case=='seam' else 'vertices span'):
+            model._require_flush_lug_end(body,spec)
+
+
 def test_nut_face_carries_the_screw_clearance_and_four_through_taps_only():
-    assert spec.NUT_FACE_X==spec.LUG_X0
+    assert spec.NUT_FACE_X==spec.LUG_X1
     assert math.isclose(spec.NUT_AXIS_Y,-lead.SCREW_LATERAL)
     assert math.isclose(trammel.CARRIAGE_TOP_Z+spec.NUT_AXIS_Z,lead.SCREW_AXIS_Z)
     assert math.isclose(spec.SCREW_CLEARANCE_DIA,.351*INCH)
     assert spec.SCREW_CLEARANCE_DIA-printed_band_mm(3,unit=spec.UNIT)>lead.SCREW_MAJOR_DIA
-    assert set(spec.DRAWING_DIMENSIONS)>={'NutClearanceProfile','NutPatternReference','LugProfile'}
+    assert set(spec.DRAWING_DIMENSIONS)>={'NutClearanceProfile','NutPatternReference'}
     # Option B: the faced nut seats flat (no recess) and the countersunk
     # heads key it (no dowel hole).
     assert not any('Seat' in feature or 'Dowel' in feature for feature in spec.DRAWING_DIMENSIONS)
@@ -95,7 +167,7 @@ def test_four_taps_sit_on_the_nut_pcd_on_the_lug_diagonals_and_are_transferred()
     assert set(drawing.NUT_KEEP)=={'NutCentreY','NutCentreZ','NutClearanceDia','NutClock'}
     source=(FOLDER/'_oblique_block_drawing.py').read_text(encoding='utf-8')
     assert source.count('process=contract.TRANSFER_PROCESS')==1
-    # The callout lands on the tap at the view's upper right (+Y, +Z).
+    # The callout lands on the Right view's upper-left tap (+Y, +Z).
     tree=ast.parse(source)
     [index]=[n.slice.value for n in ast.walk(tree) if isinstance(n,ast.Subscript)
              and ast.unparse(n.value)=='contract.NUT_HOLES_YZ']
@@ -184,7 +256,7 @@ def test_every_tap_is_bound_by_the_native_clocking_band_the_walls_charge():
     assert spec.CALLOUTS_PREFIX=={'NutClock':f'{feed_nut.SCREW_COUNT}X '}
     assert spec.LUG_WALLS_MM==spec.lug_walls_mm(spec.NUT_CLOCK_TOL_DEG)
     y,z=spec.NUT_HOLES_YZ[spec.NUT_CLOCK_TAP]
-    assert (y<spec.NUT_AXIS_Y,z>spec.NUT_AXIS_Z)==(True,True)  # VIEW D's lower right
+    assert (y<spec.NUT_AXIS_Y,z>spec.NUT_AXIS_Z)==(True,True)  # VIEW D's lower left
     assert math.isclose(math.degrees(math.atan2(spec.NUT_AXIS_Y-y,z-spec.NUT_AXIS_Z)),spec.NUT_CLOCK_DEG)
     assert math.isclose(spec.NUT_CLOCK_RAY,feed_nut.HOLE_PCD/2)
     # Negative control: a tap free to sit 10° off its diagonal, as an
@@ -217,9 +289,8 @@ def test_plan_ordinates_start_on_the_left_edge():
     for name,(x,_y) in zip(('PlanHole1X','PlanHole2X'),pivot.PLAN_DATUM_HOLES):
         assert math.isclose(values[name],x-pivot.BLOCK_X0)
     assert math.isclose(values['PlanLugX'],spec.LUG_X0-spec.BLOCK_X0)
-    assert math.isclose(values['LugWidth'],spec.LUG_X1-spec.LUG_X0)
     assert math.isclose(values['PlanOverallY'],spec.BLOCK_WIDTH/2-spec.LUG_Y0)
-    assert not {'BlockEndX','BoreX','LugEndX','LugEndY','LugLength'}&set(spec.DRAWING_PRECISION_BY_NAME)
+    assert not {'BlockEndX','BoreX','LugWidth','LugCornerX','LugCornerY','LugLength'}&set(spec.DRAWING_PRECISION_BY_NAME)
 
 
 def test_reference_lines_on_the_printed_outline_are_plain_sketch_lines():
@@ -250,15 +321,19 @@ def test_reference_lines_on_the_printed_outline_are_plain_sketch_lines():
 
 
 def test_nut_and_lug_clear_both_end_blocks_at_both_travel_limits():
-    assert math.isclose(spec.NUT_REACH_X[0],spec.NUT_FACE_X-feed_nut.REACH)
+    assert math.isclose(spec.NUT_REACH_X[1],spec.NUT_FACE_X+feed_nut.REACH)
     assert feed_nut.REACH==feed_nut.LENGTH_MAX
     for station in trammel.CARRIAGE_TRAVEL:
         lo,hi=(station+v for v in spec.NUT_REACH_X)
         for box in lead.KP08_BOXES.values():
             assert max(box[0]-hi,lo-box[1])>=lead.FEED_GAP
-    # The -X gap to the near KP08 at the longest faced nut (13.8).
+    # Near clearance is the lug, not a nut projecting toward the spindle.
     near=min(gap for (name,_station),gap in spec.FEED_GAPS.items() if name=='KP08 near')
-    assert round(near,1)==2.8
+    assert round(near,1)==4.5
+    assert min(spec.FEED_GAPS_WORST.values()) >= lead.FEED_GAP
+    assert pivot.CBORE_SECTION_X < spec.LUG_X0
+    source=(FOLDER/'_oblique_block_drawing.py').read_text(encoding='utf-8')
+    assert "'*Right',*NUT_XY" in source
 
 
 def test_feed_entrypoints_use_the_native_shared_geometry_and_not_a_separate_bracket():
@@ -276,3 +351,65 @@ def test_only_the_kp08_axis_height_prints_exact_millimetres():
     # Owner ruling 4 (2026-11-01): the KP08 vendor line prints exact mm; the
     # nut's taps print nothing (transferred).
     assert spec.METRIC_DIMENSIONS=={('NutPatternReference','NutCentreZ'):(3,printed_band_mm(3,unit='mm'))}
+
+
+def test_counterbore_callout_and_view_d_reference_use_separate_lanes():
+    import _oblique_block_drawing as drawing
+
+    name = "CarriageCounterbores3Dia"
+    assert spec.CALLOUTS_ABOVE[name] == "4X COUNTERBORE"
+    assert spec.CALLOUTS_BELOW[name] == "FLOOR: SECTION B-B"
+    assert drawing.VIEW_SHEET_REF == "(SHEET 2)"
+    assert drawing.FEED_PLAN_KEEP[name] != drawing.PLAN_KEEP[name]
+    # Retained 84d PDF rectangles, translated by the authored lane changes.
+    # These are predictions, not native results; the fresh PDF is still gated.
+    rise = (drawing.FEED_PLAN_KEEP[name][1] - .150) * 1000
+    bottom_leader = 141.6389 + rise
+    top_text = 158.7648 + rise
+    assert bottom_leader - 160.934 - .065 >= 4.0
+    assert 184.937 - .065 - top_text >= 2.0
+    dx = (drawing.VIEW_SHEET_REF_OFFSET[0] - .010) * 1000
+    dy = (drawing.VIEW_SHEET_REF_OFFSET[1] + .008) * 1000
+    ref_left, ref_right = 214.812 + dx, 234.6405 + dx
+    ref_top = 156.8682 + dy
+    assert abs((ref_left + ref_right) / 2 - (204.812 + 209.7703) / 2) < .1
+    assert 156.3695 - ref_top >= 2.0
+    assert 141.2195 + rise - ref_top >= 10.0
+
+
+def test_block_length_reason_rides_its_value_row_clear_of_the_dimension():
+    """Machinist review of c40296ac (TL-32 sheet 1): the 1.64 and SETS
+    COUNTERBORE END WALL hung beside the dimension at its own height, and the
+    leader ran along the line, through the right arrowhead and across the
+    extension line. Predictions come from that PDF's rectangles: 2.74 mm a
+    character (the reason's 25 spanned x 205.78..274.22), a 6.38 mm row box,
+    and a centre-anchored text block (the two rows' centre, (240, 258.5), was
+    the old xy). TL-22 shares the layout (its own test checks the same)."""
+    import _oblique_block_drawing as drawing
+
+    reason = spec.CALLOUTS_BELOW['BlockLength']
+    assert reason == pivot.CALLOUTS_BELOW['BlockLength'] == 'SETS COUNTERBORE END WALL'
+    assert 'BlockLength' not in spec.CALLOUTS_SUFFIX
+    char_mm, row_mm = (274.22 - 205.78) / len(reason), 258.90 - 252.52
+    width = (len('1.64 ') + len(reason)) * char_mm
+    x, y = (value * 1000 for value in drawing.BLOCK_LENGTH_TEXT_XY)
+    left, right, bottom, top = x - width / 2, x + width / 2, y - row_mm / 2, y + row_mm / 2
+    span_left = drawing.FEED_PLAN_XY[0] * 1000 - spec.BLOCK_LENGTH / 2
+    span_right = span_left + spec.BLOCK_LENGTH
+    line_y = drawing.FEED_PLAN_KEEP['BlockLength'][1] * 1000
+    # One row stands over the span, right of the x157 B cutting line, under
+    # the y266.7 border, its underline (~0.7 under the box) well above the
+    # dimension line and the extension lines' 1 mm overrun.
+    assert left - 157.0 >= 4.0
+    assert span_left < left < (span_left + span_right) / 2 < right
+    assert 266.7 - top >= 2.0
+    assert bottom + .7 - (line_y + 1.0) >= 3.0
+    # Negative control: the old two-row block's underline sat on the line.
+    old_bottom = 258.5 - (264.46 - 252.52) / 2
+    assert old_bottom + .7 - (line_y + 1.0) < 0.0
+    source = (FOLDER / '_oblique_block_drawing.py').read_text(encoding='utf-8')
+    call = "    _inline_below_callout(adapter, plan_annotations, 'BlockLength', contract.CALLOUTS_BELOW['BlockLength'])\n"
+    assert call in source
+    assert source.index(call) < source.index(
+        "offset_dimension_text(adapter, plan_annotations, {'BlockLength': BLOCK_LENGTH_TEXT_XY})"
+    )

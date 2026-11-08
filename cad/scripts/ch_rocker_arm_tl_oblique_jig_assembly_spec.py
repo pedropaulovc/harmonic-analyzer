@@ -32,8 +32,28 @@ transferred through the seated nut at assembly (F2).
 
 Every fabricated and purchased family has its own BOM row. Each purchased
 kit's members (the TL-VN-83 rail kit, the TL-VN-84 leadscrew kit and the
-shared clamping kit) are logical rows backed by one configured native model.
+shared clamping kit) are logical rows backed by one configured native model,
+and so are the two TL-20 base bars (oblique simplification PR2: ``Bar1``
+drilled for the end brackets, ``Bar2`` plain; one Number). The rail screws and
+the three strap clamps share one common 3/4 screw row (TL-VN-61, McMaster
+91251A197). The upper KP08 and lower TL-28 screws share the 5/8 family and
+one row (TL-VN-62).
 PLACEMENTS, QUANTITIES and BOM_ORDER are the builder and drawing authority.
+
+R4 strap holding (owner rulings 2026-11-07): each faced, bandsawn strap blank
+arrives with no hub hole and loose CL/CR clearance holes in its end waste.
+Its raw edge seats toward -Y against two loose stock 1/8 x 3/4 dowels
+(98381A473, the existing MHA-SM-VN-53 native, no new identity) standing in
+the TL-24 riser's #30 stop holes on the carrier top; CL and CR clamp the
+ends. The strap's hub hole is then drilled and reamed in place at the same
+DRO position (step 10) that tapped the carrier's HUB #8-32, through into the
+riser's relief, and the HUB clamp seats the brass top-hat washer's spigot in
+that hole. CL, CR and HUB are common-screw occurrences that ride the carrier
+while the rail and bracket-family bar screws stay fixed: each occurrence, not
+each family, is fixed or moving (``LOCKED_TO``'s ``None`` entries,
+``is_moving``). ``STRAP_CLAMP_SCREW_INSTANCES`` publishes their stable
+``instance_name`` selectors so a view can hide them without the common
+screw's rail occurrences.
 
 Mates and the sweep: the structure is fixed; the carriages slide on their
 rails and the carrier rides the two pivot pins (``PIN_MATES``: two hole-on-pin
@@ -68,12 +88,14 @@ import math
 from collections.abc import Iterator
 from dataclasses import dataclass
 
+import _config
 from _assembly_contract import assembly_contract
 from _hole_spec import NUMBER_DRILL_MM
 from _printed_tolerance import printed_band_mm
 from _title_block_units import LENGTH_UNITS
 
 import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
+import ch_rocker_arm_tl_oblique_end_bracket_spec as end_bracket
 import ch_rocker_arm_tl_vn_oblique_pivot_screw_spec as pivot_screw
 import ch_rocker_arm_tl_vn_oblique_pivot_spacer_spec as pivot_spacer
 import ch_rocker_arm_tl_vn_oblique_pivot_shim_spec as pivot_shim
@@ -81,21 +103,20 @@ import ch_rocker_arm_tl_vn_oblique_bracket_screw_spec as bracket_screw
 import ch_rocker_arm_tl_vn_oblique_carriage_screw_spec as carriage_screw
 import ch_rocker_arm_tl_vn_oblique_rail_kit_carriage_spec as carriage
 import ch_rocker_arm_tl_oblique_carrier_spec as carrier
-import ch_rocker_arm_tl_vn_oblique_cl_dowel_spec as cl_dowel
-import ch_rocker_arm_tl_vn_oblique_clamp_screw_spec as clamp_screw
+import sm_vn_knife_mount_dowel_spec as stop_pin
 import ch_rocker_arm_tl_oblique_fasteners_spec as fasteners
+import ch_rocker_arm_tl_oblique_end_bracket_spec as end_bracket
 import ch_rocker_arm_tl_oblique_feed_lever_spec as feed_lever
 import sh_vn_clamping_kit_flange_nut_spec as flange_nut
 import ch_rocker_arm_tl_vn_oblique_handwheel_spec as handwheel
 import sh_vn_clamping_kit_hold_down_stud_spec as hold_down_stud
-import ch_rocker_arm_tl_vn_oblique_hub_pin_spec as hub_pin
+import ch_rocker_arm_tl_oblique_hub_washer_spec as hub_washer
 import ch_rocker_arm_tl_vn_oblique_leadscrew_kit_feed_nut_spec as feed_nut
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
 import ch_rocker_arm_tl_oblique_feed_block_spec as feed_block
 import ch_rocker_arm_tl_vn_oblique_leadscrew_kit_leadscrew_spec as leadscrew_stock
 import ch_rocker_arm_tl_vn_oblique_lever_screw_spec as lever_screw
 import ch_rocker_arm_tl_vn_oblique_lever_washer_spec as lever_washer
-import ch_rocker_arm_tl_vn_oblique_kp08_screw_spec as kp08_screw
 import ch_rocker_arm_tl_vn_oblique_pillow_block_spec as pillow_block
 import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
 import ch_rocker_arm_tl_vn_oblique_rail_screw_spec as rail_screw
@@ -104,6 +125,9 @@ import ch_rocker_arm_tl_vn_oblique_riser_screw_spec as riser_screw
 import ch_rocker_arm_tl_oblique_riser_spec as riser
 import sh_vn_clamping_kit_t_nut_spec as t_nut
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
+import ch_rocker_arm_tl_oblique_holding_spec as holding
+
+holding.require_clearance()
 
 ASM_NAME = "ch-rocker-arm-tl-oblique-jig"
 DRAWING_NUMBER = "MHA-CH-06-TL-00"
@@ -145,6 +169,11 @@ def _torque(nm: float) -> str:
 
 
 BASE_BAR = "ch-rocker-arm-tl-oblique-base-bar"
+# The base bar's two members (one native model, one Number): Bar1 under rail
+# 1 carries the TL-28 bracket holes, Bar2 under rail 2 is plain.
+BASE_BAR_1 = f"{BASE_BAR}--{base_bar.BAR1}"
+BASE_BAR_2 = f"{BASE_BAR}--{base_bar.BAR2}"
+BASE_BARS = (BASE_BAR_1, BASE_BAR_2)
 PIVOT_BLOCK = "ch-rocker-arm-tl-oblique-pivot-block"
 FEED_BLOCK = "ch-rocker-arm-tl-oblique-feed-block"
 PIVOT_SCREW = "ch-rocker-arm-tl-vn-oblique-pivot-screw"
@@ -152,7 +181,7 @@ PIVOT_SPACER = "ch-rocker-arm-tl-vn-oblique-pivot-spacer"
 PIVOT_SHIM = "ch-rocker-arm-tl-vn-oblique-pivot-shim"
 CARRIER = "ch-rocker-arm-tl-oblique-carrier"
 RISER = "ch-rocker-arm-tl-oblique-riser"
-HUB_PIN = "ch-rocker-arm-tl-vn-oblique-hub-pin"
+HUB_WASHER = "ch-rocker-arm-tl-oblique-hub-washer"
 FEED_LEVER = "ch-rocker-arm-tl-oblique-feed-lever"
 END_BRACKET = leadscrew.END_BRACKET
 # Bought hardware (parent-scoped TL-VN and shared SH-VN-57; VN-72 retired),
@@ -161,7 +190,11 @@ END_BRACKET = leadscrew.END_BRACKET
 RAIL_KIT = "ch-rocker-arm-tl-vn-oblique-rail-kit"
 RAIL = "ch-rocker-arm-tl-vn-oblique-rail-kit--Rail"
 CARRIAGE = "ch-rocker-arm-tl-vn-oblique-rail-kit--Carriage"
-CL_DOWEL = "ch-rocker-arm-tl-vn-oblique-cl-dowel"
+# The riser's two loose end stops: the existing MHA-SM-VN-53 native
+# (98381A473, 1/8 x 3/4) reused unchanged, no new identity (Main, R4).
+STOP_PIN = "sm-vn-knife-mount-dowel"
+if (stop_pin.DIA, stop_pin.LENGTH) != (riser.STOP_PIN_DIA, riser.STOP_PIN_LENGTH):
+    raise AssertionError("the reused native is not the riser's stock stop pin")
 LEADSCREW_KIT = "ch-rocker-arm-tl-vn-oblique-leadscrew-kit"
 LEADSCREW = "ch-rocker-arm-tl-vn-oblique-leadscrew-kit--LeadScrew"
 FEED_NUT = "ch-rocker-arm-tl-vn-oblique-leadscrew-kit--FeedNut"
@@ -171,12 +204,13 @@ CLAMPING_KIT = "sh-vn-clamping-kit-hardware"
 HOLD_DOWN_STUD = "sh-vn-clamping-kit-hardware--HoldDownStud"
 T_NUT = "sh-vn-clamping-kit-hardware--TNut"
 FLANGE_NUT = "sh-vn-clamping-kit-hardware--FlangeNut"
+# The jig's common #8-32 x 3/4 SHCS: the rail screws, then the CL, CR and HUB
+# strap clamps (fasteners.COMMON_SCREW_ROWS), one row.
 RAIL_SCREW = "ch-rocker-arm-tl-vn-oblique-rail-screw"
-BRACKET_SCREW = "ch-rocker-arm-tl-vn-oblique-bracket-screw"
 CARRIAGE_SCREW = "ch-rocker-arm-tl-vn-oblique-carriage-screw"
-PILLOW_BLOCK_SCREW = "ch-rocker-arm-tl-vn-oblique-kp08-screw"
+# TL-VN-62, #8-32 x 5/8: four KP08 screws, then four lower TL-28 screws.
+PILLOW_BLOCK_SCREW = "ch-rocker-arm-tl-vn-oblique-bracket-screw"
 RISER_SCREW = "ch-rocker-arm-tl-vn-oblique-riser-screw"
-CLAMP_SCREW = "ch-rocker-arm-tl-vn-oblique-clamp-screw"
 LEVER_SCREW = "ch-rocker-arm-tl-vn-oblique-lever-screw"
 LEVER_LOCK_WASHER = "ch-rocker-arm-tl-vn-oblique-lever-washer"
 
@@ -184,7 +218,8 @@ LEVER_LOCK_WASHER = "ch-rocker-arm-tl-vn-oblique-lever-washer"
 # moves and the drawing proves this inventory in its established item order.
 # The bought counts are each member's own, never the number of purchased kits.
 QUANTITIES = {
-    BASE_BAR: base_bar.QUANTITY,
+    BASE_BAR_1: base_bar.CONFIGURATION_QUANTITIES[base_bar.BAR1],
+    BASE_BAR_2: base_bar.CONFIGURATION_QUANTITIES[base_bar.BAR2],
     CARRIER: 1,
     PIVOT_BLOCK: 1,
     FEED_BLOCK: 1,
@@ -192,12 +227,12 @@ QUANTITIES = {
     PIVOT_SPACER: pivot_spacer.QUANTITY,
     PIVOT_SHIM: pivot_shim.QUANTITY,
     RISER: 1,
-    HUB_PIN: 1,
+    HUB_WASHER: 1,
     FEED_LEVER: 1,
     END_BRACKET: leadscrew.END_BRACKET_QUANTITY,
     RAIL: fasteners.RAILS,
     CARRIAGE: fasteners.RAILS,
-    CL_DOWEL: cl_dowel.QUANTITY,
+    STOP_PIN: len(riser.STOP_PIN_CARRIER_POINTS),
     LEADSCREW: leadscrew_stock.QUANTITY,
     FEED_NUT: feed_nut.QUANTITY,
     PILLOW_BLOCK: pillow_block.QUANTITY,
@@ -206,11 +241,9 @@ QUANTITIES = {
     T_NUT: t_nut.QUANTITY,
     FLANGE_NUT: flange_nut.QUANTITY,
     RAIL_SCREW: rail_screw.QUANTITY,
-    BRACKET_SCREW: bracket_screw.QUANTITY,
     CARRIAGE_SCREW: carriage_screw.QUANTITY,
-    PILLOW_BLOCK_SCREW: kp08_screw.QUANTITY,
+    PILLOW_BLOCK_SCREW: bracket_screw.QUANTITY,
     RISER_SCREW: riser_screw.QUANTITY,
-    CLAMP_SCREW: clamp_screw.QUANTITY,
     LEVER_SCREW: lever_screw.QUANTITY,
     LEVER_LOCK_WASHER: lever_washer.QUANTITY,
 }
@@ -218,7 +251,8 @@ QUANTITIES = {
 # the builder's insertion order (the builder asserts it) and the steps' item
 # numbers (``_item``, ITEM_NUMBERS) read it (c4-r10, rule 25).
 BOM_ORDER = (
-    BASE_BAR,
+    BASE_BAR_1,
+    BASE_BAR_2,
     CARRIER,
     PIVOT_BLOCK,
     FEED_BLOCK,
@@ -226,12 +260,12 @@ BOM_ORDER = (
     PIVOT_SPACER,
     PIVOT_SHIM,
     RISER,
-    HUB_PIN,
+    HUB_WASHER,
     FEED_LEVER,
     END_BRACKET,
     RAIL,
     CARRIAGE,
-    CL_DOWEL,
+    STOP_PIN,
     LEADSCREW,
     FEED_NUT,
     PILLOW_BLOCK,
@@ -240,11 +274,9 @@ BOM_ORDER = (
     T_NUT,
     FLANGE_NUT,
     RAIL_SCREW,
-    BRACKET_SCREW,
     CARRIAGE_SCREW,
     PILLOW_BLOCK_SCREW,
     RISER_SCREW,
-    CLAMP_SCREW,
     LEVER_SCREW,
     LEVER_LOCK_WASHER,
 )
@@ -269,10 +301,22 @@ if (
     leadscrew_stock.CONFIGURATION, feed_nut.CONFIGURATION,
 ) != tuple(KIT_IDENTITIES[family][1] for family in (RAIL, CARRIAGE, LEADSCREW, FEED_NUT)):
     raise AssertionError("a kit family's configuration is not its member spec's")
+# The fabricated configured members (not purchased kits: no SKU key).
+FABRICATED_MEMBER_IDENTITIES = {
+    BASE_BAR_1: (BASE_BAR, base_bar.BAR1),
+    BASE_BAR_2: (BASE_BAR, base_bar.BAR2),
+}
+if tuple(member for _physical, member in FABRICATED_MEMBER_IDENTITIES.values()) != (
+    base_bar.CONFIGURATIONS
+):
+    raise AssertionError("the jig's base bar members are not the part's configurations")
+# Every configured member family, fabricated or purchased: each instance is a
+# persisted role reference (``instance_name``).
+MEMBER_IDENTITIES = {**FABRICATED_MEMBER_IDENTITIES, **KIT_IDENTITIES}
 COMPONENT_IDENTITIES: dict[str, tuple[str, str | None]] = {
     family: (family, None) for family in BOM_ORDER
 }
-COMPONENT_IDENTITIES.update(KIT_IDENTITIES)
+COMPONENT_IDENTITIES.update(MEMBER_IDENTITIES)
 
 
 def component_family(native_stem: str, configuration: str) -> str:
@@ -301,14 +345,17 @@ PASS = "inner"
 THETA = 0.0
 POSE = trammel.carrier_pose(PASS, THETA)
 PIN_STATION = trammel.SYMMETRIC_PIN_STATION[PASS]  # ⚙ 227.404 on both rails
-CARRIAGE_STATION = PIN_STATION - trammel.PIN_OFFSET  # ⚙ 259.404
+CARRIAGE_STATION = PIN_STATION - trammel.PIN_OFFSET  # centred on the pivot
 RAILS = (1, 2)  # rail 1 on the -X side, rail 2 on the +X side
-# One base bar part (TL-20, QTY 2). Rail 1 takes it as saved; rail 2 takes it
-# turned over (180° about its long axis), which swaps its slots' sides so
-# each slot still lands on its T-slot stud. Every bar feature goes through.
+# One base bar part (TL-20, QTY 2), two members: rail 1 takes Bar1 as saved;
+# rail 2 takes Bar2 turned over (180° about its long axis), which swaps its
+# slots' sides so each slot still lands on its T-slot stud. Every Bar2
+# feature goes through.
 TURNED_OVER = {1: False, 2: True}
-if base_bar.QUANTITY != len(RAILS):
+if base_bar.QUANTITY != len(RAILS) or len(BASE_BARS) != len(RAILS):
     raise AssertionError("one base bar under each rail")
+if leadscrew.RAIL != RAILS.index(1) + 1 or TURNED_OVER[leadscrew.RAIL]:
+    raise AssertionError("the bracket holes' Bar1 lies unturned under the leadscrew rail")
 
 
 def _unit(vector: tuple[float, float]) -> tuple[float, float]:
@@ -347,8 +394,8 @@ def _turned_over(rows: Rows) -> Rows:
 
 
 # Base bars: origin on the spindle-end face, on the rail axis, bottom face on
-# the table; the bar runs from RAIL_NEAR_S ⚙, flush with its rail's near end,
-# to BASE_BAR_FAR_S ⚙, RAIL_OVERHANG ⚙ short of the rail's far end.
+# the table; the bar and its datum-trimmed rail both run from
+# RAIL_NEAR_S ⚙ to BASE_BAR_FAR_S ⚙, flush at both ends.
 # Turned over, the part's bottom face (its z = 0) is on top, so its origin
 # stands BASE_BAR_THICK ⚙ above the table.
 BASE_BAR_PLACEMENTS: tuple[tuple[Point3, Rows], ...] = tuple(
@@ -391,13 +438,6 @@ CARRIER_ROWS = _rz(POSE.rotation, ((1.0, 0.0, 0.0), (0.0, 0.0, 1.0), (0.0, -1.0,
 RISER_ORIGIN = _at(riser.BLANK_ORIGIN, trammel.CARRIER_TOP_Z)
 RISER_ROWS = PIN_ROWS
 
-# The cut gauge pin is bonded in the carrier's HUB hole, factory end up, its
-# top set hub_pin.TIP_SET above the riser; its bottom lands on the underside.
-HUB_SET_ABOVE_RISER = hub_pin.TIP_SET
-HUB_PIN_TOP_Z = trammel.CARRIER_TOP_Z + trammel.RISER_THICK + HUB_SET_ABOVE_RISER
-HUB_PIN_ORIGIN = _at(trammel.HUB, HUB_PIN_TOP_Z - hub_pin.CUT_LENGTH)
-HUB_PIN_ROWS = PIN_ROWS
-
 # Feed lever: Y-up model, +X toward the operator (carrier -Y), +Y up, width
 # along model -Z (carrier +X); origin at the inner end on the bottom face and
 # the back long side, so the hole line (model z = -HOLE_Y) lands on carrier
@@ -432,10 +472,11 @@ END_BRACKET_PLACEMENTS: tuple[tuple[Point3, Rows], ...] = tuple(
 # --- Heights ⚙ ---------------------------------------------------------------------
 RAIL_TOP_Z = trammel.RAIL_SEAT_Z + trammel.RAIL_HEIGHT  # 27.0
 CARRIAGE_UNDERSIDE_Z = trammel.RAIL_SEAT_Z + trammel.CARRIAGE_UNDER  # 16.3
-HUB_PIN_BOTTOM_Z = HUB_PIN_ORIGIN[2]
 PIVOT_HEAD_UNDERSIDE_Z = PIVOT_SCREW_BOTTOM_Z + pivot_screw.SHOULDER_LENGTH
 PIVOT_HEAD_TOP_Z = PIVOT_HEAD_UNDERSIDE_Z + pivot_screw.HEAD_HEIGHT
-PART_TOP_Z = trammel.CARRIER_TOP_Z + trammel.RISER_THICK + trammel.STRAP_THICK
+PART_TOP_Z = holding.PART_TOP_Z  # the strap's top face; no strap is modelled
+if abs(PART_TOP_Z - (trammel.CARRIER_TOP_Z + trammel.RISER_THICK + trammel.STRAP_THICK)) > 1e-9:
+    raise AssertionError("the holding proof's strap top is not the jig's stack")
 
 # --- Hold-down studs: reworked length on the reference installed stack ------------
 # PM-30MV T-slot throat/foot depths are unmeasured reference estimates owned
@@ -551,9 +592,6 @@ PIVOT_SPACER_PLACEMENTS: tuple[Placement, ...] = tuple(
     (_at(pin, trammel.PIVOT_BLOCK_TOP_Z + trammel.PIVOT_SHIM_PACK), PIN_ROWS)
     for pin in trammel.pin_pair(PASS)
 )
-# The CL dowel, pressed chamfered end first from the top, its round tip set
-# above the riser (cl_dowel spec); its chamfered end's height follows.
-CL_DOWEL_PLACEMENTS = (_carried(trammel.CL, cl_dowel.TIP_BASE_Z),)
 # The leadscrew feed (leadscrew_spec): the screw from its near end and the
 # handwheel from its hub end, both along rail 1 away from the spindle (local
 # +Y), the handwheel's grip up (local +X).
@@ -580,13 +618,11 @@ HANDWHEEL_PLACEMENTS = (
         FEED_ROWS,
     ),
 )
-# The TL-VN-84 kit's FeedNut seats on the integral lug's -X face, its body toward the
-# spindle, its bore on the leadscrew axis: its axis (+Y) along the block's
-# -X, its seat face (y = 0) on the lug face. It is turned 45° about that
-# axis (+X onto the block's +Y+Z diagonal), so its four holes, at 0/90/180/
-# 270° in its own frame, sit on the lug's diagonals over TL-32's taps.
+# The FeedNut seats on the lug's +X face, its body away from the spindle.
+# Local +Y follows block +X; local +X remains on the block +Y/+Z diagonal,
+# placing the same four holes over the lug's transferred taps.
 _DIAGONAL = math.sqrt(0.5)
-FEED_NUT_ROWS: Rows = axis_rows((0.0, _DIAGONAL, _DIAGONAL), (-1.0, 0.0, 0.0))
+FEED_NUT_ROWS: Rows = axis_rows((0.0, _DIAGONAL, _DIAGONAL), (1.0, 0.0, 0.0))
 FEED_NUT_PLACEMENTS = (
     compose(
         FEED_BLOCK_PLACEMENTS[0],
@@ -608,12 +644,12 @@ if any(
     raise AssertionError("the placed feed nut's holes are not over TL-32's taps")
 # The four nut screws, flat heads seated nominally in the flange's
 # countersinks: each head top feed_nut.SCREW_GRIP off the lug face, each
-# screw's +Y (head) along the block's -X.
-NUT_ROWS: Rows = ((0.0, 1.0, 0.0), (-1.0, 0.0, 0.0), (0.0, 0.0, 1.0))
+# screw's +Y (head) along the block's +X.
+NUT_ROWS: Rows = ((0.0, -1.0, 0.0), (1.0, 0.0, 0.0), (0.0, 0.0, 1.0))
 NUT_SCREW_PLACEMENTS: tuple[Placement, ...] = tuple(
     compose(
         FEED_BLOCK_PLACEMENTS[0],
-        (feed_block.NUT_FACE_X - feed_nut.SCREW_GRIP, y, z),
+        (feed_block.NUT_FACE_X + feed_nut.SCREW_GRIP, y, z),
         NUT_ROWS,
     )
     for y, z in feed_block.NUT_HOLES_YZ
@@ -650,14 +686,15 @@ T_NUT_PLACEMENTS = HOLD_DOWN_STUD_PLACEMENTS  # +X along the table's T-slot
 FLANGE_NUT_PLACEMENTS: tuple[Placement, ...] = tuple(
     ((*xy, FLANGE_NUT_SEAT_Z), UPRIGHT_ROWS) for xy in STUD_XY
 )
-# Screws, head on its seat: rail 1's seven then rail 2's; bracket screws up
-# from bar 1's underside; four per block into its carriage; two per KP08.
+# Screws, head on its seat: rail 1's then rail 2's; the TL-28 bar screws (the
+# same common screw) up from Bar1's underside, two per bracket; four per
+# block into its carriage; two per KP08.
 RAIL_SCREW_PLACEMENTS: tuple[Placement, ...] = tuple(
     compose(rail, (x, 0.0, trammel.RAIL_SCREW_SEAT_ABOVE_BASE), UPRIGHT_ROWS)
     for rail in RAIL_PLACEMENTS
     for x in guide_rail.HOLE_X
 )
-BRACKET_SCREW_PLACEMENTS: tuple[Placement, ...] = tuple(
+BAR_SCREW_PLACEMENTS: tuple[Placement, ...] = tuple(
     compose(
         BASE_BAR_PLACEMENTS[RAILS.index(leadscrew.RAIL)],
         (*hole, base_bar.BRACKET_CBORE_DEPTH),
@@ -671,8 +708,8 @@ CARRIAGE_SCREW_PLACEMENTS: tuple[Placement, ...] = tuple(
     for point in pivot_block.BOLT_POINTS
 )
 # On the carrier: the riser's flat heads seated nominally 0.53 below its top,
-# the CR clamp screw's head on the strap, each lever screw's wedge-lock pair
-# (TL-VN-71) on the feed lever and the screw's head on the pair.
+# each lever screw's wedge-lock pair (TL-VN-71) on the feed lever and the
+# screw's head on the pair.
 RISER_SCREW_PLACEMENTS: tuple[Placement, ...] = tuple(
     _carried(
         point,
@@ -682,7 +719,29 @@ RISER_SCREW_PLACEMENTS: tuple[Placement, ...] = tuple(
     )
     for point in trammel.RISER_SCREWS
 )
-CLAMP_SCREW_PLACEMENTS = (_carried(trammel.CR, PART_TOP_Z),)
+# The strap's holding (owner rulings 2026-11-07): the CL and CR common screws'
+# heads on the strap's end waste; the brass top-hat washer's seat face on the
+# strap at HUB (its spigot down into the reamed hub hole), the HUB common
+# screw's head on the washer; the two loose stop pins chamfered end down on
+# the carrier top in the riser's stop holes. No strap is modelled.
+STRAP_CLAMP_ROLES = ("CL", "CR", "HUB")
+STRAP_CLAMP_POINTS = {**carrier.END_CLAMPS, "HUB": carrier.HUB}
+STRAP_CLAMP_SCREW_PLACEMENTS: tuple[Placement, ...] = (
+    *(_carried(STRAP_CLAMP_POINTS[role], PART_TOP_Z) for role in ("CL", "CR")),
+    _carried(STRAP_CLAMP_POINTS["HUB"], PART_TOP_Z + hub_washer.THICK),
+)
+HUB_WASHER_PLACEMENTS = ((_at(carrier.HUB, PART_TOP_Z), PIN_ROWS),)
+STOP_PIN_PLACEMENTS: tuple[Placement, ...] = tuple(
+    _carried(point, trammel.CARRIER_TOP_Z) for point in riser.STOP_PIN_CARRIER_POINTS
+)
+if tuple(STRAP_CLAMP_POINTS) != STRAP_CLAMP_ROLES:
+    raise AssertionError("the strap clamps are not CL, CR then HUB")
+# Each head top is the holding proof's (``holding.CLAMP_TOP_Z``, keyed "hub").
+_HOLDING_CLAMP_KEYS = {"CL": "CL", "CR": "CR", "HUB": "hub"}
+for _role, (_origin, _rows) in zip(STRAP_CLAMP_ROLES, STRAP_CLAMP_SCREW_PLACEMENTS, strict=True):
+    _head_top = _origin[2] + rail_screw.DIMS.head_h
+    if abs(_head_top - holding.CLAMP_TOP_Z[_HOLDING_CLAMP_KEYS[_role]]) > 1e-9:
+        raise AssertionError(f"the {_role} clamp head is not the holding proof's height")
 LEVER_LOCK_WASHER_PLACEMENTS: tuple[Placement, ...] = tuple(
     _carried(point, trammel.CARRIER_TOP_Z + feed_lever.LEVER_THICK)
     for point in carrier.LEVER_HOLES
@@ -819,7 +878,8 @@ PIVOT_FIT_PACK_MAX = math.ceil(max(pack for _, pack in _fits) / _THOU - 1e-9) * 
 # Every instance of every logical family, in insertion order. Ordinary families
 # keep native <stem>-N names; kit instances use persisted role-local references.
 PLACEMENTS: dict[str, tuple[Placement, ...]] = {
-    BASE_BAR: BASE_BAR_PLACEMENTS,
+    BASE_BAR_1: (BASE_BAR_PLACEMENTS[RAILS.index(1)],),
+    BASE_BAR_2: (BASE_BAR_PLACEMENTS[RAILS.index(2)],),
     CARRIER: ((CARRIER_ORIGIN, CARRIER_ROWS),),
     PIVOT_BLOCK: PIVOT_BLOCK_PLACEMENTS,
     FEED_BLOCK: FEED_BLOCK_PLACEMENTS,
@@ -827,12 +887,12 @@ PLACEMENTS: dict[str, tuple[Placement, ...]] = {
     PIVOT_SPACER: PIVOT_SPACER_PLACEMENTS,
     PIVOT_SHIM: PIVOT_SHIM_PLACEMENTS,
     RISER: ((RISER_ORIGIN, RISER_ROWS),),
-    HUB_PIN: ((HUB_PIN_ORIGIN, HUB_PIN_ROWS),),
+    HUB_WASHER: HUB_WASHER_PLACEMENTS,
     FEED_LEVER: ((FEED_LEVER_ORIGIN, FEED_LEVER_ROWS),),
     END_BRACKET: END_BRACKET_PLACEMENTS,
     RAIL: RAIL_PLACEMENTS,
     CARRIAGE: CARRIAGE_PLACEMENTS,
-    CL_DOWEL: CL_DOWEL_PLACEMENTS,
+    STOP_PIN: STOP_PIN_PLACEMENTS,
     LEADSCREW: LEADSCREW_PLACEMENTS,
     FEED_NUT: FEED_NUT_PLACEMENTS,
     PILLOW_BLOCK: PILLOW_BLOCK_PLACEMENTS,
@@ -840,30 +900,55 @@ PLACEMENTS: dict[str, tuple[Placement, ...]] = {
     HOLD_DOWN_STUD: HOLD_DOWN_STUD_PLACEMENTS,
     T_NUT: T_NUT_PLACEMENTS,
     FLANGE_NUT: FLANGE_NUT_PLACEMENTS,
-    RAIL_SCREW: RAIL_SCREW_PLACEMENTS,
-    BRACKET_SCREW: BRACKET_SCREW_PLACEMENTS,
+    # One BOM row: the rail screws, then the strap's CL, CR and HUB clamps.
+    RAIL_SCREW: RAIL_SCREW_PLACEMENTS + STRAP_CLAMP_SCREW_PLACEMENTS,
     CARRIAGE_SCREW: CARRIAGE_SCREW_PLACEMENTS,
-    PILLOW_BLOCK_SCREW: PILLOW_BLOCK_SCREW_PLACEMENTS,
+    PILLOW_BLOCK_SCREW: PILLOW_BLOCK_SCREW_PLACEMENTS + BAR_SCREW_PLACEMENTS,
     # One BOM row, two joints: the riser's 4, then the feed nut's 4.
     RISER_SCREW: RISER_SCREW_PLACEMENTS + NUT_SCREW_PLACEMENTS,
-    CLAMP_SCREW: CLAMP_SCREW_PLACEMENTS,
     LEVER_SCREW: LEVER_SCREW_PLACEMENTS,
     LEVER_LOCK_WASHER: LEVER_LOCK_WASHER_PLACEMENTS,
 }
 
 
 def instance_name(stem: str, index: int) -> str:
-    """Selector for family instance ``index`` (0-based), not a guessed kit Name2."""
-    if stem in KIT_IDENTITIES:
-        return f"@{KIT_IDENTITIES[stem][1]}:{index + 1}"
+    """Selector for family instance ``index`` (0-based), not a guessed member Name2."""
+    if stem in MEMBER_IDENTITIES:
+        return f"@{MEMBER_IDENTITIES[stem][1]}:{index + 1}"
     return f"{stem}-{index + 1}"
 
 
-KIT_COMPONENT_REFERENCES = {
+MEMBER_COMPONENT_REFERENCES = {
     instance_name(family, index): identity
-    for family, identity in KIT_IDENTITIES.items()
+    for family, identity in MEMBER_IDENTITIES.items()
     for index in range(QUANTITIES[family])
 }
+# The rail and bracket screw families' occurrences by joint (PLACEMENTS' order).
+RAIL_SCREW_INSTANCES = tuple(
+    instance_name(RAIL_SCREW, index) for index in range(len(RAIL_SCREW_PLACEMENTS))
+)
+KP08_SCREW_INSTANCES = tuple(
+    instance_name(PILLOW_BLOCK_SCREW, index)
+    for index in range(len(PILLOW_BLOCK_SCREW_PLACEMENTS))
+)
+BAR_SCREW_INSTANCES = tuple(
+    instance_name(PILLOW_BLOCK_SCREW, len(PILLOW_BLOCK_SCREW_PLACEMENTS) + index)
+    for index in range(len(BAR_SCREW_PLACEMENTS))
+)
+# The strap's three common clamp screws, by role: stable 0-based indices into
+# the rail screw family after its rail occurrences, and their
+# ``instance_name`` selectors (rail-screw-17, -18, -19). A view that hides the
+# strap's holding hides exactly these occurrences, never the whole common
+# stem, whose rail occurrences stay on the bars.
+STRAP_CLAMP_SCREW_INDICES = {
+    role: len(RAIL_SCREW_PLACEMENTS) + offset
+    for offset, role in enumerate(STRAP_CLAMP_ROLES)
+}
+STRAP_CLAMP_SCREW_INSTANCES = {
+    role: instance_name(RAIL_SCREW, index) for role, index in STRAP_CLAMP_SCREW_INDICES.items()
+}
+if max(STRAP_CLAMP_SCREW_INDICES.values()) + 1 != QUANTITIES[RAIL_SCREW]:
+    raise AssertionError("the strap clamps are not the common screw's last occurrences")
 # The riser screw family's occurrences by joint (PLACEMENTS' order).
 RISER_SCREW_INSTANCES = tuple(
     instance_name(RISER_SCREW, index) for index in range(len(RISER_SCREW_PLACEMENTS))
@@ -886,7 +971,9 @@ SLIDE_RAIL = leadscrew.RAIL
 # One exact parent per occurrence. The two block designs belong to different
 # carriages, while the two identical pivot stacks follow those two blocks.
 _SUPPORT_PARENTS = ((FEED_BLOCK, 0), (PIVOT_BLOCK, 0))
-LOCKED_TO: dict[str, tuple[tuple[str, int], ...]] = {
+# ``None``: an occurrence of a partly moving family that stays fixed (the
+# common screw's rail occurrences; its strap clamps ride).
+LOCKED_TO: dict[str, tuple[tuple[str, int] | None, ...]] = {
     FEED_BLOCK: ((CARRIAGE, 0),),
     PIVOT_BLOCK: ((CARRIAGE, 1),),
     PIVOT_SCREW: _SUPPORT_PARENTS,
@@ -899,15 +986,50 @@ LOCKED_TO: dict[str, tuple[tuple[str, int], ...]] = {
         *((CARRIER, 0) for _ in trammel.RISER_SCREWS),
         *((FEED_BLOCK, 0) for _ in feed_block.NUT_HOLES_YZ),
     ),
-    HUB_PIN: ((CARRIER, 0),),
+    HUB_WASHER: ((CARRIER, 0),),
     FEED_LEVER: ((CARRIER, 0),),
     LEVER_SCREW: tuple((CARRIER, 0) for _ in carrier.LEVER_HOLES),
-    CL_DOWEL: ((CARRIER, 0),),
-    CLAMP_SCREW: ((CARRIER, 0),),
+    STOP_PIN: tuple((CARRIER, 0) for _ in riser.STOP_PIN_CARRIER_POINTS),
+    RAIL_SCREW: (
+        *(None for _ in RAIL_SCREW_PLACEMENTS),
+        *((CARRIER, 0) for _ in STRAP_CLAMP_SCREW_PLACEMENTS),
+    ),
     LEVER_LOCK_WASHER: tuple((CARRIER, 0) for _ in carrier.LEVER_HOLES),
 }
-# Every family that rides the sweep, in BOM order.
-MOVING = tuple(stem for stem in BOM_ORDER if stem in (CARRIAGE, CARRIER, *LOCKED_TO))
+
+
+def is_moving(stem: str, index: int) -> bool:
+    """True when ``stem``'s occurrence ``index`` (0-based) rides the sweep."""
+    if stem in (CARRIAGE, CARRIER):
+        return True
+    parents = LOCKED_TO.get(stem)
+    return parents is not None and parents[index] is not None
+
+
+# Every family with an occurrence that rides the sweep, in BOM order.
+MOVING = tuple(
+    stem for stem in BOM_ORDER
+    if any(is_moving(stem, index) for index in range(QUANTITIES[stem]))
+)
+# Every occurrence that rides the sweep, family by family in BOM order.
+MOVING_INSTANCES = tuple(
+    instance_name(stem, index)
+    for stem in MOVING
+    for index in range(QUANTITIES[stem])
+    if is_moving(stem, index)
+)
+# Every occurrence lock-mated directly to the carrier: what a view hides to
+# show the slides without the carrier and its load.
+CARRIER_RIDERS = tuple(
+    instance_name(stem, index)
+    for stem in BOM_ORDER
+    for index, parent in enumerate(LOCKED_TO.get(stem, ()))
+    if parent is not None and parent[0] == CARRIER
+)
+if not set(STRAP_CLAMP_SCREW_INSTANCES.values()) <= set(CARRIER_RIDERS):
+    raise AssertionError("the strap clamp screws do not ride the carrier")
+if set(RAIL_SCREW_INSTANCES + BAR_SCREW_INSTANCES) & set(MOVING_INSTANCES):
+    raise AssertionError("a rail or TL-28 bar screw rides the sweep")
 # Their native files, in the same order: the contract's allowed and required
 # free stems. The free-DOF gate reads a component's Name2 less its instance
 # suffix, so a moving kit member counts under its kit's physical stem (the
@@ -918,8 +1040,10 @@ MOVING_STEMS = tuple(dict.fromkeys(COMPONENT_IDENTITIES[stem][0] for stem in MOV
 
 def lock_parent(stem: str, index: int) -> str:
     """The instance that ``stem``'s instance ``index`` (0-based) is locked to."""
-    parent, parent_index = LOCKED_TO[stem][index]
-    return instance_name(parent, parent_index)
+    parent = LOCKED_TO[stem][index]
+    if parent is None:
+        raise ValueError(f"{instance_name(stem, index)} is fixed, not lock-mated")
+    return instance_name(*parent)
 
 
 # The carrier's pin mates, by pass: (mate name, carrier hole, pin instance).
@@ -953,30 +1077,31 @@ COVER_Y = trammel.THROAT_TO_COVER  # the column's pleated cover, 7.5 in from the
 
 # --- BOM ------------------------------------------------------------------------------
 # DESCRIPTION cells, one printed line each; no vendor or brand (the yaml owns
-# each source). Shared kit members use the producer's native Description authority.
+# each source). Shared kit members use the producer's native Description
+# authority, except the trimmed rail's reference length below.
 # The TL-VN-83 kit rail and carriages carry the owner's description note
 # under the BOM (BOM_NOTE, #2177). Screws by their fastener-table callout.
 BOM_DESCRIPTIONS = {
-    BASE_BAR: "BASE BAR",
+    # The base bar members print their native configuration descriptions.
+    BASE_BAR_1: base_bar.CONFIGURATION_DESCRIPTIONS[base_bar.BAR1],
+    BASE_BAR_2: base_bar.CONFIGURATION_DESCRIPTIONS[base_bar.BAR2],
     PIVOT_BLOCK: "PIVOT BLOCK",
     FEED_BLOCK: "FEED BLOCK",
     PIVOT_SCREW: "5/16-18 SHOULDER SCREW, 3/8 X 1-1/2",
     PIVOT_SPACER: "SPACER, 3/8 ID X 5/8 OD X 5/8",
     PIVOT_SHIM: "SHIM 3/8 X 5/8, FITTING STOCK",
     CARRIER: "CARRIER PLATE",
-    RISER: "ACETAL RISER",
-    # TL-00 review (farm 20261104T210601055Z): the bought pin's size, Ø.4000
-    # X its 2.00 supply length; step 11 cuts it.
-    HUB_PIN: (
-        f"HUB LOCATOR PIN Ø{_length(hub_pin.DIA, 4)} X "
-        f"{_length(hub_pin.SUPPLY_LENGTH, 2)}"
-    ),
+    RISER: "6061 RISER",
+    HUB_WASHER: "BRASS TOP-HAT HUB CLAMP WASHER",
     FEED_LEVER: "FEED LEVER",
     END_BRACKET: "END BRACKET",
     # Kit members print their native per-configuration descriptions.
-    RAIL: guide_rail.BOM_DESCRIPTION,
+    # The kit's own row is the fitted 439.928 (TL-VN-83); here it is a
+    # reference, each rail trimmed to its bar in step 1 (TL-00 review
+    # 62753c5e), labelled mm on the inch sheet (#290).
+    RAIL: f"{guide_rail.STYLE} RAIL, {trammel.RAIL_LENGTH:.0f} MM REF, TRIM TO BAR",
     CARRIAGE: carriage.BOM_DESCRIPTION,
-    CL_DOWEL: "DOWEL PIN 1/4 X 1, CL LOCATOR",
+    STOP_PIN: "DOWEL PIN 1/8 X 3/4, LOOSE END STOP",
     # Vendor-metric rows keep their millimetres, labelled (#290).
     LEADSCREW: leadscrew_stock.BOM_DESCRIPTION,
     FEED_NUT: feed_nut.BOM_DESCRIPTION,
@@ -987,11 +1112,9 @@ BOM_DESCRIPTIONS = {
     T_NUT: t_nut.BOM_DESCRIPTION,
     FLANGE_NUT: flange_nut.BOM_DESCRIPTION,
     RAIL_SCREW: rail_screw.CALLOUT,
-    BRACKET_SCREW: bracket_screw.CALLOUT,
     CARRIAGE_SCREW: carriage_screw.CALLOUT,
-    PILLOW_BLOCK_SCREW: kp08_screw.CALLOUT,
+    PILLOW_BLOCK_SCREW: bracket_screw.CALLOUT,
     RISER_SCREW: f"{riser_screw.CALLOUT} SCREW",
-    CLAMP_SCREW: clamp_screw.CALLOUT,
     LEVER_SCREW: lever_screw.CALLOUT,
     LEVER_LOCK_WASHER: f"{lever_washer.SCREW_SIZE} WEDGE-LOCK WASHER PAIR",
 }
@@ -1001,20 +1124,13 @@ BOM_DESCRIPTIONS = {
 ITEM_NUMBERS = {stem: str(index) for index, stem in enumerate(BOM_ORDER, 1)}
 
 # --- Native explode (JIG_EXPLODED) -------------------------------------------------
-# Presentation separates each purchased pivot member above its block and the
-# carrier above its supports. The bonded hub locator is shown below the
-# carrier for identification, not as an instruction for destructive removal.
+# Presentation separates the pivot stacks and carrier. The strap clamps, the
+# top-hat washer and the loose stop pins lift out above the carrier's riders.
 # (label, selectors, axis, signed distance mm).
 EXPLODED_VIEW_NAME = "JIG_EXPLODED"
 SOURCE_CONFIGURATION = "Default"
-_CARRIER_RIDERS = (
-    RISER,
-    *RISER_SCREW_INSTANCES,
-    CLAMP_SCREW,
-    FEED_LEVER,
-    LEVER_SCREW,
-    LEVER_LOCK_WASHER,
-)
+_END_CLAMP_SCREWS = tuple(STRAP_CLAMP_SCREW_INSTANCES[role] for role in ("CL", "CR"))
+_HUB_CLAMP_SCREW = STRAP_CLAMP_SCREW_INSTANCES["HUB"]
 _BLOCK_RIDERS = (CARRIAGE_SCREW, FEED_NUT, *NUT_SCREW_INSTANCES, PIVOT_SHIM, PIVOT_SPACER)
 EXPLODE_STEPS = (
     ("shoulder screws withdraw", (PIVOT_SCREW,), "z", 250.0),
@@ -1028,34 +1144,33 @@ EXPLODE_STEPS = (
         "z",
         60.0,
     ),
-    ("clamp screw lifts out", (CLAMP_SCREW,), "z", 40.0),
+    ("end clamp screws lift out", _END_CLAMP_SCREWS, "z", 40.0),
+    ("hub clamp screw lifts out", (_HUB_CLAMP_SCREW,), "z", 110.0),
+    ("hub washer lifts off", (HUB_WASHER,), "z", 85.0),
+    ("stop pins lift out", (STOP_PIN,), "z", 60.0),
     ("riser screws lift out", RISER_SCREW_INSTANCES, "z", 30.0),
-    ("riser lifts off", (RISER, *RISER_SCREW_INSTANCES, CLAMP_SCREW), "z", 60.0),
     (
-        "carrier lifts off the pins",
-        (CARRIER, HUB_PIN, CL_DOWEL, *_CARRIER_RIDERS),
+        "riser lifts off",
+        (RISER, *RISER_SCREW_INSTANCES, *_END_CLAMP_SCREWS, STOP_PIN),
         "z",
-        230.0,
+        60.0,
     ),
-    ("bonded hub locator identification", (HUB_PIN,), "z", -150.0),
-    # The dowel goes in from above, down through the riser (step 11), so it
-    # lifts out as the clamp screw does, clear above the lifted riser.
-    ("cl dowel lifts out", (CL_DOWEL,), "z", 100.0),
+    ("carrier lifts off the pins", (CARRIER, *CARRIER_RIDERS), "z", 230.0),
     ("nut screws back out", NUT_SCREW_INSTANCES, "x", 30.0),
     ("blocks lift off", (PIVOT_BLOCK, FEED_BLOCK, *_BLOCK_RIDERS), "z", 90.0),
     ("carriage screws lift out", (CARRIAGE_SCREW,), "z", 60.0),
     ("carriages lift off the rails", (CARRIAGE,), "z", 50.0),
-    ("rail screws lift out", (RAIL_SCREW,), "z", 35.0),
+    ("rail screws lift out", RAIL_SCREW_INSTANCES, "z", 35.0),
     ("handwheel slides off", (HANDWHEEL,), "x", -50.0),
-    ("kp08 screws lift out", (PILLOW_BLOCK_SCREW,), "z", 40.0),
-    ("bracket screws drop out", (BRACKET_SCREW,), "z", -40.0),
+    ("kp08 screws lift out", KP08_SCREW_INSTANCES, "z", 40.0),
+    ("bar screws drop out", BAR_SCREW_INSTANCES, "z", -40.0),
     ("flange nuts lift off", (FLANGE_NUT,), "z", 60.0),
     ("t-nuts drop out", (T_NUT,), "z", -30.0),
 )
 # Shown where they are fitted: the table-side structure and the feed's
 # stationary parts every exploded item is read against.
 EXPLODE_STATIC = (
-    BASE_BAR,
+    *BASE_BARS,
     END_BRACKET,
     RAIL,
     LEADSCREW,
@@ -1076,7 +1191,7 @@ def explode_shift(component_or_family: str, axis: str) -> float:
         family = component_or_family
         names = tuple(instance_name(family, index) for index in range(QUANTITIES[family]))
     else:
-        identity = KIT_COMPONENT_REFERENCES.get(component_or_family)
+        identity = MEMBER_COMPONENT_REFERENCES.get(component_or_family)
         if identity is not None:
             family = component_family(*identity)
         else:
@@ -1107,15 +1222,20 @@ def explode_lift(component_or_family: str) -> float:
     return explode_shift(component_or_family, "z")
 
 
-_CARRIER_UNDERSIDE_EXPLODED = trammel.CARRIER_UNDERSIDE_Z + explode_lift(CARRIER)
+# The lifted stop pins stand clear above the lifted riser, the end clamp
+# screws' tips clear above its top, and the hub screw's tip above its washer.
+_RISER_TOP_EXPLODED = trammel.CARRIER_TOP_Z + trammel.RISER_THICK + explode_lift(RISER)
+if trammel.CARRIER_TOP_Z + explode_lift(STOP_PIN) <= _RISER_TOP_EXPLODED:
+    raise AssertionError("the exploded stop pins stand in the riser")
+for _screw in _END_CLAMP_SCREWS:
+    _tip = PART_TOP_Z - rail_screw.DIMS.length + explode_lift(_screw)
+    if _tip <= _RISER_TOP_EXPLODED:
+        raise AssertionError(f"the exploded {_screw} stands in the riser")
 if (
-    _CARRIER_UNDERSIDE_EXPLODED - (HUB_PIN_TOP_Z + explode_lift(HUB_PIN))
-    <= trammel.HUB[1] - carrier.OUTLINE_Y[0]
+    PART_TOP_Z + hub_washer.THICK - rail_screw.DIMS.length + explode_lift(_HUB_CLAMP_SCREW)
+    <= PART_TOP_Z + hub_washer.THICK + explode_lift(HUB_WASHER)
 ):
-    raise AssertionError("the exploded carrier hides the HUB pin")
-# The riser must clear the HUB pin's locator before it moves sideways.
-if explode_lift(RISER) - explode_lift(CARRIER) <= HUB_PIN_TOP_Z - trammel.CARRIER_TOP_Z:
-    raise AssertionError("the exploded riser does not clear the HUB pin")
+    raise AssertionError("the exploded hub screw stands in its washer")
 # Every occurrence's selector, ``instance_name`` by family and index.
 INSTANCE_NAMES = frozenset(
     instance_name(family, index)
@@ -1148,7 +1268,7 @@ _static = {
 }
 if _moved & _static or _moved | _static != INSTANCE_NAMES:
     raise AssertionError("every occurrence is exploded or deliberately static, not both")
-_RAIL_SCREW_TOP_EXPLODED = RAIL_TOP_Z + explode_lift(RAIL_SCREW)
+_RAIL_SCREW_TOP_EXPLODED = RAIL_TOP_Z + max(map(explode_lift, RAIL_SCREW_INSTANCES))
 if _RAIL_SCREW_TOP_EXPLODED > CARRIAGE_UNDERSIDE_Z + explode_lift(CARRIAGE):
     raise AssertionError("the exploded rail screws stand inside the carriages")
 # Each exploded sheet's cross-reference, after its cluster's title; the
@@ -1201,38 +1321,6 @@ for _name, (_right, _up, _sight) in VIEW_AXES.items():
         raise AssertionError(f"{_name}: not a right-handed orthonormal frame")
 PLAN_VIEW_LABEL = "PLAN, FROM ABOVE"
 ELEVATION_VIEW_LABEL = "ELEVATION FROM THE OPERATOR SIDE (-Y)"
-
-# --- CL dowel tip setting (sheet 1 elevation, native REFERENCE) -------------------
-# The CL dowel's round tip above the riser top: a hidden construction line on
-# the assembly Top plane (machine X-Z, the plane the operator's elevation
-# looks at) up the dowel axis, from the riser top to the modelled round tip.
-# Its length is the nominal cl_dowel.TIP_HEIGHT the model is placed at; the
-# fitter sets the tip TIP_SET_MIN..TIP_SET_MAX above the ACTUAL riser (step
-# 11), so the elevation prints it as a reference, parenthesised, no band.
-CL_TIP_FEATURE = "ClTipSetting"
-CL_TIP_DIMENSION = "ClTipAboveRiser"
-CL_TIP_PRECISION = 3
-# TL-00 review (2026-11-02): the sheet 1 caption names what the bare (.064)
-# measures. A callout on the dimension itself stacked its value onto the
-# leader shelf (jig-asm r4 review), so the caption carries the name.
-CL_TIP_REFERENCE = f"({_length(cl_dowel.TIP_HEIGHT, CL_TIP_PRECISION)})"
-CL_TIP_RISER_TOP_Z = trammel.CARRIER_TOP_Z + trammel.RISER_THICK
-# The round tip: the dowel's local +Y end (cl_dowel frame) in the machine frame.
-_CL_TIP = frame_point(CL_DOWEL_PLACEMENTS[0], (0.0, cl_dowel.LENGTH, 0.0))
-# Machine (X, Z) of the line's riser-top end, then its tip end.
-CL_TIP_LINE = ((_CL_TIP[0], CL_TIP_RISER_TOP_Z), (_CL_TIP[0], _CL_TIP[2]))
-# The builder marks exactly these for the drawing, at these places.
-DRAWING_DIMENSIONS: dict[str, set[str]] = {CL_TIP_FEATURE: {CL_TIP_DIMENSION}}
-DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    CL_TIP_FEATURE: {CL_TIP_DIMENSION: CL_TIP_PRECISION}
-}
-if abs(_CL_TIP[2] - CL_TIP_RISER_TOP_Z - cl_dowel.TIP_HEIGHT) > 1e-9:
-    raise AssertionError(
-        "the modelled CL tip does not stand TIP_HEIGHT above the riser"
-    )
-if not cl_dowel.TIP_SET_MIN <= cl_dowel.TIP_HEIGHT <= cl_dowel.TIP_SET_MAX:
-    raise AssertionError("the CL tip reference lies outside the fitter's setting band")
-
 
 # --- Sheet 1 plan tags ---------------------------------------------------------------
 # Each tag's text, the machine point its leader touches and the machine XY of
@@ -1312,18 +1400,16 @@ PLAN_TAGS: tuple[PlanTag, ...] = (
 )
 
 # --- Fitter package text -------------------------------------------------------------
-# The rails are set by indicating a pin in each pivot block; the carrier holds
-# its own pin spacing to ±POSITION_BAND, the same band the readings use. The
-# readings and the band print at the carrier's 4 places (a .0001 DRO).
-ALIGNMENT_BAND = carrier.POSITION_BAND
+# Rail-angle setting is an assembly control, independent of the carrier's
+# .XXX hole-table locations. Preserve the existing .0008 indicating band.
+ALIGNMENT_BAND = 0.0008 * trammel.INCH
 ALIGNMENT_PLACES = 4
 ASSEMBLED_CAPTION = (
     "INNER PASS AT THE SYMMETRIC POSITION: A1/B1; OUTER PASS: A2/B2. "
     "BOTH SHOULDER SCREWS MUST BE SEATED AND TORQUED BEFORE CUTTING. "
     "CHECK ACTUAL SPINDLE/TOOL/HOLDER CLEARANCE BEFORE USE (OPERATION SHEET). "
     "MACHINE ORIGIN: SPINDLE AT TABLE TOP; +Y TOWARD COLUMN. "
-    f"ELEVATION {CL_TIP_REFERENCE}: CL DOWEL TIP ABOVE THE RISER, A "
-    "REFERENCE; STEP 11 SETS IT."
+    "NO STRAP SHOWN; ITS CLAMPS AND STOP PINS AS FITTED."
 )
 
 
@@ -1387,7 +1473,9 @@ _BAR_SCREW = fasteners.callout(fasteners.BRACKET_TO_BAR)
 _CARRIAGE_SCREW = fasteners.callout(fasteners.BLOCK_TO_CARRIAGE)
 _KP08_SCREW = fasteners.callout(fasteners.KP08_TO_BRACKET)
 _RISER_SCREW = fasteners.callout(fasteners.RISER_TO_CARRIER)
-_CLAMP_SCREW = fasteners.callout(fasteners.CR_CLAMP)
+_CLAMP_SCREW = fasteners.callout(fasteners.END_CLAMP)  # CL, CR and HUB alike
+if fasteners.callout(fasteners.HUB_CLAMP) != _CLAMP_SCREW:
+    raise AssertionError("the HUB clamp is not the end clamps' common screw")
 _LEVER_SCREW = fasteners.callout(fasteners.LEVER_TO_CARRIER)
 
 # --- Leadscrew thrust and retained static-clamp torque basis --------------------
@@ -1408,13 +1496,58 @@ FEED_THRUST_N = (
     * _SCREW_EFFICIENCY
     / (leadscrew_stock.LEAD / 1000.0)
 )  # 1361
-# Owner ruling 2026-10-27: TL-28 may lift its heel elastically under this
-# thrust (it opens at leadscrew.BRACKET_OPENING_THRUST, 704 N); slip governs.
-if leadscrew.BRACKET_SLIP_THRUST < leadscrew.SLIP_MARGIN_MIN * FEED_THRUST_N:
+# FEED_THRUST_N is the crank's abuse envelope, not the cutting load.
+#
+# The normal finish feed's thrust, from the cut itself: the 3/8 four-flute
+# HSS cutter (trammel.PART_CUTTER_DIA) on the rocker arm's low-carbon steel at
+# cutting-data.toml's profile chip load for that cutter (0.0254 mm/tooth).
+# Specific cutting force kc = kc1 h^-mc with kc1 1500 N/mm², mc 0.22
+# (SOURCED: Machining Doctor, Specific Cutting Force, material group 02,
+# low-carbon steel), h the chip load (its maximum, a full-slot entry). Each
+# tooth's tangential force kc ap h over the whole strap (ap = STRAP_THICK,
+# one pass). AUTHOR'S CHOICE: at most two teeth cut at once (a full slot,
+# 4 flutes) and each tooth's radial force is no larger than its tangential,
+# so the cutter's resultant is at most 2 sqrt(2) times one tooth's.
+_CUT_KC1_MPA = 1500.0
+_CUT_MC = 0.22
+_CUT_TEETH_ENGAGED = 2
+NORMAL_FEED_CHIP_LOAD_MM = 0.0254  # cutting-data.toml: low-carbon steel, HSS profile, 3-12.7
+_CUT_KC_MPA = _CUT_KC1_MPA * NORMAL_FEED_CHIP_LOAD_MM ** (-_CUT_MC)  # 3364
+_CUT_TOOTH_FORCE_N = _CUT_KC_MPA * trammel.STRAP_THICK * NORMAL_FEED_CHIP_LOAD_MM  # 213
+NORMAL_CUT_FORCE_N = _CUT_TEETH_ENGAGED * math.sqrt(2.0) * _CUT_TOOTH_FORCE_N  # 602
+
+
+def _feed_ratio(theta: float) -> float:
+    """Leadscrew thrust per newton along the cutter's path (virtual work):
+    the cutter centre moves R dθ while carriage 1's pin moves
+    ds_A = R cos((ALPHA + θ)/2) dθ (trammel.pin_station)."""
+    return 1.0 / math.cos((trammel.ALPHA + theta) / 2.0)
+
+
+NORMAL_FEED_RATIO = max(
+    _feed_ratio(sign * trammel.SWEEP[name])
+    for name in trammel.PASS_RADIUS
+    for sign in (-1.0, 1.0)
+)  # 1.03 at the sweep's end
+NORMAL_FEED_THRUST_N = NORMAL_CUT_FORCE_N * NORMAL_FEED_RATIO  # 619
+# Owner ruling Main 2026-11-06 (option B; replaces the 2026-10-27 slip-governs
+# criterion for TL-28 on TL-20 only): no slip under the normal feed; above
+# leadscrew.BRACKET_SLIP_THRUST (1344 N, handwheel abuse) TL-28 may slip onto
+# its bar screws' positive thread stop, which carries the abuse envelope.
+# The heel's elastic opening (leadscrew.BRACKET_OPENING_THRUST) is reported.
+if leadscrew.BRACKET_SLIP_THRUST < leadscrew.SLIP_MARGIN_MIN * NORMAL_FEED_THRUST_N:
     raise AssertionError(
         f"TL-28 slips at {leadscrew.BRACKET_SLIP_THRUST:.0f} N, under "
-        f"{leadscrew.SLIP_MARGIN_MIN} x the {FEED_THRUST_N:.0f} N feed thrust"
+        f"{leadscrew.SLIP_MARGIN_MIN} x the {NORMAL_FEED_THRUST_N:.0f} N normal feed"
     )
+BRACKET_ABUSE_THRUST_N = max(FEED_THRUST_N, leadscrew.HAND_ABUSE_THRUST)  # 1361
+BRACKET_ABUSE_STOP_MARGINS = leadscrew.bracket_stop_margins(BRACKET_ABUSE_THRUST_N)
+for _check, _margin in BRACKET_ABUSE_STOP_MARGINS.items():
+    if _margin < leadscrew.STOP_MARGIN_MIN:
+        raise AssertionError(
+            f"TL-28's positive stop fails its {_check} at the "
+            f"{BRACKET_ABUSE_THRUST_N:.0f} N crank envelope ({_margin:.2f})"
+        )
 _AL_SHEAR_ULTIMATE_MPA = 207.0
 _STRIP_SAFETY = 3.0
 _NUT_FACTOR = 0.20
@@ -1529,20 +1662,24 @@ _AL_YIELD_MPA = 276.0
 _NUT_TORQUE = _torque(NUT_SCREW_TORQUE_NM)
 
 # --- The KP08 screws: their tightening torque -----------------------------------
-# Each #6-32 X 5/8 BHCS (TL-VN-65) clamps a KP08's cast foot to TL-28. The
-# listing's title says zinc alloy and its description cast iron; the jig
+# Each #8-32 X 5/8 SHCS (TL-VN-62; owner ruling Main 2026-11-06, option B,
+# expressly approves this second length) clamps a KP08's cast foot to TL-28.
+# The listing's title says zinc alloy and its description cast iron; the jig
 # takes the weaker, zinc (Zamak 3, yield 208 MPa, SOURCED: AZoM
 # https://www.azom.com/article.aspx?ArticleID=9565, read 2026-11-04). The
-# torque stays under Holo-Krome's 15 in·lbf for a #6 button head (SOURCED:
-# https://www.holo-krome.com/uploads/7/2/7/5/72754089/hk_torquedatachart.pdf,
-# read 2026-11-04). The head bears on the foot round the Ø5 hole with the
-# block floated fully to one side (kp08_screw.HOLE_FLOAT); the tap is the
-# worst-case full thread in TL-28's 6061.
+# head's least flat bearing (bracket_screw.HEAD_BEARING_DIA_MIN, .241 in: ASME
+# B18.3 Table 1 #8, A min .257 less K .008 each edge, note (12)) bears on
+# the foot round the Ø5 hole (UNVERIFIED, #2184) with the
+# block floated fully to one side (bracket_screw.HOLE_FLOAT); the tap is the
+# worst-case full thread in TL-28's 6061 top-face thread. The torque is kept
+# at 1.0 N·m for the zinc foot. This is a seating torque: the KP08-to-TL-28
+# joint's slip under thrust was never checked (an inherited open question,
+# not certified here).
 _ZAMAK_YIELD_MPA = 208.0
 KP08_SCREW_TORQUE_NM = 1.0
 KP08_SCREW_PRELOAD_N = KP08_SCREW_TORQUE_NM / (
     _NUT_FACTOR * fasteners.KP08_TO_BRACKET.major_mm / 1000.0
-)  # 1426
+)  # 1200
 KP08_SCREW_ENGAGEMENT_MIN = leadscrew.full_thread_min(
     fasteners.KP08_TO_BRACKET.length, leadscrew.KP08_FOOT_THICK, fasteners.KP08_TO_BRACKET.thread
 )  # 8.67
@@ -1554,7 +1691,7 @@ _KP08_STRIP_N = (
     * fasteners.KP08_TO_BRACKET.major_mm
     * KP08_SCREW_ENGAGEMENT_MIN
     * _AL_SHEAR_ULTIMATE_MPA
-)  # 14.8 kN
+)  # 17.6 kN
 
 
 def _circle_overlap_mm2(r1: float, r2: float, d: float) -> float:
@@ -1569,14 +1706,14 @@ def _circle_overlap_mm2(r1: float, r2: float, d: float) -> float:
     return a1 + a2 - kite
 
 
-KP08_FOOT_BEARING_MM2 = math.pi * kp08_screw.DIMS.bearing_edge_r**2 - _circle_overlap_mm2(
-    kp08_screw.DIMS.bearing_edge_r, leadscrew.KP08_HOLE_DIA / 2.0, kp08_screw.HOLE_FLOAT
-)  # 14.1
-KP08_FOOT_BEARING_MPA = KP08_SCREW_PRELOAD_N / KP08_FOOT_BEARING_MM2  # 101
-# The #6-32 tensile stress area, 0.00909 in² (ASME B1.1), against half the
-# 91255A150's 140,000 psi (SOURCED: McMaster-Carr page, read 2026-11-04).
-_KP08_SCREW_STRESS_AREA_MM2 = 0.00909 * trammel.INCH**2
-_KP08_SCREW_TENSILE_MPA = kp08_screw.TENSILE_PSI * 0.006894757
+KP08_FOOT_BEARING_MM2 = math.pi * bracket_screw.HEAD_BEARING_R**2 - _circle_overlap_mm2(
+    bracket_screw.HEAD_BEARING_R, leadscrew.KP08_HOLE_DIA / 2.0, bracket_screw.HOLE_FLOAT
+)
+KP08_FOOT_BEARING_MPA = KP08_SCREW_PRELOAD_N / KP08_FOOT_BEARING_MM2
+# The #8-32 tensile stress area, 0.0140 in² (ASME B1.1), against half the
+# 91251A196's tensile (bracket_screw.TENSILE_PSI).
+_KP08_SCREW_STRESS_AREA_MM2 = leadscrew.SHCS_8_STRESS_AREA_MM2
+_KP08_SCREW_TENSILE_MPA = bracket_screw.TENSILE_PSI * 0.006894757
 KP08_SCREW_MARGINS = {
     "foot bearing": _ZAMAK_YIELD_MPA / KP08_FOOT_BEARING_MPA,
     "TL-28 thread strip": _KP08_STRIP_N / _STRIP_SAFETY / KP08_SCREW_PRELOAD_N,
@@ -1589,8 +1726,6 @@ for _check, _margin in KP08_SCREW_MARGINS.items():
             f"the KP08 screws at {KP08_SCREW_TORQUE_NM} N·m fail their {_check} "
             f"budget ({_margin:.2f})"
         )
-if KP08_SCREW_TORQUE_NM >= 15.0 * _NM_PER_IN_LBF:
-    raise ValueError("the KP08 screw torque reaches the #6 button head's 15 in·lbf")
 _KP08_TORQUE = _torque(KP08_SCREW_TORQUE_NM)
 
 
@@ -1642,21 +1777,43 @@ def _item(stem: str) -> str:
     return f"(ITEM {ITEM_NUMBERS[stem]})"
 
 
-# Review jig-asm r2/r3: steps 10 and 11 name item 9 as its BOM row does.
-_HUB_PIN = f"{BOM_DESCRIPTIONS[HUB_PIN]} {_item(HUB_PIN)}"
-# TL-21 supplies the CL spot; the HUB is drilled in situ from the apex
-# (owner ruling 5, option A, 2026-11-01: carrier HUB_RADIAL_STACK). Fit doc
-# F16 (HUB, the purchased .4000 reamer) and F19 (CL, the owned .2490 reamer)
-# size the finished holes.
-_HUB_HOLE = (
-    f"HUB Ø{_length(carrier.HUB_HOLE_LIMITS[0], 4)}-"
-    f"{_length(carrier.HUB_HOLE_LIMITS[1], 4)} THRU, FOR THE {_HUB_PIN}, "
-    "BONDED AT STEP 11"
+# The rocker-arm process plan (cad/process/ch_rocker_arm/plan.toml, the held
+# route for MHA-CH-06 and its MHA-CH-13 strap) owns the blank, its chords, its
+# loose CL/CR holes and the strap hub's drill/ream with its tool envelope;
+# TL-00 cites its operations and repeats none of its numbers.
+PROCESS_PLAN = "MHA-CH-06 PLAN"
+# The in-situ HUB position (owner ruling 3, 2026-11-07): step 10 taps the
+# carrier's HUB there and every strap's hub hole is drilled and reamed at the
+# same DRO setting, so their relative eccentricity is the DRO's repeatability,
+# not an independent table tolerance (carrier.HUB_RADIAL_STACK).
+_HUB_DRO = (
+    f"X 0, Y {_length(carrier.HUB_OFFSET_PRINTED, carrier.HUB_OFFSET_PLACES)} "
+    f"±{_length(carrier.HUB_OFFSET_BAND, carrier.HUB_OFFSET_PLACES)}"
 )
-_CL_HOLE = (
-    f"CL Ø{_length(carrier.CL_DOWEL_DIA + min(carrier.CL_HOLE_BAND), 4)}-"
-    f"{_length(carrier.CL_DOWEL_DIA + max(carrier.CL_HOLE_BAND), 4)} THRU, FOR THE "
-    f"1/4 X 1 DOWEL ({_length(cl_dowel.DIA_MIN, 4)}-{_length(cl_dowel.DIA_MAX, 4)})"
+_STRAP_CLAMPS = f"{_CLAMP_SCREW} {_item(RAIL_SCREW)}"
+# ONE ordinary stop-axis station band applies in the carrier frame, before
+# spotting the other riser holes (riser.STOP_RAW_Y_LIMITS). Steps 6/10 retain
+# spindle-origin DRO zero: transform the targets at the symmetric inner pose,
+# rather than printing carrier coordinates as machine readings.
+_STOP_AXIS_PLACES = 2
+_STOP_AXIS_BAND = printed_band_mm(_STOP_AXIS_PLACES, unit=UNIT)
+if abs(
+    riser.STOP_RAW_Y_LIMITS[1] - riser.STOP_PIN_CARRIER_POINTS[0][1]
+    - riser.STOP_PIN_DIA_LIMITS[1] / 2.0 - riser.STOP_PIN_TILT_RADIUS - _STOP_AXIS_BAND
+) > 1e-9:
+    raise AssertionError("the stop-axis band is not the riser's stop-chain band")
+_STOP_SYMMETRIC_POSE = trammel.carrier_pose("inner", 0.0)
+STOP_PIN_DRO_POINTS = tuple(
+    _STOP_SYMMETRIC_POSE.to_machine(point) for point in riser.STOP_PIN_CARRIER_POINTS
+)
+_STOP_X = {abs(x) for x, _y in STOP_PIN_DRO_POINTS}
+_STOP_Y = {y for _x, y in STOP_PIN_DRO_POINTS}
+if len(_STOP_X) != 1 or len(_STOP_Y) != 1:
+    raise AssertionError("the stop pins no longer stand symmetric on one Y")
+_STOP_DRO = (
+    f"X ±{_length(_STOP_X.pop(), _STOP_AXIS_PLACES)}, "
+    f"Y {_length(_STOP_Y.pop(), _STOP_AXIS_PLACES)} "
+    f"±{_length(_STOP_AXIS_BAND, _STOP_AXIS_PLACES)}"
 )
 # The shared stud REWORK sheet points to this installed-stack acceptance.
 OPERATION_SHEET_NUMBER = 9
@@ -1669,37 +1826,53 @@ SNUG_FASTENERS = (
     RAIL_SCREW,
     CARRIAGE_SCREW,
     RISER_SCREW,
-    CLAMP_SCREW,
 )
 _SNUG_ITEMS = sorted(int(ITEM_NUMBERS[stem]) for stem in SNUG_FASTENERS)
 GENERAL_TORQUE_NOTE = (
-    "TORQUE WHERE NO STEP STATES ONE (ITEMS "
-    f"{', '.join(map(str, _SNUG_ITEMS[:-1]))} AND {_SNUG_ITEMS[-1]}): RUN "
-    "EACH SCREW OR NUT IN SNUG BY HAND ON A STANDARD-LENGTH HEX KEY OR "
-    "WRENCH, NO EXTENSION."
+    "UNSPECIFIED TORQUES (ITEMS "
+    f"{', '.join(map(str, _SNUG_ITEMS[:-1]))} AND {_SNUG_ITEMS[-1]}): "
+    "SNUG BY HAND WITH A STANDARD-LENGTH HEX KEY OR WRENCH; NO EXTENSION."
 )
+# Keep sheets 7–8 at the normal note size and paragraph spacing. The BOM owns
+# the shim SKU/thickness buy list; P1 cites it rather than printing it twice.
+# Step 1 cites its documents by Number (TL-00 review 62753c5e): the base
+# bar's process plan and the rail kit's receipt sheet, whose note [A] states
+# the counterbore-to-end wall each trimmed rail keeps.
+# A literal row (base_bar_spec's convention): drawing closures track this
+# concrete registry row, not a dynamic read of another part's.
+BASE_BAR_NUMBER = _config.parts("ch-rocker-arm-tl-oblique-base-bar")["number"]
+if base_bar.PART_NAME != "ch-rocker-arm-tl-oblique-base-bar":
+    raise AssertionError("step 1's base-bar Number reads another part's row")
+RAIL_RECEIPT_REFERENCE = f"{base_bar.RAIL_NUMBER} SHEET {guide_rail.RECEIPT_SHEET}"
 ASSEMBLY_STEPS = (
-    f"1. SCREW AN {guide_rail.STYLE} RAIL {_item(RAIL)} ON EACH BASE BAR WITH "
-    f"{trammel.RAIL_HOLE_COUNT} {_RAIL_SCREW} {_item(RAIL_SCREW)}, NEAR ENDS FLUSH: "
-    "ONE BAR AS DRAWN FOR RAIL 1, THE OTHER TURNED OVER FOR RAIL 2, "
-    "ITS COUNTERBORES UP. SCREW AN END BRACKET "
-    f"{_item(END_BRACKET)} ON RAIL 1'S BAR AT EACH KP08 STATION, "
-    f"{len(leadscrew.BAR_SCREW_LATERALS)} {_BAR_SCREW} "
-    f"{_item(BRACKET_SCREW)} PER BRACKET FROM BELOW, "
-    f"{_torque(leadscrew.BAR_SCREW_TORQUE_NM)}.",
-    "2. SET BOTH BARS ON THE TABLE, NEAR ENDS TOWARD THE SPINDLE. USE TWO "
-    f"UNCUT {fasteners.HOLD_DOWN_STUD_THREAD} STUDS {_item(HOLD_DOWN_STUD)} "
-    "PER BAR IN THE OUTER T-SLOTS, IN T-NUTS "
-    f"{_item(T_NUT)} UNDER FINGER-TIGHT FLANGE NUTS {_item(FLANGE_NUT)}. "
-    "THE STUDS STAY UNCUT UNTIL STEP 13B; THERE HD3 CUTS EACH TO ITS BOM "
-    f"LENGTH, {_length(hold_down_stud.LENGTH, hold_down_stud.LENGTH_PLACES)}. UNTIL THEN FOLLOW HD1 FOR "
-    "UNCUT-STOCK OBSTRUCTIONS.",
-    # Owner decisions on #2177: the kit's rails each arrive with two
-    # carriages; the play check picks the pair the jig keeps, and a carriage
-    # off a rail only ever rides the kit's plastic false rail (loading arbor).
-    f"3. EACH RAIL ARRIVES WITH 2 GREASED {carriage.STYLE} CARRIAGES "
+    # Select carriages and finish all rail/bar preparation before fastening
+    # the rails/brackets or putting the bars on the machine table.
+    f"1. PREPARE RAILS PER THE {BASE_BAR_NUMBER} PROCESS PLAN AND "
+    f"{RAIL_RECEIPT_REFERENCE}. "
+    f"EACH RAIL ARRIVES WITH 2 GREASED {carriage.STYLE} CARRIAGES "
     f"{_item(CARRIAGE)}: ROCK ALL 4 SIDEWAYS UNDER AN INDICATOR; KEEP THE 2 "
-    "TIGHTEST, ONE PER RAIL. A CARRIAGE LEAVES A RAIL ONLY ONTO A KIT FALSE RAIL.",
+    "TIGHTEST, ONE PER RAIL. A CARRIAGE LEAVES A RAIL ONLY ONTO A KIT FALSE RAIL. "
+    f"IF NONE MEETS {trammel.CARRIAGE_PLAY_TIR_MAX:.2f} MM, FIT A PRELOADED (Z0/ZA) "
+    f"{carriage.STYLE} CARRIAGE. "
+    "TRIM EACH RAIL TO ITS ACTUAL BAR, FLUSH BOTH ENDS; CHECK EACH END "
+    f"COUNTERBORE WALL {guide_rail.WALL_ACCEPTANCE_MM:.1f} MM MIN "
+    f"({RAIL_RECEIPT_REFERENCE} NOTE [A]). "
+    "TRANSFER ITS HOLES TO THAT BAR PER THAT PLAN; "
+    "KEEP EACH PAIR IDENTIFIED. ALL EIGHT SCREWS MUST ENTER FREELY BY HAND "
+    "WITHOUT MOVING THE RAIL. CLEAN ALL CUTTING GRIT BEFORE RELOADING.",
+    f"2. FIT EACH {guide_rail.STYLE} RAIL {_item(RAIL)} WITH "
+    f"{trammel.RAIL_HOLE_COUNT} {_RAIL_SCREW} {_item(RAIL_SCREW)}, NEAR ENDS FLUSH. "
+    f"BASE BAR 1 {_item(BASE_BAR_1)}: AS DRAWN, RAIL 1. BASE BAR 2 "
+    f"{_item(BASE_BAR_2)}: TURNED OVER, RAIL 2; PLAN MIRROR OF BAR 1. "
+    f"AT EACH KP08 STATION ON BAR 1, FIT AN END BRACKET {_item(END_BRACKET)} "
+    f"WITH {len(leadscrew.BAR_SCREW_LATERALS)} {_BAR_SCREW} {_item(PILLOW_BLOCK_SCREW)} "
+    f"FROM BELOW, NO WASHERS, {_torque(leadscrew.BAR_SCREW_TORQUE_NM)}.",
+    "3. SET BARS ON THE TABLE, NEAR ENDS TOWARD THE SPINDLE. PER BAR, FIT "
+    f"2 UNCUT {fasteners.HOLD_DOWN_STUD_THREAD} STUDS {_item(HOLD_DOWN_STUD)} "
+    f"IN OUTER T-SLOT T-NUTS {_item(T_NUT)}, FLANGE NUTS {_item(FLANGE_NUT)} FINGER-TIGHT. "
+    "KEEP STUDS UNCUT UNTIL 13B/HD3; CUT TO BOM LENGTH "
+    f"{_length(hold_down_stud.LENGTH, hold_down_stud.LENGTH_PLACES)} THERE. "
+    "FOLLOW HD1 FOR UNCUT-STOCK OBSTRUCTIONS.",
     f"4. FIT THE FEED BLOCK {_item(FEED_BLOCK)} ON RAIL 1'S CARRIAGE, "
     f"THE PLAIN PIVOT BLOCK {_item(PIVOT_BLOCK)} ON RAIL 2'S, "
     "PIVOT COUNTERBORES TOWARD THE SPINDLE AND FEED LUG TOWARD THE COLUMN.",
@@ -1713,15 +1886,18 @@ ASSEMBLY_STEPS = (
     f"{_length(pivot_block.REACH_MIN, 3)}-{_length(pivot_block.REACH_MAX, 3)} "
     "OF THE CARRIAGE'S M4 X 5 AND NEVER BOTTOMS. "
     f"TEMPORARILY SEAT THE SHOULDER SCREWS {_item(PIVOT_SCREW)} FOR INDICATING.",
-    "6. ZERO THE DRO X AND Y ON THE SPINDLE ORIGIN (SHEET 1). AT EACH "
-    "ALIGNMENT-TABLE STATION, RUN THE TABLE UNTIL THE DRO READS ITS X AND Y, "
-    "SLIDE THE CARRIAGE UNTIL ITS SCREW SHOULDER CENTRES IN X UNDER A "
-    "SPINDLE-MOUNTED INDICATOR AND TAP THE BAR UNTIL IT CENTRES IN Y; "
-    "TIGHTEN THE HOLD-DOWN NUTS AND READ EACH STATION AGAIN. SET EACH SWEEP "
-    "LIMIT (SHEET 1) THE SAME WAY, CENTRING IN X ONLY, AND WITNESS-MARK EACH "
-    "BAR AT ITS CARRIAGE'S SPINDLE-END FACE, I OR O BY PASS.",
-    f"7. FIT EACH KP08 {_item(PILLOW_BLOCK)} WITH 2 {_KP08_SCREW} "
-    f"{_item(PILLOW_BLOCK_SCREW)}, LOOSE.",
+    "6. ZERO DRO X/Y AT THE SPINDLE ORIGIN (SHEET 1). AT EACH ALIGNMENT-TABLE "
+    "X/Y, CENTRE THE SHOULDER UNDER A SPINDLE INDICATOR: SLIDE THE CARRIAGE "
+    "IN X, TAP THE BAR IN Y. TIGHTEN HOLD-DOWN NUTS; RECHECK EVERY STATION. "
+    "SET EACH SWEEP LIMIT (SHEET 1) THE SAME WAY, CENTRING IN X ONLY. "
+    "WITNESS-MARK EACH BAR AT ITS CARRIAGE'S SPINDLE-END FACE, I OR O BY PASS.",
+    # Receipt foot bounds protect the whole upper reach from the opposed
+    # hand-tap cut and retain 1.5D full engagement at the thickest foot.
+    # The foot remains UNVERIFIED (#2184).
+    f"7. CHECK EACH KP08 {_item(PILLOW_BLOCK)} FOOT IS "
+    f"{_bound(end_bracket.KP08_FOOT_THICK_MIN, 3, up=True)} TO "
+    f"{_bound(end_bracket.KP08_FOOT_THICK_MAX, 3, up=False)} THICK AT ITS 2 HOLES. "
+    f"FIT EACH KP08 WITH 2 {_KP08_SCREW} {_item(PILLOW_BLOCK_SCREW)}, LOOSE.",
     # TL-00 review (farm 20261104T210601055Z, blocker): one linear order,
     # every cross-reference one way: F1A, 8A, F1B, F2, 8B, F3.
     # The Tr8 screw's stub and the hub's gap close its metric cut along the
@@ -1738,89 +1914,79 @@ ASSEMBLY_STEPS = (
     "ON A1/B1; SELECT SHIMS PER P1 AND COMPLETE P1-P3 (SHEET 8). RECORD HD1 "
     "H THROUGH THE COMPLETE INNER-PASS HAND SWEEP, MARK TO MARK (STEP 6), "
     "USING THE HANDWHEEL.",
-    # The carrier stays on its A1/B1 seats from step 9 to 13A: HUB and CL are
-    # finished in place on the running jig (carrier spec) and nothing removes
-    # it before 13A. The HUB is set from the spindle origin (the apex) by
-    # the printed offset, so the pin spacing moves it with the cut.
-    f"10. WITH THE CARRIER {_item(CARRIER)} STILL ON A1/B1 THROUGH STEP 11, "
-    "FEED IT TO THE SYMMETRIC POSITION AND RUN THE TABLE UNTIL THE DRO READS "
-    f"X 0, Y {_length(carrier.HUB_OFFSET_PRINTED, carrier.HUB_OFFSET_PLACES)} "
-    f"±{_length(carrier.HUB_OFFSET_BAND, carrier.HUB_OFFSET_PLACES)}. "
-    "MATCH-DRILL AND REAM THE HUB THERE, THEN THE CL HOLE OFF ITS SPOT, IN "
-    f"ONE SETUP SQUARE TO THE CARRIER TOP: {_HUB_HOLE}; {_CL_HOLE}.",
-    "11. CLAMP THE RISER ON THE CARRIER AND SPOT ITS "
-    f"{len(riser.SCREW_HOLES) + 3} HOLES FROM BELOW THROUGH THE FINISHED CARRIER "
-    "HOLES; FINISH TO MHA-CH-06-TL-24 AND FIT WITH "
+    # The carrier stays on its A1/B1 seats from step 9 to 13A: its HUB tap is
+    # made in place on the running jig and nothing removes it before 13A. The
+    # HUB is set from the spindle origin (the apex) by the printed offset, so
+    # the pin spacing moves it with the cut.
+    f"10. KEEP CARRIER {_item(CARRIER)} ON A1/B1 THROUGH STEP 11. "
+    "FEED TO SYMMETRIC POSITION; MOVE TABLE UNTIL THE DRO READS "
+    f"{_HUB_DRO}. RECORD IT: EVERY STRAP'S HUB HOLE IS DRILLED AND REAMED "
+    "THERE (O5). SPINDLE-GUIDED, SPOT, TAP-DRILL AND TAP THE CARRIER'S HUB "
+    f"{carrier.HUB_THREAD} THRU THERE, NO COUNTERBORE. CL AND CR ARE THE "
+    "CARRIER DRAWING'S ORDINARY TAPS; DO NOT REDRILL.",
+    f"11. AT THE STEP 10 SYMMETRIC POSITION, STAND THE {QUANTITIES[STOP_PIN]} "
+    f"STOP PINS {_item(STOP_PIN)} CHAMFERED END DOWN IN THE RISER'S STOP HOLES "
+    f"(DRILLED FIRST, {carrier.RISER_NUMBER}); SET THE RISER ON THE CARRIER SO "
+    f"THE PIN AXES READ DRO {_STOP_DRO} AND CLAMP IT. ONLY THEN SPOT "
+    f"{len(riser.SCREW_HOLES) + len(STRAP_CLAMP_ROLES)} THROUGH-HOLE CENTRES "
+    f"FROM BELOW. FINISH TO {carrier.RISER_NUMBER}; FIT WITH "
     f"{len(riser.SCREW_HOLES)} {_RISER_SCREW}S {_item(RISER_SCREW)}. "
-    f"CUT THE {_HUB_PIN} TO "
-    f"{_length(hub_pin.CUT_LENGTH, hub_pin.CUT_PLACES)}; "
-    "DEBURR THE CUT END ONLY, CUT END DOWN, FACTORY END UP. CLEAN AND BOND "
-    f"WITH LOCTITE 638; SET ITS FACTORY TOP WITH A {_length(hub_pin.TIP_SET, 3)} "
-    f"GAUGE ABOVE THE RISER ({_length(hub_pin.TIP_SET, 3)} +/-"
-    f"{_length(hub_pin.TIP_SET_BAND, 3)}); LET THE BOND CURE BEFORE USE. "
-    f"PRESS THE CL DOWEL {_item(CL_DOWEL)} CHAMFERED END FIRST DOWN UNTIL ITS "
-    f"ROUND TIP IS {_length(cl_dowel.TIP_SET_MIN, 3)}-"
-    f"{_length(cl_dowel.TIP_SET_MAX, 3)} ABOVE THE RISER. "
-    f"CHECK THE {carrier.STRAP_NUMBER} STRAP SEATS FLAT, LOCATES AND SLIDES OFF; "
-    "THE CL TIP MUST NOT STAND ABOVE IT.",
-    f"12. BOLT THE FEED LEVER ON WITH 2 {_LEVER_SCREW} {_item(LEVER_SCREW)} "
-    f"ON WEDGE-LOCK PAIRS {_item(LEVER_LOCK_WASHER)}, {_LEVER_TORQUE}, "
-    "GRIP TOWARD THE OPERATOR. THE CR CLAMP SCREW "
-    f"{_item(CLAMP_SCREW)}, FITTED AT EACH WORK LOADING, GOES THROUGH WORK, "
-    "STRAP AND RISER INTO THE CARRIER. "
-    "FEED WITH THE HANDWHEEL; DO NOT FORCE THE LEVER AGAINST THE ENGAGED NUT.",
+    "KEEP BOTH STOP PINS LOOSE IN THEIR HOLES. OMIT THE TOP-HAT WASHER AND "
+    "THE CL, CR AND HUB SCREWS UNTIL O4.",
+    f"12. FIT FEED LEVER WITH 2 {_LEVER_SCREW} {_item(LEVER_SCREW)} "
+    f"AND WEDGE-LOCK PAIRS {_item(LEVER_LOCK_WASHER)}, {_LEVER_TORQUE}; "
+    f"GRIP TOWARD OPERATOR. THE CL, CR AND HUB {_STRAP_CLAMPS} ARE FITTED "
+    "AT EACH WORK LOADING (O4-O6). "
+    "HANDWHEEL FEED; NEVER FORCE LEVER AGAINST ENGAGED NUT.",
     f"13A. FIT A2/B2 PER O1; COMPLETE HD1 (SHEET {OPERATION_SHEET_NUMBER}).",
     # Review jig-asm r1/r2 (2026-11-02): the carrier stays off from 13B
     # through HD3, so 13B states only O1's removal half and 13C its refit.
     "13B. ISOLATE THE SPINDLE, SUPPORT THE CARRIER, REMOVE BOTH SHOULDER "
     "SCREWS AND LIFT IT OFF; KEEP IT OFF AND REWORK STUDS PER HD2-HD3.",
-    "13C. MOVE THE CARRIAGES UNTIL A2/B2 LINE UP OVER THE BLOCK COUNTERBORES, "
+    "13C. MOVE CARRIAGES TO ALIGN A2/B2 OVER BLOCK COUNTERBORES; "
     "LOWER THE CARRIER ONTO THEM, REFIT BOTH SCREWS PER P2 AND CHECK P1-P3; "
     "DO HD4 AND THE CHECKS.",
     "13D. RETURN TO A1/B1 PER O1; REPEAT HD4 AND THE CHECKS.",
 )
 ASSEMBLY_CHECKS = (
-    "CHECK: EVERY ALIGNMENT READING WITHIN "
-    f"±{_length(ALIGNMENT_BAND, ALIGNMENT_PLACES)} OF ITS TARGET.",
-    "CHECK: HANDWHEEL FEEDS EACH COMPLETE PASS WITHOUT BINDING; BOTH "
-    "CARRIAGES STAY ON THEIR RAILS AND ALL MOVING PARTS CLEAR STUDS, NUTS "
-    "AND COLUMN COVER.",
-    "CHECK: BOTH SHOULDER ENDS ARE SEATED, SCREWS TORQUED AND EACH HEAD "
-    "HAS THE P1 RUNNING GAP WITHOUT CLAMPING THE CARRIER.",
-    # The kit carriages' play moves the cut radius about 1:1 (trammel
-    # CARRIAGE_PLAY_*); the fit-up check stands in for preload (#2177).
-    "CHECK: WITH AN INDICATOR AT THE SHOULDER-SCREW HEAD, ROCK THE CARRIER BY "
-    "HAND SIDEWAYS TO THE RAIL; ACCEPT "
-    f"{trammel.CARRIAGE_PLAY_TIR_MAX:.2f} MM TIR MAX.",
+    "CHECK: ALIGNMENT READINGS WITHIN "
+    f"±{_length(ALIGNMENT_BAND, ALIGNMENT_PLACES)} OF TARGET.",
+    "CHECK: HANDWHEEL FEEDS BOTH FULL PASSES WITHOUT BINDING; CARRIAGES "
+    "STAY ON RAILS; MOVING PARTS CLEAR STUDS, NUTS AND COLUMN COVER.",
+    "CHECK: SHOULDER ENDS SEATED, SCREWS TORQUED; BOTH HEADS HAVE P1 "
+    "RUNNING GAP WITHOUT CLAMPING CARRIER.",
+    # Owner P1-A, 2026-11-07: .02 TIR, same #2177 shoulder-head sideways check.
+    "CHECK: INDICATE SHOULDER-SCREW HEAD; ROCK CARRIER SIDEWAYS TO RAIL BY "
+    f"HAND: {trammel.CARRIAGE_PLAY_TIR_MAX:.2f} MM TIR MAX.",
 )
 PIVOT_FIT_STEPS = (
-    f"P1. AT EACH SUPPORT SET A LOOSE SPACER {_item(PIVOT_SPACER)} ON THE "
-    "BLOCK, NO SHIMS. LOWER THE CARRIER ON THE CHOSEN HOLE PAIR, SEAT BOTH "
-    "SHOULDER SCREWS AND MEASURE EACH HEAD-TO-CARRIER GAP. LIFT THE CARRIER; "
-    f"UNDER EACH SPACER STACK SHIMS {_item(PIVOT_SHIM)}, FITTING "
-    "STOCK PER THE BUY LIST UNDER THE BOM ("
-    + ", ".join(f"{sku} {_length(t * _THOU, 3)}" for t, sku in sorted(pivot_shim.FIT_SKUS.items()))
-    + f"), THAT CLOSE ITS GAP TO {_length(PIVOT_RUNNING_GAP[0], 3)}-"
-    f"{_length(PIVOT_RUNNING_GAP[1], 3)} THROUGH FREE SWING: NOMINAL "
-    f"{pivot_shim.PER_SUPPORT} X {_length(pivot_shim.THICKNESS, 3)}, "
-    f"WORST CASE UP TO {_length(PIVOT_FIT_PACK_MAX, 3)} ({PIVOT_FIT_SHIMS_MAX} SHIMS). "
-    "REMEASURE. THE SAME SHIM SET MUST SERVE BOTH HOLE PAIRS; NO SHIM "
-    "BETWEEN SPACER AND CARRIER.",
-    f"P2. CLEAN THE {pivot_screw.THREAD} THREADS; APPLY LOCTITE 222. LIGHTLY GREASE THE "
-    "SHOULDERS AND SPACER FACES WITH NLGI 2 LITHIUM GREASE, KEEPING THREADS "
-    "CLEAN OF GREASE. "
-    f"SEAT THE SHOULDERS IN THEIR COUNTERBORES AND TORQUE TO "
-    f"{_torque(PIVOT_SCREW_TORQUE_NM)}. THE HEADS MUST NOT CLAMP THE CARRIER.",
-    "P3. HANDWHEEL-SWEEP THE FITTED HOLE PAIR'S COMPLETE PASS. CHECK THE GAP AT BOTH "
-    "SUPPORTS, FREE ROTATION AND POSITIVE LIFT CAPTURE UNDER BOTH HEADS. "
-    "REFIT A FAILED STACK; DO NOT LOOSEN A SEATED SCREW TO MAKE CLEARANCE.",
+    f"P1. SET A LOOSE SPACER {_item(PIVOT_SPACER)} ON EACH BLOCK, NO SHIMS. "
+    "LOWER CARRIER ON CHOSEN HOLE PAIR; SEAT BOTH SHOULDER SCREWS. MEASURE "
+    "EACH HEAD-TO-CARRIER GAP; LIFT CARRIER. UNDER EACH SPACER FIT SHIMS "
+    f"{_item(PIVOT_SHIM)} FROM THE BUY LIST UNDER THE BOM TO GIVE "
+    f"{_length(PIVOT_RUNNING_GAP[0], 3)}-{_length(PIVOT_RUNNING_GAP[1], 3)} GAP THROUGH FREE SWING. "
+    f"NOMINAL {pivot_shim.PER_SUPPORT} X {_length(pivot_shim.THICKNESS, 3)}; "
+    f"MAX PACK {_length(PIVOT_FIT_PACK_MAX, 3)} ({PIVOT_FIT_SHIMS_MAX} SHIMS). "
+    "REMEASURE. SAME SHIMS FOR BOTH HOLE PAIRS; NONE BETWEEN SPACER AND CARRIER.",
+    f"P2. CLEAN {pivot_screw.THREAD} THREADS; APPLY LOCTITE 222. LIGHTLY GREASE "
+    "SHOULDERS AND SPACER FACES WITH NLGI 2 LITHIUM GREASE; KEEP THREADS "
+    "GREASE-FREE. SEAT SHOULDERS IN COUNTERBORES; TORQUE "
+    f"{_torque(PIVOT_SCREW_TORQUE_NM)}. HEADS MUST NOT CLAMP CARRIER.",
+    "P3. HANDWHEEL-SWEEP FITTED PAIR'S FULL PASS: CHECK BOTH SUPPORT GAPS, "
+    "FREE ROTATION AND POSITIVE LIFT CAPTURE UNDER BOTH HEADS. REFIT A FAILED "
+    "STACK; NEVER LOOSEN A SEATED SCREW FOR CLEARANCE.",
 )
 # Sheet 2, under the BOM: what item 7's QTY counts and the fitting stock to
 # buy, and the owner's description note for the kit rails and carriages
 # (#2177, 2026-11-04), in three lines; the rail and carriage registry
-# records and inventory entries carry it word for word. No line is longer
-# than the shim buy list's 75 characters, the widest the field under the BOM
-# already prints.
+# records and inventory entries carry it word for word. Then one line names
+# the two base-bar rows' shared Number as two configurations, each on its own
+# TL-20 sheet in configuration order (TL-00 review 62753c5e). No line is
+# longer than the shim buy list's 75 characters, the widest the field under
+# the BOM already prints.
+_BASE_BAR_SHEETS = tuple(
+    base_bar.CONFIGURATIONS.index(configuration) + 1 for configuration in (base_bar.BAR1, base_bar.BAR2)
+)
 BOM_NOTE = "\n".join((
     f"ITEM {ITEM_NUMBERS[PIVOT_SHIM]}: SHIM FITTING STOCK, SELECTED PER P1.",
     f"BOM QTY. {pivot_shim.QUANTITY} IS THE NOMINAL PACK, {pivot_shim.PER_SUPPORT} X "
@@ -1835,9 +2001,13 @@ BOM_NOTE = "\n".join((
     "NUIBBYED-BRANDED, NOT GENUINE HIWIN. Z0 PRELOAD AND C ACCURACY NOT",
     "REQUIRED; ACCEPT BY FIT-UP PLAY CHECK "
     f"({trammel.CARRIAGE_PLAY_TIR_MAX:.2f} MM TIR MAX AT THE PIVOT).",
+    f"ITEMS {ITEM_NUMBERS[BASE_BAR_1]}-{ITEM_NUMBERS[BASE_BAR_2]}: ONE NUMBER, TWO CONFIGURATIONS "
+    f"({BASE_BAR_NUMBER} SHEETS {_BASE_BAR_SHEETS[0]}, {_BASE_BAR_SHEETS[1]}).",
 ))
 if int(ITEM_NUMBERS[CARRIAGE]) != int(ITEM_NUMBERS[RAIL]) + 1:
     raise AssertionError("the BOM note's kit items are no longer consecutive")
+if int(ITEM_NUMBERS[BASE_BAR_2]) != int(ITEM_NUMBERS[BASE_BAR_1]) + 1:
+    raise AssertionError("the BOM note's base-bar items are no longer consecutive")
 # F2's transfer drills, by the names the fitter asks for; TL-32's spec owns
 # their sizes (TRANSFER_SPOT_DIA, NUT_TAP_DRILL).
 _SPOT_DRILL = "#29"
@@ -1874,8 +2044,8 @@ FEED_FIT_STEPS = (
     f"RECEIPT LIMITS ON {feed_nut.REWORK_SHEET_REFERENCE}; REJECT ONE OUTSIDE "
     "THEM. FACE AND COUNTERSINK IT PER THAT SHEET; REJECT ONE OUTSIDE ITS "
     "FACED LENGTH.",
-    "F1B. AFTER STEP 8A, NUT SEAT FACE "
-    "TOWARD THE LUG, MOVE THE FEED CARRIAGE TO EACH TRAVEL END IN TURN AND "
+    "F1B. AFTER STEP 8A, SEAT THE NUT ON THE LUG'S FACE AWAY FROM THE SPINDLE, "
+    "BODY AWAY FROM THE LUG. MOVE THE FEED CARRIAGE TO EACH TRAVEL END AND "
     "ALIGN EACH KP08 SO THE SCREW RUNS CENTRED IN THE LUG'S "
     f"Ø{_length(feed_block.SCREW_CLEARANCE_DIA, feed_block.NUT_PATTERN_PLACES)} "
     f"CLEARANCE WITHOUT FORCING IT; TIGHTEN THE KP08 SCREWS TO {_KP08_TORQUE}, "
@@ -1896,9 +2066,11 @@ FEED_FIT_STEPS = (
     f"{_NUT_TORQUE}. IF THE SCREW BINDS, LOOSEN, RE-CENTRE AND RETIGHTEN; IF IT "
     "STILL BINDS, OPEN THE COUNTERSINKS PER "
     f"{feed_nut.REWORK_SHEET_REFERENCE}. GO TO STEP 8B.",
-    "F3. AFTER STEP 8B, WITH THE HANDWHEEL AND ALL SET SCREWS TIGHT, TURN THE "
-    "HANDWHEEL TO BOTH FEED-CARRIAGE TRAVEL ENDS: NO BINDING, NUT OR LUG "
-    "CONTACT WITH A KP08, AND NO MOVING PART CONTACT. REPEAT F1B-F2 IF IT BINDS.",
+    # End to end is the full feed-carriage travel. This three-line instruction
+    # preserves the installed checks without overrunning sheet 8's source view.
+    "F3. AFTER STEP 8B, WITH THE HANDWHEEL AND ALL SET SCREWS TIGHT, "
+    "FEED END TO END BY HANDWHEEL: NO BINDING, NUT OR LUG CONTACT WITH A "
+    "KP08, AND NO MOVING PART CONTACT. REPEAT F1B-F2 IF IT BINDS.",
 )
 
 # The studs' measurements, fit limits and installed acceptance, migrated from
@@ -1973,12 +2145,47 @@ OPERATION_STEPS = (
     "O2. SERVICE: SUPPORT THE CARRIER BEFORE REMOVING ITS TWO SCREWS. "
     "KEEP THE SELECTED SHIMS WITH THEIR SUPPORTS. AFTER REASSEMBLY REPEAT "
     "THE PIVOT GAP, FEED ALIGNMENT, HD4 AND ACTUAL TOOLING-CLEARANCE CHECKS.",
+    f"O3. SELF-CUT THE 6061 RISER WITH THE {trammel.RISER_CUTTER_IN} CUTTER "
+    "BEFORE LOADING WORK, THE TOP-HAT WASHER AND CL, CR AND HUB SCREWS OUT. "
+    "KEEP ALL FOUR RISER SCREWS AND BOTH STOP PINS FITTED. THE FINISHED BAND "
+    f"CLEARS THE {trammel.PART_CUTTER_IN} STRAP CUTTER BY "
+    f"{(trammel.RISER_CUTTER_DIA - trammel.PART_CUTTER_DIA) / 2.0:.2f} MM PER "
+    "SIDE; THE STRAP CUTTER DOES NOT CUT THE RISER.",
+    f"O4. EACH STRAP BLANK ARRIVES FACED, LAID OUT AND BANDSAWN PER {PROCESS_PLAN} "
+    "S0-S1, WITH NO HUB HOLE; ITS LOOSE CL/CR HOLES ARE TRANSFERRED AND "
+    "DRILLED OFF-JIG PER S2 OP20. "
+    "SEAT IT FLAT ON THE RISER, RAW EDGE TOWARD -Y AGAINST BOTH STOP PINS, "
+    "ALONG THE STRAP TO ITS END MARK; FIT THE CL AND CR "
+    f"{_STRAP_CLAMPS} DIRECTLY ON THE WORK AND TIGHTEN.",
+    f"O5. PER {PROCESS_PLAN} S2 OP30-OP40, MOVE TABLE TO THE STEP 10 DRO POSITION "
+    f"({_HUB_DRO}) AND, SPINDLE-GUIDED, DRILL AND REAM THE STRAP'S HUB HOLE "
+    "THRU INTO THE RISER'S RELIEF. NEVER REDRILL OR RETAP THE CARRIER.",
+    f"O6. SEAT THE TOP-HAT WASHER {_item(HUB_WASHER)} SPIGOT DOWN IN THE REAMED "
+    "HOLE, FLANGE FLAT ON THE STRAP. FIT THE HUB "
+    f"{_STRAP_CLAMPS} THROUGH IT INTO THE CARRIER'S HUB TAP; TORQUE "
+    f"{_torque(holding.HUB_TORQUE_NM)}; THE HEAD NEED NOT BEAR FULLY ON THE FLANGE. CUT "
+    f"PER {PROCESS_PLAN} S3 OP10-OP20, RETAINING ALL THREE CLAMPS THROUGH BOTH "
+    "PASSES. EACH START IS AN EDGE CUT WITH AIR BESIDE THE CUTTER, NEVER A "
+    "FULL-WIDTH SLOT OR PLUNGE.",
 )
+# The fixture's highest point over the strap: the uncut stock stop pins at
+# full length and tilt (holding.TOOLING_TOP_Z_MAX), above every clamp head.
+TOOLING_TOP_Z_MAX = holding.TOOLING_TOP_Z_MAX
+# The carrier-seated, tilted stock pin (holding.STOP_PIN_HEIGHT_MAX: L_MAX
+# plus D_MAX x the hole-play slope), not the bare stock length.
+_STOP_PIN_TOP_MAX = trammel.CARRIER_TOP_Z + holding.STOP_PIN_HEIGHT_MAX
+_HUB_HEAD_TOP_MAX = trammel.CARRIER_TOP_Z + holding.HUB_GRIP_LIMITS[1] + rail_screw.DIMS.head_h
+if not TOOLING_TOP_Z_MAX >= _STOP_PIN_TOP_MAX > max(_HUB_HEAD_TOP_MAX, *holding.CLAMP_TOP_Z.values()):
+    raise AssertionError("the stop pins no longer stand tallest over the strap")
+if holding.CLAMP_TOP_Z["CL"] != holding.CLAMP_TOP_Z["CR"]:
+    raise AssertionError("the CL and CR heads no longer stand at one height")
 CAPTURE_CHECKS = (
     "TOOLING CLEARANCE: BEFORE USE, WITH THE SPINDLE ISOLATED, CHECK THE "
     "ACTUAL SPINDLE, CUTTER, NON-CUTTING TOOL AND HOLDER AGAINST THE "
     "FIXTURE THROUGH BOTH PASSES AND THE ENTIRE USED Z RANGE, INCLUDING "
-    "BREAKTHROUGH AND RETRACTION. INCLUDE BOTH SHOULDER-SCREW HEADS. "
+    "BREAKTHROUGH AND RETRACTION. INCLUDE BOTH SHOULDER-SCREW HEADS, THE "
+    "CL, CR AND HUB SCREW HEADS, THE TOP-HAT WASHER AND BOTH STOP PINS AT "
+    "FULL HEIGHT. "
     "VERIFY VISIBLE OR MEASURED CLEARANCE AT EVERY CLOSEST APPROACH: "
     "NO SPINDLE/TOOL/HOLDER CONTACT WITH THE FIXTURE.",
     "KEEP THE REPEATED STEP 6 ACTUAL SPINDLE-AXIS REGISTER; REINDICATE AFTER "
@@ -1986,6 +2193,12 @@ CAPTURE_CHECKS = (
     f"REFERENCE TABLE HEIGHTS: WORK {_length(PART_TOP_Z, 3)}; SHOULDER-SCREW HEADS "
     f"{_length(PIVOT_HEAD_TOP_Z, 3)}, NOMINAL. "
     "SET CUTTING DEPTH FROM THE ACTUAL SEATED WORK, NOT THESE REFERENCES.",
+    f"CLAMP HEADS FROM TABLE: CL/CR {_length(holding.CLAMP_TOP_Z['CL'], 3)}, "
+    f"HUB {_length(holding.CLAMP_TOP_Z['hub'], 3)}, NOMINAL; THE STOP PIN TOPS "
+    f"STAND TALLEST, FIXTURE TOP {_bound(TOOLING_TOP_Z_MAX, 3, up=True)} MAX. "
+    f"TOP-HAT WASHER {holding.WASHER_CLEARANCE_MIN:.1f} MM MIN TO BOTH CUTTER "
+    "FLANKS. CHECK WITH THE WASHER AND CLAMPS FITTED, NOT AS FOR THE RISER "
+    "SELF-CUT.",
     "ACCEPTANCE: THE CARRIAGE/RAIL AND TABLE ANCHORS PASS THE ASSEMBLY CHECKS "
     "AFTER FINAL TIGHTENING (EVERY STEP 6 READING WITHIN "
     f"±{_length(ALIGNMENT_BAND, ALIGNMENT_PLACES)}; "
@@ -1998,8 +2211,7 @@ CAPTURE_CHECKS = (
 def _bar_corners(rail: int) -> list[tuple[float, float]]:
     """A bar's plan corners: the operator- and column-side edges (the rail
     off the centreline since the 2026-10-17 widening) at both ends. The bar
-    starts flush with its rail's near end and stops short of its far end
-    (``trammel.RAIL_OVERHANG``)."""
+    and its datum-trimmed rail share both end stations."""
     near, far = trammel.RAIL_NEAR_S, trammel.BASE_BAR_FAR_S
     edges = (trammel.BASE_BAR_OPERATOR_EDGE, trammel.BASE_BAR_COLUMN_EDGE)
     return [trammel.rail_point(rail, s, lat) for s in (near, far) for lat in edges]
@@ -2048,10 +2260,12 @@ def _component_local_boxes() -> dict[str, Box3]:
     nut_r = feed_nut.FLANGE_DIA_MAX / 2.0
     # The fitted nut's flange round its axis (+Y), seat face to faced end.
     nut_box = ((-nut_r, nut_r), (0.0, feed_nut.LENGTH_MAX), (-nut_r, nut_r))
+    bar_box = ((0.0, base_bar.BAR_LENGTH), (base_bar.LOW_SIDE_Y, base_bar.HIGH_SIDE_Y), (0.0, base_bar.BAR_THICK))
     boxes = {
-        BASE_BAR: ((0.0, base_bar.BAR_LENGTH), (base_bar.LOW_SIDE_Y, base_bar.HIGH_SIDE_Y), (0.0, base_bar.BAR_THICK)),
+        BASE_BAR_1: bar_box,
+        BASE_BAR_2: bar_box,
         RAIL: ((0.0, guide_rail.LENGTH), (-guide_rail.WIDTH / 2.0, guide_rail.WIDTH / 2.0), (0.0, guide_rail.HEIGHT)),
-        CARRIAGE: ((-carriage.LENGTH / 2.0 - carriage.NIPPLE_PROUD, carriage.LENGTH / 2.0 + carriage.PLUG_PROUD), (-carriage.WIDTH / 2.0, carriage.WIDTH / 2.0), (carriage.UNDERSIDE_Z, carriage.MOUNTING_FACE_Z)),
+        CARRIAGE: ((-carriage.LENGTH / 2.0 - carriage.PLUG_PROUD, carriage.LENGTH / 2.0 + carriage.NIPPLE_PROUD), (-carriage.WIDTH / 2.0, carriage.WIDTH / 2.0), (carriage.UNDERSIDE_Z, carriage.MOUNTING_FACE_Z)),
         PIVOT_BLOCK: ((pivot_block.BLOCK_X0, pivot_block.BLOCK_X1), (-pivot_block.BLOCK_WIDTH / 2.0, pivot_block.BLOCK_WIDTH / 2.0), (0.0, pivot_block.BLOCK_HEIGHT)),
         FEED_BLOCK: ((pivot_block.BLOCK_X0, pivot_block.BLOCK_X1), (feed_block.LUG_Y0, pivot_block.BLOCK_WIDTH / 2.0), (0.0, pivot_block.BLOCK_HEIGHT)),
         PIVOT_SCREW: ((-pivot_screw.HEAD_DIA / 2.0, pivot_screw.HEAD_DIA / 2.0), (-pivot_screw.HEAD_DIA / 2.0, pivot_screw.HEAD_DIA / 2.0), (-pivot_screw.THREAD_LENGTH, pivot_screw.SHOULDER_LENGTH + pivot_screw.HEAD_HEIGHT)),
@@ -2059,9 +2273,16 @@ def _component_local_boxes() -> dict[str, Box3]:
         PIVOT_SHIM: ((-pivot_shim.OD / 2.0, pivot_shim.OD / 2.0), (-pivot_shim.OD / 2.0, pivot_shim.OD / 2.0), (0.0, pivot_shim.THICKNESS)),
         CARRIER: (carrier.OUTLINE_X, (-carrier.THICKNESS, 0.0), (-carrier.OUTLINE_Y[1], -carrier.OUTLINE_Y[0])),
         RISER: ((0.0, riser.BLANK_LENGTH), (0.0, riser.BLANK_WIDTH), (0.0, riser.THICKNESS)),
-        HUB_PIN: ((-hub_pin.DIA / 2.0, hub_pin.DIA / 2.0), (-hub_pin.DIA / 2.0, hub_pin.DIA / 2.0), (0.0, hub_pin.CUT_LENGTH)),
+        # The top-hat washer: flange above its seat face, spigot below it.
+        HUB_WASHER: ((-hub_washer.OD / 2.0, hub_washer.OD / 2.0), (-hub_washer.OD / 2.0, hub_washer.OD / 2.0), (-hub_washer.SPIGOT_LENGTH, hub_washer.THICK)),
         FEED_LEVER: ((0.0, feed_lever.LEVER_LENGTH), (0.0, feed_lever.LEVER_THICK), (-feed_lever.LEVER_WIDTH, 0.0)),
-        CL_DOWEL: _axis_y_box(cl_dowel.DIA_MAX / 2.0, 0.0, cl_dowel.LENGTH),
+        # The supplier's maximum pin, tilted in its loose hole: the holding
+        # proof's height and full top float about its nominal axis.
+        STOP_PIN: _axis_y_box(
+            riser.STOP_PIN_DIA_LIMITS[1] / 2.0 + holding.STOP_PIN_TOP_FLOAT_MAX,
+            0.0,
+            holding.STOP_PIN_HEIGHT_MAX,
+        ),
         END_BRACKET: ((0.0, leadscrew.BRACKET_LENGTH), (-leadscrew.BRACKET_WIDTH / 2.0, leadscrew.BRACKET_WIDTH / 2.0), (0.0, leadscrew.BRACKET_THICK)),
         LEADSCREW: _axis_y_box(leadscrew_stock.MAJOR_DIA / 2.0, 0.0, leadscrew_stock.LENGTH),
         FEED_NUT: nut_box,
@@ -2074,10 +2295,10 @@ def _component_local_boxes() -> dict[str, Box3]:
         RISER_SCREW: _axis_y_box(riser_screw.DIMS.head_dia / 2.0, -riser_screw.DIMS.length, 0.0),
     }
     for stem, screw in (
-        (RAIL_SCREW, rail_screw), (BRACKET_SCREW, bracket_screw),
+        (RAIL_SCREW, rail_screw),
         (CARRIAGE_SCREW, carriage_screw),
-        (PILLOW_BLOCK_SCREW, kp08_screw),
-        (CLAMP_SCREW, clamp_screw), (LEVER_SCREW, lever_screw),
+        (PILLOW_BLOCK_SCREW, bracket_screw),
+        (LEVER_SCREW, lever_screw),
     ):
         radius = max(screw.DIMS.head_dia, screw.DIMS.major_dia) / 2.0
         boxes[stem] = _axis_y_box(radius, -screw.DIMS.length, screw.DIMS.head_h)
@@ -2088,29 +2309,37 @@ def _component_local_boxes() -> dict[str, Box3]:
 
 def _component_label(stem: str, index: int) -> str:
     names = {
-        BASE_BAR: "base bar", RAIL: "rail", CARRIAGE: "carriage",
+        BASE_BAR_1: "base bar 1", BASE_BAR_2: "base bar 2",
+        RAIL: "rail", CARRIAGE: "carriage",
         PIVOT_BLOCK: "pivot block 2", FEED_BLOCK: "feed block",
         PIVOT_SCREW: "pivot screw", PIVOT_SPACER: "pivot spacer",
         PIVOT_SHIM: "pivot shim",
         CARRIER: "carrier", RISER: "riser", FEED_LEVER: "feed lever",
-        HUB_PIN: "HUB locator", CL_DOWEL: "CL dowel",
+        HUB_WASHER: "HUB top-hat washer", STOP_PIN: "stop pin",
         FEED_NUT: "feed nut",
         LEADSCREW: "screw", HANDWHEEL: "handwheel",
         END_BRACKET: "end bracket", PILLOW_BLOCK: "pillow block",
         HOLD_DOWN_STUD: "hold-down stud", T_NUT: "T-nut", FLANGE_NUT: "flange nut",
-        RAIL_SCREW: "rail screw", BRACKET_SCREW: "bracket screw",
+        RAIL_SCREW: "rail screw",
         CARRIAGE_SCREW: "carriage screw",
         PILLOW_BLOCK_SCREW: "pillow block screw",
-        RISER_SCREW: "riser screw", CLAMP_SCREW: "clamp screw",
+        RISER_SCREW: "riser screw",
         LEVER_SCREW: "lever screw",
         LEVER_LOCK_WASHER: "lever lock washer",
     }
+    if stem == PILLOW_BLOCK_SCREW and index >= len(PILLOW_BLOCK_SCREW_PLACEMENTS):
+        return f"bar screw {index - len(PILLOW_BLOCK_SCREW_PLACEMENTS) + 1}"
+    if stem == RAIL_SCREW:
+        for role, clamp in STRAP_CLAMP_SCREW_INDICES.items():
+            if index == clamp:
+                return f"{role} clamp screw"
     name = names[stem]
     return f"{name} {index + 1}" if QUANTITIES[stem] > 1 else name
 
 
 def _motion_root(stem: str, index: int) -> tuple[str, int]:
-    while stem in LOCKED_TO:
+    """The carriage or carrier an occurrence rides, or itself when fixed."""
+    while stem in LOCKED_TO and LOCKED_TO[stem][index] is not None:
         stem, index = LOCKED_TO[stem][index]
     return stem, index
 
@@ -2146,6 +2375,8 @@ def _component_records(
             continue
         corners = _box_corners(boxes[stem])
         for index, placement in enumerate(PLACEMENTS[stem]):
+            if pass_name is not None and not is_moving(stem, index):
+                continue
             if pass_name is not None:
                 placement = _swept_placement(stem, index, pass_name, theta)
             label = _component_label(stem, index)
@@ -2192,7 +2423,7 @@ def feed_nut_travel_gaps() -> dict[str, float]:
     )
     gaps = {}
     for label, (stem, index, points) in records.items():
-        if stem in MOVING:
+        if is_moving(stem, index):
             if _motion_root(stem, index)[0] == CARRIER:
                 gaps[label] = min(p[2] for p in points) - swept[2][1]
         elif stem != LEADSCREW:
@@ -2214,6 +2445,34 @@ MODEL_EXTENT = _model_extent()
 
 # --- Clearance check over the full sweep of both passes -------------------------
 SWEEP_SAMPLES = 2001  # per pass, endpoints included: a 0.011 degree step
+
+# Continuous (not sampled) separating axes for the centred rail branches.
+# Include the nipple beyond either seal in each oriented carriage rectangle.
+# s_A+s_B = 4 R sin(alpha/2) cos(theta/2), least at a pass endpoint.
+_CARRIAGE_HALF_ENVELOPE = carriage.LENGTH / 2 + max(carriage.NIPPLE_PROUD, carriage.PLUG_PROUD)
+CARRIAGE_PAIR_GAPS = {
+    name: (4 * radius * math.sin(trammel.HALF_ALPHA) * math.cos(trammel.SWEEP[name] / 2)
+           - 2 * trammel.PIN_OFFSET - 2 * _CARRIAGE_HALF_ENVELOPE)
+    * math.cos(trammel.HALF_ALPHA) - carriage.WIDTH * math.sin(trammel.HALF_ALPHA)
+    for name, radius in trammel.PASS_RADIUS.items()
+}
+_BLOCK_SIDE_BAND = 2 * printed_band_mm(2, unit=pivot_block.UNIT)
+CENTRED_BLOCK_CLEARANCES = {
+    "KP08 lateral": leadscrew.SCREW_LATERAL - leadscrew.KP08_LENGTH / 2
+    - leadscrew.KP08_MARGIN - pivot_block.BLOCK_WIDTH / 2
+    - _BLOCK_SIDE_BAND - leadscrew.KP08_STATION_ENVELOPE,
+    "leadscrew lateral": leadscrew.SCREW_LATERAL - leadscrew.SCREW_MAJOR_DIA / 2
+    - pivot_block.BLOCK_WIDTH / 2 - _BLOCK_SIDE_BAND - leadscrew.KP08_STATION_ENVELOPE,
+    "far stud lateral": trammel.HOLD_DOWN_LATERAL - trammel.HOLD_DOWN_ADJUST
+    - flange_nut.FLANGE_DIA / 2 - pivot_block.BLOCK_WIDTH / 2 - _BLOCK_SIDE_BAND,
+    "lug to near stud": trammel.CARRIAGE_TRAVEL[0] + feed_block.LUG_X0
+    - trammel.HOLD_DOWN_NEAR_S - flange_nut.FLANGE_DIA / 2
+    - feed_block.LUG_POSITION_BAND - printed_band_mm(2, unit=base_bar.UNIT),
+    "lug above bracket": trammel.CARRIAGE_HEIGHT - leadscrew.BRACKET_THICK
+    - end_bracket.THICK_STOCK_BAND,
+}
+if min((*CARRIAGE_PAIR_GAPS.values(), *CENTRED_BLOCK_CLEARANCES.values())) <= 0.0:
+    raise AssertionError("centred rail branches lose a continuous separating axis")
 
 
 def sweep_thetas(pass_name: str, samples: int = SWEEP_SAMPLES) -> Iterator[float]:
@@ -2254,17 +2513,7 @@ def moving_outlines(
     })
     stations = carriage_stations(pass_name, theta)
     out["feed block"] = [
-        trammel.rail_point(1, stations[1] + x, -y)
-        for x, y in (
-            (pivot_block.BLOCK_X0, feed_block.LUG_Y1),
-            (feed_block.LUG_X0, feed_block.LUG_Y1),
-            (feed_block.LUG_X0, feed_block.LUG_Y0),
-            (feed_block.LUG_X1, feed_block.LUG_Y0),
-            (feed_block.LUG_X1, feed_block.LUG_Y1),
-            (pivot_block.BLOCK_X1, feed_block.LUG_Y1),
-            (pivot_block.BLOCK_X1, pivot_block.BLOCK_WIDTH / 2.0),
-            (pivot_block.BLOCK_X0, pivot_block.BLOCK_WIDTH / 2.0),
-        )
+        trammel.rail_point(1, stations[1] + x, -y) for x, y in feed_block.PLAN_OUTLINE
     ]
     out["pivot block 2"] = _rail_rect(
         2, stations[2] + pivot_block.BLOCK_X0,
@@ -2273,9 +2522,6 @@ def moving_outlines(
     return out
 
 
-def hub_locator(pass_name: str, theta: float) -> tuple[tuple[float, float], float]:
-    """Machine XY centre and radius of the straight bonded gauge pin."""
-    return trammel.carrier_pose(pass_name, theta).to_machine(trammel.HUB), hub_pin.DIA / 2.0
 
 
 def fixed_outlines() -> dict[str, list[tuple[float, float]]]:
@@ -2424,7 +2670,11 @@ def carriage_origin(rail: int, station: float) -> Point3:
 
 
 def sweep_poses(pass_name: str) -> list[dict]:
-    """``pass_name``'s poses in visit order; ``check`` marks each first visit."""
+    """Pass poses in visit order; ``check`` marks each first visit.
+
+    Origins contain moving occurrences, not whole supplier families: the
+    three strap clamps move, while their rail/bar screw siblings stay fixed.
+    """
     sweep = trammel.SWEEP[pass_name]
     seen: set[int] = set()
     poses = []
@@ -2436,11 +2686,13 @@ def sweep_poses(pass_name: str) -> list[dict]:
                 "theta_rad": theta,
                 "drive_mm": slide_distance(stations[SLIDE_RAIL]),
                 "check": index not in seen,
-                "carriages": {
-                    instance_name(CARRIAGE, RAILS.index(rail)): list(
-                        carriage_origin(rail, station)
+                "origins": {
+                    instance_name(family, occurrence): list(
+                        _swept_placement(family, occurrence, pass_name, theta)[0]
                     )
-                    for rail, station in stations.items()
+                    for family in BOM_ORDER if family in MOVING
+                    for occurrence in range(QUANTITIES[family])
+                    if is_moving(family, occurrence)
                 },
             }
         )
@@ -2478,8 +2730,15 @@ for (_origin, _rows), _pin in zip(BLOCK_PLACEMENTS, PIVOT_SCREW_ORIGINS):
         raise AssertionError("pivot counterbore is not on its screw axis")
 if abs(trammel.PIVOT_BLOCK_TOP_Z + trammel.PIVOT_SHIM_PACK + pivot_spacer.LENGTH - trammel.CARRIER_UNDERSIDE_Z) > 1e-9:
     raise AssertionError("shim and spacer do not support the nominal carrier seat")
-if not HUB_PIN_TOP_Z < PART_TOP_Z:
-    raise AssertionError("the HUB pin stands above the strap")
+# Each stop pin stands in its riser stop hole and each strap clamp over its
+# riser clearance (the riser's own model frame carried by its placement).
+for (_origin, _rows), _hole in zip(
+    (*STOP_PIN_PLACEMENTS, *STRAP_CLAMP_SCREW_PLACEMENTS),
+    (*riser.STOP_PIN_HOLES, riser.CL_HOLE, riser.CR_HOLE, riser.HUB_HOLE),
+    strict=True,
+):
+    if math.dist(_origin[:2], frame_point((RISER_ORIGIN, RISER_ROWS), (*_hole, 0.0))[:2]) > 1e-9:
+        raise AssertionError("a stop pin or strap clamp is off its riser hole")
 
 
 def bar_point(rail: int, point: Point3) -> Point3:
@@ -2535,7 +2794,7 @@ def _right_handed(rows: Rows) -> bool:
 # The bought hardware: one right-handed placement per BOM unit; each carriage
 # seats its pivot block; the KP08 bores sit on the leadscrew's axis; the
 # rail's holes over the bar's tapped holes, read from the bar's underside on
-# rail 1 (the bracket screws come up through bar 1); the underside pick
+# rail 1 (the TL-28 bar screws come up through Bar1); the underside pick
 # clear of the collar and every pin hole; the sweep's end poses at the end stops.
 if set(PLACEMENTS) != set(BOM_ORDER) or any(
     len(PLACEMENTS[stem]) != QUANTITIES[stem] for stem in BOM_ORDER
@@ -2562,7 +2821,7 @@ _tap_out = [_tap_x * _wheel_rows[0][i] + _tap_z * _wheel_rows[2][i] for i in ran
 if math.dist(_tap_out, _screw_rows[0]) > 1e-9:
     raise AssertionError("the handwheel's set screw is not clocked to the flats")
 if guide_rail.HOLE_X != base_bar.RAIL_HOLE_X or TURNED_OVER[leadscrew.RAIL]:
-    raise AssertionError("the rail holes or the bracket screws miss the bar")
+    raise AssertionError("the rail holes or the TL-28 bar screws miss the bar")
 if CARRIER_ORIGIN[2] != trammel.CARRIER_TOP_Z:
     raise AssertionError("the carrier's origin (its Top plane) is not its top face")
 for _pass, _stops in trammel.END_STOPS.items():

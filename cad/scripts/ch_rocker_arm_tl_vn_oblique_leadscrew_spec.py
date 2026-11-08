@@ -18,7 +18,8 @@ Frames. Layout stations are rail 1's: ``s`` along the rail from the spindle
 (``trammel.rail_point``) ⚙, ``lateral`` square to it (+ toward the column), and
 machine Z (table top = 0). Each new part's own frame is given with its
 envelope below. In base bar 1's part frame, x = s - RAIL_NEAR_S ⚙ and
-y = -lateral; the turned-over bar under rail 2 carries the same holes, unused.
+y = -lateral; only base bar 1 (TL-20's ``Bar1`` configuration) carries the
+bracket holes, the turned-over bar under rail 2 (``Bar2``) has none.
 
 Why the column side: the far hold-down stud stands on the rail's front side
 (lateral -1.48 ⚙ at bar station 15.35 ⚙, up to STUD_TOP_Z), away from the
@@ -32,20 +33,21 @@ lifts the axis to 52.338. The handwheel grip sweeps below the carrier
 underside.
 Each bracket stands wholly on bar 1 (the user's 2026-10-17 ruling A′: the
 bar widened, now 5.50 wide, its column-side edge at lateral 88.9 ⚙), its outer
-end flush with that edge, on 4 x #8 screws in one row: two pairs symmetric
-about the screw axis, the inner at ±.433, the outer at ±1.09, the round
-half-span inside the rule-17 window (below) between the #8 tap's wall to the
-KP08's outer #6-32 tap in TL-28 and TL-20's counterbore wall to the bar's edge.
+end flush with that edge. TL-28 has only two through holes, at the KP08's
+42 bolt spacing about the screw axis, #29 drilled THRU with limited #8-32
+threads from both faces. A #8-32 x 5/8 SHCS enters from each side; TL-20's
+underside counterbore is .200 ±.005. TL-28's full-thread and opposed-cut
+limits protect both complete physical screw reaches (owner A″).
 
 Travel. The KP08 blocks sit at least FEED_GAP outside the feed lug's reach
-over the carriage travel ``trammel.CARRIAGE_TRAVEL`` ⚙ (107.2 .. 421.4, both
+over the carriage travel ``trammel.CARRIAGE_TRAVEL`` ⚙ (75.2 .. 389.4, both
 passes); the screw runs NEAR_STUB past the near KP08 and on into the
 handwheel's bore past its grub and its set-screw flat
 (HANDWHEEL_ENGAGEMENT_MIN), short of the wheel's outer face; the hub stands
-HUB_GAP past the far block: SCREW_LENGTH 410. The stations
-and the screw length are fixed (the drilled parts carry them); self-checks
-guard them against the bought block, so a vendor swap changes the bought
-numbers only, or trips a check.
+HUB_GAP past the far block. The near station follows the centred feed block;
+the screw cut preserves handwheel engagement. Both mounting joints' hole
+floats and printed stations enter the clearance envelope; none of these
+geometric checks certifies the unverified KP08 height or thrust rating.
 
 The nut remains attached to the feed block during either feed mode. Align
 the KP08 blocks at both travel ends so the screw runs centred in the feed
@@ -56,14 +58,27 @@ Thrust is taken on the KP08 inner-ring set screws gripping the screw's flats
 (no journals; the uxcell block has no axial or end-play rating): a hand-fed
 finish pass only.
 
-LOAD_CASES (ruling A′): 1 kN hand-abuse thrust along the screw at its axis
-(lateral 2.165, 40.4 above the bar top), on each TL-28's 4 x #8-32 torqued to
-2.8 N·m (25 in·lbf; head bearing on TL-20's counterbore floor limits it):
-preload T/(0.2 d) 3.36 kN a screw; the row's centroid is on the screw axis
-(e = 0), so the bracket slips at 2.69 kN (μ 0.2, margin 2.69). It starts to
-open (F·h = n·P·w/6, w 12.7) at 704 N, below TL-00's 1361 N feed thrust at
-a 70 N hand pull. Owner ruling 2026-10-27: the heel may lift elastically;
-slip governs, held at 1.5 x both the 1 kN abuse and the feed thrust.
+LOAD_CASES: 1 kN hand-abuse thrust along the screw at its axis (lateral
+2.165, 40.4 above the bar top), on each TL-28's 2 x #8-32 torqued to 2.8 N·m
+(25 in·lbf; head bearing on TL-20's counterbore floor limits it): preload
+T/(0.2 d) 3.36 kN a screw; the pair's centroid is on the screw axis (e = 0),
+so the bracket slips at 1.34 kN (μ 0.2). It starts to open (F·h = n·P·w/6,
+w 12.7) at 352 N. Owner ruling 2026-11-06 (Main, option B of the PR2
+two-hole review, replacing the 2026-10-27 "slip governs" criterion for the
+TL-28/TL-20 joint): above that slip load the bracket may slip until the
+screws' threads bear on TL-20's clearance holes, a positive stop. The
+owner's R4 ruling (Main, relayed by the coordinator after farm 84d5991d45)
+keeps option B and accepts up to 1.06 mm lost motion on reversal (the
+option-B ruling's ~.9 mm superseded). TL-20's #12 (.189) clearance holes
+hold this joint's worst case to 0.876 mm (the largest drilled hole over the
+#8 UNC-3A minimum major; 0.737 at its basic major), unchanged.
+That bound is the TL-28-on-TL-20 joint alone; the KP08-on-TL-28 joint above
+it (Ø5 holes, UNVERIFIED #2184) was never slip-checked and is not included
+(``KP08_SCREW_FLOAT_MAX``, an open question). The joint must not slip under
+the normal finish-feed thrust (the jig assembly spec derives it from the
+cutter load), and the positive stop must carry the abuse envelope (the 1 kN
+abuse or TL-00's 1361 N firm 70 N hand pull, whichever is greater) in
+thread/hole bearing and screw shear (``bracket_stop_margins``).
 
 Bought dimensions live in one block below (``# --- Bought items``). Items
 marked UNVERIFIED are assumed until verified on receipt.
@@ -110,9 +125,9 @@ INCH_SCREW_LENGTHS = ("1/4", "5/16", "3/8", "7/16", "1/2", "5/8", "3/4")  # SHCS
 SHCS_LENGTH_TOL_MM = 0.03 * INCH  # STANDARD: ASME B18.3 (SHCS), to 1 in long
 TAP_MOUTH_BREAK = float(_config.title_block("edge_break")["chamfer_max_mm"])
 _TIP_INCOMPLETE_PITCHES = 1.5  # rule 18
-# Each bought screw is the shortest stock length whose worst-case full thread
-# reaches 2 D: rule 18's 1.5 D and half a diameter more, so a bought flange or
-# foot thicker than its unbanded catalogue nominal still leaves 1.5 D.
+# Default purchased-length target: 2D at nominal bought grip, leaving
+# tolerance reserve above mandatory 1.5D. Owner A″ explicitly overrides
+# this selection target for BAR_SCREW_LENGTH only, not the 1.5D requirement.
 ENGAGEMENT_TARGET_D = 2.0
 
 
@@ -153,17 +168,22 @@ KP08_HEIGHT = 28.0
 KP08_BORE = 8.0
 KP08_WIDTH = 13.0  # the listing's W: the housing's axial width
 # US-customary UNC (fastener policy): the block's plain Ø5 holes, sized for
-# its maker's M4, float a #6-32 (major 3.505).
-KP08_SCREW = "#6-32"
+# its maker's M4, float a #8-32 (major 4.166) 0.417 a side; the #8 SHCS head
+# (Ø.270) still covers the hole at that float (bracket_screw spec, TL-VN-62).
+KP08_SCREW = "#8-32"
 KP08_HOLE_DIA = 5.0
-KP08_FOOT_THICK = 5.0  # UNVERIFIED: base (foot) thickness, not on the listing
-# Rule 18 through the foot at its unverified nominal (a thicker foot takes
-# engagement off one for one: ENGAGEMENT_TARGET_D's half diameter). The 5/8
-# tip stops inside TL-28's 25.4 THRU tap.
+KP08_FOOT_THICK = 5.0  # UNVERIFIED (#2184): base (foot) thickness, not on the listing
+# The nominal-foot 2D selection retains reserve above mandatory 1.5D.
+# Owner A″ retains this 5/8 and bounds the receipt foot at .196–.292
+# (end-bracket spec); its finite thread/seam contract excludes 3/4.
 KP08_SCREW_LENGTH = _shortest_length(KP08_FOOT_THICK, KP08_SCREW)  # 5/8
 KP08_SCREW_FULL_THREAD_MIN = full_thread_min(
     KP08_SCREW_LENGTH, KP08_FOOT_THICK, KP08_SCREW
-)  # 8.67, 2.47 D
+)  # 8.67, 2.08 D
+# The KP08 screw's reach past TL-28's top face on the nominal foot: its
+# length (B18.3: no plus length tolerance) less the UNVERIFIED 5.0. A thinner
+# foot reaches deeper; TL-28's spec takes its tip gap on the least foot.
+KP08_SCREW_REACH = float(Fraction(KP08_SCREW_LENGTH)) * INCH - KP08_FOOT_THICK
 KP08_MARGIN = 3.0  # clearance-check envelope margin, all round (Main)
 # HARFINGTON handwheel (Amazon B0DJ3DZT86, read 2026-11-04), along the screw
 # axis from the hub end outward: hub, rim, then the revolving handle standing
@@ -206,10 +226,8 @@ SCREW_LATERAL = 54.991  # 2.165; TL-32's nut lug reads it
 BRACKET_THICK = 1.0 * INCH  # OnlineMetals 1165 half-by-one bar, on edge
 KP08_BASE_Z = trammel.BASE_BAR_THICK + BRACKET_THICK  # 37.338
 SCREW_AXIS_Z = KP08_BASE_Z + KP08_AXIS_HEIGHT  # 52.338
-# Far KP08 outer face to the handwheel's hub end: the 410 screw's far end then
-# stands 13 into the wheel's bore, past the grub on its flat (which runs out
-# through the cut end, leadscrew_stock.OPEN_FLAT), and 1 short of the hub's
-# guaranteed bore depth.
+# Far KP08 outer face to the handwheel's hub end. Retain the 13 mm nominal
+# engagement when moving the near support; the screw cut follows both ends.
 HUB_GAP = 11.0
 # The drilled parts fix the KP08 stations and the screw length; a vendor swap
 # must not move them. The self-checks below guard them against the bought
@@ -242,72 +260,76 @@ BRACKET_INNER_LATERAL = 20.066  # .79: 3 clear of the carriage's side (lateral 1
 # Ruling A′ (2026-10-17): the outer end flush with bar 1's column-side edge,
 # so the bracket stands wholly on the bar (it cantilevered past the 1/2 x 4).
 BRACKET_LENGTH = trammel.BASE_BAR_COLUMN_EDGE - BRACKET_INNER_LATERAL  # 2.71
-# KP08 screws: #6-32 tapped (through) at 42 centres about the screw axis.
-BRACKET_KP08_HOLES_X = tuple(
+# Two #29 through bores at the KP08's 42 centres. Independently limited
+# #8-32 threads from both faces receive the upper and lower 5/8 screws.
+# The pair's centroid stands under the thrust (LOAD_CASES: e = 0).
+BRACKET_HOLES_X = tuple(
     SCREW_LATERAL + side * KP08_BOLT_SPACING / 2.0 - BRACKET_INNER_LATERAL
     for side in (-1.0, 1.0)
-)  # 13.925, 55.925: the vendor span, printed .548 and 2.202
+)  # 13.925, 55.925: the vendor span, printed exact in mm
+BAR_SCREW_LATERALS = tuple(
+    BRACKET_INNER_LATERAL + x for x in BRACKET_HOLES_X
+)  # 33.991, 75.991
 # Bar screws: #8-32 SHCS up from the bar's underside (counterbored there, the
-# head recessed: ``base_bar.BRACKET_CBORE_DEPTH``) into #8-32 tapped THRU holes
-# in the bracket; fitted before the bar goes on the table. Top-down
-# counterbores leave no wall to the KP08 #6-32 taps.
+# head recessed: ``base_bar.BRACKET_CBORE_DEPTH``) into TL-28's holes; fitted
+# before the bar goes on the table. Owner 2026-11-07 A″ selects 5/8 in
+# place of the normal 2D purchase target; worst full thread remains >=1.5D.
 BAR_SCREW = "#8-32"
 BAR_SCREW_LENGTH = "5/8"
-# Ruling A′: four in one row, two pairs symmetric about the screw axis, so the
-# row's centroid stands under the thrust (LOAD_CASES: e = 0). The inner pair
-# keeps C4's 44 (between the KP08's #6-32s) on the grid; the outer half-span
-# is the .01 in value inside the rule-17 window, worst case at the printed
-# bands: its #8 tap clear of TL-28's outer #6-32 tap, its TL-20 counterbore
-# clear of the bar's column-side edge, both at the .080 target.
 WALL_TARGET = WALL_TARGET_MM  # drawing-guidelines rule 17 (floor base_bar.BRACKET_WALL_MIN)
-BAR_SCREW_INNER_HALF_SPAN = 10.9982  # .433
-_TL28_UNIT = drawing_unit(
-    "parts/ch-rocker-arm-tl-oblique-end-bracket",
-    _config.parts("ch-rocker-arm-tl-oblique-end-bracket"),
-)
-_TL28_BAND = printed_band_mm(3, unit=_TL28_UNIT)  # TL-28's stations print at .XXX
-_BAR_SCREW_R = THREAD_MAJOR_MM[BAR_SCREW] / 2.0
-_KP08_SCREW_R = THREAD_MAJOR_MM[KP08_SCREW] / 2.0
-BAR_SCREW_OUTER_HALF_SPAN_MIN = (
-    KP08_BOLT_SPACING / 2.0 + 2.0 * _TL28_BAND + _BAR_SCREW_R + _KP08_SCREW_R
-) + WALL_TARGET  # 27.12
-BAR_SCREW_OUTER_HALF_SPAN_MAX = (
-    trammel.BASE_BAR_COLUMN_EDGE
-    - SCREW_LATERAL
-    - base_bar.BRACKET_HOLE_BAND
-    - base_bar.BRACKET_CBORE_RADIUS_MAX
-) - WALL_TARGET  # 27.70
-BAR_SCREW_OUTER_HALF_SPAN = round(
-    math.floor(BAR_SCREW_OUTER_HALF_SPAN_MAX / INCH * 100.0) / 100.0 * INCH, 9
-)  # 1.09
-if not (
-    BAR_SCREW_OUTER_HALF_SPAN_MIN
-    <= BAR_SCREW_OUTER_HALF_SPAN
-    <= BAR_SCREW_OUTER_HALF_SPAN_MAX
-):
-    raise AssertionError("the outer bar screws' half-span leaves its rule-17 window")
-BAR_SCREW_LATERALS = tuple(
-    SCREW_LATERAL + side * half
-    for side, half in (
-        (-1.0, BAR_SCREW_OUTER_HALF_SPAN),
-        (-1.0, BAR_SCREW_INNER_HALF_SPAN),
-        (1.0, BAR_SCREW_INNER_HALF_SPAN),
-        (1.0, BAR_SCREW_OUTER_HALF_SPAN),
-    )
-)  # 1.075, 1.732, 2.598, 3.255
-BRACKET_BAR_HOLES_X = tuple(
-    lateral - BRACKET_INNER_LATERAL for lateral in BAR_SCREW_LATERALS
-)  # .285, .942, 1.808, 2.465
 SHCS_8_HEAD = 0.164 * INCH  # #8 SHCS head height (ASME B18.3)
 SHCS_8_MAJOR = 0.164 * INCH  # #8 thread major diameter
-BAR_SCREW_LENGTH_MM = 0.625 * INCH
-BAR_SCREW_GRIP = base_bar.BAR_THICK - base_bar.BRACKET_CBORE_DEPTH  # 7.137
-BAR_SCREW_ENGAGEMENT = BAR_SCREW_LENGTH_MM - BAR_SCREW_GRIP  # 8.738 nominal
-# Worst case at TL-20's printed bands (8.357 .. 9.119).
+BAR_SCREW_LENGTH_MM = float(Fraction(BAR_SCREW_LENGTH)) * INCH
+BAR_SCREW_GRIP = base_bar.BAR_THICK - base_bar.BRACKET_CBORE_DEPTH  # 6.858
+BAR_SCREW_ENGAGEMENT = BAR_SCREW_LENGTH_MM - BAR_SCREW_GRIP  # 9.017 nominal
+# Geometric range at nominal screw length only: 8.636 .. 9.398.
 BAR_SCREW_ENGAGEMENT_RANGE = base_bar.bracket_screw_under_head(BAR_SCREW_LENGTH_MM)
+BAR_SCREW_ACTUAL_REACH_RANGE = (
+    BAR_SCREW_ENGAGEMENT_RANGE[0] - SHCS_LENGTH_TOL_MM,
+    BAR_SCREW_ENGAGEMENT_RANGE[1],
+)  # 7.874 .. 9.398; do not subtract short-length twice in full_thread_min.
+# Rule 18: the worst-case grip (the thickest bar under the shallowest
+# counterbore) and the shortest screw, less its tip's incomplete threads.
+BAR_SCREW_GRIP_MAX = BAR_SCREW_LENGTH_MM - BAR_SCREW_ENGAGEMENT_RANGE[0]  # 7.239
+BAR_SCREW_FULL_THREAD_MIN = full_thread_min(
+    BAR_SCREW_LENGTH, BAR_SCREW_GRIP_MAX, BAR_SCREW
+)  # 6.433375, 1.544D
 
-KP08_S = (72.0, 443.0)  # near, far: KP08 axial centre stations
-SCREW_LENGTH = 410.0
+KP08_S = (62.484, 443.0)  # near 2.46 in, far unchanged: axial centre stations
+# PR4 follows PR2's #8-32 class-3A upper and lower mounting screws. Charge
+# both joints' full radial float, not friction, at ASME B1.1 minimum major.
+# This is a clearance envelope, not a change to PR2's positive-stop ruling.
+SHCS_8_MAJOR_MIN = base_bar.BRACKET_SCREW_MAJOR_MIN
+BRACKET_STOP_FLOAT_MAX = base_bar.BRACKET_SCREW_FLOAT_WORST
+# The upper KP08 joint was never slip-checked; its Ø5 hole remains
+# UNVERIFIED (#2184). Charge its full float for clearance without certifying it.
+KP08_SCREW_FLOAT_MAX = (KP08_HOLE_DIA - SHCS_8_MAJOR_MIN) / 2.0
+# The near bar station prints 47.48 mm from its end, not 47.484; charge
+# that rounding in addition to its explicit metric location band.
+_KP08_STATION_ROUNDING = max(
+    abs((s - trammel.RAIL_NEAR_S) - round(s - trammel.RAIL_NEAR_S, base_bar.BRACKET_STATION_PLACES))
+    for s in KP08_S
+)
+# Along the screw is TL-28 local Y: HoleRowY is .250 at ROW_PLACES=3
+# on the inch sheet, not the metric X stations of the opposed-hole pair.
+# Resolve its package unit here; importing end_bracket would close a cycle.
+BRACKET_AXIAL_ROW_BAND = printed_band_mm(
+    3,
+    unit=drawing_unit(
+        "parts/ch-rocker-arm-tl-oblique-end-bracket",
+        _config.parts("ch-rocker-arm-tl-oblique-end-bracket"),
+    ),
+)
+KP08_STATION_ENVELOPE = (
+    base_bar.BRACKET_STATION_BAND + _KP08_STATION_ROUNDING + BRACKET_AXIAL_ROW_BAND
+    + BRACKET_STOP_FLOAT_MAX + KP08_SCREW_FLOAT_MAX
+)
+# Native metric sheet prints one place. The chosen cut is
+# round((443 + 6.5 + 11 + 13) - (62.484 - 6.5 - 2), 1) = 419.5:
+# retain the far end, with 12.984 nominal wheel engagement after rounding.
+# Freeze this manufactured size: a vendor swap must trip the fit guards,
+# not silently resize the already-cut screw.
+SCREW_LENGTH = 419.5
 KP08_FACE_S = (
     KP08_S[0] - KP08_WIDTH / 2.0,  # the near block's outer face
     KP08_S[1] + KP08_WIDTH / 2.0,  # the far block's outer face
@@ -324,10 +346,10 @@ WHEEL_S = (
 )
 
 # --- Additions to sibling parts -------------------------------------------------
-# TL-20 base bar (both bars, single configuration): 8 x #8 SHCS clearance
-# THRU (4 at each KP08 station, ruling A′), counterbored from the bar's underside (head flush), bar part frame (x
-# from the spindle end, y = -lateral on rail 1). The turned-over bar 2 shows
-# them on top, unused.
+# TL-20 base bar, its Bar1 configuration only (the Bar2 configuration under
+# rail 2 is plain): 4 x #8 SHCS clearance THRU (2 under each TL-28, at the
+# KP08's stations), counterbored from the bar's underside (head recessed), bar
+# part frame (x from the spindle end, y = -lateral on rail 1).
 BASE_BAR_HOLES: tuple[tuple[float, float], ...] = tuple(
     (s - trammel.RAIL_NEAR_S, -lateral)
     for s in KP08_S
@@ -414,6 +436,14 @@ for _stud_s, _stud_lat in trammel.HOLD_DOWN_STUDS:
 _near_stud_s = trammel.HOLD_DOWN_STUDS[0][0]
 if not BRACKET_BOXES["end bracket near"][0] > _near_stud_s + 14.0:
     raise AssertionError("the near bracket reaches the near hold-down's nut")
+# Include the printed stud station and the complete support float even
+# though the installed short studs also clear the moving blocks in Z.
+KP08_STUD_CLEARANCE_WORST = (
+    KP08_BOXES["KP08 near"][0] - (_near_stud_s + 14.0)
+    - KP08_STATION_ENVELOPE - printed_band_mm(2, unit=base_bar.UNIT)
+)
+if KP08_STUD_CLEARANCE_WORST <= 0.0:
+    raise AssertionError("the displaced near KP08 reaches the hold-down envelope")
 # Both brackets stand on the bar, inside its ends; the far bracket's screws too.
 if not (
     BRACKET_BOXES["end bracket far"][1] < trammel.BASE_BAR_FAR_S
@@ -456,10 +486,12 @@ for _x, _y in BASE_BAR_HOLES:
     ):
         if math.hypot(_x - _sx, _y - _sy) < 20.0:
             raise AssertionError("a bracket screw hole is near a hold-down slot")
-# Screw engagement: at least 1.5 diameters, never through the part it enters.
+# Rule 18 at the worst case: each screw's full thread at least 1.5 D; neither
+# runs through TL-28 (its tip clears the other's: TL-28 spec).
 if not (
     1.5 * SHCS_8_MAJOR
-    <= BAR_SCREW_ENGAGEMENT_RANGE[0]
+    <= BAR_SCREW_FULL_THREAD_MIN
+    < BAR_SCREW_ENGAGEMENT_RANGE[0]
     <= BAR_SCREW_ENGAGEMENT
     <= BAR_SCREW_ENGAGEMENT_RANGE[1]
     < BRACKET_THICK
@@ -469,16 +501,15 @@ if not 1.5 * THREAD_MAJOR_MM[KP08_SCREW] <= KP08_SCREW_FULL_THREAD_MIN:
     raise AssertionError("the KP08 screws' engagement in the end bracket")
 
 # TL-20's counterbores stand clear of the bar's column-side edge at the .080
-# target (ruling A′: the outer screws' row sits .245 in from it), every wall
-# at the rule-17 floor.
+# target, every wall at the rule-17 floor.
 _bar_walls = base_bar.bracket_hole_walls(BASE_BAR_HOLES)
 if _bar_walls["-Y edge"] < WALL_TARGET:
     raise AssertionError("a TL-20 bracket counterbore is under .080 from the bar edge")
 if min(_bar_walls.values()) < base_bar.BRACKET_WALL_MIN:
     raise AssertionError(f"a TL-20 bracket hole wall is under rule 17: {_bar_walls}")
 
-# --- LOAD_CASES (ruling A′): one TL-28 on its 4 x #8, hand-abuse thrust --------
-# The #8 bracket screws' torque: one TL-00 figure (step 1), 25 in·lbf, set by
+# --- LOAD_CASES: one TL-28 on its 2 x #8 bar screws ---------------------------------
+# The #8 bracket screws' torque: one TL-00 figure (step 2), 25 in·lbf, set by
 # the head's bearing on TL-20's counterbore floor (BRACKET_HEAD_BEARING_MIN),
 # printed as 2.8 N·m.
 BAR_SCREW_TORQUE_IN_LBF = 25
@@ -491,23 +522,80 @@ SLIP_MARGIN_MIN = 1.5
 _n = len(BAR_SCREW_LATERALS)
 _centroid = sum(BAR_SCREW_LATERALS) / _n
 _r = [abs(lateral - _centroid) for lateral in BAR_SCREW_LATERALS]
-BAR_SCREW_THRUST_ECCENTRICITY = SCREW_LATERAL - _centroid  # 0: the pairs centre
+BAR_SCREW_THRUST_ECCENTRICITY = SCREW_LATERAL - _centroid  # 0: the pair centres
 # The worst screw's shear per newton of thrust: direct plus the group's twist.
 _worst_shear = 1.0 / _n + abs(BAR_SCREW_THRUST_ECCENTRICITY) * max(_r) / sum(
     r * r for r in _r
 )
-BRACKET_SLIP_THRUST = FRICTION_MIN * BAR_SCREW_PRELOAD / _worst_shear  # 2.69 kN
+BRACKET_SLIP_THRUST = FRICTION_MIN * BAR_SCREW_PRELOAD / _worst_shear  # 1.34 kN
 # Opening onset: the thrust's moment about the bracket's heel, at the screw
-# axis above the bar top, against the row's preload over the bracket width.
-# Owner ruling 2026-10-27 (#1943 review): slip governs. A firm hand pull can
-# reach the onset (TL-00's 1361 N feed thrust), lifting the heel elastically;
-# the joint must not slip, so the onset is reported, not required.
+# axis above the bar top, against the pair's preload over the bracket width.
+# Reported, not required: the heel may lift elastically (owner ruling
+# 2026-10-27, #1943 review).
 _thrust_height = SCREW_AXIS_Z - trammel.BASE_BAR_THICK  # 40.4
 BRACKET_OPENING_THRUST = (
     _n * BAR_SCREW_PRELOAD * BRACKET_WIDTH / (6.0 * _thrust_height)
-)  # 704 N
-if BRACKET_SLIP_THRUST < SLIP_MARGIN_MIN * HAND_ABUSE_THRUST:
+)  # 352 N
+
+# Owner ruling 2026-11-06 (Main, option B of the PR2 two-hole review; it
+# replaces the 2026-10-27 no-slip criterion for TL-28 on TL-20): "slip to
+# positive thread stop acceptable above ~1344 N (handwheel abuse only)". Its
+# "up to ~.9 mm reversal lost motion accepted" is superseded by the owner's
+# R4 ruling (Main, relayed by the coordinator after farm 84d5991d45): option
+# B retained, reversal lost motion up to 1.06 mm accepted. The #12 geometry
+# is kept (a #9 would change the head-to-counterbore contact and the
+# engagement). The normal finish feed must not slip
+# the bracket (jig assembly spec, NORMAL_FEED_THRUST_N); above BRACKET_SLIP_THRUST
+# the bracket moves on TL-20 until each bar screw's thread bears on its
+# clearance hole's wall, and the abuse envelope is carried there.
+# Lost motion of this lower joint alone (TL-28 on TL-20): the bracket slides
+# across the whole diametral float of a bar screw in its TL-20 clearance hole
+# at each reversal of the thrust. Guarded at the true worst case: the largest
+# DRILLED HOLES clearance hole (the #12's .189 + .004) over the #8's minimum
+# major. The bought 91251A196/91251A197 are UNC-3A, whose #8-32 minimum major
+# is .1585 in (ASME B1.1, external class 3A). Disclosed beside it: the
+# basic-major (.164) figures, 0.368 a side and 0.737 reversal. The upper
+# joint (KP08 on TL-28, ``KP08_SCREW_FLOAT_MAX``) is not part of this bound.
+BRACKET_STOP_FLOAT_BASIC = base_bar.BRACKET_SCREW_FLOAT_MAX  # 0.368 a side
+BRACKET_REVERSAL_LOST_MOTION_BASIC = 2.0 * BRACKET_STOP_FLOAT_BASIC  # 0.737
+BRACKET_REVERSAL_LOST_MOTION = 2.0 * BRACKET_STOP_FLOAT_MAX  # 0.876
+BRACKET_REVERSAL_LOST_MOTION_ACCEPTED = 1.06  # the R4 ruling's "up to 1.06 mm"
+if BRACKET_REVERSAL_LOST_MOTION > BRACKET_REVERSAL_LOST_MOTION_ACCEPTED:
     raise AssertionError(
-        f"TL-28 slips at {BRACKET_SLIP_THRUST:.0f} N, under "
-        f"{SLIP_MARGIN_MIN} x the {HAND_ABUSE_THRUST:.0f} N hand-abuse thrust"
+        f"TL-28 can shift {BRACKET_REVERSAL_LOST_MOTION:.3f} on TL-20 at a reversal, "
+        f"over the ruling's {BRACKET_REVERSAL_LOST_MOTION_ACCEPTED}"
     )
+# The positive stop: each bar screw's thread bears on the wall of TL-20's
+# clearance hole over the bar left under the counterbore (its least printed
+# length) and on TL-28's thread over its worst-case full thread, and the
+# screw shears across its tensile stress area at the joint face. Materials:
+# 6061-T6 yield 276 MPa (SOURCED: ASM / MatWeb 6061-T6, as the jig assembly
+# spec), taken in bearing; ASTM A574 170,000 psi tensile with 0.6 of it as
+# the shear ultimate (the common estimate, as the feed nut's screws); the
+# #8-32 tensile stress area 0.0140 in² (ASME B1.1).
+AL_YIELD_MPA = 276.0
+A574_TENSILE_MPA = 170_000.0 * 0.006894757
+SHCS_8_STRESS_AREA_MM2 = 0.0140 * INCH**2
+STOP_MARGIN_MIN = SLIP_MARGIN_MIN
+
+
+def bracket_stop_margins(thrust: float) -> dict[str, float]:
+    """The positive stop's margins when one TL-28 has slipped onto its bar
+    screws under ``thrust`` (N), carried by the screws alone (no friction)."""
+    per_screw = thrust * _worst_shear
+    return {
+        "TL-20 hole wall bearing": AL_YIELD_MPA
+        / (per_screw / (SHCS_8_MAJOR * base_bar.BRACKET_CBORE_FLOOR_MIN)),
+        "TL-28 thread bearing": AL_YIELD_MPA
+        / (per_screw / (SHCS_8_MAJOR * BAR_SCREW_FULL_THREAD_MIN)),
+        "screw shear": 0.6 * A574_TENSILE_MPA / (per_screw / SHCS_8_STRESS_AREA_MM2),
+    }
+
+
+BRACKET_STOP_MARGINS = bracket_stop_margins(HAND_ABUSE_THRUST)
+for _check, _margin in BRACKET_STOP_MARGINS.items():
+    if _margin < STOP_MARGIN_MIN:
+        raise AssertionError(
+            f"TL-28's positive stop fails its {_check} at the "
+            f"{HAND_ABUSE_THRUST:.0f} N hand-abuse thrust ({_margin:.2f})"
+        )

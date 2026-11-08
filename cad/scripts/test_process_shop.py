@@ -13,7 +13,6 @@ import pytest
 from prechips.model import CuttingData, Inventory, Policy
 
 import _process_plans as plans
-import _rocker_interface as rocker_interface
 import ch_rocker_arm_spec as rocker
 from _printed_limits import limits
 
@@ -323,11 +322,8 @@ _HUB_FILING_BANDS_MM = {
     "pin_dia_limits_mm": (6.485, 6.490),
 }
 _HUB_FILING_RUNOUT_TIR_MM = 0.025
-_FILING_STAND_STEP_LIMITS_MM = (0.39, 0.49)
 
 
-def _rocker_plan() -> dict[str, Any]:
-    return tomllib.loads(plans.plan_path("ch_rocker_arm").read_text(encoding="utf-8"))
 
 
 def _fixture_solids(fixture: str) -> dict[str, dict[str, Any]]:
@@ -369,163 +365,41 @@ def test_pm30mv_table_models_share_the_manual_slot_section():
         )
 
 
-def test_rocker_mill_clamp_studs_enter_the_centre_t_slot():
+def test_held_built_up_route_uses_procured_strap_and_existing_facing_equipment():
+    import ch_rocker_arm_tl_oblique_blank_spec as blank
+    import ch_rocker_arm_tl_oblique_trammel_spec as trammel
+
     inventory = _shop("inventory.toml")
-    members = inventory["fixtures"]["clamping-kit-pm-52pcck-14mm"]["members"]
-    risers = _fixture_solids("rocker-riser-blocks")
-    table = risers["table"]
-    centre_slot = risers["table slot 2 neck"]
-    slot_y = centre_slot["at_mm"][1] + centre_slot["size_mm"][1] / 2
-    local_table_top = table["at_mm"][2] + table["size_mm"][2]
-    blocks = [solid for name, solid in risers.items() if name.endswith("riser")]
-    assert len(blocks) == 6
-    for block in blocks:
-        assert block["at_mm"][2] == local_table_top
-        assert block["at_mm"][2] + block["size_mm"][2] == 0.0
-    checked: dict[str, int] = {}
-    for setup in _rocker_plan()["setups"]:
-        hold = setup["hold"]
-        if hold["fixture"] != "rocker-riser-blocks":
-            continue
-        hold_pose = hold["pose"]
-        table_y = hold_pose["origin_mm"][1] + hold_pose["x"][0] * slot_y
-        table_top = hold_pose["origin_mm"][2] + local_table_top
-        checked[setup["id"]] = 0
-        for clamp in hold["clamps"]:
-            kit, member = (
-                clamp["ref"].split("/", 1) if "/" in clamp["ref"] else ("", "")
-            )
-            if kit != "clamping-kit-pm-52pcck-14mm":
-                continue
-            assert member == (
-                "strap-pad-mill-raised" if setup["id"] == "S1" else "strap-pad-mill"
-            )
-            solids = {solid["name"]: solid for solid in members[member]["solids"]}
-            stud = solids["stud"]
-            assert stud["length_mm"] == 101.6
-            pose = clamp["pose"]
-            stud_y = pose["origin_mm"][1] + stud["at_mm"][0] * pose["x"][1]
-            assert abs(stud_y - table_y) + stud["dia_mm"] / 2 < 7.0
-            bottom = pose["origin_mm"][2] + stud["at_mm"][2]
-            assert table_top - 24.0 < bottom < table_top - 14.0
-            foot = solids["T-nut foot"]
-            foot_top = pose["origin_mm"][2] + foot["at_mm"][2] + foot["size_mm"][2]
-            assert abs(foot_top - (table_top - 14.0)) < 1e-9
-            foot_width = (
-                abs(pose["x"][1]) * foot["size_mm"][0]
-                + abs(pose["x"][0]) * foot["size_mm"][1]
-            )
-            assert foot_width < 25.0
-            checked[setup["id"]] += 1
-    assert checked == {"S1": 2, "S2": 2, "S3": 2, "S4": 2}
-
-
-def test_pedestal_top_carries_the_lower_hub_face():
-    plan = _rocker_plan()
-    setups = {setup["id"]: setup for setup in plan["setups"]}
-    solids = _fixture_solids("rocker-filing-stand")
-    pedestal = solids["hub pedestal"]
-    lower_hub_face = (plan["stock"]["section_mm"][1] - rocker.HUB_LENGTH) / 2
-    assert abs(lower_hub_face - 0.4405) < 1e-9
-    hub_face_op = next(op for op in setups["S1"]["ops"] if op["op"] == 10)
-    assert hub_face_op["to_z"] - rocker.HUB_LENGTH == pytest.approx(lower_hub_face)
-    low, high = _FILING_STAND_STEP_LIMITS_MM
-    assert low <= lower_hub_face <= high
-    assert high - low <= 2 * rocker.HUB_LENGTH_BAND[0] + 1e-9
-    assert limits(pedestal["dia_mm"], 2)[1] < rocker.HUB_DIA_MIN
-    pedestal_height = pedestal["length_mm"] * pedestal["axis"][2]
-    pedestal_top = pedestal["at_mm"][2] + pedestal_height
-    for side in ("left", "right"):
-        block = solids[f"{side} end block"]
-        block_top = block["at_mm"][2] + block["size_mm"][2]
-        assert block_top == 0.0
-        assert pedestal["at_mm"][2] == block["at_mm"][2]
-        assert low <= pedestal_top - block_top <= high
-    assert setups["S5"]["hold"]["fixture"] == "rocker-filing-stand"
-    held_top = setups["S5"]["hold"]["pose"]["origin_mm"][2] + pedestal_top
-    assert abs(held_top + rocker.HUB_LENGTH) <= rocker.HUB_LENGTH_BAND[0]
-
-
-def test_end_blocks_sit_under_the_blank_ends_clear_of_the_arm():
-    stock = _rocker_plan()["stock"]
-    solids = _fixture_solids("rocker-filing-stand")
-    raw_left = stock["origin_mm"][0]
-    raw_right = raw_left + stock["length_mm"]
-    assert raw_right == -raw_left
-    for side in ("left", "right"):
-        block = solids[f"{side} end block"]
-        length_max = limits(block["size_mm"][0], 1)[1]
-        if side == "left":
-            assert block["at_mm"][0] == raw_left
-            assert block["at_mm"][0] + length_max < -rocker.ROD_TIP_X
-        else:
-            assert block["at_mm"][0] + block["size_mm"][0] == raw_right
-            assert raw_right - length_max > rocker.ROD_TIP_X
-
-
-def test_stack_height_seats_the_centred_strap_on_the_raw_ends():
-    plan = _rocker_plan()
-    setups = {setup["id"]: setup for setup in plan["setups"]}
-    raw_thickness = plan["stock"]["section_mm"][1]
-    strap_face_op = next(op for op in setups["S3"]["ops"] if op["op"] == 10)
-    strap_face_z = strap_face_op["to_z"]
-    assert strap_face_z == pytest.approx((raw_thickness + rocker.ARM_THICKNESS) / 2)
-    stack = _fixture_solids("strap-shim-stack")["stack"]
-    height = stack["size_mm"][2]
-    assert stack["shim"] is True and stack["bears"] == "face"
-    assert height == pytest.approx(raw_thickness - strap_face_z)
-    ground_flat = 3 / 32 * 25.4  # approved 3/32 in stock, inventory purchase
-    assert 0 < height - ground_flat < height
-    for setup_id, seat_z in (("S1", 0.0), ("S4", raw_thickness - strap_face_z)):
-        hold = setups[setup_id]["hold"]
-        supports = [
-            clamp for clamp in hold["clamps"] if clamp["ref"] == "strap-shim-stack"
-        ]
-        assert len(supports) == 4
-        for support in supports:
-            pose = support["pose"]
-            assert pose["z"] == [0.0, 0.0, 1.0]
-            top = pose["origin_mm"][2] + stack["at_mm"][2] + height
-            assert top == pytest.approx(seat_z)
-
-
-def test_s4_stacks_stay_inside_the_arm_strap_band():
-    plan = _rocker_plan()
-    setup = next(setup for setup in plan["setups"] if setup["id"] == "S4")
-    stack = _fixture_solids("strap-shim-stack")["stack"]
-    supports = [
-        clamp for clamp in setup["hold"]["clamps"] if clamp["ref"] == "strap-shim-stack"
+    plan = tomllib.loads(plans.plan_path("ch_rocker_arm").read_text(encoding="utf-8"))
+    assert plan["construction"] == "built_up"
+    (stock,) = [
+        row for row in inventory["stock"]
+        if any("pid/4807" in cite for cite in row.get("cite", []))
     ]
-    assert len(supports) == 4
-    assert plan["frames"][setup["frame"]]["y"] == [0.0, -1.0, 0.0]
-    stations = []
-    for support in supports:
-        pose = support["pose"]
-        assert pose["x"] == [1.0, 0.0, 0.0]
-        stations.append((abs(pose["origin_mm"][0]), -pose["origin_mm"][1]))
-
-    def strap_band(x: float) -> tuple[float, float]:
-        bottom = rocker_interface.CENTER_Y - math.sqrt(
-            rocker_interface.R_BOTTOM**2 - x**2
-        )
-        top = rocker_interface.CENTER_Y - math.sqrt(rocker.R_TOP**2 - x**2)
-        return bottom - rocker_interface.PIVOT_MID_Y, top - rocker_interface.PIVOT_MID_Y
-
-    half_l = limits(stack["size_mm"][0], 1)[1] / 2
-    for width, fits in (
-        (limits(stack["size_mm"][1], 1)[1], True),
-        (0.75 * 25.4, False),  # the as-bought width must still fail at X120
-    ):
-        inside = all(
-            strap_band(x + half_l)[0] < y - width / 2
-            and y + width / 2 < strap_band(x - half_l)[1]
-            for x, y in stations
-        )
-        assert inside is fits, width
-    for x, y in stations:
-        bottom, top = strap_band(x)
-        assert top - bottom == pytest.approx(rocker_interface.ARM_DEPTH, abs=0.5)
-        assert bottom < y < top
+    assert stock["section_mm"] == plan["stock"]["section_mm"]
+    assert stock["length_mm"] >= plan["stock"]["length_mm"] == trammel.BLANK_LENGTH
+    assert plan["stock"]["on_hand"] is stock["on_hand"]
+    assert plan["stock"]["origin_mm"] == pytest.approx((-175.0, blank.RAW_Y_MIN, 0.0))
+    plate = _fixture_solids("thin-part-tape-subplate")["plate"]
+    assert plate["size_mm"][0] >= trammel.BLANK_LENGTH
+    assert plate["size_mm"][1] >= trammel.BLANK_WIDTH
+    assert "tape-3m-444" in inventory["consumables"]
+    assert "bandsaw-4x6" in inventory["machines"]
+    assert "bandsaw-blade-g5114" in inventory["tools"]
+    setups = {setup["id"]: setup for setup in plan["setups"]}
+    facing = setups["S0"]["ops"][0]
+    assert facing["do"] == "finish_face"
+    assert "fixtures.thin-part-tape-subplate" in facing["note"]
+    assert "consumables.tape-3m-444" in facing["note"]
+    assert "micrometers/0-1in" in facing["note"]
+    # No retained legacy setup can silently put the new 1/8 blank on the old
+    # 5/16 route's end risers, hanging shim packs or hub filing pedestal.
+    retired = {"rocker-riser-blocks", "strap-shim-stack", "rocker-filing-stand"}
+    assert not {
+        setup.get("hold", {}).get("fixture") for setup in plan["setups"]
+    } & retired
+    assert setups["S1"]["machine"] == "bandsaw-4x6"
+    assert [op["feature"] for op in setups["S3"]["ops"]] == ["top_edge", "profile_outer"]
 
 
 def test_kit_holds_the_hub_coaxiality_and_filed_band():

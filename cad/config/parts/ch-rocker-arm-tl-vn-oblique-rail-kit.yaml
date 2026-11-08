@@ -3,11 +3,14 @@ ch-rocker-arm-tl-vn-oblique-rail-kit:
   number: MHA-CH-06-TL-VN-83
   # Generic HIWIN-style HGR15 rail / HGH15CA carriage; NUIBBYED-branded, not genuine HIWIN.
   # Supplied as a matched rail/carriage kit. Z0 preload and C accuracy not required; accept
-  # by fit-up play check (≤ 0.05 mm TIR at the pivot).
+  # by fit-up play check (≤ 0.02 mm TIR at the shoulder-screw head, owner P1-A 2026-11-07).
+  # Rock sideways by hand; if none passes, fit a preloaded (Z0/ZA) HGH15CA per TL-00.
   # One kit (ASIN B0C4DJNL33: 2 rails + 4 carriages) supplies both members; the jig uses
   # both rails and the 2 carriages with the least play, one per rail. Replaces TL-VN-50
   # (rail) and TL-VN-51 (carriage). cad/process/shop/inventory.toml
   # fixtures.trammel-hgr15-rails holds the listing read and the receipt checks.
+  # Installed Rail: trim to actual 17.32 in base bar, flush both ends with
+  # safe end walls. Transfer actual holes to its own bar; stations are REF.
   stock_name: HIWIN-style HGR15 rail, 450 mm, NUIBBYED kit (2 rails + 4 HGH15CA)
   supplier: Amazon (sold by XIQI)
   supplier_skus: ["B0C4DJNL33"]

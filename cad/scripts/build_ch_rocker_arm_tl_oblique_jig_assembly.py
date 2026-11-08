@@ -6,8 +6,9 @@ saved under rail 1 on -X, turned over under rail 2 on +X) held to the table
 by hold-down studs in T-nuts under flange nuts, an HGR15 rail screwed on each
 bar with an HGH15 carriage on it, a plain pivot block on rail 2 and an
 integral nut-lug feed block on rail 1. Purchased shoulder screws, selected
-shims and loose spacers support and capture the carrier. Its gauge-pin HUB
-locator is bonded; the CL dowel, riser, clamp and lever retain their roles.
+shims and loose spacers support and capture the carrier. The strap is held
+by three common #8-32 SHCS (CL and CR direct, HUB through the brass top-hat
+washer) against two loose stock stop pins in the riser.
 The raised leadscrew runs in two KP08 blocks on on-edge end brackets and
 through the feed block's nut. Every bought item and screw is inserted.
 
@@ -16,8 +17,9 @@ Authored in the MACHINE frame of ``ch_rocker_arm_tl_oblique_jig_assembly_spec``
 column, +Z up) at the symmetric inner pass. Every pose is the spec's
 (``spec.PLACEMENTS``), derived from the calculator
 ``ch_rocker_arm_tl_oblique_trammel_spec``. The structure is fixed; the moving
-families (``spec.MOVING``) are inserted free at that pose and mated
-(``spec.LOCKED_TO``, ``spec.PIN_MATES``): each carriage on its rail, the
+occurrences (``spec.is_moving``: the families in ``spec.MOVING``, but only the
+common screw's strap clamps of its family) are inserted free at that pose and
+mated (``spec.LOCKED_TO``, ``spec.PIN_MATES``): each carriage on its rail, the
 carrier on the two pins (a planar P-R-R-P loop), everything else lock-mated
 to what carries it. Carriage 1's slide is the one free DOF: recorded in the
 DOF manifest (``spec.SLIDE_KEY``), never authored, and the build writes the
@@ -33,10 +35,6 @@ The named explode JIG_EXPLODED (Default and Default Simplified) is the fitter
 drawing's exploded view: the disassembly order along the machine axes, each
 step read back in world space and the saved pose proven unchanged.
 
-The hidden sketch ``spec.CL_TIP_FEATURE`` carries the CL dowel's round tip
-above the riser top (``cl_dowel.TIP_HEIGHT``) for the elevation's reference
-dimension: the fitter sets the tip against the actual riser.
-
 Run (SolidWorks already open)::
 
     uv run python cad\scripts\build_ch_rocker_arm_tl_oblique_jig_assembly.py
@@ -47,7 +45,7 @@ from __future__ import annotations
 import json
 import math
 import sys
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -79,21 +77,11 @@ from _com import _early_bound
 from _component_references import component_identity, component_reference_names
 from _custom_properties import apply_custom_properties
 from _document_units import apply_package_model_units
-from _drawing_marks import DRAWN_BY, mark_dimensions_for_drawing
-from _drawing_precision import apply_drawing_precision
-from _feature_tree import name_last_feature
+from _drawing_marks import DRAWN_BY
 from _ch_rocker_arm_tl_oblique_jig_interference import ALLOWED_PAIRS
 from _named_views import octant_rotation
 from _session import run_build
 from _simplified_names import simplified_name
-from _sketch import (
-    SketchDims,
-    anchor_point_to_origin,
-    blank_sketch,
-    dimension_between,
-    ensure_fully_defined,
-    set_sketch_direct_db,
-)
 from _transforms import euler_from_rows
 from _visibility import blank_reference_geometry
 
@@ -101,9 +89,11 @@ ASM_NAME = "ch-rocker-arm-tl-oblique-jig"
 assert ASM_NAME == spec.ASM_NAME, (ASM_NAME, spec.ASM_NAME)
 # Literal (physical filename, logical family) rows: the build graph reads the
 # first field syntactically, never through a spec-derived or generated filename.
-# A repeated kit file is one producer with one configured BOM row per member.
+# A repeated configured file (a purchased kit or the TL-20 base bar) is one
+# producer with one configured BOM row per member.
 _PARTS = (
-    ("ch-rocker-arm-tl-oblique-base-bar", "ch-rocker-arm-tl-oblique-base-bar"),
+    ("ch-rocker-arm-tl-oblique-base-bar", "ch-rocker-arm-tl-oblique-base-bar--Bar1"),
+    ("ch-rocker-arm-tl-oblique-base-bar", "ch-rocker-arm-tl-oblique-base-bar--Bar2"),
     ("ch-rocker-arm-tl-oblique-carrier", "ch-rocker-arm-tl-oblique-carrier"),
     ("ch-rocker-arm-tl-oblique-pivot-block", "ch-rocker-arm-tl-oblique-pivot-block"),
     ("ch-rocker-arm-tl-oblique-feed-block", "ch-rocker-arm-tl-oblique-feed-block"),
@@ -111,12 +101,12 @@ _PARTS = (
     ("ch-rocker-arm-tl-vn-oblique-pivot-spacer", "ch-rocker-arm-tl-vn-oblique-pivot-spacer"),
     ("ch-rocker-arm-tl-vn-oblique-pivot-shim", "ch-rocker-arm-tl-vn-oblique-pivot-shim"),
     ("ch-rocker-arm-tl-oblique-riser", "ch-rocker-arm-tl-oblique-riser"),
-    ("ch-rocker-arm-tl-vn-oblique-hub-pin", "ch-rocker-arm-tl-vn-oblique-hub-pin"),
+    ("ch-rocker-arm-tl-oblique-hub-washer", "ch-rocker-arm-tl-oblique-hub-washer"),
     ("ch-rocker-arm-tl-oblique-feed-lever", "ch-rocker-arm-tl-oblique-feed-lever"),
     ("ch-rocker-arm-tl-oblique-end-bracket", "ch-rocker-arm-tl-oblique-end-bracket"),
     ("ch-rocker-arm-tl-vn-oblique-rail-kit", "ch-rocker-arm-tl-vn-oblique-rail-kit--Rail"),
     ("ch-rocker-arm-tl-vn-oblique-rail-kit", "ch-rocker-arm-tl-vn-oblique-rail-kit--Carriage"),
-    ("ch-rocker-arm-tl-vn-oblique-cl-dowel", "ch-rocker-arm-tl-vn-oblique-cl-dowel"),
+    ("sm-vn-knife-mount-dowel", "sm-vn-knife-mount-dowel"),
     ("ch-rocker-arm-tl-vn-oblique-leadscrew-kit", "ch-rocker-arm-tl-vn-oblique-leadscrew-kit--LeadScrew"),
     ("ch-rocker-arm-tl-vn-oblique-leadscrew-kit", "ch-rocker-arm-tl-vn-oblique-leadscrew-kit--FeedNut"),
     ("ch-rocker-arm-tl-vn-oblique-pillow-block", "ch-rocker-arm-tl-vn-oblique-pillow-block"),
@@ -125,11 +115,9 @@ _PARTS = (
     ("sh-vn-clamping-kit-hardware", "sh-vn-clamping-kit-hardware--TNut"),
     ("sh-vn-clamping-kit-hardware", "sh-vn-clamping-kit-hardware--FlangeNut"),
     ("ch-rocker-arm-tl-vn-oblique-rail-screw", "ch-rocker-arm-tl-vn-oblique-rail-screw"),
-    ("ch-rocker-arm-tl-vn-oblique-bracket-screw", "ch-rocker-arm-tl-vn-oblique-bracket-screw"),
     ("ch-rocker-arm-tl-vn-oblique-carriage-screw", "ch-rocker-arm-tl-vn-oblique-carriage-screw"),
-    ("ch-rocker-arm-tl-vn-oblique-kp08-screw", "ch-rocker-arm-tl-vn-oblique-kp08-screw"),
+    ("ch-rocker-arm-tl-vn-oblique-bracket-screw", "ch-rocker-arm-tl-vn-oblique-bracket-screw"),
     ("ch-rocker-arm-tl-vn-oblique-riser-screw", "ch-rocker-arm-tl-vn-oblique-riser-screw"),
-    ("ch-rocker-arm-tl-vn-oblique-clamp-screw", "ch-rocker-arm-tl-vn-oblique-clamp-screw"),
     ("ch-rocker-arm-tl-vn-oblique-lever-screw", "ch-rocker-arm-tl-vn-oblique-lever-screw"),
     ("ch-rocker-arm-tl-vn-oblique-lever-washer", "ch-rocker-arm-tl-vn-oblique-lever-washer"),
 )
@@ -162,8 +150,11 @@ async def _place_family(adapter: Any, physical: str, family: str) -> dict[str, s
     native_stem, configuration = spec.COMPONENT_IDENTITIES[family]
     if physical != native_stem:
         raise ValueError(f"{family}: manifest file {physical!r} != {native_stem!r}")
-    ground = family not in spec.MOVING
     placements = spec.PLACEMENTS[family]
+    # Fixed occurrences are grounded; the moving ones are inserted free at
+    # their pose (the common screw's strap clamps ride; its rail occurrences
+    # and the bracket-family bar screws stay fixed).
+    grounds = [not spec.is_moving(family, index) for index in range(len(placements))]
     selectors = [spec.instance_name(family, index) for index in range(len(placements))]
     if len(placements) >= _BATCH_MIN:
         # Keep the batch's source rows in the bounded append-loop form the
@@ -176,7 +167,7 @@ async def _place_family(adapter: Any, physical: str, family: str) -> dict[str, s
                     "part": physical,
                     "position": list(origin),
                     "rows": _rows(rows),
-                    "ground": ground,
+                    "ground": grounds[index],
                     "configuration": configuration or "",
                     "component_reference": selector[1:] if configuration else "",
                 }
@@ -184,7 +175,9 @@ async def _place_family(adapter: Any, physical: str, family: str) -> dict[str, s
         names = await place_components_batch(adapter, rows_spec, label=family)
     else:
         names = []
-        for selector, (origin, rows) in zip(selectors, placements, strict=True):
+        for index, (selector, (origin, rows)) in enumerate(
+            zip(selectors, placements, strict=True)
+        ):
             matrix = _rows(rows)
             names.append(
                 await place_component(
@@ -193,7 +186,7 @@ async def _place_family(adapter: Any, physical: str, family: str) -> dict[str, s
                     list(origin),
                     euler_from_rows(matrix),
                     matrix,
-                    ground=ground,
+                    ground=grounds[index],
                     configuration=configuration or "",
                     component_reference=selector[1:] if configuration else "",
                     label=selector,
@@ -216,15 +209,16 @@ async def _place_family(adapter: Any, physical: str, family: str) -> dict[str, s
     return observed
 
 
-def _verify_kit_references(adapter: Any, placed_names: dict[str, str]) -> None:
-    """Read every kit role/file/member again after the final solve before save."""
+def _verify_member_references(adapter: Any, placed_names: dict[str, str]) -> None:
+    """Read every configured member's role/file/member again after the final
+    solve before save (purchased kits and the TL-20 base bars)."""
     actual = component_reference_names(
-        adapter.currentModel, spec.KIT_COMPONENT_REFERENCES
+        adapter.currentModel, spec.MEMBER_COMPONENT_REFERENCES
     )
     expected = {selector: placed_names[selector] for selector in actual}
     if actual != expected:
         raise RuntimeError(
-            f"jig final kit references {actual!r} != inserted {expected!r}"
+            f"jig final member references {actual!r} != inserted {expected!r}"
         )
 
 
@@ -261,9 +255,11 @@ async def _mate_carriages(adapter: Any, names: dict[str, str]) -> None:
 async def _lock_families(
     adapter: Any, families: list[str], names: dict[str, str]
 ) -> None:
-    """Lock-mate every instance of ``families`` to what carries it."""
+    """Lock-mate every moving instance of ``families`` to what carries it."""
     for stem in families:
         for index in range(spec.QUANTITIES[stem]):
+            if not spec.is_moving(stem, index):
+                continue
             child = names[spec.instance_name(stem, index)]
             parent = names[spec.lock_parent(stem, index)]
             await lock_mate(
@@ -347,14 +343,15 @@ def explode_step_components(
     selectors: Sequence[str],
     groups: Mapping[str, Sequence[Any]],
     by_name: Mapping[str, Any],
-    kit_names: Mapping[str, str],
+    member_names: Mapping[str, str],
 ) -> list[Any]:
     """The native components one ``spec.EXPLODE_STEPS`` entry moves.
 
     A family selector moves its whole identity group. An instance selector
     (``spec.instance_name``; the riser and nut screws share a family but
-    explode apart) moves the one occurrence it names: a kit occurrence by its
-    persisted role reference (``kit_names``), any other by the Name2
+    explode apart; so do the KP08 and TL-28 bar screws) moves the one
+    occurrence it names: a configured member's occurrence by its persisted
+    role reference (``member_names``), any other by the Name2
     ``_place_family`` proved equal to its selector.
     """
     moved: dict[str, Any] = {}
@@ -368,7 +365,7 @@ def explode_step_components(
                 raise RuntimeError(
                     f"{label}: unknown explode selector {selector!r}"
                 ) from error
-            name = kit_names.get(occurrence, occurrence)
+            name = member_names.get(occurrence, occurrence)
             if name not in by_name:
                 raise RuntimeError(
                     f"{label}: explode occurrence {selector!r} has no component {name!r}"
@@ -480,7 +477,7 @@ def _create_jig_explode(adapter: Any, configuration_name: str) -> None:
         _early_bound(component, "IComponent2")
         for component in (assembly.GetComponents(True) or ())
     )
-    kit_names = component_reference_names(model, spec.KIT_COMPONENT_REFERENCES)
+    member_names = component_reference_names(model, spec.MEMBER_COMPONENT_REFERENCES)
     groups: dict[str, list[Any]] = {family: [] for family in spec.QUANTITIES}
     for component in components:
         identity = component_identity(component)
@@ -519,7 +516,7 @@ def _create_jig_explode(adapter: Any, configuration_name: str) -> None:
         for step_index, (label, selectors, key, distance_mm) in enumerate(
             spec.EXPLODE_STEPS, 1
         ):
-            moved = explode_step_components(label, selectors, groups, by_name, kit_names)
+            moved = explode_step_components(label, selectors, groups, by_name, member_names)
             distance = distance_mm / 1000.0
             with _telemetry.span(
                 "assembly.jig_explode.step", label=label, moved=len(moved)
@@ -712,113 +709,6 @@ def name_machine_views(adapter: Any) -> None:
     model.ShowNamedView2("*Isometric", _SW_ISOMETRIC_VIEW)
 
 
-def _elevation_sketch_mapper(
-    adapter: Any, *, label: str
-) -> Callable[[float, float], tuple[float, float]]:
-    """Map machine (X, Z) mm, at Y = 0, into the ACTIVE Top-plane sketch.
-
-    The plane's sketch axes are SolidWorks' to state (``ModelToSketchTransform``;
-    build_ch_rocker_arm_tl_oblique_carrier's mapper): machine X must run along
-    sketch u and Z along v, either sign, so a vertical relation runs up Z."""
-    import pythoncom
-    from win32com.client import VARIANT
-
-    active = adapter.currentModel.GetActiveSketch2()
-    if active is None:
-        raise RuntimeError(f"{label}: no active sketch")
-    sketch = _early_bound(active, "ISketch")
-    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
-
-    def raw(model_mm: tuple[float, float, float]) -> tuple[float, ...]:
-        point = utility.CreatePoint(
-            VARIANT(
-                pythoncom.VT_ARRAY | pythoncom.VT_R8, [c / 1000.0 for c in model_mm]
-            )
-        )
-        moved = _early_bound(
-            _early_bound(point, "IMathPoint").MultiplyTransform(transform),
-            "IMathPoint",
-        )
-        return tuple(c * 1000.0 for c in moved.ArrayData)
-
-    base = raw((0.0, 0.0, 0.0))
-    for unit, along in (((1.0, 0.0, 0.0), 0), ((0.0, 0.0, 1.0), 1)):
-        delta = [m - b for m, b in zip(raw(unit), base, strict=True)]
-        if abs(abs(delta[along]) - 1.0) > 1e-6:
-            raise RuntimeError(
-                f"{label}: machine {unit} maps to sketch {delta!r}, not along "
-                f"sketch {'uv'[along]}"
-            )
-
-    def to_sketch(x: float, z: float) -> tuple[float, float]:
-        u, v, w = raw((x, 0.0, z))
-        if abs(w) > 1e-4:
-            raise RuntimeError(f"{label}: ({x}, 0, {z}) is {w:g} mm off the sketch")
-        u, v = round(u, 9), round(v, 9)
-        return (0.0 if abs(u) < 1e-9 else u, 0.0 if abs(v) < 1e-9 else v)
-
-    return to_sketch
-
-
-async def _author_cl_tip_setting(adapter: Any) -> None:
-    """CL TIP ABOVE RISER (``spec.CL_TIP_FEATURE``): a construction line on
-    the Top plane (machine X-Z, the operator's elevation's plane) up the CL
-    dowel's axis from the riser top to the round tip the dowel is placed at,
-    its length ``cl_dowel.TIP_HEIGHT``. The fitter sets the tip against the
-    actual riser (step 11), so the elevation prints it as a reference. Marked
-    for the drawing, then blanked. No component, mate or pose edits."""
-    feature = spec.CL_TIP_FEATURE
-    (x, riser_top_z), (tip_x, tip_z) = spec.CL_TIP_LINE
-    tip_height = spec.cl_dowel.TIP_HEIGHT
-    if tip_x != x or abs(tip_z - riser_top_z - tip_height) > 1e-9:
-        raise RuntimeError(f"{feature}: {spec.CL_TIP_LINE} is not TIP_HEIGHT up Z")
-    if abs(x) < 1e-9 or abs(riser_top_z) < 1e-9:
-        # anchor_point_to_origin emits one dimension per nonzero coordinate.
-        raise RuntimeError(f"{feature}: the riser-top end must lie off both axes")
-    dims = SketchDims()
-    check(f"create {feature} sketch", await adapter.create_sketch("Top"))
-    to_sketch = _elevation_sketch_mapper(adapter, label=feature)
-    start, end = to_sketch(x, riser_top_z), to_sketch(x, tip_z)
-    # Direct to the database: inference would snap a 1.6 line's ends.
-    set_sketch_direct_db(adapter, True)
-    try:
-        line = check(f"{feature} line", await adapter.add_line(*start, *end))
-    finally:
-        set_sketch_direct_db(adapter, False)
-    segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
-    segment.ConstructionGeometry = True
-    if not bool(segment.ConstructionGeometry):
-        raise RuntimeError(f"{feature} line is not construction")
-    check(
-        f"{feature} vertical",
-        await adapter.add_sketch_constraint(line, None, "vertical"),
-    )
-    await anchor_point_to_origin(
-        adapter, f"{line}.start", *start, "CL dowel axis at the riser top"
-    )
-    dims.record("ClTipAxisX")
-    dims.record("ClTipRiserTopZ")
-    await dimension_between(
-        adapter,
-        f"{line}.start",
-        f"{line}.end",
-        "vertical_distance",
-        tip_height,
-        "CL round tip above the riser top",
-    )
-    dims.record(spec.CL_TIP_DIMENSION)
-    await ensure_fully_defined(adapter, feature)
-    check(f"exit {feature} sketch", await adapter.exit_sketch())
-    name_last_feature(adapter, feature)
-    dims.apply(adapter, feature)
-    apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
-    mark_dimensions_for_drawing(adapter, feature, spec.DRAWING_DIMENSIONS[feature])
-    # Blanked so no view renders the line; the drawing shows it in the
-    # elevation only, for its one imported reference dimension.
-    blank_sketch(adapter, feature)
-
-
 async def build(adapter) -> dict[str, str]:
     # Flip seeds + free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
     activate_assembly_contract(ASM_NAME)
@@ -838,8 +728,8 @@ async def build(adapter) -> dict[str, str]:
     # the nut bracket locked to it; the carrier on the pins; its riders
     # locked to it.
     await _mate_carriages(adapter, placed_names)
-    def _rides_carrier(parents: tuple[tuple[str, int], ...]) -> bool:
-        return any(parent == spec.CARRIER for parent, _n in parents)
+    def _rides_carrier(parents: tuple[tuple[str, int] | None, ...]) -> bool:
+        return any(parent is not None and parent[0] == spec.CARRIER for parent in parents)
 
     carried = [stem for stem, parents in spec.LOCKED_TO.items() if not _rides_carrier(parents)]
     riders = [stem for stem, parents in spec.LOCKED_TO.items() if _rides_carrier(parents)]
@@ -849,6 +739,8 @@ async def build(adapter) -> dict[str, str]:
     # The mates solved in place: every moving instance is still at its pose.
     for moving in spec.MOVING:
         for index, (origin, rows) in enumerate(spec.PLACEMENTS[moving]):
+            if not spec.is_moving(moving, index):
+                continue
             assert_component_placed(
                 adapter,
                 placed_names[spec.instance_name(moving, index)],
@@ -859,13 +751,15 @@ async def build(adapter) -> dict[str, str]:
         f"jig at the {spec.PASS} pass, theta {spec.THETA:g}: pins at station "
         f"{spec.PIN_STATION:.3f}, carriages at {spec.CARRIAGE_STATION:.3f}; "
         f"carrier underside Z {spec.trammel.CARRIER_UNDERSIDE_Z:.1f}, "
-        f"HUB pin Z {spec.HUB_PIN_BOTTOM_Z:.1f}..{spec.HUB_PIN_TOP_Z:.1f}"
+        f"strap top Z {spec.PART_TOP_Z:.3f}"
     )
 
     # One free DOF, the sweep: every moving family reads under-constrained
     # (a rider a mate silently fixed fails) and nothing else does. A moving
     # kit member shares its file with a fixed one (Carriage with Rail, FeedNut
-    # with LeadScrew), so each of its own occurrences must read free too.
+    # with LeadScrew), and the common screw's strap clamps share theirs with
+    # its fixed rail and bar occurrences, so each such moving occurrence must
+    # read free itself.
     assert_free_dof_necessity(
         adapter,
         1,
@@ -874,7 +768,9 @@ async def build(adapter) -> dict[str, str]:
             placed_names[spec.instance_name(family, index)]
             for family in spec.MOVING
             if family in spec.KIT_IDENTITIES
+            or not all(spec.is_moving(family, i) for i in range(spec.QUANTITIES[family]))
             for index in range(spec.QUANTITIES[family])
+            if spec.is_moving(family, index)
         ),
         allowed_stems=allowed_free_stems(ASM_NAME),
     )
@@ -889,9 +785,6 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         allowed_pairs=ALLOWED_PAIRS,
     )
-    # The CL dowel's tip-above-riser reference, after the poses and the
-    # interference check (it touches no component, mate or pose).
-    await _author_cl_tip_setting(adapter)
 
     # Title-block identity for the fitter drawing
     # (draw_ch_rocker_arm_tl_oblique_jig_assembly.py); material and finish are
@@ -919,7 +812,7 @@ async def build(adapter) -> dict[str, str]:
     return await save_assembly_and_images(
         adapter,
         ASM_NAME,
-        solved_gates=lambda current: _verify_kit_references(current, placed_names),
+        solved_gates=lambda current: _verify_member_references(current, placed_names),
     )
 
 

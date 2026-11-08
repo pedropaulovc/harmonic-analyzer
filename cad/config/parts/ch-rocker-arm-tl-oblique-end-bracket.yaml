@@ -2,7 +2,7 @@ ch-rocker-arm-tl-oblique-end-bracket:
   title: Rocker Oblique Trammel End Bracket
   # Shop fixture: the parent MHA-CH-06 Number plus -TL-nn (subsystem-identities.md).
   number: MHA-CH-06-TL-28
-  # The bracket only holds four #8-32 and two #6-32 tapped holes for SHCS and
+  # The bracket only holds two #8-32 tapped holes for SHCS and
   # keeps its stock width and height: no grade or temper is functional, so
   # the title block names the aluminium flat-bar family (rule 2; machinist
   # review ENFORCE); the owned OnlineMetals 1165 6061-T6511 bar is the source.
@@ -11,16 +11,16 @@ ch-rocker-arm-tl-oblique-end-bracket:
   finish: as machined
   quantity: 2
   tolerance_class: machined_block
-  # Owner ruling 2026-11-05: the CAD follows the 2026-11-02 hand traveler (issue
-  # #2154): a hand plug tap cannot thread the 1 in height, so each tap drill runs
-  # through and each thread runs from its screw's face to .450 MIN full thread.
-  process: "saw and face to length; drill the four #8-32 and two #6-32 tap holes through; plug-tap the #8-32 from the bar (bottom) face and the #6-32 from the KP08 (top) face about 5/8 in deep, leaving .450 min full thread; break edges"
+  # Owner 2026-11-07 A″: #29 THRU bores, finite full threads from BOTH faces.
+  # Both screws are #8-32 x 5/8; neither enters the opposed-phase cut.
+  # The owned hand taps suffice; no extension-tap procurement prerequisite.
+  process: "saw and face to length; drill both holes #29 through; using tools.taps-unc-hand, plug-start then bottoming-finish each face; full thread .370-.496 in from bar face and .429-.555 in from KP08 face; bottoming TIP insertion marks .433-.527 in from bar face and .492-.586 in from KP08 face, measured from the physical tip, for 1-2 pitch lead; do not advance the plug beyond the corresponding final tip limit; unused middle thread may double-cut but neither screw may enter the opposed-phase cut; break edges"
   # KP08 axial width 13 is the uxcell listing's (55 x 13 x 28, read 2026-11-04); nominal overhang is 0.15 each side.
   # Reallocate bought 1165 leftover after TL-26; 1164 half-by-three-quarter is spare.
   machinist_exceptions:
     - id: "RV-01"
       kind: "minor"
-      where: "front view: the two 6-32 KP08 block-hole stations 13.925 ±.13 mm and 55.925 ±.13 mm"
+      where: "front view: the two 8-32 KP08 block-hole stations 13.925 ±.13 mm and 55.925 ±.13 mm"
       finding: "metric vendor-mating hole stations print in millimetres on an inch sheet, beside inch stations from the same left end"
       reason: "owner ruling 2026-11-01 (ruling 4B), relayed by Main: the KP08 pillow block, HGR15R rail and Tr8 nut are metric-only vendor lines, so the stations that mate with their holes keep the vendor's exact millimetres, printed in mm with the unit label and an explicit mm band (drawing-simplicity-policy.md, supplier-unit exception), not rounded inch conversions"
   drawing_unit: in

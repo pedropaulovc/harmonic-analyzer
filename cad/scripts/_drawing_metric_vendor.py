@@ -30,11 +30,18 @@ from _metric_vendor_dimension import (
 
 @_telemetry.traced("drawing.metric_vendor_dimensions")
 def print_imported_metric_dimensions(
-    adapter: Any, annotations: Iterable[Any], places: dict[str, int]
+    adapter: Any, annotations: Iterable[Any], places: dict[str, int],
+    *, references: Iterable[str] = (),
 ) -> None:
-    """Print each named imported dimension in mm with the ``mm`` label at the
-    builder's places, and prove it reads back; an unmatched name is an error."""
+    """Print model-owned metric controls/REFs without rewriting their text.
+
+    Reference dimensions require the complete ``(value mm)`` presentation,
+    not bare parentheses which would discard the metric unit label.
+    """
     remaining = dict(places)
+    reference_names = set(references)
+    if not reference_names <= remaining.keys():
+        raise ValueError("metric reference names must also declare model precision")
     for raw in annotations:
         annotation = _early_bound(raw, "IAnnotation")
         name = _annotation_name(adapter, annotation)
@@ -50,8 +57,11 @@ def print_imported_metric_dimensions(
             )
         if display.SetUnits2(False, _SW_MM, _SW_DECIMAL, 0, False, 0) != 0:
             raise RuntimeError(f"{name}: millimetre units were rejected on the sheet")
-        expected = (False, _SW_MM, digits, MM_SUFFIX)
-        if _presentation(display) != expected:
+        suffix = MM_SUFFIX + ")" if name in reference_names else MM_SUFFIX
+        expected = (False, _SW_MM, digits, suffix)
+        if _presentation(display) != expected or (
+            name in reference_names and str(display.GetText(1) or "") != "("
+        ):
             raise RuntimeError(
                 f"imported dimension {name!r} does not print millimetres: "
                 f"{_presentation(display)!r} != {expected!r}"

@@ -716,13 +716,14 @@ def test_washer_already_clear_od_is_unchanged_without_repositioning(monkeypatch)
     assert case.paint[case.helper.OUTER_DIAMETER].record == before
 
 
+# The retired clamp screw (MHA-CH-06-TL-VN-68) has no consumer. Its CL, CR and HUB
+# clamps use the common screw (91251A197, MHA-CH-06-TL-VN-61), which the rail row covers.
 @pytest.mark.parametrize(
     "family,head_half,head_one,front_half,front_one",
     (
         ("carriage", 14.676, 18.176, 23.332567791611, 35.489135583221),
         ("bracket", 14.605, 18.034, 21.353286632314, 31.530573264629),
         ("rail", 14.605, 18.034, 22.950425184312, 34.724850368624),
-        ("clamp", 15.9385, 20.701, 25.705462650093, 40.234925300185),
         ("lever", 17.129125, 23.08225, 28.115608490064, 45.055216980128),
     ),
 )

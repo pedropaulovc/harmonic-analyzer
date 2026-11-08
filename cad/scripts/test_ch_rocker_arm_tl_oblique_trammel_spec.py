@@ -90,7 +90,7 @@ def test_both_cutters_are_on_hand_as_four_flute_end_mills() -> None:
     assert trammel.RISER_CUTTER_DIA == pytest.approx(0.5625 * 25.4)
 
 
-def test_jig_stock_covers_finished_geometry_carrier_on_hand_riser_ordered() -> None:
+def test_carrier_stock_and_new_riser_blank_requirements() -> None:
     inventory = tomllib.loads(
         (plans.PROCESS_ROOT / "shop" / "inventory.toml").read_bytes().decode()
     )
@@ -99,8 +99,8 @@ def test_jig_stock_covers_finished_geometry_carrier_on_hand_riser_ordered() -> N
         if "OnlineMetals 1173" in row.get("note", "")
         and "TL-21 carrier" in row.get("note", "")
     ]
-    (riser,) = [
-        row for row in inventory["stock"] if "MHA-CH-06-TL-24" in row.get("note", "")
+    (former_riser,) = [
+        row for row in inventory["stock"] if "8663K55" in row.get("note", "")
     ]
     assert carrier["on_hand"] is True
     import ch_rocker_arm_tl_oblique_carrier_spec as carrier_spec
@@ -109,22 +109,21 @@ def test_jig_stock_covers_finished_geometry_carrier_on_hand_riser_ordered() -> N
     assert carrier["section_mm"][0] >= carrier_spec.PLATE_WIDTH
     assert carrier["section_mm"][1] > carrier_spec.THICKNESS
     assert carrier["length_mm"] >= carrier_spec.PLATE_LENGTH
-    # The owner-selected riser bar (McMaster 8663K55) was ordered 2026-11-03 and
-    # covers the faced and milled blank. It is not on hand until received (#2173).
-    assert "8663K55" in riser["note"]
-    assert "ordered 2026-11-03" in riser["note"]
-    assert riser["on_hand"] is False
-    assert riser["section_mm"][0] > riser_spec.BLANK_WIDTH
-    assert riser["section_mm"][1] > riser_spec.THICKNESS
-    assert riser["length_mm"] > riser_spec.BLANK_LENGTH
+    # Keep the real acetal order as provenance; do not invent a 6061 purchase.
+    assert former_riser["material"] == "Acetal (Delrin)"
+    assert "ordered 2026-11-03" in former_riser["note"]
+    assert "unallocated stock" in former_riser["note"]
+    assert 1.75 * 25.4 > riser_spec.BLANK_WIDTH
+    assert 0.25 * 25.4 > riser_spec.THICKNESS
+    assert riser_spec.BLANK_LENGTH == 13.80 * 25.4
+    assert riser_spec.BLANK_WIDTH == pytest.approx(1.69 * 25.4, rel=0.0, abs=1e-12)
 
 
 def test_strap_blank_is_the_bought_one_and_a_half_inch_strap_stock() -> None:
-    """Owner order 2026-11-03 (#2173): the MHA-CH-13 strap comes from 1/8 x
-    1-1/2 in 1018 flat. The jig takes the blank at the as-bought width and the
-    strap faced to its finished thickness; the strap, its CL/CR holes and the
-    CR clamp screw's head seat all stay on the narrower blank, over the riser."""
-    import ch_rocker_arm_tl_oblique_carrier_spec as carrier_spec
+    """Preserve the procured 4807 stock and its existing source datum."""
+    import ch_rocker_arm_tl_oblique_blank_spec as blank
+    import ch_rocker_arm_tl_oblique_riser_spec as riser
+    from _mcmaster_91251a197 import DIMS as common_screw
 
     inventory = tomllib.loads(
         (plans.PROCESS_ROOT / "shop" / "inventory.toml").read_bytes().decode()
@@ -135,7 +134,7 @@ def test_strap_blank_is_the_bought_one_and_a_half_inch_strap_stock() -> None:
         if "(MHA-CH-13)" in row.get("note", "") and "BLANK_WIDTH" in row.get("note", "")
     ]
     width, thick = strap["section_mm"]
-    assert trammel.BLANK_WIDTH == width == pytest.approx(1.5 * 25.4)
+    assert blank.BLANK_WIDTH == trammel.BLANK_WIDTH == width == pytest.approx(1.5 * 25.4)
     assert thick > trammel.STRAP_THICK == rocker.ARM_THICKNESS
     # Five blanks in each 72 in length, short by four 1/8 in cut bands.
     assert 5 * trammel.BLANK_LENGTH + 4 * 0.125 * 25.4 < strap["length_mm"]
@@ -150,18 +149,14 @@ def test_strap_blank_is_the_bought_one_and_a_half_inch_strap_stock() -> None:
         (trammel.BLANK_WIDTH - (high - low)) / 2.0
     )
     assert trammel.BLANK_EDGE_WASTE >= WALL_TARGET_MM
-    # The blank, centred on that span, carries the CL dowel's hole and the CR
-    # clamp screw's head seat (its widest head) with the .080 wall to an edge.
-    edge_low = low - trammel.BLANK_EDGE_WASTE
-    edge_high = high + trammel.BLANK_EDGE_WASTE
-    cl_hole_r = (carrier_spec.CL_DOWEL_DIA + max(carrier_spec.CL_HOLE_BAND)) / 2.0
-    head_r = carrier_spec.CR_HEAD_DIA_MAX / 2.0
-    for y, radius in ((trammel.CL[1], cl_hole_r), (trammel.CR[1], head_r)):
-        assert edge_low + WALL_TARGET_MM <= y - radius
-        assert y + radius <= edge_high - WALL_TARGET_MM
-    # The strap's whole span lies over the riser blank it is clamped onto.
-    riser_low = trammel.RISER_BLANK_ORIGIN[1]
-    assert riser_low < low < high < riser_low + trammel.RISER_BLANK_WIDTH
+    # Both common #8 heads remain wholly in end waste on the procured blank.
+    # The exact transferred-hole/setup certificate is in holding_spec.
+    edge_low, edge_high = blank.RAW_Y_MIN, blank.RAW_Y_MAX
+    head_r = common_screw.head_dia / 2.0
+    for point in (trammel.CL, trammel.CR):
+        assert edge_low + WALL_TARGET_MM <= point[1] - head_r
+        assert point[1] + head_r <= edge_high - WALL_TARGET_MM
+    assert riser.BLANK_ORIGIN[1] < low < high < riser.BLANK_ORIGIN[1] + riser.BLANK_WIDTH
 
 
 def test_both_cutter_circles_share_the_arc_centre() -> None:
@@ -241,6 +236,19 @@ def test_every_pin_stays_on_its_rail_over_both_passes() -> None:
                 carriage = s - trammel.PIN_OFFSET
                 lo, hi = trammel.CARRIAGE_S_RANGE
                 assert lo <= carriage <= hi
+                assert carriage <= hi - trammel.RAIL_LENGTH_BAND
+
+
+def test_trimmed_rails_retain_full_travel_at_shortest_bar_length() -> None:
+    assert trammel.RAIL_LENGTH == trammel.BASE_BAR_LENGTH
+    assert trammel.RAIL_SUPPLY_LENGTH == 450.0
+    assert trammel.RAIL_TRIM_PER_END == pytest.approx(5.036)
+    assert trammel.CARRIAGE_S_RANGE == pytest.approx((45.7, 424.228))
+    # Centring the pivot moves the carriage interval 32 mm toward the near end.
+    assert trammel.PIN_OFFSET == 0.0
+    assert trammel.CARRIAGE_END_MARGINS_WORST == pytest.approx(
+        (29.515018839, 34.607559206), abs=0.001
+    )
 
 
 def test_the_sweep_carries_the_part_cutter_past_both_tip_lands() -> None:
@@ -279,7 +287,7 @@ def test_carriage_play_and_shoulder_clearance_share_half_the_top_edge_band() -> 
     the play the check admits moves the cut radius 1:1, and with the shoulder
     clearance it must stay inside half the strap's top-edge band (the hub aims
     at its middle)."""
-    assert trammel.CARRIAGE_PLAY_TIR_MAX == 0.05
+    assert trammel.CARRIAGE_PLAY_TIR_MAX == 0.02
     assert trammel.CARRIAGE_PLAY_RADIUS_PER_PLAY == 1.0
     assert trammel.CARRIAGE_PLAY_RADIUS == pytest.approx(
         1.0 * trammel.CARRIAGE_PLAY_TIR_MAX
@@ -290,8 +298,9 @@ def test_carriage_play_and_shoulder_clearance_share_half_the_top_edge_band() -> 
     assert trammel.CARRIAGE_PLAY_RADIUS <= trammel.RADIUS_FROM_SHOULDER_CLEARANCE
     budget = trammel.CARRIAGE_PLAY_RADIUS + trammel.RADIUS_FROM_SHOULDER_CLEARANCE
     assert budget <= half_band
-    # 0.050 + 0.112 leaves 0.092 of the .010 in (0.254) half band.
-    assert half_band - budget == pytest.approx(0.092, abs=5e-4)
+    # .020 + .112 leaves .122 here; the complete carrier stack also charges
+    # HUB setting/rounding and the correlated pin error against that same HUB.
+    assert half_band - budget == pytest.approx(0.122, abs=5e-4)
 
 
 def test_plain_pivot_stack_sets_the_carrier_height() -> None:

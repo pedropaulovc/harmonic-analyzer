@@ -89,6 +89,7 @@ CLEARANCE_MM = {  # (size, fit) -> hole diameter (CLOSE/NORMAL/LOOSE_FIT)
 }
 NUMBER_DRILL_MM = {  # number drills cut diameter exactly
     "#9": 4.978,
+    "#12": 4.801,  # 0.1890in: #8 screw clearance held to about .9 reversal (oblique TL-20)
     "#19": 4.216,
     "#20": 4.089,
     "#21": 4.039,
@@ -134,6 +135,8 @@ class HoleSpec:
     thread_class: str = "2B"
     fit: str = "normal"
     overrides_mm: dict[str, float] = field(default_factory=dict)
+    # HoleWizard5's bottom-angle input; 180 produces a flat-bottom blind hole.
+    drill_angle_deg: float = 118.0
 
 
 def blind_cut_dia_mm(spec: HoleSpec) -> float:

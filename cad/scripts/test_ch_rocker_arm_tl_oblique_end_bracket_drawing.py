@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import re
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -17,9 +18,9 @@ import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import draw_ch_rocker_arm_tl_oblique_end_bracket as drawing
 import export_features
-from _drawing_contract import model_toleranced_dimensions
 from _hole_spec import THREAD_MAJOR_MM
 from _inch_wall_limits import WALL_TARGET_MM
+from _paths import CAD_ROOT
 from _printed_tolerance import printed_band_mm
 
 STEM = "ch_rocker_arm_tl_oblique_end_bracket"
@@ -70,64 +71,69 @@ def test_stock_is_the_half_by_one_flat_on_edge() -> None:
     assert spec.KP08_FOOT_OVERHANG == pytest.approx(0.15)
 
 
-def test_kp08_taps_land_on_the_blocks_bolt_spacing_about_the_screw() -> None:
-    holes = [_features()[f"kp08_tap_{i}"] for i in (1, 2)]
+def test_two_holes_land_on_the_blocks_bolt_spacing_about_the_screw() -> None:
+    # A″ retains the two KP08-pitch #29 through bores, with independently
+    # limited full thread from each screw face.
+    holes = [_features()[f"tap_{i}"] for i in (1, 2)]
     laterals = [_lateral(h["at"][0]) for h in holes]
     half = leadscrew.KP08_BOLT_SPACING / 2.0
     assert laterals == pytest.approx(
         [leadscrew.SCREW_LATERAL - half, leadscrew.SCREW_LATERAL + half]
     )
+    assert laterals == pytest.approx(list(leadscrew.BAR_SCREW_LATERALS))
     # Owner ruling 4 (2026-11-01): the KP08's metric stations print exact
     # millimetres at three places, labelled mm, with the millimetre title
     # block's three-place band.
-    assert spec.KP08_TAP_X == pytest.approx((13.925, 55.925))
-    assert all(x == round(x, 3) for x in spec.KP08_TAP_X)
+    assert spec.HOLE_X == pytest.approx((13.925, 55.925))
+    assert spec.HOLE_X == pytest.approx(leadscrew.BRACKET_HOLES_X)
+    assert all(x == round(x, 3) for x in spec.HOLE_X)
     assert spec.METRIC_DIMENSIONS == {
         ("KP08Taps", "KP08Tap1X"): (3, 0.13),
         ("KP08Taps", "KP08Tap2X"): (3, 0.13),
     }
-    assert spec.KP08_TAP_BAND == printed_band_mm(3, unit="mm")
+    assert spec.HOLE_BAND == printed_band_mm(3, unit="mm")
     assert "set_metric_vendor_units(" in Path(part.__file__).read_text(encoding="utf-8")
     sheet = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "print_imported_metric_dimensions(" in sheet
     for hole in holes:
         x = hole["at"][0]
         assert hole["station"] == pytest.approx([x - 0.13, x + 0.13])
-    assert all(h["at"][1] == 0.0 for h in holes)  # the row on the screw's KP08_S
-    assert spec.KP08_TAP_SPEC.kind == "tapped"  # UNC: the block's holes are plain
-    assert spec.KP08_TAP_SPEC.size == leadscrew.KP08_SCREW == "#6-32"
+        assert hole["at"][1] == 0.0  # the row on the screw's KP08_S
+        assert hole["at"][2] == spec.BRACKET_THICK and hole["axis"] == [0.0, 0.0, -1.0]
+        assert hole["thru"] is True
+    assert spec.SCREW == leadscrew.BAR_SCREW == leadscrew.KP08_SCREW == "#8-32"
+    assert spec.BAR_TAP_SPEC.kind == spec.KP08_TAP_SPEC.kind == "tapped"
+    assert spec.BAR_TAP_SPEC.size == spec.KP08_TAP_SPEC.size == "#8-32"
+    assert spec.BAR_TAP_SPEC.end == "blind"
+    assert spec.BAR_TAP_SPEC.depth_mm == spec.BAR_TAP_DRILL_DEPTH
+    assert spec.BAR_TAP_SPEC.overrides_mm == {"ThreadDepth": spec.MODELED_THREAD_DEPTH}
     assert spec.KP08_TAP_SPEC.end == "through_all"
-    assert spec.KP08_TAP_DRILL == pytest.approx(2.705)
-
-
-def test_bar_taps_land_on_the_base_bars_bracket_holes() -> None:
-    holes = [_features()[f"bar_tap_{i}"] for i in (1, 2, 3, 4)]
-    laterals = [_lateral(h["at"][0]) for h in holes]
-    assert laterals == pytest.approx(list(leadscrew.BAR_SCREW_LATERALS))
-    # Ruling A′: two pairs symmetric about the screw axis; every station
-    # prints as modelled at .XXX.
-    assert all(_on_grid(x, spec.HOLE_PLACES) for x in spec.BAR_TAP_X)
-    assert spec.BAR_TAP_SPEC.kind == "tapped"
-    assert spec.BAR_TAP_SPEC.size == leadscrew.BAR_SCREW == "#8-32"
-    assert spec.BAR_TAP_SPEC.end == "through_all"
-    # No counterbore in this part: the screws come up through the bar.
-    assert not any(kind.startswith("counterbore") for kind in (spec.BAR_TAP_SPEC.kind,))
-    # Their threads start on the bar (bottom) face, where the screws enter.
     assert spec.BAR_TAP_FACE == ((0.0, 0.0, -1.0), 0.0)
-    assert all(h["at"][2] == 0.0 and h["axis"] == [0.0, 0.0, 1.0] for h in holes)
+    assert spec.KP08_TAP_FACE == ((0.0, 0.0, 1.0), spec.BRACKET_THICK)
+    assert spec.TAP_DRILL == pytest.approx(3.454)
+    for hole in holes:
+        assert hole["thread"].startswith(f"{spec.SCREW} UNC")
 
 
 def test_both_patterns_fit_their_mates_at_three_places() -> None:
-    # Each station's band about the row's: the bar taps' .XXX, the KP08
-    # taps' exact millimetres at ±0.13.
-    band = printed_band_mm(spec.HOLE_PLACES, unit="in")
-    assert spec.POSITION_RADIUS >= math.hypot(band, band)
-    assert spec.POSITION_RADIUS <= math.hypot(band + 0.0127, band)
-    # The uxcell block's listed Ø5 holes about the #6-32's 3.505 major.
-    assert spec.KP08_SCREW_FLOAT == pytest.approx(0.7475)
+    # Each station's ±0.13 mm about the row's ±.005.
+    band_mm = printed_band_mm(spec.HOLE_PLACES, unit="mm")
+    row_band = printed_band_mm(spec.ROW_PLACES, unit="in")
+    assert spec.POSITION_RADIUS >= math.hypot(band_mm, row_band)
+    assert spec.POSITION_RADIUS == pytest.approx(0.182, abs=1e-3)
+    # The uxcell block's listed Ø5 holes (UNVERIFIED, #2184) about the #8's
+    # 4.166 major.
+    assert spec.KP08_SCREW_FLOAT == pytest.approx(0.417, abs=1e-3)
     assert spec.KP08_PATTERN_ALLOWANCE > 0.0
-    assert spec.BAR_HOLE_DIA == pytest.approx(4.978)
-    assert spec.BAR_PATTERN_ALLOWANCE > 0.0
+    # TL-20's #12 (.189) clearance: each two-screw joint slides and turns, so
+    # half the worst spacing difference must sit inside the least float.
+    assert spec.BAR_HOLE_DIA == pytest.approx(4.801)
+    assert spec.BAR_SCREW_FLOAT == pytest.approx(0.3175, abs=1e-4)
+    assert spec.BAR_PAIR_MISFIT == pytest.approx(0.261, abs=1e-3)
+    assert spec.BAR_PATTERN_ALLOWANCE == pytest.approx(
+        spec.BAR_SCREW_FLOAT - spec.BAR_PAIR_MISFIT
+    )
+    assert spec.BAR_PATTERN_ALLOWANCE > 0.05
     stations = {*drawing.STATION_ORDER, "HoleRowY"}
     assert all(spec.DRAWING_PRECISION_BY_NAME[name] == 3 for name in stations)
     # At the title block's two places this part's and TL-20's position
@@ -137,116 +143,215 @@ def test_both_patterns_fit_their_mates_at_three_places() -> None:
 
 
 def test_every_tight_band_names_its_mate() -> None:
-    for name in ("KP08Tap1X", "KP08Tap2X"):
-        assert spec.CALLOUTS_BELOW[name] == spec.KP08_MATE_CALLOUT
-    for name in ("BarTap1X", "BarTap2X", "BarTap3X", "BarTap4X"):
-        assert spec.CALLOUTS_BELOW[name] == spec.BAR_MATE_CALLOUT
-    assert spec.CALLOUTS_BELOW["HoleRowY"] == spec.ROW_CALLOUT
-    assert "KP08" in spec.KP08_MATE_CALLOUT
-    assert "MHA-CH-06-TL-20" in spec.BAR_MATE_CALLOUT
-    assert "KP08" in spec.ROW_CALLOUT and "MHA-CH-06-TL-20" in spec.ROW_CALLOUT
+    for name in ("KP08Tap1X", "KP08Tap2X", "HoleRowY"):
+        assert spec.CALLOUTS_BELOW[name] == spec.MATE_CALLOUT == spec.ROW_CALLOUT
+    assert spec.MATE_CALLOUT == "KP08 + MHA-CH-06-TL-20"
     # Every three-place dimension on the sheet carries its mate.
     three_place = {
         name for name, places in spec.DRAWING_PRECISION_BY_NAME.items() if places == 3
     }
     assert three_place <= set(spec.CALLOUTS_BELOW)
     for name, feature in _features().items():
-        if name.startswith(("bar_tap", "kp08_tap")):
-            assert feature["note"].startswith("MATCHES"), name
+        if name.startswith("tap_"):
+            assert feature["note"].startswith(f"{spec.MATE_CALLOUT}; "), name
 
 
 def test_no_vendor_sku_on_the_sheet() -> None:
     texts = (
-        spec.KP08_MATE_CALLOUT,
-        spec.BAR_MATE_CALLOUT,
+        spec.MATE_CALLOUT,
         spec.ROW_CALLOUT,
+        drawing.THREAD_LIMIT_CALLOUT,
+        spec.CALLOUTS_BELOW[spec.BAR_THREAD_DEPTH_DIMENSION],
+        spec.CALLOUTS_BELOW[spec.KP08_THREAD_DEPTH_DIMENSION],
         spec.DRAWING_NOTES,
         spec.ISOMETRIC_VIEW_NOTE,
     )
     for text in texts:
         assert not re.search(r"\b\d{4,}[A-Z]\d+\b", text), text  # McMaster style
         assert "AMPEC" not in text.upper()
+        assert "RULING" not in text.upper() and "OWNER" not in text.upper()
 
 
 def test_walls_hold_rule_17_at_worst_case() -> None:
     walls = spec.WALLS_MM
     assert spec.WALL_TARGET == WALL_TARGET_MM
     assert min(walls.values()) >= spec.WALL_TARGET
-    # Ruling A′: every tap to its row neighbours and the end taps to the
-    # ends, in row order, plus the row to both sides.
-    taps = [name for name in walls if "tap" in name]
-    assert len(taps) == len(spec.BAR_TAP_X) + len(spec.KP08_TAP_X) + 1
+    # Each hole to its end, the two holes to each other, the row to both sides.
+    holes = [name for name in walls if name.startswith("hole")]
+    assert len(holes) == len(spec.HOLE_X) + 1
     assert {"row to -Y side", "row to +Y side"} <= set(walls)
     assert spec.RULE_20_SHORTFALLS == ()
     # Cross-check from the exported bands: each thread's major at its station
     # band's far end.
-    holes = _features()
-    bar_1, kp08_1 = holes["bar_tap_1"], holes["kp08_tap_1"]
-    bar_r = THREAD_MAJOR_MM[spec.BAR_SCREW] / 2.0
-    kp08_r = THREAD_MAJOR_MM[spec.KP08_THREAD] / 2.0
-    assert bar_1["station"][0] - bar_r >= WALL_TARGET_MM
-    assert kp08_1["station"][0] - bar_1["station"][1] - bar_r - kp08_r >= WALL_TARGET_MM
-    assert bar_1["height"][0] - bar_r >= WALL_TARGET_MM
+    features = _features()
+    tap_1, tap_2 = features["tap_1"], features["tap_2"]
+    r = THREAD_MAJOR_MM[spec.SCREW] / 2.0
+    assert tap_1["station"][0] - r >= WALL_TARGET_MM
+    assert tap_2["station"][0] - tap_1["station"][1] - 2.0 * r >= WALL_TARGET_MM
+    assert tap_1["height"][0] - r >= WALL_TARGET_MM
 
 
-def test_threads_stop_at_a_full_thread_from_the_screws_faces() -> None:
-    # Owner ruling 2026-11-05: the CAD matches the 2026-11-02 hand traveler.
-    # Drill THRU; thread .450 MIN from each screw's face.
-    assert spec.FULL_THREAD_DEPTH == pytest.approx(0.450 * 25.4)
-    assert spec.FULL_THREAD_DEPTH < spec.BRACKET_THICK - spec.THICK_STOCK_BAND
-    assert spec.KP08_TAP_FACE == ((0.0, 0.0, 1.0), spec.BRACKET_THICK)
-    assert spec.BAR_THREAD_CALLOUT == "MIN FAR SIDE"
-    assert spec.KP08_THREAD_CALLOUT == "MIN"
-    for thread, reach in spec.SCREW_REACH_MAX.items():
-        assert spec.FULL_THREAD_DEPTH >= 1.5 * THREAD_MAJOR_MM[thread]
-        assert 1.5 * THREAD_MAJOR_MM[thread] <= reach <= spec.FULL_THREAD_DEPTH
-    assert spec.SCREW_REACH_MAX[spec.KP08_THREAD] == pytest.approx(10.875)
-    taps = {name: f for name, f in _features().items() if "_tap_" in name}
-    assert len(taps) == 6 and all(f["thru"] is True for f in taps.values())
-    # Both wizard features take the blind thread after their THRU tap drill.
-    builder = Path(part.__file__).read_text(encoding="utf-8")
-    for feature in ("BarTaps", "KP08Taps"):
-        assert builder.count(f'_thread_from_face(adapter, "{feature}"') == 1
-    # The fastener table's receiving thread is the full thread, not the height.
-    assert fasteners.BRACKET_TO_BAR.thread_depth_mm == spec.FULL_THREAD_DEPTH
-    assert fasteners.KP08_TO_BRACKET.thread_depth_mm == spec.FULL_THREAD_DEPTH
-    assert fasteners.BRACKET_TO_BAR.protrusion_mm < 0.0
-    assert fasteners.KP08_TO_BRACKET.protrusion_mm < 0.0
-
-
-def test_holes_carry_the_title_block_band_except_the_kp08_stations() -> None:
-    # Only the KP08 stations carry a model band: millimetres on the inch
-    # sheet, which the inch title block's rows do not cover (owner ruling 4).
-    # (The loop over METRIC_DIMENSIONS reports its source names.)
-    assert model_toleranced_dimensions(part) == {
-        ("feature_name", "dimension_name"): "band"
-    }
-    holes = _features()
-    # The tap drills print .XXX with the title block's drilled-hole band.
-    for name, drill in (
-        ("bar_tap_1", spec.BAR_TAP_DRILL),
-        ("kp08_tap_1", spec.KP08_TAP_DRILL),
-    ):
-        low, high = holes[name]["dia"]
-        assert low == pytest.approx(round(drill / 25.4, 3) * 25.4)
-        assert high - low == pytest.approx(spec.DRILLED_BAND[0])
-    band = printed_band_mm(spec.HOLE_PLACES, unit="in")
-    for name, width in (
-        ("kp08_tap_2", 2.0 * spec.KP08_TAP_BAND),
-        ("bar_tap_1", 2.0 * band),
-    ):
-        low, high = holes[name]["station"]
-        assert high - low == pytest.approx(width)
-    assert holes["bar_tap_1"]["height"] == pytest.approx(
-        [spec.HOLE_ROW_Y - band, spec.HOLE_ROW_Y + band]
+def test_opposed_full_thread_limits_protect_each_screw_from_the_other_tap() -> None:
+    major = THREAD_MAJOR_MM[spec.SCREW]
+    assert leadscrew.BAR_SCREW_LENGTH == leadscrew.KP08_SCREW_LENGTH == "5/8"
+    assert spec.BRACKET_THICK == pytest.approx(25.4)
+    assert spec.BAR_THREAD_LIMITS == pytest.approx((0.370 * 25.4, 0.496 * 25.4))
+    assert spec.KP08_THREAD_LIMITS == pytest.approx((0.429 * 25.4, 0.555 * 25.4))
+    assert spec.MODELED_THREAD_DEPTH == pytest.approx(0.433 * 25.4)
+    assert not hasattr(spec, "BAR_THREAD_DEPTH")
+    assert not hasattr(spec, "KP08_THREAD_DEPTH")
+    assert all(
+        low < spec.MODELED_THREAD_DEPTH < high
+        for low, high in (spec.BAR_THREAD_LIMITS, spec.KP08_THREAD_LIMITS)
     )
-    assert holes["bar_tap_1"]["height_from"] == "bracket_low_side"
+    assert spec.BAR_REACH_MAX == pytest.approx(leadscrew.BAR_SCREW_ENGAGEMENT_RANGE[1])
+    for bounds, reach, opposed_reach in (
+        (spec.BAR_THREAD_LIMITS, spec.BAR_REACH_MAX, spec.KP08_REACH_MAX),
+        (spec.KP08_THREAD_LIMITS, spec.KP08_REACH_MAX, spec.BAR_REACH_MAX),
+    ):
+        low, high = bounds
+        assert low >= reach - 1e-9
+        assert low >= 1.5 * major
+        assert high + spec.BOTTOMING_LEAD_LIMITS[1] + opposed_reach <= spec.THICK_MIN
+        assert all(_on_grid(value, 3) for value in bounds)
+    # Thread zones may overlap in the unused middle; no artificial central
+    # web/non-overlap guard may replace either screw-zone exclusion.
+    assert sum((spec.BAR_THREAD_LIMITS[1], spec.KP08_THREAD_LIMITS[1])) > spec.THICK_MIN
+    assert leadscrew.BAR_SCREW_FULL_THREAD_MIN >= 1.5 * major
+    assert leadscrew.full_thread_min(
+        leadscrew.KP08_SCREW_LENGTH, spec.KP08_FOOT_THICK_MAX, spec.SCREW
+    ) >= 1.5 * major
+    assert spec.SCREW_TIP_GAP_MIN == pytest.approx(
+        spec.THICK_MIN - spec.BAR_REACH_MAX - spec.KP08_REACH_MAX
+    )
+    assert spec.SCREW_TIP_GAP_MIN > 0.0
+    assert fasteners.BRACKET_TO_BAR.thread_depth_mm == spec.BAR_THREAD_LIMITS[0]
+    assert fasteners.KP08_TO_BRACKET.thread_depth_mm == spec.KP08_THREAD_LIMITS[0]
+    from prechips.model import Feature
+
+    for name in ("tap_1", "tap_2"):
+        feature = _features()[name]
+        assert feature["thru"] is True and "note" in feature["requirements"]
+        for low, high in (spec.BAR_THREAD_LIMITS, spec.KP08_THREAD_LIMITS):
+            assert f"{low:.3f} TO {high:.3f} mm" in feature["note"]
+        assert set(feature) <= set(Feature.model_fields)
+
+
+def test_kp08_receipt_band_stands_and_its_least_foot_keeps_the_tips_apart() -> None:
+    # The receipt check's floor (jig step 7) is the vendor-acceptance band,
+    # not widened by the through thread: .196, just under the UNVERIFIED
+    # nominal 5.0 (#2184). On it the 5/8 reaches deepest and the tips still
+    # clear (the test above).
+    assert spec.KP08_FOOT_THICK_MIN == pytest.approx(0.196 * 25.4)
+    assert _on_grid(spec.KP08_FOOT_THICK_MIN, spec.FOOT_PLACES)
+    assert spec.KP08_FOOT_THICK_MIN < leadscrew.KP08_FOOT_THICK
+    assert spec.SCREW_TIP_GAP_MIN > 0.0
+
+
+def test_thickest_kp08_foot_keeps_the_kp08_screw_at_one_and_a_half_d() -> None:
+    # Coordinator gate (post-cap #2237): the receipt check took any foot over
+    # .196. A thicker foot takes the 5/8's engagement off one for one, so the
+    # same check's upper bound is the foot at which its worst-case full thread
+    # is still 1.5 D, rounded DOWN to .001. #2184: the foot stays UNVERIFIED.
+    major = THREAD_MAJOR_MM[spec.SCREW]
+    exact = (
+        leadscrew.full_thread_min(leadscrew.KP08_SCREW_LENGTH, 0.0, spec.SCREW)
+        - 1.5 * major
+    )
+    printed = math.floor(exact / 25.4 * 1000.0 + 1e-9) / 1000.0
+    assert spec.KP08_FOOT_THICK_MAX == pytest.approx(printed * 25.4)
+    assert round(spec.KP08_FOOT_THICK_MAX / 25.4, 3) == 0.292
+    assert spec.KP08_FOOT_THICK_MAX <= exact
+    full = leadscrew.full_thread_min(
+        leadscrew.KP08_SCREW_LENGTH, spec.KP08_FOOT_THICK_MAX, spec.SCREW
+    )
+    assert full >= 1.5 * major
+    assert (
+        spec.KP08_FOOT_THICK_MIN
+        < leadscrew.KP08_FOOT_THICK
+        < spec.KP08_FOOT_THICK_MAX
+    )
+    # A thicker foot only shortens the 5/8's reach: the tip gap, taken on the
+    # least foot, still holds.
+    assert spec.KP08_SCREW_LENGTH_MM - spec.KP08_FOOT_THICK_MAX < spec.KP08_REACH_MAX
+
+
+def test_threads_are_stated_by_native_callouts_and_section_limits() -> None:
+    assert drawing.TAP_FEATURES == ("BarTaps", "KP08Taps")
+    pointer = drawing.THREAD_LIMIT_CALLOUT
+    assert drawing.callout_states_its_thread([f"8-32 UNC\n{pointer}", "", "", ""])
+    assert not drawing.callout_states_its_thread([pointer, "", "", ""])
+    assert not drawing.callout_states_its_thread(["8-32 UNC THRU ALL", "", "", ""])
+    assert not drawing.callout_states_its_thread(
+        [f"8-32 UNC <hw-threaddepth>\n{pointer}", "", "", ""]
+    )
+    for stray in ("#8-32 Tapped Hole", "8-32 Tapped Hole1", "#8-32 UNC - 2B"):
+        assert drawing.stray_thread_notes([spec.ISOMETRIC_VIEW_NOTE, stray]) == [stray]
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "_require_thread_depths(section)" in source
+    assert "_require_threads_drawn(adapter, section)" in source
+    assert "_require_threads_stated_by_callouts_only(adapter, callouts)" in source
+
+
+def test_bottom_blind_precursor_leaves_real_material_for_the_top_wizard() -> None:
+    assert spec.BAR_TAP_DRILL_DEPTH == pytest.approx(0.625 * 25.4)
+    from _hole_spec import DRILL_POINT_H
+
+    assert spec.MODELED_THREAD_DEPTH < spec.BAR_TAP_DRILL_DEPTH
+    assert spec.BAR_TAP_DRILL_DEPTH + spec.TAP_DRILL / 2.0 * DRILL_POINT_H < spec.THICK_MIN
+    assert spec.BAR_TAP_DRILL_DEPTH != pytest.approx(
+        spec.BRACKET_THICK - spec.MODELED_THREAD_DEPTH
+    )
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    body = source[source.index("async def build"):]
+    assert body.count("wizard_holes(") == 2
+    assert body.index("BAR_TAP_SPEC,") < body.index("KP08_TAP_SPEC,")
+    assert body.index("KP08_TAP_SPEC,") < body.index("_bar_face_cosmetic_threads(")
+    assert body.index("_bar_face_cosmetic_threads(") < body.index("_drive_and_finalize_threads(")
+    assert "_thread_from_face(" not in body
+    assert "diameter=THREAD_MAJOR" in source
+    assert part.V_HOLES == pytest.approx(
+        len(spec.HOLE_X) * math.pi * (spec.TAP_DRILL / 2.0) ** 2 * spec.BRACKET_THICK
+    )
+
+
+def test_owned_hand_taps_replace_the_extension_tap_prerequisite() -> None:
+    assert not hasattr(spec, "TAP_REACH_MIN") and not hasattr(spec, "TAP_TOOL")
+    inventory = tomllib.loads(
+        (CAD_ROOT / "process" / "shop" / "inventory.toml").read_text(encoding="utf-8")
+    )
+    assert "tap-8-32-extension-spiral-point" not in inventory["tools"]
+    hand = inventory["tools"]["taps-unc-hand"]["members"]["8-32-plug"]
+    assert hand["flute_len_in"]["value"] == pytest.approx(0.75)
+    process = _config.parts(ARTIFACT)["process"].lower()
+    assert "plug" in process and "bottoming" in process
+    assert "tap-8-32-extension-spiral-point" not in process
+    for low, high in (spec.BAR_THREAD_LIMITS, spec.KP08_THREAD_LIMITS):
+        assert f"{low / 25.4:.3f}".lstrip("0") in process
+        assert f"{high / 25.4:.3f}".lstrip("0") in process
+
+
+def test_hole_size_row_and_stations_retain_their_existing_bands() -> None:
+    holes = _features()
+    band = printed_band_mm(spec.ROW_PLACES, unit="in")
+    for name in ("tap_1", "tap_2"):
+        # The tap drill prints .XXX with the title block's drilled-hole band.
+        low, high = holes[name]["dia"]
+        assert low == pytest.approx(round(spec.TAP_DRILL / 25.4, 3) * 25.4)
+        assert high - low == pytest.approx(spec.DRILLED_BAND[0])
+        low, high = holes[name]["station"]
+        assert high - low == pytest.approx(2.0 * spec.HOLE_BAND)
+        assert holes[name]["height"] == pytest.approx(
+            [spec.HOLE_ROW_Y - band, spec.HOLE_ROW_Y + band]
+        )
+        assert holes[name]["height_from"] == "bracket_low_side"
 
 
 def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    assert set(drawing.PLAN_KEEP) | set(drawing.END_KEEP) == marked
-    assert not set(drawing.PLAN_KEEP) & set(drawing.END_KEEP)
+    keeps = (drawing.PLAN_KEEP, drawing.END_KEEP, drawing.SECTION_KEEP)
+    assert set().union(*keeps) == marked
+    assert sum(len(keep) for keep in keeps) == len(marked)
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
     assert set(spec.CALLOUTS_BELOW) <= marked
 
@@ -266,7 +371,7 @@ def test_every_exported_band_endpoint_is_a_printed_value() -> None:
             if (name, requirement) in stock:
                 continue  # the supplier's band about the stock size
             places = feature["precision"][requirement]
-            metric = name.startswith("kp08_tap") and requirement == "station"
+            metric = name.startswith("tap_") and requirement == "station"
             for end in band:
                 if metric:  # exact millimetres (owner ruling 4)
                     assert end == pytest.approx(round(end, places), abs=1e-9), name
@@ -288,22 +393,30 @@ def test_row_is_located_from_the_faced_low_side() -> None:
     assert drawing._FROM_LOW_SIDE[0] == "bracket_low_side"
 
 
-def test_every_tap_has_its_own_callout() -> None:
-    called = sorted((kind, x) for kind, x, _xy, _side in drawing.TAP_CALLOUTS)
-    assert called == sorted(
-        [("bar", x) for x in spec.BAR_TAP_X] + [("kp08", x) for x in spec.KP08_TAP_X]
-    )
+def test_every_hole_has_its_own_callout() -> None:
+    called = sorted(x for x, _xy, _side in drawing.TAP_CALLOUTS)
+    assert called == sorted(spec.HOLE_X)
+    assert drawing.CALLOUT_ROWS == 3
+    assert drawing.CALLOUT_GLYPHS >= len(drawing.THREAD_LIMIT_CALLOUT)
+
+
+# Exact definitions captured by native-failure-a8b2ac4c-end-bracket.log.
+_NATIVE_TAP_CALLOUT = {
+    5: "<hw-threaddesc> <hw-threadclass> <HOLE-DEPTH> <hw-threaddepth>",
+    6: "",
+    7: "<NUM_INST>X <MOD-DIAM> <hw-tapdrldia> <hw-thru>",
+    8: "",
+}
+_NATIVE_TAP_TOKENS = (
+    "<hw-threaddesc>", "<hw-threadclass>", "<HOLE-DEPTH>", "<hw-threaddepth>",
+    "<NUM_INST>", "<MOD-DIAM>", "<hw-tapdrldia>", "<hw-thru>",
+)
 
 
 def test_single_hole_definitions_drop_exactly_the_count() -> None:
-    definitions = {
-        5: "<hw-thread> UNC - <hw-threadclass> THRU ALL",
-        6: "",
-        7: "<NUM_INST>X <MOD-DIAM><hw-tapdrldia> THRU ALL",
-        8: "",
-    }
+    definitions = dict(_NATIVE_TAP_CALLOUT)
     updated = drawing.single_hole_definitions(definitions)
-    assert updated == {**definitions, 7: "<MOD-DIAM><hw-tapdrldia> THRU ALL"}
+    assert updated == {**definitions, 7: "<MOD-DIAM> <hw-tapdrldia> <hw-thru>"}
     with pytest.raises(RuntimeError):
         drawing.single_hole_definitions(updated)  # no count left to drop
     with pytest.raises(RuntimeError):
@@ -311,31 +424,167 @@ def test_single_hole_definitions_drop_exactly_the_count() -> None:
     with pytest.raises(RuntimeError):
         drawing.single_hole_definitions({5: "", 6: "", 7: ""})
     assert drawing._PRINTED_COUNT.search("x\n2X Ø3.45 THRU ALL")
-    assert not drawing._PRINTED_COUNT.search("Ø3.45 THRU ALL\n6-32 UNC THRU ALL")
+    assert not drawing._PRINTED_COUNT.search("Ø3.45 THRU ALL\n8-32 UNC THRU ALL")
 
 
-def test_thread_depth_definitions_follow_the_depth_with_its_callout() -> None:
+def test_observed_native_callout_is_the_positive_transformation_control() -> None:
+    first = drawing.thread_limit_definitions(_NATIVE_TAP_CALLOUT, include_drill=True)
+    second = drawing.thread_limit_definitions(_NATIVE_TAP_CALLOUT, include_drill=False)
+    thread_text = "<hw-threaddesc> <hw-threadclass>\n" + drawing.THREAD_LIMIT_CALLOUT
+    assert first == {
+        5: thread_text, 6: "",
+        7: "#29 DRILL <MOD-DIAM> <hw-tapdrldia> <hw-thru>; BOTH HOLES", 8: "",
+    }
+    assert second == {5: thread_text, 6: "", 7: "", 8: ""}
+    all_text = "\n".join((*first.values(), *second.values()))
+    assert all_text.count("#29 DRILL") == all_text.count("<hw-thru>") == 1
+    assert all_text.count("<hw-threaddesc>") == 2
+    assert all_text.count(drawing.THREAD_LIMIT_CALLOUT) == 2
+    assert "<hw-threaddepth>" not in all_text and "<HOLE-DEPTH>" not in all_text
+    assert not re.search(r"\d*\.\d", all_text)
+
+
+@pytest.mark.parametrize("rotation", range(4))
+@pytest.mark.parametrize("whitespace", [" ", "\t  "])
+def test_callout_tokens_can_move_between_native_text_parts(rotation, whitespace) -> None:
+    parts = (5, 6, 7, 8)
     definitions = {
-        5: "<hw-thread> UNC - <hw-threadclass> <HOLE-DEPTH><hw-threaddepth>",
-        6: "",
-        7: "<MOD-DIAM><hw-tapdrldia> THRU ALL",
-        8: "",
+        parts[(index + rotation) % 4]: text.replace(" ", whitespace)
+        for index, text in enumerate(_NATIVE_TAP_CALLOUT.values())
     }
-    updated = drawing.thread_depth_definitions(definitions, "MIN FAR SIDE")
-    assert updated == {
-        **definitions,
-        5: "<hw-thread> UNC - <hw-threadclass> <HOLE-DEPTH><hw-threaddepth> MIN FAR SIDE",
+    for include_drill in (True, False):
+        updated = drawing.thread_limit_definitions(definitions, include_drill=include_drill)
+        updated = drawing.omit_thread_class_definitions(updated)
+        text = "\n".join(updated.values())
+        assert text.count("<hw-threaddesc>") == 1
+        assert text.count(drawing.THREAD_LIMIT_CALLOUT) == 1
+        assert text.count("<hw-thru>") == int(include_drill)
+        assert text.count("<hw-tapdrldia>") == int(include_drill)
+        for removed in ("<hw-threaddepth>", "<HOLE-DEPTH>", "<hw-threadclass>", "<NUM_INST>"):
+            assert removed not in text
+
+
+@pytest.mark.parametrize("layout", ["split", "combined"])
+def test_depth_removal_does_not_erase_other_tokens_in_its_text_part(layout) -> None:
+    definitions = (
+        {
+            5: "KEEP A <hw-threadclass> <MOD-DIAM>",
+            6: "KEEP B <hw-threaddepth> <NUM_INST>X",
+            7: "KEEP C <hw-tapdrldia> <hw-threaddesc>",
+            8: "KEEP D <hw-thru> <HOLE-DEPTH>",
+        }
+        if layout == "split" else
+        {5: "KEEP " + " ".join(_NATIVE_TAP_CALLOUT.values()), 6: "", 7: "", 8: ""}
+    )
+    updated = drawing.thread_limit_definitions(definitions, include_drill=False)
+    text = "\n".join(updated.values())
+    assert text.count("KEEP") == (4 if layout == "split" else 1)
+    assert text.count("<hw-threaddesc>") == text.count("<hw-threadclass>") == 1
+    assert text.count(drawing.THREAD_LIMIT_CALLOUT) == 1
+    for removed in ("<hw-threaddepth>", "<HOLE-DEPTH>", "<MOD-DIAM>", "<hw-tapdrldia>", "<hw-thru>"):
+        assert removed not in text
+
+
+@pytest.mark.parametrize("token", _NATIVE_TAP_TOKENS)
+@pytest.mark.parametrize("defect", ["missing", "duplicate"])
+def test_missing_or_duplicate_native_callout_tokens_are_refused(token, defect) -> None:
+    definitions = dict(_NATIVE_TAP_CALLOUT)
+    if defect == "missing":
+        definitions = {part: text.replace(token, "") for part, text in definitions.items()}
+    else:
+        definitions[8] = token
+    with pytest.raises(RuntimeError, match="exactly one"):
+        drawing.thread_limit_definitions(definitions, include_drill=True)
+
+
+@pytest.mark.parametrize("old,wrong", [
+    ("<hw-threaddesc>", "<hw-thread>"),
+    ("<hw-thru>", "THRU ALL"),
+    ("<hw-tapdrldia>", "<hw-thruholedia>"),
+    ("<HOLE-DEPTH>", "<DEPTH>"),
+])
+def test_synthetic_or_wrong_token_spellings_are_not_native_proof(old, wrong) -> None:
+    definitions = {
+        part: text.replace(old, wrong) for part, text in _NATIVE_TAP_CALLOUT.items()
     }
     with pytest.raises(RuntimeError):
-        drawing.thread_depth_definitions(
-            {**definitions, 5: "<hw-thread> THRU ALL"}, "MIN"
+        drawing.thread_limit_definitions(definitions, include_drill=True)
+
+
+def test_unexpected_native_depth_token_is_not_silently_left_on_the_sheet() -> None:
+    with pytest.raises(RuntimeError, match="unexpected opposed-thread"):
+        drawing.thread_limit_definitions(
+            {**_NATIVE_TAP_CALLOUT, 8: "<hw-tapdrldepth>"}, include_drill=True,
         )
-    with pytest.raises(RuntimeError):
-        drawing.thread_depth_definitions({**definitions, 6: "<hw-threaddepth>"}, "MIN")
-    assert drawing.THREAD_CALLOUTS == {
-        "bar": spec.BAR_THREAD_CALLOUT,
-        "kp08": spec.KP08_THREAD_CALLOUT,
-    }
+
+
+@pytest.mark.parametrize("thru_text", ["THRU", "THRU ALL"])
+def test_native_callout_rewrite_and_class_omission_keep_one_shared_drill(monkeypatch, thru_text) -> None:
+    from types import SimpleNamespace
+
+    class Display:
+        def __init__(self, definitions):
+            self.definitions = dict(definitions)
+
+        def IsHoleCallout(self):
+            return True
+
+        def GetText(self, part):
+            if part in (5, 6, 7, 8):
+                return self.definitions[part]
+            text = self.definitions[part + 4]
+            for token, value in (
+                ("<hw-threaddesc>", "8-32 UNC"), ("<hw-threadclass>", "2B"),
+                ("<NUM_INST>", "2"), ("<MOD-DIAM>", "Ø"),
+                ("<hw-tapdrldia>", ".136"), ("<hw-thru>", thru_text),
+                ("<HOLE-DEPTH>", "DEPTH"), ("<hw-threaddepth>", ".433"),
+            ):
+                text = text.replace(token, value)
+            return text
+
+        def SetText(self, part, text):
+            self.definitions[part + 4] = text  # native setter returns void
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    # Native thread/class data is deliberately NOT in prefix part 5.
+    moved = {5: "", 6: _NATIVE_TAP_CALLOUT[7], 7: "", 8: _NATIVE_TAP_CALLOUT[5]}
+    callouts = []
+    for index in range(2):
+        display = Display(moved)
+        drawing._call_out_one_hole(display, label=str(index), include_drill=index == 0)
+        drawing._omit_tap_thread_class(display, label=str(index))
+        callouts.append((str(index), display))
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(GetFirstView=lambda: None))
+    drawing._require_threads_stated_by_callouts_only(adapter, callouts)
+    for _label, display in callouts:
+        assert ".433" not in "\n".join(display.GetText(part) for part in (1, 2, 3, 4))
+        assert "<hw-threaddesc>" in "\n".join(display.definitions.values())
+
+
+def test_both_full_thread_depths_have_part_owned_limit_dimensions() -> None:
+    for reference, name, nominal, bounds in (
+        (spec.BAR_THREAD_REFERENCE, spec.BAR_THREAD_DEPTH_DIMENSION,
+         spec.MODELED_THREAD_DEPTH, spec.BAR_THREAD_LIMITS),
+        (spec.KP08_THREAD_REFERENCE, spec.KP08_THREAD_DEPTH_DIMENSION,
+         spec.MODELED_THREAD_DEPTH, spec.KP08_THREAD_LIMITS),
+    ):
+        assert spec.DRAWING_DIMENSIONS[reference] == {name}
+        assert spec.DRAWING_PRECISION[reference][name] == 3
+        assert name in drawing.SECTION_KEEP and name in drawing.SECTION_TEXT
+        assert bounds[0] < nominal < bounds[1]
+        label = spec.CALLOUTS_BELOW[name]
+        assert "FULL THREAD" in label and "BOTH HOLES" in label
+        assert not re.search(r"\d*\.\d", label)
+    assert spec.BAR_THREAD_WITNESS_X == pytest.approx(
+        spec.HOLE_X[-1] + spec.THREAD_MAJOR / 2.0
+    )
+    assert spec.KP08_THREAD_WITNESS_X == pytest.approx(
+        spec.HOLE_X[0] - spec.THREAD_MAJOR / 2.0
+    )
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "top_ref.record(KP08_THREAD_DEPTH_DIMENSION" in source
+    assert "blank_sketch(adapter, KP08_THREAD_REFERENCE)" in source
+    assert source.index("_set_thread_limits(") < source.index("save_part_and_images(")
 
 
 # --- Sheet layout (model mm in the plan, sheet m around it) -----------------------
@@ -346,16 +595,8 @@ def _plan(name: str) -> tuple[float, float]:
     return x, y
 
 
-_STATION_MATES = {
-    **{f"BarTap{k}X": spec.BAR_MATE_CALLOUT for k in range(1, 5)},
-    "KP08Tap1X": spec.KP08_MATE_CALLOUT,
-    "KP08Tap2X": spec.KP08_MATE_CALLOUT,
-}
-_STATION_X = {
-    **{f"BarTap{k}X": x for k, x in enumerate(spec.BAR_TAP_X, start=1)},
-    "KP08Tap1X": spec.KP08_TAP_X[0],
-    "KP08Tap2X": spec.KP08_TAP_X[1],
-}
+_STATION_MATES = {"KP08Tap1X": spec.MATE_CALLOUT, "KP08Tap2X": spec.MATE_CALLOUT}
+_STATION_X = {"KP08Tap1X": spec.HOLE_X[0], "KP08Tap2X": spec.HOLE_X[1]}
 
 
 def _block(name: str) -> tuple[float, float, float, float]:
@@ -457,17 +698,15 @@ def test_row_block_sits_between_its_extension_lines_off_the_part() -> None:
     assert left >= LEFT_BORDER + 0.01
 
 
-def _callout_block(kind: str, xy: tuple[float, float]) -> tuple[float, ...]:
-    half = drawing.CALLOUT_GLYPHS[kind] * drawing.GLYPH / 2.0
-    half_high = drawing.text_half_high(2)
+def _callout_block(xy: tuple[float, float]) -> tuple[float, ...]:
+    half = drawing.CALLOUT_GLYPHS * drawing.GLYPH / 2.0
+    half_high = drawing.text_half_high(drawing.CALLOUT_ROWS)
     return xy[0] - half, xy[0] + half, xy[1] - half_high, xy[1] + half_high
 
 
-def _leader(
-    kind: str, x: float, xy: tuple[float, float]
-) -> tuple[tuple[float, float], ...]:
+def _leader(x: float, xy: tuple[float, float]) -> tuple[tuple[float, float], ...]:
     """Shelf end nearer the hole (the bottom row's baseline) to its centre."""
-    left, right, bottom, _top = _callout_block(kind, xy)
+    left, right, bottom, _top = _callout_block(xy)
     near = left if abs(left - x) < abs(right - x) else right
     return (near, bottom), (x, 0.0)
 
@@ -491,9 +730,9 @@ def _box_edges(box: tuple[float, ...]) -> list[tuple[tuple[float, float], ...]]:
 
 def test_each_leader_lands_on_its_own_hole_crossing_nothing() -> None:
     callouts = drawing.TAP_CALLOUTS
-    leaders = [_leader(kind, x, xy) for kind, x, xy, _side in callouts]
-    blocks = [_callout_block(kind, xy) for kind, _x, xy, _side in callouts]
-    holes = [(x, drawing.TAP_DRILLS[kind] / 2.0) for kind, x, _xy, _side in callouts]
+    leaders = [_leader(x, xy) for x, xy, _side in callouts]
+    blocks = [_callout_block(xy) for _x, xy, _side in callouts]
+    holes = [(x, spec.TAP_DRILL / 2.0) for x, _xy, _side in callouts]
     width_ext = (
         (spec.BRACKET_LENGTH + 0.5, spec.HALF_WIDTH),
         (
@@ -501,13 +740,11 @@ def test_each_leader_lands_on_its_own_hole_crossing_nothing() -> None:
             spec.HALF_WIDTH,
         ),
     )
-    for i, ((kind, x, xy, side), leader) in enumerate(
-        zip(callouts, leaders, strict=True)
-    ):
+    for i, ((x, xy, side), leader) in enumerate(zip(callouts, leaders, strict=True)):
         (sx, sy), _centre = leader
         # The edge pick is the rim on the leader's side, off the centre lines.
-        ex, ey, _ez = drawing.tap_edge_model(kind, x, side)
-        assert math.hypot(ex - x, ey) == pytest.approx(drawing.TAP_DRILLS[kind] / 2.0)
+        ex, ey, _ez = drawing.tap_edge_model(x, side)
+        assert math.hypot(ex - x, ey) == pytest.approx(spec.TAP_DRILL / 2.0)
         assert (sx - x) * side > 0 and ey > 0
         assert not _cross(*leader, *width_ext), i
         for j, other in enumerate(leaders):
@@ -537,7 +774,7 @@ def test_each_leader_lands_on_its_own_hole_crossing_nothing() -> None:
 
 def test_tap_callouts_stand_over_the_plan_inside_the_sheet() -> None:
     gap = drawing.TEXT_GAP - 1e-9
-    blocks = [_callout_block(kind, xy) for kind, _x, xy, _side in drawing.TAP_CALLOUTS]
+    blocks = [_callout_block(xy) for _x, xy, _side in drawing.TAP_CALLOUTS]
     end_top = drawing.END_CENTER[1] + spec.HALF_WIDTH * drawing._S / 1000.0
     end_left = drawing.END_CENTER[0] - spec.BRACKET_THICK / 2.0 * drawing._S / 1000.0
     for i, box in enumerate(blocks):
@@ -635,16 +872,376 @@ def test_prechips_solids_are_valid_fixture_solids() -> None:
     for solid in spec.PRECHIPS_SOLIDS:
         FixtureSolid.model_validate(solid)
     names = {solid["name"] for solid in spec.PRECHIPS_SOLIDS}
-    assert names == {
-        "end bracket",
-        "bar tap 1",
-        "bar tap 2",
-        "bar tap 3",
-        "bar tap 4",
-        "KP08 tap 1",
-        "KP08 tap 2",
-    }
+    assert names == {"end bracket", "tap 1", "tap 2"}
     box = spec.PRECHIPS_SOLIDS[0]
     assert box["size_mm"] == pytest.approx(
         [spec.BRACKET_LENGTH, spec.BRACKET_WIDTH, spec.BRACKET_THICK]
+    )
+
+
+@pytest.mark.parametrize("drift", [None, "drill_end", "thread_end", "depth"])
+def test_local_post_wizard_edit_preserves_thru_drill_and_reads_thread_back(
+    monkeypatch, drift,
+) -> None:
+    from types import SimpleNamespace
+
+    definition = SimpleNamespace(EndCondition=1, ThreadEndCondition=0, ThreadDepth=0.012)
+    feature = SimpleNamespace(GetDefinition=lambda: definition)
+    model = SimpleNamespace(FeatureByName=lambda name: feature)
+    monkeypatch.setattr(part, "_early_bound", lambda obj, _interface: obj)
+    edits_seen = []
+
+    def commit(got_model, got_feature, got_definition, edits, label):
+        assert (got_model, got_feature, got_definition) == (model, feature, definition)
+        edits_seen.extend(edits)
+        for name, value in edits:
+            setattr(definition, name, value)
+        if drift == "drill_end":
+            definition.EndCondition = 0
+        elif drift == "thread_end":
+            definition.ThreadEndCondition = 1
+        elif drift == "depth":
+            definition.ThreadDepth += 0.001
+        return definition
+
+    monkeypatch.setattr(part, "_commit_definition_edits", commit)
+    adapter = SimpleNamespace(currentModel=model)
+    if drift:
+        with pytest.raises(RuntimeError, match="thread did not stop short"):
+            part._thread_from_face(adapter, "KP08Taps", 12.0, label="test")
+    else:
+        part._thread_from_face(adapter, "KP08Taps", 12.0, label="test")
+    assert edits_seen == [("ThreadEndCondition", 0), ("ThreadDepth", 0.012)]
+
+
+@pytest.mark.parametrize("face", ["bar", "kp08"])
+@pytest.mark.parametrize("refuse", [False, True])
+def test_limit_tolerance_is_written_to_the_part_and_read_back(monkeypatch, refuse, face) -> None:
+    from types import SimpleNamespace
+
+    class Tolerance:
+        def __init__(self):
+            self._type = 2
+            self.low = self.high = 0.0
+
+        @property
+        def Type(self):
+            return self._type
+
+        @Type.setter
+        def Type(self, value):
+            if not refuse:
+                self._type = value
+
+        def GetMinValue(self):
+            return self.low
+
+        def GetMaxValue(self):
+            return self.high
+
+    tolerance = Tolerance()
+    nominal = spec.MODELED_THREAD_DEPTH
+    reference, dimension_name, bounds = (
+        (spec.BAR_THREAD_REFERENCE, spec.BAR_THREAD_DEPTH_DIMENSION, spec.BAR_THREAD_LIMITS)
+        if face == "bar" else
+        (spec.KP08_THREAD_REFERENCE, spec.KP08_THREAD_DEPTH_DIMENSION, spec.KP08_THREAD_LIMITS)
+    )
+    low, high = bounds
+    from _drawing_tolerances import _tolerance_places
+
+    assert _tolerance_places(low - nominal, high - nominal, display_unit="in") == 3
+    dimension = SimpleNamespace(SystemValue=nominal / 1000.0, Tolerance=tolerance)
+    monkeypatch.setattr(part, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(part, "_named_dimension", lambda *_args: (object(), dimension))
+    calls = []
+
+    def bilateral(adapter, reference, name, lower, upper, **kwargs):
+        calls.append((reference, name, lower, upper, kwargs))
+        tolerance.low, tolerance.high = lower / 1000.0, upper / 1000.0
+
+    monkeypatch.setattr(part, "set_dimension_bilateral_tolerance", bilateral)
+    args = (None, reference, dimension_name, nominal, (low, high))
+    if refuse:
+        with pytest.raises(RuntimeError, match="native thread limits differ"):
+            part._set_thread_limits(*args)
+    else:
+        part._set_thread_limits(*args)
+        assert tolerance.Type == 3
+    assert calls == [
+        (reference, dimension_name,
+         low - nominal, high - nominal, {"places": 3, "display_unit": "in"})
+    ]
+
+
+@pytest.mark.parametrize("failure", [None, "missing", "owner", "band", "nominal", "wizard"])
+def test_section_refuses_unowned_or_lost_full_thread_limits(monkeypatch, failure) -> None:
+    from types import SimpleNamespace
+
+    displays = []
+    wizards = {}
+    for index, (reference, name, feature, nominal, bounds) in enumerate((
+        (spec.BAR_THREAD_REFERENCE, spec.BAR_THREAD_DEPTH_DIMENSION, "BarTaps",
+         spec.MODELED_THREAD_DEPTH, spec.BAR_THREAD_LIMITS),
+        (spec.KP08_THREAD_REFERENCE, spec.KP08_THREAD_DEPTH_DIMENSION, "KP08Taps",
+         spec.MODELED_THREAD_DEPTH, spec.KP08_THREAD_LIMITS),
+    )):
+        low, high = bounds
+        tolerance = SimpleNamespace(
+            Type=2 if failure == "band" and index == 0 else 3,
+            GetMinValue=lambda value=(low - nominal) / 1000.0: value,
+            GetMaxValue=lambda value=(high - nominal) / 1000.0: value,
+        )
+        owner = "UnrelatedSketch" if failure == "owner" and index == 0 else reference
+        dim = SimpleNamespace(
+            FullName=f"{name}@{owner}@part",
+            SystemValue=(nominal + (1.0 if failure == "nominal" and index == 0 else 0.0)) / 1000,
+            Tolerance=tolerance,
+        )
+        displays.append(SimpleNamespace(
+            GetDimension2=lambda _config, value=dim: value,
+            GetPrimaryTolPrecision2=lambda: 3,
+        ))
+        wizard = SimpleNamespace(
+            ThreadDepth=nominal / 1000.0,
+            ThreadEndCondition=1 if failure == "wizard" and index == 0 else 0,
+        )
+        wizards[feature] = SimpleNamespace(GetDefinition=lambda value=wizard: value)
+    if failure == "missing":
+        displays.pop()
+    model = SimpleNamespace(FeatureByName=lambda name: wizards[name])
+    section = SimpleNamespace(
+        ReferencedDocument=model, GetDisplayDimensions=lambda: displays,
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    if failure:
+        with pytest.raises(RuntimeError):
+            drawing._require_thread_depths(section)
+    else:
+        drawing._require_thread_depths(section)
+
+
+def test_both_section_limit_blocks_stand_clear_of_the_body_and_title_block() -> None:
+    scale = drawing._S / 1000.0
+    for name, (text_x, _y, text_z) in drawing.SECTION_TEXT.items():
+        half = drawing.text_half(spec.CALLOUTS_BELOW[name])
+        rows = 2 + len(spec.CALLOUTS_BELOW[name].splitlines())
+        half_high = drawing.text_half_high(rows)
+        if name == spec.BAR_THREAD_DEPTH_DIMENSION:
+            assert text_x - half >= spec.BRACKET_LENGTH + drawing.DEPTH_LANE
+        else:
+            assert text_x + half <= -drawing.DEPTH_LANE
+        centre_x, centre_y = drawing.SECTION_CENTER
+        left = centre_x + (text_x - half - spec.BRACKET_LENGTH / 2.0) * scale
+        right = centre_x + (text_x + half - spec.BRACKET_LENGTH / 2.0) * scale
+        bottom = centre_y + (text_z - half_high - spec.BRACKET_THICK / 2.0) * scale
+        assert LEFT_BORDER < left < right < RIGHT_BORDER
+        assert bottom > TITLE_BLOCK_TOP + 0.01
+
+
+def test_thread_ink_requires_complete_native_depth_coverage() -> None:
+    start, end = (0.1, 0.08), (0.1, 0.105)
+    assert drawing._covers([(0.1, 0.08, 0.1, 0.105)], start, end)
+    assert drawing._covers([(0.1, 0.08, 0.1, 0.105)], end, start)
+    assert not drawing._covers([], start, end)
+    assert not drawing._covers([(0.1, 0.08, 0.1, 0.09)], start, end)
+
+
+
+
+def test_tip_marks_finish_full_threads_without_reaching_the_opposed_screw() -> None:
+    assert spec.BAR_TIP_MARK_LIMITS == pytest.approx((.433 * 25.4, .527 * 25.4))
+    assert spec.KP08_TIP_MARK_LIMITS == pytest.approx((.492 * 25.4, .586 * 25.4))
+    assert leadscrew.BAR_SCREW_ACTUAL_REACH_RANGE == pytest.approx((7.874, 9.398))
+    assert (spec.KP08_REACH_MIN, spec.KP08_REACH_MAX) == pytest.approx((7.6962, 10.8966))
+    assert leadscrew.BAR_SCREW_FULL_THREAD_MIN == pytest.approx(6.433375)
+    assert spec.KP08_FULL_THREAD_AT_RECEIPT_MAX == pytest.approx(6.255575)
+    lead_low, lead_high = spec.BOTTOMING_LEAD_LIMITS
+    for full, marks, opposite_reach in (
+        (spec.BAR_THREAD_LIMITS, spec.BAR_TIP_MARK_LIMITS, spec.KP08_REACH_MAX),
+        (spec.KP08_THREAD_LIMITS, spec.KP08_TIP_MARK_LIMITS, spec.BAR_REACH_MAX),
+    ):
+        assert marks[0] - lead_high >= full[0] - 1e-9
+        assert marks[1] - lead_low <= full[1] + 1e-9
+        assert marks[1] + opposite_reach < spec.THICK_MIN
+        assert marks[1] < spec.HAND_TAP_FLUTE_LENGTH
+    assert min(
+        spec.BAR_OPPOSED_CUT_CLEARANCE_MIN, spec.KP08_OPPOSED_CUT_CLEARANCE_MIN
+    ) == pytest.approx(0.0127)
+    assert spec.TIP_MARK_SEAM_CLEARANCE_MIN == pytest.approx(0.8128)
+    assert spec.TIP_MARK_SEAM_CLEARANCE_MIN > min(
+        spec.BAR_OPPOSED_CUT_CLEARANCE_MIN, spec.KP08_OPPOSED_CUT_CLEARANCE_MIN
+    )
+
+
+# Captured values are evidence, not regenerated expected output.
+# 4031a82a: both wizards read 10.9982; the top witness remained 12.4968.
+# 0e989113: editing the top to 12.4968 changed BOTH bottom cosmetic depths,
+# but BarTaps and its witness remained 10.9982. Circle readbacks are from
+# that second log (worker 4); no first-run cosmetic depths were captured.
+_FIRST_WIZARD_DEPTHS_MM = {"BarTaps": 10.9982, "KP08Taps": 10.9982}
+_FIRST_TOP_WITNESS_MM = 12.4968
+_SECOND_NATIVE_DEPTHS_MM = {
+    "BarTaps": 10.9982, "KP08Taps": 12.4968,
+    "BarFaceThread1": 12.4968, "BarFaceThread2": 12.4968,
+}
+_SECOND_BOTTOM_CIRCLES_MM = (
+    [13.925000090000001, 0.0, -6.938893903907228e-15, 1.7271999999999843],
+    [55.92499991, 0.0, -6.938893903907228e-15, 1.7271999999999843],
+)
+
+
+def test_observed_native_depth_pairs_support_coupling_not_independence() -> None:
+    assert tuple(_FIRST_WIZARD_DEPTHS_MM.values()) == pytest.approx(
+        (spec.MODELED_THREAD_DEPTH, spec.MODELED_THREAD_DEPTH)
+    )
+    assert _FIRST_TOP_WITNESS_MM != pytest.approx(_FIRST_WIZARD_DEPTHS_MM["KP08Taps"])
+    assert (
+        _SECOND_NATIVE_DEPTHS_MM["KP08Taps"],
+        _SECOND_NATIVE_DEPTHS_MM["BarFaceThread1"],
+        _SECOND_NATIVE_DEPTHS_MM["BarFaceThread2"],
+    ) == pytest.approx((12.4968, 12.4968, 12.4968))
+    assert _SECOND_NATIVE_DEPTHS_MM["BarTaps"] != _SECOND_NATIVE_DEPTHS_MM["KP08Taps"]
+
+
+@pytest.mark.parametrize("post_commit_drift", [None, "top", "bottom"])
+def test_shared_thread_depth_survives_observed_coupling_driving_and_rebuild(
+    monkeypatch, post_commit_drift,
+) -> None:
+    """Replay captured coupled state, then exercise the proposed common target.
+
+    The initial readings below are the second native failure. Writing top depth
+    also writes both bottom cosmetics, as observed in that run. A successful
+    replay is an offline contract proof, not a new native observation at .433.
+    """
+    import asyncio
+    from types import SimpleNamespace
+
+    shared = {"depth": _SECOND_NATIVE_DEPTHS_MM["KP08Taps"] / 1000.0}
+
+    class TopWizard:
+        EndCondition = 1
+        ThreadEndCondition = 0
+
+        @property
+        def ThreadDepth(self):
+            return shared["depth"]
+
+        @ThreadDepth.setter
+        def ThreadDepth(self, value):
+            shared["depth"] = value
+
+    class BottomCosmetic:
+        EndCondition = 0
+        DiameterType = 2
+        Diameter = 4.166 / 1000.0
+
+        def __init__(self, circle):
+            self.circle = circle
+            self.corrupted_depth = None
+
+        @property
+        def BlindDepth(self):
+            return shared["depth"] if self.corrupted_depth is None else self.corrupted_depth
+
+    bar = SimpleNamespace(
+        EndCondition=0, ThreadEndCondition=0,
+        ThreadDepth=_SECOND_NATIVE_DEPTHS_MM["BarTaps"] / 1000.0,
+    )
+    top = TopWizard()
+    cosmetics = {
+        f"BarFaceThread{k}": BottomCosmetic(circle)
+        for k, circle in enumerate(_SECOND_BOTTOM_CIRCLES_MM, start=1)
+    }
+    definitions = {"BarTaps": bar, "KP08Taps": top, **cosmetics}
+    features = {
+        name: SimpleNamespace(GetDefinition=lambda value=value: value)
+        for name, value in definitions.items()
+    }
+    model = SimpleNamespace(FeatureByName=lambda name: features.get(name))
+    adapter = SimpleNamespace(currentModel=model)
+    monkeypatch.setattr(part, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(
+        part, "_thread_edge_circle", lambda _model, definition, **_kwargs: definition.circle,
+    )
+    # Positive control: these exact captured cosmetic values are read, not
+    # replaced with expectations. The old mismatched full state must fail.
+    assert tuple(value.BlindDepth * 1000.0 for value in cosmetics.values()) == pytest.approx(
+        (_SECOND_NATIVE_DEPTHS_MM["BarFaceThread1"], _SECOND_NATIVE_DEPTHS_MM["BarFaceThread2"])
+    )
+    with pytest.raises(RuntimeError, match="bar-face threads"):
+        part._require_bar_face_threads(adapter, tuple(cosmetics))
+
+    rows = {
+        spec.BAR_THREAD_REFERENCE: {
+            "BarThreadStation": spec.BAR_THREAD_WITNESS_X,
+            spec.BAR_THREAD_DEPTH_DIMENSION: _SECOND_NATIVE_DEPTHS_MM["BarTaps"],
+        },
+        spec.KP08_THREAD_REFERENCE: {
+            "KP08ThreadStation": spec.KP08_THREAD_WITNESS_X,
+            "KP08ThreadFace": spec.BRACKET_THICK,
+            spec.KP08_THREAD_DEPTH_DIMENSION: _FIRST_TOP_WITNESS_MM,
+        },
+    }
+    monkeypatch.setattr(
+        part, "dump_dimensions",
+        lambda _adapter, reference: [
+            {"full_name": f"{name}@{reference}@part", "value_mm": value}
+            for name, value in rows[reference].items()
+        ],
+    )
+    jobs = [
+        (f"{spec.BAR_THREAD_DEPTH_DIMENSION}@{spec.BAR_THREAD_REFERENCE}", '"ModeledThreadDepth"'),
+        (f"{spec.KP08_THREAD_DEPTH_DIMENSION}@{spec.KP08_THREAD_REFERENCE}", '"ModeledThreadDepth"'),
+    ]
+    events = []
+    commits = []
+
+    async def drive(_adapter, full_name, expression):
+        assert expression == '"ModeledThreadDepth"'
+        events.append(("drive", full_name, expression))
+        name, reference = full_name.split("@")
+        rows[reference][name] = spec.MODELED_THREAD_DEPTH
+
+    async def rebuild(_adapter):
+        events.append(("rebuild",))
+        if commits and post_commit_drift == "top":
+            top.ThreadDepth = _SECOND_NATIVE_DEPTHS_MM["KP08Taps"] / 1000.0
+        elif commits and post_commit_drift == "bottom":
+            next(iter(cosmetics.values())).corrupted_depth = 12.4968 / 1000.0
+
+    def commit(got_model, got_feature, definition, edits, _label):
+        assert got_model is model and got_feature is features["KP08Taps"]
+        assert definition is top
+        assert definition.ThreadDepth * 1000.0 == pytest.approx(
+            _SECOND_NATIVE_DEPTHS_MM["KP08Taps"]
+        )
+        events.append(("commit",))
+        commits.append(tuple(edits))
+        for name, value in edits:
+            setattr(definition, name, value)
+        return definition
+
+    monkeypatch.setattr(part, "drive_dimension", drive)
+    monkeypatch.setattr(part, "force_rebuild", rebuild)
+    monkeypatch.setattr(part, "_commit_definition_edits", commit)
+    if post_commit_drift:
+        with pytest.raises(RuntimeError, match="KP08ThreadReference|bar-face threads"):
+            asyncio.run(part._drive_and_finalize_threads(adapter, jobs, tuple(cosmetics)))
+    else:
+        asyncio.run(part._drive_and_finalize_threads(adapter, jobs, tuple(cosmetics)))
+        assert top.ThreadDepth == pytest.approx(spec.MODELED_THREAD_DEPTH / 1000.0)
+        assert bar.ThreadDepth == pytest.approx(spec.MODELED_THREAD_DEPTH / 1000.0)
+        assert all(
+            value.BlindDepth == pytest.approx(spec.MODELED_THREAD_DEPTH / 1000.0)
+            for value in cosmetics.values()
+        )
+    assert top.EndCondition == 1 and top.ThreadEndCondition == 0
+    assert len(commits) == 1
+    assert events == [
+        ("rebuild",),
+        *(("drive", name, expression) for name, expression in jobs),
+        ("rebuild",), ("commit",), ("rebuild",),
+    ]
+    assert rows[spec.KP08_THREAD_REFERENCE][spec.KP08_THREAD_DEPTH_DIMENSION] == pytest.approx(
+        spec.MODELED_THREAD_DEPTH
     )

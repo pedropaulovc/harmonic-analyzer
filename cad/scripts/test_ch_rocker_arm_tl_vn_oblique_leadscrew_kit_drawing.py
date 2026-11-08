@@ -75,7 +75,7 @@ def test_kit_row_has_one_configuration_per_member() -> None:
         "LeadScrew": spec.BOM_DESCRIPTION,
         "FeedNut": nut.BOM_DESCRIPTION,
     }
-    assert spec.BOM_DESCRIPTION == f"TR8X2 LEADSCREW, {spec.LENGTH:.0f} MM LONG"
+    assert spec.BOM_DESCRIPTION == f"TR8X2 LEADSCREW, {spec.LENGTH:.{spec.LENGTH_PLACES}f} MM LONG"
     # One line in the title block's MATERIAL cell; the provenance is the specs'.
     assert len(ROW["material_specification"]) <= 36
     assert spec.SKU in (spec.__doc__ or "")
@@ -222,13 +222,17 @@ def test_volume_is_the_blank_less_five_flat_segments() -> None:
     assert spec.FLAT_SEGMENT_AREA == pytest.approx(segment(r), rel=1e-12)
     assert spec.FLAT_VOLUME_MM3 == pytest.approx(segment(r) * 8.0, rel=1e-12)
     assert spec.FLAT_CHORD == pytest.approx(2.0 * r * math.sin(theta / 2.0))
-    # The open flat: the full segment from 400 to the far break, then the
-    # break's shrinking round (a fine midpoint sum, independent of the spec's
-    # Simpson rule); its face likewise.
+    # The open flat starts half a flat length before the actual handwheel
+    # grub, measured from the screw's relocated near end. Integrate through
+    # the shrinking end break independently of the spec's Simpson rule.
     steps = 20000
     h = c / steps
     radii = [r - (k + 0.5) * h for k in range(steps)]
-    full = spec.LENGTH - c - 400.0
+    handwheel_start = (
+        feed.HUB_END_S + feed.HANDWHEEL_GRUB_FROM_HUB
+        - feed.SCREW_NEAR_END_S - spec.FLAT_LENGTH / 2.0
+    )
+    full = spec.LENGTH - c - handwheel_start
     open_volume = segment(r) * full + h * sum(segment(radius) for radius in radii)
     open_area = spec.FLAT_CHORD * full + h * sum(
         2.0 * math.sqrt(radius**2 - offset**2) for radius in radii
@@ -273,8 +277,12 @@ def test_flat_stations_are_c4s_set_screw_positions() -> None:
         "FarKP08": feed.KP08_S[1] - near,
         "Handwheel": feed.HUB_END_S + feed.HANDWHEEL_GRUB_FROM_HUB - near,
     }
-    assert spec.FLAT_STATIONS == pytest.approx(
-        {"NearKP08": 8.5, "FarKP08": 379.5, "Handwheel": 404.0}
+    assert spec.FLAT_STATIONS["NearKP08"] == pytest.approx(feed.KP08_WIDTH / 2.0 + feed.NEAR_STUB)
+    assert spec.FLAT_STATIONS["FarKP08"] - spec.FLAT_STATIONS["NearKP08"] == pytest.approx(
+        feed.KP08_S[1] - feed.KP08_S[0]
+    )
+    assert spec.FLAT_STATIONS["Handwheel"] - spec.FLAT_STATIONS["FarKP08"] == pytest.approx(
+        feed.KP08_WIDTH / 2.0 + feed.HUB_GAP + feed.HANDWHEEL_GRUB_FROM_HUB
     )
     # Each KP08 locks with two set screws 120° apart; the handwheel with one of
     # its two (the other bears on the plain thread past the nut's travel).
@@ -283,9 +291,10 @@ def test_flat_stations_are_c4s_set_screw_positions() -> None:
     assert spec.FLAT_COUNT == 5
     assert spec.HANDWHEEL_SET_SCREW_MAJOR == 5.0
     # Review bought-r15 (rule 10): the print stations each flat's near edge.
-    assert spec.FLAT_STARTS == pytest.approx(
-        {"NearKP08": 4.5, "FarKP08": 375.5, "Handwheel": 400.0}
-    )
+    assert spec.FLAT_STARTS == pytest.approx({
+        name: station - spec.FLAT_LENGTH / 2.0
+        for name, station in spec.FLAT_STATIONS.items()
+    })
     for name, start in spec.FLAT_STARTS.items():
         lo, hi = (s - near for s in spec.FLAT_HOUSINGS[name])
         assert lo <= start - spec.FLAT_TOLERANCE
@@ -299,8 +308,9 @@ def test_flat_stations_are_c4s_set_screw_positions() -> None:
     # stays inside the handwheel's guaranteed bore at a long cut.
     station = spec.FLAT_STATIONS["Handwheel"]
     cover = min(
-        station - 2.5 - (400.0 + spec.FLAT_TOLERANCE),
-        spec.LENGTH - spec.LENGTH_TOLERANCE - spec.END_CHAMFER - (station + 2.5),
+        spec.FLAT_LENGTH / 2.0 - spec.HANDWHEEL_SET_SCREW_MAJOR / 2.0 - spec.FLAT_TOLERANCE,
+        spec.LENGTH - spec.LENGTH_TOLERANCE - spec.END_CHAMFER
+        - (station + spec.HANDWHEEL_SET_SCREW_MAJOR / 2.0),
     )
     assert spec.HANDWHEEL_GRUB_COVER == pytest.approx(cover) == pytest.approx(0.7)
     assert (
@@ -322,9 +332,12 @@ def test_handwheel_flat_runs_out_through_the_cut_end_at_title_block_bands() -> N
     assert spec.FLAT_ENDS["Handwheel"] == spec.LENGTH + spec.FLAT_RUNOUT
     assert spec.FLAT_RUNOUT > spec.LENGTH_TOLERANCE
     assert spec.CLOSED_FLATS == ("NearKP08", "FarKP08")
-    # Negative control: the closed 400..408 flat at these bands breaks through
-    # the shortest cut's far break.
-    closed_far_edge = 400.0 + spec.FLAT_LENGTH + spec.FLAT_TOLERANCE + spec.FLAT_LENGTH_TOLERANCE
+    # Negative control: closing an 8 mm flat at the CURRENT handwheel
+    # station would break through the shortest cut's far chamfer at .X bands.
+    closed_far_edge = (
+        spec.FLAT_STATIONS["Handwheel"] + spec.FLAT_LENGTH / 2.0
+        + spec.FLAT_TOLERANCE + spec.FLAT_LENGTH_TOLERANCE
+    )
     assert closed_far_edge > spec.LENGTH - spec.LENGTH_TOLERANCE - spec.END_CHAMFER
     # Every closed flat stays off both end breaks at its bands, the far one at
     # the shortest cut; the open one off the near end.
@@ -337,9 +350,13 @@ def test_handwheel_flat_runs_out_through_the_cut_end_at_title_block_bands() -> N
             far_edge + spec.FLAT_LENGTH_TOLERANCE
             < spec.LENGTH - spec.LENGTH_TOLERANCE - spec.END_CHAMFER
         ), name
-    # C4's hub gap: 13 engaged, 1 short of the bore's 14.
+    # Retained hub gap; the chosen one-place cut changes engagement by its
+    # rounding residual, not by the near support's entire relocation.
     assert feed.HUB_GAP == 11.0
-    assert feed.HANDWHEEL_ENGAGEMENT == pytest.approx(13.0)
+    engagement = spec.LENGTH - (feed.KP08_S[1] - feed.KP08_S[0]) - feed.KP08_WIDTH - feed.NEAR_STUB - feed.HUB_GAP
+    assert feed.HANDWHEEL_ENGAGEMENT == pytest.approx(engagement)
+    assert engagement - spec.LENGTH_TOLERANCE >= feed.HANDWHEEL_ENGAGEMENT_MIN
+    assert engagement + spec.LENGTH_TOLERANCE < feed.HANDWHEEL_BORE_LENGTH
 
 
 def test_flats_hold_the_set_screws_at_the_band_limits() -> None:
@@ -430,7 +447,10 @@ def test_flats_sketch_records_every_dimension_it_emits(monkeypatch) -> None:
     assert spec.DRAWING_DIMENSIONS["FlatProfile"] <= set(names)
     assert by_name["FlatLength"][2:] == ("vertical_distance", 8.0)
     assert by_name["FlatAF"][2:] == ("horizontal_distance", pytest.approx(7.28))
-    assert by_name["HandwheelFlatLength"][2:] == ("vertical_distance", 11.0)
+    assert by_name["HandwheelFlatLength"][2:] == (
+        "vertical_distance",
+        pytest.approx(spec.LENGTH + spec.FLAT_RUNOUT - spec.FLAT_STARTS["Handwheel"]),
+    )
     for name, start in spec.FLAT_STARTS.items():
         station = by_name[f"{name}FlatStation"]
         assert station[1:] == ("origin", "vertical_distance", start)
@@ -443,11 +463,18 @@ def test_flats_sketch_records_every_dimension_it_emits(monkeypatch) -> None:
 
     # The across-flat prints on the handwheel's rectangle, the length on the
     # far KP08's; the handwheel's runs 1 past the cut end, its length unprinted.
-    assert by_name["FlatLength"][0].startswith(chain_of(375.5))
-    assert by_name["HandwheelFlatLength"][0].startswith(chain_of(400.0))
-    offset = spec.MAJOR_DIA / 2.0 - spec.FLAT_DEPTH  # 3.28
-    assert [(offset, 400.0), (offset, 411.0), (5.0, 411.0), (5.0, 400.0)] in chains
-    assert [(offset, 375.5), (offset, 383.5), (5.0, 383.5), (5.0, 375.5)] in chains
+    assert by_name["FlatLength"][0].startswith(chain_of(spec.FLAT_STARTS["FarKP08"]))
+    assert by_name["HandwheelFlatLength"][0].startswith(chain_of(spec.FLAT_STARTS["Handwheel"]))
+    offset = spec.MAJOR_DIA / 2.0 - spec.FLAT_DEPTH
+    reach = spec.MAJOR_DIA / 2.0 + 1.0
+    for name in ("Handwheel", "FarKP08"):
+        start = spec.FLAT_STARTS[name]
+        end = spec.LENGTH + spec.FLAT_RUNOUT if name == "Handwheel" else start + spec.FLAT_LENGTH
+        assert [(offset, start), (offset, end), (reach, end), (reach, start)] in chains
+    # This is the actual rectangle sent to the native cut, not only a spec
+    # flag: it must remove material through the longest permissible blank.
+    handwheel_chain = next(points for points in chains if points[0] == (offset, spec.FLAT_STARTS["Handwheel"]))
+    assert handwheel_chain[1][1] > spec.LENGTH + spec.LENGTH_TOLERANCE
 
 
 def test_clock_flat_sketch_is_defined_by_its_angle(monkeypatch) -> None:
@@ -499,7 +526,7 @@ def test_clock_flat_sketch_is_defined_by_its_angle(monkeypatch) -> None:
     monkeypatch.setattr(part.SketchDims, "apply", apply)
     plane = asyncio.run(part._clock_flat(Adapter(), "FarKP08"))
     assert plane == "FarKP08ClockPlane"
-    assert planes == [("offset", "Top Plane", 379.5)]
+    assert planes == [("offset", "Top Plane", feed.KP08_S[1] - feed.SCREW_NEAR_END_S)]
     names = applied["FarKP08ClockProfile"]
     # The angle is authored natively, outside the adapter's dimension call.
     assert names[-1] == "FarKP08ClockAngle" and len(emitted) == len(names) - 1
@@ -547,30 +574,33 @@ def test_flat_face_readback_refuses_a_wrong_cut(monkeypatch) -> None:
     area = spec.FLAT_CHORD * spec.FLAT_LENGTH
     offset = spec.MAJOR_DIA / 2.0 - spec.FLAT_DEPTH
     c, s = math.cos(math.radians(120.0)), math.sin(math.radians(120.0))
-    closed = ((375.5, 383.5, area),)
+    start, end = spec.FLAT_STARTS["FarKP08"], spec.FLAT_ENDS["FarKP08"]
+    station = feed.KP08_S[1] - feed.SCREW_NEAR_END_S
+    closed = ((start, end, area),)
     good = [
-        face((c, 0.0, s), (offset * c, 379.5, offset * s), area),
-        face((0.0, 1.0, 0.0), (0.0, 375.5, 0.0)),
-        face((0.0, -1.0, 0.0), (0.0, 383.5, 0.0)),
+        face((c, 0.0, s), (offset * c, station, offset * s), area),
+        face((0.0, 1.0, 0.0), (0.0, start, 0.0)),
+        face((0.0, -1.0, 0.0), (0.0, end, 0.0)),
     ]
     part._flat_faces_readback(adapter(good), "FarKP08ClockFlat", 120.0, closed)
     deep = offset + 0.1
-    shallow = [face((c, 0.0, s), (deep * c, 379.5, deep * s), area), *good[1:]]
-    off_station = [good[0], good[1], face((0.0, -1.0, 0.0), (0.0, 384.5, 0.0))]
+    shallow = [face((c, 0.0, s), (deep * c, station, deep * s), area), *good[1:]]
+    off_station = [good[0], good[1], face((0.0, -1.0, 0.0), (0.0, end + 1.0, 0.0))]
     for faces in (shallow, off_station, good[:2]):
         with pytest.raises(RuntimeError):
             part._flat_faces_readback(adapter(faces), "FarKP08ClockFlat", 120.0, closed)
     with pytest.raises(RuntimeError):  # a clock-0 flat where the 120° one belongs
         part._flat_faces_readback(adapter(good), "FarKP08ClockFlat", 0.0, closed)
     # The open flat: its start wall only, its face run through the far break.
-    open_ = ((400.0, None, spec.OPEN_FLAT_AREA_MM2),)
+    start = spec.FLAT_STARTS["Handwheel"]
+    open_ = ((start, None, spec.OPEN_FLAT_AREA_MM2),)
     run_out = [
-        face((1.0, 0.0, 0.0), (offset, 405.0, 0.0), spec.OPEN_FLAT_AREA_MM2),
-        face((0.0, 1.0, 0.0), (0.0, 400.0, 0.0)),
+        face((1.0, 0.0, 0.0), (offset, (start + spec.LENGTH) / 2.0, 0.0), spec.OPEN_FLAT_AREA_MM2),
+        face((0.0, 1.0, 0.0), (0.0, start, 0.0)),
     ]
     part._flat_faces_readback(adapter(run_out), "Flats", 0.0, open_)
-    closed_at_end = [*run_out, face((0.0, -1.0, 0.0), (0.0, 408.0, 0.0))]
-    short = [face((1.0, 0.0, 0.0), (offset, 404.0, 0.0), area), run_out[1]]
+    closed_at_end = [*run_out, face((0.0, -1.0, 0.0), (0.0, start + spec.FLAT_LENGTH, 0.0))]
+    short = [face((1.0, 0.0, 0.0), (offset, start + spec.FLAT_LENGTH / 2.0, 0.0), area), run_out[1]]
     for faces in (closed_at_end, short):
         with pytest.raises(RuntimeError):
             part._flat_faces_readback(adapter(faces), "Flats", 0.0, open_)
@@ -578,7 +608,7 @@ def test_flat_face_readback_refuses_a_wrong_cut(monkeypatch) -> None:
 
 def test_cut_length_is_the_axis_edge_driving_dimension() -> None:
     """The emitted dimensions match the recorded names one for one, and the
-    410 is a driving dimension of its own: the axis edge, emitted first."""
+    cut length is a driving dimension of its own: the axis edge, emitted first."""
     emitted = []
     ok = SimpleNamespace(is_success=True, data="D", error=None)
 
@@ -717,7 +747,7 @@ def test_one_axis_horizontal_view_at_the_largest_fitting_scale() -> None:
     # 1:1 overruns the border; 1:2 is the next project scale down.
     assert spec.LENGTH / 1000 > usable
     assert draw.SHEET_SCALE == draw.ISO_SCALE == (1.0, 2.0)
-    assert draw.SCREW_SHEET_LENGTH == pytest.approx(0.205)
+    assert draw.SCREW_SHEET_LENGTH == pytest.approx(spec.LENGTH * draw.SHEET_SCALE[0] / draw.SHEET_SCALE[1] / 1000.0)
     # *Front looks at the profile sketch; -90 deg lays model +Y to sheet right.
     assert draw.MAIN_VIEW_ANGLE == -math.pi / 2.0
     half = draw.SCREW_SHEET_LENGTH / 2.0
@@ -728,7 +758,7 @@ def test_one_axis_horizontal_view_at_the_largest_fitting_scale() -> None:
         draw.MAIN_CENTER[0] + half,
         draw.MAIN_CENTER[1] + radius,
     )
-    # The isometric stands the axis up: 410 cos 35.26 deg plus the end ellipses.
+    # The isometric stands the actual cut axis up, plus the end ellipses.
     iso_half_height = (
         (spec.LENGTH * math.sqrt(2.0 / 3.0) + spec.MAJOR_DIA)
         * draw._SHEET_PER_MODEL_MM
@@ -760,7 +790,10 @@ def test_one_axis_horizontal_view_at_the_largest_fitting_scale() -> None:
         draw.MAIN_KEEP[f"{name}FlatStation"][1] for name in ("FarKP08", "Handwheel")
     ]
     assert len(set(rows)) == 2 and max(rows) < main[1] - 0.015
-    assert draw.sheet_x(spec.FLAT_STATIONS["Handwheel"]) == pytest.approx(0.2945)
+    end_to_grub = spec.LENGTH - spec.FLAT_STATIONS["Handwheel"]
+    assert draw.sheet_x(spec.FLAT_STATIONS["Handwheel"]) == pytest.approx(
+        main[2] - end_to_grub * draw._SHEET_PER_MODEL_MM
+    )
     # The cut length's dimension line (its text about 2.7 mm over it) stands
     # over the sections' letters, 1.7 .. 7.9 mm past the cutting lines' reach.
     assert text_y - 0.0027 > draw.MAIN_CENTER[1] + draw.SECTION_REACH + 0.0079 + 0.004
@@ -788,8 +821,8 @@ def test_one_axis_horizontal_view_at_the_largest_fitting_scale() -> None:
         caption_bottom = y - drop - draw.SECTION_CAPTION_GAP - 0.013
         assert caption_bottom > text_y + draw.TEXT_HALF_HEIGHT, section.label
         # The cutting line crosses its station's flat, 2.5 clear of both of
-        # its ends: the far flat's start prints the 375.5 station's extension
-        # line (machinist review: 0.5 off it, the two lines merged).
+        # its ends and away from the far KP08 station's extension line
+        # (machinist review: at 0.5 separation the two lines merged).
         start = spec.FLAT_STARTS[section.flat]
         assert start + 2.5 <= section.cut_mm <= start + spec.FLAT_LENGTH - 2.5
         assert section.cut_mm != spec.FLAT_STATIONS[section.flat]
@@ -894,9 +927,10 @@ def test_feed_nut_receipt_limits_are_native_dimensions_on_sheet_3() -> None:
         nut.BODY_DIA_MAX / 2.0
     )
     assert nut.REACH == nut.LENGTH_MAX
-    assert feed_block.NUT_REACH_X[0] == pytest.approx(
-        feed_block.NUT_FACE_X - nut.LENGTH_MAX
-    )
+    assert feed_block.NUT_REACH_X == pytest.approx((
+        feed_block.LUG_X0, feed_block.NUT_FACE_X + nut.LENGTH_MAX,
+    ))
+    assert feed_block.NUT_FACE_X == feed_block.LUG_X1
 
 
 def test_feed_nut_rework_is_native_banded_controls_on_sheet_3() -> None:
@@ -2203,6 +2237,57 @@ def test_details_letters_stand_off_the_screw() -> None:
     assert all(math.dist(a, b) > 0.010 for a in letters for b in letters if a != b)
 
 
+def test_settled_detail_frames_fit_after_translating_the_whole_bank() -> None:
+    # Final native 0c3 frames, not the smaller nominal fences. C's box is
+    # also the 84d failure: the earlier placement check was not a settled one.
+    measured = (
+        (.008517633303345734, .047647259642392935, .0772935907769218, .11642314838436299),
+        (.0638121, .0548120, .1181879, .1091880),
+        (.1307121, .0512121, .1922879, .1127879),
+    )
+    old_x = (.043, .091, .1615)
+    translations = [detail.centre[0] - x for detail, x in zip(draw.END_DETAILS, old_x, strict=True)]
+    assert translations == pytest.approx([.008] * 3)
+    for detail, box, dx in zip(draw.END_DETAILS, measured, translations, strict=True):
+        moved = (box[0] + dx, box[1], box[2] + dx, box[3])
+        draw._require_detail_bounds(SimpleNamespace(GetOutline=lambda box=moved: box), detail)
+        assert moved[0] - draw.BORDER[0] > .003
+        assert draw.TITLE_BLOCK[0] - moved[2] > .015
+
+
+def test_detail_containment_is_rechecked_when_the_native_outline_settles() -> None:
+    detail = draw.END_DETAILS[0]._replace(centre=(.043, draw.DETAIL_ROW_Y))
+    outline = _fence_box(detail)
+    view = SimpleNamespace(GetOutline=lambda: outline)
+    draw._require_detail_bounds(view, detail)
+    # Same centre, expanded native frame: this must refuse even if the
+    # geometric-fence check already passed, as it did in the old build.
+    outline = (.008517633303345734, .047647259642392935, .0772935907769218, .11642314838436299)
+    with pytest.raises(RuntimeError, match="leaves the drawable sheet"):
+        draw._require_detail_bounds(view, detail)
+    # A displaced frame still inside the border must not silently move the
+    # detail away from the authored dimension and caption lanes.
+    detail = draw.END_DETAILS[0]
+    outline = tuple(v + (.001 if i in (0, 2) else 0)
+                    for i, v in enumerate(_fence_box(detail)))
+    with pytest.raises(RuntimeError, match="moved from its reserved centre"):
+        draw._require_detail_bounds(view, detail)
+
+
+def test_detail_bounds_are_read_after_projection_and_in_the_final_callback() -> None:
+    tree = ast.parse((SCRIPTS / "draw_ch_rocker_arm_tl_vn_oblique_leadscrew_kit.py").read_text())
+    functions = {node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)}
+    create = functions["_create_end_detail"]
+    calls = [node.value.func.id for node in create.body
+             if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call)
+             and isinstance(node.value.func, ast.Name)]
+    assert calls.index("_require_detail_bounds") > calls.index("settle_detail_projection")
+    [settled] = [node for node in functions["_append_leadscrew_sheet"].body
+                 if isinstance(node, ast.FunctionDef) and node.name == "settled"]
+    assert any(isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+               and node.func.id == "_require_detail_bounds" for node in ast.walk(settled))
+
+
 def test_thread_is_called_out_on_the_main_view() -> None:
     """The bought thread is named by a leadered callout touching the screw,
     a designation and its extent, no size or method (rule 7)."""
@@ -2232,7 +2317,7 @@ def test_drawing_requires_every_control(monkeypatch, fault, target) -> None:
     """A reference-only, moved, banded or re-placed control is a regression."""
     monkeypatch.setattr(trim_drawing, "_early_bound", lambda value, _kind: value)
     assert draw.EXPECTED_CONTROLS["CutLength"] == (
-        pytest.approx(0.410),
+        pytest.approx(spec.LENGTH / 1000.0),
         pytest.approx(-0.0008),
         pytest.approx(0.0008),
     )

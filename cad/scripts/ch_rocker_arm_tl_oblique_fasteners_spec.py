@@ -34,6 +34,18 @@ Only the feed lever screws use wedge-lock pairs. The four feed nut screws'
 flat heads seat in 82° countersinks cut in the brass nut's flange at fit-up.
 Hold-down studs retain their loaded lower ends when shortened. These nominal
 fit contracts do not certify the jig.
+
+One common screw (oblique simplification PR2; R4 owner rulings 2026-11-07):
+McMaster 91251A197, #8-32 x 3/4 SHCS (``COMMON_SCREW``), wherever its head
+and engagement fit: the rail screws and the strap's CL, CR and HUB clamps
+into TL-21's ordinary #8-32 THRU taps, 19 in all, one BOM row
+(``ch-rocker-arm-tl-vn-oblique-rail-screw``). The HUB clamp bears on the
+brass top-hat washer (TL-52); the end clamps bear directly on the strap.
+Every other screw or stud is in ``COMMON_SCREW_EXCEPTIONS`` with the reason
+it cannot be the common one. Both TL-28 joints use the owner-selected
+91251A196 #8-32 x 5/8 (A″, 2026-11-07): their whole reaches stay out of the
+independently phased opposed hand-tap cuts. Eight share one second-length
+BOM row.
 """
 
 from __future__ import annotations
@@ -52,17 +64,17 @@ import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
 import ch_rocker_arm_tl_oblique_riser_spec as riser
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import ch_rocker_arm_tl_vn_oblique_pivot_screw_spec as pivot_screw
+import ch_rocker_arm_tl_oblique_hub_washer_spec as hub_washer
 from _hole_spec import THREAD_MAJOR_MM
 from _mcmaster_91771a112 import DIMS as _RISER_SCREW
 
 INCH = trammel.INCH
 RAILS = 2  # one rail, one base bar, one carriage, one pivot block per side
 SHCS = "SHCS"
+LOW_HEAD = "LOW-HEAD SHCS"
 # The riser's countersinks take only the B18.6.3 machine-screw head; a B18.3
 # socket flat head stands proud of them (trammel spec; Codex #1583).
 FLAT_HEAD = "B18.6.3 FLAT HEAD"
-# The KP08 screws: a button head on each pillow block's cast foot.
-BHCS = "BHCS"
 # The TL-VN-71 wedge-lock pair's stack under each feed lever screw head: the
 # 91812A230 band's 0.090 in maximum (the lever washer spec pins it).
 LEVER_LOCK_STACK = 0.090 * INCH  # 2.286
@@ -78,7 +90,7 @@ def inch_mm(length: str) -> float:
 class Fastener:
     joint: str
     thread: str  # as printed: "#8-32", "M4"
-    head: str  # SHCS, BHCS or FLAT HEAD
+    head: str  # SHCS or FLAT HEAD
     length: str  # as printed: "3/4" (inch) or "20" (mm)
     count: int
     grip_mm: float  # under the head, before the receiving thread
@@ -158,8 +170,8 @@ BRACKET_TO_BAR = Fastener(
     SHCS,
     leadscrew.BAR_SCREW_LENGTH,
     len(leadscrew.BASE_BAR_HOLES),
-    leadscrew.BAR_SCREW_GRIP,  # head recessed in TL-20's 4.80 counterbore
-    end_bracket.FULL_THREAD_DEPTH,  # drilled THRU, threaded from the bar face
+    leadscrew.BAR_SCREW_GRIP,  # head recessed in TL-20's .200 counterbore
+    end_bracket.BAR_THREAD_LIMITS[0],  # guaranteed full thread from bottom
 )
 BLOCK_TO_CARRIAGE = Fastener(
     "TL-32 feed block / TL-22 pivot block to HGH15CA carriage",
@@ -176,11 +188,11 @@ BLOCK_TO_CARRIAGE = Fastener(
 KP08_TO_BRACKET = Fastener(
     "KP08 pillow block to TL-28 end bracket",
     leadscrew.KP08_SCREW,
-    BHCS,
+    SHCS,
     leadscrew.KP08_SCREW_LENGTH,
-    2 * leadscrew.END_BRACKET_QUANTITY,
+    len(end_bracket.HOLE_X) * leadscrew.END_BRACKET_QUANTITY,
     leadscrew.KP08_FOOT_THICK,  # UNVERIFIED foot thickness
-    end_bracket.FULL_THREAD_DEPTH,  # drilled THRU, threaded from the KP08 face
+    end_bracket.KP08_THREAD_LIMITS[0],  # guaranteed full thread from top
 )
 NUT_TO_FEED_BLOCK = Fastener(
     "TL-VN-84 FeedNut to TL-32 feed block",
@@ -201,16 +213,29 @@ RISER_TO_CARRIER = Fastener(
     riser.THICKNESS - _RISER_SCREW.seated_recess(riser.CSK_DIA, riser.CSK_ANGLE),
     carrier.THICKNESS,  # tapped THRU
 )
-CR_CLAMP = Fastener(
-    "CR clamp: rocker-arm strap and riser to TL-21 carrier",
-    carrier.CR_THREAD,
+# R4 strap holding (owner rulings 2026-11-07): the common screw through the
+# strap's loose end-waste holes and the riser's #9 clearances into TL-21's
+# ordinary #8-32 THRU taps at CL and CR, its head directly on the strap.
+END_CLAMP = Fastener(
+    "CL and CR end clamps: strap end waste and riser to TL-21 carrier",
+    carrier.CLAMP_THREAD,
     SHCS,
-    "7/8",
-    1,
-    trammel.RISER_THICK + trammel.STRAP_THICK,
+    "3/4",
+    len(carrier.END_CLAMPS),
+    riser.THICKNESS + trammel.STRAP_THICK,
     carrier.THICKNESS,  # tapped THRU
-    # the full bought screw: its tip stands into the free space above the rail
-    tip_clearance_mm=trammel.CARRIER_TO_RAIL_GAP,
+)
+# The HUB clamp: the same screw through the brass top-hat washer, whose
+# flange alone adds to the grip (its spigot sits in the strap's reamed hole),
+# the strap and the riser's relief into TL-21's in-situ #8-32 THRU tap.
+HUB_CLAMP = Fastener(
+    "HUB clamp: top-hat washer, strap and riser to TL-21 carrier",
+    carrier.HUB_THREAD,
+    SHCS,
+    "3/4",
+    1,
+    hub_washer.THICK + trammel.STRAP_THICK + riser.THICKNESS,
+    carrier.THICKNESS,  # tapped THRU
 )
 LEVER_TO_CARRIER = Fastener(
     "TL-26 feed lever to TL-21 carrier",
@@ -231,7 +256,8 @@ FASTENERS: tuple[Fastener, ...] = (
     KP08_TO_BRACKET,
     NUT_TO_FEED_BLOCK,
     RISER_TO_CARRIER,
-    CR_CLAMP,
+    END_CLAMP,
+    HUB_CLAMP,
     LEVER_TO_CARRIER,
 )
 LEVER_LOCK_WASHER = Washer(
@@ -241,7 +267,51 @@ LEVER_LOCK_WASHER = Washer(
     LEVER_TO_CARRIER.count,
     LEVER_LOCK_STACK,
 )
-WASHERS: tuple[Washer, ...] = (LEVER_LOCK_WASHER,)
+HUB_WASHER = Washer(HUB_CLAMP.joint, "#8", "BRASS TOP-HAT WASHER", 1, hub_washer.THICK)
+WASHERS: tuple[Washer, ...] = (LEVER_LOCK_WASHER, HUB_WASHER)
+
+# --- The common screw and its exceptions ---------------------------------------
+# One SKU wherever its head and engagement fit (module docstring): these
+# rows are its, and their count is the one BOM row's.
+COMMON_SCREW = ("#8-32", "3/4", SHCS)  # McMaster 91251A197
+COMMON_SCREW_ROWS: tuple[Fastener, ...] = (RAIL_TO_BAR, END_CLAMP, HUB_CLAMP)
+COMMON_SCREW_COUNT = sum(row.count for row in COMMON_SCREW_ROWS)  # 16 + 2 + 1
+# Every other screw or stud the jig consumes, and why it is not the common
+# #8-32 x 3/4 SHCS. Keys: the fitter's name for the item.
+COMMON_SCREW_EXCEPTIONS: dict[str, str] = {
+    "M4 SHCS, carriage": (
+        "the bought HGH15CA carriage is tapped M4 x 5; its thread fixes the size, "
+        "and each screw is cut to its counterbore at assembly"
+    ),
+    "5/16-18 shoulder screw, pivot": (
+        "the pivot's 3/8 shoulder is the bearing journal the carrier turns on, "
+        "not a clamping screw"
+    ),
+    "5/16-18 SHCS, feed lever": (
+        "screws into TL-21's existing 5/16-18 THRU taps (carrier.LEVER_THREAD) "
+        "through the TL-26 hand lever's holes and the TL-VN-71 5/16 wedge-lock "
+        "pairs; a #8-32 mates neither the taps nor the washers"
+    ),
+    "#4-40 flat heads, riser and feed nut": (
+        "flush countersunk heads into the existing #4-40 taps of TL-21 and the "
+        "feed block's lug, through the riser's countersinks and the bought "
+        "nut's countersunk Ø3.5 flange holes, which a #8 does not pass"
+    ),
+    "1/2-13 hold-down studs": (
+        "the mill table's T-slots and the bought clamping kit fix the size"
+    ),
+    "kit set screws, handwheel and KP08": (
+        "supplied in the bought handwheel and pillow blocks, tapped by their makers"
+    ),
+    "#8-32 x 5/8 SHCS, KP08 to TL-28": (
+        "owner A″ 2026-11-07: finite full-thread and opposed hand-tap "
+        "cut limits protect the entire upper screw reach"
+    ),
+    "#8-32 x 5/8 SHCS, TL-28 to bar": (
+        "owner A″ 2026-11-07: .200 counterbore and 5/8 screw retain 1.5D "
+        "full thread without entering the opposed-phase cut"
+    ),
+}
 
 
 @dataclass(frozen=True)
@@ -293,6 +363,18 @@ if abs(RAIL_TO_BAR.engagement_mm - base_bar.RAIL_SCREW_ENGAGEMENT) > 1e-9:
     raise AssertionError("rail screw engagement disagrees with the base bar spec")
 if abs(BRACKET_TO_BAR.engagement_mm - leadscrew.BAR_SCREW_ENGAGEMENT) > 1e-9:
     raise AssertionError("bar screw engagement disagrees with the leadscrew spec")
+if abs(KP08_TO_BRACKET.engagement_mm - leadscrew.KP08_SCREW_REACH) > 1e-9:
+    raise AssertionError("KP08 screw engagement disagrees with the leadscrew spec")
+for _row in COMMON_SCREW_ROWS:
+    if (_row.thread, _row.length, _row.head) != COMMON_SCREW:
+        raise AssertionError(f"{_row.joint} is not the common screw")
+# Every row that is not the common screw has its reason.
+if sum(
+    1
+    for _row in FASTENERS
+    if (_row.thread, _row.length, _row.head) != COMMON_SCREW
+) != len(FASTENERS) - len(COMMON_SCREW_ROWS):
+    raise AssertionError("a fastener row duplicates the common screw outside its rows")
 if abs(NUT_TO_FEED_BLOCK.engagement_mm - feed_nut.SCREW_ENGAGEMENT) > 1e-9:
     raise AssertionError("nut screw engagement disagrees with the feed nut spec")
 if abs(BLOCK_TO_CARRIAGE.engagement_mm - pivot_block.SCREW_REACH) > 1e-9:

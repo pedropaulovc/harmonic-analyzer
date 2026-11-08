@@ -3822,6 +3822,14 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         # tree): poses closing on the calculator, the shop-fixture rule, and
         # the pinned sweep clearances of both passes.
         SCRIPTS_DIR / "test_ch_rocker_arm_tl_oblique_jig_assembly.py",
+        # The R3 hold-down's clamp heights, cutter-flank gaps and flange
+        # clearances (ch_rocker_arm_tl_oblique_holding_spec).
+        SCRIPTS_DIR / "test_ch_rocker_arm_tl_oblique_holding_spec.py",
+        # The held bandsaw blank's clipped stock, radial allowance and entry
+        # engagement before the oblique-trammel jig passes.
+        SCRIPTS_DIR / "test_ch_rocker_arm_tl_oblique_blank_spec.py",
+        # Native carrier-table identity and correlated pin/HUB tolerance budget.
+        SCRIPTS_DIR / "test_ch_rocker_arm_tl_oblique_carrier_table.py",
         # The pen carriage's CG-on-rod-axis balance, paper stand-off and rider
         # layout (pn_pen_carriage_geom) that build_pn_pen_assembly places from.
         SCRIPTS_DIR / "test_pn_pen_carriage_geom.py",

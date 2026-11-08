@@ -14,24 +14,34 @@ tolerance chain. TL-32's nut face is VIEW D on its own 2:1 sheet, its arrow on
 the plan. The layout notes below give sheet millimetres.
 """
 from __future__ import annotations
+import json
 import math
 from typing import Any
 from _check import check
 from _com import _early_bound
+from _drawing_attachment import _assert_attached_to, _assert_leader_lands
 from _drawing_common import (DrawingOutputs, finalize_drawing, new_project_drawing, read_required_properties, rebuild_drawing,
                              remove_notes_matching)
 from _drawing_dimensions import assert_imported_precision, dimension_name, offset_dimension_text
+from _drawing_edges import _segment_distance, scan_view_edges
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout
-from _drawing_leader_notes import add_leader_note
+from _drawing_leader_notes import add_attached_note, add_leader_note
 from _drawing_projection import model_point_in_view
 from _drawing_sections import create_section_view
 from _drawing_sheets import create_blank_drawing_sheets
+from _drawing_types import layout_report_path
 from _drawing_view_display import set_hidden_lines_removed
+from _fit_deviations import deviations
 from _hole_callout_thread_class import omit_title_block_thread_class
 from _paths import CAD_ROOT
 from _drawing_metric_vendor import print_imported_metric_dimensions
 from _part_properties import part_drawing_unit
+from _layout_audit import (arrowhead_segments, assign_sheet_text, audited_annotations,
+                           group_rows, ink_key, ink_spans, printed_dump, span_box, text_items)
+from _layout_geometry import Box, estimate_text_box
+from _title_block_units import MM_PER_INCH, render_number
+from _pdf_ink import page_ink, read_pdf_ink
 import _telemetry
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
@@ -42,66 +52,45 @@ SHEET_SCALE = (1.0,1.0)
 # SolidWorks' own descriptive note for TL-32's Hole Wizard nut taps; the native
 # tap callout already states the thread.
 TAPPED_HOLE_NOTE = '#4-40 Tapped Hole'
-# Sheet metres. The plan sits at x .170 so the 112 mm REAM text, the tap
-# callout and the 4X callouts fit left of it inside the border, with short
-# leaders. Plan geometry on the sheet: block x 139..201, y 185..225; frame
-# centre 181,205; bore 149,205; holes x 168/194, y 192/218.
-# Both sections are removed sections whose cutting lines run 4 mm past both
-# block edges, so each prints the whole profile at its cut (review of farm
-# run 20261027T171931429Z: a cut stopping inside the block printed a slice
-# that read as a complete small part). Both look away from the plan (third
-# angle, review of farm run 20261024T133158704Z), so their letters stand on
-# the plan side: A along y 205 from x 205 to 135, its letters up between the
-# seat axis's extension line (y 205) and row 4Y's (y 218); B along x 194
-# from y 229 down, letters left at x ~176..182 (TL-22 to y 181; TL-32 stops
-# inside the block at y 210, since its lug fills x 171.75..190.25 below).
-# The REAM and 4X DRILL callouts stand under the A letter at x 135, their
-# leaders rising to the seat and hole 1 from the lower left; the 4X
-# COUNTERBORE stands lower right, its leader on hole 3 (review: two leaders
-# converged on hole 1).
-# X ordinates stand above the plan in 9 mm lanes from the -X edge (x 139):
-# the 10.00 to the seat, its text right of its 10 mm span, then the two hole
-# columns and the 62.00 overall, 8 mm under the border. The 62.00's text and
-# the counterbore end wall it sets stand off right of the +X edge, leadered,
-# one row under the value, the block centred on its point: inline, the
-# callout row pushed the line onto the 55.000's text, and centred at y .2615
-# the value crossed the border (farm run 20261028T152045278Z). Rows are
-# dimensioned once each from the seat axis: 3Y/4Y on the +X side at x .222,
-# clear of A's right letter, arrows inside so neither's outside tail strikes
-# the other's text (review r1-r3); BlockSideY at x .231 and BlockWidth past
-# its shouldered text, its three rows centred on the point over the bottom
-# edge's extension line, 4 mm right of BlockSideY's arrow tail (at x .255
-# 1.6 mm, same run) and left of TL-32's 88.00 (x .285).
+# Sheet metres. B-B still cuts the -X M4 column, avoiding the integral +X
+# lug. Its upper arrow stands ABOVE all X-dimension tiers; its lower arrow
+# stands below the clearance-hole leader. Do not shrink the existing fonts.
+# The retained 0c3ed359 pivot PDF put B at x148.225..151.669 mm, directly on
+# the x149.172 datum witnesses. At y259 its bottom is y256.310, above the
+# highest witness (y254.500), and its top y264.512 clears the y266.7 border.
+# Keep dimension text right of the x157 cutting line, not on that line.
+# X ordinates remain native baseline dimensions from the finished -X edge;
+# Y starts at the pivot axis. Native layout and machinist-review own fit.
 PLAN_XY = (.170,.205)
 PLAN_KEEP = {
-    'BlockLength':(.170,.259),'PlanHole2X':(.1665,.250),'PlanHole1X':(.1535,.241),
-    'PlanBoreX':(.157,.232),
+    'BlockLength':(.170,.2535),'PlanHole2X':(.1665,.248),'PlanHole1X':(.171,.2395),
+    'PlanBoreX':(.1635,.231),
     'BlockWidth':(.2595,.203),'BlockSideY':(.231,.220),
     'CarriageDrills3Y':(.222,.1985),'CarriageDrills4Y':(.222,.2115),
     'BoreDia':(.078,.196),'CarriageDrills1Dia':(.085,.168),'CarriageCounterbores3Dia':(.245,.150),
-    # The tap's Ø on its circle at the seat's floor, from high on the upper
-    # left: the leader enters the plan's left edge under the length stack's
-    # extension lines and passes over the A-A arrow's letter. In A-A its
-    # extension lines rose from the top face through the empty Ø.3750 seat
-    # (machinist review, delta 20261104T040714425Z); on the bottom face with
-    # them hidden, its arrows ran along the edge (#2119's final
-    # 20261103T190306489Z).
+    # TL-32 still prints this separate native tap dimension in its established
+    # upper-left lane. TL-22 imports it at the same source position, then
+    # hides only the display after the spec-generated note passes readback.
     'TapDrillDia':(.071,.2455),
 }
-BLOCK_LENGTH_TEXT_XY = (.240,.2585)
+# TL-22 and TL-32 share this top tier (machinist review of c40296ac, TL-32
+# sheet 1; TL-22's PDF placed it identically). With the value over its
+# reason, the two rows were centred at (240, 258.5) mm, right of the 1.64 at
+# its own height. Their underline sat on the y253.5 dimension line, so the
+# leader ran from mid-span along the line, through its right arrowhead and
+# across the right extension line. The 13 mm under the border cannot hold two
+# rows plus a clear rise, so the reason prints on the value's row
+# ("1.64 SETS COUNTERBORE END WALL": about 82 mm at that PDF's 2.74 mm a
+# character, in a 6.38 mm row). The row is centred so it spans x 162..244
+# and y 257.8..264.2: 5 mm right of the x157 cutting line, 2.5 mm under the
+# border, and its underline about 5 mm over the dimension line. The leader
+# then rises steeply above the span, clear of both extension lines and the
+# arrowheads.
+BLOCK_LENGTH_TEXT_XY = (.203,.261)
 ROW_DIMENSIONS = ('CarriageDrills3Y','CarriageDrills4Y')
-# Section A-A looks up the sheet (third-angle: placed below the plan, its
-# arrows point away from it, review of farm run 20261024T133158704Z), so the
-# top face prints on top: Z 0..24.3 at y 67.9..92.2, the seat floor at y
-# 84.55. The tap's Ø prints on the plan (PLAN_KEEP). The
-# 7.650 seat depth keeps its line at x .120, arrows inside so the line is
-# drawn for the text leader to land on, and stands its text, with the stack
-# it sets, off to the upper left in the empty band under the plan's
-# callouts. The ~72 mm two-row text is centred on the point and must end
-# left of x .120, or the leader to its right end crosses its last letters
-# (farm run 20261024T133158704Z).
-# A-A is centred on its cut span (X -46..+24), the block's own centre, so its
-# -X face lands at x 139 under the plan's.
+# A-A remains below the plan, top face up. Its depth text stays outboard
+# left of the dimension line; the baseline and actual section span come
+# from the model, not the retired asymmetric block's sheet coordinates.
 SIDE_XY = (.170,.080)
 SIDE_KEEP = {'TopBoreDepth':(.120,.088)}
 # TL-22 prints the block height (the Block extrusion's depth) on a standard
@@ -126,6 +115,12 @@ SEAT_DEPTH_TEXT_XY = (.078,.104)
 FLOOR_XY = (.335,.1225)
 FLOOR_KEEP = {'CboreFloor':(.380,.156)}
 FEED_FLOOR_KEEP = FLOOR_KEEP | {'SectionBlockHeight':(.335,.172)}
+# A-A retains its short overrun. B-B needs independent physical lanes:
+# the top is a paper ordinate, the bottom is 16 mm past the block edge.
+# The latter puts B's top at y174.446 on TL-22, below the drill leader's
+# y178.287 at B's left edge. The -X cut never enters TL-32's +X lug.
+FLOOR_CUT_TOP_Y = .259
+FLOOR_CUT_BOTTOM_OVERRUN_MM = 16.0
 # The section letters print smaller than the document default, and the
 # cutting-line arrows shorter, so A's right letter, past the block's +X edge,
 # ends under row 4Y's extension line (y 218): at the template's arrows its
@@ -139,62 +134,44 @@ _PREF_OPTION_NONE = 0
 # The 1:1 pictorial's top vertex touched the border at y .235 (review of farm
 # run 20261027T181901497Z); 7 mm lower it stays clear of B-B's 24.30 (y 175).
 ISO_XY, ISO_SCALE = (.355,.228), SHEET_SCALE
-# TL-32: the plan drops 24 mm so its block lands where TL-22's does; the lug
-# (x 171.75..190.25, y 137..185) takes the space below. Under it: LugWidth,
-# arrows and text inside its 18.5 mm span, then the lug face from the -X
-# edge. B's line runs on past the lug's end to y 105, under both: its lower
-# arrow and letter point left, into the lug's lane, so a line stopping at
-# the block's -Y edge put them on the lug, and one stopping inside the block
-# printed a strip read as a whole part (review of farm run
-# 20261027T181901497Z). The 88.00 overall stands outermost on the +X side,
-# past the 4X COUNTERBORE callout. A-A moves down 20 mm. Its taller
-# pictorial prints at 1:2 to stay under the border.
+# TL-32's plan drops to allow its column-side lug below the block. PlanLugX
+# has its own baseline lane; the lug's +X side is the block's end (owner
+# ruling 2026-11-07), so no lug width prints. B-B stops beyond the block
+# because its -X column no longer crosses the lug. The taller pictorial
+# retains its own 1:2 scale.
 FEED_PLAN_XY = (.170,.181)
 FEED_PLAN_KEEP = PLAN_KEEP | {
-    'LugWidth':(.181,.1305),'PlanLugX':(.1554,.1225),'PlanOverallY':(.285,.181),
+    'PlanLugX':(.1554,.1225),'PlanOverallY':(.285,.181),
+    # 84d's counterbore leader crossed VIEW D at y160.934; its text also
+    # met D's sheet reference. Raise only this callout: its bottom row starts
+    # y165.219 and its top ends y182.765, below the y184.937 width witness.
+    'CarriageCounterbores3Dia':(.245,.174),
 }
-FEED_FLOOR_CUT_END_Y = -100
 FEED_SIDE_XY = (.170,.060)
 FEED_SIDE_KEEP = {'TopBoreDepth':(.120,.068)}
 FEED_SEAT_DEPTH_TEXT_XY = (.078,.084)
 FEED_ISO_XY, FEED_ISO_SCALE = (.360,.225), (1,2)
-# VIEW D looks at the lug's -X (nut) face: its letter's leader is the viewing
-# arrow, level with the lug's mid-length, 15 mm left of that face.
+# VIEW D looks at the lug's +X nut face; its arrow approaches from the right.
 VIEW_LETTER = 'D'
 VIEW_LETTER_HEIGHT = .005
 VIEW_ARROW_RUN = .015
-# VIEW D prints on sheet 2: the arrow's letter says so on a row under it,
-# centred under the letter, clear of the 4X DRILL leader above (review of
-# farm run 20261101T175835750Z).
+# VIEW D prints on sheet 2. Keep that reference centred under D, with a
+# separate text row; it is not a face/sheet qualifier for the counterbores.
 VIEW_SHEET_REF = '(SHEET 2)'
-VIEW_SHEET_REF_OFFSET = (-.010, -.008)
-# Nut interface, VIEW D, *Left at 2:1 on a 2:1 sheet, at .190,.175: Z runs
-# right from the bottom face at x 165.7, Y=0 prints at y 223, the lug end
-# (Y -68) at y 87; the clearance's axis at 190.5,113, the four taps
-# transferred from the TL-VN-84 FeedNut on its diagonals at x 179.2 / 201.8, y 101.7 /
-# 124.3. The clearance stands from the lug end / carriage-face corner. Left
-# of the view: the clearance's .515 (x 104) and, under the lug end, the
-# 12.400 mm height, its three rows outboard left of the bottom face's
-# extension line. The Ø.351 clearance callout comes in from the left, its
-# four rows over the .515's axis extension line (y 113) and its leader under
-# the upper-left tap; the taps' transfer callout from the upper right onto
-# the upper-right tap's rim, wholly right of the view's edge (x 214; from
-# the lower right its rows ran into the title block, final
-# 20261103T152424387Z). The taps' clocking, 4X 45° ±5° from the axis's +Z
-# centreline to the lower-right (-Y, +Z) tap, reads on the wedge's bisector
-# 45 mm out (at 2:1), wholly right of the lug's top face (x 214.5) and above
-# the title block: its arc runs 222-236 x, 81-113 y, outside the lug's
-# corner (214.5, 87) by 10 mm.
+VIEW_SHEET_REF_OFFSET = (-.0075, -.011)
+# VIEW D is the standard Right view at 2:1. Relative to the former Left
+# view its Z direction reverses: mirror the annotation lanes about NUT_XY,
+# not the model or its native dimensions. The lug end remains below the block.
 NUT_XY, NUT_SCALE = (.190,.175), (2,1)
 NUT_KEEP = {
-    'NutCentreY':(.104,.100),'NutCentreZ':(.134,.0772),
-    'NutClearanceDia':(.135,.133),'NutClock':(.2321,.0958),
+    'NutCentreY':(.276,.100),'NutCentreZ':(.246,.0772),
+    'NutClearanceDia':(.245,.133),'NutClock':(.1479,.0958),
 }
 NUT_CAPTION = 'VIEW D'
 NUT_CAPTION_XY = (.178,.058)  # the note's left edge; centred under the view
 # TL-32's cut-face sections hang their captions 6 mm under the face.
 SECTION_CAPTION_GAP = .006
-NUT_CALLOUT_XY = (.268,.165)
+NUT_CALLOUT_XY = (.112,.165)
 NUT_ISO_XY = (.380,.215)
 _ARROWS_INSIDE = 0  # swDimArrowsInside
 _CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
@@ -218,12 +195,303 @@ def _displays(adapter, annotations, names) -> dict[str, Any]:
     return found
 
 
+# One normal-height, four-line note replaces the two plan-diameter displays.
+# Lower-right blank lane, below B-B's plan cutting line; see retained-389
+# geometry in the focused regression. The 315-degree rim pick clears centre marks.
+PIVOT_STACK_XY = (.190, .125)
+PIVOT_NOTE_HEIGHT = .0035
+PIVOT_STACK_LANE = (.185, .100, .312, .130)
+
+
+def _pivot_stack_semantics(text):
+    """Plain note rows: retain numbers, signs and precision; normalize whitespace/symbols."""
+    text = text.replace('Ø', '<MOD-DIAM>').replace('↧', '<HOLE-DEPTH>')
+    return tuple(' '.join(row.split()) for row in text.splitlines())
+
+
+def _pivot_stack_text(contract):
+    """Owner-approved compact text generated from spec values/bands, never copied sizes."""
+    if contract.UNIT != 'in':
+        raise RuntimeError('pivot stacked callout requires its inch drawing contract')
+    places = contract.DRAWING_PRECISION_BY_NAME
+
+    def size(name):
+        return render_number(round(contract.DRAWING_VALUES[name] / MM_PER_INCH, places[name]), 'in', places[name])
+
+    def signed(mm):
+        magnitude = render_number(round(abs(mm) / MM_PER_INCH, contract.BORE_PLACES), 'in', contract.BORE_PLACES)
+        return ('-' if mm < 0 else '+') + magnitude
+
+    lower, upper = deviations(contract.BORE_BAND)
+    return (
+        f'REAM <MOD-DIAM>{size("BoreDia")} {signed(upper)}/{signed(lower)} <HOLE-DEPTH>{size("TopBoreDepth")}\n'
+        '  LOCATING FIT, TL-VN-77 SHOULDER\n'
+        f'DRILL <MOD-DIAM>{size("TapDrillDia")} THRU\n'
+        f'{contract.PIVOT_TAP} UNC TAP THRU BELOW SEAT'
+    )
+
+
+def _pivot_stack_estimate(text):
+    """Conservative offline bound, not a substitute for the exported PDF glyph gate.
+
+    One full cap-height per glyph (versus the shared 0.62 average), 1.6-height
+    row pitch and 1 mm all-round bearing/ink padding. Symbols count as one
+    glyph. At the current spec: [189,103.7]..[306.5,126] mm, 3.7 mm minimum air.
+    """
+    glyphs = text.replace('<MOD-DIAM>', 'Ø').replace('<HOLE-DEPTH>', '↧')
+    if len(glyphs.splitlines()) != 4:
+        raise RuntimeError('pivot stacked callout must remain four short lines')
+    box = estimate_text_box(glyphs, anchor=PIVOT_STACK_XY, height=PIVOT_NOTE_HEIGHT,
+                            advance_ratio=1.0, line_spacing=1.6)
+    if box is None:
+        raise RuntimeError('pivot stacked callout has no estimated text extent')
+    padded = Box(box.xmin - .001, box.ymin - .001, box.xmax + .001, box.ymax + .001)
+    left, bottom, right, top = PIVOT_STACK_LANE
+    if min(padded.xmin - left, padded.ymin - bottom, right - padded.xmax, top - padded.ymax) < .003:
+        raise RuntimeError(f'pivot stacked callout estimate lacks 3 mm lane margin: {padded.mm()!r}')
+    return padded
+
+
+@_telemetry.traced("drawing.pivot_stacked_callout")
+def _stack_pivot_callout(adapter, plan, annotations, contract):
+    """One outer-rim note generated from spec, independently checked against native sources."""
+    names = ('BoreDia', 'TopBoreDepth', 'TapDrillDia')
+    displays = _displays(adapter, annotations, names)
+
+    def source_state(display):
+        dim = _early_bound(display.GetDimension2(0), 'IDimension')
+        ann = _early_bound(display.GetAnnotation(), 'IAnnotation')
+        tol = _early_bound(dim.Tolerance, 'IDimensionTolerance')
+        return (
+            str(dim.FullName), float(dim.SystemValue),
+            tuple(str(display.GetText(which) or '') for which in range(1, 9)),
+            int(display.GetPrimaryPrecision2()), int(display.GetPrimaryTolPrecision2()),
+            (int(tol.Type), float(tol.GetMinValue()), float(tol.GetMaxValue())),
+            tuple(float(v) for v in (ann.GetPosition() or ())),
+        )
+
+    sources = {}
+    for name, feature in zip(names, ('TopBoreProfile', 'TopBore', 'PivotTapProfile')):
+        display = displays[name]
+        state = source_state(display)
+        if (state[0].split('@')[:2] != [name, feature]
+                or not math.isfinite(state[1])
+                or not math.isclose(state[1] * 1000, contract.DRAWING_VALUES[name], rel_tol=0, abs_tol=1e-6)
+                or state[3] != contract.DRAWING_PRECISION_BY_NAME[name]
+                or state[2][2:4] != (contract.CALLOUTS_ABOVE.get(name, ''), contract.CALLOUTS_BELOW.get(name, ''))
+                or len(state[6]) != 3 or not all(math.isfinite(v) for v in state[6])):
+            raise RuntimeError(f'{name}: unreadable native stacked-callout source {state!r}')
+        ann = _early_bound(display.GetAnnotation(), 'IAnnotation')
+        if int(ann.OwnerType) != 0 or ann.IsDangling():
+            raise RuntimeError(f'{name}: source is not a live drawing-view dimension')
+        sources[name] = (_early_bound(display.GetDimension2(0), 'IDimension'), state)
+    bore_state = sources['BoreDia'][1]
+    tolerance_kind, lower, upper = bore_state[5]
+    tolerance_places = bore_state[3] if bore_state[4] == -3 else bore_state[4]
+    expected_lower, expected_upper = deviations(contract.BORE_BAND)
+    if (tolerance_kind != 2 or not all(math.isfinite(v) for v in (lower, upper))
+            or tolerance_places != contract.BORE_PLACES
+            or not math.isclose(lower * 1000, expected_lower, rel_tol=0, abs_tol=1e-6)
+            or not math.isclose(upper * 1000, expected_upper, rel_tol=0, abs_tol=1e-6)):
+        raise RuntimeError('BoreDia: native locating-fit band disagrees with the generated spec band')
+    if any(sources[name][1][5][0] != 0 for name in ('TopBoreDepth', 'TapDrillDia')):
+        raise RuntimeError('pivot stacked callout: unexpected explicit depth/drill tolerance')
+
+    text = _pivot_stack_text(contract)
+    expected = _pivot_stack_semantics(text)
+    estimate = _pivot_stack_estimate(text)
+    edges = scan_view_edges(plan, label='pivot stacked callout rim')
+    outer = edges.circle_at(
+        (part.BORE_X, part.BORE_Y, contract.BLOCK_HEIGHT), part.BORE_DIA / 2,
+        axis=(0.0, 0.0, 1.0), center_tol_mm=1e-6, radius_tol_mm=1e-6, label='pivot reamed mouth',
+    )
+    if not all(math.isfinite(v) for v in outer.circle):
+        raise RuntimeError('pivot stacked callout outer rim is unreadable')
+    centre = _project(adapter, plan, (part.BORE_X, part.BORE_Y, contract.BLOCK_HEIGHT), 'pivot centre')
+    rim_offset = part.BORE_DIA / (2 * math.sqrt(2))
+    landing = _project(adapter, plan,
+                       (part.BORE_X + rim_offset, part.BORE_Y - rim_offset, contract.BLOCK_HEIGHT),
+                       'pivot outer lower-right rim')
+    radius = math.dist(centre, landing)
+    obstacles = tuple(_project(adapter, plan, (x, y, contract.BLOCK_HEIGHT),
+                               'carriage counterbore')
+                      for x, y in part.BOLT_POINTS)
+    x, y = part.BOLT_POINTS[0]
+    obstacle_rim = _project(adapter, plan, (x + part.CBORE_DIA / 2, y, contract.BLOCK_HEIGHT),
+                            'carriage counterbore radius')
+    obstacle_radius = math.dist(obstacles[0], obstacle_rim)
+    if (not all(math.isfinite(v) for point in (centre, landing, *obstacles, obstacle_rim) for v in point)
+            or radius <= 0 or obstacle_radius <= 0):
+        raise RuntimeError('pivot stacked callout projection is unreadable')
+    note = _early_bound(add_attached_note(
+        adapter, plan, text=text, entity=outer.edge, leader_attach_xy=landing,
+        note_xy=PIVOT_STACK_XY, label='pivot stacked native callout',
+    ), 'INote')
+    _size_note(adapter, note, PIVOT_NOTE_HEIGHT, label='pivot generated callout note height')
+
+    def resolved():
+        text_format = _early_bound(note.GetAnnotation(), 'IAnnotation').GetTextFormat(0)
+        if (_pivot_stack_semantics(str(note.GetText() or '')) != expected or text_format is None
+                or not math.isclose(float(text_format.CharHeight), PIVOT_NOTE_HEIGHT, rel_tol=0, abs_tol=1e-9)):
+            raise RuntimeError(f'generated pivot callout disagrees with spec text or note height: {note.GetText()!r}')
+
+    resolved()  # Never hide source displays until generated text/height agrees with the spec.
+    for name in ('BoreDia', 'TapDrillDia'):
+        _early_bound(displays[name].GetAnnotation(), 'IAnnotation').Visible = 3  # swAnnotationHidden
+    rebuild_drawing(adapter, label='hide replaced pivot diameter displays')
+
+    @_telemetry.traced("drawing.pivot_stacked_callout_readback")
+    def settled():
+        resolved()
+        for name, display in displays.items():
+            dimension, state = sources[name]
+            current = _early_bound(display.GetDimension2(0), 'IDimension')
+            ann = _early_bound(display.GetAnnotation(), 'IAnnotation')
+            read = source_state(display)
+            if (int(adapter.swApp.IsSame(current, dimension)) != 1 or read[:6] != state[:6]
+                    or len(read[6]) != 3 or not all(math.isfinite(v) for v in read[6])
+                    or math.dist(read[6], state[6]) > 1e-5 or ann.IsDangling()
+                    or int(ann.Visible) != (1 if name == 'TopBoreDepth' else 3)):
+                raise RuntimeError(f'{name}: stacked callout lost its native source/precision/visibility')
+        ann = _early_bound(note.GetAnnotation(), 'IAnnotation')
+        if int(ann.OwnerType) != 0 or int(adapter.swApp.IsSame(ann.Owner, plan)) != 1 or int(ann.Visible) != 1:
+            raise RuntimeError('pivot stacked callout is not visible in its plan view')
+        position = tuple(float(v) for v in (ann.GetPosition() or ()))
+        if (len(position) != 3 or not all(math.isfinite(v) for v in position)
+                or math.dist(position[:2], PIVOT_STACK_XY) > 1e-5):
+            raise RuntimeError('pivot stacked callout moved from its authored text position')
+        _assert_attached_to(adapter, ann, outer.edge, entity_type='EDGE',
+                            what='pivot stacked callout', label='outer reamed rim')
+        _assert_leader_lands(ann, landing, what='pivot stacked callout', label='outer reamed rim', tolerance=1e-5)
+        points = tuple(float(v) for v in (ann.GetLeaderPointsAtIndex(0) or ()))
+        if len(points) not in (6, 9) or not all(math.isfinite(v) for v in points):
+            raise RuntimeError('pivot stacked callout leader is unreadable')
+        xy = [(points[i], points[i + 1]) for i in range(0, len(points), 3)]
+        strokes = list(zip(xy, xy[1:]))
+        data = _early_bound(ann.GetDisplayData(), 'IDisplayData')
+        if data is None or int(data.GetArrowHeadCount()) != 1:
+            raise RuntimeError('pivot stacked callout must have exactly one native arrow')
+        arrow = tuple(float(v) for v in (data.GetArrowHeadAtIndex2(0) or ()))
+        if (len(arrow) != 12 or not all(math.isfinite(v) for v in arrow)
+                or math.dist(arrow[:2], landing) > 1e-5
+                or arrow[8] not in (0, 1) or arrow[6] <= 0 or arrow[7] <= 0):
+            raise RuntimeError('pivot stacked callout arrow is not on the outer rim')
+        triangle = arrowhead_segments(arrow)
+        if len(triangle) != 3:
+            raise RuntimeError('pivot stacked callout arrow triangle is unreadable')
+        strokes += [((edge.x0, edge.y0), (edge.x1, edge.y1)) for edge in triangle]
+        if any(_segment_distance(centre, start, end) < radius - 1e-5 for start, end in strokes):
+            raise RuntimeError('pivot stacked callout leader/arrow crosses the bore interior')
+        if any(_segment_distance(obstacle, start, end) < obstacle_radius + .001
+               for obstacle in obstacles for start, end in strokes):
+            raise RuntimeError('pivot stacked callout leader/arrow crowds a carriage counterbore')
+        _telemetry.info('pivot stacked native callout readback', generated=text, resolved=str(note.GetText()),
+                        note_height_m=PIVOT_NOTE_HEIGHT, estimated_text_bounds_mm=estimate.mm(),
+                        source_names=[state[0] for _, state in sources.values()],
+                        leader_points_m=list(points), arrow_sheet_data=list(arrow))
+
+    settled()
+    return settled
+
+
+@_telemetry.traced("drawing.pivot_callout_pdf_text")
+def _assert_pivot_pdf_text(pdf, report_path, contract) -> None:
+    """Reuse the finished sheet's text assignment; only PDF glyphs bound the note."""
+    report = json.loads(report_path.read_text(encoding='utf-8'))
+    pages = read_pdf_ink(pdf)
+    if (len(pages) != 1 or len(report['sheets']) != 1
+            or report['stem'] != pdf.stem or report['sheets'][0]['page'] != 0):
+        raise RuntimeError('pivot callout PDF/report must describe its one finished sheet')
+    dump = printed_dump({**report['sheets'][0], 'ink': page_ink(pages[0])})
+    annotations = audited_annotations(dump)
+    expected = _pivot_stack_text(contract)
+    notes = [item for item in annotations if item.get('type') == 6
+             and not (item.get('note') or {}).get('balloon')
+             and _pivot_stack_semantics(str((item.get('note') or {}).get('text', '')))
+             == _pivot_stack_semantics(expected)]
+    if len(notes) != 1 or not notes[0].get('name'):
+        raise RuntimeError('pivot callout PDF report lacks its unique four-line note')
+    note = notes[0]
+    items = text_items(note.get('display') or {})
+    if ink_key(''.join(item.text for row in group_rows(items) for item in row)) != ink_key(expected):
+        raise RuntimeError('pivot callout display rows are missing or changed')
+    spans = ink_spans(dump)
+    # Use the audit's one sheet-wide assignment, including competing
+    # dimensions, notes, section letters and detail captions. No guessed
+    # row positions, second matcher or estimated symbol bounds.
+    matches = assign_sheet_text(dump, annotations, spans)
+    boxes = []
+    for index, item in enumerate(items):
+        if not ink_key(item.text):
+            continue
+        key = (id(note), index)
+        if key not in matches:
+            raise RuntimeError('pivot callout text is missing from the exported PDF')
+        boxes.append(span_box(spans, matches[key]))
+    if not boxes:
+        raise RuntimeError('pivot callout PDF has no measured text')
+    left, bottom, right, top = PIVOT_STACK_LANE
+    for box in boxes:
+        if (not all(math.isfinite(v) for v in (box.xmin, box.ymin, box.xmax, box.ymax))
+                or not (left <= box.xmin < box.xmax <= right
+                        and bottom <= box.ymin < box.ymax <= top)):
+            raise RuntimeError(f'pivot printed callout text left its reserved lane: {box!r}')
+    # REPORT does not enforce these fleet-wide. Reuse its already-computed
+    # findings for this note only, rather than inventing another collision audit.
+    label = f"note {note['name']}"
+    kinds = {'outside-border', 'keep-out', 'text-clearance', 'text-on-view', 'text-on-line'}
+    failures = []
+    for finding in report['findings']:
+        labelled = any(str(finding.get(side, '')) == label
+                       or str(finding.get(side, '')).startswith(label + ' ')
+                       for side in ('a', 'b'))
+        unmatched = (finding['kind'] == 'text-unmatched'
+                     and finding.get('a') == note['name']
+                     and finding.get('b') in {item.text for item in items})
+        if (finding['kind'] in kinds and labelled) or unmatched:
+            failures.append(finding)
+    if failures:
+        raise RuntimeError(f'pivot printed callout text audit failed: {failures!r}')
+    _telemetry.info('pivot printed callout text readback',
+                    rows=expected.splitlines(), text_bounds_mm=[box.mm() for box in boxes])
+
+
 def _set_arrow_side(adapter, annotations, names, side) -> None:
     for name, display in _displays(adapter, annotations, names).items():
         display.ArrowSide = side
         if int(display.ArrowSide) != side:
             raise RuntimeError(f'{name}: arrows did not move to side {side}')
     rebuild_drawing(adapter, label=f'arrow side {side}')
+
+
+# swDimensionTextParts_e (swconst.tlb, SOLIDWORKS 3DEXPERIENCE R2026x, read
+# 2026-11-07): swDimensionTextSuffix = 2, swDimensionTextCalloutBelow = 4.
+_TEXT_SUFFIX = 2
+_TEXT_CALLOUT_BELOW = 4
+
+
+@_telemetry.traced("drawing.block_callout_to_value_row", label_param="name")
+def _inline_below_callout(adapter, annotations, name: str, text: str) -> None:
+    """Move the model's below-callout ``text`` of dimension ``name`` onto its
+    value's row as a suffix. The words and the native value are unchanged;
+    only the row moves. Refuses a callout other than the spec's.
+
+    COM contract (sldworks.tlb R2026x, IDisplayDimension, audited
+    2026-11-07): ``GetText(WhichText: VT_I4) -> VT_BSTR`` and
+    ``SetText(WhichText: VT_I4, Text: VT_BSTR) -> VT_VOID``. SetText reports
+    nothing and replaces (never appends to) the part, so both parts are read
+    back and the move is accepted only on the exact pair."""
+    display = _displays(adapter, annotations, (name,))[name]
+    below = str(display.GetText(_TEXT_CALLOUT_BELOW) or '')
+    if below != text:
+        raise RuntimeError(f'{name}: below-callout reads {below!r}, expected {text!r}')
+    suffix = f' {text}'
+    display.SetText(_TEXT_SUFFIX, suffix)
+    display.SetText(_TEXT_CALLOUT_BELOW, '')
+    read = (str(display.GetText(_TEXT_SUFFIX) or ''), str(display.GetText(_TEXT_CALLOUT_BELOW) or ''))
+    if read != (suffix, ''):
+        raise RuntimeError(f'{name}: callout did not move onto the value row, reads {read!r}')
+    rebuild_drawing(adapter, label=f'{name} callout on its value row')
 
 
 def _size_note(adapter, note, height: float, *, label: str) -> None:
@@ -367,10 +635,10 @@ def _fit_section_letters(adapter, fitted, matched, *, below_y: float) -> None:
 
 
 def _view_arrow(adapter, plan, contract) -> None:
-    """The lettered viewing arrow onto the lug's -X face (draw_dt_cone_tip_block)."""
-    tip = _project(adapter, plan, (contract.LUG_X0, (contract.LUG_Y0 + contract.LUG_Y1) / 2,
+    """The lettered viewing arrow onto the lug's +X nut face."""
+    tip = _project(adapter, plan, (contract.NUT_FACE_X, (contract.LUG_Y0 + contract.LUG_Y1) / 2,
                                    contract.BLOCK_HEIGHT), 'view D arrow tip')
-    text_xy = (tip[0] - VIEW_ARROW_RUN, tip[1] + VIEW_LETTER_HEIGHT / 2)
+    text_xy = (tip[0] + VIEW_ARROW_RUN, tip[1] + VIEW_LETTER_HEIGHT / 2)
     note = add_leader_note(adapter, VIEW_LETTER, text_xy=text_xy, attach_xy=tip, view=plan,
                            label=f'view {VIEW_LETTER} viewing arrow')
     _size_note(adapter, note, VIEW_LETTER_HEIGHT, label=f'view {VIEW_LETTER} arrow letter')
@@ -402,8 +670,7 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
     plan = place_view(adapter,str(source),'*Front',*plan_xy,scale=SHEET_SCALE)
     # Each cutting line runs so its arrows point away from the section it
     # names (third-angle): A-A below the plan looks up, B-B right of it looks
-    # left, and the plan's top face prints toward the plan in both. The lines
-    # run past the block (layout notes above), with short arrows.
+    # left. A-A stays short; B-B's ends use the reserved annotation lanes.
     _set_section_arrows(adapter)
     side = create_section_view(adapter,plan,
         line_start=_project(adapter,plan,(part.BLOCK_X1+4,0,contract.BLOCK_HEIGHT),'pivot cut start'),
@@ -413,17 +680,22 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
     set_hidden_lines_removed(adapter,plan)
     plan_annotations = curate_view_dimensions(adapter,plan,keep=plan_keep,view_label='plan',
                      dimensions_by_feature=contract.DRAWING_DIMENSIONS)
-    _set_arrow_side(adapter, plan_annotations, ROW_DIMENSIONS + (('LugWidth',) if is_feed else ()), _ARROWS_INSIDE)
+    settled_checks = ()
+    _set_arrow_side(adapter, plan_annotations, ROW_DIMENSIONS, _ARROWS_INSIDE)
     set_hidden_lines_removed(adapter,side)
     side_annotations = curate_view_dimensions(adapter,side,keep=side_keep,view_label='pivot section direction',
                      dimensions_by_feature=contract.DRAWING_DIMENSIONS)
     _set_arrow_side(adapter, side_annotations, ('TopBoreDepth',), _ARROWS_INSIDE)
     offset_dimension_text(adapter, side_annotations, {'TopBoreDepth': seat_text_xy})
+    _inline_below_callout(adapter, plan_annotations, 'BlockLength', contract.CALLOUTS_BELOW['BlockLength'])
     offset_dimension_text(adapter, plan_annotations, {'BlockLength': BLOCK_LENGTH_TEXT_XY})
     annotations = plan_annotations + side_annotations
     x = part.CBORE_SECTION_X
-    start = _project(adapter,plan,(x,part.BLOCK_WIDTH/2+4,contract.BLOCK_HEIGHT),'floor cut start')
-    end_y = FEED_FLOOR_CUT_END_Y if is_feed else -part.BLOCK_WIDTH/2-4
+    cut_axis = _project(adapter,plan,(x,part.BLOCK_WIDTH/2,contract.BLOCK_HEIGHT),'floor cut axis')
+    if cut_axis[1] + .004 > FLOOR_CUT_TOP_Y:
+        raise RuntimeError('B-B top arrow lane does not clear the block')
+    start = (cut_axis[0], FLOOR_CUT_TOP_Y)
+    end_y = -part.BLOCK_WIDTH/2-FLOOR_CUT_BOTTOM_OVERRUN_MM
     end = _project(adapter,plan,(x,end_y,contract.BLOCK_HEIGHT),'floor cut end')
     floor = create_section_view(adapter,plan,line_start=start,line_end=end,view_xy=FLOOR_XY,
                                 section_label='B',scale=(1,1),partial=True,
@@ -450,7 +722,7 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
     if is_feed:
         _view_arrow(adapter, plan, contract)
         drawing.ActivateSheet(sheets[1])
-        nut = place_view(adapter,str(source),'*Left',*NUT_XY,scale=NUT_SCALE)
+        nut = place_view(adapter,str(source),'*Right',*NUT_XY,scale=NUT_SCALE)
         nut_iso = place_view(adapter,str(source),'*Isometric',*NUT_ISO_XY,scale=FEED_ISO_SCALE)
         set_hidden_lines_removed(adapter,nut)
         set_hidden_lines_removed(adapter,nut_iso)
@@ -462,8 +734,8 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
         if caption is None:
             raise RuntimeError('failed to insert the VIEW D caption')
         _size_note(adapter, caption, VIEW_LETTER_HEIGHT, label='VIEW D caption')
-        # The callout reaches the upper-right tap (+Y, +Z) from the upper
-        # right. The title block's THREADS row owns the class; the process
+        # The +Y/+Z tap is upper-left in this Right view. Its callout
+        # approaches from the left; the title block owns the thread class.
         # row says where the taps come from (TL-00 says how).
         y,z = contract.NUT_HOLES_YZ[3]
         rim = contract.NUT_TAP_DRILL/2/math.sqrt(2)
@@ -481,6 +753,8 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
     precision = {name:places for dims in contract.DRAWING_PRECISION.values()
                  for name,places in dims.items() if name in kept}
     assert_imported_precision(adapter,annotations,precision)
+    if not is_feed:
+        settled_checks = (_stack_pivot_callout(adapter, plan, annotations, contract),)
     if is_feed:
         # SolidWorks pins its own TAPPED_HOLE_NOTE once per view that picks up
         # the one NutTaps feature, and which views do is its choice: the same
@@ -494,7 +768,10 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
         _telemetry.info(f'removed automatic {TAPPED_HOLE_NOTE!r} notes by sheet: {removed}')
     drawing.ActivateSheet(sheets[0])
     outputs = DrawingOutputs(slddrw=spec.outputs['slddrw'],pdf=spec.outputs['pdf'],png=spec.outputs['png'])
-    return await finalize_drawing(adapter,outputs,pdf_title='Rocker Oblique Trammel Block Manufacturing Drawing',
-                                  scale=SHEET_SCALE,layout=spec.layout,sheet_scales=sheet_scales,
-                                  redundant_note_substrings=(TAPPED_HOLE_NOTE,) if is_feed else (),
-                                  expected_redundant_notes=0)
+    artifacts = await finalize_drawing(adapter,outputs,pdf_title='Rocker Oblique Trammel Block Manufacturing Drawing',
+                                       scale=SHEET_SCALE,layout=spec.layout,sheet_scales=sheet_scales,
+                                       redundant_note_substrings=(TAPPED_HOLE_NOTE,) if is_feed else (),
+                                       expected_redundant_notes=0, settled_checks=settled_checks)
+    if not is_feed:
+        _assert_pivot_pdf_text(outputs.pdf, layout_report_path(spec.artifact_stem), contract)
+    return artifacts

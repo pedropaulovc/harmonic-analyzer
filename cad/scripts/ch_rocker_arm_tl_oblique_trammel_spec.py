@@ -52,13 +52,18 @@ Error sensitivity (printed next to the bands that carry it):
 
 * rail angle: 0.1 degree of pin-line angle changes R by
   ``RADIUS_PER_TENTH_DEG`` (about 4.7 mm) and moves the arc centre about as
-  far. That is why HUB and CL are reamed in place on the running jig, where
-  the real circle sits.
+  far. The strap HUB is therefore reamed in place on the running jig; the
+  carrier tap is made at the same DRO setting, not used as a precision locator.
 * pin-pair Y: a Y error between the A1/B1 and A2/B2 pairs moves the second
-  circle's centre 1:1, so the 16.00 band moves 1:1. A2/B2 are therefore
-  dimensioned from A1/B1, never from a plate edge.
+  circle's centre 1:1, so the 16.00 band moves 1:1. A2/B2 Y is therefore the
+  carrier table's local .964 ±.002 from the A1-B1 axis line, never from a
+  plate edge; the other table coordinates are ordinary .XXX ±.005.
 * pin spacing: a D error changes R by ``RADIUS_PER_SPACING`` (1.77) per unit
-  of spacing error. The spacing is held by one DRO setting.
+  of spacing error. Those absolute radius errors are not independent of the
+  strap: its HUB is reamed in situ on the same pins, so only each pass's
+  correlated edge-to-pivot error counts, bounded by
+  ``carrier_spec.correlated_pin_budget``. Rail alignment keeps its
+  assembly-owned .0008.
 * shoulder/carrier clearance: the purchased Ø.375 shoulder (-.001/0) in the
   carrier's .3760-.3765 REAM_SLIDE hole gives .0010-.0025 (0.025-0.064 mm)
   diametral clearance. This can move the edge 1:1; it is not a
@@ -72,14 +77,18 @@ Error sensitivity (printed next to the bands that carry it):
   (``CARRIAGE_PLAY_RADIUS_PER_PLAY``). A numeric trammel check at
   alpha 16.4405 deg, D 450.1, R_c 795.24 over the +/-11 deg sweep gave
   0.01 / 0.02 / 0.05 mm of play as at most 0.010 / 0.020 / 0.050 mm of
-  radial error (owner, issue #2177). The fit-up acceptance is
-  ``CARRIAGE_PLAY_TIR_MAX`` 0.05 mm TIR at the shoulder-screw head, so its
-  radius contribution ``CARRIAGE_PLAY_RADIUS`` 0.050 is under the shoulder
-  term, and both together stay inside half the strap's .020 in (0.508) one-sided
-  ``TOP_EDGE_BAND`` that the hub aims at the middle of. The rail/carriage
-  pair's height and width tolerances do not apply: one carriage runs on each
-  rail, the selected shims set the carrier height, and HUB and CL are reamed
-  in place. So neither Z0 preload nor C accuracy is required of the pair.
+  radial error (owner, issue #2177). Owner P1-A (2026-11-07, PR #2236
+  comment 4504212381) tightens ``CARRIAGE_PLAY_TIR_MAX`` to 0.02 mm TIR at
+  the shoulder-screw head, retaining that same sideways-rocking check and
+  keeping the two tightest of the four kit carriages. Its radius contribution
+  ``CARRIAGE_PLAY_RADIUS`` is 0.020 mm. ``carrier_spec.pin_relative_stack``
+  adds it once to the HUB setting stack (already including shoulder clearance)
+  and each pass's correlated pin error: outer 0.24419, inner 0.14971 mm,
+  both inside the unchanged 0.254 mm half-band. The rail/carriage pair's
+  height and width tolerances do not apply: one carriage runs on each rail,
+  the selected shims set the carrier height, and the strap HUB is reamed
+  in place. Z0 preload and C accuracy are not required for a passing kit
+  carriage; if none meets 0.02, fit a preloaded (Z0/ZA) HGH15CA carriage.
 
 Sweep (Main, 2026-10-16). The brief swept the cutter over the whole 350
 blank, +/-13 degrees about C. Here each pass covers the part only. The
@@ -94,13 +103,13 @@ rail: 75.2 to 389.4 over both passes. The riser's 9/16 in cutter rides the
 same circle as the part cutter with a larger radius. The same stops
 therefore cut the riser clear of every position the part cutter reaches.
 
-Pivot pin offset (owner-approved 2026-10-23). Keep ``PIN_OFFSET`` 32 toward
-the spindle along the rail, preserving both pass stations and the carrier
-hole layout. The plain .375 reamed shoulder seat replaces the former bearing
-cartridge. The carriage centre still runs 107.2 to 421.4 against the rail's
-45.7 to 434.3 (half the 61.4 carriage from each end of the 450 rail). The
-rail overhangs its 17.32 bar's far end by 10.07; the carriage's far end, at
-452.1 at most, stays over the bar (owner ruling 2026-11-04, #2177 option B).
+Centred pivots (owner-authorized 2026-11-06). ``PIN_OFFSET`` is zero:
+both blocks and their shoulder bores centre on the HGH15CA patterns. The
+carrier holes and cutter circles are unchanged; carriage travel and stops
+follow the pin stations, 75.2 to 389.4. The feed nut faces away from the
+spindle and the near KP08 moves inward to clear that travel. The rails retain
+their 439.928 nominal fitted length, flush with the actual bars. Each actual
+rail transfers its mounting pattern to its own bar; printed stations are REF.
 """
 
 from __future__ import annotations
@@ -168,7 +177,7 @@ APEX_Y = R_C1 - H1  # the spindle on the carrier's +Y centreline (inner pass)
 HUB = (0.0, HUB_RADIUS - H1)
 HUB_OFFSET = HUB_RADIUS - R_C1
 
-# --- Riser (6 mm acetal, cut on the jig by the 9/16 in cutter) ⚙ ------------
+# --- Riser (6061, self-cut by the 9/16 in cutter before loading the strap) ------
 RISER_INNER_RADIUS = R_C1 + RISER_CUTTER_DIA / 2.0
 RISER_OUTER_RADIUS = R_C2 - RISER_CUTTER_DIA / 2.0
 # Acceptance on the riser: HUB pin to the riser's inner edge at the apex.
@@ -205,7 +214,7 @@ def at_arc_station(
 # are UNC (memory/fastener-policy-us-customary.md), and they are ASME B18.6.3
 # #4-40 x 5/8 82-degree flat-head machine screws (head Ø0.225 in max), not
 # the plan's M4: an M4 countersunk head (Ø8.96 max) would leave under 1.5 of
-# acetal to a self-cut edge. A B18.3 socket flat head (Ø0.255 in) does not fit
+# aluminium to a self-cut edge. A B18.3 socket flat head (Ø0.255 in) does not fit
 # the riser's countersink either (TrammelJig, jig-r5).
 RISER_SCREW = "#4-40"
 RISER_SCREW_HEAD_DIA = round(0.225 * INCH, 9)
@@ -245,18 +254,6 @@ RISER_SCREW_WALLS = (
     - _RISER_CSK_MOUTH_MAX
     - _RISER_RADIAL_SHIFT,
 )
-# The milled riser blank, 13.40 x 1.60 in, lies square on the carrier with its
-# corner at RISER_BLANK_ORIGIN (carrier frame, y .63). The self-cut band runs
-# from y 21.40 (inner edge at the blank's ends) to 50.90 (outer edge at the
-# apex), nominally at least 5 inside both long edges. Rule 17 reads the
-# blank's edges, so its size prints .XX (.X is for unread features only).
-RISER_BLANK_LENGTH = 340.36  # 13.40
-RISER_BLANK_WIDTH = 40.64  # 1.60
-RISER_BLANK_ORIGIN = (-RISER_BLANK_LENGTH / 2.0, 16.002)  # y .63
-RISER_BAND_Y = (
-    math.sqrt(RISER_INNER_RADIUS**2 - (RISER_BLANK_LENGTH / 2.0) ** 2) - H1,
-    RISER_OUTER_RADIUS - H1,
-)
 
 # --- Blank, tip lands, CL/CR ⚙ ------------------------------------------------
 # The strap blank is sawn from the 1/8 x 1-1/2 in 1018 cold-finish flat bought
@@ -273,17 +270,13 @@ TIP_ANGLE = (rocker.TOP_ARC_LEN / 2.0) / rocker.R_TOP
 # it with at least the .080 wall of waste beyond each edge.
 STRAP_SPAN_Y = (R_INNER * math.cos(TIP_ANGLE) - H1, R_OUTER - H1)
 BLANK_EDGE_WASTE = (BLANK_WIDTH - (STRAP_SPAN_Y[1] - STRAP_SPAN_Y[0])) / 2.0
-# CL (a 1/4 in dowel in a tooling hole) and CR (the clamp screw) sit in the
-# blank's end waste on the hub radius, angularly midway between the tip land
-# and the blank's square end, so the saw cut that drops the waste has room on
-# both sides of the hole.
+# Both common #8 clamps sit in the blank's end waste on the hub radius,
+# angularly midway between the tip land and square end, leaving room for the
+# final cut that removes the waste. Neither station is a locating dowel.
 _BLANK_END_ANGLE = math.asin((BLANK_LENGTH / 2.0) / HUB_RADIUS)
 CL_ANGLE = (TIP_ANGLE + _BLANK_END_ANGLE) / 2.0
 CR = on_hub_radius(HUB_RADIUS * math.sin(CL_ANGLE))
 CL = (-CR[0], CR[1])
-# The same points from the hub (the strap's own frame for the T1 setup):
-CL_FROM_HUB = (CL[0] - HUB[0], CL[1] - HUB[1])
-CR_FROM_HUB = (CR[0] - HUB[0], CR[1] - HUB[1])
 
 # --- Sweep and stops ⚙ --------------------------------------------------------
 # Each pass runs until the part cutter has passed the tip land by its own
@@ -365,7 +358,8 @@ RADIUS_FROM_SHOULDER_CLEARANCE = (
 # Carriage play (docstring): the fit-up check's acceptance, TIR at the
 # shoulder-screw head rocking the carrier sideways to the rail, and the cut
 # radius it can move (1:1, owner's numeric trammel check, #2177).
-CARRIAGE_PLAY_TIR_MAX = 0.05
+# Owner P1-A, 2026-11-07: PR #2236 comment 4504212381; same inspection method.
+CARRIAGE_PLAY_TIR_MAX = 0.02
 CARRIAGE_PLAY_RADIUS_PER_PLAY = 1.0
 CARRIAGE_PLAY_RADIUS = CARRIAGE_PLAY_RADIUS_PER_PLAY * CARRIAGE_PLAY_TIR_MAX
 # The hub aims at the middle of the strap's one-sided top-edge band, so the
@@ -373,16 +367,20 @@ CARRIAGE_PLAY_RADIUS = CARRIAGE_PLAY_RADIUS_PER_PLAY * CARRIAGE_PLAY_TIR_MAX
 TOP_EDGE_HALF_BAND = (max(rocker.TOP_EDGE_BAND) - min(rocker.TOP_EDGE_BAND)) / 2.0
 
 # --- Bought hardware (catalogue values; not modelled in detail) --------------
-# HGR15 rail, 450 as supplied (Amazon kit B0C4DJNL33, owner ruling #2177): a
-# generic HIWIN-style rail on the 60 pitch, 8 holes at a symmetric 15 end
-# distance. The listing states no pitch or end distance; its photos show 8
-# holes a rail. The bars are tapped to the received rails (TL-20).
-RAIL_LENGTH = 450.0
+# HGR15 kit rails arrive 450 long. Trim to the actual existing 17.32 in bar,
+# flush both ends with safe end walls, then transfer the actual hole pattern.
+RAIL_SUPPLY_LENGTH = 450.0
+BASE_BAR_LENGTH = 439.928  # 17.32; retain the existing bar blanks
+RAIL_LENGTH = BASE_BAR_LENGTH
 RAIL_WIDTH = 15.0
 RAIL_HEIGHT = 15.0
 RAIL_HOLE_PITCH = 60.0
 RAIL_HOLE_COUNT = 8
-RAIL_HOLE_END = (RAIL_LENGTH - (RAIL_HOLE_COUNT - 1) * RAIL_HOLE_PITCH) / 2.0
+RAIL_TRIM_LENGTH = RAIL_SUPPLY_LENGTH - RAIL_LENGTH
+RAIL_TRIM_PER_END = RAIL_TRIM_LENGTH / 2.0
+# Nominal per end only; actual removals need not be equal.
+RAIL_HOLE_END = round((RAIL_LENGTH - (RAIL_HOLE_COUNT - 1) * RAIL_HOLE_PITCH) / 2.0, 9)
+RAIL_LENGTH_BAND = printed_band_mm(2, unit=BASE_BAR_UNIT)
 # The rails' M4 holes (Ø4.5, Ø7.5 counterbore) take #8-32 UNC socket screws
 # (Ø4.17), keeping the repo's UNC thread policy. A 3/4 in screw seats on the
 # counterbore floor 9.7 above the rail base, so 9.35 of it engages the bar.
@@ -399,9 +397,8 @@ CARRIAGE_BOLT_SPAN = (26.0, 26.0)  # (along, across), four M4 tapped
 CARRIAGE_BOLT = "M4"
 
 # --- Rails on the bars --------------------------------------------------------
-# Each rail's near end stops RAIL_NEAR_S from the spindle axis (brief), flush
-# with its bar's near end. The kit rail is used uncut: it runs RAIL_OVERHANG
-# past the bar's far end (owner ruling 2026-11-04, #2177 option B).
+# Each rail starts RAIL_NEAR_S from the spindle; after datum-led trimming it
+# is flush with its actual finished bar at both ends.
 RAIL_NEAR_S = 15.0
 RAIL_FAR_S = RAIL_NEAR_S + RAIL_LENGTH
 # A carriage stays fully on its rail: centre within half its length of an end.
@@ -409,9 +406,9 @@ CARRIAGE_S_RANGE = (
     RAIL_NEAR_S + CARRIAGE_LENGTH / 2.0,
     RAIL_FAR_S - CARRIAGE_LENGTH / 2.0,
 )
-# The unchanged pivot station preserves the carrier's four holes and both
-# sweeps; the simplified block locates a shoulder screw at that same station.
-PIN_OFFSET = -32.0  # pin s minus carriage-centre s
+# Centre the shoulder bore and block on the carriage pattern. The carrier's
+# four holes and cutter circles stay fixed; feed layout follows this travel.
+PIN_OFFSET = 0.0  # pin s minus carriage-centre s
 CARRIAGE_TRAVEL = (PIN_S_MIN - PIN_OFFSET, PIN_S_MAX - PIN_OFFSET)
 END_STOPS = {
     name: (lo - PIN_OFFSET, hi - PIN_OFFSET) for name, (lo, hi) in PIN_TRAVEL.items()
@@ -438,9 +435,9 @@ PIVOT_SHIM_PACK = 1.016  # 5 x .008
 PIVOT_SPACER_LENGTH = 15.875  # .625 loose purchased spacer (TL-VN-78)
 PIVOT_SUPPORT_HEIGHT = PIVOT_SHIM_PACK + PIVOT_SPACER_LENGTH
 # Finished dimensions, not purchased stock: face 1/2 in 6061-T6511 bar to
-# CARRIER_THICK and 1/4 in acetal to RISER_THICK (#1619). Both native drawing
-# dimensions take their printed title-block band, not a supplier-stock
-# tolerance. CL locator height is set from the actual riser at assembly.
+# CARRIER_THICK and 1/4 in 6061 to RISER_THICK. Both native drawing dimensions
+# take their printed title-block band, not a supplier-stock tolerance.
+# CL locator height is set from the actual riser at assembly.
 CARRIER_THICK = 11.938  # .47
 CARRIER_THICK_PLACES = 2
 CARRIER_THICK_BAND = printed_band_mm(CARRIER_THICK_PLACES, unit=CARRIER_UNIT)
@@ -478,18 +475,16 @@ BASE_BAR_WIDTH_IN = 5.5
 BASE_BAR_WIDTH = round(BASE_BAR_WIDTH_IN * INCH, 9)  # 139.7, milled
 BASE_BAR_COLUMN_EDGE = round(3.5 * INCH, 9)  # lateral +88.9
 BASE_BAR_OPERATOR_EDGE = BASE_BAR_COLUMN_EDGE - BASE_BAR_WIDTH  # lateral -50.8
-# Owner ruling 2026-11-04 (#2177, option B): the bars keep their 17.32 length,
-# so bar 1's blank sawn 2026-10-29 stays usable and no stock is bought; the
-# 450 kit rail, used uncut, overhangs the bar's far end by 10.07.
-BASE_BAR_LENGTH = 439.928  # 17.32
+# Rails and bars share the existing bar length; no bar stock is replaced.
 BASE_BAR_FAR_S = RAIL_NEAR_S + BASE_BAR_LENGTH
-RAIL_OVERHANG = RAIL_FAR_S - BASE_BAR_FAR_S  # 10.07
-# The rail's last hole stays on the bar, and the carriage stays over the bar
-# at the far end of its working travel.
-if not RAIL_NEAR_S + RAIL_HOLE_END + (RAIL_HOLE_COUNT - 1) * RAIL_HOLE_PITCH < BASE_BAR_FAR_S:
-    raise AssertionError("the rail's last hole lies past the bar's far end")
-if not CARRIAGE_TRAVEL[1] + CARRIAGE_LENGTH / 2.0 < BASE_BAR_FAR_S:
-    raise AssertionError("the carriage runs off the bar onto the rail's overhang")
+RAIL_OVERHANG = RAIL_FAR_S - BASE_BAR_FAR_S
+# Include the bar's printed .XX length band when checking full seal support.
+CARRIAGE_END_MARGINS_WORST = (
+    CARRIAGE_TRAVEL[0] - CARRIAGE_S_RANGE[0],
+    CARRIAGE_S_RANGE[1] - RAIL_LENGTH_BAND - CARRIAGE_TRAVEL[1],
+)
+if min(CARRIAGE_END_MARGINS_WORST) <= 0.0:
+    raise AssertionError("the carriage runs off the trimmed rail at full travel")
 # Two 1/2-13 hold-down studs per bar in .53 slots across the bar, one each
 # side of the rail, outside the carriage's sweep. Their stations put both on
 # T-slots two pitches apart, the far one inside the table end by a T-nut.
@@ -572,10 +567,5 @@ if abs((STUD_Y[0] - STUD_Y[1]) - 2.0 * TSLOT_PITCH) > 1e-9:
     raise AssertionError("the hold-down studs do not land two T-slot pitches apart")
 if min(RISER_SCREW_WALLS) < WALL_TARGET_MM:
     raise AssertionError("a riser countersink breaks rule 17's .080 wall target")
-if not (
-    RISER_BLANK_ORIGIN[1] + 5.0 <= RISER_BAND_Y[0]
-    and RISER_BAND_Y[1] <= RISER_BLANK_ORIGIN[1] + RISER_BLANK_WIDTH - 5.0
-):
-    raise AssertionError("the riser's nominal band runs within 5 of a blank edge")
 if BLANK_EDGE_WASTE < WALL_TARGET_MM:
     raise AssertionError("the strap blank leaves under .080 of waste beyond an edge")

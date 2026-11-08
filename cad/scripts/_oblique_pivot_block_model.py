@@ -4,12 +4,14 @@ Taps are represented by their drill cylinders (as native Wizard taps are),
 not by helical cut threads. The model owns every size and printed tolerance.
 """
 from __future__ import annotations
+import math
 from typing import Any
 from collections.abc import Callable
+import _telemetry
 from _appearance import apply_material
 from _bore_axis import name_bore_axis
 from _check import check
-from _com import _early_bound
+from _com import _bind, _com_invoke, _early_bound
 from _dimensions import name_dimensions
 from _document_units import apply_package_model_units
 from _drawing_marks import clear_dimensions_for_drawing, mark_dimensions_for_drawing
@@ -111,18 +113,10 @@ def _as_construction(adapter: Any, entity_id: str) -> None:
 async def _cbore_floor_reference(adapter, part) -> list[tuple[str, str]]:
     """The hidden sketch carrying the printed counterbore floor height.
 
-    Section B-B cuts along Y through the (+13, +13) counterbore (along X its
-    arrows and letters would sit on the bore: review r5; through the -13
-    column its left-pointing letters met the seat's 10.00 extension line), so
-    its cutting plane is the Right plane (model YZ) carried to X = +BoltX; a
-    derived view imports a reference sketch that lies in its cut
-    (build_pd_platen ``CboreFloorReference``). One construction line on the
-    M4 clearance hole's +Y wall, a visible section edge, from the carriage
-    seat (Z = 0) up to the counterbore floor: its foot's Y from the origin
-    (unprinted; the Z = 0 end sits on the sketch axis), and its rise, the
-    printed floor. The off-sketch check in ``_sketch_mapper`` proves the
-    plane stands at X = +13 and that the sketch opened on it, not on a
-    fallback plane.
+    B-B cuts the -X carriage-hole column, clear of the centred feed block's
+    +X lug. Its native reference sketch lies on the same Right-plane offset,
+    so the section imports the actual counterbore floor from the carriage
+    seat. The mapper checks the signed plane location before authoring.
     """
     from solidworks_mcp.adapters.base import CreatePlaneParameters
 
@@ -418,8 +412,155 @@ async def _nut_pattern_reference(adapter, part) -> None:
     dims.apply(adapter, feature)
 
 
+def _native_nut_tap_diameter(adapter, part) -> float:
+    """Use the committed Wizard drill, not the rounded catalogue volume value."""
+    from _feature_tree import _feature_by_name
+
+    feature = _feature_by_name(adapter, "NutTaps")
+    # GetDefinition is VT_DISPATCH. Bind the raw InvokeTypes return before
+    # reading its property; _early_bound alone passes bare PyIDispatch through.
+    definition = _bind(_com_invoke(feature, "IFeature", "GetDefinition"), "IWizardHoleFeatureData2")
+    if feature.GetTypeName2() != "HoleWzd" or definition is None:
+        raise RuntimeError(f"{part.PART_NAME}: NutTaps has no native Hole Wizard definition")
+    diameter = float(definition.ThruTapDrillDiameter) * 1000.0
+    # TAP_DRILL_MM pins this table entry to three decimal mm; the Wizard
+    # retains the exact native value. This tests that representation, not a
+    # manufacturing allowance. Solid-cylinder matching below stays at 1e-6 mm.
+    if not math.isfinite(diameter) or diameter <= 0.0 or round(diameter, 3) != part.NUT_TAP_DRILL:
+        raise RuntimeError(
+            f"{part.PART_NAME}: NutTaps.ThruTapDrillDiameter={diameter!r} mm "
+            f"does not represent catalogue drill {part.NUT_TAP_DRILL!r} mm"
+        )
+    _telemetry.info(
+        f"{part.PART_NAME}: native NutTaps through-tap drill {diameter!r} mm; "
+        f"catalogue three-decimal value {part.NUT_TAP_DRILL!r} mm"
+    )
+    return diameter
+
+
+@_telemetry.traced("part.readback.flush_lug_end")
+def _require_flush_lug_end(body, part) -> dict[str, list[float]]:
+    """TL-32's +X end is ONE planar face from the lug end to the +Y edge,
+    full height (owner ruling 2026-11-07): the lug's +X side and the block's
+    end merged, with no step and no seam between the two extrusions.
+
+    Exact reads only; ``IFace2.GetBox`` is not a tight box. Members (both
+    tlbs SOLIDWORKS 3DEXPERIENCE R2026x, audited 2026-11-07), lengths in
+    metres:
+    ``IBody2.GetFaces() -> VARIANT`` (faces); ``face_geometry`` reads
+    ``IFace2.GetSurface() -> IDispatch``, ``ISurface.Identity() -> I4``
+    (swSurfaceTypes_e PLANE_TYPE = 4001), ``ISurface.PlaneParams`` (get,
+    ``VARIANT`` [normal xyz, root point xyz]) and
+    ``IFace2.FaceInSurfaceSense() -> BOOL`` (the outward normal);
+    ``IFace2.GetEdges() -> VARIANT`` (edges);
+    ``IEdge.GetStartVertex()/GetEndVertex() -> IDispatch`` (None on a closed
+    edge: the face's tap and clearance circles); ``IVertex.GetPoint() ->
+    VARIANT`` [x, y, z]."""
+    from _gtol_face import SURFACE_PLANE
+    from _gtol_face_read import face_geometry
+    ends = []
+    for face in _com_invoke(body, "IBody2", "GetFaces") or ():
+        geometry = face_geometry(face, identities=frozenset({SURFACE_PLANE}))
+        if geometry is None or geometry.identity != SURFACE_PLANE:
+            continue
+        normal, plane_x = geometry.outward_normal, geometry.parameters[3] * 1000.0
+        if abs(normal[0] - 1.0) < 1e-9 and abs(plane_x - part.BLOCK_X1) < 1e-6:
+            ends.append(face)
+    if len(ends) != 1:
+        raise RuntimeError(f"{part.PART_NAME}: {len(ends)} planar +X faces at X {part.BLOCK_X1} mm, "
+                           "expected the one merged lug and block end")
+    corners = []
+    for edge in _com_invoke(ends[0], "IFace2", "GetEdges") or ():
+        for end in ("GetStartVertex", "GetEndVertex"):
+            vertex = _com_invoke(edge, "IEdge", end)
+            if vertex is not None:
+                corners.append([float(c) * 1000.0 for c in _com_invoke(vertex, "IVertex", "GetPoint")])
+    span = {
+        "x": [min(c[0] for c in corners), max(c[0] for c in corners)] if corners else [],
+        "y": [min(c[1] for c in corners), max(c[1] for c in corners)] if corners else [],
+        "z": [min(c[2] for c in corners), max(c[2] for c in corners)] if corners else [],
+    }
+    want = {"x": (part.BLOCK_X1, part.BLOCK_X1), "y": (part.LUG_Y0, part.BLOCK_WIDTH / 2),
+            "z": (0.0, part.BLOCK_HEIGHT)}
+    if not corners or not all(
+        math.isclose(got, wanted, rel_tol=0.0, abs_tol=1e-6)
+        for axis, limits in want.items() for got, wanted in zip(span[axis], limits, strict=True)
+    ):
+        raise RuntimeError(
+            f"{part.PART_NAME}: the +X end face's vertices span {span!r} mm, "
+            f"expected {want!r}: the lug end does not run flush with the block end"
+        )
+    return span
+
+
+@_telemetry.traced("part.readback.oblique_block_geometry")
+def require_block_geometry(adapter, part) -> None:
+    """Read physical bore axes and model dimensions; never certify a nominal box."""
+    from _drawing_precision import _named_dimensions
+    from _gtol_face import SURFACE_CYLINDER
+    from _gtol_face_read import face_geometry
+
+    bodies = tuple(_early_bound(adapter.currentModel, "IPartDoc").GetBodies2(0, False) or ())
+    if len(bodies) != 1:
+        raise RuntimeError(f"{part.PART_NAME}: expected one native solid for readback")
+    cylinders = []
+    for face in _early_bound(bodies[0], "IBody2").GetFaces() or ():
+        geometry = face_geometry(face, identities=frozenset({SURFACE_CYLINDER}))
+        if geometry is not None and geometry.identity == SURFACE_CYLINDER:
+            cylinders.append(geometry.parameters)
+    observations = [
+        {"origin_mm": [v * 1000.0 for v in parameters[:3]],
+         "axis": list(parameters[3:6]), "diameter_mm": parameters[6] * 2000.0}
+        for parameters in cylinders if len(parameters) == 7
+    ]
+    expected = [
+        ("pivot seat", 2, (spec.BORE_X, spec.BORE_Y, 0.0), spec.BORE_DIA),
+        ("pivot tap", 2, (spec.BORE_X, spec.BORE_Y, 0.0), spec.PIVOT_TAP_DRILL),
+        *[
+            (f"M4 {index} {label}", 2, (x, y, 0.0), diameter)
+            for index, (x, y) in enumerate(spec.BOLT_POINTS, 1)
+            for label, diameter in (("clearance", spec.HOLE_DIA), ("counterbore", spec.CBORE_DIA))
+        ],
+    ]
+    if hasattr(part, "NUT_FACE_X"):
+        nut_tap_diameter = _native_nut_tap_diameter(adapter, part)
+        expected += [
+            ("leadscrew clearance", 0, (0.0, part.NUT_AXIS_Y, part.NUT_AXIS_Z), part.SCREW_CLEARANCE_DIA),
+            *[(f"nut tap {index}", 0, (0.0, y, z), nut_tap_diameter)
+              for index, (y, z) in enumerate(part.NUT_HOLES_YZ, 1)],
+        ]
+    measured = {}
+    for label, axis, centre, diameter in expected:
+        matches = [
+            parameters for parameters in cylinders
+            if len(parameters) == 7
+            and abs(abs(parameters[axis + 3]) - 1.0) < 1e-9
+            and all(abs(parameters[i] * 1000.0 - centre[i]) < 1e-6
+                    for i in range(3) if i != axis)
+            and abs(parameters[6] * 2000.0 - diameter) < 1e-6
+        ]
+        if not matches:
+            raise RuntimeError(
+                f"{part.PART_NAME}: no native {label} at {centre}, "
+                f"axis index {axis}, diameter {diameter!r} mm; "
+                f"observed solid cylinders: {observations!r}"
+            )
+        measured[label] = [list(parameters) for parameters in matches]
+    if hasattr(part, "LUG_WIDTH"):
+        measured["flush +X end span"] = _require_flush_lug_end(bodies[0], part)
+    dimensions = {}
+    for feature, names in part.DRAWING_DIMENSIONS.items():
+        wanted = set(names) & part.DRAWING_VALUES.keys()
+        for name, (_display, dimension) in _named_dimensions(adapter, feature, wanted).items():
+            value = float(dimension.SystemValue) * 1000.0
+            if not math.isclose(value, part.DRAWING_VALUES[name], rel_tol=0.0, abs_tol=1e-6):
+                raise RuntimeError(f"{name}@{feature}: native {value}, expected {part.DRAWING_VALUES[name]}")
+            dimensions[f"{name}@{feature}"] = value
+    _telemetry.info("centred block native dimensional readback", part=part.PART_NAME,
+                    cylinders=measured, dimensions_mm=dimensions)
+
+
 async def build_block_model(adapter, part) -> None:
-    import math
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
     check("create part", await adapter.create_part())
     apply_package_model_units(adapter, part_drawing_unit(part.PART_NAME), label=part.PART_NAME)
@@ -433,9 +574,13 @@ async def build_block_model(adapter, part) -> None:
     name_dimensions(adapter,"Block",["BlockHeight"])
     expected = part.BLOCK_LENGTH * part.BLOCK_WIDTH * part.BLOCK_HEIGHT
     if hasattr(part,"LUG_WIDTH"):
-        # The shared edge at Y=-20 joins the two full-height extrusions.
+        # Owner ruling 2026-11-07: the lug's +X side is the block's +X end.
+        # Anchored on BlockProfile's anchor corner (+X/-Y), the lug's +X edge
+        # lies on the block's, and the union leaves one face (readback,
+        # _require_flush_lug_end); the shared edge at Y=-20 joins the two
+        # full-height extrusions.
         await _rectangle(adapter,"LugProfile",(part.LUG_X0,part.LUG_X1,part.LUG_Y0,part.LUG_Y1),
-                         ["LugWidth","LugLength","LugEndX","LugEndY"])
+                         ["LugWidth","LugLength","LugCornerX","LugCornerY"], anchor=2)
         check("integral lug",await adapter.create_extrusion(ExtrusionParameters(depth=part.BLOCK_HEIGHT)))
         name_last_feature(adapter,"Lug")
         expected += part.LUG_WIDTH * part.LUG_LENGTH * part.BLOCK_HEIGHT
@@ -443,13 +588,13 @@ async def build_block_model(adapter, part) -> None:
     name_last_feature(adapter,"TopFace")
     blank_reference_geometry(adapter,(("TopFace","PLANE"),))
     await _circles(adapter,"TopFace",part.BLOCK_HEIGHT,"TopBoreProfile",
-                   [(spec.BORE_X,0,spec.BORE_DIA,("BoreX",None,"BoreDia"))])
+                   [(spec.BORE_X,0,spec.BORE_DIA,(None,None,"BoreDia"))])
     check("shoulder seat",await adapter.create_cut_extrude(ExtrusionParameters(depth=spec.BORE_DEPTH)))
     name_last_feature(adapter,"TopBore")
     name_dimensions(adapter,"TopBore",["TopBoreDepth"])
     expected -= math.pi * (spec.BORE_DIA/2)**2 * spec.BORE_DEPTH
     await _circles(adapter,"TopFace",part.BLOCK_HEIGHT,"PivotTapProfile",
-                   [(spec.BORE_X,0,spec.PIVOT_TAP_DRILL,("TapX",None,"TapDrillDia"))])
+                   [(spec.BORE_X,0,spec.PIVOT_TAP_DRILL,(None,None,"TapDrillDia"))])
     check("pivot tap drill thru",await adapter.create_cut_extrude(ExtrusionParameters(depth=part.BLOCK_HEIGHT*2)))
     name_last_feature(adapter,"PivotTap")
     expected -= math.pi*(spec.PIVOT_TAP_DRILL/2)**2 * (part.BLOCK_HEIGHT-spec.BORE_DEPTH)
@@ -473,23 +618,24 @@ async def build_block_model(adapter, part) -> None:
         await _circles(adapter,"NutFace",part.NUT_FACE_X,"NutClearanceProfile",
                        [(part.NUT_AXIS_Z,part.NUT_AXIS_Y,part.SCREW_CLEARANCE_DIA,
                          ("NutClearanceZ","NutClearanceY","NutClearanceDia"))],side=True)
-        check("NutClearance",await adapter.create_cut_extrude(ExtrusionParameters(depth=part.LUG_WIDTH*2,reverse_direction=True)))
+        check("NutClearance",await adapter.create_cut_extrude(ExtrusionParameters(depth=part.LUG_WIDTH*2)))
         name_last_feature(adapter,"NutClearance")
         name_dimensions(adapter,"NutClearance",["NutClearanceDepth"])
-        wizard_holes(adapter,part.NUT_TAP_SPEC,
-             [[part.NUT_FACE_X,y,z] for y,z in part.NUT_HOLES_YZ],(-1.0,0.0,0.0),
+        nut_taps = wizard_holes(adapter,part.NUT_TAP_SPEC,
+             [[part.NUT_FACE_X,y,z] for y,z in part.NUT_HOLES_YZ],(1.0,0.0,0.0),
              "feed nut screw taps (#4-40 through)",name="NutTaps",expect_dia_mm=part.NUT_TAP_DRILL,
              placement_dims=[((f"NutPlacement{i}U",None),(f"NutPlacement{i}V",None))
                              for i in range(1,len(part.NUT_HOLES_YZ)+1)])
         # The taps are transferred through the TL-VN-84 FeedNut at assembly:
         # modelled where the nominal nut puts them.
         expected -= math.pi*(part.SCREW_CLEARANCE_DIA/2)**2*part.LUG_WIDTH
-        expected -= len(part.NUT_HOLES_YZ)*math.pi*(part.NUT_TAP_DRILL/2)**2*part.LUG_WIDTH
+        expected -= len(part.NUT_HOLES_YZ)*math.pi*(nut_taps.hole_dia_mm/2)**2*part.LUG_WIDTH
         await _nut_pattern_reference(adapter, part)
     await name_bore_axis(adapter,"Right Plane",spec.BORE_X,"Top Plane",0.0,"pivot axis")
     name_last_feature(adapter,spec.PIVOT_AXIS_NAME)
     await force_rebuild(adapter)
     _require_one_solid_body(adapter,label=part.PART_NAME)
+    require_block_geometry(adapter, part)
     await volume_check(adapter,"finished block",expected,expected*0.002)
     set_dimension_bilateral_tolerance(adapter,"TopBoreProfile","BoreDia",*deviations(spec.BORE_BAND),
                                       places=spec.BORE_PLACES,display_unit=spec.UNIT)

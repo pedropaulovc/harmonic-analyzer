@@ -1,21 +1,20 @@
 r"""Create the drawing for the oblique-trammel jig's carrier plate (MHA-CH-06-TL-21).
 
-The top view at 1:2 carries the outline, the reamed pin holes, the CL
-centre-drill spot and every tap station (the HUB is drilled in situ at
-assembly, MHA-CH-06-TL-00 step 10). Position chains (rule 10, one datum per
-view): X from A1's axis, the left lower ream that carries the ±0.02 pair:
-the left end 34.9 from it, the lever taps' axis 225.07, B1 by the spacing
-and every spot and tap by its own baseline
-(the part's hidden StationReference); Y from the A1-B1 pin line (the reamed
-pair's own axes), 45.00 above the -Y edge. Every location dimension stands
-outside the outline in its own lane: X stations above and below, Y stations
-left and right, so no extension line crosses a text.
-Section A-A at 3:1 cuts along the pin line, is cropped to A1, and carries
-the finished thickness and underside chamfer. The shaded isometric stands
-above the title block.
+The carrier uses one native hole table (#2151, owner Option B), with tags on
+actual hole edges and X/Y from the actual A1 bore axis, +X along A1-B1, at
+.XXX under the title block. Only A2/B2 Y carries the flagged .964 ±.002
+note. The table's SIZE column is hidden: every size is its sheet-1 callout.
+The HUB is not in the table: that ordinary #8-32 tap is drilled and tapped
+at assembly (MHA-CH-06-TL-00 step 10). No chained hole-location dimensions
+remain.
 
-One sheet holds it: the left lanes need ~75 mm of the 79 between the outline
-and the border, the right lanes ~63 of 67.
+The CARRIER sheet keeps the outline, the reamed size, the native tap
+callouts and section A-A (3:1, cropped to and identified as A1, carrying the
+finished thickness and underside chamfer); the shaded isometric stands above
+the title block. The HOLE TABLE sheet holds the twelve-row table and its
+tagged plan. The HUB CLAMP sheet carries the HUB tap's native callout, which
+says it is drilled and tapped at assembly, and its position from A1 as two
+parenthesized REFERENCE dimensions.
 """
 
 from __future__ import annotations
@@ -24,7 +23,7 @@ import argparse
 import math
 import re
 import sys
-from typing import Any
+from typing import Any, Callable
 
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -51,17 +50,22 @@ from _drawing_dimension_import import import_cosmetic_threads
 from _drawing_dimensions import (
     assert_imported_precision,
     offset_dimension_text,
+    set_arc_endpoints_to_center,
     set_dimension_callouts,
+    set_reference_dimension,
 )
+from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_hole_callout import add_native_hole_callout
 from ch_rocker_arm_tl_oblique_callouts import (
     CALLOUT_PLACES,
     set_callout_lengths_to_three_places,
 )
-from _drawing_notes import add_property_linked_note
+from _drawing_notes import add_note, add_property_linked_note
+from _oblique_carrier_hole_table import create_carrier_hole_table
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
+from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
@@ -72,15 +76,14 @@ import ch_rocker_arm_tl_oblique_carrier_spec as part_spec
 from _feature_requirements import part_metadata, requirement
 from _part_properties import part_drawing_unit
 from _printed_limits import limits
-from _gtol_cone import ConeFace
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from ch_rocker_arm_tl_oblique_carrier_spec import (
     CALLOUT_PREFIXES,
-    CALLOUT_SUFFIXES,
     CALLOUTS_BELOW,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    TABLE_LOCATION_PLACES,
 )
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -101,6 +104,10 @@ SHEET_SCALE = (1.0, 2.0)
 VIEW_SCALE = (1, 2)
 ISO_SCALE = part_spec.ISOMETRIC_VIEW_SCALE
 TOP_CENTER = (0.222, 0.185)
+# The HUB clamp tap is drilled and tapped at assembly, so it is not in the
+# table; its own sheet carries its callout, which says so, and its reference
+# position. The table and its tags take a sheet of their own.
+SHEET_NAMES = ("CARRIER", "HOLE TABLE", "HUB CLAMP")
 # The iso (~58 x 34 mm at 1:8) right of section A-A and its note under it,
 # both above the title block (jig-r3: the note ran into it).
 ISO_CENTER = (0.386, 0.103)
@@ -112,101 +119,37 @@ def _xy(x: float, y: float) -> tuple[float, float, float]:
     return (x, 0.0, -y)
 
 
-# Dimension lanes, carrier mm (1:2: sheet x = 222 + X/2, y = 175 + Y/2). Y
-# stations stand left (-X half) and right (+X half), ~17-19 apart (8.5-9.5 on
-# the sheet: a multi-row text beside its lane and its clearance), the
-# 2-row riser and 3-row pin-chain texts on the outward side. X stations are
-# baselines from A1 (rule 10, one datum per view), below and above (the
-# A1-baseline note at TOP_KEEP). Carrier r11: the 45.53 HUB and 44.287 riser
-# extension lines ran 0.62 apart on the left and the 130.0 width's line ran
-# through the B2DY text, so the width stands innermost right and B2DY beside
-# it, and the riser stations name the riser
-# (RISER_STATION_CALLOUT). Carrier r13: the CL 29.35 text (centred on its
-# lane, 12.9 wide) touched the outline at x 92, so its lane stands at x 83 and
-# A2DY's at 74.5, the text 2 clear of both.
-_LEFT = (-278.0, -295.0, -312.0, -329.0, -350.0)  # sheet x 83 .. 47
-_RIGHT = (279.0, 298.0, 317.0, 336.0, 355.0, 374.0)  # sheet x 361.5 .. 409
 _A1 = part_spec.PIN_HOLES["A1"]
-# Every text position is a MODEL point (mm), mapped onto its view at run time.
-# A horizontal dimension's last row stands on its lane, its rows stacking up
-# 5.56 sheet mm apart, so a keep Y below is the lane plus its rows.
-#
-# A1-baseline lanes (sheet x: A1 109.5, CL 141.6, R2 162.2, R1 202.0, the tap
-# axis 222, R1R 242.0, R2R 281.8, CR 302.5, B1 334.5). Every X dimension shares
-# A1's extension line; each text stands in a column no other extension line
-# crosses at its height. Below, the shorter the higher (the lever callout,
-# ~144..214 x 134.6..149.3, takes the band under the plate between CL and the
-# axis, so R2 and R1 go above): CL 145 and the tap axis 132 left of the lever
-# callout; R1R 117 under it, its text in the free column between CL and the
-# axis; R2R 108 and CR 102 each in the column just short of its own end,
-# clear over the 450.135's text (to y 96.1). Above, the longer the lower,
-# each text in the column just short of its own end, both lanes over A2DX's
-# text (to 236.6): R1 238.5, R2 250, 7.6 under the border. The left end's
-# 34.9 stands between the end and A1, under the REAM leader's reach, its
-# arrows held inside so its line stops at the end (_arrows_inside).
+# Every text position is a MODEL point (mm), mapped onto its view at run time
+# (1:2: sheet x = 222 + X/2, y = 175 + Y/2). Only outline and native size
+# controls remain; the table owns all locations. The left end's 34.9 from A1
+# stands between the end and A1, under the REAM leader's reach, its arrows
+# held inside so its line stops at the end (_arrows_inside).
+_NEAR_Y_LANE_X = -350.0  # PlateNearY's dimension line, model X
 TOP_KEEP: dict[str, tuple[float, float, float]] = {
-    # Outline: the length outermost below, the left end from A1 between the
-    # two, the width innermost right, the pin line from the -Y edge
-    # outermost left.
-    "PlateLength": _xy(56.0, -194.4),  # lane y 75
-    "PlateWidth": _xy(_RIGHT[0], -8.0),
-    "PlateNearY": _xy(_LEFT[4], -24.0),
-    "EdgeX": _xy(-242.5, -120.4),  # lane y 112
-    # The pin chain: the lever taps' axis and B1 from A1, A2/B2 from A1/B1.
-    # The axis's station stands on the upper lever tap, so its extension line
-    # rises from this lane through both taps (machinist review 54e5c9a: A1X's
-    # stopped at the pin line). mr4: its function row on the lane, ~5 right
-    # of A1's extension line, no wider than the former 11-character row; the
-    # value row 4 under the ClX lane's dimension line.
-    "LeverX": _xy(-187.0, -74.84),  # lane y 132
-    "PinSpacing": _xy(172.0, -170.3),  # lane y 81.5
-    # Its text 4 sheet mm right of A1's extension line, which now rises past
-    # it to the R2 lane.
-    "A2DX": _xy(-187.0, 110.7),  # lane y 222
-    # Review 88c6d (r1/r2/r3.clarity.1): centred on its 3.6 mm span, B2DX's
-    # three rows were struck by both B1/B2 extension lines. Its rows stand
-    # wholly outboard of them and of the 520.0's +X extension line (sheet x
-    # 352), text ~358..386 x 131..147, above the isometric (top ~121) and
-    # below the 130.0's lower extension line (152.5); only its dimension line
-    # runs out under the text, crossing extension lines (rule 14 allows).
-    "B2DX": _xy(300.0, -72.0),
-    # Carrier r11: A2DY's text crossed the top border; it stands ~17 under it.
-    "A2DY": _xy(_LEFT[1], 139.0),
-    "B2DY": _xy(_RIGHT[1], 70.7),
-    # B9e4's complete native/PDF glyph block reaches y 164.57, not merely
-    # the shoulder at 111.10: the 45.00 text/arrow and its y 152.5 witness
-    # strike the size/limits and first REAM row. Lower the WHOLE block 16
-    # sheet mm, retaining the previous 3.5 mm left move. The block centres
-    # on x 52.5: run 20261024T085427509Z printed its single 91 mm mate row
-    # x 7..98, past the border (12.7) and across the plate end's extension
-    # line (x 92); the mate now wraps to two rows, 63 mm wide (x ~21..84).
-    # The diameter approach may cross genuine witness extensions (rule 14),
-    # but never a dimension line, another text row or the shoulder's text.
+    "PlateLength": _xy(56.0, -194.4),
+    "PlateWidth": _xy(279.0, -8.0),
+    "PlateNearY": _xy(_NEAR_Y_LANE_X, -24.0),
+    "EdgeX": _xy(-242.5, -120.4),
+    # B9e4's complete native/PDF glyph block reaches y 164.57: the whole block
+    # stands 16 sheet mm lower, its mate wrapped to two rows (x ~21..84).
     "PinHoleDia": _xy(-339.0, -106.3),
-    # The spot: its own diameter callout outside the plate (rule 14). Its
-    # three rows (mr8: from above the 4.154 lane its leader crossed the 7.287
-    # dimension line), ~31 wide, centred at sheet (182.25, 228.2): its shelf
-    # ~2.8 over the +Y edge, its top ~2.3 under the 7.287 lane (238.5), ~4.4
-    # inside the RiserX2 (162.5) and RiserX1 (202.0) extension lines. Every
-    # route from above that lane crosses it (or, past its end, overruns the
-    # 10 mm leader detour); this leader runs down-left ~36 over the part
-    # (detour ~8), crossing extension lines only.
-    "SpotDia": _xy(-79.5, 106.4),
-    "ClX": _xy(-193.0, -54.4),  # lane y 145
-    "ClY": _xy(_LEFT[0], 14.0),
-    # The taps: the riser stations above and below (A1-baseline note), their
-    # Y stations left; CR's X below, CR's Y and the levers right.
-    "CrX": _xy(141.0, -140.4),  # lane y 102
-    "CrY": _xy(_RIGHT[2], 13.0),
-    "RiserX1": _xy(-80.0, 138.2),  # lane y 238.5
-    "RiserX1R": _xy(-104.0, -104.8),  # lane y 117
-    "RiserY1": _xy(_LEFT[3], 65.8),
-    "RiserX2": _xy(-172.0, 161.2),  # lane y 250
-    "RiserX2R": _xy(80.0, -122.8),  # lane y 108
-    "RiserY2": _xy(_LEFT[2], 102.4),
-    "LeverY1": _xy(_RIGHT[4], -11.0),
-    "LeverY2": _xy(_RIGHT[5], -23.0),
 }
+# Machinist review 43452045 (r1/r3 clarity): the 1.77's upper extension line
+# runs from the sketch origin (X 0, sheet x 221) on the pin line, so it ran
+# through A1 and across the plate to end mid-air (A-A's end stubs are the
+# thick ones). Main's ruling: it stops outside the part, a normal 1.5 sheet mm
+# gap short of the plate's -X end. Capped (STOCK_WITNESS_MAX_M's
+# MaxWitnessLineLength, the whole line from its overshoot), it runs from its
+# 1 mm overshoot past the dimension line (43452045's two lines, both to
+# x 46.0) to that gap; the lower one (from 1 mm off the same end) loses 0.5.
+NEAR_Y_WITNESS_GAP_MM = 1.5
+_WITNESS_OVERSHOOT_MM = 1.0
+NEAR_Y_WITNESS_MAX_M = (
+    (part_spec.OUTLINE_X[0] - _NEAR_Y_LANE_X) * VIEW_SCALE[0] / VIEW_SCALE[1]
+    - NEAR_Y_WITNESS_GAP_MM
+    + _WITNESS_OVERSHOOT_MM
+) / 1000.0
 
 # Section A-A along the pin line (model Z = 0), at 3:1, +Y up, its cut
 # direction SolidWorks' own, cropped to A1's slab. It is a FULL section: the
@@ -291,28 +234,73 @@ SECTION_CHAMFER_TEXT_MODEL_MM = (_A1[0] + 10.5, -part_spec.THICKNESS - 3.5, 0.0)
 STOCK_WITNESS_MAX_M = (
     (_STOCK_TEXT_DX - _SECTION_HALF) * SECTION_SCALE[0] / SECTION_SCALE[1] - 1.5
 ) / 1000.0
+# The imported-precision contract is the DRAWING_DIMENSIONS this sheet imports
+# (TOP_KEEP and SECTION_KEEP_MODEL_MM). The hidden PinHoleProfile, tap and
+# StationReference drivers keep their part-authored .XXX on the model (the
+# part build applies all of DRAWING_PRECISION), but #2151 Option B prints
+# their locations as the native hole table's .XXX rows from A1
+# (IHoleTable.GetHoleLocationPrecision, read back by the table's settled
+# check) and A2/B2 Y as OUTER_Y_NOTE; no dimension of theirs reaches a sheet.
+# The HUB's only printed position is HUB CLAMP's two drawing-native
+# parenthesized references, not an imported driver.
+IMPORTED_PRECISION: dict[str, int] = {
+    name: DRAWING_PRECISION_BY_NAME[name]
+    for names in DRAWING_DIMENSIONS.values()
+    for name in sorted(names)
+}
 # Top centre of the caption: left of the thickness text, level with the slab.
 SECTION_CAPTION_XY = (0.043, 0.052)
+# Machinist review 43452045 (r2/r3 clarity): at (20, 83) the A1-only note
+# stood apart from A-A and the 20.5's left extension line (x 91.8) struck its
+# "NOT". Its top-left now stands directly under the caption (whose glyphs end
+# at y 37.3), its two rows (the old row's 94.7 mm over 35 characters: ~51.5
+# mm) inside the clear slot x 14..75, y 14..35 (R4NativeEye, 43452045 PDF):
+# clear of the thickness lane (x >= 78), the slab and the bottom border.
+SECTION_NOTE = "A1 ONLY — OTHER PIN\nHOLES NOT SHOWN"
+SECTION_NOTE_XY = (0.020, 0.0335)
 
 # Sheet metres: each callout block's centre; its leader lands on the near end
-# of the first line. CR up-right into the margin above the right lanes, its
-# four rows (the native two and CR_TAP_CALLOUT's two, mr4) ~219..241; the
-# risers from the outermost +X screw straight up,
-# their four rows (the native two and RISER_TAP_CALLOUT's two) ~238..258,
-# under the border; the feed lever (the -Y hole) down-left, its three rows
-# (with LEVER_TAP_CALLOUT) between the CrX and ClX lanes.
+# of the first line. CR up-right into the margin right of the plate, its
+# four rows (the native two and END_CLAMP_TAP_CALLOUT's two, mr4) ~219..241;
+# CL up-right into the free band over the +Y edge, its four rows ~220..242
+# (x ~215..265), left of the riser leader; the risers from the outermost +X
+# screw straight up, their four rows (the native two and RISER_TAP_CALLOUT's
+# two) ~238..258, under the border; the feed lever (the -Y hole) down-left,
+# its three rows (with LEVER_TAP_CALLOUT) under the plate.
 CR_CALLOUT_XY = (0.377, 0.230)
+CL_CALLOUT_XY = (0.240, 0.231)
 # The riser callout 2 mm right of jig-r10's 0.310: its leader from riser
-# screw 4 then passes clear right of the Ø3.00 spot text.
+# screw 4 then passes clear right of the CL callout.
 RISER_CALLOUT_XY = (0.312, 0.248)
 # The lever callout 2.5 mm right of 0.179 (round 8): its bottom row and
-# shoulder (sheet x ~147..218) then stand ~2.6 clear of LeverX's function
-# row (right end x 144.3), its shoulder ~4 short of LeverX's extension line.
+# shoulder stand at sheet x ~147..218, under the plate.
 LEVER_CALLOUT_XY = (0.1815, 0.143)
+# The HUB CLAMP sheet: the HUB tap's callout up-right of it, above the plate
+# (sheet x ~237..291, y ~225..247), its leader from the tap (sheet ~222, 198).
+HUB_CALLOUT_XY = (0.264, 0.236)
+# The HUB tap is drilled and tapped at assembly (TL-00 step 10; farm 82129
+# machinist review): its callout says so, and its position from A1 prints
+# only as two parenthesized REFERENCE dimensions between the actual A1 and
+# HUB edges. Keep both text and dimension lines outside the plate (rule 14):
+# X is 18 paper mm below its lower edge, Y is 28 paper mm past its right edge.
+# At 1:2 the plate is x 91.825..352.175, y 152.615..217.385 paper mm;
+# X's anchor is (165.75, 134.615), Y's (380.175, 186.094). These lanes
+# clear the callout/instructions above and the isometric/caption below.
+# Only placement changes: the native witnesses still attach to A1 and HUB.
+HUB_TAP_NOTE = "DRILL AND TAP AT ASSEMBLY\nTL-00 STEP 10"
+# No SetPrecision3: a sheet may only pass a *_spec DRAWING_REFERENCE_PRECISION
+# (_drawing_contract), and the part spec is not edited for this drawing-only
+# change, so the references print at the document's own linear places.
+HUB_REFERENCE_TEXT_MODEL_MM = {
+    "X": _xy(-112.5, part_spec.OUTLINE_Y[0] - 36.0),
+    "Y": _xy(part_spec.OUTLINE_X[1] + 56.0, 22.0),
+}
 
 part_metadata(
     precision_sources=(
         "DRAWING_PRECISION_BY_NAME",
+        "TABLE_LOCATION_PLACES",
+        ("_oblique_carrier_hole_table", "create_carrier_hole_table"),
         ("_drawing_hole_callout", "add_native_hole_callout"),
         ("ch_rocker_arm_tl_oblique_callouts", "set_callout_lengths_to_three_places"),
     )
@@ -370,49 +358,39 @@ requirement(
     precision={"height": part_spec.THICKNESS_PLACES},
 )
 
-# The pin chain's tight bands, each on its printed (rounded) nominal: B1 from
-# A1 by the spacing; A2/B2 from A1/B1 by (dX, dY).
-_CHAIN_PLACES = part_spec.DRAWING_PRECISION_BY_NAME["PinSpacing"]
-_STATION_PLACES = part_spec.DRAWING_PRECISION_BY_NAME["LeverX"]
-_BAND = (part_spec.POSITION_BAND, -part_spec.POSITION_BAND)
-_D1 = _printed(part_spec.D1, _CHAIN_PLACES)
-_DX = _printed(abs(part_spec.A2_DX), _CHAIN_PLACES)
-_DY = _printed(part_spec.A2_DY, _CHAIN_PLACES)
-# A1, the X datum, from the lever taps' axis (the model origin's X): the
-# print's LeverX (driven equal to A1X) runs from A1 to the upper lever tap,
-# its extension line through both taps, at LeverX's explicit ±.01 band.
-_A1X = _printed(abs(_A1[0]), _STATION_PLACES)
-_LEVER_STATION = (part_spec.LEVER_STATION_BAND, -part_spec.LEVER_STATION_BAND)
+# Native table baselines: A1 is the origin, B1 defines +X and the Y=0 line.
+# Every location is .XXX at the title block; A2/B2 Y carries the flagged
+# .964 ±.002 local control from the A1-B1 axis line (RV-02).
+_DIA_PLACES = part_spec.DRAWING_PRECISION_BY_NAME["PinHoleDia"]
+_STATION_PLACES = part_spec.TABLE_LOCATION_PLACES
 
 
 def _from_a1(x: float, places: int) -> float:
-    """A spot's or tap's printed X station: its baseline from A1's axis."""
+    """A hole's printed X: its table baseline from A1's axis."""
     return _printed(x - _A1[0], places)
 
 
-_CHAIN: dict[str, dict[str, tuple[Any, tuple[Any, ...]]]] = {
-    "A1": {
-        "station": (
-            limits(_A1X, _STATION_PLACES, _LEVER_STATION),
-            ("PIN_HOLES", "LEVER_STATION_BAND"),
-        ),
-        "station_nominal": (_A1X, ("PIN_HOLES", "STATIONS")),
-    },
-    "B1": {
-        "station": (limits(_D1, _CHAIN_PLACES, _BAND), ("D1", "POSITION_BAND")),
-        "station_nominal": (_D1, ("D1",)),
-        "parent": ("pin_hole_a1", ("PIN_HOLES",)),
-    },
-}
-for _key, _base in (("A2", "a1"), ("B2", "b1")):
+_CHAIN: dict[str, dict[str, tuple[Any, tuple[Any, ...]]]] = {"A1": {}}
+for _key in ("B1", "A2", "B2"):
+    _x, _y = part_spec.PIN_HOLES[_key]
     _CHAIN[_key] = {
-        "station": (limits(_DX, _CHAIN_PLACES, _BAND), ("A2_DX", "POSITION_BAND")),
-        "station_nominal": (_DX, ("A2_DX",)),
-        "parent": (f"pin_hole_{_base}", ("PIN_HOLES",)),
-        "height": (limits(_DY, _CHAIN_PLACES, _BAND), ("A2_DY", "POSITION_BAND")),
-        "height_nominal": (_DY, ("A2_DY",)),
-        "height_from": (f"pin_hole_{_base}", ("PIN_HOLES",)),
+        "station": (
+            _limits(_x - _A1[0], _STATION_PLACES),
+            ("PIN_HOLES", "TABLE_LOCATION_PLACES"),
+        ),
+        "station_nominal": (_from_a1(_x, _STATION_PLACES), ("PIN_HOLES",)),
+        "parent": ("pin_hole_a1", ("PIN_HOLES",)),
     }
+    if _key != "B1":
+        _CHAIN[_key].update({
+            "height": (
+                limits(part_spec.OUTER_Y_NOMINAL, _STATION_PLACES,
+                       (part_spec.OUTER_Y_BAND, -part_spec.OUTER_Y_BAND)),
+                ("OUTER_Y_NOMINAL", "OUTER_Y_BAND", "OUTER_Y_NOTE"),
+            ),
+            "height_nominal": (part_spec.OUTER_Y_NOMINAL, ("OUTER_Y_NOMINAL",)),
+            "height_from": ("pin_hole_a1", ("PIN_HOLES",)),
+        })
 
 for _key, (_x, _y) in part_spec.PIN_HOLES.items():
     _chain = _CHAIN[_key]
@@ -432,7 +410,7 @@ for _key, (_x, _y) in part_spec.PIN_HOLES.items():
             "at": ([_x, 0.0, -_y], ("PIN_HOLES",)),
             "axis": ([0.0, -1.0, 0.0], ("__frame__",)),
             "dia": (
-                limits(part_spec.PIN_HOLE_DIA, _CHAIN_PLACES, part_spec.PIN_HOLE_BAND),
+                limits(part_spec.PIN_HOLE_DIA, _DIA_PLACES, part_spec.PIN_HOLE_BAND),
                 ("PIN_HOLE_DIA", "PIN_HOLE_BAND"),
             ),
             "dia_nominal": (part_spec.PIN_HOLE_DIA, ("PIN_HOLE_DIA",)),
@@ -444,53 +422,28 @@ for _key, (_x, _y) in part_spec.PIN_HOLES.items():
             **_chain,
         },
         precision={
-            "dia": _CHAIN_PLACES,
+            "dia": _DIA_PLACES,
             **{
-                name: _STATION_PLACES if _key == "A1" else _CHAIN_PLACES
+                name: _STATION_PLACES
                 for name in ("station", "height")
                 if name in _chain
             },
         },
     )
 
-_SPOT_DIA_PLACES = part_spec.DRAWING_PRECISION_BY_NAME["SpotDia"]
-for _prefix, (_x, _y) in part_spec.SPOTS.items():
-    _station_places = part_spec.DRAWING_PRECISION_BY_NAME[f"{_prefix}X"]
-    _height_places = part_spec.DRAWING_PRECISION_BY_NAME[f"{_prefix}Y"]
-    requirement(
-        f"{_prefix.lower()}_spot",
-        kind="seat",
-        faces=(ConeFace(part_spec.SPOT_ANGLE / 2.0, contains_x_mm=_x),),
-        # The printed stations are inspected too (Codex #1582).
-        requirements=("dia", "angle_deg", "station", "height"),
-        fields={
-            "at": ([_x, 0.0, -_y], ("SPOTS", "CL")),
-            "dia": (_limits(part_spec.SPOT_DIA, _SPOT_DIA_PLACES), ("SPOT_DIA",)),
-            "dia_nominal": (part_spec.SPOT_DIA, ("SPOT_DIA",)),
-            "angle_deg": (part_spec.SPOT_ANGLE, ("SPOT_ANGLE", "CALLOUT_SUFFIXES")),
-            "station": (_limits(_x - _A1[0], _station_places), ("SPOTS", "PIN_HOLES")),
-            "station_nominal": (_from_a1(_x, _station_places), ("SPOTS", "PIN_HOLES")),
-            "parent": ("pin_hole_a1", ("PIN_HOLES",)),
-            "height": (_limits(_y, _height_places), ("SPOTS",)),
-        },
-        precision={
-            "dia": _SPOT_DIA_PLACES,
-            "angle_deg": 0,
-            "station": _station_places,
-            "height": _height_places,
-        },
-    )
-
 # (stem, points, thread, tap drill, spec name, station places, height places)
 _TAPS = (
-    (
-        "cr_tap",
-        (part_spec.CR,),
-        part_spec.CR_THREAD,
-        part_spec.CR_TAP_DRILL,
-        "CR_SPEC",
-        part_spec.DRAWING_PRECISION_BY_NAME["CrX"],
-        part_spec.DRAWING_PRECISION_BY_NAME["CrY"],
+    *(
+        (
+            f"{_key.lower()}_tap",
+            (_point,),
+            part_spec.CLAMP_THREAD,
+            part_spec.CLAMP_TAP_DRILL,
+            "CLAMP_SPEC",
+            _STATION_PLACES,
+            _STATION_PLACES,
+        )
+        for _key, _point in part_spec.END_CLAMPS.items()
     ),
     (
         "riser_tap",
@@ -502,18 +455,38 @@ _TAPS = (
         part_spec.RISER_STATION_PLACES,
     ),
     (
-        # On the tap axis: LeverX's extension line is their X station.
+        # On the tap axis, X 8.861 from A1 in the table.
         "lever_tap",
         part_spec.LEVER_HOLES,
         part_spec.LEVER_THREAD,
         part_spec.LEVER_TAP_DRILL,
         "LEVER_SPEC",
         _STATION_PLACES,
-        part_spec.DRAWING_PRECISION_BY_NAME["LeverY1"],
+        _STATION_PLACES,
     ),
 )
+
+
+def _tap_fields(
+    x: float, y: float, thread: str, drill: float, spec_name: str
+) -> dict[str, tuple[Any, tuple[Any, ...]]]:
+    """The native Hole Wizard callout's own content: thread, tap drill, THRU."""
+    drill_printed = _printed(drill, _CALLOUT_PLACES)
+    return {
+        "at": ([x, 0.0, -y], (spec_name,)),
+        "axis": ([0.0, -1.0, 0.0], ("__frame__",)),
+        "thread": (f"{thread} UNC-2B", (spec_name,)),
+        "tap_drill_mm": (drill, (spec_name,)),
+        "dia": (
+            limits(drill_printed, _CALLOUT_PLACES, _DRILLED),
+            (spec_name, "DRILLED_BAND"),
+        ),
+        "dia_nominal": (drill_printed, (spec_name,)),
+        "thru": (True, (spec_name,)),
+    }
+
+
 for _stem, _points, _thread, _drill, _spec_name, _places, _y_places in _TAPS:
-    _drill_printed = _printed(_drill, _CALLOUT_PLACES)
     for _index, (_x, _y) in enumerate(_points, start=1):
         requirement(
             f"{_stem}_{_index}",
@@ -521,26 +494,8 @@ for _stem, _points, _thread, _drill, _spec_name, _places, _y_places in _TAPS:
             faces=(CylinderFace(_drill, contains_x_mm=_x, contains_z_mm=-_y),),
             requirements=("thread", "dia", "station", "height", "thru"),
             fields={
-                "at": ([_x, 0.0, -_y], (_spec_name,)),
-                "axis": ([0.0, -1.0, 0.0], ("__frame__",)),
-                "thread": (f"{_thread} UNC-2B", (_spec_name,)),
-                "tap_drill_mm": (_drill, (_spec_name,)),
-                "dia": (
-                    limits(_drill_printed, _CALLOUT_PLACES, _DRILLED),
-                    (_spec_name, "DRILLED_BAND"),
-                ),
-                "dia_nominal": (_drill_printed, (_spec_name,)),
-                "thru": (True, (_spec_name,)),
-                "station": (
-                    limits(
-                        _from_a1(_x, _places),  # on its printed nominal, like _BAND
-                        _places,
-                        _LEVER_STATION,
-                    )
-                    if _stem == "lever_tap"
-                    else _limits(_x - _A1[0], _places),
-                    (_spec_name, "PIN_HOLES"),
-                ),
+                **_tap_fields(_x, _y, _thread, _drill, _spec_name),
+                "station": (_limits(_x - _A1[0], _places), (_spec_name, "PIN_HOLES")),
                 "station_nominal": (_from_a1(_x, _places), (_spec_name, "PIN_HOLES")),
                 "parent": ("pin_hole_a1", ("PIN_HOLES",)),
                 "height": (_limits(_y, _y_places), (_spec_name,)),
@@ -548,6 +503,31 @@ for _stem, _points, _thread, _drill, _spec_name, _places, _y_places in _TAPS:
             },
             precision={"dia": _CALLOUT_PLACES, "station": _places, "height": _y_places},
         )
+
+# The HUB clamp tap is drilled and tapped at assembly: no controlled station
+# (its sheet's two dimensions are parenthesized REFERENCE), its callout says so.
+requirement(
+    "hub_tap_1",
+    kind="hole",
+    faces=(
+        CylinderFace(
+            part_spec.CLAMP_TAP_DRILL,
+            contains_x_mm=part_spec.HUB[0],
+            contains_z_mm=-part_spec.HUB[1],
+        ),
+    ),
+    requirements=("thread", "dia", "thru", "note"),
+    fields={
+        **_tap_fields(
+            *part_spec.HUB, part_spec.HUB_THREAD, part_spec.CLAMP_TAP_DRILL, "HUB_SPEC"
+        ),
+        "note": (
+            " ".join(HUB_TAP_NOTE.splitlines()),
+            (("draw_ch_rocker_arm_tl_oblique_carrier", "HUB_TAP_NOTE"),),
+        ),
+    },
+    precision={"dia": _CALLOUT_PLACES},
+)
 
 
 # Copied from _trammel_block_drawing (the old trammel kit is being retired;
@@ -795,6 +775,32 @@ def _arrows_inside(adapter: Any, annotations: list[Any], name: str) -> None:
     rebuild_drawing(adapter, label=f"{name} arrows inside")
     if int(display.ArrowSide) != _ARROWS_INSIDE:
         raise RuntimeError(f"{name}: arrows did not move inside")
+
+
+@_telemetry.traced("drawing.carrier_near_y_witness_cap")
+def _cap_near_y_witness(adapter: Any, annotations: list[Any]) -> Callable[[], None]:
+    """Cap the 1.77's extension lines (NEAR_Y_WITNESS_MAX_M) so both stop
+    outside the part, a gap short of its -X end, instead of the upper one
+    running through A1 to the sketch origin; read back after the rebuild
+    (_reposition_section_dimensions' stock cap). Returns that readback for
+    the final settled check: persistence across later rebuilds is not
+    documented."""
+    (annotation,) = [
+        item for item in annotations if dimension_name(adapter, item) == "PlateNearY"
+    ]
+    display = _early_bound(
+        _early_bound(annotation, "IAnnotation").GetSpecificAnnotation(),
+        "IDisplayDimension",
+    )
+    display.MaxWitnessLineLength = NEAR_Y_WITNESS_MAX_M
+    rebuild_drawing(adapter, label="carrier 1.77 witness cap")
+
+    def check() -> None:
+        if abs(float(display.MaxWitnessLineLength) - NEAR_Y_WITNESS_MAX_M) > 1e-9:
+            raise RuntimeError("carrier 1.77: extension-line cap did not persist")
+
+    check()
+    return check
 
 
 def _metres(point_mm: tuple[float, float, float]) -> tuple[float, float, float]:
@@ -1095,7 +1101,134 @@ def _pin_section(adapter: Any, source_model: Any, top: Any) -> tuple[list[Any], 
     position_section_caption(
         adapter, section, SECTION_CAPTION_XY, label="carrier section A-A"
     )
+    add_note(adapter, SECTION_NOTE, *SECTION_NOTE_XY)
     return annotations, section
+
+
+@_telemetry.traced("drawing.carrier_hub_reference_position")
+def _hub_reference_position(adapter: Any, top: Any) -> Callable[[], None]:
+    """The HUB's position from A1 as two drawing-native dimensions between the
+    actual A1 and HUB edges, centred on both axes, parenthesized as ASME
+    REFERENCE (set_reference_dimension) at the document's places. Returns
+    their readback: the same two edges, values and parentheses after the
+    final rebuild."""
+    to_sheet = _view_mapper(adapter, top)
+
+    def edges() -> tuple[Any, Any]:
+        return (
+            _circle_edge(adapter, top, part_spec.PIN_HOLE_DIA, "A1 pin hole",
+                         center_x_mm=_A1[0], center_y_mm=_A1[1]),
+            _circle_edge(adapter, top, part_spec.CLAMP_TAP_DRILL, "HUB clamp tap",
+                         center_x_mm=part_spec.HUB[0], center_y_mm=part_spec.HUB[1]),
+        )
+
+    a1, hub = edges()
+    centres = (to_sheet(_xy(*_A1)), to_sheet(_xy(*part_spec.HUB)))
+    references = []
+    for axis, orientation, expected in (
+        ("X", "horizontal", abs(part_spec.HUB[0] - _A1[0])),
+        ("Y", "vertical", abs(part_spec.HUB[1] - _A1[1])),
+    ):
+        label = f"HUB reference {axis} from A1"
+        dimension = add_edge_dimension(
+            adapter, top, p0=centres[0], p1=centres[1],
+            text_xy=to_sheet(HUB_REFERENCE_TEXT_MODEL_MM[axis]), label=label,
+            orientation=orientation, entities=(a1, hub),
+        )
+        set_arc_endpoints_to_center(adapter, dimension, label=label)
+        display = _early_bound(dimension, "IDisplayDimension")
+        # ShowParenthesis can add a second pair (document "parentheses by
+        # default") or read True and render bare: clear it, then use the
+        # proven prefix/suffix form (_supplier_dimensions).
+        display.ShowParenthesis = False
+        if display.ShowParenthesis is not False:
+            raise RuntimeError(f"{label}: native ShowParenthesis did not clear")
+        set_reference_dimension(adapter, display.GetAnnotation(), label=label)
+        _telemetry.info(
+            f"{label}: places={display.GetPrimaryPrecision2()} "
+            f"use_doc_precision={display.GetUseDocPrecision()} "
+            f"is_reference={display.IsReferenceDim()} "
+            f"driven_state={_early_bound(display.GetDimension2(0), 'IDimension').DrivenState}"
+        )
+        references.append((display, expected, label))
+
+    def check() -> None:
+        current = edges()
+        for display, expected, label in references:
+            model = _early_bound(display.GetDimension2(0), "IDimension")
+            if any(int(model.GetArcEndCondition(index)) != 1 for index in (1, 2)):
+                raise RuntimeError(f"{label}: both endpoints must stay on the hole axes")
+            assert_dimension_measures(
+                adapter, display, expected_mm=expected, label=label, entities=current,
+            )
+            marks = (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
+            if marks != ("(", ")") or display.ShowParenthesis is not False:
+                raise RuntimeError(
+                    f"{label} is not one parenthesized REFERENCE: prefix/suffix={marks!r} "
+                    f"ShowParenthesis={display.ShowParenthesis!r}"
+                )
+
+    check()
+    return check
+
+
+def _hub_sheet(adapter: Any) -> Callable[[], None]:
+    """The HUB clamp tap's own sheet: its native callout, which says it is
+    drilled and tapped at assembly, and its reference position from A1.
+    Returns the references' settled readback, run on this sheet."""
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    if not drawing.ActivateSheet(SHEET_NAMES[2]):
+        raise RuntimeError("cannot activate the HUB clamp sheet")
+    top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=VIEW_SCALE)
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
+    for view in (top, iso):
+        set_hidden_lines_removed(adapter, view)
+    x, y = part_spec.HUB
+    label = "HUB clamp tap"
+    callout = add_native_hole_callout(
+        adapter, top, callout_xy=HUB_CALLOUT_XY, label=label,
+        edge=_circle_edge(
+            adapter, top, part_spec.CLAMP_TAP_DRILL, label,
+            center_x_mm=x, center_y_mm=y,
+        ),
+    )
+    _strip_thread_class(callout, label=f"{label} callout", thread=part_spec.HUB_THREAD)
+    set_callout_lengths_to_three_places(callout, label=f"{label} callout")
+    _append_callout_below(callout, HUB_TAP_NOTE, label=f"{label} callout")
+    check_references = _hub_reference_position(adapter, top)
+    add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
+    import_cosmetic_threads(adapter, iso)
+    for view in (top, iso):
+        _hide_thread_labels(adapter, view)
+    if not drawing.ActivateSheet(SHEET_NAMES[0]):
+        raise RuntimeError("cannot restore the carrier sheet")
+
+    @_telemetry.traced("drawing.carrier_hub_reference_position.settled")
+    def settled() -> None:
+        previous = str(_early_bound(drawing.GetCurrentSheet(), "ISheet").GetName())
+        if not drawing.ActivateSheet(SHEET_NAMES[2]):
+            raise RuntimeError("HUB clamp sheet cannot be activated for final readback")
+        try:
+            check_references()
+        finally:
+            if not drawing.ActivateSheet(previous):
+                raise RuntimeError("HUB reference readback could not restore the active sheet")
+
+    return settled
+
+
+def _hole_table_sheet(adapter: Any, source_model: Any) -> Any:
+    """The native hole table and its tagged plan; returns its settled readback."""
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    if not drawing.ActivateSheet(SHEET_NAMES[1]):
+        raise RuntimeError("cannot activate the carrier hole-table sheet")
+    top = place_view(adapter, str(SOURCE), "*Top", 0.222, 0.210, scale=VIEW_SCALE)
+    set_hidden_lines_removed(adapter, top)
+    _hide_thread_labels(adapter, top)
+    settled = create_carrier_hole_table(adapter, top, source_model, SOURCE)
+    if not drawing.ActivateSheet(SHEET_NAMES[0]):
+        raise RuntimeError("cannot restore the carrier sheet")
+    return settled
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -1110,6 +1243,7 @@ async def build(adapter: Any) -> dict[str, str]:
         "Finish",
         "Quantity",
         "Isometric View Note",
+        "Outer Pin Row Note",
     )
     read_required_properties(
         adapter.currentModel, ("Revision", "Title", *required), required=required
@@ -1121,6 +1255,9 @@ async def build(adapter: Any) -> dict[str, str]:
         layout=SPEC.layout,
         unit=part_drawing_unit(PART_STEM),
     )
+    create_blank_drawing_sheets(adapter, SHEET_NAMES, label="carrier")
+    if not _early_bound(drawing_model, "IDrawingDoc").ActivateSheet(SHEET_NAMES[0]):
+        raise RuntimeError("cannot activate the carrier sheet")
     stamp_drawing_summary(
         adapter,
         drawing_model,
@@ -1148,9 +1285,9 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
 
     on_top = _view_mapper(adapter, top)
-    # The spot's height and Ø3 live on SpotReference and every X station from
-    # A1 on StationReference, sketches the part saves hidden:
-    # _drawing_hidden_sketches shows them in the view that imports them.
+    # Every X station from A1 lives on StationReference, a sketch the part
+    # saves hidden: _drawing_hidden_sketches shows it in the view that
+    # imports it.
     annotations = hidden_sketches.curate_view_dimensions(
         adapter,
         top,
@@ -1162,9 +1299,8 @@ async def build(adapter: Any) -> dict[str, str]:
     annotations.extend(section_annotations)
     set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
     _set_callout_texts(adapter, annotations, CALLOUT_PREFIXES, part=1)
-    _set_callout_texts(adapter, annotations, CALLOUT_SUFFIXES, part=2)
-    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _arrows_inside(adapter, annotations, "EdgeX")
+    near_y_cap_settled = _cap_near_y_witness(adapter, annotations)
     ream = [
         item for item in annotations if dimension_name(adapter, item) == "PinHoleDia"
     ]
@@ -1173,17 +1309,20 @@ async def build(adapter: Any) -> dict[str, str]:
     _assert_ream_control(adapter, ream[0])
 
     # Native Hole Wizard callouts, no process words (the base bar's TL-20
-    # convention: "4X Ø2.26 THRU ALL / #4-40 UNC THRU ALL"); the CR and riser
-    # taps add the function their 3-place stations serve (rule 4; machinist
+    # convention: "4X Ø2.26 THRU ALL / #4-40 UNC THRU ALL"); the CL/CR and
+    # riser taps add the function their stations serve (rule 4; machinist
     # review mr3 for CR), the lever taps their full-thread shortfall (rule 20).
     for label, xy, drill, (x, y), thread, function in (
-        (
-            "CR clamp tap",
-            CR_CALLOUT_XY,
-            part_spec.CR_TAP_DRILL,
-            part_spec.CR,
-            part_spec.CR_THREAD,
-            part_spec.CR_TAP_CALLOUT,
+        *(
+            (
+                f"{key} clamp tap",
+                xy,
+                part_spec.CLAMP_TAP_DRILL,
+                part_spec.END_CLAMPS[key],
+                part_spec.CLAMP_THREAD,
+                part_spec.END_CLAMP_TAP_CALLOUT,
+            )
+            for key, xy in (("CL", CL_CALLOUT_XY), ("CR", CR_CALLOUT_XY))
         ),
         (
             "riser screw taps",
@@ -1218,9 +1357,24 @@ async def build(adapter: Any) -> dict[str, str]:
     import_cosmetic_threads(adapter, iso)
     for view in (top, iso):
         _hide_thread_labels(adapter, view)
+    table_settled = _hole_table_sheet(adapter, source_model)
+    hub_settled = _hub_sheet(adapter)
+    assert_imported_precision(adapter, annotations, IMPORTED_PRECISION)
 
+    @_telemetry.traced("drawing.carrier_pin_controls.settled")
     def pin_controls_settled() -> None:
-        _assert_ream_control(adapter, ream[0])
+        # The 1.77 cap is read back on its own sheet after every later
+        # rebuild (_hub_sheet's settled pattern), restoring the active sheet.
+        sheets = _early_bound(drawing_model, "IDrawingDoc")
+        previous = str(_early_bound(sheets.GetCurrentSheet(), "ISheet").GetName())
+        if not sheets.ActivateSheet(SHEET_NAMES[0]):
+            raise RuntimeError("carrier sheet cannot be activated for final readback")
+        try:
+            _assert_ream_control(adapter, ream[0])
+            near_y_cap_settled()
+        finally:
+            if not sheets.ActivateSheet(previous):
+                raise RuntimeError("carrier readback could not restore the active sheet")
 
     return await finalize_drawing(
         adapter,
@@ -1228,7 +1382,8 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Rocker Oblique Trammel Carrier Plate Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
-        settled_checks=(pin_controls_settled,),
+        settled_checks=(pin_controls_settled, table_settled, hub_settled),
+        expected_sheet_names=SHEET_NAMES,
     )
 
 

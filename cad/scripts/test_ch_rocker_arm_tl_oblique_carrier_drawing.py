@@ -6,6 +6,7 @@ import inspect
 import math
 import re
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -53,7 +54,7 @@ def test_interface_contract() -> None:
     # plate, the inner one past the lever's slot end.
     for x, y in spec.LEVER_HOLES:
         assert x == 0.0 and spec.OUTLINE_Y[0] < y < spec.LEVER_INNER_END_Y < 0.0
-        assert spec.prints_exactly(y, places["LeverY1"])
+        assert spec.prints_exactly(y, spec.TABLE_LOCATION_PLACES)
 
 
 def test_every_calculator_position_is_the_calculators() -> None:
@@ -63,8 +64,9 @@ def test_every_calculator_position_is_the_calculators() -> None:
         "pin_hole_b1": trammel.B1,
         "pin_hole_a2": trammel.A2,
         "pin_hole_b2": trammel.B2,
-        "cl_spot": trammel.CL,
+        "cl_tap_1": trammel.CL,
         "cr_tap_1": trammel.CR,
+        "hub_tap_1": trammel.HUB,
         **{
             f"riser_tap_{i}": point
             for i, point in enumerate(trammel.RISER_SCREWS, start=1)
@@ -74,46 +76,51 @@ def test_every_calculator_position_is_the_calculators() -> None:
         assert _at(features[name]) == tuple(point), name
     assert spec.PIN_HOLES == trammel.PIN_HOLES
     assert (spec.CL, spec.CR) == (trammel.CL, trammel.CR)
-    # Owner ruling 5: the HUB is drilled in situ at assembly, not on TL-21.
-    assert "hub_spot" not in features and set(spec.SPOTS) == {"Cl"}
+    # The three clamp taps stand at the calculator's stations: CL/CR in the
+    # strap's end waste, HUB on the arcs' centreline.
+    assert spec.END_CLAMPS == {"CL": trammel.CL, "CR": trammel.CR}
+    assert spec.HUB == trammel.HUB
     assert spec.RISER_SCREWS == trammel.RISER_SCREWS
     assert spec.D1 == trammel.D1
     assert math.isclose(-spec.A2_DX, (trammel.D2 - trammel.D1) / 2.0)
     assert spec.A2_DY == trammel.A2[1]
-    # The chain prints what the calculator gives.
-    b1, a2 = features["pin_hole_b1"], features["pin_hole_a2"]
-    assert b1["station_nominal"] == pytest.approx(_printed(trammel.D1, 4))
-    assert a2["station_nominal"] == pytest.approx(_printed(abs(trammel.A2[0] - trammel.A1[0]), 4))
-    assert a2["height_nominal"] == pytest.approx(_printed(trammel.A2[1], 4))
+    # Every printed X is a baseline from A1, including B2 (not B1 + dX).
+    for key in ("B1", "A2", "B2"):
+        feature = features[f"pin_hole_{key.lower()}"]
+        assert feature["station_nominal"] == pytest.approx(
+            _printed(trammel.PIN_HOLES[key][0] - trammel.A1[0], 3)
+        )
 
 
-def test_pin_chain_runs_from_a1_b1_with_banded_mates() -> None:
+def test_pin_table_uses_title_band_and_one_model_owned_local_control() -> None:
     features = _features()
-    assert features["pin_hole_b1"]["parent"] == "pin_hole_a1"
-    assert features["pin_hole_a2"]["parent"] == "pin_hole_a1"
-    assert features["pin_hole_b2"]["height_from"] == "pin_hole_b1"
-    for name in ("pin_hole_b1", "pin_hole_a2", "pin_hole_b2"):
-        low, high = features[name]["station"]
-        assert math.isclose(high - low, 2.0 * spec.POSITION_BAND)
-    # Rule 4 (jig-r3): each band names what it sets and on which part, not
-    # its sensitivity.
-    assert spec.SPACING_CALLOUT == "SETS R800 ON\nMHA-CH-13"
-    assert spec.DX_CALLOUT == spec.DY_CALLOUT == "SETS R816 ON\nMHA-CH-13"
+    assert not hasattr(spec, "POSITION_BAND")
+    assert not hasattr(spec, "POSITION_BANDED")
+    for key in ("B1", "A2", "B2"):
+        feature = features[f"pin_hole_{key.lower()}"]
+        assert feature["parent"] == "pin_hole_a1"
+        assert feature["station"][1] - feature["station"][0] == pytest.approx(.010 * INCH)
+        assert feature["precision"]["station"] == 3
+    for key in ("a2", "b2"):
+        feature = features[f"pin_hole_{key}"]
+        assert feature["height_from"] == "pin_hole_a1"
+        assert feature["height"] == pytest.approx([.962 * INCH, .966 * INCH])
+    assert spec.OUTER_Y_NOTE == "A2, B2: Y .964 ±.002 FROM THE A1-B1 AXIS LINE"
+    assert tuple(spec.A2_DY + v for v in spec.OUTER_Y_DEVIATIONS) == pytest.approx(
+        [.962 * INCH, .966 * INCH]
+    )
+    assert "station" not in features["pin_hole_a1"]
+    assert spec.DRAWING_DIMENSIONS["PinHoleProfile"] == {"PinHoleDia"}
     for text in spec.CALLOUTS_BELOW.values():
         assert "ERROR" not in text and "1:1" not in text
-    # The lever taps' axis is located from A1, the X datum, at LeverX's
-    # places: LeverX prints it from A1 to the upper lever tap (driven equal to
-    # A1X, the model's unprinted driver).
-    a1 = features["pin_hole_a1"]
-    places = spec.DRAWING_PRECISION_BY_NAME["LeverX"]
-    assert a1["station_nominal"] == pytest.approx(_printed(abs(trammel.A1[0]), places))
-    assert a1["precision"]["station"] == places
-    assert "A1X" not in spec.DRAWING_DIMENSIONS["PinHoleProfile"]
-    assert "LeverX" in spec.DRAWING_DIMENSIONS[spec.STATION_REFERENCE]
-    assert set(spec.POSITION_BANDED) <= set(spec.CALLOUTS_BELOW)
+    source = inspect.getsource(part._author_outer_pin_rows)
+    assert 'for dimension_name in ("A2DY", "B2DY")' in source
+    assert "OUTER_Y_DEVIATIONS" in source and "tolerance.SetValues(lower, upper)" in source
+    build_source = inspect.getsource(part.build)
+    assert "_author_outer_pin_rows(adapter)" in build_source
+    assert "Outer Pin Row Note" in build_source
     toleranced = model_toleranced_dimensions(part)
     assert toleranced[("PinHoleProfile", "PinHoleDia")] == "*deviations(PIN_HOLE_BAND)"
-    assert ("PinHoleProfile", "dimension_name") in toleranced
 
 
 def test_pin_holes_are_slide_reamed_and_name_the_pin() -> None:
@@ -133,17 +140,18 @@ def test_pin_holes_are_slide_reamed_and_name_the_pin() -> None:
 
 def test_taps_are_unc_and_hold_rule_18() -> None:
     features = _features()
-    assert features["cr_tap_1"]["thread"] == "1/4-20 UNC-2B"
+    for name in ("cl_tap_1", "cr_tap_1", "hub_tap_1"):
+        assert features[name]["thread"] == "#8-32 UNC-2B", name
     assert features["riser_tap_1"]["thread"] == "#4-40 UNC-2B"
     assert features["lever_tap_1"]["thread"] == "5/16-18 UNC-2B"
     # Full thread only: the plate at its .X low limit less the tap mouth's
     # edge break and one pitch of incomplete lead.
-    for thread in (spec.CR_THREAD, spec.RISER_THREAD, spec.LEVER_THREAD):
+    for thread in (spec.CLAMP_THREAD, spec.RISER_THREAD, spec.LEVER_THREAD):
         pitch = 25.4 / float(thread.rsplit("-", 1)[1])
         band = printed_band_mm(spec.DRAWING_PRECISION_BY_NAME["StockThick"], unit=spec.UNIT)
         full = spec.THICKNESS - band - spec.TAP_MOUTH_BREAK - pitch
         assert math.isclose(spec.ENGAGEMENT_MM[thread], full), thread
-    for thread in (spec.CR_THREAD, spec.RISER_THREAD):
+    for thread in (spec.CLAMP_THREAD, spec.RISER_THREAD):
         assert spec.ENGAGEMENT_MM[thread] >= 1.5 * THREAD_MAJOR_MM[thread]
     # A finished 12 plate still cannot hold 1.5D of 5/16-18. The lever callout
     # retains the existing RV-01 shortfall as a plain fact, floored (rule 20).
@@ -151,7 +159,6 @@ def test_taps_are_unc_and_hold_rule_18() -> None:
     assert spec.ENGAGEMENT_MM[lever] < 1.5 * THREAD_MAJOR_MM[lever]
     assert spec.SHORT_ENGAGEMENT == (lever,)
     assert "part_spec.LEVER_TAP_CALLOUT" in inspect.getsource(drawing.build)
-    assert spec.CR_HEAD_DIA_MAX <= spec.CR_HEAD_CLEAR_DIA
 
 
 def test_walls_hold_rule_17_at_worst_case() -> None:
@@ -159,17 +166,19 @@ def test_walls_hold_rule_17_at_worst_case() -> None:
 
 
 def test_no_skid_sag_is_negligible() -> None:
+    """The plate spans D1 between its pins; its sag under self-weight and the
+    cutting load stays a small fraction of the strap's radial band, so no
+    skid or mid-span support is needed."""
     assert round(spec.SAG_SELF_WEIGHT, 2) == 0.02
     assert round(spec.SAG_CUTTING_LOAD, 3) == 0.015
-    assert "No skid" in spec.__doc__
+    assert spec.SAG_SELF_WEIGHT + spec.SAG_CUTTING_LOAD < 0.25 * trammel.TOP_EDGE_HALF_BAND
 
 
 def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert set(drawing.TOP_KEEP) | set(drawing.SECTION_KEEP_MODEL_MM) == marked
     assert not set(drawing.TOP_KEEP) & set(drawing.SECTION_KEEP_MODEL_MM)
-    assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
-    assert set(spec.CALLOUT_SUFFIXES) <= marked
+    assert marked <= set(spec.DRAWING_PRECISION_BY_NAME)
     assert set(spec.CALLOUT_PREFIXES) <= marked
     assert set(spec.CALLOUTS_BELOW) <= marked
     # Above-callouts cannot print a line break (pn_pen_v_block_spec): none.
@@ -199,16 +208,6 @@ def test_number_is_the_parent_number_plus_a_tool_suffix() -> None:
     assert number == "MHA-CH-06-TL-21"
 
 
-def test_cl_dowel_is_a_press_in_its_finished_hole() -> None:
-    # The bought 1/4 dowel always presses into the in-place reamed hole.
-    low, high = spec.CL_DOWEL_INTERFERENCE
-    assert 0.0 < low < high
-    assert (low, high) == pytest.approx((
-        min(spec.CL_DOWEL_BAND) - max(spec.CL_HOLE_BAND),
-        max(spec.CL_DOWEL_BAND) - min(spec.CL_HOLE_BAND),
-    ))
-
-
 def test_bottom_face_preserves_the_finished_plate_thickness() -> None:
     bottom = requirements_for(drawing)["bottom_face"]
     (face,) = bottom.faces
@@ -228,14 +227,47 @@ def test_bottom_face_preserves_the_finished_plate_thickness() -> None:
     ])
 
 
-def test_spot_stations_print_from_the_hidden_reference_sketch() -> None:
-    """A reference plane cannot be imported into a drawing (farm jig-r1)."""
-    assert spec.DRAWING_DIMENSIONS[spec.SPOT_REFERENCE] == {"SpotDia", "ClY"}
-    # jig-r3: the spot has its own leader and callout, no "2X".
-    assert "2X" not in spec.CALLOUTS_BELOW["SpotDia"]
-    assert spec.CALLOUTS_BELOW["SpotDia"] == "SPOT FOR\nMHA-CH-13 CL"
-    assert set(spec.CALLOUT_SUFFIXES) == {"SpotDia"}
+def test_clamp_taps_are_ordinary_through_taps_located_by_the_table() -> None:
+    """R4: CL, CR and HUB are each one ordinary #8-32 THRU Hole Wizard tap
+    for the common clamp screw; no dowel, spot, precision bore or LEFT
+    receiver survives. CL/CR are .XXX table rows from A1; HUB's table row is
+    REF (made in situ at the assembly's HUB setting)."""
+    assert spec.CLAMP_THREAD == spec.HUB_THREAD == "#8-32"
+    for hole_spec in (spec.CLAMP_SPEC, spec.HUB_SPEC):
+        assert (hole_spec.kind, hole_spec.size, hole_spec.end) == (
+            "tapped", "#8-32", "through_all",
+        )
+    assert not {"ClTap", "CrTap", "HubTap"} & spec.DRAWING_DIMENSIONS.keys()
+    assert spec.DRAWING_PRECISION_BY_NAME["ClY"] == spec.TABLE_LOCATION_PLACES
+    assert spec.DRAWING_PRECISION_BY_NAME["CrY"] == spec.TABLE_LOCATION_PLACES
+    assert not {"HubX", "HubY"} & set(spec.DRAWING_PRECISION_BY_NAME)
+    for key in ("CL", "CR", "HUB"):
+        assert spec.TABLE_HOLES[key][2] == spec.CLAMP_TAP_DRILL, key
+    assert spec.TABLE_ROW_NOTES["HUB"] == "LOCATIONS REF; TL-00 STEP 10"
+    for name in ("SPOTS", "SPOT_REFERENCE", "LEFT_CLAMP", "HUB_HOLE_DIA", "CL_DOWEL_BAND"):
+        assert not hasattr(spec, name), name
     assert not any("Plane" in feature for feature in spec.DRAWING_DIMENSIONS)
+    source = inspect.getsource(part.build)
+    assert "for key, point in END_CLAMPS.items():" in source
+    assert 'name=f"{prefix}Tap"' in source
+    assert 'name="HubTap"' in source
+    assert 'placement_dims=[((None, None), ("HubY", None))]' in source
+    for retired in ("_spot", "_finished_hub_bore", "LeftClampTap", "HubChamfer"):
+        assert retired not in inspect.getsource(part), retired
+    features = _features()
+    for name in ("cl_tap_1", "cr_tap_1", "hub_tap_1"):
+        tap = features[name]
+        assert tap["thru"] is True, name
+        assert tap["tap_drill_mm"] == spec.CLAMP_TAP_DRILL, name
+    for name in ("cl_tap_1", "cr_tap_1"):
+        assert features[name]["parent"] == "pin_hole_a1", name
+    hub = features["hub_tap_1"]
+    assert "station" not in hub["requirements"] and "height" not in hub["requirements"]
+    assert hub["note"] == " ".join(drawing.HUB_TAP_NOTE.splitlines())
+    assert hub["note"] == "DRILL AND TAP AT ASSEMBLY TL-00 STEP 10"
+    for retired in ("cl_spot", "left_clamp_tap_1", "assembly_hub_bore",
+                    "assembly_hub_underside_chamfer"):
+        assert retired not in features, retired
 
 
 def test_in_situ_hub_fit_up_closes_inside_the_strap_top_edge_band() -> None:
@@ -262,27 +294,22 @@ def test_in_situ_hub_fit_up_closes_inside_the_strap_top_edge_band() -> None:
     assert spec.HUB_RADIAL_STACK == pytest.approx(worst)
     assert f"{spec.HUB_RADIAL_STACK:.3f}" == "0.126"
     assert spec.HUB_RADIAL_STACK < half
-    # The printed spot it replaces failed: the .XXX station band, the shift
-    # and the D1 band x 1.77 came to 0.275 (owner packet, item 5).
-    printed = (
-        printed_band_mm(3, unit=spec.UNIT)
-        + shift
-        + trammel.RADIUS_PER_SPACING * spec.POSITION_BAND
-    )
-    assert printed == pytest.approx(0.275, abs=0.001)
-    assert printed > half
+    # #2236 P1-A: the HUB setting, each pass's correlated pin error and
+    # carriage play, counted once against the same HUB, stay inside half-band.
+    for name, error in spec.PIN_RELATIVE_ERROR.items():
+        assert spec.PIN_RELATIVE_STACK[name] == pytest.approx(
+            spec.HUB_RADIAL_STACK + error + trammel.CARRIAGE_PLAY_RADIUS
+        )
+        assert spec.PIN_RELATIVE_STACK[name] < half
 
 
-def test_three_place_lever_and_cr_stations_state_true_functions() -> None:
-    """mr4: 8.861 and CR's 15.195/1.156 printed 3-place with no stated
-    function. LeverX runs to the upper lever tap (mr8: named by the feature
-    it locates); CR is CL mirrored about the tap axis, so the CR callout
-    (whose lanes hold no row) names it."""
-    assert spec.STATIONS["LeverX"] == spec.LEVER_HOLES[0]
-    assert spec.CALLOUTS_BELOW["LeverX"] == "LEVER TAPS"
-    # Its row is no wider than the "TO HUB SPOT" it replaced (LeverX's lane).
-    assert len(spec.LEVER_STATION_CALLOUT) <= len("TO HUB SPOT")
+def test_functions_are_condensed_into_native_table_rows() -> None:
     assert spec.CR == pytest.approx((-spec.CL[0], spec.CL[1]))
+    assert set(spec.TABLE_ROW_NOTES) <= set(spec.TABLE_HOLES)
+    assert spec.TABLE_ROW_NOTES["A1"].endswith("R800 / MHA-CH-13")
+    assert spec.TABLE_ROW_NOTES["A2"].endswith("R816 / MHA-CH-13; NOTE 1")
+    assert spec.TABLE_ROW_NOTES["B2"] == spec.TABLE_ROW_NOTES["A2"]
+    assert all(spec.TABLE_ROW_NOTES[f"R{i}"] == "LOCATES TL-24 RISER" for i in range(1, 5))
 
 
 def test_pin_chamfer_retains_the_spacer_thrust_seat() -> None:
@@ -420,16 +447,9 @@ def test_riser_tap_stations_print_their_walls_band_and_name_the_riser() -> None:
     riser = _config.parts("ch-rocker-arm-tl-oblique-riser")["number"]
     assert riser == "MHA-CH-06-TL-24"
     assert spec.RISER_TAP_CALLOUT == (f"HOLDS {riser} SCREWS\nCLEAR OF ITS CUT EDGES")
-    # Rule 4 (carrier r11): each 3-place station names what it locates, by
-    # the tool number the hole callout spells out in full.
-    assert spec.DRAWING_DIMENSIONS["RiserTaps"] == {"RiserY1", "RiserY2"}
-    assert set(spec.RISER_STATIONS) - {"RiserY1", "RiserY2"} <= set(spec.STATIONS)
-    assert riser.endswith(spec.RISER_TOOL_ID) and spec.RISER_TOOL_ID == "TL-24"
-    for name in spec.RISER_STATIONS:
-        assert spec.CALLOUTS_BELOW[name] == "LOCATES TL-24", name
-    assert min(trammel.RISER_SCREW_WALLS) >= WALL_TARGET_MM
-    # From A1 the station error about the cut's centre adds half the D1 band.
-    assert WALL_TARGET_MM <= spec.RISER_WALLS_FROM_A1 < min(trammel.RISER_SCREW_WALLS)
+    assert "RiserTaps" not in spec.DRAWING_DIMENSIONS
+    assert spec.RISER_WALLS_FROM_A1 >= WALL_TARGET_MM
+    assert all(spec.TABLE_ROW_NOTES[f"R{i}"] == "LOCATES TL-24 RISER" for i in range(1, 5))
     # Four rows (the native two and these two), ~4.5 mm each, centred on the
     # anchor: under the border.
     rows = 2 + len(spec.RISER_TAP_CALLOUT.splitlines())
@@ -441,19 +461,16 @@ def test_riser_tap_stations_print_their_walls_band_and_name_the_riser() -> None:
     assert "part_spec.RISER_TAP_CALLOUT" in source
 
 
-def test_riser_heights_cover_both_holes_of_their_row() -> None:
-    """Carrier-r1 review: the +X riser pair read as unlocated in Y. Each +X
-    screw shares its -X twin's height in the tap sketch, so each printed
-    height is 2X."""
+def test_riser_table_has_each_hole_even_when_model_heights_are_shared() -> None:
     screws = spec.RISER_SCREWS
     assert screws[1][1] == screws[0][1] and screws[3][1] == screws[2][1]
     assert screws[1][0] == -screws[0][0] and screws[3][0] == -screws[2][0]
     source = inspect.getsource(part)
     assert '(("RiserX1ROrigin", _origin_x("RiserX1R")), SharedCoordinate(0))' in source
     assert '(("RiserX2ROrigin", _origin_x("RiserX2R")), SharedCoordinate(2))' in source
-    assert spec.CALLOUT_PREFIXES == {"RiserY1": "2X ", "RiserY2": "2X "}
-    build = inspect.getsource(drawing.build)
-    assert "_set_callout_texts(adapter, annotations, CALLOUT_PREFIXES, part=1)" in build
+    assert not spec.CALLOUT_PREFIXES
+    for i, point in enumerate(screws, 1):
+        assert spec.TABLE_HOLES[f"R{i}"][:2] == point
 
 
 def test_every_x_station_is_a_baseline_from_a1() -> None:
@@ -461,25 +478,15 @@ def test_every_x_station_is_a_baseline_from_a1() -> None:
     (the left end, A1 and the tap axis). One X datum, A1's axis: every X
     station prints from it (rule 10)."""
     a1x = spec.PIN_HOLES["A1"][0]
-    assert spec.DRAWING_DIMENSIONS[spec.STATION_REFERENCE] == set(spec.STATIONS)
-    other_x = {
-        name
-        for feature, names in spec.DRAWING_DIMENSIONS.items()
-        if feature != spec.STATION_REFERENCE
-        for name in names
-        if "X" in name
-    }
-    # The pin chain stays on the pin-hole sketch, A1 its root; the lever taps'
-    # axis prints from A1 as a station (LeverX), not as the unprinted A1X.
-    assert other_x == {"A2DX", "B2DX"}
+    assert spec.DRAWING_DIMENSIONS[spec.STATION_REFERENCE] == {"EdgeX"}
+    assert not {"A2DX", "B2DX", "PinSpacing", "LeverX"} & set(drawing.TOP_KEEP)
     assert "PlateHalfLength" not in spec.DRAWING_DIMENSIONS["PlateProfile"]
-    assert spec.DRAWING_DIMENSIONS["CrTap"] == {"CrY"}
     assert spec.STATION_REFERENCE in spec.REFERENCE_SKETCHES
     assert spec.STATIONS["EdgeX"] == (spec.OUTLINE_X[0], spec.OUTLINE_Y[0])
     assert spec.STATIONS["ClX"] == spec.CL and spec.STATIONS["CrX"] == spec.CR
     assert spec.STATIONS["LeverX"] == spec.LEVER_HOLES[0]
     features = _features()
-    located = ("cl_spot", "cr_tap_1", "lever_tap_1", "lever_tap_2")
+    located = ("cl_tap_1", "cr_tap_1", "lever_tap_1", "lever_tap_2")
     for name in located + tuple(f"riser_tap_{i}" for i in range(1, 5)):
         feature = features[name]
         places = feature["precision"]["station"]
@@ -487,12 +494,11 @@ def test_every_x_station_is_a_baseline_from_a1() -> None:
         assert feature["station_nominal"] == pytest.approx(
             _printed(_at(feature)[0] - a1x, places)
         ), name
-    # The lever taps' axis prints once, as LeverX: its point on the upper
-    # tap, so its extension line rises through both taps (machinist review
-    # 54e5c9a: A1X's line stopped at the pin line).
-    lever_x = features["lever_tap_1"]["station_nominal"]
-    assert features["lever_tap_2"]["station_nominal"] == lever_x
-    assert lever_x == features["pin_hole_a1"]["station_nominal"]
+    # The lever taps share the A1-baseline X of their table rows.
+    assert (
+        features["lever_tap_1"]["station_nominal"]
+        == features["lever_tap_2"]["station_nominal"]
+    )
     stations = inspect.getsource(part._station_reference)
     assert '"LeverX": _pin_dim("A1X")' in stations
     # Each origin-based placement evaluates to the feature's |X| from its
@@ -508,11 +514,6 @@ def test_every_x_station_is_a_baseline_from_a1() -> None:
         for key, value in values.items():
             expression = expression.replace(f'"{key}"', repr(value))
         assert math.isclose(eval(expression), abs(x), abs_tol=1e-9), name
-    # Each X text stands within its own span, between A1 and its feature.
-    a1_sheet = _on_sheet(a1x, 0.0)[0]
-    for name, (x, _y) in spec.STATIONS.items():
-        ends = sorted((a1_sheet, _on_sheet(x, 0.0)[0]))
-        assert ends[0] < _top_text(name)[0] < ends[1], name
     # Machinist review 07a6786: the 34.9's arrows went outside its short span
     # and its line ran on into the REAM leader; they are held inside.
     assert '_arrows_inside(adapter, annotations, "EdgeX")' in inspect.getsource(
@@ -583,10 +584,9 @@ def _boxes_overlap(a, b) -> bool:
 
 def test_every_location_text_stands_outside_the_outline() -> None:
     """jig-r3: hole-location dimensions sat inside the outline, crossing
-    holes and each other. Every top-view text but the diameters stands
-    outside it, in its lane (CL's spot callout stands in the plate's free
-    band under the pin line)."""
-    diameters = {"PinHoleDia", "SpotDia"}
+    holes and each other. Every top-view text but the ream's diameter stands
+    outside it, in its lane."""
+    diameters = {"PinHoleDia"}
     x0, y0 = _on_sheet(spec.OUTLINE_X[0], spec.OUTLINE_Y[0])
     x1, y1 = _on_sheet(spec.OUTLINE_X[1], spec.OUTLINE_Y[1])
     for name in set(drawing.TOP_KEEP) - diameters:
@@ -596,39 +596,19 @@ def test_every_location_text_stands_outside_the_outline() -> None:
         tx, ty = _top_text(name)
         assert _BORDER[0] + 6.0 <= tx <= _BORDER[2] - 6.0, name
         assert _BORDER[1] <= ty <= _BORDER[3], name
-    # One sheet: the left lanes fit between the outline and the border.
+    # One sheet: the outline lanes fit between the outline and the border.
     outermost = min(_top_text(name)[0] for name in drawing.TOP_KEEP)
     assert outermost - 7.0 > _BORDER[0]
-
-
-def test_single_row_y_texts_clear_their_arrows_and_neighbours() -> None:
-    """Carrier r13: the 45.53's top arrow ran into its text (y 192), the
-    38.00's bottom arrow struck its (y 161.5), and the CL 29.35 (centred on
-    lane x 86, 12.9 wide) touched the outline at x 92. Each single-row Y
-    text, centred on its lane, stands within its span clear of both arrows
-    (3.56 long) when the span holds them inside, and clear of the outline and
-    the next lane's dimension line."""
-    arrow, half_h, half_w = 3.56, 1.75, 6.45
-    spans = {"LeverY2": spec.LEVER_HOLES[1][1]}
-    for name, far in spans.items():
-        _tx, ty = _top_text(name)
-        y_pin, y_far = sorted((_on_sheet(0.0, 0.0)[1], _on_sheet(0.0, far)[1]))
-        assert y_pin + arrow + 1.0 < ty - half_h, name
-        assert ty + half_h + 1.0 < y_far - arrow, name
-    # The right lanes' neighbours: the 38.00 under the 22.00.
-    assert _top_text("LeverY1")[1] - _top_text("LeverY2")[1] > 2 * half_h + 1.5
-    cl_x, _cl_y = _top_text("ClY")
-    outline_left_x = _on_sheet(spec.OUTLINE_X[0], 0.0)[0]
-    assert cl_x + half_w + 2.0 <= outline_left_x
-    assert cl_x - half_w - 2.0 >= _on_sheet(drawing._LEFT[1], 0.0)[0]
 
 
 def test_callouts_and_iso_clear_the_title_block() -> None:
     """jig-r3: the iso and its note ran into the title block."""
     for anchor in (
+        drawing.CL_CALLOUT_XY,
         drawing.CR_CALLOUT_XY,
         drawing.RISER_CALLOUT_XY,
         drawing.LEVER_CALLOUT_XY,
+        drawing.HUB_CALLOUT_XY,
     ):
         box = _callout_box(anchor)
         assert not _boxes_overlap(box, _TITLE_BLOCK), anchor
@@ -717,6 +697,7 @@ def test_tap_callout_leaders_clear_every_station_text() -> None:
     end of its callout's first line, ~5 mm below the anchor. Each must clear
     every top-view dimension text (approximated as 24 x 6 mm)."""
     leaders = {
+        "CL": (spec.CL, drawing.CL_CALLOUT_XY),
         "CR": (spec.CR, drawing.CR_CALLOUT_XY),
         "riser": (spec.RISER_SCREWS[3], drawing.RISER_CALLOUT_XY),
         "lever": (spec.LEVER_HOLES[1], drawing.LEVER_CALLOUT_XY),
@@ -761,27 +742,354 @@ def test_all_four_bores_keep_the_unchanged_size_and_locations() -> None:
     assert 0.0 < spec.PIN_CLEARANCE_MIN < spec.PIN_CLEARANCE_MAX
 
 
-def test_relocated_b2dx_clears_outline_border_and_isometric() -> None:
-    b2x, b2y = _top_text("B2DX")
-    assert b2y + 10.0 < _on_sheet(0.0, spec.OUTLINE_Y[0])[1] - 3.0
-    # Review 88c6d: B2DX's rows (~28 wide, "SETS R816 ON") stand wholly
-    # outboard of B2's extension line and the 520.0's at the plate's +X end,
-    # so neither strikes the text, and above the isometric.
-    half_width = len("SETS R816 ON") * 2.36 / 2.0
-    assert b2x - half_width - 3.0 > _on_sheet(spec.OUTLINE_X[1], 0.0)[0]
-    assert b2x + half_width < _BORDER[2] - 3.0
-    iso_top = drawing.ISO_CENTER[1] * 1000.0 + 17.0
-    assert b2y - 8.0 - 3.0 > iso_top
+def test_hole_table_sheet_owns_every_location() -> None:
+    """#2151 (owner Option B): one native hole table on its own sheet, its
+    tagged plan the top view; the CARRIER sheet's section names A1 only."""
+    assert drawing.SHEET_NAMES == ("CARRIER", "HOLE TABLE", "HUB CLAMP")
+    source = inspect.getsource(drawing._hole_table_sheet)
+    assert "SHEET_NAMES[1]" in source
+    assert "create_carrier_hole_table(adapter, top, source_model, SOURCE)" in source
+    build = inspect.getsource(drawing.build)
+    assert build.index("_hole_table_sheet(adapter, source_model)") < build.index(
+        "_hub_sheet(adapter)"
+    )
+    assert "settled_checks=(pin_controls_settled, table_settled, hub_settled)" in build
+    assert '"Outer Pin Row Note"' in build
+    assert "add_note(adapter, SECTION_NOTE, *SECTION_NOTE_XY)" in inspect.getsource(drawing._pin_section)
+    assert not {"ClY", "CrY", "LeverY1", "LeverY2", "RiserY1", "RiserY2"} & set(drawing.TOP_KEEP)
+    for retired in ("_LEFT", "_RIGHT", "_LEVER_STATION", "_BAND", "_CHAIN_PLACES"):
+        assert not hasattr(drawing, retired), retired
 
 
+def test_near_y_extension_lines_stop_outside_the_part() -> None:
+    """Machinist review 43452045 (r1/r3 clarity): the 1.77's upper extension
+    line ran from the sketch origin through A1 to mid-air. Main's ruling:
+    capped, it runs from its 1 mm overshoot past the dimension line to a
+    normal 1.5 mm gap short of the plate's -X end, outside the part; A-A's
+    thick end stubs stay as they are."""
+    lane_x, _lane_y = _top_text("PlateNearY")
+    cap = drawing.NEAR_Y_WITNESS_MAX_M * 1000.0
+    start = lane_x - 1.0  # 43452045: both 1.77 extension lines end at x 46.0
+    edge_x, _edge_y = _on_sheet(spec.OUTLINE_X[0], spec.OUTLINE_Y[0])
+    assert drawing.NEAR_Y_WITNESS_GAP_MM == 1.5
+    assert start + cap == pytest.approx(edge_x - 1.5)
+    # 43452045's printed lines: the plate's -X end at 91.825, overshoot 46.0.
+    assert edge_x == pytest.approx(91.825, abs=1e-3) and start == pytest.approx(46.0)
+    assert drawing._SECTION_LINE_X == (386.0, -342.0)
+    build = inspect.getsource(drawing.build)
+    assert build.index('_arrows_inside(adapter, annotations, "EdgeX")') < build.index(
+        "near_y_cap_settled = _cap_near_y_witness(adapter, annotations)"
+    )
+    # The cap's final readback runs in the sheet-1 settled check, on the
+    # CARRIER sheet, restoring whichever sheet was active.
+    settled = build[build.index("def pin_controls_settled"):build.index("return await finalize_drawing")]
+    assert settled.index("ActivateSheet(SHEET_NAMES[0])") < settled.index("near_y_cap_settled()")
+    assert settled.index("near_y_cap_settled()") < settled.index("finally:")
+    assert "ActivateSheet(previous)" in settled.split("finally:")[1]
+    assert "_assert_ream_control(adapter, ream[0])" in settled
 
-def test_lever_tap_station_prints_its_own_two_place_band():
-    # Final review: the 8.861 axis stays 3-place (kinematic), the lever taps
-    # carry the .XX band they need, set on the model dimension.
-    assert spec.DRAWING_PRECISION_BY_NAME["LeverX"] == 3
-    assert spec.LEVER_STATION_BAND == printed_band_mm(2, unit=spec.UNIT)
-    build = (Path(__file__).parent / "build_ch_rocker_arm_tl_oblique_carrier.py").read_text()
-    assert '"LeverX",\n        LEVER_STATION_BAND,' in build.replace("\r\n", "\n")
-    # A1's station is the same LeverX measurement: one band in features.toml.
-    features = _features()
-    assert features["pin_hole_a1"]["station"] == features["lever_tap_1"]["station"]
+
+@pytest.mark.parametrize("persists", [True, False])
+def test_near_y_witness_cap_is_written_and_read_back(monkeypatch, persists) -> None:
+    """Fake-driven (not native): only PlateNearY is capped, after a rebuild;
+    the returned final readback refuses a cap a later rebuild lost."""
+
+    class Display:
+        def __init__(self) -> None:
+            self.cap = 0.0
+
+        @property
+        def MaxWitnessLineLength(self) -> float:
+            return self.cap
+
+        @MaxWitnessLineLength.setter
+        def MaxWitnessLineLength(self, value: float) -> None:
+            self.cap = value if persists else 0.2
+
+    near, other = Display(), Display()
+    annotations = [
+        SimpleNamespace(name="EdgeX", GetSpecificAnnotation=lambda: other),
+        SimpleNamespace(name="PlateNearY", GetSpecificAnnotation=lambda: near),
+    ]
+    rebuilt = []
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, item: item.name)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **kw: rebuilt.append(kw["label"]))
+    if not persists:
+        with pytest.raises(RuntimeError, match="did not persist"):
+            drawing._cap_near_y_witness(SimpleNamespace(), annotations)
+        return
+    check = drawing._cap_near_y_witness(SimpleNamespace(), annotations)
+    assert near.cap == drawing.NEAR_Y_WITNESS_MAX_M and other.cap == 0.0
+    assert rebuilt == ["carrier 1.77 witness cap"]
+    check()
+    near.cap = 0.0  # a later rebuild dropped it
+    with pytest.raises(RuntimeError, match="did not persist"):
+        check()
+
+
+def test_section_note_stands_under_the_caption_clear_of_every_line() -> None:
+    """Machinist review 43452045 (r2/r3 clarity): the 20.5's left extension
+    line struck the A1-only note, which stood apart from A-A. It stands
+    directly under the caption, clear of the plate's lanes, the thickness
+    lane, the slab and the border."""
+    rows = drawing.SECTION_NOTE.splitlines()
+    assert " ".join(rows) == "A1 ONLY — OTHER PIN HOLES NOT SHOWN"
+    x, top = (value * 1000.0 for value in drawing.SECTION_NOTE_XY)
+    caption_x, caption_y = (value * 1000.0 for value in drawing.SECTION_CAPTION_XY)
+    # The caption (top-centre anchor, ~46 x 15 mm): left-aligned under it.
+    assert caption_x - 23.0 <= x < caption_x - 20.0
+    # Under the caption's glyphs (to y 37.3, R4NativeEye 43452045).
+    assert caption_y - 20.0 < top < 37.3 - 2.0
+    right = x + 2.71 * max(len(row) for row in rows)  # 43452045: 35 chars, 94.7 mm
+    assert right < 214.0 * INCH / 72.0  # the clear slot's right end (PDF pt)
+    bottom = top - 5.0 * len(rows)
+    assert bottom > _BORDER[1] + 3.0
+    a1x = spec.PIN_HOLES["A1"][0]
+    for sign in (1.0, -1.0):
+        stock_x, _ = _section_sheet(drawing.SECTION_KEEP_MODEL_MM["StockThick"], sign)
+        slab_x = min(
+            _section_sheet((a1x - drawing._SECTION_HALF, 0.0), sign)[0],
+            _section_sheet((a1x + drawing._SECTION_HALF, 0.0), sign)[0],
+        )
+        assert right + 3.0 < min(stock_x - 1.0, slab_x), sign
+    # The plate's left extension lines stand at its -X end (sheet x ~92).
+    assert right + 3.0 < _on_sheet(spec.OUTLINE_X[0], 0.0)[0]
+
+
+def test_hub_clamp_tap_has_its_own_sheet_callout_and_reference_position() -> None:
+    """Farm 82129 review: the HUB tap is drilled and tapped at assembly, so it
+    is not in the table; its sheet prints its native callout saying so and
+    its position from A1 as two parenthesized REFERENCE drawing dimensions."""
+    assert drawing.SHEET_NAMES[2] == "HUB CLAMP"
+    assert "expected_sheet_names=SHEET_NAMES" in inspect.getsource(drawing.build)
+    assert "hub_settled = _hub_sheet(adapter)" in inspect.getsource(drawing.build)
+    source = inspect.getsource(drawing._hub_sheet)
+    assert "SHEET_NAMES[2]" in source
+    assert "add_native_hole_callout" in source
+    assert "curate_view_dimensions" not in source
+    assert "_append_callout_below(callout, HUB_TAP_NOTE" in source
+    assert "_hub_reference_position(adapter, top)" in source
+    assert "_strip_thread_class(" in source
+    assert "set_callout_lengths_to_three_places(" in source
+    assert drawing.HUB_TAP_NOTE.splitlines() == ["DRILL AND TAP AT ASSEMBLY", "TL-00 STEP 10"]
+    reference = inspect.getsource(drawing._hub_reference_position)
+    for call in ("add_edge_dimension(", "set_arc_endpoints_to_center(", "set_reference_dimension(",
+                 "assert_dimension_measures(",
+                 'orientation=orientation, entities=(a1, hub)'):
+        assert call in reference, call
+    # Drawing-native only: no model dimension or part write, and no
+    # drawing-owned places (_drawing_contract: a *_spec value only).
+    assert "SetPrecision3" not in reference
+    for forbidden in ("SystemValue =", "SetSystemValue", "Parameter(", "SetValue"):
+        assert forbidden not in reference, forbidden
+    assert spec.HUB[0] == spec.LEVER_HOLES[0][0] == 0.0
+    assert not hasattr(drawing, "HUB_KEEP")
+    for retired in ("_left_clamp_sheet", "_left_clamp_depth_callout", "_trace_left_clamp_callout"):
+        assert not hasattr(drawing, retired), retired
+    assert "_require_left_clamp_thread_min" not in Path(drawing.__file__).read_text(
+        encoding="utf-8"
+    )
+
+
+@pytest.mark.parametrize("axis", ["X", "Y"])
+def test_hub_reference_text_and_dimension_line_are_outside_plate(axis) -> None:
+    """4031a82a S3: reserve whole text/arrow envelopes, not just an anchor.
+
+    This is an offline paper-layout contract, not a native ink measurement.
+    The unchanged single-line parenthesized references get a conservative
+    16 x 16 mm text reservation (including either text orientation), and
+    their dimension lines get 3 mm arrow/tail clearance on every side.
+    Native extension lines must still reach the two hole centres inside.
+    """
+    x0, y0 = _on_sheet(spec.OUTLINE_X[0], spec.OUTLINE_Y[0])
+    x1, y1 = _on_sheet(spec.OUTLINE_X[1], spec.OUTLINE_Y[1])
+    plate = (x0, y0, x1, y1)
+    mx, _zero, minus_my = drawing.HUB_REFERENCE_TEXT_MODEL_MM[axis]
+    tx, ty = _on_sheet(mx, -minus_my)
+    a1, hub = (_on_sheet(*point) for point in (drawing._A1, spec.HUB))
+    if axis == "X":
+        ends = ((a1[0], ty), (hub[0], ty))
+        assert ty == pytest.approx(y0 - 18.0)
+        assert ty + 8.0 <= y0 - 3.0
+        assert min(a1[0], hub[0]) + 8.0 < tx < max(a1[0], hub[0]) - 8.0
+    else:
+        ends = ((tx, a1[1]), (tx, hub[1]))
+        assert tx == pytest.approx(x1 + 28.0)
+        assert tx - 8.0 >= x1 + 3.0
+        assert min(a1[1], hub[1]) + 8.0 < ty < max(a1[1], hub[1]) - 8.0
+    text_box = (tx - 8.0, ty - 8.0, tx + 8.0, ty + 8.0)
+    line_box = (
+        min(p[0] for p in ends) - 3.0,
+        min(p[1] for p in ends) - 3.0,
+        max(p[0] for p in ends) + 3.0,
+        max(p[1] for p in ends) + 3.0,
+    )
+    # Reserve the complete four-row native callout/instructions and its
+    # shoulder, not only the ordinary two-row _callout_box approximation.
+    callout_x, callout_y = (v * 1000.0 for v in drawing.HUB_CALLOUT_XY)
+    callout = (callout_x - 36.0, callout_y - 16.0,
+               callout_x + 36.0, callout_y + 16.0)
+    iso_x, iso_y = (v * 1000.0 for v in drawing.ISO_CENTER)
+    iso = (iso_x - 30.0, iso_y - 18.0, iso_x + 30.0, iso_y + 18.0)
+    note_x, note_y = (v * 1000.0 for v in drawing.ISO_NOTE_XY)
+    caption = (note_x, note_y - 4.0,
+               note_x + 2.36 * len(spec.ISOMETRIC_VIEW_NOTE), note_y + 4.0)
+    for box in (text_box, line_box):
+        assert _BORDER[0] + 3.0 < box[0] < box[2] < _BORDER[2] - 3.0
+        assert _BORDER[1] + 3.0 < box[1] < box[3] < _BORDER[3] - 3.0
+        for keepout in (plate, _TITLE_BLOCK, callout, iso, caption):
+            assert not _boxes_overlap(box, keepout), (axis, box, keepout)
+    assert not _segment_hits_box(*ends, plate)
+
+
+@pytest.mark.parametrize("fault", [None, "prefix", "suffix", "show_parenthesis", "arc_end", "wrong_value"])
+def test_hub_reference_position_is_parenthesized_between_actual_edges(monkeypatch, fault):
+    """Fake-driven (not native): the two dimensions run between the A1 and
+    HUB edges, on both axes, measure HUB - A1, and their settled readback
+    refuses a lost or doubled parenthesis, centred end or value."""
+    a1, hub, created, displays, measured = object(), object(), [], [], []
+    settled = {"wrong": False}
+
+    class Display:
+        def __init__(self):
+            # Document "parentheses by default": ShowParenthesis starts True.
+            self.text, self.places, self.ShowParenthesis = {}, 2, True
+            self.model = SimpleNamespace(GetArcEndCondition=lambda _i: 1, DrivenState=1)
+
+        def GetAnnotation(self):
+            return self
+
+        def GetDimension2(self, _index):
+            return self.model
+
+        def SetText(self, part, text):
+            self.text[part] = text
+
+        def GetText(self, part):
+            return self.text.get(part, "")
+
+        def SetPrecision3(self, *_args):
+            raise AssertionError("the sheet must not own the reference places")
+
+        def GetPrimaryPrecision2(self):
+            return self.places
+
+        def GetUseDocPrecision(self):
+            return True
+
+        def IsReferenceDim(self):
+            return True
+
+    def add(_adapter, _view, **kwargs):
+        created.append(kwargs)
+        displays.append(Display())
+        return displays[-1]
+
+    def measures(_adapter, display, *, expected_mm, label, entities):
+        measured.append((label, expected_mm, entities))
+        if settled["wrong"]:
+            raise RuntimeError(f"{label} measures the wrong value")
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    def to_sheet(xyz):
+        return tuple(v / 1000.0 for v in _on_sheet(xyz[0], -xyz[2]))
+
+    monkeypatch.setattr(drawing, "_view_mapper", lambda *_: to_sheet)
+    monkeypatch.setattr(drawing, "_circle_edge", lambda _a, _v, dia, *_a2, **_k: a1 if dia == spec.PIN_HOLE_DIA else hub)
+    monkeypatch.setattr(drawing, "add_edge_dimension", add)
+    monkeypatch.setattr(drawing, "set_arc_endpoints_to_center", lambda *_a, **_k: None)
+    monkeypatch.setattr(drawing, "set_reference_dimension",
+                        lambda _adapter, display, **_k: (display.SetText(1, "("), display.SetText(2, ")")))
+    monkeypatch.setattr(drawing, "assert_dimension_measures", measures)
+    check = drawing._hub_reference_position(SimpleNamespace(), object())
+    assert [item["orientation"] for item in created] == ["horizontal", "vertical"]
+    assert all(item["entities"] == (a1, hub) for item in created)
+    for axis, item in zip(("X", "Y"), created, strict=True):
+        assert item["text_xy"] == pytest.approx(
+            to_sheet(drawing.HUB_REFERENCE_TEXT_MODEL_MM[axis])
+        )
+        assert item["p0"] == pytest.approx(to_sheet(drawing._xy(*drawing._A1)))
+        assert item["p1"] == pytest.approx(to_sheet(drawing._xy(*spec.HUB)))
+    assert all(display.text == {1: "(", 2: ")"} for display in displays)
+    assert all(display.ShowParenthesis is False for display in displays)
+    a1x, a1y = spec.PIN_HOLES["A1"]
+    assert [expected for _label, expected, _entities in measured] == pytest.approx(
+        [abs(spec.HUB[0] - a1x), abs(spec.HUB[1] - a1y)]
+    )
+    assert all(entities == (a1, hub) for _label, _expected, entities in measured)
+    if fault == "prefix":
+        displays[0].text[1] = ""
+    elif fault == "suffix":
+        displays[1].text[2] = ""
+    elif fault == "show_parenthesis":
+        displays[0].ShowParenthesis = True
+    elif fault == "arc_end":
+        displays[0].model = SimpleNamespace(GetArcEndCondition=lambda _i: 0)
+    elif fault == "wrong_value":
+        settled["wrong"] = True
+    if fault is None:
+        check()
+        return
+    with pytest.raises(RuntimeError):
+        check()
+
+
+@pytest.fixture
+def raw_dimension_binding(monkeypatch):
+    """Model _com_invoke's bare PyIDispatch, not a prewrapped dimension fake."""
+    import _com
+
+    class RawDispatch:
+        def InvokeTypes(self, *_args):
+            raise AssertionError("raw dispatch must be bound before member access")
+
+    wrappers = {}
+
+    def retained(wrapper, interface):
+        raw = RawDispatch()
+        wrappers[raw] = (interface, wrapper)
+        return raw
+
+    def early_bound(value, interface):
+        # Match the real passthrough: bare raw dispatch has no _oleobj_.
+        # Only _bind supplies the envelope needed to select a native wrapper.
+        raw = getattr(value, "_oleobj_", None)
+        if raw in wrappers:
+            expected, wrapper = wrappers[raw]
+            assert interface == expected
+            return wrapper
+        return value
+
+    monkeypatch.setattr(_com, "_early_bound", early_bound)
+    monkeypatch.setattr(part, "_early_bound", early_bound)
+    return retained
+
+
+def test_pin_chamfer_binds_raw_named_dimension_before_value_and_tolerance(
+    monkeypatch, raw_dimension_binding,
+) -> None:
+    values = {}
+
+    def set_values(lower, upper):
+        values.update(lower=lower, upper=upper)
+        return True
+
+    tolerance = SimpleNamespace(
+        Type=0, SetValues=set_values,
+        GetMinValue=lambda: values["lower"], GetMaxValue=lambda: values["upper"],
+    )
+    raw = raw_dimension_binding(
+        SimpleNamespace(SystemValue=spec.PIN_CHAMFER / 1000.0, Tolerance=tolerance),
+        "IDimension",
+    )
+    monkeypatch.setattr(part, "_named_dimension", lambda *_args: (None, raw))
+    part._pin_chamfer_min_limit(None)
+    assert tolerance.Type == spec.PIN_CHAMFER_TOL_TYPE
+    assert values == pytest.approx({
+        "lower": spec.PIN_CHAMFER_BAND[1] / 1000.0,
+        "upper": spec.PIN_CHAMFER_BAND[0] / 1000.0,
+    })
+    assert '_early_bound(_bind(dimension, "IDimension"), "IDimension")' in inspect.getsource(
+        part._pin_chamfer_min_limit
+    )

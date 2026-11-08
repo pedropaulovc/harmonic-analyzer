@@ -1,12 +1,15 @@
-r"""Create the nine-sheet oblique-trammel jig fitter package (MHA-CH-06-TL-00).
+r"""Create the eleven-sheet oblique-trammel jig fitter package (MHA-CH-06-TL-00).
 
 The assembled plan and elevation locate the rail axes and carrier pass holes.
 The associative BOM lists every fabricated and purchased family; four exploded
 sheets partition those families into rails, plain pivots, leadscrew feed and
-carrier. Each family has one real-edge BOM balloon. The final three sheets
+carrier. Each family has one real-edge BOM balloon there. The next four sheets
 carry assembly order (continued onto the fit-up sheet as needed), measured pivot
 shim fit and KP08 alignment, then pass changes, hold-down fitting and installed
-machine acceptance.
+machine acceptance. The last sheet is the same named plan of the same source
+with the carrier and every occurrence locked to it hidden in that one drawing
+view, exposing the rails, carriages, blocks and leadscrew feed under it with a
+sparse set of BOM balloons.
 
 Instruction sheets retain a visible collapsed source view for their live
 property links. All geometry, fit-up text and operation instructions come from
@@ -49,19 +52,13 @@ from _drawing_balloons import (
     BalloonLanding,
     _leaf_pose,
     _spread_balloons,
+    _stems_matching,
     _view_component_leaves,
     _view_explode_offsets,
     add_component_bom_balloons,
     assert_balloon_landings,
     isolate_drawing_view_components,
 )
-from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import (
-    assert_imported_precision,
-    offset_dimension_text,
-    set_reference_dimension,
-)
-from _drawing_hidden_sketches import _show_base_view_sketches
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_tables import (
     bom_row_identities,
@@ -79,7 +76,7 @@ from _drawing_view_configuration import (
 )
 from _drawing_view_display import set_hidden_lines_removed
 from _drawing_leader_notes import add_leader_note
-from _drawing_projection import model_point_in_view, model_points_in_view
+from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_types import DRAWING_TEMPLATES, DrawingLayout
 from _drawing_ray_pick import ViewRayCaster
@@ -109,7 +106,9 @@ BOM_SHEET = "BILL OF MATERIALS"
 STEPS_SHEET = "ASSEMBLY STEPS"
 FIT_SHEET = "PIVOT AND FEED FIT"
 OPERATION_SHEET = "OPERATION AND HOLD DOWNS"
+HOLDING_SHEET = "STRAP HOLDING AND PREPARATION"
 PIVOT_SHEET = "PLAIN PIVOTS EXPLODED"
+LINEAR_MOTION_SHEET = "LINEAR MOTION FROM ABOVE"
 
 
 @dataclass(frozen=True)
@@ -156,7 +155,7 @@ CLUSTERS = (
         "RAIL BARS EXPLODED",
         "BASE BARS, RAILS, CARRIAGES AND PIVOT BLOCK",
         (
-            spec.BASE_BAR,
+            *spec.BASE_BARS,
             spec.PIVOT_BLOCK,
             spec.RAIL,
             spec.CARRIAGE,
@@ -167,7 +166,13 @@ CLUSTERS = (
             spec.CARRIAGE_SCREW,
         ),
         (1.0, 5.0),
-        partial=((spec.CARRIAGE_SCREW, _carriage_screws(spec.PIVOT_BLOCK)),),
+        partial=(
+            (spec.CARRIAGE_SCREW, _carriage_screws(spec.PIVOT_BLOCK)),
+            # Only the 16 rail occurrences; CL/CR/HUB are carrier context.
+            # The four lower TL-28 screws share the eight-screw 5/8 family
+            # on the leadscrew sheet.
+            (spec.RAIL_SCREW, spec.RAIL_SCREW_INSTANCES),
+        ),
     ),
     Cluster(
         PIVOT_SHEET,
@@ -193,13 +198,13 @@ CLUSTERS = (
             spec.FEED_NUT,
             spec.PILLOW_BLOCK,
             spec.HANDWHEEL,
-            spec.BRACKET_SCREW,
             spec.PILLOW_BLOCK_SCREW,
         ),
         (1.0, 3.0),
         # The integral lug moves with the feed block on rail 1, fastened to
         # its carriage by its four carriage screws. The feed nut's four flat
-        # heads are riser screws, ballooned on the carrier's sheet.
+        # heads are riser screws, ballooned on the carrier's sheet. Both
+        # TL-28 screw joints belong to this sheet's short-screw family.
         context=(
             spec.instance_name(spec.CARRIAGE, 0),
             *_carriage_screws(spec.FEED_BLOCK),
@@ -212,18 +217,146 @@ CLUSTERS = (
         (
             spec.CARRIER,
             spec.RISER,
-            spec.HUB_PIN,
+            spec.HUB_WASHER,
             spec.FEED_LEVER,
-            spec.CL_DOWEL,
+            spec.STOP_PIN,
             spec.RISER_SCREW,
-            spec.CLAMP_SCREW,
             spec.LEVER_SCREW,
             spec.LEVER_LOCK_WASHER,
         ),
         (1.0, 5.0),
+        # The CL, CR and HUB clamps are the common rail screw, ballooned on
+        # the rail sheet; here they explode out of the carrier unballooned.
+        context=tuple(spec.STRAP_CLAMP_SCREW_INSTANCES.values()),
         partial=((spec.RISER_SCREW, spec.RISER_SCREW_INSTANCES),),
     ),
 )
+
+# The linear-motion sheet (owner requirement on PR4 #2227, 2026-11-06): a top
+# view of the hardware under the carrier. It is the same source assembly, its
+# same named plan (spec.PLAN_VIEW, mapping proven) and the same configuration
+# policy as every other view. Only THIS drawing view hides the carrier and
+# every occurrence the builder locks to it (spec.CARRIER_RIDERS, by occurrence:
+# LOCKED_TO's fixed ``None`` occurrences never ride): a drawing component's
+# Visible flag belongs to one drawing view, so the model, its Default
+# configuration, BOM, interference and sweeps, and every other view and sheet
+# keep the full assembly. No display state, configuration or model hide is
+# created.
+LINEAR_MOTION_HIDDEN = (spec.instance_name(spec.CARRIER, 0), *spec.CARRIER_RIDERS)
+LINEAR_MOTION_SHOWN = tuple(
+    name
+    for stem in spec.BOM_ORDER
+    for name in (spec.instance_name(stem, index) for index in range(spec.QUANTITIES[stem]))
+    if name not in LINEAR_MOTION_HIDDEN
+)
+
+
+def _instances(*stems: str) -> set[str]:
+    return {
+        spec.instance_name(stem, index)
+        for stem in stems
+        for index in range(spec.QUANTITIES[stem])
+    }
+
+
+# The owner's list, which the mates must reproduce: the carrier TL-21, the
+# riser and its four screws (the riser-screw family's feed-nut four stay), the
+# feed lever with its screws and wedge-lock washers, and the strap's top
+# workholding: the TL-52 top-hat washer, the two loose SM-VN-53 stock stop
+# pins and the common screw's CL, CR and HUB clamp occurrences, hidden by
+# occurrence (STRAP_CLAMP_SCREW_INSTANCES), never by the common stem. No strap
+# is modelled. Kept: the base bars, rails, carriages, both blocks, the pivot
+# shoulder screws with their spacers and shims, the leadscrew feed (nut, KP08
+# blocks, end brackets, handwheel) and the hold-downs, with every fastener of
+# theirs: 16 fixed common rail screws and all eight bracket-family screws
+# (four KP08 and four lower TL-28), while common occurrences 17/18/19 hide.
+if set(LINEAR_MOTION_HIDDEN) != {
+    spec.instance_name(spec.CARRIER, 0),
+    *spec.RISER_SCREW_INSTANCES,
+    *spec.STRAP_CLAMP_SCREW_INSTANCES.values(),
+    *_instances(
+        spec.RISER,
+        spec.HUB_WASHER,
+        spec.FEED_LEVER,
+        spec.STOP_PIN,
+        spec.LEVER_SCREW,
+        spec.LEVER_LOCK_WASHER,
+    ),
+}:
+    raise AssertionError("the linear-motion view must hide exactly the carrier and its load")
+if not {
+    *spec.NUT_SCREW_INSTANCES,
+    *spec.RAIL_SCREW_INSTANCES,
+    *spec.BAR_SCREW_INSTANCES,
+    *_instances(
+        *spec.BASE_BARS,
+        spec.RAIL,
+        spec.CARRIAGE,
+        spec.PIVOT_BLOCK,
+        spec.FEED_BLOCK,
+        spec.PIVOT_SCREW,
+        spec.PIVOT_SPACER,
+        spec.PIVOT_SHIM,
+        spec.LEADSCREW,
+        spec.FEED_NUT,
+        spec.PILLOW_BLOCK,
+        spec.END_BRACKET,
+        spec.HANDWHEEL,
+        spec.HOLD_DOWN_STUD,
+        spec.T_NUT,
+        spec.FLANGE_NUT,
+        spec.CARRIAGE_SCREW,
+        spec.PILLOW_BLOCK_SCREW,
+    ),
+} <= set(LINEAR_MOTION_SHOWN):
+    raise AssertionError("the linear-motion view must keep every rail, block and feed part")
+# Sparse: one balloon for each moving or guiding member of the slide and its
+# feed, no fasteners. The rail and carriage are ballooned on rail 2's (pivot
+# block's) side and the feed's six on rail 1's, so the ring draws on both.
+# The base bars and hold-downs show unballooned; sheet 3 balloons them. The
+# shoulder screw is not ballooned here: its head is lost in its counterbore
+# with the carrier gone (TL-00 review 62753c5e, Main 2026-11-07); sheet 4
+# balloons it.
+LINEAR_MOTION_BALLOONED = tuple(
+    stem
+    for stem in spec.BOM_ORDER
+    if stem
+    in {
+        spec.PIVOT_BLOCK,
+        spec.FEED_BLOCK,
+        spec.END_BRACKET,
+        spec.RAIL,
+        spec.CARRIAGE,
+        spec.LEADSCREW,
+        spec.FEED_NUT,
+        spec.PILLOW_BLOCK,
+        spec.HANDWHEEL,
+    }
+)
+_PIVOT_SIDE = 1  # rail 2 and its carriage, under the pivot block
+if (
+    spec.RAILS[_PIVOT_SIDE] != 2
+    or spec.LOCKED_TO[spec.PIVOT_BLOCK] != ((spec.CARRIAGE, _PIVOT_SIDE),)
+):
+    raise AssertionError("the pivot side's rail or carriage moved")
+_PIVOT_SIDE_FAMILIES = (spec.RAIL, spec.CARRIAGE)
+
+
+def _linear_motion_anchor(stem: str) -> BalloonAnchor:
+    """Each walks its own body for a drawn edge (_select_balloon_anchor): the
+    exploded sheets' frozen points sit on faces the plan sees edge-on. The
+    pivot side's three are pinned there; every other member family keeps its
+    first occurrence's persisted reference, as BALLOON_ANCHORS does."""
+    if stem in _PIVOT_SIDE_FAMILIES:
+        return BalloonAnchor(instance=spec.instance_name(stem, _PIVOT_SIDE))
+    if stem in spec.MEMBER_IDENTITIES:
+        return BalloonAnchor(instance=spec.instance_name(stem, 0))
+    return BalloonAnchor()
+
+
+LINEAR_MOTION_ANCHORS = {stem: _linear_motion_anchor(stem) for stem in LINEAR_MOTION_BALLOONED}
+# The owner's sheet goes last: the steps already cite sheets 1, 8 and 9 by
+# number, so no existing sheet moves.
 SHEET_NAMES = (
     ASSEMBLED_SHEET,
     BOM_SHEET,
@@ -231,6 +364,8 @@ SHEET_NAMES = (
     STEPS_SHEET,
     FIT_SHEET,
     OPERATION_SHEET,
+    HOLDING_SHEET,
+    LINEAR_MOTION_SHEET,
 )
 # The captions cite sheets by these numbers, never typed ones.
 BOM_SHEET_NUMBER = SHEET_NAMES.index(BOM_SHEET) + 1
@@ -266,6 +401,12 @@ if any(n / d > SIMPLIFIED_MAX_SCALE for n, d in CLUSTER_SCALE_LADDER):
     raise AssertionError("a cluster scale would switch the view's configuration")
 if any(cluster.scale not in CLUSTER_SCALE_LADDER for cluster in CLUSTERS):
     raise AssertionError("every cluster is placed at a ladder scale")
+# The linear-motion plan is placed at the arrangement's 1:4 and fitted on the
+# same ladder and ring room (the same simplified configuration at every rung);
+# build() reports the fitted scale.
+LINEAR_MOTION_SCALE = ASSEMBLED_SCALE
+if LINEAR_MOTION_SCALE not in CLUSTER_SCALE_LADDER:
+    raise AssertionError("the linear-motion plan is placed at a ladder scale")
 
 
 def package_sheet_scales(
@@ -280,6 +421,8 @@ def package_sheet_scales(
         STEPS_SHEET: NOTES_REFERENCE_SCALE,
         FIT_SHEET: NOTES_REFERENCE_SCALE,
         OPERATION_SHEET: ISOMETRIC_SCALE,
+        HOLDING_SHEET: NOTES_REFERENCE_SCALE,
+        LINEAR_MOTION_SHEET: LINEAR_MOTION_SCALE,
     }
     return {
         name: cluster_scales[name] if name in cluster_scales else fixed[name]
@@ -316,7 +459,7 @@ TITLE_BLOCK = (
 PLAN_CENTER = (0.274, 0.205)
 ELEVATION_CENTER = (0.274, 0.113)
 CAPTION_XY = (0.018, 0.255)
-CAPTION_WIDTH = 46  # characters; default-format note text, left of the plan
+CAPTION_WIDTH = 45  # characters; default-format note text, clear left of the plan
 ALIGNMENT_XY = (0.018, 0.093)
 ALIGNMENT_WIDTH = 68  # characters; stops left of the title block
 # Default-format note text: about 2.9 mm a character on the farm's templates.
@@ -337,26 +480,6 @@ def _label_under(center: tuple[float, float], height_mm: float, text: str):
 PLAN_LABEL_XY = _label_under(PLAN_CENTER, _EY1 - _EY0, spec.PLAN_VIEW_LABEL)
 ELEVATION_LABEL_XY = _label_under(
     ELEVATION_CENTER, _EZ1 - _EZ0, spec.ELEVATION_VIEW_LABEL
-)
-
-# The elevation's one dimension: the CL dowel's round tip above the riser top
-# (``spec.CL_TIP_LINE``), imported from the builder's hidden CL_TIP_FEATURE
-# and parenthesised as a reference; step 11 sets the tip against the actual
-# riser. Its short line is under 1 mm on the sheet at 1:4, too short to hold its text.
-# Offset the imported text independently of its dimension/witness lines:
-# 80 model mm left and 28 above the tip gives it a clear lane above the
-# left pivot, below the plan, rather than across the shoulder-screw geometry.
-CL_TIP_TEXT_MODEL_MM = (
-    spec.CL_TIP_LINE[1][0] - 80.0,
-    0.0,
-    spec.CL_TIP_LINE[1][1] + 28.0,
-)
-# The dimension line stays near the dowel; only its value is carried into
-# the clear text lane. Curation places the whole dimension before offsetting.
-CL_TIP_LINE_MODEL_MM = (
-    spec.CL_TIP_LINE[1][0] - 12.0,
-    0.0,
-    sum(point[1] for point in spec.CL_TIP_LINE) / 2.0,
 )
 
 # Sheet 2: the full-height BOM left, its collapsed reference right. The table
@@ -460,7 +583,10 @@ if sorted(_CLUSTERED) != sorted(BOM_COMPONENTS):
     raise AssertionError("the clusters must partition the BOM's families")
 # Literal stems, so the config-dependency analysis reads exactly these rows.
 PART_ROWS = {
-    "ch-rocker-arm-tl-oblique-base-bar": _config.parts(
+    "ch-rocker-arm-tl-oblique-base-bar--Bar1": _config.parts(
+        "ch-rocker-arm-tl-oblique-base-bar"
+    ),
+    "ch-rocker-arm-tl-oblique-base-bar--Bar2": _config.parts(
         "ch-rocker-arm-tl-oblique-base-bar"
     ),
     "ch-rocker-arm-tl-oblique-carrier": _config.parts(
@@ -479,8 +605,8 @@ PART_ROWS = {
         "ch-rocker-arm-tl-vn-oblique-pivot-shim"
     ),
     "ch-rocker-arm-tl-oblique-riser": _config.parts("ch-rocker-arm-tl-oblique-riser"),
-    "ch-rocker-arm-tl-vn-oblique-hub-pin": _config.parts(
-        "ch-rocker-arm-tl-vn-oblique-hub-pin"
+    "ch-rocker-arm-tl-oblique-hub-washer": _config.parts(
+        "ch-rocker-arm-tl-oblique-hub-washer"
     ),
     "ch-rocker-arm-tl-oblique-feed-lever": _config.parts(
         "ch-rocker-arm-tl-oblique-feed-lever"
@@ -497,9 +623,7 @@ PART_ROWS = {
     "ch-rocker-arm-tl-vn-oblique-rail-kit--Carriage": _config.parts(
         "ch-rocker-arm-tl-vn-oblique-rail-kit"
     ),
-    "ch-rocker-arm-tl-vn-oblique-cl-dowel": _config.parts(
-        "ch-rocker-arm-tl-vn-oblique-cl-dowel"
-    ),
+    "sm-vn-knife-mount-dowel": _config.parts("sm-vn-knife-mount-dowel"),
     "ch-rocker-arm-tl-vn-oblique-leadscrew-kit--LeadScrew": _config.parts(
         "ch-rocker-arm-tl-vn-oblique-leadscrew-kit"
     ),
@@ -524,20 +648,14 @@ PART_ROWS = {
     "ch-rocker-arm-tl-vn-oblique-rail-screw": _config.parts(
         "ch-rocker-arm-tl-vn-oblique-rail-screw"
     ),
-    "ch-rocker-arm-tl-vn-oblique-bracket-screw": _config.parts(
-        "ch-rocker-arm-tl-vn-oblique-bracket-screw"
-    ),
     "ch-rocker-arm-tl-vn-oblique-carriage-screw": _config.parts(
         "ch-rocker-arm-tl-vn-oblique-carriage-screw"
     ),
-    "ch-rocker-arm-tl-vn-oblique-kp08-screw": _config.parts(
-        "ch-rocker-arm-tl-vn-oblique-kp08-screw"
+    "ch-rocker-arm-tl-vn-oblique-bracket-screw": _config.parts(
+        "ch-rocker-arm-tl-vn-oblique-bracket-screw"
     ),
     "ch-rocker-arm-tl-vn-oblique-riser-screw": _config.parts(
         "ch-rocker-arm-tl-vn-oblique-riser-screw"
-    ),
-    "ch-rocker-arm-tl-vn-oblique-clamp-screw": _config.parts(
-        "ch-rocker-arm-tl-vn-oblique-clamp-screw"
     ),
     "ch-rocker-arm-tl-vn-oblique-lever-screw": _config.parts(
         "ch-rocker-arm-tl-vn-oblique-lever-screw"
@@ -558,7 +676,7 @@ BOM_ITEM_NUMBERS = dict(spec.ITEM_NUMBERS)
 
 # One real-edge balloon per logical BOM family.
 BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS}
-for _family in spec.KIT_IDENTITIES:
+for _family in spec.MEMBER_IDENTITIES:
     BALLOON_ANCHORS[_family] = BalloonAnchor(instance=spec.instance_name(_family, 0))
 # The base bar's walk landed on rail 2's carriage end seal (review r5): its
 # balloon lands on bar 1's long top edge on the operator's side (part +Y,
@@ -566,8 +684,15 @@ for _family in spec.KIT_IDENTITIES:
 # spindle end: what stands on the bar sits behind and above it on the sheet,
 # what hangs under it below. The bottom edge 300 out (bought-r15) selected no
 # edge on the sheet once C4 widened the bar to 1/2 x 6 (bought-r16).
-BALLOON_ANCHORS[spec.BASE_BAR] = BalloonAnchor(
-    point_mm=(200.0, base_bar.HIGH_SIDE_Y, base_bar.BAR_THICK)
+BALLOON_ANCHORS[spec.BASE_BAR_1] = BalloonAnchor(
+    point_mm=(200.0, base_bar.HIGH_SIDE_Y, base_bar.BAR_THICK),
+    instance=spec.instance_name(spec.BASE_BAR_1, 0),
+)
+# Bar 2 (Bar2) is turned over: the same operator-side top edge is its part
+# +Y edge at z 0, 200 from the spindle end.
+BALLOON_ANCHORS[spec.BASE_BAR_2] = BalloonAnchor(
+    point_mm=(200.0, base_bar.HIGH_SIDE_Y, 0.0),
+    instance=spec.instance_name(spec.BASE_BAR_2, 0),
 )
 # Keep the rail and T-nut arrows away from the two bars' overlapping inner
 # ends. Both remain native edge-attached balloons: the frozen picks must hit
@@ -644,13 +769,13 @@ BALLOON_ANCHORS[spec.PILLOW_BLOCK] = BalloonAnchor(
 # exploded poses and part envelopes, ray-cast frontmost) found seven more
 # crossing or landing against another part. Each is frozen the same way:
 # - 25 (KP08 screw) ran over the near KP08's boss to the screw end in its
-#   foot: it lands on that KP08's lifted outboard screw (kp08-screw-2, alone
-#   in white space), its head's flat-top rim on the sheet-right side; out to
-#   the upper right, between 17's and 4's;
-# - 11 (end bracket) crossed a bracket screw to the bracket's foot corner:
+#   foot: it lands on that KP08's lifted outboard screw (the family's second,
+#   alone in white space), its head's top rim on the sheet-right side; out
+#   to the upper right, between 17's and 4's (PR2: now the #8 SHCS);
+# - 11 (end bracket) crossed a bar screw to the bracket's foot corner:
 #   it lands on the near bracket's outboard (+X) end, on its edge with the
 #   spindle-side (-Y) face, mid-height, under the KP08's foot; out to the
-#   lower right, over the bracket screws;
+#   lower right, over the bar screws;
 # - 3 (pivot block, sheet 3) landed on the block's bottom corner over bar 2:
 #   it lands on the block's outboard (+X, +Y) vertical edge, mid-height, the
 #   corner nearest the ring, with white paper behind it; out to the lower
@@ -667,7 +792,7 @@ BALLOON_ANCHORS[spec.PILLOW_BLOCK] = BalloonAnchor(
 #   right;
 # - 8 (riser, sheet 6) landed on the riser's end corner on the carrier: it
 #   lands on the riser's back top long edge, 60 from its end, between its
-#   screws; straight up, right of the CL dowel's leader;
+#   screws; straight up;
 # - 10 (feed lever, sheet 6) crossed the riser to the lever's inner end: it
 #   lands on the lever's top front long edge near the grip end, where the
 #   lever stands past the carrier; out to the left.
@@ -677,9 +802,9 @@ BALLOON_ANCHORS[spec.PILLOW_BLOCK] = BalloonAnchor(
 # out crosses it.
 BALLOON_ANCHORS[spec.PILLOW_BLOCK_SCREW] = BalloonAnchor(
     point_mm=(
-        spec.kp08_screw.DIMS.flat_top_dia / 2.0 * math.cos(math.radians(45.0)),
-        spec.kp08_screw.DIMS.head_h,
-        spec.kp08_screw.DIMS.flat_top_dia / 2.0 * math.sin(math.radians(45.0)),
+        spec.bracket_screw.DIMS.head_dia / 2.0 * math.cos(math.radians(45.0)),
+        spec.bracket_screw.DIMS.head_h,
+        spec.bracket_screw.DIMS.head_dia / 2.0 * math.sin(math.radians(45.0)),
     ),
     instance=spec.instance_name(spec.PILLOW_BLOCK_SCREW, 1),
 )
@@ -707,6 +832,20 @@ BALLOON_ANCHORS[spec.HOLD_DOWN_STUD] = BalloonAnchor(
     ),
     instance=spec.instance_name(spec.HOLD_DOWN_STUD, 2),
 )
+# Farm 26bb68f31f5e (2026-11-07, sheet 3): the centred pivot block put its
+# carriage screws on the hold-down stud's route. The walked carriage-screw
+# balloon landed on the block's first screw, its (-X, -Y) bolt, at sheet
+# (187.4, 164.0) mm. That is 1.1 mm off the stud's 40 degree approach and
+# under the ring's 2.4 mm leader run-on (_UNCROSS_END_CLEARANCE_M), so the
+# uncrossing had to move the stud's balloon off its approach and the ring
+# refused. The carriage-screw balloon now lands on the block's last screw,
+# its (+X, +Y) bolt nearest the block's ballooned corner, on its head's top
+# rim at part +X. That is 7.2 mm off the stud's route. Its leader leaves to
+# the right, between the pivot block's (-20) and the stud's (40).
+BALLOON_ANCHORS[spec.CARRIAGE_SCREW] = BalloonAnchor(
+    point_mm=(spec.carriage_screw.DIMS.head_dia / 2.0, spec.carriage_screw.DIMS.head_h, 0.0),
+    instance=spec.instance_name(spec.CARRIAGE_SCREW, len(spec.CARRIAGE_SCREW_PLACEMENTS) - 1),
+)
 SHIM_RIM_DEG = 150.0
 BALLOON_ANCHORS[spec.PIVOT_SHIM] = BalloonAnchor(
     point_mm=(
@@ -719,6 +858,8 @@ BALLOON_ANCHORS[spec.PIVOT_SHIM] = BalloonAnchor(
 BALLOON_ANCHORS[spec.RISER] = BalloonAnchor(
     point_mm=(60.0, spec.riser.BLANK_WIDTH, spec.riser.THICKNESS)
 )
+# The workholding washer walks its visible body. A frozen landing needs a
+# declared approach and a settled leader-clearance proof.
 BALLOON_ANCHORS[spec.FEED_LEVER] = BalloonAnchor(
     point_mm=(280.0, spec.feed_lever.LEVER_THICK, -spec.feed_lever.LEVER_WIDTH)
 )
@@ -732,6 +873,7 @@ BALLOON_APPROACH_DEG = {
     # Sheet 3.
     spec.PIVOT_BLOCK: -20.0,
     spec.HOLD_DOWN_STUD: 40.0,
+    spec.CARRIAGE_SCREW: 10.0,
     # Sheet 4.
     spec.PIVOT_SHIM: 35.0,
     # Sheet 5.
@@ -906,9 +1048,15 @@ ASSEMBLY_STEPS_CONTINUED = STEPS_LAYOUT.continued
 ASSEMBLY_CHECKS = STEPS_LAYOUT.checks
 CHECKS_XY = STEPS_LAYOUT.checks_xy
 OPERATION_LAYOUT = steps_sheet_layout(
-    (*spec.OPERATION_STEPS, "HOLD-DOWN FIT:", *spec.HOLD_DOWN_STEPS),
-    spec.CAPTURE_CHECKS,
+    (*spec.OPERATION_STEPS[:2], "HOLD-DOWN FIT:", *spec.HOLD_DOWN_STEPS),
+    (*spec.CAPTURE_CHECKS[:3], *spec.CAPTURE_CHECKS[4:]),
     heading="OPERATION AND INSTALLED ACCEPTANCE",
+)
+HOLDING_LAYOUT = steps_sheet_layout(
+    spec.OPERATION_STEPS[2:],
+    spec.CAPTURE_CHECKS[3:4],
+    heading="STRAP PREPARATION AND THREE-POINT HOLDING",
+    reference_height=NOTES_REFERENCE_MIN_HEIGHT,
 )
 # Only this sheet has a finished view. Its room follows the filled right
 # column, keeping the actual native outline clear of its checks and title.
@@ -935,6 +1083,7 @@ NOTES_REFERENCE_REGIONS = {
     for sheet, layout in (
         (STEPS_SHEET, STEPS_LAYOUT),
         (FIT_SHEET, FIT_LAYOUT),
+        (HOLDING_SHEET, HOLDING_LAYOUT),
     )
 }
 SHEET_LAYOUTS = {name: DrawingLayout.LANDSCAPE for name in SHEET_NAMES}
@@ -960,6 +1109,19 @@ def exploded_caption(cluster: Cluster, scale: tuple[float, float]) -> str:
     )
     lines = [f"{cluster.title} {reference}"]
     return _wrapped(lines, width=EXPLODED_CAPTION_WIDTH)
+
+
+def linear_motion_caption(scale: tuple[float, float]) -> str:
+    """The linear-motion sheet's title at its fitted scale, what the view
+    leaves out (the carrier by BOM item, rule 25) and the exploded sheets'
+    cross-reference."""
+    line = (
+        f"{LINEAR_MOTION_SHEET} {_scale_text(scale)} - CARRIER "
+        f"(ITEM {BOM_ITEM_NUMBERS[spec.CARRIER]}) AND EVERY PART MOUNTED ON IT "
+        f"NOT SHOWN; BOM ON SHEET {BOM_SHEET_NUMBER}, ASSEMBLY SEQUENCE ON SHEET "
+        f"{STEPS_SHEET_NUMBER}"
+    )
+    return _wrapped((line,), width=EXPLODED_CAPTION_WIDTH)
 
 
 def _activate_sheet(adapter: Any, name: str) -> Any:
@@ -1084,7 +1246,7 @@ def _validate_source(source_model: Any) -> None:
             )
     if counts != BOM_QUANTITIES:
         raise RuntimeError(f"jig families {counts!r} != contract {BOM_QUANTITIES!r}")
-    component_reference_names(source_model, spec.KIT_COMPONENT_REFERENCES)
+    component_reference_names(source_model, spec.MEMBER_COMPONENT_REFERENCES)
 
 
 def _bom_cells(table: Any) -> tuple[tuple[str, ...], ...]:
@@ -1581,149 +1743,9 @@ def _add_plan_tags(adapter: Any, plan: Any) -> None:
         )
 
 
-def _native_dimension_anchor(annotation: Any) -> tuple[float, float, float] | None:
-    """``IAnnotation::GetPosition`` of an imported display dimension as
-    (sheet x, sheet y, native z), or None when unreadable.
-
-    Only x and y are the documented sheet placement (``types/IAnnotation/
-    GetPosition.md``: relative to the sheet's lower-left corner; a display
-    dimension's x, y is its text box's bottom-border centre). An imported model
-    dimension keeps a native z the move does not set: on farm source 9e0cccd61
-    curation's two ``SetPosition(x, y, 0.0)`` passes (it deleted two unrequested
-    imports) and ``SetPosition2(x, y, 0.0)`` read back (0.23628, 0.1381095625,
-    -0.03273): the line midpoint's sheet y as the offline elevation mapping
-    computes it, with z 32.7 mm off the sheet plane. The
-    recipes compare ``position[:2]`` (``_reposition_rerun_reason``,
-    ``_section_axis``) and carry the native z through a move
-    (``_drawing_annotation_extent``).
-    """
-    position = tuple(float(value) for value in (annotation.GetPosition() or ()))
-    if len(position) != 3 or not all(math.isfinite(value) for value in position):
-        return None
-    return position
-
-
-def _cl_tip_setting(adapter: Any, elevation: Any) -> Callable[[], None]:
-    """Import the builder's CL tip-above-riser dimension into the elevation at
-    ``CL_TIP_TEXT_MODEL_MM``, parenthesise it as a reference and prove its
-    nominal, places and that it carries no band; returns the same proof for
-    the settled drawing. Every native anchor, arrow tip and requested point is
-    compared on the sheet plane (x, y); see ``_native_dimension_anchor``."""
-    label = "jig elevation CL tip above riser"
-    name = spec.CL_TIP_DIMENSION
-    line_xy = model_point_in_view(
-        adapter, elevation,
-        tuple(value / 1000.0 for value in CL_TIP_LINE_MODEL_MM),
-        label=f"{label} line",
-    )
-    text_xy = model_point_in_view(
-        adapter, elevation,
-        tuple(value / 1000.0 for value in CL_TIP_TEXT_MODEL_MM),
-        label=f"{label} text",
-    )
-    source_ends = model_points_in_view(
-        adapter, elevation,
-        [(x / 1000.0, 0.0, z / 1000.0) for x, z in spec.CL_TIP_LINE],
-        label=f"{label} native witness ends",
-    )
-    arrow_tips = tuple((line_xy[0], y) for _x, y in source_ends)
-    _show_base_view_sketches(adapter, elevation, (spec.CL_TIP_FEATURE,), label=label)
-    annotations = curate_view_dimensions(
-        adapter,
-        elevation,
-        keep={name: line_xy},
-        view_label=label,
-        dimensions_by_feature=spec.DRAWING_DIMENSIONS,
-    )
-    if len(annotations) != 1:
-        raise RuntimeError(f"{label} must import exactly one dimension")
-    assert_imported_precision(adapter, annotations, {name: spec.CL_TIP_PRECISION})
-    display = _early_bound(
-        set_reference_dimension(adapter, annotations[0], label=label),
-        "IDisplayDimension",
-    )
-    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
-    # Reset an inherited offset before positioning the dimension line. With
-    # OffsetText on, SetPosition2 moves only the text and cannot repair a line
-    # curation previously left in the text lane. The move keeps the native z.
-    display.OffsetText = False
-    anchor = _native_dimension_anchor(annotation)
-    if (
-        anchor is None
-        or bool(display.OffsetText)
-        or not annotation.SetPosition2(*line_xy, anchor[2])
-    ):
-        raise RuntimeError(f"failed to position {label} dimension line at {anchor!r}")
-    position = _native_dimension_anchor(annotation)
-    if position is None or math.dist(position[:2], line_xy) > 0.00005:
-        raise RuntimeError(
-            f"{label}: native dimension-line anchor at {position!r}, "
-            f"expected sheet {line_xy!r}"
-        )
-
-    def prove_dimension_line() -> None:
-        data = _early_bound(display.GetDisplayData(), "IDisplayData")
-        if data is None:
-            raise RuntimeError(f"{label}: missing native dimension-line display")
-        native_tips = []
-        for index in range(int(data.GetArrowHeadCount())):
-            raw = tuple(float(v) for v in (data.GetArrowHeadAtIndex2(index) or ()))
-            if len(raw) != 12 or not all(math.isfinite(value) for value in raw):
-                raise RuntimeError(f"{label}: unreadable native dimension-line arrow")
-            native_tips.append(raw[:2])
-        # Use the same 0.05 mm paper tolerance as native annotation positions.
-        for expected in arrow_tips:
-            match = next((
-                index for index, actual in enumerate(native_tips)
-                if math.dist(actual, expected) <= 0.00005
-            ), None)
-            if match is None:
-                raise RuntimeError(
-                    f"{label}: native dimension line lost arrow at {expected!r}; "
-                    f"native arrow tips {native_tips!r}"
-                )
-            native_tips.pop(match)
-
-    rebuild_drawing(adapter, label=f"{label} dimension-line anchor")
-    prove_dimension_line()
-    offset_dimension_text(adapter, annotations, {name: text_xy})
-
-    def proven(when: str) -> None:
-        dimension = _early_bound(display.GetDimension2(0), "IDimension")
-        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-        value_mm = abs(float(dimension.SystemValue)) * 1000.0
-        brackets = (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
-        places = int(display.GetPrimaryPrecision2())
-        if (
-            abs(value_mm - spec.cl_dowel.TIP_HEIGHT) > 1e-6
-            or brackets != ("(", ")")
-            or int(tolerance.Type) != 0  # swTolNONE: a reference carries no band
-            or places != spec.CL_TIP_PRECISION
-        ):
-            raise RuntimeError(
-                f"{when} {label}: {value_mm!r} mm, brackets {brackets!r}, "
-                f"tolerance type {int(tolerance.Type)}, {places} places"
-            )
-        position = _native_dimension_anchor(annotation)
-        if (
-            not bool(display.OffsetText)
-            or position is None
-            or math.dist(position[:2], text_xy) > 0.00005
-        ):
-            raise RuntimeError(
-                f"{when} {label}: native offset text at {position!r}, "
-                f"expected sheet {text_xy!r}"
-            )
-        prove_dimension_line()
-
-    proven("placed")
-    return lambda: proven("settled")
-
-
-def _place_assembled_sheet(adapter: Any) -> Callable[[], None]:
+def _place_assembled_sheet(adapter: Any) -> None:
     """Plan over the operator's elevation at the modelled pose, each titled,
-    the plan's tags, the pose caption, the rail-alignment targets, and the
-    elevation's CL tip reference; returns that reference's settled proof."""
+    the plan's tags, the pose caption and the rail-alignment targets."""
     _activate_sheet(adapter, SHEET_NAMES[0])
     plan = _place_named_view(
         adapter, spec.PLAN_VIEW, PLAN_CENTER, ASSEMBLED_SCALE, label="jig plan"
@@ -1755,7 +1777,6 @@ def _place_assembled_sheet(adapter: Any) -> Callable[[], None]:
         ALIGNMENT_XY,
         label="rail-alignment targets",
     )
-    return _cl_tip_setting(adapter, elevation)
 
 
 @contextmanager
@@ -1981,13 +2002,18 @@ def approached_ring_slots(
 
 
 def _ring_balloons(
-    adapter: Any, view: Any, landings: Sequence[BalloonLanding], *, label: str
+    adapter: Any,
+    view: Any,
+    landings: Sequence[BalloonLanding],
+    *,
+    approach_deg: Mapping[str, float],
+    label: str,
 ) -> None:
     """Ring every one of ``view``'s balloons together, ``BALLOON_MARGIN``
-    outside its outline, set each declared one (``BALLOON_APPROACH_DEG``)
-    where its approach meets that ring, then move them between their own ring
-    slots until no two leaders cross (:func:`approached_ring_slots`);
-    attachments stay."""
+    outside its outline, set each declared one (``approach_deg``, the
+    exploded sheets' ``BALLOON_APPROACH_DEG``) where its approach meets that
+    ring, then move them between their own ring slots until no two leaders
+    cross (:func:`approached_ring_slots`); attachments stay."""
     # _spread_balloons rings on the outline it reads first: read it the same.
     outline = _view_outline(view, label=label)
     _spread_balloons(
@@ -2012,9 +2038,9 @@ def _ring_balloons(
         attachments.append((points[-3], points[-2]))
         radii.append(radius)
     approaches = {
-        index: BALLOON_APPROACH_DEG[landing.stem]
+        index: approach_deg[landing.stem]
         for index, landing in enumerate(landings)
-        if landing.stem in BALLOON_APPROACH_DEG
+        if landing.stem in approach_deg
     }
     names = [landing.instance for landing in landings]
     try:
@@ -2566,9 +2592,24 @@ def _place_finished_view(adapter: Any) -> None:
 def _fit_cluster_view(
     adapter: Any, view: Any, cluster: Cluster, configuration: str, *, label: str
 ) -> tuple[float, float]:
+    """Fit an exploded cluster view's ring (:func:`_fit_ring_view`)."""
+    return _fit_ring_view(
+        adapter, view, cluster.scale, configuration, exploded=True, label=label
+    )
+
+
+def _fit_ring_view(
+    adapter: Any,
+    view: Any,
+    placed: tuple[float, float],
+    configuration: str,
+    *,
+    exploded: bool,
+    label: str,
+) -> tuple[float, float]:
     """Re-scale the isolated view to the largest ladder scale whose measured
-    ring fits, then move its ring into the room; returns the scale."""
-    placed = cluster.scale
+    ring fits, then move its ring into the room; returns the scale. The view
+    must still reference ``configuration`` and read ``exploded`` after it."""
     scale = cluster_ring_scale(_view_outline(view, label=label), placed, label=label)
     while True:
         if scale != placed:
@@ -2586,8 +2627,9 @@ def _fit_cluster_view(
             )
         scale = CLUSTER_SCALE_LADDER[rung]
     bound = _early_bound(view, "IView")
-    if str(bound.ReferencedConfiguration) != configuration or not bool(
-        bound.IsExploded()
+    if (
+        str(bound.ReferencedConfiguration) != configuration
+        or bool(bound.IsExploded()) != exploded
     ):
         raise RuntimeError(f"{label}: re-scaling changed the view's configuration")
     center = _region_center(outline)
@@ -2865,7 +2907,13 @@ def _balloon_cluster(
             label=f"{label} BOM coverage",
             margin=BALLOON_MARGIN,
         )
-    _ring_balloons(adapter, view, landings, label=f"{label} balloons")
+    _ring_balloons(
+        adapter,
+        view,
+        landings,
+        approach_deg=BALLOON_APPROACH_DEG,
+        label=f"{label} balloons",
+    )
     landings = _relax_cluster_slide(adapter, view, landings, label=f"{label} ring")
     if sorted(landing.stem for landing in landings) != sorted(cluster.stems):
         raise RuntimeError(
@@ -2879,6 +2927,123 @@ def _balloon_cluster(
             _assert_declared_leaders_clear(
                 adapter, view, declared, label=f"{label} leaders"
             )
+    return landings
+
+
+def linear_motion_visibility_failures(leaves: Sequence[Any]) -> list[str]:
+    """How the linear-motion view's drawing components miss its contract.
+
+    Each leaf (``_drawing_balloons._ComponentLeaf``: ``path``/``name``,
+    ``identities``, ``visible`` as the view draws it) must be exactly one
+    ``LINEAR_MOTION_SHOWN`` or ``LINEAR_MOTION_HIDDEN`` occurrence, drawn
+    exactly when it is shown; every occurrence of both lists must be in the
+    view once. An unknown, ambiguous or missing component names itself."""
+    shown = frozenset(LINEAR_MOTION_SHOWN)
+    hidden = frozenset(LINEAR_MOTION_HIDDEN)
+    failures: list[str] = []
+    seen: dict[str, int] = {}
+    for leaf in leaves:
+        what = leaf.path or leaf.name
+        drawn = _stems_matching(leaf.identities, shown)
+        left_out = _stems_matching(leaf.identities, hidden)
+        matched = drawn | left_out
+        if len(matched) != 1:
+            failures.append(f"{what} matches {sorted(matched)!r}, not one occurrence")
+            continue
+        occurrence = next(iter(matched))
+        seen[occurrence] = seen.get(occurrence, 0) + 1
+        if drawn and not leaf.visible:
+            failures.append(f"{occurrence} ({what}) is hidden but must be drawn")
+        if left_out and leaf.visible:
+            failures.append(f"{occurrence} ({what}) is drawn but must be hidden")
+    for occurrence in (*LINEAR_MOTION_SHOWN, *LINEAR_MOTION_HIDDEN):
+        count = seen.get(occurrence, 0)
+        if count != 1:
+            failures.append(f"{occurrence} occurs {count} times in the view, not once")
+    return failures
+
+
+@_telemetry.traced("drawing.jig_linear_motion_visibility", label_param="label")
+def _assert_linear_motion_visibility(adapter: Any, view: Any, *, label: str) -> None:
+    """Read every drawing component of the linear-motion view back, with its
+    own and its ancestors' Visible flags, and refuse any departure from
+    :func:`linear_motion_visibility_failures`."""
+    leaves = _view_component_leaves(adapter, view, label=label)
+    failures = linear_motion_visibility_failures(leaves)
+    if failures:
+        raise RuntimeError(f"{label}: " + "; ".join(failures))
+    _telemetry.annotate(
+        shown=len(LINEAR_MOTION_SHOWN), hidden=len(LINEAR_MOTION_HIDDEN)
+    )
+    _telemetry.success(
+        f"{label}: {len(LINEAR_MOTION_SHOWN)} occurrences drawn, "
+        f"{len(LINEAR_MOTION_HIDDEN)} hidden in this view only"
+    )
+
+
+@_telemetry.traced("drawing.jig_linear_motion_view", label_param="label")
+def _place_linear_motion_view(
+    adapter: Any, *, label: str
+) -> tuple[Any, tuple[float, float]]:
+    """The arrangement's named plan of the same source, hidden-lines-removed
+    and collapsed in its policy configuration, with only
+    ``LINEAR_MOTION_SHOWN`` drawn in this one view (read back), fitted to its
+    ring room; returns the view and its scale."""
+    _activate_sheet(adapter, LINEAR_MOTION_SHEET)
+    view = _place_named_view(
+        adapter, spec.PLAN_VIEW, CLUSTER_CENTER, LINEAR_MOTION_SCALE, label=label
+    )
+    set_hidden_lines_removed(adapter, view)
+    # Configuration, then collapsed, then the carrier's load hidden here only.
+    configuration = apply_view_configuration(adapter, view, label=label)
+    set_view_exploded_state(
+        adapter, view, False, configuration=configuration, label=label
+    )
+    isolate_drawing_view_components(
+        adapter,
+        view,
+        visible_stems=frozenset(LINEAR_MOTION_SHOWN),
+        label=label,
+    )
+    _assert_linear_motion_visibility(adapter, view, label=f"{label} visibility")
+    return view, _fit_ring_view(
+        adapter, view, LINEAR_MOTION_SCALE, configuration, exploded=False, label=label
+    )
+
+
+@_telemetry.traced("drawing.jig_linear_motion_balloons", label_param="label")
+def _balloon_linear_motion(
+    adapter: Any,
+    view: Any,
+    items: Sequence[tuple[str, str]],
+    bom_name: str,
+    *,
+    label: str,
+) -> list[BalloonLanding]:
+    """The sparse BOM-linked ring on the linear-motion view: one real-edge
+    balloon for each of ``LINEAR_MOTION_BALLOONED``, numbered from the
+    package BOM. The view is collapsed, so no explode configuration is
+    activated, and no approach is declared: every balloon keeps its ring
+    slot, uncrossed."""
+    _activate_sheet(adapter, LINEAR_MOTION_SHEET)
+    _link_view_to_bom(view, bom_name, label=label)
+    wanted = tuple(item for item in items if item[0] in LINEAR_MOTION_BALLOONED)
+    landings = add_component_bom_balloons(
+        adapter,
+        view,
+        items=wanted,
+        anchors=LINEAR_MOTION_ANCHORS,
+        label=f"{label} BOM callouts",
+        margin=BALLOON_MARGIN,
+    )
+    _ring_balloons(adapter, view, landings, approach_deg={}, label=f"{label} balloons")
+    landings = _relax_cluster_slide(adapter, view, landings, label=f"{label} ring")
+    stems = sorted(landing.stem for landing in landings)
+    if stems != sorted(LINEAR_MOTION_BALLOONED):
+        raise RuntimeError(
+            f"{label} carries balloons for {stems!r}, "
+            f"expected one for each of {sorted(LINEAR_MOTION_BALLOONED)!r}"
+        )
     return landings
 
 
@@ -2904,6 +3069,7 @@ def _place_operation_notes(adapter: Any) -> None:
     for sheet, layout, label in (
         (FIT_SHEET, FIT_LAYOUT, "pivot fit and KP08 alignment"),
         (OPERATION_SHEET, OPERATION_LAYOUT, "operation and installed-machine acceptance"),
+        (HOLDING_SHEET, HOLDING_LAYOUT, "strap preparation and holding"),
     ):
         _add_note_block(adapter, sheet, layout.steps, STEPS_XY, label=label)
         if layout.continued:
@@ -3007,18 +3173,20 @@ def _place_package(
     adapter: Any,
 ) -> tuple[dict[str, tuple[float, float]], tuple[Callable[[], None], ...]]:
     """Every sheet; returns the sheets' fitted scales and the checks that
-    prove the BOM, every balloon and the CL tip reference after the last rebuild.
+    prove the BOM, every balloon and the linear-motion view's hidden set after
+    the last rebuild.
 
-    Every view is configured, then exploded or collapsed, before the BOM is
-    inserted; after it only BOM links and balloons
-    (draw_dt_drive_train_assembly's order)."""
+    Every view is configured, then exploded or collapsed (and, on the
+    cluster and linear-motion sheets, isolated) before the BOM is inserted;
+    after it only BOM links and balloons (draw_dt_drive_train_assembly's
+    order)."""
     _create_package_sheets(adapter)
     for sheet_name in SHEET_NAMES:
         sheet = _activate_sheet(adapter, sheet_name)
         scale = SHEET_SCALES[sheet_name]
         if not sheet.SetScale(float(scale[0]), float(scale[1]), False, False):
             raise RuntimeError(f"failed to set jig sheet scale: {sheet_name}")
-    cl_tip_settled = _place_assembled_sheet(adapter)
+    _place_assembled_sheet(adapter)
     reference = _place_reference_view(adapter)
     _place_finished_view(adapter)
     notes_scales = _place_notes_reference_views(adapter)
@@ -3026,6 +3194,8 @@ def _place_package(
         (cluster, *_place_cluster_view(adapter, cluster))
         for cluster in CLUSTERS
     ]
+    linear_label = f"jig {LINEAR_MOTION_SHEET.lower()}"
+    linear_view, linear_scale = _place_linear_motion_view(adapter, label=linear_label)
     _activate_sheet(adapter, BOM_SHEET)
     table = insert_bom_table(
         adapter,
@@ -3062,12 +3232,25 @@ def _place_package(
         )
     if sorted(landing.stem for landing in landings) != sorted(BOM_COMPONENTS):
         raise RuntimeError("jig package requires exactly one balloon per BOM family")
+    # The linear-motion balloons repeat items the exploded sheets already
+    # balloon, so they stay out of that one-per-family partition.
+    linear_landings = _balloon_linear_motion(
+        adapter, linear_view, items, bom_name, label=linear_label
+    )
+    _add_note_block(
+        adapter,
+        LINEAR_MOTION_SHEET,
+        linear_motion_caption(linear_scale),
+        EXPLODED_CAPTION_XY,
+        label=f"{LINEAR_MOTION_SHEET.lower()} caption",
+    )
     _place_steps_notes(adapter)
     _place_operation_notes(adapter)
     scales = package_sheet_scales(
         {cluster.sheet: scale for cluster, _view, scale in placed}
     )
     scales.update(notes_scales)
+    scales[LINEAR_MOTION_SHEET] = linear_scale
 
     def bom_settled() -> None:
         retained = validate_bom_number_property(
@@ -3084,8 +3267,10 @@ def _place_package(
 
     return scales, (
         bom_settled,
-        lambda: assert_balloon_landings(adapter, landings),
-        cl_tip_settled,
+        lambda: assert_balloon_landings(adapter, [*landings, *linear_landings]),
+        lambda: _assert_linear_motion_visibility(
+            adapter, linear_view, label=f"{linear_label} settled visibility"
+        ),
         kit_note_settled,
         bom_note_settled,
     )

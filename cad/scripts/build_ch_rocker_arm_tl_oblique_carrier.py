@@ -18,15 +18,13 @@ Z, model Z = -carrier Y, so a Top-plane sketch reads carrier (X, Y)):
   plane, coincident with the Front plane: the A1-B1 pin line), which drives
   the feature's distance and carries the finished thickness section A-A prints,
   driven from Plate's depth;
-* ``StationReference``, a hidden Top-plane sketch of points, carries every
-  printed X station as a baseline from A1's axis (rule 10); the spot and tap
-  placements below stay origin-based, driven from it;
-* the CL centre-drill spot is a 90 degree cone, revolved on a plane through
-  its axis parallel to the Front plane (the plane's offset is the spot's Y
-  station) as the pivot plate's seat cone; the HUB is not on this part (it is
-  drilled in situ at assembly, owner ruling 5);
-* the CR, riser and feed-lever taps are UNC Hole Wizard features from the
-  top face, through;
+* ``StationReference`` retains the unchanged hidden model baseline drivers;
+  only EdgeX prints as a dimension. The drawing's native hole table reads
+  the actual hole axes from A1; the tap placements stay origin-based;
+* the CL and CR end-clamp taps (``ClTap``, ``CrTap``), the HUB clamp tap
+  (``HubTap``), the riser and the feed-lever taps are UNC Hole Wizard
+  features from the top face, through; the three clamp taps are the
+  ordinary #8-32 of the common clamp screw;
 * each pin hole carries a hidden reference axis (``PIN_HOLE_AXES``), two
   offset planes' intersection, which the jig assembly mates on.
 
@@ -47,12 +45,8 @@ from _document_units import apply_package_model_units
 from _part_properties import part_drawing_unit
 from _bore_axis import name_bore_axis
 from _check import check
-from _com import _early_bound
+from _com import _bind, _early_bound
 from _dimensions import drive_dimension, name_dimensions
-from _drawing_dimension_insert import (
-    add_angular_reference_dimension,
-    add_diametric_linear_dimension,
-)
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -61,7 +55,6 @@ from _drawing_marks import (
 from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_tolerances import (
     set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
 )
 from _feature_tree import _feature_by_name, name_last_feature
 from _fit_deviations import deviations
@@ -86,15 +79,17 @@ from _sketch_chains import define_rectilinear_chain
 from _sketch_circle import define_circle
 from _visibility import blank_reference_geometry
 from ch_rocker_arm_tl_oblique_carrier_spec import (
-    CR,
-    CR_SPEC,
-    CR_TAP_DRILL,
+    CLAMP_SPEC,
+    CLAMP_TAP_DRILL,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
     LEVER_HOLES,
     LEVER_SPEC,
     LEVER_TAP_DRILL,
+    END_CLAMPS,
+    HUB,
+    HUB_SPEC,
     OUTLINE_X,
     OUTLINE_Y,
     PIN_HOLE_AXES,
@@ -103,17 +98,12 @@ from ch_rocker_arm_tl_oblique_carrier_spec import (
     PIN_HOLES,
     PLATE_LENGTH,
     PLATE_WIDTH,
-    POSITION_BAND,
-    POSITION_BANDED,
+    OUTER_Y_DEVIATIONS,
+    OUTER_Y_NOTE,
     RISER_SCREWS,
     RISER_SPEC,
     REFERENCE_SKETCHES,
     RISER_TAP_DRILL,
-    SPOT_DIA,
-    SPOT_FLANK_ANGLE,
-    SPOT_REFERENCE,
-    SPOTS,
-    LEVER_STATION_BAND,
     STATION_REFERENCE,
     STATIONS,
     THICKNESS,
@@ -135,20 +125,15 @@ _SAVED_DRAWING_PROPERTIES = (
     "Finish",
     "Quantity",
     "Isometric View Note",
+    "Outer Pin Row Note",
 )
 
-AXIS_OVERRUN = 2.0  # the revolve axis centerline's free end above the top face
 THROUGH_CUT_DEPTH = 2.0 * (THICKNESS + 1.0)
 _UP = (0.0, 1.0, 0.0)  # the top face's outward normal (model +Y)
 
 _R_PIN = PIN_HOLE_DIA / 2.0
-_R_SPOT = SPOT_DIA / 2.0
 V_PLATE = PLATE_LENGTH * PLATE_WIDTH * THICKNESS
 V_PINS = len(PIN_HOLES) * math.pi * _R_PIN**2 * THICKNESS
-# A 90 degree cone: its depth equals its mouth radius.
-V_SPOT = (
-    math.pi * _R_SPOT**2 * (_R_SPOT * math.tan(math.radians(SPOT_FLANK_ANGLE))) / 3.0
-)
 # Each 45 degree chamfer removes a triangle of legs c revolved about the hole
 # axis at its centroid radius r + c/3 (pn_pen_v_block's chamfer volume).
 V_PIN_CHAMFER = len(PIN_HOLES) * math.pi * PIN_CHAMFER**2 * (_R_PIN + PIN_CHAMFER / 3.0)
@@ -218,153 +203,6 @@ def _sketch_mapper(
     return to_sketch
 
 
-async def _spot(
-    adapter, prefix: str, point: tuple[float, float]
-) -> list[tuple[str, str]]:
-    """One Ø3 x 90 degree centre-drill spot: a plane through its axis parallel
-    to the Front plane (offset = the Y station), and a revolved cone on it
-    (the pivot plate's ``_cone_cut``: face -> mouth -> apex -> face, a
-    centerline axis, the cone depth fixing the flank, a driven face-to-flank
-    reference proving it).
-
-    The printed station and size live in the hidden ``SpotReference`` sketch
-    (a reference plane's offset cannot be imported into a drawing: farm
-    jig-r1); the plane offset, the cone's station and its mouth diameter are
-    driven from it, so none of them is marked."""
-    from solidworks_mcp.adapters.base import CreatePlaneParameters, RevolveParameters
-
-    x, y = point
-    plane = f"{prefix}AxisPlane"
-    check(
-        f"create_plane {plane}",
-        await adapter.create_plane(
-            CreatePlaneParameters(mode="offset", base_plane="Front Plane", offset=-y)
-        ),
-    )
-    name_last_feature(adapter, plane)
-    plane_offset = name_dimensions(adapter, plane, [f"{prefix}PlaneOffset"])[0]
-    jobs = [(plane_offset, f'"{prefix}Y@{SPOT_REFERENCE}"')]
-    blank_reference_geometry(adapter, ((plane, "PLANE"),))
-
-    label = f"{prefix} spot"
-    dims = SketchDims()
-    check(f"create_sketch {label}", await adapter.create_sketch(plane))
-    to_sketch = _sketch_mapper(adapter, u_axis=0, v_axis=1, label=label)
-    drop = _R_SPOT * math.tan(math.radians(SPOT_FLANK_ANGLE))
-    profile = [
-        to_sketch((x, 0.0, -y)),
-        to_sketch((x + _R_SPOT, 0.0, -y)),
-        to_sketch((x, -drop, -y)),
-    ]
-    set_sketch_direct_db(adapter, True)
-    axis = check(
-        f"{label} axis",
-        await adapter.add_centerline(*profile[0], *to_sketch((x, AXIS_OVERRUN, -y))),
-    )
-    lines = await add_line_chain(adapter, profile)
-    set_sketch_direct_db(adapter, False)
-    face, flank, axis_side = lines
-    for i in range(len(lines)):
-        check(
-            f"{label} junction {i}",
-            await adapter.add_sketch_constraint(
-                f"{lines[i]}.end", f"{lines[(i + 1) % len(lines)]}.start", "coincident"
-            ),
-        )
-    for first, second, relation in (
-        (face, None, "horizontal"),
-        (axis_side, None, "vertical"),
-        (axis, None, "vertical"),
-        (f"{axis}.start", f"{face}.start", "coincident"),
-    ):
-        check(
-            f"{label} {relation} {first}",
-            await adapter.add_sketch_constraint(first, second, relation),
-        )
-    # The axis foot sits on the top face (sketch v = 0): a zero station gets
-    # its relation, not a dimension (anchor_point_to_origin).
-    await anchor_point_to_origin(
-        adapter, f"{face}.start", profile[0][0], profile[0][1], f"{label} station"
-    )
-    if profile[0][0] != 0.0:
-        dims.record(f"{prefix}SpotX", f'"{prefix}XOrigin@{SPOT_REFERENCE}"')
-    await add_diametric_linear_dimension(
-        adapter,
-        axis,
-        f"{flank}.start",
-        to_sketch((x + _R_SPOT, 3.0, -y)),
-        f"{label} mouth diameter",
-    )
-    dims.record(f"{prefix}SpotMouthDia", f'"SpotDia@{SPOT_REFERENCE}"')
-    await dimension_between(
-        adapter,
-        f"{flank}.start",
-        f"{flank}.end",
-        "vertical_distance",
-        drop,
-        f"{label} cone depth",
-    )
-    dims.record(
-        f"{prefix}SpotDepth",
-        f'"SpotDia@{SPOT_REFERENCE}" / 2 / tan({90.0 - SPOT_FLANK_ANGLE:g})',
-    )
-    bisector = math.radians(180.0 + SPOT_FLANK_ANGLE / 2.0)
-    reach = 0.5 * _R_SPOT
-    await add_angular_reference_dimension(
-        adapter,
-        face,
-        flank,
-        to_sketch(
-            (
-                x + _R_SPOT + reach * math.cos(bisector),
-                reach * math.sin(bisector),
-                -y,
-            )
-        ),
-        f"{label} face-to-flank angle",
-        expected_degrees=SPOT_FLANK_ANGLE,
-    )
-    dims.record(f"{prefix}SpotFlankAngle")
-    check(
-        f"{label} axis length",
-        await adapter.add_sketch_dimension(axis, None, "linear", AXIS_OVERRUN),
-    )
-    dims.record(f"{prefix}SpotAxisLength")
-    await ensure_fully_defined(adapter, f"{label} profile")
-    check(f"exit_sketch {label}", await adapter.exit_sketch())
-    name_last_feature(adapter, f"{prefix}SpotProfile")
-    jobs += dims.apply(adapter, f"{prefix}SpotProfile")
-    check(
-        f"revolve-cut {label}",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
-    )
-    name_last_feature(adapter, f"{prefix}Spot")
-    return jobs
-
-
-async def _spot_reference(adapter) -> list[tuple[str, str]]:
-    """The hidden reference sketch that carries the spot's printed height and
-    Ø3 (drawing-simplicity-policy: a value the sheet prints but no importable
-    feature dimension carries). A Top-plane sketch reads carrier (X, Y): CL by
-    X and Y, a Ø3 circle on the spot's mouth, its X driven from its printed
-    station from A1 (``STATION_REFERENCE``)."""
-    ref = SketchDims()
-    check("create_sketch spot reference", await adapter.create_sketch("Top"))
-    await define_circle(
-        adapter,
-        *SPOTS["Cl"],
-        _R_SPOT,
-        "CL spot reference",
-        dims=ref,
-        names=("ClXOrigin", "ClY", "SpotDia"),
-        drives=(_origin_x("ClX"), None, None),
-    )
-    await ensure_fully_defined(adapter, "spot reference sketch")
-    check("exit_sketch spot reference", await adapter.exit_sketch())
-    name_last_feature(adapter, SPOT_REFERENCE)
-    return ref.apply(adapter, SPOT_REFERENCE)
-
-
 def _add_point(adapter, point: tuple[float, float], label: str) -> str:
     """One sketch point straight into the sketch DB (no inference snap),
     registered for the adapter's dimension refs (build_dt_pinion_lever)."""
@@ -381,8 +219,7 @@ def _add_point(adapter, point: tuple[float, float], label: str) -> str:
 
 
 def _origin_x(station: str) -> str:
-    """A feature's origin-based |X| placement as its printed station from A1
-    (``STATIONS``) less A1's own |X| (A1X; A1 is at -A1X)."""
+    """An origin-based |X| placement from its hidden A1 baseline driver."""
     a1x = _pin_dim("A1X")
     printed = f'"{station}@{STATION_REFERENCE}"'
     if STATIONS[station][0] < 0.0:
@@ -391,19 +228,13 @@ def _origin_x(station: str) -> str:
 
 
 async def _station_reference(adapter) -> list[tuple[str, str]]:
-    """The hidden Top-plane sketch of points carrying every printed X station
-    from A1 (rule 10: one datum per view; drawing-simplicity-policy: a Hole
-    Wizard placement sketch cannot carry a datum point). Points, not
-    construction lines: the drawing shows the sketch in the view it
-    dimensions (build_dt_pinion_lever's points-only idiom).
+    """Retain the original A1-based geometry drivers without printing chains.
 
-    The A1 point stands on the pin line, its X driven from A1X. Each station
-    point stands on its feature's centre (the left end's on the -X/-Y corner),
-    so its extension line leaves the feature: X from the A1 point (printed,
-    the owner the feature placements are driven from), Y from it too (not
-    printed; driven where a printed Y has a name, else the spec's). LeverX is
-    the lever taps' printed station, driven equal to A1X: the taps stand on
-    the origin's X, so it cannot disagree with them."""
+    A Hole Wizard placement sketch cannot carry a datum point. This point-only
+    owner supplies its baseline drivers and the one surviving EdgeX dimension.
+    The hole table reads physical edges; none of these hidden points is its
+    datum or a replacement for a hole.
+    """
     stations = SketchDims()
     check("create_sketch station reference", await adapter.create_sketch("Top"))
     a1 = PIN_HOLES["A1"]
@@ -414,10 +245,7 @@ async def _station_reference(adapter) -> list[tuple[str, str]]:
         "EdgeX": '"PlateHalfLength@PlateProfile" - ' + _pin_dim("A1X"),
         "LeverX": _pin_dim("A1X"),
     }
-    y_drives = {
-        "EdgeX": '"PlateNearY@PlateProfile"',
-        "ClX": f'"ClY@{SPOT_REFERENCE}"',
-    }
+    y_drives = {"EdgeX": '"PlateNearY@PlateProfile"'}
     for name, point in STATIONS.items():
         target = _add_point(adapter, point, f"{name} station")
         await anchor_point_to_point(
@@ -650,6 +478,7 @@ def _pin_chamfer_min_limit(adapter) -> None:
     lower, upper = deviations(PIN_CHAMFER_BAND)
     label = f"PinChamferSize@{SECTION_REFERENCE}"
     _, dimension = _named_dimension(adapter, SECTION_REFERENCE, "PinChamferSize")
+    dimension = _early_bound(_bind(dimension, "IDimension"), "IDimension")
     value = float(dimension.SystemValue)
     if not math.isclose(value, PIN_CHAMFER / 1000.0, abs_tol=1e-9):
         raise RuntimeError(
@@ -670,6 +499,26 @@ def _pin_chamfer_min_limit(adapter) -> None:
     ):
         raise RuntimeError(f"{label}: MIN-limit tolerance readback changed")
     _telemetry.success(f"{label}: single limit {PIN_CHAMFER:g} MIN")
+
+
+def _author_outer_pin_rows(adapter) -> None:
+    """Author the flagged limits on the unchanged, unprinted geometric drivers."""
+    for dimension_name in ("A2DY", "B2DY"):
+        # Preserve the irrational nominal: shift native limits to printed .964,
+        # without rounding a displayed deviation or moving the model geometry.
+        _, dimension = _named_dimension(adapter, "PinHoleProfile", dimension_name)
+        dimension = _early_bound(_bind(dimension, "IDimension"), "IDimension")
+        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+        tolerance.Type = 2  # swTolBILAT
+        lower, upper = (value / 1000.0 for value in OUTER_Y_DEVIATIONS)
+        if not tolerance.SetValues(lower, upper):
+            raise RuntimeError(f"{dimension_name}: local row limits rejected")
+        if (
+            int(tolerance.Type) != 2
+            or abs(float(tolerance.GetMinValue()) - lower) > 1e-12
+            or abs(float(tolerance.GetMaxValue()) - upper) > 1e-12
+        ):
+            raise RuntimeError(f"{dimension_name}: local row limits changed")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -747,33 +596,50 @@ async def build(adapter) -> dict[str, str]:
         adapter, "pin chamfers", volume - V_PIN_CHAMFER, 0.05 * V_PIN_CHAMFER + 0.05
     )
 
-    # --- X stations from A1, then the CL centre-drill spot -------------------
+    # --- X stations from A1 ---------------------------------------------------
     # The printed baselines first: the hidden sketch of points that drives
-    # every spot and tap X placement, ahead of them in the tree. Then the
-    # spot's printed height and Ø3: the hidden reference sketch that drives
-    # its plane and cone, ahead of them in the tree.
+    # every tap X placement, ahead of them in the tree.
     drive_jobs += await _station_reference(adapter)
-    drive_jobs += await _spot_reference(adapter)
-    for prefix, point in SPOTS.items():
-        drive_jobs += await _spot(adapter, prefix, point)
-        volume = await volume_check(
-            adapter, f"{prefix} spot", volume - V_SPOT, 0.05 * V_SPOT + 0.05
-        )
 
     # --- Taps from the top face, through ------------------------------------
-    cr = wizard_holes(
+    # The CL and CR end clamps: one ordinary #8-32 feature each, X from its
+    # printed station, Y from the pin line.
+    for key, point in END_CLAMPS.items():
+        prefix = key.title()
+        clamp = wizard_holes(
+            adapter,
+            CLAMP_SPEC,
+            [_top(point)],
+            _UP,
+            f"{key} clamp tap ({CLAMP_SPEC.size})",
+            name=f"{prefix}Tap",
+            expect_dia_mm=CLAMP_TAP_DRILL,
+            placement_dims=[
+                ((f"{prefix}XOrigin", _origin_x(f"{prefix}X")), (f"{prefix}Y", None)),
+            ],
+        )
+        drive_jobs += clamp.placement_drive_jobs
+        v_clamp = math.pi * (clamp.hole_dia_mm / 2.0) ** 2 * THICKNESS
+        volume = await volume_check(
+            adapter, f"{key} tap", volume - v_clamp, 0.03 * v_clamp
+        )
+
+    # The HUB clamp: on the origin's X, so its placement takes the origin-axis
+    # relation; its unmarked HubY places it. The sheet prints no HUB station:
+    # it is made in situ at the assembly's HUB setting (HUB_TAP_CALLOUT).
+    hub = wizard_holes(
         adapter,
-        CR_SPEC,
-        [_top(CR)],
+        HUB_SPEC,
+        [_top(HUB)],
         _UP,
-        f"CR clamp tap ({CR_SPEC.size})",
-        name="CrTap",
-        expect_dia_mm=CR_TAP_DRILL,
-        placement_dims=[(("CrXOrigin", _origin_x("CrX")), ("CrY", None))],
+        f"HUB clamp tap ({HUB_SPEC.size})",
+        name="HubTap",
+        expect_dia_mm=CLAMP_TAP_DRILL,
+        placement_dims=[((None, None), ("HubY", None))],
     )
-    drive_jobs += cr.placement_drive_jobs
-    v_cr = math.pi * (cr.hole_dia_mm / 2.0) ** 2 * THICKNESS
-    volume = await volume_check(adapter, "CR tap", volume - v_cr, 0.03 * v_cr)
+    drive_jobs += hub.placement_drive_jobs
+    v_hub = math.pi * (hub.hole_dia_mm / 2.0) ** 2 * THICKNESS
+    volume = await volume_check(adapter, "HUB tap", volume - v_hub, 0.03 * v_hub)
 
     riser = wizard_holes(
         adapter,
@@ -840,8 +706,8 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    # Rule 4: the reamed pin holes and the pin-position chain; the bands are
-    # millimetres, UNIT prints them in inches.
+    # Rule 4: the reamed pin holes; the band is millimetres, UNIT prints it
+    # in inches. The native table owns every location at the title block.
     set_dimension_bilateral_tolerance(
         adapter,
         "PinHoleProfile",
@@ -849,22 +715,9 @@ async def build(adapter) -> dict[str, str]:
         *deviations(PIN_HOLE_BAND),
         display_unit=UNIT,
     )
-    for dimension_name in POSITION_BANDED:
-        set_dimension_symmetric_tolerance(
-            adapter,
-            "PinHoleProfile",
-            dimension_name,
-            POSITION_BAND,
-            display_unit=UNIT,
-        )
-    # The lever taps' station: its own .XX band on the 3-place axis.
-    set_dimension_symmetric_tolerance(
-        adapter,
-        STATION_REFERENCE,
-        "LeverX",
-        LEVER_STATION_BAND,
-        display_unit=UNIT,
-    )
+    # Owner's flagged .964 ±.002 control: unchanged geometric nominal,
+    # actual native limits shifted to the printed nominal, never a draw edit.
+    _author_outer_pin_rows(adapter)
     _pin_chamfer_min_limit(adapter)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
@@ -876,6 +729,7 @@ async def build(adapter) -> dict[str, str]:
         PART_NAME,
         {
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+            "Outer Pin Row Note": OUTER_Y_NOTE,
         },
     )
     artefacts = await save_part_and_images(adapter, PART_NAME)

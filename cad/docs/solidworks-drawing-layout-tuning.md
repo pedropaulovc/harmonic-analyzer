@@ -433,6 +433,147 @@ The accepted gap therefore started the witness 10.5 paper mm short of its
 clear lane. Compute it from that actual row endpoint; still require the
 rebuilt witness to clear the complete A letter by 2 mm and remain visible.
 
+The simplified TL-22 in frozen run `4031a82adcd2` made the separate
+`DRILL THRU` Ø.257 and REAM Ø.3750 leaders ambiguous at their concentric
+rings. Changing the tap arrows to Inside still left a centre-crossing
+presentation in the subsequent `389` review. The owner's replacement is
+**one stacked callout with one outside leader on the outer reamed circle**,
+not two independently routed diameter leaders.
+
+The native-linked attempt resolved its source values and passed the native
+source/leader checks, but run `4685555f` reported the whole-note extent
+`(24.796,176.396)..(164.907,225.006)` mm. `INote.GetExtent` includes the fixed
+leader, so that rectangle is not a text-only measurement against the
+`(20,182)..(145,230)` mm text lane. The owner's approved option B replaces that
+expanded source-caption block with a **plain, four-line spec-generated
+note**, explicitly sized to the normal **3.5 mm** note height through
+`_size_note`. The later relocation below keeps that height and all geometry guards.
+
+`_pivot_stack_text` formats the bore diameter, seat depth and tap-drill
+diameter from `DRAWING_VALUES` at `DRAWING_PRECISION_BY_NAME` places;
+the signed upper/lower deviations come from `BORE_BAND` at `BORE_PLACES`,
+and the thread identity comes from `PIVOT_TAP`. The rows are REAM size/band/
+depth, the short TL-VN-77 locating-fit qualifier, DRILL size THRU, and the
+thread BELOW SEAT. No geometry number is copied into the recipe. Native
+dimension-link properties, split-STACK parsing and the carrier-table
+semantic-parser dependency are removed.
+
+Keep all three imported sources (`BoreDia@TopBoreProfile`,
+`TopBoreDepth@TopBore`, `TapDrillDia@PivotTapProfile`) and the existing
+imported-precision gate. Before inserting the note, require their native
+values, feature names, precision and fit band to agree with the spec.
+Verify the generated visible text and actual 3.5 mm height before hiding
+only the two plan-diameter **display annotations**; the section's seat-depth
+dimension remains visible. Recheck native identity, values, precision,
+tolerances, text definitions, visibility and original positions after the
+last rebuild. Plain-row text comparison retains every number, sign and
+printed decimal place; only whitespace and diameter/depth symbol encoding
+are normalized.
+
+The offline estimate uses the existing `estimate_text_box`: one full
+cap-height per glyph (conservative versus its calibrated 0.62 average),
+1.6-height row pitch, and 1 mm padding on every side. The current four rows'
+longest line is 33 glyphs, giving padded bounds
+**`(189,103.7)..(306.5,126)` mm**, with minimum lane margin **3.7 mm**.
+The estimate requires at least 3 mm margin, but is never used as measured
+geometry. Run `e4a597af` reported a whole-note extent of
+`(24.7960066889632,205.46646153846154)..(164.9071638795986,225.00577257525084)`
+mm. `INote.GetExtent` includes the fixed leader, so comparing that rectangle
+with the text lane was the wrong measurement. Do not use it, native text
+width probes, or a dependency on the clamping-kit drawing recipe here.
+
+The ordinary post-export audit runs in REPORT mode. For this stem it does
+not enforce `outside-border`, `text-clearance` or `text-on-view`, so merely
+removing the native extent guard would leave a gap. After finalization,
+the pivot-only `_assert_pivot_pdf_text` reads the freshly written layout
+report and the exported sheet through `_pdf_ink.read_pdf_ink`/`page_ink`.
+It requires exactly one visible ordinary note with the four-line spec text,
+then uses existing `printed_dump`, `audited_annotations`, `group_rows` and
+`assign_sheet_text`. This is the audit's sheet-wide assignment, including
+competing dimensions and section/detail labels, not a second matcher with
+guessed row positions. Every ink-bearing display item must match the PDF;
+the full display string must also preserve the four source rows.
+`span_box` gives only the matched glyph bounds, including split runs around
+diameter/depth symbols. Missing or changed rows fail, and every measured
+piece must stay in the measured lower-right `(185,100)..(312,130)` mm text lane.
+
+The local guard also makes the already-computed report findings fatal for
+this note only: `outside-border`, `keep-out`, `text-clearance`, `text-on-view`,
+`text-on-line` and `text-unmatched`. Other notes' findings are not reclassified.
+It reuses the shared audit's geometry and clearance policy rather than
+implementing another collision checker or rerunning the audit.
+Only the leader/arrow may leave the text lane; their independent native
+geometry proofs remain below. Telemetry records the measured PDF row bounds
+separately from the offline estimate. Focused synthetic PDF fixtures cover
+split symbol runs, a valid outside-lane leader, missing/changed rows,
+out-of-lane text, foreign-text collisions and model-edge crossings.
+
+Native `192bc492` / run `02b13cf0` passed the plain-note/source/height/rim
+checks but the existing audit rejected its leader crossing B-B. The segment
+`(104.2,209.6)..(165.2,205)` crossed the actual B cutting line
+`x157, y168.934..259` at `y205.618` mm. This happened **before** the new
+post-finalization PDF guard ran; it was not a PDF-glyph matching failure.
+
+The replacement anchor is **`(190,125)` mm**, below that cutting-line span
+and right of the bore centre **`(170,205)` mm**. The old `165.2` coordinate
+was the left arrow tip, not the centre. The retained native `389` /
+`0e989113` PDF and layout report establish the blank lane:
+the conservative note box clears A-A's actual outline top `y97.780` by
+**5.920 mm**, B-B's outline left `x317.220` by **10.720 mm**, and the
+counterbore caption's lowest glyph `y142.5728` by **16.5728 mm**.
+
+Select the **315-degree outer-rim point**, derived from the unchanged bore
+radius: **`(173.367596,201.632404)` mm**. Do not retain the left pick when
+moving the note right, or use the bottom-axis pick beside the centre-mark
+tail. For a predicted left-side text exit `(190,109.6)`, the off-axis shaft
+clears the lower centre-mark end `(170,200)` by **3.6042 mm** and the
+right-lower mark end `(178.214,192)` by **3.0561 mm**. Its nearest carriage
+counterbore rim clearance is **3.8288 mm**; the complete leader/arrow must
+retain at least **1 mm** clearance from **all four** counterbores.
+
+The offline route regression retains actual B-B, dimension/extension,
+carriage-leader and centre-mark segments. In particular, the lower
+BlockWidth/BlockSideY witness at `y184.934` starts at **x191.828**, not at the
+bore. The predicted shaft crosses the part's bottom outline there at
+**x176.3854**: an allowed feature-outline crossing, not a dimension crossing.
+At `y192`, the shaft is at **x175.1084**, left of the carriage-position
+witness's **x188.786** start. TopBoreDepth ink ends below `y98.4438`;
+the side-height and B-B floor dimensions are well to the right.
+
+The same view-owned, single attached note and single-arrow checks remain;
+every stroke must stay outside the bore disk. The geometry calculation and
+synthetic regression are not native proof of where SolidWorks will choose
+the text exit. The existing section/leader audit and the unchanged PDF
+glyph guard must still accept the regenerated sheet. Creation and settled
+readback retain the generated/resolved text, sources and actual geometry.
+
+TL-32 keeps its original presentation; neither part nor any spec changes.
+The shared helper re-keys only pivot/feed drawings and their reviews.
+Parent validation must inspect the four-line native/PDF text, fit band,
+normal height, actual lane extent and the relocated one-leader route. The
+offline estimate is not a claim of a final native pass.
+
+### TL-21 assembly-HUB reference lanes
+
+Run `4031a82a` confirmed that the sheet-3 `(8.86)` and `(1.79)` reference
+dimensions were inside the plate despite available paper space. Keep their
+native A1/HUB sources, centre endpoints, values and parentheses; place the
+horizontal dimension line 18 paper mm below the plate and the vertical line
+28 paper mm beyond its right edge. Reserve the complete text envelopes and
+arrow/line margins, not only the annotation anchors. These source positions
+still require settled native readback and inspection of the exported sheet.
+
+### TL-28 opposed-thread finalization
+
+Run `4031a82a` read the top wizard's thread as 10.9982 mm after construction
+and equation driving, while its distinct top witness remained 12.4968 mm.
+The bottom-depth value identifies the mismatch, not the undocumented native
+coupling mechanism. Commit the top finite thread once, after bottom cosmetic
+thread insertion and all dimension driving; rebuild, then verify both wizard/
+witness pairs and every bottom cosmetic thread together. A final edit that
+resets the other face must still fail. Never substitute witness values for
+native thread readback or retry setters until the guard passes.
+
 ### TL-30 capture-cap functional sheets
 
 The `d349b99300c6` native cap drawing imported all 32 model dimensions, including

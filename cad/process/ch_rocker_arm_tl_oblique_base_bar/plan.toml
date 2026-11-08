@@ -2,8 +2,10 @@
 # machining instructions. Shared shop values include unmeasured #1413 placeholders, so any
 # traveler from this plan is PROVISIONAL and is not approval to machine.
 #
-# ch_rocker_arm_tl_oblique_base_bar (MHA-CH-06-TL-20 v47): two identical bars, the second
-# turned over in the jig. Process intent from the owner's hand-written 2026-10-30 traveler
+# ch_rocker_arm_tl_oblique_base_bar (MHA-CH-06-TL-20 v47): two bars from one route, the second
+# turned over in the jig. Bar 1 (the Bar1 configuration) carries the four TL-28 end-bracket
+# holes; bar 2 (Bar2, same Number) has none and skips their ops (A 90-120, 260-290, 430-460;
+# B 50-60). Process intent from the owner's hand-written 2026-10-30 traveler
 # (not prechips output) and the v47 drawing (farm run 20261030T220540504Z, machinist SHIP).
 # Stock follows the owner ruling in harmonic-analyzer issue #2083: the owned OnlineMetals
 # 1173 1/2 x 6 bar is milled to width on edge in the vise, not ripped. The #290 inch drawing
@@ -15,7 +17,7 @@ part = "ch-rocker-arm-tl-oblique-base-bar"
 features = "../../out/features/ch_rocker_arm_tl_oblique_base_bar/features.toml"
 construction = "one_piece"
 quantity = 2
-quantity_cite = ["harmonic-analyzer/cad/config/parts/ch-rocker-arm-tl-oblique-base-bar.yaml:quantity", "AUTHOR'S CHOICE: both bars follow this same route; do not mirror the second"]
+quantity_cite = ["harmonic-analyzer/cad/config/parts/ch-rocker-arm-tl-oblique-base-bar.yaml:configuration_quantities", "AUTHOR'S CHOICE: both bars follow this same route, bar 2 without the bracket-hole ops; do not mirror the second"]
 
 [drawing]
 number = "MHA-CH-06-TL-20"
@@ -36,9 +38,9 @@ z = "up"
 # One 443 mm blank per bar from the owned 1/2 x 6 bar (#2083): about 1.5 over the 439.928 length at
 # each end, the zero edge about 1.0 proud of the finished -Y side, about 0.35 on each big
 # face. These placements are the author's route choice, not measurements of a sawn blank.
-# Owner ruling 2026-11-04 (#2177 option B): the bar keeps its 439.928 length; the 450 kit rail
-# goes on uncut, flush at the zero end, and overhangs the far end by 10.07, so the bar takes the
-# rail's eight #8-32 taps at 15 .. 435 (the last 4.93 from the far end).
+# Retain existing 439.928 mm nominal bars. Trim each actual rail flush with
+# its actual bar, retaining safe hole end walls; transfer that rail's holes.
+# Drawing stations are nominal REF, NOT DRO targets or supplier pitch limits.
 [stock]
 form = "flat_bar"
 form_verify = false
@@ -748,7 +750,7 @@ coolant = "cutting oil, brushed on"
 deburr_mm = 0.25
 deburr_cite = "features.toml general_tolerances edge_break R0.25"
 stock_in = "T2b"
-note = "Before loading, write ZERO END on one end and C'BORE SIDE - UP IN VISE on one big face (both faces are the same; pick either). The face on top becomes the bottom of bar 1: the counterbores go in it, so every hole is made in one setup. Check the DRO: X counts up to the right, Y counts down toward you (every Y on this sheet is negative). Don't lean on the overhanging ends."
+note = "Before loading, write ZERO END on one end and C'BORE SIDE - UP IN VISE on one big face (both faces are the same; pick either). The face on top becomes the bottom of bar 1: the counterbores go in it, so every hole is made in one setup. Bar 2 has no bracket holes or counterbores: mark it BAR 2 and skip ops 90-120, 260-290 and 430-460. Check the DRO: X counts up to the right, Y counts down toward you (every Y on this sheet is negative). Don't lean on the overhanging ends."
 
 [setups.stock_state]
 top_feature = "underside_seat"
@@ -769,10 +771,6 @@ bracket_hole_1 = 0.0
 bracket_hole_2 = 0.0
 bracket_hole_3 = 0.0
 bracket_hole_4 = 0.0
-bracket_hole_5 = 0.0
-bracket_hole_6 = 0.0
-bracket_hole_7 = 0.0
-bracket_hole_8 = 0.0
 near_slot = 0.0
 far_slot = 0.0
 
@@ -789,10 +787,6 @@ bracket_hole_1 = 11.938
 bracket_hole_2 = 11.938
 bracket_hole_3 = 11.938
 bracket_hole_4 = 11.938
-bracket_hole_5 = 11.938
-bracket_hole_6 = 11.938
-bracket_hole_7 = 11.938
-bracket_hole_8 = 11.938
 near_slot = 11.938
 far_slot = 11.938
 
@@ -863,7 +857,7 @@ coolant = "cutting oil, brushed on"
 deburr_mm = 0.25
 deburr_cite = "features.toml general_tolerances edge_break R0.25"
 stock_in = "A0"
-note = "Same clamping as A0: do not unclamp. Drill only over open air: every hole is clear of the parallels, but look before every hole anyway. Brush on oil, peck every 3 mm, stop exactly on each DRO number. The eight rail holes are the only tight feature (+/-0.08 along X). Before the first rail hole, read the kit rail's receipt check (MHA-CH-06-TL-VN-83 sheet 2): its eight holes measured from the end that sits flush at X 0 must each be within +/-0.08 of 15, 75, 135, 195, 255, 315, 375, 435; if any is outside +/-0.08, stop and report before drilling. Drill every rail hole at its printed station, never at a measured one."
+note = "Same clamping as A0: do not unclamp the bar. For BRACKET holes use their printed positions; rail stations are REF, NOT DRO targets. Before rail work, transfer all carriages onto kit false rails; protect bearings/raceways from grit. Centre the purchased rail's hole span over its actual finished bar, mark both end trims (5.036 mm each nominal only), abrasive-cut with allowance and finish both ends flush to the bar without touching running surfaces. Keep all eight holes and fully enclosed counterbores. Before transfer, inspect actual end ligaments: at least 0.080 in from each counterbore to its trimmed end and each planned tap major to a bar end, hold-down slot or bracket hole/counterbore, with measurement uncertainty deducted. Stop if insufficient; do not move a rail hole or enlarge a slot to rescue it. Align the rail on the ordinary rail-row line, clamp without movement and transfer ALL EIGHT actual hole centres to this bar. Mark the paired bar/rail and near ends. Remove the rail before spotting at the transferred marks, drilling and tapping; support the bar over open air and brush on oil. No transfer-punch accuracy is assumed: after deburring, refit the identified pair flush at both ends and check all eight screws enter freely by hand without shifting or forcing the rail. Do not redrill to the REF positions to rescue a failed fit; stop and report. Clean all grit before reloading carriages. Finally inspect actual tap-to-end, slot and bracket ligaments to the same 0.080 in minimum and run both complete pass sweeps with seals fully supported."
 
 [setups.stock_state]
 top_feature = "underside_seat"
@@ -884,10 +878,6 @@ bracket_hole_1 = 0.0
 bracket_hole_2 = 0.0
 bracket_hole_3 = 0.0
 bracket_hole_4 = 0.0
-bracket_hole_5 = 0.0
-bracket_hole_6 = 0.0
-bracket_hole_7 = 0.0
-bracket_hole_8 = 0.0
 near_slot = 0.0
 far_slot = 0.0
 
@@ -904,10 +894,6 @@ bracket_hole_1 = 11.938
 bracket_hole_2 = 11.938
 bracket_hole_3 = 11.938
 bracket_hole_4 = 11.938
-bracket_hole_5 = 11.938
-bracket_hole_6 = 11.938
-bracket_hole_7 = 11.938
-bracket_hole_8 = 11.938
 near_slot = 11.938
 far_slot = 11.938
 
@@ -1091,46 +1077,6 @@ rpm = 3000.0
 approach_mm = 3.0
 
 [[setups.ops]]
-op = 130
-do = "spot"
-feature = "bracket_hole_5"
-tool = "center-drills-lms-4859/2"
-holder = "drill-chuck-r8"
-depth_mm = 2.86                   # pilot 1.98 + (3.0 - 1.982) / 2 / tan 30: a 3 mm cone (inventory #2 facts)
-rpm = 3000.0
-approach_mm = 3.0
-
-[[setups.ops]]
-op = 140
-do = "spot"
-feature = "bracket_hole_6"
-tool = "center-drills-lms-4859/2"
-holder = "drill-chuck-r8"
-depth_mm = 2.86                   # pilot 1.98 + (3.0 - 1.982) / 2 / tan 30: a 3 mm cone (inventory #2 facts)
-rpm = 3000.0
-approach_mm = 3.0
-
-[[setups.ops]]
-op = 150
-do = "spot"
-feature = "bracket_hole_7"
-tool = "center-drills-lms-4859/2"
-holder = "drill-chuck-r8"
-depth_mm = 2.86                   # pilot 1.98 + (3.0 - 1.982) / 2 / tan 30: a 3 mm cone (inventory #2 facts)
-rpm = 3000.0
-approach_mm = 3.0
-
-[[setups.ops]]
-op = 160
-do = "spot"
-feature = "bracket_hole_8"
-tool = "center-drills-lms-4859/2"
-holder = "drill-chuck-r8"
-depth_mm = 2.86                   # pilot 1.98 + (3.0 - 1.982) / 2 / tan 30: a 3 mm cone (inventory #2 facts)
-rpm = 3000.0
-approach_mm = 3.0
-
-[[setups.ops]]
 op = 190
 do = "drill"
 feature = "rail_hole_1"
@@ -1214,7 +1160,7 @@ approach_mm = 3.0
 op = 260
 do = "drill"
 feature = "bracket_hole_1"
-tool = "drills-metric/5mm"
+tool = "drill-index-115/#12"
 holder = "drill-chuck-r8"
 exit_mm = 3.0                     # stop about 3 mm past breakthrough
 rpm = 3000.0
@@ -1224,7 +1170,7 @@ approach_mm = 3.0
 op = 270
 do = "drill"
 feature = "bracket_hole_2"
-tool = "drills-metric/5mm"
+tool = "drill-index-115/#12"
 holder = "drill-chuck-r8"
 exit_mm = 3.0                     # stop about 3 mm past breakthrough
 rpm = 3000.0
@@ -1234,7 +1180,7 @@ approach_mm = 3.0
 op = 280
 do = "drill"
 feature = "bracket_hole_3"
-tool = "drills-metric/5mm"
+tool = "drill-index-115/#12"
 holder = "drill-chuck-r8"
 exit_mm = 3.0                     # stop about 3 mm past breakthrough
 rpm = 3000.0
@@ -1244,47 +1190,7 @@ approach_mm = 3.0
 op = 290
 do = "drill"
 feature = "bracket_hole_4"
-tool = "drills-metric/5mm"
-holder = "drill-chuck-r8"
-exit_mm = 3.0                     # stop about 3 mm past breakthrough
-rpm = 3000.0
-approach_mm = 3.0
-
-[[setups.ops]]
-op = 300
-do = "drill"
-feature = "bracket_hole_5"
-tool = "drills-metric/5mm"
-holder = "drill-chuck-r8"
-exit_mm = 3.0                     # stop about 3 mm past breakthrough
-rpm = 3000.0
-approach_mm = 3.0
-
-[[setups.ops]]
-op = 310
-do = "drill"
-feature = "bracket_hole_6"
-tool = "drills-metric/5mm"
-holder = "drill-chuck-r8"
-exit_mm = 3.0                     # stop about 3 mm past breakthrough
-rpm = 3000.0
-approach_mm = 3.0
-
-[[setups.ops]]
-op = 320
-do = "drill"
-feature = "bracket_hole_7"
-tool = "drills-metric/5mm"
-holder = "drill-chuck-r8"
-exit_mm = 3.0                     # stop about 3 mm past breakthrough
-rpm = 3000.0
-approach_mm = 3.0
-
-[[setups.ops]]
-op = 330
-do = "drill"
-feature = "bracket_hole_8"
-tool = "drills-metric/5mm"
+tool = "drill-index-115/#12"
 holder = "drill-chuck-r8"
 exit_mm = 3.0                     # stop about 3 mm past breakthrough
 rpm = 3000.0
@@ -1376,10 +1282,10 @@ do = "counterbore"
 feature = "bracket_hole_1_counterbore"
 tool = "endmills-lms-6784/5-16in-2fl"
 holder = "r8-collets-lms-4860/5-16in"
-depth_mm = 4.8
+depth_mm = 5.08
 rpm = 2000.0
 approach_mm = 3.0
-note = "Quill stop at 4.80 deep (4.67 to 4.93); plunge slowly with oil, then straight up. After this one a #8 socket head must sit below the surface: a steel rule laid across it must not rock."
+note = "Bar 1 only. Quill stop at 5.08 deep (4.953 to 5.207); plunge slowly with oil, then straight up. After this one a #8 socket head must sit below the surface: a steel rule laid across it must not rock."
 note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 A11"]
 
 [[setups.ops]]
@@ -1388,10 +1294,10 @@ do = "counterbore"
 feature = "bracket_hole_2_counterbore"
 tool = "endmills-lms-6784/5-16in-2fl"
 holder = "r8-collets-lms-4860/5-16in"
-depth_mm = 4.8
+depth_mm = 5.08
 rpm = 2000.0
 approach_mm = 3.0
-note = "Quill stop at 4.80 deep (4.67 to 4.93); plunge slowly with oil, then straight up."
+note = "Quill stop at 5.08 deep (4.953 to 5.207); plunge slowly with oil, then straight up."
 note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 A11"]
 
 [[setups.ops]]
@@ -1400,10 +1306,10 @@ do = "counterbore"
 feature = "bracket_hole_3_counterbore"
 tool = "endmills-lms-6784/5-16in-2fl"
 holder = "r8-collets-lms-4860/5-16in"
-depth_mm = 4.8
+depth_mm = 5.08
 rpm = 2000.0
 approach_mm = 3.0
-note = "Quill stop at 4.80 deep (4.67 to 4.93); plunge slowly with oil, then straight up."
+note = "Quill stop at 5.08 deep (4.953 to 5.207); plunge slowly with oil, then straight up."
 note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 A11"]
 
 [[setups.ops]]
@@ -1412,58 +1318,10 @@ do = "counterbore"
 feature = "bracket_hole_4_counterbore"
 tool = "endmills-lms-6784/5-16in-2fl"
 holder = "r8-collets-lms-4860/5-16in"
-depth_mm = 4.8
+depth_mm = 5.08
 rpm = 2000.0
 approach_mm = 3.0
-note = "Quill stop at 4.80 deep (4.67 to 4.93); plunge slowly with oil, then straight up."
-note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 A11"]
-
-[[setups.ops]]
-op = 470
-do = "counterbore"
-feature = "bracket_hole_5_counterbore"
-tool = "endmills-lms-6784/5-16in-2fl"
-holder = "r8-collets-lms-4860/5-16in"
-depth_mm = 4.8
-rpm = 2000.0
-approach_mm = 3.0
-note = "Quill stop at 4.80 deep (4.67 to 4.93); plunge slowly with oil, then straight up."
-note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 A11"]
-
-[[setups.ops]]
-op = 480
-do = "counterbore"
-feature = "bracket_hole_6_counterbore"
-tool = "endmills-lms-6784/5-16in-2fl"
-holder = "r8-collets-lms-4860/5-16in"
-depth_mm = 4.8
-rpm = 2000.0
-approach_mm = 3.0
-note = "Quill stop at 4.80 deep (4.67 to 4.93); plunge slowly with oil, then straight up."
-note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 A11"]
-
-[[setups.ops]]
-op = 490
-do = "counterbore"
-feature = "bracket_hole_7_counterbore"
-tool = "endmills-lms-6784/5-16in-2fl"
-holder = "r8-collets-lms-4860/5-16in"
-depth_mm = 4.8
-rpm = 2000.0
-approach_mm = 3.0
-note = "Quill stop at 4.80 deep (4.67 to 4.93); plunge slowly with oil, then straight up."
-note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 A11"]
-
-[[setups.ops]]
-op = 500
-do = "counterbore"
-feature = "bracket_hole_8_counterbore"
-tool = "endmills-lms-6784/5-16in-2fl"
-holder = "r8-collets-lms-4860/5-16in"
-depth_mm = 4.8
-rpm = 2000.0
-approach_mm = 3.0
-note = "Quill stop at 4.80 deep (4.67 to 4.93); plunge slowly with oil, then straight up."
+note = "Quill stop at 5.08 deep (4.953 to 5.207); plunge slowly with oil, then straight up."
 note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 A11"]
 
 # Slots: a 1/2 in (12.7) cutter is smaller than the 13.462 (.53) slot, so its R6.35 cannot
@@ -1557,7 +1415,7 @@ coolant = "none"
 deburr_mm = 0.25
 deburr_cite = "features.toml general_tolerances edge_break R0.25"
 stock_in = "A"
-note = "Provisional (#1413 shop placeholders): these checks do not approve the bar for use. Outside a range, don't use the bar until someone has looked at it. Then make the second bar exactly the same way. Don't mirror it: in the jig bar 2 is simply turned over."
+note = "Provisional (#1413 shop placeholders): these checks do not approve the bar for use. Outside a range, don't use the bar until someone has looked at it. Then make bar 2 the same way, without the four bracket holes (skip A ops 90-120, 260-290, 430-460 and B ops 50-60), and mark it BAR 2. Don't mirror it: in the jig bar 2 is simply turned over."
 
 [setups.stock_state]
 top_z = 11.938
@@ -1596,25 +1454,24 @@ checks = { length = "calipers-18in" }
 op = 40
 do = "inspect"
 feature = ["rail_hole_1", "rail_hole_2", "rail_hole_3", "rail_hole_4", "rail_hole_5", "rail_hole_6", "rail_hole_7", "rail_hole_8"]
-checks = { dia = "pin-gauges", thru = "pin-gauges", station = "calipers-18in", height = "calipers-18in", thread = "unknown", note = "unknown" }
+checks = { dia = "pin-gauges", thru = "pin-gauges", height = "calipers-18in", thread = "unknown", note = "unknown" }
 inspection_methods.height = "On the top face (no counterbores): put the largest plain pin gauge that enters the hole, diameter D; calipers from the zero edge to the near side of the pin, plus D/2."
-inspection_methods.station = "On the top face: largest pin gauge that enters, diameter D; calipers from the zero end to the near side of the pin, plus D/2, for each hole."
 inspection_methods.thread = "An 8-32 screw turns in all the way with your fingers."
-inspection_methods.note = "The real test: lay the HGR15 kit rail on the un-marked face, its end flush with the zero end (it overhangs the far end by about 10); all eight #8-32 x 3/4 socket screws start by hand without pushing the rail sideways."
+inspection_methods.note = "Matched-pair acceptance: both ends flush and all eight screws enter freely by hand without shifting or forcing the rail. Actual minimum rail counterbore/end and bar tap/end, slot and bracket ligaments must be 0.080 in with uncertainty deducted. Both full carriage sweeps retain complete end-seal support. Keep the accepted pair identified."
 
 [[setups.ops]]
 op = 50
 do = "inspect"
-feature = ["bracket_hole_1", "bracket_hole_2", "bracket_hole_3", "bracket_hole_4", "bracket_hole_5", "bracket_hole_6", "bracket_hole_7", "bracket_hole_8"]
+feature = ["bracket_hole_1", "bracket_hole_2", "bracket_hole_3", "bracket_hole_4"]
 checks = { dia = "pin-gauges", thru = "pin-gauges", station = "calipers-18in", height = "calipers-18in", note = "unknown" }
-inspection_methods.station = "On the top face, the side without the counterbores (there the hole is its 4.98-5.08 drilled size): largest pin gauge that enters, diameter D; calipers from the zero end to the near side of the pin, plus D/2."
+inspection_methods.station = "On the top face, the side without the counterbores (there the hole is its 4.80-4.90 drilled size): largest pin gauge that enters, diameter D; calipers from the zero end to the near side of the pin, plus D/2."
 inspection_methods.height = "On the top face, the side without the counterbores: largest pin gauge that enters, diameter D; calipers from the zero edge to the near side of the pin, plus D/2."
-inspection_methods.note = "A #8 socket screw drops through each hole freely and its head sits below the counterbore face."
+inspection_methods.note = "Bar 1 only. A #8 socket screw drops through each hole freely and its head sits below the counterbore face. Bar 2: no bracket holes."
 
 [[setups.ops]]
 op = 60
 do = "inspect"
-feature = ["bracket_hole_1_counterbore", "bracket_hole_2_counterbore", "bracket_hole_3_counterbore", "bracket_hole_4_counterbore", "bracket_hole_5_counterbore", "bracket_hole_6_counterbore", "bracket_hole_7_counterbore", "bracket_hole_8_counterbore"]
+feature = ["bracket_hole_1_counterbore", "bracket_hole_2_counterbore", "bracket_hole_3_counterbore", "bracket_hole_4_counterbore"]
 checks = { dia = "calipers", depth = "calipers" }
 
 [[setups.ops]]

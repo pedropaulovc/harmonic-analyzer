@@ -39,8 +39,11 @@ Source of each number:
   series' base-to-centre height (check: the bore axis stands 15 over the
   foot's bottom face, measured with an Ø8 pin in the bore; the leadscrew
   axis height is set by it), and ``FOOT_THICK`` 5 (check: the foot under the
-  bolt holes is 5 thick or thinner, so the #6-32 screw's engagement in TL-28
-  holds at least its rule-18 minimum).
+  bolt holes is .196 to .292 thick: no thicker, so the #8-32 x 5/8 screw's
+  worst-case full thread in TL-28 holds rule 18's 1.5 D,
+  ``end_bracket.KP08_FOOT_THICK_MAX``; no thinner, so its tip stays clear of
+  the bar screw's tip in TL-28's shared THRU thread,
+  ``end_bracket.KP08_FOOT_THICK_MIN`` and ``SCREW_TIP_GAP_MIN``).
 - DERIVED (shape ESTIMATED from the photographs): the boss is round and
   concentric with the bore, its crown the overall height, so
   ``BOSS_RADIUS`` = ``HEIGHT`` - ``AXIS_HEIGHT``; its sides drop straight to
@@ -52,10 +55,10 @@ symmetric about its axial mid-plane: housing, foot and the insert's outer
 and inner rings together. Whether the 13 overall also bounds the
 photographed inner ring where it stands proud is a verify-on-receipt item.
 
-Fit of the TL-28 screws (unchanged by the swap): the listing's Ø5 holes at
-42 centres float a #6-32 (major 3.505, 0.75 radial clearance), on the
-same 42 the TL-28 #6-32 taps are drilled at, so the screws and taps carry
-over.
+Fit of the TL-28 screws (oblique simplification PR2, owner ruling Main
+2026-11-06 option B): the listing's Ø5 holes at 42 centres float a #8-32
+(major 4.166, 0.417 radial clearance), on the same 42 as TL-28's two
+holes, each tapped from its top face for these screws.
 
 Omitted, each documented: the inner-ring set screws and their tapped holes
 (size and count unpublished), the foot's hex recesses round the bolt holes,

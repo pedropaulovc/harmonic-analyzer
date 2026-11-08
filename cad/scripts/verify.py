@@ -242,8 +242,11 @@ _COMPONENT_BAND = {
     # the thumbscrew.
     "ms-measuring-stick": (5, 7),  # expected 6
     # The rocker's oblique-trammel jig (shop fixture, TL-00; never under the
-    # top): its 7 made parts (9 instances) and its 22 bought families, every
-    # screw, stud, nut and bearing inserted (jig spec QUANTITIES).
+    # top): its made parts (TL-20's Bar1/Bar2 members among them) and its
+    # bought families, every screw, stud, nut and bearing inserted (jig spec
+    # QUANTITIES). Oblique simplification PR2: -8 #8 bracket screws, +4 common
+    # bar screws (2 a bracket); the KP08 screws stay 4. R3 replaces the
+    # hub pin with the stud, sleeve, washer and two low-head screws (+4).
     "ch-rocker-arm-tl-oblique-jig": (94, 96),  # expected 95
     "ha-harmonic-analyzer": (
         7,
@@ -895,7 +898,7 @@ def _shared_reference_counts(name: str) -> dict[str, dict[str, int]]:
         return {
             "": {
                 member: jig.QUANTITIES[family]
-                for family, (_physical, member) in jig.KIT_IDENTITIES.items()
+                for family, (_physical, member) in jig.MEMBER_IDENTITIES.items()
             }
         }
     roles = {
@@ -1334,8 +1337,8 @@ async def _walk_pass_sweep(adapter: Any, name: str) -> list[str]:
     """Walk every pass of the recorded sweep and return each failure.
 
     The slide is authored transiently from the DOF manifest (DRIVE_<key>) and
-    driven pose by pose; each pose reads both carriages back against the
-    sidecar (a solver that took the other branch of the pin loop stops the
+    driven pose by pose; each pose reads every moving occurrence back against
+    the sidecar (a wrong linkage branch or misplaced block/nut stops the
     walk there) and runs native interference where the pose is a check pose.
     A pass with a ``remate`` re-seats the carrier first: at the pass's first
     pose the previous holes' coaxials are suppressed and the pass's hole axes
@@ -1388,18 +1391,18 @@ async def _walk_pass_sweep(adapter: Any, name: str) -> list[str]:
                 f"{walk['pass']} pass, theta {math.degrees(pose['theta_rad']):+.3f} deg "
                 f"(slide {pose['drive_mm']:.3f} mm)"
             )
-            carriages = bind_component_selectors(
-                adapter.currentModel, pose["carriages"]
+            components = bind_component_selectors(
+                adapter.currentModel, pose["origins"]
             )
-            for carriage, origin in pose["carriages"].items():
+            for component, origin in pose["origins"].items():
                 at = [
                     v * 1000.0
-                    for v in component_transform(adapter, carriages[carriage])[9:12]
+                    for v in component_transform(adapter, components[component])[9:12]
                 ]
                 off = math.dist(at, origin)
                 if off > tolerance:
                     failures.append(
-                        f"{where}: {carriage} at {[round(v, 3) for v in at]}, "
+                        f"{where}: {component} at {[round(v, 3) for v in at]}, "
                         f"{off:.3f} mm off its station (> {tolerance} mm)"
                     )
             if failures:
