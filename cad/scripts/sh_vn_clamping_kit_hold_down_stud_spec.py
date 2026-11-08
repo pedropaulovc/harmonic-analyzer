@@ -125,8 +125,9 @@ DRAWING_PRECISION_BY_NAME = {
 DIMENSION_TOLERANCE_TYPES = {"FinishedLength": 0, "CutEndChamfer": 6}  # NONE / MAX
 # The attached side-view chamfer callout reads the saved native angle. Its MAX
 # driver and precision remain source-owned even without a printed end dimension.
+# The 2.25 length prints plain: the CUT END and LOWER FACTORY END leaders say
+# which end is cut (oblique-asm restack r2: its words repeated them).
 DIMENSION_CALLOUTS = {
-    "FinishedLength": "FINISHED CUT LENGTH;\nUPPER FREE END ONLY",
     "CutEndChamfer": "CUT END",
 }
 STOCK_NOTE = f"{THREAD} X {STOCK_LENGTH} IN STUD STOCK; {SUPPLIER.upper()} {SKU} KIT"
