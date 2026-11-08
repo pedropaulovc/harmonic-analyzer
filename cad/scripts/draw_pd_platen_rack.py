@@ -82,7 +82,9 @@ FRONT_KEEP = {
 END_KEEP = {
     "BackerDepth": (END_CENTER[0], 0.082),
     "RackDepth": (END_CENTER[0], 0.156),
-    "RackHeight": (0.390, 0.135),
+    # Its three centred rows ("CLEARS MHA-PD-11" the widest, ~46 mm) stand
+    # ~5 mm right of the rack's outline and ~3.5 mm inside the border.
+    "RackHeight": (0.3925, 0.135),
     "RackInset": (0.375, 0.095),
     "SeamHeight": (0.321, 0.112),
 }

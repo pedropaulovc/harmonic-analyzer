@@ -841,3 +841,11 @@ def test_the_stock_refs_carry_the_receiving_ceilings_the_cut_end_reserve_uses() 
         assert printed * 25.4 <= ceiling_mm
         assert printed + step > ceiling_mm / 25.4
         assert printed > spec.RACK_HEIGHT / 25.4
+    # Each limit names the mate it protects (round 5: a supplier size's limit
+    # with no mate read as invented).
+    assert spec.DIMENSION_CALLOUTS["RackHeight"].splitlines()[1] == (
+        f"CLEARS {_config.parts('pd-platen-guide')['number']}"
+    )
+    assert spec.DIMENSION_CALLOUTS["RackDepth"].endswith(
+        f" FOR {_config.parts('pd-transgear-feed-pinion')['number']} MESH"
+    )
