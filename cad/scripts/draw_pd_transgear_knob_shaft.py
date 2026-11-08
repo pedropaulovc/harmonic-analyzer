@@ -408,6 +408,9 @@ DIMENSION_SUFFIXES = {
     "TipStation": f" {STATIONS_LINK}",
     "FrontReliefDia": f" {NECK_LINK}",
     "FlatEnd": f" {NECK_LINK}",
+    # Round 7: the neck width keeps .XXX (at .XX its least, .006, falls
+    # under the flat end's .007) and links the neck note like its neighbours.
+    "FrontReliefWidth": f" {NECK_LINK}",
     # Round 6: the overall keeps .XXX (the knob cup's pin wall fails at .XX)
     # and states that function once, at the dimension, not in a note (r3).
     "OverallLength": (
@@ -583,11 +586,13 @@ DETAIL_KEEP: dict[str, tuple[float, float]] = {
     # out past the border, so the one reason rides the value's line as a
     # suffix, starting well inside the border.
     "FrontReliefDia": (_detail_xy(-0.14, 0.0)[0], _DETAIL_TOP + 0.0093),
-    # Under the crop, right of the step's witness line (centred on the 4 mm
-    # span it would sit on both witness lines): its value alone, clear of
-    # the tool end's outer arrow (y 173.5), the crop (from y 195.0 there),
-    # the step's witness line (x 107) and the journal Ø's line (x 134.3).
-    "FrontReliefWidth": (_STEP_X + 0.013, _DETAIL_BOTTOM - 0.0087),
+    # Under the crop, LEFT of F's witness line (round 7: with its note link
+    # the ~39 mm text no longer fits the 23 mm between the step's witness
+    # line and the journal Ø's column on the right), its line running out
+    # past F over the flat end's block, as the flat end's own text stands
+    # outside its witness lines.  DETAIL_TEXT_* below check it against the
+    # round-6 render's measures.
+    "FrontReliefWidth": (_F_DETAIL_X - 0.0225, _DETAIL_BOTTOM - 0.0060),
     # Left of the crop: the leader runs from the corner 12-24 deg below
     # level, inside the corner's own quadrant, through the pinion's blank
     # interior under its root and over the axis.  Its 23.5 mm text, centred
@@ -607,6 +612,30 @@ DETAIL_KEEP: dict[str, tuple[float, float]] = {
     # detail label.
     "FlatToolRadius": (_F_DETAIL_X - 0.031, _DETAIL_BOTTOM + 0.0085),
 }
+# Round-6 render, detail B: a one-line value's text ran keep - 1.9 mm to
+# keep + 1.5 mm over its line at keep - 2.8 mm (.016 at keep y 185.8: text
+# 183.9-187.3, line 183.0); the flat end's stacked limits ran to keep +
+# 4.3 mm (182.8 at keep 178.5); ".007 SEE NOTE 4" ran 34.7 mm, so 2.6 mm a
+# character covers it.
+DETAIL_CHAR_WIDTH = 0.0026
+_WIDTH_X, _WIDTH_Y = DETAIL_KEEP["FrontReliefWidth"]
+_WIDTH_HALF = (
+    len(inch_text(FRONT_RELIEF_WIDTH, 3) + DIMENSION_SUFFIXES["FrontReliefWidth"])
+    * DETAIL_CHAR_WIDTH / 2.0
+)
+DETAIL_TEXT_WIDTH_BOX = (
+    _WIDTH_X - _WIDTH_HALF, _WIDTH_Y - 0.0028, _WIDTH_X + _WIDTH_HALF, _WIDTH_Y + 0.0015
+)
+DETAIL_TEXT_FLAT_END_TOP = DETAIL_KEEP["FlatEnd"][1] + 0.0043
+_left, _line, _right, _top = DETAIL_TEXT_WIDTH_BOX
+if _right > _F_DETAIL_X - 0.003:
+    raise AssertionError("the neck width's text runs into F's witness line")
+if _line < DETAIL_TEXT_FLAT_END_TOP + 0.002:
+    raise AssertionError("the neck width's line runs into the flat end's limits")
+if math.dist((_right, _top), DETAIL_CENTER) < DETAIL_CROP_RADIUS + 0.003:
+    raise AssertionError("the neck width's text runs into detail B's crop")
+if _left < END_CENTER[0] + HALF_OD + 0.002:
+    raise AssertionError("the neck width's text runs over the end view")
 # Top-left anchors.  The label stands left of the crop, 3 mm under the
 # corner R's text (its limits print to 5 mm under its point).
 DETAIL_LABEL_XY = (0.042, _CORNER_CENTER[1] - 0.014)

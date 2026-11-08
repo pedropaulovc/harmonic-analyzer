@@ -1274,22 +1274,33 @@ def test_run_035809_detail_b_blocks_stand_clear() -> None:
     assert fx - flat_half > drawing.END_CENTER[0] + drawing.HALF_OD
     wx, wy = drawing.DETAIL_KEEP["FrontReliefWidth"]
     assert "FrontReliefWidth" not in below
-    width_line = wy - 0.0028
-    width_top = wy + 0.0007
-    half = len(".016") * char_w / 2
+    # Round 7: the neck width (.XXX: at .XX its least falls under the flat
+    # end's .007) links the neck note on its value's line; its ~39 mm text
+    # stands left of F's witness line over the flat end's block (round 6
+    # measures: text keep - 1.9 to + 1.5 mm, line keep - 2.8 mm; the flat
+    # end's stacked limits to its keep + 4.3 mm).
+    assert spec.FRONT_RELIEF_WIDTH - printed_band_mm(2, unit=spec.UNIT) < max(
+        spec.CORE_FLAT_CUT_END_LIMITS
+    )
+    assert drawing.DIMENSION_SUFFIXES["FrontReliefWidth"] == f" {drawing.NECK_LINK}"
+    text = spec.inch_text(spec.FRONT_RELIEF_WIDTH, 3) + drawing.DIMENSION_SUFFIXES["FrontReliefWidth"]
+    assert text == ".016 SEE NOTE 4"
+    half = len(text) * char_w / 2
+    width_line, width_top = wy - 0.0028, wy + 0.0015
+    assert drawing.DETAIL_TEXT_WIDTH_BOX == pytest.approx((wx - half, width_line, wx + half, width_top))
+    flat_block_top = fy + 0.0043
+    assert drawing.DETAIL_TEXT_FLAT_END_TOP == pytest.approx(flat_block_top)
     # Round 1: the two lines 2.3 mm apart read as one line carrying both
-    # values.  Each now has its own line, 4 mm or more apart; the neck
-    # width's stands right of the step's witness line, left of the journal
-    # Ø's line and under the crop.
+    # values.  Each keeps its own line, the neck width's 2 mm over the flat
+    # end's block and 11 mm over its line.
+    assert width_line - flat_block_top >= 0.002
     assert width_line - flat_line >= 0.004
-    assert flat_top < width_line
-    assert wx - half > drawing._STEP_X + 0.003
-    assert wx + 0.0071 < drawing.SIDE_KEEP["JournalDia"][0] - 0.005
-    left = wx - half
-    crop_bottom = center[1] - math.sqrt(crop**2 - (left - center[0]) ** 2)
-    assert width_top < crop_bottom - 0.003
-    # The two blocks stand side by side, the tool end's left of F.
-    assert fx + flat_half < left - 0.005
+    # Left of F's witness line, outside the crop, right of the end view's
+    # tooth tips, under the flat end radius's text (keep - 2 mm).
+    assert wx + half <= drawing._F_DETAIL_X - 0.003
+    assert math.dist((wx + half, width_top), center) >= crop + 0.003
+    assert wx - half >= drawing.END_CENTER[0] + drawing.HALF_OD + 0.002
+    assert width_top < drawing.DETAIL_KEEP["FlatToolRadius"][1] - 0.002 - 0.005
 
 
 def test_flat_reference_sketch_carries_the_printed_flat_on_the_front_plane(
