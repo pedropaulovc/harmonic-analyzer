@@ -265,10 +265,11 @@ missing spec file or correct the inventory's `cad` stem before retrying.
 ## Strict local travelers and enrollment
 
 `_process_plans.TRAVELER_STEMS` is the enrollment authority for the
-`prechips:<stem>` task family. It is currently **empty**. The rocker plan is
-migrated but held until its traveler reaches exit 0; the legacy shaft and cone
-plans remain tracked but are stale against the pinned prechips; they are neither
-run nor shipped. A stem enrolls only after its
+`prechips:<stem>` task family. It is currently **empty**. The rocker, base bar,
+shaft and cone plans are held source proposals, not qualified travelers. The
+rocker's source-authored preform is analytically referenced by HA but is not
+PC-modeled or consumable: its `bandsaw_preform` table is deliberately retained,
+and a deburr note does not model seven saw cuts. A stem enrolls only after its
 migrated plan reaches exit 0 on real exported geometry. See
 [`cad/process/README.md`](../../process/README.md) for authoring and enrollment.
 
@@ -284,8 +285,12 @@ files, CAD-tagged fixture spec modules, the locked consumer and executed wrapper
 closure. It runs locally on the submitter without a SolidWorks seat, including
 under the farm executor, and needs FreeCAD 1.1 (see
 [`DEVELOPING.md`](../../../DEVELOPING.md#process-traveler-prerequisites)).
-The consumer is pinned to PyPI `prechips==0.2.0`; no upstream examples are run by
-this task family.
+The consumer remains pinned to PyPI `prechips==0.2.0`, with the lockfile unchanged;
+no upstream examples are run by this task family. The new shaft/cone proposals
+are unsupported by that pin and remain **HELD / UNENROLLED**. A Prechips release
+carrying the new contracts, the HA pin bump and traveler activation are deferred.
+The new PC contracts alone do not establish full consumer or native execution,
+nor resolve the plans' physical setup, retained-stock, inspection or finish holds.
 
 | prechips exit | build/release gate | interpretation |
 |---|---|---|

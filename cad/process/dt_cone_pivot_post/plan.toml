@@ -1,10 +1,17 @@
-# Process candidate copied from https://github.com/pedropaulovc/prechips/blob/55cae713860a491b8925aed1ad8a24fb30502fe0/examples/cone-pivot-post/plan.toml
-# Current geometry follows dt_cone_pivot_post_spec and its configured axes;
-# test_dt_cone_pivot_post_drawing.py binds these declarative setup values.
-# Inventory flags, unknown setup bindings and the one-piece operation intent
-# remain the source candidate's, not a verified machining route.
-# All blank allowances, grip, jogs, feeds and depths marked AUTHOR'S CHOICE.
-# No speed, source material grade, available blank, tool reach or setup binding is invented.
+# Held integral solid-stock process candidate; not enrolled for machining.
+# CAD authority: current dt_cone_pivot_post_spec and drawing contracts.
+# FINISH UNRESOLVED: owner selected solid stock; the drawing still requires
+# paint and MASK MACHINED FACES. No paint/mask split has been authorized.
+# All actual tooling, fixture/pose, cutting, inspection and calibration availability
+# remains unknown. AUTHOR'S CHOICE geometry/methods below are proposals, not evidence.
+# Native rotary, manual-root and honing replay is unresolved; no default
+# full-feature sweep or bounding-box removal may stand in for actual cutter moves.
+# PRACTICAL HELD ROUTE proposal (no ball milling): S1 turns Y0..68.072 to an Ø46
+# envelope and finishes the boss-free lathe bands; S1C saws the tail off; S2B/S2BR
+# remove head-band bulk with flat-end floors/terraces/crank stairs; S2H cuts head arcs
+# and body free arcs directly to CAD radius on a horizontal dividing head (rotary
+# stock/motion UNKNOWN, no credit); S2F files the remaining 1-3mm root sectors to
+# qualified source masters. Actual tools/fixtures/settings/results unknown.
 part = "dt-cone-pivot-post"
 features = "../../out/features/dt_cone_pivot_post/features.toml"
 construction = "one_piece"
@@ -13,23 +20,22 @@ quantity_cite = ["harmonic-analyzer/cad/config/parts/dt-cone-pivot-post.yaml:dt-
 
 [drawing]
 number = "MHA-DT-05" # parts/dt-cone-pivot-post.yaml:dt-cone-pivot-post.number
-revision = "unknown"
-
-[paths]
-inventory = "../shop/inventory.toml"
-policy = "../shop/shop-policy.toml"
-cutting_data = "../shop/cutting-data.toml"
+revision = "v48" # authored next-revision candidate; not an assertion of machining approval
 
 [stock]
-form = "round_bar"
-material = "unknown" # source only pins ferrous_noncritical, not a purchased grade
-on_hand = false # inventory stock=[]; this is a procurement candidate, not an inventory item
- dia_mm = 110.0 # AUTHOR'S CHOICE: radius55 covers hypot(50.6591,21.844/2)=51.8231
-length_mm = 128.742 # AUTHOR'S CHOICE: BLOCK_HEIGHT + foot allowance6 + sacrificial grip28
-north_allowance_mm = 6.0 # AUTHOR'S CHOICE: exposed foot-facing allowance
-south_grip_mm = 28.0 # AUTHOR'S CHOICE: beyond the finished BLOCK_HEIGHT
-note = "AUTHOR'S CHOICE: bar parallel model Y. The complete crank boss reach fits inside radius55; no Ø45 envelope is claimed. Keep both integral journal pads during roughing. Catalogue identity and material grade unknown; M4 swept-envelope/clearance proof not supplied."
-cite = ["AUTHOR'S CHOICE", "harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:29-33,49-67"]
+form = "rectangular_bar"
+material = "unknown" # ferrous_noncritical source; actual grade/heat/certificate unknown
+on_hand = false # purchase candidate only; no allocation or ownership claim
+section_mm = [50.8, 76.2] # AUTHOR'S CHOICE: nominal2x3in flat-bar proposal
+length_mm = 128.742
+north_allowance_mm = 6.0
+south_grip_mm = 28.0
+origin_mm = [-25.4, -6.0, 52.2]
+axis = [0.0, 1.0, 0.0]
+section_axis = [1.0, 0.0, 0.0] # axis cross section_axis = model-Z
+as_is_faces = []
+note = "AUTHOR'S CHOICE: proposed purchase/sawn rectangular2x3in flat bar, modelX[-25.4,25.4],Z[-24.0,52.2],Y[-6,122.742]. Contains bodyR20.955, headR21.336, cone with0.20 cap allowance (extreme|X|13.185222,|Z|22.60475215), common crank capsZ[-21.5753,50.8591]. Section margins: cone low-Z1.39524785, crank high-Z1.3409, head low-Z2.664. Offset centroidZ14.1 from body axisZ0 via independent four-jaw contacts. Rotating corner radius58.05170109, diameter116.1034022 is SWING ONLY, never material/contact diameter or stiffness. Low-carbon steel is a proposal; actual material/heat/certificate, ownership/allocation, incoming dimensions/straightness, fixtures/tools/poses/bindings/calibration unknown. Qualify source/allowance containment, contacts/reach, imbalance, interrupted cuts and swept clearance; no example inventory or observations adopted."
+cite = ["AUTHOR'S CHOICE: nominal2x3in purchase candidate, offset envelope and allowances", "harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:post_envelope.BLOCK_DIA,HEAD_DIA,BLOCK_HEIGHT,CONE_BOSS_LENGTH,CRANK_BOSS_START_Z,CRANK_BOSS_END_Z,CRANK_BOSS_DIA"]
 
 # Existing shaft convention: X diametric, Z toward the exposed end. The EL400
 # is only a manual reference; its installation on this lathe remains unknown.
@@ -44,6 +50,16 @@ x = "away_from_spindle_axis" # AUTHOR'S CHOICE; verify each machine's positive s
 y = "away" # AUTHOR'S CHOICE: existing EL400 positive mill-Y convention
 z = "toward_exposed_end"
 
+# Owner-selected common manufacturing axis, centred in the permitted printed
+# separation band. The original CAD/manifest and setup frames stay unchanged.
+# Native placement proof must preserve boss/bore concentricity and head support.
+[axis_placements.crank]
+boss = "crank_boss"
+bore = "crank_bore"
+caps = "crank_boss_faces"
+support = "head"
+separation_mm = 43.2735
+
 # Plan-owned setup frames (PLAN.md §4.1; docs/plan.md "frames"). The exported
 # manifest declares only `model` and an unknown `setup`; the original
 # T1/M2/J3/C4 axes convention is retained, with current post origins and yaw.
@@ -54,8 +70,8 @@ x = [1.0, 0.0, 0.0]
 y = [0.0, 0.0, 1.0]
 z = [0.0, -1.0, 0.0]
 binding = "unknown"
-note = "AUTHOR'S CHOICE: foot-exposed frame (one-piece lathe S1, built-up mill S0); +Z toward the foot, +X radial withdrawal on the lathe."
-cite = ["AUTHOR'S CHOICE", "harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:29-33,373-376"]
+note = "AUTHOR'S CHOICE: foot-exposed frame,+Z footward,+X radial withdrawal. Lay out body axisX25.4 from narrow sides,Z24.0 above low-Z broad side on BOTH ends; independent jaws offset centroidZ14.1 to spindle axisZ0. Trial-turn lower band, micrometer ACTUAL diameter with qualified1-2in instrument, indicate real cylinder at two stations and enter measured diameter for X zero. Never indicate a flat as OD or measure116.1034022 swing as material. Actual fixture/tool/pose/indication/calibration and limits unknown."
+cite = ["AUTHOR'S CHOICE", "harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:BLOCK_HEIGHT"]
 
 # Head top follows dt_cone_pivot_post_spec.BLOCK_HEIGHT.
 [frames.M2]
@@ -65,7 +81,7 @@ y = [0.0, 0.0, -1.0]
 z = [0.0, 1.0, 0.0]
 binding = "unknown"
 note = "AUTHOR'S CHOICE: foot-down milling; Z0 at finished foot, head top follows the current post body height."
-cite = ["AUTHOR'S CHOICE", "harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:29-33,79-81,373-376"]
+cite = ["AUTHOR'S CHOICE", "harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:BLOCK_HEIGHT"]
 
 # Origin = exported journal_bore at; setup -Z = exported journal_bore axis.
 [frames.J3]
@@ -75,7 +91,7 @@ y = [0.0, -1.0, 0.0]
 z = [-0.22496988592078224, 0.0, -0.9743657169814578]
 binding = "unknown"
 note = "AUTHOR'S CHOICE: spindle toward the north cone-boss face; trig basis follows the configured horizontal plan incline, not a bore tilt."
-cite = ["AUTHOR'S CHOICE", "harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:62-67,268-279"]
+cite = ["AUTHOR'S CHOICE", "harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:BORE_HEIGHT,INCLINE_DEG"]
 
 # Origin = current CRANK_BORE_HEIGHT and CRANK_BOSS_START_Z.
 [frames.C4]
@@ -84,145 +100,266 @@ x = [1.0, 0.0, 0.0]
 y = [0.0, -1.0, 0.0]
 z = [0.0, 0.0, -1.0]
 binding = "unknown"
-note = "AUTHOR'S CHOICE: crank boss north face Z0; depth goes into boss along negative setup Z."
-cite = ["AUTHOR'S CHOICE", "harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:49-57"]
+note = "AUTHOR'S CHOICE: retain nominal C4 unchanged. Common process crank axis is modelY38.1+43.2735=81.3735, so boss/bore/caps together lie at setupXY(0,-0.17785649710401); north capZ0. Actual A/B fixture binding and offsets remain unknown."
+cite = ["AUTHOR'S CHOICE", "harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:CRANK_BORE_HEIGHT,CRANK_BOSS_START_Z"]
 
-# S1 only turns BELOW the inclined pad (lowest pad Y38.1-17.272/2=29.464).
-# Do not turn the full body/head and thereby remove either integral boss.
+[frames.JR]
+origin = [0.0, 38.1, 0.0]
+x = [0.9743657169814578, 0.0, -0.22496988592078224]
+y = [0.0, 1.0, 0.0]
+z = [0.22496988592078224, 0.0, 0.9743657169814578]
+binding = "unknown"
+note = "AUTHOR'S CHOICE: reverse journal-axis presentation for the south cone-boss cap; physical registration unresolved."
+cite = ["AUTHOR'S CHOICE", "harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:CONE_BOSS_LENGTH,INCLINE_DEG"]
+
+[frames.CR]
+origin = [0.0, 81.19564350289599, 50.6591]
+x = [1.0, 0.0, 0.0]
+y = [0.0, 1.0, 0.0]
+z = [0.0, 0.0, 1.0]
+binding = "unknown"
+note = "AUTHOR'S CHOICE: retain nominal CR unchanged. Common operative crank centre setupXY(0,+0.17785649710401), far capZ0. Actual reverse A/B fixture registration remains unknown."
+cite = ["AUTHOR'S CHOICE", "harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:CRANK_BOSS_END_Z"]
+
+[frames.P2]
+origin = [0.0, 0.0, 0.0]
+x = [1.0, 0.0, 0.0]
+y = [0.0, 1.0, 0.0]
+z = [0.0, 0.0, 1.0]
+binding = "unknown"
+note = "AUTHOR'S CHOICE: radial presentation from model+Z after S2 tail removal, lower finishedY1..21 band/B/keyed meridian proposed references; S1 turned toY28 leaves7mm collar gap. Independently measure actual signed highest standing crown patch across the entire selected flat-end footprint from calibrated body-axis reference after prior cuts; touch that same patch. Never half a band diameter or nominal20.955. S2H retains these model-aligned axes, S2F same proposed cradle. Actual pickup/fixture/pose/calibration unknown; Y transfer remains explicit PICKUP HOLD."
+cite = ["AUTHOR'S CHOICE: proposed manual radial presentation"]
+
+[frames.PR2]
+origin = [0.0, 0.0, 0.0]
+x = [-1.0, 0.0, 0.0]
+y = [0.0, 1.0, 0.0]
+z = [0.0, 0.0, -1.0]
+binding = "unknown"
+note = "AUTHOR'S CHOICE: stopped-spindle reversal from model-Z; recover lower-body/B/meridian, independently remeasure actual signed highest standing crown patch across entire tool footprint from calibrated body-axis reference and touch same patch. Never half a band diameter or nominal20.955. Actual indicator/tool/fixture registration/calibration unknown; Y transfer remains PICKUP HOLD, not measured pose."
+cite = ["AUTHOR'S CHOICE: proposed reverse manual radial presentation"]
+[frames.KI]
+origin = [-100.0, 0.0, 0.0]
+x = [0.0, 0.0, -1.0]
+y = [0.0, 1.0, 0.0]
+z = [1.0, 0.0, 0.0]
+binding = "unknown"
+note = "AUTHOR'S CHOICE proposed final inspection attitude ONLY after S7: model+X upward, B against qualified buttons, actual finished A establishes meridian. Nominal100mm body-axis height is a stand design proposal, not calibrated H0 or actual installed pose. Actual stand/liner/reference-arbor availability, physical binding, clock, H0 and stem radius remain unknown; no demonstration commissioning facts adopted."
+cite = ["AUTHOR'S CHOICE: proposed final signed-station inspection stand"]
+
+
+[frames.TC]
+origin = [-25.4, 0.0, 0.0]
+x = [0.0, 1.0, 0.0]
+y = [0.0, 0.0, 1.0]
+z = [1.0, 0.0, 0.0]
+binding = "unknown"
+note = "AUTHOR'S CHOICE saw presentation: raw head modelX=-25.4 broad flat on saw bed;setupX=modelY,setupY=modelZ,setupZ=modelX+25.4. Proposed raw section setupY[-24,52.2],Z[0,50.8]. Actual saw/vise/support construction, blade square, bed/roller alignment, clamping, tool/body/guide clearance, physical pose/binding and calibration UNKNOWN."
+cite = ["AUTHOR'S CHOICE: direct raw rectangular head cutoff construction", "harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:BLOCK_HEIGHT"]
+
+# Process-only waste planes for S2B/S2BR practical bulk prep (at = point on the plane,
+# axis = toward kept material). Each names an actual offset plane/trajectory, never
+# finished-surface coverage.
+[process_features.cone_prep_p2_cap_z50p8591]
+kind = "end_face"
+at = [0.0, 81.3735, 50.8591]
+axis = [0.0, 0.0, -1.0]
+note = "Waste plane at the crank far-cap allowance modelZ50.8591 over the head band; later C4 cap facing starts from it."
+cite = ["AUTHOR'S CHOICE: practical bulk-prep waste plane offset from v47 STEP crank/head/body solids, harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:CRANK_BOSS_START_Z,CRANK_BOSS_END_Z,HEAD_DIA"]
+
+[process_features.cone_prep_p2_floor_z21p5]
+kind = "end_face"
+at = [0.0, 81.3735, 21.5]
+axis = [0.0, 0.0, -1.0]
+note = "Waste floor modelZ21.5 beside the crank column, 0.164 above headR21.336; not a finished face."
+cite = ["AUTHOR'S CHOICE: practical bulk-prep waste plane offset from v47 STEP crank/head/body solids, harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:CRANK_BOSS_START_Z,CRANK_BOSS_END_Z,HEAD_DIA"]
+
+[process_features.cone_prep_pr2_floor_zm21p5753]
+kind = "end_face"
+at = [0.0, 81.3735, -21.5753]
+axis = [0.0, 0.0, 1.0]
+note = "Waste floor at the crank north-cap allowance modelZ-21.5753; C4 local thickness counts from it."
+cite = ["AUTHOR'S CHOICE: practical bulk-prep waste plane offset from v47 STEP crank/head/body solids, harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:CRANK_BOSS_START_Z,CRANK_BOSS_END_Z,HEAD_DIA"]
+
+[process_features.cone_prep_p2_t1_px]
+kind = "end_face"
+at = [11.422, 81.3735, 18.61]
+axis = [-1.0, 0.0, 0.0]
+note = "Coarse head-band terrace wall modelX11.422 above modelZ18.61 (P2); corner on rho21.836 leaves<=3.08 for S2H side arcs and S2F crown filing."
+cite = ["AUTHOR'S CHOICE: practical bulk-prep waste plane offset from v47 STEP crank/head/body solids, harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:CRANK_BOSS_START_Z,CRANK_BOSS_END_Z,HEAD_DIA"]
+
+[process_features.cone_prep_p2_t1_mx]
+kind = "end_face"
+at = [-11.422, 81.3735, 18.61]
+axis = [1.0, 0.0, 0.0]
+note = "Coarse head-band terrace wall modelX-11.422 above modelZ18.61 (P2); corner on rho21.836 leaves<=3.08 for S2H side arcs and S2F crown filing."
+cite = ["AUTHOR'S CHOICE: practical bulk-prep waste plane offset from v47 STEP crank/head/body solids, harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:CRANK_BOSS_START_Z,CRANK_BOSS_END_Z,HEAD_DIA"]
+
+[process_features.cone_prep_p2_t2_px]
+kind = "end_face"
+at = [15.44, 81.3735, 15.44]
+axis = [-1.0, 0.0, 0.0]
+note = "Coarse head-band terrace wall modelX15.44 above modelZ15.44 (P2); corner on rho21.836 leaves<=3.08 for S2H side arcs and S2F crown filing."
+cite = ["AUTHOR'S CHOICE: practical bulk-prep waste plane offset from v47 STEP crank/head/body solids, harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:CRANK_BOSS_START_Z,CRANK_BOSS_END_Z,HEAD_DIA"]
+
+[process_features.cone_prep_p2_t2_mx]
+kind = "end_face"
+at = [-15.44, 81.3735, 15.44]
+axis = [1.0, 0.0, 0.0]
+note = "Coarse head-band terrace wall modelX-15.44 above modelZ15.44 (P2); corner on rho21.836 leaves<=3.08 for S2H side arcs and S2F crown filing."
+cite = ["AUTHOR'S CHOICE: practical bulk-prep waste plane offset from v47 STEP crank/head/body solids, harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:CRANK_BOSS_START_Z,CRANK_BOSS_END_Z,HEAD_DIA"]
+
+[process_features.cone_prep_p2_t3_px]
+kind = "end_face"
+at = [18.911, 81.3735, 10.918]
+axis = [-1.0, 0.0, 0.0]
+note = "Coarse head-band terrace wall modelX18.911 above modelZ10.918 (P2); corner on rho21.836 leaves<=3.08 for S2H side arcs and S2F crown filing."
+cite = ["AUTHOR'S CHOICE: practical bulk-prep waste plane offset from v47 STEP crank/head/body solids, harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:CRANK_BOSS_START_Z,CRANK_BOSS_END_Z,HEAD_DIA"]
+
+[process_features.cone_prep_p2_t3_mx]
+kind = "end_face"
+at = [-18.911, 81.3735, 10.918]
+axis = [1.0, 0.0, 0.0]
+note = "Coarse head-band terrace wall modelX-18.911 above modelZ10.918 (P2); corner on rho21.836 leaves<=3.08 for S2H side arcs and S2F crown filing."
+cite = ["AUTHOR'S CHOICE: practical bulk-prep waste plane offset from v47 STEP crank/head/body solids, harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:CRANK_BOSS_START_Z,CRANK_BOSS_END_Z,HEAD_DIA"]
+
+[process_features.cone_prep_p2_t4_px]
+kind = "end_face"
+at = [21.092, 81.3735, 5.652]
+axis = [-1.0, 0.0, 0.0]
+note = "Coarse head-band terrace wall modelX21.092 above modelZ5.652 (P2); corner on rho21.836 leaves<=3.08 for S2H side arcs and S2F crown filing."
+cite = ["AUTHOR'S CHOICE: practical bulk-prep waste plane offset from v47 STEP crank/head/body solids, harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:CRANK_BOSS_START_Z,CRANK_BOSS_END_Z,HEAD_DIA"]
+
+[process_features.cone_prep_p2_t4_mx]
+kind = "end_face"
+at = [-21.092, 81.3735, 5.652]
+axis = [1.0, 0.0, 0.0]
+note = "Coarse head-band terrace wall modelX-21.092 above modelZ5.652 (P2); corner on rho21.836 leaves<=3.08 for S2H side arcs and S2F crown filing."
+cite = ["AUTHOR'S CHOICE: practical bulk-prep waste plane offset from v47 STEP crank/head/body solids, harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:CRANK_BOSS_START_Z,CRANK_BOSS_END_Z,HEAD_DIA"]
+
+[process_features.cone_prep_p2_t5_px]
+kind = "end_face"
+at = [21.836, 81.3735, 0.0]
+axis = [-1.0, 0.0, 0.0]
+note = "Coarse head-band terrace wall modelX21.836 above modelZ0.0 (P2); corner on rho21.836 leaves<=3.08 for S2H side arcs and S2F crown filing."
+cite = ["AUTHOR'S CHOICE: practical bulk-prep waste plane offset from v47 STEP crank/head/body solids, harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:CRANK_BOSS_START_Z,CRANK_BOSS_END_Z,HEAD_DIA"]
+
+[process_features.cone_prep_p2_t5_mx]
+kind = "end_face"
+at = [-21.836, 81.3735, 0.0]
+axis = [1.0, 0.0, 0.0]
+note = "Coarse head-band terrace wall modelX-21.836 above modelZ0.0 (P2); corner on rho21.836 leaves<=3.08 for S2H side arcs and S2F crown filing."
+cite = ["AUTHOR'S CHOICE: practical bulk-prep waste plane offset from v47 STEP crank/head/body solids, harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:CRANK_BOSS_START_Z,CRANK_BOSS_END_Z,HEAD_DIA"]
+
+[process_features.cone_prep_pr2_t1_px]
+kind = "end_face"
+at = [11.422, 81.3735, -18.61]
+axis = [-1.0, 0.0, 0.0]
+note = "Coarse head-band terrace wall modelX11.422 above modelZ-18.61 (PR2); corner on rho21.836 leaves<=3.08 for S2H side arcs and S2F crown filing."
+cite = ["AUTHOR'S CHOICE: practical bulk-prep waste plane offset from v47 STEP crank/head/body solids, harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:CRANK_BOSS_START_Z,CRANK_BOSS_END_Z,HEAD_DIA"]
+
+[process_features.cone_prep_pr2_t1_mx]
+kind = "end_face"
+at = [-11.422, 81.3735, -18.61]
+axis = [1.0, 0.0, 0.0]
+note = "Coarse head-band terrace wall modelX-11.422 above modelZ-18.61 (PR2); corner on rho21.836 leaves<=3.08 for S2H side arcs and S2F crown filing."
+cite = ["AUTHOR'S CHOICE: practical bulk-prep waste plane offset from v47 STEP crank/head/body solids, harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:CRANK_BOSS_START_Z,CRANK_BOSS_END_Z,HEAD_DIA"]
+
+[process_features.cone_prep_pr2_t2_px]
+kind = "end_face"
+at = [15.44, 81.3735, -15.44]
+axis = [-1.0, 0.0, 0.0]
+note = "Coarse head-band terrace wall modelX15.44 above modelZ-15.44 (PR2); corner on rho21.836 leaves<=3.08 for S2H side arcs and S2F crown filing."
+cite = ["AUTHOR'S CHOICE: practical bulk-prep waste plane offset from v47 STEP crank/head/body solids, harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:CRANK_BOSS_START_Z,CRANK_BOSS_END_Z,HEAD_DIA"]
+
+[process_features.cone_prep_pr2_t2_mx]
+kind = "end_face"
+at = [-15.44, 81.3735, -15.44]
+axis = [1.0, 0.0, 0.0]
+note = "Coarse head-band terrace wall modelX-15.44 above modelZ-15.44 (PR2); corner on rho21.836 leaves<=3.08 for S2H side arcs and S2F crown filing."
+cite = ["AUTHOR'S CHOICE: practical bulk-prep waste plane offset from v47 STEP crank/head/body solids, harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:CRANK_BOSS_START_Z,CRANK_BOSS_END_Z,HEAD_DIA"]
+
+[process_features.cone_prep_pr2_t3_px]
+kind = "end_face"
+at = [18.911, 81.3735, -10.918]
+axis = [-1.0, 0.0, 0.0]
+note = "Coarse head-band terrace wall modelX18.911 above modelZ-10.918 (PR2); corner on rho21.836 leaves<=3.08 for S2H side arcs and S2F crown filing."
+cite = ["AUTHOR'S CHOICE: practical bulk-prep waste plane offset from v47 STEP crank/head/body solids, harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:CRANK_BOSS_START_Z,CRANK_BOSS_END_Z,HEAD_DIA"]
+
+[process_features.cone_prep_pr2_t3_mx]
+kind = "end_face"
+at = [-18.911, 81.3735, -10.918]
+axis = [1.0, 0.0, 0.0]
+note = "Coarse head-band terrace wall modelX-18.911 above modelZ-10.918 (PR2); corner on rho21.836 leaves<=3.08 for S2H side arcs and S2F crown filing."
+cite = ["AUTHOR'S CHOICE: practical bulk-prep waste plane offset from v47 STEP crank/head/body solids, harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:CRANK_BOSS_START_Z,CRANK_BOSS_END_Z,HEAD_DIA"]
+
+[process_features.cone_prep_pr2_t4_px]
+kind = "end_face"
+at = [21.092, 81.3735, -5.652]
+axis = [-1.0, 0.0, 0.0]
+note = "Coarse head-band terrace wall modelX21.092 above modelZ-5.652 (PR2); corner on rho21.836 leaves<=3.08 for S2H side arcs and S2F crown filing."
+cite = ["AUTHOR'S CHOICE: practical bulk-prep waste plane offset from v47 STEP crank/head/body solids, harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:CRANK_BOSS_START_Z,CRANK_BOSS_END_Z,HEAD_DIA"]
+
+[process_features.cone_prep_pr2_t4_mx]
+kind = "end_face"
+at = [-21.092, 81.3735, -5.652]
+axis = [1.0, 0.0, 0.0]
+note = "Coarse head-band terrace wall modelX-21.092 above modelZ-5.652 (PR2); corner on rho21.836 leaves<=3.08 for S2H side arcs and S2F crown filing."
+cite = ["AUTHOR'S CHOICE: practical bulk-prep waste plane offset from v47 STEP crank/head/body solids, harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:CRANK_BOSS_START_Z,CRANK_BOSS_END_Z,HEAD_DIA"]
+
+[process_features.cone_prep_pr2_t5_px]
+kind = "end_face"
+at = [21.836, 81.3735, 0.0]
+axis = [-1.0, 0.0, 0.0]
+note = "Coarse head-band terrace wall modelX21.836 above modelZ0.0 (PR2); corner on rho21.836 leaves<=3.08 for S2H side arcs and S2F crown filing."
+cite = ["AUTHOR'S CHOICE: practical bulk-prep waste plane offset from v47 STEP crank/head/body solids, harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:CRANK_BOSS_START_Z,CRANK_BOSS_END_Z,HEAD_DIA"]
+
+[process_features.cone_prep_pr2_t5_mx]
+kind = "end_face"
+at = [-21.836, 81.3735, 0.0]
+axis = [1.0, 0.0, 0.0]
+note = "Coarse head-band terrace wall modelX-21.836 above modelZ0.0 (PR2); corner on rho21.836 leaves<=3.08 for S2H side arcs and S2F crown filing."
+cite = ["AUTHOR'S CHOICE: practical bulk-prep waste plane offset from v47 STEP crank/head/body solids, harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:CRANK_BOSS_START_Z,CRANK_BOSS_END_Z,HEAD_DIA"]
+
+# S1 turns Y0..68.072 only to the Ø46 envelope that still contains every cone point
+# (max radius 22.8966), then targets full-radius finish ONLY on boss-free bands Y0..28.4 and Y59..67.4; terminal blend/rootY67.4..68.072 is S2RF:5.
 [[setups]]
 id = "S1"
 machine = "PM-1127VF-LB"
-frame = "T1" # plan.frames.T1, AUTHOR'S CHOICE; exported `setup` and physical binding stay unknown
-stock_in = "authored_round_blank"
-coolant = "CRC cutting oil brushed on" # AUTHOR'S CHOICE; inventory consumable, not speed evidence
-deburr_mm = 0.25 # title_block.yaml:edge_break.radius_mm, edge_break.chamfer_max_mm
-deburr_cite = ["harmonic-analyzer/cad/config/title_block.yaml:edge_break.radius_mm", "harmonic-analyzer/cad/config/title_block.yaml:edge_break.chamfer_max_mm"]
+frame = "T1"
+stock_in = "stock"
+coolant = "unknown"
+deburr_mm = 0.25
+deburr_cite = ["AUTHOR'S CHOICE", "harmonic-analyzer/cad/config/title_block.yaml:in.edge_break"]
 [setups.stock_state]
-od_mm = 110.0 # AUTHOR'S CHOICE: declared blank OD, not a measurement
-north_end_z = 6.0 # AUTHOR'S CHOICE: foot allowance in T1
-south_end_z = -122.742 # AUTHOR'S CHOICE: BLOCK_HEIGHT + sacrificial grip28 behind foot
-note = "AUTHOR'S CHOICE: jaws end at the finished head top; stock extends another28mm along model +Y."
+od_mm = 116.1034022 # rotational swing bound ONLY; real proposed stock is rectangular
+north_end_z = 6.0
+south_end_z = -122.742
+note = "Proposed real rectangular stockX±25.4,Z[-24.0,52.2],Y[-6,122.742]. od_mm only encloses rotation about body axisZ0 (2*hypot(25.4,52.2)); NOT material/contact diameter or stiffness input. Blank centroidZ14.1 offset via independent four-jaw contacts; actual section/length/contact/rigidity and allocation unknown."
 [setups.hold]
-fixture = "chuck-4jaw-6-d1-4"
-support = "none" # AUTHOR'S CHOICE: unsupported route; shop ratio remains unknown
- grip_on = "sacrificial upper28mm past the final head top"
+fixed_jaw = "not_applicable" # proposed non-vise hold; actual fixture availability unknown
+fixture = "unknown"
+support = "unknown"
+grip_on = "AUTHOR'S CHOICE: rectangular50.8x76.2 tailY94.742..122.742; independently offset four-jaw flat contacts"
 grip_mm = 28.0
-stickout_mm = 100.742 # AUTHOR'S CHOICE: exposed foot allowance6 + BLOCK_HEIGHT
-fixed_jaw = "not_applicable"
-jaws_along = "not_applicable"
-parallels = "not_applicable"
-jaw_above_parallels_mm = "not_applicable"
-stop = "AUTHOR'S CHOICE: jaw fronts at T1 Z minus the current body height; separately verify tool clearance"
-clamp = "AUTHOR'S CHOICE: centre in four-jaw; tighten all jaws and remove key before cutting"
+stickout_mm = 100.742
+stop = "Proposed jaw fronts atT1Z-94.742; actual chuck, jaw contact and support unknown."
+clamp = "HOLD actual four-jaw contacts/reach/28mm engagement, positive restraint, cantilever rigidity, imbalance and swept toolpost/apron/bed clearance. Lay out axis at both ends, independently offset centroidZ14.1, tighten/remove key and isolated-spindle hand-turn full revolution. Qualify low-speed interrupted cuts, trial-turn lower band, micrometer ACTUAL diameter, indicate real cylinder at two stations.116.1034022 is SWING ONLY, never round-bar stiffness; actual support/settings/results unknown."
+note = "Nominal proposed PM-1127VF-LB published11in swing exceeds116.1034022mm geometric blank rotation, but actual machine availability, bed/cross-slide/toolpost/jaw clearance, fixture pose/binding, indicator/calibration and balance remain UNKNOWN. The raw head block stays rectangular and offset through every S1 op. Published nominal swing is not actual clearance or stiffness; no example commissioning data adopted."
 [setups.zero.x]
 feature = "spindle_axis"
 edge_mm = 0.0
 from = "+x"
-method = "trial_cut_measure" # EL4009.2.1 p62; measured diameter unavailable
- tool = "turning-tools-warner-lms-4132/AR"
-gauge = "unknown" # no inventory outside micrometer spans the110mm trial-cut blank
-check_jog_mm = 10.0 # AUTHOR'S CHOICE
+method = "trial_cut_measure"
+tool = "unknown"
+gauge = "unknown"
+check_jog_mm = 10.0
 [setups.zero.z]
 face = "foot_seat"
 edge_mm = 0.0
 from = "+z"
 method = "face_then_set"
 after_op = 10
- tool = "turning-tools-warner-lms-4132/AR"
-paper_mm = 0.0 # AUTHOR'S CHOICE: direct cut face
-check_jog_mm = 10.0
-retouch_after = []
-[[setups.ops]]
-op = 10
-do = "face"
-feature = "foot_seat"
-tool = "turning-tools-warner-lms-4132/AR"
-holder = "qctp-axa-lms-2280/1-turning-facing"
-to_z = 0.0
-direction = "radially_inward"
-doc_mm = 0.25 # AUTHOR'S CHOICE, not cutting-data proof
-feed_mm_rev = 0.05 # AUTHOR'S CHOICE; RPM unknown
-note = "AUTHOR'S CHOICE: remove6mm axial allowance in passes and establish datum B; reach/nose geometry and speed remain unresolved."
-[setups.ops.checks]
-finish_ra = "unknown"
-[[setups.ops]]
-op = 20
-do = "rough_turn"
-feature = "body"
-tool = "turning-tools-warner-lms-4132/AR"
-holder = "qctp-axa-lms-2280/1-turning-facing"
-z_from = 0.0
-z_to = -24.5 # AUTHOR'S CHOICE: stop short of inclined pad lowest Y24.768
-rough_allowance_mm = 0.4 # AUTHOR'S CHOICE: on DIAMETER
- direction = "toward_chuck"
-doc_mm = 0.25
-feed_mm_rev = 0.05
-[[setups.ops]]
-op = 30
-do = "finish_turn"
-feature = "body"
-tool = "turning-tools-warner-lms-4132/AR"
-holder = "qctp-axa-lms-2280/1-turning-facing"
-z_from = 0.0
-z_to = -24.5
- direction = "toward_chuck"
-doc_mm = 0.1 # AUTHOR'S CHOICE
-feed_mm_rev = 0.03 # AUTHOR'S CHOICE
-note = "AUTHOR'S CHOICE: only the lower body region; S2 finishes the remaining outline without cutting off the bosses."
-[setups.ops.checks]
-dia = "micrometers/1-2in"
-height = "calipers"
-
-[[setups]]
-id = "S2"
-machine = "PM-30MV"
-frame = "M2" # plan.frames.M2, AUTHOR'S CHOICE; physical binding unknown
-stock_in = "S1_integral_blank"
-coolant = "CRC cutting oil brushed on"
-deburr_mm = 0.25
-deburr_cite = ["harmonic-analyzer/cad/config/title_block.yaml:edge_break.radius_mm", "harmonic-analyzer/cad/config/title_block.yaml:edge_break.chamfer_max_mm"]
-[setups.stock_state]
-top_z = 122.742 # AUTHOR'S CHOICE: BLOCK_HEIGHT + sacrificial grip28 before removal
-bottom_z = 0.0
-note = "AUTHOR'S CHOICE: nominal foot-down placement; toolpaths around both integral pads and real clamping contacts are unproven."
-[setups.stock_state.local_thickness]
-mount_west = 94.742 # current BLOCK_HEIGHT; drill after the head is faced
-mount_east = 94.742
-[setups.hold]
-fixture = "unknown" # no suitable full-envelope integral-blank nest is recorded
-support = "unknown"
-grip_on = "finished lower-body region and foot; contact geometry unknown"
-grip_mm = 20.0 # AUTHOR'S CHOICE target; no manufactured nest claimed
-fixed_jaw = "not_applicable"
-jaws_along = "not_applicable"
-parallels = "not_applicable"
-jaw_above_parallels_mm = "not_applicable"
-stop = "AUTHOR'S CHOICE: indicate foot datum B and body axis; stop geometry unknown"
-clamp = "AUTHOR'S CHOICE: restraint must clear complete head and crank boss; hardware selection unknown"
-[setups.zero.transfer]
-from = "S1"
-indicate = ["foot_seat", "body"]
-gauge = "dial-indicator"
-runout_limit_mm = "unknown" # no sourced refixture budget
-[setups.zero.x]
-feature = "body_axis"
-edge_mm = 0.0
-from = "indicated"
-method = "indicate_axis"
-tool = "dial-indicator"
-check_jog_mm = 10.0
-[setups.zero.y]
-feature = "body_axis"
-edge_mm = 0.0
-from = "indicated"
-method = "indicate_axis"
-tool = "dial-indicator"
-check_jog_mm = 10.0
-[setups.zero.z]
-face = "foot_seat"
-edge_mm = 0.0
-from = "+z"
-method = "touch_then_set"
 tool = "unknown"
 paper_mm = 0.0
 check_jog_mm = 10.0
@@ -230,93 +367,330 @@ retouch_after = []
 [[setups.ops]]
 op = 10
 do = "face"
-feature = "head"
+feature = "foot_seat"
+faces = ["HAF_FOOT_SEAT__P01"]
 tool = "unknown"
 holder = "unknown"
-to_z = 94.742 # current BLOCK_HEIGHT; removes AUTHOR'S CHOICE28mm grip
- direction = "positive_setup_x"
-note = "AUTHOR'S CHOICE: remove sacrificial grip; reach and fixture/tool identities remain unknown."
+to_z = 0.0
+direction = "radially_inward"
+rpm = "unknown"
+doc_mm = "unknown"
+feed_mm_rev = "unknown"
+note = "AUTHOR'S CHOICE: remove6mm foot allowance in qualified low-speed interrupted radial-facing passes over real rectangular section; start beyondR58.06 swing, not imaginary round OD. Establish B/Z0 from actual cut, micrometer trial-turned diameter for X. Qualify tool nose/reach, restraint/imbalance/support/material-dependent settings; actual tooling/cutting/measurement unknown. Tool changes retouch same master."
 [setups.ops.checks]
-dia = "calipers"
-height = "calipers"
+finish_ra = "unknown"
+[setups.ops.inspection_methods]
+finish_ra = "Proposed quantitative traces across B lay at multiple radii, requirementRa<=3.2um. Actual instrument, cutoff, calibration, uncertainty and observations unknown; no acceptance inferred from feed."
 [[setups.ops]]
-op = 20
-do = "profile"
+op = 12
+do = "rough_turn"
 feature = "body"
 tool = "unknown"
 holder = "unknown"
-stock_to_leave_mm = 0.0
- direction = "around_retained_integral_pads"
-note = "AUTHOR'S CHOICE: finish body outline outside S1 turned region, retain both bosses; no swept toolpath/envelope or physical clearance proof is supplied."
-[setups.ops.checks]
-dia = "calipers"
-height = "calipers"
+z_from = 0.5
+z_to = -68.072
+to_dia = 87.0
+direction = "toward_chuck"
+rpm = "unknown"
+doc_mm = "unknown"
+feed_mm_rev = "unknown"
+note = "AUTHOR'S CHOICE BULK PREP stage 1/3, not a finished-body claim: interrupted corner cuts on the REAL offset rectangle over modelY0..68.072 from swingØ116.1 toØ87. Each pass starts in air atT1Z+0.5 (air lead>=actual nose radius before the foot edge) and stops atZ-68.072 against the rectangular head block; actual nose leaves a process fillet there, carried to S2B/S2R. Spindle speed must be limited by WHOLE-BLANK imbalance, not cut diameter: the rectangular head+tail keeps rotating at swingØ116.1 with centroid offset14.1 through every stage. Actual tool/nose/holder, material/density, speeds/feeds, forces, imbalance and grip capability unknown; the116.1 swing is not stiffness."
+[[setups.ops]]
+op = 13
+do = "rough_turn"
+feature = "body"
+tool = "unknown"
+holder = "unknown"
+z_from = 0.5
+z_to = -68.072
+to_dia = 70.0
+direction = "toward_chuck"
+rpm = "unknown"
+doc_mm = "unknown"
+feed_mm_rev = "unknown"
+note = "AUTHOR'S CHOICE BULK PREP stage 2/3:Ø87 toØ70, same window/air lead. Any speed increase over stage 1 must keep the actual whole-assembly unbalance force no higher than the qualified stage-1 value (nominal geometric unbalance falls from ~52.8 to ~38.4kg.mm at assumed steel density, i.e. ~1.17x speed at equal force) and pass an isolated run-up check; actual values unknown."
+[[setups.ops]]
+op = 15
+do = "rough_turn"
+feature = "body"
+tool = "unknown"
+holder = "unknown"
+z_from = 0.5
+z_to = -68.072
+to_dia = 46.0
+direction = "toward_chuck"
+rpm = "unknown"
+doc_mm = "unknown"
+feed_mm_rev = "unknown"
+note = "AUTHOR'S CHOICE BULK PREP stage 3/3:Ø70 to the Ø46.000 envelope (R23). Every cone point with its0.20 cap allowance lies inside R22.8966, leaving>=0.1034 radial on the cone extreme and2.045 on bodyR20.955; head/crank beyondY68.072 untouched. Nominal geometry: 36 radial passes of1.0 over the three stages. The head/tail rectangle still dominates unbalance at Ø46 (nominal ~23.5kg.mm), so speed stays imbalance-limited. Actual tool, speeds/feeds, forces, imbalance and grip capability unknown."
+[[setups.ops]]
+op = 20
+do = "rough_turn"
+feature = "body"
+tool = "unknown"
+holder = "unknown"
+z_from = 0.5
+z_to = -28.4
+to_dia = 42.31
+rough_allowance_mm = 0.2
+direction = "toward_chuck"
+rpm = "unknown"
+doc_mm = "unknown"
+feed_mm_rev = "unknown"
+note = "AUTHOR'S CHOICE: from the Ø46 envelope rough onlyY0..28.4 toØ42.310, radial removal1.845 requiring four0.5/0.5/0.5/0.345 proposed passes, with air lead atZ+0.5. Stop atZ-28.4: overrun past the clamp-gap flat (Y28.0) keeps the nose/lead transition1.064mm before pad lowestY29.464; actual tool nose/lead/runout and native tip/holder proof against the R22.8966 pad envelope unknown. Collar endsY21, leaving a flat toY28.0 for the S2H body arcs from Y28.4, not a sharp-shoulder claim."
+[[setups.ops]]
+op = 25
+do = "rough_turn"
+feature = "body"
+tool = "unknown"
+holder = "unknown"
+z_from = -59.0
+z_to = -67.8
+to_dia = 42.31
+rough_allowance_mm = 0.2
+direction = "toward_chuck"
+rpm = "unknown"
+doc_mm = "unknown"
+feed_mm_rev = "unknown"
+note = "AUTHOR'S CHOICE: rough middle bodyY59..67.8 fromØ46 toØ42.31 BEFORE lower finish op30 in proposed radial passes1.0/0.845. Traverse to entry outsideR23, feed radially in atZ-59, turn toward chuck. The proposed right-hand AR has a0.4 nose and11mm trailing functional head: at startY59 the nose centreY58.6 keeps the trailing head at/beyondY47.6,0.864 clear of the inclined bossY<=46.736. Qualify exact full tool, holder and fixture swept clearance before cutting; this axial calculation alone is not clearance proof. Actual tool geometry unknown; AR envelope is a design constraint, not installed-tool evidence. Full-radius target onlyY59..67.4; S2H stations52.5/55.5/58.5 address omitted body, S2F excluded cone sectors, S2RF:5 terminal bodyY67.4..68.072. PHYSICAL ENTRY HOLD before this operation: qualify actual radial entry into the retained upstream R23 stock, secondary-edge engagement, lead-in, force and chip load, and the full tool/holder/fixture envelope. Longitudinal DOC does not qualify radial entry. Do not execute or claim after-operation stock until qualified."
 [[setups.ops]]
 op = 30
-do = "profile"
+do = "finish_turn"
+feature = "body"
+tool = "unknown"
+holder = "unknown"
+z_from = 0.5
+z_to = -28.4
+to_dia = 41.91
+direction = "toward_chuck"
+rpm = "unknown"
+doc_mm = "unknown"
+feed_mm_rev = "unknown"
+note = "AUTHOR'S CHOICE: target41.910 within41.656..42.164 onY0..28.4 only, removing0.2 radial in two0.1 proposed passes, with the same air lead and pad margin as op20. Preserve actual band/B and recoverable meridian. Actual measured diameter, tool geometry and refixture error unknown."
+[setups.ops.checks]
+dia = "unknown"
+[setups.ops.inspection_methods]
+dia = "Proposed cooled actual-diameter readings atY3,12,21,26 in two directions using qualified1-2in micrometer. Record measured diameter for trial-cut X zero; later flat-end pickups independently measure actual highest standing patches across the entire tool footprint, not half this diameter;116.1034022 rotating bound is never a micrometer reading. Actual gauge/calibration/uncertainty/observations unknown."
+[[setups.ops]]
+op = 35
+do = "finish_turn"
+feature = "body"
+tool = "unknown"
+holder = "unknown"
+z_from = -59.0
+z_to = -67.8
+to_dia = 41.91
+direction = "toward_chuck"
+rpm = "unknown"
+doc_mm = "unknown"
+feed_mm_rev = "unknown"
+note = "AUTHOR'S CHOICE: finish modelY59..67.8 toØ41.910,0.2 radial in two0.1 proposed passes, same entry and clearance HOLD as op25. Full-radius target ONLYY59..67.4; terminal nose blendY67.4..67.8 and remaining skin toY68.072 require S2RF:5. Actual tool/cutting/measurements unknown. PHYSICAL ENTRY HOLD before this operation: qualify actual radial entry into the retained upstream R23 stock, secondary-edge engagement, lead-in, force and chip load, and the full tool/holder/fixture envelope. Longitudinal DOC does not qualify radial entry. Do not execute or claim after-operation stock until qualified."
+[setups.ops.checks]
+dia = "unknown"
+[setups.ops.inspection_methods]
+dia = "Proposed actual-diameter readings atY62.25 and64.0 in two directions, corrected diameter41.656..42.164mm. Before reading qualify ACTUAL anvil and spindle footprints entirely inside full-radius bandY59..67.4; if either does not fit, HOLD, no invented anvil measurement. Actual gauge/calibration/uncertainty/observations unknown."
+# S1C saws the raw tail off, leaving a 1.5mm facing allowance above the head (proposal).
+[[setups]]
+id = "S1C"
+machine = "unknown"
+frame = "TC"
+stock_in = "S1"
+coolant = "unknown"
+deburr_mm = 0.25
+deburr_cite = ["AUTHOR'S CHOICE: remove loose saw burrs only within subsequent facing allowance"]
+[setups.stock_state]
+top_z = 50.8
+bottom_z = 0.0
+note = "AUTHOR'S CHOICE actual-shape proposal: raw head/tail rectangle inTC X68.072..122.742,Y[-24,52.2],Z[0,50.8]; carry real prior S1 removals. Not a whole-stock bounding-box reset. Actual incoming dimensions/removal evidence UNKNOWN."
+[setups.hold]
+fixture = "unknown"
+support = "unknown"
+jaws_along = "x"
+fixed_jaw = "back"
+jaw_center_along_mm = 37.5
+parallels = "none"
+jaw_above_parallels_mm = 60.0
+grip_mm = 50.8
+grip_on = "AUTHOR'S CHOICE: actual raw head opposing flats TCY=-24/52.2,X68.072..92.5,Z0..50.8; actual jaw dimensions/contact/fixture UNKNOWN"
+stop = "Propose layout of retained sawnface96.242 from actual B; align kept-side blade edge there only after measuring actual kerf. No guessed bandsaw DRO zero or axial thrust on slug. Actual gauges/calibration/mark/setting UNKNOWN."
+clamp = "Propose direct retained raw-head vise grip,bed-seated on modelX=-25.4 flat,not on a cylindrical envelope. Jawwidth110 centredX37.5 would endX92.5,3.742 before proposed kerflow96.242,with24.428mm axial overlap on each head flat. Actual vise/bed dimensions,positive restraint,contact,load capability and body-cantilever results UNKNOWN; do not import demonstration fixture facts. Independently anchored outfeed support/capture must not lift head or close kerf."
+note = "AUTHOR'S CHOICE physical support construction: adjustable full outfeed shoe TCX98.75..123.5,Y[-31,59],topbedZ0; proposed compliant/free-rolling upper capture atX111 with15N target download,no rigid second vise or axial clamp. This changes the earlier all-solidsX>=101/no-preload alternative: new shoe front is only1.008 beyond nominal kerfhigh97.742,so actual bladebody/bow/guide travel down to fullcut MUST fit; no imaginary plane proves that gap. Raw slug is solid25x76.2x50.8,COMX110.242. At proposed1018 density its illustrative mass~0.760kg gives gravity tipping threshold~85N aboutshoe front; nominal15Nupper capture adds~182N to~267N. HA actual material/density,blade downward/side forces,shoe/roller adjustment,compliance,deflection,friction,pinching,fixture/pose/binding and calibration UNKNOWN; these static design calculations are not load/clearance certification. Actual support cannot be named/posed until sourced and qualified; do not borrow slug as fixture stock."
+[[setups.ops]]
+op = 10
+do = "saw_cut"
 feature = "head"
+keep = "head"
+tool = "unknown"
+cut_plane = { axis = "x", value = 96.992, keep = "below" }
+feed_mm_min = "unknown"
+note = "AUTHOR'S CHOICE: real bandsaw cut through complete proposed50.8x76.2 raw section. Qualified actual kerf1.5 would leave raw cutface96.242,kerf96.242..97.742,and25mm slug97.742..122.742. Actual kerf/tool/saw unknown means actual retained boundary and routed stock remain unknown. Propose low-speed light controlled descent,bounded actual downward/side force and independently qualified outfeed support/capture; no nominal volume grants execution. Keep=head preserves work,not an output ownership claim. Finished headtop94.742 is1.5 below proposed retained plane; common crank top92.2955 has3.9465 clearance,cone top46.736 remains. Raise blade,stop power/wait before slug retrieval. No target-face/surface-finish credit; no allowance_mm or stock_removal_bounds on straight saw_cut."
+note_cite = ["AUTHOR'S CHOICE: proposed saw cutcentre/kerf/face allowance", "harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:BLOCK_HEIGHT,CRANK_BOSS_DIA", "prechips/docs/rules-geometry.md:Saw cut-off"]
+
+[[setups]]
+id = "S2"
+machine = "PM-30MV"
+frame = "M2"
+stock_in = "S1C"
+coolant = "unknown"
+deburr_mm = 0.25
+deburr_cite = ["AUTHOR'S CHOICE", "harmonic-analyzer/cad/config/title_block.yaml:in.edge_break"]
+[setups.stock_state]
+top_z = 96.242 # proposed conditional on qualified actual kerf; not observed arrival
+bottom_z = 0.0
+note = "S1 proposal faced B, turnedY0..68.072 to the Ø46 envelope and finished full-radius targets onlyY0..28.4 andY59..67.4; terminal blend/rootY67.4..68.072 unfinished for S2RF:5; S1C proposed real cutoff leaves a1.5 full-section face allowance on the offset rectangular head blockY68.072..96.242; actual kerf/retained stock UNKNOWN until sourced/qualified. Carry actual S1 geometry, no nominal-part reset; other overstock remains for S2B/S2BR."
+[setups.stock_state.local_thickness]
+mount_west = 94.742
+mount_east = 94.742
+[setups.hold]
+fixed_jaw = "not_applicable" # proposed non-vise lower-body nest
+fixture = "unknown"
+support = "unknown"
+grip_on = "AUTHOR'S CHOICE: lower bandY1..21 and B pads"
+grip_mm = 20.0
+stop = "Propose three B pads atmodelXZ(0,15),(12.990381,-7.5),(-12.990381,-7.5), keyed meridian; drill columnsX±12.954,Z0 relieved."
+clamp = "Proposed split lower-body nest/clampsY1..21,B pads, bolts outside tool/drill corridor; S1Y0..28.4 gives7mm collar gap. Loosely locate B/body/meridian, secure, then recheck after final tightening; recover/reclamp/recheck if disturbed, STOP on movement. Qualify offset rectangular head/lever arm and full facing/drilling/shank/holder corridors, not finished-head-only geometry. Actual nest/drill-exit relief/hardware/pose/load qualification unknown; no example contacts adopted."
+note = "FIRST-USE fixture continuation HOLD before S2: actual fixture identity, manufacture/construction method, assembled B seating/reference calibration and corridor/load qualification unresolved. No ready fixture selector or made hardware is asserted. Component physical sizes and posed setup-frame AABB extents are different quantities; neither alone proves contact or swept clearance. Preserve all authored geometry/poses."
+[setups.zero.transfer]
+from = "S1C"
+indicate = ["body", "foot_seat"]
+gauge = "unknown"
+runout_limit_mm = "unknown"
+[setups.zero.x]
+feature = "body_axis"
+edge_mm = 0.0
+from = "indicated"
+method = "indicate_axis"
+tool = "unknown"
+check_jog_mm = 10.0
+[setups.zero.y]
+feature = "body_axis"
+edge_mm = 0.0
+from = "indicated"
+method = "indicate_axis"
+tool = "unknown"
+check_jog_mm = 10.0
+[setups.zero.z]
+face = "head"
+edge_mm = "unknown"
+from = "+z"
+method = "measure_then_set"
+gauge = "unknown"
+measure = "M = actual signed accessible arriving head-top height above the calibrated seated B-pad reference, positive M2+Z; independently height-gauge/comparator measure the entire selected footprint, then touch that same intact patch. Qualify B seating/reference transfer, contact/sign/calibration or STOP. Design96.242 raw bound and94.742 target are never readings. Replan/qualify first face level if measured overstock exceeds authored0.5 DOC; no fixed three-level assumption on arbitrary M. Actual gauge/tool/calibration unknown."
+offset_mm = 0.0
+tool = "unknown"
+paper_mm = 0.0
+check_jog_mm = 10.0
+retouch_after = []
+[[setups.zero.tool_touches]]
+tool = "unknown"
+z_face = "head"
+method = "measure_then_set"
+z_gauge = "unknown"
+z_measure = "M = independently remeasured actual signed head-top height from the same calibrated seated B reference after preceding cuts; qualify a new intact full-tool-footprint patch outside all spots/holes/counterbores and touch that same patch before op60. Never nominal94.742 or inherited tool length. STOP if actual patch/reference/calibration/access unqualified; actual tool/gauge unknown."
+z_offset_mm = 0.0
+paper_mm = 0.0
+before_ops = [60]
+[[setups.zero.tool_touches]]
+tool = "unknown"
+z_face = "head"
+method = "measure_then_set"
+z_gauge = "unknown"
+z_measure = "M = independently remeasured actual signed head-top height from the same calibrated seated B reference after preceding cuts; qualify a new intact full-tool-footprint patch outside all spots/holes/counterbores and touch that same patch before op70. Never nominal94.742 or inherited tool length. STOP if actual patch/reference/calibration/access unqualified; actual tool/gauge unknown."
+z_offset_mm = 0.0
+paper_mm = 0.0
+before_ops = [70]
+[[setups.zero.tool_touches]]
+tool = "unknown"
+z_face = "head"
+method = "measure_then_set"
+z_gauge = "unknown"
+z_measure = "M = independently remeasured actual signed head-top height from the same calibrated seated B reference after preceding cuts; qualify a new intact full-tool-footprint patch outside all spots/holes/counterbores and touch that same patch before op80. Never nominal94.742 or inherited tool length. STOP if actual patch/reference/calibration/access unqualified; actual tool/gauge unknown."
+z_offset_mm = 0.0
+paper_mm = 0.0
+before_ops = [80]
+[[setups.zero.tool_touches]]
+tool = "unknown"
+z_face = "head"
+method = "measure_then_set"
+z_gauge = "unknown"
+z_measure = "M = independently remeasured actual signed head-top height from the same calibrated seated B reference after preceding cuts; qualify a new intact full-tool-footprint patch outside all spots/holes/counterbores and touch that same patch before op90. Never nominal94.742 or inherited tool length. STOP if actual patch/reference/calibration/access unqualified; actual tool/gauge unknown."
+z_offset_mm = 0.0
+paper_mm = 0.0
+before_ops = [90]
+[[setups.zero.tool_touches]]
+tool = "unknown"
+z_face = "head"
+method = "measure_then_set"
+z_gauge = "unknown"
+z_measure = "M = independently remeasured actual signed head-top height from the same calibrated seated B reference after preceding cuts; qualify a new intact full-tool-footprint patch outside all spots/holes/counterbores and touch that same patch before op100. Never nominal94.742 or inherited tool length. STOP if actual patch/reference/calibration/access unqualified; actual tool/gauge unknown."
+z_offset_mm = 0.0
+paper_mm = 0.0
+before_ops = [100]
+[[setups.zero.tool_touches]]
+tool = "unknown"
+z_face = "head"
+method = "measure_then_set"
+z_gauge = "unknown"
+z_measure = "M = independently remeasured actual signed head-top height from the same calibrated seated B reference after preceding cuts; qualify a new intact full-tool-footprint patch outside all spots/holes/counterbores and touch that same patch before op110. Never nominal94.742 or inherited tool length. STOP if actual patch/reference/calibration/access unqualified; actual tool/gauge unknown."
+z_offset_mm = 0.0
+paper_mm = 0.0
+before_ops = [110]
+[[setups.ops]]
+op = 10
+do = "face"
+feature = "head"
+faces = ["HAF_HEAD__P02"]
 tool = "unknown"
 holder = "unknown"
-stock_to_leave_mm = 0.0
- direction = "around_retained_crank_boss"
+to_z = 94.742
+direction = "positive_setup_x"
+doc_mm = 0.5 # AUTHOR'S CHOICE maximum proposed axial layer; actual qualified cutting data unknown
+ae_mm = 12.0 # AUTHOR'S CHOICE maximum proposed row spacing, conditional on qualified cutter
+approach_mm = 5.0 # proposed retract above actual arriving sawn top96.242
+contour = { method = "linear_table", step_mm = 12.0, open_side = "-y", sweep_frame = "model", sweep_bounds = { x = [-25.4, 25.4], y = [94.742, 96.242], z = [-24.0, 52.2] } }
+stock_removal_bounds = { x = [-25.4, 25.4], y = [-52.2, 24.0], z = [94.742, 96.242] } # proposed M2 full-section footprint/depth of the1.5 saw allowance
+note = "AUTHOR'S CHOICE facing proposal: ONLY1.5 saw allowance over FULL real rectangle,not28tail/head-onlydisk. Nominal three<=0.5 axial layers95.742,95.242,94.742,edge-inclusive rowsY-52.2/24,spacing<=12 AND<=ACTUAL flat cutting diameter. Select/qualify actual face-capable cutter; run X-only from outsideX±(25.4+ACTUALradius),lower entirely in air,feed row,retractM2Z101.242 before return/Y index. Actual cutter diameter/flutes/corner geometry/flute/projection/holder availability,settings/forces,pose/binding/calibration and native sweep evidence UNKNOWN. Conditional bounds name the actual proposed swept footprint/depth,not permission for unswept deletion. Actual arriving sawplane/depth schedule must be recomputed if actual kerf differs; no processmetadata zero or nominalpartreset. Preserve source targetheadY94.742 and common crank top92.2955; existing mount operations follow,then radial/head-root work only after tail physically gone."
 [setups.ops.checks]
-dia = "calipers"
-height = "calipers"
-[[setups.ops]]
-op = 40
-do = "profile"
-feature = "crank_boss"
-tool = "unknown"
-holder = "unknown"
-stock_to_leave_mm = 0.0
- direction = "along_crank_axis"
-[setups.ops.checks]
-dia = "calipers"
-[[setups.ops]]
-op = 45
-do = "inspect"
-feature = "crank_boss_faces"
-note = "Existing crank-boss length/station checks, keyed to the exported face owner."
-[setups.ops.checks]
-length = "calipers"
-station = "calipers"
-[[setups.ops]]
-op = 50
-do = "profile"
-feature = "cone_boss"
-tool = "unknown"
-holder = "unknown"
-stock_to_leave_mm = 0.0
- direction = "along_inclined_journal_axis"
-[setups.ops.checks]
-dia = "calipers"
+height = "unknown"
+[setups.ops.inspection_methods]
+height = "Proposed B-seated block/indicator head-top comparison at four points;94.488..94.996 overall height. Gauge/calibration/uncertainty and observations unknown."
 [[setups.ops]]
 op = 60
 do = "spot"
 feature = "mount_west"
 tool = "unknown"
 holder = "unknown"
-depth_mm = 0.5 # AUTHOR'S CHOICE
+depth_mm = 0.5
+to_z = 94.242 # nominal proposal: head94.742 minus0.5; actual face/tool/setting qualification unknown
+note = "AUTHOR'S CHOICE: nominal M2X-12.954,Y0; verify sign/jog sense before cutting, actual spindle/tool offset unknown."
 [[setups.ops]]
 op = 70
 do = "drill"
 feature = "mount_west"
-tool = "unknown" # no measured7.14248mm drill is asserted
+tool = "unknown"
 holder = "unknown"
-exit_mm = 0.5 # AUTHOR'S CHOICE; actual drill-point target remains unknown
+exit_mm = 0.5
+note = "AUTHOR'S CHOICE: procure long pilot appropriate to7.14248..7.24408 hole band; target hole midpoint7.19328, not assumed drill outcome. For proposed118deg point and nominalD7.1438, tip allowanceD/(2tan59deg)~2.146 plus.5exit givesM2Z-2.646,total97.388 from94.742. Actual D/point/flute/projection and even availability unknown: recalculate from qualified tool, prove>=actual travel plus clearance. Proposed2mm pecks/full withdrawal every6mm requires material/tool qualification; speeds/feeds unknown."
 [setups.ops.checks]
 dia = "unknown"
-station = "calipers"
+thru = "unknown"
+[setups.ops.inspection_methods]
+dia = "Proposed short-contact expanding TRANSFER gauge, lock expansion at depth, withdraw/measure contacts, repeat depths/directions. No direct-reading feature invented. Actual gauge/calibration/uncertainty and results unknown; printed7.14248..7.24408, guard derived only from actual capability."
+thru = "HOLD: existing expanding7.14..7.25 pilot/Ø8 external-stem device is a mouth/centering transfer only;8mm stem/62mm length cannot prove full passage of approximately94.742mm column. Compatible qualified full-through method and clear-exit evidence unresolved; no new gauge or qualified CMM method asserted."
 [[setups.ops]]
 op = 80
 do = "counterbore"
 feature = "mount_west_counterbore"
 tool = "unknown"
 holder = "unknown"
-depth_mm = 6.0198 # spec:81 nominal; acceptance band in manifest
+depth_mm = 6.0198
+note = "AUTHOR'S CHOICE: retainX-12.954,Y0; proposed piloted flat counterboreØ11.50, pilot must fit ACTUAL hole. Printed11.176..11.684, not undersize7/16 endmill. Independently measure/touch qualified intact head-top patch from calibrated seated B as op80 retouch, never nominal94.742 as reading. Flat-floor88.7222 is candidate target, not attained surface. Actual cutter geometry/depth stop/cutting settings unknown."
 [setups.ops.checks]
-dia = "calipers"
-depth = "calipers"
+dia = "unknown"
+depth = "unknown"
+[setups.ops.inspection_methods]
+dia = "Proposed bore comparison in two directions, band11.176..11.684; actual setting/gauge/calibration unknown."
+depth = "Proposed bridge depth comparison from clean head top to annular floor at three sectors,5.842..6.350, not into through hole; actual gauge/calibration/results unknown."
 [[setups.ops]]
 op = 90
 do = "spot"
@@ -324,6 +698,8 @@ feature = "mount_east"
 tool = "unknown"
 holder = "unknown"
 depth_mm = 0.5
+to_z = 94.242 # same nominal spotting bottom; not an observed station or execution approval
+note = "AUTHOR'S CHOICE:M2X+12.954,Y0; physical offset/tool/cutting data unknown."
 [[setups.ops]]
 op = 100
 do = "drill"
@@ -331,9 +707,13 @@ feature = "mount_east"
 tool = "unknown"
 holder = "unknown"
 exit_mm = 0.5
+note = "AUTHOR'S CHOICE: same qualified-tool/reach/breakthrough methodS2:70, positiveX12.954. Actual drill diameter,118deg assumption, long-flute reach and chip evacuation must be established, not copied as measured evidence."
 [setups.ops.checks]
 dia = "unknown"
-station = "calipers"
+thru = "unknown"
+[setups.ops.inspection_methods]
+dia = "Proposed repeated locked-transfer comparison aswest, printed7.14248..7.24408; actual capability/results unknown."
+thru = "HOLD: existing short expanding-pilot mouth/centering transfer only; compatible full-through method for approximately94.742mm column and clear-exit evidence unresolved. No fictional new gauge."
 [[setups.ops]]
 op = 110
 do = "counterbore"
@@ -341,61 +721,1110 @@ feature = "mount_east_counterbore"
 tool = "unknown"
 holder = "unknown"
 depth_mm = 6.0198
+note = "AUTHOR'S CHOICE: M2X+12.954,Y0, same proposed flat-floor88.7222 and measured-pilot-fit methodS2:80; actual tool/cutting/inspection capability unknown."
 [setups.ops.checks]
-dia = "calipers"
-depth = "calipers"
+dia = "unknown"
+depth = "unknown"
+[setups.ops.inspection_methods]
+dia = "Proposed actual diameter11.176..11.684 in two directions, no nominal cutter pass; calibrated method unknown."
+depth = "Proposed top-to-annular-floor5.842..6.350 comparison, avoiding through hole; actual method capability/results unknown."
+
+# S2B/S2BR PRACTICAL BULK PREP proposal (P2 then PR2 presentations): flat-end floors,
+# coarse head-band terraces and crank stairs leaving <=3.08 terrace-corner stock for the
+# S2H head arcs and S2F crown/saddle filing, and 0.15..0.25 crank OD stock for S2F. Printed paths are the only removal credit
+# except the full-swept face boxes. Actual tools/fixtures/settings are unknown.
+[[setups]]
+id = "S2B"
+machine = "PM-30MV"
+frame = "P2"
+stock_in = "S2"
+coolant = "unknown"
+deburr_mm = 0.25
+deburr_cite = ["AUTHOR'S CHOICE", "harmonic-analyzer/cad/config/title_block.yaml:in.edge_break"]
+[setups.stock_state]
+top_z = 52.2
+bottom_z = -24.0
+note = "Arriving: S1 Ø46 envelope Y0..68.072 (cone inside R22.8966; Y28.4..59 remains R23), lathe-final Ø41.91 on Y0..28.4 and Y59..67.4 (terminal blend/rootY67.4..68.072 unfinished for S2RF:5), raw offset head block X±25.4,Z[-24.0,52.2],Y68.072..94.742; S1C sawed the tail off and S2:10 faced the1.5 allowance to94.742. No ideal-part reset."
+[setups.hold]
+fixed_jaw = "not_applicable" # proposed non-vise radial cradle
+fixture = "unknown"
+support = "unknown"
+grip_on = "AUTHOR'S CHOICE: finished lower bandY1..21, B stop and keyed meridian"
+grip_mm = 20.0
+stop = "Proposed B buttons atY0; base/clampsY<24."
+clamp = "Proposed positively clamped radial cradle, no free rotation or hand-holding under load. Bulk-prep side/face-milling loads on the20mm lower grip with the head block cantilevered are unqualified; actual manufactured cradle, hardware, contacts, pose and load qualification unknown."
+note = "Proposed S2F-type radial cradle presentation for practical bulk prep; qualify the actual arriving stock, lower grip, cutter/shank/holder and every stroke/return corridor. Actual fixture, tool, gauge, pose, calibration and availability unknown."
+[setups.zero.transfer]
+from = "S2"
+indicate = ["body", "foot_seat"]
+gauge = "unknown"
+runout_limit_mm = "unknown"
+[setups.zero.x]
+feature = "body_axis"
+edge_mm = 0.0
+from = "indicated"
+method = "indicate_axis"
+tool = "unknown"
+check_jog_mm = 10.0
+[setups.zero.y]
+feature = "foot_seat"
+edge_mm = "unknown"
+from = "indicated"
+method = "indicate_axis"
+tool = "unknown"
+check_jog_mm = 10.0
+procedure = "PICKUP HOLD: qualified B-button-plane-to-machine-Y transfer, accessible actual contact, gauge offset/sign/calibration and post-clamp seating check missing; seated B plane is not an axis/crest. Preserve target frame; no nominal readings, plane crest or future-bore sweep."
+[setups.zero.z]
+face = "body"
+edge_mm = "unknown"
+from = "+z"
+method = "measure_then_set"
+gauge = "unknown"
+measure = "M = independently height-gauge/block-stack/comparator measured ACTUAL SIGNED highest standing contact patch from the recovered body-centre reference plane across the ENTIRE selected flat-end footprint, then touch THAT SAME qualified patch. Proposed Ø19.05 contact centre modelY58 gives footprintY48.475..67.525, avoiding coneY<=46.736 and headY>=68.072 but touching retained higher crown belowY59. Crown varies after preparation: measure afresh at this stage, never assume R23 or halfØ41.91. STOP if patch extent, signed height or entire tool footprint cannot be qualified. Proposed rocker-position-height-gauge procedure only; actual tool/gauge identity, calibration, uncertainty, patch and station UNKNOWN, M is not observed"
+offset_mm = 0.0
+tool = "unknown"
+paper_mm = 0.0
+check_jog_mm = 10.0
+retouch_after = []
+[[setups.ops]]
+op = 10
+do = "face"
+feature = "cone_prep_p2_cap_z50p8591"
+tool = "unknown"
+holder = "unknown"
+to_z = 50.8591
+direction = "positive_setup_x"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = "unknown"
+ae_mm = "unknown"
+approach_mm = 5.0
+contour = { method = "linear_table", step_mm = 8.0, open_side = "+y", sweep_frame = "P2", sweep_bounds = { x = [-25.4, 25.4], y = [68.072, 94.742], z = [50.8591, 52.2] } }
+stock_removal_bounds = { x = [-25.4, 25.4], y = [58.547, 94.742], z = [50.8591, 52.2] }
+note = "AUTHOR'S CHOICE nominal proposal for a proposed Ø19.05 corner-R0.127 flat end; actual tool, holder, speeds/feeds, fixture, pose and gauge unknown, recompute rows/levels if different. Face the head-band block from raw Z52.2 to the crank far-cap allowance plane Z50.8591 (1 level, 5 X-strokes centred68.072..94.742 step8, cutter reaches Y58.547). Only this swept slab is credited; C4 faces the cap from here."
+[[setups.ops]]
+op = 20
+do = "face"
+feature = "cone_prep_p2_floor_z21p5"
+tool = "unknown"
+holder = "unknown"
+to_z = 21.5
+direction = "positive_setup_x"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = "unknown"
+ae_mm = "unknown"
+approach_mm = 5.0
+contour = { method = "linear_table", step_mm = 8.0, open_side = "+y", sweep_frame = "P2", sweep_bounds = { x = [-25.4, 25.4], y = [68.072, 94.742], z = [21.5, 50.8591] }, keep_out = [{ at = [0.0, 81.3735], dia_mm = 24.844 }] }
+stock_removal_bounds = { x = [-25.4, 25.4], y = [58.547, 94.742], z = [21.5, 50.8591] } # crank keep_out island R12.422 and its cusps are honoured by the kernel
+note = "AUTHOR'S CHOICE nominal proposal for a proposed Ø19.05 corner-R0.127 flat end; actual tool, holder, speeds/feeds, fixture, pose and gauge unknown, recompute rows/levels if different. Bulk floor Z50.8591 to21.5 around the crank: 20 levels<=1.5 (last1.359), X-strokes step8, crank keep_out island R12.422 (crankR10.922+1.5); ~29,000mm3. Worst island-cusp residual ~R15.5 from crank centre near Y94.7 is removed by op30/35. Floor0.164 above headR21.336; not a finished face."
+[[setups.ops]]
+op = 30
+do = "rough_profile"
+feature = "crank_boss"
+tool = "unknown"
+holder = "unknown"
+to_z = 21.5
+rough_allowance_mm = 1.0
+direction = "conventional"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = "unknown"
+ae_mm = "unknown"
+approach_mm = 5.0
+contour = { method = "stairs", cusp_mm = 0.5 }
+note = "AUTHOR'S CHOICE nominal proposal for a proposed Ø19.05 corner-R0.127 flat end; actual tool, holder, speeds/feeds, fixture, pose and gauge unknown, recompute rows/levels if different. Crank column above the Z21.5 floor: handwheel stairs around the full crank circle R10.922+1.0 (cusp0.5), ~86 moves. no finished claim; crank/head saddle below Z21.5 stays S2F/S2R work."
+[[setups.ops]]
+op = 35
+do = "rough_profile"
+feature = "crank_boss"
+tool = "unknown"
+holder = "unknown"
+to_z = 21.5
+rough_allowance_mm = 0.15
+direction = "conventional"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = "unknown"
+ae_mm = "unknown"
+approach_mm = 5.0
+contour = { method = "stairs", cusp_mm = 0.1 }
+note = "AUTHOR'S CHOICE nominal proposal for a proposed Ø19.05 corner-R0.127 flat end; actual tool, holder, speeds/feeds, fixture, pose and gauge unknown, recompute rows/levels if different. Crank column above the Z21.5 floor: handwheel stairs around the full crank circle R10.922+0.15 (cusp0.1), ~412 moves. Second pass leaves 0.15..0.25 radial stock on crank OD modelZ21.5..50.6591 for S2F filing to qualified masters; no finished claim; crank/head saddle below Z21.5 stays S2F/S2R work."
+[[setups.ops]]
+op = 50
+do = "profile"
+feature = "cone_prep_p2_t1_px"
+tool = "unknown"
+holder = "unknown"
+to_z = 18.61
+direction = "positive_setup_y"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = "unknown"
+ae_mm = "unknown"
+approach_mm = 5.0
+contour = { method = "linear_table", step_mm = 12.0, open_side = "+x", sweep_frame = "P2", sweep_bounds = { x = [11.422, 25.4], y = [68.072, 94.742], z = [18.61, 21.5] } }
+note = "AUTHOR'S CHOICE nominal proposal for a proposed Ø19.05 corner-R0.127 flat end; actual tool, holder, speeds/feeds, fixture, pose and gauge unknown, recompute rows/levels if different. Coarse terrace 1 model+X: Y-strokes centred68.072..94.742 (cutter overruns to58.547/104.267 over waste/air), wall setupX11.422, floor setupZ18.61 from21.5, <=1.5 per level. Floor/wall corner lies on rho21.836, clear of headR21.336, crankR10.922+0.5 and bodyR20.955 (overrunY58.547..68.072; lathe-final onlyY59..67.4). Printed paths only; no stock_removal_bounds, no finished claim; leaves<=3.08 terrace-corner stock: S2H arcs finish polar54..126 each side, crown sectors are S2F filing."
+[[setups.ops]]
+op = 55
+do = "profile"
+feature = "cone_prep_p2_t1_mx"
+tool = "unknown"
+holder = "unknown"
+to_z = 18.61
+direction = "positive_setup_y"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = "unknown"
+ae_mm = "unknown"
+approach_mm = 5.0
+contour = { method = "linear_table", step_mm = 12.0, open_side = "-x", sweep_frame = "P2", sweep_bounds = { x = [-25.4, -11.422], y = [68.072, 94.742], z = [18.61, 21.5] } }
+note = "AUTHOR'S CHOICE nominal proposal for a proposed Ø19.05 corner-R0.127 flat end; actual tool, holder, speeds/feeds, fixture, pose and gauge unknown, recompute rows/levels if different. Coarse terrace 1 model-X: Y-strokes centred68.072..94.742 (cutter overruns to58.547/104.267 over waste/air), wall setupX-11.422, floor setupZ18.61 from21.5, <=1.5 per level. Floor/wall corner lies on rho21.836, clear of headR21.336, crankR10.922+0.5 and bodyR20.955 (overrunY58.547..68.072; lathe-final onlyY59..67.4). Printed paths only; no stock_removal_bounds, no finished claim; leaves<=3.08 terrace-corner stock: S2H arcs finish polar54..126 each side, crown sectors are S2F filing."
+[[setups.ops]]
+op = 60
+do = "profile"
+feature = "cone_prep_p2_t2_px"
+tool = "unknown"
+holder = "unknown"
+to_z = 15.44
+direction = "positive_setup_y"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = "unknown"
+ae_mm = "unknown"
+approach_mm = 5.0
+contour = { method = "linear_table", step_mm = 12.0, open_side = "+x", sweep_frame = "P2", sweep_bounds = { x = [15.44, 25.4], y = [68.072, 94.742], z = [15.44, 18.61] } }
+note = "AUTHOR'S CHOICE nominal proposal for a proposed Ø19.05 corner-R0.127 flat end; actual tool, holder, speeds/feeds, fixture, pose and gauge unknown, recompute rows/levels if different. Coarse terrace 2 model+X: Y-strokes centred68.072..94.742 (cutter overruns to58.547/104.267 over waste/air), wall setupX15.44, floor setupZ15.44 from18.61, <=1.5 per level. Floor/wall corner lies on rho21.836, clear of headR21.336, crankR10.922+0.5 and bodyR20.955 (overrunY58.547..68.072; lathe-final onlyY59..67.4). Printed paths only; no stock_removal_bounds, no finished claim; leaves<=3.08 terrace-corner stock: S2H arcs finish polar54..126 each side, crown sectors are S2F filing."
+[[setups.ops]]
+op = 65
+do = "profile"
+feature = "cone_prep_p2_t2_mx"
+tool = "unknown"
+holder = "unknown"
+to_z = 15.44
+direction = "positive_setup_y"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = "unknown"
+ae_mm = "unknown"
+approach_mm = 5.0
+contour = { method = "linear_table", step_mm = 12.0, open_side = "-x", sweep_frame = "P2", sweep_bounds = { x = [-25.4, -15.44], y = [68.072, 94.742], z = [15.44, 18.61] } }
+note = "AUTHOR'S CHOICE nominal proposal for a proposed Ø19.05 corner-R0.127 flat end; actual tool, holder, speeds/feeds, fixture, pose and gauge unknown, recompute rows/levels if different. Coarse terrace 2 model-X: Y-strokes centred68.072..94.742 (cutter overruns to58.547/104.267 over waste/air), wall setupX-15.44, floor setupZ15.44 from18.61, <=1.5 per level. Floor/wall corner lies on rho21.836, clear of headR21.336, crankR10.922+0.5 and bodyR20.955 (overrunY58.547..68.072; lathe-final onlyY59..67.4). Printed paths only; no stock_removal_bounds, no finished claim; leaves<=3.08 terrace-corner stock: S2H arcs finish polar54..126 each side, crown sectors are S2F filing."
+[[setups.ops]]
+op = 70
+do = "profile"
+feature = "cone_prep_p2_t3_px"
+tool = "unknown"
+holder = "unknown"
+to_z = 10.918
+direction = "positive_setup_y"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = "unknown"
+ae_mm = "unknown"
+approach_mm = 5.0
+contour = { method = "linear_table", step_mm = 12.0, open_side = "+x", sweep_frame = "P2", sweep_bounds = { x = [18.911, 25.4], y = [68.072, 94.742], z = [10.918, 15.44] } }
+note = "AUTHOR'S CHOICE nominal proposal for a proposed Ø19.05 corner-R0.127 flat end; actual tool, holder, speeds/feeds, fixture, pose and gauge unknown, recompute rows/levels if different. Coarse terrace 3 model+X: Y-strokes centred68.072..94.742 (cutter overruns to58.547/104.267 over waste/air), wall setupX18.911, floor setupZ10.918 from15.44, <=1.5 per level. Floor/wall corner lies on rho21.836, clear of headR21.336, crankR10.922+0.5 and bodyR20.955 (overrunY58.547..68.072; lathe-final onlyY59..67.4). Printed paths only; no stock_removal_bounds, no finished claim; leaves<=3.08 terrace-corner stock: S2H arcs finish polar54..126 each side, crown sectors are S2F filing."
+[[setups.ops]]
+op = 75
+do = "profile"
+feature = "cone_prep_p2_t3_mx"
+tool = "unknown"
+holder = "unknown"
+to_z = 10.918
+direction = "positive_setup_y"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = "unknown"
+ae_mm = "unknown"
+approach_mm = 5.0
+contour = { method = "linear_table", step_mm = 12.0, open_side = "-x", sweep_frame = "P2", sweep_bounds = { x = [-25.4, -18.911], y = [68.072, 94.742], z = [10.918, 15.44] } }
+note = "AUTHOR'S CHOICE nominal proposal for a proposed Ø19.05 corner-R0.127 flat end; actual tool, holder, speeds/feeds, fixture, pose and gauge unknown, recompute rows/levels if different. Coarse terrace 3 model-X: Y-strokes centred68.072..94.742 (cutter overruns to58.547/104.267 over waste/air), wall setupX-18.911, floor setupZ10.918 from15.44, <=1.5 per level. Floor/wall corner lies on rho21.836, clear of headR21.336, crankR10.922+0.5 and bodyR20.955 (overrunY58.547..68.072; lathe-final onlyY59..67.4). Printed paths only; no stock_removal_bounds, no finished claim; leaves<=3.08 terrace-corner stock: S2H arcs finish polar54..126 each side, crown sectors are S2F filing."
+[[setups.ops]]
+op = 80
+do = "profile"
+feature = "cone_prep_p2_t4_px"
+tool = "unknown"
+holder = "unknown"
+to_z = 5.652
+direction = "positive_setup_y"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = "unknown"
+ae_mm = "unknown"
+approach_mm = 5.0
+contour = { method = "linear_table", step_mm = 12.0, open_side = "+x", sweep_frame = "P2", sweep_bounds = { x = [21.092, 25.4], y = [68.072, 94.742], z = [5.652, 10.918] } }
+note = "AUTHOR'S CHOICE nominal proposal for a proposed Ø19.05 corner-R0.127 flat end; actual tool, holder, speeds/feeds, fixture, pose and gauge unknown, recompute rows/levels if different. Coarse terrace 4 model+X: Y-strokes centred68.072..94.742 (cutter overruns to58.547/104.267 over waste/air), wall setupX21.092, floor setupZ5.652 from10.918, <=1.5 per level. Floor/wall corner lies on rho21.836, clear of headR21.336, crankR10.922+0.5 and bodyR20.955 (overrunY58.547..68.072; lathe-final onlyY59..67.4). Printed paths only; no stock_removal_bounds, no finished claim; leaves<=3.08 terrace-corner stock: S2H arcs finish polar54..126 each side, crown sectors are S2F filing."
+[[setups.ops]]
+op = 85
+do = "profile"
+feature = "cone_prep_p2_t4_mx"
+tool = "unknown"
+holder = "unknown"
+to_z = 5.652
+direction = "positive_setup_y"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = "unknown"
+ae_mm = "unknown"
+approach_mm = 5.0
+contour = { method = "linear_table", step_mm = 12.0, open_side = "-x", sweep_frame = "P2", sweep_bounds = { x = [-25.4, -21.092], y = [68.072, 94.742], z = [5.652, 10.918] } }
+note = "AUTHOR'S CHOICE nominal proposal for a proposed Ø19.05 corner-R0.127 flat end; actual tool, holder, speeds/feeds, fixture, pose and gauge unknown, recompute rows/levels if different. Coarse terrace 4 model-X: Y-strokes centred68.072..94.742 (cutter overruns to58.547/104.267 over waste/air), wall setupX-21.092, floor setupZ5.652 from10.918, <=1.5 per level. Floor/wall corner lies on rho21.836, clear of headR21.336, crankR10.922+0.5 and bodyR20.955 (overrunY58.547..68.072; lathe-final onlyY59..67.4). Printed paths only; no stock_removal_bounds, no finished claim; leaves<=3.08 terrace-corner stock: S2H arcs finish polar54..126 each side, crown sectors are S2F filing."
+[[setups.ops]]
+op = 90
+do = "profile"
+feature = "cone_prep_p2_t5_px"
+tool = "unknown"
+holder = "unknown"
+to_z = 0.0
+direction = "positive_setup_y"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = "unknown"
+ae_mm = "unknown"
+approach_mm = 5.0
+contour = { method = "linear_table", step_mm = 12.0, open_side = "+x", sweep_frame = "P2", sweep_bounds = { x = [21.836, 25.4], y = [68.072, 94.742], z = [0.0, 5.652] } }
+note = "AUTHOR'S CHOICE nominal proposal for a proposed Ø19.05 corner-R0.127 flat end; actual tool, holder, speeds/feeds, fixture, pose and gauge unknown, recompute rows/levels if different. Coarse terrace 5 model+X: Y-strokes centred68.072..94.742 (cutter overruns to58.547/104.267 over waste/air), wall setupX21.836, floor setupZ0.0 from5.652, <=1.5 per level. Floor/wall corner lies on rho21.836, clear of headR21.336, crankR10.922+0.5 and bodyR20.955 (overrunY58.547..68.072; lathe-final onlyY59..67.4). Printed paths only; no stock_removal_bounds, no finished claim; leaves<=3.08 terrace-corner stock: S2H arcs finish polar54..126 each side, crown sectors are S2F filing."
+[[setups.ops]]
+op = 95
+do = "profile"
+feature = "cone_prep_p2_t5_mx"
+tool = "unknown"
+holder = "unknown"
+to_z = 0.0
+direction = "positive_setup_y"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = "unknown"
+ae_mm = "unknown"
+approach_mm = 5.0
+contour = { method = "linear_table", step_mm = 12.0, open_side = "-x", sweep_frame = "P2", sweep_bounds = { x = [-25.4, -21.836], y = [68.072, 94.742], z = [0.0, 5.652] } }
+note = "AUTHOR'S CHOICE nominal proposal for a proposed Ø19.05 corner-R0.127 flat end; actual tool, holder, speeds/feeds, fixture, pose and gauge unknown, recompute rows/levels if different. Coarse terrace 5 model-X: Y-strokes centred68.072..94.742 (cutter overruns to58.547/104.267 over waste/air), wall setupX-21.836, floor setupZ0.0 from5.652, <=1.5 per level. Floor/wall corner lies on rho21.836, clear of headR21.336, crankR10.922+0.5 and bodyR20.955 (overrunY58.547..68.072; lathe-final onlyY59..67.4). Printed paths only; no stock_removal_bounds, no finished claim; leaves<=3.08 terrace-corner stock: S2H arcs finish polar54..126 each side, crown sectors are S2F filing."
 
 [[setups]]
-id = "S3"
+id = "S2BR"
 machine = "PM-30MV"
-frame = "J3" # plan.frames.J3, AUTHOR'S CHOICE; physical binding unknown
-stock_in = "S2_integral_profile"
-coolant = "CRC cutting oil brushed on"
-deburr_mm = 0.1 # cone rim limit: dt_cone_gear_shaft_spec.py:79-97,111-113; draw:264
-deburr_cite = ["harmonic-analyzer/cad/scripts/dt_cone_gear_shaft_spec.py:79-97,111-113", "harmonic-analyzer/cad/scripts/draw_dt_cone_pivot_post.py:254-264"]
+frame = "PR2"
+stock_in = "S2B"
+coolant = "unknown"
+deburr_mm = 0.25
+deburr_cite = ["AUTHOR'S CHOICE", "harmonic-analyzer/cad/config/title_block.yaml:in.edge_break"]
 [setups.stock_state]
-top_z = 21.0055 # spec:67 half face-to-face; construction J3 frame
-bottom_z = -21.0055
-[setups.stock_state.local_thickness]
-journal_bore = 42.011 # spec:67
+top_z = 24.0
+bottom_z = -50.8591
+note = "PR2 reverses S2B: setupZ[-50.8591,24.0] over the head band (model+Z side already at the crank cap plane/Z21.5 floor/terraces/rows); body band remains the S1 envelope plus S2B rows on +Z. Carry every S2B residual; no ideal-part reset."
 [setups.hold]
-fixture = "BS-0"
-support = "unknown" # suitable asymmetrical-body restraint is not in the inventory
- grip_on = "AUTHOR'S CHOICE: body, clocked against foot datum B; clamping adapter unknown"
+fixed_jaw = "not_applicable" # proposed non-vise radial cradle
+fixture = "unknown"
+support = "unknown"
+grip_on = "AUTHOR'S CHOICE: finished lower bandY1..21, B stop and keyed meridian"
 grip_mm = 20.0
+stop = "Proposed B buttons atY0; base/clampsY<24."
+clamp = "Proposed positively clamped radial cradle, no free rotation or hand-holding under load. Bulk-prep side/face-milling loads on the20mm lower grip with the head block cantilevered are unqualified; actual manufactured cradle, hardware, contacts, pose and load qualification unknown."
+note = "Proposed reversed radial cradle presentation for practical bulk prep; qualify the actual arriving stock, lower grip, cutter/shank/holder and every stroke/return corridor. Actual fixture, tool, gauge, pose, calibration and availability unknown."
+[setups.zero.transfer]
+from = "S2B"
+indicate = ["body", "foot_seat"]
+gauge = "unknown"
+runout_limit_mm = "unknown"
+[setups.zero.x]
+feature = "body_axis"
+edge_mm = 0.0
+from = "indicated"
+method = "indicate_axis"
+tool = "unknown"
+check_jog_mm = 10.0
+[setups.zero.y]
+feature = "foot_seat"
+edge_mm = "unknown"
+from = "indicated"
+method = "indicate_axis"
+tool = "unknown"
+check_jog_mm = 10.0
+procedure = "PICKUP HOLD: after stopped-spindle reversal, qualified seated B-button-plane-to-machine-Y transfer, accessible contact, gauge offset/sign/calibration and post-clamp seating check missing; B plane is not a crest. Preserve target frame; no nominal readings, plane crest or future-bore sweep."
+[setups.zero.z]
+face = "body"
+edge_mm = "unknown"
+from = "+z"
+method = "measure_then_set"
+gauge = "unknown"
+measure = "M = independently height-gauge/block-stack/comparator measured ACTUAL SIGNED highest standing contact patch from the recovered body-centre reference plane across the ENTIRE selected flat-end footprint, then touch THAT SAME qualified patch. Proposed Ø19.05 contact centre modelY58 gives footprintY48.475..67.525, avoiding coneY<=46.736 and headY>=68.072 but touching retained higher crown belowY59. Crown varies after preparation: measure afresh at this stage, never assume R23 or halfØ41.91. STOP if patch extent, signed height or entire tool footprint cannot be qualified. Proposed rocker-position-height-gauge procedure only; actual tool/gauge identity, calibration, uncertainty, patch and station UNKNOWN, M is not observed"
+offset_mm = 0.0
+tool = "unknown"
+paper_mm = 0.0
+check_jog_mm = 10.0
+retouch_after = []
+[[setups.ops]]
+op = 10
+do = "face"
+feature = "cone_prep_pr2_floor_zm21p5753"
+tool = "unknown"
+holder = "unknown"
+to_z = 21.5753
+direction = "positive_setup_x"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = "unknown"
+ae_mm = "unknown"
+approach_mm = 5.0
+contour = { method = "linear_table", step_mm = 8.0, open_side = "+y", sweep_frame = "PR2", sweep_bounds = { x = [-25.4, 25.4], y = [68.072, 94.742], z = [21.5753, 24.0] } }
+stock_removal_bounds = { x = [-25.4, 25.4], y = [58.547, 94.742], z = [21.5753, 24.0] }
+note = "AUTHOR'S CHOICE nominal proposal for a proposed Ø19.05 corner-R0.127 flat end; actual tool, holder, speeds/feeds, fixture, pose and gauge unknown, recompute rows/levels if different. Face model-Z side of the head band from raw setupZ24.0 to the crank north-cap allowance plane setupZ21.5753 (2 levels); body/head lie below (R<=21.336). C4 setup-entry span 72.4344 = 50.8591-(-21.5753) counts from this plane and S2B:10; after S4:5 near-facing, the hole operations consume the 72.2344 design span."
+[[setups.ops]]
+op = 50
+do = "profile"
+feature = "cone_prep_pr2_t1_px"
+tool = "unknown"
+holder = "unknown"
+to_z = 18.61
+direction = "positive_setup_y"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = "unknown"
+ae_mm = "unknown"
+approach_mm = 5.0
+contour = { method = "linear_table", step_mm = 12.0, open_side = "-x", sweep_frame = "PR2", sweep_bounds = { x = [-25.4, -11.422], y = [68.072, 94.742], z = [18.61, 21.5753] } }
+note = "AUTHOR'S CHOICE nominal proposal for a proposed Ø19.05 corner-R0.127 flat end; actual tool, holder, speeds/feeds, fixture, pose and gauge unknown, recompute rows/levels if different. Coarse terrace 1 model+X: Y-strokes centred68.072..94.742 (cutter overruns to58.547/104.267 over waste/air), wall setupX-11.422, floor setupZ18.61 from21.5753, <=1.5 per level. Floor/wall corner lies on rho21.836, clear of headR21.336, crankR10.922+0.5 and bodyR20.955 (overrunY58.547..68.072; lathe-final onlyY59..67.4). Printed paths only; no stock_removal_bounds, no finished claim; leaves<=3.08 terrace-corner stock: S2H arcs finish polar54..126 each side, crown sectors are S2F filing."
+[[setups.ops]]
+op = 55
+do = "profile"
+feature = "cone_prep_pr2_t1_mx"
+tool = "unknown"
+holder = "unknown"
+to_z = 18.61
+direction = "positive_setup_y"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = "unknown"
+ae_mm = "unknown"
+approach_mm = 5.0
+contour = { method = "linear_table", step_mm = 12.0, open_side = "+x", sweep_frame = "PR2", sweep_bounds = { x = [11.422, 25.4], y = [68.072, 94.742], z = [18.61, 21.5753] } }
+note = "AUTHOR'S CHOICE nominal proposal for a proposed Ø19.05 corner-R0.127 flat end; actual tool, holder, speeds/feeds, fixture, pose and gauge unknown, recompute rows/levels if different. Coarse terrace 1 model-X: Y-strokes centred68.072..94.742 (cutter overruns to58.547/104.267 over waste/air), wall setupX11.422, floor setupZ18.61 from21.5753, <=1.5 per level. Floor/wall corner lies on rho21.836, clear of headR21.336, crankR10.922+0.5 and bodyR20.955 (overrunY58.547..68.072; lathe-final onlyY59..67.4). Printed paths only; no stock_removal_bounds, no finished claim; leaves<=3.08 terrace-corner stock: S2H arcs finish polar54..126 each side, crown sectors are S2F filing."
+[[setups.ops]]
+op = 60
+do = "profile"
+feature = "cone_prep_pr2_t2_px"
+tool = "unknown"
+holder = "unknown"
+to_z = 15.44
+direction = "positive_setup_y"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = "unknown"
+ae_mm = "unknown"
+approach_mm = 5.0
+contour = { method = "linear_table", step_mm = 12.0, open_side = "-x", sweep_frame = "PR2", sweep_bounds = { x = [-25.4, -15.44], y = [68.072, 94.742], z = [15.44, 18.61] } }
+note = "AUTHOR'S CHOICE nominal proposal for a proposed Ø19.05 corner-R0.127 flat end; actual tool, holder, speeds/feeds, fixture, pose and gauge unknown, recompute rows/levels if different. Coarse terrace 2 model+X: Y-strokes centred68.072..94.742 (cutter overruns to58.547/104.267 over waste/air), wall setupX-15.44, floor setupZ15.44 from18.61, <=1.5 per level. Floor/wall corner lies on rho21.836, clear of headR21.336, crankR10.922+0.5 and bodyR20.955 (overrunY58.547..68.072; lathe-final onlyY59..67.4). Printed paths only; no stock_removal_bounds, no finished claim; leaves<=3.08 terrace-corner stock: S2H arcs finish polar54..126 each side, crown sectors are S2F filing."
+[[setups.ops]]
+op = 65
+do = "profile"
+feature = "cone_prep_pr2_t2_mx"
+tool = "unknown"
+holder = "unknown"
+to_z = 15.44
+direction = "positive_setup_y"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = "unknown"
+ae_mm = "unknown"
+approach_mm = 5.0
+contour = { method = "linear_table", step_mm = 12.0, open_side = "+x", sweep_frame = "PR2", sweep_bounds = { x = [15.44, 25.4], y = [68.072, 94.742], z = [15.44, 18.61] } }
+note = "AUTHOR'S CHOICE nominal proposal for a proposed Ø19.05 corner-R0.127 flat end; actual tool, holder, speeds/feeds, fixture, pose and gauge unknown, recompute rows/levels if different. Coarse terrace 2 model-X: Y-strokes centred68.072..94.742 (cutter overruns to58.547/104.267 over waste/air), wall setupX15.44, floor setupZ15.44 from18.61, <=1.5 per level. Floor/wall corner lies on rho21.836, clear of headR21.336, crankR10.922+0.5 and bodyR20.955 (overrunY58.547..68.072; lathe-final onlyY59..67.4). Printed paths only; no stock_removal_bounds, no finished claim; leaves<=3.08 terrace-corner stock: S2H arcs finish polar54..126 each side, crown sectors are S2F filing."
+[[setups.ops]]
+op = 70
+do = "profile"
+feature = "cone_prep_pr2_t3_px"
+tool = "unknown"
+holder = "unknown"
+to_z = 10.918
+direction = "positive_setup_y"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = "unknown"
+ae_mm = "unknown"
+approach_mm = 5.0
+contour = { method = "linear_table", step_mm = 12.0, open_side = "-x", sweep_frame = "PR2", sweep_bounds = { x = [-25.4, -18.911], y = [68.072, 94.742], z = [10.918, 15.44] } }
+note = "AUTHOR'S CHOICE nominal proposal for a proposed Ø19.05 corner-R0.127 flat end; actual tool, holder, speeds/feeds, fixture, pose and gauge unknown, recompute rows/levels if different. Coarse terrace 3 model+X: Y-strokes centred68.072..94.742 (cutter overruns to58.547/104.267 over waste/air), wall setupX-18.911, floor setupZ10.918 from15.44, <=1.5 per level. Floor/wall corner lies on rho21.836, clear of headR21.336, crankR10.922+0.5 and bodyR20.955 (overrunY58.547..68.072; lathe-final onlyY59..67.4). Printed paths only; no stock_removal_bounds, no finished claim; leaves<=3.08 terrace-corner stock: S2H arcs finish polar54..126 each side, crown sectors are S2F filing."
+[[setups.ops]]
+op = 75
+do = "profile"
+feature = "cone_prep_pr2_t3_mx"
+tool = "unknown"
+holder = "unknown"
+to_z = 10.918
+direction = "positive_setup_y"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = "unknown"
+ae_mm = "unknown"
+approach_mm = 5.0
+contour = { method = "linear_table", step_mm = 12.0, open_side = "+x", sweep_frame = "PR2", sweep_bounds = { x = [18.911, 25.4], y = [68.072, 94.742], z = [10.918, 15.44] } }
+note = "AUTHOR'S CHOICE nominal proposal for a proposed Ø19.05 corner-R0.127 flat end; actual tool, holder, speeds/feeds, fixture, pose and gauge unknown, recompute rows/levels if different. Coarse terrace 3 model-X: Y-strokes centred68.072..94.742 (cutter overruns to58.547/104.267 over waste/air), wall setupX18.911, floor setupZ10.918 from15.44, <=1.5 per level. Floor/wall corner lies on rho21.836, clear of headR21.336, crankR10.922+0.5 and bodyR20.955 (overrunY58.547..68.072; lathe-final onlyY59..67.4). Printed paths only; no stock_removal_bounds, no finished claim; leaves<=3.08 terrace-corner stock: S2H arcs finish polar54..126 each side, crown sectors are S2F filing."
+[[setups.ops]]
+op = 80
+do = "profile"
+feature = "cone_prep_pr2_t4_px"
+tool = "unknown"
+holder = "unknown"
+to_z = 5.652
+direction = "positive_setup_y"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = "unknown"
+ae_mm = "unknown"
+approach_mm = 5.0
+contour = { method = "linear_table", step_mm = 12.0, open_side = "-x", sweep_frame = "PR2", sweep_bounds = { x = [-25.4, -21.092], y = [68.072, 94.742], z = [5.652, 10.918] } }
+note = "AUTHOR'S CHOICE nominal proposal for a proposed Ø19.05 corner-R0.127 flat end; actual tool, holder, speeds/feeds, fixture, pose and gauge unknown, recompute rows/levels if different. Coarse terrace 4 model+X: Y-strokes centred68.072..94.742 (cutter overruns to58.547/104.267 over waste/air), wall setupX-21.092, floor setupZ5.652 from10.918, <=1.5 per level. Floor/wall corner lies on rho21.836, clear of headR21.336, crankR10.922+0.5 and bodyR20.955 (overrunY58.547..68.072; lathe-final onlyY59..67.4). Printed paths only; no stock_removal_bounds, no finished claim; leaves<=3.08 terrace-corner stock: S2H arcs finish polar54..126 each side, crown sectors are S2F filing."
+[[setups.ops]]
+op = 85
+do = "profile"
+feature = "cone_prep_pr2_t4_mx"
+tool = "unknown"
+holder = "unknown"
+to_z = 5.652
+direction = "positive_setup_y"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = "unknown"
+ae_mm = "unknown"
+approach_mm = 5.0
+contour = { method = "linear_table", step_mm = 12.0, open_side = "+x", sweep_frame = "PR2", sweep_bounds = { x = [21.092, 25.4], y = [68.072, 94.742], z = [5.652, 10.918] } }
+note = "AUTHOR'S CHOICE nominal proposal for a proposed Ø19.05 corner-R0.127 flat end; actual tool, holder, speeds/feeds, fixture, pose and gauge unknown, recompute rows/levels if different. Coarse terrace 4 model-X: Y-strokes centred68.072..94.742 (cutter overruns to58.547/104.267 over waste/air), wall setupX21.092, floor setupZ5.652 from10.918, <=1.5 per level. Floor/wall corner lies on rho21.836, clear of headR21.336, crankR10.922+0.5 and bodyR20.955 (overrunY58.547..68.072; lathe-final onlyY59..67.4). Printed paths only; no stock_removal_bounds, no finished claim; leaves<=3.08 terrace-corner stock: S2H arcs finish polar54..126 each side, crown sectors are S2F filing."
+[[setups.ops]]
+op = 90
+do = "profile"
+feature = "cone_prep_pr2_t5_px"
+tool = "unknown"
+holder = "unknown"
+to_z = 0.0
+direction = "positive_setup_y"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = "unknown"
+ae_mm = "unknown"
+approach_mm = 5.0
+contour = { method = "linear_table", step_mm = 12.0, open_side = "-x", sweep_frame = "PR2", sweep_bounds = { x = [-25.4, -21.836], y = [68.072, 94.742], z = [0.0, 5.652] } }
+note = "AUTHOR'S CHOICE nominal proposal for a proposed Ø19.05 corner-R0.127 flat end; actual tool, holder, speeds/feeds, fixture, pose and gauge unknown, recompute rows/levels if different. Coarse terrace 5 model+X: Y-strokes centred68.072..94.742 (cutter overruns to58.547/104.267 over waste/air), wall setupX-21.836, floor setupZ0.0 from5.652, <=1.5 per level. Floor/wall corner lies on rho21.836, clear of headR21.336, crankR10.922+0.5 and bodyR20.955 (overrunY58.547..68.072; lathe-final onlyY59..67.4). Printed paths only; no stock_removal_bounds, no finished claim; leaves<=3.08 terrace-corner stock: S2H arcs finish polar54..126 each side, crown sectors are S2F filing."
+[[setups.ops]]
+op = 95
+do = "profile"
+feature = "cone_prep_pr2_t5_mx"
+tool = "unknown"
+holder = "unknown"
+to_z = 0.0
+direction = "positive_setup_y"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = "unknown"
+ae_mm = "unknown"
+approach_mm = 5.0
+contour = { method = "linear_table", step_mm = 12.0, open_side = "+x", sweep_frame = "PR2", sweep_bounds = { x = [21.836, 25.4], y = [68.072, 94.742], z = [0.0, 5.652] } }
+note = "AUTHOR'S CHOICE nominal proposal for a proposed Ø19.05 corner-R0.127 flat end; actual tool, holder, speeds/feeds, fixture, pose and gauge unknown, recompute rows/levels if different. Coarse terrace 5 model-X: Y-strokes centred68.072..94.742 (cutter overruns to58.547/104.267 over waste/air), wall setupX21.836, floor setupZ0.0 from5.652, <=1.5 per level. Floor/wall corner lies on rho21.836, clear of headR21.336, crankR10.922+0.5 and bodyR20.955 (overrunY58.547..68.072; lathe-final onlyY59..67.4). Printed paths only; no stock_removal_bounds, no finished claim; leaves<=3.08 terrace-corner stock: S2H arcs finish polar54..126 each side, crown sectors are S2F filing."
+
+# S2H body arcs: 20 proposed Ø6.35 station-windows x5 layers =100 body passes; with50 head passes,150 total (previously85 body/135 total).
+# S2H: proposed horizontal dividing-head continuous rotation. Head arcs and body free arcs are cut DIRECTLY to
+# the CAD radii in computed collision-free windows; kernel rotary poses are diagnostic only,
+# after-op stock/attainment/motion stay UNKNOWN and no allowance or coverage is credited.
+[[setups]]
+id = "S2H"
+machine = "PM-30MV"
+frame = "P2"
+stock_in = "S2BR"
+coolant = "unknown"
+deburr_mm = 0.25
+deburr_cite = ["AUTHOR'S CHOICE", "harmonic-analyzer/cad/config/title_block.yaml:in.edge_break"]
+[setups.stock_state]
+top_z = 50.8591
+bottom_z = -23.0
+note = "AUTHOR'S CHOICE Head axis = setup Y (model Y), shown at head rotation 0 (setup = model). Arriving S2B/S2BR prep: crank cap planes Z50.8591/-21.5753, crank OD R10.922+0.15..0.25 above Z21.5, head-band floors and five terraces per side (outermost arriving point R23.724 inside the head windows, R24.40 near phi50), body band Y28.4..59 still the S1 Ø46 envelope, body Y0..28.4 and Y59..67.4 lathe-final Ø41.91 (terminal blend/rootY67.4..68.072 unfinished for S2RF:5). No ideal-part reset."
+[setups.hold]
+fixture = "unknown"
+chuck = "unknown"
+support = "unknown"
+grip_on = "finished Ø41.91 lower band modelY0..20; foot B seated against the chuck body front face (intentional contact: the Ø41.91 foot cannot enter the Ø30 bore)"
+grip_mm = 20.0
+stickout_mm = 74.742
 fixed_jaw = "not_applicable"
 jaws_along = "not_applicable"
 parallels = "not_applicable"
 jaw_above_parallels_mm = "not_applicable"
-stop = "AUTHOR'S CHOICE: indicate foot B before changing bore-axis yaw"
-clamp = "AUTHOR'S CHOICE: verify asymmetrical post restraint and mill spindle clearance; adapter unknown"
+pose = { origin_mm = [0.0, 20.0, 0.0], x = [0.0, 0.0, 1.0], z = [0.0, 1.0, 0.0] }
+jaw_clock_deg = 45.0
+stop = "Jaw faces at modelY20 (jaw depth20 spans Y0..20); clean, square chuck front face bears on B at Y0. Qualify face cleanliness/squareness and B contact before tightening."
+clamp = "AUTHOR'S CHOICE Tighten the independent jaws a little at a time while indicating the Y0..20 band and a second DTI station atY63.0 on the S1 Y59..67.4 Ø41.91 band (the 20mm grip alone cannot show tilt). Align the head axis to table Y travel with a DTI sweep along the Y59..67.4 band top and side. Work overhangs to Y94.742, cutting 5..75mm beyond the jaws on a 20mm grip with no tailstock (head top carries only off-axis mount holes): light layers only, re-indicate after each layer set; stop on movement."
+note = "AUTHOR'S CHOICE Swing about head axis: crank tip~R52,chuckR63.5 below centre height100. Chuck body/jaws rotate,head body fixed. PROCESS-CHOICE HOLD: proposed35mm projection Ø6.35 tool (~5.5D) and five-layer0.409 candidate unqualified; over4D heuristic recursively halves AUTHORED DOC, not an absolute verified physical limit. No replacement layer sequence is authored/approved by halving; neither recipe executes without coherent physical qualification. At TDC depth is axial to cutter/spindleZ AND radial into work; head-axis axial bands differ from cutter-centre stations. Stock/motion proof, actual equipment/settings/load/backlash/locking/feed/torque remain UNKNOWN."
 [setups.hold.index]
-fixture = "BS-0"
-feature = "crank_bore" # exported owner of the BASIC inter-bore angle
-angle_deg = 13.0011073536895 # current INCLINE_DEG, BASIC plan angle; not bore tilt
-positions = 1 # AUTHOR'S CHOICE: one angular setting, NO closure claim
+fixture = "unknown"
+rotation = "continuous"
 [setups.zero.transfer]
-from = "S2"
-indicate = ["foot_seat", "body"]
-gauge = "dial-indicator"
+from = "S2BR"
+indicate = ["body", "foot_seat"]
+gauge = "unknown"
 runout_limit_mm = "unknown"
 [setups.zero.x]
-feature = "journal_axis"
+feature = "body_axis"
 edge_mm = 0.0
 from = "indicated"
 method = "indicate_axis"
-tool = "dial-indicator"
+tool = "unknown"
 check_jog_mm = 10.0
 [setups.zero.y]
-feature = "journal_axis"
-edge_mm = 0.0
+feature = "foot_seat"
+edge_mm = "unknown"
 from = "indicated"
 method = "indicate_axis"
-tool = "dial-indicator"
+tool = "unknown"
+check_jog_mm = 10.0
+procedure = "PICKUP HOLD: qualified actual seated chuck/B-plane-to-machine-Y transfer missing; establish actual face squareness/axial seating, accessible contact and calibrated gauge offset/sign, then post-clamp recheck. Preserve target frame; no nominal readings, plane crest or future-bore sweep."
+[setups.zero.z]
+face = "body"
+edge_mm = "unknown"
+from = "+z"
+method = "measure_then_set"
+gauge = "unknown"
+measure = "M = independently height-gauge/block-stack/comparator measured ACTUAL SIGNED highest standing contact patch from the recovered body-centre reference plane across the ENTIRE selected flat-end footprint, then touch THAT SAME qualified patch. Proposed Ø19.05 contact centre modelY58 gives footprintY48.475..67.525, avoiding coneY<=46.736 and headY>=68.072 but touching retained higher crown belowY59. Crown varies after preparation: measure afresh at this stage, never assume R23 or halfØ41.91. STOP if patch extent, signed height or entire tool footprint cannot be qualified. Proposed rocker-position-height-gauge procedure only; actual tool/gauge identity, calibration, uncertainty, patch and station UNKNOWN, M is not observed"
+offset_mm = 0.0
+tool = "unknown"
+paper_mm = 0.0
+check_jog_mm = 10.0
+retouch_after = []
+[[setups.zero.tool_touches]]
+tool = "unknown"
+z_face = "body"
+method = "measure_then_set"
+z_gauge = "unknown"
+z_measure = "M = independently height-gauge/block-stack/comparator measured ACTUAL SIGNED highest standing patch from recovered body-centre plane across ENTIRE Ø6.35 footprint AFTER head-tool ops10/20, head locked; touch THAT SAME measured patch before op30. Proposed centreY58 footprintY54.825..61.175 straddlesY59. Crown varies after prep; never assume R23 or halfØ41.91. STOP if actual patch, signed station or footprint not qualified. Proposed rocker-position-height-gauge procedure only; actual tool/gauge identity, calibration, uncertainty, patch and station UNKNOWN; M not observed. Small-tool installation: existing ground Ø6.35 HSS variant proposed installed projection35mm; actual tool/holder and installation setting UNKNOWN, nominal, OAL61.9 leaves26.9mm insertion versus R8 minimum grip25mm (1.9mm margin); exposed noncutting body19.1mm atØ9.525. No change to the proposed original LMS tool installation. At approximately5.5D extension, actual force, chatter and whole-body runout qualification remain HOLD; no actual10N load proof is supplied."
+z_offset_mm = 0.0
+paper_mm = 0.0
+before_ops = [30]
+[[setups.ops]]
+op = 10
+do = "profile"
+feature = "head"
+faces = "unknown"
+approach = "rotary"
+tool = "unknown"
+holder = "unknown"
+to_dia = 42.672
+z_from = 48.072
+z_to = 74.742
+angle_window_deg = [-126.0, -54.0]
+direction = "conventional"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = 0.4776
+ae_mm = 6.0
+approach_mm = 5.0
+note = "STABLE-SELECTOR HOLD: faces unknown because HAF_HEAD__P01/HAF_BODY__P01 label groups contain both half-cylinder faces; match the intended cylindrical portion/intersection with this authored window in the current export before execution. AUTHOR'S CHOICE DIRECT finish of head R21.336 in the model+X crank-free window: source polar 54.0..126.0deg from +Z (head rotation = -polar). Centred Ø19.05 cutter+0.5 clears crank column+0.2 over the whole window at R21.336 (computed: blocked below 53.5 and above 126.5). 5 radial layers from the arriving stock: ceil((23.724-21.336)/0.5)=5, equal 0.4776; tip radii (setup Z at TDC) 23.2464, 22.7688, 22.2912, 21.8136, 21.336. Stations cutter-centre modelY 65.0, 71.0, 77.0, 83.0, 89.0 (head-axis z 45.0, 51.0, 57.0, 63.0, 69.0): every new band lies on the cutter +Y half (first from Y68.072 at +3.072; bodyY67.4..68.072 is S2RF:5, later +3.475..+9.525; last reaches Y98.5). CONVENTIONAL: CW spindle (omega -Z) moves +Y-half teeth +X; work top must move -X, i.e. head rotation NEGATIVE about +Y (window angle decreasing); cutting load opposes the worm, preload the worm in the driving direction. Per pass: head locked, cutter centred X0 at the window start, lower to the layer radius, unlock and crank through the window, stop, retract Z, relock, step Y; never reverse under engagement. Order: for EACH layer, stations lowest Y to highest Y (keeps the +Y shoulder to one layer). Crown sectors within 54deg of +-Z (beside the crank) stay at terrace stock for S2F. Kernel rotary samples are diagnostic target poses only: layers, stations, continuous motion, clearance between poses, torque and attained radius are NOT proven; after-op stock is UNKNOWN and no coverage or later allowance is credited. Measure the actual result (micrometer/radius gauge) before S2F."
+[[setups.ops]]
+op = 20
+do = "profile"
+feature = "head"
+faces = "unknown"
+approach = "rotary"
+tool = "unknown"
+holder = "unknown"
+to_dia = 42.672
+z_from = 48.072
+z_to = 74.742
+angle_window_deg = [54.0, 126.0]
+direction = "conventional"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = 0.4776
+ae_mm = 6.0
+approach_mm = 5.0
+note = "STABLE-SELECTOR HOLD: faces unknown because HAF_HEAD__P01/HAF_BODY__P01 label groups contain both half-cylinder faces; match the intended cylindrical portion/intersection with this authored window in the current export before execution. AUTHOR'S CHOICE DIRECT finish of head R21.336 in the model-X crank-free window: source polar 234.0..306.0deg from +Z (head rotation = -polar). Centred Ø19.05 cutter+0.5 clears crank column+0.2 over the whole window at R21.336 (computed: blocked below 53.5 and above 126.5). 5 radial layers from the arriving stock: ceil((23.724-21.336)/0.5)=5, equal 0.4776; tip radii (setup Z at TDC) 23.2464, 22.7688, 22.2912, 21.8136, 21.336. Stations cutter-centre modelY 65.0, 71.0, 77.0, 83.0, 89.0 (head-axis z 45.0, 51.0, 57.0, 63.0, 69.0): every new band lies on the cutter +Y half (first from Y68.072 at +3.072; bodyY67.4..68.072 is S2RF:5, later +3.475..+9.525; last reaches Y98.5). CONVENTIONAL: CW spindle (omega -Z) moves +Y-half teeth +X; work top must move -X, i.e. head rotation NEGATIVE about +Y (window angle decreasing); cutting load opposes the worm, preload the worm in the driving direction. Per pass: head locked, cutter centred X0 at the window start, lower to the layer radius, unlock and crank through the window, stop, retract Z, relock, step Y; never reverse under engagement. Order: for EACH layer, stations lowest Y to highest Y (keeps the +Y shoulder to one layer). Crown sectors within 54deg of +-Z (beside the crank) stay at terrace stock for S2F. Kernel rotary samples are diagnostic target poses only: layers, stations, continuous motion, clearance between poses, torque and attained radius are NOT proven; after-op stock is UNKNOWN and no coverage or later allowance is credited. Measure the actual result (micrometer/radius gauge) before S2F."
+[[setups.ops]]
+op = 30
+do = "profile"
+feature = "body"
+faces = ["HAF_BODY__P01"]
+approach = "rotary"
+tool = "unknown"
+holder = "unknown"
+to_dia = 41.91
+z_from = 8.4
+z_to = 8.675
+angle_window_deg = [-180.0, 180.0]
+direction = "conventional"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = 0.409
+ae_mm = 3.0
+approach_mm = 5.0
+note = "AUTHOR'S CHOICE DIRECT finish of body R20.955, full turn: footprint Y22.3..28.7 is clear of the cone (Y>=29.464). Station cutter-centre modelY25.5 (head-axis z5.5); new band Y28.4..28.675 from the lathe band end Y28.4 lies on the cutter +Y half; cutter min Y22.325 and Ø9.525 body min Y20.7375 clear the jaw face Y20. 5 radial layers from the S1 envelope: ceil((23.0-20.955)/0.5)=5, equal 0.409; tip radii 22.591, 22.182, 21.773, 21.364, 20.955. CONVENTIONAL: CW spindle (omega -Z) moves +Y-half teeth +X; work top must move -X, i.e. head rotation NEGATIVE about +Y (window angle decreasing); cutting load opposes the worm, preload the worm in the driving direction. Per pass: head locked, cutter centred X0 at the window start, lower to the layer radius, unlock and crank through the window, stop, retract Z, relock, step Y; never reverse under engagement. Order: for EACH layer, stations lowest Y to highest Y (keeps the +Y shoulder to one layer). Kernel rotary samples are diagnostic target poses only: layers, stations, continuous motion, clearance between poses, torque and attained radius are NOT proven; after-op stock is UNKNOWN and no coverage or later allowance is credited. Measure the actual result (micrometer/radius gauge) before S2F."
+[[setups.ops]]
+op = 35
+do = "profile"
+feature = "body"
+faces = "unknown"
+approach = "rotary"
+tool = "unknown"
+holder = "unknown"
+to_dia = 41.91
+z_from = 8.675
+z_to = 11.675
+angle_window_deg = [-171.0, -35.0]
+direction = "conventional"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = 0.409
+ae_mm = 3.0
+approach_mm = 5.0
+note = "STABLE-SELECTOR HOLD: faces unknown because HAF_HEAD__P01/HAF_BODY__P01 label groups contain both half-cylinder faces; match the intended cylindrical portion/intersection with this authored window in the current export before execution. AUTHOR'S CHOICE DIRECT finish of body R20.955 in the model+X cone-free window for this station: source polar 35.0..171.0deg (computed: centred Ø6.35+0.5 vs cone R8.636 with t+-21.2055). Station cutter-centre modelY28.5 (head-axis z8.5); new band Y28.675..31.675 from the previous upper edge Y28.675 lies on the cutter +Y half; cutter min Y25.325 and Ø9.525 body min Y23.7375 clear the jaw face Y20. 5 radial layers from the S1 envelope: ceil((23.0-20.955)/0.5)=5, equal 0.409; tip radii 22.591, 22.182, 21.773, 21.364, 20.955. CONVENTIONAL: CW spindle (omega -Z) moves +Y-half teeth +X; work top must move -X, i.e. head rotation NEGATIVE about +Y (window angle decreasing); cutting load opposes the worm, preload the worm in the driving direction. Per pass: head locked, cutter centred X0 at the window start, lower to the layer radius, unlock and crank through the window, stop, retract Z, relock, step Y; never reverse under engagement. Order: for EACH layer, stations lowest Y to highest Y (keeps the +Y shoulder to one layer). Excluded cone sectors stay S2F filing. Kernel rotary samples are diagnostic target poses only: layers, stations, continuous motion, clearance between poses, torque and attained radius are NOT proven; after-op stock is UNKNOWN and no coverage or later allowance is credited. Measure the actual result (micrometer/radius gauge) before S2F."
+[[setups.ops]]
+op = 40
+do = "profile"
+feature = "body"
+faces = "unknown"
+approach = "rotary"
+tool = "unknown"
+holder = "unknown"
+to_dia = 41.91
+z_from = 8.675
+z_to = 11.675
+angle_window_deg = [9.0, 145.0]
+direction = "conventional"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = 0.409
+ae_mm = 3.0
+approach_mm = 5.0
+note = "STABLE-SELECTOR HOLD: faces unknown because HAF_HEAD__P01/HAF_BODY__P01 label groups contain both half-cylinder faces; match the intended cylindrical portion/intersection with this authored window in the current export before execution. AUTHOR'S CHOICE DIRECT finish of body R20.955 in the model-X cone-free window for this station: source polar 215.0..351.0deg (computed: centred Ø6.35+0.5 vs cone R8.636 with t+-21.2055). Station cutter-centre modelY28.5 (head-axis z8.5); new band Y28.675..31.675 from the previous upper edge Y28.675 lies on the cutter +Y half; cutter min Y25.325 and Ø9.525 body min Y23.7375 clear the jaw face Y20. 5 radial layers from the S1 envelope: ceil((23.0-20.955)/0.5)=5, equal 0.409; tip radii 22.591, 22.182, 21.773, 21.364, 20.955. CONVENTIONAL: CW spindle (omega -Z) moves +Y-half teeth +X; work top must move -X, i.e. head rotation NEGATIVE about +Y (window angle decreasing); cutting load opposes the worm, preload the worm in the driving direction. Per pass: head locked, cutter centred X0 at the window start, lower to the layer radius, unlock and crank through the window, stop, retract Z, relock, step Y; never reverse under engagement. Order: for EACH layer, stations lowest Y to highest Y (keeps the +Y shoulder to one layer). Excluded cone sectors stay S2F filing. Kernel rotary samples are diagnostic target poses only: layers, stations, continuous motion, clearance between poses, torque and attained radius are NOT proven; after-op stock is UNKNOWN and no coverage or later allowance is credited. Measure the actual result (micrometer/radius gauge) before S2F."
+[[setups.ops]]
+op = 45
+do = "profile"
+feature = "body"
+faces = "unknown"
+approach = "rotary"
+tool = "unknown"
+holder = "unknown"
+to_dia = 41.91
+z_from = 11.675
+z_to = 14.675
+angle_window_deg = [-164.0, -42.0]
+direction = "conventional"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = 0.409
+ae_mm = 3.0
+approach_mm = 5.0
+note = "STABLE-SELECTOR HOLD: faces unknown because HAF_HEAD__P01/HAF_BODY__P01 label groups contain both half-cylinder faces; match the intended cylindrical portion/intersection with this authored window in the current export before execution. AUTHOR'S CHOICE DIRECT finish of body R20.955 in the model+X cone-free window for this station: source polar 42.0..164.0deg (computed: centred Ø6.35+0.5 vs cone R8.636 with t+-21.2055). Station cutter-centre modelY31.5 (head-axis z11.5); new band Y31.675..34.675 from the previous upper edge Y31.675 lies on the cutter +Y half; cutter min Y28.325 and Ø9.525 body min Y26.7375 clear the jaw face Y20. 5 radial layers from the S1 envelope: ceil((23.0-20.955)/0.5)=5, equal 0.409; tip radii 22.591, 22.182, 21.773, 21.364, 20.955. CONVENTIONAL: CW spindle (omega -Z) moves +Y-half teeth +X; work top must move -X, i.e. head rotation NEGATIVE about +Y (window angle decreasing); cutting load opposes the worm, preload the worm in the driving direction. Per pass: head locked, cutter centred X0 at the window start, lower to the layer radius, unlock and crank through the window, stop, retract Z, relock, step Y; never reverse under engagement. Order: for EACH layer, stations lowest Y to highest Y (keeps the +Y shoulder to one layer). Excluded cone sectors stay S2F filing. Kernel rotary samples are diagnostic target poses only: layers, stations, continuous motion, clearance between poses, torque and attained radius are NOT proven; after-op stock is UNKNOWN and no coverage or later allowance is credited. Measure the actual result (micrometer/radius gauge) before S2F."
+[[setups.ops]]
+op = 50
+do = "profile"
+feature = "body"
+faces = "unknown"
+approach = "rotary"
+tool = "unknown"
+holder = "unknown"
+to_dia = 41.91
+z_from = 11.675
+z_to = 14.675
+angle_window_deg = [16.0, 138.0]
+direction = "conventional"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = 0.409
+ae_mm = 3.0
+approach_mm = 5.0
+note = "STABLE-SELECTOR HOLD: faces unknown because HAF_HEAD__P01/HAF_BODY__P01 label groups contain both half-cylinder faces; match the intended cylindrical portion/intersection with this authored window in the current export before execution. AUTHOR'S CHOICE DIRECT finish of body R20.955 in the model-X cone-free window for this station: source polar 222.0..344.0deg (computed: centred Ø6.35+0.5 vs cone R8.636 with t+-21.2055). Station cutter-centre modelY31.5 (head-axis z11.5); new band Y31.675..34.675 from the previous upper edge Y31.675 lies on the cutter +Y half; cutter min Y28.325 and Ø9.525 body min Y26.7375 clear the jaw face Y20. 5 radial layers from the S1 envelope: ceil((23.0-20.955)/0.5)=5, equal 0.409; tip radii 22.591, 22.182, 21.773, 21.364, 20.955. CONVENTIONAL: CW spindle (omega -Z) moves +Y-half teeth +X; work top must move -X, i.e. head rotation NEGATIVE about +Y (window angle decreasing); cutting load opposes the worm, preload the worm in the driving direction. Per pass: head locked, cutter centred X0 at the window start, lower to the layer radius, unlock and crank through the window, stop, retract Z, relock, step Y; never reverse under engagement. Order: for EACH layer, stations lowest Y to highest Y (keeps the +Y shoulder to one layer). Excluded cone sectors stay S2F filing. Kernel rotary samples are diagnostic target poses only: layers, stations, continuous motion, clearance between poses, torque and attained radius are NOT proven; after-op stock is UNKNOWN and no coverage or later allowance is credited. Measure the actual result (micrometer/radius gauge) before S2F."
+[[setups.ops]]
+op = 55
+do = "profile"
+feature = "body"
+faces = "unknown"
+approach = "rotary"
+tool = "unknown"
+holder = "unknown"
+to_dia = 41.91
+z_from = 14.675
+z_to = 17.675
+angle_window_deg = [-160.25, -45.75]
+direction = "conventional"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = 0.409
+ae_mm = 3.0
+approach_mm = 5.0
+note = "STABLE-SELECTOR HOLD: faces unknown because HAF_HEAD__P01/HAF_BODY__P01 label groups contain both half-cylinder faces; match the intended cylindrical portion/intersection with this authored window in the current export before execution. AUTHOR'S CHOICE DIRECT finish of body R20.955 in the model+X cone-free window for this station: source polar 45.75..160.25deg (computed: centred Ø6.35+0.5 vs cone R8.636 with t+-21.2055). Station cutter-centre modelY34.5 (head-axis z14.5); new band Y34.675..37.675 from the previous upper edge Y34.675 lies on the cutter +Y half; cutter min Y31.325 and Ø9.525 body min Y29.7375 clear the jaw face Y20. 5 radial layers from the S1 envelope: ceil((23.0-20.955)/0.5)=5, equal 0.409; tip radii 22.591, 22.182, 21.773, 21.364, 20.955. CONVENTIONAL: CW spindle (omega -Z) moves +Y-half teeth +X; work top must move -X, i.e. head rotation NEGATIVE about +Y (window angle decreasing); cutting load opposes the worm, preload the worm in the driving direction. Per pass: head locked, cutter centred X0 at the window start, lower to the layer radius, unlock and crank through the window, stop, retract Z, relock, step Y; never reverse under engagement. Order: for EACH layer, stations lowest Y to highest Y (keeps the +Y shoulder to one layer). Excluded cone sectors stay S2F filing. Kernel rotary samples are diagnostic target poses only: layers, stations, continuous motion, clearance between poses, torque and attained radius are NOT proven; after-op stock is UNKNOWN and no coverage or later allowance is credited. Measure the actual result (micrometer/radius gauge) before S2F."
+[[setups.ops]]
+op = 60
+do = "profile"
+feature = "body"
+faces = "unknown"
+approach = "rotary"
+tool = "unknown"
+holder = "unknown"
+to_dia = 41.91
+z_from = 14.675
+z_to = 17.675
+angle_window_deg = [19.75, 134.25]
+direction = "conventional"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = 0.409
+ae_mm = 3.0
+approach_mm = 5.0
+note = "STABLE-SELECTOR HOLD: faces unknown because HAF_HEAD__P01/HAF_BODY__P01 label groups contain both half-cylinder faces; match the intended cylindrical portion/intersection with this authored window in the current export before execution. AUTHOR'S CHOICE DIRECT finish of body R20.955 in the model-X cone-free window for this station: source polar 225.75..340.25deg (computed: centred Ø6.35+0.5 vs cone R8.636 with t+-21.2055). Station cutter-centre modelY34.5 (head-axis z14.5); new band Y34.675..37.675 from the previous upper edge Y34.675 lies on the cutter +Y half; cutter min Y31.325 and Ø9.525 body min Y29.7375 clear the jaw face Y20. 5 radial layers from the S1 envelope: ceil((23.0-20.955)/0.5)=5, equal 0.409; tip radii 22.591, 22.182, 21.773, 21.364, 20.955. CONVENTIONAL: CW spindle (omega -Z) moves +Y-half teeth +X; work top must move -X, i.e. head rotation NEGATIVE about +Y (window angle decreasing); cutting load opposes the worm, preload the worm in the driving direction. Per pass: head locked, cutter centred X0 at the window start, lower to the layer radius, unlock and crank through the window, stop, retract Z, relock, step Y; never reverse under engagement. Order: for EACH layer, stations lowest Y to highest Y (keeps the +Y shoulder to one layer). Excluded cone sectors stay S2F filing. Kernel rotary samples are diagnostic target poses only: layers, stations, continuous motion, clearance between poses, torque and attained radius are NOT proven; after-op stock is UNKNOWN and no coverage or later allowance is credited. Measure the actual result (micrometer/radius gauge) before S2F."
+[[setups.ops]]
+op = 65
+do = "profile"
+feature = "body"
+faces = "unknown"
+approach = "rotary"
+tool = "unknown"
+holder = "unknown"
+to_dia = 41.91
+z_from = 17.675
+z_to = 20.675
+angle_window_deg = [-158.75, -47.25]
+direction = "conventional"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = 0.409
+ae_mm = 3.0
+approach_mm = 5.0
+note = "STABLE-SELECTOR HOLD: faces unknown because HAF_HEAD__P01/HAF_BODY__P01 label groups contain both half-cylinder faces; match the intended cylindrical portion/intersection with this authored window in the current export before execution. AUTHOR'S CHOICE DIRECT finish of body R20.955 in the model+X cone-free window for this station: source polar 47.25..158.75deg (computed: centred Ø6.35+0.5 vs cone R8.636 with t+-21.2055). Station cutter-centre modelY37.5 (head-axis z17.5); new band Y37.675..40.675 from the previous upper edge Y37.675 lies on the cutter +Y half; cutter min Y34.325 and Ø9.525 body min Y32.7375 clear the jaw face Y20. 5 radial layers from the S1 envelope: ceil((23.0-20.955)/0.5)=5, equal 0.409; tip radii 22.591, 22.182, 21.773, 21.364, 20.955. CONVENTIONAL: CW spindle (omega -Z) moves +Y-half teeth +X; work top must move -X, i.e. head rotation NEGATIVE about +Y (window angle decreasing); cutting load opposes the worm, preload the worm in the driving direction. Per pass: head locked, cutter centred X0 at the window start, lower to the layer radius, unlock and crank through the window, stop, retract Z, relock, step Y; never reverse under engagement. Order: for EACH layer, stations lowest Y to highest Y (keeps the +Y shoulder to one layer). Excluded cone sectors stay S2F filing. Kernel rotary samples are diagnostic target poses only: layers, stations, continuous motion, clearance between poses, torque and attained radius are NOT proven; after-op stock is UNKNOWN and no coverage or later allowance is credited. Measure the actual result (micrometer/radius gauge) before S2F."
+[[setups.ops]]
+op = 70
+do = "profile"
+feature = "body"
+faces = "unknown"
+approach = "rotary"
+tool = "unknown"
+holder = "unknown"
+to_dia = 41.91
+z_from = 17.675
+z_to = 20.675
+angle_window_deg = [21.25, 132.75]
+direction = "conventional"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = 0.409
+ae_mm = 3.0
+approach_mm = 5.0
+note = "STABLE-SELECTOR HOLD: faces unknown because HAF_HEAD__P01/HAF_BODY__P01 label groups contain both half-cylinder faces; match the intended cylindrical portion/intersection with this authored window in the current export before execution. AUTHOR'S CHOICE DIRECT finish of body R20.955 in the model-X cone-free window for this station: source polar 227.25..338.75deg (computed: centred Ø6.35+0.5 vs cone R8.636 with t+-21.2055). Station cutter-centre modelY37.5 (head-axis z17.5); new band Y37.675..40.675 from the previous upper edge Y37.675 lies on the cutter +Y half; cutter min Y34.325 and Ø9.525 body min Y32.7375 clear the jaw face Y20. 5 radial layers from the S1 envelope: ceil((23.0-20.955)/0.5)=5, equal 0.409; tip radii 22.591, 22.182, 21.773, 21.364, 20.955. CONVENTIONAL: CW spindle (omega -Z) moves +Y-half teeth +X; work top must move -X, i.e. head rotation NEGATIVE about +Y (window angle decreasing); cutting load opposes the worm, preload the worm in the driving direction. Per pass: head locked, cutter centred X0 at the window start, lower to the layer radius, unlock and crank through the window, stop, retract Z, relock, step Y; never reverse under engagement. Order: for EACH layer, stations lowest Y to highest Y (keeps the +Y shoulder to one layer). Excluded cone sectors stay S2F filing. Kernel rotary samples are diagnostic target poses only: layers, stations, continuous motion, clearance between poses, torque and attained radius are NOT proven; after-op stock is UNKNOWN and no coverage or later allowance is credited. Measure the actual result (micrometer/radius gauge) before S2F."
+[[setups.ops]]
+op = 75
+do = "profile"
+feature = "body"
+faces = "unknown"
+approach = "rotary"
+tool = "unknown"
+holder = "unknown"
+to_dia = 41.91
+z_from = 20.675
+z_to = 23.675
+angle_window_deg = [-159.0, -47.0]
+direction = "conventional"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = 0.409
+ae_mm = 3.0
+approach_mm = 5.0
+note = "STABLE-SELECTOR HOLD: faces unknown because HAF_HEAD__P01/HAF_BODY__P01 label groups contain both half-cylinder faces; match the intended cylindrical portion/intersection with this authored window in the current export before execution. AUTHOR'S CHOICE DIRECT finish of body R20.955 in the model+X cone-free window for this station: source polar 47.0..159.0deg (computed: centred Ø6.35+0.5 vs cone R8.636 with t+-21.2055). Station cutter-centre modelY40.5 (head-axis z20.5); new band Y40.675..43.675 from the previous upper edge Y40.675 lies on the cutter +Y half; cutter min Y37.325 and Ø9.525 body min Y35.7375 clear the jaw face Y20. 5 radial layers from the S1 envelope: ceil((23.0-20.955)/0.5)=5, equal 0.409; tip radii 22.591, 22.182, 21.773, 21.364, 20.955. CONVENTIONAL: CW spindle (omega -Z) moves +Y-half teeth +X; work top must move -X, i.e. head rotation NEGATIVE about +Y (window angle decreasing); cutting load opposes the worm, preload the worm in the driving direction. Per pass: head locked, cutter centred X0 at the window start, lower to the layer radius, unlock and crank through the window, stop, retract Z, relock, step Y; never reverse under engagement. Order: for EACH layer, stations lowest Y to highest Y (keeps the +Y shoulder to one layer). Excluded cone sectors stay S2F filing. Kernel rotary samples are diagnostic target poses only: layers, stations, continuous motion, clearance between poses, torque and attained radius are NOT proven; after-op stock is UNKNOWN and no coverage or later allowance is credited. Measure the actual result (micrometer/radius gauge) before S2F."
+[[setups.ops]]
+op = 80
+do = "profile"
+feature = "body"
+faces = "unknown"
+approach = "rotary"
+tool = "unknown"
+holder = "unknown"
+to_dia = 41.91
+z_from = 20.675
+z_to = 23.675
+angle_window_deg = [21.0, 133.0]
+direction = "conventional"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = 0.409
+ae_mm = 3.0
+approach_mm = 5.0
+note = "STABLE-SELECTOR HOLD: faces unknown because HAF_HEAD__P01/HAF_BODY__P01 label groups contain both half-cylinder faces; match the intended cylindrical portion/intersection with this authored window in the current export before execution. AUTHOR'S CHOICE DIRECT finish of body R20.955 in the model-X cone-free window for this station: source polar 227.0..339.0deg (computed: centred Ø6.35+0.5 vs cone R8.636 with t+-21.2055). Station cutter-centre modelY40.5 (head-axis z20.5); new band Y40.675..43.675 from the previous upper edge Y40.675 lies on the cutter +Y half; cutter min Y37.325 and Ø9.525 body min Y35.7375 clear the jaw face Y20. 5 radial layers from the S1 envelope: ceil((23.0-20.955)/0.5)=5, equal 0.409; tip radii 22.591, 22.182, 21.773, 21.364, 20.955. CONVENTIONAL: CW spindle (omega -Z) moves +Y-half teeth +X; work top must move -X, i.e. head rotation NEGATIVE about +Y (window angle decreasing); cutting load opposes the worm, preload the worm in the driving direction. Per pass: head locked, cutter centred X0 at the window start, lower to the layer radius, unlock and crank through the window, stop, retract Z, relock, step Y; never reverse under engagement. Order: for EACH layer, stations lowest Y to highest Y (keeps the +Y shoulder to one layer). Excluded cone sectors stay S2F filing. Kernel rotary samples are diagnostic target poses only: layers, stations, continuous motion, clearance between poses, torque and attained radius are NOT proven; after-op stock is UNKNOWN and no coverage or later allowance is credited. Measure the actual result (micrometer/radius gauge) before S2F."
+[[setups.ops]]
+op = 85
+do = "profile"
+feature = "body"
+faces = "unknown"
+approach = "rotary"
+tool = "unknown"
+holder = "unknown"
+to_dia = 41.91
+z_from = 23.675
+z_to = 26.675
+angle_window_deg = [-162.0, -44.0]
+direction = "conventional"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = 0.409
+ae_mm = 3.0
+approach_mm = 5.0
+note = "STABLE-SELECTOR HOLD: faces unknown because HAF_HEAD__P01/HAF_BODY__P01 label groups contain both half-cylinder faces; match the intended cylindrical portion/intersection with this authored window in the current export before execution. AUTHOR'S CHOICE DIRECT finish of body R20.955 in the model+X cone-free window for this station: source polar 44.0..162.0deg (computed: centred Ø6.35+0.5 vs cone R8.636 with t+-21.2055). Station cutter-centre modelY43.5 (head-axis z23.5); new band Y43.675..46.675 from the previous upper edge Y43.675 lies on the cutter +Y half; cutter min Y40.325 and Ø9.525 body min Y38.7375 clear the jaw face Y20. 5 radial layers from the S1 envelope: ceil((23.0-20.955)/0.5)=5, equal 0.409; tip radii 22.591, 22.182, 21.773, 21.364, 20.955. CONVENTIONAL: CW spindle (omega -Z) moves +Y-half teeth +X; work top must move -X, i.e. head rotation NEGATIVE about +Y (window angle decreasing); cutting load opposes the worm, preload the worm in the driving direction. Per pass: head locked, cutter centred X0 at the window start, lower to the layer radius, unlock and crank through the window, stop, retract Z, relock, step Y; never reverse under engagement. Order: for EACH layer, stations lowest Y to highest Y (keeps the +Y shoulder to one layer). Excluded cone sectors stay S2F filing. Kernel rotary samples are diagnostic target poses only: layers, stations, continuous motion, clearance between poses, torque and attained radius are NOT proven; after-op stock is UNKNOWN and no coverage or later allowance is credited. Measure the actual result (micrometer/radius gauge) before S2F."
+[[setups.ops]]
+op = 90
+do = "profile"
+feature = "body"
+faces = "unknown"
+approach = "rotary"
+tool = "unknown"
+holder = "unknown"
+to_dia = 41.91
+z_from = 23.675
+z_to = 26.675
+angle_window_deg = [18.0, 136.0]
+direction = "conventional"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = 0.409
+ae_mm = 3.0
+approach_mm = 5.0
+note = "STABLE-SELECTOR HOLD: faces unknown because HAF_HEAD__P01/HAF_BODY__P01 label groups contain both half-cylinder faces; match the intended cylindrical portion/intersection with this authored window in the current export before execution. AUTHOR'S CHOICE DIRECT finish of body R20.955 in the model-X cone-free window for this station: source polar 224.0..342.0deg (computed: centred Ø6.35+0.5 vs cone R8.636 with t+-21.2055). Station cutter-centre modelY43.5 (head-axis z23.5); new band Y43.675..46.675 from the previous upper edge Y43.675 lies on the cutter +Y half; cutter min Y40.325 and Ø9.525 body min Y38.7375 clear the jaw face Y20. 5 radial layers from the S1 envelope: ceil((23.0-20.955)/0.5)=5, equal 0.409; tip radii 22.591, 22.182, 21.773, 21.364, 20.955. CONVENTIONAL: CW spindle (omega -Z) moves +Y-half teeth +X; work top must move -X, i.e. head rotation NEGATIVE about +Y (window angle decreasing); cutting load opposes the worm, preload the worm in the driving direction. Per pass: head locked, cutter centred X0 at the window start, lower to the layer radius, unlock and crank through the window, stop, retract Z, relock, step Y; never reverse under engagement. Order: for EACH layer, stations lowest Y to highest Y (keeps the +Y shoulder to one layer). Excluded cone sectors stay S2F filing. Kernel rotary samples are diagnostic target poses only: layers, stations, continuous motion, clearance between poses, torque and attained radius are NOT proven; after-op stock is UNKNOWN and no coverage or later allowance is credited. Measure the actual result (micrometer/radius gauge) before S2F."
+[[setups.ops]]
+op = 95
+do = "profile"
+feature = "body"
+faces = "unknown"
+approach = "rotary"
+tool = "unknown"
+holder = "unknown"
+to_dia = 41.91
+z_from = 26.675
+z_to = 29.675
+angle_window_deg = [-167.5, -38.5]
+direction = "conventional"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = 0.409
+ae_mm = 3.0
+approach_mm = 5.0
+note = "STABLE-SELECTOR HOLD: faces unknown because HAF_HEAD__P01/HAF_BODY__P01 label groups contain both half-cylinder faces; match the intended cylindrical portion/intersection with this authored window in the current export before execution. AUTHOR'S CHOICE DIRECT finish of body R20.955 in the model+X cone-free window for this station: source polar 38.5..167.5deg (computed: centred Ø6.35+0.5 vs cone R8.636 with t+-21.2055). Station cutter-centre modelY46.5 (head-axis z26.5); new band Y46.675..49.675 from the previous upper edge Y46.675 lies on the cutter +Y half; cutter min Y43.325 and Ø9.525 body min Y41.7375 clear the jaw face Y20. 5 radial layers from the S1 envelope: ceil((23.0-20.955)/0.5)=5, equal 0.409; tip radii 22.591, 22.182, 21.773, 21.364, 20.955. CONVENTIONAL: CW spindle (omega -Z) moves +Y-half teeth +X; work top must move -X, i.e. head rotation NEGATIVE about +Y (window angle decreasing); cutting load opposes the worm, preload the worm in the driving direction. Per pass: head locked, cutter centred X0 at the window start, lower to the layer radius, unlock and crank through the window, stop, retract Z, relock, step Y; never reverse under engagement. Order: for EACH layer, stations lowest Y to highest Y (keeps the +Y shoulder to one layer). Excluded cone sectors stay S2F filing. Kernel rotary samples are diagnostic target poses only: layers, stations, continuous motion, clearance between poses, torque and attained radius are NOT proven; after-op stock is UNKNOWN and no coverage or later allowance is credited. Measure the actual result (micrometer/radius gauge) before S2F."
+[[setups.ops]]
+op = 100
+do = "profile"
+feature = "body"
+faces = "unknown"
+approach = "rotary"
+tool = "unknown"
+holder = "unknown"
+to_dia = 41.91
+z_from = 26.675
+z_to = 29.675
+angle_window_deg = [12.5, 141.5]
+direction = "conventional"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = 0.409
+ae_mm = 3.0
+approach_mm = 5.0
+note = "STABLE-SELECTOR HOLD: faces unknown because HAF_HEAD__P01/HAF_BODY__P01 label groups contain both half-cylinder faces; match the intended cylindrical portion/intersection with this authored window in the current export before execution. AUTHOR'S CHOICE DIRECT finish of body R20.955 in the model-X cone-free window for this station: source polar 218.5..347.5deg (computed: centred Ø6.35+0.5 vs cone R8.636 with t+-21.2055). Station cutter-centre modelY46.5 (head-axis z26.5); new band Y46.675..49.675 from the previous upper edge Y46.675 lies on the cutter +Y half; cutter min Y43.325 and Ø9.525 body min Y41.7375 clear the jaw face Y20. 5 radial layers from the S1 envelope: ceil((23.0-20.955)/0.5)=5, equal 0.409; tip radii 22.591, 22.182, 21.773, 21.364, 20.955. CONVENTIONAL: CW spindle (omega -Z) moves +Y-half teeth +X; work top must move -X, i.e. head rotation NEGATIVE about +Y (window angle decreasing); cutting load opposes the worm, preload the worm in the driving direction. Per pass: head locked, cutter centred X0 at the window start, lower to the layer radius, unlock and crank through the window, stop, retract Z, relock, step Y; never reverse under engagement. Order: for EACH layer, stations lowest Y to highest Y (keeps the +Y shoulder to one layer). Excluded cone sectors stay S2F filing. Kernel rotary samples are diagnostic target poses only: layers, stations, continuous motion, clearance between poses, torque and attained radius are NOT proven; after-op stock is UNKNOWN and no coverage or later allowance is credited. Measure the actual result (micrometer/radius gauge) before S2F."
+[[setups.ops]]
+op = 105
+do = "profile"
+feature = "body"
+faces = "unknown"
+approach = "rotary"
+tool = "unknown"
+holder = "unknown"
+to_dia = 41.91
+z_from = 29.675
+z_to = 30.0
+angle_window_deg = [-178.75, -27.25]
+direction = "conventional"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = 0.409
+ae_mm = 3.0
+approach_mm = 5.0
+note = "STABLE-SELECTOR HOLD: faces unknown because HAF_HEAD__P01/HAF_BODY__P01 label groups contain both half-cylinder faces; match the intended cylindrical portion/intersection with this authored window in the current export before execution. AUTHOR'S CHOICE DIRECT finish of body R20.955 in the model+X cone-free window for this station: source polar 27.25..178.75deg (computed: centred Ø6.35+0.5 vs cone R8.636 with t+-21.2055). Station cutter-centre modelY49.5 (head-axis z29.5); new band Y49.675..50.0 from the previous upper edge Y49.675 lies on the cutter +Y half; cutter min Y46.325 and Ø9.525 body min Y44.7375 clear the jaw face Y20. 5 radial layers from the S1 envelope: ceil((23.0-20.955)/0.5)=5, equal 0.409; tip radii 22.591, 22.182, 21.773, 21.364, 20.955. CONVENTIONAL: CW spindle (omega -Z) moves +Y-half teeth +X; work top must move -X, i.e. head rotation NEGATIVE about +Y (window angle decreasing); cutting load opposes the worm, preload the worm in the driving direction. Per pass: head locked, cutter centred X0 at the window start, lower to the layer radius, unlock and crank through the window, stop, retract Z, relock, step Y; never reverse under engagement. Order: for EACH layer, stations lowest Y to highest Y (keeps the +Y shoulder to one layer). Excluded cone sectors stay S2F filing. Kernel rotary samples are diagnostic target poses only: layers, stations, continuous motion, clearance between poses, torque and attained radius are NOT proven; after-op stock is UNKNOWN and no coverage or later allowance is credited. Measure the actual result (micrometer/radius gauge) before S2F."
+[[setups.ops]]
+op = 110
+do = "profile"
+feature = "body"
+faces = "unknown"
+approach = "rotary"
+tool = "unknown"
+holder = "unknown"
+to_dia = 41.91
+z_from = 29.675
+z_to = 30.0
+angle_window_deg = [1.25, 152.75]
+direction = "conventional"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = 0.409
+ae_mm = 3.0
+approach_mm = 5.0
+note = "STABLE-SELECTOR HOLD: faces unknown because HAF_HEAD__P01/HAF_BODY__P01 label groups contain both half-cylinder faces; match the intended cylindrical portion/intersection with this authored window in the current export before execution. AUTHOR'S CHOICE DIRECT finish of body R20.955 in the model-X cone-free window for this station: source polar 207.25..358.75deg (computed: centred Ø6.35+0.5 vs cone R8.636 with t+-21.2055). Station cutter-centre modelY49.5 (head-axis z29.5); new band Y49.675..50.0 from the previous upper edge Y49.675 lies on the cutter +Y half; cutter min Y46.325 and Ø9.525 body min Y44.7375 clear the jaw face Y20. 5 radial layers from the S1 envelope: ceil((23.0-20.955)/0.5)=5, equal 0.409; tip radii 22.591, 22.182, 21.773, 21.364, 20.955. CONVENTIONAL: CW spindle (omega -Z) moves +Y-half teeth +X; work top must move -X, i.e. head rotation NEGATIVE about +Y (window angle decreasing); cutting load opposes the worm, preload the worm in the driving direction. Per pass: head locked, cutter centred X0 at the window start, lower to the layer radius, unlock and crank through the window, stop, retract Z, relock, step Y; never reverse under engagement. Order: for EACH layer, stations lowest Y to highest Y (keeps the +Y shoulder to one layer). Excluded cone sectors stay S2F filing. Kernel rotary samples are diagnostic target poses only: layers, stations, continuous motion, clearance between poses, torque and attained radius are NOT proven; after-op stock is UNKNOWN and no coverage or later allowance is credited. Measure the actual result (micrometer/radius gauge) before S2F."
+
+[[setups.ops]]
+op = 120
+do = "profile"
+feature = "body"
+faces = ["HAF_BODY__P01"]
+approach = "rotary"
+tool = "unknown"
+holder = "unknown"
+to_dia = 41.91
+z_from = 32.675
+z_to = 35.675
+angle_window_deg = [-180.0, 180.0]
+direction = "conventional"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = 0.409
+ae_mm = 3.0
+approach_mm = 5.0
+note = "AUTHOR'S CHOICE existing Ø6.35 HSS/BS-0 recipe: proposed1250rpm/100mm/min; actual tool/holder/dividing head/fixture/cutting data unknown. Whole HAF_BODY__P01 applies only to this full360 band; partial-window selectors remain unknown. DIRECT finish of body R20.955, full turn, machining the retained R23 envelope above the cone and below the S1 full-radius band: footprint Y49.325..55.675 is clear of the cone (Y<=46.736) and the head shoulder Y68.072. Station cutter-centre modelY52.5 (head-axis z32.5); new band Y52.675..55.675 from the previous upper edge Y52.675 lies on the cutter +Y half; Ø9.525 shank spans Y47.7375..57.2625, clear of the cone pad and the jaw face Y20. 5 radial layers from the S1 envelope, same recipe as S2H:30: ceil((23.0-20.955)/0.5)=5, equal 0.409; tip radii 22.591, 22.182, 21.773, 21.364, 20.955. CONVENTIONAL: CW spindle (omega -Z) moves +Y-half teeth +X; work top must move -X, i.e. head rotation NEGATIVE about +Y (window angle decreasing); cutting load opposes the worm, preload the worm in the driving direction. Per pass: head locked, cutter centred X0 at the window start, lower to the layer radius, unlock and crank through the window, stop, retract Z, relock, step Y; never reverse under engagement. Order: for EACH layer, stations lowest Y to highest Y (keeps the +Y shoulder to one layer). Proposed recipe only: 1250rpm, 100mm/min, axial<=0.5; work ~0.73rpm = ~29handwheel rpm; <=1.45min cutting per 360deg pass atR23; retract/reposition/handling time is unmeasured. Stations Y52.5/55.5/58.5 add 15 passes (S2H body passes 85 to 100) and a conservative added cut time 21.7min = 15 x 2pi x R23/100mm/min (maximum circumference, excluding retracts). Kernel rotary samples are diagnostic target poses only: layers, stations, continuous motion, clearance between poses, torque and attained radius are NOT proven; after-op stock is UNKNOWN and no coverage or later allowance is credited. Measure the actual result (micrometer/radius gauge) before S2F."
+[[setups.ops]]
+op = 130
+do = "profile"
+feature = "body"
+faces = ["HAF_BODY__P01"]
+approach = "rotary"
+tool = "unknown"
+holder = "unknown"
+to_dia = 41.91
+z_from = 35.675
+z_to = 38.675
+angle_window_deg = [-180.0, 180.0]
+direction = "conventional"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = 0.409
+ae_mm = 3.0
+approach_mm = 5.0
+note = "AUTHOR'S CHOICE existing Ø6.35 HSS/BS-0 recipe: proposed1250rpm/100mm/min; actual tool/holder/dividing head/fixture/cutting data unknown. Whole HAF_BODY__P01 applies only to this full360 band; partial-window selectors remain unknown. DIRECT finish of body R20.955, full turn, machining the retained R23 envelope above the cone and below the S1 full-radius band: footprint Y52.325..58.675 is clear of the cone (Y<=46.736) and the head shoulder Y68.072. Station cutter-centre modelY55.5 (head-axis z35.5); new band Y55.675..58.675 from the previous upper edge Y55.675 lies on the cutter +Y half; Ø9.525 shank spans Y50.7375..60.2625, clear of the cone pad and the jaw face Y20. 5 radial layers from the S1 envelope, same recipe as S2H:30: ceil((23.0-20.955)/0.5)=5, equal 0.409; tip radii 22.591, 22.182, 21.773, 21.364, 20.955. CONVENTIONAL: CW spindle (omega -Z) moves +Y-half teeth +X; work top must move -X, i.e. head rotation NEGATIVE about +Y (window angle decreasing); cutting load opposes the worm, preload the worm in the driving direction. Per pass: head locked, cutter centred X0 at the window start, lower to the layer radius, unlock and crank through the window, stop, retract Z, relock, step Y; never reverse under engagement. Order: for EACH layer, stations lowest Y to highest Y (keeps the +Y shoulder to one layer). Proposed recipe only: 1250rpm, 100mm/min, axial<=0.5; work ~0.73rpm = ~29handwheel rpm; <=1.45min cutting per 360deg pass atR23; retract/reposition/handling time is unmeasured. Stations Y52.5/55.5/58.5 add 15 passes (S2H body passes 85 to 100) and a conservative added cut time 21.7min = 15 x 2pi x R23/100mm/min (maximum circumference, excluding retracts). Kernel rotary samples are diagnostic target poses only: layers, stations, continuous motion, clearance between poses, torque and attained radius are NOT proven; after-op stock is UNKNOWN and no coverage or later allowance is credited. Measure the actual result (micrometer/radius gauge) before S2F."
+[[setups.ops]]
+op = 140
+do = "profile"
+feature = "body"
+faces = ["HAF_BODY__P01"]
+approach = "rotary"
+tool = "unknown"
+holder = "unknown"
+to_dia = 41.91
+z_from = 38.675
+z_to = 41.675
+angle_window_deg = [-180.0, 180.0]
+direction = "conventional"
+rpm = "unknown"
+feed_mm_min = "unknown"
+doc_mm = 0.409
+ae_mm = 3.0
+approach_mm = 5.0
+note = "AUTHOR'S CHOICE existing Ø6.35 HSS/BS-0 recipe: proposed1250rpm/100mm/min; actual tool/holder/dividing head/fixture/cutting data unknown. Whole HAF_BODY__P01 applies only to this full360 band; partial-window selectors remain unknown. DIRECT finish of body R20.955, full turn, machining the retained R23 envelope above the cone and below the S1 full-radius band: footprint Y55.325..61.675 is clear of the cone (Y<=46.736) and the head shoulder Y68.072. Station cutter-centre modelY58.5 (head-axis z38.5); new band Y58.675..61.675 from the previous upper edge Y58.675 lies on the cutter +Y half; Ø9.525 shank spans Y53.7375..63.2625, clear of the cone pad and the jaw face Y20. This band overlaps the S1-finished Y59..61.675 at the same R20.955 (harmless, last layer only); it claims nothing beyond Y61.675. 5 radial layers from the S1 envelope, same recipe as S2H:30: ceil((23.0-20.955)/0.5)=5, equal 0.409; tip radii 22.591, 22.182, 21.773, 21.364, 20.955. CONVENTIONAL: CW spindle (omega -Z) moves +Y-half teeth +X; work top must move -X, i.e. head rotation NEGATIVE about +Y (window angle decreasing); cutting load opposes the worm, preload the worm in the driving direction. Per pass: head locked, cutter centred X0 at the window start, lower to the layer radius, unlock and crank through the window, stop, retract Z, relock, step Y; never reverse under engagement. Order: for EACH layer, stations lowest Y to highest Y (keeps the +Y shoulder to one layer). Proposed recipe only: 1250rpm, 100mm/min, axial<=0.5; work ~0.73rpm = ~29handwheel rpm; <=1.45min cutting per 360deg pass atR23; retract/reposition/handling time is unmeasured. Stations Y52.5/55.5/58.5 add 15 passes (S2H body passes 85 to 100) and a conservative added cut time 21.7min = 15 x 2pi x R23/100mm/min (maximum circumference, excluding retracts). Kernel rotary samples are diagnostic target poses only: layers, stations, continuous motion, clearance between poses, torque and attained radius are NOT proven; after-op stock is UNKNOWN and no coverage or later allowance is credited. Measure the actual result (micrometer/radius gauge) before S2F."
+
+# Manual root finishing removes the actual material that S2B/S2BR/S2H cannot reach
+# (1-3mm, quantified below); it never relabels stock as an acceptable fillet or native-proved surface.
+[[setups]]
+id = "S2F"
+machine = "finishing-bench"
+frame = "P2"
+stock_in = "S2H"
+coolant = "unknown"
+deburr_mm = 0.25
+deburr_cite = ["AUTHOR'S CHOICE", "harmonic-analyzer/cad/config/title_block.yaml:in.edge_break"]
+[setups.stock_state]
+top_z = 50.8591 # proposed carried bound inP2
+bottom_z = -23.0
+note = "Conservative carried bound after proposed S2B/S2BR prep and S2H rotary arcs; actual S2H radii UNKNOWN until measured. AUTHOR'S CHOICE nominal design-intent leftovers (not observations): body cone sectors outside the S2H windows ~940mm3 total, ~440mm2, up to 2.04 radial; head crown sectors within 54deg of +-Z beside the crank ~2400mm3, ~1370mm2, mostly 1.0..2.7, max 3.06; crank OD 0.15..0.25 above Z21.5 and both crank/head saddles. No finished-stock reset. Tail removal precedes this mandatory root finishing."
+[setups.hold]
+fixed_jaw = "not_applicable" # proposed bench-bolted non-vise cradle
+fixture = "unknown"
+support = "unknown"
+grip_on = "AUTHOR'S CHOICE: lower band model Y1..21, B and meridian"
+grip_mm = 20.0
+stop = "Proposed bench cradle/B stop and meridian: locate/recover with work loosely seated; actual hardware/pose unknown."
+clamp = "Remove part from powered machine; bench-bolt cradle. Locate/recover B, body seating and meridian with work loosely seated, then secure positive lower-body restraint. AFTER final tightening recheck/recover B, body seating and meridian; repeat clamp/recheck if disturbed. Repeat for opposed-cradle reverse access. STOP unless restraint and final location are qualified; actual restraint/results unknown."
+note = "Frame legend: model Y is part height from B; model X/Z describe the part radial section. P2 is the selected setup frame, not permission to copy source coordinates into a DRO. Actual setup/axis binding remains unknown."
+[[setups.ops]]
+op = 10
+do = "file_to_line"
+feature = "body"
+faces = ["HAF_BODY__P01"]
+tool = "unknown"
+holder = "unknown"
+guide = { template = "unknown", gauge = "unknown" }
+note = "AUTHOR'S CHOICE mandatory physical root finishing. Actual material: body band Y28.4..52.675 inside the two cone sectors S2H excluded; S2H:120 full turn physically sweeps these again aboveY49.325 without stock/coverage credit, so measure and file only actual residual (polar ~-20..47 and ~160..227deg), up to 2.04 radial, ~440mm2/~940mm3 nominal. Bench-file then needle-file/blade order: FIRST coarse second-cut then smooth safe-edge hand files on the accessible protrusion (safe edge on the finished neighbour), re-offering qualified masters after each small bite; ONLY for the last cusp/inside corner (within ~0.10 of the line) safe-edge needle/warding files then thin backed blades/scrapers, which do NOT remove bulk stock. Qualify each source-derived zero-allowance section master (actual size/error band) before cutting; no inside-fillet permission. Blue, scrape high contact, wash/repeat. Exact union: body X²+Z²=20.955², cone u²+(Y-38.1)²=8.636² with u=.974365716981X-.224969885921Z, |t|<=21.0055 (t=.224969885921X+.974365716981Z); not a blend radius. Proposed sectionsY29.464,30,32,34,36,38.1,40,42,44,46,46.736, refine<=.25 near roots; access from BOTH±Z with stable clamps. Never gouge the S2H-finished cylinder or leave filing stock as a permitted fillet. Actual file/scraper dimensions/edge, masters, contact observations and native hand-tool replay unknown."
+[[setups.ops]]
+op = 20
+do = "file_to_line"
+feature = "cone_boss"
+faces = ["HAF_CONE_BOSS__P01", "HAF_CONE_BOSS__P02"]
+tool = "unknown"
+holder = "unknown"
+guide = { template = "unknown", gauge = "unknown" }
+note = "AUTHOR'S CHOICE: opposite safe-edge direction ofS2F:10 completes BOTH saddle roots to coneR8.636 (cone OD rings sit inside the same sector stock); same bench-file-first order. Preserve cap+0.20 and body; inspect±X and both±Z ends, no single blue patch as full coverage. Actual tool access/master/calibration and exact-corner proof unknown; physical root removal mandatory."
+[[setups.ops]]
+op = 30
+do = "file_to_line"
+feature = "head"
+faces = ["HAF_HEAD__P01"]
+tool = "unknown"
+holder = "unknown"
+guide = { template = "unknown", gauge = "unknown" }
+note = "AUTHOR'S CHOICE: file the four head crown sectors S2H could not reach (within 54deg of +-Z beside the crank; nominal terrace stock mostly 1.0..2.7, max 3.06, ~1370mm2/~2400mm3) and the head-crank saddle roots to exact union headR21.336 and common crankX²+(Y-81.3735)²=10.922²; blend to the S2H-finished side arcs without gouging. Bench-file then needle-file/blade order: FIRST coarse second-cut then smooth safe-edge hand files on the accessible protrusion (safe edge on the finished neighbour), re-offering qualified masters after each small bite; ONLY for the last cusp/inside corner (within ~0.10 of the line) safe-edge needle/warding files then thin backed blades/scrapers, which do NOT remove bulk stock. Qualify each source-derived zero-allowance section master (actual size/error band) before cutting; no inside-fillet permission. Proposed sectionsY70.4515,71,73,75,77,79,81.3735,84,87,90,92,92.2955, refine<=.25 near roots; approach both openZ ends with safe adjacent face/blue source masters. Remove cusp, no gouge/blend or independent crank shift. Leave underside annulus toS2R/S2RF; all actual tooling/master/pose and native evidence unknown."
+[[setups.ops]]
+op = 40
+do = "file_to_line"
+feature = "crank_boss"
+faces = ["HAF_CRANK_BOSS__P01", "HAF_CRANK_BOSS__P02"]
+tool = "unknown"
+holder = "unknown"
+guide = { template = "unknown", gauge = "unknown" }
+note = "AUTHOR'S CHOICE: complete opposite safe-edge directionS2F:30 for every crank root, BOTH±Z ends, preserve head support/caps. Final nominalR10.922 at commonY81.3735; S2B stairs leave 0.15..0.25 crank OD stock plus cusps, filed with smooth safe-edge files and checked with a qualified crank master/micrometer after each bite. Actual hand tools/access/observations unknown; unsupported native replay is not permission to omit physical cusp removal."
+[[setups.ops]]
+op = 50
+do = "inspect"
+feature = ["body", "head", "cone_boss", "crank_boss"]
+note = "HOLD: proposed source-section blue contact on both adjoining cylinders, optical root/validated replica examination and adjacent-cylinder coordinate scans. A2mm probe cannot contact a true sharp concavity; finite tool/optical resolution grants no CAD fillet allowance. Actual gauges, masters, replica fidelity, calibration/uncertainty and results unknown."
+[setups.ops.checks]
+body = { dia = "unknown", height = "unknown" }
+head = { dia = "unknown", height = "unknown" }
+cone_boss = { dia = "unknown" }
+crank_boss = { dia = "unknown" }
+
+[[setups]]
+id = "S2R"
+machine = "PM-1127VF-LB"
+frame = "T1"
+stock_in = "S2F"
+coolant = "unknown"
+deburr_mm = 0.25
+deburr_cite = ["AUTHOR'S CHOICE", "harmonic-analyzer/cad/config/title_block.yaml:in.edge_break"]
+[setups.stock_state]
+od_mm = 42.672
+north_end_z = 0.0
+south_end_z = -94.742
+note = "Proposed asymmetric integral state, crankR51.8231 envelope plus unresolved stock; head band arrives S2H-arc-finished in polar54..126 each side and S2F-filed in crown/saddle sectors (actual radii measured, not assumed); not plainØ42.672 chucking."
+[setups.hold]
+fixed_jaw = "not_applicable" # proposed head adapter on chuck, not a vise
+fixture = "unknown"
+support = "unknown"
+grip_on = "AUTHOR'S CHOICE: head ±X sectors at model Y75..93, crank-clear ±Z windows; 18 mm is head-to-collar, NOT flange-to-jaw engagement"
+grip_mm = 18.0
+stop = "Propose adapter flange at model Y99..105 held by HEADSTOCK four-jaw behind Y99, collar axial position by B-to-flange comparison. No nonexistent head-top pads."
+clamp = "Proposed split head adapter leaves crank corridor open, connector cheeks behind head; adjustable brass pads set to the ACTUAL coarsely machined/finished head by measurement and indication, not nominal R21.336. Qualify positive restraint, balance, spindle swing and fixed toolpost/apron clearances; actual adapter/pads/pose/support/indication and grip evidence unknown."
+note = "The proposed HEADSTOCK four-jaw holds the adapter flange. The 18 mm grip is head-to-collar; 6 mm flange thickness is NOT jaw engagement. Actual flange-to-jaw engagement remains UNKNOWN. Actual rotating clearance is not proven by nominal swing. Proposed part envelope R51.8231 and fixture envelope require measured full swept clearance; no example fixture ID/solid or commissioning observation is adopted. Model Y denotes part height from B; T1 Z is axial DRO travel and T1 X displays diameter, not model X. Actual setup/axis binding remains unknown."
+[setups.zero.transfer]
+from = "S2F"
+indicate = ["body", "foot_seat"]
+gauge = "unknown"
+runout_limit_mm = "unknown"
+[setups.zero.x]
+feature = "spindle_axis"
+edge_mm = 0.0
+from = "+x"
+method = "touch_then_set"
+tool = "unknown"
+gauge = "unknown"
 check_jog_mm = 10.0
 [setups.zero.z]
-face = "cone_boss_north_face"
-edge_mm = 21.0055
+face = "foot_seat"
+edge_mm = 0.0
 from = "+z"
 method = "touch_then_set"
 tool = "unknown"
@@ -405,14 +1834,165 @@ retouch_after = []
 [[setups.ops]]
 op = 10
 do = "face"
+feature = "head"
+faces = "unknown"
+tool = "unknown"
+holder = "unknown"
+to_z = -68.072
+direction = "radially_inward"
+rpm = "unknown"
+doc_mm = "unknown"
+feed_mm_rev = "unknown"
+note = "STABLE-SELECTOR HOLD: only underside annulus at model Y68.072, normal -model Y, R20.955..21.336 (radial width .381 mm). Exact exported face is unlabeled: no stable HAF binding. faces remains unknown; no entity-number selector. AUTHOR'S CHOICE tool concept: thin .20 mm axial sharp HSS head/6 mm radial reach, backing entirely footward at model Y<=68.072 after R26.955, holder footward too. A centred 8 mm backing would collide with crank beginning at model Y70.4515; offset concept leaves 2.3795 mm axial separation, NOT actual clearance proof. Propose blade approach T1 Z-67.80 mm, R21.40 mm, qualified small axial steps to Z-68.072 mm, inward displayed X42.672->41.910 mm, retract +Z before radial return. Never turn full upper outline or trial-cut finished shoulder for zero. Actual blade/nose/holder/projection/pose/speed and clearance unknown. S2RF physically scrapes root; source .010 in edge-break grants NO internal fillet allowance. Native/corner/binding qualification remains HOLD."
+
+[[setups]]
+id = "S2RF"
+machine = "finishing-bench"
+frame = "P2"
+stock_in = "S2R"
+coolant = "unknown"
+deburr_mm = 0.25
+deburr_cite = ["AUTHOR'S CHOICE", "harmonic-analyzer/cad/config/title_block.yaml:in.edge_break"]
+[setups.stock_state]
+top_z = 50.8591 # proposed carried bound inP2
+bottom_z = -23.0
+note = "Conservative carried section; bodyY67.4..68.072 (AR nose blendY67.4..67.8 plus remaining root skin) UNFINISHED for op5; annulus face alone cannot finish this cylinder; actual residual stock/removal and exact-corner proof unknown. Tail removal only by prior S1C/S2 and head-band prep by S2B/S2BR, not new ideal-stock reset."
+[setups.hold]
+fixed_jaw = "not_applicable" # proposed bench-bolted non-vise cradle
+fixture = "unknown"
+support = "unknown"
+grip_on = "AUTHOR'S CHOICE: lower model Y1..21 band/B in removed-to-bench radial cradle"
+grip_mm = 20.0
+stop = "Proposed B stop/meridian: locate/recover with work loosely seated; actual hardware/pose unknown."
+clamp = "Locate/recover B, body seating and meridian with work loosely seated, then secure positive bench restraint. AFTER final tightening recheck/recover B, body seating and meridian; repeat clamp/recheck if disturbed. Repeat in each reoriented quadrant. STOP unless final restraint/location is qualified. NEVER hand-file rotating asymmetric work; actual equipment/support unknown."
+note = "Model Y is part height from B; model X/Z are part radial coordinates in the P2 presentation, not lathe DRO axes. Actual setup binding remains unknown."
+[[setups.ops]]
+op = 5
+do = "file_to_line"
+feature = "body"
+faces = ["HAF_BODY__P01"]
+tool = "unknown"
+holder = "unknown"
+guide = { template = "unknown", gauge = "unknown" }
+note = "AUTHOR'S CHOICE existing root-kit/handle/master procedure; actual tools/masters/fixture/access/calibration unknown. TERMINAL BODY BLEND, mandatory BEFORE the annulus root op10: S1:35 finished full-radius body contact only to Y67.4, so body R20.955 (source faces HAF_BODY__P01) over Y67.4..68.072 is NOT finished by S1, S2H or S2R; the S2R:10 annulus face alone does not finish this cylinder band. Actual material: the r0.4 AR nose blend Y67.4..67.8 plus the unturned Y67.8..68.072 skin (nominally the tiny R21.336 skin where the S2H head arcs swept; measure the actual residual in every sector). BEFORE cutting, qualify a zero-allowance source-profile master for body R20.955 meeting plane Y68.072 (actual size/error band recorded) and match it repeatably to the S1-finished band Y59..67.4. Use cone-root-finishing-kit safe-edge needle/warding files with the uncut safe edge bearing on the head underside plane Y68.072, cutting face on the body skin, short circumferential strokes; then the 0.3 thin backed blades/scrapers drawn AWAY from the root for the last cusp. Re-offer the master and blue after each small bite; remove only material above R20.955, do not undercut the S1-finished band, lower the annulus plane or add relief/chamfer. Work all four quadrants in positively clamped bench attitudes; no powered or free rotation. No internal fillet permission: finite tool edge is not CAD radius. Side access and file/scraper contact are NOT native-proved: native hand-tool replay remains HOLD, never permission to omit physical finishing."
+[setups.ops.checks]
+dia = "unknown"
+[setups.ops.inspection_methods]
+dia = "Body diameter/profile over the narrow Y67.4..68.072 band by qualified source-profile master blue contact and optical/validated-replica sections against the S1-finished Y59..67.4 band at four quadrants. The 0.672-wide band does not fit a micrometer anvil: no micrometer reading is pretended. Exact sharp body/annulus metrology remains HOLD; finite instrument resolution is not internal-radius permission. Actual master/optical equipment, calibration, uncertainty and results UNKNOWN."
+[[setups.ops]]
+op = 10
+do = "file_to_line"
+feature = "head"
+faces = "unknown"
+tool = "unknown"
+holder = "unknown"
+guide = { template = "unknown", gauge = "unknown" }
+note = "STABLE-SELECTOR HOLD same unbound annulusS2R:10. AUTHOR'S CHOICE mandatory physical annulus-root completion AFTER op5 finishes bodyY67.4..68.072 toR20.955: thin safe-edge backed scraper from footward side, cutting upper edge alongY68.072, polished safe flank on bodyR20.955, backing/holder entirelyY<=68.072. Scrape nose cusp in controlled strokes away from root, blue source sharp L-section, inspect all quadrants; do not lower plane, gouge body or add relief/chamfer. Finite tool nose grants no CAD radius allowance. Actual tools/masters/access/pose and native hand-tool replay unknown, not permission to omit physical root finishing."
+[[setups.ops]]
+op = 20
+do = "inspect"
+feature = "head"
+faces = "unknown"
+note = "STABLE-SELECTOR/CORNER HOLD: proposed B-to-shoulder block/indicator comparison, blue plane contact and optical/validated root replica with thin source-section masters. Large probe cannot contact true sharp line; no claimed zero-radius evidence from nominal tool size. Actual instruments/calibration/uncertainty/results unknown."
+[setups.ops.checks]
+height = "unknown"
+[setups.ops.inspection_methods]
+height = "Proposed top94.742 minus shoulder68.072 gives26.670 target, printed26.416..26.924; inspect quadrants for residual cusp/undercut. Actual bound face/gauge/calibration and observations unknown."
+
+[[setups]]
+id = "S3"
+machine = "PM-30MV"
+frame = "J3"
+stock_in = "S2RF"
+coolant = "unknown"
+deburr_mm = 0.1016
+deburr_cite = ["harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:JOURNAL_BORE"]
+[setups.stock_state]
+top_z = 23.0
+bottom_z = -23.0
+note = "AUTHOR'S CHOICE: both cone caps arrive inside the S1 Ø46 envelope, nominally J3Z±23.0 along the journal axis (S2B/S2BR rows keep cone+0.15 and its t±21.2055 cap allowance clear); proposed cap allowance plane J3Z±21.2055. Actual arriving stock unknown, residual/root debt carried."
+[setups.stock_state.local_thickness]
+journal_bore = 44.0055
+[setups.hold]
+fixed_jaw = "not_applicable" # proposed independent body cradle, not a vise
+fixture = "unknown"
+support = "unknown"
+grip_on = "AUTHOR'S CHOICE: lower body/B, not a pilot bore"
+grip_mm = 20.0
+stop = "Proposed journal centre 38.1 mm above B and 13.0011073536895 deg horizontal yaw; actual master/physical binding unknown."
+clamp = "Before A exists, loosely seat lower body/B and master references. BEFORE clamping measure the actual cooled body/contact region; qualify actual-part fit, collar closure, contact and body/B alignment. The proposed nominal Ø41.91 mm split collar does NOT prove fit over the entire allowed Ø41.656..42.164 mm body band. STOP if unqualified: no forcing, invented contact evidence or remade geometry. Secure independent body clamps and recheck/recover body/B alignment AFTER final tightening; repeat clamp/recheck if disturbed. Clamp is NOT datum A. No A arbor in pilot or occupied drill/bore/hone corridor. Actual cradle/restraint/pose, fit/contact/alignment observations and limits remain unknown."
+note = "Model Y is part height from B; J3 is the selected setup frame, not interchangeable model/DRO coordinates. No example fixture, measured fit or contact result is adopted."
+[setups.zero.transfer]
+from = "S2RF"
+indicate = ["foot_seat", "body"]
+gauge = "unknown"
+runout_limit_mm = "unknown"
+[setups.zero.x]
+feature = "journal_axis"
+edge_mm = "unknown"
+from = "indicated"
+method = "indicate_axis"
+tool = "unknown"
+check_jog_mm = 10.0
+procedure = "PICKUP HOLD: no journal bore exists yet. Missing qualified existing lower-body/B-to-target-J3-axis transfer including yaw, transverse offsets and actual fixture-reference calibration. Named unqualified master/source coordinates are not observed bore/axis. Preserve J3; no future-bore sweep or nominal reading."
+[setups.zero.y]
+feature = "journal_axis"
+edge_mm = "unknown"
+from = "indicated"
+method = "indicate_axis"
+tool = "unknown"
+check_jog_mm = 10.0
+procedure = "PICKUP HOLD: same unqualified existing lower-body/B-to-target-J3-axis transfer as X, including yaw/transverse offsets and actual fixture-reference calibration. No journal bore exists; preserve target frame, no future-bore sweep or nominal reading."
+[setups.zero.z]
+face = "cone_boss_north_face"
+edge_mm = "unknown"
+from = "+z"
+method = "measure_then_set"
+gauge = "unknown"
+measure = "M = actual signed raw north-cap station along J3 (S1 envelope crown, nominal Z23.0) transferred from the recovered body-centre reference plane; touch the actual contact patch, not nominal allowance"
+offset_mm = 0.0
+tool = "unknown"
+paper_mm = 0.0
+check_jog_mm = 10.0
+retouch_after = []
+[[setups.zero.tool_touches]]
+tool = "unknown" # proposed original LMS finishing endmill after op8 ground HSS
+z_face = "cone_boss_north_face"
+method = "measure_then_set"
+z_gauge = "unknown" # proposed rocker-position-height-gauge block/comparator method
+z_measure = "M = actual signed J3 north station of the SURVIVING standing north-cap patch left by op8 as actually cut, independently block-compared from the recovered body-centre reference plane after op8; touch the finishing flat end on that same measured patch before op10. Nominal 21.2055 is the op8 target, never the measured value; STOP if the surviving patch or its signed station cannot be independently established; actual tool/gauge identity, calibration, uncertainty, patch and station UNKNOWN; procedural M not observed"
+z_offset_mm = 0.0
+paper_mm = 0.0
+before_ops = [10]
+[[setups.ops]]
+op = 8
+do = "rough_face"
 feature = "cone_boss_north_face"
+faces = ["HAF_CONE_BOSS_NORTH_FACE__P01"]
+tool = "unknown"
+holder = "unknown"
+to_z = 21.2055
+direction = "positive_setup_x"
+doc_mm = 0.5 # AUTHOR'S CHOICE maximum proposed axial layer; actual cutting data unknown
+ae_mm = 7.0
+approach_mm = 5.0
+contour = { method = "linear_table", step_mm = 7.0, sweep_frame = "J3", sweep_bounds = { x = [-9.4, 9.4], y = [-2.375, 4.6], z = [21.2055, 23.0] } }
+stock_removal_bounds = { x = [-9.4, 9.4], y = [-11.9, 10.1], z = [21.2055, 23.0] }
+note = "AUTHOR'S CHOICE nominal proposal for a proposed Ø19.05 flat end: rough the S1-envelope crown over the north pad from J3Z23.0 to the0.20 cap-allowance plane21.2055 in4 layers<=0.5, X-strokes on two rows centred J3y-2.375 and4.6 (cutter modelY23.975..50.0, clear of collar/cradle Y<=23), so the box is fully swept for that cutter. Actual cutter diameter/corner/settings/fixture unknown: recompute rows and box if different. Not a finish; op10 takes the last0.20."
+[[setups.ops]]
+op = 10
+do = "face"
+feature = "cone_boss_north_face"
+faces = ["HAF_CONE_BOSS_NORTH_FACE__P01"]
 tool = "unknown"
 holder = "unknown"
 to_z = 21.0055
- direction = "positive_setup_x"
+direction = "positive_setup_x"
+note = "AUTHOR'S CHOICE: axial presentation finishes NORTH CAP ONLY from.20 allowance, X-only strokes with retracted Y stepovers, not boss OD full-circle through body. Actual cutter/datum transfer/cutting settings unknown; station/length checked afterS5."
 [setups.ops.checks]
 finish_ra = "unknown"
-length = "calipers" # existing cone-boss length check, on its exported owner after final facing
+[setups.ops.inspection_methods]
+finish_ra = "Proposed quantitative north-annulus tracesRa<=1.6; actual stylus/access/calibration/uncertainty unknown."
 [[setups.ops]]
 op = 20
 do = "spot"
@@ -420,6 +2000,7 @@ feature = "journal_bore"
 tool = "unknown"
 holder = "unknown"
 depth_mm = 0.5
+note = "AUTHOR'S CHOICE: J3X0,Y0 from finishednorthZ21.0055; actual tool pickup unknown."
 [[setups.ops]]
 op = 30
 do = "drill"
@@ -427,72 +2008,140 @@ feature = "journal_bore"
 tool = "unknown"
 holder = "unknown"
 exit_mm = 0.5
+note = "AUTHOR'S CHOICE proposed12.05 pilot/118deg point: finished north21.0055 through the raw reverse S1 envelope-23.0 (S5 later faces it to the cap), point3.621+.5exit gives nominaltip-27.1265,total48.132. REQUIRE qualified actual flute/reach/projection beyond computed full plunge, not just42.011 finished length. Actual tool D/point/reach and chip/cutting settings unknown; recalculate before execution."
 [[setups.ops]]
 op = 40
 do = "bore"
 feature = "journal_bore"
 tool = "unknown"
 holder = "unknown"
-direction = "negative_setup_z" # AUTHOR'S CHOICE: feed into journal along spindle axis
+direction = "negative_setup_z"
 exit_mm = 0.5
-note = "AUTHOR'S CHOICE: finish the running journal, establish datum A, retain B clocking; neither a verified bore gauge nor cutter reach is available."
+to_dia = 12.282
+note = "AUTHOR'S CHOICE: single-ended full-through boring preserves one axis, not two independent meeting bores. Proposed measured prehone12.282 leaves.00525diameter to12.28725 midpoint. Require bar head belowpilot diameter, rigid shank, pointreach>=44.0055 (north cap21.0055 to raw reverse envelope-23.0)+.5exit plus actual access/holder clearance. Actual bar/head/projection/quill envelope/deflection/cutting data unknown; no demonstrated50mm or inventory reach adopted."
+[[setups.ops]]
+op = 50
+do = "hone"
+feature = "journal_bore"
+tool = "unknown"
+holder = "unknown"
+direction = "axial_hand_strokes_both_directions"
+to_dia = 12.28725 # AUTHOR'S CHOICE process target, not actual tool setting/measurement
+rpm = "unknown"
+note = "AUTHOR'S CHOICE: adjustable 10..13 mm diameter honing concept with full 44.0055 mm working bore access (raw reverse envelope until S5) and overlapping both mouths. HAND rotation and HAND axial strokes ONLY; NO powered spindle. Proposed 120 rpm is an UNQUALIFIED design maximum, NOT an operating command or qualified setting; rpm remains unknown. Proposed working cycle no more than 10 seconds before clean/cool/gauge is NOT feed; actual hand-feed qualification remains unknown. No bellmouth/dwell. Target actual 12.28725 mm, not lower-edge reamer nominal. Require suitable abrasive/shaft reach/hand holder; actual tool/holder/reach and physical qualification unknown. Native hone stock replay unsupported, not an asserted removal."
 [setups.ops.checks]
 dia = "unknown"
+thru = "unknown"
 height = "unknown"
 finish_ra = "unknown"
+unknown = "unknown"
+[setups.ops.inspection_methods]
+dia = "Proposed small-bore comparator with sufficient actual reach/head clearance, zero in calibrated near-size ring using its actual certified diameter, then add measured deviation. Printed12.2809..12.2936,target12.28725, entry/mid/exit two directions. Ring/gauge identities, actual dimensions, uncertainty/repeatability/guards and observations UNKNOWN; no demonstration ring actuals/calibration imported."
+thru = "Proposed full unexpanded-mandrel passage/clear-mouth inspection; actual equipment and results unknown."
+height = "Proposed B-seated short-zone expanding A mandrel, opposite-end/180deg-reversed stem-centre block comparisons; subtract actual stem radius. Printed37.846..38.354,target38.1. Actual fixture/stem centring/calibration/uncertainty unknown."
+finish_ra = "Proposed validated internal replicas at entry/mid/exit and quantitative cross-lay profilometryRa<=1.6. Actual stylus/replica fidelity/calibration/uncertainty/cutoff/results unknown."
+unknown = "HOLD literal exported unknown requirement, note RIMS BREAK .004 MAX. No nominal deburr or unqualified observation resolves it."
 
 [[setups]]
 id = "S4"
 machine = "PM-30MV"
-frame = "C4" # plan.frames.C4, AUTHOR'S CHOICE; physical binding unknown
-stock_in = "S3_finished_datum_A"
-coolant = "CRC cutting oil brushed on"
+frame = "C4"
+stock_in = "S3"
+coolant = "unknown"
 deburr_mm = 0.25
-deburr_cite = ["harmonic-analyzer/cad/config/title_block.yaml:edge_break.radius_mm", "harmonic-analyzer/cad/config/title_block.yaml:edge_break.chamfer_max_mm"]
+deburr_cite = ["AUTHOR'S CHOICE", "harmonic-analyzer/cad/config/title_block.yaml:in.edge_break"]
 [setups.stock_state]
-top_z = 0.0 # crank north machined face in C4, spec:53-54
-bottom_z = -72.0344 # spec:55-56
+top_z = 0.2
+bottom_z = -72.2344
+note = "SETUP-ENTRY design only: top+.2, far face-72.2344,total72.4344. S4:5 removes near.2 toZ0; BEFORE drill/bore design entryZ0, far face-72.2344, thickness72.2344. local_thickness describes this consuming-operation span, not setup-entry total. Actual arriving/after stock and independent far-face bounds UNKNOWN/HOLD; commands do not prove stock or breakthrough."
 [setups.stock_state.local_thickness]
-crank_bore = 72.0344
+crank_bore = 72.2344
 [setups.hold]
+fixed_jaw = "not_applicable" # proposed A/B-located body cradle
 fixture = "unknown"
 support = "unknown"
-grip_on = "AUTHOR'S CHOICE: finished cone bore A and foot B; fixture/mating arbor unknown"
+grip_on = "AUTHOR'S CHOICE: independent lower-body clamps, finished A location, B roll"
 grip_mm = 20.0
-fixed_jaw = "not_applicable"
-jaws_along = "not_applicable"
-parallels = "not_applicable"
-jaw_above_parallels_mm = "not_applicable"
-stop = "AUTHOR'S CHOICE: clock on B and indicate finished A, not a pilot hole"
-clamp = "AUTHOR'S CHOICE: maintain A/B orientation during crank boring; actual hardware unknown"
+stop = "Proposed REMOVABLE A locator/actual B with work loosely seated, then operative crank centre model Y81.3735; nominal C4 unchanged."
+clamp = "BEFORE clamping measure the actual cooled body/contact region; qualify fit, collar closure, contact and A/B alignment. Proposed nominal Ø41.91 mm collar does NOT prove fit over the entire Ø41.656..42.164 mm body band. STOP if unqualified: no forcing, invented contact evidence or remade geometry. Secure independent body pads BEFORE removing A locator; AFTER final tightening recheck/recover actual A/B, repeat clamp/recheck if disturbed, then withdraw locator and re-indicate. Clear full crank bore/cap corridor; clamp is NOT A. Actual fixture/arbor/pose/metrology, fit/contact/alignment observations and limits unknown."
+note = "Model Y is part height from B, not C4 DRO Y. Common-axis placement remains unchanged; actual setup/axis binding remains unknown."
 [setups.zero.transfer]
 from = "S3"
 indicate = ["journal_bore", "foot_seat"]
-gauge = "dial-indicator"
-runout_limit_mm = "unknown" # Ø.10 angularity is NOT a scalar runout budget
+gauge = "unknown"
+runout_limit_mm = "unknown"
 [setups.zero.x]
 feature = "crank_axis"
 edge_mm = 0.0
 from = "indicated"
 method = "indicate_axis"
-tool = "dial-indicator"
+tool = "unknown"
 check_jog_mm = 10.0
 [setups.zero.y]
-feature = "crank_axis"
+feature = "journal_axis"
 edge_mm = 0.0
 from = "indicated"
 method = "indicate_axis"
-tool = "dial-indicator"
+tool = "unknown"
 check_jog_mm = 10.0
 [setups.zero.z]
 face = "crank_boss_faces"
-edge_mm = 0.0
+edge_mm = "unknown"
 from = "+z"
-method = "touch_then_set"
+method = "measure_then_set"
+gauge = "unknown"
+measure = "M_C4=-modelZ, actual signed station along setup+Z=-modelZ from the qualified body-centre master; AxisSet=M_C4-21.3753+signedPaper. Independently block-compare actual raw patch, never nominal allowance. Design M21.5753 givesZ+.2 and M21.3753 givesZ0, not observations. STOP if actual master transfer/contact/calibration unqualified; actual gauge/tool unknown."
+offset_mm = -21.3753
 tool = "unknown"
 paper_mm = 0.0
 check_jog_mm = 10.0
 retouch_after = []
+[[setups.zero.tool_touches]]
+tool = "unknown"
+z_face = "crank_boss_faces"
+method = "measure_then_set"
+z_gauge = "unknown"
+z_measure = "M_C4=-modelZ, independently measured actual signed station along setup+Z from qualified body-centre master after preceding cuts, on qualified intact annular contact outside spot/hole. AxisSet=M_C4-21.3753+signedPaper. STOP if contact/reference/calibration unqualified; no nominal readings or inherited tool length. For hone independently transfer both measured mouths to physical stroke marks. Actual tool/gauge unknown."
+z_offset_mm = -21.3753
+paper_mm = 0.0
+before_ops = [10]
+[[setups.zero.tool_touches]]
+tool = "unknown"
+z_face = "crank_boss_faces"
+method = "measure_then_set"
+z_gauge = "unknown"
+z_measure = "M_C4=-modelZ, independently measured actual signed station along setup+Z from qualified body-centre master after preceding cuts, on qualified intact annular contact outside spot/hole. AxisSet=M_C4-21.3753+signedPaper. STOP if contact/reference/calibration unqualified; no nominal readings or inherited tool length. For hone independently transfer both measured mouths to physical stroke marks. Actual tool/gauge unknown."
+z_offset_mm = -21.3753
+paper_mm = 0.0
+before_ops = [20]
+[[setups.zero.tool_touches]]
+tool = "unknown"
+z_face = "crank_boss_faces"
+method = "measure_then_set"
+z_gauge = "unknown"
+z_measure = "M_C4=-modelZ, independently measured actual signed station along setup+Z from qualified body-centre master after preceding cuts, on qualified intact annular contact outside spot/hole. AxisSet=M_C4-21.3753+signedPaper. STOP if contact/reference/calibration unqualified; no nominal readings or inherited tool length. For hone independently transfer both measured mouths to physical stroke marks. Actual tool/gauge unknown."
+z_offset_mm = -21.3753
+paper_mm = 0.0
+before_ops = [30]
+[[setups.zero.tool_touches]]
+tool = "unknown"
+z_face = "crank_boss_faces"
+method = "measure_then_set"
+z_gauge = "unknown"
+z_measure = "M_C4=-modelZ, independently measured actual signed station along setup+Z from qualified body-centre master after preceding cuts, on qualified intact annular contact outside spot/hole. AxisSet=M_C4-21.3753+signedPaper. STOP if contact/reference/calibration unqualified; no nominal readings or inherited tool length. For hone independently transfer both measured mouths to physical stroke marks. Actual tool/gauge unknown."
+z_offset_mm = -21.3753
+paper_mm = 0.0
+before_ops = [40]
+[[setups.ops]]
+op = 5
+do = "face"
+feature = "crank_boss_faces"
+faces = ["HAF_CRANK_BOSS_FACES__P01"]
+tool = "unknown"
+holder = "unknown"
+to_z = 0.0
+direction = "positive_setup_x"
+note = "AUTHOR'S CHOICE: NORTH CAP ONLY, operativeC4XY(0,-.17785649710401), capZ0/modelZ-21.3753; remove.20 allowance in qualified X-only passes. No axial boss-profile shortcut. Actual tool/pose/cutting and native access unknown."
 [[setups.ops]]
 op = 10
 do = "spot"
@@ -500,6 +2149,7 @@ feature = "crank_bore"
 tool = "unknown"
 holder = "unknown"
 depth_mm = 0.5
+note = "AUTHOR'S CHOICE:C4X0,Y-.17785649710401; not nominal frameoriginY0. Actual spindle pickup/offset/tool unknown."
 [[setups.ops]]
 op = 20
 do = "drill"
@@ -507,19 +2157,337 @@ feature = "crank_bore"
 tool = "unknown"
 holder = "unknown"
 exit_mm = 0.5
+to_z = -76.100 # explicit commanded tip, conservative .005 grid
+note = "AUTHOR'S CHOICE: selected post-near-face design far face-72.2344, not-72.4344. Source illustrative D11.2/118deg point gives11.2/(2tan59deg)=3.3648194665543376; exact tip minimum=-76.09921946655433 including.5exit. COMMAND to_z=-76.100 conservatively on.005 grid. Actual D/point/flutes/projection/holder/quill and actual far face/exit space must be independently qualified; stock/breakthrough remain UNKNOWN/HOLD. Source94flute/121projection are illustrative, not actual tool facts."
 [[setups.ops]]
 op = 30
 do = "bore"
 feature = "crank_bore"
 tool = "unknown"
 holder = "unknown"
-direction = "negative_setup_z" # AUTHOR'S CHOICE: feed into crank boss
+direction = "negative_setup_z"
 exit_mm = 0.5
-note = "AUTHOR'S CHOICE: finish crank bore at sourced spacing from A; separately inspect Ø.10 angularity to A/B, not the BASIC cone-angle value."
+to_dia = 11.431
+to_z = -72.735 # commanded boring edge; exact design minimum -72.2344-.5=-72.7344
+note = "AUTHOR'S CHOICE: single-ended through boring on SAME common boss/bore/cap axis. Proposed actual prehone11.431 leaves.00535diameter to11.43635 midpoint. Require bar head below11.2 pilot, pointreach>=72.2344+.5exit plus actual clearance; long slender bar stiffness/chatter/deflection must be qualified. Actual tool/shank/head/projection/holder/quill/cutting data unknown; no copied82mm reach proof or two-ended meeting bore."
+[[setups.ops]]
+op = 40
+do = "hone"
+feature = "crank_bore"
+tool = "unknown"
+holder = "unknown"
+direction = "axial_hand_strokes_both_directions"
+to_dia = 11.43635 # AUTHOR'S CHOICE process target, not actual tool setting/measurement
+rpm = "unknown"
+note = "AUTHOR'S CHOICE: adjustable small-bore honing for entire 72.2344 mm pre-cap length, overlapped mouths, no dwell/bellmouth. HAND rotation and HAND axial strokes ONLY; NO powered spindle. Proposed 120 rpm is an UNQUALIFIED design maximum, NOT an operating command or qualified setting; rpm remains unknown. Proposed working cycle no more than 10 seconds before clean/cool/measure is NOT feed; actual hand-feed qualification remains unknown. Target 11.43635 mm interior of 11.4300..11.4427 mm, not nominal lower-edge reamer output. Actual abrasive/shaft reach/hand holder and physical/finish capability unknown. Native honing replay unresolved."
 [setups.ops.checks]
 dia = "unknown"
+thru = "unknown"
 separation = "unknown"
 angularity_dia = "unknown"
+angularity_datums = "unknown"
 finish_ra = "unknown"
 [setups.ops.inspection_methods]
-angularity_dia = "unknown" # no calibrated datum-fixture geometric inspection supplied
+dia = "Proposed actual-ring-zero long-reach comparator, corrected actualring+deviation, entry/mid/exit two directions, printed11.4300..11.4427,target11.43635. Actual gauge/ring dimensions/calibration/uncertainty and acceptance guard unknown; NO example calibrated ring actuals adopted."
+thru = "Proposed full unexpanded-mandrel passage/clear mouths after withdrawal; equipment/results unknown."
+separation = "Proposed B-seated A/crank short-zone mandrel stem-centre block comparisons, reverse/average and subtract actual radii; Hcrank-HA target43.2735, printed43.095643502896..43.451243502896. Actual fixture/stem errors/gauges/calibration/uncertainty unknown. Do not use source lower-edge separation43.0956435 as process outcome."
+angularity_datums = "Proposed calibrated coordinate scanning of actual primaryjournalA cylinder then actual secondaryB plane to constrain roll; construct basic crank direction13.0011073536895deg yaw aboutB normal fromA. No free simultaneous fit of both bores, pilot datum, nominalOD datum or scalarTIR substitute. Actual service/instrument/stylus reach/calibration/association method unknown."
+angularity_dia = "Proposed actual crank-wall helical+axial scanning with full72.0344 bore access from both ends, probe-radius compensation and section-centre/median-line extraction. Express all median-line centres transverse to BASIC direction fixed byA/B; minimum enclosing transverse circle allows translation but NO direction refit; required diameter<=.1016. Determine pitch/generator density by converged scans and bounded hidden form, then guard using ACTUAL expanded comparison uncertainty plus sampling/form bound. Actual machine/stylus/100mm-class access, calibration, numerical uncertainty, sampling bound and results UNKNOWN; no demonstration.006/.010 bounds or acceptance pass imported. Short-zone mandrels may guide process but cannot alone prove bowed median-line conformance."
+finish_ra = "Proposed validated wall replicas/profilometryRa<=1.6 at both mouths/mid. Actual equipment/replica transfer/calibration/uncertainty/results unknown."
+
+[[setups]]
+id = "S5"
+machine = "PM-30MV"
+frame = "JR"
+stock_in = "S4"
+coolant = "unknown"
+deburr_mm = 0.1016
+deburr_cite = ["harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:JOURNAL_BORE"]
+[setups.stock_state]
+top_z = 23.0
+bottom_z = -21.0055
+note = "AUTHOR'S CHOICE: south cap arrives as the raw S1 Ø46 envelope (nominal JRZ23.0 along the journal axis); actual arriving stock unknown."
+[setups.hold]
+fixed_jaw = "not_applicable" # proposed reversed non-vise body cradle
+fixture = "unknown"
+support = "unknown"
+grip_on = "AUTHOR'S CHOICE: lower body/B, A locates only"
+grip_mm = 20.0
+stop = "Proposed reverse-J3 registration using finished A/B with work loosely seated; actual hardware/pose unknown."
+clamp = "BEFORE clamping measure actual cooled body/contact region and qualify fit, collar closure, contact and A/B alignment. Proposed nominal Ø41.91 mm collar does NOT prove fit over the entire Ø41.656..42.164 mm body band. STOP if unqualified: no forcing, invented contact evidence or remade geometry. Secure independent body clamps, recheck/recover A/B AFTER final tightening, repeat clamp/recheck if disturbed, then withdraw A locator/support from cap/hone corridor and re-indicate. Clamp is NOT A; no bore clamping or pilot substitute. Actual restraint/metrology and fit/contact/alignment observations unknown."
+note = "Model Y is part height from B, not reverse-J3 DRO Y. Actual setup/axis binding remains unknown."
+[setups.zero.transfer]
+from = "S4"
+indicate = ["journal_bore", "foot_seat"]
+gauge = "unknown"
+runout_limit_mm = "unknown"
+[setups.zero.x]
+feature = "journal_axis"
+edge_mm = 0.0
+from = "indicated"
+method = "indicate_axis"
+tool = "unknown"
+check_jog_mm = 10.0
+[setups.zero.y]
+feature = "journal_axis"
+edge_mm = 0.0
+from = "indicated"
+method = "indicate_axis"
+tool = "unknown"
+check_jog_mm = 10.0
+[setups.zero.z]
+face = "cone_boss_south_face"
+edge_mm = "unknown"
+from = "+z"
+method = "measure_then_set"
+gauge = "unknown"
+measure = "M = actual signed reverse-JR raw south-cap station (S1 envelope crown, nominal Z23.0) from the recovered body-centre reference plane; touch the actual contact patch clear of the A mouth"
+offset_mm = 0.0
+tool = "unknown"
+paper_mm = 0.0
+check_jog_mm = 10.0
+retouch_after = []
+[[setups.zero.tool_touches]]
+tool = "unknown" # proposed original LMS finishing endmill after op8 ground HSS
+z_face = "cone_boss_south_face"
+method = "measure_then_set"
+z_gauge = "unknown" # proposed rocker-position-height-gauge block/comparator method
+z_measure = "M = actual signed reverse-JR south station of the SURVIVING standing south-cap patch left by op8 as actually cut, independently block-compared from the recovered body-centre reference plane after op8; touch the finishing flat end on that same measured patch before op10. Nominal 21.2055 is the op8 target, never the measured value; STOP if the surviving patch or its signed station cannot be independently established; actual tool/gauge identity, calibration, uncertainty, patch and station UNKNOWN; procedural M not observed"
+z_offset_mm = 0.0
+paper_mm = 0.0
+before_ops = [10]
+[[setups.ops]]
+op = 8
+do = "rough_face"
+feature = "cone_boss_south_face"
+faces = ["HAF_CONE_BOSS_SOUTH_FACE__P01"]
+tool = "unknown"
+holder = "unknown"
+to_z = 21.2055
+direction = "positive_setup_x"
+doc_mm = 0.5 # AUTHOR'S CHOICE maximum proposed axial layer; actual cutting data unknown
+ae_mm = 7.0
+approach_mm = 5.0
+contour = { method = "linear_table", step_mm = 7.0, sweep_frame = "JR", sweep_bounds = { x = [-9.4, 9.4], y = [-4.6, 2.375], z = [21.2055, 23.0] } }
+stock_removal_bounds = { x = [-9.4, 9.4], y = [-10.1, 11.9], z = [21.2055, 23.0] }
+note = "AUTHOR'S CHOICE nominal proposal for a proposed Ø19.05 flat end, mirror of S3:8: rough the S1-envelope crown over the south pad from JRZ23.0 to21.2055 in4 layers<=0.5, X-strokes on rows centred JRy-4.6 and2.375 (cutter modelY23.975..50.0, clear of collar/cradle Y<=23). Actual cutter/settings/fixture unknown: recompute rows and box if different. Op10 takes the last0.20; constant-Z strokes stay above the A mouth."
+[[setups.ops]]
+op = 10
+do = "face"
+feature = "cone_boss_south_face"
+faces = ["HAF_CONE_BOSS_SOUTH_FACE__P01"]
+tool = "unknown"
+holder = "unknown"
+to_z = 21.0055
+direction = "positive_setup_x"
+note = "AUTHOR'S CHOICE: remove.20 toJRZ21.0055 with cap-only X strokes/retractedY stepover, preserveA. Actual tool/cutting/access unknown. South cap has no exported requirements: do not copy northRa1.6 onto it."
+[[setups.ops]]
+op = 20
+do = "inspect"
+feature = "cone_boss_north_face"
+note = "Proposed final station/length after BOTH caps exist; actual instruments/calibration/uncertainty/results unknown."
+[setups.ops.checks]
+length = "unknown"
+station = "unknown"
+finish_ra = "unknown"
+[setups.ops.inspection_methods]
+length = "Proposed direct cap-annulus length41.8846..42.1386,target42.011, multiple sectors; no length/2 station assumption."
+station = "Proposed independent body-centre reference normalA from lower-body/B registration, north-cap station20.9547..21.0563,target21.0055; actual fixture/reference errors/gauge unknown."
+finish_ra = "Proposed quantitative NORTH annulusRa<=1.6; actual stylus/access/calibration/uncertainty/results unknown."
+
+[[setups]]
+id = "S6"
+machine = "PM-30MV"
+frame = "CR"
+stock_in = "S5"
+coolant = "unknown"
+deburr_mm = 0.25
+deburr_cite = ["AUTHOR'S CHOICE", "harmonic-analyzer/cad/config/title_block.yaml:in.edge_break"]
+[setups.stock_state]
+top_z = 0.2
+bottom_z = -72.0344
+[setups.hold]
+fixed_jaw = "not_applicable" # proposed reversed non-vise body cradle
+fixture = "unknown"
+support = "unknown"
+grip_on = "AUTHOR'S CHOICE: lower-body clamps, A location/B roll"
+grip_mm = 20.0
+stop = "Proposed reverse-C4 registration using A/B with work loosely seated; operative common centre model Y81.3735, nominal CR unchanged; actual binding unknown."
+clamp = "BEFORE clamping measure actual cooled body/contact region and qualify fit, collar closure, contact and A/B alignment. Proposed nominal Ø41.91 mm collar does NOT prove fit over the entire Ø41.656..42.164 mm body band. STOP if unqualified: no forcing, invented contact evidence or remade geometry. Secure independent body pads BEFORE removing A locator/support; AFTER final tightening recheck/recover A/B, repeat clamp/recheck if disturbed, then withdraw locator/support from far-cap corridor and re-indicate. Clamp is NOT A; no pilot or invented runout limit. Actual equipment/pose and fit/contact/alignment observations unknown."
+note = "Model Y is part height from B, not CR DRO Y. Actual setup/axis binding remains unknown."
+[setups.zero.transfer]
+from = "S5"
+indicate = ["journal_bore", "foot_seat"]
+gauge = "unknown"
+runout_limit_mm = "unknown"
+[setups.zero.x]
+feature = "crank_axis"
+edge_mm = 0.0
+from = "indicated"
+method = "indicate_axis"
+tool = "unknown"
+check_jog_mm = 10.0
+[setups.zero.y]
+feature = "journal_axis"
+edge_mm = 0.0
+from = "indicated"
+method = "indicate_axis"
+tool = "unknown"
+check_jog_mm = 10.0
+[setups.zero.z]
+face = "crank_boss_faces"
+edge_mm = "unknown"
+from = "+z"
+method = "measure_then_set"
+gauge = "unknown"
+measure = "M_CR=+modelZ, actual signed station along setup+Z=+modelZ from qualified body-centre master; AxisSet=M_CR-50.6591+signedPaper. Independently block-compare actual far-cap patch. Design M50.8591 givesZ+.2 and M50.6591 givesZ0, not measurements. STOP if actual master transfer/contact/calibration unqualified; actual gauge/tool unknown."
+offset_mm = -50.6591
+tool = "unknown"
+paper_mm = 0.0
+check_jog_mm = 10.0
+retouch_after = []
+[[setups.ops]]
+op = 10
+do = "face"
+feature = "crank_boss_faces"
+faces = ["HAF_CRANK_BOSS_FACES__P02"]
+tool = "unknown"
+holder = "unknown"
+to_z = 0.0
+direction = "positive_setup_x"
+note = "AUTHOR'S CHOICE: far-cap-only facing atCRXY(0,+.17785649710401),Z0/modelZ50.6591; total72.0344. Do not shift bore/cap separately. Actual tool/cutting/fixture/access unknown."
+[setups.ops.checks]
+length = "unknown"
+station = "unknown"
+[setups.ops.inspection_methods]
+length = "Proposed direct cap-annulus readings71.9074..72.1614,target72.0344; actual gauge/calibration/uncertainty/results unknown."
+station = "Independent north-cap station21.2598..21.5138,target21.3753 from body-centre reference normalcrank; actual datum fixture/gauge/calibration/results unknown, not inferred from length."
+
+[[setups]]
+id = "S7"
+machine = "finishing-bench"
+frame = "M2"
+stock_in = "S6"
+coolant = "unknown"
+deburr_mm = 0.1016
+deburr_cite = ["harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:JOURNAL_BORE"]
+[setups.hold]
+fixed_jaw = "not_applicable" # proposed bench nest; actual fixture availability unknown
+fixture = "unknown"
+support = "unknown"
+grip_on = "AUTHOR'S CHOICE: light lower-body restraint on B pads, no bore load"
+grip_mm = 20.0
+stop = "Proposed B pads/A reference; actual physical fixture/pose unknown."
+clamp = "Remove and clean before metrology, positively restrain on bench for hand work; actual hardware/observations unknown."
+[[setups.ops]]
+op = 5
+do = "deburr"
+feature = "body"
+tool = "unknown"
+holder = "unknown"
+note = "AUTHOR'S CHOICE: safe-edge file/fine stone loose exterior/mount/counterbore entrance-exit burrs with proposed.10 external break<=source.254 maximum. No precision-bore enlargement, B/cap lowering or internal-root rounding. Actual hand tools/access/edge inspection unknown."
+[[setups.ops]]
+op = 10
+do = "deburr"
+feature = "journal_bore"
+tool = "unknown"
+holder = "unknown"
+note = "Proposed careful manual rim deburr preserving precision bore. RIMS BREAK .004 MAX=.1016mm overrides general.010in; actual optical method/calibration/observations unknown. Literal exported unknown remains HOLD, not satisfied by nominal deburr."
+[setups.ops.checks]
+unknown = "unknown"
+[[setups.ops]]
+op = 20
+do = "inspect"
+feature = "crank_bore"
+note = "RepeatS4:40 actual diameter/thru/separation/finish/A-B angularity after all cap/deburr work; every actual gauge, availability, calibration/uncertainty and result remainsunknown."
+[setups.ops.checks]
+dia = "unknown"
+thru = "unknown"
+separation = "unknown"
+finish_ra = "unknown"
+angularity_dia = "unknown"
+angularity_datums = "unknown"
+[setups.ops.inspection_methods]
+dia = "Proposed actual-ring-zero full-reach comparator, actualring+deviation11.4300..11.4427; actual gauge/calibration/guard/results unknown."
+thru = "Proposed full passage/clear-mouth inspection; actual equipment/results unknown."
+separation = "Repeat independent A/crank stem-centre comparison43.095643502896..43.451243502896,target43.2735; actual fixture/errors/gauge/calibration unknown."
+finish_ra = "Proposed validated internal replicas/quantitativeRa<=1.6; actual equipment/transfer/calibration/uncertainty/results unknown."
+angularity_datums = "Re-establish actual primaryA/secondaryB, fix BASIC crank direction asS4:40; actual scanning service/stylus/association/calibration unknown."
+angularity_dia = "Repeat full helical/axial median-line survey asS4:40, zone<=.1016 with guards derived from ACTUAL certified uncertainty plus validated form/sampling bound. Both bounds and actual observations unknown, no demonstration guard/pass."
+[[setups.ops]]
+op = 25
+do = "inspect"
+feature = "journal_bore"
+note = "FinalA after all caps/deburr, repeatS3:50 proposal with actual qualified equipment; no earlier nominal tool result carried as pass."
+[setups.ops.checks]
+dia = "unknown"
+thru = "unknown"
+height = "unknown"
+finish_ra = "unknown"
+unknown = "unknown"
+[setups.ops.inspection_methods]
+dia = "Proposed actual-ring-zero comparator, entry/mid/exit two directions12.2809..12.2936,target12.28725; actual equipment/calibration/guards/results unknown."
+thru = "Proposed complete42.011 passage/clear mouths; actual gauge/results unknown."
+height = "Proposed actualA centre aboveB37.846..38.354,target38.1, reversed short-zone mandrel comparison; actual fixture/gauge/calibration unknown."
+finish_ra = "Proposed validated replica/profilometryRa<=1.6; actual transfer/calibration/uncertainty/results unknown."
+unknown = "HOLD literal exported unknown / RIMS BREAK .004 MAX, no invented acceptance."
+[[setups.ops]]
+op = 27
+do = "inspect"
+feature = ["body", "head", "cone_boss", "crank_boss"]
+note = "Proposed final source-cylinder scans plus thin-master blue/optical or validated-replica sharp-root checks after all work. A large probe cannot inspect a mathematical sharp concavity; finite observation resolution is not fillet permission. Actual instruments/masters/source-section realization/pose/calibration/uncertainty/results unknown. Native rotary/manual-root/hone replay, exact-corner and unlabeled underside stable-binding holds remain explicit."
+[setups.ops.checks]
+body = { dia = "unknown", height = "unknown" }
+head = { dia = "unknown", height = "unknown" }
+cone_boss = { dia = "unknown" }
+crank_boss = { dia = "unknown" }
+[setups.ops.inspection_methods]
+body = { dia = "Proposed actual diameter41.656..42.164 and root-adjacent sections, no hidden stock interpolated to ideal; equipment/results unknown.", height = "B-to-top94.488..94.996, not lateral endpoint68.072; actual gauge/calibration unknown." }
+head = { dia = "Proposed actual42.418..42.926 plus root/no-overcut checks; equipment/results unknown.", height = "Independent top-minus-shoulder26.416..26.924, underside stable-binding HOLD; actual gauge/calibration unknown." }
+cone_boss = { dia = "Proposed actual17.018..17.526 BOTH pads/root-adjacent sections plus optical sharp-line checks; all actual evidence unknown." }
+crank_boss = { dia = "Proposed actual21.590..22.098 on common centreY81.3735, both cap extensions/head roots; actual instruments/qualification/results unknown." }
+
+[[setups]]
+id = "S8"
+machine = "finishing-bench"
+frame = "KI"
+stock_in = "S7"
+coolant = "unknown"
+deburr_mm = 0.1016
+deburr_cite = ["harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:JOURNAL_BORE"]
+[setups.hold]
+fixture = "unknown"
+support = "unknown"
+pose = "unknown"
+fixed_jaw = "not_applicable"
+grip_on = "AUTHOR'S CHOICE: finished lower-bodyY1..21 in replaceable liner fitted to actual diameter; inspection restraint only"
+grip_mm = 20.0
+stop = "Proposed finished B on three stand buttons and actual finished A mandrel clocks13.0011073536895deg above negative standX to recover model+X upward. Actual contacts, datums, clocking master and physical registration unknown; S2 before A exists does not establish this setting."
+clamp = "Proposed stiff granite-mounted stand with fingerlight fitted lower-body collar. Qualify assembled/clamped actual H0 with matched reference arbor, blocks and indicator reversal; seat B, clock actual A, reclamp and recheck reference/clock. Actual stand/liner/reference arbor, instruments, calibrated dimensions, pose and commissioning remain UNKNOWN."
+note = "Final inspection after S7 final A/B and deburring, before deferred coating HOLD. Nominal KI is a design proposal only. Actual positive-reading offset is H0 plus actual transfer-stem radius; both, their uncertainty and the assembled datum qualification remain unknown. No example fixture ID, H0 calibration,4mm actual radius,104mm measured offset or uncertainty qualification is imported."
+[[setups.ops]]
+op = 10
+do = "inspect"
+feature = "mount_west"
+note = "Proposed final signed west station; actual stand, short-contact expanding transfer mandrel, height gauge, indicator, blocks and calibration UNKNOWN. No early S2 station acceptance."
+inspection_readings = { station = { kind = "relative_coordinate", offset_mm = "unknown", method = "Proposed assembled/clamped H0 qualification by reference arbor, blocks and indicator reversal; qualify actual stem radius, actual A-based clock, centring and both-mouth reversal. Physical positive height = signed station + actual H0 + actual stem radius. Actual implementation, calibrated values and combined uncertainty unknown.", cite = "unknown" } }
+[setups.ops.checks]
+station = "unknown"
+[setups.ops.inspection_methods]
+station = "Proposed B-seated/A-clocked stand method: engage short expanding pilot in actual through-bore beyond counterbore, compare external stem top against wrung blocks using qualified height-gauge/indicator on the same granite zero. Xwest=Htop-rstem-H0, necessarily negative; reverse mandrel180deg/average and repeat both mouths for tilt. Verify A-based clock and east-above/west-below centre sign. Unchanged printed[-13.208,-12.700],target-12.954. Actual fixture/tool/gauge identities, H0, stem radius/straightness/centring, calibration, positive physical-reading band, uncertainty/guards and observations unknown; derive guards only from qualified actual capability. No invented negative instrument range or demonstration correction."
+[[setups.ops]]
+op = 20
+do = "inspect"
+feature = "mount_east"
+note = "Proposed final signed east station without disturbing S8 actual datum setting; both independent signed stations required, not spacing alone."
+inspection_readings = { station = { kind = "relative_coordinate", offset_mm = "unknown", method = "Proposed same assembled/clamped reference-arbor/block/indicator reversal, actual H0/stem-radius and A-clock/both-mouth qualification as S8:10; actual offset, calibration and combined uncertainty unknown.", cite = "unknown" } }
+[setups.ops.checks]
+station = "unknown"
+[setups.ops.inspection_methods]
+station = "Repeat proposed S8:10 centred through-bore mandrel, positive stem-top block/indicator comparison,180deg reversal and both-mouth checks for east. Xeast=Htop-rstem-H0 positive; printed12.700..13.208,target12.954. Report both signed stations and nominal25.908 difference; spacing alone cannot establish signed location. Actual stand/gauges/pose/calibration/offset, physical-reading band, combined uncertainty/guards and measurements remain unknown."
+[[setups.ops]]
+op = 30
+do = "coating"
+feature = "body"
+process = "unknown"
+note = "FINISH UNRESOLVED — HOLD. Integral solid stock chosen; authoritative finish remains RAL 6005 ALKYD; SSPC-SP 3; 2-3 MIL DFT; MASK MACHINED FACES; OIL BARE FACES ISO VG 32. All exterior surfaces are machined and no paint/mask split or substitution authorized. Actual process/service/material/inspection availability unknown. Native rotary/manual-root/hone replay, stable underside binding, exact corner, tooling/fixture/pose and metrology holds are NOT bypassed by this proposal."
