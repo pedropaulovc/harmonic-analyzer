@@ -266,6 +266,10 @@ def test_clusters_partition_the_bom() -> None:
     assert feed.context == (
         spec.instance_name(spec.CARRIAGE, 0), *feed_screws, *spec.NUT_SCREW_INSTANCES,
     )
+    # Both TL-28 joints are already visible through their shared 5/8 family;
+    # the lower screws must not also be duplicated as context occurrences.
+    assert spec.PILLOW_BLOCK_SCREW in feed.stems
+    assert not set(spec.BAR_SCREW_INSTANCES) & set(feed.context)
     assert spec.CARRIAGE_SCREW not in feed.visible
     assert set(feed_screws) | set(spec.NUT_SCREW_INSTANCES) <= feed.visible
     assert spec.FEED_NUT in feed.stems and spec.RISER_SCREW not in feed.stems

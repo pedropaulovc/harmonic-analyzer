@@ -44,16 +44,15 @@ def test_catalogue_row_is_the_registered_mcmaster_screw() -> None:
 
 
 def test_quantity_thread_and_length_are_the_fastener_tables() -> None:
-    # PR2: the jig's common screw, the rail screws and the TL-28 bar screws.
+    # A″: lower TL-28 screws move to TL-VN-62; PR2 retains 16 rail screws.
     row = fasteners.RAIL_TO_BAR
     assert spec.ROW is row
     assert spec.ROWS == fasteners.COMMON_SCREW_ROWS == (
         fasteners.RAIL_TO_BAR,
-        fasteners.BRACKET_TO_BAR,
     )
     assert int(_config.parts(STEM)["quantity"]) == spec.QUANTITY == sum(
         r.count for r in spec.ROWS
-    ) == 20
+    ) == 16
     for each in spec.ROWS:
         assert (dims.THREAD, dims.LENGTH_TEXT, fasteners.SHCS) == (
             each.thread,

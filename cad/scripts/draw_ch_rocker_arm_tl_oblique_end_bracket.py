@@ -5,13 +5,15 @@ One part, two off (the title block's quantity). A 2.71 x 1/2 x 1 in flat at
 two hole stations from the inner end and the length, all stacked below it,
 the row's station from the -Y side face (left), the stock width (right) and
 one native callout per hole over it, each leader on its own hole; the end
-view, projected right of the plan, carries the stock thickness; the shaded
-isometric rides top right at 1:1, clear of the title block. No datums
-(drawing-guidelines.md rule 5). The two hole stations (the KP08's 42 mm
-span) print exact millimetres, labelled mm (owner ruling 4, 2026-11-01).
-Each hole is drilled and tapped #8-32 THRU from the top face (Main's R4
-ruling): its callout prints the drill and the thread, both THRU ALL, and no
-depth.
+view, projected right of the plan, carries the stock thickness and section
+A-A's cutting line; section A-A, cut along the hole row and placed under the
+plan, draws both faces' threads solid and carries two part-owned LIMIT
+dimensions for their independent full-thread depths. Each plan callout
+identifies its thread and refers to those limits; the first alone states
+#29 DRILL THRU for BOTH HOLES, retaining the native drill-diameter token.
+The shaded isometric rides top right at 1:1. The KP08's 42 mm bolt span
+prints exact millimetres, labelled mm. No hand-formatted depth substitutes
+for either native dimension or its model-owned limits.
 
 Run with SolidWorks open::
 
@@ -21,6 +23,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import re
 import sys
 from typing import Any
@@ -40,13 +43,19 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
 )
+from _drawing_detail_projection import settle_detail_projection
+from _drawing_dimension_import import import_cosmetic_threads
 from _drawing_dimensions import (
     assert_imported_precision,
+    offset_dimension_text,
     set_dimension_callouts,
 )
-from _drawing_hidden_sketches import curate_view_dimensions
+from _drawing_hidden_sketches import curate_view_dimensions, part_sketches_shown
+from _drawing_projection import model_point_in_view, model_points_in_view
+from _drawing_sections import create_section_view
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -56,6 +65,7 @@ from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
+from _section_axis import position_section_caption
 import _telemetry
 import ch_rocker_arm_tl_oblique_end_bracket_spec as part_spec
 from _feature_requirements import part_metadata, requirement
@@ -66,6 +76,11 @@ from _drawing_metric_vendor import print_imported_metric_dimensions
 from _supplier_dimensions import supplier_reference_dimension
 from ch_rocker_arm_tl_oblique_callouts import set_callout_lengths_to_three_places
 from ch_rocker_arm_tl_oblique_end_bracket_spec import (
+    BAR_TAP_SPEC,
+    BAR_THREAD_DEPTH,
+    BAR_THREAD_DEPTH_DIMENSION,
+    BAR_THREAD_REFERENCE,
+    BAR_THREAD_LIMITS,
     BRACKET_LENGTH,
     BRACKET_THICK,
     BRACKET_WIDTH,
@@ -75,6 +90,11 @@ from ch_rocker_arm_tl_oblique_end_bracket_spec import (
     HALF_WIDTH,
     HOLE_ROW_Y,
     HOLE_X,
+    KP08_TAP_SPEC,
+    KP08_THREAD_DEPTH,
+    KP08_THREAD_DEPTH_DIMENSION,
+    KP08_THREAD_REFERENCE,
+    KP08_THREAD_LIMITS,
     MATE_CALLOUT,
     METRIC_DIMENSIONS,
     ROW_CALLOUT,
@@ -82,7 +102,7 @@ from ch_rocker_arm_tl_oblique_end_bracket_spec import (
     STOCK_FRACTION_DENOMINATORS,
     TAP_CALLOUT_PLACES,
     TAP_DRILL,
-    TAP_SPEC,
+    THREAD_MAJOR,
 )
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -158,7 +178,7 @@ ROW_TAIL = 6.35 / _S
 # The dimension lines below the plan, nearest first, shortest span nearest:
 # the first block clears the row station's line tail, each next one the line
 # above it; the length's one-line block clears the last station's line.
-STATION_ORDER = ("Tap1X", "Tap2X")
+STATION_ORDER = ("KP08Tap1X", "KP08Tap2X")
 _FIRST_LANE = -_HW - ROW_TAIL - TEXT_GAP - (TWO_LINE_DROP + text_half_high(2))
 STATION_LANES = tuple(_FIRST_LANE - i * MATE_LANE for i in range(len(STATION_ORDER)))
 LENGTH_LANE = STATION_LANES[-1] - (TEXT_GAP + TEXT_DROP + text_half_high(1))
@@ -207,6 +227,40 @@ END_KEEP: dict[str, tuple[float, float, float]] = {
     "BracketThick": (_L, -_HW - SIDE_LANE, _H / 2.0),
 }
 
+# Section A-A: the plane of the hole row (model y 0), its cutting line drawn
+# across the end view (where it is the view's mid-height line; on the plan it
+# would run along the row's and the width's own lines) from SECTION_OVERRUN
+# below the bottom face to as far above the top. Removed under the plan at
+# the sheet scale, +Z up, its centre (mid-length, mid-height) on
+# SECTION_CENTER: its top 10 under the plan's lowest text (sheet y 0.142),
+# its foot 15 over the title block's top; the caption under it, left of the
+# title block. Independent top/bottom full-thread LIMIT dimensions stand
+# left/right of the section, each on a native OffsetText leader.
+SECTION_LABEL = "A"
+SECTION_OVERRUN = 2.0
+SECTION_LINE_MODEL_MM = (
+    (_L, 0.0, -SECTION_OVERRUN),
+    (_L, 0.0, _H + SECTION_OVERRUN),
+)
+SECTION_ANCHOR_MODEL_MM = (_L / 2.0, 0.0, _H / 2.0)
+SECTION_CENTER = (PLAN_CENTER[0], 0.106)
+SECTION_CAPTION_XY = (PLAN_CENTER[0], 0.074)
+DEPTH_LANE = SIDE_LANE / 2.0
+SECTION_KEEP: dict[str, tuple[float, float, float]] = {
+    BAR_THREAD_DEPTH_DIMENSION: (_L + DEPTH_LANE, 0.0, BAR_THREAD_DEPTH / 2.0),
+    KP08_THREAD_DEPTH_DIMENSION: (-DEPTH_LANE, 0.0, _H - KP08_THREAD_DEPTH / 2.0),
+}
+SECTION_TEXT = {
+    BAR_THREAD_DEPTH_DIMENSION: (
+        _L + DEPTH_LANE + TEXT_GAP
+        + text_half(CALLOUTS_BELOW[BAR_THREAD_DEPTH_DIMENSION]), 0.0, _H / 2.0,
+    ),
+    KP08_THREAD_DEPTH_DIMENSION: (
+        -DEPTH_LANE - TEXT_GAP
+        - text_half(CALLOUTS_BELOW[KP08_THREAD_DEPTH_DIMENSION]), 0.0, _H / 2.0,
+    ),
+}
+_TEXT_SETTLE_M = 0.0005
 
 # One native callout per hole over the plan, its count dropped (c4-r3: a 2X
 # callout's leader lands on one hole only, leaving the other's thread to a
@@ -217,12 +271,13 @@ END_KEEP: dict[str, tuple[float, float, float]] = {
 # tiers clear the +Y side by 1 and stand a block plus the audit's row pitch
 # apart (c4-r8). Each tuple: the hole's X, the text block's centre (model X,
 # Y) and the side (-1 left) whose upper rim the edge pick takes.
-# Each callout's two rows, the widest this many glyphs: "Ø.136 THRU ALL" /
-# THREAD_ROW, the thread once its class is dropped.
-_THREAD_TEXT = part_spec.SCREW.lstrip("#")  # "8-32"
-THREAD_ROW = f"{_THREAD_TEXT} UNC THRU ALL"
-CALLOUT_ROWS = 2
-CALLOUT_GLYPHS = len(THREAD_ROW)
+# The larger callout has the native drill row plus a thread identity and a
+# section pointer. The other identifies its own hole but does not repeat
+# the one through-drilling requirement.
+THREAD_LIMIT_CALLOUT = "BOTH FACES: SECTION A-A"
+DRILL_PROCESS = "#29 DRILL"
+CALLOUT_ROWS = 3
+CALLOUT_GLYPHS = len("#29 DRILL Ø.136 THRU ALL; BOTH HOLES")
 _TIER_PITCH = 2.0 * text_half_high(CALLOUT_ROWS) + STACK_PITCH + 0.1
 TAP_TIERS = tuple(
     _HW + 5.0 + text_half_high(CALLOUT_ROWS) + 0.2 + k * _TIER_PITCH
@@ -352,20 +407,20 @@ for _index, _x in enumerate(part_spec.HOLE_X, start=1):
         faces=(CylinderFace(part_spec.TAP_DRILL, contains_x_mm=_x),),
         requirements=("thread", "dia", "station", "height", "thru", "note"),
         fields={
-            # Drilled and tapped THRU from the top face.
-            "at": ([_x, 0.0, part_spec.BRACKET_THICK], ("HOLE_X", "TAP_FACE")),
+            # Drilled THRU from the top; threaded from both faces.
+            "at": ([_x, 0.0, part_spec.BRACKET_THICK], ("HOLE_X", "KP08_TAP_FACE")),
             "axis": _INTO_BRACKET,
             "thread": (
-                f"{part_spec.SCREW} UNC-{part_spec.TAP_SPEC.thread_class}",
-                ("TAP_SPEC", "SCREW"),
+                f"{part_spec.SCREW} UNC-{part_spec.KP08_TAP_SPEC.thread_class}",
+                ("KP08_TAP_SPEC", "BAR_TAP_SPEC", "SCREW"),
             ),
-            "tap_drill_mm": (part_spec.TAP_DRILL, ("TAP_SPEC",)),
+            "tap_drill_mm": (part_spec.TAP_DRILL, ("KP08_TAP_SPEC",)),
             "dia": (
                 limits(_drill, TAP_CALLOUT_PLACES, part_spec.DRILLED_BAND),
                 ("TAP_DRILL", "DRILLED_BAND"),
             ),
             "nominal_dia": (_drill, ("TAP_DRILL",)),
-            "thru": (True, ("TAP_SPEC",)),
+            "thru": (True, ("KP08_TAP_SPEC",)),
             # A DRO absolute from the inner end: the KP08's 42 bolt spacing,
             # exact millimetres with its own band (owner ruling 4).
             "station": (
@@ -380,17 +435,23 @@ for _index, _x in enumerate(part_spec.HOLE_X, start=1):
             ),
             "station_nominal": (_x, ("HOLE_X",)),
             **_row_fields(),
-            # The thread runs THRU: both screws' tips stay apart on the
-            # thinnest stock (SCREW_TIP_GAP_MIN), no depth printed.
+            # prechips has no per-face thread-depth field. This cited note
+            # carries both independently model-owned section LIMIT bands.
             "note": (
-                f"{MATE_CALLOUT}; THREAD THRU FROM THE TOP FACE",
+                f"{MATE_CALLOUT}; FULL THREAD "
+                f"{part_spec.KP08_THREAD_LIMITS[0]:.3f} TO "
+                f"{part_spec.KP08_THREAD_LIMITS[1]:.3f} mm FROM THE TOP FACE AND "
+                f"{part_spec.BAR_THREAD_LIMITS[0]:.3f} TO "
+                f"{part_spec.BAR_THREAD_LIMITS[1]:.3f} mm FROM THE BOTTOM FACE",
                 (
                     "MATE_CALLOUT",
                     "KP08_PATTERN_ALLOWANCE",
                     "BAR_PATTERN_ALLOWANCE",
                     "POSITION_RADIUS",
-                    "TAP_SPEC",
-                    "SCREW_TIP_GAP_MIN",
+                    "KP08_THREAD_LIMITS",
+                    "BAR_THREAD_LIMITS",
+                    "BAR_THREAD_REFERENCE",
+                    "KP08_THREAD_REFERENCE",
                 ),
             ),
         },
@@ -420,13 +481,353 @@ def _view_mapper(adapter: Any, view: Any):
     return to_sheet
 
 
+def _metres(point_mm: tuple[float, float, float]) -> tuple[float, float, float]:
+    return tuple(value / 1000.0 for value in point_mm)
+
+
+def _section_axes(
+    adapter: Any, native: Any
+) -> tuple[tuple[float, float], tuple[float, float]]:
+    """Sheet directions of model +X and +Z (1 mm each) in section A-A, read
+    behind the projection barrier (draw_ch_rocker_arm_tl_oblique_carrier
+    ``_section_axes``)."""
+    native.UpdateViewDisplayGeometry()
+    x, y, z = SECTION_ANCHOR_MODEL_MM
+    origin, plus_x, plus_z = model_points_in_view(
+        adapter,
+        native,
+        (_metres((x, y, z)), _metres((x + 1.0, y, z)), _metres((x, y, z + 1.0))),
+        label="end bracket section A-A axes",
+        names=("origin", "plus x", "plus z"),
+    )
+    return (
+        (plus_x[0] - origin[0], plus_x[1] - origin[1]),
+        (plus_z[0] - origin[0], plus_z[1] - origin[1]),
+    )
+
+
+def _orient_section(adapter: Any, section: Any) -> None:
+    """Turn section A-A until model +Z runs up the sheet, keeping the cut
+    direction SolidWorks gives it (draw_ch_rocker_arm_tl_oblique_carrier
+    ``_orient_section``: a reversed section imported nothing, jig-r4). +X
+    then reads right or left; SECTION_KEEP is projected either way, and the
+    log says which."""
+    native = _early_bound(section, "IView")
+    _right, up = _section_axes(adapter, native)
+    native.Angle = float(native.Angle) + math.pi / 2.0 - math.atan2(up[1], up[0])
+    rebuild_drawing(adapter, label="end bracket section turned")
+    right, up = _section_axes(adapter, native)
+    tolerance = 1e-7
+    if (
+        up[1] <= 0.0
+        or abs(up[0]) > tolerance
+        or abs(right[1]) > tolerance
+        or abs(right[0]) <= tolerance
+    ):
+        raise RuntimeError(f"end bracket section A-A is not +Z up: {right=}, {up=}")
+    _telemetry.info(
+        f"end bracket section A-A angle={float(native.Angle):.6f} rad, "
+        f"+X reads {'right' if right[0] > 0.0 else 'left'} (cut not reversed)"
+    )
+
+
+def _centre_section(adapter: Any, section: Any) -> None:
+    """Land the cut's centre (mid-length, mid-height) on SECTION_CENTER: a
+    section's Position is its cut-plane origin, not its outline's centre
+    (draw_ch_rocker_arm_tl_oblique_carrier ``_centre_section``)."""
+    native = _early_bound(section, "IView")
+    anchor = _metres(SECTION_ANCHOR_MODEL_MM)
+    for attempt in range(4):
+        native.UpdateViewDisplayGeometry()
+        projected = model_point_in_view(
+            adapter, native, anchor, label=f"end bracket section A-A centre, pass {attempt}"
+        )
+        if math.dist(projected, SECTION_CENTER) <= 1e-4:
+            break
+        position = tuple(float(value) for value in native.Position)
+        moved = [
+            position[axis] + SECTION_CENTER[axis] - projected[axis] for axis in (0, 1)
+        ]
+        if not native.SetViewPosition(double_array(moved), False):
+            raise RuntimeError("failed to re-centre end bracket section A-A")
+        rebuild_drawing(adapter, label="end bracket section re-centred")
+    settle_detail_projection(
+        adapter,
+        native,
+        anchor,
+        ink_xy=SECTION_CENTER,
+        tolerance_xy=(0.0005, 0.0005),
+        label="end bracket section A-A",
+    )
+
+
+def _section(adapter: Any, end: Any) -> Any:
+    """Section A-A along the hole row, cut from the end view, +Z up, centred."""
+    line = model_points_in_view(
+        adapter,
+        end,
+        [_metres(point) for point in SECTION_LINE_MODEL_MM],
+        label="end bracket section A-A line",
+        names=("below", "above"),
+    )
+    section = create_section_view(
+        adapter,
+        end,
+        line_start=line[0],
+        line_end=line[1],
+        view_xy=SECTION_CENTER,
+        section_label=SECTION_LABEL,
+        scale=VIEW_SCALE,
+        label="bottom thread depth section",
+    )
+    _orient_section(adapter, section)
+    # A section shows no hidden lines (rule 9), set before centring so the
+    # display change cannot shift the ink.
+    set_hidden_lines_removed(adapter, section)
+    _centre_section(adapter, section)
+    return section
+
+
+def _require_thread_depths(section: Any) -> None:
+    """Both imported LIMIT dimensions belong to their own face's source."""
+    view = _early_bound(section, "IView")
+    expected = {
+        BAR_THREAD_DEPTH_DIMENSION: (
+            BAR_THREAD_REFERENCE, "BarTaps", BAR_THREAD_DEPTH, BAR_THREAD_LIMITS,
+        ),
+        KP08_THREAD_DEPTH_DIMENSION: (
+            KP08_THREAD_REFERENCE, "KP08Taps", KP08_THREAD_DEPTH, KP08_THREAD_LIMITS,
+        ),
+    }
+    model = _early_bound(view.ReferencedDocument, "IModelDoc2")
+    found = set()
+    for raw in view.GetDisplayDimensions() or ():
+        display = _early_bound(raw, "IDisplayDimension")
+        dimension = _early_bound(display.GetDimension2(0), "IDimension")
+        full_name = str(dimension.FullName)
+        name, owner, *_ = full_name.split("@")
+        if name not in expected or name in found:
+            raise RuntimeError(f"section A-A has an unexpected dimension {full_name}")
+        reference, feature_name, nominal, limits_mm = expected[name]
+        if owner != reference:
+            raise RuntimeError(f"{full_name}: wrong full-thread source")
+        raw_taps = _early_bound(model, "IPartDoc").FeatureByName(feature_name)
+        if raw_taps is None:
+            raise RuntimeError(f"section A-A's part has no {feature_name}")
+        wizard = _early_bound(
+            _early_bound(raw_taps, "IFeature").GetDefinition(), "IWizardHoleFeatureData2"
+        )
+        actual = float(dimension.SystemValue) * 1000.0
+        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+        endpoints = (
+            actual + float(tolerance.GetMinValue()) * 1000.0,
+            actual + float(tolerance.GetMaxValue()) * 1000.0,
+        )
+        if (
+            int(wizard.ThreadEndCondition) != 0
+            or abs(float(wizard.ThreadDepth) * 1000.0 - nominal) > 1e-4
+            or abs(actual - nominal) > 1e-4
+            or int(tolerance.Type) != 3
+            or int(display.GetPrimaryTolPrecision2()) != 3
+            or any(abs(got - want) > 1e-4 for got, want in zip(endpoints, limits_mm))
+        ):
+            raise RuntimeError(f"{full_name}: native full-thread LIMITS lost: {endpoints}")
+        found.add(name)
+    if found != set(expected):
+        raise RuntimeError(f"section A-A missing full-thread LIMIT dimensions: {found}")
+
+
+# Section A-A draws both faces' threads (machinist review 0c3ed35988: it drew
+# only the top thread, dashed, and no bottom thread). SolidWorks prints a
+# section's thread annotation dashed, as a hidden thread, so every thread in
+# the cut moves onto a visible thin continuous layer of its own
+# (draw_pn_pen_v_block._section_thread_on_visible_layer). The cut runs on
+# both holes' axes, so each hole shows its top and its bottom thread. Farm
+# 84d5991d45 and 26bb still drew no bottom thread: every view imported
+# BarTaps' own thread annotations hidden (Visible 3, no display) while
+# KP08Taps' drew, so the part carries a native cosmetic thread on each
+# finished bore's bottom edge (build_..._end_bracket, BarFaceThread) and the
+# settled section must draw each one, both sides, from the bottom face to
+# BAR_THREAD_DEPTH, where the depth's witness lands.
+SECTION_THREAD_LAYER = "TAP-THREAD-SECTION"
+SECTION_THREAD_INSTANCES = len(HOLE_X) * len(("BarFaceThread", "KP08Taps"))
+_COSMETIC_THREAD_ANNOTATION = 1  # swAnnotationType_e.swCosmeticThread
+_THREAD_LINE_TOL_M = 0.00025
+
+
+def _thread_annotation_lines(
+    section: Any,
+) -> tuple[list[tuple[float, float, float, float]], list[tuple[str, int, int]]]:
+    """Every visible cosmetic thread's drawn lines in section A-A (sheet m),
+    and each thread annotation's (name, Visible, line count) for the log."""
+    lines: list[tuple[float, float, float, float]] = []
+    states: list[tuple[str, int, int]] = []
+    for raw_annotation in _early_bound(section, "IView").GetAnnotations() or ():
+        annotation = _early_bound(raw_annotation, "IAnnotation")
+        if int(annotation.GetType()) != _COSMETIC_THREAD_ANNOTATION:
+            continue
+        visible = int(annotation.Visible)
+        drawn: list[tuple[float, float, float, float]] = []
+        raw_data = annotation.GetDisplayData()
+        if raw_data is not None:
+            data = _early_bound(raw_data, "IDisplayData")
+            for index in range(int(data.GetLineCount())):
+                # GetLineAtIndex2 -> [color, lineType, _, _, start[3], end[3]].
+                raw = [float(value) for value in data.GetLineAtIndex2(index)]
+                drawn.append((raw[4], raw[5], raw[7], raw[8]))
+        states.append((str(annotation.GetName() or ""), visible, len(drawn)))
+        if visible == 1:
+            lines.extend(drawn)
+    return lines, states
+
+
+def _covers(
+    lines: list[tuple[float, float, float, float]],
+    start: tuple[float, float],
+    end: tuple[float, float],
+) -> bool:
+    """True when drawn segments along ``start``..``end`` cover it and one of
+    them ends at ``end`` (the thread's drawn end, where the depth lands)."""
+    length = math.dist(start, end)
+    if length <= 0.0:
+        return False
+    ux, uy = (end[0] - start[0]) / length, (end[1] - start[1]) / length
+
+    def along(point: tuple[float, float]) -> tuple[float, float]:
+        dx, dy = point[0] - start[0], point[1] - start[1]
+        return dx * ux + dy * uy, abs(dx * uy - dy * ux)
+
+    spans: list[tuple[float, float]] = []
+    ends_at_end = False
+    for x0, y0, x1, y1 in lines:
+        (s0, off0), (s1, off1) = along((x0, y0)), along((x1, y1))
+        if max(off0, off1) > _THREAD_LINE_TOL_M:
+            continue
+        spans.append((min(s0, s1), max(s0, s1)))
+        if min(abs(s0 - length), abs(s1 - length)) <= _THREAD_LINE_TOL_M:
+            ends_at_end = True
+    reach = _THREAD_LINE_TOL_M
+    for low, high in sorted(spans):
+        if low > reach:
+            break
+        reach = max(reach, high)
+    return ends_at_end and reach >= length - _THREAD_LINE_TOL_M
+
+
+@_telemetry.traced("drawing.end_bracket.require_threads_drawn")
+def _require_threads_drawn(adapter: Any, section: Any) -> None:
+    """Both sides of both face threads must draw to their native depth."""
+    lines, states = _thread_annotation_lines(section)
+    missing = []
+    for face, start_z, end_z in (
+        ("bottom", 0.0, BAR_THREAD_DEPTH),
+        ("top", _H, _H - KP08_THREAD_DEPTH),
+    ):
+        for x in HOLE_X:
+            for side in (-1.0, 1.0):
+                radius_x = x + side * THREAD_MAJOR / 2.0
+                start = model_point_in_view(
+                    adapter, section, _metres((radius_x, 0.0, start_z)),
+                    label=f"section A-A {face} thread face",
+                )
+                end = model_point_in_view(
+                    adapter, section, _metres((radius_x, 0.0, end_z)),
+                    label=f"section A-A {face} thread end",
+                )
+                if not _covers(lines, start, end):
+                    missing.append((face, round(radius_x, 3)))
+    if missing:
+        raise RuntimeError(f"section A-A missing thread lines {missing}; {states!r}")
+
+
+def _section_threads_on_visible_layer(adapter: Any, section: Any) -> None:
+    """Import section A-A's cosmetic threads, both faces' on both holes, and
+    print them thin and solid; the layer's state and every thread
+    annotation's layer are read back."""
+    seeds, instances = import_cosmetic_threads(adapter, section)
+    if instances < SECTION_THREAD_INSTANCES:
+        raise RuntimeError(
+            f"section A-A shows {instances} cosmetic-thread instances ({seeds} "
+            f"seeds), not both faces' threads on both holes "
+            f"({SECTION_THREAD_INSTANCES})"
+        )
+    draw = adapter.currentModel
+    manager = _early_bound(draw.GetLayerManager(), "ILayerMgr")
+    layer = manager.GetLayer(SECTION_THREAD_LAYER)
+    if layer is None:
+        # COLORREF black, swLineCONTINUOUS (0), swLW_THIN (0).
+        if (
+            int(
+                manager.AddLayer(
+                    SECTION_THREAD_LAYER, "section A-A tap threads", 0, 0, 0
+                )
+            )
+            != 1
+        ):
+            raise RuntimeError(f"failed to add layer {SECTION_THREAD_LAYER}")
+        layer = manager.GetLayer(SECTION_THREAD_LAYER)
+    layer = _early_bound(layer, "ILayer")
+    layer.Visible = True
+    if not bool(layer.Visible) or int(layer.Style) != 0 or int(layer.Width) != 0:
+        raise RuntimeError(
+            f"layer {SECTION_THREAD_LAYER} reads visible={layer.Visible!r}, style "
+            f"{layer.Style!r}, width {layer.Width!r}; wanted visible thin continuous"
+        )
+    moved = 0
+    for raw_annotation in _early_bound(section, "IView").GetAnnotations() or ():
+        annotation = _early_bound(raw_annotation, "IAnnotation")
+        if int(annotation.GetType()) != _COSMETIC_THREAD_ANNOTATION:
+            continue
+        annotation.Layer = SECTION_THREAD_LAYER
+        if str(annotation.Layer or "") != SECTION_THREAD_LAYER:
+            raise RuntimeError(f"a cosmetic thread refused layer {SECTION_THREAD_LAYER}")
+        moved += 1
+    if moved < 2:
+        raise RuntimeError(
+            f"section A-A lists {moved} cosmetic-thread annotations to layer, "
+            "not one for each face's thread"
+        )
+    rebuild_drawing(adapter, label=f"cosmetic threads to {SECTION_THREAD_LAYER}")
+    _telemetry.info(
+        f"section A-A cosmetic threads: seeds/instances={(seeds, instances)!r}, "
+        f"{moved} on {SECTION_THREAD_LAYER}"
+    )
+    _require_threads_drawn(adapter, section)
+
+
+@_telemetry.traced("drawing.end_bracket.offset_depth_text")
+def _offset_depth_text(
+    adapter: Any, annotations: list[Any], text_xy: dict[str, tuple[float, float]]
+) -> None:
+    """Offset both independent full-thread limit blocks clear of their lines."""
+    offset_dimension_text(adapter, annotations, text_xy)
+    found = set()
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        name = dimension_name(adapter, annotation)
+        if name not in text_xy:
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        position = annotation.GetPosition()
+        if (
+            name in found
+            or not bool(display.OffsetText)
+            or position is None
+            or math.dist(position[:2], text_xy[name]) > _TEXT_SETTLE_M
+        ):
+            raise RuntimeError(f"section A-A {name}: limit text not at {text_xy[name]}")
+        found.add(name)
+    if found != set(text_xy):
+        raise RuntimeError(f"section A-A lost limit dimensions: {found}")
+
+
 def _omit_tap_thread_class(display: Any, *, label: str) -> None:
-    """The title block's THREADS row owns the UNC class (rule 2): the thread
-    row reads ``8-32 UNC THRU ALL``, not ``... - 2B ...``."""
+    """The title block owns UNC class; the callout retains native identity."""
     omit_title_block_thread_class(display, label=label)
     native = _early_bound(display, "IDisplayDimension")
     resolved = [str(native.GetText(part) or "") for part in (1, 2, 3, 4)]
-    if any(TAP_SPEC.thread_class in text for text in resolved):
+    classes = {BAR_TAP_SPEC.thread_class, KP08_TAP_SPEC.thread_class}
+    if any(cls in text for text in resolved for cls in classes):
         raise RuntimeError(f"{label}: callout still prints its class: {resolved!r}")
 
 
@@ -445,9 +846,39 @@ def single_hole_definitions(definitions: dict[int, str]) -> dict[int, str]:
     return {**definitions, part: _COUNT.sub("", definitions[part], count=1)}
 
 
+def thread_limit_definitions(
+    definitions: dict[int, str], *, include_drill: bool
+) -> dict[int, str]:
+    """Keep native identity/diameter tokens; depths belong to section LIMITS."""
+    updated = single_hole_definitions(definitions)
+    thread_parts = [
+        part for part, text in updated.items()
+        if "<hw-thread>" in text and "<HOLE-DEPTH><hw-threaddepth>" in text
+    ]
+    drill_parts = [
+        part for part, text in updated.items()
+        if "<MOD-DIAM>" in text and "THRU ALL" in text
+    ]
+    if (
+        len(thread_parts) != 1 or len(drill_parts) != 1
+        or sum(text.count("<hw-threaddepth>") for text in updated.values()) != 1
+    ):
+        raise RuntimeError(f"unexpected opposed-thread native callout: {definitions!r}")
+    thread_part, drill_part = thread_parts[0], drill_parts[0]
+    if thread_part == drill_part:
+        raise RuntimeError("thread and drill must have independent callout rows")
+    updated[thread_part] = updated[thread_part].replace(
+        "<HOLE-DEPTH><hw-threaddepth>", f"\n{THREAD_LIMIT_CALLOUT}", 1
+    )
+    updated[drill_part] = (
+        f"{DRILL_PROCESS} {updated[drill_part]}; BOTH HOLES" if include_drill else ""
+    )
+    return updated
+
+
 @_telemetry.traced("drawing.end_bracket.single_hole_callout")
-def _call_out_one_hole(display: Any, *, label: str) -> None:
-    """Write the count-free definition; prove no row prints a count."""
+def _call_out_one_hole(display: Any, *, label: str, include_drill: bool) -> None:
+    """State native thread identity and exactly one shared through-drill row."""
     native = _early_bound(display, "IDisplayDimension")
 
     def read(parts: tuple[int, ...]) -> dict[int, str]:
@@ -456,17 +887,19 @@ def _call_out_one_hole(display: Any, *, label: str) -> None:
         }
 
     definitions = read((5, 6, 7, 8))
-    updated = single_hole_definitions(definitions)
+    updated = thread_limit_definitions(definitions, include_drill=include_drill)
     for definition_part, writable_part in ((5, 1), (6, 2), (7, 3), (8, 4)):
         if updated[definition_part] != definitions[definition_part]:
             native.SetText(writable_part, updated[definition_part])
     persisted = read((5, 6, 7, 8))
     resolved = read((1, 2, 3, 4))
-    if persisted != updated or any(
-        _PRINTED_COUNT.search(text) for text in resolved.values()
+    if (
+        persisted != updated
+        or any(_PRINTED_COUNT.search(text) for text in resolved.values())
+        or sum(text.count(THREAD_LIMIT_CALLOUT) for text in resolved.values()) != 1
     ):
         raise RuntimeError(
-            f"{label}: callout prints a count: "
+            f"{label}: callout prints a count or misses the section pointer: "
             f"definitions={persisted!r}, resolved={resolved!r}"
         )
     _telemetry.info(f"{label}: {resolved!r}")
@@ -479,23 +912,29 @@ def _activate_view(adapter: Any, view: Any, *, label: str) -> None:
         raise RuntimeError(f"failed to activate the {label} view {name!r}")
 
 
-# SolidWorks pins its own "#8-32 Tapped Hole" note per tap feature and view
-# (farm 0c3 swept one per wizard from the plan). The count is SolidWorks'
-# bookkeeping, not the sheet's contract; finalize bounds it by the features
-# that carry such a note: the one tap feature. The contract is what the
-# settled sheet says: each hole's callout states its thread and drill THRU,
-# and no note anywhere repeats a thread.
-TAP_FEATURES = ("Taps",)
-REDUNDANT_THREAD_NOTES = range(1, len(TAP_FEATURES) + 1)
+# SolidWorks pins its own "#8-32 Tapped Hole" note per tap feature and view,
+# and the cut's cosmetic-thread import regroups them: farm 0c3 swept two from
+# the plan, 84d (both faces' threads imported into A-A) one. The count is
+# SolidWorks' bookkeeping, not the sheet's contract; finalize bounds it by
+# the features that carry such a note: the two tap features (BarTaps,
+# KP08Taps) and the part's bottom cosmetic threads (BarFaceThread1/2, whose
+# callout text is the same "#8-32 Tapped Hole"). The contract is what the
+# settled sheet says: each hole's callout states its thread and points at
+# A-A, and no note anywhere repeats a thread.
+TAP_FEATURES = ("BarTaps", "KP08Taps")
+BAR_FACE_THREADS = tuple(f"BarFaceThread{k}" for k in range(1, len(HOLE_X) + 1))
+REDUNDANT_THREAD_NOTES = range(1, len(TAP_FEATURES) + len(BAR_FACE_THREADS) + 1)
+_THREAD_TEXT = part_spec.SCREW.lstrip("#")  # "8-32"
 
 
 def callout_states_its_thread(resolved: list[str]) -> bool:
-    """One hole's resolved callout rows: a thread row and a drill row, both
-    THRU ALL."""
-    rows = "\n".join(resolved).splitlines()
-    thread = [row for row in rows if f"{_THREAD_TEXT} UNC" in row]
-    drill = [row for row in rows if "THRU ALL" in row and row not in thread]
-    return len(thread) == 1 and "THRU ALL" in thread[0] and len(drill) == 1
+    """Each hole names its thread and the independent section LIMIT bands."""
+    text = "\n".join(resolved)
+    return (
+        f"{_THREAD_TEXT} UNC" in text
+        and text.count(THREAD_LIMIT_CALLOUT) == 1
+        and "<hw-threaddepth>" not in text
+    )
 
 
 def stray_thread_notes(texts: list[str]) -> list[str]:
@@ -512,6 +951,7 @@ def _require_threads_stated_by_callouts_only(
 ) -> None:
     """After the final rebuild: both callouts still state their thread, and no
     note on the sheet (any view, or the sheet itself) repeats one."""
+    drill_rows = []
     for label, display in callouts:
         native = _early_bound(display, "IDisplayDimension")
         resolved = [
@@ -521,6 +961,17 @@ def _require_threads_stated_by_callouts_only(
             raise RuntimeError(
                 f"{label}: settled callout lost its thread: {resolved!r}"
             )
+        drill_rows.extend(
+            row for text in resolved for row in text.splitlines() if "THRU" in row
+        )
+    if (
+        len(callouts) != len(HOLE_X)
+        or len(drill_rows) != 1
+        or DRILL_PROCESS not in drill_rows[0]
+        or "THRU ALL" not in drill_rows[0]
+        or "BOTH HOLES" not in drill_rows[0]
+    ):
+        raise RuntimeError(f"expected one #29 DRILL THRU for both holes: {drill_rows}")
     texts: list[str] = []
     node = _early_bound(adapter.currentModel, "IDrawingDoc").GetFirstView()  # sheet
     while node is not None:
@@ -568,6 +1019,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
     check("open end bracket source", await adapter.open_model(str(SOURCE)))
+    source_model = adapter.currentModel
     required = (
         "Number",
         "Material Specification",
@@ -624,6 +1076,37 @@ async def build(adapter: Any) -> dict[str, str]:
             dimensions_by_feature=DRAWING_DIMENSIONS,
         ),
     ]
+    # BarThreadReference lies in A-A's cutting plane, saved hidden: a derived
+    # view takes it from the part as it stands when it is cut and selects it
+    # through its base view, so the section is cut and curated while the part
+    # shows it (draw_fr_nameplate's SectionReference).
+    with part_sketches_shown(
+        adapter,
+        source_model,
+        (BAR_THREAD_REFERENCE, KP08_THREAD_REFERENCE),
+        label="section A-A full-thread references",
+        base_view=end,
+    ):
+        section = _section(adapter, end)
+        annotations += curate_view_dimensions(
+            adapter,
+            section,
+            keep={
+                name: model_point_in_view(
+                    adapter, section, _metres(xyz), label=f"section A-A {name} text"
+                )
+                for name, xyz in SECTION_KEEP.items()
+            },
+            view_label="end bracket section A-A",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
+        )
+    position_section_caption(
+        adapter, section, SECTION_CAPTION_XY, label="end bracket section A-A"
+    )
+    _require_thread_depths(section)
+    # Both faces' threads drawn solid in the cut; the depth's witness leaves
+    # the bottom thread's drawn end (BAR_THREAD_WITNESS_X).
+    _section_threads_on_visible_layer(adapter, section)
     # Places are authored on the part; the sheet only proves the import kept
     # them, then writes the mate callouts and the stock references.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
@@ -636,12 +1119,23 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
     set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
+    # The depth's text, rows and all, off its line onto its leader.
+    _offset_depth_text(
+        adapter,
+        annotations,
+        {
+            name: model_point_in_view(
+                adapter, section, _metres(xyz), label=f"section A-A {name} text"
+            )
+            for name, xyz in SECTION_TEXT.items()
+        },
+    )
     _stock_references(adapter, annotations)
 
     if not auto_center_marks(adapter, plan, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the plan")
     callouts: list[tuple[str, Any]] = []
-    for x, (text_x, text_y), side in TAP_CALLOUTS:
+    for index, (x, (text_x, text_y), side) in enumerate(TAP_CALLOUTS):
         label = f"screw hole at {x:.3f} mm"
         callout = add_native_hole_callout(
             adapter,
@@ -650,9 +1144,13 @@ async def build(adapter: Any) -> dict[str, str]:
             callout_xy=on_plan((text_x, text_y, _H)),
             label=label,
         )
-        _call_out_one_hole(callout, label=label)
-        _omit_tap_thread_class(callout, label=label)
+        # Format native length variables before the second callout's
+        # redundant drill/depth rows are removed.
         set_callout_lengths_to_three_places(callout, label=label)
+        _call_out_one_hole(
+            callout, label=label, include_drill=index == 0
+        )
+        _omit_tap_thread_class(callout, label=label)
         callouts.append((label, callout))
 
     # The property-linked blocks land in the active view: the plan.
@@ -672,6 +1170,8 @@ async def build(adapter: Any) -> dict[str, str]:
         expected_redundant_notes=REDUNDANT_THREAD_NOTES,
         settled_checks=(
             lambda: _require_threads_stated_by_callouts_only(adapter, callouts),
+            lambda: _require_thread_depths(section),
+            lambda: _require_threads_drawn(adapter, section),
         ),
     )
 

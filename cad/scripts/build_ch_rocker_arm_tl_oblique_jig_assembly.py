@@ -355,7 +355,7 @@ def explode_step_components(
 
     A family selector moves its whole identity group. An instance selector
     (``spec.instance_name``; the riser and nut screws share a family but
-    explode apart; so do the rail and TL-28 bar screws) moves the one
+    explode apart; so do the KP08 and TL-28 bar screws) moves the one
     occurrence it names: a configured member's occurrence by its persisted
     role reference (``member_names``), any other by the Name2
     ``_place_family`` proved equal to its selector.

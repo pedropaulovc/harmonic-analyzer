@@ -8,9 +8,8 @@ ch-rocker-arm-tl-vn-oblique-rail-screw:
   material: Alloy Steel
   material_specification: "Alloy steel, black oxide, ASTM A574, Rockwell C37; McMaster-Carr 91251A197"
   finish: black oxide
-  # The jig's common #8-32 X 3/4 SHCS: the fastener table's RAIL_TO_BAR (16)
-  # and BRACKET_TO_BAR (4) counts.
-  quantity: 20
+  # PR2's RAIL_TO_BAR (16); upward R3 adds its three strap clamps (19).
+  quantity: 16
   tolerance_class: machined_block
   fit_class: fastener_clearance
   process: purchased

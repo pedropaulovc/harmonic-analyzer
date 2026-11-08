@@ -34,10 +34,10 @@ underside.
 Each bracket stands wholly on bar 1 (the user's 2026-10-17 ruling A′: the
 bar widened, now 5.50 wide, its column-side edge at lateral 88.9 ⚙), its outer
 end flush with that edge. TL-28 has only two through holes, at the KP08's
-42 bolt spacing about the screw axis, each tapped #8-32 THRU from the top: a
-#8-32 x 3/4 SHCS (the jig's common screw) comes up into each from TL-20's
-underside and a #8-32 x 5/8 SHCS comes down into it through the KP08's
-Ø5 hole. Both 3/4 cannot fit: their tips would meet (TL-28 spec).
+42 bolt spacing about the screw axis, #29 drilled THRU with limited #8-32
+threads from both faces. A #8-32 x 5/8 SHCS enters from each side; TL-20's
+underside counterbore is .200 ±.005. TL-28's full-thread and opposed-cut
+limits protect both complete physical screw reaches (owner A″).
 
 Travel. The KP08 blocks sit at least FEED_GAP outside the feed lug's reach
 over the carriage travel ``trammel.CARRIAGE_TRAVEL`` ⚙ (107.2 .. 421.4, both
@@ -123,9 +123,9 @@ INCH_SCREW_LENGTHS = ("1/4", "5/16", "3/8", "7/16", "1/2", "5/8", "3/4")  # SHCS
 SHCS_LENGTH_TOL_MM = 0.03 * INCH  # STANDARD: ASME B18.3 (SHCS), to 1 in long
 TAP_MOUTH_BREAK = float(_config.title_block("edge_break")["chamfer_max_mm"])
 _TIP_INCOMPLETE_PITCHES = 1.5  # rule 18
-# Each bought screw is the shortest stock length whose worst-case full thread
-# reaches 2 D: rule 18's 1.5 D and half a diameter more, so a bought flange or
-# foot thicker than its unbanded catalogue nominal still leaves 1.5 D.
+# Default purchased-length target: 2D at nominal bought grip, leaving
+# tolerance reserve above mandatory 1.5D. Owner A″ explicitly overrides
+# this selection target for BAR_SCREW_LENGTH only, not the 1.5D requirement.
 ENGAGEMENT_TARGET_D = 2.0
 
 
@@ -171,11 +171,9 @@ KP08_WIDTH = 13.0  # the listing's W: the housing's axial width
 KP08_SCREW = "#8-32"
 KP08_HOLE_DIA = 5.0
 KP08_FOOT_THICK = 5.0  # UNVERIFIED (#2184): base (foot) thickness, not on the listing
-# Rule 18 through the foot at its unverified nominal (a thicker foot takes
-# engagement off one for one: ENGAGEMENT_TARGET_D's half diameter). The jig's
-# common #8-32 x 3/4 cannot be used here: its tip would meet the bar screw's
-# in TL-28's shared through hole (TL-28 spec, SCREW_TIP_GAP_MIN). Owner ruling
-# 2026-11-06 (Main, relayed on PR2) approves this 5/8 as the second length.
+# The nominal-foot 2D selection retains reserve above mandatory 1.5D.
+# Owner A″ retains this 5/8 and bounds the receipt foot at .196–.292
+# (end-bracket spec); its finite thread/seam contract excludes 3/4.
 KP08_SCREW_LENGTH = _shortest_length(KP08_FOOT_THICK, KP08_SCREW)  # 5/8
 KP08_SCREW_FULL_THREAD_MIN = full_thread_min(
     KP08_SCREW_LENGTH, KP08_FOOT_THICK, KP08_SCREW
@@ -262,10 +260,9 @@ BRACKET_INNER_LATERAL = 20.066  # .79: 3 clear of the carriage's side (lateral 1
 # Ruling A′ (2026-10-17): the outer end flush with bar 1's column-side edge,
 # so the bracket stands wholly on the bar (it cantilevered past the 1/2 x 4).
 BRACKET_LENGTH = trammel.BASE_BAR_COLUMN_EDGE - BRACKET_INNER_LATERAL  # 2.71
-# The two through holes: at the KP08's 42 centres about the screw axis, each
-# tapped #8-32 THRU from the top. Each takes the KP08 screw from the top and a
-# bar screw from below, so the pair's centroid stands under the thrust
-# (LOAD_CASES: e = 0).
+# Two #29 through bores at the KP08's 42 centres. Independently limited
+# #8-32 threads from both faces receive the upper and lower 5/8 screws.
+# The pair's centroid stands under the thrust (LOAD_CASES: e = 0).
 BRACKET_HOLES_X = tuple(
     SCREW_LATERAL + side * KP08_BOLT_SPACING / 2.0 - BRACKET_INNER_LATERAL
     for side in (-1.0, 1.0)
@@ -275,24 +272,28 @@ BAR_SCREW_LATERALS = tuple(
 )  # 33.991, 75.991
 # Bar screws: #8-32 SHCS up from the bar's underside (counterbored there, the
 # head recessed: ``base_bar.BRACKET_CBORE_DEPTH``) into TL-28's holes; fitted
-# before the bar goes on the table. The jig's common screw (fasteners spec):
-# its worst-case full thread past TL-20's worst-case grip is 1.5 D and more.
+# before the bar goes on the table. Owner 2026-11-07 A″ selects 5/8 in
+# place of the normal 2D purchase target; worst full thread remains >=1.5D.
 BAR_SCREW = "#8-32"
-BAR_SCREW_LENGTH = "3/4"
+BAR_SCREW_LENGTH = "5/8"
 WALL_TARGET = WALL_TARGET_MM  # drawing-guidelines rule 17 (floor base_bar.BRACKET_WALL_MIN)
 SHCS_8_HEAD = 0.164 * INCH  # #8 SHCS head height (ASME B18.3)
 SHCS_8_MAJOR = 0.164 * INCH  # #8 thread major diameter
 BAR_SCREW_LENGTH_MM = float(Fraction(BAR_SCREW_LENGTH)) * INCH
-BAR_SCREW_GRIP = base_bar.BAR_THICK - base_bar.BRACKET_CBORE_DEPTH  # 7.137
-BAR_SCREW_ENGAGEMENT = BAR_SCREW_LENGTH_MM - BAR_SCREW_GRIP  # 11.913 nominal
-# The screw's reach past TL-20's top at the printed bands (11.532 .. 12.294).
+BAR_SCREW_GRIP = base_bar.BAR_THICK - base_bar.BRACKET_CBORE_DEPTH  # 6.858
+BAR_SCREW_ENGAGEMENT = BAR_SCREW_LENGTH_MM - BAR_SCREW_GRIP  # 9.017 nominal
+# Geometric range at nominal screw length only: 8.636 .. 9.398.
 BAR_SCREW_ENGAGEMENT_RANGE = base_bar.bracket_screw_under_head(BAR_SCREW_LENGTH_MM)
+BAR_SCREW_ACTUAL_REACH_RANGE = (
+    BAR_SCREW_ENGAGEMENT_RANGE[0] - SHCS_LENGTH_TOL_MM,
+    BAR_SCREW_ENGAGEMENT_RANGE[1],
+)  # 7.874 .. 9.398; do not subtract short-length twice in full_thread_min.
 # Rule 18: the worst-case grip (the thickest bar under the shallowest
 # counterbore) and the shortest screw, less its tip's incomplete threads.
-BAR_SCREW_GRIP_MAX = BAR_SCREW_LENGTH_MM - BAR_SCREW_ENGAGEMENT_RANGE[0]  # 7.518
+BAR_SCREW_GRIP_MAX = BAR_SCREW_LENGTH_MM - BAR_SCREW_ENGAGEMENT_RANGE[0]  # 7.239
 BAR_SCREW_FULL_THREAD_MIN = full_thread_min(
     BAR_SCREW_LENGTH, BAR_SCREW_GRIP_MAX, BAR_SCREW
-)  # 9.33, 2.24 D
+)  # 6.433375, 1.544D
 
 KP08_S = (72.0, 443.0)  # near, far: KP08 axial centre stations
 SCREW_LENGTH = 410.0

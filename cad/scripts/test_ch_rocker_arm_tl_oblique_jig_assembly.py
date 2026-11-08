@@ -63,12 +63,11 @@ PART_STEMS = {
 PIVOT_FAMILIES = {spec.PIVOT_SCREW: 2, spec.PIVOT_SPACER: 2, spec.PIVOT_SHIM: 10}
 # Each screw family and its fastener-table rows (count, callout, engagement):
 # the riser screw's TL-VN-67 also holds the feed nut on (owner ruling
-# 2026-11-04, option B); the rail screw's TL-VN-61 is the jig's common screw,
-# also holding the TL-28 brackets to bar 1 (oblique simplification PR2).
+# 2026-11-04, option B); owner A″ groups both TL-28 joints in TL-VN-62.
 SCREW_ROWS = {
-    spec.RAIL_SCREW: (fasteners.RAIL_TO_BAR, fasteners.BRACKET_TO_BAR),
+    spec.RAIL_SCREW: (fasteners.RAIL_TO_BAR,),
     spec.CARRIAGE_SCREW: (fasteners.BLOCK_TO_CARRIAGE,),
-    spec.PILLOW_BLOCK_SCREW: (fasteners.KP08_TO_BRACKET,),
+    spec.PILLOW_BLOCK_SCREW: (fasteners.KP08_TO_BRACKET, fasteners.BRACKET_TO_BAR),
     spec.RISER_SCREW: (fasteners.RISER_TO_CARRIER, fasteners.NUT_TO_FEED_BLOCK),
     spec.CLAMP_SCREW: (fasteners.CR_CLAMP,),
     spec.LEVER_SCREW: (fasteners.LEVER_TO_CARRIER,),
@@ -623,9 +622,9 @@ def test_builder_places_exactly_the_inventory() -> None:
         spec.HOLD_DOWN_STUD: 4,
         spec.T_NUT: 4,
         spec.FLANGE_NUT: 4,
-        spec.RAIL_SCREW: 20,
+        spec.RAIL_SCREW: 16,
         spec.CARRIAGE_SCREW: 8,
-        spec.PILLOW_BLOCK_SCREW: 4,
+        spec.PILLOW_BLOCK_SCREW: 8,
         spec.RISER_SCREW: 8,
         spec.CLAMP_SCREW: 1,
         spec.LEVER_SCREW: 2,
@@ -1382,23 +1381,20 @@ def test_sweep_table_edge_margins(report) -> None:
 # (blind tap). Engagement is never more than the receiving thread's depth.
 FASTENER_TABLE = {
     "RAIL_TO_BAR": ("#8-32 X 3/4 SHCS", 16, 9.35, 9.35 - trammel.BASE_BAR_THICK),  # tip short of the faced bar's underside
-    # The jig's common #8-32 x 3/4 up through Bar1 into TL-28's THRU thread
-    # (tapped from the top), two a bracket (owner ruling Main 2026-11-06, B).
+    # A″ lower 5/8 screws enter the limited bottom full thread.
     "BRACKET_TO_BAR": (
-        "#8-32 X 3/4 SHCS", 4,
+        "#8-32 X 5/8 SHCS", 4,
         leadscrew.BAR_SCREW_ENGAGEMENT,
-        leadscrew.BAR_SCREW_ENGAGEMENT - end_bracket.BRACKET_THICK,
+        leadscrew.BAR_SCREW_ENGAGEMENT - end_bracket.BAR_THREAD_LIMITS[0],
     ),
     "BLOCK_TO_CARRIAGE": (
         "M4 X 20 SHCS", 8,
         pivot_block.SCREW_REACH,
         pivot_block.SCREW_REACH - pivot_block.CARRIAGE_THREAD_DEPTH,
     ),
-    # The approved second length down through the KP08's foot (5.0,
-    # UNVERIFIED #2184) into the same THRU thread, its tip clear of the bar
-    # screw's (end_bracket.SCREW_TIP_GAP_MIN).
+    # Upper 5/8 screws stop within the top full-thread guarantee.
     "KP08_TO_BRACKET": (
-        "#8-32 X 5/8 SHCS", 4, 10.875, 10.875 - end_bracket.BRACKET_THICK,
+        "#8-32 X 5/8 SHCS", 4, 10.875, 10.875 - end_bracket.KP08_THREAD_LIMITS[0],
     ),
     # The 5/8 screw past the TL-VN-84 FeedNut flange (its head seated in the
     # countersink) into the lug's THRU tap, the tip stopping inside it.
@@ -1494,12 +1490,10 @@ def test_fastener_table_engagement_and_protrusion() -> None:
 
 
 def test_one_common_screw_with_every_exception_reasoned() -> None:
-    """Oblique simplification PR2: the #8-32 x 3/4 SHCS (91251A197, TL-VN-61)
-    is the rail and TL-28 bar screw, one BOM row; every other screw or stud
-    the jig consumes is an exception with its reason."""
+    """PR2 common rail screw and the reasoned owner-selected exceptions."""
     assert fasteners.COMMON_SCREW == ("#8-32", "3/4", fasteners.SHCS)
-    assert fasteners.COMMON_SCREW_ROWS == (fasteners.RAIL_TO_BAR, fasteners.BRACKET_TO_BAR)
-    assert fasteners.COMMON_SCREW_COUNT == 16 + 4 == spec.QUANTITIES[spec.RAIL_SCREW]
+    assert fasteners.COMMON_SCREW_ROWS == (fasteners.RAIL_TO_BAR,)
+    assert fasteners.COMMON_SCREW_COUNT == 16 == spec.QUANTITIES[spec.RAIL_SCREW]
     for row in fasteners.COMMON_SCREW_ROWS:
         assert (row.thread, row.length, row.head) == fasteners.COMMON_SCREW
     # No other row is the common screw.
@@ -1514,6 +1508,7 @@ def test_one_common_screw_with_every_exception_reasoned() -> None:
         "1/2-13 hold-down studs",
         "kit set screws, handwheel and KP08",
         "#8-32 x 5/8 SHCS, KP08 to TL-28",
+        "#8-32 x 5/8 SHCS, TL-28 to bar",
     }
     assert all(reason.strip() for reason in fasteners.COMMON_SCREW_EXCEPTIONS.values())
     # The screw families on the BOM: the common one and the excepted ones.
@@ -1527,6 +1522,25 @@ def test_one_common_screw_with_every_exception_reasoned() -> None:
     root = Path(__file__).resolve().parents[2]
     assert not (root / "cad/config/parts/ch-rocker-arm-tl-vn-oblique-kp08-screw.yaml").exists()
     assert not (root / "cad/scripts/_mcmaster_91255a150.py").exists()
+
+def test_a200_shares_the_short_sku_but_not_the_explode_direction() -> None:
+    assert spec.PLACEMENTS[spec.RAIL_SCREW] == spec.RAIL_SCREW_PLACEMENTS
+    assert spec.PLACEMENTS[spec.PILLOW_BLOCK_SCREW] == (
+        spec.PILLOW_BLOCK_SCREW_PLACEMENTS + spec.BAR_SCREW_PLACEMENTS
+    )
+    assert spec.KP08_SCREW_INSTANCES == tuple(
+        spec.instance_name(spec.PILLOW_BLOCK_SCREW, index) for index in range(4)
+    )
+    assert spec.BAR_SCREW_INSTANCES == tuple(
+        spec.instance_name(spec.PILLOW_BLOCK_SCREW, index) for index in range(4, 8)
+    )
+    explode = {name: (members, axis, travel) for name, members, axis, travel in spec.EXPLODE_STEPS}
+    assert explode["kp08 screws lift out"] == (spec.KP08_SCREW_INSTANCES, "z", 40.0)
+    assert explode["bar screws drop out"] == (spec.BAR_SCREW_INSTANCES, "z", -40.0)
+    one = next(step for step in spec.ASSEMBLY_STEPS if step.startswith("1. "))
+    assert f"{spec._item(spec.PILLOW_BLOCK_SCREW)} PER BRACKET FROM BELOW" in one
+    assert fasteners.BRACKET_TO_BAR.thread_depth_mm == end_bracket.BAR_THREAD_LIMITS[0]
+    assert fasteners.KP08_TO_BRACKET.thread_depth_mm == end_bracket.KP08_THREAD_LIMITS[0]
 
 
 def test_carriage_screws_are_cut_to_fit_under_a_confirmed_owner_exception() -> None:
@@ -1591,7 +1605,7 @@ def test_bracket_bar_screws_sit_on_the_kp08_pitch() -> None:
 
 def test_bracket_slip_stop_and_lost_motion_follow_ruling_b() -> None:
     # Owner ruling Main 2026-11-06 (option B; replaces the 2026-10-27
-    # slip-governs criterion for TL-28 on TL-20 only): two #8-32 x 3/4 at
+    # slip-governs criterion for TL-28 on TL-20 only): A″ keeps the 5/8 screws at
     # 2.8 N·m, no washers. No slip under the normal cutting feed; above
     # ~1344 N (handwheel abuse) the bracket may slip onto its bar screws'
     # positive thread stop, which carries the abuse envelope in hole/thread

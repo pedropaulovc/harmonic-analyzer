@@ -87,10 +87,10 @@ supplier band all enter it).
 
 End bracket holes (PR C4; PR2's two-hole TL-28), ``Bar1`` only: 4 x #8 SHCS
 clearance (``BRACKET_HOLE_DIA`` .189, a #12 drill) THRU, counterbored Ø.313 x
-.189 from the UNDERSIDE, at the leadscrew layout's ``BASE_BAR_HOLES`` (a pair
+.200 from the UNDERSIDE, at the leadscrew layout's ``BASE_BAR_HOLES`` (a pair
 at each KP08 station, on TL-28's two holes at the KP08's 42 mm foot pitch;
-rows 54.909 and 12.909 mm from the -Y edge). Two #8-32 x 3/4 SHCS (the
-jig's common screw, ``ch_rocker_arm_tl_oblique_fasteners_spec``) per TL-28
+rows 54.909 and 12.909 mm from the -Y edge). Two #8-32 x 5/8 SHCS (owner
+A″, ``ch_rocker_arm_tl_oblique_fasteners_spec``) per TL-28
 bracket go up through the bar into the bracket's lower threads before the
 bar goes on the table; the heads sit below the underside. Since the
 2026-10-17 widening (ruling A′) each bracket stands wholly on the bar, its
@@ -342,7 +342,7 @@ BRACKET_HOLE_DIA = NUMBER_DRILL_MM[BRACKET_HOLE_DRILL]  # .189
 BRACKET_SCREW_HEAD_DIA = 0.270 * INCH  # #8 SHCS head, ASME B18.3 max
 BRACKET_SCREW_HEAD_HEIGHT = 0.164 * INCH
 BRACKET_CBORE_DIA = 7.9502  # .313, the 5/16 counterbore
-BRACKET_CBORE_DEPTH = 4.8006  # .189: the head sinks at the shallowest print
+BRACKET_CBORE_DEPTH = 5.080  # .200 ±.005: owner A″, 2026-11-07
 BRACKET_HOLE_SPEC = HoleSpec(
     "counterbore_socket",
     BRACKET_SCREW,
@@ -372,11 +372,10 @@ BRACKET_ROW_BAND = BRACKET_STATION_BAND
 #   (BRACKET_HEAD_FLOAT_CLEARANCE_MIN against BRACKET_SCREW_FLOAT_WORST). At
 #   .31 ±.01 the .300 bore leaves the .270 head 0.381 a side against the
 #   screw's 0.438: the head would bear first.
-# - ↧ .189 ±.005: the depth sets how far the 3/4 screw reaches into TL-28's
-#   THRU thread (bracket_screw_under_head; TL-28's BAR_REACH_MAX 12.294),
-#   the reach TL-28's tip gap to the KP08 screw is taken on
-#   (SCREW_TIP_GAP_MIN). It prints at the callout's one precision, which
-#   the diameter needs.
+# - ↧ .200 ±.005: the depth holds the 5/8 screw's physical reach to
+#   9.398 max in TL-28 while retaining 1.5D full engagement at the short
+#   screw/thick grip limit. TL-28's independent full-thread and opposed
+#   tap-lead envelopes protect this whole reach, not a fictitious bare tip.
 # The test proves the diameter's counterfactual and the depth's reach.
 BRACKET_CBORE_PLACES = 3
 BRACKET_CALLOUT_PRECISION = {

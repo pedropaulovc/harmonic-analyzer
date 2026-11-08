@@ -34,8 +34,8 @@ Every fabricated and purchased family has its own BOM row. Each purchased
 kit's members (the TL-VN-83 rail kit, the TL-VN-84 leadscrew kit and the
 shared clamping kit) are logical rows backed by one configured native model,
 and so are the two TL-20 base bars (oblique simplification PR2: ``Bar1``
-drilled for the end brackets, ``Bar2`` plain; one Number). The rail screws
-and the TL-28 bar screws are one common screw and one row (TL-VN-61).
+drilled for the end brackets, ``Bar2`` plain; one Number). The upper KP08
+and lower TL-28 screws share the 5/8 family and one row (TL-VN-62).
 PLACEMENTS, QUANTITIES and BOM_ORDER are the builder and drawing authority.
 
 Mates and the sweep: the structure is fixed; the carriages slide on their
@@ -179,11 +179,10 @@ CLAMPING_KIT = "sh-vn-clamping-kit-hardware"
 HOLD_DOWN_STUD = "sh-vn-clamping-kit-hardware--HoldDownStud"
 T_NUT = "sh-vn-clamping-kit-hardware--TNut"
 FLANGE_NUT = "sh-vn-clamping-kit-hardware--FlangeNut"
-# The jig's common #8-32 x 3/4 SHCS: the rail screws, then the TL-28 bar
-# screws (fasteners.COMMON_SCREW_ROWS), one row.
+# The common #8-32 x 3/4 rail screws, one row.
 RAIL_SCREW = "ch-rocker-arm-tl-vn-oblique-rail-screw"
 CARRIAGE_SCREW = "ch-rocker-arm-tl-vn-oblique-carriage-screw"
-# TL-VN-62, #8-32 x 5/8 SHCS: each KP08 down into its TL-28.
+# TL-VN-62, #8-32 x 5/8: four KP08 screws, then four lower TL-28 screws.
 PILLOW_BLOCK_SCREW = "ch-rocker-arm-tl-vn-oblique-bracket-screw"
 RISER_SCREW = "ch-rocker-arm-tl-vn-oblique-riser-screw"
 CLAMP_SCREW = "ch-rocker-arm-tl-vn-oblique-clamp-screw"
@@ -867,10 +866,9 @@ PLACEMENTS: dict[str, tuple[Placement, ...]] = {
     HOLD_DOWN_STUD: HOLD_DOWN_STUD_PLACEMENTS,
     T_NUT: T_NUT_PLACEMENTS,
     FLANGE_NUT: FLANGE_NUT_PLACEMENTS,
-    # One BOM row, two joints: the rail screws, then the TL-28 bar screws.
-    RAIL_SCREW: RAIL_SCREW_PLACEMENTS + BAR_SCREW_PLACEMENTS,
+    RAIL_SCREW: RAIL_SCREW_PLACEMENTS,
     CARRIAGE_SCREW: CARRIAGE_SCREW_PLACEMENTS,
-    PILLOW_BLOCK_SCREW: PILLOW_BLOCK_SCREW_PLACEMENTS,
+    PILLOW_BLOCK_SCREW: PILLOW_BLOCK_SCREW_PLACEMENTS + BAR_SCREW_PLACEMENTS,
     # One BOM row, two joints: the riser's 4, then the feed nut's 4.
     RISER_SCREW: RISER_SCREW_PLACEMENTS + NUT_SCREW_PLACEMENTS,
     CLAMP_SCREW: CLAMP_SCREW_PLACEMENTS,
@@ -895,8 +893,12 @@ MEMBER_COMPONENT_REFERENCES = {
 RAIL_SCREW_INSTANCES = tuple(
     instance_name(RAIL_SCREW, index) for index in range(len(RAIL_SCREW_PLACEMENTS))
 )
+KP08_SCREW_INSTANCES = tuple(
+    instance_name(PILLOW_BLOCK_SCREW, index)
+    for index in range(len(PILLOW_BLOCK_SCREW_PLACEMENTS))
+)
 BAR_SCREW_INSTANCES = tuple(
-    instance_name(RAIL_SCREW, len(RAIL_SCREW_PLACEMENTS) + index)
+    instance_name(PILLOW_BLOCK_SCREW, len(PILLOW_BLOCK_SCREW_PLACEMENTS) + index)
     for index in range(len(BAR_SCREW_PLACEMENTS))
 )
 # The riser screw family's occurrences by joint (PLACEMENTS' order).
@@ -1083,7 +1085,7 @@ EXPLODE_STEPS = (
     ("carriages lift off the rails", (CARRIAGE,), "z", 50.0),
     ("rail screws lift out", RAIL_SCREW_INSTANCES, "z", 35.0),
     ("handwheel slides off", (HANDWHEEL,), "x", -50.0),
-    ("kp08 screws lift out", (PILLOW_BLOCK_SCREW,), "z", 40.0),
+    ("kp08 screws lift out", KP08_SCREW_INSTANCES, "z", 40.0),
     ("bar screws drop out", BAR_SCREW_INSTANCES, "z", -40.0),
     ("flange nuts lift off", (FLANGE_NUT,), "z", 60.0),
     ("t-nuts drop out", (T_NUT,), "z", -30.0),
@@ -1771,7 +1773,7 @@ ASSEMBLY_STEPS = (
     "BASE BAR 1. SCREW AN "
     f"END BRACKET {_item(END_BRACKET)} ON BASE BAR 1 AT EACH KP08 STATION, "
     f"{len(leadscrew.BAR_SCREW_LATERALS)} {_BAR_SCREW} "
-    f"{_item(RAIL_SCREW)} PER BRACKET FROM BELOW, NO WASHERS, "
+    f"{_item(PILLOW_BLOCK_SCREW)} PER BRACKET FROM BELOW, NO WASHERS, "
     f"{_torque(leadscrew.BAR_SCREW_TORQUE_NM)}.",
     "2. SET BOTH BARS ON THE TABLE, NEAR ENDS TOWARD THE SPINDLE. USE TWO "
     f"UNCUT {fasteners.HOLD_DOWN_STUD_THREAD} STUDS {_item(HOLD_DOWN_STUD)} "
@@ -1810,10 +1812,9 @@ ASSEMBLY_STEPS = (
     "TIGHTEN THE HOLD-DOWN NUTS AND READ EACH STATION AGAIN. SET EACH SWEEP "
     "LIMIT (SHEET 1) THE SAME WAY, CENTRING IN X ONLY, AND WITNESS-MARK EACH "
     "BAR AT ITS CARRIAGE'S SPINDLE-END FACE, I OR O BY PASS.",
-    # The foot (UNVERIFIED, #2184) between TL-28's two bounds: no thinner,
-    # so the 5/8's tip stays clear of the bar screw's in the shared THRU
-    # thread; no thicker, so its full thread holds 1.5 D
-    # (end_bracket.KP08_FOOT_THICK_MIN/MAX).
+    # Receipt foot bounds protect the whole upper reach from the opposed
+    # hand-tap cut and retain 1.5D full engagement at the thickest foot.
+    # The foot remains UNVERIFIED (#2184).
     f"7. CHECK EACH KP08 {_item(PILLOW_BLOCK)} FOOT IS "
     f"{_bound(end_bracket.KP08_FOOT_THICK_MIN, 3, up=True)} TO "
     f"{_bound(end_bracket.KP08_FOOT_THICK_MAX, 3, up=False)} THICK AT ITS 2 HOLES. "
@@ -2203,6 +2204,8 @@ def _component_label(stem: str, index: int) -> str:
         LEVER_SCREW: "lever screw",
         LEVER_LOCK_WASHER: "lever lock washer",
     }
+    if stem == PILLOW_BLOCK_SCREW and index >= len(PILLOW_BLOCK_SCREW_PLACEMENTS):
+        return f"bar screw {index - len(PILLOW_BLOCK_SCREW_PLACEMENTS) + 1}"
     name = names[stem]
     return f"{name} {index + 1}" if QUANTITIES[stem] > 1 else name
 

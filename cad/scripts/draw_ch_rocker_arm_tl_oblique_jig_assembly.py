@@ -169,8 +169,8 @@ CLUSTERS = (
         (1.0, 5.0),
         partial=(
             (spec.CARRIAGE_SCREW, _carriage_screws(spec.PIVOT_BLOCK)),
-            # The common screw's rail occurrences; its TL-28 bar screws
-            # show unballooned on the leadscrew sheet.
+            # Rail occurrences only; the lower TL-28 screws belong to
+            # the short-screw family on the leadscrew sheet.
             (spec.RAIL_SCREW, spec.RAIL_SCREW_INSTANCES),
         ),
     ),
@@ -203,10 +203,9 @@ CLUSTERS = (
         (1.0, 3.0),
         # The integral lug moves with the feed block on rail 1, fastened to
         # its carriage by its four carriage screws. The feed nut's four flat
-        # heads are riser screws, ballooned on the carrier's sheet. The TL-28
-        # bar screws are the common rail screw, ballooned on the rail sheet.
+        # heads are riser screws, ballooned on the carrier's sheet. Both
+        # TL-28 screw joints belong to this sheet's short-screw family.
         context=(
-            *spec.BAR_SCREW_INSTANCES,
             spec.instance_name(spec.CARRIAGE, 0),
             *_carriage_screws(spec.FEED_BLOCK),
             *spec.NUT_SCREW_INSTANCES,

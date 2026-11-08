@@ -646,10 +646,15 @@ def test_bracket_counterbores_sink_and_seat_the_heads() -> None:
     assert spec.BRACKET_HEAD_CLEARANCE_MIN >= 0.25
     assert spec.BRACKET_HEAD_BEARING_MIN >= 0.5
     assert spec.BRACKET_CBORE_FLOOR_MIN >= WALL_TARGET_MM
-    # Rule 18: the common #8-32 x 3/4 reaches 1.5 D into TL-28 at the printed
-    # worst (the faced .47 bar at its .XX band), and never through the 1 in
-    # bracket; its deepest reach is TL-28's bar-thread window floor.
-    assert leadscrew.BAR_SCREW_LENGTH_MM == pytest.approx(0.75 * 25.4)
+    # Owner A″: .200 counterbore, 5/8 screw; no length tolerance hidden
+    # in the geometric under-head helper, and no double charge in full thread.
+    assert spec.BRACKET_CBORE_DEPTH == pytest.approx(.200 * 25.4)
+    assert spec.BRACKET_HEAD_RECESS_MIN == pytest.approx(.7874)
+    assert spec.BRACKET_CBORE_FLOOR_MIN == pytest.approx(6.477)
+    assert leadscrew.BAR_SCREW_LENGTH_MM == pytest.approx(.625 * 25.4)
+    assert leadscrew.BAR_SCREW_ACTUAL_REACH_RANGE == pytest.approx((7.874, 9.398))
+    assert leadscrew.BAR_SCREW_FULL_THREAD_MIN == pytest.approx(6.433375)
+    assert leadscrew.BAR_SCREW_FULL_THREAD_MIN >= 1.5 * THREAD_MAJOR_MM["#8-32"]
     low, high = spec.bracket_screw_under_head(leadscrew.BAR_SCREW_LENGTH_MM)
     assert low >= 1.5 * THREAD_MAJOR_MM[leadscrew.BAR_SCREW]
     assert high < leadscrew.BRACKET_THICK
@@ -708,10 +713,8 @@ def test_counterbore_three_places_hold_the_head_float_and_the_screw_reach() -> N
     assert spec.BRACKET_HEAD_FLOAT_CLEARANCE_MIN == pytest.approx(clearance)
     assert clearance >= travel
     assert (0.31 * 25.4 - two - head) / 2.0 < travel
-    # Depth: .189 ±.005 lets the 3/4 screw reach at most 12.294 past the
-    # bar's top into TL-28's THRU thread; TL-28's tip gap to the 5/8 KP08
-    # screw is taken on that reach. The depth prints at the callout's one
-    # precision, the diameter's.
+    # .200 ±.005 limits physical reach to 9.398; TL-28 protects that
+    # whole reach from the opposed tap's phased lead cuts.
     screw = leadscrew.BAR_SCREW_LENGTH_MM
     reach_max = spec.bracket_screw_under_head(screw)[1]
     assert reach_max == pytest.approx(end_bracket.BAR_REACH_MAX)

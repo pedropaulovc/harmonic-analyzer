@@ -37,12 +37,12 @@ fit contracts do not certify the jig.
 
 One common screw (oblique simplification PR2): McMaster 91251A197, #8-32 x
 3/4 SHCS (``COMMON_SCREW``), wherever its head and engagement fit: the rail
-screws and the TL-28 bar screws, 20 in all, one BOM row
+screws, 16 in all, one BOM row
 (``ch-rocker-arm-tl-vn-oblique-rail-screw``). Every other screw or stud is
 in ``COMMON_SCREW_EXCEPTIONS`` with the reason it cannot be the common one.
-The KP08 screws are the owner-approved second length, 91251A196 #8-32 x 5/8
-(owner ruling 2026-11-06, Main, relayed on PR2): the 3/4 from the top would
-meet the bar screw's tip in TL-28's shared hole.
+Both TL-28 joints use the owner-selected 91251A196 #8-32 x 5/8 (A″,
+2026-11-07): their whole reaches stay out of the independently phased
+opposed hand-tap cuts. Eight share one second-length BOM row.
 """
 
 from __future__ import annotations
@@ -165,8 +165,8 @@ BRACKET_TO_BAR = Fastener(
     SHCS,
     leadscrew.BAR_SCREW_LENGTH,
     len(leadscrew.BASE_BAR_HOLES),
-    leadscrew.BAR_SCREW_GRIP,  # head recessed in TL-20's 4.80 counterbore
-    end_bracket.BRACKET_THICK,  # tapped THRU from the top; tips apart
+    leadscrew.BAR_SCREW_GRIP,  # head recessed in TL-20's .200 counterbore
+    end_bracket.BAR_THREAD_LIMITS[0],  # guaranteed full thread from bottom
 )
 BLOCK_TO_CARRIAGE = Fastener(
     "TL-32 feed block / TL-22 pivot block to HGH15CA carriage",
@@ -187,7 +187,7 @@ KP08_TO_BRACKET = Fastener(
     leadscrew.KP08_SCREW_LENGTH,
     len(end_bracket.HOLE_X) * leadscrew.END_BRACKET_QUANTITY,
     leadscrew.KP08_FOOT_THICK,  # UNVERIFIED foot thickness
-    end_bracket.BRACKET_THICK,  # the same THRU thread, from the KP08 face
+    end_bracket.KP08_THREAD_LIMITS[0],  # guaranteed full thread from top
 )
 NUT_TO_FEED_BLOCK = Fastener(
     "TL-VN-84 FeedNut to TL-32 feed block",
@@ -254,8 +254,8 @@ WASHERS: tuple[Washer, ...] = (LEVER_LOCK_WASHER,)
 # One SKU wherever its head and engagement fit (module docstring): these
 # rows are its, and their count is the one BOM row's.
 COMMON_SCREW = ("#8-32", "3/4", SHCS)  # McMaster 91251A197
-COMMON_SCREW_ROWS: tuple[Fastener, ...] = (RAIL_TO_BAR, BRACKET_TO_BAR)
-COMMON_SCREW_COUNT = sum(row.count for row in COMMON_SCREW_ROWS)  # 20
+COMMON_SCREW_ROWS: tuple[Fastener, ...] = (RAIL_TO_BAR,)
+COMMON_SCREW_COUNT = sum(row.count for row in COMMON_SCREW_ROWS)  # 16
 # Every other screw or stud the jig consumes, and why it is not the common
 # #8-32 x 3/4 SHCS. Keys: the fitter's name for the item.
 COMMON_SCREW_EXCEPTIONS: dict[str, str] = {
@@ -289,9 +289,12 @@ COMMON_SCREW_EXCEPTIONS: dict[str, str] = {
         "supplied in the bought handwheel and pillow blocks, tapped by their makers"
     ),
     "#8-32 x 5/8 SHCS, KP08 to TL-28": (
-        "the 3/4 from the top would meet the bar screw's tip in TL-28's shared "
-        "hole (end bracket spec COMMON_SCREW_TIP_GAP); the 5/8 is the "
-        "owner-approved second length (owner ruling 2026-11-06, Main)"
+        "owner A″ 2026-11-07: finite full-thread and opposed hand-tap "
+        "cut limits protect the entire upper screw reach"
+    ),
+    "#8-32 x 5/8 SHCS, TL-28 to bar": (
+        "owner A″ 2026-11-07: .200 counterbore and 5/8 screw retain 1.5D "
+        "full thread without entering the opposed-phase cut"
     ),
 }
 

@@ -44,16 +44,16 @@ def test_catalogue_row_is_the_registered_mcmaster_screw() -> None:
 
 
 def test_quantity_thread_and_length_are_the_fastener_tables() -> None:
-    # PR2 (owner ruling Main 2026-11-06, option B): the KP08 screws, two a
-    # KP08, the expressly approved second length.
+    # A″: the same 5/8 SKU serves upper and lower TL-28 joints.
     row = fasteners.KP08_TO_BRACKET
     assert spec.ROW is row
-    assert int(_config.parts(STEM)["quantity"]) == spec.QUANTITY == row.count == 4
-    assert (dims.THREAD, dims.LENGTH_TEXT, fasteners.SHCS) == (
-        row.thread,
-        row.length,
-        row.head,
-    )
+    assert spec.ROWS == (fasteners.KP08_TO_BRACKET, fasteners.BRACKET_TO_BAR)
+    assert int(_config.parts(STEM)["quantity"]) == spec.QUANTITY == 8
+    assert sum(each.count for each in spec.ROWS) == 8
+    for each in spec.ROWS:
+        assert (dims.THREAD, dims.LENGTH_TEXT, fasteners.SHCS) == (
+            each.thread, each.length, each.head,
+        )
     assert dims.DIMS.length == pytest.approx(row.length_mm)
     assert dims.DIMS.major_dia == pytest.approx(row.major_mm, abs=1e-3)
     assert spec.CALLOUT == fasteners.callout(row) == "#8-32 X 5/8 SHCS"

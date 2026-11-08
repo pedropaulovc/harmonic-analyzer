@@ -33,25 +33,13 @@ spec's): origin on the bottom face at the inner end (toward the rail),
 mid-width; +X outward (machine +lateral), +Y along the screw, +Z up. Envelope
 X 0 .. 2.71, Y -.25 .. .25, Z 0 .. 1.00.
 
-Holes (owner ruling 2026-11-06, Main, option B of the PR2 two-hole review;
-Main's R4 ruling, through-thread cutover): two #29 tap drills on the
-mid-width row (Y 0), at the KP08's 42 mm bolt spacing about the screw axis,
-X 13.925 and 55.925 mm, each tapped #8-32 UNC THRU the 1 in height from the
-top face. One thread serves both screws: a #8-32 x 3/4 SHCS up through base
-bar 1 (the jig's common screw) and a #8-32 x 5/8 SHCS down through the
-KP08's Ø5 hole (the owner-approved second length). Their tips must not meet
-in the shared thread: on the thinnest stock (``THICK_MIN``) the 3/4's
-deepest reach past the bottom face (``BAR_REACH_MAX``, set by TL-20's
-counterbore stack) and the 5/8's deepest reach past the top face on the
-thinnest KP08 foot the receipt check accepts (``KP08_REACH_MAX``, on the
-unchanged .196 .. .292 band) leave ``SCREW_TIP_GAP_MIN`` 1.905 mm; no tap
-depth enters it. The thickest foot (``KP08_FOOT_THICK_MAX``) keeps the
-5/8's full thread at 1.5 D. The common 3/4 from the top as well would
-collide (``COMMON_SCREW_TIP_GAP``). The through thread takes a long-shank
-spiral-point tap the shop does not own (``TAP_TOOL``, a receipt
-prerequisite). This replaces the per-face depth windows (.491 from the
-bottom, .436 from the top) and, before them, the six-hole layout (four #8
-bar taps and two #6-32 KP08 taps).
+Holes (owner ruling 2026-11-07, Main, A″): two #29 drills THRU at the
+KP08's 42 mm span, X 13.925 and 55.925 mm. Both entries take #8-32 x 5/8
+SHCS. Full thread is limited to .370–.496 from the bar face and .429–.555
+from the KP08 face. Plug-start and bottoming-finish with the owned hand
+taps. Neither screw may enter the opposed-phase cut, including its lead;
+unused middle thread may be double-cut. The KP08 foot receipt band remains
+.196–.292, UNVERIFIED (#2184).
 
 Bands. Both patterns are fixed-fastener fits, so the stations print exact mm
 at three places (±0.13 mm) and the row at the title block's ±.005. Each hole
@@ -72,10 +60,8 @@ row at its printed limits, the length at its .XX band, the stock width at its
 supplier band, each thread at its major diameter (``WALLS_MM``). No rule-20
 shortfall.
 
-Rule 18 belongs to the screws' lengths (leadscrew spec): each screw's
-worst-case full-thread engagement is 1.5 D and more
-(``leadscrew.BAR_SCREW_FULL_THREAD_MIN``, ``leadscrew.KP08_SCREW_FULL_THREAD_MIN``);
-the through thread is full over each screw's whole reach.
+Each screw retains 1.5D of full thread at the worst grip. The engagement
+helper's 1.5-pitch loss is NOT guaranteed thread-free tip clearance.
 """
 
 from __future__ import annotations
@@ -128,7 +114,7 @@ STOCK_FRACTION_DENOMINATORS = {"BracketWidth": 2, "BracketThick": 1}  # (1/2), (
 STOCK_DIMENSIONS = {"BracketWidth", "BracketThick"}
 THICK_MIN = BRACKET_THICK - THICK_STOCK_BAND  # 25.095
 
-# --- Holes: two tap drills on the mid-width row, #8-32 THRU from the top ------
+# --- Holes: #29 THRU, independently limited threads from both faces ----------
 HOLE_ROW_Y = HALF_WIDTH  # .250 from the -Y side face to the row
 ROW_PLACES = 3  # a fixed-fastener pattern's row (module docstring)
 SCREW = leadscrew.BAR_SCREW  # "#8-32"
@@ -145,18 +131,15 @@ _PITCH = 25.4 / float(SCREW.rsplit("-", 1)[1])  # 0.794
 # the native callout carries.
 TAP_CALLOUT_PLACES = 3
 
-# One thread, tapped THRU the whole height from the top face (Main's R4
-# ruling). The #8-32 hand taps on file (``taps-unc-hand``: .75 flute on a
-# .168 shank, wider than the tap drill) cannot pass 1 in from one face. The
-# route takes a long-shank (extension) spiral-point #8-32 tap whose thread
-# and neck reach through the thickest stock with its plug chamfer (3-5
-# threads) clear of the far face, so the bottom face's thread is full:
-# TAP_REACH_MIN. It is a receipt prerequisite, not owned: the shop inventory
-# carries it as TAP_TOOL, present = false, its SKU chosen when verified live.
-THICK_MAX = BRACKET_THICK + THICK_STOCK_BAND  # 25.705
-PLUG_TAP_LEAD = 5.0 * _PITCH  # 3.969
-TAP_REACH_MIN = THICK_MAX + PLUG_TAP_LEAD  # 29.674 (1.168)
-TAP_TOOL = "tap-8-32-extension-spiral-point"  # inventory.toml [tools.*]
+THICK_MAX = BRACKET_THICK + THICK_STOCK_BAND
+BOTTOMING_LEAD_LIMITS = (_PITCH, 2.0 * _PITCH)
+HAND_TAP_FLUTE_LENGTH = 0.75 * 25.4  # catalogue-valued, not measured
+BAR_THREAD_LIMITS = (0.370 * 25.4, 0.496 * 25.4)
+KP08_THREAD_LIMITS = (0.429 * 25.4, 0.555 * 25.4)
+BAR_THREAD_DEPTH = 0.433 * 25.4
+KP08_THREAD_DEPTH = 0.492 * 25.4
+BAR_TIP_MARK_LIMITS = (0.433 * 25.4, 0.527 * 25.4)
+KP08_TIP_MARK_LIMITS = (0.492 * 25.4, 0.586 * 25.4)
 
 
 def _inch_floor(value: float, places: int) -> float:
@@ -165,11 +148,8 @@ def _inch_floor(value: float, places: int) -> float:
     return math.floor(value / 25.4 * scale + 1e-9) / scale * 25.4
 
 
-# The two screws share each through thread: the 3/4 bar screw up from the
-# bottom face, the 5/8 KP08 screw down from the top. Their tips must not
-# meet. The deepest the 3/4 reaches past the bottom face is set by TL-20's
-# counterbore stack at its printed bands (base bar bracket_screw_under_head).
-BAR_REACH_MAX = leadscrew.BAR_SCREW_ENGAGEMENT_RANGE[1]  # 12.294
+# Whole physical reach: zero guaranteed thread-free tip credit.
+BAR_REACH_MAX = leadscrew.BAR_SCREW_ENGAGEMENT_RANGE[1]  # 9.398
 # The 5/8 (ASME B18.3: no plus length tolerance) reaches past the top face
 # its length less the KP08 foot (UNVERIFIED 5.0, #2184), deepest on the
 # thinnest foot the receipt check (jig step 7) accepts. That band is the
@@ -202,29 +182,60 @@ if not (
     raise AssertionError("the KP08 foot's receipt band leaves the 5/8 under 1.5 D")
 # Rule 18 for the bar screw: its worst-case full thread (leadscrew spec).
 if leadscrew.BAR_SCREW_FULL_THREAD_MIN < 1.5 * THREAD_MAJOR_MM[SCREW]:
-    raise AssertionError("the 3/4 bar screw's full thread in TL-28 is under 1.5 D")
-# The physical tip gap: the thinnest stock less both deepest reaches. The
-# thread runs THRU, so no tap depth enters it.
-SCREW_TIP_GAP_MIN = THICK_MIN - BAR_REACH_MAX - KP08_REACH_MAX  # 1.905
+    raise AssertionError("the 5/8 bar screw's full thread in TL-28 is under 1.5 D")
+# Physical tip separation does not by itself prove phase-seam clearance.
+SCREW_TIP_GAP_MIN = THICK_MIN - BAR_REACH_MAX - KP08_REACH_MAX  # 4.8006
 if SCREW_TIP_GAP_MIN <= 0.0:
     raise AssertionError("the end bracket's two screw tips collide")
-# Why the KP08 screw is the 5/8 and not the jig's common 3/4: from the top
-# the 3/4 would reach 14.07 past the face on the least foot and meet the bar
-# screw's tip.
-COMMON_SCREW_TIP_GAP = (
-    THICK_MIN
-    - BAR_REACH_MAX
-    - (float(Fraction(leadscrew.BAR_SCREW_LENGTH)) * 25.4 - KP08_FOOT_THICK_MIN)
+KP08_REACH_MIN = (
+    KP08_SCREW_LENGTH_MM - leadscrew.SHCS_LENGTH_TOL_MM - KP08_FOOT_THICK_MAX
 )
-if COMMON_SCREW_TIP_GAP >= 0.0:
-    raise AssertionError("the common 3/4 now fits the KP08 too: use it there")
+KP08_FULL_THREAD_AT_RECEIPT_MAX = leadscrew.full_thread_min(
+    leadscrew.KP08_SCREW_LENGTH, KP08_FOOT_THICK_MAX, SCREW
+)
+BAR_OPPOSED_CUT_CLEARANCE_MIN = (
+    THICK_MIN - BAR_REACH_MAX - KP08_THREAD_LIMITS[1] - BOTTOMING_LEAD_LIMITS[1]
+)
+KP08_OPPOSED_CUT_CLEARANCE_MIN = (
+    THICK_MIN - KP08_REACH_MAX - BAR_THREAD_LIMITS[1] - BOTTOMING_LEAD_LIMITS[1]
+)
+if (
+    BAR_THREAD_LIMITS[0] + 1e-9 < BAR_REACH_MAX
+    or KP08_THREAD_LIMITS[0] + 1e-9 < KP08_REACH_MAX
+    or min(BAR_OPPOSED_CUT_CLEARANCE_MIN, KP08_OPPOSED_CUT_CLEARANCE_MIN) <= 0.0
+):
+    raise AssertionError("a TL-28 screw enters the opposed-phase cutting envelope")
+for _full, _tip in (
+    (BAR_THREAD_LIMITS, BAR_TIP_MARK_LIMITS),
+    (KP08_THREAD_LIMITS, KP08_TIP_MARK_LIMITS),
+):
+    if (
+        _tip[0] - BOTTOMING_LEAD_LIMITS[1] < _full[0]
+        or _tip[1] - BOTTOMING_LEAD_LIMITS[0] > _full[1]
+        or _tip[1] >= HAND_TAP_FLUTE_LENGTH
+    ):
+        raise AssertionError("bottoming tip marks do not hold full-thread limits")
+# .8128 mm at prescribed marks, versus .0127 at drawing Fmax plus 2p.
+TIP_MARK_SEAM_CLEARANCE_MIN = min(
+    THICK_MIN - BAR_REACH_MAX - KP08_TIP_MARK_LIMITS[1],
+    THICK_MIN - KP08_REACH_MAX - BAR_TIP_MARK_LIMITS[1],
+)
+if TIP_MARK_SEAM_CLEARANCE_MIN <= 0.0:
+    raise AssertionError("a prescribed tap-tip mark enters the opposite screw")
 
-# The native model: one THRU ALL tapped wizard from the top face, its thread
-# THRU (the shop drills #29 through and taps through from the top).
-TAP_SPEC = HoleSpec("tapped", SCREW, end="through_all")
-TAP_DRILL = blind_cut_dia_mm(TAP_SPEC)  # #29, .136
-# The wizard's placement face: (model outward normal, its Z).
-TAP_FACE = ((0.0, 0.0, 1.0), BRACKET_THICK)  # the top, under the KP08 foot
+# Construction-only blind precursor: independent of top thread depth.
+BAR_TAP_DRILL_DEPTH = 0.625 * 25.4
+BAR_TAP_SPEC = HoleSpec(
+    "tapped", SCREW, end="blind", depth_mm=BAR_TAP_DRILL_DEPTH,
+    overrides_mm={"ThreadDepth": BAR_THREAD_DEPTH},
+)
+KP08_TAP_SPEC = HoleSpec("tapped", SCREW, end="through_all")
+TAP_DRILL = blind_cut_dia_mm(BAR_TAP_SPEC)
+THREAD_MAJOR = THREAD_MAJOR_MM[SCREW]
+if not BAR_THREAD_DEPTH <= BAR_TAP_DRILL_DEPTH < BRACKET_THICK - TAP_DRILL / 2.0 * 0.60086:
+    raise AssertionError("the precursor drill must leave the KP08 face intact")
+BAR_TAP_FACE = ((0.0, 0.0, -1.0), 0.0)
+KP08_TAP_FACE = ((0.0, 0.0, 1.0), BRACKET_THICK)
 
 _LENGTH_LOW = _limits(BRACKET_LENGTH, LENGTH_PLACES)[0]
 _R = THREAD_MAJOR_MM[SCREW] / 2.0
@@ -328,20 +339,31 @@ for _wall, _mm in WALLS_MM.items():
 RULE_20_SHORTFALLS: tuple[str, ...] = ()
 
 # --- Drawing -------------------------------------------------------------------------
-# The stations print from the one tap wizard (the plan's visible holes).
+# Native section witnesses own the two full-thread LIMIT dimensions.
+BAR_THREAD_REFERENCE = "BarThreadReference"
+BAR_THREAD_DEPTH_DIMENSION = "BarThreadDepth"
+BAR_THREAD_WITNESS_X = HOLE_X[-1] + THREAD_MAJOR / 2.0
+KP08_THREAD_REFERENCE = "KP08ThreadReference"
+KP08_THREAD_DEPTH_DIMENSION = "KP08ThreadDepth"
+KP08_THREAD_WITNESS_X = HOLE_X[0] - THREAD_MAJOR / 2.0
+# Stations print from the final top wizard's visible holes.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BracketProfile": {"BracketLength", "BracketWidth"},
     # The stock thickness: a reference sketch, not the extrusion's depth,
     # whose import has no drawing-view attachment (farm r1).
     "BracketThickReference": {"BracketThick"},
-    "Taps": {"Tap1X", "Tap2X"},
+    "KP08Taps": {"KP08Tap1X", "KP08Tap2X"},
     "HoleRowReference": {"HoleRowY"},
+    BAR_THREAD_REFERENCE: {BAR_THREAD_DEPTH_DIMENSION},
+    KP08_THREAD_REFERENCE: {KP08_THREAD_DEPTH_DIMENSION},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BracketProfile": {"BracketLength": LENGTH_PLACES, "BracketWidth": STOCK_PLACES},
     "BracketThickReference": {"BracketThick": STOCK_PLACES},
-    "Taps": dict.fromkeys(DRAWING_DIMENSIONS["Taps"], HOLE_PLACES),
+    "KP08Taps": dict.fromkeys(DRAWING_DIMENSIONS["KP08Taps"], HOLE_PLACES),
     "HoleRowReference": {"HoleRowY": ROW_PLACES},
+    BAR_THREAD_REFERENCE: {BAR_THREAD_DEPTH_DIMENSION: TAP_CALLOUT_PLACES},
+    KP08_THREAD_REFERENCE: {KP08_THREAD_DEPTH_DIMENSION: TAP_CALLOUT_PLACES},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
@@ -362,8 +384,8 @@ for _name, _value in (
 # The metric vendor line's stations (owner ruling 4): (feature, dimension) ->
 # (millimetre places, symmetric band mm).
 METRIC_DIMENSIONS: dict[tuple[str, str], tuple[int, float]] = {
-    ("Taps", name): (HOLE_PLACES, HOLE_BAND)
-    for name in sorted(DRAWING_DIMENSIONS["Taps"])
+    ("KP08Taps", name): (HOLE_PLACES, HOLE_BAND)
+    for name in sorted(DRAWING_DIMENSIONS["KP08Taps"])
 }
 for _x in HOLE_X:
     if abs(_x - round(_x, HOLE_PLACES)) > 1e-9:
@@ -372,9 +394,11 @@ for _x in HOLE_X:
 # Width and thickness are the bar as bought (their references carry STOCK);
 # every station names its mates, and the row the same.
 CALLOUTS_BELOW = {
-    "Tap1X": MATE_CALLOUT,
-    "Tap2X": MATE_CALLOUT,
+    "KP08Tap1X": MATE_CALLOUT,
+    "KP08Tap2X": MATE_CALLOUT,
     "HoleRowY": ROW_CALLOUT,
+    BAR_THREAD_DEPTH_DIMENSION: "BOTTOM FULL THREAD\nBOTH HOLES",
+    KP08_THREAD_DEPTH_DIMENSION: "TOP FULL THREAD\nBOTH HOLES",
 }
 # drawing-guidelines.md (units): an as-bought fraction is an untoleranced REF;
 # the supplier's catalogue tolerance governs.

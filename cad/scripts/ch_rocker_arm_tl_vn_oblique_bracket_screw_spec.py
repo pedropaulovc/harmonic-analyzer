@@ -1,22 +1,20 @@
-r"""MHA-CH-06-TL-VN-62 oblique-trammel KP08 screw: McMaster 91251A196.
+r"""MHA-CH-06-TL-VN-62 oblique-trammel end-bracket screws: McMaster 91251A196.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure.  Shop fixture hardware (cad/docs/subsystem-identities.md), modelled
 so the jig assembly can mate it and run native interference: the
-``#8-32 X 5/8 SHCS`` that holds a KP08 pillow block to its TL-28 end bracket,
-down through the block's Ø5 foot hole into the bracket's #8-32 THRU thread,
-its tip clear of the bar screw's (``end_bracket.SCREW_TIP_GAP_MIN``); the head
-seats on the KP08's foot (its thickness is UNVERIFIED, #2184).  It is the C4 fastener table's
-``KP08_TO_BRACKET`` row, four in the jig.  It is its own row on the jig's
-BOM; the shop inventory carries no screw stock (no ``INVENTORY_ID``), and the
+``#8-32 X 5/8 SHCS`` used on both sides of TL-28: four down through the
+KP08 feet and four up through TL-20's .200 counterbores. The independently
+limited threads protect both reaches from the opposed hand-tap cut.
+The KP08 foot remains UNVERIFIED (#2184). The fastener table's
+``KP08_TO_BRACKET`` and ``BRACKET_TO_BAR`` rows total eight in the jig.
+They share one BOM row; the shop carries no screw stock (no ``INVENTORY_ID``), and the
 assembly steps cite it by item and callout (``fasteners.callout``).
 
-Oblique simplification PR2 (owner ruling 2026-11-06, Main, option B): TL-28
-has two holes, each tapped #8-32 THRU from the top; the bar screws below are the
-jig's common #8-32 x 3/4 (TL-VN-61), and this 5/8 is the owner-approved
-second length (the 3/4 from the top would meet the bar screw's tip). The
-same SKU held TL-28 to TL-20 before PR2; it replaces the #6-32 button heads
-(91255A150, TL-VN-65, retired).
+Owner A″ 2026-11-07 selects this length for both TL-28 joints, preserving
+1.5D full engagement and the owned plug-start/bottoming-finish route.
+TL-VN-61 remains the 3/4 rail screw. The retired #6-32 KP08 button-head
+identity TL-VN-65 is not restored.
 
 The head on the KP08 foot (``HEAD_OVER_HOLE``): the #8's float in the Ø5
 hole at its minimum major (``leadscrew.KP08_SCREW_FLOAT_MAX``) is under the
@@ -49,7 +47,7 @@ Sources:
 
 Part frame: screw axis local +Y through the origin, published as
 ``ScrewAxis`` (Front ∩ Right); the bearing face (head underside) at y = 0 (the Top Plane), the tip at
-y = -length.  Mate the Top Plane to the head's seat, the KP08's foot.
+y = -length. Mate the Top Plane to the KP08 foot or TL-20 counterbore floor.
 """
 
 from __future__ import annotations
@@ -66,12 +64,14 @@ UNIT = drawing_unit(
 )
 SKU = PART_NO
 ROW = fasteners.KP08_TO_BRACKET
-QUANTITY = ROW.count
+ROWS = (fasteners.KP08_TO_BRACKET, fasteners.BRACKET_TO_BAR)
+QUANTITY = sum(row.count for row in ROWS)
 PACK_QUANTITY = 100  # McMaster sells 91251A196 in packs of 100
 CALLOUT = fasteners.callout(ROW)  # "#8-32 X 5/8 SHCS"
 
-if (THREAD, LENGTH_TEXT, fasteners.SHCS) != (ROW.thread, ROW.length, ROW.head):
-    raise AssertionError(f"{SKU} is not the screw of {ROW.joint}")
+for _row in ROWS:
+    if (THREAD, LENGTH_TEXT, fasteners.SHCS) != (_row.thread, _row.length, _row.head):
+        raise AssertionError(f"{SKU} is not the screw of {_row.joint}")
 if abs(DIMS.length - ROW.length_mm) > 1e-9:
     raise AssertionError(f"{SKU}: {DIMS.length} long, the row prints {ROW.length_mm}")
 if abs(DIMS.major_dia - ROW.major_mm) > 1e-3:
