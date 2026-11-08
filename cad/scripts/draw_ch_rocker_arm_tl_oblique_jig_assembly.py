@@ -196,9 +196,14 @@ CLUSTERS = (
             spec.PIVOT_SHIM,
         ),
         (1.0, 4.0),
+        # The carrier stands in each support's stack, between the spacer and
+        # the screw head (restack r4, r1-r3: the stack drawn without it). At
+        # its explode it lies above and behind the spacers and shims, clear
+        # of the shim's 35-degree leader.
         context=(
             spec.instance_name(spec.FEED_BLOCK, 0),
             spec.instance_name(spec.PIVOT_BLOCK, 0),
+            spec.instance_name(spec.CARRIER, 0),
         ),
     ),
     Cluster(
@@ -1183,18 +1188,18 @@ def _scale_text(scale: tuple[float, float]) -> str:
     return f"{scale[0]:g}:{scale[1]:g}"
 
 
-# The pivot sheet explodes each support's screw, spacer and shims over its
-# block; the carrier between them is exploded on its own sheet, so the
-# caption states the stack in order by item (jig-asm restack r1: no view
-# showed it). One line: the caption region holds three.
-PIVOT_STACK_NOTE = (
-    f"ITEMS BOTTOM UP: BLOCK {BOM_ITEM_NUMBERS[spec.PIVOT_BLOCK]}/"
-    f"{BOM_ITEM_NUMBERS[spec.FEED_BLOCK]}, SHIMS {BOM_ITEM_NUMBERS[spec.PIVOT_SHIM]}, "
-    f"SPACER {BOM_ITEM_NUMBERS[spec.PIVOT_SPACER]}, CARRIER "
-    f"{BOM_ITEM_NUMBERS[spec.CARRIER]}, SCREW {BOM_ITEM_NUMBERS[spec.PIVOT_SCREW]}."
+# The pivot sheet shows the carrier and both blocks for each support's stack;
+# each is ballooned on its own sheet, which the caption names (restack r4:
+# the blocks carried no balloons here). One line: the region holds three.
+PIVOT_CONTEXT_NOTE = (
+    f"UNBALLOONED HERE: CARRIER {BOM_ITEM_NUMBERS[spec.CARRIER]} (SHEET "
+    f"{SHEET_NAMES.index('CARRIER EXPLODED') + 1}), BLOCKS "
+    f"{BOM_ITEM_NUMBERS[spec.PIVOT_BLOCK]} AND {BOM_ITEM_NUMBERS[spec.FEED_BLOCK]} "
+    f"(SHEETS {SHEET_NAMES.index('RAIL BARS EXPLODED') + 1}, "
+    f"{SHEET_NAMES.index('LEADSCREW FEED EXPLODED') + 1})."
 )
-if len(PIVOT_STACK_NOTE) > EXPLODED_CAPTION_WIDTH:
-    raise AssertionError("the pivot stack note wraps past the caption's three lines")
+if len(PIVOT_CONTEXT_NOTE) > EXPLODED_CAPTION_WIDTH:
+    raise AssertionError("the pivot context note wraps past the caption's three lines")
 
 
 # Every view's scale is its sheet's scale (finalize_drawing sets each sheet to
@@ -1209,7 +1214,7 @@ def exploded_caption(cluster: Cluster) -> str:
     )
     lines = [f"{cluster.title} {reference}"]
     if cluster.sheet == PIVOT_SHEET:
-        lines.append(PIVOT_STACK_NOTE)
+        lines.append(PIVOT_CONTEXT_NOTE)
     return _wrapped(lines, width=EXPLODED_CAPTION_WIDTH)
 
 

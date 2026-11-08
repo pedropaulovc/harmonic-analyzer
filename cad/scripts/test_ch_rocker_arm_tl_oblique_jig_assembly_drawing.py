@@ -137,6 +137,13 @@ def _pivot_cluster_extent():
             (0.0, block.BLOCK_HEIGHT),
         )
         points.extend(_exploded_part_points(stem, bounds))
+    # The carrier, context in each support's stack: its plate box in its
+    # frame (top face at z 0, the outline across its local x and -z).
+    carrier = spec.carrier
+    points.extend(_exploded_part_points(spec.CARRIER, (
+        carrier.OUTLINE_X, (-carrier.THICKNESS, 0.0),
+        (-carrier.OUTLINE_Y[1], -carrier.OUTLINE_Y[0]),
+    )))
     return [(x, y) for x, y, _z in points], (
         min(z for _x, _y, z in points), max(z for _x, _y, z in points)
     )
@@ -379,10 +386,12 @@ def test_clusters_partition_the_bom() -> None:
     pivot = next(c for c in drawing.CLUSTERS if c.sheet == drawing.PIVOT_SHEET)
     assert set(pivot.stems) == {spec.PIVOT_SCREW, spec.PIVOT_SPACER, spec.PIVOT_SHIM}
     assert set(pivot.context) == {
-        spec.instance_name(spec.FEED_BLOCK, 0), spec.instance_name(spec.PIVOT_BLOCK, 0)
+        spec.instance_name(spec.FEED_BLOCK, 0),
+        spec.instance_name(spec.PIVOT_BLOCK, 0),
+        spec.instance_name(spec.CARRIER, 0),
     }
     assert drawing.exploded_caption(pivot).endswith(
-        "\nITEMS BOTTOM UP: BLOCK 4/5, SHIMS 8, SPACER 7, CARRIER 3, SCREW 6."
+        "\nUNBALLOONED HERE: CARRIER 3 (SHEET 6), BLOCKS 4 AND 5 (SHEETS 3, 5)."
     )
     assert all(stem in spec.BOM_ORDER for c in drawing.CLUSTERS for stem in c.stems)
 
