@@ -43,6 +43,7 @@ import ch_rocker_arm_tl_vn_oblique_rail_kit_rail_spec as rail
 from _com import _early_bound
 from _drawing_annotation_extent import CLEAR_GAP_M, boxes_clear
 from _drawing_common import read_required_properties
+from _drawing_edges import scan_view_edges
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
@@ -780,9 +781,19 @@ def append_rail_receipt_sheet(adapter: Any) -> tuple[Callable[[], None], ...]:
             names=[f"hole {RECEIPT_FLAG_HOLE + 1}"],
         )
         landing = flag_landing(tuple(flag_hole))
+        # The rim itself, not a sheet pick: a pick on the rim attached 1.2 mm
+        # under it (farm runs 20261108T053341172Z and 20261108T054638879Z,
+        # tip (0.09819, 0.15748) both times).
+        rim = scan_view_edges(front, label="rail flag counterbore rim").circle_at(
+            (rail.HOLE_X[RECEIPT_FLAG_HOLE], 0.0, rail.HEIGHT),
+            rail.CBORE_DIA / 2.0,
+            axis=(0.0, 0.0, 1.0),
+            label="rail flag counterbore rim",
+        ).edge
         flag_note = add_attached_note(
-            adapter, front, text=rail.RECEIPT_FLAG, entity_xy=landing,
-            note_xy=RECEIPT_FLAG_ANCHOR, label="rail hole pattern",
+            adapter, front, text=rail.RECEIPT_FLAG, entity=rim, attached_to=rim,
+            leader_attach_xy=landing, note_xy=RECEIPT_FLAG_ANCHOR,
+            label="rail hole pattern",
         )
         notes.append((flag_note, rail.RECEIPT_FLAG, rail.RECEIPT_FLAG, flag_envelope(landing)))
         note = _literal_note(adapter, ITEM_LABEL, *ITEM_LABEL_XY)
