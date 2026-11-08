@@ -142,7 +142,8 @@ HOLES row.
     what it stays clear of (`↧ .016, CLEARS .028 ENGRAVING`).
   That stated wall or clearance is the feature's function under this rule
   and its one reason under rule 7; it is neither narration nor a second
-  datum.
+  datum. The source model proves the stated value: take it as given, and do
+  not recompute the wall at another place count.
 - Inch drill diameters, including native Hole Wizard callouts, use three
   decimal places. Their tolerance still comes from DRILLED HOLES, not the
   three-place linear grade. Keep the exact decimal of a named number, letter
@@ -188,6 +189,8 @@ a chamfer gets the loosest title-block band that serves it.
   `DIAMETRAL INTERFERENCE` as the stated requirement repeats the limits in
   private words. A matched pair whose nominal is REF has no limits to repeat;
   there the stated clearance or interference range is the requirement (below).
+  So is a size printed at title-block places whose linked note states the
+  fitted range: the printed size is the supply size, and the range is the fit.
   A gear centre distance names the mesh; a width that sets a stack names the
   stack. Where
   the mate alone does not show why the band is tight, add a few words of
@@ -639,10 +642,13 @@ sub-assembly, never on part fabrication.
   pose, at a scale where every part is identifiable, plus the isometric
   (rule 8).
 - An exploded view, or a sequence of them, showing order, orientation and
-  which face mates to which. Each exploded part is drawn clear of its mates,
-  moved along the axis it goes in on; a part still overlapping or hidden by
-  its mate in the exploded view does not show its order or face. Every
-  balloon lands on a visible face of its own part.
+  which face mates to which. Each part that a step fits on its own is drawn
+  clear of the parts it goes on, moved along the axis it goes in on; such a
+  part still overlapping or hidden by its mate does not show its order or
+  face. Parts that an earlier step or another sheet already joined (a
+  pressed dowel, a gear on its shaft, a block with its kit bearing) may stay
+  together as one unit. Every balloon lands on a visible face of its own
+  part.
 - A parts list with item number, part number, description and quantity, and
   balloons tying every visible part to it. Every row is ballooned somewhere;
   every balloon has a row.
