@@ -30,6 +30,7 @@ bar length and the clamp-screw stations.
 
 from __future__ import annotations
 
+import _config
 from _gtol_planar import PlanarFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from _column_clamp_interface import BAR_DEPTH
@@ -223,19 +224,23 @@ CLAMP_HOLE_PROCESS = "DRILL"
 # The platen guide MHA-PD-11 hangs by its top rail's underside on the top
 # face and slides along it (pd_platen_guide_spec's own "bar_slide" face is
 # its mate); the platen MHA-PD-02's back slides across the front face: the
-# slide grade, rule 6.
+# slide grade, rule 6.  Each symbol carries its one reason on its own shelf,
+# naming the part that slides there by its drawing number (rules 4 and 7:
+# flagged where it applies), as MHA-PD-11's own slide symbol does.
 # PlanarFace offsets run along the outward normal (point . normal).
 SURFACE_FINISHES = (
     SurfaceFinishControl(
         "top_slide",
         MACHINED_UM,
         PlanarFace((0, 1, 0), BAR_HEIGHT / 2.0),
+        production_method=f"SLIDES ON {_config.parts('pd-platen-guide')['number']}",
         display_unit=UNIT,
     ),
     SurfaceFinishControl(
         "front_slide",
         MACHINED_UM,
         PlanarFace((0, 0, -1), BAR_DEPTH / 2.0),
+        production_method=f"SLIDES ON {_config.parts('pd-platen')['number']}",
         display_unit=UNIT,
     ),
 )
@@ -249,8 +254,4 @@ BACK_VIEW_CAPTION = f"VIEW {FRONT_FACE_VIEW_LETTER}"
 # The two face views mirror each other, so the end every station runs from is
 # named at that end in both views (rule 10: one end, plainly the same one).
 STATION_END_LABEL = "END A"
-# Each slide grade's reason, beside its symbol (rule 7: flagged where it
-# applies), naming the part that slides there by its drawing number (rule 4).
-TOP_FINISH_REASON = "MHA-PD-11 SLIDES HERE"
-FRONT_FINISH_REASON = "MHA-PD-02 SLIDES HERE"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"

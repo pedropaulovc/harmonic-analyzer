@@ -128,12 +128,10 @@ from pd_support_bar_drawing_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     FRONT_FACE_VIEW_LETTER,
-    FRONT_FINISH_REASON,
     HANGER_HEIGHT_X,
     HOOK_TAP_REFERENCE_NAMES,
     STATION_END_LABEL,
     SURFACE_FINISHES,
-    TOP_FINISH_REASON,
 )
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -239,19 +237,14 @@ FRONT_KEEP = {
     "PivotCskDia": (_face_x(PIVOT_TAP_X) + 0.059, FACE_TOP + CSK_CALLOUT_RISE),
     "BracketCskDia": (_face_x(BRACKET_TAP_X[1]) + 0.066, FACE_TOP + CSK_CALLOUT_RISE),
 }
-# The top face's slide roughness on its edge, left of the section line.
+# The top face's slide roughness on its edge, left of the section line. Each
+# slide symbol carries its reason (SLIDES ON the mate) on its own shelf,
+# right of the symbol (round 6 of the fan-out: a reason standing beside the
+# symbol with no leader of its own read as loose text, rule 7); the ~35 mm
+# line at FINISH_CHAR_HEIGHT runs over the bar's left end, under the top
+# reason's old place and left of section A-A's cutting line (~0.124).
 TOP_FINISH_MODEL_X = -178.0
 TOP_FINISH_SYMBOL_XY = (LEFT_END + 0.030, FACE_TOP + 0.014)
-# Each finish's reason stands left of its symbol at the symbol's foot, its
-# right end ~6 mm short of the leader's knee, so it reads as the symbol's
-# (machinist review round 6: the top one, 18 mm over its symbol, floated).
-# The 21-character reasons (the mate's number) centre 5 mm further left than
-# the 17-character ones did, so their right ends stay put.
-REASON_FROM_SYMBOL = (-0.0395, -0.001)
-TOP_REASON_TOP = (
-    TOP_FINISH_SYMBOL_XY[0] + REASON_FROM_SYMBOL[0],
-    TOP_FINISH_SYMBOL_XY[1] + REASON_FROM_SYMBOL[1],
-)
 
 # The clamp stations from the same left (x = -226) end, on the sheet's right
 # here, shortest nearest the bar. The first two rows' texts (spans of 5.75 and
@@ -282,14 +275,11 @@ BACK_KEEP = {
 # and over the bar.
 CLAMP_CALLOUT_XY = (_back_x(max(CLAMP_ROUND_X)) - 0.005, BACK_TOP + 0.017)
 # The front face's slide roughness, seen face-on: a leader to a point clear
-# of the holes, the symbol above the view, left of the counterbores' callout.
+# of the holes, the symbol above the view where the old loose reason stood,
+# its ~35 mm reason line ending well left of the counterbores' callout
+# (~0.218) and under the principal view's length line.
 FRONT_FINISH_MODEL_XY = (-40.0, 6.0)
-FRONT_FINISH_SYMBOL_XY = (0.192, BACK_TOP + 0.014)
-# Its reason stands left of it, under the principal view's length line.
-FRONT_REASON_TOP = (
-    FRONT_FINISH_SYMBOL_XY[0] + REASON_FROM_SYMBOL[0],
-    FRONT_FINISH_SYMBOL_XY[1] + REASON_FROM_SYMBOL[1],
-)
+FRONT_FINISH_SYMBOL_XY = (0.150, BACK_TOP + 0.014)
 # Centre the front caption under the native outer station span, then keep
 # its complete text block right of detail C's native dimension text.
 FRONT_CAPTION_AIR_M = 0.004
@@ -1673,8 +1663,6 @@ async def build(adapter: Any) -> dict[str, str]:
     front_caption = _place_front_caption(
         adapter, back, back_annotations, detail_annotations
     )
-    _place_caption(adapter, TOP_FINISH_REASON, TOP_REASON_TOP)
-    _place_caption(adapter, FRONT_FINISH_REASON, FRONT_REASON_TOP)
     _place_caption(adapter, STATION_END_LABEL, FACE_END_LABEL_TOP)
     _place_caption(adapter, STATION_END_LABEL, BACK_END_LABEL_TOP)
     rebuild_drawing(adapter, label="slot callout clearance")

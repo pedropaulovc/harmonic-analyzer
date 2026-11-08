@@ -12,6 +12,7 @@ import pytest
 import _config
 from _column_clamp_interface import BAR_DEPTH
 from _inch_wall_limits import WALL_TARGET_MM
+from _surface_finish import surface_finish_by_key
 import build_pd_support_bar as part
 import draw_pd_support_bar as drawing
 import pd_support_bar_drawing_spec as sheet_spec
@@ -26,8 +27,14 @@ def test_printed_mating_numbers_resolve_to_the_registered_parts() -> None:
         (drawing.CLAMP_CBORE_CALLOUT, "sh-vn-clamp-screw"),
         (drawing.DIMENSION_CALLOUTS["PivotCskDia"], "pd-vn-transgear-pivot-screw"),
         (drawing.DIMENSION_CALLOUTS["BracketCskDia"], "pd-latch-hook"),
-        (drawing.TOP_FINISH_REASON, "pd-platen-guide"),
-        (drawing.FRONT_FINISH_REASON, "pd-platen"),
+        (
+            surface_finish_by_key(sheet_spec.SURFACE_FINISHES, "top_slide").production_method,
+            "pd-platen-guide",
+        ),
+        (
+            surface_finish_by_key(sheet_spec.SURFACE_FINISHES, "front_slide").production_method,
+            "pd-platen",
+        ),
     )
     for text, mate in references:
         printed = set(re.findall(r"\bMHA-[A-Z0-9]+(?:-[A-Z0-9]+)+\b", text))
