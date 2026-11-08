@@ -285,8 +285,12 @@ files, CAD-tagged fixture spec modules, the locked consumer and executed wrapper
 closure. It runs locally on the submitter without a SolidWorks seat, including
 under the farm executor, and needs FreeCAD 1.1 (see
 [`DEVELOPING.md`](../../../DEVELOPING.md#process-traveler-prerequisites)).
-The consumer is pinned to PyPI `prechips==0.2.0`; no upstream examples are run by
-this task family.
+The consumer remains pinned to PyPI `prechips==0.2.0`, with the lockfile unchanged;
+no upstream examples are run by this task family. The new shaft/cone proposals
+are unsupported by that pin and remain **HELD / UNENROLLED**. A Prechips release
+carrying the new contracts, the HA pin bump and traveler activation are deferred.
+The new PC contracts alone do not establish full consumer or native execution,
+nor resolve the plans' physical setup, retained-stock, inspection or finish holds.
 
 | prechips exit | build/release gate | interpretation |
 |---|---|---|

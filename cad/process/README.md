@@ -40,10 +40,14 @@ must preserve concentricity and head support before it earns geometry credit.
 The signed-station inspection offset and citation remain `unknown`, not copied
 calibrations. The paint/mask split is unresolved despite the one-piece decision.
 
-This first contract cutover preserves the expanded shaft/cone source intent,
-not a claim that the pinned consumer fully executes it. General traveler
-rendering, native retained-stock/motion replay and the full consumer migration
-remain deferred. In particular, the cone's rotary, manual-root and honing
+This source reconciliation preserves the expanded shaft/cone intent, but the
+new proposals are **unsupported by the current PyPI `prechips==0.2.0` pin** and
+remain held and unenrolled. The pin and lockfile stay unchanged. A Prechips
+release carrying the new contracts, the HA pin bump and traveler activation are
+all deferred. The new PC contracts alone do not establish full consumer or
+native execution. General traveler rendering, native retained-stock/motion replay
+and the full consumer migration also remain deferred. In particular, the cone's
+rotary, manual-root and honing
 operations have no completed native proof; neither prose, ideal feature sweeps
 nor bounding-box removal may substitute for actual material-changing semantics.
 The shaft's cradle, support engagement, dome compensation, flat-face labels and
