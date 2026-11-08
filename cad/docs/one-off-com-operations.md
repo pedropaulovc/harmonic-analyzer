@@ -78,8 +78,10 @@ preflight refuses to start unless:
   hands results back **through the cache**, so `off` cannot work;
 - `farm.py agents --json` reports the client's required farm protocol (currently
   7) and no known worker reports an incompatible or unreadable protocol;
-- would-be leaves pass the selected pool's `agent.protocol.leaf_admitted`, and
-  that pool's canonical identity tag matches the reported fleet identities.
+- would-be leaves pass the selected pool's `agent.protocol.leaf_admitted`.
+
+Mixed agent versions are expected during rolling upgrades and are not checked;
+the protocol version is.
 
 A preflight failure prints `farm: <reason>` and exits 2, also before any action
 runs.
@@ -159,9 +161,8 @@ throw away afterwards. Non-negotiable shape:
    `agent.protocol.leaf_admitted`.** That function in the `-PoolHome` checkout
    is authoritative; do not copy its prefix list here or into a dispatch guard.
    Preflight refuses an unadmitted leaf with exit 2 before FIFO registration.
-   PoolHome's full identity, normalized by its own `agent_identity_tag`, must
-   match the fleet's reported `agent_version` tags. Mixed, missing or mismatching
-   tags exit 2: check out the deployed pool release, or finish the rollout.
+   Mixed agent versions are expected during rolling upgrades and are not checked;
+   the protocol version is.
    Preflight conservatively checks the entire requested closure, including
    leaves skipped by doit `-s`/`--single` or satisfied by cache hits.
    Actual dispatch must find the task in the
