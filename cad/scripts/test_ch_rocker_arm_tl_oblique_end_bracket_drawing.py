@@ -400,15 +400,23 @@ def test_every_hole_has_its_own_callout() -> None:
     assert drawing.CALLOUT_GLYPHS >= len(drawing.THREAD_LIMIT_CALLOUT)
 
 
+# Exact definitions captured by native-failure-a8b2ac4c-end-bracket.log.
+_NATIVE_TAP_CALLOUT = {
+    5: "<hw-threaddesc> <hw-threadclass> <HOLE-DEPTH> <hw-threaddepth>",
+    6: "",
+    7: "<NUM_INST>X <MOD-DIAM> <hw-tapdrldia> <hw-thru>",
+    8: "",
+}
+_NATIVE_TAP_TOKENS = (
+    "<hw-threaddesc>", "<hw-threadclass>", "<HOLE-DEPTH>", "<hw-threaddepth>",
+    "<NUM_INST>", "<MOD-DIAM>", "<hw-tapdrldia>", "<hw-thru>",
+)
+
+
 def test_single_hole_definitions_drop_exactly_the_count() -> None:
-    definitions = {
-        5: "<hw-thread> UNC - <hw-threadclass> <HOLE-DEPTH><hw-threaddepth>",
-        6: "",
-        7: "<NUM_INST>X <MOD-DIAM><hw-tapdrldia> THRU ALL",
-        8: "",
-    }
+    definitions = dict(_NATIVE_TAP_CALLOUT)
     updated = drawing.single_hole_definitions(definitions)
-    assert updated == {**definitions, 7: "<MOD-DIAM><hw-tapdrldia> THRU ALL"}
+    assert updated == {**definitions, 7: "<MOD-DIAM> <hw-tapdrldia> <hw-thru>"}
     with pytest.raises(RuntimeError):
         drawing.single_hole_definitions(updated)  # no count left to drop
     with pytest.raises(RuntimeError):
@@ -419,32 +427,138 @@ def test_single_hole_definitions_drop_exactly_the_count() -> None:
     assert not drawing._PRINTED_COUNT.search("Ø3.45 THRU ALL\n8-32 UNC THRU ALL")
 
 
-def test_native_callouts_share_one_drill_requirement_and_never_type_depths() -> None:
-    definitions = {
-        5: "<hw-thread> UNC - <hw-threadclass> <HOLE-DEPTH><hw-threaddepth>",
-        6: "",
-        7: "<NUM_INST>X <MOD-DIAM><hw-tapdrldia> THRU ALL",
-        8: "",
+def test_observed_native_callout_is_the_positive_transformation_control() -> None:
+    first = drawing.thread_limit_definitions(_NATIVE_TAP_CALLOUT, include_drill=True)
+    second = drawing.thread_limit_definitions(_NATIVE_TAP_CALLOUT, include_drill=False)
+    thread_text = "<hw-threaddesc> <hw-threadclass>\n" + drawing.THREAD_LIMIT_CALLOUT
+    assert first == {
+        5: thread_text, 6: "",
+        7: "#29 DRILL <MOD-DIAM> <hw-tapdrldia> <hw-thru>; BOTH HOLES", 8: "",
     }
-    first = drawing.thread_limit_definitions(definitions, include_drill=True)
-    second = drawing.thread_limit_definitions(definitions, include_drill=False)
+    assert second == {5: thread_text, 6: "", 7: "", 8: ""}
     all_text = "\n".join((*first.values(), *second.values()))
-    assert all_text.count("#29 DRILL") == all_text.count("THRU ALL") == 1
-    assert "<hw-tapdrldia>" in first[7] and second[7] == ""
-    assert all_text.count("<hw-thread>") == 2
+    assert all_text.count("#29 DRILL") == all_text.count("<hw-thru>") == 1
+    assert all_text.count("<hw-threaddesc>") == 2
     assert all_text.count(drawing.THREAD_LIMIT_CALLOUT) == 2
-    assert "<hw-threaddepth>" not in all_text
-    assert "<HOLE-DEPTH>" not in all_text
+    assert "<hw-threaddepth>" not in all_text and "<HOLE-DEPTH>" not in all_text
     assert not re.search(r"\d*\.\d", all_text)
+
+
+@pytest.mark.parametrize("rotation", range(4))
+@pytest.mark.parametrize("whitespace", [" ", "\t  "])
+def test_callout_tokens_can_move_between_native_text_parts(rotation, whitespace) -> None:
+    parts = (5, 6, 7, 8)
+    definitions = {
+        parts[(index + rotation) % 4]: text.replace(" ", whitespace)
+        for index, text in enumerate(_NATIVE_TAP_CALLOUT.values())
+    }
+    for include_drill in (True, False):
+        updated = drawing.thread_limit_definitions(definitions, include_drill=include_drill)
+        updated = drawing.omit_thread_class_definitions(updated)
+        text = "\n".join(updated.values())
+        assert text.count("<hw-threaddesc>") == 1
+        assert text.count(drawing.THREAD_LIMIT_CALLOUT) == 1
+        assert text.count("<hw-thru>") == int(include_drill)
+        assert text.count("<hw-tapdrldia>") == int(include_drill)
+        for removed in ("<hw-threaddepth>", "<HOLE-DEPTH>", "<hw-threadclass>", "<NUM_INST>"):
+            assert removed not in text
+
+
+@pytest.mark.parametrize("layout", ["split", "combined"])
+def test_depth_removal_does_not_erase_other_tokens_in_its_text_part(layout) -> None:
+    definitions = (
+        {
+            5: "KEEP A <hw-threadclass> <MOD-DIAM>",
+            6: "KEEP B <hw-threaddepth> <NUM_INST>X",
+            7: "KEEP C <hw-tapdrldia> <hw-threaddesc>",
+            8: "KEEP D <hw-thru> <HOLE-DEPTH>",
+        }
+        if layout == "split" else
+        {5: "KEEP " + " ".join(_NATIVE_TAP_CALLOUT.values()), 6: "", 7: "", 8: ""}
+    )
+    updated = drawing.thread_limit_definitions(definitions, include_drill=False)
+    text = "\n".join(updated.values())
+    assert text.count("KEEP") == (4 if layout == "split" else 1)
+    assert text.count("<hw-threaddesc>") == text.count("<hw-threadclass>") == 1
+    assert text.count(drawing.THREAD_LIMIT_CALLOUT) == 1
+    for removed in ("<hw-threaddepth>", "<HOLE-DEPTH>", "<MOD-DIAM>", "<hw-tapdrldia>", "<hw-thru>"):
+        assert removed not in text
+
+
+@pytest.mark.parametrize("token", _NATIVE_TAP_TOKENS)
+@pytest.mark.parametrize("defect", ["missing", "duplicate"])
+def test_missing_or_duplicate_native_callout_tokens_are_refused(token, defect) -> None:
+    definitions = dict(_NATIVE_TAP_CALLOUT)
+    if defect == "missing":
+        definitions = {part: text.replace(token, "") for part, text in definitions.items()}
+    else:
+        definitions[8] = token
+    with pytest.raises(RuntimeError, match="exactly one"):
+        drawing.thread_limit_definitions(definitions, include_drill=True)
+
+
+@pytest.mark.parametrize("old,wrong", [
+    ("<hw-threaddesc>", "<hw-thread>"),
+    ("<hw-thru>", "THRU ALL"),
+    ("<hw-tapdrldia>", "<hw-thruholedia>"),
+    ("<HOLE-DEPTH>", "<DEPTH>"),
+])
+def test_synthetic_or_wrong_token_spellings_are_not_native_proof(old, wrong) -> None:
+    definitions = {
+        part: text.replace(old, wrong) for part, text in _NATIVE_TAP_CALLOUT.items()
+    }
     with pytest.raises(RuntimeError):
+        drawing.thread_limit_definitions(definitions, include_drill=True)
+
+
+def test_unexpected_native_depth_token_is_not_silently_left_on_the_sheet() -> None:
+    with pytest.raises(RuntimeError, match="unexpected opposed-thread"):
         drawing.thread_limit_definitions(
-            {**definitions, 7: "<NUM_INST>X <hw-tapdrldia> BLIND"},
-            include_drill=True,
+            {**_NATIVE_TAP_CALLOUT, 8: "<hw-tapdrldepth>"}, include_drill=True,
         )
-    with pytest.raises(RuntimeError):
-        drawing.thread_limit_definitions(
-            {**definitions, 5: "<hw-thread> THRU ALL"}, include_drill=True,
-        )
+
+
+@pytest.mark.parametrize("thru_text", ["THRU", "THRU ALL"])
+def test_native_callout_rewrite_and_class_omission_keep_one_shared_drill(monkeypatch, thru_text) -> None:
+    from types import SimpleNamespace
+
+    class Display:
+        def __init__(self, definitions):
+            self.definitions = dict(definitions)
+
+        def IsHoleCallout(self):
+            return True
+
+        def GetText(self, part):
+            if part in (5, 6, 7, 8):
+                return self.definitions[part]
+            text = self.definitions[part + 4]
+            for token, value in (
+                ("<hw-threaddesc>", "8-32 UNC"), ("<hw-threadclass>", "2B"),
+                ("<NUM_INST>", "2"), ("<MOD-DIAM>", "Ø"),
+                ("<hw-tapdrldia>", ".136"), ("<hw-thru>", thru_text),
+                ("<HOLE-DEPTH>", "DEPTH"), ("<hw-threaddepth>", ".433"),
+            ):
+                text = text.replace(token, value)
+            return text
+
+        def SetText(self, part, text):
+            self.definitions[part + 4] = text  # native setter returns void
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    # Native thread/class data is deliberately NOT in prefix part 5.
+    moved = {5: "", 6: _NATIVE_TAP_CALLOUT[7], 7: "", 8: _NATIVE_TAP_CALLOUT[5]}
+    callouts = []
+    for index in range(2):
+        display = Display(moved)
+        drawing._call_out_one_hole(display, label=str(index), include_drill=index == 0)
+        drawing._omit_tap_thread_class(display, label=str(index))
+        callouts.append((str(index), display))
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(GetFirstView=lambda: None))
+    drawing._require_threads_stated_by_callouts_only(adapter, callouts)
+    for _label, display in callouts:
+        assert ".433" not in "\n".join(display.GetText(part) for part in (1, 2, 3, 4))
+        assert "<hw-threaddesc>" in "\n".join(display.definitions.values())
 
 
 def test_both_full_thread_depths_have_part_owned_limit_dimensions() -> None:
@@ -932,16 +1046,6 @@ def test_thread_ink_requires_complete_native_depth_coverage() -> None:
     assert not drawing._covers([(0.1, 0.08, 0.1, 0.09)], start, end)
 
 
-def test_native_drill_token_is_preserved_without_assuming_blind_tap_names() -> None:
-    definitions = {
-        5: "<hw-thread> UNC <HOLE-DEPTH><hw-threaddepth>",
-        6: "",
-        7: "<NUM_INST>X <MOD-DIAM><hw-thruholedia> THRU ALL",
-        8: "",
-    }
-    result = drawing.thread_limit_definitions(definitions, include_drill=True)
-    assert "<hw-thruholedia>" in result[7]
-    assert "<hw-tapdrldia>" not in result[7]
 
 
 def test_tip_marks_finish_full_threads_without_reaching_the_opposed_screw() -> None:
