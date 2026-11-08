@@ -268,9 +268,9 @@ _TEXT_SETTLE_M = 0.0005
 # both callouts stand up-left of their holes, the outer hole's a tier higher
 # so its leader passes over the inner hole's block and no leader crosses
 # another, a callout or a line (every station hangs under the plan). The
-# tiers clear the +Y side by 1 and stand a block plus the audit's row pitch
-# apart (c4-r8). Each tuple: the hole's X, the text block's centre (model X,
-# Y) and the side (-1 left) whose upper rim the edge pick takes.
+# tiers clear the +Y side by 10.4 sheet mm and stand a block plus the audit's
+# row pitch apart (c4-r8). Each tuple: the hole's X, the text block's centre
+# (model X, Y) and the side (-1 left) whose upper rim the edge pick takes.
 # The larger callout has the native drill row plus a thread identity and a
 # section pointer. The other identifies its own hole but does not repeat
 # the one through-drilling requirement.
@@ -294,7 +294,8 @@ def _tap_callout(
 
 
 TAP_CALLOUTS: tuple[tuple[float, tuple[float, float], int], ...] = (
-    _tap_callout(HOLE_X[0], 0, -1, 2.5),
+    # A 2.5 sheet mm shelf run keeps the full block 10.116 mm inside the border.
+    _tap_callout(HOLE_X[0], 0, -1, TEXT_GAP),
     _tap_callout(HOLE_X[1], 1, -1, 3.0),
 )
 
