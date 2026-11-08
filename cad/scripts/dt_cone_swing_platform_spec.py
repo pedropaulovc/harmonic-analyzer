@@ -258,8 +258,8 @@ HOLDDOWN_LOCAL_X = -1.016  # -.04
 HOLDDOWN_STATION_TOL_MM = 0.127  # +/-.005
 # The same stacks run through the post-mount taps, whose placement dimensions
 # (PostMountWestX/WestZ/EastX/EastZ) carry this band instead of the grade:
-# the shop's +/-.005 drilled-hole row.  Delegated ruling 2026-11-07 (Main),
-# no precedent; owner review #2144 (was +/-.004; adjuster embed, tip lateral
+# the shop's +/-.005 drilled-hole row. Owner ruling 2026-11-08 (Pedro), #2144 item 9.1
+# (was +/-.004; adjuster embed, tip lateral
 # take-up and the hold-down webs still close at +/-.005).
 POST_MOUNT_STATION_TOL_MM = 0.127  # +/-.005
 # McMaster 91251A108 product page (read 2026-09-29): #4-40 x 3/8 black-oxide

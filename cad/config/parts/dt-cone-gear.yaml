@@ -51,7 +51,7 @@ dt-cone-gear:
       kind: "accept"
       where: "sheet T006 and its continuation sheet 21: the tip Ø.1696 +.0000/-.0008 on the side view, the CIRCULAR TOOTH THICKNESS .0343 +.0000/-.0016 on the front view, and FORM TOLERANCE: X +.0008 / -.0000 on sheet 21, each flagged SEE NOTE 2 (accept over pins, then by backlash with MHA-DT-12 at assembly)"
       finding: "the three T006 tooth bands are converted millimetre widths, not plain inch steps, and narrower than their shop-table rows (rule 4)"
-      reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144 (fan-out OQ-3: keep, with routes). The bands are the custom DT6-FORM1 tooth's (dt_cone_gear_spec CUSTOM_SIX_*): widening the thickness to -.0020 fails the spec's tip-land minimum, and the over-pins then backlash acceptance in note 2 and GEAR DATA is the fit route. Accepts the notation and width of these three T006 bands only, no other band or callout departure."
+      reason: "Owner ruling 2026-11-08 (Pedro), #2144 item 9.3 (fan-out OQ-3: keep, with routes). The bands are the custom DT6-FORM1 tooth's (dt_cone_gear_spec CUSTOM_SIX_*): widening the thickness to -.0020 fails the spec's tip-land minimum, and the over-pins then backlash acceptance in note 2 and GEAR DATA is the fit route. Accepts the notation and width of these three T006 bands only, no other band or callout departure."
     - id: "RV-06"
       kind: "accept"
       where: "every gear sheet, DETAIL A: the D-bore Ø +.0018/+.0010 THRU and BORE ACROSS FLAT +.0008/+.0004, each flagged SEE NOTE 1 (made to the measured MHA-DT-04 land, clearance REF)"
