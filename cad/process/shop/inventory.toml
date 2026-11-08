@@ -6984,3 +6984,28 @@ section_mm = [152.4, 1.6002]
 length_mm = 152.4
 on_hand = false
 cite = ["McMaster-Carr 8956K455 https://www.mcmaster.com/8956K455/ ordered 2026-11-03"]
+
+[fixtures.rocker-oblique-trammel]
+name = "MHA-CH-06-TL-00 oblique trammel"
+kind = "trammel"
+present = "unknown"
+shop_made = true
+verify = true
+note = "CAD-defined fixture, not an observed completed or commissioned shop installation. Obtain and inspect the fixture, then record the actual installation measurements before guided cutting."
+make_document = { id = "MHA-CH-06-TL-00", revision = "v47", cite = "harmonic-analyzer v47/pdf/ch-rocker-arm-tl-oblique-jig-assembly.pdf" }
+commissioning_record = "unknown"
+rail_angle_deg = "unknown"
+rail_angle_error_deg = "unknown"
+pin_spacing_mm = { inner = "unknown", outer = "unknown" }
+pin_spacing_error_mm = "unknown"
+pin_clearance_mm = "unknown"
+rail_offset_mm = "unknown"
+rail_travel_mm = "unknown"
+dowel_reading_mm = "unknown"
+pin_dia_mm = "unknown"
+rail_width_mm = "unknown"
+rail_height_mm = "unknown"
+bed_height_mm = "unknown"
+carrier_length_mm = "unknown"
+carrier_width_mm = "unknown"
+carrier_thickness_mm = "unknown"

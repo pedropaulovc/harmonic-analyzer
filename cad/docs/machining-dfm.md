@@ -85,7 +85,7 @@ its first-root position; no second general note restates that location.
   | `dt-cylinder-gear` (+ integral cam) | 20 | 120 teeth + eccentric cam + 0.4 mm index notch, all co-phased +Y — hand-repeating 20× scatters the phase |
   | `dt-cone-gear` | 20 | involute teeth cut with stock 48DP PA20 range cutters indexed on a dividing head; T006 alone needs a special cutter (see [Cutter plan](#cutter-plan)); wire-EDM = outsource alt |
   | `pivot-bushing` / `lever-bushing` | 19 each | turned spacers whose **length** sets channel pitch — length consistency across the set is the point |
-  | `ch-rocker-arm` | 20 | flat R800 profile, one setup — ideal CNC profile part |
+  | `ch-rocker-arm` | 20 | built-up hub and profiled strap; repeated profiles merit a repeatable method, but the held manual route also requires joining and inspection |
   | `ch-connecting-rod` | 20 | flat 2D outline from 1018 plate, stepped both faces, slotted fork → 2.5D |
   | `sm-knife-mount` | 2 | trivial prismatic block, 2 identical |
 
@@ -868,7 +868,7 @@ run. No COM, farm, or generated-traveler certification is claimed here.
 
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
-| **`ch-pivot-shaft`** ×1 | plain steel bar Ø6.35×203.2 | solid, no bore/step/thread; 2 end faces | **L/D 32:1** → whip; steady-rest / between-centers | 1 | manual lathe + steady |
+| **`ch-pivot-shaft`** ×1 | plain steel bar; see current drawing and stock allocation | plain shaft, domed ends and two same-side flats | slender turning, support and flat inspection require qualified holding | multiple | supported turning, end finishing and milling; held route in [`cad/process`](../process/README.md) |
 | **`ch-fulcrum-shaft`** ×1 | plain steel bar Ø6.35×166.4 | domed R3.175 ends; two 0.3-deep set-screw flats on one side at ±75.0 | **L/D 26:1** → whip; **same stock as pivot-shaft — don't mix** | 2 (turn domes; mill both flats in one setup) | manual lathe + steady, mill |
 | **`pivot-bushing`** ×19 | brass, OD Ø10.0×**4.5565** | Ø6.5 through bore (rides Ø6.35, **0.15 mm** clr); stubby L/D 0.46 | **length 4.5565 sets the 7.0565 channel pitch** → parting-length repeatability across all 19 is *the* critical dim | 1 (turn + bore + part) | **CNC-REPEAT** / collet stop for length consistency |
 | **`lever-bushing`** ×19 | brass, OD Ø12.0×**4.0565** | Ø6.5 through bore (rides Ø6.35, 0.15 mm clr); twin of pivot-bushing | same drill/ream as pivot-bushing; differs only OD (12 vs 10) + length (4.0565 vs 4.5565) — **don't mix the two sets** | 1 | **CNC-REPEAT** / collet stop |
@@ -877,7 +877,7 @@ run. No COM, farm, or generated-traveler certification is claimed here.
 
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
-| **`ch-rocker-arm`** ×20 | flat steel plate **2.5 mm** thick, ~270×21 | **top edge = R800 concave arc** (the amplitude-bar rides ON it) — it is the **2D OUTLINE of the plate, NOT a concave pocket/face**; bottom edge R816 concentric; Ø6.5 pivot bore + Ø2.0 rod-pin bore, both through the plate | none severe — pivot bore is **inherently square** (drilled through flat stock, one setup); no slot, no internal corner | **1** (all features one plane) | **CNC 2.5D profile** (×20 identical) or bandsaw+template; the R800 is profiled, not form-cut |
+| **`ch-rocker-arm`** ×20 | built-up hub and strap, per component details | profiled strap and joined hub; final pivot bore and rod hole | component preparation, press fit, profile tooling and inspection require qualification | multiple | held hub/strap and press route; see [`cad/process`](../process/README.md) |
 | **`fr-rocker-arm-support`** | modeled Gray Cast Iron; drawing permits gray iron casting or low-carbon steel stock; trapezoidal wedge, 6.35 mm shell/web | opposed 165.1 mm pockets with **R6.35** internal corners; through cavity with **R12.7** corners; **4× 5/16 through clearance drills** in the 6.35 mm foot for top-down 1/4-20 hex-head screws; RimChamfer 1.27 | 6.35 mm web/shell; from solid stock, each pocket reaches about 28.6 mm at the wide foot. R6.35 is ordinary contour geometry on a PM-25MV and does not need square-corner EDM; a 1/8″ end mill can finish the radius, but its long reach in 1018 favors roughing with a stiffer cutter first | casting route: foot holes/rim; solid-stock route: **2 opposed pocket setups** + foot drilling | cast body, or rough both pockets from 1018 with a larger cutter and finish the R6.35 corners with a 1/8″ end mill; drill the clearance pattern from the seat face |
 
 ---
@@ -898,8 +898,9 @@ run. No COM, farm, or generated-traveler certification is claimed here.
 3. ~~**Model the `sm-knife-mount` mounting holes**~~ — RESOLVED (top-frame rederive, 2026-08-02; #10-24 hex-head cutover, 2026-10-13): the
    block is clamped to the top-frame casting's integral crossbar by the cut-to-length 18-8 hex-head Bolt
    and new #10 SAE washer on the whole faced top, into a #10-24 bottoming tap and keyed by two dowels pressed into the crossbar's blind underside reams and slipped into the block's round hole and slot (owner ruling 2026-10-24, T+H3); the current route is documented above. Its revised native wizard and dimension import require the scoped farm proof; offline tests alone are not native evidence.
-4. **Reconcile the `ch-rocker-arm` R800 vs book 812.8 mm** (already a §4 Finding) before it becomes a
-   drawing callout — but note the good news from this pass: it's a *profile* dimension, cheap to change.
+4. **Reconcile the `ch-rocker-arm` R800 vs book 812.8 mm** (already a §4 Finding).
+   The drawing includes profile controls; the remaining source comparison does
+   not make the held manufacturing route qualified.
 5. **Consider enlarging the tip cone gears** (T006–T012) — the model already flags them marginal and a
    period build used harder metal. **DP caveat:** enlarging OD at a *fixed tooth count* changes the
    DP/module and **breaks the shared 48DP mesh** — tooth *counts* preserve the ratio, but DP/pitch
