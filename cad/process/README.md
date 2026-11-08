@@ -2,7 +2,7 @@
 
 This directory holds HA-authored process plans (`<stem>/plan.toml`) and shared
 shop data (`shop/inventory.toml`, `shop/shop-policy.toml`,
-`shop/cutting-data.toml`). prechips is pinned to PyPI `prechips==0.2.0`.
+`shop/cutting-data.toml`). prechips is pinned to PyPI `prechips==0.3.0`.
 `cad/scripts/_process_plans.py:TRAVELER_STEMS` is the enrollment authority; it is
 currently empty. The rocker plan is a **HELD REFERENCE ROUTE**, not enrolled or
 qualified for machining. Its current built-up strap/hub route and oblique-trammel
@@ -40,21 +40,27 @@ must preserve concentricity and head support before it earns geometry credit.
 The signed-station inspection offset and citation remain `unknown`, not copied
 calibrations. The paint/mask split is unresolved despite the one-piece decision.
 
-This source reconciliation preserves the expanded shaft/cone intent, but the
-new proposals are **unsupported by the current PyPI `prechips==0.2.0` pin** and
-remain held and unenrolled. The pin and lockfile stay unchanged. A Prechips
-release carrying the new contracts, the HA pin bump and traveler activation are
-all deferred. The new PC contracts alone do not establish full consumer or
-native execution. General traveler rendering, native retained-stock/motion replay
-and the full consumer migration also remain deferred. In particular, the cone's
-rotary, manual-root and honing
-operations have no completed native proof; neither prose, ideal feature sweeps
-nor bounding-box removal may substitute for actual material-changing semantics.
-The shaft's cradle, support engagement, dome compensation, flat-face labels and
-apex pickup remain unqualified. Existing demonstration/placeholder shop records
-are not actual availability, installed geometry or commissioning measurements.
-Schema acceptance and the narrow PC field contracts cannot turn these holds
-into a manufacturing or first-article pass.
+Prechips 0.3.0 adds three bounded contracts: explicitly qualified tailstock tool
+mounting, relative-coordinate inspection readings, and shared-axis native
+placement.
+The release and dependency upgrade are separate from traveler activation:
+all four plans remain **HELD / UNENROLLED**, and enrollment stays empty.
+Installed schema/API admission is not full-plan consumption, native route replay
+or machining qualification. The strict revision guard still refuses authored
+v48 plans against v47 exports before invoking the consumer or geometry kernel;
+do not relabel or rewrite the exported geometry to bypass it.
+
+Full consumer migration, general traveler rendering and native retained-stock/
+motion replay remain deferred. The relative-reading contract does not yet supply
+printed physical reading bands or an executable inspection procedure. The cone's
+rotary, manual-root and honing operations have no completed native proof; neither
+prose, ideal feature sweeps nor bounding-box removal may substitute for actual
+material-changing semantics. Its inspection qualification and finish holds
+remain unresolved. The shaft's cradle, support engagement, dome compensation,
+flat-face labels and apex pickup remain unqualified. Existing demonstration/
+placeholder shop records are not actual availability, installed geometry or
+commissioning measurements. Schema acceptance and the narrow PC contracts cannot
+turn these holds into a manufacturing or first-article pass.
 
 ## Bind stable labels, not STEP entity numbers
 

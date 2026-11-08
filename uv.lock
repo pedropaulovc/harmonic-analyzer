@@ -1341,7 +1341,7 @@ requires-dist = [
     { name = "opentelemetry-exporter-otlp-proto-http", specifier = ">=1.20" },
     { name = "opentelemetry-sdk", specifier = ">=1.20" },
     { name = "pillow", specifier = ">=10.0" },
-    { name = "prechips", specifier = "==0.2.0" },
+    { name = "prechips", specifier = "==0.3.0" },
     { name = "pypdf", specifier = ">=6.14.2" },
     { name = "pypdfium2", specifier = ">=5.11.0" },
     { name = "pywin32", marker = "sys_platform == 'win32'", specifier = ">=306" },
@@ -2580,7 +2580,7 @@ wheels = [
 
 [[package]]
 name = "prechips"
-version = "0.2.0"
+version = "0.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "opentelemetry-api" },
@@ -2590,9 +2590,9 @@ dependencies = [
     { name = "pydantic" },
     { name = "rich" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/0e/fe/b460d8e528abb7089b37769b5181c72eeccc2822a067ded75608661d7e7d/prechips-0.2.0.tar.gz", hash = "sha256:49b14dd262e5a16fc0eacf6ca48f7c744f51ab1addfcd4713be34bd147b28ec3", size = 892827, upload-time = "2026-10-17T23:03:34.819Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a0/de/9cc613eb15379ab2391f7c7a8b61da7f44ee156dda2827760843c7aaa0a8/prechips-0.3.0.tar.gz", hash = "sha256:aac3dcb329fe199aa97eb31b1c1b6fcb244da14823f7b4783d6051923676a86c", size = 1141424, upload-time = "2026-11-08T17:19:04.805Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b4/ed/13c8ae0b7281cee3adea6c45592798494ed6d649273fd791cecb403e2274/prechips-0.2.0-py3-none-any.whl", hash = "sha256:86e79129cdc4d57861a18dbabe40734a8447b319297fc7ddf8d302c28a9acf4a", size = 904445, upload-time = "2026-10-17T23:03:33.052Z" },
+    { url = "https://files.pythonhosted.org/packages/17/3e/a6fd7f01475a317a1751343fd7175727ba1ba00f384314074cdf62280a39/prechips-0.3.0-py3-none-any.whl", hash = "sha256:3acc4cd4b746d1edea18349069491f4122523198fb47539a5ba66cb336291663", size = 1187562, upload-time = "2026-11-08T17:19:03.026Z" },
 ]
 
 [[package]]
