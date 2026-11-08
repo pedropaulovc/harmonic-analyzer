@@ -28,9 +28,9 @@ OUT = ROOT / "cad/out"
 DIRECTORY = OUT / "reports/section-visibility-probe"
 REPORT = DIRECTORY / "report.json"
 JOURNAL = DIRECTORY / "calls.jsonl"
-PRODUCTION_COMMIT = "3b8d009b6ee853afb14808025a7228037f6e120a"
+PRODUCTION_COMMIT = "89af06161d50f2eacb8d5b234251a81986633af0"
 SOURCE_HASHES = {
-    "_drawing_balloons.py": "7db3e6bfb9293abdf99f720b3a2331ff36b82cfa6e87a2ad757d3608dbb50146",
+    "_drawing_balloons.py": "7400695736205f379361dbe7787cf669f39dee31cd6a844faabfa10cfa3ff0e9",
     "draw_pd_paper_drive_assembly.py": "d4759508bc652979508e2e245be70cb64b45e6d5b982632c9a9cb3f06425cec5",
 }
 MODEL_HASHES = {

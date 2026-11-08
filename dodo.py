@@ -3304,7 +3304,7 @@ def _verify_task(name: str) -> dict[str, Any]:
             "verbosity": 2,
         }
     if name == "pd_section_visibility_probe":
-        script = (SCRIPTS_DIR / "diagnostics/probe_pd_section_lifetime.py").resolve()
+        script = (SCRIPTS_DIR / "diagnostics/probe_pd_section_visibility.py").resolve()
         native_drawing = next(
             path for path in _drawing_cache_outputs("pd_paper_drive_assembly")
             if path.suffix.casefold() == ".slddrw"
