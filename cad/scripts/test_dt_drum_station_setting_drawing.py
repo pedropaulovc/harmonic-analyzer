@@ -135,7 +135,8 @@ def test_the_drum_station_view_isolates_the_arbor_and_drum() -> None:
     assert drawing.SHEET_SCALES[drawing.SHEET_NAMES[drawing.BANK_SETTINGS_SHEET - 1]] == (
         drawing.DRUM_STATION_SETTING_SCALE
     )
-    assert "DRUM STATION" in drawing.SHEET_NAMES[drawing.BANK_SETTINGS_SHEET - 1]
+    # The sheet names the drum's part, the alignment pinion, by its number.
+    assert "MHA-DT-01 STATION SETTINGS" in drawing.SHEET_NAMES[drawing.BANK_SETTINGS_SHEET - 1]
 
 
 def test_the_crop_holds_the_whole_head_and_the_drum_front_end() -> None:
