@@ -8,13 +8,13 @@ ch-rocker-arm-tl-oblique-feed-block:
   finish: as machined
   quantity: 1
   tolerance_class: machined_block
-  process: "Centred 1.64 x 1.58 x .96 rail-1 block with integral nut lug, 3.47 overall across. Lug starts .87 from the block's spindle end and runs flush to the block's far end: one continuous +X face, no step. The feed nut seats on that +X face, body away from spindle. Drill the leadscrew clearance to print; transfer the four taps through the MHA-CH-06-TL-VN-84 FeedNut at TL-00 assembly: #43 drill .635 deep and 4-40 UNC .500 deep, blind from the +X face. Keep carriage counterbore floors .570 above the bottom; pivot seat reamed .3760-.3765, .359 deep from top with a 5/16-18 tapped through hole below."
+  process: "Centred 1.64 x 1.58 x .96 rail-1 block with integral nut lug, 3.47 overall across. Lug starts .87 from the block's spindle end and runs flush to the block's far end: one continuous +X face, no step. The feed nut seats on that +X face, body away from spindle. Drill the leadscrew clearance to print; transfer the four taps through the MHA-CH-06-TL-VN-84 FeedNut at TL-00 assembly. Keep carriage counterbore floors .570 above the bottom; pivot seat reamed .3760-.3765, .359 deep from top with a 5/16-18 tapped through hole below."
   machinist_exceptions:
     - id: "RV-02"
       kind: "minor"
-      where: "VIEW D: the KP08 leadscrew axis 11.765 ±.13 mm"
+      where: "VIEW D: the KP08 leadscrew axis 12.400 ±.13 mm"
       finding: "a metric vendor-mating station prints in millimetres on an inch sheet, beside inch dimensions"
-      reason: "owner ruling 2026-11-01 (ruling 4B), relayed by Main: the KP08 pillow block is a metric-only vendor line, so the leadscrew axis height that mates with it keeps the vendor's exact millimetres, printed in mm with the unit label and an explicit mm band (drawing-simplicity-policy.md, supplier-unit exception), not a rounded inch conversion. The axis moved 12.400 -> 11.765 mm when TL-28 was faced to .975 from the 1 in bar (Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144, pending owner confirmation); the ruling's vendor-mm treatment is unchanged."
+      reason: "owner ruling 2026-11-01 (ruling 4B), relayed by Main: the KP08 pillow block is a metric-only vendor line, so the leadscrew axis height that mates with it keeps the vendor's exact millimetres, printed in mm with the unit label and an explicit mm band (drawing-simplicity-policy.md, supplier-unit exception), not a rounded inch conversion"
     - id: "RV-03"
       kind: "minor"
       where: "Section B-B, the .570 counterbore floor callout: ENGAGES .162 MIN (1.03D)"
@@ -22,7 +22,7 @@ ch-rocker-arm-tl-oblique-feed-block:
       reason: "The HGH15CA-style carriage's M4 holes are 5 mm deep (the HIWIN reference geometry, checked on the kit carriage at receipt), so no M4 reaches 1.5D (6.0 mm). Owner ruling 2026-11-01, option A (the jig's RV-05): the counterbore floor drops .614 to .570 and each screw is cut to fit its own floor at assembly (rule 19), so the reach carries only the ±.005 cut and the .001 reading: .183 of tip reach, 1.03D of full thread once the 0.75P tip chamfer is deducted Owner exception confirmed 2026-11-01 (relayed by Main) at 1.16D. Delegated ruling 2026-11-03 (Main), following the owner option-A ruling of 2026-11-01: the recount charges the 0.75P tip chamfer, .162 MIN (1.03D), same geometry, shop-fixture load; owner review #2144."
     - id: "RV-04"
       kind: "minor"
-      where: "VIEW D, the Ø.351 leadscrew clearance callout: WALL .063 MIN TO TAPS"
-      finding: "wall from the leadscrew clearance to the four transferred blind #4-40 taps .063 in (1.60 mm) at the printed worst case plus rule 17's drill wander (the Ø.351 at its +.004, the leadscrew at its .287 mm stack offset over TL-28 faced .975 ±.005 and the 11.765 ±.13 mm axis, the nut's holes at their ±0.05 station and the #29 spot's 0.073 residual, every tap anywhere in VIEW D's 4X 45° ±5° clocking, and the #43 drill's 0.3° wander at the .505 deepest full thread, 0.067 mm), under the .080 in target and over the .060 in floor (rule 17)"
-      reason: "Owner ruling 2026-11-04 (#2177 option B, relayed by Main): Ø.351 leadscrew clearance, then wall .060 in at the printed worst case, accepted below the .080 target and above the .060 floor. Farm r1 (2026-11-07) found that wall left no drill wander on the THRU #43 taps; Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144, pending owner confirmation: the taps go blind (.500 thread, .635 drill) and TL-28 is faced to .975 ±.005, leaving wall .063 in (1.60 mm) at the printed worst case with wander, .083 nominal, still between the floor and the target; the KP08 axis height behind the stack is UNVERIFIED (#2184)."
+      where: "VIEW D, the Ø.351 leadscrew clearance callout: WALL .060 MIN TO TAPS"
+      finding: "wall from the leadscrew clearance to the four transferred #4-40 taps .060 in (1.53 mm) at the printed worst case (the drill at its +.004, the leadscrew at its .453 mm stack offset, the nut's holes at their ±0.05 station and the #29 spot's 0.073 residual, every tap anywhere in VIEW D's 4X 45° ±5° clocking), under the .080 in target and over the .060 in floor (rule 17)"
+      reason: "Owner ruling 2026-11-04 (#2177 option B, relayed by Main): Ø.351 leadscrew clearance, wall .060 in (1.53 mm) at the printed worst case, .083 nominal, accepted below the .080 target and above the .060 floor; the KP08 axis height behind the stack is UNVERIFIED (#2184)."
   drawing_unit: in

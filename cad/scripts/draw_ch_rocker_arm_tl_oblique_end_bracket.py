@@ -224,12 +224,6 @@ PLAN_KEEP: dict[str, tuple[float, float, float]] = {
 END_KEEP: dict[str, tuple[float, float, float]] = {
     "BracketThick": (_L, -_HW - SIDE_LANE, _H / 2.0),
 }
-# The faced .975 is a functional height, not a stock size: the KP08 pillow
-# block (TL-VN-56) sits on it, so it sets the leadscrew axis that the TL-32
-# nut's tap wall is proved against (Delegated ruling 2026-11-07 (Main), no
-# precedent; owner review #2144). Farm r3 (20261108T014606685Z) asked the
-# three places to name that mate (rules 3, 4); its row below says so.
-THICK_FUNCTION = "SETS TL-VN-56 (KP08)\nLEADSCREW HEIGHT"
 
 # Section A-A: the plane of the hole row (model y 0), its cutting line drawn
 # across the end view (where it is the view's mid-height line; on the plan it
@@ -1076,22 +1070,6 @@ def _stock_references(adapter: Any, annotations: list[Any]) -> None:
         )
 
 
-def _name_the_thickness_function(adapter: Any, annotations: list[Any]) -> None:
-    """BracketThick's row below (swDimensionTextCalloutBelow 4) names the
-    mate its three places serve; read back through the definition (8)."""
-    matches = [item for item in annotations if dimension_name(adapter, item) == "BracketThick"]
-    if len(matches) != 1:
-        raise RuntimeError(f"expected one BracketThick dimension, found {len(matches)}")
-    native = _early_bound(
-        _early_bound(matches[0], "IAnnotation").GetSpecificAnnotation(),
-        "IDisplayDimension",
-    )
-    native.SetText(4, THICK_FUNCTION)  # void put: read back below
-    persisted = str(native.GetText(8) or "").replace("\r", "")
-    if persisted != THICK_FUNCTION:
-        raise RuntimeError(f"BracketThick did not take its function row: {persisted!r}")
-
-
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -1209,7 +1187,6 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
     _stock_references(adapter, annotations)
-    _name_the_thickness_function(adapter, annotations)
 
     if not auto_center_marks(adapter, plan, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the plan")

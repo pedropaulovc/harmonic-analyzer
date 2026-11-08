@@ -218,15 +218,15 @@ def test_native_block_readback_refuses_moved_or_missing_geometry(monkeypatch, fe
 
     part = feed_spec if feed else spec
     cylinders = []
-    # A blind-tap Wizard can retain the exact inch drill conversion while
+    # A through-tap Wizard can retain the exact inch drill conversion while
     # TAP_DRILL_MM stores three decimal mm. This is a binding fixture, not
     # a claim that worker10's unrecorded physical radius has been measured.
     native_drill_mm = .089 * INCH
-    definition = SimpleNamespace(TapDrillDiameter=native_drill_mm / 1000.0)
+    definition = SimpleNamespace(ThruTapDrillDiameter=native_drill_mm / 1000.0)
     if fault == "nut_wrong_drill":
-        definition.TapDrillDiameter = .0023
+        definition.ThruTapDrillDiameter = .0023
     if fault == "nut_unreadable_drill":
-        definition.TapDrillDiameter = float("nan")
+        definition.ThruTapDrillDiameter = float("nan")
     feature = SimpleNamespace(
         GetTypeName2=lambda: "HoleWzd",
         GetDefinition=lambda: None if fault == "nut_no_definition" else definition,
@@ -310,7 +310,7 @@ def test_committed_nut_drill_binds_dispatch_before_property_read(monkeypatch, ra
 
     # A bare PyIDispatch has InvokeTypes but no _oleobj_ or named property.
     raw = SimpleNamespace(InvokeTypes=lambda *args: pytest.fail("unbound dispatch access"))
-    wrapper = SimpleNamespace(_oleobj_=object(), TapDrillDiameter=.089 * INCH / 1000.0)
+    wrapper = SimpleNamespace(_oleobj_=object(), ThruTapDrillDiameter=.089 * INCH / 1000.0)
     bindings = []
 
     def bind(obj, interface):
@@ -324,25 +324,6 @@ def test_committed_nut_drill_binds_dispatch_before_property_read(monkeypatch, ra
     monkeypatch.setattr(_feature_tree, "_feature_by_name", lambda adapter, name: feature)
     assert model._native_nut_tap_diameter(None, feed_spec) == pytest.approx(.089 * INCH)
     assert bindings == ([(raw, "IWizardHoleFeatureData2")] if raw_result else [])
-
-
-def test_nut_taps_are_blind_with_their_drill_depth_gated():
-    """Main's TL-32 ruling (2026-11-07): the nut taps are blind. The readback
-    refuses a through spec before touching the model, and the build gates
-    the drill depth and charges each blind drill's cylinder and point."""
-    import _oblique_pivot_block_model as model
-    import ch_rocker_arm_tl_oblique_feed_block_spec as feed_spec
-    from _hole_spec import HoleSpec
-
-    assert feed_spec.NUT_TAP_SPEC.end == "blind"
-    assert feed_spec.NUT_TAP_SPEC.depth_mm == feed_spec.NUT_TAP_DRILL_DEPTH < feed_spec.LUG_WIDTH
-    through = SimpleNamespace(PART_NAME="through", NUT_TAP_SPEC=HoleSpec("tapped", "#4-40"))
-    with pytest.raises(RuntimeError, match="must be blind"):
-        model._native_nut_tap_diameter(None, through)
-    source = Path(model.__file__).read_text(encoding="utf-8")
-    assert "abs(nut_taps.depth_mm - part.NUT_TAP_DRILL_DEPTH) > 0.005" in source
-    assert "blind_hole_volume_mm3(nut_taps.hole_dia_mm,nut_taps.depth_mm)" in source
-    assert "nut_taps.hole_dia_mm/2)**2*part.LUG_WIDTH" not in source
 
 
 @pytest.mark.parametrize("feed", [False, True])

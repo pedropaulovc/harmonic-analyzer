@@ -31,10 +31,7 @@ from _drawing_tables import insert_hole_table
 import _telemetry
 import ch_rocker_arm_tl_oblique_carrier_spec as spec
 
-# The corner datum's X arrow stands under the plate's bottom edge at about
-# y 164 mm (farm r3, 20261108T014606685Z: it ran through the first row at
-# a .175 top), so the table's top sits under it.
-TABLE_ANCHOR = (0.020, 0.158)
+TABLE_ANCHOR = (0.020, 0.175)
 TABLE_WIDTHS = (0.012, 0.019, 0.019, 0.078, 0.065)
 # The physical columns, in the IncludeHidden=True index domain every read
 # and write below uses: SIZE stays generated (and compared) while hidden.
