@@ -2009,14 +2009,37 @@ def test_r4_operation_order_cites_the_plan_and_retains_all_clamps() -> None:
     assert "BEFORE THE FIRST STRAP" in steps["18"]
     assert "PLAN S0-S1 AND S2 OP20" in steps["19"]
     assert "PLAN S2 OP30-OP40" in steps["20A"]
-    assert "PLAN S3 OP10-OP20" in steps["21D"]
+    assert "PLAN S3 OP10-OP20" in steps["21E"]
     assert spec._torque(spec.holding.HUB_TORQUE_NM) in steps["21A"]
     assert spec._item(spec.HUB_WASHER) in steps["21"]
     for text in steps.values():
         # The plan prints the blank, chords and the hub tool envelope.
         assert "350 MM" not in text and "REAMER" not in text
     assert f"{spec._CLAMP_SCREW} {spec._item(spec.RAIL_SCREW)}" in steps["19B"]
-    assert "ALL 3 CLAMP SCREWS" in steps["21D"]
+    assert "ALL 3 CLAMP SCREWS" in steps["21E"]
+
+
+def test_riser_groove_has_a_depth_and_a_bench_acceptance() -> None:
+    """TL-00 round 2: the in-place riser cut is a groove .215 ±.010 deep from
+    the riser top, never through the thinnest printed riser to the carrier,
+    checked at both pass ends with its remedies."""
+    inch = spec.trammel.INCH
+    steps = {text.split(". ", 1)[0]: text for text in spec.OPERATION_STEPS}
+    assert ".215 DEEP FROM THE RISER TOP" in steps["18"]
+    assert steps["18A"].startswith("18A. CHECK") and ".205-.225" in steps["18A"]
+    assert steps["18B"].startswith("18B. IF ") and steps["18C"].startswith("18C. IF ")
+    assert spec.RISER_GROOVE_DEPTH + spec.RISER_GROOVE_BAND < spec.riser.THICKNESS - spec.riser.THICKNESS_BAND
+    assert spec.RISER_GROOVE_DEPTH == pytest.approx(0.215 * inch)
+
+
+def test_clamp_screw_clearance_is_checked_once_they_are_fitted() -> None:
+    """TL-00 round 2: 17A ran before the strap clamp screws and washer were
+    fitted; their closest approach is checked at 21B, after 21A."""
+    steps = {text.split(". ", 1)[0]: text for text in spec.OPERATION_STEPS}
+    assert "CLAMP" not in steps["17A"] and "WASHER" not in steps["17A"]
+    assert "STEPS 17-17A" in steps["21B"] and "3 CLAMP SCREWS FITTED" in steps["21B"]
+    order = list(steps)
+    assert order.index("21A") < order.index("21B") < order.index("21E")
 
 
 def test_r4_holding_hardware_placements_close_on_actual_seats() -> None:
@@ -2737,7 +2760,7 @@ def test_stop_pins_govern_the_tooling_top_and_the_holding_check_prints_it() -> N
     # #2144; pending owner confirmation): the washer clearance prints inch,
     # rounded up from the holding proof's minimum, every designed gap above it.
     printed = f"{spec._length(spec.WASHER_CLEARANCE_PRINTED, 3)} MIN"
-    assert printed == ".060 MIN" and printed in steps["21B"]
+    assert printed == ".060 MIN" and printed in steps["21C"]
     assert spec.WASHER_CLEARANCE_PRINTED >= spec.holding.WASHER_CLEARANCE_MIN
     assert min(spec.holding.WASHER_GAPS_MIN.values()) >= spec.WASHER_CLEARANCE_PRINTED
 

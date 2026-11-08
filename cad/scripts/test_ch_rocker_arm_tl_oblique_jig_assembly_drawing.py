@@ -644,18 +644,24 @@ def test_bom_extent_rejects_border_title_and_reserved_content_intrusions() -> No
 def test_each_cluster_rings_inside_its_sheet() -> None:
     for cluster in drawing.CLUSTERS:
         initial = _cluster_outline(cluster)
-        scale = drawing.cluster_ring_scale(initial, cluster.scale, label=cluster.sheet)
+        scale = drawing.cluster_ring_scale(
+            initial, cluster.scale, label=cluster.sheet, centred=cluster.centred
+        )
         # Fit at the returned scale, not the initial placement scale. Every
-        # larger ladder rung must fail the same physical ring budget.
+        # larger ladder rung must fail the same physical ring budget (or,
+        # for a centred cluster, slide).
         for larger in drawing.CLUSTER_SCALE_LADDER[
             :drawing.CLUSTER_SCALE_LADDER.index(scale)
         ]:
-            assert drawing.cluster_ring_fit(
+            _shift, overflows, slide = drawing.cluster_ring_fit(
                 _cluster_outline(cluster, scale=larger)
-            )[1]
+            )
+            assert overflows or (cluster.centred and slide < 0.0)
         outline = _cluster_outline(cluster, scale=scale)
         shift, overflows, slide = drawing.cluster_ring_fit(outline)
         assert not overflows and slide <= 0.0
+        if cluster.centred:
+            assert slide == 0.0
         placed = (
             outline[0] + shift[0],
             outline[1] + shift[1],

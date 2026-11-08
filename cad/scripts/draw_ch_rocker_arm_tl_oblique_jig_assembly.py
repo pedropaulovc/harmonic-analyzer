@@ -130,6 +130,10 @@ class Cluster:
     # context instances: (family, its frozen landing here, its declared
     # approach degrees here, as BALLOON_APPROACH_DEG's).
     repeated: tuple[tuple[str, BalloonAnchor, float], ...] = ()
+    # Rule 15: a wide, short view slid left of the title block leaves the
+    # sheet's right half empty (TL-00 round 2, sheet 5); a centred cluster
+    # takes the largest scale whose ring needs no slide.
+    centred: bool = False
 
     @property
     def visible(self) -> frozenset[str]:
@@ -231,6 +235,7 @@ CLUSTERS = (
                 135.0,
             ),
         ),
+        centred=True,
     ),
     Cluster(
         "CARRIER EXPLODED",
@@ -2541,6 +2546,7 @@ def cluster_ring_scale(
     placed: tuple[float, float],
     *,
     label: str,
+    centred: bool = False,
 ) -> tuple[float, float]:
     """The largest ladder scale whose balloon ring fits.
 
@@ -2558,9 +2564,11 @@ def cluster_ring_scale(
     for scale in CLUSTER_SCALE_LADDER:
         k = (scale[0] / scale[1]) / (placed[0] / placed[1])
         hw, hh = (x1 - x0) / 2.0 * k, (y1 - y0) / 2.0 * k
-        _shift, overflows, _slide = cluster_ring_fit(
+        _shift, overflows, slide = cluster_ring_fit(
             (cx - hw, cy - hh, cx + hw, cy + hh)
         )
+        if centred and slide < -1e-6:
+            overflows = [*overflows, f"slid {-slide * 1000:.1f} mm off centre"]
         if not overflows:
             return scale
         findings.append(f"{_scale_text(scale)}: {'; '.join(overflows)}")
@@ -2739,7 +2747,8 @@ def _fit_cluster_view(
 ) -> tuple[float, float]:
     """Fit an exploded cluster view's ring (:func:`_fit_ring_view`)."""
     return _fit_ring_view(
-        adapter, view, cluster.scale, configuration, exploded=True, label=label
+        adapter, view, cluster.scale, configuration, exploded=True, label=label,
+        centred=cluster.centred,
     )
 
 
@@ -2751,18 +2760,22 @@ def _fit_ring_view(
     *,
     exploded: bool,
     label: str,
+    centred: bool = False,
 ) -> tuple[float, float]:
     """Re-scale the isolated view to the largest ladder scale whose measured
-    ring fits, then move its ring into the room; returns the scale. The view
-    must still reference ``configuration`` and read ``exploded`` after it."""
-    scale = cluster_ring_scale(_view_outline(view, label=label), placed, label=label)
+    ring fits (unslid when ``centred``), then move its ring into the room;
+    returns the scale. The view must still reference ``configuration`` and
+    read ``exploded`` after it."""
+    scale = cluster_ring_scale(
+        _view_outline(view, label=label), placed, label=label, centred=centred
+    )
     while True:
         if scale != placed:
             _set_view_scale(adapter, view, scale, label=label)
             placed = scale
         outline = _view_outline(view, label=label)
         shift, overflows, slide = cluster_ring_fit(outline)
-        if not overflows:
+        if not overflows and not (centred and slide < -1e-6):
             break
         # The outline did not scale in proportion: the next rung down.
         rung = CLUSTER_SCALE_LADDER.index(scale) + 1

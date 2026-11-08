@@ -92,10 +92,9 @@ ISO_CENTER = (0.330, 0.170)
 FRONT_KEEP = {"FinishedLength": (0.060, FRONT_CENTER[1])}
 END_KEEP: dict[str, tuple[float, float]] = {}
 # The side-view attached callout reads this unchanged native source control;
-# no duplicate imported chamfer dimension is printed in the end view.
-END_VIEW_LABEL = "CUT END VIEW"
-END_VIEW_LABEL_XY = (0.092, 0.224)
-# Sheet 1's item label, in the same top band; right of the cut-end view.
+# no duplicate imported chamfer dimension is printed in the end view. The end
+# view is projected above the front view, so it carries no name (rule 26).
+# Sheet 1's item label, in the same top band; right of the end view.
 # Sheet 1 carries the quantity, so this sheet needs no registry read.
 ITEM_LABEL = VARIANTS[0][1]
 ITEM_LABEL_XY = (0.150, 0.262)
@@ -627,8 +626,6 @@ def append_stud_rework_sheets(adapter: Any) -> tuple[Callable[[], None], ...]:
     annotations = [*front_annotations, *end_annotations]
     assert_machining_controls(adapter, annotations)
     set_machining_callouts(adapter, annotations)
-    if add_note(adapter, END_VIEW_LABEL, *END_VIEW_LABEL_XY) is None:
-        raise RuntimeError("failed to label the permanent stud cut-end view")
     if add_note(adapter, ITEM_LABEL, *ITEM_LABEL_XY) is None:
         raise RuntimeError("failed to label the stud REWORK sheet's item")
     settled_notes = add_rework_notes(adapter, front)
