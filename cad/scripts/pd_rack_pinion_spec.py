@@ -37,7 +37,7 @@ import _config
 from _fit_deviations import deviations
 from _fit_ream_h7 import REAM_H7
 from _gear_fit_limits import gear_tip_band_mm
-from _gear_quality import reducer_k_setting_diameter_mm, toothspace_runout_tir_mm
+from _gear_quality import toothspace_runout_tir_mm
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _package_units import drawing_unit
@@ -244,10 +244,12 @@ TOOTH_SPACE_GAUGE_TIP_AIR_MIN_MM = min(contact.tip_air_mm for contact in _GAUGE_
 # #1 cutter), so the centre takes ordinary fine-pitch practice: nominal
 # plus a positive allowance, never minus, since a close centre binds
 # (MISUMI Mech Lab, "Center to Center Spacing for Shafts with Spur Gears":
-# fine pitch +0.002 in / -0); the allowance is the catalogue +0.05, the
-# radius of K's drawn setting circle about S
-# (stock_form_quality.reducer_k_setting_diameter_mm; owner ruling
-# 2026-10-27, option A: standard gears take the standard band).
+# fine pitch +0.002 in / -0); the allowance is the catalogue +0.05
+# (owner ruling 2026-10-27, option A: standard gears take the standard band).
+# MHA-PD-00 VIEW K's setting circle about S is wider
+# (stock_form_quality.reducer_k_setting_diameter_mm, Ø.008, owner ruling
+# 2026-11-08 (Pedro), #2144 item 5.3): this band, along S-K, is the tighter
+# of the two, and the mesh sets it.
 # paper_drive_mesh_check.reducer_mesh over the printed bands (tooth
 # thickness at the manufactured_profiles corners, both 0.05 TIR tooth-space
 # runouts) bounds the usable centres to 43.737..43.851 (standard centre
@@ -262,12 +264,13 @@ TOOTH_SPACE_GAUGE_TIP_AIR_MIN_MM = min(contact.tip_air_mm for contact in _GAUGE_
 MESH_PINION_TEETH = 15
 MESH_ANGLE_DEG = -168.0
 CENTRE_DISTANCE = 43.794
-# The setting the arm and plate sheets print: the knob bore is held this
+# The setting the arm and plate sheets point at: the knob bore is held this
 # band from the pin bore when the pair is match-drilled, and must still be
-# there with the plate screwed down. Its top is K's setting-circle radius,
-# .002 in exactly (43.8448, inside the 43.851 contact-ratio limit).
+# there with the plate screwed down. Its top is .002 in exactly (43.8448,
+# inside the 43.851 contact-ratio limit).
+CENTRE_DISTANCE_SET_BAND_IN = 0.002
 CENTRE_DISTANCE_WINDOW = (
-    CENTRE_DISTANCE, round(CENTRE_DISTANCE + reducer_k_setting_diameter_mm() / 2.0, 6)
+    CENTRE_DISTANCE, round(CENTRE_DISTANCE + CENTRE_DISTANCE_SET_BAND_IN * 25.4, 6)
 )
 # (upper, lower) deviations from CENTRE_DISTANCE, as every band here.
 CENTRE_DISTANCE_SET_BAND = (round(CENTRE_DISTANCE_WINDOW[1] - CENTRE_DISTANCE, 6), 0.0)
