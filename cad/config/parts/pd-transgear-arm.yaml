@@ -29,8 +29,3 @@ pd-transgear-arm:
       where: "sheet note 3, linked from the end view's latch-pin hole callout: PIN HOLE TO FACES .065 MIN"
       finding: "latch-pin hole ligament to the front and rear faces below the .080 target (rule 17)"
       reason: "owner ruling 2026-10-27 (#1379): the .125 MHA-PD-VN-58 hole at mid-thickness of the 5/16 stock leaves .0659 at full budget, printed .065 MIN (stock band ±.001, .XXX height band ±.005 from the title block per coordinator ruling (a), 0.3 deg run-off over the deepest hole, both .010 breaks at the mouth), above the .060 floor; the next stock size up is tracked in #2019"
-    - id: "RV-05"
-      kind: "accept"
-      where: "section A-A, the pin bore C's perpendicularity frame ⊥ Ø.0008 A"
-      finding: "perpendicularity zone tighter than the reamed-hole row's Ø.001 (rules 3, 5)"
-      reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144 (fan-out Q2-A, 2a). Rule 26 bars the projected-zone modifier, so the pin bore's axis tilt is held by a plain perpendicularity over the arm's 5/16 stock; projected to the chain plane (32.36 mm) ⊥ Ø.001 gives .1036 mm and fails the MHA-PD-22 collar to MHA-PD-06 disc air (statistical .0891 under its .1016 floor), while ⊥ Ø.0008 gives .0831 and passes (the stack holds up to about .088)"

@@ -36,4 +36,4 @@ pd-transgear-arm-plate:
       kind: "accept"
       where: "the knob bore's perpendicularity frame to datum A (face-A view)"
       finding: "perpendicularity frame on a running bore (rule 5)"
-      reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144. Knob axis K carried from the bore to the chain plane must stay inside the reducer's axis zone the air stacks charge, and this frame is what bounds it: Ø.002 over the shortest bore (28.47 mm) projects to 0.0719 mm at K_PROJECTED_HEIGHT_MM (40.31 mm) against the 0.0832 mm zone (paper_drive_arm_registration.AXIS_PROJECTED_ZONE_DIAMETER_MM)"
+      reason: "owner ruling 2026-11-08 (Pedro), #2144 item 4.1: K stays a plain ⊥ Ø.002 A, no projected zone (rule 26). Knob axis K carried from the bore to the chain plane must stay inside the reducer's axis zone the air stacks and meshes charge, and this frame is what bounds it: Ø.002 over the shortest bore (28.47 mm) projects to 0.0719 mm at K_PROJECTED_HEIGHT_MM (40.31 mm) against the 0.0832 mm zone (paper_drive_arm_registration.AXIS_PROJECTED_ZONE_DIAMETER_MM)"

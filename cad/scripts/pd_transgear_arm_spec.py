@@ -24,7 +24,6 @@ import pd_vn_transgear_latch_pin_spec as LATCH_PIN
 import pd_transgear_arm_geometry as ARM
 import pd_vn_transgear_arm_plate_locating_pin_spec as LOCATOR_PIN
 import _transgear_arm_plate_locating_interface as LOCATING_PIN
-import paper_drive_arm_registration as REGISTRATION
 import pd_transgear_pin_spec as PIN
 from pd_transgear_arm_geometry import (
     REDUCER_POSITION_DIAMETER,
@@ -89,21 +88,16 @@ PART_DATUMS = (
 # The frames print in inches (#290). Delegated ruling 2026-11-07 (Main, no
 # precedent; owner review #2144): no projected zone anywhere on MHA-PD-18
 # (rule 26 bars the modifier). The pin bore S (datum C) takes ⌖ Ø.004 to
-# A|B and a plain ⊥ Ø.0008 to A over the bore; the axis it allows, run on
-# from the thinnest stock to the chain plane in front of face A, stays
-# inside the reducer's projected-axis zone.
-GEOMETRIC_TOLERANCES_IN = {"position": ".004", "perpendicularity": ".0008"}
+# A|B and a plain ⊥ Ø.001 to A over the bore, the reamed-hole row (owner
+# ruling 2026-11-08 (Pedro), #2144 item 4.1). The axis it allows, run on
+# from the thinnest stock to the chain plane in front of face A, is
+# paper_drive_arm_registration.S_AXIS_ZONE_DIAMETER_MM: the meshes and the
+# platen air charge it, and MHA-PD-00's collar feeler accepts the collar air
+# it closes (pd_cluster_air.ASSEMBLY_ACCEPTED_COLLAR_SOURCES).
+GEOMETRIC_TOLERANCES_IN = {"position": ".004", "perpendicularity": ARM.PIN_BORE_PERPENDICULARITY_IN}
 GEOMETRIC_TOLERANCES_MM = {key: float(value) * 25.4 for key, value in GEOMETRIC_TOLERANCES_IN.items()}
 if GEOMETRIC_TOLERANCES_MM["position"] > REDUCER_POSITION_DIAMETER:
     raise AssertionError("MHA-PD-18 prints a reducer position zone wider than its stacks assume")
-if (
-    GEOMETRIC_TOLERANCES_MM["perpendicularity"] * REGISTRATION.S_PROJECTED_HEIGHT_MM
-    / (THICKNESS - ARM.THICKNESS_BAND)
-    > REGISTRATION.AXIS_PROJECTED_ZONE_DIAMETER_MM
-):
-    raise AssertionError(
-        "MHA-PD-18's pin-bore perpendicularity leaves the reducer's axis zone at the chain plane"
-    )
 GEOMETRIC_CONTROLS = (
     GeometricControl(
         "feed_stud_position", "position", GEOMETRIC_TOLERANCES_IN["position"],

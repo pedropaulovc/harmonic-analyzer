@@ -144,20 +144,21 @@ def test_native_controls_reference_actual_bores_and_reach_the_real_chain_plane()
         assert {(feature, name) for feature, name in spec.BASIC_REDUCER_DIMENSIONS if feature == "LocatorProfile"} == {
             ("LocatorProfile", name) for name in ("LocatorX1", "LocatorY1", "LocatorX2", "LocatorY2")
         }
-    # The arm's pin bore S has a plain perpendicularity over the bore (no
-    # projected zone, rule 26); run on from the thinnest stock to the chain
-    # plane, the axis it allows stays inside the reducer's axis zone there.
+    # The arm's pin bore S has a plain ⊥ .001 over the bore, the reamed row
+    # (no projected zone, rule 26; owner ruling 2026-11-08, #2144 item 4.1).
+    # Run on from the thinnest stock to the chain plane it is S's own axis
+    # zone, wider than K's budget; the stacks charge that wider zone.
     arm_control = next(
         control for control in arm_spec.GEOMETRIC_CONTROLS if control.key == "feed_stud_perpendicularity"
     )
     assert arm_control.projected_zone_height_mm is None
     assert arm_control.characteristic == "perpendicularity"
-    assert arm_control.tolerance == ".0008" and arm_control.datums == ("A",)
-    assert (
+    assert arm_control.tolerance == ".001" and arm_control.datums == ("A",)
+    assert registration.S_AXIS_ZONE_DIAMETER_MM == pytest.approx(
         float(arm_control.tolerance) * 25.4 * registration.S_PROJECTED_HEIGHT_MM
         / (arm.THICKNESS - arm.THICKNESS_BAND)
-        <= registration.AXIS_PROJECTED_ZONE_DIAMETER_MM
     )
+    assert registration.S_AXIS_ZONE_DIAMETER_MM > registration.AXIS_PROJECTED_ZONE_DIAMETER_MM
     # K prints a plain ⊥ Ø.002 to A over its bore (fan-out Q2-A, rule 26);
     # carried to K's projected height past the real chain plane, that tilt
     # stays inside the axes' tilt budget the air stacks charge.

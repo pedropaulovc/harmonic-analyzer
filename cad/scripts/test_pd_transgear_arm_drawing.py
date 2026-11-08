@@ -941,10 +941,10 @@ def test_no_frame_carries_a_projected_zone_and_the_controls_are_as_ruled() -> No
     """Delegated ruling 2026-11-07 (Main, no precedent; owner review #2144):
     rule 26 bars the projected-zone modifier, so no frame on MHA-PD-18
     carries one. The pin bore S (datum C) takes ⌖ Ø.004 to A|B and a plain
-    ⊥ Ø.0008 to A; the 2X dowel reams ⌖ Ø.004 to A|B|C; the plate taps take
-    no frame. The zones stay inside what the reducer's stacks were judged at:
-    the bore's axis, run on from the thinnest stock to the chain plane, stays
-    inside the reducer's axis zone there."""
+    ⊥ Ø.001 to A, the reamed row (owner ruling 2026-11-08, #2144 item 4.1);
+    the 2X dowel reams ⌖ Ø.004 to A|B|C; the plate taps take no frame. The
+    bore's axis, run on from the thinnest stock to the chain plane, is the S
+    axis zone the stacks charge."""
     import paper_drive_arm_registration as registration
     from _gtol_frame import gtol_frame_signature
 
@@ -958,7 +958,7 @@ def test_no_frame_carries_a_projected_zone_and_the_controls_are_as_ruled() -> No
     assert set(controls) == {"feed_stud_position", "feed_stud_perpendicularity", *locators}
     position, square = controls["feed_stud_position"], controls["feed_stud_perpendicularity"]
     assert (position.characteristic, position.tolerance, position.datums) == ("position", ".004", ("A", "B"))
-    assert (square.characteristic, square.tolerance, square.datums) == ("perpendicularity", ".0008", ("A",))
+    assert (square.characteristic, square.tolerance, square.datums) == ("perpendicularity", ".001", ("A",))
     for control in (position, square):
         assert control.face.diameter_mm == geometry.PIN_BORE_DIA
         assert control.face.contains_x_mm == geometry.PIN_STATION
@@ -968,9 +968,8 @@ def test_no_frame_carries_a_projected_zone_and_the_controls_are_as_ruled() -> No
         assert (control.face.contains_x_mm, control.face.contains_y_mm) == xy
     assert float(position.tolerance) * 25.4 <= geometry.REDUCER_POSITION_DIAMETER + 1e-12
     thinnest = geometry.THICKNESS - geometry.THICKNESS_BAND
-    assert (
+    assert registration.S_AXIS_ZONE_DIAMETER_MM == pytest.approx(
         float(square.tolerance) * 25.4 * registration.S_PROJECTED_HEIGHT_MM / thinnest
-        <= registration.AXIS_PROJECTED_ZONE_DIAMETER_MM
     )
     # The datums the frames name are the part's: A the front face, B the
     # pivot bore, C the pin bore.

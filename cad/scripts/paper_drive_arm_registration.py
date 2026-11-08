@@ -128,6 +128,16 @@ K_PROJECTED_HEIGHT_MM = (
     math.ceil(1000.0 * (PLATE_MOUNT_MACHINE_Z_MM - CHAIN_PLANE_MACHINE_Z_LIMITS_MM[0]) / 25.4)
     * 25.4 / 1000.0
 )
+# The pin S's axis zone at the farthest chain plane: MHA-PD-18's plain
+# ⊥ .001 over the bore (no projected zone, rule 26), run on from the thinnest
+# stock to S_PROJECTED_HEIGHT_MM (owner ruling 2026-11-08 (Pedro), #2144
+# item 4.1).  Wider than K's AXIS_PROJECTED_ZONE_DIAMETER_MM; the meshes and
+# the platen air charge it, and MHA-PD-00's collar feeler accepts the collar
+# air it closes (pd_cluster_air.ASSEMBLY_ACCEPTED_COLLAR_SOURCES).
+S_AXIS_ZONE_DIAMETER_MM = (
+    ARM.PIN_BORE_PERPENDICULARITY_MM * S_PROJECTED_HEIGHT_MM
+    / (ARM.THICKNESS - ARM.THICKNESS_BAND)
+)
 KNOB_JOURNAL_CONTACT_START_LOCAL_Z_MM = SHAFT.PINION_REAR_Z + RING.LENGTH
 KNOB_JOURNAL_CONTACT_END_LOCAL_Z_MM = KNOB_JOURNAL_CONTACT_START_LOCAL_Z_MM + PLATE.HUB_TO_BOSS
 KNOB_JOURNAL_CONTACT_SPAN_MIN_MM = (

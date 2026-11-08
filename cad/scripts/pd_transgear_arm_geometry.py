@@ -81,6 +81,12 @@ STOCK_SKU = "9517K466"
 STOCK_THICKNESS_IN = Fraction(5, 16)
 THICKNESS = float(STOCK_THICKNESS_IN) * MM_PER_IN  # 7.9375
 THICKNESS_BAND = 0.001 * MM_PER_IN  # ±0.0254
+# The pin bore S's perpendicularity to face A, over the bore: ⊥ .001, the
+# shop's reamed-hole row (owner ruling 2026-11-08 (Pedro), #2144 item 4.1).
+# Its axis zone run on to the chain plane is
+# paper_drive_arm_registration.S_AXIS_ZONE_DIAMETER_MM.
+PIN_BORE_PERPENDICULARITY_IN = ".001"
+PIN_BORE_PERPENDICULARITY_MM = float(PIN_BORE_PERPENDICULARITY_IN) * MM_PER_IN
 
 # --- Outline: hull of r12.5 about P and r7 about T, cut square through T ----
 PIVOT_END_R = 12.5

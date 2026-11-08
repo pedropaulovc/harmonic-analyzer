@@ -967,7 +967,7 @@ async def build(adapter: Any) -> dict[str, str]:
                 label="feed stud position pin bore wall",
             ),
         ),
-        # Plain ⊥ Ø.0008 to A over the bore, under the position frame.
+        # Plain ⊥ Ø.001 to A over the bore, under the position frame.
         "feed_stud_perpendicularity": PmiDrawingPlacement(
             section, (_STUD_FRAME_X, SECTION_CENTER[1] + 0.0195),
             attachment_xy=_wall_point(
