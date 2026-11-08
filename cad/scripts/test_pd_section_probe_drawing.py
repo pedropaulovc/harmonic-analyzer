@@ -81,7 +81,8 @@ def test_duplicate_comparison_is_linear_and_fresh_only(tmp_path, monkeypatch):
         journal.close()
 
 
-def test_build_reacquires_document_after_show_and_exports_duplicates(tmp_path, monkeypatch):
+@pytest.mark.parametrize("scenario", ["matching", "mismatched"])
+def test_build_reacquires_document_after_show_and_exports_duplicates(tmp_path, monkeypatch, scenario):
     monkeypatch.setattr(probe, "_early_bound", lambda value, interface: value)
     monkeypatch.setattr(probe._telemetry, "info", lambda message: None)
     out = tmp_path / "out"
@@ -93,7 +94,10 @@ def test_build_reacquires_document_after_show_and_exports_duplicates(tmp_path, m
     monkeypatch.setattr(probe, "JOURNAL", directory / "calls.jsonl")
     monkeypatch.setattr(probe, "DRAWING", drawing)
     monkeypatch.setattr(probe._seat_forensics, "OUT_FAILURES", out / "failures")
-    monkeypatch.setattr(probe, "digest", lambda path: probe.INPUT_HASHES[Path(path).relative_to(out).as_posix()])
+    observed_hashes = dict(probe.INPUT_HASHES)
+    if scenario == "mismatched":
+        observed_hashes["slddrw/pd-paper-drive-assembly.SLDDRW"] = "different cached drawing"
+    monkeypatch.setattr(probe, "digest", lambda path: observed_hashes[Path(path).relative_to(out).as_posix()])
     fresh_owners = [owner("first"), owner("second")]
     fresh_view = section(fresh_owners)
     identity = {"sheet": "PLATEN AND SUPPORT", "view": "Section A-A"}
@@ -137,10 +141,19 @@ def test_build_reacquires_document_after_show_and_exports_duplicates(tmp_path, m
         GetOpenDocumentByName=get_open_document, IsSame=same,
         CloseDoc=lambda title: calls.append("close without save"),
     )
-    asyncio.run(probe.build(SimpleNamespace(swApp=app)))
+    if scenario == "mismatched":
+        with pytest.raises(RuntimeError, match="differ from the pinned dc892 artifacts"):
+            asyncio.run(probe.build(SimpleNamespace(swApp=app)))
+    else:
+        asyncio.run(probe.build(SimpleNamespace(swApp=app)))
     canonical = json.loads(probe.REPORT.read_text())
     failure = json.loads((out / "failures/section-visibility-probe/report.json").read_text())
     assert canonical == failure
+    if scenario == "mismatched":
+        assert canonical["status"] == "failed"
+        assert canonical["input_sha256_after"] == observed_hashes
+        assert calls == []
+        return
     assert canonical["status"] == "observation_complete"
     assert len(canonical["after"]["rows"]) == 2
     assert canonical["duplicate_owner_identity"][0]["pairs"][0]["native_is_same"] == 0

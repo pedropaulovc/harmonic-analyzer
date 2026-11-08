@@ -286,8 +286,11 @@ async def build(adapter):
                 journal.call("CloseDoc without saving", lambda: adapter.swApp.CloseDoc(title), lambda value: None)
             report["input_sha256_after"] = {name: digest(OUT / name) for name in INPUT_HASHES}
             persist()
-            if report["input_sha256_after"] != INPUT_HASHES:
-                raise RuntimeError("read-only probe changed native input files")
+            if report["input_sha256_after"] != report["input_sha256"]:
+                report["status"] = "failed"
+                report["error"] = "read-only probe changed native input files"
+                persist()
+                raise RuntimeError(report["error"])
         finally:
             journal.close()
     return {"report": str(REPORT), "journal": str(JOURNAL)}
