@@ -106,7 +106,7 @@ def test_two_holes_land_on_the_blocks_bolt_spacing_about_the_screw() -> None:
     assert spec.BAR_TAP_SPEC.size == spec.KP08_TAP_SPEC.size == "#8-32"
     assert spec.BAR_TAP_SPEC.end == "blind"
     assert spec.BAR_TAP_SPEC.depth_mm == spec.BAR_TAP_DRILL_DEPTH
-    assert spec.BAR_TAP_SPEC.overrides_mm == {"ThreadDepth": spec.BAR_THREAD_DEPTH}
+    assert spec.BAR_TAP_SPEC.overrides_mm == {"ThreadDepth": spec.MODELED_THREAD_DEPTH}
     assert spec.KP08_TAP_SPEC.end == "through_all"
     assert spec.BAR_TAP_FACE == ((0.0, 0.0, -1.0), 0.0)
     assert spec.KP08_TAP_FACE == ((0.0, 0.0, 1.0), spec.BRACKET_THICK)
@@ -197,8 +197,13 @@ def test_opposed_full_thread_limits_protect_each_screw_from_the_other_tap() -> N
     assert spec.BRACKET_THICK == pytest.approx(25.4)
     assert spec.BAR_THREAD_LIMITS == pytest.approx((0.370 * 25.4, 0.496 * 25.4))
     assert spec.KP08_THREAD_LIMITS == pytest.approx((0.429 * 25.4, 0.555 * 25.4))
-    assert spec.BAR_THREAD_DEPTH == pytest.approx(0.433 * 25.4)
-    assert spec.KP08_THREAD_DEPTH == pytest.approx(0.492 * 25.4)
+    assert spec.MODELED_THREAD_DEPTH == pytest.approx(0.433 * 25.4)
+    assert not hasattr(spec, "BAR_THREAD_DEPTH")
+    assert not hasattr(spec, "KP08_THREAD_DEPTH")
+    assert all(
+        low < spec.MODELED_THREAD_DEPTH < high
+        for low, high in (spec.BAR_THREAD_LIMITS, spec.KP08_THREAD_LIMITS)
+    )
     assert spec.BAR_REACH_MAX == pytest.approx(leadscrew.BAR_SCREW_ENGAGEMENT_RANGE[1])
     for bounds, reach, opposed_reach in (
         (spec.BAR_THREAD_LIMITS, spec.BAR_REACH_MAX, spec.KP08_REACH_MAX),
@@ -292,10 +297,10 @@ def test_bottom_blind_precursor_leaves_real_material_for_the_top_wizard() -> Non
     assert spec.BAR_TAP_DRILL_DEPTH == pytest.approx(0.625 * 25.4)
     from _hole_spec import DRILL_POINT_H
 
-    assert spec.BAR_THREAD_DEPTH < spec.BAR_TAP_DRILL_DEPTH
+    assert spec.MODELED_THREAD_DEPTH < spec.BAR_TAP_DRILL_DEPTH
     assert spec.BAR_TAP_DRILL_DEPTH + spec.TAP_DRILL / 2.0 * DRILL_POINT_H < spec.THICK_MIN
     assert spec.BAR_TAP_DRILL_DEPTH != pytest.approx(
-        spec.BRACKET_THICK - spec.KP08_THREAD_DEPTH
+        spec.BRACKET_THICK - spec.MODELED_THREAD_DEPTH
     )
     source = Path(part.__file__).read_text(encoding="utf-8")
     body = source[source.index("async def build"):]
@@ -445,14 +450,14 @@ def test_native_callouts_share_one_drill_requirement_and_never_type_depths() -> 
 def test_both_full_thread_depths_have_part_owned_limit_dimensions() -> None:
     for reference, name, nominal, bounds in (
         (spec.BAR_THREAD_REFERENCE, spec.BAR_THREAD_DEPTH_DIMENSION,
-         spec.BAR_THREAD_DEPTH, spec.BAR_THREAD_LIMITS),
+         spec.MODELED_THREAD_DEPTH, spec.BAR_THREAD_LIMITS),
         (spec.KP08_THREAD_REFERENCE, spec.KP08_THREAD_DEPTH_DIMENSION,
-         spec.KP08_THREAD_DEPTH, spec.KP08_THREAD_LIMITS),
+         spec.MODELED_THREAD_DEPTH, spec.KP08_THREAD_LIMITS),
     ):
         assert spec.DRAWING_DIMENSIONS[reference] == {name}
         assert spec.DRAWING_PRECISION[reference][name] == 3
         assert name in drawing.SECTION_KEEP and name in drawing.SECTION_TEXT
-        assert nominal == pytest.approx(sum(bounds) / 2.0)
+        assert bounds[0] < nominal < bounds[1]
         label = spec.CALLOUTS_BELOW[name]
         assert "FULL THREAD" in label and "BOTH HOLES" in label
         assert not re.search(r"\d*\.\d", label)
@@ -795,8 +800,9 @@ def test_local_post_wizard_edit_preserves_thru_drill_and_reads_thread_back(
     assert edits_seen == [("ThreadEndCondition", 0), ("ThreadDepth", 0.012)]
 
 
+@pytest.mark.parametrize("face", ["bar", "kp08"])
 @pytest.mark.parametrize("refuse", [False, True])
-def test_limit_tolerance_is_written_to_the_part_and_read_back(monkeypatch, refuse) -> None:
+def test_limit_tolerance_is_written_to_the_part_and_read_back(monkeypatch, refuse, face) -> None:
     from types import SimpleNamespace
 
     class Tolerance:
@@ -820,8 +826,16 @@ def test_limit_tolerance_is_written_to_the_part_and_read_back(monkeypatch, refus
             return self.high
 
     tolerance = Tolerance()
-    nominal = spec.BAR_THREAD_DEPTH
-    low, high = spec.BAR_THREAD_LIMITS
+    nominal = spec.MODELED_THREAD_DEPTH
+    reference, dimension_name, bounds = (
+        (spec.BAR_THREAD_REFERENCE, spec.BAR_THREAD_DEPTH_DIMENSION, spec.BAR_THREAD_LIMITS)
+        if face == "bar" else
+        (spec.KP08_THREAD_REFERENCE, spec.KP08_THREAD_DEPTH_DIMENSION, spec.KP08_THREAD_LIMITS)
+    )
+    low, high = bounds
+    from _drawing_tolerances import _tolerance_places
+
+    assert _tolerance_places(low - nominal, high - nominal, display_unit="in") == 3
     dimension = SimpleNamespace(SystemValue=nominal / 1000.0, Tolerance=tolerance)
     monkeypatch.setattr(part, "_early_bound", lambda obj, _interface: obj)
     monkeypatch.setattr(part, "_named_dimension", lambda *_args: (object(), dimension))
@@ -832,8 +846,7 @@ def test_limit_tolerance_is_written_to_the_part_and_read_back(monkeypatch, refus
         tolerance.low, tolerance.high = lower / 1000.0, upper / 1000.0
 
     monkeypatch.setattr(part, "set_dimension_bilateral_tolerance", bilateral)
-    args = (None, spec.BAR_THREAD_REFERENCE, spec.BAR_THREAD_DEPTH_DIMENSION,
-            nominal, (low, high))
+    args = (None, reference, dimension_name, nominal, (low, high))
     if refuse:
         with pytest.raises(RuntimeError, match="native thread limits differ"):
             part._set_thread_limits(*args)
@@ -841,7 +854,7 @@ def test_limit_tolerance_is_written_to_the_part_and_read_back(monkeypatch, refus
         part._set_thread_limits(*args)
         assert tolerance.Type == 3
     assert calls == [
-        (spec.BAR_THREAD_REFERENCE, spec.BAR_THREAD_DEPTH_DIMENSION,
+        (reference, dimension_name,
          low - nominal, high - nominal, {"places": 3, "display_unit": "in"})
     ]
 
@@ -854,9 +867,9 @@ def test_section_refuses_unowned_or_lost_full_thread_limits(monkeypatch, failure
     wizards = {}
     for index, (reference, name, feature, nominal, bounds) in enumerate((
         (spec.BAR_THREAD_REFERENCE, spec.BAR_THREAD_DEPTH_DIMENSION, "BarTaps",
-         spec.BAR_THREAD_DEPTH, spec.BAR_THREAD_LIMITS),
+         spec.MODELED_THREAD_DEPTH, spec.BAR_THREAD_LIMITS),
         (spec.KP08_THREAD_REFERENCE, spec.KP08_THREAD_DEPTH_DIMENSION, "KP08Taps",
-         spec.KP08_THREAD_DEPTH, spec.KP08_THREAD_LIMITS),
+         spec.MODELED_THREAD_DEPTH, spec.KP08_THREAD_LIMITS),
     )):
         low, high = bounds
         tolerance = SimpleNamespace(
@@ -956,34 +969,84 @@ def test_tip_marks_finish_full_threads_without_reaching_the_opposed_screw() -> N
     )
 
 
+# Captured values are evidence, not regenerated expected output.
+# 4031a82a: both wizards read 10.9982; the top witness remained 12.4968.
+# 0e989113: editing the top to 12.4968 changed BOTH bottom cosmetic depths,
+# but BarTaps and its witness remained 10.9982. Circle readbacks are from
+# that second log (worker 4); no first-run cosmetic depths were captured.
+_FIRST_WIZARD_DEPTHS_MM = {"BarTaps": 10.9982, "KP08Taps": 10.9982}
+_FIRST_TOP_WITNESS_MM = 12.4968
+_SECOND_NATIVE_DEPTHS_MM = {
+    "BarTaps": 10.9982, "KP08Taps": 12.4968,
+    "BarFaceThread1": 12.4968, "BarFaceThread2": 12.4968,
+}
+_SECOND_BOTTOM_CIRCLES_MM = (
+    [13.925000090000001, 0.0, -6.938893903907228e-15, 1.7271999999999843],
+    [55.92499991, 0.0, -6.938893903907228e-15, 1.7271999999999843],
+)
+
+
+def test_observed_native_depth_pairs_support_coupling_not_independence() -> None:
+    assert tuple(_FIRST_WIZARD_DEPTHS_MM.values()) == pytest.approx(
+        (spec.MODELED_THREAD_DEPTH, spec.MODELED_THREAD_DEPTH)
+    )
+    assert _FIRST_TOP_WITNESS_MM != pytest.approx(_FIRST_WIZARD_DEPTHS_MM["KP08Taps"])
+    assert (
+        _SECOND_NATIVE_DEPTHS_MM["KP08Taps"],
+        _SECOND_NATIVE_DEPTHS_MM["BarFaceThread1"],
+        _SECOND_NATIVE_DEPTHS_MM["BarFaceThread2"],
+    ) == pytest.approx((12.4968, 12.4968, 12.4968))
+    assert _SECOND_NATIVE_DEPTHS_MM["BarTaps"] != _SECOND_NATIVE_DEPTHS_MM["KP08Taps"]
+
+
 @pytest.mark.parametrize("post_commit_drift", [None, "top", "bottom"])
-def test_distinct_thread_depths_survive_driving_and_the_final_rebuild(
+def test_shared_thread_depth_survives_observed_coupling_driving_and_rebuild(
     monkeypatch, post_commit_drift,
 ) -> None:
-    """Adversarially inject the observed drift during later rebuilding.
+    """Replay captured coupled state, then exercise the proposed common target.
 
-    Farm 4031a82a ended with the correct top witness but the bottom depth on
-    KP08Taps. This fake moves a correct top depth to the bottom depth during
-    pre-finalization rebuilds; that timing is a test adversary, not a claim
-    about SOLIDWORKS' undocumented internal sharing mechanism.
+    The initial readings below are the second native failure. Writing top depth
+    also writes both bottom cosmetics, as observed in that run. A successful
+    replay is an offline contract proof, not a new native observation at .433.
     """
     import asyncio
     from types import SimpleNamespace
 
-    assert spec.BAR_THREAD_DEPTH != spec.KP08_THREAD_DEPTH
+    shared = {"depth": _SECOND_NATIVE_DEPTHS_MM["KP08Taps"] / 1000.0}
+
+    class TopWizard:
+        EndCondition = 1
+        ThreadEndCondition = 0
+
+        @property
+        def ThreadDepth(self):
+            return shared["depth"]
+
+        @ThreadDepth.setter
+        def ThreadDepth(self, value):
+            shared["depth"] = value
+
+    class BottomCosmetic:
+        EndCondition = 0
+        DiameterType = 2
+        Diameter = 4.166 / 1000.0
+
+        def __init__(self, circle):
+            self.circle = circle
+            self.corrupted_depth = None
+
+        @property
+        def BlindDepth(self):
+            return shared["depth"] if self.corrupted_depth is None else self.corrupted_depth
+
     bar = SimpleNamespace(
-        EndCondition=0, ThreadEndCondition=0, ThreadDepth=spec.BAR_THREAD_DEPTH / 1000.0,
+        EndCondition=0, ThreadEndCondition=0,
+        ThreadDepth=_SECOND_NATIVE_DEPTHS_MM["BarTaps"] / 1000.0,
     )
-    top = SimpleNamespace(
-        EndCondition=1, ThreadEndCondition=0, ThreadDepth=spec.KP08_THREAD_DEPTH / 1000.0,
-    )
+    top = TopWizard()
     cosmetics = {
-        f"BarFaceThread{k}": SimpleNamespace(
-            EndCondition=0, BlindDepth=spec.BAR_THREAD_DEPTH / 1000.0,
-            DiameterType=2, Diameter=spec.THREAD_MAJOR / 1000.0,
-            circle=[x, 0.0, 0.0, spec.TAP_DRILL / 2.0],
-        )
-        for k, x in enumerate(spec.HOLE_X, start=1)
+        f"BarFaceThread{k}": BottomCosmetic(circle)
+        for k, circle in enumerate(_SECOND_BOTTOM_CIRCLES_MM, start=1)
     }
     definitions = {"BarTaps": bar, "KP08Taps": top, **cosmetics}
     features = {
@@ -996,15 +1059,23 @@ def test_distinct_thread_depths_survive_driving_and_the_final_rebuild(
     monkeypatch.setattr(
         part, "_thread_edge_circle", lambda _model, definition, **_kwargs: definition.circle,
     )
+    # Positive control: these exact captured cosmetic values are read, not
+    # replaced with expectations. The old mismatched full state must fail.
+    assert tuple(value.BlindDepth * 1000.0 for value in cosmetics.values()) == pytest.approx(
+        (_SECOND_NATIVE_DEPTHS_MM["BarFaceThread1"], _SECOND_NATIVE_DEPTHS_MM["BarFaceThread2"])
+    )
+    with pytest.raises(RuntimeError, match="bar-face threads"):
+        part._require_bar_face_threads(adapter, tuple(cosmetics))
+
     rows = {
         spec.BAR_THREAD_REFERENCE: {
             "BarThreadStation": spec.BAR_THREAD_WITNESS_X,
-            spec.BAR_THREAD_DEPTH_DIMENSION: 0.0,
+            spec.BAR_THREAD_DEPTH_DIMENSION: _SECOND_NATIVE_DEPTHS_MM["BarTaps"],
         },
         spec.KP08_THREAD_REFERENCE: {
             "KP08ThreadStation": spec.KP08_THREAD_WITNESS_X,
             "KP08ThreadFace": spec.BRACKET_THICK,
-            spec.KP08_THREAD_DEPTH_DIMENSION: 0.0,
+            spec.KP08_THREAD_DEPTH_DIMENSION: _FIRST_TOP_WITNESS_MM,
         },
     }
     monkeypatch.setattr(
@@ -1015,41 +1086,35 @@ def test_distinct_thread_depths_survive_driving_and_the_final_rebuild(
         ],
     )
     jobs = [
-        (f"{spec.BAR_THREAD_DEPTH_DIMENSION}@{spec.BAR_THREAD_REFERENCE}", '"BarThreadDepth"'),
-        (f"{spec.KP08_THREAD_DEPTH_DIMENSION}@{spec.KP08_THREAD_REFERENCE}", '"KP08ThreadDepth"'),
+        (f"{spec.BAR_THREAD_DEPTH_DIMENSION}@{spec.BAR_THREAD_REFERENCE}", '"ModeledThreadDepth"'),
+        (f"{spec.KP08_THREAD_DEPTH_DIMENSION}@{spec.KP08_THREAD_REFERENCE}", '"ModeledThreadDepth"'),
     ]
-    globals_mm = {
-        '"BarThreadDepth"': spec.BAR_THREAD_DEPTH,
-        '"KP08ThreadDepth"': spec.KP08_THREAD_DEPTH,
-    }
     events = []
     commits = []
 
     async def drive(_adapter, full_name, expression):
+        assert expression == '"ModeledThreadDepth"'
         events.append(("drive", full_name, expression))
         name, reference = full_name.split("@")
-        rows[reference][name] = globals_mm[expression]
+        rows[reference][name] = spec.MODELED_THREAD_DEPTH
 
     async def rebuild(_adapter):
         events.append(("rebuild",))
-        if not commits or post_commit_drift == "top":
-            top.ThreadDepth = bar.ThreadDepth
+        if commits and post_commit_drift == "top":
+            top.ThreadDepth = _SECOND_NATIVE_DEPTHS_MM["KP08Taps"] / 1000.0
+        elif commits and post_commit_drift == "bottom":
+            next(iter(cosmetics.values())).corrupted_depth = 12.4968 / 1000.0
 
     def commit(got_model, got_feature, definition, edits, _label):
         assert got_model is model and got_feature is features["KP08Taps"]
         assert definition is top
-        assert definition.ThreadDepth == bar.ThreadDepth
-        assert rows[spec.KP08_THREAD_REFERENCE][spec.KP08_THREAD_DEPTH_DIMENSION] == pytest.approx(
-            spec.KP08_THREAD_DEPTH
+        assert definition.ThreadDepth * 1000.0 == pytest.approx(
+            _SECOND_NATIVE_DEPTHS_MM["KP08Taps"]
         )
         events.append(("commit",))
         commits.append(tuple(edits))
         for name, value in edits:
             setattr(definition, name, value)
-        if post_commit_drift == "bottom":
-            # If editing the top wizard also rewrites a bottom cosmetic
-            # thread, the unchanged final bottom guard must reject it.
-            next(iter(cosmetics.values())).BlindDepth = top.ThreadDepth
         return definition
 
     monkeypatch.setattr(part, "drive_dimension", drive)
@@ -1060,10 +1125,10 @@ def test_distinct_thread_depths_survive_driving_and_the_final_rebuild(
             asyncio.run(part._drive_and_finalize_threads(adapter, jobs, tuple(cosmetics)))
     else:
         asyncio.run(part._drive_and_finalize_threads(adapter, jobs, tuple(cosmetics)))
-        assert top.ThreadDepth == pytest.approx(spec.KP08_THREAD_DEPTH / 1000.0)
-        assert bar.ThreadDepth == pytest.approx(spec.BAR_THREAD_DEPTH / 1000.0)
+        assert top.ThreadDepth == pytest.approx(spec.MODELED_THREAD_DEPTH / 1000.0)
+        assert bar.ThreadDepth == pytest.approx(spec.MODELED_THREAD_DEPTH / 1000.0)
         assert all(
-            value.BlindDepth == pytest.approx(spec.BAR_THREAD_DEPTH / 1000.0)
+            value.BlindDepth == pytest.approx(spec.MODELED_THREAD_DEPTH / 1000.0)
             for value in cosmetics.values()
         )
     assert top.EndCondition == 1 and top.ThreadEndCondition == 0
@@ -1074,5 +1139,5 @@ def test_distinct_thread_depths_survive_driving_and_the_final_rebuild(
         ("rebuild",), ("commit",), ("rebuild",),
     ]
     assert rows[spec.KP08_THREAD_REFERENCE][spec.KP08_THREAD_DEPTH_DIMENSION] == pytest.approx(
-        spec.KP08_THREAD_DEPTH
+        spec.MODELED_THREAD_DEPTH
     )

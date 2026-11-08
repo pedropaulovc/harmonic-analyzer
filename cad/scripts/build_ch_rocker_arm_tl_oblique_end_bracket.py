@@ -9,12 +9,11 @@ inner end face (model x 0) about the mid-width line, extruded +Z by the stock
 thickness; the two holes on the row y 0 (the KP08's 42 mm span) are tapped
 #8-32 UNC from both faces (owner A″ ruling) by two native Hole Wizard
 features at the same stations: ``BarTaps``, BLIND from the bottom face
-(independent construction drill depth and ``BAR_THREAD_DEPTH``), then
-``KP08Taps``, THRU ALL from the intact top face, post-edited to blind
-``KP08_THREAD_DEPTH``. Its drill completes the through hole; then
-one native cosmetic thread per finished bore from its bottom edge,
-``BarFaceThread1``/``2``, ``BAR_THREAD_DEPTH`` deep (the bottom thread the
-section draws).
+(independent construction drill depth), then ``KP08Taps``, THRU ALL from
+the intact top face. Both finite thread definitions and the added bottom
+cosmetic threads use ``MODELED_THREAD_DEPTH``: SOLIDWORKS couples the top
+wizard and those cosmetic depths. The two manufacturing LIMIT bands remain
+independent; the common model nominal is inside both.
 The row's printed station (.250 from the -Y side face) lives on a hidden
 reference sketch, ``HoleRowReference`` (build_ch_rocker_arm_tl_oblique_base_bar's
 ``RailRowReference``); the stock thickness the end view prints lives on another,
@@ -73,7 +72,6 @@ from ch_rocker_arm_tl_oblique_end_bracket_spec import (
     BAR_TAP_DRILL_DEPTH,
     BAR_TAP_FACE,
     BAR_TAP_SPEC,
-    BAR_THREAD_DEPTH,
     BAR_THREAD_DEPTH_DIMENSION,
     BAR_THREAD_REFERENCE,
     BAR_THREAD_WITNESS_X,
@@ -89,7 +87,7 @@ from ch_rocker_arm_tl_oblique_end_bracket_spec import (
     ISOMETRIC_VIEW_NOTE,
     KP08_TAP_FACE,
     KP08_TAP_SPEC,
-    KP08_THREAD_DEPTH,
+    MODELED_THREAD_DEPTH,
     KP08_THREAD_DEPTH_DIMENSION,
     KP08_THREAD_REFERENCE,
     KP08_THREAD_WITNESS_X,
@@ -207,7 +205,7 @@ _MAJOR_DIAMETER_TYPE = 2
 @_telemetry.traced("feature.bar_face_cosmetic_threads")
 async def _bar_face_cosmetic_threads(adapter) -> tuple[str, ...]:
     """One #8-32 cosmetic thread per bore from its bottom edge, BLIND
-    BAR_THREAD_DEPTH, named ``BarFaceThread<k>``; picked square-on to the
+    MODELED_THREAD_DEPTH, named ``BarFaceThread<k>``; picked square-on to the
     bottom face, the standard isometric restored after."""
     from solidworks_mcp.adapters.base import AddThreadParameters
 
@@ -228,7 +226,7 @@ async def _bar_face_cosmetic_threads(adapter) -> tuple[str, ...]:
                         standard="ansi_inch",
                         size=SCREW,
                         end_type="blind",
-                        depth=BAR_THREAD_DEPTH,
+                        depth=MODELED_THREAD_DEPTH,
                         diameter=THREAD_MAJOR,
                         note=BAR_FACE_THREAD_NOTE,
                     )
@@ -277,7 +275,7 @@ def _thread_edge_circle(model, definition, *, label: str) -> list[float]:
 @_telemetry.traced("feature.require_bar_face_threads")
 def _require_bar_face_threads(adapter, names: tuple[str, ...]) -> None:
     """Each bottom cosmetic thread BLIND at BarTaps' committed thread depth,
-    the spec's BAR_THREAD_DEPTH (build_mg_magnifying_lever's readback), on
+    the spec's MODELED_THREAD_DEPTH, on
     its own bore's bottom edge: the tap drill's circle centred on that
     station, on the bottom face."""
     model = _early_bound(adapter.currentModel, "IModelDoc2")
@@ -314,7 +312,7 @@ def _require_bar_face_threads(adapter, names: tuple[str, ...]) -> None:
     }
     if (
         set(readback) != set(wanted)
-        or abs(wizard_mm - BAR_THREAD_DEPTH) > 0.005
+        or abs(wizard_mm - MODELED_THREAD_DEPTH) > 0.005
         or any(
             end != _BLIND
             or abs(depth - wizard_mm) > 0.005
@@ -330,7 +328,7 @@ def _require_bar_face_threads(adapter, names: tuple[str, ...]) -> None:
         raise RuntimeError(
             f"bar-face threads {readback!r} differ from their bottom edges "
             f"{wanted!r} or BarTaps' thread {wizard_mm:.4f} mm / "
-            f"BAR_THREAD_DEPTH {BAR_THREAD_DEPTH:.4f}"
+            f"MODELED_THREAD_DEPTH {MODELED_THREAD_DEPTH:.4f}"
         )
     _telemetry.info(f"bar-face threads read back: {readback!r}")
 
@@ -416,36 +414,34 @@ def _set_thread_limits(
 async def _drive_and_finalize_threads(
     adapter, drive_jobs: list[tuple[str, str]], bar_face_threads: tuple[str, ...]
 ) -> None:
-    """Finish driving before committing and proving the independent threads.
+    """Commit the shared native depth, preserving independent face LIMIT bands.
 
-    The final top-thread write must follow all bottom cosmetic-thread insertions
-    on KP08Taps' finished bores. Those insertions receive BAR_THREAD_DEPTH;
-    writing KP08_THREAD_DEPTH before them was not stable in farm run 4031a82a.
-    Its distinct, correctly driven witness survived while the wizard read the
-    bottom depth. The log does not isolate which intervening native rebuild
-    exposed that coupling, so do not attribute it to an equation-name alias.
-
-    Commit once, rebuild, then require the top, bottom and cosmetic definitions
-    together. A rebuild that changes either face still fails; there is no repair
-    loop or readback substitution.
+    Run 4031a82a read both wizards at 10.9982 mm after bottom cosmetic creation.
+    Run 0e989113 then read the top wizard and BOTH bottom cosmetic threads at
+    12.4968 mm after editing the top; the bottom wizard stayed at 10.9982 mm.
+    Ordering alone therefore does not provide independent cosmetic depths.
+    All native thread definitions now intentionally use the spec's one modeled
+    depth inside both manufacturing bands. Commit once, rebuild, then prove
+    both witnesses, wizards and bottom cosmetic depths/edges; no repair loop
+    or substitution of a witness value for a mismatched native readback.
     """
     await force_rebuild(adapter)
     for dimension_name, expression in drive_jobs:
         await drive_dimension(adapter, dimension_name, expression)
     await force_rebuild(adapter)
     _thread_from_face(
-        adapter, "KP08Taps", KP08_THREAD_DEPTH, label="KP08-face screw threads"
+        adapter, "KP08Taps", MODELED_THREAD_DEPTH, label="KP08-face screw threads"
     )
     await force_rebuild(adapter)
     _require_thread_reference(
         adapter, feature_name="BarTaps", reference=BAR_THREAD_REFERENCE,
         dimension_name=BAR_THREAD_DEPTH_DIMENSION, station_name="BarThreadStation",
-        depth_mm=BAR_THREAD_DEPTH, witness_x=BAR_THREAD_WITNESS_X,
+        depth_mm=MODELED_THREAD_DEPTH, witness_x=BAR_THREAD_WITNESS_X,
     )
     _require_thread_reference(
         adapter, feature_name="KP08Taps", reference=KP08_THREAD_REFERENCE,
         dimension_name=KP08_THREAD_DEPTH_DIMENSION, station_name="KP08ThreadStation",
-        depth_mm=KP08_THREAD_DEPTH, witness_x=KP08_THREAD_WITNESS_X,
+        depth_mm=MODELED_THREAD_DEPTH, witness_x=KP08_THREAD_WITNESS_X,
     )
     _require_bar_face_threads(adapter, bar_face_threads)
 
@@ -465,8 +461,7 @@ async def build(adapter) -> dict[str, str]:
         ("BracketThick", BRACKET_THICK),
         ("HoleX1", HOLE_X[0]),
         ("HoleX2", HOLE_X[1]),
-        ("BarThreadDepth", BAR_THREAD_DEPTH),
-        ("KP08ThreadDepth", KP08_THREAD_DEPTH),
+        ("ModeledThreadDepth", MODELED_THREAD_DEPTH),
         ("ThreadMajor", THREAD_MAJOR),
     ):
         await set_global(adapter, name, f"{value}mm")
@@ -508,7 +503,7 @@ async def build(adapter) -> dict[str, str]:
 
     # --- Bar-face threads: ONE #8-32 UNC BLIND wizard from the bottom face --
     # Their screws come up through TL-20, so each thread runs from the bar
-    # face, BAR_THREAD_DEPTH deep; the independent construction-only drill
+    # face, MODELED_THREAD_DEPTH deep; the independent construction-only drill
     # leaves the top face intact for the next wizard. The wizard
     # sets the row on y 0 by an origin relation (a zero coordinate takes no
     # dimension); each station is a dimension from the inner end.
@@ -533,7 +528,7 @@ async def build(adapter) -> dict[str, str]:
 
     # --- KP08-face threads: ONE #8-32 UNC wizard THRU ALL from the top face --
     # Its drill completes each through hole; its thread stops
-    # KP08_THREAD_DEPTH from the top, short of the bar screw's reach.
+    # MODELED_THREAD_DEPTH from the top, within that face's manufacturing band.
     kp08_normal, kp08_z = KP08_TAP_FACE
     kp08_taps = wizard_holes(
         adapter,
@@ -628,7 +623,7 @@ async def build(adapter) -> dict[str, str]:
     # side (BAR_THREAD_WITNESS_X, where the section draws that thread's side
     # line), on the Top plane through the row, sketch (u, v) = model (X, -Z)
     # (build_fr_nameplate's SectionReference): one on the bottom face, one
-    # BAR_THREAD_DEPTH above it, at the drawn thread's end. Points, not a
+    # MODELED_THREAD_DEPTH above it, at the drawn thread's end. Points, not a
     # line: a line would print over the thread. _require_thread_reference
     # proves the depth equals BarTaps' committed thread depth and the
     # station the hole's plus half the major diameter.
@@ -640,16 +635,16 @@ async def build(adapter) -> dict[str, str]:
         adapter, face_point, witness_x, 0.0, "bar thread face station"
     )
     thread_ref.record("BarThreadStation", f'"HoleX{len(HOLE_X)}" + "ThreadMajor" / 2')
-    end_point = _add_point(adapter, (witness_x, -BAR_THREAD_DEPTH), "bar thread end")
+    end_point = _add_point(adapter, (witness_x, -MODELED_THREAD_DEPTH), "bar thread end")
     await anchor_point_to_point(
         adapter,
         face_point,
         end_point,
         0.0,
-        -BAR_THREAD_DEPTH,
+        -MODELED_THREAD_DEPTH,
         BAR_THREAD_DEPTH_DIMENSION,
     )
-    thread_ref.record(BAR_THREAD_DEPTH_DIMENSION, '"BarThreadDepth"')
+    thread_ref.record(BAR_THREAD_DEPTH_DIMENSION, '"ModeledThreadDepth"')
     await ensure_fully_defined(adapter, "bar thread reference sketch")
     check("exit_sketch bar thread reference", await adapter.exit_sketch())
     name_last_feature(adapter, BAR_THREAD_REFERENCE)
@@ -670,14 +665,14 @@ async def build(adapter) -> dict[str, str]:
     top_ref.record("KP08ThreadFace", '"BracketThick"')
     end_point = _add_point(
         adapter,
-        (KP08_THREAD_WITNESS_X, -BRACKET_THICK + KP08_THREAD_DEPTH),
+        (KP08_THREAD_WITNESS_X, -BRACKET_THICK + MODELED_THREAD_DEPTH),
         "KP08 thread end",
     )
     await anchor_point_to_point(
-        adapter, face_point, end_point, 0.0, KP08_THREAD_DEPTH,
+        adapter, face_point, end_point, 0.0, MODELED_THREAD_DEPTH,
         KP08_THREAD_DEPTH_DIMENSION,
     )
-    top_ref.record(KP08_THREAD_DEPTH_DIMENSION, '"KP08ThreadDepth"')
+    top_ref.record(KP08_THREAD_DEPTH_DIMENSION, '"ModeledThreadDepth"')
     await ensure_fully_defined(adapter, "KP08 thread reference sketch")
     check("exit_sketch KP08 thread reference", await adapter.exit_sketch())
     name_last_feature(adapter, KP08_THREAD_REFERENCE)
@@ -699,11 +694,11 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     _set_thread_limits(
         adapter, BAR_THREAD_REFERENCE, BAR_THREAD_DEPTH_DIMENSION,
-        BAR_THREAD_DEPTH, BAR_THREAD_LIMITS,
+        MODELED_THREAD_DEPTH, BAR_THREAD_LIMITS,
     )
     _set_thread_limits(
         adapter, KP08_THREAD_REFERENCE, KP08_THREAD_DEPTH_DIMENSION,
-        KP08_THREAD_DEPTH, KP08_THREAD_LIMITS,
+        MODELED_THREAD_DEPTH, KP08_THREAD_LIMITS,
     )
     for (feature_name, dimension_name), (places, band) in METRIC_DIMENSIONS.items():
         set_dimension_symmetric_tolerance(

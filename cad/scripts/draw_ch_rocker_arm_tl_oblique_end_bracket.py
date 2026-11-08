@@ -8,8 +8,8 @@ one native callout per hole over it, each leader on its own hole; the end
 view, projected right of the plan, carries the stock thickness and section
 A-A's cutting line; section A-A, cut along the hole row and placed under the
 plan, draws both faces' threads solid and carries two part-owned LIMIT
-dimensions for their independent full-thread depths. Each plan callout
-identifies its thread and refers to those limits; the first alone states
+dimensions for independent full-thread LIMIT bands about one common modeled
+depth. Each plan callout identifies its thread; the first alone states
 #29 DRILL THRU for BOTH HOLES, retaining the native drill-diameter token.
 The shaded isometric rides top right at 1:1. The KP08's 42 mm bolt span
 prints exact millimetres, labelled mm. No hand-formatted depth substitutes
@@ -77,7 +77,6 @@ from _supplier_dimensions import supplier_reference_dimension
 from ch_rocker_arm_tl_oblique_callouts import set_callout_lengths_to_three_places
 from ch_rocker_arm_tl_oblique_end_bracket_spec import (
     BAR_TAP_SPEC,
-    BAR_THREAD_DEPTH,
     BAR_THREAD_DEPTH_DIMENSION,
     BAR_THREAD_REFERENCE,
     BAR_THREAD_LIMITS,
@@ -91,7 +90,7 @@ from ch_rocker_arm_tl_oblique_end_bracket_spec import (
     HOLE_ROW_Y,
     HOLE_X,
     KP08_TAP_SPEC,
-    KP08_THREAD_DEPTH,
+    MODELED_THREAD_DEPTH,
     KP08_THREAD_DEPTH_DIMENSION,
     KP08_THREAD_REFERENCE,
     KP08_THREAD_LIMITS,
@@ -247,8 +246,8 @@ SECTION_CENTER = (PLAN_CENTER[0], 0.106)
 SECTION_CAPTION_XY = (PLAN_CENTER[0], 0.074)
 DEPTH_LANE = SIDE_LANE / 2.0
 SECTION_KEEP: dict[str, tuple[float, float, float]] = {
-    BAR_THREAD_DEPTH_DIMENSION: (_L + DEPTH_LANE, 0.0, BAR_THREAD_DEPTH / 2.0),
-    KP08_THREAD_DEPTH_DIMENSION: (-DEPTH_LANE, 0.0, _H - KP08_THREAD_DEPTH / 2.0),
+    BAR_THREAD_DEPTH_DIMENSION: (_L + DEPTH_LANE, 0.0, MODELED_THREAD_DEPTH / 2.0),
+    KP08_THREAD_DEPTH_DIMENSION: (-DEPTH_LANE, 0.0, _H - MODELED_THREAD_DEPTH / 2.0),
 }
 SECTION_TEXT = {
     BAR_THREAD_DEPTH_DIMENSION: (
@@ -594,10 +593,10 @@ def _require_thread_depths(section: Any) -> None:
     view = _early_bound(section, "IView")
     expected = {
         BAR_THREAD_DEPTH_DIMENSION: (
-            BAR_THREAD_REFERENCE, "BarTaps", BAR_THREAD_DEPTH, BAR_THREAD_LIMITS,
+            BAR_THREAD_REFERENCE, "BarTaps", MODELED_THREAD_DEPTH, BAR_THREAD_LIMITS,
         ),
         KP08_THREAD_DEPTH_DIMENSION: (
-            KP08_THREAD_REFERENCE, "KP08Taps", KP08_THREAD_DEPTH, KP08_THREAD_LIMITS,
+            KP08_THREAD_REFERENCE, "KP08Taps", MODELED_THREAD_DEPTH, KP08_THREAD_LIMITS,
         ),
     }
     model = _early_bound(view.ReferencedDocument, "IModelDoc2")
@@ -649,7 +648,7 @@ def _require_thread_depths(section: Any) -> None:
 # KP08Taps' drew, so the part carries a native cosmetic thread on each
 # finished bore's bottom edge (build_..._end_bracket, BarFaceThread) and the
 # settled section must draw each one, both sides, from the bottom face to
-# BAR_THREAD_DEPTH, where the depth's witness lands.
+# MODELED_THREAD_DEPTH, where the depth's witness lands.
 SECTION_THREAD_LAYER = "TAP-THREAD-SECTION"
 SECTION_THREAD_INSTANCES = len(HOLE_X) * len(("BarFaceThread", "KP08Taps"))
 _COSMETIC_THREAD_ANNOTATION = 1  # swAnnotationType_e.swCosmeticThread
@@ -721,8 +720,8 @@ def _require_threads_drawn(adapter: Any, section: Any) -> None:
     lines, states = _thread_annotation_lines(section)
     missing = []
     for face, start_z, end_z in (
-        ("bottom", 0.0, BAR_THREAD_DEPTH),
-        ("top", _H, _H - KP08_THREAD_DEPTH),
+        ("bottom", 0.0, MODELED_THREAD_DEPTH),
+        ("top", _H, _H - MODELED_THREAD_DEPTH),
     ):
         for x in HOLE_X:
             for side in (-1.0, 1.0):

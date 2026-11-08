@@ -41,6 +41,11 @@ taps. Neither screw may enter the opposed-phase cut, including its lead;
 unused middle thread may be double-cut. The KP08 foot receipt band remains
 .196–.292, UNVERIFIED (#2184).
 
+The native model uses one shared .433 thread depth inside both face bands.
+SOLIDWORKS couples the top wizard and the added bottom cosmetic threads
+(farm runs 4031a82a and 0e989113). This nominal is a representation choice,
+not a replacement for either manufacturing LIMIT band or tap-tip mark.
+
 Bands. Both patterns are fixed-fastener fits, so the stations print exact mm
 at three places (±0.13 mm) and the row at the title block's ±.005. Each hole
 then sits in its band's half-side square, ``POSITION_RADIUS`` from nominal.
@@ -136,8 +141,15 @@ BOTTOMING_LEAD_LIMITS = (_PITCH, 2.0 * _PITCH)
 HAND_TAP_FLUTE_LENGTH = 0.75 * 25.4  # catalogue-valued, not measured
 BAR_THREAD_LIMITS = (0.370 * 25.4, 0.496 * 25.4)
 KP08_THREAD_LIMITS = (0.429 * 25.4, 0.555 * 25.4)
-BAR_THREAD_DEPTH = 0.433 * 25.4
-KP08_THREAD_DEPTH = 0.492 * 25.4
+# One native depth for the coupled wizard/cosmetic definitions. Keep the
+# existing bottom nominal, not a rounded midpoint; both printed LIMIT bands
+# retain three-place deviations about this common model value.
+MODELED_THREAD_DEPTH = 0.433 * 25.4
+if not all(
+    low <= MODELED_THREAD_DEPTH <= high
+    for low, high in (BAR_THREAD_LIMITS, KP08_THREAD_LIMITS)
+):
+    raise AssertionError("the shared modeled thread depth must lie in both face bands")
 BAR_TIP_MARK_LIMITS = (0.433 * 25.4, 0.527 * 25.4)
 KP08_TIP_MARK_LIMITS = (0.492 * 25.4, 0.586 * 25.4)
 
@@ -227,12 +239,12 @@ if TIP_MARK_SEAM_CLEARANCE_MIN <= 0.0:
 BAR_TAP_DRILL_DEPTH = 0.625 * 25.4
 BAR_TAP_SPEC = HoleSpec(
     "tapped", SCREW, end="blind", depth_mm=BAR_TAP_DRILL_DEPTH,
-    overrides_mm={"ThreadDepth": BAR_THREAD_DEPTH},
+    overrides_mm={"ThreadDepth": MODELED_THREAD_DEPTH},
 )
 KP08_TAP_SPEC = HoleSpec("tapped", SCREW, end="through_all")
 TAP_DRILL = blind_cut_dia_mm(BAR_TAP_SPEC)
 THREAD_MAJOR = THREAD_MAJOR_MM[SCREW]
-if not BAR_THREAD_DEPTH <= BAR_TAP_DRILL_DEPTH < BRACKET_THICK - TAP_DRILL / 2.0 * 0.60086:
+if not MODELED_THREAD_DEPTH <= BAR_TAP_DRILL_DEPTH < BRACKET_THICK - TAP_DRILL / 2.0 * 0.60086:
     raise AssertionError("the precursor drill must leave the KP08 face intact")
 BAR_TAP_FACE = ((0.0, 0.0, -1.0), 0.0)
 KP08_TAP_FACE = ((0.0, 0.0, 1.0), BRACKET_THICK)

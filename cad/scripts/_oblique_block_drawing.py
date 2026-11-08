@@ -15,16 +15,18 @@ the plan. The layout notes below give sheet millimetres.
 """
 from __future__ import annotations
 import math
+import re
 from typing import Any
 from _check import check
 from _com import _early_bound
+from _drawing_attachment import _assert_attached_to, _assert_leader_lands
 from _drawing_common import (DrawingOutputs, finalize_drawing, new_project_drawing, read_required_properties, rebuild_drawing,
                              remove_notes_matching)
 from _drawing_dimensions import assert_imported_precision, dimension_name, offset_dimension_text
-from _drawing_edges import scan_view_edges
+from _drawing_edges import _segment_distance, scan_view_edges
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout
-from _drawing_leader_notes import add_leader_note
+from _drawing_leader_notes import add_attached_note, add_leader_note
 from _drawing_projection import model_point_in_view
 from _drawing_sections import create_section_view
 from _drawing_sheets import create_blank_drawing_sheets
@@ -34,6 +36,7 @@ from _paths import CAD_ROOT
 from _drawing_metric_vendor import print_imported_metric_dimensions
 from _part_properties import part_drawing_unit
 from _layout_audit import arrowhead_segments
+from _oblique_carrier_hole_table import _size_semantics
 import _telemetry
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
@@ -60,13 +63,9 @@ PLAN_KEEP = {
     'BlockWidth':(.2595,.203),'BlockSideY':(.231,.220),
     'CarriageDrills3Y':(.222,.1985),'CarriageDrills4Y':(.222,.2115),
     'BoreDia':(.078,.196),'CarriageDrills1Dia':(.085,.168),'CarriageCounterbores3Dia':(.245,.150),
-    # The tap's Ø on its circle at the seat's floor, from high on the upper
-    # left: the leader enters the plan's left edge under the length stack's
-    # extension lines and passes over the A-A arrow's letter. In A-A its
-    # extension lines rose from the top face through the empty Ø.3750 seat
-    # (machinist review, delta 20261104T040714425Z); on the bottom face with
-    # them hidden, its arrows ran along the edge (#2119's final
-    # 20261103T190306489Z).
+    # TL-32 still prints this separate native tap dimension in its established
+    # upper-left lane. TL-22 imports it at the same source position, then
+    # hides only the display after its stacked native note resolves.
     'TapDrillDia':(.071,.2455),
 }
 # TL-22 and TL-32 share this top tier (machinist review of c40296ac, TL-32
@@ -191,108 +190,175 @@ def _displays(adapter, annotations, names) -> dict[str, Any]:
     return found
 
 
-@_telemetry.traced("drawing.pivot_tap_arrow_inside")
-def _place_pivot_tap_arrow_inside(adapter, plan, annotations, contract):
-    """Keep the imported source; put its arrow body inside the drill circle.
+# A single outside callout replaces the two plan-diameter displays on TL-22.
+# Sheet metres: four rows in the former left-hand callout lanes, aimed at the
+# seat's leftmost rim, between (not through) the two left carriage holes.
+PIVOT_STACK_XY = (.025, .225)
+PIVOT_FIT_TEXT = 'LOCATING FIT ON TL-VN-77 SHOULDER'
+PIVOT_THREAD_TEXT = f'{part.PIVOT_TAP} UNC TAP THRU BELOW SEAT'
 
-    Retained 4031 leader endpoints indicate an inner-circle tip, but an
-    outside arrow body can cross the outer reamed ring. Set the documented
-    diameter ArrowSide, not an unsupported annotation reattachment or a
-    text move. The part and its cutting sketch remain untouched.
 
-    SDK v3.12.1: GetArrowHeadAtIndex2 returns [tip3, dir3, width, height,
-    style, normal3]. Reuse the layout audit's calibrated direction-to-base
-    convention to prove the whole native triangle lies inside the bore.
+def _pivot_stack_semantics(text):
+    """Reuse native SIZE-band semantics, ignoring only note font markup."""
+    text = re.sub(r'</?FONT\b[^>]*>', '', text, flags=re.IGNORECASE)
+    return _size_semantics('pivot stacked callout', text.replace('Ø', '<MOD-DIAM>').replace('↧', '<HOLE-DEPTH>'))
+
+
+def _pivot_stack_text(bore, depth, drill):
+    return (f'REAM {bore} <HOLE-DEPTH>{depth}\n{PIVOT_FIT_TEXT}\n'
+            f'DRILL {drill} THRU\n{PIVOT_THREAD_TEXT}')
+
+
+@_telemetry.traced("drawing.pivot_stacked_callout")
+def _stack_pivot_callout(adapter, plan, annotations, contract):
+    """One outer-rim leader; sizes and tolerance remain native dimension links.
+
+    SDK v3.12.1 INote.PropertyLinkedText documents quoted drawing-dimension
+    references (e.g. "RD1@Drawing View1"). IncludeDimPrefixSuffixTolerance
+    preserves the linked dimension's prefix/suffix/band. Never author sizes
+    from GetText/SystemValue: numeric formatting below is readback-only.
     """
-    displays = _displays(adapter, annotations, ('TapDrillDia', 'BoreDia'))
+    names = ('BoreDia', 'TopBoreDepth', 'TapDrillDia')
+    displays = _displays(adapter, annotations, names)
+
+    def source_state(display):
+        dim = _early_bound(display.GetDimension2(0), 'IDimension')
+        ann = _early_bound(display.GetAnnotation(), 'IAnnotation')
+        tol = _early_bound(dim.Tolerance, 'IDimensionTolerance')
+        return (
+            str(dim.FullName), float(dim.SystemValue),
+            tuple(str(display.GetText(which) or '') for which in range(1, 9)),
+            int(display.GetPrimaryPrecision2()), int(display.GetPrimaryTolPrecision2()),
+            (int(tol.Type), float(tol.GetMinValue()), float(tol.GetMaxValue())),
+            str(display.GetNameForSelection()), tuple(float(v) for v in (ann.GetPosition() or ())),
+        )
+
     sources = {}
-    rim_specs = {
-        'TapDrillDia': ('PivotTapProfile', part.PIVOT_TAP_DRILL, contract.BLOCK_HEIGHT - part.BORE_DEPTH),
-        'BoreDia': ('TopBoreProfile', part.BORE_DIA, contract.BLOCK_HEIGHT),
-    }
-    for name, display in displays.items():
-        feature, diameter, _ = rim_specs[name]
-        dimension = _early_bound(display.GetDimension2(0), 'IDimension')
-        if dimension is None or str(dimension.FullName).split('@')[:2] != [name, feature]:
-            raise RuntimeError(f'{name}: missing native {feature} source')
-        value = float(dimension.SystemValue)
-        if not math.isfinite(value) or not math.isclose(value, diameter / 1000, rel_tol=0, abs_tol=1e-9):
-            raise RuntimeError(f'{name}: native diameter reads {value!r} m')
-        # GetText(0), swDimensionTextAll, is unsupported. Parts 1..4 read
-        # resolved text; 5..8 retain its native token-bearing definitions.
-        text = tuple(str(display.GetText(which) or '') for which in range(1, 9))
-        if text[2:4] != (contract.CALLOUTS_ABOVE[name], contract.CALLOUTS_BELOW[name]):
-            raise RuntimeError(f'{name}: native process/thread callout changed: {text!r}')
-        annotation = _early_bound(display.GetAnnotation(), 'IAnnotation')
-        position = tuple(float(v) for v in annotation.GetPosition())
-        if len(position) != 3 or not all(math.isfinite(v) for v in position):
-            raise RuntimeError(f'{name}: unreadable native text position')
-        sources[name] = (dimension, str(dimension.FullName), value, text, position, int(display.ArrowSide))
+    for name, feature in zip(names, ('TopBoreProfile', 'TopBore', 'PivotTapProfile')):
+        display = displays[name]
+        state = source_state(display)
+        if (state[0].split('@')[:2] != [name, feature]
+                or not math.isfinite(state[1])
+                or not math.isclose(state[1] * 1000, contract.DRAWING_VALUES[name], rel_tol=0, abs_tol=1e-6)
+                or state[3] != contract.DRAWING_PRECISION_BY_NAME[name]
+                or state[2][2:4] != (contract.CALLOUTS_ABOVE.get(name, ''), contract.CALLOUTS_BELOW.get(name, ''))
+                or not state[6] or '"' in state[6] or '@' not in state[6]
+                or len(state[7]) != 3 or not all(math.isfinite(v) for v in state[7])):
+            raise RuntimeError(f'{name}: unreadable native stacked-callout source {state!r}')
+        ann = _early_bound(display.GetAnnotation(), 'IAnnotation')
+        if int(ann.OwnerType) != 0 or ann.IsDangling():
+            raise RuntimeError(f'{name}: source is not a live drawing-view dimension')
+        sources[name] = (_early_bound(display.GetDimension2(0), 'IDimension'), state)
+    bore_state = sources['BoreDia'][1]
+    tolerance_kind, lower, upper = bore_state[5]
+    tolerance_places = bore_state[3] if bore_state[4] == -3 else bore_state[4]
+    if (tolerance_kind != 2 or not all(math.isfinite(v) for v in (lower, upper))
+            or not 0 <= lower < upper or tolerance_places < 0):
+        raise RuntimeError('BoreDia: native bilateral locating-fit band is unavailable')
+    if any(sources[name][1][5][0] != 0 for name in ('TopBoreDepth', 'TapDrillDia')):
+        raise RuntimeError('pivot stacked callout: unexpected explicit depth/drill tolerance')
 
-    @_telemetry.traced("drawing.pivot_tap_arrow_readback")
+    # Only quoted native selection names enter the authored size fields.
+    linked = _pivot_stack_text(*(f'"{sources[name][1][6]}"' for name in names))
+    numeric = {name: f'{state[1] / .0254:.{state[3]}f}' for name, (_, state) in sources.items()}
+    band = (f'<STACK>{upper / .0254:+.{tolerance_places}f}'
+            f'<OVER>{lower / .0254:+.{tolerance_places}f}</STACK>')
+    expected = _pivot_stack_semantics(_pivot_stack_text(
+        '<MOD-DIAM>' + numeric['BoreDia'] + band, numeric['TopBoreDepth'],
+        '<MOD-DIAM>' + numeric['TapDrillDia'],
+    ))
+    edges = scan_view_edges(plan, label='pivot stacked callout rim')
+    outer = edges.circle_at(
+        (part.BORE_X, part.BORE_Y, contract.BLOCK_HEIGHT), part.BORE_DIA / 2,
+        axis=(0.0, 0.0, 1.0), center_tol_mm=1e-6, radius_tol_mm=1e-6, label='pivot reamed mouth',
+    )
+    if not all(math.isfinite(v) for v in outer.circle):
+        raise RuntimeError('pivot stacked callout outer rim is unreadable')
+    centre = _project(adapter, plan, (part.BORE_X, part.BORE_Y, contract.BLOCK_HEIGHT), 'pivot centre')
+    landing = _project(adapter, plan, (part.BORE_X - part.BORE_DIA / 2, part.BORE_Y, contract.BLOCK_HEIGHT),
+                       'pivot outer left rim')
+    radius = math.dist(centre, landing)
+    obstacle = _project(adapter, plan, (-part.BOLT_X, part.BOLT_Y, contract.BLOCK_HEIGHT),
+                        'upper-left carriage counterbore')
+    obstacle_rim = _project(adapter, plan,
+                            (-part.BOLT_X + part.CBORE_DIA / 2, part.BOLT_Y, contract.BLOCK_HEIGHT),
+                            'upper-left counterbore radius')
+    obstacle_radius = math.dist(obstacle, obstacle_rim)
+    if (not all(math.isfinite(v) for point in (centre, landing, obstacle, obstacle_rim) for v in point)
+            or radius <= 0 or obstacle_radius <= 0):
+        raise RuntimeError('pivot stacked callout projection is unreadable')
+    note = _early_bound(add_attached_note(
+        adapter, plan, text='REAM', entity=outer.edge, leader_attach_xy=landing,
+        note_xy=PIVOT_STACK_XY, label='pivot stacked native callout',
+    ), 'INote')
+    # Install links through the documented property, not by assuming that
+    # InsertNote interprets quoted names. This note cannot ship unresolved.
+    note.IncludeDimPrefixSuffixTolerance = True
+    note.PropertyLinkedText = linked
+    rebuild_drawing(adapter, label='resolve pivot stacked dimension links')
+
+    def resolved():
+        if (str(note.PropertyLinkedText) != linked or not bool(note.IncludeDimPrefixSuffixTolerance)
+                or _pivot_stack_semantics(str(note.GetText() or '')) != expected):
+            raise RuntimeError(f'pivot stacked callout lost native size/depth/fit links: {note.GetText()!r}')
+
+    resolved()  # Never hide the source displays until every linked value/band resolves.
+    for name in ('BoreDia', 'TapDrillDia'):
+        _early_bound(displays[name].GetAnnotation(), 'IAnnotation').Visible = 3  # swAnnotationHidden
+    rebuild_drawing(adapter, label='hide replaced pivot diameter displays')
+
+    @_telemetry.traced("drawing.pivot_stacked_callout_readback")
     def settled():
-        edges = scan_view_edges(plan, label='pivot tap and reamed seat rims')
-        measured = {}
+        resolved()
         for name, display in displays.items():
-            source, full_name, value, text, position, arrow_side = sources[name]
-            dimension = _early_bound(display.GetDimension2(0), 'IDimension')
-            annotation = _early_bound(display.GetAnnotation(), 'IAnnotation')
-            if (
-                dimension is None or int(adapter.swApp.IsSame(dimension, source)) != 1
-                or str(dimension.FullName) != full_name or float(dimension.SystemValue) != value
-                or tuple(str(display.GetText(which) or '') for which in range(1, 9)) != text
-                or annotation.IsDangling()
-            ):
-                raise RuntimeError(f'{name}: lost its native source/value/callout')
-            expected_side = _ARROWS_INSIDE if name == 'TapDrillDia' else arrow_side
-            if int(display.ArrowSide) != expected_side:
-                raise RuntimeError(f'{name}: native arrow side changed from {expected_side}')
-            actual_position = tuple(float(v) for v in annotation.GetPosition())
-            if (len(actual_position) != 3 or not all(math.isfinite(v) for v in actual_position)
-                    or math.dist(actual_position, position) > 1e-5):
-                raise RuntimeError(f'{name}: native text moved while placing its arrow')
-            _, diameter, z = rim_specs[name]
-            circle = edges.circle_at(
-                (part.BORE_X, part.BORE_Y, z), diameter / 2, axis=(0.0, 0.0, 1.0),
-                center_tol_mm=1e-6, radius_tol_mm=1e-6, label=name,
-            ).circle
-            if not all(math.isfinite(v) for v in circle):
-                raise RuntimeError(f'{name}: unreadable native mouth circle {circle!r}')
-            cx, cy, cz, _, _, _, radius = circle
-            centre = _project(adapter, plan, (cx, cy, cz), f'{name} centre')
-            rim = _project(adapter, plan, (cx + radius, cy, cz), f'{name} rim')
-            sheet_radius = math.dist(centre, rim)
-            data = _early_bound(display.GetDisplayData(), 'IDisplayData')
-            count = int(data.GetArrowHeadCount()) if data is not None else 0
-            if count <= 0:
-                raise RuntimeError(f'{name}: expected native diameter arrows')
-            arrows = []
-            for index in range(count):
-                arrow = tuple(float(v) for v in (data.GetArrowHeadAtIndex2(index) or ()))
-                # 0.01 paper mm rejects the neighbouring concentric circle
-                # (1.499 mm away at 1:1), while allowing native display roundoff.
-                if (len(arrow) != 12 or not all(math.isfinite(v) for v in arrow)
-                        or not all(math.isfinite(v) for v in centre)
-                        or not math.isfinite(sheet_radius) or sheet_radius <= 0
-                        or abs(math.dist(arrow[:2], centre) - sheet_radius) > 1e-5):
-                    raise RuntimeError(f'{name}: native arrow {index} missed its own rim: {arrow!r}')
-                triangle = arrowhead_segments(arrow)
-                if name == 'TapDrillDia':
-                    # A disk is convex: containing the three native vertices
-                    # contains the complete open (0) or filled (1) triangle
-                    # (swArrowStyle_e), not just its rim tip.
-                    if (arrow[8] not in (0, 1) or arrow[6] <= 0 or arrow[7] <= 0 or len(triangle) != 3
-                            or any(math.dist((edge.x0, edge.y0), centre) > sheet_radius + 1e-5
-                                   for edge in triangle)):
-                        raise RuntimeError(f'TapDrillDia: native arrow {index} body is not inside the drill circle')
-                arrows.append(list(arrow))
-            measured[name] = {
-                'source': full_name, 'mouth_circle_mm': list(circle),
-                'arrows_sheet_data': arrows, 'sheet_radius_m': sheet_radius,
-            }
-        _telemetry.info('pivot callout native rim readback', rims=measured)
+            dimension, state = sources[name]
+            current = _early_bound(display.GetDimension2(0), 'IDimension')
+            ann = _early_bound(display.GetAnnotation(), 'IAnnotation')
+            read = source_state(display)
+            if (int(adapter.swApp.IsSame(current, dimension)) != 1 or read[:7] != state[:7]
+                    or len(read[7]) != 3 or not all(math.isfinite(v) for v in read[7])
+                    or math.dist(read[7], state[7]) > 1e-5 or ann.IsDangling()
+                    or int(ann.Visible) != (1 if name == 'TopBoreDepth' else 3)):
+                raise RuntimeError(f'{name}: stacked callout lost its native source/precision/visibility')
+        ann = _early_bound(note.GetAnnotation(), 'IAnnotation')
+        if int(ann.OwnerType) != 0 or int(adapter.swApp.IsSame(ann.Owner, plan)) != 1 or int(ann.Visible) != 1:
+            raise RuntimeError('pivot stacked callout is not visible in its plan view')
+        position = tuple(float(v) for v in (ann.GetPosition() or ()))
+        if (len(position) != 3 or not all(math.isfinite(v) for v in position)
+                or math.dist(position[:2], PIVOT_STACK_XY) > 1e-5):
+            raise RuntimeError('pivot stacked callout moved from its authored text position')
+        _assert_attached_to(adapter, ann, outer.edge, entity_type='EDGE',
+                            what='pivot stacked callout', label='outer reamed rim')
+        _assert_leader_lands(ann, landing, what='pivot stacked callout', label='outer reamed rim', tolerance=1e-5)
+        points = tuple(float(v) for v in (ann.GetLeaderPointsAtIndex(0) or ()))
+        if len(points) not in (6, 9) or not all(math.isfinite(v) for v in points):
+            raise RuntimeError('pivot stacked callout leader is unreadable')
+        xy = [(points[i], points[i + 1]) for i in range(0, len(points), 3)]
+        strokes = list(zip(xy, xy[1:]))
+        data = _early_bound(ann.GetDisplayData(), 'IDisplayData')
+        if data is None or int(data.GetArrowHeadCount()) != 1:
+            raise RuntimeError('pivot stacked callout must have exactly one native arrow')
+        arrow = tuple(float(v) for v in (data.GetArrowHeadAtIndex2(0) or ()))
+        if (len(arrow) != 12 or not all(math.isfinite(v) for v in arrow)
+                or math.dist(arrow[:2], landing) > 1e-5
+                or arrow[8] not in (0, 1) or arrow[6] <= 0 or arrow[7] <= 0):
+            raise RuntimeError('pivot stacked callout arrow is not on the outer rim')
+        triangle = arrowhead_segments(arrow)
+        if len(triangle) != 3:
+            raise RuntimeError('pivot stacked callout arrow triangle is unreadable')
+        strokes += [((edge.x0, edge.y0), (edge.x1, edge.y1)) for edge in triangle]
+        if any(_segment_distance(centre, start, end) < radius - 1e-5 for start, end in strokes):
+            raise RuntimeError('pivot stacked callout leader/arrow crosses the bore interior')
+        if any(_segment_distance(obstacle, start, end) < obstacle_radius + .001 for start, end in strokes):
+            raise RuntimeError('pivot stacked callout leader/arrow crowds the upper-left counterbore')
+        extent = tuple(float(v) for v in (note.GetExtent() or ()))
+        if (len(extent) != 6 or not all(math.isfinite(v) for v in extent)
+                or not (.020 <= extent[0] < extent[3] <= .145 and .182 <= extent[1] < extent[4] <= .230)):
+            raise RuntimeError(f'pivot stacked callout text left its reserved lane: {extent!r}')
+        _telemetry.info('pivot stacked native callout readback', linked=linked, resolved=str(note.GetText()),
+                        source_names=[state[0] for _, state in sources.values()],
+                        leader_points_m=list(points), arrow_sheet_data=list(arrow), text_extent_m=list(extent))
 
-    _set_arrow_side(adapter, annotations, ('TapDrillDia',), _ARROWS_INSIDE)
     settled()
     return settled
 
@@ -522,8 +588,6 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
     plan_annotations = curate_view_dimensions(adapter,plan,keep=plan_keep,view_label='plan',
                      dimensions_by_feature=contract.DRAWING_DIMENSIONS)
     settled_checks = ()
-    if not is_feed:
-        settled_checks = (_place_pivot_tap_arrow_inside(adapter, plan, plan_annotations, contract),)
     _set_arrow_side(adapter, plan_annotations, ROW_DIMENSIONS, _ARROWS_INSIDE)
     set_hidden_lines_removed(adapter,side)
     side_annotations = curate_view_dimensions(adapter,side,keep=side_keep,view_label='pivot section direction',
@@ -596,6 +660,8 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
     precision = {name:places for dims in contract.DRAWING_PRECISION.values()
                  for name,places in dims.items() if name in kept}
     assert_imported_precision(adapter,annotations,precision)
+    if not is_feed:
+        settled_checks = (_stack_pivot_callout(adapter, plan, annotations, contract),)
     if is_feed:
         # SolidWorks pins its own TAPPED_HOLE_NOTE once per view that picks up
         # the one NutTaps feature, and which views do is its choice: the same

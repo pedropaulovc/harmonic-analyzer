@@ -433,43 +433,47 @@ The accepted gap therefore started the witness 10.5 paper mm short of its
 clear lane. Compute it from that actual row endpoint; still require the
 rebuilt witness to clear the complete A letter by 2 mm and remain visible.
 
-The simplified one-sheet TL-22 in frozen run `4031a82adcd2` made the
-`DRILL THRU` Ø.257 / `5/16-18 UNC TAP THRU BELOW SHOULDER SEAT` arrow appear
-attached to the outer Ø.3750 reamed ring. Retained layout endpoints indicate
-an inner-circle tip: `(167.3, 206.9)` mm is about 3.30 mm from the independently
-located `(170, 205)` centre, versus nominal drill radius 3.264 mm and seat
-radius 4.7625 mm. Those rounded line endpoints are not native arrow-tip
-measurements. An outside arrow body crossing the outer ring explains the
-ambiguity, but remains an inference until the native arrow record is read.
+The simplified TL-22 in frozen run `4031a82adcd2` made the separate
+`DRILL THRU` Ø.257 and REAM Ø.3750 leaders ambiguous at their concentric
+rings. Changing the tap arrows to Inside still left a centre-crossing
+presentation in the subsequent `389` review. The owner's replacement is
+**one stacked callout with one outside leader on the outer reamed circle**,
+not two independently routed diameter leaders.
 
-For **TL-22 only**, `_place_pivot_tap_arrow_inside` explicitly sets the existing
-`TapDrillDia` display's `IDisplayDimension.ArrowSide` to
-`swDimArrowsInside` (0), using the existing setter/readback/rebuild helper.
-The original native parts, cutting sketches, source dimensions, tolerances
-and text locations remain untouched; TL-32's presentation is unchanged.
-Do not use `IAnnotation.SetAttachedEntities` or
-`SetLeaderAttachmentPointAtIndex` to reattach this imported dimension:
-the pinned SDK does not establish dimension support for those operations.
+For TL-22 only, `_stack_pivot_callout` inserts a view-owned attached note:
+REAM with the linked bore diameter and bilateral band, a depth symbol with
+the linked seat depth, the TL-VN-77 locating-fit row, DRILL with the linked
+tap-drill diameter THRU, and the unchanged 5/16-18 thread identity BELOW
+SEAT. `INote.PropertyLinkedText` uses quoted actual
+`IDisplayDimension.GetNameForSelection` names; the pinned SDK explicitly
+documents drawing-dimension links. `IncludeDimPrefixSuffixTolerance=True`
+retains the native diameter prefixes and fit tolerance. No diameter, depth
+or tolerance is authored from a numeric copy.
 
-The placement captures the original `IDimension`, full source name, value,
-resolved text, token-bearing definitions, text positions and REAM arrow side.
-Its settled proof resolves the visible inner drill and outer seat circles
-by centre, axial depth, axis and radius. `GetArrowHeadAtIndex2` returns
-`[tip3, direction3, width, height, style, normal3]`: width runs along the
-direction and height across it. The triangle uses the existing layout-audit
-parser's calibrated direction-to-base convention (125 native arrowheads),
-not an invented SDK sign rule. The tap's tip must lie on the inner circle
-and its **entire triangular body** inside it; REAM's tip stays on the outer
-circle. The unchanged 0.01 paper-mm radial/position bound rejects drift.
+Keep all three imported sources (`BoreDia@TopBoreProfile`,
+`TopBoreDepth@TopBore`, `TapDrillDia@PivotTapProfile`) and the existing
+imported-precision gate. Resolve and semantically verify the note before
+hiding only the two plan-diameter **display annotations**. The section's
+seat-depth dimension remains visible. Native identities, values, precision,
+tolerances, text definitions, selection names and original text positions
+are checked again after the final rebuild. The note's unresolved link
+string and resolved values/band must agree; SIZE-band semantics reuse the
+existing parser that treats split sign/value stacks as equivalent rather
+than depending on a seat's `<STACK>` serialization.
 
-The finalizer repeats that read-only proof after its last rebuild and logs
-the native circle and full arrow records. It never retries or repairs a
-failed landing. Focused regressions distinguish a correct inner tip with
-an outward-crossing body from a truly contained arrow, and cover malformed
-records, source drift, ignored property puts and pivot-only routing.
-Parent validation must inspect the fresh native/PDF arrow geometry; these
-offline contracts are not a claim of native success. Editing the shared
-drawing helper still re-keys TL-32's drawing/review inputs, not either part.
+The note attaches to the exact outer rim through the existing entity/
+selection-point note helper. Its final check requires one live leader and
+one native arrow at the leftmost outer-rim point. Every leader and arrow
+stroke must stay outside the bore disk and at least 1 mm clear of the
+upper-left carriage counterbore. The four-row text block stays in the
+reserved left lane, without font changes. Operation-level creation and
+settled-readback spans retain the native link, resolved text and geometry.
+
+TL-32 keeps its original presentation. Neither native part nor any spec
+changes; the shared drawing-helper edit still re-keys feed drawing/review
+inputs. Parent validation must inspect the fresh native/PDF resolution,
+tolerance band and one-leader route. The guarded dimension-note form is
+SDK-documented but not claimed seat-proven by offline tests.
 
 ### TL-21 assembly-HUB reference lanes
 

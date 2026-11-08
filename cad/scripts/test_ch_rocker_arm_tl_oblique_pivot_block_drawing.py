@@ -335,57 +335,91 @@ def test_block_length_reason_rides_its_value_row_clear_of_the_dimension():
     assert call in body and 'if is_feed:' + call not in body
 
 
-@pytest.mark.parametrize('fault', (
-    None, 'tap_outer', 'ream_inner', 'missing_inner', 'wrong_depth', 'wrong_radius',
-    'wrong_axis', 'nan_arrow', 'short_arrow', 'zero_arrows', 'two_inside_arrows',
-    'second_tip_outer', 'second_body_outside', 'two_ream_arrows', 'second_ream_tip_inner',
-    'source_name', 'source_identity', 'value', 'thread', 'definition', 'dangling',
-    'body_outside', 'body_wings_outside', 'body_zero_width', 'body_zero_direction',
-    'body_hidden', 'side_drift', 'ream_side', 'text_position',
-))
-def test_pivot_inside_arrow_proves_body_and_tip_without_changing_source(monkeypatch, fault):
+def _stacked_pivot_fixture(monkeypatch):
     import _oblique_block_drawing as drawing
     from _drawing_edges import ViewEdge, ViewEdges
+    from _fit_deviations import deviations
 
+    plan, outer, inner = object(), object(), object()
     origin = drawing.PLAN_XY
-    mouth_z = spec.BLOCK_HEIGHT - spec.BORE_DEPTH
-    names = ('TapDrillDia', 'BoreDia')
-    radii = (spec.PIVOT_TAP_DRILL / 2, spec.BORE_DIA / 2)
-    state = {}
-    circles = []
-    displays = {}
-    for name, feature, radius, z in zip(
-        names, ('PivotTapProfile', 'TopBoreProfile'), radii, (mouth_z, spec.BLOCK_HEIGHT)
+    landing = (origin[0] - spec.BORE_DIA / 2000, origin[1])
+    source_rows, displays = {}, {}
+    for name, feature, view in (
+        ('BoreDia', 'TopBoreProfile', 'Plan'), ('TopBoreDepth', 'TopBore', 'Section'),
+        ('TapDrillDia', 'PivotTapProfile', 'Plan'),
     ):
-        circles.append(ViewEdge(
-            edge=object(), line=None, vertices=None,
-            circle=(spec.BORE_X, spec.BORE_Y, z, 0.0, 0.0, 1.0, radius),
-        ))
-        row = state[name] = {
-            'dimension': SimpleNamespace(FullName=f'{name}@{feature}@block.Part', SystemValue=radius / 500),
-            'text': ('<MOD-DIAM>', '', spec.CALLOUTS_ABOVE[name], spec.CALLOUTS_BELOW[name],
-                     '<MOD-DIAM>', '', spec.CALLOUTS_ABOVE[name], spec.CALLOUTS_BELOW[name]),
-            # Correct inner tip, but outside body spans the outer ring.
-            'arrow': (origin[0] - radius / 1000, origin[1], 0.0, -1.0, 0.0, 0.0,
-                      .002, .001, 0.0, 0.0, 0.0, 1.0),
-            'position': (*drawing.PLAN_KEEP[name], 0.0), 'count': 1, 'dangling': False,
-        }
-        annotation = SimpleNamespace(IsDangling=lambda row=row: row['dangling'],
-                                     GetPosition=lambda row=row: row['position'])
-        data = SimpleNamespace(GetArrowHeadCount=lambda row=row: row['count'],
-                               GetArrowHeadAtIndex2=lambda index, row=row: row['arrow'] if index == 0 else row['second_arrow'])
-        displays[name] = SimpleNamespace(
-            ArrowSide=1,
-            GetDimension2=lambda index, row=row: row['dimension'],
-            GetText=lambda which, row=row: row['text'][which - 1],
-            GetAnnotation=lambda annotation=annotation: annotation,
-            GetDisplayData=lambda data=data: data,
+        lower, upper = deviations(spec.BORE_BAND) if name == 'BoreDia' else (0.0, 0.0)
+        tolerance = SimpleNamespace(Type=2 if name == 'BoreDia' else 0, lower=lower / 1000, upper=upper / 1000)
+        tolerance.GetMinValue = lambda tolerance=tolerance: tolerance.lower
+        tolerance.GetMaxValue = lambda tolerance=tolerance: tolerance.upper
+        dimension = SimpleNamespace(FullName=f'{name}@{feature}@block.Part',
+                                    SystemValue=spec.DRAWING_VALUES[name] / 1000, Tolerance=tolerance)
+        above, below = spec.CALLOUTS_ABOVE.get(name, ''), spec.CALLOUTS_BELOW.get(name, '')
+        row = source_rows[name] = SimpleNamespace(
+            dimension=dimension, texts=('', '', above, below, '', '', above, below),
+            places=spec.DRAWING_PRECISION_BY_NAME[name], tolerance_places=-3,
+            selection=f'{name}@{feature}@block.Part@{view}',
         )
-    # Same drill's opposite rim is identical in plan; keep the axial test.
-    circles.insert(0, ViewEdge(
-        edge=object(), line=None, vertices=None,
-        circle=(spec.BORE_X, spec.BORE_Y, 0.0, 0.0, 0.0, 1.0, radii[0]),
-    ))
+        xy = drawing.SEAT_DEPTH_TEXT_XY if name == 'TopBoreDepth' else drawing.PLAN_KEEP[name]
+        annotation = SimpleNamespace(Visible=1, OwnerType=0, position=(*xy, 0.0), dangling=False)
+        annotation.GetPosition = lambda annotation=annotation: annotation.position
+        annotation.IsDangling = lambda annotation=annotation: annotation.dangling
+        row.annotation = annotation
+        displays[name] = SimpleNamespace(
+            GetDimension2=lambda index, row=row: row.dimension,
+            GetText=lambda which, row=row: row.texts[which - 1],
+            GetPrimaryPrecision2=lambda row=row: row.places,
+            GetPrimaryTolPrecision2=lambda row=row: row.tolerance_places,
+            GetNameForSelection=lambda row=row: row.selection,
+            GetAnnotation=lambda annotation=annotation: annotation,
+        )
+    # A synthetic native COM record, not a claim about the pending farm sheet.
+    text = drawing._pivot_stack_text(
+        '<MOD-DIAM>.3750<STACK divider=DIM>+.0015<OVER>+.0010</STACK>',
+        '.359', '<MOD-DIAM>.257',
+    )
+    note = SimpleNamespace(
+        PropertyLinkedText='', IncludeDimPrefixSuffixTolerance=False, text=text,
+        extent=(.025, .198, 0.0, .130, .225, 0.0),
+    )
+    native = SimpleNamespace(
+        Visible=1, OwnerType=0, Owner=plan, position=(*drawing.PIVOT_STACK_XY, 0.0),
+        leaders=1, attached=outer, dangling=False,
+        points=(.130, origin[1], 0.0, *landing, 0.0),
+        arrow=(*landing, 0.0, -1.0, 0.0, 0.0, .002, .001, 0.0, 0.0, 0.0, 1.0),
+        arrow_count=1,
+    )
+    native.GetPosition = lambda: native.position
+    native.GetLeaderCount = lambda: native.leaders
+    native.GetLeaderPointsAtIndex = lambda index: native.points
+    native.GetAttachedEntities3 = lambda: [native.attached]
+    native.GetAttachedEntityCount3 = lambda: 1
+    native.GetAttachedEntityTypes = lambda: [1]
+    native.IsDangling = lambda: native.dangling
+    native.GetDisplayData = lambda: SimpleNamespace(
+        GetArrowHeadCount=lambda: native.arrow_count, GetArrowHeadAtIndex2=lambda index: native.arrow,
+    )
+    note.GetAnnotation = lambda: native
+    note.GetText = lambda: note.text
+    note.GetExtent = lambda: note.extent
+    inserted = []
+
+    def add_note(adapter, view, **kwargs):
+        assert view is plan and kwargs['entity'] is outer
+        assert kwargs['leader_attach_xy'] == pytest.approx(landing)
+        assert kwargs['note_xy'] == drawing.PIVOT_STACK_XY
+        assert kwargs['text'] == 'REAM'
+        inserted.append(kwargs)
+        note.PropertyLinkedText = kwargs['text']
+        return note
+
+    circles = [
+        ViewEdge(edge=inner, line=None, vertices=None,
+                 circle=(spec.BORE_X, spec.BORE_Y, spec.BLOCK_HEIGHT - spec.BORE_DEPTH,
+                         0.0, 0.0, 1.0, spec.PIVOT_TAP_DRILL / 2)),
+        ViewEdge(edge=outer, line=None, vertices=None,
+                 circle=(spec.BORE_X, spec.BORE_Y, spec.BLOCK_HEIGHT, 0.0, 0.0, 1.0, spec.BORE_DIA / 2)),
+    ]
     monkeypatch.setattr(drawing, '_early_bound', lambda obj, interface: obj)
     monkeypatch.setattr(drawing, '_displays',
                         lambda adapter, annotations, names: {name: displays[name] for name in names})
@@ -394,122 +428,127 @@ def test_pivot_inside_arrow_proves_body_and_tip_without_changing_source(monkeypa
     monkeypatch.setattr(drawing, '_project',
                         lambda adapter, view, point, label: (origin[0] + point[0] / 1000,
                                                            origin[1] + point[1] / 1000))
+    monkeypatch.setattr(drawing, 'add_attached_note', add_note)
     rebuilds = []
 
     def rebuild(adapter, *, label):
         rebuilds.append(label)
-        assert displays['TapDrillDia'].ArrowSide == drawing._ARROWS_INSIDE
-        assert displays['BoreDia'].ArrowSide == 1
-        arrow = state['TapDrillDia']['arrow']
-        state['TapDrillDia']['arrow'] = (*arrow[:3], 1.0, *arrow[4:])
+        wanted = 1 if label.startswith('resolve') else 3
+        assert source_rows['BoreDia'].annotation.Visible == wanted
+        assert source_rows['TapDrillDia'].annotation.Visible == wanted
+        assert source_rows['TopBoreDepth'].annotation.Visible == 1
 
     monkeypatch.setattr(drawing, 'rebuild_drawing', rebuild)
     reports = []
     monkeypatch.setattr(drawing._telemetry, 'info', lambda message, **kwargs: reports.append(kwargs))
     adapter = SimpleNamespace(swApp=SimpleNamespace(IsSame=lambda a, b: int(a is b)))
-    old_triangle = drawing.arrowhead_segments(state['TapDrillDia']['arrow'])
-    assert max(math.dist((edge.x0, edge.y0), origin) for edge in old_triangle) > radii[1] / 1000
-    settled = drawing._place_pivot_tap_arrow_inside(adapter, object(), [], spec)
-    assert rebuilds == ['arrow side 0']
-    assert reports[-1]['rims']['TapDrillDia']['mouth_circle_mm'][2] == mouth_z
-    assert reports[-1]['rims']['BoreDia']['mouth_circle_mm'][2] == spec.BLOCK_HEIGHT
-    tap = state['TapDrillDia']
-    if fault in ('tap_outer', 'ream_inner'):
-        name, radius = ('TapDrillDia', radii[1]) if fault == 'tap_outer' else ('BoreDia', radii[0])
-        state[name]['arrow'] = (origin[0] - radius / 1000, *state[name]['arrow'][1:])
-    elif fault == 'missing_inner':
-        circles.pop(1)
-    elif fault in ('wrong_depth', 'wrong_radius', 'wrong_axis'):
-        circle = list(circles[1].circle)
-        if fault == 'wrong_axis':
-            circle[3:6] = (1.0, 0.0, 0.0)
-        else:
-            circle[2 if fault == 'wrong_depth' else 6] += .1
-        circles[1] = ViewEdge(edge=object(), line=None, vertices=None, circle=tuple(circle))
-    elif fault == 'nan_arrow':
-        tap['arrow'] = (float('nan'), *tap['arrow'][1:])
-    elif fault == 'short_arrow':
-        tap['arrow'] = tap['arrow'][:6]
-    elif fault == 'zero_arrows':
-        tap['count'] = 0
-    elif fault in ('two_inside_arrows', 'second_tip_outer', 'second_body_outside',
-                   'two_ream_arrows', 'second_ream_tip_inner'):
-        is_ream = fault in ('two_ream_arrows', 'second_ream_tip_inner')
-        name = 'BoreDia' if is_ream else 'TapDrillDia'
-        row = state[name]
-        radius = radii[1 if is_ream else 0]
-        row['count'] = 2
-        second = [origin[0] + radius / 1000, origin[1], 0.0,
-                  1.0 if is_ream else -1.0, 0.0, 0.0, .002, .001, 0.0, 0.0, 0.0, 1.0]
-        if fault == 'second_tip_outer':
-            second[0] = origin[0] + radii[1] / 1000
-        elif fault == 'second_body_outside':
-            second[3] = 1.0
-        elif fault == 'second_ream_tip_inner':
-            second[0] = origin[0] + radii[0] / 1000
-        row['second_arrow'] = tuple(second)
-    elif fault == 'source_name':
-        tap['dimension'].FullName = 'TapDrillDia@TopBoreProfile@block.Part'
+    return SimpleNamespace(drawing=drawing, adapter=adapter, plan=plan, rows=source_rows, note=note,
+                           native=native, landing=landing, origin=origin, inner=inner, circles=circles,
+                           inserted=inserted, rebuilds=rebuilds, reports=reports)
+
+
+@pytest.mark.parametrize('fault', (
+    None, 'split_stack', 'changed_link', 'unresolved', 'drill_value', 'depth_value',
+    'missing_band', 'rounded_band', 'negative_band', 'missing_diameter', 'include_band_off',
+    'source_identity', 'source_value', 'source_precision', 'source_band', 'source_tokens',
+    'source_position', 'source_shown', 'depth_hidden', 'wrong_owner', 'hidden_note', 'note_position',
+    'two_leaders', 'wrong_attachment', 'inner_tip', 'centre_crossing', 'upper_left_crossing',
+    'arrow_inside', 'two_arrows', 'malformed_arrow', 'text_outside',
+))
+def test_one_stacked_pivot_callout_preserves_native_links_and_outside_route(monkeypatch, fault):
+    case = _stacked_pivot_fixture(monkeypatch)
+    proof = case.drawing._stack_pivot_callout(case.adapter, case.plan, [], spec)
+    assert len(case.inserted) == 1 and len(case.rebuilds) == 2
+    for row in case.rows.values():
+        assert f'"{row.selection}"' in case.note.PropertyLinkedText
+    # Geometry numbers are never copied into the authored note.
+    assert all(value not in case.note.PropertyLinkedText for value in ('.375', '.0015', '.0010', '.359', '.257'))
+    tap = case.rows['TapDrillDia']
+    if fault == 'split_stack':
+        case.note.text = case.note.text.replace(
+            '<STACK divider=DIM>+.0015<OVER>+.0010</STACK>',
+            '<STACK divider=DIM>+<OVER>+</STACK><STACK halign=LEFT>.00150<OVER>.00100</STACK>',
+        ).replace('.3750', '0.37500')
+    elif fault == 'changed_link':
+        case.note.PropertyLinkedText += ' BROKEN'
+    elif fault == 'unresolved':
+        case.note.text = case.note.PropertyLinkedText
+    elif fault == 'drill_value':
+        case.note.text = case.note.text.replace('.257', '.258')
+    elif fault == 'depth_value':
+        case.note.text = case.note.text.replace('.359', '.360')
+    elif fault == 'missing_band':
+        case.note.text = case.note.text.replace('<STACK divider=DIM>+.0015<OVER>+.0010</STACK>', '')
+    elif fault == 'rounded_band':
+        case.note.text = case.note.text.replace('.0015', '.002')
+    elif fault == 'negative_band':
+        case.note.text = case.note.text.replace('+.0010', '-.0010')
+    elif fault == 'missing_diameter':
+        case.note.text = case.note.text.replace('<MOD-DIAM>', '', 1)
+    elif fault == 'include_band_off':
+        case.note.IncludeDimPrefixSuffixTolerance = False
     elif fault == 'source_identity':
-        tap['dimension'] = SimpleNamespace(**vars(tap['dimension']))
-    elif fault == 'value':
-        tap['dimension'].SystemValue = spec.BORE_DIA / 1000
-    elif fault == 'thread':
-        tap['text'] = (*tap['text'][:3], 'WRONG THREAD', *tap['text'][4:])
-    elif fault == 'definition':
-        tap['text'] = (*tap['text'][:4], 'DIAMETER', *tap['text'][5:])
-    elif fault == 'dangling':
-        tap['dangling'] = True
-    elif fault in ('body_outside', 'body_wings_outside', 'body_zero_width', 'body_zero_direction', 'body_hidden'):
-        arrow = list(tap['arrow'])
-        if fault == 'body_outside':
-            arrow[3] = -1.0
-        elif fault == 'body_wings_outside':
-            arrow[7] = .01
-        elif fault == 'body_zero_width':
-            arrow[6] = 0.0
-        elif fault == 'body_hidden':
-            arrow[8] = 10.0  # swNO_ARROWHEAD must not certify a synthetic triangle
-        else:
-            arrow[3:6] = (0.0, 0.0, 0.0)
-        tap['arrow'] = tuple(arrow)
-    elif fault == 'side_drift':
-        displays['TapDrillDia'].ArrowSide = 1
-    elif fault == 'ream_side':
-        displays['BoreDia'].ArrowSide = 0
-    elif fault == 'text_position':
-        tap['position'] = (tap['position'][0] + .001, *tap['position'][1:])
-    if fault in (None, 'two_inside_arrows', 'two_ream_arrows'):
-        settled()
-        assert len(reports) == 2 and rebuilds == ['arrow side 0']
-        if fault is not None:
-            name = 'BoreDia' if fault == 'two_ream_arrows' else 'TapDrillDia'
-            assert len(reports[-1]['rims'][name]['arrows_sheet_data']) == 2
+        tap.dimension = SimpleNamespace(**vars(tap.dimension))
+    elif fault == 'source_value':
+        tap.dimension.SystemValue += .001
+    elif fault == 'source_precision':
+        tap.places = 2
+    elif fault == 'source_band':
+        case.rows['BoreDia'].dimension.Tolerance.upper += .00001
+    elif fault == 'source_tokens':
+        tap.texts = (*tap.texts[:4], 'CHANGED', *tap.texts[5:])
+    elif fault == 'source_position':
+        tap.annotation.position = (.050, .050, 0.0)
+    elif fault == 'source_shown':
+        tap.annotation.Visible = 1
+    elif fault == 'depth_hidden':
+        case.rows['TopBoreDepth'].annotation.Visible = 3
+    elif fault == 'wrong_owner':
+        case.native.Owner = object()
+    elif fault == 'hidden_note':
+        case.native.Visible = 3
+    elif fault == 'note_position':
+        case.native.position = (.026, .225, 0.0)
+    elif fault == 'two_leaders':
+        case.native.leaders = 2
+    elif fault == 'wrong_attachment':
+        case.native.attached = case.inner
+    elif fault == 'inner_tip':
+        inner = (case.origin[0] - spec.PIVOT_TAP_DRILL / 2000, case.origin[1])
+        case.native.points = (*case.native.points[:3], *inner, 0.0)
+        case.native.arrow = (*inner, *case.native.arrow[2:])
+    elif fault == 'centre_crossing':
+        case.native.points = (*case.origin, 0.0, *case.landing, 0.0)
+    elif fault == 'upper_left_crossing':
+        obstacle = (case.origin[0] - spec.BOLT_X / 1000, case.origin[1] + spec.BOLT_Y / 1000)
+        case.native.points = (*obstacle, 0.0, *case.landing, 0.0)
+    elif fault == 'arrow_inside':
+        case.native.arrow = (*case.native.arrow[:3], 1.0, *case.native.arrow[4:])
+    elif fault == 'two_arrows':
+        case.native.arrow_count = 2
+    elif fault == 'malformed_arrow':
+        case.native.arrow = case.native.arrow[:6]
+    elif fault == 'text_outside':
+        case.note.extent = (.025, .198, 0.0, .170, .225, 0.0)
+    if fault in (None, 'split_stack'):
+        proof()
+        assert len(case.rebuilds) == 2 and len(case.reports) == 2
     else:
         with pytest.raises(RuntimeError):
-            settled()
+            proof()
 
 
-def test_inside_arrow_setter_refuses_ignored_native_put(monkeypatch):
-    import _oblique_block_drawing as drawing
-
-    class RefusedDisplay:
-        @property
-        def ArrowSide(self):
-            return 1
-
-        @ArrowSide.setter
-        def ArrowSide(self, side):
-            assert side == drawing._ARROWS_INSIDE
-
-    monkeypatch.setattr(drawing, '_displays', lambda *args: {'TapDrillDia': RefusedDisplay()})
-    monkeypatch.setattr(drawing, 'rebuild_drawing', lambda *args, **kwargs: pytest.fail('put was ignored'))
-    with pytest.raises(RuntimeError, match='arrows did not move'):
-        drawing._set_arrow_side(None, [], ('TapDrillDia',), drawing._ARROWS_INSIDE)
+def test_stacked_links_must_resolve_before_hiding_source_dimensions(monkeypatch):
+    case = _stacked_pivot_fixture(monkeypatch)
+    case.note.text = 'UNRESOLVED'
+    with pytest.raises(RuntimeError, match='lost native size/depth/fit links'):
+        case.drawing._stack_pivot_callout(case.adapter, case.plan, [], spec)
+    assert all(row.annotation.Visible == 1 for row in case.rows.values())
+    assert case.rebuilds == ['resolve pivot stacked dimension links']
 
 
 @pytest.mark.parametrize('feed', (False, True))
-def test_inside_tap_arrow_and_settled_proof_are_pivot_only(feed):
+def test_stacked_callout_keeps_imported_precision_gate_and_is_pivot_only(feed):
     source = Path(__file__).with_name('_oblique_block_drawing.py').read_text(encoding='utf-8')
     tree = ast.parse(source)
     build = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef)
@@ -519,19 +558,20 @@ def test_inside_tap_arrow_and_settled_proof_are_pivot_only(feed):
                            for target in node.targets))
     conditional = next(node for node in build.body if isinstance(node, ast.If)
                        and any(isinstance(child, ast.Call) and isinstance(child.func, ast.Name)
-                               and child.func.id == '_place_pivot_tap_arrow_inside'
-                               for child in ast.walk(node)))
-    calls = []
-    proof = object()
+                               and child.func.id == '_stack_pivot_callout' for child in ast.walk(node)))
+    precision = next(node for node in build.body if isinstance(node, ast.Expr)
+                     and isinstance(node.value, ast.Call) and isinstance(node.value.func, ast.Name)
+                     and node.value.func.id == 'assert_imported_precision')
+    assert build.body.index(precision) < build.body.index(conditional)
+    assert ast.unparse(precision.value) == 'assert_imported_precision(adapter, annotations, precision)'
+    calls, proof = [], object()
 
-    def place(*args):
+    def stack(*args):
         calls.append(args)
         return proof
 
-    env = dict(is_feed=feed, adapter=object(), plan=object(), plan_annotations=[],
-               contract=object(), _place_pivot_tap_arrow_inside=place)
-    # Execute only the real routing statements: feed must not call the
-    # placement helper or inject a pivot-only proof into its finalizer.
+    env = dict(is_feed=feed, adapter=object(), plan=object(), annotations=[],
+               contract=object(), _stack_pivot_callout=stack)
     exec(compile(ast.Module(body=[initial, conditional], type_ignores=[]), '<pivot-routing>', 'exec'), env)
     assert len(calls) == (0 if feed else 1)
     assert env['settled_checks'] == (() if feed else (proof,))
