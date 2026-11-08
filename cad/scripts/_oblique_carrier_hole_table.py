@@ -16,7 +16,7 @@ Owner review 2026-11-07 (rule 10): X/Y LOC run from the plate's lower-left
 corner, where the left end meets the -Y edge, which an edge finder picks up;
 never from a hole centre. The holes whose stacks assume a station from A1
 (B1, A2, B2, CL, CR, R1-R4: the spec's pin intervals, station and riser-wall
-errors) keep that one relation at ±.005 in flagged NOTE 2 (coordinator
+errors) keep that one relation at ±.005 in NOTE 2, which names its tags (coordinator
 ruling 2026-11-07, option (b)); NOTE 1 keeps A2/B2's Y .964 ±.002 from the
 A1-B1 axis line.
 
@@ -699,9 +699,9 @@ def create_carrier_hole_table(
     table.SetColumnHidden(SIZE_COLUMN, True)
     tabled_edges = {tag: edges[tag] for tag in TABLED_HOLES}
     _tags(adapter, view, tabled_edges, place=True)
-    # NOTE 1 is flagged in the A2/B2 rows; the exact owner text is linked to
-    # the saved model property and checked against both native local controls.
-    # NOTE 2 (A1_RELATION_NOTE) is flagged in its own rows.
+    # NOTE 1 names A2/B2; the exact owner text is linked to the saved model
+    # property and checked against both native local controls. NOTE 2
+    # (A1_RELATION_NOTE) names its own tags; the rows carry no flags.
     # The notes stand beside the table's top, risen with it (TABLE_ANCHOR).
     add_note(adapter, "1", .225, .178)
     flagged = add_property_linked_note(adapter, "Outer Pin Row Note", .235, .178)
