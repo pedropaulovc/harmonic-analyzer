@@ -1994,13 +1994,25 @@ def test_step_11_sets_the_stop_axes_before_spotting_the_riser() -> None:
         assert dro_point == pytest.approx(origin[:2], abs=1e-9)
         assert dro_point[1] < 0.0 < carrier_point[1]
     assert spec._STOP_AXIS_BAND == pytest.approx(0.254)
-    assert spec._STOP_DRO == "X -6.61 AND X 6.61, Y -.57 (±.01)"
+    assert spec._STOP_DRO == "X -6.61 AND X 6.61, Y -.57"
     steps = {text.split(". ", 1)[0]: text for text in spec.ASSEMBLY_STEPS}
     assert spec._STOP_DRO in steps["11A"]
     assert spec._item(spec.STOP_PIN) in steps["11"]
     # The axes are set before the riser is spotted from the carrier.
     order = list(steps)
     assert order.index("11A") < order.index("11C")
+
+
+def test_step_6_places_the_origin_from_the_middle_t_slot() -> None:
+    """Restack r3: the origin is located from a table feature the builder can
+    touch, the middle T-slot the table is centred on, at the table's centre."""
+    steps = {text.split(". ", 1)[0]: text for text in spec.ASSEMBLY_STEPS}
+    assert spec._ORIGIN_FROM_SLOT == "1.244"
+    assert (
+        f"SPINDLE AXIS {spec._ORIGIN_FROM_SLOT} TOWARD THE COLUMN FROM THE MIDDLE "
+        "T-SLOT CENTRELINE, AT THE TABLE'S LENGTHWISE MIDPOINT."
+    ) in steps["6"]
+    assert -trammel.TABLE_CENTRE_Y == pytest.approx(1.244 * trammel.INCH, abs=0.0005 * trammel.INCH)
 
 
 def test_r4_operation_order_cites_the_plan_and_retains_all_clamps() -> None:

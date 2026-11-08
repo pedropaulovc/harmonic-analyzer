@@ -1990,10 +1990,11 @@ _STOP_Y = {y for _x, y in STOP_PIN_DRO_POINTS}
 if len(_STOP_X) != 1 or len(_STOP_Y) != 1:
     raise AssertionError("the stop pins no longer stand symmetric on one Y")
 _STOP_X_TEXT = _length(_STOP_X.pop(), _STOP_AXIS_PLACES)
+# The two-place axes take the title block's .XX band (_STOP_AXIS_BAND is
+# that grade), so the step prints no band of its own (rule 2; restack r3).
 _STOP_DRO = (
     f"X -{_STOP_X_TEXT} AND X {_STOP_X_TEXT}, "
-    f"Y {_length(_STOP_Y.pop(), _STOP_AXIS_PLACES)} "
-    f"(±{_length(_STOP_AXIS_BAND, _STOP_AXIS_PLACES)})"
+    f"Y {_length(_STOP_Y.pop(), _STOP_AXIS_PLACES)}"
 )
 # Review jig-asm r1 (minor): the screws and nuts whose steps state no
 # torque. Their fastener specs carry no torque figure, so rule 24's one
@@ -2181,6 +2182,11 @@ _HUB_GAP = _length(leadscrew.HUB_GAP, 3)
 _PIVOT_GAP = f"{_length(PIVOT_RUNNING_GAP[0], 3)}-{_length(PIVOT_RUNNING_GAP[1], 3)}"
 _PILLOW = f"PILLOW BLOCK {_item(PILLOW_BLOCK)}"
 _FEELER = "FEELER GAUGE"
+# Step 6's origin: the middle T-slot centreline lies TABLE_CENTRE_Y (-Y,
+# operator side) of the spindle axis, and the table's length is centred on it.
+if not trammel.TABLE_CENTRE_Y < 0.0 or TABLE_X[0] != -TABLE_X[1]:
+    raise AssertionError("step 6's origin no longer sits +Y of a table-centred middle slot")
+_ORIGIN_FROM_SLOT = _length(-trammel.TABLE_CENTRE_Y, 3)
 
 # The rail kit as bought (registry stock name: "... (2 rails + 4 HGH15CA)",
 # its carriages shipped on plastic loading arbors): step 1 rocks all four,
@@ -2253,8 +2259,7 @@ ASSEMBLY_STEPS = (
     # counterbore (rule 19); the jig's RV-05 accepts the reach it leaves.
     "5. MEASURE EACH BLOCK'S 4 COUNTERBORE FLOOR HEIGHTS ABOVE ITS BOTTOM TO .001.",
     f"5A. CUT EACH {_CARRIAGE_SCREW} {_item(CARRIAGE_SCREW)} TO ITS OWN FLOOR "
-    f"HEIGHT + {_length(pivot_block.SCREW_REACH, 3)} "
-    f"(±{_length(pivot_block.SCREW_CUT_BAND, 3)}) UNDER THE HEAD.",
+    f"HEIGHT + {_length(pivot_block.SCREW_REACH, 3)} UNDER THE HEAD.",
     "5B. DEBURR EACH CUT END.",
     "5C. FASTEN EACH BLOCK WITH ITS 4 SCREWS: EACH TIP ENGAGES "
     f"{_length(pivot_block.REACH_MIN, 3)}-{_length(pivot_block.REACH_MAX, 3)} "
@@ -2264,7 +2269,12 @@ ASSEMBLY_STEPS = (
     # table move made by gauge-block stack and indicator (the rail setting
     # table's title); the origin stops return the table to the origin for
     # rail 2 and the hub, and the DRO keeps the origin for the pass table.
-    "6. ZERO THE DRO X AND Y AT THE SPINDLE ORIGIN (SHEET 1).",
+    # The table sits centred on the middle T-slot (trammel.TABLE_CENTRE_Y),
+    # its length centred under the spindle (TABLE_X): restack r3's blocker,
+    # the origin had no table feature the builder can touch.
+    "6. ZERO THE DRO X AND Y AT THE SPINDLE ORIGIN (SHEET 1): SPINDLE AXIS "
+    f"{_ORIGIN_FROM_SLOT} TOWARD THE COLUMN FROM THE MIDDLE T-SLOT CENTRELINE, AT "
+    "THE TABLE'S LENGTHWISE MIDPOINT.",
     "6A. CLAMP AN X AND A Y ORIGIN STOP TO THE TABLE, EACH AGAINST ITS OWN DIAL "
     "INDICATOR FIXED TO THE MACHINE, NONE MOVED UNTIL STEP 10D.",
     "6B. ZERO BOTH ORIGIN-STOP INDICATORS.",
