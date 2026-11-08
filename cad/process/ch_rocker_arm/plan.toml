@@ -39,7 +39,7 @@ material_verify = true
 on_hand = false
 as_is_faces = []
 prerequisite = "Confirm receipt, grade and actual section before sawing: OM4807 1/8 x 1-1/2 in flat for each strap, and ordered OM4793 1/2 in 1018 round for each hub. Catalogue nominal is not an on-hand measurement. Saw strap blanks 354 mm long and hub blanks 42 mm long; remove saw burrs. Use the bandsaw and blade only after stock section, tooth engagement, speed and holding are confirmed."
-note = "ONE combined route, two material-disjoint branches. H1 makes the hub supply; P1/P1E/P2/P2E complete both entire blank planes before P3 squares the strap blank; T1 makes the socket and waste locating holes; R1/R2 rough, T2/T3 finish the arcs on the extant oblique trammel; T4A/T4B/T4C/T4 clock and mill lands/tapers and remove waste; J1 presses; F1/F2 finish the joined hub and bore; D1 drills the rod hole; I1/B1 inspect and finish. No separately imported component bundles. Raw longitudinal strap edges remain scrap, not claimed finished/as-is faces. Existing shared example inventory is illustrative and is not proof of present shop capability."
+note = "ONE combined route, two material-disjoint branches. H1 makes the hub supply; P1/P1E/P2/P2E complete both entire blank planes before P3 squares the strap blank; T1 makes the socket and waste locating holes; R1/R2 rough, T2/T3 finish the arcs on the extant oblique trammel; T4A/T4B/T4C/T4 clock and mill lands/tapers and remove waste; J1 presses; F1/F2 finish the joined hub and bore; D1 drills the rod hole; I1/B1 inspect and finish. No separately imported component bundles. Raw longitudinal strap edges remain scrap, not claimed finished/as-is faces. Actual HA inventory identity and measurement provenance govern; this held proposal does not establish shop capability."
 cite = ["AUTHOR'S CHOICE: illustrative process proposal; not a measurement or approval", "harmonic-analyzer/cad/scripts/ch_rocker_hub_spec.py:1-70", "harmonic-analyzer/cad/scripts/ch_rocker_strap_spec.py:1-97", "harmonic-analyzer/cad/process/shop/inventory.toml:6480-6489,6687-6694"]
 
 [[stock.components]]
@@ -289,17 +289,21 @@ paper_mm = 0.05
 tool = "hss-toolbit-3-8-rh"
 edge_mm = 2.0
 check_jog_mm = 2.0
-retouch_after = [20, 30, 50]
+retouch_after = [20, 30]
 
 [[setups.zero.tool_touches]]
 tool = "parting-blade-lms-1728"
 holder = "qctp-axa-lms-2280/7-parting"
 before_ops = [70]
+x_face = "hub_land"
+x_method = "paper"
+x_paper_mm = 0.05
+gauge = "micrometers/0-1in"
 z_face = "hub_supply_front"
 method = "paper"
 paper_mm = 0.05
 edge_mm = 0.0
-corner = "tailstock_side"
+corner = "chuck_side"
 check_jog_mm = 2.0
 
 [[setups.ops]]
@@ -385,7 +389,7 @@ to_z = -8.5
 feed_mm_rev = 0.025
 doc_mm = 0.1
 direction = "toward_axis"
-note = "Set kept/front blade edge at supply Z-8.50, blade width toward chuck. HOLD actual positive sleeve capture/support. Proposed noncontact tray below cut; stop with a thin web, isolate, sever web by hand and retrieve. Stone sacrificial parted end only. Supply end is not final hub length."
+note = "The tailstock-side blade edge forms the kept supply end at Z -8.50; blade width lies toward the chuck. The front-face paper touch sets the chuck-side edge, so use the derived width-compensated DRO target, not -8.50 as the chuck-side reading. Qualify actual blade width and measure the finished land for the explicit X paper pickup. HOLD actual positive sleeve capture/support. Proposed noncontact tray below cut; stop with a thin web, isolate, sever web by hand and retrieve. Stone sacrificial parted end only. Supply end is not final hub length."
 
 # P1 — Face +Z broad face to strap datum B; raw long edges are waste.
 [[setups]]
@@ -399,6 +403,8 @@ deburr_mm = 0.1
 
 [setups.hold]
 fixture = "unknown"
+# Qualify the actual table-to-primary bearing riser; example dimensions are not shop facts.
+riser = "unknown"
 support = "unknown"
 grip_mm = "unknown"
 stop = "unknown"
@@ -429,7 +435,7 @@ from = "+z"
 face = "top"
 method = "paper"
 paper_mm = 0.05
-tool = "endmills-lms-6784/3-8in-4fl"
+tool = "endmills-lms-6784/1-4in-4fl"
 check_jog_mm = 5.0
 retouch_after = []
 
@@ -438,16 +444,16 @@ op = 10
 do = "face"
 approach_mm = 15.0 # Authored retract above standing stock; no physical clearance acceptance.
 feature = "strap_datum_b"
-tool = "endmills-lms-6784/3-8in-4fl"
+tool = "endmills-lms-6784/1-4in-4fl"
 holder = "r8-collets-lms-4860/3-8in"
 faces = ["HAF_STRAP_DATUM_B__P01"]
 to_z = 0.0
 doc_mm = 0.15
 feed_mm_min = 60.0
 direction = "conventional"
-stock_removal_bounds = { "x" = [-152.0, 152.0], "y" = [-17.402679940547772, 30.697320059452224], "z" = [0.0, 0.3429] }
+stock_removal_bounds = { "x" = [-150.0, 150.0], "y" = [-12.402679940547772, 25.697320059452224], "z" = [0.0, 0.3429] }
 contour = { "method" = "linear_table", "step_mm" = 5.0 }
-note = "Face the central region with cutter overrun bounded by model X -152..152 and 5 mm past each raw longitudinal edge; this reaches every final strap-face point, including the cutter radius beyond the 292.509136 mm finished span. Keep the raw 3.175 mm end ears under supported clamps. P1E moves restraint onto this finished central area and faces the ears before reversal; no adhesive qualification is credited."
+note = "Use the 1/4 in four-flute end mill in the existing 3/8 in-shank collet. Face the central X -150..150 region across the raw width, leaving the supported end ears under their clamps; P1E finishes those ears after transferring restraint to the central face. HOLD until actual projection, flute/shank/holder geometry and the complete clamp clearance are established. Every final strap-face point remains required; no adhesive hold is used."
 
 # P1E — Transfer restraint onto finished central B, then face both upper ears.
 [[setups]]
@@ -461,6 +467,8 @@ deburr_mm = 0.1
 
 [setups.hold]
 fixture = "unknown"
+# Qualify the actual table-to-primary bearing riser; example dimensions are not shop facts.
+riser = "unknown"
 support = "unknown"
 grip_mm = "unknown"
 stop = "unknown"
@@ -538,6 +546,8 @@ deburr_mm = 0.1
 
 [setups.hold]
 fixture = "unknown"
+# Qualify the actual table-to-primary bearing riser; example dimensions are not shop facts.
+riser = "unknown"
 support = "unknown"
 grip_mm = "unknown"
 stop = "unknown"
@@ -565,10 +575,14 @@ check_jog_mm = 5.0
 
 [setups.zero.z]
 from = "+z"
-face = "top"
-method = "paper"
+face = "raw lower face, measured from finished datum B"
+method = "measure_then_set"
+gauge = "micrometers/0-1in"
+measure = "Measure M from the completed datum-B face to the incoming raw lower face, before clamping, at both ears and the central strip. Do not use nominal stock thickness; resolve taper or warp and qualify the actual gauge before setting the datum."
+measure_before_hold = true
+offset_mm = -2.4892
 paper_mm = 0.05
-tool = "endmills-lms-6784/3-8in-4fl"
+tool = "endmills-lms-6784/1-4in-4fl"
 check_jog_mm = 5.0
 retouch_after = []
 
@@ -577,18 +591,18 @@ op = 10
 do = "face"
 approach_mm = 15.0 # Authored retract above standing stock; no physical clearance acceptance.
 feature = "strap_faces"
-tool = "endmills-lms-6784/3-8in-4fl"
+tool = "endmills-lms-6784/1-4in-4fl"
 holder = "r8-collets-lms-4860/3-8in"
 faces = ["HAF_STRAP_FACES__P01"]
 to_z = 0.0
 doc_mm = 0.15
 feed_mm_min = 60.0
 direction = "conventional"
-stock_removal_bounds = { "x" = [-152.0, 152.0], "y" = [-30.697320059452224, 17.402679940547772], "z" = [0.0, 0.3429] }
+stock_removal_bounds = { "x" = [-150.0, 150.0], "y" = [-25.697320059452224, 12.402679940547772], "z" = [0.0, 0.3429] }
 contour = { "method" = "linear_table", "step_mm" = 5.0 }
 checks = { "thickness" = "micrometers/0-1in" }
 inspection_methods = { "thickness" = "Micrometer across both cleaned broad faces at both ends, middle and each future arm tip, clear of burrs. Every reading2.4638–2.5146mm. Sweep the supported face with DTI to find lift/warp; do not force it flat to obtain a thickness pass." }
-note = "All final strap faces are finished to 2.4892 mm; no final broad-face stock remains for postjoin cutting. End ears under the clamps still measure 2.8321 mm until P2E faces them with central restraint, yielding a uniform 2.4892 mm blank before P3."
+note = "Use the 1/4 in four-flute end mill and the measured-M Z setting to finish the central strip to 2.4892 mm from datum B; do not derive finished thickness from the purchased stock nominal. The authored allowance is a proposal, not a stock measurement: establish actual entry heights and pass depths before cutting. End ears retain their incoming allowance until P2E transfers restraint and faces them to the same finished plane. HOLD until qualified unforced inspection establishes 2.4638–2.5146 mm."
 
 # P2E — Transfer to central restraint and finish lower ears before any blank drilling.
 [[setups]]
@@ -602,6 +616,8 @@ deburr_mm = 0.1
 
 [setups.hold]
 fixture = "unknown"
+# Qualify the actual table-to-primary bearing riser; example dimensions are not shop facts.
+riser = "unknown"
 support = "unknown"
 grip_mm = "unknown"
 stop = "unknown"
@@ -681,6 +697,8 @@ deburr_mm = 0.1
 
 [setups.hold]
 fixture = "unknown"
+# Qualify the actual table-to-primary bearing riser; example dimensions are not shop facts.
+riser = "unknown"
 support = "unknown"
 grip_mm = "unknown"
 stop = "unknown"
@@ -756,6 +774,8 @@ deburr_mm = 0.0
 
 [setups.hold]
 fixture = "unknown"
+# Qualify the actual table-to-primary bearing riser; example dimensions are not shop facts.
+riser = "unknown"
 support = "unknown"
 grip_mm = "unknown"
 stop = "unknown"
@@ -897,6 +917,8 @@ deburr_mm = 0.1
 
 [setups.hold]
 fixture = "unknown"
+# Qualify the actual table-to-primary bearing riser; example dimensions are not shop facts.
+riser = "unknown"
 support = "unknown"
 grip_mm = "unknown"
 stop = "unknown"
@@ -967,6 +989,8 @@ deburr_mm = 0.1
 
 [setups.hold]
 fixture = "unknown"
+# Qualify the actual table-to-primary bearing riser; example dimensions are not shop facts.
+riser = "unknown"
 support = "unknown"
 grip_mm = "unknown"
 stop = "unknown"
@@ -1035,7 +1059,7 @@ support = "unknown"
 clamp = "unknown"
 stop = "unknown"
 grip_mm = "unknown"
-note = "HOLD actual MHA-CH-06-TL-00 oblique trammel: TL-21 carrier, self-cut TL-22 riser, bonded HUB locator, CL dowel, supported CR clamp and captured shoulder pivots. Presence, installed solids/pose, contact/support, rail commissioning, metrology and moving clearance remain unknown. Finished datum B seats on riser in STRAP_DOWN; no template substitution or reflected-only installation."
+note = "HOLD actual MHA-CH-06-TL-00 oblique trammel: TL-21 carrier, self-cut TL-24 riser, bonded HUB locator, CL dowel, supported CR clamp and captured shoulder pivots. Presence, installed solids/pose, contact/support, rail commissioning, metrology and moving clearance remain unknown. Finished datum B seats on riser in STRAP_DOWN; no template substitution or reflected-only installation."
 
 [setups.stock_state]
 top_z = 0.0
@@ -1083,7 +1107,7 @@ support = "unknown"
 clamp = "unknown"
 stop = "unknown"
 grip_mm = "unknown"
-note = "HOLD actual MHA-CH-06-TL-00 oblique trammel: TL-21 carrier, self-cut TL-22 riser, bonded HUB locator, CL dowel, supported CR clamp and captured shoulder pivots. Presence, installed solids/pose, contact/support, rail commissioning, metrology and moving clearance remain unknown. Finished datum B seats on riser in STRAP_DOWN; no template substitution or reflected-only installation."
+note = "HOLD actual MHA-CH-06-TL-00 oblique trammel: TL-21 carrier, self-cut TL-24 riser, bonded HUB locator, CL dowel, supported CR clamp and captured shoulder pivots. Presence, installed solids/pose, contact/support, rail commissioning, metrology and moving clearance remain unknown. Finished datum B seats on riser in STRAP_DOWN; no template substitution or reflected-only installation."
 
 [setups.stock_state]
 top_z = 0.0
@@ -1136,6 +1160,8 @@ deburr_mm = 0.0
 
 [setups.hold]
 fixture = "unknown"
+# Qualify the actual table-fixed clocking base and its bearing rise; example dimensions are not shop facts.
+riser = "unknown"
 support = "unknown"
 grip_mm = "unknown"
 stop = "unknown"
@@ -1217,6 +1243,8 @@ deburr_mm = 0.0
 
 [setups.hold]
 fixture = "unknown"
+# Qualify the actual table-fixed clocking base and its bearing rise; example dimensions are not shop facts.
+riser = "unknown"
 support = "unknown"
 grip_mm = "unknown"
 stop = "unknown"
@@ -1298,6 +1326,8 @@ deburr_mm = 0.0
 
 [setups.hold]
 fixture = "unknown"
+# Qualify the actual table-fixed clocking base and its bearing rise; example dimensions are not shop facts.
+riser = "unknown"
 support = "unknown"
 grip_mm = "unknown"
 stop = "unknown"
@@ -1371,6 +1401,8 @@ deburr_mm = 0.0
 
 [setups.hold]
 fixture = "unknown"
+# Qualify the actual table-fixed clocking base and its bearing rise; example dimensions are not shop facts.
+riser = "unknown"
 support = "unknown"
 grip_mm = "unknown"
 stop = "unknown"
@@ -1488,12 +1520,14 @@ id = "F1"
 machine = "PM-30MV"
 frame = "FINISH_UP"
 stock_in = "J1"
-note = "After press, face +Z hub end and finish reamed datum bore A in same established axis."
+note = "After press, face +Z hub end and finish reamed datum bore A in the same established axis. In F1, Z0 is the target upper hub face, not strap datum B. Strap B lies below Z0 by the signed offset in the datum recipe; add the paper thickness to that face coordinate when setting the DRO. All cutting and retouch Z readings remain in this one setup frame; model Z coordinates are CAD references, not DRO commands. An unresolved tool-touch setting remains HOLD. The 0.1 mm edge-break cap is an intermediate process choice to preserve material for final deburring, not a new drawing limit. Keep the sharp press-joint root unchanged; B1 retains the CAD maximum 0.254 mm on permitted exposed edges."
 coolant = "cutting_oil_brush"
 deburr_mm = 0.1
 
 [setups.hold]
 fixture = "unknown"
+# Qualify the actual bearing riser and below-seat hub offset; no example height is a shop fact.
+riser = "unknown"
 support = "unknown"
 grip_mm = "unknown"
 stop = "unknown"
@@ -1545,7 +1579,7 @@ feed_mm_min = 40.0
 direction = "conventional"
 stock_removal_bounds = { "x" = [-5.3, 5.3], "y" = [-5.3, 5.3], "z" = [0.0, 0.72175] }
 contour = { "method" = "linear_table", "step_mm" = 3.0 }
-note = "Face upper hub only to modelZ+3.52825. Keep cutter well above already finished strap faces; never blanket-face joined strap."
+note = "Face upper hub only to setup Z0, the upper-hub target defined by the FINISH_UP frame. Keep cutter well above already finished strap faces; never blanket-face joined strap."
 
 [[setups.ops]]
 op = 20
@@ -1566,12 +1600,14 @@ id = "F2"
 machine = "PM-30MV"
 frame = "FINISH_DOWN"
 stock_in = "F1"
-note = "Reverse after reaming; finish lower hub end to 7.080 mm length and inspect stack/strap registration."
+note = "Reverse after reaming; finish lower hub end to 7.080 mm length and inspect stack/strap registration. The 0.1 mm edge-break cap is an intermediate process choice to preserve material for final deburring, not a new drawing limit. Keep the sharp press-joint root unchanged; B1 retains the CAD maximum 0.254 mm on permitted exposed edges."
 coolant = "cutting_oil_brush"
 deburr_mm = 0.1
 
 [setups.hold]
 fixture = "unknown"
+# Qualify the actual table-to-primary bearing riser; example dimensions are not shop facts.
+riser = "unknown"
 support = "unknown"
 grip_mm = "unknown"
 stop = "unknown"
@@ -1635,17 +1671,19 @@ id = "D1"
 machine = "PM-30MV"
 frame = "STRAP_UP"
 stock_in = "F2"
-note = "Drill #47 rod-pin hole AFTER join and final bore; locate from A and B, never from end waste tooling holes."
+note = "Drill #47 rod-pin hole AFTER join and final bore; locate from A and B, never from end waste tooling holes. D1 X/Y zero is reamed datum A. Inspection model coordinates use a different origin: subtract the model-Y offset of A, 8 mm, to compare them with D1 Y; do not enter a model-Y inspection reference directly as a DRO command. The 0.1 mm edge-break cap is an intermediate process choice to preserve material for final deburring, not a new drawing limit. Keep the sharp press-joint root unchanged; B1 retains the CAD maximum 0.254 mm on permitted exposed edges."
 coolant = "cutting_oil_brush"
 deburr_mm = 0.1
 
 [setups.hold]
 fixture = "unknown"
+# Qualify the actual bearing riser and below-seat hub offset; no example height is a shop fact.
+riser = "unknown"
 support = "unknown"
 grip_mm = "unknown"
 stop = "unknown"
 clamp = "unknown"
-note = "HOLD relieved plate supports finished datum B and rod end; locate actual reamed A, clock arm from established component geometry without new holes, clamp without bowing. Provide sacrificial support and breakthrough clearance directly under rod hole."
+note = "HOLD relieved plate supports the finished strap underside opposite datum B and the rod end; locate actual reamed A, clock arm from established component geometry without new holes, clamp without bowing. Provide sacrificial support and breakthrough clearance directly under rod hole. Qualify spindle travel from the actual strap seating plane, accounting for the hub below that plane; adding the full hub height above the seat is not a valid stack."
 
 [setups.stock_state]
 top_z = 2.28365
@@ -1677,7 +1715,7 @@ method = "paper"
 paper_mm = 0.05
 tool = "unknown"
 check_jog_mm = 5.0
-retouch_after = [20]
+retouch_after = [] # No retouch after the last operation; required tool-change touches remain.
 
 [[setups.ops]]
 op = 10
@@ -1700,7 +1738,7 @@ holder = "drill-chuck-r8"
 exit_mm = 1.0
 feed_mm_rev = 0.025
 checks = { "at" = "unknown", "dia" = "unknown", "thru" = "unknown", "position_dia" = "unknown" }
-inspection_methods = { "at" = "Establish datum A from reamed bore and B from strap face with clocking resolved by current drawing; measure actual rod axis at X133.06740213488345,Y16.456064115939025 in model. BASIC coordinates are not independent +/- tolerances.", "dia" = "Qualified actual plug pair/continuous bore measurement inside1.994–2.0956.", "thru" = "Confirm through full strap with no burr/bell mouth.", "position_dia" = "HOLD qualified A|B datum-simulated position inspection. Determine actual rod axis relative to A and B and evaluate .2032mm diametral zone (RFS). Preserve raw readings, datum construction and uncertainty. Do not reuse retired fixed-tip-C fixture: C is the rod hole in the current drawing." }
+inspection_methods = { "at" = "Establish datum A from reamed bore and B from strap face with clocking resolved by the current drawing. The BASIC model coordinates printed with this check are CAD references, not D1 DRO commands: D1 is centred on A, so its Y equals model Y minus the 8 mm model-Y offset of A; X is unchanged. Transform measured and reference coordinates into the same frame before comparing. BASIC coordinates are not independent +/- tolerances.", "dia" = "Qualified actual plug pair/continuous bore measurement inside1.994–2.0956.", "thru" = "Confirm through full strap with no burr/bell mouth.", "position_dia" = "HOLD qualified A|B datum-simulated position inspection. Determine actual rod axis relative to A and B and evaluate .2032mm diametral zone (RFS). Preserve raw readings, datum construction and uncertainty. Do not reuse retired fixed-tip-C fixture: C is the rod hole in the current drawing." }
 note = "Actual #47 nominal 1.994 mm, DRILLED+.004/0 in. No tap, ream or counterbore called for; maintain datum B without bending the strap."
 
 # I1 — Final finished-dimension and datum-based inspection; no machine DRO or visual nominal can substitute for metrology.
@@ -1760,7 +1798,7 @@ do = "inspect"
 feature = "rod_hole"
 checks = { "at" = "unknown", "dia" = "unknown", "thru" = "unknown", "position_dia" = "unknown" }
 go_no_go = { "dia" = { "go" = 2.0, "no_go" = 2.09 } }
-inspection_methods = { "at" = "Establish datum A from reamed bore and B from strap face with clocking resolved by current drawing; measure actual rod axis at X133.06740213488345,Y16.456064115939025 in model. BASIC coordinates are not independent +/- tolerances.", "dia" = "Qualified actual plug pair/continuous bore measurement inside1.994–2.0956.", "thru" = "Confirm through full strap with no burr/bell mouth.", "position_dia" = "HOLD qualified A|B datum-simulated position inspection. Determine actual rod axis relative to A and B and evaluate .2032mm diametral zone (RFS). Preserve raw readings, datum construction and uncertainty. Do not reuse retired fixed-tip-C fixture: C is the rod hole in the current drawing." }
+inspection_methods = { "at" = "Establish datum A from reamed bore and B from strap face with clocking resolved by the current drawing. The BASIC model coordinates printed with this check are CAD references, not D1 DRO commands: D1 is centred on A, so its Y equals model Y minus the 8 mm model-Y offset of A; X is unchanged. Transform measured and reference coordinates into the same frame before comparing. BASIC coordinates are not independent +/- tolerances.", "dia" = "Qualified actual plug pair/continuous bore measurement inside1.994–2.0956.", "thru" = "Confirm through full strap with no burr/bell mouth.", "position_dia" = "HOLD qualified A|B datum-simulated position inspection. Determine actual rod axis relative to A and B and evaluate .2032mm diametral zone (RFS). Preserve raw readings, datum construction and uncertainty. Do not reuse retired fixed-tip-C fixture: C is the rod hole in the current drawing." }
 note = "HOLD any unestablished inspection capability; record actual readings against CURRENT MHA-CH-06/v48 (reserved; current export remains required), never manufacture a pass from nominal CAD dimensions."
 
 [[setups.ops]]
@@ -1842,6 +1880,6 @@ do = "inspect"
 feature = ["pivot_bore", "hub_faces", "strap_faces", "strap_datum_b", "hub_od", "rod_hole", "top_edge", "profile_outer", "tip_land_pos_x", "tip_land_neg_x", "hub_root"]
 checks = { "pivot_bore" = { "dia" = "unknown", "thru" = "unknown", "finish_ra" = "unknown", "process" = "unknown" }, "hub_faces" = { "length" = "unknown" }, "strap_faces" = { "thickness" = "unknown" }, "strap_datum_b" = { "thickness" = "unknown" }, "hub_od" = { "dia" = "unknown", "coaxiality_dia" = "unknown" }, "rod_hole" = { "at" = "unknown", "dia" = "unknown", "thru" = "unknown", "position_dia" = "unknown" }, "top_edge" = { "height_above_pivot" = "unknown", "radius" = "unknown", "surface_profile" = "unknown" }, "profile_outer" = { "bottom_radius" = "unknown", "mirror_symmetric" = "unknown", "surface_profile" = "unknown" }, "tip_land_pos_x" = { "land_angle_deg" = "unknown", "station" = "unknown", "surface_profile" = "unknown" }, "tip_land_neg_x" = { "land_angle_deg" = "unknown", "station" = "unknown", "surface_profile" = "unknown" }, "hub_root" = { "radius" = "unknown" } }
 go_no_go = { "rod_hole" = { "dia" = { "go" = 2.0, "no_go" = 2.09 } } }
-inspection_methods = { "pivot_bore" = { "dia" = "Qualified current-band6.5024–6.5278 metrology; both ends/full bore, actual uncertainty included. Old6.500/6.530 plugs are prohibited.", "thru" = "Confirm actual unobstructed full diameter through hub.", "finish_ra" = "Qualified actual-wall Ra1.6um maximum measurement/replica method, not comparator assertion.", "process" = "Record postpress reaming tool, operation and lot." }, "hub_faces" = { "length" = "Measure directly over end annuli at multiple angles:7.0565–7.1073; preserve20-arm order and record individual lengths for separate drawing stack acceptance." }, "strap_faces" = { "thickness" = "Micrometer finished broad faces clear of hub and burrs at distributed stations:2.4638–2.5146." }, "strap_datum_b" = { "thickness" = "Confirm datum B face is actual +Z face; repeat distributed strap thickness checks and check it seats unforced. Supplemental .004in strap position to hub/G must be measured, not omitted because absent as exported requirement." }, "hub_od" = { "dia" = "Measure all upper/lower split hub OD patches at both ends/middle:9.906–10.414; retain actual measured supply-land record.", "coaxiality_dia" = "HOLD datum-A cylindrical simulator and qualified OD-axis method across BOTH hub projections. Determine actual OD axis relative to reamed A over full extent; diametral zone<=.1016. A single TIR on loose pin without fit/uncertainty budget is not evidence. Supplemental drawing HUB WALL .064 MIN=1.6256 including eccentricity must hold; evaluate measured minimum land, maximum bore and worst axis shift, not nominal wall." }, "rod_hole" = { "at" = "Establish datum A from reamed bore and B from strap face with clocking resolved by current drawing; measure actual rod axis at X133.06740213488345,Y16.456064115939025 in model. BASIC coordinates are not independent +/- tolerances.", "dia" = "Qualified actual plug pair/continuous bore measurement inside1.994–2.0956.", "thru" = "Confirm through full strap with no burr/bell mouth.", "position_dia" = "HOLD qualified A|B datum-simulated position inspection. Determine actual rod axis relative to A and B and evaluate .2032mm diametral zone (RFS). Preserve raw readings, datum construction and uncertainty. Do not reuse retired fixed-tip-C fixture: C is the rod hole in the current drawing." }, "top_edge" = { "height_above_pivot" = "Evaluate top edge relative actual reamed A at mirror plane,8.000–8.508; keep whole top surface in the unequally disposed profile zone.", "radius" = "BASIC R800 curvature about nominal [0,816,0], governed by profile; never accept an invented standalone +/- radius tolerance.", "surface_profile" = "HOLD whole-surface current A|B|C profile measurement,0.508 U0.508, over entire bounded top edge. Qualify optical/CMM/current scanning method and datum construction; finite sample points alone are not entire-surface proof." }, "profile_outer" = { "bottom_radius" = "BASIC R816 concentric with R800; evaluate through profile, not invented radius limits.", "mirror_symmetric" = "Check both taper joins/arc ends mirrored in actual datum coordinate system, not just equal caliper overall lengths.", "surface_profile" = "HOLD qualified whole-surface current A|B|C profile inspection0.508 U0 BETWEEN J AND K, including lower arc and BOTH straight taper faces. Do not borrow one top-edge pass for separate taper faces." }, "tip_land_pos_x" = { "land_angle_deg" = "BASIC10.460060747357092deg radial land; evaluate within surface-profile control, no independent angle tolerance.", "station" = "BASIC X+146.25456773160636 end corner; actual land width5.588mm and endpoints from current model/drawing, subject to profile.", "surface_profile" = "HOLD qualified A|B|C whole-land0.508 U0 surface-profile measurement, including tip station/orientation." }, "tip_land_neg_x" = { "land_angle_deg" = "Mirror radial BASIC10.460060747357092deg; evaluate within surface-profile control.", "station" = "BASIC X-146.25456773160636 end corner; check actual5.588mm radial land and joins.", "surface_profile" = "HOLD qualified A|B|C whole-land0.508 U0 profile measurement; do not infer this side from rod side." }, "hub_root" = { "radius" = "Inspect BOTH roots through all split exported annular patches; sharp0 is allowed, no groove, no burr, MAX0.2032mm. Qualified optical/limit capability unresolved; do not apply generalR.010 edge break here." } }
+inspection_methods = { "pivot_bore" = { "dia" = "Qualified current-band6.5024–6.5278 metrology; both ends/full bore, actual uncertainty included. Old6.500/6.530 plugs are prohibited.", "thru" = "Confirm actual unobstructed full diameter through hub.", "finish_ra" = "Qualified actual-wall Ra1.6um maximum measurement/replica method, not comparator assertion.", "process" = "Record postpress reaming tool, operation and lot." }, "hub_faces" = { "length" = "Measure directly over end annuli at multiple angles:7.0565–7.1073; preserve20-arm order and record individual lengths for separate drawing stack acceptance." }, "strap_faces" = { "thickness" = "Micrometer finished broad faces clear of hub and burrs at distributed stations:2.4638–2.5146." }, "strap_datum_b" = { "thickness" = "Confirm datum B face is actual +Z face; repeat distributed strap thickness checks and check it seats unforced. Supplemental .004in strap position to hub/G must be measured, not omitted because absent as exported requirement." }, "hub_od" = { "dia" = "Measure all upper/lower split hub OD patches at both ends/middle:9.906–10.414; retain actual measured supply-land record.", "coaxiality_dia" = "HOLD datum-A cylindrical simulator and qualified OD-axis method across BOTH hub projections. Determine actual OD axis relative to reamed A over full extent; diametral zone<=.1016. A single TIR on loose pin without fit/uncertainty budget is not evidence. Supplemental drawing HUB WALL .064 MIN=1.6256 including eccentricity must hold; evaluate measured minimum land, maximum bore and worst axis shift, not nominal wall." }, "rod_hole" = { "at" = "Establish datum A from reamed bore and B from strap face with clocking resolved by the current drawing. The BASIC model coordinates printed with this check are CAD references, not D1 DRO commands: D1 is centred on A, so its Y equals model Y minus the 8 mm model-Y offset of A; X is unchanged. Transform measured and reference coordinates into the same frame before comparing. BASIC coordinates are not independent +/- tolerances.", "dia" = "Qualified actual plug pair/continuous bore measurement inside1.994–2.0956.", "thru" = "Confirm through full strap with no burr/bell mouth.", "position_dia" = "HOLD qualified A|B datum-simulated position inspection. Determine actual rod axis relative to A and B and evaluate .2032mm diametral zone (RFS). Preserve raw readings, datum construction and uncertainty. Do not reuse retired fixed-tip-C fixture: C is the rod hole in the current drawing." }, "top_edge" = { "height_above_pivot" = "Evaluate top edge relative actual reamed A at mirror plane,8.000–8.508; keep whole top surface in the unequally disposed profile zone.", "radius" = "BASIC R800 curvature about nominal [0,816,0], governed by profile; never accept an invented standalone +/- radius tolerance.", "surface_profile" = "HOLD whole-surface current A|B|C profile measurement,0.508 U0.508, over entire bounded top edge. Qualify optical/CMM/current scanning method and datum construction; finite sample points alone are not entire-surface proof." }, "profile_outer" = { "bottom_radius" = "BASIC R816 concentric with R800; evaluate through profile, not invented radius limits.", "mirror_symmetric" = "Check both taper joins/arc ends mirrored in actual datum coordinate system, not just equal caliper overall lengths.", "surface_profile" = "HOLD qualified whole-surface current A|B|C profile inspection0.508 U0 BETWEEN J AND K, including lower arc and BOTH straight taper faces. Do not borrow one top-edge pass for separate taper faces." }, "tip_land_pos_x" = { "land_angle_deg" = "BASIC10.460060747357092deg radial land; evaluate within surface-profile control, no independent angle tolerance.", "station" = "BASIC X+146.25456773160636 end corner; actual land width5.588mm and endpoints from current model/drawing, subject to profile.", "surface_profile" = "HOLD qualified A|B|C whole-land0.508 U0 surface-profile measurement, including tip station/orientation." }, "tip_land_neg_x" = { "land_angle_deg" = "Mirror radial BASIC10.460060747357092deg; evaluate within surface-profile control.", "station" = "BASIC X-146.25456773160636 end corner; check actual5.588mm radial land and joins.", "surface_profile" = "HOLD qualified A|B|C whole-land0.508 U0 profile measurement; do not infer this side from rod side." }, "hub_root" = { "radius" = "Inspect BOTH roots through all split exported annular patches; sharp0 is allowed, no groove, no burr, MAX0.2032mm. Qualified optical/limit capability unresolved; do not apply generalR.010 edge break here." } }
 inspection_note = "On return verify matte-black appearance/coverage, no corrosion or residue, press joint intact and no trapped process solution. Clean and lightly oil as vendor specifies. Repeat ALL dimensional/geometric checks listed above on final coated state, including hub length/thickness, both bores, A|B|C profiles and root. Final release remains HOLD for unresolved capability, fixture/native geometry debt or20-arm stack result; this held proposal is not enrollment or machining approval."
 
