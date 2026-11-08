@@ -1,32 +1,30 @@
 r"""Pure-data print contract for MHA-SM-01, the gooseneck weldment.
 
 PURE DATA, no SolidWorks/COM imports.  ``sm_gooseneck_geom`` owns every size
-and ``sm_gooseneck_spring_joint`` the end piece's tap, counterbore and wall
-budget; this module adds what the print states: the marked model dimensions,
-their places and callouts, the end-piece tap's callout rows, and the notes.
+and ``sm_gooseneck_spring_joint`` the end piece's tap and wall budget; this
+module adds what the print states: the marked model dimensions, their places
+and callouts, the end-piece tap's callout rows, and the notes.
 ``build_sm_gooseneck`` marks and authors them on the part;
 ``draw_sm_gooseneck`` places exactly ``DRAWING_DIMENSIONS``.
 
 Design (owner rulings 2026-10-27, #1951).  The whole gooseneck is 1/2 in x
 0.065 in 4130-N seamless tube (OnlineMetals 7322), its OD and wall printed as
 stock, bent R3.0 on the 1/2 in x 3 in CLR die.  The arm ends flush, with no
-step, in a solid Ø.500 end piece silver-brazed on a shank inside the tube
-and tapped 1/4-28 UNF-2B blind after the braze for MHA-SM-04; an arm-end
-counterbore clears that screw's thread run-out.  A 5/8 in x 0.058 in 4130-N
-seamless sleeve (OnlineMetals 7324), select-fitted from stock and brazed both
-ends, covers the leg from its foot: the post the top frame's Ø17 hub bore
-takes.
+step, in a solid Ø.500 end piece silver-brazed on a shank inside the tube.  A
+5/8 in x 0.058 in 4130-N seamless sleeve (OnlineMetals 7324), select-fitted
+from stock and brazed both ends, covers the leg from its foot: the post the
+top frame's Ø17 hub bore takes.  Owner ruling 2026-11-08 (Pedro), #2144 item
+11.4: the end piece takes a plain 1/4-20 UNC blind tap for the purchased
+MHA-SM-VN-56 shoulder screw, with no counterbore, position frames or datums;
+its axis carries the title block's implied-zero coaxial offset.
 
 Every size is a native model dimension: the elevation's leg length, bend
 radius, arm straight and sleeve length; section A-A's end piece (head Ø and
-length, braze shank Ø and length) and counterbore (LIMIT Ø and depth, floor
-corner R.004 MAX); the end view's native blind-tap callout.  The notes state
-stock, process and intent only.  The counterbore's wall shortfall (owner
-minor sm-gooseneck RV-01) is stated as ``C'BORE WALL .nnn MIN`` under the
-head Ø, the wall's outer bound (drawing-guidelines.md rule 20), the shank's
-braze fit on the shank Ø (rule 4, the matched fit names its mate and
-clearance) and the tap's and the counterbore's axis limits as position
-frames on the end view (GEOMETRIC_TOLERANCES_IN).
+length, braze shank Ø and length); the end view's native blind-tap callout,
+which names the screw and states its full-thread engagement (rule 20, owner
+minor sm-gooseneck RV-04).  The notes state stock, process and intent only.
+The shank's braze fit sits on the shank Ø (rule 4, the matched fit names its
+mate and clearance).
 
 Decimal-inch sheet (#290): every size prints at the places its band needs
 (DRAWING_PRECISION, below); the end piece's calibrated spring-support sizes
@@ -40,15 +38,15 @@ import math
 
 import _config
 import sm_gooseneck_geom as geom
+import sm_vn_gooseneck_shoulder_screw_spec as screw
 from _package_units import drawing_unit
 from sm_gooseneck_spring_joint import (
     BRAZE_CLEARANCE_MAX,
     BRAZE_CLEARANCE_MIN,
-    COUNTERBORE_AXIS_OFFSET_MAX,
-    COUNTERBORE_WALL_CALLOUT_MIN,
-    COUNTERBORE_WALL_MIN,
-    PLUG_WALL_TARGET,
-    THREAD_AXIS_OFFSET_MAX,
+    ENGAGEMENT_CALLOUT_D,
+    ENGAGEMENT_CALLOUT_MIN,
+    ENGAGEMENT_MIN,
+    ENGAGEMENT_MIN_D,
     owner_minor,
 )
 
@@ -65,10 +63,10 @@ def _inch(value_mm: float, places: int) -> str:
     return f"{value_mm / geom.MM_PER_IN:.{places}f}".removeprefix("0")
 
 
-# The counterbore wall under the rule 17 target stands only on owner minor
-# RV-01 (sm_gooseneck_spring_joint.owner_minor).
-if COUNTERBORE_WALL_MIN < PLUG_WALL_TARGET:
-    owner_minor(_config.parts("sm-gooseneck"), "RV-01", "sm_gooseneck")
+# The shoulder screw's engagement under rule 18's 1.5D stands only on owner
+# minor RV-04 (sm_gooseneck_spring_joint.owner_minor).
+if ENGAGEMENT_MIN < ENGAGEMENT_MIN_D * screw.MAJOR_DIA:
+    owner_minor(_config.parts("sm-gooseneck"), "RV-04", "sm_gooseneck")
 
 # The stock the print names (OnlineMetals 7322 tube, 7324 sleeve; the
 # registry's material specification): its OD and wall in inches, each
@@ -100,32 +98,13 @@ if not (
 # the part, #1942).  Novice rubric (fan-out of #2223): a callout carries at
 # most two lines of words, a feature with several tight dimensions names its
 # mate once on one numbered flag note linked to each of them (rule 4), and a
-# fit is named with its clearance as REF.  The counterbore's MIN limits (Ø,
-# depth) and its floor corner's MAX clear MHA-SM-04's thread run-out
-# (sm_gooseneck_spring_joint): one note, linked from all three.  The braze
-# shank and the sleeve each link their own fit note.
-SCREW_NUMBER = str(_config.parts("sm-gooseneck-spring-screw")["number"])
-COUNTERBORE_NOTE = 1
-SHANK_FIT_NOTE = 2
-SLEEVE_FIT_NOTE = 3
-COUNTERBORE_WALL_CALLOUT = (
-    f"C'BORE WALL {_inch(COUNTERBORE_WALL_CALLOUT_MIN * geom.MM_PER_IN, 3)} MIN"
-)
-COUNTERBORE_NOTE_LINK = f"SEE NOTE {COUNTERBORE_NOTE}"
-COUNTERBORE_DIA_CALLOUT = COUNTERBORE_NOTE_LINK
-# The floor corner's native "R.004 MAX" links the run-out note; the
-# counterbore's axis limit is its position frame (GEOMETRIC_TOLERANCES_IN).
-COUNTERBORE_FLOOR_CALLOUT = COUNTERBORE_NOTE_LINK
-# No row longer than r8's 23-character row (55.5 mm): each block stands
-# between the sheet's left border and the end face (farm run
-# 20261028T062539287Z: "CLEARS MHA-SM-04 RUN-OUT" crossed the border).
-COUNTERBORE_ROW_MAX_CHARS = 23
-_COUNTERBORE_ROWS = f"{COUNTERBORE_DIA_CALLOUT}\n{COUNTERBORE_FLOOR_CALLOUT}"
-if max(map(len, _COUNTERBORE_ROWS.splitlines())) > COUNTERBORE_ROW_MAX_CHARS:
-    raise AssertionError("a counterbore callout row is wider than r8's 23 characters")
-# The head Ø ends flush with the tube's OD; the counterbore's wall to it is
-# the stated shortfall (owner minor RV-01), at the counterbore's largest.
-PLUG_DIA_CALLOUT = f"FLUSH WITH TUBE OD\n{COUNTERBORE_WALL_CALLOUT}"
+# fit is named with its clearance as REF.  The braze shank and the sleeve
+# each link their own fit note.
+SCREW_NUMBER = str(_config.parts("sm-vn-gooseneck-shoulder-screw")["number"])
+SHANK_FIT_NOTE = 1
+SLEEVE_FIT_NOTE = 2
+# The head Ø ends flush with the tube's OD.
+PLUG_DIA_CALLOUT = "FLUSH WITH TUBE OD"
 # The bend radius is the tube's centreline radius; the arrowhead lands on the
 # outer arc, so the value says which in plain words (machinist review of
 # e487a1bb4; "CLR" read as clearance, novice-rubric screen).  One short row
@@ -164,61 +143,29 @@ DIMENSION_CALLOUTS: dict[str, dict[str, str]] = {
         "PlugDia": PLUG_DIA_CALLOUT,
         "PlugShankDia": SHANK_FIT_CALLOUT,
     },
-    "CounterboreProfile": {
-        "CounterboreDia": COUNTERBORE_DIA_CALLOUT,
-        "CounterboreFloorCornerR": COUNTERBORE_FLOOR_CALLOUT,
-    },
 }
 DIMENSION_CALLOUTS_BY_NAME: dict[str, str] = {
     name: text
     for callouts in DIMENSION_CALLOUTS.values()
     for name, text in callouts.items()
 }
-# Above the value, one row (SolidWorks prints no line break in the above
-# compartment, pn_pen_v_block_spec): the counterbore depth links the
-# run-out note.  Below its stacked pair it would cross the end face's
-# extension lines.
-COUNTERBORE_DEPTH_CALLOUT = COUNTERBORE_NOTE_LINK
-DIMENSION_CALLOUTS_ABOVE: dict[str, dict[str, str]] = {
-    "CounterboreProfile": {"CounterboreDepth": COUNTERBORE_DEPTH_CALLOUT},
-}
-DIMENSION_CALLOUTS_ABOVE_BY_NAME: dict[str, str] = {
-    name: text
-    for callouts in DIMENSION_CALLOUTS_ABOVE.values()
-    for name, text in callouts.items()
-}
 
 # The end piece's native blind-tap callout (end view): the title block's
 # THREADS row owns the 2B class (drawing-guidelines.md rule 2), the tap's
 # two depths print at the places their band is read at
-# (sm_gooseneck_spring_joint.TAP_DEPTH_BAND), measured from the counterbore
-# floor (the Hole Wizard start face; codjiflo P2 on #1997), which the first
-# row states in plain words (novice-rubric screen: "DEEPEST DRILL AT C'BORE
-# MAX" left the depth origin unclear, rule 26).  The counterbore depth's MAX
-# still sets the drill's deepest point
-# (sm_gooseneck_spring_joint.TAP_DRILL_DEPTH_MAX).  The drill's wander is a
-# budget term, not a print row (sm_gooseneck_spring_joint.DRILL_WANDER_MAX).
-# Three rows in all (the layout audit's tall-block limit is four).
-# Inch sheet: the depths at .XX (their band), the drill Ø at .XXX (#3, .213).
+# (sm_gooseneck_spring_joint.TAP_DEPTH_BAND), from the end face, the Hole
+# Wizard start face.  The drill's wander is a budget term, not a print row
+# (sm_gooseneck_spring_joint.DRILL_WANDER_MAX).  Under the native rows: the
+# screw it takes and, as a plain manufacturing fact (rule 20), its full-thread
+# engagement under 1.5D (owner minor RV-04), floored to .001 and .01D.  Four
+# rows in all (the layout audit's tall-block limit).  Inch sheet: the depths
+# at .XX (their band), the drill Ø at .XXX (#7, .201).
 TAP_CALLOUT_PRECISION = {"hw-tapdrldia": 3, "hw-threaddepth": 2, "hw-tapdrldepth": 2}
-TAP_CALLOUT_BELOW = f"FOR {SCREW_NUMBER}; DEPTHS FROM C'BORE FLOOR"
-# The two axis limits the run-out clearance and the counterbore wall charge
-# (sm_gooseneck_spring_joint), as standard position frames on the end view
-# instead of prose (delegated ruling sm Q6, 2026-11-07 (Main), no precedent;
-# owner review #2144; pending owner confirmation; RV-03): the tap ⌖ to A, the
-# end piece's Ø.50 OD (flush with the tube's), and the counterbore ⌖ to B,
-# the tap.  Each zone is twice its radial offset; the literal values are the
-# part-owned mapping the drawing's frames read (test_part_owned_geometric_
-# tolerances), checked here against the offsets the stacks charge.
-GEOMETRIC_TOLERANCES_IN: dict[str, str] = {
-    "tap position": ".012",
-    "counterbore position": ".008",
-}
-if GEOMETRIC_TOLERANCES_IN != {
-    "tap position": _inch(2.0 * THREAD_AXIS_OFFSET_MAX, 3),
-    "counterbore position": _inch(2.0 * COUNTERBORE_AXIS_OFFSET_MAX, 3),
-}:
-    raise AssertionError("gooseneck axis zones are not twice the charged offsets")
+ENGAGEMENT_STATEMENT = (
+    f"ENGAGEMENT {f'{ENGAGEMENT_CALLOUT_MIN:.3f}'.removeprefix('0')} MIN "
+    f"({ENGAGEMENT_CALLOUT_D:.2f}D)"
+)
+TAP_CALLOUT_BELOW = f"FOR {SCREW_NUMBER}\n{ENGAGEMENT_STATEMENT}"
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  StationReference is a hidden construction sketch on the
@@ -231,9 +178,8 @@ if GEOMETRIC_TOLERANCES_IN != {
 # sleeve; OverallReference a hidden construction sketch on the Front plane
 # whose lines lie on drawn edges, carrying the bent form's overall height
 # (foot face to the arm's top) and reach (end face to the leg's outer side).
-# EndPieceProfile and CounterboreProfile
-# lie on the arm-axis plane, so section A-A (cut along the arm axis) carries
-# them. ---
+# EndPieceProfile lies on the arm-axis plane, so section A-A (cut along the
+# arm axis) carries it. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "StationReference": {"LegLength", "ArmStraight"},
     "TubeOdReference": {"TubeOdRef"},
@@ -241,11 +187,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BendPath": {"BendRadius"},
     "SleeveProfile": {"SleeveLength", "SleeveDia"},
     "EndPieceProfile": {"PlugDia", "PlugHeadLength", "PlugShankDia", "PlugShankLength"},
-    "CounterboreProfile": {
-        "CounterboreDia",
-        "CounterboreDepth",
-        "CounterboreFloorCornerR",
-    },
 }
 # The tube and sleeve are as supplied: their stock Ø print as reference,
 # untoleranced, and the supplier's catalogue tolerance governs (drawing-
@@ -257,7 +198,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # (16.4, 1.07) lay out the bend and govern; the overall sizes check the
 # finished bend from real faces (machinist review r5 of farm run
 # 20261101T004958072Z).  The braze shank's Ø is turned to the measured tube
-# ID (note 2), so its nominal is a reference and the clearance governs
+# ID (note 1), so its nominal is a reference and the clearance governs
 # (round 2, 20261107T110808280Z: a plain .363 beside the fit note was a
 # second controlling value, rule 7).
 REFERENCE_DIMENSIONS: dict[str, frozenset[str]] = {
@@ -274,21 +215,11 @@ TUBE_OD_REF_SPAN = 20.0
 # radius the die's: the title block's .X band (drawing-guidelines.md rule 3).
 # The two overall references print at two places (the snapped leg puts the
 # height at 19.650, a one-place tie).  The stock Ø (REF) print at their
-# three-place sizes; the braze shank and the counterbore's LIMIT Ø, depth and
-# floor-corner MAX at three, the places their bands need
+# three-place sizes; the braze shank at three, the places its band needs
 # (sm_gooseneck_spring_joint); the arm straight (the spring eye's station)
 # and the end piece's head Ø and lengths at the title block's .XX.
 ONE_PLACE_DIMENSIONS = frozenset({"LegLength", "BendRadius", "SleeveLength"})
-THREE_PLACE_DIMENSIONS = frozenset(
-    {
-        "TubeOdRef",
-        "SleeveDia",
-        "PlugShankDia",
-        "CounterboreDia",
-        "CounterboreDepth",
-        "CounterboreFloorCornerR",
-    }
-)
+THREE_PLACE_DIMENSIONS = frozenset({"TubeOdRef", "SleeveDia", "PlugShankDia"})
 
 
 def places(name: str) -> int:
@@ -306,31 +237,26 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     for dimensions in DRAWING_PRECISION.values()
     for name, places in dimensions.items()
 }
-if (set(DIMENSION_CALLOUTS_BY_NAME) | set(DIMENSION_CALLOUTS_ABOVE_BY_NAME)) - set(
-    DRAWING_PRECISION_BY_NAME
-):
+if set(DIMENSION_CALLOUTS_BY_NAME) - set(DRAWING_PRECISION_BY_NAME):
     raise AssertionError("a gooseneck callout names an unmarked dimension")
 
-# Four lines (drawing-guidelines.md rule 7), each linked from its features
-# by SEE NOTE n except the last: the counterbore's run-out clearance (its
-# MIN Ø and depth, its floor corner's MAX), the shank's matched fit in the
-# tube and the sleeve's on it (the joint's window, braze or retaining
-# compound, owner ruling 2026-10-27 on #1997; the sleeve's lower end flush
-# with the tube's, LEG_BOTTOM in sm_gooseneck_geom, which no view shows
-# inside the sleeve), then the order the owner ruled (2026-10-27, #1997: join
-# the end piece before bending, cooled or fully cured; recorded as RV-02 in
+# Three lines (drawing-guidelines.md rule 7), each linked from its features
+# by SEE NOTE n except the last: the shank's matched fit in the tube and the
+# sleeve's on it (the joint's window, braze or retaining compound, owner
+# ruling 2026-10-27 on #1997; the sleeve's lower end flush with the tube's,
+# LEG_BOTTOM in sm_gooseneck_geom, which no view shows inside the sleeve),
+# then the order the owner ruled (2026-10-27, #1997: join the end piece
+# before bending, cooled or fully cured; recorded as RV-02 in
 # sm-gooseneck.yaml) with the bend's acceptance.  Sizes are on the features
 # and the bend radius is native, so no line names a tool.  Each line ends
 # left of the title block.
 DRAWING_NOTES = "\n".join(
     (
-        f"{COUNTERBORE_NOTE}. C'BORE DIAMETER, DEPTH AND CORNER CLEAR "
-        f"{SCREW_NUMBER} THREAD RUN-OUT",
         f"{SHANK_FIT_NOTE}. TURN TO MEASURED TUBE ID, CLEARANCE {_BRAZE_WINDOW}; "
         "BAg-7 FULL LAP OR LOCTITE 638",
         f"{SLEEVE_FIT_NOTE}. SELECT-FIT ON TUBE, CLEARANCE {_BRAZE_WINDOW}; "
         "LOWER ENDS FLUSH; BAg-7 FILLETS",
-        "4. JOIN END PIECE, COOL OR FULLY CURE, THEN BEND: OVALITY 5% MAX, NO KINKS",
+        "3. JOIN END PIECE, COOL OR FULLY CURE, THEN BEND: OVALITY 5% MAX, NO KINKS",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"

@@ -1936,16 +1936,6 @@
       ]
     },
     {
-      "old_stem": "sm-gooseneck-spring-screw",
-      "old_number": "MHA-SM-004",
-      "new_identities": [
-        {
-          "stem": "sm-gooseneck-spring-screw",
-          "number": "MHA-SM-04"
-        }
-      ]
-    },
-    {
       "old_stem": "sm-gooseneck",
       "old_number": "MHA-SM-001",
       "new_identities": [
@@ -2288,6 +2278,30 @@
         {
           "stem": "ch-rocker-arm-tl-oblique-hub-washer",
           "number": "MHA-CH-06-TL-52"
+        }
+      ]
+    },
+    {
+      "old_stem": "sm-vn-gooseneck-shoulder-screw",
+      "old_number": null,
+      "introduced": "2026-11-08",
+      "new_identities": [
+        {
+          "parent": "sm-summing",
+          "stem": "sm-vn-gooseneck-shoulder-screw",
+          "number": "MHA-SM-VN-56"
+        }
+      ]
+    },
+    {
+      "old_stem": "sm-vn-gooseneck-shoulder-washer",
+      "old_number": null,
+      "introduced": "2026-11-08",
+      "new_identities": [
+        {
+          "parent": "sm-summing",
+          "stem": "sm-vn-gooseneck-shoulder-washer",
+          "number": "MHA-SM-VN-57"
         }
       ]
     }
@@ -2754,6 +2768,17 @@
           "parent": "pd-paper-drive",
           "stem": "pd-vn-transgear-pivot-shim",
           "number": "MHA-PD-VN-67"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "sm-gooseneck-spring-screw",
+      "old_number": "MHA-SM-004",
+      "new_identities": [
+        {
+          "stem": "sm-gooseneck-spring-screw",
+          "number": "MHA-SM-04"
         }
       ],
       "status": "retired"

@@ -562,10 +562,17 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
-        name="sm_gooseneck_spring_screw",
-        part="sm_gooseneck_spring_screw",
-        artifact_stem="sm-gooseneck-spring-screw",
-        script_name="draw_sm_gooseneck_spring_screw.py",
+        name="sm_vn_gooseneck_shoulder_screw",
+        part="sm_vn_gooseneck_shoulder_screw",
+        artifact_stem="sm-vn-gooseneck-shoulder-screw",
+        script_name="draw_sm_vn_gooseneck_shoulder_screw.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="sm_vn_gooseneck_shoulder_washer",
+        part="sm_vn_gooseneck_shoulder_washer",
+        artifact_stem="sm-vn-gooseneck-shoulder-washer",
+        script_name="draw_sm_vn_gooseneck_shoulder_washer.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(

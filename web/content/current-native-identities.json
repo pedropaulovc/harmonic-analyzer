@@ -592,6 +592,28 @@
       ]
     },
     {
+      "sourceStem": "sm-vn-gooseneck-shoulder-screw",
+      "sourceNumber": null,
+      "identities": [
+        {
+          "parent": "sm-summing",
+          "stem": "sm-vn-gooseneck-shoulder-screw",
+          "number": "MHA-SM-VN-56"
+        }
+      ]
+    },
+    {
+      "sourceStem": "sm-vn-gooseneck-shoulder-washer",
+      "sourceNumber": null,
+      "identities": [
+        {
+          "parent": "sm-summing",
+          "stem": "sm-vn-gooseneck-shoulder-washer",
+          "number": "MHA-SM-VN-57"
+        }
+      ]
+    },
+    {
       "sourceStem": "vn-magnifying-bracket-screw",
       "sourceNumber": "MHA-VN-050",
       "identities": [
@@ -1033,7 +1055,7 @@
       "status": "archive-only"
     }
   ],
-  "currentRegistryMapSha256": "47e96074f70b6740d35d120feea6c837ae28258c0c9059d923adb9cf47fa92db",
+  "currentRegistryMapSha256": "89a8ce9c3e46291030d91e54c9361a2e53181b2c7a34612db95d1ed20b94da5d",
   "nativeIdentities": [
     {
       "sourceStem": "ch-rocker-arm-tl-oblique-feed-lever",
@@ -1992,16 +2014,6 @@
         {
           "stem": "sh-column-clamp-front",
           "number": "MHA-SH-01"
-        }
-      ]
-    },
-    {
-      "sourceStem": "sm-gooseneck-spring-screw",
-      "sourceNumber": "MHA-SM-004",
-      "identities": [
-        {
-          "stem": "sm-gooseneck-spring-screw",
-          "number": "MHA-SM-04"
         }
       ]
     },

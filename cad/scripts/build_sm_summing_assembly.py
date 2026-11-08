@@ -34,11 +34,14 @@ boss-hook / counter-spring / gooseneck chain.
   boss top face + counter-spring + gooseneck -- the counter-balance hung from
   the east column; the gooseneck's brazed O15.875 sleeve is the post the
   top-frame rail hub's set screw grips (no separate clamp part).
-* sm-gooseneck-spring-screw -- made MHA-SM-04 slotted cheese-head screw, head
-  outboard: the supplier upper loop sits on its plain O6.35 body and the head
-  clamps it to the face of the gooseneck's flush end piece, while the 1/4-28
-  thread runs into the end piece's blind tap (owner ruling 2026-10-27
-  (#1951)); locked to the fixed gooseneck with no additional operational DOF.
+* sm-vn-gooseneck-shoulder-screw + sm-vn-gooseneck-shoulder-washer --
+  purchased MHA-SM-VN-56 shoulder screw, head outboard, its shoulder seated
+  on the face of the gooseneck's flush end piece and its 1/4-20 thread in the
+  end piece's plain blind tap; MHA-SM-VN-57 under its head.  Owner ruling
+  2026-11-08 (Pedro), #2144 item 11.4, superseding #1951's clamped eye: the
+  supplier upper loop rides free on the shoulder between the end face and
+  the washer.  Both locked to the fixed gooseneck with no additional
+  operational DOF.
 
 Cross-subassembly fits (checked at the top level): the channel springs
 (ch-channel.SLDASM) thread the summing-lever plate's O4.5 holes -- gated
@@ -554,6 +557,8 @@ import spring_mount_geom as spring_mounts  # noqa: E402
 import sm_summing_lever_spec  # noqa: E402
 from stock_anchor_geom import ANCHOR_9490T1  # noqa: E402
 import sm_vn_boss_hook_jam_nut_spec as jam_nut  # noqa: E402
+import sm_vn_gooseneck_shoulder_screw_spec as shoulder_screw  # noqa: E402
+import sm_vn_gooseneck_shoulder_washer_spec as shoulder_washer  # noqa: E402
 
 BOSS_HOOK_POS = (*spring_mounts.COUNTER_ANCHOR_XY, SUMMING_Z)
 # MHA-SM-VN-55 on the anchor axis, its z = 0 face on the boss top face:
@@ -567,9 +572,9 @@ JAM_NUT_ROWS = ROT_X_NEG90
 # The counter spring and gooseneck use complete calibrated placements loaded by
 # ``counter_seat`` before assembly creation.
 
-UPPER_EYE_CLAMP_NOTES = (
-    "MHA-SM-04: CLAMP COUNTER-SPRING UPPER EYE TO END PIECE.\n"
-    "TIGHTEN UNTIL UPPER EYE IS CLAMPED AND CANNOT SWIVEL.\n"
+UPPER_EYE_NOTES = (
+    "MHA-SM-VN-56: SEAT SHOULDER ON END PIECE FACE.\n"
+    "MHA-SM-VN-57 UNDER THE HEAD; UPPER EYE RIDES FREE ON SHOULDER.\n"
     "NO THREADLOCKER."
 )
 
@@ -646,7 +651,7 @@ async def _finish_setting(
 
 
 async def _author_settings(adapter) -> None:
-    """CounterSetting: the MHA-SM-04 axis above the knife contact level (the
+    """CounterSetting: the MHA-SM-VN-56 axis above the knife contact level (the
     gooseneck height the level setting finds). KnifeRockGauge: the boss face's
     minimum travel at the free-rock floor, up the boss-hook axis."""
     for name, value in _SETTING_GLOBALS.items():
@@ -982,32 +987,50 @@ async def build(adapter) -> dict[str, str]:
         [0.0, 180.0, 0.0],
         ROT_Y_180,
     )
-    # The made screw's under-head plane is local Z=0; ROT_Y_POS90 maps head +Z
-    # to machine +X, outboard of the end piece, and sends the threaded shank
-    # into its blind tap.
-    # This mate records the static clamped pose, not a mechanical screw lock.
-    # Tightening the physical eye clamp adds no operational DOF.
+    # The shoulder screw's origin is its shoulder end face, local +Z to the
+    # head; ROT_Y_POS90 maps +Z to machine +X, so the shoulder seats on the
+    # end face and the thread runs into the blind tap.  The washer's bottom
+    # face (its origin) sits under the head on the same axis.  These mates
+    # record the seated pose, not a mechanical screw lock; the eye rides free
+    # on the shoulder (#2144 item 11.4) and adds no operational DOF.
     screw_rows = ROT_Y_POS90
-    screw_position = [
-        spring_mounts.GOOSENECK_END_X + sm_gooseneck_geom.SPRING_EYE_GAP,
-        gooseneck_origin_y + sm_gooseneck_geom.ARM_Y,
+    screw_y = gooseneck_origin_y + sm_gooseneck_geom.ARM_Y
+    screw_position = [spring_mounts.GOOSENECK_END_X, screw_y, SUMMING_Z]
+    washer_position = [
+        spring_mounts.GOOSENECK_END_X
+        + shoulder_screw.SHOULDER_LENGTH
+        - shoulder_washer.THICKNESS,
+        screw_y,
         SUMMING_Z,
     ]
-    screw = await place_component(
-        adapter,
-        "sm-gooseneck-spring-screw",
-        screw_position,
-        euler_from_rows(screw_rows),
-        screw_rows,
-        ground=False,
-    )
-    await lock_mate(
-        adapter,
-        named_ref(f"Front Plane@{screw}", "PLANE"),
-        named_ref(f"Front Plane@{gooseneck}", "PLANE"),
-        label="gooseneck spring screw clamped to end piece",
-    )
-    assert_component_placed(adapter, screw, screw_position, screw_rows)
+    # Literal stems: _buildgraph's source-expression contract reads them.
+    for stem, position, label in (
+        (
+            "sm-vn-gooseneck-shoulder-screw",
+            screw_position,
+            "shoulder screw seated on end piece",
+        ),
+        (
+            "sm-vn-gooseneck-shoulder-washer",
+            washer_position,
+            "shoulder washer under the head",
+        ),
+    ):
+        component = await place_component(
+            adapter,
+            stem,
+            position,
+            euler_from_rows(screw_rows),
+            screw_rows,
+            ground=False,
+        )
+        await lock_mate(
+            adapter,
+            named_ref(f"Front Plane@{component}", "PLANE"),
+            named_ref(f"Front Plane@{gooseneck}", "PLANE"),
+            label=label,
+        )
+        assert_component_placed(adapter, component, position, screw_rows)
 
     # Certify the AS-BUILT model.  The lever rock remains the sole intended
     # freed DOF; the exact allowed-stem set rejects any free screw, dowel, or
@@ -1040,7 +1063,7 @@ async def build(adapter) -> dict[str, str]:
             "Material Specification": "SEE COMPONENT DRAWINGS",
             "Finish": "SEE COMPONENT DRAWINGS",
             "Quantity": "1",
-            "Manufacturing Notes": UPPER_EYE_CLAMP_NOTES,
+            "Manufacturing Notes": UPPER_EYE_NOTES,
             "Drawn By": DRAWN_BY,
         },
     )

@@ -1,0 +1,17 @@
+sm-vn-gooseneck-shoulder-washer:
+  title: Gooseneck Shoulder Washer
+  number: MHA-SM-VN-57
+  stock_name: 18-8 Stainless Steel Ring Shim, 5/16 in ID x 1/2 in OD x .030 in
+  supplier: McMaster-Carr
+  supplier_skus: [98126A907]
+  material: AISI 304
+  material_specification: "18-8 stainless steel ring shim, ASTM A240; McMaster-Carr 98126A907"
+  finish: AS SUPPLIED
+  installation_notes: |-
+    INSTALLATION - ON THE MHA-SM-VN-56 SHOULDER
+    ONE WASHER UNDER THE HEAD; IT RETAINS THE UPPER EYE
+    OF MHA-SM-VN-51.
+  quantity: 1
+  tolerance_class: machined_block
+  process: purchased
+  drawing_unit: in

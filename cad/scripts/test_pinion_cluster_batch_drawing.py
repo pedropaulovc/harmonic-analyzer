@@ -421,11 +421,15 @@ def test_cross_numbered_fit_pairs_use_fixed_runtime_oracles() -> None:
             frozenset(("sm-vn-boss-hook-1", "sm-summing-lever-1")): _annulus_limit(
                 4.826, 3.797, 19.05
             ),
-            # MHA-SM-04 1/4-28 major in the #3 drill of the blind end-piece
-            # tap: counterbore floor (2.78) to the free-gap tip (14.62).
-            frozenset(("sm-gooseneck-spring-screw-1", "sm-gooseneck-1")): _annulus_limit(
-                6.35, 5.41, 11.84
+            # MHA-SM-VN-56 1/4-20 major in the #7 drill of the blind end-piece
+            # tap: the shoulder seats on the end face, so the whole 7/16
+            # thread stands in the tap (#2144 item 11.4).
+            frozenset(("sm-vn-gooseneck-shoulder-screw-1", "sm-gooseneck-1")): _annulus_limit(
+                6.35, 5.105, 11.1125
             ),
+            frozenset(
+                ("sm-vn-gooseneck-shoulder-screw-1", "sm-vn-gooseneck-shoulder-washer-1")
+            ): 0.0,
         }
     )
     # Owner ruling 2026-10-24 (T+H3): the four knife-mount dowels press into
@@ -592,10 +596,13 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(("sm-vn-boss-hook-1", "sm-summing-lever-1")): _annulus_limit(
                 4.826, 3.797, 19.05
             ),
-            # MHA-SM-04 1/4-28 major, #3 drill, 14.62 tip reach less 2.78 counterbore.
-            frozenset(("sm-gooseneck-spring-screw-1", "sm-gooseneck-1")): _annulus_limit(
-                6.35, 5.41, 11.84
+            # MHA-SM-VN-56 1/4-20 major, #7 drill, 7/16 thread seated (#2144 item 11.4).
+            frozenset(("sm-vn-gooseneck-shoulder-screw-1", "sm-gooseneck-1")): _annulus_limit(
+                6.35, 5.105, 11.1125
             ),
+            frozenset(
+                ("sm-vn-gooseneck-shoulder-screw-1", "sm-vn-gooseneck-shoulder-washer-1")
+            ): 0.0,
         },
         "pn-pen": {
             # #4-40 thumb screw through the stirrup's .24 bottom rail.

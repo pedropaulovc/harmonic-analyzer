@@ -1,0 +1,17 @@
+sm-vn-gooseneck-shoulder-screw:
+  title: Gooseneck Shoulder Screw
+  number: MHA-SM-VN-56
+  stock_name: Alloy Steel Shoulder Screw, 5/16 x 3/8 in Shoulder, 1/4-20
+  supplier: McMaster-Carr
+  supplier_skus: [91259A576]
+  material: Alloy Steel
+  material_specification: "Black-oxide alloy steel shoulder screw, Rockwell C32, ASME B18.3; McMaster-Carr 91259A576"
+  finish: black oxide
+  installation_notes: |-
+    INSTALLATION - MHA-SM-01 END PIECE
+    MHA-SM-VN-57 WASHER UNDER THE HEAD; UPPER EYE OF MHA-SM-VN-51
+    ON THE SHOULDER. SEAT THE SHOULDER ON THE END FACE.
+  quantity: 1
+  tolerance_class: machined_block
+  process: purchased
+  drawing_unit: in

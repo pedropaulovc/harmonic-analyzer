@@ -8,11 +8,12 @@ Owner rulings 2026-10-27 (#1951), rederived from the ch19 reference photos:
 the WHOLE gooseneck is 1/2 in tube, 4130-N seamless 1/2 in OD x 0.065 in wall
 (OnlineMetals 7322), bent on the stock 1/2 in x 3 in CLR die (R3.0,
 Pro-Tools 105).  The arm ends flush, with no step, in a solid Ø.500 end piece
-brazed on a shank into the tube bore and tapped for MHA-SM-04.  The top
+brazed on a shank into the tube bore and tapped 1/4-20 for the MHA-SM-VN-56
+shoulder screw (owner ruling 2026-11-08 (Pedro), #2144 item 11.4).  The top
 frame's Ø17 bore and hub set screw are unchanged: a 5/8 in x 0.058 in 4130-N
 sleeve (OnlineMetals 7324), select-fitted from stock and brazed over the leg
-from its foot, is the post they take.  The spring eye's centre and the clamp
-face stay where they were.
+from its foot, is the post they take.  The spring eye's centre and the end
+face it rests on stay where they were.
 
 Stock limits: OnlineMetals alloy-steel tolerances (read 2026-10-27,
 https://www.onlinemetals.com/en/alloy-steel-tolerances): 4130-N cold drawn

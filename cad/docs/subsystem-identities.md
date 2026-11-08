@@ -377,7 +377,7 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | part | `gooseneck` | MHA-032 | `sm-gooseneck` | MHA-SM-001 | `sm-gooseneck` | MHA-SM-01 |
 | part | `knife-mount` | MHA-037 | `sm-knife-mount` | MHA-SM-002 | `sm-knife-mount` | MHA-SM-02 |
 | part | `summing-lever` | MHA-073 | `sm-summing-lever` | MHA-SM-003 | `sm-summing-lever` | MHA-SM-03 |
-| part | — | — | `sm-gooseneck-spring-screw` | MHA-SM-004 | `sm-gooseneck-spring-screw` | MHA-SM-04 |
+| retired part | — | — | `sm-gooseneck-spring-screw` | MHA-SM-004 | — (replaced by the purchased `sm-vn-gooseneck-shoulder-screw`, MHA-SM-VN-56) | MHA-SM-04 (retired 2026-11-08; never reissued) |
 | part | `boss-hook` | MHA-005 | `vn-boss-hook` | MHA-VN-001 | `sm-vn-boss-hook` | MHA-SM-VN-50 |
 | part | `channel-spring-installed` | MHA-011 | `vn-channel-spring-installed` | MHA-VN-004 | `ch-vn-channel-spring-installed` | MHA-CH-VN-50 |
 | part | `counter-spring` | MHA-019 | `vn-counter-spring` | MHA-VN-005 | `sm-vn-counter-spring` | MHA-SM-VN-51 |
@@ -445,6 +445,8 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | part | — | — | `vn-rocker-thrust-washer` | MHA-VN-070 | `ch-vn-rocker-thrust-washer` | MHA-CH-VN-56 |
 | part | — | — | `vn-bracket-hold-down-screw` | MHA-VN-071 | `ch-vn-bracket-hold-down-screw` | MHA-CH-VN-57 |
 | part | — | — | `vn-boss-hook-jam-nut` | MHA-VN-072 | `sm-vn-boss-hook-jam-nut` | MHA-SM-VN-55 |
+| part | — | — | — | — | `sm-vn-gooseneck-shoulder-screw` | MHA-SM-VN-56 |
+| part | — | — | — | — | `sm-vn-gooseneck-shoulder-washer` | MHA-SM-VN-57 |
 | part | — | — | `vn-knife-hanger-washer` (new #10 family) | MHA-VN-060 | `sm-vn-knife-hanger-washer` | MHA-SM-VN-54 |
 | part | — | — | `vn-chain-connecting-link` | MHA-VN-068 | `pd-vn-chain-connecting-link` | MHA-PD-VN-66 |
 | part | — | — | — | — | `pd-vn-transgear-cluster-shim` | MHA-PD-VN-68 |
@@ -747,3 +749,6 @@ A retired Number is never reused. A family added after a cutover takes the next 
 | retired | `ch-rocker-arm-tl-vn-oblique-cl-dowel` | MHA-CH-06-TL-VN-53 | 2026-11-07 owner ruling 4: the CL end clamp takes the common MHA-CH-06-TL-VN-61 screw; no registry, builder or drawing; Number never reissued |
 | retired | `ch-rocker-arm-tl-vn-oblique-clamp-screw` | MHA-CH-06-TL-VN-68 | 2026-11-07 owner ruling 4: the CR end clamp takes the common MHA-CH-06-TL-VN-61 screw; no registry, builder or drawing; Number never reissued |
 | added | `ch-rocker-arm-tl-oblique-hub-washer` | MHA-CH-06-TL-52 | 2026-11-06 turned C360 brass top-hat washer x1 (owner ruling 5, 2026-11-07: Ø11 flange, spigot Ø9.95 ±.05 x .35 long, 13/64 bore, flange edges broken .005 max), seated under the common MHA-CH-06-TL-VN-61 HUB clamp screw on the strap; TL-35 stays retired and is not reused |
+| retired | `sm-gooseneck-spring-screw` | MHA-SM-04 | Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: the shop-turned 1/4-28 cheese-head screw that clamped the counter spring's upper eye gives way to the purchased MHA-SM-VN-56 shoulder screw, the eye riding free on its shoulder (superseding #1951's clamped eye); no registry, builder or drawing; stem and Number never reissued |
+| added | `sm-vn-gooseneck-shoulder-screw` | MHA-SM-VN-56 | Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: McMaster-Carr 91259A576 alloy-steel shoulder screw, 5/16 x 3/8 in shoulder, 1/4-20 thread; its shoulder seats on the MHA-SM-01 end face in a plain blind tap, and the MHA-SM-VN-51 upper eye rides free on it |
+| added | `sm-vn-gooseneck-shoulder-washer` | MHA-SM-VN-57 | Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: McMaster-Carr 98126A907 18-8 stainless ring shim, 5/16 ID x 1/2 OD x .030 in, under the MHA-SM-VN-56 head; retains the MHA-SM-VN-51 upper eye |

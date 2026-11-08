@@ -46,6 +46,7 @@ recipes:
 | 91251A197 | `ch-rocker-arm-tl-vn-oblique-rail-screw` (MHA-CH-06-TL-VN-61, 19 in the final A″ stack: 16 rail + 3 CL/CR/HUB clamps; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
 | 91251A541 | — (retired TL-VN-68, 2026-11-07: the CR clamp takes the common 91251A197; catalogue-only diagnostic removed) | Socket Head Screw |
 | 91251A583 | `ch-rocker-arm-tl-vn-oblique-lever-screw` (MHA-CH-06-TL-VN-69; shop fixture; catalogue-only, product page login-walled, the 7/8 in sibling's vendor model read for dimensions, not replica-gated) | Socket Head Screw |
+| 91259A576 | `sm-vn-gooseneck-shoulder-screw` (MHA-SM-VN-56; catalogue-only, no vendor model) | Alloy Steel Shoulder Screw, 5/16" Shoulder × 3/8", 1/4"-20 Thread |
 | 91812A215 | — (retired TL-VN-70, 2026-10-23; jig-only diagnostic recipe removed) | Extreme-Vibration-Resistant Wedge Lock Washer |
 | 91812A230 | `ch-rocker-arm-tl-vn-oblique-lever-washer` (MHA-CH-06-TL-VN-71; shop fixture; catalogue-only, product page login-walled, no vendor model) | Extreme-Vibration-Resistant Wedge Lock Washer |
 | 90323A492 | — (retired TL-VN-77 source, 2026-10-31; now Huyett BLTS40-0375-1500188P, issue #290) | 18-8 Precision Shoulder Screw, Ø10 × 35, metric thread |
@@ -102,6 +103,7 @@ recipes:
 | 9715K43 | `pd-vn-transgear-pivot-spring` (catalogue-only; no vendor model) | Curved Disc Spring |
 | 97431A240 | `pd-vn-transgear-retaining-ring` (catalogue-only; CAD download refused) | Side-Mount External Retaining Ring |
 | 97431A260 | — (retired 2026-10-31, #290: the 1/8 in pin takes 97431A240; replica recipe removed) | Side-Mount External Retaining Ring |
+| 98126A907 | `sm-vn-gooseneck-shoulder-washer` (MHA-SM-VN-57; catalogue-only, no vendor model) | 18-8 Stainless Steel Ring Shim, 5/16" ID × 1/2" OD × .030" |
 | 98296A026 | — (diagnostic recipe; former `vn-transgear-collar-cross-pin`, MHA-VN-037 retired) | 1050-1095 Spring Steel Slotted Spring Pin |
 | 98296A027 | `dt-vn-pinion-strap-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
 | 98296A031 | `pd-vn-transgear-knob-cup-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
@@ -1110,6 +1112,25 @@ Catalog specifications checked on September 10, 2026:
   R3 proved the prior native joint geometry and assembly soundness; the
   revised datum and machinist-driven sheet edits require a fresh scoped
   native proof and sheet review before they are reported verified.
+- [91259A576](https://www.mcmaster.com/91259A576/) supplies the new
+  `sm-vn-gooseneck-shoulder-screw`, **MHA-SM-VN-56**, one, and
+  [98126A907](https://www.mcmaster.com/98126A907/) the new
+  `sm-vn-gooseneck-shoulder-washer`, **MHA-SM-VN-57**, one (owner ruling
+  2026-11-08 (Pedro), #2144 item 11.4). They replace the shop-turned
+  MHA-SM-04 clamp screw, whose Number is retired and never reissued. The
+  shoulder seats on MHA-SM-01's end face in a plain blind 1/4-20 tap; the
+  counter spring's upper eye rides free on the shoulder under the washer,
+  superseding #1951's clamped eye. Live on 2026-11-08, 91259A576: alloy
+  steel, black oxide, Rockwell C32; shoulder Ø.3125 −.002/−.004 × .375
+  ±.005; 1/4-20 UNC-3A thread 7/16 long; head Ø7/16 × 7/32; 5/32 hex key.
+  The head's least Ø .419 and the thread and shoulder necks come from
+  ASME B18.3's 5/16 row, not the product page. Live on 2026-11-08,
+  98126A907: 18-8 stainless ring shim, ASTM A240; ID .3125 +.011/0, OD
+  .500 ±.002, thickness .030 ±.002, Rockwell B70; $8.48 per pack of 10.
+  No vendor CAD download, hash or measured vendor geometry is claimed. The
+  shoulder-Ø choice is open with the owner: the 5/16 shoulder drops the
+  arm against the plumb spring by 0.794 mm and the 1/2 OD washer reaches
+  the half-turn (see the #2144 item 11.4 thread).
 - [91255A106](https://www.mcmaster.com/91255A106/) (`pd-vn-guide-lock-screw`,
   MHA-PD-VN-60, eight) holds the four guide locks to the platen guides per ruling
   R9-31 (September 30, 2026): these screws ride the platen, and the MHA-SH-VN-51 (then MHA-PD-VN-52)

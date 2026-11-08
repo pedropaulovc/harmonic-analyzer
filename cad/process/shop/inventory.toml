@@ -6935,7 +6935,7 @@ cite = ["Metal Supermarkets Seattle (Kent), mild-steel-round-tube-1020-dom 1.000
 [[stock]]
 form = "round_bar"
 material = "4140 alloy steel, cold drawn, heat treated (vendor)"
-note = "Ordered 2026-11-03: CD heat-treated 0.500 in 4140 round, 4 in (cut to length). The listing states no hardness: check it against the HRC 32 the drawing requires on receipt. Allocation: sm-gooseneck-spring-screw (MHA-SM-04)."
+note = "Ordered 2026-11-03: CD heat-treated 0.500 in 4140 round, 4 in (cut to length). The listing states no hardness: Originally allocated to the made gooseneck spring screw, retired 2026-11-08 for a purchased shoulder screw (owner ruling (Pedro), #2144 item 11.4). Retain this order as unallocated stock."
 dia_mm = 12.7
 length_mm = 101.6
 on_hand = false

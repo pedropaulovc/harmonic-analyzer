@@ -80,10 +80,6 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
     # set_single_limit converts each caller's single-limit band.
     ("_single_limit_tolerance", "band"): (
         "(__import__('pn_pen_hanger_spec').SLOT_CORNER_R_BAND,"
-        " __import__('sm_gooseneck_spring_screw_geom').PLAIN_LENGTH_MIN_BAND,"
-        " __import__('sm_gooseneck_spring_screw_geom').FULL_THREAD_STATION_MAX_BAND,"
-        " __import__('sm_gooseneck_spring_screw_geom').UNDERHEAD_CORNER_R_BAND,"
-        " __import__('sm_gooseneck_spring_joint').COUNTERBORE_FLOOR_CORNER_R_BAND,"
         " __import__('dt_pinion_cam_spec').THIN_WALL_MIN_BAND,"
         " __import__('pn_pen_frame_spec').TAP_WALL_MIN_BAND,"
         " __import__('pn_pen_rod_spec').TAP_WALL_MIN_BAND,"
@@ -254,6 +250,24 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ("ch_rocker_arm_tl_vn_oblique_pivot_spacer_spec", "OD_BAND"): (
         "catalogue OD band, upper limit indexed for the carrier's thrust-seat "
         "chamfer-mouth check; the sheet prints it as untoleranced REF"
+    ),
+    # #2144 item 11.4: McMaster 91259A576 / 98126A907 catalogue bands, indexed
+    # into MIN/MAX limits that sm_gooseneck_spring_joint charges; the sheets
+    # print them as untoleranced REF.
+    ("sm_vn_gooseneck_shoulder_screw_spec", "SHOULDER_DIA_BAND"): (
+        "catalogue shoulder band, indexed for the washer and eye clearances"
+    ),
+    ("sm_vn_gooseneck_shoulder_screw_spec", "SHOULDER_LENGTH_BAND"): (
+        "catalogue shoulder-length band, indexed for the eye's axial play"
+    ),
+    ("sm_vn_gooseneck_shoulder_washer_spec", "ID_BAND"): (
+        "catalogue bore band, indexed for the washer's float on the shoulder"
+    ),
+    ("sm_vn_gooseneck_shoulder_washer_spec", "OD_BAND"): (
+        "catalogue OD band, indexed for the eye retention and half-turn clearance"
+    ),
+    ("sm_vn_gooseneck_shoulder_washer_spec", "THICKNESS_BAND"): (
+        "catalogue thickness band, indexed for the eye's axial play"
     ),
     ("mg_wheel_axle_spec", "THREAD_LEN_BAND"): (
         "equal band indexed into the native symmetric (+/-) tolerance"

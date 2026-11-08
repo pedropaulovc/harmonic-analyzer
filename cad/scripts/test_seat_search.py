@@ -219,7 +219,7 @@ def test_wrong_hint_still_ends_in_a_native_bracket(fake, gain, hint) -> None:
 
 
 class _PrecisionBand(_FakeContact):
-    """The counter upper loop on MHA-SM-04's plain Ø6.35 body (farm run
+    """The counter upper loop on the retired gooseneck screw's plain Ø6.35 body (farm run
     20261027T205137862Z): a 2e-6 mm sweep read the native verdict CLEAR again
     10-12e-6 mm inside its outer boundary, inside the modeller's ~1e-5 mm
     precision, and ClosestDistance over-reported by ~2.8e-5 mm."""
@@ -464,13 +464,13 @@ def test_counter_support_certificate_refuses_stale_or_unproven_parts(
     with pytest.raises(RuntimeError, match="cannot prove the counter support"):
         driver._require_current_support_parts()
 
-    ledger.write_text('{"stale": ["part:sm_gooseneck_spring_screw: x changed"]}')
+    ledger.write_text('{"stale": ["part:sm_vn_gooseneck_shoulder_screw: x changed"]}')
     with pytest.raises(RuntimeError, match="refusing to certify .* stale"):
         driver._require_current_support_parts()
 
     ledger.write_text("{}")
     driver._require_current_support_parts()
-    assert seen[-1] == ["part:sm_gooseneck", "part:sm_gooseneck_spring_screw"]
+    assert seen[-1] == ["part:sm_gooseneck", "part:sm_vn_gooseneck_shoulder_screw"]
 
 
 def test_driver_imports_against_the_stale_counter_record_it_replaces() -> None:

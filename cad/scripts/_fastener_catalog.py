@@ -218,6 +218,21 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "#10-24 Zinc-Plated Steel Narrow-Profile Hex Nut",
         "90760A140",
     ),
+    # Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: the counter spring's
+    # upper eye rides free on this shoulder screw's 5/16 shoulder, seated on
+    # the MHA-SM-01 end face, under the MHA-SM-VN-57 washer.
+    "sm-vn-gooseneck-shoulder-screw": _stock(
+        "sm-vn-gooseneck-shoulder-screw",
+        "Alloy Steel Shoulder Screw, 5/16 x 3/8 in Shoulder, 1/4-20",
+        "91259A576",
+        material="Alloy Steel",
+    ),
+    "sm-vn-gooseneck-shoulder-washer": _stock(
+        "sm-vn-gooseneck-shoulder-washer",
+        "18-8 Stainless Steel Ring Shim, 5/16 in ID x 1/2 in OD x .030 in",
+        "98126A907",
+        material="AISI 304",
+    ),
     # The four platen-clip screws: brass #2-56 x 1/4, whose head stays inside
     # the clip's rail where the MHA-PD-VN-52 #4-40 head would overhang. A pan
     # head (2026-10-15): the 90114A124 fillister's least head left 0.05 mm of

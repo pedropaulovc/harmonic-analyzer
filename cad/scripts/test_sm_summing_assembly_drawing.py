@@ -293,7 +293,7 @@ def test_retention_rows_cite_the_package_steps() -> None:
     assert hanger.exposure is joint_retention.Exposure.STATIC_CLAMP
     assert hanger.lock is joint_retention.Lock.NONE
     assert rows["sm-summing/boss-hook-in-lever"].installed_at == "MHA-SM-00 STEP 2"
-    assert rows["sm-summing/gooseneck-spring-screw"].installed_at == "MHA-SM-00 STEP 8"
+    assert rows["sm-summing/gooseneck-shoulder-screw"].installed_at == "MHA-SM-00 STEP 8"
     hook = rows["sm-summing/boss-hook-in-lever"]
     assert hook.lock is joint_retention.Lock.JAM_NUT
     assert hook.lock_part == "sm_vn_boss_hook_jam_nut"

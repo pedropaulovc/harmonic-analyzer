@@ -279,13 +279,16 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
         cad_map = json.loads((ROOT / "cad/config/current-identity-map.json").read_text(encoding="utf-8"))
         identity = CurrentNativeIdentity()
         retired = cad_map["retired_identities"]
-        self.assertEqual(len(retired), 40)
+        self.assertEqual(len(retired), 41)
         # #2119: the 3/16 pen-rod set screw gave way to the shared MHA-SH-VN-54;
-        # #290: the arm's spot face took the MHA-PD-VN-67 pivot shim's room.
+        # #290: the arm's spot face took the MHA-PD-VN-67 pivot shim's room;
+        # #2144 item 11.4: the purchased MHA-SM-VN-56 shoulder screw retired the
+        # made gooseneck spring screw.
         machine = [row for row in retired if "-tl-" not in row["old_stem"]]
         self.assertEqual([(row["old_stem"], [t["number"] for t in row["new_identities"]])
                           for row in machine], [("vn-pen-rod-set-screw", ["MHA-PN-VN-52"]),
-                                                ("vn-transgear-pivot-shim", ["MHA-PD-VN-67"])])
+                                                ("vn-transgear-pivot-shim", ["MHA-PD-VN-67"]),
+                                                ("sm-gooseneck-spring-screw", ["MHA-SM-04"])])
         oblique_reservations = {
             "ch-rocker-arm-tl-oblique-pivot-pin": "MHA-CH-06-TL-23",
             "ch-rocker-arm-tl-oblique-hub-pin": "MHA-CH-06-TL-25",

@@ -159,6 +159,10 @@ class CounterScrewDiameterTests(unittest.TestCase):
             "cheese_head_plain_body": (
                 types.SimpleNamespace(MAJOR_DIA=6.35, BODY_DIA=6.30), 6.30
             ),
+            # #2144 item 11.4: the eye rides on the purchased screw's shoulder.
+            "shoulder_screw_shoulder": (
+                types.SimpleNamespace(MAJOR_DIA=6.35, SHOULDER_DIA=7.9375), 7.9375
+            ),
         }
         for name, (screw, expected) in cases.items():
             with self.subTest(name):

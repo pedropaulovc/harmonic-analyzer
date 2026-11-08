@@ -88,7 +88,9 @@ retiredTooling.push(...[
 })))
 // Machine identities retired after the cutover: the 3/16 pen-rod set screw gave
 // way to the shared MHA-SH-VN-54 1/4 cup point (#2119, rule 18 engagement), and
-// the MHA-PD-VN-67 pivot shim to the arm's spot face (#290).
+// the MHA-PD-VN-67 pivot shim to the arm's spot face (#290), and the made
+// gooseneck spring screw to the purchased MHA-SM-VN-56 shoulder screw (owner
+// ruling 2026-11-08 (Pedro), #2144 item 11.4).
 const retiredMachine = [{
   old_stem: 'vn-pen-rod-set-screw',
   old_number: 'MHA-VN-061',
@@ -98,6 +100,11 @@ const retiredMachine = [{
   old_stem: 'vn-transgear-pivot-shim',
   old_number: 'MHA-VN-069',
   new_identities: [{ parent: 'pd-paper-drive', stem: 'pd-vn-transgear-pivot-shim', number: 'MHA-PD-VN-67' }],
+  status: 'retired',
+}, {
+  old_stem: 'sm-gooseneck-spring-screw',
+  old_number: 'MHA-SM-004',
+  new_identities: [{ stem: 'sm-gooseneck-spring-screw', number: 'MHA-SM-04' }],
   status: 'retired',
 }]
 
