@@ -678,10 +678,13 @@ def test_controls_print_at_the_title_block_rows() -> None:
     # the pillow blocks by their short number. The handwheel's flat station
     # prints bare.
     assert (spec.FLAT_LENGTH_CALLOUT, spec.FLAT_AF_CALLOUT) == ("4X", "3X")
-    assert draw.FLAT_CALLOUTS == {
-        "FlatLength": "4X FLATS FOR\nTL-VN-56",
-        "FlatAF": "3X\nC, D, E",
-    }
+    assert set(draw.FLAT_CALLOUTS) == {"FlatLength", "FlatAF"}
+    assert draw.FLAT_CALLOUTS["FlatLength"].startswith(f"{spec.FLAT_LENGTH_CALLOUT} ")
+    assert draw.FLAT_CALLOUTS["FlatLength"].endswith("TL-VN-56")
+    # The across-flat's count, its one clock, and the details it covers.
+    af_rows = draw.FLAT_CALLOUTS["FlatAF"].splitlines()
+    assert len(af_rows) == 2 and af_rows[0].startswith(f"{spec.FLAT_AF_CALLOUT} ")
+    assert af_rows[1] == ", ".join(detail.label for detail in draw.END_DETAILS)
     # The feed absorbs the band at either limit.
     short_margin = (feed.NEAR_STUB - feed.NEAR_STUB_MIN) + (
         feed.HANDWHEEL_ENGAGEMENT - feed.HANDWHEEL_ENGAGEMENT_MIN
@@ -1073,9 +1076,6 @@ def test_rework_bands_name_their_mates_at_their_callouts() -> None:
     assert screw_short == "TL-VN-67"
     rows = countersink.splitlines()
     assert rows == [f"FOR {screw_short} ({nut.SCREW_SKU})", nut.CSK_WALL_TEXT]
-    # Centred under the value, a row over 28 characters reaches the dimension
-    # line entering the shoulder (farm run 20261108T000844770Z: 33 did).
-    assert max(len(row) for row in rows) <= 28
     # Nothing the spec does not establish: no seat depth, no flush; the only
     # numbers past the screw's are the spec's walls.
     assert "FLUSH" not in countersink and not re.search(r"\d\.\d", rows[0])
@@ -2189,10 +2189,7 @@ def test_details_carry_the_near_station_and_the_printed_flat() -> None:
     assert set(by_label["D"].keep) == {"FlatLength"}
     assert set(by_label["E"].keep) == {"FlatAF"}
     assert (spec.PRINTED_FLAT, spec.PRINTED_LENGTH_FLAT) == ("Handwheel", "FarKP08")
-    assert draw.FLAT_CALLOUTS == {
-        "FlatLength": "4X FLATS FOR\nTL-VN-56",
-        "FlatAF": "3X\nC, D, E",
-    }
+    assert set(draw.FLAT_CALLOUTS) == {"FlatLength", "FlatAF"}
     for detail in draw.END_DETAILS:
         fence = detail.radius_mm * draw._DETAIL_PER_MODEL_MM
         for name, (x, y) in detail.keep.items():

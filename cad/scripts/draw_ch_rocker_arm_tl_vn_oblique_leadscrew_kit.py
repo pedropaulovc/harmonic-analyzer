@@ -443,9 +443,12 @@ END_DETAILS = (
 # same-parent short drawing number (rule 4).
 # The handwheel's flat runs to the end, which detail E shows; its start
 # station prints bare (rule 7: a location carries no words). The
-# across-flat is each clock-0 flat's, one in each detail (the clock flats
-# print their own in sections A-A and B-B). The across-flat's rows stay
-# narrower than the 25 mm between fences D and E.
+# across-flat is each clock-0 flat's, one in each detail, all three on one
+# clock: "IN LINE" says so, and with "3X" that E has that one flat alone
+# (review of farm run 20261108T015328529Z: detail E left its flat count and
+# its angle to D's flats undefined); the clock flats print their own in
+# sections A-A and B-B. The across-flat's rows stay narrower than the 25 mm
+# between fences D and E.
 _JIG_PREFIX = "MHA-CH-06-"
 
 
@@ -460,7 +463,7 @@ KP08_NUMBER = _config.parts("ch-rocker-arm-tl-vn-oblique-pillow-block")["number"
 FLAT_CALLOUTS = {
     "FlatLength": f"{FLAT_LENGTH_CALLOUT} FLATS FOR\n{short_number(KP08_NUMBER)}",
     "FlatAF": "\n".join(
-        (FLAT_AF_CALLOUT, ", ".join(detail.label for detail in END_DETAILS))
+        (f"{FLAT_AF_CALLOUT} IN LINE", ", ".join(detail.label for detail in END_DETAILS))
     ),
 }
 # The cylinder face on the axis, 50 mm right of centre: 2 mm from either
@@ -511,9 +514,15 @@ REWORK_SECTION_OVERRUN = 0.008
 # the countersink's past the body's end and above it. That callout prints on
 # a leader whose shoulder starts at the text point and runs right under the
 # block (run 20261105T010614057Z: shoulder 0.331 to 0.425, past the border at
-# 0.419), so the point sits just clear of the body's end.
+# 0.419), so the point sits just clear of the body's end. Its rows hang over
+# the shoulder from the dimension line, so the shoulder stands over the upper
+# outside arrow's tail: at 1.0 mm past the rim the last row straddled the
+# upper extension line and the arrow struck its first letter (rule 14,
+# machinist review, farm runs 20261108T000844770Z and 20261108T015328529Z;
+# the arrow's tail stood 7 mm over the shoulder on the sheet). 3.5 mm lifts
+# it 10 mm, the tail then 3 mm under it.
 FLANGE_THICK_TEXT_MM = (feed_nut.FLANGE_DIA / 2.0 + 6.0, feed_nut.FLANGE_THICK / 2.0)
-CSK_DIA_TEXT_MM = (feed_nut.FLANGE_DIA / 2.0 + 1.0, feed_nut.LENGTH + 2.0)
+CSK_DIA_TEXT_MM = (feed_nut.FLANGE_DIA / 2.0 + 3.5, feed_nut.LENGTH + 2.0)
 # The faced length's line stands 2.5 mm under the flange's rim, its witnesses
 # down from the body's -X silhouette, over the section's caption
 # (REWORK_CAPTION_TOP). Its offset text block is CENTRED on its point (run

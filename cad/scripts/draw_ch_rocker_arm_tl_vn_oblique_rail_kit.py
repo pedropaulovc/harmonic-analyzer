@@ -248,10 +248,13 @@ FRONT_DIMENSION_PRECISION = {
     for name, places in places_by_name.items()
     if name in RECEIPT_DIMENSIONS
 }
-# The flag: a note of its own, centred under the station (a callout on the
-# station stacked that value onto the row over it). Its top stands 4 mm
-# under the station's line, under its extension lines' overrun; its two
-# lines are the pattern and its match-transfer mate.
+# The flag: the hole pattern's callout, centred under the station (a callout
+# on the station stacked that value onto the row over it), its leader to one
+# hole's counterbore (rule 7: a match-transfer requirement is the feature's
+# callout, leadered; as loose text under the view it failed machinist review,
+# farm run 20261108T015328529Z). Its top stands 4 mm under the station's
+# line, under its extension lines' overrun; its two lines are the pattern
+# and its match-transfer mate.
 _LAST_ROW_LINE_DROP = (
     STATION_FIRST_DROP
     + (len(DRAWN_STATIONS) - 1) * STATION_ROW_PITCH
@@ -263,6 +266,27 @@ RECEIPT_FLAG_CELL = (
     RECEIPT_FLAG_XY[1] - 0.011,
     RECEIPT_FLAG_XY[0] + 0.075,
     RECEIPT_FLAG_XY[1] + 0.001,
+)
+# Its 42-character second line printed 94.2 mm wide, centred on FRONT
+# (farm run 20261108T000844770Z): the note's upper-left anchor stands half
+# that left of centre.
+RECEIPT_FLAG_ANCHOR = (RECEIPT_FLAG_XY[0] - 0.047, RECEIPT_FLAG_XY[1])
+# The leader lands on the fourth hole's counterbore rim, down-right at 45°,
+# the hole over the text's left half: a straight short rise, clear of the
+# station's lines at the near end.
+RECEIPT_FLAG_HOLE = 3
+_FLAG_RIM = rail.CBORE_DIA / 2.0 * _sheet_mm(SHEET_SCALE) / math.sqrt(2.0)
+RECEIPT_FLAG_LANDING = (
+    FRONT_CENTER[0] - _FRONT_HALF[0]
+    + rail.HOLE_X[RECEIPT_FLAG_HOLE] * _sheet_mm(SHEET_SCALE) + _FLAG_RIM,
+    FRONT_CENTER[1] - _FLAG_RIM,
+)
+# The note's readback envelope: its text cell and the leader up to the rim.
+RECEIPT_FLAG_ENVELOPE = (
+    RECEIPT_FLAG_CELL[0],
+    RECEIPT_FLAG_CELL[1],
+    RECEIPT_FLAG_CELL[2],
+    RECEIPT_FLAG_LANDING[1] + 0.001,
 )
 
 # The end walls' acceptance prints in words at one leader per rail end
@@ -298,25 +322,27 @@ def wall_flag_regions(edge_xy: tuple[float, float], note_xy: tuple[float, float]
     return text, envelope
 
 
-def assert_wall_flag_landing(note: Any, edge_xy: tuple[float, float], text_cell: Box) -> tuple[Segment, ...]:
+def assert_wall_flag_landing(
+    note: Any, edge_xy: tuple[float, float], text_cell: Box, *, what: str = "rail wall flag",
+) -> tuple[Segment, ...]:
     """Read the settled text anchor and both leader endpoints independently."""
     annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
     anchor = tuple(float(v) for v in annotation.GetPosition() or ())[:2]
     if len(anchor) != 2 or not _inside((*anchor, *anchor), text_cell):
-        raise RuntimeError(f"rail wall flag text left its lane: {anchor!r}")
+        raise RuntimeError(f"{what} text left its lane: {anchor!r}")
     if int(annotation.GetLeaderCount()) != 1:
-        raise RuntimeError("rail wall flag must retain exactly one leader")
+        raise RuntimeError(f"{what} must retain exactly one leader")
     points = tuple(float(v) for v in annotation.GetLeaderPointsAtIndex(0) or ())
     if len(points) < 6:
-        raise RuntimeError("rail wall flag leader is unreadable")
+        raise RuntimeError(f"{what} leader is unreadable")
     if len(points) % 3:
-        raise RuntimeError("rail wall flag leader points are incomplete")
+        raise RuntimeError(f"{what} leader points are incomplete")
     ends = ((points[0], points[1]), (points[-3], points[-2]))
     if not any(
         _inside((*start, *start), text_cell) and math.dist(tip, edge_xy) <= 0.001
         for start, tip in (ends, ends[::-1])
     ):
-        raise RuntimeError(f"rail wall flag leader left its intended feature: {ends!r}")
+        raise RuntimeError(f"{what} leader left its intended feature: {ends!r}")
     vertices = tuple((points[i], points[i + 1]) for i in range(0, len(points), 3))
     return tuple(zip(vertices, vertices[1:]))
 
@@ -738,7 +764,6 @@ def append_rail_receipt_sheet(adapter: Any) -> tuple[Callable[[], None], ...]:
             ))
             for label, x, y, scale in CAPTIONS
         ]
-        centred.append((rail.RECEIPT_FLAG, *RECEIPT_FLAG_XY, RECEIPT_FLAG_CELL))
         for text, x, y, box in centred:
             note = _literal_note(adapter, text, x, y)
             bounds = _box(note.GetExtent(), label=text, kind="note")
@@ -746,7 +771,11 @@ def append_rail_receipt_sheet(adapter: Any) -> tuple[Callable[[], None], ...]:
             if not annotation.SetPosition(2 * x - (bounds[0] + bounds[2]) / 2, y, 0.0):
                 raise RuntimeError(f"{text}: failed to centre the note")
             notes.append((note, text, text, box))
-        flag_note = notes[-1][0]
+        flag_note = add_attached_note(
+            adapter, front, text=rail.RECEIPT_FLAG, entity_xy=RECEIPT_FLAG_LANDING,
+            note_xy=RECEIPT_FLAG_ANCHOR, label="rail hole pattern",
+        )
+        notes.append((flag_note, rail.RECEIPT_FLAG, rail.RECEIPT_FLAG, RECEIPT_FLAG_ENVELOPE))
         note = _literal_note(adapter, ITEM_LABEL, *ITEM_LABEL_XY)
         for label, edge_xy, note_xy in WALL_FLAGS:
             wall_note = add_attached_note(
@@ -825,10 +854,16 @@ def append_rail_receipt_sheet(adapter: Any) -> tuple[Callable[[], None], ...]:
             leaders = assert_wall_flag_landing(wall_note, edge_xy, text_cell)
             require_wall_leaders_clear(leaders, length_text, length_segments)
         assert_view_arrow(arrow_note, arrow_tip)
+        assert_wall_flag_landing(
+            flag_note, RECEIPT_FLAG_LANDING, RECEIPT_FLAG_CELL, what="rail hole pattern callout",
+        )
+        # The stack rule reads the flag's text: its extent less the leader's
+        # rise to the rim, which stands over the text's top.
+        flag_extent = _box(flag_note.GetExtent(), label=rail.RECEIPT_FLAG, kind="note")
         assert_receipt_stack_clear(
             adapter,
             annotations,
-            _box(flag_note.GetExtent(), label=rail.RECEIPT_FLAG, kind="note"),
+            (*flag_extent[:3], min(flag_extent[3], RECEIPT_FLAG_CELL[3])),
         )
 
     settled()

@@ -319,9 +319,7 @@ def _wall_text(wall: float) -> str:
     return f"{math.floor(wall * 100.0 + 1e-9) / 100.0:.2f}"
 
 
-# The callout's second row, centred under its value: at 33 characters its
-# left end reached the dimension line entering the shoulder (rule 14,
-# machinist review, farm run 20261108T000844770Z); 28 clear it.
+# The countersink callout's last row: the two stated walls, each named.
 CSK_WALL_TEXT = (
     f"MIN WALL: BODY {_wall_text(CSK_WALL_TO_BODY)}, "
     f"OD {_wall_text(CSK_WALL_TO_OD)}"

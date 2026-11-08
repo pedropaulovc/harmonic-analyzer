@@ -65,12 +65,14 @@ CUT_TEXT_LEFT = 0.012  # the value's centre, left of the step
 # the axis, clear of its short 9.5 mm span. The chamfer's ".03 X 45°", far
 # wider than its 0.76 mm leg, shelves right of the tip, above the reach of the
 # shoulder Ø's upper arrow (at 11 mm it struck the '3', farm run
-# 20261103T090917552Z) and under the thread note.
+# 20261103T090917552Z; at 14 mm its line met the arrow's tail in a T,
+# machinist review, farm run 20261108T015328529Z: the tail reaches 11 mm, so
+# 18 mm leaves 4 mm) and under the thread note.
 SHELVES = {
     "SupplierShoulderDiameter": (False, "right"),
     part.CHAMFER_LEG_DIMENSION: (True, "right"),
 }
-CHAMFER_RISE = 0.014  # the chamfer's text, above the axis
+CHAMFER_RISE = 0.018  # the chamfer's text, above the axis
 # Note anchors are their text's top-left corner (farm run 20261101T194619431Z).
 # The cut note's top sits under the shoulder Ø's shelved text: under the screw
 # its leader crossed its own text and the cut's dimension line (machinist
@@ -82,7 +84,7 @@ CHAMFER_RISE = 0.014  # the chamfer's text, above the axis
 CUT_NOTE_RIGHT = 0.008  # right of the thread tip
 CUT_NOTE_DROP = 0.014  # below the axis
 THREAD_NOTE_RIGHT = 0.002  # right of the shoulder step
-THREAD_NOTE_RISE = 0.021  # above the head rim
+THREAD_NOTE_RISE = 0.025  # above the head rim, 4 mm over the chamfer's rise
 THREAD_LANDING = 0.2  # of the thread length, from the shoulder
 # Every carrier lies on a Right-view edge; construction curves print as the
 # continuous thick outline on this sheet (``_construction_line_font``), not as
