@@ -336,8 +336,14 @@ _TABLE_NOTE_COLUMN = 4
 _TABLE_MATE_COLUMN = 5
 # Each note's top 4 mm under the one above (or under the table).
 _NOTE_PITCH = 0.008
-# Above the title block (y 65 mm) with air.
+# The title block (top y 65 mm) starts at x 216 mm; the notes, at x 20 mm,
+# end left of it, so below y 68 mm only the border (y 15 mm with air) bounds
+# them (farm r4 20261108T022716612Z: an 84 mm table put the notes' bottom
+# at 67.8 mm against a 68 mm bound that assumed the title block's height).
 _TITLE_BLOCK_TOP = 0.068
+_TITLE_BLOCK_LEFT = 0.216
+_BORDER_BOTTOM = 0.015
+_NOTE_GLYPH = 0.0027
 # Tags stand outside the outline (rule 14), each on a leader to its hole,
 # model mm: the upper holes' tags 6 mm (sheet) above the top edge, the lower
 # ones' 6 mm under the bottom edge; left of the A-A line's upper end (R3)
@@ -975,10 +981,15 @@ def _hole_table(
         notes_bottom = (
             TABLE_ANCHOR[1] - table_height - 0.004 - len(TABLE_NOTES) * _NOTE_PITCH
         )
-        if notes_bottom < _TITLE_BLOCK_TOP or TABLE_ANCHOR[0] + width > ISO_NOTE_XY[0]:
+        notes_right = TABLE_ANCHOR[0] + max(map(len, TABLE_NOTES)) * _NOTE_GLYPH
+        if (
+            notes_bottom < _BORDER_BOTTOM
+            or (notes_bottom < _TITLE_BLOCK_TOP and notes_right > _TITLE_BLOCK_LEFT)
+            or TABLE_ANCHOR[0] + width > ISO_NOTE_XY[0]
+        ):
             raise RuntimeError(
                 f"riser table ({width:.4f} x {table_height:.4f} m) and its notes "
-                "crowd the isometric or the title block"
+                "crowd the isometric, the title block or the border"
             )
 
     settled()
