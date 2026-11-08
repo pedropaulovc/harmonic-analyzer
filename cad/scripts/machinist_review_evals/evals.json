@@ -5054,6 +5054,47 @@
           "evidence": "MHA-PD-11 sheet 1 table headings: 'TAG', 'X LOC (BASIC)', 'Y LOC (BASIC)', 'SIZE'. Rows A1-A9 give X values '1.062', '2.909', '3.185', '3.461', '5.308', '7.155', '7.431', '7.707', '9.554', each at Y '0.140', with 'Ø.089 THRU ALL / 4-40 UNC - 2B THRU ALL'. The view carries matching A1-A9 tags, X/Y zero marks and the linked pattern note 'MATCHES MHA-PD-02 AND MHA-PD-12 HOLES; WALL .060 MIN, TAPS TO EDGES'."
         }
       ]
+    },
+    {
+      "id": 86,
+      "name": "tl-oblique-jig-feed-nut-exploded-2281",
+      "package": "ch_rocker_arm_tl_oblique_jig_assembly",
+      "kind": "assembly",
+      "release": "farm-20261107T190246596Z-c752cccb88bc4b7e93c2d7eeaa9bb4c7",
+      "prompt": "Blind machinist review of the ch-rocker-arm-tl-oblique-jig assembly package (11 sheets).",
+      "expected_output": "FIX (#2281). Sheet 5's LEADSCREW FEED EXPLODED view leaves the item 17 feed nut behind the item 5 feed-block lug instead of exploding it clear: balloon 17 lands on the sliver of nut that shows above the lug, and the four item 26 flat heads are drawn against the lug face with no nut between them. This is a rule 22 exploded-view clarity finding, not a blocker. The frozen PDF is farm run c752 at 522dec4fef (SHA-256 6e3f5775...); its sheet 5 renders pixel-identical to run ce83 (1d178294...), whose review caught the defect where c752's did not.",
+      "expectations": [
+        {
+          "text": "Verdict is FIX",
+          "check": {
+            "verdict": "FIX"
+          },
+          "rule": 22,
+          "polarity": "negative",
+          "confidence": "high",
+          "evidence": "Sheet 5 LEADSCREW FEED EXPLODED 1:3: item 17 (MHA-CH-06-TL-VN-84 TR8X2 BRASS FLANGE NUT) is drawn behind the MHA-CH-06-TL-32 feed-block lug, not exploded. Rule 22 (PR #2309): 'Each exploded part is drawn clear of its mates ... Every balloon lands on a visible face of its own part.' The package carries other confirmed defects too, so FIX alone does not prove the target; the next expectation does."
+        },
+        {
+          "text": "A clarity finding says sheet 5's LEADSCREW FEED EXPLODED view does not explode the item 17 feed nut clear of the item 5 feed-block lug: the nut stays behind or overlapping the lug, balloon 17 lands on the thin sliver of it that shows (a face the view hides), and/or the four item 26 flat heads are drawn against the lug face with no nut between them, so the view does not show which lug face the nut seats on",
+          "check": {
+            "category": "clarity"
+          },
+          "rule": 22,
+          "polarity": "negative",
+          "confidence": "high",
+          "evidence": "Sheet 5, right of balloon 5: only a thin brass curved edge of the nut shows above the lug top, between the M4 SHCS (item 24); balloon 17's leader ends on it. Four #4-40 flat heads (item 26, MHA-CH-06-TL-VN-67) stand off the lug's end face with no nut drawn between them and the lug. Sheet 8 step F1B: 'SEAT THE NUT ON THE LUG'S FACE AWAY FROM THE SPINDLE, BODY AWAY FROM THE LUG.' Run ce83 of the same sheet (#2281) confirmed this in 2 of 3 runs ('Balloon 17's leader ends on a barely visible curved sliver behind the lug'); run c752 raised it in 0 of 3."
+        },
+        {
+          "text": "No blocker is about sheet 5's exploded view: an exploded view that exists but does not read is a clarity (presentation) finding, not a missing exploded view or order",
+          "check": {
+            "absent_from": "blockers"
+          },
+          "rule": 22,
+          "polarity": "positive",
+          "confidence": "medium",
+          "evidence": "Sheets 3-6 carry exploded views and sheet 7 the assembly sequence. The assembly severity table puts 'an exploded view that does not read, including an exploded part drawn still overlapping or hidden by its mate, or a balloon landing on a face of its part that the view hides' under presentation, which maps to clarity; only 'no exploded view or order' is missing (blockers)."
+        }
+      ]
     }
   ]
 }
