@@ -19,6 +19,7 @@ import _supplier_screw_dimensions as supplier_dimensions
 import _stock_trim_drawing as trim_drawing
 import build_ch_rocker_arm_tl_vn_oblique_leadscrew_kit as part
 import ch_rocker_arm_tl_oblique_feed_block_spec as feed_block
+import ch_rocker_arm_tl_oblique_jig_assembly_spec as jig
 import ch_rocker_arm_tl_vn_oblique_leadscrew_kit_feed_nut_spec as nut
 import ch_rocker_arm_tl_vn_oblique_leadscrew_kit_leadscrew_spec as spec
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as feed
@@ -677,14 +678,27 @@ def test_controls_print_at_the_title_block_rows() -> None:
     # Every KP08 flat is one size; the printed one says how many and names
     # the pillow blocks by their short number. The handwheel's flat station
     # prints bare.
-    assert (spec.FLAT_LENGTH_CALLOUT, spec.FLAT_AF_CALLOUT) == ("4X", "3X")
+    assert spec.FLAT_LENGTH_CALLOUT == "4X"
     assert set(draw.FLAT_CALLOUTS) == {"FlatLength", "FlatAF"}
     assert draw.FLAT_CALLOUTS["FlatLength"].startswith(f"{spec.FLAT_LENGTH_CALLOUT} ")
-    assert draw.FLAT_CALLOUTS["FlatLength"].endswith("TL-VN-56")
-    # The across-flat's count, its one clock, and the details it covers.
-    af_rows = draw.FLAT_CALLOUTS["FlatAF"].splitlines()
-    assert len(af_rows) == 2 and af_rows[0].startswith(f"{spec.FLAT_AF_CALLOUT} ")
-    assert af_rows[1] == ", ".join(detail.label for detail in draw.END_DETAILS)
+    assert draw.FLAT_CALLOUTS["FlatAF"].splitlines()[0] == ", ".join(
+        detail.label for detail in draw.END_DETAILS
+    )
+    # The across-flat links note 1, which gives one flat at each detail and
+    # their free angle, set at a numbered TL-00 step (owner ruling via Main).
+    assert draw.FLAT_CALLOUTS["FlatAF"].endswith("SEE NOTE 1")
+    assert draw.FLAT_CLOCK_NOTE.startswith("1. ")
+    assert "ANGLE FREE" in draw.FLAT_CLOCK_NOTE
+    assert f"SET AT {draw.FLAT_CLOCK_STEP}." in draw.FLAT_CLOCK_NOTE
+    assert draw.FLAT_CLOCK_NOTE in draw.NOTES
+    assert draw.FLAT_CLOCK_STEP.startswith("MHA-CH-06-TL-00 STEP ")
+    # The cited step is the one that tightens the set screws on the flats.
+    step = draw.FLAT_CLOCK_STEP.rsplit(" ", 1)[1]
+    assert any(
+        re.match(rf"{step}[A-Z]?\. ", text) and "SET SCREWS ON THE" in text
+        and "FLATS" in text
+        for text in jig.ASSEMBLY_STEPS
+    )
     # The feed absorbs the band at either limit.
     short_margin = (feed.NEAR_STUB - feed.NEAR_STUB_MIN) + (
         feed.HANDWHEEL_ENGAGEMENT - feed.HANDWHEEL_ENGAGEMENT_MIN
@@ -1087,11 +1101,15 @@ def test_rework_bands_name_their_mates_at_their_callouts() -> None:
     kp08 = _config.parts("ch-rocker-arm-tl-vn-oblique-pillow-block")["number"]
     assert lane == "below" and draw.KP08_NUMBER == kp08
     assert faced.splitlines()[-1] == kp08
-    # The receipt limits print once, natively; each callout below them names
-    # its mate, with no number of its own but the body's RV-02 wall row, the
-    # spec's.
+    # The receipt limits print once, natively; each size callout below them
+    # names its mate, with no number of its own but the body's RV-02 wall
+    # row, the spec's. The PCD, a location, carries its identifier only
+    # (rule 7).
+    assert draw.RECEIPT_CALLOUTS["ReceiptHolePcd"] == ("below", "PCD")
     mates = {}
     for name, (lane, text) in draw.RECEIPT_CALLOUTS.items():
+        if name == "ReceiptHolePcd":
+            continue
         rows = text.splitlines()
         if name == "ReceiptBodyDia":
             assert rows[-1] == nut.THREAD_WALL_TEXT
@@ -1102,7 +1120,6 @@ def test_rework_bands_name_their_mates_at_their_callouts() -> None:
         "ReceiptFlangeDia": "LUG FACE",
         "ReceiptBodyDia": f"CLEARS HEADS OF {nut.SCREW_COUNT}X {screw_short}",
         "ReceiptHoleDia": f"{feed_block.NUMBER} LUG",
-        "ReceiptHolePcd": f"{feed_block.NUMBER} LUG",
     }
     assert draw.RECEIPT_CALLOUTS["ReceiptFlangeDia"][1].startswith(f"WITHIN {feed_block.NUMBER}\n")
     assert draw.RECEIPT_CALLOUTS["ReceiptBodyDia"][1] == (
@@ -2101,10 +2118,12 @@ def test_notes_name_the_item_not_its_length_or_material() -> None:
     # Identity only: no stock size row. The bought stock's sizes are the
     # thread designation's and the SKU's; a note typing spec numbers that no
     # native dimension owns breaks model ownership (rule 7, review), and the
-    # 1:10 gauge sketch before it read as a confusing pseudo-view.
-    assert len(draw.NOTES.splitlines()) == 3
+    # 1:10 gauge sketch before it read as a confusing pseudo-view. Note 1
+    # (the across-flat's free clock) follows the three identity rows.
+    identity = "\n".join(draw.NOTES.splitlines()[:3])
+    assert draw.NOTES == f"{identity}\n{draw.FLAT_CLOCK_NOTE}"
     assert not hasattr(draw, "STOCK_REFERENCE")
-    assert re.findall(r"\d", draw.NOTES.replace("TR8X2", "").replace("[1]", "")) == []
+    assert re.findall(r"\d", identity.replace("TR8X2", "").replace("[1]", "")) == []
     assert not hasattr(spec, "SUPPLIER_REFERENCE_DIMENSIONS")
     assert "Manufacturing Notes" not in draw.NOTES
     assert set(part.MEMBER_NOTE_PROPERTIES) <= set(part.SAVED_DRAWING_PROPERTIES)
@@ -2258,12 +2277,13 @@ def test_settled_detail_frames_fit_after_translating_the_whole_bank() -> None:
     )
     old_x = (.043, .091, .1615)
     translations = [detail.centre[0] - x for detail, x in zip(draw.END_DETAILS, old_x, strict=True)]
-    assert translations == pytest.approx([.008] * 3)
+    # The bank moved +8 mm; E 4 mm more, widening the D-E text lane.
+    assert translations == pytest.approx([.008, .008, .012])
     for detail, box, dx in zip(draw.END_DETAILS, measured, translations, strict=True):
         moved = (box[0] + dx, box[1], box[2] + dx, box[3])
         draw._require_detail_bounds(SimpleNamespace(GetOutline=lambda box=moved: box), detail)
         assert moved[0] - draw.BORDER[0] > .003
-        assert draw.TITLE_BLOCK[0] - moved[2] > .015
+        assert draw.TITLE_BLOCK[0] - moved[2] > .011
 
 
 def test_detail_containment_is_rechecked_when_the_native_outline_settles() -> None:

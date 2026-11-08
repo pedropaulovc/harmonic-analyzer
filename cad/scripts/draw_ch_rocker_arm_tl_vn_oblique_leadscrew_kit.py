@@ -105,7 +105,7 @@ from ch_rocker_arm_tl_vn_oblique_leadscrew_kit_leadscrew_spec import (
     DIMENSION_TOLERANCE_TYPES,
     DRAWING_DIMENSIONS,
     FLAT_AF,
-    FLAT_AF_CALLOUT,
+    FLAT_AF_PLACES,
     FLAT_LENGTH,
     FLAT_LENGTH_CALLOUT,
     FLAT_STARTS,
@@ -371,11 +371,19 @@ _FAR_XY = (0.099, DETAIL_ROW_Y)
 # flat runs out through the cut end (owner ruling 2026-11-05), so the
 # detail shows no land past it. The fence's radius 7 holds the flat's start
 # corners and the far end's (each 6.40 off its centre) whole.
-# The across-flat's text (its widest row, "C, D, E", about 15 mm wide, centred
-# on its dimension line) stands between D's fence and E's.
+# The across-flat's text ("C, D, E" over "SEE NOTE 1", about 24 mm wide,
+# centred on its dimension line) stands midway between D's fence and E's.
+# "3X IN LINE", 1.5 mm off E's fence, was struck by it (machinist review,
+# farm run 20261108T031012373Z): E stands 4 mm further right (its settled
+# frame's right 11.6 mm short of the title block) and the line midway, for
+# 31 mm of text room.
 _WHEEL_CENTRE_MM = (FLAT_STARTS["Handwheel"] + LENGTH) / 2.0
 _WHEEL_RADIUS_MM = 7.0
-_WHEEL_XY = (0.1695, DETAIL_ROW_Y)
+_WHEEL_XY = (0.1735, DETAIL_ROW_Y)
+_DE_GAP_MID_X = (
+    _FAR_XY[0] + 6.0 * _DETAIL_PER_MODEL_MM
+    + _WHEEL_XY[0] - _WHEEL_RADIUS_MM * _DETAIL_PER_MODEL_MM
+) / 2.0
 # The across-flat runs from the far crest (clock 180, radius -4) to the flat
 # (FLAT_AF - 4 toward clock 0): its middle stands at half their sum.
 _AF_MID_RADIUS_MM = (FLAT_AF - MAJOR_DIA) / 2.0
@@ -430,7 +438,7 @@ END_DETAILS = (
             "FlatAF": detail_xy(
                 _WHEEL_CENTRE_MM,
                 _WHEEL_XY,
-                _WHEEL_CENTRE_MM - _WHEEL_RADIUS_MM - 3.5,
+                _WHEEL_CENTRE_MM - (_WHEEL_XY[0] - _DE_GAP_MID_X) / _DETAIL_PER_MODEL_MM,
                 _AF_MID_RADIUS_MM,
             ),
         },
@@ -443,12 +451,15 @@ END_DETAILS = (
 # same-parent short drawing number (rule 4).
 # The handwheel's flat runs to the end, which detail E shows; its start
 # station prints bare (rule 7: a location carries no words). The
-# across-flat is each clock-0 flat's, one in each detail, all three on one
-# clock: "IN LINE" says so, and with "3X" that E has that one flat alone
-# (review of farm run 20261108T015328529Z: detail E left its flat count and
-# its angle to D's flats undefined); the clock flats print their own in
-# sections A-A and B-B. The across-flat's rows stay narrower than the 25 mm
-# between fences D and E.
+# across-flat is each clock-0 flat's, one in each detail (the clock flats
+# print their own in sections A-A and B-B). Those three flats' angle to each
+# other is free: each KP08 ring and the handwheel turn to them at fit-up
+# (the leadscrew spec; MHA-CH-06-TL-00 step 8 tightens their set screws on
+# the flats). Note 1 says so in words, linked from the across-flat (owner
+# ruling via Main, 2026-11-08): "3X IN LINE" read as a private phrase and a
+# section would draw an angle the print does not control (machinist review,
+# farm runs 20261108T015328529Z and 20261108T031012373Z).
+FLAT_CLOCK_STEP = "MHA-CH-06-TL-00 STEP 8"
 _JIG_PREFIX = "MHA-CH-06-"
 
 
@@ -463,14 +474,14 @@ KP08_NUMBER = _config.parts("ch-rocker-arm-tl-vn-oblique-pillow-block")["number"
 FLAT_CALLOUTS = {
     "FlatLength": f"{FLAT_LENGTH_CALLOUT} FLATS FOR\n{short_number(KP08_NUMBER)}",
     "FlatAF": "\n".join(
-        (f"{FLAT_AF_CALLOUT} IN LINE", ", ".join(detail.label for detail in END_DETAILS))
+        (", ".join(detail.label for detail in END_DETAILS), "SEE NOTE 1")
     ),
 }
 # The cylinder face on the axis, 50 mm right of centre: 2 mm from either
 # silhouette and clear of the dimension above.
 CENTERLINE_PICK = (MAIN_CENTER[0] + 0.050, MAIN_CENTER[1])
-# Right of the details and over the title block (top-left anchored, three
-# rows about 13 mm tall and 70 mm wide): under the handwheel station's text
+# Right of the details and over the title block (top-left anchored, five
+# rows about 22 mm tall and 105 mm wide): under the handwheel station's text
 # (0.128) and left of the isometric.
 NOTES_XY = (0.230, 0.105)
 # The catalogue designation in plain text: the material is the title block's
@@ -478,13 +489,21 @@ NOTES_XY = (0.230, 0.105)
 # nowhere: the item's thread designation and the SKU identify the stock, and
 # a note row typing spec numbers no native dimension owns breaks model
 # ownership (rule 7; review of a numeric STOCK row and, before it, a 1:10
-# gauge sketch that read as a confusing pseudo-view).
+# gauge sketch that read as a confusing pseudo-view). Note 1 follows: the
+# across-flat's flats and their free angle.
 LEADSCREW_ITEM = "[1] TR8X2 LEAD SCREW"
+FLAT_CLOCK_NOTE = (
+    f"1. THE {FLAT_AF:.{FLAT_AF_PLACES}f} FLAT AT "
+    f"{', '.join(d.label for d in END_DETAILS[:-1])} "
+    f"AND {END_DETAILS[-1].label}: ONE AT EACH,\n"
+    f"ANGLE FREE, SET AT {FLAT_CLOCK_STEP}."
+)
 NOTES = "\n".join(
     (
         f"ITEM: {LEADSCREW_ITEM}",
         f"SUPPLIER: {property_link('Supplier')}",
         f"SKU: {property_link('Supplier SKUs')}",
+        FLAT_CLOCK_NOTE,
     )
 )
 EXPECTED_CONTROLS = {
@@ -615,7 +634,10 @@ RECEIPT_CALLOUTS = {
     "ReceiptHoleDia": (
         "below", f"AS SUPPLIED, MATCHES TAPS IN\n{FEED_BLOCK_NUMBER} LUG",
     ),
-    "ReceiptHolePcd": ("below", f"PCD, MATCHES TAPS IN\n{FEED_BLOCK_NUMBER} LUG"),
+    # A location carries no words (rule 7): the PCD names itself; the 4X
+    # hole size callout names the mate once (machinist review, farm run
+    # 20261108T031012373Z).
+    "ReceiptHolePcd": ("below", "PCD"),
 }
 _CALLOUT_TEXT_PARTS = {"above": 3, "below": 4}
 if any(
@@ -1400,6 +1422,7 @@ def _append_leadscrew_sheet(adapter: Any) -> tuple[Callable[[], None], ...]:
             f"ITEM: {LEADSCREW_ITEM}",
             f"SUPPLIER: {properties['Supplier']}",
             f"SKU: {properties['Supplier SKUs']}",
+            FLAT_CLOCK_NOTE,
         )
     )
     printed = str(_early_bound(note, "INote").GetText() or "")
