@@ -649,7 +649,10 @@ def test_the_jig_bored_k_lands_in_the_set_band_with_margin_at_both_ends() -> Non
     # within a quarter division of the spindle. The indicator's unknown
     # accuracy over its range scales that sub-division reading only; the
     # bound holds while the indicator repeats to its stated sweep at null.
-    division = inventory["gauges"]["dti"]["resolution_in"]["value"] * 25.4
+    division_in = inventory["gauges"]["dti"]["resolution_in"]["value"]
+    # The printed sweep is a value on the shop's own test indicator.
+    assert drawing.KNOB_SETTING_INDICATOR_DIVISION_IN == division_in
+    division = division_in * 25.4
     centring = drawing.KNOB_SETTING_TRUE_SWEEP_DIVISIONS * division / 2.0
     # Signed worst case, every bound adding the same way: the DRO is zeroed
     # on S, so its two axes' errors enter once, on the S-to-K move, both
@@ -1174,10 +1177,12 @@ def test_no_retired_part_is_named_on_the_sheet() -> None:
     text = _unit_step_notes().fitup_steps
     printed = set(re.findall(r"MHA-(?!VN-)[A-Z]{2}-(?:[0-9]{2}(?:-TL-(?:[0-9]{2}|VN-[5-9][0-9]))?|VN-[5-9][0-9])(?:-T[0-9]{3})?(?![A-Z0-9-])", text))
     assert not any(number in text for number in retired)
-    # Off-BOM numbers: the drive-train package the crank side cites, and the
-    # frame parts (columns, base deck) the bar is clamped to and set from.
+    # Off-BOM numbers: the drive-train package the crank side cites and its
+    # crankshaft the fit-up pulls forward, and the frame parts (columns, base
+    # deck) the bar is clamped to and set from.
     assert printed <= set(drawing.BOM_PART_NUMBERS.values()) | {
         assembly_contract("dt-drive-train").number,
+        drawing.CRANKSHAFT,
         drawing.FRAME_COLUMN,
         drawing.FRAME_BASE,
     }
@@ -2025,6 +2030,25 @@ def test_the_platen_group_is_built_and_hung_before_its_locks_are_set() -> None:
     assert drawing.GUIDE_SCREWS + drawing.CLIP_SCREWS == len(
         assembly.GUIDE_SCREW_XY
     ) + len(assembly.CLIP_SCREW_XY)
+
+
+def test_the_lock_taps_are_the_even_taps_counted_from_either_end() -> None:
+    """The steps count the guide's lock taps in plain words (round 4, rule
+    22): along the rail the platen-screw taps alternate with the lock taps,
+    so the lock taps are the 2nd, 4th, 6th and 8th from either end."""
+    import build_pd_platen_guide as guide
+
+    stations = sorted(
+        [(x, "screw") for x in guide.SCREW_STATION_X]
+        + [(x, "lock") for x in guide.HOLE_X]
+    )
+    kinds = [kind for _, kind in stations]
+    assert len(kinds) == drawing.GUIDE_TAPS_IN_ROW
+    lock_positions = [i + 1 for i, kind in enumerate(kinds) if kind == "lock"]
+    assert lock_positions == [2, 4, 6, 8]
+    assert kinds == kinds[::-1]
+    hung = _step_body("platen-hung")
+    assert not re.search(r"\bA[1-9]\b", _step_body("guides-screwed") + hung)
 
 
 def test_the_chain_is_closed_and_run_after_the_collar_is_accepted() -> None:

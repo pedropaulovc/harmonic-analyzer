@@ -588,9 +588,17 @@ KNOB_SETTING_INSTANCES = frozenset({"pd-transgear-arm-1", "pd-transgear-arm-plat
 # The located step's acceptance for "true": a null reading on the indicator, so the
 # setting's centring bound comes from this stated sweep, not from the
 # indicator's unknown accuracy over its range (codjiflo P2 on 8e8d5d5): under
-# half a division of sweep puts each centre within a quarter division.
-KNOB_SETTING_TRUE = "TRUE: UNDER HALF A DIVISION OF SWEEP"
+# half a division of sweep puts each centre within a quarter division. The
+# sweep prints as a value on the shop's .0005 test indicator
+# (inventory gauges.dti.resolution_in), so "true" has a fixed limit whatever
+# indicator is at hand (machinist review round 4, rules 22 and 26).
 KNOB_SETTING_TRUE_SWEEP_DIVISIONS = 0.5
+KNOB_SETTING_INDICATOR_DIVISION_IN = 0.0005
+KNOB_SETTING_TRUE = (
+    "TRUE: SWEEP UNDER "
+    f"{f'{KNOB_SETTING_TRUE_SWEEP_DIVISIONS * KNOB_SETTING_INDICATOR_DIVISION_IN:.5f}'.lstrip('0')}"
+    f" ON A {f'{KNOB_SETTING_INDICATOR_DIVISION_IN:.4f}'.lstrip('0')} TEST INDICATOR"
+)
 # The second column's steps end above this on sheet 5.
 KNOB_SETTING_FIELD_TOP = 0.144
 # The plate-screw tap inside the crop, in the machine frame (mm): the arm's
@@ -1599,6 +1607,13 @@ REDUCER_BACKLASH_FEELERS_MM = (
 # guide screws, its through-taps the clip screws.
 GUIDE_SCREWS = len(platen.GUIDE_HOLE_X) * len(platen.GUIDE_HOLE_Y)
 CLIP_SCREWS = len(platen.SOCKET_XY)
+# Each guide's row of taps along its length: the platen-screw taps spotted at
+# step 3 alternate with the 4 lock taps, so the lock taps are the 2nd, 4th,
+# 6th and 8th from either end (build_pd_platen_guide HOLE_X and
+# SCREW_STATION_X; the test checks the order). The steps count them in
+# plain words: the A1-A9 tags live only on MHA-PD-11 (machinist review
+# round 4, rule 22).
+GUIDE_TAPS_IN_ROW = 9
 
 
 # The engaged-feed window, measured from the rack's -X cut end. Machine X is
@@ -1656,6 +1671,9 @@ TAP_0_80_DRILL_TEXT = (
 # are the columns; MHA-FR-01 carries the base deck).
 FRAME_COLUMN = str(_config.parts("fr-tube-frame")["number"])
 FRAME_BASE = str(_config.parts("fr-harmonic-base")["number"])
+# The drive-train crankshaft the chain fit-up pulls forward (rule 4: named by
+# its drawing number; machinist review round 4).
+CRANKSHAFT = str(_config.parts("dt-crankshaft")["number"])
 
 
 def _press_remedy(item: str, receiver: str, restart_key: str) -> str:
@@ -1760,9 +1778,8 @@ def _step_text(
             f"CLAMP THE {guides} {n['pd-platen-guide']} GUIDES TO THE PLATEN BACK, "
             "ENDS FLUSH WITH THE PLATEN ENDS, EACH ON ITS ROW OF "
             f"\u00d8{steps.inch_text(platen.GUIDE_HOLE_DIA, 3)} PLATEN HOLES.",
-            f"SPOT EACH GUIDE'S {guide_taps} TAPS A1, A3, A5, A7, A9 (AS "
-            f"{n['pd-platen-guide']} LETTERS THEM) THROUGH THE PLATEN HOLES WITH A "
-            "9/64 TRANSFER PUNCH.",
+            f"SPOT EACH GUIDE THROUGH THE {guide_taps} PLATEN HOLES OF ITS ROW WITH "
+            "A 9/64 TRANSFER PUNCH.",
             "UNCLAMP THE GUIDES.",
             f"DRILL EACH SPOT {TAP_4_40_DRILL_TEXT} THRU.",
             "TAP EACH HOLE #4-40 UNC-2B THRU.",
@@ -1779,9 +1796,10 @@ def _step_text(
             f"LAY THE {n['pd-platen-paper']} PAPER BETWEEN THE CLIPS.",
         ),
         "platen-hung": (
-            "SCREW A #4-40 TRANSFER SCREW INTO EACH GUIDE TAP A2, A4, A6 AND A8.",
-            f"LAY A {n['pd-guide-lock']} LOCK OVER EACH TAP PAIR, ITS GUIDE-SIDE EDGE "
-            "TOWARD THE GUIDE.",
+            "SCREW A #4-40 TRANSFER SCREW INTO THE 2ND, 4TH, 6TH AND 8TH OF EACH "
+            f"GUIDE'S {GUIDE_TAPS_IN_ROW} TAPS, COUNTED FROM EITHER END.",
+            f"LAY A {n['pd-guide-lock']} LOCK OVER EACH TAP PAIR (2ND AND 4TH, 6TH "
+            "AND 8TH), ITS GUIDE-SIDE EDGE TOWARD THE GUIDE.",
             "STRIKE EACH LOCK TO MARK BOTH ITS HOLES.",
             f"CHECK WITH A SCALE: EACH MARK {_mark_window(guide_lock.HOLE_Y)} FROM THE "
             "LOCK'S GUIDE-SIDE EDGE.",
@@ -2056,13 +2074,13 @@ def _step_text(
             f"HARDEN AND TEMPER THE HOOK PER {n['pd-latch-hook']}.",
             "REFIT THE HOOK WITH ITS PIN HOLE'S LOWER EDGE ON THE PIN.",
             "TIGHTEN THE HOOK SCREWS.",
-            "UNCLAMP THE ARM. IT STAYS LATCHED: THE "
-            f"{n['pd-vn-transgear-latch-pin']} PIN STANDS THROUGH THE "
-            f"{n['pd-latch-hook']} HOOK'S PIN HOLE.",
+            "UNCLAMP THE ARM.",
+            f"CHECK: THE ARM STAYS LATCHED, THE {n['pd-vn-transgear-latch-pin']} PIN "
+            f"STANDING THROUGH THE {n['pd-latch-hook']} HOOK'S PIN HOLE.",
             "CHECK: THE ENGAGED FEED RUNS WITH NO TIGHT SPOT AND THE PLATEN SHAKES "
             f"{shake} AT THE DATUM, READ WITH A DIAL INDICATOR ON THE PLATEN END.",
-            f"IF NOT, REPEAT {s('hanger-meshed', 2)}-"
-            f"{s('hook-pin-hole-match-drilled', 7)} WITH A NEW {n['pd-latch-hook']} "
+            f"IF EITHER CHECK FAILS, REPEAT {s('hanger-meshed', 2)}-"
+            f"{s('hook-pin-hole-match-drilled', 8)} WITH A NEW {n['pd-latch-hook']} "
             "HOOK.",
         ),
         "loaded-rack-geometry-checked": (
@@ -2080,7 +2098,7 @@ def _step_text(
         "fitup-pose-set": (
             f"CHECK: THE ARM IS LATCHED, THE {n['pd-vn-transgear-latch-pin']} PIN "
             f"THROUGH THE {n['pd-latch-hook']} HOOK'S PIN HOLE.",
-            "PULL THE CRANK SHAFT FORWARD.",
+            f"PULL THE {CRANKSHAFT} CRANKSHAFT FORWARD.",
             f"PUSH THE KNOB SHAFT REARWARD, {teeth} ON THE "
             f"{n['pd-transgear-knob-thrust-ring']} RING, THE RING ON THE "
             f"{n['pd-transgear-arm-plate']} PLATE'S FRONT BOSS.",
@@ -2168,8 +2186,8 @@ def _step_text(
             "CHECK: RAISED AND RELEASED, THE ARM SWINGS FREE ON ITS PIVOT.",
             f"LATCH THE ARM: LIFT IT UNTIL THE {n['pd-vn-transgear-latch-pin']} PIN "
             f"SNAPS INTO THE {n['pd-latch-hook']} HOOK'S PIN HOLE.",
-            f"CHECK: THE RING GAP READS {CLUSTER_FLOAT_VIEW_NAME} ON FEELERS AND THE "
-            "DISC TURNS FREE.",
+            f"CHECK: THE RING GAP READS {CLUSTER_FLOAT_VIEW_NAME} ON FEELERS.",
+            "CHECK: THE DISC TURNS FREE.",
             "CHECK: COLLAR TO DISC CLEARANCE "
             f"{steps.COLLAR_DISC_AIR_TEXT}, AS "
             f"{s('collar-disc-air-inspected', 2)}.",
@@ -2181,9 +2199,9 @@ def _step_text(
             f"{steps.step_number('collar-shoulder-seated')}, "
             f"{s('fitup-accepted', 4)} STEP "
             f"{steps.step_number('hanger-pivoted')}, "
-            f"{s('fitup-accepted', 6)} STEP "
+            f"{s('fitup-accepted', 6)} AND {s('fitup-accepted', 7)} STEP "
             f"{steps.step_number('disc-cluster-shimmed')}, "
-            f"{s('fitup-accepted', 7)} STEP "
+            f"{s('fitup-accepted', 8)} STEP "
             f"{steps.step_number('collar-disc-air-inspected')}.",
         ),
         "chain-closed": (
