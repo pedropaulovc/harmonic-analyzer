@@ -2303,11 +2303,14 @@ def _step_text(
             f"{s('disc-cluster-hung', 1)}), KEEPING ITS SHIMS.",
             f"SLIDE THE HUB AND DISC OFF THE {n['pd-transgear-feed-pinion']} D-FLAT "
             "AS ONE, THEIR SCREWS LEFT IN.",
-            # The feeler check carries both seat faces' squareness: MHA-PD-10
-            # step face (Q1 C) and MHA-PD-17 spigot end ⊥ .001 (owner ruling
-            # 2026-11-08 (Pedro), #2144 item 3.2). Setting the step back
-            # recovers the air whichever face closed it; the spigot end is
-            # never re-faced, as that would take the disc off its screws.
+            # The feeler check carries every feeler-accepted collar-air source:
+            # the MHA-PD-10 step face (Q1 C), the MHA-PD-17 spigot end ⊥ .001
+            # (owner ruling 2026-11-08 (Pedro), #2144 item 3.2) and the
+            # MHA-PD-18 pin bore S ⊥ Ø.001 A, its projected axis zone (owner
+            # ruling 2026-11-08 (Pedro), #2144 item 4.1). Setting the step
+            # back recovers the air whichever face or axis closed it; the
+            # spigot end is never re-faced, as that would take the disc off
+            # its screws.
             f"RE-FACE THE {n['pd-transgear-feed-pinion']} STEP FACE SQUARE ON A "
             f"MANDREL BY THE AMOUNT {s('collar-disc-air-inspected', 2)} READ SHORT; "
             f"THE {n['pd-transgear-disc-hub']} SPIGOT END SEATS ON IT, SO HUB AND "
