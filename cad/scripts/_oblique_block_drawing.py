@@ -196,10 +196,11 @@ def _displays(adapter, annotations, names) -> dict[str, Any]:
 
 
 # One normal-height, four-line note replaces the two plan-diameter displays.
-# The proved outer-rim leader and the original text lane remain unchanged.
-PIVOT_STACK_XY = (.025, .225)
+# Lower-right blank lane, below B-B's plan cutting line; see retained-389
+# geometry in the focused regression. The 315-degree rim pick clears centre marks.
+PIVOT_STACK_XY = (.190, .125)
 PIVOT_NOTE_HEIGHT = .0035
-PIVOT_STACK_LANE = (.020, .182, .145, .230)
+PIVOT_STACK_LANE = (.185, .100, .312, .130)
 
 
 def _pivot_stack_semantics(text):
@@ -235,7 +236,7 @@ def _pivot_stack_estimate(text):
 
     One full cap-height per glyph (versus the shared 0.62 average), 1.6-height
     row pitch and 1 mm all-round bearing/ink padding. Symbols count as one
-    glyph. At the current spec: [24,203.7]..[141.5,226] mm, 3.5 mm minimum air.
+    glyph. At the current spec: [189,103.7]..[306.5,126] mm, 3.7 mm minimum air.
     """
     glyphs = text.replace('<MOD-DIAM>', 'Ø').replace('<HOLE-DEPTH>', '↧')
     if len(glyphs.splitlines()) != 4:
@@ -307,16 +308,19 @@ def _stack_pivot_callout(adapter, plan, annotations, contract):
     if not all(math.isfinite(v) for v in outer.circle):
         raise RuntimeError('pivot stacked callout outer rim is unreadable')
     centre = _project(adapter, plan, (part.BORE_X, part.BORE_Y, contract.BLOCK_HEIGHT), 'pivot centre')
-    landing = _project(adapter, plan, (part.BORE_X - part.BORE_DIA / 2, part.BORE_Y, contract.BLOCK_HEIGHT),
-                       'pivot outer left rim')
+    rim_offset = part.BORE_DIA / (2 * math.sqrt(2))
+    landing = _project(adapter, plan,
+                       (part.BORE_X + rim_offset, part.BORE_Y - rim_offset, contract.BLOCK_HEIGHT),
+                       'pivot outer lower-right rim')
     radius = math.dist(centre, landing)
-    obstacle = _project(adapter, plan, (-part.BOLT_X, part.BOLT_Y, contract.BLOCK_HEIGHT),
-                        'upper-left carriage counterbore')
-    obstacle_rim = _project(adapter, plan,
-                            (-part.BOLT_X + part.CBORE_DIA / 2, part.BOLT_Y, contract.BLOCK_HEIGHT),
-                            'upper-left counterbore radius')
-    obstacle_radius = math.dist(obstacle, obstacle_rim)
-    if (not all(math.isfinite(v) for point in (centre, landing, obstacle, obstacle_rim) for v in point)
+    obstacles = tuple(_project(adapter, plan, (x, y, contract.BLOCK_HEIGHT),
+                               'carriage counterbore')
+                      for x, y in part.BOLT_POINTS)
+    x, y = part.BOLT_POINTS[0]
+    obstacle_rim = _project(adapter, plan, (x + part.CBORE_DIA / 2, y, contract.BLOCK_HEIGHT),
+                            'carriage counterbore radius')
+    obstacle_radius = math.dist(obstacles[0], obstacle_rim)
+    if (not all(math.isfinite(v) for point in (centre, landing, *obstacles, obstacle_rim) for v in point)
             or radius <= 0 or obstacle_radius <= 0):
         raise RuntimeError('pivot stacked callout projection is unreadable')
     note = _early_bound(add_attached_note(
@@ -378,8 +382,9 @@ def _stack_pivot_callout(adapter, plan, annotations, contract):
         strokes += [((edge.x0, edge.y0), (edge.x1, edge.y1)) for edge in triangle]
         if any(_segment_distance(centre, start, end) < radius - 1e-5 for start, end in strokes):
             raise RuntimeError('pivot stacked callout leader/arrow crosses the bore interior')
-        if any(_segment_distance(obstacle, start, end) < obstacle_radius + .001 for start, end in strokes):
-            raise RuntimeError('pivot stacked callout leader/arrow crowds the upper-left counterbore')
+        if any(_segment_distance(obstacle, start, end) < obstacle_radius + .001
+               for obstacle in obstacles for start, end in strokes):
+            raise RuntimeError('pivot stacked callout leader/arrow crowds a carriage counterbore')
         _telemetry.info('pivot stacked native callout readback', generated=text, resolved=str(note.GetText()),
                         note_height_m=PIVOT_NOTE_HEIGHT, estimated_text_bounds_mm=estimate.mm(),
                         source_names=[state[0] for _, state in sources.values()],

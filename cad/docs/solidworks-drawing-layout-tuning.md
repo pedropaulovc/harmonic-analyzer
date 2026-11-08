@@ -447,7 +447,7 @@ leader, so that rectangle is not a text-only measurement against the
 `(20,182)..(145,230)` mm text lane. The owner's approved option B replaces that
 expanded source-caption block with a **plain, four-line spec-generated
 note**, explicitly sized to the normal **3.5 mm** note height through
-`_size_note`. It does not reduce that height or enlarge the lane to fit.
+`_size_note`. The later relocation below keeps that height and all geometry guards.
 
 `_pivot_stack_text` formats the bore diameter, seat depth and tap-drill
 diameter from `DRAWING_VALUES` at `DRAWING_PRECISION_BY_NAME` places;
@@ -474,7 +474,7 @@ The offline estimate uses the existing `estimate_text_box`: one full
 cap-height per glyph (conservative versus its calibrated 0.62 average),
 1.6-height row pitch, and 1 mm padding on every side. The current four rows'
 longest line is 33 glyphs, giving padded bounds
-**`(24,203.7)..(141.5,226)` mm**, with minimum lane margin **3.5 mm**.
+**`(189,103.7)..(306.5,126)` mm**, with minimum lane margin **3.7 mm**.
 The estimate requires at least 3 mm margin, but is never used as measured
 geometry. Run `e4a597af` reported a whole-note extent of
 `(24.7960066889632,205.46646153846154)..(164.9071638795986,225.00577257525084)`
@@ -495,7 +495,7 @@ guessed row positions. Every ink-bearing display item must match the PDF;
 the full display string must also preserve the four source rows.
 `span_box` gives only the matched glyph bounds, including split runs around
 diameter/depth symbols. Missing or changed rows fail, and every measured
-piece must stay in the unchanged `(20,182)..(145,230)` mm text lane.
+piece must stay in the measured lower-right `(185,100)..(312,130)` mm text lane.
 
 The local guard also makes the already-computed report findings fatal for
 this note only: `outside-border`, `keep-out`, `text-clearance`, `text-on-view`,
@@ -508,16 +508,49 @@ separately from the offline estimate. Focused synthetic PDF fixtures cover
 split symbol runs, a valid outside-lane leader, missing/changed rows,
 out-of-lane text, foreign-text collisions and model-edge crossings.
 
-The already-proved leader construction is unchanged: one view-owned note,
-one live leader and one native arrow on the leftmost outer-rim point.
-Every leader/arrow stroke stays outside the bore disk and at least 1 mm
-clear of the upper-left carriage counterbore. Creation and settled-readback
-operation spans retain the generated/resolved text, sources and geometry.
+Native `192bc492` / run `02b13cf0` passed the plain-note/source/height/rim
+checks but the existing audit rejected its leader crossing B-B. The segment
+`(104.2,209.6)..(165.2,205)` crossed the actual B cutting line
+`x157, y168.934..259` at `y205.618` mm. This happened **before** the new
+post-finalization PDF guard ran; it was not a PDF-glyph matching failure.
+
+The replacement anchor is **`(190,125)` mm**, below that cutting-line span
+and right of the bore centre **`(170,205)` mm**. The old `165.2` coordinate
+was the left arrow tip, not the centre. The retained native `389` /
+`0e989113` PDF and layout report establish the blank lane:
+the conservative note box clears A-A's actual outline top `y97.780` by
+**5.920 mm**, B-B's outline left `x317.220` by **10.720 mm**, and the
+counterbore caption's lowest glyph `y142.5728` by **16.5728 mm**.
+
+Select the **315-degree outer-rim point**, derived from the unchanged bore
+radius: **`(173.367596,201.632404)` mm**. Do not retain the left pick when
+moving the note right, or use the bottom-axis pick beside the centre-mark
+tail. For a predicted left-side text exit `(190,109.6)`, the off-axis shaft
+clears the lower centre-mark end `(170,200)` by **3.6042 mm** and the
+right-lower mark end `(178.214,192)` by **3.0561 mm**. Its nearest carriage
+counterbore rim clearance is **3.8288 mm**; the complete leader/arrow must
+retain at least **1 mm** clearance from **all four** counterbores.
+
+The offline route regression retains actual B-B, dimension/extension,
+carriage-leader and centre-mark segments. In particular, the lower
+BlockWidth/BlockSideY witness at `y184.934` starts at **x191.828**, not at the
+bore. The predicted shaft crosses the part's bottom outline there at
+**x176.3854**: an allowed feature-outline crossing, not a dimension crossing.
+At `y192`, the shaft is at **x175.1084**, left of the carriage-position
+witness's **x188.786** start. TopBoreDepth ink ends below `y98.4438`;
+the side-height and B-B floor dimensions are well to the right.
+
+The same view-owned, single attached note and single-arrow checks remain;
+every stroke must stay outside the bore disk. The geometry calculation and
+synthetic regression are not native proof of where SolidWorks will choose
+the text exit. The existing section/leader audit and the unchanged PDF
+glyph guard must still accept the regenerated sheet. Creation and settled
+readback retain the generated/resolved text, sources and actual geometry.
 
 TL-32 keeps its original presentation; neither part nor any spec changes.
 The shared helper re-keys only pivot/feed drawings and their reviews.
 Parent validation must inspect the four-line native/PDF text, fit band,
-normal height, actual lane extent and unchanged one-leader route. The
+normal height, actual lane extent and the relocated one-leader route. The
 offline estimate is not a claim of a final native pass.
 
 ### TL-21 assembly-HUB reference lanes

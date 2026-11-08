@@ -397,21 +397,108 @@ def test_generated_pivot_text_refuses_wrong_units_and_inverted_band():
         drawing._pivot_stack_text(contract)
 
 
-def test_compact_pivot_estimate_retains_margin_inside_the_unchanged_native_lane():
+def test_compact_pivot_estimate_retains_margin_in_measured_lower_right_lane():
     import _oblique_block_drawing as drawing
 
     text = drawing._pivot_stack_text(spec)
     box = drawing._pivot_stack_estimate(text)
-    assert box.mm() == pytest.approx((24.0, 203.7, 141.5, 226.0))
-    assert drawing.PIVOT_STACK_LANE == (.020, .182, .145, .230)
+    assert box.mm() == pytest.approx((189.0, 103.7, 306.5, 126.0))
+    assert drawing.PIVOT_STACK_LANE == (.185, .100, .312, .130)
     left, bottom, right, top = drawing.PIVOT_STACK_LANE
-    assert min(box.xmin - left, box.ymin - bottom, right - box.xmax, top - box.ymax) == pytest.approx(.0035)
+    assert min(box.xmin - left, box.ymin - bottom, right - box.xmax, top - box.ymax) == pytest.approx(.0037)
     # The estimator uses one cap-height per glyph, 1.6-height row pitch,
-    # plus 1 mm all-round padding. Native GetExtent remains the real gate.
+    # plus 1 mm all-round padding. Exported PDF glyphs remain the real gate.
     with pytest.raises(RuntimeError, match='lane margin'):
         drawing._pivot_stack_estimate(text.replace('SHOULDER', 'SHOULDER' + 'W' * 20))
     with pytest.raises(RuntimeError, match='four short lines'):
         drawing._pivot_stack_estimate(text + '\nEXTRA ROW')
+
+
+@pytest.mark.parametrize('start_y_mm', (103.7, 109.6, 126.0))
+def test_lower_right_pivot_route_clears_retained_389_annotation_ink(start_y_mm):
+    import _oblique_block_drawing as drawing
+    from _drawing_layout_check import LeaderSegment, _proper_crossing
+
+    # Native389 / 0e989113 pivot layout report: actual sheet-mm segments.
+    # The retired native192 leader is the positive crossing control.
+    cut_b = LeaderSegment('B-B', 'section', .157, .168934, .157, .259)
+    retired = LeaderSegment('native192', 'note', .1042, .2096, .1652, .205)
+    assert _proper_crossing(retired, cut_b, tol=1e-9) == pytest.approx((.157, .2056183607))
+    offset = spec.BORE_DIA / (2000 * math.sqrt(2))
+    tip = (drawing.PLAN_XY[0] + offset, drawing.PLAN_XY[1] - offset)
+    start = (drawing.PIVOT_STACK_XY[0], start_y_mm / 1000)
+    shaft = LeaderSegment('candidate', 'note', *start, *tip)
+    length = math.dist(start, tip)
+    direction = tuple((a - b) / length for a, b in zip(start, tip))
+    triangle = drawing.arrowhead_segments(
+        (*tip, 0.0, *direction, 0.0, .003556, .000762, 0.0, 0.0, 0.0, 1.0))
+    route = [shaft, *(LeaderSegment('arrow', 'note', edge.x0, edge.y0, edge.x1, edge.y1)
+                      for edge in triangle)]
+    recorded_mm = (
+        ('A-A', 145.172, 205, 194.828, 205),
+        ('PlanBoreX witness', 170, 213.2625, 170, 229.2219),
+        ('BlockLength left witness', 149.172, 185.934, 149.172, 254.5),
+        ('BlockLength right witness', 190.828, 185.934, 190.828, 254.5),
+        ('BlockWidth/SideY lower witness', 191.828, 184.934, 260.5, 184.934),
+        ('BlockWidth upper witness', 191.828, 225.066, 260.5, 225.066),
+        ('BlockWidth lower dimension', 259.5, 184.934, 259.5, 194.6656),
+        ('BlockWidth upper dimension', 259.5, 225.066, 259.5, 211.3344),
+        ('BlockSideY dimension', 231, 184.934, 231, 217.2219),
+        ('Y station witness', 178.2625, 205, 232, 205),
+        ('CarriageDrills3Y witness', 188.786, 192, 223, 192),
+        ('CarriageDrills3Y lower dimension', 222, 192, 222, 195.7219),
+        ('CarriageDrills3Y upper dimension', 222, 205, 222, 201.2781),
+        ('CarriageDrills4Y witness', 188.786, 218, 223, 218),
+        ('drill leader', 155.7679, 190.0745, 136.2924, 159.6389),
+        ('drill diameter line', 158.2321, 193.9255, 155.7679, 190.0745),
+        ('drill shoulder', 136.2924, 159.6389, 35.2951, 159.6389),
+        ('counterbore leader', 184.9007, 188.5522, 210.7628, 141.6389),
+        ('counterbore diameter line', 181.0993, 195.4478, 184.9007, 188.5522),
+        ('counterbore shoulder', 210.7628, 141.6389, 277.6497, 141.6389),
+        ('TopBoreDepth top witness', 173.7625, 92.192, 119, 92.192),
+        ('TopBoreDepth floor witness', 173.7625, 83.0734, 119, 83.0734),
+        ('TopBoreDepth dimension', 120, 83.0734, 120, 92.192),
+        ('TopBoreDepth leader', 120, 87.6327, 113.8701, 98.4438),
+        ('TopBoreDepth shoulder', 113.8701, 98.4438, 42.1299, 98.4438),
+        ('BlockHeight right witness', 312.192, 183.934, 312.192, 172.2219),
+        ('BlockHeight left witness', 287.808, 183.934, 287.808, 172.2219),
+        ('BlockHeight dimension', 312.192, 173.2219, 287.808, 173.2219),
+        ('CboreFloor right witness', 347.192, 138.786, 347.192, 148.6656),
+        ('CboreFloor left witness', 332.714, 138.786, 332.714, 148.6656),
+        ('CboreFloor dimension/shoulder', 332.714, 147.6656, 410.0295, 147.6656),
+        ('centre lower tail', 170, 200, 170, 197.7375),
+        ('centre right tail', 175, 205, 177.2625, 205),
+        ('lower-right centre left tail', 180.5, 192, 178.214, 192),
+        ('lower-right centre vertical', 183, 187.214, 183, 196.786),
+        ('lower-left centre right tail', 159.5, 192, 161.786, 192),
+    )
+    recorded = [cut_b, *(LeaderSegment(label, 'annotation', *(v / 1000 for v in coordinates))
+                         for label, *coordinates in recorded_mm)]
+    for segment in route:
+        for obstacle in recorded:
+            assert _proper_crossing(segment, obstacle, tol=1e-9) is None, obstacle.label
+        # Centre marks need real air, not merely a non-crossing predicate.
+        for obstacle in recorded[-5:]:
+            a, b = (segment.x0, segment.y0), (segment.x1, segment.y1)
+            c, d = (obstacle.x0, obstacle.y0), (obstacle.x1, obstacle.y1)
+            assert min(drawing._segment_distance(a, c, d), drawing._segment_distance(b, c, d),
+                       drawing._segment_distance(c, a, b), drawing._segment_distance(d, a, b)) > .001
+        for x, y in spec.BOLT_POINTS:
+            centre = (drawing.PLAN_XY[0] + x / 1000, drawing.PLAN_XY[1] + y / 1000)
+            assert drawing._segment_distance(centre, (segment.x0, segment.y0),
+                                             (segment.x1, segment.y1)) >= spec.CBORE_DIA / 2000 + .001
+    # All remaining plan X-size/ordinate lines are ABOVE the entire route.
+    assert max(segment.y0 for segment in route) < .2132625
+    assert max(segment.y1 for segment in route) < .2132625
+    # Crossing the part's bottom outline is allowed: it is not the
+    # BlockWidth/BlockSideY extension, which starts at x191.828.
+    outline = LeaderSegment('part outline', 'geometry', .149172, .184934, .190828, .184934)
+    crossing = _proper_crossing(shaft, outline, tol=1e-9)
+    assert crossing is not None and crossing[0] < .191828
+    box = drawing._pivot_stack_estimate(drawing._pivot_stack_text(spec))
+    assert box.ymin - .097780 == pytest.approx(.00592)  # A-A view outline
+    assert .317220 - box.xmax == pytest.approx(.01072)  # B-B view outline
+    assert .1425728 - box.ymax == pytest.approx(.0165728)  # existing counterbore caption
 
 
 def _stacked_pivot_fixture(monkeypatch):
@@ -421,7 +508,11 @@ def _stacked_pivot_fixture(monkeypatch):
 
     plan, outer, inner = object(), object(), object()
     origin = drawing.PLAN_XY
-    landing = (origin[0] - spec.BORE_DIA / 2000, origin[1])
+    rim_offset = spec.BORE_DIA / (2000 * math.sqrt(2))
+    landing = (origin[0] + rim_offset, origin[1] - rim_offset)
+    start = (drawing.PIVOT_STACK_XY[0], drawing.PIVOT_STACK_XY[1] - .0154)
+    length = math.dist(start, landing)
+    direction = tuple((a - b) / length for a, b in zip(start, landing))
     source_rows, displays = {}, {}
     for name, feature in (
         ('BoreDia', 'TopBoreProfile'), ('TopBoreDepth', 'TopBore'), ('TapDrillDia', 'PivotTapProfile'),
@@ -454,8 +545,8 @@ def _stacked_pivot_fixture(monkeypatch):
     native = SimpleNamespace(
         Visible=1, OwnerType=0, Owner=plan, position=(*drawing.PIVOT_STACK_XY, 0.0),
         leaders=1, attached=outer, dangling=False,
-        points=(.130, origin[1], 0.0, *landing, 0.0),
-        arrow=(*landing, 0.0, -1.0, 0.0, 0.0, .002, .001, 0.0, 0.0, 0.0, 1.0),
+        points=(*start, 0.0, *landing, 0.0),
+        arrow=(*landing, 0.0, *direction, 0.0, .003556, .000762, 0.0, 0.0, 0.0, 1.0),
         arrow_count=1, font=SimpleNamespace(CharHeight=.005),
     )
     native.GetPosition = lambda: native.position
@@ -521,7 +612,8 @@ def _stacked_pivot_fixture(monkeypatch):
     'missing_band', 'rounded_band', 'negative_band', 'printed_places', 'missing_diameter', 'note_height',
     'source_identity', 'source_feature', 'source_value', 'source_precision', 'source_band', 'source_tokens',
     'source_position', 'source_shown', 'depth_hidden', 'wrong_owner', 'hidden_note', 'note_position',
-    'two_leaders', 'wrong_attachment', 'inner_tip', 'centre_crossing', 'upper_left_crossing',
+    'two_leaders', 'wrong_attachment', 'inner_tip', 'centre_crossing',
+    'upper_left_crossing', 'upper_right_crossing', 'lower_left_crossing', 'lower_right_crossing',
     'arrow_inside', 'two_arrows', 'malformed_arrow',
 ))
 def test_generated_pivot_callout_preserves_native_sources_and_outside_route(monkeypatch, fault):
@@ -529,7 +621,7 @@ def test_generated_pivot_callout_preserves_native_sources_and_outside_route(monk
     proof = case.drawing._stack_pivot_callout(case.adapter, case.plan, [], spec)
     assert len(case.inserted) == 1 and len(case.rebuilds) == 2
     assert case.native.font.CharHeight == case.drawing.PIVOT_NOTE_HEIGHT
-    assert case.reports[0]['estimated_text_bounds_mm'] == pytest.approx((24.0, 203.7, 141.5, 226.0))
+    assert case.reports[0]['estimated_text_bounds_mm'] == pytest.approx((189.0, 103.7, 306.5, 126.0))
     tap = case.rows['TapDrillDia']
     if fault == 'unicode_crlf':
         case.note.text = case.note.text.replace('<MOD-DIAM>', 'Ø').replace('<HOLE-DEPTH>', '↧').replace('\n', '\r\n')
@@ -574,22 +666,26 @@ def test_generated_pivot_callout_preserves_native_sources_and_outside_route(monk
     elif fault == 'hidden_note':
         case.native.Visible = 3
     elif fault == 'note_position':
-        case.native.position = (.026, .225, 0.0)
+        case.native.position = (case.native.position[0] + .001, *case.native.position[1:])
     elif fault == 'two_leaders':
         case.native.leaders = 2
     elif fault == 'wrong_attachment':
         case.native.attached = case.inner
     elif fault == 'inner_tip':
-        inner = (case.origin[0] - spec.PIVOT_TAP_DRILL / 2000, case.origin[1])
+        offset = spec.PIVOT_TAP_DRILL / (2000 * math.sqrt(2))
+        inner = (case.origin[0] + offset, case.origin[1] - offset)
         case.native.points = (*case.native.points[:3], *inner, 0.0)
         case.native.arrow = (*inner, *case.native.arrow[2:])
     elif fault == 'centre_crossing':
         case.native.points = (*case.origin, 0.0, *case.landing, 0.0)
-    elif fault == 'upper_left_crossing':
-        obstacle = (case.origin[0] - spec.BOLT_X / 1000, case.origin[1] + spec.BOLT_Y / 1000)
+    elif fault in ('upper_left_crossing', 'upper_right_crossing', 'lower_left_crossing', 'lower_right_crossing'):
+        sx = -1 if 'left' in fault else 1
+        sy = 1 if 'upper' in fault else -1
+        obstacle = (case.origin[0] + sx * spec.BOLT_X / 1000, case.origin[1] + sy * spec.BOLT_Y / 1000)
         case.native.points = (*obstacle, 0.0, *case.landing, 0.0)
     elif fault == 'arrow_inside':
-        case.native.arrow = (*case.native.arrow[:3], 1.0, *case.native.arrow[4:])
+        case.native.arrow = (*case.native.arrow[:3], -case.native.arrow[3], -case.native.arrow[4],
+                             *case.native.arrow[5:])
     elif fault == 'two_arrows':
         case.native.arrow_count = 2
     elif fault == 'malformed_arrow':
@@ -689,16 +785,18 @@ def test_pivot_exported_pdf_rows_gate_real_text_not_leader_extent(monkeypatch, f
     from _pdf_ink import PageInk, Span, Stroke, page_ink
 
     rows = drawing._pivot_stack_text(spec).splitlines()
-    texts = [{'t': row, 'pos': [.025, .225 - index * .0056, 0.0],
+    offset = spec.BORE_DIA / (2000 * math.sqrt(2))
+    landing = (drawing.PLAN_XY[0] + offset, drawing.PLAN_XY[1] - offset)
+    texts = [{'t': row, 'pos': [.190, .125 - index * .0056, 0.0],
               'h': .0035, 'ref': 0}
              for index, row in enumerate(rows)]
     spans = [
-        Span(ink_key(row), .025, .2215 - index * .0056,
-             .125, .225 - index * .0056, ())
+        Span(ink_key(row), .190, .1215 - index * .0056,
+             .290, .125 - index * .0056, ())
         for index, row in enumerate(rows)
     ]
-    # Exact e4a597af whole-note extent is outside the text lane. It contains
-    # the leader, and must not replace the exported glyph measurement.
+    # Historical e4a597af whole-note extent is deliberately retained: it must
+    # never replace the relocated exported glyphs/independent leader proof.
     note = {
         'type': 6, 'name': 'PivotStack', 'visible': 1, 'owner_type': 0,
         'note': {'text': '\n'.join(rows), 'balloon': False, 'extent': [
@@ -706,16 +804,16 @@ def test_pivot_exported_pdf_rows_gate_real_text_not_leader_extent(monkeypatch, f
             .1649071638795986, .22500577257525084, -1.5907173098783955e-15,
         ]},
         'display': {'texts': texts},
-        'leaders': [[.130, .205, 0.0, .1652375, .205, 0.0]],
+        'leaders': [[.190, .1096, 0.0, *landing, 0.0]],
     }
     annotations = [note]
-    strokes = [Stroke(.130, .205, .1652375, .205, .00013, (0, 0, 0), False, False, True)]
+    strokes = [Stroke(.190, .1096, *landing, .00013, (0, 0, 0), False, False, True)]
     if fault == 'split_symbols':
         first = spans.pop(0)
         spans[:0] = [
-            replace(first, text='REAM', xmax=.034),
-            replace(first, text='.3750+.0015/+.0010', xmin=.037, xmax=.083),
-            replace(first, text='.359', xmin=.086, xmax=.098),
+            replace(first, text='REAM', xmax=.199),
+            replace(first, text='.3750+.0015/+.0010', xmin=.202, xmax=.248),
+            replace(first, text='.359', xmin=.251, xmax=.263),
         ]
     elif fault == 'unordered_display':
         texts.reverse()
@@ -726,7 +824,7 @@ def test_pivot_exported_pdf_rows_gate_real_text_not_leader_extent(monkeypatch, f
     elif fault == 'wrong_value':
         spans[0] = replace(spans[0], text=spans[0].text.replace('.3750', '.3751'))
     elif fault == 'text_outside':
-        spans[0] = replace(spans[0], xmax=.150)
+        spans[0] = replace(spans[0], xmax=.320)
     elif fault == 'other_text':
         spans.append(replace(spans[0], text='FOREIGN TEXT'))
         annotations.append({
@@ -735,7 +833,7 @@ def test_pivot_exported_pdf_rows_gate_real_text_not_leader_extent(monkeypatch, f
             'display': {'texts': [{**texts[0], 't': 'FOREIGN TEXT'}]},
         })
     elif fault == 'model_edge':
-        strokes.append(Stroke(.020, .223, .130, .223, .00035, (0, 0, 0), False, False, True))
+        strokes.append(Stroke(.185, .123, .295, .123, .00035, (0, 0, 0), False, False, True))
     elif fault == 'duplicate_note':
         annotations.append({**note, 'name': 'DuplicatePivot'})
     page = PageInk(.4318, .2794, (), tuple(spans), tuple(strokes))
@@ -744,7 +842,7 @@ def test_pivot_exported_pdf_rows_gate_real_text_not_leader_extent(monkeypatch, f
         'width': page.width, 'height': page.height,
         'zone': dict.fromkeys(('left', 'right', 'bottom', 'top'), .0127),
         'title_block': [.216, 0.0, page.width, .066],
-        'views': [{'name': 'Plan', 'outline': [.015, .170, .195, .240],
+        'views': [{'name': 'Plan', 'outline': [.015, .070, .318, .240],
                    'annotations': annotations}],
         'sheet_annotations': [], 'tables': [], 'read_errors': {},
         'ink': page_ink(page),
