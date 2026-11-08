@@ -5,15 +5,17 @@ actual hole edges and X/Y from the plate's lower-left corner (owner review
 2026-11-07, rule 10: a corner an edge finder picks up, never a hole centre)
 at .XXX under the title block. The holes whose stacks assume a station from
 A1 hold that relation at ±.005 in flagged NOTE 2; A2/B2 Y keeps the flagged
-.964 ±.002 from the A1-B1 axis line (NOTE 1). The table's SIZE column is
-hidden: every size is its sheet-1 callout. The HUB is not in the table: that
-ordinary #8-32 tap is drilled and tapped at assembly (MHA-CH-06-TL-00 step
-10). No chained hole-location dimensions remain.
+.964 ±.002 from the A1-B1 axis line (NOTE 1). The table's generated SIZE
+column is hidden: each row's NOTE cell carries its size and process. The HUB
+is not in the table: that ordinary #8-32 tap is drilled and tapped at
+assembly (MHA-CH-06-TL-00 step 10). No chained hole-location dimensions
+remain.
 
 The CARRIER sheet keeps the outline, the reamed size and its running fit,
-the native tap callouts and section A-A (3:1, cropped to and identified as
-A1, carrying the finished thickness and underside chamfer; its cutting plane
-a short whole line across A1 alone, rule 9); the shaded isometric stands
+the native tap callouts, each naming its mate, and section A-A (3:1,
+labelled SECTION A-A, HOLE A1 and cropped to A1's slab, carrying the
+finished thickness and underside chamfer; its cutting plane a short whole
+line across A1 alone, rule 9); the shaded isometric stands
 above the title block. The HOLE TABLE sheet holds the twelve-row table and
 its tagged plan. The HUB CLAMP sheet carries the HUB tap's native callout,
 which says it is drilled and tapped at assembly, and its position from A1 as
@@ -37,6 +39,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     visible_component_entities,
 )
 
+import _config
 from _check import check
 from _com import _early_bound
 from _drawing_common import (
@@ -63,7 +66,7 @@ from ch_rocker_arm_tl_oblique_callouts import (
     CALLOUT_PLACES,
     set_callout_lengths_to_three_places,
 )
-from _drawing_notes import add_note, add_property_linked_note
+from _drawing_notes import add_property_linked_note
 from _oblique_carrier_hole_table import (
     A1_RELATED,
     create_carrier_hole_table,
@@ -205,6 +208,9 @@ SECTION_CROP_MODEL_MM = (
     (_A1[0] - _SECTION_HALF, -part_spec.THICKNESS - 1.0, 0.0),
     (_A1[0] + _SECTION_HALF, 1.0, 0.0),
 )
+# The most a cropped outline's width runs past its fence's (sheet m): the
+# measured margins, +19 to +25.6 mm (_crop_section), and room besides.
+_CROP_OUTLINE_SLACK_M = 0.040
 # Machinist review mr4: the cropped slab's square hatch ends read as the
 # part's own ends. A long-break line (thin, one Z: draw_fr_nameplate's
 # SECTION_BREAK) stands on each crop edge across the cut, past the top and
@@ -268,37 +274,52 @@ IMPORTED_PRECISION: dict[str, int] = {
     if name not in TABLE_ROW_DIMENSIONS
 }
 # Top centre of the caption: left of the thickness text, level with the slab.
-SECTION_CAPTION_XY = (0.043, 0.052)
-# Machinist review 43452045 (r2/r3 clarity): at (20, 83) the A1-only note
-# stood apart from A-A and the 20.5's left extension line (x 91.8) struck its
-# "NOT". Its top-left now stands directly under the caption (whose glyphs end
-# at y 37.3), its two rows (the old row's 94.7 mm over 35 characters: ~51.5
-# mm) inside the clear slot x 14..75, y 14..35 (R4NativeEye, 43452045 PDF):
+# Its three rows (SECTION A-A, / HOLE A1 / SCALE 3 : 1, the old two rows'
+# ~46 mm wide, ~8.2 mm a row) stand ~20..66 x 28..52 sheet mm, in the slot
+# the A1-only note held (x 14..75, y 14..35, R4NativeEye at 43452045):
 # clear of the thickness lane (x >= 78), the slab and the bottom border.
-SECTION_NOTE = "A1 ONLY — OTHER PIN\nHOLES NOT SHOWN"
-SECTION_NOTE_XY = (0.020, 0.0335)
+SECTION_CAPTION_XY = (0.043, 0.052)
+# Machinist review r7: the view's own label names the hole it cuts
+# ("SECTION A-A, HOLE A1"), replacing the separate A1-only note.
+SECTION_CAPTION_HOLE = "HOLE A1"
+# B landscape's inner border and the title block's corner (sheet m): the
+# cropped A-A and its dimensions stand inside the one, clear of the other.
+SHEET_INNER_BORDER = (0.0127, 0.0127, 0.4191, 0.2667)
+TITLE_BLOCK = (0.2159, 0.0127, 0.4191, 0.0651)
+
+# Each tap callout's mate, named once (rule 4; machinist review r7): the
+# mating part's number and what the screws hold, no assembly instruction.
+FEED_LEVER_NUMBER = _config.parts("ch-rocker-arm-tl-oblique-feed-lever")["number"]
+END_CLAMP_TAP_TEXT = f"CLAMPS {part_spec.STRAP_NUMBER}"
+RISER_TAP_TEXT = f"HOLDS {part_spec.RISER_NUMBER} SCREWS"
+LEVER_TAP_TEXT = f"HOLDS {FEED_LEVER_NUMBER}\n{part_spec.LEVER_TAP_CALLOUT}"
+# CL and CR are one size: one callout on CL counts both (rule 10, machinist
+# review r7); the HOLE TABLE locates CR.
+END_CLAMP_COUNT = len(part_spec.END_CLAMPS)
 
 # Sheet metres: each callout block's centre; its leader lands on the near end
-# of the first line. CR up-right into the margin right of the plate, its
-# four rows (the native two and END_CLAMP_TAP_CALLOUT's two, mr4) ~219..241;
-# CL up-right into the free band over the +Y edge, its four rows ~220..242
-# (x ~215..265), left of the riser leader; the risers from the outermost +X
-# screw straight up, their four rows (the native two and RISER_TAP_CALLOUT's
-# two) ~238..258, under the border; the feed lever (the -Y hole) down-left,
-# its three rows (with LEVER_TAP_CALLOUT) under the plate.
-CR_CALLOUT_XY = (0.377, 0.230)
+# of the first line. CL up-right into the free band over the +Y edge, its
+# three rows (the native two, the first now "2X", and END_CLAMP_TAP_TEXT)
+# ~222..240 (x ~215..265), left of the riser leader; the risers from the
+# outermost +X screw straight up, their three rows (the native two and
+# RISER_TAP_TEXT) ~241..255, under the border; the feed lever (the -Y hole)
+# down-left, its four rows (with LEVER_TAP_TEXT) under the plate.
 CL_CALLOUT_XY = (0.240, 0.231)
 # The riser callout 2 mm right of jig-r10's 0.310: its leader from riser
 # screw 4 then passes clear right of the CL callout.
 RISER_CALLOUT_XY = (0.312, 0.248)
-# The lever callout 2.5 mm right of 0.179 (round 8): its bottom row and
-# shoulder stand at sheet x ~147..218, under the plate.
-LEVER_CALLOUT_XY = (0.1815, 0.143)
+# The lever callout 2.5 mm right of 0.179 (round 8), its rows and shoulder
+# at sheet x ~147..218 under the plate; 2 mm lower than its three-row 0.143
+# (round 8) for the mate's row, so its top row keeps ~2.5 mm under the
+# plate's lower edge (152.6).
+LEVER_CALLOUT_XY = (0.1815, 0.141)
 # The HUB CLAMP sheet: the HUB tap's callout up-right of it, above the plate
-# (sheet x ~237..291, y ~225..247), its leader from the tap (sheet ~222, 198).
+# (sheet x ~237..291; its five rows ~222..250, clear of the plate's 217.4
+# and the border), its leader from the tap (sheet ~222, 198).
 HUB_CALLOUT_XY = (0.264, 0.236)
 # The HUB tap is drilled and tapped at assembly (TL-00 step 10; farm 82129
-# machinist review): its callout says so, and its position from A1 prints
+# machinist review): its callout names its mate first (rule 4, machinist
+# review r7), then says so, and its position from A1 prints
 # only as two parenthesized REFERENCE dimensions between the actual A1 and
 # HUB edges. Keep both text and dimension lines outside the plate (rule 14):
 # X is 18 paper mm below its lower edge, Y is 28 paper mm past its right edge.
@@ -310,7 +331,9 @@ HUB_CALLOUT_XY = (0.264, 0.236)
 # rule 10: one datum per view): this sheet's one view has one datum, A1's
 # real bore, the same one NOTE 2 relates the pin pattern to; TL-00 step 10
 # alone locates the HUB, so these are REF and control nothing.
-HUB_TAP_NOTE = "DRILL AND TAP AT ASSEMBLY\nTL-00 STEP 10"
+HUB_TAP_NOTE = (
+    f"CLAMPS {part_spec.STRAP_NUMBER} HUB\nDRILL AND TAP AT ASSEMBLY\nTL-00 STEP 10"
+)
 # No SetPrecision3: a sheet may only pass a *_spec DRAWING_REFERENCE_PRECISION
 # (_drawing_contract), and the part spec is not edited for this drawing-only
 # change, so the references print at the document's own linear places.
@@ -561,7 +584,7 @@ requirement(
         ),
         "note": (
             " ".join(HUB_TAP_NOTE.splitlines()),
-            (("draw_ch_rocker_arm_tl_oblique_carrier", "HUB_TAP_NOTE"),),
+            (("draw_ch_rocker_arm_tl_oblique_carrier", "HUB_TAP_NOTE"), "STRAP_NUMBER"),
         ),
     },
     precision={"dia": _CALLOUT_PLACES},
@@ -754,6 +777,52 @@ def _append_callout_below(display: Any, text: str, *, label: str) -> None:
         )
 
 
+_INSTANCE_COUNT = re.compile(r"<NUM_INST>X\s*")
+_PRINTED_COUNT = re.compile(r"^\s*(\d+)X\s", re.MULTILINE)
+
+
+def counted_definitions(definitions: dict[int, str], count: int) -> dict[int, str]:
+    """A one-hole native callout's text parts counting ``count`` like holes:
+    its instance-count field, if it has one, becomes the literal count;
+    otherwise the count leads the drill row (the row carrying <MOD-DIAM>)."""
+    if set(definitions) != {5, 6, 7, 8}:
+        raise RuntimeError(f"unexpected hole-callout parts: {definitions!r}")
+    fields = [part for part, text in definitions.items() if "<NUM_INST>" in text]
+    if fields:
+        if len(fields) != 1 or len(_INSTANCE_COUNT.findall(definitions[fields[0]])) != 1:
+            raise RuntimeError(f"hole callout lacks one instance count: {definitions!r}")
+        (part,) = fields
+        text = _INSTANCE_COUNT.sub(f"{count}X ", definitions[part], count=1)
+    else:
+        drills = [part for part, text in definitions.items() if "<MOD-DIAM>" in text]
+        if len(drills) != 1 or definitions[drills[0]].count("<MOD-DIAM>") != 1:
+            raise RuntimeError(f"hole callout lacks one drill row: {definitions!r}")
+        (part,) = drills
+        text = definitions[part]
+        start = text.rfind("\n", 0, text.index("<MOD-DIAM>")) + 1
+        text = f"{text[:start]}{count}X {text[start:]}"
+    return {**definitions, part: text}
+
+
+def _count_callout(display: Any, count: int, *, label: str) -> None:
+    """Count ``count`` like holes on one native callout (rule 10: one size,
+    one callout), written through the parts ``_strip_thread_class`` edits and
+    read back: exactly one printed row leads with the count."""
+    native = _early_bound(display, "IDisplayDimension")
+    definitions = {part: str(native.GetText(part) or "") for part in (5, 6, 7, 8)}
+    updated = counted_definitions(definitions, count)
+    for definition_part, writable_part in ((5, 1), (6, 2), (7, 3), (8, 4)):
+        if updated[definition_part] != definitions[definition_part]:
+            native.SetText(writable_part, updated[definition_part])
+    persisted = {part: str(native.GetText(part) or "") for part in (5, 6, 7, 8)}
+    resolved = "\n".join(str(native.GetText(part) or "") for part in (1, 2, 3, 4))
+    if persisted != updated or _PRINTED_COUNT.findall(resolved) != [str(count)]:
+        raise RuntimeError(
+            f"{label} does not print {count}X once: definitions={persisted!r}, "
+            f"resolved={resolved!r}"
+        )
+
+
 def _view_mapper(adapter: Any, view: Any):
     """Return model point (mm) -> sheet xy (m) through the view's transform."""
     transform = _early_bound(
@@ -829,51 +898,70 @@ def _hatch_counts(native: Any) -> tuple[int, ...]:
     return (int(native.GetFaceHatchCount()), *(int(value) for value in solid))
 
 
+def _section_line(section: Any) -> tuple[float, ...]:
+    """A-A's cutting line as IDrSection GetLineInfo reports it."""
+    definition = _early_bound(_early_bound(section, "IView").GetSection(), "IDrSection")
+    reported = tuple(float(value) for value in definition.GetLineInfo())
+    if len(reported) != 6 or not all(map(math.isfinite, reported)):
+        raise RuntimeError(f"carrier section A-A: unreadable cutting line {reported!r}")
+    return reported
+
+
+def _set_section_line(
+    adapter: Any, section: Any, line: tuple[float, ...], *, partial: bool, label: str
+) -> None:
+    """Draw A-A's cutting line through ``line`` (GetLineInfo's frame), partial
+    or full, and read back: the mode, the line in either direction and a cut
+    that still hatches. The partial cut spans A1 alone, so its piece count
+    may differ from the long cut's; the proof is a hatched cut face."""
+    native = _early_bound(section, "IView")
+    definition = _early_bound(native.GetSection(), "IDrSection")
+    reported = _section_line(section)
+    before = _hatch_counts(native)
+    definition.SetPartialSection(partial)  # void put: read back below
+    if not definition.SetLineInfo(double_array(list(line))):
+        raise RuntimeError(f"carrier section A-A refused its {label} cutting line")
+    rebuild_drawing(adapter, label=f"carrier section A-A {label} line")
+    if bool(definition.GetPartialSection()) != partial:
+        raise RuntimeError(f"carrier section A-A {label} line: partial is not {partial}")
+    applied = _section_line(section)
+    after = _hatch_counts(native)
+    _telemetry.info(
+        f"carrier section A-A {label} line {reported!r} -> {applied!r} (asked "
+        f"{line!r}); face/solid hatches {before} -> {after}"
+    )
+    if not any(
+        all(abs(a - b) <= 1e-8 for a, b in zip(applied, wanted))
+        for wanted in (line, line[3:] + line[:3])
+    ):
+        raise RuntimeError(f"carrier section A-A {label} line did not persist: {applied!r}")
+    if after[0] < 1:
+        raise RuntimeError(f"carrier section A-A lost its cut: hatches {before} -> {after}")
+
+
 def _shorten_section_line(
-    adapter: Any, top: Any, section: Any, annotations: list[Any]
+    adapter: Any, top: Any, section: Any, annotations: list[Any], full: tuple[float, ...]
 ) -> None:
     """Shorten A-A's drawn line to SECTION_SHORT_X, across A1 alone (rule 9),
-    once the long line has cut, imported and been cropped. IDrSection
+    once the long line ``full`` has cut, imported and been cropped. IDrSection
     SetLineInfo takes the frame GetLineInfo reports, so the new ends are the
     old line interpolated at their carrier X. A full section whose line
     stops inside the plate cuts nothing (old-base farm r2 at 6dc18abb3d: face
     hatches 3 -> 0), so the section becomes partial first (draw_fr_nameplate's
-    A-A is a partial cut on a short line). Read back: partial, the line
-    persists, the cut still hatches and its dimensions stay visible."""
-    native = _early_bound(section, "IView")
-    definition = _early_bound(native.GetSection(), "IDrSection")
-    reported = tuple(float(value) for value in definition.GetLineInfo())
-    if len(reported) != 6 or not all(map(math.isfinite, reported)):
-        raise RuntimeError(f"carrier section A-A: unreadable cutting line {reported!r}")
-    plus_x, minus_x = _section_line_frame(adapter, top, reported)
+    A-A is a partial cut on a short line). The view moves with the line's
+    midpoint (~250 model mm here), so the shortened view jumps off the sheet
+    (farm r7, 20261108T052002860Z: the section shortened after centring
+    printed empty, its dimensions at sheet x ~750..815 mm) and is centred
+    after this (_settle_section). Read back (_set_section_line), and its
+    dimensions stay visible."""
+    plus_x, minus_x = _section_line_frame(adapter, top, full)
     x0, x1 = _SECTION_LINE_X
     short = tuple(
         a + (x - x0) / (x1 - x0) * (b - a)
         for x in SECTION_SHORT_X
         for a, b in zip(plus_x, minus_x, strict=True)
     )
-    before = _hatch_counts(native)
-    definition.SetPartialSection(True)  # void put: read back below
-    if not definition.SetLineInfo(double_array(list(short))):
-        raise RuntimeError("carrier section A-A refused its short cutting line")
-    rebuild_drawing(adapter, label="carrier section A-A short line")
-    if not bool(definition.GetPartialSection()):
-        raise RuntimeError("carrier section A-A did not become a partial section")
-    applied = tuple(float(value) for value in definition.GetLineInfo())
-    after = _hatch_counts(native)
-    _telemetry.info(
-        f"carrier section A-A line {reported!r} -> {applied!r} (asked {short!r}); "
-        f"face/solid hatches {before} -> {after}"
-    )
-    if not any(
-        len(applied) == 6 and all(abs(a - b) <= 1e-8 for a, b in zip(applied, wanted))
-        for wanted in (short, short[3:] + short[:3])
-    ):
-        raise RuntimeError(f"carrier section A-A short line did not persist: {applied!r}")
-    # The partial cut spans A1 alone, so its piece count may differ from the
-    # long cut's; the proof is that it still hatches a cut face.
-    if after[0] < 1:
-        raise RuntimeError(f"carrier section A-A lost its cut: hatches {before} -> {after}")
+    _set_section_line(adapter, section, short, partial=True, label="short")
     hidden = [
         dimension_name(adapter, annotation)
         for annotation in annotations
@@ -975,9 +1063,10 @@ def _crop_section(adapter: Any, section: Any) -> None:
         f"{outline!r}, fence corners {sheet_corners!r}"
     )
     # The outline carries a margin past the fence (fr_nameplate r3: +19 mm on
-    # a 69 mm fence; jig-r8 here: +25.6 mm on 72 mm), so it is not held to
-    # the fence's width: the proof is that it still contains the fence and
-    # shrank from the 2.1 m full cut.
+    # a 69 mm fence; jig-r8 here: +25.6 mm on 72 mm; old-base n1: +22 mm on
+    # 54 mm), so it is not held to the fence's width: the proof is that it
+    # contains the fence within _CROP_OUTLINE_SLACK_M, whether the cut was
+    # the full line's or, re-cropped, the short partial line's.
     width = 2.0 * _SECTION_HALF * SECTION_SCALE[0] / SECTION_SCALE[1] / 1000.0
     fence_x = sorted(float(x) for x, _ in sheet_corners)
     fence_y = sorted(float(y) for _, y in sheet_corners)
@@ -991,7 +1080,7 @@ def _crop_section(adapter: Any, section: Any) -> None:
         status != 1
         or not bool(native.IsCropped())
         or not contains
-        or outline[2] - outline[0] > 0.25 * (before[2] - before[0])
+        or outline[2] - outline[0] > fence_x[-1] - fence_x[0] + _CROP_OUTLINE_SLACK_M
     ):
         raise RuntimeError(
             f"carrier section A-A did not crop to its {width * 1000.0:.1f} mm "
@@ -1124,6 +1213,97 @@ def _reposition_section_dimensions(
     return placed
 
 
+def _assert_section_on_sheet(adapter: Any, section: Any, annotations: list[Any]) -> None:
+    """Section A-A, cropped and hatched, with its dimensions, stands inside
+    the inner border and clear of the title block (farm r7,
+    20261108T052002860Z: shortened after centring, it printed off the sheet
+    and A-A's frame came out empty)."""
+    native = _early_bound(section, "IView")
+    native.UpdateViewDisplayGeometry()
+    outline = tuple(float(value) for value in native.GetOutline())
+    hatches = _hatch_counts(native)
+
+    def on_sheet(x0: float, y0: float, x1: float, y1: float) -> bool:
+        left, bottom, right, top = SHEET_INNER_BORDER
+        inside = left <= x0 and x1 <= right and bottom <= y0 and y1 <= top
+        return inside and not (x1 > TITLE_BLOCK[0] and y0 < TITLE_BLOCK[3])
+
+    texts = {
+        dimension_name(adapter, annotation): tuple(
+            float(value) for value in _early_bound(annotation, "IAnnotation").GetPosition()
+        )[:2]
+        for annotation in annotations
+    }
+    off = sorted(name for name, (x, y) in texts.items() if not on_sheet(x, y, x, y))
+    if not bool(native.IsCropped()) or hatches[0] < 1 or not on_sheet(*outline[:4]) or off:
+        raise RuntimeError(
+            f"carrier section A-A is not on the sheet: cropped {bool(native.IsCropped())}, "
+            f"hatches {hatches}, outline {outline!r}, dimensions off the sheet {off}, "
+            f"texts {texts!r}"
+        )
+    _telemetry.info(f"carrier section A-A outline {outline!r}, hatches {hatches}")
+
+
+def _settle_section(adapter: Any, section: Any, annotations: list[Any]) -> list[Any]:
+    """Once its line is final: cropped (again if the line change dropped the
+    crop), centred, its dimensions and the chamfer text placed again, and
+    proven on the sheet."""
+    if not bool(_early_bound(section, "IView").IsCropped()):
+        _telemetry.warn("carrier section A-A lost its crop with its line; cropping again")
+        _crop_section(adapter, section)
+    _centre_section(adapter, section)
+    annotations = _reposition_section_dimensions(adapter, section, annotations)
+    chamfer_text = model_point_in_view(
+        adapter, section, _metres(SECTION_CHAMFER_TEXT_MODEL_MM),
+        label="section A-A chamfer text",
+    )
+    offset_dimension_text(adapter, annotations, {"PinChamferSize": chamfer_text})
+    _assert_section_on_sheet(adapter, section, annotations)
+    return annotations
+
+
+def _section_caption(section: Any) -> tuple[Any, str]:
+    """A-A's native caption note and its linked view-label fields (found as
+    ``position_section_caption`` finds it: by its label field)."""
+    captions = []
+    for raw in _early_bound(section, "IView").GetNotes() or ():
+        note = _early_bound(raw, "INote")
+        linked_text = str(note.PropertyLinkedText or "")
+        if "<VLLABEL>" in linked_text:
+            captions.append((note, linked_text))
+    if len(captions) != 1:
+        raise RuntimeError(f"expected one native section A-A caption, found {len(captions)}")
+    return captions[0]
+
+
+def section_caption_text(linked_text: str) -> str:
+    """The native caption's linked text with the hole named after its label:
+    SECTION A-A, / HOLE A1 / the scale (machinist review r7)."""
+    if linked_text.count("<VLLABEL>") != 1 or SECTION_CAPTION_HOLE in linked_text:
+        raise RuntimeError(f"unexpected section A-A caption fields: {linked_text!r}")
+    newline = "\r\n" if "\r\n" in linked_text else "\n"
+    return linked_text.replace(
+        "<VLLABEL>", f"<VLLABEL>,{newline}{SECTION_CAPTION_HOLE}", 1
+    )
+
+
+def _label_section_hole(adapter: Any, section: Any) -> None:
+    """Name A1 in A-A's own caption, keeping its native label and scale
+    fields (draw_pd_transgear_arm ``_match_pin_section_caption``)."""
+    note, linked_text = _section_caption(section)
+    labelled = section_caption_text(linked_text)
+    note.PropertyLinkedText = labelled
+    rebuild_drawing(adapter, label="carrier section A-A caption hole")
+    if str(note.PropertyLinkedText or "") != labelled:
+        raise RuntimeError("carrier section A-A caption did not take its hole")
+
+
+def _assert_section_caption(section: Any) -> None:
+    _note, linked_text = _section_caption(section)
+    if "<VLLABEL>," not in linked_text or SECTION_CAPTION_HOLE not in linked_text:
+        raise RuntimeError(f"carrier section A-A caption lost its hole: {linked_text!r}")
+
+
 def _pin_section(adapter: Any, source_model: Any, top: Any) -> tuple[list[Any], Any]:
     """Full section A-A along the pin line, cropped to A1's slab, carrying the
     finished thickness and the chamfer leg, both from SectionReference.
@@ -1135,10 +1315,13 @@ def _pin_section(adapter: Any, source_model: Any, top: Any) -> tuple[list[Any], 
     partial cut imported nothing (carrier-diag); the line crosses the whole
     plate, so the cut closes (carrier r11). Curated before it is
     cropped (the cropped import dropped StockThick), then cropped (fr_nameplate
-    A-A), centred, and its dimensions placed again; then it is made partial
-    and its drawn line shortened across A1 alone (rule 9,
-    ``_shorten_section_line``), still while the sketch is shown. A section
-    shows no hidden lines.
+    A-A); then made partial and its drawn line shortened across A1 alone
+    (rule 9, ``_shorten_section_line``), still while the sketch is shown, and
+    only then centred and its dimensions placed again: shortening moves the
+    view (farm r7). Should the short partial line not settle on the sheet,
+    the full line across the plate is drawn again (still whole, rule 9) and
+    the view settled on it, with a warning. A section shows no hidden lines.
+    Its caption names the hole it cuts.
     """
     line = [
         model_point_in_view(adapter, top, _metres(point), label="section A-A line")
@@ -1172,19 +1355,22 @@ def _pin_section(adapter: Any, source_model: Any, top: Any) -> tuple[list[Any], 
             dimensions_by_feature=DRAWING_DIMENSIONS,
         )
         _crop_section(adapter, section)
-        _centre_section(adapter, section)
-        annotations = _reposition_section_dimensions(adapter, section, annotations)
-        chamfer_text = model_point_in_view(
-            adapter, section, _metres(SECTION_CHAMFER_TEXT_MODEL_MM),
-            label="section A-A chamfer text",
-        )
-        offset_dimension_text(adapter, annotations, {"PinChamferSize": chamfer_text})
-        _shorten_section_line(adapter, top, section, annotations)
+        full = _section_line(section)
+        try:
+            _shorten_section_line(adapter, top, section, annotations, full)
+            annotations = _settle_section(adapter, section, annotations)
+        except RuntimeError as error:
+            _telemetry.warn(
+                f"carrier section A-A: the short partial line did not settle ({error}); "
+                "drawing the full line across the plate"
+            )
+            _set_section_line(adapter, section, full, partial=False, label="full")
+            annotations = _settle_section(adapter, section, annotations)
     _sketch_section_breaks(adapter, section)
+    _label_section_hole(adapter, section)
     position_section_caption(
         adapter, section, SECTION_CAPTION_XY, label="carrier section A-A"
     )
-    add_note(adapter, SECTION_NOTE, *SECTION_NOTE_XY)
     return annotations, section
 
 
@@ -1385,20 +1571,18 @@ async def build(adapter: Any) -> dict[str, str]:
     _assert_ream_control(adapter, ream[0])
 
     # Native Hole Wizard callouts, no process words (the base bar's TL-20
-    # convention: "4X Ø2.26 THRU ALL / #4-40 UNC THRU ALL"); the CL/CR and
-    # riser taps add the function their stations serve (rule 4; machinist
-    # review mr3 for CR), the lever taps their full-thread shortfall (rule 20).
-    for label, xy, drill, (x, y), thread, function in (
-        *(
-            (
-                f"{key} clamp tap",
-                xy,
-                part_spec.CLAMP_TAP_DRILL,
-                part_spec.END_CLAMPS[key],
-                part_spec.CLAMP_THREAD,
-                part_spec.END_CLAMP_TAP_CALLOUT,
-            )
-            for key, xy in (("CL", CL_CALLOUT_XY), ("CR", CR_CALLOUT_XY))
+    # convention: "4X Ø2.26 THRU ALL / #4-40 UNC THRU ALL"), each naming its
+    # mate once (rule 4, machinist review r7); the lever taps add their
+    # full-thread shortfall (rule 20). CL's one callout counts CR too.
+    for label, xy, drill, (x, y), thread, function, count in (
+        (
+            "end clamp taps",
+            CL_CALLOUT_XY,
+            part_spec.CLAMP_TAP_DRILL,
+            part_spec.END_CLAMPS["CL"],
+            part_spec.CLAMP_THREAD,
+            END_CLAMP_TAP_TEXT,
+            END_CLAMP_COUNT,
         ),
         (
             "riser screw taps",
@@ -1406,7 +1590,8 @@ async def build(adapter: Any) -> dict[str, str]:
             part_spec.RISER_TAP_DRILL,
             part_spec.RISER_SCREWS[3],
             part_spec.RISER_THREAD,
-            part_spec.RISER_TAP_CALLOUT,
+            RISER_TAP_TEXT,
+            None,
         ),
         (
             "feed lever taps",
@@ -1414,7 +1599,8 @@ async def build(adapter: Any) -> dict[str, str]:
             part_spec.LEVER_TAP_DRILL,
             part_spec.LEVER_HOLES[1],
             part_spec.LEVER_THREAD,
-            part_spec.LEVER_TAP_CALLOUT,
+            LEVER_TAP_TEXT,
+            None,
         ),
     ):
         callout = add_native_hole_callout(
@@ -1426,8 +1612,9 @@ async def build(adapter: Any) -> dict[str, str]:
         )
         _strip_thread_class(callout, label=f"{label} callout", thread=thread)
         set_callout_lengths_to_three_places(callout, label=f"{label} callout")
-        if function is not None:
-            _append_callout_below(callout, function, label=f"{label} callout")
+        if count is not None:
+            _count_callout(callout, count, label=f"{label} callout")
+        _append_callout_below(callout, function, label=f"{label} callout")
 
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
     import_cosmetic_threads(adapter, iso)
@@ -1447,6 +1634,8 @@ async def build(adapter: Any) -> dict[str, str]:
             raise RuntimeError("carrier sheet cannot be activated for final readback")
         try:
             _assert_ream_control(adapter, ream[0])
+            _assert_section_on_sheet(adapter, section, section_annotations)
+            _assert_section_caption(section)
         finally:
             if not sheets.ActivateSheet(previous):
                 raise RuntimeError("carrier readback could not restore the active sheet")

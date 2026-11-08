@@ -4,10 +4,11 @@ The in-situ HUB tap is NOT in the table (farm 82129 machinist review): TL-00
 step 10 drills and taps that ordinary #8-32 receiver at assembly, so its
 position prints only as a parenthesized reference on the HUB CLAMP sheet.
 Every physical top-face hole, the HUB included, is still identified against
-the source body; the table and its tags carry the other twelve. The SIZE
-column is hidden: each hole's size and process is its callout (the HUB's on
-sheet 3, every other on sheet 1), and the pin holes' 4X REAM THRU is their
-only size authority.
+the source body; the table and its tags carry the other twelve. The
+generated SIZE column is hidden (its stacked REAM band prints at the
+document's two places); each tag's size and process is written into its own
+NOTE cell instead (machinist review r7, rules 9 and 10: the size once per
+tag group in the table, never deferred to a callout sheet).
 
 Owner review 2026-11-07 (rule 10): X/Y LOC run from the plate's lower-left
 corner, where the left end meets the -Y edge, which an edge finder picks up;
@@ -38,18 +39,20 @@ from _drawing_projection import model_point_in_view
 from _drawing_tables import insert_hole_table
 import _telemetry
 import ch_rocker_arm_tl_oblique_carrier_spec as spec
+from ch_rocker_arm_tl_oblique_callouts import CALLOUT_PLACES
 
 # The corner datum's X arrow stands under the plate's bottom edge at about
 # y 164 mm (old-base farm r3, 20261108T014606685Z: it ran through the first
 # row at a .175 top), so the table's top sits under it.
 TABLE_ANCHOR = (0.020, 0.158)
-# NOTE at 105: 'R816 / MHA-CH-13; NOTES 1, 2' and 'LOCATES TL-24 RISER;
-# NOTE 2' (27-29 glyphs) wrapped at 65 and still at 88 (the table font runs
-# ~3.3 mm a glyph with its margins), and the doubled rows ran the table past
-# the border at a .158 top (restack farm r1 20261108T040030048Z, r2
-# 20261108T045159962Z). Right edge 20 + 155 = 175 mm, the title block's lane
-# at 216.
-TABLE_WIDTHS = (0.012, 0.019, 0.019, 0.078, 0.105)
+# NOTE at 140: each row now carries its size, ~3.3 mm a glyph with its
+# margins (29 glyphs wrapped at 88 mm, restack farm r1 20261108T040030048Z;
+# a doubled row ran the table past the border at a .158 top, r2
+# 20261108T045159962Z), so the longest row, 38 glyphs, needs ~130 mm. Right
+# edge 20 + 190 = 210 mm, inside the title block's lane at 216.
+TABLE_WIDTHS = (0.012, 0.019, 0.019, 0.078, 0.140)
+# The longest NOTE cell, in printed glyphs (each <MOD-DIAM> prints one).
+NOTE_MAX_GLYPHS = 38
 # The physical columns, in the IncludeHidden=True index domain every read
 # and write below uses: SIZE stays generated (and compared) while hidden.
 COLUMNS = ("TAG", "X LOC", "Y LOC", "SIZE", "NOTE")
@@ -58,9 +61,6 @@ IN_SITU_HOLES = ("HUB",)
 TABLED_HOLES = {
     tag: hole for tag, hole in spec.TABLE_HOLES.items() if tag not in IN_SITU_HOLES
 }
-# Machinist review 43452045: the untagged HUB's size is on sheet 3, so the
-# note names both callout sheets.
-HOLE_SIZES_NOTE = "HOLE SIZES PER CALLOUTS, SHEETS 1 AND 3"
 # Sheet metres relative to the actual projected hole centre. Keep the close
 # A1/A2 and B1/B2 pairs on opposite sides of their respective rows; A2's tag
 # sits up-right, off the datum's Y axis label (82129 review read it "AY2").
@@ -90,22 +90,61 @@ A1_RELATION_NOTE = (
     "FROM THE A1-B1 AXIS LINE IN Y WITHIN \u00b1.005"
 )
 ORIGIN_NOTE = "X/Y LOC FROM THE LOWER-LEFT PLATE CORNER"
-# Each row's NOTE cell: the pass it sets or its function, and its flags.
-ROW_NOTES = {
-    "A1": "R800 / MHA-CH-13",
-    "B1": "R800 / MHA-CH-13; NOTE 2",
-    "A2": "R816 / MHA-CH-13; NOTES 1, 2",
-    "B2": "R816 / MHA-CH-13; NOTES 1, 2",
-    "CL": "END CLAMP; NOTE 2",
-    "CR": "END CLAMP; NOTE 2",
-    **{f"R{i}": "LOCATES TL-24 RISER; NOTE 2" for i in range(1, 5)},
-    **{f"L{i}": "FEED LEVER; SEE CALLOUT" for i in range(1, 3)},
+
+
+def _tap_size(drill: float, thread: str) -> str:
+    """A tap row's size as its sheet-1 callout prints it: the tap drill at
+    the callout's places, then the thread, both through."""
+    return (
+        f"<MOD-DIAM>{spec.inch_text(drill, CALLOUT_PLACES)} THRU, "
+        f"{thread.lstrip('#')} UNC THRU"
+    )
+
+
+# Each tag's size and process (rules 9, 10): the reamed pins at their limits
+# in ASME Y14.5's single-line limit form, low limit first (the sheet-1 4X
+# REAM's .3750 +.0015/+.0010), the taps as drill and thread.
+PIN_SIZE = (
+    f"<MOD-DIAM>{spec.inch_text(spec.PIN_HOLE_DIA + min(spec.PIN_HOLE_BAND), 4)}-"
+    f"{spec.inch_text(spec.PIN_HOLE_DIA + max(spec.PIN_HOLE_BAND), 4)} REAM THRU"
+)
+ROW_SIZES = {
+    **dict.fromkeys(spec.PIN_HOLES, PIN_SIZE),
+    **dict.fromkeys(spec.END_CLAMPS, _tap_size(spec.CLAMP_TAP_DRILL, spec.CLAMP_THREAD)),
+    **{f"R{i}": _tap_size(spec.RISER_TAP_DRILL, spec.RISER_THREAD) for i in range(1, 5)},
+    **{f"L{i}": _tap_size(spec.LEVER_TAP_DRILL, spec.LEVER_THREAD) for i in range(1, 3)},
 }
-if set(ROW_NOTES) != set(TABLED_HOLES) or any(
-    ("NOTE 2" in note or "NOTES 1, 2" in note) != (tag in A1_RELATED)
-    for tag, note in ROW_NOTES.items()
+# Each row's flagged notes: NOTE 1 on A2/B2, NOTE 2 on A1_RELATED. The mates
+# are named once, on the sheet-1 callouts (machinist review r7: no repeated
+# mate, no undefined pass label).
+ROW_FLAGS = {
+    tag: tuple(
+        number for number, tags in ((1, ("A2", "B2")), (2, A1_RELATED)) if tag in tags
+    )
+    for tag in TABLED_HOLES
+}
+
+
+def _flags(numbers: tuple[int, ...]) -> str:
+    if not numbers:
+        return ""
+    label = "NOTE" if len(numbers) == 1 else "NOTES"
+    return f"; {label} {', '.join(map(str, numbers))}"
+
+
+ROW_NOTES = {tag: f"{ROW_SIZES[tag]}{_flags(ROW_FLAGS[tag])}" for tag in TABLED_HOLES}
+if set(ROW_SIZES) != set(TABLED_HOLES) or any(
+    len(note.replace("<MOD-DIAM>", "\u00d8")) > NOTE_MAX_GLYPHS for note in ROW_NOTES.values()
 ):
-    raise AssertionError("NOTE 2's rows, and only those, carry its flag")
+    raise AssertionError("every tabled row needs a size that fits one NOTE line")
+# SolidWorks may read the diameter code back as its glyph (the riser's
+# native SIZE cells: draw_ch_rocker_arm_tl_oblique_riser).
+_DIAMETER = re.compile("\u2300|\u00d8")
+
+
+def _note_text(text: str) -> str:
+    """A NOTE cell's text with the diameter glyph in its code form."""
+    return _DIAMETER.sub("<MOD-DIAM>", text)
 
 
 def table_location(tag: str) -> tuple[float, float]:
@@ -322,9 +361,10 @@ def _frozen_rows(
         raise RuntimeError(f"carrier table has {columns} columns {stage}; expected TAG/X/Y/SIZE/NOTE")
     for tag, (row, cells) in rows.items():
         expected = (*generated[tag], "" if notes is None else notes[tag])
-        if (cells[0], *map(_location_value, cells[1:3]), _size_semantics(tag, cells[3]), cells[4]) != (
+        if (cells[0], *map(_location_value, cells[1:3]), _size_semantics(tag, cells[3]),
+                _note_text(cells[4])) != (
                 expected[0], *map(_location_value, expected[1:3]),
-                _size_semantics(tag, expected[3]), expected[4]):
+                _size_semantics(tag, expected[3]), _note_text(expected[4])):
             raise RuntimeError(
                 f"carrier generated row or flag changed {stage}: {tag} (row {row}) "
                 f"expected={expected!r} actual={cells!r}"
@@ -621,7 +661,7 @@ def create_carrier_hole_table(
         note = ROW_NOTES[tag]
         table.SetText2(row, 4, True, note)  # void put: read back below
         written = (str(table.Text2(row, 4, True) or ""), _cell(table, row, 4))
-        if written != (note, note):
+        if tuple(map(_note_text, written)) != (note, note):
             raise RuntimeError(
                 f"carrier {tag} NOTE (row {row}) did not take: expected={note!r} "
                 f"driving/displayed={written!r}"
@@ -632,8 +672,8 @@ def create_carrier_hole_table(
             raise RuntimeError(
                 f"carrier table column {column} rejected its width: expected={width} actual={actual}"
             )
-    # Each hole's size and process is its sheet-1 callout (the 4X REAM THRU
-    # is the pin holes' only size authority): hide the generated SIZE column.
+    # Each tag's size and process is in its NOTE cell (ROW_SIZES); the
+    # generated SIZE column, at the document's places, is hidden.
     # SetColumnHidden is VT_VOID; the BOOL readback proves it after rebuild.
     table.SetColumnHidden(SIZE_COLUMN, True)
     tabled_edges = {tag: edges[tag] for tag in TABLED_HOLES}
@@ -646,7 +686,6 @@ def create_carrier_hole_table(
     add_note(adapter, "2", .225, .153)
     add_note(adapter, A1_RELATION_NOTE, .235, .153)
     add_note(adapter, ORIGIN_NOTE, .225, .133)
-    add_note(adapter, HOLE_SIZES_NOTE, .225, .123)
     rebuild_drawing(adapter, label="carrier table and tags")
     _size_column_hidden(table, "after its rebuild")
 

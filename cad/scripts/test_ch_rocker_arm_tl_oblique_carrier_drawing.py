@@ -178,7 +178,13 @@ def test_taps_are_unc_and_hold_rule_18() -> None:
     lever = spec.LEVER_THREAD
     assert spec.ENGAGEMENT_MM[lever] < 1.5 * THREAD_MAJOR_MM[lever]
     assert spec.SHORT_ENGAGEMENT == (lever,)
-    assert "part_spec.LEVER_TAP_CALLOUT" in inspect.getsource(drawing.build)
+    # Machinist review r7: the callout names its mate once, then the shortfall.
+    lever_number = _config.parts("ch-rocker-arm-tl-oblique-feed-lever")["number"]
+    assert lever_number == "MHA-CH-06-TL-26" == drawing.FEED_LEVER_NUMBER
+    assert drawing.LEVER_TAP_TEXT.splitlines() == [
+        f"HOLDS {lever_number}", spec.LEVER_TAP_CALLOUT
+    ]
+    assert "LEVER_TAP_TEXT" in inspect.getsource(drawing.build)
 
 
 def test_walls_hold_rule_17_at_worst_case() -> None:
@@ -290,7 +296,7 @@ def test_clamp_taps_are_ordinary_through_taps_located_by_the_table() -> None:
     hub = features["hub_tap_1"]
     assert "station" not in hub["requirements"] and "height" not in hub["requirements"]
     assert hub["note"] == " ".join(drawing.HUB_TAP_NOTE.splitlines())
-    assert hub["note"] == "DRILL AND TAP AT ASSEMBLY TL-00 STEP 10"
+    assert hub["note"] == "CLAMPS MHA-CH-13 HUB DRILL AND TAP AT ASSEMBLY TL-00 STEP 10"
     for retired in ("cl_spot", "left_clamp_tap_1", "assembly_hub_bore",
                     "assembly_hub_underside_chamfer"):
         assert retired not in features, retired
@@ -329,18 +335,38 @@ def test_in_situ_hub_fit_up_closes_inside_the_strap_top_edge_band() -> None:
         assert spec.PIN_RELATIVE_STACK[name] < half
 
 
-def test_functions_are_condensed_into_native_table_rows() -> None:
-    """The sheet's NOTE cells: what each row sets, and its note flags (NOTE 2
-    on every A1-related row, NOTE 1 on A2/B2). A1 is no longer the origin."""
+def test_table_rows_carry_their_size_and_note_flags() -> None:
+    """Machinist review r7 (rules 9, 10): each NOTE cell carries its row's
+    size and process (the pins at their REAM limits, the taps as drill and
+    thread, as their callouts print them) and its note flags (NOTE 2 on
+    every A1-related row, NOTE 1 on A2/B2). No undefined pass label, no
+    repeated mate, no deferral to the callout sheets."""
     notes = carrier_table.ROW_NOTES
     assert spec.CR == pytest.approx((-spec.CL[0], spec.CL[1]))
     assert set(notes) == set(carrier_table.TABLED_HOLES)
-    assert notes["A1"] == "R800 / MHA-CH-13"
-    assert notes["B1"] == "R800 / MHA-CH-13; NOTE 2"
-    assert notes["A2"] == notes["B2"] == "R816 / MHA-CH-13; NOTES 1, 2"
-    assert notes["CL"] == notes["CR"] == "END CLAMP; NOTE 2"
-    assert all(notes[f"R{i}"] == "LOCATES TL-24 RISER; NOTE 2" for i in range(1, 5))
-    assert not any("ORIGIN" in note or "X AXIS" in note for note in notes.values())
+    pin = "<MOD-DIAM>.3760-.3765 REAM THRU"
+    assert notes["A1"] == pin
+    assert notes["B1"] == f"{pin}; NOTE 2"
+    assert notes["A2"] == notes["B2"] == f"{pin}; NOTES 1, 2"
+    assert notes["CL"] == notes["CR"] == "<MOD-DIAM>.136 THRU, 8-32 UNC THRU; NOTE 2"
+    assert all(
+        notes[f"R{i}"] == "<MOD-DIAM>.089 THRU, 4-40 UNC THRU; NOTE 2" for i in range(1, 5)
+    )
+    assert notes["L1"] == notes["L2"] == "<MOD-DIAM>.257 THRU, 5/16-18 UNC THRU"
+    # The pin limits are the sheet-1 4X REAM's .3750 +.0015/+.0010.
+    low, high = sorted(spec.PIN_HOLE_BAND)
+    assert spec.inch_text(spec.PIN_HOLE_DIA + low, 4) == ".3760"
+    assert spec.inch_text(spec.PIN_HOLE_DIA + high, 4) == ".3765"
+    for retired in ("R800", "R816", "MHA-CH-13", "SEE CALLOUT", "RISER", "CLAMP",
+                    "ORIGIN", "X AXIS"):
+        assert not any(retired in note for note in notes.values()), retired
+    assert not hasattr(carrier_table, "HOLE_SIZES_NOTE")
+    # One line each: the longest fits the NOTE column (~3.3 mm a glyph).
+    longest = max(len(note.replace("<MOD-DIAM>", "D")) for note in notes.values())
+    assert longest <= carrier_table.NOTE_MAX_GLYPHS
+    assert carrier_table.NOTE_MAX_GLYPHS * 3.3 < carrier_table.TABLE_WIDTHS[-1] * 1000.0
+    visible = sum(carrier_table.TABLE_WIDTHS) - carrier_table.TABLE_WIDTHS[carrier_table.SIZE_COLUMN]
+    assert carrier_table.TABLE_ANCHOR[0] + visible <= 0.216
 
 
 def test_pin_chamfer_retains_the_spacer_thrust_seat() -> None:
@@ -425,7 +451,9 @@ def test_section_is_full_and_cropped_to_the_cut_span() -> None:
     same line, same base-view selection, imported PinChamferSize and
     StockThick. So A-A is full and cropped to A1's slab (fr_nameplate A-A's
     Crop2 fence). jig-r9/c4-r4: imported after the crop it lost StockThick,
-    so it is curated first, then cropped, centred and placed again."""
+    so it is curated first, then cropped; farm r7: centred before its line
+    was shortened, the view jumped off the sheet with the line's midpoint,
+    so it is shortened, then centred and its dimensions placed again."""
     source = inspect.getsource(drawing._pin_section)
     assert "partial=False" in source
     assert "partial=True" not in source
@@ -435,20 +463,36 @@ def test_section_is_full_and_cropped_to_the_cut_span() -> None:
             "create_section_view(",
             "curate_view_dimensions(",
             "_crop_section(adapter, section)",
-            "_centre_section(adapter, section)",
-            "_reposition_section_dimensions(adapter, section, annotations)",
+            "_shorten_section_line(adapter, top, section, annotations, full)",
+            "_settle_section(adapter, section, annotations)",
         )
     ]
     assert order == sorted(order)
+    settle = inspect.getsource(drawing._settle_section)
+    order = [
+        settle.index(call)
+        for call in (
+            "_crop_section(adapter, section)",
+            "_centre_section(adapter, section)",
+            "_reposition_section_dimensions(adapter, section, annotations)",
+            "offset_dimension_text(",
+            "_assert_section_on_sheet(adapter, section, annotations)",
+        )
+    ]
+    assert order == sorted(order)
+    assert "IsCropped()" in settle.split("_crop_section(")[0]
     again = inspect.getsource(drawing._reposition_section_dimensions)
     assert "reposition=keep" in again and ".Visible" in again
     crop = inspect.getsource(drawing._crop_section)
     assert "Crop2(False, True, 0)" in crop
     assert "IsCropped()" in crop
     # jig-r8: the outline ran 25.6 mm past the 72 mm fence, so the check is
-    # containment plus the shrink, not width equality.
+    # containment within a slack, not width equality; absolute, so a re-crop
+    # of the short partial cut is held to it too.
     assert "not contains" in crop
     assert "width + 0.025" not in crop
+    assert "fence_x[-1] - fence_x[0] + _CROP_OUTLINE_SLACK_M" in crop
+    assert 0.0256 < drawing._CROP_OUTLINE_SLACK_M <= 0.040
     a1x = spec.PIN_HOLES["A1"][0]
     (x0, y0, _), (x1, y1, _) = drawing.SECTION_CROP_MODEL_MM
     assert math.isclose(x0, a1x - drawing._SECTION_HALF)
@@ -485,21 +529,25 @@ def test_riser_tap_stations_print_their_walls_band_and_name_the_riser() -> None:
         assert tap["station"][1] - tap["station"][0] == pytest.approx(.010 * INCH)
     riser = _config.parts("ch-rocker-arm-tl-oblique-riser")["number"]
     assert riser == "MHA-CH-06-TL-24"
-    assert spec.RISER_TAP_CALLOUT == (f"HOLDS {riser} SCREWS\nCLEAR OF ITS CUT EDGES")
+    # Machinist review r7: the mate once, no assembly instruction.
+    assert drawing.RISER_TAP_TEXT == f"HOLDS {riser} SCREWS"
     assert "RiserTaps" not in spec.DRAWING_DIMENSIONS
     assert spec.RISER_WALLS_FROM_A1 >= WALL_TARGET_MM
     assert all(
-        carrier_table.ROW_NOTES[f"R{i}"] == "LOCATES TL-24 RISER; NOTE 2" for i in range(1, 5)
+        carrier_table.ROW_NOTES[f"R{i}"] == "<MOD-DIAM>.089 THRU, 4-40 UNC THRU; NOTE 2"
+        for i in range(1, 5)
     )
-    # Four rows (the native two and these two), ~4.5 mm each, centred on the
-    # anchor: under the border.
-    rows = 2 + len(spec.RISER_TAP_CALLOUT.splitlines())
+    # Three rows (the native two and the mate), ~4.5 mm each, centred on the
+    # anchor: under the border, and inside it to the right.
+    rows = 2 + len(drawing.RISER_TAP_TEXT.splitlines())
     x, y = (value * 1000.0 for value in drawing.RISER_CALLOUT_XY)
     assert y + 4.5 * rows / 2.0 + 3.0 < _BORDER[3]
-    half = 2.36 * max(len(row) for row in spec.RISER_TAP_CALLOUT.splitlines()) / 2.0
-    assert x + half < drawing.CR_CALLOUT_XY[0] * 1000.0 - 25.0 + 2.0
+    half = 2.36 * len(drawing.RISER_TAP_TEXT) / 2.0
+    assert x + half < _BORDER[2]
     source = inspect.getsource(drawing.build)
-    assert "part_spec.RISER_TAP_CALLOUT" in source
+    assert "RISER_TAP_TEXT" in source
+    for retired in ("CLEAR OF ITS CUT EDGES", "END WASTE", "LOCATES"):
+        assert retired not in Path(drawing.__file__).read_text(encoding="utf-8"), retired
 
 
 def test_riser_table_has_each_hole_even_when_model_heights_are_shared() -> None:
@@ -554,6 +602,7 @@ def test_every_hole_is_located_from_the_corner_and_related_to_a1() -> None:
         assert (feature.get("parent") == "pin_hole_a1") is related, name
         # prechips Feature forbids extra keys (extra_forbidden).
         assert not any(key.startswith("a1_") or key == "station_from" for key in feature), name
+        assert (2 in carrier_table.ROW_FLAGS[tag]) is related, name
         assert ("NOTE 2" in carrier_table.ROW_NOTES[tag]
                 or "NOTES 1, 2" in carrier_table.ROW_NOTES[tag]) is related, name
     assert set(carrier_table.A1_RELATED) == {
@@ -596,13 +645,21 @@ def test_section_line_is_one_short_whole_line_across_a1() -> None:
         if tag != "A1" and abs(y) <= diameter / 2.0:
             assert x - diameter / 2.0 > plus or x + diameter / 2.0 < minus, tag
     section = inspect.getsource(drawing._pin_section)
-    assert section.index("offset_dimension_text(") < section.index(
-        "_shorten_section_line(adapter, top, section, annotations)"
+    assert section.index("full = _section_line(section)") < section.index(
+        "_shorten_section_line(adapter, top, section, annotations, full)"
     ) < section.index("_sketch_section_breaks(")
+    # Should the short partial line not settle on the sheet, the full line
+    # (still whole) is drawn again and the view settled on it, loudly.
+    fallback = section.split("except RuntimeError as error:")[1]
+    assert fallback.index("_telemetry.warn(") < fallback.index(
+        '_set_section_line(adapter, section, full, partial=False, label="full")'
+    ) < fallback.index("_settle_section(adapter, section, annotations)")
     shorten = inspect.getsource(drawing._shorten_section_line)
-    assert "SetLineInfo" in shorten and "GetLineInfo" in shorten
-    assert shorten.index("SetPartialSection(True)") < shorten.index("SetLineInfo(")
-    assert "GetPartialSection()" in shorten and "lost its cut" in shorten
+    assert "_set_section_line(adapter, section, short, partial=True" in shorten
+    line = inspect.getsource(drawing._set_section_line)
+    assert "SetLineInfo" in line and "_section_line(section)" in line
+    assert line.index("SetPartialSection(partial)") < line.index("SetLineInfo(")
+    assert "GetPartialSection()" in line and "lost its cut" in line
 
 
 class _FakeSection:
@@ -671,7 +728,7 @@ def test_short_section_line_is_partial_hatched_and_read_back(monkeypatch, fault)
     monkeypatch.setattr(drawing._telemetry, "info", lambda *_a, **_k: None)
     visible = SimpleNamespace(Visible=1)
     if fault is None:
-        drawing._shorten_section_line(None, None, section, [visible])
+        drawing._shorten_section_line(None, None, section, [visible], reported)
         (asked,) = [call[1] for call in section.calls if call[0] == "SetLineInfo"]
         expected = tuple(
             value
@@ -684,12 +741,130 @@ def test_short_section_line_is_partial_hatched_and_read_back(monkeypatch, fault)
         assert section.calls.count("UpdateViewDisplayGeometry") == 2
         return
     message = {
-        "not_partial": "did not become a partial section",
+        "not_partial": "short line: partial is not True",
         "no_hatch": "lost its cut",
         "not_persisted": "short line did not persist",
     }[fault]
     with pytest.raises(RuntimeError, match=message):
-        drawing._shorten_section_line(None, None, section, [visible])
+        drawing._shorten_section_line(None, None, section, [visible], reported)
+
+
+def test_full_section_line_fallback_restores_the_long_cut(monkeypatch) -> None:
+    """Fake-driven: the fallback draws the reported long line again as a
+    full (not partial) cut, read back the same way."""
+    reported = (0.4, 0.1, 0.0, -0.3, 0.1, 0.0)
+    section = _FakeSection((0.1, 0.1, 0.0, 0.08, 0.1, 0.0))
+    section.partial = True
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "double_array", list)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
+    monkeypatch.setattr(drawing._telemetry, "info", lambda *_a, **_k: None)
+    drawing._set_section_line(None, section, reported, partial=False, label="full")
+    assert section.line == reported and section.partial is False
+    assert [call for call in section.calls if isinstance(call, tuple)] == [
+        ("SetPartialSection", False), ("SetLineInfo", reported)
+    ]
+
+
+class _FakeSectionView:
+    def __init__(self, outline, *, cropped=True, faces=1):
+        self.outline, self.cropped, self.faces = outline, cropped, faces
+
+    def UpdateViewDisplayGeometry(self):
+        pass
+
+    def GetOutline(self):
+        return self.outline
+
+    def IsCropped(self):
+        return self.cropped
+
+    def GetFaceHatchCount(self):
+        return self.faces
+
+    def GetSolidHatchCount(self):
+        return (0, 0)
+
+
+@pytest.mark.parametrize("fault", [None, "off_sheet", "title_block", "uncropped",
+                                   "unhatched", "dimension_off"])
+def test_section_on_sheet_check_refuses_an_empty_or_off_sheet_view(monkeypatch, fault) -> None:
+    """Fake-driven: farm r7 printed A-A's frame empty, the shortened view
+    ~0.67 m off the sheet. The check holds the outline inside the border,
+    clear of the title block, cropped and hatched, and every section
+    dimension's text on the sheet."""
+    outline = {
+        "off_sheet": (-0.595, 0.023, -0.519, 0.081),
+        "title_block": (0.180, 0.023, 0.256, 0.060),
+    }.get(fault, (0.080, 0.023, 0.156, 0.081))
+    view = _FakeSectionView(
+        outline, cropped=fault != "uncropped", faces=0 if fault == "unhatched" else 1
+    )
+    text = (0.750, 0.050, 0.0) if fault == "dimension_off" else (0.079, 0.052, 0.0)
+    dimension = SimpleNamespace(GetPosition=lambda: text)
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, _item: "StockThick")
+    monkeypatch.setattr(drawing._telemetry, "info", lambda *_a, **_k: None)
+    if fault is None:
+        drawing._assert_section_on_sheet(None, view, [dimension])
+        return
+    with pytest.raises(RuntimeError, match="not on the sheet"):
+        drawing._assert_section_on_sheet(None, view, [dimension])
+
+
+def test_section_caption_names_hole_a1() -> None:
+    """Machinist review r7: the view is labelled SECTION A-A, HOLE A1 on its
+    own native caption (label and scale fields kept); no separate note."""
+    native = "<VLNAME> <VLLABEL>\r\n<VLSCALE><VLSCALEV>"
+    assert drawing.section_caption_text(native) == (
+        "<VLNAME> <VLLABEL>,\r\nHOLE A1\r\n<VLSCALE><VLSCALEV>"
+    )
+    assert drawing.section_caption_text("<VLNAME> <VLLABEL>\n<VLSCALE>") == (
+        "<VLNAME> <VLLABEL>,\nHOLE A1\n<VLSCALE>"
+    )
+    for refused in ("<VLNAME>", drawing.section_caption_text(native)):
+        with pytest.raises(RuntimeError, match="unexpected section A-A caption"):
+            drawing.section_caption_text(refused)
+    source = inspect.getsource(drawing._pin_section)
+    assert source.index("_label_section_hole(adapter, section)") < source.index(
+        "position_section_caption("
+    )
+    assert "add_note" not in source
+    for retired in ("SECTION_NOTE", "SECTION_NOTE_XY"):
+        assert not hasattr(drawing, retired), retired
+    assert "A1 ONLY" not in Path(drawing.__file__).read_text(encoding="utf-8")
+    build = inspect.getsource(drawing.build)
+    settled = build[build.index("def pin_controls_settled"):build.index("return await finalize_drawing")]
+    assert "_assert_section_on_sheet(adapter, section, section_annotations)" in settled
+    assert "_assert_section_caption(section)" in settled
+
+
+def test_end_clamp_taps_print_one_2x_callout_naming_the_strap() -> None:
+    """Machinist review r7 (rule 10): CL and CR are one size, so one callout
+    on CL counts both, and it names the strap it clamps, nothing more."""
+    assert drawing.END_CLAMP_COUNT == 2
+    assert drawing.END_CLAMP_TAP_TEXT == "CLAMPS MHA-CH-13" == f"CLAMPS {spec.STRAP_NUMBER}"
+    assert not hasattr(drawing, "CR_CALLOUT_XY")
+    build = inspect.getsource(drawing.build)
+    assert 'part_spec.END_CLAMPS["CL"]' in build and "CR_CALLOUT" not in build
+    assert build.index("_strip_thread_class(") < build.index("_count_callout(callout, count")
+    assert build.index("_count_callout(callout, count") < build.index("_append_callout_below(")
+    # The count field, when the native callout carries one, becomes 2X ...
+    field = {5: "", 6: "", 7: "<NUM_INST>X <MOD-DIAM><hw-tapdrldia> THRU ALL\n<hw-thread>", 8: ""}
+    assert drawing.counted_definitions(field, 2)[7] == (
+        "2X <MOD-DIAM><hw-tapdrldia> THRU ALL\n<hw-thread>"
+    )
+    # ... and otherwise the count leads the drill row.
+    plain = {5: "", 6: "", 7: "<MOD-DIAM><hw-tapdrldia> THRU ALL\n<hw-thread>", 8: "X"}
+    assert drawing.counted_definitions(plain, 2) == {**plain, 7: f"2X {plain[7]}"}
+    later = {5: "", 6: "", 7: "ROW\n<MOD-DIAM>.136", 8: ""}
+    assert drawing.counted_definitions(later, 2)[7] == "ROW\n2X <MOD-DIAM>.136"
+    for bad in ({5: "", 6: "", 7: "", 8: ""},
+                {5: "<MOD-DIAM>", 6: "", 7: "<MOD-DIAM>", 8: ""},
+                {5: "<NUM_INST>X ", 6: "<NUM_INST>X ", 7: "", 8: ""},
+                {1: ""}):
+        with pytest.raises(RuntimeError):
+            drawing.counted_definitions(bad, 2)
 
 
 def test_hole_callouts_carry_no_process_words() -> None:
@@ -764,7 +939,6 @@ def test_callouts_and_iso_clear_the_title_block() -> None:
     """jig-r3: the iso and its note ran into the title block."""
     for anchor in (
         drawing.CL_CALLOUT_XY,
-        drawing.CR_CALLOUT_XY,
         drawing.RISER_CALLOUT_XY,
         drawing.LEVER_CALLOUT_XY,
         drawing.HUB_CALLOUT_XY,
@@ -838,16 +1012,17 @@ def test_section_is_never_reversed_and_fits_either_way() -> None:
         assert 0.0 < (cx - lx) * sign - half < 25.0, sign
         assert _BORDER[0] < cx - half and cx + half < _TITLE_BLOCK[0]
     # Carrier r13: the caption printed above the 520.0's lane, cut off from
-    # the slab by its extension line. It (top-centre anchor, ~46 x 15 mm)
-    # stands in the section's own band, level with the slab, left of the
-    # thickness text as +X reads (right, jig-r5 and r13), inside the border.
+    # the slab by its extension line. It (top-centre anchor, ~46 mm wide,
+    # three ~8.2 mm rows with HOLE A1) stands in the section's own band,
+    # level with the slab, left of the thickness text as +X reads (right,
+    # jig-r5 and r13), inside the border.
     caption_x, caption_y = (value * 1000.0 for value in drawing.SECTION_CAPTION_XY)
     x0, y0 = _section_sheet((a1x - drawing._SECTION_HALF, -spec.THICKNESS), 1.0)
     x1, y1 = _section_sheet((a1x + drawing._SECTION_HALF, 0.0), 1.0)
     tx, _ty = _section_sheet(drawing.SECTION_KEEP_MODEL_MM["StockThick"], 1.0)
     assert _BORDER[0] + 3.0 < caption_x - 23.0
     assert caption_x + 23.0 < tx - 6.5 - 3.0
-    assert y0 < caption_y - 15.0 and caption_y < y1
+    assert caption_y - 3 * 8.2 > _BORDER[1] + 3.0 and caption_y < y1
     assert caption_y + 3.0 < lowest_lane_y
 
 
@@ -857,7 +1032,6 @@ def test_tap_callout_leaders_clear_every_station_text() -> None:
     every top-view dimension text (approximated as 24 x 6 mm)."""
     leaders = {
         "CL": (spec.CL, drawing.CL_CALLOUT_XY),
-        "CR": (spec.CR, drawing.CR_CALLOUT_XY),
         "riser": (spec.RISER_SCREWS[3], drawing.RISER_CALLOUT_XY),
         "lever": (spec.LEVER_HOLES[1], drawing.LEVER_CALLOUT_XY),
     }
@@ -914,7 +1088,7 @@ def test_hole_table_sheet_owns_every_location() -> None:
     )
     assert "settled_checks=(pin_controls_settled, table_settled, hub_settled)" in build
     assert '"Outer Pin Row Note"' in build
-    assert "add_note(adapter, SECTION_NOTE, *SECTION_NOTE_XY)" in inspect.getsource(drawing._pin_section)
+    assert "_label_section_hole(adapter, section)" in inspect.getsource(drawing._pin_section)
     assert not {"ClY", "CrY", "LeverY1", "LeverY2", "RiserY1", "RiserY2"} & set(drawing.TOP_KEEP)
     for retired in ("_LEFT", "_RIGHT", "_LEVER_STATION", "_BAND", "_CHAIN_PLACES"):
         assert not hasattr(drawing, retired), retired
@@ -935,22 +1109,14 @@ def test_ream_control_is_read_back_on_the_carrier_sheet() -> None:
     assert 'CALLOUTS_BELOW["PinHoleDia"]' in ream
 
 
-def test_section_note_stands_under_the_caption_clear_of_every_line() -> None:
-    """Machinist review 43452045 (r2/r3 clarity): the 20.5's left extension
-    line struck the A1-only note, which stood apart from A-A. It stands
-    directly under the caption, clear of the plate's lanes, the thickness
-    lane, the slab and the border."""
-    rows = drawing.SECTION_NOTE.splitlines()
-    assert " ".join(rows) == "A1 ONLY — OTHER PIN HOLES NOT SHOWN"
-    x, top = (value * 1000.0 for value in drawing.SECTION_NOTE_XY)
+def test_section_caption_stands_in_the_old_note_slot_clear_of_every_line() -> None:
+    """Machinist review r7: the A1-only note is gone; the caption's own third
+    row (HOLE A1) hangs into the slot it held (x 14..75, y 14..35,
+    R4NativeEye 43452045), clear of the thickness lane, the slab, the
+    plate's left extension lines and the border."""
     caption_x, caption_y = (value * 1000.0 for value in drawing.SECTION_CAPTION_XY)
-    # The caption (top-centre anchor, ~46 x 15 mm): left-aligned under it.
-    assert caption_x - 23.0 <= x < caption_x - 20.0
-    # Under the caption's glyphs (to y 37.3, R4NativeEye 43452045).
-    assert caption_y - 20.0 < top < 37.3 - 2.0
-    right = x + 2.71 * max(len(row) for row in rows)  # 43452045: 35 chars, 94.7 mm
-    assert right < 214.0 * INCH / 72.0  # the clear slot's right end (PDF pt)
-    bottom = top - 5.0 * len(rows)
+    right = caption_x + 23.0
+    bottom = caption_y - 3 * 8.2
     assert bottom > _BORDER[1] + 3.0
     a1x = spec.PIN_HOLES["A1"][0]
     for sign in (1.0, -1.0):
@@ -979,7 +1145,9 @@ def test_hub_clamp_tap_has_its_own_sheet_callout_and_reference_position() -> Non
     assert "_hub_reference_position(adapter, top)" in source
     assert "_strip_thread_class(" in source
     assert "set_callout_lengths_to_three_places(" in source
-    assert drawing.HUB_TAP_NOTE.splitlines() == ["DRILL AND TAP AT ASSEMBLY", "TL-00 STEP 10"]
+    assert drawing.HUB_TAP_NOTE.splitlines() == [
+        "CLAMPS MHA-CH-13 HUB", "DRILL AND TAP AT ASSEMBLY", "TL-00 STEP 10"
+    ]
     reference = inspect.getsource(drawing._hub_reference_position)
     for call in ("add_edge_dimension(", "set_arc_endpoints_to_center(", "set_reference_dimension(",
                  "assert_dimension_measures(",

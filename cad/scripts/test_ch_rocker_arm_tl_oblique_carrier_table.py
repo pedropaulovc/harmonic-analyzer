@@ -39,8 +39,8 @@ def test_table_inventory_is_complete_and_replaces_location_dimensions():
     assert set(table.TAG_OFFSETS) == set(TABLED)
     assert table.COLUMNS[table.SIZE_COLUMN] == "SIZE"
     assert set(drawing.TOP_KEEP) == {"PlateLength", "PlateWidth", "PinHoleDia"}
-    assert drawing.SECTION_NOTE.startswith("A1 ONLY")
-    assert "SECTION_NOTE" in inspect.getsource(drawing._pin_section)
+    assert not hasattr(drawing, "SECTION_NOTE")
+    assert "_label_section_hole(adapter, section)" in inspect.getsource(drawing._pin_section)
     assert set(table.ROW_NOTES) == set(TABLED) and "HUB" not in table.ROW_NOTES
     assert "parent" not in drawing._PIN_ROWS["A1"]
     assert assembly.ALIGNMENT_BAND == pytest.approx(.0008 * I)
@@ -1047,6 +1047,22 @@ def test_every_superseded_driver_prints_in_the_native_table_at_its_places():
     assert table.ROW_NOTES["A2"].endswith("NOTES 1, 2") and table.ROW_NOTES["B2"].endswith("NOTES 1, 2")
 
 
+@pytest.mark.parametrize("glyph", ["<MOD-DIAM>", "\u2300", "\u00d8"])
+def test_note_cells_read_back_with_the_diameter_as_code_or_glyph(glyph):
+    """Each NOTE cell is written with <MOD-DIAM>; SolidWorks may read it back
+    as the glyph (the riser's native SIZE cells), which is the same text.
+    Any other change still refuses."""
+    native = NativeCells()
+    for row in native.cells[1:]:
+        row[4] = row[4].replace("<MOD-DIAM>", glyph)
+    generated = {tag: cells[:4] for tag, (_row, cells) in table._rows(native).items()}
+    assert set(table._frozen_rows(native, generated, notes=table.ROW_NOTES, stage="now")) \
+        == set(TABLED)
+    native.cells[1][4] = native.cells[1][4].replace("REAM", "DRILL")
+    with pytest.raises(RuntimeError, match="changed now"):
+        table._frozen_rows(native, generated, notes=table.ROW_NOTES, stage="now")
+
+
 def _settled_harness(monkeypatch, *, fail_check=False):
     """Run the production create_carrier_hole_table and its settled callback
     over a three-sheet fake drawing. Native table content is NOT exercised
@@ -1125,10 +1141,11 @@ def test_table_selects_only_the_twelve_tabled_holes_and_hides_size(monkeypatch):
     assert state["edges"]["HUB"] not in entities
     assert {id(edge) for edge in entities} == {id(state["edges"][tag]) for tag in TABLED}
     assert state["hidden"] == [(table.SIZE_COLUMN, True)]
-    # 43452045 review: the untagged HUB's size is its sheet-3 callout.
-    assert table.HOLE_SIZES_NOTE == "HOLE SIZES PER CALLOUTS, SHEETS 1 AND 3"
-    assert table.HOLE_SIZES_NOTE in state["notes"]
-    assert not any("HUB" in text for text in state["notes"])
+    # Machinist review r7: each row's NOTE cell carries its size; no sheet
+    # note defers the sizes to the callout sheets.
+    assert not hasattr(table, "HOLE_SIZES_NOTE")
+    assert not any("CALLOUT" in text or "HUB" in text for text in state["notes"])
+    assert len(state["notes"]) == 4
     # Owner review 2026-11-07: NOTE 2 and the corner origin are printed; the
     # retired A1-origin note is not.
     for text in ("1", "2", table.A1_RELATION_NOTE, table.ORIGIN_NOTE):
