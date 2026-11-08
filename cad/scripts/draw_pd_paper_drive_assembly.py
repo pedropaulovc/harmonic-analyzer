@@ -34,6 +34,7 @@ from collections import Counter
 from dataclasses import dataclass
 import json
 import math
+import re
 import sys
 import textwrap
 from typing import Any, Callable, Iterable, Sequence
@@ -597,6 +598,11 @@ KNOB_SETTING_INSTANCES = frozenset({"pd-transgear-arm-1", "pd-transgear-arm-plat
 # circle (paper_drive_arm_registration.REDUCER_AXIS_SETUP_RADIUS_MM). The pivot
 # lever amplifies the across error, so one division (.0005) puts K up to
 # .0022 off (test_the_jig_bored_k_lands_in_the_set_band_with_margin_at_both_ends).
+# The knob-bore point's label inside VIEW K. VIEW K keeps its letter (other
+# sheets cite "MHA-PD-00 VIEW K"), so the point takes a letter used nowhere
+# else on the package (machinist review round 7, rules 9 and 26: K meant
+# both the view and the bore).
+KNOB_BORE_LETTER = "N"
 KNOB_SETTING_TRUE_SWEEP_DIVISIONS = 0.5
 KNOB_SETTING_INDICATOR_DIVISION_IN = 0.0005
 _KNOB_SETTING_SWEEP_TEXT = (
@@ -605,7 +611,7 @@ _KNOB_SETTING_SWEEP_TEXT = (
 _KNOB_SETTING_DIVISION_TEXT = f"{KNOB_SETTING_INDICATOR_DIVISION_IN:.4f}".lstrip("0")
 KNOB_SETTING_TRUE = (
     f"TRUE: SWEEP UNDER {_KNOB_SETTING_SWEEP_TEXT}, HALF A DIVISION ON A "
-    f"{_KNOB_SETTING_DIVISION_TEXT} TEST INDICATOR, SO K ENDS WITHIN "
+    f"{_KNOB_SETTING_DIVISION_TEXT} TEST INDICATOR, SO {KNOB_BORE_LETTER} ENDS WITHIN "
     f"{steps.inch_text(registration.REDUCER_AXIS_SETUP_RADIUS_MM, 3)} OF ITS "
     "VIEW K SETTING"
 )
@@ -624,7 +630,7 @@ KNOB_SETTING_TAP_XY = (
 )
 KNOB_SETTING_LEGEND = {
     "S": f"{_config.parts('pd-transgear-arm')['number']} PIN BORE",
-    "K": f"{_config.parts('pd-transgear-arm-plate')['number']} KNOB BORE",
+    KNOB_BORE_LETTER: f"{_config.parts('pd-transgear-arm-plate')['number']} KNOB BORE",
     "T": f"{_config.parts('pd-vn-transgear-arm-plate-screw')['number']} TAP",
 }
 # The DRO frame is the arm's pivot-bore-to-S axis: ALONG runs from S toward
@@ -635,10 +641,10 @@ KNOB_SETTING_PIVOT_LINES = (
     "ALONG: S TO PIVOT BORE",
     "ACROSS: SQUARE TO IT",
 )
-# Rule 4: the S-K band is the knob pinion's centre distance on the disc, so
+# Rule 4: the S-N band is the knob pinion's centre distance on the disc, so
 # the key names that mesh (two lines, to stay left of the circle).
 KNOB_SETTING_MESH_LINES = (
-    f"S-K SETS {_config.parts('pd-transgear-knob-shaft')['number']} "
+    f"S-{KNOB_BORE_LETTER} SETS {_config.parts('pd-transgear-knob-shaft')['number']} "
     f"{knob_shaft.TEETH}T",
     f"TO {_config.parts('pd-rack-pinion')['number']} {disc.TEETH}T MESH",
 )
@@ -652,10 +658,10 @@ KNOB_SETTING_CAPTION = "\n".join(
 )
 KNOB_SETTING_CAPTION_XY = (0.213, 0.131)
 # Each letter's centre stands this far off its circle's centre (sheet m): S
-# inward and away from Q (at 15:150 S-K spans most of the crop, so S's
+# inward and away from Q (at 15:150 S-N spans most of the crop, so S's
 # letter past the pin would leave it), T diagonally away from both chain
-# legs, K radially out past the plate's boss, just outside the crop.
-KNOB_SETTING_LETTER_GAPS = {"S": 0.005, "T": 0.005, "K": 0.0095}
+# legs, N radially out past the plate's boss, just outside the crop.
+KNOB_SETTING_LETTER_GAPS = {"S": 0.005, "T": 0.005, KNOB_BORE_LETTER: 0.0095}
 # Half a default-height capital letter (sheet m): note positions are the
 # text's upper-left corner.
 KNOB_SETTING_LETTER_HALF = (0.0013, 0.0018)
@@ -792,9 +798,9 @@ def knob_setting_letters(
     directions = {
         "S": unit((inward[0] + away[0], inward[1] + away[1])),
         "T": unit((along[0] + across[0], along[1] + across[1])),
-        "K": unit((k[0] - centre[0], k[1] - centre[1])),
+        KNOB_BORE_LETTER: unit((k[0] - centre[0], k[1] - centre[1])),
     }
-    tips = {"S": s, "T": t, "K": k}
+    tips = {"S": s, "T": t, KNOB_BORE_LETTER: k}
     letters = {}
     for letter, tip in tips.items():
         gap = KNOB_SETTING_LETTER_GAPS[letter]
@@ -1880,9 +1886,9 @@ def _step_text(
             "ZERO THE DRO ON S.",
             f"MOVE THE TABLE TO THE {KNOB_SETTING_VIEW_NAME} ALONG AND ACROSS "
             "SETTINGS FROM S.",
-            "TAP THE PLATE UNTIL ITS KNOB BORE K INDICATES TRUE.",
+            f"TAP THE PLATE UNTIL ITS KNOB BORE {KNOB_BORE_LETTER} INDICATES TRUE.",
             "TIGHTEN THE CLAMPS.",
-            "CHECK: RE-INDICATED, K IS STILL TRUE.",
+            f"CHECK: RE-INDICATED, {KNOB_BORE_LETTER} IS STILL TRUE.",
             f"IF NOT, REPEAT {s('arm-plate-located', 5)}-{s('arm-plate-located', 7)}.",
             "MATCH-DRILL 2 PILOTS THROUGH THE PLATE AND THE ARM.",
             "UNCLAMP AND PART THE ARM AND THE PLATE.",
@@ -1894,6 +1900,8 @@ def _step_text(
             f"{steps.inch_window(plate_locating_interface.PROUD_LIMITS_MM, 3, ' TO ')} "
             "PROUD, READ WITH A DEPTH MICROMETER.",
             _press_remedy("DOWEL", f"{n['pd-transgear-arm']} ARM", "latch-pin-pressed"),
+            "FIT THE PLATE BACK ON THE "
+            f"{n['pd-vn-transgear-arm-plate-locating-pin']} DOWELS.",
             "MATCH-MARK ARM AND PLATE.",
             # Delegated ruling 2026-11-07 (Main, L1): the plate's screw holes
             # are the master for the arm's 8-32 taps.
@@ -2115,9 +2123,9 @@ def _step_text(
             "CHECK: THE ENGAGED FEED RUNS WITH NO TIGHT SPOT.",
             f"CHECK: THE PLATEN SHAKES {shake} AT THE DATUM, READ WITH A DIAL "
             "INDICATOR ON THE PLATEN END.",
-            f"IF A CHECK FAILS, REPEAT {s('hanger-meshed', 2)}-"
-            f"{s('hook-pin-hole-match-drilled', 9)} WITH A NEW {n['pd-latch-hook']} "
-            "HOOK.",
+            f"IF A CHECK FAILS, FIT A NEW UNDRILLED {n['pd-latch-hook']} HOOK PER "
+            f"{s('latch-hook-fitted', 5)}-{s('latch-hook-fitted', 9)} AND REPEAT "
+            f"{s('hanger-meshed', 2)}-{s('hook-pin-hole-match-drilled', 9)}.",
         ),
         "loaded-rack-geometry-checked": (
             "LOAD THE PAPER.",
@@ -2437,6 +2445,11 @@ class StepNotes:
         return "\n".join(column.text for column in self.columns)
 
     @property
+    def code_key(self) -> str:
+        """The sprocket code key printed on the chain sheet."""
+        return sprocket_code_key(self.columns)
+
+    @property
     def exploded_caption_xy(self) -> tuple[float, float]:
         """One blank line under the actual steps, at default 4.5 mm line pitch."""
         return (
@@ -2445,9 +2458,88 @@ class StepNotes:
         )
 
 
+# Rule 22/26 (machinist review round 7): the steps name the three MHA-PD-09
+# sprockets by their configuration codes. One labelled key, on the chain
+# sheet's free right half, defines every code from the removable sprocket's
+# configurations and mounted selection; every other step sheet that prints a
+# code points to it from its first heading (the DT-00 code-key pattern, owner
+# ruling 2026-11-08 via Main).
+SPROCKET_CODE_PATTERN = re.compile(
+    r"\b(?:" + "|".join(re.escape(name) for name, _teeth in sprocket.CONFIGS) + r")\b"
+)
+CODE_KEY_SHEET = "CHAIN FIT-UP"
+CODE_KEY_XY = FITUP_NOTE_XY[1]
+CODE_KEY_POINTER = f"(CODES: SHEET {SHEET_NAMES.index(CODE_KEY_SHEET) + 1} KEY)"
+_SPARE_CONFIGS = [
+    name
+    for name, _teeth in sprocket.CONFIGS
+    if name not in (sprocket.CRANK_CONFIG, sprocket.KNOB_CONFIG)
+]
+if len(_SPARE_CONFIGS) != 1:
+    raise AssertionError("the code key names one crank, one knob and one spare sprocket")
+SPROCKET_CODE_HOMES = {
+    sprocket.CRANK_CONFIG: f"ON THE {CRANKSHAFT} CRANKSHAFT",
+    sprocket.KNOB_CONFIG: (
+        f"ON THE {_N['pd-transgear-knob-shaft']} KNOB SHAFT, DRIVEN BY THE "
+        f"{_N['pd-transgear-drive-collar']} COLLAR'S DOWELS"
+    ),
+    _SPARE_CONFIGS[0]: "SPARE, STORED LOOSE ON THE BASE DECK",
+}
+
+
+def _code_sheets(columns: Sequence[StepColumn]) -> list[str]:
+    """The step sheets, in order, whose columns print a sprocket code."""
+    return list(
+        dict.fromkeys(
+            column.sheet for column in columns if SPROCKET_CODE_PATTERN.search(column.text)
+        )
+    )
+
+
+def sprocket_code_key(columns: Sequence[StepColumn]) -> str:
+    """The labelled key: one line per code, from the sprocket configurations."""
+    numbers = [SHEET_NAMES.index(sheet) + 1 for sheet in _code_sheets(columns)]
+    span = (
+        f"SHEET {numbers[0]}" if len(numbers) == 1 else f"SHEETS {numbers[0]}-{numbers[-1]}"
+    )
+    lines = [f"CODE KEY ({span}): {_N['pd-transgear-removable']} SPROCKETS"]
+    for name, teeth in sprocket.CONFIGS:
+        lines += textwrap.wrap(
+            f"{name}: {teeth}-TOOTH, {SPROCKET_CODE_HOMES[name]}.",
+            width=FITUP_LINE_WIDTH,
+            subsequent_indent="  ",
+            break_on_hyphens=False,
+        )
+    return "\n".join(lines)
+
+
+def _point_to_code_key(columns: tuple[StepColumn, ...]) -> tuple[StepColumn, ...]:
+    """Append the key pointer to the first heading of every other step sheet
+    that prints a code. The pointer rides the heading's own line, so the
+    packed line counts stand."""
+    sheets = _code_sheets(columns)
+    if CODE_KEY_SHEET not in sheets:
+        raise AssertionError("the code key's sheet must itself print the codes")
+    out = []
+    seen: set[str] = set()
+    for column in columns:
+        first_on_sheet = column.sheet not in seen
+        if first_on_sheet and column.sheet in sheets and column.sheet != CODE_KEY_SHEET:
+            first, _, rest = column.text.partition("\n")
+            pointed = f"{first} {CODE_KEY_POINTER}"
+            if len(pointed) > FITUP_LINE_WIDTH:
+                raise AssertionError(f"{column.sheet}: the code pointer overruns its heading")
+            column = StepColumn(column.sheet, column.xy, f"{pointed}\n{rest}")
+        seen.add(column.sheet)
+        out.append(column)
+    return tuple(out)
+
+
 def format_step_notes(*, operating_domain: RackOperatingDomain) -> StepNotes:
     """Format the sheet steps around a supplied engaged-feed window."""
-    return StepNotes(pack_step_columns(_step_text(operating_domain=operating_domain)))
+    return StepNotes(
+        _point_to_code_key(pack_step_columns(_step_text(operating_domain=operating_domain)))
+    )
 
 
 def require_step_notes() -> StepNotes:
@@ -2523,6 +2615,7 @@ def sheet_texts(notes: StepNotes) -> tuple[str, ...]:
     """Every explicitly formatted package text besides the BOM's own cells."""
     return (
         *(column.text for column in notes.columns),
+        notes.code_key,
         *EXPLODED_CAPTIONS.values(),
         *ASSEMBLED_CAPTIONS.values(),
         TRANSGEAR_CAPTION,
@@ -4081,6 +4174,10 @@ def _place_fitup_sheets(adapter: Any, step_notes: StepNotes) -> None:
             adapter, column.sheet, column.text, column.xy,
             label=f"{column.sheet} step column {index + 1}",
         )
+    _place_sheet_note(
+        adapter, CODE_KEY_SHEET, step_notes.code_key, CODE_KEY_XY,
+        label=f"{CODE_KEY_SHEET} sprocket code key",
+    )
 
 
 @_telemetry.traced("drawing.paper_drive_assembly")

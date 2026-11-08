@@ -564,16 +564,19 @@ def test_view_k_frames_the_chain_with_its_settings_outside_the_crop() -> None:
                 assert end[1] + shift[1] + 0.003 < drawing.KNOB_SETTING_FIELD_TOP
             boxes.append(box)
         # Each circle lettered on a leader to its centre: S and T inside the
-        # crop, K just outside it past the boss, each clear of the chain.
+        # crop, the knob bore just outside it past the boss, each clear of the
+        # chain. The bore's letter is not the view's (round 7, rule 26).
+        bore = drawing.KNOB_BORE_LETTER
+        assert bore != "K" and bore not in {"S", "T"}
         letters = drawing.knob_setting_letters(s, q, k, t)
-        assert letters.keys() == drawing.KNOB_SETTING_LEGEND.keys() == {"S", "K", "T"}
+        assert letters.keys() == drawing.KNOB_SETTING_LEGEND.keys() == {"S", bore, "T"}
         half_w, half_h = drawing.KNOB_SETTING_LETTER_HALF
         diagonal = math.hypot(half_w, half_h)
         for letter, ((left, top), tip) in letters.items():
-            assert tip == {"S": s, "K": k, "T": t}[letter]
+            assert tip == {"S": s, bore: k, "T": t}[letter]
             middle = (left + half_w, top - half_h)
             reach = math.dist(middle, centre)
-            if letter == "K":
+            if letter == bore:
                 assert reach - diagonal > drawing.KNOB_SETTING_RADIUS
             else:
                 assert reach + diagonal < drawing.KNOB_SETTING_RADIUS
@@ -604,7 +607,7 @@ def test_view_k_frames_the_chain_with_its_settings_outside_the_crop() -> None:
     # The legend names each lettered circle by its part number.
     for letter, stem in (
         ("S", "pd-transgear-arm"),
-        ("K", "pd-transgear-arm-plate"),
+        (drawing.KNOB_BORE_LETTER, "pd-transgear-arm-plate"),
         ("T", "pd-vn-transgear-arm-plate-screw"),
     ):
         assert f"{letter}: {_number(stem)} " in drawing.KNOB_SETTING_CAPTION
@@ -2051,6 +2054,43 @@ def test_the_lock_taps_are_the_even_taps_counted_from_either_end() -> None:
     assert not re.search(r"\bA[1-9]\b", _step_body("guides-screwed") + hung)
 
 
+def test_one_code_key_defines_every_sprocket_code_and_each_code_sheet_points_to_it() -> None:
+    """Round 7 (rules 22, 26): T12/T18/T24 are defined in one labelled key
+    built from the sprocket configurations; every other step sheet that
+    prints a code points to it from its first heading."""
+    notes = _unit_step_notes()
+    key = notes.code_key.splitlines()
+    entries = [line for line in key[1:] if not line.startswith(" ")]
+    assert [entry.split(":")[0] for entry in entries] == [
+        name for name, _teeth in sprocket.CONFIGS
+    ]
+    for (name, teeth), entry in zip(sprocket.CONFIGS, entries):
+        assert entry.startswith(f"{name}: {teeth}-TOOTH, ")
+    assert all(len(line) <= drawing.FITUP_LINE_WIDTH for line in key)
+    code_sheets = {
+        column.sheet
+        for column in notes.columns
+        if drawing.SPROCKET_CODE_PATTERN.search(column.text)
+    }
+    assert drawing.CODE_KEY_SHEET in code_sheets
+    first_column = {}
+    for column in notes.columns:
+        first_column.setdefault(column.sheet, column)
+    for sheet, column in first_column.items():
+        heading = column.text.splitlines()[0]
+        pointed = sheet in code_sheets and sheet != drawing.CODE_KEY_SHEET
+        assert heading.endswith(drawing.CODE_KEY_POINTER) == pointed
+    # The key stands in the chain sheet's free second column, which no step
+    # slot uses, above the title block.
+    assert all(
+        slot.xy != drawing.CODE_KEY_XY
+        for slot in drawing.STEP_SLOTS
+        if slot.sheet == drawing.CODE_KEY_SHEET
+    )
+    bottom = drawing.CODE_KEY_XY[1] - len(key) * drawing.STEP_LINE_PITCH
+    assert bottom > drawing.FITUP_NOTE_LIMITS[1][1]
+
+
 def test_the_chain_is_closed_and_run_after_the_collar_is_accepted() -> None:
     """Codex B3: routing, closure, adjustment and a functional run."""
     assert steps.SEQUENCE[-3:] == (
@@ -2430,8 +2470,8 @@ def test_note_formatting_is_explicit_about_its_supplied_window() -> None:
     window = steps.inch_window(domain.axis_from_left_end_limits_mm, 3, " TO ")
     assert window in drawing.engaged_feed_text(domain)
     assert drawing.engaged_feed_text(domain) in _step_body("hanger-meshed")
-    assert notes.columns == drawing.pack_step_columns(
-        drawing._step_text(operating_domain=domain)
+    assert notes.columns == drawing._point_to_code_key(
+        drawing.pack_step_columns(drawing._step_text(operating_domain=domain))
     )
     assert drawing.sheet_texts(notes)[: len(notes.columns)] == tuple(
         column.text for column in notes.columns
