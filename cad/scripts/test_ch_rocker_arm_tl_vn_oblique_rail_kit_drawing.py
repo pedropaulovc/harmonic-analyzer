@@ -216,7 +216,10 @@ def test_member_features_are_disjoint_and_own_every_named_feature() -> None:
     carriage_names = {
         name for name in named["_author_carriage"] if not name.startswith(("f'", "name", "feature"))
     }
-    assert rail_names == set(part.MEMBER_FEATURES["Rail"])
+    # The helper names its own hidden EndWall sketch; it is the rail's last
+    # feature, so the Carriage configuration suppresses it with its parents.
+    assert part.MEMBER_FEATURES["Rail"][-1] == rail.SUPPLIER_REFERENCE == "SupplierReference"
+    assert rail_names | {rail.SUPPLIER_REFERENCE} == set(part.MEMBER_FEATURES["Rail"])
     loop_features = {"NippleEnd", "PlugEnd", "GreaseNipple", "PortPlug"}
     loop_profiles = {"GreaseNippleProfile", "PortPlugProfile"}
     assert carriage_names | loop_features | loop_profiles == set(part.MEMBER_FEATURES["Carriage"])
@@ -326,11 +329,13 @@ def test_rail_stations_are_unbanded_model_references() -> None:
     assert rail.DRAWING_DIMENSIONS == {
         "Rail": {"Length"},
         "BoltHoleProfile": set(rail.STATION_DIMENSIONS),
+        "SupplierReference": {"EndWall"},
     }
     assert rail.REFERENCE_PLACES == base_bar.RAIL_HOLE_PLACES == 3
     assert rail.DRAWING_PRECISION == {
         "Rail": {"Length": 3},
         "BoltHoleProfile": dict.fromkeys(rail.STATION_DIMENSIONS, 3),
+        "SupplierReference": {"EndWall": 3},
     }
     tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
     assert not any(
@@ -418,13 +423,13 @@ def test_hole_sketch_places_every_station_from_the_end_face(monkeypatch) -> None
 def test_rail_receipt_note_points_at_the_stations() -> None:
     bar = _config.parts("ch-rocker-arm-tl-oblique-base-bar")
     # The pairing and free screw entry are the jig's steps (rule 7): the
-    # member's one note is the end walls' acceptance, printed in words at a
-    # leader on each rail end face (no flag, no footer note).
-    assert rail.DRAWING_NOTES == rail.WALL_CALLOUT
-    lines = rail.WALL_CALLOUT.splitlines()
-    assert len(lines) == 2 and max(len(line) for line in lines) <= 8
-    assert "[" not in rail.WALL_CALLOUT
-    assert f"{rail.WALL_ACCEPTANCE_MM:.1f} MIN" in rail.WALL_CALLOUT
+    # member's one note is the end walls' acceptance, the EndWall reference
+    # dimension's callout (no flag, no footer note).
+    assert rail.DRAWING_NOTES == rail.END_WALL_CALLOUT == "2X, 2.0 MIN AFTER TRIM"
+    assert not hasattr(rail, "WALL_CALLOUT")
+    assert "2X" in rail.END_WALL_CALLOUT
+    assert f"{rail.WALL_ACCEPTANCE_MM:.1f} MIN" in rail.END_WALL_CALLOUT
+    assert "[" not in rail.END_WALL_CALLOUT and "\n" not in rail.END_WALL_CALLOUT
     assert rail.WALL_ACCEPTANCE_MM == 2.0
     assert "MHA-CH-06-TL-00 SHEET 1 LIMITS; SEALS ON RAIL, NO BIND" in rail.END_FIT_CALLOUT
     # The flag gives the hole pattern as one REF pattern (rule 10), then its
@@ -438,84 +443,104 @@ def test_rail_receipt_note_points_at_the_stations() -> None:
     assert len(rail.END_FIT_CALLOUT.splitlines()) == 2
     assert rail.CBORE_END_WALL_WORST >= base_bar.WALL_TARGET_MM
     assert rail.CBORE_END_WALLS_WORST == pytest.approx((6.214, 5.96))
-    assert {label for label, _, _ in draw.WALL_FLAGS} == {"near end", "far end"}
-    # Each arrow lands on its rail end face at mid-height.
-    ends = sorted(edge for _, edge, _ in draw.WALL_FLAGS)
-    half = rail.LENGTH / 2.0 * 0.0005
-    assert ends[0] == pytest.approx((draw.FRONT_CENTER[0] - half, draw.FRONT_CENTER[1]))
-    assert ends[1] == pytest.approx((draw.FRONT_CENTER[0] + half, draw.FRONT_CENTER[1]))
     # The 2:1 end profile is lettered VIEW B; views at the sheet's scale
     # print no scale (rule 9).
     assert draw.caption_text("RIGHT", (2, 1)) == "VIEW B  2:1"
     assert draw.caption_text("TOP", draw.SHEET_SCALE) == "TOP"
 
 
-def test_wall_flag_extent_includes_the_native_leader(monkeypatch) -> None:
-    # 114c1622 near-end flag: GetExtent includes text AND leader to the end.
-    reported = (
-        0.023639363281249964, 0.16034543750000008,
-        0.06191944531249996, 0.17927042187500009,
+def test_end_wall_is_a_hidden_model_chord_from_the_far_end_face() -> None:
+    """End face to end-counterbore edge, a sketch reference on Front."""
+    from _supplier_screw_layout import supplier_screw_lane_plan
+
+    assert rail.END_WALL == rail.HOLE_X[0] - rail.CBORE_DIA / 2.0
+    assert rail.END_WALL == pytest.approx(6.214)
+    # The pattern is symmetric: the far wall is the near wall, so 2X.
+    assert rail.LENGTH - rail.HOLE_X[-1] - rail.CBORE_DIA / 2.0 == pytest.approx(rail.END_WALL)
+    assert rail.END_WALL_DIMENSION == "EndWall"
+    # A negative value runs toward -X from the far end face (x = LENGTH).
+    assert rail.END_WALL_REFERENCE == (("EndWall", -rail.END_WALL, "horizontal"),)
+    assert rail.END_WALL_REFERENCE_STARTS == {"EndWall": (rail.LENGTH, 0.0)}
+    ((name, value, _),) = rail.END_WALL_REFERENCE
+    start = rail.END_WALL_REFERENCE_STARTS[name]
+    assert start[0] + value == pytest.approx(rail.HOLE_X[-1] + rail.CBORE_DIA / 2.0)
+    assert start[1] == 0.0  # the rail's centreline on the seat (Front) plane
+    # The helper's own pure pre-check accepts the row on Front.
+    assert set(supplier_screw_lane_plan(rail.END_WALL_REFERENCE)) == {"EndWall"}
+    # The builder authors it after the counterbores and before the solid's
+    # unchanged volume/centroid checks, and lets the helper mark it.
+    tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
+    author = next(
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "_author_rail"
     )
-    edge = (0.062036, 0.160)
-    target = (0.024, 0.179)
-    text_cell, envelope = draw.wall_flag_regions(edge, target)
-    assert not _inside_box(reported, text_cell)
-    assert _inside_box(reported, envelope)
+    calls = [
+        node for node in ast.walk(author)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    ]
+    order = [call.func.id for call in sorted(calls, key=lambda c: (c.lineno, c.col_offset))]
+    (reference,) = [call for call in calls if call.func.id == "add_supplier_reference_sketch"]
+    assert ast.unparse(reference.args[1]) == "rail.END_WALL_REFERENCE"
+    assert {k.arg: ast.unparse(k.value) for k in reference.keywords} == {
+        "starts": "rail.END_WALL_REFERENCE_STARTS", "planes": "{}",
+    }
+    assert order.index("add_supplier_reference_sketch") < order.index("_rail_checks")
+    assert order.index("_rail_checks") < order.index("apply_drawing_precision")
+    marked = [
+        node for node in ast.walk(author)
+        if isinstance(node, ast.If) and "rail.SUPPLIER_REFERENCE" in ast.unparse(node.test)
+    ]
+    assert len(marked) == 1 and "mark_dimensions_for_drawing" in ast.unparse(marked[0])
+
+
+def test_pattern_flag_leader_rises_left_of_its_text(monkeypatch) -> None:
+    """Farm run 20261108T031012373Z: from the text's left edge to the fourth
+    hole the leader ran back through the "8". The second hole stands left of
+    the text, so the leader leaves its left side up-left to the rim."""
+    assert draw.RECEIPT_FLAG_HOLE == 1
+    per_mm = draw._sheet_mm(draw.SHEET_SCALE)
+    end_face_x = draw.FRONT_CENTER[0] - draw._FRONT_HALF[0]
+    hole = (end_face_x + rail.HOLE_X[1] * per_mm, draw.FRONT_CENTER[1])
+    rim = rail.CBORE_DIA / 2.0 * per_mm
+    landing = draw.RECEIPT_FLAG_LANDING
+    # On the counterbore rim, 45° down-right of the hole's centre.
+    assert math.dist(landing, hole) == pytest.approx(rim)
+    assert landing[0] - hole[0] == pytest.approx(hole[1] - landing[1])
+    text = estimate_text_box(
+        rail.RECEIPT_FLAG, anchor=draw.RECEIPT_FLAG_ANCHOR,
+        height=draw.DIMENSION_TEXT_HEIGHT, reference=0,
+    )
+    # Left of and above the text: a leader from its left side never crosses it.
+    assert landing[0] < draw.RECEIPT_FLAG_ANCHOR[0] <= text.xmin + 1e-12
+    assert landing[1] > text.ymax
+    # Right of Station1's far witness, clear of its near-end stack.
+    _, _, inks, _ = _stack_ink()
+    station_right = max(x for segment in inks["Station1"][1] for x, _ in segment)
+    assert landing[0] - station_right >= draw.CLEAR_GAP_M
+    # The readback envelope keeps a 1 mm reserve round the tip.
+    envelope = draw.RECEIPT_FLAG_ENVELOPE
+    assert envelope[0] <= landing[0] - 0.001 and envelope[3] >= landing[1] + 0.001
+    # The settled readback: anchor in its cell, leader from the cell to the rim.
     monkeypatch.setattr(draw, "_early_bound", lambda value, _interface: value)
+    anchor = draw.RECEIPT_FLAG_ANCHOR
+    start = (anchor[0], anchor[1] - draw.DIMENSION_TEXT_HEIGHT / 2.0)
     annotation = SimpleNamespace(
-        GetPosition=lambda: (*target, 0.0),
+        GetPosition=lambda: (*anchor, 0.0),
         GetLeaderCount=lambda: 1,
-        GetLeaderPointsAtIndex=lambda _index: (*target, 0.0, *edge, 0.0),
+        GetLeaderPointsAtIndex=lambda _index: (*start, 0.0, *landing, 0.0),
     )
     note = SimpleNamespace(GetAnnotation=lambda: annotation)
-    draw.assert_wall_flag_landing(note, edge, text_cell)
-    # A leader-inclusive envelope is not a replacement for the text-lane guard.
-    annotation.GetPosition = lambda: (*edge, 0.0)
+    cell = draw.RECEIPT_FLAG_CELL
+    draw.assert_leader_note_landing(note, landing, cell, what="flag")
+    annotation.GetPosition = lambda: (*landing, 0.0)
     with pytest.raises(RuntimeError, match="text left its lane"):
-        draw.assert_wall_flag_landing(note, edge, text_cell)
-    annotation.GetPosition = lambda: (*target, 0.0)
+        draw.assert_leader_note_landing(note, landing, cell, what="flag")
+    annotation.GetPosition = lambda: (*anchor, 0.0)
     annotation.GetLeaderPointsAtIndex = lambda _index: (
-        *target, 0.0, edge[0] + 0.003, edge[1], 0.0,
+        *start, 0.0, landing[0] + 0.003, landing[1], 0.0,
     )
     with pytest.raises(RuntimeError, match="intended feature"):
-        draw.assert_wall_flag_landing(note, edge, text_cell)
-
-
-def test_below_rail_wall_flags_clear_native_overall_ink(monkeypatch) -> None:
-    monkeypatch.setattr(draw, "_early_bound", lambda value, _interface: value)
-    # Native 957501d1 extents, translated by the proven +20/+4 mm correction.
-    length_text = (0.0706, 0.1744, 0.2073, 0.1870)
-    length_lines = [((0.062, 0.1744), (0.282, 0.1744))]
-    for _label, edge, target in draw.WALL_FLAGS:
-        text_cell, envelope = draw.wall_flag_regions(edge, target)
-        assert envelope[3] < length_lines[0][0][1] - draw.CLEAR_GAP_M
-        annotation = SimpleNamespace(
-            GetPosition=lambda: (*target, 0.0),
-            GetLeaderCount=lambda: 1,
-            GetLeaderPointsAtIndex=lambda _index: (*target, 0.0, *edge, 0.0),
-        )
-        note = SimpleNamespace(GetAnnotation=lambda: annotation)
-        leaders = draw.assert_wall_flag_landing(note, edge, text_cell)
-        draw.require_wall_leaders_clear(leaders, length_text, length_lines)
-    # Crossing-path mutation against the measured overall-line segment.
-    with pytest.raises(RuntimeError, match="overall Length line"):
-        draw.require_wall_leaders_clear(
-            (((0.250, 0.190), (0.277, 0.161875)),),
-            length_text, length_lines,
-        )
-    with pytest.raises(RuntimeError, match="Length text"):
-        draw.require_wall_leaders_clear(
-            (((0.080, 0.200), (0.080, 0.160)),),
-            length_text, length_lines,
-        )
-    source = Path(draw.__file__).read_text(encoding="utf-8")
-    tree = ast.parse(source)
-    settled = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "settled")
-    assert any(
-        isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
-        and n.func.id == "require_wall_leaders_clear"
-        for n in ast.walk(settled)
-    )
+        draw.assert_leader_note_landing(note, landing, cell, what="flag")
 
 
 @pytest.mark.parametrize("bar_deviation", (-trammel.RAIL_LENGTH_BAND, trammel.RAIL_LENGTH_BAND))
@@ -752,12 +777,16 @@ def test_receipt_dimensions_are_the_marked_model_dimensions() -> None:
     # The first station alone locates the pattern; the flag gives the pitch
     # (rule 10: a regular pattern counts as one axis).
     assert draw.DRAWN_STATIONS == rail.STATION_DIMENSIONS[:1] == ("Station1",)
-    assert set(draw.RECEIPT_DIMENSIONS) == {"Station1", "Length"}
+    assert set(draw.RECEIPT_DIMENSIONS) == {"Station1", "EndWall", "Length"}
     assert set(draw.RECEIPT_DIMENSIONS) <= marked
     assert draw.STATION_NOMINALS == {"Station1": rail.HOLE_X[0]}
-    # The short first span carries its arrows and its text outside.
-    assert draw.STATION_ARROW_SIDES == {"Station1": 1}
-    assert draw.TEXT_OUTSIDE_START == {"Station1": 0.027}
+    assert draw.RECEIPT_NOMINALS == {
+        "Station1": rail.HOLE_X[0], "EndWall": rail.END_WALL, "Length": rail.LENGTH,
+    }
+    # The short spans carry their arrows and their texts outside.
+    assert draw.RECEIPT_ARROW_SIDES == {"Station1": 1, "EndWall": 1}
+    assert draw.TEXT_OUTSIDE_START == {"Station1": 0.027, "EndWall": 0.028}
+    assert draw.RECEIPT_CALLOUTS_BELOW == {"EndWall": rail.END_WALL_CALLOUT}
     assert draw.RECEIPT_DIMENSIONS["Length"][:2] == (0.0, rail.LENGTH)
     start, end, offset = draw.RECEIPT_DIMENSIONS["Station1"]
     assert (start, end) == (0.0, rail.HOLE_X[0])  # from the -X end face
@@ -765,20 +794,29 @@ def test_receipt_dimensions_are_the_marked_model_dimensions() -> None:
     rail_edge = draw._FRONT_HALF[1]
     assert -offset - 0.003 > rail_edge
     assert draw.RECEIPT_DIMENSIONS["Length"][2] - 0.003 > rail_edge
+    # The end wall at the far end, where its model chord runs: far
+    # counterbore edge to far end face, a row under the rail.
+    start, end, offset = draw.RECEIPT_DIMENSIONS["EndWall"]
+    assert (start, end) == (rail.LENGTH - rail.END_WALL, rail.LENGTH)
+    assert end - start == pytest.approx(rail.END_WALL)
+    assert offset == -draw.END_WALL_DROP < -draw.STATION_FIRST_DROP
     # assert_imported_precision checks exactly the dimensions the view keeps:
     # a checked name that never reaches the sheet fails the build.
     assert set(draw.FRONT_DIMENSION_PRECISION) == set(draw.RECEIPT_DIMENSIONS)
+    assert draw.FRONT_DIMENSION_PRECISION["EndWall"] == rail.REFERENCE_PLACES
 
 
 _EXTENSION_GAP = 0.0016  # extension lines start off, and overrun, by this much
+# A callout row's pitch, as the Length fixture's callout above its value.
+_CALLOUT_ROW = 0.005
 
 
 def _stack_ink(*, lift=None):
     """The receipt stack as SolidWorks printed run 20261104T222143958Z's:
     each text centred at its requested point, its dimension line
-    ``TEXT_OVER_LINE`` under it, the extension lines from the part to just
-    past the line. ``lift`` raises named texts off their lines (sheet
-    metres)."""
+    ``TEXT_OVER_LINE`` under it (under its callout, where one stands below
+    it), the extension lines from the part to just past the line. ``lift``
+    raises named texts off their lines (sheet metres)."""
     per_mm = draw._sheet_mm(draw.SHEET_SCALE)
     center_y = draw.FRONT_CENTER[1]
     end_face_x = draw.FRONT_CENTER[0] - draw._FRONT_HALF[0]
@@ -790,12 +828,10 @@ def _stack_ink(*, lift=None):
     inks = {}
     for name, (start, end, offset) in draw.RECEIPT_DIMENSIONS.items():
         x, y = draw.receipt_text_point(name, sheet(start), sheet(end), offset)
-        line_y = y - draw.TEXT_OVER_LINE
+        below_text = draw.RECEIPT_CALLOUTS_BELOW.get(name)
+        line_y = y - draw.TEXT_OVER_LINE - (_CALLOUT_ROW if below_text else 0.0)
         y += (lift or {}).get(name, 0.0)
-        if name == "Length":
-            text = f"({rail.LENGTH:.3f})"
-        else:
-            text = f"({end:.{rail.REFERENCE_PLACES}f})"
+        text = f"({end - start:.{rail.REFERENCE_PLACES}f})"
         box = estimate_text_box(
             text, anchor=(x, y), height=draw.DIMENSION_TEXT_HEIGHT, reference=2
         )
@@ -808,6 +844,15 @@ def _stack_ink(*, lift=None):
             text_box = (
                 min(text_box[0], above.xmin), text_box[1],
                 max(text_box[2], above.xmax), above.ymax,
+            )
+        if below_text:
+            below = estimate_text_box(
+                below_text, anchor=(x, y - _CALLOUT_ROW),
+                height=draw.DIMENSION_TEXT_HEIGHT, reference=2,
+            )
+            text_box = (
+                min(text_box[0], below.xmin), below.ymin,
+                max(text_box[2], below.xmax), text_box[3],
             )
         x0, x1 = sheet(start)[0], sheet(end)[0]
         segments = [((x0, line_y), (x1, line_y))]
@@ -924,6 +969,8 @@ def test_receipt_sheet_views_captions_and_notes_fit() -> None:
         assert footer < cell[1] and cell[3] <= BORDER[3], name
         assert not _overlaps(cell, TITLE_BLOCK), name
         for text_name, box in texts.items():
+            if (name, text_name) == ("*Front", "EndWall"):
+                continue  # under the rail, in FRONT's padding: see below
             assert not _overlaps(cell, box), (name, text_name)
     names = sorted(cells)
     for i, first in enumerate(names):
@@ -956,15 +1003,51 @@ def test_receipt_sheet_views_captions_and_notes_fit() -> None:
     label = draw.ITEM_LABEL_CELL
     assert all(not _overlaps(label, cell) for cell in cells.values())
     assert BORDER[1] < label[1] and label[3] <= BORDER[3]
-    # The end-wall callouts stand inside the border, clear of the other
-    # views, every caption, the flag and the stack's texts.
-    for wall_label, edge, target in draw.WALL_FLAGS:
-        text_cell, _ = draw.wall_flag_regions(edge, target)
-        assert _inside_box(text_cell, BORDER), wall_label
-        for other in ("*Top", "*Right", "*Isometric"):
-            assert not _overlaps(text_cell, cells[other]), (wall_label, other)
-        for other, box in {**caption_boxes, **texts}.items():
-            assert not _overlaps(text_cell, box), (wall_label, other)
+    # The end wall's text stands under the rail inside the border, clear of
+    # the other views and every caption.
+    end_wall = texts["EndWall"]
+    assert _inside_box(end_wall, BORDER) and end_wall[1] > TITLE_BLOCK[3]
+    for other in ("*Top", "*Right", "*Isometric"):
+        assert not _overlaps(end_wall, cells[other]), other
+    for other, box in caption_boxes.items():
+        assert not _overlaps(end_wall, box), other
+
+
+def test_end_wall_text_stands_under_the_far_end_clear_of_the_flag() -> None:
+    """The EndWall value and its callout below, outside its 3.1 mm span's
+    left witness: clear of the flag's cell, FRONT's caption and the rail."""
+    _, _, inks, flag = _stack_ink()
+    text, segments = inks["EndWall"]
+    far_end = draw.FRONT_CENTER[0] + draw._FRONT_HALF[0]
+    left_witness = far_end - rail.END_WALL * draw._sheet_mm(draw.SHEET_SCALE)
+    xs = {x for segment in segments for x, _ in segment}
+    for witness in (left_witness, far_end):
+        assert any(x == pytest.approx(witness, abs=1e-9) for x in xs), witness
+    # Outside its span, left of its left witness: arrowhead room between.
+    assert text[2] + draw.CLEAR_GAP_M <= left_witness
+    # Clear of the flag's reserved cell (so of its text) and its estimate.
+    assert draw.RECEIPT_FLAG_CELL[2] + draw.CLEAR_GAP_M <= text[0]
+    assert draw.boxes_clear(text, flag)
+    # At the flag's measured advance (94.2 mm for 42 characters, farm run
+    # 20261108T000844770Z) the callout, centred on the text point, still
+    # stands clear of the flag's cell and of its left witness.
+    x, _ = draw.receipt_text_point(
+        "EndWall", (left_witness, 0.0), (far_end, 0.0), 0.0
+    )
+    half = len(rail.END_WALL_CALLOUT) * 0.0942 / 42 / 2.0
+    assert draw.RECEIPT_FLAG_CELL[2] + draw.CLEAR_GAP_M <= x - half
+    assert x + half + 0.002 <= left_witness
+    # FRONT's caption.
+    label, cx, cy, _ = draw.CAPTIONS[0]
+    assert label == "FRONT"
+    caption = (cx - draw._CAPTION_HALF_WIDTH, cy - 0.006, cx + draw._CAPTION_HALF_WIDTH, cy + 0.001)
+    assert caption[2] + draw.CLEAR_GAP_M <= text[0]
+    # Under the rail's printed edge even if SOLIDWORKS centres the two-row
+    # block, not the value, on the text point (2.5 mm higher).
+    rail_edge = draw.FRONT_CENTER[1] - draw._FRONT_HALF[1]
+    assert text[3] + 0.0025 + draw.CLEAR_GAP_M <= rail_edge
+    # It is no station: the stack rule leaves its row free but its ink clear.
+    assert draw.receipt_stack_findings(inks, flag) == []
 
 
 def test_native_multiline_length_ink_clears_witnesses_and_top_caption() -> None:
@@ -1079,8 +1162,15 @@ def _receipt_annotations():
         )
         for name, x in zip(draw.DRAWN_STATIONS, rail.HOLE_X, strict=False)
     ]
+    # The end wall's chord runs toward -X: its native value may read negative.
+    annotations.append(
+        _Annotation("EndWall", _Display(
+            -rail.END_WALL, {1: "(", 2: ")", 4: rail.END_WALL_CALLOUT},
+            _Tolerance(0, 0, 0), rail.REFERENCE_PLACES,
+        ))
+    )
     for annotation in annotations:
-        annotation.display.ArrowSide = draw.STATION_ARROW_SIDES[annotation.name]
+        annotation.display.ArrowSide = draw.RECEIPT_ARROW_SIDES[annotation.name]
     annotations.append(
         _Annotation("Length", _Display(
             rail.LENGTH, {1: "(", 2: ")", 3: rail.END_FIT_CALLOUT},
@@ -1104,6 +1194,12 @@ def _receipt_annotations():
         "extra",
         "short-arrows",
         "nominal",
+        "end-wall-bare",
+        "end-wall-no-callout",
+        "end-wall-callout-above",
+        "end-wall-short-arrows",
+        "end-wall-nominal",
+        "end-wall-missing",
     ],
 )
 def test_receipt_controls_readback_refuses_every_drift(monkeypatch, fault) -> None:
@@ -1137,6 +1233,18 @@ def test_receipt_controls_readback_refuses_every_drift(monkeypatch, fault) -> No
         by_name["Station1"].ArrowSide = 0
     elif fault == "nominal":
         by_name["Station1"].dimension.SystemValue += 0.0001
+    elif fault == "end-wall-bare":
+        by_name["EndWall"].texts = {4: rail.END_WALL_CALLOUT}
+    elif fault == "end-wall-no-callout":
+        del by_name["EndWall"].texts[4]
+    elif fault == "end-wall-callout-above":
+        by_name["EndWall"].texts[3] = by_name["EndWall"].texts.pop(4)
+    elif fault == "end-wall-short-arrows":
+        by_name["EndWall"].ArrowSide = 0
+    elif fault == "end-wall-nominal":
+        by_name["EndWall"].dimension.SystemValue -= 0.0001
+    elif fault == "end-wall-missing":
+        annotations = [a for a in annotations if a.name != "EndWall"]
     if fault is None:
         draw.assert_receipt_controls(object(), annotations)
     else:

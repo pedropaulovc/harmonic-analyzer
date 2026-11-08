@@ -6,10 +6,11 @@ HIWIN reference STEP (the member specs record every source):
 * ``Rail`` (default): the end-face ``SECTION`` on the Right plane extruded to
   the trimmed base-bar length, then eight Ø4.5 holes and Ø7.5 counterbores
   down from the top. Every hole is placed from the -X end face (rule 10:
-  baseline, never chained); the extrusion's ``Length`` and the eight
-  ``Station<n>`` dimensions are marked for the receipt sheet, each station
-  carrying the base bar's receipt band as its native tolerance. Frame: origin
-  at the -X end face, on the seat face, on the rail centreline.
+  baseline, never chained); the extrusion's ``Length``, the eight
+  ``Station<n>`` dimensions and the hidden ``SupplierReference`` sketch's
+  ``EndWall`` chord (far end face to far counterbore edge; it changes no
+  solid) are marked for the receipt sheet as untoleranced references.
+  Frame: origin at the -X end face, on the seat face, on the rail centreline.
 * ``Carriage``: ``EndCaps`` (``CAP_OUTLINE`` mid-plane over L 61.4),
   ``SteelBody`` (``BODY_OUTLINE`` over L1 39.4), the offset rail ``Channel``
   cut through, four Ø3.242 x 5 ``M4Bores`` down from the mounting face, and
@@ -74,6 +75,8 @@ from _sketch import (
 )
 from _sketch_chains import define_polygon_chain
 from _sketch_circle import define_circle
+from _supplier_screw_reference import add_supplier_reference_sketch
+from _supplier_screw_reference_names import FEATURE_BY_PLANE
 from _visibility import assert_reference_geometry_hidden, blank_reference_geometry
 
 PART_NAME = "ch-rocker-arm-tl-vn-oblique-rail-kit"
@@ -92,6 +95,8 @@ STOCK_PROPERTIES = {
     "Supplier SKUs": ", ".join(str(sku) for sku in _PART["supplier_skus"]),
 }
 MEMBER_SPECS = {RAIL_CONFIGURATION: rail, CARRIAGE_CONFIGURATION: carriage}
+if rail.SUPPLIER_REFERENCE != FEATURE_BY_PLANE["Front"]:
+    raise AssertionError("the rail's EndWall carrier is not the helper's Front sketch")
 # Parent sketches and planes precede their dependent features; no feature is
 # shared by the two members.
 MEMBER_FEATURES = {
@@ -103,6 +108,7 @@ MEMBER_FEATURES = {
         "RailTop",
         "CounterboreProfile",
         "Counterbores",
+        rail.SUPPLIER_REFERENCE,
     ),
     CARRIAGE_CONFIGURATION: (
         "EndCapSection",
@@ -285,7 +291,8 @@ def _require_one_solid_body(adapter: Any, *, label: str) -> None:
 
 
 async def _author_rail(adapter: Any) -> None:
-    """The HGR15 rail: section, eight through holes, eight counterbores."""
+    """The HGR15 rail: section, eight through holes, eight counterbores and
+    the hidden EndWall reference chord."""
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
     await _section_sketch(adapter, rail.SECTION, "rail section")
@@ -343,12 +350,22 @@ async def _author_rail(adapter: Any) -> None:
     await volume_check(
         adapter, "counterbores", volume - V_CBORE_ANNULI, 0.01 * V_CBORE_ANNULI
     )
+    # The end wall's hidden reference chord: a sketch dimension only, so the
+    # unchanged volume and centroid checks below prove the solid unchanged.
+    # The helper marks EndWall for drawing itself.
+    await add_supplier_reference_sketch(
+        adapter,
+        rail.END_WALL_REFERENCE,
+        starts=rail.END_WALL_REFERENCE_STARTS,
+        planes={},
+    )
     await _rail_checks(adapter)
 
     # Nominal supplier/matched-layout references carry no fabrication band.
     apply_drawing_precision(adapter, rail.DRAWING_PRECISION)
     for feature_name, names in rail.DRAWING_DIMENSIONS.items():
-        mark_dimensions_for_drawing(adapter, feature_name, names)
+        if feature_name != rail.SUPPLIER_REFERENCE:
+            mark_dimensions_for_drawing(adapter, feature_name, names)
 
 
 async def _rail_checks(adapter: Any) -> None:

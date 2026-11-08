@@ -1,9 +1,10 @@
 r"""Pure-data envelope of the kit's ``Rail`` member: HGR15 datum-trimmed to its actual base bar (MHA-CH-06-TL-VN-83).
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
-closure: ``build_ch_rocker_arm_tl_vn_oblique_rail_kit`` extrudes ``SECTION``
-and cuts the eight counterbored holes in the ``Rail`` configuration, and the
-carriage member spec reads ``SECTION`` for its running clearance.
+closure: ``build_ch_rocker_arm_tl_vn_oblique_rail_kit`` extrudes ``SECTION``,
+cuts the eight counterbored holes and authors the hidden ``EndWall``
+reference chord in the ``Rail`` configuration, and the carriage member spec
+reads ``SECTION`` for its running clearance.
 
 Two rails, one per base bar (MHA-CH-06-TL-20), each carrying one HGH15CA
 carriage, the kit's ``Carriage`` member
@@ -284,15 +285,31 @@ VOLUME_TOL_MM3 = 5e-4 * VOLUME_MM3
 STATION_DIMENSIONS: tuple[str, ...] = tuple(
     f"Station{k}" for k in range(1, HOLE_COUNT + 1)
 )
+# The end wall, end face to the end counterbore's edge, as the nominal
+# model's reference: a hidden construction chord on the Front (seat) plane,
+# sketch (u, v) = model (x, y), along the centreline from the FAR (+X) end
+# face toward -X (a negative value runs toward -X) to the far counterbore's
+# +X edge. The pattern is symmetric, so this wall is the near end's too.
+# The chord is a sketch reference dimension; it changes no solid.
+END_WALL = HOLE_X[0] - CBORE_DIA / 2.0
+END_WALL_DIMENSION = "EndWall"
+END_WALL_REFERENCE: tuple[tuple[str, float, str], ...] = (
+    (END_WALL_DIMENSION, -END_WALL, "horizontal"),
+)
+END_WALL_REFERENCE_STARTS = {END_WALL_DIMENSION: (LENGTH, 0.0)}
+# The hidden sketch add_supplier_reference_sketch authors on Front.
+SUPPLIER_REFERENCE = "SupplierReference"
 DRAWING_DIMENSIONS = {
     "Rail": {"Length"},
     "BoltHoleProfile": set(STATION_DIMENSIONS),
+    SUPPLIER_REFERENCE: {END_WALL_DIMENSION},
 }
 # Three places preserve the exact nominal metric station after trimming.
 REFERENCE_PLACES = base_bar.RAIL_HOLE_PLACES
 DRAWING_PRECISION = {
     "Rail": {"Length": 3},
     "BoltHoleProfile": dict.fromkeys(STATION_DIMENSIONS, REFERENCE_PLACES),
+    SUPPLIER_REFERENCE: {END_WALL_DIMENSION: REFERENCE_PLACES},
 }
 # No supplier pitch precision is published or assumed. The matched pair is
 # accepted by free screw insertion with both ends flush, not a station band.
@@ -313,13 +330,14 @@ END_FIT_CALLOUT = (
 # Main's explicit 2026-11-07 sheet ruling prints the metric wall as 2.0 MIN.
 # The existing conservative 2.032 mm source-envelope guard remains unchanged.
 WALL_ACCEPTANCE_MM = 2.0
-# The end walls' acceptance prints in words at a leader on each rail end face
-# (rule 7: a short requirement at its leader, no flag). It is the member's
-# one manufacturing note. The pairing of each rail with its bar and the free
-# screw entry are the jig's steps (MHA-CH-06-TL-00 steps 1E, 1F), not this
-# part sheet's (rule 7).
-WALL_CALLOUT = f"END WALL\n{WALL_ACCEPTANCE_MM:.1f} MIN"
-DRAWING_NOTES = WALL_CALLOUT
+# The end walls' acceptance is the EndWall reference dimension's callout
+# below its value (machinist review, farm run 20261108T031012373Z: a worded
+# "END WALL" leader did not say what the 2.0 runs between). One dimension,
+# 2X: the walls at both ends. It is the member's one manufacturing note. The
+# pairing of each rail with its bar and the free screw entry are the jig's
+# steps (MHA-CH-06-TL-00 steps 1E, 1F), not this part sheet's (rule 7).
+END_WALL_CALLOUT = f"2X, {WALL_ACCEPTANCE_MM:.1f} MIN AFTER TRIM"
+DRAWING_NOTES = END_WALL_CALLOUT
 # The member's native BOM row under the kit's one Number.
 BOM_DESCRIPTION = f"{STYLE} RAIL, {LENGTH:.3f} MM, KIT, TRIMMED"
 if abs(LENGTH - (2.0 * HOLE_END + (HOLE_COUNT - 1) * HOLE_PITCH)) > 1e-9:
