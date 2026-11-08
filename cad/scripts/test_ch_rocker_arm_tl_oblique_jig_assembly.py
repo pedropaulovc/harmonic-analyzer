@@ -2217,7 +2217,7 @@ def test_kit_rails_and_carriages_carry_the_owner_note_and_the_play_check() -> No
     assert carriage.STYLE in preparation
     assert "ROCK ALL 4 SIDEWAYS UNDER AN INDICATOR; KEEP THE 2 TIGHTEST, ONE PER RAIL." in preparation
     assert "ONLY ONTO A KIT FALSE RAIL" in preparation
-    assert "IF NONE MEETS 0.02, FIT A PRELOADED (Z0/ZA) HGH15CA CARRIAGE." in preparation
+    assert "IF NONE MEETS 0.02 MM, FIT A PRELOADED (Z0/ZA) HGH15CA CARRIAGE." in preparation
     assert trammel.RAIL_HOLE_COUNT == 8
 
 
