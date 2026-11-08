@@ -80,16 +80,18 @@ def visibility_fixture(states=(True, True, False)):
 
 def test_batches_both_polarities_and_skips_unchanged():
     adapter, view, components, calls, selected = visibility_fixture()
-    visibility.set_drawing_view_instance_visibility(
+    returned = visibility.set_drawing_view_instance_visibility(
         adapter, view, frozenset({"item-0", "item-2"}), mode="show", label="test"
     )
+    assert returned is view
     assert [c.Visible for c in components] == [True, False, True]
     assert calls == [("hide", (components[1].Name,)), ("show", (components[2].Name,)), ("rebuild",)]
     assert selected == []
     calls.clear()
-    visibility.set_drawing_view_instance_visibility(
+    returned = visibility.set_drawing_view_instance_visibility(
         adapter, view, frozenset({"item-0", "item-2"}), mode="show", label="noop"
     )
+    assert returned is view
     assert calls == []
 
 
@@ -251,16 +253,22 @@ def section_fixture(count=3, shown_count=1):
             Component=selected[index - 1].Component,
         )
     )
+    model = adapter.currentModel
+    model.GetPathName = lambda: "C:/native/drawing.SLDDRW"
+    model.GetTitle = lambda: "drawing.SLDDRW"
+    model.GetViews = lambda: ((SimpleNamespace(GetName2=lambda: "Sheet1"), view),)
+    adapter.swApp.GetDocuments = lambda: (model,)
     return adapter, view, components, calls, selected, hidden, wrapper
 
 
 @pytest.mark.parametrize("count,shown_count", [(3, 1), (147, 5)])
 def test_section_uses_hidden_inventory_for_noop_not_true_tree_flags(count, shown_count):
     adapter, view, components, calls, _, hidden, _ = section_fixture(count, shown_count)
-    visibility.set_drawing_view_instance_visibility(
+    returned = visibility.set_drawing_view_instance_visibility(
         adapter, view, frozenset(f"item-{i}" for i in range(shown_count)),
         mode="show", label="section noop",
     )
+    assert returned is view
     assert calls == []
     assert hidden == set(range(shown_count, count))
     assert all(component.Visible is True for component in components)
@@ -416,3 +424,225 @@ def test_section_hidden_inventory_rejects_two_proved_representations():
     view.GetHiddenComponents = lambda: (wrapped,)
     with pytest.raises(RuntimeError, match="2 exact view matches"):
         visibility._visibility_components(view, label="ambiguous hidden owner")
+
+
+@pytest.mark.parametrize("document_path", ["C:/native/drawing.SLDDRW", ""])
+def test_section_returns_fresh_view_for_show_restore_and_noop(document_path):
+    adapter, view, components, calls, selected, hidden, _ = section_fixture()
+    model = adapter.currentModel
+    model.GetPathName = lambda: document_path
+    current = [view]
+    current_model = [model]
+    adapter.swApp.GetDocuments = lambda: (current_model[0],)
+    stale = []
+    sheet = SimpleNamespace(GetName2=lambda: "Sheet1")
+    model.GetViews = lambda: ((sheet, current[0]),)
+    model.SelectionManager.GetSelectedObjectsDrawingView2 = lambda index, mark: current[0]
+
+    for component in components:
+        def select(append, data, component=component):
+            assert append and data.View is current[0]
+            selected.append(component)
+            return True
+        component.Select = select
+
+    def stale_model_access(*args):
+        raise AssertionError("retained pre-rebuild model used")
+
+    def rebuild():
+        calls.append(("rebuild",))
+        previous = current[0]
+        fresh = SimpleNamespace(**vars(previous))
+        aliases = [SimpleNamespace(**vars(component)) for component in components]
+        for alias in aliases:
+            alias.Name = "stale/duplicate"
+        previous.RootDrawingComponent2 = lambda resolve: SimpleNamespace(GetChildren=aliases)
+        stale.append(previous)
+        current[0] = fresh
+        previous_model = current_model[0]
+        current_model[0] = SimpleNamespace(**vars(previous_model))
+        previous_model.GetPathName = stale_model_access
+        previous_model.ClearSelection2 = stale_model_access
+        return True
+
+    model.EditRebuild3 = rebuild
+    shown = visibility.set_drawing_view_instance_visibility(
+        adapter, view, frozenset({"item-0", "item-1"}), mode="show", label="show"
+    )
+    assert shown is current[0] and shown is not view
+    assert adapter.currentModel is current_model[0] and adapter.currentModel is not model
+    assert hidden == {2}
+    restored = visibility.set_drawing_view_instance_visibility(
+        adapter, shown, frozenset({"item-0"}), mode="show", label="restore"
+    )
+    assert restored is current[0] and restored is not shown
+    assert adapter.currentModel is current_model[0]
+    assert hidden == {1, 2}
+    unchanged = visibility.set_drawing_view_instance_visibility(
+        adapter, restored, frozenset({"item-0"}), mode="show", label="noop"
+    )
+    assert unchanged is restored
+    assert calls == [
+        ("show", (components[1].Name,)), ("rebuild",),
+        ("hide", (components[1].Name,)), ("rebuild",),
+    ]
+    assert selected == [] and all(component.Visible for component in components)
+    for retained in stale:
+        with pytest.raises(RuntimeError, match="duplicate drawing component"):
+            visibility._visibility_components(retained, label="retained proxy")
+
+
+@pytest.mark.parametrize("phase", ["preflight", "readback"])
+@pytest.mark.parametrize("fault", [
+    "missing-document", "duplicate-document", "unreadable-documents",
+    "missing-view", "duplicate-view", "unreadable-views",
+])
+def test_section_resolution_refuses_missing_or_ambiguous_identity(phase, fault):
+    adapter, view, _, calls, selected, _, _ = section_fixture()
+    model = adapter.currentModel
+    sheet = SimpleNamespace(GetName2=lambda: "Sheet1")
+
+    def corrupt():
+        if fault == "missing-document":
+            adapter.swApp.GetDocuments = lambda: ()
+        elif fault == "duplicate-document":
+            adapter.swApp.GetDocuments = lambda: (model, model)
+        elif fault == "unreadable-documents":
+            adapter.swApp.GetDocuments = lambda: None
+        elif fault == "missing-view":
+            model.GetViews = lambda: ((sheet,),)
+        elif fault == "duplicate-view":
+            model.GetViews = lambda: ((sheet, view, view),)
+        else:
+            model.GetViews = lambda: None
+
+    if phase == "preflight":
+        corrupt()
+    else:
+        def rebuild():
+            calls.append(("rebuild",))
+            corrupt()
+            return True
+        model.EditRebuild3 = rebuild
+    with pytest.raises(RuntimeError, match="expected one|inventory is unreadable"):
+        visibility.set_drawing_view_instance_visibility(
+            adapter, view, frozenset({"item-0", "item-1"}), mode="show", label=fault
+        )
+    assert selected == []
+    if phase == "preflight":
+        assert calls == []
+    else:
+        assert calls[-1] == ("rebuild",)
+
+
+def test_family_isolation_returns_reacquired_section(monkeypatch):
+    adapter, view, components, _, _, _, _ = section_fixture()
+    model = adapter.currentModel
+    fresh = SimpleNamespace(**vars(view))
+    sheet = SimpleNamespace(GetName2=lambda: "Sheet1")
+
+    def rebuild():
+        model.GetViews = lambda: ((sheet, fresh),)
+        return True
+
+    model.EditRebuild3 = rebuild
+    monkeypatch.setattr(
+        visibility, "_drawing_component_stems",
+        lambda adapter, component, stems: {"family"} if component is components[1] else set(),
+    )
+    returned = visibility.isolate_drawing_view_components(
+        adapter, view, visible_stems=frozenset({"family"}), label="family section"
+    )
+    assert returned is fresh
+
+
+def test_generic_seat_double_preserves_visibility_view_return(monkeypatch):
+    from types import ModuleType
+    from _test_stubbed_build import stub_seat
+
+    recipe = ModuleType("visibility_return_recipe")
+    recipe.isolate_drawing_view_components = visibility.isolate_drawing_view_components
+    recipe.set_drawing_view_instance_visibility = visibility.set_drawing_view_instance_visibility
+    seat = stub_seat(monkeypatch, recipe, keep=())
+    adapter, view = object(), object()
+    assert recipe.isolate_drawing_view_components(
+        adapter, view, visible_stems=frozenset({"family"}), label="family"
+    ) is view
+    assert recipe.set_drawing_view_instance_visibility(
+        adapter, view, frozenset({"instance"}), mode="show", label="instance"
+    ) is view
+    assert seat.isolate_drawing_view_components.call_count == 1
+    assert seat.set_drawing_view_instance_visibility.call_count == 1
+
+
+def test_section_resolver_refusal_never_cleans_up_stale_model(monkeypatch):
+    adapter, view, _, _, selected, _, _ = section_fixture()
+    model = adapter.currentModel
+    events = []
+    monkeypatch.setattr(visibility._telemetry, "event", lambda name, **fields: events.append((name, fields)))
+
+    def stale_clear(*args):
+        raise AssertionError("stale model cleanup must not run")
+
+    def rebuild():
+        model.ClearSelection2 = stale_clear
+        adapter.swApp.GetDocuments = lambda: ()
+        return True
+
+    model.EditRebuild3 = rebuild
+    with pytest.raises(RuntimeError, match="expected one current drawing"):
+        visibility.set_drawing_view_instance_visibility(
+            adapter, view, frozenset({"item-0", "item-1"}), mode="show", label="lost drawing"
+        )
+    assert selected == []
+    timing = next(fields for name, fields in events if name == "drawing.visibility.timings")
+    assert timing["outcome"] == "failed" and timing["cleanup_error"] == ""
+
+
+def test_cleanup_failure_preserves_primary_refusal_and_timing(monkeypatch):
+    adapter, view, components, _, _, = visibility_fixture()
+    events = []
+    clears = []
+    primary = RuntimeError("primary selection failure")
+
+    def clear(*args):
+        clears.append("clear")
+        if len(clears) > 1:
+            raise RuntimeError("secondary cleanup failure")
+
+    def select(*args):
+        raise primary
+
+    adapter.currentModel.ClearSelection2 = clear
+    components[1].Select = select
+    monkeypatch.setattr(visibility._telemetry, "event", lambda name, **fields: events.append((name, fields)))
+    with pytest.raises(RuntimeError, match="primary selection failure") as caught:
+        visibility.set_drawing_view_instance_visibility(
+            adapter, view, frozenset({"item-0", "item-2"}), mode="show", label="selection failure"
+        )
+    assert caught.value is primary
+    assert "secondary cleanup failure" in " ".join(primary.__notes__)
+    timing = next(fields for name, fields in events if name == "drawing.visibility.timings")
+    assert timing["outcome"] == "failed" and "secondary cleanup failure" in timing["cleanup_error"]
+    assert len(clears) == 2
+
+
+def test_failed_post_command_clear_is_not_retried(monkeypatch):
+    adapter, view, _, calls, _ = visibility_fixture()
+    clear_count = 0
+    events = []
+
+    def clear(*args):
+        nonlocal clear_count
+        clear_count += 1
+        if clear_count == 2:
+            raise RuntimeError("post-command clear failed")
+
+    adapter.currentModel.ClearSelection2 = clear
+    monkeypatch.setattr(visibility._telemetry, "event", lambda name, **fields: events.append((name, fields)))
+    with pytest.raises(RuntimeError, match="post-command clear failed"):
+        visibility.set_drawing_view_instance_visibility(
+            adapter, view, frozenset({"item-0", "item-2"}), mode="show", label="clear failure"
+        )
+    assert clear_count == 2 and ("rebuild",) not in calls
+    assert any(name == "drawing.visibility.timings" for name, _ in events)

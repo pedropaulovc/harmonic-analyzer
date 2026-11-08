@@ -4417,9 +4417,12 @@ def test_place_bom_sheet_preserves_native_grouped_quantities_with_visible_number
     for name in (
         "_activate_sheet", "set_high_quality_shaded_with_edges",
         "apply_view_configuration", "_place_sheet_note", "_link_view_to_bom",
-        "set_drawing_view_instance_visibility", "_shift_view", "_uncross_ring",
+        "_shift_view", "_uncross_ring",
     ):
         monkeypatch.setattr(drawing, name, lambda *_, **__: None)
+    monkeypatch.setattr(
+        drawing, "set_drawing_view_instance_visibility", lambda _adapter, view, *_, **__: view
+    )
     # Model the observed post-operation views, without attributing the native
     # configuration change to any particular link/isolation/scale operation.
     native_views = iter((

@@ -747,6 +747,7 @@ def _stub_drive_train_sheets(monkeypatch, fitted_for):
         def call(*_args, **_kwargs):
             view = by_sheet[active[0]]
             seen.append((event, view.configuration, view.exploded_in))
+            return view
 
         return call
 

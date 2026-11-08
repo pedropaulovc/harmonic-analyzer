@@ -3055,9 +3055,7 @@ def _fit_cluster_view(
     # the ring fits, and later every balloon attaches to, the geometry the
     # sheet prints.
     configuration = _configure_view(adapter, view, exploded=True, label=label)
-    set_drawing_view_instance_visibility(
-        adapter, view, frozenset(facts.clusters[cluster]), mode="show", label=label
-    )
+    view = set_drawing_view_instance_visibility(adapter, view, frozenset(facts.clusters[cluster]), mode="show", label=label)
     preferred_outline = _view_outline(view)
     scale = cluster_ring_scale(preferred_outline, preferred, label=label)
     outline = preferred_outline
@@ -3227,7 +3225,7 @@ def _setting_view(
     step(f"{label}: set_hidden_lines_removed")
     _configure_view(adapter, view, exploded=False, label=label)
     step(f"{label}: configure_view")
-    set_drawing_view_instance_visibility(adapter, view, names, mode="show", label=label)
+    view = set_drawing_view_instance_visibility(adapter, view, names, mode="show", label=label)
     step(f"{label}: isolate_instances")
     projected = model_point_in_view(
         adapter, view, tuple(value / 1000.0 for value in model_point), label=label

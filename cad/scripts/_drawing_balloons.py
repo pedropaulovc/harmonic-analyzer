@@ -699,6 +699,85 @@ def _visibility_owner_chain(component: Any, *, label: str) -> tuple[_VisibilityO
     return tuple(chain)
 
 
+@dataclass(frozen=True)
+class _SectionVisibilityIdentity:
+    document_path: str
+    document_title: str
+    sheet_name: str
+    view_name: str
+
+
+def _section_views(model: Any, *, label: str):
+    sheets = _early_bound(model, "IDrawingDoc").GetViews()
+    if not isinstance(sheets, (tuple, list)):
+        raise RuntimeError(f"{label}: drawing sheet inventory is unreadable")
+    for sheet in sheets:
+        if not isinstance(sheet, (tuple, list)) or not sheet:
+            raise RuntimeError(f"{label}: drawing view inventory is unreadable")
+        sheet_name = _early_bound(sheet[0], "IView").GetName2()
+        if not isinstance(sheet_name, str) or not sheet_name:
+            raise RuntimeError(f"{label}: drawing sheet has no stable name")
+        for raw in sheet[1:]:
+            candidate = _early_bound(raw, "IView")
+            if int(candidate.Type) == 2:
+                yield sheet_name, candidate
+
+
+def _resolve_section_visibility_view(
+    app: Any, identity: _SectionVisibilityIdentity, *, label: str
+) -> tuple[Any, Any]:
+    """Resolve fresh proxies, including unsaved drawings with an empty path."""
+    documents = app.GetDocuments()
+    if not isinstance(documents, (tuple, list)):
+        raise RuntimeError(f"{label}: open document inventory is unreadable")
+    matches = []
+    for raw in documents:
+        document = _early_bound(raw, "IModelDoc2")
+        if int(document.GetType()) != 3:
+            continue
+        if (document.GetPathName(), document.GetTitle()) == (
+            identity.document_path, identity.document_title
+        ):
+            matches.append(document)
+    if len(matches) != 1:
+        raise RuntimeError(f"{label}: expected one current drawing for {identity!r}; found {len(matches)}")
+    document = matches[0]
+    views = [
+        candidate for sheet_name, candidate in _section_views(document, label=label)
+        if sheet_name == identity.sheet_name and candidate.GetName2() == identity.view_name
+    ]
+    if len(views) != 1:
+        raise RuntimeError(f"{label}: expected one current section for {identity!r}; found {len(views)}")
+    return document, views[0]
+
+
+def _section_visibility_identity(
+    app: Any, model: Any, view: Any, *, label: str
+) -> _SectionVisibilityIdentity:
+    """Prove a unique plain identity before a command can invalidate wrappers."""
+    path, title, name = model.GetPathName(), model.GetTitle(), view.GetName2()
+    if not isinstance(path, str) or any(not isinstance(value, str) or not value for value in (title, name)):
+        raise RuntimeError(f"{label}: drawing or section identity is unreadable")
+    matches = []
+    for sheet_name, candidate in _section_views(model, label=label):
+        if candidate.GetName2() != name:
+            continue
+        comparison = app.IsSame(candidate, view)
+        if type(comparison) is not int or comparison not in (0, 1):
+            raise RuntimeError(f"{label}: section identity comparison is unreadable: {comparison!r}")
+        if comparison == 1:
+            matches.append(_SectionVisibilityIdentity(path, title, sheet_name, name))
+    if len(matches) != 1:
+        raise RuntimeError(f"{label}: expected one native section identity; found {len(matches)}")
+    identity = matches[0]
+    current_model, current_view = _resolve_section_visibility_view(app, identity, label=label)
+    for current, expected in ((current_model, model), (current_view, view)):
+        comparison = app.IsSame(current, expected)
+        if type(comparison) is not int or comparison != 1:
+            raise RuntimeError(f"{label}: section identity resolved to a different native object")
+    return identity
+
+
 def _section_source_document(view: Any, *, label: str) -> Any:
     """Resolve the documented base-view source, never the session's active model."""
     seen: set[str] = set()
@@ -809,12 +888,13 @@ def _apply_drawing_visibility(
     *,
     enumerate_seconds: float,
     label: str,
-) -> None:
+) -> Any:
     """Batch only changed drawing occurrences; never touch the source assembly.
 
     IDrawingComponent.Select supplies drawing-context selections. The SDK's
     IModelDoc2 HideComponent2/ShowComponent2 commands support drawing documents.
     Both return void, so exact post-rebuild readback is the success criterion.
+    Return the usable view: a changed section must be reacquired after rebuild.
     """
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     if int(model.GetType()) != 3:  # swDocDRAWING
@@ -832,6 +912,8 @@ def _apply_drawing_visibility(
     selection_seconds = apply_seconds = rebuild_seconds = readback_seconds = 0.0
     started = perf_counter()
     outcome = "failed"
+    selection_owner = None
+    primary_error = None
     try:
         if changed:
             tick = perf_counter()
@@ -839,6 +921,10 @@ def _apply_drawing_visibility(
             self_comparison = app.IsSame(view, view)
             if type(self_comparison) is not int or self_comparison != 1:
                 raise RuntimeError(f"{label}: native view identity self-control failed: {self_comparison!r}")
+            section_identity = (
+                _section_visibility_identity(app, model, view, label=label)
+                if int(view.Type) == 2 else None
+            )
             planned_owners: dict[str, Any] = {}
             owner_keys: set[_VisibilityOwner] = set()
             for group in groups.values():
@@ -861,6 +947,7 @@ def _apply_drawing_visibility(
                     continue
                 tick = perf_counter()
                 model.ClearSelection2(True)
+                selection_owner = model
                 for row in group:
                     if not row.component.Select(True, data):
                         raise RuntimeError(f"{label}: could not select drawing component {row.name!r}")
@@ -898,12 +985,19 @@ def _apply_drawing_visibility(
                 else:
                     model.HideComponent2()
                 apply_seconds += perf_counter() - tick
+                # Cleanup is attempted once, before rebuild can stale a proxy.
+                selection_owner = None
                 model.ClearSelection2(True)
             tick = perf_counter()
             if not model.EditRebuild3():
                 raise RuntimeError(f"{label}: rebuild after visibility changes failed")
             rebuild_seconds = perf_counter() - tick
         tick = perf_counter()
+        if changed and section_identity is not None:
+            # SOLIDWORKS 2026 SP4 exposed alias names through the retained
+            # section wrapper after ShowComponent2. Never inspect it again.
+            model, view = _resolve_section_visibility_view(app, section_identity, label=label)
+            adapter.currentModel = model
         after = _visibility_components(view, label=label)
         observed = {row.name: row.visible for row in after}
         flag_drift = {
@@ -930,9 +1024,18 @@ def _apply_drawing_visibility(
             )),
         )
         outcome = "verified"
+    except BaseException as error:
+        primary_error = error
+        raise
     finally:
-        if changed:
-            model.ClearSelection2(True)
+        cleanup_error = None
+        if selection_owner is not None:
+            try:
+                selection_owner.ClearSelection2(True)
+            except Exception as error:
+                cleanup_error = error
+                if primary_error is not None:
+                    primary_error.add_note(f"{label}: selection cleanup also failed: {error!r}")
         _telemetry.event(
             "drawing.visibility.timings", label=label, strategy="batch_commands", outcome=outcome,
             enumerated=len(rows), changed=changed, unchanged=len(rows) - changed,
@@ -940,7 +1043,11 @@ def _apply_drawing_visibility(
             enumerate_seconds=enumerate_seconds, selection_seconds=selection_seconds,
             apply_seconds=apply_seconds, rebuild_seconds=rebuild_seconds,
             readback_seconds=readback_seconds, total_seconds=enumerate_seconds + perf_counter() - started,
+            cleanup_error=repr(cleanup_error) if cleanup_error is not None else "",
         )
+        if cleanup_error is not None and primary_error is None:
+            raise cleanup_error
+    return view
 
 
 @_telemetry.traced("drawing.isolate_components", label_param="label")
@@ -950,8 +1057,8 @@ def isolate_drawing_view_components(
     *,
     visible_stems: frozenset[str],
     label: str,
-) -> None:
-    """Show only requested leaf families, preserving parent visibility."""
+) -> Any:
+    """Show requested leaf families; return the current usable drawing view."""
     if not visible_stems:
         raise ValueError(f"{label}: visible component set must not be empty")
     started = perf_counter()
@@ -974,19 +1081,20 @@ def isolate_drawing_view_components(
     for row in rows:
         if not row.parent and desired[row.name] and any(not desired[name] for name in row.ancestors):
             raise RuntimeError(f"{label}: requested component {row.name!r} has a hidden ancestor")
-    _apply_drawing_visibility(
+    view = _apply_drawing_visibility(
         adapter, view, rows, desired,
         enumerate_seconds=perf_counter() - started, label=label,
     )
     _telemetry.success(f"{label}: isolated {', '.join(sorted(found))}")
+    return view
 
 
 @_telemetry.traced("drawing.isolate_instances", label_param="label")
 def set_drawing_view_instance_visibility(
     adapter: Any, view: Any, names: frozenset[str], *,
     mode: Literal["show", "hide"], label: str
-) -> None:
-    """Show or hide named top-level instances; every other takes the opposite."""
+) -> Any:
+    """Set top-level visibility and return the current view for subsequent use."""
     started = perf_counter()
     view = _early_bound(view, "IView")
     rows = _visibility_components(view, label=label)
@@ -999,7 +1107,7 @@ def set_drawing_view_instance_visibility(
             row.visible if row.ancestors else (_instance_name(row.name) in names) == (mode == "show")
         ) for row in rows
     }
-    _apply_drawing_visibility(
+    return _apply_drawing_visibility(
         adapter, view, rows, desired,
         enumerate_seconds=perf_counter() - started, label=label,
     )

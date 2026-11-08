@@ -2332,9 +2332,7 @@ def _place_deck_detail(
     centre = model_point_in_view(adapter, view, detail.model_centre_m, label=label)
     if max(abs(a - b) for a, b in zip(centre, detail.centre)) > _VIEW_POSITION_TOL_M:
         raise RuntimeError(f"{label} centre sits at {centre!r}, not {detail.centre!r}")
-    isolate_drawing_view_components(
-        adapter, view, visible_stems=frozenset(detail.stems), label=label
-    )
+    view = isolate_drawing_view_components(adapter, view, visible_stems=frozenset(detail.stems), label=label)
     _sketch_view_circle(adapter, view, detail.centre, detail.radius_m, label=label)
     status = int(view.Crop2(False, False, 1))
     adapter.currentModel.ClearSelection2(True)
