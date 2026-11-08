@@ -423,13 +423,33 @@ def test_hole_sketch_places_every_station_from_the_end_face(monkeypatch) -> None
 def test_rail_receipt_note_points_at_the_stations() -> None:
     bar = _config.parts("ch-rocker-arm-tl-oblique-base-bar")
     # The pairing and free screw entry are the jig's steps (rule 7): the
-    # member's one note is the end walls' acceptance, the EndWall reference
-    # dimension's callout (no flag, no footer note).
-    assert rail.END_WALL_CALLOUT.splitlines() == ["2X, 2.0 MIN", "AFTER TRIM"]
-    assert rail.DRAWING_NOTES == "2X, 2.0 MIN AFTER TRIM"
+    # member's one note is the end walls' acceptance. The EndWall location
+    # dimension carries its count only (rule 7); note 1 names the trim's
+    # step and what it leaves, the dimension's value at both ends 2.0 MIN.
+    # Note 1 stands under FRONT's caption, left of the title block.
+    label, cx, cy, _ = draw.CAPTIONS[0]
+    assert label == "FRONT"
+    assert draw.END_WALL_NOTE_CELL[3] + draw.CLEAR_GAP_M <= cy - 0.006
+    assert draw.END_WALL_NOTE_CELL[2] < 0.200
+    x, y = draw.END_WALL_NOTE_XY
+    rows = rail.END_WALL_NOTE.splitlines()
+    assert x + max(map(len, rows)) * 0.0020 <= draw.END_WALL_NOTE_CELL[2]
+    assert y - len(rows) * 0.005 >= draw.END_WALL_NOTE_CELL[1]
+    assert rail.END_WALL_CALLOUT == "2X"
+    note = " ".join(rail.END_WALL_NOTE.splitlines())
+    assert rail.DRAWING_NOTES == note
+    assert note.startswith("1. ")
+    assert f"AT {rail.TRIM_STEP}," in note
+    assert f"({rail.END_WALL:.{rail.REFERENCE_PLACES}f})" in note
+    assert f"IS {rail.WALL_ACCEPTANCE_MM:.1f} MIN." in note
+    assert max(len(row) for row in rail.END_WALL_NOTE.splitlines()) <= 44
     assert not hasattr(rail, "WALL_CALLOUT")
-    assert f"{rail.WALL_ACCEPTANCE_MM:.1f} MIN" in rail.END_WALL_CALLOUT
-    assert "[" not in rail.END_WALL_CALLOUT
+    # The cited step is the one that trims each rail to its bar.
+    step = rail.TRIM_STEP.rsplit(" ", 1)[1]
+    assert any(
+        text.startswith(f"{step}. ") and "TRIM EACH RAIL" in text
+        for text in jig.ASSEMBLY_STEPS
+    )
     assert rail.WALL_ACCEPTANCE_MM == 2.0
     assert "MHA-CH-06-TL-00 SHEET 1 LIMITS; SEALS ON RAIL, NO BIND" in rail.END_FIT_CALLOUT
     # The flag gives the hole pattern as one REF pattern (rule 10), then its

@@ -330,16 +330,26 @@ END_FIT_CALLOUT = (
 # Main's explicit 2026-11-07 sheet ruling prints the metric wall as 2.0 MIN.
 # The existing conservative 2.032 mm source-envelope guard remains unchanged.
 WALL_ACCEPTANCE_MM = 2.0
-# The end walls' acceptance is the EndWall reference dimension's callout
-# below its value (machinist review, farm run 20261108T031012373Z: a worded
-# "END WALL" leader did not say what the 2.0 runs between). One dimension,
-# 2X: the walls at both ends. Two rows, so it fits between the pattern
-# callout and the far end. It is the member's one manufacturing note, on one
-# line. The pairing of each rail with its bar and the free screw entry are
-# the jig's steps (MHA-CH-06-TL-00 steps 1E, 1F), not this part sheet's
-# (rule 7).
-END_WALL_CALLOUT = f"2X, {WALL_ACCEPTANCE_MM:.1f} MIN\nAFTER TRIM"
-DRAWING_NOTES = " ".join(END_WALL_CALLOUT.splitlines())
+# The EndWall reference dimension prints at the far end with its count only
+# (rule 7: a location dimension carries its value and band, no words). Note 1
+# says in words what the trim is, where it happens and what it must leave:
+# the dimension's value, the walls at both ends, 2.0 MIN (machinist review,
+# farm run 20261108T055401995Z, 3 of 3 runs: "AFTER TRIM" under the value
+# was an undefined process reference and words on a location; before it, run
+# 20261108T031012373Z: a worded "END WALL" leader did not say what the 2.0
+# runs between). The trim is MHA-CH-06-TL-00 step 1's ("TRIM EACH RAIL TO ITS
+# ACTUAL BAR, FLUSH BOTH ENDS"). The note is the member's one manufacturing
+# note, on one line. The pairing of each rail with its bar and the free screw
+# entry stay the jig's steps (rule 7).
+END_WALL_CALLOUT = "2X"
+TRIM_STEP = "MHA-CH-06-TL-00 STEP 1"
+END_WALL_NOTE = (
+    "1. EACH RAIL IS TRIMMED TO ITS BASE BAR AT\n"
+    f"{TRIM_STEP}, EITHER END, {HOLE_COUNT} HOLES\n"
+    f"KEPT. AFTER TRIM, EACH END WALL ({END_WALL:.{REFERENCE_PLACES}f}),\n"
+    f"END FACE TO COUNTERBORE, IS {WALL_ACCEPTANCE_MM:.1f} MIN."
+)
+DRAWING_NOTES = " ".join(END_WALL_NOTE.splitlines())
 # The member's native BOM row under the kit's one Number.
 BOM_DESCRIPTION = f"{STYLE} RAIL, {LENGTH:.3f} MM, KIT, TRIMMED"
 if abs(LENGTH - (2.0 * HOLE_END + (HOLE_COUNT - 1) * HOLE_PITCH)) > 1e-9:

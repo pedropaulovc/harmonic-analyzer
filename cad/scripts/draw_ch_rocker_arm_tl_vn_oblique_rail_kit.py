@@ -237,10 +237,10 @@ RECEIPT_DIMENSIONS["Length"] = (0.0, rail.LENGTH, LENGTH_ROW_RISE)
 STATION_NOMINALS = dict(zip(DRAWN_STATIONS, rail.HOLE_X, strict=False))
 # The end wall (2X) at the FAR end, where its model chord runs, clear of
 # Station1's near-end stack: far counterbore edge (its start, the left
-# witness) to the far end face. Its value and its two callout rows below
-# stack three rows over its line (a callout under a station lifted that
-# value 2.5 mm, run 20261104T222143958Z), so its text centre stands 5 mm
-# deeper than Station1's: the block's top keeps Station1's air under the rail.
+# witness) to the far end face. Its value and its "2X" stack two rows over
+# its line (a callout under a station lifted that value 2.5 mm, run
+# 20261104T222143958Z); its text centre stands 5 mm deeper than Station1's,
+# as printed clear in farm run 20261108T055401995Z with a three-row block.
 END_WALL_NAME = rail.END_WALL_DIMENSION
 END_WALL_DROP = STATION_FIRST_DROP + 0.005
 RECEIPT_DIMENSIONS[END_WALL_NAME] = (
@@ -253,10 +253,9 @@ RECEIPT_CALLOUTS_BELOW = {END_WALL_NAME: rail.END_WALL_CALLOUT}
 # Neither short span holds its text or its two native arrowheads: each text
 # stands outside its span's left witness, its arrows outside. The station's
 # 4.982 mm span: 27 mm, half its text + the padded cell's 7.59 mm reach + the
-# 2 mm gap. The end wall's 3.107 mm span: 19.5 mm, half its 11-character
-# callout row (28.7 mm at the flag's measured 2.61 mm a character, farm run
-# 20261108T031012373Z) + 5 mm of arrowhead room, its text inside the rail's
-# run, right of the flag's cell.
+# 2 mm gap. The end wall's 3.107 mm span: 19.5 mm, the placement farm run
+# 20261108T055401995Z printed clear of the flag and the witness with an
+# 11-character callout row; "2X" and "(6.214)" are narrower.
 TEXT_OUTSIDE_START = {**dict.fromkeys(DRAWN_STATIONS, 0.027), END_WALL_NAME: 0.0195}
 _DIM_ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
 RECEIPT_ARROW_SIDES = dict.fromkeys((*DRAWN_STATIONS, END_WALL_NAME), _DIM_ARROWS_OUTSIDE)
@@ -386,6 +385,12 @@ _CAPTION_HALF_WIDTH = 0.022  # "ISOMETRIC  1:4" at 3 mm is about 33 mm wide
 ITEM_LABEL = f"{VARIANTS[0][1]}: RECEIPT CHECK"
 ITEM_LABEL_XY = (0.050, 0.262)
 ITEM_LABEL_CELL = (0.045, 0.252, 0.200, 0.264)
+# Note 1 (the trim and its end-wall minimum), upper-left anchored under
+# FRONT's near half: four 3 mm rows of at most 44 characters (88 mm at the
+# item label's measured 2.0 mm a character, farm run 20261108T055401995Z
+# PDF), left of the title block and clear under FRONT's caption.
+END_WALL_NOTE_XY = (0.020, 0.118)
+END_WALL_NOTE_CELL = (0.015, 0.090, 0.150, 0.120)
 
 
 # The end profile at 2:1 is not a projection at the sheet's 1:2, so it is a
@@ -798,6 +803,8 @@ def append_rail_receipt_sheet(adapter: Any) -> tuple[Callable[[], None], ...]:
         notes.append((flag_note, rail.RECEIPT_FLAG, rail.RECEIPT_FLAG, flag_envelope(landing)))
         note = _literal_note(adapter, ITEM_LABEL, *ITEM_LABEL_XY)
         notes.append((note, ITEM_LABEL, ITEM_LABEL, ITEM_LABEL_CELL))
+        note = _literal_note(adapter, rail.END_WALL_NOTE, *END_WALL_NOTE_XY)
+        notes.append((note, rail.END_WALL_NOTE, rail.END_WALL_NOTE, END_WALL_NOTE_CELL))
         arrow_note, arrow_tip = _add_view_arrow(adapter, views["*Top"])
         notes.append(
             (arrow_note, END_VIEW_LETTER, END_VIEW_LETTER, view_arrow_cell(arrow_tip))
