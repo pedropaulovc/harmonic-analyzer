@@ -8,10 +8,12 @@ Both lengths, from the seat face, read in DETAIL A, a 20:1 native detail of
 the flange-to-spigot step: at 4:1 the .014 spigot is 1.4 mm of sheet and the
 two chained lengths' arrowheads piled up on their shared extension line
 (farm r1, run 20261107T221729532Z).  The flange thickness carries the
-owner's edge break and the floored wall it leaves at the rims (machinist
-exception RV-01); the spigot length carries its local edge limits.  Each
-callout keeps to two lines of words (rule 7).  Places and bands are authored
-on the part (``ch_rocker_arm_tl_oblique_hub_washer_spec``).
+floored wall the owner's edge break leaves at the rims (machinist exception
+RV-01).  The three local edge limits (the flange rims' .005 break, the sharp
+spigot end edge and the R.003 inside corner) are leader notes in DETAIL A,
+each arrow on the edge or corner it controls (rule 7: flag it where it
+applies), not rows under the size dimensions.  Places and bands are
+authored on the part (``ch_rocker_arm_tl_oblique_hub_washer_spec``).
 
 Run with SolidWorks open::
 
@@ -44,6 +46,7 @@ from _drawing_dimensions import (
     offset_dimension_text,
     set_dimension_callouts,
 )
+from _drawing_leader_notes import add_leader_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
@@ -87,24 +90,29 @@ PNG = OUTPUTS.png
 # the title block's DRILLED HOLES row is its band.  The O.D.'s .XXX row names
 # what it clears (rule 3), the 3/8 cutter on the jig; the holding proof and
 # the jig's tooling-clearance check carry the 1.5 mm floor.  The flange
-# thickness carries the owner's .005 break and the floored wall it leaves at
-# the rims (machinist exception RV-01, owner ruling 2026-11-07, #2249; rule
-# 20's plain fact).  The spigot's band names its mate, the strap hole's
-# limits REF (the strap's sheet controls them).  The spigot length carries
-# its two local edge limits, which override the title block's break and
-# inside corner.  The edge limits are the spec's own printed rows, less the
-# narration that followed them, so the sheet authors no limit of its own
-# (test_drawing_specification_purity); the spec's whole callouts are no
-# longer printed.
-_BREAK_ROW = SPEC_CALLOUTS["WasherThickness"].splitlines()[0].removesuffix(":")
-_END_ROW, _ROOT_ROW, _ = SPEC_CALLOUTS["SpigotLength"].splitlines()
+# thickness carries the floored wall the .005 rim breaks leave (machinist
+# exception RV-01, owner ruling 2026-11-07, #2249; rule 20's plain fact).
+# The spigot's band names its mate, the strap hole's limits REF (the strap's
+# sheet controls them).  The spigot length prints bare.
 DIMENSION_CALLOUTS: dict[str, str] = {
     "WasherBore": SPEC_CALLOUTS["WasherBore"],
     "WasherOd": f"CLEARS 3/8 CUTTER\nON {JIG_NUMBER}",
-    "WasherThickness": f"{_BREAK_ROW}\n{FLANGE_WALL_CALLOUT}",
+    "WasherThickness": FLANGE_WALL_CALLOUT,
     "SpigotDia": SPEC_CALLOUTS["SpigotDia"],
-    "SpigotLength": f"{_END_ROW.removesuffix(';')}\n{_ROOT_ROW.partition(':')[0]}",
 }
+# The local edge limits, each overriding the title block where its default
+# cannot serve: the .010 break would leave the flange no seat ring on the
+# strap outside its hub hole (spec SEAT_RING_MIN), and the .010 break or the
+# R.040 inside corner would each consume the shortest .014 spigot's locating
+# land (spec SPIGOT_LAND_MIN).  The texts are the spec's own printed rows,
+# less the narration that followed them, so the sheet authors no limit of
+# its own (test_drawing_specification_purity); each note's leader names its
+# edge or corner, so the ROOT label goes.
+_BREAK_ROW = SPEC_CALLOUTS["WasherThickness"].splitlines()[0].removesuffix(":")
+_END_ROW, _ROOT_ROW, _ = SPEC_CALLOUTS["SpigotLength"].splitlines()
+RIM_BREAK_NOTE = f"{_BREAK_ROW}\nBOTH FLANGE RIMS"
+SPIGOT_END_NOTE = _END_ROW.removesuffix(";")
+ROOT_CORNER_NOTE = _ROOT_ROW.partition(":")[0].removeprefix("ROOT ")
 
 # A Ø.433 x .074 top hat at 4:1 (44 mm across, 7.5 mm long): the face view,
 # the side view and the isometric on one row midway between the top border
@@ -204,22 +212,51 @@ DETAIL_HEAD_X = _detail_xy(*_HEAD_CORNER)[0]
 DETAIL_SEAT_X = _detail_xy(*_SEAT_CORNER)[0]
 DETAIL_SPIGOT_X = _detail_xy(*_SPIGOT_CORNER)[0]
 DETAIL_OD_TOP_Y = _detail_xy(*_SEAT_CORNER)[1]
+DETAIL_SPIGOT_TOP_Y = _detail_xy(*_SPIGOT_CORNER)[1]
 # The two lengths share the seat face's extension line, so they stand on two
 # rows 10 mm apart and their arrowheads on that line never meet: the
 # spigot's length nearer the part, the thickness above it.  Each text block
 # leaves its span on a leader, the thickness's left of the head-side face's
 # extension line and the spigot's right of the spigot end's, clear of the
-# circle.
+# circle.  An offset text centres on its point, and SolidWorks runs the
+# dimension line's outside stub level toward it: on the row (run
+# 20261108T055431582Z) the .06 line struck the X of its text and the .014
+# line the E of its own.  So each block stands above its row, its lowest
+# line clear of the stub's height (5.5 mm row pitch: the .06's two lines
+# reach 2.75 mm below its point plus the glyph's half height), and beyond
+# the stub's end (about 3.3 mm past its extension line on that render).
 _SPIGOT_ROW_Y = DETAIL_OD_TOP_Y + 0.008
 _THICK_ROW_Y = _SPIGOT_ROW_Y + 0.010
+TEXT_RISE = 0.009
 DETAIL_KEEP = {
     "WasherThickness": ((DETAIL_HEAD_X + DETAIL_SEAT_X) / 2.0, _THICK_ROW_Y),
     "SpigotLength": ((DETAIL_SEAT_X + DETAIL_SPIGOT_X) / 2.0, _SPIGOT_ROW_Y),
 }
 DETAIL_TEXT_XY = {
-    "WasherThickness": (DETAIL_HEAD_X - 0.032, _THICK_ROW_Y),
-    "SpigotLength": (DETAIL_SPIGOT_X + 0.038, _SPIGOT_ROW_Y),
+    "WasherThickness": (DETAIL_HEAD_X - 0.032, _THICK_ROW_Y + TEXT_RISE),
+    "SpigotLength": (DETAIL_SPIGOT_X + 0.016, _SPIGOT_ROW_Y + TEXT_RISE),
 }
+# The edge-limit leader notes, each arrow on the profile point where its
+# edge or corner shows in the detail: the head-side flange rim (the
+# outermost, reached from open air on the left), the spigot end edge and
+# the inside corner where the spigot meets the flange.  A note anchors at its
+# top-left and its leader leaves the side nearest the tip.  The rim note
+# stands left of the circle, under the thickness's text and its leader; the
+# two spigot notes stand right of the circle, under the .014's text, the
+# corner's above the end edge's so their leaders never cross, and both stay
+# below the .014 dimension line (a leader may cross an extension line, rule
+# 14, not a dimension line).
+RIM_TIP_XY = _detail_xy(*_HEAD_CORNER)
+SPIGOT_END_TIP_XY = _detail_xy(*_SPIGOT_CORNER)
+ROOT_CORNER_TIP_XY = (DETAIL_SEAT_X, DETAIL_SPIGOT_TOP_Y)
+RIM_NOTE_XY = (0.024, DETAIL_OD_TOP_Y + 0.007)
+ROOT_NOTE_XY = (0.140, DETAIL_OD_TOP_Y + 0.002)
+SPIGOT_END_NOTE_XY = (0.140, DETAIL_SPIGOT_TOP_Y - 0.002)
+DETAIL_NOTES = (
+    ("flange rim break", RIM_BREAK_NOTE, RIM_NOTE_XY, RIM_TIP_XY),
+    ("spigot root corner", ROOT_CORNER_NOTE, ROOT_NOTE_XY, ROOT_CORNER_TIP_XY),
+    ("spigot end edge", SPIGOT_END_NOTE, SPIGOT_END_NOTE_XY, SPIGOT_END_TIP_XY),
+)
 
 
 @_telemetry.traced("hub_washer.step_detail")
@@ -411,6 +448,17 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     offset_dimension_text(adapter, detail_annotations, DETAIL_TEXT_XY)
+    # Each edge limit at the edge or corner it controls, owned by detail A
+    # (add_leader_note reads its tip back).
+    for label, text, text_xy, tip_xy in DETAIL_NOTES:
+        add_leader_note(
+            adapter,
+            text,
+            text_xy=text_xy,
+            attach_xy=tip_xy,
+            label=f"hub washer {label}",
+            view=detail,
+        )
     # Re-assert the detail's hidden-lines-removed display once its
     # annotations have landed (draw_ch_pivot_shaft: left as placed, its 5:1
     # detail printed arcs as straight segments).

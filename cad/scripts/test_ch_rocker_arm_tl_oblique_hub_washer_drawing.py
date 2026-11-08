@@ -141,17 +141,21 @@ def test_local_edge_limits_keep_a_cylindrical_locating_land() -> None:
     assert spec.SPIGOT_LAND_MIN > 0.0
     # The owner's .005 flange break: the seat ring left on the strap outside
     # its hub hole, which the title block's .010 would lose.
-    thickness = drawing.DIMENSION_CALLOUTS["WasherThickness"]
-    assert thickness.splitlines() == ["BREAK EDGES .005 MAX", spec.FLANGE_WALL_CALLOUT]
     assert spec.SEAT_RING_MIN == pytest.approx(
         (10.8712 - 10.1727) / 2.0 - spec.SPIGOT_FLOAT_MAX - 0.127
     )
     assert spec.SEAT_RING_MIN > 0.0
     assert spec.SEAT_RING_MIN - edge_break_chamfer_mm(unit=spec.UNIT) + 0.127 < 0.0
-    assert drawing.DIMENSION_CALLOUTS["SpigotLength"].splitlines() == [
-        "END EDGE SHARP, NO BURR",
-        "ROOT R.003 MAX",
-    ]
+    # So all three limits print, each as its own leader note on the edge or
+    # corner it controls, and the size dimensions carry none of them.
+    assert drawing.DIMENSION_CALLOUTS["WasherThickness"] == spec.FLANGE_WALL_CALLOUT
+    assert "SpigotLength" not in drawing.DIMENSION_CALLOUTS
+    notes = {label: text for label, text, _, _ in drawing.DETAIL_NOTES}
+    assert notes == {
+        "flange rim break": "BREAK EDGES .005 MAX\nBOTH FLANGE RIMS",
+        "spigot root corner": "R.003 MAX",
+        "spigot end edge": "END EDGE SHARP, NO BURR",
+    }
 
 
 def test_bore_clears_the_8_32_shcs_and_its_fillet() -> None:
@@ -254,20 +258,83 @@ def test_detail_a_carries_both_lengths_on_separate_rows() -> None:
     spigot_row = drawing.DETAIL_KEEP["SpigotLength"][1]
     assert spigot_row > drawing.DETAIL_OD_TOP_Y
     assert thick_row - spigot_row >= 0.008
-    # Each text block on its own side, off the circle.
     cx, cy = drawing.DETAIL_CENTER
     r = drawing.DETAIL_CROP_RADIUS
-    assert drawing.DETAIL_TEXT_XY["WasherThickness"][0] < drawing.DETAIL_HEAD_X - 0.025
-    assert drawing.DETAIL_TEXT_XY["SpigotLength"][0] > drawing.DETAIL_SPIGOT_X + 0.030
-    for name, (x, y) in drawing.DETAIL_TEXT_XY.items():
-        assert math.dist((x, y), (cx, cy)) > r + 0.020, name
+    # Repeat review of run 20261108T055431582Z: each dimension line's outside
+    # stub ran level into its text.  Each text block now stands above its
+    # row, its lowest line clear of the stub's height, and its near edge
+    # beyond the stub's end (about 3.3 mm past the extension line).
+    thick_x, thick_y = drawing.DETAIL_TEXT_XY["WasherThickness"]
+    spigot_x, spigot_y = drawing.DETAIL_TEXT_XY["SpigotLength"]
+    assert thick_y - thick_row - (_ROW_PITCH / 2.0 + _GLYPH / 2.0) > 0.002
+    assert spigot_y - spigot_row - _GLYPH / 2.0 > 0.002
+    wall_half = len(spec.FLANGE_WALL_CALLOUT) * _CHAR / 2.0
+    assert thick_x + wall_half < drawing.DETAIL_HEAD_X - 0.0033
+    assert spigot_x - len(".014") * _CHAR / 2.0 > drawing.DETAIL_SPIGOT_X + 0.0033
+    for name, xy in drawing.DETAIL_TEXT_XY.items():
+        assert math.dist(xy, (cx, cy)) > r, name
     # Clear of the bottom border (0.0127), the title block (x 0.216) and the
     # face view (its bottom near y 0.128).
     assert drawing.DETAIL_LABEL_XY[1] - 0.010 > 0.0127
-    assert drawing.DETAIL_TEXT_XY["SpigotLength"][0] + 0.030 < 0.216
-    assert max(thick_row, spigot_row) + 0.015 < drawing.FRONT_CENTER[1] - spec.OD / 2.0 * drawing._S
+    assert max(thick_y, spigot_y) + 0.010 < drawing.FRONT_CENTER[1] - spec.OD / 2.0 * drawing._S
     # The parent's letter above the flange Ø's upper extension line.
     assert drawing.DETAIL_LETTER_XY[1] > drawing._OD_TOP_Y + 0.005
+
+
+# Sheet text metrics read off the prescreen and run 20261108T055431582Z
+# renders: about 2.45 mm per character, 5.5 mm row pitch, 3.5 mm glyphs.
+_CHAR = 0.00245
+_ROW_PITCH = 0.0055
+_GLYPH = 0.0035
+
+
+def _crosses(a: tuple, b: tuple, c: tuple, d: tuple) -> bool:
+    def side(p, q, r):
+        return (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])
+
+    return side(a, b, c) * side(a, b, d) < 0 and side(c, d, a) * side(c, d, b) < 0
+
+
+def test_edge_limit_notes_point_at_their_edges_from_clear_air() -> None:
+    tips = {label: tip for label, _, _, tip in drawing.DETAIL_NOTES}
+    # The arrows land on the profile points where each edge or corner shows.
+    assert tips["flange rim break"] == pytest.approx(
+        (drawing.DETAIL_HEAD_X, drawing.DETAIL_OD_TOP_Y)
+    )
+    assert tips["spigot end edge"] == pytest.approx(
+        (drawing.DETAIL_SPIGOT_X, drawing.DETAIL_SPIGOT_TOP_Y)
+    )
+    assert tips["spigot root corner"] == pytest.approx(
+        (drawing.DETAIL_SEAT_X, drawing.DETAIL_SPIGOT_TOP_Y)
+    )
+    assert drawing.DETAIL_SPIGOT_TOP_Y < drawing.DETAIL_OD_TOP_Y
+    cx, cy = drawing.DETAIL_CENTER
+    r = drawing.DETAIL_CROP_RADIUS
+    spigot_row = drawing.DETAIL_KEEP["SpigotLength"][1]
+    thick_text_bottom = (
+        drawing.DETAIL_TEXT_XY["WasherThickness"][1] - _ROW_PITCH / 2.0 - _GLYPH
+    )
+    spigot_text_bottom = drawing.DETAIL_TEXT_XY["SpigotLength"][1] - _GLYPH
+    leaders = {}
+    for label, text, (x, y), tip in drawing.DETAIL_NOTES:
+        rows = text.splitlines()
+        width = max(len(row) for row in rows) * _CHAR
+        bottom = y - len(rows) * _ROW_PITCH
+        # Top-left anchored, wholly outside the detail circle and the sheet's
+        # border, title block and the dimension texts above.
+        for corner in ((x, y), (x + width, y), (x, bottom), (x + width, bottom)):
+            assert math.dist(corner, (cx, cy)) > r, label
+        assert x > 0.0127 and x + width < 0.216 and bottom > 0.0127, label
+        assert y < min(thick_text_bottom, spigot_text_bottom), label
+        # The leader leaves the side nearest the tip, mid-height.
+        start = (x + width if tip[0] > x + width else x, (y + bottom) / 2.0)
+        leaders[label] = (start, tip)
+        # Below every dimension line (rule 14: a leader never crosses one).
+        assert max(start[1], tip[1]) < spigot_row, label
+    labels = sorted(leaders)
+    for i, first in enumerate(labels):
+        for second in labels[i + 1 :]:
+            assert not _crosses(*leaders[first], *leaders[second]), (first, second)
 
 
 def _calls(path: str) -> dict[str, ast.Call]:
