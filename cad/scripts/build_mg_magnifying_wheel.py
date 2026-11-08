@@ -118,6 +118,7 @@ from mg_magnifying_wheel_spec import (
     DRAWING_NOTES,
     DRAWING_PRECISION,
     HUB_FILLET_PRINTED,
+    REFERENCE_DIAMETERS,
     REFERENCE_SKETCHES,
     REFERENCE_WITNESS_LEN,
     RIM_FILLET_PRINTED,
@@ -126,6 +127,7 @@ from mg_magnifying_wheel_spec import (
     SPOKE_PITCH_PREFIX,
     SPOKE_PITCH_SPOKES,
     SPOKE_REFERENCE,
+    SPOKE_FACE_OFFSET,
     SPOKE_STUB_R,
     SURFACE_FINISHES,
     TIE2_CLOCK_SPOKE,
@@ -426,15 +428,19 @@ _CENTRELINE_OVERRUN = 2.0
 
 
 async def _diameter_reference(adapter) -> list[tuple[str, str]]:
-    """Section A-A's rim diameters (mg_magnifying_wheel_spec.DIAMETER_REFERENCE).
+    """Section A-A's rim diameters and the spokes' back face
+    (mg_magnifying_wheel_spec.DIAMETER_REFERENCE).
 
     A hidden sketch on SECTION_PLANE: the wheel axis as a centreline, and on
     each rim surface a construction witness REFERENCE_WITNESS_LEN long, the
     OD's from the rim's back face, the rim bore's from the back rim-bore
     round's tangent.  Each Ø is a diametric dimension from the axis to its
     witness's start, driven from the global its Front-plane circle is driven
-    from, so the sketch restates the geometry and moves with it.  It adds no
-    volume.
+    from, so the sketch restates the geometry and moves with it.  A third
+    witness starts where the spokes' back face meets the rim bore, and
+    SpokeFaceOffset locates it from the OD witness's start along the axis
+    (SPOKE_FACE_OFFSET): the part owns that size and its casting band, so A-A
+    imports it like the spokes' thickness.  It adds no volume.
     """
     feature = DIAMETER_REFERENCE
     _section_plane(adapter)
@@ -459,13 +465,20 @@ async def _diameter_reference(adapter) -> list[tuple[str, str]]:
         lines.append(
             check(f"{feature} {name} witness", await adapter.add_line(*start, *end))
         )
+    face_z = SPOKE_AXIAL / 2.0
+    face_start = to_sketch((_RIM_IN_R, 0.0, face_z))
+    face_end = to_sketch((_RIM_IN_R, 0.0, face_z - REFERENCE_WITNESS_LEN))
+    face = check(
+        f"{feature} SpokeFaceOffset witness",
+        await adapter.add_line(*face_start, *face_end),
+    )
     set_sketch_direct_db(adapter, False)
-    for line in lines:
+    for line in (*lines, face):
         segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
         segment.ConstructionGeometry = True
         if not bool(segment.ConstructionGeometry):
             raise RuntimeError(f"{feature} {line}: construction flag rejected")
-    for line in (axis, *lines):
+    for line in (axis, *lines, face):
         check(
             f"{feature} {line} axial",
             await adapter.add_sketch_constraint(line, None, _AXIAL),
@@ -508,6 +521,33 @@ async def _diameter_reference(adapter) -> list[tuple[str, str]]:
             name,
         )
         dims.record(name, drive)
+    # The spokes' back-face witness: on the rim bore's radius, its length,
+    # and located from the OD witness's start (the rim's back face).
+    await dimension_between(
+        adapter,
+        f"{face}.start",
+        "origin",
+        _RADIAL_DISTANCE,
+        _RIM_IN_R,
+        f"{feature} SpokeFaceOffset witness radius",
+    )
+    dims.record(None)
+    check(
+        f"{feature} SpokeFaceOffset witness length",
+        await adapter.add_sketch_dimension(
+            face, None, "linear", REFERENCE_WITNESS_LEN
+        ),
+    )
+    dims.record(None)
+    await dimension_between(
+        adapter,
+        f"{lines[0]}.start",
+        f"{face}.start",
+        _AXIAL_DISTANCE,
+        SPOKE_FACE_OFFSET,
+        "SpokeFaceOffset",
+    )
+    dims.record("SpokeFaceOffset")
     await ensure_fully_defined(adapter, feature)
     check(f"exit_sketch {feature}", await adapter.exit_sketch())
     name_last_feature(adapter, feature)
@@ -1207,7 +1247,7 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     # A diametric linear dimension prints no Ø of its own: the native symbol
     # token supplies it (build_dt_pinion_arbor's journal references).
-    for name in sorted(DRAWING_DIMENSIONS[DIAMETER_REFERENCE]):
+    for name in REFERENCE_DIAMETERS:
         set_dimension_prefix(adapter, DIAMETER_REFERENCE, name, "<MOD-DIAM>")
     set_dimension_prefix(adapter, SPOKE_REFERENCE, "SpokePitch", SPOKE_PITCH_PREFIX)
     clear_dimensions_for_drawing(adapter)

@@ -48,7 +48,8 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     )
     assert kept == marked
     assert not set(drawing.FRONT_KEEP) & set(drawing.SECTION_KEEP)
-    # The rim's Ø print on A-A from the hidden reference sketch alone.
+    # The rim's Ø and the spokes' back face print on A-A from the hidden
+    # reference sketch alone.
     assert set(drawing.SECTION_DIAMETER_KEEP) == set(
         mg_magnifying_wheel_spec.DRAWING_DIMENSIONS[
             mg_magnifying_wheel_spec.DIAMETER_REFERENCE
@@ -370,7 +371,7 @@ def test_linked_notes_specify_the_fits_the_ties_and_the_angle_the_spokes() -> No
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 
 
-def test_no_gdt_frames_and_two_sheet_dimensions() -> None:
+def test_no_gdt_frames_and_one_sheet_dimension() -> None:
     calls = _called_names(drawing.__file__)
     assert calls.count("add_datum_feature") == 0
     assert calls.count("add_feature_control_frame") == 0
@@ -381,15 +382,22 @@ def test_no_gdt_frames_and_two_sheet_dimensions() -> None:
         for control in mg_magnifying_wheel_spec.SURFACE_FINISHES
     }
     assert finishes == {"mg_wheel_bore": MACHINED_UM}
-    # Only the rim's axial width and the spokes' back face are added on the
-    # sheet; the face rides the spokes' casting band and is centred in the
-    # rim.
-    assert calls.count("add_edge_dimension") == 2
+    # Only the rim's axial width is added on the sheet.  The spokes' back
+    # face is a part dimension (SpokeFaceOffset on the hidden A-A reference
+    # sketch) carrying the spokes' casting band, centred in the rim: the
+    # part owns its band, the sheet only places it.
+    assert calls.count("add_edge_dimension") == 1
     spec = mg_magnifying_wheel_spec
     assert spec.SPOKE_FACE_OFFSET == pytest.approx(
         (rim.RIM_AXIAL - geom.SPOKE_AXIAL) / 2.0
     )
-    assert spec.DRAWING_REFERENCE_PRECISION["spoke face"] == 2
+    reference = spec.DIAMETER_REFERENCE
+    assert "SpokeFaceOffset" in spec.DRAWING_DIMENSIONS[reference]
+    assert "SpokeFaceOffset" in spec.CAST_DIMENSIONS[reference]
+    assert spec.DRAWING_PRECISION[reference]["SpokeFaceOffset"] == 2
+    assert "spoke face" not in spec.DRAWING_REFERENCE_PRECISION
+    assert "SpokeFaceOffset" in drawing.SECTION_DIAMETER_KEEP
+    assert "SpokeFaceOffset" not in spec.REFERENCE_DIAMETERS
     assert "SpokeAxial" in spec.CAST_DIMENSIONS["Spoke"]
     assert not hasattr(mg_magnifying_wheel_spec, "GEOMETRIC_TOLERANCES_MM")
 

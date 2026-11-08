@@ -9,9 +9,9 @@ ties) and SECTION A-A, cut along the face's horizontal centreline through the
 like the lathe holds it, is the hub profile, the rim's Ø, the groove and the
 axial widths in solid lines (drawing-guidelines.md rule 9 (show internal
 shape in solid lines; a spoked part is cut through a spoke)).  Every size
-rides the part's marked dimensions; only the rim's axial width, the spokes'
-back-face offset and the rim-bore round's R (on its cut arc) are added on
-the sheet.  The rim's Ø come from a hidden reference sketch in A-A's plane,
+rides the part's marked dimensions; only the rim's axial width and the
+rim-bore round's R (on its cut arc) are added on the sheet.  The rim's Ø and
+the spokes' back-face offset come from a hidden reference sketch in A-A's plane,
 shown in the part while A-A is cut (_drawing_hidden_sketches).  TIE 2,
 radial inside the rim, shows in a broken-out window on the face
 (TIE2_WINDOW).  The bore's and the spigot's matched fits are numbered notes
@@ -97,7 +97,6 @@ from mg_magnifying_wheel_spec import (
     BORE_DIA,
     BORE_FIT_NOTE,
     CAST_ROUND_R,
-    CAST_TOL,
     DIAMETER_REFERENCE,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
@@ -113,7 +112,6 @@ from mg_magnifying_wheel_spec import (
     SPIGOT_DIA,
     SPIGOT_FIT_NOTE,
     SPOKE_AXIAL,
-    SPOKE_FACE_OFFSET,
     SPOKE_PITCH_DEG,
     SURFACE_FINISHES,
     TIE1_CLOCK_DEG,
@@ -548,10 +546,12 @@ _RIM_OD_DIA_X = _GROOVE_DIA_X - _GROOVE_BLOCK_HALF - _TEXT_OFF_LINE
 # rim on both; no dimension line runs over it (owner review 2026-11-07:
 # solid from dimension lines at a glance).  Above the rim, three rows left
 # of the rim's back face, the smallest span nearest the part: the spokes'
-# back face from the rim's (".08", added below), then the spokes'
-# thickness (".16"), whose extension lines start where the spoke meets the
-# rim bore (_set_section_witnesses), then the rim's width (".31", added
-# below).  Every line runs from the part leftward to its text.
+# back face from the rim's (".08", SpokeFaceOffset, imported from the
+# hidden DIAMETER_REFERENCE sketch), then the spokes' thickness (".16"),
+# whose extension lines start where the spoke meets the rim bore
+# (_set_section_witnesses), as the ".08"'s spoke-side line does, then the
+# rim's width (".31", added below).  Every line runs from the part leftward
+# to its text.
 _SPOKE_FACE_ROW = SECTION_CENTER[1] + _RIM_R + 0.006
 _SPOKE_ROW = _SPOKE_FACE_ROW + 0.0055
 _RIM_WIDTH_ROW = _SPOKE_ROW + 0.0055
@@ -663,15 +663,17 @@ SPIGOT_TEXT_XY = (
     _SPIGOT_DIM_X + 0.008 + len(f"SEE NOTE {SPIGOT_FIT_NOTE}") * 0.0026 / 2.0,
     SECTION_CENTER[1],
 )
-# The rim's two Ø, imported from the hidden DIAMETER_REFERENCE sketch in
-# A-A's plane (mg_magnifying_wheel_spec): the rim bore's between its extension
-# lines under the hub; the rim OD's, an overall size printed bare
-# (drawing-guidelines.md rule 7: no reason on an overall size), between its
-# own at the hub's height, clear of the groove bottom's line to its right
-# and the front view to its left.
+# The rim's two Ø and the spokes' back face, imported from the hidden
+# DIAMETER_REFERENCE sketch in A-A's plane (mg_magnifying_wheel_spec): the
+# rim bore's Ø between its extension lines under the hub; the rim OD's, an
+# overall size printed bare (drawing-guidelines.md rule 7: no reason on an
+# overall size), between its own at the hub's height, clear of the groove
+# bottom's line to its right and the front view to its left; the back
+# face's on its row above the rim (SPOKE_FACE_TEXT_XY).
 SECTION_DIAMETER_KEEP = {
     "RimInnerDiaDim": (_RIM_BORE_DIA_X, SECTION_CENTER[1] - 0.030),
     "RimOuterDiaDim": (_RIM_OD_DIA_X, SECTION_CENTER[1]),
+    "SpokeFaceOffset": SPOKE_FACE_TEXT_XY,
 }
 # The rim-bore round's R is a sheet radial on its cut arc: A-A cannot import
 # a fillet radius whose arc IS the cut (neither the targeted import nor
@@ -1488,95 +1490,6 @@ def _add_round_radius(adapter: Any, section: Any, edges: ViewEdges) -> Any:
     return annotation
 
 
-_TOL_SYMMETRIC = 4  # swTolType_e.swTolSYMMETRIC
-
-
-def _add_spoke_face(
-    adapter: Any,
-    section: Any,
-    edges: ViewEdges,
-    rim_back: Any,
-    *,
-    rim_point: tuple[float, float],
-) -> Any:
-    """Locate the spokes' back face from the rim's back face on A-A and
-    return its annotation.
-
-    The cut seed spoke's back face is a straight cut-face line in the
-    spokes' back plane (z = +SPOKE_AXIAL / 2) from the hub to the rim bore:
-    every visible straight edge lying wholly in that plane is a spoke edge,
-    and the longest above the axis (model +X) is picked as a native entity.
-    The dimension must measure SPOKE_FACE_OFFSET across the rim's back cut
-    line and that edge; it prints .XX with the spokes' casting band,
-    ±CAST_TOL, as their thickness does (mg_magnifying_wheel_spec
-    .CAST_DIMENSIONS), read back.
-    """
-    label = "spoke face"
-    plane_z = SPOKE_AXIAL / 2.0
-    faces = [
-        item
-        for item in edges.lines
-        if all(abs(end[2] - plane_z) < 1e-6 for end in item.line)
-        and item.midpoint_mm[0] > 0.0
-    ]
-    if not faces:
-        raise RuntimeError(
-            f"{label}: no visible spoke edge in z={plane_z:g} above the axis; "
-            f"{len(edges.lines)} visible lines"
-        )
-    spoke = max(faces, key=lambda item: item.length_mm)
-    (spoke_point,) = model_points_in_view(
-        adapter,
-        section,
-        (tuple(value / 1000.0 for value in spoke.midpoint_mm),),
-        label="wheel spoke face pick",
-        names=("spoke back face",),
-    )
-    entities = (rim_back, spoke.edge)
-    dimension = add_edge_dimension(
-        adapter,
-        section,
-        p0=rim_point,
-        p1=spoke_point,
-        text_xy=SPOKE_FACE_TEXT_XY,
-        label=label,
-        orientation="horizontal",
-        entities=entities,
-    )
-    assert_dimension_measures(
-        adapter,
-        dimension,
-        expected_mm=SPOKE_FACE_OFFSET,
-        label=label,
-        entities=entities,
-    )
-    display = _early_bound(dimension, "IDisplayDimension")
-    _pass_through_places(display, label)
-    tolerance = _early_bound(
-        _early_bound(display.GetDimension2(0), "IDimension").Tolerance,
-        "IDimensionTolerance",
-    )
-    band = CAST_TOL / 1000.0
-    tolerance.Type = _TOL_SYMMETRIC
-    if not tolerance.SetValues(-band, band):
-        raise RuntimeError(f"{label}: SetValues rejected ±{CAST_TOL} mm")
-    if (
-        int(tolerance.Type) != _TOL_SYMMETRIC
-        or abs(float(tolerance.GetMaxValue()) - band) > 1e-9
-        or abs(float(tolerance.GetMinValue()) + band) > 1e-9
-    ):
-        raise RuntimeError(
-            f"{label}: tolerance type {int(tolerance.Type)} "
-            f"{float(tolerance.GetMinValue())!r}..{float(tolerance.GetMaxValue())!r} "
-            f"is not ±{band!r} m"
-        )
-    places = DRAWING_REFERENCE_PRECISION[label]
-    display.SetPrecision3(-1, -1, places, -1)
-    if int(display.GetPrimaryTolPrecision2()) != places:
-        raise RuntimeError(f"{label}: {places} tolerance places did not persist")
-    return _early_bound(display.GetAnnotation(), "IAnnotation")
-
-
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -1740,8 +1653,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # The rim's axial width across the section between its side faces' cut
     # lines (_RIM_SIDE_POINTS), its text left of the rim's back face on its
     # own row (above).  Each line is selected as a native entity: a
-    # coordinate hit-test finds no edge.  One sweep serves them, the spokes'
-    # back face and the rim-bore round's arc.
+    # coordinate hit-test finds no edge.  One sweep serves them and the
+    # rim-bore round's arc.
     section_edges = scan_view_edges(section, label="wheel section edges")
     rim_sides = tuple(
         _line_through(section_edges, point, label=f"rim side cut line z={point[2]:+g}")
@@ -1777,9 +1690,6 @@ async def build(adapter: Any) -> dict[str, str]:
         _early_bound(rim_width, "IDisplayDimension"), "rim axial width"
     )
     round_radius = _add_round_radius(adapter, section, section_edges)
-    spoke_face = _add_spoke_face(
-        adapter, section, section_edges, rim_sides[0], rim_point=rim_back
-    )
     _add_centrelines(adapter, section, WEB_CENTRELINES, label="wheel web centreline")
     rebuild_drawing(adapter, label="wheel dimension layout")
     _assert_text_off_iso(
@@ -1788,7 +1698,6 @@ async def build(adapter: Any) -> dict[str, str]:
             *annotations,
             _early_bound(rim_width, "IDisplayDimension").GetAnnotation(),
             round_radius,
-            spoke_face,
         ],
         iso,
     )

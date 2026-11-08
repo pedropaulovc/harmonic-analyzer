@@ -72,10 +72,11 @@ from mg_wheel_group import HUB_RUNNING, WHEEL_BORE_MAX
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  The face view carries the bore, spoke, fillet and tie
 # dimensions; SECTION A-A carries the hub profile, the groove, the spoke
-# thickness and the rim's two diameters (DIAMETER_REFERENCE: turned sizes on
-# the side view, drawing-guidelines.md rule 11 (turned parts read like the
-# lathe)).  The rim's axial width and the rim-bore round's R are added on
-# the sheet (A-A cannot import a fillet radius whose arc is the cut). ---
+# thickness, the spokes' back face and the rim's two diameters
+# (DIAMETER_REFERENCE: turned sizes on the side view, drawing-guidelines.md
+# rule 11 (turned parts read like the lathe)).  The rim's axial width and
+# the rim-bore round's R are added on the sheet (A-A cannot import a fillet
+# radius whose arc is the cut). ---
 #
 # The rim's Ø are Front-plane circles, which no side view can import, so
 # they are restated as diametric dimensions on a hidden reference sketch in
@@ -116,7 +117,7 @@ TIE2_FROM_SPOKE_DEG = (
 if not 0.0 < TIE2_FROM_SPOKE_DEG < 90.0:
     raise AssertionError("TIE 2 must sit in the acute sector past its spoke")
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    DIAMETER_REFERENCE: {"RimOuterDiaDim", "RimInnerDiaDim"},
+    DIAMETER_REFERENCE: {"RimOuterDiaDim", "RimInnerDiaDim", "SpokeFaceOffset"},
     SPOKE_REFERENCE: {"SpokePitch", "Tie2Clock"},
     "SpokeProfile": {"SpokeRootWidth", "SpokeTipWidth"},
     "Spoke": {"SpokeAxial"},
@@ -149,7 +150,11 @@ RIM_FILLET_PRINTED = (1, 1)
 # the whole row (LEVER_WIRE_WEB_GAP below).  The spigot and the bore are
 # matched fits, a reference nominal at the places their reamers carry.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    DIAMETER_REFERENCE: {"RimOuterDiaDim": 2, "RimInnerDiaDim": 2},
+    DIAMETER_REFERENCE: {
+        "RimOuterDiaDim": 2,
+        "RimInnerDiaDim": 2,
+        "SpokeFaceOffset": 2,
+    },
     SPOKE_REFERENCE: {"SpokePitch": 0, "Tie2Clock": 0},
     "SpokeProfile": {"SpokeRootWidth": 2, "SpokeTipWidth": 2},
     "Spoke": {"SpokeAxial": 2},
@@ -175,7 +180,7 @@ REFERENCE_DIMENSIONS = frozenset({"SpigotDia", "BoreDiaDim"})
 # The as-cast sizes carry the explicit +/-.03 casting band (CAST_TOL) at
 # .XX; the turned and drilled ones take the title block.
 CAST_DIMENSIONS: dict[str, set[str]] = {
-    DIAMETER_REFERENCE: {"RimInnerDiaDim"},
+    DIAMETER_REFERENCE: {"RimInnerDiaDim", "SpokeFaceOffset"},
     "SpokeProfile": {"SpokeRootWidth", "SpokeTipWidth"},
     "Spoke": {"SpokeAxial"},
     "HubProfile": {"HubFrontZ"},
@@ -187,16 +192,19 @@ _CAST_NAMES = set().union(*CAST_DIMENSIONS.values())
 # the sheet only passes them through).  The rim-bore round is a single
 # limit, R.03 MAX: TIE2_FACE_WALL takes the R at that limit, and a sharp
 # edge falls under the title block's edge break.  The rim's axial width
-# takes .XX: at .X its +/-.1 eats TIE 2's ligament to the rim faces.  The
-# spokes' back face is located from the rim's back face at .XX with the
-# casting band (CAST_TOL), as the spokes' own thickness is: the spokes stand
-# centred in the rim, (RIM_AXIAL - SPOKE_AXIAL) / 2 in from each face.
+# takes .XX: at .X its +/-.1 eats TIE 2's ligament to the rim faces.
 DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "rim bore round": 2,
     "rim axial width": 2,
-    "spoke face": 2,
 }
+# The spokes' back face is located from the rim's back face on A-A
+# (DIAMETER_REFERENCE's SpokeFaceOffset, a model dimension so the part owns
+# its band) at .XX with the casting band (CAST_TOL), as the spokes' own
+# thickness is: the spokes stand centred in the rim, (RIM_AXIAL -
+# SPOKE_AXIAL) / 2 in from each face.
 SPOKE_FACE_OFFSET = (RIM_AXIAL - SPOKE_AXIAL) / 2.0
+# The rim's two Ø on DIAMETER_REFERENCE (printed with the Ø token).
+REFERENCE_DIAMETERS = ("RimInnerDiaDim", "RimOuterDiaDim")
 ROUND_TEXT_SUFFIX = " MAX"
 
 # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the notes say only what no callout can.  The bore's running fit and
