@@ -1849,9 +1849,11 @@ def _step_text(
             "FACE AND THE BAR'S BACK FACE WITH FEELERS.",
             f"WHERE IT IS UNDER {lock_gap.split(' TO ')[0]}, REMOVE THE LOCK.",
             f"FACE THE {n['pd-platen-guide']} GUIDE'S BACK FACE UNDER EACH REMOVED "
-            "LOCK BY THAT LOCK'S SHORTFALL.",
+            f"LOCK BY THE AMOUNT ITS GAP READ UNDER {lock_gap.split(' TO ')[0]}.",
             "REFIT EACH REMOVED LOCK WITH ITS SCREWS TIGHT.",
             f"CHECK: THE GAP IS {lock_gap} AT EVERY LOCK.",
+            f"IF A GAP IS STILL UNDER {lock_gap.split(' TO ')[0]}, REPEAT "
+            f"{s('lock-seats-faced', 1)}-{s('lock-seats-faced', 4)} FOR THAT LOCK.",
             "IF A GAP IS OVER THE WINDOW, REPLACE THAT GUIDE AND REPEAT FROM "
             f"STEP {steps.step_number('guides-screwed')}.",
         ),
@@ -1976,6 +1978,14 @@ def _step_text(
             f"IF NOT, SLACKEN THE {n['pd-vn-transgear-disc-screw']} SCREWS AND REPEAT "
             f"{s('disc-taps-transferred', 1)} AND {s('disc-taps-transferred', 5)}-"
             f"{s('disc-taps-transferred', 6)}.",
+            # Rule 23 bench acceptance for the disc screws: they carry the
+            # drive torque as shear on the flange's bolt circle
+            # (joint_retention 'pd-paper-drive/disc-screws', STATIC_CLAMP;
+            # machinist review round 6, accept PD-00-disc-hub-shear-clamp).
+            "CHECK: WITH THE SLEEVE HELD, FIRM HAND TORQUE AT THE DISC RIM DOES "
+            "NOT TURN THE DISC ON THE HUB.",
+            f"IF IT TURNS, FIT NEW {n['pd-vn-transgear-disc-screw']} SCREWS AND "
+            f"REPEAT {s('disc-taps-transferred', 6)}-{s('disc-taps-transferred', 8)}.",
             "MATCH-MARK DISC AND HUB.",
         ),
         "disc-screws-cut": (
