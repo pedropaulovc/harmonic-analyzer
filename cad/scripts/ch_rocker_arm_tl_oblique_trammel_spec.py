@@ -143,9 +143,12 @@ def _inch_fraction(text: str) -> float:
 
 
 # --- Inputs -------------------------------------------------------------------
-R_INNER = rocker.R_TOP  # R800 top edge
-R_OUTER = rocker_interface.R_BOTTOM  # R816 bottom edge
-# Aim the hub at the middle of the one-sided top-edge band (8.0 +0.50/0).
+# The book radii about a centre raised by the arcs' mid-zone shift (owner
+# ruling 2026-11-08, #2144 item 10.3): on the strap's mid-zone arcs at the
+# mirror line, off them by the shift x (1 - cos phi), under 0.005, off it.
+R_INNER = rocker_interface.BOOK_TOP_RADIUS  # R800 top edge
+R_OUTER = rocker_interface.BOOK_BOTTOM_RADIUS  # R816 bottom edge
+# Aim the hub at the middle of the top-edge band (8.254 +/-.254).
 HUB_TO_TOP_EDGE = rocker.TOP_EDGE_ABOVE_PIVOT + sum(rocker.TOP_EDGE_BAND) / 2.0
 HUB_RADIUS = R_INNER + HUB_TO_TOP_EDGE  # rho, the hub (and CL/CR) radius about C
 ALPHA_DEG = 16.4405
@@ -263,8 +266,9 @@ RISER_SCREW_WALLS = (
 # the jig. Its width is the as-bought 1-1/2 in.
 BLANK_LENGTH = 350.0
 BLANK_WIDTH = round(1.5 * INCH, 9)  # 38.1
-# The tip lands are radial lines through the top arc's ends.
-TIP_ANGLE = (rocker.TOP_ARC_LEN / 2.0) / rocker.R_TOP
+# The tip lands are radial lines through the book top arc's ends; the
+# mid-zone lands lie 0.254 inside them, within the pass's run-out.
+TIP_ANGLE = (rocker.BOOK_TOP_ARC_LEN / 2.0) / R_INNER
 # The strap's radial extent across the blank (carrier Y): from the R800 edge's
 # ends at the tip lands to the R816 edge at the apex. The blank's width covers
 # it with at least the .080 wall of waste beyond each edge.

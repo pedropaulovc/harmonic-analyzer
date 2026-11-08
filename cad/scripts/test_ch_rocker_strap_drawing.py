@@ -98,17 +98,18 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
 
 def test_printed_edge_limits_are_the_finished_rockers() -> None:
     # The strap's outline is finished here, so each edge's PRINTED inch limits
-    # must be the finished MHA-CH-06's: the .315 BASIC height with its .020
-    # one-sided zone, above the pivot and (mirrored) below it.
+    # must be the finished MHA-CH-06's: the .325 / .305 mid-zone heights each
+    # +/- half the .020 profile zone, above the pivot and below it. They are
+    # the limits the former one-sided .315 bands printed (#2144 item 10.3).
     def limits(nominal_mm: float, places: int, band: tuple[float, float]):
         nominal = round(nominal_mm / 25.4, places)
         upper, lower = (round(d / 25.4, 3) for d in band)
         return round(nominal + lower, 3), round(nominal + upper, 3)
 
     arm_places = rocker_notes.DRAWING_PRECISION["TopEdgeReference"]["TopAbovePivot"]
-    zone = round(rocker.TOP_EDGE_BAND[0] / 25.4, 3)
+    zone = round((rocker.TOP_EDGE_BAND[0] - rocker.TOP_EDGE_BAND[1]) / 25.4, 3)
     arm_height = round(rocker.TOP_EDGE_ABOVE_PIVOT / 25.4, arm_places)
-    assert (arm_height, zone) == (0.315, 0.020)
+    assert (arm_height, zone) == (0.325, 0.020)
     top = limits(
         spec.TOP_EDGE_ABOVE_PIVOT,
         notes.DRAWING_PRECISION_BY_NAME["TopAbovePivot"],
@@ -119,9 +120,9 @@ def test_printed_edge_limits_are_the_finished_rockers() -> None:
         notes.DRAWING_PRECISION_BY_NAME["BottomBelowPivot"],
         spec.BOTTOM_EDGE_BAND,
     )
-    assert top == (arm_height, round(arm_height + zone, 3)) == (0.315, 0.335)
-    assert bottom == (round(arm_height - zone, 3), arm_height) == (0.295, 0.315)
-    # Each edge's tolerance prints at its nominal's places (.315 +.020/.000).
+    assert top == (round(arm_height - zone / 2.0, 3), round(arm_height + zone / 2.0, 3)) == (0.315, 0.335)
+    assert bottom == (0.295, 0.315)
+    # Each edge's tolerance prints at its nominal's places (.325 +/-.010).
     tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
     places = {
         call.args[2].value: ast.unparse(keyword.value)
@@ -146,9 +147,8 @@ def test_every_band_is_native_and_names_its_mate() -> None:
     }
     assert spec.ARM_THICKNESS_BAND == rocker.ARM_THICKNESS_BAND == (0.0254, -0.0254)
     assert spec.TOP_EDGE_BAND == rocker.TOP_EDGE_BAND
-    # The bottom edge's band mirrors the top's: the finished part's lower
-    # profile zone, wholly in material.
-    assert spec.BOTTOM_EDGE_BAND == (0.0, -0.508)
+    # The bottom edge's band is the arm's: the lower profile zone's halves.
+    assert spec.BOTTOM_EDGE_BAND == rocker.BOTTOM_EDGE_BAND == pytest.approx((0.254, -0.254))
     assert notes.DIMENSION_CALLOUTS["HoleDia"] == notes.HOLE_CALLOUT
     assert notes.DIMENSION_CALLOUTS["StrapThickness"] == rocker_notes.STRAP_FIT_CALLOUT
 

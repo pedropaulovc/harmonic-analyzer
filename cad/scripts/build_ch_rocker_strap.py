@@ -226,7 +226,7 @@ async def build(adapter) -> dict[str, str]:
         check(
             "edge reference centerline",
             await adapter.add_centerline(
-                0.0, 0.0, 0.0, PIVOT_MID_Y + TOP_EDGE_ABOVE_PIVOT
+                0.0, PIVOT_MID_Y - BOTTOM_EDGE_BELOW_PIVOT, 0.0, PIVOT_MID_Y + TOP_EDGE_ABOVE_PIVOT
             ),
         ),
     ]
@@ -363,8 +363,8 @@ async def build(adapter) -> dict[str, str]:
     await report_mass_properties(adapter)
 
     # Native bands: the thickness (the finished part's, the faces are not cut
-    # again), the hub hole's press band, the top edge's one-sided plus over the
-    # hole and the bottom edge's one-sided minus under it.
+    # again), the hub hole's press band, and the arc-system zone's bilateral
+    # band on the top edge's height over the hole and the bottom edge's under it.
     strap_lower, strap_upper = deviations(ARM_THICKNESS_BAND)
     if strap_lower != -strap_upper:
         raise AssertionError("ch_rocker_arm_spec.ARM_THICKNESS_BAND must be symmetric")
@@ -383,7 +383,7 @@ async def build(adapter) -> dict[str, str]:
         "StrapProfile",
         "TopAbovePivot",
         *deviations(TOP_EDGE_BAND),
-        # Y14.5 inch: the tolerance carries the nominal's places (.315 +.020/.000).
+        # Y14.5 inch: the tolerance carries the nominal's places (.325 +/-.010).
         places=DRAWING_PRECISION_BY_NAME["TopAbovePivot"],
         display_unit=UNIT,
     )
@@ -392,7 +392,7 @@ async def build(adapter) -> dict[str, str]:
         "StrapProfile",
         "BottomBelowPivot",
         *deviations(BOTTOM_EDGE_BAND),
-        # Y14.5 inch: the tolerance carries the nominal's places (.315 +.020/.000).
+        # Y14.5 inch: the tolerance carries the nominal's places (.305 +/-.010).
         places=DRAWING_PRECISION_BY_NAME["BottomBelowPivot"],
         display_unit=UNIT,
     )

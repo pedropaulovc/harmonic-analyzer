@@ -291,11 +291,9 @@ def _profile_normal_limits(
 
 
 def _printed_profile_limits() -> tuple[tuple[float, float], tuple[float, float]]:
+    """Both frames print no U: prechips' equal-bilateral t / 2 outside."""
     zone = float(arm_drawing.ARC_PROFILE_ZONE_MM)
-    return tuple(
-        _profile_normal_limits(zone, float(arm_drawing.ARC_PROFILE_OUTSIDE_MM[name]))
-        for name in ("TopRadius", "BottomRadius")
-    )
+    return tuple(_profile_normal_limits(zone, zone / 2.0) for _name in ("TopRadius", "BottomRadius"))
 
 
 def test_printed_profile_controls_are_their_sources() -> None:
@@ -336,14 +334,12 @@ def test_printed_profile_controls_are_their_sources() -> None:
         arm.R_TOP, rocker_interface.R_BOTTOM, rocker_interface.CENTER_Y
     )
     assert arm_drawing.TOP_EDGE_BAND is arm.TOP_EDGE_BAND
-    assert arm_drawing.ARC_PROFILE_ZONE_MM == f"{arm.TOP_EDGE_BAND[0]:g}"
-    assert arm_drawing.ARC_PROFILE_OUTSIDE_MM == {
-        "TopRadius": arm_drawing.ARC_PROFILE_ZONE_MM,
-        "BottomRadius": f"{arm.TOP_EDGE_BAND[1]:g}",
-    }
+    assert arm_drawing.ARC_PROFILE_ZONE_MM == f"{arm.TOP_EDGE_BAND[0] - arm.TOP_EDGE_BAND[1]:g}"
+    # Equal-bilateral frames (#2144 item 10.3): no Ⓤ disposition to export.
+    assert not hasattr(arm_drawing, "ARC_PROFILE_OUTSIDE_MM")
     top, bottom = _printed_profile_limits()
-    assert top == (arm.TOP_EDGE_BAND[1], arm.TOP_EDGE_BAND[0])
-    assert bottom == (-arm.TOP_EDGE_BAND[0], arm.TOP_EDGE_BAND[1])
+    assert top == pytest.approx((arm.TOP_EDGE_BAND[1], arm.TOP_EDGE_BAND[0]))
+    assert bottom == pytest.approx((arm.BOTTOM_EDGE_BAND[1], arm.BOTTOM_EDGE_BAND[0]))
     # At the mirror station n_top=+Y and n_bottom=-Y. Height is the SAME
     # normal zone evaluated here, not another independent centre translation.
     assert rocker_interface.CENTER_Y - arm.R_TOP - rocker_interface.PIVOT_MID_Y == arm.TOP_EDGE_ABOVE_PIVOT
@@ -495,33 +491,37 @@ def test_crotch_clears_the_arm_through_the_whole_swing() -> None:
 
     No centre-height perturbation is added to top profile. The fixed centre is
     PIVOT_MID_Y+BASIC height+R_TOP. The top zone controls that height at the mirror
-    station; the bottom U0 zone only removes material. Straight end faces are
+    station; the bottom zone's outside half adds material. Straight end faces are
     covered by endpoint/convex-disc containment using the printed land length,
     overall width, BASIC C-clocked land angle and taper-intersection X in the
     A|B|C DRF. This is a planar fit bound, not a new taper-form, datum-error,
     or channel-closure tolerance model.
 
-    Legacy containment is geometric: its low-height/short-top-radius corner
-    moves the centre down t=.508 and grows the lower radius by t. The current
-    entire inside-zone outline lies in the BASIC R_BOTTOM disc, and
-    distance(C,C_legacy)+R_BOTTOM = t+R_BOTTOM = R_legacy. Thus that continued
-    legacy circle contains it at every rotation. This does NOT turn the old
+    The pin spec's legacy corner (the top edge at its low limit, the top
+    radius short and the lower one long by .XX) is the lower outline's outside
+    limit moved t=.508 down: the same radius about a centre t lower, so it
+    lies below the actual outline at every x. This does NOT turn the old
     radius/height bands into printed controls or couple the two actual profiles.
     """
     top, bottom = _printed_profile_limits()
-    assert bottom[1] == 0.0
+    assert bottom[1] == pytest.approx(arm.BOTTOM_EDGE_BAND[0])
     current_radius = rocker_interface.R_BOTTOM + max(bottom)
-    legacy_centre = rocker_interface.PIVOT_MID_Y + arm.TOP_EDGE_ABOVE_PIVOT - arm.LINEAR_2PL + arm.R_TOP
+    legacy_centre = (
+        rocker_interface.PIVOT_MID_Y + arm.TOP_EDGE_ABOVE_PIVOT + arm.TOP_EDGE_BAND[1]
+        + arm.R_TOP - arm.LINEAR_2PL
+    )
     legacy_radius = rocker_interface.R_BOTTOM + arm.LINEAR_2PL
-    assert abs(rocker_interface.CENTER_Y - legacy_centre) + current_radius <= legacy_radius + 1e-9
+    assert legacy_radius == pytest.approx(current_radius)
+    assert rocker_interface.CENTER_Y - legacy_centre == pytest.approx(
+        float(arm_drawing.ARC_PROFILE_ZONE_MM)
+    )
     assert _profile_crotch_clearance(top, bottom) >= pin.CROTCH_CLEARANCE_MIN
 
 
 def test_inside_zone_widening_cannot_worsen_crotch_clearance() -> None:
     top, bottom = _printed_profile_limits()
     zone = float(arm_drawing.ARC_PROFILE_ZONE_MM)
-    outside = float(arm_drawing.ARC_PROFILE_OUTSIDE_MM["BottomRadius"])
-    assert outside == 0.0
+    outside = zone / 2.0
     wider = _profile_normal_limits(2.0 * zone, outside)
     slot_depth = rod.FORK_TOP_Y - rod.FORK_CROTCH_Y
     width, depth = rod.FORK_WIDTH + pin.ROD_LINEAR_2PL, slot_depth - pin.ROD_LINEAR_2PL
@@ -540,7 +540,7 @@ def test_inside_zone_widening_cannot_worsen_crotch_clearance() -> None:
 
 
 def test_same_width_outside_allocation_fault_reduces_air_but_still_clears() -> None:
-    """Named drawing fault: reverse bottom U0 to wholly OUTSIDE at printed width.
+    """Named drawing fault: dispose the bottom zone wholly OUTSIDE at printed width.
 
     This is not an interference negative control: the real 0.5-wide fault still
     clears. Do not enlarge it or reverse an unnamed normal just to force failure.

@@ -24,10 +24,11 @@ _INVENTORY = _SHOP["gauges"]
 
 
 def _printed_zones() -> dict[str, tuple[float, float]]:
-    """Each profiled feature's printed (t, U), from the exported manifest."""
+    """Each profiled feature's printed (t, U), from the exported manifest: an
+    unstated U is prechips' equal-bilateral t / 2."""
     features = export_features.requirement_manifest(STEM)["features"]
     return {
-        name: (fields["surface_profile"], fields["surface_profile_u"])
+        name: (fields["surface_profile"], fields.get("surface_profile_u", fields["surface_profile"] / 2.0))
         for name, fields in features.items()
         if "surface_profile" in fields
     }
@@ -167,29 +168,36 @@ def _into_material(point, start, end) -> float:
 def test_template_straight_edges_sit_mid_zone_along_their_own_normals(
     template_line, rocker_line
 ) -> None:
-    """The lower outline's 0.5 Ⓤ0 zone lies wholly inside the material, so
-    each land and taper aims half the zone in along its own normal. The old
-    rigid +Y shift left the near-vertical land 0.045 OUTSIDE the zone."""
+    """Each land and taper aims at its zone's middle along its own normal:
+    since the rocker's nominal is mid-zone (#2144 item 10.3) the template's
+    line is the rocker's own. The old rigid +Y shift left the near-vertical
+    land 0.045 OUTSIDE the zone."""
+    assert check._MID_ZONE == 0.0
     for fraction in (0.0, 0.25, 0.5, 0.75, 1.0):
         point = tuple(
             a + fraction * (b - a) for a, b in zip(*template_line, strict=True)
         )
         # Three-place stations and the radial land: 2 microns at most.
         assert math.isclose(
-            _into_material(point, *rocker_line), _MID_ZONE, abs_tol=0.002
+            _into_material(point, *rocker_line), check._MID_ZONE, abs_tol=0.002
         )
 
 
 def test_template_arcs_stay_on_the_trammel_radii_about_the_raised_centre() -> None:
-    """Both arcs keep the trammel's radii about a centre raised by half the
-    zone: mid-zone on the mirror line, short of it by half the zone times
-    (1 - cos phi) off it."""
+    """Both arcs keep the trammel's book radii about a centre raised by the
+    rocker's mid-zone shift: on the mid-zone arcs on the mirror line, inside
+    the top one and outside the bottom one by the shift times (1 - cos phi)
+    off it."""
     trammel = _SHOP["tools"]["rocker-trammel"]["members"]
     assert (check.R_TOP, check.R_BOTTOM) == (
         trammel["R800"]["length_mm"]["value"],
         trammel["R816"]["length_mm"]["value"],
     )
-    assert math.isclose(check.CENTER_Y - _ROCKER_CENTRE_Y, _MID_ZONE, abs_tol=1e-9)
+    shift = rocker_interface.PROFILE_MID_ZONE_SHIFT
+    assert (check.R_TOP - shift, check.R_BOTTOM - shift) == pytest.approx(
+        (rocker.R_TOP, rocker_interface.R_BOTTOM), abs=1e-9
+    )
+    assert math.isclose(check.CENTER_Y - _ROCKER_CENTRE_Y, shift, abs_tol=1e-9)
     for radius, end_x in (
         (check.R_TOP, check.TOP_END_X),
         (check.R_BOTTOM, check.BOT_END_X),
@@ -198,12 +206,12 @@ def test_template_arcs_stay_on_the_trammel_radii_about_the_raised_centre() -> No
         for step in range(11):
             x = end_x * step / 10.0
             y = check.CENTER_Y - math.sqrt(radius**2 - x**2)
-            # + toward the arcs' centre: outside the top edge, inside the bottom.
-            residual = _MID_ZONE - (radius - math.hypot(x, y - _ROCKER_CENTRE_Y))
+            # + away from the arcs' centre, off the rocker's mid-zone arc.
+            residual = math.hypot(x, y - _ROCKER_CENTRE_Y) - (radius - shift)
             assert residual >= -1e-9
             worst = max(worst, residual)
         phi = math.asin(end_x / radius)
-        assert math.isclose(worst, _MID_ZONE * (1.0 - math.cos(phi)), abs_tol=1e-5)
+        assert math.isclose(worst, shift * (1.0 - math.cos(phi)), abs_tol=1e-5)
         assert worst < check.DTI_ACCEPTANCE
 
 

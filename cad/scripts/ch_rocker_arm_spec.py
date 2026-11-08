@@ -47,9 +47,11 @@ ARM_THICKNESS = 2.4892  # .098
 # (Main ruling 2026-10, option b): each inter-arm gap holds one tine of each
 # neighbouring rod fork (ch_rod_pivot_pin_spec.joint_budget).
 ARM_THICKNESS_BAND = (0.0254, -0.0254)  # (upper, lower) deviations, +/-.001
-TOP_ARC_LEN = 292.1  # top edge arc length = 11.5" (ch.30 back view)
-BOT_ARC_LEN = 266.7  # bottom edge arc length = 10.5" (ch.30 back-view sketch)
-TIP_FACE = 5.588  # .22 tip face, perpendicular to the top edge
+# The book outline (ch. 30 back view): an 11.5" top arc on R800, a 10.5"
+# bottom arc on R816, and a .22 tip land square to the top edge at each end.
+BOOK_TOP_ARC_LEN = 292.1
+BOOK_BOT_ARC_LEN = 266.7
+BOOK_TIP_FACE = 5.588
 PIVOT_HOLE_DIA = 6.5024  # .256, rides the .250 pivot shaft
 ROD_HOLE_SPEC = HoleSpec("drilled_number", "#47")
 
@@ -62,6 +64,65 @@ SURFACE_FINISHES = (
 # --- Derived spans (equations of the primitives; mirror build_ch_rocker_arm). ---
 R_TOP = _rocker_interface.CURVE_RADIUS
 
+
+def _mid_zone_outline() -> tuple[float, float, float]:
+    """(top arc length, bottom arc length, tip land) of the mid-zone outline.
+
+    Owner ruling 2026-11-08 (Pedro), #2144 item 10.3: the nominal is the book
+    outline with every edge moved to the middle of its former one-sided zone
+    (_rocker_interface.PROFILE_MID_ZONE_SHIFT): the top arc outward, the lower
+    outline (bottom arc, tapers and tip lands) into the material, each along
+    its own normal. The land stays radial to the shared centre, through the
+    offset land's top end (0.018 deg off parallel, under 0.002 over its
+    length); its foot is on the offset taper, and the taper's foot is on the
+    mid-zone bottom arc. Arc-centre frame, +Y up, the arm below the centre.
+    """
+    shift = _rocker_interface.PROFILE_MID_ZONE_SHIFT
+    r_top0, r_bot0 = _rocker_interface.BOOK_TOP_RADIUS, _rocker_interface.BOOK_BOTTOM_RADIUS
+    r_top, r_bot = R_TOP, _rocker_interface.R_BOTTOM
+    a_top = BOOK_TOP_ARC_LEN / 2.0 / r_top0
+    a_bot = BOOK_BOT_ARC_LEN / 2.0 / r_bot0
+    top0 = (r_top0 * math.sin(a_top), -r_top0 * math.cos(a_top))
+    tip0 = (top0[0] + BOOK_TIP_FACE * math.sin(a_top), top0[1] - BOOK_TIP_FACE * math.cos(a_top))
+    bot0 = (r_bot0 * math.sin(a_bot), -r_bot0 * math.cos(a_bot))
+    middle = (0.0, -(r_top0 + r_bot0) / 2.0)
+
+    def inward(start: tuple[float, float], end: tuple[float, float]) -> tuple[float, float]:
+        dx, dy = end[0] - start[0], end[1] - start[1]
+        n = (-dy / math.hypot(dx, dy), dx / math.hypot(dx, dy))
+        side = (middle[0] - start[0]) * n[0] + (middle[1] - start[1]) * n[1]
+        return n if side > 0.0 else (-n[0], -n[1])
+
+    def on_circle(p: tuple[float, float], d: tuple[float, float], radius: float) -> float:
+        """Line parameter of ``p + s d`` on the circle, the root nearest ``p``."""
+        a = d[0] ** 2 + d[1] ** 2
+        b = 2.0 * (p[0] * d[0] + p[1] * d[1])
+        root = math.sqrt(b * b - 4.0 * a * (p[0] ** 2 + p[1] ** 2 - radius**2))
+        return min(((-b + root) / (2.0 * a), (-b - root) / (2.0 * a)), key=abs)
+
+    def crossing(
+        p: tuple[float, float], d: tuple[float, float], q: tuple[float, float], e: tuple[float, float]
+    ) -> float:
+        return ((q[0] - p[0]) * e[1] - (q[1] - p[1]) * e[0]) / (d[0] * e[1] - d[1] * e[0])
+
+    land_in, taper_in = inward(top0, tip0), inward(tip0, bot0)
+    land_p = (top0[0] + shift * land_in[0], top0[1] + shift * land_in[1])
+    land_d = (tip0[0] - top0[0], tip0[1] - top0[1])
+    taper_p = (tip0[0] + shift * taper_in[0], tip0[1] + shift * taper_in[1])
+    taper_d = (bot0[0] - tip0[0], bot0[1] - tip0[1])
+    s = on_circle(land_p, land_d, r_top)
+    top = (land_p[0] + s * land_d[0], land_p[1] + s * land_d[1])
+    a_top_mid = math.atan2(top[0], -top[1])
+    radial = (math.sin(a_top_mid), -math.cos(a_top_mid))
+    tip_face = crossing(top, radial, taper_p, taper_d)
+    t = on_circle(taper_p, taper_d, r_bot)
+    bot = (taper_p[0] + t * taper_d[0], taper_p[1] + t * taper_d[1])
+    a_bot_mid = math.atan2(bot[0], -bot[1])
+    return 2.0 * r_top * a_top_mid, 2.0 * r_bot * a_bot_mid, tip_face
+
+
+TOP_ARC_LEN, BOT_ARC_LEN, TIP_FACE = _mid_zone_outline()  # 291.499, 266.460, 5.705
+
 _ALPHA_TOP = (TOP_ARC_LEN / 2.0) / R_TOP
 _ALPHA_BOT = (BOT_ARC_LEN / 2.0) / _rocker_interface.R_BOTTOM
 TOP_END_X = R_TOP * math.sin(_ALPHA_TOP)
@@ -70,7 +131,7 @@ BOT_END_X = _rocker_interface.R_BOTTOM * math.sin(_ALPHA_BOT)
 
 # Rod tip: the top-arc endpoint pushed out along the radius by the tip face.
 _RAD_X = TOP_END_X / R_TOP
-ROD_TIP_X = TOP_END_X + TIP_FACE * _RAD_X  # widest half-span (~146.25)
+ROD_TIP_X = TOP_END_X + TIP_FACE * _RAD_X  # widest half-span (~145.98)
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows. build_ch_rocker_arm marks exactly these; draw_ch_rocker_arm keeps
@@ -81,18 +142,21 @@ ROD_TIP_X = TOP_END_X + TIP_FACE * _RAD_X  # widest half-span (~146.25)
 
 # The amplitude bar's foot rides the top edge, and at d = 0 its cheeks pass
 # over this arm's hub, so the print controls the edge's height over the pivot
-# axis directly, on the nominal mirror plane, one-sided: the edge may only come out
-# high (user ruling 2026-09-26). The centre distance is then REF, and
-# the R800 governs only the curvature. With the amplitude bar's one-sided
-# notch (ch_amplitude_bar_spec.BOTTOM_NOTCH_DEPTH_BAND) a bar can rest at most
-# 1.0 higher than nominal: a steady lever tilt of ~0.45 deg on that channel.
-# Its fundamental moves at most 0.0036 mm (0.04 % of the d = 88 term) across
-# the stations: error_budget.hook_displacement with the edge 0.5 high and the
-# notch 0.5 shallow (test_rocker_bank_layout pins both numbers).
+# axis directly, on the nominal mirror plane. Its zone is equal-bilateral
+# about the mid-zone nominal (owner ruling 2026-11-08, #2144 item 10.3): the
+# admitted edges are the former one-sided band's, which let the edge come out
+# only high off the R800 arc (user ruling 2026-09-26). The centre distance is
+# then REF, and the radius governs only the curvature. With the amplitude
+# bar's one-sided notch (ch_amplitude_bar_spec.BOTTOM_NOTCH_DEPTH_BAND) a bar
+# rests from the zone's half below the nominal to its half plus the notch's
+# 0.5 above: test_rocker_bank_layout pins the slack and the channel effect
+# (error_budget.hook_displacement) at those limits.
 # drawing-simplicity-policy.md `How the repository implements the guidelines` (Codex #936 PRRT_kwDOPHDy386mV3AO): the band is the part's,
 # on a model dimension -- build_ch_rocker_arm's hidden TopEdgeReference sketch,
 # whose one printed dimension IS this height and drives the arcs' centre.
-TOP_EDGE_ABOVE_PIVOT = _rocker_interface.CENTER_Y - _rocker_interface.PIVOT_MID_Y - R_TOP  # 8.0, .315
+TOP_EDGE_ABOVE_PIVOT = _rocker_interface.CENTER_Y - _rocker_interface.PIVOT_MID_Y - R_TOP  # 8.254, .325
+# The lower arc's midpoint under the pivot axis, ArmDepth below the top edge.
+BOTTOM_EDGE_BELOW_PIVOT = _rocker_interface.ARM_DEPTH - TOP_EDGE_ABOVE_PIVOT  # 7.746, .305
 
 # Drawing prose (DRAWING_NOTES / ISOMETRIC_VIEW_NOTE) lives in
 # ch_rocker_arm_notes.py -- see ch_connecting_rod_notes for the rationale.
@@ -128,8 +192,13 @@ GEOMETRIC_TOLERANCES_IN: dict[str, str] = {
 GEOMETRIC_TOLERANCES_MM: dict[str, float] = {
     name: float(zone) * 25.4 for name, zone in GEOMETRIC_TOLERANCES_IN.items()
 }
-# (upper, lower): the top edge's one-sided profile zone above, all outside.
-TOP_EDGE_BAND = (GEOMETRIC_TOLERANCES_MM["top edge surface profile"], 0.0)
+# (upper, lower) on each edge's height off the pivot axis: the arc-system
+# profile zone, equal-bilateral about the mid-zone nominal (owner ruling
+# 2026-11-08, #2144 item 10.3). Upper is away from the pivot, outside the
+# material, on both edges.
+_PROFILE_HALF = GEOMETRIC_TOLERANCES_MM["top edge surface profile"] / 2.0
+TOP_EDGE_BAND = (_PROFILE_HALF, -_PROFILE_HALF)
+BOTTOM_EDGE_BAND = (_PROFILE_HALF, -_PROFILE_HALF)
 PIVOT_HOLE_BAND = (0.0254, 0.0)  # (upper, lower) +.0010/.0000: reamed; native on PivotDia
 RULE12_WALL_FLOOR = WALL_FLOOR_MM  # drawing-guidelines.md rule 17 (walls and webs)
 # Authoritative diametral zone; the hub OD's position frame prints it.

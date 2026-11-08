@@ -270,33 +270,23 @@ VIEW_ARROW_TEXT_X = 0.2625
 VIEW_ARROW_TIP_GAP = 0.0035
 VIEW_LETTER_HEIGHT = 0.005
 
-# Re-express the part-owned one-sided height envelope as a normal profile zone:
-# no second numeric tolerance lives in the drawing prose. The zero lower limit
-# is pinned by the rocker contract; it is Ⓤ0 on the lower (inside-material)
-# outline: the R816 arc, both tapers and both tip lands, between J and K. The
+# Re-express the part-owned height bands as one normal profile zone: no second
+# numeric tolerance lives in the drawing prose. The rocker contract's bands are
+# equal-bilateral about the mid-zone nominal (owner ruling 2026-11-08, #2144
+# item 10.3), so neither frame carries a Ⓤ modifier: the top arc, and the lower
+# outline (its arc, both tapers and both tip lands) between J and K. The
 # amplitude bar's foot rides the top edge (its named mate, below the frame).
-ARC_PROFILE_ZONE_MM = f"{TOP_EDGE_BAND[0]:g}"
-ARC_PROFILE_OUTSIDE_MM = {
-    "TopRadius": ARC_PROFILE_ZONE_MM,
-    "BottomRadius": f"{TOP_EDGE_BAND[1]:g}",
-}
-
-
-def _zone_text(zone_mm: str) -> str:
-    """A frame zone (mm) as the inch sheet prints it; a nil zone is a bare 0."""
-    return inch_text(float(zone_mm), _FRAME_P) if float(zone_mm) else "0"
-
+ARC_PROFILE_ZONE_MM = f"{TOP_EDGE_BAND[0] - TOP_EDGE_BAND[1]:g}"
+if TOP_EDGE_BAND != (-TOP_EDGE_BAND[1], TOP_EDGE_BAND[1]) or rocker.BOTTOM_EDGE_BAND != TOP_EDGE_BAND:
+    raise AssertionError("the arc-system frames print equal-bilateral zones only")
 
 # The frames' own printed text, decimal inch; the zone is the spec's FCF row.
 ARC_PROFILE_ZONE_TEXT = rocker.GEOMETRIC_TOLERANCES_IN["top edge surface profile"]
-ARC_PROFILE_OUTSIDE_TEXT = {
-    frame: _zone_text(zone) for frame, zone in ARC_PROFILE_OUTSIDE_MM.items()
-}
 ARC_PROFILE_DATUMS = ("A", "B", "C")
 
-# The two frames control one nominal concentric arc system. Their material
-# sides differ: top outside is +Y, bottom inside is +Y. A single shared frame
-# would put one of the zones on the wrong side of its basic arc.
+# The two frames control one nominal concentric arc system, each zone
+# equal-bilateral about its own BASIC outline: the top one names the bar's
+# foot mate below it, the lower one is limited BETWEEN J and K.
 # Top-lefts. The top frame's below-frame mate row (1.1 mm under, 3.4 mm tall)
 # clears the BASIC 8.00 box (top ~0.195), the frame's top the raised overall
 # width line (~0.2185). View F holds the sheet's left band, so the lower frame
@@ -408,16 +398,15 @@ _XY = tuple[float, float]
 def _least_tip_land_mm() -> float:
     """The shortest tip land the J↔K and top-edge zones permit (+X; mirrored).
 
-    The land is BASIC 5.59 inside the lower Ⓤ0 zone: its top end is on the top
-    arc, whose zone lies wholly outside it (toward the arc centre), and its foot
-    is on the taper. Each of the land and taper lines may lie anywhere in its
-    zone, tilted too, so each line's two ends move independently between the
-    zone's outside and inside limits, and the top arc between its own. The
-    length is near-linear in those five offsets, so the least is at a vertex:
-    the taper tilted in by the whole zone at the land's foot only (4.969).
-    prechips 0.1.2's ``tilt_across`` takes this as the land_angle extent (C2).
+    The land is BASIC inside the lower zone: its top end is on the top arc and
+    its foot is on the taper. Each of the land and taper lines may lie anywhere
+    in its equal-bilateral zone, tilted too, so each line's two ends move
+    independently between the zone's outside and inside limits, and the top
+    arc between its own. The length is near-linear in those five offsets, so
+    the least is at a vertex. prechips 0.1.2's ``tilt_across`` takes this as
+    the land_angle extent (C2).
     """
-    zone, lower_outside = TOP_EDGE_BAND
+    upper, lower_limit = rocker.BOTTOM_EDGE_BAND
     cx, cy = 0.0, rocker_interface.CENTER_Y
     mx, my = (_TOP[0] + _BOTTOM[0]) / 2.0, (_TOP[1] + _BOTTOM[1]) / 2.0
 
@@ -431,8 +420,8 @@ def _least_tip_land_mm() -> float:
         return (point[0] + by * normal[0], point[1] + by * normal[1])
 
     land_in, taper_in = inward(_TOP, _TIP), inward(_TIP, _BOTTOM)
-    lower = (-lower_outside, zone - lower_outside)  # into the material
-    top_radii = (rocker_interface.CURVE_RADIUS - zone, rocker_interface.CURVE_RADIUS)  # wholly outside: centreward
+    lower = (-upper, -lower_limit)  # into the material: away from outside
+    top_radii = tuple(rocker_interface.CURVE_RADIUS - d for d in TOP_EDGE_BAND)  # up is centreward
     lengths = []
     for offsets in itertools.product(lower, repeat=4):
         p0, p1 = moved(_TOP, land_in, offsets[0]), moved(_TIP, land_in, offsets[1])
@@ -450,19 +439,19 @@ def _least_tip_land_mm() -> float:
     return min(lengths)
 
 
-TIP_LAND_LEAST_MM = math.floor(_least_tip_land_mm() * 1e3) / 1e3  # 4.969
+TIP_LAND_LEAST_MM = math.floor(_least_tip_land_mm() * 1e3) / 1e3
 
 # A printed profile frame as prechips 0.1.2 reads it (docs/features.md, Surface
-# profiles): t, U and the datum frame are the frame's own printed strings. The
+# profiles): t and the datum frame are the frame's own printed strings, and no
+# U is printed, so prechips reads the zone as equal-bilateral (t / 2). The
 # frame's material sides (ARC_PROFILE_FRAME_XY) give each governed BASIC's sense.
 _ZONE_SOURCES = ("TOP_EDGE_BAND", ("draw_ch_rocker_arm", "ARC_PROFILE_ZONE_MM"), ("draw_ch_rocker_arm", "_add_arc_profiles"))
 
 
-def _profile_zone(frame: str, governs: dict[str, Any], governs_sources: tuple[Any, ...]) -> dict[str, tuple[Any, tuple[Any, ...]]]:
-    """``frame`` keys ARC_PROFILE_OUTSIDE_MM; ``governs`` names this feature's own BASICs."""
+def _profile_zone(governs: dict[str, Any], governs_sources: tuple[Any, ...]) -> dict[str, tuple[Any, tuple[Any, ...]]]:
+    """One arc-system frame's zone; ``governs`` names this feature's own BASICs."""
     return {
         "surface_profile": (float(ARC_PROFILE_ZONE_MM), _ZONE_SOURCES),
-        "surface_profile_u": (float(ARC_PROFILE_OUTSIDE_MM[frame]), (*_ZONE_SOURCES, ("draw_ch_rocker_arm", "ARC_PROFILE_OUTSIDE_MM"))),
         "surface_profile_datums": (ARC_PROFILE_DATUMS, (("draw_ch_rocker_arm", "ARC_PROFILE_DATUMS"), ("draw_ch_rocker_arm", "_add_arc_profiles"))),
         "surface_profile_governs": (governs, (("draw_ch_rocker_arm", "ARC_PROFILE_FRAME_XY"), *governs_sources)),
     }
@@ -488,7 +477,7 @@ for _name, _sign, _face in (("tip_land_pos_x", 1, _RIGHT[0]), ("tip_land_neg_x",
             # The land angle is read across the shortest land the zones allow.
             # The station is read along X, off the land's normal by the land
             # angle; material added on the land moves it outward.
-            **_profile_zone("BottomRadius", {
+            **_profile_zone({
                 "land_angle_deg": {"tilt_across": TIP_LAND_LEAST_MM},
                 "station": {"sense": "increases", "obliquity_deg": _LAND_ANGLE},
             }, (("draw_ch_rocker_arm", "TIP_LAND_LEAST_MM"), ("draw_ch_rocker_arm", "_least_tip_land_mm"), "_ALPHA_TOP")),
@@ -1956,16 +1945,16 @@ TOP_EDGE = requirement(
         "radius": (rocker_interface.CURVE_RADIUS, (("_rocker_interface", "CURVE_RADIUS"), ("draw_ch_rocker_arm", "_basic_profile_dimensions"))), "radius_nominal": (rocker_interface.CURVE_RADIUS, (("_rocker_interface", "CURVE_RADIUS"),)),
         "dimension_type": ("basic", (("draw_ch_rocker_arm", "_basic_profile_dimensions"),)),
         # The printed frame, kept whole as text; the zone below is what reads it.
-        "note": (f"SURFACE PROFILE {ARC_PROFILE_ZONE_TEXT} U{ARC_PROFILE_OUTSIDE_TEXT['TopRadius']} TO {'|'.join(ARC_PROFILE_DATUMS)}", ("TOP_EDGE_BAND", ("draw_ch_rocker_arm", "_add_arc_profiles"))),
+        "note": (f"SURFACE PROFILE {ARC_PROFILE_ZONE_TEXT} TO {'|'.join(ARC_PROFILE_DATUMS)}", ("TOP_EDGE_BAND", ("draw_ch_rocker_arm", "_add_arc_profiles"))),
         # Material added on the top edge moves it toward the arc centre.
-        **_profile_zone("TopRadius", {"radius": "decreases", "height_above_pivot": "increases"}, (("draw_ch_rocker_arm", "_basic_profile_dimensions"),)),
+        **_profile_zone({"radius": "decreases", "height_above_pivot": "increases"}, (("draw_ch_rocker_arm", "_basic_profile_dimensions"),)),
         "arc_len": (rocker.TOP_ARC_LEN, ("TOP_ARC_LEN",)),
         "arc_centre": ([0.0, rocker_interface.CENTER_Y, 0.0], (("_rocker_interface", "CENTER_Y"),)),
         "centre_from_pivot_ref": (rocker_interface.CENTER_Y - rocker_interface.PIVOT_MID_Y, (("_rocker_interface", "CENTER_Y"), ("_rocker_interface", "PIVOT_MID_Y"))),
         "end": (list(_TOP), ("TOP_END_X", "TOP_END_Y")),
     }, precision={"height_above_pivot": _TOP_P, "radius": _RADIUS_P},
 )
-# One Ⓤ0 zone over the lower outline between J and K: the R816 arc, both
+# One zone over the lower outline between J and K: the lower arc, both
 # tapers and both tip lands, all filed to the one scribed line (option 4).
 PROFILE_OUTER = requirement(
     "profile_outer", kind="profile", faces=(CylinderFace(2 * rocker_interface.R_BOTTOM), _RIGHT[1], _TIPS[1]),
@@ -1973,10 +1962,10 @@ PROFILE_OUTER = requirement(
         "bottom_radius": (rocker_interface.R_BOTTOM, (("_rocker_interface", "R_BOTTOM"), ("draw_ch_rocker_arm", "_basic_profile_dimensions"))),
         "bottom_radius_nominal": (rocker_interface.R_BOTTOM, (("_rocker_interface", "R_BOTTOM"),)),
         "dimension_type": ("basic", (("draw_ch_rocker_arm", "_basic_profile_dimensions"),)),
-        "note": (f"SURFACE PROFILE {ARC_PROFILE_ZONE_TEXT} U{ARC_PROFILE_OUTSIDE_TEXT['BottomRadius']} TO {'|'.join(ARC_PROFILE_DATUMS)}, BETWEEN {PROFILE_BETWEEN[0]} AND {PROFILE_BETWEEN[1]}", ("TOP_EDGE_BAND", ("draw_ch_rocker_arm", "_add_arc_profiles"))),
+        "note": (f"SURFACE PROFILE {ARC_PROFILE_ZONE_TEXT} TO {'|'.join(ARC_PROFILE_DATUMS)}, BETWEEN {PROFILE_BETWEEN[0]} AND {PROFILE_BETWEEN[1]}", ("TOP_EDGE_BAND", ("draw_ch_rocker_arm", "_add_arc_profiles"))),
         # Material added on the lower outline moves it away from the arc centre.
         # The tip lands declare this same zone themselves (see the tip-land loop).
-        **_profile_zone("BottomRadius", {"bottom_radius": "increases"}, (("draw_ch_rocker_arm", "_basic_profile_dimensions"),)),
+        **_profile_zone({"bottom_radius": "increases"}, (("draw_ch_rocker_arm", "_basic_profile_dimensions"),)),
         "arc_centre": ([0.0, rocker_interface.CENTER_Y, 0.0], (("_rocker_interface", "CENTER_Y"),)), "top_edge_feature": ("top_edge", (("draw_ch_rocker_arm", "_dress_arc_radii"),)),
         "bottom_arc_len": (rocker.BOT_ARC_LEN, ("BOT_ARC_LEN",)),
         "mirror_symmetric": (True, (("draw_ch_rocker_arm", "_add_rocker_outline_dimensions"), ("draw_ch_rocker_arm", "_dress_detail_dimensions"))), "depth_ref": (rocker_interface.ARM_DEPTH, (("_rocker_interface", "ARM_DEPTH"),)),
@@ -3120,7 +3109,7 @@ def _arc_profile_point(name: str) -> tuple[float, float, float]:
 
 
 def _add_arc_profiles(adapter: Any, front: Any) -> dict[str, Any]:
-    """Attach and retain native frames: Ⓤ0.5 top (its mate below it), Ⓤ0 bottom J↔K, total zone 0.5."""
+    """Attach and retain native frames: the top arc's (its mate below it) and J↔K's, each equal-bilateral .020."""
     profiles = {}
     for name, radius in (("TopRadius", R_TOP), ("BottomRadius", R_BOTTOM)):
         edge = visible_circle_edge(adapter, front, 2.0 * radius)
@@ -3133,7 +3122,6 @@ def _add_arc_profiles(adapter: Any, front: Any) -> dict[str, Any]:
             frame_xy=ARC_PROFILE_FRAME_XY[name],
             characteristic="profile_surface",
             tolerance=GEOMETRIC_TOLERANCES_IN["top edge surface profile"],
-            outside_disposition=ARC_PROFILE_OUTSIDE_TEXT[name],
             datums=ARC_PROFILE_DATUMS,
             # The amplitude bar's foot rides the top edge (rule 4: name the mate).
             quantity=rocker_notes.TOP_EDGE_MATE_CALLOUT if name == "TopRadius" else "",

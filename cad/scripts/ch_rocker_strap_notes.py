@@ -29,8 +29,8 @@ __all__ = [
 # implements the guidelines`: the PART owns places and bands). One sketch,
 # ``StrapProfile``, carries the outline and the hub hole, and every printed
 # location runs from the hub hole's centre (rule 10: from a real feature):
-# the top edge's height over it (one-sided plus) and the bottom edge's depth
-# under it (one-sided minus) -- the finished part's bands -- both on the
+# the top edge's height over it and the bottom edge's depth under it, each
+# +/- the arc-system zone's half -- the finished part's bands -- both on the
 # hole's vertical centreline, the symmetry axis both arcs' centres lie on;
 # both tip lands' and both taper feet's offsets, each arc's radius, the
 # tip land and its angle from the hole's vertical centreline (the lands are
@@ -53,9 +53,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Strap": {"StrapThickness"},
 }
 # The hole at four places with its press band; the thickness at three with
-# its band; both edges at three with their one-sided bands, the .315 the
-# finished MHA-CH-06 prints (at two places the 8 mm nominal rounds to .31 and
-# shifts each edge's limits .005 off the rocker's profile zone); the radii at
+# its band; both edges at three with their bilateral bands, the .325 and .305
+# the finished MHA-CH-06 prints (at two places each rounds .005 off and
+# shifts its limits that far off the rocker's profile zone); the radii at
 # one (noncritical sizes: each edge is held at the centreline by its own
 # height, and a .1 radius error moves the 5.76 half-chord's sagitta .002);
 # the offsets and the land at two (the title block's .XX); the land angle at
