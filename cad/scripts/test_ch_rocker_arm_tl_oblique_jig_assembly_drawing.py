@@ -3000,19 +3000,17 @@ def test_linear_motion_view_hides_only_the_carrier_and_its_load() -> None:
         if spec.instance_name(stem, index) in hidden
     )
     # The common screw is hidden by occurrence, never by stem: its three strap
-    # clamps (CL, CR, HUB: 0-based 20, 21, 22, native -21..-23) leave with the
-    # carrier, its rail and TL-28 bar screws stay on the bars.
+    # clamps (CL, CR, HUB: 0-based 16, 17, 18, native -17..-19) leave with the
+    # carrier; its rail screws and the bracket family's TL-28 bar screws stay.
     assert spec.STRAP_CLAMP_SCREW_INSTANCES == {
         role: spec.instance_name(spec.RAIL_SCREW, index)
-        for role, index in (("CL", 20), ("CR", 21), ("HUB", 22))
+        for role, index in (("CL", 16), ("CR", 17), ("HUB", 18))
     }
     clamps = set(spec.STRAP_CLAMP_SCREW_INSTANCES.values())
     assert len(clamps) == 3
     assert _family_instances(spec.RAIL_SCREW) & hidden == clamps
     assert set(spec.RAIL_SCREW_INSTANCES) | set(spec.BAR_SCREW_INSTANCES) <= shown
-    assert _family_instances(spec.RAIL_SCREW) - clamps == (
-        set(spec.RAIL_SCREW_INSTANCES) | set(spec.BAR_SCREW_INSTANCES)
-    )
+    assert _family_instances(spec.RAIL_SCREW) - clamps == set(spec.RAIL_SCREW_INSTANCES)
     # The riser-screw family splits: the feed nut's four stay on the lug.
     assert set(spec.NUT_SCREW_INSTANCES) <= shown
     # Only common occurrences 17/18/19 ride the carrier; the 16 rail screws
@@ -3026,6 +3024,7 @@ def test_linear_motion_view_hides_only_the_carrier_and_its_load() -> None:
     }
     bracket = _family_instances(spec.PILLOW_BLOCK_SCREW)
     assert len(bracket) == 8
+    assert bracket == set(spec.KP08_SCREW_INSTANCES) | set(spec.BAR_SCREW_INSTANCES)
     assert bracket <= shown
     assert not bracket & hidden
     assert _family_instances(

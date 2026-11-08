@@ -1664,8 +1664,9 @@ def test_a200_shares_the_short_sku_but_not_the_explode_direction() -> None:
     explode = {name: (members, axis, travel) for name, members, axis, travel in spec.EXPLODE_STEPS}
     assert explode["kp08 screws lift out"] == (spec.KP08_SCREW_INSTANCES, "z", 40.0)
     assert explode["bar screws drop out"] == (spec.BAR_SCREW_INSTANCES, "z", -40.0)
-    one = next(step for step in spec.ASSEMBLY_STEPS if step.startswith("1. "))
-    assert f"{spec._item(spec.PILLOW_BLOCK_SCREW)} FROM BELOW" in one
+    fitting = next(step for step in spec.ASSEMBLY_STEPS if step.startswith("2. "))
+    assert f"{spec._item(spec.PILLOW_BLOCK_SCREW)} FROM BELOW" in fitting
+    assert spec._torque(leadscrew.BAR_SCREW_TORQUE_NM) in fitting
     assert fasteners.BRACKET_TO_BAR.thread_depth_mm == end_bracket.BAR_THREAD_LIMITS[0]
     assert fasteners.KP08_TO_BRACKET.thread_depth_mm == end_bracket.KP08_THREAD_LIMITS[0]
 
