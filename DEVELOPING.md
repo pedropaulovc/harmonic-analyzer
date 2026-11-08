@@ -305,9 +305,9 @@ completed
 ## Process traveler prerequisites
 
 `prechips:<stem>` tasks run on the submitter, including when SolidWorks leaves
-run on the farm. They need **FreeCAD 1.1** there; the pinned prechips Python
-dependency does not install the FreeCAD executable. The planned 0.3.0 dependency
-upgrade admits new bounded contracts, not qualified held routes or traveler
+run on the farm. They need **FreeCAD 1.1** there; the pinned `prechips==0.3.0`
+Python dependency does not install the FreeCAD executable. This release
+admits new bounded contracts, not qualified held routes or traveler
 enrollment. prechips discovers the Windows FreeCAD 1.1 installation or a command
 on `PATH`; set `FREECAD_CMD` when it lives elsewhere:
 

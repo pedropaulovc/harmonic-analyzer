@@ -285,9 +285,8 @@ files, CAD-tagged fixture spec modules, the locked consumer and executed wrapper
 closure. It runs locally on the submitter without a SolidWorks seat, including
 under the farm executor, and needs FreeCAD 1.1 (see
 [`DEVELOPING.md`](../../../DEVELOPING.md#process-traveler-prerequisites)).
-The dependency upgrade targets PyPI `prechips==0.3.0`; the pin and lockfile remain
-at `0.2.0` until publication and the explicit upgrade. No upstream examples are
-run by this task family. The release adds bounded contracts for qualified
+The consumer is pinned to PyPI `prechips==0.3.0`. No upstream examples are run by
+this task family. The release adds bounded contracts for qualified
 tailstock tool mounting, relative-coordinate inspection readings and shared-axis
 native placement, not complete route consumption or machining qualification.
 The shaft/cone proposals remain **HELD / UNENROLLED**, as do the rocker and base

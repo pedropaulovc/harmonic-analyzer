@@ -2,8 +2,7 @@
 
 This directory holds HA-authored process plans (`<stem>/plan.toml`) and shared
 shop data (`shop/inventory.toml`, `shop/shop-policy.toml`,
-`shop/cutting-data.toml`). The dependency upgrade targets PyPI `prechips==0.3.0`;
-the pin and lockfile remain at `0.2.0` until publication and the explicit upgrade.
+`shop/cutting-data.toml`). prechips is pinned to PyPI `prechips==0.3.0`.
 `cad/scripts/_process_plans.py:TRAVELER_STEMS` is the enrollment authority; it is
 currently empty. The rocker plan is a **HELD REFERENCE ROUTE**, not enrolled or
 qualified for machining. Its current built-up strap/hub route and oblique-trammel
@@ -41,9 +40,9 @@ must preserve concentricity and head support before it earns geometry credit.
 The signed-station inspection offset and citation remain `unknown`, not copied
 calibrations. The paint/mask split is unresolved despite the one-piece decision.
 
-Prechips 0.3.0 adoption is being prepared for three bounded contracts: explicitly
-qualified tailstock tool mounting, relative-coordinate inspection readings, and
-shared-axis native placement. The current `0.2.0` pin cannot admit the new fields.
+Prechips 0.3.0 adds three bounded contracts: explicitly qualified tailstock tool
+mounting, relative-coordinate inspection readings, and shared-axis native
+placement.
 The release and dependency upgrade are separate from traveler activation:
 all four plans remain **HELD / UNENROLLED**, and enrollment stays empty.
 Installed schema/API admission is not full-plan consumption, native route replay

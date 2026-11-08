@@ -489,9 +489,9 @@ scoped recorded face refs, requires two rocker pivot-bore patches and identical
 scoped/full STEP bytes, and reports both digests. Release staging copies the
 verified scoped bundles under `features/`. Each enrolled `prechips:<stem>` task
 depends only on its own `package:features:<stem>` leaf, not `package:features`, and uses
-the exactly pinned PyPI prechips consumer and `cad/process/` with a strict
+the exactly pinned PyPI `prechips==0.3.0` consumer and `cad/process/` with a strict
 **exit 0 only** policy: bad input, machining blockers and required unknowns all
-fail without a stamp. The planned 0.3.0 upgrade adds bounded contract admission,
+fail without a stamp. The 0.3.0 release adds bounded contract admission,
 not full-route qualification; the revision guard still refuses v48 plans against
 v47 exports before consumer/kernel execution.
 Build and release include every stem in `_process_plans.TRAVELER_STEMS`.
