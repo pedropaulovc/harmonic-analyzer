@@ -3714,6 +3714,7 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         # Drawing infrastructure and cross-sheet contracts do not follow the
         # per-sheet test_*_drawing.py suffix, so enroll them explicitly.
         SCRIPTS_DIR / "test_drawing_marks.py",
+        SCRIPTS_DIR / "test_drawing_visibility.py",
         SCRIPTS_DIR / "test_cone_drawing_batch_contract.py",
         # The two cone tip screws' supplier reference lines lie under their
         # own extension lines (one file for both sheets' shared builders).

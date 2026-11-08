@@ -2838,12 +2838,8 @@ def _place_cluster_view(
     set_view_exploded_state(
         adapter, view, True, configuration=configuration, label=label
     )
-    isolate_drawing_view_components(
-        adapter,
-        view,
-        visible_stems=cluster.visible,
-        label=label,
-    )
+    view = isolate_drawing_view_components(adapter, view, visible_stems=cluster.visible,
+    label=label,)
     return view, _fit_cluster_view(adapter, view, cluster, configuration, label=label)
 
 

@@ -6,12 +6,13 @@ without re-keying ordinary part annotations.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from itertools import product
 import math
-from pathlib import PureWindowsPath
+from pathlib import Path, PureWindowsPath
 import re
 import sys
+from time import perf_counter
 from typing import Any, Iterable, Literal, Mapping, Sequence
 
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
@@ -653,6 +654,412 @@ def _view_component_leaves(
     return tuple(leaves)
 
 
+@dataclass(frozen=True)
+class _VisibilityComponent:
+    component: Any
+    name: str
+    visible: bool
+    parent: bool
+    ancestors: tuple[str, ...]
+    tree_visible: bool
+
+
+@dataclass(frozen=True)
+class _VisibilityOwner:
+    name: str
+    path: str
+    configuration: str
+
+
+def _visibility_owner(component: Any, *, label: str) -> _VisibilityOwner:
+    if component is None:
+        raise RuntimeError(f"{label}: drawing occurrence has no native component")
+    name = component.Name2
+    path = component.GetPathName()
+    configuration = component.ReferencedConfiguration
+    if any(not isinstance(value, str) or not value for value in (name, path, configuration)):
+        raise RuntimeError(
+            f"{label}: unreadable native occurrence identity: {(name, path, configuration)!r}"
+        )
+    return _VisibilityOwner(name, str(Path(path).resolve()).casefold(), configuration)
+
+
+def _visibility_owner_chain(component: Any, *, label: str) -> tuple[_VisibilityOwner, ...]:
+    """Native leaf-to-root identity; an unreadable parent is never an empty chain."""
+    component = _early_bound(component, "IComponent2")
+    if component is None:
+        raise RuntimeError(f"{label}: drawing occurrence has no native component")
+    chain: list[_VisibilityOwner] = []
+    while component is not None:
+        owner = _visibility_owner(component, label=label)
+        if owner in chain:
+            raise RuntimeError(f"{label}: cyclic native component ancestry: {chain!r}")
+        chain.append(owner)
+        component = _early_bound(component.GetParent(), "IComponent2")
+    return tuple(chain)
+
+
+@dataclass(frozen=True)
+class _SectionVisibilityIdentity:
+    document_path: str
+    document_title: str
+    sheet_name: str
+    view_name: str
+
+
+def _section_views(model: Any, *, label: str):
+    sheets = _early_bound(model, "IDrawingDoc").GetViews()
+    if not isinstance(sheets, (tuple, list)):
+        raise RuntimeError(f"{label}: drawing sheet inventory is unreadable")
+    for sheet in sheets:
+        if not isinstance(sheet, (tuple, list)) or not sheet:
+            raise RuntimeError(f"{label}: drawing view inventory is unreadable")
+        sheet_name = _early_bound(sheet[0], "IView").GetName2()
+        if not isinstance(sheet_name, str) or not sheet_name:
+            raise RuntimeError(f"{label}: drawing sheet has no stable name")
+        for raw in sheet[1:]:
+            candidate = _early_bound(raw, "IView")
+            if int(candidate.Type) == 2:
+                yield sheet_name, candidate
+
+
+def _resolve_section_visibility_view(
+    app: Any, identity: _SectionVisibilityIdentity, *, label: str
+) -> tuple[Any, Any]:
+    """Resolve fresh proxies, including unsaved drawings with an empty path."""
+    documents = app.GetDocuments()
+    if not isinstance(documents, (tuple, list)):
+        raise RuntimeError(f"{label}: open document inventory is unreadable")
+    matches = []
+    for raw in documents:
+        document = _early_bound(raw, "IModelDoc2")
+        if int(document.GetType()) != 3:
+            continue
+        if (document.GetPathName(), document.GetTitle()) == (
+            identity.document_path, identity.document_title
+        ):
+            matches.append(document)
+    if len(matches) != 1:
+        raise RuntimeError(f"{label}: expected one current drawing for {identity!r}; found {len(matches)}")
+    document = matches[0]
+    views = [
+        candidate for sheet_name, candidate in _section_views(document, label=label)
+        if sheet_name == identity.sheet_name and candidate.GetName2() == identity.view_name
+    ]
+    if len(views) != 1:
+        raise RuntimeError(f"{label}: expected one current section for {identity!r}; found {len(views)}")
+    return document, views[0]
+
+
+def _section_visibility_identity(
+    app: Any, model: Any, view: Any, *, label: str
+) -> _SectionVisibilityIdentity:
+    """Prove a unique plain identity before a command can invalidate wrappers."""
+    path, title, name = model.GetPathName(), model.GetTitle(), view.GetName2()
+    if not isinstance(path, str) or any(not isinstance(value, str) or not value for value in (title, name)):
+        raise RuntimeError(f"{label}: drawing or section identity is unreadable")
+    matches = []
+    for sheet_name, candidate in _section_views(model, label=label):
+        if candidate.GetName2() != name:
+            continue
+        comparison = app.IsSame(candidate, view)
+        if type(comparison) is not int or comparison not in (0, 1):
+            raise RuntimeError(f"{label}: section identity comparison is unreadable: {comparison!r}")
+        if comparison == 1:
+            matches.append(_SectionVisibilityIdentity(path, title, sheet_name, name))
+    if len(matches) != 1:
+        raise RuntimeError(f"{label}: expected one native section identity; found {len(matches)}")
+    identity = matches[0]
+    current_model, current_view = _resolve_section_visibility_view(app, identity, label=label)
+    for current, expected in ((current_model, model), (current_view, view)):
+        comparison = app.IsSame(current, expected)
+        if type(comparison) is not int or comparison != 1:
+            raise RuntimeError(f"{label}: section identity resolved to a different native object")
+    return identity
+
+
+def _section_source_document(view: Any, *, label: str) -> Any:
+    """Resolve the documented base-view source, never the session's active model."""
+    seen: set[str] = set()
+    source_view = view
+    while int(source_view.Type) == 2:  # swDrawingSectionView has no documented ReferencedDocument
+        name = source_view.GetName2()
+        if not isinstance(name, str) or not name or name in seen:
+            raise RuntimeError(f"{label}: missing or cyclic section base-view identity: {name!r}")
+        seen.add(name)
+        source_view = _early_bound(source_view.GetBaseView(), "IView")
+        if source_view is None:
+            raise RuntimeError(f"{label}: section has no base view")
+    document = source_view.ReferencedDocument
+    if document is None or isinstance(document, str):
+        raise RuntimeError(f"{label}: section base view has no referenced source document")
+    source = _early_bound(document, "IModelDoc2")
+    if int(source.GetType()) != 2:  # swDocASSEMBLY
+        raise RuntimeError(f"{label}: section source is not an assembly")
+    return source
+
+
+def _section_hidden_names(
+    view: Any, rows: list[_VisibilityComponent], *, label: str
+) -> set[str]:
+    """Join a section's authoritative hidden owners to its complete drawing tree.
+
+    Native PD qualification found 147 true tree flags but 142 hidden owners.
+    A hidden owner can carry one generated source-assembly wrapper. Remove only
+    that natively proved wrapper, not an arbitrary drawing-name prefix or suffix.
+    """
+    hidden = view.GetHiddenComponents()
+    if hidden is None:
+        hidden = ()
+    if not isinstance(hidden, (tuple, list)):
+        raise RuntimeError(f"{label}: hidden component inventory is not an array: {hidden!r}")
+    if not hidden:
+        return set()
+    source = _section_source_document(view, label=label)
+    path = source.GetPathName()
+    configuration = view.ReferencedConfiguration
+    if not isinstance(path, str) or not path or not isinstance(configuration, str) or not configuration:
+        raise RuntimeError(f"{label}: section source path/configuration is unreadable")
+    source_path = str(Path(path).resolve()).casefold()
+    by_chain: dict[tuple[_VisibilityOwner, ...], str] = {}
+    for row in rows:
+        chain = _visibility_owner_chain(row.component.Component, label=label)
+        if chain in by_chain:
+            raise RuntimeError(f"{label}: duplicate view native occurrence identity: {chain!r}")
+        by_chain[chain] = row.name
+    result: set[str] = set()
+    for raw in hidden:
+        chain = _visibility_owner_chain(raw, label=label)
+        matches = {by_chain[chain]} if chain in by_chain else set()
+        wrapper = chain[-1]
+        if len(chain) > 1 and wrapper.path == source_path and wrapper.configuration == configuration:
+            prefix = wrapper.name + "/"
+            if all(owner.name.startswith(prefix) and owner.name != prefix for owner in chain[:-1]):
+                unwrapped = tuple(
+                    replace(owner, name=owner.name[len(prefix):]) for owner in chain[:-1]
+                )
+                if unwrapped in by_chain:
+                    matches.add(by_chain[unwrapped])
+        if len(matches) != 1:
+            raise RuntimeError(
+                f"{label}: hidden owner has {len(matches)} exact view matches: {chain!r}"
+            )
+        name = next(iter(matches))
+        if name in result:
+            raise RuntimeError(f"{label}: duplicate hidden occurrence: {name!r}")
+        result.add(name)
+    return result
+
+
+def _visibility_components(view: Any, *, label: str) -> list[_VisibilityComponent]:
+    """Read the entire occurrence tree, including unchanged descendant flags."""
+    root = _early_bound(view.RootDrawingComponent2(False), "IDrawingComponent")
+    if root is None:
+        raise RuntimeError(f"{label}: drawing view has no root component")
+    pending = [(child, ()) for child in _drawing_component_children(root)]
+    rows: list[_VisibilityComponent] = []
+    names: set[str] = set()
+    while pending:
+        raw, ancestors = pending.pop()
+        component = _early_bound(raw, "IDrawingComponent")
+        name = str(component.Name or "")
+        if not name or name in names:
+            raise RuntimeError(f"{label}: empty or duplicate drawing component name {name!r}")
+        names.add(name)
+        children = _drawing_component_children(component)
+        pending.extend((child, (*ancestors, name)) for child in children)
+        visible = component.Visible
+        if type(visible) is not bool:
+            raise RuntimeError(f"{label}: unreadable drawing visibility for {name!r}: {visible!r}")
+        rows.append(_VisibilityComponent(
+            component, name, visible, bool(children), ancestors, visible
+        ))
+    if int(view.Type) == 2:  # swDrawingSectionView
+        hidden = _section_hidden_names(view, rows, label=label)
+        rows = [replace(row, visible=row.name not in hidden) for row in rows]
+    return rows
+
+
+def _apply_drawing_visibility(
+    adapter: Any,
+    view: Any,
+    rows: list[_VisibilityComponent],
+    desired: dict[str, bool],
+    *,
+    enumerate_seconds: float,
+    label: str,
+) -> Any:
+    """Batch only changed drawing occurrences; never touch the source assembly.
+
+    IDrawingComponent.Select supplies drawing-context selections. The SDK's
+    IModelDoc2 HideComponent2/ShowComponent2 commands support drawing documents.
+    Both return void, so exact post-rebuild readback is the success criterion.
+    Return the usable view: a changed section must be reacquired after rebuild.
+    Own the component-bearing ``rows`` list: a changed section consumes it before
+    re-resolution. Callers must not retain individual row/component aliases.
+    """
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    if int(model.GetType()) != 3:  # swDocDRAWING
+        raise RuntimeError(f"{label}: visibility requires a drawing document")
+    configuration = str(view.ReferencedConfiguration)
+    display_mode = int(view.GetDisplayMode2())
+    groups = {
+        visible: [row for row in rows if desired[row.name] == visible and row.visible != visible]
+        for visible in (False, True)
+    }
+    changed = sum(map(len, groups.values()))
+    enumerated = len(rows)
+    show_count, hide_count = len(groups[True]), len(groups[False])
+    untouched_flags = {
+        row.name: row.tree_visible for row in rows if desired[row.name] == row.visible
+    }
+    selection_seconds = apply_seconds = rebuild_seconds = readback_seconds = 0.0
+    started = perf_counter()
+    outcome = "failed"
+    selection_owner = None
+    primary_error = None
+    try:
+        if changed:
+            tick = perf_counter()
+            app = _early_bound(adapter.swApp, "ISldWorks")
+            self_comparison = app.IsSame(view, view)
+            if type(self_comparison) is not int or self_comparison != 1:
+                raise RuntimeError(f"{label}: native view identity self-control failed: {self_comparison!r}")
+            section_identity = (
+                _section_visibility_identity(app, model, view, label=label)
+                if int(view.Type) == 2 else None
+            )
+            planned_owners: dict[str, Any] = {}
+            owner_keys: set[_VisibilityOwner] = set()
+            for group in groups.values():
+                for row in group:
+                    owner = _early_bound(row.component.Component, "IComponent2")
+                    key = _visibility_owner(owner, label=label)
+                    if key in owner_keys:
+                        raise RuntimeError(f"{label}: duplicate planned native occurrence: {key!r}")
+                    owner_keys.add(key)
+                    planned_owners[row.name] = owner
+            manager = _early_bound(model.SelectionManager, "ISelectionMgr")
+            data = manager.CreateSelectData()
+            data.View = view
+            expected_view = view_name(adapter, view)
+            if not expected_view:
+                raise RuntimeError(f"{label}: drawing view has no name")
+            selection_seconds += perf_counter() - tick
+            for visible, group in groups.items():
+                if not group:
+                    continue
+                tick = perf_counter()
+                model.ClearSelection2(True)
+                selection_owner = model
+                for row in group:
+                    if not row.component.Select(True, data):
+                        raise RuntimeError(f"{label}: could not select drawing component {row.name!r}")
+                count = int(manager.GetSelectedObjectCount2(-1))
+                if count != len(group):
+                    raise RuntimeError(f"{label}: selected {count} components, expected {len(group)}")
+                for index in range(1, count + 1):
+                    if int(manager.GetSelectedObjectType3(index, -1)) != 20:  # swSelCOMPONENTS
+                        raise RuntimeError(f"{label}: selection {index} is not a component")
+                    selected_view = manager.GetSelectedObjectsDrawingView2(index, -1)
+                    view_comparison = app.IsSame(selected_view, view) if selected_view is not None else None
+                    if type(view_comparison) is not int or view_comparison != 1:
+                        raise RuntimeError(f"{label}: selection {index} belongs to another view")
+                    selected_component = _early_bound(
+                        manager.GetSelectedObjectsComponent4(index, -1), "IDrawingComponent"
+                    )
+                    if selected_component is None:
+                        raise RuntimeError(f"{label}: selection {index} has no drawing component")
+                    planned = group[index - 1]
+                    owner = _early_bound(selected_component.Component, "IComponent2")
+                    comparison = app.IsSame(owner, planned_owners[planned.name]) if owner is not None else None
+                    if type(comparison) is not int or comparison != 1:
+                        actual_name = str(selected_component.Name or "")
+                        raise RuntimeError(
+                            f"{label}: selected occurrence identities differ from visibility plan; "
+                            f"native_comparison={comparison!r}, expected_count={len(group)}, "
+                            f"selected_count={count}, "
+                            f"missing={sorted(row.name for row in group[index - 1:])[:12]!r}, "
+                            f"unexpected={[actual_name]!r}"
+                        )
+                selection_seconds += perf_counter() - tick
+                tick = perf_counter()
+                if visible:
+                    model.ShowComponent2()
+                else:
+                    model.HideComponent2()
+                apply_seconds += perf_counter() - tick
+                # Cleanup is attempted once, before rebuild can stale a proxy.
+                selection_owner = None
+                model.ClearSelection2(True)
+            tick = perf_counter()
+            if not model.EditRebuild3():
+                raise RuntimeError(f"{label}: rebuild after visibility changes failed")
+            rebuild_seconds = perf_counter() - tick
+        tick = perf_counter()
+        if changed and section_identity is not None:
+            # Retained drawing/native component proxies change SW 34.4.0's
+            # generated section context. Release every transient component
+            # reference before asking for the rebuilt tree; no GC or retry.
+            rows.clear()
+            for group in groups.values():
+                group.clear()
+            planned_owners.clear()
+            row = planned = owner = selected_component = None
+            model, view = _resolve_section_visibility_view(app, section_identity, label=label)
+            adapter.currentModel = model
+        after = _visibility_components(view, label=label)
+        observed = {row.name: row.visible for row in after}
+        flag_drift = {
+            row.name: (untouched_flags[row.name], row.tree_visible)
+            for row in after if row.name in untouched_flags and row.tree_visible != untouched_flags[row.name]
+        }
+        if flag_drift:
+            raise RuntimeError(f"{label}: unchanged occurrence tree flags changed: {flag_drift!r}")
+        if str(view.ReferencedConfiguration) != configuration or int(view.GetDisplayMode2()) != display_mode:
+            raise RuntimeError(f"{label}: visibility changed the view configuration or display mode")
+        readback_seconds = perf_counter() - tick
+        if observed != desired:
+            raise RuntimeError(
+                f"{label}: visibility readback mismatch; expected={desired!r}; observed={observed!r}"
+            )
+        _telemetry.event(
+            "drawing.visibility.verified", label=label,
+            configuration=configuration, display_mode=display_mode,
+            visible_names=tuple(sorted(
+                row.name for row in after if row.visible and all(observed[name] for name in row.ancestors)
+            )),
+            hidden_names=tuple(sorted(
+                row.name for row in after if not row.visible or any(not observed[name] for name in row.ancestors)
+            )),
+        )
+        outcome = "verified"
+    except BaseException as error:
+        primary_error = error
+        raise
+    finally:
+        cleanup_error = None
+        if selection_owner is not None:
+            try:
+                selection_owner.ClearSelection2(True)
+            except Exception as error:
+                cleanup_error = error
+                if primary_error is not None:
+                    primary_error.add_note(f"{label}: selection cleanup also failed: {error!r}")
+        _telemetry.event(
+            "drawing.visibility.timings", label=label, strategy="batch_commands", outcome=outcome,
+            enumerated=enumerated, changed=changed, unchanged=enumerated - changed,
+            show=show_count, hide=hide_count,
+            enumerate_seconds=enumerate_seconds, selection_seconds=selection_seconds,
+            apply_seconds=apply_seconds, rebuild_seconds=rebuild_seconds,
+            readback_seconds=readback_seconds, total_seconds=enumerate_seconds + perf_counter() - started,
+            cleanup_error=repr(cleanup_error) if cleanup_error is not None else "",
+        )
+        if cleanup_error is not None and primary_error is None:
+            raise cleanup_error
+    return view
+
+
 @_telemetry.traced("drawing.isolate_components", label_param="label")
 def isolate_drawing_view_components(
     adapter: Any,
@@ -660,36 +1067,62 @@ def isolate_drawing_view_components(
     *,
     visible_stems: frozenset[str],
     label: str,
-) -> None:
-    """Show only requested top-level component families in one drawing view."""
+) -> Any:
+    """Show requested leaf families; return the current usable drawing view."""
     if not visible_stems:
         raise ValueError(f"{label}: visible component set must not be empty")
-    root = adapter._attempt(lambda: view.RootDrawingComponent2(False), default=None)
-    if root is None:
-        raise RuntimeError(f"{label}: drawing view has no root component")
-
-    pending = list(_drawing_component_children(root))
+    started = perf_counter()
+    view = _early_bound(view, "IView")
+    rows = _visibility_components(view, label=label)
     found: set[str] = set()
-    enumerated: list[str] = []
-    while pending:
-        drawing_component = pending.pop()
-        children = _drawing_component_children(drawing_component)
-        pending.extend(children)
-        enumerated.append(str(drawing_component.Name or ""))
-        if children:
+    desired: dict[str, bool] = {}
+    for row in rows:
+        if row.parent:
+            desired[row.name] = row.visible
             continue
-        matched = _drawing_component_stems(adapter, drawing_component, visible_stems)
-        drawing_component.Visible = bool(matched)
+        matched = _drawing_component_stems(adapter, row.component, visible_stems)
+        desired[row.name] = bool(matched)
         found.update(matched)
-
     missing = sorted(visible_stems - found)
     if missing:
         raise RuntimeError(
-            f"{label}: component families not found: {missing}; "
-            f"enumerated={sorted(enumerated)}"
+            f"{label}: component families not found: {missing}; enumerated={sorted(desired)}"
         )
-    rebuild_drawing(adapter, label="isolate_drawing_view_components")
+    for row in rows:
+        if not row.parent and desired[row.name] and any(not desired[name] for name in row.ancestors):
+            raise RuntimeError(f"{label}: requested component {row.name!r} has a hidden ancestor")
+    # The loop variable otherwise keeps its last component alive in this frame.
+    del row
+    view = _apply_drawing_visibility(
+        adapter, view, rows, desired,
+        enumerate_seconds=perf_counter() - started, label=label,
+    )
     _telemetry.success(f"{label}: isolated {', '.join(sorted(found))}")
+    return view
+
+
+@_telemetry.traced("drawing.isolate_instances", label_param="label")
+def set_drawing_view_instance_visibility(
+    adapter: Any, view: Any, names: frozenset[str], *,
+    mode: Literal["show", "hide"], label: str
+) -> Any:
+    """Set top-level visibility and return the current view for subsequent use."""
+    started = perf_counter()
+    view = _early_bound(view, "IView")
+    rows = _visibility_components(view, label=label)
+    found = {_instance_name(row.name) for row in rows if not row.ancestors}
+    missing = sorted(names - found)
+    if missing:
+        raise RuntimeError(f"{label}: instances not in the view: {missing!r}; found={sorted(found)!r}")
+    desired = {
+        row.name: (
+            row.visible if row.ancestors else (_instance_name(row.name) in names) == (mode == "show")
+        ) for row in rows
+    }
+    return _apply_drawing_visibility(
+        adapter, view, rows, desired,
+        enumerate_seconds=perf_counter() - started, label=label,
+    )
 
 
 def _natural_sort_key(name: str) -> tuple[tuple[int, int | str], ...]:

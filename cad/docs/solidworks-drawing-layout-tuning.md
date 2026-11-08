@@ -637,6 +637,86 @@ chained to A|B|C. None of these presentation/reference controls changes a
 datum feature, geometry, zone or manufacturing tolerance.
 
 
+## Drawing visibility batching and section wrapper lifetime
+
+Use `_drawing_balloons.isolate_drawing_view_components` for leaf families and
+`set_drawing_view_instance_visibility` for top-level instance sets. Both return
+the usable current `IView`; **assign that return value and replace every retained
+alias before subsequent view operations**. Ordinary views and no-op calls retain
+their existing handle. Do not revive per-component unconditional `Visible`
+setters or add display-mode changes to the batching path.
+
+Preflight all requested identities, select only changed occurrences with the
+exact drawing context, and check appended selection count, type, order, native
+owner identity and view identity before `HideComponent2` / `ShowComponent2`.
+Rebuild once after a real delta, then compare exact visibility and unchanged
+descendant flags. A no-op does not select, issue a hide/show command or rebuild.
+Keep aggregate enumeration, selection, command, rebuild and readback timings;
+per-component diagnostic journals belong in isolated experiments, not production
+telemetry.
+
+For a section, `IDrawingComponent.Visible` is not effective visibility. The PD
+native census had 147 true flags and 142 hidden owners. Use
+`IView.GetHiddenComponents` for both delta planning and readback, joining every
+owner to exactly one view occurrence through the proven native path,
+configuration and source-parent chain. Unknown, duplicate or unreadable owners
+fail. Resolve the section's source through `GetBaseView`; its own
+`ReferencedDocument` is documented as empty. Never guess a generated root name,
+accept either visibility source opportunistically, or repeat hiding to conceal a
+failed readback.
+
+Retained section wrappers produced duplicate generated drawing names after a
+native show/rebuild on SOLIDWORKS revision **34.4.0**. In the
+[cached-input positive control](https://github.com/user-attachments/files/34538285/pd-section-fresh-wrapper-proof.zip),
+fresh document / `GetViews` references preserved all 147 exact drawing names,
+native owner tuples and raw flags while the hidden set changed from 142 to 141:
+only `sh-vn-chain-link-11` / `InnerLink` was removed. Display/configuration state
+and all three pinned native input hashes were unchanged; all 2,708 journaled
+calls completed without a getter error. This is evidence for fresh-reference
+readback, not permission to loosen uniqueness or a guarantee about other
+SOLIDWORKS versions.
+
+Fresh lookup alone was insufficient. A
+[matched lifetime experiment](https://github.com/user-attachments/files/34539300/pd-section-component-lifetime-proof.zip)
+reopened the same final drawing bytes for every case: retaining only document
+and view handles, or only selection-manager/data/view handles, preserved correct
+part owners; retaining drawing/native component proxies alone changed the
+generated names to angle form and made both sampled owners report the source
+assembly with empty configuration. The hidden set still changed correctly.
+There were no forced collections, sleeps, saves or visibility-oracle fallbacks.
+The section mutation operation therefore owns its component-bearing row list:
+release that list, batch groups, planned native owners and component loop/
+selection aliases before re-enumerating the rebuilt tree. Preserve only plain
+desired identities, flags and counts across that boundary. The family caller's
+last loop row is an alias too; merely dropping one local list is insufficient.
+
+For changed sections, capture and prove a unique plain drawing/path/title,
+sheet-view name and view name before mutation. After rebuilding, stop using the
+old section wrapper. Enumerate `ISldWorks.GetDocuments` and `IDrawingDoc.GetViews`
+to resolve that exact identity again, refusing missing or ambiguous matches.
+The same resolver covers saved and unsaved drawings (an unsaved path is empty);
+`GetOpenDocumentByName` requires a fully qualified name, not a guessed title.
+Install the proven fresh drawing into `adapter.currentModel` and return the
+fresh view to the caller, not merely to the validator. Complete selection
+cleanup before rebuilding; never call the old drawing proxy from a failure
+cleanup path after re-resolution fails. Preserve the primary refusal and its
+timings when a still-owned selection's cleanup also fails.
+
+The [matched channel A–B–B–A report and independent replay](https://github.com/user-attachments/files/34537651/channel-matched-abba-proof.zip)
+measured seven isolation calls per fresh drawing at A1/B1/B2/A2 =
+1419.6296 / 71.5919 / 72.2693 / 1663.9559 seconds: summed isolation time fell
+**95.3346% (21.43445×)**. Inputs were hash-identical in one SOLIDWORKS process,
+all 28 exact visible sets matched, source/sibling state stayed unchanged, and
+final display tuples matched the baseline's observed settling. These are
+two runs per arm, not a broad statistical guarantee or a whole-build speedup;
+queue time is excluded and witness overhead is reported separately.
+
+[Seven-drawing final-head PDF/audit/policy evidence](https://github.com/user-attachments/files/34537879/final-seven-sheet-proof-dc892.zip)
+distinguishes full reviews from minimal-change policy passes. Raw audit findings
+are retained: the independently replayed PD balloon-9 ring-fit false positive is
+tracked in [#2305](https://github.com/pedropaulovc/harmonic-analyzer/issues/2305),
+not suppressed or “fixed” by moving correct sheet ink.
+
 ## What is readable from the API (stop guessing)
 
 | Question | API | Evidence |

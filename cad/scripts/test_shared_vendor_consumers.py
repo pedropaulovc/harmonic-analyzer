@@ -250,8 +250,19 @@ def late_bound_drawing_view():
             for component in components
         ]
         root = SimpleNamespace(GetChildren=tuple(drawings))
-        view = SimpleNamespace(RootDrawingComponent2=lambda _resolve: root)
+        view = SimpleNamespace(
+            RootDrawingComponent2=lambda _resolve: root, GetName2=lambda: "Drawing View1"
+        )
+        from test_drawing_visibility import visibility_model
+
+        model, calls, _selected = visibility_model(view)
         rebuilds = []
+
+        def rebuild():
+            rebuilds.append(True)
+            return True
+
+        model.EditRebuild3 = rebuild
 
         def attempt(callback, default=None):
             try:
@@ -261,7 +272,9 @@ def late_bound_drawing_view():
 
         adapter = SimpleNamespace(
             _attempt=attempt,
-            currentModel=SimpleNamespace(EditRebuild3=lambda: rebuilds.append(True)),
+            currentModel=model,
+            swApp=model.native_app,
+            _get_attr_or_call=lambda obj, name: getattr(obj, name)(),
         )
         return adapter, view, drawings, rebuilds
 

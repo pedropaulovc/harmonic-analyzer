@@ -2683,7 +2683,7 @@ def test_cluster_recipe_isolates_real_families_and_their_context_before_fitting(
     monkeypatch, sheet,
 ) -> None:
     cluster = next(c for c in drawing.CLUSTERS if c.sheet == sheet)
-    view, adapter = object(), object()
+    view, current_view, adapter = object(), object(), object()
     events = []
     monkeypatch.setattr(drawing, "_activate_sheet", lambda a, s: events.append(("sheet", s)))
     monkeypatch.setattr(drawing, "_place_named_view", lambda *a, **kw: view)
@@ -2695,17 +2695,17 @@ def test_cluster_recipe_isolates_real_families_and_their_context_before_fitting(
     )
     monkeypatch.setattr(
         drawing, "isolate_drawing_view_components",
-        lambda a, v, **kw: events.append(("isolate", kw["visible_stems"])),
+        lambda a, v, **kw: events.append(("isolate", kw["visible_stems"])) or current_view,
     )
 
     def fit(a, placed, fitted_cluster, configuration, **kwargs):
-        assert a is adapter and placed is view and fitted_cluster is cluster
+        assert a is adapter and placed is current_view and fitted_cluster is cluster
         assert configuration == "Default Simplified"
         assert events[-1] == ("isolate", cluster.visible)
         return (1.0, 5.0)
 
     monkeypatch.setattr(drawing, "_fit_cluster_view", fit)
-    assert drawing._place_cluster_view(adapter, cluster) == (view, (1.0, 5.0))
+    assert drawing._place_cluster_view(adapter, cluster) == (current_view, (1.0, 5.0))
     assert events[0] == ("sheet", sheet)
     assert events[1] == ("explode", True, "Default Simplified")
 

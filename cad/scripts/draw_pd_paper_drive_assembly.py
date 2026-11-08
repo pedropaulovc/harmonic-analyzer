@@ -68,6 +68,7 @@ from _drawing_balloons import (
     add_component_bom_balloons,
     assert_balloon_landings,
     isolate_drawing_view_components,
+    set_drawing_view_instance_visibility,
 )
 from _assembly_contract import assembly_contract
 from _drawing_common import (
@@ -2675,48 +2676,6 @@ def _split_bom(
     return pieces
 
 
-def _isolate_instances(
-    adapter: Any, view: Any, names: frozenset[str], *, label: str
-) -> None:
-    """Show exactly the named top-level instances in one drawing view.
-
-    The shared ``isolate_drawing_view_components`` works per FAMILY, and the
-    removable sprocket's family also holds the crank wheel and spare T18
-    on the deck; this isolates per instance, as draw_drive_train_assembly
-    does, and reads the visibility back.
-    """
-    _set_instance_visibility(adapter, view, names, shown=True, label=label)
-
-
-def _hide_instances(
-    adapter: Any, view: Any, names: frozenset[str], *, label: str
-) -> None:
-    """Hide exactly the named top-level instances; show every other one."""
-    _set_instance_visibility(adapter, view, names, shown=False, label=label)
-
-
-def _set_instance_visibility(
-    adapter: Any, view: Any, names: frozenset[str], *, shown: bool, label: str
-) -> None:
-    """Named instances take ``shown``, the rest the opposite; all must exist."""
-    view = _early_bound(view, "IView")
-    root = view.RootDrawingComponent2(False)
-    if root is None:
-        raise RuntimeError(f"{label}: drawing view has no root component")
-    root = _early_bound(root, "IDrawingComponent")
-    found: set[str] = set()
-    for raw in tuple(root.GetChildren() or ()):
-        drawing_component = _early_bound(raw, "IDrawingComponent")
-        raw_name = str(drawing_component.Name or "")
-        name = raw_name.split("@", 1)[0].replace("\\", "/").rsplit("/", 1)[-1]
-        named = name in names
-        drawing_component.Visible = named == shown
-        if named:
-            found.add(name)
-    rebuild_drawing(adapter, label=f"{label} visibility")
-    missing = sorted(names - found)
-    if missing:
-        raise RuntimeError(f"{label}: instances not in the view: {missing!r}")
 
 
 def _place_assembled_sheet(adapter: Any) -> Any:
@@ -2740,10 +2699,8 @@ def _place_assembled_sheet(adapter: Any) -> Any:
             # Lying flat on the deck, the spare T18 shows edge-on in the
             # front and right views as a bare unlabelled bar; the isometric
             # shows and balloons it (eye pass of PD run 11).
-            _hide_instances(
-                adapter, view, frozenset({SPARE_INSTANCE, *SPARE_SHIM_INSTANCES}),
-                label=f"paper drive {orientation} spare",
-            )
+            view = set_drawing_view_instance_visibility(adapter, view, frozenset({SPARE_INSTANCE, *SPARE_SHIM_INSTANCES}),
+            mode="hide", label=f"paper drive {orientation} spare",)
     label = "sheet 1 isometric"
     scale, outline = step_down_to_fit(
         _native_outline_at(adapter, view, ASSEMBLED_SCALE, label=label),
@@ -2889,7 +2846,7 @@ def _place_bom_sheet(
     set_high_quality_shaded_with_edges(adapter, view, label=label)
     apply_view_configuration(adapter, view, label=label)
     _link_view_to_bom(view, table, label=label)
-    _isolate_instances(adapter, view, TRANSGEAR_INSTANCES, label=label)
+    view = set_drawing_view_instance_visibility(adapter, view, TRANSGEAR_INSTANCES, mode="show", label=label)
     if dict(
         _validate_bom(adapter, table, counts, configuration=bom_configuration)
     ) != items:
@@ -3162,7 +3119,7 @@ def _place_pivot_view(adapter: Any, items: dict[str, str]) -> None:
         "IView",
     )
     apply_view_configuration(adapter, locator, label=label)
-    _isolate_instances(adapter, locator, PIVOT_VIEW_INSTANCES, label=label)
+    locator = set_drawing_view_instance_visibility(adapter, locator, PIVOT_VIEW_INSTANCES, mode="show", label=label)
     head, front = _centre_pivot_view(
         adapter, locator, PIVOT_LOCATOR_CENTER, label=label
     )
@@ -3184,7 +3141,7 @@ def _place_pivot_view(adapter: Any, items: dict[str, str]) -> None:
         scale=PIVOT_SECTION_SCALE,
         label=section_label,
     )
-    _isolate_instances(adapter, section, PIVOT_VIEW_INSTANCES, label=section_label)
+    section = set_drawing_view_instance_visibility(adapter, section, PIVOT_VIEW_INSTANCES, mode="show", label=section_label)
     head, front = _centre_pivot_view(
         adapter, section, PIVOT_SECTION_CENTER, label=section_label
     )
@@ -3306,7 +3263,7 @@ def _place_transgear_exploded_sheet(
         set_view_exploded_state(
             adapter, view, True, configuration=configuration, label=label
         )
-        _isolate_instances(adapter, view, exploded_group_instances(group), label=label)
+        view = set_drawing_view_instance_visibility(adapter, view, exploded_group_instances(group), mode="show", label=label)
         _scale, outline = step_down_to_fit(
             _native_outline_at(adapter, view, TRANSGEAR_EXPLODED_SCALE, label=label),
             (TRANSGEAR_EXPLODED_SCALE,),
@@ -3365,9 +3322,7 @@ def _place_exploded_sheet(
     set_view_exploded_state(
         adapter, view, True, configuration=configuration, label=label
     )
-    isolate_drawing_view_components(
-        adapter, view, visible_stems=explode.SHOWN_STEMS, label=label
-    )
+    view = isolate_drawing_view_components(adapter, view, visible_stems=explode.SHOWN_STEMS, label=label)
     scale, outline = step_down_to_fit(
         _native_outline_at(adapter, view, EXPLODED_SCALE, label=label),
         EXPLODED_SCALE_LADDER,
@@ -3413,7 +3368,7 @@ def _place_knob_setting_view(adapter: Any) -> None:
         "IView",
     )
     apply_view_configuration(adapter, view, label=label)
-    _isolate_instances(adapter, view, KNOB_SETTING_INSTANCES, label=label)
+    view = set_drawing_view_instance_visibility(adapter, view, KNOB_SETTING_INSTANCES, mode="show", label=label)
     model = tuple(
         (x / 1000.0, y / 1000.0, 0.0)
         for x, y in (
@@ -3512,7 +3467,7 @@ def _place_cluster_float_view(adapter: Any) -> None:
         "IView",
     )
     apply_view_configuration(adapter, view, label=label)
-    _isolate_instances(adapter, view, CLUSTER_FLOAT_INSTANCES, label=label)
+    view = set_drawing_view_instance_visibility(adapter, view, CLUSTER_FLOAT_INSTANCES, mode="show", label=label)
     model = tuple(
         tuple(value / 1000.0 for value in point)
         for point in (CLUSTER_FLOAT_MODEL_CENTRE, cluster_float.TEXT_POINT)
