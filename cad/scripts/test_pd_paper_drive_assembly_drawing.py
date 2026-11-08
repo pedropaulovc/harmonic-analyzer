@@ -1603,10 +1603,15 @@ def test_the_cluster_is_shimmed_to_view_e_after_it_is_hung() -> None:
     # shims plus the spares the model stores in the spare sprocket's bore.
     low_count, high_count = cluster_fit.SHIM_COUNT_RANGE
     assert f"UP TO {high_count} IN ALL" in " ".join(shimmed.split())
-    # Round 9: the gap is corrected either way. The bare stack is never under
-    # the window, so an under gap is an overshoot and one shim comes off.
-    assert "IF IT IS OVER OR UNDER" in " ".join(shimmed.split())
-    assert "IF UNDER, TAKE ONE SHIM OFF" in " ".join(shimmed.split())
+    # Rounds 9-10: the gap is corrected either way, one action a sub-step. The
+    # bare stack is never under the window (printed), so an under gap is an
+    # overshoot and one shim comes off; shims target the window's middle.
+    flat = " ".join(shimmed.split())
+    assert "WITH NO SHIMS IT NEVER READS UNDER" in flat
+    assert "IF IT READ UNDER, TAKE ONE SHIM OFF." in flat
+    middle = disc.inch_text(sum(cluster_fit.RING_FLOAT_RANGE) / 2.0, 3)
+    assert f"TOTALLING THE GAP LESS {middle}" in flat
+    assert cluster_fit.RING_FLOAT_RANGE[0] < sum(cluster_fit.RING_FLOAT_RANGE) / 2.0
     assert cluster_fit.UNSHIMMED_FLOAT_RANGE[0] >= cluster_fit.RING_FLOAT_RANGE[0]
     assert high_count <= cluster_fit.SHIM_COUNT_MAX
     description = drawing.BOM_DESCRIPTIONS["pd-vn-transgear-cluster-shim"]
@@ -2136,8 +2141,9 @@ def test_the_knob_wheel_is_read_held_back_on_its_seat() -> None:
     """Codex P2 on b2eb9a0e1: read the wheel held back on its seat, not
     floated forward under the nut. Its actual float is paid once in service."""
     pose = _step_body("fitup-pose-set")
+    knob = drawing.sprocket_name(sprocket.KNOB_CONFIG)
+    assert f"{knob}, HELD BACK ON ITS SEAT" in " ".join(pose.split())
     held_back = f"{drawing.sprocket_name(sprocket.KNOB_CONFIG, numbered=False)} HELD BACK"
-    assert held_back in " ".join(pose.split())
     assert held_back in " ".join(_step_body("collar-rear-faced-to-fit").split())
     accepted = _step_body("fitup-accepted")
     assert accepted.startswith(f"CHECK, IN STEP {steps.step_number('fitup-pose-set')}")

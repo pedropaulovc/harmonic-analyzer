@@ -180,6 +180,7 @@ SHEET_NAMES = (
     "ASSEMBLY AND FIT-UP (CONT.)",
     "ASSEMBLY AND FIT-UP (CONT. 2)",
     "ASSEMBLY AND FIT-UP (CONT. 3)",
+    "ASSEMBLY AND FIT-UP (CONT. 4)",
     "CHAIN FIT-UP",
     "BILL OF MATERIALS",
 )
@@ -647,15 +648,25 @@ KNOB_SETTING_MESH_LINES = (
     f"{knob_shaft.TEETH}T",
     f"TO {_config.parts('pd-rack-pinion')['number']} {disc.TEETH}T MESH",
 )
+# Machinist review round 10: the caption names VIEW K's parent and that it
+# looks the same way (the sheet 1 front view's circle K, *Front here too), so
+# ALONG and ACROSS read as the step 9B setup sees the arm.
+KNOB_SETTING_PARENT_LINES = (
+    f"DETAIL OF CIRCLE {KNOB_SETTING_VIEW_NAME[-1]},",
+    "SHEET 1 FRONT VIEW",
+)
 KNOB_SETTING_CAPTION = "\n".join(
     (
         f"{KNOB_SETTING_VIEW_NAME}, 1:1 (STEP {steps.step_number('arm-plate-located')})",
+        *KNOB_SETTING_PARENT_LINES,
         *KNOB_SETTING_MESH_LINES,
         *(f"{letter}: {name}" for letter, name in KNOB_SETTING_LEGEND.items()),
         *KNOB_SETTING_PIVOT_LINES,
     )
 )
-KNOB_SETTING_CAPTION_XY = (0.213, 0.131)
+# Raised a line for the two parent lines (round 10), still under the steps'
+# field top.
+KNOB_SETTING_CAPTION_XY = (0.213, 0.139)
 # Each letter's centre stands this far off its circle's centre (sheet m): S
 # inward and away from Q (at 15:150 S-N spans most of the crop, so S's
 # letter past the pin would leave it), T diagonally away from both chain
@@ -863,6 +874,7 @@ SHEET_SCALES = {
     "ASSEMBLY AND FIT-UP (CONT.)": FITUP_SCALE,
     "ASSEMBLY AND FIT-UP (CONT. 2)": FITUP_SCALE,
     "ASSEMBLY AND FIT-UP (CONT. 3)": FITUP_SCALE,
+    "ASSEMBLY AND FIT-UP (CONT. 4)": FITUP_SCALE,
     "CHAIN FIT-UP": FITUP_SCALE,
     "BILL OF MATERIALS": BOM_REFERENCE_SCALE,
 }
@@ -1763,6 +1775,10 @@ def _step_text(
     crank = sprocket_name(sprocket.CRANK_CONFIG)
     knob_short = sprocket_name(sprocket.KNOB_CONFIG, numbered=False)
     crank_short = sprocket_name(sprocket.CRANK_CONFIG, numbered=False)
+    # The knob wheel floats collar.KNOB_FLOAT_RANGE forward of its seat (the
+    # collar's front face) under the thumbnut; the setting and its acceptance
+    # read it held back on that seat, the pose
+    # ACCEPTED_CHAIN_OFFSET_IN_SERVICE assumes.
     held_back = f"{knob_short} HELD BACK ON ITS SEAT"
     float_sheet = SHEET_NAMES.index(CLUSTER_FLOAT_SHEET) + 1
     pose = steps.step_number("fitup-pose-set")
@@ -1776,6 +1792,27 @@ def _step_text(
 
     def s(key: str, index: int) -> str:
         return sub_step(key, index)
+
+    shim_target = steps.inch_text(sum(cluster_fit.RING_FLOAT_RANGE) / 2.0, 3)
+    # Remedies that run back through joints made permanent by then (13J
+    # stake, 22D/22E cross-pin, 15C-15F tapped disc) release and renew named
+    # parts. Owner ruling 2026-11-08 (auto-selected after timeout), pending
+    # owner confirmation (#2144): renew, the bar's staked tap re-chased and
+    # re-staked on fresh metal, 31D's cluster re-faced without renewal.
+    knob_stack_off = (
+        f"REMOVE THE {n['pd-transgear-thumbnut']} THUMBNUT, THE {knob_short} AND "
+        "THE COLLAR."
+    )
+    knob_pin_out = (
+        f"PRESS THE {n['pd-vn-transgear-knob-cup-pin']} PIN OUT AND DRAW THE "
+        f"{n['pd-transgear-knob-shaft']} SHAFT OUT FORWARD."
+    )
+    pivot_unscrewed = (
+        f"PLATEN SLID CLEAR, UNSCREW THE {n['pd-vn-transgear-pivot-screw']} SCREW "
+        "THROUGH ITS STAKES AND LIFT THE ARM OFF."
+    )
+    pivot_tap_chased = f"RE-CHASE THE {n['pd-support-bar']} BAR'S PIVOT TAP FROM THE FRONT."
+    fresh_stake = f"STAKING FRESH METAL AT {s('hanger-pivoted', 8)}"
 
     return {
         "bar-clamped": (
@@ -2040,22 +2077,24 @@ def _step_text(
             "RING ON ITS GROOVE'S FRONT WALL.",
             f"READ THE GAP BETWEEN THE {n['pd-transgear-front-bushing']} BUSHING AND "
             f"THE {n['pd-vn-transgear-retaining-ring']} RING WITH FEELERS.",
-            # Machinist review rounds 8-9: the shims sit under the rear
+            # Machinist review rounds 8-10: the shims sit under the rear
             # bushing, so the stack comes off to change them, either way, and
             # goes back on to re-read. The bare stack is never under the
             # window (transgear_cluster_fit.UNSHIMMED_FLOAT_RANGE), so an
-            # under gap is an overshoot: one shim comes off.
-            f"CHECK: THE GAP READS {CLUSTER_FLOAT_VIEW_NAME} (SHEET {float_sheet}).",
-            f"IF IT DOES, GO TO STEP {steps.step_number('disc-cluster-shimmed') + 1}; "
-            "IF IT IS OVER OR UNDER, REMOVE THE RING, THE "
+            # under gap is an overshoot: one shim comes off. The shims are
+            # sized to bring the gap to the window's middle.
+            f"CHECK: THE GAP READS {CLUSTER_FLOAT_VIEW_NAME} (SHEET {float_sheet}); "
+            "WITH NO SHIMS IT NEVER READS UNDER.",
+            f"IF IT DOES, GO TO STEP {steps.step_number('disc-cluster-shimmed') + 1}.",
+            "IF NOT, REMOVE THE RING, THE "
             f"{n['pd-transgear-front-bushing']} BUSHING, THE SLEEVE WITH HUB AND DISC, "
             f"AND THE {n['pd-transgear-rear-bushing']} BUSHING.",
-            f"IF THE GAP WAS OVER, SLIDE {n['pd-vn-transgear-cluster-shim']} SHIMS ON "
-            "THE PIN AGAINST THE ARM FACE, TOGETHER AS THICK AS ITS EXCESS OVER "
-            f"{CLUSTER_FLOAT_VIEW_NAME}; IF UNDER, TAKE ONE SHIM OFF. UP TO "
+            f"IF IT READ OVER, ADD {n['pd-vn-transgear-cluster-shim']} SHIMS AT THE "
+            f"ARM FACE TOTALLING THE GAP LESS {shim_target}, UP TO "
             f"{cluster_fit.SHIM_COUNT_RANGE[1]} IN ALL.",
+            "IF IT READ UNDER, TAKE ONE SHIM OFF.",
             f"REFIT PER {s('disc-cluster-hung', 1)}-{s('disc-cluster-hung', 4)}.",
-            f"REPEAT {s('disc-cluster-shimmed', 0)}-{s('disc-cluster-shimmed', 3)}.",
+            f"REPEAT FROM {s('disc-cluster-shimmed', 0)}.",
         ),
         "collar-pins-pressed": (
             f"PRESS {TRANSGEAR_QUANTITIES['pd-vn-transgear-knob-drive-pin']} "
@@ -2092,7 +2131,7 @@ def _step_text(
             f"CUP AND {n['pd-transgear-knob-shaft']} SHAFT AND REPEAT FROM "
             f"{s('knob-stack-fitted', 0)}.",
             f"SLIDE THE {n['pd-transgear-drive-collar']} COLLAR ON THE "
-            f"{n['pd-transgear-knob-shaft']} SHAFT'S D-CORE, ITS DOWELS FORWARD, "
+            f"{n['pd-transgear-knob-shaft']} SHAFT'S D-FLAT, ITS DOWELS FORWARD, "
             "NOT YET FIXED TO THE SHAFT.",
             "TURN THE KNOB ONLY BY THE COLLAR UNTIL STEP "
             f"{steps.step_number('chain-closed')}; FROM THEN ON, TURN THE CRANK.",
@@ -2129,8 +2168,8 @@ def _step_text(
             f"{engaged_feed_text(operating_domain)}, STOPPING SHORT OF BOTH ENDS.",
             "CHECK: NO TIGHT SPOT.",
             "CHECK: SHAKE AT EVERY TOOTH.",
-            f"IF EITHER CHECK FAILS, UNCLAMP THE ARM AND REPEAT {s('hanger-meshed', 2)}-"
-            f"{s('hanger-meshed', 6)}; RESET ONLY WITH THE FEED DISENGAGED.",
+            "IF EITHER CHECK FAILS, UNCLAMP AND LOWER THE ARM, FEED DISENGAGED.",
+            f"REPEAT {s('hanger-meshed', 0)}-{s('hanger-meshed', 6)}.",
         ),
         # The hook's pin hole is match-drilled from the pin at that mesh,
         # then the hook is hardened and refitted with the hole's lower edge on
@@ -2177,7 +2216,8 @@ def _step_text(
             f"{n['pd-transgear-knob-thrust-ring']} RING, THE RING ON THE "
             f"{n['pd-transgear-arm-plate']} PLATE'S FRONT BOSS.",
             f"SLIDE THE COLLAR BACK AGAINST THE {teeth}.",
-            f"FIT THE {knob} AND THE THUMBNUT FINGER-TIGHT, {held_back}.",
+            f"FIT THE {knob}, HELD BACK ON ITS SEAT.",
+            f"FIT THE {n['pd-transgear-thumbnut']} THUMBNUT FINGER-TIGHT.",
             "TURN THE DISC UNTIL, ON THE LINE THROUGH THE KNOB AND DISC AXES, "
             f"A {disc.TEETH}T TOOTH STANDS CENTRED IN A {teeth} GAP WITHIN {clock} "
             "AT THE PITCH CIRCLE, READ WITH A TEST INDICATOR ON A GAUGE PIN IN "
@@ -2191,12 +2231,34 @@ def _step_text(
             # The arm already carries the plate's dowels and taps, so a plate
             # set off cannot be re-located on it: the transgear is rebuilt
             # (delegated ruling 2026-11-07 (Main), no precedent; owner review
-            # #2144; pending owner confirmation).
-            "IF A CHECK FAILS, REBUILD THE TRANSGEAR FROM STEP "
-            f"{steps.step_number('latch-pin-pressed')} WITH A NEW "
-            f"{n['pd-transgear-arm']} ARM, {n['pd-transgear-arm-plate']} PLATE AND "
-            f"{n['pd-latch-hook']} HOOK, SKIPPING {s('latch-hook-fitted', 1)}-"
-            f"{s('latch-hook-fitted', 4)} (THE BAR KEEPS ITS HOOK TAPS).",
+            # #2144; pending owner confirmation), releasing the cross-pin and
+            # the stake and renewing every part they fix (owner ruling
+            # 2026-11-08, pending owner confirmation).
+            f"IF A CHECK FAILS, {knob_stack_off}",
+            knob_pin_out,
+            "REMOVE THE CLUSTER "
+            f"({s('disc-cluster-hung', 4)} BACK TO {s('disc-cluster-hung', 1)}), "
+            f"KEEPING ITS SHIMS, AND THE {n['pd-latch-hook']} HOOK.",
+            pivot_unscrewed,
+            pivot_tap_chased,
+            f"REBUILD FROM STEP {steps.step_number('latch-pin-pressed')} WITH A NEW "
+            f"{n['pd-transgear-arm']} ARM, {n['pd-transgear-arm-plate']} PLATE, "
+            f"{n['pd-transgear-pin']} PIN, {n['pd-transgear-pivot-spacer']} SPACER, "
+            f"{n['pd-transgear-knob-shaft']} SHAFT, {n['pd-transgear-knob-cup']} CUP, "
+            f"{n['pd-latch-hook']} HOOK, {n['pd-vn-transgear-latch-pin']} DOWEL, "
+            f"{TRANSGEAR_QUANTITIES['pd-vn-transgear-arm-plate-locating-pin']} "
+            f"{n['pd-vn-transgear-arm-plate-locating-pin']} DOWELS, "
+            f"{TRANSGEAR_QUANTITIES['pd-vn-transgear-arm-plate-screw']} "
+            f"{n['pd-vn-transgear-arm-plate-screw']} SCREWS, "
+            f"{n['pd-vn-transgear-pivot-screw']} SCREW AND "
+            f"{n['pd-vn-transgear-knob-cup-pin']} PIN.",
+            f"SKIP STEPS {steps.step_number('disc-cluster-assembled')}-"
+            f"{steps.step_number('oil-hole-drilled')}, "
+            f"{steps.step_number('collar-pins-pressed')}-"
+            f"{steps.step_number('pilot-faced-to-fit')} AND "
+            f"{s('latch-hook-fitted', 1)}-{s('latch-hook-fitted', 4)}: THE CLUSTER, "
+            "THE COLLAR AND THE BAR'S HOOK TAPS ARE REUSED.",
+            f"AT {s('hanger-pivoted', 8)}, STAKE FRESH METAL BESIDE THE OLD STAKES.",
         ),
         "collar-rear-faced-to-fit": (
             f"IN STEP {pose}'S POSE, {held_back}, FIT THE COLLAR AS "
@@ -2239,9 +2301,22 @@ def _step_text(
             f"BETWEEN THE {n['pd-transgear-drive-collar']} COLLAR AND THE "
             f"{n['pd-rack-pinion']} DISC ALL ROUND THE OVERLAP (CLEARANCE "
             f"{steps.COLLAR_DISC_AIR_TEXT}).",
-            f"IF SHORT, RE-FACE THE {n['pd-transgear-feed-pinion']} STEP FACE "
-            "SQUARE ON A MANDREL AND REPEAT FROM STEP "
-            f"{steps.step_number('disc-cluster-assembled')}.",
+            f"IF SHORT, {knob_stack_off}",
+            f"STRIP THE CLUSTER ({s('disc-cluster-hung', 4)} BACK TO "
+            f"{s('disc-cluster-hung', 1)}), KEEPING ITS SHIMS.",
+            f"SLIDE THE HUB AND DISC OFF THE {n['pd-transgear-feed-pinion']} D-FLAT "
+            "AS ONE, THEIR SCREWS LEFT IN.",
+            f"RE-FACE THE {n['pd-transgear-feed-pinion']} STEP FACE SQUARE ON A "
+            f"MANDREL BY THE AMOUNT {s('collar-disc-air-inspected', 2)} READ SHORT.",
+            "REFIT THE HUB'S D-BORE ON THE D-FLAT, SPIGOT TO THE STEP FACE, DISC "
+            "AND HUB MATCH MARKS TOGETHER.",
+            f"REPEAT {s('disc-taps-transferred', 0)} AND "
+            f"{s('disc-taps-transferred', 6)}-{s('disc-taps-transferred', 9)}.",
+            f"RE-DRILL THE OIL HOLE THROUGH THE HUB INTO THE SLEEVE'S HOLE, AS STEP "
+            f"{steps.step_number('oil-hole-drilled')}.",
+            f"REPEAT STEPS {steps.step_number('disc-cluster-hung')}-"
+            f"{steps.step_number('disc-cluster-shimmed')} AND "
+            f"{steps.step_number('collar-shoulder-seated')}.",
             "REFIT THE PLATEN.",
             f"REPEAT {s('collar-disc-air-inspected', 1)}-"
             f"{s('collar-disc-air-inspected', 2)} AND "
@@ -2265,17 +2340,26 @@ def _step_text(
             "CHECK: COLLAR TO DISC CLEARANCE "
             f"{steps.COLLAR_DISC_AIR_TEXT}, AS "
             f"{s('collar-disc-air-inspected', 2)}.",
-            "IF A CHECK FAILS, REPEAT ITS SETTING STEP: "
-            f"{s('fitup-accepted', 0)} STEP "
-            f"{steps.step_number('collar-rear-faced-to-fit')}, "
-            f"{s('fitup-accepted', 1)} STEP {steps.step_number('knob-stack-fitted')}, "
-            f"{s('fitup-accepted', 2)} STEP "
-            f"{steps.step_number('collar-shoulder-seated')}, "
-            f"{s('fitup-accepted', 5)} STEP "
-            f"{steps.step_number('hanger-pivoted')}, "
-            f"{s('fitup-accepted', 7)} AND {s('fitup-accepted', 8)} STEP "
-            f"{steps.step_number('disc-cluster-shimmed')}, "
-            f"{s('fitup-accepted', 9)} STEP "
+            f"IF {s('fitup-accepted', 0)} FAILS, REPEAT FROM STEP "
+            f"{steps.step_number('collar-rear-faced-to-fit')}.",
+            f"IF {s('fitup-accepted', 1)} FAILS, {knob_stack_off}",
+            knob_pin_out,
+            f"REPEAT STEP {steps.step_number('knob-stack-fitted')} WITH A NEW "
+            f"{n['pd-transgear-knob-shaft']} SHAFT, {n['pd-transgear-knob-cup']} CUP "
+            f"AND {n['pd-vn-transgear-knob-cup-pin']} PIN, THEN FROM STEP {pose}.",
+            f"IF {s('fitup-accepted', 2)} FAILS, REPEAT FROM STEP "
+            f"{steps.step_number('collar-shoulder-seated')}.",
+            f"IF {s('fitup-accepted', 5)} FAILS, ARM UNLATCHED, {pivot_unscrewed}",
+            pivot_tap_chased,
+            f"REPEAT STEP {steps.step_number('hanger-pivoted')} WITH A NEW "
+            f"{n['pd-vn-transgear-pivot-screw']} SCREW AND "
+            f"{n['pd-transgear-pivot-spacer']} SPACER, {fresh_stake}.",
+            f"REPEAT {s('hook-pin-hole-match-drilled', 7)}-"
+            f"{s('hook-pin-hole-match-drilled', 9)}, THEN FROM STEP {pose}.",
+            f"IF {s('fitup-accepted', 7)} OR {s('fitup-accepted', 8)} FAILS, REPEAT "
+            f"STEP {steps.step_number('disc-cluster-shimmed')}, THEN FROM STEP "
+            f"{steps.step_number('collar-disc-air-inspected')}.",
+            f"IF {s('fitup-accepted', 9)} FAILS, REPEAT STEP "
             f"{steps.step_number('collar-disc-air-inspected')}.",
         ),
         "chain-closed": (
@@ -2359,6 +2443,8 @@ STEP_SLOTS: tuple[StepSlot, ...] = (
     StepSlot("ASSEMBLY AND FIT-UP (CONT. 2)", FITUP_NOTE_XY[1], FITUP_NOTE_LIMITS[1][1]),
     StepSlot("ASSEMBLY AND FIT-UP (CONT. 3)", FITUP_NOTE_XY[0], FITUP_NOTE_LIMITS[0][1]),
     StepSlot("ASSEMBLY AND FIT-UP (CONT. 3)", FITUP_NOTE_XY[1], FITUP_NOTE_LIMITS[1][1]),
+    StepSlot("ASSEMBLY AND FIT-UP (CONT. 4)", FITUP_NOTE_XY[0], FITUP_NOTE_LIMITS[0][1]),
+    StepSlot("ASSEMBLY AND FIT-UP (CONT. 4)", FITUP_NOTE_XY[1], FITUP_NOTE_LIMITS[1][1]),
     StepSlot("CHAIN FIT-UP", FITUP_NOTE_XY[0], FITUP_NOTE_LIMITS[0][1]),
     StepSlot("CHAIN FIT-UP", FITUP_NOTE_XY[1], FITUP_NOTE_LIMITS[1][1]),
 )
