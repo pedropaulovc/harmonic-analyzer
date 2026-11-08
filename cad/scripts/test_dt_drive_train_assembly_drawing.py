@@ -795,22 +795,44 @@ def test_every_set_feeler_the_steps_and_checks_print_has_a_leaf_row() -> None:
     assert drawing.SETTING_TABLE_LEFT + sum(widths) <= drawing.STATION_TABLE_FIELD[0]
 
 
-def test_the_pivot_seat_step_prints_mha_fr_01s_offsets_from_the_nearer_seat() -> None:
-    """Owner 2026-11-08 (FoFr #2261): MHA-FR-01 prints D1's X/Y as reference,
-    so 9R carries the offsets from the nearer MHA-DT-02 seat and their band,
-    read from the base's model constants, not typed."""
+def test_the_pivot_seat_is_transferred_from_the_cone_set_then_checked() -> None:
+    """Owner 2026-11-08 (FoFr #2261; rubric sample round 18 #0): D1 is
+    transfer-punched through the MHA-DT-20 pivot bore with the cone set at
+    its working position, drilled and tapped, then checked from the back
+    MHA-DT-02 seat alone (no DRO zero) at the band cone_set_stack books, the
+    offsets read from the base's model constants, not typed."""
     import build_fr_harmonic_base as base_build
+    import cone_set_stack
+    import dt_vn_cone_pivot_screw_spec as pivot_screw
     import fr_harmonic_base_spec as base_spec
 
-    step = " ".join(drawing.BANK_STEPS.split())
+    step = _rig_step_body("other-base-mounting")
+    number = drawing.PIVOT_SEAT_STEP_NUMBER
     x_mm, y_mm = base_build.PIVOT_SEAT_OFFSETS_MM
     expected = (
-        f"CENTRE {drawing.inch_text(abs(x_mm), 3)} RIGHT, {drawing.inch_text(abs(y_mm), 3)} BACK "
-        f"OF THE BACK MHA-DT-02 SEAT ±{drawing.inch_text(base_spec.PIVOT_SEAT_POSITION_BAND_MM, 3)}"
+        f"{drawing.PIVOT_SEAT_CHECK}. CHECK THAT ITS CENTRE IS "
+        f"{drawing.inch_text(abs(x_mm), 3)} RIGHT, {drawing.inch_text(abs(y_mm), 3)} BACK "
+        f"OF THE BACK MHA-DT-02 SEAT ±{drawing.inch_text(base_spec.PIVOT_SEAT_POSITION_BAND_MM, 3)}."
     )
-    assert f"{drawing.PIVOT_SEAT_STEP}. DRILL AND TAP THE MHA-FR-01 PIVOT SEAT" in step
-    assert expected in step
-    assert "CENTRE 1.030 RIGHT, .482 BACK OF THE BACK MHA-DT-02 SEAT ±.002" in step
+    route = [
+        f"{number}A. CLAMP MHA-DT-20 TO MHA-FR-01.",
+        f"{number}B. TRANSFER-PUNCH MHA-FR-01 THRU THE MHA-DT-20 PIVOT BORE.",
+        f"{number}C. LIFT MHA-DT-20 AND THE LEAVES OFF.",
+        f"{drawing.PIVOT_SEAT_STEP}. DRILL AND TAP {pivot_screw.THREAD} AT THE PUNCH MARK",
+        expected,
+        f"{number}F. IF IT IS OUT, REDO {number}-{drawing.PIVOT_SEAT_CHECK} OVER A",
+    ]
+    assert step.startswith(
+        "CONE SET ON THE BASE: SET MHA-DT-20 ON THE CHECK 4D FEELER LEAVES."
+    )
+    positions = [step.index(part) for part in route]
+    assert positions == sorted(positions)
+    assert "1.030 RIGHT, .482 BACK OF THE BACK MHA-DT-02 SEAT ±.002" in step
+    assert drawing.DRO_ZERO_STEP not in step and "DRO" not in step
+    band = base_spec.PIVOT_SEAT_POSITION_BAND_MM
+    assert band == cone_set_stack.PIVOT_SEAT_POSITION_MM
+    # The pivot seat is cut once, here: the bank no longer drills it.
+    assert "PIVOT SEAT" not in drawing.BANK_STEPS
     # The nearer seat is the back one; model -X is the FRONT view's RIGHT.
     assert base_build.PIVOT_NEAR_PEDESTAL_XZ == base_build.PEDESTAL_SCREW_XZ[1]
     assert x_mm < 0.0 and y_mm < 0.0

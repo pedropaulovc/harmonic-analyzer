@@ -1445,28 +1445,27 @@ CONE_CRANK_STEPS = _note_text(
 # the actual accepted stack on the spring-gap feeler.  The front pedestal's
 # location and seat run as 8K-8Z, so step 9D is the spring-gap set (setting
 # table row 4, sheet 13 DETAIL A).  Every DRO target is
-# a SETTING_TABLE row on sheet 14.  Step 23 stands the cone set over the
-# pivot seat drilled at PIVOT_SEAT_STEP.
-# The DRO zero every later bank, pivot-seat and back-ear setting reads from.
+# a SETTING_TABLE row on sheet 14.
+# The DRO zero every later bank and back-ear setting reads from.
 DRO_ZERO_STEP = "8P"
-PIVOT_SEAT_STEP = "9R"
 
 
 def pivot_seat_acceptance() -> str:
-    """9R's acceptance: the pivot seat's centre from the nearer transferred
+    """The pivot seat's check: its centre from the nearer transferred
     MHA-DT-02 seat, as MHA-FR-01's model places it (build_fr_harmonic_base
     PIVOT_SEAT_OFFSETS_MM, signed table X and table Y = machine -Z), at
-    fr_harmonic_base_spec's band.  Owner, 2026-11-08: the offsets print only
-    here; MHA-FR-01 sheet 2 calls its D1 X/Y reference (FoFr #2261).  The
-    FRONT view looks from the crank (-Z) end, so its RIGHT is model -X and
-    BACK is +Z (DIRECTION_NOTES)."""
+    fr_harmonic_base_spec's band, from that one origin.  Owner, 2026-11-08:
+    D1 is transferred from the MHA-DT-20 pivot bore at assembly and the
+    offsets print only here; MHA-FR-01 calls its D1 X/Y reference (FoFr
+    #2261).  The FRONT view looks from the crank (-Z) end, so its RIGHT is
+    model -X and BACK is +Z (DIRECTION_NOTES)."""
     table_x, table_y = BASE_BUILD.PIVOT_SEAT_OFFSETS_MM
     nearer = BASE_BUILD.PEDESTAL_SCREW_XZ.index(BASE_BUILD.PIVOT_NEAR_PEDESTAL_XZ)
     seat = ("FRONT", "BACK")[nearer]
     side = "RIGHT" if table_x < 0.0 else "LEFT"
     along = "BACK" if table_y < 0.0 else "FRONT"
     return (
-        f"CENTRE {inch_text(abs(table_x), 3)} {side}, {inch_text(abs(table_y), 3)} "
+        f"{inch_text(abs(table_x), 3)} {side}, {inch_text(abs(table_y), 3)} "
         f"{along} OF THE {seat} MHA-DT-02 SEAT ±{inch_text(base.PIVOT_SEAT_POSITION_BAND_MM, 3)}"
     )
 
@@ -1537,23 +1536,23 @@ BANK_STEPS = _note_text(
         "9N. TIGHTEN MHA-DT-VN-62.",
         "9P. REMOVE THE FEELER.",
         "9Q. WRITE THE DRO X IN THE PEDESTAL RECHECK TABLE.",
-        f"{PIVOT_SEAT_STEP}. DRILL AND TAP THE MHA-FR-01 PIVOT SEAT PER ITS PRINT ({DRO_ZERO_STEP} ZERO):",
-        f"   {pivot_seat_acceptance()}.",
-        "9S. MEASURE MHA-DT-02 OUTER FACE TO OUTER FACE.",
+        # The MHA-FR-01 pivot seat is no longer cut here on the DRO: it is
+        # transferred from the MHA-DT-20 pivot bore at PIVOT_SEAT_STEP (step 23).
+        "9R. MEASURE MHA-DT-02 OUTER FACE TO OUTER FACE.",
         # Round 11: the length plainly, both domes counted.
-        f"9T. TURN MHA-DT-13 TO THE 9S SPAN + {inch_text(2.0 * bank.ARBOR_DOME_HEIGHT, 2)} "
+        f"9S. TURN MHA-DT-13 TO THE 9R SPAN + {inch_text(2.0 * bank.ARBOR_DOME_HEIGHT, 2)} "
         f"({inch_text(bank.ARBOR_DOME_HEIGHT, 2)} DOME EACH END).",
-        # Round 18: one line, so sheet 9's left field keeps 9R's D1 acceptance.
-        "9U. PUSH MHA-DT-13 IN FROM THE BACK UNTIL EACH DOME STANDS "
+        # Round 18: one line, so the fields keep room for step 23's transfer.
+        "9T. PUSH MHA-DT-13 IN FROM THE BACK UNTIL EACH DOME STANDS "
         f"{inch_text(bank.ARBOR_DOME_HEIGHT, 2)} PROUD.",
-        "9V. SPOT MHA-DT-13 THROUGH EACH CROWN TAP WITH A #43 DRILL, .02 DEEP.",
-        "9W. BLOW OUT THE CHIPS.",
-        "9X. RUN THE FRONT MHA-SH-VN-54 IN TIGHT, THEN THE BACK ONE.",
-        "9Y. CHECK THAT EACH GEAR TURNS FREE BY HAND.",
+        "9U. SPOT MHA-DT-13 THROUGH EACH CROWN TAP WITH A #43 DRILL, .02 DEEP.",
+        "9V. BLOW OUT THE CHIPS.",
+        "9W. RUN THE FRONT MHA-SH-VN-54 IN TIGHT, THEN THE BACK ONE.",
+        "9X. CHECK THAT EACH GEAR TURNS FREE BY HAND.",
         # Rule 23 (rubric sample round 12, #0): MHA-DT-13, set in both crowns
-        # (9X), ties the two pedestals into one frame on two screws; the
+        # (9W), ties the two pedestals into one frame on two screws; the
         # bench check covers all three.
-        "9Z. CHECK BY HAND THAT MHA-DT-13 AND BOTH MHA-DT-02 DO NOT MOVE.",
+        "9Y. CHECK BY HAND THAT MHA-DT-13 AND BOTH MHA-DT-02 DO NOT MOVE.",
         # #936 P1 b, option A (user ruling 2026-09-26): the back MHA-CH-08 ear
         # is the rocker bank's axial datum (rocker_bank_layout), set on the
         # DRO zero so the cams and the rocker stations share one datum.  Hub
@@ -1663,8 +1662,13 @@ RIG_REWORDINGS: dict[str, tuple[tuple[str, str], ...]] = {
         ),
     ),
     # The pin's position is the instruction; why it bears is not.
+    # Round 19: 16C on one line (the possessive, as 21A), so step 23 has room.
     "straps-pinned-to-torque-shaft": (
         (", SO IT BEARS IN BOTH MHA-DT-18 AND CLEARS MHA-DT-16.", "."),
+        (
+            "SET THE MHA-DT-19 REAR END FLUSH WITH THE MHA-DT-18 REAR FACE ",
+            "SET MHA-DT-19'S REAR END FLUSH WITH MHA-DT-18'S REAR FACE ",
+        ),
     ),
 }
 
@@ -1681,6 +1685,15 @@ def _numbered_step(key: str, text: str) -> str:
         ),
         heading=False,
     )
+
+
+# The cone set's pivot seat (owner 2026-11-08): transferred, drilled and
+# tapped, then checked, all in step 23 (key other-base-mounting).  A seat out
+# of its band is opened to a larger tap, plugged and transferred again.
+PIVOT_SEAT_STEP_NUMBER = steps.step_number("other-base-mounting")
+PIVOT_SEAT_STEP = f"{PIVOT_SEAT_STEP_NUMBER}D"
+PIVOT_SEAT_CHECK = f"{PIVOT_SEAT_STEP_NUMBER}E"
+PIVOT_SEAT_PLUG = "1/4-20"
 
 
 def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
@@ -1753,8 +1766,7 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
         # settings, and those settings are rechecked once screwed down.
         (
             "rig-seats-transferred",
-            f"SPOT MHA-FR-01 THROUGH THE {slotted} MHA-DT-18 HOLES AND THE MHA-DT-24 "
-            "FOOT HOLE.\n"
+            f"SPOT MHA-FR-01 THRU {slotted} MHA-DT-18 HOLES AND THE MHA-DT-24 FOOT HOLE.\n"
             "LIFT THE RIG AND MHA-DT-24 OFF THE BASE.\n"
             "DRILL AND TAP EACH SEAT PER ITS MHA-FR-01 TRANSFER CALLOUT.\n"
             f"REFIT THE RIG AND MHA-DT-24 AT THE {steps.step_number('rig-located')}B-"
@@ -1784,21 +1796,28 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
             f"PEEN BOTH ENDS FLUSH WITH THE HUB (SHEET {FULL_DETAIL_SHEET}).\n"
             f"CHECK THAT {LEVER_NUMBER} DOES NOT TURN OR SLIDE ON {LIFT_ROD_NUMBER} BY HAND.",
         ),
-        # The cone set goes on last, into the pivot seat drilled at
-        # PIVOT_SEAT_STEP; the stop and lock seats are MHA-FR-01 print holes.
-        # Check 4 then sets the swing and clamps it with MHA-DT-VN-51.
+        # Owner, 2026-11-08 (FoFr #2261, rubric sample round 18 #0): the
+        # pivot seat is transferred from the MHA-DT-20 reamed pivot bore with
+        # the cone set at its working position (the check 4D leaves), then
+        # drilled and tapped and checked from the back MHA-DT-02 seat alone,
+        # at the band cone_set_stack books.  The stop and lock seats are
+        # MHA-FR-01 print holes.  Check 4 then sets the swing and clamps it.
         (
             "other-base-mounting",
-            "CONE SET ON THE BASE: OIL THE MHA-DT-VN-52 SHOULDER.\n"
-            f"STAND MHA-DT-20 ON MHA-FR-01 OVER THE STEP {PIVOT_SEAT_STEP} PIVOT SEAT.\n"
-            "RUN MHA-DT-VN-52 DOWN THROUGH ITS PIVOT BORE UNTIL ITS SHOULDER SEATS HARD ON "
-            "THE BASE.\n"
+            "CONE SET ON THE BASE: SET MHA-DT-20 ON THE CHECK 4D FEELER LEAVES.\n"
+            "CLAMP MHA-DT-20 TO MHA-FR-01.\n"
+            "TRANSFER-PUNCH MHA-FR-01 THRU THE MHA-DT-20 PIVOT BORE.\n"
+            "LIFT MHA-DT-20 AND THE LEAVES OFF.\n"
+            f"DRILL AND TAP {pivot_screw.THREAD} AT THE PUNCH MARK PER MHA-FR-01.\n"
+            f"CHECK THAT ITS CENTRE IS {pivot_seat_acceptance()}.\n"
+            f"IF IT IS OUT, REDO {PIVOT_SEAT_STEP_NUMBER}-{PIVOT_SEAT_CHECK} OVER A "
+            f"{PIVOT_SEAT_PLUG} PLUG IN LOCTITE 638.\n"
+            "RUN THE OILED MHA-DT-VN-52 DOWN THRU THE MHA-DT-20 PIVOT BORE UNTIL ITS "
+            "SHOULDER SEATS HARD ON THE BASE.\n"
             "CHECK THAT MHA-DT-20 SWINGS FREELY UNDER THE HEAD.\n"
-            "RUN 1X MHA-SH-VN-52, THE SWING STOP, INTO ITS TAPPED MHA-FR-01 SEAT (HOLE "
-            "TABLE) UNTIL ITS HEAD SEATS.\n"
+            "RUN THE MHA-SH-VN-52 SWING STOP INTO MHA-FR-01 UNTIL IT SEATS.\n"
             "SWING THE CONE SET IN.\n"
-            "RUN MHA-DT-VN-51 FINGER-LOOSE THROUGH THE MHA-DT-20 NOTCH INTO ITS TAPPED "
-            f"MHA-FR-01 SEAT (HOLE TABLE) FOR CHECK 4 (SHEET {CHECKS_SHEET}).",
+            "RUN MHA-DT-VN-51 IN FINGER-LOOSE THRU THE MHA-DT-20 NOTCH.",
         ),
     )
     # One blank line between the rig's numbered steps, as _note_text does.
@@ -2038,11 +2057,13 @@ BANK_PRIMARY, BANK_CONTINUED, BANK_LAST = _split_sequence_chain(
     (BANK_CONTINUED_FROM, _BANK_CONTINUED_HEADING),
     (BANK_LAST_FROM, _BANK_CONTINUED_HEADING),
 )
+# Round 19: step 23's pivot-seat transfer moves each rig split two to four
+# lines on (11B, 16E, 21E), the bank having handed 9R's lines to sheet 9.
 RIG_SPLITS = (
-    (f"{steps.step_number('arbor-collar-pinned')}A", RIG_SEQUENCE_HEADING),
-    (f"{steps.step_number('straps-pinned-to-torque-shaft')}C", RIG_SEQUENCE_HEADING),
+    (f"{steps.step_number('arbor-collar-pinned')}B", RIG_SEQUENCE_HEADING),
+    (f"{steps.step_number('straps-pinned-to-torque-shaft')}E", RIG_SEQUENCE_HEADING),
     (
-        f"{steps.step_number('cam-collars-set')}A",
+        f"{steps.step_number('cam-collars-set')}E",
         "ASSEMBLY SEQUENCE CONT. - PINION RIG AND CONE SET ON THE BASE",
     ),
 )
