@@ -52,17 +52,18 @@ from ch_rocker_arm_tl_oblique_callouts import CALLOUT_PLACES
 # farm 20261108T055431582Z) and the header run ~147 mm, which a .158 top
 # would have put through the .015 floor.
 TABLE_ANCHOR = (0.020, 0.173)
-# TAG/X/Y at r8's proven 12/19/19 mm: at 11/17/17 with a 150 mm NOTE the
-# thirteen rows ran 194.8 mm (~14.5 mm a row, farm 20261108T070114760Z)
-# against r8's ~11. Each NOTE cell is two short lines (size and process;
-# mate and flags), which the rows' two-row hidden SIZE cells already make
-# room for; at the render's ~2.41 mm a glyph (farm 20261108T055431582Z: the
-# 34-glyph pin row ran 82 mm) a NOTE_MAX_GLYPHS line needs ~96 mm of the
-# 110. Right edge 20 + 160 = 180 mm, well inside the title block's 216.
+# TAG/X/Y at r8's proven 12/19/19 mm. The NOTE cells wrap far earlier than
+# the glyph estimate: at 110 mm, farm r10 (20261108T083048016Z) measured
+# A1 (lines of 22 and 23 glyphs) at 11.2 mm, two rows, while every row with
+# a 25-glyph or longer line grew a row per wrapped line (15.7/20.2 mm) and
+# the table ran 219 mm. So each cell holds two lines of at most 23 glyphs
+# (A1's proven pair): the size, then the mate. The note flags left the rows:
+# NOTES 1 and 2 name their own tags. Thirteen ~11.2 mm rows and the header
+# run ~152 mm from the .173 top. Right edge 20 + 160 = 180 mm.
 TABLE_WIDTHS = (0.012, 0.019, 0.019, 0.078, 0.110)
 # The longest NOTE line, in printed glyphs (each <MOD-DIAM> prints one),
 # and the most lines a NOTE cell holds.
-NOTE_MAX_GLYPHS = 40
+NOTE_MAX_GLYPHS = 23
 NOTE_MAX_LINES = 2
 # The physical columns, in the IncludeHidden=True index domain every read
 # and write below uses: SIZE stays generated (and compared) while hidden.
@@ -99,16 +100,14 @@ A1_RELATION_NOTE = (
     "B1, A2, B2, CL, CR, R1-R4: LOCATE FROM A1 IN X AND\n"
     "FROM THE A1-B1 AXIS LINE IN Y WITHIN \u00b1.005"
 )
-ORIGIN_NOTE = "X/Y LOC FROM THE LOWER-LEFT PLATE CORNER"
+# The HUB's X/Y are REF: TL-00 step 10 locates it (sheet 3's references).
+ORIGIN_NOTE = "X/Y LOC FROM THE LOWER-LEFT PLATE CORNER; HUB X/Y REF"
 
 
 def _tap_size(drill: float, thread: str) -> str:
     """A tap row's size as its sheet-1 callout prints it: the tap drill at
-    the callout's places, then the thread, both through."""
-    return (
-        f"<MOD-DIAM>{spec.inch_text(drill, CALLOUT_PLACES)} THRU, "
-        f"{thread.lstrip('#')} UNC THRU"
-    )
+    the callout's places, then the thread, through."""
+    return f"<MOD-DIAM>{spec.inch_text(drill, CALLOUT_PLACES)}, {thread.lstrip('#')} UNC THRU"
 
 
 # Each tag's size and process (rules 9, 10): the reamed pins at their limits
@@ -125,14 +124,7 @@ ROW_SIZES = {
     **{f"L{i}": _tap_size(spec.LEVER_TAP_DRILL, spec.LEVER_THREAD) for i in range(1, 3)},
     # Drilled and tapped at assembly (TL-00 step 10, its HUB CLAMP sheet
     # callout), so its size line says when.
-    "HUB": f"AT ASSEMBLY: {_tap_size(spec.CLAMP_TAP_DRILL, spec.HUB_THREAD)}",
-}
-# Each row's flagged notes: NOTE 1 on A2/B2, NOTE 2 on A1_RELATED.
-ROW_FLAGS = {
-    tag: tuple(
-        number for number, tags in ((1, ("A2", "B2")), (2, A1_RELATED)) if tag in tags
-    )
-    for tag in TABLED_HOLES
+    "HUB": f"{spec.HUB_THREAD.lstrip('#')} UNC AT ASSEMBLY",
 }
 # Each tag group's mate, once in the table (machinist review r8, rule 10),
 # MHA-CH-06's own parts by their same-parent short TL- form.
@@ -151,22 +143,12 @@ ROW_MATES = {
     **dict.fromkeys(spec.END_CLAMPS, f"CLAMPS {spec.STRAP_NUMBER}"),
     **{f"R{i}": f"HOLDS {_short(spec.RISER_NUMBER)}" for i in range(1, 5)},
     **{f"L{i}": f"HOLDS {_short(FEED_LEVER_NUMBER)}" for i in range(1, 3)},
-    # The HUB's X/Y are REF: TL-00 step 10 locates it (sheet 3's references).
-    "HUB": f"CLAMPS {spec.STRAP_NUMBER} HUB; LOC REF, SHEET 3",
+    "HUB": f"CLAMPS {spec.STRAP_NUMBER} HUB",
 }
 
 
-def _flags(numbers: tuple[int, ...]) -> str:
-    if not numbers:
-        return ""
-    label = "NOTE" if len(numbers) == 1 else "NOTES"
-    return f"; {label} {', '.join(map(str, numbers))}"
-
-
-# Two lines a cell: size and process, then the mate and the note flags.
-ROW_NOTES = {
-    tag: f"{ROW_SIZES[tag]}\n{ROW_MATES[tag]}{_flags(ROW_FLAGS[tag])}" for tag in TABLED_HOLES
-}
+# Two lines a cell: size and process, then the mate.
+ROW_NOTES = {tag: f"{ROW_SIZES[tag]}\n{ROW_MATES[tag]}" for tag in TABLED_HOLES}
 if set(ROW_SIZES) != set(TABLED_HOLES) or set(ROW_MATES) != set(TABLED_HOLES) or any(
     len(note.splitlines()) > NOTE_MAX_LINES
     or any(len(line.replace("<MOD-DIAM>", "\u00d8")) > NOTE_MAX_GLYPHS

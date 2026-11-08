@@ -335,47 +335,42 @@ def test_in_situ_hub_fit_up_closes_inside_the_strap_top_edge_band() -> None:
         assert spec.PIN_RELATIVE_STACK[name] < half
 
 
-def test_table_rows_carry_their_size_mate_and_note_flags() -> None:
+def test_table_rows_carry_their_size_and_mate() -> None:
     """Machinist review r7/r8 (rules 9, 10): each NOTE cell carries, on two
     short lines, its row's size and process (the pins at their REAM limits,
-    the taps as drill and thread, as their callouts print them), then its
-    tag group's mate (same-parent TL- short forms) and its note flags (NOTE 2
-    on every A1-related row, NOTE 1 on A2/B2). No undefined pass label, no
-    deferral to the callout sheets."""
+    the taps as drill and thread), then its tag group's mate (same-parent
+    TL- short forms). No undefined pass label, no deferral to the callout
+    sheets. Farm r10 (20261108T083048016Z): any line past 23 glyphs wrapped
+    and grew its row, so no row carries note flags: NOTES 1 and 2 name their
+    own tags."""
     notes = {tag: note.splitlines() for tag, note in carrier_table.ROW_NOTES.items()}
     assert spec.CR == pytest.approx((-spec.CL[0], spec.CL[1]))
     assert set(notes) == set(carrier_table.TABLED_HOLES) == set(spec.TABLE_HOLES)
-    pin = "<MOD-DIAM>.3760-.3765 REAM THRU"
-    fit = "RUNNING FIT ON TL-VN-77"
+    pin = ["<MOD-DIAM>.3760-.3765 REAM THRU", "RUNNING FIT ON TL-VN-77"]
     assert spec.PIN_NUMBER == "MHA-CH-06-TL-VN-77"
-    assert notes["A1"] == [pin, fit]
-    assert notes["B1"] == [pin, f"{fit}; NOTE 2"]
-    assert notes["A2"] == notes["B2"] == [pin, f"{fit}; NOTES 1, 2"]
-    clamp = "<MOD-DIAM>.136 THRU, 8-32 UNC THRU"
-    assert notes["CL"] == notes["CR"] == [clamp, "CLAMPS MHA-CH-13; NOTE 2"]
+    assert notes["A1"] == notes["B1"] == notes["A2"] == notes["B2"] == pin
+    assert notes["CL"] == notes["CR"] == ["<MOD-DIAM>.136, 8-32 UNC THRU", "CLAMPS MHA-CH-13"]
     assert all(
-        notes[f"R{i}"] == ["<MOD-DIAM>.089 THRU, 4-40 UNC THRU", "HOLDS TL-24; NOTE 2"]
-        for i in range(1, 5)
+        notes[f"R{i}"] == ["<MOD-DIAM>.089, 4-40 UNC THRU", "HOLDS TL-24"] for i in range(1, 5)
     )
-    assert notes["L1"] == notes["L2"] == ["<MOD-DIAM>.257 THRU, 5/16-18 UNC THRU", "HOLDS TL-26"]
-    assert notes["HUB"] == [f"AT ASSEMBLY: {clamp}", "CLAMPS MHA-CH-13 HUB; LOC REF, SHEET 3"]
+    assert notes["L1"] == notes["L2"] == ["<MOD-DIAM>.257, 5/16-18 UNC THRU", "HOLDS TL-26"]
+    assert notes["HUB"] == ["8-32 UNC AT ASSEMBLY", "CLAMPS MHA-CH-13 HUB"]
     # The pin limits are the sheet-1 4X REAM's .3750 +.0015/+.0010.
     low, high = sorted(spec.PIN_HOLE_BAND)
     assert spec.inch_text(spec.PIN_HOLE_DIA + low, 4) == ".3760"
     assert spec.inch_text(spec.PIN_HOLE_DIA + high, 4) == ".3765"
-    for retired in ("R800", "R816", "SEE CALLOUT", "ORIGIN", "X AXIS", "MHA-CH-06-"):
+    for retired in ("R800", "R816", "SEE CALLOUT", "ORIGIN", "X AXIS", "MHA-CH-06-", "NOTE"):
         assert not any(retired in line for lines in notes.values() for line in lines), retired
     assert not hasattr(carrier_table, "HOLE_SIZES_NOTE")
-    # Two short lines a cell, each fitting the NOTE column with margin: the
-    # render prints ~2.41 mm a glyph (farm 20261108T055431582Z: the 34-glyph
-    # pin row ran 82 mm).
+    for retired in ("ROW_FLAGS", "_flags"):
+        assert not hasattr(carrier_table, retired), retired
+    # Two lines a cell, each no longer than A1's proven 23-glyph pair.
     assert carrier_table.NOTE_MAX_LINES == 2
     assert all(len(lines) == 2 for lines in notes.values())
     longest = max(
         len(line.replace("<MOD-DIAM>", "D")) for lines in notes.values() for line in lines
     )
-    assert longest <= carrier_table.NOTE_MAX_GLYPHS == 40
-    assert carrier_table.NOTE_MAX_GLYPHS * 2.41 + 10.0 < carrier_table.TABLE_WIDTHS[-1] * 1000.0
+    assert longest <= carrier_table.NOTE_MAX_GLYPHS == 23
     visible = sum(carrier_table.TABLE_WIDTHS) - carrier_table.TABLE_WIDTHS[carrier_table.SIZE_COLUMN]
     assert carrier_table.TABLE_ANCHOR[0] + visible <= 0.216 - 0.030
     # r9 (farm 20261108T070114760Z): at 11/17/17 the rows ran ~14.5 mm; the
@@ -388,9 +383,9 @@ def test_hub_row_is_tagged_ref_and_agrees_with_sheet_3() -> None:
     tagged and tabled; its X/Y are REF (TL-00 step 10 locates it) and agree
     with sheet 3's parenthesized references from A1."""
     assert "HUB" in carrier_table.TABLED_HOLES and "HUB" in carrier_table.TAG_OFFSETS
-    assert "HUB" not in carrier_table.A1_RELATED and not carrier_table.ROW_FLAGS["HUB"]
-    assert "LOC REF" in carrier_table.ROW_NOTES["HUB"]
-    assert carrier_table.ROW_NOTES["HUB"].startswith("AT ASSEMBLY: ")
+    assert "HUB" not in carrier_table.A1_RELATED
+    assert carrier_table.ROW_NOTES["HUB"].startswith("8-32 UNC AT ASSEMBLY\n")
+    assert carrier_table.ORIGIN_NOTE.endswith("; HUB X/Y REF")
     assert not hasattr(carrier_table, "IN_SITU_HOLES")
     hub_x, hub_y = carrier_table.table_location("HUB")
     a1_x, a1_y = carrier_table.table_location("A1")
@@ -571,8 +566,7 @@ def test_riser_tap_stations_print_their_walls_band_and_name_the_riser() -> None:
     assert "RiserTaps" not in spec.DRAWING_DIMENSIONS
     assert spec.RISER_WALLS_FROM_A1 >= WALL_TARGET_MM
     assert all(
-        carrier_table.ROW_NOTES[f"R{i}"]
-        == "<MOD-DIAM>.089 THRU, 4-40 UNC THRU\nHOLDS TL-24; NOTE 2"
+        carrier_table.ROW_NOTES[f"R{i}"] == "<MOD-DIAM>.089, 4-40 UNC THRU\nHOLDS TL-24"
         for i in range(1, 5)
     )
     # Three rows (the native two and the mate), ~4.5 mm each, centred on the
@@ -623,6 +617,14 @@ def test_every_hole_is_located_from_the_corner_and_related_to_a1() -> None:
         **{f"riser_tap_{i}": f"R{i}" for i in range(1, 5)},
     }
     assert set(located.values()) | {"HUB"} == set(carrier_table.TABLED_HOLES)
+    # NOTE 2 names its own tags (r10: no row flags); "R1-R4" is a range.
+    named = set()
+    for item in carrier_table.A1_RELATION_NOTE.split(":", 1)[0].split(", "):
+        span = re.fullmatch(r"([A-Z]+)(\d+)-\1(\d+)", item)
+        named |= (
+            {f"{span[1]}{i}" for i in range(int(span[2]), int(span[3]) + 1)} if span else {item}
+        )
+    assert named == set(carrier_table.A1_RELATED)
     for name, tag in located.items():
         feature = features[name]
         places = feature["precision"]["station"]
@@ -640,16 +642,17 @@ def test_every_hole_is_located_from_the_corner_and_related_to_a1() -> None:
         assert (feature.get("parent") == "pin_hole_a1") is related, name
         # prechips Feature forbids extra keys (extra_forbidden).
         assert not any(key.startswith("a1_") or key == "station_from" for key in feature), name
-        assert (2 in carrier_table.ROW_FLAGS[tag]) is related, name
-        assert ("NOTE 2" in carrier_table.ROW_NOTES[tag]
-                or "NOTES 1, 2" in carrier_table.ROW_NOTES[tag]) is related, name
+        assert (tag in named) is related, name
+        assert "NOTE" not in carrier_table.ROW_NOTES[tag], name
     assert set(carrier_table.A1_RELATED) == {
         "B1", "A2", "B2", "CL", "CR", "R1", "R2", "R3", "R4"
     }
     note = carrier_table.A1_RELATION_NOTE
     assert note.startswith("B1, A2, B2, CL, CR, R1-R4:") and note.endswith("\u00b1.005")
     assert "LOCATE FROM A1 IN X" in note and "FROM THE A1-B1 AXIS LINE IN Y" in note
-    assert carrier_table.ORIGIN_NOTE == "X/Y LOC FROM THE LOWER-LEFT PLATE CORNER"
+    assert carrier_table.ORIGIN_NOTE == (
+        "X/Y LOC FROM THE LOWER-LEFT PLATE CORNER; HUB X/Y REF"
+    )
     # The lever taps share the corner X of their table rows.
     assert (
         features["lever_tap_1"]["station_nominal"]

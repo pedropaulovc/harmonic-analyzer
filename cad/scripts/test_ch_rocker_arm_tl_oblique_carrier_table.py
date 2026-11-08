@@ -41,7 +41,8 @@ def test_table_inventory_is_complete_and_replaces_location_dimensions():
     assert set(drawing.TOP_KEEP) == {"PlateLength", "PlateWidth", "PinHoleDia"}
     assert not hasattr(drawing, "SECTION_NOTE")
     assert "_label_section_hole(adapter, section)" in inspect.getsource(drawing._pin_section)
-    assert set(table.ROW_NOTES) == set(TABLED) and "LOC REF" in table.ROW_NOTES["HUB"]
+    assert set(table.ROW_NOTES) == set(TABLED) and "AT ASSEMBLY" in table.ROW_NOTES["HUB"]
+    assert table.ORIGIN_NOTE.endswith("; HUB X/Y REF")
     assert "parent" not in drawing._PIN_ROWS["A1"]
     assert assembly.ALIGNMENT_BAND == pytest.approx(.0008 * I)
     assert "carrier.POSITION_BAND" not in inspect.getsource(assembly)
@@ -540,7 +541,13 @@ def test_frozen_rows_name_the_row_and_both_values(fault):
     elif fault == "note":
         native.cells[2][4] = ""
     elif fault == "moved_note":
-        native.cells[1][4], native.cells[2][4] = native.cells[2][4], native.cells[1][4]
+        # Like holes share one NOTE (A1 and B1 both read the pin size and
+        # mate), so the swap is with the first row whose note differs.
+        other = next(
+            row for row, cells in enumerate(native.cells[1:], 1)
+            if cells[4] != native.cells[1][4]
+        )
+        native.cells[1][4], native.cells[other][4] = native.cells[other][4], native.cells[1][4]
     elif fault == "columns":
         native.TotalColumnCount = 4
     if fault is None:
@@ -722,7 +729,7 @@ def test_observed_size_serializations_pass_and_real_changes_still_fail(generated
     for mutate, match in (
         (lambda cells: cells[1].__setitem__(3, actual_size.replace(".38", ".39")), r"changed now: A1 \(row 1\)"),
         (lambda cells: cells[1].__setitem__(3, actual_size.replace(".46", ".47")), r"changed now: A1 \(row 1\)"),
-        (lambda cells: cells[1].__setitem__(4, table.ROW_NOTES["B1"]), r"changed now: A1 \(row 1\)"),
+        (lambda cells: cells[1].__setitem__(4, table.ROW_NOTES["CL"]), r"changed now: A1 \(row 1\)"),
         (lambda cells: cells[2].__setitem__(1, "1.000"), "not measured from the corner"),
         (lambda cells: cells[2].__setitem__(0, "A1"), "extra/duplicate"),
     ):
@@ -1022,9 +1029,9 @@ def test_every_superseded_driver_prints_in_the_native_table_at_its_places():
     covered = {cell for drivers in (TABLE_SUPERSEDED_DRIVERS, TABLE_ROW_DRIVERS)
                for cells in drivers.values() for cell in cells}
     # Complete: every tabled location cell but the HUB's, which are REF (it
-    # is drilled and tapped at assembly, TL-00 step 10; its NOTE says so).
+    # is drilled and tapped at assembly, TL-00 step 10; ORIGIN_NOTE says so).
     expected = {(tag, axis) for tag in TABLED if tag != "HUB" for axis in (0, 1)}
-    assert "LOC REF" in table.ROW_NOTES["HUB"]
+    assert "HUB X/Y REF" in table.ORIGIN_NOTE and "AT ASSEMBLY" in table.ROW_NOTES["HUB"]
     assert covered == expected
     assert spec.PIN_HOLES["A1"][1] == spec.PIN_HOLES["B1"][1]
     assert not {"HubX", "HubY"} & set(spec.DRAWING_PRECISION_BY_NAME)
@@ -1052,7 +1059,10 @@ def test_every_superseded_driver_prints_in_the_native_table_at_its_places():
     # (test_outer_note_reads_actual_model_limits_and_never_writes_them).
     assert spec.inch_text(spec.OUTER_Y_NOMINAL, spec.TABLE_LOCATION_PLACES) in spec.OUTER_Y_NOTE
     assert spec.inch_text(spec.OUTER_Y_BAND, spec.TABLE_LOCATION_PLACES) in spec.OUTER_Y_NOTE
-    assert table.ROW_NOTES["A2"].endswith("NOTES 1, 2") and table.ROW_NOTES["B2"].endswith("NOTES 1, 2")
+    # NOTE 1 names its own tags; the rows carry no flags (farm r10: a longer
+    # NOTE line wrapped and grew its row).
+    assert spec.OUTER_Y_NOTE.startswith("A2, B2: ")
+    assert not any("NOTE" in note for note in table.ROW_NOTES.values())
 
 
 @pytest.mark.parametrize("glyph", ["<MOD-DIAM>", "\u2300", "\u00d8"])
@@ -1152,7 +1162,9 @@ def test_table_selects_all_thirteen_holes_and_hides_size(monkeypatch):
     # Machinist review r7: each row's NOTE cell carries its size; no sheet
     # note defers the sizes to the callout sheets.
     assert not hasattr(table, "HOLE_SIZES_NOTE")
-    assert not any("CALLOUT" in text or "HUB" in text for text in state["notes"])
+    assert not any("CALLOUT" in text for text in state["notes"])
+    # The HUB is named in the notes once: ORIGIN_NOTE's REF clause.
+    assert [text for text in state["notes"] if "HUB" in text] == [table.ORIGIN_NOTE]
     assert len(state["notes"]) == 4
     # Owner review 2026-11-07: NOTE 2 and the corner origin are printed; the
     # retired A1-origin note is not.
