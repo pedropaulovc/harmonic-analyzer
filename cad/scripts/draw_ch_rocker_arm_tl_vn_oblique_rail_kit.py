@@ -236,12 +236,12 @@ RECEIPT_DIMENSIONS["Length"] = (0.0, rail.LENGTH, LENGTH_ROW_RISE)
 STATION_NOMINALS = dict(zip(DRAWN_STATIONS, rail.HOLE_X, strict=False))
 # The end wall (2X) at the FAR end, where its model chord runs, clear of
 # Station1's near-end stack: far counterbore edge (its start, the left
-# witness) to the far end face. Its value and its callout below stack two
-# rows over its line (a callout under a station lifted that value 2.5 mm,
-# run 20261104T222143958Z), so its text centre stands that much deeper than
-# Station1's: the block's top keeps Station1's air under the rail.
+# witness) to the far end face. Its value and its two callout rows below
+# stack three rows over its line (a callout under a station lifted that
+# value 2.5 mm, run 20261104T222143958Z), so its text centre stands 5 mm
+# deeper than Station1's: the block's top keeps Station1's air under the rail.
 END_WALL_NAME = rail.END_WALL_DIMENSION
-END_WALL_DROP = STATION_FIRST_DROP + 0.0025
+END_WALL_DROP = STATION_FIRST_DROP + 0.005
 RECEIPT_DIMENSIONS[END_WALL_NAME] = (
     rail.LENGTH - rail.END_WALL, rail.LENGTH, -END_WALL_DROP
 )
@@ -252,11 +252,11 @@ RECEIPT_CALLOUTS_BELOW = {END_WALL_NAME: rail.END_WALL_CALLOUT}
 # Neither short span holds its text or its two native arrowheads: each text
 # stands outside its span's left witness, its arrows outside. The station's
 # 4.982 mm span: 27 mm, half its text + the padded cell's 7.59 mm reach + the
-# 2 mm gap. The end wall's 3.107 mm span: 28 mm, half its 22-character
-# callout (49.3 mm at the flag's measured 2.243 mm a character, farm run
-# 20261108T000844770Z) + 3.5 mm, its text inside the rail's run, right of
-# the flag's cell.
-TEXT_OUTSIDE_START = {**dict.fromkeys(DRAWN_STATIONS, 0.027), END_WALL_NAME: 0.028}
+# 2 mm gap. The end wall's 3.107 mm span: 19.5 mm, half its 11-character
+# callout row (28.7 mm at the flag's measured 2.61 mm a character, farm run
+# 20261108T031012373Z) + 5 mm of arrowhead room, its text inside the rail's
+# run, right of the flag's cell.
+TEXT_OUTSIDE_START = {**dict.fromkeys(DRAWN_STATIONS, 0.027), END_WALL_NAME: 0.0195}
 _DIM_ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
 RECEIPT_ARROW_SIDES = dict.fromkeys((*DRAWN_STATIONS, END_WALL_NAME), _DIM_ARROWS_OUTSIDE)
 _CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
@@ -282,14 +282,16 @@ _LAST_ROW_LINE_DROP = (
     + TEXT_OVER_LINE
 )
 RECEIPT_FLAG_XY = (FRONT_CENTER[0], FRONT_CENTER[1] - _LAST_ROW_LINE_DROP - 0.004)
-# Its 42-character second line printed 94.2 mm wide, centred on FRONT
-# (farm run 20261108T000844770Z): the note's upper-left anchor stands half
-# that left of centre. The cell reaches 28 mm left of the text for the
-# leader's start, 3.9 mm right of it: the end wall's text stands beyond.
+# Its 42-character second line printed 109.7 mm wide from the anchor (the
+# farm run 20261108T031012373Z PDF: x 0.1245..0.2341; the 94.2 mm estimate
+# before it was short and the run 20261108T050910243Z readback failed on
+# it). The note's upper-left anchor stands 47 mm left of FRONT's centre. The
+# cell reaches 28 mm left of the text for the leader's start, 2.9 mm right
+# of it: the end wall's text stands beyond.
 RECEIPT_FLAG_CELL = (
     RECEIPT_FLAG_XY[0] - 0.075,
     RECEIPT_FLAG_XY[1] - 0.011,
-    RECEIPT_FLAG_XY[0] + 0.051,
+    RECEIPT_FLAG_XY[0] + 0.065,
     RECEIPT_FLAG_XY[1] + 0.001,
 )
 RECEIPT_FLAG_ANCHOR = (RECEIPT_FLAG_XY[0] - 0.047, RECEIPT_FLAG_XY[1])

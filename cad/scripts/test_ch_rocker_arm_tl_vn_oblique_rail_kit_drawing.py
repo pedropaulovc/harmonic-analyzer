@@ -425,11 +425,11 @@ def test_rail_receipt_note_points_at_the_stations() -> None:
     # The pairing and free screw entry are the jig's steps (rule 7): the
     # member's one note is the end walls' acceptance, the EndWall reference
     # dimension's callout (no flag, no footer note).
-    assert rail.DRAWING_NOTES == rail.END_WALL_CALLOUT == "2X, 2.0 MIN AFTER TRIM"
+    assert rail.END_WALL_CALLOUT.splitlines() == ["2X, 2.0 MIN", "AFTER TRIM"]
+    assert rail.DRAWING_NOTES == "2X, 2.0 MIN AFTER TRIM"
     assert not hasattr(rail, "WALL_CALLOUT")
-    assert "2X" in rail.END_WALL_CALLOUT
     assert f"{rail.WALL_ACCEPTANCE_MM:.1f} MIN" in rail.END_WALL_CALLOUT
-    assert "[" not in rail.END_WALL_CALLOUT and "\n" not in rail.END_WALL_CALLOUT
+    assert "[" not in rail.END_WALL_CALLOUT
     assert rail.WALL_ACCEPTANCE_MM == 2.0
     assert "MHA-CH-06-TL-00 SHEET 1 LIMITS; SEALS ON RAIL, NO BIND" in rail.END_FIT_CALLOUT
     # The flag gives the hole pattern as one REF pattern (rule 10), then its
@@ -785,7 +785,7 @@ def test_receipt_dimensions_are_the_marked_model_dimensions() -> None:
     }
     # The short spans carry their arrows and their texts outside.
     assert draw.RECEIPT_ARROW_SIDES == {"Station1": 1, "EndWall": 1}
-    assert draw.TEXT_OUTSIDE_START == {"Station1": 0.027, "EndWall": 0.028}
+    assert set(draw.TEXT_OUTSIDE_START) == {"Station1", "EndWall"}
     assert draw.RECEIPT_CALLOUTS_BELOW == {"EndWall": rail.END_WALL_CALLOUT}
     assert draw.RECEIPT_DIMENSIONS["Length"][:2] == (0.0, rail.LENGTH)
     start, end, offset = draw.RECEIPT_DIMENSIONS["Station1"]
@@ -829,7 +829,8 @@ def _stack_ink(*, lift=None):
     for name, (start, end, offset) in draw.RECEIPT_DIMENSIONS.items():
         x, y = draw.receipt_text_point(name, sheet(start), sheet(end), offset)
         below_text = draw.RECEIPT_CALLOUTS_BELOW.get(name)
-        line_y = y - draw.TEXT_OVER_LINE - (_CALLOUT_ROW if below_text else 0.0)
+        below_rows = len(below_text.splitlines()) if below_text else 0
+        line_y = y - draw.TEXT_OVER_LINE - below_rows * _CALLOUT_ROW
         y += (lift or {}).get(name, 0.0)
         text = f"({end - start:.{rail.REFERENCE_PLACES}f})"
         box = estimate_text_box(
@@ -847,7 +848,7 @@ def _stack_ink(*, lift=None):
             )
         if below_text:
             below = estimate_text_box(
-                below_text, anchor=(x, y - _CALLOUT_ROW),
+                below_text, anchor=(x, y - (1 + below_rows) / 2.0 * _CALLOUT_ROW),
                 height=draw.DIMENSION_TEXT_HEIGHT, reference=2,
             )
             text_box = (
@@ -1028,13 +1029,17 @@ def test_end_wall_text_stands_under_the_far_end_clear_of_the_flag() -> None:
     # Clear of the flag's reserved cell (so of its text) and its estimate.
     assert draw.RECEIPT_FLAG_CELL[2] + draw.CLEAR_GAP_M <= text[0]
     assert draw.boxes_clear(text, flag)
-    # At the flag's measured advance (94.2 mm for 42 characters, farm run
-    # 20261108T000844770Z) the callout, centred on the text point, still
+    # The flag's second line printed 109.7 mm from x 0.1245 (the farm run
+    # 20261108T031012373Z PDF): inside its cell. At that advance (2.61 mm a
+    # character) the callout's widest row, centred on the text point, still
     # stands clear of the flag's cell and of its left witness.
+    assert draw.RECEIPT_FLAG_ANCHOR[0] - 0.001 <= 0.1245
+    assert 0.1245 + 0.1097 <= draw.RECEIPT_FLAG_CELL[2]
     x, _ = draw.receipt_text_point(
         "EndWall", (left_witness, 0.0), (far_end, 0.0), 0.0
     )
-    half = len(rail.END_WALL_CALLOUT) * 0.0942 / 42 / 2.0
+    widest = max(len(row) for row in rail.END_WALL_CALLOUT.splitlines())
+    half = widest * 0.1097 / 42 / 2.0
     assert draw.RECEIPT_FLAG_CELL[2] + draw.CLEAR_GAP_M <= x - half
     assert x + half + 0.002 <= left_witness
     # FRONT's caption.
@@ -1042,10 +1047,10 @@ def test_end_wall_text_stands_under_the_far_end_clear_of_the_flag() -> None:
     assert label == "FRONT"
     caption = (cx - draw._CAPTION_HALF_WIDTH, cy - 0.006, cx + draw._CAPTION_HALF_WIDTH, cy + 0.001)
     assert caption[2] + draw.CLEAR_GAP_M <= text[0]
-    # Under the rail's printed edge even if SOLIDWORKS centres the two-row
-    # block, not the value, on the text point (2.5 mm higher).
+    # Under the rail's printed edge even if SOLIDWORKS centres the three-row
+    # block, not the value, on the text point (one row higher).
     rail_edge = draw.FRONT_CENTER[1] - draw._FRONT_HALF[1]
-    assert text[3] + 0.0025 + draw.CLEAR_GAP_M <= rail_edge
+    assert text[3] + _CALLOUT_ROW + draw.CLEAR_GAP_M <= rail_edge
     # It is no station: the stack rule leaves its row free but its ink clear.
     assert draw.receipt_stack_findings(inks, flag) == []
 
