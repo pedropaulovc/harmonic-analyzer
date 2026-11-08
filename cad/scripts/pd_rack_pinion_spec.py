@@ -289,9 +289,8 @@ FACE_WIDTH_PLACES = 3
 # Clears the hub's spigot (MHA-PD-17, pd_transgear_disc_hub_geometry): the
 # bore reamed .504 REAM_H7 (a .5040 decimal chucking reamer) over the
 # spigot's SHAFT_H.  The clearance is the set-at-assembly route of the tooth
-# space runout (PART_TOOTH_SPACE_RUNOUT_TIR_MM below).  Delegated ruling
-# 2026-11-07 (Main), no precedent; owner review #2144 (pending owner
-# confirmation): Q-PD06-1 option B.
+# space runout (PART_TOOTH_SPACE_RUNOUT_TIR_MM below).  Owner ruling
+# 2026-11-08 (Pedro), #2144 item 3.1 (Q-PD06-1 option B).
 BORE_DIA = 12.8016  # .504
 BORE_BAND = REAM_H7  # (upper, lower) deviations: +.0005/0
 BORE_DEVIATIONS = deviations(BORE_BAND)
@@ -469,6 +468,6 @@ TOOTH_SPACE_CALLOUT = "\n".join(
 # is held by the thickness's size envelope (rule #1, .118 ±.005), so the
 # stacks that read it (the paper-drive assembly's platen air, the hub's step
 # gap) take the whole thickness band.  Conservative: they also take the
-# thickest disc.  Delegated ruling 2026-11-07 (Main), no precedent; owner
-# review #2144 (pending owner confirmation): Q-PD06-2 option C.
+# thickest disc.  Owner ruling 2026-11-08 (Pedro), #2144 item 3.1 (Q-PD06-2
+# option C, the rear-face frame dropped).
 REAR_FACE_PARALLELISM_BOUND_MM = FACE_WIDTH_MAX - FACE_WIDTH_MIN

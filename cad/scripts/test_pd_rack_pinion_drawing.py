@@ -166,7 +166,7 @@ def test_the_package_declares_the_tap_web_the_sheet_prints() -> None:
     (entry,) = [entry for entry in exceptions if entry["id"] == "RV-03"]
     assert entry["kind"] == "minor"
     assert spec.TAP_WALL_TEXT in entry["where"]
-    assert "delegated ruling 2026-11-04" in entry["reason"]
+    assert "Owner ruling 2026-11-08 (Pedro), #2144 item 3.1" in entry["reason"]
     assert "#2144" in entry["reason"]
     assert f"{spec.TAP_WALL_TEXT}." in callouts.DRAWING_NOTES
 

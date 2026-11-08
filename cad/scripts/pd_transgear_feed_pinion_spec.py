@@ -271,8 +271,7 @@ BOSS_DIA_PLACES = 4
 # zone is the face's extent, the 12T's tip circle.  It prints at the shop's
 # .001 row; the collar-to-disc air it closes is accepted at MHA-PD-00 by a
 # feeler, the face re-faced square on a mandrel if short (pd_cluster_air;
-# delegated ruling 2026-11-07 (Main), no precedent; owner review #2144;
-# pending owner confirmation).
+# Owner ruling 2026-11-08 (Pedro), #2144 item 3.4).
 BORE_DATUM = "A"
 # Spacing is held by the dividing head and is not inspected; one pin in
 # every space on a radial indicator catches eccentricity and gross slips.
@@ -291,8 +290,8 @@ STEP_FACE_PERPENDICULARITY_ZONE_DIA = OUTSIDE_DIA
 
 # --- D-flat (local -Y): drive only ------------------------------------------------
 # The hub drives through it.  The flat plane prints from the boss axis at
-# .138 0/-.001, the shop's .0001-place row (delegated ruling 2026-11-07
-# (Main), no precedent; owner review #2144; pending owner confirmation):
+# .138 0/-.001, the shop's .0001-place row (Owner ruling 2026-11-08
+# (Pedro), #2144 item 3.4):
 # the hub's flat sits pd_transgear_disc_hub_spec.FLAT_CLEARANCE off it (the
 # hub owns its band and checks the pair).
 FLAT_TO_AXIS = 3.5052  # .138
