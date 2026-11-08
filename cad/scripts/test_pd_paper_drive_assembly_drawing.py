@@ -2592,6 +2592,7 @@ def test_spare_is_hidden_edge_on_and_shown_on_the_ballooned_isometric(
             RootDrawingComponent2=lambda _all: root, GetName2=lambda: orientation
         )
         adapter.currentModel, _calls, _selected = visibility_model(view)
+        adapter.swApp = adapter.currentModel.native_app
         views[orientation] = (view, drawn)
         return views[orientation][0]
 

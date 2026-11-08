@@ -273,6 +273,7 @@ def late_bound_drawing_view():
         adapter = SimpleNamespace(
             _attempt=attempt,
             currentModel=model,
+            swApp=model.native_app,
             _get_attr_or_call=lambda obj, name: getattr(obj, name)(),
         )
         return adapter, view, drawings, rebuilds
