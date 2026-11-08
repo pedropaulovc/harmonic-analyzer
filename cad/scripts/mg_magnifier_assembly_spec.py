@@ -164,8 +164,8 @@ THREAD_PROJECTION_TOL = _lever.THREAD_PROJECTION_TOL
 assert _lever.LEVER_UNIT == UNIT, "the lever charges this sheet's projection band in its unit"
 INSTALLED_FULL_ENGAGEMENT_MIN = _lever.INSTALLED_FULL_ENGAGEMENT_MIN
 
-# The thread-past-locknut window as the press-gauge callout prints it. High:
-# the axle's limit. Low: the locknut on full thread, i.e. at least the dome's
+# The thread-past-locknut window that the step 3B check prints. High: the
+# axle's limit. Low: the locknut on full thread, i.e. at least the dome's
 # incomplete pitch past it (mg_wheel_group.LOCKNUT_THREAD_MARGIN).
 THREAD_PAST_LOCKNUT_TEXT = render_number(
     _pin.THREAD_PAST_LOCKNUT_LIMIT / LENGTH_UNITS[UNIT], UNIT, 3
@@ -182,14 +182,12 @@ THREAD_PAST_LOCKNUT_MIN_TEXT = render_number(
 # but prints none of the callout (run 20261012T185729782Z). Below ones can wrap.
 SETTING_CALLOUTS = {
     FEATURE: {
-        # The reference gauge's acceptance, both sides of the stack window
-        # (PRESS_GAUGE_LOW_LIMIT, PRESS_GAUGE_HIGH_LIMIT), as a number pair a
-        # depth rod reads at the second nut (owner ruling 2026-11-06, Q1).
-        PRESS_GAUGE_DIMENSION: (
-            3,
-            f"ACCEPT: THREAD END {THREAD_PAST_LOCKNUT_MIN_TEXT}-"
-            f"{THREAD_PAST_LOCKNUT_TEXT} PAST 2ND NUT",
-        ),
+        # The press gauge prints as a bare reference. Its acceptance, the
+        # number pair a depth rod reads at the second nut (owner ruling
+        # 2026-11-06, Q1), is printed in the MHA-MG-00 thread-end check,
+        # which points to DETAIL B, the view that draws the nuts. Farm rounds
+        # 1-3 of #2286 gated the pair as a callout on DETAIL A, which draws
+        # no nut; Main chose option A on 2026-11-08.
         # One reason line; the steps carry how the nuts set and lock it
         # (owner ruling 2026-11-06, Q2).
         ENDSHAKE_DIMENSION: (4, "WHEEL FREE, NO RATTLE"),

@@ -1008,9 +1008,9 @@ def boundary_letter_xy(
     )
 
 
-# The gauge's dimension line runs above the bar, inside the circle, its
-# callout above the value; the endshake's text stands right of the stack,
-# above the nuts and past the crop, with its callout below.
+# The gauge's dimension line runs above the bar, inside the circle, a bare
+# reference; the endshake's text stands right of the stack, above the nuts
+# and past the crop, with its callout below.
 GAUGE_RISE = 12.0
 ENDSHAKE_RISE = 5.5
 PRESSED_KEEP = {
@@ -1027,15 +1027,18 @@ ENDSHAKE_KEEP = {
 def _assert_callouts(
     displays: list[tuple[str, Any]], callouts: dict[str, tuple[int, str]]
 ) -> None:
-    """Read inherited native setting text without writing the released model."""
+    """Read inherited native setting text without writing the released model.
+    A dimension with no callout (the bare press-gauge reference) must carry
+    none above or below."""
     for name, display in displays:
-        part, expected = callouts[name]
-        text = str(display.GetText(part) or "").replace("\r\n", "\n")
-        if text != expected:
-            location = {3: "above", 4: "below"}[part]
-            raise RuntimeError(
-                f"{name}: {location} callout reads {text!r}, not {expected!r}"
-            )
+        checks = (callouts[name],) if name in callouts else ((3, ""), (4, ""))
+        for part, expected in checks:
+            text = str(display.GetText(part) or "").replace("\r\n", "\n")
+            if text != expected:
+                location = {3: "above", 4: "below"}[part]
+                raise RuntimeError(
+                    f"{name}: {location} callout reads {text!r}, not {expected!r}"
+                )
 
 
 def _activate(adapter: Any, view: Any, *, label: str) -> str:

@@ -119,22 +119,24 @@ def test_the_stack_dimensions_are_marked_banded_and_called_out() -> None:
 
 def test_the_press_gauge_is_a_reference_accepted_at_the_nuts() -> None:
     # Machinist reviews of e04fd60ab and 179705ff2: a band on a hand
-    # press is unneeded precision; the gauge prints as a reference and its
-    # callout states the acceptance. A press to nominal within the stack's
-    # allocation passes it at every corner.
+    # press is unneeded precision; the gauge prints as a bare reference. Its
+    # acceptance, read at the second nut, prints in the thread-end check
+    # (#2286 option A: farm rounds 1-3 gated it as a DETAIL A callout, a
+    # view with no nut). A press to nominal within the stack's allocation
+    # passes it at every corner.
     low = stack.PRESS_GAUGE - stack.PRESS_GAUGE_TOL
     high = stack.PRESS_GAUGE + stack.PRESS_GAUGE_TOL
     assert stack.PRESS_GAUGE_LOW_LIMIT / 25.4 == pytest.approx(1.497, abs=1e-6)
     assert stack.PRESS_GAUGE_HIGH_LIMIT / 25.4 == pytest.approx(1.502, abs=1e-6)
     assert stack.PRESS_GAUGE_LOW_LIMIT <= low < high <= stack.PRESS_GAUGE_HIGH_LIMIT
-    part, text = stack.SETTING_CALLOUTS[stack.FEATURE][stack.PRESS_GAUGE_DIMENSION]
-    assert part == 3 and "\n" not in text
+    assert stack.PRESS_GAUGE_DIMENSION not in stack.SETTING_CALLOUTS[stack.FEATURE]
     # The printed window, in inches: the high side is the axle's own limit
     # and passes the worst stack; the low side keeps the locknut on full
     # thread, the dome's incomplete pitch past it, which the stack's low
     # corner holds (owner ruling 2026-11-06).
+    checked = notes.STEP_TEXT[steps.AXLE_CHECKED_KEY]
     low_text, high_text = re.search(
-        r"ACCEPT: THREAD END (\.\d+)-(\.\d+) PAST 2ND NUT", text
+        r"STANDS (\.\d+)-(\.\d+) PAST THE SECOND NUT", checked
     ).groups()
     printed = float(high_text) * 25.4
     assert printed == pytest.approx(mg_wheel_axle_spec.THREAD_PAST_LOCKNUT_LIMIT)
@@ -143,9 +145,9 @@ def test_the_press_gauge_is_a_reference_accepted_at_the_nuts() -> None:
     assert mg_wheel_group.LOCKNUT_THREAD_MARGIN >= 0.0
     assert "LOCKNUT ON FULL THREAD" not in drawing.PRESSED.label_text
     # The acceptance is checked on the trial stack, then again once both
-    # nuts are set, at the DETAIL A gauge with a named instrument.
-    checked = notes.STEP_TEXT[steps.AXLE_CHECKED_KEY]
-    assert "DETAIL A" in checked and "CALIPER DEPTH ROD" in checked
+    # nuts are set, where DETAIL B draws them, with a named instrument.
+    assert notes.ENDSHAKE_DETAIL_TITLE in checked and "CALIPER DEPTH ROD" in checked
+    assert notes.PRESS_DETAIL_TITLE not in checked
     accepted = steps.SEQUENCE.index(steps.AXLE_ACCEPTED_KEY)
     assert accepted > steps.SEQUENCE.index(steps.LOCKNUT_JAMMED_KEY)
     assert notes.STEP_TEXT[steps.AXLE_ACCEPTED_KEY].startswith("CHECK ")
@@ -169,10 +171,6 @@ def test_the_press_gauge_is_a_reference_accepted_at_the_nuts() -> None:
     assert notes.STEP_TEXT["axle-rechecked"].endswith(
         f"RETURN TO STEP {steps.step_number(steps.AXLE_HELD_KEY)}."
     )
-    # The one-line callout centres over the value: at the 2.7 mm a capital
-    # measured on the e04fd60ab sheet it stays inside the right border.
-    x, _y = drawing.PRESSED_KEEP[stack.PRESS_GAUGE_DIMENSION]
-    assert x + len(text) * 0.0027 / 2.0 < SHEET_RIGHT - 0.005
 
 
 def test_each_press_is_accepted_at_the_bench_with_a_slip_fit_remedy() -> None:
@@ -207,10 +205,11 @@ def test_each_press_is_accepted_at_the_bench_with_a_slip_fit_remedy() -> None:
         assert rule in notes.BOND_NOTE
 
 
-def test_the_axle_press_stops_at_the_plain_end_window_the_axle_spec_proves() -> None:
+def test_the_axle_press_goes_to_the_plain_end_window_as_a_first_setting() -> None:
     """The bar sheet no longer prints the pressed axle's end window (fanout/mg
-    #2260); the press step stops at it, read from the axle spec's limits, and
-    the thread-end check says it governs any further press."""
+    #2260). The press step goes to it as a first setting, read from the axle
+    spec's limits; the thread-end check is the only acceptance (#2286
+    option A)."""
     low, high = (
         float(text) * 25.4 for text in notes.BACK_END_SUNK_TEXT.split("-")
     )
@@ -218,13 +217,12 @@ def test_the_axle_press_stops_at_the_plain_end_window_the_axle_spec_proves() -> 
     assert high == pytest.approx(mg_wheel_axle_spec.BACK_END_SUNK_MAX, abs=0.0127)
     assert 0.0 < low < high
     pressed = notes.STEP_TEXT[steps.AXLE_PRESSED_KEY]
-    assert f"UNTIL ITS PLAIN END IS {notes.BACK_END_SUNK_TEXT} BELOW THE FAR FACE OF ITEM " in pressed
-    assert "CALIPER DEPTH ROD" in pressed
-    checked = notes.STEP_TEXT[steps.AXLE_CHECKED_KEY]
-    assert f"AS {notes.ENDSHAKE_DETAIL_TITLE} SHOWS IT" in checked
-    assert checked.endswith(
-        f"GOVERN OVER THE STEP {steps.step_number(steps.AXLE_PRESSED_KEY)} DEPTH."
+    assert (
+        f"TO A FIRST SETTING: ITS PLAIN END {notes.BACK_END_SUNK_TEXT} BELOW THE FAR FACE OF ITEM "
+        in pressed
     )
+    assert "CALIPER DEPTH ROD" in pressed
+    assert "GOVERN" not in notes.STEP_TEXT[steps.AXLE_CHECKED_KEY]
 
 
 def test_the_drum_press_accepts_the_recess_window_the_wheel_lengths_prove() -> None:
@@ -346,7 +344,14 @@ def test_the_details_and_labels_do_not_overlap() -> None:
     assert _circle_box(drawing.ENDSHAKE)[3] < upper_label_bottom
 
 
-@pytest.mark.parametrize("feature", [stack.FEATURE, stack.LEVER_FEATURE])
+@pytest.mark.parametrize(
+    "feature",
+    [
+        feature
+        for feature, callouts in stack.SETTING_CALLOUTS.items()
+        if any(part == 3 for part, _text in callouts.values())
+    ],
+)
 def test_an_above_callout_with_a_line_break_is_refused_before_model_writes(
     monkeypatch, feature
 ) -> None:
@@ -381,6 +386,15 @@ def test_each_callout_reads_back_from_its_own_compartment(feature) -> None:
     wrong = [(name, _Display({7 - part: text})), *good[1:]]
     with pytest.raises(RuntimeError, match="callout reads ''"):
         drawing._assert_callouts(wrong, callouts)
+
+
+@pytest.mark.parametrize("part", [3, 4])
+def test_the_bare_press_gauge_reference_inherits_no_callout(part) -> None:
+    callouts = stack.SETTING_CALLOUTS[stack.FEATURE]
+    drawing._assert_callouts([(stack.PRESS_GAUGE_DIMENSION, _Display({}))], callouts)
+    stray = [(stack.PRESS_GAUGE_DIMENSION, _Display({part: "ACCEPT"}))]
+    with pytest.raises(RuntimeError, match="callout reads 'ACCEPT', not ''"):
+        drawing._assert_callouts(stray, callouts)
 
 
 @pytest.mark.parametrize("feature", [stack.FEATURE, stack.LEVER_FEATURE, stack.THREAD_FEATURE])
@@ -3770,8 +3784,11 @@ def test_mg_settings_only_read_inherited_native_callouts(
     def forbidden(*_args):
         pytest.fail("drawing settings must not write native callout text")
 
-    for name, (part, text) in callouts.items():
-        text_parts[name] = {part: text.replace("\n", "\r\n")}
+    # Every imported setting, including the bare press-gauge reference,
+    # which inherits no callout (#2286 option A).
+    for name in precision:
+        part, text = callouts.get(name, (None, ""))
+        text_parts[name] = {part: text.replace("\n", "\r\n")} if part else {}
         band_m = stack.DIMENSION_TOLERANCES.get(name, 0.0) / 1000.0
         reference = group == "stack" and name in stack.REFERENCE_DIMENSIONS
         if reference:

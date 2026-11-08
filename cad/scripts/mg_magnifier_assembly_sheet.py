@@ -26,6 +26,8 @@ from mg_magnifier_assembly_spec import (
     ENDSHAKE_TOL,
     FEATURE,
     PRESS_GAUGE_DIMENSION,
+    THREAD_PAST_LOCKNUT_MIN_TEXT,
+    THREAD_PAST_LOCKNUT_TEXT,
     UNIT,
 )
 from _title_block_units import LENGTH_UNITS, render_number
@@ -265,17 +267,18 @@ STEP_TEXT = {
         f"IF {_DRUM} CAME OFF, BOND IT TO {_WHEEL} WITH {BOND_GRADE}, "
         f"{BOND_NOTE_REF}."
     ),
-    # The press stop is the plain end's window below the bar's far face (the
-    # bar's depth stack, which MHA-MG-08 names; the spec proves the window),
-    # read with a depth rod. The thread end past the second nut governs any
-    # further press (local review of round 1: two limits, neither said which
-    # governs). Its limits are the DETAIL A gauge's ACCEPT callout (owner
-    # ruling 2026-11-06 Q1); DETAIL B is the view that draws the nuts and the
-    # thread end, so the check points there for where to read (farm rounds 1
-    # and 2: DETAIL A draws no nut).
+    # The press goes to a first setting: the plain end's window below the
+    # bar's far face (the bar's depth stack, which MHA-MG-08 names; the spec
+    # proves the window), read with a depth rod. The only acceptance of the
+    # axle's position is the thread end past the second nut: the number pair
+    # a depth rod reads there (owner ruling 2026-11-06 Q1), printed in the
+    # check from the spec's constants and read where DETAIL B draws the nuts.
+    # Farm rounds 1-3 gated it as a callout on DETAIL A, which draws no nut,
+    # and r3 read two acceptances; Main chose option A on 2026-11-08.
     _steps.AXLE_PRESSED_KEY: (
-        f"PRESS {_AXLE} INTO {_BAR}, THREADED END OUT, UNTIL ITS PLAIN END IS "
-        f"{BACK_END_SUNK_TEXT} BELOW THE FAR FACE OF {_BAR} (CALIPER DEPTH ROD)."
+        f"PRESS {_AXLE} INTO {_BAR}, THREADED END OUT, TO A FIRST SETTING: ITS "
+        f"PLAIN END {BACK_END_SUNK_TEXT} BELOW THE FAR FACE OF {_BAR} (CALIPER "
+        "DEPTH ROD)."
     ),
     _steps.AXLE_HELD_KEY: f"CHECK {_AXLE} DOES NOT TURN OR SLIDE BY HAND.",
     "axle-pressed-out": f"IF IT DOES, OR {_AXLE} SLID IN BY HAND, PRESS {_AXLE} OUT.",
@@ -288,9 +291,9 @@ STEP_TEXT = {
         f"JAM BOTH {_NUT} NUTS ON {_AXLE} WITH {_WHEEL} JUST FREE."
     ),
     _steps.AXLE_CHECKED_KEY: (
-        f"CHECK THE THREAD END PAST THE SECOND NUT, AS {ENDSHAKE_DETAIL_TITLE} "
-        f"SHOWS IT, AGAINST THE {PRESS_DETAIL_TITLE} ACCEPT LIMITS (CALIPER DEPTH "
-        f"ROD): THEY GOVERN OVER THE {_step(_steps.AXLE_PRESSED_KEY)} DEPTH."
+        f"CHECK THE THREAD END IN {ENDSHAKE_DETAIL_TITLE} STANDS "
+        f"{THREAD_PAST_LOCKNUT_MIN_TEXT}-{THREAD_PAST_LOCKNUT_TEXT} PAST THE "
+        "SECOND NUT (CALIPER DEPTH ROD)."
     ),
     "trial-parts-removed-to-press": (
         f"IF IT FAILS, REMOVE THE TRIAL NUTS AND PARTS FROM {_AXLE}."
