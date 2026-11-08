@@ -230,7 +230,7 @@ def test_owner_ruled_shortfalls_are_declared_and_stated() -> None:
     assert entries["RV-01"].where.endswith(spec.EAR_WALL_NOTE)
     assert entries["RV-02"].where.endswith(spec.SCREW_LINE_NOTE)
     # The ±.004 ear locations, narrower than the drilled-hole row, are
-    # accepted (delegated ruling L3, 2026-11-07, owner review #2144).
+    # accepted (Owner ruling 2026-11-08 (Pedro), #2144 item 12.3).
     assert entries["RV-03"].kind == "accept"
     assert "#2144" in entries["RV-03"].reason
     # The printed values, from the computed worst cases at the sheet's three
