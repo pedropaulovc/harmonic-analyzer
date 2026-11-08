@@ -113,13 +113,17 @@ def test_native_failures_refuse_and_clear_selection(fault):
         model.EditRebuild3 = lambda: False
     elif fault == "document":
         model.GetType = lambda: 2
-    with pytest.raises(RuntimeError):
+    with pytest.raises(RuntimeError) as error:
         visibility.set_drawing_view_instance_visibility(
             adapter, view, frozenset({"item-0"}), mode="show", label=fault
         )
     assert selected == []
     if fault not in {"readback", "rebuild"}:
         assert calls == []
+    if fault == "identity":
+        assert "expected_count=1, selected_count=1" in str(error.value)
+        assert "missing=['assembly/item-1@View1']" in str(error.value)
+        assert "unexpected=['assembly/item-0@View1']" in str(error.value)
 
 
 def test_family_missing_preflights_all_leaves(monkeypatch):
