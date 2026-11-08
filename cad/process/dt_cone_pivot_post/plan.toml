@@ -127,7 +127,7 @@ x = [1.0, 0.0, 0.0]
 y = [0.0, 1.0, 0.0]
 z = [0.0, 0.0, 1.0]
 binding = "unknown"
-note = "AUTHOR'S CHOICE: after S2 tail removal, radial presentation from model+Z, body axis horizontal. Lower finishedY1..21 band/B/keyed meridian are proposed references; S1 turned toY28 leaves7mm collar gap. Measure ACTUAL cooled band diameter with qualified outside micrometer; touch the proposed flat-end cutter on the uppermost crown and assign half that diameter, not unmeasured nominal20.955. S2H uses the same model-aligned axes on a dividing head and S2F the same cradle. Actual cutter radius/pickup/cradle/pose/calibration unknown."
+note = "AUTHOR'S CHOICE: radial presentation from model+Z after S2 tail removal, lower finishedY1..21 band/B/keyed meridian proposed references; S1 turned toY28 leaves7mm collar gap. Independently measure actual signed highest standing crown patch across the entire selected flat-end footprint from calibrated body-axis reference after prior cuts; touch that same patch. Never half a band diameter or nominal20.955. S2H retains these model-aligned axes, S2F same proposed cradle. Actual pickup/fixture/pose/calibration unknown; Y transfer remains explicit PICKUP HOLD."
 cite = ["AUTHOR'S CHOICE: proposed manual radial presentation"]
 
 [frames.PR2]
@@ -136,7 +136,7 @@ x = [-1.0, 0.0, 0.0]
 y = [0.0, 1.0, 0.0]
 z = [0.0, 0.0, -1.0]
 binding = "unknown"
-note = "AUTHOR'S CHOICE: stopped-spindle reverse presentation from model-Z; recover lower-body/B/meridian, re-measure ACTUAL band diameter, touch the proposed flat-end cutter on the new uppermost crown and assign half that diameter, not unmeasured nominal20.955. Actual indicator/cutter/fixture registration and calibration remain unknown; not a measured pose."
+note = "AUTHOR'S CHOICE: stopped-spindle reversal from model-Z; recover lower-body/B/meridian, independently remeasure actual signed highest standing crown patch across entire tool footprint from calibrated body-axis reference and touch same patch. Never half a band diameter or nominal20.955. Actual indicator/tool/fixture registration/calibration unknown; Y transfer remains PICKUP HOLD, not measured pose."
 cite = ["AUTHOR'S CHOICE: proposed reverse manual radial presentation"]
 [frames.KI]
 origin = [-100.0, 0.0, 0.0]
@@ -548,7 +548,8 @@ support = "unknown"
 grip_on = "AUTHOR'S CHOICE: lower bandY1..21 and B pads"
 grip_mm = 20.0
 stop = "Propose three B pads atmodelXZ(0,15),(12.990381,-7.5),(-12.990381,-7.5), keyed meridian; drill columnsX±12.954,Z0 relieved."
-clamp = "Proposed split lower-body nest/clampsY1..21,B pads, bolts outside tool/drill corridor; S1Y0..28.4 band gives7mm collar gap. Qualify the offset rectangular head block/lever arm and facing/drilling/shank/holder corridors, not finished-head-only geometry. Actual nest/drill-exit relief/hardware/pose/load qualification unknown; no example contacts adopted."
+clamp = "Proposed split lower-body nest/clampsY1..21,B pads, bolts outside tool/drill corridor; S1Y0..28.4 gives7mm collar gap. Loosely locate B/body/meridian, secure, then recheck after final tightening; recover/reclamp/recheck if disturbed, STOP on movement. Qualify offset rectangular head/lever arm and full facing/drilling/shank/holder corridors, not finished-head-only geometry. Actual nest/drill-exit relief/hardware/pose/load qualification unknown; no example contacts adopted."
+note = "FIRST-USE fixture continuation HOLD before S2: actual fixture identity, manufacture/construction method, assembled B seating/reference calibration and corridor/load qualification unresolved. No ready fixture selector or made hardware is asserted. Component physical sizes and posed setup-frame AABB extents are different quantities; neither alone proves contact or swept clearance. Preserve all authored geometry/poses."
 [setups.zero.transfer]
 from = "S1C"
 indicate = ["body", "foot_seat"]
@@ -569,14 +570,71 @@ method = "indicate_axis"
 tool = "unknown"
 check_jog_mm = 10.0
 [setups.zero.z]
-face = "foot_seat"
-edge_mm = 0.0
+face = "head"
+edge_mm = "unknown"
 from = "+z"
-method = "touch_then_set"
+method = "measure_then_set"
+gauge = "unknown"
+measure = "M = actual signed accessible arriving head-top height above the calibrated seated B-pad reference, positive M2+Z; independently height-gauge/comparator measure the entire selected footprint, then touch that same intact patch. Qualify B seating/reference transfer, contact/sign/calibration or STOP. Design96.242 raw bound and94.742 target are never readings. Replan/qualify first face level if measured overstock exceeds authored0.5 DOC; no fixed three-level assumption on arbitrary M. Actual gauge/tool/calibration unknown."
+offset_mm = 0.0
 tool = "unknown"
 paper_mm = 0.0
 check_jog_mm = 10.0
 retouch_after = []
+[[setups.zero.tool_touches]]
+tool = "unknown"
+z_face = "head"
+method = "measure_then_set"
+z_gauge = "unknown"
+z_measure = "M = independently remeasured actual signed head-top height from the same calibrated seated B reference after preceding cuts; qualify a new intact full-tool-footprint patch outside all spots/holes/counterbores and touch that same patch before op60. Never nominal94.742 or inherited tool length. STOP if actual patch/reference/calibration/access unqualified; actual tool/gauge unknown."
+z_offset_mm = 0.0
+paper_mm = 0.0
+before_ops = [60]
+[[setups.zero.tool_touches]]
+tool = "unknown"
+z_face = "head"
+method = "measure_then_set"
+z_gauge = "unknown"
+z_measure = "M = independently remeasured actual signed head-top height from the same calibrated seated B reference after preceding cuts; qualify a new intact full-tool-footprint patch outside all spots/holes/counterbores and touch that same patch before op70. Never nominal94.742 or inherited tool length. STOP if actual patch/reference/calibration/access unqualified; actual tool/gauge unknown."
+z_offset_mm = 0.0
+paper_mm = 0.0
+before_ops = [70]
+[[setups.zero.tool_touches]]
+tool = "unknown"
+z_face = "head"
+method = "measure_then_set"
+z_gauge = "unknown"
+z_measure = "M = independently remeasured actual signed head-top height from the same calibrated seated B reference after preceding cuts; qualify a new intact full-tool-footprint patch outside all spots/holes/counterbores and touch that same patch before op80. Never nominal94.742 or inherited tool length. STOP if actual patch/reference/calibration/access unqualified; actual tool/gauge unknown."
+z_offset_mm = 0.0
+paper_mm = 0.0
+before_ops = [80]
+[[setups.zero.tool_touches]]
+tool = "unknown"
+z_face = "head"
+method = "measure_then_set"
+z_gauge = "unknown"
+z_measure = "M = independently remeasured actual signed head-top height from the same calibrated seated B reference after preceding cuts; qualify a new intact full-tool-footprint patch outside all spots/holes/counterbores and touch that same patch before op90. Never nominal94.742 or inherited tool length. STOP if actual patch/reference/calibration/access unqualified; actual tool/gauge unknown."
+z_offset_mm = 0.0
+paper_mm = 0.0
+before_ops = [90]
+[[setups.zero.tool_touches]]
+tool = "unknown"
+z_face = "head"
+method = "measure_then_set"
+z_gauge = "unknown"
+z_measure = "M = independently remeasured actual signed head-top height from the same calibrated seated B reference after preceding cuts; qualify a new intact full-tool-footprint patch outside all spots/holes/counterbores and touch that same patch before op100. Never nominal94.742 or inherited tool length. STOP if actual patch/reference/calibration/access unqualified; actual tool/gauge unknown."
+z_offset_mm = 0.0
+paper_mm = 0.0
+before_ops = [100]
+[[setups.zero.tool_touches]]
+tool = "unknown"
+z_face = "head"
+method = "measure_then_set"
+z_gauge = "unknown"
+z_measure = "M = independently remeasured actual signed head-top height from the same calibrated seated B reference after preceding cuts; qualify a new intact full-tool-footprint patch outside all spots/holes/counterbores and touch that same patch before op110. Never nominal94.742 or inherited tool length. STOP if actual patch/reference/calibration/access unqualified; actual tool/gauge unknown."
+z_offset_mm = 0.0
+paper_mm = 0.0
+before_ops = [110]
 [[setups.ops]]
 op = 10
 do = "face"
@@ -618,7 +676,7 @@ dia = "unknown"
 thru = "unknown"
 [setups.ops.inspection_methods]
 dia = "Proposed short-contact expanding TRANSFER gauge, lock expansion at depth, withdraw/measure contacts, repeat depths/directions. No direct-reading feature invented. Actual gauge/calibration/uncertainty and results unknown; printed7.14248..7.24408, guard derived only from actual capability."
-thru = "Proposed full unexpanded-mandrel pass and clear-exit examination; actual gauge/access/results unknown."
+thru = "HOLD: existing expanding7.14..7.25 pilot/Ø8 external-stem device is a mouth/centering transfer only;8mm stem/62mm length cannot prove full passage of approximately94.742mm column. Compatible qualified full-through method and clear-exit evidence unresolved; no new gauge or qualified CMM method asserted."
 [[setups.ops]]
 op = 80
 do = "counterbore"
@@ -626,7 +684,7 @@ feature = "mount_west_counterbore"
 tool = "unknown"
 holder = "unknown"
 depth_mm = 6.0198
-note = "AUTHOR'S CHOICE: retainX-12.954,Y0; proposed piloted flat counterboreØ11.50, pilot must fit ACTUAL hole. Printed11.176..11.684, not undersize7/16 endmill. Flat floorM2Z88.7222 from top94.742; actual cutter geometry/depth stop/cutting settings unknown."
+note = "AUTHOR'S CHOICE: retainX-12.954,Y0; proposed piloted flat counterboreØ11.50, pilot must fit ACTUAL hole. Printed11.176..11.684, not undersize7/16 endmill. Independently measure/touch qualified intact head-top patch from calibrated seated B as op80 retouch, never nominal94.742 as reading. Flat-floor88.7222 is candidate target, not attained surface. Actual cutter geometry/depth stop/cutting settings unknown."
 [setups.ops.checks]
 dia = "unknown"
 depth = "unknown"
@@ -655,7 +713,7 @@ dia = "unknown"
 thru = "unknown"
 [setups.ops.inspection_methods]
 dia = "Proposed repeated locked-transfer comparison aswest, printed7.14248..7.24408; actual capability/results unknown."
-thru = "Proposed full passage/clear-exit inspection; gauge/results unknown."
+thru = "HOLD: existing short expanding-pilot mouth/centering transfer only; compatible full-through method for approximately94.742mm column and clear-exit evidence unresolved. No fictional new gauge."
 [[setups.ops]]
 op = 110
 do = "counterbore"
@@ -710,11 +768,12 @@ tool = "unknown"
 check_jog_mm = 10.0
 [setups.zero.y]
 feature = "foot_seat"
-edge_mm = 0.0
+edge_mm = "unknown"
 from = "indicated"
 method = "indicate_axis"
 tool = "unknown"
 check_jog_mm = 10.0
+procedure = "PICKUP HOLD: qualified B-button-plane-to-machine-Y transfer, accessible actual contact, gauge offset/sign/calibration and post-clamp seating check missing; seated B plane is not an axis/crest. Preserve target frame; no nominal readings, plane crest or future-bore sweep."
 [setups.zero.z]
 face = "body"
 edge_mm = "unknown"
@@ -767,7 +826,7 @@ tool = "unknown"
 holder = "unknown"
 to_z = 21.5
 rough_allowance_mm = 1.0
-direction = "climb"
+direction = "conventional"
 rpm = "unknown"
 feed_mm_min = "unknown"
 doc_mm = "unknown"
@@ -783,7 +842,7 @@ tool = "unknown"
 holder = "unknown"
 to_z = 21.5
 rough_allowance_mm = 0.15
-direction = "climb"
+direction = "conventional"
 rpm = "unknown"
 feed_mm_min = "unknown"
 doc_mm = "unknown"
@@ -977,11 +1036,12 @@ tool = "unknown"
 check_jog_mm = 10.0
 [setups.zero.y]
 feature = "foot_seat"
-edge_mm = 0.0
+edge_mm = "unknown"
 from = "indicated"
 method = "indicate_axis"
 tool = "unknown"
 check_jog_mm = 10.0
+procedure = "PICKUP HOLD: after stopped-spindle reversal, qualified seated B-button-plane-to-machine-Y transfer, accessible contact, gauge offset/sign/calibration and post-clamp seating check missing; B plane is not a crest. Preserve target frame; no nominal readings, plane crest or future-bore sweep."
 [setups.zero.z]
 face = "body"
 edge_mm = "unknown"
@@ -1009,7 +1069,7 @@ ae_mm = "unknown"
 approach_mm = 5.0
 contour = { method = "linear_table", step_mm = 8.0, open_side = "+y", sweep_frame = "PR2", sweep_bounds = { x = [-25.4, 25.4], y = [68.072, 94.742], z = [21.5753, 24.0] } }
 stock_removal_bounds = { x = [-25.4, 25.4], y = [58.547, 94.742], z = [21.5753, 24.0] }
-note = "AUTHOR'S CHOICE nominal proposal for a proposed Ø19.05 corner-R0.127 flat end; actual tool, holder, speeds/feeds, fixture, pose and gauge unknown, recompute rows/levels if different. Face model-Z side of the head band from raw setupZ24.0 to the crank north-cap allowance plane setupZ21.5753 (2 levels); body/head lie below (R<=21.336). C4 local thickness 72.4344 = 50.8591-(-21.5753) counts from this plane and S2B:10."
+note = "AUTHOR'S CHOICE nominal proposal for a proposed Ø19.05 corner-R0.127 flat end; actual tool, holder, speeds/feeds, fixture, pose and gauge unknown, recompute rows/levels if different. Face model-Z side of the head band from raw setupZ24.0 to the crank north-cap allowance plane setupZ21.5753 (2 levels); body/head lie below (R<=21.336). C4 setup-entry span 72.4344 = 50.8591-(-21.5753) counts from this plane and S2B:10; after S4:5 near-facing, the hole operations consume the 72.2344 design span."
 [[setups.ops]]
 op = 50
 do = "profile"
@@ -1192,7 +1252,7 @@ pose = { origin_mm = [0.0, 20.0, 0.0], x = [0.0, 0.0, 1.0], z = [0.0, 1.0, 0.0] 
 jaw_clock_deg = 45.0
 stop = "Jaw faces at modelY20 (jaw depth20 spans Y0..20); clean, square chuck front face bears on B at Y0. Qualify face cleanliness/squareness and B contact before tightening."
 clamp = "AUTHOR'S CHOICE Tighten the independent jaws a little at a time while indicating the Y0..20 band and a second DTI station atY63.0 on the S1 Y59..67.4 Ø41.91 band (the 20mm grip alone cannot show tilt). Align the head axis to table Y travel with a DTI sweep along the Y59..67.4 band top and side. Work overhangs to Y94.742, cutting 5..75mm beyond the jaws on a 20mm grip with no tailstock (head top carries only off-axis mount holes): light layers only, re-indicate after each layer set; stop on movement."
-note = "AUTHOR'S CHOICE Swing about the head axis: crank tip ~R52, chuck R63.5, both below centre height100. Chuck body/jaws turn with the work; head body stays put. Proposed dividing-head worm backlash, locking, hand-crank feed control and torque are unqualified. Actual dividing head, chuck, tools, settings and fixtures unknown."
+note = "AUTHOR'S CHOICE Swing about head axis: crank tip~R52,chuckR63.5 below centre height100. Chuck body/jaws rotate,head body fixed. PROCESS-CHOICE HOLD: proposed35mm projection Ø6.35 tool (~5.5D) and five-layer0.409 candidate unqualified; over4D heuristic recursively halves AUTHORED DOC, not an absolute verified physical limit. No replacement layer sequence is authored/approved by halving; neither recipe executes without coherent physical qualification. At TDC depth is axial to cutter/spindleZ AND radial into work; head-axis axial bands differ from cutter-centre stations. Stock/motion proof, actual equipment/settings/load/backlash/locking/feed/torque remain UNKNOWN."
 [setups.hold.index]
 fixture = "unknown"
 rotation = "continuous"
@@ -1210,11 +1270,12 @@ tool = "unknown"
 check_jog_mm = 10.0
 [setups.zero.y]
 feature = "foot_seat"
-edge_mm = 0.0
+edge_mm = "unknown"
 from = "indicated"
 method = "indicate_axis"
 tool = "unknown"
 check_jog_mm = 10.0
+procedure = "PICKUP HOLD: qualified actual seated chuck/B-plane-to-machine-Y transfer missing; establish actual face squareness/axial seating, accessible contact and calibrated gauge offset/sign, then post-clamp recheck. Preserve target frame; no nominal readings, plane crest or future-bore sweep."
 [setups.zero.z]
 face = "body"
 edge_mm = "unknown"
@@ -1868,18 +1929,20 @@ gauge = "unknown"
 runout_limit_mm = "unknown"
 [setups.zero.x]
 feature = "journal_axis"
-edge_mm = 0.0
+edge_mm = "unknown"
 from = "indicated"
 method = "indicate_axis"
 tool = "unknown"
 check_jog_mm = 10.0
+procedure = "PICKUP HOLD: no journal bore exists yet. Missing qualified existing lower-body/B-to-target-J3-axis transfer including yaw, transverse offsets and actual fixture-reference calibration. Named unqualified master/source coordinates are not observed bore/axis. Preserve J3; no future-bore sweep or nominal reading."
 [setups.zero.y]
 feature = "journal_axis"
-edge_mm = 0.0
+edge_mm = "unknown"
 from = "indicated"
 method = "indicate_axis"
 tool = "unknown"
 check_jog_mm = 10.0
+procedure = "PICKUP HOLD: same unqualified existing lower-body/B-to-target-J3-axis transfer as X, including yaw/transverse offsets and actual fixture-reference calibration. No journal bore exists; preserve target frame, no future-bore sweep or nominal reading."
 [setups.zero.z]
 face = "cone_boss_north_face"
 edge_mm = "unknown"
@@ -1990,8 +2053,9 @@ deburr_cite = ["AUTHOR'S CHOICE", "harmonic-analyzer/cad/config/title_block.yaml
 [setups.stock_state]
 top_z = 0.2
 bottom_z = -72.2344
+note = "SETUP-ENTRY design only: top+.2, far face-72.2344,total72.4344. S4:5 removes near.2 toZ0; BEFORE drill/bore design entryZ0, far face-72.2344, thickness72.2344. local_thickness describes this consuming-operation span, not setup-entry total. Actual arriving/after stock and independent far-face bounds UNKNOWN/HOLD; commands do not prove stock or breakthrough."
 [setups.stock_state.local_thickness]
-crank_bore = 72.4344
+crank_bore = 72.2344
 [setups.hold]
 fixed_jaw = "not_applicable" # proposed A/B-located body cradle
 fixture = "unknown"
@@ -2022,13 +2086,52 @@ tool = "unknown"
 check_jog_mm = 10.0
 [setups.zero.z]
 face = "crank_boss_faces"
-edge_mm = 0.2
+edge_mm = "unknown"
 from = "+z"
-method = "touch_then_set"
+method = "measure_then_set"
+gauge = "unknown"
+measure = "M_C4=-modelZ, actual signed station along setup+Z=-modelZ from the qualified body-centre master; AxisSet=M_C4-21.3753+signedPaper. Independently block-compare actual raw patch, never nominal allowance. Design M21.5753 givesZ+.2 and M21.3753 givesZ0, not observations. STOP if actual master transfer/contact/calibration unqualified; actual gauge/tool unknown."
+offset_mm = -21.3753
 tool = "unknown"
 paper_mm = 0.0
 check_jog_mm = 10.0
 retouch_after = []
+[[setups.zero.tool_touches]]
+tool = "unknown"
+z_face = "crank_boss_faces"
+method = "measure_then_set"
+z_gauge = "unknown"
+z_measure = "M_C4=-modelZ, independently measured actual signed station along setup+Z from qualified body-centre master after preceding cuts, on qualified intact annular contact outside spot/hole. AxisSet=M_C4-21.3753+signedPaper. STOP if contact/reference/calibration unqualified; no nominal readings or inherited tool length. For hone independently transfer both measured mouths to physical stroke marks. Actual tool/gauge unknown."
+z_offset_mm = -21.3753
+paper_mm = 0.0
+before_ops = [10]
+[[setups.zero.tool_touches]]
+tool = "unknown"
+z_face = "crank_boss_faces"
+method = "measure_then_set"
+z_gauge = "unknown"
+z_measure = "M_C4=-modelZ, independently measured actual signed station along setup+Z from qualified body-centre master after preceding cuts, on qualified intact annular contact outside spot/hole. AxisSet=M_C4-21.3753+signedPaper. STOP if contact/reference/calibration unqualified; no nominal readings or inherited tool length. For hone independently transfer both measured mouths to physical stroke marks. Actual tool/gauge unknown."
+z_offset_mm = -21.3753
+paper_mm = 0.0
+before_ops = [20]
+[[setups.zero.tool_touches]]
+tool = "unknown"
+z_face = "crank_boss_faces"
+method = "measure_then_set"
+z_gauge = "unknown"
+z_measure = "M_C4=-modelZ, independently measured actual signed station along setup+Z from qualified body-centre master after preceding cuts, on qualified intact annular contact outside spot/hole. AxisSet=M_C4-21.3753+signedPaper. STOP if contact/reference/calibration unqualified; no nominal readings or inherited tool length. For hone independently transfer both measured mouths to physical stroke marks. Actual tool/gauge unknown."
+z_offset_mm = -21.3753
+paper_mm = 0.0
+before_ops = [30]
+[[setups.zero.tool_touches]]
+tool = "unknown"
+z_face = "crank_boss_faces"
+method = "measure_then_set"
+z_gauge = "unknown"
+z_measure = "M_C4=-modelZ, independently measured actual signed station along setup+Z from qualified body-centre master after preceding cuts, on qualified intact annular contact outside spot/hole. AxisSet=M_C4-21.3753+signedPaper. STOP if contact/reference/calibration unqualified; no nominal readings or inherited tool length. For hone independently transfer both measured mouths to physical stroke marks. Actual tool/gauge unknown."
+z_offset_mm = -21.3753
+paper_mm = 0.0
+before_ops = [40]
 [[setups.ops]]
 op = 5
 do = "face"
@@ -2054,7 +2157,8 @@ feature = "crank_bore"
 tool = "unknown"
 holder = "unknown"
 exit_mm = 0.5
-note = "AUTHOR'S CHOICE proposed11.2 pilot/118deg point: far allowanceC4Z-72.2344 plus point3.365+.5exit givesnominaltip-76.0994. Actual tool/point angle/flute/projection/holder/quill must exceed actual recomputed plunge plus clearance; no demo94flute/121projection adopted as fact. Qualified peck/evacuation/cutting settings unknown."
+to_z = -76.100 # explicit commanded tip, conservative .005 grid
+note = "AUTHOR'S CHOICE: selected post-near-face design far face-72.2344, not-72.4344. Source illustrative D11.2/118deg point gives11.2/(2tan59deg)=3.3648194665543376; exact tip minimum=-76.09921946655435 including.5exit. COMMAND to_z=-76.100 conservatively on.005 grid. Actual D/point/flutes/projection/holder/quill and actual far face/exit space must be independently qualified; stock/breakthrough remain UNKNOWN/HOLD. Source94flute/121projection are illustrative, not actual tool facts."
 [[setups.ops]]
 op = 30
 do = "bore"
@@ -2064,6 +2168,7 @@ holder = "unknown"
 direction = "negative_setup_z"
 exit_mm = 0.5
 to_dia = 11.431
+to_z = -72.735 # commanded boring edge; exact design minimum -72.2344-.5=-72.7344
 note = "AUTHOR'S CHOICE: single-ended through boring on SAME common boss/bore/cap axis. Proposed actual prehone11.431 leaves.00535diameter to11.43635 midpoint. Require bar head below11.2 pilot, pointreach>=72.2344+.5exit plus actual clearance; long slender bar stiffness/chatter/deflection must be qualified. Actual tool/shank/head/projection/holder/quill/cutting data unknown; no copied82mm reach proof or two-ended meeting bore."
 [[setups.ops]]
 op = 40
@@ -2231,9 +2336,12 @@ tool = "unknown"
 check_jog_mm = 10.0
 [setups.zero.z]
 face = "crank_boss_faces"
-edge_mm = 0.2
+edge_mm = "unknown"
 from = "+z"
-method = "touch_then_set"
+method = "measure_then_set"
+gauge = "unknown"
+measure = "M_CR=+modelZ, actual signed station along setup+Z=+modelZ from qualified body-centre master; AxisSet=M_CR-50.6591+signedPaper. Independently block-compare actual far-cap patch. Design M50.8591 givesZ+.2 and M50.6591 givesZ0, not measurements. STOP if actual master transfer/contact/calibration unqualified; actual gauge/tool unknown."
+offset_mm = -50.6591
 tool = "unknown"
 paper_mm = 0.0
 check_jog_mm = 10.0

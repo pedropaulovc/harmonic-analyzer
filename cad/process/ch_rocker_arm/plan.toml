@@ -39,7 +39,7 @@ material_verify = true
 on_hand = false
 as_is_faces = []
 prerequisite = "Confirm receipt, grade and actual section before sawing: OM4807 1/8 x 1-1/2 in flat for each strap, and ordered OM4793 1/2 in 1018 round for each hub. Catalogue nominal is not an on-hand measurement. Saw strap blanks 354 mm long and hub blanks 42 mm long; remove saw burrs. Use the bandsaw and blade only after stock section, tooth engagement, speed and holding are confirmed."
-note = "ONE combined route, two material-disjoint branches. H1 makes the hub supply; P1/P1E/P2/P2E complete both entire blank planes before P3 squares the strap blank; T1 makes the socket and waste locating holes; R1/R2 rough, T2/T3 finish the arcs on the extant oblique trammel; T4A/T4B/T4C/T4 clock and mill lands/tapers and remove waste; J1 presses; F1/F2 finish the joined hub and bore; D1 drills the rod hole; I1/B1 inspect and finish. No separately imported component bundles. Raw longitudinal strap edges remain scrap, not claimed finished/as-is faces. Actual HA inventory identity and measurement provenance govern; this held proposal does not establish shop capability."
+note = "ONE combined route, two material-disjoint branches. H1 plans hub manufacture with a partial powered parting cut and an explicit held, unmodeled manual-sever handoff; it does not establish a completed separated component. P1/P1E/P2/P2E complete both entire blank planes before P3 squares the strap blank; T1 makes the socket and waste locating holes; R1/R2 rough, T2/T3 finish the arcs on the extant oblique trammel; T4A/T4B/T4C/T4 clock and mill lands/tapers and remove waste; J1 presses; F1/F2 finish the joined hub and bore; D1 drills the rod hole; I1/B1 inspect and finish. No separately imported component bundles. Raw longitudinal strap edges remain scrap, not claimed finished/as-is faces. Actual HA inventory identity and measurement provenance govern; this held proposal does not establish shop capability."
 cite = ["AUTHOR'S CHOICE: illustrative process proposal; not a measurement or approval", "harmonic-analyzer/cad/scripts/ch_rocker_hub_spec.py:1-70", "harmonic-analyzer/cad/scripts/ch_rocker_strap_spec.py:1-97", "harmonic-analyzer/cad/process/shop/inventory.toml:6480-6489,6687-6694"]
 
 [[stock.components]]
@@ -243,7 +243,7 @@ depth = 12.0
 thru = false
 requirements = ["dia"]
 precision = { "dia" = 4 }
-note = "Letter-D supply drilling: full-diameter10mm depth leaves the separated8.50mm supply through. The12mm transient blind-depth guard includes the1.87721mm118deg drill point, not12mm of full-diameter bore; it ends in sacrificial bar ahead of the nominal chuck front at supply Z-15. Confirm actual point, stickout and jaw clearance. This preparation is NOT a press interface or final pivot-bore credit. Supply .246 DRILLED +.004/0; postpress ream remains mandatory."
+note = "Letter-D supply drilling: full-diameter10mm depth leaves the separated8.50mm supply through. The12mm transient blind-depth guard includes the1.87721mm118deg drill point, not12mm of full-diameter bore; it ends in sacrificial bar ahead of the nominal chuck front at supply Z-15. Confirm actual point, stickout and jaw clearance. This preparation is NOT a press interface or final pivot-bore credit. Supply 0.246 in DRILLED +.004/0; postpress ream remains mandatory."
 cite = ["AUTHOR'S CHOICE: illustrative process proposal; not a measurement or approval", "harmonic-analyzer/cad/scripts/ch_rocker_hub_spec.py:43-49"]
 
 # H1 — Manufacture MHA-CH-12 hub supply from ordered1/2in1018 round; not from finished purchased hub.
@@ -268,8 +268,8 @@ parallels = "not_applicable"
 jaw_above_parallels_mm = "not_applicable"
 pose = "unknown"
 jaw_clock_deg = "unknown"
-stop = "Rule-set17mm raw stickout; confirm actual blank length42 before this authored grip."
-clamp = "Tighten chuck pinions and remove key; indicate raw OD. HOLD actual sleeve-capture/support arrangement. Proposed catch tray clear below cut: stop spindle before final breakthrough, isolate and sever thin remaining web by hand; never reach into rotating chuck or use a captive mandrel."
+stop = "Rule-set17mm raw stickout; confirm actual blank length42 before clamping the last 25 mm of raw bar."
+clamp = "Tighten chuck pinions and remove key; indicate raw OD. The powered cut in op 70 must leave its declared web. Stop and isolate the spindle and withdraw the blade before op 80. HOLD the actual manual cutting tool, non-damaging sleeve retention, catch-tray placement and hand access until qualified; never reach into rotating work or use a captive mandrel."
 
 [setups.stock_state]
 od_mm = 12.7
@@ -367,16 +367,16 @@ tool = "drill-index-115/D"
 holder = "drill-chuck-tailstock-mt3"
 depth_mm = 10.0
 feed_mm_rev = 0.08
-note = "Full diameter to 10 mm; 118 deg letter-D point reaches 11.87721 mm within the 12 mm guard, beyond the 8.50 mm kept sleeve but ahead of the nominal chuck front at 15 mm. Confirm actual point/reach and chuck clearance. Never call this under-size supply bore final datum A."
+note = "Full-diameter DEPTH 10 mm (supply bore 0.246 in); 118 deg letter-D point reaches 11.87721 mm within the 12 mm guard, beyond the 8.50 mm kept sleeve but ahead of the nominal chuck front at 15 mm. Confirm actual point/reach and chuck clearance. Never call this under-size supply bore final datum A."
 checks = { "dia" = "unknown" }
-inspection_methods = { "dia" = "After separation, gauge supply bore6.2484–6.3500 through the full8.50mm; establish the actual plug/bore-gauge capability before machining." }
+inspection_methods = { "dia" = "HOLD actual bore-gauge capability, access and uncertainty. Before partial parting, check the accessible mouth and bore at depths spanning the future supply length in two directions within 6.2484–6.3500 including uncertainty; do not infer bore size from the drill. The rear opening does not yet exist. Repeat the complete two-mouth check in op 90 only after the held manual-sever handoff." }
 
 [[setups.ops]]
 op = 60
 do = "inspect"
 feature = "hub_land"
 checks = { "dia" = "unknown" }
-inspection_note = "Record land sizes and verify planned supply length8.50 >=8.128mm (.32 MIN), with stock at both final faces. Supply wall from smallest land/largest supply bore is at least1.91643mm before final ream. Reject taper, scored land or out-of-band bore; retain lot identification."
+inspection_note = "Record land sizes and verify the planned supply window 8.50 >=8.128 mm (.32 MIN), with stock at both final faces. This is a pre-cut window check, not a completed-length measurement. Supply wall from smallest land/largest supply bore is at least 1.91643 mm before final ream. Reject taper, scored land or out-of-band bore; retain lot identification. Actual separated length and both bore openings are checked in op 90 after qualified manual separation."
 inspection_methods = { "dia" = "Repeat the qualified land diameter check after cooling and before part-off. No caliper substitution for the .0004in supply band." }
 
 [[setups.ops]]
@@ -386,10 +386,29 @@ feature = "hub_supply_parting"
 tool = "parting-blade-lms-1728"
 holder = "qctp-axa-lms-2280/7-parting"
 to_z = -8.5
+# AUTHOR'S CHOICE: maximum supply bore 6.35 + twice a nominal 0.25 mm radial web.
+# Actual outside/bore sizes and stop-setting uncertainty remain qualification HOLDs.
+to_dia = 6.85
 feed_mm_rev = 0.025
 doc_mm = 0.1
 direction = "toward_axis"
-note = "The tailstock-side blade edge forms the kept supply end at Z -8.50; blade width lies toward the chuck. The front-face paper touch sets the chuck-side edge, so use the derived width-compensated DRO target, not -8.50 as the chuck-side reading. Qualify actual blade width and measure the finished land for the explicit X paper pickup. HOLD actual positive sleeve capture/support. Proposed noncontact tray below cut; stop with a thin web, isolate, sever web by hand and retrieve. Stone sacrificial parted end only. Supply end is not final hub length."
+note = "The tailstock-side blade edge locates the proposed kept-end cut at Z -8.50; blade width lies toward the chuck. The front-face paper touch sets the chuck-side edge, so use the derived width-compensated DRO target, not -8.50 as the chuck-side reading. Qualify actual blade width and measure the finished land for the explicit X paper pickup. The stop diameter is an author-selected process choice: maximum supply bore 6.35 plus twice a nominal 0.25 mm radial web, not a CAD dimension or a measured web. HOLD actual outside/bore sizes, stop-setting uncertainty, capture and access. Stop powered feed at the declared diameter; do not continue to X0 or claim a separated sleeve. Stop and isolate the spindle, withdraw the blade and retain the raw bar in the chuck for the separate held handoff."
+
+[[setups.ops]]
+op = 80
+do = "manual_sever"
+feature = "hub_supply_parting"
+tool = "unknown"
+note = "HOLD — UNMODELED MATERIAL CHANGE. The intended handoff is to sever the residual web only with the spindle stopped and isolated, the powered blade withdrawn and the raw bar still securely chuck-held. Before any hand cutting, qualify the actual manual cutting tool, non-damaging retention of the prospective sleeve, catch-tray placement and hand access. Do not improvise with fingers near a powered chuck, a captive mandrel, or twisting the finished press land. If those prerequisites are met, sever only the remaining sacrificial web, control the stationary sleeve and remove it after separation; dress only the sacrificial parted end without shortening below the supply minimum. No manual removal, separation, finished face or resulting-stock geometry is established by this plan. Downstream joining remains HOLD; the inspection below is a planned check, not a material-state receipt."
+note_cite = ["AUTHOR'S CHOICE: explicitly held manual-separation handoff after a partial powered cut; not a physical qualification or CAD requirement", "harmonic-analyzer/cad/scripts/ch_rocker_hub_spec.py:51-64"]
+
+[[setups.ops]]
+op = 90
+do = "inspect"
+feature = ["hub_land", "hub_supply_bore"]
+checks = { "hub_land" = { "dia" = "unknown" }, "hub_supply_bore" = { "dia" = "unknown" } }
+inspection_methods = { "hub_land" = { "dia" = "HOLD qualified actual outside metrology. After qualified manual separation, repeat both ends/middle in two directions; uncertainty must fit within 10.18286–10.19302. Reject manual-cut damage or distortion; no actual reading is recorded." }, "hub_supply_bore" = { "dia" = "HOLD qualified actual bore metrology. After qualified separation, check both now-accessible mouths and the middle over the entire actual sleeve length in two directions within 6.2484–6.3500 including uncertainty; confirm unobstructed openings without burrs. Instrument selection is not a passing part result." } }
+inspection_note = "Record actual separated supply length at least 8.128 mm (.32 MIN), sufficient stock at both later finished hub faces, and repeated land/bore readings. The nominal 8.50 mm window is not a measured length. These planned inspections do not establish the unmodeled resulting stock or authorize pressing; retain the manual-handoff and downstream HOLDs."
 
 # P1 — Face +Z broad face to strap datum B; raw long edges are waste.
 [[setups]]
@@ -397,7 +416,7 @@ id = "P1"
 machine = "PM-30MV"
 frame = "STRAP_UP"
 stock_in = "stock.strap"
-note = "Face +Z broad face to strap datum B; raw long edges are waste."
+note = "Face +Z broad face to strap datum B; raw long edges are waste. The 0.1 mm edge-break cap is an intermediate process cap, not the CAD 0.254 mm maximum retained at B1; preserve sharp socket mouths and the sharp press-joint root."
 coolant = "cutting_oil_brush" # Mechanical clamps, not an adhesive hold.
 deburr_mm = 0.1
 
@@ -417,6 +436,7 @@ top_z = 0.3429
 bottom_z = -2.8321
 
 [setups.zero.x]
+procedure = "Use selected edge-finder on the named edge from the declared side. At contact, Axis Set equals edge coordinate -177.0 mm plus the signed actual finder radius (negative for the declared negative-side touch). Retract clear, take up backlash and check a +10.0 mm work-coordinate jog increases the reading by 10.0 mm. Verify controller direction; table-feed sign is not inferred. Use the existing controller-grid setting/residual handling; if it cannot establish this pickup, HOLD, do not round the edge geometry."
 edge = "raw sawn left end before end squaring; author nominal 2 mm beyond final blank end"
 edge_mm = -177.0
 from = "-x"
@@ -424,6 +444,7 @@ tool = "edge-finder"
 check_jog_mm = 10.0
 
 [setups.zero.y]
+procedure = "Use selected edge-finder on the named edge from the declared side. At contact, Axis Set equals edge coordinate -12.402679940547772 mm plus the signed actual finder radius (negative for the declared negative-side touch). Retract clear, take up backlash and check a +5.0 mm work-coordinate jog increases the reading by 5.0 mm. Verify controller direction; table-feed sign is not inferred. Use the existing controller-grid setting/residual handling; if it cannot establish this pickup, HOLD, do not round the edge geometry."
 edge = "raw near long edge; verify actual overhang before setting the nominal centre"
 edge_mm = -12.402679940547772
 from = "-y"
@@ -431,6 +452,7 @@ tool = "edge-finder"
 check_jog_mm = 5.0
 
 [setups.zero.z]
+procedure = "With spindle isolated use selected endmills-lms-6784/1-4in-4fl and the specified 0.05 mm paper on the named face. Axis Set is the face coordinate plus 0.05 mm; after a safe +5.0 mm work-coordinate check jog the reading must increase by 5.0 mm, with controller direction verified. The proposed incoming top is Z0.3429: nominal paper contact is Z0.3929 and the +5 mm check is Z5.3929, not finished-face zero. Use existing controller-grid setting/residual handling; an unrepresentable setting or unqualified face remains HOLD, not permission to round geometry."
 from = "+z"
 face = "top"
 method = "paper"
@@ -461,7 +483,7 @@ id = "P1E"
 machine = "PM-30MV"
 frame = "STRAP_UP"
 stock_in = "P1"
-note = "Finish sacrificial upper ears while raw underside remains flat; every final B face was already faced in P1."
+note = "Finish sacrificial upper ears while raw underside remains flat; every final B face was already faced in P1. The 0.1 mm edge-break cap is an intermediate process cap, not the CAD 0.254 mm maximum retained at B1; preserve sharp socket mouths and the sharp press-joint root."
 coolant = "cutting_oil_brush"
 deburr_mm = 0.1
 
@@ -473,7 +495,7 @@ support = "unknown"
 grip_mm = "unknown"
 stop = "unknown"
 clamp = "unknown"
-note = "HOLD: same continuous raw-underside seat as P1. With spindle isolated establish two supported central press clamps on finished B (proposed X+/-80) BEFORE removing either end clamp. Actual clamp geometry, pose, torque and cutter clearance unknown. Recover raw end/edge pickups; finish both upper ears coplanar with central B before reversal, without forcing bow flat."
+note = "HOLD: same continuous raw-underside seat as P1. With spindle isolated establish two supported central press clamps on finished B (proposed X+/-80) BEFORE removing either end clamp. Actual clamp geometry, pose, torque and cutter clearance unknown. Recover raw end/edge pickups; finish both upper ears coplanar with central B before reversal, without forcing bow flat. For the proposed seat only, fixture-local Z0 would map to setup Z-2.8321 and finished central B to setup Z0; this does not establish an actual fixture pose."
 clamps = [{ ref = "unknown", pose = "unknown", restraint = "press", torque_nm = "unknown", note = "Required central transfer press clamp; establish before removing end restraint." }, { ref = "unknown", pose = "unknown", restraint = "press", torque_nm = "unknown", note = "Required central transfer press clamp; establish before removing end restraint." }]
 
 [setups.stock_state]
@@ -481,6 +503,7 @@ top_z = 0.3429
 bottom_z = -2.8321
 
 [setups.zero.x]
+procedure = "Use selected edge-finder on the named edge from the declared side. At contact, Axis Set equals edge coordinate -177.0 mm plus the signed actual finder radius (negative for the declared negative-side touch). Retract clear, take up backlash and check a +10.0 mm work-coordinate jog increases the reading by 10.0 mm. Verify controller direction; table-feed sign is not inferred. Use the existing controller-grid setting/residual handling; if it cannot establish this pickup, HOLD, do not round the edge geometry."
 edge = "raw sawn left end"
 edge_mm = -177.0
 from = "-x"
@@ -488,6 +511,7 @@ tool = "edge-finder"
 check_jog_mm = 10.0
 
 [setups.zero.y]
+procedure = "Use selected edge-finder on the named edge from the declared side. At contact, Axis Set equals edge coordinate -12.402679940547772 mm plus the signed actual finder radius (negative for the declared negative-side touch). Retract clear, take up backlash and check a +5.0 mm work-coordinate jog increases the reading by 5.0 mm. Verify controller direction; table-feed sign is not inferred. Use the existing controller-grid setting/residual handling; if it cannot establish this pickup, HOLD, do not round the edge geometry."
 edge = "raw near long edge"
 edge_mm = -12.402679940547772
 from = "-y"
@@ -495,6 +519,7 @@ tool = "edge-finder"
 check_jog_mm = 5.0
 
 [setups.zero.z]
+procedure = "With spindle isolated use endmills-lms-6784/3-8in-4fl and the specified 0.05 mm paper on the clean Z0 face: Axis Set Z+0.05, not zero at paper contact. Retract in +Z, take up backlash and check the +5.0 mm jog reads Z+5.05 mm; verify controller direction before further motion. This paper correction does not establish a second zero."
 face = "strap_datum_b"
 edge_mm = 0.0
 from = "+z"
@@ -540,7 +565,7 @@ id = "P2"
 machine = "PM-30MV"
 frame = "STRAP_DOWN"
 stock_in = "P1E"
-note = "Reverse; finish -Z strap face to .098 +/- .001 in, never re-face after press."
+note = "Reverse; finish -Z strap face to .098 +/- .001 in, never re-face after press. The 0.1 mm edge-break cap is an intermediate process cap, not the CAD 0.254 mm maximum retained at B1; preserve sharp socket mouths and the sharp press-joint root."
 coolant = "cutting_oil_brush" # Mechanical clamps, not an adhesive hold.
 deburr_mm = 0.1
 
@@ -560,6 +585,7 @@ top_z = 0.3429
 bottom_z = -2.4892
 
 [setups.zero.x]
+procedure = "Use selected edge-finder on the named edge from the declared side. At contact, Axis Set equals edge coordinate -177.0 mm plus the signed actual finder radius (negative for the declared negative-side touch). Retract clear, take up backlash and check a +10.0 mm work-coordinate jog increases the reading by 10.0 mm. Verify controller direction; table-feed sign is not inferred. Use the existing controller-grid setting/residual handling; if it cannot establish this pickup, HOLD, do not round the edge geometry."
 edge = "raw sawn left end before end squaring; author nominal 2 mm beyond final blank end"
 edge_mm = -177.0
 from = "-x"
@@ -567,6 +593,7 @@ tool = "edge-finder"
 check_jog_mm = 10.0
 
 [setups.zero.y]
+procedure = "Use selected edge-finder on the named edge from the declared side. At contact, Axis Set equals edge coordinate -25.697320059452225 mm plus the signed actual finder radius (negative for the declared negative-side touch). Retract clear, take up backlash and check a +5.0 mm work-coordinate jog increases the reading by 5.0 mm. Verify controller direction; table-feed sign is not inferred. Use the existing controller-grid setting/residual handling; if it cannot establish this pickup, HOLD, do not round the edge geometry."
 edge = "raw near long edge; verify actual overhang before setting the nominal centre"
 edge_mm = -25.697320059452225
 from = "-y"
@@ -574,6 +601,7 @@ tool = "edge-finder"
 check_jog_mm = 5.0
 
 [setups.zero.z]
+procedure = "With spindle isolated use selected endmills-lms-6784/1-4in-4fl and the specified 0.05 mm paper on the named face. Axis Set is the face coordinate plus 0.05 mm; after a safe +5.0 mm work-coordinate check jog the reading must increase by 5.0 mm, with controller direction verified. Use the actual pre-clamp measured M and the existing signed offset, never a nominal thickness or invented reading. Use existing controller-grid setting/residual handling; an unrepresentable setting or unqualified face remains HOLD, not permission to round geometry."
 from = "+z"
 face = "raw lower face, measured from finished datum B"
 method = "measure_then_set"
@@ -610,7 +638,7 @@ id = "P2E"
 machine = "PM-30MV"
 frame = "STRAP_DOWN"
 stock_in = "P2"
-note = "Finish both lower sacrificial ears so the complete blank is uniform 2.4892 mm before P3 and trammel preparation."
+note = "Finish both lower sacrificial ears so the complete blank is uniform 2.4892 mm before P3 and trammel preparation. The 0.1 mm edge-break cap is an intermediate process cap, not the CAD 0.254 mm maximum retained at B1; preserve sharp socket mouths and the sharp press-joint root."
 coolant = "cutting_oil_brush"
 deburr_mm = 0.1
 
@@ -622,7 +650,7 @@ support = "unknown"
 grip_mm = "unknown"
 stop = "unknown"
 clamp = "unknown"
-note = "HOLD: keep complete upper B face continuously seated. With spindle isolated establish central press restraint on finished lower face (proposed X+/-80) BEFORE removing end clamps. Actual fixture, pose, geometry, torque and clearance unknown. Recover pickups and face both lower ears; verify full uniform 2.4892mm nominal thickness and unforced flat seating before P3."
+note = "HOLD: keep complete upper B face continuously seated. With spindle isolated establish central press restraint on finished lower face (proposed X+/-80) BEFORE removing end clamps. Actual fixture, pose, geometry, torque and clearance unknown. Recover pickups and face both lower ears; verify full uniform 2.4892mm nominal thickness and unforced flat seating before P3. For the proposed seat only, fixture-local Z0 would map to setup Z-2.4892 and the finished lower face to setup Z0; actual installation remains unknown."
 clamps = [{ ref = "unknown", pose = "unknown", restraint = "press", torque_nm = "unknown", note = "Required central transfer press clamp; establish before removing end restraint." }, { ref = "unknown", pose = "unknown", restraint = "press", torque_nm = "unknown", note = "Required central transfer press clamp; establish before removing end restraint." }]
 
 [setups.stock_state]
@@ -630,6 +658,7 @@ top_z = 0.3429
 bottom_z = -2.4892
 
 [setups.zero.x]
+procedure = "Use selected edge-finder on the named edge from the declared side. At contact, Axis Set equals edge coordinate -177.0 mm plus the signed actual finder radius (negative for the declared negative-side touch). Retract clear, take up backlash and check a +10.0 mm work-coordinate jog increases the reading by 10.0 mm. Verify controller direction; table-feed sign is not inferred. Use the existing controller-grid setting/residual handling; if it cannot establish this pickup, HOLD, do not round the edge geometry."
 edge = "raw sawn left end"
 edge_mm = -177.0
 from = "-x"
@@ -637,6 +666,7 @@ tool = "edge-finder"
 check_jog_mm = 10.0
 
 [setups.zero.y]
+procedure = "Use selected edge-finder on the named edge from the declared side. At contact, Axis Set equals edge coordinate -25.697320059452225 mm plus the signed actual finder radius (negative for the declared negative-side touch). Retract clear, take up backlash and check a +5.0 mm work-coordinate jog increases the reading by 5.0 mm. Verify controller direction; table-feed sign is not inferred. Use the existing controller-grid setting/residual handling; if it cannot establish this pickup, HOLD, do not round the edge geometry."
 edge = "raw near long edge"
 edge_mm = -25.697320059452225
 from = "-y"
@@ -644,6 +674,7 @@ tool = "edge-finder"
 check_jog_mm = 5.0
 
 [setups.zero.z]
+procedure = "With spindle isolated use endmills-lms-6784/3-8in-4fl and the specified 0.05 mm paper on the clean Z0 face: Axis Set Z+0.05, not zero at paper contact. Retract in +Z, take up backlash and check the +5.0 mm jog reads Z+5.05 mm; verify controller direction before further motion. This paper correction does not establish a second zero."
 face = "strap_faces"
 edge_mm = 0.0
 from = "+z"
@@ -691,7 +722,7 @@ id = "P3"
 machine = "PM-30MV"
 frame = "STRAP_END"
 stock_in = "P2E"
-note = "Square sawn ends to 350 mm trammel blank, retaining raw 38.1 mm nominal long edges."
+note = "Square sawn ends to 350 mm trammel blank, retaining raw 38.1 mm nominal long edges. The 0.1 mm edge-break cap is an intermediate process cap, not the CAD 0.254 mm maximum retained at B1; preserve sharp socket mouths and the sharp press-joint root. End names +X/-X refer to the model: STRAP_END reverses both X and Y, so the model +X end is setup X0 and the model -X end is setup X350."
 coolant = "cutting_oil_brush"
 deburr_mm = 0.1
 
@@ -710,6 +741,7 @@ top_z = 0.0
 bottom_z = -2.4892
 
 [setups.zero.x]
+procedure = "Use selected edge-finder on the named edge from the declared side. At contact, Axis Set equals edge coordinate -2.0 mm plus the signed actual finder radius (negative for the declared negative-side touch). Retract clear, take up backlash and check a +10.0 mm work-coordinate jog increases the reading by 10.0 mm. Verify controller direction; table-feed sign is not inferred. Use the existing controller-grid setting/residual handling; if it cannot establish this pickup, HOLD, do not round the edge geometry."
 edge = "raw sawn +X model end; setup X points toward model -X, 2 mm outside the prepared end"
 edge_mm = -2.0
 from = "-x"
@@ -717,6 +749,7 @@ tool = "edge-finder"
 check_jog_mm = 10.0
 
 [setups.zero.y]
+procedure = "Use selected edge-finder on the named edge from the declared side. At contact, Axis Set equals edge coordinate -25.697320059452225 mm plus the signed actual finder radius (negative for the declared negative-side touch). Retract clear, take up backlash and check a +5.0 mm work-coordinate jog increases the reading by 5.0 mm. Verify controller direction; table-feed sign is not inferred. Use the existing controller-grid setting/residual handling; if it cannot establish this pickup, HOLD, do not round the edge geometry."
 edge = "raw near long edge; verify actual overhang before setting the nominal centre"
 edge_mm = -25.697320059452225
 from = "-y"
@@ -724,6 +757,7 @@ tool = "edge-finder"
 check_jog_mm = 5.0
 
 [setups.zero.z]
+procedure = "With spindle isolated use endmills-lms-6784/1-4in-4fl and the specified 0.05 mm paper on the clean Z0 face: Axis Set Z+0.05, not zero at paper contact. Retract in +Z, take up backlash and check the +5.0 mm jog reads Z+5.05 mm; verify controller direction before further motion. This paper correction does not establish a second zero."
 from = "+z"
 face = "top"
 method = "paper"
@@ -760,7 +794,7 @@ feed_mm_min = 60.0
 direction = "conventional"
 stock_removal_bounds = { "x" = [350.0, 352.0], "y" = [-25.697320059452224, 12.402679940547772], "z" = [-2.4892, 0.0] }
 contour = { "method" = "linear_table", "step_mm" = 2.0, "open_side" = "+x" }
-note = "Side-mill opposite end from air with same 1/4 in cutter: final centre X353.175 reaches the -X prepared plane on the 0.005 mm DRO grid without residual skin. Cross full raw width, lift 3 mm above B before each return, step down to Z-2.7. HOLD real support/clamp and sacrificial relief for both projecting ends; verify 350 mm length, squareness and CL/CR support registration. No prepared_blank on built_up root."
+note = "Side-mill opposite end from air with same 1/4 in cutter: final centre X353.175 reaches the -X prepared plane on the 0.005 mm DRO grid without residual skin. Cross full raw width, lift 3 mm above B before each return, step down to Z-2.7. HOLD real support/clamp and sacrificial relief for both projecting ends; verify 350 mm length, squareness and CL/CR support registration. This prepares only the strap component, not the joined hub-and-strap assembly."
 
 # T1 — Prepare actual MHA-CH-13 press socket and CL/CR waste tooling holes before arc cutting.
 [[setups]]
@@ -788,6 +822,7 @@ bottom_z = -2.4892
 local_thickness = { "strap_socket" = 2.4892, "cl_waste" = 2.4892, "cr_waste" = 2.4892 }
 
 [setups.zero.x]
+procedure = "Use selected edge-finder on the named edge from the declared side. At contact, Axis Set equals edge coordinate -175.0 mm plus the signed actual finder radius (negative for the declared negative-side touch). Retract clear, take up backlash and check a +10.0 mm work-coordinate jog increases the reading by 10.0 mm. Verify controller direction; table-feed sign is not inferred. Use the existing controller-grid setting/residual handling; if it cannot establish this pickup, HOLD, do not round the edge geometry."
 edge = "prepared blank left end; indicate locator axis on re-holds instead of assuming repeatability"
 edge_mm = -175.0
 from = "-x"
@@ -795,6 +830,7 @@ tool = "edge-finder"
 check_jog_mm = 10.0
 
 [setups.zero.y]
+procedure = "Use selected edge-finder on the named edge from the declared side. At contact, Axis Set equals edge coordinate -25.697320059452225 mm plus the signed actual finder radius (negative for the declared negative-side touch). Retract clear, take up backlash and check a +5.0 mm work-coordinate jog increases the reading by 5.0 mm. Verify controller direction; table-feed sign is not inferred. Use the existing controller-grid setting/residual handling; if it cannot establish this pickup, HOLD, do not round the edge geometry."
 edge = "raw near long edge; verify actual overhang before setting the nominal centre"
 edge_mm = -25.697320059452225
 from = "-y"
@@ -802,6 +838,7 @@ tool = "edge-finder"
 check_jog_mm = 5.0
 
 [setups.zero.z]
+procedure = "With spindle isolated use selected unknown and the specified 0.05 mm paper on the named face. Axis Set is the face coordinate plus 0.05 mm; after a safe +5.0 mm work-coordinate check jog the reading must increase by 5.0 mm, with controller direction verified. Use existing controller-grid setting/residual handling; an unrepresentable setting or unqualified face remains HOLD, not permission to round geometry."
 from = "+z"
 face = "top"
 method = "paper"
@@ -842,7 +879,7 @@ exit_mm = 1.0
 feed_mm_rev = 0.12
 checks = { "dia" = "unknown" }
 inspection_methods = { "dia" = "HOLD: register the actual .4000in reamer and qualified10.1600–10.1727 socket measurement. Check both mouths and full thickness in two directions. Both mouths SHARP, NO BURR; remove raised burr with flat stone only, never countersink/chamfer." }
-note = "Exact .4000-.4005in socket, completed on strap ancestor before press. Existing6.5mm reamer is not this tool. A named joint is not preparation."
+note = "Exact .4000-.4005in socket, completed on strap ancestor before press. Existing6.5mm reamer is not this tool. Record actual socket preparation before assembly; naming the joint is not evidence of machining."
 
 [[setups.ops]]
 op = 40
@@ -911,7 +948,7 @@ id = "R1"
 machine = "PM-30MV"
 frame = "STRAP_UP"
 stock_in = "T1"
-note = "Rough outside finished top_edge with single-axis DRO stairs, leaving stock for the trammel/manual finish."
+note = "Rough outside finished top_edge with single-axis DRO stairs, leaving stock for the trammel/manual finish. The 0.1 mm edge-break cap is an intermediate process cap, not the CAD 0.254 mm maximum retained at B1; preserve sharp socket mouths and the sharp press-joint root. From T1, rigidly flip the strap 180 degrees about model X from STRAP_DOWN to STRAP_UP: X is unchanged, Y and Z reverse, and datum B is now the exposed top. Re-indicate the socket and tooling line, then recover Z; do not reuse the previous zeros."
 coolant = "cutting_oil_brush"
 deburr_mm = 0.1
 
@@ -931,6 +968,7 @@ top_z = 0.0
 bottom_z = -2.4892
 
 [setups.zero.x]
+procedure = "Use unknown to indicate the named bore centre; Axis Set X to the existing centre coordinate 0.0 mm, not the bore wall. Retract clear, take up backlash and make the +1.0 mm work-coordinate check jog: reading must increase by 1.0 mm. Verify controller direction; table-feed sign is not inferred. Retain HOLD for an unrepresentable setting or unqualified pickup."
 feature = "strap_socket"
 method = "indicate"
 from = "indicated"
@@ -939,6 +977,7 @@ edge_mm = 0.0
 check_jog_mm = 1.0
 
 [setups.zero.y]
+procedure = "Use unknown to indicate the named bore centre; Axis Set Y to the existing centre coordinate 0.0 mm, not the bore wall. Retract clear, take up backlash and make the +1.0 mm work-coordinate check jog: reading must increase by 1.0 mm. Verify controller direction; table-feed sign is not inferred. Retain HOLD for an unrepresentable setting or unqualified pickup."
 feature = "strap_socket"
 method = "indicate"
 from = "indicated"
@@ -947,6 +986,7 @@ edge_mm = 0.0
 check_jog_mm = 1.0
 
 [setups.zero.z]
+procedure = "With spindle isolated use selected endmills-lms-6784/3-8in-4fl and the specified 0.05 mm paper on the named face. Axis Set is the face coordinate plus 0.05 mm; after a safe +5.0 mm work-coordinate check jog the reading must increase by 5.0 mm, with controller direction verified. Use existing controller-grid setting/residual handling; an unrepresentable setting or unqualified face remains HOLD, not permission to round geometry."
 from = "+z"
 face = "top"
 method = "paper"
@@ -983,7 +1023,7 @@ id = "R2"
 machine = "PM-30MV"
 frame = "STRAP_UP"
 stock_in = "R1"
-note = "Rough outside finished profile_outer with single-axis DRO stairs, leaving stock for the trammel/manual finish."
+note = "Rough outside finished profile_outer with single-axis DRO stairs, leaving stock for the trammel/manual finish. The 0.1 mm edge-break cap is an intermediate process cap, not the CAD 0.254 mm maximum retained at B1; preserve sharp socket mouths and the sharp press-joint root."
 coolant = "cutting_oil_brush"
 deburr_mm = 0.1
 
@@ -1003,6 +1043,7 @@ top_z = 0.0
 bottom_z = -2.4892
 
 [setups.zero.x]
+procedure = "Use unknown to indicate the named bore centre; Axis Set X to the existing centre coordinate 0.0 mm, not the bore wall. Retract clear, take up backlash and make the +1.0 mm work-coordinate check jog: reading must increase by 1.0 mm. Verify controller direction; table-feed sign is not inferred. Retain HOLD for an unrepresentable setting or unqualified pickup."
 feature = "strap_socket"
 method = "indicate"
 from = "indicated"
@@ -1011,6 +1052,7 @@ edge_mm = 0.0
 check_jog_mm = 1.0
 
 [setups.zero.y]
+procedure = "Use unknown to indicate the named bore centre; Axis Set Y to the existing centre coordinate 0.0 mm, not the bore wall. Retract clear, take up backlash and make the +1.0 mm work-coordinate check jog: reading must increase by 1.0 mm. Verify controller direction; table-feed sign is not inferred. Retain HOLD for an unrepresentable setting or unqualified pickup."
 feature = "strap_socket"
 method = "indicate"
 from = "indicated"
@@ -1019,6 +1061,7 @@ edge_mm = 0.0
 check_jog_mm = 1.0
 
 [setups.zero.z]
+procedure = "With spindle isolated use selected endmills-lms-6784/3-8in-4fl and the specified 0.05 mm paper on the named face. Axis Set is the face coordinate plus 0.05 mm; after a safe +5.0 mm work-coordinate check jog the reading must increase by 5.0 mm, with controller direction verified. Use existing controller-grid setting/residual handling; an unrepresentable setting or unqualified face remains HOLD, not permission to round geometry."
 from = "+z"
 face = "top"
 method = "paper"
@@ -1049,7 +1092,7 @@ id = "T2"
 machine = "PM-30MV"
 frame = "STRAP_DOWN"
 stock_in = "R2"
-note = "Finish circular edge on extant oblique trammel, dedicated holding state; no rough back-off."
+note = "Finish circular edge on extant oblique trammel, dedicated holding state; no rough back-off. Receive the R2 strap with both CL/CR locating end wastes intact and the upper scrap/clamp removed; recover the existing STRAP_DOWN installation, not a new blank."
 coolant = "cutting_oil_brush"
 deburr_mm = 0.0
 
@@ -1154,7 +1197,7 @@ id = "T4A"
 machine = "PM-30MV"
 frame = "TIP_POS"
 stock_in = "T3"
-note = "PROPOSED single-axis side milling of TIP_POS; no oblique hand-saw clearing-box substitution."
+note = "PROPOSED single-axis side milling of TIP_POS; no oblique hand-saw clearing-box substitution. From T3, rigidly flip 180 degrees about model X to datum B uppermost, then rotate the supported part/cradle about Z into TIP_POS. Recover the socket and exposed-face datum after clocking; no reflection or inherited zero. Rotated stock rectangles are setup-frame bounding envelopes of the same strap, not new rectangular blanks. The lower-rail offcut island lies on the negative-Y side of the tip supporting plane; it is distinct from the positive-Y clearing region. HOLD proof of its actual separation, captured support and cutter clearance before the stated release; do not relocate the scrap kit or infer separation from the clearing bounds. HA fixture pose and datum-edge installation remain unknown: the demo pre-zero chord is not an HA installation fact. HOLD actual clocking/pickup qualification; final-origin endpoints are not a pre-zero procedure."
 coolant = "cutting_oil_brush"
 deburr_mm = 0.0
 
@@ -1175,6 +1218,7 @@ top_z = 0.0
 bottom_z = -2.4892
 
 [setups.zero.x]
+procedure = "Use unknown to indicate the named bore centre; Axis Set X to the existing centre coordinate -5.427586520093197 mm, not the bore wall. Retract clear, take up backlash and make the +1.0 mm work-coordinate check jog: reading must increase by 1.0 mm. Verify controller direction; table-feed sign is not inferred. Retain HOLD for an unrepresentable setting or unqualified pickup."
 feature = "strap_socket"
 method = "indicate"
 from = "indicated"
@@ -1183,6 +1227,7 @@ edge_mm = -5.427586520093197
 check_jog_mm = 1.0
 
 [setups.zero.y]
+procedure = "Use unknown to indicate the named bore centre; Axis Set Y to the existing centre coordinate -146.69246653020895 mm, not the bore wall. Retract clear, take up backlash and make the +1.0 mm work-coordinate check jog: reading must increase by 1.0 mm. Verify controller direction; table-feed sign is not inferred. Retain HOLD for an unrepresentable setting or unqualified pickup."
 feature = "strap_socket"
 method = "indicate"
 from = "indicated"
@@ -1191,6 +1236,7 @@ edge_mm = -146.69246653020895
 check_jog_mm = 1.0
 
 [setups.zero.z]
+procedure = "With spindle isolated use endmills-lms-6784/1-4in-4fl and the specified 0.05 mm paper on the clean Z0 face: Axis Set Z+0.05, not zero at paper contact. Retract in +Z, take up backlash and check the +5.0 mm jog reads Z+5.05 mm; verify controller direction before further motion. This paper correction does not establish a second zero."
 from = "+z"
 face = "top"
 method = "paper"
@@ -1213,14 +1259,14 @@ feed_mm_min = 40.0
 direction = "conventional"
 stock_removal_bounds = { x = [-4.48, 38.545], y = [0.0, 30.065], z = [-2.4892, 0.0] }
 contour = { method = "linear_table", step_mm = 2.0, open_side = "+y" }
-note = "Clear waste outside the supporting plane in successive single-axis X passes, step Y only with cutter clear; no diagonal XY feed. Lower from air in <=0.5 mm levels. Final centre Y3.175 reaches target Y0 exactly on 0.005 mm DRO grid; target segment X0..5.587999999999997. All finished part lies on -Y side of this supporting plane; finite bounds encompass the raw blank, not a claim of an oblique saw kerf. Retract above strap before returns. Verify full cutter/holder/cradle/offcut envelope before use; no native pass or manufactured result is asserted."
+note = "Clear waste outside the supporting plane in successive single-axis X passes, step Y only with cutter clear; no diagonal XY feed. Lower from air in <=0.5 mm levels. Final centre Y3.175 reaches target Y0 exactly on 0.005 mm DRO grid; target segment X0..5.588. All finished part lies on -Y side of this supporting plane; finite bounds encompass the raw blank, not a claim of an oblique saw kerf. Retract above strap before returns. Verify full cutter/holder/cradle/offcut envelope before use; no native pass or manufactured result is asserted."
 
 [[setups.ops]]
 op = 20
 do = "release"
 feature = "strap_datum_b"
 keep = "strap_datum_b"
-note = "Stop and isolate spindle before loosening only the positive-tip scrap clamp. Retain the piece carrying complete strap datum B; remove separated lower-rail offcut, its clamp and removable seat. Keep both central press clamps engaged until the supported opposite-tip rehold. No unsupported scrap clamp or seat may enter a later taper cut. Actual release/retention remains a required physical operation, not an observed result."
+note = "Stop and isolate spindle before loosening only the positive-tip scrap clamp. Retain the piece carrying the strap with its complete finished broad datum-B face; remove separated lower-rail offcut, its clamp and removable seat. Keep both central press clamps engaged until the supported opposite-tip rehold. No unsupported scrap clamp or seat may enter a later taper cut. Actual release/retention remains a required physical operation, not an observed result."
 
 # PROPOSED: clock the supported work so this straight edge is parallel to X.
 [frames.TIP_NEG]
@@ -1237,7 +1283,7 @@ id = "T4B"
 machine = "PM-30MV"
 frame = "TIP_NEG"
 stock_in = "T4A"
-note = "PROPOSED single-axis side milling of TIP_NEG; no oblique hand-saw clearing-box substitution."
+note = "PROPOSED single-axis side milling of TIP_NEG; no oblique hand-saw clearing-box substitution. Any rotated stock rectangle is a setup-frame bounding envelope of the same carried strap, not a new blank; re-indicate after reorientation. The lower-rail offcut island lies on the negative-Y side of the tip supporting plane; it is distinct from the positive-Y clearing region. HOLD proof of its actual separation, captured support and cutter clearance before the stated release; do not relocate the scrap kit or infer separation from the clearing bounds. HA fixture pose and datum-edge installation remain unknown: the demo pre-zero chord is not an HA installation fact. HOLD actual clocking/pickup qualification; final-origin endpoints are not a pre-zero procedure."
 coolant = "cutting_oil_brush"
 deburr_mm = 0.0
 
@@ -1258,6 +1304,7 @@ top_z = 0.0
 bottom_z = -2.4892
 
 [setups.zero.x]
+procedure = "Use unknown to indicate the named bore centre; Axis Set X to the existing centre coordinate 11.015586520093194 mm, not the bore wall. Retract clear, take up backlash and make the +1.0 mm work-coordinate check jog: reading must increase by 1.0 mm. Verify controller direction; table-feed sign is not inferred. Retain HOLD for an unrepresentable setting or unqualified pickup."
 feature = "strap_socket"
 method = "indicate"
 from = "indicated"
@@ -1266,6 +1313,7 @@ edge_mm = 11.015586520093194
 check_jog_mm = 1.0
 
 [setups.zero.y]
+procedure = "Use unknown to indicate the named bore centre; Axis Set Y to the existing centre coordinate -146.69246653020895 mm, not the bore wall. Retract clear, take up backlash and make the +1.0 mm work-coordinate check jog: reading must increase by 1.0 mm. Verify controller direction; table-feed sign is not inferred. Retain HOLD for an unrepresentable setting or unqualified pickup."
 feature = "strap_socket"
 method = "indicate"
 from = "indicated"
@@ -1274,6 +1322,7 @@ edge_mm = -146.69246653020895
 check_jog_mm = 1.0
 
 [setups.zero.z]
+procedure = "With spindle isolated use endmills-lms-6784/1-4in-4fl and the specified 0.05 mm paper on the clean Z0 face: Axis Set Z+0.05, not zero at paper contact. Retract in +Z, take up backlash and check the +5.0 mm jog reads Z+5.05 mm; verify controller direction before further motion. This paper correction does not establish a second zero."
 from = "+z"
 face = "top"
 method = "paper"
@@ -1296,14 +1345,14 @@ feed_mm_min = 40.0
 direction = "conventional"
 stock_removal_bounds = { x = [-32.955, 10.07], y = [0.0, 30.065], z = [-2.4892, 0.0] }
 contour = { method = "linear_table", step_mm = 2.0, open_side = "+y" }
-note = "Clear waste outside the supporting plane in successive single-axis X passes, step Y only with cutter clear; no diagonal XY feed. Lower from air in <=0.5 mm levels. Final centre Y3.175 reaches target Y0 exactly on 0.005 mm DRO grid; target segment X0..5.587999999999997. All finished part lies on -Y side of this supporting plane; finite bounds encompass the raw blank, not a claim of an oblique saw kerf. Retract above strap before returns. Verify full cutter/holder/cradle/offcut envelope before use; no native pass or manufactured result is asserted."
+note = "Clear waste outside the supporting plane in successive single-axis X passes, step Y only with cutter clear; no diagonal XY feed. Lower from air in <=0.5 mm levels. Final centre Y3.175 reaches target Y0 exactly on 0.005 mm DRO grid; target segment X0..5.588. All finished part lies on -Y side of this supporting plane; finite bounds encompass the raw blank, not a claim of an oblique saw kerf. Retract above strap before returns. Verify full cutter/holder/cradle/offcut envelope before use; no native pass or manufactured result is asserted."
 
 [[setups.ops]]
 op = 20
 do = "release"
 feature = "strap_datum_b"
 keep = "strap_datum_b"
-note = "Stop and isolate spindle before releasing only the negative-tip scrap clamp. Retain the piece carrying complete strap datum B; remove separated lower-rail offcut, its clamp and removable seat. Keep central press restraint until supported taper rehold. Both tip scrap kits must be absent before any taper cut. Actual removal/retention is required, not an observed result."
+note = "Stop and isolate spindle before releasing only the negative-tip scrap clamp. Retain the piece carrying the strap with its complete finished broad datum-B face; remove separated lower-rail offcut, its clamp and removable seat. Keep central press restraint until supported taper rehold. Both tip scrap kits must be absent before any taper cut. Actual removal/retention is required, not an observed result."
 
 # PROPOSED: clock the supported work so this straight edge is parallel to X.
 [frames.TAPER_POS]
@@ -1320,7 +1369,7 @@ id = "T4C"
 machine = "PM-30MV"
 frame = "TAPER_POS"
 stock_in = "T4B"
-note = "PROPOSED single-axis side milling of TAPER_POS; no oblique hand-saw clearing-box substitution."
+note = "PROPOSED single-axis side milling of TAPER_POS; no oblique hand-saw clearing-box substitution. Any rotated stock rectangle is a setup-frame bounding envelope of the same carried strap, not a new blank; re-indicate after reorientation. HA fixture pose and datum-edge installation remain unknown: the demo pre-zero chord is not an HA installation fact. HOLD actual clocking/pickup qualification; final-origin endpoints are not a pre-zero procedure."
 coolant = "cutting_oil_brush"
 deburr_mm = 0.0
 
@@ -1340,6 +1389,7 @@ top_z = 0.0
 bottom_z = -2.4892
 
 [setups.zero.x]
+procedure = "Use unknown to indicate the named bore centre; Axis Set X to the existing centre coordinate 116.55067611006163 mm, not the bore wall. Retract clear, take up backlash and make the +1.0 mm work-coordinate check jog: reading must increase by 1.0 mm. Verify controller direction; table-feed sign is not inferred. Retain HOLD for an unrepresentable setting or unqualified pickup."
 feature = "strap_socket"
 method = "indicate"
 from = "indicated"
@@ -1348,6 +1398,7 @@ edge_mm = 116.55067611006163
 check_jog_mm = 1.0
 
 [setups.zero.y]
+procedure = "Use unknown to indicate the named bore centre; Axis Set Y to the existing centre coordinate -89.75501535505208 mm, not the bore wall. Retract clear, take up backlash and make the +1.0 mm work-coordinate check jog: reading must increase by 1.0 mm. Verify controller direction; table-feed sign is not inferred. Retain HOLD for an unrepresentable setting or unqualified pickup."
 feature = "strap_socket"
 method = "indicate"
 from = "indicated"
@@ -1356,6 +1407,7 @@ edge_mm = -89.75501535505208
 check_jog_mm = 1.0
 
 [setups.zero.z]
+procedure = "With spindle isolated use endmills-lms-6784/1-4in-4fl and the specified 0.05 mm paper on the clean Z0 face: Axis Set Z+0.05, not zero at paper contact. Retract in +Z, take up backlash and check the +5.0 mm jog reads Z+5.05 mm; verify controller direction before further motion. This paper correction does not establish a second zero."
 from = "+z"
 face = "top"
 method = "paper"
@@ -1395,7 +1447,7 @@ id = "T4"
 machine = "PM-30MV"
 frame = "TAPER_NEG"
 stock_in = "T4C"
-note = "PROPOSED single-axis side milling of TAPER_NEG; no oblique hand-saw clearing-box substitution."
+note = "PROPOSED single-axis side milling of TAPER_NEG; no oblique hand-saw clearing-box substitution. Any rotated stock rectangle is a setup-frame bounding envelope of the same carried strap, not a new blank; re-indicate after reorientation. HA fixture pose and datum-edge installation remain unknown: the demo pre-zero chord is not an HA installation fact. HOLD actual clocking/pickup qualification; final-origin endpoints are not a pre-zero procedure."
 coolant = "cutting_oil_brush"
 deburr_mm = 0.0
 
@@ -1415,6 +1467,7 @@ top_z = 0.0
 bottom_z = -2.4892
 
 [setups.zero.x]
+procedure = "Use unknown to indicate the named bore centre; Axis Set X to the existing centre coordinate -97.86098813975588 mm, not the bore wall. Retract clear, take up backlash and make the +1.0 mm work-coordinate check jog: reading must increase by 1.0 mm. Verify controller direction; table-feed sign is not inferred. Retain HOLD for an unrepresentable setting or unqualified pickup."
 feature = "strap_socket"
 method = "indicate"
 from = "indicated"
@@ -1423,6 +1476,7 @@ edge_mm = -97.86098813975588
 check_jog_mm = 1.0
 
 [setups.zero.y]
+procedure = "Use unknown to indicate the named bore centre; Axis Set Y to the existing centre coordinate -89.75501535505207 mm, not the bore wall. Retract clear, take up backlash and make the +1.0 mm work-coordinate check jog: reading must increase by 1.0 mm. Verify controller direction; table-feed sign is not inferred. Retain HOLD for an unrepresentable setting or unqualified pickup."
 feature = "strap_socket"
 method = "indicate"
 from = "indicated"
@@ -1431,6 +1485,7 @@ edge_mm = -89.75501535505207
 check_jog_mm = 1.0
 
 [setups.zero.z]
+procedure = "With spindle isolated use endmills-lms-6784/1-4in-4fl and the specified 0.05 mm paper on the clean Z0 face: Axis Set Z+0.05, not zero at paper contact. Retract in +Z, take up backlash and check the +5.0 mm jog reads Z+5.05 mm; verify controller direction before further motion. This paper correction does not establish a second zero."
 from = "+z"
 face = "top"
 method = "paper"
@@ -1469,7 +1524,7 @@ id = "J1"
 machine = "fitting-bench"
 frame = "ASSEMBLY"
 stock_in = ["H1", "T4"]
-note = "Press completed MHA-CH-12 hub into completed MHA-CH-13 socket; no brazing/compound route."
+note = "Press completed MHA-CH-12 hub into completed MHA-CH-13 socket; no brazing/compound route. The fitting bench is staging only: pressing requires a qualified supported press-bed installation; no actual HA press/nest placement is established."
 coolant = "none" # Joint process requires clean, dry matched surfaces.
 deburr_mm = 0.0 # Preserve sharp, no-groove press interface.
 
@@ -1540,6 +1595,7 @@ bottom_z = -7.77825
 local_thickness = { "pivot_bore" = 7.77825 }
 
 [setups.zero.x]
+procedure = "Use unknown to indicate the named bore centre; Axis Set X to the existing centre coordinate 0.0 mm, not the bore wall. Retract clear, take up backlash and make the +1.0 mm work-coordinate check jog: reading must increase by 1.0 mm. Verify controller direction; table-feed sign is not inferred. Retain HOLD for an unrepresentable setting or unqualified pickup."
 feature = "hub_supply_bore"
 method = "indicate"
 from = "indicated"
@@ -1548,6 +1604,7 @@ edge_mm = 0.0
 check_jog_mm = 1.0
 
 [setups.zero.y]
+procedure = "Use unknown to indicate the named bore centre; Axis Set Y to the existing centre coordinate 0.0 mm, not the bore wall. Retract clear, take up backlash and make the +1.0 mm work-coordinate check jog: reading must increase by 1.0 mm. Verify controller direction; table-feed sign is not inferred. Retain HOLD for an unrepresentable setting or unqualified pickup."
 feature = "hub_supply_bore"
 method = "indicate"
 from = "indicated"
@@ -1556,6 +1613,7 @@ edge_mm = 0.0
 check_jog_mm = 1.0
 
 [setups.zero.z]
+procedure = "With spindle isolated use selected reamers-metric/6.5mm and the specified 0.05 mm paper on the named face. Axis Set is the face coordinate plus 0.05 mm; after a safe +5.0 mm work-coordinate check jog the reading must increase by 5.0 mm, with controller direction verified. Use existing controller-grid setting/residual handling; an unrepresentable setting or unqualified face remains HOLD, not permission to round geometry."
 from = "+z"
 face = "strap datum B"
 edge_mm = -2.28365
@@ -1592,7 +1650,7 @@ exit_mm = 1.0
 feed_mm_rev = 0.1
 checks = { "dia" = "unknown", "thru" = "unknown", "finish_ra" = "unknown", "process" = "unknown" }
 inspection_methods = { "dia" = "HOLD qualified6.5024–6.5278mm bore metrology; old6.500GO/6.530NO-GO straddles current band and is invalid. Measure both mouths/full bore after cooling.", "thru" = "Confirm open full diameter through supply hub; probe/plug without forcing. Recheck after lower facing.", "finish_ra" = "HOLD traceable method demonstrating Ra<=1.6um on the actual reamed wall, not a drawing nominal or external surface. Existing replica-kit entry is illustrative, not proven capability.", "process" = "Record actual reaming operation and selected tool/lot. Existing example reamer is nominal6.512, not proof of real bore size or installed capability." }
-note = "Supply .246 bore is mandatory prior drilling; ream only after press. Retain actual reamers-metric/6.5mm inventory selection as unqualified: its placeholder is not the example 6.512mm cutter. HOLD actual measured cutting size, allowance, runout and resulting current-band bore approval. Record actual selected tool/lot/operator; do not use .250, old 6.500GO or drill-only finish."
+note = "Supply 0.246 in bore is mandatory prior drilling; ream only after press. Retain actual reamers-metric/6.5mm inventory selection as unqualified: its placeholder is not the example 6.512mm cutter. HOLD actual measured cutting size, allowance, runout and resulting current-band bore approval. Record actual selected tool/lot/operator; do not use .250, old 6.500GO or drill-only finish."
 
 # F2 — Reverse after reaming; finish lower hub end to7.080mm length and inspect stack/strap registration.
 [[setups]]
@@ -1619,6 +1677,7 @@ top_z = 0.69825
 bottom_z = -7.08
 
 [setups.zero.x]
+procedure = "Use unknown to indicate the named bore centre; Axis Set X to the existing centre coordinate 0.0 mm, not the bore wall. Retract clear, take up backlash and make the +1.0 mm work-coordinate check jog: reading must increase by 1.0 mm. Verify controller direction; table-feed sign is not inferred. Retain HOLD for an unrepresentable setting or unqualified pickup."
 feature = "pivot_bore"
 method = "indicate"
 from = "indicated"
@@ -1627,6 +1686,7 @@ edge_mm = 0.0
 check_jog_mm = 1.0
 
 [setups.zero.y]
+procedure = "Use unknown to indicate the named bore centre; Axis Set Y to the existing centre coordinate 0.0 mm, not the bore wall. Retract clear, take up backlash and make the +1.0 mm work-coordinate check jog: reading must increase by 1.0 mm. Verify controller direction; table-feed sign is not inferred. Retain HOLD for an unrepresentable setting or unqualified pickup."
 feature = "pivot_bore"
 method = "indicate"
 from = "indicated"
@@ -1635,6 +1695,7 @@ edge_mm = 0.0
 check_jog_mm = 1.0
 
 [setups.zero.z]
+procedure = "With spindle isolated use selected endmills-lms-6784/3-8in-4fl and the specified 0.05 mm paper on the named face. Axis Set is the face coordinate plus 0.05 mm; after a safe +5.0 mm work-coordinate check jog the reading must increase by 5.0 mm, with controller direction verified. Use the actual pre-clamp measured M and the existing signed offset, never a nominal thickness or invented reading. Use existing controller-grid setting/residual handling; an unrepresentable setting or unqualified face remains HOLD, not permission to round geometry."
 from = "+z"
 face = "upper finished hub face seated reference"
 method = "measure_then_set"
@@ -1692,6 +1753,7 @@ local_thickness = { "rod_hole" = 2.4892 }
 entry_z = { "rod_hole" = 0.0 } # Entry at strap datum B, not remote hub top2.28365.
 
 [setups.zero.x]
+procedure = "Use unknown to indicate the named bore centre; Axis Set X to the existing centre coordinate 0.0 mm, not the bore wall. Retract clear, take up backlash and make the +1.0 mm work-coordinate check jog: reading must increase by 1.0 mm. Verify controller direction; table-feed sign is not inferred. Retain HOLD for an unrepresentable setting or unqualified pickup."
 feature = "pivot_bore"
 method = "indicate"
 from = "indicated"
@@ -1700,6 +1762,7 @@ edge_mm = 0.0
 check_jog_mm = 1.0
 
 [setups.zero.y]
+procedure = "Use unknown to indicate the named bore centre; Axis Set Y to the existing centre coordinate 0.0 mm, not the bore wall. Retract clear, take up backlash and make the +1.0 mm work-coordinate check jog: reading must increase by 1.0 mm. Verify controller direction; table-feed sign is not inferred. Retain HOLD for an unrepresentable setting or unqualified pickup."
 feature = "pivot_bore"
 method = "indicate"
 from = "indicated"
@@ -1708,6 +1771,7 @@ edge_mm = 0.0
 check_jog_mm = 1.0
 
 [setups.zero.z]
+procedure = "With spindle isolated use drill-index-115/#47 and the specified 0.05 mm paper on the clean Z0 face: Axis Set Z+0.05, not zero at paper contact. Retract in +Z, take up backlash and check the +5.0 mm jog reads Z+5.05 mm; verify controller direction before further motion. This paper correction does not establish a second zero."
 from = "+z"
 face = "strap datum B"
 edge_mm = 0.0
