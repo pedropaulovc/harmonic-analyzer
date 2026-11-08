@@ -117,6 +117,7 @@ from _column_clamp_interface import BAR_DEPTH
 from _hole_spec import NUMBER_DRILL_MM, TAP_DRILL_MM, blind_cut_dia_mm
 from _printed_tolerance import printed_deviations
 import paper_drive_mesh_check as mesh_check
+import paper_drive_arm_registration as registration
 import pd_latch_hook_geometry as hook_geometry
 import paper_drive_rack_setup as rack_setup
 import pd_paper_drive_assembly_steps as steps
@@ -588,16 +589,25 @@ KNOB_SETTING_INSTANCES = frozenset({"pd-transgear-arm-1", "pd-transgear-arm-plat
 # The located step's acceptance for "true": a null reading on the indicator, so the
 # setting's centring bound comes from this stated sweep, not from the
 # indicator's unknown accuracy over its range (codjiflo P2 on 8e8d5d5): under
-# half a division of sweep puts each centre within a quarter division. The
-# sweep prints as a value on the shop's .0005 test indicator
-# (inventory gauges.dti.resolution_in), so "true" has a fixed limit whatever
-# indicator is at hand (machinist review round 4, rules 22 and 26).
+# half a division of sweep puts each centre within a quarter division. It
+# prints as a value on the shop's .0005 test indicator
+# (inventory gauges.dti.resolution_in; machinist review round 4, rules 22 and
+# 26) and names what it holds (round 5 read .00025 as finer than the .002
+# S-K band needs, rule 4): K's worst case must stay inside its .002 setting
+# circle (paper_drive_arm_registration.REDUCER_AXIS_SETUP_RADIUS_MM). The pivot
+# lever amplifies the across error, so one division (.0005) puts K up to
+# .0022 off (test_the_jig_bored_k_lands_in_the_set_band_with_margin_at_both_ends).
 KNOB_SETTING_TRUE_SWEEP_DIVISIONS = 0.5
 KNOB_SETTING_INDICATOR_DIVISION_IN = 0.0005
+_KNOB_SETTING_SWEEP_TEXT = (
+    f"{KNOB_SETTING_TRUE_SWEEP_DIVISIONS * KNOB_SETTING_INDICATOR_DIVISION_IN:.5f}".lstrip("0")
+)
+_KNOB_SETTING_DIVISION_TEXT = f"{KNOB_SETTING_INDICATOR_DIVISION_IN:.4f}".lstrip("0")
 KNOB_SETTING_TRUE = (
-    "TRUE: SWEEP UNDER "
-    f"{f'{KNOB_SETTING_TRUE_SWEEP_DIVISIONS * KNOB_SETTING_INDICATOR_DIVISION_IN:.5f}'.lstrip('0')}"
-    f" ON A {f'{KNOB_SETTING_INDICATOR_DIVISION_IN:.4f}'.lstrip('0')} TEST INDICATOR"
+    f"TRUE: SWEEP UNDER {_KNOB_SETTING_SWEEP_TEXT}, HALF A DIVISION ON A "
+    f"{_KNOB_SETTING_DIVISION_TEXT} TEST INDICATOR, SO K ENDS WITHIN "
+    f"{steps.inch_text(registration.REDUCER_AXIS_SETUP_RADIUS_MM, 3)} OF ITS "
+    "VIEW K SETTING"
 )
 # The second column's steps end above this on sheet 5.
 KNOB_SETTING_FIELD_TOP = 0.144
@@ -1751,7 +1761,8 @@ def _step_text(
             f"ON THE {n['pd-support-bar']} BAR WITH THE {n['sh-vn-clamp-screw']} "
             "SCREWS FROM THE BAR FRONT, ALL FOUR SNUG.",
             f"SET THE BAR TOP {steps.BAR_TOP_ABOVE_DECK_TEXT} ABOVE THE {FRAME_BASE} "
-            "BASE DECK AT BOTH COLUMNS, READ WITH A RULE FROM THE DECK.",
+            "BASE DECK AT BOTH COLUMNS, READ WITH A HEIGHT GAUGE STANDING ON THE "
+            "DECK.",
             # Rule 19 fit-up for the slotted pair (owner ruling 2026-10-15,
             # #1471 option A): the round pair locates.
             "TIGHTEN THE ROUND-HOLE PAIR OF SCREWS.",
@@ -1788,11 +1799,20 @@ def _step_text(
             "HEADS IN THE COUNTERBORES.",
             "CHECK: EVERY SCREW ENTERS BY HAND.",
             "IF ONE BINDS, RUN THE TAP THROUGH AGAIN.",
+            f"TIGHTEN ALL {GUIDE_SCREWS} GUIDE SCREWS.",
+            "CHECK: PUSHED FIRMLY BY HAND ALONG AND ACROSS, NEITHER GUIDE MOVES ON "
+            "THE PLATEN.",
+            f"IF ONE MOVES, MAKE A NEW {n['pd-platen-guide']} GUIDE AND REPEAT "
+            f"{s('guides-screwed', 0)}-{s('guides-screwed', 9)} FOR IT.",
         ),
         "clips-fitted": (
             f"SCREW THE {n['pd-platen-clip']} CLIPS TO THE PLATEN FRONT WITH "
             f"{CLIP_SCREWS} {n['pd-vn-platen-clip-screw']} SCREWS, SPRING RAILS "
             "INBOARD.",
+            f"TIGHTEN ALL {CLIP_SCREWS} CLIP SCREWS.",
+            "CHECK: PUSHED FIRMLY BY HAND, NEITHER CLIP MOVES ON THE PLATEN.",
+            "IF ONE MOVES, FIT NEW SCREWS TO IT AND REPEAT "
+            f"{s('clips-fitted', 1)}-{s('clips-fitted', 2)}.",
             f"LAY THE {n['pd-platen-paper']} PAPER BETWEEN THE CLIPS.",
         ),
         "platen-hung": (
@@ -1801,11 +1821,12 @@ def _step_text(
             f"LAY A {n['pd-guide-lock']} LOCK OVER EACH TAP PAIR (2ND AND 4TH, 6TH "
             "AND 8TH), ITS GUIDE-SIDE EDGE TOWARD THE GUIDE.",
             "STRIKE EACH LOCK TO MARK BOTH ITS HOLES.",
-            f"CHECK WITH A SCALE: EACH MARK {_mark_window(guide_lock.HOLE_Y)} FROM THE "
-            "LOCK'S GUIDE-SIDE EDGE.",
-            f"CHECK: THE LEFT MARK {_mark_window(guide_lock.HOLE_XY[0][0])} AND THE "
-            f"RIGHT MARK {_mark_window(guide_lock.HOLE_XY[1][0])} FROM THE LOCK'S "
-            f"LEFT EDGE, LEFT AND RIGHT AS {n['pd-guide-lock']}'S FRONT VIEW SHOWS.",
+            f"CHECK WITH CALIPERS: EACH MARK {_mark_window(guide_lock.HOLE_Y)} FROM "
+            "THE LOCK'S GUIDE-SIDE EDGE.",
+            "CHECK WITH CALIPERS: THE LEFT MARK "
+            f"{_mark_window(guide_lock.HOLE_XY[0][0])} AND THE RIGHT MARK "
+            f"{_mark_window(guide_lock.HOLE_XY[1][0])} FROM THE LOCK'S LEFT EDGE, "
+            f"LEFT AND RIGHT AS {n['pd-guide-lock']}'S FRONT VIEW SHOWS.",
             "IF A MARK IS OUTSIDE, STONE THE MARKS OFF AND REPEAT "
             f"{s('platen-hung', 1)}-{s('platen-hung', 4)}.",
             "DRILL EACH LOCK "
@@ -1887,11 +1908,13 @@ def _step_text(
             "MATCH MARKS TOGETHER.",
             f"FIT {TRANSGEAR_QUANTITIES['pd-vn-transgear-arm-plate-screw']} "
             f"{n['pd-vn-transgear-arm-plate-screw']} SCREWS IN THE ARM'S THROUGH "
-            "TAPS; SNUG BOTH, THEN TIGHTEN THEM IN TURN.",
+            "TAPS.",
+            "SNUG BOTH SCREWS.",
+            "TIGHTEN THE SCREWS IN TURN.",
             "CHECK, AFTER EVERY REFIT: PUSHED AND ROCKED BY HAND, THE PLATE HAS "
             "NO SHAKE ON THE DOWELS AND NO DAYLIGHT UNDER IT.",
             "IF IT SHAKES OR SHOWS DAYLIGHT, CLEAN AND DEBURR THE FACES AND "
-            f"DOWELS AND REPEAT {s('arm-plate-fitted', 0)}-{s('arm-plate-fitted', 2)}.",
+            f"DOWELS AND REPEAT {s('arm-plate-fitted', 0)}-{s('arm-plate-fitted', 4)}.",
         ),
         "arm-plate-screws-cut": (
             f"REMOVE BOTH {n['pd-vn-transgear-arm-plate-screw']} SCREWS.",
@@ -1908,14 +1931,15 @@ def _step_text(
         # slides, and staked there (rule 23); the spot-face floor sets the
         # spring room (transgear_hanger_joints).
         "hanger-pivoted": (
-            f"ON THE {n['pd-vn-transgear-pivot-screw']} SHOULDER SCREW THE ARM'S "
-            f"PIVOT BORE WAS REAMED TO, FIT THE {n['pd-vn-transgear-pivot-spring']} "
-            "SPRING, THEN THE ARM, FROM THE REAR.",
+            f"FIT THE {n['pd-vn-transgear-pivot-spring']} SPRING ON THE "
+            f"{n['pd-vn-transgear-pivot-screw']} SHOULDER SCREW THE ARM'S PIVOT BORE "
+            "WAS REAMED TO, FROM THE REAR.",
+            "FIT THE ARM'S PIVOT BORE ON THE SHOULDER, FROM THE REAR.",
             f"PRESS THE {n['pd-transgear-pivot-spacer']} SPACER, AS MADE, ON THE "
             "SHOULDER, FLUSH WITH ITS END ON A FLAT PLATE.",
             "IF THE SPACER SLIDES ON BY HAND, MAKE A NEW "
             f"{n['pd-transgear-pivot-spacer']} SPACER AND REPEAT "
-            f"{s('hanger-pivoted', 1)}.",
+            f"{s('hanger-pivoted', 2)}.",
             f"FACE THE SCREW'S TIP SO THAT, SEATED IN THE {n['pd-support-bar']} "
             "BAR'S THROUGH TAP, IT STANDS "
             f"{steps.inch_window(pivot_screw.TIP_RECESS, 3, ' TO ')} BELOW THE "
@@ -1923,7 +1947,7 @@ def _step_text(
             "SEAT THE SCREW.",
             "CHECK: RAISED AND RELEASED, THE ARM FALLS FREELY.",
             "IF IT STICKS, CLEAN AND OIL THE ARM'S BORE AND THE SHOULDER AND "
-            f"REPEAT {s('hanger-pivoted', 4)}-{s('hanger-pivoted', 5)}.",
+            f"REPEAT {s('hanger-pivoted', 5)}-{s('hanger-pivoted', 6)}.",
             "PLATEN SLID CLEAR, STAKE THE TAP MOUTH AT THE BAR FRONT ONTO THE TIP "
             f"AT {PIVOT_STAKE_POINTS_TEXT}, NOTHING PROUD OF THE FACE "
             f"({PIVOT_VIEW_REF}).",
@@ -2007,8 +2031,8 @@ def _step_text(
         "knob-stack-fitted": (
             f"PASS THE {n['pd-transgear-knob-shaft']} SHAFT THROUGH THE LOOSE "
             f"{n['pd-transgear-knob-thrust-ring']} RING INTO THE "
-            f"{n['pd-transgear-arm-plate']} PLATE BORE FROM THE FRONT; PUSH IT "
-            "REARWARD.",
+            f"{n['pd-transgear-arm-plate']} PLATE BORE FROM THE FRONT.",
+            "PUSH THE SHAFT REARWARD.",
             f"FIT THE {n['pd-transgear-knob-cup']} CUP ON THE SHAFT'S REAR JOURNAL "
             f"ON A {steps.inch_text(knob_shaft.END_FLOAT, 3)} FEELER AT THE PLATE'S "
             "REAR BOSS.",
@@ -2056,9 +2080,10 @@ def _step_text(
             "CLAMP THE ARM TO THE BAR.",
             "RUN THE PLATEN THROUGH THE ENGAGED FEED, "
             f"{engaged_feed_text(operating_domain)}, STOPPING SHORT OF BOTH ENDS.",
-            "CHECK: NO TIGHT SPOT; SHAKE AT EVERY TOOTH.",
-            f"IF NOT, UNCLAMP THE ARM AND REPEAT {s('hanger-meshed', 2)}-"
-            f"{s('hanger-meshed', 5)}; RESET ONLY WITH THE FEED DISENGAGED.",
+            "CHECK: NO TIGHT SPOT.",
+            "CHECK: SHAKE AT EVERY TOOTH.",
+            f"IF EITHER CHECK FAILS, UNCLAMP THE ARM AND REPEAT {s('hanger-meshed', 2)}-"
+            f"{s('hanger-meshed', 6)}; RESET ONLY WITH THE FEED DISENGAGED.",
         ),
         # The hook's pin hole is match-drilled from the pin at that mesh,
         # then the hook is hardened and refitted with the hole's lower edge on
@@ -2077,23 +2102,25 @@ def _step_text(
             "UNCLAMP THE ARM.",
             f"CHECK: THE ARM STAYS LATCHED, THE {n['pd-vn-transgear-latch-pin']} PIN "
             f"STANDING THROUGH THE {n['pd-latch-hook']} HOOK'S PIN HOLE.",
-            "CHECK: THE ENGAGED FEED RUNS WITH NO TIGHT SPOT AND THE PLATEN SHAKES "
-            f"{shake} AT THE DATUM, READ WITH A DIAL INDICATOR ON THE PLATEN END.",
-            f"IF EITHER CHECK FAILS, REPEAT {s('hanger-meshed', 2)}-"
-            f"{s('hook-pin-hole-match-drilled', 8)} WITH A NEW {n['pd-latch-hook']} "
+            "CHECK: THE ENGAGED FEED RUNS WITH NO TIGHT SPOT.",
+            f"CHECK: THE PLATEN SHAKES {shake} AT THE DATUM, READ WITH A DIAL "
+            "INDICATOR ON THE PLATEN END.",
+            f"IF A CHECK FAILS, REPEAT {s('hanger-meshed', 2)}-"
+            f"{s('hook-pin-hole-match-drilled', 9)} WITH A NEW {n['pd-latch-hook']} "
             "HOOK.",
         ),
         "loaded-rack-geometry-checked": (
             "LOAD THE PAPER.",
             "TURN THE KNOB TO RUN THE PLATEN THROUGH THE WHOLE ENGAGED FEED.",
-            "CHECK: NO TIGHT SPOT; ARM, HOOK AND PLATEN STAY SEATED.",
+            "CHECK: NO TIGHT SPOT.",
+            "CHECK: ARM, HOOK AND PLATEN STAY SEATED.",
             "CHECK: KNOB HELD, THE PLATEN SHAKES ALONG THE RACK AT BOTH ENDS AND "
             "THE MIDDLE OF THE FEED.",
-            "IF EITHER CHECK FAILS, RE-SEAT THE RACK OR GUIDES (STEPS "
+            "IF A CHECK FAILS, RE-SEAT THE RACK OR GUIDES (STEPS "
             f"{steps.step_number('rack-soldered')} AND "
             f"{steps.step_number('guides-screwed')}) AND REPEAT "
             f"{s('loaded-rack-geometry-checked', 1)}-"
-            f"{s('loaded-rack-geometry-checked', 3)}.",
+            f"{s('loaded-rack-geometry-checked', 4)}.",
         ),
         "fitup-pose-set": (
             f"CHECK: THE ARM IS LATCHED, THE {n['pd-vn-transgear-latch-pin']} PIN "
@@ -2109,8 +2136,8 @@ def _step_text(
             f"A {disc.TEETH}T TOOTH STANDS CENTRED IN A {teeth} GAP WITHIN {clock} "
             "AT THE PITCH CIRCLE, READ WITH A TEST INDICATOR ON A GAUGE PIN IN "
             "THE GAP.",
-            "CHECK: TURNED BY THE COLLAR, THE KNOB RUNS WITH NO TIGHT SPOT AND "
-            "SHAKE AT EVERY TOOTH.",
+            "CHECK: TURNED BY THE COLLAR, THE KNOB RUNS WITH NO TIGHT SPOT.",
+            "CHECK: THE KNOB HAS SHAKE AT EVERY TOOTH.",
             f"CHECK: KNOB HELD, A {steps.inch_text(REDUCER_BACKLASH_FEELERS_MM[0], 3)} "
             f"FEELER ENTERS THE {teeth} / {disc.TEETH}T MESH AND A "
             f"{steps.inch_text(REDUCER_BACKLASH_FEELERS_MM[1], 3)} FEELER DOES NOT, "
@@ -2119,7 +2146,7 @@ def _step_text(
             # set off cannot be re-located on it: the transgear is rebuilt
             # (delegated ruling 2026-11-07 (Main), no precedent; owner review
             # #2144; pending owner confirmation).
-            "IF EITHER CHECK FAILS, REBUILD THE TRANSGEAR FROM STEP "
+            "IF A CHECK FAILS, REBUILD THE TRANSGEAR FROM STEP "
             f"{steps.step_number('latch-pin-pressed')} WITH A NEW "
             f"{n['pd-transgear-arm']} ARM, {n['pd-transgear-arm-plate']} PLATE AND "
             f"{n['pd-latch-hook']} HOOK, SKIPPING {s('latch-hook-fitted', 1)}-"
@@ -2173,7 +2200,7 @@ def _step_text(
             f"REPEAT {s('collar-disc-air-inspected', 1)}-"
             f"{s('collar-disc-air-inspected', 2)} AND "
             f"{s('loaded-rack-geometry-checked', 1)}-"
-            f"{s('loaded-rack-geometry-checked', 3)}.",
+            f"{s('loaded-rack-geometry-checked', 4)}.",
         ),
         "fitup-accepted": (
             f"CHECK, IN STEP {pose}'S POSE: THE {knob} FRONT FACE STANDS "
@@ -2182,7 +2209,8 @@ def _step_text(
             f"CHECK: KNOB END FLOAT {knob_window}, READ WITH FEELERS AT THE CUP.",
             f"CHECK: THE {knob} TURNS FREE UNDER THE NUT.",
             f"UNLATCH THE ARM: PULL THE {n['pd-latch-hook']} HOOK'S FINGER TAB ALONG "
-            "THE ARM UNTIL THE HOOK CLEARS THE PIN, AND LOWER THE ARM.",
+            "THE ARM UNTIL THE HOOK CLEARS THE PIN.",
+            "LOWER THE ARM.",
             "CHECK: RAISED AND RELEASED, THE ARM SWINGS FREE ON ITS PIVOT.",
             f"LATCH THE ARM: LIFT IT UNTIL THE {n['pd-vn-transgear-latch-pin']} PIN "
             f"SNAPS INTO THE {n['pd-latch-hook']} HOOK'S PIN HOLE.",
@@ -2197,11 +2225,11 @@ def _step_text(
             f"{s('fitup-accepted', 1)} STEP {steps.step_number('knob-stack-fitted')}, "
             f"{s('fitup-accepted', 2)} STEP "
             f"{steps.step_number('collar-shoulder-seated')}, "
-            f"{s('fitup-accepted', 4)} STEP "
+            f"{s('fitup-accepted', 5)} STEP "
             f"{steps.step_number('hanger-pivoted')}, "
-            f"{s('fitup-accepted', 6)} AND {s('fitup-accepted', 7)} STEP "
+            f"{s('fitup-accepted', 7)} AND {s('fitup-accepted', 8)} STEP "
             f"{steps.step_number('disc-cluster-shimmed')}, "
-            f"{s('fitup-accepted', 8)} STEP "
+            f"{s('fitup-accepted', 9)} STEP "
             f"{steps.step_number('collar-disc-air-inspected')}.",
         ),
         "chain-closed": (
@@ -2219,15 +2247,17 @@ def _step_text(
         "chain-run-accepted": (
             "TURN THE CRANK 2 TURNS EACH WAY.",
             "CHECK: THE CHAIN SEATS ON EVERY TOOTH OF BOTH WHEELS WITHOUT "
-            "CLIMBING OR A TIGHT SPOT, AND THE SLACK RUN TOUCHES NOTHING.",
-            "IF IT CLIMBS OR BINDS, REPEAT STEP "
+            "CLIMBING OR A TIGHT SPOT.",
+            "CHECK: THE SLACK RUN TOUCHES NOTHING.",
+            "IF A CHECK FAILS, REPEAT STEP "
             f"{steps.step_number('collar-rear-faced-to-fit')}.",
             # As shipped: latched, the feed in mesh (delegated ruling
             # 2026-11-07 (Main), no precedent; owner review #2144; pending
             # owner confirmation).
             "LEAVE THE ARM LATCHED FOR SHIPPING.",
             f"CHECK: THE {n['pd-vn-transgear-latch-pin']} PIN STANDS THROUGH THE "
-            f"{n['pd-latch-hook']} HOOK'S PIN HOLE AND THE FEED IS IN MESH.",
+            f"{n['pd-latch-hook']} HOOK'S PIN HOLE.",
+            "CHECK: THE FEED IS IN MESH.",
         ),
     }
 
