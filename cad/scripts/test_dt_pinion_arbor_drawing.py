@@ -34,13 +34,13 @@ def test_required_drawing_paths_and_registry() -> None:
 
 
 def test_spec_is_the_single_source_of_every_printed_dimension() -> None:
-    # The sheet's maps are the spec's plus the two plain spans' diameters
+    # The sheet's maps are the spec's plus the back stub's 2X diameter
     # (dt_pinion_arbor_notes); builder and drawing read the same objects.
     assert part.DRAWING_DIMENSIONS is sheet.DRAWING_DIMENSIONS
     assert drawing.DRAWING_DIMENSIONS is sheet.DRAWING_DIMENSIONS
     assert part.DRAWING_PRECISION is sheet.DRAWING_PRECISION
     assert part.REFERENCE_SKETCHES is sheet.REFERENCE_SKETCHES
-    added = {"CollarSpanReference": {"CollarSpanDia"}, "BackStubReference": {"BackStubDia"}}
+    added = {"BackStubReference": {"BackStubDia"}}
     assert sheet.DRAWING_DIMENSIONS == {**spec.DRAWING_DIMENSIONS, **added}
     assert not set(added) & set(spec.DRAWING_DIMENSIONS)
     marked = set().union(*sheet.DRAWING_DIMENSIONS.values())
@@ -55,7 +55,7 @@ def test_spec_is_the_single_source_of_every_printed_dimension() -> None:
     assert not kept & drawing.UNPRINTED_DIMENSIONS
     assert kept | drawing.UNPRINTED_DIMENSIONS == marked
     assert set(sheet.DRAWING_PRECISION_BY_NAME) == marked
-    assert set(spec.DRAWING_PRECISION_BY_NAME) == marked - {"CollarSpanDia", "BackStubDia"}
+    assert set(spec.DRAWING_PRECISION_BY_NAME) == marked - {"BackStubDia"}
     assert not hasattr(spec, "DRAWING_REFERENCE_PRECISION")
     # The donor carries the head diameter only; the neck's imports straight
     # into detail A.
@@ -197,7 +197,6 @@ def test_only_the_two_journal_lands_carry_the_running_band_and_finish() -> None:
     assert spec.SHAFT_DIA_BAND == (-0.01016, -0.09652)
     assert model_toleranced_dimensions(part) == {
         ("BondZoneReference", "BondZoneDia"): "*deviations(SHAFT_DIA_BAND)",
-        ("CollarSpanReference", "CollarSpanDia"): "*deviations(SHAFT_DIA_BAND)",
         ("BackStubReference", "BackStubDia"): "*deviations(SHAFT_DIA_BAND)",
         ("CrossHoleProfile", "CrossHoleDia"): "*deviations(CROSS_HOLE_DIA_BAND)",
         ("PinHoleProfile", "PinHoleDia"): "*deviations(PIN_HOLE_DIA_BAND)",
@@ -542,34 +541,80 @@ def test_fence_judges_an_unread_or_misread_dimension_as_all_extension_lines() ->
     )
 
 
-def test_each_plain_span_carries_its_own_diameter_and_mate() -> None:
+# Sheet obstacles near the principal view's plain-span diameters, in sheet mm
+# as (x0, y0, x1, y1): read off the round-3 PDF and the round-4/5 layout audits
+# (fan-out dt-fab-3).  The neck-end witness, the 1.82's head-end witness, the
+# front land's diameter line, the front Ra's leader, the (.05)'s two
+# witnesses and detail A's fence edge.
+_PRINCIPAL_LINES_MM = (
+    (296.0, 96.2, 296.0, 163.8),
+    (260.2, 136.2, 260.2, 165.0),
+    (241.8, 141.4, 241.8, 166.0),
+    (253.2, 124.0, 259.3, 166.0),
+    (78.4, 171.0, 78.4, 218.2),
+    (79.6, 171.0, 79.6, 218.2),
+    (133.6, 227.6, 133.6, 243.0),
+)
+# A "Ø.3125 -.0004/-.0038" block over a "SEE NOTE 2" row, measured from its
+# dimension line on the round-4/5 farm sheets: 32.3 mm long whichever side
+# SolidWorks runs it, from 7.3 mm under its text position to 6.3 mm over;
+# a "2X " prefix adds 6.7 mm (draw_dt_cone_pivot_post, farm run
+# 20261101T115401213Z).
+_DIA_BLOCK_RUN_MM = 32.3
+_COUNT_PREFIX_MM = 6.7
+_DIA_BLOCK_BELOW_MM, _DIA_BLOCK_ABOVE_MM = 7.3, 6.3
+
+
+def _crossed_either_side(xy: tuple[float, float], run_mm: float) -> list[str]:
+    """Which side's text block (left or right of the dimension line at ``xy``,
+    sheet metres) meets a known line, with 1 mm of margin."""
+    x, y = xy[0] * 1000.0, xy[1] * 1000.0
+    y0, y1 = y - _DIA_BLOCK_BELOW_MM - 1.0, y + _DIA_BLOCK_ABOVE_MM + 1.0
+    sides = {"left": (x - run_mm - 1.0, x + 1.0), "right": (x - 1.0, x + run_mm + 1.0)}
+    crossed = []
+    for side, (x0, x1) in sides.items():
+        for lx0, ly0, lx1, ly1 in _PRINCIPAL_LINES_MM:
+            if max(lx0, lx1) >= x0 and min(lx0, lx1) <= x1 and max(ly0, ly1) >= y0 and min(ly0, ly1) <= y1:
+                crossed.append(side)
+                break
+    return crossed
+
+
+def test_either_side_check_catches_the_collar_span_flips() -> None:
+    """Round 4 ran the collar span's block right of its line, over the neck
+    witness; round 5, moved left, SolidWorks ran it left, over the front
+    land's witnesses and Ra leader.  The check judges both sides at once."""
+    round_4 = (drawing._sheet_x(spec.HEAD_REAR_Z + 41.0), 0.154)
+    round_5 = (drawing._sheet_x(spec.FRONT_JOURNAL_Z) + 0.0012, 0.154)
+    assert "right" in _crossed_either_side(round_4, _DIA_BLOCK_RUN_MM)
+    assert "left" in _crossed_either_side(round_5, _DIA_BLOCK_RUN_MM)
+
+
+def test_spans_outside_the_journals_share_one_2x_diameter_and_mate() -> None:
     """Round 3 of fan-out dt-fab-3: the span by the head (the collar's, with
     its pin hole) and the back stub had no diameter on the view and no
-    mate.  Each now prints its own flank diameter flagged to note 2, the
-    sliding fit of MHA-DT-33, which slides over both to its pin station."""
+    mate.  Same limits, same mate: one 2X flank diameter on the back stub
+    sizes both and flags note 2, the sliding fit of MHA-DT-33, which slides
+    over both to its pin station.  Round 5: the collar span had no open
+    space for a block of its own, so it prints none."""
     import dt_alignment_pinion_spec as drum
     import dt_pinion_arbor_collar_spec as collar
 
-    neck_end = spec.NECK_LEN
-    front_land = spec.FRONT_JOURNAL_FROM_HEAD_REAR
     back_land_end = spec.BACK_JOURNAL_FROM_HEAD_REAR + spec.JOURNAL_LEN
     rim = spec.BACK_RIM_FROM_HEAD_REAR
-    pin_r = part.PIN_HOLE_DIA / 2.0
     stations = {f: s for f, _d, s, _l in sheet.SPAN_REFERENCES}
     lengths = {f: n for f, _d, _s, n in sheet.SPAN_REFERENCES}
-    collar_station = stations["CollarSpanReference"]
-    assert neck_end < collar_station
-    assert collar_station - (spec.PIN_STATION_FROM_HEAD_REAR + pin_r) >= 1.5
-    assert collar_station + lengths["CollarSpanReference"] < front_land
+    assert set(stations) == {"BondZoneReference", "BackStubReference"}
     stub = stations["BackStubReference"]
     assert back_land_end < stub and stub + lengths["BackStubReference"] < rim
-    for name in ("CollarSpanDia", "BackStubDia"):
-        assert drawing.DIMENSION_CALLOUTS[name] == "SEE NOTE 2"
-        assert sheet.DRAWING_PRECISION_BY_NAME[name] == 4
+    assert sheet.BACK_STUB_DIA_PREFIX == "2X <MOD-DIAM>"
+    assert drawing.DIMENSION_CALLOUTS["BackStubDia"] == "SEE NOTE 2"
+    assert sheet.DRAWING_PRECISION_BY_NAME["BackStubDia"] == 4
+    assert not any("CollarSpan" in name for name in drawing.PRINCIPAL_KEEP)
     note_2 = " ".join(drawing.SHEET_NOTES.split("\n2. ")[1].split())
     assert note_2 == (
-        "SPANS (2X): SLIDING FIT IN MHA-DT-33 PINION ARBOR RETENTION COLLAR "
-        "(CLEARANCE .0004-.0078)."
+        "SPANS (2X) OUTSIDE THE JOURNALS: SLIDING FIT IN MHA-DT-33 "
+        "PINION ARBOR RETENTION COLLAR (CLEARANCE .0004-.0078)."
     )
     # The clearance from both parts' printed limits; its minimum is the
     # collar spec's own slide-on clearance.
@@ -582,20 +627,15 @@ def test_each_plain_span_carries_its_own_diameter_and_mate() -> None:
     assert spec.SHAFT_DIA + spec.SHAFT_DIA_BAND[0] < smallest_bore
     for title_block_max_in in (0.31 + 0.01, 0.312 + 0.005):
         assert title_block_max_in * 25.4 > smallest_bore
-    # Placement: the collar span's line clear of the pin hole and the front
-    # land's head-end witness, the stub's inside the back land's crown end.
-    collar_x = drawing.PRINCIPAL_KEEP["CollarSpanDia"][0]
-    assert collar_x - drawing._sheet_x(spec.FRONT_JOURNAL_Z) >= 0.001
-    assert drawing._sheet_x(spec.PIN_Z) - pin_r / 1000.0 - collar_x >= 0.0015
-    # Round 4 (40a03f2a): the text, which runs right of its dimension line,
-    # crossed the neck-end witness at x 0.2960; it now ends short of it.
-    text_end = collar_x + drawing.COLLAR_SPAN_TEXT_RUN
-    assert drawing.NECK_END_WITNESS_X - text_end >= 0.0015
-    stub_x = drawing.PRINCIPAL_KEEP["BackStubDia"][0]
+    # Placement: the stub's line inside the back land's crown end, and its
+    # 2X block clear of every known line whichever side SolidWorks runs it.
+    stub_xy = drawing.PRINCIPAL_KEEP["BackStubDia"]
     land_crown_x = drawing._sheet_x(spec.BACK_JOURNAL_Z + spec.JOURNAL_LEN)
-    assert land_crown_x - stub_x >= 0.0015
+    assert land_crown_x - stub_xy[0] >= 0.0015
+    assert _crossed_either_side(stub_xy, _DIA_BLOCK_RUN_MM + _COUNT_PREFIX_MM) == []
     rows = drawing.SHEET_NOTES.replace("<MOD-DIAM>", "Ø").splitlines()
     assert len(rows) <= 4
+    assert max(map(len, rows)) <= 66
 
 
 def test_bond_zone_diameter_is_a_flank_dimension_on_the_drum() -> None:
@@ -849,9 +889,7 @@ def test_reference_witnesses_are_drawn_in_the_outline_black() -> None:
     machinist reads as a groove (Main)."""
     import inspect
 
-    assert set(drawing.REFERENCE_WITNESSES) == {
-        "BondZoneReference", "CollarSpanReference", "BackStubReference",
-    }
+    assert set(drawing.REFERENCE_WITNESSES) == {"BondZoneReference", "BackStubReference"}
     assert drawing.REFERENCE_WITNESS_COLOR == 0
     assert part.SPAN_REFERENCES is sheet.SPAN_REFERENCES
     for feature, dimension, station, length in sheet.SPAN_REFERENCES:
@@ -1072,7 +1110,6 @@ def test_every_dimension_carrying_reference_sketch_is_saved_hidden() -> None:
         "BackJournalReference",
         "BackRimReference",
         "BondZoneReference",
-        "CollarSpanReference",
         "BackStubReference",
         "DrumStationReference",
         "PinStationReference",
@@ -1082,7 +1119,7 @@ def test_every_dimension_carrying_reference_sketch_is_saved_hidden() -> None:
     assert set(sheet.REFERENCE_SKETCHES) == expected
     assert len(sheet.REFERENCE_SKETCHES) == len(expected)
     assert expected == {name for name in sheet.DRAWING_DIMENSIONS if name.endswith("Reference")}
-    assert set(spec.REFERENCE_SKETCHES) == expected - {"CollarSpanReference", "BackStubReference"}
+    assert set(spec.REFERENCE_SKETCHES) == expected - {"BackStubReference"}
     source = Path(part.__file__).read_text(encoding="utf-8")
     authored = set(re.findall(r'"(\w+Reference)"', source)) | {
         f"{prefix}Reference" for prefix in re.findall(r'prefix="(\w+)"', source)

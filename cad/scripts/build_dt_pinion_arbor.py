@@ -85,6 +85,7 @@ from dt_pinion_arbor_spec import (
 # The sheet's marked set: the spec's plus the two plain spans' diameters
 # (dt_pinion_arbor_notes), so dt_pinion_arbor_spec's other readers keep theirs.
 from dt_pinion_arbor_notes import (
+    BACK_STUB_DIA_PREFIX,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     REFERENCE_SKETCHES,
@@ -919,9 +920,6 @@ async def build(adapter) -> dict[str, str]:
         adapter, "BondZoneReference", "BondZoneDia", *deviations(SHAFT_DIA_BAND), display_unit=UNIT
     )
     set_dimension_bilateral_tolerance(
-        adapter, "CollarSpanReference", "CollarSpanDia", *deviations(SHAFT_DIA_BAND), display_unit=UNIT
-    )
-    set_dimension_bilateral_tolerance(
         adapter, "BackStubReference", "BackStubDia", *deviations(SHAFT_DIA_BAND), display_unit=UNIT
     )
     set_dimension_bilateral_tolerance(
@@ -953,8 +951,10 @@ async def build(adapter) -> dict[str, str]:
         display_unit=UNIT,
     )
     # A diametric linear dimension on a side-view sketch prints no Ø by itself.
-    for prefix in ("FrontJournal", "BackJournal", "BondZone", "CollarSpan", "BackStub"):
+    for prefix in ("FrontJournal", "BackJournal", "BondZone"):
         set_dimension_prefix(adapter, f"{prefix}Reference", f"{prefix}Dia", "<MOD-DIAM>")
+    # One size for both spans outside the journals (dt_pinion_arbor_notes).
+    set_dimension_prefix(adapter, "BackStubReference", "BackStubDia", BACK_STUB_DIA_PREFIX)
     set_dimension_prefix(adapter, "FrontCapProfile", "HeadCapR", "SR")
     set_dimension_prefix(adapter, "BackCapProfile", "BackCapR", "SR")
     clear_dimensions_for_drawing(adapter)

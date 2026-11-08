@@ -77,7 +77,6 @@ from dt_pinion_arbor_spec import (
 from dt_pinion_arbor_notes import (
     BACK_STUB_DIA_Z,
     BOND_ZONE_WITNESS_LEN,
-    COLLAR_SPAN_DIA_Z,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     SPAN_WITNESS_LEN,
@@ -106,17 +105,21 @@ JOURNAL_CLEARANCE = (
     STRAP_BORE + REAM_SLIDE[0] - (SHAFT_DIA + JOURNAL_DIA_BAND[1]),
 )
 JOURNAL_CALLOUT = "RUNNING FIT,\nSEE NOTE 1"
-# Every Ø5/16 span prints its own diameter on the view (round 3 of fan-out
-# dt-fab-3).  The drum's span between the journals (the drum, 2.40-8.04
-# from the head rear face, rests on both lands' inner ends:
+# Every Ø5/16 span's size is on the view (round 3 of fan-out dt-fab-3).  The
+# drum's span between the journals (the drum, 2.40-8.04 from the head rear
+# face, rests on both lands' inner ends:
 # dt_pinion_arbor_spec.DRUM_*_END_ON_JOURNAL_MIN) is its bonded fit, reason
-# once at its callout.  The span by the head (the collar's, with its pin
-# hole) and the back stub take the same -.0004/-.0038: MHA-DT-33 slides
-# over both from the back crown to its pin station, the band's upper limit
-# its slide-on clearance (dt_pinion_arbor_collar_spec.SLIDE_CLEARANCE_MIN),
-# so both flag note 2, the sliding fit with that collar.  The title block's
-# .XX or .XXX on the back stub (Ø.32 or Ø.317 max) would stop the collar
-# (bore .3125 min) and the drum (.3135 min) passing it, so it keeps the band.
+# once at its callout.  The two spans outside the journals (the collar's, by
+# the head, with its pin hole; the back stub) take the same -.0004/-.0038:
+# MHA-DT-33 slides over both from the back crown to its pin station, the
+# band's upper limit its slide-on clearance
+# (dt_pinion_arbor_collar_spec.SLIDE_CLEARANCE_MIN).  One 2X diameter on the
+# back stub sizes both and flags note 2, which names them and that sliding
+# fit (round 5: the collar span's own block had no open space between the
+# front land's and the neck's witnesses, whichever side SolidWorks put it).
+# The title block's .XX or .XXX on the back stub (Ø.32 or Ø.317 max) would
+# stop the collar (bore .3125 min) and the drum (.3135 min) passing it, so it
+# keeps the band.
 STRAP_NAME = "PINION BRACKET STRAP"
 COLLAR_NAME = "PINION ARBOR RETENTION COLLAR"
 COLLAR_CLEARANCE = (
@@ -132,8 +135,9 @@ SHEET_NOTES = (
     f"1. JOURNALS (2X): RUNNING FIT IN {STRAP_NUMBER} {STRAP_NAME},\n"
     f"   TURN TO MEASURED BORE (CLEARANCE {_inch(JOURNAL_CLEARANCE[0])}-"
     f"{_inch(JOURNAL_CLEARANCE[1])}).\n"
-    f"2. SPANS (2X): SLIDING FIT IN {COLLAR_NUMBER} {COLLAR_NAME}\n"
-    f"   (CLEARANCE {_inch(COLLAR_CLEARANCE[0])}-{_inch(COLLAR_CLEARANCE[1])})."
+    f"2. SPANS (2X) OUTSIDE THE JOURNALS: SLIDING FIT IN {COLLAR_NUMBER}\n"
+    f"   {COLLAR_NAME} (CLEARANCE {_inch(COLLAR_CLEARANCE[0])}-"
+    f"{_inch(COLLAR_CLEARANCE[1])})."
 )
 # Under the property-linked inside-corner note (top-left at y 0.060).
 NOTES_XY = (0.020, 0.052)
@@ -325,27 +329,19 @@ BOND_ZONE_TEXT_XY = (_sheet_x(BOND_ZONE_DIA_Z), 0.1474 + 0.0028)
 # untouched.  The drum station's sketch stays hidden: its dimension does not
 # print (UNPRINTED_DIMENSIONS).  The spans (model z, mm) are the builder's,
 # both read from dt_pinion_arbor_notes: the bond zone's and, round 3 of
-# fan-out dt-fab-3, the collar span's and the back stub's.
+# fan-out dt-fab-3, the back stub's.
 REFERENCE_WITNESS_COLOR = 0  # COLORREF black, the outline's colour.
 REFERENCE_WITNESSES = {
     "BondZoneReference": (BOND_ZONE_DIA_Z, BOND_ZONE_DIA_Z + BOND_ZONE_WITNESS_LEN),
-    "CollarSpanReference": (COLLAR_SPAN_DIA_Z, COLLAR_SPAN_DIA_Z + SPAN_WITNESS_LEN),
     "BackStubReference": (BACK_STUB_DIA_Z, BACK_STUB_DIA_Z + SPAN_WITNESS_LEN),
 }
-# The collar span's diameter hangs its block below the shaft, over the 1.82's
-# text (y ~0.140), in the slot between the front land's head-end witness
-# (x 0.2608) and the neck-end witness (x 0.2960).  Its text runs right of the
-# dimension line: round 4 (40a03f2a) put the line at x 0.2661 and the text
-# ended at x 0.2984, across the neck-end witness.  With the line 1.2 mm right
-# of the land's witness the text ends at ~0.2944, 1.6 mm short of the neck's
-# (COLLAR_SPAN_TEXT_RUN, the measured line-to-text-end run).  The back
-# stub's (line at x ~0.086, 2 mm inside the back land's crown-end witness at
-# x 0.0881 and right of the (.05)'s right arrow tail) rises above the shaft,
-# past the back land's diameter block (top y ~0.208) and the (.05) row
-# (y ~0.222).
-COLLAR_SPAN_TEXT_RUN = 0.2984 - 0.2661
-NECK_END_WITNESS_X = 0.2960
-COLLAR_SPAN_TEXT_XY = (_sheet_x(FRONT_JOURNAL_Z) + 0.0012, 0.1540)
+# The back stub's 2X diameter (line at x ~0.086, 2 mm inside the back land's
+# crown-end witness at x 0.0881 and right of the (.05)'s right arrow tail)
+# rises above the shaft, past the back land's diameter block (top y ~0.208)
+# and the (.05) row (y ~0.222), into sheet left open on both sides of its
+# line (round-3 PDF: no line in x 0.040-0.133 over y 0.225-0.250), so the
+# block is clear whichever side SolidWorks runs it (round 4 ran the collar
+# span's right of its line, round 5 left).
 BACK_STUB_TEXT_XY = (_sheet_x(BACK_STUB_DIA_Z), 0.2360)
 SW_SEL_EXT_SKETCH_SEGS = 24  # swSelectType_e.swSelEXTSKETCHSEGS
 REFERENCE_WITNESS_LEN_TOL = 0.01  # mm; the witnesses are fully defined sketch lengths
@@ -411,7 +407,6 @@ PRINCIPAL_KEEP = {
     # station's text.
     "FrontJournalDia": (FRONT_JOURNAL_DIA_X, 0.1515),
     "BondZoneDia": BOND_ZONE_TEXT_XY,
-    "CollarSpanDia": COLLAR_SPAN_TEXT_XY,
     "BackStubDia": BACK_STUB_TEXT_XY,
     "BackJournalDia": (BACK_JOURNAL_TEXT_X, BACK_JOURNAL_DIA_Y),
     # y 0.140, not 0.130: lifts the dimension line to y ~0.1372 so its head-end
@@ -526,7 +521,6 @@ DIMENSION_CALLOUTS = {
     "FrontJournalDia": JOURNAL_CALLOUT,
     "BackJournalDia": JOURNAL_CALLOUT,
     "BondZoneDia": BOND_ZONE_CALLOUT,
-    "CollarSpanDia": SPAN_CALLOUT,
     "BackStubDia": SPAN_CALLOUT,
     "PinHoleDia": PIN_HOLE_CALLOUT,
 }

@@ -1,30 +1,31 @@
 """Sheet-only dimension set for the pinion arbor (MHA-DT-22).
 
-Every plain Ø5/16 span prints its own diameter on the view (fan-out dt-fab-3
-round 3: a size given only in note prose was not on the view).  The bond zone's
-flank diameter is the spec's; the two spans either side of it (the collar's,
-by the head, with the pin hole; the back stub, past the back land) gain theirs
-here.  Only build_dt_pinion_arbor and draw_dt_pinion_arbor import this module,
-so dt_pinion_arbor_spec (which the collar, pin, rig fit-up and other sheets
-read) stays as it is.  The sheet's maps are the spec's plus these entries.
+Every plain Ø5/16 span's size is on the view (fan-out dt-fab-3 round 3: a size
+given only in note prose was not on the view).  The bond zone's flank diameter
+is the spec's.  The two spans outside the journals (the collar's, by the head,
+with the pin hole; the back stub, past the back land) take the same limits and
+the same mate, so one 2X diameter on the back stub sizes both (round 5: the
+collar span has no open sheet space for its own block, which SolidWorks
+flipped onto the front land's witnesses either side).  Only
+build_dt_pinion_arbor and draw_dt_pinion_arbor import this module, so
+dt_pinion_arbor_spec (which the collar, pin, rig fit-up and other sheets
+read) stays as it is.  The sheet's maps are the spec's plus this entry.
 """
 
 from __future__ import annotations
 
 import dt_pinion_arbor_spec as spec
 
-# Each span's diameter is measured at a short construction witness run along
-# its flank, from its station toward the back crown (mm from the head rear
-# face): the collar span's clear of the pin hole and the front land, the back
-# stub's between the back land and the crown.
+# Each diameter is measured at a short construction witness run along its
+# flank, from its station toward the back crown (mm from the head rear face):
+# the back stub's between the back land and the crown.
 BOND_ZONE_WITNESS_LEN = 4.0
 SPAN_WITNESS_LEN = 4.0
-COLLAR_SPAN_DIA_FROM_HEAD_REAR = 41.0
 BACK_STUB_DIA_FROM_HEAD_REAR = 221.0
-COLLAR_SPAN_DIA_Z = spec.HEAD_REAR_Z + COLLAR_SPAN_DIA_FROM_HEAD_REAR
 BACK_STUB_DIA_Z = spec.HEAD_REAR_Z + BACK_STUB_DIA_FROM_HEAD_REAR
+# One size for both spans outside the journals.
+BACK_STUB_DIA_PREFIX = "2X <MOD-DIAM>"
 _NEW_SPANS = (
-    ("CollarSpanReference", "CollarSpanDia", COLLAR_SPAN_DIA_FROM_HEAD_REAR, SPAN_WITNESS_LEN),
     ("BackStubReference", "BackStubDia", BACK_STUB_DIA_FROM_HEAD_REAR, SPAN_WITNESS_LEN),
 )
 SPAN_REFERENCES = (
