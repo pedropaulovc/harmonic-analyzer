@@ -25,8 +25,8 @@ HUB_RADIAL_STACK is that setting's band and printed rounding plus the
 pin-shoulder clearance. Every strap hole is reamed at the same setting, so
 no stud, nose or slip float enters the location. ``PIN_RELATIVE_ERROR``
 bounds each strap edge's correlated pin-shape error against that SAME HUB;
-``PIN_RELATIVE_STACK`` adds the two once per edge against half the
-strap's 0/-.020 radial band.
+``PIN_RELATIVE_STACK`` adds these and the accepted carriage-play radius once
+per edge against half the strap's 0/-.020 radial band.
 """
 
 from __future__ import annotations
@@ -320,7 +320,7 @@ if not set().union(*DRAWING_DIMENSIONS.values()) <= set(DRAWING_PRECISION_BY_NAM
 
 # The in-place STRAP hole follows the actual inner-pass apex. There is no
 # stud/nose float in this location stack; the correlated pin-relative error
-# below completes it.
+# and accepted carriage play below complete it.
 _TOP_EDGE_HALF_BAND = (max(rocker.TOP_EDGE_BAND) - min(rocker.TOP_EDGE_BAND)) / 2.0
 HUB_OFFSET_PLACES = 4  # a .0001 DRO, as the alignment table
 HUB_OFFSET_BAND = 0.0005 * trammel.INCH  # ±.0005 on the DRO setting
@@ -440,17 +440,22 @@ def pin_relative_stack(hub_radial_stack: float = HUB_RADIAL_STACK) -> dict[str, 
 
     Every strap hole is reamed at the HUB DRO setting, so an edge-to-pivot
     error is that setting's stack plus the edge's correlated pin-shape error
-    against the same HUB. No stud, nose or washer float locates the strap,
-    and the absolute R800/R816 radius errors are already inside the same-HUB
-    comparison, never added again. The hub aims mid-band, so each edge may
-    spend half of its 0/-.020 radial limits (``_TOP_EDGE_HALF_BAND``).
+    against the same HUB and the accepted carriage-play radius. The setting
+    stack already includes shoulder clearance; do not add that term again.
+    No stud, nose or washer float locates the strap, and the absolute R800/R816
+    radius errors are already inside the same-HUB comparison, never added again.
+    The hub aims mid-band, so each edge may spend half of its 0/-.020 radial
+    limits (``_TOP_EDGE_HALF_BAND``).
     """
     if not math.isfinite(hub_radial_stack) or hub_radial_stack < 0.0:
         raise ValueError("HUB radial stack must be finite and nonnegative")
-    stack = {name: hub_radial_stack + error for name, error in PIN_RELATIVE_ERROR.items()}
+    stack = {
+        name: hub_radial_stack + error + trammel.CARRIAGE_PLAY_RADIUS
+        for name, error in PIN_RELATIVE_ERROR.items()
+    }
     if max(stack.values()) > _TOP_EDGE_HALF_BAND:
         raise AssertionError(
-            "HUB setting plus correlated pin error exceed half the strap's "
+            "HUB setting plus correlated pin error and carriage play exceed half the strap's "
             f"radial band: stack_mm={stack!r}, half_band_mm={_TOP_EDGE_HALF_BAND!r}"
         )
     return stack
@@ -485,9 +490,10 @@ def station_sweep_error(
 
     A clamp or stop outside the arc endpoint needs a Euclidean bound. For
     each box corner, |w-dr*u|² is a single sine/cosine expression; bound its
-    entire sweep analytically, then include the outer chord's norm remainder.
-    ``station_errors`` defaults to the table row's own X/Y errors; a station
-    set from the carrier by another ordinary band passes that band instead.
+    entire sweep analytically, then include the outer chord's norm remainder
+    and accepted carriage-play displacement once. ``station_errors`` defaults
+    to the table row's own X/Y errors; a station set from the carrier by another
+    ordinary band passes that band instead.
     """
     ex, ey = table_coordinate_errors(point) if station_errors is None else station_errors
     if min(ex, ey) < 0.0:
@@ -510,11 +516,14 @@ def station_sweep_error(
                 wx * wx + wy * wy + dr * dr, trammel.SWEEP[pass_name],
             )
             worst_squared = max(worst_squared, high)
-    return math.sqrt(worst_squared) + q * chord_max**2 / (2.0 * (trammel.D2 - chord_max))
+    return (
+        math.sqrt(worst_squared) + q * chord_max**2 / (2.0 * (trammel.D2 - chord_max))
+        + trammel.CARRIAGE_PLAY_RADIUS
+    )
 
 
 def station_cut_error(point: tuple[float, float], pass_name: str) -> float:
-    """Table-located hole versus self-cut edge, including printed rounding."""
+    """Table-located hole versus self-cut edge, with rounding and carriage play."""
     theta = math.atan2(point[0], point[1] + trammel.H1)
     sx, cy = math.sin(theta), math.cos(theta)
     station_errors = table_coordinate_errors(point)
@@ -537,11 +546,14 @@ def station_cut_error(point: tuple[float, float], pass_name: str) -> float:
     radius = math.dist(point, trammel.ARC_CENTRE)
     remainder = v_max**2 / (2.0 * (radius - v_max))
     remainder += q * chord_max**2 / (2.0 * (trammel.D2 - chord_max))
-    return worst + abs(sx) * station_errors[0] + abs(cy) * station_errors[1] + remainder
+    return (
+        worst + abs(sx) * station_errors[0] + abs(cy) * station_errors[1] + remainder
+        + trammel.CARRIAGE_PLAY_RADIUS
+    )
 
 
 # Rule 17 (riser walls): each table-located riser tap against both self-cut
-# edges, charging the same correlated pin errors that move those cuts.
+# edges, charging the correlated pin errors and carriage play that move those cuts.
 _RISER_MOUTH_MAX = (
     trammel.RISER_CSK_DIA + printed_band_mm(trammel.RISER_CSK_PLACES, unit=trammel.RISER_UNIT)
 ) / 2.0

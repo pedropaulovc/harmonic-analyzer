@@ -2189,6 +2189,7 @@ def test_kit_rails_and_carriages_carry_the_owner_note_and_the_play_check() -> No
     for description in spec.BOM_DESCRIPTIONS.values():
         assert "Z0" not in description and "PRELOAD" not in description
     tir = f"{trammel.CARRIAGE_PLAY_TIR_MAX:.2f} MM TIR MAX"
+    assert tir == "0.02 MM TIR MAX"
     rail_item, carriage_item = spec.ITEM_NUMBERS[spec.RAIL], spec.ITEM_NUMBERS[spec.CARRIAGE]
     note = spec.BOM_NOTE.split("\n")
     kit = note.index(
@@ -2214,6 +2215,9 @@ def test_kit_rails_and_carriages_carry_the_owner_note_and_the_play_check() -> No
     preparation = next(text for text in spec.ASSEMBLY_STEPS if text.startswith("1. "))
     assert spec._item(spec.CARRIAGE) in preparation
     assert carriage.STYLE in preparation
+    assert "ROCK ALL 4 SIDEWAYS UNDER AN INDICATOR; KEEP THE 2 TIGHTEST, ONE PER RAIL." in preparation
+    assert "ONLY ONTO A KIT FALSE RAIL" in preparation
+    assert "IF NONE MEETS 0.02, FIT A PRELOADED (Z0/ZA) HGH15CA CARRIAGE." in preparation
     assert trammel.RAIL_HOLE_COUNT == 8
 
 

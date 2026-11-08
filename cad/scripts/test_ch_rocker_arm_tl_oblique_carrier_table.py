@@ -60,8 +60,8 @@ def test_owner_pin_only_bounds_and_rounded_budget():
         name: max(abs(v) for v in spec.PIN_ROUNDED_BUDGET[name])
         for name in ("inner", "outer")
     }
-    # R4: no stud or nose float locates the strap; the in-situ HUB setting
-    # stack and each pass's correlated pin error are each counted once.
+    # R4/P1-A: no stud or nose float locates the strap; the in-situ HUB setting
+    # stack, correlated pin error and accepted carriage play are counted once.
     for retired in ("PIN_RELATIVE_ALLOWANCE", "HUB_SHANK_RADIAL_FLOAT",
                     "HUB_NOSE_RADIAL_FLOAT", "NOSE_FLOAT_ALLOWANCE",
                     "require_pin_relative_budget", "hub_stud"):
@@ -69,10 +69,13 @@ def test_owner_pin_only_bounds_and_rounded_budget():
     half = spec._TOP_EDGE_HALF_BAND
     assert half == pytest.approx(.010 * I)
     assert spec.PIN_RELATIVE_STACK == pytest.approx({
-        name: spec.HUB_RADIAL_STACK + error for name, error in spec.PIN_RELATIVE_ERROR.items()
+        name: spec.HUB_RADIAL_STACK + error + trammel.CARRIAGE_PLAY_RADIUS
+        for name, error in spec.PIN_RELATIVE_ERROR.items()
     })
-    assert spec.PIN_RELATIVE_STACK["inner"] / I == pytest.approx(.005107, abs=2e-6)
-    assert spec.PIN_RELATIVE_STACK["outer"] / I == pytest.approx(.008826, abs=2e-6)
+    assert spec.HUB_RADIAL_STACK == pytest.approx(.12588, abs=5e-6)
+    assert trammel.RADIUS_FROM_SHOULDER_CLEARANCE == pytest.approx(.11218, abs=5e-6)
+    assert spec.PIN_RELATIVE_STACK["inner"] == pytest.approx(.14971, abs=5e-6)
+    assert spec.PIN_RELATIVE_STACK["outer"] == pytest.approx(.24419, abs=5e-6)
     assert spec.PIN_RELATIVE_REMAINING == pytest.approx({
         name: half - stack for name, stack in spec.PIN_RELATIVE_STACK.items()
     })
@@ -80,12 +83,12 @@ def test_owner_pin_only_bounds_and_rounded_budget():
     assert spec.HUB_RADIAL_STACK <= .005 * I
 
 
-@pytest.mark.parametrize("hub_stack_in,fits", [(.004956, True), (.0061, True), (.0065, False)])
+@pytest.mark.parametrize("hub_stack_in,fits", [(.004956, True), (.0053, True), (.0061, False), (.0065, False)])
 def test_pin_relative_stack_is_functional_in_the_hub_setting(hub_stack_in, fits):
     if fits:
         stack = spec.pin_relative_stack(hub_stack_in * I)
         assert stack["outer"] == pytest.approx(
-            hub_stack_in * I + spec.PIN_RELATIVE_ERROR["outer"]
+            hub_stack_in * I + spec.PIN_RELATIVE_ERROR["outer"] + trammel.CARRIAGE_PLAY_RADIUS
         )
     else:
         with pytest.raises(AssertionError, match="radial band"):
@@ -93,6 +96,28 @@ def test_pin_relative_stack_is_functional_in_the_hub_setting(hub_stack_in, fits)
     for bad in (-1e-9, math.inf, math.nan):
         with pytest.raises(ValueError):
             spec.pin_relative_stack(bad)
+
+
+def test_carriage_play_is_charged_once_and_old_acceptance_is_rejected(monkeypatch):
+    accepted = spec.pin_relative_stack()
+    monkeypatch.setattr(trammel, "CARRIAGE_PLAY_RADIUS", 0.0)
+    without_play = spec.pin_relative_stack()
+    for name in accepted:
+        assert accepted[name] - without_play[name] == pytest.approx(.02)
+    # PR #2236 P1: the old .05 acceptance exceeds the unchanged .254 half-band.
+    monkeypatch.setattr(trammel, "CARRIAGE_PLAY_RADIUS", .05)
+    with pytest.raises(AssertionError, match="radial band"):
+        spec.pin_relative_stack()
+
+
+@pytest.mark.parametrize("pass_name", ["inner", "outer"])
+def test_station_cut_and_sweep_consumers_charge_carriage_play_once(monkeypatch, pass_name):
+    point = trammel.CL
+    cut = spec.station_cut_error(point, pass_name)
+    sweep = spec.station_sweep_error(point, pass_name)
+    monkeypatch.setattr(trammel, "CARRIAGE_PLAY_RADIUS", 0.0)
+    assert cut - spec.station_cut_error(point, pass_name) == pytest.approx(.02)
+    assert sweep - spec.station_sweep_error(point, pass_name) == pytest.approx(.02)
 
 
 def _circle(a, b):
@@ -129,7 +154,9 @@ def test_enclosure_covers_exact_correlated_circles_and_interior_boxes():
 
 def test_local_row_band_is_functional_not_an_unconditional_pass_constant():
     loose = spec.correlated_pin_budget(outer_y_band=.005 * I)
-    assert max(abs(v) for v in loose["outer"]) > spec._TOP_EDGE_HALF_BAND - spec.HUB_RADIAL_STACK
+    assert max(abs(v) for v in loose["outer"]) > (
+        spec._TOP_EDGE_HALF_BAND - spec.HUB_RADIAL_STACK - trammel.CARRIAGE_PLAY_RADIUS
+    )
     zero = spec.correlated_pin_budget(0, 0, include_rounding=False)
     assert zero["inner"] == pytest.approx((0, 0), abs=1e-9)
     assert zero["outer"] == pytest.approx((0, 0), abs=1e-9)

@@ -89,23 +89,26 @@ def cutter_gap(
 
 
 def washer_cutter_gaps(correlated_pin_error: float = 0.0) -> dict[str, float]:
-    """Spigot-centred full-sweep gaps less one correlated pin error.
+    """Spigot-centred full-sweep gaps with play and one correlated pin error.
 
     OD/spigot/bore are turned in one chucking. Screw/tap drift affects the
     fillet fit-up, not washer centring; no thread crest enters this stack.
+    HUB_RADIAL_STACK already charges shoulder clearance; carriage play is
+    a separate term, included once just as in carrier.pin_relative_stack.
     """
     if correlated_pin_error < 0.0:
         raise ValueError("correlated pin error must be nonnegative")
     return {
         name: cutter_gap(trammel.HUB, washer.OD_LIMITS[1] / 2.0, name)
-        - SPIGOT_FLOAT_MAX - carrier.HUB_RADIAL_STACK - correlated_pin_error
+        - SPIGOT_FLOAT_MAX - carrier.HUB_RADIAL_STACK
+        - trammel.CARRIAGE_PLAY_RADIUS - correlated_pin_error
         for name in trammel.SWEEP
     }
 
 
 WASHER_GAPS = {name: cutter_gap(trammel.HUB, washer.OD / 2.0, name) for name in trammel.SWEEP}
 # Each pass charges its own correlated pin-shape error against the SAME
-# in-situ HUB once, beside the spigot float and HUB setting stack.
+# in-situ HUB once, beside the spigot float, HUB setting stack and carriage play.
 WASHER_GAPS_MIN = {
     name: washer_cutter_gaps(carrier.PIN_RELATIVE_ERROR[name])[name]
     for name in trammel.SWEEP
@@ -132,7 +135,7 @@ END_HEAD_GAPS = {
     for name in trammel.SWEEP
 }
 # CL/CR lie beyond the finite cutter arc: charge each head's complete
-# correlated table-row and cut displacement over the whole sweep.
+# correlated table-row and cut displacement, including accepted carriage play.
 END_HEAD_GAPS_MIN = {
     name: min(
         cutter_gap(point, SCREW_HEAD_DIA_LIMITS[1] / 2.0, name)
@@ -183,7 +186,7 @@ STOP_PIN_TOP_FLOAT_MAX = riser.STOP_PIN_FLOAT_MAX * (
     / riser.STOP_PIN_SUPPORT_MIN
 )
 # The stop axes are set from the carrier at the riser's one ordinary .XX
-# station band; the same correlated pin errors move both self-cut sweeps.
+# station band; correlated pin errors and carriage play move both self-cut sweeps.
 STOP_STATION_BAND = printed_band_mm(riser.STATION_PLACES, unit=riser.UNIT)
 STOP_PIN_GAPS_MIN = {
     name: min(

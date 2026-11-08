@@ -645,7 +645,7 @@ def test_carriage_note_is_the_owner_kit_description_and_play_acceptance() -> Non
     ):
         assert fact in note, fact
     assert "PIVOT" not in note
-    assert trammel.CARRIAGE_PLAY_TIR_MAX == 0.05
+    assert trammel.CARRIAGE_PLAY_TIR_MAX == 0.02
     # The item tags are the sheet's own member labels.
     assert [label.split()[0] for _, label in draw.VARIANTS] == [
         rail.ITEM_TAG, carriage.ITEM_TAG,

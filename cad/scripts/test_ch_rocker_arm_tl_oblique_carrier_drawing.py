@@ -294,10 +294,12 @@ def test_in_situ_hub_fit_up_closes_inside_the_strap_top_edge_band() -> None:
     assert spec.HUB_RADIAL_STACK == pytest.approx(worst)
     assert f"{spec.HUB_RADIAL_STACK:.3f}" == "0.126"
     assert spec.HUB_RADIAL_STACK < half
-    # #2151: the HUB setting plus each pass's correlated pin error, counted
-    # once against the same in-situ HUB, stays inside half the band.
+    # #2236 P1-A: the HUB setting, each pass's correlated pin error and
+    # carriage play, counted once against the same HUB, stay inside half-band.
     for name, error in spec.PIN_RELATIVE_ERROR.items():
-        assert spec.PIN_RELATIVE_STACK[name] == pytest.approx(spec.HUB_RADIAL_STACK + error)
+        assert spec.PIN_RELATIVE_STACK[name] == pytest.approx(
+            spec.HUB_RADIAL_STACK + error + trammel.CARRIAGE_PLAY_RADIUS
+        )
         assert spec.PIN_RELATIVE_STACK[name] < half
 
 

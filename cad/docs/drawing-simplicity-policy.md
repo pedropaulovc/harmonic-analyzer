@@ -313,23 +313,44 @@ Including `.XXX` nominal rounding gives relative pin-shape bounds
 
 No stud, sleeve or nose locates the strap: every strap hole is reamed at the
 HUB DRO setting. `pin_relative_stack` therefore charges each edge the R4
-`HUB_RADIAL_STACK` (`.004956`: offset band, printed-offset rounding and pin
-shoulder clearance) plus that pass's correlated pin error, once, against half
-the strap's `0/-.020` radial limits. The top edge stacks to `.005107` and the
-bottom to `.008826`, both inside `.010`; the source guard refuses a larger
-HUB setting stack (for example `.0065`). The product band and these jig
-errors are never charged twice.
+`HUB_RADIAL_STACK` (`.12588 mm`: offset band, printed-offset rounding and pin
+shoulder clearance, including the `.11218 mm` shoulder term), that pass's
+correlated pin error and `trammel.CARRIAGE_PLAY_RADIUS`, each once, against
+half the strap's unchanged `0/-.020` radial limits. Owner **P1-A, 2026-11-07**,
+approved tightening carriage acceptance from `.05` to `.02 mm TIR` with the
+existing `1.0` radius factor to close
+[PR #2236 P1](https://github.com/pedropaulovc/harmonic-analyzer/pull/2236#discussion_r4504212381)
+(thread `PRRT_kwDOPHDy386074XU`). The resulting top/inner stack is about
+`.14971 mm` (`.005894 in`) and bottom/outer `.24419 mm` (`.009614 in`),
+both inside `.254 mm` (`.010 in`). The source guard rejects the original
+`.05 mm` play allowance and an oversized HUB setting stack (for example
+`.0061 in`). Shoulder clearance is already in `HUB_RADIAL_STACK`, not added
+again; product bands and nominal geometry are unchanged.
+
+The procedure still indicates the shoulder-screw head while rocking the
+carrier sideways to the rail by hand, checks all four kit carriages, and
+keeps the two tightest, one per rail. The rail-kit footer already uses its
+three permitted note lines beside the general line. Consequently TL-00
+preparation step 1 carries the owner's conditional fallback: if none meets
+`.02`, fit a preloaded `(Z0/ZA) HGH15CA` carriage. No new inventory purchase,
+quantity, SKU or cost is recorded. Printed play acceptance remains sourced
+from `CARRIAGE_PLAY_TIR_MAX` in the rail-kit note, TL-00 BOM note and final
+shoulder-head check.
 
 The same correlated errors feed the tooling-clearance and riser-wall checks.
-The TL-52 washer keeps at least `1.813 mm` to each complete cutter sweep
+The TL-52 washer keeps about `1.793 mm` to the limiting complete cutter sweep
 (OD and the #2249A spigot's `.14605 mm` float at their limits, each pass's own
-pin error), above the
-`1.5 mm` floor. The end-clamp heads and stop pins charge their table-row (or
-riser `.XX` station) error with the moved cut over the whole sweep. The TL-24
-CL/CR #9 clearances keep `.1218`/`.1018` to the self-cut edges and the riser
-taps `.0822`, so the riser needs no wall exception. Ref
+pin error and `.020 mm` carriage play), above the unchanged `1.5 mm` floor.
+The end-clamp heads and stop pins charge their table-row (or riser `.XX`
+station) error and accepted carriage play with the moved cut over the whole
+sweep. The self-cut riser-wall bounds likewise include carriage play once:
+CL/CR #9 clearances retain about `.1210`/`.1010`, and the riser taps `.0814`,
+above `.080`; no wall exception is introduced. Ref
 [#2151](https://github.com/pedropaulovc/harmonic-analyzer/issues/2151);
 its separate machinist-review rubric/eval work is not part of this change.
+The trailing-zero issue [#2293](https://github.com/pedropaulovc/harmonic-analyzer/issues/2293)
+and stale thirteen-row prose issue [#2294](https://github.com/pedropaulovc/harmonic-analyzer/issues/2294)
+remain deferred; this P1 correction does not change those sections.
 
 
 ## The gate

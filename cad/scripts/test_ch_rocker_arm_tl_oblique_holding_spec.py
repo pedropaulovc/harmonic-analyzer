@@ -161,14 +161,19 @@ def test_guard_rejects_screw_protrusion_and_real_cutter_floor(monkeypatch) -> No
 
 def test_table_layer_charges_each_correlated_pin_error_once() -> None:
     # Washer: each pass's own correlated pin error against the in-situ HUB,
-    # beside R4's spigot float and HUB setting stack, never the product band.
+    # beside spigot float, HUB setting and carriage play, never the product band.
     base = holding.washer_cutter_gaps()
     for name in trammel.SWEEP:
         assert holding.WASHER_GAPS_MIN[name] == pytest.approx(
             base[name] - carrier.PIN_RELATIVE_ERROR[name]
         )
-    # #2249A spigot .391 ±.002: pilot float .14605 leaves ~1.813 (outer).
-    assert min(holding.WASHER_GAPS_MIN.values()) >= 1.81 > holding.WASHER_CLEARANCE_MIN
+        assert holding.WASHER_GAPS_MIN[name] == pytest.approx(
+            holding.cutter_gap(trammel.HUB, washer.OD_LIMITS[1] / 2.0, name)
+            - holding.SPIGOT_FLOAT_MAX - carrier.PIN_RELATIVE_STACK[name]
+        )
+    # #2249A spigot .391 ±.002: float .14605 plus .02 play leaves ~1.793 outer.
+    assert min(holding.WASHER_GAPS_MIN.values()) == pytest.approx(1.793, abs=5e-4)
+    assert min(holding.WASHER_GAPS_MIN.values()) >= 1.79 > holding.WASHER_CLEARANCE_MIN
     # End heads: each point's own table-row and cut displacement.
     for name in trammel.SWEEP:
         assert holding.END_HEAD_GAPS_MIN[name] == pytest.approx(min(
