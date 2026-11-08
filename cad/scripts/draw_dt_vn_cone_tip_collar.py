@@ -120,8 +120,8 @@ TAP_CALLOUT_XY = (TAP_CENTER[0] + 0.0553, TAP_CENTER[1] - 0.0062)
 # The tap drill's size prints three inch places, as every Hole Wizard callout
 # on an inch sheet does (#290, draw_dt_cone_tip_block). It is written at
 # render time, the declared exception RV-01 in
-# cad/config/parts/dt-vn-cone-tip-collar.yaml (delegated ruling 2026-11-02,
-# owner review #2144): a part-authored precision does not reach the callout.
+# cad/config/parts/dt-vn-cone-tip-collar.yaml (Owner ruling 2026-11-08,
+# (Pedro), #2144 item 1.2): a part-authored precision does not reach the callout.
 TAP_CALLOUT_PRECISION = {"hw-thrutapdrldia": 3}
 TAP_NOTE_XY = (TAP_CENTER[0] - 0.030, TAP_CENTER[1] + 0.025)
 # Lower left, under the end view whose bore it enlarges, in the field the
