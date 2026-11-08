@@ -192,7 +192,7 @@ def _sheet_x(model_x_mm: float) -> float:
 # The 29.6 height's dimension line stands at sheet x 0.024, 65.6 mm off the
 # block's -X face (its text 6 mm inside the border), and the bore's Ø, its
 # bored band and its three callout
-# rows (BORE THRU, then the knife seat's mate, BORE_CALLOUT below) sit in
+# rows (REAM THRU, then the knife seat's mate, BORE_CALLOUT below) sit in
 # the band between them: the 5ff8fba5d render ran the
 # height line (then x 0.063) 3.62 mm through the Ø (text 58.5..75.3 mm).
 # BORE_DIA_TEXT_HALF_WIDTH is half the widest row, "MHA-SM-03 TRUNNION": 18
@@ -344,7 +344,7 @@ TOP_KEEP = {
     "SlotEndFromB": SLOT_END_TEXT_XY,
     "HoleRowFace": ROW_FACE_TEXT_XY,
 }
-# The knife bore is bored (Ra 63 µin, +.0015/0 band): the process is stated
+# The knife bore is reamed (Ra 63 µin, +.0015/0 band): the process is stated
 # (blind machinist review, 2026-10-09: a bare THRU left drill or ream open),
 # and the band's mate and fit under it (rule 4): the summing lever's hex
 # trunnion, whose top ridge rocks on the bore's crown.  The mate's number is
@@ -361,7 +361,10 @@ TOP_KEEP = {
 # deferred to a view).  These rows are drawing text, so the frame's import
 # closure keeps its key.
 LEVER_NUMBER = str(_config.parts("sm-summing-lever")["number"])
-BORE_CALLOUT = "\n".join(("BORE THRU", "RUNNING FIT ON", f"{LEVER_NUMBER} TRUNNION"))
+# The bore is reamed to size after heat treatment, like datum B (Owner
+# ruling 2026-11-08 (Pedro), SM-02 harden less): a 12 mm H7 reamer (.4724-
+# .4731) cuts inside the +.0015/0 band.
+BORE_CALLOUT = "\n".join(("REAM THRU", "RUNNING FIT ON", f"{LEVER_NUMBER} TRUNNION"))
 _SLIP_FIT = f"{DOWEL_NUMBER} SLIDING FIT"
 _SLIP_CLEARANCE = "CLEARANCE {:.4f}-{:.4f}".format(*PIN_SLIP_PRINTED).replace("0.", ".")
 _PIN_DEPTH_REF = f"{PIN_HOLE_DEPTH / DOWEL.MM_PER_IN:.{PIN_HOLE_DEPTH_PLACES}f}".lstrip("0")

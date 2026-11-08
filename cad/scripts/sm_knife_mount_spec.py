@@ -30,9 +30,13 @@ Owner ruling 2026-10-24 (T+H3), from this sheet's machinist ENFORCE review
 press reams could not be cut before through-hardening): the two
 MHA-SM-VN-53 dowels press into the MHA-FR-02 crossbar, knocked out from its
 faced top, and slip into this block's round hole (datum B) and its slot
-(datum C, open to the -X face).  The block's finish states that its sizes
-apply after heat treatment; O1's growth (<= .0005 in on the bore, <= .0001
-in on the slip sizes) stays inside the remaining bands.
+(datum C, open to the -X face).  Owner ruling 2026-11-08 (Pedro), SM-02
+harden less: the O1 block is hardened and drawn back to 40-45 HRC (tempered
+about 1000 F; Cincinnati Tool Steel Co.'s AISI O1 data sheet), which the
+shop can still ream, and the bore, datum B and datum C's slot are cut to
+their printed bands after heat treatment (no allowance, no lap); the finish
+says so.  No check here or in the summing assembly charges the seat's
+hardness (no contact-stress or wear model reads it).
 """
 
 from __future__ import annotations
@@ -94,9 +98,10 @@ SURFACE_FINISHES = (
 # General tolerances the printed places claim (title block, drawing-guidelines.md rule 3 (decimal places carry the tolerance)).
 _XX = printed_band_mm(2, unit=UNIT)
 _XXX = printed_band_mm(3, unit=UNIT)
-# The Ø.472 bore is BORED through on the boring head (no .472 reamer is
-# owned; the .4835 decimal reamer re-nominal fails the tap's crown web) to an
-# explicit .4720 +.0015/.0000 band, Ra 63 µin on its knife seat: the rock
+# The Ø.472 bore is REAMED through after heat treatment (Owner ruling
+# 2026-11-08 (Pedro), SM-02 harden less; formerly bored, as no .472 reamer is
+# owned): a 12 mm H7 reamer, carbide at 40-45 HRC, cuts .4724-.4731 inside
+# the explicit .4720 +.0015/.0000 band, Ra 63 µin on its knife seat: the rock
 # budget takes the smallest bore, the webs the largest.  A plain inch step
 # (rule 4; machinist review round 4, farm run 20261107T161739921Z: the
 # former +.0012 read as converted millimetres), loosened rather than

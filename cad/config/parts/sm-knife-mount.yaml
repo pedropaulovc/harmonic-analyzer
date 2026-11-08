@@ -2,13 +2,14 @@ sm-knife-mount:
   number: MHA-SM-02
   material: AISI O1 tool steel
   material_specification: AISI O1 tool steel
-  # Round 9 (farm run 20261108T014715557Z) gated the former mate-naming clause as a fragment; each fit callout already names its mate.
-  finish: "58-60 HRC, unpainted; fit sizes apply after hardening"
+  # Owner ruling 2026-11-08 (Pedro), SM-02 harden less: harden the O1, then draw it back to a hardness the shop can still ream, and cut the fit sizes to their printed bands after heat treatment (no allowance, no lap).
+  # 40-45 HRC: Cincinnati Tool Steel Co., AISI O1 data sheet (https://cintool.com/documents/Oil_Hardening/01.pdf), 1 in rounds oil-quenched from 1475 F and tempered 2 h: 900 F 47, 1000 F 44, 1100 F 39 HRC.
+  finish: "40-45 HRC, unpainted; fit sizes cut after hardening"
   quantity: 2
   tolerance_class: machined_block
   # Pedro's owner ruling, 2026-11-05 (coordinator session): tap annealed, inspect hardened.
-  # Delegated ruling sm Q5, 2026-11-07 (Main), no precedent; owner review #2144 (pending owner confirmation): fit sizes cut annealed too, accepted functionally after hardening.
-  process: "machined in the annealed condition, fit sizes included; one blind #10-24 thread per mount (two mounts total), spotted through MHA-FR-02's #10 hole and cut with a bottoming tap before hardening; after heat treatment the MHA-SM-VN-53 dowels slide home, the MHA-SM-03 trunnion enters the knife bore and the thread is gauge-checked"
+  # Delegated ruling sm Q5 (2026-11-07, Main) is superseded for the fit sizes by the 2026-11-08 owner ruling above.
+  process: "machined in the annealed condition with the fit sizes left under size; one blind #10-24 thread per mount (two mounts total), spotted through MHA-FR-02's #10 hole and cut with a bottoming tap before hardening; hardened, then tempered about 1000 F to 40-45 HRC; after heat treatment the MHA-SM-03 trunnion bore and the datum-B MHA-SM-VN-53 dowel hole are reamed and the datum-C slot milled to their printed bands, and the thread is gauge-checked"
   drawing_unit: in
   machinist_exceptions:
     - id: "RV-01"

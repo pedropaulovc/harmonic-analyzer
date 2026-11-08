@@ -1001,11 +1001,11 @@ def test_part_stamps_make_critical_properties() -> None:
     assert config["material"] == "AISI O1 tool steel"
     assert config["material_specification"] == "AISI O1 tool steel"
     # drawing-guidelines.md rule 2 (the title block is the general specification): the heat treatment and the bare surface are the Finish field's,
-    # stated once there (the sheet has no notes block), with the state the
-    # slip bands are inspected in (T+H3: cut soft, hardening's growth inside
-    # the band).
+    # stated once there (the sheet has no notes block), with when the fit
+    # sizes are cut: after the block is drawn back to a reamable hardness
+    # (owner ruling 2026-11-08, SM-02 harden less).
     finish = config["finish"]
-    assert "58-60 HRC" in finish
+    assert "40-45 HRC" in finish
     assert "unpainted" in finish
     assert "after hardening" in finish
     assert "Brass" not in config["material_specification"]
@@ -1411,16 +1411,14 @@ def test_the_slip_seats_hold_their_margins_and_webs() -> None:
     assert spec.PIN_HOLE_DIA_BAND == spec.SLOT_WIDTH_BAND == dowel.SLIP_HOLE_DIA_BAND
 
 
-def test_the_bore_states_its_bored_band_and_mate() -> None:
-    # Machinist review B3: a bare THRU left drill or ream open; the bore is
-    # bored to Ø.4720 +.0015/0 (S3: a boring head, not a ream; Ra 63 µin
-    # stays).  ENFORCE review (2026-10-24, rule 4): the band names its mate,
-    # the lever's trunnion.  The process word and the mate's number, the
+def test_the_bore_states_its_band_and_mate() -> None:
+    # Machinist review B3: a bare THRU left the process open, so a process
+    # word leads (reamed after heat treatment since the owner ruling of
+    # 2026-11-08, SM-02 harden less).  ENFORCE review (2026-10-24, rule 4):
+    # the band names its mate, the lever's trunnion.  The mate's number, the
     # lever's from the registry; three rows, the ones BORE_DIA_TEXT_TOP_REACH
     # was measured on under the stacked band (farm run 20261024T114146582Z).
     rows = drawing.DIMENSION_CALLOUTS["BoreDia"].splitlines()
-    assert "BORE" in rows[0].split()
-    assert "REAM" not in drawing.DIMENSION_CALLOUTS["BoreDia"]
     # The mate's number is drawing text: the spec, in MHA-FR-02's and the
     # frame assembly's import closure, must not read the lever's registry row.
     lever_number = _config.parts("sm-summing-lever")["number"]
