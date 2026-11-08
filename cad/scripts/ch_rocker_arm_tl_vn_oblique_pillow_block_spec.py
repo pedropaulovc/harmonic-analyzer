@@ -133,12 +133,16 @@ VOLUME_MM3 = WIDTH * (BASE_AREA + BOSS_UPPER_AREA - BORE_AREA) - 2.0 * HOLE_VOLU
 # pass both holes into its taps (the pass condition; machinist review), the
 # screws and the bracket named by drawing number, in plain shop words (no
 # CAD term such as "envelope model": rule 26). The screws' number is the
-# registry's (pinned by the drawing test; a spec stays pure data).
+# registry's (pinned by the drawing test; a spec stays pure data). It is
+# numbered note 1, linked from the holes' callout (``HOLE_CALLOUT``): an
+# unlinked general note left the mates off the callout (rule 7, local repeat
+# review of farm run 20261108T000844770Z).
 BRACKET_SCREW_NUMBER = "MHA-CH-06-TL-VN-62"
 DRAWING_NOTES = (
-    f"2X HOLES PASS {BRACKET_SCREW_NUMBER} SCREWS INTO"
+    f"1. 2X HOLES PASS {BRACKET_SCREW_NUMBER} SCREWS INTO"
     f" {leadscrew.END_BRACKET_NUMBER} TAPS."
 )
+HOLE_CALLOUT = "2X, SEE NOTE 1"
 
 # Reference sizes on the plan view (the Front Plane, sketch (u, v) = model
 # (X, Y)): the listing's bolt-hole spacing and bolt hole, the receipt
@@ -162,7 +166,7 @@ SUPPLIER_REFERENCE_SIDES = {
 }
 SUPPLIER_REFERENCE_FORMATS = {
     "SupplierBoltSpacing": (0, "length", None, None),
-    "SupplierBoltHoleDiameter": (1, "diameter", None, "2X"),
+    "SupplierBoltHoleDiameter": (1, "diameter", None, HOLE_CALLOUT),
 }
 SUPPLIER_REFERENCE_UNITS = {
     name: "mm" for name, _, _ in SUPPLIER_REFERENCE_DIMENSIONS
