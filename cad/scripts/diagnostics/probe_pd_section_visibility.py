@@ -1,10 +1,8 @@
-"""Experiment-only, admitted cached-drawing probe; never runs the PD builder.
+"""Experiment-only qualification of the final PD visibility helper.
 
-Show the previously failing chain-link occurrence once, then abandon every
-pre-change view/component proxy and observe only a freshly resolved section.
-Every native call is journaled and flushed before execution, including errors.
-A successful diagnostic means observations completed, not that production's
-old-name readback contract passed.
+Consume the separately built drawing, show the same hidden chain-link occurrence,
+restore it, then prove a no-op. Never run a builder from inside this native leaf.
+Raw observation is independent of production inventory/validation helpers.
 """
 from __future__ import annotations
 
@@ -22,18 +20,25 @@ from _com import _early_bound
 from _session import run_build
 import _seat_forensics
 import _telemetry
+import _drawing_balloons as visibility
+import draw_pd_paper_drive_assembly as recipe
 
 ROOT = Path(__file__).resolve().parents[3]
 OUT = ROOT / "cad/out"
 DIRECTORY = OUT / "reports/section-visibility-probe"
 REPORT = DIRECTORY / "report.json"
 JOURNAL = DIRECTORY / "calls.jsonl"
-INPUT_HASHES = {
-    "slddrw/pd-paper-drive-assembly.SLDDRW": "81551b5bf360b87fe858fbad96cbcc2a648afc90bd6dd9fc2b2ff425cf9a9b80",
+PRODUCTION_COMMIT = "3b8d009b6ee853afb14808025a7228037f6e120a"
+SOURCE_HASHES = {
+    "_drawing_balloons.py": "7db3e6bfb9293abdf99f720b3a2331ff36b82cfa6e87a2ad757d3608dbb50146",
+    "draw_pd_paper_drive_assembly.py": "d4759508bc652979508e2e245be70cb64b45e6d5b982632c9a9cb3f06425cec5",
+}
+MODEL_HASHES = {
     "sldasm/pd-paper-drive.SLDASM": "bd55e967cd2957e028330c157cebfb37aa6d014e1d3f4420fd646ec8c1fae128",
     "sldprt/sh-vn-chain-link.SLDPRT": "14fca2a7c0d4ce1a632efe4d5649c090c2299a41be123d24a4930bb87b8609c7",
 }
 DRAWING = OUT / "slddrw/pd-paper-drive-assembly.SLDDRW"
+INPUT_NAMES = (DRAWING.relative_to(OUT).as_posix(), *MODEL_HASHES)
 TARGET_NAME = "sh-vn-chain-link-11"
 HIDDEN_TARGET_NAME = "pd-paper-drive-1/sh-vn-chain-link-11"
 TARGET_CONFIGURATION = "InnerLink"
@@ -176,41 +181,115 @@ def observe_section(journal, view, phase):
     return {"state": state, "rows": rows, "hidden_returned_none": hidden is None, "hidden": hidden_rows}, components, owners
 
 
-def show_once(app, journal, report, persist):
+def row_inventory(snapshot):
+    result = {}
+    owners = set()
+    for row in snapshot["rows"]:
+        if row.get("errors") or row.get("owner_error") or row["owner"].get("errors"):
+            raise RuntimeError("raw section observation contains unreadable fields")
+        key = tuple(row["owner"][name] for name in ("name", "path", "configuration"))
+        name = row["drawing_name"]
+        if name in result or key in owners or type(row["own_visible"]) is not bool:
+            raise RuntimeError("raw section observation has ambiguous occurrences")
+        owners.add(key)
+        result[name] = (row["own_visible"], key)
+    return result
+
+
+def hidden_inventory(snapshot):
+    rows = snapshot["hidden"]
+    if any(row.get("errors") for row in rows):
+        raise RuntimeError("raw hidden owner observation contains unreadable fields")
+    values = [tuple(row[name] for name in ("name", "path", "configuration")) for row in rows]
+    if len(set(values)) != len(values):
+        raise RuntimeError("raw hidden owner observation contains duplicates")
+    return set(values)
+
+
+def qualify(adapter, journal, report, persist):
+    app = adapter.swApp
     model, view, identity, active_sheet = fresh_section(app, journal)
+    adapter.currentModel = model
     before, components, owners = observe_section(journal, view, "before")
-    report.update(view_identity=identity, active_sheet_before=active_sheet, before=before)
+    del components, owners
+    report.update(view_identity=identity, active_sheet_before=active_sheet, before=before, phases=[])
     persist()
-    matches = [row["index"] for row in before["rows"] if row.get("owner", {}).get("name") == TARGET_NAME and row["owner"].get("configuration") == TARGET_CONFIGURATION]
-    hidden_matches = [row for row in before["hidden"] if row.get("name") == HIDDEN_TARGET_NAME and row.get("configuration") == TARGET_CONFIGURATION]
-    if len(matches) != 1 or len(hidden_matches) != 1 or len(before["rows"]) != 147 or len(before["hidden"]) != 142:
-        raise RuntimeError("cached section differs from the previously failing exact occurrence/census")
-    index = matches[0]
-    if digest(before["rows"][index]["owner"]["path"]) != INPUT_HASHES["sldprt/sh-vn-chain-link.SLDPRT"] or digest(hidden_matches[0]["path"]) != INPUT_HASHES["sldprt/sh-vn-chain-link.SLDPRT"]:
-        raise RuntimeError("target owner points at different native bytes")
-    journal.call("before.ClearSelection2", lambda: model.ClearSelection2(True))
-    manager = _early_bound(model.SelectionManager, "ISelectionMgr")
-    data = journal.call("SelectionManager.CreateSelectData", lambda: manager.CreateSelectData(), lambda value: value is not None)
-    journal.call("SelectData.View=set exact section", lambda: setattr(data, "View", view), lambda value: None)
-    if not journal.call("target DrawingComponent.Select", lambda: components[index].Select(True, data)):
-        raise RuntimeError("hidden target selection failed")
-    if journal.call("GetSelectedObjectCount2", lambda: manager.GetSelectedObjectCount2(-1)) != 1 or journal.call("GetSelectedObjectType3", lambda: manager.GetSelectedObjectType3(1, -1)) != 20:
-        raise RuntimeError("selection count/type mismatch")
-    selected_view = journal.call("GetSelectedObjectsDrawingView2", lambda: manager.GetSelectedObjectsDrawingView2(1, -1), lambda value: value is not None)
-    selected = journal.call("GetSelectedObjectsComponent4", lambda: _early_bound(manager.GetSelectedObjectsComponent4(1, -1), "IDrawingComponent"), lambda value: value is not None)
-    selected_owner = journal.call("selected DrawingComponent.Component", lambda: _early_bound(selected.Component, "IComponent2"), lambda value: value is not None)
-    for name, left, right in (("view", selected_view, view), ("owner", selected_owner, owners[index])):
-        same = journal.call(f"before IsSame selected {name}", lambda: app.IsSame(left, right))
-        if type(same) is not int or same != 1:
-            raise RuntimeError(f"selection {name} identity unproved: {same!r}")
-    journal.call("IModelDoc2.ShowComponent2", lambda: model.ShowComponent2(), lambda value: None)
-    journal.call("after-command.ClearSelection2", lambda: model.ClearSelection2(True))
-    if not journal.call("IModelDoc2.EditRebuild3", lambda: model.EditRebuild3()):
-        raise RuntimeError("final rebuild failed")
-    report["command_completed"] = True
+    rows_before = row_inventory(before)
+    hidden_before = hidden_inventory(before)
+    target = [row for row in before["rows"] if row["owner"]["name"] == TARGET_NAME and row["owner"]["configuration"] == TARGET_CONFIGURATION]
+    target_hidden = [owner for owner in hidden_before if owner[0] == HIDDEN_TARGET_NAME and owner[2] == TARGET_CONFIGURATION]
+    if len(target) != 1 or len(target_hidden) != 1 or len(rows_before) != 147 or len(hidden_before) != 142:
+        raise RuntimeError("section differs from the previously failing exact occurrence/census")
+    for path in (target[0]["owner"]["path"], target_hidden[0][1]):
+        if digest(path) != MODEL_HASHES["sldprt/sh-vn-chain-link.SLDPRT"]:
+            raise RuntimeError("target owner points at different native bytes")
+    expected_hidden = {
+        ("pd-paper-drive-1/" + owner[0], owner[1], owner[2])
+        for _, owner in rows_before.values() if owner[0] not in recipe.PIVOT_VIEW_INSTANCES
+    }
+    if expected_hidden != hidden_before:
+        raise RuntimeError("initial raw inventory differs from the exact authored five-instance set")
+
+    for phase, names, expected, counts in (
+        ("show", recipe.PIVOT_VIEW_INSTANCES | {TARGET_NAME}, hidden_before - set(target_hidden), (1, 0)),
+        ("restore", recipe.PIVOT_VIEW_INSTANCES, hidden_before, (0, 1)),
+        ("noop", recipe.PIVOT_VIEW_INSTANCES, hidden_before, (0, 0)),
+    ):
+        record = {"phase": phase, "expected_hidden": sorted(expected), "events": []}
+        report["phases"].append(record)
+        persist()
+        original_event = visibility._telemetry.event
+
+        def capture_event(name, **fields):
+            if name.startswith("drawing.visibility."):
+                record["events"].append({"name": name, **fields})
+            original_event(name, **fields)
+
+        visibility._telemetry.event = capture_event
+        try:
+            view = journal.call(
+                f"{phase}: final visibility helper",
+                lambda: visibility.set_drawing_view_instance_visibility(
+                    adapter, view, frozenset(names), mode="show", label=f"section control {phase}"
+                ),
+                lambda value: value is not None,
+            )
+        except Exception as error:
+            record["helper_error"] = repr(error)
+            persist()
+            try:
+                _, observed_view, _, _ = fresh_section(app, journal, expected=identity)
+                record["after_failure"], _, _ = observe_section(journal, observed_view, phase + ".failure-fresh")
+                persist()
+            except Exception as capture_error:
+                record["capture_error"] = repr(capture_error)
+                error.add_note(f"fresh failure observation also failed: {capture_error!r}")
+                persist()
+            raise
+        finally:
+            visibility._telemetry.event = original_event
+        # Consume the RETURNED proxy directly; another lookup must not mask a bad return.
+        after, components, owners = observe_section(journal, view, phase + ".returned")
+        record["after"] = after
+        record["adapter_document_path"] = journal.call(
+            phase + ".adapter.currentModel.GetPathName", lambda: adapter.currentModel.GetPathName()
+        )
+        persist()
+        record["duplicate_owner_identity"] = duplicate_owner_identity(app, journal, after, owners)
+        del components, owners
+        persist()
+        if row_inventory(after) != rows_before or hidden_inventory(after) != expected or after["state"] != before["state"]:
+            raise RuntimeError(f"{phase}: exact raw section identity/visibility/state mismatch")
+        timings = [event for event in record["events"] if event["name"] == "drawing.visibility.timings"]
+        if len(timings) != 1 or timings[0]["outcome"] != "verified" or (timings[0]["show"], timings[0]["hide"]) != counts:
+            raise RuntimeError(f"{phase}: helper timing/count outcome differs from the positive control")
+        if phase == "noop" and any(timings[0][key] != 0 for key in ("changed", "selection_seconds", "apply_seconds", "rebuild_seconds")):
+            raise RuntimeError("no-op selected, mutated or rebuilt the section")
+        record["status"] = "passed"
+        persist()
+    report["status"] = "passed"
+    report["qualification"] = "final helper show, restore and no-op; exact raw section readback"
     persist()
-    # All view/component/selection proxies die with this frame. None are returned.
-    return identity
 
 
 def duplicate_owner_identity(app, journal, snapshot, owners):
@@ -243,14 +322,20 @@ async def build(adapter):
     DIRECTORY.mkdir(parents=True, exist_ok=True)
     failure_directory = _seat_forensics.OUT_FAILURES / "section-visibility-probe"
     failure_directory.mkdir(parents=True, exist_ok=True)
-    report = {"status": "running", "input_commit": "dc892b2dd10026db0a1918080b5cdf7b16563323", "drawing_cache_key": "f2bdecebc7e542ea47d7212951c67e9950bb2168a7409371eee02affa31bf8de", "input_sha256": {name: digest(OUT / name) for name in INPUT_HASHES}}
+    report = {
+        "status": "running", "production_commit": PRODUCTION_COMMIT,
+        "source_sha256": {name: digest(ROOT / "cad/scripts" / name) for name in SOURCE_HASHES},
+        "input_sha256": {name: digest(OUT / name) for name in INPUT_NAMES},
+    }
     journal = Journal((JOURNAL, failure_directory / "calls.jsonl"))
     persist = lambda: checkpoint(report, failure_directory)
     persist()
     title = None
     try:
-        if report["input_sha256"] != INPUT_HASHES:
-            raise RuntimeError("cached native inputs differ from the pinned dc892 artifacts")
+        if report["source_sha256"] != SOURCE_HASHES:
+            raise RuntimeError("qualification source differs from the exact final production code")
+        if {name: report["input_sha256"][name] for name in MODEL_HASHES} != MODEL_HASHES:
+            raise RuntimeError("native model inputs differ from the pinned dc892 artifacts")
         opened = journal.call("OpenDoc6 silent+read-only drawing", lambda: adapter.swApp.OpenDoc6(str(DRAWING), 3, 1 | 2, "", 0, 0), lambda value: {"tuple_length": len(value)} if isinstance(value, tuple) else {"unexpected_type": type(value).__name__})
         if not isinstance(opened, tuple) or len(opened) != 3:
             raise RuntimeError("unexpected OpenDoc6 binding shape")
@@ -261,20 +346,7 @@ async def build(adapter):
             raise RuntimeError(f"cached drawing open refused: errors={errors}, warnings={warnings}")
         title = journal.call("opened drawing.GetTitle", lambda document=document: _early_bound(document, "IModelDoc2").GetTitle())
         del document, opened
-        identity = show_once(adapter.swApp, journal, report, persist)
-        fresh_model, fresh_view, _, active_sheet = fresh_section(adapter.swApp, journal, expected=identity)
-        report["active_sheet_after"] = active_sheet
-        after, fresh_components, fresh_owners = observe_section(journal, fresh_view, "after-fresh")
-        report["after"] = after
-        persist()
-        report["duplicate_owner_identity"] = duplicate_owner_identity(
-            adapter.swApp, journal, after, fresh_owners
-        )
-        persist()
-        report["status"] = "observation_complete"
-        report["qualification"] = "diagnostic only; raw names/owners require interpretation"
-        del fresh_components, fresh_owners, fresh_view, fresh_model
-        persist()
+        qualify(adapter, journal, report, persist)
     except Exception as error:
         report["status"] = "failed"
         report["error"] = repr(error)
@@ -284,7 +356,7 @@ async def build(adapter):
         try:
             if title is not None:
                 journal.call("CloseDoc without saving", lambda: adapter.swApp.CloseDoc(title), lambda value: None)
-            report["input_sha256_after"] = {name: digest(OUT / name) for name in INPUT_HASHES}
+            report["input_sha256_after"] = {name: digest(OUT / name) for name in INPUT_NAMES}
             persist()
             if report["input_sha256_after"] != report["input_sha256"]:
                 report["status"] = "failed"

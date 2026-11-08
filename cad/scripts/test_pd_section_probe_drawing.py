@@ -81,84 +81,132 @@ def test_duplicate_comparison_is_linear_and_fresh_only(tmp_path, monkeypatch):
         journal.close()
 
 
-@pytest.mark.parametrize("scenario", ["matching", "mismatched"])
-def test_build_reacquires_document_after_show_and_exports_duplicates(tmp_path, monkeypatch, scenario):
+@pytest.mark.parametrize("scenario", ["matching", "mismatched-model", "mismatched-source", "helper-failure"])
+def test_build_pins_source_and_models_and_exports_refusal(tmp_path, monkeypatch, scenario):
     monkeypatch.setattr(probe, "_early_bound", lambda value, interface: value)
     monkeypatch.setattr(probe._telemetry, "info", lambda message: None)
     out = tmp_path / "out"
     directory = out / "reports/section-visibility-probe"
-    drawing = out / "slddrw/pd-paper-drive-assembly.SLDDRW"
     monkeypatch.setattr(probe, "OUT", out)
     monkeypatch.setattr(probe, "DIRECTORY", directory)
     monkeypatch.setattr(probe, "REPORT", directory / "report.json")
     monkeypatch.setattr(probe, "JOURNAL", directory / "calls.jsonl")
-    monkeypatch.setattr(probe, "DRAWING", drawing)
+    monkeypatch.setattr(probe, "DRAWING", out / probe.INPUT_NAMES[0])
     monkeypatch.setattr(probe._seat_forensics, "OUT_FAILURES", out / "failures")
-    observed_hashes = dict(probe.INPUT_HASHES)
-    if scenario == "mismatched":
-        observed_hashes["slddrw/pd-paper-drive-assembly.SLDDRW"] = "different cached drawing"
-    monkeypatch.setattr(probe, "digest", lambda path: observed_hashes[Path(path).relative_to(out).as_posix()])
-    fresh_owners = [owner("first"), owner("second")]
-    fresh_view = section(fresh_owners)
-    identity = {"sheet": "PLATEN AND SUPPORT", "view": "Section A-A"}
-    show_completed = False
+    hashes = {probe.INPUT_NAMES[0]: "new final drawing bytes", **probe.MODEL_HASHES}
+    sources = dict(probe.SOURCE_HASHES)
+    if scenario == "mismatched-model":
+        hashes["sldasm/pd-paper-drive.SLDASM"] = "wrong model"
+    if scenario == "mismatched-source":
+        sources["_drawing_balloons.py"] = "wrong helper"
+
+    def digest(path):
+        path = Path(path)
+        return sources[path.name] if path.name in sources else hashes[path.relative_to(out).as_posix()]
+
+    monkeypatch.setattr(probe, "digest", digest)
     calls = []
 
-    class StaleDocument:
-        def GetTitle(self):
-            return "pd-paper-drive-assembly.SLDDRW"
-
-        def __getattr__(self, name):
-            raise AssertionError(f"retained pre-rebuild document used: {name}")
-
-    fresh_document = SimpleNamespace(
-        GetType=lambda: 3, GetPathName=lambda: str(drawing),
-        GetCurrentSheet=lambda: SimpleNamespace(GetName=lambda: identity["sheet"]),
-        GetViews=lambda: ((SimpleNamespace(GetName2=lambda: identity["sheet"]), fresh_view),),
-    )
-
-    def get_open_document(path):
-        assert show_completed
-        assert path == str(drawing)
-        calls.append("fresh document")
-        return fresh_document
-
-    def show_once(app, journal, report, persist):
-        nonlocal show_completed
-        show_completed = True
-        report["command_completed"] = True
+    def qualify(adapter, journal, report, persist):
+        calls.append("qualify")
+        report["phases"] = [{"phase": "show", "witness": "persisted before refusal"}]
         persist()
-        return identity
+        if scenario == "helper-failure":
+            raise RuntimeError("helper refused")
+        report["status"] = "passed"
+        persist()
 
-    def same(left, right):
-        assert left is fresh_owners[0] and right is fresh_owners[1]
-        calls.append("fresh owners")
-        return 0
-
-    monkeypatch.setattr(probe, "show_once", show_once)
+    monkeypatch.setattr(probe, "qualify", qualify)
     app = SimpleNamespace(
-        OpenDoc6=lambda *args: (StaleDocument(), 0, 0),
-        GetOpenDocumentByName=get_open_document, IsSame=same,
+        OpenDoc6=lambda *args: (SimpleNamespace(GetTitle=lambda: "drawing.SLDDRW"), 0, 0),
         CloseDoc=lambda title: calls.append("close without save"),
     )
-    if scenario == "mismatched":
-        with pytest.raises(RuntimeError, match="differ from the pinned dc892 artifacts"):
-            asyncio.run(probe.build(SimpleNamespace(swApp=app)))
-    else:
+    if scenario == "matching":
         asyncio.run(probe.build(SimpleNamespace(swApp=app)))
+    else:
+        with pytest.raises(RuntimeError):
+            asyncio.run(probe.build(SimpleNamespace(swApp=app)))
     canonical = json.loads(probe.REPORT.read_text())
     failure = json.loads((out / "failures/section-visibility-probe/report.json").read_text())
     assert canonical == failure
-    if scenario == "mismatched":
-        assert canonical["status"] == "failed"
-        assert canonical["input_sha256_after"] == observed_hashes
-        assert calls == []
-        return
-    assert canonical["status"] == "observation_complete"
-    assert len(canonical["after"]["rows"]) == 2
-    assert canonical["duplicate_owner_identity"][0]["pairs"][0]["native_is_same"] == 0
-    assert canonical["input_sha256_after"] == probe.INPUT_HASHES
-    assert calls == ["fresh document", "fresh owners", "close without save"]
+    assert canonical["input_sha256_after"] == hashes
+    assert canonical["status"] == ("passed" if scenario == "matching" else "failed")
+    assert calls == ([] if scenario.startswith("mismatched") else ["qualify", "close without save"])
+    if scenario == "helper-failure":
+        assert canonical["phases"][0]["witness"] == "persisted before refusal"
+
+
+@pytest.mark.parametrize("fault", ["none", "ineffective-show", "bad-return", "helper-error"])
+def test_final_control_uses_returned_view_and_independent_raw_sets(tmp_path, monkeypatch, fault):
+    import copy
+
+    monkeypatch.setattr(probe._telemetry, "info", lambda message: None)
+    monkeypatch.setattr(probe._telemetry, "event", lambda name, **fields: None)
+    monkeypatch.setattr(probe, "digest", lambda path: probe.MODEL_HASHES["sldprt/sh-vn-chain-link.SLDPRT"])
+    names = [*sorted(probe.recipe.PIVOT_VIEW_INSTANCES), probe.TARGET_NAME, *[f"other-{i}" for i in range(141)]]
+    rows = [
+        {"index": index, "drawing_name": "section/" + name, "own_visible": True,
+         "owner": {"name": name, "path": f"C:/fixture/{name}.SLDPRT",
+                   "configuration": "InnerLink" if name == probe.TARGET_NAME else "Default"}}
+        for index, name in enumerate(names)
+    ]
+    hidden = set(names) - probe.recipe.PIVOT_VIEW_INSTANCES
+    current = [object()]
+    model = SimpleNamespace(GetPathName=lambda: "C:/fixture/drawing.SLDDRW")
+    adapter = SimpleNamespace(swApp=object(), currentModel=None)
+    identity = {"sheet": "Sheet1", "view": "Section A-A"}
+    monkeypatch.setattr(probe, "fresh_section", lambda *args, **kwargs: (model, current[0], identity, "Sheet1"))
+
+    def observe(journal, view, phase):
+        assert view is current[0], "caller used an unusable helper return"
+        owners = [
+            {**row["owner"], "name": "pd-paper-drive-1/" + row["owner"]["name"]}
+            for row in rows if row["owner"]["name"] in hidden
+        ]
+        return {"rows": copy.deepcopy(rows), "hidden": owners, "state": {"configuration": "Default"}}, [], []
+
+    monkeypatch.setattr(probe, "observe_section", observe)
+    helper_calls = []
+
+    def helper(adapter, view, shown, *, mode, label):
+        assert view is current[0] and mode == "show"
+        phase = label.rsplit(" ", 1)[-1]
+        helper_calls.append(phase)
+        if fault != "ineffective-show":
+            hidden.clear()
+            hidden.update(set(names) - shown)
+        if phase != "noop":
+            current[0] = object()
+        if fault == "helper-error":
+            raise RuntimeError("helper refused after command")
+        adapter.currentModel = model
+        show, hide = {"show": (1, 0), "restore": (0, 1), "noop": (0, 0)}[phase]
+        probe.visibility._telemetry.event(
+            "drawing.visibility.timings", outcome="verified", show=show, hide=hide,
+            changed=show + hide, selection_seconds=show + hide, apply_seconds=show + hide,
+            rebuild_seconds=show + hide,
+        )
+        return object() if fault == "bad-return" else current[0]
+
+    monkeypatch.setattr(probe.visibility, "set_drawing_view_instance_visibility", helper)
+    report = {}
+    checkpoints = []
+    journal = probe.Journal((tmp_path / "calls.jsonl",))
+    try:
+        if fault == "none":
+            probe.qualify(adapter, journal, report, lambda: checkpoints.append(copy.deepcopy(report)))
+            assert report["status"] == "passed"
+            assert helper_calls == ["show", "restore", "noop"]
+            assert [len(phase["after"]["hidden"]) for phase in report["phases"]] == [141, 142, 142]
+        else:
+            with pytest.raises((RuntimeError, AssertionError)):
+                probe.qualify(adapter, journal, report, lambda: checkpoints.append(copy.deepcopy(report)))
+            assert helper_calls == ["show"]
+            if fault == "helper-error":
+                assert len(report["phases"][0]["after_failure"]["hidden"]) == 141
+                assert checkpoints[-1]["phases"][0]["helper_error"]
+    finally:
+        journal.close()
 
 
 def test_cached_probe_has_exact_native_prerequisites_and_report_targets():
