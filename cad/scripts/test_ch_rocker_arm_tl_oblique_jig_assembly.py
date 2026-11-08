@@ -2085,10 +2085,10 @@ def test_general_torque_note_covers_every_fastener_no_step_torques() -> None:
     assert spec._item(spec.RAIL_SCREW) in steps["2A"]
     assert spec._item(spec.PILLOW_BLOCK_SCREW) in steps["2B"]
     assert spec._torque(leadscrew.BAR_SCREW_TORQUE_NM) in steps["2B"]
-    # The riser screw family's four feed-nut screws take 8N's torque; its
+    # The riser screw family's four feed-nut screws take 8S's torque; its
     # four riser screws, with no stated torque, stay on the general note.
-    assert spec._item(spec.RISER_SCREW) in steps["8L"]
-    assert spec._torque(spec.NUT_SCREW_TORQUE_NM) in steps["8N"]
+    assert spec._item(spec.RISER_SCREW) in steps["8Q"]
+    assert spec._torque(spec.NUT_SCREW_TORQUE_NM) in steps["8S"]
     threaded = {
         spec.RAIL_SCREW, spec.CARRIAGE_SCREW,
         spec.PILLOW_BLOCK_SCREW, spec.RISER_SCREW,
@@ -2397,7 +2397,8 @@ def test_feed_nut_is_reworked_seated_and_transferred_in_one_order() -> None:
     steps = {text.split(". ", 1)[0]: text for text in spec.ASSEMBLY_STEPS}
     heads = list(steps)
     sequence = ("7B", "7C", "7D", "7E", "7F", "8A", "8B", "8C", "8D", "8E", "8F",
-                "8G", "8H", "8J", "8K", "8L", "8M", "8N", "8P", "8Q", "8R", "8S")
+                "8G", "8H", "8J", "8K", "8L", "8M", "8N", "8P", "8Q", "8R", "8S",
+                "8T", "8U", "8V", "8W")
     assert [head for head in heads if head in sequence] == list(sequence)
     assert spec._item(spec.FEED_NUT) in steps["7B"]
     assert feed_nut.REWORK_SHEET_REFERENCE in steps["7B"]
@@ -2433,23 +2434,28 @@ def test_feed_nut_is_reworked_seated_and_transferred_in_one_order() -> None:
     assert spec.NUMBER_DRILL_MM[spec._SPOT_DRILL] == pytest.approx(feed_block.TRANSFER_SPOT_DIA, abs=1e-3)
     assert spec.NUMBER_DRILL_MM[spec._TAP_DRILL] == feed_block.NUT_TAP_DRILL
     assert spec._SPOT_DRILL in steps["8J"]
-    assert spec._TAP_DRILL in steps["8K"] and feed_nut.SCREW_THREAD in steps["8K"]
+    # TL-32's blind taps (FoObFab): drilled and tapped to its depths from the
+    # lug's nut face with the nut stood off, then the nut reseated at 8G.
+    assert spec._TAP_DRILL in steps["8M"] and feed_block.NUT_TAP_DRILL_DEPTH_TEXT in steps["8M"]
+    assert feed_nut.SCREW_THREAD in steps["8N"] and feed_block.NUT_TAP_THREAD_DEPTH_TEXT in steps["8N"]
+    assert "THRU" not in steps["8M"] + steps["8N"]
+    assert "STEP 8G" in steps["8P"]
     # Owner ruling 2026-11-04 (#2177 option 3): the nut screws' heads are
     # calipered to the limit TL-32's head-to-body stack-up is built on; an
     # oversize head is replaced, the nut body never cut.
     head_limit = spec._bound(feed_nut.SCREW_HEAD_DIA_MAX, 3, up=False)
-    assert head_limit == ".212" and f"Ø{head_limit} MAX" in steps["8L"]
-    assert spec._item(spec.RISER_SCREW) in steps["8L"]
+    assert head_limit == ".212" and f"Ø{head_limit} MAX" in steps["8Q"]
+    assert spec._item(spec.RISER_SCREW) in steps["8Q"]
     assert feed_block.HEAD_TO_BODY_SHARP_CENTRED < 0.0 < feed_block.HEAD_TO_BODY_MIN
-    assert steps["8M"].startswith("8M. IF ") and "NEVER MACHINE THE NUT BODY" in steps["8M"]
+    assert steps["8R"].startswith("8R. IF ") and "NEVER MACHINE THE NUT BODY" in steps["8R"]
     assert spec._torque(spec.NUT_SCREW_TORQUE_NM) == "2.7 IN·LBF"
-    assert spec._torque(spec.NUT_SCREW_TORQUE_NM) in steps["8N"]
+    assert spec._torque(spec.NUT_SCREW_TORQUE_NM) in steps["8S"]
     # 4475311242: the countersink opening stays within the sheet's band,
     # typed nowhere in TL-00.
-    remedy = steps["8R"]
+    remedy = steps["8V"]
     assert feed_nut.REWORK_SHEET_REFERENCE in remedy
     assert not re.search(r"\d\.\d", remedy.replace(feed_nut.REWORK_SHEET_REFERENCE, ""))
-    assert spec._item(spec.HANDWHEEL) in steps["8S"]
+    assert spec._item(spec.HANDWHEEL) in steps["8W"]
     # The fit-up acts on what it finds; it never stops to report.
     for head in sequence:
         assert "REPORT" not in steps[head] and "STOP" not in steps[head]
