@@ -998,11 +998,15 @@ async def build(adapter: Any) -> dict[str, str]:
     read_required_properties(
         adapter.currentModel, ("Revision", "Title", *required), required=required
     )
+    # Three document places: the native hole table's SIZE cells print at the
+    # document precision (farm r2 at 6dc18abb3d: '.13', '.20' at two), as
+    # draw_fr_rocker_arm_support does; the LOC columns keep their own .XX.
     drawing_model, _sheet = new_project_drawing(
         adapter,
         property_view=PART_STEM,
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        decimals=3,
         unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
