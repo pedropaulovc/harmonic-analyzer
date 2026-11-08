@@ -15,7 +15,6 @@ the plan. The layout notes below give sheet millimetres.
 """
 from __future__ import annotations
 import math
-import re
 from typing import Any
 from _check import check
 from _com import _early_bound
@@ -31,12 +30,14 @@ from _drawing_projection import model_point_in_view
 from _drawing_sections import create_section_view
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
+from _fit_deviations import deviations
 from _hole_callout_thread_class import omit_title_block_thread_class
 from _paths import CAD_ROOT
 from _drawing_metric_vendor import print_imported_metric_dimensions
 from _part_properties import part_drawing_unit
 from _layout_audit import arrowhead_segments
-from _oblique_carrier_hole_table import _size_semantics
+from _layout_geometry import Box, estimate_text_box
+from _title_block_units import MM_PER_INCH, render_number
 import _telemetry
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
@@ -65,7 +66,7 @@ PLAN_KEEP = {
     'BoreDia':(.078,.196),'CarriageDrills1Dia':(.085,.168),'CarriageCounterbores3Dia':(.245,.150),
     # TL-32 still prints this separate native tap dimension in its established
     # upper-left lane. TL-22 imports it at the same source position, then
-    # hides only the display after its stacked native note resolves.
+    # hides only the display after the spec-generated note passes readback.
     'TapDrillDia':(.071,.2455),
 }
 # TL-22 and TL-32 share this top tier (machinist review of c40296ac, TL-32
@@ -190,40 +191,65 @@ def _displays(adapter, annotations, names) -> dict[str, Any]:
     return found
 
 
-# A single outside callout replaces the two plan-diameter displays on TL-22.
-# Sheet metres: the linked source-caption stack uses the former left-hand lanes, aimed at the
-# seat's leftmost rim, between (not through) the two left carriage holes.
+# One normal-height, four-line note replaces the two plan-diameter displays.
+# The proved outer-rim leader and the original text lane remain unchanged.
 PIVOT_STACK_XY = (.025, .225)
+PIVOT_NOTE_HEIGHT = .0035
+PIVOT_STACK_LANE = (.020, .182, .145, .230)
 
 
 def _pivot_stack_semantics(text):
-    """Canonicalize the observed split sign/value band locally, not on carrier."""
-    text = re.sub(r'</?FONT\b[^>]*>', '', text, flags=re.IGNORECASE)
-    text = re.sub(
-        r'<STACK\b[^>]*>\s*([+-])\s*<OVER>\s*([+-])\s*</STACK>\s*'
-        r'<STACK\b[^>]*>\s*(\d*\.\d+)\s*<OVER>\s*(\d*\.\d+)\s*</STACK>',
-        lambda match: f'<STACK>{match[1]}{match[3]}<OVER>{match[2]}{match[4]}</STACK>',
-        text, flags=re.IGNORECASE,
+    """Plain note rows: retain numbers, signs and precision; normalize whitespace/symbols."""
+    text = text.replace('Ø', '<MOD-DIAM>').replace('↧', '<HOLE-DEPTH>')
+    return tuple(' '.join(row.split()) for row in text.splitlines())
+
+
+def _pivot_stack_text(contract):
+    """Owner-approved compact text generated from spec values/bands, never copied sizes."""
+    if contract.UNIT != 'in':
+        raise RuntimeError('pivot stacked callout requires its inch drawing contract')
+    places = contract.DRAWING_PRECISION_BY_NAME
+
+    def size(name):
+        return render_number(round(contract.DRAWING_VALUES[name] / MM_PER_INCH, places[name]), 'in', places[name])
+
+    def signed(mm):
+        magnitude = render_number(round(abs(mm) / MM_PER_INCH, contract.BORE_PLACES), 'in', contract.BORE_PLACES)
+        return ('-' if mm < 0 else '+') + magnitude
+
+    lower, upper = deviations(contract.BORE_BAND)
+    return (
+        f'REAM <MOD-DIAM>{size("BoreDia")} {signed(upper)}/{signed(lower)} <HOLE-DEPTH>{size("TopBoreDepth")}\n'
+        '  LOCATING FIT, TL-VN-77 SHOULDER\n'
+        f'DRILL <MOD-DIAM>{size("TapDrillDia")} THRU\n'
+        f'{contract.PIVOT_TAP} UNC TAP THRU BELOW SEAT'
     )
-    return _size_semantics('pivot stacked callout', text.replace('Ø', '<MOD-DIAM>').replace('↧', '<HOLE-DEPTH>'))
 
 
-def _pivot_stack_text(bore, depth, drill):
-    # a8b2ac4c proved the links expand ABOVE/BELOW as well as value/band.
-    # All process/fit/thread prose therefore comes from those native links.
-    return f'{bore}\n<HOLE-DEPTH>{depth}\n{drill}'
+def _pivot_stack_estimate(text):
+    """Conservative offline bound, not a substitute for the unchanged native extent gate.
+
+    One full cap-height per glyph (versus the shared 0.62 average), 1.6-height
+    row pitch and 1 mm all-round bearing/ink padding. Symbols count as one
+    glyph. At the current spec: [24,203.7]..[141.5,226] mm, 3.5 mm minimum air.
+    """
+    glyphs = text.replace('<MOD-DIAM>', 'Ø').replace('<HOLE-DEPTH>', '↧')
+    if len(glyphs.splitlines()) != 4:
+        raise RuntimeError('pivot stacked callout must remain four short lines')
+    box = estimate_text_box(glyphs, anchor=PIVOT_STACK_XY, height=PIVOT_NOTE_HEIGHT,
+                            advance_ratio=1.0, line_spacing=1.6)
+    if box is None:
+        raise RuntimeError('pivot stacked callout has no estimated text extent')
+    padded = Box(box.xmin - .001, box.ymin - .001, box.xmax + .001, box.ymax + .001)
+    left, bottom, right, top = PIVOT_STACK_LANE
+    if min(padded.xmin - left, padded.ymin - bottom, right - padded.xmax, top - padded.ymax) < .003:
+        raise RuntimeError(f'pivot stacked callout estimate lacks 3 mm lane margin: {padded.mm()!r}')
+    return padded
 
 
 @_telemetry.traced("drawing.pivot_stacked_callout")
 def _stack_pivot_callout(adapter, plan, annotations, contract):
-    """One outer-rim leader; sizes and tolerance remain native dimension links.
-
-    SDK v3.12.1 INote.PropertyLinkedText documents quoted drawing-dimension
-    references (e.g. "RD1@Drawing View1"). IncludeDimPrefixSuffixTolerance
-    preserves the linked dimension's prefix/suffix/band and (a8b2ac4c native
-    readback) ABOVE/BELOW captions. Never author sizes or extra captions:
-    numeric formatting and caption composition below are readback-only.
-    """
+    """One outer-rim note generated from spec, independently checked against native sources."""
     names = ('BoreDia', 'TopBoreDepth', 'TapDrillDia')
     displays = _displays(adapter, annotations, names)
 
@@ -236,7 +262,7 @@ def _stack_pivot_callout(adapter, plan, annotations, contract):
             tuple(str(display.GetText(which) or '') for which in range(1, 9)),
             int(display.GetPrimaryPrecision2()), int(display.GetPrimaryTolPrecision2()),
             (int(tol.Type), float(tol.GetMinValue()), float(tol.GetMaxValue())),
-            str(display.GetNameForSelection()), tuple(float(v) for v in (ann.GetPosition() or ())),
+            tuple(float(v) for v in (ann.GetPosition() or ())),
         )
 
     sources = {}
@@ -248,8 +274,7 @@ def _stack_pivot_callout(adapter, plan, annotations, contract):
                 or not math.isclose(state[1] * 1000, contract.DRAWING_VALUES[name], rel_tol=0, abs_tol=1e-6)
                 or state[3] != contract.DRAWING_PRECISION_BY_NAME[name]
                 or state[2][2:4] != (contract.CALLOUTS_ABOVE.get(name, ''), contract.CALLOUTS_BELOW.get(name, ''))
-                or not state[6] or '"' in state[6] or '@' not in state[6]
-                or len(state[7]) != 3 or not all(math.isfinite(v) for v in state[7])):
+                or len(state[6]) != 3 or not all(math.isfinite(v) for v in state[6])):
             raise RuntimeError(f'{name}: unreadable native stacked-callout source {state!r}')
         ann = _early_bound(display.GetAnnotation(), 'IAnnotation')
         if int(ann.OwnerType) != 0 or ann.IsDangling():
@@ -258,26 +283,18 @@ def _stack_pivot_callout(adapter, plan, annotations, contract):
     bore_state = sources['BoreDia'][1]
     tolerance_kind, lower, upper = bore_state[5]
     tolerance_places = bore_state[3] if bore_state[4] == -3 else bore_state[4]
+    expected_lower, expected_upper = deviations(contract.BORE_BAND)
     if (tolerance_kind != 2 or not all(math.isfinite(v) for v in (lower, upper))
-            or not 0 <= lower < upper or tolerance_places < 0):
-        raise RuntimeError('BoreDia: native bilateral locating-fit band is unavailable')
+            or tolerance_places != contract.BORE_PLACES
+            or not math.isclose(lower * 1000, expected_lower, rel_tol=0, abs_tol=1e-6)
+            or not math.isclose(upper * 1000, expected_upper, rel_tol=0, abs_tol=1e-6)):
+        raise RuntimeError('BoreDia: native locating-fit band disagrees with the generated spec band')
     if any(sources[name][1][5][0] != 0 for name in ('TopBoreDepth', 'TapDrillDia')):
         raise RuntimeError('pivot stacked callout: unexpected explicit depth/drill tolerance')
 
-    # Only quoted native selection names enter the authored size fields.
-    linked = _pivot_stack_text(*(f'"{sources[name][1][6]}"' for name in names))
-    numeric = {name: f'{state[1] / .0254:.{state[3]}f}' for name, (_, state) in sources.items()}
-    band = (f'<STACK>{upper / .0254:+.{tolerance_places}f}'
-            f'<OVER>{lower / .0254:+.{tolerance_places}f}</STACK>')
-    expanded = {}
-    for name, (_, state) in sources.items():
-        prefix, suffix, above, below = state[2][:4]
-        value = numeric[name]
-        if name != 'TopBoreDepth' and '<MOD-DIAM>' not in prefix and 'Ø' not in prefix:
-            value = '<MOD-DIAM>' + value
-        value = prefix + value + (band if name == 'BoreDia' else '') + suffix
-        expanded[name] = '\n'.join(text for text in (above, value, below) if text)
-    expected = _pivot_stack_semantics(_pivot_stack_text(*(expanded[name] for name in names)))
+    text = _pivot_stack_text(contract)
+    expected = _pivot_stack_semantics(text)
+    estimate = _pivot_stack_estimate(text)
     edges = scan_view_edges(plan, label='pivot stacked callout rim')
     outer = edges.circle_at(
         (part.BORE_X, part.BORE_Y, contract.BLOCK_HEIGHT), part.BORE_DIA / 2,
@@ -299,21 +316,18 @@ def _stack_pivot_callout(adapter, plan, annotations, contract):
             or radius <= 0 or obstacle_radius <= 0):
         raise RuntimeError('pivot stacked callout projection is unreadable')
     note = _early_bound(add_attached_note(
-        adapter, plan, text='REAM', entity=outer.edge, leader_attach_xy=landing,
+        adapter, plan, text=text, entity=outer.edge, leader_attach_xy=landing,
         note_xy=PIVOT_STACK_XY, label='pivot stacked native callout',
     ), 'INote')
-    # Install links through the documented property, not by assuming that
-    # InsertNote interprets quoted names. This note cannot ship unresolved.
-    note.IncludeDimPrefixSuffixTolerance = True
-    note.PropertyLinkedText = linked
-    rebuild_drawing(adapter, label='resolve pivot stacked dimension links')
+    _size_note(adapter, note, PIVOT_NOTE_HEIGHT, label='pivot generated callout note height')
 
     def resolved():
-        if (str(note.PropertyLinkedText) != linked or not bool(note.IncludeDimPrefixSuffixTolerance)
-                or _pivot_stack_semantics(str(note.GetText() or '')) != expected):
-            raise RuntimeError(f'pivot stacked callout lost native size/depth/fit links: {note.GetText()!r}')
+        text_format = _early_bound(note.GetAnnotation(), 'IAnnotation').GetTextFormat(0)
+        if (_pivot_stack_semantics(str(note.GetText() or '')) != expected or text_format is None
+                or not math.isclose(float(text_format.CharHeight), PIVOT_NOTE_HEIGHT, rel_tol=0, abs_tol=1e-9)):
+            raise RuntimeError(f'generated pivot callout disagrees with spec text or note height: {note.GetText()!r}')
 
-    resolved()  # Never hide the source displays until every linked value/band resolves.
+    resolved()  # Never hide source displays until generated text/height agrees with the spec.
     for name in ('BoreDia', 'TapDrillDia'):
         _early_bound(displays[name].GetAnnotation(), 'IAnnotation').Visible = 3  # swAnnotationHidden
     rebuild_drawing(adapter, label='hide replaced pivot diameter displays')
@@ -326,9 +340,9 @@ def _stack_pivot_callout(adapter, plan, annotations, contract):
             current = _early_bound(display.GetDimension2(0), 'IDimension')
             ann = _early_bound(display.GetAnnotation(), 'IAnnotation')
             read = source_state(display)
-            if (int(adapter.swApp.IsSame(current, dimension)) != 1 or read[:7] != state[:7]
-                    or len(read[7]) != 3 or not all(math.isfinite(v) for v in read[7])
-                    or math.dist(read[7], state[7]) > 1e-5 or ann.IsDangling()
+            if (int(adapter.swApp.IsSame(current, dimension)) != 1 or read[:6] != state[:6]
+                    or len(read[6]) != 3 or not all(math.isfinite(v) for v in read[6])
+                    or math.dist(read[6], state[6]) > 1e-5 or ann.IsDangling()
                     or int(ann.Visible) != (1 if name == 'TopBoreDepth' else 3)):
                 raise RuntimeError(f'{name}: stacked callout lost its native source/precision/visibility')
         ann = _early_bound(note.GetAnnotation(), 'IAnnotation')
@@ -363,10 +377,12 @@ def _stack_pivot_callout(adapter, plan, annotations, contract):
         if any(_segment_distance(obstacle, start, end) < obstacle_radius + .001 for start, end in strokes):
             raise RuntimeError('pivot stacked callout leader/arrow crowds the upper-left counterbore')
         extent = tuple(float(v) for v in (note.GetExtent() or ()))
+        left, bottom, right, top = PIVOT_STACK_LANE
         if (len(extent) != 6 or not all(math.isfinite(v) for v in extent)
-                or not (.020 <= extent[0] < extent[3] <= .145 and .182 <= extent[1] < extent[4] <= .230)):
+                or not (left <= extent[0] < extent[3] <= right and bottom <= extent[1] < extent[4] <= top)):
             raise RuntimeError(f'pivot stacked callout text left its reserved lane: {extent!r}')
-        _telemetry.info('pivot stacked native callout readback', linked=linked, resolved=str(note.GetText()),
+        _telemetry.info('pivot stacked native callout readback', generated=text, resolved=str(note.GetText()),
+                        note_height_m=PIVOT_NOTE_HEIGHT, estimated_text_bounds_mm=estimate.mm(),
                         source_names=[state[0] for _, state in sources.values()],
                         leader_points_m=list(points), arrow_sheet_data=list(arrow), text_extent_m=list(extent))
 

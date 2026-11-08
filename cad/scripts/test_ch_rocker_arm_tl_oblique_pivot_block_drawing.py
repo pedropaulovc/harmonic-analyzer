@@ -335,41 +335,83 @@ def test_block_length_reason_rides_its_value_row_clear_of_the_dimension():
     assert call in body and 'if is_feed:' + call not in body
 
 
-# Exact native a8b2ac4c log expansion: links resolved, but our literal prose
-# duplicated the native ABOVE/BELOW captions. Keep this evidence unnormalized.
-_PIVOT_NATIVE_SPLIT_BAND = (
-    '<STACK divider=DIM valign=BOTTOM>+<OVER>+</STACK>'
-    '<STACK divider=DIM valign=BOTTOM halign=LEFT>.0015<OVER>.0010</STACK>'
-)
-_PIVOT_CANONICAL_BAND = '<STACK>+.0015<OVER>+.0010</STACK>'
-_PIVOT_NATIVE_DUPLICATED = (
-    'REAM REAM\r\n<MOD-DIAM>.3750 ' + _PIVOT_NATIVE_SPLIT_BAND
-    + '\r\nLOCATING FIT ON MHA-CH-06-TL-VN-77 SHOULDER <HOLE-DEPTH>.359'
-    '\r\nSETS TL-VN-77 SHOULDER HEIGHT\r\nLOCATING FIT ON TL-VN-77 SHOULDER'
-    '\r\nDRILL DRILL THRU\r\n<MOD-DIAM>.257'
-    '\r\n5/16-18 UNC TAP THRU BELOW SHOULDER SEAT THRU'
-    '\r\n5/16-18 UNC TAP THRU BELOW SEAT'
-)
-# Expected clean expansion of the same native sources with only link
-# separators/depth symbol authored. This is not a new native observation.
-_PIVOT_CLEAN_EXPANSION = (
-    'REAM\r\n<MOD-DIAM>.3750 ' + _PIVOT_NATIVE_SPLIT_BAND
-    + '\r\nLOCATING FIT ON MHA-CH-06-TL-VN-77 SHOULDER'
-    '\n<HOLE-DEPTH>.359\r\nSETS TL-VN-77 SHOULDER HEIGHT'
-    '\nDRILL THRU\r\n<MOD-DIAM>.257\r\n5/16-18 UNC TAP THRU BELOW SHOULDER SEAT'
+_PIVOT_GENERATED_TEXT = (
+    'REAM <MOD-DIAM>.3750 +.0015/+.0010 <HOLE-DEPTH>.359\n'
+    '  LOCATING FIT, TL-VN-77 SHOULDER\n'
+    'DRILL <MOD-DIAM>.257 THRU\n'
+    '5/16-18 UNC TAP THRU BELOW SEAT'
 )
 
 
-def test_exact_native_split_band_normalizes_without_erasing_duplicate_captions():
+def _pivot_text_contract():
+    return SimpleNamespace(
+        UNIT=spec.UNIT, DRAWING_VALUES=dict(spec.DRAWING_VALUES),
+        DRAWING_PRECISION_BY_NAME=dict(spec.DRAWING_PRECISION_BY_NAME),
+        BORE_BAND=spec.BORE_BAND, BORE_PLACES=spec.BORE_PLACES, PIVOT_TAP=spec.PIVOT_TAP,
+    )
+
+
+def test_compact_pivot_text_is_four_spec_generated_rows_at_normal_height():
     import _oblique_block_drawing as drawing
 
-    canonical = _PIVOT_NATIVE_DUPLICATED.replace(_PIVOT_NATIVE_SPLIT_BAND, _PIVOT_CANONICAL_BAND)
-    assert drawing._pivot_stack_semantics(_PIVOT_NATIVE_DUPLICATED) == drawing._pivot_stack_semantics(canonical)
-    # Semantic normalization must not turn the bad old wording into a pass.
-    assert drawing._pivot_stack_semantics(_PIVOT_NATIVE_DUPLICATED) != drawing._pivot_stack_semantics(_PIVOT_CLEAN_EXPANSION)
-    assert drawing._pivot_stack_semantics(_PIVOT_CLEAN_EXPANSION) == drawing._pivot_stack_semantics(
-        _PIVOT_CLEAN_EXPANSION.replace(_PIVOT_NATIVE_SPLIT_BAND, _PIVOT_CANONICAL_BAND)
+    assert drawing._pivot_stack_text(spec) == _PIVOT_GENERATED_TEXT
+    assert drawing.PIVOT_NOTE_HEIGHT == .0035
+    assert len(drawing._pivot_stack_text(spec).splitlines()) == 4
+    assert drawing._pivot_stack_semantics(_PIVOT_GENERATED_TEXT) == drawing._pivot_stack_semantics(
+        _PIVOT_GENERATED_TEXT.replace('<MOD-DIAM>', 'Ø').replace('<HOLE-DEPTH>', '↧').replace('\n', '\r\n')
     )
+
+
+@pytest.mark.parametrize('change,printed', (
+    ('BoreDia', '<MOD-DIAM>.5000'), ('TopBoreDepth', '<HOLE-DEPTH>.400'),
+    ('TapDrillDia', '<MOD-DIAM>.250'), ('band', '+.0020/+.0010'),
+    ('precision', '<MOD-DIAM>.375'), ('thread', '3/8-16 UNC TAP'),
+))
+def test_generated_pivot_text_tracks_spec_values_bands_places_and_thread(change, printed):
+    import _oblique_block_drawing as drawing
+    from _title_block_units import MM_PER_INCH
+
+    contract = _pivot_text_contract()
+    if change in ('BoreDia', 'TopBoreDepth', 'TapDrillDia'):
+        contract.DRAWING_VALUES[change] = {'BoreDia': .5, 'TopBoreDepth': .4, 'TapDrillDia': .25}[change] * MM_PER_INCH
+    elif change == 'band':
+        contract.BORE_BAND = (.002 * MM_PER_INCH, .001 * MM_PER_INCH)
+    elif change == 'precision':
+        contract.DRAWING_PRECISION_BY_NAME['BoreDia'] = 3
+    else:
+        contract.PIVOT_TAP = '3/8-16'
+    text = drawing._pivot_stack_text(contract)
+    assert printed in text and text != _PIVOT_GENERATED_TEXT
+
+
+def test_generated_pivot_text_refuses_wrong_units_and_inverted_band():
+    import _oblique_block_drawing as drawing
+
+    contract = _pivot_text_contract()
+    contract.UNIT = 'mm'
+    with pytest.raises(RuntimeError, match='inch'):
+        drawing._pivot_stack_text(contract)
+    contract.UNIT = 'in'
+    contract.BORE_BAND = tuple(reversed(spec.BORE_BAND))
+    with pytest.raises(ValueError, match='inverted'):
+        drawing._pivot_stack_text(contract)
+
+
+def test_compact_pivot_estimate_retains_margin_inside_the_unchanged_native_lane():
+    import _oblique_block_drawing as drawing
+
+    text = drawing._pivot_stack_text(spec)
+    box = drawing._pivot_stack_estimate(text)
+    assert box.mm() == pytest.approx((24.0, 203.7, 141.5, 226.0))
+    assert drawing.PIVOT_STACK_LANE == (.020, .182, .145, .230)
+    left, bottom, right, top = drawing.PIVOT_STACK_LANE
+    assert min(box.xmin - left, box.ymin - bottom, right - box.xmax, top - box.ymax) == pytest.approx(.0035)
+    # The estimator uses one cap-height per glyph, 1.6-height row pitch,
+    # plus 1 mm all-round padding. Native GetExtent remains the real gate.
+    with pytest.raises(RuntimeError, match='lane margin'):
+        drawing._pivot_stack_estimate(text.replace('SHOULDER', 'SHOULDER' + 'W' * 20))
+    with pytest.raises(RuntimeError, match='four short lines'):
+        drawing._pivot_stack_estimate(text + '\nEXTRA ROW')
 
 
 def _stacked_pivot_fixture(monkeypatch):
@@ -381,9 +423,8 @@ def _stacked_pivot_fixture(monkeypatch):
     origin = drawing.PLAN_XY
     landing = (origin[0] - spec.BORE_DIA / 2000, origin[1])
     source_rows, displays = {}, {}
-    for name, feature, view in (
-        ('BoreDia', 'TopBoreProfile', 'Plan'), ('TopBoreDepth', 'TopBore', 'Section'),
-        ('TapDrillDia', 'PivotTapProfile', 'Plan'),
+    for name, feature in (
+        ('BoreDia', 'TopBoreProfile'), ('TopBoreDepth', 'TopBore'), ('TapDrillDia', 'PivotTapProfile'),
     ):
         lower, upper = deviations(spec.BORE_BAND) if name == 'BoreDia' else (0.0, 0.0)
         tolerance = SimpleNamespace(Type=2 if name == 'BoreDia' else 0, lower=lower / 1000, upper=upper / 1000)
@@ -395,7 +436,6 @@ def _stacked_pivot_fixture(monkeypatch):
         row = source_rows[name] = SimpleNamespace(
             dimension=dimension, texts=('', '', above, below, '', '', above, below),
             places=spec.DRAWING_PRECISION_BY_NAME[name], tolerance_places=-3,
-            selection=f'{name}@{feature}@block.Part@{view}',
         )
         xy = drawing.SEAT_DEPTH_TEXT_XY if name == 'TopBoreDepth' else drawing.PLAN_KEEP[name]
         annotation = SimpleNamespace(Visible=1, OwnerType=0, position=(*xy, 0.0), dangling=False)
@@ -407,22 +447,16 @@ def _stacked_pivot_fixture(monkeypatch):
             GetText=lambda which, row=row: row.texts[which - 1],
             GetPrimaryPrecision2=lambda row=row: row.places,
             GetPrimaryTolPrecision2=lambda row=row: row.tolerance_places,
-            GetNameForSelection=lambda row=row: row.selection,
             GetAnnotation=lambda annotation=annotation: annotation,
         )
-    # Source expansion and split-band serialization are taken from a8b2ac4c;
-    # the outer-leader geometry below remains a synthetic COM fixture.
-    text = _PIVOT_CLEAN_EXPANSION
-    note = SimpleNamespace(
-        PropertyLinkedText='', IncludeDimPrefixSuffixTolerance=False, text=text,
-        extent=(.025, .198, 0.0, .130, .225, 0.0),
-    )
+    # Synthetic COM geometry, not a claim about the next native sheet.
+    note = SimpleNamespace(text=_PIVOT_GENERATED_TEXT, extent=(.0248, .2045, 0.0, .110, .225, 0.0))
     native = SimpleNamespace(
         Visible=1, OwnerType=0, Owner=plan, position=(*drawing.PIVOT_STACK_XY, 0.0),
         leaders=1, attached=outer, dangling=False,
         points=(.130, origin[1], 0.0, *landing, 0.0),
         arrow=(*landing, 0.0, -1.0, 0.0, 0.0, .002, .001, 0.0, 0.0, 0.0, 1.0),
-        arrow_count=1,
+        arrow_count=1, font=SimpleNamespace(CharHeight=.005),
     )
     native.GetPosition = lambda: native.position
     native.GetLeaderCount = lambda: native.leaders
@@ -431,6 +465,8 @@ def _stacked_pivot_fixture(monkeypatch):
     native.GetAttachedEntityCount3 = lambda: 1
     native.GetAttachedEntityTypes = lambda: [1]
     native.IsDangling = lambda: native.dangling
+    native.GetTextFormat = lambda index: native.font
+    native.SetTextFormat = lambda index, use_doc, value: True
     native.GetDisplayData = lambda: SimpleNamespace(
         GetArrowHeadCount=lambda: native.arrow_count, GetArrowHeadAtIndex2=lambda index: native.arrow,
     )
@@ -443,9 +479,8 @@ def _stacked_pivot_fixture(monkeypatch):
         assert view is plan and kwargs['entity'] is outer
         assert kwargs['leader_attach_xy'] == pytest.approx(landing)
         assert kwargs['note_xy'] == drawing.PIVOT_STACK_XY
-        assert kwargs['text'] == 'REAM'
+        assert kwargs['text'] == _PIVOT_GENERATED_TEXT
         inserted.append(kwargs)
-        note.PropertyLinkedText = kwargs['text']
         return note
 
     circles = [
@@ -468,7 +503,7 @@ def _stacked_pivot_fixture(monkeypatch):
 
     def rebuild(adapter, *, label):
         rebuilds.append(label)
-        wanted = 1 if label.startswith('resolve') else 3
+        wanted = 1 if label == 'pivot generated callout note height' else 3
         assert source_rows['BoreDia'].annotation.Visible == wanted
         assert source_rows['TapDrillDia'].annotation.Visible == wanted
         assert source_rows['TopBoreDepth'].annotation.Visible == 1
@@ -483,50 +518,40 @@ def _stacked_pivot_fixture(monkeypatch):
 
 
 @pytest.mark.parametrize('fault', (
-    None, 'single_stack', 'duplicate_captions', 'changed_link', 'missing_link', 'unresolved', 'drill_value', 'depth_value',
-    'missing_band', 'rounded_band', 'negative_band', 'missing_diameter', 'include_band_off',
+    None, 'unicode_crlf', 'duplicate_captions', 'drill_value', 'depth_value',
+    'missing_band', 'rounded_band', 'negative_band', 'printed_places', 'missing_diameter', 'note_height',
     'source_identity', 'source_feature', 'source_value', 'source_precision', 'source_band', 'source_tokens',
     'source_position', 'source_shown', 'depth_hidden', 'wrong_owner', 'hidden_note', 'note_position',
     'two_leaders', 'wrong_attachment', 'inner_tip', 'centre_crossing', 'upper_left_crossing',
     'arrow_inside', 'two_arrows', 'malformed_arrow', 'text_outside',
 ))
-def test_one_stacked_pivot_callout_preserves_native_links_and_outside_route(monkeypatch, fault):
+def test_generated_pivot_callout_preserves_native_sources_and_outside_route(monkeypatch, fault):
     case = _stacked_pivot_fixture(monkeypatch)
     proof = case.drawing._stack_pivot_callout(case.adapter, case.plan, [], spec)
     assert len(case.inserted) == 1 and len(case.rebuilds) == 2
-    for row in case.rows.values():
-        assert f'"{row.selection}"' in case.note.PropertyLinkedText
-    # Geometry numbers are never copied into the authored note.
-    assert all(value not in case.note.PropertyLinkedText for value in ('.375', '.0015', '.0010', '.359', '.257'))
-    assert case.note.PropertyLinkedText == case.drawing._pivot_stack_text(
-        *(f'"{case.rows[name].selection}"' for name in ('BoreDia', 'TopBoreDepth', 'TapDrillDia'))
-    )
-    assert all(word not in case.note.PropertyLinkedText for word in ('REAM', 'DRILL', 'THRU', 'SHOULDER', '5/16'))
+    assert case.native.font.CharHeight == case.drawing.PIVOT_NOTE_HEIGHT
+    assert case.reports[0]['estimated_text_bounds_mm'] == pytest.approx((24.0, 203.7, 141.5, 226.0))
     tap = case.rows['TapDrillDia']
-    if fault == 'single_stack':
-        case.note.text = case.note.text.replace(_PIVOT_NATIVE_SPLIT_BAND, _PIVOT_CANONICAL_BAND).replace('.3750', '0.37500')
+    if fault == 'unicode_crlf':
+        case.note.text = case.note.text.replace('<MOD-DIAM>', 'Ø').replace('<HOLE-DEPTH>', '↧').replace('\n', '\r\n')
     elif fault == 'duplicate_captions':
-        case.note.text = _PIVOT_NATIVE_DUPLICATED
-    elif fault == 'changed_link':
-        case.note.PropertyLinkedText += ' BROKEN'
-    elif fault == 'missing_link':
-        case.note.PropertyLinkedText = case.note.PropertyLinkedText.replace(f'"{tap.selection}"', '')
-    elif fault == 'unresolved':
-        case.note.text = case.note.PropertyLinkedText
+        case.note.text = case.note.text.replace('REAM', 'REAM REAM')
     elif fault == 'drill_value':
         case.note.text = case.note.text.replace('.257', '.258')
     elif fault == 'depth_value':
         case.note.text = case.note.text.replace('.359', '.360')
     elif fault == 'missing_band':
-        case.note.text = case.note.text.replace(_PIVOT_NATIVE_SPLIT_BAND, '')
+        case.note.text = case.note.text.replace('+.0015/+.0010', '')
     elif fault == 'rounded_band':
         case.note.text = case.note.text.replace('.0015', '.002')
     elif fault == 'negative_band':
-        case.note.text = case.note.text.replace('+<OVER>+', '+<OVER>-')
+        case.note.text = case.note.text.replace('+.0010', '-.0010')
+    elif fault == 'printed_places':
+        case.note.text = case.note.text.replace('.3750', '.375')
     elif fault == 'missing_diameter':
         case.note.text = case.note.text.replace('<MOD-DIAM>', '', 1)
-    elif fault == 'include_band_off':
-        case.note.IncludeDimPrefixSuffixTolerance = False
+    elif fault == 'note_height':
+        case.native.font.CharHeight = .004
     elif fault == 'source_identity':
         tap.dimension = SimpleNamespace(**vars(tap.dimension))
     elif fault == 'source_feature':
@@ -572,7 +597,7 @@ def test_one_stacked_pivot_callout_preserves_native_links_and_outside_route(monk
         case.native.arrow = case.native.arrow[:6]
     elif fault == 'text_outside':
         case.note.extent = (.025, .198, 0.0, .170, .225, 0.0)
-    if fault in (None, 'single_stack'):
+    if fault in (None, 'unicode_crlf'):
         proof()
         assert len(case.rebuilds) == 2 and len(case.reports) == 2
     else:
@@ -580,13 +605,29 @@ def test_one_stacked_pivot_callout_preserves_native_links_and_outside_route(monk
             proof()
 
 
-def test_stacked_links_must_resolve_before_hiding_source_dimensions(monkeypatch):
+@pytest.mark.parametrize('fault', ('feature', 'value', 'precision', 'band'))
+def test_generated_note_refuses_native_sources_that_disagree_with_spec_before_insertion(monkeypatch, fault):
     case = _stacked_pivot_fixture(monkeypatch)
-    case.note.text = 'UNRESOLVED'
-    with pytest.raises(RuntimeError, match='lost native size/depth/fit links'):
+    if fault == 'feature':
+        case.rows['TapDrillDia'].dimension.FullName = 'TapDrillDia@WrongFeature@block.Part'
+    elif fault == 'value':
+        case.rows['TapDrillDia'].dimension.SystemValue += .001
+    elif fault == 'precision':
+        case.rows['TapDrillDia'].places = 2
+    else:
+        case.rows['BoreDia'].dimension.Tolerance.upper += .00001
+    with pytest.raises(RuntimeError):
+        case.drawing._stack_pivot_callout(case.adapter, case.plan, [], spec)
+    assert not case.inserted
+
+
+def test_generated_note_must_agree_with_spec_before_hiding_source_dimensions(monkeypatch):
+    case = _stacked_pivot_fixture(monkeypatch)
+    case.note.text = 'WRONG TEXT'
+    with pytest.raises(RuntimeError, match='disagrees with spec text'):
         case.drawing._stack_pivot_callout(case.adapter, case.plan, [], spec)
     assert all(row.annotation.Visible == 1 for row in case.rows.values())
-    assert case.rebuilds == ['resolve pivot stacked dimension links']
+    assert case.rebuilds == ['pivot generated callout note height']
 
 
 @pytest.mark.parametrize('feed', (False, True))
