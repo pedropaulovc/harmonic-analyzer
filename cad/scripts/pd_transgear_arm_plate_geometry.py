@@ -204,6 +204,8 @@ NOTCH_BAND = max(
 # and the matched pilots go through at the arm's pattern from the pin S:
 # K's setting circle about S (MHA-PD-00 VIEW K) carries into every
 # B-referenced frame here, so they take that circle, not the arm's zone.
+# It reads stock_form_quality.reducer_k_setting_diameter_mm (Ø.008 since
+# owner ruling 2026-11-08 (Pedro), #2144 item 5.3), not the S-K set band.
 REDUCER_POSITION_DIAMETER = reducer_k_setting_diameter_mm()
 REDUCER_POSITION_RADIUS = REDUCER_POSITION_DIAMETER / 2.0
 # The plate's slip-hole mouths take the title block's edge break (its

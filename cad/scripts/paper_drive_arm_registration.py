@@ -28,12 +28,14 @@ from _gear_quality import (
 ARM_LOCATOR_SITES_MM = ARM.LOCATOR_SITES_MM
 PLATE_LOCATOR_SITES_MM = PLATE.LOCATOR_SITES_MM
 LOCATOR_PAIR_BASELINE_MM = ARM.LOCATOR_PAIR_BASELINE_MM
-# K's drawn setting circle about S (MHA-PD-00 VIEW K); its radius is the
-# set band, the band's far end at its edge.
+# K's drawn setting circle about S (MHA-PD-00 VIEW K), Ø.008:
+# stock_form_quality.reducer_k_setting_diameter_mm (owner ruling 2026-11-08
+# (Pedro), #2144 item 5.3). It bounds K's whole landing error, across S-K
+# included; along S-K the set band below is tighter, and both are checked.
 REDUCER_AXIS_SETUP_RADIUS_MM = reducer_k_setting_diameter_mm() / 2.0
 # The drawn matched setting: K held this band (upper, lower) from
-# CENTRE_DISTANCE along S-K (the reducer's set band, printed on the arm
-# and plate sheets).
+# CENTRE_DISTANCE along S-K (the reducer's set band,
+# pd_rack_pinion_spec.CENTRE_DISTANCE_SET_BAND_IN, which the mesh sets).
 REDUCER_CENTRE_DISTANCE_SET_BAND_MM = ARM.DISC.CENTRE_DISTANCE_SET_BAND
 # Unit vector S -> K in the arm frame (x along the arm, y across), the
 # frame of every K reading below.

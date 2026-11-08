@@ -202,9 +202,8 @@ def test_measured_receiver_pays_full_two_pose_travel_and_uncertainty() -> None:
     widths = _receive()
     assert widths == pytest.approx((0.062, 0.054))
     assert math.hypot(*widths) <= registration.LOCATOR_GEAR_PLANE_TRAVEL_MAX_MM
-    # Both reamed patterns at their Ø.004 position row; K's setting circle Ø.004.
+    # Both reamed patterns at their Ø.004 position row.
     assert registration.LOCATOR_GEAR_PLANE_TRAVEL_MAX_MM == pytest.approx(2.0 * 0.1016)
-    assert registration.REDUCER_AXIS_SETUP_RADIUS_MM == pytest.approx(0.0508)
     assert registration.LOCATOR_COORDINATE_TRAVEL_MAX_MM <= (
         registration.LOCATOR_GEAR_PLANE_TRAVEL_MAX_MM / math.sqrt(2.0)
     )
@@ -213,8 +212,10 @@ def test_measured_receiver_pays_full_two_pose_travel_and_uncertainty() -> None:
 def test_setup_must_hold_the_drawn_centre_distance_band_along_s_k() -> None:
     import pd_rack_pinion_spec as disc
     high, low = disc.CENTRE_DISTANCE_SET_BAND
-    # +x/-0: never closer than nominal; the top is K's setting circle radius.
-    assert (high, low) == (registration.REDUCER_AXIS_SETUP_RADIUS_MM, 0.0)
+    # +x/-0: never closer than nominal. Along S-K the set band is the tighter
+    # limit: its top lies inside K's setting circle (owner ruling 2026-11-08,
+    # #2144 item 5.3), so the receiver checks both.
+    assert low == 0.0 and 0.0 < high < registration.REDUCER_AXIS_SETUP_RADIUS_MM
     uncertainty = 0.001
     s_to_k = (arm.KNOB_BORE_STATION - arm.PIN_STATION, arm.KNOB_BORE_OFFSET)
     assert math.hypot(*s_to_k) == pytest.approx(disc.CENTRE_DISTANCE)
@@ -225,11 +226,52 @@ def test_setup_must_hold_the_drawn_centre_distance_band_along_s_k() -> None:
     for along in (low, low - 0.002):
         with pytest.raises(ValueError, match="centre distance"):
             _receive(setup_error_xy_mm=_setup(0.0, along))
-    # The top of the band is the position circle's own limit.
-    with pytest.raises(ValueError, match="position circle"):
+    # Past the band's top, still inside the circle: refused by the band.
+    with pytest.raises(ValueError, match="centre distance"):
         _receive(setup_error_xy_mm=_setup(0.0, high))
-    # The same error across S-K is only a clocking error: accepted.
-    _receive(setup_error_xy_mm=_setup(high / 2.0, 0.002))
+    # Across S-K an error is only a clocking error: accepted up to the
+    # circle, refused past it.
+    _receive(setup_error_xy_mm=_setup(high, 0.002))
+    with pytest.raises(ValueError, match="position circle"):
+        _receive(setup_error_xy_mm=_setup(registration.REDUCER_AXIS_SETUP_RADIUS_MM, 0.002))
+
+
+def test_a_full_division_setting_lands_k_in_the_band_and_the_circle() -> None:
+    """Owner ruling 2026-11-08 (Pedro), #2144 item 5.3: MHA-PD-00 reads S and K
+    true on a full division of the shop's test indicator. Signed worst case
+    (the PD-00 VIEW K budget): the DRO, zeroed on S, errs once on the S-to-K
+    move; the indicator centres S and K within half a division each; the
+    pivot-and-pin tram turns K about S by its lever. Along S-K, the dialled
+    mid-band aim plus that error stays inside the mesh's set band; in all,
+    K stays inside its setting circle."""
+    import tomllib
+
+    from _process_plans import PROCESS_ROOT
+    import pd_paper_drive_knob_setting_spec as knob_setting
+    import pd_rack_pinion_spec as disc
+
+    inventory = tomllib.loads((PROCESS_ROOT / "shop" / "inventory.toml").read_text(encoding="utf-8"))
+    dro_accuracy = 0.0002 * 25.4
+    assert any(
+        cite.startswith("DRO accuracy") and ".0002” Accuracy" in cite
+        for cite in inventory["machines"]["PM-30MV"]["cite"]
+    )
+    division = inventory["gauges"]["dti"]["resolution_in"]["value"] * 25.4
+    centring = division / 2.0
+    ux, uy = registration.S_TO_K_UNIT
+    dro = dro_accuracy * (abs(ux) + abs(uy))
+    lever = knob_setting.K_SET_CENTRE_DISTANCE_MM / arm.PIN_STATION
+    radial_err = dro + 2.0 * centring
+    tangential_err = radial_err + 2.0 * centring * lever
+    low, high = disc.CENTRE_DISTANCE_WINDOW
+    x, y = knob_setting.K_FROM_S_ALONG_MM, knob_setting.K_FROM_S_ACROSS_MM
+    radial = math.hypot(x, y) - low
+    tangential = abs(x * uy - y * ux)
+    assert 0.0 < radial - radial_err and radial + radial_err < high - low
+    landing = math.hypot(radial + radial_err, tangential + tangential_err)
+    assert landing < registration.REDUCER_AXIS_SETUP_RADIUS_MM
+    # The set band alone would not hold it: the circle is why it grew.
+    assert landing > high - low
 
 
 def test_loaded_envelope_is_anchored_to_the_setup_reading() -> None:
