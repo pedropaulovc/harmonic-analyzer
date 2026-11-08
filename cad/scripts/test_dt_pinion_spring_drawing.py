@@ -869,7 +869,7 @@ def test_clearance_hole_callout_prints_the_title_block_drilled_hole_places() -> 
     entry = exceptions["RV-02"]
     assert entry.kind == "accept"
     assert entry.reason.startswith(
-        "Delegated ruling 2026-11-02 (Main), following owner precedent"
+        "Owner ruling 2026-11-08 (Pedro), #2144 item 1.2"
     )
     assert "#2144" in entry.reason and "20261102T230110877Z" in entry.reason
     assert f"written as {dt_pinion_spring_spec.HOLE_CALLOUT_PRECISION} " in entry.where
