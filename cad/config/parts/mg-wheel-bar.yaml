@@ -22,7 +22,7 @@ mg-wheel-bar:
       kind: "minor"
       where: "front view, 2X clamp-hole callout: WALL .070 MIN (clamp holes top wall, to the top face)"
       finding: "clamp holes top wall .070 MIN, below the .080 target (rule 17)"
-      reason: "owner ruling 2026-10-26 (#1532): the row stands 5.0 mm (.197) under the top face (strap top flush with the bar top; row at the MHA-SH-02 taps' height), so no height change reaches this wall; full worst case = the title block's +/-.005 row band (tightened from +/-.007, delegated ruling 2026-11-07, Main, no precedent; owner review #2144), DRILLED HOLES +.004, 0.3 deg run-off, R.010 edge break at the rim and at the top edge; holds the .060 floor"
+      reason: "owner ruling 2026-10-26 (#1532): the row stands 5.0 mm (.197) under the top face (strap top flush with the bar top; row at the MHA-SH-02 taps' height), so no height change reaches this wall; full worst case = the title block's +/-.005 row band (tightened from +/-.007, Owner ruling 2026-11-08 (Pedro), #2144 item 11.2), DRILLED HOLES +.004, 0.3 deg run-off, R.010 edge break at the rim and at the top edge; holds the .060 floor"
     - id: "RV-07"
       kind: "minor"
       where: "front view, hanger-hole callout: WALL .076 MIN (hanger hole end wall, to the left end)"

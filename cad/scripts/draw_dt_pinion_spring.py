@@ -1189,7 +1189,7 @@ async def build(adapter: Any) -> dict[str, str]:
         process=HOLE_PROCESS,
     )
     # This render-time precision write is the declared exception RV-02 in
-    # cad/config/parts/dt-pinion-spring.yaml (delegated ruling 2026-11-02,
+    # cad/config/parts/dt-pinion-spring.yaml (Owner ruling 2026-11-08 (Pedro), #2144 item 1.2,
     # owner review #2144): a part-authored precision does not reach the
     # callout (run 20261102T230110877Z).
     set_hole_callout_precision(

@@ -365,8 +365,8 @@ TENON_STRAIGHT_WALL_MIN = (TENON_DIA_MIN - PIVOT_BORE_FIT_MAX) / 2.0 - BORE_ECCE
 # bore's mouth are both exposed there and each takes the title block's break,
 # as TENON_GLUE_LENGTH_MIN charges the end break (codjiflo on #2102, #2171).
 TENON_WALL_MIN = round(TENON_STRAIGHT_WALL_MIN - 2.0 * EDGE_BREAK_MAX_MM, 6)
-# Main delegated ruling 2026-11-04 (#2171, option C; listed for owner review
-# on #2144): that end ring is oak bonded inside the brass ferrule, its edges
+# Owner ruling 2026-11-08 (Pedro), #2144 item 7.2 (#2171, option C): that
+# end ring is oak bonded inside the brass ferrule, its edges
 # carry no load (the bore runs on the MHA-DT-32 shoulder along its length), and
 # a larger tenon would need a larger ferrule against the user's 2026-09-30 ring
 # size, so .040 is accepted as minor exception RV-02 (precedent #1900's
