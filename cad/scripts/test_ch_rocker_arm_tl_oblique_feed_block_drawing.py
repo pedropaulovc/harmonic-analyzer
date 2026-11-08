@@ -173,14 +173,15 @@ def test_four_taps_sit_on_the_nut_pcd_on_the_lug_diagonals_and_are_transferred()
 
 
 def test_clearance_is_the_smallest_three_place_drill_over_the_vertical_stack():
-    # TL-28's as-bought 1 in (±.012) and the lug's 12.400 ±.13 mm put the
-    # leadscrew up to .435 mm off the clearance's axis (Codjiflo P1 on #2112).
-    assert math.isclose(spec.LEADSCREW_OFFSET_Z,.012*INCH+printed_band_mm(3,unit='mm'))
-    assert round(spec.LEADSCREW_OFFSET_Z,4)==.4348
+    # TL-28's as-bought 1 in (±.012) and the clearance's own 12.400 ±.05 mm
+    # (owner ruling 2026-11-08, A2 option (i)) put the leadscrew up to .355 mm
+    # off the clearance's axis (Codjiflo P1 on #2112); laterally ±.002.
+    assert math.isclose(spec.LEADSCREW_OFFSET_Z,.012*INCH+.05)
+    assert math.isclose(spec.LEADSCREW_OFFSET_Y,.002*INCH)
     assert spec.LEADSCREW_RADIAL_CLEARANCE>spec.LEADSCREW_OFFSET
-    assert round((spec.LEADSCREW_RADIAL_CLEARANCE-spec.LEADSCREW_OFFSET)*1000)==5
-    # Ø.350 would not clear the stack.
-    assert (.350*INCH-lead.SCREW_MAJOR_DIA)/2<spec.LEADSCREW_OFFSET
+    # Ø.350 would not clear the as-bought stack at the title block's bands.
+    title_block=math.hypot(printed_band_mm(3,unit=spec.UNIT),.012*INCH+printed_band_mm(3,unit='mm'))
+    assert (.350*INCH-lead.SCREW_MAJOR_DIA)/2<title_block
 
 
 def test_transfer_spot_enters_every_hole_and_the_heads_clear_the_nut_body():
@@ -233,15 +234,24 @@ def test_clearance_to_tap_wall_is_the_stated_shortfall_and_every_face_wall_meets
     assert WALL_FLOOR_MM<=clearance<WALL_TARGET_MM
     assert all(v>=WALL_TARGET_MM for k,v in walls.items() if k!='taps to the leadscrew clearance')
     # The radial wall at the clocking limit: the offset's largest component
-    # along a tap at 50° from the lug's Y axis, the tap at its least radius.
+    # along a tap at 50° from the lug's Y axis, the tap at its least radius,
+    # less rule 17's 0.3° wander over the .770 THRU tap (machinist review,
+    # farm r1 20261107T221729532Z; owner ruling 2026-11-08, A2 option (i)).
     a=math.radians(spec.NUT_CLOCK_DEG+spec.NUT_CLOCK_TOL_DEG)
     toward=spec.LEADSCREW_OFFSET_Y*math.cos(a)+spec.LEADSCREW_OFFSET_Z*math.sin(a)
     radius=feed_nut.HOLE_PCD/2-feed_nut.HOLE_STATION_BAND-spec.FIT_UP_RESIDUAL
     clearance_r=(spec.SCREW_CLEARANCE_DIA+drilled_oversize_mm(unit=spec.UNIT))/2
-    expected=radius-toward-THREAD_MAJOR_MM['#4-40']/2-clearance_r
+    wander=spec.LUG_WIDTH*math.tan(math.radians(.3))
+    assert math.isclose(spec.NUT_TAP_WANDER,wander)
+    expected=radius-toward-THREAD_MAJOR_MM['#4-40']/2-wander-clearance_r
     assert math.isclose(clearance,expected)
+    assert round(clearance/INCH,4)==.0606
     assert spec.NUT_WALL_MIN_TEXT=='WALL .060 MIN TO TAPS'
     assert spec.NUT_WALL_MIN<=clearance
+    # Negative control: at the title block's ±.005 / ±.13 mm stations the
+    # wander puts the wall under the .060 floor.
+    loose=printed_band_mm(3,unit=spec.UNIT)*math.cos(a)+(.012*INCH+.13)*math.sin(a)
+    assert radius-loose-THREAD_MAJOR_MM['#4-40']/2-wander-clearance_r<WALL_FLOOR_MM
 
 
 def test_view_d_prints_size_then_process_names_the_leadscrew_and_bare_locations():
@@ -375,8 +385,14 @@ def test_feed_entrypoints_use_the_native_shared_geometry_and_not_a_separate_brac
 
 def test_only_the_kp08_axis_height_prints_exact_millimetres():
     # Owner ruling 4 (2026-11-01): the KP08 vendor line prints exact mm; the
-    # nut's taps print nothing (transferred).
-    assert spec.METRIC_DIMENSIONS=={('NutPatternReference','NutCentreZ'):(3,printed_band_mm(3,unit='mm'))}
+    # nut's taps print nothing (transferred). The clearance's height and
+    # lateral stations carry ±.05 mm / ±.002 (owner ruling 2026-11-08, A2
+    # option (i)), set on the saved model's dimensions.
+    assert spec.METRIC_DIMENSIONS=={('NutPatternReference','NutCentreZ'):(3,.05)}
+    assert spec.INCH_TOLERANCED_DIMENSIONS=={('NutPatternReference','NutCentreY'):(3,.002*INCH)}
+    import _oblique_pivot_block_model as model
+    source=Path(model.__file__).read_text(encoding='utf-8')
+    assert 'getattr(part,"INCH_TOLERANCED_DIMENSIONS",{})' in source
 
 
 def test_counterbore_callout_and_view_d_reference_use_separate_lanes():

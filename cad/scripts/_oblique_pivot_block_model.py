@@ -683,6 +683,10 @@ async def build_block_model(adapter, part) -> None:
     for (feature_name,dimension_name),(places,band) in getattr(part,"METRIC_DIMENSIONS",{}).items():
         set_dimension_symmetric_tolerance(adapter,feature_name,dimension_name,band,display_unit="mm")
         set_metric_vendor_units(adapter,feature_name,dimension_name,places=places)
+    # TL-32's Ø.351 clearance station in Y, ±.002 (owner ruling 2026-11-08
+    # (Pedro), A2 option (i)); its Z is the millimetre band above.
+    for (feature_name,dimension_name),(places,band) in getattr(part,"INCH_TOLERANCED_DIMENSIONS",{}).items():
+        set_dimension_symmetric_tolerance(adapter,feature_name,dimension_name,band,places=places,display_unit="in")
     # TL-32's tap clocking band, every tap (TL-00 F1B sets all four holes in it).
     if hasattr(part,"NUT_CLOCK_DIMENSION"):
         set_dimension_symmetric_angular_tolerance(adapter,"NutPatternReference",part.NUT_CLOCK_DIMENSION,
