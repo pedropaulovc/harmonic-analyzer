@@ -253,8 +253,12 @@ def _pivot_stack_estimate(text):
 
 
 @_telemetry.traced("drawing.pivot_stacked_callout")
-def _stack_pivot_callout(adapter, plan, annotations, contract):
-    """One outer-rim note generated from spec, independently checked against native sources."""
+def _stack_pivot_callout(adapter, plan, annotations, contract, printed=None):
+    """One outer-rim note generated from spec, independently checked against native sources.
+
+    ``printed`` is the sheet's BLOCK_CALLOUTS merge (written before this
+    runs): the sources must read those above/below rows, the model's
+    CALLOUTS_* where the sheet writes none."""
     names = ('BoreDia', 'TopBoreDepth', 'TapDrillDia')
     displays = _displays(adapter, annotations, names)
 
@@ -278,7 +282,7 @@ def _stack_pivot_callout(adapter, plan, annotations, contract):
                 or not math.isfinite(state[1])
                 or not math.isclose(state[1] * 1000, contract.DRAWING_VALUES[name], rel_tol=0, abs_tol=1e-6)
                 or state[3] != contract.DRAWING_PRECISION_BY_NAME[name]
-                or state[2][2:4] != (contract.CALLOUTS_ABOVE.get(name, ''), contract.CALLOUTS_BELOW.get(name, ''))
+                or state[2][2:4] != _printed_rows(name, contract, printed)
                 or len(state[6]) != 3 or not all(math.isfinite(v) for v in state[6])):
             raise RuntimeError(f'{name}: unreadable native stacked-callout source {state!r}')
         ann = _early_bound(display.GetAnnotation(), 'IAnnotation')
@@ -462,6 +466,14 @@ def _set_arrow_side(adapter, annotations, names, side) -> None:
         if int(display.ArrowSide) != side:
             raise RuntimeError(f'{name}: arrows did not move to side {side}')
     rebuild_drawing(adapter, label=f'arrow side {side}')
+
+
+def _printed_rows(name, contract, printed):
+    """The above/below rows a source prints: the sheet's ``printed`` parts,
+    else the saved model's CALLOUTS_*."""
+    parts = (printed or {}).get(name, {})
+    return (parts.get('above', contract.CALLOUTS_ABOVE.get(name, '')),
+            parts.get('below', contract.CALLOUTS_BELOW.get(name, '')))
 
 
 # swDimensionTextParts_e (swconst.tlb, SOLIDWORKS 3DEXPERIENCE R2026x, read
@@ -763,9 +775,6 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None, ca
     set_hidden_lines_removed(adapter,plan)
     plan_annotations = curate_view_dimensions(adapter,plan,keep=plan_keep,view_label='plan',
                      dimensions_by_feature=contract.DRAWING_DIMENSIONS)
-    settled_checks = ()
-    if not is_feed:
-        settled_checks = (_place_pivot_tap_arrow_inside(adapter, plan, plan_annotations, contract),)
     _set_arrow_side(adapter, plan_annotations, ('PlanHole3Y',), _ARROWS_INSIDE)
     set_hidden_lines_removed(adapter,side)
     side_annotations = curate_view_dimensions(adapter,side,keep=side_keep,view_label='pivot section direction',
@@ -834,6 +843,7 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None, ca
         annotations += nut_annotations
         sheet_scales = {sheets[0]: SHEET_SCALE, sheets[1]: NUT_SCALE}
     _set_callouts(adapter, annotations, printed)
+    settled_checks = ()
     # Every printed dimension keeps its part-authored places; the repeated
     # row/column locations left off the sheet print nothing to check.
     kept = {*plan_keep, *side_keep, *floor_keep, *right_keep, *(NUT_KEEP if is_feed else ())}
@@ -841,7 +851,7 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None, ca
                  for name,places in dims.items() if name in kept}
     assert_imported_precision(adapter,annotations,precision)
     if not is_feed:
-        settled_checks = (_stack_pivot_callout(adapter, plan, annotations, contract),)
+        settled_checks = (_stack_pivot_callout(adapter, plan, annotations, contract, printed=printed),)
     if is_feed:
         # SolidWorks pins its own TAPPED_HOLE_NOTE once per view that picks up
         # the one NutTaps feature, and which views do is its choice: the same

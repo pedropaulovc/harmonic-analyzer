@@ -853,15 +853,21 @@ def test_stacked_callout_keeps_imported_precision_gate_and_is_pivot_only(feed):
     assert ast.unparse(precision.value) == 'assert_imported_precision(adapter, annotations, precision)'
     calls, proof = [], object()
 
-    def stack(*args):
-        calls.append(args)
+    def stack(*args, **kwargs):
+        calls.append((args, kwargs))
         return proof
 
+    printed = {}
     env = dict(is_feed=feed, adapter=object(), plan=object(), annotations=[],
-               contract=object(), _stack_pivot_callout=stack)
+               contract=object(), printed=printed, _stack_pivot_callout=stack)
     exec(compile(ast.Module(body=[initial, conditional], type_ignores=[]), '<pivot-routing>', 'exec'), env)
     assert len(calls) == (0 if feed else 1)
     assert env['settled_checks'] == (() if feed else (proof,))
+    # The proof runs after the sheet writes its callouts and reads them.
+    assert all(kwargs == {'printed': printed} for _args, kwargs in calls)
+    body = ast.unparse(build)
+    assert body.index('_set_callouts(adapter, annotations, printed)') < body.index(
+        '_stack_pivot_callout(')
     finalizer = next(node for node in ast.walk(build) if isinstance(node, ast.Call)
                      and isinstance(node.func, ast.Name) and node.func.id == 'finalize_drawing')
     assert ast.unparse(next(keyword.value for keyword in finalizer.keywords
@@ -881,6 +887,21 @@ def test_stacked_callout_keeps_imported_precision_gate_and_is_pivot_only(feed):
                _assert_pivot_pdf_text=lambda *args: pdf_calls.append(args))
     exec(compile(ast.Module(body=[pdf_guard], type_ignores=[]), '<pivot-pdf-routing>', 'exec'), env)
     assert pdf_calls == ([] if feed else [(outputs.pdf, report_path, env['contract'])])
+
+
+def test_pivot_stack_sources_read_the_sheets_printed_rows():
+    """The owner's generated note (stack 1ee5e10933) checks its three hidden
+    or REF sources' above/below rows; this sheet writes BLOCK_CALLOUTS first
+    (no 'SETS ...' reason under A-A's .359), so the check reads the printed
+    rows, the model's CALLOUTS_* where the sheet writes none."""
+    import _oblique_block_drawing as drawing
+
+    printed = drawing.block_callouts()
+    assert drawing._printed_rows('TopBoreDepth', spec, printed) == (spec.CALLOUTS_ABOVE.get('TopBoreDepth', ''), '')
+    assert drawing._printed_rows('BoreDia', spec, printed) == ('', printed['BoreDia']['below'])
+    assert drawing._printed_rows('BoreDia', spec, None) == (spec.CALLOUTS_ABOVE['BoreDia'], spec.CALLOUTS_BELOW['BoreDia'])
+    source = Path(drawing.__file__).read_text(encoding='utf-8')
+    assert 'PIVOT_STACK_CALLOUTS' not in source and '    printed = block_callouts(callouts)\n' in source
 
 
 @pytest.mark.parametrize('fault', (
