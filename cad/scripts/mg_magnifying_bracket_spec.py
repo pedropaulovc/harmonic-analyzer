@@ -61,7 +61,6 @@ MOUNTING_HOLE_PRECISION = {"hw-diam": 3}
 TAP_HOLE_PRECISION = {"hw-thrutapdrldia": 3}
 TAP_PROCESS = "MATES MHA-MG-03 LEVER"
 # The foot holes drill to the title block's .XXX row; the MHA-SM-03 taps are
-# spotted through them at assembly (delegated ruling 2026-11-07, Main, no
-# precedent; owner review #2144).
+# spotted through them at assembly (owner ruling 2026-11-08, #2144 item 11.1).
 MOUNTING_HOLE_PROCESS = "MATES MHA-SM-03 TAPPED HOLES"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"

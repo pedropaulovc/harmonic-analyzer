@@ -64,6 +64,8 @@ from magnifying_bracket_joint_layout import (
     SIDE_PLATE_Y,
     SIDE_PLATE_Z,
     GRIP_MIN,
+    CLEARANCE_DIA,
+    CLEARANCE_HOLE_DEVIATIONS,
     SIDE_PLATE_HEIGHT,
     SIDE_PLATE_HEIGHT_DEVIATIONS,
 )
@@ -287,6 +289,39 @@ if SCREW_SHEAR_STRESS > SCREW_SHEAR_ALLOWABLE:
 # The worst load already carries the +50 % guide friction: no separation.
 if JOINT_PRELOAD_MARGIN <= 1.0:
     raise AssertionError("magnifying bracket #2-56 joint separates under prying")
+
+# The settle onto the shanks (owner ruling 2026-11-08, #2144 item 11.1).
+# Friction cannot hold the flange: two screws at the conservative preload and
+# a dry steel-on-steel 0.15 resist far less than the least in-plane torque.
+# The flange therefore turns about its seat normal, in the load's sense (the
+# torque never reverses, asserted above), until both shanks bear on opposite
+# sides of their holes. The SM-03 taps are spotted through these holes, so each
+# shank starts centred and the whole diametral play of both holes is taken
+# across the screw pitch. The assembly step pre-settles it -- "ROTATE MHA-MG-01
+# NOSE DOWN UNTIL BOTH SCREWS BEAR, THEN TIGHTEN" -- before the fixture drop
+# and the pen zero, which then take up the resulting hook offset once.
+FRICTION_COEFFICIENT = 0.15
+JOINT_FRICTION_MOMENT = 2.0 * FRICTION_COEFFICIENT * SCREW_PRELOAD_N * SCREW_PITCH_X / 2.0
+SETTLE_ROTATION_RAD = tuple(
+    (CLEARANCE_DIA + deviation - SCREW_MAJOR_DIA) / SCREW_PITCH_X
+    for deviation in CLEARANCE_HOLE_DEVIATIONS
+)  # (least, greatest) hole: 1.7 to 2.1 degrees
+# The settle turns the lever group, hook included, about the screw row's
+# centre; Mz < 0 turns it clockwise seen from +Z (the lever's free end down,
+# away from the top-frame rail). Hook offset along wire 1 at the greatest
+# settle, signed as hook_deflection_along_wire.
+_HX, _HY = HOOK[0] - JOINT[0], HOOK[1] - JOINT[1]
+HOOK_SETTLE_ALONG_WIRE = -(
+    -SETTLE_ROTATION_RAD[1] * -_HY * WIRE_DIR[0]
+    + -SETTLE_ROTATION_RAD[1] * _HX * WIRE_DIR[1]
+)
+if JOINT_FRICTION_MOMENT >= abs(JOINT_MZ_MIN_TENSION):
+    raise AssertionError(
+        "magnifying bracket joint friction now holds the least torque: the "
+        "settle step and its charge no longer describe the joint"
+    )
+if not 0.0 < SETTLE_ROTATION_RAD[0] <= SETTLE_ROTATION_RAD[1]:
+    raise AssertionError("magnifying bracket settle play must be positive")
 
 
 def material_demand_report() -> dict[str, float | str | None]:

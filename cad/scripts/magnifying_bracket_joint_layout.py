@@ -128,9 +128,9 @@ FLANGE_THICKNESS_BAND = FOOT_GRIP_TOL
 THREAD_DEPTH_BAND = 0.0508  # native metadata only; the drawing prints .195 MIN
 LINEAR_BAND = printed_band_mm(2)  # PRINTED title-block .XX band, not the unrounded .02 in
 POSITION_BAND = 0.0508
-# One master (delegated ruling 2026-11-07, Main, no precedent; owner review
-# #2144): MHA-MG-01's foot holes are drilled to the title block's .XXX row,
-# and the MHA-SM-03 taps are spotted through them at assembly.
+# One master (owner ruling 2026-11-08, #2144 item 11.1): MHA-MG-01's foot
+# holes are drilled to the title block's .XXX row, and the MHA-SM-03 taps are
+# spotted through them at assembly.
 BRACKET_POSITION_PLACES = 3
 BRACKET_POSITION_BAND = printed_band_mm(BRACKET_POSITION_PLACES, unit=BRACKET_UNIT)
 DRILLED_DIAMETER_PLUS = drilled_oversize_mm()
