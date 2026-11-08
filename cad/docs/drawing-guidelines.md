@@ -642,13 +642,11 @@ sub-assembly, never on part fabrication.
   pose, at a scale where every part is identifiable, plus the isometric
   (rule 8).
 - An exploded view, or a sequence of them, showing order, orientation and
-  which face mates to which. Each part that a step fits on its own is drawn
-  clear of the parts it goes on, moved along the axis it goes in on; such a
-  part still overlapping or hidden by its mate does not show its order or
-  face. Parts that an earlier step or another sheet already joined (a
-  pressed dowel, a gear on its shaft, a block with its kit bearing) may stay
-  together as one unit. Every balloon lands on a visible face of its own
-  part.
+  which face mates to which. Every part the view balloons is visible in it,
+  and its balloon lands on a visible face of that part; a part left hidden
+  behind its mate, ballooned on a sliver or a hidden face, does not show its
+  order or face. Parts may stay seated together where the steps make the
+  order plain; exploding every stepwise part is not required.
 - A parts list with item number, part number, description and quantity, and
   balloons tying every visible part to it. Every row is ballooned somewhere;
   every balloon has a row.
