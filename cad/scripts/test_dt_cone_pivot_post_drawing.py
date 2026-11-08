@@ -110,7 +110,7 @@ def test_post_preserves_harvested_sizes_and_follows_the_configured_axes() -> Non
     )
 
 
-def test_current_manufacturing_plan_tracks_post_geometry_without_changing_tooling() -> (
+def test_held_manufacturing_plan_tracks_post_geometry_without_claiming_tooling() -> (
     None
 ):
     plan_path = (
@@ -129,8 +129,9 @@ def test_current_manufacturing_plan_tracks_post_geometry_without_changing_toolin
     assert setups["S1"]["hold"]["stickout_mm"] == pytest.approx(
         stock["north_allowance_mm"] + spec.BLOCK_HEIGHT
     )
+    assert setups["S2"]["stock_in"] == "S1C"
     assert setups["S2"]["stock_state"]["top_z"] == pytest.approx(
-        spec.BLOCK_HEIGHT + stock["south_grip_mm"]
+        spec.BLOCK_HEIGHT + 1.5
     )
     assert setups["S2"]["stock_state"]["local_thickness"] == {
         "mount_west": spec.BLOCK_HEIGHT,
@@ -149,9 +150,25 @@ def test_current_manufacturing_plan_tracks_post_geometry_without_changing_toolin
         spec.CRANK_BORE_HEIGHT,
         spec.CRANK_BOSS_START_Z,
     ]
-    index = setups["S3"]["hold"]["index"]
-    assert index["angle_deg"] == pytest.approx(spec.INCLINE_DEG)
-    assert index["fixture"] == "BS-0" and index["positions"] == 1
+    assert setups["S3"]["hold"]["fixture"] == "unknown"
+    assert setups["S3"]["hold"]["support"] == "unknown"
+    assert "index" not in setups["S3"]["hold"]
+    assert journal["binding"] == "unknown"
+    placement = plan["axis_placements"]["crank"]
+    assert placement == {
+        "boss": "crank_boss",
+        "bore": "crank_bore",
+        "caps": "crank_boss_faces",
+        "support": "head",
+        "separation_mm": 43.2735,
+    }
+    # The manufacturing axis moves as one feature group, not by relabelling CAD
+    # or moving the original setup frame. Native placement proof remains required.
+    operative_height = spec.BORE_HEIGHT + placement["separation_mm"]
+    assert operative_height == pytest.approx(81.3735)
+    assert operative_height - plan["frames"]["C4"]["origin"][1] == pytest.approx(
+        0.17785649710401
+    )
     assert plan["construction"] == "one_piece"
 
 
@@ -202,13 +219,9 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     }
     # No dimension may be placed twice: two views that both carry a value are
     # two chances for the sheet to contradict itself.
-    assert (
-        len(drawing.FRONT_KEEP)
-        + len(drawing.TOP_KEEP)
-        + len(drawing.SECTION_KEEP)
-        + len(drawing.JOURNAL_KEEP)
-        == len(kept)
-    )
+    assert len(drawing.FRONT_KEEP) + len(drawing.TOP_KEEP) + len(
+        drawing.SECTION_KEEP
+    ) + len(drawing.JOURNAL_KEEP) == len(kept)
 
 
 def test_mounting_hole_callouts_cite_their_split_helper_owner() -> None:
@@ -269,7 +282,9 @@ def test_finish_extent_uses_the_template_rules(
     )
     monkeypatch.setattr(audit, "collect_document", lambda _adapter: [sheet])
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
-    monkeypatch.setattr(drawing, "_view_outline", lambda _view: (0.213, 0.117, 0.257, 0.2034))
+    monkeypatch.setattr(
+        drawing, "_view_outline", lambda _view: (0.213, 0.117, 0.257, 0.2034)
+    )
     # A contained Finish reaches the next independent gate (missing Ra);
     # escaping any rule fails before that gate.  No live COM seat is needed.
     with pytest.raises(RuntimeError, match=expected_error):
@@ -285,7 +300,9 @@ def _landscape_sheet() -> tuple[object, tuple]:
     from test_drawing_layout_check import ZONE_MARGINS
 
     template = DRAWING_TEMPLATES[DrawingLayout.LANDSCAPE]
-    region = DrawableRegion.from_margins(template.width_m, template.height_m, **ZONE_MARGINS)
+    region = DrawableRegion.from_margins(
+        template.width_m, template.height_m, **ZONE_MARGINS
+    )
     return region, _keep_outs(template.width_m, template.height_m)
 
 
@@ -302,7 +319,9 @@ def _plan_gate(monkeypatch: pytest.MonkeyPatch, labels: list[str]) -> None:
         ),
     ]
     monkeypatch.setattr(audit, "collect_document", lambda _adapter: sheets)
-    monkeypatch.setattr(drawing, "_view_outline", lambda _view: (0.213, 0.117, 0.257, 0.2034))
+    monkeypatch.setattr(
+        drawing, "_view_outline", lambda _view: (0.213, 0.117, 0.257, 0.2034)
+    )
     drawing._assert_native_layout(
         SimpleNamespace(currentModel=object()),
         "journal",
@@ -310,7 +329,9 @@ def _plan_gate(monkeypatch: pytest.MonkeyPatch, labels: list[str]) -> None:
     )
 
 
-def test_the_station_must_survive_its_hidden_sketch(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_the_station_must_survive_its_hidden_sketch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Hiding a sketch in a view hides what was imported from it (rim-aba9
     lost the station so), so the stations and the plan angle come through the
     hidden-owner import, and the gate fails a sheet that lost any of them."""
@@ -326,6 +347,7 @@ def test_the_station_must_survive_its_hidden_sketch(monkeypatch: pytest.MonkeyPa
         _plan_gate(monkeypatch, ["CrankBossStartZ", "ConeBossNorthZ"])
     with pytest.raises(RuntimeError, match=r"\['ConeBossNorthZ'\] once"):
         _plan_gate(monkeypatch, ["CrankBossStartZ", "InclineAngle"])
+
     # With all present the gate moves on to the title block.
     def title_block(_obj, _iface):
         raise LookupError("title block")
@@ -476,9 +498,7 @@ def test_part_owns_every_printed_decimal_place() -> None:
     # length and the closures print .XXX, and the basic plan angle prints the
     # model's exact value (#906, it feeds the frame).
     assert {
-        name
-        for name, places in spec.DRAWING_PRECISION_BY_NAME.items()
-        if places >= 3
+        name for name, places in spec.DRAWING_PRECISION_BY_NAME.items() if places >= 3
     } == {
         "CrankBoreDia",
         "JournalBoreDia",
@@ -569,9 +589,10 @@ def test_the_plan_angle_is_model_geometry_not_sheet_text() -> None:
     assert "add_angular_reference_dimension" not in source
     # Hidden through blank_reference_sketches (read back, and the drawing
     # shows it per view), never through the plane/axis blanker.
-    assert "JournalPlanReference" not in source.split(
-        "_blank_reference_geometry(\n        adapter,"
-    )[1]
+    assert (
+        "JournalPlanReference"
+        not in source.split("_blank_reference_geometry(\n        adapter,")[1]
+    )
 
 
 def test_machined_faces_are_called_out_on_the_casting() -> None:
@@ -697,7 +718,9 @@ def test_boss_north_is_the_whole_north_annulus_on_the_journal() -> None:
     incline = math.radians(spec.INCLINE_DEG)
     axis = (math.sin(incline), 0.0, math.cos(incline))
     assert part.BOSS_NORTH_NORMAL == pytest.approx([-c for c in axis], abs=1e-12)
-    offset = [c - b for c, b in zip(part.BOSS_NORTH_CENTRE, (0.0, spec.BORE_HEIGHT, 0.0))]
+    offset = [
+        c - b for c, b in zip(part.BOSS_NORTH_CENTRE, (0.0, spec.BORE_HEIGHT, 0.0))
+    ]
     assert offset == pytest.approx(
         [-spec.CONE_BOSS_LENGTH / 2.0 * c for c in axis], abs=1e-12
     )
@@ -727,7 +750,11 @@ def test_face_finder_keeps_only_the_square_face_through_the_station() -> None:
     normal = part.BOSS_NORTH_NORMAL
     centre = part.BOSS_NORTH_CENTRE
     # any root point in the face plane: the centre moved across the axis
-    in_plane = (centre[0] + 5.0 * normal[2], centre[1] + 3.0, centre[2] - 5.0 * normal[0])
+    in_plane = (
+        centre[0] + 5.0 * normal[2],
+        centre[1] + 3.0,
+        centre[2] - 5.0 * normal[0],
+    )
     target = _FakeFace(normal, in_plane)
     faces = [
         _FakeFace((0.0, 0.0, 0.0), centre),  # the collar OD #916 picked
@@ -764,11 +791,9 @@ def test_v2_feature_topology_uses_midplane_extrusions_and_hole_wizard() -> None:
     assert 'name="AttachmentScrewHoles"' in source
 
 
-
-
 def test_bore_rim_com_scan_is_traced() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert ('@_telemetry.traced("drawing.bore_rim_scan")\n' "def _bore_rim_edge") in source
+    assert ('@_telemetry.traced("drawing.bore_rim_scan")\ndef _bore_rim_edge') in source
 
 
 def test_part_config_is_a_machined_casting() -> None:
@@ -798,14 +823,19 @@ def test_journal_rims_print_the_thrust_ring_break() -> None:
     import dt_cone_gear_shaft_spec as shaft
 
     break_max = shaft.THRUST_EDGE_BREAK_MAX
-    assert f"RIMS BREAK {shaft.inch_text(break_max, 3)} MAX" == shaft.POST_JOURNAL_RIM_BREAK
+    assert (
+        f"RIMS BREAK {shaft.inch_text(break_max, 3)} MAX"
+        == shaft.POST_JOURNAL_RIM_BREAK
+    )
     bore_callout = drawing.DIMENSION_CALLOUTS["JournalBoreDia"]
     # r16 (rules 4 and 7): the tighter break carries its reason under it.
     assert bore_callout.splitlines()[-2:] == [
         shaft.POST_JOURNAL_RIM_BREAK,
         "FOR COLLAR SEAT",
     ]
-    assert f"EDGE BREAK {shaft.inch_text(break_max, 3)} MAX" in shaft.COLLAR_STOCK_CALLOUT
+    assert (
+        f"EDGE BREAK {shaft.inch_text(break_max, 3)} MAX" in shaft.COLLAR_STOCK_CALLOUT
+    )
     ring = shaft.THRUST_RING_MIN
     assert ring - 2.0 * break_max >= shaft.THRUST_RING_FLOOR
     # the title block's general break on the rim would not hold the floor
@@ -864,7 +894,9 @@ def test_foot_seat_mate_rides_its_ra_symbol_not_a_loose_note() -> None:
     loose general note, not on the callout it explains; it prints over the
     foot seat's Ra, and the sheet carries no general note."""
     foot = surface_finish_by_key(spec.SURFACE_FINISHES, "foot_seat")
-    assert foot.production_method == spec.FOOT_SEAT_FINISH_TARGET == "SEATS ON MHA-DT-20"
+    assert (
+        foot.production_method == spec.FOOT_SEAT_FINISH_TARGET == "SEATS ON MHA-DT-20"
+    )
     assert spec.DRAWING_NOTES == ""
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert '"Manufacturing Notes"' not in source
@@ -876,9 +908,7 @@ def test_body_diameter_claims_no_unmeasurable_flushness() -> None:
     guaranteed by the body Ø's and the .827 station's printed limits; each band
     governs its own surface (crank_boss_rim proves the 64T clear of both)."""
     assert "MainBodyDia" not in drawing.DIMENSION_CALLOUTS
-    assert not [
-        text for text in drawing.DIMENSION_CALLOUTS.values() if "FLUSH" in text
-    ]
+    assert not [text for text in drawing.DIMENSION_CALLOUTS.values() if "FLUSH" in text]
 
 
 def test_body_diameter_takes_the_title_block_band() -> None:
@@ -1076,7 +1106,9 @@ def test_crank_boss_station_has_one_driving_global() -> None:
     """The printed station and the plane the boss grows from cannot drift apart."""
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert '"CrankBossNearZ": CRANK_BOSS_NEAR_Z,' in source
-    assert 'drive_jobs.append(("D1@CrankInterfacePlane", \'"CrankBossNearZ"\'))' in source
+    assert (
+        'drive_jobs.append(("D1@CrankInterfacePlane", \'"CrankBossNearZ"\'))' in source
+    )
     assert 'station.record("CrankBossStartZ", \'"CrankBossNearZ"\')' in source
 
 
@@ -1099,7 +1131,9 @@ def test_the_post_saves_every_reference_sketch_hidden() -> None:
     one that carries a drawing dimension is saved hidden, read back, and the
     drawing shows it only in the view that dimensions it.  JournalPlanReference
     and BoreSpacingReference were the release's last visibility debt."""
-    references = {name for name in spec.DRAWING_DIMENSIONS if name.endswith("Reference")}
+    references = {
+        name for name in spec.DRAWING_DIMENSIONS if name.endswith("Reference")
+    }
     assert references == {
         "JournalPlanReference",
         "CrankBossStationReference",
@@ -1164,7 +1198,10 @@ def test_crank_bore_is_located_from_the_cone_bore_and_never_binds() -> None:
     drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'label="crank axis height reference"' in drawing_source
     source = Path(part.__file__).read_text(encoding="utf-8")
-    assert """set_global(adapter, "CrankAxisY", '"JournalAxisY" + "CrankAboveCone"')""" in source
+    assert (
+        """set_global(adapter, "CrankAxisY", '"JournalAxisY" + "CrankAboveCone"')"""
+        in source
+    )
     # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the spacing band is a dimension, never a setup method.
     assert "ONE SETUP" not in spec.DRAWING_NOTES
     assert "BORE-TO-BORE" not in spec.DRAWING_NOTES

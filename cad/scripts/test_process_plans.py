@@ -601,6 +601,12 @@ def test_verification_requires_the_provisional_stamp(synthetic, tamper):
         plans.verify_traveler(STEM, out)
 
 
+def test_held_shaft_and_cone_track_revisions_without_traveler_enrollment():
+    assert {"ch_pivot_shaft", "dt_cone_pivot_post"} <= set(plans.MIGRATED_PLANS)
+    assert plans.TRAVELER_STEMS == ()
+    assert plans.revision_stems() == plans.MIGRATED_PLANS
+
+
 def test_migrated_and_enrolled_plan_revisions_match_configured_release():
     import yaml
 
@@ -613,38 +619,206 @@ def test_migrated_and_enrolled_plan_revisions_match_configured_release():
         )
 
 
-def test_revision_stems_deduplicate_migrated_and_enrolled_without_enrolling(monkeypatch):
+def test_revision_stems_deduplicate_migrated_and_enrolled_without_enrolling(
+    monkeypatch,
+):
     migrated = ("synthetic_held", "synthetic_shared", "synthetic_held")
     enrolled = ("synthetic_shared", "synthetic_enrolled", "synthetic_enrolled")
     monkeypatch.setattr(plans, "MIGRATED_PLANS", migrated)
     monkeypatch.setattr(plans, "TRAVELER_STEMS", enrolled)
 
     assert plans.revision_stems() == (
-        "synthetic_held", "synthetic_shared", "synthetic_enrolled"
+        "synthetic_held",
+        "synthetic_shared",
+        "synthetic_enrolled",
     )
     assert plans.MIGRATED_PLANS == migrated
     assert plans.TRAVELER_STEMS == enrolled
 
 
-def test_migrated_plans_name_faces_by_bare_labels_their_op_owns():
+def test_migrated_plan_faces_use_owned_labels_inheritance_or_explicit_debt():
+    from export_features import feature_selectors
+
+    expected_debt = {
+        "ch_pivot_shaft": {"north_flat", "south_flat"},
+        "dt_cone_pivot_post": {"head", "body"},
+    }
+    assert expected_debt.keys() <= set(plans.revision_stems())
     for stem in plans.revision_stems():
         text = plans.plan_path(stem).read_text(encoding="utf-8")
         plan = tomllib.loads(text)
         assert plan["part"] == stem.replace("_", "-")
-        # The wrapper passes the shop files; exact STEP refs exist only once bound.
         assert "paths" not in plan
         assert plans._REF.search(text) is None
-        faced = [
-            (op["feature"], label)
-            for setup in plan["setups"]
-            for op in setup["ops"]
-            for label in op.get("faces", ())
-        ]
-        assert faced
+        selectors = feature_selectors(stem)
+        implicit, debt, faced = set(), set(), []
+        for setup in plan["setups"]:
+            for op in setup["ops"]:
+                if "faces" not in op:
+                    features = op.get("feature", ())
+                    if isinstance(features, str):
+                        features = (features,)
+                    for feature in features:
+                        if feature in selectors:
+                            assert selectors[feature], (stem, feature)
+                            implicit.add(feature)
+                faces = op.get("faces", ())
+                if faces == "unknown":
+                    assert stem not in plans.TRAVELER_STEMS
+                    debt.add(op["feature"])
+                    continue
+                assert isinstance(faces, (list, tuple)), (stem, setup["id"], op["op"])
+                faced.extend((op["feature"], label) for label in faces)
+        # Unknowns are an enumerated debt, not a wildcard face exemption.
+        assert debt == expected_debt.get(stem, set()), stem
+        assert faced or implicit, stem
+        if stem == "ch_pivot_shaft":
+            assert {"pivot_bearing", "north_dome", "south_dome"} <= implicit
         for feature, label in faced:
             match = plans._LABEL.fullmatch(label)
             assert match is not None, label
             assert match["feature"].lower() == feature, label
+
+
+def test_held_shaft_uses_allocated_stock_without_changing_finished_geometry():
+    import ch_pivot_shaft_spec as spec
+
+    plan = tomllib.loads(plans.plan_path("ch_pivot_shaft").read_text(encoding="utf-8"))
+    setups = {setup["id"]: setup for setup in plan["setups"]}
+    stock = plan["stock"]
+    assert stock["form"] == "round_bar"
+    assert stock["dia_mm"] == 9.525
+    assert stock["on_hand"] is False
+    assert stock["as_is_faces"] == []
+    assert (stock["dia_mm"] - spec.SHAFT_DIA) / 2 == pytest.approx(1.5875)
+    for sid in ("S0", "S1"):
+        assert setups[sid]["stock_state"]["od_mm"] == stock["dia_mm"]
+    assert [setup["stock_in"] for setup in plan["setups"]] == [
+        "stock",
+        *[setup["id"] for setup in plan["setups"][:-1]],
+    ]
+    centre = next(op for op in setups["S0"]["ops"] if op["do"] == "center_drill")
+    assert centre["tool_mount"] == "tailstock"
+    assert setups["S1"]["hold"]["support"] == "dead_centre_tailstock_mt3"
+    assert any(
+        support["ref"] == "follow_rest" for support in setups["S1"]["hold"]["supports"]
+    )
+    assert setups["S4"]["hold"]["fixture"] == "unknown"
+    assert setups["S4"]["hold"]["pose"] == "unknown"
+    flats = [
+        op
+        for setup in plan["setups"]
+        for op in setup["ops"]
+        if op["do"] == "face" and op["feature"] in {"north_flat", "south_flat"}
+    ]
+    assert {op["feature"] for op in flats} == {"north_flat", "south_flat"}
+    assert all(
+        op["to_z"] == pytest.approx(spec.FLAT_AF - spec.SHAFT_DIA / 2) for op in flats
+    )
+
+
+def test_held_cone_keeps_stock_lineage_and_native_placement_contract():
+    import dt_cone_pivot_post_spec as spec
+    from export_features import feature_selectors
+
+    plan = tomllib.loads(
+        plans.plan_path("dt_cone_pivot_post").read_text(encoding="utf-8")
+    )
+    setups = plan["setups"]
+    assert [setup["stock_in"] for setup in setups] == [
+        "stock",
+        *[setup["id"] for setup in setups[:-1]],
+    ]
+    assert plan["construction"] == "one_piece"
+    assert plan["stock"]["material"] == "unknown"
+    assert plan["stock"]["on_hand"] is False
+    selectors = feature_selectors("dt_cone_pivot_post")
+    placement = plan["axis_placements"]["crank"]
+    assert all(
+        placement[key] in selectors for key in ("boss", "bore", "caps", "support")
+    )
+    separation = placement["separation_mm"]
+    upper, lower = spec.CRANK_ABOVE_CONE_BAND
+    assert spec.CRANK_ABOVE_CONE + lower < separation < spec.CRANK_ABOVE_CONE + upper
+    axis_y = spec.BORE_HEIGHT + separation
+    assert axis_y == pytest.approx(81.3735)
+    assert axis_y - spec.CRANK_BORE_HEIGHT == pytest.approx(0.177856497104)
+    assert spec.HEAD_BASE_Y < axis_y - spec.CRANK_BOSS_DIA / 2
+    assert axis_y + spec.CRANK_BOSS_DIA / 2 < spec.BLOCK_HEIGHT
+    assert plan["frames"]["C4"]["origin"] == pytest.approx(
+        [0.0, spec.CRANK_BORE_HEIGHT, spec.CRANK_BOSS_START_Z]
+    )
+    assert plan["frames"]["CR"]["origin"] == pytest.approx(
+        [0.0, spec.CRANK_BORE_HEIGHT, spec.CRANK_BOSS_END_Z]
+    )
+    assert all(frame["binding"] == "unknown" for frame in plan["frames"].values())
+    finishes = [op for setup in setups for op in setup["ops"] if op["do"] == "coating"]
+    assert finishes
+    assert all(op["process"] == "unknown" for op in finishes)
+
+
+def test_held_cone_signed_inspection_readings_remain_uncommissioned():
+    plan = tomllib.loads(
+        plans.plan_path("dt_cone_pivot_post").read_text(encoding="utf-8")
+    )
+    inspections = [
+        op
+        for setup in plan["setups"]
+        for op in setup["ops"]
+        if "inspection_readings" in op
+    ]
+    assert {op["feature"] for op in inspections} == {"mount_west", "mount_east"}
+    for op in inspections:
+        assert "station" in op["inspection_readings"]
+        for requirement, reading in op["inspection_readings"].items():
+            assert reading["kind"] == "relative_coordinate"
+            assert reading["offset_mm"] == "unknown"
+            assert reading["cite"] == "unknown"
+            assert reading["method"]
+            assert op["checks"][requirement] == "unknown"
+
+
+def test_held_cone_c4_consuming_span_retouches_and_conservative_tip_command():
+    import dt_cone_pivot_post_spec as spec
+
+    plan = tomllib.loads(
+        plans.plan_path("dt_cone_pivot_post").read_text(encoding="utf-8")
+    )
+    c4 = next(setup for setup in plan["setups"] if setup["frame"] == "C4")
+    state = c4["stock_state"]
+    allowance = 0.2
+    assert state["top_z"] == allowance
+    assert state["bottom_z"] == pytest.approx(-(spec.CRANK_BOSS_LENGTH + allowance))
+    assert state["local_thickness"]["crank_bore"] == pytest.approx(-state["bottom_z"])
+    ops = c4["ops"]
+    near_face = next(op for op in ops if op["do"] == "face")
+    drill = next(op for op in ops if op["do"] == "drill")
+    assert near_face["to_z"] == 0.0
+    assert ops.index(near_face) < ops.index(drill)
+    zero = c4["zero"]
+    assert zero["z"]["method"] == "measure_then_set"
+    assert zero["z"]["edge_mm"] == "unknown"
+    assert zero["z"]["offset_mm"] == pytest.approx(spec.CRANK_BOSS_START_Z)
+    touches = zero["tool_touches"]
+    assert len(touches) == 4
+    assert {number for touch in touches for number in touch["before_ops"]} == {
+        op["op"] for op in ops if op["feature"] == "crank_bore"
+    }
+    for touch in touches:
+        assert touch["method"] == "measure_then_set"
+        assert touch["z_offset_mm"] == pytest.approx(spec.CRANK_BOSS_START_Z)
+        assert touch["tool"] == touch["z_gauge"] == "unknown"
+    reverse = next(setup for setup in plan["setups"] if setup["frame"] == "CR")
+    assert reverse["zero"]["z"]["offset_mm"] == pytest.approx(-spec.CRANK_BOSS_END_Z)
+    assert reverse["zero"]["z"]["edge_mm"] == "unknown"
+    assert drill["tool"] == drill["holder"] == "unknown"
+    assert drill["exit_mm"] == 0.5
+    point = 11.2 / (2 * math.tan(math.radians(118 / 2)))
+    assert point == pytest.approx(3.3648194665543376, abs=1e-14, rel=0)
+    minimum_tip = state["bottom_z"] - drill["exit_mm"] - point
+    assert minimum_tip == pytest.approx(-76.09921946655433, abs=2e-14, rel=0)
+    assert drill["to_z"] == -76.100
+    assert drill["to_z"] < minimum_tip < drill["to_z"] + 0.005
 
 
 def test_chain_drilled_features_are_broken_out_before_they_are_filed():
@@ -826,8 +1000,59 @@ def test_posed_unknown_primitive_names_the_solid():
         _posed_box({"name": "mystery", "shape": "cone", "at_mm": [0, 0, 0]}, pose)
 
 
+def test_held_shaft_lathe_retouches_follow_exposed_end_datums():
+    # Axial end/corner contacts are not mill XY top-face touch spots. This checks
+    # nominal datum accessibility and cut ordering, not installed tool/holder
+    # collision clearance: actual jaw clock and commissioning remain unknown.
+    shop = tomllib.loads(
+        (plans.PROCESS_ROOT / "shop" / "inventory.toml").read_text(encoding="utf-8")
+    )
+    plan = tomllib.loads(plans.plan_path("ch_pivot_shaft").read_text(encoding="utf-8"))
+    checked = 0
+    for setup in plan["setups"]:
+        if shop["machines"][setup["machine"]]["kind"] != "lathe":
+            continue
+        touches = setup["zero"].get("tool_touches", ())
+        if not touches:
+            continue
+        hold = setup["hold"]
+        state = setup["stock_state"]
+        exposed_end = max(state["north_end_z"], state["south_end_z"])
+        jaw_front = exposed_end - hold["stickout_mm"]
+        assert hold["pose"]["z"] == [0.0, 0.0, 1.0]
+        assert hold["pose"]["origin_mm"][2] == pytest.approx(jaw_front)
+        assert hold["jaw_clock_deg"] == "unknown"
+        assert hold["support"] == "none"
+        ops = {op["op"]: op for op in setup["ops"]}
+        order = list(ops)
+        for touch in touches:
+            checked += 1
+            contact_z = touch["edge_mm"]
+            assert contact_z > jaw_front
+            assert touch["paper_mm"] >= 0
+            assert touch["x_paper_mm"] >= 0
+            assert touch["x_face"]
+            assert touch["before_ops"]
+            for number in touch["before_ops"]:
+                assert ops[number]["tool"] == touch["tool"]
+            if "after_op" in touch:
+                previous = ops[touch["after_op"]]
+                assert previous["do"] == "part_off"
+                assert previous["keep"] == "pivot_bearing"
+                assert contact_z == pytest.approx(previous["to_z"])
+                assert all(
+                    order.index(touch["after_op"]) < order.index(number)
+                    for number in touch["before_ops"]
+                )
+            else:
+                assert contact_z == pytest.approx(exposed_end)
+                if touch["method"] == "measure_then_set":
+                    assert touch["z_offset_mm"] == setup["zero"]["z"]["offset_mm"]
+    assert checked > 0
+
+
 @pytest.mark.parametrize("stem", plans.revision_stems())
-def test_every_touch_spot_clears_the_hold_by_the_tool_radius_plus_1mm(stem):
+def test_every_mill_touch_spot_clears_the_hold_by_the_tool_radius_plus_1mm(stem):
     # A paper touch lowers the tool onto the work's top face at a spot the plan names in
     # prose (prechips 0.1.2 has no touch-position field). The tool's widest diameter must
     # clear, in plan view, every hold solid standing above that face (strap clamps, vise
@@ -840,12 +1065,21 @@ def test_every_touch_spot_clears_the_hold_by_the_tool_radius_plus_1mm(stem):
     for setup in plan["setups"]:
         zero = setup.get("zero", {})
         touches = [
-            (touch["tool"], touch["method"]) for touch in zero.get("tool_touches", ())
+            (touch["tool"], touch["method"])
+            for touch in zero.get("tool_touches", ())
+            if touch["method"] != "measure_then_set"
         ]
         if zero.get("z", {}).get("method") == "paper":
             touches.append((zero["z"]["tool"], zero["z"].get("edge", "")))
         if not touches:
             continue
+        machine_kind = shop["machines"][setup["machine"]]["kind"]
+        if machine_kind == "lathe":
+            # Lathe X is diametric/radial and Z is axial; the separate shaft
+            # retouch contract checks its exposed-end datums without inventing
+            # a mill top plane or an XY rotating-tool envelope.
+            continue
+        assert machine_kind == "mill", (stem, setup["id"], machine_kind)
         hold = setup["hold"]
         top = setup["stock_state"]["top_z"]
         if "pose" in hold:
@@ -978,17 +1212,75 @@ def test_revision_validation_names_authored_revision_line(synthetic, configured)
             plans.bind_plan(STEM, out)
 
 
+@pytest.mark.parametrize("stem", ["ch_pivot_shaft", "dt_cone_pivot_post"])
+@pytest.mark.parametrize("check", [False, True])
+def test_held_v48_plan_rejects_v47_export_before_consumer_or_kernel(
+    tmp_path, monkeypatch, stem, check
+):
+    from contextlib import nullcontext
+    from types import SimpleNamespace
+
+    import prechips_traveler as wrapper
+
+    assert plans.TRAVELER_STEMS == ()
+    plans.check_authored_plan_revision(stem, "v48")
+    out = tmp_path / "out"
+    manifest, step = plans.bundle_paths(stem, out)
+    manifest.parent.mkdir(parents=True)
+    step.write_bytes(b"preserved v47 STEP bytes")
+    manifest.write_text(
+        f'part = "{stem.replace("_", "-")}"\n'
+        f'step = "{step.name}"\n'
+        f'step_sha256 = "{hashlib.sha256(step.read_bytes()).hexdigest()}"\n'
+        '[drawing]\nrevision = "v47"\n',
+        encoding="utf-8",
+    )
+    before = (manifest.read_bytes(), step.read_bytes())
+    with pytest.raises(plans.PlanBindError, match="differs from manifest 'v47'"):
+        plans.check_plan_revision(stem, out, revision="v48")
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("revision mismatch reached the consumer or kernel")
+
+    errors = []
+    root = SimpleNamespace(record_exception=errors.append, set_status=lambda _: None)
+    tracing = SimpleNamespace(trace_provider=None, log_provider=None)
+    monkeypatch.setattr(wrapper.telemetry, "configure", lambda *_: tracing)
+    monkeypatch.setattr(wrapper._telemetry, "set_service", lambda *_: None)
+    monkeypatch.setattr(
+        wrapper._telemetry, "capture_external_telemetry", lambda *_: None
+    )
+    monkeypatch.setattr(
+        wrapper._telemetry, "run_pipeline_span", lambda *a, **kw: nullcontext(root)
+    )
+    monkeypatch.setattr(wrapper._telemetry, "span", lambda *a, **kw: nullcontext())
+    monkeypatch.setattr(wrapper._telemetry, "error", lambda *_: None)
+    monkeypatch.setattr(
+        plans,
+        "bind_shop",
+        lambda *a, **kw: tuple(tmp_path / n for n in plans.SHOP_FILES),
+    )
+    monkeypatch.setattr(wrapper.kernel, "discover_kernel", forbidden)
+    monkeypatch.setattr(wrapper.cli, "main", forbidden)
+    argv = [stem, "--out", str(out)] + (["--check"] if check else [])
+    assert wrapper.main(argv) == 3
+    assert len(errors) == 1
+    assert isinstance(errors[0], plans.PlanBindError)
+    assert "differs from manifest 'v47'" in str(errors[0])
+    assert (manifest.read_bytes(), step.read_bytes()) == before
+    assert not (out / "travelers" / stem / "plan.toml").exists()
+    assert not (out / "travelers" / stem / ".check" / "plan.toml").exists()
+
+
 @pytest.mark.parametrize("revision", ['"v40"', '"unknown"', '""', "41"])
 def test_authored_only_revision_validation_names_stale_or_invalid_line(
     synthetic, revision
 ):
     source, _out, manifest, _shop = synthetic
     manifest.unlink()
-    source.write_text(f'[drawing]\nrevision = {revision}\n', encoding="utf-8")
+    source.write_text(f"[drawing]\nrevision = {revision}\n", encoding="utf-8")
 
-    with pytest.raises(
-        plans.PlanBindError, match="line 2:.*configured revision 'v41'"
-    ):
+    with pytest.raises(plans.PlanBindError, match="line 2:.*configured revision 'v41'"):
         plans.check_authored_plan_revision(STEM, "v41")
 
 

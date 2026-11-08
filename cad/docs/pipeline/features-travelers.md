@@ -265,10 +265,11 @@ missing spec file or correct the inventory's `cad` stem before retrying.
 ## Strict local travelers and enrollment
 
 `_process_plans.TRAVELER_STEMS` is the enrollment authority for the
-`prechips:<stem>` task family. It is currently **empty**. The rocker plan is
-migrated but held until its traveler reaches exit 0; the legacy shaft and cone
-plans remain tracked but are stale against the pinned prechips; they are neither
-run nor shipped. A stem enrolls only after its
+`prechips:<stem>` task family. It is currently **empty**. The rocker, base bar,
+shaft and cone plans are held source proposals, not qualified travelers. The
+rocker's source-authored preform is analytically referenced by HA but is not
+PC-modeled or consumable: its `bandsaw_preform` table is deliberately retained,
+and a deburr note does not model seven saw cuts. A stem enrolls only after its
 migrated plan reaches exit 0 on real exported geometry. See
 [`cad/process/README.md`](../../process/README.md) for authoring and enrollment.
 

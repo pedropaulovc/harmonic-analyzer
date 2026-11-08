@@ -4,22 +4,53 @@ This directory holds HA-authored process plans (`<stem>/plan.toml`) and shared
 shop data (`shop/inventory.toml`, `shop/shop-policy.toml`,
 `shop/cutting-data.toml`). prechips is pinned to PyPI `prechips==0.2.0`.
 `cad/scripts/_process_plans.py:TRAVELER_STEMS` is the enrollment authority; it is
-currently empty. The rocker plan is a **HELD REFERENCE ROUTE**, migrated to
-prechips 0.1.2 but not enrolled or qualified for machining. The 2026-10-21
-standalone-tooling retirement removed its former tooling CAD, including the
-physical outline template still required by the historical S5/S7 route.
-Inventory collision envelopes and the analytic rocker-profile checks are not
-replacement fabrication CAD or evidence of a fabricated, qualified gauge.
-Before enrollment, qualify the required physical tooling and revalidate the
-route against current geometry and the pinned prechips, then obtain traveler
-exit 0 (step 6 below). The oblique-trammel base bar plan (MHA-CH-06-TL-20) is a
+currently empty. The rocker plan is a **HELD REFERENCE ROUTE**, not enrolled or
+qualified for machining. Its current built-up strap/hub route and oblique-trammel
+jig replace the retired one-piece outline-template sequence; historical inline
+inventory envelopes do not qualify the current jig or restore retired tooling.
+Before enrollment, qualify physical tooling and revalidate the route against
+current geometry and the pinned prechips, then obtain traveler exit 0 (step 6
+below). The oblique-trammel base bar plan (MHA-CH-06-TL-20) is a
 held preview route from the owned 1/2 x 6 bar (#2083), migrated but not enrolled:
 the v47 drawing still prints the width as stock (#2083 open) and its travelers stay
-provisional. The legacy shaft and cone plans remain tracked as provenance,
-but are stale against the pinned prechips and are not run or shipped. Do not
-enroll one merely because its plan file exists. `_process_plans.MIGRATED_PLANS`
-records migrated plans, including the held rocker and base bar; `revision_stems()` is the
-deduplicated union of migrated and enrolled plans for revision tracking only.
+provisional. The shaft and cone are **HELD / UNENROLLED** source proposals:
+allocated 3/8-inch 1018 shaft stock departs from the advisory 5/16-inch drawing
+note without changing finished geometry; the cone remains integral one-piece
+with **FINISH UNRESOLVED**. Stock receipt, support, pickups, physical bindings,
+tooling and inspection availability remain unproved. These are not first-article
+records or machining approval. Do not enroll a plan merely because it parses.
+`_process_plans.MIGRATED_PLANS` includes all four held plans; `revision_stems()`
+is the deduplicated union of migrated and enrolled plans for revision tracking only.
+
+The current rocker and base-bar plans retain latest-main jig authority. The
+rocker's `bandsaw_preform` is source-authored and analytically referenced by
+`ch_rocker_arm_tl_oblique_blank_spec.py`, but **not PC-modeled or consumable**.
+Its cutting prose under `deburr` is not seven modeled saw cuts. The binder must
+not strip that table to obtain schema acceptance or claim the resulting stock
+state is proved. PC consumption and material-changing saw semantics are deferred;
+the obsolete full rocker rewrite is not the source for this route.
+
+The shaft/cone reconciliation takes contracts from the held proposal at
+[`e53b0641a6`](https://github.com/pedropaulovc/harmonic-analyzer/commit/e53b0641a6),
+not its demonstration shop values. The cone's common crank boss/bore/caps
+placement is a native placement contract, not an aim-only note: separation
+43.2735 mm gives model Y 81.3735, delta Y +0.177856497104 mm from CAD nominal.
+CAD, exported geometry and nominal setup frames are unchanged; native placement
+must preserve concentricity and head support before it earns geometry credit.
+The signed-station inspection offset and citation remain `unknown`, not copied
+calibrations. The paint/mask split is unresolved despite the one-piece decision.
+
+This first contract cutover preserves the expanded shaft/cone source intent,
+not a claim that the pinned consumer fully executes it. General traveler
+rendering, native retained-stock/motion replay and the full consumer migration
+remain deferred. In particular, the cone's rotary, manual-root and honing
+operations have no completed native proof; neither prose, ideal feature sweeps
+nor bounding-box removal may substitute for actual material-changing semantics.
+The shaft's cradle, support engagement, dome compensation, flat-face labels and
+apex pickup remain unqualified. Existing demonstration/placeholder shop records
+are not actual availability, installed geometry or commissioning measurements.
+Schema acceptance and the narrow PC field contracts cannot turn these holds
+into a manufacturing or first-article pass.
 
 ## Bind stable labels, not STEP entity numbers
 
@@ -45,6 +76,10 @@ Binding also rejects a plan drawing revision that differs from the scoped
 manifest. Release preflight requires enrolled plans' authored and manifest
 revisions to match the configured next revision. It checks held migrated plans'
 authored freshness without requiring or qualifying an exported manifest.
+The authored v48 plans must refuse delivered v47 feature/STEP pairs **before**
+the PC consumer or geometry kernel runs. Never relabel those exports or weaken
+the revision guard to demonstrate a held proposal. Source/schema acceptance is
+not native stock, placement, clearance, traveler or machining qualification.
 Do not add `[paths]` to a tracked plan: the wrapper supplies the three shared
 shop inputs as CLI flags. Binding never edits the tracked plan.
 
@@ -57,11 +92,11 @@ fixture frame, derived from the same constants used to build its SolidWorks
 part. Never supply both `cad` and `solids`, and do not maintain a second set of
 fixture dimensions in the inventory.
 
-The held rocker's retired standalone tooling is a historical exception, not
-registered spec-driven CAD: its inline inventory solids support retained
+The rocker's retired standalone-tooling inventory is a historical exception,
+not registered current jig CAD: its inline solids support historical
 process/clearance checks only. They do not restore deleted builders, drawings
-or physical-gauge qualification. Re-establish and qualify any required tooling
-before using or enrolling that route.
+or physical-gauge qualification and must not replace the current oblique-trammel
+jig authority. Qualify that current route's actual tooling before enrollment.
 
 `bind_shop` writes the generated inventory under
 `cad/out/travelers/_shop/inventory.toml`, inserts the spec's primitives and
@@ -149,7 +184,7 @@ invokes the full traveler command and verifies its outputs after exit 0; a faile
 bind or consumer run cannot retain an old success certificate. Both modes
 preserve nonzero consumer exits: 2 (machining blockers), 3 (bad input), 4 (required
 unknowns) and unexpected failures are failures, not advisory passes. Do not run
-this loop on the unchanged stale legacy plans.
+this loop on a revision-mismatched bundle or the unconsumable rocker preform.
 
 ## Build and release contract
 
