@@ -115,8 +115,8 @@ DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
 }
 
 # The two blind taps fasten the magnifying bracket and are spotted through
-# its holes at assembly (delegated ruling sm Q7, 2026-11-07 (Main), no
-# precedent; owner review #2144; MHA-SM-00 carries the step): their stations
+# its holes at assembly (owner ruling 2026-11-08 (#2144 item 11.1), Pedro;
+# formerly delegated ruling sm Q7; MHA-SM-00 carries the step): their stations
 # print REF (build_sm_summing_lever._receiver_coordinate_dimensions).  Their
 # native callout owns the pilot and full-thread depths; no additional cavity
 # or wall limit prints.

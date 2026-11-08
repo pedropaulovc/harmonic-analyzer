@@ -2083,8 +2083,8 @@ async def _receiver_coordinate_dimensions(adapter) -> None:
     check("exit receiver coordinate sketch", await adapter.exit_sketch())
     name_last_feature(adapter, "ReceiverCoordinates")
     dimensions.apply(adapter, "ReceiverCoordinates")
-    # Reference stations (delegated ruling sm Q7, 2026-11-07 (Main), no
-    # precedent; owner review #2144; pending owner confirmation): the taps
+    # Reference stations (owner ruling 2026-11-08 (#2144 item 11.1), Pedro;
+    # formerly delegated ruling sm Q7): the taps
     # are spotted through MHA-MG-01's holes at assembly (MHA-SM-00), so the
     # print gives the stations in parentheses, untoleranced; the receiver
     # walls still charge joint.POSITION_BAND as the bracket's placement.
