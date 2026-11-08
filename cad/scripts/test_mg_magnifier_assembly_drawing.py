@@ -206,9 +206,10 @@ def test_each_press_is_accepted_at_the_bench_with_a_slip_fit_remedy() -> None:
         assert rule in notes.BOND_NOTE
 
 
-def test_the_axle_press_accepts_the_plain_end_window_the_axle_spec_proves() -> None:
+def test_the_axle_press_stops_at_the_plain_end_window_the_axle_spec_proves() -> None:
     """The bar sheet no longer prints the pressed axle's end window (fanout/mg
-    #2260); the press step accepts it, read from the axle spec's limits."""
+    #2260); the press step stops at it, read from the axle spec's limits, and
+    the thread-end check says it governs any further press."""
     low, high = (
         float(text) * 25.4 for text in notes.BACK_END_SUNK_TEXT.split("-")
     )
@@ -216,8 +217,11 @@ def test_the_axle_press_accepts_the_plain_end_window_the_axle_spec_proves() -> N
     assert high == pytest.approx(mg_wheel_axle_spec.BACK_END_SUNK_MAX, abs=0.0127)
     assert 0.0 < low < high
     pressed = notes.STEP_TEXT[steps.AXLE_PRESSED_KEY]
-    assert f": ITS PLAIN END {notes.BACK_END_SUNK_TEXT} BELOW THE FAR FACE OF ITEM " in pressed
+    assert f"UNTIL ITS PLAIN END IS {notes.BACK_END_SUNK_TEXT} BELOW THE FAR FACE OF ITEM " in pressed
     assert "CALIPER DEPTH ROD" in pressed
+    assert notes.STEP_TEXT[steps.AXLE_CHECKED_KEY].endswith(
+        f"GOVERNS OVER THE STEP {steps.step_number(steps.AXLE_PRESSED_KEY)} DEPTH."
+    )
 
 
 def test_each_hand_set_clamp_is_checked_to_hold_its_setting() -> None:

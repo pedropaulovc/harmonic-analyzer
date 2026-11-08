@@ -253,14 +253,14 @@ STEP_TEXT = {
         f"IF {_DRUM} CAME OFF, BOND IT TO {_WHEEL} WITH {BOND_GRADE}, "
         f"{BOND_NOTE_REF}."
     ),
-    # Machinist review (run 20261024T053015093Z): the REF depth is the first
-    # stop; the DETAIL A ACCEPT limit governs any further press. The plain
-    # end's window is the bar's depth stack (MHA-MG-08 names it), accepted
-    # here at the press.
+    # The press stop is the plain end's window below the bar's far face (the
+    # bar's depth stack, which MHA-MG-08 names; the spec proves the window),
+    # read with a depth rod. The thread end past the second nut (the DETAIL A
+    # ACCEPT note, owner ruling 2026-11-06 Q1) governs any further press
+    # (local review of round 1: two limits, neither said which governs).
     _steps.AXLE_PRESSED_KEY: (
-        f"PRESS {_AXLE} INTO {_BAR}, THREADED END OUT, TO THE REF DEPTH IN "
-        f"{PRESS_DETAIL_TITLE}: ITS PLAIN END {BACK_END_SUNK_TEXT} BELOW THE FAR "
-        f"FACE OF {_BAR} (CALIPER DEPTH ROD)."
+        f"PRESS {_AXLE} INTO {_BAR}, THREADED END OUT, UNTIL ITS PLAIN END IS "
+        f"{BACK_END_SUNK_TEXT} BELOW THE FAR FACE OF {_BAR} (CALIPER DEPTH ROD)."
     ),
     _steps.AXLE_HELD_KEY: f"CHECK {_AXLE} DOES NOT TURN OR SLIDE BY HAND.",
     "axle-pressed-out": f"IF IT DOES, OR {_AXLE} SLID IN BY HAND, PRESS {_AXLE} OUT.",
@@ -273,8 +273,9 @@ STEP_TEXT = {
         f"JAM BOTH {_NUT} NUTS ON {_AXLE} WITH {_WHEEL} JUST FREE."
     ),
     _steps.AXLE_CHECKED_KEY: (
-        f"CHECK BOTH ACCEPT LIMITS IN {PRESS_DETAIL_TITLE} WITH A CALIPER DEPTH "
-        "ROD ON THE THREAD END PAST THE SECOND NUT."
+        "CHECK THE THREAD END PAST THE SECOND NUT AGAINST THE ACCEPT NOTE IN "
+        f"{PRESS_DETAIL_TITLE} (CALIPER DEPTH ROD): IT GOVERNS OVER THE "
+        f"{_step(_steps.AXLE_PRESSED_KEY)} DEPTH."
     ),
     "trial-parts-removed-to-press": (
         f"IF IT FAILS, REMOVE THE TRIAL NUTS AND PARTS FROM {_AXLE}."
@@ -339,8 +340,8 @@ STEP_TEXT = {
         f"IF THE SECOND NUT WAS LOOSENED, RETURN TO {_step(_steps.ENDSHAKE_SET_KEY)}."
     ),
     _steps.AXLE_ACCEPTED_KEY: (
-        f"CHECK BOTH ACCEPT LIMITS IN {PRESS_DETAIL_TITLE} AGAIN AS IN "
-        f"{_step(_steps.AXLE_CHECKED_KEY)}."
+        "CHECK THE THREAD END PAST THE SECOND NUT AGAINST THE ACCEPT NOTE IN "
+        f"{PRESS_DETAIL_TITLE} AGAIN, AS IN {_step(_steps.AXLE_CHECKED_KEY)}."
     ),
     # The final reading's own remedy: strip the stack back to the bare axle
     # and take the trial-fit loop again (machinist review, stab-split s2).
