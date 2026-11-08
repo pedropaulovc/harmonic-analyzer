@@ -237,7 +237,7 @@ RECEIPT_DIMENSIONS["Length"] = (0.0, rail.LENGTH, LENGTH_ROW_RISE)
 STATION_NOMINALS = dict(zip(DRAWN_STATIONS, rail.HOLE_X, strict=False))
 # The end wall (2X) at the FAR end, where its model chord runs, clear of
 # Station1's near-end stack: far counterbore edge (its start, the left
-# witness) to the far end face. Its value and its "2X" stack two rows over
+# witness) to the far end face. Its value and its callout stack two rows over
 # its line (a callout under a station lifted that value 2.5 mm, run
 # 20261104T222143958Z); its text centre stands 5 mm deeper than Station1's,
 # as printed clear in farm run 20261108T055401995Z with a three-row block.
@@ -253,9 +253,9 @@ RECEIPT_CALLOUTS_BELOW = {END_WALL_NAME: rail.END_WALL_CALLOUT}
 # Neither short span holds its text or its two native arrowheads: each text
 # stands outside its span's left witness, its arrows outside. The station's
 # 4.982 mm span: 27 mm, half its text + the padded cell's 7.59 mm reach + the
-# 2 mm gap. The end wall's 3.107 mm span: 19.5 mm, the placement farm run
-# 20261108T055401995Z printed clear of the flag and the witness with an
-# 11-character callout row; "2X" and "(6.214)" are narrower.
+# 2 mm gap. The end wall's 3.107 mm span: 19.5 mm. Its 14-character
+# callout row is 31 mm at the 2.23 mm a character "2X, 2.0 MIN" printed in
+# farm run 20261108T055401995Z: clear of the flag, 4.7 mm before the witness.
 TEXT_OUTSIDE_START = {**dict.fromkeys(DRAWN_STATIONS, 0.027), END_WALL_NAME: 0.0195}
 _DIM_ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
 RECEIPT_ARROW_SIDES = dict.fromkeys((*DRAWN_STATIONS, END_WALL_NAME), _DIM_ARROWS_OUTSIDE)

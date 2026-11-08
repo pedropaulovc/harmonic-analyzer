@@ -330,18 +330,19 @@ END_FIT_CALLOUT = (
 # Main's explicit 2026-11-07 sheet ruling prints the metric wall as 2.0 MIN.
 # The existing conservative 2.032 mm source-envelope guard remains unchanged.
 WALL_ACCEPTANCE_MM = 2.0
-# The EndWall reference dimension prints at the far end with its count only
-# (rule 7: a location dimension carries its value and band, no words). Note 1
-# says in words what the trim is, where it happens and what it must leave:
-# the dimension's value, the walls at both ends, 2.0 MIN (machinist review,
-# farm run 20261108T055401995Z, 3 of 3 runs: "AFTER TRIM" under the value
-# was an undefined process reference and words on a location; before it, run
-# 20261108T031012373Z: a worded "END WALL" leader did not say what the 2.0
-# runs between). The trim is MHA-CH-06-TL-00 step 1's ("TRIM EACH RAIL TO ITS
-# ACTUAL BAR, FLUSH BOTH ENDS"). The note is the member's one manufacturing
-# note, on one line. The pairing of each rail with its bar and the free screw
-# entry stay the jig's steps (rule 7).
-END_WALL_CALLOUT = "2X"
+# The EndWall reference dimension prints at the far end with its count and
+# its link to note 1 (rule 7: a location dimension carries no requirement
+# words). Note 1 says in words what the trim is, where it happens and what it
+# must leave: the dimension's value, the walls at both ends, 2.0 MIN
+# (machinist review: farm run 20261108T055401995Z, 3 of 3 runs, "AFTER TRIM"
+# under the value was an undefined process reference and words on a
+# location; run 20261108T060418489Z, 3 of 3, note 1 unlinked from the
+# dimension; before them, run 20261108T031012373Z, a worded "END WALL"
+# leader did not say what the 2.0 runs between). The trim is MHA-CH-06-TL-00
+# step 1's ("TRIM EACH RAIL TO ITS ACTUAL BAR, FLUSH BOTH ENDS"). The note is
+# the member's one manufacturing note, on one line. The pairing of each rail
+# with its bar and the free screw entry stay the jig's steps (rule 7).
+END_WALL_CALLOUT = "2X, SEE NOTE 1"
 TRIM_STEP = "MHA-CH-06-TL-00 STEP 1"
 END_WALL_NOTE = (
     "1. EACH RAIL IS TRIMMED TO ITS BASE BAR AT\n"

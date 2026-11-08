@@ -435,7 +435,7 @@ def test_rail_receipt_note_points_at_the_stations() -> None:
     rows = rail.END_WALL_NOTE.splitlines()
     assert x + max(map(len, rows)) * 0.0020 <= draw.END_WALL_NOTE_CELL[2]
     assert y - len(rows) * 0.005 >= draw.END_WALL_NOTE_CELL[1]
-    assert rail.END_WALL_CALLOUT == "2X"
+    assert rail.END_WALL_CALLOUT == "2X, SEE NOTE 1"
     note = " ".join(rail.END_WALL_NOTE.splitlines())
     assert rail.DRAWING_NOTES == note
     assert note.startswith("1. ")
@@ -444,10 +444,11 @@ def test_rail_receipt_note_points_at_the_stations() -> None:
     assert f"IS {rail.WALL_ACCEPTANCE_MM:.1f} MIN." in note
     assert max(len(row) for row in rail.END_WALL_NOTE.splitlines()) <= 44
     assert not hasattr(rail, "WALL_CALLOUT")
-    # The cited step is the one that trims each rail to its bar.
+    # The cited step (or one of its lettered sub-steps) trims each rail to
+    # its bar.
     step = rail.TRIM_STEP.rsplit(" ", 1)[1]
     assert any(
-        text.startswith(f"{step}. ") and "TRIM EACH RAIL" in text
+        re.match(rf"{step}[A-Z]?\. ", text) and "TRIM EACH RAIL" in text
         for text in jig.ASSEMBLY_STEPS
     )
     assert rail.WALL_ACCEPTANCE_MM == 2.0
@@ -1063,18 +1064,20 @@ def test_end_wall_text_stands_under_the_far_end_clear_of_the_flag() -> None:
     assert draw.RECEIPT_FLAG_CELL[2] + draw.CLEAR_GAP_M <= text[0]
     assert draw.boxes_clear(text, flag)
     # The flag's second line printed 109.7 mm from x 0.1245 (the farm run
-    # 20261108T031012373Z PDF): inside its cell. At that advance (2.61 mm a
-    # character) the callout's widest row, centred on the text point, still
-    # stands clear of the flag's cell and of its left witness.
+    # 20261108T031012373Z PDF): inside its cell. The EndWall callout's
+    # "2X, 2.0 MIN" printed 24.5 mm (2.23 mm a character, run
+    # 20261108T055401995Z PDF): at that advance its widest row, centred on
+    # the text point, still stands clear of the flag's cell and leaves
+    # arrowhead room before its left witness.
     assert draw.RECEIPT_FLAG_ANCHOR[0] - 0.001 <= 0.1245
     assert 0.1245 + 0.1097 <= draw.RECEIPT_FLAG_CELL[2]
     x, _ = draw.receipt_text_point(
         "EndWall", (left_witness, 0.0), (far_end, 0.0), 0.0
     )
     widest = max(len(row) for row in rail.END_WALL_CALLOUT.splitlines())
-    half = widest * 0.1097 / 42 / 2.0
+    half = widest * 0.0245 / 11 / 2.0
     assert draw.RECEIPT_FLAG_CELL[2] + draw.CLEAR_GAP_M <= x - half
-    assert x + half + 0.002 <= left_witness
+    assert x + half + 0.003 <= left_witness
     # FRONT's caption.
     label, cx, cy, _ = draw.CAPTIONS[0]
     assert label == "FRONT"
