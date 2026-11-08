@@ -433,6 +433,65 @@ The accepted gap therefore started the witness 10.5 paper mm short of its
 clear lane. Compute it from that actual row endpoint; still require the
 rebuilt witness to clear the complete A letter by 2 mm and remain visible.
 
+The simplified one-sheet TL-22 in frozen run `4031a82adcd2` made the
+`DRILL THRU` Ø.257 / `5/16-18 UNC TAP THRU BELOW SHOULDER SEAT` arrow appear
+attached to the outer Ø.3750 reamed ring. Retained layout endpoints indicate
+an inner-circle tip: `(167.3, 206.9)` mm is about 3.30 mm from the independently
+located `(170, 205)` centre, versus nominal drill radius 3.264 mm and seat
+radius 4.7625 mm. Those rounded line endpoints are not native arrow-tip
+measurements. An outside arrow body crossing the outer ring explains the
+ambiguity, but remains an inference until the native arrow record is read.
+
+For **TL-22 only**, `_place_pivot_tap_arrow_inside` explicitly sets the existing
+`TapDrillDia` display's `IDisplayDimension.ArrowSide` to
+`swDimArrowsInside` (0), using the existing setter/readback/rebuild helper.
+The original native parts, cutting sketches, source dimensions, tolerances
+and text locations remain untouched; TL-32's presentation is unchanged.
+Do not use `IAnnotation.SetAttachedEntities` or
+`SetLeaderAttachmentPointAtIndex` to reattach this imported dimension:
+the pinned SDK does not establish dimension support for those operations.
+
+The placement captures the original `IDimension`, full source name, value,
+resolved text, token-bearing definitions, text positions and REAM arrow side.
+Its settled proof resolves the visible inner drill and outer seat circles
+by centre, axial depth, axis and radius. `GetArrowHeadAtIndex2` returns
+`[tip3, direction3, width, height, style, normal3]`: width runs along the
+direction and height across it. The triangle uses the existing layout-audit
+parser's calibrated direction-to-base convention (125 native arrowheads),
+not an invented SDK sign rule. The tap's tip must lie on the inner circle
+and its **entire triangular body** inside it; REAM's tip stays on the outer
+circle. The unchanged 0.01 paper-mm radial/position bound rejects drift.
+
+The finalizer repeats that read-only proof after its last rebuild and logs
+the native circle and full arrow records. It never retries or repairs a
+failed landing. Focused regressions distinguish a correct inner tip with
+an outward-crossing body from a truly contained arrow, and cover malformed
+records, source drift, ignored property puts and pivot-only routing.
+Parent validation must inspect the fresh native/PDF arrow geometry; these
+offline contracts are not a claim of native success. Editing the shared
+drawing helper still re-keys TL-32's drawing/review inputs, not either part.
+
+### TL-21 assembly-HUB reference lanes
+
+Run `4031a82a` confirmed that the sheet-3 `(8.86)` and `(1.79)` reference
+dimensions were inside the plate despite available paper space. Keep their
+native A1/HUB sources, centre endpoints, values and parentheses; place the
+horizontal dimension line 18 paper mm below the plate and the vertical line
+28 paper mm beyond its right edge. Reserve the complete text envelopes and
+arrow/line margins, not only the annotation anchors. These source positions
+still require settled native readback and inspection of the exported sheet.
+
+### TL-28 opposed-thread finalization
+
+Run `4031a82a` read the top wizard's thread as 10.9982 mm after construction
+and equation driving, while its distinct top witness remained 12.4968 mm.
+The bottom-depth value identifies the mismatch, not the undocumented native
+coupling mechanism. Commit the top finite thread once, after bottom cosmetic
+thread insertion and all dimension driving; rebuild, then verify both wizard/
+witness pairs and every bottom cosmetic thread together. A final edit that
+resets the other face must still fail. Never substitute witness values for
+native thread readback or retry setters until the guard passes.
+
 ### TL-30 capture-cap functional sheets
 
 The `d349b99300c6` native cap drawing imported all 32 model dimensions, including

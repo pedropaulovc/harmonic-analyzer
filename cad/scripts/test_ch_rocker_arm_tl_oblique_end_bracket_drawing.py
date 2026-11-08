@@ -301,8 +301,9 @@ def test_bottom_blind_precursor_leaves_real_material_for_the_top_wizard() -> Non
     body = source[source.index("async def build"):]
     assert body.count("wizard_holes(") == 2
     assert body.index("BAR_TAP_SPEC,") < body.index("KP08_TAP_SPEC,")
-    assert body.index("KP08_TAP_SPEC,") < body.index("_thread_from_face(")
-    assert body.index("_thread_from_face(") < body.index("_bar_face_cosmetic_threads(")
+    assert body.index("KP08_TAP_SPEC,") < body.index("_bar_face_cosmetic_threads(")
+    assert body.index("_bar_face_cosmetic_threads(") < body.index("_drive_and_finalize_threads(")
+    assert "_thread_from_face(" not in body
     assert "diameter=THREAD_MAJOR" in source
     assert part.V_HOLES == pytest.approx(
         len(spec.HOLE_X) * math.pi * (spec.TAP_DRILL / 2.0) ** 2 * spec.BRACKET_THICK
@@ -952,4 +953,126 @@ def test_tip_marks_finish_full_threads_without_reaching_the_opposed_screw() -> N
     assert spec.TIP_MARK_SEAM_CLEARANCE_MIN == pytest.approx(0.8128)
     assert spec.TIP_MARK_SEAM_CLEARANCE_MIN > min(
         spec.BAR_OPPOSED_CUT_CLEARANCE_MIN, spec.KP08_OPPOSED_CUT_CLEARANCE_MIN
+    )
+
+
+@pytest.mark.parametrize("post_commit_drift", [None, "top", "bottom"])
+def test_distinct_thread_depths_survive_driving_and_the_final_rebuild(
+    monkeypatch, post_commit_drift,
+) -> None:
+    """Adversarially inject the observed drift during later rebuilding.
+
+    Farm 4031a82a ended with the correct top witness but the bottom depth on
+    KP08Taps. This fake moves a correct top depth to the bottom depth during
+    pre-finalization rebuilds; that timing is a test adversary, not a claim
+    about SOLIDWORKS' undocumented internal sharing mechanism.
+    """
+    import asyncio
+    from types import SimpleNamespace
+
+    assert spec.BAR_THREAD_DEPTH != spec.KP08_THREAD_DEPTH
+    bar = SimpleNamespace(
+        EndCondition=0, ThreadEndCondition=0, ThreadDepth=spec.BAR_THREAD_DEPTH / 1000.0,
+    )
+    top = SimpleNamespace(
+        EndCondition=1, ThreadEndCondition=0, ThreadDepth=spec.KP08_THREAD_DEPTH / 1000.0,
+    )
+    cosmetics = {
+        f"BarFaceThread{k}": SimpleNamespace(
+            EndCondition=0, BlindDepth=spec.BAR_THREAD_DEPTH / 1000.0,
+            DiameterType=2, Diameter=spec.THREAD_MAJOR / 1000.0,
+            circle=[x, 0.0, 0.0, spec.TAP_DRILL / 2.0],
+        )
+        for k, x in enumerate(spec.HOLE_X, start=1)
+    }
+    definitions = {"BarTaps": bar, "KP08Taps": top, **cosmetics}
+    features = {
+        name: SimpleNamespace(GetDefinition=lambda value=value: value)
+        for name, value in definitions.items()
+    }
+    model = SimpleNamespace(FeatureByName=lambda name: features.get(name))
+    adapter = SimpleNamespace(currentModel=model)
+    monkeypatch.setattr(part, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(
+        part, "_thread_edge_circle", lambda _model, definition, **_kwargs: definition.circle,
+    )
+    rows = {
+        spec.BAR_THREAD_REFERENCE: {
+            "BarThreadStation": spec.BAR_THREAD_WITNESS_X,
+            spec.BAR_THREAD_DEPTH_DIMENSION: 0.0,
+        },
+        spec.KP08_THREAD_REFERENCE: {
+            "KP08ThreadStation": spec.KP08_THREAD_WITNESS_X,
+            "KP08ThreadFace": spec.BRACKET_THICK,
+            spec.KP08_THREAD_DEPTH_DIMENSION: 0.0,
+        },
+    }
+    monkeypatch.setattr(
+        part, "dump_dimensions",
+        lambda _adapter, reference: [
+            {"full_name": f"{name}@{reference}@part", "value_mm": value}
+            for name, value in rows[reference].items()
+        ],
+    )
+    jobs = [
+        (f"{spec.BAR_THREAD_DEPTH_DIMENSION}@{spec.BAR_THREAD_REFERENCE}", '"BarThreadDepth"'),
+        (f"{spec.KP08_THREAD_DEPTH_DIMENSION}@{spec.KP08_THREAD_REFERENCE}", '"KP08ThreadDepth"'),
+    ]
+    globals_mm = {
+        '"BarThreadDepth"': spec.BAR_THREAD_DEPTH,
+        '"KP08ThreadDepth"': spec.KP08_THREAD_DEPTH,
+    }
+    events = []
+    commits = []
+
+    async def drive(_adapter, full_name, expression):
+        events.append(("drive", full_name, expression))
+        name, reference = full_name.split("@")
+        rows[reference][name] = globals_mm[expression]
+
+    async def rebuild(_adapter):
+        events.append(("rebuild",))
+        if not commits or post_commit_drift == "top":
+            top.ThreadDepth = bar.ThreadDepth
+
+    def commit(got_model, got_feature, definition, edits, _label):
+        assert got_model is model and got_feature is features["KP08Taps"]
+        assert definition is top
+        assert definition.ThreadDepth == bar.ThreadDepth
+        assert rows[spec.KP08_THREAD_REFERENCE][spec.KP08_THREAD_DEPTH_DIMENSION] == pytest.approx(
+            spec.KP08_THREAD_DEPTH
+        )
+        events.append(("commit",))
+        commits.append(tuple(edits))
+        for name, value in edits:
+            setattr(definition, name, value)
+        if post_commit_drift == "bottom":
+            # If editing the top wizard also rewrites a bottom cosmetic
+            # thread, the unchanged final bottom guard must reject it.
+            next(iter(cosmetics.values())).BlindDepth = top.ThreadDepth
+        return definition
+
+    monkeypatch.setattr(part, "drive_dimension", drive)
+    monkeypatch.setattr(part, "force_rebuild", rebuild)
+    monkeypatch.setattr(part, "_commit_definition_edits", commit)
+    if post_commit_drift:
+        with pytest.raises(RuntimeError, match="KP08ThreadReference|bar-face threads"):
+            asyncio.run(part._drive_and_finalize_threads(adapter, jobs, tuple(cosmetics)))
+    else:
+        asyncio.run(part._drive_and_finalize_threads(adapter, jobs, tuple(cosmetics)))
+        assert top.ThreadDepth == pytest.approx(spec.KP08_THREAD_DEPTH / 1000.0)
+        assert bar.ThreadDepth == pytest.approx(spec.BAR_THREAD_DEPTH / 1000.0)
+        assert all(
+            value.BlindDepth == pytest.approx(spec.BAR_THREAD_DEPTH / 1000.0)
+            for value in cosmetics.values()
+        )
+    assert top.EndCondition == 1 and top.ThreadEndCondition == 0
+    assert len(commits) == 1
+    assert events == [
+        ("rebuild",),
+        *(("drive", name, expression) for name, expression in jobs),
+        ("rebuild",), ("commit",), ("rebuild",),
+    ]
+    assert rows[spec.KP08_THREAD_REFERENCE][spec.KP08_THREAD_DEPTH_DIMENSION] == pytest.approx(
+        spec.KP08_THREAD_DEPTH
     )

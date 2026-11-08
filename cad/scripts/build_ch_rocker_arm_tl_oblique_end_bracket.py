@@ -142,10 +142,11 @@ def _thread_from_face(
     """Stop a THRU tap's thread ``depth_mm`` from its wizard face; its tap
     drill stays THRU ALL.
 
-    ``wizard_holes`` commits a through tap with a THRU ALL thread; its own
-    edit flow then sets the thread's end and depth, and the committed
-    definition, read back, is the proof (a hand tap cannot thread the 1 in
-    height: owner ruling 2026-11-05).
+    This is the final thread-definition write, after cosmetic-thread creation
+    and equation driving. Run 4031a82a initially read the top depth correctly
+    here, but later read the bottom depth from KP08Taps after those operations.
+    The caller rebuilds and checks both face definitions and cosmetic threads;
+    an immediate ModifyDefinition readback alone is not durable proof.
     """
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     # IPartDoc::FeatureByName is VT_DISPATCH: a missing feature is None,
@@ -411,6 +412,44 @@ def _set_thread_limits(
         raise RuntimeError(f"{reference}: native thread limits differ: {endpoints!r}")
 
 
+@_telemetry.traced("feature.finalize_opposed_threads")
+async def _drive_and_finalize_threads(
+    adapter, drive_jobs: list[tuple[str, str]], bar_face_threads: tuple[str, ...]
+) -> None:
+    """Finish driving before committing and proving the independent threads.
+
+    The final top-thread write must follow all bottom cosmetic-thread insertions
+    on KP08Taps' finished bores. Those insertions receive BAR_THREAD_DEPTH;
+    writing KP08_THREAD_DEPTH before them was not stable in farm run 4031a82a.
+    Its distinct, correctly driven witness survived while the wizard read the
+    bottom depth. The log does not isolate which intervening native rebuild
+    exposed that coupling, so do not attribute it to an equation-name alias.
+
+    Commit once, rebuild, then require the top, bottom and cosmetic definitions
+    together. A rebuild that changes either face still fails; there is no repair
+    loop or readback substitution.
+    """
+    await force_rebuild(adapter)
+    for dimension_name, expression in drive_jobs:
+        await drive_dimension(adapter, dimension_name, expression)
+    await force_rebuild(adapter)
+    _thread_from_face(
+        adapter, "KP08Taps", KP08_THREAD_DEPTH, label="KP08-face screw threads"
+    )
+    await force_rebuild(adapter)
+    _require_thread_reference(
+        adapter, feature_name="BarTaps", reference=BAR_THREAD_REFERENCE,
+        dimension_name=BAR_THREAD_DEPTH_DIMENSION, station_name="BarThreadStation",
+        depth_mm=BAR_THREAD_DEPTH, witness_x=BAR_THREAD_WITNESS_X,
+    )
+    _require_thread_reference(
+        adapter, feature_name="KP08Taps", reference=KP08_THREAD_REFERENCE,
+        dimension_name=KP08_THREAD_DEPTH_DIMENSION, station_name="KP08ThreadStation",
+        depth_mm=KP08_THREAD_DEPTH, witness_x=KP08_THREAD_WITNESS_X,
+    )
+    _require_bar_face_threads(adapter, bar_face_threads)
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
@@ -510,9 +549,6 @@ async def build(adapter) -> dict[str, str]:
         ],
     )
     drive_jobs += kp08_taps.placement_drive_jobs
-    _thread_from_face(
-        adapter, "KP08Taps", KP08_THREAD_DEPTH, label="KP08-face screw threads"
-    )
     volume = await volume_check(
         adapter,
         "bracket with through holes",
@@ -648,25 +684,11 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += top_ref.apply(adapter, KP08_THREAD_REFERENCE)
     _require_one_solid_body(adapter, label="end bracket")
 
-    await force_rebuild(adapter)
-    for dimension_name, expression in drive_jobs:
-        await drive_dimension(adapter, dimension_name, expression)
-    await force_rebuild(adapter)
+    await _drive_and_finalize_threads(adapter, drive_jobs, bar_face_threads)
     await volume_check(
         adapter, "driven end bracket (equations neutral)", volume, _V_TOL
     )
     _require_one_solid_body(adapter, label="driven end bracket")
-    _require_thread_reference(
-        adapter, feature_name="BarTaps", reference=BAR_THREAD_REFERENCE,
-        dimension_name=BAR_THREAD_DEPTH_DIMENSION, station_name="BarThreadStation",
-        depth_mm=BAR_THREAD_DEPTH, witness_x=BAR_THREAD_WITNESS_X,
-    )
-    _require_thread_reference(
-        adapter, feature_name="KP08Taps", reference=KP08_THREAD_REFERENCE,
-        dimension_name=KP08_THREAD_DEPTH_DIMENSION, station_name="KP08ThreadStation",
-        depth_mm=KP08_THREAD_DEPTH, witness_x=KP08_THREAD_WITNESS_X,
-    )
-    _require_bar_face_threads(adapter, bar_face_threads)
 
     # Every model edit -- material, marked set, model-owned places -- precedes
     # the save. The row prints at three places, so the title block's ±.005

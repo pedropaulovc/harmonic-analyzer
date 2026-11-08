@@ -333,3 +333,189 @@ def test_block_length_reason_rides_its_value_row_clear_of_the_dimension():
     body = source[source.index('def draw_block'):]
     call = "\n    _inline_below_callout(adapter, plan_annotations, 'BlockLength', contract.CALLOUTS_BELOW['BlockLength'])\n"
     assert call in body and 'if is_feed:' + call not in body
+
+
+@pytest.mark.parametrize('fault', (
+    None, 'tap_outer', 'ream_inner', 'missing_inner', 'wrong_depth', 'wrong_radius',
+    'wrong_axis', 'nan_arrow', 'short_arrow', 'zero_arrows', 'two_arrows',
+    'source_name', 'source_identity', 'value', 'thread', 'definition', 'dangling',
+    'body_outside', 'body_wings_outside', 'body_zero_width', 'body_zero_direction',
+    'body_hidden', 'side_drift', 'ream_side', 'text_position',
+))
+def test_pivot_inside_arrow_proves_body_and_tip_without_changing_source(monkeypatch, fault):
+    import _oblique_block_drawing as drawing
+    from _drawing_edges import ViewEdge, ViewEdges
+
+    origin = drawing.PLAN_XY
+    mouth_z = spec.BLOCK_HEIGHT - spec.BORE_DEPTH
+    names = ('TapDrillDia', 'BoreDia')
+    radii = (spec.PIVOT_TAP_DRILL / 2, spec.BORE_DIA / 2)
+    state = {}
+    circles = []
+    displays = {}
+    for name, feature, radius, z in zip(
+        names, ('PivotTapProfile', 'TopBoreProfile'), radii, (mouth_z, spec.BLOCK_HEIGHT)
+    ):
+        circles.append(ViewEdge(
+            edge=object(), line=None, vertices=None,
+            circle=(spec.BORE_X, spec.BORE_Y, z, 0.0, 0.0, 1.0, radius),
+        ))
+        row = state[name] = {
+            'dimension': SimpleNamespace(FullName=f'{name}@{feature}@block.Part', SystemValue=radius / 500),
+            'text': ('<MOD-DIAM>', '', spec.CALLOUTS_ABOVE[name], spec.CALLOUTS_BELOW[name],
+                     '<MOD-DIAM>', '', spec.CALLOUTS_ABOVE[name], spec.CALLOUTS_BELOW[name]),
+            # Correct inner tip, but outside body spans the outer ring.
+            'arrow': (origin[0] - radius / 1000, origin[1], 0.0, -1.0, 0.0, 0.0,
+                      .002, .001, 0.0, 0.0, 0.0, 1.0),
+            'position': (*drawing.PLAN_KEEP[name], 0.0), 'count': 1, 'dangling': False,
+        }
+        annotation = SimpleNamespace(IsDangling=lambda row=row: row['dangling'],
+                                     GetPosition=lambda row=row: row['position'])
+        data = SimpleNamespace(GetArrowHeadCount=lambda row=row: row['count'],
+                               GetArrowHeadAtIndex2=lambda index, row=row: row['arrow'])
+        displays[name] = SimpleNamespace(
+            ArrowSide=1,
+            GetDimension2=lambda index, row=row: row['dimension'],
+            GetText=lambda which, row=row: row['text'][which - 1],
+            GetAnnotation=lambda annotation=annotation: annotation,
+            GetDisplayData=lambda data=data: data,
+        )
+    # Same drill's opposite rim is identical in plan; keep the axial test.
+    circles.insert(0, ViewEdge(
+        edge=object(), line=None, vertices=None,
+        circle=(spec.BORE_X, spec.BORE_Y, 0.0, 0.0, 0.0, 1.0, radii[0]),
+    ))
+    monkeypatch.setattr(drawing, '_early_bound', lambda obj, interface: obj)
+    monkeypatch.setattr(drawing, '_displays',
+                        lambda adapter, annotations, names: {name: displays[name] for name in names})
+    monkeypatch.setattr(drawing, 'scan_view_edges',
+                        lambda *args, **kwargs: ViewEdges('fixture', tuple(circles)))
+    monkeypatch.setattr(drawing, '_project',
+                        lambda adapter, view, point, label: (origin[0] + point[0] / 1000,
+                                                           origin[1] + point[1] / 1000))
+    rebuilds = []
+
+    def rebuild(adapter, *, label):
+        rebuilds.append(label)
+        assert displays['TapDrillDia'].ArrowSide == drawing._ARROWS_INSIDE
+        assert displays['BoreDia'].ArrowSide == 1
+        arrow = state['TapDrillDia']['arrow']
+        state['TapDrillDia']['arrow'] = (*arrow[:3], 1.0, *arrow[4:])
+
+    monkeypatch.setattr(drawing, 'rebuild_drawing', rebuild)
+    reports = []
+    monkeypatch.setattr(drawing._telemetry, 'info', lambda message, **kwargs: reports.append(kwargs))
+    adapter = SimpleNamespace(swApp=SimpleNamespace(IsSame=lambda a, b: int(a is b)))
+    old_triangle = drawing.arrowhead_segments(state['TapDrillDia']['arrow'])
+    assert max(math.dist((edge.x0, edge.y0), origin) for edge in old_triangle) > radii[1] / 1000
+    settled = drawing._place_pivot_tap_arrow_inside(adapter, object(), [], spec)
+    assert rebuilds == ['arrow side 0']
+    assert reports[-1]['rims']['TapDrillDia']['mouth_circle_mm'][2] == mouth_z
+    assert reports[-1]['rims']['BoreDia']['mouth_circle_mm'][2] == spec.BLOCK_HEIGHT
+    tap = state['TapDrillDia']
+    if fault in ('tap_outer', 'ream_inner'):
+        name, radius = ('TapDrillDia', radii[1]) if fault == 'tap_outer' else ('BoreDia', radii[0])
+        state[name]['arrow'] = (origin[0] - radius / 1000, *state[name]['arrow'][1:])
+    elif fault == 'missing_inner':
+        circles.pop(1)
+    elif fault in ('wrong_depth', 'wrong_radius', 'wrong_axis'):
+        circle = list(circles[1].circle)
+        if fault == 'wrong_axis':
+            circle[3:6] = (1.0, 0.0, 0.0)
+        else:
+            circle[2 if fault == 'wrong_depth' else 6] += .1
+        circles[1] = ViewEdge(edge=object(), line=None, vertices=None, circle=tuple(circle))
+    elif fault == 'nan_arrow':
+        tap['arrow'] = (float('nan'), *tap['arrow'][1:])
+    elif fault == 'short_arrow':
+        tap['arrow'] = tap['arrow'][:6]
+    elif fault in ('zero_arrows', 'two_arrows'):
+        tap['count'] = 0 if fault == 'zero_arrows' else 2
+    elif fault == 'source_name':
+        tap['dimension'].FullName = 'TapDrillDia@TopBoreProfile@block.Part'
+    elif fault == 'source_identity':
+        tap['dimension'] = SimpleNamespace(**vars(tap['dimension']))
+    elif fault == 'value':
+        tap['dimension'].SystemValue = spec.BORE_DIA / 1000
+    elif fault == 'thread':
+        tap['text'] = (*tap['text'][:3], 'WRONG THREAD', *tap['text'][4:])
+    elif fault == 'definition':
+        tap['text'] = (*tap['text'][:4], 'DIAMETER', *tap['text'][5:])
+    elif fault == 'dangling':
+        tap['dangling'] = True
+    elif fault in ('body_outside', 'body_wings_outside', 'body_zero_width', 'body_zero_direction', 'body_hidden'):
+        arrow = list(tap['arrow'])
+        if fault == 'body_outside':
+            arrow[3] = -1.0
+        elif fault == 'body_wings_outside':
+            arrow[7] = .01
+        elif fault == 'body_zero_width':
+            arrow[6] = 0.0
+        elif fault == 'body_hidden':
+            arrow[8] = 10.0  # swNO_ARROWHEAD must not certify a synthetic triangle
+        else:
+            arrow[3:6] = (0.0, 0.0, 0.0)
+        tap['arrow'] = tuple(arrow)
+    elif fault == 'side_drift':
+        displays['TapDrillDia'].ArrowSide = 1
+    elif fault == 'ream_side':
+        displays['BoreDia'].ArrowSide = 0
+    elif fault == 'text_position':
+        tap['position'] = (tap['position'][0] + .001, *tap['position'][1:])
+    if fault is None:
+        settled()
+        assert len(reports) == 2 and rebuilds == ['arrow side 0']
+    else:
+        with pytest.raises(RuntimeError):
+            settled()
+
+
+def test_inside_arrow_setter_refuses_ignored_native_put(monkeypatch):
+    import _oblique_block_drawing as drawing
+
+    class RefusedDisplay:
+        @property
+        def ArrowSide(self):
+            return 1
+
+        @ArrowSide.setter
+        def ArrowSide(self, side):
+            assert side == drawing._ARROWS_INSIDE
+
+    monkeypatch.setattr(drawing, '_displays', lambda *args: {'TapDrillDia': RefusedDisplay()})
+    monkeypatch.setattr(drawing, 'rebuild_drawing', lambda *args, **kwargs: pytest.fail('put was ignored'))
+    with pytest.raises(RuntimeError, match='arrows did not move'):
+        drawing._set_arrow_side(None, [], ('TapDrillDia',), drawing._ARROWS_INSIDE)
+
+
+@pytest.mark.parametrize('feed', (False, True))
+def test_inside_tap_arrow_and_settled_proof_are_pivot_only(feed):
+    source = Path(__file__).with_name('_oblique_block_drawing.py').read_text(encoding='utf-8')
+    tree = ast.parse(source)
+    build = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef)
+                 and node.name == 'draw_block')
+    initial = next(node for node in build.body if isinstance(node, ast.Assign)
+                   and any(isinstance(target, ast.Name) and target.id == 'settled_checks'
+                           for target in node.targets))
+    conditional = next(node for node in build.body if isinstance(node, ast.If)
+                       and any(isinstance(child, ast.Call) and isinstance(child.func, ast.Name)
+                               and child.func.id == '_place_pivot_tap_arrow_inside'
+                               for child in ast.walk(node)))
+    calls = []
+    proof = object()
+
+    def place(*args):
+        calls.append(args)
+        return proof
+
+    env = dict(is_feed=feed, adapter=object(), plan=object(), plan_annotations=[],
+               contract=object(), _place_pivot_tap_arrow_inside=place)
+    # Execute only the real routing statements: feed must not call the
+    # placement helper or inject a pivot-only proof into its finalizer.
+    exec(compile(ast.Module(body=[initial, conditional], type_ignores=[]), '<pivot-routing>', 'exec'), env)
+    assert len(calls) == (0 if feed else 1)
+    assert env['settled_checks'] == (() if feed else (proof,))
+    finalizer = next(node for node in ast.walk(build) if isinstance(node, ast.Call)
+                     and isinstance(node.func, ast.Name) and node.func.id == 'finalize_drawing')
+    assert ast.unparse(next(keyword.value for keyword in finalizer.keywords
+                           if keyword.arg == 'settled_checks')) == 'settled_checks'

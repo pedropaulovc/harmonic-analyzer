@@ -21,6 +21,7 @@ from _com import _early_bound
 from _drawing_common import (DrawingOutputs, finalize_drawing, new_project_drawing, read_required_properties, rebuild_drawing,
                              remove_notes_matching)
 from _drawing_dimensions import assert_imported_precision, dimension_name, offset_dimension_text
+from _drawing_edges import scan_view_edges
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_leader_notes import add_leader_note
@@ -32,6 +33,7 @@ from _hole_callout_thread_class import omit_title_block_thread_class
 from _paths import CAD_ROOT
 from _drawing_metric_vendor import print_imported_metric_dimensions
 from _part_properties import part_drawing_unit
+from _layout_audit import arrowhead_segments
 import _telemetry
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
@@ -187,6 +189,108 @@ def _displays(adapter, annotations, names) -> dict[str, Any]:
     if missing:
         raise RuntimeError(f'block dimensions not imported: {missing}')
     return found
+
+
+@_telemetry.traced("drawing.pivot_tap_arrow_inside")
+def _place_pivot_tap_arrow_inside(adapter, plan, annotations, contract):
+    """Keep the imported source; put its arrow body inside the drill circle.
+
+    Retained 4031 leader endpoints indicate an inner-circle tip, but an
+    outside arrow body can cross the outer reamed ring. Set the documented
+    diameter ArrowSide, not an unsupported annotation reattachment or a
+    text move. The part and its cutting sketch remain untouched.
+
+    SDK v3.12.1: GetArrowHeadAtIndex2 returns [tip3, dir3, width, height,
+    style, normal3]. Reuse the layout audit's calibrated direction-to-base
+    convention to prove the whole native triangle lies inside the bore.
+    """
+    displays = _displays(adapter, annotations, ('TapDrillDia', 'BoreDia'))
+    sources = {}
+    rim_specs = {
+        'TapDrillDia': ('PivotTapProfile', part.PIVOT_TAP_DRILL, contract.BLOCK_HEIGHT - part.BORE_DEPTH),
+        'BoreDia': ('TopBoreProfile', part.BORE_DIA, contract.BLOCK_HEIGHT),
+    }
+    for name, display in displays.items():
+        feature, diameter, _ = rim_specs[name]
+        dimension = _early_bound(display.GetDimension2(0), 'IDimension')
+        if dimension is None or str(dimension.FullName).split('@')[:2] != [name, feature]:
+            raise RuntimeError(f'{name}: missing native {feature} source')
+        value = float(dimension.SystemValue)
+        if not math.isfinite(value) or not math.isclose(value, diameter / 1000, rel_tol=0, abs_tol=1e-9):
+            raise RuntimeError(f'{name}: native diameter reads {value!r} m')
+        # GetText(0), swDimensionTextAll, is unsupported. Parts 1..4 read
+        # resolved text; 5..8 retain its native token-bearing definitions.
+        text = tuple(str(display.GetText(which) or '') for which in range(1, 9))
+        if text[2:4] != (contract.CALLOUTS_ABOVE[name], contract.CALLOUTS_BELOW[name]):
+            raise RuntimeError(f'{name}: native process/thread callout changed: {text!r}')
+        annotation = _early_bound(display.GetAnnotation(), 'IAnnotation')
+        position = tuple(float(v) for v in annotation.GetPosition())
+        if len(position) != 3 or not all(math.isfinite(v) for v in position):
+            raise RuntimeError(f'{name}: unreadable native text position')
+        sources[name] = (dimension, str(dimension.FullName), value, text, position, int(display.ArrowSide))
+
+    @_telemetry.traced("drawing.pivot_tap_arrow_readback")
+    def settled():
+        edges = scan_view_edges(plan, label='pivot tap and reamed seat rims')
+        measured = {}
+        for name, display in displays.items():
+            source, full_name, value, text, position, arrow_side = sources[name]
+            dimension = _early_bound(display.GetDimension2(0), 'IDimension')
+            annotation = _early_bound(display.GetAnnotation(), 'IAnnotation')
+            if (
+                dimension is None or int(adapter.swApp.IsSame(dimension, source)) != 1
+                or str(dimension.FullName) != full_name or float(dimension.SystemValue) != value
+                or tuple(str(display.GetText(which) or '') for which in range(1, 9)) != text
+                or annotation.IsDangling()
+            ):
+                raise RuntimeError(f'{name}: lost its native source/value/callout')
+            expected_side = _ARROWS_INSIDE if name == 'TapDrillDia' else arrow_side
+            if int(display.ArrowSide) != expected_side:
+                raise RuntimeError(f'{name}: native arrow side changed from {expected_side}')
+            actual_position = tuple(float(v) for v in annotation.GetPosition())
+            if (len(actual_position) != 3 or not all(math.isfinite(v) for v in actual_position)
+                    or math.dist(actual_position, position) > 1e-5):
+                raise RuntimeError(f'{name}: native text moved while placing its arrow')
+            _, diameter, z = rim_specs[name]
+            circle = edges.circle_at(
+                (part.BORE_X, part.BORE_Y, z), diameter / 2, axis=(0.0, 0.0, 1.0),
+                center_tol_mm=1e-6, radius_tol_mm=1e-6, label=name,
+            ).circle
+            if not all(math.isfinite(v) for v in circle):
+                raise RuntimeError(f'{name}: unreadable native mouth circle {circle!r}')
+            cx, cy, cz, _, _, _, radius = circle
+            centre = _project(adapter, plan, (cx, cy, cz), f'{name} centre')
+            rim = _project(adapter, plan, (cx + radius, cy, cz), f'{name} rim')
+            sheet_radius = math.dist(centre, rim)
+            data = _early_bound(display.GetDisplayData(), 'IDisplayData')
+            if data is None or int(data.GetArrowHeadCount()) != 1:
+                raise RuntimeError(f'{name}: expected one native diameter arrow')
+            arrow = tuple(float(v) for v in (data.GetArrowHeadAtIndex2(0) or ()))
+            # 0.01 paper mm rejects the neighbouring concentric circle
+            # (1.499 mm away at 1:1), while allowing native display roundoff.
+            if (len(arrow) != 12 or not all(math.isfinite(v) for v in arrow)
+                    or not all(math.isfinite(v) for v in centre)
+                    or not math.isfinite(sheet_radius) or sheet_radius <= 0
+                    or abs(math.dist(arrow[:2], centre) - sheet_radius) > 1e-5):
+                raise RuntimeError(f'{name}: native arrow missed its own rim: {arrow!r}')
+            triangle = arrowhead_segments(arrow)
+            if name == 'TapDrillDia':
+                # A disk is convex: containing the three native vertices
+                # contains the complete open (0) or filled (1) triangle
+                # (swArrowStyle_e), not just its rim tip.
+                if (arrow[8] not in (0, 1) or arrow[6] <= 0 or arrow[7] <= 0 or len(triangle) != 3
+                        or any(math.dist((edge.x0, edge.y0), centre) > sheet_radius + 1e-5
+                               for edge in triangle)):
+                    raise RuntimeError('TapDrillDia: native arrow body is not inside the drill circle')
+            measured[name] = {
+                'source': full_name, 'mouth_circle_mm': list(circle),
+                'arrow_sheet_data': list(arrow), 'sheet_radius_m': sheet_radius,
+            }
+        _telemetry.info('pivot callout native rim readback', rims=measured)
+
+    _set_arrow_side(adapter, annotations, ('TapDrillDia',), _ARROWS_INSIDE)
+    settled()
+    return settled
 
 
 def _set_arrow_side(adapter, annotations, names, side) -> None:
@@ -413,6 +517,9 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
     set_hidden_lines_removed(adapter,plan)
     plan_annotations = curate_view_dimensions(adapter,plan,keep=plan_keep,view_label='plan',
                      dimensions_by_feature=contract.DRAWING_DIMENSIONS)
+    settled_checks = ()
+    if not is_feed:
+        settled_checks = (_place_pivot_tap_arrow_inside(adapter, plan, plan_annotations, contract),)
     _set_arrow_side(adapter, plan_annotations, ROW_DIMENSIONS, _ARROWS_INSIDE)
     set_hidden_lines_removed(adapter,side)
     side_annotations = curate_view_dimensions(adapter,side,keep=side_keep,view_label='pivot section direction',
@@ -501,4 +608,4 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
     return await finalize_drawing(adapter,outputs,pdf_title='Rocker Oblique Trammel Block Manufacturing Drawing',
                                   scale=SHEET_SCALE,layout=spec.layout,sheet_scales=sheet_scales,
                                   redundant_note_substrings=(TAPPED_HOLE_NOTE,) if is_feed else (),
-                                  expected_redundant_notes=0)
+                                  expected_redundant_notes=0, settled_checks=settled_checks)

@@ -892,6 +892,57 @@ def test_hub_clamp_tap_has_its_own_sheet_callout_and_reference_position() -> Non
     )
 
 
+@pytest.mark.parametrize("axis", ["X", "Y"])
+def test_hub_reference_text_and_dimension_line_are_outside_plate(axis) -> None:
+    """4031a82a S3: reserve whole text/arrow envelopes, not just an anchor.
+
+    This is an offline paper-layout contract, not a native ink measurement.
+    The unchanged single-line parenthesized references get a conservative
+    16 x 16 mm text reservation (including either text orientation), and
+    their dimension lines get 3 mm arrow/tail clearance on every side.
+    Native extension lines must still reach the two hole centres inside.
+    """
+    x0, y0 = _on_sheet(spec.OUTLINE_X[0], spec.OUTLINE_Y[0])
+    x1, y1 = _on_sheet(spec.OUTLINE_X[1], spec.OUTLINE_Y[1])
+    plate = (x0, y0, x1, y1)
+    mx, _zero, minus_my = drawing.HUB_REFERENCE_TEXT_MODEL_MM[axis]
+    tx, ty = _on_sheet(mx, -minus_my)
+    a1, hub = (_on_sheet(*point) for point in (drawing._A1, spec.HUB))
+    if axis == "X":
+        ends = ((a1[0], ty), (hub[0], ty))
+        assert ty == pytest.approx(y0 - 18.0)
+        assert ty + 8.0 <= y0 - 3.0
+        assert min(a1[0], hub[0]) + 8.0 < tx < max(a1[0], hub[0]) - 8.0
+    else:
+        ends = ((tx, a1[1]), (tx, hub[1]))
+        assert tx == pytest.approx(x1 + 28.0)
+        assert tx - 8.0 >= x1 + 3.0
+        assert min(a1[1], hub[1]) + 8.0 < ty < max(a1[1], hub[1]) - 8.0
+    text_box = (tx - 8.0, ty - 8.0, tx + 8.0, ty + 8.0)
+    line_box = (
+        min(p[0] for p in ends) - 3.0,
+        min(p[1] for p in ends) - 3.0,
+        max(p[0] for p in ends) + 3.0,
+        max(p[1] for p in ends) + 3.0,
+    )
+    # Reserve the complete four-row native callout/instructions and its
+    # shoulder, not only the ordinary two-row _callout_box approximation.
+    callout_x, callout_y = (v * 1000.0 for v in drawing.HUB_CALLOUT_XY)
+    callout = (callout_x - 36.0, callout_y - 16.0,
+               callout_x + 36.0, callout_y + 16.0)
+    iso_x, iso_y = (v * 1000.0 for v in drawing.ISO_CENTER)
+    iso = (iso_x - 30.0, iso_y - 18.0, iso_x + 30.0, iso_y + 18.0)
+    note_x, note_y = (v * 1000.0 for v in drawing.ISO_NOTE_XY)
+    caption = (note_x, note_y - 4.0,
+               note_x + 2.36 * len(spec.ISOMETRIC_VIEW_NOTE), note_y + 4.0)
+    for box in (text_box, line_box):
+        assert _BORDER[0] + 3.0 < box[0] < box[2] < _BORDER[2] - 3.0
+        assert _BORDER[1] + 3.0 < box[1] < box[3] < _BORDER[3] - 3.0
+        for keepout in (plate, _TITLE_BLOCK, callout, iso, caption):
+            assert not _boxes_overlap(box, keepout), (axis, box, keepout)
+    assert not _segment_hits_box(*ends, plate)
+
+
 @pytest.mark.parametrize("fault", [None, "prefix", "suffix", "show_parenthesis", "arc_end", "wrong_value"])
 def test_hub_reference_position_is_parenthesized_between_actual_edges(monkeypatch, fault):
     """Fake-driven (not native): the two dimensions run between the A1 and
@@ -941,7 +992,10 @@ def test_hub_reference_position_is_parenthesized_between_actual_edges(monkeypatc
             raise RuntimeError(f"{label} measures the wrong value")
 
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(drawing, "_view_mapper", lambda *_: lambda xyz: (xyz[0] / 2000.0, -xyz[2] / 2000.0))
+    def to_sheet(xyz):
+        return tuple(v / 1000.0 for v in _on_sheet(xyz[0], -xyz[2]))
+
+    monkeypatch.setattr(drawing, "_view_mapper", lambda *_: to_sheet)
     monkeypatch.setattr(drawing, "_circle_edge", lambda _a, _v, dia, *_a2, **_k: a1 if dia == spec.PIN_HOLE_DIA else hub)
     monkeypatch.setattr(drawing, "add_edge_dimension", add)
     monkeypatch.setattr(drawing, "set_arc_endpoints_to_center", lambda *_a, **_k: None)
@@ -951,6 +1005,12 @@ def test_hub_reference_position_is_parenthesized_between_actual_edges(monkeypatc
     check = drawing._hub_reference_position(SimpleNamespace(), object())
     assert [item["orientation"] for item in created] == ["horizontal", "vertical"]
     assert all(item["entities"] == (a1, hub) for item in created)
+    for axis, item in zip(("X", "Y"), created, strict=True):
+        assert item["text_xy"] == pytest.approx(
+            to_sheet(drawing.HUB_REFERENCE_TEXT_MODEL_MM[axis])
+        )
+        assert item["p0"] == pytest.approx(to_sheet(drawing._xy(*drawing._A1)))
+        assert item["p1"] == pytest.approx(to_sheet(drawing._xy(*spec.HUB)))
     assert all(display.text == {1: "(", 2: ")"} for display in displays)
     assert all(display.ShowParenthesis is False for display in displays)
     a1x, a1y = spec.PIN_HOLES["A1"]

@@ -281,14 +281,20 @@ HUB_CALLOUT_XY = (0.264, 0.236)
 # The HUB tap is drilled and tapped at assembly (TL-00 step 10; farm 82129
 # machinist review): its callout says so, and its position from A1 prints
 # only as two parenthesized REFERENCE dimensions between the actual A1 and
-# HUB edges. Their texts are MODEL points (1:2: sheet x = 222 + X/2,
-# y = 175 + Y/2): X's line at sheet y ~182, between A1's rim (~177) and
-# A2's (~185); Y's at sheet x ~234, its HUB witness short of R2 (~241, 197).
+# HUB edges. Keep both text and dimension lines outside the plate (rule 14):
+# X is 18 paper mm below its lower edge, Y is 28 paper mm past its right edge.
+# At 1:2 the plate is x 91.825..352.175, y 152.615..217.385 paper mm;
+# X's anchor is (165.75, 134.615), Y's (380.175, 186.094). These lanes
+# clear the callout/instructions above and the isometric/caption below.
+# Only placement changes: the native witnesses still attach to A1 and HUB.
 HUB_TAP_NOTE = "DRILL AND TAP AT ASSEMBLY\nTL-00 STEP 10"
 # No SetPrecision3: a sheet may only pass a *_spec DRAWING_REFERENCE_PRECISION
 # (_drawing_contract), and the part spec is not edited for this drawing-only
 # change, so the references print at the document's own linear places.
-HUB_REFERENCE_TEXT_MODEL_MM = {"X": _xy(-112.5, 14.0), "Y": _xy(24.0, 22.0)}
+HUB_REFERENCE_TEXT_MODEL_MM = {
+    "X": _xy(-112.5, part_spec.OUTLINE_Y[0] - 36.0),
+    "Y": _xy(part_spec.OUTLINE_X[1] + 56.0, 22.0),
+}
 
 part_metadata(
     precision_sources=(
