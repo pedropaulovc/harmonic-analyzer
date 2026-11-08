@@ -19,7 +19,7 @@ import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import draw_ch_rocker_arm_tl_oblique_carrier as drawing
 from _drawing_tables import insert_hole_table
 
-I = trammel.INCH
+I = trammel.INCH  # noqa: E741 (the inch, as the spec writes it)
 
 
 TABLED = table.TABLED_HOLES
@@ -38,13 +38,11 @@ def test_table_inventory_is_complete_and_replaces_location_dimensions():
     assert len(TABLED) == 12
     assert set(table.TAG_OFFSETS) == set(TABLED)
     assert table.COLUMNS[table.SIZE_COLUMN] == "SIZE"
-    assert set(drawing.TOP_KEEP) == {
-        "PlateLength", "PlateWidth", "PlateNearY", "EdgeX", "PinHoleDia",
-    }
+    assert set(drawing.TOP_KEEP) == {"PlateLength", "PlateWidth", "PinHoleDia"}
     assert drawing.SECTION_NOTE.startswith("A1 ONLY")
     assert "SECTION_NOTE" in inspect.getsource(drawing._pin_section)
-    assert "LOCATIONS REF" in spec.TABLE_ROW_NOTES["HUB"]
-    assert "station" not in drawing._CHAIN["A1"]
+    assert set(table.ROW_NOTES) == set(TABLED) and "HUB" not in table.ROW_NOTES
+    assert "parent" not in drawing._PIN_ROWS["A1"]
     assert assembly.ALIGNMENT_BAND == pytest.approx(.0008 * I)
     assert "carrier.POSITION_BAND" not in inspect.getsource(assembly)
     assert drawing.MACHINIST_REVIEW.name == "ENFORCE"
@@ -172,10 +170,10 @@ class NativeCells:
     columns are skipped, so a reader in the wrong domain gets the wrong cell."""
 
     def __init__(self):
-        a1x, a1y = spec.PIN_HOLES["A1"]
         self.cells = [list(table.COLUMNS)] + [
-            [tag, f"{(x-a1x)/I:.3f}", f"{(y-a1y)/I:.3f}", "native size", spec.TABLE_ROW_NOTES[tag]]
-            for tag, (x, y, _dia) in TABLED.items()
+            [tag, *(f"{value / I:.3f}" for value in table.table_location(tag)),
+             "native size", table.ROW_NOTES[tag]]
+            for tag in TABLED
         ]
         self.TotalRowCount = len(self.cells)
         self.TotalColumnCount = len(table.COLUMNS)
@@ -340,14 +338,18 @@ def test_outer_note_reads_actual_model_limits_and_never_writes_them(monkeypatch)
     assert "SetValues" not in source and "SetPrecision" not in source
 
 
-def test_native_table_renames_default_tags_and_reattaches_the_real_edge():
+def test_native_table_renames_default_tags_and_keeps_the_corner_origin():
     assert "manual_tags" not in inspect.signature(insert_hole_table).parameters
     source = inspect.getsource(table.create_carrier_hole_table)
-    assert 'edges["A1"]' in source and "origin.Reattach()" in source
+    # Owner review 2026-11-07 (rule 10): the origin stays on the real corner
+    # vertex it is inserted on; it is never reattached to a hole.
+    assert "datum_xy=_point(adapter, view, *ORIGIN)" in source
+    assert "Reattach" not in source and 'edges["A1"]' not in source
+    assert table.ORIGIN == (spec.OUTLINE_X[0], spec.OUTLINE_Y[0])
     assert "datum_point=" not in source and "manual_tags" not in source
-    # Rename only after the datum is A1 (rows identify by their A1 cells),
-    # then rebuild before the generated rows are frozen.
-    assert (source.index("origin.Reattach()") < source.index("_assign_tags(feature, table)")
+    # Rename from each row's own corner cells, then rebuild before the
+    # generated rows are frozen.
+    assert (source.index("insert_hole_table(") < source.index("_assign_tags(feature, table)")
             < source.index('label="carrier owner tags"') < source.index("rows = _rows(table)"))
     # NOTE text goes into each tag's row as re-read AFTER the column rebuild,
     # every void SetText2 put is read back, and settle compares whole rows,
@@ -356,7 +358,8 @@ def test_native_table_renames_default_tags_and_reattaches_the_real_edge():
             < source.index('_frozen_rows(table, generated, notes=None')
             < source.index("table.SetText2(row, 4, True, note)")
             < source.index("table.Text2(row, 4, True)")
-            < source.index('_frozen_rows(table, generated, notes=spec.TABLE_ROW_NOTES'))
+            < source.index('_frozen_rows(table, generated, notes=ROW_NOTES'))
+    assert "carrier table datum left its corner vertex" in source
     assert "DisplayedText2(row, column, True)" in inspect.getsource(table._cell)
     assert "GetCorrespondingEntity2" in inspect.getsource(table._source_edges)
     assert "GetAttachedEntities3" in inspect.getsource(table._tags)
@@ -536,11 +539,11 @@ def test_frozen_rows_name_the_row_and_both_values(fault):
     elif fault == "columns":
         native.TotalColumnCount = 4
     if fault is None:
-        rows = table._frozen_rows(native, generated, notes=spec.TABLE_ROW_NOTES, stage="now")
+        rows = table._frozen_rows(native, generated, notes=table.ROW_NOTES, stage="now")
         assert set(rows) == set(TABLED)
         return
     with pytest.raises(RuntimeError) as failure:
-        table._frozen_rows(native, generated, notes=spec.TABLE_ROW_NOTES, stage="now")
+        table._frozen_rows(native, generated, notes=table.ROW_NOTES, stage="now")
     message = str(failure.value)
     if fault == "columns":
         assert "has 4 columns now" in message
@@ -574,25 +577,23 @@ def _trimmed(text):
     return format(Decimal(text).normalize(), "f")
 
 
-@pytest.mark.parametrize("style", ["leading_zero", "zero_sign"])
 @pytest.mark.parametrize("side", ["table", "generated"])
-def test_frozen_location_cells_ignore_zero_style_only(side, style):
-    # Farm 957501d1: generated '.000' redisplayed as '0.000' after the column insert.
+def test_frozen_location_cells_ignore_zero_style_only(side):
+    # Farm 957501d1: generated '.000' redisplayed as '0.000' after the column
+    # insert. From the corner no cell is zero; L2's Y (.270) is the one that
+    # can lose or gain its leading zero.
     native = NativeCells()
-    assert native.cells[1][:3] == ["A1", "0.000", "0.000"]
+    assert native.cells[-1][:3] == ["L2", "10.250", "0.270"]
     generated = {tag: cells[:4] for tag, (_row, cells) in table._rows(native).items()}
-    if style == "leading_zero":
-        restyled = {tag: (cells[0], *map(_strip_leading_zero, cells[1:3]), cells[3])
-                    for tag, cells in generated.items()}
-        assert restyled["A1"][1:3] == (".000", ".000")
-    else:
-        restyled = {**generated, "A1": ("A1", "-0.000", "-.000", generated["A1"][3])}
+    restyled = {tag: (cells[0], *map(_strip_leading_zero, cells[1:3]), cells[3])
+                for tag, cells in generated.items()}
+    assert restyled["L2"][1:3] == ("10.250", ".270")
     if side == "table":
         for row in native.cells[1:]:
             row[:4] = restyled[row[0]]
     else:
         generated = restyled
-    assert set(table._frozen_rows(native, generated, notes=spec.TABLE_ROW_NOTES, stage="now")) \
+    assert set(table._frozen_rows(native, generated, notes=table.ROW_NOTES, stage="now")) \
         == set(TABLED)
 
 
@@ -614,9 +615,9 @@ def test_frozen_location_cells_still_refuse_real_drift(drift):
         row, column = next((r, c) for r, cells in enumerate(native.cells[1:], 1)
                            for c in (1, 2) if not cells[c].endswith("0"))
         native.cells[row][column] = native.cells[row][column][:-1]
-        match = "is not measured from A1"
+        match = "is not measured from the corner"
     with pytest.raises(RuntimeError, match=match):
-        table._frozen_rows(native, generated, notes=spec.TABLE_ROW_NOTES, stage="now")
+        table._frozen_rows(native, generated, notes=table.ROW_NOTES, stage="now")
 
 
 @pytest.mark.parametrize("side", ["table", "generated"])
@@ -627,7 +628,7 @@ def test_frozen_location_cells_accept_value_equal_leading_and_trailing_zeros(sid
     padded = {tag: (cells[0], *(text + "0" for text in cells[1:3]), cells[3])
               for tag, cells in generated.items()}
     trimmed = {tag: (cells[0], *map(_trimmed, cells[1:3]), cells[3]) for tag, cells in generated.items()}
-    assert trimmed["A1"][1:3] == ("0", "0")
+    assert trimmed["L2"][1:3] == ("10.25", "0.27")
     assert any(not cells[c].endswith("0") for cells in trimmed.values() for c in (1, 2))
     for restyled in (padded, trimmed):
         table_cells = NativeCells()
@@ -637,7 +638,7 @@ def test_frozen_location_cells_accept_value_equal_leading_and_trailing_zeros(sid
                 row[:4] = restyled[row[0]]
         else:
             expected = restyled
-        assert set(table._frozen_rows(table_cells, expected, notes=spec.TABLE_ROW_NOTES, stage="now")) \
+        assert set(table._frozen_rows(table_cells, expected, notes=table.ROW_NOTES, stage="now")) \
             == set(TABLED)
         assert set(table._row_holes(table_cells).values()) == set(TABLED)
 
@@ -690,8 +691,8 @@ def test_size_semantics_compare_printed_values_not_serialization():
 
 
 @pytest.mark.parametrize("generated_size,actual_size", [
-    (_SIZE_957_PLAIN, _SIZE_957_PLAIN),  # 957501d1 (with the '.000' -> '0.000' flip)
-    (_SIZE_A754_BEFORE, _SIZE_A754_AFTER),  # a7547069 (with the '0.000' -> '.000' flip)
+    (_SIZE_957_PLAIN, _SIZE_957_PLAIN),  # 957501d1 (with a '.270' -> '0.270' flip)
+    (_SIZE_A754_BEFORE, _SIZE_A754_AFTER),  # a7547069 (with a '0.270' -> '.270' flip)
     (_SIZE_957_PLAIN, _SIZE_A754_AFTER),  # zero band appears
     (_SIZE_A754_BEFORE, _SIZE_957_PLAIN),  # zero band disappears
 ])
@@ -699,30 +700,34 @@ def test_observed_size_serializations_pass_and_real_changes_still_fail(generated
     native = NativeCells()
     native.cells[1][3] = generated_size
     generated = {tag: cells[:4] for tag, (_row, cells) in table._rows(native).items()}
-    # Each run's observed location style flip across the NOTE column.
-    before, after = (".000", "0.000") if generated_size == _SIZE_957_PLAIN else ("0.000", ".000")
-    generated["A1"] = ("A1", before, before, generated_size)
-    native.cells[1][1:4] = [after, after, actual_size]
-    assert set(table._frozen_rows(native, generated, notes=spec.TABLE_ROW_NOTES, stage="now")) \
+    # Each run's observed location style flip across the NOTE column, on the
+    # one cell with a leading zero from the corner (L2's Y, the last row).
+    zero = native.cells[-1][2]
+    assert native.cells[-1][0] == "L2" and zero == "0.270"
+    before, after = (".270", zero) if generated_size == _SIZE_957_PLAIN else (zero, ".270")
+    generated["L2"] = (*generated["L2"][:2], before, generated["L2"][3])
+    native.cells[-1][2] = after
+    native.cells[1][3] = actual_size
+    assert set(table._frozen_rows(native, generated, notes=table.ROW_NOTES, stage="now")) \
         == set(TABLED)
     # Real changes on the same row still fail: size, depth, coordinate, note,
     # another hole's identity, and a missing row.
     for mutate, match in (
         (lambda cells: cells[1].__setitem__(3, actual_size.replace(".38", ".39")), r"changed now: A1 \(row 1\)"),
         (lambda cells: cells[1].__setitem__(3, actual_size.replace(".46", ".47")), r"changed now: A1 \(row 1\)"),
-        (lambda cells: cells[1].__setitem__(4, spec.TABLE_ROW_NOTES["B1"]), r"changed now: A1 \(row 1\)"),
-        (lambda cells: cells[2].__setitem__(1, "1.000"), "not measured from A1"),
+        (lambda cells: cells[1].__setitem__(4, table.ROW_NOTES["B1"]), r"changed now: A1 \(row 1\)"),
+        (lambda cells: cells[2].__setitem__(1, "1.000"), "not measured from the corner"),
         (lambda cells: cells[2].__setitem__(0, "A1"), "extra/duplicate"),
     ):
         bad = NativeCells()
         bad.cells[1][3] = actual_size
         mutate(bad.cells)
         with pytest.raises(RuntimeError, match=match):
-            table._frozen_rows(bad, generated, notes=spec.TABLE_ROW_NOTES, stage="now")
+            table._frozen_rows(bad, generated, notes=table.ROW_NOTES, stage="now")
     missing = NativeCells()
     missing.TotalRowCount -= 1
     with pytest.raises(RuntimeError, match="row/column inventory"):
-        table._frozen_rows(missing, generated, notes=spec.TABLE_ROW_NOTES, stage="now")
+        table._frozen_rows(missing, generated, notes=table.ROW_NOTES, stage="now")
 
 
 def test_freshly_inserted_note_cells_must_be_empty_before_writing():
@@ -765,7 +770,7 @@ class DefaultTagTable(NativeCells):
 
 
 @pytest.mark.parametrize("base", [0, 1])
-def test_default_tags_are_renamed_two_phase_by_each_rows_a1_cells(base):
+def test_default_tags_are_renamed_two_phase_by_each_rows_corner_cells(base):
     native = DefaultTagTable(base=base)
     assert {cells[0] for cells in native.cells[1:]} >= {"A1", "A2"}  # live collisions
     table._assign_tags(native, native)
@@ -786,7 +791,7 @@ def test_default_tags_are_renamed_two_phase_by_each_rows_a1_cells(base):
     refused = {row for row, tag in holes.items() if after[row] != tag}
     assert refused, (before, after)
     assert all(after[row] == before[row] for row in refused), (before, after)
-    with pytest.raises(RuntimeError, match="not measured from A1|extra/duplicate"):
+    with pytest.raises(RuntimeError, match="not measured from the corner|extra/duplicate"):
         table._rows(direct)
 
 
@@ -924,8 +929,9 @@ def test_outer_row_authoring_binds_raw_named_dimensions(monkeypatch, failure):
 
 
 # Each hidden model driver the R4 sheet no longer imports -> the native table
-# (row, axis) cells that print the location it drives (axis 0 = X LOC from A1,
-# 1 = Y LOC from the A1-B1 line). Build: _PIN_AXIS_DRIVES, _origin_x
+# (row, axis) cells that print the location it drives (axis 0 = X, 1 = Y; the
+# drivers measure from A1 and the A1-B1 line, the table prints from the plate
+# corner, NOTE 2 holds the A1 relation). Build: _PIN_AXIS_DRIVES, _origin_x
 # baselines from A1, SharedCoordinate(0/2) for the R2/R4 Y, LeverX on both
 # lever taps. A2DY/B2DY additionally own the flagged OUTER_Y_NOTE limits.
 TABLE_SUPERSEDED_DRIVERS = {
@@ -938,6 +944,13 @@ TABLE_SUPERSEDED_DRIVERS = {
     "RiserX1": (("R1", 0),), "RiserX1R": (("R2", 0),),
     "RiserX2": (("R3", 0),), "RiserX2R": (("R4", 0),),
     "RiserY1": (("R1", 1), ("R2", 1)), "RiserY2": (("R3", 1), ("R4", 1)),
+}
+# The part still marks these for the drawing; the sheet curates them out
+# (drawing.TABLE_ROW_DIMENSIONS) because A1's corner row prints them, and B1
+# shares A1's Y.
+TABLE_ROW_DRIVERS = {
+    "EdgeX": (("A1", 0),),
+    "PlateNearY": (("A1", 1), ("B1", 1)),
 }
 
 
@@ -961,7 +974,7 @@ def _imported(monkeypatch, places_by_name):
 
 
 def test_imported_precision_contract_is_exactly_what_the_sheet_imports():
-    imported = set().union(*spec.DRAWING_DIMENSIONS.values())
+    imported = set().union(*spec.DRAWING_DIMENSIONS.values()) - drawing.TABLE_ROW_DIMENSIONS
     assert set(drawing.IMPORTED_PRECISION) == imported
     assert imported == set(drawing.TOP_KEEP) | set(drawing.SECTION_KEEP_MODEL_MM)
     assert all(drawing.IMPORTED_PRECISION[name] == spec.DRAWING_PRECISION_BY_NAME[name] for name in imported)
@@ -979,10 +992,10 @@ def test_production_precision_guard_takes_the_imported_set_and_refuses_defects(m
         return
     if defect == "legacy_contract":  # farm 1608aaf0: the whole part map
         precision = dict(spec.DRAWING_PRECISION_BY_NAME)
-        match = re.escape(repr(sorted(TABLE_SUPERSEDED_DRIVERS)))
+        match = re.escape(repr(sorted({*TABLE_SUPERSEDED_DRIVERS, *TABLE_ROW_DRIVERS})))
     elif defect == "missing":
-        annotations = [item for item in annotations if item.name != "EdgeX"]
-        match = re.escape("['EdgeX']")
+        annotations = [item for item in annotations if item.name != "PlateLength"]
+        match = re.escape("['PlateLength']")
     else:
         _module, _adapter, annotations = _imported(
             monkeypatch, {**drawing.IMPORTED_PRECISION, "PinHoleDia": drawing.IMPORTED_PRECISION["PinHoleDia"] - 1},
@@ -994,15 +1007,16 @@ def test_production_precision_guard_takes_the_imported_set_and_refuses_defects(m
 
 def test_every_superseded_driver_prints_in_the_native_table_at_its_places():
     superseded = set(spec.DRAWING_PRECISION_BY_NAME) - set(drawing.IMPORTED_PRECISION)
-    assert superseded == set(TABLE_SUPERSEDED_DRIVERS)
-    assert all(spec.DRAWING_PRECISION_BY_NAME[name] == spec.TABLE_LOCATION_PLACES for name in superseded)
+    assert superseded == set(TABLE_SUPERSEDED_DRIVERS) | set(TABLE_ROW_DRIVERS)
+    assert set(TABLE_ROW_DRIVERS) == drawing.TABLE_ROW_DIMENSIONS
+    assert all(spec.DRAWING_PRECISION_BY_NAME[name] == spec.TABLE_LOCATION_PLACES
+               for name in TABLE_SUPERSEDED_DRIVERS)
     assert spec.RISER_STATION_PLACES == spec.TABLE_LOCATION_PLACES
-    covered = {cell for cells in TABLE_SUPERSEDED_DRIVERS.values() for cell in cells}
-    # Complete: every tabled location cell but A1 (the origin) and B1's Y (the
-    # A1-B1 line itself). The HUB is not tabled (drilled at assembly).
-    expected = {(tag, axis) for tag in TABLED for axis in (0, 1)} - {
-        ("A1", 0), ("A1", 1), ("B1", 1),
-    }
+    covered = {cell for drivers in (TABLE_SUPERSEDED_DRIVERS, TABLE_ROW_DRIVERS)
+               for cells in drivers.values() for cell in cells}
+    # Complete: every tabled location cell. The HUB is not tabled (drilled
+    # at assembly).
+    expected = {(tag, axis) for tag in TABLED for axis in (0, 1)}
     assert covered == expected
     assert spec.PIN_HOLES["A1"][1] == spec.PIN_HOLES["B1"][1]
     assert not {"HubX", "HubY"} & set(spec.DRAWING_PRECISION_BY_NAME)
@@ -1024,13 +1038,13 @@ def test_every_superseded_driver_prints_in_the_native_table_at_its_places():
         if text.endswith("0"):
             assert tag in table._rows(bad)
         else:
-            with pytest.raises(RuntimeError, match=f"{tag} is not measured from A1"):
+            with pytest.raises(RuntimeError, match=f"{tag} is not measured from the corner"):
                 table._rows(bad)
     # A2DY/B2DY's .964 ±.002 is the model-linked flagged note
     # (test_outer_note_reads_actual_model_limits_and_never_writes_them).
     assert spec.inch_text(spec.OUTER_Y_NOMINAL, spec.TABLE_LOCATION_PLACES) in spec.OUTER_Y_NOTE
     assert spec.inch_text(spec.OUTER_Y_BAND, spec.TABLE_LOCATION_PLACES) in spec.OUTER_Y_NOTE
-    assert spec.TABLE_ROW_NOTES["A2"].endswith("NOTE 1") and spec.TABLE_ROW_NOTES["B2"].endswith("NOTE 1")
+    assert table.ROW_NOTES["A2"].endswith("NOTES 1, 2") and table.ROW_NOTES["B2"].endswith("NOTES 1, 2")
 
 
 def _settled_harness(monkeypatch, *, fail_check=False):
@@ -1051,8 +1065,12 @@ def _settled_harness(monkeypatch, *, fail_check=False):
     current = lambda: SimpleNamespace(GetName=lambda: state["active"])  # noqa: E731
     edges = {tag: SimpleNamespace(Select4=lambda *_: True) for tag in spec.TABLE_HOLES}
     inserted, hidden, notes_added = {}, [], []
-    annotation = SimpleNamespace(GetAttachedEntities3=lambda: (edges["A1"],), IsDangling=lambda: False)
-    origin = SimpleNamespace(Reattach=lambda: True, GetAnnotation=lambda: annotation)
+    # The datum's attached entities: the plate's lower-left vertex alone,
+    # never a hole edge (tests swap them to probe the settled refusal).
+    state.update(attached=(SimpleNamespace(),), dangling=False)
+    annotation = SimpleNamespace(GetAttachedEntities3=lambda: state["attached"],
+                                 IsDangling=lambda: state["dangling"])
+    origin = SimpleNamespace(GetAnnotation=lambda: annotation)
     feature = SimpleNamespace(
         DatumOrigin=origin, CombineSameSize=False, CombineTags=False,
         GetHoleLocationUseDocPrecision=lambda: False,
@@ -1111,11 +1129,56 @@ def test_table_selects_only_the_twelve_tabled_holes_and_hides_size(monkeypatch):
     assert table.HOLE_SIZES_NOTE == "HOLE SIZES PER CALLOUTS, SHEETS 1 AND 3"
     assert table.HOLE_SIZES_NOTE in state["notes"]
     assert not any("HUB" in text for text in state["notes"])
+    # Owner review 2026-11-07: NOTE 2 and the corner origin are printed; the
+    # retired A1-origin note is not.
+    for text in ("1", "2", table.A1_RELATION_NOTE, table.ORIGIN_NOTE):
+        assert text in state["notes"], text
+    assert not any("FROM A1;" in text or "+X ALONG" in text for text in state["notes"])
+    assert state["inserted"]["anchor_xy"] == table.TABLE_ANCHOR
     source = inspect.getsource(table.create_carrier_hole_table)
     assert source.index("SetColumnHidden(SIZE_COLUMN, True)") < source.index(
         '_size_column_hidden(table, "after its rebuild")'
     )
     assert '_size_column_hidden(table, "at settled readback")' in source
+
+
+@pytest.mark.parametrize("fault", [None, "on_a1", "on_hub", "dangling", "two"])
+def test_settled_datum_stays_on_its_corner_vertex(monkeypatch, fault):
+    """Owner review 2026-11-07 (rule 10): the origin is the plate's real
+    corner; settled refuses a datum moved onto any hole edge (the HUB's
+    included), a dangling one, or one attached to more than one entity."""
+    state, _seen, create = _settled_harness(monkeypatch)
+    settled = create()
+    if fault in ("on_a1", "on_hub"):
+        state["attached"] = (state["edges"]["A1" if fault == "on_a1" else "HUB"],)
+    elif fault == "dangling":
+        state["dangling"] = True
+    elif fault == "two":
+        state["attached"] = state["attached"] * 2
+    if fault is None:
+        settled()
+        return
+    with pytest.raises(RuntimeError, match="datum left its corner vertex"):
+        settled()
+
+
+def test_table_layout_stays_under_the_corner_datum_and_inside_its_lane():
+    """Old-base farm r3 (20261108T014606685Z): the corner datum's X arrow
+    (sheet y ~164, ~13 mm under the plate's bottom edge on the HOLE TABLE
+    sheet) ran through the first row at a .175 top. The table's top stands
+    under it and its bottom/right edges keep the border/title-block lane
+    the settled check enforces."""
+    view_y = 0.210  # _hole_table_sheet's Top view centre
+    scale = drawing.VIEW_SCALE[0] / drawing.VIEW_SCALE[1]
+    bottom_edge = view_y + (spec.OUTLINE_Y[0] - sum(spec.OUTLINE_Y) / 2.0) * scale / 1000.0
+    assert "0.222, 0.210" in inspect.getsource(drawing._hole_table_sheet)
+    datum_arrow_y = bottom_edge - .013
+    assert table.TABLE_ANCHOR[1] < datum_arrow_y - .004
+    assert table.TABLE_ANCHOR == (0.020, 0.158)
+    visible = sum(w for column, w in enumerate(table.TABLE_WIDTHS) if column != table.SIZE_COLUMN)
+    assert table.TABLE_ANCHOR[0] + visible <= .216
+    # Thirteen rows (header + twelve) at a generous 7 mm still clear .015.
+    assert table.TABLE_ANCHOR[1] - (len(TABLED) + 1) * .007 >= .015
 
 
 def test_settled_widths_are_read_in_visible_positions(monkeypatch):
