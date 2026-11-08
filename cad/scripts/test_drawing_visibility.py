@@ -145,3 +145,46 @@ def test_family_preserves_parent_and_checks_nested_leaves(monkeypatch):
     )
     assert [c.Visible for c in components] == [True, True, False]
     assert calls == [("hide", (components[2].Name,)), ("rebuild",)]
+
+
+@pytest.mark.parametrize("mutate_descendant", [False, True])
+def test_instance_batches_preserve_descendant_own_flags(mutate_descendant):
+    adapter, view, components, calls, selected = visibility_fixture((True, True, True))
+    components[0].GetChildren = (components[1],)
+    root = SimpleNamespace(GetChildren=(components[0], components[2]))
+    view.RootDrawingComponent2 = lambda _: root
+    if mutate_descendant:
+        hide = adapter.currentModel.HideComponent2
+
+        def corrupt_child():
+            hide()
+            components[1].Visible = False
+
+        adapter.currentModel.HideComponent2 = corrupt_child
+        with pytest.raises(RuntimeError, match="visibility readback mismatch"):
+            visibility.set_drawing_view_instance_visibility(
+                adapter, view, frozenset({"item-0"}), mode="hide", label="nested corruption"
+            )
+    else:
+        visibility.set_drawing_view_instance_visibility(
+            adapter, view, frozenset({"item-0"}), mode="hide", label="nested hide"
+        )
+        assert [c.Visible for c in components] == [False, True, True]
+        assert calls == [("hide", (components[0].Name,)), ("rebuild",)]
+    assert selected == []
+
+
+def test_family_refuses_to_claim_leaf_is_visible_through_hidden_parent(monkeypatch):
+    adapter, view, components, calls, _ = visibility_fixture((False, True, True))
+    components[0].GetChildren = (components[1], components[2])
+    root = SimpleNamespace(GetChildren=(components[0],))
+    view.RootDrawingComponent2 = lambda _: root
+    monkeypatch.setattr(
+        visibility, "_drawing_component_stems",
+        lambda _, component, stems: {"family"} if component is components[1] else set(),
+    )
+    with pytest.raises(RuntimeError, match="hidden ancestor"):
+        visibility.isolate_drawing_view_components(
+            adapter, view, visible_stems=frozenset({"family"}), label="hidden parent"
+        )
+    assert calls == []

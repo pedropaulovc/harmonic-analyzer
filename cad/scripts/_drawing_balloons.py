@@ -660,27 +660,29 @@ class _VisibilityComponent:
     name: str
     visible: bool
     parent: bool
+    ancestors: tuple[str, ...]
 
 
-def _visibility_components(
-    view: Any, *, scope: Literal["tree", "children"], label: str
-) -> list[_VisibilityComponent]:
-    """Read the complete scope before mutation, retaining parents as invariants."""
+def _visibility_components(view: Any, *, label: str) -> list[_VisibilityComponent]:
+    """Read the entire occurrence tree, including unchanged descendant flags."""
     root = _early_bound(view.RootDrawingComponent2(False), "IDrawingComponent")
     if root is None:
         raise RuntimeError(f"{label}: drawing view has no root component")
-    pending = list(_drawing_component_children(root))
+    pending = [(child, ()) for child in _drawing_component_children(root)]
     rows: list[_VisibilityComponent] = []
     names: set[str] = set()
     while pending:
-        component = _early_bound(pending.pop(), "IDrawingComponent")
+        raw, ancestors = pending.pop()
+        component = _early_bound(raw, "IDrawingComponent")
         name = str(component.Name or "")
         if not name or name in names:
             raise RuntimeError(f"{label}: empty or duplicate drawing component name {name!r}")
         names.add(name)
-        children = _drawing_component_children(component) if scope == "tree" else ()
-        pending.extend(children)
-        rows.append(_VisibilityComponent(component, name, bool(component.Visible), bool(children)))
+        children = _drawing_component_children(component)
+        pending.extend((child, (*ancestors, name)) for child in children)
+        rows.append(_VisibilityComponent(
+            component, name, bool(component.Visible), bool(children), ancestors
+        ))
     return rows
 
 
@@ -690,7 +692,6 @@ def _apply_drawing_visibility(
     rows: list[_VisibilityComponent],
     desired: dict[str, bool],
     *,
-    scope: Literal["tree", "children"],
     enumerate_seconds: float,
     label: str,
 ) -> None:
@@ -762,7 +763,7 @@ def _apply_drawing_visibility(
         tick = perf_counter()
         observed = {
             row.name: row.visible
-            for row in _visibility_components(view, scope=scope, label=label)
+            for row in _visibility_components(view, label=label)
         }
         if str(view.ReferencedConfiguration) != configuration or int(view.GetDisplayMode2()) != display_mode:
             raise RuntimeError(f"{label}: visibility changed the view configuration or display mode")
@@ -804,7 +805,7 @@ def isolate_drawing_view_components(
         raise ValueError(f"{label}: visible component set must not be empty")
     started = perf_counter()
     view = _early_bound(view, "IView")
-    rows = _visibility_components(view, scope="tree", label=label)
+    rows = _visibility_components(view, label=label)
     found: set[str] = set()
     desired: dict[str, bool] = {}
     for row in rows:
@@ -819,8 +820,11 @@ def isolate_drawing_view_components(
         raise RuntimeError(
             f"{label}: component families not found: {missing}; enumerated={sorted(desired)}"
         )
+    for row in rows:
+        if not row.parent and desired[row.name] and any(not desired[name] for name in row.ancestors):
+            raise RuntimeError(f"{label}: requested component {row.name!r} has a hidden ancestor")
     _apply_drawing_visibility(
-        adapter, view, rows, desired, scope="tree",
+        adapter, view, rows, desired,
         enumerate_seconds=perf_counter() - started, label=label,
     )
     _telemetry.success(f"{label}: isolated {', '.join(sorted(found))}")
@@ -834,16 +838,18 @@ def set_drawing_view_instance_visibility(
     """Show or hide named top-level instances; every other takes the opposite."""
     started = perf_counter()
     view = _early_bound(view, "IView")
-    rows = _visibility_components(view, scope="children", label=label)
-    found = {_instance_name(row.name) for row in rows}
+    rows = _visibility_components(view, label=label)
+    found = {_instance_name(row.name) for row in rows if not row.ancestors}
     missing = sorted(names - found)
     if missing:
         raise RuntimeError(f"{label}: instances not in the view: {missing!r}; found={sorted(found)!r}")
     desired = {
-        row.name: (_instance_name(row.name) in names) == (mode == "show") for row in rows
+        row.name: (
+            row.visible if row.ancestors else (_instance_name(row.name) in names) == (mode == "show")
+        ) for row in rows
     }
     _apply_drawing_visibility(
-        adapter, view, rows, desired, scope="children",
+        adapter, view, rows, desired,
         enumerate_seconds=perf_counter() - started, label=label,
     )
 
