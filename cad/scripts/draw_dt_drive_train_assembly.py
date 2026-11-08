@@ -50,6 +50,7 @@ from _drawing_balloons import (
     add_component_bom_balloons,
     assert_balloon_landings,
     balloon_item_resolved,
+    set_drawing_view_instance_visibility,
 )
 from _drawing_common import (
     _SW_SHADED_EDGES,
@@ -2539,48 +2540,6 @@ def _configure_view(
     return configuration
 
 
-@_telemetry.traced("drawing.isolate_instances", label_param="label")
-def _isolate_instances(adapter: Any, view: Any, names: frozenset[str], *, label: str) -> None:
-    """Show exactly the named top-level instances in one drawing view.
-
-    The shared ``isolate_drawing_view_components`` works per FAMILY; this
-    isolates per instance and reads the visibility back.
-    """
-    view = _early_bound(view, "IView")
-    root = view.RootDrawingComponent2(False)
-    if root is None:
-        raise RuntimeError(f"{label}: drawing view has no root component")
-    root = _early_bound(root, "IDrawingComponent")
-    shown: set[str] = set()
-    seen: list[str] = []
-    hidden = 0
-    for raw in tuple(root.GetChildren() or ()):
-        drawing_component = _early_bound(raw, "IDrawingComponent")
-        raw_name = str(drawing_component.Name or "")
-        seen.append(raw_name)
-        name = raw_name.split("@", 1)[0].replace("\\", "/").rsplit("/", 1)[-1]
-        visible = name in names
-        drawing_component.Visible = visible
-        if visible:
-            shown.add(name)
-        else:
-            hidden += 1
-    if not adapter.currentModel.EditRebuild3():
-        raise RuntimeError(f"{label}: rebuild after isolation failed")
-    missing = sorted(names - shown)
-    _telemetry.event(
-        "drawing.isolate_instances",
-        label=label,
-        shown=len(shown),
-        hidden=hidden,
-        missing=tuple(missing),
-        outline_mm=tuple(value * 1000.0 for value in _view_outline(view)),
-    )
-    if missing:
-        raise RuntimeError(
-            f"{label}: instances not in the view: {missing!r}; "
-            f"drawing components seen (first 12): {seen[:12]!r}"
-        )
 
 
 def _check_package_layout(adapter: Any, field_findings: list[str]) -> None:
@@ -3096,7 +3055,9 @@ def _fit_cluster_view(
     # the ring fits, and later every balloon attaches to, the geometry the
     # sheet prints.
     configuration = _configure_view(adapter, view, exploded=True, label=label)
-    _isolate_instances(adapter, view, frozenset(facts.clusters[cluster]), label=label)
+    set_drawing_view_instance_visibility(
+        adapter, view, frozenset(facts.clusters[cluster]), mode="show", label=label
+    )
     preferred_outline = _view_outline(view)
     scale = cluster_ring_scale(preferred_outline, preferred, label=label)
     outline = preferred_outline
@@ -3266,7 +3227,7 @@ def _setting_view(
     step(f"{label}: set_hidden_lines_removed")
     _configure_view(adapter, view, exploded=False, label=label)
     step(f"{label}: configure_view")
-    _isolate_instances(adapter, view, names, label=label)
+    set_drawing_view_instance_visibility(adapter, view, names, mode="show", label=label)
     step(f"{label}: isolate_instances")
     projected = model_point_in_view(
         adapter, view, tuple(value / 1000.0 for value in model_point), label=label

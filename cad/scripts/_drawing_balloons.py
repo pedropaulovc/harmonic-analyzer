@@ -12,6 +12,7 @@ import math
 from pathlib import PureWindowsPath
 import re
 import sys
+from time import perf_counter
 from typing import Any, Iterable, Literal, Mapping, Sequence
 
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
@@ -653,6 +654,143 @@ def _view_component_leaves(
     return tuple(leaves)
 
 
+@dataclass(frozen=True)
+class _VisibilityComponent:
+    component: Any
+    name: str
+    visible: bool
+    parent: bool
+
+
+def _visibility_components(
+    view: Any, *, scope: Literal["tree", "children"], label: str
+) -> list[_VisibilityComponent]:
+    """Read the complete scope before mutation, retaining parents as invariants."""
+    root = _early_bound(view.RootDrawingComponent2(False), "IDrawingComponent")
+    if root is None:
+        raise RuntimeError(f"{label}: drawing view has no root component")
+    pending = list(_drawing_component_children(root))
+    rows: list[_VisibilityComponent] = []
+    names: set[str] = set()
+    while pending:
+        component = _early_bound(pending.pop(), "IDrawingComponent")
+        name = str(component.Name or "")
+        if not name or name in names:
+            raise RuntimeError(f"{label}: empty or duplicate drawing component name {name!r}")
+        names.add(name)
+        children = _drawing_component_children(component) if scope == "tree" else ()
+        pending.extend(children)
+        rows.append(_VisibilityComponent(component, name, bool(component.Visible), bool(children)))
+    return rows
+
+
+def _apply_drawing_visibility(
+    adapter: Any,
+    view: Any,
+    rows: list[_VisibilityComponent],
+    desired: dict[str, bool],
+    *,
+    scope: Literal["tree", "children"],
+    enumerate_seconds: float,
+    label: str,
+) -> None:
+    """Batch only changed drawing occurrences; never touch the source assembly.
+
+    IDrawingComponent.Select supplies drawing-context selections. The SDK's
+    IModelDoc2 HideComponent2/ShowComponent2 commands support drawing documents.
+    Both return void, so exact post-rebuild readback is the success criterion.
+    """
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    if int(model.GetType()) != 3:  # swDocDRAWING
+        raise RuntimeError(f"{label}: visibility requires a drawing document")
+    configuration = str(view.ReferencedConfiguration)
+    display_mode = int(view.GetDisplayMode2())
+    groups = {
+        visible: [row for row in rows if desired[row.name] == visible and row.visible != visible]
+        for visible in (False, True)
+    }
+    changed = sum(map(len, groups.values()))
+    selection_seconds = apply_seconds = rebuild_seconds = readback_seconds = 0.0
+    started = perf_counter()
+    outcome = "failed"
+    try:
+        if changed:
+            manager = _early_bound(model.SelectionManager, "ISelectionMgr")
+            data = manager.CreateSelectData()
+            data.View = view
+            expected_view = view_name(adapter, view)
+            if not expected_view:
+                raise RuntimeError(f"{label}: drawing view has no name")
+            for visible, group in groups.items():
+                if not group:
+                    continue
+                tick = perf_counter()
+                model.ClearSelection2(True)
+                for row in group:
+                    if not row.component.Select(True, data):
+                        raise RuntimeError(f"{label}: could not select drawing component {row.name!r}")
+                count = int(manager.GetSelectedObjectCount2(-1))
+                if count != len(group):
+                    raise RuntimeError(f"{label}: selected {count} components, expected {len(group)}")
+                selected: set[str] = set()
+                for index in range(1, count + 1):
+                    if int(manager.GetSelectedObjectType3(index, -1)) != 20:  # swSelCOMPONENTS
+                        raise RuntimeError(f"{label}: selection {index} is not a component")
+                    selected_view = manager.GetSelectedObjectsDrawingView2(index, -1)
+                    if selected_view is None or view_name(adapter, selected_view) != expected_view:
+                        raise RuntimeError(f"{label}: selection {index} belongs to another view")
+                    selected_component = _early_bound(
+                        manager.GetSelectedObjectsComponent4(index, -1), "IDrawingComponent"
+                    )
+                    if selected_component is None:
+                        raise RuntimeError(f"{label}: selection {index} has no drawing component")
+                    selected.add(str(selected_component.Name or ""))
+                if selected != {row.name for row in group}:
+                    raise RuntimeError(f"{label}: selected occurrence identities differ from visibility plan")
+                selection_seconds += perf_counter() - tick
+                tick = perf_counter()
+                if visible:
+                    model.ShowComponent2()
+                else:
+                    model.HideComponent2()
+                apply_seconds += perf_counter() - tick
+                model.ClearSelection2(True)
+            tick = perf_counter()
+            if not model.EditRebuild3():
+                raise RuntimeError(f"{label}: rebuild after visibility changes failed")
+            rebuild_seconds = perf_counter() - tick
+        tick = perf_counter()
+        observed = {
+            row.name: row.visible
+            for row in _visibility_components(view, scope=scope, label=label)
+        }
+        if str(view.ReferencedConfiguration) != configuration or int(view.GetDisplayMode2()) != display_mode:
+            raise RuntimeError(f"{label}: visibility changed the view configuration or display mode")
+        readback_seconds = perf_counter() - tick
+        if observed != desired:
+            raise RuntimeError(
+                f"{label}: visibility readback mismatch; expected={desired!r}; observed={observed!r}"
+            )
+        _telemetry.event(
+            "drawing.visibility.verified", label=label,
+            configuration=configuration, display_mode=display_mode,
+            visible_names=tuple(sorted(name for name, visible in observed.items() if visible)),
+            hidden_names=tuple(sorted(name for name, visible in observed.items() if not visible)),
+        )
+        outcome = "verified"
+    finally:
+        if changed:
+            model.ClearSelection2(True)
+        _telemetry.event(
+            "drawing.visibility.timings", label=label, strategy="batch_commands", outcome=outcome,
+            enumerated=len(rows), changed=changed, unchanged=len(rows) - changed,
+            show=len(groups[True]), hide=len(groups[False]),
+            enumerate_seconds=enumerate_seconds, selection_seconds=selection_seconds,
+            apply_seconds=apply_seconds, rebuild_seconds=rebuild_seconds,
+            readback_seconds=readback_seconds, total_seconds=enumerate_seconds + perf_counter() - started,
+        )
+
+
 @_telemetry.traced("drawing.isolate_components", label_param="label")
 def isolate_drawing_view_components(
     adapter: Any,
@@ -661,35 +799,53 @@ def isolate_drawing_view_components(
     visible_stems: frozenset[str],
     label: str,
 ) -> None:
-    """Show only requested top-level component families in one drawing view."""
+    """Show only requested leaf families, preserving parent visibility."""
     if not visible_stems:
         raise ValueError(f"{label}: visible component set must not be empty")
-    root = adapter._attempt(lambda: view.RootDrawingComponent2(False), default=None)
-    if root is None:
-        raise RuntimeError(f"{label}: drawing view has no root component")
-
-    pending = list(_drawing_component_children(root))
+    started = perf_counter()
+    view = _early_bound(view, "IView")
+    rows = _visibility_components(view, scope="tree", label=label)
     found: set[str] = set()
-    enumerated: list[str] = []
-    while pending:
-        drawing_component = pending.pop()
-        children = _drawing_component_children(drawing_component)
-        pending.extend(children)
-        enumerated.append(str(drawing_component.Name or ""))
-        if children:
+    desired: dict[str, bool] = {}
+    for row in rows:
+        if row.parent:
+            desired[row.name] = row.visible
             continue
-        matched = _drawing_component_stems(adapter, drawing_component, visible_stems)
-        drawing_component.Visible = bool(matched)
+        matched = _drawing_component_stems(adapter, row.component, visible_stems)
+        desired[row.name] = bool(matched)
         found.update(matched)
-
     missing = sorted(visible_stems - found)
     if missing:
         raise RuntimeError(
-            f"{label}: component families not found: {missing}; "
-            f"enumerated={sorted(enumerated)}"
+            f"{label}: component families not found: {missing}; enumerated={sorted(desired)}"
         )
-    rebuild_drawing(adapter, label="isolate_drawing_view_components")
+    _apply_drawing_visibility(
+        adapter, view, rows, desired, scope="tree",
+        enumerate_seconds=perf_counter() - started, label=label,
+    )
     _telemetry.success(f"{label}: isolated {', '.join(sorted(found))}")
+
+
+@_telemetry.traced("drawing.isolate_instances", label_param="label")
+def set_drawing_view_instance_visibility(
+    adapter: Any, view: Any, names: frozenset[str], *,
+    mode: Literal["show", "hide"], label: str
+) -> None:
+    """Show or hide named top-level instances; every other takes the opposite."""
+    started = perf_counter()
+    view = _early_bound(view, "IView")
+    rows = _visibility_components(view, scope="children", label=label)
+    found = {_instance_name(row.name) for row in rows}
+    missing = sorted(names - found)
+    if missing:
+        raise RuntimeError(f"{label}: instances not in the view: {missing!r}; found={sorted(found)!r}")
+    desired = {
+        row.name: (_instance_name(row.name) in names) == (mode == "show") for row in rows
+    }
+    _apply_drawing_visibility(
+        adapter, view, rows, desired, scope="children",
+        enumerate_seconds=perf_counter() - started, label=label,
+    )
 
 
 def _natural_sort_key(name: str) -> tuple[tuple[int, int | str], ...]:

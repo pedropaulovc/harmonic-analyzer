@@ -2559,7 +2559,8 @@ class _DrawnInstance:
     def __init__(self, name: str) -> None:
         self.instance = name
         self.Name = f"pd-paper-drive/{name}@pd-paper-drive"
-        self.Visible = None  # never written: the sheet's default
+        self.Visible = True
+        self.GetChildren = ()
 
 
 def test_spare_is_hidden_edge_on_and_shown_on_the_ballooned_isometric(
@@ -2567,9 +2568,14 @@ def test_spare_is_hidden_edge_on_and_shown_on_the_ballooned_isometric(
 ) -> None:
     seat = stub_seat(
         monkeypatch, drawing,
-        keep=("_place_assembled_sheet", "_hide_instances", "_set_instance_visibility"),
+        keep=("_place_assembled_sheet", "set_drawing_view_instance_visibility"),
     )
     seat._early_bound.side_effect = lambda obj, _interface: obj
+    from test_drawing_visibility import visibility_model
+
+    adapter = SimpleNamespace(
+        _get_attr_or_call=lambda obj, name: getattr(obj, name)()
+    )
     cx = sum(drawing.ISO_RING_LIMITS[0::2]) / 2.0
     cy = sum(drawing.ISO_RING_LIMITS[1::2]) / 2.0
     seat._native_outline_at.return_value = (
@@ -2582,11 +2588,15 @@ def test_spare_is_hidden_edge_on_and_shown_on_the_ballooned_isometric(
     def place_view(_adapter, _path, orientation, _x, _y, *, scale):
         drawn = [_DrawnInstance(name) for name in names]
         root = SimpleNamespace(GetChildren=lambda: tuple(drawn))
-        views[orientation] = (SimpleNamespace(RootDrawingComponent2=lambda _all: root), drawn)
+        view = SimpleNamespace(
+            RootDrawingComponent2=lambda _all: root, GetName2=lambda: orientation
+        )
+        adapter.currentModel, _calls, _selected = visibility_model(view)
+        views[orientation] = (view, drawn)
         return views[orientation][0]
 
     seat.place_view.side_effect = place_view
-    iso = drawing._place_assembled_sheet(MagicMock())
+    iso = drawing._place_assembled_sheet(adapter)
 
     assert set(views) == {"*Front", "*Right", "*Isometric"}
     for orientation in ("*Front", "*Right"):
@@ -2594,7 +2604,7 @@ def test_spare_is_hidden_edge_on_and_shown_on_the_ballooned_isometric(
         assert shown == {name: name not in hidden for name in names}
     # The returned isometric is the ballooned one, its instances untouched.
     assert iso is views["*Isometric"][0]
-    assert all(drawn.Visible is None for drawn in views["*Isometric"][1])
+    assert all(drawn.Visible is True for drawn in views["*Isometric"][1])
 
 
 def _native_pd_component(name, stem, configuration, *, origin=None):
@@ -4406,7 +4416,7 @@ def test_place_bom_sheet_preserves_native_grouped_quantities_with_visible_number
     for name in (
         "_activate_sheet", "set_high_quality_shaded_with_edges",
         "apply_view_configuration", "_place_sheet_note", "_link_view_to_bom",
-        "_isolate_instances", "_shift_view", "_uncross_ring",
+        "set_drawing_view_instance_visibility", "_shift_view", "_uncross_ring",
     ):
         monkeypatch.setattr(drawing, name, lambda *_, **__: None)
     # Model the observed post-operation views, without attributing the native

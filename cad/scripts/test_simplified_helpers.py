@@ -762,7 +762,7 @@ def _stub_drive_train_sheets(monkeypatch, fitted_for):
         "_activate_sheet": activate,
         "place_view": place,
         "set_high_quality_shaded_with_edges": idle,
-        "_isolate_instances": record("isolate"),
+        "set_drawing_view_instance_visibility": record("isolate"),
         "_link_view_to_bom": record("bom link"),
         "_view_outline": lambda _view: (0.0, 0.0, 0.1, 0.1),
         "cluster_ring_scale": lambda _outline, preferred, **_kwargs: fitted_for(preferred),
