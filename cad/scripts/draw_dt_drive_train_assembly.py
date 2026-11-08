@@ -150,7 +150,6 @@ from dt_drive_train_assembly_spec import (
     unclassified_stems,
 )
 import dt_drive_train_steps as steps
-import dt_mesh_checks as mesh_checks
 import dt_pinion_cam_geometry as cam_geometry
 from dt_pinion_arbor_geometry import (
     HEAD_CAP_SAG as ARBOR_HEAD_CAP_SAG,
@@ -1849,10 +1848,8 @@ CHECKS = _note_text(
         # pedestal term booked at zero), then T120 is set on its feeler.  The
         # shims may move each pedestal only inside its setting-table range, so
         # stand (#1691 review r4).  Backing the swing off would undo the T120
-        # set (#1691 review r2), so a T012 bind is cleared at the tip that
-        # governs it: the MHA-DT-12 tip reaching the T012 flank below its base
-        # circle (dt_mesh_checks interference margin; owner choice A,
-        # 2026-11-08, pending owner confirmation).
+        # set (#1691 review r2), so a T012 bind is cleared at the MHA-DT-12
+        # tip that marks (owner ruling 2026-11-08 (Pedro), option B).
         "4. CONE SWING SET: LOOSEN MHA-DT-VN-51.",
         "4A. SWING THE CONE SET ON MHA-DT-VN-52 OUT TO THE MHA-SH-VN-52 STOP.",
         "4B. ZERO DIAL INDICATORS: EACH MHA-DT-02 IN X, THE FRONT ONE IN Y.",
@@ -1878,13 +1875,10 @@ CHECKS = _note_text(
         # and its remedy are one step each.
         "4Q. LEAVE MHA-DT-02 AND THE T120 SET AS THEY ARE FROM HERE ON.",
         "4R. REDO CHECKS 4-7 AFTER ANY LATER LOOSENING OF MHA-DT-02.",
-        # User ruling 2026-10-10: T012's arithmetic worst-corner overlap is a
-        # REF fit-up note, never a gate (dt_mesh_checks; the RSS corner is gated).
-        # It is involute interference, not tip-to-root: the radial tip-to-root
-        # clearance stays positive at that corner.
+        # Owner ruling 2026-11-08 (Pedro), option B: 4S prints the running
+        # acceptance only; the gate is the RSS corner (test_standard_mesh_checks).
         f"4S. TURN THE CRANK {gear64.TEETH // pinion.TEETH} FULL TURNS: T012 MUST RUN FREE IN ITS "
-        "MHA-DT-12 (THE MHA-DT-12 TIP MAY REACH THE T012 FLANK BELOW ITS BASE "
-        f"CIRCLE, UP TO {inch_text(-mesh_checks.cone_check(12).interference_margin_worst_mm, 3)} REF).",
+        "MHA-DT-12.",
         "4T. IF IT BINDS, STONE THE MHA-DT-12 TIP WHERE IT MARKS.",
         "4U. VERIFY MHA-DT-VN-52 FULL-FORM THREAD ENGAGEMENT "
         f"{pivot_screw.MIN_USEFUL_ENGAGEMENT_TEXT}.",

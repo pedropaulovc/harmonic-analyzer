@@ -3,10 +3,9 @@
 Cone family (user ruling 2026-10-10; centre set at assembly on T120,
 cone_set_stack): nominal contact ratio >= 1.0 at the running mean centre,
 and no binding, positive root clearance and no involute interference at the
-RSS corner. The RSS contact ratio and the arithmetic worst-corner
-interference are reported only. The crank pair's open-corner figure is a
-reference, as main printed it (dt_crank_drive_gear_notes, user ruling
-2026-09-30).
+RSS corner. The RSS contact ratio is reported only. The crank pair's
+open-corner figure is a reference, as main printed it
+(dt_crank_drive_gear_notes, user ruling 2026-09-30).
 
 Pending exception rulings (#971):
 * T006 (user ruling 2026-10-10): no full-depth six-tooth form reaches a
