@@ -43,7 +43,7 @@ import ch_rocker_arm_tl_vn_oblique_rail_kit_rail_spec as rail
 from _com import _early_bound
 from _drawing_annotation_extent import CLEAR_GAP_M, boxes_clear
 from _drawing_common import read_required_properties
-from _drawing_dimension_import import curate_view_dimensions
+from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
     set_dimension_callouts,

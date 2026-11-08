@@ -681,14 +681,16 @@ def test_controls_print_at_the_title_block_rows() -> None:
     assert spec.FLAT_LENGTH_CALLOUT == "4X"
     assert set(draw.FLAT_CALLOUTS) == {"FlatLength", "FlatAF"}
     assert draw.FLAT_CALLOUTS["FlatLength"].startswith(f"{spec.FLAT_LENGTH_CALLOUT} ")
-    assert draw.FLAT_CALLOUTS["FlatAF"].splitlines()[0] == ", ".join(
-        detail.label for detail in draw.END_DETAILS
-    )
-    # The across-flat links note 1, which gives one flat at each detail and
-    # their free angle, set at a numbered TL-00 step (owner ruling via Main).
-    assert draw.FLAT_CALLOUTS["FlatAF"].endswith("SEE NOTE 1")
+    # Each section's across-flat covers both of its station's flats (one per
+    # KP08 set screw); detail E's links note 1, which gives the flats' free
+    # angle between stations, set at a numbered TL-00 step (owner ruling via
+    # Main).
+    assert draw.SECTION_AF_PREFIX == f"{draw.KP08_FLATS_PER_STATION}X "
+    assert spec.KP08_SET_SCREW_SPACING_DEG * draw.KP08_FLATS_PER_STATION < 360.0
+    assert draw.FLAT_CALLOUTS["FlatAF"] == "SEE NOTE 1"
     assert draw.FLAT_CLOCK_NOTE.startswith("1. ")
-    assert "ANGLE FREE" in draw.FLAT_CLOCK_NOTE
+    assert "ANGLE BETWEEN STATIONS FREE" in draw.FLAT_CLOCK_NOTE
+    assert "ONE AT EACH" not in draw.FLAT_CLOCK_NOTE
     assert f"SET AT {draw.FLAT_CLOCK_STEP}." in draw.FLAT_CLOCK_NOTE
     assert draw.FLAT_CLOCK_NOTE in draw.NOTES
     assert draw.FLAT_CLOCK_STEP.startswith("MHA-CH-06-TL-00 STEP ")

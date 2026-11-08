@@ -105,7 +105,6 @@ from ch_rocker_arm_tl_vn_oblique_leadscrew_kit_leadscrew_spec import (
     DIMENSION_TOLERANCE_TYPES,
     DRAWING_DIMENSIONS,
     FLAT_AF,
-    FLAT_AF_PLACES,
     FLAT_LENGTH,
     FLAT_LENGTH_CALLOUT,
     FLAT_STARTS,
@@ -450,16 +449,20 @@ END_DETAILS = (
 # The length is every KP08 flat's, the pillow blocks named by their
 # same-parent short drawing number (rule 4).
 # The handwheel's flat runs to the end, which detail E shows; its start
-# station prints bare (rule 7: a location carries no words). The
-# across-flat is each clock-0 flat's, one in each detail (the clock flats
-# print their own in sections A-A and B-B). Those three flats' angle to each
-# other is free: each KP08 ring and the handwheel turn to them at fit-up
-# (the leadscrew spec; MHA-CH-06-TL-00 step 8 tightens their set screws on
-# the flats). Note 1 says so in words, linked from the across-flat (owner
-# ruling via Main, 2026-11-08): "3X IN LINE" read as a private phrase and a
-# section would draw an angle the print does not control (machinist review,
-# farm runs 20261108T015328529Z and 20261108T031012373Z).
+# station prints bare (rule 7: a location carries no words). Detail E's
+# across-flat is the handwheel flat's. Sections A-A and B-B print each KP08
+# station's two flats as one "2X" across-flat: both flats are one size
+# (machinist review, farm run 20261108T043255012Z, 2 of 3 runs: with the
+# section's one 7.28 the second flat at C and D read unsized). The angle
+# between the stations' flats is free: each KP08 ring and the handwheel turn
+# to them at fit-up (the leadscrew spec; MHA-CH-06-TL-00 step 8 tightens
+# their set screws on the flats). Note 1 says so in words, linked from
+# detail E's across-flat (owner ruling via Main, 2026-11-08): "3X IN LINE"
+# read as a private phrase and a section would draw an angle the print does
+# not control (farm runs 20261108T015328529Z and 20261108T031012373Z).
 FLAT_CLOCK_STEP = "MHA-CH-06-TL-00 STEP 8"
+KP08_FLATS_PER_STATION = 2  # one per inner-ring set screw (the leadscrew spec)
+SECTION_AF_PREFIX = f"{KP08_FLATS_PER_STATION}X "
 _JIG_PREFIX = "MHA-CH-06-"
 
 
@@ -473,9 +476,7 @@ def short_number(number: str) -> str:
 KP08_NUMBER = _config.parts("ch-rocker-arm-tl-vn-oblique-pillow-block")["number"]
 FLAT_CALLOUTS = {
     "FlatLength": f"{FLAT_LENGTH_CALLOUT} FLATS FOR\n{short_number(KP08_NUMBER)}",
-    "FlatAF": "\n".join(
-        (", ".join(detail.label for detail in END_DETAILS), "SEE NOTE 1")
-    ),
+    "FlatAF": "SEE NOTE 1",
 }
 # The cylinder face on the axis, 50 mm right of centre: 2 mm from either
 # silhouette and clear of the dimension above.
@@ -493,10 +494,9 @@ NOTES_XY = (0.230, 0.105)
 # across-flat's flats and their free angle.
 LEADSCREW_ITEM = "[1] TR8X2 LEAD SCREW"
 FLAT_CLOCK_NOTE = (
-    f"1. THE {FLAT_AF:.{FLAT_AF_PLACES}f} FLAT AT "
-    f"{', '.join(d.label for d in END_DETAILS[:-1])} "
-    f"AND {END_DETAILS[-1].label}: ONE AT EACH,\n"
-    f"ANGLE FREE, SET AT {FLAT_CLOCK_STEP}."
+    f"1. FLATS AT {', '.join(d.label for d in END_DETAILS[:-1])} "
+    f"AND {END_DETAILS[-1].label}: ANGLE BETWEEN STATIONS FREE,\n"
+    f"SET AT {FLAT_CLOCK_STEP}."
 )
 NOTES = "\n".join(
     (
@@ -1015,6 +1015,19 @@ def _offset_angle_text(
     _require_position(annotation, text_xy, f"{name} text")
 
 
+def _prefix_section_af(adapter: Any, annotations: list[Any], name: str) -> None:
+    """Prefix the section's across-flat ``SECTION_AF_PREFIX``: both of the
+    station's flats are that size. Read back, since SetText is void."""
+    matches = [item for item in annotations if dimension_name(adapter, item) == name]
+    if len(matches) != 1:
+        raise RuntimeError(f"section needs one native {name}, got {len(matches)}")
+    annotation = _early_bound(matches[0], "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    display.SetText(1, SECTION_AF_PREFIX)  # swDimensionTextPrefix
+    if str(display.GetText(1) or "") != SECTION_AF_PREFIX:
+        raise RuntimeError(f"{name} prefix did not persist as {SECTION_AF_PREFIX!r}")
+
+
 def _require_position(annotation: Any, target: tuple[float, float], label: str) -> None:
     position = annotation.GetPosition()
     if (
@@ -1082,6 +1095,7 @@ def _add_clock_sections(adapter: Any, main: Any) -> list[Any]:
             dimensions_by_feature=DRAWING_DIMENSIONS,
         )
         _offset_angle_text(adapter, view_annotations, angle, arc, angle_text)
+        _prefix_section_af(adapter, view_annotations, f"{section.flat}ClockAF")
         annotations += view_annotations
         _trim_centre_mark(adapter, view, section)
         face_half = MAJOR_DIA / 2000.0 * SECTION_SCALE[0] / SECTION_SCALE[1]
