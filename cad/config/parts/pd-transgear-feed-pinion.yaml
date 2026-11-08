@@ -35,3 +35,8 @@ pd-transgear-feed-pinion:
       where: "the boss wall between the Ø.3130 boss and the Ø.1250 bore at the nose face"
       finding: "boss wall below the .080 in target (rule 17)"
       reason: "owner ruling 2026-10-27 (#1378): accept as is. Re-sized for #290 (boss .313 +.0005/.0000): .3130/2 less .1265/2 is .0933; less the .010 OD and bore edge breaks the worst wall is .0733, between the .060 floor and the .080 target (first ruled at 1.638 mm, .0645)"
+    - id: "RV-05"
+      kind: "accept"
+      where: "the GEAR DATA row SPAN MATCHED FIT: BACKLASH WITH MATE SET AT ASSY .0048 TO .0055 (DIAL), PER MHA-PD-00 STEP 24"
+      finding: "rack datum shake band .0048 TO .0055 printed at four places, not a plain inch step (rule 4)"
+      reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144; pending owner confirmation: the window is the feed mesh's datum backlash from the MHA-PD-10 GEAR DATA (pd_transgear_feed_pinion_spec.RACK_BACKLASH_RANGE, the same RACK_DATUM_BACKLASH_TEXT constant MHA-PD-10 prints, with the identical exception there). .005 TO .0055 is an unreadable .0005 window and .0045 TO .0055 gives up margin at the binding end; the dial reads .0001"
