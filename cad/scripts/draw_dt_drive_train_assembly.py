@@ -606,11 +606,12 @@ SEQUENCE_LEFT_FIELD = (
 # recheck table (round 1 measured those at x 147.6 mm and y 178.1 mm) and
 # clear left of the reference view (x 361 mm up).
 STATION_TABLE_FIELD = (0.158, 0.172, 0.350, 0.117)
-# The external interfaces print on sheet 14 under the feeler stack table
-# (bottom ~121 mm), left of the title block (x 216 mm): sheet 12's right field
-# holds the checks continuation and saved pose (rubric sample round 4: the
-# one-thing check lines outgrew sheet 12).
-INTERFACE_FIELD = (NOTE_FIELD_LEFT[0], 0.112, NOTE_FIELD_LEFT[2], NOTE_FIELD_LEFT[3])
+# The external interfaces print on sheet 14 under the feeler stack table,
+# left of the title block (x 216 mm): sheet 12's right field holds the checks
+# continuation and saved pose (rubric sample round 4: the one-thing check
+# lines outgrew sheet 12).  Round 16's .004 and .020 rows (5.5 mm each, the
+# R16 print's pitch) take the table bottom from ~120 to ~109 mm.
+INTERFACE_FIELD = (NOTE_FIELD_LEFT[0], 0.101, NOTE_FIELD_LEFT[2], NOTE_FIELD_LEFT[3])
 SETTING_TABLE_LEFT = NOTE_FIELD_LEFT[0]
 # A general table's cell text runs ~2.8 mm a character at the 3.5 mm note
 # font (47 note lines measured 212.33 mm; 70 characters ~194 mm); each column
@@ -991,7 +992,18 @@ SETTING_TABLE_ROWS = (
 # 66MA metric gage's leaves (pinion_rig_fitup): the steps print each setting's
 # inch size, this table the stamped leaves that make it up.
 FEELER_STACK_TITLE = f"FEELER STACKS - {FITUP.FEELER_GAGE_NAME} LEAVES"
-FEELER_STACK_HEADER = ("SETTING", "LEAVES (MM, AS STAMPED)", "STEPS")
+# Round 16: "LEAVES (MM STAMPED)" leaves the STEPS column room for its CHECK
+# cites while the table stays left of the cone station table (x 158 mm).
+FEELER_STACK_HEADER = ("SETTING", "LEAVES (MM STAMPED)", "STEPS")
+
+
+def _nearest_leaf(setting: float) -> float:
+    """The one gage leaf that prints as ``setting`` to the thousandth: a
+    cone feeler is a stack-derived reading, not a whole leaf step."""
+    leaf = min(FITUP.FEELER_GAGE_LEAVES_MM, key=lambda value: abs(value - setting))
+    if inch_text(leaf, FEELER_PLACES) != inch_text(setting, FEELER_PLACES):
+        raise AssertionError(f"no single leaf prints as {inch_text(setting, FEELER_PLACES)}")
+    return leaf
 
 
 def _feeler_stack_rows() -> tuple[tuple[str, str, str], ...]:
@@ -1016,10 +1028,24 @@ def _feeler_stack_rows() -> tuple[tuple[str, str, str], ...]:
             f"{_step_ref('rig-located', 'E')}, CHECK 7",
         ),
     )
-    rows: dict[tuple[str, str], list[str]] = {}
-    for setting, leaves, step in settings:
+    # Rubric sample round 16 (#0, 3/3 runs): the cone set's fit-up and
+    # radial-set feelers, printed to the thousandth, each one leaf.
+    nearest = (
+        (
+            pinion.T120_FITUP_FEELER_MM,
+            f"{_step_ref('crank-mesh-checked', 'H')}, {_step_ref('crank-mesh-checked', 'J')}",
+        ),
+        (set_stack.feeler_gap_mm(12), "CHECK 4D"),
+        (set_stack.feeler_gap_mm(120), "CHECK 4D, 4M"),
+    )
+    for setting, leaves, _step in settings:
         if abs(sum(leaves) - setting) > 1e-9:
             raise AssertionError(f"the {inch_text(setting, FEELER_PLACES)} leaves miss it")
+    rows: dict[tuple[str, str], list[str]] = {}
+    for setting, leaves, step in (
+        *settings,
+        *((setting, (_nearest_leaf(setting),), step) for setting, step in nearest),
+    ):
         key = (
             inch_text(setting, FEELER_PLACES),
             " + ".join(f"{leaf:.2f}" for leaf in sorted(leaves, reverse=True)),
@@ -1764,8 +1790,9 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
 # dimensions it as the COLLAR PIN hole (rubric sample round 2: undefined term).
 FEELER_TABLE_NOTE = _note_text(
     (
-        f"FEELERS: {FITUP.FEELER_GAGE_NAME} LEAF STACKS, LISTED IN THE SHEET {SETTING_SHEET} "
-        "TABLE.",
+        # Round 16 (#0): package-wide, not only the rig's.
+        f"ALL SET FEELERS AND SHIMS: {FITUP.FEELER_GAGE_NAME} LEAF STACKS, SHEET "
+        f"{SETTING_SHEET} TABLE.",
         f"PIN STATION (STEP {steps.step_number('arbor-collar-pinned')}): THE MHA-DT-22 COLLAR "
         "PIN HOLE (SEE ITS PRINT).",
     ),
@@ -1806,7 +1833,7 @@ CHECKS = _note_text(
         "4B. ZERO DIAL INDICATORS: EACH MHA-DT-02 IN X, THE FRONT ONE IN Y.",
         "4C. EASE THE MHA-DT-02 SCREWS (MHA-DT-VN-62) UNTIL EACH PEDESTAL MOVES",
         "   UNDER LIGHT TAPS.",
-        "4D. SWING IN ON RADIAL SHIMS, TIP TO MHA-DT-12 ROOT: "
+        "4D. SWING IN ON FEELER LEAVES, TIP TO MHA-DT-12 ROOT: "
         f"{inch_text(set_stack.feeler_gap_mm(12), FEELER_PLACES)} AT T012, "
         f"{_T120_SET_FEELER} AT T120.",
         "4E. TIGHTEN MHA-DT-VN-62.",
@@ -1817,7 +1844,7 @@ CHECKS = _note_text(
         "4H. RESET IT INTO ITS ACCEPT RANGE ON ITS INDICATORS.",
         "4J. TIGHTEN ITS MHA-DT-VN-62.",
         "4K. SWING THE CONE SET OUT.",
-        "4L. REMOVE THE SHIMS.",
+        "4L. REMOVE THE LEAVES.",
         f"4M. SWING IN UNTIL A {_T120_SET_FEELER} FEELER IS SNUG T120 TIP TO ROOT.",
         "4N. TIGHTEN MHA-DT-VN-51 WITH THE CONE SET HELD THERE.",
         # Rule 23 (rubric sample round 5): the adjustable clamp's acceptance.

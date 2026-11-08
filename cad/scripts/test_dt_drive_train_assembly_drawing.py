@@ -584,7 +584,7 @@ def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
         check.index("TIGHTEN MHA-DT-VN-62"),
         # CodeRabbit on #1272: the shims block the swing, so they come out
         # before the T120 feeler set.
-        check.index("SWING THE CONE SET OUT. 4L. REMOVE THE SHIMS"),
+        check.index("SWING THE CONE SET OUT. 4L. REMOVE THE LEAVES"),
         check.index(f"{feeler(set_stack.feeler_gap_mm(120))} FEELER IS SNUG T120 TIP TO ROOT"),
         check.index("TIGHTEN MHA-DT-VN-51"),
     ]
@@ -778,6 +778,21 @@ def test_the_tip_gap_feeler_is_the_rest_gap_in_gage_leaves() -> None:
     assert math.isclose(sum(leaves), tip_gap.TIP_GAP_FEELER, abs_tol=1e-9)
     assert set(leaves) <= set(fitup.FEELER_GAGE_LEAVES_MM)
     assert "CHECK 7" in row[2]
+
+
+def test_every_set_feeler_the_steps_and_checks_print_has_a_leaf_row() -> None:
+    """Rubric sample round 16 (#0, 3/3 runs): each feeler a step or check
+    sets is a sheet 14 row citing it; check cites carry CHECK.  The table
+    stays left of the cone station table."""
+    rows = {row[0]: row[2] for row in drawing.FEELER_STACK_ROWS}
+    assert "4H, 4J" in rows[".004"]
+    assert "CHECK 4D" in rows[".018"] and "3A" in rows[".018"]
+    assert rows[".020"] == "CHECK 4D, 4M"
+    assert "4F" in rows[".010"]
+    checks = " ".join(drawing.CHECKS.split())
+    assert "RADIAL SHIMS" not in checks and "SWING IN ON FEELER LEAVES" in checks
+    widths = drawing.table_column_widths(drawing.FEELER_STACK_HEADER, drawing.FEELER_STACK_ROWS)
+    assert drawing.SETTING_TABLE_LEFT + sum(widths) <= drawing.STATION_TABLE_FIELD[0]
 
 
 @pytest.mark.parametrize("setting", (0.05, 0.95, 1.0, 1.05, 2.0, 2.5, 2.95))
