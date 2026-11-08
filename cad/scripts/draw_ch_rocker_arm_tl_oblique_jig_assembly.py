@@ -575,7 +575,6 @@ TITLE_BLOCK_KEEP_OUT = (
 # 4.525 mm line pitch and about 2.9 mm a character.
 NOTE_LINE_M = 0.004525
 STEPS_LINE_WIDTH = 68  # characters; 197 mm, either column
-STEPS_HEADING = "ASSEMBLY SEQUENCE"
 STEPS_XY = (0.018, 0.262)
 # The left column ends 4 mm over the inner border at the 4.525 mm pitch; farm
 # r17's sheet 6 printed this note at 4.34 mm a line, so the real gap is wider.
