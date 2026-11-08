@@ -2407,7 +2407,7 @@ def test_rail_preparation_cites_numbered_documents_and_the_stated_wall() -> None
     assert spec.BASE_BAR_NUMBER == "MHA-CH-06-TL-20"
     assert spec.RAIL_RECEIPT_REFERENCE == "MHA-CH-06-TL-VN-83 SHEET 2"
     assert f"{spec.BASE_BAR_NUMBER} PROCESS PLAN" in preparation
-    assert f"2X {guide_rail.WALL_ACCEPTANCE_MM:.1f} MIN DIMENSION ON {spec.RAIL_RECEIPT_REFERENCE}" in preparation
+    assert f"{spec.RAIL_RECEIPT_REFERENCE} NOTE 1" in preparation
     assert f"{guide_rail.WALL_ACCEPTANCE_MM:.1f} MIN" in guide_rail.DRAWING_NOTES
     assert " MM MIN" not in preparation
 
