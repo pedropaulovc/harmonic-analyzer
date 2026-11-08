@@ -493,6 +493,19 @@ def test_end_wall_is_a_hidden_model_chord_from_the_far_end_face() -> None:
     assert len(marked) == 1 and "mark_dimensions_for_drawing" in ast.unparse(marked[0])
 
 
+def test_flag_landing_follows_the_projected_hole() -> None:
+    """Farm run 20261108T053341172Z: FRONT settled 1.2 mm off its nominal
+    centre and the nominal pick missed the rim. The landing is the projected
+    hole centre's rim point, wherever the view stands."""
+    rim = rail.CBORE_DIA / 2.0 * draw._sheet_mm(draw.SHEET_SCALE)
+    for hole in ((0.097, 0.160), (0.0969, 0.1588)):
+        landing = draw.flag_landing(hole)
+        assert math.dist(landing, hole) == pytest.approx(rim)
+        assert landing[0] > hole[0] and landing[1] < hole[1]
+        envelope = draw.flag_envelope(landing)
+        assert envelope[0] <= landing[0] - 0.001 and envelope[3] >= landing[1] + 0.001
+
+
 def test_pattern_flag_leader_rises_left_of_its_text(monkeypatch) -> None:
     """Farm run 20261108T031012373Z: from the text's left edge to the fourth
     hole the leader ran back through the "8". The second hole stands left of

@@ -300,21 +300,36 @@ RECEIPT_FLAG_ANCHOR = (RECEIPT_FLAG_XY[0] - 0.047, RECEIPT_FLAG_XY[1])
 # up-left from the text's left side without crossing it (on the fourth
 # hole, over the text, it ran through the "8", farm run
 # 20261108T031012373Z), and right of the station's lines at the near end.
+# The rim is found from the hole's projected centre, not FRONT's nominal
+# centre: a 1.2 mm settle of the view put the nominal pick off the rim (farm
+# run 20261108T053341172Z, tip (0.09819, 0.15748)).
 RECEIPT_FLAG_HOLE = 1
 _FLAG_RIM = rail.CBORE_DIA / 2.0 * _sheet_mm(SHEET_SCALE) / math.sqrt(2.0)
-RECEIPT_FLAG_LANDING = (
+
+
+def flag_landing(hole_xy: tuple[float, float]) -> tuple[float, float]:
+    """The counterbore rim point, down-right at 45° of the hole's centre."""
+    return (hole_xy[0] + _FLAG_RIM, hole_xy[1] - _FLAG_RIM)
+
+
+def flag_envelope(landing: tuple[float, float]) -> Box:
+    """The note's readback envelope: its text cell and the leader up to the
+    rim, with a 1 mm reserve round the tip."""
+    return (
+        min(RECEIPT_FLAG_CELL[0], landing[0] - 0.001),
+        RECEIPT_FLAG_CELL[1],
+        RECEIPT_FLAG_CELL[2],
+        landing[1] + 0.001,
+    )
+
+
+# Where the rim stands with FRONT at its nominal centre.
+RECEIPT_FLAG_LANDING = flag_landing((
     FRONT_CENTER[0] - _FRONT_HALF[0]
-    + rail.HOLE_X[RECEIPT_FLAG_HOLE] * _sheet_mm(SHEET_SCALE) + _FLAG_RIM,
-    FRONT_CENTER[1] - _FLAG_RIM,
-)
-# The note's readback envelope: its text cell and the leader up to the rim,
-# with a 1 mm reserve round the tip.
-RECEIPT_FLAG_ENVELOPE = (
-    min(RECEIPT_FLAG_CELL[0], RECEIPT_FLAG_LANDING[0] - 0.001),
-    RECEIPT_FLAG_CELL[1],
-    RECEIPT_FLAG_CELL[2],
-    RECEIPT_FLAG_LANDING[1] + 0.001,
-)
+    + rail.HOLE_X[RECEIPT_FLAG_HOLE] * _sheet_mm(SHEET_SCALE),
+    FRONT_CENTER[1],
+))
+RECEIPT_FLAG_ENVELOPE = flag_envelope(RECEIPT_FLAG_LANDING)
 
 
 def assert_leader_note_landing(
@@ -757,11 +772,19 @@ def append_rail_receipt_sheet(adapter: Any) -> tuple[Callable[[], None], ...]:
             if not annotation.SetPosition(2 * x - (bounds[0] + bounds[2]) / 2, y, 0.0):
                 raise RuntimeError(f"{text}: failed to centre the note")
             notes.append((note, text, text, box))
+        (flag_hole,) = model_points_in_view(
+            adapter,
+            front,
+            [(rail.HOLE_X[RECEIPT_FLAG_HOLE] / 1000.0, 0.0, 0.0)],
+            label="rail hole pattern flag hole",
+            names=[f"hole {RECEIPT_FLAG_HOLE + 1}"],
+        )
+        landing = flag_landing(tuple(flag_hole))
         flag_note = add_attached_note(
-            adapter, front, text=rail.RECEIPT_FLAG, entity_xy=RECEIPT_FLAG_LANDING,
+            adapter, front, text=rail.RECEIPT_FLAG, entity_xy=landing,
             note_xy=RECEIPT_FLAG_ANCHOR, label="rail hole pattern",
         )
-        notes.append((flag_note, rail.RECEIPT_FLAG, rail.RECEIPT_FLAG, RECEIPT_FLAG_ENVELOPE))
+        notes.append((flag_note, rail.RECEIPT_FLAG, rail.RECEIPT_FLAG, flag_envelope(landing)))
         note = _literal_note(adapter, ITEM_LABEL, *ITEM_LABEL_XY)
         notes.append((note, ITEM_LABEL, ITEM_LABEL, ITEM_LABEL_CELL))
         arrow_note, arrow_tip = _add_view_arrow(adapter, views["*Top"])
@@ -825,7 +848,7 @@ def append_rail_receipt_sheet(adapter: Any) -> tuple[Callable[[], None], ...]:
         title_fit()
         assert_view_arrow(arrow_note, arrow_tip)
         assert_leader_note_landing(
-            flag_note, RECEIPT_FLAG_LANDING, RECEIPT_FLAG_CELL, what="rail hole pattern callout",
+            flag_note, landing, RECEIPT_FLAG_CELL, what="rail hole pattern callout",
         )
         # The stack rule reads the flag's text: its extent less the leader's
         # rise to the rim, which stands over the text's top.
