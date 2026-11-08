@@ -440,15 +440,15 @@ presentation in the subsequent `389` review. The owner's replacement is
 **one stacked callout with one outside leader on the outer reamed circle**,
 not two independently routed diameter leaders.
 
-For TL-22 only, `_stack_pivot_callout` inserts a view-owned attached note:
-REAM with the linked bore diameter and bilateral band, a depth symbol with
-the linked seat depth, the TL-VN-77 locating-fit row, DRILL with the linked
-tap-drill diameter THRU, and the unchanged 5/16-18 thread identity BELOW
-SEAT. `INote.PropertyLinkedText` uses quoted actual
-`IDisplayDimension.GetNameForSelection` names; the pinned SDK explicitly
-documents drawing-dimension links. `IncludeDimPrefixSuffixTolerance=True`
-retains the native diameter prefixes and fit tolerance. No diameter, depth
-or tolerance is authored from a numeric copy.
+For TL-22 only, `_stack_pivot_callout` inserts a view-owned attached note.
+Its authored text is only the three quoted actual
+`IDisplayDimension.GetNameForSelection` links, newline separators and the
+depth symbol before the seat-depth link. Native run `a8b2ac4c` proved that
+`IncludeDimPrefixSuffixTolerance=True` expands **ABOVE/BELOW captions too**:
+the earlier literal REAM/DRILL/fit/thread words duplicated the source text.
+Let the links supply those words, including the full locating-fit and
+shoulder-height captions. No diameter, depth, tolerance or duplicate process
+prose is authored from a copy.
 
 Keep all three imported sources (`BoreDia@TopBoreProfile`,
 `TopBoreDepth@TopBore`, `TapDrillDia@PivotTapProfile`) and the existing
@@ -457,23 +457,29 @@ hiding only the two plan-diameter **display annotations**. The section's
 seat-depth dimension remains visible. Native identities, values, precision,
 tolerances, text definitions, selection names and original text positions
 are checked again after the final rebuild. The note's unresolved link
-string and resolved values/band must agree; SIZE-band semantics reuse the
-existing parser that treats split sign/value stacks as equivalent rather
-than depending on a seat's `<STACK>` serialization.
+string and resolved values/band/captions must agree. Expected expansion uses
+the validated native source captions, values and bands, not guessed concise
+wording. The local normalizer joins the observed adjacent sign stack
+(`+<OVER>+`) and value stack (`.0015<OVER>.0010`) before applying the existing
+SIZE semantics parser; carrier code is unchanged. It preserves signs and
+values and does not erase doubled caption words. The exact failing native
+string is retained as a regression fixture alongside the expected clean
+link expansion.
 
 The note attaches to the exact outer rim through the existing entity/
 selection-point note helper. Its final check requires one live leader and
 one native arrow at the leftmost outer-rim point. Every leader and arrow
 stroke must stay outside the bore disk and at least 1 mm clear of the
-upper-left carriage counterbore. The four-row text block stays in the
-reserved left lane, without font changes. Operation-level creation and
+upper-left carriage counterbore. The complete linked-caption stack stays in
+the reserved left lane, without font changes. Operation-level creation and
 settled-readback spans retain the native link, resolved text and geometry.
 
 TL-32 keeps its original presentation. Neither native part nor any spec
 changes; the shared drawing-helper edit still re-keys feed drawing/review
-inputs. Parent validation must inspect the fresh native/PDF resolution,
-tolerance band and one-leader route. The guarded dimension-note form is
-SDK-documented but not claimed seat-proven by offline tests.
+inputs. Native dimension-link expansion is evidenced by `a8b2ac4c`; that
+attempt stopped before source hiding and layout proof. Parent validation
+must still inspect the clean native/PDF captions, tolerance band and
+one-leader route. Offline fixtures are not a claim of that final native pass.
 
 ### TL-21 assembly-HUB reference lanes
 

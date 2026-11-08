@@ -191,22 +191,27 @@ def _displays(adapter, annotations, names) -> dict[str, Any]:
 
 
 # A single outside callout replaces the two plan-diameter displays on TL-22.
-# Sheet metres: four rows in the former left-hand callout lanes, aimed at the
+# Sheet metres: the linked source-caption stack uses the former left-hand lanes, aimed at the
 # seat's leftmost rim, between (not through) the two left carriage holes.
 PIVOT_STACK_XY = (.025, .225)
-PIVOT_FIT_TEXT = 'LOCATING FIT ON TL-VN-77 SHOULDER'
-PIVOT_THREAD_TEXT = f'{part.PIVOT_TAP} UNC TAP THRU BELOW SEAT'
 
 
 def _pivot_stack_semantics(text):
-    """Reuse native SIZE-band semantics, ignoring only note font markup."""
+    """Canonicalize the observed split sign/value band locally, not on carrier."""
     text = re.sub(r'</?FONT\b[^>]*>', '', text, flags=re.IGNORECASE)
+    text = re.sub(
+        r'<STACK\b[^>]*>\s*([+-])\s*<OVER>\s*([+-])\s*</STACK>\s*'
+        r'<STACK\b[^>]*>\s*(\d*\.\d+)\s*<OVER>\s*(\d*\.\d+)\s*</STACK>',
+        lambda match: f'<STACK>{match[1]}{match[3]}<OVER>{match[2]}{match[4]}</STACK>',
+        text, flags=re.IGNORECASE,
+    )
     return _size_semantics('pivot stacked callout', text.replace('Ø', '<MOD-DIAM>').replace('↧', '<HOLE-DEPTH>'))
 
 
 def _pivot_stack_text(bore, depth, drill):
-    return (f'REAM {bore} <HOLE-DEPTH>{depth}\n{PIVOT_FIT_TEXT}\n'
-            f'DRILL {drill} THRU\n{PIVOT_THREAD_TEXT}')
+    # a8b2ac4c proved the links expand ABOVE/BELOW as well as value/band.
+    # All process/fit/thread prose therefore comes from those native links.
+    return f'{bore}\n<HOLE-DEPTH>{depth}\n{drill}'
 
 
 @_telemetry.traced("drawing.pivot_stacked_callout")
@@ -215,8 +220,9 @@ def _stack_pivot_callout(adapter, plan, annotations, contract):
 
     SDK v3.12.1 INote.PropertyLinkedText documents quoted drawing-dimension
     references (e.g. "RD1@Drawing View1"). IncludeDimPrefixSuffixTolerance
-    preserves the linked dimension's prefix/suffix/band. Never author sizes
-    from GetText/SystemValue: numeric formatting below is readback-only.
+    preserves the linked dimension's prefix/suffix/band and (a8b2ac4c native
+    readback) ABOVE/BELOW captions. Never author sizes or extra captions:
+    numeric formatting and caption composition below are readback-only.
     """
     names = ('BoreDia', 'TopBoreDepth', 'TapDrillDia')
     displays = _displays(adapter, annotations, names)
@@ -263,10 +269,15 @@ def _stack_pivot_callout(adapter, plan, annotations, contract):
     numeric = {name: f'{state[1] / .0254:.{state[3]}f}' for name, (_, state) in sources.items()}
     band = (f'<STACK>{upper / .0254:+.{tolerance_places}f}'
             f'<OVER>{lower / .0254:+.{tolerance_places}f}</STACK>')
-    expected = _pivot_stack_semantics(_pivot_stack_text(
-        '<MOD-DIAM>' + numeric['BoreDia'] + band, numeric['TopBoreDepth'],
-        '<MOD-DIAM>' + numeric['TapDrillDia'],
-    ))
+    expanded = {}
+    for name, (_, state) in sources.items():
+        prefix, suffix, above, below = state[2][:4]
+        value = numeric[name]
+        if name != 'TopBoreDepth' and '<MOD-DIAM>' not in prefix and 'Ø' not in prefix:
+            value = '<MOD-DIAM>' + value
+        value = prefix + value + (band if name == 'BoreDia' else '') + suffix
+        expanded[name] = '\n'.join(text for text in (above, value, below) if text)
+    expected = _pivot_stack_semantics(_pivot_stack_text(*(expanded[name] for name in names)))
     edges = scan_view_edges(plan, label='pivot stacked callout rim')
     outer = edges.circle_at(
         (part.BORE_X, part.BORE_Y, contract.BLOCK_HEIGHT), part.BORE_DIA / 2,

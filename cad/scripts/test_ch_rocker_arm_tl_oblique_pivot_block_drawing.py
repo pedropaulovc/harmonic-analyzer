@@ -335,6 +335,43 @@ def test_block_length_reason_rides_its_value_row_clear_of_the_dimension():
     assert call in body and 'if is_feed:' + call not in body
 
 
+# Exact native a8b2ac4c log expansion: links resolved, but our literal prose
+# duplicated the native ABOVE/BELOW captions. Keep this evidence unnormalized.
+_PIVOT_NATIVE_SPLIT_BAND = (
+    '<STACK divider=DIM valign=BOTTOM>+<OVER>+</STACK>'
+    '<STACK divider=DIM valign=BOTTOM halign=LEFT>.0015<OVER>.0010</STACK>'
+)
+_PIVOT_CANONICAL_BAND = '<STACK>+.0015<OVER>+.0010</STACK>'
+_PIVOT_NATIVE_DUPLICATED = (
+    'REAM REAM\r\n<MOD-DIAM>.3750 ' + _PIVOT_NATIVE_SPLIT_BAND
+    + '\r\nLOCATING FIT ON MHA-CH-06-TL-VN-77 SHOULDER <HOLE-DEPTH>.359'
+    '\r\nSETS TL-VN-77 SHOULDER HEIGHT\r\nLOCATING FIT ON TL-VN-77 SHOULDER'
+    '\r\nDRILL DRILL THRU\r\n<MOD-DIAM>.257'
+    '\r\n5/16-18 UNC TAP THRU BELOW SHOULDER SEAT THRU'
+    '\r\n5/16-18 UNC TAP THRU BELOW SEAT'
+)
+# Expected clean expansion of the same native sources with only link
+# separators/depth symbol authored. This is not a new native observation.
+_PIVOT_CLEAN_EXPANSION = (
+    'REAM\r\n<MOD-DIAM>.3750 ' + _PIVOT_NATIVE_SPLIT_BAND
+    + '\r\nLOCATING FIT ON MHA-CH-06-TL-VN-77 SHOULDER'
+    '\n<HOLE-DEPTH>.359\r\nSETS TL-VN-77 SHOULDER HEIGHT'
+    '\nDRILL THRU\r\n<MOD-DIAM>.257\r\n5/16-18 UNC TAP THRU BELOW SHOULDER SEAT'
+)
+
+
+def test_exact_native_split_band_normalizes_without_erasing_duplicate_captions():
+    import _oblique_block_drawing as drawing
+
+    canonical = _PIVOT_NATIVE_DUPLICATED.replace(_PIVOT_NATIVE_SPLIT_BAND, _PIVOT_CANONICAL_BAND)
+    assert drawing._pivot_stack_semantics(_PIVOT_NATIVE_DUPLICATED) == drawing._pivot_stack_semantics(canonical)
+    # Semantic normalization must not turn the bad old wording into a pass.
+    assert drawing._pivot_stack_semantics(_PIVOT_NATIVE_DUPLICATED) != drawing._pivot_stack_semantics(_PIVOT_CLEAN_EXPANSION)
+    assert drawing._pivot_stack_semantics(_PIVOT_CLEAN_EXPANSION) == drawing._pivot_stack_semantics(
+        _PIVOT_CLEAN_EXPANSION.replace(_PIVOT_NATIVE_SPLIT_BAND, _PIVOT_CANONICAL_BAND)
+    )
+
+
 def _stacked_pivot_fixture(monkeypatch):
     import _oblique_block_drawing as drawing
     from _drawing_edges import ViewEdge, ViewEdges
@@ -373,11 +410,9 @@ def _stacked_pivot_fixture(monkeypatch):
             GetNameForSelection=lambda row=row: row.selection,
             GetAnnotation=lambda annotation=annotation: annotation,
         )
-    # A synthetic native COM record, not a claim about the pending farm sheet.
-    text = drawing._pivot_stack_text(
-        '<MOD-DIAM>.3750<STACK divider=DIM>+.0015<OVER>+.0010</STACK>',
-        '.359', '<MOD-DIAM>.257',
-    )
+    # Source expansion and split-band serialization are taken from a8b2ac4c;
+    # the outer-leader geometry below remains a synthetic COM fixture.
+    text = _PIVOT_CLEAN_EXPANSION
     note = SimpleNamespace(
         PropertyLinkedText='', IncludeDimPrefixSuffixTolerance=False, text=text,
         extent=(.025, .198, 0.0, .130, .225, 0.0),
@@ -448,9 +483,9 @@ def _stacked_pivot_fixture(monkeypatch):
 
 
 @pytest.mark.parametrize('fault', (
-    None, 'split_stack', 'changed_link', 'unresolved', 'drill_value', 'depth_value',
+    None, 'single_stack', 'duplicate_captions', 'changed_link', 'missing_link', 'unresolved', 'drill_value', 'depth_value',
     'missing_band', 'rounded_band', 'negative_band', 'missing_diameter', 'include_band_off',
-    'source_identity', 'source_value', 'source_precision', 'source_band', 'source_tokens',
+    'source_identity', 'source_feature', 'source_value', 'source_precision', 'source_band', 'source_tokens',
     'source_position', 'source_shown', 'depth_hidden', 'wrong_owner', 'hidden_note', 'note_position',
     'two_leaders', 'wrong_attachment', 'inner_tip', 'centre_crossing', 'upper_left_crossing',
     'arrow_inside', 'two_arrows', 'malformed_arrow', 'text_outside',
@@ -463,14 +498,19 @@ def test_one_stacked_pivot_callout_preserves_native_links_and_outside_route(monk
         assert f'"{row.selection}"' in case.note.PropertyLinkedText
     # Geometry numbers are never copied into the authored note.
     assert all(value not in case.note.PropertyLinkedText for value in ('.375', '.0015', '.0010', '.359', '.257'))
+    assert case.note.PropertyLinkedText == case.drawing._pivot_stack_text(
+        *(f'"{case.rows[name].selection}"' for name in ('BoreDia', 'TopBoreDepth', 'TapDrillDia'))
+    )
+    assert all(word not in case.note.PropertyLinkedText for word in ('REAM', 'DRILL', 'THRU', 'SHOULDER', '5/16'))
     tap = case.rows['TapDrillDia']
-    if fault == 'split_stack':
-        case.note.text = case.note.text.replace(
-            '<STACK divider=DIM>+.0015<OVER>+.0010</STACK>',
-            '<STACK divider=DIM>+<OVER>+</STACK><STACK halign=LEFT>.00150<OVER>.00100</STACK>',
-        ).replace('.3750', '0.37500')
+    if fault == 'single_stack':
+        case.note.text = case.note.text.replace(_PIVOT_NATIVE_SPLIT_BAND, _PIVOT_CANONICAL_BAND).replace('.3750', '0.37500')
+    elif fault == 'duplicate_captions':
+        case.note.text = _PIVOT_NATIVE_DUPLICATED
     elif fault == 'changed_link':
         case.note.PropertyLinkedText += ' BROKEN'
+    elif fault == 'missing_link':
+        case.note.PropertyLinkedText = case.note.PropertyLinkedText.replace(f'"{tap.selection}"', '')
     elif fault == 'unresolved':
         case.note.text = case.note.PropertyLinkedText
     elif fault == 'drill_value':
@@ -478,17 +518,19 @@ def test_one_stacked_pivot_callout_preserves_native_links_and_outside_route(monk
     elif fault == 'depth_value':
         case.note.text = case.note.text.replace('.359', '.360')
     elif fault == 'missing_band':
-        case.note.text = case.note.text.replace('<STACK divider=DIM>+.0015<OVER>+.0010</STACK>', '')
+        case.note.text = case.note.text.replace(_PIVOT_NATIVE_SPLIT_BAND, '')
     elif fault == 'rounded_band':
         case.note.text = case.note.text.replace('.0015', '.002')
     elif fault == 'negative_band':
-        case.note.text = case.note.text.replace('+.0010', '-.0010')
+        case.note.text = case.note.text.replace('+<OVER>+', '+<OVER>-')
     elif fault == 'missing_diameter':
         case.note.text = case.note.text.replace('<MOD-DIAM>', '', 1)
     elif fault == 'include_band_off':
         case.note.IncludeDimPrefixSuffixTolerance = False
     elif fault == 'source_identity':
         tap.dimension = SimpleNamespace(**vars(tap.dimension))
+    elif fault == 'source_feature':
+        tap.dimension.FullName = 'TapDrillDia@TopBoreProfile@block.Part'
     elif fault == 'source_value':
         tap.dimension.SystemValue += .001
     elif fault == 'source_precision':
@@ -530,7 +572,7 @@ def test_one_stacked_pivot_callout_preserves_native_links_and_outside_route(monk
         case.native.arrow = case.native.arrow[:6]
     elif fault == 'text_outside':
         case.note.extent = (.025, .198, 0.0, .170, .225, 0.0)
-    if fault in (None, 'split_stack'):
+    if fault in (None, 'single_stack'):
         proof()
         assert len(case.rebuilds) == 2 and len(case.reports) == 2
     else:

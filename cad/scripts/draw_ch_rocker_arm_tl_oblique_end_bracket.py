@@ -60,7 +60,6 @@ from _drawing_hole_callout import add_native_hole_callout
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
-from _hole_callout_thread_class import omit_title_block_thread_class
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
@@ -822,16 +821,26 @@ def _offset_depth_text(
 
 
 def _omit_tap_thread_class(display: Any, *, label: str) -> None:
-    """The title block owns UNC class; the callout retains native identity."""
-    omit_title_block_thread_class(display, label=label)
+    """The title block owns class; find its token in any native text part."""
     native = _early_bound(display, "IDisplayDimension")
+    if native.IsHoleCallout() is not True:
+        raise RuntimeError(f"{label}: thread-class removal needs a native hole callout")
+    definitions = {
+        part: str(native.GetText(part) or "") for part in (5, 6, 7, 8)
+    }
+    revised = omit_thread_class_definitions(definitions)
+    for definition_part, writable_part in ((5, 1), (6, 2), (7, 3), (8, 4)):
+        if revised[definition_part] != definitions[definition_part]:
+            native.SetText(writable_part, revised[definition_part])
+    if any(str(native.GetText(part) or "") != text for part, text in revised.items()):
+        raise RuntimeError(f"{label}: tap callout kept its thread class")
     resolved = [str(native.GetText(part) or "") for part in (1, 2, 3, 4)]
     classes = {BAR_TAP_SPEC.thread_class, KP08_TAP_SPEC.thread_class}
     if any(cls in text for text in resolved for cls in classes):
         raise RuntimeError(f"{label}: callout still prints its class: {resolved!r}")
 
 
-_COUNT = re.compile(r"<NUM_INST>X\s*")
+_COUNT = re.compile(r"<NUM_INST>[ \t]*X[ \t]*")
 _PRINTED_COUNT = re.compile(r"^\s*\d+X\s", re.MULTILINE)
 
 
@@ -846,33 +855,80 @@ def single_hole_definitions(definitions: dict[int, str]) -> dict[int, str]:
     return {**definitions, part: _COUNT.sub("", definitions[part], count=1)}
 
 
+def _unique_callout_token_parts(
+    definitions: dict[int, str], required: tuple[str, ...]
+) -> dict[str, int]:
+    """Token ownership is independent of prefix/suffix/above/below placement."""
+    if set(definitions) != {5, 6, 7, 8}:
+        raise RuntimeError(f"unexpected hole-callout parts: {definitions!r}")
+    owners = {}
+    for token in required:
+        matches = [
+            part for part, text in definitions.items()
+            for _ in range(text.count(token))
+        ]
+        if len(matches) != 1:
+            raise RuntimeError(f"hole callout requires exactly one {token}: {definitions!r}")
+        owners[token] = matches[0]
+    return owners
+
+
+def omit_thread_class_definitions(definitions: dict[int, str]) -> dict[int, str]:
+    """Remove only the native class token and its optional separating dash."""
+    token = "<hw-threadclass>"
+    part = _unique_callout_token_parts(definitions, (token,))[token]
+    before, _token, after = definitions[part].partition(token)
+    before = before.rstrip(" \t")
+    if before.endswith("-"):
+        before = before[:-1].rstrip(" \t")
+    return {**definitions, part: before + after}
+
+
 def thread_limit_definitions(
     definitions: dict[int, str], *, include_drill: bool
 ) -> dict[int, str]:
-    """Keep native identity/diameter tokens; depths belong to section LIMITS."""
+    """Preserve native tokens without guessing their text part or whitespace.
+
+    Run a8b2ac4c returned hw-threaddesc, a spaced depth pair and hw-thru,
+    not the synthetic hw-thread/adjacent-depth/literal-THRU-ALL fixture.
+    The model nominal is omitted; both source-owned LIMIT dimensions remain
+    untouched. Drill tokens may share a text part with thread tokens.
+    """
+    required = (
+        "<hw-threaddesc>", "<hw-threadclass>", "<HOLE-DEPTH>", "<hw-threaddepth>",
+        "<NUM_INST>", "<MOD-DIAM>", "<hw-tapdrldia>", "<hw-thru>",
+    )
+    owners = _unique_callout_token_parts(definitions, required)
+    unknown = {
+        token for text in definitions.values() for token in re.findall(r"<[^>]+>", text)
+        if token not in required
+    }
+    if unknown:
+        raise RuntimeError(f"unexpected opposed-thread callout tokens: {sorted(unknown)}")
     updated = single_hole_definitions(definitions)
-    thread_parts = [
-        part for part, text in updated.items()
-        if "<hw-thread>" in text and "<HOLE-DEPTH><hw-threaddepth>" in text
-    ]
-    drill_parts = [
-        part for part, text in updated.items()
-        if "<MOD-DIAM>" in text and "THRU ALL" in text
-    ]
-    if (
-        len(thread_parts) != 1 or len(drill_parts) != 1
-        or sum(text.count("<hw-threaddepth>") for text in updated.values()) != 1
-    ):
-        raise RuntimeError(f"unexpected opposed-thread native callout: {definitions!r}")
-    thread_part, drill_part = thread_parts[0], drill_parts[0]
-    if thread_part == drill_part:
-        raise RuntimeError("thread and drill must have independent callout rows")
-    updated[thread_part] = updated[thread_part].replace(
-        "<HOLE-DEPTH><hw-threaddepth>", f"\n{THREAD_LIMIT_CALLOUT}", 1
+    depth_symbol_part = owners["<HOLE-DEPTH>"]
+    updated[depth_symbol_part] = updated[depth_symbol_part].replace("<HOLE-DEPTH>", "", 1)
+    depth_part = owners["<hw-threaddepth>"]
+    updated[depth_part] = updated[depth_part].replace(
+        "<hw-threaddepth>", f"\n{THREAD_LIMIT_CALLOUT}", 1
     )
-    updated[drill_part] = (
-        f"{DRILL_PROCESS} {updated[drill_part]}; BOTH HOLES" if include_drill else ""
-    )
+    if include_drill:
+        diameter_part = owners["<MOD-DIAM>"]
+        updated[diameter_part] = updated[diameter_part].replace(
+            "<MOD-DIAM>", f"{DRILL_PROCESS} <MOD-DIAM>", 1
+        )
+        thru_part = owners["<hw-thru>"]
+        updated[thru_part] = updated[thru_part].replace(
+            "<hw-thru>", "<hw-thru>; BOTH HOLES", 1
+        )
+    else:
+        for token in ("<MOD-DIAM>", "<hw-tapdrldia>", "<hw-thru>"):
+            part = owners[token]
+            updated[part] = updated[part].replace(token, "", 1)
+    updated = {
+        part: "\n".join(line.rstrip(" \t") for line in text.split("\n")).strip()
+        for part, text in updated.items()
+    }
     return updated
 
 
@@ -951,7 +1007,7 @@ def _require_threads_stated_by_callouts_only(
 ) -> None:
     """After the final rebuild: both callouts still state their thread, and no
     note on the sheet (any view, or the sheet itself) repeats one."""
-    drill_rows = []
+    drill_callouts = []
     for label, display in callouts:
         native = _early_bound(display, "IDisplayDimension")
         resolved = [
@@ -961,17 +1017,17 @@ def _require_threads_stated_by_callouts_only(
             raise RuntimeError(
                 f"{label}: settled callout lost its thread: {resolved!r}"
             )
-        drill_rows.extend(
-            row for text in resolved for row in text.splitlines() if "THRU" in row
-        )
+        text = "\n".join(resolved)
+        if DRILL_PROCESS in text or re.search(r"\bTHRU\b", text):
+            drill_callouts.append(text)
     if (
         len(callouts) != len(HOLE_X)
-        or len(drill_rows) != 1
-        or DRILL_PROCESS not in drill_rows[0]
-        or "THRU ALL" not in drill_rows[0]
-        or "BOTH HOLES" not in drill_rows[0]
+        or len(drill_callouts) != 1
+        or drill_callouts[0].count(DRILL_PROCESS) != 1
+        or len(re.findall(r"\bTHRU(?:\s+ALL)?\b", drill_callouts[0])) != 1
+        or drill_callouts[0].count("BOTH HOLES") != 1
     ):
-        raise RuntimeError(f"expected one #29 DRILL THRU for both holes: {drill_rows}")
+        raise RuntimeError(f"expected one #29 DRILL THRU for both holes: {drill_callouts}")
     texts: list[str] = []
     node = _early_bound(adapter.currentModel, "IDrawingDoc").GetFirstView()  # sheet
     while node is not None:
