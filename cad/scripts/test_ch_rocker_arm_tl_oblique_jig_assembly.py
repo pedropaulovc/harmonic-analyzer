@@ -2788,8 +2788,7 @@ def test_stop_pins_govern_the_tooling_top_and_the_holding_check_prints_it() -> N
     assert f"FIXTURE TOP {spec._length(spec.TOOLING_TOP_Z_MAX, 3)} MAX" in spec.REFERENCE_HEIGHTS
     steps = {text.split(". ", 1)[0]: text for text in spec.OPERATION_STEPS}
     assert "BOTH STOP PINS AT FULL HEIGHT" in steps["17A"]
-    # Q5 (Delegated ruling 2026-11-07 (Main), no precedent; owner review
-    # #2144; pending owner confirmation): the washer clearance prints inch,
+    # Q5 (Owner ruling 2026-11-08 (Pedro), #2144 item 13.2): the washer clearance prints inch,
     # rounded up from the holding proof's minimum, every designed gap above it.
     printed = f"{spec._length(spec.WASHER_CLEARANCE_PRINTED, 3)} MIN"
     assert printed == ".060 MIN" and printed in steps["21D"]

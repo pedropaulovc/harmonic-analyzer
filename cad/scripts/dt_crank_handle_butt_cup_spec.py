@@ -55,7 +55,7 @@ BODY_DIA_TOL = printed_band_mm(3, unit=UNIT)
 # re-review): overall and pocket depth.  The floor is what remains, so the
 # overall carries enough that its .XX worst case, over the deepest banded
 # pocket, still leaves the rule-17 target at the floor hole's lip, both of the
-# hole's mouths broken (Main delegated ruling 2026-11-04, #2196: .32 -> .34).
+# hole's mouths broken (Owner ruling 2026-11-08 (Pedro), #2144 item 7.3: .32 -> .34).
 OVERALL_LENGTH = 8.636  # .34
 # Deep enough that the longest banded MHA-DT-32 head, at the widest fitted end
 # play, still sits below the face (Codex P2 on #1139).  User ruling 2026-09-30.
@@ -68,8 +68,8 @@ POCKET_DIA = 6.2992  # .248
 POCKET_CLEARANCE = (0.2032, 0.4064)  # .008-.016
 POCKET_DIA_MAX = 6.5278  # .257
 # Owner ruling B on #1375: the cup grows around the unchanged head and pocket,
-# rather than retaining a sub-floor wall or tightening the body band.  Main
-# delegated ruling 2026-11-04 (#2170, option B) grows it again so that the
+# rather than retaining a sub-floor wall or tightening the body band.
+# Owner ruling 2026-11-08 (Pedro), #2144 item 7.1 grows it again so that the
 # floor holds at the outer face, where both of the wall's edges are broken.
 POCKET_WALL_FLOOR_MM = WALL_FLOOR_MM
 BODY_DIA = 10.7188  # .422: the largest pocket, two .060 face walls, their breaks and the band

@@ -1308,7 +1308,7 @@ def test_each_seat_names_its_own_mate_on_each_member() -> None:
     shop = declared["RV-02"]
     assert shop.kind == "minor"
     assert table.removeprefix("SEATS ON ") in shop.where
-    assert "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144" in (
+    assert "Owner ruling 2026-11-08 (Pedro), #2144 item 1.3" in (
         shop.reason
     )
 
