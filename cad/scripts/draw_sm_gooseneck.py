@@ -61,6 +61,7 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
+from _drawing_curve_quality import set_precise_curve_quality
 from _drawing_detail_projection import settle_detail_projection
 from _drawing_dimensions import assert_imported_precision
 from _drawing_edges import scan_view_edges
@@ -238,9 +239,13 @@ DETAIL_LABEL_XY = (
 )
 DETAIL_LETTER_OFFSET = (0.011, -0.006)
 # Datum A is the end face's Ø.50 rim (the end piece's OD, flush with the
-# tube's), tagged up-left of the detail, clear of the leg's two silhouette
-# lines (they drop from the rim's 0 and 180 degree points).  Right of the
-# detail, under section A-A's Ø.50 block (bottom y ~0.153) and over its
+# tube's), tagged up-right of the detail, clear of the leg's two silhouette
+# lines (they drop from the rim's 0 and 180 degree points), under section
+# A-A's bottom edge (y ~0.181) and left of its Ø.50 line (x 0.087).  Tagged
+# up-left, the box sat on the sheet's left border: SolidWorks hangs the box a
+# ~6.3 mm shoulder beyond the requested point, which is the shoulder's end
+# (round 9, farm run 20261108T014715557Z, 3/3 runs).
+# Right of the detail, under section A-A's Ø.50 block (bottom y ~0.153) and over its
 # caption: the tap's ⌖ Ø.012 | A frame (~31 mm, one 7 mm row), datum B's tag
 # hung under its middle, and the counterbore's ⌖ Ø.008 | B frame under that.
 # Each frame's leader runs left from the frame: the tap frame's to the tap
@@ -260,7 +265,7 @@ DATUM_B_XY = (
 COUNTERBORE_FRAME_XY = (DETAIL_FRAME_X, 0.1285)
 TAP_FRAME_RIM_DEG = 35.0
 COUNTERBORE_FRAME_RIM_DEG = -10.0
-DATUM_A_RIM_DEG = 135.0
+DATUM_A_RIM_DEG = 60.0
 # Datum A is picked by a hit-test on its rim, zoomed in (the window's
 # half-span: _drawing_scan._HIT_ZOOM_HALF; the FR-02 hanger datums'
 # HANGER_DATUM_PICK_ZOOM_HALF), not landed by selection point: a tag landed
@@ -269,7 +274,7 @@ DATUM_A_RIM_DEG = 135.0
 # as a frame's leader on a bore circle re-solves (_drawing_attachment's
 # 1 mm bound).
 DATUM_A_PICK_ZOOM_HALF = 0.0025
-DATUM_A_OFFSET = (-0.0085, 0.011)
+DATUM_A_OFFSET = (0.0048, 0.0105)
 
 # Section A-A: a full section on the horizontal plane through the arm axis,
 # cut faces only, cropped to the end piece and the tube over its shank.  A
@@ -1044,6 +1049,10 @@ async def build(adapter: Any) -> dict[str, str]:
         layout=SPEC.layout,
         unit=part_drawing_unit(PART_STEM),
     )
+    # At DETAIL C's 4:1 the default curve resolution printed the end face's
+    # rims as 20-sided polygons, the counterbore's mouth and floor as two
+    # offset ones (round 9, farm run 20261108T014715557Z).
+    set_precise_curve_quality(adapter, label="gooseneck")
     stamp_drawing_summary(
         adapter,
         drawing_model,

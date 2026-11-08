@@ -442,8 +442,9 @@ def test_detail_c_frames_land_each_on_its_own_rim_in_the_open_field() -> None:
     )
     assert not _crosses(tap_start, tap_landing, counterbore_start, counterbore_landing)
     assert tap_landing[1] > counterbore_landing[1]
-    # Datum A's box (~7 mm) stands outside the detail's boundary, up-left,
-    # inside the border.
+    # Datum A's box (~7.1 mm) hangs a ~6.3 mm shoulder beyond its requested
+    # point (round 9); either side, it stands outside the detail's boundary,
+    # up-right, under section A-A's bottom edge and left of its Ø.50 line.
     datum_pick = drawing._rim_point(
         centre, geom.TUBE_DIA / 2.0, drawing.DATUM_A_RIM_DEG
     )
@@ -451,9 +452,13 @@ def test_detail_c_frames_land_each_on_its_own_rim_in_the_open_field() -> None:
         datum_pick[0] + drawing.DATUM_A_OFFSET[0],
         datum_pick[1] + drawing.DATUM_A_OFFSET[1],
     )
-    assert symbol[0] - 0.0035 > 0.0125
-    assert math.dist(symbol, centre) > radius
-    assert symbol[1] + drawing.DATUM_TAG_BOX + 0.005 < counterbore_block_bottom
+    assert symbol[0] > datum_pick[0]
+    box_x = (symbol[0] - 0.0005, symbol[0] + 0.0135)
+    box_y = (symbol[1] - 0.0036, symbol[1] + 0.0036)
+    for corner in ((x, y) for x in box_x for y in box_y):
+        assert math.dist(corner, centre) > radius + 0.001
+    assert box_y[1] + 0.003 < drawing._SY0 - drawing._SECTION_HALF
+    assert box_x[1] + 0.003 < drawing.SECTION_KEEP["PlugDia"][0]
     # The end view's letter stands right of its boundary, left of the
     # elevation's end face.
     end_centre = (drawing.END_CENTER[0], drawing.ARM_AXIS_Y)

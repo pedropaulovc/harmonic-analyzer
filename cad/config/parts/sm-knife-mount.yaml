@@ -2,7 +2,8 @@ sm-knife-mount:
   number: MHA-SM-02
   material: AISI O1 tool steel
   material_specification: AISI O1 tool steel
-  finish: "58-60 HRC, unpainted; after hardening MHA-SM-VN-53 dowels, MHA-SM-03 trunnion fit"
+  # Round 9 (farm run 20261108T014715557Z) gated the former mate-naming clause as a fragment; each fit callout already names its mate.
+  finish: "58-60 HRC, unpainted; fit sizes apply after hardening"
   quantity: 2
   tolerance_class: machined_block
   # Pedro's owner ruling, 2026-11-05 (coordinator session): tap annealed, inspect hardened.
