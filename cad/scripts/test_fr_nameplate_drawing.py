@@ -759,13 +759,10 @@ def test_declared_exceptions_name_the_printed_minimums() -> None:
         "RV-05": "minor",
         "RV-06": "accept",
     }
-    for entry in declared.values():
-        assert entry.reason.endswith((
-            "(owner-accepted)", "(owner-ruled shortfall)", "(pending owner confirmation)"
-        ))
-    # The delegated entries (run 20261107T234638358Z) quote the ruling.
+    for name in ("RV-01", "RV-02", "RV-03"):
+        assert declared[name].reason.endswith(("(owner-accepted)", "(owner-ruled shortfall)"))
     for name in ("RV-05", "RV-06"):
-        assert "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144" in declared[name].reason
+        assert "Owner ruling 2026-11-08 (Pedro), #2144 item 12.2" in declared[name].reason
     floor, screws = print_spec.MINIMUM_NOTES.splitlines()
     assert floor in declared["RV-02"].where
     assert screws in declared["RV-03"].where

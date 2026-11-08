@@ -17,4 +17,4 @@ dt-crank-handle:
       kind: "minor"
       where: "tenon callout: WALL .040 MIN AT TENON END"
       finding: "oak tenon wall .0402 at the tenon's free end, where the outside edge and the pivot-bore mouth each take the .010 edge break, below the .060 floor (rule 17)"
-      reason: "Main delegated ruling 2026-11-04 (#2171, option C; listed for owner review on #2144): the end ring is oak bonded inside the MHA-DT-34 ferrule, its edges carry no load (the bore runs on the MHA-DT-32 shoulder along its length), and restoring .060 needs a larger ferrule against the user's 2026-09-30 ring size; precedent owner ruling 2026-10-26 (#1900, MHA-DT-34 arm face, both edges broken)"
+      reason: "Owner ruling 2026-11-08 (Pedro), #2144 item 7.2 (#2171, option C): the end ring is oak bonded inside the MHA-DT-34 ferrule, its edges carry no load (the bore runs on the MHA-DT-32 shoulder along its length), and restoring .060 needs a larger ferrule against the user's 2026-09-30 ring size; precedent owner ruling 2026-10-26 (#1900, MHA-DT-34 arm face, both edges broken)"
