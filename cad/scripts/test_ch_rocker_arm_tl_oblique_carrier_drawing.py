@@ -296,7 +296,7 @@ def test_clamp_taps_are_ordinary_through_taps_located_by_the_table() -> None:
     hub = features["hub_tap_1"]
     assert "station" not in hub["requirements"] and "height" not in hub["requirements"]
     assert hub["note"] == " ".join(drawing.HUB_TAP_NOTE.splitlines())
-    assert hub["note"] == "CLAMPS MHA-CH-13 HUB DRILL AND TAP AT ASSEMBLY TL-00 STEP 10"
+    assert hub["note"] == "CLAMPS MHA-CH-13 HUB DRILL AND TAP AT ASSEMBLY, TL-00 STEP 10"
     for retired in ("cl_spot", "left_clamp_tap_1", "assembly_hub_bore",
                     "assembly_hub_underside_chamfer"):
         assert retired not in features, retired
@@ -335,38 +335,74 @@ def test_in_situ_hub_fit_up_closes_inside_the_strap_top_edge_band() -> None:
         assert spec.PIN_RELATIVE_STACK[name] < half
 
 
-def test_table_rows_carry_their_size_and_note_flags() -> None:
-    """Machinist review r7 (rules 9, 10): each NOTE cell carries its row's
+def test_table_rows_carry_their_size_mate_and_note_flags() -> None:
+    """Machinist review r7/r8 (rules 9, 10): each NOTE cell carries its row's
     size and process (the pins at their REAM limits, the taps as drill and
-    thread, as their callouts print them) and its note flags (NOTE 2 on
-    every A1-related row, NOTE 1 on A2/B2). No undefined pass label, no
-    repeated mate, no deferral to the callout sheets."""
+    thread, as their callouts print them), its tag group's mate (same-parent
+    TL- short forms) and its note flags (NOTE 2 on every A1-related row,
+    NOTE 1 on A2/B2). No undefined pass label, no deferral to the callout
+    sheets."""
     notes = carrier_table.ROW_NOTES
     assert spec.CR == pytest.approx((-spec.CL[0], spec.CL[1]))
-    assert set(notes) == set(carrier_table.TABLED_HOLES)
-    pin = "<MOD-DIAM>.3760-.3765 REAM THRU"
+    assert set(notes) == set(carrier_table.TABLED_HOLES) == set(spec.TABLE_HOLES)
+    pin = "<MOD-DIAM>.3760-.3765 REAM THRU; TL-VN-77 RUNNING FIT"
+    assert spec.PIN_NUMBER == "MHA-CH-06-TL-VN-77"
     assert notes["A1"] == pin
     assert notes["B1"] == f"{pin}; NOTE 2"
     assert notes["A2"] == notes["B2"] == f"{pin}; NOTES 1, 2"
-    assert notes["CL"] == notes["CR"] == "<MOD-DIAM>.136 THRU, 8-32 UNC THRU; NOTE 2"
-    assert all(
-        notes[f"R{i}"] == "<MOD-DIAM>.089 THRU, 4-40 UNC THRU; NOTE 2" for i in range(1, 5)
+    assert notes["CL"] == notes["CR"] == (
+        "<MOD-DIAM>.136 THRU, 8-32 UNC THRU; CLAMPS MHA-CH-13; NOTE 2"
     )
-    assert notes["L1"] == notes["L2"] == "<MOD-DIAM>.257 THRU, 5/16-18 UNC THRU"
+    assert all(
+        notes[f"R{i}"] == "<MOD-DIAM>.089 THRU, 4-40 UNC THRU; HOLDS TL-24; NOTE 2"
+        for i in range(1, 5)
+    )
+    assert notes["L1"] == notes["L2"] == "<MOD-DIAM>.257 THRU, 5/16-18 UNC THRU; HOLDS TL-26"
+    assert notes["HUB"].splitlines() == [
+        "<MOD-DIAM>.136 THRU, 8-32 UNC THRU; CLAMPS MHA-CH-13 HUB",
+        "DRILL AND TAP AT ASSEMBLY, SHEET 3; LOC REF",
+    ]
     # The pin limits are the sheet-1 4X REAM's .3750 +.0015/+.0010.
     low, high = sorted(spec.PIN_HOLE_BAND)
     assert spec.inch_text(spec.PIN_HOLE_DIA + low, 4) == ".3760"
     assert spec.inch_text(spec.PIN_HOLE_DIA + high, 4) == ".3765"
-    for retired in ("R800", "R816", "MHA-CH-13", "SEE CALLOUT", "RISER", "CLAMP",
-                    "ORIGIN", "X AXIS"):
+    for retired in ("R800", "R816", "SEE CALLOUT", "ORIGIN", "X AXIS", "MHA-CH-06-"):
         assert not any(retired in note for note in notes.values()), retired
     assert not hasattr(carrier_table, "HOLE_SIZES_NOTE")
-    # One line each: the longest fits the NOTE column (~3.3 mm a glyph).
-    longest = max(len(note.replace("<MOD-DIAM>", "D")) for note in notes.values())
+    # Each line fits the NOTE column: the render prints ~2.41 mm a glyph
+    # (farm 20261108T055431582Z: the 34-glyph pin row ran 82 mm).
+    longest = max(
+        len(line.replace("<MOD-DIAM>", "D"))
+        for note in notes.values() for line in note.splitlines()
+    )
     assert longest <= carrier_table.NOTE_MAX_GLYPHS
-    assert carrier_table.NOTE_MAX_GLYPHS * 3.3 < carrier_table.TABLE_WIDTHS[-1] * 1000.0
+    assert carrier_table.NOTE_MAX_GLYPHS * 2.41 + 4.0 < carrier_table.TABLE_WIDTHS[-1] * 1000.0
     visible = sum(carrier_table.TABLE_WIDTHS) - carrier_table.TABLE_WIDTHS[carrier_table.SIZE_COLUMN]
     assert carrier_table.TABLE_ANCHOR[0] + visible <= 0.216
+    # "19.395" (6 glyphs, ~14 mm) fits the narrowed X/Y LOC columns.
+    assert min(carrier_table.TABLE_WIDTHS[1:3]) * 1000.0 > 6 * 2.41
+
+
+def test_hub_row_is_tagged_ref_and_agrees_with_sheet_3() -> None:
+    """Machinist review r8: the HUB is drawn on the tagged view, so it is
+    tagged and tabled; its X/Y are REF (TL-00 step 10 locates it) and agree
+    with sheet 3's parenthesized references from A1."""
+    assert "HUB" in carrier_table.TABLED_HOLES and "HUB" in carrier_table.TAG_OFFSETS
+    assert "HUB" not in carrier_table.A1_RELATED and not carrier_table.ROW_FLAGS["HUB"]
+    assert "LOC REF" in carrier_table.ROW_NOTES["HUB"]
+    assert not hasattr(carrier_table, "IN_SITU_HOLES")
+    hub_x, hub_y = carrier_table.table_location("HUB")
+    a1_x, a1_y = carrier_table.table_location("A1")
+    assert (hub_x - a1_x, hub_y - a1_y) == pytest.approx(
+        (spec.HUB[0] - spec.PIN_HOLES["A1"][0], spec.HUB[1] - spec.PIN_HOLES["A1"][1])
+    )
+    # The printed .XXX corner values less A1's give sheet 3's .XX references.
+    places = spec.TABLE_LOCATION_PLACES
+    printed = [round(value / INCH, places) for value in (hub_x, hub_y, a1_x, a1_y)]
+    assert f"{printed[0] - printed[2]:.2f}" == f"{(spec.HUB[0] - spec.PIN_HOLES['A1'][0]) / INCH:.2f}"
+    assert f"{printed[1] - printed[3]:.2f}" == f"{(spec.HUB[1] - spec.PIN_HOLES['A1'][1]) / INCH:.2f}"
+    hub = _features()["hub_tap_1"]
+    assert _at(hub) == pytest.approx(spec.HUB)
 
 
 def test_pin_chamfer_retains_the_spacer_thrust_seat() -> None:
@@ -534,7 +570,8 @@ def test_riser_tap_stations_print_their_walls_band_and_name_the_riser() -> None:
     assert "RiserTaps" not in spec.DRAWING_DIMENSIONS
     assert spec.RISER_WALLS_FROM_A1 >= WALL_TARGET_MM
     assert all(
-        carrier_table.ROW_NOTES[f"R{i}"] == "<MOD-DIAM>.089 THRU, 4-40 UNC THRU; NOTE 2"
+        carrier_table.ROW_NOTES[f"R{i}"]
+        == "<MOD-DIAM>.089 THRU, 4-40 UNC THRU; HOLDS TL-24; NOTE 2"
         for i in range(1, 5)
     )
     # Three rows (the native two and the mate), ~4.5 mm each, centred on the
@@ -567,7 +604,7 @@ def test_every_hole_is_located_from_the_corner_and_related_to_a1() -> None:
     plate's lower-left corner an edge finder picks up, never a hole centre.
     The holes whose stacks assume one ±.005 station from A1 (coordinator
     ruling 2026-11-07, option (b)) keep it in flagged NOTE 2; the lever taps
-    relate to the -Y edge only and the HUB is not tabled."""
+    relate to the -Y edge only and the HUB's row is REF."""
     corner = (spec.OUTLINE_X[0], spec.OUTLINE_Y[0])
     assert carrier_table.ORIGIN == corner
     assert spec.DRAWING_DIMENSIONS[spec.STATION_REFERENCE] == {"EdgeX"}
@@ -584,7 +621,7 @@ def test_every_hole_is_located_from_the_corner_and_related_to_a1() -> None:
         "lever_tap_1": "L1", "lever_tap_2": "L2",
         **{f"riser_tap_{i}": f"R{i}" for i in range(1, 5)},
     }
-    assert set(located.values()) == set(carrier_table.TABLED_HOLES)
+    assert set(located.values()) | {"HUB"} == set(carrier_table.TABLED_HOLES)
     for name, tag in located.items():
         feature = features[name]
         places = feature["precision"]["station"]
@@ -1146,7 +1183,7 @@ def test_hub_clamp_tap_has_its_own_sheet_callout_and_reference_position() -> Non
     assert "_strip_thread_class(" in source
     assert "set_callout_lengths_to_three_places(" in source
     assert drawing.HUB_TAP_NOTE.splitlines() == [
-        "CLAMPS MHA-CH-13 HUB", "DRILL AND TAP AT ASSEMBLY", "TL-00 STEP 10"
+        "CLAMPS MHA-CH-13 HUB", "DRILL AND TAP AT ASSEMBLY, TL-00 STEP 10"
     ]
     reference = inspect.getsource(drawing._hub_reference_position)
     for call in ("add_edge_dimension(", "set_arc_endpoints_to_center(", "set_reference_dimension(",
@@ -1201,10 +1238,13 @@ def test_hub_reference_text_and_dimension_line_are_outside_plate(axis) -> None:
         max(p[1] for p in ends) + 3.0,
     )
     # Reserve the complete four-row native callout/instructions and its
-    # shoulder, not only the ordinary two-row _callout_box approximation.
+    # shoulder, not only the ordinary two-row _callout_box approximation:
+    # its widest row (r8: 40 glyphs at ~2.53 mm, the render's) sets the width.
     callout_x, callout_y = (v * 1000.0 for v in drawing.HUB_CALLOUT_XY)
-    callout = (callout_x - 36.0, callout_y - 16.0,
-               callout_x + 36.0, callout_y + 16.0)
+    half = 2.53 * max(map(len, drawing.HUB_TAP_NOTE.splitlines())) / 2.0
+    assert half > 36.0
+    callout = (callout_x - half, callout_y - 16.0,
+               callout_x + half, callout_y + 16.0)
     iso_x, iso_y = (v * 1000.0 for v in drawing.ISO_CENTER)
     iso = (iso_x - 30.0, iso_y - 18.0, iso_x + 30.0, iso_y + 18.0)
     note_x, note_y = (v * 1000.0 for v in drawing.ISO_NOTE_XY)

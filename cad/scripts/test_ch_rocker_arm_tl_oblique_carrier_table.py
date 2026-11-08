@@ -31,17 +31,17 @@ def test_table_inventory_is_complete_and_replaces_location_dimensions():
         "A1", "B1", "A2", "B2", "CL", "CR", "HUB",
         "R1", "R2", "R3", "R4", "L1", "L2",
     }
-    # Farm 82129 review: the in-situ HUB is drilled and tapped at assembly,
-    # so it is a physical source hole but never a table row or tag.
-    assert table.IN_SITU_HOLES == ("HUB",)
-    assert TABLED == {tag: hole for tag, hole in spec.TABLE_HOLES.items() if tag != "HUB"}
-    assert len(TABLED) == 12
+    # Machinist review r8: the in-situ HUB, drawn on the tagged view, is
+    # tagged and tabled too (its X/Y REF), so the table holds every hole.
+    assert not hasattr(table, "IN_SITU_HOLES")
+    assert TABLED == spec.TABLE_HOLES
+    assert len(TABLED) == 13
     assert set(table.TAG_OFFSETS) == set(TABLED)
     assert table.COLUMNS[table.SIZE_COLUMN] == "SIZE"
     assert set(drawing.TOP_KEEP) == {"PlateLength", "PlateWidth", "PinHoleDia"}
     assert not hasattr(drawing, "SECTION_NOTE")
     assert "_label_section_hole(adapter, section)" in inspect.getsource(drawing._pin_section)
-    assert set(table.ROW_NOTES) == set(TABLED) and "HUB" not in table.ROW_NOTES
+    assert set(table.ROW_NOTES) == set(TABLED) and "LOC REF" in table.ROW_NOTES["HUB"]
     assert "parent" not in drawing._PIN_ROWS["A1"]
     assert assembly.ALIGNMENT_BAND == pytest.approx(.0008 * I)
     assert "carrier.POSITION_BAND" not in inspect.getsource(assembly)
@@ -195,6 +195,11 @@ class NativeCells:
 
     def RowHidden(self, _row):
         return False
+
+
+def _row_of(native: NativeCells, tag: str) -> int:
+    """A fake table's row index for ``tag``."""
+    return next(row for row, cells in enumerate(native.cells) if cells[0] == tag)
 
 
 # The Hole Wizard cuts the exact inch drill, not _hole_spec's 3-decimal mm
@@ -583,7 +588,8 @@ def test_frozen_location_cells_ignore_zero_style_only(side):
     # insert. From the corner no cell is zero; L2's Y (.270) is the one that
     # can lose or gain its leading zero.
     native = NativeCells()
-    assert native.cells[-1][:3] == ["L2", "10.250", "0.270"]
+    l2 = _row_of(native, "L2")
+    assert native.cells[l2][:3] == ["L2", "10.250", "0.270"]
     generated = {tag: cells[:4] for tag, (_row, cells) in table._rows(native).items()}
     restyled = {tag: (cells[0], *map(_strip_leading_zero, cells[1:3]), cells[3])
                 for tag, cells in generated.items()}
@@ -701,12 +707,13 @@ def test_observed_size_serializations_pass_and_real_changes_still_fail(generated
     native.cells[1][3] = generated_size
     generated = {tag: cells[:4] for tag, (_row, cells) in table._rows(native).items()}
     # Each run's observed location style flip across the NOTE column, on the
-    # one cell with a leading zero from the corner (L2's Y, the last row).
-    zero = native.cells[-1][2]
-    assert native.cells[-1][0] == "L2" and zero == "0.270"
+    # one cell with a leading zero from the corner (L2's Y).
+    l2 = _row_of(native, "L2")
+    zero = native.cells[l2][2]
+    assert native.cells[l2][0] == "L2" and zero == "0.270"
     before, after = (".270", zero) if generated_size == _SIZE_957_PLAIN else (zero, ".270")
     generated["L2"] = (*generated["L2"][:2], before, generated["L2"][3])
-    native.cells[-1][2] = after
+    native.cells[l2][2] = after
     native.cells[1][3] = actual_size
     assert set(table._frozen_rows(native, generated, notes=table.ROW_NOTES, stage="now")) \
         == set(TABLED)
@@ -835,7 +842,7 @@ def test_complete_view_tag_identity_refuses_every_inventory_failure(monkeypatch,
         annotations.append(annotations[0])
     elif fault == "orphan":
         annotations.append(annotation("Z99", object()))
-    elif fault == "hub_tag":  # the in-situ HUB is never tagged on the table sheet
+    elif fault == "hub_tag":  # a second HUB tag, on a stray edge
         annotations.append(annotation("HUB", object()))
     else:
         annotations[0] = annotation("A1", edges["A1"], dangling=True)
@@ -1014,9 +1021,10 @@ def test_every_superseded_driver_prints_in_the_native_table_at_its_places():
     assert spec.RISER_STATION_PLACES == spec.TABLE_LOCATION_PLACES
     covered = {cell for drivers in (TABLE_SUPERSEDED_DRIVERS, TABLE_ROW_DRIVERS)
                for cells in drivers.values() for cell in cells}
-    # Complete: every tabled location cell. The HUB is not tabled (drilled
-    # at assembly).
-    expected = {(tag, axis) for tag in TABLED for axis in (0, 1)}
+    # Complete: every tabled location cell but the HUB's, which are REF (it
+    # is drilled and tapped at assembly, TL-00 step 10; its NOTE says so).
+    expected = {(tag, axis) for tag in TABLED if tag != "HUB" for axis in (0, 1)}
+    assert "LOC REF" in table.ROW_NOTES["HUB"]
     assert covered == expected
     assert spec.PIN_HOLES["A1"][1] == spec.PIN_HOLES["B1"][1]
     assert not {"HubX", "HubY"} & set(spec.DRAWING_PRECISION_BY_NAME)
@@ -1133,12 +1141,12 @@ def _settled_harness(monkeypatch, *, fail_check=False):
     return state, seen, lambda: table.create_carrier_hole_table(adapter, None, None, Path("carrier.SLDPRT"))
 
 
-def test_table_selects_only_the_twelve_tabled_holes_and_hides_size(monkeypatch):
+def test_table_selects_all_thirteen_holes_and_hides_size(monkeypatch):
     state, _seen, create = _settled_harness(monkeypatch)
     create()
     entities = state["inserted"]["hole_entities"]
-    assert len(entities) == len(state["inserted"]["hole_points"]) == 12
-    assert state["edges"]["HUB"] not in entities
+    assert len(entities) == len(state["inserted"]["hole_points"]) == 13
+    assert state["edges"]["HUB"] in entities
     assert {id(edge) for edge in entities} == {id(state["edges"][tag]) for tag in TABLED}
     assert state["hidden"] == [(table.SIZE_COLUMN, True)]
     # Machinist review r7: each row's NOTE cell carries its size; no sheet
@@ -1181,21 +1189,29 @@ def test_settled_datum_stays_on_its_corner_vertex(monkeypatch, fault):
 
 def test_table_layout_stays_under_the_corner_datum_and_inside_its_lane():
     """Old-base farm r3 (20261108T014606685Z): the corner datum's X arrow
-    (sheet y ~164, ~13 mm under the plate's bottom edge on the HOLE TABLE
-    sheet) ran through the first row at a .175 top. The table's top stands
-    under it and its bottom/right edges keep the border/title-block lane
-    the settled check enforces."""
-    view_y = 0.210  # _hole_table_sheet's Top view centre
+    (~13 mm under the plate's bottom edge on the HOLE TABLE sheet) ran
+    through the first row at a top 11 mm under the edge. The table's top
+    stands under it and its bottom/right edges keep the border/title-block
+    lane the settled check enforces. r8: thirteen rows run ~147 mm (~11 mm
+    rows, a ~6 mm header, farm 20261108T055431582Z), so the view, its
+    datum and the table rose 15 mm together."""
+    view_x, view_y = drawing.TABLE_VIEW_CENTER
+    assert (view_x, view_y) == (0.222, 0.225)
+    assert "*TABLE_VIEW_CENTER" in inspect.getsource(drawing._hole_table_sheet)
     scale = drawing.VIEW_SCALE[0] / drawing.VIEW_SCALE[1]
     bottom_edge = view_y + (spec.OUTLINE_Y[0] - sum(spec.OUTLINE_Y) / 2.0) * scale / 1000.0
-    assert "0.222, 0.210" in inspect.getsource(drawing._hole_table_sheet)
+    top_edge = view_y + (spec.OUTLINE_Y[1] - sum(spec.OUTLINE_Y) / 2.0) * scale / 1000.0
+    assert top_edge + .008 < .2667  # the plate stays under the top border
     datum_arrow_y = bottom_edge - .013
     assert table.TABLE_ANCHOR[1] < datum_arrow_y - .004
-    assert table.TABLE_ANCHOR == (0.020, 0.158)
+    assert table.TABLE_ANCHOR == (0.020, 0.173)
+    # The table rose with the view (r7's .158 under a .210 view).
+    assert table.TABLE_ANCHOR[1] - .158 == pytest.approx(view_y - .210)
     visible = sum(w for column, w in enumerate(table.TABLE_WIDTHS) if column != table.SIZE_COLUMN)
     assert table.TABLE_ANCHOR[0] + visible <= .216
-    # Thirteen rows (header + twelve) at a generous 7 mm still clear .015.
-    assert table.TABLE_ANCHOR[1] - (len(TABLED) + 1) * .007 >= .015
+    # The header, thirteen ~11 mm rows and a HUB row grown by a line ~5 mm
+    # still clear .015.
+    assert table.TABLE_ANCHOR[1] - (.006 + len(TABLED) * .011 + .005) >= .015
 
 
 def test_settled_widths_are_read_in_visible_positions(monkeypatch):

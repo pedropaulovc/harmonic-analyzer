@@ -6,17 +6,17 @@ actual hole edges and X/Y from the plate's lower-left corner (owner review
 at .XXX under the title block. The holes whose stacks assume a station from
 A1 hold that relation at ±.005 in flagged NOTE 2; A2/B2 Y keeps the flagged
 .964 ±.002 from the A1-B1 axis line (NOTE 1). The table's generated SIZE
-column is hidden: each row's NOTE cell carries its size and process. The HUB
-is not in the table: that ordinary #8-32 tap is drilled and tapped at
-assembly (MHA-CH-06-TL-00 step 10). No chained hole-location dimensions
-remain.
+column is hidden: each row's NOTE cell carries its size, process and mate.
+The HUB, an ordinary #8-32 tap drilled and tapped at assembly
+(MHA-CH-06-TL-00 step 10), is tagged and tabled too, its X/Y REF. No chained
+hole-location dimensions remain.
 
 The CARRIER sheet keeps the outline, the reamed size and its running fit,
 the native tap callouts, each naming its mate, and section A-A (3:1,
 labelled SECTION A-A, HOLE A1 and cropped to A1's slab, carrying the
 finished thickness and underside chamfer; its cutting plane a short whole
 line across A1 alone, rule 9); the shaded isometric stands
-above the title block. The HOLE TABLE sheet holds the twelve-row table and
+above the title block. The HOLE TABLE sheet holds the thirteen-row table and
 its tagged plan. The HUB CLAMP sheet carries the HUB tap's native callout,
 which says it is drilled and tapped at assembly, and its position from A1 as
 two parenthesized REFERENCE dimensions.
@@ -39,7 +39,6 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     visible_component_entities,
 )
 
-import _config
 from _check import check
 from _com import _early_bound
 from _drawing_common import (
@@ -69,6 +68,7 @@ from ch_rocker_arm_tl_oblique_callouts import (
 from _drawing_notes import add_property_linked_note
 from _oblique_carrier_hole_table import (
     A1_RELATED,
+    FEED_LEVER_NUMBER,
     create_carrier_hole_table,
     table_location,
 )
@@ -112,10 +112,15 @@ SHEET_SCALE = (1.0, 2.0)
 VIEW_SCALE = (1, 2)
 ISO_SCALE = part_spec.ISOMETRIC_VIEW_SCALE
 TOP_CENTER = (0.222, 0.185)
-# The HUB clamp tap is drilled and tapped at assembly, so it is not in the
-# table; its own sheet carries its callout, which says so, and its reference
-# position. The table and its tags take a sheet of their own.
+# The HUB clamp tap is drilled and tapped at assembly: its own sheet carries
+# its callout, which says so, and its reference position from A1; the HOLE
+# TABLE tags it with REF X/Y. The table and its tags take a sheet of their own.
 SHEET_NAMES = ("CARRIER", "HOLE TABLE", "HUB CLAMP")
+# The HOLE TABLE sheet's tagged plan, 15 mm above its first .210 (r8): the
+# thirteenth (HUB) row needs the height under it, and ~25 mm was free above
+# the plate (its top now ~256 mm, the border 266.7). The corner datum rises
+# with it, and TABLE_ANCHOR with the datum.
+TABLE_VIEW_CENTER = (0.222, 0.225)
 # The iso (~58 x 34 mm at 1:8) right of section A-A and its note under it,
 # both above the title block (jig-r3: the note ran into it).
 ISO_CENTER = (0.386, 0.103)
@@ -289,7 +294,6 @@ TITLE_BLOCK = (0.2159, 0.0127, 0.4191, 0.0651)
 
 # Each tap callout's mate, named once (rule 4; machinist review r7): the
 # mating part's number and what the screws hold, no assembly instruction.
-FEED_LEVER_NUMBER = _config.parts("ch-rocker-arm-tl-oblique-feed-lever")["number"]
 END_CLAMP_TAP_TEXT = f"CLAMPS {part_spec.STRAP_NUMBER}"
 RISER_TAP_TEXT = f"HOLDS {part_spec.RISER_NUMBER} SCREWS"
 LEVER_TAP_TEXT = f"HOLDS {FEED_LEVER_NUMBER}\n{part_spec.LEVER_TAP_CALLOUT}"
@@ -314,8 +318,9 @@ RISER_CALLOUT_XY = (0.312, 0.248)
 # plate's lower edge (152.6).
 LEVER_CALLOUT_XY = (0.1815, 0.141)
 # The HUB CLAMP sheet: the HUB tap's callout up-right of it, above the plate
-# (sheet x ~237..291; its five rows ~222..250, clear of the plate's 217.4
-# and the border), its leader from the tap (sheet ~222, 198).
+# (its four rows, two of words (rule 7, machinist review r8), ~225..247; the
+# 40-glyph second word row ~2.5 mm a glyph, sheet x ~213..315), clear of the
+# plate's 217.4 and the border, its leader from the tap (sheet ~222, 198).
 HUB_CALLOUT_XY = (0.264, 0.236)
 # The HUB tap is drilled and tapped at assembly (TL-00 step 10; farm 82129
 # machinist review): its callout names its mate first (rule 4, machinist
@@ -332,7 +337,7 @@ HUB_CALLOUT_XY = (0.264, 0.236)
 # real bore, the same one NOTE 2 relates the pin pattern to; TL-00 step 10
 # alone locates the HUB, so these are REF and control nothing.
 HUB_TAP_NOTE = (
-    f"CLAMPS {part_spec.STRAP_NUMBER} HUB\nDRILL AND TAP AT ASSEMBLY\nTL-00 STEP 10"
+    f"CLAMPS {part_spec.STRAP_NUMBER} HUB\nDRILL AND TAP AT ASSEMBLY, TL-00 STEP 10"
 )
 # No SetPrecision3: a sheet may only pass a *_spec DRAWING_REFERENCE_PRECISION
 # (_drawing_contract), and the part spec is not edited for this drawing-only
@@ -1491,7 +1496,7 @@ def _hole_table_sheet(adapter: Any, source_model: Any) -> Any:
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
     if not drawing.ActivateSheet(SHEET_NAMES[1]):
         raise RuntimeError("cannot activate the carrier hole-table sheet")
-    top = place_view(adapter, str(SOURCE), "*Top", 0.222, 0.210, scale=VIEW_SCALE)
+    top = place_view(adapter, str(SOURCE), "*Top", *TABLE_VIEW_CENTER, scale=VIEW_SCALE)
     set_hidden_lines_removed(adapter, top)
     _hide_thread_labels(adapter, top)
     settled = create_carrier_hole_table(adapter, top, source_model, SOURCE)
