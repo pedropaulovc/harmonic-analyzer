@@ -3,11 +3,7 @@
 from __future__ import annotations
 
 import hashlib
-import importlib
-import itertools
 import json
-import math
-import re
 import sys
 import time
 import tomllib
@@ -601,6 +597,17 @@ def test_verification_requires_the_provisional_stamp(synthetic, tamper):
         plans.verify_traveler(STEM, out)
 
 
+def test_reconciled_plans_track_revisions_without_traveler_enrollment():
+    assert plans.MIGRATED_PLANS == (
+        "ch_rocker_arm",
+        "ch_rocker_arm_tl_oblique_base_bar",
+        "ch_pivot_shaft",
+        "dt_cone_pivot_post",
+    )
+    assert plans.TRAVELER_STEMS == ()
+    assert plans.revision_stems() == plans.MIGRATED_PLANS
+
+
 def test_migrated_and_enrolled_plan_revisions_match_configured_release():
     import yaml
 
@@ -626,7 +633,9 @@ def test_revision_stems_deduplicate_migrated_and_enrolled_without_enrolling(monk
     assert plans.TRAVELER_STEMS == enrolled
 
 
-def test_migrated_plans_name_faces_by_bare_labels_their_op_owns():
+def test_migrated_plan_faces_use_owned_labels_inheritance_or_unenrolled_unknowns():
+    from export_features import feature_selectors
+
     for stem in plans.revision_stems():
         text = plans.plan_path(stem).read_text(encoding="utf-8")
         plan = tomllib.loads(text)
@@ -634,13 +643,32 @@ def test_migrated_plans_name_faces_by_bare_labels_their_op_owns():
         # The wrapper passes the shop files; exact STEP refs exist only once bound.
         assert "paths" not in plan
         assert plans._REF.search(text) is None
-        faced = [
-            (op["feature"], label)
-            for setup in plan["setups"]
-            for op in setup["ops"]
-            for label in op.get("faces", ())
-        ]
-        assert faced
+        selectors = feature_selectors(stem)
+        implicit = set()
+        faced = []
+        for setup in plan["setups"]:
+            for op in setup["ops"]:
+                if "faces" not in op:
+                    features = op.get("feature", ())
+                    if isinstance(features, str):
+                        features = (features,)
+                    for feature in features:
+                        if feature in selectors:
+                            assert selectors[feature], (stem, feature)
+                            implicit.add(feature)
+                faces = op.get("faces", ())
+                if faces == "unknown":
+                    # Missing source labels are explicit debt, never an invented ref
+                    # or permission to enroll a held candidate.
+                    assert stem not in plans.TRAVELER_STEMS
+                    continue
+                assert isinstance(faces, (list, tuple)), (stem, setup["id"], op["op"])
+                faced.extend((op["feature"], label) for label in faces)
+        # An omitted selector inherits the feature's drawing-owned face domain.
+        # Keep positive coverage even when a route needs no explicit HAF labels.
+        assert faced or implicit, stem
+        if stem == "ch_pivot_shaft":
+            assert {"pivot_bearing", "north_dome", "south_dome"} <= implicit
         for feature, label in faced:
             match = plans._LABEL.fullmatch(label)
             assert match is not None, label
@@ -670,233 +698,6 @@ def test_chain_drilled_features_are_broken_out_before_they_are_filed():
             ), (
                 f"{stem} {sid} op {op['op']}: {op['feature']} is filed with no break-out step"
             )
-
-
-# A touch spot printed in a plan's prose: "at X+157.0 Y+6.65", setup-frame millimetres.
-_TOUCH_SPOT = re.compile(r"\bat X([+-]\d+(?:\.\d+)?) Y([+-]\d+(?:\.\d+)?)")
-
-
-def _tool_radius(tools: dict, ref: str) -> float:
-    """Half the widest of a member's cutting and shank diameters, in mm."""
-    kit, member = ref.split("/", 1)
-    record = tools[kit]["members"][member]
-
-    def value(key: str) -> float:
-        field = record.get(key, 0.0)
-        return float(field["value"] if isinstance(field, dict) else field)
-
-    return max(value("dia_mm"), value("shank_mm"), value("shank_in") * 25.4) / 2
-
-
-def _hold_solids(fixtures: dict, ref: str) -> list[dict]:
-    kit, _, member = ref.partition("/")
-    record = fixtures[kit]["members"][member] if member else fixtures[kit]
-    if "cad" in record:
-        return importlib.import_module(f"{record['cad']}_spec").PRECHIPS_SOLIDS
-    return record["solids"]
-
-
-def _vise_jaw_boxes(
-    fixtures: dict, hold: dict, seat_z: float, top: float
-) -> list[tuple[str, tuple[list[float], list[float]]]]:
-    """Setup-frame boxes of an unposed vise hold's jaw plates that stand above ``top``.
-
-    The jaws close on the work over the parallels, so each jaw's inner face is taken at
-    the outer face of the parallel nearest it; real jaws are never closer to the work."""
-    name = hold["fixture"]
-    vise = fixtures[name]
-    assert vise["kind"] == "vise", f"{name}: an unposed hold must be a vise"
-    assert "jaws_angle_deg" not in hold, f"{name}: swivelled jaws not modelled"
-
-    def mm(record: dict, key: str) -> float:
-        field = record[key]
-        return float(field["value"] if isinstance(field, dict) else field) * 25.4
-
-    jaw_top = seat_z + hold["jaw_above_parallels_mm"]
-    if jaw_top <= top:
-        return []
-    kit, _, member = hold["parallels"].partition("/")
-    parallels = {**fixtures[kit], **fixtures[kit].get("members", {}).get(member, {})}
-    reach = mm(parallels, "width_in") / 2
-    across = 1 - "xy".index(hold["jaws_along"])
-    rows = sorted(centre[across] for centre in hold["parallels_centres_mm"])
-    inner = (rows[0] - reach, rows[-1] + reach)
-    half, depth = mm(vise, "jaw_width_in") / 2, mm(vise, "jaw_depth_in")
-    centre = hold["jaw_center_along_mm"]
-    boxes = []
-    for side, span in (
-        ("jaw low", (inner[0] - depth, inner[0])),
-        ("jaw high", (inner[1], inner[1] + depth)),
-    ):
-        low, high = [centre - half] * 2 + [seat_z], [centre + half] * 2 + [jaw_top]
-        low[across], high[across] = span
-        boxes.append((side, (low, high)))
-    return boxes
-
-
-def _posed_box(solid: dict, pose: dict) -> tuple[list[float], list[float]]:
-    """Conservative setup-frame AABB for supported box and cylinder primitives."""
-    x, z = pose["x"], pose["z"]
-    y = [
-        z[1] * x[2] - z[2] * x[1],
-        z[2] * x[0] - z[0] * x[2],
-        z[0] * x[1] - z[1] * x[0],
-    ]
-    at = solid["at_mm"]
-    shape = solid.get("shape")
-    if shape == "cylinder":
-        axis_length = math.sqrt(sum(component**2 for component in solid["axis"]))
-        if axis_length == 0:
-            raise ValueError(
-                f"fixture solid {solid.get('name', '?')!r}: zero cylinder axis"
-            )
-        axis = [component / axis_length for component in solid["axis"]]
-        direction = [sum(axis[k] * (x, y, z)[k][a] for k in range(3)) for a in range(3)]
-        start = [
-            pose["origin_mm"][a] + sum(at[k] * (x, y, z)[k][a] for k in range(3))
-            for a in range(3)
-        ]
-        end = [start[a] + solid["length_mm"] * direction[a] for a in range(3)]
-        radial = [
-            solid["dia_mm"] / 2 * math.sqrt(max(0.0, 1.0 - component**2))
-            for component in direction
-        ]
-        return (
-            [min(start[a], end[a]) - radial[a] for a in range(3)],
-            [max(start[a], end[a]) + radial[a] for a in range(3)],
-        )
-    if shape != "box":
-        raise ValueError(
-            f"fixture solid {solid.get('name', '?')!r}: unsupported shape {shape!r}"
-        )
-    size = solid["size_mm"]
-    corners = [
-        [
-            pose["origin_mm"][axis]
-            + sum((at[k] + size[k] * corner[k]) * (x, y, z)[k][axis] for k in range(3))
-            for axis in range(3)
-        ]
-        for corner in itertools.product((0, 1), repeat=3)
-    ]
-    return [min(c[a] for c in corners) for a in range(3)], [
-        max(c[a] for c in corners) for a in range(3)
-    ]
-
-
-@pytest.mark.parametrize(
-    ("axis", "low", "high"),
-    [
-        ([0.0, 0.0, 1.0], [-2.0, -2.0, 0.0], [2.0, 2.0, 10.0]),
-        ([0.0, 0.0, 2.0], [-2.0, -2.0, 0.0], [2.0, 2.0, 10.0]),
-        ([1.0, 0.0, 0.0], [0.0, -2.0, -2.0], [10.0, 2.0, 2.0]),
-        (
-            [0.6, 0.0, 0.8],
-            [-1.6, -2.0, -1.2],
-            [7.6, 2.0, 9.2],
-        ),
-    ],
-)
-def test_posed_cylinder_bounds_include_radial_extent(axis, low, high):
-    solid = {
-        "name": "stud",
-        "shape": "cylinder",
-        "at_mm": [0.0, 0.0, 0.0],
-        "axis": axis,
-        "dia_mm": 4.0,
-        "length_mm": 10.0,
-    }
-    pose = {"origin_mm": [0.0, 0.0, 0.0], "x": [1.0, 0.0, 0.0], "z": [0.0, 0.0, 1.0]}
-    actual_low, actual_high = _posed_box(solid, pose)
-    assert actual_low == pytest.approx(low)
-    assert actual_high == pytest.approx(high)
-
-
-def test_posed_cylinder_rejects_a_zero_axis():
-    solid = {"name": "stud", "shape": "cylinder", "at_mm": [0, 0, 0], "axis": [0, 0, 0]}
-    pose = {"origin_mm": [0.0, 0.0, 0.0], "x": [1.0, 0.0, 0.0], "z": [0.0, 0.0, 1.0]}
-    with pytest.raises(ValueError, match="fixture solid 'stud': zero cylinder axis"):
-        _posed_box(solid, pose)
-
-
-def test_posed_unknown_primitive_names_the_solid():
-    pose = {"origin_mm": [0.0, 0.0, 0.0], "x": [1.0, 0.0, 0.0], "z": [0.0, 0.0, 1.0]}
-    with pytest.raises(
-        ValueError, match="fixture solid 'mystery': unsupported shape 'cone'"
-    ):
-        _posed_box({"name": "mystery", "shape": "cone", "at_mm": [0, 0, 0]}, pose)
-
-
-@pytest.mark.parametrize(
-    "stem",
-    [
-        pytest.param(
-            stem,
-            marks=(
-                pytest.mark.xfail(
-                    strict=True,
-                    raises=AssertionError,
-                    reason="superseded plan collides with 52PCCK clamps; rewrite in #1577",
-                )
-                if stem == "ch_rocker_arm"
-                else ()
-            ),
-        )
-        for stem in plans.revision_stems()
-    ],
-)
-def test_every_touch_spot_clears_the_hold_by_the_tool_radius_plus_1mm(stem):
-    # A paper touch lowers the tool onto the work's top face at a spot the plan names in
-    # prose (prechips 0.1.2 has no touch-position field). The tool's widest diameter must
-    # clear, in plan view, every hold solid standing above that face (strap clamps, vise
-    # jaws) by 1 mm; solids wholly under it (table, riser blocks, shim stacks) cannot meet
-    # a tool that stops on it, and a touch over a support is the stiffest spot.
-    shop = tomllib.loads(
-        (plans.PROCESS_ROOT / "shop" / "inventory.toml").read_text(encoding="utf-8")
-    )
-    plan = tomllib.loads(plans.plan_path(stem).read_text(encoding="utf-8"))
-    for setup in plan["setups"]:
-        zero = setup.get("zero", {})
-        touches = [
-            (touch["tool"], touch["method"]) for touch in zero.get("tool_touches", ())
-        ]
-        if zero.get("z", {}).get("method") == "paper":
-            touches.append((zero["z"]["tool"], zero["z"].get("edge", "")))
-        if not touches:
-            continue
-        hold = setup["hold"]
-        top = setup["stock_state"]["top_z"]
-        if "pose" in hold:
-            placed = [(hold["fixture"], hold["pose"])] + [
-                (clamp["ref"], clamp["pose"]) for clamp in hold.get("clamps", ())
-            ]
-            boxes = [
-                (ref, solid.get("name", "?"), box)
-                for ref, pose in placed
-                for solid in _hold_solids(shop["fixtures"], ref)
-                if not solid.get("void", False)
-                for box in [_posed_box(solid, pose)]
-                if box[1][2] > top
-            ]
-        else:
-            boxes = [
-                (hold["fixture"], name, box)
-                for name, box in _vise_jaw_boxes(
-                    shop["fixtures"], hold, setup["stock_state"]["bottom_z"], top
-                )
-            ]
-        for tool, prose in touches:
-            where = f"{stem} {setup['id']} {tool} touch"
-            spot = _TOUCH_SPOT.search(prose)
-            assert spot, f"{where}: no 'at X.. Y..' spot in {prose!r}"
-            sx, sy = float(spot[1]), float(spot[2])
-            need = _tool_radius(shop["tools"], tool) + 1.0
-            for ref, name, (low, high) in boxes:
-                dx = max(low[0] - sx, 0.0, sx - high[0])
-                dy = max(low[1] - sy, 0.0, sy - high[1])
-                assert math.hypot(dx, dy) >= need, (
-                    f"{where} at X{sx:+} Y{sy:+}: {ref} {name} is "
-                    f"{math.hypot(dx, dy):.2f} away, needs {need:.2f}"
-                )
 
 
 def test_shop_without_cad_has_no_spec_dependencies(synthetic):
@@ -993,6 +794,21 @@ def test_revision_validation_names_authored_revision_line(synthetic, configured)
     if configured is None:
         with pytest.raises(plans.PlanBindError, match="line 4:.*drawing.revision"):
             plans.bind_plan(STEM, out)
+
+
+def test_authored_candidate_revision_does_not_qualify_an_older_exact_export(synthetic):
+    source, out, manifest, _shop = synthetic
+    source.write_text('[drawing]\nrevision = "v48"\n', encoding="utf-8")
+    manifest.write_text('[drawing]\nrevision = "v47"\n', encoding="utf-8")
+    exact_export = manifest.read_bytes()
+
+    # Held HA plans follow next_revision; the preserved v47 proof is not a v48 export.
+    plans.check_authored_plan_revision(STEM, "v48")
+    with pytest.raises(
+        plans.PlanBindError, match="differs from manifest 'v47'"
+    ):
+        plans.check_plan_revision(STEM, out, revision="v48")
+    assert manifest.read_bytes() == exact_export
 
 
 @pytest.mark.parametrize("revision", ['"v40"', '"unknown"', '""', "41"])

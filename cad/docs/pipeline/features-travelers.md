@@ -10,9 +10,10 @@ aggregator depending on every `package:features:<stem>` leaf, not a COM export a
 This namespace is interim until `solidworks-pool` admits top-level `features` targets; no pool change is included.
 Each leaf's native dependency is its own part, not assemblies or drawing
 artefacts. The three machine parts have held process plans; they are not
-enrolled travelers. The built-up rocker route uses the assembled v47 bundle,
-with component manufacturing branches and plan-owned press joint features
-citing the detail drawings; it does not require separate component exports.
+enrolled travelers. The built-up rocker route has component manufacturing
+branches and plan-owned press joint features citing the detail drawings; it does
+not require separate component exports. The Prechips example uses the assembled
+v47 bundle; the held HA plan tracks the v48 reservation, not a v48 export claim.
 Fixture bundles expose drawing requirements too.
 Each leaf writes only its own self-contained bundle:
 
@@ -149,9 +150,8 @@ provenance, not fitted-head or every-point floor acceptance; the part's
 native/spec geometry and actual-fit guards remain separate and unchanged.
 
 Turned-feature `z_mm` intervals describe nominal geometry along the feature's
-source-frame Z axis, not an acceptance band. Shaft grooves overlay the journal
-and body envelopes; the bank-derived south endpoint remains nominal cut-to-fit
-geometry, not a new end-past-scribe requirement. Cone `body_axis`, `crank_axis`
+source-frame Z axis, not an acceptance band. The current shaft is plain with
+two flats and domed ends, not the historical cut-to-fit shaft. Cone `body_axis`, `crank_axis`
 and `cone_axis` are geometry-owned coordinate transforms for the model-Y
 body/head, offset model-Z crank boss and inclined boss; they are not setup
 frames, manufactured datums or physical bindings. Dome `base_radius` comes
@@ -268,11 +268,10 @@ missing spec file or correct the inventory's `cad` stem before retrying.
 ## Strict local travelers and enrollment
 
 `_process_plans.TRAVELER_STEMS` is the enrollment authority for the
-`prechips:<stem>` task family. It is currently **empty**. The rocker plan is
-migrated but held until its traveler reaches exit 0; the legacy shaft and cone
-plans remain tracked but are stale against the pinned prechips; they are neither
-run nor shipped. A stem enrolls only after its
-migrated plan reaches exit 0 on real exported geometry. See
+`prechips:<stem>` task family. It is currently **empty**. The shaft, rocker and
+cone plans are migrated but held, not enrolled. A stem enrolls only after its
+migrated plan reaches exit 0 on real exported geometry and its outstanding
+route and physical holds are resolved. See
 [`cad/process/README.md`](../../process/README.md) for authoring and enrollment.
 
 For an enrolled stem:

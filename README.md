@@ -179,8 +179,8 @@ Drawing-bound requirement manifests for the rocker arm, pivot shaft and cone
 pivot post are exported with named STEP face sets. Enrolled `prechips:<stem>`
 tasks bind the committed process plans to those exact exports and generate strict
 [prechips](https://github.com/pedropaulovc/prechips) travelers; only exit 0 passes
-the build and release gates. Releases include the verified travelers alongside
-their feature bundles. No plans are enrolled yet. The shaft, cone and
+the build and release gates. The release pipeline includes verified travelers
+for enrolled plans alongside their feature bundles; none are enrolled yet. The shaft, cone and
 built-up rocker routes are held; CAD-authoritative reconciliation and a passing
 checker result do not themselves qualify physical machining. See the
 [process-plan holds](cad/process/README.md) and

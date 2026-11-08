@@ -5108,6 +5108,27 @@ def test_prechips_rejects_unexported_enrollment(monkeypatch):
         list(dodo.task_prechips())
 
 
+def test_reconciled_held_plans_are_recipe_inputs_not_traveler_tasks(
+    synthetic_prechips_kernel,
+):
+    import _process_plans
+
+    dodo = _load_dodo()
+    assert _process_plans.TRAVELER_STEMS == ()
+    recipe = next(task for task in dodo.task_check() if task["name"] == "recipe")
+    for stem in (
+        "ch_rocker_arm",
+        "ch_rocker_arm_tl_oblique_base_bar",
+        "ch_pivot_shaft",
+        "dt_cone_pivot_post",
+    ):
+        source = _process_plans.plan_path(stem).resolve()
+        assert recipe["file_dep"].count(str(source)) == 1
+    assert list(dodo.task_prechips()) == []
+    assert synthetic_prechips_kernel["discoveries"] == 0
+    assert synthetic_prechips_kernel["queries"] == []
+
+
 def test_prechips_empty_enrollment_has_no_tasks(monkeypatch, synthetic_prechips_kernel):
     import _process_plans
     dodo = _load_dodo()

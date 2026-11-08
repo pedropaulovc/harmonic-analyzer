@@ -7,18 +7,24 @@ shop data (`shop/inventory.toml`, `shop/shop-policy.toml`,
 currently empty. The shaft, rocker and cone routes are held and are not
 enrolled or qualified for machining. Reconciliation uses CAD source commit
 `441290434f34f62faba176ef576af6879189c5e7` and the exact v47 release source.
-The migrated HA shaft and cone plans carry the v48 revision reservation; the
-Prechips examples retain the exact v47 pair. That reservation does not turn
-v47 bytes into a v48 export or establish qualification.
+The migrated HA shaft, rocker and cone plans carry the v48 revision reservation;
+the Prechips examples retain the exact v47 pairs. That reservation does not
+turn v47 bytes into a v48 export or establish qualification.
 
 The shaft is plain, with two aligned same-side flats and domed ends; the old
-shouldered, cut-to-fit route is superseded. The cone is integral solid stock;
+shouldered, cut-to-fit route is superseded. The HA flat endwall binding is held
+pending stable exported labels; overall-length inspection also holds until
+vertical support and contact repeatability are qualified. The cone is integral
+solid stock;
 its paint and machined-face masking instruction remains unresolved and held
-for an owner ruling. The rocker is a built-up hub and strap according to the
+for an owner ruling. Its underside shoulder also has a stable-selector hold
+pending an upstream HAF label; the narrow-shoulder tool and adapter remain
+unverified. The rocker is a built-up hub and strap according to the
 current detail drawings. Its combined route manufactures both components and
-declares a plan-owned press joint from those drawings against the assembled
-v47 STEP; no separate component export is required. Stock, pressing, tooling
-and physical bindings need resolution. None of these authored routes supplies
+declares a plan-owned press joint from those drawings; the Prechips example
+uses the assembled v47 STEP, while the held HA plan tracks v48. No separate
+component export is required. Stock, pressing, tooling and physical bindings
+need resolution. None of these authored routes supplies
 missing measurements or establishes a safe setup.
 
 The oblique-trammel base bar plan (MHA-CH-06-TL-20) is a held preview from the
