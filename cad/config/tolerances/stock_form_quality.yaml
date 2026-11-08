@@ -18,14 +18,12 @@ stock_form_quality:
   # .004 in exactly (fan-out, F3 pattern; delegated ruling 2026-11-07 (Main)).
   reducer_k_setting_diameter_mm: 0.1016
   shaft_turned_runout_mm: 0.050
-  # The reducer axes' tilt budget, stated as its zone at each axis's projected
-  # height (S 32.36 mm, K 40.31 mm). Rule 26 bars the projected-zone
-  # modifier, so each bore prints a plain perpendicularity over its own
-  # length that holds this tilt: S's ⊥ Ø.0008 over the thinnest 7.912 mm arm
-  # stock reaches .0831 here. The MHA-PD-22 collar to MHA-PD-06 disc air
-  # (0.1016 statistical floor) passes up to about .088; ⊥ Ø.001 (.1036)
-  # fails it (fan-out Q2-A, 2a; delegated ruling 2026-11-07 (Main), no
-  # precedent; owner review #2144).
+  # K's axis tilt budget, stated as its zone at K's projected height
+  # (40.31 mm). Rule 26 bars the projected-zone modifier, so MHA-PD-19's
+  # knob bore prints a plain ⊥ Ø.002 over its length, reaching .0719 here.
+  # S takes its own wider zone from MHA-PD-18's ⊥ Ø.001 (the reamed row):
+  # paper_drive_arm_registration.S_AXIS_ZONE_DIAMETER_MM, .1039 at S's 32.36 mm
+  # (owner ruling 2026-11-08 (Pedro), #2144 item 4.1).
   reducer_axis_projected_zone_diameter_mm: 0.0832
   # Assembly acceptance, a separate grade: each three-indicator seat reading,
   # loaded minus snug, stays within this (paper_drive_arm_registration).
