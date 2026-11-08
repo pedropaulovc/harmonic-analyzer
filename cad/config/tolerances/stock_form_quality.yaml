@@ -15,11 +15,14 @@ stock_form_quality:
   # delegated ruling 2026-11-07 (Main), no precedent; owner review #2144).
   reducer_position_diameter_mm: 0.1016
   # The matched knob bore K's setting circle about the arm's pin bore S
-  # (MHA-PD-00 VIEW K): its radius is the reducer centre's standard +0.05/-0 set band
-  # (owner ruling 2026-10-27, option A). S and the arm/plate hole patterns
-  # keep reducer_position_diameter_mm.
-  # .004 in exactly (fan-out, F3 pattern; delegated ruling 2026-11-07 (Main)).
-  reducer_k_setting_diameter_mm: 0.1016
+  # (MHA-PD-00 VIEW K), Ø.008 in exactly: a step read true on a full .0005
+  # division of the shop's test indicator lands K within .0563 mm of its
+  # setting, inside the .1016 radius (owner ruling 2026-11-08 (Pedro), #2144
+  # item 5.3). The S-K centre-distance set band is narrower and is not this
+  # key: pd_rack_pinion_spec.CENTRE_DISTANCE_SET_BAND_IN (+.002/-0, the mesh's
+  # contact-ratio floors). S and the arm hole patterns keep
+  # reducer_position_diameter_mm.
+  reducer_k_setting_diameter_mm: 0.2032
   shaft_turned_runout_mm: 0.050
   # The reducer axes' tilt budget, stated as its zone at each axis's projected
   # height (S 32.36 mm, K 40.31 mm). Rule 26 bars the projected-zone
