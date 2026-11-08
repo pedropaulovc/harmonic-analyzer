@@ -328,7 +328,9 @@ TABLE_NOTES = (SPOT_NOTE, ORIGIN_NOTE)
 # Sheet metres: the table's top-left corner, left under the plan (the
 # length's dimension line stands at 0.180, the lower tags' text ends 0.185).
 TABLE_ANCHOR = (0.020, 0.172)
-TABLE_WIDTHS = (0.012, 0.016, 0.016, 0.034, 0.036, 0.058)
+# SIZE at 38: SolidWorks holds the native cell to its text, and farm r3
+# (20261108T014606685Z, 1850057757) measured "Ø.129 THRU ALL" at 37.4 mm.
+TABLE_WIDTHS = (0.012, 0.016, 0.016, 0.038, 0.036, 0.058)
 _TABLE_SIZE_COLUMN = 3
 _TABLE_NOTE_COLUMN = 4
 _TABLE_MATE_COLUMN = 5
