@@ -648,10 +648,11 @@ def test_the_jig_bored_k_lands_in_the_set_band_with_margin_at_both_ends() -> Non
     ]
     accuracy = stated * 25.4
     # Centring is a null reading against the step's stated acceptance, not a
-    # measured size: under half a division of sweep (the TIR) puts each centre
-    # within a quarter division of the spindle. The indicator's unknown
-    # accuracy over its range scales that sub-division reading only; the
-    # bound holds while the indicator repeats to its stated sweep at null.
+    # measured size: under one division of sweep (the TIR) puts each centre
+    # within half a division of the spindle (owner ruling 2026-11-08 (Pedro),
+    # #2144 item 5.3). The indicator's unknown accuracy over its range scales
+    # that reading only; the bound holds while the indicator repeats to its
+    # stated sweep at null.
     division_in = inventory["gauges"]["dti"]["resolution_in"]["value"]
     # The printed sweep is a value on the shop's own test indicator.
     assert drawing.KNOB_SETTING_INDICATOR_DIVISION_IN == division_in
@@ -665,7 +666,8 @@ def test_the_jig_bored_k_lands_in_the_set_band_with_margin_at_both_ends() -> Non
     radial_err = dro + 2.0 * centring
     lever = knob_setting.K_SET_CENTRE_DISTANCE_MM / steps_arm.PIN_STATION
     tangential_err = dro + 2.0 * centring + 2.0 * centring * lever
-    assert radial_err == pytest.approx(0.0135, abs=1e-4)
+    assert centring == pytest.approx(division / 2.0)
+    assert radial_err == pytest.approx(0.0199, abs=1e-4)
     # The printed values are the display's own counts: the operator dials
     # exactly what VIEW K prints.
     # The 5 um scale's inch-mode count, .0002.

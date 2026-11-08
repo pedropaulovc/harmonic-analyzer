@@ -590,27 +590,28 @@ KNOB_SETTING_INSTANCES = frozenset({"pd-transgear-arm-1", "pd-transgear-arm-plat
 # The located step's acceptance for "true": a null reading on the indicator, so the
 # setting's centring bound comes from this stated sweep, not from the
 # indicator's unknown accuracy over its range (codjiflo P2 on 8e8d5d5): under
-# half a division of sweep puts each centre within a quarter division. It
-# prints as a value on the shop's .0005 test indicator
+# one division of sweep puts each centre within half a division. It prints
+# as a value on the shop's .0005 test indicator
 # (inventory gauges.dti.resolution_in; machinist review round 4, rules 22 and
-# 26) and names what it holds (round 5 read .00025 as finer than the .002
-# S-K band needs, rule 4): K's worst case must stay inside its .002 setting
-# circle (paper_drive_arm_registration.REDUCER_AXIS_SETUP_RADIUS_MM). The pivot
-# lever amplifies the across error, so one division (.0005) puts K up to
-# .0022 off (test_the_jig_bored_k_lands_in_the_set_band_with_margin_at_both_ends).
+# 26) and names what it holds (round 5 read a finer sweep as finer than the
+# .002 S-K band needs, rule 4): K's worst case must stay inside its Ø.008
+# setting circle (paper_drive_arm_registration.REDUCER_AXIS_SETUP_RADIUS_MM;
+# owner ruling 2026-11-08 (Pedro), #2144 item 5.3). The pivot lever amplifies
+# the across error, so one division (.0005) puts K up to .0022 off, inside
+# the .004 radius (test_the_jig_bored_k_lands_in_the_set_band_with_margin_at_both_ends).
 # The knob-bore point's label inside VIEW K. VIEW K keeps its letter (other
 # sheets cite "MHA-PD-00 VIEW K"), so the point takes a letter used nowhere
 # else on the package (machinist review round 7, rules 9 and 26: K meant
 # both the view and the bore).
 KNOB_BORE_LETTER = "N"
-KNOB_SETTING_TRUE_SWEEP_DIVISIONS = 0.5
+KNOB_SETTING_TRUE_SWEEP_DIVISIONS = 1
 KNOB_SETTING_INDICATOR_DIVISION_IN = 0.0005
 _KNOB_SETTING_SWEEP_TEXT = (
-    f"{KNOB_SETTING_TRUE_SWEEP_DIVISIONS * KNOB_SETTING_INDICATOR_DIVISION_IN:.5f}".lstrip("0")
+    f"{KNOB_SETTING_TRUE_SWEEP_DIVISIONS * KNOB_SETTING_INDICATOR_DIVISION_IN:g}".lstrip("0")
 )
 _KNOB_SETTING_DIVISION_TEXT = f"{KNOB_SETTING_INDICATOR_DIVISION_IN:.4f}".lstrip("0")
 KNOB_SETTING_TRUE = (
-    f"TRUE: SWEEP UNDER {_KNOB_SETTING_SWEEP_TEXT}, HALF A DIVISION ON A "
+    f"TRUE: SWEEP UNDER {_KNOB_SETTING_SWEEP_TEXT}, ONE DIVISION ON A "
     f"{_KNOB_SETTING_DIVISION_TEXT} TEST INDICATOR, SO {KNOB_BORE_LETTER} ENDS WITHIN "
     f"{steps.inch_text(registration.REDUCER_AXIS_SETUP_RADIUS_MM, 3)} OF ITS "
     "VIEW K SETTING"
