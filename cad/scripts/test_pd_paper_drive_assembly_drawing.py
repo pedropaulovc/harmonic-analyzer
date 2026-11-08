@@ -2046,6 +2046,12 @@ def test_the_platen_group_is_built_and_hung_before_its_locks_are_set() -> None:
     assert drawing.GUIDE_SCREWS + drawing.CLIP_SCREWS == len(
         assembly.GUIDE_SCREW_XY
     ) + len(assembly.CLIP_SCREW_XY)
+    # Owner ruling 2026-11-08 (Pedro), #2144 item 2.3: MHA-PD-11's screw taps
+    # are tapped to its print and the screws float in MHA-PD-02's holes, so
+    # nothing is spotted, drilled or tapped through the platen at assembly.
+    guides_screwed = " ".join(_step_body("guides-screwed").split())
+    for word in ("SPOT", "TRANSFER", "DRILL", "TAP EACH"):
+        assert word not in guides_screwed
 
 
 def test_the_lock_taps_are_the_even_taps_counted_from_either_end() -> None:

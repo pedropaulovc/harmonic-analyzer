@@ -1634,8 +1634,10 @@ REDUCER_BACKLASH_FEELERS_MM = (
 # guide screws, its through-taps the clip screws.
 GUIDE_SCREWS = len(platen.GUIDE_HOLE_X) * len(platen.GUIDE_HOLE_Y)
 CLIP_SCREWS = len(platen.SOCKET_XY)
-# Each guide's row of taps along its length: the platen-screw taps spotted at
-# step 3 alternate with the 4 lock taps, so the lock taps are the 2nd, 4th,
+# Each guide's row of taps along its length: the platen-screw taps, tapped to
+# MHA-PD-11's print (owner ruling 2026-11-08 (Pedro), #2144 item 2.3: the
+# screws float in MHA-PD-02's holes, so nothing is spotted through the
+# platen), alternate with the 4 lock taps, so the lock taps are the 2nd, 4th,
 # 6th and 8th from either end (build_pd_platen_guide HOLE_X and
 # SCREW_STATION_X; the test checks the order). The steps count them in
 # plain words: the A1-A9 tags live only on MHA-PD-11 (machinist review
@@ -1783,7 +1785,6 @@ def _step_text(
     float_sheet = SHEET_NAMES.index(CLUSTER_FLOAT_SHEET) + 1
     pose = steps.step_number("fitup-pose-set")
     guides = len(platen.GUIDE_HOLE_Y)
-    guide_taps = len(platen.GUIDE_HOLE_X)
     clock = steps.inch_text(
         steps.inch_floor_mm(quality.reducer_setup_clock_deviation_mm(), 3), 3
     )
@@ -1849,21 +1850,17 @@ def _step_text(
             f"CLAMP THE {guides} {n['pd-platen-guide']} GUIDES TO THE PLATEN BACK, "
             "ENDS FLUSH WITH THE PLATEN ENDS, EACH ON ITS ROW OF "
             f"\u00d8{steps.inch_text(platen.GUIDE_HOLE_DIA, 3)} PLATEN HOLES.",
-            f"SPOT EACH GUIDE THROUGH THE {guide_taps} PLATEN HOLES OF ITS ROW WITH "
-            "A 9/64 TRANSFER PUNCH.",
-            "UNCLAMP THE GUIDES.",
-            f"DRILL EACH SPOT {TAP_4_40_DRILL_TEXT} THRU.",
-            "TAP EACH HOLE #4-40 UNC-2B THRU.",
             f"SCREW THE GUIDES ON WITH {GUIDE_SCREWS} "
             f"{n['sh-vn-brass-fillister-screw']} SCREWS FROM THE PLATEN FRONT, "
             "HEADS IN THE COUNTERBORES.",
             "CHECK: EVERY SCREW ENTERS BY HAND.",
-            "IF ONE BINDS, RUN THE TAP THROUGH AGAIN.",
+            "IF ONE BINDS, RUN A #4-40 TAP THROUGH ITS GUIDE TAP AGAIN.",
             f"TIGHTEN ALL {GUIDE_SCREWS} GUIDE SCREWS.",
+            "UNCLAMP THE GUIDES.",
             "CHECK: PUSHED FIRMLY BY HAND ALONG AND ACROSS, NEITHER GUIDE MOVES ON "
             "THE PLATEN.",
             f"IF ONE MOVES, MAKE A NEW {n['pd-platen-guide']} GUIDE AND REPEAT "
-            f"{s('guides-screwed', 0)}-{s('guides-screwed', 9)} FOR IT.",
+            f"{s('guides-screwed', 0)}-{s('guides-screwed', 5)} FOR IT.",
         ),
         "clips-fitted": (
             f"SCREW THE {n['pd-platen-clip']} CLIPS TO THE PLATEN FRONT WITH "
