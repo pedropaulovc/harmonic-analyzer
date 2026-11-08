@@ -129,7 +129,7 @@ DIMENSION_CALLOUTS = {
     "FinishedLength": "FINISHED CUT LENGTH;\nUPPER FREE END ONLY",
     "CutEndChamfer": "CUT END",
 }
-STOCK_NOTE = f"{THREAD} X {STOCK_LENGTH} IN STUD STOCK; PM {SKU} KIT"
+STOCK_NOTE = f"{THREAD} X {STOCK_LENGTH} IN STUD STOCK; {SUPPLIER.upper()} {SKU} KIT"
 LOWER_END_NOTE = "LOWER FACTORY END UNMODIFIED"
 # The kit reference sheet owns this one-line installation legend. The separate
 # REWORK sheet reads STOCK_NOTE and LOWER_END_NOTE through their own properties.
