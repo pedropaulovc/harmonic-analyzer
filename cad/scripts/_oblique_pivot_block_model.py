@@ -410,7 +410,8 @@ async def _nut_pattern_reference(adapter, part) -> None:
                             part.BLOCK_HEIGHT, f"{feature} lug end length")
     dims.record("NutEndLength")
     axis_uv = at(part.NUT_AXIS_Y, part.NUT_AXIS_Z)
-    axis = await _construction_circle(adapter, dims, f"{end}.start", end_start, axis_uv, part.SCREW_CLEARANCE_DIA,
+    end_corner = (f"{end}.start", end_start)
+    axis = await _construction_circle(adapter, dims, end_corner, end_corner, axis_uv, part.SCREW_CLEARANCE_DIA,
                                       ("NutCentreZ", "NutCentreY", "NutCentreDia"), f"{feature} nut axis")
     centre = f"{axis}.center"
     reach = part.NUT_CLOCK_RAY

@@ -152,8 +152,9 @@ def test_y_baseline_lanes_keep_each_text_off_the_other_lines(feed):
             assert not (y0 <= feature_y <= y1 and x0 <= lane + 1.0), (name, other, 'witness')
             ox0, oy0, ox1, oy1 = boxes[other]
             assert x1 <= ox0 or ox1 <= x0 or y1 <= oy0 or oy1 <= y0
-        # Its own witness at the feature: the text clears it (or rides its span).
-        assert y0 > base
+        # Its own witness at the edge: the text rides its span, or (.278,
+        # farm r4) stands wholly under the -Y edge with air.
+        assert y0 > base or y1 < base - 1.0, name
 
 
 def test_native_builder_owns_real_solids_dimensions_and_final_volume():

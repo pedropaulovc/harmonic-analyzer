@@ -75,7 +75,9 @@ PLAN_XY = (.170,.205)
 PLAN_KEEP = {
     'BlockLength':(.170,.2535),'PlanHole2X':(.1665,.248),'PlanHole1X':(.171,.2395),
     'PlanBoreX':(.1635,.231),
-    'PlanHole3Y':(.2045,.1965),'BlockSideY':(.2175,.199),'PlanHole2Y':(.2305,.2115),
+    # .278's text under the -Y edge, outside its 7 mm span: beside its span
+    # it read '.278.79' with the seat's text (farm r4 20261108T022716612Z).
+    'PlanHole3Y':(.2045,.1795),'BlockSideY':(.2175,.199),'PlanHole2Y':(.2305,.2115),
     'BlockWidth':(.2595,.203),
     'BoreDia':(.078,.196),'CarriageDrills1Dia':(.085,.168),'CarriageCounterbores3Dia':(.245,.150),
     # TL-32 still prints this separate native tap dimension in its established
