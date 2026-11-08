@@ -1410,7 +1410,7 @@ PACKAGE_NATIVE_PY = (SCRIPTS_DIR / "package_native.py").resolve()
 # The gate suites, by SolidWorks-dependence -- the single source of truth for the
 # verify:/check: task names (reused by build + release so a new gate is wired in
 # one place).
-_VERIFY_NAMES = ("soundness", "kinematics")  # need SW (spine); subsystems retired
+_VERIFY_NAMES = ("soundness", "kinematics", "pd_section_visibility_probe")
 # Offline checks REQUIRED on every build/release (fast, high-value):
 _CHECK_NAMES = (
     "math",
@@ -3303,6 +3303,34 @@ def _verify_task(name: str) -> dict[str, Any]:
             "clean": True,
             "verbosity": 2,
         }
+    if name == "pd_section_visibility_probe":
+        script = (SCRIPTS_DIR / "diagnostics/probe_pd_section_visibility.py").resolve()
+        native_drawing = next(
+            path for path in _drawing_cache_outputs("pd_paper_drive_assembly")
+            if path.suffix.casefold() == ".slddrw"
+        )
+        # This diagnostic consumes an immutable, hash-pinned drawing cache hit.
+        # Its raw bytes are therefore a machine-stable input, not a rebuilt file.
+        deps = sorted(set([
+            str(script), *_helper_deps(script), str(native_drawing),
+            _sldasm("pd_paper_drive"), _assembly_execution_token("pd_paper_drive"),
+        ]))
+        label = f"verify:{name}"
+        outputs = [Path(path) for path in _canonical_targets(label)]
+        return {
+            "name": name,
+            "task_dep": ["drawing:pd_paper_drive_assembly", "assembly:pd_paper_drive"],
+            "file_dep": deps,
+            "targets": [str(path) for path in outputs],
+            "uptodate": [not _cache.forced_refresh(label)],
+            "actions": [(
+                _cached_com_action,
+                [label, [sys.executable, str(script)], deps, outputs,
+                 "verify-pd-section-visibility-probe", None],
+            )],
+            "clean": True,
+            "verbosity": 2,
+        }
     raise ValueError(f"unknown canonical task: verify:{name}")
 
 
@@ -5048,6 +5076,9 @@ def _canonical_targets(name: str) -> list[str]:
     if family == "verify_soundness":
         return [str(REPORTS / f"verify-soundness-{subname.replace('_', '-')}.ok")]
     if family == "verify":
+        if subname == "pd_section_visibility_probe":
+            directory = REPORTS / "section-visibility-probe"
+            return [str(directory / "report.json"), str(directory / "calls.jsonl")]
         return [str(REPORTS / f"verify-{subname}.ok")]
     if family == "check":
         if subname.startswith("machinist_review:"):
