@@ -318,17 +318,22 @@ LEFT_KEEP: dict[str, tuple[float, float]] = {
     "FullDepth": (_left_of(_LEFT_REAR_X, _FULL_DEPTH_TEXT_WIDTH), _LEFT_BOTTOM - 0.0100),
     "CutterRunout": (_left_of(_LEFT_REAR_X, _CUTTER_TEXT_WIDTH), _LEFT_BOTTOM - 0.0250),
 }
-# The caption stands beside the cropped view, right of the view's NATIVE box
-# and level with the axis, the lane right of the view being empty down to
-# the title block (over the view it read as one of B-B's callouts, round 2
-# run 20261107T121559938Z).  The native box is not the crop fence: round 3
-# (run 20261107T163331267Z) measured the fence (342.97, 94.75)-(388.94,
-# 137.25) mm become the box (337.18, 89.71)-(398.73, 142.29), its right side
-# 9.8 mm past the fence, and the caption 1.7 mm inside it failed the layout
-# audit.  The margins below are those, rounded up to 0.1 mm (left, bottom,
-# right, top), and the caption's native extent is round 3's 16.20 x 4.29 mm
-# with its upper left within 0.05 mm of the anchor.  The caption clears the
-# box by 3 mm and still ends ~1 mm inside the border.
+# The caption stands under the cropped view, below the view's NATIVE box and
+# right of the cutter rows' extension lines, the lane there being empty down
+# to the title block.  Over the view it read as one of B-B's callouts (round
+# 2, run 20261107T121559938Z); right of it, it ended ~1 mm from the border
+# (final-head review, run 20261108T014931710Z).  The native box is not the
+# crop fence: round 3 (run 20261107T163331267Z) measured the fence (342.97,
+# 94.75)-(388.94, 137.25) mm become the box (337.18, 89.71)-(398.73, 142.29),
+# and a caption 1.7 mm inside it failed the layout audit.  The margins below
+# are those, rounded up to 0.1 mm (left, bottom, right, top), and the
+# caption's native extent is round 3's 16.20 x 4.29 mm with its upper left
+# within 0.05 mm of the anchor.  Under the view the rear face's, the full
+# depth's and the run-out's extension lines run from the view down to the
+# run-out's dimension line at the title block (the final-head PNG: x 347.0,
+# 377.4, 388.3 mm), so a centred caption would cross them: it starts 4 mm
+# right of the run-out's line, 3 mm under the native box, and ends over
+# 10 mm inside the border.
 VIEW_C_NATIVE_MARGINS = (0.0058, 0.0051, 0.0098, 0.0051)
 VIEW_C_NATIVE_BOX = (
     OUTSIDE_CROP_FENCE[0] - VIEW_C_NATIVE_MARGINS[0],
@@ -337,11 +342,14 @@ VIEW_C_NATIVE_BOX = (
     OUTSIDE_CROP_FENCE[3] + VIEW_C_NATIVE_MARGINS[3],
 )
 LEFT_CAPTION_EXTENT = (0.0163, 0.0043)  # native width, height
-# 3 mm plus the extent's 0.05 mm offset from its anchor.
+# The rightmost extension line under the view: the run-out limit's station.
+VIEW_C_LAST_WITNESS_X = _outside_sheet_xy(0.0, CUTTER_RUNOUT_MAX)[0]
+# Each air plus the extent's 0.05 mm offset from its anchor.
+LEFT_CAPTION_WITNESS_AIR = 0.0041
 LEFT_CAPTION_VIEW_AIR = 0.0031
 LEFT_CAPTION_XY = (
-    VIEW_C_NATIVE_BOX[2] + LEFT_CAPTION_VIEW_AIR,
-    LEFT_CENTER[1] + LEFT_CAPTION_EXTENT[1] / 2.0,
+    VIEW_C_LAST_WITNESS_X + LEFT_CAPTION_WITNESS_AIR,
+    VIEW_C_NATIVE_BOX[1] - LEFT_CAPTION_VIEW_AIR,
 )
 
 # Viewing arrows (rule 9): a letter note whose straight leader is the arrow

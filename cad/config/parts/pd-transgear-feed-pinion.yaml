@@ -40,3 +40,8 @@ pd-transgear-feed-pinion:
       where: "the GEAR DATA row SPAN MATCHED FIT: BACKLASH WITH MATE SET AT ASSY .0048 TO .0055 (DIAL), PER MHA-PD-00 STEP 24"
       finding: "rack datum shake band .0048 TO .0055 printed at four places, not a plain inch step (rule 4)"
       reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144; pending owner confirmation: the window is the feed mesh's datum backlash from the MHA-PD-10 GEAR DATA (pd_transgear_feed_pinion_spec.RACK_BACKLASH_RANGE, the same RACK_DATUM_BACKLASH_TEXT constant MHA-PD-10 prints, with the identical exception there). .005 TO .0055 is an unreadable .0005 window and .0045 TO .0055 gives up margin at the binding end; the dial reads .0001"
+    - id: "RV-06"
+      kind: "accept"
+      where: "the end view's SPAN 2 TEETH .1523/.1515 limits, MATCHED FIT, SEE GEAR DATA"
+      finding: "span limits .0008 apart read as a converted millimetre band, not a plain inch step (rule 4)"
+      reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144; pending owner confirmation (L3): the limits are the stock #8 cutter's 2-tooth tangent span over its +/-.0004 radial-setting window, widened by the profile's geometry bound and rounded outward to .0001 (pd_transgear_feed_pinion_spec.SPAN_LIMITS); the manufactured tooth profiles the feed-rack mesh check reads are derived back from these printed limits, so a .001 step would pass spans outside the setting window the mesh is proved over. The span is a matched fit, its acceptance the GEAR DATA backlash with MHA-PD-05 set at assembly (RV-05)"

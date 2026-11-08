@@ -93,7 +93,7 @@ def test_part_authors_every_callout_on_a_marked_dimension() -> None:
         words = [row for row in text.split("\n") if row != callouts.BORE_PROCESS_CALLOUT]
         assert len(words) <= 2, name
     assert callouts.CALLOUTS[callouts.TEXT_PREFIX] == {
-        ("RootProfile", "RootDia"): "ROOT ENVELOPE <MOD-DIAM>"
+        ("RootProfile", "RootDia"): "ROOT DIAMETER <MOD-DIAM>"
     }
 
 
@@ -828,7 +828,7 @@ def test_root_reads_across_two_gap_floors_on_the_rear_view() -> None:
     assert min(offset, pitch - offset) < 1e-9
     assert math.hypot(x - cx, y - cy) > drawing.HALF_OD + 0.015
     assert _printed_text("RootDia").strip() == (
-        f"ROOT ENVELOPE \u00d8{_inch(spec.ROOT_DIA_MIN, spec.ROOT_DIA_PLACES)} min."
+        f"ROOT DIAMETER \u00d8{_inch(spec.ROOT_DIA_MIN, spec.ROOT_DIA_PLACES)} min."
     )
 
 
@@ -1206,16 +1206,21 @@ _R3_FENCE = (0.3429663, 0.09474832, 0.3889429, 0.13725168)
 _R3_VIEW_BOX = (0.33718068, 0.08970559, 0.39872856, 0.14228562)
 _R3_CAPTION_EXTENT = (0.39699605, 0.11348873, 0.41319938, 0.11777785)
 _R3_CAPTION_ANCHOR = (0.3970429, 0.11775)
+# The final-head PNG (run 20261108T014931710Z, 431.8 mm over 5100 px): the
+# extension lines under VIEW C (rear face, full depth, run-out).
+_FINAL_WITNESS_X = (0.3470, 0.3774, 0.3883)
 
 
-def test_view_c_caption_clears_the_views_native_box() -> None:
+def test_view_c_caption_stands_under_its_view_clear_of_everything() -> None:
     """Round 2 (run 20261107T121559938Z): over the view, the caption read as
-    one of B-B's callouts.  Round 3 (run 20261107T163331267Z): beside it, at
-    the crop fence plus round 1's top margin, the caption stood 1.7 mm inside
-    the view's native box, whose right side runs 9.8 mm past the fence, and
-    failed the layout audit.  Its native extent clears the native box,
-    re-derived from round 3's margins over the fence, by 3 mm; it stands
-    level with the view, inside the border, and below the boss's callout."""
+    one of B-B's callouts.  Round 3 (run 20261107T163331267Z): beside it, the
+    caption stood 1.7 mm inside the view's native box, whose right side runs
+    9.8 mm past the crop fence, and failed the layout audit.  The final head
+    (run 20261108T014931710Z): right of the view it ended ~1 mm from the
+    border.  It stands under the view: its native extent, from round 3's
+    measured margins and caption, starts 4 mm right of the rightmost
+    extension line, its top 3 mm under the native box, its right end 10 mm
+    inside the border, above the title block and clear of the cutter rows."""
     margins = drawing.VIEW_C_NATIVE_MARGINS
     measured = (
         _R3_FENCE[0] - _R3_VIEW_BOX[0],
@@ -1237,11 +1242,22 @@ def test_view_c_caption_clears_the_views_native_box() -> None:
     x, y = drawing.LEFT_CAPTION_XY
     caption = Box(x - slack, y - height - slack, x + width + slack, y + slack)
     view = drawing.VIEW_C_NATIVE_BOX
-    assert caption.xmin - view[2] >= 0.003 - 1e-9
-    assert view[1] < caption.ymin and caption.ymax < view[3]
-    assert caption.xmax < drawing.SHEET_INNER_BORDER[2] - 0.0005
-    boss = _printed_box("BossDia", drawing.RIGHT_KEEP["BossDia"])
-    assert caption.ymax + TEXT_CLEARANCE_HEIGHTS * _CAP_M < boss.ymin
+    # The extension lines the module derives are the ones the sheet drew.
+    scale = drawing.VIEW_SCALE[0] / 1000.0
+    witnesses = [
+        drawing._LEFT_REAR_X + z * scale
+        for z in (0.0, spec.FULL_DEPTH_MIN, spec.CUTTER_RUNOUT_MAX)
+    ]
+    assert witnesses == pytest.approx(_FINAL_WITNESS_X, abs=0.0003)
+    assert drawing.VIEW_C_LAST_WITNESS_X == pytest.approx(max(witnesses))
+    assert caption.xmin - max(witnesses) >= 0.004 - 1e-9
+    assert view[1] - caption.ymax >= 0.003 - 1e-9
+    # Under the view, not beside it.
+    assert view[0] < caption.xmin < view[2]
+    assert caption.xmax <= drawing.SHEET_INNER_BORDER[2] - 0.010
+    assert caption.ymin > _TITLE_BLOCK_TOP + 0.010
+    for name, xy in drawing.LEFT_KEEP.items():
+        assert caption.gap(_printed_box(name, xy)) >= TEXT_CLEARANCE_HEIGHTS * _CAP_M, name
 
 
 def test_tooth_edge_exception_is_flagged_at_the_teeth() -> None:
