@@ -131,14 +131,13 @@ MINIMUM_NOTES = "\n".join(
 )
 MINIMUM_NOTES_XY = (0.030, 0.055)
 # The thickness is stock with no band of its own, so it carries no reason.
-# The field depth states its function (run 20261107T191011860Z, 2/3: a
-# three-place depth with no band and no stated function, rule 3): it stays
-# shallower than the .028 engraving, which a two-place ±.01 depth could
-# pass. A comparison of depths, not a datum: run 20261107T220230661Z (2/3)
-# read 'ABOVE ENGRAVING FLOOR' as measured from that floor. Rows of 21 and
-# 14 glyphs at ~2.45 mm from the 364.4 mm shelf end 3 mm inside the border.
+# The field depth names its feature only. Why it holds three places (it stays
+# shallower than the .028 engraving, which a two-place ±.01 depth could pass)
+# is fr-nameplate RV-06: printed on the sheet it read as a second datum (run
+# 20261107T220230661Z, 2/3) and as narration (run 20261107T234638358Z, 2/3);
+# left off, run 20261107T191011860Z (2/3) asked for it.
 SECTION_CALLOUTS = {
-    "FieldDepth": "SUNK FIELD, SHALLOWER\nTHAN ENGRAVING",
+    "FieldDepth": "SUNK FIELD DEPTH",
     "EngravingDepth": ENGRAVING_DEPTH_CALLOUT,
 }
 SECTION_CENTER = (0.350, 0.115)

@@ -471,11 +471,14 @@ def test_section_a_dimensions_each_depth_on_its_own_line() -> None:
     assert floor["callout"] == "FLOOR UNDER ENGRAVING"
 
 
-def test_sunk_field_depth_names_why_it_holds_three_places() -> None:
+def test_sunk_field_depth_holds_three_places_by_declared_exception() -> None:
     # PR #1468 r4 review: the field depth printed .XXX with no stated
     # function. The field must stay above the engraving's floor so the
     # lettering stays cut; .028 and .016 at .XXX (+-.005) leave .002, and at
     # .XX (+-.010) the field could cut below the engraving.
+    from _paths import CAD_ROOT
+    from machinist_exceptions import load_exceptions
+
     assert (0.028 - 0.005) - (0.016 + 0.005) == pytest.approx(0.002)
     assert (0.028 - 0.005) - (0.016 + 0.010) < 0.0
     assert print_spec.ENGRAVING_BELOW_FIELD_MIN == pytest.approx(0.002 * 25.4)
@@ -483,13 +486,17 @@ def test_sunk_field_depth_names_why_it_holds_three_places() -> None:
         "FieldDepth": 3,
         "EngravingDepth": 3,
     }
+    # The reason lives in RV-06, not on the sheet: printed, it read as a
+    # second datum (run 20261107T220230661Z) and as narration (run
+    # 20261107T234638358Z).
     rows = drawing.SECTION_CALLOUTS["FieldDepth"].split("\n")
-    assert rows == ["SUNK FIELD, SHALLOWER", "THAN ENGRAVING"]
-    # A depth comparison, never a second datum (run 20261107T220230661Z).
-    assert "FLOOR" not in drawing.SECTION_CALLOUTS["FieldDepth"]
-    # Left-aligned at the shelf; ~2.45 mm a glyph on the r5 render, the
-    # widest row stays 3 mm inside the 419.1 mm right border.
-    assert drawing.SECTION_KEEP["FieldDepth"][0] + max(map(len, rows)) * 0.00245 < 0.4191 - 0.003
+    assert rows == ["SUNK FIELD DEPTH"]
+    declared = {
+        entry.id: entry
+        for entry in load_exceptions(CAD_ROOT / "config", "fr_nameplate", "part")
+    }
+    assert "SUNK FIELD DEPTH" in declared["RV-06"].where
+    assert ".002" in declared["RV-06"].reason
     # The three-row block (value and two callout rows, 4.5 mm each) keeps its
     # leader shelf above the field's outside arrow, ~5.7 mm long on the r4
     # render, at the decorated face.
@@ -749,9 +756,16 @@ def test_declared_exceptions_name_the_printed_minimums() -> None:
         "RV-01": "accept",
         "RV-02": "minor",
         "RV-03": "minor",
+        "RV-05": "minor",
+        "RV-06": "accept",
     }
     for entry in declared.values():
-        assert entry.reason.endswith(("(owner-accepted)", "(owner-ruled shortfall)"))
+        assert entry.reason.endswith((
+            "(owner-accepted)", "(owner-ruled shortfall)", "(pending owner confirmation)"
+        ))
+    # The delegated entries (run 20261107T234638358Z) quote the ruling.
+    for name in ("RV-05", "RV-06"):
+        assert "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144" in declared[name].reason
     floor, screws = print_spec.MINIMUM_NOTES.splitlines()
     assert floor in declared["RV-02"].where
     assert screws in declared["RV-03"].where
