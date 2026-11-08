@@ -9,8 +9,11 @@ part without editing a central exporter list. `package:features` is a seat-free
 aggregator depending on every `package:features:<stem>` leaf, not a COM export action.
 This namespace is interim until `solidworks-pool` admits top-level `features` targets; no pool change is included.
 Each leaf's native dependency is its own part, not assemblies or drawing
-artefacts. The three machine parts have legacy committed process plans; they
-are not enrolled travelers yet. Fixture bundles expose drawing requirements too.
+artefacts. The three machine parts have held process plans; they are not
+enrolled travelers. The built-up rocker route uses the assembled v47 bundle,
+with component manufacturing branches and plan-owned press joint features
+citing the detail drawings; it does not require separate component exports.
+Fixture bundles expose drawing requirements too.
 Each leaf writes only its own self-contained bundle:
 
 ```text

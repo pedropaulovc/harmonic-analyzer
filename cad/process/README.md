@@ -4,22 +4,31 @@ This directory holds HA-authored process plans (`<stem>/plan.toml`) and shared
 shop data (`shop/inventory.toml`, `shop/shop-policy.toml`,
 `shop/cutting-data.toml`). prechips is pinned to PyPI `prechips==0.2.0`.
 `cad/scripts/_process_plans.py:TRAVELER_STEMS` is the enrollment authority; it is
-currently empty. The rocker plan is a **HELD REFERENCE ROUTE**, migrated to
-prechips 0.1.2 but not enrolled or qualified for machining. The 2026-10-21
-standalone-tooling retirement removed its former tooling CAD, including the
-physical outline template still required by the historical S5/S7 route.
-Inventory collision envelopes and the analytic rocker-profile checks are not
-replacement fabrication CAD or evidence of a fabricated, qualified gauge.
-Before enrollment, qualify the required physical tooling and revalidate the
-route against current geometry and the pinned prechips, then obtain traveler
-exit 0 (step 6 below). The oblique-trammel base bar plan (MHA-CH-06-TL-20) is a
-held preview route from the owned 1/2 x 6 bar (#2083), migrated but not enrolled:
-the v47 drawing still prints the width as stock (#2083 open) and its travelers stay
-provisional. The legacy shaft and cone plans remain tracked as provenance,
-but are stale against the pinned prechips and are not run or shipped. Do not
-enroll one merely because its plan file exists. `_process_plans.MIGRATED_PLANS`
-records migrated plans, including the held rocker and base bar; `revision_stems()` is the
-deduplicated union of migrated and enrolled plans for revision tracking only.
+currently empty. The shaft, rocker and cone routes are held and are not
+enrolled or qualified for machining. Reconciliation uses CAD source commit
+`441290434f34f62faba176ef576af6879189c5e7` and the exact v47 release source.
+The migrated HA shaft and cone plans carry the v48 revision reservation; the
+Prechips examples retain the exact v47 pair. That reservation does not turn
+v47 bytes into a v48 export or establish qualification.
+
+The shaft is plain, with two aligned same-side flats and domed ends; the old
+shouldered, cut-to-fit route is superseded. The cone is integral solid stock;
+its paint and machined-face masking instruction remains unresolved and held
+for an owner ruling. The rocker is a built-up hub and strap according to the
+current detail drawings. Its combined route manufactures both components and
+declares a plan-owned press joint from those drawings against the assembled
+v47 STEP; no separate component export is required. Stock, pressing, tooling
+and physical bindings need resolution. None of these authored routes supplies
+missing measurements or establishes a safe setup.
+
+The oblique-trammel base bar plan (MHA-CH-06-TL-20) is a held preview from the
+owned 1/2 x 6 bar (#2083), migrated but not enrolled: the v47 drawing still
+prints the width as stock (#2083 open), so its travelers stay provisional.
+Do not enroll a plan merely because its file exists.
+`_process_plans.MIGRATED_PLANS` records migrated plans, and `revision_stems()`
+is the deduplicated union of migrated and enrolled plans for revision tracking
+only. Before enrollment, revalidate against the drawing and pinned prechips,
+resolve physical and route holds, and obtain the required traveler result.
 
 ## Bind stable labels, not STEP entity numbers
 
@@ -57,11 +66,10 @@ fixture frame, derived from the same constants used to build its SolidWorks
 part. Never supply both `cad` and `solids`, and do not maintain a second set of
 fixture dimensions in the inventory.
 
-The held rocker's retired standalone tooling is a historical exception, not
-registered spec-driven CAD: its inline inventory solids support retained
-process/clearance checks only. They do not restore deleted builders, drawings
-or physical-gauge qualification. Re-establish and qualify any required tooling
-before using or enrolling that route.
+The rocker's retired standalone tooling and its inline inventory solids are
+historical; collision envelopes do not qualify physical tooling. The current
+built-up route uses the oblique tooling described by the current CAD details;
+its availability and physical suitability still require verification.
 
 `bind_shop` writes the generated inventory under
 `cad/out/travelers/_shop/inventory.toml`, inserts the spec's primitives and
