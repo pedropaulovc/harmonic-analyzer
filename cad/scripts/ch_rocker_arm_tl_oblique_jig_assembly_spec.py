@@ -92,7 +92,7 @@ from dataclasses import dataclass
 import _config
 from _assembly_contract import assembly_contract
 from _hole_spec import NUMBER_DRILL_MM
-from _process_plans import PROCESS_ROOT
+from _paths import CAD_ROOT
 from _printed_tolerance import printed_band_mm
 from _title_block_units import LENGTH_UNITS
 
@@ -1472,7 +1472,7 @@ CHAIN_STATIONS = trammel.ALIGNMENT_STATIONS
 _CHAIN_LINKS = tuple(zip((0.0, *CHAIN_STATIONS[:-1]), CHAIN_STATIONS))
 _GAUGE_SET_KEY = "gauge-blocks-mitutoyo"
 _GAUGE_SET = tomllib.loads(
-    (PROCESS_ROOT / "shop" / "inventory.toml").read_text(encoding="utf-8")
+    (CAD_ROOT / "process" / "shop" / "inventory.toml").read_text(encoding="utf-8")
 )["gauges"][_GAUGE_SET_KEY]
 if not (
     _GAUGE_SET["present"]
@@ -2011,8 +2011,8 @@ GENERAL_TORQUE_NOTE = (
     "SNUG BY HAND WITH A STANDARD-LENGTH HEX KEY OR WRENCH; NO EXTENSION."
 )
 # Step 1 cites its documents by Number (TL-00 review 62753c5e): the base
-# bar's process plan and the rail kit's receipt sheet, whose END WALL callout
-# states the counterbore-to-end wall each trimmed rail keeps.
+# bar's process plan and the rail kit's receipt sheet, whose 2X MIN wall
+# dimension states the counterbore-to-end wall each trimmed rail keeps.
 # A literal row (base_bar_spec's convention): drawing closures track this
 # concrete registry row, not a dynamic read of another part's.
 BASE_BAR_NUMBER = _config.parts("ch-rocker-arm-tl-oblique-base-bar")["number"]
@@ -2209,8 +2209,8 @@ ASSEMBLY_STEPS = (
     "THE KIT.",
     f"1D. TRIM EACH RAIL {_item(RAIL)} TO ITS BASE BAR PER THE {BASE_BAR_NUMBER} "
     "PROCESS PLAN: BOTH ENDS FLUSH WITH THE BAR.",
-    "1E. CHECK THE END COUNTERBORE WALLS OF EACH TRIMMED RAIL TO "
-    f"{RAIL_RECEIPT_REFERENCE}, END WALL.",
+    "1E. CHECK THE END COUNTERBORE WALLS OF EACH TRIMMED RAIL TO THE 2X "
+    f"{guide_rail.WALL_ACCEPTANCE_MM:.1f} MIN DIMENSION ON {RAIL_RECEIPT_REFERENCE}.",
     "1F. TRANSFER EACH RAIL'S HOLES TO ITS BAR PER THAT PLAN: RAIL AND BAR "
     "MARKED AS A PAIR.",
     f"1G. CHECK THAT ALL {trammel.RAIL_HOLE_COUNT} SCREWS ENTER EACH BAR FREELY "
