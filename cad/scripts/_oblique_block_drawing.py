@@ -43,6 +43,7 @@ from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 import ch_rocker_arm_tl_oblique_pivot_block_spec as part
 from ch_rocker_arm_tl_oblique_callouts import set_callout_lengths_to_three_places
+from draw_sh_vn_clamping_kit_hardware import _note_text_box
 
 SHEET_SCALE = (1.0,1.0)
 # SolidWorks' own descriptive note for TL-32's Hole Wizard nut taps; the native
@@ -376,15 +377,18 @@ def _stack_pivot_callout(adapter, plan, annotations, contract):
             raise RuntimeError('pivot stacked callout leader/arrow crosses the bore interior')
         if any(_segment_distance(obstacle, start, end) < obstacle_radius + .001 for start, end in strokes):
             raise RuntimeError('pivot stacked callout leader/arrow crowds the upper-left counterbore')
-        extent = tuple(float(v) for v in (note.GetExtent() or ()))
+        # GetExtent includes the fixed leader, which must reach beyond the
+        # text lane. Measure only rendered text; prove the leader above.
+        extent = _note_text_box(ann, label='pivot stacked callout')
         left, bottom, right, top = PIVOT_STACK_LANE
-        if (len(extent) != 6 or not all(math.isfinite(v) for v in extent)
-                or not (left <= extent[0] < extent[3] <= right and bottom <= extent[1] < extent[4] <= top)):
+        if (len(extent) != 4 or not all(math.isfinite(v) for v in extent)
+                or not (left <= extent[0] < extent[2] <= right and bottom <= extent[1] < extent[3] <= top)):
             raise RuntimeError(f'pivot stacked callout text left its reserved lane: {extent!r}')
         _telemetry.info('pivot stacked native callout readback', generated=text, resolved=str(note.GetText()),
                         note_height_m=PIVOT_NOTE_HEIGHT, estimated_text_bounds_mm=estimate.mm(),
                         source_names=[state[0] for _, state in sources.values()],
-                        leader_points_m=list(points), arrow_sheet_data=list(arrow), text_extent_m=list(extent))
+                        leader_points_m=list(points), arrow_sheet_data=list(arrow), text_extent_m=list(extent),
+                        note_extent_m=list(note.GetExtent() or ()))
 
     settled()
     return settled

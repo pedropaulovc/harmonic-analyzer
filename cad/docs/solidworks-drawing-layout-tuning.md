@@ -441,9 +441,10 @@ presentation in the subsequent `389` review. The owner's replacement is
 not two independently routed diameter leaders.
 
 The native-linked attempt resolved its source values and passed the native
-source/leader checks, but run `4685555f` measured its text extent as
-`(24.796,176.396)..(164.907,225.006)` mm, outside the existing
-`(20,182)..(145,230)` mm lane. The owner's approved option B replaces that
+source/leader checks, but run `4685555f` reported the whole-note extent
+`(24.796,176.396)..(164.907,225.006)` mm. `INote.GetExtent` includes the fixed
+leader, so that rectangle is not a text-only measurement against the
+`(20,182)..(145,230)` mm text lane. The owner's approved option B replaces that
 expanded source-caption block with a **plain, four-line spec-generated
 note**, explicitly sized to the normal **3.5 mm** note height through
 `_size_note`. It does not reduce that height or enlarge the lane to fit.
@@ -474,9 +475,23 @@ cap-height per glyph (conservative versus its calibrated 0.62 average),
 1.6-height row pitch, and 1 mm padding on every side. The current four rows'
 longest line is 33 glyphs, giving padded bounds
 **`(24,203.7)..(141.5,226)` mm**, with minimum lane margin **3.5 mm**.
-The estimate requires at least 3 mm margin, but does not replace or loosen
-the actual `INote.GetExtent` gate. Telemetry records the height, estimated
-bounds and actual text extent for comparison.
+The estimate requires at least 3 mm margin, but is never used as measured
+geometry. The settled text-lane gate directly reuses
+`draw_sh_vn_clamping_kit_hardware._note_text_box`: four-coordinate bounds
+from native `IDisplayData` text runs, including their measured widths,
+heights, reference positions and angles. Missing text or nonpositive/
+nonfinite text sizes fail closed; there is no estimated-width fallback.
+Telemetry records the height, estimated bounds, measured text bounds and
+whole-note extent separately.
+
+Run `e4a597af` reported a whole-note extent of
+`(24.7960066889632,205.46646153846154)..(164.9071638795986,225.00577257525084)`
+mm. Its right edge is outside the text lane because the leader reaches the
+bore. The focused positive fixture retains that exact six-coordinate
+extent while supplying independently measured text runs inside the lane.
+It passes only with the separate physical leader/arrow proofs below;
+bad text bounds, missing/unreadable widths and extra or misrouted leaders
+remain negative controls. This fixture is not a native text measurement.
 
 The already-proved leader construction is unchanged: one view-owned note,
 one live leader and one native arrow on the leftmost outer-rim point.

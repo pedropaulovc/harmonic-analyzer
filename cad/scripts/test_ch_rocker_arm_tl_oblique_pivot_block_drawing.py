@@ -449,14 +449,21 @@ def _stacked_pivot_fixture(monkeypatch):
             GetPrimaryTolPrecision2=lambda row=row: row.tolerance_places,
             GetAnnotation=lambda annotation=annotation: annotation,
         )
-    # Synthetic COM geometry, not a claim about the next native sheet.
-    note = SimpleNamespace(text=_PIVOT_GENERATED_TEXT, extent=(.0248, .2045, 0.0, .110, .225, 0.0))
+    # Exact e4a597af whole-note extent includes the outside leader. The text
+    # runs below are synthetic measured COM data, not a native-pass claim.
+    note = SimpleNamespace(text=_PIVOT_GENERATED_TEXT, extent=(
+        0.0247960066889632, 0.20546646153846154, -1.4542750301607925e-15,
+        0.1649071638795986, 0.22500577257525084, -1.5907173098783955e-15,
+    ))
     native = SimpleNamespace(
         Visible=1, OwnerType=0, Owner=plan, position=(*drawing.PIVOT_STACK_XY, 0.0),
         leaders=1, attached=outer, dangling=False,
         points=(.130, origin[1], 0.0, *landing, 0.0),
         arrow=(*landing, 0.0, -1.0, 0.0, 0.0, .002, .001, 0.0, 0.0, 0.0, 1.0),
         arrow_count=1, font=SimpleNamespace(CharHeight=.005),
+        text_rows=_PIVOT_GENERATED_TEXT.splitlines(),
+        text_widths=[.0852, .080, .060, .100],
+        text_positions=[(.025, .2215 - index * .0052, 0.0) for index in range(4)],
     )
     native.GetPosition = lambda: native.position
     native.GetLeaderCount = lambda: native.leaders
@@ -469,6 +476,13 @@ def _stacked_pivot_fixture(monkeypatch):
     native.SetTextFormat = lambda index, use_doc, value: True
     native.GetDisplayData = lambda: SimpleNamespace(
         GetArrowHeadCount=lambda: native.arrow_count, GetArrowHeadAtIndex2=lambda index: native.arrow,
+        GetTextCount=lambda: len(native.text_rows),
+        GetTextAtIndex=lambda index: native.text_rows[index],
+        GetTextInBoxWidthAtIndex=lambda index: native.text_widths[index],
+        GetTextHeightAtIndex=lambda index: native.font.CharHeight,
+        GetTextPositionAtIndex=lambda index: native.text_positions[index],
+        GetTextRefPositionAtIndex=lambda index: 1,
+        GetTextAngleAtIndex=lambda index: 0.0,
     )
     note.GetAnnotation = lambda: native
     note.GetText = lambda: note.text
@@ -491,6 +505,10 @@ def _stacked_pivot_fixture(monkeypatch):
                  circle=(spec.BORE_X, spec.BORE_Y, spec.BLOCK_HEIGHT, 0.0, 0.0, 1.0, spec.BORE_DIA / 2)),
     ]
     monkeypatch.setattr(drawing, '_early_bound', lambda obj, interface: obj)
+    import draw_sh_vn_clamping_kit_hardware as hardware
+    # Exercise the imported helper itself, including its native-width refusal.
+    assert drawing._note_text_box is hardware._note_text_box
+    monkeypatch.setattr(hardware, '_early_bound', lambda obj, interface: obj)
     monkeypatch.setattr(drawing, '_displays',
                         lambda adapter, annotations, names: {name: displays[name] for name in names})
     monkeypatch.setattr(drawing, 'scan_view_edges',
@@ -524,6 +542,7 @@ def _stacked_pivot_fixture(monkeypatch):
     'source_position', 'source_shown', 'depth_hidden', 'wrong_owner', 'hidden_note', 'note_position',
     'two_leaders', 'wrong_attachment', 'inner_tip', 'centre_crossing', 'upper_left_crossing',
     'arrow_inside', 'two_arrows', 'malformed_arrow', 'text_outside',
+    'missing_text', 'zero_text_width', 'nan_text_width', 'nan_text_position',
 ))
 def test_generated_pivot_callout_preserves_native_sources_and_outside_route(monkeypatch, fault):
     case = _stacked_pivot_fixture(monkeypatch)
@@ -531,6 +550,9 @@ def test_generated_pivot_callout_preserves_native_sources_and_outside_route(monk
     assert len(case.inserted) == 1 and len(case.rebuilds) == 2
     assert case.native.font.CharHeight == case.drawing.PIVOT_NOTE_HEIGHT
     assert case.reports[0]['estimated_text_bounds_mm'] == pytest.approx((24.0, 203.7, 141.5, 226.0))
+    assert case.note.extent[3] > case.drawing.PIVOT_STACK_LANE[2]
+    assert case.reports[0]['note_extent_m'] == list(case.note.extent)
+    assert case.reports[0]['text_extent_m'] == pytest.approx((.025, .2059, .125, .225))
     tap = case.rows['TapDrillDia']
     if fault == 'unicode_crlf':
         case.note.text = case.note.text.replace('<MOD-DIAM>', 'Ø').replace('<HOLE-DEPTH>', '↧').replace('\n', '\r\n')
@@ -596,13 +618,30 @@ def test_generated_pivot_callout_preserves_native_sources_and_outside_route(monk
     elif fault == 'malformed_arrow':
         case.native.arrow = case.native.arrow[:6]
     elif fault == 'text_outside':
-        case.note.extent = (.025, .198, 0.0, .170, .225, 0.0)
+        case.native.text_positions[0] = (.150, .2215, 0.0)
+    elif fault == 'missing_text':
+        case.native.text_rows = []
+    elif fault == 'zero_text_width':
+        case.native.text_widths[0] = 0.0
+    elif fault == 'nan_text_width':
+        case.native.text_widths[0] = float('nan')
+    elif fault == 'nan_text_position':
+        case.native.text_positions[0] = (float('nan'), .2215, 0.0)
     if fault in (None, 'unicode_crlf'):
         proof()
         assert len(case.rebuilds) == 2 and len(case.reports) == 2
     else:
         with pytest.raises(RuntimeError):
             proof()
+
+
+def test_pivot_text_bounds_refuse_missing_native_width(monkeypatch):
+    case = _stacked_pivot_fixture(monkeypatch)
+    proof = case.drawing._stack_pivot_callout(case.adapter, case.plan, [], spec)
+    case.native.text_widths[0] = None
+    # No estimated-width fallback when the COM accessor returns no value.
+    with pytest.raises(TypeError):
+        proof()
 
 
 @pytest.mark.parametrize('fault', ('feature', 'value', 'precision', 'band'))
