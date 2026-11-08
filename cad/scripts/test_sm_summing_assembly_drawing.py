@@ -79,7 +79,9 @@ def test_bom_rows_come_from_the_part_registry() -> None:
     assert drawing.BOM_SKUS[spec.KNIFE_MOUNT] == "-"
     assert drawing.BOM_SKUS[spec.BOSS_HOOK] == "9490T1"
     assert set(drawing.BALLOON_ANCHORS) == set(notes.BOM_ORDER)
-    assert spec.QUANTITIES[spec.DOWEL] == builder.knife_dowel.PER_MOUNT * 2
+    # Owner ruling 2026-11-08 (Pedro), #2144 item 11.3: one dowel per mount.
+    assert builder.knife_dowel.PER_MOUNT == 1
+    assert spec.QUANTITIES[spec.DOWEL] == builder.knife_dowel.PER_MOUNT * 2 == 2
 
 
 def test_every_bom_part_is_installed_by_a_numbered_step() -> None:
@@ -119,7 +121,7 @@ def test_station_slide_clears_the_hex_trunnion() -> None:
 
 def test_dowels_leave_the_mounts_with_the_crossbar_not_with_the_mounts() -> None:
     # Owner ruling 2026-10-24 (T+H3): the dowels press into the crossbar, so
-    # the explode lifts them out of the mounts' round hole and slot before any
+    # the explode lifts them out of the mounts' round holes before any
     # station slides, and no station slide carries them.
     labels = [label for label, *_ in explode.EXPLODE_STEPS]
     dowel_steps = [
@@ -300,15 +302,46 @@ def test_retention_rows_cite_the_package_steps() -> None:
     assert nut.installed_at == "MHA-SM-00 STEP 2"
 
 
-def test_step_six_runs_each_hanger_bolt_home_by_hand_before_drawing_up() -> None:
+def test_step_five_runs_each_hanger_bolt_home_by_hand_then_sets_the_gauge_pin() -> None:
     # Owner ruling 2026-10-27 (#2018 option C): accepted as is.  Each cut
     # bolt is run in by hand to its washer before it draws the mount's top
-    # seat flat to the crossbar underside.
-    step = notes.ASSEMBLY_STEPS[5]
-    assert step.startswith("6. ")
+    # seat flat to the crossbar underside.  Owner ruling 2026-11-08 (Pedro),
+    # #2144 item 11.3: with both bolts finger-tight the gauge pin through
+    # both bores sets the mounts' yaw before they are tightened, and it must
+    # slide back out (check 6).
+    step = notes.ASSEMBLY_STEPS[4]
+    assert step.startswith("5. ")
     assert "MHA-SM-VN-52" in step
     assert "WASHER" in step
-    assert step.index("BY HAND") < step.index("TIGHTEN")
+    assert "WITHOUT THE LEVER" in step
+    assert step.index("BY HAND") < step.index(notes.KNIFE_GAUGE_BAR) < step.index("TIGHTEN")
+    assert notes.KNIFE_GAUGE_BAR == "Ø.4720 CLASS ZZ MINUS GAUGE PIN"
+    assert spec.KNIFE_GAUGE_BAR_DIA == pytest.approx(2.0 * builder.knife_mount.BORE_R_MIN)
+    assert notes.KNIFE_GAUGE_BAR not in " ".join(notes.BOM_DESCRIPTIONS.values())
+    assert any(
+        check.startswith("6. AFTER STEP 5") and notes.KNIFE_GAUGE_BAR in check
+        for check in notes.ASSEMBLY_CHECKS
+    )
+
+
+def test_rear_mount_is_rehung_on_the_lever_and_swung_to_the_rock_gauge() -> None:
+    # Coordinator ruling on the SM-00 order for #2144 item 11.3: the lever's
+    # rigid stubs cannot enter two fixed bores, so the rear mount comes off,
+    # takes its stub, is re-hung finger-tight and swung until check 2 passes.
+    step = notes.ASSEMBLY_STEPS[5]
+    assert step.startswith("6. ") and "REAR MOUNT" in step
+    assert (
+        step.index("LIFT THE MOUNT OFF")
+        < step.index("RE-HANG")
+        < step.index("BY HAND")
+        < step.index("SWING THE REAR MOUNT ABOUT ITS DOWEL")
+        < step.index("(CHECK 2)")
+        < step.index("TIGHTEN")
+    )
+    # The cut stays at step 4 and the hanger joint completes at step 6, the
+    # steps the purchased-part sheets and joint_retention cite.
+    assert notes.ASSEMBLY_STEPS[3].startswith("4. ") and "CUT AN" in notes.ASSEMBLY_STEPS[3]
+    assert builder.KNIFE_REAR_YAW_RANGE_DEG > builder.KNIFE_BAR_YAW_DEG
 
 
 def test_hanger_fit_up_reach_matches_the_builder_band() -> None:

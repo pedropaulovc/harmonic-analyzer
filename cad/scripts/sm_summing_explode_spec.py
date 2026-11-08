@@ -7,8 +7,9 @@ the boss hook and the hook unscrews from the lever boss, its jam nut still
 threaded on the shank between the cut end and the boss (step 2 spins the
 nut on from the cut end before the hook enters the boss); then the dowels,
 pressed into the crossbar's underside reams (owner ruling 2026-10-24, T+H3),
-rise with the crossbar out of the mounts' round holes and slots (step 5 lifts
-the mounts onto them), each knife-mount station (mount, its washer and bolt)
+rise with the crossbar out of the mounts' round holes (steps 5-6 hang the
+mounts on them, one dowel per mount since owner ruling 2026-11-08 (Pedro),
+#2144 item 11.3), each knife-mount station (mount, its washer and bolt)
 slides off its hex trunnion along Z, the bolts and washers lift and the
 bolts clear their washers.  No SolidWorks imports.
 """

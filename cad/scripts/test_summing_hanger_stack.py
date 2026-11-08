@@ -165,7 +165,7 @@ def test_instance_readback_rejects_drifted_hardware(
         )
 
 
-def test_new_washers_add_two_instances_to_the_thirteen_component_recipe() -> None:
+def test_new_washers_add_two_instances_to_the_one_dowel_per_mount_recipe() -> None:
     tree = ast.parse(Path(asm.__file__).read_text(encoding="utf-8"))
     builds = [
         node
@@ -210,7 +210,7 @@ def test_new_washers_add_two_instances_to_the_thirteen_component_recipe() -> Non
         "sm-knife-mount": 2,
         "sm-vn-knife-hanger-stud": 2,
         "sm-vn-knife-hanger-washer": 2,
-        "sm-vn-knife-mount-dowel": 4,
+        "sm-vn-knife-mount-dowel": 2,
         "sm-summing-lever": 1,
         "sm-vn-boss-hook": 1,
         "sm-vn-boss-hook-jam-nut": 1,
@@ -218,9 +218,11 @@ def test_new_washers_add_two_instances_to_the_thirteen_component_recipe() -> Non
         "sm-gooseneck": 1,
         "sm-gooseneck-spring-screw": 1,
     }
-    assert sum(counts.values()) == 16
+    # Owner ruling 2026-11-08 (Pedro), #2144 item 11.3: one dowel per mount
+    # takes the former thirteen-component recipe to eleven.
+    assert sum(counts.values()) == 14
     added = counts["sm-vn-knife-hanger-washer"] + counts["sm-vn-boss-hook-jam-nut"]
-    assert sum(counts.values()) - added == 13
+    assert sum(counts.values()) - added == 11
 
 
 def test_washer_seat_pairs_allow_exact_contacts_but_no_solid_overlap() -> None:

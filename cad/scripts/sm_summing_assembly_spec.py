@@ -45,7 +45,7 @@ QUANTITIES = {
     KNIFE_MOUNT: 2,
     HANGER_WASHER: 2,
     HANGER_BOLT: 2,
-    DOWEL: 4,
+    DOWEL: 2,
     LEVER: 1,
     BOSS_HOOK: 1,
     BOSS_JAM_NUT: 1,
@@ -64,6 +64,20 @@ QUANTITIES = {
 HANGER_FIT_REACH = 8.9154  # .351
 HANGER_FIT_REACH_TOL = 0.1524  # .006
 HANGER_FIT_REACH_PLACES = 3
+
+# --- Knife-mount gauge bar (Owner ruling 2026-11-08 (Pedro), #2144 item 11.3) --
+# A tool, not a BOM part: with each MHA-SM-02 hung on its one MHA-SM-VN-53
+# dowel and its bolt finger-tight, a Ø.4720 class ZZ MINUS gauge pin
+# (+.0000/-.0002 in) slides through BOTH mounts' bores; the bolts are
+# tightened and the bar must slide back out.  It sets the front mount's yaw
+# about its dowel (and proves both mounts' pitch); the rear mount is then
+# re-hung on the lever's stub and swung until the rock gauge passes
+# (``build_sm_summing_assembly`` budgets both).  Its nominal is the bore's
+# smallest printed Ø, so it enters every conforming bore.
+KNIFE_GAUGE_BAR_DIA_IN = 0.4720
+KNIFE_GAUGE_BAR_BAND_IN = (0.0, -0.0002)  # (upper, lower), class ZZ minus
+KNIFE_GAUGE_BAR_DIA = KNIFE_GAUGE_BAR_DIA_IN * 25.4  # 11.9888
+KNIFE_GAUGE_BAR_DIA_MIN = (KNIFE_GAUGE_BAR_DIA_IN + min(KNIFE_GAUGE_BAR_BAND_IN)) * 25.4
 
 # --- Assembly settings, as model dimensions -------------------------------------
 # Two blanked Front-plane construction sketches in the assembly (sketch x =

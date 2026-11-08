@@ -1,16 +1,18 @@
 r"""MHA-SM-VN-53 knife-mount-dowel: McMaster 98381A473 stock dowel.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
-closure.  Four are used, two per knife mount: each is pressed chamfer end
+closure.  Two are used, one per knife mount: each is pressed chamfer end
 first to the flat floor of a blind ream in the underside of the MHA-FR-02
 crossbar, a knockout drilled up from that floor through the faced top on
-the ream's drawn axis, and slips, at assembly, into the MHA-SM-02 knife mount's top seat,
-one into a round hole, the other into a slot open to the block's -X face
-(owner ruling 2026-10-24, T+H3: the press and its way out live in the soft
-casting, the hardened block carries only slip bands).  The pair keys the
-block against turning about its #10-24 knife-hanger hex bolt (MHA-SM-VN-52):
-the bolt clamps the seat to the casting underside, the pins react the torque
-and hold the block's yaw.
+the ream's drawn axis, and slips, at assembly, into the MHA-SM-02 knife
+mount's round hole (datum B) in its top seat (owner ruling 2026-10-24,
+T+H3: the press and its way out live in the soft casting, the hardened
+block carries only slip bands).  Owner ruling 2026-11-08 (Pedro), #2144
+item 11.3 (scheme S1): one dowel and the #10-24 knife-hanger hex bolt
+(MHA-SM-VN-52) hang each block; the bolt clamps the seat to the casting
+underside, the pin locates it, and the block's yaw about the pin is set at
+MHA-SM-00 by a Ø.4720 gauge bar slid through both mounts' bores while the
+bolts are tightened.
 
 Catalogue: 1/8 x 3/4 alloy-steel dowel, Round x Chamfer ends, diameter
 +0.0001/+0.0003 in, Rockwell C47 min, ASME B18.8.2; the size row, the end
@@ -46,7 +48,7 @@ from _fit_ream_h7 import REAM_H7
 from _printed_tolerance import printed_band_mm
 from _supplier_pin_data import SupplierPinReference
 
-# The knife mount's slip hole, slot and their depth print on its sheet, in
+# The knife mount's slip hole and its depth print on its sheet, in
 # its unit (#290); the press ream's on MHA-FR-02's.
 _MOUNT_UNIT = drawing_unit("parts/sm-knife-mount", _config.parts("sm-knife-mount"))
 # The press ream's size, depth and stations print on MHA-FR-02, in its unit,
@@ -83,49 +85,34 @@ LENGTH_GRADE = 0.010 * MM_PER_IN  # 0.254
 _XX = printed_band_mm(2, unit=_FRAME_UNIT)
 _XXX = printed_band_mm(3, unit=_FRAME_UNIT)
 
-# Two pins per knife mount, their axes HANGER_OFFSET either side of the
-# knife-hanger screw axis along machine X in BOTH parts (block local X is
-# machine X: the mounts are placed unrotated).  Owner ruling 2026-10-24
-# (T+H3, machinist ENFORCE review of MHA-SM-02, rule 16): the pins press
-# into the MHA-FR-02 crossbar, each to the floor of a blind ream drilled from
-# the underside, a knockout drilled up from its floor through the top, located
-# by the drawn common axis only (+/-.005 implied, owner ruling 2026-10-27
-# (c)), and slip
-# into the hardened knife mount, one into its round hole (datum B) and the
-# other into its slot (datum C), open to the block's -X face.  The crossbar
-# prints each +X ream's station .XXX from its screw axis (HANGER_OFFSET_TOL)
-# and each -X ream BASIC SPAN from its +X ream under a ⌖Ø.002 frame (fr-top-
-# frame ENFORCE review, farm run 20261027T030041319Z: a frame needs BASIC
-# locations), so a mount fitted turned end for end, its round hole on the
-# -X pin, still floats inside the crossbar's #10 clearance hole; the block's
-# slot takes up the spacing (``fr_top_frame_spec``, ``sm_knife_mount_spec``,
-# ``build_sm_summing_assembly``).
-PER_MOUNT = 2
+# One pin per knife mount, its axis HANGER_OFFSET along machine +X from the
+# knife-hanger screw axis in BOTH parts (block local X is machine X: the
+# mounts are placed unrotated).  Owner ruling 2026-10-24 (T+H3, machinist
+# ENFORCE review of MHA-SM-02, rule 16): the pin presses into the MHA-FR-02
+# crossbar, to the floor of a blind ream drilled from the underside, a
+# knockout drilled up from its floor through the top, located by the drawn
+# common axis only (+/-.005 implied, owner ruling 2026-10-27 (c)), and slips
+# into the hardened knife mount's round hole (datum B).  The crossbar prints
+# the ream's station .XXX from its screw axis (HANGER_OFFSET_TOL).  Owner
+# ruling 2026-11-08 (Pedro), #2144 item 11.3 (scheme S1): the -X pin, its
+# crossbar ream and the block's slot (datum C) are deleted; the block turns
+# about its one pin until the MHA-SM-00 gauge bar, slid through both
+# mounts' bores, sets its yaw (``build_sm_summing_assembly``).
+PER_MOUNT = 1
 MOUNTS = 2
 QUANTITY = PER_MOUNT * MOUNTS
 # 7.632 for the #10-24 hex bolt that replaced the #6-32 screw (the user's
 # knife-hanger regression fix): the crossbar's Ø6.045 #10 loose clearance
 # hole, drilled from the underside under a shallow top spotface, and its then
 # slot, shortened to 3.95, each kept 2.0 of wall at the print-worst plus
-# drill drift, inside to the hole and outside to the 25 crossbar's face; the
-# block widened to 25.4 so its then pressed -X dowel kept 2.0 to the far
-# face round the 15.264 BASIC span.  T+H3 moves the slot to the block and
-# the press to the crossbar's reams (``build_fr_top_frame``'s ream walls,
-# ``sm_knife_mount_spec``'s slot webs).  History: 7.100, not the
-# original 1/4 in, because at 6.350 the crossbar's blind slot left under 2.0
-# of wall to the then #6 clearance hole at the print-worst plus drill drift
-# (codex machinist review of fr_top_frame 4d11a94e); Q7 option C, approved as
-# built by the user 2026-10-13 (#1348): 14.200 BASIC span, 24 crossbar, 25
-# block, Ø4.699 #6 hole drilled from the underside.
+# drill drift, inside to the hole and outside to the 25 crossbar's face.
+# History: 7.100, not the original 1/4 in, because at 6.350 the crossbar's
+# blind slot left under 2.0 of wall to the then #6 clearance hole at the
+# print-worst plus drill drift (codex machinist review of fr_top_frame
+# 4d11a94e); Q7 option C, approved as built by the user 2026-10-13 (#1348).
 HANGER_OFFSET = 7.62  # .300 (#290: was 7.632, off the inch grid)
 HANGER_OFFSET_PLACES = 3
 HANGER_OFFSET_TOL = _XXX  # 0.127
-# The pair's centre-to-centre span along the dowel line: BASIC on the
-# crossbar, within the -X ream's Ø.002 position zone radius
-# (``fr_top_frame_spec.HANGER_PRESS_HOLE_POSITION_TOL``, which asserts it);
-# the knife mount's slot takes that variation as travel.
-SPAN = 2.0 * HANGER_OFFSET  # 15.24, .600
-SPAN_TOL = 0.0254
 
 # --- The press: the crossbar's blind reams (owner ruling 2026-10-24, T+H3) --
 # Reamed from the faced underside to a flat floor, printed .XX, the pin
@@ -190,14 +177,14 @@ if PRESS_FLOOR_LIFT_MAX > 0.02 * PRESS_DEPTH_TOL:
         f"the ream floor's corner holds the dowel {PRESS_FLOOR_LIFT_MAX:.4f} off its floor"
     )
 
-# --- The slip: the knife mount's round hole and open slot -------------------
+# --- The slip: the knife mount's round hole (datum B) -----------------------
 # A slip on the pin's catalogue diameter at 0.02..0.10 diametral clearance
-# (the dt_pinion_cam_spec slip band), reamed (the round hole, a purchased
-# .1280 chucking reamer) or milled (the slot's width) to an explicit
-# .1280 +/-.0007 band: .0020..0.0036 in (0.0508..0.0914).  The band's maximum,
-# .1287 (3.269), keeps the loosest slip (and the rock, bolt-float, web and
-# slot-margin stacks it feeds) under main's 3.270; the tightest slip, .0020,
-# keeps the pin-to-hole tilt proof's angular margin (codjiflo round 6).
+# (the dt_pinion_cam_spec slip band), reamed (a purchased .1280 chucking
+# reamer) to an explicit .1280 +/-.0007 band: .0020..0.0036 in
+# (0.0508..0.0914).  The band's maximum, .1287 (3.269), keeps the loosest
+# slip (and the bolt-float and web stacks it feeds) under main's 3.270; the
+# tightest slip, .0020, keeps the pin-to-hole tilt proof's angular margin
+# (codjiflo round 6).
 # Cut soft in the O1 block: hardening's growth (<= .0001 in on this size,
 # owner ruling 2026-10-24, H3) stays inside the band.
 SLIP_HOLE_DIA = 3.2512  # .1280
@@ -210,7 +197,7 @@ if SLIP_CLEARANCE_MIN < 0.02 or SLIP_CLEARANCE_MAX > 0.10:
         f"knife-mount dowel slip clearance {SLIP_CLEARANCE_MIN}-"
         f"{SLIP_CLEARANCE_MAX} is outside 0.02-0.10"
     )
-# The block's round hole and slot, blind from its top seat, printed .XX: the
+# The block's round hole, blind from its top seat, printed .XX: the
 # floor-clearance and tilt stacks read the depth's band.
 SLIP_DEPTH = 9.398  # .37
 SLIP_DEPTH_PLACES = 2

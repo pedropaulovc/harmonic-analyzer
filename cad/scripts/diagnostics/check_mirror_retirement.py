@@ -141,7 +141,7 @@ expect(
     IDENTITY,
     "knife-mount back",
 )
-# Revised cut bolts, new SAE washers and dowel pairs are checked against
+# Revised cut bolts, new SAE washers and the knife-mount dowels are checked against
 # actual assembly transforms by build_sm_summing_assembly's per-instance
 # readbacks when rebuilt. This historical pose dump does not certify the
 # revised hardware; only the unchanged knife-mount and lever poses share it.

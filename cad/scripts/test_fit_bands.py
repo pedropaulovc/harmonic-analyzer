@@ -114,11 +114,6 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
         " blank_dia_band(12), tooth_thickness_band(12))",
         "each",
     ),
-    # for dim_name, band in (("PinHoleDia", PIN_HOLE_DIA_BAND), ("SlotWidth",
-    # SLOT_WIDTH_BAND)): deviations(band), then the symmetric setter -- the
-    # knife mount's datum-B hole and datum-C slot slip bands (owner ruling
-    # 2026-10-24, T+H3), both the dowel spec's SLIP_HOLE_DIA_BAND.
-    ("build_sm_knife_mount", "band"): ("(PIN_HOLE_DIA_BAND, SLOT_WIDTH_BAND)", "each"),
 }
 
 # Consumer modules that cannot be imported without SolidWorks, with the reason.

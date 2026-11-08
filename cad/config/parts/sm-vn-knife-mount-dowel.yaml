@@ -9,9 +9,9 @@ sm-vn-knife-mount-dowel:
   finish: plain; no coating
   installation_notes: |-
     INSTALLATION - PRESS FIT IN THE MHA-FR-02 CROSSBAR UNDERSIDE REAM,
-    CHAMFER END FIRST. ONE PIN SLIPS INTO THE MHA-SM-02 KNIFE MOUNT
-    ROUND HOLE, ONE INTO ITS SLOT.
-  quantity: 4
+    CHAMFER END FIRST. ONE PIN PER MHA-SM-02 KNIFE MOUNT, SLIPPING INTO
+    ITS ROUND HOLE.
+  quantity: 2
   tolerance_class: machined_block
   process: purchased
   drawing_unit: in

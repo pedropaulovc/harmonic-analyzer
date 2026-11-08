@@ -229,9 +229,10 @@ _COMPONENT_BAND = {
     # washers and the wave spring; +2 MHA-CH-VN-55 fulcrum crown set screws)
     # The former monolithic output split by function (no per-channel parts here);
     # bands tightened to the measured green-build counts (verify:subsystems).
-    "sm-summing": (14, 16),  # ch 18-19, source-recipe expected 15: two mounts,
-    # two cut #10-24 hex bolts, two NEW 96659A104 SAE washers, four dowels,
-    # lever, boss hook, counter spring, gooseneck and spring-clamp screw.
+    "sm-summing": (12, 14),  # ch 18-19, source-recipe expected 13: two mounts,
+    # two cut #10-24 hex bolts, two NEW 96659A104 SAE washers, two dowels (one
+    # per mount, owner ruling 2026-11-08 (Pedro), #2144 item 11.3), lever,
+    # boss hook, counter spring, gooseneck and spring-clamp screw.
     "mg-magnifier": (11, 13),  # ch 20-21, measured 12 (+lever-wire, 2026-07-04)
     "pn-pen": (10, 12),  # ch 24, expected 11 (2026-10 re-derivation: + rod set screw, adjuster stud + jam nut)
     "pd-paper-drive": (112, 120),  # ch 22-23-25, expected 116 (54 placed + 62-link
