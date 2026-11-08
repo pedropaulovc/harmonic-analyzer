@@ -1372,11 +1372,12 @@ def test_lever_tip_placement_uses_opposite_native_view_and_isolation(monkeypatch
     monkeypatch.setattr(
         drawing, "set_hidden_lines_removed", lambda _a, _v: events.append(("HLR",))
     )
+    current_view = object()
     monkeypatch.setattr(
         drawing, "isolate_drawing_view_components",
-        lambda _a, _v, **kwargs: events.append(("isolate", kwargs["visible_stems"])),
+        lambda _a, _v, **kwargs: events.append(("isolate", kwargs["visible_stems"])) or current_view,
     )
-    assert drawing._placed_detail(adapter, detail) is view
+    assert drawing._placed_detail(adapter, detail) is current_view
     assert events[0] == ("place", str(drawing.SOURCE), "*Front", detail.centre, (4, 1))
     assert view.Position == pytest.approx((0.060, 0.070))
     assert events[-2:] == [
@@ -3628,11 +3629,18 @@ def immutable_tip_build(
     monkeypatch.setattr(drawing, "_place_exploded_view", place)
     monkeypatch.setattr(drawing, "_place_collapsed_view", place)
     for name in (
-        "assert_full_detail_view", "isolate_drawing_view_components",
+        "assert_full_detail_view",
         "_show_tangent_edges", "_assert_bom_clears_reference_field",
         "_link_view_to_bom", "_move_wire_balloon", "assert_balloon_landings",
     ):
         monkeypatch.setattr(drawing, name, lambda *_a, **_k: None)
+
+    def isolate(_adapter, view, *, visible_stems, label):
+        current = SimpleNamespace(**vars(view))
+        views[label] = current
+        return current
+
+    monkeypatch.setattr(drawing, "isolate_drawing_view_components", isolate)
     monkeypatch.setattr(drawing, "_fit_ring", lambda _a, _v, ladder, *_args, **_k: ladder[0])
     monkeypatch.setattr(drawing, "insert_bom_table", lambda *_a, **_k: magnifier_bom.table)
     items = state.bom_items

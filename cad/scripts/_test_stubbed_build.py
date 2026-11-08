@@ -97,6 +97,9 @@ def stub_seat(
         seat.add_line_chain.side_effect = lambda _adapter, points, close=True: [
             f"Line{k}" for k in range(len(points) if close else len(points) - 1)
         ]
+    for name in ("isolate_drawing_view_components", "set_drawing_view_instance_visibility"):
+        if name in stubbed:
+            getattr(seat, name).side_effect = lambda _adapter, view, *args, **kwargs: view
     seat.stubbed = frozenset(stubbed)
     return seat
 

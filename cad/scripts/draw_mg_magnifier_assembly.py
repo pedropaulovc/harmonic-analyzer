@@ -796,9 +796,7 @@ def _placed_detail(adapter: Any, detail: StackDetail | LeverTipDetail) -> Any:
             f"{detail.title} centre sits at {centre!r}, not {detail.centre!r}"
         )
     set_hidden_lines_removed(adapter, view)
-    isolate_drawing_view_components(
-        adapter, view, visible_stems=detail.stems, label=detail.title
-    )
+    view = isolate_drawing_view_components(adapter, view, visible_stems=detail.stems, label=detail.title)
     return view
 
 
@@ -2468,13 +2466,16 @@ async def build(adapter: Any) -> dict[str, str]:
         label=BOM_REFERENCE_LABEL,
     )
     source_step(f"{BOM_REFERENCE_LABEL} ring fit")
-    for sheet_name, view, stems, label in (
-        (SHEET_NAMES[1], wheel, explode.WHEEL_GROUP_STEMS, WHEEL_LABEL),
-        (SHEET_NAMES[2], lever, explode.LEVER_GROUP_STEMS, LEVER_LABEL),
-    ):
-        _activate_sheet(adapter, sheet_name)
-        isolate_drawing_view_components(adapter, view, visible_stems=stems, label=label)
-        source_step(f"{label} isolation")
+    _activate_sheet(adapter, SHEET_NAMES[1])
+    wheel = isolate_drawing_view_components(
+        adapter, wheel, visible_stems=explode.WHEEL_GROUP_STEMS, label=WHEEL_LABEL
+    )
+    source_step(f"{WHEEL_LABEL} isolation")
+    _activate_sheet(adapter, SHEET_NAMES[2])
+    lever = isolate_drawing_view_components(
+        adapter, lever, visible_stems=explode.LEVER_GROUP_STEMS, label=LEVER_LABEL
+    )
+    source_step(f"{LEVER_LABEL} isolation")
     _show_tangent_edges(adapter, lever, label=LEVER_LABEL)
     source_step(f"{LEVER_LABEL} tangent edges")
 

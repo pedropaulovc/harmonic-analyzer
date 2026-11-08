@@ -866,9 +866,7 @@ def _placed_detail(adapter: Any, detail: Detail) -> Any:
         raise RuntimeError(
             f"{detail.label} centre sits at {centre!r}, not {detail.centre!r}"
         )
-    isolate_drawing_view_components(
-        adapter, view, visible_stems=detail.stems, label=detail.label
-    )
+    view = isolate_drawing_view_components(adapter, view, visible_stems=detail.stems, label=detail.label)
     return view
 
 

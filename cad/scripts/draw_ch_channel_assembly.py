@@ -1621,9 +1621,7 @@ def _placed_bank_view(adapter: Any, bank: BankView) -> Any:
         )
     if not pictorial:
         set_hidden_lines_removed(adapter, view)
-    isolate_drawing_view_components(
-        adapter, view, visible_stems=bank.stems, label=bank.title
-    )
+    view = isolate_drawing_view_components(adapter, view, visible_stems=bank.stems, label=bank.title)
     return view
 
 
