@@ -1603,6 +1603,11 @@ def test_the_cluster_is_shimmed_to_view_e_after_it_is_hung() -> None:
     # shims plus the spares the model stores in the spare sprocket's bore.
     low_count, high_count = cluster_fit.SHIM_COUNT_RANGE
     assert f"UP TO {high_count} IN ALL" in " ".join(shimmed.split())
+    # Round 9: the gap is corrected either way. The bare stack is never under
+    # the window, so an under gap is an overshoot and one shim comes off.
+    assert "IF IT IS OVER OR UNDER" in " ".join(shimmed.split())
+    assert "IF UNDER, TAKE ONE SHIM OFF" in " ".join(shimmed.split())
+    assert cluster_fit.UNSHIMMED_FLOAT_RANGE[0] >= cluster_fit.RING_FLOAT_RANGE[0]
     assert high_count <= cluster_fit.SHIM_COUNT_MAX
     description = drawing.BOM_DESCRIPTIONS["pd-vn-transgear-cluster-shim"]
     assert "SUPPLY" not in description

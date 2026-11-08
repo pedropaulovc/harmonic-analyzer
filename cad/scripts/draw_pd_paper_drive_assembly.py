@@ -2040,20 +2040,22 @@ def _step_text(
             "RING ON ITS GROOVE'S FRONT WALL.",
             f"READ THE GAP BETWEEN THE {n['pd-transgear-front-bushing']} BUSHING AND "
             f"THE {n['pd-vn-transgear-retaining-ring']} RING WITH FEELERS.",
-            # Machinist review round 8: the shims sit under the rear bushing,
-            # so the stack comes off to fit them and goes back on to re-read.
-            f"IF IT READS {CLUSTER_FLOAT_VIEW_NAME} (SHEET {float_sheet}), GO TO STEP "
-            f"{steps.step_number('disc-cluster-shimmed') + 1}. IF OVER, REMOVE THE "
-            f"RING, THE {n['pd-transgear-front-bushing']} BUSHING, THE SLEEVE WITH HUB "
-            f"AND DISC, AND THE {n['pd-transgear-rear-bushing']} BUSHING.",
-            f"SLIDE {n['pd-vn-transgear-cluster-shim']} SHIMS ON THE PIN AGAINST THE "
-            f"ARM FACE, UP TO {cluster_fit.SHIM_COUNT_RANGE[1]} IN ALL, TOGETHER AS "
-            f"THICK AS THE GAP'S EXCESS OVER {CLUSTER_FLOAT_VIEW_NAME}.",
+            # Machinist review rounds 8-9: the shims sit under the rear
+            # bushing, so the stack comes off to change them, either way, and
+            # goes back on to re-read. The bare stack is never under the
+            # window (transgear_cluster_fit.UNSHIMMED_FLOAT_RANGE), so an
+            # under gap is an overshoot: one shim comes off.
+            f"CHECK: THE GAP READS {CLUSTER_FLOAT_VIEW_NAME} (SHEET {float_sheet}).",
+            f"IF IT DOES, GO TO STEP {steps.step_number('disc-cluster-shimmed') + 1}; "
+            "IF IT IS OVER OR UNDER, REMOVE THE RING, THE "
+            f"{n['pd-transgear-front-bushing']} BUSHING, THE SLEEVE WITH HUB AND DISC, "
+            f"AND THE {n['pd-transgear-rear-bushing']} BUSHING.",
+            f"IF THE GAP WAS OVER, SLIDE {n['pd-vn-transgear-cluster-shim']} SHIMS ON "
+            "THE PIN AGAINST THE ARM FACE, TOGETHER AS THICK AS ITS EXCESS OVER "
+            f"{CLUSTER_FLOAT_VIEW_NAME}; IF UNDER, TAKE ONE SHIM OFF. UP TO "
+            f"{cluster_fit.SHIM_COUNT_RANGE[1]} IN ALL.",
             f"REFIT PER {s('disc-cluster-hung', 1)}-{s('disc-cluster-hung', 4)}.",
-            f"CHECK: PUSHED AS {s('disc-cluster-shimmed', 0)}, THE GAP READS "
-            f"{CLUSTER_FLOAT_VIEW_NAME}.",
-            f"IF NOT, REPEAT {s('disc-cluster-shimmed', 2)}-"
-            f"{s('disc-cluster-shimmed', 5)}.",
+            f"REPEAT {s('disc-cluster-shimmed', 0)}-{s('disc-cluster-shimmed', 3)}.",
         ),
         "collar-pins-pressed": (
             f"PRESS {TRANSGEAR_QUANTITIES['pd-vn-transgear-knob-drive-pin']} "
