@@ -44,7 +44,7 @@ UNIT = drawing_unit("parts/pd-guide-lock", _config.parts("pd-guide-lock"))
 # on each lock station.
 LOCK_WIDTH = 22.606  # .89, along +X
 # R9-59: the plate laps past the rail's outer edge. Its screw holes sit on the
-# rail's tap row, .140 above the rail's datum B (pd_platen_guide_spec.TAP_Y):
+# rail's tap row, .140 above the rail's bottom face (pd_platen_guide_spec.TAP_Y):
 # that is the bottom rail's outer edge and .150 below the top rail's, so at
 # .155 from the guide-side edge the plate laps .015 past the bottom rail and
 # .005 past the top one, and the holes keep the .080 wall target at the
@@ -87,9 +87,11 @@ CORNER_R = 1.778  # .07
 # Screw-hole layout on the guide-side band (matches the guide's hole pitch:
 # the two stations sit x +-.276 about the hole pattern's centre, the lock
 # station, on the rail's tap row past the lip). R9-49: 1/8 DRILL
-# (.125) over the #4-40 majors carries this plate's coordinate bands and
-# the rail taps' Ø.008 position (pd_vn_guide_lock_screw_spec.LOCK_SET_OFFSET);
-# the #4 close .120 left too little.
+# (.125) over the #4-40 majors carries this plate's coordinate bands
+# (pd_vn_guide_lock_screw_spec.LOCK_SET_OFFSET); the rail taps' .XXX
+# coordinates would not fit in its .013 float, so the holes are transferred
+# from the rail's lock taps at assembly (owner ruling 2026-11-08). The #4
+# close .120 left too little.
 HOLE_XY = ((3.9878, HOLE_Y), (18.0086, HOLE_Y))  # .157, .709
 # Plate-frame x of the hole pattern's centre: the assembly puts it on the
 # lock station (the plate's own centre stands right of it).

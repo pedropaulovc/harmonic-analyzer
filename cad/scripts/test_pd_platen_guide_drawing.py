@@ -216,7 +216,8 @@ def test_lock_receivers_are_through_taps_that_hold_the_screw_tip() -> None:
 
 def test_lock_through_tap_exits_clear_the_front_taps() -> None:
     # Each through tap exits the platen-mating face .276 from a front tap:
-    # both majors at the 9X Ø.008 position, both mouths broken .010.
+    # both stations at the title block's .XXX ±.005 (owner ruling
+    # 2026-11-08), both mouths broken .010.
     from _inch_wall_limits import WALL_FLOOR_MM
 
     c2c = min(
@@ -225,51 +226,57 @@ def test_lock_through_tap_exits_clear_the_front_taps() -> None:
         for front in guide.SCREW_STATION_X
     )
     assert c2c == pytest.approx(0.276 * 25.4)
-    wall = c2c - 0.008 * 25.4 - THREAD_MAJOR_MM["#4-40"] - 2.0 * 0.010 * 25.4
-    assert wall == pytest.approx(3.454, abs=1e-3)
+    wall = c2c - 2.0 * 0.005 * 25.4 - THREAD_MAJOR_MM["#4-40"] - 2.0 * 0.010 * 25.4
+    assert wall == pytest.approx(3.403, abs=1e-3)
     assert wall >= WALL_FLOOR_MM
     assert guide.LOCK_TAP_EXIT_WALL_MIN == pytest.approx(wall)
 
 
 def test_tap_walls_to_the_edges_pay_both_breaks_and_print_at_the_floor() -> None:
-    # Codjiflo (#2124): .080 unbroken from each tap's major at its Ø.008 zone
-    # to datum B and to the .29 top face at its minimum, less the title
-    # block's .010 outside edge break and the tap's .010 mouth break.
+    # Codjiflo (#2124): .080 unbroken from each tap's major at the row's
+    # .140 ±.004 (owner ruling 2026-11-08) to the bottom face and to the .29
+    # top face at its minimum, less the title block's .010 outside edge break
+    # and the tap's .010 mouth break.
     from _inch_wall_limits import WALL_FLOOR_MM
 
     unbroken = guide.TAP_Y - THREAD_MAJOR_MM["#4-40"] / 2.0 - 0.004 * 25.4
     assert unbroken == pytest.approx(0.080 * 25.4, abs=1e-3)
     assert guide.TAP_EDGE_WALL_MIN == pytest.approx(unbroken - 2.0 * 0.010 * 25.4)
     assert guide.TAP_EDGE_WALL_MIN >= WALL_FLOOR_MM - 0.0005
-    # Rule 20: the sheet states the shortfall at the tap pattern's note, and
-    # the package declares it (delegated ruling RV-01).
+    # Rule 20: the sheet states the shortfall at the tap row's note, and the
+    # package declares it (owner ruling RV-01).
     assert guide.TAP_EDGE_WALL_TEXT == "WALL .060 MIN, TAPS TO EDGES"
-    assert drawing.FCF_MATE_NOTE.split("\n")[1:] == [guide.TAP_EDGE_WALL_TEXT]
-    assert "BY HAND" not in drawing.FCF_MATE_NOTE
+    assert drawing.TAP_ROW_NOTE.split("\n")[1:] == [guide.TAP_EDGE_WALL_TEXT]
     exceptions = _config.parts("pd-platen-guide")["machinist_exceptions"]
-    assert any(
-        entry["kind"] == "minor" and ".060" in entry["where"] for entry in exceptions
+    (entry,) = [entry for entry in exceptions if entry["id"] == "RV-01"]
+    assert entry["kind"] == "minor" and ".060" in entry["where"]
+    assert entry["reason"].startswith("Owner ruling 2026-11-08 (Pedro)")
+
+
+def test_the_taps_print_plain_coordinates_without_gdt() -> None:
+    """Owner ruling 2026-11-08 (#2144 item 2.3): noncritical holes, no
+    position frame or datums, no spot-through route. The stations take the
+    title block's .XXX ±.005; the tap row's ±.004 is on the note at the
+    table, with its reason."""
+    from pd_platen_guide_spec import (
+        TAP_STATION_BAND,
+        TAP_STATION_PLACES,
+        TAP_Y_BAND,
+        TAP_Y_BAND_TEXT,
     )
 
-
-def test_only_the_platen_taps_are_spotted_and_the_lock_taps_are_accepted() -> None:
-    """Main's final ruling 2026-11-07: the platen-screw taps are spotted
-    through MHA-PD-02's holes at assembly; the lock taps are cut to the Ø.008
-    zone (accepted, RV-03) and MHA-PD-12's holes are transferred from them."""
-    platen = _config.parts("pd-platen")["number"]
-    lock = _config.parts("pd-guide-lock")["number"]
-    tags = [f"A{i}" for i in range(1, len(drawing.HOLE_STATIONS_MM) + 1)]
-    assert len(drawing.PLATEN_TAP_TAGS) == len(drawing.FRONT_X)
-    assert drawing.FCF_MATE_NOTE.startswith(", ".join(drawing.PLATEN_TAP_TAGS))
-    assert platen in drawing.FCF_MATE_NOTE
-    assert lock not in drawing.FCF_MATE_NOTE
-    lock_tags = [tag for tag in tags if tag not in drawing.PLATEN_TAP_TAGS]
-    assert len(lock_tags) == len(drawing.REAR_X)
+    assert not hasattr(guide, "GEOMETRIC_TOLERANCES_MM")
+    assert TAP_STATION_PLACES == 3
+    assert TAP_STATION_BAND == pytest.approx(0.005 * 25.4)
+    assert TAP_Y_BAND == pytest.approx(0.004 * 25.4)
+    assert TAP_Y_BAND_TEXT == ".140 ±.004"
+    assert drawing.TAP_ROW_NOTE.split("\n")[0] == "A1-A9: Y LOC .140 ±.004"
+    assert len(drawing.HOLE_TAGS) == len(drawing.HOLE_STATIONS_MM) == 9
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    for gone in ("add_feature_control_frame", "add_datum_feature", "SPOT THRU"):
+        assert gone not in source
     exceptions = _config.parts("pd-platen-guide")["machinist_exceptions"]
-    (entry,) = [entry for entry in exceptions if entry["id"] == "RV-03"]
-    assert entry["kind"] == "accept"
-    assert all(tag in entry["where"] for tag in lock_tags)
-    assert entry["reason"].startswith("Delegated ruling 2026-11-07 (Main), no precedent")
+    assert [entry["id"] for entry in exceptions] == ["RV-01"]
 
 
 class _FakeHoleTable:
@@ -388,9 +395,9 @@ def test_required_drawing_paths() -> None:
     assert drawing.PNG.as_posix().endswith("/png/pd-platen-guide_drawing.png")
 
 
-def test_sheet_carries_no_notes_block_restating_the_position_frame() -> None:
-    # The 9X position frame already says it; "HOLE POSITION PER FCF." only
-    # repeated it (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)), and nothing else needs a note.
+def test_sheet_carries_no_notes_block() -> None:
+    # The tap-row note at the hole table carries the only words the taps
+    # need (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).
     assert not hasattr(guide, "DRAWING_NOTES")
     for module in (guide, drawing):
         assert "Manufacturing Notes" not in Path(module.__file__).read_text(
@@ -484,27 +491,12 @@ def test_part_authors_the_printed_dimensions_and_places() -> None:
     assert source.count("dimensions_by_feature=DRAWING_DIMENSIONS") == 2
 
 
-def test_datum_b_surface_symbol_is_clear_of_every_hole_axis() -> None:
-    hole_axis_x = {
-        drawing.FRONT_LEFT_X_M + station / 1000.0
-        for station in (*drawing.REAR_X, *drawing.FRONT_X)
-    }
-    assert drawing.DATUM_B_SYMBOL_X_M == pytest.approx(
-        drawing.FRONT_LEFT_X_M + guide.GUIDE_LENGTH * 0.6 / 1000.0, abs=1.3e-5
-    )
-    # The stations sit on the platen's .001 grid, within half a step.
-    assert min(
-        abs(drawing.DATUM_B_SYMBOL_X_M - x) for x in hole_axis_x
-    ) == pytest.approx(
-        (guide.GUIDE_LENGTH * 0.1 - guide.LOCK_SCREW_DX) / 1000.0, abs=1.3e-5
-    )
+def test_bar_slide_finish_lands_on_the_bottom_surface_edge() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "def _bottom_surface_edge(" in source
     assert 'visible_view_entities(view, 1, label="platen-guide bottom edge")' in source
     assert "if span_mm < GUIDE_LENGTH - 0.1:" in source
-    assert "datum_b_entity = _bottom_surface_edge(front)" in source
-    assert "entity=datum_b_entity" in source
-    assert "symbol_xy=(DATUM_B_SYMBOL_X_M, 0.098)" in source
+    assert "entity=_bottom_surface_edge(front)" in source
 
 
 def test_gdt_xml_and_note_links_use_native_drawing_contracts() -> None:

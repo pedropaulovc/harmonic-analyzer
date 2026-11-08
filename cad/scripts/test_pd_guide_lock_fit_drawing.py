@@ -37,7 +37,9 @@ DRILLED_PLUS = drilled_oversize_mm(unit="in")
 EDGE_BREAK = edge_break_chamfer_mm(unit="in")
 # The lock: 1/16 in sheet as supplied, +/-0.005 in (McMaster 1388K196).
 SHEET_MAX = (1.0 / 16.0 + 0.005) * IN
-# The lock's ±.001 hole coordinates; the guide taps' Ø.008 position zone.
+# The lock's ±.001 hole coordinates. Its holes are transferred from the
+# guide's lock taps at assembly (owner ruling 2026-11-08: the taps print
+# plain .XXX coordinates), each within a Ø.008 of its tap's axis.
 LOCK_BAND = 0.001 * IN
 GUIDE_ZONE = 0.008 * IN
 
@@ -75,13 +77,18 @@ def test_the_quarter_inch_screw_is_refused(monkeypatch) -> None:
 
 def test_lock_and_guide_hole_positions_fit_the_fixed_fastener_stack() -> None:
     """R9-49: the hole-over-screw radial clearance covers the radial reach of
-    the lock's ±.001 hole coordinates plus half the guide's Ø.008, with the
-    1/8 drill at its smallest and the screw major at its largest."""
+    the lock's ±.001 hole coordinates plus half the transfer's Ø.008, with
+    the 1/8 drill at its smallest and the screw major at its largest. The
+    guide's .XXX tap coordinates (±.005 stations, ±.004 row) would not fit:
+    hence the transfer."""
     hole_min = 0.125 * IN
     radial = (2.0 * LOCK_BAND**2) ** 0.5 + GUIDE_ZONE / 2.0
     # The printed bands, untightened.
     assert lock.HOLE_LOCATION_BAND == pytest.approx(LOCK_BAND)
-    assert guide.GEOMETRIC_TOLERANCES_IN["guide hole-pattern position"] == ".008"
+    assert screw.LOCK_TRANSFER_ZONE == pytest.approx(GUIDE_ZONE)
+    assert guide.TAP_POSITION_RADIAL == pytest.approx(math.hypot(0.005, 0.004) * IN)
+    untransferred = (2.0 * LOCK_BAND**2) ** 0.5 + guide.TAP_POSITION_RADIAL
+    assert (hole_min - MAJOR_MAX) / 2.0 < untransferred
     assert blind_cut_dia_mm(lock.HOLE_SPEC) == pytest.approx(hole_min)
     assert (hole_min - MAJOR_MAX) / 2.0 >= radial
     # Pushed off the bar onto the screws, the lock gains at least the radial
@@ -117,8 +124,8 @@ _SET_MIN = _CLEARANCE_MIN - _POSITION
 _SET_MAX = _CLEARANCE_MAX + _POSITION
 # Holes at x .157 and .709 (±.001) from the left edge of the .89 (.XX ±.01)
 # plate, y .155 from its guide-side edge, on the .29 rail's tap row .140 above
-# its datum B (owner ruling 2026-11-01, B2): the plate laps .015 past the
-# bottom rail's datum B and .005 past the top rail's top face; the .45 height
+# its bottom face (owner ruling 2026-11-01, B2): the plate laps .015 past the
+# bottom rail's bottom face and .005 past the top rail's top face; the .45 height
 # at .XX. PR #1897 grew the plate so every hole wall reaches the wall target.
 _HOLE_X = (0.157 * IN, 0.709 * IN)
 _HOLE_Y = 0.155 * IN
@@ -179,10 +186,10 @@ def _set_plate_reach(e1, e2, w1, w2, c1, c2, width):
 
 
 def test_a_set_plate_skews_at_the_reviewed_hole_errors() -> None:
-    """Review of 8689c2a0d: opposite hole-position errors (lock band, guide
-    tap just inside its zone) on the tightest holes skew the set plate, and
-    its far corner comes toward the spacer (the skew's cosine draws a nearer
-    far edge in less) instead of receding."""
+    """Review of 8689c2a0d: opposite hole-position errors (lock band,
+    transferred hole just inside its zone) on the tightest holes skew the set
+    plate, and its far corner comes toward the spacer (the skew's cosine draws
+    a nearer far edge in less) instead of receding."""
     reach = _set_plate_reach(
         (0.0, LOCK_BAND), (0.0, -LOCK_BAND), (0.0, -0.999 * _TAP_R), (0.0, 0.999 * _TAP_R),
         _CLEARANCE_MIN, _CLEARANCE_MIN, _WIDTH,
@@ -214,7 +221,7 @@ def test_a_set_plate_skews_further_on_unequal_hole_clearances() -> None:
 
 
 def test_the_set_plate_envelope_bounds_every_corner_of_the_bands() -> None:
-    """Every combination of hole-coordinate extremes, tap errors on the
+    """Every combination of hole-coordinate extremes, transfer errors on the
     Ø.008 circle, clearance extremes and plate width stays inside the
     envelope the sweep reads, on both long edges."""
     taps = [

@@ -19,9 +19,9 @@ worst case holds 2.17D (``ENGAGEMENT_WORST``) and the tip stays inside the
 guide (``build_pd_platen_guide`` asserts the tip against the guide's
 shallowest seat).
 
-Ruling R9-49: the lock's hole positions and the guide's Ø.008 tap
-position need hole-over-screw clearance; the #4 close .120 left too
-little.  The lock holes are 1/8 DRILL (.125), and at assembly each lock is
+Ruling R9-49: the lock's holes need hole-over-screw clearance over their
+transfer from the guide's lock taps (owner ruling 2026-11-08); the #4 close
+.120 left too little.  The lock holes are 1/8 DRILL (.125), and at assembly each lock is
 pushed away from the bar until its holes bear on the screws before they are
 tightened (``pd_paper_drive_assembly_steps`` "guide-locks-set").  Pushed so, a
 lock stands between ``LOCK_SET_OFFSET`` beyond its model position at each
@@ -92,12 +92,18 @@ SCREW_MAJOR_MAX = SHANK_DIA
 SCREW_MAJOR_MIN = 0.1061 * IN
 LOCK_HOLE_DIA_MIN = blind_cut_dia_mm(lock.HOLE_SPEC)
 LOCK_HOLE_DIA_MAX = LOCK_HOLE_DIA_MIN + drilled_oversize_mm(unit=lock.UNIT)
-# Radial position error of one screw axis relative to its lock hole: the
-# radial reach of the lock's ± coordinate band plus half the guide's printed
-# position diameter.
+# Radial position error of one screw axis relative to its lock hole. The
+# lock's holes are transferred from the rail's lock taps at assembly (owner
+# ruling 2026-11-08: the taps print plain .XXX coordinates, whose reach the
+# .125 hole's .013 float cannot carry), so the rail tap's coordinate error
+# cancels. A transferred hole stands within LOCK_TRANSFER_ZONE of its tap's
+# axis (the transfer's residual: the punch's fit in the tap and the drill's
+# start, the zone the rail's taps once printed); this is its radius plus the
+# radial reach of the lock's own ± coordinate band.
+LOCK_TRANSFER_ZONE = 0.008 * IN
 POSITION_RADIAL = (
     math.hypot(lock.HOLE_LOCATION_BAND, lock.HOLE_LOCATION_BAND)
-    + float(guide.GEOMETRIC_TOLERANCES_MM["guide hole-pattern position"]) / 2.0
+    + LOCK_TRANSFER_ZONE / 2.0
 )
 CLEARANCE_RADIAL_MIN = (LOCK_HOLE_DIA_MIN - SCREW_MAJOR_MAX) / 2.0
 CLEARANCE_RADIAL_MAX = (LOCK_HOLE_DIA_MAX - SCREW_MAJOR_MIN) / 2.0
