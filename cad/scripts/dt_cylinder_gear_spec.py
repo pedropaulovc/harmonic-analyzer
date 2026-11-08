@@ -133,8 +133,7 @@ CAM_ROOT_WEB_MIN_MM = STOCK_FORM.root_radius_min_mm - (CAM_DIA / 2.0 + ECCENTRIC
 # Per-gear band only: error_budget.yaml cam_eccentricity books each channel's
 # throw independently, so no matched-set range is drawn (machinist review r1).
 # The located-bore row, +/-.002 in (rubric shop table): the budget still
-# closes with it.  Delegated ruling 2026-11-07 (Main), no precedent; owner
-# review #2144 -- pending owner confirmation.
+# closes with it.  Owner ruling 2026-11-08 (Pedro), #2144 item 8.2.
 ECCENTRICITY_TOLERANCE_MM = 0.0508  # +/-.0020 in
 _CAM_DIA_LOWER = printed_deviations(
     CAM_DIA, CAM_DIA_PLACES, deviations(CAM_DIA_BAND), unit=UNIT

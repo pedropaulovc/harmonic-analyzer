@@ -85,8 +85,7 @@ def holes_per_tooth(teeth: int, circle: int) -> float:
 
 # --- Index-hole circles: hole count -> bolt-circle diameter -------------------
 INDEX_HOLE_DIA = 0.157 * INCH  # GUESS (#2157): Ø4 mm index-pin class
-# Reamed to a sliding fit on the head's index pin (delegated ruling 2026-11-07,
-# owner review #2144, pending owner confirmation).
+# Reamed to a sliding fit on the head's index pin (Owner ruling 2026-11-08 (Pedro), #2144 item 9.4).
 INDEX_HOLE_DEVIATIONS = (0.0, 0.0005 * INCH)
 INDEX_HOLE_PLACES = 4
 RING_COUNTS = (57, 51, 24)

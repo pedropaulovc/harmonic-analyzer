@@ -132,8 +132,7 @@ HALF_WIDTH = ARM_WIDTH / 2.0
 # from an edge, not from a drawn centreline (fan-out round 5, rule 10;
 # Main 2026-11-07).  Half the as-rolled width at the title block's .XX: a
 # ±.002 band named no mate (fan-out round 6, rule 4), so it loosens to the
-# row (L2, Delegated ruling 2026-11-07 (Main), no precedent; owner review
-# #2144) once the one stack it feeds passes.  That stack is the cheek round
+# row (L2, Owner ruling 2026-11-08 (Pedro), #2144 item 6.3) once the one stack it feeds passes.  That stack is the cheek round
 # the hub seat: the hub's ARM_CHEEK_WORST_MM assumes a centred bore in the
 # thinnest bar, so the near side loses the .XX offset plus half the mill's
 # width band.  Its construction line stands two thirds of the way from the
