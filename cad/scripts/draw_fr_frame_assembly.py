@@ -95,7 +95,6 @@ from _simplified_names import simplified_name
 import _telemetry
 from _assembly_contract import assembly_contract
 from _title_block_units import render_number
-from build_fr_top_frame import TOP_CROSS_SCREW_FAR_WALL_START_MAX
 import fr_frame_assembly_steps as steps
 from fr_frame_attachment_spec import (
     BASE_SCREW_Y,
@@ -120,6 +119,7 @@ from fr_nameplate_spec import (
 )
 from fr_rocker_arm_support_section_spec import FOOT_THICKNESS as SUPPORT_FOOT_THICKNESS
 from fr_rocker_arm_support_spec import SUPPORT_WORLD_X, SUPPORT_WORLD_Z
+from fr_top_frame_spec import TOP_CROSS_SCREW_FAR_WALL_START_MAX
 from fr_tube_frame_spec import SUPPLY_LENGTH_MIN_IN as COLUMN_SUPPLY_LENGTH_MIN_IN
 from fr_vn_lag_screw_spec import BEARING_OFFSET as LAG_BEARING_OFFSET, HEAD_H as LAG_HEAD_H
 from sh_vn_brass_fillister_screw_spec import HEAD_H as NAMEPLATE_SCREW_HEAD_H

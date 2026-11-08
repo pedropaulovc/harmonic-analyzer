@@ -236,6 +236,7 @@ from fr_top_frame_spec import (
     PRINTED_LINEAR_BAND_MM,
     REAR_COLUMN_Z,
     UNIT,
+    TOP_CROSS_SCREW_FAR_WALL_START_MAX,
     printed_limit,
     SET_SCREW_THREAD,
     RING_HEIGHT,
@@ -1224,14 +1225,14 @@ if SIDE_CLEARANCE_FLOOR_LAND <= 0.0:
     raise AssertionError("top near-wall clearance outgrows its counterbore floor")
 if SIDE_CLEARANCE_CAP_LIGAMENT < WALL_TARGET_MM:
     raise AssertionError("top near-wall clearance leaves under .080 to the cap recess")
-# Far-wall engagement (rule 18, print worst): every floor is located from
-# its own socket axis ("4X COUNTERBORE FLOOR FROM SOCKET AXIS", .XX), so the
-# seat-to-axis stack is that one band at its most outboard; the shared joint
-# adds the match-bored socket ceiling and the far mouth's edge break, and
-# books the shortest stock screw and its 0.7-pitch tip.
-TOP_CROSS_SCREW_FAR_WALL_START_MAX = far_wall_start_max_mm(
+# Far-wall engagement (rule 18, print worst): fr_top_frame_spec's
+# TOP_CROSS_SCREW_FAR_WALL_START_MAX is this counterbore floor's printed
+# seat-to-axis stack plus the match-bored socket ceiling and the far mouth's
+# edge break; the joint books the shortest stock screw and its 0.7-pitch tip.
+if TOP_CROSS_SCREW_FAR_WALL_START_MAX != far_wall_start_max_mm(
     COUNTERBORE_MAX_FLOOR_OFFSET, unit=UNIT
-)  # 30.018
+):
+    raise AssertionError("the spec's far-wall start is not this counterbore floor's")
 TOP_CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT = far_wall_full_thread_min_mm(
     TOP_CROSS_SCREW_FAR_WALL_START_MAX
 )  # 12.35 (2.56D); 11.72 (2.43D) at a 1.5-pitch tip
