@@ -2007,6 +2007,8 @@ def _drawing_cache_outputs(stem: str) -> list[Path]:
         from _visibility_native_proof import output_paths
 
         outputs.extend(output_paths())
+    if stem == "pd_paper_drive_assembly":
+        outputs.append(REPORTS / "visibility-proof/pd-observations.json")
     return outputs
 
 

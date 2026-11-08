@@ -248,3 +248,91 @@ async def run(adapter, recipe, build):
     finally:
         recipe.isolate_drawing_view_components = original
         checkpoint()
+
+
+def owner_evidence(raw):
+    """Retain exact native identity/ancestry, never infer it from drawing names."""
+    component = _early_bound(raw, "IComponent2")
+    if component is None:
+        return {"error": "null IComponent2"}
+    chain = []
+    try:
+        for _ in range(64):
+            path = str(component.GetPathName())
+            chain.append({
+                "name": str(component.Name2), "path_raw": path,
+                "path_resolved": str(Path(path).resolve()) if path else "",
+                "configuration": str(component.ReferencedConfiguration),
+            })
+            component = _early_bound(component.GetParent(), "IComponent2")
+            if component is None:
+                return {"chain": chain}
+        return {"chain": chain, "error": "native parent chain exceeded 64"}
+    except Exception as error:
+        return {"chain": chain, "error": repr(error)}
+
+
+def section_inventory(adapter, view):
+    """Capture both authorities without choosing whichever would pass."""
+    view = _early_bound(view, "IView")
+    result = {"view": view_name(adapter, view), "view_type": int(view.Type),
+              "state": view_state(view), "occurrences": [], "hidden_owners": []}
+    for row in visibility._visibility_components(view, label="section inventory"):
+        result["occurrences"].append({
+            "drawing_name": row.name, "visible_flag": row.visible,
+            "drawing_ancestors": row.ancestors, "parent": row.parent,
+            "owner": owner_evidence(row.component.Component),
+        })
+    result["hidden_owners"] = [owner_evidence(raw) for raw in tuple(view.GetHiddenComponents() or ())]
+    source = _early_bound(view.ReferencedDocument, "IModelDoc2")
+    result["source_file"] = str(source.GetPathName())
+    result["source_owners"] = [
+        owner_evidence(raw) for raw in tuple(_early_bound(source, "IAssemblyDoc").GetComponents(False) or ())
+    ]
+    return result
+
+
+async def observe_instances(adapter, recipe, build):
+    """Run the real PD builder and retain before/after flags and hidden owners."""
+    PROOF.mkdir(parents=True, exist_ok=True)
+    report = {"status": "running", "calls": [], "pid": int(adapter.swApp.GetProcessID()),
+              "revision": str(adapter.swApp.RevisionNumber())}
+    original = recipe.set_drawing_view_instance_visibility
+
+    def checkpoint():
+        encoded = json.dumps(report, indent=2)
+        (PROOF / "pd-observations.json").write_text(encoded, encoding="utf-8")
+        forensic = ROOT / "cad/out/failures/visibility-proof"
+        forensic.mkdir(parents=True, exist_ok=True)
+        (forensic / "pd-observations.json").write_text(encoded, encoding="utf-8")
+
+    def observed(adapter, view, names, *, mode, label):
+        record = {"label": label, "mode": mode, "requested": sorted(names)}
+        report["calls"].append(record)
+        record["before"] = section_inventory(adapter, view)
+        checkpoint()
+        try:
+            original(adapter, view, names, mode=mode, label=label)
+            record["operation"] = "returned"
+        except Exception as error:
+            record["operation_error"] = repr(error)
+            raise
+        finally:
+            try:
+                record["after"] = section_inventory(adapter, view)
+            except Exception as error:
+                record["after_error"] = repr(error)
+            checkpoint()
+
+    recipe.set_drawing_view_instance_visibility = observed
+    try:
+        result = await build(adapter)
+        report["status"] = "builder_succeeded"
+        return result
+    except Exception as error:
+        report["status"] = "builder_failed"
+        report["error"] = repr(error)
+        raise
+    finally:
+        recipe.set_drawing_view_instance_visibility = original
+        checkpoint()
