@@ -795,51 +795,71 @@ def test_every_set_feeler_the_steps_and_checks_print_has_a_leaf_row() -> None:
     assert drawing.SETTING_TABLE_LEFT + sum(widths) <= drawing.STATION_TABLE_FIELD[0]
 
 
-def test_the_pivot_seat_mark_is_transferred_and_checked_before_drilling() -> None:
-    """Owner 2026-11-08 (FoFr #2261; rubric sample rounds 18-19): D1 is
-    transfer-punched through the MHA-DT-20 pivot bore with the cone set at
-    its working position; the mark is checked from the back MHA-DT-02 seat
-    alone (no DRO zero) at the band cone_set_stack books, before drilling, so
-    an out mark costs one re-punch, never a plug (Main, round 20).  The
-    offsets are read from the base's model constants, not typed."""
-    import build_fr_harmonic_base as base_build
-    import cone_set_stack
+def test_the_pivot_seat_is_transferred_and_trusted() -> None:
+    """Owner ruling 2026-11-08 (Pedro): step 23 transfer-punches D1 through
+    the MHA-DT-20 pivot bore with the cone set at its working position,
+    lifts off, spot-drills, drills and taps; the swing check is the only
+    acceptance, and DT-00 prints no offset from the pedestal seats."""
+    import dt_drive_train_steps as steps
     import dt_vn_cone_pivot_screw_spec as pivot_screw
-    import fr_harmonic_base_spec as base_spec
 
     step = _rig_step_body("other-base-mounting")
-    number = drawing.PIVOT_SEAT_STEP_NUMBER
-    x_mm, y_mm = base_build.PIVOT_SEAT_OFFSETS_MM
-    band = base_spec.PIVOT_SEAT_POSITION_BAND_MM
-    expected = (
-        f"{drawing.PIVOT_SEAT_CHECK}. CHECK THAT THE PUNCH MARK IS "
-        f"{drawing.inch_text(abs(x_mm), 3)} RIGHT, {drawing.inch_text(abs(y_mm), 3)} "
-        f"BACK OF THE BACK MHA-DT-02 SEAT ±{drawing.inch_text(band, 3)}."
-    )
+    number = steps.step_number("other-base-mounting")
     route = [
         f"{number}A. CLAMP MHA-DT-20 TO MHA-FR-01.",
         f"{number}B. TRANSFER-PUNCH MHA-FR-01 THRU THE MHA-DT-20 PIVOT BORE.",
         f"{number}C. LIFT MHA-DT-20 AND THE LEAVES OFF.",
-        expected,
-        f"{number}E. IF IT IS OUT, REDO {number}-{drawing.PIVOT_SEAT_CHECK} ONCE.",
-        f"{number}F. SPOT-DRILL THE ACCEPTED PUNCH MARK.",
-        f"{drawing.PIVOT_SEAT_STEP}. DRILL AND TAP {pivot_screw.THREAD} THERE",
+        f"{number}D. SPOT-DRILL THE PUNCH MARK.",
+        f"{number}E. DRILL AND TAP {pivot_screw.THREAD} THERE PER MHA-FR-01.",
+        "CHECK THAT MHA-DT-20 SWINGS FREELY UNDER THE HEAD.",
     ]
-    assert "PLUG" not in step
     assert step.startswith(
         "CONE SET ON THE BASE: SET MHA-DT-20 ON THE CHECK 4D FEELER LEAVES."
     )
     positions = [step.index(part) for part in route]
     assert positions == sorted(positions)
-    assert "1.030 RIGHT, .482 BACK OF THE BACK MHA-DT-02 SEAT ±.002" in step
-    assert drawing.DRO_ZERO_STEP not in step and "DRO" not in step
-    band = base_spec.PIVOT_SEAT_POSITION_BAND_MM
-    assert band == cone_set_stack.PIVOT_SEAT_POSITION_MM
+    assert step.count("CHECK THAT") == 1
+    for absent in ("PUNCH MARK IS", "PLUG", "DRO", "MHA-DT-02 SEAT", "1.030", ".482"):
+        assert absent not in step
     # The pivot seat is cut once, here: the bank no longer drills it.
     assert "PIVOT SEAT" not in drawing.BANK_STEPS
-    # The nearer seat is the back one; model -X is the FRONT view's RIGHT.
-    assert base_build.PIVOT_NEAR_PEDESTAL_XZ == base_build.PEDESTAL_SCREW_XZ[1]
-    assert x_mm < 0.0 and y_mm < 0.0
+
+
+def test_one_code_key_defines_every_code_and_every_step_sheet_points_to_it() -> None:
+    """Owner ruling 2026-11-08 (Pedro; rubric sample round 20 #2): one
+    labelled key, built from the placed cone gears and the MHA-DT-12 count,
+    defines the Tnnn codes and GEAR 0-19; each step sheet points to it."""
+    facts = _drawing_facts()
+    fields = drawing.package_note_fields(facts)
+    keys = [
+        (field, text)
+        for field in fields
+        for _label, text in field.blocks
+        if text.startswith(drawing.CODE_KEY_HEADING)
+    ]
+    assert len(keys) == 1
+    key_field, key = keys[0]
+    assert key_field.sheet == drawing.SETTING_SHEET
+    assert drawing.CODE_KEY_POINTER == f"(CODES: SHEET {drawing.SETTING_SHEET} KEY)"
+    keyed = set(re.findall(r"\bT\d{3}\b", key))
+    assert keyed == {code for _station, code in facts.cone_rows()}
+    last_gear = facts.count("dt-cylinder-gear") - 1
+    assert f"GEAR 0-{last_gear} = MHA-DT-12 FROM THE FRONT" in key
+    step_sheets = (
+        drawing.SEQUENCE_SHEET,
+        drawing.BANK_SHEET,
+        drawing.FIT_SHEET,
+        drawing.CONTINUATION_SHEET,
+        drawing.CHECKS_SHEET,
+    )
+    for sheet in step_sheets:
+        blocks = [field.blocks for field in fields if field.sheet == sheet]
+        texts = [text for block in blocks for _label, text in block]
+        assert any(drawing.CODE_KEY_POINTER in text for text in texts), sheet
+        printed = " ".join(texts)
+        assert set(re.findall(r"(?<!MHA-PD-09 )\bT\d{3}\b", printed)) <= keyed, sheet
+        gears = {int(n) for n in re.findall(r"\bGEARS? (\d+)\b", printed)}
+        assert all(0 <= gear <= last_gear for gear in gears), sheet
 
 
 @pytest.mark.parametrize("setting", (0.05, 0.95, 1.0, 1.05, 2.0, 2.5, 2.95))
@@ -1030,8 +1050,10 @@ def test_source_refusals_and_bom_order() -> None:
 def test_cone_station_rows_run_front_to_back() -> None:
     rows = drawing.cone_station_rows([(30.0, "T006"), (-25.0, "T120"), (0.0, "T060")])
     assert rows == [(1, "T120"), (2, "T060"), (3, "T006")]
-    table = drawing.station_table_text(rows)
-    assert table.splitlines()[1].startswith("STN  1  T120")
+    table = drawing.code_key_text(rows, 3).splitlines()
+    assert table[1] == "TNNN = MHA-DT-03 WITH NNN TEETH, BY STATION, FRONT TO BACK:"
+    assert table[2].startswith("STN  1  T120")
+    assert table[-1] == "GEAR 0-2 = MHA-DT-12 FROM THE FRONT, GEAR 0 ON MHA-DT-26."
 
 
 def test_bom_split_keeps_the_first_column_no_taller() -> None:

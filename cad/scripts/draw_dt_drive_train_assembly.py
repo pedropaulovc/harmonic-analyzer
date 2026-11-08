@@ -158,7 +158,6 @@ from dt_pinion_arbor_geometry import (
     HEAD_REAR_Z as ARBOR_HEAD_REAR_Z,
 )
 from dt_pinion_spring_section import SCREW_EAST_OF_PIVOT as SPRING_SCREW_EAST_OF_PIVOT
-import build_fr_harmonic_base as BASE_BUILD
 import fr_harmonic_base_spec as base
 import pinion_rig_fitup as FITUP
 from pinion_rig_park_geometry import APINION_X
@@ -253,6 +252,11 @@ BANK_SETTINGS_SHEET = 13
 # The DRO targets, feeler stacks, pedestal recheck record and the cone
 # station table: the sheet the steps and checks read their numbers from.
 SETTING_SHEET = 14
+# Owner ruling 2026-11-08 (Pedro): one labelled code key defines the cone-gear
+# codes and GEAR 0-19 (code_key_text).  It is the sheet 14 station table,
+# titled as the key, and every step sheet's first heading points to it.
+CODE_KEY_HEADING = f"CODE KEY (SHEETS {SEQUENCE_SHEET}-{CHECKS_SHEET})"
+CODE_KEY_POINTER = f"(CODES: SHEET {SETTING_SHEET} KEY)"
 BANK_SETTING_SCALE = (1.0, 1.0)
 BANK_SPRING_DETAIL_SCALE = (4.0, 1.0)
 # 12 mm left of its first seat (0.205): run 20261103T063712849Z's native
@@ -606,7 +610,10 @@ SEQUENCE_LEFT_FIELD = (
 # table prints right of the narrow feeler stack table, under the pedestal
 # recheck table (round 1 measured those at x 147.6 mm and y 178.1 mm) and
 # clear left of the reference view (x 361 mm up).
-STATION_TABLE_FIELD = (0.158, 0.172, 0.350, 0.117)
+# Owner ruling 2026-11-08 (Pedro): the field holds the code key, two lines
+# more than the station table it carries (bottom 117 -> 110 mm, still over
+# the interface notes' 101 mm top and the title block's 65.5 mm).
+STATION_TABLE_FIELD = (0.158, 0.172, 0.350, 0.110)
 # The external interfaces print on sheet 14 under the feeler stack table,
 # left of the title block (x 216 mm): sheet 12's right field holds the checks
 # continuation and saved pose (rubric sample round 4: the one-thing check
@@ -1238,7 +1245,7 @@ def inch_envelope(limits_mm: tuple[float, float], places: int) -> str:
 # crank end (model -Z), BACK the cone tip end, RIGHT model -X.
 CONE_CRANK_STEPS = _note_text(
     (
-        "ASSEMBLY SEQUENCE - CONE SET AND CRANK",
+        f"ASSEMBLY SEQUENCE - CONE SET AND CRANK {CODE_KEY_POINTER}",
         # Slide the one flat of every gear onto the shaft and close the
         # accepted stack against its collar before setting tip end play.
         "1. SLIDE MHA-DT-07 ONTO THE MHA-DT-04 D-FLAT AGAINST ITS COLLAR.",
@@ -1448,33 +1455,11 @@ CONE_CRANK_STEPS = _note_text(
 # a SETTING_TABLE row on sheet 14.
 # The DRO zero every later bank and back-ear setting reads from.
 DRO_ZERO_STEP = "8P"
-
-
-def pivot_seat_acceptance() -> str:
-    """The pivot seat's check: its centre from the nearer transferred
-    MHA-DT-02 seat, as MHA-FR-01's model places it (build_fr_harmonic_base
-    PIVOT_SEAT_OFFSETS_MM, signed table X and table Y = machine -Z), at
-    fr_harmonic_base_spec's band, from that one origin.  Owner, 2026-11-08:
-    D1 is transferred from the MHA-DT-20 pivot bore at assembly and the
-    offsets print only here; MHA-FR-01 calls its D1 X/Y reference (FoFr
-    #2261).  The FRONT view looks from the crank (-Z) end, so its RIGHT is
-    model -X and BACK is +Z (DIRECTION_NOTES)."""
-    table_x, table_y = BASE_BUILD.PIVOT_SEAT_OFFSETS_MM
-    nearer = BASE_BUILD.PEDESTAL_SCREW_XZ.index(BASE_BUILD.PIVOT_NEAR_PEDESTAL_XZ)
-    seat = ("FRONT", "BACK")[nearer]
-    side = "RIGHT" if table_x < 0.0 else "LEFT"
-    along = "BACK" if table_y < 0.0 else "FRONT"
-    return (
-        f"{inch_text(abs(table_x), 3)} {side}, {inch_text(abs(table_y), 3)} "
-        f"{along} OF THE {seat} MHA-DT-02 SEAT ±{inch_text(base.PIVOT_SEAT_POSITION_BAND_MM, 3)}"
-    )
-
-
 BANK_STEPS = _note_text(
     (
         "ASSEMBLY SEQUENCE - CYLINDER BANK",
-        # Rubric sample round 4: GEAR 0 / GEAR 19 are defined where first used.
-        "GEARS: MHA-DT-12 ARE GEAR 0 (FRONT, ON MHA-DT-26) TO GEAR 19 (BACK).",
+        # Owner ruling 2026-11-08 (Pedro): GEAR 0-19 are defined in the sheet 7
+        # code key (code_key_text), not by a prose line here.
         "8. WRITE DOWN EACH MHA-DT-12'S MICED THICKNESS, CAM FACE TO BACK FACE.",
         # Each connecting rod comes pinned to its rocker arm (MHA-CH-00's
         # bench pinning step, cited by key): its ring is captured in the closed
@@ -1536,8 +1521,8 @@ BANK_STEPS = _note_text(
         "9N. TIGHTEN MHA-DT-VN-62.",
         "9P. REMOVE THE FEELER.",
         "9Q. WRITE THE DRO X IN THE PEDESTAL RECHECK TABLE.",
-        # The MHA-FR-01 pivot seat is no longer cut here on the DRO: it is
-        # transferred from the MHA-DT-20 pivot bore at PIVOT_SEAT_STEP (step 23).
+        # The MHA-FR-01 pivot seat is not cut here on the DRO: step 23
+        # transfers it from the MHA-DT-20 pivot bore.
         "9R. MEASURE MHA-DT-02 OUTER FACE TO OUTER FACE.",
         # Round 11: the length plainly, both domes counted.
         f"9S. TURN MHA-DT-13 TO THE 9R SPAN + {inch_text(2.0 * bank.ARBOR_DOME_HEIGHT, 2)} "
@@ -1687,15 +1672,6 @@ def _numbered_step(key: str, text: str) -> str:
     )
 
 
-# The cone set's pivot seat (owner 2026-11-08), all in step 23 (key
-# other-base-mounting): transfer-punched, the mark checked before any
-# drilling (Main, round 20: the remedy is one re-punch, not a plug), then
-# spot-drilled, drilled and tapped from the accepted mark.
-PIVOT_SEAT_STEP_NUMBER = steps.step_number("other-base-mounting")
-PIVOT_SEAT_CHECK = f"{PIVOT_SEAT_STEP_NUMBER}D"
-PIVOT_SEAT_STEP = f"{PIVOT_SEAT_STEP_NUMBER}G"
-
-
 def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
     """The pinion rig's steps, counted from the built assembly."""
     reworded = {
@@ -1796,22 +1772,20 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
             f"PEEN BOTH ENDS FLUSH WITH THE HUB (SHEET {FULL_DETAIL_SHEET}).\n"
             f"CHECK THAT {LEVER_NUMBER} DOES NOT TURN OR SLIDE ON {LIFT_ROD_NUMBER} BY HAND.",
         ),
-        # Owner, 2026-11-08 (FoFr #2261, rubric sample rounds 18-19): the
-        # pivot seat is transfer-punched through the MHA-DT-20 reamed pivot
-        # bore with the cone set at its working position (the check 4D
-        # leaves); the mark is checked from the back MHA-DT-02 seat alone, at
-        # the band cone_set_stack books, before it is drilled, so an out mark
-        # costs one re-punch.  The stop and lock seats are MHA-FR-01 print
-        # holes.  Check 4 then sets the swing and clamps it.
+        # Owner ruling 2026-11-08 (Pedro): step 23 trusts the transfer
+        # through the MHA-DT-20 reamed pivot bore, with the cone set at its
+        # working position (the check 4D leaves): punch, lift off, spot-drill,
+        # drill and tap.  The swing check (23H) is the only acceptance, and
+        # DT-00 prints no offset from the pedestal seats (FoFr #2261 owns D1
+        # as a transfer).  The stop and lock seats are MHA-FR-01 print holes.
+        # Check 4 then sets the swing and clamps it.
         (
             "other-base-mounting",
             "CONE SET ON THE BASE: SET MHA-DT-20 ON THE CHECK 4D FEELER LEAVES.\n"
             "CLAMP MHA-DT-20 TO MHA-FR-01.\n"
             "TRANSFER-PUNCH MHA-FR-01 THRU THE MHA-DT-20 PIVOT BORE.\n"
             "LIFT MHA-DT-20 AND THE LEAVES OFF.\n"
-            f"CHECK THAT THE PUNCH MARK IS {pivot_seat_acceptance()}.\n"
-            f"IF IT IS OUT, REDO {PIVOT_SEAT_STEP_NUMBER}-{PIVOT_SEAT_CHECK} ONCE.\n"
-            "SPOT-DRILL THE ACCEPTED PUNCH MARK.\n"
+            "SPOT-DRILL THE PUNCH MARK.\n"
             f"DRILL AND TAP {pivot_screw.THREAD} THERE PER MHA-FR-01.\n"
             "RUN THE OILED MHA-DT-VN-52 DOWN THRU THE MHA-DT-20 PIVOT BORE UNTIL ITS "
             "SHOULDER SEATS HARD ON THE BASE.\n"
@@ -1851,7 +1825,7 @@ _T120_SET_FEELER = inch_text(set_stack.feeler_gap_mm(120), FEELER_PLACES)
 
 CHECKS = _note_text(
     (
-        "ASSEMBLY-ONLY FUNCTIONAL CHECKS",
+        f"ASSEMBLY-ONLY FUNCTIONAL CHECKS {CODE_KEY_POINTER}",
         # Rubric sample round 9 (rule 22): one check a line.
         "1. THE CRANK TURNS FREELY THROUGH FULL TURNS.",
         f"1A. ONE CRANK TURN TURNS THE CONE SET {Fraction(pinion.TEETH, gear64.TEETH)} TURN "
@@ -2044,7 +2018,7 @@ def _split_sequence_chain(
 # proves each fits.
 CONE_CONTINUED_FROM = f"{steps.step_number('tip-adjuster-set')}E"
 CRANK_CONTINUED_FROM = str(steps.step_number("crank-hub-fitted"))
-_CRANK_CONTINUED_HEADING = "ASSEMBLY SEQUENCE CONT. - CRANK"
+_CRANK_CONTINUED_HEADING = f"ASSEMBLY SEQUENCE CONT. - CRANK {CODE_KEY_POINTER}"
 CONE_CRANK_PRIMARY, CONE_CRANK_CONTINUED, CRANK_CONTINUED = _split_sequence_chain(
     CONE_CRANK_STEPS,
     (CONE_CONTINUED_FROM, "ASSEMBLY SEQUENCE CONT. - CONE SET AND CRANK"),
@@ -2056,13 +2030,16 @@ BANK_LAST_FROM = f"{steps.step_number('cylinder-bank-located')}B"
 BANK_PRIMARY, BANK_CONTINUED, BANK_LAST = _split_sequence_chain(
     BANK_STEPS,
     (BANK_CONTINUED_FROM, _BANK_CONTINUED_HEADING),
-    (BANK_LAST_FROM, _BANK_CONTINUED_HEADING),
+    (BANK_LAST_FROM, f"{_BANK_CONTINUED_HEADING} {CODE_KEY_POINTER}"),
 )
 # Rounds 19-20: step 23's pivot-seat transfer moves each rig split on
 # (11B, 16E, 21F), the bank having handed 9R's lines to sheet 9.
 RIG_SPLITS = (
     (f"{steps.step_number('arbor-collar-pinned')}B", RIG_SEQUENCE_HEADING),
-    (f"{steps.step_number('straps-pinned-to-torque-shaft')}E", RIG_SEQUENCE_HEADING),
+    (
+        f"{steps.step_number('straps-pinned-to-torque-shaft')}E",
+        f"{RIG_SEQUENCE_HEADING} {CODE_KEY_POINTER}",
+    ),
     (
         f"{steps.step_number('cam-collars-set')}F",
         "ASSEMBLY SEQUENCE CONT. - PINION RIG AND CONE SET ON THE BASE",
@@ -2575,15 +2552,26 @@ def cone_station_rows(
     return [(index, config) for index, (_z, config) in enumerate(ordered, start=1)]
 
 
-def station_table_text(rows: Sequence[tuple[int, str]]) -> str:
-    """Two-column station table: STN n  MHA-DT-03 Tnnn."""
+def code_key_text(rows: Sequence[tuple[int, str]], cylinder_gears: int) -> str:
+    """The package's labelled code key (owner ruling 2026-11-08, Pedro): the
+    MHA-DT-03 codes as the model configures them, by station front to back
+    (``rows``, from the placed cone gears), two columns, and GEAR 0 to the
+    last of the ``cylinder_gears`` MHA-DT-12, counted from the front."""
+    code = rows[0][1]
+    digits = "N" * (len(code) - 1)
     half = (len(rows) + 1) // 2
-    lines = ["CONE STATION TABLE - MHA-DT-03 BY STATION, FRONT TO BACK"]
+    lines = [
+        CODE_KEY_HEADING,
+        f"{code[0]}{digits} = MHA-DT-03 WITH {digits} TEETH, BY STATION, FRONT TO BACK:",
+    ]
     for left, right in zip(rows[:half], [*rows[half:], None]):
         text = f"STN {left[0]:>2}  {left[1]}"
         if right is not None:
             text += f"      STN {right[0]:>2}  {right[1]}"
         lines.append(text)
+    lines.append(
+        f"GEAR 0-{cylinder_gears - 1} = MHA-DT-12 FROM THE FRONT, GEAR 0 ON MHA-DT-26."
+    )
     return "\n".join(lines)
 
 
@@ -2766,7 +2754,12 @@ def package_note_fields(facts: SourceFacts) -> tuple[NoteField, ...]:
             SETTING_SHEET,
             f"sheet {SETTING_SHEET} station table field",
             STATION_TABLE_FIELD,
-            (("cone station table", station_table_text(facts.cone_rows())),),
+            (
+                (
+                    "code key",
+                    code_key_text(facts.cone_rows(), facts.count("dt-cylinder-gear")),
+                ),
+            ),
         ),
         NoteField(
             SETTING_SHEET,
