@@ -440,46 +440,55 @@ presentation in the subsequent `389` review. The owner's replacement is
 **one stacked callout with one outside leader on the outer reamed circle**,
 not two independently routed diameter leaders.
 
-For TL-22 only, `_stack_pivot_callout` inserts a view-owned attached note.
-Its authored text is only the three quoted actual
-`IDisplayDimension.GetNameForSelection` links, newline separators and the
-depth symbol before the seat-depth link. Native run `a8b2ac4c` proved that
-`IncludeDimPrefixSuffixTolerance=True` expands **ABOVE/BELOW captions too**:
-the earlier literal REAM/DRILL/fit/thread words duplicated the source text.
-Let the links supply those words, including the full locating-fit and
-shoulder-height captions. No diameter, depth, tolerance or duplicate process
-prose is authored from a copy.
+The native-linked attempt resolved its source values and passed the native
+source/leader checks, but run `4685555f` measured its text extent as
+`(24.796,176.396)..(164.907,225.006)` mm, outside the existing
+`(20,182)..(145,230)` mm lane. The owner's approved option B replaces that
+expanded source-caption block with a **plain, four-line spec-generated
+note**, explicitly sized to the normal **3.5 mm** note height through
+`_size_note`. It does not reduce that height or enlarge the lane to fit.
+
+`_pivot_stack_text` formats the bore diameter, seat depth and tap-drill
+diameter from `DRAWING_VALUES` at `DRAWING_PRECISION_BY_NAME` places;
+the signed upper/lower deviations come from `BORE_BAND` at `BORE_PLACES`,
+and the thread identity comes from `PIVOT_TAP`. The rows are REAM size/band/
+depth, the short TL-VN-77 locating-fit qualifier, DRILL size THRU, and the
+thread BELOW SEAT. No geometry number is copied into the recipe. Native
+dimension-link properties, split-STACK parsing and the carrier-table
+semantic-parser dependency are removed.
 
 Keep all three imported sources (`BoreDia@TopBoreProfile`,
 `TopBoreDepth@TopBore`, `TapDrillDia@PivotTapProfile`) and the existing
-imported-precision gate. Resolve and semantically verify the note before
-hiding only the two plan-diameter **display annotations**. The section's
-seat-depth dimension remains visible. Native identities, values, precision,
-tolerances, text definitions, selection names and original text positions
-are checked again after the final rebuild. The note's unresolved link
-string and resolved values/band/captions must agree. Expected expansion uses
-the validated native source captions, values and bands, not guessed concise
-wording. The local normalizer joins the observed adjacent sign stack
-(`+<OVER>+`) and value stack (`.0015<OVER>.0010`) before applying the existing
-SIZE semantics parser; carrier code is unchanged. It preserves signs and
-values and does not erase doubled caption words. The exact failing native
-string is retained as a regression fixture alongside the expected clean
-link expansion.
+imported-precision gate. Before inserting the note, require their native
+values, feature names, precision and fit band to agree with the spec.
+Verify the generated visible text and actual 3.5 mm height before hiding
+only the two plan-diameter **display annotations**; the section's seat-depth
+dimension remains visible. Recheck native identity, values, precision,
+tolerances, text definitions, visibility and original positions after the
+last rebuild. Plain-row text comparison retains every number, sign and
+printed decimal place; only whitespace and diameter/depth symbol encoding
+are normalized.
 
-The note attaches to the exact outer rim through the existing entity/
-selection-point note helper. Its final check requires one live leader and
-one native arrow at the leftmost outer-rim point. Every leader and arrow
-stroke must stay outside the bore disk and at least 1 mm clear of the
-upper-left carriage counterbore. The complete linked-caption stack stays in
-the reserved left lane, without font changes. Operation-level creation and
-settled-readback spans retain the native link, resolved text and geometry.
+The offline estimate uses the existing `estimate_text_box`: one full
+cap-height per glyph (conservative versus its calibrated 0.62 average),
+1.6-height row pitch, and 1 mm padding on every side. The current four rows'
+longest line is 33 glyphs, giving padded bounds
+**`(24,203.7)..(141.5,226)` mm**, with minimum lane margin **3.5 mm**.
+The estimate requires at least 3 mm margin, but does not replace or loosen
+the actual `INote.GetExtent` gate. Telemetry records the height, estimated
+bounds and actual text extent for comparison.
 
-TL-32 keeps its original presentation. Neither native part nor any spec
-changes; the shared drawing-helper edit still re-keys feed drawing/review
-inputs. Native dimension-link expansion is evidenced by `a8b2ac4c`; that
-attempt stopped before source hiding and layout proof. Parent validation
-must still inspect the clean native/PDF captions, tolerance band and
-one-leader route. Offline fixtures are not a claim of that final native pass.
+The already-proved leader construction is unchanged: one view-owned note,
+one live leader and one native arrow on the leftmost outer-rim point.
+Every leader/arrow stroke stays outside the bore disk and at least 1 mm
+clear of the upper-left carriage counterbore. Creation and settled-readback
+operation spans retain the generated/resolved text, sources and geometry.
+
+TL-32 keeps its original presentation; neither part nor any spec changes.
+The shared helper re-keys only pivot/feed drawings and their reviews.
+Parent validation must inspect the four-line native/PDF text, fit band,
+normal height, actual lane extent and unchanged one-leader route. The
+offline estimate is not a claim of a final native pass.
 
 ### TL-21 assembly-HUB reference lanes
 
