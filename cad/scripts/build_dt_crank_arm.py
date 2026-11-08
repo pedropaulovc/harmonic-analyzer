@@ -46,7 +46,6 @@ from _holes import wizard_holes
 
 import _telemetry
 from _drawing_precision import apply_drawing_precision
-from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
@@ -68,9 +67,7 @@ from dt_crank_arm_spec import (
     FIDUCIAL_X,
     FIDUCIAL_Y,
     HALF_WIDTH,
-    AXIS_FROM_EDGE_PLACES,
     AXIS_FROM_EDGE_STATION_X,
-    AXIS_FROM_EDGE_TOLERANCE,
     HANDLE_PIVOT_HOLE_SPEC,
     HUB_SEAT_DIA,
     ISOMETRIC_VIEW_NOTE,
@@ -580,15 +577,6 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    # The axis from the top edge holds half the mill's width band.
-    set_dimension_symmetric_tolerance(
-        adapter,
-        "StationReference",
-        "AxisFromEdge",
-        AXIS_FROM_EDGE_TOLERANCE,
-        places=AXIS_FROM_EDGE_PLACES,
-        display_unit=part_drawing_unit(PART_NAME),
-    )
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

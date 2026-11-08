@@ -75,13 +75,17 @@ def test_reference_dimensions_remain_model_owned() -> None:
     assert spec.DRAWING_DIMENSIONS["HubSeatProfile"] == {"HubSeatDia"}
     assert spec.HALF_WIDTH - spec.ANCHOR_SCREW_Y == pytest.approx(8.128)  # .32
     assert spec.ARM_END_X + spec.HALF_WIDTH == pytest.approx(100.33)  # 3.95
-    # The axis from the top edge: half the bar, at half the mill's band
-    # (.500 +/-.002), its station between the anchor tap and the pivot.
+    # The axis from the top edge: half the bar at the title block's .XX, its
+    # station between the anchor tap and the pivot; the hub-seat cheek still
+    # holds the wall target with the axis off centre by that band.
     assert spec.HALF_WIDTH == pytest.approx(12.7)
-    assert spec.AXIS_FROM_EDGE_TOLERANCE == pytest.approx(
-        geometry.ARM_WIDTH_STOCK_MINUS / 2.0
-    )
     assert spec.ANCHOR_SCREW_X < spec.AXIS_FROM_EDGE_STATION_X < spec.ARM_C2C
+    assert spec.ARM_CHEEK_OFF_CENTRE_WORST_MM == pytest.approx(
+        geometry.ARM_CHEEK_WORST_MM
+        - geometry.GENERAL_2PL_TOL_MM
+        - geometry.ARM_WIDTH_STOCK_MINUS / 2.0
+    )
+    assert spec.ARM_CHEEK_OFF_CENTRE_WORST_MM >= geometry.WALL_TARGET_MM
 
 
 def test_handle_end_is_a_semicircle_about_the_pivot() -> None:
@@ -122,15 +126,10 @@ def test_sheet_uses_imported_part_precision_and_no_gdt() -> None:
     assert set(spec.DRAWING_PRECISION_BY_NAME) == set().union(
         *spec.DRAWING_DIMENSIONS.values()
     )
-    places = dict(spec.DRAWING_PRECISION_BY_NAME)
-    assert places.pop("AxisFromEdge") == spec.AXIS_FROM_EDGE_PLACES == 3
-    assert set(places.values()) == {2}
+    assert set(spec.DRAWING_PRECISION_BY_NAME.values()) == {2}
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
-    # Every dimension takes the title block's .XX but the axis from the top
-    # edge, which carries half the mill's width band.
-    assert model_toleranced_dimensions(arm) == {
-        ("StationReference", "AxisFromEdge"): "AXIS_FROM_EDGE_TOLERANCE"
-    }
+    # Every dimension takes the title block's .XX; none carries its own band.
+    assert model_toleranced_dimensions(arm) == {}
     assert spec.SURFACE_FINISHES == ()
     assert not hasattr(spec, "GEOMETRIC_TOLERANCES_MM")
 
