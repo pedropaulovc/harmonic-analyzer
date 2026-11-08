@@ -86,12 +86,22 @@ CLAMP_STATION_NAMES = (
     "ClampStation3",
     "ClampStation4",
 )
+# The clamp row's two runs each read their own .551 from the top face (round
+# 7 review blocker: the round pair's east run carried no height): the west
+# run's ClampRowHeight off the +X end in VIEW D, the east run's off a stub
+# over its end in the principal view, the end's other side crowded in VIEW D
+# (the round holes' callout and leader, END A, the 1.010 and the stations).
+CLAMP_EAST_HEIGHT_NAME = "ClampEastRowHeight"
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BarProfile": {"Length", "Height"},
     "Bar": {"Depth"},
     "HangerRowReference": {"HangerRowHeight", *HANGER_STATION_NAMES},
-    "ClampRowReference": {"ClampRowHeight", *CLAMP_STATION_NAMES},
+    "ClampRowReference": {
+        "ClampRowHeight",
+        CLAMP_EAST_HEIGHT_NAME,
+        *CLAMP_STATION_NAMES,
+    },
     # The pivot and hook taps print once each, on their countersinks'
     # stacked callouts (below); the tap drill is the TAP size's.
     "CountersinkReference": {"PivotCskDia", "BracketCskDia"},
@@ -113,6 +123,7 @@ SHEET_PRECISION: dict[str, dict[str, int]] = {
     },
     "ClampRowReference": {
         "ClampRowHeight": CLAMP_POSITION_PLACES,
+        CLAMP_EAST_HEIGHT_NAME: CLAMP_POSITION_PLACES,
         **dict.fromkeys(CLAMP_STATION_NAMES, CLAMP_POSITION_PLACES),
     },
     "CountersinkReference": {"PivotCskDia": 3, "BracketCskDia": 3},
@@ -138,8 +149,9 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
 # only where its holes are, and no two rows' lines share a stretch of the
 # bar (build_pd_support_bar.ROW_CENTRELINES): the taps' one line runs from
 # just short of the pivot to HANGER_HEIGHT_X, where the .571 reads off it;
-# the clamp holes' east line from END A past the round pair, its west line
-# from short of the slots to the +X end, where the .551 reads off it. Model
+# the clamp holes' east line from END A past the round pair, its own .551
+# off its end; its west line from short of the slots to the +X end, where
+# the other .551 reads off it. Model
 # millimetres along the bar from its centre; each overrun clears the
 # widest ring round its end hole (a slot counterbore reaches 5.75).
 TAP_CENTRELINE_OVERRUN = 6.0
@@ -159,10 +171,12 @@ DIMENSION_CALLOUTS = {
     # rule 18's 1.5D at the thinnest bar (transgear_hanger_joints).  Keeping
     # both bands leaves pd_support_bar_spec, and every part importing it,
     # unkeyed.
-    # Two short lines: the height's text stands right of the round
-    # counterbores' callout (draw_pd_support_bar.BACK_KEEP).
+    # Two short lines each: the height's text stands right of the round
+    # counterbores' callout (draw_pd_support_bar.BACK_KEEP); the thickness's
+    # left of section A-A's left extension line (a 28-character row ran
+    # through it, round 7 of the fan-out; draw_pd_support_bar.SECTION_KEEP).
     "Height": "SETS MHA-PD-12\nRETENTION",
-    "Depth": "SETS MHA-PD-VN-57 ENGAGEMENT",
+    "Depth": "SETS MHA-PD-VN-57\nENGAGEMENT",
     # One stacked callout per hole or pattern, on its countersink's MAX Ø
     # (machinist review round 5: a separate tap callout per hole put two
     # leaders on one small hole, arrowheads stacked): the tap line above, the

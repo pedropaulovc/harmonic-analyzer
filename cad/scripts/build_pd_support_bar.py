@@ -105,6 +105,7 @@ from pd_support_bar_spec import (
 from pd_support_bar_drawing_spec import (
     BANDED_HANGER_NAMES,
     CLAMP_CENTRELINE_OVERRUN,
+    CLAMP_EAST_HEIGHT_NAME,
     CLAMP_HOLE_CALLOUT_PLACES,
     CLAMP_POSITION_PLACES,
     CLAMP_SLOT_CBORE_WIDTH_LIMITS,
@@ -377,7 +378,10 @@ class ReferenceRow:
     each hole's (station dimension name, model x), and the row's drawn
     centrelines as (start x, end x) runs along the bar (``ROW_CENTRELINES``).
     The height reads off the last run's end: a rise on the +X end's edge when
-    the run reaches it, else a point under a stub on the top face."""
+    the run reaches it, else a point under a stub on the top face. Every
+    other run carrying holes names its own height (``run_heights``, read off
+    a stub over its end the same way), so no run's holes are left without a
+    height (round 7 review blocker: the round pair's run had none)."""
 
     feature: str
     prefix: str
@@ -385,13 +389,14 @@ class ReferenceRow:
     row_y: float
     holes: tuple[tuple[str, float], ...]
     runs: tuple[tuple[float, float], ...]
+    run_heights: tuple[str, ...] = ()
 
 
 # The rows' drawn centrelines (pd_support_bar_drawing_spec.HANGER_HEIGHT_X and
 # the overruns): the taps' one run from just short of the pivot to where the
-# .571 reads off it; the clamp holes' east run from END A past the round pair
-# and their west run from short of the slots to the +X end, where the .551
-# reads off it.
+# .571 reads off it; the clamp holes' east run from END A past the round pair,
+# its own .551 reading off its end (CLAMP_EAST_HEIGHT_NAME), and their west run
+# from short of the slots to the +X end, where the other .551 reads off it.
 _CLAMP_EAST = tuple(x for x in CLAMP_ROW_X if x < 0.0)
 _CLAMP_WEST = tuple(x for x in CLAMP_ROW_X if x > 0.0)
 HANGER_ROW = ReferenceRow(
@@ -412,6 +417,7 @@ CLAMP_ROW = ReferenceRow(
         (LEFT_END_X, max(_CLAMP_EAST) + CLAMP_CENTRELINE_OVERRUN),
         (min(_CLAMP_WEST) - CLAMP_CENTRELINE_OVERRUN, BAR_LENGTH / 2.0),
     ),
+    (CLAMP_EAST_HEIGHT_NAME,),
 )
 ROW_CENTRELINES = (HANGER_ROW, CLAMP_ROW)
 
@@ -430,6 +436,8 @@ for _row in ROW_CENTRELINES:
         raise AssertionError(f"{_row.feature}: a hole is on no centreline run, or on two")
     if not all(LEFT_END_X <= a < b <= BAR_LENGTH / 2.0 for a, b in _row.runs):
         raise AssertionError(f"{_row.feature}: a centreline run leaves the bar")
+    if len(_row.run_heights) != len(_row.runs) - 1:
+        raise AssertionError(f"{_row.feature}: a run carries holes but no height")
 for _a in HANGER_ROW.runs:
     for _b in CLAMP_ROW.runs:
         if _a[0] < _b[1] and _b[0] < _a[1]:
@@ -634,12 +642,13 @@ async def _author_row(adapter, row: ReferenceRow) -> list[tuple[str, str]]:
     from the top face. A row whose first run does not start at END A drops a
     plain line down END A's edge to the row, the stations' origin; a row
     whose last run reaches the +X end reads its height off a rise down that
-    edge, any other off a stub on the top face over the run's end. Lines on
-    the bar's edges are plain sketch lines, which print inside the edges'
-    heavier strokes; as construction geometry their grey dashes showed along
-    the end (machinist review round 2). Every dimension is driven from the
-    bar globals (``row_equations``) or holds a fixed offset from the bar's
-    centre, where the holes stand."""
+    edge, any other off a stub on the top face over the run's end; every
+    other run reads its own height (``row.run_heights``) off a stub over its
+    end. Lines on the bar's edges are plain sketch lines, which print inside
+    the edges' heavier strokes; as construction geometry their grey dashes
+    showed along the end (machinist review round 2). Every dimension is
+    driven from the bar globals (``row_equations``) or holds a fixed offset
+    from the bar's centre, where the holes stand."""
     feature = row.feature
     rise_x = BAR_LENGTH / 2.0
     row_y = row.row_y
@@ -663,6 +672,13 @@ async def _author_row(adapter, row: ReferenceRow) -> list[tuple[str, str]]:
             f"{feature} height stub",
             await adapter.add_line(end_x - HEIGHT_STUB_LENGTH, top_y, end_x, top_y),
         )
+    early = [
+        check(
+            f"{feature} run {index} height stub",
+            await adapter.add_line(x - HEIGHT_STUB_LENGTH, top_y, x, top_y),
+        )
+        for index, (_x0, x) in enumerate(row.runs[:-1])
+    ]
     runs = []
     for index, run in enumerate(row.runs):
         xs = (run[0], *(x for _, x in _run_holes(row, run)), run[1])
@@ -687,6 +703,11 @@ async def _author_row(adapter, row: ReferenceRow) -> list[tuple[str, str]]:
             top, None, "vertical" if on_rise else "horizontal"
         ),
     )
+    for index, stub in enumerate(early):
+        check(
+            f"{feature} run {index} stub horizontal",
+            await adapter.add_sketch_constraint(stub, None, "horizontal"),
+        )
     for index, legs in enumerate(runs):
         for leg_index, leg in enumerate(legs):
             label = f"{feature} run {index} leg {leg_index}"
@@ -703,14 +724,29 @@ async def _author_row(adapter, row: ReferenceRow) -> list[tuple[str, str]]:
                 f"{feature} run {index} leg {leg_index} chained",
                 await adapter.add_sketch_constraint(f"{leg}.end", end, "coincident"),
             )
-    # Every run but the last stands on the last one's line.
-    for index, legs in enumerate(runs[:-1]):
-        check(
-            f"{feature} run {index} on the row",
-            await adapter.add_sketch_constraint(
-                f"{legs[0]}.start", f"{runs[-1][-1]}.end", "horizontal_points"
-            ),
+
+    async def stub_height(
+        stub: str, run_end: str, x: float, prefix: str, name: str, label: str
+    ) -> None:
+        """A run's height off the stub on the top face over its end: the stub
+        held at its fixed offset from the bar's centre on the top face."""
+        await anchor_point_to_origin(adapter, f"{stub}.end", x, top_y, label)
+        dims.record(f"{prefix}StubX", f"{abs(x):.10g}mm")
+        dims.record(f"{prefix}StubY", BAR_HALF_HEIGHT_EQUATION)
+        await dimension_between(
+            adapter,
+            f"{stub}.start",
+            f"{stub}.end",
+            "horizontal_distance",
+            HEIGHT_STUB_LENGTH,
+            f"{label} length",
         )
+        dims.record(f"{prefix}StubLength", f"{HEIGHT_STUB_LENGTH:.10g}mm")
+        await dimension_between(
+            adapter, f"{stub}.end", run_end, "vertical_distance", top_y - row_y, name
+        )
+        dims.record(name, equations[row.height_name])
+
     if on_rise:
         await anchor_point_to_origin(
             adapter, f"{top}.start", rise_x, top_y, f"{feature} top corner"
@@ -727,29 +763,23 @@ async def _author_row(adapter, row: ReferenceRow) -> list[tuple[str, str]]:
         )
         dims.record(row.height_name, equations[row.height_name])
     else:
-        await anchor_point_to_origin(
-            adapter, f"{top}.end", end_x, top_y, f"{feature} height stub"
-        )
-        dims.record(f"{row.prefix}StubX", f"{abs(end_x):.10g}mm")
-        dims.record(f"{row.prefix}StubY", BAR_HALF_HEIGHT_EQUATION)
-        await dimension_between(
-            adapter,
-            f"{top}.start",
-            f"{top}.end",
-            "horizontal_distance",
-            HEIGHT_STUB_LENGTH,
-            f"{feature} height stub length",
-        )
-        dims.record(f"{row.prefix}StubLength", f"{HEIGHT_STUB_LENGTH:.10g}mm")
-        await dimension_between(
-            adapter,
-            f"{top}.end",
+        await stub_height(
+            top,
             f"{runs[-1][-1]}.end",
-            "vertical_distance",
-            top_y - row_y,
-            f"{feature} height",
+            end_x,
+            row.prefix,
+            row.height_name,
+            f"{feature} height stub",
         )
-        dims.record(row.height_name, equations[row.height_name])
+    for index, (stub, name) in enumerate(zip(early, row.run_heights, strict=True)):
+        await stub_height(
+            stub,
+            f"{runs[index][-1]}.end",
+            row.runs[index][1],
+            f"{row.prefix}Run{index}",
+            name,
+            f"{feature} run {index} height stub",
+        )
     if drop is not None:
         await anchor_point_to_origin(
             adapter, f"{drop}.start", LEFT_END_X, top_y, f"{feature} END A corner"

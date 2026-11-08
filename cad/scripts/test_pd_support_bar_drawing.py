@@ -293,6 +293,17 @@ def test_reference_rows_follow_the_bar_globals_onto_the_holes(
                 for index, run in enumerate(row.runs)
                 for side, x in zip(("Start", "End"), run)
             },
+            # Every other run reads its own height off a stub over its end.
+            **{
+                key: value
+                for index, name in enumerate(row.run_heights)
+                for key, value in (
+                    (f"{row.prefix}Run{index}StubX", abs(row.runs[index][1])),
+                    (f"{row.prefix}Run{index}StubY", height / 2.0),
+                    (f"{row.prefix}Run{index}StubLength", part.HEIGHT_STUB_LENGTH),
+                    (name, height / 2.0 - row_y),
+                )
+            },
         }
         authored = _authored_row(monkeypatch, row)
         for name, value, drive in authored:
@@ -300,6 +311,10 @@ def test_reference_rows_follow_the_bar_globals_onto_the_holes(
             # Neutral at the built size, tracking the holes at any other.
             assert _evaluate(drive, built) == pytest.approx(value), name
             assert _evaluate(drive, globals_mm) == pytest.approx(expected[name]), name
+        # Every run carrying holes has a height dimension.
+        heights = {row.height_name, *row.run_heights}
+        assert heights <= {name for name, _value, _drive in authored}
+        assert len(heights) == len(row.runs)
 
 
 def test_each_row_draws_its_own_centreline() -> None:
@@ -333,6 +348,40 @@ def test_each_row_draws_its_own_centreline() -> None:
     # of the west slots' counterbores, the text's lane over the top face.
     assert sheet_spec.HANGER_HEIGHT_X > spec.BRACKET_TAP_X[1] + 0.020 / drawing._S
     assert sheet_spec.HANGER_HEIGHT_X < min(part.CLAMP_SLOT_X) - slot_reach
+
+
+def test_round_pair_run_reads_its_own_height_in_the_principal_view() -> None:
+    """Round 7 review blocker: the round pair's east run carried no height,
+    the .551 reading only off the west (slots') run. The east run reads its
+    own .551 off its end in the principal view, the back face, which imports
+    it (VIEW D's import deletes it as unrequested, as the principal view's
+    deletes the bar height). Round 7's native layout: the .571 text sat on
+    its line's shelf, 6.4 mm tall, 2.45 mm a character; the top slide
+    symbol's leader drops at 0.0807 from its shelf at 0.2424."""
+    name = sheet_spec.CLAMP_EAST_HEIGHT_NAME
+    clamps = part.CLAMP_ROW
+    assert clamps.run_heights == (name,)
+    assert name in sheet_spec.DRAWING_DIMENSIONS["ClampRowReference"]
+    assert name in drawing.FRONT_KEEP and name not in drawing.BACK_KEEP
+    assert sheet_spec.SHEET_PRECISION["ClampRowReference"][name] == 3
+    # It is a location: no band of its own, no words (title block ±.005).
+    assert name not in drawing.DIMENSION_CALLOUTS
+    line_x, text_y = drawing.FRONT_KEEP[name]
+    assert line_x == pytest.approx(
+        drawing._face_x(clamps.runs[0][1]) + drawing.HANGER_ROW_LINE_SIDE
+    )
+    assert text_y == drawing.FRONT_KEEP["HangerRowHeight"][1]
+    text = f"{part.CLAMP_ROW_HEIGHT / 25.4:.3f}".lstrip("0")
+    box = (line_x, text_y - 0.0032, line_x + len(text) * 0.00245, text_y + 0.0032)
+    leader_x, shelf_y = 0.0807, 0.2424
+    assert drawing._face_x(drawing.TOP_FINISH_MODEL_X) == pytest.approx(leader_x, abs=5e-4)
+    assert box[0] - leader_x >= 0.005
+    assert shelf_y - box[3] >= 0.003
+    assert box[1] - drawing.FACE_TOP >= 0.002
+    # Right of the run's end, past the inner round hole's ring.
+    assert line_x - drawing._face_x(max(part.CLAMP_ROUND_X)) > 0.005
+    # Well left of section A-A's letters (0.1208).
+    assert 0.1208 - box[2] >= 0.015
 
 
 def test_tap_row_height_text_clears_the_hook_leader_and_both_shoulders() -> None:
@@ -1310,6 +1359,31 @@ def test_section_a_a_caption_stands_directly_under_the_cut_bar() -> None:
     assert 0.002 <= gap <= 0.006
     # Still above the isometric's centre, which stands under it.
     assert drawing.SECTION_CAPTION_TOP_Y > drawing.ISO_CENTER[1] + 0.040
+
+
+def test_section_a_a_thickness_text_clears_both_extension_lines() -> None:
+    """Round 7 of the fan-out: the 28-character 'SETS MHA-PD-VN-57
+    ENGAGEMENT' row ran 11 mm across the left extension line, which ended
+    inside its 'M'. Round 7's native layout: the keep is the block's centre,
+    5.6 mm a row, 2.78 mm a character, the dimension line 0.4 mm over the
+    block's foot and the extension lines 1 mm past it. The block stands left
+    of the left extension line by 1.5 mm or more, right of the hook taps'
+    callout shoulder (round 2's 0.3124 end, 0.2393), its foot (so its line)
+    where round 7's was, and under the border."""
+    scale = drawing.SECTION_SCALE[0] / drawing.SECTION_SCALE[1]
+    left_face = drawing.SECTION_CENTER[0] - BAR_DEPTH * scale / 2000.0
+    top = drawing.SECTION_CENTER[1] + spec.BAR_HEIGHT * scale / 2000.0
+    x = left_face - drawing.SECTION_DEPTH_SIDE
+    y = top + drawing.SECTION_DEPTH_RISE
+    rows = [".374", *drawing.DIMENSION_CALLOUTS["Depth"].splitlines()]
+    assert len(rows) - 1 <= 2
+    half_width = max(map(len, rows)) * 0.00278 / 2.0
+    half_height = len(rows) * 0.0056 / 2.0 + 0.0003
+    box = (x - half_width, y - half_height, x + half_width, y + half_height)
+    assert left_face - box[2] >= 0.0015 + 0.0025
+    assert box[0] - 0.3124 >= 0.005
+    assert box[1] == pytest.approx(0.2297, abs=5e-4)
+    assert box[3] < 0.2667 - 0.005
 
 
 class _DetailView:

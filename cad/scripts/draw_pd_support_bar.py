@@ -121,6 +121,7 @@ from pd_support_bar_spec import (
 from pd_support_bar_drawing_spec import (
     BACK_VIEW_CAPTION,
     CLAMP_CALLOUT_PRECISION,
+    CLAMP_EAST_HEIGHT_NAME,
     CLAMP_CBORE_CALLOUT,
     CLAMP_HOLE_PROCESS,
     DIMENSION_CALLOUTS,
@@ -203,7 +204,12 @@ def _back_x(model_x: float) -> float:
 # right end (pd_support_bar_drawing_spec.HANGER_HEIGHT_X), between the hook
 # taps and the west slots: its line HANGER_ROW_LINE_SIDE right of that end,
 # its one-row text over the top face (HANGER_ROW_TEXT_RISE, centre), right
-# of the hook taps' leader and under both callouts' shoulders.
+# of the hook taps' leader and under both callouts' shoulders. The clamp
+# row's east run (the round pair's) reads its own .551 here the same way,
+# off its end over END A's half of the bar, its text right of the top slide
+# symbol's leader and under its shelf (round 7 review blocker: that run had
+# no height; VIEW D's END A side carries the round holes' callout and leader,
+# END A, the 1.010 and the stations).
 # The section line runs up through the pivot, its arrows and letters left of
 # it. Every location carries its value and band alone (rule 7; the hook
 # taps' stations REF, their callout's spotting route sets them): the mate
@@ -232,6 +238,10 @@ FRONT_KEEP = {
     "Length": (FACE_CENTER[0], FACE_BOTTOM - 4.0 * ROW_STEP),
     "HangerRowHeight": (
         _face_x(HANGER_HEIGHT_X) + HANGER_ROW_LINE_SIDE,
+        FACE_TOP + HANGER_ROW_TEXT_RISE,
+    ),
+    CLAMP_EAST_HEIGHT_NAME: (
+        _face_x(CLAMP_ROW.runs[0][1]) + HANGER_ROW_LINE_SIDE,
         FACE_TOP + HANGER_ROW_TEXT_RISE,
     ),
     "PivotCskDia": (_face_x(PIVOT_TAP_X) + 0.059, FACE_TOP + CSK_CALLOUT_RISE),
@@ -367,12 +377,21 @@ SLOT_DEPTH_TEXT_SIDE = 0.018
 SLOT_CALLOUT_AIR_M = 0.003
 
 # Section A-A: the thickness up-left of the cut bar, its text outside the
-# extension lines since the 2:1 span is narrower than it. Nothing is
-# dimensioned under the cut bar, so its caption's top stands just under the
-# bar's foot at the native caption's x (r4 review: a 35 mm drop, kept from
-# when the thread and drill depths stood there, put it beside the isometric).
+# extension lines since the 2:1 span is narrower than it. The keep is the
+# text block's centre and the dimension line runs under its last row (round
+# 7 native: the two-row block 0.2297-0.2416, its line at 0.2301, the
+# extension lines rising to 0.2311). The three-row block (value, two
+# 17-character rows at 2.78 mm a character) centres SECTION_DEPTH_SIDE left
+# of the cut's left face, so its right end stands 4.4 mm short of the left
+# extension line (round 7: the 28-character row ran 11 mm across it) and its
+# left end 11 mm right of the hook taps' callout shoulder (0.3124); the rise
+# keeps the block's foot, and so its line, where the two-row block's were.
+# Nothing is dimensioned under the cut bar, so its caption's top stands just
+# under the bar's foot at the native caption's x (r4 review: a 35 mm drop,
+# kept from when the thread and drill depths stood there, put it beside the
+# isometric).
 SECTION_KEEP_NAMES = ("Depth",)
-SECTION_DEPTH_RISE = 0.010
+SECTION_DEPTH_RISE = 0.0128
 SECTION_DEPTH_SIDE = 0.028
 SECTION_CAPTION_GAP = 0.004
 SECTION_CAPTION_TOP_Y = (
@@ -1624,8 +1643,9 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     # Both face views draw both rows' centrelines, each row its own lines
-    # (rule 26): each view's import showed the row it dimensions.
-    _show_row_centrelines(adapter, face, CLAMP_ROW.feature, label="back face")
+    # (rule 26): each view's import showed the rows it dimensions, the back
+    # face both (its tap row and the clamp row's east .551), VIEW D the clamp
+    # row alone.
     _show_row_centrelines(adapter, back, HANGER_ROW.feature, label="front face")
 
     annotations = [
