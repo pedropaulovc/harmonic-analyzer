@@ -384,10 +384,13 @@ DIAMETER_BLOCK_SIZE = (0.027, 0.014)
 # right of the 19.0's head-end witness; the underline still starts right of
 # detail A's view box (x 0.1928).
 # Two rows preserve the measured underline height between the crown-sag and
-# cross-hole text.  The fit names the spring pin it presses (fan-out, as the
-# MHA-DT-33 collar sheet prints it) by its number; at 22 characters the
-# longer row keeps the underline right of detail A's view box.
-PIN_HOLE_CALLOUT = f"{_PIN_DRILL_THRU_CALLOUT}\nPRESS FIT {_PIN_NUMBER}"
+# cross-hole text.  The hole names the pin it takes by number and kind: the
+# round-7 local repeat read "PRESS FIT" on a hole at or above the pin's
+# nominal as a fit with no interference, while a slotted spring pin grips by
+# compressing into that B18.8.2 hole band.  A third row would run into the
+# MHA-DT-15 bore callout above, and a 24+ character row puts the underline
+# over detail A's view box, so "SPRING PIN" carries the fit.
+PIN_HOLE_CALLOUT = f"{_PIN_DRILL_THRU_CALLOUT}\n{_PIN_NUMBER} SPRING PIN"
 PIN_HOLE_CALLOUT_ADVANCE = 0.00267
 PIN_HOLE_CALLOUT_CENTRE_DX = 0.00075
 PIN_HOLE_LEADER_ARROW_DX = -0.0004

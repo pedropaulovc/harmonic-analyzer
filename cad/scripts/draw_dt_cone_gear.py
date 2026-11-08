@@ -402,17 +402,20 @@ def form_plot_labels() -> list[tuple[str, tuple[float, float]]]:
 
 # Each tag's text top-left from the point its leader lands on (sheet m). The
 # root and relief rows P3-P11 stand 1.3-7.7 mm apart at 75:1, too close to
-# tag one by one; their zone label names them (P2-P12). P1 and P2 hang under
-# the X axis, clear of each other; the involute rows P12-P17, 4-16 mm apart,
-# are tagged inside the space, up and left of the flank.
+# tag one by one; their zone label names them (P2-P12). A tag's native box
+# spans its text AND its leader's landing (round 7 of the fan-out: P1/P2,
+# P12/P13 and P15/P16 overlapped by 1.3-7.7 mm), so neighbours alternate
+# sides: P1 down-right of the origin and P2 right of it, under the X axis;
+# P12, P14, P15 and P17 inside the space, up-left of the flank; P13 and P16
+# outside it, down-right.
 FORM_TAG_TEXT_OFFSETS = {
-    1: (0.010, -0.012),
+    1: (0.004, -0.009),
     2: (0.002, -0.0037),
     12: (-0.011, 0.005),
-    13: (-0.010, 0.007),
+    13: (0.0047, -0.0014),
     14: (-0.012, 0.007),
-    15: (-0.012, 0.007),
-    16: (-0.011, 0.007),
+    15: (-0.0085, 0.0069),
+    16: (0.0048, -0.0008),
     17: (-0.011, 0.0075),
 }
 # The zone labels' text top-left from their leaders' landings: the root arc's
@@ -432,7 +435,7 @@ def form_point_tags() -> list[tuple[str, tuple[float, float], tuple[float, float
     for number, (dx, dy) in FORM_TAG_TEXT_OFFSETS.items():
         _radius, x, y = points[number - 1]
         tip = form_plot_xy(x, y)
-        text = f"P{number} (X0 Y0)" if number == 1 else f"P{number}"
+        text = f"P{number}"
         tags.append((text, (tip[0] + dx, tip[1] + dy), tip))
     return tags
 

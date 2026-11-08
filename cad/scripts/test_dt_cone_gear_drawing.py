@@ -715,28 +715,24 @@ def test_tooth_space_sheet_plots_the_table_beside_it() -> None:
     boxes = []
     for text, (left, top) in drawing.form_plot_labels():
         width = max(map(len, text.splitlines())) * 0.0026
-        boxes.append((text, (left, top - 0.0046 * len(text.splitlines()), left + width, top), None))
-    # Point tags and zone labels at 2.5 mm, each with a leader to its point.
-    for text, (left, top), tip in (*drawing.form_point_tags(), *drawing.form_zone_labels()):
-        boxes.append((text, (left, top - 0.0025, left + len(text) * 0.00179, top), tip))
-    for _text, (x0, y0, x1, y1), _tip in boxes:
+        box = (left, top - 0.0046 * len(text.splitlines()), left + width, top)
+        boxes.append((text, box, box, None))
+    # Point tags and zone labels at 2.5 mm, each with a leader to its point:
+    # the audit's native box spans the text and the leader's landing.
+    for text, xy, tip in (*drawing.form_point_tags(), *drawing.form_zone_labels()):
+        boxes.append((text, _tag_text_box(text, xy), _tag_native_box(text, xy, tip), tip))
+    for _text, _box, (x0, y0, x1, y1), _tip in boxes:
         plotted += [(x0, y0), (x1, y1)]
     xs, ys = zip(*plotted)
     assert min(xs) > table_right + 0.020
     assert max(xs) < 0.415
     # Above the title block (top 0.064) and below the border (0.267).
     assert min(ys) > 0.070 and max(ys) < 0.262
-    # No two labels touch, no leader runs through another label, and no
-    # label sits on the drawn flank.
-    for index, (text, box, tip) in enumerate(boxes):
-        for other, other_box, _ in boxes[index + 1:]:
-            gap = 0.001
-            assert (
-                box[2] + gap <= other_box[0] or other_box[2] + gap <= box[0]
-                or box[3] + gap <= other_box[1] or other_box[3] + gap <= box[1]
-            ), (text, other)
+    # Native boxes 2 mm apart, no leader through another label's text, and
+    # no text on the drawn flank.
+    assert not _tag_overlaps(boxes, _TAG_CLEAR)
     flank_points = plotted[: 2 * len(flank)]
-    for text, (x0, y0, x1, y1), tip in boxes:
+    for text, (x0, y0, x1, y1), _native, tip in boxes:
         assert not any(
             x0 - 0.001 < x < x1 + 0.001 and y0 - 0.001 < y < y1 + 0.001
             for x, y in flank_points
@@ -745,16 +741,95 @@ def test_tooth_space_sheet_plots_the_table_beside_it() -> None:
             continue
         start = (min(max(tip[0], x0), x1), (y0 + y1) / 2.0)
         leader = Segment(*start, *tip)
-        for other, other_box, _ in boxes:
+        for other, other_box, _native_other, _ in boxes:
             if other != text:
                 assert segment_box_distance(leader, Box(*other_box)) > 0.0005, (text, other)
     # Every point is tagged or inside a labelled zone's range.
-    tagged = {int(text.split()[0][1:]) for text, _xy, _tip in drawing.form_point_tags()}
+    tagged = {int(text[1:]) for text, _xy, _tip in drawing.form_point_tags()}
     root_end, junction_row = drawing.form_zones()
     assert {1, root_end, junction_row, len(rows)} <= tagged
     assert junction_row == min(
         range(1, len(rows) + 1), key=lambda number: abs(rows[number - 1][0] - junction)
     )
+
+
+# A DETAIL B tag's native extent as the layout audit read it (round 7 of the
+# fan-out, run 20261108T032608040Z, sheet mm): the text from 0.4 mm left of
+# and 0.2 mm over its top-left point, 1.8 mm a character (2.5 mm text), down
+# 3.4 mm, joined with the leader's landing.
+_TAG_LEFT, _TAG_TOP, _TAG_CHAR, _TAG_DEPTH = 0.0004, 0.0002, 0.0018, 0.0034
+_TAG_CLEAR = 0.002
+
+
+def _tag_text_box(text: str, xy: tuple[float, float]) -> tuple[float, float, float, float]:
+    left, top = xy
+    return (left - _TAG_LEFT, top - _TAG_DEPTH, left + len(text) * _TAG_CHAR, top + _TAG_TOP)
+
+
+def _tag_native_box(
+    text: str, xy: tuple[float, float], tip: tuple[float, float]
+) -> tuple[float, float, float, float]:
+    x0, y0, x1, y1 = _tag_text_box(text, xy)
+    return (min(x0, tip[0]), min(y0, tip[1]), max(x1, tip[0]), max(y1, tip[1]))
+
+
+def _tag_overlaps(boxes, clear: float) -> set[frozenset[str]]:
+    """Pairs of labels whose native boxes stand under ``clear`` apart (0: the
+    audit's own test, overlap)."""
+    found = set()
+    for index, (text, _box, native, _tip) in enumerate(boxes):
+        for other, _other_box, other_native, _ in boxes[index + 1:]:
+            if not (
+                native[2] + clear <= other_native[0]
+                or other_native[2] + clear <= native[0]
+                or native[3] + clear <= other_native[1]
+                or other_native[3] + clear <= native[1]
+            ):
+                found.add(frozenset((text, other)))
+    return found
+
+
+def test_tag_box_model_reproduces_the_round_7_overlaps() -> None:
+    """Positive control: round 7's offsets, through the model, give the
+    audit's three overlaps and boxes that cover what it measured."""
+    round_7 = {
+        1: ("P1 (X0 Y0)", (0.010, -0.012)),
+        2: ("P2", (0.002, -0.0037)),
+        12: ("P12", (-0.011, 0.005)),
+        13: ("P13", (-0.010, 0.007)),
+        14: ("P14", (-0.012, 0.007)),
+        15: ("P15", (-0.012, 0.007)),
+        16: ("P16", (-0.011, 0.007)),
+        17: ("P17", (-0.011, 0.0075)),
+    }
+    measured_mm = {
+        "P1 (X0 Y0)": (280.0, 124.6, 305.8, 140.1),
+        "P2": (290.7, 132.4, 296.3, 139.3),
+        "P12": (295.9, 169.4, 306.7, 174.5),
+        "P13": (298.9, 173.2, 309.2, 180.1),
+        "P15": (317.4, 191.3, 329.4, 198.2),
+        "P16": (326.9, 196.0, 338.1, 202.9),
+    }
+    points = spec.custom_six_form_points_mm()
+    boxes = []
+    for number, (text, (dx, dy)) in round_7.items():
+        _r, x, y = points[number - 1]
+        tip = drawing.form_plot_xy(x, y)
+        xy = (tip[0] + dx, tip[1] + dy)
+        boxes.append((text, None, _tag_native_box(text, xy, tip), tip))
+    by_text = {text: native for text, _box, native, _tip in boxes}
+    for text, (x0, y0, x1, y1) in measured_mm.items():
+        model = by_text[text]
+        # The model covers the native box, at most 2.5 mm wider.
+        for got, want in zip(model, (x0, y0, x1, y1)):
+            assert abs(got * 1000.0 - want) < 2.5, (text, model)
+        assert model[0] * 1000 <= x0 + 0.5 and model[1] * 1000 <= y0 + 0.5, text
+        assert model[2] * 1000 >= x1 - 0.5 and model[3] * 1000 >= y1 - 0.5, text
+    assert _tag_overlaps(boxes, 0.0) == {
+        frozenset(("P1 (X0 Y0)", "P2")),
+        frozenset(("P12", "P13")),
+        frozenset(("P15", "P16")),
+    }
 
 
 def test_configuration_owned_bores_and_title_block_alloys_cover_the_family() -> None:
