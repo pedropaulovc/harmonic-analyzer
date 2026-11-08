@@ -1212,6 +1212,14 @@ def test_table_layout_stays_under_the_corner_datum_and_inside_its_lane():
     # The header, thirteen ~11 mm rows and a HUB row grown by a line ~5 mm
     # still clear .015.
     assert table.TABLE_ANCHOR[1] - (.006 + len(TABLED) * .011 + .005) >= .015
+    # r9: the measured size and each row's height are logged on success too,
+    # and the lane error carries them.
+    source = inspect.getsource(table.create_carrier_hole_table)
+    assert '_telemetry.info(f"carrier table {measured}")' in source
+    assert "row heights mm" in source
+    assert source.index('_telemetry.info(f"carrier table {measured}")') < source.index(
+        "carrier table crosses the border or title-block lane: {measured}"
+    )
 
 
 def test_settled_widths_are_read_in_visible_positions(monkeypatch):

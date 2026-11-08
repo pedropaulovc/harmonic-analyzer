@@ -52,13 +52,18 @@ from ch_rocker_arm_tl_oblique_callouts import CALLOUT_PLACES
 # farm 20261108T055431582Z) and the header run ~147 mm, which a .158 top
 # would have put through the .015 floor.
 TABLE_ANCHOR = (0.020, 0.173)
-# NOTE at 150 (TAG/X/Y narrowed to 11/17/17 mm: "19.395" prints ~14 mm):
-# the render prints ~2.41 mm a glyph (farm 20261108T055431582Z: the 34-glyph
-# pin row ran 82 mm), so NOTE_MAX_GLYPHS lines need ~140 mm. Right edge
-# 20 + 195 = 215 mm, inside the title block's lane at 216.
-TABLE_WIDTHS = (0.011, 0.017, 0.017, 0.078, 0.150)
-# The longest NOTE line, in printed glyphs (each <MOD-DIAM> prints one).
-NOTE_MAX_GLYPHS = 58
+# TAG/X/Y at r8's proven 12/19/19 mm: at 11/17/17 with a 150 mm NOTE the
+# thirteen rows ran 194.8 mm (~14.5 mm a row, farm 20261108T070114760Z)
+# against r8's ~11. Each NOTE cell is two short lines (size and process;
+# mate and flags), which the rows' two-row hidden SIZE cells already make
+# room for; at the render's ~2.41 mm a glyph (farm 20261108T055431582Z: the
+# 34-glyph pin row ran 82 mm) a NOTE_MAX_GLYPHS line needs ~96 mm of the
+# 110. Right edge 20 + 160 = 180 mm, well inside the title block's 216.
+TABLE_WIDTHS = (0.012, 0.019, 0.019, 0.078, 0.110)
+# The longest NOTE line, in printed glyphs (each <MOD-DIAM> prints one),
+# and the most lines a NOTE cell holds.
+NOTE_MAX_GLYPHS = 40
+NOTE_MAX_LINES = 2
 # The physical columns, in the IncludeHidden=True index domain every read
 # and write below uses: SIZE stays generated (and compared) while hidden.
 COLUMNS = ("TAG", "X LOC", "Y LOC", "SIZE", "NOTE")
@@ -118,7 +123,9 @@ ROW_SIZES = {
     **dict.fromkeys(spec.END_CLAMPS, _tap_size(spec.CLAMP_TAP_DRILL, spec.CLAMP_THREAD)),
     **{f"R{i}": _tap_size(spec.RISER_TAP_DRILL, spec.RISER_THREAD) for i in range(1, 5)},
     **{f"L{i}": _tap_size(spec.LEVER_TAP_DRILL, spec.LEVER_THREAD) for i in range(1, 3)},
-    "HUB": _tap_size(spec.CLAMP_TAP_DRILL, spec.HUB_THREAD),
+    # Drilled and tapped at assembly (TL-00 step 10, its HUB CLAMP sheet
+    # callout), so its size line says when.
+    "HUB": f"AT ASSEMBLY: {_tap_size(spec.CLAMP_TAP_DRILL, spec.HUB_THREAD)}",
 }
 # Each row's flagged notes: NOTE 1 on A2/B2, NOTE 2 on A1_RELATED.
 ROW_FLAGS = {
@@ -140,17 +147,13 @@ def _short(number: str) -> str:
 
 FEED_LEVER_NUMBER = _config.parts("ch-rocker-arm-tl-oblique-feed-lever")["number"]
 ROW_MATES = {
-    **dict.fromkeys(spec.PIN_HOLES, f"{_short(spec.PIN_NUMBER)} RUNNING FIT"),
+    **dict.fromkeys(spec.PIN_HOLES, f"RUNNING FIT ON {_short(spec.PIN_NUMBER)}"),
     **dict.fromkeys(spec.END_CLAMPS, f"CLAMPS {spec.STRAP_NUMBER}"),
     **{f"R{i}": f"HOLDS {_short(spec.RISER_NUMBER)}" for i in range(1, 5)},
     **{f"L{i}": f"HOLDS {_short(FEED_LEVER_NUMBER)}" for i in range(1, 3)},
-    "HUB": f"CLAMPS {spec.STRAP_NUMBER} HUB",
+    # The HUB's X/Y are REF: TL-00 step 10 locates it (sheet 3's references).
+    "HUB": f"CLAMPS {spec.STRAP_NUMBER} HUB; LOC REF, SHEET 3",
 }
-# The HUB is drilled and tapped at assembly (TL-00 step 10, its HUB CLAMP
-# sheet callout): its row's X/Y are REF, said on a second line (one line
-# would run ~70 glyphs). TABLE_ANCHOR's floor budget leaves ~10 mm should
-# that row grow.
-ROW_EXTRA = {"HUB": "DRILL AND TAP AT ASSEMBLY, SHEET 3; LOC REF"}
 
 
 def _flags(numbers: tuple[int, ...]) -> str:
@@ -160,17 +163,15 @@ def _flags(numbers: tuple[int, ...]) -> str:
     return f"; {label} {', '.join(map(str, numbers))}"
 
 
+# Two lines a cell: size and process, then the mate and the note flags.
 ROW_NOTES = {
-    tag: "\n".join(
-        (f"{ROW_SIZES[tag]}; {ROW_MATES[tag]}{_flags(ROW_FLAGS[tag])}",
-         *((ROW_EXTRA[tag],) if tag in ROW_EXTRA else ()))
-    )
-    for tag in TABLED_HOLES
+    tag: f"{ROW_SIZES[tag]}\n{ROW_MATES[tag]}{_flags(ROW_FLAGS[tag])}" for tag in TABLED_HOLES
 }
 if set(ROW_SIZES) != set(TABLED_HOLES) or set(ROW_MATES) != set(TABLED_HOLES) or any(
-    len(line.replace("<MOD-DIAM>", "\u00d8")) > NOTE_MAX_GLYPHS
+    len(note.splitlines()) > NOTE_MAX_LINES
+    or any(len(line.replace("<MOD-DIAM>", "\u00d8")) > NOTE_MAX_GLYPHS
+           for line in note.splitlines())
     for note in ROW_NOTES.values()
-    for line in note.splitlines()
 ):
     raise AssertionError("every tabled row needs a size and mate that fit the NOTE column")
 # SolidWorks may read the diameter code back as its glyph (the riser's
@@ -744,26 +745,34 @@ def create_carrier_hole_table(
                        for edge in current.values())
                 or annotation.IsDangling()):
             raise RuntimeError("carrier table datum left its corner vertex")
-        _frozen_rows(table, generated, notes=ROW_NOTES, stage="at settled readback")
+        rows = _frozen_rows(table, generated, notes=ROW_NOTES, stage="at settled readback")
         _size_column_hidden(table, "at settled readback")
         # Every tag, the HUB's included, stays on its own physical hole.
         _tags(adapter, view, {tag: current[tag] for tag in TABLED_HOLES}, place=False)
         if str(_early_bound(flagged, "INote").GetText()).strip() != spec.OUTER_Y_NOTE:
             raise RuntimeError("carrier flagged note differs from its model-owned limits")
         rows_total, columns = _inventory(table)
-        height = sum(float(table.GetRowHeight(row)) for row in range(rows_total))
+        row_heights = [float(table.GetRowHeight(row)) for row in range(rows_total)]
+        height = sum(row_heights)
         # GetColumnWidth indexes VISIBLE positions, not the hidden-inclusive
         # domain (native BOM evidence, _drawing_tables._bom_physical_columns):
         # with SIZE hidden, positions 0..3 are TAG/X/Y/NOTE.
         visible = tuple(width for column, width in enumerate(TABLE_WIDTHS) if column != SIZE_COLUMN)
         widths = tuple(float(table.GetColumnWidth(position)) for position in range(columns - 1))
+        tags = {row: tag for tag, (row, _cells) in rows.items()}
+        measured = (
+            f"{sum(widths) * 1000:.1f} x {height * 1000:.1f} mm from {TABLE_ANCHOR}; "
+            f"widths {tuple(round(width * 1000, 1) for width in widths)} mm; row heights mm "
+            + ", ".join(
+                f"{tags.get(row, 'header')} {value * 1000:.1f}"
+                for row, value in enumerate(row_heights)
+            )
+        )
+        _telemetry.info(f"carrier table {measured}")
         if any(abs(actual - expected) > 1e-6 for actual, expected in zip(widths, visible, strict=True)):
             raise RuntimeError(f"carrier visible column widths {widths!r}, expected {visible!r}")
         if TABLE_ANCHOR[1] - height < .015 or TABLE_ANCHOR[0] + sum(widths) > .216:
-            raise RuntimeError(
-                f"carrier table crosses the border or title-block lane: "
-                f"{sum(widths) * 1000:.1f} x {height * 1000:.1f} mm from {TABLE_ANCHOR}"
-            )
+            raise RuntimeError(f"carrier table crosses the border or title-block lane: {measured}")
         _owned_table(adapter, view, feature, table)
 
     @_telemetry.traced("drawing.carrier_hole_table.settled")

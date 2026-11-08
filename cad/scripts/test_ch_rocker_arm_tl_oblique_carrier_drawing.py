@@ -336,51 +336,51 @@ def test_in_situ_hub_fit_up_closes_inside_the_strap_top_edge_band() -> None:
 
 
 def test_table_rows_carry_their_size_mate_and_note_flags() -> None:
-    """Machinist review r7/r8 (rules 9, 10): each NOTE cell carries its row's
-    size and process (the pins at their REAM limits, the taps as drill and
-    thread, as their callouts print them), its tag group's mate (same-parent
-    TL- short forms) and its note flags (NOTE 2 on every A1-related row,
-    NOTE 1 on A2/B2). No undefined pass label, no deferral to the callout
-    sheets."""
-    notes = carrier_table.ROW_NOTES
+    """Machinist review r7/r8 (rules 9, 10): each NOTE cell carries, on two
+    short lines, its row's size and process (the pins at their REAM limits,
+    the taps as drill and thread, as their callouts print them), then its
+    tag group's mate (same-parent TL- short forms) and its note flags (NOTE 2
+    on every A1-related row, NOTE 1 on A2/B2). No undefined pass label, no
+    deferral to the callout sheets."""
+    notes = {tag: note.splitlines() for tag, note in carrier_table.ROW_NOTES.items()}
     assert spec.CR == pytest.approx((-spec.CL[0], spec.CL[1]))
     assert set(notes) == set(carrier_table.TABLED_HOLES) == set(spec.TABLE_HOLES)
-    pin = "<MOD-DIAM>.3760-.3765 REAM THRU; TL-VN-77 RUNNING FIT"
+    pin = "<MOD-DIAM>.3760-.3765 REAM THRU"
+    fit = "RUNNING FIT ON TL-VN-77"
     assert spec.PIN_NUMBER == "MHA-CH-06-TL-VN-77"
-    assert notes["A1"] == pin
-    assert notes["B1"] == f"{pin}; NOTE 2"
-    assert notes["A2"] == notes["B2"] == f"{pin}; NOTES 1, 2"
-    assert notes["CL"] == notes["CR"] == (
-        "<MOD-DIAM>.136 THRU, 8-32 UNC THRU; CLAMPS MHA-CH-13; NOTE 2"
-    )
+    assert notes["A1"] == [pin, fit]
+    assert notes["B1"] == [pin, f"{fit}; NOTE 2"]
+    assert notes["A2"] == notes["B2"] == [pin, f"{fit}; NOTES 1, 2"]
+    clamp = "<MOD-DIAM>.136 THRU, 8-32 UNC THRU"
+    assert notes["CL"] == notes["CR"] == [clamp, "CLAMPS MHA-CH-13; NOTE 2"]
     assert all(
-        notes[f"R{i}"] == "<MOD-DIAM>.089 THRU, 4-40 UNC THRU; HOLDS TL-24; NOTE 2"
+        notes[f"R{i}"] == ["<MOD-DIAM>.089 THRU, 4-40 UNC THRU", "HOLDS TL-24; NOTE 2"]
         for i in range(1, 5)
     )
-    assert notes["L1"] == notes["L2"] == "<MOD-DIAM>.257 THRU, 5/16-18 UNC THRU; HOLDS TL-26"
-    assert notes["HUB"].splitlines() == [
-        "<MOD-DIAM>.136 THRU, 8-32 UNC THRU; CLAMPS MHA-CH-13 HUB",
-        "DRILL AND TAP AT ASSEMBLY, SHEET 3; LOC REF",
-    ]
+    assert notes["L1"] == notes["L2"] == ["<MOD-DIAM>.257 THRU, 5/16-18 UNC THRU", "HOLDS TL-26"]
+    assert notes["HUB"] == [f"AT ASSEMBLY: {clamp}", "CLAMPS MHA-CH-13 HUB; LOC REF, SHEET 3"]
     # The pin limits are the sheet-1 4X REAM's .3750 +.0015/+.0010.
     low, high = sorted(spec.PIN_HOLE_BAND)
     assert spec.inch_text(spec.PIN_HOLE_DIA + low, 4) == ".3760"
     assert spec.inch_text(spec.PIN_HOLE_DIA + high, 4) == ".3765"
     for retired in ("R800", "R816", "SEE CALLOUT", "ORIGIN", "X AXIS", "MHA-CH-06-"):
-        assert not any(retired in note for note in notes.values()), retired
+        assert not any(retired in line for lines in notes.values() for line in lines), retired
     assert not hasattr(carrier_table, "HOLE_SIZES_NOTE")
-    # Each line fits the NOTE column: the render prints ~2.41 mm a glyph
-    # (farm 20261108T055431582Z: the 34-glyph pin row ran 82 mm).
+    # Two short lines a cell, each fitting the NOTE column with margin: the
+    # render prints ~2.41 mm a glyph (farm 20261108T055431582Z: the 34-glyph
+    # pin row ran 82 mm).
+    assert carrier_table.NOTE_MAX_LINES == 2
+    assert all(len(lines) == 2 for lines in notes.values())
     longest = max(
-        len(line.replace("<MOD-DIAM>", "D"))
-        for note in notes.values() for line in note.splitlines()
+        len(line.replace("<MOD-DIAM>", "D")) for lines in notes.values() for line in lines
     )
-    assert longest <= carrier_table.NOTE_MAX_GLYPHS
-    assert carrier_table.NOTE_MAX_GLYPHS * 2.41 + 4.0 < carrier_table.TABLE_WIDTHS[-1] * 1000.0
+    assert longest <= carrier_table.NOTE_MAX_GLYPHS == 40
+    assert carrier_table.NOTE_MAX_GLYPHS * 2.41 + 10.0 < carrier_table.TABLE_WIDTHS[-1] * 1000.0
     visible = sum(carrier_table.TABLE_WIDTHS) - carrier_table.TABLE_WIDTHS[carrier_table.SIZE_COLUMN]
-    assert carrier_table.TABLE_ANCHOR[0] + visible <= 0.216
-    # "19.395" (6 glyphs, ~14 mm) fits the narrowed X/Y LOC columns.
-    assert min(carrier_table.TABLE_WIDTHS[1:3]) * 1000.0 > 6 * 2.41
+    assert carrier_table.TABLE_ANCHOR[0] + visible <= 0.216 - 0.030
+    # r9 (farm 20261108T070114760Z): at 11/17/17 the rows ran ~14.5 mm; the
+    # TAG/X/Y widths stay r8's proven 12/19/19.
+    assert carrier_table.TABLE_WIDTHS[:3] == (0.012, 0.019, 0.019)
 
 
 def test_hub_row_is_tagged_ref_and_agrees_with_sheet_3() -> None:
@@ -390,6 +390,7 @@ def test_hub_row_is_tagged_ref_and_agrees_with_sheet_3() -> None:
     assert "HUB" in carrier_table.TABLED_HOLES and "HUB" in carrier_table.TAG_OFFSETS
     assert "HUB" not in carrier_table.A1_RELATED and not carrier_table.ROW_FLAGS["HUB"]
     assert "LOC REF" in carrier_table.ROW_NOTES["HUB"]
+    assert carrier_table.ROW_NOTES["HUB"].startswith("AT ASSEMBLY: ")
     assert not hasattr(carrier_table, "IN_SITU_HOLES")
     hub_x, hub_y = carrier_table.table_location("HUB")
     a1_x, a1_y = carrier_table.table_location("A1")
@@ -571,7 +572,7 @@ def test_riser_tap_stations_print_their_walls_band_and_name_the_riser() -> None:
     assert spec.RISER_WALLS_FROM_A1 >= WALL_TARGET_MM
     assert all(
         carrier_table.ROW_NOTES[f"R{i}"]
-        == "<MOD-DIAM>.089 THRU, 4-40 UNC THRU; HOLDS TL-24; NOTE 2"
+        == "<MOD-DIAM>.089 THRU, 4-40 UNC THRU\nHOLDS TL-24; NOTE 2"
         for i in range(1, 5)
     )
     # Three rows (the native two and the mate), ~4.5 mm each, centred on the
