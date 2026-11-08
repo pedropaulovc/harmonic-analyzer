@@ -188,3 +188,35 @@ def test_family_refuses_to_claim_leaf_is_visible_through_hidden_parent(monkeypat
             adapter, view, visible_stems=frozenset({"family"}), label="hidden parent"
         )
     assert calls == []
+
+
+def test_first_state_refusal_is_retained_in_exporter_manifest(monkeypatch, tmp_path):
+    import json
+    import time
+    import dodo
+    import _visibility_native_proof as proof
+
+    failures = tmp_path / "cad/out/reports/failures"
+    monkeypatch.setattr(proof, "PROOF", tmp_path / "cad/out/reports/visibility-proof")
+    monkeypatch.setattr(proof._seat_forensics, "OUT_FAILURES", failures)
+    monkeypatch.setattr(dodo, "FAILURES", failures)
+    report = {"arms": [{"isolation": []}]}
+    record = {"label": "first baseline"}
+    report["arms"][0]["isolation"].append(record)
+    before = {"view": {"position": [0.0, 0.0]}, "source": {}, "siblings": {}}
+    after = {"view": {"position": [0.1, 0.0]}, "source": {}, "siblings": {}}
+    started = time.time() - 1.0
+    with pytest.raises(RuntimeError, match="state changed"):
+        proof.record_and_assert_state(
+            record, before, after, lambda: proof.persist_report("report.json", report)
+        )
+    exported = failures / "visibility-proof/report.json"
+    stored = json.loads(exported.read_text(encoding="utf-8"))
+    assert stored["arms"][0]["isolation"][0]["state_before"] == before
+    assert stored["arms"][0]["isolation"][0]["state_after"] == after
+    assert stored["arms"][0]["isolation"][0]["changed_state_fields"] == ["view"]
+    assert exported in dodo._failure_artefacts(started)
+    manifest = dodo._artefact_record(exported)
+    assert manifest.startswith("visibility-proof/report.json:")
+    assert f"failures/{manifest.split(':', 1)[0]}" == "failures/visibility-proof/report.json"
+    assert json.loads((proof.PROOF / "report.json").read_text(encoding="utf-8")) == stored

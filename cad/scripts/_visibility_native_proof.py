@@ -22,11 +22,12 @@ from _com import _early_bound
 import _drawing_balloons as visibility
 from _drawing_common import rebuild_drawing
 from solidworks_mcp.adapters.solidworks.drawing import view_name
+import _seat_forensics
 import _telemetry
 
 ROOT = Path(__file__).resolve().parents[2]
 PROOF = ROOT / "cad/out/reports/visibility-proof"
-ORDER = ("A", "B", "B", "A")
+ORDER = ("A",)  # Resolve the baseline invariant before another ABBA measurement.
 
 
 def digest(path: Path) -> str:
@@ -40,6 +41,30 @@ def output_paths() -> list[Path]:
         for index, variant in enumerate(ORDER, 1)
         for kind in ("SLDDRW", "pdf", "png", "layout.json")
     )]
+
+
+def persist_report(name, report):
+    """Use the same failure root that the doit parent inventories and uploads."""
+    encoded = json.dumps(report, indent=2)
+    PROOF.mkdir(parents=True, exist_ok=True)
+    (PROOF / name).write_text(encoded, encoding="utf-8")
+    forensic = _seat_forensics.OUT_FAILURES / "visibility-proof"
+    forensic.mkdir(parents=True, exist_ok=True)
+    (forensic / name).write_text(encoded, encoding="utf-8")
+
+
+def record_and_assert_state(record, before, after, checkpoint):
+    """Persist the first observed mismatch before refusing it."""
+    record["state_before"] = before
+    record["state_after"] = after
+    record["changed_state_fields"] = sorted(
+        key for key in before.keys() | after.keys() if before.get(key) != after.get(key)
+    )
+    checkpoint()
+    if record["changed_state_fields"]:
+        raise RuntimeError(
+            f"proof: state changed in {record['label']}: {record['changed_state_fields']}"
+        )
 
 
 def _baseline(adapter, view, *, visible_stems, label):
@@ -143,11 +168,7 @@ async def run(adapter, recipe, build):
               "timing_scope": "isolation only; complete-build raw includes separately measured witness overhead"}
 
     def checkpoint():
-        encoded = json.dumps(report, indent=2)
-        (PROOF / "report.json").write_text(encoded, encoding="utf-8")
-        forensic = ROOT / "cad/out/failures/visibility-proof"
-        forensic.mkdir(parents=True, exist_ok=True)
-        (forensic / "report.json").write_text(encoded, encoding="utf-8")
+        persist_report("report.json", report)
 
     original = recipe.isolate_drawing_view_components
     expected_after = {}
@@ -179,14 +200,21 @@ async def run(adapter, recipe, build):
                 if label in expected_states and state != expected_states[label]:
                     raise RuntimeError(f"proof: fresh-view display/configuration differs for {label}")
                 expected_states[label] = state
+                record = {"label": label, "before": before, "native_inputs_sha256": hashes}
+                arm["isolation"].append(record)
+                checkpoint()
                 witness = time.perf_counter() - start
                 start = time.perf_counter()
                 implementation(adapter, view, visible_stems=visible_stems, label=label)
                 elapsed = time.perf_counter() - start
                 start = time.perf_counter()
                 after = normalized_flags(view)
-                if state != view_state(view) or other != siblings(adapter, view) or source != source_state(view):
-                    raise RuntimeError(f"proof: display/configuration, sibling or source changed in {label}")
+                record.update(seconds=elapsed, after=after)
+                record_and_assert_state(
+                    record, {"view": state, "siblings": other, "source": source},
+                    {"view": view_state(view), "siblings": siblings(adapter, view),
+                     "source": source_state(view)}, checkpoint,
+                )
                 rows = visibility._visibility_components(view, label=label)
                 desired = {row.name: row.visible if row.parent else bool(visibility._drawing_component_stems(adapter, row.component, visible_stems)) for row in rows}
                 if drawing_flags(view) != desired:
@@ -196,9 +224,8 @@ async def run(adapter, recipe, build):
                 expected_after[label] = after
                 witness += time.perf_counter() - start
                 arm["witness_seconds"] += witness
-                arm["isolation"].append({"label": label, "seconds": elapsed, "before": before, "after": after, "view_state": state,
-                                         "sibling_names": sorted(other), "source_configuration": source["active_configuration"],
-                                         "native_inputs_sha256": hashes})
+                record.update(view_state=state, sibling_names=sorted(other),
+                              source_configuration=source["active_configuration"])
                 checkpoint()
 
             recipe.isolate_drawing_view_components = measured
@@ -300,11 +327,7 @@ async def observe_instances(adapter, recipe, build):
     original = recipe.set_drawing_view_instance_visibility
 
     def checkpoint():
-        encoded = json.dumps(report, indent=2)
-        (PROOF / "pd-observations.json").write_text(encoded, encoding="utf-8")
-        forensic = ROOT / "cad/out/failures/visibility-proof"
-        forensic.mkdir(parents=True, exist_ok=True)
-        (forensic / "pd-observations.json").write_text(encoded, encoding="utf-8")
+        persist_report("pd-observations.json", report)
 
     def observed(adapter, view, names, *, mode, label):
         record = {"label": label, "mode": mode, "requested": sorted(names)}
@@ -336,3 +359,45 @@ async def observe_instances(adapter, recipe, build):
     finally:
         recipe.set_drawing_view_instance_visibility = original
         checkpoint()
+
+
+def capture_selection_failure(adapter, view, group, manager, label):
+    """Capture native representation and equality controls before selection clears."""
+    expected = [row.component for row in group]
+    selected = [
+        _early_bound(manager.GetSelectedObjectsComponent4(index, -1), "IDrawingComponent")
+        for index in range(1, int(manager.GetSelectedObjectCount2(-1)) + 1)
+    ]
+    record = {
+        "label": label,
+        "expected": [{"name": str(component.Name), "owner": owner_evidence(component.Component)}
+                     for component in expected],
+        "selected": [{"name": str(component.Name), "owner": owner_evidence(component.Component)}
+                     for component in selected],
+    }
+    persist_report("selection-mismatch.json", record)
+    app = _early_bound(adapter.swApp, "ISldWorks")
+
+    def compare(left, right):
+        try:
+            code = app.IsSame(left, right)
+            return code if type(code) is int else {"invalid_type": type(code).__name__, "value": repr(code)}
+        except Exception as error:
+            return {"error": repr(error)}
+
+    started = time.perf_counter()
+    record["view_self"] = compare(view, view)
+    record["selected_views"] = [
+        compare(view, manager.GetSelectedObjectsDrawingView2(index, -1))
+        for index in range(1, len(selected) + 1)
+    ]
+    record["drawing_expected_self"] = [compare(component, component) for component in expected]
+    record["drawing_selected_self"] = [compare(component, component) for component in selected]
+    record["drawing_matrix"] = [[compare(actual, planned) for planned in expected] for actual in selected]
+    native_expected = [_early_bound(component.Component, "IComponent2") for component in expected]
+    native_selected = [_early_bound(component.Component, "IComponent2") for component in selected]
+    record["native_expected_self"] = [compare(component, component) for component in native_expected]
+    record["native_selected_self"] = [compare(component, component) for component in native_selected]
+    record["native_matrix"] = [[compare(actual, planned) for planned in native_expected] for actual in native_selected]
+    record["matrix_seconds"] = time.perf_counter() - started
+    persist_report("selection-mismatch.json", record)

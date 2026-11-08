@@ -746,8 +746,20 @@ def _apply_drawing_visibility(
                     if selected_component is None:
                         raise RuntimeError(f"{label}: selection {index} has no drawing component")
                     selected.add(str(selected_component.Name or ""))
-                if selected != {row.name for row in group}:
-                    raise RuntimeError(f"{label}: selected occurrence identities differ from visibility plan")
+                expected = {row.name for row in group}
+                if selected != expected:
+                    from _visibility_native_proof import capture_selection_failure
+
+                    try:
+                        capture_selection_failure(adapter, view, group, manager, label)
+                    except Exception as capture_error:
+                        _telemetry.warn(f"{label}: selection evidence capture failed: {capture_error!r}")
+                    raise RuntimeError(
+                        f"{label}: selected occurrence identities differ from visibility plan; "
+                        f"expected_count={len(expected)}, selected_count={len(selected)}, "
+                        f"missing={sorted(expected - selected)[:12]!r}, "
+                        f"unexpected={sorted(selected - expected)[:12]!r}"
+                    )
                 selection_seconds += perf_counter() - tick
                 tick = perf_counter()
                 if visible:
