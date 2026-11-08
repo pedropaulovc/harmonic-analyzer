@@ -567,10 +567,10 @@ def test_arc_profiles_attach_two_native_frames_to_nominal_circle_edges(
         frames,
         ("TopRadius", "BottomRadius"),
         (800.0, 816.0),
-        (-130.0, 58.0),
+        (-130.0, 50.0),
         # View F holds the sheet's left band: the lower frame sits under the
         # strap's right half, between the D and E detail letters.
-        ((0.130, 0.211), (0.206, 0.163)),
+        ((0.130, 0.211), (0.202, 0.163)),
         (".020", "0"),
         (ch_rocker_arm_notes.TOP_EDGE_MATE_CALLOUT, ""),
     ):

@@ -158,12 +158,14 @@ FRONT_KEEP = {
     # above both, the dimension line carried up to it.
     "RodTipLen": (_front(ROD_TIP_X, 0.0)[0] + 0.031, 0.226),
     # The land's angle from vertical (r4: "RADIAL" named a centre the sheet
-    # does not show). Its text sits 25 mm down the acute wedge's bisector
-    # from the land's top end, below the rod tip: clear of the taper foot's
-    # extension line (x ~0.318) and above the thickness callout (y < 0.159).
+    # does not show). Inside the 10.5 deg wedge (25 mm down its bisector, r5)
+    # the ~18 mm text was struck by its own arc and extension line, so it
+    # stands right of the land's extension line at the same 25 mm radius,
+    # 2 mm clear of it, the arc carried out (detail E on MHA-CH-06): above the
+    # thickness callout (y < 0.159), left of the end view.
     "TipLandAngle": (
-        _front(TOP_END_X, TOP_END_Y)[0] + 0.025 * math.sin(_ALPHA_TOP / 2.0),
-        _front(TOP_END_X, TOP_END_Y)[1] - 0.025 * math.cos(_ALPHA_TOP / 2.0),
+        _front(TOP_END_X, TOP_END_Y)[0] + 0.025 * math.sin(_ALPHA_TOP) + 0.002 + 0.009,
+        _front(TOP_END_X, TOP_END_Y)[1] - 0.025 * math.cos(_ALPHA_TOP),
     ),
 }
 # The 2.5 mm end view is narrower than its four-row callout: centred over it
