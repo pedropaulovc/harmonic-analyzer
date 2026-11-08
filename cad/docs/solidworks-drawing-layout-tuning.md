@@ -476,22 +476,37 @@ cap-height per glyph (conservative versus its calibrated 0.62 average),
 longest line is 33 glyphs, giving padded bounds
 **`(24,203.7)..(141.5,226)` mm**, with minimum lane margin **3.5 mm**.
 The estimate requires at least 3 mm margin, but is never used as measured
-geometry. The settled text-lane gate directly reuses
-`draw_sh_vn_clamping_kit_hardware._note_text_box`: four-coordinate bounds
-from native `IDisplayData` text runs, including their measured widths,
-heights, reference positions and angles. Missing text or nonpositive/
-nonfinite text sizes fail closed; there is no estimated-width fallback.
-Telemetry records the height, estimated bounds, measured text bounds and
-whole-note extent separately.
-
-Run `e4a597af` reported a whole-note extent of
+geometry. Run `e4a597af` reported a whole-note extent of
 `(24.7960066889632,205.46646153846154)..(164.9071638795986,225.00577257525084)`
-mm. Its right edge is outside the text lane because the leader reaches the
-bore. The focused positive fixture retains that exact six-coordinate
-extent while supplying independently measured text runs inside the lane.
-It passes only with the separate physical leader/arrow proofs below;
-bad text bounds, missing/unreadable widths and extra or misrouted leaders
-remain negative controls. This fixture is not a native text measurement.
+mm. `INote.GetExtent` includes the fixed leader, so comparing that rectangle
+with the text lane was the wrong measurement. Do not use it, native text
+width probes, or a dependency on the clamping-kit drawing recipe here.
+
+The ordinary post-export audit runs in REPORT mode. For this stem it does
+not enforce `outside-border`, `text-clearance` or `text-on-view`, so merely
+removing the native extent guard would leave a gap. After finalization,
+the pivot-only `_assert_pivot_pdf_text` reads the freshly written layout
+report and the exported sheet through `_pdf_ink.read_pdf_ink`/`page_ink`.
+It requires exactly one visible ordinary note with the four-line spec text,
+then uses existing `printed_dump`, `audited_annotations`, `group_rows` and
+`assign_sheet_text`. This is the audit's sheet-wide assignment, including
+competing dimensions and section/detail labels, not a second matcher with
+guessed row positions. Every ink-bearing display item must match the PDF;
+the full display string must also preserve the four source rows.
+`span_box` gives only the matched glyph bounds, including split runs around
+diameter/depth symbols. Missing or changed rows fail, and every measured
+piece must stay in the unchanged `(20,182)..(145,230)` mm text lane.
+
+The local guard also makes the already-computed report findings fatal for
+this note only: `outside-border`, `keep-out`, `text-clearance`, `text-on-view`,
+`text-on-line` and `text-unmatched`. Other notes' findings are not reclassified.
+It reuses the shared audit's geometry and clearance policy rather than
+implementing another collision checker or rerunning the audit.
+Only the leader/arrow may leave the text lane; their independent native
+geometry proofs remain below. Telemetry records the measured PDF row bounds
+separately from the offline estimate. Focused synthetic PDF fixtures cover
+split symbol runs, a valid outside-lane leader, missing/changed rows,
+out-of-lane text, foreign-text collisions and model-edge crossings.
 
 The already-proved leader construction is unchanged: one view-owned note,
 one live leader and one native arrow on the leftmost outer-rim point.
