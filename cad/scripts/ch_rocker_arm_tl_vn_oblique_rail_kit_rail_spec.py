@@ -313,11 +313,13 @@ END_FIT_CALLOUT = (
 # Main's explicit 2026-11-07 sheet ruling prints the metric wall as 2.0 MIN.
 # The existing conservative 2.032 mm source-envelope guard remains unchanged.
 WALL_ACCEPTANCE_MM = 2.0
-# The pairing of each rail with its bar and the free screw entry are the
-# jig's steps (MHA-CH-06-TL-00 steps 1E, 1F), not this part sheet's (rule 7).
-DRAWING_NOTES = (
-    f"[A] WALL FROM EACH END COUNTERBORE TO RAIL END: {WALL_ACCEPTANCE_MM:.1f} MIN."
-)
+# The end walls' acceptance prints in words at a leader on each rail end face
+# (rule 7: a short requirement at its leader, no flag). It is the member's
+# one manufacturing note. The pairing of each rail with its bar and the free
+# screw entry are the jig's steps (MHA-CH-06-TL-00 steps 1E, 1F), not this
+# part sheet's (rule 7).
+WALL_CALLOUT = f"END WALL\n{WALL_ACCEPTANCE_MM:.1f} MIN"
+DRAWING_NOTES = WALL_CALLOUT
 # The member's native BOM row under the kit's one Number.
 BOM_DESCRIPTION = f"{STYLE} RAIL, {LENGTH:.3f} MM, KIT, TRIMMED"
 if abs(LENGTH - (2.0 * HOLE_END + (HOLE_COUNT - 1) * HOLE_PITCH)) > 1e-9:

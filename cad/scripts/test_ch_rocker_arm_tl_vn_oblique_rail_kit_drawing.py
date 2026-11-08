@@ -30,7 +30,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_types import DrawingLayout
 from _layout_geometry import estimate_text_box
 from _part_configuration_exports import member_configurations
-from _purchased_fastener_drawing import check_item, footer_top, note_lines
+from _purchased_fastener_drawing import check_item, note_lines
 from _purchased_part_variants import _member_properties
 
 STEM = "ch-rocker-arm-tl-vn-oblique-rail-kit"
@@ -417,14 +417,15 @@ def test_hole_sketch_places_every_station_from_the_end_face(monkeypatch) -> None
 
 def test_rail_receipt_note_points_at_the_stations() -> None:
     bar = _config.parts("ch-rocker-arm-tl-oblique-base-bar")
-    lines = note_lines(rail.DRAWING_NOTES, label=NAME)
     # The pairing and free screw entry are the jig's steps (rule 7): the
-    # sheet's note is the wall acceptance alone.
-    assert lines == ("[A] WALL FROM EACH END COUNTERBORE TO RAIL END: 2.0 MIN.",)
-    note = " ".join(lines)
+    # member's one note is the end walls' acceptance, printed in words at a
+    # leader on each rail end face (no flag, no footer note).
+    assert rail.DRAWING_NOTES == rail.WALL_CALLOUT
+    lines = rail.WALL_CALLOUT.splitlines()
+    assert len(lines) == 2 and max(len(line) for line in lines) <= 8
+    assert "[" not in rail.WALL_CALLOUT
+    assert f"{rail.WALL_ACCEPTANCE_MM:.1f} MIN" in rail.WALL_CALLOUT
     assert rail.WALL_ACCEPTANCE_MM == 2.0
-    assert "TAP WALL" not in note
-    assert "TRANSFER TO" not in note
     assert "MHA-CH-06-TL-00 SHEET 1 LIMITS; SEALS ON RAIL, NO BIND" in rail.END_FIT_CALLOUT
     # The flag gives the hole pattern as one REF pattern (rule 10), then its
     # match-transfer mate.
@@ -437,10 +438,12 @@ def test_rail_receipt_note_points_at_the_stations() -> None:
     assert len(rail.END_FIT_CALLOUT.splitlines()) == 2
     assert rail.CBORE_END_WALL_WORST >= base_bar.WALL_TARGET_MM
     assert rail.CBORE_END_WALLS_WORST == pytest.approx((6.214, 5.96))
-    assert {label for label, _, _ in draw.WALL_FLAGS} == {
-        "near counterbore", "far counterbore",
-    }
-    assert len(draw.WALL_FLAGS) == 2
+    assert {label for label, _, _ in draw.WALL_FLAGS} == {"near end", "far end"}
+    # Each arrow lands on its rail end face at mid-height.
+    ends = sorted(edge for _, edge, _ in draw.WALL_FLAGS)
+    half = rail.LENGTH / 2.0 * 0.0005
+    assert ends[0] == pytest.approx((draw.FRONT_CENTER[0] - half, draw.FRONT_CENTER[1]))
+    assert ends[1] == pytest.approx((draw.FRONT_CENTER[0] + half, draw.FRONT_CENTER[1]))
     # The 2:1 end profile is lettered VIEW B; views at the sheet's scale
     # print no scale (rule 9).
     assert draw.caption_text("RIGHT", (2, 1)) == "VIEW B  2:1"
@@ -908,8 +911,9 @@ def test_receipt_texts_fit_their_spans_rows_and_the_border() -> None:
 
 
 def test_receipt_sheet_views_captions_and_notes_fit() -> None:
-    footer = footer_top(rail.DRAWING_NOTES, label=NAME)
-    assert draw.RECEIPT_NOTE_TOP == footer
+    # No footer note on this sheet: views and captions stand over the title
+    # block's top.
+    footer = TITLE_BLOCK[3]
     cells = {name: draw.view_cell(center, half) for name, center, half, _ in draw.VIEWS}
     _, _, inks, _ = _stack_ink()
     texts = {name: text for name, (text, _) in inks.items()}
@@ -952,9 +956,15 @@ def test_receipt_sheet_views_captions_and_notes_fit() -> None:
     label = draw.ITEM_LABEL_CELL
     assert all(not _overlaps(label, cell) for cell in cells.values())
     assert BORDER[1] < label[1] and label[3] <= BORDER[3]
-    note = draw.RECEIPT_NOTE_CELL
-    assert note[3] == pytest.approx(footer + 0.001)
-    assert not _overlaps(note, TITLE_BLOCK)
+    # The end-wall callouts stand inside the border, clear of the other
+    # views, every caption, the flag and the stack's texts.
+    for wall_label, edge, target in draw.WALL_FLAGS:
+        text_cell, _ = draw.wall_flag_regions(edge, target)
+        assert _inside_box(text_cell, BORDER), wall_label
+        for other in ("*Top", "*Right", "*Isometric"):
+            assert not _overlaps(text_cell, cells[other]), (wall_label, other)
+        for other, box in {**caption_boxes, **texts}.items():
+            assert not _overlaps(text_cell, box), (wall_label, other)
 
 
 def test_native_multiline_length_ink_clears_witnesses_and_top_caption() -> None:

@@ -1073,7 +1073,9 @@ def test_rework_bands_name_their_mates_at_their_callouts() -> None:
     assert screw_short == "TL-VN-67"
     rows = countersink.splitlines()
     assert rows == [f"FOR {screw_short} ({nut.SCREW_SKU})", nut.CSK_WALL_TEXT]
-    assert countersink == "FOR TL-VN-67 (91771A112)\nMIN WALL 0.40 TO BODY, 0.45 TO OD"
+    # Centred under the value, a row over 28 characters reaches the dimension
+    # line entering the shoulder (farm run 20261108T000844770Z: 33 did).
+    assert max(len(row) for row in rows) <= 28
     # Nothing the spec does not establish: no seat depth, no flush; the only
     # numbers past the screw's are the spec's walls.
     assert "FLUSH" not in countersink and not re.search(r"\d\.\d", rows[0])
@@ -3079,7 +3081,6 @@ def test_countersink_walls_are_the_worst_case_the_package_allows() -> None:
     ) == pytest.approx(1.05)
     assert max(nut.HOLE_WALL_TO_BODY, nut.HOLE_WALL_TO_OD) < nut.WALL_FLOOR
     # Printed rounded down, so a MIN never overstates the wall.
-    assert nut.CSK_WALL_TEXT == "MIN WALL 0.40 TO BODY, 0.45 TO OD"
     for printed, wall in zip(
         re.findall(r"\d+\.\d\d", nut.CSK_WALL_TEXT),
         (nut.CSK_WALL_TO_BODY, nut.CSK_WALL_TO_OD),

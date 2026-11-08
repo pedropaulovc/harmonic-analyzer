@@ -59,16 +59,12 @@ from _layout_geometry import estimate_text_box
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _purchased_fastener_drawing import (
-    _FOOTER_RIGHT,
-    _NOTE_X,
-    _NOTES_BOTTOM,
     _box,
     _center_marks_without_lines,
     _inside,
     _literal_note,
     _purchased_title_block,
     _rebuild,
-    footer_top,
 )
 from _purchased_title_fit import fit_purchased_title_block
 from _purchased_variant_drawing import (
@@ -119,8 +115,8 @@ SOURCE_PROPERTIES = ("Number", "Material Specification", "Finish", *NOTE_PROPERT
 
 # --- Sheet 2: the rail receipt check --------------------------------------------
 # ASME B landscape 431.8 x 279.4, all in sheet metres. The border is 12.7 mm
-# in; the title block fills x >= 215.9 mm below y = 65.1 mm; the receipt
-# note's three lines use the existing dynamic footer_top reserve.
+# in; the title block fills x >= 215.9 mm below y = 65.1 mm. The rail's one
+# requirement prints at its end leaders, so this sheet has no footer note.
 #
 # The trimmed rail fits at 1:2, the largest project scale whose
 # length fits the drawable width with the profile beside it.
@@ -269,19 +265,22 @@ RECEIPT_FLAG_CELL = (
     RECEIPT_FLAG_XY[1] + 0.001,
 )
 
-# Exactly one [A] flag per rail end, attached to the end counterbore's
-# lower rim. The complete leaders remain below the rail and the Length line.
+# The end walls' acceptance prints in words at one leader per rail end
+# (rule 7: a short requirement at its leader, no flag; a lettered [A] flag
+# with a footer note failed machinist review, farm run 20261108T000844770Z).
+# Each arrow lands on the rail's end face at mid-height, the wall's outer
+# face: on the end counterbore's rim it read as landing on a groove line.
+# The near text stands left of the rail over the station's value, the far
+# text right of it, short of VIEW B; both under the Length line.
 _NEAR_END_X = FRONT_CENTER[0] - _FRONT_HALF[0]
+_FAR_END_X = FRONT_CENTER[0] + _FRONT_HALF[0]
 WALL_FLAGS = (
-    ("near counterbore", (
-        _NEAR_END_X + rail.HOLE_X[0] * _sheet_mm(SHEET_SCALE),
-        FRONT_CENTER[1] - rail.CBORE_DIA / 2.0 * _sheet_mm(SHEET_SCALE),
-    ), (0.014, 0.158)),
-    ("far counterbore", (
-        _NEAR_END_X + rail.HOLE_X[-1] * _sheet_mm(SHEET_SCALE),
-        FRONT_CENTER[1] - rail.CBORE_DIA / 2.0 * _sheet_mm(SHEET_SCALE),
-    ), (0.300, 0.158)),
+    ("near end", (_NEAR_END_X, FRONT_CENTER[1]), (0.016, 0.1695)),
+    ("far end", (_FAR_END_X, FRONT_CENTER[1]), (0.288, 0.1655)),
 )
+# A note's text block from its upper-left anchor: two 3.5 mm rows of at most
+# eight characters (about 19 mm wide, 9 mm tall) with margin.
+WALL_TEXT_REACH = (-0.001, -0.012, 0.025, 0.002)
 
 
 def wall_flag_regions(edge_xy: tuple[float, float], note_xy: tuple[float, float]) -> tuple[Box, Box]:
@@ -290,8 +289,8 @@ def wall_flag_regions(edge_xy: tuple[float, float], note_xy: tuple[float, float]
     Same 1 mm tip reserve as draw_pn_vn_pen_marker.GRIP_NOTE_EXTENT; it is
     not permission for the text anchor or the attached tip to leave its lane.
     """
-    text = (note_xy[0] - 0.001, note_xy[1] - 0.007,
-            note_xy[0] + 0.012, note_xy[1] + 0.002)
+    left, bottom, right, top = WALL_TEXT_REACH
+    text = (note_xy[0] + left, note_xy[1] + bottom, note_xy[0] + right, note_xy[1] + top)
     envelope = (
         min(text[0], edge_xy[0] - 0.001), min(text[1], edge_xy[1] - 0.001),
         max(text[2], edge_xy[0] + 0.001), max(text[3], edge_xy[1] + 0.001),
@@ -364,16 +363,13 @@ _CAPTION_HALF_WIDTH = 0.022  # "ISOMETRIC  1:4" at 3 mm is about 33 mm wide
 ITEM_LABEL = f"{VARIANTS[0][1]}: RECEIPT CHECK"
 ITEM_LABEL_XY = (0.050, 0.262)
 ITEM_LABEL_CELL = (0.045, 0.252, 0.200, 0.264)
-# The receipt note in the footer's notes lines (rule 7's budget).
-RECEIPT_NOTE_TOP = footer_top(rail.DRAWING_NOTES, label=PART_STEM)
-RECEIPT_NOTE_CELL = (0.015, _NOTES_BOTTOM - 0.001, _FOOTER_RIGHT, RECEIPT_NOTE_TOP + 0.001)
 
 
 # The end profile at 2:1 is not a projection at the sheet's 1:2, so it is a
 # lettered view (rule 9): VIEW B, named by a letter arrow looking along the
 # rail at TOP's far (+X) end, right of it and left of the isometric. The
 # letter matches draw_fr_tube_frame's VIEW A arrow: 5 mm, its leader
-# straight to the end face at mid-height. ``[A]`` is the wall flag's label.
+# straight to the end face at mid-height.
 END_VIEW_LETTER = "B"
 VIEW_LETTER_HEIGHT = 0.005
 # The letter's upper-left, from the arrow tip; its readback cell, from the tip.
@@ -754,15 +750,13 @@ def append_rail_receipt_sheet(adapter: Any) -> tuple[Callable[[], None], ...]:
         note = _literal_note(adapter, ITEM_LABEL, *ITEM_LABEL_XY)
         for label, edge_xy, note_xy in WALL_FLAGS:
             wall_note = add_attached_note(
-                adapter, front, text="[A]", entity_xy=edge_xy,
+                adapter, front, text=rail.WALL_CALLOUT, entity_xy=edge_xy,
                 note_xy=note_xy, label=f"rail wall {label}",
             )
             text_cell, box = wall_flag_regions(edge_xy, note_xy)
             wall_flags.append((wall_note, edge_xy, text_cell))
-            notes.append((wall_note, "[A]", "[A]", box))
+            notes.append((wall_note, rail.WALL_CALLOUT, rail.WALL_CALLOUT, box))
         notes.append((note, ITEM_LABEL, ITEM_LABEL, ITEM_LABEL_CELL))
-        note = _literal_note(adapter, rail.DRAWING_NOTES, _NOTE_X, RECEIPT_NOTE_TOP)
-        notes.append((note, rail.DRAWING_NOTES, rail.DRAWING_NOTES, RECEIPT_NOTE_CELL))
         arrow_note, arrow_tip = _add_view_arrow(adapter, views["*Top"])
         notes.append(
             (arrow_note, END_VIEW_LETTER, END_VIEW_LETTER, view_arrow_cell(arrow_tip))

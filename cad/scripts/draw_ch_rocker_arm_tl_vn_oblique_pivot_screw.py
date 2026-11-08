@@ -49,13 +49,18 @@ GENERAL_TEXT = "PURCHASED PART AS SUPPLIED; SHORTEN THREADED END AND CHAMFER AT 
 VIEW_LAYOUT = "standard"
 # The Right view carries every dimension: the head Ø left of the head, the
 # shoulder Ø right of the thread end, the shoulder length above, the cut
-# (.570) on its own line under the thread, the end chamfer (.03 X 45°) on
-# the thread's upper silhouette, the cut note right of the thread end under
-# the shoulder Ø with a short leader to the tip's end face, the thread
-# leader above-right.
+# (.570) on its own line under the thread, its value left of the step under
+# the shoulder, the end chamfer (.03 X 45°) on the thread's upper silhouette,
+# the cut note right of the thread end under the shoulder Ø with a short
+# leader to the tip's end face, the thread leader above-right.
 SUPPLIER_MARGINS = {"*Right": (0.020, 0.020, 0.060, 0.012)}
 DIAMETER_LANE = 0.014  # vertical diameter lines, out from the head / thread end
 LENGTH_LANE = 0.008  # horizontal length lines, out from the head's rim
+# The cut's 14.5 mm span holds its arrows but not its value too: centred,
+# SolidWorks set the value outside right, under the cut note's first line
+# (machinist review, farm run 20261108T000844770Z). Its value stands outside
+# left instead, under the shoulder, where nothing else prints.
+CUT_TEXT_LEFT = 0.012  # the value's centre, left of the step
 # The shoulder Ø's value and callout shelve right of its dimension line, at
 # the axis, clear of its short 9.5 mm span. The chamfer's ".03 X 45°", far
 # wider than its 0.76 mm leg, shelves right of the tip, above the reach of the
@@ -153,7 +158,7 @@ def _place_dimensions(adapter, right) -> dict[str, object]:
         "SupplierHeadDiameter": (at["head"][0] - DIAMETER_LANE, axis_y),
         "SupplierShoulderDiameter": (at["tip"][0] + DIAMETER_LANE, axis_y),
         "SupplierShoulderLength": ((at["joint"][0] + at["step"][0]) / 2.0, axis_y + rim + LENGTH_LANE),
-        part.CUT_DIMENSION: ((at["step"][0] + at["tip"][0]) / 2.0, axis_y - rim - LENGTH_LANE),
+        part.CUT_DIMENSION: (at["step"][0] - CUT_TEXT_LEFT, axis_y - rim - LENGTH_LANE),
         part.CHAMFER_LEG_DIMENSION: (at["tip"][0], axis_y + CHAMFER_RISE),
     }
     by_feature = {
