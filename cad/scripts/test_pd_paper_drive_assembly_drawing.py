@@ -745,14 +745,14 @@ def test_the_feed_setup_reference_uses_the_selected_ratios_and_reference_pitch()
         * feed_pinion.PITCH_DIA
     )
     assert paper_geometry.NET_RACK_TRAVEL_PER_CRANK_REV == pytest.approx(expected)
-    text = steps.PAPER_FEED_REFERENCE_TEXT
+    text = drawing.PAPER_FEED_TEXT
     match = re.search(r"PLATEN TRAVEL (\d*\.\d+) PER CRANK REV \(REF\)", text)
     assert match
     places = steps.PAPER_FEED_REFERENCE_PLACES
     assert len(match[1].split(".")[1]) == places
     assert float(match[1]) * 25.4 == pytest.approx(expected, abs=0.5 * 10.0**-places * 25.4)
-    assert f"{sprocket.CRANK_CONFIG} CRANK" in text
-    assert f"{sprocket.KNOB_CONFIG} KNOB" in text
+    assert f"{sprocket.CRANK_TEETH}-TOOTH CRANK" in text
+    assert f"{sprocket.KNOB_TEETH}-TOOTH KNOB" in text
     for caption in drawing.ASSEMBLED_CAPTIONS.values():
         assert text in caption
     # The form-cutter setting changes the tooth boundary, not the rolling pitch.
@@ -1599,10 +1599,10 @@ def test_the_cluster_is_shimmed_to_view_e_after_it_is_hung() -> None:
     assert "RING ON ITS GROOVE'S FRONT WALL" in " ".join(shimmed.split())
     assert disc.inch_text(cluster_fit.END_FLOAT_MIN, 3) not in shimmed
     # Codjiflo and machinist review (#2124): the step gives the fit-up's
-    # count range, and the BOM's QTY is the whole kit, the stack's nominal
-    # shims plus the spares the model stores in the spare T18's bore.
+    # most shims, and the BOM's QTY is the whole kit, the stack's nominal
+    # shims plus the spares the model stores in the spare sprocket's bore.
     low_count, high_count = cluster_fit.SHIM_COUNT_RANGE
-    assert f"{low_count} TO {high_count} " in " ".join(shimmed.split())
+    assert f"UP TO {high_count} IN ALL" in " ".join(shimmed.split())
     assert high_count <= cluster_fit.SHIM_COUNT_MAX
     description = drawing.BOM_DESCRIPTIONS["pd-vn-transgear-cluster-shim"]
     assert "SUPPLY" not in description
@@ -1874,7 +1874,10 @@ def test_every_bom_item_is_ballooned_on_some_sheet() -> None:
     # Edge-on in the front and right views the spare is a bare bar: hidden
     # there, shown and ballooned on the isometric only.
     for caption in drawing.ASSEMBLED_CAPTIONS.values():
-        assert "T18 SPARE, STORED LOOSE" in " ".join(caption.split())
+        assert (
+            f"{drawing.sprocket_name(drawing._SPARE_CONFIGS[0])} ON THE BASE DECK IS A "
+            "SPARE, STORED LOOSE"
+        ) in " ".join(caption.split())
 
 
 def test_the_exploded_sheet_balloons_exactly_the_platen_group() -> None:
@@ -2054,41 +2057,21 @@ def test_the_lock_taps_are_the_even_taps_counted_from_either_end() -> None:
     assert not re.search(r"\bA[1-9]\b", _step_body("guides-screwed") + hung)
 
 
-def test_one_code_key_defines_every_sprocket_code_and_each_code_sheet_points_to_it() -> None:
-    """Round 7 (rules 22, 26): T12/T18/T24 are defined in one labelled key
-    built from the sprocket configurations; every other step sheet that
-    prints a code points to it from its first heading."""
-    notes = _unit_step_notes()
-    key = notes.code_key.splitlines()
-    entries = [line for line in key[1:] if not line.startswith(" ")]
-    assert [entry.split(":")[0] for entry in entries] == [
-        name for name, _teeth in sprocket.CONFIGS
-    ]
-    for (name, teeth), entry in zip(sprocket.CONFIGS, entries):
-        assert entry.startswith(f"{name}: {teeth}-TOOTH, ")
-    assert all(len(line) <= drawing.FITUP_LINE_WIDTH for line in key)
-    code_sheets = {
-        column.sheet
-        for column in notes.columns
-        if drawing.SPROCKET_CODE_PATTERN.search(column.text)
-    }
-    assert drawing.CODE_KEY_SHEET in code_sheets
-    first_column = {}
-    for column in notes.columns:
-        first_column.setdefault(column.sheet, column)
-    for sheet, column in first_column.items():
-        heading = column.text.splitlines()[0]
-        pointed = sheet in code_sheets and sheet != drawing.CODE_KEY_SHEET
-        assert heading.endswith(drawing.CODE_KEY_POINTER) == pointed
-    # The key stands in the chain sheet's free second column, which no step
-    # slot uses, above the title block.
-    assert all(
-        slot.xy != drawing.CODE_KEY_XY
-        for slot in drawing.STEP_SLOTS
-        if slot.sheet == drawing.CODE_KEY_SHEET
+def test_the_sprockets_are_named_plainly_never_by_configuration_code() -> None:
+    """Round 8 (rules 22, 26): the steps and sheet 1 name each MHA-PD-09
+    sprocket by its tooth count, never by the bare T12/T18/T24 code."""
+    codes = re.compile(
+        r"\b(?:" + "|".join(re.escape(name) for name, _teeth in sprocket.CONFIGS) + r")\b"
     )
-    bottom = drawing.CODE_KEY_XY[1] - len(key) * drawing.STEP_LINE_PITCH
-    assert bottom > drawing.FITUP_NOTE_LIMITS[1][1]
+    notes = _unit_step_notes()
+    for text in drawing.sheet_texts(notes):
+        assert not codes.search(text), text
+    assert drawing.sprocket_name(sprocket.KNOB_CONFIG) == (
+        f"{sprocket.KNOB_TEETH}-TOOTH {_number('pd-transgear-removable')} SPROCKET"
+    )
+    assert drawing.sprocket_name(drawing._SPARE_CONFIGS[0]) in drawing.ASSEMBLED_CAPTIONS[
+        next(iter(drawing.ASSEMBLED_CAPTIONS))
+    ].replace("\n", " ")
 
 
 def test_the_chain_is_closed_and_run_after_the_collar_is_accepted() -> None:
@@ -2103,7 +2086,9 @@ def test_the_chain_is_closed_and_run_after_the_collar_is_accepted() -> None:
     assert f"LOOP {chain.LINK_COUNT - 1} PITCHES" in closed
     assert f"THE LOOP {chain.LINK_COUNT} PITCHES" in closed
     assert "ANSI #25" in closed
-    assert f"OVER THE {sprocket.KNOB_CONFIG} AND THE {sprocket.CRANK_CONFIG}" in closed
+    knob = drawing.sprocket_name(sprocket.KNOB_CONFIG, numbered=False)
+    crank = drawing.sprocket_name(sprocket.CRANK_CONFIG, numbered=False)
+    assert f"OVER THE {knob} AND THE {crank}" in " ".join(closed.split())
     assert chain.LINK_COUNT % 2 == 0
     assert chain.LINK_PITCH == sprocket.CHAIN_PITCH
     assert chain.CENTRELINE_LEN == pytest.approx(
@@ -2146,8 +2131,9 @@ def test_the_knob_wheel_is_read_held_back_on_its_seat() -> None:
     """Codex P2 on b2eb9a0e1: read the wheel held back on its seat, not
     floated forward under the nut. Its actual float is paid once in service."""
     pose = _step_body("fitup-pose-set")
-    assert steps.KNOB_HELD_BACK_TEXT in pose
-    assert steps.KNOB_HELD_BACK_TEXT in _step_body("collar-rear-faced-to-fit")
+    held_back = f"{drawing.sprocket_name(sprocket.KNOB_CONFIG, numbered=False)} HELD BACK"
+    assert held_back in " ".join(pose.split())
+    assert held_back in " ".join(_step_body("collar-rear-faced-to-fit").split())
     accepted = _step_body("fitup-accepted")
     assert accepted.startswith(f"CHECK, IN STEP {steps.step_number('fitup-pose-set')}")
     low, high = steps.ACCEPTED_CHAIN_OFFSET_IN_SERVICE
@@ -2308,7 +2294,7 @@ def test_the_loaded_rack_check_is_one_dial_run_over_the_engaged_window() -> None
 
 def test_the_reducer_is_clocked_once_with_an_ordinary_limit() -> None:
     body = _step_body("fitup-pose-set")
-    assert steps.KNOB_HELD_BACK_TEXT in body
+    assert "HELD BACK ON ITS SEAT" in " ".join(body.split())
     clock = steps.inch_floor_mm(drawing.quality.reducer_setup_clock_deviation_mm(), 3)
     assert f"WITHIN {disc.inch_text(clock, 3)} AT THE PITCH CIRCLE" in body
     assert "TEST INDICATOR" in body
@@ -2470,8 +2456,8 @@ def test_note_formatting_is_explicit_about_its_supplied_window() -> None:
     window = steps.inch_window(domain.axis_from_left_end_limits_mm, 3, " TO ")
     assert window in drawing.engaged_feed_text(domain)
     assert drawing.engaged_feed_text(domain) in _step_body("hanger-meshed")
-    assert notes.columns == drawing._point_to_code_key(
-        drawing.pack_step_columns(drawing._step_text(operating_domain=domain))
+    assert notes.columns == drawing.pack_step_columns(
+        drawing._step_text(operating_domain=domain)
     )
     assert drawing.sheet_texts(notes)[: len(notes.columns)] == tuple(
         column.text for column in notes.columns

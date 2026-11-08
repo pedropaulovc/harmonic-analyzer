@@ -34,7 +34,6 @@ from collections import Counter
 from dataclasses import dataclass
 import json
 import math
-import re
 import sys
 import textwrap
 from typing import Any, Callable, Iterable, Sequence
@@ -1692,6 +1691,15 @@ FRAME_BASE = str(_config.parts("fr-harmonic-base")["number"])
 CRANKSHAFT = str(_config.parts("dt-crankshaft")["number"])
 
 
+def sprocket_name(configuration: str, *, numbered: bool = True) -> str:
+    """Rule 26 (machinist review round 8): a MHA-PD-09 sprocket by its plain
+    name, its tooth count from the configuration, never the bare code."""
+    teeth = sprocket.configuration_teeth(configuration)
+    if numbered:
+        return f"{teeth}-TOOTH {_N['pd-transgear-removable']} SPROCKET"
+    return f"{teeth}-TOOTH SPROCKET"
+
+
 def _press_remedy(item: str, receiver: str, restart_key: str) -> str:
     """Rule 23: a press whose part slides in by hand is a slip fit; the hole
     is oversize, so the receiving part is remade and the build repeated."""
@@ -1708,6 +1716,12 @@ ARM_PLATE_SCREW_HOLE_TEXT = (
 ARM_PLATE_SPOT_DRILL_TEXT = (
     f"#1 (\u00d8{steps.inch_text(plate_geometry.SCREW_HOLE_DIA, 3)})"
 )
+# 9K's pilots: a #44 drill under the press ream leaves stock for both reams
+# (machinist review round 8: the step named no size or place).
+PLATE_DOWEL_PILOT_DIA_MM = 2.1844  # #44 (.086)
+if PLATE_DOWEL_PILOT_DIA_MM >= min(plate_locating_interface.PRESS_HOLE_LIMITS_MM) - 0.1:
+    raise AssertionError("the dowel pilots must leave ream stock")
+PLATE_DOWEL_PILOT_TEXT = f"#44 (\u00d8{steps.inch_text(PLATE_DOWEL_PILOT_DIA_MM, 3)})"
 # MHA-PD-12's holes are struck through the MHA-PD-11 taps with the lock placed
 # by hand; each mark is checked from the lock's edges to the hole locations'
 # printed .XXX band less the transfer's own .001 (the screw point and the
@@ -1745,8 +1759,11 @@ def _step_text(
     shake = steps.RACK_DATUM_BACKLASH_TEXT
     lock_gap = steps.inch_window(platen_guide.LOCK_GAP_FIT, 3, " TO ")
     teeth = f"{KNOB_TEETH}T"
-    knob = sprocket.KNOB_CONFIG
-    crank = sprocket.CRANK_CONFIG
+    knob = sprocket_name(sprocket.KNOB_CONFIG)
+    crank = sprocket_name(sprocket.CRANK_CONFIG)
+    knob_short = sprocket_name(sprocket.KNOB_CONFIG, numbered=False)
+    crank_short = sprocket_name(sprocket.CRANK_CONFIG, numbered=False)
+    held_back = f"{knob_short} HELD BACK ON ITS SEAT"
     float_sheet = SHEET_NAMES.index(CLUSTER_FLOAT_SHEET) + 1
     pose = steps.step_number("fitup-pose-set")
     guides = len(platen.GUIDE_HOLE_Y)
@@ -1890,7 +1907,8 @@ def _step_text(
             "TIGHTEN THE CLAMPS.",
             f"CHECK: RE-INDICATED, {KNOB_BORE_LETTER} IS STILL TRUE.",
             f"IF NOT, REPEAT {s('arm-plate-located', 5)}-{s('arm-plate-located', 7)}.",
-            "MATCH-DRILL 2 PILOTS THROUGH THE PLATE AND THE ARM.",
+            f"MATCH-DRILL 2 {PLATE_DOWEL_PILOT_TEXT} PILOTS THROUGH THE PLATE AND "
+            f"THE ARM AT {n['pd-transgear-arm-plate']}'S 2 LOCATING-HOLE PLACES.",
             "UNCLAMP AND PART THE ARM AND THE PLATE.",
             f"REAM THE ARM'S 2 HOLES TO {n['pd-transgear-arm']} (PRESS).",
             f"REAM THE PLATE'S 2 HOLES TO {n['pd-transgear-arm-plate']} (SLIP).",
@@ -2022,11 +2040,20 @@ def _step_text(
             "RING ON ITS GROOVE'S FRONT WALL.",
             f"READ THE GAP BETWEEN THE {n['pd-transgear-front-bushing']} BUSHING AND "
             f"THE {n['pd-vn-transgear-retaining-ring']} RING WITH FEELERS.",
-            f"FIT {cluster_fit.SHIM_COUNT_RANGE[0]} TO "
-            f"{cluster_fit.SHIM_COUNT_RANGE[1]} {n['pd-vn-transgear-cluster-shim']} "
-            f"SHIMS UNDER THE {n['pd-transgear-rear-bushing']} BUSHING, AT THE ARM "
-            f"FACE, UNTIL THE GAP READS {CLUSTER_FLOAT_VIEW_NAME} (SHEET "
-            f"{float_sheet}).",
+            # Machinist review round 8: the shims sit under the rear bushing,
+            # so the stack comes off to fit them and goes back on to re-read.
+            f"IF IT READS {CLUSTER_FLOAT_VIEW_NAME} (SHEET {float_sheet}), GO TO STEP "
+            f"{steps.step_number('disc-cluster-shimmed') + 1}. IF OVER, REMOVE THE "
+            f"RING, THE {n['pd-transgear-front-bushing']} BUSHING, THE SLEEVE WITH HUB "
+            f"AND DISC, AND THE {n['pd-transgear-rear-bushing']} BUSHING.",
+            f"SLIDE {n['pd-vn-transgear-cluster-shim']} SHIMS ON THE PIN AGAINST THE "
+            f"ARM FACE, UP TO {cluster_fit.SHIM_COUNT_RANGE[1]} IN ALL, TOGETHER AS "
+            f"THICK AS THE GAP'S EXCESS OVER {CLUSTER_FLOAT_VIEW_NAME}.",
+            f"REFIT PER {s('disc-cluster-hung', 1)}-{s('disc-cluster-hung', 4)}.",
+            f"CHECK: PUSHED AS {s('disc-cluster-shimmed', 0)}, THE GAP READS "
+            f"{CLUSTER_FLOAT_VIEW_NAME}.",
+            f"IF NOT, REPEAT {s('disc-cluster-shimmed', 2)}-"
+            f"{s('disc-cluster-shimmed', 5)}.",
         ),
         "collar-pins-pressed": (
             f"PRESS {TRANSGEAR_QUANTITIES['pd-vn-transgear-knob-drive-pin']} "
@@ -2148,8 +2175,7 @@ def _step_text(
             f"{n['pd-transgear-knob-thrust-ring']} RING, THE RING ON THE "
             f"{n['pd-transgear-arm-plate']} PLATE'S FRONT BOSS.",
             f"SLIDE THE COLLAR BACK AGAINST THE {teeth}.",
-            f"FIT THE {knob} AND THE THUMBNUT FINGER-TIGHT, "
-            f"{steps.KNOB_HELD_BACK_TEXT}.",
+            f"FIT THE {knob} AND THE THUMBNUT FINGER-TIGHT, {held_back}.",
             "TURN THE DISC UNTIL, ON THE LINE THROUGH THE KNOB AND DISC AXES, "
             f"A {disc.TEETH}T TOOTH STANDS CENTRED IN A {teeth} GAP WITHIN {clock} "
             "AT THE PITCH CIRCLE, READ WITH A TEST INDICATOR ON A GAUGE PIN IN "
@@ -2171,15 +2197,15 @@ def _step_text(
             f"{s('latch-hook-fitted', 4)} (THE BAR KEEPS ITS HOOK TAPS).",
         ),
         "collar-rear-faced-to-fit": (
-            f"IN STEP {pose}'S POSE, {steps.KNOB_HELD_BACK_TEXT}, FIT THE COLLAR AS "
+            f"IN STEP {pose}'S POSE, {held_back}, FIT THE COLLAR AS "
             f"MADE (LONG), ITS REAR FACE ON THE {n['pd-transgear-knob-shaft']} "
             f"{teeth} FRONT FACE.",
-            f"READ THE {knob} FRONT FACE AGAINST THE {crank} FRONT FACE WITH A "
+            f"READ THE {knob_short}'S FRONT FACE AGAINST THE {crank}'S FRONT FACE WITH A "
             "STRAIGHTEDGE ACROSS BOTH AND FEELERS.",
             "REMOVE THE COLLAR.",
             "FACE THE COLLAR'S REAR UNTIL, REFITTED, THE "
-            f"{knob} FRONT FACE STANDS {collar.FIT_UP_OFFSET_SET_TEXT} FORWARD OF "
-            f"THE {crank} FRONT FACE.",
+            f"{knob_short}'S FRONT FACE STANDS {collar.FIT_UP_OFFSET_SET_TEXT} FORWARD "
+            f"OF THE {crank_short}'S FRONT FACE.",
             f"CHECK: THE FINISHED COLLAR BODY IS WITHIN "
             f"{n['pd-transgear-drive-collar']}'S FITTED LIMITS.",
             f"IF NOT, MAKE A NEW {n['pd-transgear-drive-collar']} COLLAR AND REPEAT "
@@ -2221,11 +2247,11 @@ def _step_text(
             f"{s('loaded-rack-geometry-checked', 4)}.",
         ),
         "fitup-accepted": (
-            f"CHECK, IN STEP {pose}'S POSE: THE {knob} FRONT FACE STANDS "
-            f"{steps.OFFSET_ACCEPT_TEXT} FORWARD OF THE {crank} FRONT FACE "
+            f"CHECK, IN STEP {pose}'S POSE: THE {knob_short}'S FRONT FACE STANDS "
+            f"{steps.OFFSET_ACCEPT_TEXT} FORWARD OF THE {crank_short}'S FRONT FACE "
             "(STRAIGHTEDGE AND FEELERS).",
             f"CHECK: KNOB END FLOAT {knob_window}, READ WITH FEELERS AT THE CUP.",
-            f"CHECK: THE {knob} TURNS FREE UNDER THE NUT.",
+            f"CHECK: THE {knob_short} TURNS FREE UNDER THE NUT.",
             f"UNLATCH THE ARM: PULL THE {n['pd-latch-hook']} HOOK'S FINGER TAB ALONG "
             "THE ARM UNTIL THE HOOK CLEARS THE PIN.",
             "LOWER THE ARM.",
@@ -2255,8 +2281,8 @@ def _step_text(
             f"({CHAIN_QUANTITIES['sh-vn-chain-link--InnerLink']} "
             f"{n['sh-vn-chain-link--InnerLink']} INNER AND "
             f"{CHAIN_QUANTITIES['sh-vn-chain-link--OuterLink']} "
-            f"{n['sh-vn-chain-link--OuterLink']} OUTER LINKS) OVER THE {knob} AND "
-            f"THE {crank}, SLACK RUN HANGING FREE; NO TENSIONING. THE CONNECTING "
+            f"{n['sh-vn-chain-link--OuterLink']} OUTER LINKS) OVER THE {knob_short} AND "
+            f"THE {crank_short}, SLACK RUN HANGING FREE; NO TENSIONING. THE CONNECTING "
             f"LINK MAKES THE LOOP {chain.LINK_COUNT} PITCHES.",
             f"JOIN THE ENDS WITH THE {n['pd-vn-chain-connecting-link']} #25 "
             f"CONNECTING LINK (MCMASTER {_SKU['pd-vn-chain-connecting-link']}), "
@@ -2332,6 +2358,7 @@ STEP_SLOTS: tuple[StepSlot, ...] = (
     StepSlot("ASSEMBLY AND FIT-UP (CONT. 3)", FITUP_NOTE_XY[0], FITUP_NOTE_LIMITS[0][1]),
     StepSlot("ASSEMBLY AND FIT-UP (CONT. 3)", FITUP_NOTE_XY[1], FITUP_NOTE_LIMITS[1][1]),
     StepSlot("CHAIN FIT-UP", FITUP_NOTE_XY[0], FITUP_NOTE_LIMITS[0][1]),
+    StepSlot("CHAIN FIT-UP", FITUP_NOTE_XY[1], FITUP_NOTE_LIMITS[1][1]),
 )
 if {slot.sheet for slot in STEP_SLOTS} != set(SHEET_NAMES[3:-1]):
     raise AssertionError("every steps sheet takes step columns")
@@ -2445,11 +2472,6 @@ class StepNotes:
         return "\n".join(column.text for column in self.columns)
 
     @property
-    def code_key(self) -> str:
-        """The sprocket code key printed on the chain sheet."""
-        return sprocket_code_key(self.columns)
-
-    @property
     def exploded_caption_xy(self) -> tuple[float, float]:
         """One blank line under the actual steps, at default 4.5 mm line pitch."""
         return (
@@ -2458,88 +2480,9 @@ class StepNotes:
         )
 
 
-# Rule 22/26 (machinist review round 7): the steps name the three MHA-PD-09
-# sprockets by their configuration codes. One labelled key, on the chain
-# sheet's free right half, defines every code from the removable sprocket's
-# configurations and mounted selection; every other step sheet that prints a
-# code points to it from its first heading (the DT-00 code-key pattern, owner
-# ruling 2026-11-08 via Main).
-SPROCKET_CODE_PATTERN = re.compile(
-    r"\b(?:" + "|".join(re.escape(name) for name, _teeth in sprocket.CONFIGS) + r")\b"
-)
-CODE_KEY_SHEET = "CHAIN FIT-UP"
-CODE_KEY_XY = FITUP_NOTE_XY[1]
-CODE_KEY_POINTER = f"(CODES: SHEET {SHEET_NAMES.index(CODE_KEY_SHEET) + 1} KEY)"
-_SPARE_CONFIGS = [
-    name
-    for name, _teeth in sprocket.CONFIGS
-    if name not in (sprocket.CRANK_CONFIG, sprocket.KNOB_CONFIG)
-]
-if len(_SPARE_CONFIGS) != 1:
-    raise AssertionError("the code key names one crank, one knob and one spare sprocket")
-SPROCKET_CODE_HOMES = {
-    sprocket.CRANK_CONFIG: f"ON THE {CRANKSHAFT} CRANKSHAFT",
-    sprocket.KNOB_CONFIG: (
-        f"ON THE {_N['pd-transgear-knob-shaft']} KNOB SHAFT, DRIVEN BY THE "
-        f"{_N['pd-transgear-drive-collar']} COLLAR'S DOWELS"
-    ),
-    _SPARE_CONFIGS[0]: "SPARE, STORED LOOSE ON THE BASE DECK",
-}
-
-
-def _code_sheets(columns: Sequence[StepColumn]) -> list[str]:
-    """The step sheets, in order, whose columns print a sprocket code."""
-    return list(
-        dict.fromkeys(
-            column.sheet for column in columns if SPROCKET_CODE_PATTERN.search(column.text)
-        )
-    )
-
-
-def sprocket_code_key(columns: Sequence[StepColumn]) -> str:
-    """The labelled key: one line per code, from the sprocket configurations."""
-    numbers = [SHEET_NAMES.index(sheet) + 1 for sheet in _code_sheets(columns)]
-    span = (
-        f"SHEET {numbers[0]}" if len(numbers) == 1 else f"SHEETS {numbers[0]}-{numbers[-1]}"
-    )
-    lines = [f"CODE KEY ({span}): {_N['pd-transgear-removable']} SPROCKETS"]
-    for name, teeth in sprocket.CONFIGS:
-        lines += textwrap.wrap(
-            f"{name}: {teeth}-TOOTH, {SPROCKET_CODE_HOMES[name]}.",
-            width=FITUP_LINE_WIDTH,
-            subsequent_indent="  ",
-            break_on_hyphens=False,
-        )
-    return "\n".join(lines)
-
-
-def _point_to_code_key(columns: tuple[StepColumn, ...]) -> tuple[StepColumn, ...]:
-    """Append the key pointer to the first heading of every other step sheet
-    that prints a code. The pointer rides the heading's own line, so the
-    packed line counts stand."""
-    sheets = _code_sheets(columns)
-    if CODE_KEY_SHEET not in sheets:
-        raise AssertionError("the code key's sheet must itself print the codes")
-    out = []
-    seen: set[str] = set()
-    for column in columns:
-        first_on_sheet = column.sheet not in seen
-        if first_on_sheet and column.sheet in sheets and column.sheet != CODE_KEY_SHEET:
-            first, _, rest = column.text.partition("\n")
-            pointed = f"{first} {CODE_KEY_POINTER}"
-            if len(pointed) > FITUP_LINE_WIDTH:
-                raise AssertionError(f"{column.sheet}: the code pointer overruns its heading")
-            column = StepColumn(column.sheet, column.xy, f"{pointed}\n{rest}")
-        seen.add(column.sheet)
-        out.append(column)
-    return tuple(out)
-
-
 def format_step_notes(*, operating_domain: RackOperatingDomain) -> StepNotes:
     """Format the sheet steps around a supplied engaged-feed window."""
-    return StepNotes(
-        _point_to_code_key(pack_step_columns(_step_text(operating_domain=operating_domain)))
-    )
+    return StepNotes(pack_step_columns(_step_text(operating_domain=operating_domain)))
 
 
 def require_step_notes() -> StepNotes:
@@ -2559,6 +2502,20 @@ EXPLODED_CAPTIONS = {
     f"BOM: SHEET {SHEET_NAMES.index('BILL OF MATERIALS') + 1}"
     for scale in EXPLODED_SCALE_LADDER
 }
+_SPARE_CONFIGS = [
+    name
+    for name, _teeth in sprocket.CONFIGS
+    if name not in (sprocket.CRANK_CONFIG, sprocket.KNOB_CONFIG)
+]
+if len(_SPARE_CONFIGS) != 1:
+    raise AssertionError("sheet 1 names one crank, one knob and one spare sprocket")
+# Sheet 1's feed reference, the sprockets by plain name (machinist review
+# round 8, rule 26: the configuration codes read as undefined).
+PAPER_FEED_TEXT = (
+    f"FEED SETUP: {sprocket.CRANK_TEETH}-TOOTH CRANK / {sprocket.KNOB_TEETH}-TOOTH "
+    "KNOB SPROCKET.\n"
+    f"PLATEN TRAVEL {steps.PAPER_TRAVEL_PER_CRANK_TEXT} PER CRANK REV (REF)."
+)
 # Sheet 1, at each scale its isometric may take: which removable is which,
 # and where every other item balloons.
 ASSEMBLED_CAPTIONS = {
@@ -2567,11 +2524,11 @@ ASSEMBLED_CAPTIONS = {
             "\n".join(
                 textwrap.wrap(
                     f"ISOMETRIC{_scale_suffix(scale, SHEET_SCALES['ASSEMBLED VIEWS'])}: THE "
-                    f"{_N['pd-transgear-removable']} ON THE BASE DECK IS THE T18 "
+                    f"{sprocket_name(_SPARE_CONFIGS[0])} ON THE BASE DECK IS A "
                     f"SPARE, STORED LOOSE WITH THE SPARE "
                     f"{_N['pd-vn-transgear-cluster-shim']} SHIMS IN ITS BORE; "
-                    f"THE {sprocket.KNOB_CONFIG} IS ON THE KNOB, "
-                    f"THE {sprocket.CRANK_CONFIG} ON THE "
+                    f"THE {sprocket_name(sprocket.KNOB_CONFIG, numbered=False)} IS ON "
+                    f"THE KNOB, THE {sprocket.CRANK_TEETH}-TOOTH ON THE "
                     "CRANK. PLATEN AND SUPPORT ITEMS: SHEET "
                     f"{SHEET_NAMES.index('PLATEN AND SUPPORT') + 1}; TRANSGEAR "
                     f"ITEMS: SHEETS {SHEET_NAMES.index('TRANSGEAR VIEWS') + 1} AND "
@@ -2579,7 +2536,7 @@ ASSEMBLED_CAPTIONS = {
                     width=FITUP_LINE_WIDTH,
                 )
             ),
-            steps.PAPER_FEED_REFERENCE_TEXT,
+            PAPER_FEED_TEXT,
         )
     )
     for scale in ISO_SCALE_LADDER
@@ -2615,7 +2572,6 @@ def sheet_texts(notes: StepNotes) -> tuple[str, ...]:
     """Every explicitly formatted package text besides the BOM's own cells."""
     return (
         *(column.text for column in notes.columns),
-        notes.code_key,
         *EXPLODED_CAPTIONS.values(),
         *ASSEMBLED_CAPTIONS.values(),
         TRANSGEAR_CAPTION,
@@ -4174,10 +4130,6 @@ def _place_fitup_sheets(adapter: Any, step_notes: StepNotes) -> None:
             adapter, column.sheet, column.text, column.xy,
             label=f"{column.sheet} step column {index + 1}",
         )
-    _place_sheet_note(
-        adapter, CODE_KEY_SHEET, step_notes.code_key, CODE_KEY_XY,
-        label=f"{CODE_KEY_SHEET} sprocket code key",
-    )
 
 
 @_telemetry.traced("drawing.paper_drive_assembly")
