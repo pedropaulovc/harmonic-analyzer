@@ -25,9 +25,9 @@ its lateral play: the carrier rocked by hand sideways to the rail, at most
 ``trammel.CARRIAGE_PLAY_TIR_MAX`` TIR read at the shoulder-screw head (the
 trammel spec's docstring carries the radius budget). Owner P1-A (2026-11-07,
 PR #2236 comment 4504212381) sets that acceptance to 0.02 mm. Of the four
-kit carriages the two tightest are kept, one per rail. If none passes, the
-jig assembly's preparation step calls for a preloaded (Z0/ZA) HGH15CA
-carriage.
+kit carriages the two tightest are kept, one per rail. If no carriage on a
+rail passes, the jig assembly's preparation step replaces the
+MHA-CH-06-TL-VN-83 kit (owner ruling 2026-11-08: no fallback carriage).
 
 REFERENCE GEOMETRY. Every number here is HIWIN's HGH15CA, the style the kit
 copies; HIWIN is not the supplier. The first pass was datasheet-built: no
