@@ -1,9 +1,9 @@
-"""Build purchased MHA-SM-VN-56, the gooseneck shoulder screw (McMaster 91259A576).
+"""Build purchased MHA-SM-VN-56, the gooseneck shoulder screw (McMaster 91259A535).
 
 Datasheet-built nominal envelope, as the oblique trammel's pivot screw
 (build_ch_rocker_arm_tl_vn_oblique_pivot_screw): no vendor CAD, and no
 unreported edge, neck or socket form is inferred.  Axis +Z, origin on the
-shoulder end face; the nominal 1/4-20 thread envelope extends -Z.  Supplier
+shoulder end face; the nominal 10-24 thread envelope extends -Z.  Supplier
 sizes are model-owned construction references in a Right-plane sketch, in
 the final part frame, not claims of helical attachment.
 """

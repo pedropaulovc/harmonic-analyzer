@@ -178,9 +178,10 @@ def counter_upper_support_geometry() -> dict[str, str | float]:
     Older integral-shank, die-relief and clamped-eye certificates do not
     measure this support: owner ruling 2026-11-08 (Pedro), #2144 item 11.4
     (superseding #1951's clamped eye) seats the purchased MHA-SM-VN-56
-    shoulder screw (McMaster 91259A576) on the flush end face of the Ø12.70
-    tube arm's end piece, its plain 1/4-20 tap without a counterbore, and the
-    loop rides free on the Ø7.94 shoulder, resting on that end face.  The
+    shoulder screw (McMaster 91259A535, auto-selected pending owner
+    confirmation) on the flush end face of the Ø12.70 tube arm's end piece, its
+    plain #10-24 tap without a counterbore, and the loop rides free on the
+    Ø6.35 shoulder, resting on that end face.  The
     washer under the head only retains the loop and is not in the fixture.
     Channel measurements are unchanged; the analytic force and clearance model
     never depends on a native certificate.
@@ -215,8 +216,8 @@ def counter_seat() -> tuple[SettledSpring, float]:
     if record.get("upper_support") != counter_upper_support_geometry():
         raise ValueError(
             "Stale counter native calibration: upper support must be the "
-            "purchased MHA-SM-VN-56 shoulder screw (McMaster 91259A576, Ø7.94 "
-            "shoulder, 1/4-20 thread) seated on the end face, the eye free on "
+            "purchased MHA-SM-VN-56 shoulder screw (McMaster 91259A535, Ø6.35 "
+            "shoulder, 10-24 thread) seated on the end face, the eye free on "
             "its shoulder (#2144 item 11.4). Rebuild sm-vn-gooseneck-shoulder-"
             "screw and sm-gooseneck, then run diagnostics/calibrate_spring_seats.py "
             "--presets neutral square --counter-only --write on a licensed "

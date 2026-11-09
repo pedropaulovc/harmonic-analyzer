@@ -1,7 +1,8 @@
 """SolidWorks-free physical and registry contracts for MHA-SM-VN-56.
 
 Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: the counter spring's upper
-eye rides free on the shoulder of McMaster 91259A576 (read live 2026-11-08),
+eye rides free on the shoulder of McMaster 91259A535 (read live 2026-11-08;
+auto-selected after the owner's ask timed out, pending owner confirmation),
 seated on the MHA-SM-01 end face.
 """
 from __future__ import annotations
@@ -87,19 +88,22 @@ def test_counter_seat_certificate_names_this_screw():
 
 def test_supplier_dimensions_and_physical_contract():
     inch = 25.4
-    assert spec.SKU == "91259A576"
-    assert spec.SHOULDER_DIA == pytest.approx(5 / 16 * inch)
+    assert spec.SKU == "91259A535"
+    assert spec.SHOULDER_DIA == pytest.approx(0.250 * inch)
     assert spec.SHOULDER_DIA_BAND == pytest.approx((-0.002 * inch, -0.004 * inch))
     assert spec.SHOULDER_LENGTH == pytest.approx(0.375 * inch)
     assert spec.SHOULDER_LENGTH_BAND == pytest.approx((0.005 * inch, -0.005 * inch))
-    assert (spec.THREAD, spec.THREAD_CLASS) == ("1/4-20", "3A")
-    assert spec.PITCH == pytest.approx(inch / 20.0)
-    assert spec.THREAD_LENGTH == pytest.approx(7 / 16 * inch)
-    assert (spec.HEAD_DIA, spec.HEAD_HEIGHT) == pytest.approx((7 / 16 * inch, 7 / 32 * inch))
+    assert (spec.THREAD, spec.THREAD_CLASS) == ("#10-24", "3A")
+    assert spec.MAJOR_DIA == pytest.approx(0.190 * inch)
+    assert spec.PITCH == pytest.approx(inch / 24.0)
+    assert spec.THREAD_LENGTH == pytest.approx(3 / 8 * inch)
+    assert (spec.HEAD_DIA, spec.HEAD_HEIGHT) == pytest.approx((3 / 8 * inch, 3 / 16 * inch))
     assert spec.LENGTH == pytest.approx(spec.SHOULDER_LENGTH + spec.HEAD_HEIGHT)
-    # ASME B18.3's 5/16 row: the head's least Ø and the necks the joint charges.
-    assert spec.HEAD_DIA_MIN == pytest.approx(0.419 * inch)
-    assert spec.THREAD_NECK_WIDTH_MAX == pytest.approx(0.100 * inch)
+    # ASME B18.3's 1/4 row: the head's least Ø and the necks the joint charges.
+    assert spec.HEAD_DIA_MIN == pytest.approx(0.357 * inch)
+    assert spec.THREAD_NECK_WIDTH_MAX == pytest.approx(0.083 * inch)
+    assert spec.SHOULDER_NECK_DIA_MIN == pytest.approx(0.227 * inch)
+    assert spec.HEAD_FILLET_TRANSITION_DIA_MAX == pytest.approx(0.276 * inch)
     assert spec.SHOULDER_NECK_DIA_MIN < spec.SHOULDER_DIA + min(spec.SHOULDER_DIA_BAND)
     assert spec.HEAD_DIA > spec.SHOULDER_DIA > spec.MAJOR_DIA
 
@@ -116,7 +120,7 @@ def test_native_supplier_witness_inventory():
         "SupplierShoulderLength": (-spec.SHOULDER_LENGTH, spec.SHOULDER_DIA / 2.0),
         "SupplierHeadDiameter": (-spec.LENGTH, -spec.HEAD_DIA / 2.0),
     }
-    assert spec.THREAD_NOTE == "1/4-20 UNC-3A\n(AS SUPPLIED)"
+    assert spec.THREAD_NOTE == "10-24 UNC-3A\n(AS SUPPLIED)"
 
 
 def test_build_uses_contract_dimensions_and_publishes_z_axis(monkeypatch):

@@ -241,15 +241,15 @@ def test_isolated_counter_provenance_identifies_the_whole_support(
     assert support["component"] == "sm-vn-gooseneck-shoulder-screw"
     assert support["number"] == "MHA-SM-VN-56"
     assert support["number"] == _config.parts(support["component"])["number"]
-    assert support["supplier_sku"] == "91259A576"
-    assert support["thread"] == "1/4-20"
-    assert support["pitch_mm"] == pytest.approx(1.27)
-    assert support["major_dia_mm"] == pytest.approx(6.35)
-    assert support["thread_length_mm"] == pytest.approx(11.1125)
-    assert support["shoulder_dia_mm"] == pytest.approx(7.9375)
+    assert support["supplier_sku"] == "91259A535"
+    assert support["thread"] == "#10-24"
+    assert support["pitch_mm"] == pytest.approx(25.4 / 24.0)
+    assert support["major_dia_mm"] == pytest.approx(4.826)
+    assert support["thread_length_mm"] == pytest.approx(9.525)
+    assert support["shoulder_dia_mm"] == pytest.approx(6.35)
     assert support["shoulder_length_mm"] == pytest.approx(9.525)
-    assert support["head_dia_mm"] == pytest.approx(11.1125)
-    assert support["head_height_mm"] == pytest.approx(5.55625)
+    assert support["head_dia_mm"] == pytest.approx(9.525)
+    assert support["head_height_mm"] == pytest.approx(4.7625)
     assert support["eye_gap_mm"] == pytest.approx(4.88061)
     assert not any(
         key.startswith(("plug_counterbore", "clamp_", "body_", "slot_")) for key in support

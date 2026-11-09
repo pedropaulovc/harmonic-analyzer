@@ -29,14 +29,14 @@ _COUNTER_ANCHOR_THREAD_LIMIT = smooth_annulus_limit_mm3(
 # this literal, test-pinned to build_sm_summing_assembly, to avoid broad
 # recipe cache keys.
 _KNIFE_HANGER_REACH = 8.9173
-# MHA-SM-VN-56's 1/4-20 thread (McMaster 91259A576, 7/16 long) in the #7
-# drill of the blind 1/4-20 tap in MHA-SM-01's solid end piece: the shoulder
+# MHA-SM-VN-56's 10-24 thread (McMaster 91259A535, 3/8 long) in the #25
+# drill of the blind #10-24 tap in MHA-SM-01's solid end piece: the shoulder
 # seats on the end face, so the whole thread length stands in the tap (owner
 # ruling 2026-11-08 (Pedro), #2144 item 11.4: plain tap, no counterbore). A
 # literal, test-pinned to sm_vn_gooseneck_shoulder_screw_spec.THREAD_LENGTH
 # like _KNIFE_HANGER_REACH, so a screw or gooseneck edit does not re-key this
 # table or the summing soundness gate.
-_GOOSENECK_THREAD_LENGTH = 11.1125
+_GOOSENECK_THREAD_LENGTH = 9.525
 # Bearing seats are exact face contacts, NOT interference fits. Zero volume
 # permits a reported coincidence but no unmeasured kernel sliver allowance.
 _KNIFE_HANGER_SEAT_OVERLAP_LIMIT = 0.0
@@ -63,7 +63,7 @@ ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
     # Spring/support contact has no allowance and remains independently gated.
     frozenset(("sm-vn-gooseneck-shoulder-screw-1", "sm-gooseneck-1")): (
         smooth_annulus_limit_mm3(
-            THREAD_MAJOR_MM["1/4-20"], TAP_DRILL_MM["1/4-20"], _GOOSENECK_THREAD_LENGTH
+            THREAD_MAJOR_MM["#10-24"], TAP_DRILL_MM["#10-24"], _GOOSENECK_THREAD_LENGTH
         )
     ),
     # The washer on the shoulder under the head: face and bore contacts, no

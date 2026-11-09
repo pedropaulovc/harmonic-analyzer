@@ -33,7 +33,7 @@ from _supplier_unbanded import assert_supplier_screw_unbanded
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["sm_vn_gooseneck_shoulder_screw"]
-ITEM = "ALLOY STEEL SHOULDER SCREW, 5/16 X 3/8, 1/4-20"
+ITEM = "ALLOY STEEL SHOULDER SCREW, 1/4 X 3/8, 10-24"
 # The dimensioned Right view needs the standard layout's taller row; the
 # undimensioned Top takes the shorter cell.
 VIEW_LAYOUT = "standard"

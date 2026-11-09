@@ -1,20 +1,26 @@
 """MHA-SM-VN-57: purchased washer under the MHA-SM-VN-56 shoulder screw's head.
 
 Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: a thin washer under the
-91259A576 head, on its 5/16 shoulder, keeps the counter spring's upper eye
-(Ø.374 ID) from passing the Ø7/16 head.
+shoulder screw's head, on its 1/4 shoulder, keeps the counter spring's upper
+eye (Ø.374 ID) from passing the Ø3/8 head.  SKU auto-selected after the
+owner's ask timed out, pending owner confirmation (with the screw's
+91259A535).
 
-Source: https://www.mcmaster.com/98126A907/, read live 2026-11-08; page-stated
-fields only: 18-8 stainless steel ring shim, ASTM A240, round, for round
-shafts, unpassivated, Rockwell B70 min; ID 5/16 (0 to +.011), OD 1/2
-(-.002 to +.002), thickness .030 (-.002 to +.002); $8.48 per pack of 10.
+Source: https://www.mcmaster.com/93475A250/, read live 2026-11-08; page-stated
+fields only: 18-8 stainless steel general purpose washer for M6, DIN 125; ID
+6.4 mm, OD 12.0 mm, thickness 1.4 to 1.8 mm; $6.19 per pack of 100.  The page
+states no ID or OD tolerance: DIN 125-1 / ISO 7089 (product grade A) gives
+M6 ID 6.40-6.62 and OD 11.57-12.00 (the standard's table as listed at
+https://www.aspenfasteners.com/m6-din-125-type-a-iso-7089-7090-metric-standard-flat-washers-a4-stainless-steel/,
+read 2026-11-08).
 
-Selected on the same date over the same 5/16 x 1/2 family's 99040A616 (.016,
-OD +/-.005, so .505 MAX over the end piece's Ø.50) and 98126A906 (.020): the
-.030 ring is the stiffest of the thin rows with the tighter OD band; and over
-94773A686/94773A743 (shoulder-screw shims, OD 7/16), whose .432 MIN OD keeps
-only .74 of the eye.  The fit and retention arithmetic is
-``sm_gooseneck_spring_joint``'s.
+Selected on the same date for the window the joint needs: the bore must
+pass the Ø.248 MAX shoulder and stay under the head (B18.3 Ø.357 MIN), and
+the OD must keep 1.0 of the eye (OD MIN .453) yet stay clear of the counter
+spring's leading half-turn (OD MAX about .476).  DIN 125 M6's 11.57-12.00
+(.4555-.4724) sits inside that window, its bore over the shoulder; the
+98126A907 ring shim first drafted (OD .498 MIN) meets the half-turn.
+The fit and retention arithmetic is ``sm_gooseneck_spring_joint``'s.
 
 Model: the nominal supplied annulus, datasheet-built (no vendor STEP).  Bands
 are (upper, lower) deviations, mm.  Frame: axis +Z; origin at the bottom
@@ -25,21 +31,20 @@ the screw's spec; the drawing test proves ``UNIT`` against the row.
 from __future__ import annotations
 
 PART_NAME = "sm-vn-gooseneck-shoulder-washer"
-UNIT = "in"
-INCH = 25.4
+UNIT = "mm"
 
-SKU = "98126A907"
-CATALOG_URL = "https://www.mcmaster.com/98126A907/"
+SKU = "93475A250"
+CATALOG_URL = "https://www.mcmaster.com/93475A250/"
 CATALOG_CHECKED_DATE = "2026-11-08"
 QUANTITY = 1
 AXIS_NAME = "ScrewAxis"
 
-ID = 5.0 / 16.0 * INCH
-ID_BAND = (0.011 * INCH, 0.0)
-OD = 0.500 * INCH
-OD_BAND = (0.002 * INCH, -0.002 * INCH)
-THICKNESS = 0.030 * INCH
-THICKNESS_BAND = (0.002 * INCH, -0.002 * INCH)
+ID = 6.4
+ID_BAND = (0.22, 0.0)  # ISO 7089 grade A, M6: 6.40-6.62
+OD = 12.0
+OD_BAND = (0.0, -0.43)  # ISO 7089 grade A, M6: 11.57-12.00
+THICKNESS = 1.6
+THICKNESS_BAND = (0.2, -0.2)  # the page's 1.4 to 1.8 mm
 LENGTH = THICKNESS
 
 ID_MIN = ID + ID_BAND[1]
@@ -63,17 +68,17 @@ SUPPLIER_REFERENCE_STARTS = {
 SUPPLIER_REFERENCE_PLANES = {"SupplierOuterDiameter": "Top", "SupplierThickness": "Top"}
 # Supplier sizes print as untoleranced REF; the catalogue band governs.
 SUPPLIER_REFERENCE_FORMATS = {
-    "SupplierOuterDiameter": (3, "diameter", None, "OUTSIDE"),
-    "SupplierThickness": (3, "length", None, "THICKNESS"),
+    "SupplierOuterDiameter": (1, "diameter", None, "OUTSIDE"),
+    "SupplierThickness": (1, "length", None, "THICKNESS"),
 }
 SUPPLIER_REFERENCE_SIDES = {"SupplierOuterDiameter": "bottom", "SupplierThickness": "right"}
-SUPPLIER_REFERENCE_UNITS = {"SupplierOuterDiameter": "in", "SupplierThickness": "in"}
+SUPPLIER_REFERENCE_UNITS = {"SupplierOuterDiameter": "mm", "SupplierThickness": "mm"}
 # The bore is the ring profile's own bore-circle diameter, printed on the
 # Front (end) view's visible bore circle: the edge-on Top view shows no bore.
 BORE_FEATURE = "RingProfile"
 BORE_DIMENSION = "SupplierBoreDiameter"
-BORE_FORMAT = (3, "diameter", None, "BORE")
+BORE_FORMAT = (1, "diameter", None, "BORE")
 SUPPLIER_DATA = (
-    "18-8 STAINLESS RING SHIM, ASTM A240.",
-    "ID .3125-.3235, OD .498-.502, THICKNESS .028-.032.",
+    "18-8 STAINLESS FLAT WASHER FOR M6, DIN 125.",
+    "ID 6.40-6.62, OD 11.57-12.00, THICKNESS 1.4-1.8 (ISO 7089 GRADE A).",
 )

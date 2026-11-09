@@ -14,7 +14,7 @@ step, in a solid Ø.500 end piece silver-brazed on a shank inside the tube.  A
 5/8 in x 0.058 in 4130-N seamless sleeve (OnlineMetals 7324), select-fitted
 from stock and brazed both ends, covers the leg from its foot: the post the
 top frame's Ø17 hub bore takes.  Owner ruling 2026-11-08 (Pedro), #2144 item
-11.4: the end piece takes a plain 1/4-20 UNC blind tap for the purchased
+11.4: the end piece takes a plain #10-24 UNC blind tap for the purchased
 MHA-SM-VN-56 shoulder screw, with no counterbore, position frames or datums;
 its axis carries the title block's implied-zero coaxial offset.
 

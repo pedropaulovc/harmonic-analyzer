@@ -161,7 +161,7 @@ class CounterScrewDiameterTests(unittest.TestCase):
             ),
             # #2144 item 11.4: the eye rides on the purchased screw's shoulder.
             "shoulder_screw_shoulder": (
-                types.SimpleNamespace(MAJOR_DIA=6.35, SHOULDER_DIA=7.9375), 7.9375
+                types.SimpleNamespace(MAJOR_DIA=4.826, SHOULDER_DIA=6.35), 6.35
             ),
         }
         for name, (screw, expected) in cases.items():

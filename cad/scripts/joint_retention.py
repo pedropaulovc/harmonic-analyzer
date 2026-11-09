@@ -619,7 +619,6 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "ch_vn_fulcrum_set_screw",  # #1-72 UNF x 5/32 cup-point set screw (McMaster 91375A942, MHA-CH-VN-55), member: x2, one into each fulcrum_keeper crown tap
         "sm_gooseneck",  # receiver: plain blind-tapped solid end piece brazed into the 1/2 in tube arm (#2144 item 11.4); its sleeve is the post gripped by the frame's set screw
         "sm_vn_gooseneck_shoulder_screw",  # purchased MHA-SM-VN-56 shoulder screw, member: seated on the gooseneck end face; the counter-spring upper eye rides free on its shoulder
-        "sm_vn_gooseneck_shoulder_washer",  # MHA-SM-VN-57 washer on the shoulder under the head, retains the upper eye; no thread
         "fr_vn_gooseneck_set_screw",  # 1/4-20 UNC x 3/4 square-head cup point (91410A540), member: into top_frame hub boss tap, grips summing gooseneck
         "pd_vn_guide_lock_screw",  # #4-40 slotted pan head (McMaster 91792A108, MHA-PD-VN-60, R9-31), member: 8 into the platen_guide rear through taps
         "pn_vn_hanger_screw",  # #8-32 UNC x 1 hex head (McMaster 93075A199), member through the pen-hanger strap's clearance hole into the hanger nut and jam nut
@@ -708,6 +707,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "dt_vn_keeper_chain_link",  # snap loop link
         "sm_vn_knife_mount_dowel",  # MHA-SM-VN-53 1/8 dowels, two pressed into the crossbar's blind underside reams per knife mount, slip in the knife mount's round hole and slot
         "sm_vn_knife_hanger_washer",  # new 18-8 SAE washer (McMaster 96659A104), hex-head bearing on the faced crossbar top; no thread
+        "sm_vn_gooseneck_shoulder_washer",  # MHA-SM-VN-57 washer loose on the shoulder under the head, retains the upper eye (#2144 item 11.4); no thread
         "pd_latch_hook",  # MHA-PD-14 formed spring-steel hook: screw holes drilled thru, latch-pin hole match-drilled at assembly; no thread
         "sh_vn_music_wire",  # LeverWire and PenWire members, wrapped/tied, no thread
         "mg_magnifying_wheel",  # reamed .1890 running bore + two Ø1 wire-tie holes; no thread
@@ -776,6 +776,7 @@ UNTHREADED_STOCK: dict[str, str] = {
     "dt_vn_keeper_chain_link": "plain chain link",
     "sm_vn_knife_mount_dowel": "dowel pin pressed into a blind reamed hole",
     "sm_vn_knife_hanger_washer": "plain SAE washer under the knife-hanger hex head; no thread",
+    "sm_vn_gooseneck_shoulder_washer": "plain washer loose on the gooseneck shoulder screw under its head (#2144 item 11.4); no thread",
     "dt_vn_pinion_strap_pin": "slotted spring pin pressed into a plain hole",
     "pd_vn_transgear_knob_drive_pin": "dowel pin pressed into a plain hole",
     "pd_vn_transgear_knob_cup_pin": "slotted spring pin in a hole match-drilled at assembly",

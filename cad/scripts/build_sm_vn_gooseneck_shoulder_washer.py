@@ -1,6 +1,6 @@
 """Build purchased MHA-SM-VN-57, the washer under the gooseneck shoulder screw's head.
 
-Datasheet-built nominal annulus (McMaster 98126A907), as the oblique
+Datasheet-built nominal annulus (McMaster 93475A250), as the oblique
 trammel's pivot shim (build_ch_rocker_arm_tl_vn_oblique_pivot_shim): no vendor
 CAD, and no unreported edge form is inferred.  Axis +Z, origin on the bottom
 face.  Supplier sizes are model-owned, untoleranced construction references

@@ -421,11 +421,11 @@ def test_cross_numbered_fit_pairs_use_fixed_runtime_oracles() -> None:
             frozenset(("sm-vn-boss-hook-1", "sm-summing-lever-1")): _annulus_limit(
                 4.826, 3.797, 19.05
             ),
-            # MHA-SM-VN-56 1/4-20 major in the #7 drill of the blind end-piece
-            # tap: the shoulder seats on the end face, so the whole 7/16
+            # MHA-SM-VN-56 10-24 major in the #25 drill of the blind end-piece
+            # tap: the shoulder seats on the end face, so the whole 3/8
             # thread stands in the tap (#2144 item 11.4).
             frozenset(("sm-vn-gooseneck-shoulder-screw-1", "sm-gooseneck-1")): _annulus_limit(
-                6.35, 5.105, 11.1125
+                4.826, 3.797, 9.525
             ),
             frozenset(
                 ("sm-vn-gooseneck-shoulder-screw-1", "sm-vn-gooseneck-shoulder-washer-1")
@@ -596,9 +596,9 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(("sm-vn-boss-hook-1", "sm-summing-lever-1")): _annulus_limit(
                 4.826, 3.797, 19.05
             ),
-            # MHA-SM-VN-56 1/4-20 major, #7 drill, 7/16 thread seated (#2144 item 11.4).
+            # MHA-SM-VN-56 10-24 major, #25 drill, 3/8 thread seated (#2144 item 11.4).
             frozenset(("sm-vn-gooseneck-shoulder-screw-1", "sm-gooseneck-1")): _annulus_limit(
-                6.35, 5.105, 11.1125
+                4.826, 3.797, 9.525
             ),
             frozenset(
                 ("sm-vn-gooseneck-shoulder-screw-1", "sm-vn-gooseneck-shoulder-washer-1")

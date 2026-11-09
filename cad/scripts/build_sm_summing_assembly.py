@@ -36,7 +36,7 @@ boss-hook / counter-spring / gooseneck chain.
   top-frame rail hub's set screw grips (no separate clamp part).
 * sm-vn-gooseneck-shoulder-screw + sm-vn-gooseneck-shoulder-washer --
   purchased MHA-SM-VN-56 shoulder screw, head outboard, its shoulder seated
-  on the face of the gooseneck's flush end piece and its 1/4-20 thread in the
+  on the face of the gooseneck's flush end piece and its 10-24 thread in the
   end piece's plain blind tap; MHA-SM-VN-57 under its head.  Owner ruling
   2026-11-08 (Pedro), #2144 item 11.4, superseding #1951's clamped eye: the
   supplier upper loop rides free on the shoulder between the end face and

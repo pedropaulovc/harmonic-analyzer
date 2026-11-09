@@ -219,18 +219,19 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "90760A140",
     ),
     # Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: the counter spring's
-    # upper eye rides free on this shoulder screw's 5/16 shoulder, seated on
-    # the MHA-SM-01 end face, under the MHA-SM-VN-57 washer.
+    # upper eye rides free on this shoulder screw's 1/4 shoulder, seated on
+    # the MHA-SM-01 end face, under the MHA-SM-VN-57 washer.  Both SKUs were
+    # auto-selected after the owner's ask timed out, pending owner confirmation.
     "sm-vn-gooseneck-shoulder-screw": _stock(
         "sm-vn-gooseneck-shoulder-screw",
-        "Alloy Steel Shoulder Screw, 5/16 x 3/8 in Shoulder, 1/4-20",
-        "91259A576",
+        "Alloy Steel Shoulder Screw, 1/4 x 3/8 in Shoulder, 10-24",
+        "91259A535",
         material="Alloy Steel",
     ),
     "sm-vn-gooseneck-shoulder-washer": _stock(
         "sm-vn-gooseneck-shoulder-washer",
-        "18-8 Stainless Steel Ring Shim, 5/16 in ID x 1/2 in OD x .030 in",
-        "98126A907",
+        "18-8 Stainless Steel Washer for M6, 6.4 mm ID x 12.0 mm OD x 1.6 mm",
+        "93475A250",
         material="AISI 304",
     ),
     # The four platen-clip screws: brass #2-56 x 1/4, whose head stays inside

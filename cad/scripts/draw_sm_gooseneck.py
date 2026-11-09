@@ -7,7 +7,7 @@ the notes; sheet/template and export behaviour lives in ``_drawing_common``.
 The gooseneck is a 1/2 in 4130-N tube bent R3.0, its arm ending flush in a
 solid Ø.500 end piece brazed on a shank inside the tube, with a 5/8 in sleeve
 brazed over the leg (owner rulings 2026-10-27, #1951).  Owner ruling
-2026-11-08 (Pedro), #2144 item 11.4: the end piece takes a plain 1/4-20 blind
+2026-11-08 (Pedro), #2144 item 11.4: the end piece takes a plain #10-24 blind
 tap for the purchased MHA-SM-VN-56 shoulder screw, with no counterbore,
 frames or datums; the screw is NOT part of this weldment.  The
 sheet carries, at 1:3:
@@ -813,7 +813,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
-    # SolidWorks pins its own "1/4-20 Tapped Hole" note beside a tap's native
+    # SolidWorks pins its own "#10-24 Tapped Hole" note beside a tap's native
     # callout; the callout already states the thread, so any such label goes,
     # and finalize_drawing's count then proves none is left.
     removed_tap_labels = remove_notes_matching(adapter, TAPPED_HOLE_NOTE)

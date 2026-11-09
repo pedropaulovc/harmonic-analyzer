@@ -2,7 +2,8 @@
 
 Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: a thin washer under the
 MHA-SM-VN-56 shoulder screw's head retains the counter spring's free upper
-eye (McMaster 98126A907, read live 2026-11-08).
+eye (McMaster 93475A250, DIN 125 M6, read live 2026-11-08; auto-selected
+after the owner's ask timed out, pending owner confirmation).
 """
 from __future__ import annotations
 
@@ -36,13 +37,13 @@ def test_native_section_is_the_nominal_washer(monkeypatch):
     adapter = SimpleNamespace(
         create_sketch=AsyncMock(), exit_sketch=AsyncMock(), create_extrusion=AsyncMock(),
     )
-    asyncio.run(part._ring(adapter, "Ring", 12.7, 7.9375, 0.762))
+    asyncio.run(part._ring(adapter, "Ring", 12.0, 6.4, 1.6))
     adapter.create_sketch.assert_awaited_once_with("Front")
     assert [call.args[1:4] for call in circles.await_args_list] == [
-        (0.0, 0.0, 6.35), (0.0, 0.0, 3.96875)
+        (0.0, 0.0, 6.0), (0.0, 0.0, 3.2)
     ]
     extrusion = adapter.create_extrusion.call_args.args[0]
-    assert extrusion.depth == 0.762
+    assert extrusion.depth == 1.6
     assert not extrusion.reverse_direction
 
 
@@ -59,16 +60,17 @@ def test_catalogue_and_current_identity():
     assert row["material"] == stock.material == part.MATERIAL
     assert row["quantity"] == spec.QUANTITY == 1
     # #290: the sheet prints the registry row's drawing unit.
-    assert row["drawing_unit"] == spec.UNIT == "in"
+    assert row["drawing_unit"] == spec.UNIT == "mm"
 
 
 def test_supplier_dimensions_and_physical_contract():
-    inch = 25.4
-    assert spec.SKU == "98126A907"
-    assert (spec.ID, spec.OD, spec.THICKNESS) == pytest.approx((0.3125 * inch, 0.5 * inch, 0.030 * inch))
-    assert (spec.ID_MIN, spec.ID_MAX) == pytest.approx((0.3125 * inch, 0.3235 * inch))
-    assert (spec.OD_MIN, spec.OD_MAX) == pytest.approx((0.498 * inch, 0.502 * inch))
-    assert (spec.THICKNESS_MIN, spec.THICKNESS_MAX) == pytest.approx((0.028 * inch, 0.032 * inch))
+    assert spec.SKU == "93475A250"
+    assert (spec.ID, spec.OD, spec.THICKNESS) == pytest.approx((6.4, 12.0, 1.6))
+    # ISO 7089 grade A, M6 (the page states no ID/OD tolerance); the page's
+    # thickness range.
+    assert (spec.ID_MIN, spec.ID_MAX) == pytest.approx((6.40, 6.62))
+    assert (spec.OD_MIN, spec.OD_MAX) == pytest.approx((11.57, 12.00))
+    assert (spec.THICKNESS_MIN, spec.THICKNESS_MAX) == pytest.approx((1.4, 1.8))
     # The washer slides on the largest shoulder and the head covers its bore.
     assert spec.ID_MIN > screw.SHOULDER_DIA + max(screw.SHOULDER_DIA_BAND)
     assert screw.HEAD_DIA_MIN > spec.ID_MAX
@@ -84,13 +86,13 @@ def test_native_supplier_witness_inventory():
         assert value > 0
         assert spec.SUPPLIER_REFERENCE_PLANES[name] == "Top"
         assert orientation == ("vertical" if name == "SupplierThickness" else "horizontal")
-        assert spec.SUPPLIER_REFERENCE_UNITS[name] == "in"
+        assert spec.SUPPLIER_REFERENCE_UNITS[name] == "mm"
     assert spec.SUPPLIER_REFERENCE_STARTS == {
         "SupplierOuterDiameter": (-spec.OD / 2.0, -spec.THICKNESS),
         "SupplierThickness": (spec.OD / 2.0, -spec.THICKNESS),
     }
     assert spec.BORE_FEATURE == "RingProfile" and spec.BORE_DIMENSION not in names
-    assert spec.BORE_FORMAT == (3, "diameter", None, "BORE")
+    assert spec.BORE_FORMAT == (1, "diameter", None, "BORE")
 
 
 def test_build_uses_contract_dimensions_and_publishes_z_axis(monkeypatch):

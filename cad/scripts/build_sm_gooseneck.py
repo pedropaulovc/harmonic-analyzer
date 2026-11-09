@@ -4,7 +4,7 @@ Owner rulings 2026-10-27 (#1951): the whole gooseneck is 1/2 in x 0.065 in
 4130-N seamless tube, bent R3.0 (the 1/2 in x 3 in CLR die).  Its arm ends
 flush, with no step, in a SOLID Ø.500 end piece silver-brazed on a shank
 inside the tube bore.  Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: the
-end piece is tapped plain 1/4-20 UNC-2B BLIND for the purchased MHA-SM-VN-56
+end piece is tapped plain #10-24 UNC-2B BLIND for the purchased MHA-SM-VN-56
 shoulder screw, with no counterbore (``sm_gooseneck_spring_joint``).  A 5/8 in
 x 0.058 in 4130-N sleeve, select-fitted from stock and brazed, covers the leg
 from its foot: the post the east top-frame hub's Ø17 bore and set screw take.

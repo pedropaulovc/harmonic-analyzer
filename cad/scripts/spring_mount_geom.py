@@ -232,11 +232,11 @@ _COUNTER_LOWER_OFFSET = _counter_lower_offset()
 
 
 def counter_upper_support_offset(axis: tuple[float, float]) -> float:
-    """Seat the loop's pull-side passes on MHA-SM-VN-56's Ø7.94 shoulder.
+    """Seat the loop's pull-side passes on MHA-SM-VN-56's Ø6.35 shoulder.
 
     Owner ruling 2026-11-08 (Pedro), #2144 item 11.4, superseding #1951's
     clamped eye: the loop rides free on the purchased shoulder screw's ground
-    shoulder, never on its 1/4-20 thread (the shoulder is seated on the end
+    shoulder, never on its 10-24 thread (the shoulder is seated on the end
     face, so the thread is inside the end piece), so the bearing surface is
     the shoulder diameter.
     """

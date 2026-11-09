@@ -46,7 +46,7 @@ recipes:
 | 91251A197 | `ch-rocker-arm-tl-vn-oblique-rail-screw` (MHA-CH-06-TL-VN-61, 19 in the final A″ stack: 16 rail + 3 CL/CR/HUB clamps; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
 | 91251A541 | — (retired TL-VN-68, 2026-11-07: the CR clamp takes the common 91251A197; catalogue-only diagnostic removed) | Socket Head Screw |
 | 91251A583 | `ch-rocker-arm-tl-vn-oblique-lever-screw` (MHA-CH-06-TL-VN-69; shop fixture; catalogue-only, product page login-walled, the 7/8 in sibling's vendor model read for dimensions, not replica-gated) | Socket Head Screw |
-| 91259A576 | `sm-vn-gooseneck-shoulder-screw` (MHA-SM-VN-56; catalogue-only, no vendor model) | Alloy Steel Shoulder Screw, 5/16" Shoulder × 3/8", 1/4"-20 Thread |
+| 91259A535 | `sm-vn-gooseneck-shoulder-screw` (MHA-SM-VN-56; catalogue-only, no vendor model) | Alloy Steel Shoulder Screw, 1/4" Shoulder × 3/8", 10-24 Thread |
 | 91812A215 | — (retired TL-VN-70, 2026-10-23; jig-only diagnostic recipe removed) | Extreme-Vibration-Resistant Wedge Lock Washer |
 | 91812A230 | `ch-rocker-arm-tl-vn-oblique-lever-washer` (MHA-CH-06-TL-VN-71; shop fixture; catalogue-only, product page login-walled, no vendor model) | Extreme-Vibration-Resistant Wedge Lock Washer |
 | 90323A492 | — (retired TL-VN-77 source, 2026-10-31; now Huyett BLTS40-0375-1500188P, issue #290) | 18-8 Precision Shoulder Screw, Ø10 × 35, metric thread |
@@ -92,6 +92,7 @@ recipes:
 | 92916A480 | `mg-vn-wheel-axle-back-washer` (catalogue-only; no vendor model) | Brass Washer for Number 10 Screw Size |
 | 93075A194 | — (diagnostic recipe; `pn-vn-hanger-screw` until the 2026-10-14 through-strap nut stack) | Low-Strength Zinc-Plated Steel Hex Head Screw |
 | 93075A199 | `pn-vn-hanger-screw` | Low-Strength Zinc-Plated Steel Hex Head Screw |
+| 93475A250 | `sm-vn-gooseneck-shoulder-washer` (MHA-SM-VN-57; catalogue-only, no vendor model) | 18-8 Stainless Steel General Purpose Washer for M6, 6.4 mm ID, 12.0 mm OD |
 | 93585A190 | `dt-vn-cone-lock-knob` | Stainless Steel High-Profile Knurled-Head Thumb Screw |
 | 94025A150 | — (diagnostic recipe; `dt-vn-cone-tip-adjuster` until drawing-guidelines.md rule 18 (thread engagement) E11) | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
 | 94025A164 | `dt-vn-cone-tip-adjuster` | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
@@ -103,7 +104,6 @@ recipes:
 | 9715K43 | `pd-vn-transgear-pivot-spring` (catalogue-only; no vendor model) | Curved Disc Spring |
 | 97431A240 | `pd-vn-transgear-retaining-ring` (catalogue-only; CAD download refused) | Side-Mount External Retaining Ring |
 | 97431A260 | — (retired 2026-10-31, #290: the 1/8 in pin takes 97431A240; replica recipe removed) | Side-Mount External Retaining Ring |
-| 98126A907 | `sm-vn-gooseneck-shoulder-washer` (MHA-SM-VN-57; catalogue-only, no vendor model) | 18-8 Stainless Steel Ring Shim, 5/16" ID × 1/2" OD × .030" |
 | 98296A026 | — (diagnostic recipe; former `vn-transgear-collar-cross-pin`, MHA-VN-037 retired) | 1050-1095 Spring Steel Slotted Spring Pin |
 | 98296A027 | `dt-vn-pinion-strap-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
 | 98296A031 | `pd-vn-transgear-knob-cup-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
@@ -1112,25 +1112,30 @@ Catalog specifications checked on September 10, 2026:
   R3 proved the prior native joint geometry and assembly soundness; the
   revised datum and machinist-driven sheet edits require a fresh scoped
   native proof and sheet review before they are reported verified.
-- [91259A576](https://www.mcmaster.com/91259A576/) supplies the new
+- [91259A535](https://www.mcmaster.com/91259A535/) supplies the new
   `sm-vn-gooseneck-shoulder-screw`, **MHA-SM-VN-56**, one, and
-  [98126A907](https://www.mcmaster.com/98126A907/) the new
+  [93475A250](https://www.mcmaster.com/93475A250/) the new
   `sm-vn-gooseneck-shoulder-washer`, **MHA-SM-VN-57**, one (owner ruling
-  2026-11-08 (Pedro), #2144 item 11.4). They replace the shop-turned
-  MHA-SM-04 clamp screw, whose Number is retired and never reissued. The
-  shoulder seats on MHA-SM-01's end face in a plain blind 1/4-20 tap; the
-  counter spring's upper eye rides free on the shoulder under the washer,
-  superseding #1951's clamped eye. Live on 2026-11-08, 91259A576: alloy
-  steel, black oxide, Rockwell C32; shoulder Ø.3125 −.002/−.004 × .375
-  ±.005; 1/4-20 UNC-3A thread 7/16 long; head Ø7/16 × 7/32; 5/32 hex key.
-  The head's least Ø .419 and the thread and shoulder necks come from
-  ASME B18.3's 5/16 row, not the product page. Live on 2026-11-08,
-  98126A907: 18-8 stainless ring shim, ASTM A240; ID .3125 +.011/0, OD
-  .500 ±.002, thickness .030 ±.002, Rockwell B70; $8.48 per pack of 10.
-  No vendor CAD download, hash or measured vendor geometry is claimed. The
-  shoulder-Ø choice is open with the owner: the 5/16 shoulder drops the
-  arm against the plumb spring by 0.794 mm and the 1/2 OD washer reaches
-  the half-turn (see the #2144 item 11.4 thread).
+  2026-11-08 (Pedro), #2144 item 11.4; both SKUs auto-selected after the
+  owner's ask timed out, pending owner confirmation). They replace the
+  shop-turned MHA-SM-04 clamp screw, whose Number is retired and never
+  reissued. The shoulder seats on MHA-SM-01's end face in a plain blind
+  #10-24 tap; the counter spring's upper eye rides free on the shoulder under
+  the washer, superseding #1951's clamped eye. The ruling named 91259A576
+  (5/16 shoulder); its Ø7.94 shoulder drops the arm 0.794 mm against the
+  plumb spring and the leading half-turn then meets the tube, so the 1/4
+  shoulder keeps the retired screw's Ø6.35 support. Live on 2026-11-08,
+  91259A535: alloy steel, black oxide, Rockwell C32; shoulder Ø.250
+  −.002/−.004 × .375 ±.005; 10-24 UNC-3A thread 3/8 long; head Ø3/8 × 3/16;
+  1/8 hex key; $3.48 each. The head's least Ø .357 and the thread and
+  shoulder necks come from ASME B18.3's 1/4 row, not the product page. Live
+  on 2026-11-08, 93475A250: 18-8 stainless general purpose washer for M6,
+  DIN 125; ID 6.4, OD 12.0, thickness 1.4 to 1.8 mm; $6.19 per pack of 100.
+  The page states no ID/OD tolerance; ISO 7089 grade A gives 6.40–6.62 and
+  11.57–12.00. That OD keeps at least 1.04 of the Ø.374 eye yet stays clear
+  of the leading half-turn (the 98126A907 1/2 OD ring shim first drafted
+  meets it). No vendor CAD download, hash or measured vendor geometry is
+  claimed.
 - [91255A106](https://www.mcmaster.com/91255A106/) (`pd-vn-guide-lock-screw`,
   MHA-PD-VN-60, eight) holds the four guide locks to the platen guides per ruling
   R9-31 (September 30, 2026): these screws ride the platen, and the MHA-SH-VN-51 (then MHA-PD-VN-52)

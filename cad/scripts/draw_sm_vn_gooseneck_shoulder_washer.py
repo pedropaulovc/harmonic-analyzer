@@ -30,7 +30,7 @@ from _supplier_unbanded import assert_supplier_screw_unbanded
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["sm_vn_gooseneck_shoulder_washer"]
-ITEM = "18-8 SS RING SHIM, 5/16 X 1/2, .030 THICK"
+ITEM = "18-8 SS FLAT WASHER, M6, 6.4 X 12.0 X 1.6, DIN 125"
 # The OD and thickness texts shelve past their own outer witnesses, clear of
 # the lines: the OD on the Top's bottom lane, left of the thin strip so the
 # thickness text beside it on the right stays clear of it. The bore is
@@ -46,7 +46,7 @@ SUPPLIER_MARGINS = {
 }
 BORE = part.BORE_DIMENSION
 _BORE_REFERENCE = {
-    "label": f"{BORE}@{part.BORE_FEATURE}", "units": "in", "precision": part.BORE_FORMAT[0],
+    "label": f"{BORE}@{part.BORE_FEATURE}", "units": part.UNIT, "precision": part.BORE_FORMAT[0],
     "expected_mm": part.ID, "presentation": part.BORE_FORMAT[1], "callout": part.BORE_FORMAT[3],
 }
 

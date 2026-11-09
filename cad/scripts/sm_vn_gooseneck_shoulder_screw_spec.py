@@ -1,23 +1,27 @@
 """MHA-SM-VN-56: purchased gooseneck counter-spring shoulder screw.
 
-Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: option A, McMaster
-91259A576, the counter spring's upper eye riding free on its 5/16 shoulder
+Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: option A, a purchased
+shoulder screw, the counter spring's upper eye riding free on its shoulder
 under a thin washer (MHA-SM-VN-57), the shoulder end seated on the MHA-SM-01
-end face and the 1/4-20 thread in that end piece's plain blind tap.  This
-supersedes #1951's clamped eye and retires the made MHA-SM-04.
+end face and the thread in that end piece's plain blind tap.  This supersedes
+#1951's clamped eye and retires the made MHA-SM-04.  The ruling named
+91259A576 (5/16 shoulder); its Ø7.94 shoulder drops the arm 0.79 mm against
+the plumb spring and the leading half-turn then meets the tube.  SKU
+91259A535 (1/4 shoulder, the retired screw's Ø6.35 support) was
+auto-selected after the owner's ask timed out, pending owner confirmation.
 
-Source: https://www.mcmaster.com/91259A576/, read live 2026-11-08; page-stated
+Source: https://www.mcmaster.com/91259A535/, read live 2026-11-08; page-stated
 fields only: alloy steel shoulder screw, black oxide, Rockwell C32, ASME
-B18.3, standard shoulder fit; shoulder Ø5/16 (-.004 to -.002), shoulder length
-3/8 (-.005 to +.005); 1/4-20 UNC, Class 3A, thread length 7/16; head Ø7/16 x
-7/32 high, knurled; 5/32 hex drive; $3.65 each.
+B18.3, standard shoulder fit; shoulder Ø1/4 (-.004 to -.002), shoulder length
+3/8 (-.005 to +.005); 10-24 UNC, Class 3A, thread length 3/8; head Ø3/8 x
+3/16 high, knurled; 1/8 hex drive; $3.48 each.
 
 The page states no thread-neck or under-head forms.  The joint budgets
 (``sm_gooseneck_spring_joint``) take them from the ASME B18.3 socket head
-shoulder screw table the page cites (5/16 nominal row, as tabulated in
+shoulder screw table the page cites (1/4 nominal row, as tabulated in
 https://www.nutty.com/content/product-pdfs/socket_shoulder_bolt.pdf, read
-2026-11-08): thread neck width .100, shoulder (under-head) neck Ø .289 MIN x
-.093 MAX wide, head fillet transition Ø .345 MAX, head Ø .419 MIN.
+2026-11-08): thread neck width .083, shoulder (under-head) neck Ø .227 MIN x
+.093 MAX wide, head fillet transition Ø .276 MAX, head Ø .357 MIN.
 
 Model: the nominal supplied envelope, datasheet-built (no vendor STEP): the
 shoulder, the head and the thread as plain cylinders at the page's sizes; the
@@ -36,36 +40,36 @@ PART_NAME = "sm-vn-gooseneck-shoulder-screw"
 UNIT = "in"
 INCH = 25.4
 
-SKU = "91259A576"
-CATALOG_URL = "https://www.mcmaster.com/91259A576/"
+SKU = "91259A535"
+CATALOG_URL = "https://www.mcmaster.com/91259A535/"
 CATALOG_CHECKED_DATE = "2026-11-08"
 QUANTITY = 1
 AXIS_NAME = "ScrewAxis"
 
-SHOULDER_DIA = 5.0 / 16.0 * INCH  # 5/16 basic
+SHOULDER_DIA = 0.250 * INCH  # 1/4 basic
 SHOULDER_DIA_BAND = (-0.002 * INCH, -0.004 * INCH)
 SHOULDER_LENGTH = 0.375 * INCH  # 3/8
 SHOULDER_LENGTH_BAND = (0.005 * INCH, -0.005 * INCH)
-THREAD = "1/4-20"
+THREAD = "#10-24"  # the _hole_spec key; the page and sheets print 10-24
 THREAD_SIZE = THREAD  # the receiver's HoleSpec size
 THREAD_CLASS = "3A"
-MAJOR_DIA = 0.250 * INCH
-PITCH = INCH / 20.0
-THREAD_LENGTH = 7.0 / 16.0 * INCH  # from the shoulder end face to the tip
-HEAD_DIA = 7.0 / 16.0 * INCH
-HEAD_HEIGHT = 7.0 / 32.0 * INCH
-HEX = 5.0 / 32.0 * INCH
+MAJOR_DIA = 0.190 * INCH
+PITCH = INCH / 24.0
+THREAD_LENGTH = 0.375 * INCH  # 3/8, from the shoulder end face to the tip
+HEAD_DIA = 0.375 * INCH  # 3/8
+HEAD_HEIGHT = 3.0 / 16.0 * INCH
+HEX = 0.125 * INCH  # 1/8
 LENGTH = SHOULDER_LENGTH + HEAD_HEIGHT
 
-# ASME B18.3 (5/16 nominal row), the standard the page cites; module docstring.
-THREAD_NECK_WIDTH_MAX = 0.100 * INCH
-SHOULDER_NECK_DIA_MIN = 0.289 * INCH
+# ASME B18.3 (1/4 nominal row), the standard the page cites; module docstring.
+THREAD_NECK_WIDTH_MAX = 0.083 * INCH
+SHOULDER_NECK_DIA_MIN = 0.227 * INCH
 SHOULDER_NECK_WIDTH_MAX = 0.093 * INCH
-HEAD_FILLET_TRANSITION_DIA_MAX = 0.345 * INCH
-HEAD_DIA_MIN = 0.419 * INCH
+HEAD_FILLET_TRANSITION_DIA_MAX = 0.276 * INCH
+HEAD_DIA_MIN = 0.357 * INCH
 
 if not HEAD_DIA > SHOULDER_DIA > MAJOR_DIA:
-    raise AssertionError("91259A576 is not stepped head > shoulder > thread")
+    raise AssertionError("91259A535 is not stepped head > shoulder > thread")
 
 # The sheet dimensions the screw on its RIGHT view, axis horizontal as it lies
 # in the lathe (as MHA-CH-06-TL-VN-77's).  The diameters and the shoulder
@@ -91,8 +95,8 @@ REFERENCE_FORMATS = {
     "SupplierShoulderLength": (3, "length", None, None),
     "SupplierHeadDiameter": (3, "diameter", None, "HEAD"),
 }
-THREAD_NOTE = f"{THREAD} UNC-{THREAD_CLASS}\n(AS SUPPLIED)"
+THREAD_NOTE = f"{THREAD.lstrip('#')} UNC-{THREAD_CLASS}\n(AS SUPPLIED)"
 SUPPLIER_DATA = (
-    "SHOULDER Ø.3085-.3105 X .370-.380; HEAD Ø.438 X .219; 5/32 HEX KEY.",
-    "1/4-20 UNC-3A, 7/16 THREAD; ALLOY STEEL, BLACK OXIDE, RC 32.",
+    "SHOULDER Ø.2460-.2480 X .370-.380; HEAD Ø.375 X .188; 1/8 HEX KEY.",
+    "10-24 UNC-3A, 3/8 THREAD; ALLOY STEEL, BLACK OXIDE, RC 32.",
 )

@@ -88,7 +88,6 @@ def test_counter_leading_half_turn_clears_tube_and_retainer() -> None:
 
 def test_counter_upper_loop_rides_on_the_shoulder_and_clears_the_tube() -> None:
     """The MHA-SM-VN-56 shoulder carries the plumb loop, free (#2144 item 11.4)."""
-    import build_sm_summing_assembly as summing
     import sm_gooseneck_spring_joint as spring_joint
     import sm_vn_gooseneck_shoulder_screw_spec as shoulder_screw
     from _counter_spring_hang import assert_counter_spring_top_hang
@@ -107,8 +106,14 @@ def test_counter_upper_loop_rides_on_the_shoulder_and_clears_the_tube() -> None:
     # shallowest full thread.
     assert shoulder_screw.THREAD_LENGTH < spring_joint.TAP_THREAD_DEPTH_MIN
     assert_counter_spring_top_hang(pose, spring_mount_geom.GOOSENECK_ORIGIN_Y)
-    # The screw frame's head (+Z) points outboard (machine +X), so its thread
-    # runs into the end piece.
+
+
+def test_counter_shoulder_screw_head_points_outboard() -> None:
+    """The screw frame's head (+Z) points outboard (machine +X), so its thread
+    runs into the end piece.  Imports the summing build, so it waits on the
+    re-recorded counter calibration (settled_spring_seats)."""
+    import build_sm_summing_assembly as summing
+
     assert summing.ROT_Y_POS90[2] == [1.0, 0.0, 0.0]
 
 

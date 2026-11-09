@@ -52,7 +52,7 @@ def test_end_piece_is_flush_and_the_tube_ends_on_its_head() -> None:
 
 def test_blind_tap_stays_inside_the_solid_end_piece() -> None:
     assert joint.TAP_SPEC.kind.startswith("tapped")
-    assert joint.TAP_SPEC.size == "1/4-20"
+    assert joint.TAP_SPEC.size == "#10-24"
     assert joint.TAP_SPEC.end == "blind"
     assert joint.TAP_SPEC.thread_class == "2B"
     assert part.TAP_DRILL_DIA == joint.TAP_DRILL_DIA
@@ -132,7 +132,7 @@ def test_every_direct_db_block_restores_inference_in_finally() -> None:
 
 
 def test_end_piece_carries_no_counterbore_frames_or_datums() -> None:
-    # Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: plain 1/4-20 tap; no
+    # Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: plain #10-24 tap; no
     # counterbore, frames, datums or RV-01.
     marked = {name for names in spec.DRAWING_DIMENSIONS.values() for name in names}
     assert not any("Counterbore" in name for name in marked)
@@ -316,7 +316,7 @@ def test_tap_callout_states_geometry_and_its_mate_within_four_rows() -> None:
         f"ENGAGEMENT {f'{joint.ENGAGEMENT_CALLOUT_MIN:.3f}'.lstrip('0')} MIN "
         f"({joint.ENGAGEMENT_CALLOUT_D:.2f}D)",
     ]
-    assert rows[1] == "ENGAGEMENT .262 MIN (1.05D)"
+    assert rows[1] == "ENGAGEMENT .229 MIN (1.20D)"
     assert spec.SCREW_NUMBER == "MHA-SM-VN-56"
     # No row longer than r7's 39-character row, which stood left of the arm
     # straight's text.
@@ -356,13 +356,13 @@ def saved_tap(monkeypatch):
     """Read-only saved feature with independently specified native tap metadata."""
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
     definition = SimpleNamespace(
-        FastenerSize="1/4-20",
+        FastenerSize="#10-24",
         ThreadClass="2B",
         ThreadEndCondition=0,  # blind
         EndCondition=0,
-        TapDrillDiameter=0.005105,  # native model length units are metres
-        TapDrillDepth=0.015748,  # .62 in
-        ThreadDepth=0.0127,  # .50 in
+        TapDrillDiameter=0.003797,  # native model length units are metres
+        TapDrillDepth=0.014224,  # .56 in
+        ThreadDepth=0.011176,  # .44 in
     )
     feature = SimpleNamespace(
         GetTypeName2=lambda: "HoleWzd",
@@ -385,7 +385,7 @@ def test_saved_native_receiver_accepts_the_blind_tap(saved_tap, field, offset_mm
 @pytest.mark.parametrize(
     ("field", "value", "diagnostic"),
     [
-        ("FastenerSize", "1/4-28", "thread size"),
+        ("FastenerSize", "1/4-20", "thread size"),
         ("ThreadClass", "", "ThreadClass"),
         ("ThreadClass", "3B", "ThreadClass"),
         ("ThreadEndCondition", 1, "ThreadEndCondition"),
@@ -393,13 +393,13 @@ def test_saved_native_receiver_accepts_the_blind_tap(saved_tap, field, offset_mm
         ("EndCondition", 1, "EndCondition"),
         ("EndCondition", 2, "EndCondition"),
         ("TapDrillDiameter", 0.0, "tap drill"),
-        ("TapDrillDiameter", 0.005099, "tap drill"),
-        ("TapDrillDiameter", 0.005111, "tap drill"),
+        ("TapDrillDiameter", 0.003791, "tap drill"),
+        ("TapDrillDiameter", 0.003803, "tap drill"),
         ("TapDrillDiameter", math.nan, "tap drill"),
-        ("TapDrillDepth", 0.0156, "tap drill depth"),
+        ("TapDrillDepth", 0.0141, "tap drill depth"),
         ("TapDrillDepth", 0.0200, "tap drill depth"),
-        ("ThreadDepth", 0.0130, "thread depth"),
-        ("ThreadDepth", 0.0122, "thread depth"),
+        ("ThreadDepth", 0.0113, "thread depth"),
+        ("ThreadDepth", 0.0105, "thread depth"),
     ],
 )
 def test_saved_native_receiver_rejects_lost_thread_metadata(

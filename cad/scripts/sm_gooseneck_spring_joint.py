@@ -3,16 +3,18 @@
 Owner ruling 2026-11-08 (Pedro), #2144 item 11.4, supersedes #1951's clamped
 eye: the whole gooseneck is still 1/2 in tube ending flush in the solid
 Ø.500 end piece (sm_gooseneck_geom), but the counter spring's upper eye now
-rides FREE on the 5/16 shoulder of the purchased McMaster 91259A576 shoulder
-screw (MHA-SM-VN-56), under a thin MHA-SM-VN-57 washer beneath its head.  The
-shoulder end seats on the end face and the 1/4-20 thread runs into a plain
-1/4-20 UNC blind tap: no counterbore, no position frames, no datums.  The
-tap's axis carries the implied-zero coaxial offset of the title block's .XXX
-row.
+rides FREE on the 1/4 shoulder of a purchased shoulder screw (MHA-SM-VN-56,
+McMaster 91259A535) under an MHA-SM-VN-57 washer (McMaster 93475A250)
+beneath its head; both SKUs were auto-selected after the owner's ask timed
+out, pending owner confirmation (the ruling's 91259A576 5/16 shoulder drops
+the arm 0.79 mm and its leading half-turn meets the tube).  The shoulder end
+seats on the end face and the 10-24 thread runs into a plain #10-24 UNC blind
+tap: no counterbore, no position frames, no datums.  The tap's axis carries
+the implied-zero coaxial offset of the title block's .XXX row.
 
 One owner minor (cad/config/parts/sm-gooseneck.yaml RV-04, drafted pending
-the owner's confirmation) stands against rule 18: the catalogue screw's 7/16
-thread, less its B18.3 thread neck and tip lead, engages ENGAGEMENT_MIN (1.05D)
+the owner's confirmation) stands against rule 18: the catalogue screw's 3/8
+thread, less its B18.3 thread neck and tip lead, engages ENGAGEMENT_MIN (1.20D)
 of full thread, under 1.5D.  The check raises unless that declaration is
 present (sm_gooseneck_spec).  MHA-SM-01 prints decimal inch (#290): every term
 below charges the limits its sheet prints.
@@ -187,14 +189,14 @@ WIRE_R = spring.WIRE_RADIUS_MM
 
 # --- The end piece's blind tap (drawing-guidelines.md rule 18) -----------------
 # The shoulder seats on the end face, so the screw's tip stands its catalogue
-# thread length (7/16, the B18.3 basic thread length) into the tap.  The full
+# thread length (3/8, the B18.3 basic thread length) into the tap.  The full
 # thread runs past that tip at the printed band; a bottoming tap's 1.5-pitch
 # lead (TAP_LEAD) past the deepest full thread stays inside the shallowest
 # full-Ø drill; the drill's 118-degree point may cross into the shank, where
 # DRILL_POINT_SHANK_WALL_MIN is its wall (below).  Both depths run from the
 # end face (the Hole Wizard start face) and print .XX on the inch sheet.
-TAP_THREAD_DEPTH = 0.50 * MM_PER_IN
-TAP_DRILL_DEPTH = 0.62 * MM_PER_IN
+TAP_THREAD_DEPTH = 0.44 * MM_PER_IN
+TAP_DRILL_DEPTH = 0.56 * MM_PER_IN
 TAP_DEPTH_BAND = printed_band_mm(2, unit=UNIT)
 TAP_LEAD = 1.5 * screw.PITCH
 TAP_SPEC = HoleSpec(
