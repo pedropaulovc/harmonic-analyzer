@@ -85,11 +85,16 @@ def pin_assembly_template(adapter: Any) -> dict[str, Any]:
     from solidworks_mcp.adapters import sw_type_info
 
     preference = sw_type_info.constant("swDefaultTemplateAssembly")  # raises if absent
-    value = adapter.swApp.GetUserPreferenceStringValue(preference)
+    preference_value = adapter.swApp.GetUserPreferenceStringValue(preference)
+    # The preference may be empty while SOLIDWORKS has a usable default.
+    # GetDocumentTemplate resolves the template used by NewDocument; for an
+    # assembly its remaining arguments are explicitly unused by the SDK.
+    value = adapter.swApp.GetDocumentTemplate(DOC_ASSEMBLY, "", 0, 0.0, 0.0)
     path = Path(value) if isinstance(value, str) and value else None
     if path is None or path.suffix.lower() != ".asmdot" or not path.is_file() or not path.stat().st_size:
-        raise RuntimeError(f"Seat default assembly template is not an existing .ASMDOT: {value!r}")
+        raise RuntimeError(f"Resolved assembly template is not an existing .ASMDOT: resolved={value!r}, preference={preference_value!r}")
     return {"preference": "swDefaultTemplateAssembly", "preference_id": preference,
+            "preference_value": preference_value, "resolver": "GetDocumentTemplate",
             "path": str(path), "sha256": digest(path), "bytes": path.stat().st_size,
             "seat_local": True, "in_recipe_cache_key": False}
 
