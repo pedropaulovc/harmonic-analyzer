@@ -712,6 +712,29 @@ def test_the_matched_plate_is_refitted_on_its_dowels_and_re_read() -> None:
     assert steps.step_number("arm-plate-located") + 1 == steps.step_number("arm-plate-fitted")
 
 
+def test_the_plate_recheck_names_its_bore_and_acceptance() -> None:
+    """The re-check can print on the sheet after VIEW K and the TRUE key, so it
+    names the bore's part and points at the step and sheet that define TRUE
+    (integration review, run 20261109T062834910Z)."""
+    sheet = drawing.SHEET_NAMES.index(drawing.KNOB_SETTING_SHEET) + 1
+    defined = drawing.sub_step("arm-plate-located", 2)
+    assert drawing.KNOB_SETTING_TRUE in _step_body("arm-plate-located")
+    assert (
+        f"CHECK: RE-INDICATED, {_number('pd-transgear-arm-plate')} KNOB BORE "
+        f"{drawing.KNOB_BORE_LETTER} IS STILL TRUE PER {defined} (SHEET {sheet})."
+        in _step_body("arm-plate-located")
+    )
+    columns = drawing.pack_step_columns(
+        drawing._step_text(operating_domain=_unit_operating_domain())
+    )
+    defining = [
+        column
+        for column in columns
+        if any(line.startswith(f"{defined}. ") for line in column.text.splitlines())
+    ]
+    assert [column.sheet for column in defining] == [drawing.KNOB_SETTING_SHEET]
+
+
 def test_bom_identifies_the_current_inch_mesh_parts_without_cutter_prose() -> None:
     for stem, spec in (
         ("pd-rack-pinion", disc),
@@ -1460,6 +1483,28 @@ def test_the_actual_collar_disc_overlap_is_checked_before_final_platen_installat
         "DISC SET BACK BY THAT AMOUNT." in flat
     )
     assert "RE-FACE THE " + _number("pd-transgear-disc-hub") not in flat
+    # The feeler check only passes or fails, so the shortfall is read before
+    # the stack comes off, and the re-face takes the minimum less that reading
+    # (integration review, run 20261109T062834910Z).
+    texts = drawing._step_text(operating_domain=_unit_operating_domain())[
+        "collar-disc-air-inspected"
+    ]
+    feeler = steps.COLLAR_DISC_AIR_TEXT.split()[0]
+    assert texts[2].startswith(f"CHECK: A {feeler} FEELER ENTERS ")
+    assert texts[3] == (
+        "IF SHORT, READ THE THICKEST FEELER THAT ENTERS ALL ROUND THE OVERLAP "
+        "(NONE: READ 0)."
+    )
+    read = drawing.sub_step("collar-disc-air-inspected", 3)
+    assert (
+        f"RE-FACE THE {_number('pd-transgear-feed-pinion')} STEP FACE SQUARE ON A "
+        f"MANDREL BY {feeler} LESS THE {read} READING;" in flat
+    )
+    assert "READ SHORT" not in flat
+    assert texts[-1].startswith(
+        f"REPEAT {drawing.sub_step('collar-disc-air-inspected', 1)}-"
+        f"{drawing.sub_step('collar-disc-air-inspected', 2)} AND "
+    )
     assert steps.COLLAR_DISC_AIR_MIN == collar.COLLAR_DISC_AIR_MIN
     assert steps.COLLAR_DISC_AIR_TEXT in _step_body("fitup-accepted")
     keys = (
