@@ -39,7 +39,7 @@ import _telemetry
 from _com import _early_bound
 from _drawing_annotation_extent import CLEAR_GAP_M, PLACE_SETTLE_M
 from _drawing_hidden_sketches import _show_hidden_owners, curate_view_dimensions
-from _drawing_leaders import set_near_side_diameter
+from _drawing_leaders import dimension_segments, set_near_side_diameter
 from _layout_geometry import ARROW_TEXT_CLEARANCE_M
 from _part_properties import part_drawing_unit
 from _session import run_build
@@ -117,6 +117,15 @@ HEIGHT_TEXT_WIDTH_M = 0.0201493
 DIAMETER_TEXT_WIDTH_M = 0.0030139 + 0.0052784 + 0.0300417
 # swLeaderLineVisibility_e.swLeaderLineNone.
 LEADER_LINE_NONE = 3
+# The free height's witnesses start this far off the envelope's near (OD)
+# end: at the document's zero gap they overlaid the ring's outline and ran on
+# from it in one unbroken line (round 2 review, run
+# 20261107T130047431Z-91b02fb2). Natively each witness starts at the
+# envelope's FAR end: a bare 1.5 mm gap moved that start only from x 1403 px
+# to 1421 px, under the outline (round 3 PNG, run 20261107T175747102Z), so the
+# gap spans the envelope's OD length too (``witness_gap``), and a settled
+# check reads the witnesses back off the envelope.
+WITNESS_GAP_M = 0.0015
 
 
 def _centre(bounds: tuple[float, float, float, float]) -> tuple[float, float]:
@@ -244,6 +253,46 @@ def _view_scale(view: Any) -> float:
     return numerator / denominator
 
 
+def witness_gap(scale: float) -> float:
+    """The free height's local witness gap on a view at ``scale``: from the
+    far end of the OD-long envelope to ``WITNESS_GAP_M`` past its near end."""
+    return supplier_spec.OD / 1000.0 * scale + WITNESS_GAP_M
+
+
+def _set_witness_gap(display: Any, index: int, gap: float, *, label: str) -> None:
+    """One witness's local native gap, read back."""
+    typed = _early_bound(display, "IDisplayDimension")
+    if typed.SetWitnessLineGap(index, False, gap) is not True:
+        raise RuntimeError(f"{label}: witness gap {index} was refused")
+    ok, use_doc, actual = typed.GetWitnessLineGap(index, False, 0.0)
+    if (
+        ok is not True or use_doc is not False
+        or type(actual) not in (int, float) or not math.isfinite(actual)
+        or not math.isclose(actual, gap, rel_tol=0.0, abs_tol=1e-8)
+    ):
+        raise RuntimeError(
+            f"{label}: witness gap {index} did not persist: {(ok, use_doc, actual)!r}"
+        )
+
+
+def assert_witnesses_clear_the_envelope(
+    segments: list[tuple[tuple[float, float], tuple[float, float]]],
+    near_end_x: float,
+    *,
+    label: str,
+) -> None:
+    """Every line of the free height (witnesses, dimension line, text shelf)
+    starts at least ``WITNESS_GAP_M`` past the envelope's near end, less a
+    0.2 mm settle: none overlays or runs on from the outline."""
+    limit = near_end_x + WITNESS_GAP_M - 0.0002
+    starts = [min(a[0], b[0]) for a, b in segments]
+    if not starts or min(starts) < limit:
+        raise RuntimeError(
+            f"{label}: free-height lines start at x {min(starts, default=math.nan):.5f} m, "
+            f"inside {limit:.5f} m (envelope end {near_end_x:.5f} m)"
+        )
+
+
 @_telemetry.traced("drawing.cylinder_bank_spring.size_texts")
 def place_size_texts(
     adapter: Any,
@@ -255,15 +304,21 @@ def place_size_texts(
 
     The free height's annotation still sits at its station, which offset
     mode keeps as the dimension line's; the write then moves only the text.
-    The shared finaliser's rebuild settles all three.
+    Its witnesses first take their local gap off the envelope
+    (``witness_gap``). The shared finaliser's rebuild settles all three.
     """
     displays = _size_displays(adapter, views)
+    scales = {key: _view_scale(views[key]) for key in TEXT_SIDES}
     positions = size_text_positions(
-        {key: reference_bounds(key) for key in TEXT_SIDES},
-        {key: _view_scale(views[key]) for key in TEXT_SIDES},
+        {key: reference_bounds(key) for key in TEXT_SIDES}, scales
     )
     for name in TEXT_SIDES["free_front"]:
         displays[name].OffsetText = True
+        for index in (0, 1):
+            _set_witness_gap(
+                displays[name], index, witness_gap(scales["free_front"]),
+                label=f"{supplier_spec.SKU} {name}",
+            )
     for name in TEXT_SIDES["free_top"]:
         set_near_side_diameter(
             displays[name].GetAnnotation(), f"{supplier_spec.SKU} {name}"
@@ -390,6 +445,12 @@ def supplier_dimensions(
                 raise RuntimeError(
                     f"{supplier_spec.SKU} {name}: diametral leader line is showing"
                 )
+        for name in TEXT_SIDES["free_front"]:
+            assert_witnesses_clear_the_envelope(
+                dimension_segments(displays[name].GetAnnotation()),
+                reference_bounds("free_front")[2],
+                label=f"{supplier_spec.SKU} {name}",
+            )
 
     settled_checks.append(check_settled_references)
 

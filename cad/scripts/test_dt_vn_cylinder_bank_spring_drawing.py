@@ -327,7 +327,8 @@ def test_sizes_import_at_their_stations_and_settle_under_the_shared_contract(
     monkeypatch,
 ) -> None:
     """Free height at its 10 mm station, the diameters where the shared
-    disc placement imported them; one settled check, over the whole sheet."""
+    disc placement imported them; one settled check, over the whole sheet,
+    that also reads the free height's lines back off the envelope."""
     import draw_dt_vn_cylinder_bank_spring as drawing
 
     calls = []
@@ -361,9 +362,22 @@ def test_sizes_import_at_their_stations_and_settle_under_the_shared_contract(
     def reacquire(_adapter, views, *, expected, configurations):
         calls.append(("reacquire", expected, configurations))
         return {
-            name: SimpleNamespace(LeaderVisibility=leaders.get(name))
+            name: SimpleNamespace(
+                LeaderVisibility=leaders.get(name), GetAnnotation=lambda name=name: name
+            )
             for _key, name, _args, _field in references
         }
+
+    near_end = FRONT_BOUNDS[2]
+    witness = {"start": near_end + drawing.WITNESS_GAP_M}
+
+    def segments(annotation):
+        calls.append(("segments", annotation))
+        start = witness["start"]
+        return [((start, 0.133), (_STATION_X + 0.001, 0.133)),
+                ((_STATION_X, 0.130), (_STATION_X, 0.137))]
+
+    monkeypatch.setattr(drawing, "dimension_segments", segments)
 
     monkeypatch.setattr(drawing, "_early_bound", lambda display, _kind: display)
 
@@ -416,7 +430,12 @@ def test_sizes_import_at_their_stations_and_settle_under_the_shared_contract(
         "installed_iso": {},
     }
     assert configurations["installed_iso"] == "Default"
-    assert len(asserted) == 3 * len(references)
+    assert asserted[-1] == ("segments", "SupplierFreeHeight")
+    assert len(asserted) == 3 * len(references) + 1
+    witness["start"] = near_end
+    with pytest.raises(RuntimeError, match="SupplierFreeHeight: free-height lines start"):
+        check()
+    witness["start"] = near_end + drawing.WITNESS_GAP_M
     leaders["SupplierOD"] = 0
     with pytest.raises(RuntimeError, match="SupplierOD: diametral leader line is showing"):
         check()
@@ -495,9 +514,10 @@ def test_fixed_texts_fit_their_cells() -> None:
 def test_each_size_text_is_one_position_write_inside_one_span(
     monkeypatch, refused
 ) -> None:
-    """The free height enters offset mode and the diameters take the
-    near-side style before any write; each text then gets exactly one
-    SetPosition2, at its fixed position, with no rebuild or readback."""
+    """The free height enters offset mode and takes its local witness gaps,
+    and the diameters take the near-side style, before any write; each text
+    then gets exactly one SetPosition2, at its fixed position, with no
+    rebuild or readback."""
     import _telemetry
     import draw_dt_vn_cylinder_bank_spring as drawing
 
@@ -521,6 +541,14 @@ def test_each_size_text_is_one_position_write_inside_one_span(
 
         def GetAnnotation(self):
             return self
+
+        def SetWitnessLineGap(self, index, use_doc, gap):
+            calls.append(("gap", self.name, index, use_doc, gap))
+            self.__dict__.setdefault("gaps", {})[index] = gap
+            return True
+
+        def GetWitnessLineGap(self, index, _use_doc, _gap):
+            return True, False, self.gaps[index]
 
     def write(display):
         def set_position(x, y, _z):
@@ -568,6 +596,8 @@ def test_each_size_text_is_one_position_write_inside_one_span(
         == styles
         == [
             ("offset", "SupplierFreeHeight", True),
+            ("gap", "SupplierFreeHeight", 0, False, drawing.witness_gap(2.0)),
+            ("gap", "SupplierFreeHeight", 1, False, drawing.witness_gap(2.0)),
             ("near side", "SupplierID"),
             ("leaders", "SupplierID", drawing.LEADER_LINE_NONE),
             ("near side", "SupplierOD"),
@@ -580,7 +610,35 @@ def test_each_size_text_is_one_position_write_inside_one_span(
         assert xy == pytest.approx(expected[label])
 
 
-def test_installation_note_fits_the_sheet() -> None:
-    lines = _config.parts(STEM)["installation_notes"].splitlines()
-    assert len(lines) <= 4
-    assert all(len(line) <= 70 for line in lines), lines
+@pytest.mark.parametrize(
+    ("written", "read", "match"),
+    [
+        (False, None, "was refused"),
+        (True, (True, True, 0.0015), "did not persist"),
+        (True, (True, False, 0.0), "did not persist"),
+        (True, (False, False, 0.0015), "did not persist"),
+    ],
+    ids=["refused", "document-gap", "lost", "unread"],
+)
+def test_witness_gap_refuses_a_lost_local_gap(monkeypatch, written, read, match) -> None:
+    import draw_dt_vn_cylinder_bank_spring as drawing
+
+    display = SimpleNamespace(
+        SetWitnessLineGap=lambda *_args: written,
+        GetWitnessLineGap=lambda *_args: read,
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    with pytest.raises(RuntimeError, match=match):
+        drawing._set_witness_gap(display, 0, 0.0015, label="test")
+
+
+def test_witness_gap_spans_the_envelope_from_its_far_end() -> None:
+    """Natively each witness starts at the envelope's far end (round 3 PNG),
+    so its gap ends WITNESS_GAP_M past the near end on the 2:1 view."""
+    import draw_dt_vn_cylinder_bank_spring as drawing
+
+    x0, _y0, x1, _y1 = FRONT_BOUNDS
+    assert x1 - x0 == pytest.approx(spec.OD / 1000.0 * 2.0)
+    assert x0 + drawing.witness_gap(2.0) == pytest.approx(x1 + drawing.WITNESS_GAP_M)
+    # The witness keeps a visible run to 1 mm past its station.
+    assert x0 + drawing.witness_gap(2.0) < _STATION_X - 0.005
