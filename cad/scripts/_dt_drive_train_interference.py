@@ -45,6 +45,13 @@ from dt_vn_crank_seat_drive_pin_spec import PRESS_DEPTH as _CRANK_SEAT_PIN_DEPTH
 from dt_cone_tip_block_spec import DOWEL_HOLE_DEPTH as _TIP_DOWEL_PRESS_DEPTH
 from dt_vn_locating_pin_spec import DIA as _LOCATING_PIN_DIA
 from dt_vn_locating_pin_spec import PRESS_HOLE_DIA as _LOCATING_PIN_PRESS_HOLE_DIA
+from cone_tip_cluster import (
+    ADJUSTER_THREAD as _END_SCREW_THREAD,
+    BLOCK_DEPTH_MM as _BLOCK_DEPTH,
+    BUSHING_BORE_DIA_MM as _BUSHING_BORE_DIA,
+    BUSHING_LENGTH_MM as _BUSHING_LENGTH,
+    STEM_DIA_MM as _PIVOT_DIA,
+)
 
 
 # Crank taper pin in its PILOT holes (ch11 p.14): released drawings drill the
@@ -84,23 +91,14 @@ _CRANK_PIN_SHAFT_MM3 = _pin_overlap(_CS_S0, _CS_S1, _CS_PILOT)
 
 # Independent SolidWorks-kernel observations for the exact stock bodies in
 # their production receivers, each with ten-percent bounded headroom so any
-# materially deeper insertion fails.  The cup-tip adjuster makes its intended
-# thrust contact with the shaft end at 0.13 mm3: the 45 deg cup's analytic
-# (2/3)*pi*r^3 for the 0.79 stub (0.131), re-read at 0.1309 by the
-# mha092-r3-8b1b drive-train leaf on drawing-guidelines.md rule 18 (thread engagement) E11's 94025A164.  The 1/16 in
-# tip land doubles the stub radius, so the contact scales by r^3: 0.13 * 8 =
-# 1.04 (analytic 1.047) until the next drive-train build re-observes it.
+# materially deeper insertion fails.
 #
-# The tip block's two threaded pairs were read by that same leaf (8b1bdef31,
-# farm run 20260925T225229777Z; assembly:drive_train log line 333/335,
-# verify_soundness:drive_train line 115/117):
-# - 91794A112 pinch screw (15.875, 17-wide block): 7.8008 mm3.  It replaces
-#   the analytic 22.78 (6.47 read on the 14-wide block, scaled by far-jaw
-#   length), which ran 2.9x high: the per-length scaling does not hold.
-# - 94025A164 adjuster (#10-32, 9.5 embed): 16.4412 mm3 over its 13 thread
-#   bodies.  It replaces the smooth-annulus bound (major 4.826 in the #21
-#   4.0386 drill, 9.5 deep: 57.29), 3.5x the reading, loose enough to hide a
-#   regression.
+# The tip block's pinch screw was read by the mha092-r3-8b1b drive-train leaf
+# (8b1bdef31, farm run 20260925T225229777Z; assembly:drive_train log line
+# 333/335, verify_soundness:drive_train line 115/117): 91794A112 pinch screw
+# (15.875, 17-wide block): 7.8008 mm3.  It replaces the analytic 22.78 (6.47
+# read on the 14-wide block, scaled by far-jaw length), which ran 2.9x high:
+# the per-length scaling does not hold.
 #
 # The MHA-DT-VN-60 hold-down (91251A108 #4-40 x 3/8 SHCS) up through the platform
 # into the MHA-DT-21 foot tap: 5.6585 mm3, read by the first prism-block
@@ -108,11 +106,22 @@ _CRANK_PIN_SHAFT_MM3 = _pin_overlap(_CS_S0, _CS_S1, _CS_PILOT)
 # assembly:drive_train log line 465).
 _TIP_PINCH_OBSERVED_MM3 = 7.8008
 _TIP_PINCH_GATE_LIMIT_MM3 = _TIP_PINCH_OBSERVED_MM3 * 1.10
-_TIP_ADJUSTER_OBSERVED_MM3 = 16.4412
-_TIP_ADJUSTER_GATE_LIMIT_MM3 = _TIP_ADJUSTER_OBSERVED_MM3 * 1.10
 _TIP_HOLDDOWN_OBSERVED_MM3 = 5.6585
 _TIP_HOLDDOWN_GATE_LIMIT_MM3 = _TIP_HOLDDOWN_OBSERVED_MM3 * 1.10
-_ADJUSTER_THRUST_GATE_LIMIT_MM3 = 0.13 * 8.0 * 1.10
+# MHA-DT-39, the 1/4-28 end screw (owner decision C1 keyed, 2026-11-09, PR
+# #1992), runs through MHA-DT-21's whole tapped depth with its threaded end
+# proud of the south face: the smooth annulus of its major in the 1/4-28 tap
+# drill over that depth bounds its helical overlap until the first drive-train
+# build observes it (the old #10-32 cup's observed 16.44 replaced a smooth
+# bound 3.5x high, so re-pin this one to the reading x 1.10 then).
+_END_SCREW_GATE_LIMIT_MM3 = smooth_annulus_limit_mm3(
+    THREAD_MAJOR_MM[_END_SCREW_THREAD], TAP_DRILL_MM[_END_SCREW_THREAD], _BLOCK_DEPTH
+)
+# MHA-DT-38 pressed on MHA-DT-37's pivot: the modelled press is the nominal
+# pivot in the nominal .0615 bore over the bushing's whole length.
+_BUSHING_PRESS_GATE_LIMIT_MM3 = smooth_annulus_limit_mm3(
+    _PIVOT_DIA, _BUSHING_BORE_DIA, _BUSHING_LENGTH
+)
 
 ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
     frozenset(("dt-crank-pin-1", "dt-crank-hub-1")): 1.10 * _CRANK_PIN_HUB_MM3,
@@ -130,19 +139,23 @@ ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
     frozenset(
         ("dt-crank-handle-pivot-screw-1", "dt-crank-arm-1")
     ): smooth_annulus_limit_mm3(THREAD_MAJOR_MM["#4-40"], TAP_DRILL_MM["#4-40"], 7.0),
-    # drawing-guidelines.md rule 18 (thread engagement) E11: #10-32 94025A164 in the tapped block, observed above.
+    # MHA-DT-39's 1/4-28 thread in the tapped block, bounded above.
     frozenset(
-        ("dt-vn-cone-tip-adjuster-1", "dt-cone-tip-block-1")
-    ): _TIP_ADJUSTER_GATE_LIMIT_MM3,
+        ("dt-cone-tip-end-screw-1", "dt-cone-tip-block-1")
+    ): _END_SCREW_GATE_LIMIT_MM3,
     frozenset(
         ("dt-vn-cone-tip-pinch-screw-1", "dt-cone-tip-block-1")
     ): _TIP_PINCH_GATE_LIMIT_MM3,
     frozenset(
         ("dt-vn-cone-tip-block-screw-1", "dt-cone-tip-block-1")
     ): _TIP_HOLDDOWN_GATE_LIMIT_MM3,
+    # The bushing's press on the pivot.  The LOCTITE 638 bonded slip fits
+    # (T024 on land 2, T018/T012 on the spigot, the spigot in MHA-DT-04's
+    # socket) are modelled line-to-line at their nominal sizes and need no
+    # allowance.
     frozenset(
-        ("dt-vn-cone-tip-adjuster-1", "dt-cone-gear-shaft-1")
-    ): _ADJUSTER_THRUST_GATE_LIMIT_MM3,
+        ("dt-cone-tip-bushing-1", "dt-cone-tip-gear-1")
+    ): _BUSHING_PRESS_GATE_LIMIT_MM3,
     # U30 (I22): each MHA-DT-VN-61 (1/4-20 MSC 40923906, major 6.35) in its #7
     # (5.105) MHA-DT-20 tap, as deep as the cut length runs past the post's
     # grip (the counterbore floor).  The smooth-annulus upper bound until the

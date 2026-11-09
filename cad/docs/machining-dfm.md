@@ -22,57 +22,46 @@ its first-root position; no second general note restates that location.
 ## The headlines (read these first)
 
 - **Three parts carry the whole risk. Everything else is generous.**
-  1. **`dt-cone-gear` T006** — minimum root-to-bore web **0.64 mm** on a **Ø4.31 mm OD gear with a 1/32 in (Ø0.794 mm) bore**.
-     The terminal journal was cut to 1/32 in so the 48DP PA20 gap floor keeps at least the 0.62 mm
-     web floor, the one named web exception ([`gear-standard.md`](./gear-standard.md#what-it-costs)).
-     The single hardest part in the machine. These teeth are cut as involute flanks closed by a gap
-     floor with printed diameter limits; T006's floor, cut by DT6-FORM1, is Ø2.136 MIN / Ø2.201 MAX.
-     After a forced T006 rebuild, `build_dt_cone_gear.py` compares the native minimum and maximum
-     root radii with the nominal finite-arc envelope within 0.002 mm. The printed limits enclose
-     the manufacturing corners, not just that nominal envelope. T012 shares the 1/32 in terminal and its web is 2.02 mm at the worst
-     case, over the 2.0 target; the T018 and T024 webs meet the target on the S1 bores.
+  1. **`dt-cone-tip-gear` (T006, MHA-DT-37)** — six leaves on a **Ø4.31 mm OD** solid, with an integral
+     Ø.0625 in spigot (.71 in long, L/D about 12) to the south and an integral Ø.0625 in pivot (.25 in) to the north
+     (owner decision C1 keyed, 2026-11-09, PR #1992). The single hardest part in the machine. Turn the
+     spigot and pivot between centres with steady support, then cut the leaves; the teeth are involute
+     flanks closed by a gap floor with printed diameter limits, and the floor, cut by DT6-FORM1, is
+     Ø2.136 MIN / Ø2.201 MAX, the cutter running off over both stems (.011 in radial). T006 has no bore, so
+     the former 0.62 mm web floor exception is gone. The thinnest cone web is now T012's 1.641 mm
+     (.0646 in MIN, owner-accepted RV-03) over its reamed Ø.0625 in bore on the spigot; the T018 and T024
+     webs meet the target.
      Period mitigation: the tip gears were a harder yellow metal.
   2. **`sm-summing-lever` knife edge** — the sharp top-vertex ridge of a hex trunnion that protrudes
      **21.717 mm unsupported** past each end of a casting-shaped organic lever. Delicate (nicks/rounds)
      *and* fixturing-hostile from bar. Per §6 the edge should be a **separate hardened tool-steel
      insert**, not this parent — which also removes it from this part's machining hazard.
-  3. **`dt-cone-gear-shaft` tip** — a **Ø.0310 +.0000/-.0008 in (0.7671–0.7874 mm) terminal land, about
-     1.32 in (33.6 mm) long in steel (L/D about 43)**,
-     carrying the T012/T006 seats and the MHA-DT-VN-54 stack collar, its cup tip seated in the MHA-DT-VN-55 adjuster.
-     Support the slender work with a follower/steady and take a light finishing cut;
-     the terminal D-flat continues from the T018 step through the shaft tip.
-     Break the two long torque corners of the terminal flat no more than .001 in (0.0254 mm); the
-     collar's set-screw landing on the .0170 +.0000/-.0004 in (0.4216–0.4318 mm) across-flat already
-     pays for that break. The model leaves these corners sharp and the sheet prints the break above
-     that across-flat as `CORNERS .001 MAX`, because the title block's R.010 edge break would leave
-     the flat face only about ±.005 in wide on this land. The stepped collar (inch sheet: Ø.66 body, Ø.25 × .138 nose, .453 overall;
-     `dt_vn_cone_tip_collar_spec.OUTER_DIA`) has a
-     finished bore of Ø.0330 ±.0010 and a radial #2-56 through tap. Fit the stock McMaster
-     94355A213 #2-56 × 5/16 in flat-point screw unaltered, with no dog. To fit the collar, hold the
-     gear stack south on the shaft's thrust collar, set the original 0.45 ±0.10 feeler off the
-     T006 thrust face, seat both collar bore ends on the round back of the terminal, snug the
-     stock flat point on the D-flat, then remove the feeler.
-     Never run or swing a loose collar.
-     During the post fit-up (MHA-DT-00 step 3), hold MHA-DT-05 pushed toward
-     MHA-DT-21 along the shaft throughout: turn the post on its screws until the
-     tip centres in the cup, tighten both MHA-DT-VN-61 screws and recheck. This takes
-     up the post's along-shaft screw clearance away from G19.
-     Installation notes are in `dt_vn_cone_tip_collar_spec.INSTALLATION_NOTES`;
-     `dt_tip_collar_air.py` owns the
-     air stack over the whole swing. Use worst-case arithmetic over every source if it
-     clears everywhere; otherwise use the statistical method everywhere: nominal air
-     minus the arithmetic sum of `IN_SERVICE_CLEARANCES`, minus the RSS of independent
-     printed manufacturing and set tolerances, minus the swing-interval arc allowance.
-     Fastener and running clearances, thread centring, the cup screw in its thread,
-     shaft swing in the post journal off the cup, collar float and cock, set-screw
-     thread rock, and G19 cock can all be taken up together; never put them in the RSS.
-     ASME B18.6.2 limits only the cup diameter, not its depth or wall angle, so the
-     released shaft swing is bounded by the post journal, not by assumed cup capture.
-     The current calculated least nose air is 0.6554 mm (`dt_tip_collar_air.require_air()`),
-     not a measured clearance.
+  3. **The bonded cone tip** (owner decision C1 keyed, 2026-11-09, PR #1992) — T024 bonded with LOCTITE 638
+     on round land 2 one 0.45 ±0.10 feeler off T030 (0.35–0.55 mm stack float); T018 and T012 bonded on the
+     MHA-DT-37 spigot, whose end is bonded in the reamed Ø.0625 × .20 in socket in MHA-DT-04's end; land 2
+     ends .025 in inside T024's bore so T018 always butts T024. Degrease, phase each bonded gear to the keyed
+     stack by pin within the compound's fixture time (a phasing-pin jig is the research's DFM
+     recommendation #4), and let it cure before load; a bonded slip fit has nothing to adjust afterwards.
+     The MHA-DT-38 brass bushing is pressed on the pivot against the leaves, made to its measured bore.
+     The MHA-DT-39 end screw (stock 91794A558 with a reamed Ø.0630 × .12 in pivot hole, wall to the 2A
+     thread root .067 in MIN, RV-01) threads into MHA-DT-21: run it in until the shaft stops shuttling, back
+     off 1/8 turn for 0.05–0.25 mm end play, then tighten the pinch screw. Ream the end-screw hole held on
+     its thread so it runs true. MHA-DT-21's axis height is made to the measured MHA-DT-05 journal-axis
+     height above MHA-DT-20 (matched fit, ±.003 in) so the pivot enters the end screw; tighten the block's
+     hold-down with the pivot running free in MHA-DT-39. At the print-worst stack the end screw keeps 1.39D
+     of full thread in the block, under rule 18's 1.5D (pending owner ruling, dt-drive-train DT-07).
+     `dt_cone_tip_air.py` owns the cone-tip air to G19 over the whole swing: the bushing, the end
+     screw's proud end and MHA-DT-21's south face where it stands over G19. Use worst-case arithmetic
+     over every source if it clears everywhere; otherwise use the statistical method everywhere: nominal
+     air minus the arithmetic sum of `IN_SERVICE_CLEARANCES`, minus the RSS of independent printed
+     manufacturing and set tolerances, minus the swing-interval arc allowance. Fastener and running
+     clearances, thread centring, shaft swing in the post journal and G19 cock can all be taken up
+     together; never put them in the RSS. The current calculated least air is 0.112 mm at the bushing,
+     3.945 mm at the end screw and 5.094 mm at the block (`dt_cone_tip_air.require_air()`), not a measured
+     clearance; `_native_cone_tip_air` checks the saved bodies against it.
      The shaft drawing (one sheet, **Shaft Controls**) dimensions each chucking
      from its own collar face (rule 11): the journal and the collar web from the
-     journal-side thrust face, the three shoulders and the tip from the
+     journal-side thrust face, the land step and the tip from the
      collar's tip-side (MHA-DT-07 seat) face. The journal, web and tip station
      chain the two ends; the front-to-tip overall is a reference. The
      presentation does not prescribe a workholding arrangement.
@@ -81,7 +70,7 @@ its first-root position; no second general note restates that location.
   | family | qty | why CNC |
   |---|---|---|
   | `dt-cylinder-gear` (+ integral cam) | 20 | 120 teeth + eccentric cam + 0.4 mm index notch, all co-phased +Y — hand-repeating 20× scatters the phase |
-  | `dt-cone-gear` | 20 | involute teeth cut with stock 48DP PA20 range cutters indexed on a dividing head; T006 alone needs a special cutter (see [Cutter plan](#cutter-plan)); wire-EDM = outsource alt |
+  | `dt-cone-gear` | 19 | involute teeth cut with stock 48DP PA20 range cutters indexed on a dividing head; T006 (`dt-cone-tip-gear`) alone needs a special cutter (see [Cutter plan](#cutter-plan)); wire-EDM = outsource alt |
   | `pivot-bushing` / `lever-bushing` | 19 each | turned spacers whose **length** sets channel pitch — length consistency across the set is the point |
   | `ch-rocker-arm` | 20 | flat R800 profile, one setup — ideal CNC profile part |
   | `ch-connecting-rod` | 20 | flat 2D outline from 1018 plate, stepped both faces, slotted fork → 2.5D |
@@ -112,9 +101,11 @@ its first-root position; no second general note restates that location.
   Other receivers are threaded too; the `sm-knife-mount` #10-24 bottoming hanger-bolt tap is one
   example. The 20 `dt-cone-gear`s and the 64T `dt-crank-drive-gear` transmit torque
   through a 1/16 square key on land 1 (the 64T and T030–T120, owner decision C1
-  keyed, 2026-11-09, PR #1992) and matching D-bores on the D-flat lands 2–4; the cylinder gears
-  ride free on their stationary arbor. The gears seat against each other,
-  without an adhesive joint or spacers, from the collar-supported 64T to T006.
+  keyed, 2026-11-09, PR #1992); T024 is bonded with LOCTITE 638 on round land 2,
+  and T018 and T012 on the integral spigot of `dt-cone-tip-gear` (T006), itself
+  bonded in the shaft's end socket; the cylinder gears ride free on their
+  stationary arbor. The gears seat against each other without spacers from the
+  collar-supported 64T to T030 and from T024 to T006, one feeler-set float between.
 
 - **`fr-harmonic-base` cross-screw seats:** the green-top height and the
   cross-screw axis are dimensioned from the same faced underside, rather than
@@ -870,8 +861,11 @@ run. No COM, farm, or generated-traveler certification is claimed here.
 
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
-| **`dt-cone-gear`** ×20 (T006→T120) | round brass bar, extruded disc, face **6.8756 ±0.025** each, OD printed per gear at the AGMA (N + 2)/DP blank, +0/−0.05, capped by the cutter's form (`dt_cone_gear_spec.py`; T006 Ø4.31 +0/−0.02); tip gears T006–T024 harder yellow metal | T030+ round Ø9.525 bore broached for the land-1 1/16 key (1/16 A broach, 3/8 A bushing; keyway on +X, clocked to the phase-0 tooth); T006–T024 D-bore matching the land's single +X flat, clocked to the phase-0 tooth: round seat Ø by config (T006/T012 0.79375, T018 3.175, T024 6.350); bore AF +0.010/+0.020 over shaft nominal AF (0.01–0.03 clearance), diametral slip clearance 0.025–0.105; 6–120 involute teeth PA20, tooth thickness ±0.075 (T006 +0/−0.04), 2.5D through-cut | **T006 web 0.64 mm minimum** on the 1/32 in bore (the flat cuts inward from that circle; see [`gear-standard.md`](./gear-standard.md#what-it-costs)); whole gear tiny → difficult workholding, especially forming and gauging the D without damaging the teeth | ≥2 (turn/bore, indexed teeth, plus D-bore finishing) | stock 48DP PA20 range cutter per gear, **indexed**, set up within 0.05 TIR of the finished bore (see [Cutter plan](#cutter-plan)); T006 needs its named custom ground tool, DT6-FORM1; form the bore flat to the AF gauge (filing or broaching is a hobby-shop possibility, not a selected route; EDM or a D-shaped punch needs process/fixture approval). Measure all 20 touching faces as a stack: **137.512 ±0.20** |
-| **`dt-cone-gear-shaft`** ×1 | stepped steel bar; integral Ø12.2308 post journal, thrust collar then Ø9.525→6.35→3.175→0.79375 gear lands | turned steps plus **a 1/16 square keyseat milled along the Ø9.525 land on +X** (S .3385 +0/−.0040 in, width .0625 +.0020/−0 in; carries the MHA-DT-VN-71 key) and **one milled +X D-flat on each smaller gear land**, nominal AF **5.842/2.921/0.432** respectively, each +0/−0.010; the Ø0.79375 flat continues through the tip end and the MHA-DT-VN-54 stack collar's set screw locks on it. Finish the post journal for 0.05 diametral clearance | slender terminal land needs tailstock support; flat machining adds an indexed milling setup and inspection against the mating D-bores | lathe + at least 1 indexed milling setup | manual lathe **+ steady/follower**, then mill/gauge the co-clocked flats; do not leave a round section under the MHA-DT-VN-54 collar |
+| **`dt-cone-gear`** ×19 (T012→T120) | round brass bar, extruded disc, face **6.8756 ±0.025** each, OD printed per gear at the AGMA (N + 2)/DP blank, +0/−0.05, capped by the cutter's form (`dt_cone_gear_spec.py`); tip gears T012–T024 harder yellow metal | T030+ round Ø9.525 bore broached for the land-1 1/16 key (1/16 A broach, 3/8 A bushing; keyway on +X, clocked to the phase-0 tooth); T024 reamed round Ø6.350 (+.0018/+.0010 in) and T012/T018 reamed Ø1.5875 (+.0005/−0 in), bonded slip fits (owner decision C1 keyed, 2026-11-09, PR #1992); 12–120 involute teeth PA20, tooth thickness ±0.075, 2.5D through-cut | **T012 web 1.641 mm (.0646 in) minimum** over its reamed bore (RV-03); T030 keyway-corner web .0622 in (RV-07); whole gear tiny → difficult workholding | ≥2 (turn/bore, indexed teeth) | stock 48DP PA20 range cutter per gear, **indexed**, set up within 0.05 TIR of the finished bore (see [Cutter plan](#cutter-plan)). Measure the keyed faces 64T–T030 as one stack and T024–T006 as the bonded tip | 
+| **`dt-cone-tip-gear`** ×1 (T006, MHA-DT-37) | C67500 bar; six leaves Ø4.31 +0/−0.02 OD, face 6.8756 ±0.025, integral Ø.0625 in spigot × .71 south and Ø.0625 in pivot × .25 north | DT6-FORM1 leaves, tooth thickness +0/−0.04; spigot bonded in MHA-DT-04's socket and through T012/T018; pivot carries the pressed MHA-DT-38 bushing (made to its measured bore) and runs in MHA-DT-39 | spigot L/D about 12 whips; ~4 mm gear hard to grip; the cutter must run off over both stems | ≥2 (turn between centres, indexed leaves) | manual lathe between centres **+ steady**, then the named custom ground tool DT6-FORM1, indexed | 
+| **`dt-cone-gear-shaft`** ×1 | stepped steel bar; integral Ø12.2555 post journal, thrust collar then Ø9.525 keyed land 1 and Ø6.35 round land 2 | turned steps plus **a 1/16 square keyseat milled along the Ø9.525 land on +X** (S .3391 +0/−.0040 in, width .0625 +.0020/−0 in; carries the MHA-DT-VN-71 key); land 2 ends .025 in inside the bonded T024's bore with a reamed Ø.0625 × .20 in socket for the MHA-DT-37 spigot. Finish the post journal for its printed running clearance | none severe: the slender terminal land, its D-flats and the tailstock note are gone (C1 keyed) | lathe + 1 milling setup (keyseat) | manual lathe, drill and ream the end socket, then mill the keyseat | 
+| **`dt-cone-tip-bushing`** ×1 (MHA-DT-38) | C36000 brass bar; Ø.228 × .160 in | Ø.0615 in reamed bore, press fit on the MHA-DT-37 pivot; north face bears on MHA-DT-39 | wall .0805 in minimum | 1 (turn, ream, part) | manual lathe | 
+| **`dt-cone-tip-end-screw`** ×1 (MHA-DT-39) | McMaster-Carr 91794A558 18-8 slotted fillister 1/4-28 × 5/8 | drilled and reamed Ø.0630 × .12 in pivot hole concentric in the threaded end (running fit on the MHA-DT-37 pivot) | wall to the 2A thread root **.067 in MIN** (RV-01, rule 17 minor) | 1 (hold on the thread in a threaded collet or split nut) | manual lathe, centre drill, drill, ream | 
 
 ### Pivots, bushings, shafts (T1 — the 19-channel stacks)
 
@@ -893,12 +887,12 @@ run. No COM, farm, or generated-traveler certification is claimed here.
 
 ## Recommended actions (gaps this pass surfaced)
 
-1. **Retain the executable native wall guard for the smallest cone gear.** After a forced T006
+1. **Retain the executable native wall guard for the cone gears.** After a forced
    rebuild, `build_dt_cone_gear.py` measures the native floor edges directly and compares both radial
    extrema with `dt_cone_gear_spec.floor_radius_min_mm` / `floor_radius_max_mm` within 0.002 mm.
    These are the nominal finite-arc envelope; the separate printed diameters from `floor_limits_mm`
    also enclose the manufacturing corners. The guard checks the native web at the maximum allowed
-   bore against the retained web requirement; `test_dt_cone_gear_drawing` pins the T006 web exception
+   bore against the retained web requirement; `test_dt_cone_gear_drawing` pins the T012 web exception
    (`WEB_EXCEPTIONS_MM`). Keep both when changing the tooth profile or bore bands.
 2. **Qualify the selected `sm-summing-lever` solid-stock route and the unchanged
    knife roots/edge.** Option A removes the pad step and rib ledge, not the
@@ -909,7 +903,7 @@ run. No COM, farm, or generated-traveler certification is claimed here.
    and new #10 SAE washer on the whole faced top, into a #10-24 bottoming tap and located by one dowel pressed into the crossbar's blind underside ream and slipped into the block's round hole (owner ruling 2026-10-24, T+H3; one dowel per mount and a gauge pin through both bores setting their yaw at MHA-SM-00, owner ruling 2026-11-08 (Pedro), #2144 item 11.3); the current route is documented above. Its revised native wizard and dimension import require the scoped farm proof; offline tests alone are not native evidence.
 4. **Reconcile the `ch-rocker-arm` R800 vs book 812.8 mm** (already a §4 Finding) before it becomes a
    drawing callout — but note the good news from this pass: it's a *profile* dimension, cheap to change.
-5. **Consider enlarging the tip cone gears** (T006–T012) — the model already flags them marginal and a
+5. **Consider enlarging the tip cone gears** (T006 `dt-cone-tip-gear` and T012) — the model already flags them marginal and a
    period build used harder metal. **DP caveat:** enlarging OD at a *fixed tooth count* changes the
    DP/module and **breaks the shared 48DP mesh** — tooth *counts* preserve the ratio, but DP/pitch
    diameter preserves the *mesh* (`dt_cone_gear_spec.py` and `dt_cylinder_gear_spec.py` both read `diametral_pitch` from `gear_train.yaml`; §4
@@ -951,8 +945,8 @@ steps instead of one big engagement.
   the **majority of tool-access & gouge issues is reasonable** — it's a real simulation, not a
   rule-of-thumb checker.
   - **But its blind spot is exactly where the worst risk lives.** Fusion treats geometry as **rigid**
-  and stock as **held**, so it will *not* warn that the **T006 web (0.64 mm minimum)** breaks in
-  workholding, the **Ø0.79375 mm slender shaft tip** whips, the **1.90 mm cam wall** is fragile, or that
+  and stock as **held**, so it will *not* warn that the **T012 web (1.64 mm minimum)** breaks in
+  workholding, the **Ø1.5875 mm T006 spigot** whips, the **1.90 mm cam wall** is fragile, or that
   a ~4 mm gear can't be gripped. Thin-wall / fragile-feature / fixturing failures are not modelled
   by CAM sim. **A clean Fusion sim is not a substitute for a first cut on the fragile parts.**
 
@@ -1002,7 +996,7 @@ plates have not been checked against this list; check yours before cutting.
 
 | part | teeth | cutter | index per tooth (40:1) |
 |---|--:|:--:|---|
-| `dt-cone-gear` T006 | 6 | special, see below | 6 turns + 10 holes on 15 |
+| `dt-cone-tip-gear` T006 | 6 | special, see below | 6 turns + 10 holes on 15 |
 | `dt-cone-gear` T012 | 12 | #8 | 3 turns + 5 on 15 |
 | `dt-cone-gear` T018 | 18 | #6 | 2 turns + 4 on 18 |
 | `dt-cone-gear` T024 | 24 | #5 | 1 turn + 10 on 15 |
@@ -1046,8 +1040,9 @@ teeth is possible in principle, but the part is not designed around it.
 
 No range cutter reaches 6 teeth, so T006 needs a tool made in the shop: DT6-FORM1, a custom
 ground form tool whose full grind, including the relief that clears the drum tips, is
-drawn on its own detail sheet in the MHA-DT-03 package. The root-to-bore web it leaves is
-0.64 mm, over the 0.62 mm floor; see [`gear-standard.md`](./gear-standard.md#what-it-costs).
+drawn on its own detail sheet in the MHA-DT-37 package. T006 has no bore since owner
+decision C1 keyed (2026-11-09, PR #1992), so the cutter leaves no root-to-bore web; it runs off over
+the integral spigot and pivot (.011 in radial).
 
 For background on shop-made form cutters, Law's *Gears and Gear Cutting*
 (`references/gears-and-gear-cutting/`, ch. 12) forms the cutter profile with a button tool: two

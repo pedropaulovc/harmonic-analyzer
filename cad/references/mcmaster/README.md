@@ -75,6 +75,7 @@ recipes:
 | 91794A055 | `pd-vn-transgear-disc-screw` | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 91794A078 | `mg-vn-magnifying-bracket-screw` (catalogue-only; no vendor model) | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 91794A080 | `ch-vn-frame-side-screw` (catalogue-only; no vendor model) | 18-8 Stainless Steel Fillister Head Slotted Screw |
+| 91794A558 | `dt-cone-tip-end-screw` (MHA-DT-39, fabricated from stock: one added drill-and-ream pivot hole in its threaded end; owner decision C1 keyed, 2026-11-09, PR #1992) | 18-8 Stainless Steel Fillister Head Slotted Screw, 1/4"-28 x 5/8" |
 | 92240A540 | `fr-vn-lag-screw` | 18-8 Stainless Steel Hex Head Screw |
 | 91829A560 | `dt-vn-cone-pivot-screw` | Slotted 18-8 Stainless Steel Precision Shoulder Screw |
 | 91829A566 | `sm-vn-gooseneck-shoulder-screw` (MHA-SM-VN-56; catalogue-only, datasheet-built with the 91829A560 family's slot) | Slotted 18-8 Stainless Steel Precision Shoulder Screw, 1/4" Shoulder × 3/8", 10-24 Thread |
@@ -87,7 +88,7 @@ recipes:
 | 92671A005 | `mg-vn-wheel-axle-nut` (catalogue-only; no vendor model) | Brass Hex Nut |
 | 92671A115 | `pn-vn-pen-adjust-nut` (catalogue-only; no vendor model) | Brass Hex Nut |
 | 9414T1 | — (the purchased cone-tip collar, category MHA-VN-016, now MHA-DT-VN-54, until the 2026-10-08 terminal redesign) | Set Screw Shaft Collar for 1/16" Diameter |
-| 94355A213 | `dt-vn-cone-tip-collar` set screw, fitted as supplied | 18-8 Stainless Steel Flat-Tip Set Screw, #2-56 x 5/16" |
+| 94355A213 | — (the set screw of `dt-vn-cone-tip-collar`, MHA-DT-VN-54, fitted as supplied; retired with the collar 2026-11-09, owner decision C1 keyed, PR #1992) | 18-8 Stainless Steel Flat-Tip Set Screw, #2-56 x 5/16" |
 | 92865A585 | — (diagnostic recipe; former `vn-hex-bolt`, MHA-VN-008 retired) | Medium-Strength Grade 5 Steel Hex Head Screw |
 | 92916A250 | `mg-vn-wheel-axle-front-washer` (catalogue-only; no vendor model) | Brass Washer for Number 4 Screw Size |
 | 96659A104 | `sm-vn-knife-hanger-washer` (MHA-SM-VN-54; catalogue-only, no vendor model) | 18-8 Stainless Steel SAE Washer for Number 10 Screw Size |
@@ -96,7 +97,7 @@ recipes:
 | 93075A199 | `pn-vn-hanger-screw` | Low-Strength Zinc-Plated Steel Hex Head Screw |
 | 93585A190 | `dt-vn-cone-lock-knob` | Stainless Steel High-Profile Knurled-Head Thumb Screw |
 | 94025A150 | — (diagnostic recipe; `dt-vn-cone-tip-adjuster` until drawing-guidelines.md rule 18 (thread engagement) E11) | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
-| 94025A164 | `dt-vn-cone-tip-adjuster` | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
+| 94025A164 | — (retired MHA-DT-VN-55 `dt-vn-cone-tip-adjuster`, 2026-11-09, owner decision C1 keyed, PR #1992: the MHA-DT-39 end screw replaces it; diagnostic recipe removed) | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
 | 94773A606 | `pd-vn-transgear-cluster-shim` (MHA-PD-VN-68; catalogue-only, no vendor model) | Shim for Shortening Screw Shoulders, 18-8 Stainless Steel, 1/8" Shoulder |
 | 93600A189 | — (retired 2026-11-02, #290: MHA-PD-VN-64 takes 98381A435; recipe removed) | Passivated 316 Stainless Steel ISO 2338-m6 Dowel Pin |
 | 9666K56 | `sh-vn-music-wire` (MHA-SH-VN-56; `LeverWire` and `PenWire` configurations cut from one coil; catalogue-only, no vendor model) | Lubricated 1080 Spring Steel Wire, 0.031 in, 1/4 lb coil |

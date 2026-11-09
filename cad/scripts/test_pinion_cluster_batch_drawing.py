@@ -229,7 +229,7 @@ def test_intentional_fit_allowance_bounds_the_pair_total(monkeypatch) -> None:
     compared alone against the pair limit; a split pair whose every body is
     under the limit but whose sum is over it passed.
     """
-    pair = ("dt-cone-tip-block-1", "dt-vn-cone-tip-adjuster-1")
+    pair = ("dt-cone-tip-block-1", "dt-cone-tip-end-screw-1")
     monkeypatch.setattr(_assembly, "_early_bound", lambda obj, *_args: obj)
     events: list[tuple[str, dict]] = []
     monkeypatch.setattr(
@@ -450,15 +450,22 @@ def test_cross_numbered_fit_pairs_use_fixed_runtime_oracles() -> None:
 def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
     threaded_by_assembly = {
         "dt-drive-train": {
-            # mha092-r3-8b1b drive-train leaf: 16.4412 and 7.8008 observed,
-            # plus ten percent.
-            frozenset(("dt-vn-cone-tip-adjuster-1", "dt-cone-tip-block-1")): 18.08532,
+            # mha092-r3-8b1b drive-train leaf: 7.8008 observed, plus ten
+            # percent.
             frozenset(("dt-vn-cone-tip-pinch-screw-1", "dt-cone-tip-block-1")): 8.58088,
             # First prism-block drive-train leaf: 5.6585 observed, plus ten
             # percent.
             frozenset(("dt-vn-cone-tip-block-screw-1", "dt-cone-tip-block-1")): 6.22435,
-            # 1/16 in tip land: 0.13 observed at Ø0.79, scaled by r^3 (x8).
-            frozenset(("dt-vn-cone-tip-adjuster-1", "dt-cone-gear-shaft-1")): 1.144,
+            # MHA-DT-39 1/4-28 major 6.35 in the #3 tap drill 5.41 through
+            # MHA-DT-21's .430 (10.922) depth.
+            frozenset(("dt-cone-tip-end-screw-1", "dt-cone-tip-block-1")): _annulus_limit(
+                6.35, 5.41, 10.922
+            ),
+            # MHA-DT-38's nominal .0615 (1.5621) bore pressed on MHA-DT-37's
+            # nominal .0625 (1.5875) pivot over its .160 (4.064) length.
+            frozenset(("dt-cone-tip-bushing-1", "dt-cone-tip-gear-1")): _annulus_limit(
+                1.5875, 1.5621, 4.064
+            ),
             # MHA-DT-VN-70 #2-56 major 2.184 in the #50 tap drill 1.778: the
             # 6.35 shank less the 1.194 chain wire and 0.02 air, within 5.14.
             frozenset(("dt-vn-keeper-chain-screw-1", "dt-crank-arm-1")): _annulus_limit(

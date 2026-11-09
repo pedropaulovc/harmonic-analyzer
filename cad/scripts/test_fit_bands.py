@@ -88,14 +88,20 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
     ),
     # for configuration, teeth in CONFIGS: band = band_for(teeth); deviations(band)
     ("build_dt_cone_gear", "band"): (
-        "(blank_dia_band(6), tooth_thickness_band(6),"
-        " blank_dia_band(12), tooth_thickness_band(12))",
+        "tuple(band_for(teeth) for _feature, _name, band_for, carried"
+        " in _BANDED_DIMENSIONS for teeth in carried)",
         "each",
     ),
     # for name, band in (("BlankDia", blank_dia_band(teeth)), ...): deviations(band)
     ("draw_dt_cone_gear", "band"): (
-        "(blank_dia_band(6), tooth_thickness_band(6),"
-        " blank_dia_band(12), tooth_thickness_band(12))",
+        "tuple(band_for(teeth) for band_for in (blank_dia_band, tooth_thickness_band)"
+        " for teeth in __import__('dt_cone_gear_spec').CONFIGURATION_TEETH)",
+        "each",
+    ),
+    # The cone tip gear's loop over its own module-level bands.
+    ("build_dt_cone_tip_gear", "band"): (
+        "(BLANK_DIA_BAND, FACE_WIDTH_BAND, TOOTH_THICKNESS_BAND, SPIGOT_DIA_BAND,"
+        " PIVOT_DIA_BAND)",
         "each",
     ),
     # _apply_neck_and_flat_limits passes each native LIMIT band in turn.
@@ -106,8 +112,8 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
     ),
     # for feature, name, band_for in _BANDED_DIMENSIONS: band = band_for(teeth)
     ("_cone_gear_readback", "band"): (
-        "(blank_dia_band(6), tooth_thickness_band(6),"
-        " blank_dia_band(12), tooth_thickness_band(12))",
+        "tuple(band_for(teeth) for _feature, _name, band_for, carried"
+        " in _BANDED_DIMENSIONS for teeth in carried)",
         "each",
     ),
 }
@@ -283,6 +289,10 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "the 5/8 bar's supplied size band, indexed for the thrust ring's "
         "worst-case width (THRUST_RING_MIN)"
     ),
+    ("dt_cone_gear_shaft_spec", "_T030_NORTH_BAND"): (
+        "the cone gear stack's T030 north-face station band (an axial stack "
+        "position, not a fit), indexed into T024_NORTH_FACE_DEVIATION_MM"
+    ),
     ("pn_pen_hanger_spec", "STRAP_T_STOCK_BAND"): (
         "the 3 mm strap stock's supplied thickness band, indexed for the "
         "slot-bottom gap (SLOT_BOTTOM_GAP_MIN) and the arm cover "
@@ -358,10 +368,6 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "the pivot bore reamed 6.350 H7 on the 91829A560 shoulder: indexed into "
         "the Hole Wizard diameter tolerance, the cone set stack's and support "
         "pose's pivot float and the assembly's pivot air"
-    ),
-    ("dt_vn_cone_tip_collar_spec", "BORE_DIA_BAND"): (
-        "the finished bore's seat band, indexed to re-centre the modelled bore "
-        "(BORE_MODEL_DIA_BAND, the band the build sets natively)"
     ),
     ("ch_rocker_arm_spec", "PIVOT_HOLE_BAND"): (
         "indexed into the hub's wall floor (HUB_DIA_MIN); the build also "

@@ -6,44 +6,36 @@ import math
 
 import cone_land_key
 import cone_line
+import cone_tip_cluster
 import dt_cone_pivot_post_spec
-import dt_cone_tip_block_spec
 
 from _fit_deviations import deviations
 from _gtol_cylinder import CylinderFace
-from _inch_wall_limits import WALL_FLOOR_MM
+from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _printed_tolerance import edge_break_chamfer_mm, printed_band_mm, printed_deviations
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 from dt_cone_gear_spec import FACE_WIDTH as CONE_GEAR_FACE_WIDTH, SEAT_PITCH, outside_dia_mm
+from dt_cone_gear_spec import FACE_WIDTH_BAND as CONE_GEAR_FACE_WIDTH_BAND
 from dt_cone_gear_stack import PITCH_LOCKSTEP_TOLERANCE, face_band
 from _cone_axis_constants import GEAR_AXIS_SHIFT
 from dt_cone_pivot_post_spec import JOURNAL_BORE_BAND as POST_JOURNAL_BORE_BAND
 from cone_shaft_land_bands import (  # noqa: F401  re-exported for the shaft build
-    FLAT_AF_BAND,
     GEAR_SEAT_BAND,
     LAND_DIA_PLACES,
-    LAND_AF_PLACES,
     RUNNING_DIA_BAND,
     SECTION_CONE_GEAR_TEETH,
     SECTION_DIA_BANDS,
-    SECTION_FLAT_AF,
-    TERMINAL_DIA_IN,
-    TERMINAL_DIA_MM,
-    TERMINAL_DIA_PLACES,
-    TERMINAL_FLAT_EDGE_BREAK_MAX,
     UNIT,
+    land_finished_dia_limits_mm,
 )
-from cone_stack_end_play import COLLAR_FEELER, MARGIN_SPARE, SHAFT_END_PLAY
-from dt_vn_cone_tip_collar_spec import WIDTH as TIP_COLLAR_WIDTH
-from _mcmaster_94025a164 import CUP_DEPTH
+from cone_stack_end_play import MARGIN_SPARE, SHAFT_END_PLAY, STACK_FEELER_BAND
 from dt_crank_drive_gear_spec import CENTRE_SHIFT_NORTH as GEAR64_CENTRE_SHIFT_NORTH
 from dt_crank_drive_gear_spec import FACE_WIDTH as GEAR64_FACE_WIDTH
 from dt_crank_drive_gear_spec import LAYOUT_FACE_WIDTH as GEAR64_LAYOUT_FACE_WIDTH
 from dt_crank_drive_gear_spec import SOUTH_FACE_SHIFT_NORTH as GEAR64_SOUTH_FACE_SHIFT_NORTH
 from dt_crank_drive_gear_spec import LAYOUT_CENTRE_STATION as GEAR64_LAYOUT_CENTRE_STATION
-from gear_seat_fit import flat_bore_af_band, seat_bore_band
-
+from gear_seat_fit import seat_bore_band
 
 MM_PER_IN = 25.4
 
@@ -86,7 +78,7 @@ FRONT_STUB = (
     + JOURNAL_PROUD
 )
 
-# Axial capture (#914, user ruling 2026-09-25).  The tip adjuster pushes the
+# Axial capture (#914, user ruling 2026-09-25).  The tip end screw pushes the
 # shaft south, toward the post; nothing reacted it until the 64T met the post
 # boss 1.681 further on.  An integral collar fills that gap: its south face
 # bears on the post's north boss face (flush with the journal end) and the
@@ -186,15 +178,6 @@ COLLAR_STOCK_CALLOUT = "\n".join(
 # The same break on the post's journal rims, the ring's other bounding edge;
 # the post sheet prints it with the journal size.
 POST_JOURNAL_RIM_BREAK = f"RIMS BREAK {inch_text(THRUST_EDGE_BREAK_MAX, 3)} MAX"
-# The terminal flat's two long torque corners stay sharp in the model; their
-# break limit is a drawing requirement, printed above the terminal across-flat
-# (draw_dt_cone_gear_shaft).  cone_shaft_land_bands derives the number.  One
-# line: SolidWorks stores an above callout's line break but prints none of it
-# (run 20261010T071427837Z).  No process word: the limit is the requirement
-# (machinist review r1).
-TORQUE_CORNER_CALLOUT = f"CORNERS {inch_text(TERMINAL_FLAT_EDGE_BREAK_MAX, 3)} MAX"
-
-
 def _gear(teeth: int) -> str:
     return f"T{teeth:03d}"
 
@@ -205,14 +188,17 @@ def _gear(teeth: int) -> str:
 # on MHA-DT-19's pivot shaft, its clearance the printed limits'
 # (JOURNAL_DIAMETRAL_CLEARANCE_MM) as a REF row of its own: two lines of
 # words (rule 7) narrow enough to stand between the faced end and section
-# A-A (round 3's 33-character line crowded section A's letter).  Every gear
-# land slides in the bores of the gears it carries; those mates (MHA-DT-03,
-# MHA-DT-07 and the MHA-DT-VN-71 key on land 1, MHA-DT-VN-54 on the terminal
-# land) and the flats' matched fit are flag note LAND_NOTE, linked from each
-# land's diameter, the keyseat and each across-flat: the stepped tip's texts
-# climb over each other and have no room for the names.
+# A-A (round 3's 33-character line crowded section A's letter).  Land 1
+# slides in the bores of the gears it carries (MHA-DT-03, MHA-DT-07 and the
+# MHA-DT-VN-71 key): flag note LAND_NOTE, linked from its diameter and the
+# keyseat.  Land 2 and the socket are bonded fits (owner decision C1 keyed,
+# 2026-11-09, PR #1992; cone_tip_cluster): flag note BOND_NOTE names their
+# mates, linked from land 2's diameter and the socket's.  The compound is
+# named on the assembly sheet, where the joint is made (rule 23).
 LAND_NOTE = 1
+BOND_NOTE = 2
 LAND_FLAG = f"SEE NOTE {LAND_NOTE}"
+BOND_FLAG = f"SEE NOTE {BOND_NOTE}"
 JOURNAL_FIT_CALLOUT = (
     "RUNNING FIT, MATCHED\n"
     "TO MHA-DT-05 BORE\n"
@@ -223,19 +209,9 @@ SEAT_MATE_CALLOUTS = {
     "Sec0Dia": JOURNAL_FIT_CALLOUT,
     "Sec1Dia": LAND_FLAG,
 }
-# The terminal land's band also carries the MHA-DT-VN-54 collar, whose bore
-# clearance is derived from this diameter (dt_vn_cone_tip_collar_spec; codex
-# review of #1644 at fd9aa2df7); LAND_NOTE names it with D-D's gears.
-TERMINAL_LAND = 4
-SEAT_MATE_SUFFIXES = {f"Sec{land}Dia": f" {LAND_FLAG}" for land in (2, 3, TERMINAL_LAND)}
-# An across-flat line is centred on its section; with "SEE" B-B's would
-# overrun the sheet border by 0.6 mm, so the flats carry the bare flag.  Land 1
-# is keyed (owner decision 2026-11-09, C1 keyed, PR #1992): its keyseat width
-# carries the same bare flag.
-FLAT_MATE_SUFFIXES = {
-    "Sec1KeyseatWidth": f" NOTE {LAND_NOTE}",
-    **{f"Sec{land}AF": f" NOTE {LAND_NOTE}" for land in (2, 3, 4)},
-}
+SEAT_MATE_SUFFIXES = {"Sec2Dia": f" {BOND_FLAG}"}
+# The keyseat width is centred on its section; it carries the bare flag.
+KEYSEAT_MATE_SUFFIXES = {"Sec1KeyseatWidth": f" NOTE {LAND_NOTE}"}
 
 # Station layout.  Every cone gear station was laid out on a 6.5 reference
 # face one exact-tracking seat pitch (dt_cone_gear_spec.SEAT_PITCH) from the next;
@@ -250,7 +226,8 @@ T006_NORTH_FACE_STATION = cone_line.T006_NORTH_FACE
 
 
 def gear_faces(j: int) -> tuple[float, float]:
-    """(south, north) cone station of seat j's gear faces (pivot end = 0)."""
+    """(south, north) cone station of seat j's gear faces at their layout
+    stations (pivot end = 0)."""
     north = T006_NORTH_FACE_STATION - (19 - j) * SEAT_PITCH
     return north - CONE_GEAR_FACE_WIDTH, north
 
@@ -268,38 +245,14 @@ if not (
         f"{gear_faces(0)[0]:.6f} within 0..{PITCH_LOCKSTEP_TOLERANCE}"
     )
 
-# The tip end: the custom MHA-DT-VN-54 stack collar is set one COLLAR_FEELER
-# north of T006's face and locked on the
-# Sec4 D-flat.  The MHA-DT-21 tip block is a straight prism fixed by its
-# hold-down: its north face stands TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET south of
-# the pivot, itself PIVOT_FROM_T006_NORTH_FACE north of T006's face
-# (cone_line's constants).  drawing-guidelines.md rule 18 (thread engagement) E11's #10-32 McMaster 94025A164 cup
-# adjuster sits ADJUSTER_EMBED (the block spec's) in from that face with its
-# apex on the tip.  The vendor Sketch2 profile (Line7, harvested 2026-09-24)
-# puts the 45 deg conical cup apex 1.2065 mm beyond the cup rim
-# (4.7625 - 3.556), so this spec ends the shaft there; the assembly backs the
-# adjuster out by the stub's seat depth on the cup wall. The block, pivot
-# and embed stations follow their pure geometry owners.
-TIP_COLLAR_START_STATION = T006_NORTH_FACE_STATION + COLLAR_FEELER
-TIP_COLLAR_END_STATION = TIP_COLLAR_START_STATION + TIP_COLLAR_WIDTH
-TIP_BLOCK_LENGTH = dt_cone_tip_block_spec.BLOCK_Z
-PIVOT_FROM_T006_NORTH_FACE = cone_line.PIVOT_STATION - cone_line.T006_NORTH_FACE
-TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET = dt_cone_tip_block_spec.TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET
-TIP_BLOCK_NORTH_FACE_STATION = dt_cone_tip_block_spec.TIP_BLOCK_NORTH_FACE
-TIP_BLOCK_SOUTH_FACE_STATION = TIP_BLOCK_NORTH_FACE_STATION - TIP_BLOCK_LENGTH
-ADJUSTER_EMBED = dt_cone_tip_block_spec.ADJUSTER_EMBED
-ADJUSTER_CUP_RIM_STATION = TIP_BLOCK_NORTH_FACE_STATION - ADJUSTER_EMBED
-T006_TIP_STATION = ADJUSTER_CUP_RIM_STATION + CUP_DEPTH
-
-# Land steps (user ruling 2026-09-28).  The touching gears leave no air gap
-# to step in, so each step sits SEAT_STEP_SETBACK SOUTH of the interface where
-# a smaller-bore gear first sits -- the north faces of T030 (j = 15), T024
-# (j = 16) and T018 (j = 17) -- inside the larger gear's bore.  The larger
-# gear then overhangs its land by the setback; the smaller one sits wholly on
-# its own land.  The import-time proof below the precision table shows the
-# step and its root fillet stay south of the smaller gear at print-worst.
+# Land step (user ruling 2026-09-28).  The touching gears leave no air gap
+# to step in, so the land-1 to land-2 step sits SEAT_STEP_SETBACK SOUTH of
+# T030's north face (j = 15), inside T030's bore.  T030 then overhangs land 1
+# by the setback; T024 sits wholly on land 2.  The import-time proof below
+# the precision table shows the step and its root fillet stay south of T024
+# at print-worst.
 SEAT_STEP_SETBACK = 1.0
-SEAT_STEP_GEARS = (15, 16, 17)
+SEAT_STEP_GEAR = 15
 
 
 def seat_step_station(j: int) -> float:
@@ -307,123 +260,107 @@ def seat_step_station(j: int) -> float:
     return gear_faces(j)[1] - SEAT_STEP_SETBACK
 
 
-# U40 moved the terminal land start under T018. The cutter-native redesign
-# keeps that station and substitutes the authoritative .031 in terminal
-# diameter, shared by T012, T006 and the stack collar.
-TIP_LAND_START_STATION = seat_step_station(17)
-TIP_STUB_START_STATION = TIP_LAND_START_STATION
-TIP_STUB_LENGTH = T006_TIP_STATION - TIP_STUB_START_STATION
+# The tip (owner decision C1 keyed, 2026-11-09, PR #1992; cone_tip_cluster).
+# T024 (seat j = 16) is bonded on land 2 one STACK_FEELER off T030's north
+# face, so in the model it sits TIP_SET_SHIFT_MM north of its layout
+# station; the shaft ends TIP_END_RECESS_MM inside T024's bore, so T018
+# always butts T024's north face.  The reamed socket for T006's spigot runs
+# SOCKET_DEPTH_MM into that end.
+T024_SEAT = 16
+T024_NORTH_FACE_STATION = gear_faces(T024_SEAT)[1] + cone_tip_cluster.TIP_SET_SHIFT_MM
+TIP_END_STATION = T024_NORTH_FACE_STATION - cone_tip_cluster.TIP_END_RECESS_MM
+SOCKET_DIA = cone_tip_cluster.STEM_BORE_DIA_MM
+SOCKET_DIA_BAND = cone_tip_cluster.STEM_BORE_BAND
+SOCKET_DEPTH = cone_tip_cluster.SOCKET_DEPTH_MM
+SOCKET_FLOOR_STATION = TIP_END_STATION - SOCKET_DEPTH
+# A standard blind ream is fully defined by its callout (drawing-guidelines.md
+# rules 9 and 12): the imported SocketDia over "REAM <depth> .20", the depth
+# at the title block's .XX, its flag after it -- dt_cone_tip_block's dowel
+# hole recipe.  The depth is not a marked dimension: it would dimension to a
+# hidden line on the side view.
+SOCKET_DEPTH_PLACES = 2
+SOCKET_CALLOUT = "\n".join(
+    (
+        f"REAM <HOLE-DEPTH> {inch_text(SOCKET_DEPTH, SOCKET_DEPTH_PLACES)}",
+        BOND_FLAG,
+    )
+)
 
 # (diameter in inches, section end station in mm from the front stub end).
-# Intermediate seats keep the retained sizes and fit classes. The terminal
-# size lives in cone_shaft_land_bands and the gear family checks its web
-# against the current cutter-owned printed MIN floors, not an old snapshot.
-# Tailstock support remains required for the now more slender terminal land.
-# Diameters decrease toward the tip for tip-first assembly.  The stations
-# are the gear stack's (closures): only the journal's end is a fabricated
-# length, snapped above.
+# Diameters decrease toward the tip for tip-first assembly.  The land-1 end
+# is a gear-stack closure and land 2's end the tip cluster's; only the
+# journal's end is a fabricated length, snapped above.
 SECTION_DIAS: tuple[float, ...] = (
     JOURNAL_DIA,  # integral v2-post bearing journal, .4825
     cone_land_key.LAND_DIA_MM,  # 3/8: 64T + T120..T030 seats, keyed
-    6.35,  # 1/4: T024 seat
-    3.175,  # 1/8: T018 seat
-    TERMINAL_DIA_MM,  # .031: T012/T006, collar, tip
+    6.35,  # 1/4: T024, bonded; the socket in its end
 )
 SECTION_ENDS: tuple[float, ...] = (
     JOURNAL_END,
-    FRONT_STUB + seat_step_station(15),
-    FRONT_STUB + seat_step_station(16),
-    FRONT_STUB + TIP_LAND_START_STATION,
-    FRONT_STUB + T006_TIP_STATION,
+    FRONT_STUB + seat_step_station(SEAT_STEP_GEAR),
+    FRONT_STUB + TIP_END_STATION,
 )
 SECTIONS: tuple[tuple[float, float], ...] = tuple(
     (dia / MM_PER_IN, end) for dia, end in zip(SECTION_DIAS, SECTION_ENDS, strict=True)
 )
 SHAFT_LENGTH = SECTION_ENDS[-1]
+
+
 def validate_gear_loading_clearances() -> None:
     """Require accepted physical tips before a native shaft build starts.
 
     Pure layout/fit readers remain importable when a cutter family is refused;
     the accepted outside-dia reader must still refuse at this runtime boundary.
-    Tip-first assembly: each small gear passes over no land it cannot clear.
+    Tip-first assembly: T024, the first gear on, is the smallest gear that
+    passes a shaft land, and its tips clear the keyed land it stops short of.
     """
-    for teeth, next_bore in ((6, 4), (12, 3), (18, 2), (24, 1)):
-        if outside_dia_mm(teeth) <= SECTION_DIAS[next_bore]:
-            raise AssertionError(
-                f"T{teeth:03d} tip diameter does not exceed the next inboard bore"
-            )
+    if outside_dia_mm(24) <= SECTION_DIAS[1]:
+        raise AssertionError("T024 tip diameter does not exceed the keyed land")
 
-# D-flats (user ruling 2026-09-28): lands 2-4 each carry one flat with its
-# outward normal on the shaft's local +X (the Right plane's normal), across
-# flat SECTION_FLAT_AF (flat to the opposite side of the land, the size a
-# micrometer reads) with FLAT_AF_BAND.  Each flat runs its whole land, from
-# the larger land's face to the land's end, and the gears' D-bores (MHA-DT-03)
-# slide straight on.  The terminal land's flat runs
-# out THROUGH THE TIP (user ruling 2026-09-28): T012 and T006 slide on over
-# it and MHA-DT-VN-54 is a thrust spacer riding the D, so the end face is a D too.
-# Land 1 is round and keyed instead (owner decision 2026-11-09, C1 keyed,
-# PR #1992; superseding the 2026-09-28 ruling's "no keys" for land 1 only):
-# the 1/16 keyseat (cone_land_key) sits on the same +X clock and runs the
-# same extent the flat did, from the collar's tip-side face to the land's end.
-# FLAT_OFFSETS[i] is the flat's distance from the axis.
-FLAT_OFFSETS: tuple[float | None, ...] = tuple(
-    None if af is None else af - dia / 2.0
-    for af, dia in zip(SECTION_FLAT_AF, SECTION_DIAS)
-)
-FLAT_LANDS = tuple(i for i, af in enumerate(SECTION_FLAT_AF) if af is not None)
-if FLAT_LANDS != (2, 3, 4):
-    raise AssertionError(f"lands 2-4 and only those carry a flat: {FLAT_LANDS}")
+
+# Land 1 is round and keyed (owner decision 2026-11-09, C1 keyed, PR #1992):
+# the 1/16 keyseat (cone_land_key) on the shaft's local +X runs the land, from
+# the collar's tip-side face to the land's end.  No D-flat remains on the
+# shaft.
 KEYED_LAND = 1
-if SECTION_DIAS[KEYED_LAND] != cone_land_key.LAND_DIA_MM or KEYED_LAND in FLAT_LANDS:
-    raise AssertionError("land 1 is the keyed Ø.375 land, without a flat")
-# Each flat (and land 1's keyseat) runs off its land's end into air: the next
-# land lies wholly inside the flat plane (keyseat floor), so milling one never
-# touches a smaller land.  And every gear, bore at its largest and flat (keyway
-# top) at its shallowest, passes over every land north of its own on the way
-# to its seat.
-for _land in (KEYED_LAND, *FLAT_LANDS[:-1]):
-    _next_radius_max = (SECTION_DIAS[_land + 1] + SECTION_DIA_BANDS[_land + 1][0]) / 2.0
-    _bore_dia_max = SECTION_DIAS[_land] + seat_bore_band(SECTION_DIA_BANDS[_land])[0]
-    if _land == KEYED_LAND:
-        # Floor at its lowest (S at its minimum, land at its largest); keyway
-        # top at its lowest (T at its minimum, bore at its largest).
-        _cut_offset_min = (
-            cone_land_key.limits(cone_land_key.KEYSEAT_S_MM, cone_land_key.KEYSEAT_S_BAND)[0]
-            - (SECTION_DIAS[_land] + SECTION_DIA_BANDS[_land][0]) / 2.0
-        )
-        _bore_cut_min = (
-            cone_land_key.limits(cone_land_key.KEYWAY_T_MM, cone_land_key.KEYWAY_T_BAND)[0]
-            - _bore_dia_max / 2.0
-        )
-    else:
-        _cut_offset_min = FLAT_OFFSETS[_land]
-        _bore_cut_min = (
-            SECTION_FLAT_AF[_land] + flat_bore_af_band(FLAT_AF_BAND)[1] - _bore_dia_max / 2.0
-        )
-    if _cut_offset_min < _next_radius_max or _bore_cut_min < _next_radius_max:
-        raise AssertionError(
-            f"land {_land}'s cut {_cut_offset_min:.4f} (bore's {_bore_cut_min:.4f}) "
-            f"reaches into land {_land + 1} (radius {_next_radius_max:.4f})"
-        )
+if SECTION_DIAS[KEYED_LAND] != cone_land_key.LAND_DIA_MM:
+    raise AssertionError("land 1 is the keyed Ø.375 land")
+# The keyseat runs off its land's end into air: land 2 lies wholly inside the
+# keyseat floor, so milling it never touches land 2.  And every land-1 gear,
+# bore at its largest and keyway top at its shallowest, passes over land 2.
+_LAND2_RADIUS_MAX = (SECTION_DIAS[2] + SECTION_DIA_BANDS[2][0]) / 2.0
+_KEYSEAT_FLOOR_OFFSET_MIN = (
+    cone_land_key.limits(cone_land_key.KEYSEAT_S_MM, cone_land_key.KEYSEAT_S_BAND)[0]
+    - (SECTION_DIAS[KEYED_LAND] + SECTION_DIA_BANDS[KEYED_LAND][0]) / 2.0
+)
+_KEYWAY_TOP_OFFSET_MIN = (
+    cone_land_key.limits(cone_land_key.KEYWAY_T_MM, cone_land_key.KEYWAY_T_BAND)[0]
+    - (SECTION_DIAS[KEYED_LAND] + seat_bore_band(SECTION_DIA_BANDS[KEYED_LAND])[0])
+    / 2.0
+)
+if min(_KEYSEAT_FLOOR_OFFSET_MIN, _KEYWAY_TOP_OFFSET_MIN) < _LAND2_RADIUS_MAX:
+    raise AssertionError(
+        f"land 1's keyseat floor {_KEYSEAT_FLOOR_OFFSET_MIN:.4f} (keyway top "
+        f"{_KEYWAY_TOP_OFFSET_MIN:.4f}) reaches into land 2 (radius {_LAND2_RADIUS_MAX:.4f})"
+    )
 
 # Two length origins, one per chucking (drawing-guidelines.md rule 11; Main's
 # delegated ruling (b), 2026-11-07, round 6).  The journal-side chucking faces
 # the collar's thrust face, the face the post bears on: the journal runs back
 # from it to the front stub and the collar web forward to the collar's
 # tip-side face.  The tip-side chucking faces that tip-side face, the seat the
-# gear stack is pushed onto (MHA-DT-07 first): the three land steps and the
-# tip run forward from it, so a step and the gear it stands behind share one
-# face and the collar web never enters between them.  The journal (1.70) and
-# the web (.125) chain the two origins and the front stub to the tip; the
+# gear stack is pushed onto (MHA-DT-07 first): the land step and the tip run
+# forward from it, so the step and the gear it stands behind share one face
+# and the collar web never enters between them.  The journal (1.70) and the
+# web (.125) chain the two origins and the front stub to the tip; the
 # front-to-tip overall is a reference.  Each land's end plane is offset from
 # SECTION_ORIGINS[i] by SECTION_KNOBS[i], the value its SecEnd{i} global
-# carries; land 0 is the journal, extruded from the front face.  Each flat is
-# cut back from its land's end plane over its land.
+# carries; land 0 is the journal, extruded from the front face.  The keyseat
+# is cut back from land 1's end plane over the land, the socket from land
+# 2's end plane.
 DATUM_STATION = COLLAR_END_STATION
 SECTION_ORIGINS = (
     "Front Plane",
-    "CollarEndPlane",
-    "CollarEndPlane",
     "CollarEndPlane",
     "CollarEndPlane",
 )
@@ -432,76 +369,52 @@ SECTION_KNOBS = tuple(
     for end, origin in zip(SECTION_ENDS, SECTION_ORIGINS)
 )
 
-# Diameter and across-flat bands, one NAMED class per land, live in
-# cone_shaft_land_bands so the gears derive their bores from them without
-# importing this spec; build_dt_cone_gear_shaft applies them to the model
-# dimensions.
+# Diameter bands, one NAMED class per land, live in cone_shaft_land_bands so
+# the gears derive their bores from them without importing this spec;
+# build_dt_cone_gear_shaft applies them to the model dimensions.
 
-# Step root radius.  Each step sits inside the larger gear's bore, one
-# SEAT_STEP_SETBACK behind the smaller gear's south face, so the root's
-# radius must not reach the smaller gear: the fillet stands .004 proud of the
-# smaller land -- more than that gear's radial clearance on either the round
-# or the flat -- so its axial run is booked in the setback (the proof below).
-# R.004 is the standard tool nose radius.  Modelled as geometry, round root
-# and flat root alike, and dimensioned once, not written as a process note.
+# Step root radius.  The step sits inside T030's bore, one SEAT_STEP_SETBACK
+# behind T024's south face, so the root's radius must not reach T024: the
+# fillet stands .004 proud of land 2 -- more than T024's radial clearance --
+# so its axial run is booked in the setback (the proof below).  R.004 is the
+# standard tool nose radius.  Modelled as geometry and dimensioned once, not
+# written as a process note.
 FILLET_RADIUS = 0.1016  # .004
 # The setback books the root's run at its printed maximum, so the radius
 # prints as the single limit R.004 MAX (swTolMAX prints the model value, then
-# MAX): the title block's +-.005 would let a .009 root reach the smaller gear
-# (Codjiflo P2 on #2107).  Any root from sharp up to .004 is good.  The
-# stacked +.000/-.002 band this replaced named no mate at its callout and had
-# no room to (machinist review of the final7 render, 20261102T152513202Z).
+# MAX): the title block's +-.005 would let a .009 root reach T024 (Codjiflo
+# P2 on #2107).  Any root from sharp up to .004 is good.
 FILLET_R_BAND = (0.0, -FILLET_RADIUS)  # (upper, lower): any root up to the MAX
 FILLET_R_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "R.004 MAX"
-# Three identical land-step roots (the collar's roots stay sharp,
-# build_dt_cone_gear_shaft), one fillet feature, one radius dimension.
-FILLET_CALLOUT = "3X"
 
 # Surface texture, on the one land that runs: the .4825 journal turns in
-# the pivot post bore.  Every other land only carries parts locked to the
-# shaft -- the gears slide on and are driven by the key (land 1) and the
-# flats, the MHA-DT-VN-54 collar is screwed to the terminal flat -- and the tip bears on the
-# adjuster's cup with its end, not its round, so they are left to the
-# title-block process row (drawing-guidelines.md rule 6; machinist review
-# r5, 20261018T080102803Z, which found the tip land's Ra 1.6 unexplained).
+# the pivot post bore.  The gear lands and the socket only carry parts fixed
+# to the shaft -- the land-1 gears are driven by the key, T024 and T006's
+# spigot are bonded -- so they are left to the title-block process row
+# (drawing-guidelines.md rule 6).
 SURFACE_FINISHES = (
     SurfaceFinishControl(
         "pivot_journal", MACHINED_UM, CylinderFace(JOURNAL_DIA), display_unit=UNIT
     ),
 )
 
-# The sheet's numbered flag notes, four lines (drawing-guidelines.md rule 7:
-# few, flagged, never a method).  Note LAND_NOTE is linked from every land's
-# diameter, land 1's keyseat and each across-flat: it names each land's mates
-# once by drawing number (rule 4; sections A-A to D-D cut lands 1 to 4: A-A
-# the keyed land with its MHA-DT-VN-71 key, owner decision 2026-11-09, PR
-# #1992), and gives the flats' .0004 bands (B-B to D-D), under the
-# milled-width row, their fit route: each flat is milled matched to its gears'
-# measured D-bores with an unambiguous acceptance (rule 4's matched pair: a
-# clearance range OR an acceptance; Codjiflo P2 on #2331 held the block to
-# rule 7's four lines, so the REF clearance went).  The keyseat and the flats' common clock is the aligned
-# sections' and the title block's angle (error_budget.yaml books it per land
-# as cone_land_clock).  Note STACK_NOTE names, once, the stack the
-# three-place lengths set (rule 4): each step stands SEAT_STEP_SETBACK behind
-# the smaller gear's south face (the proof below) and the collar web is the
-# MHA-DT-07 station and the stack's origin.  The tailstock line is the one
-# process word, by user ruling (U40, 2026-09-23): the slender terminal land
-# cannot be turned unsupported, so the support IS the requirement (exception
-# RV-02 in cad/config/parts/dt-cone-gear-shaft.yaml).  Lines stay short: the
-# note block starts 20 mm in and the title block begins at 216 mm.
-STACK_NOTE = 2
-TAILSTOCK_NOTE = 3
-# The printed step lengths (from the collar's tip-side face, SECTION_KNOBS)
-# and the collar web, as their dimensions print them.
-STACK_LENGTHS_TEXT = ", ".join(
-    inch_text(SECTION_KNOBS[land], 3) for land in (1, 2, 3)
-) + f" AND {inch_text(COLLAR_THICKNESS, 3)}"
+# The sheet's numbered flag notes (drawing-guidelines.md rule 7: few,
+# flagged, never a method).  Note LAND_NOTE names land 1's mates once by
+# drawing number (rule 4; section A-A cuts the keyed land, owner decision
+# 2026-11-09, PR #1992); the keyseat and its clock are the section's and the
+# title block's angle (error_budget.yaml books it as cone_flat_clock).  Note
+# BOND_NOTE names the bonded mates of land 2 and the socket.  Note STACK_NOTE
+# names, once, the stack the three-place lengths set (rule 4): the step
+# stands SEAT_STEP_SETBACK behind T024's south face (the proof below) and the
+# collar web is the MHA-DT-07 station and the stack's origin.  The
+# 2026-09-28 flats' matched-fit line and U40's tailstock line went with the
+# flats and the tip land (C1 keyed supersedes both).
+STACK_NOTE = 3
 DRAWING_NOTES = "\n".join(
     (
-        f"{LAND_NOTE}. SLIDING FIT IN MHA-DT-03; A-A ALSO MHA-DT-07 AND KEY MHA-DT-VN-71;",
-        "   D-D ALSO MHA-DT-VN-54; MILL FLATS TO MEASURED D-BORES: NO ROCK.",
-        f"{STACK_NOTE}. {STACK_LENGTHS_TEXT} SET THE MHA-DT-07 AND MHA-DT-03 STACK.",
-        f"{TAILSTOCK_NOTE}. TURN THE TIP LAND WITH TAILSTOCK SUPPORT.",
+        f"{LAND_NOTE}. SLIDING FIT: MHA-DT-03 30T-120T GEARS, MHA-DT-07, KEY MHA-DT-VN-71.",
+        f"{BOND_NOTE}. BONDED FIT: LAND MHA-DT-03 24T GEAR; SOCKET MHA-DT-37 SPIGOT.",
+        f"{STACK_NOTE}. FLAGGED LENGTHS SET THE MHA-DT-07 AND MHA-DT-03 STACK.",
     )
 )
 
@@ -509,18 +422,11 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Sec0Profile": {"Sec0Dia"},
     "Sec1Profile": {"Sec1Dia"},
     "Sec2Profile": {"Sec2Dia"},
-    "Sec3Profile": {"Sec3Dia"},
-    "Sec4Profile": {"Sec4Dia"},
     "Sec0": {"Sec0End"},
     "Sec1": {"Sec1End"},
     "Sec2": {"Sec2End"},
-    "Sec3": {"Sec3End"},
-    "Sec4": {"Sec4End"},
     "Sec1KeyseatProfile": {"Sec1KeyseatWidth", "Sec1KeyseatS"},
-    "Sec1KeyseatEndProfile": {"Sec1KeyseatEndSet"},
-    "Sec2FlatProfile": {"Sec2AF"},
-    "Sec3FlatProfile": {"Sec3AF"},
-    "Sec4FlatProfile": {"Sec4AF"},
+    "SocketProfile": {"SocketDia"},
     "ShoulderFillets": {"ShoulderR"},
     "CollarProfile": {"CollarDia"},
     "Collar": {"CollarWidth"},
@@ -530,27 +436,26 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # the part build stamps it and the sheet only reads it back.  Decimal inch
 # (#290).
 #
-# Diameters and across-flats: four places.  Each carries its named band
-# (SECTION_DIA_BANDS, FLAT_AF_BAND), so their places are only the number's
-# spelling.  Land 1's keyseat width and S print at cone_land_key's places
-# with its bands.
+# Diameters: four places.  Each carries its named band (SECTION_DIA_BANDS,
+# the socket's REAM_H7), so their places are only the number's spelling.
+# Land 1's keyseat width and S print at cone_land_key's places with its
+# bands.
 #
-# Land steps Sec1End..Sec3End (from the collar's tip-side face): three
-# places, which is the title-block .XXX general grade (+-.005) and no
-# explicit band.  This is a location requirement, not a spelling: each step
-# sits SEAT_STEP_SETBACK behind the smaller gear's south face, and the proof
-# below books the step's printed limit with the stack's and the fillet's in
-# that 1.0 mm; the .XX grade (+-.01) alone would take half of it.
+# Land step Sec1End (from the collar's tip-side face): three places, the
+# title-block .XXX general grade (+-.005) and no explicit band.  This is a
+# location requirement, not a spelling: the step sits SEAT_STEP_SETBACK
+# behind T024's south face, and the proof below books the step's printed
+# limit with the stack's and the fillet's in that 1.0 mm; the .XX grade
+# (+-.01) alone would take half of it.
 #
-# Tip station Sec4End (collar's tip-side face to the tip): two places, the
-# title block's .XX grade (+-.01), by user ruling 2026-09-29.  The tip block
-# is fixed by its hold-down, so this band, with the collar web's (the post
-# bears on the other collar face), lands on the adjuster's embed;
-# build_dt_drive_train_assembly closes that stack by the block's depth and the
-# 1.0D adjuster engagement instead of a tighter length.  Journal length
-# Sec0End (collar thrust face back to the front stub): two places, the .XX
-# grade, since the journal's guaranteed bearing span below reads it (never .X).
-# Step radius: three places; nothing depends on it beyond the setback proof.
+# Tip Sec2End (collar's tip-side face to the end): three places, the .XXX
+# grade, booked in the recess proof below (the end stays inside T024's bore
+# at every limit).  Journal length Sec0End (collar thrust face back to the
+# front stub): two places, the .XX grade, since the journal's guaranteed
+# bearing span below reads it (never .X).  The socket's depth prints in its
+# callout at SOCKET_DEPTH_PLACES, the .XX grade, booked in the spigot proof
+# below.  Step radius: three places;
+# nothing depends on it beyond the setback proof.
 #
 # Keyseat end (machinist review of 06460fb: the mill stop): the end radius's
 # centre from the collar's tip-side face, two places, the title block's .XX
@@ -570,21 +475,14 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Sec0Profile": {"Sec0Dia": LAND_DIA_PLACES[0]},
     "Sec1Profile": {"Sec1Dia": LAND_DIA_PLACES[1]},
     "Sec2Profile": {"Sec2Dia": LAND_DIA_PLACES[2]},
-    "Sec3Profile": {"Sec3Dia": LAND_DIA_PLACES[3]},
-    "Sec4Profile": {"Sec4Dia": LAND_DIA_PLACES[4]},
     "Sec0": {"Sec0End": 2},
     "Sec1": {"Sec1End": 3},
     "Sec2": {"Sec2End": 3},
-    "Sec3": {"Sec3End": 3},
-    "Sec4": {"Sec4End": 2},
     "Sec1KeyseatProfile": {
         "Sec1KeyseatWidth": cone_land_key.KEYSEAT_PLACES,
         "Sec1KeyseatS": cone_land_key.KEYSEAT_PLACES,
     },
-    "Sec1KeyseatEndProfile": {"Sec1KeyseatEndSet": cone_land_key.KEY_END_SET_PLACES},
-    "Sec2FlatProfile": {"Sec2AF": LAND_AF_PLACES[2]},
-    "Sec3FlatProfile": {"Sec3AF": LAND_AF_PLACES[3]},
-    "Sec4FlatProfile": {"Sec4AF": LAND_AF_PLACES[4]},
+    "SocketProfile": {"SocketDia": cone_tip_cluster.STEM_PLACES},
     "ShoulderFillets": {"ShoulderR": 3},
     "CollarProfile": {"CollarDia": 3},
     "Collar": {"CollarWidth": 3},
@@ -592,8 +490,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
 # The collar's stock reference prints as the bar's fraction.
 COLLAR_DIA_FRACTION_DENOMINATOR = 8
 # The front-to-tip overall (#917 R5 (a)) is the sheet's one reference
-# dimension, the read-only sum of the journal and the tip station: two
-# places, the grade of the lengths it sums.
+# dimension, the read-only sum of the journal, the web and the tip: two
+# places.
 DRAWING_REFERENCE_PRECISION = 2
 
 _PRECISION_NAMES = [
@@ -621,12 +519,14 @@ _LENGTH_NOMINALS = {
 
 def printed_length_deviations(name: str) -> tuple[float, float]:
     """(lower, upper) mm about the model of a marked length's printed limits:
-    the inch value the sheet prints, with its own band (the step roots) or the
-    title block's."""
+    the inch value the sheet prints (the socket depth in its callout), with
+    its own band (the step root) or the title block's."""
     if name == "ShoulderR":
         return printed_deviations(
             FILLET_RADIUS, DRAWING_PRECISION_BY_NAME[name], deviations(FILLET_R_BAND), unit=UNIT
         )
+    if name == "SocketDepth":
+        return printed_deviations(SOCKET_DEPTH, SOCKET_DEPTH_PLACES, unit=UNIT)
     return printed_deviations(
         _LENGTH_NOMINALS[name], DRAWING_PRECISION_BY_NAME[name], unit=UNIT
     )
@@ -654,53 +554,107 @@ if JOURNAL_SUPPORT_SPAN_MIN_MM <= 0.0:
     raise AssertionError("post/shaft pair has no guaranteed cylindrical bearing span")
 
 
-# The setback proof (user ruling 2026-09-28).  Each step and its root fillet
-# must stay south of the smaller gear's south face -- the larger gear's north
-# face -- with the stack pushed onto the collar at its shortest: the step at
-# the north end of its printed limits, the fillet's R.004 +.000 run along the
-# smaller land, the stack's own shortfall up to that face
-# (dt_cone_gear_stack.face_band) and the fleet's MARGIN_SPARE.  The steps and
-# the stack share the collar's tip-side face (round 6), so the collar web no
-# longer stands between them; its printed short limit is still charged, as a
-# second spare, so the re-datum loosens no proof (FoDtFab4's condition).  The
-# fillet runs the same .004 along the flat's root as along the round's, so the
-# one budget covers the smaller gear's round bore and its flat alike.  In
-# service the stack only floats north, off the step.
-SEAT_STEP_BUDGET: dict[str, dict[str, float]] = {}
-for _name, _j, _end in zip(("Sec1End", "Sec2End", "Sec3End"), SEAT_STEP_GEARS, SECTION_ENDS[1:4]):
-    if abs(_end - FRONT_STUB - seat_step_station(_j)) > 1e-9:
-        raise AssertionError(f"{_name} is not one setback behind gear {_j}'s north face")
-    _terms = {
-        "step band": printed_length_deviations(_name)[1],
-        "fillet": FILLET_RADIUS + printed_length_deviations("ShoulderR")[1],
-        "collar band": -printed_length_deviations("CollarWidth")[0],
-        "stack": -face_band(_j, "north")[1],
-        "spare": MARGIN_SPARE,
-    }
-    _terms["margin"] = SEAT_STEP_SETBACK - sum(_terms.values())
-    SEAT_STEP_BUDGET[_name] = _terms
-    if _terms["margin"] < 0.0:
-        raise AssertionError(
-            f"{_name}: the step and its root reach the smaller gear at print-worst {_terms}"
-        )
-
-# The key's north end at the far printed limits of the keyseat end's .XX
-# location and the key's .XX length stays south of T024 (gear 16), which
-# rides land 2's flat: the key sits between the keyseat's end and T024.
-KEY_NORTH_MARGIN_MM = (
-    FRONT_STUB
-    + gear_faces(16)[0]
-    - (
-        COLLAR_END_STATION
-        + cone_land_key.KEY_END_SET_MM
-        + printed_length_deviations("Sec1KeyseatEndSet")[1]
-        + cone_land_key.KEY_LENGTH_MM
-        + printed_band_mm(cone_land_key.KEY_LENGTH_PLACES, unit=UNIT)
-    )
-)
-if KEY_NORTH_MARGIN_MM <= 0.0:
+# The setback proof (user ruling 2026-09-28).  The step and its root fillet
+# must stay south of T024's south face -- T030's north face -- with the stack
+# pushed onto the collar at its shortest: the step at the north end of its
+# printed limits, the fillet's R.004 +.000 run along land 2, the stack's own
+# shortfall up to that face (dt_cone_gear_stack.face_band) and the fleet's
+# MARGIN_SPARE.  The step and the stack share the collar's tip-side face
+# (round 6), so the collar web no longer stands between them; its printed
+# short limit is still charged, as a second spare, so the re-datum loosens no
+# proof (FoDtFab4's condition).  T024 sits one feeler further north still;
+# that only adds air.
+if abs(SECTION_ENDS[1] - FRONT_STUB - seat_step_station(SEAT_STEP_GEAR)) > 1e-9:
+    raise AssertionError("Sec1End is not one setback behind T030's north face")
+SEAT_STEP_BUDGET: dict[str, float] = {
+    "step band": printed_length_deviations("Sec1End")[1],
+    "fillet": FILLET_RADIUS + printed_length_deviations("ShoulderR")[1],
+    "collar band": -printed_length_deviations("CollarWidth")[0],
+    "stack": -face_band(SEAT_STEP_GEAR, "north")[1],
+    "spare": MARGIN_SPARE,
+}
+SEAT_STEP_BUDGET["margin"] = SEAT_STEP_SETBACK - sum(SEAT_STEP_BUDGET.values())
+if SEAT_STEP_BUDGET["margin"] < 0.0:
     raise AssertionError(
-        f"the key reaches T024 at print-worst ({KEY_NORTH_MARGIN_MM} mm)"
+        f"Sec1End: the step and its root reach T024 at print-worst {SEAT_STEP_BUDGET}"
+    )
+
+
+def _limits(nominal: float, band: tuple[float, float]) -> tuple[float, float]:
+    """(minimum, maximum) of ``nominal`` under (upper, lower) deviations."""
+    return nominal + min(band), nominal + max(band)
+
+
+# The recess proof (cone_tip_cluster.TIP_END_RECESS_MM).  The shaft's end must
+# stand inside T024's bore at every limit, so T018 always butts T024's north
+# face, and short of T024's south face, so T024 is bonded on land 2.  T024's
+# north face deviates from its model station as T030's north face does with
+# the stack pushed onto the collar (dt_cone_gear_stack.face_band), plus the
+# feeler set's STACK_FEELER_BAND either way and T024's own face width band;
+# the end deviates by Sec2End's printed limits.  Both run from the collar's
+# tip-side face, so the collar web does not enter.
+_T030_NORTH_BAND = face_band(SEAT_STEP_GEAR, "north")
+T024_NORTH_FACE_DEVIATION_MM = (
+    _T030_NORTH_BAND[1] - STACK_FEELER_BAND + CONE_GEAR_FACE_WIDTH_BAND[1],
+    _T030_NORTH_BAND[0] + STACK_FEELER_BAND + CONE_GEAR_FACE_WIDTH_BAND[0],
+)
+_END_DEVIATION = printed_length_deviations("Sec2End")
+TIP_END_RECESS_LIMITS_MM = (
+    cone_tip_cluster.TIP_END_RECESS_MM
+    + T024_NORTH_FACE_DEVIATION_MM[0]
+    - _END_DEVIATION[1],
+    cone_tip_cluster.TIP_END_RECESS_MM
+    + T024_NORTH_FACE_DEVIATION_MM[1]
+    - _END_DEVIATION[0],
+)
+_FACE_WIDTH_LIMITS = _limits(CONE_GEAR_FACE_WIDTH, CONE_GEAR_FACE_WIDTH_BAND)
+# T024's bonded length on land 2 at its least.
+T024_BOND_LENGTH_MIN_MM = _FACE_WIDTH_LIMITS[0] - TIP_END_RECESS_LIMITS_MM[1]
+if TIP_END_RECESS_LIMITS_MM[0] <= 0.0 or T024_BOND_LENGTH_MIN_MM <= 0.0:
+    raise AssertionError(
+        f"the shaft end leaves T024's bore: recess {TIP_END_RECESS_LIMITS_MM}, "
+        f"bond length {T024_BOND_LENGTH_MIN_MM:.4f} mm"
+    )
+
+# The spigot proof.  T006's spigot runs SPIGOT_LENGTH_MM south of T006's
+# leaves, through T012 and T018 (two face widths, butted on T024's north
+# face) into the socket.  Over the recess range above, with the spigot (.XX,
+# on the T006 sheet in this unit) and the socket depth (.XX) at their limits
+# and both face widths at theirs, the spigot keeps air at the socket floor
+# and at least SPIGOT_SOCKET_ENGAGEMENT_MIN_MM in the socket.
+_SPIGOT_LIMITS = _limits(
+    cone_tip_cluster.SPIGOT_LENGTH_MM,
+    printed_deviations(cone_tip_cluster.SPIGOT_LENGTH_MM, 2, unit=UNIT),
+)
+_SOCKET_DEPTH_LIMITS = _limits(SOCKET_DEPTH, printed_length_deviations("SocketDepth"))
+SPIGOT_FLOOR_AIR_MIN_MM = (
+    TIP_END_RECESS_LIMITS_MM[0]
+    + 2.0 * _FACE_WIDTH_LIMITS[0]
+    - _SPIGOT_LIMITS[1]
+    + _SOCKET_DEPTH_LIMITS[0]
+)
+SPIGOT_ENGAGEMENT_MIN_MM = (
+    _SPIGOT_LIMITS[0] - 2.0 * _FACE_WIDTH_LIMITS[1] - TIP_END_RECESS_LIMITS_MM[1]
+)
+if (
+    SPIGOT_FLOOR_AIR_MIN_MM <= 0.0
+    or SPIGOT_ENGAGEMENT_MIN_MM < cone_tip_cluster.SPIGOT_SOCKET_ENGAGEMENT_MIN_MM
+):
+    raise AssertionError(
+        f"T006's spigot: floor air {SPIGOT_FLOOR_AIR_MIN_MM:.4f} mm, engagement "
+        f"{SPIGOT_ENGAGEMENT_MIN_MM:.4f} mm (needs "
+        f"{cone_tip_cluster.SPIGOT_SOCKET_ENGAGEMENT_MIN_MM:.4f})"
+    )
+
+# The socket's wall (drawing-guidelines.md rule 17's .080 target): land 2 at
+# its least printed diameter round the socket at its largest.
+SOCKET_WALL_MIN_MM = (
+    land_finished_dia_limits_mm(SECTION_DIAS[2], 2)[0]
+    - _limits(SOCKET_DIA, SOCKET_DIA_BAND)[1]
+) / 2.0
+if SOCKET_WALL_MIN_MM < WALL_TARGET_MM:
+    raise AssertionError(
+        f"socket wall {SOCKET_WALL_MIN_MM:.4f} mm under rule 17's .080"
     )
 
 # The keyseat's end at its printed low limit, cut by the widest end mill

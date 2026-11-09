@@ -1086,36 +1086,12 @@ def finite_difference_check(
 # --------------------------------------------------------------------------
 
 
-def flat_edge_break_mm() -> float:
-    """The flat half-chord the title block's edge break may take off a
-    D-flat's torque corner. A C0.25 chamfer's leg along the flat is at most
-    0.25; an R0.25 break sets back R*cot(a/2) < R, since every flat meets
-    its land at an obtuse corner (a ~ 147 deg on the Ø1.5875 tip land)."""
+def edge_break_mm() -> float:
+    """The flank length the title block's edge break may take off the key's
+    top corner: a C0.25 chamfer's leg is at most 0.25, and an R0.25 break
+    sets back R*cot(a/2) <= R at the key's square corner."""
     row = _config.title_block("edge_break")
     return max(float(row["radius_mm"]), float(row["chamfer_max_mm"]))
-
-
-def _flat_half_chord(diameter: float, af: float) -> float:
-    """Half the width of a D-flat with across-flat ``af`` on a ``diameter`` land."""
-    return math.sqrt((diameter - af) * af)
-
-
-def _flat_chord_range(
-    diameter: float,
-    af: float,
-    dia_band: tuple[float, float],
-    af_band: tuple[float, float],
-) -> tuple[float, float]:
-    """(shortest, longest) flat half-chord a print accepts. For a fixed AF
-    the chord grows with the diameter; for a fixed diameter it shrinks as the
-    AF grows, because every flat is shallow (AF > D/2). Both extremes are
-    therefore corners of the limit box."""
-    chords = [
-        _flat_half_chord(diameter + d_dev, af + af_dev)
-        for d_dev in dia_band
-        for af_dev in af_band
-    ]
-    return min(chords), max(chords)
 
 
 def _key_levers(dia_band: tuple[float, float]) -> tuple[float, float, float]:
@@ -1128,7 +1104,7 @@ def _key_levers(dia_band: tuple[float, float]) -> tuple[float, float, float]:
     height in the shallowest keyseat on the largest land, less the title
     block's edge break on the key's top corner; it must stay above the gear's
     largest bore, where the keyway flank starts."""
-    edge_break = flat_edge_break_mm()
+    edge_break = edge_break_mm()
     radius_lo = (cone_land_key.LAND_DIA_MM + min(dia_band)) / 2.0
     radius_hi = (cone_land_key.LAND_DIA_MM + max(dia_band)) / 2.0
     s_lo = cone_land_key.KEYSEAT_S_MM + min(cone_land_key.KEYSEAT_S_BAND)
@@ -1155,122 +1131,50 @@ def _key_levers(dia_band: tuple[float, float]) -> tuple[float, float, float]:
 def phase_profiles() -> dict[str, tuple[np.ndarray, np.ndarray]]:
     """Phase radians = drawn deviation * per-channel scale + fixed residual.
 
-    Cone gear T_i has T_i/120 of its phase at the 120T cylinder cam.
-    The Ø9.525 land drives the 64T and T030..T120 through the MHA-DT-VN-71 key
-    (owner decision C1 keyed, 2026-11-09, PR #1992); the other lands keep a
-    D-flat. A D-bore's AF clearance turns its gear by c / lever, where the
-    lever is how far along the flat the gear's bore can bear before contact
-    runs out. A keyway's side clearance c is split about the key, so cranking
-    one way turns its gear by c / (2 lever), the lever the key's top
-    (``_key_levers``). Every scatter term is bounded at the print's worst, not
-    averaged: a flat's lever is the shortest shaft flat MHA-DT-04 accepts (land
-    at its smallest diameter and largest AF) less the title block's edge break
-    on its torque corner (``flat_edge_break_mm``), or the shortest bore flat if
-    that is shorter. The bore flat's corner is an inside corner, which the
-    title block does not break. The keyed land's mean lag (the key's
-    keyseat and keyway clearances at their means, on the longest unbroken
-    levers) is the reference: the crank index removes it, since that lag is
-    proportional to i and only shifts the index, so the keyed gears carry no
-    residual and only their keyways' scatter (``cone_key_play``). Each flatted
-    land's residual is its mean lag against that reference. Per-land
-    departures and per-gear scatter cannot be removed by that index. A shaft
-    land's flat clocked off the keyseat turns every gear on it by the same
-    angle (``cone_land_clock``, drawn per land by ``draw_groups``).
+    Cone gear T_i has T_i/120 of its phase at the 120T cylinder cam.  Owner
+    decision C1 keyed (2026-11-09, PR #1992): the Ø9.525 land drives the 64T
+    and T030..T120 through the MHA-DT-VN-71 key; T024 is bonded (LOCTITE 638)
+    on the round land 2, T018 and T012 on MHA-DT-37's spigot and the spigot in
+    the shaft, so no D-flat remains.  A keyway's side clearance c is split
+    about the key, so cranking one way turns its gear by c / (2 lever), the
+    lever the key's top (``_key_levers``) at the print's worst.  The keyed
+    land's mean lag is proportional to i and only shifts the crank index, so
+    the keyed gears carry no residual and only their keyways' scatter
+    (``cone_key_play``); their teeth are indexed off the keyway
+    (``cone_flat_clock``).  A bonded gear has no bore feature to index from:
+    MHA-DT-00 sets its clock with a pin through lined-up tooth spaces before
+    the compound grabs, and it cures there with no play.  Its scatter
+    (``cone_tip_bond_clock``) is its tooth space about that pin at its pitch
+    circle, a pitch-arc length: the turn at the cone gear is that arc over its
+    pitch radius, and at the cam T_i/120 of it, i.e. 1/(60 m) per mm on every
+    bonded gear.
     """
     teeth = 6 * np.arange(1, N_ELEMENTS + 1)
     ratio = teeth / 120.0
-    edge_break = flat_edge_break_mm()
-    land_af_band = cone_shaft_land_bands.FLAT_AF_BAND
-    bore_af_band = gear_seat_fit.flat_bore_af_band(land_af_band)
-    flat_levers = np.full(N_ELEMENTS, np.inf)
-    key_levers = np.full(N_ELEMENTS, np.inf)
-    reference_lag = math.nan
-    for dia_band, af, carried in zip(
-        cone_shaft_land_bands.SECTION_DIA_BANDS,
-        cone_shaft_land_bands.SECTION_FLAT_AF,
-        cone_shaft_land_bands.SECTION_CONE_GEAR_TEETH,
-        strict=True,
-    ):
-        if not carried:
-            continue  # pivot journal, with no gear
-        if af is None:
-            if 120 not in carried:
-                raise ValueError(f"the keyed land must carry T120, not {carried}")
-            short, way_long, seat_long = _key_levers(dia_band)
-            for count in carried:
-                key_levers[count // 6 - 1] = 2.0 * short
-            reference_lag = sum(
-                (lo + hi) / 2.0 / (2.0 * lever)
-                for (lo, hi), lever in (
-                    (cone_land_key.KEYSEAT_SIDE_CLEARANCE_MM, seat_long),
-                    (cone_land_key.KEYWAY_SIDE_CLEARANCE_MM, way_long),
-                )
-            )
-            continue
-        bore_band = gear_seat_fit.seat_bore_band(dia_band)
-        # The configured gear's bore is the nominal diameter of its shaft
-        # section; the section's bands set the land's and bores' limits.
-        for count in carried:
-            diameter = dt_cone_gear_spec.bore_dia_mm(count)
-            shaft_short, _ = _flat_chord_range(diameter, af, dia_band, land_af_band)
-            bore_short, _ = _flat_chord_range(diameter, af, bore_band, bore_af_band)
-            if shaft_short <= edge_break:
-                raise ValueError(
-                    f"the {edge_break} edge break leaves no D-flat lever on the "
-                    f"Ø{diameter:.4f} land: shortest half-chord {shaft_short:.4f}"
-                )
-            flat_levers[count // 6 - 1] = min(shaft_short - edge_break, bore_short)
-    clearance_lo, clearance_hi = gear_seat_fit.FLAT_AF_CLEARANCE
-    clearance_mean = (clearance_lo + clearance_hi) / 2.0
-    flatted = np.isfinite(flat_levers)
-    if not np.all(flatted ^ np.isfinite(key_levers)):
-        raise ValueError("every cone gear rides exactly one of a D-flat and the key")
-    residual = np.where(
-        flatted, ratio * (clearance_mean / flat_levers - reference_lag), 0.0
-    )
+    keyed = np.isin(teeth, dt_cone_gear_spec.KEYED_TEETH)
+    if not np.all(keyed ^ np.isin(teeth, (6, *dt_cone_gear_spec.ROUND_BORE_TEETH))):
+        raise ValueError("every cone gear is either keyed or bonded")
+    short, _, _ = _key_levers(cone_shaft_land_bands.SECTION_DIA_BANDS[dt_cone_gear_spec.KEYED_LAND])
+    key_levers = np.where(keyed, 2.0 * short, np.inf)
+    pitch_radius = teeth * dt_cone_gear_spec.MODULE_MM / 2.0
     deg = math.pi / 180.0
     return {
         "cam_phase": (np.full(N_ELEMENTS, deg), np.zeros(N_ELEMENTS)),
         "mesh_lag_spread": (np.full(N_ELEMENTS, deg), np.zeros(N_ELEMENTS)),
-        "cone_flat_clock": (ratio * deg, np.zeros(N_ELEMENTS)),
-        "cone_land_clock": (ratio * deg, np.zeros(N_ELEMENTS)),
-        "cone_flat_play": (ratio / flat_levers, residual),
+        "cone_flat_clock": (np.where(keyed, ratio * deg, 0.0), np.zeros(N_ELEMENTS)),
         "cone_key_play": (ratio / key_levers, np.zeros(N_ELEMENTS)),
+        "cone_tip_bond_clock": (
+            np.where(keyed, 0.0, ratio / pitch_radius),
+            np.zeros(N_ELEMENTS),
+        ),
     }
 
 
-def draw_groups() -> dict[str, np.ndarray]:
-    """Features whose one draw moves several channels together.
-
-    ``group[i]`` is channel i's draw column, -1 a channel the feature never
-    moves. ``cone_land_clock`` is each flatted shaft land's clock off the
-    Ø9.525 land's keyseat: that land carries T030..T120 and the 64T on the
-    MHA-DT-VN-71 key, so it is the reference, and turning it turns the whole
-    train (a crank-index shift). Every other land turns its own gears
-    together -- T006 and T012 share the tip land's single flat.
-    """
-    land = np.full(N_ELEMENTS, -1)
-    column = 0
-    for carried in cone_shaft_land_bands.SECTION_CONE_GEAR_TEETH:
-        if not carried or 120 in carried:
-            continue  # the pivot journal, and the reference land
-        for count in carried:
-            land[count // 6 - 1] = column
-        column += 1
-    return {"cone_land_clock": land}
-
-
 def draw_feature(
-    rng: np.random.Generator, key: str, tolerance: float, draws: int, n_axes: int
+    rng: np.random.Generator, tolerance: float, draws: int, n_axes: int
 ) -> np.ndarray:
     """One feature's deviations, uniform within +/-``tolerance``: draws x 20,
-    or draws x 20 x axes for a position zone (``feature_axes``). A grouped
-    feature (``draw_groups``) takes one column per group, shared by its
-    channels."""
-    groups = draw_groups().get(key)
-    if groups is not None:
-        columns = rng.uniform(-tolerance, tolerance, size=(draws, int(groups.max()) + 1))
-        return np.where(groups >= 0, columns[:, np.maximum(groups, 0)], 0.0)
+    or draws x 20 x axes for a position zone (``feature_axes``)."""
     size = (draws, N_ELEMENTS) if n_axes == 1 else (draws, N_ELEMENTS, n_axes)
     return rng.uniform(-tolerance, tolerance, size=size)
 
@@ -1453,7 +1357,7 @@ def monte_carlo(
 
     def draw(key: str, f: dict[str, Any]) -> np.ndarray:
         n_axes = len(axes.get(key, ((key, 1.0),)))
-        return draw_feature(rng, key, f["tolerance"], draws, n_axes)
+        return draw_feature(rng, f["tolerance"], draws, n_axes)
 
     all_dev = {
         key: draw(key, f)
@@ -1920,7 +1824,7 @@ def pair_joint_worst(
     dev = {}
     for key, f in feats.items():
         n_axes = len(axes.get(key, ((key, 1.0),)))
-        dev[key] = draw_feature(rng, key, f["tolerance"], draws, n_axes)
+        dev[key] = draw_feature(rng, f["tolerance"], draws, n_axes)
     scatter = _channel_model(
         x,
         nom,

@@ -14,7 +14,9 @@ SEQUENCE: tuple[str, ...] = (
     # Cone set and crank (CONE_CRANK_STEPS).
     "cone-gears-stacked",
     "post-and-tip-block",
-    "tip-adjuster-set",
+    # Owner decision C1 keyed (2026-11-09, PR #1992): MHA-DT-39 sets the end
+    # play against MHA-DT-38 (was "tip-adjuster-set", the retired VN-55 cup).
+    "end-play-set",
     "crank-mesh-checked",
     "paper-drive-wheel",
     "crank-hub-fitted",

@@ -4,7 +4,7 @@ validated single-part original).
 
 Replicas use vendor model harvests from ``cad/references/mcmaster/`` and
 the corresponding ``cad/out/reports/mcmaster-<part>-dump.json``.
-90280A837 and 91794A112 start from the supplied catalog dimensions and the
+90280A837, 91794A112 and 91794A558 start from the supplied catalog dimensions and the
 existing fillister family equations; their native comparison is required
 before release.
 Gates run against the vendor's own mass properties and face-area multiset
@@ -68,6 +68,7 @@ from diagnostics.diag_build_91771A112 import build_91771A112  # noqa: E402
 from diagnostics.diag_build_90325A174 import build_90325A174  # noqa: E402
 from diagnostics.diag_build_91794A080 import build_91794A080  # noqa: E402
 from diagnostics.diag_build_91794A112 import build_91794A112  # noqa: E402
+from diagnostics.diag_build_91794A558 import build_91794A558  # noqa: E402
 from diagnostics.diag_build_91794A055 import build_91794A055  # noqa: E402
 from diagnostics.diag_build_92240A539 import build_92240A539  # noqa: E402
 from diagnostics.diag_build_92240A540 import build_92240A540  # noqa: E402
@@ -79,7 +80,6 @@ from diagnostics.diag_build_93075A194 import build_93075A194  # noqa: E402
 from diagnostics.diag_build_93075A199 import build_93075A199  # noqa: E402
 from diagnostics.diag_build_93585A190 import build_93585A190  # noqa: E402
 from diagnostics.diag_build_94025A150 import build_94025A150  # noqa: E402
-from diagnostics.diag_build_94025A164 import build_94025A164  # noqa: E402
 from diagnostics.diag_build_98296A027 import build_98296A027  # noqa: E402
 from diagnostics.diag_build_98296A031 import build_98296A031  # noqa: E402
 from diagnostics.diag_build_98381A435 import build_98381A435  # noqa: E402
@@ -90,7 +90,6 @@ from diagnostics.diag_build_97431A240 import build_97431A240  # noqa: E402
 REGISTRY = {
     "90126A211": build_90126A211,
     "94025A150": build_94025A150,
-    "94025A164": build_94025A164,
     "90114A511": build_90114A511,
     "92240A539": build_92240A539,
     "92240A540": build_92240A540,
@@ -117,6 +116,7 @@ REGISTRY = {
     "90280A837": build_90280A837,
     "91794A080": build_91794A080,
     "91794A112": build_91794A112,
+    "91794A558": build_91794A558,
     "9275K141": build_9275K141,
     "98296A027": build_98296A027,
     "98296A031": build_98296A031,

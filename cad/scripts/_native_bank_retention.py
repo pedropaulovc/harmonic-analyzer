@@ -26,7 +26,7 @@ import dt_vn_cylinder_bank_spring_spec as spring
 import pinion_rig_layout as rig
 import pinion_rig_park_geometry as park
 from _com import _early_bound
-from _native_tip_collar_air import (
+from _native_cone_tip_air import (
     NATIVE_RESOLUTION_MM,
     _array,
     _closest,

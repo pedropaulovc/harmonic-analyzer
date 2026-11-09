@@ -321,10 +321,16 @@ SECTION_KEEP = {
     "PivotBearingReliefDepth": _shifted(0.365, 0.1195),
 }
 
-# Tip-block hold-down hole (user ruling 2026-09-29): its 10.45 station from
-# the pivot bore is too small to dimension at 1:2 beside the relief, so
-# DETAIL B enlarges the pivot-to-hole region of the hole-location plan to 2:1
-# and carries HoldDownZ and HoldDownX.  The detail inherits the plan's
+# Tip-block hold-down hole (user ruling 2026-09-29): its station from the
+# pivot bore is too small to dimension at 1:2 beside the relief, so
+# DETAIL B enlarges the pivot-to-hole region of the hole-location plan and
+# carries HoldDownZ and HoldDownX.  C1 keyed (owner decision 2026-11-09, PR
+# #1992) moved the hole .329 south with MHA-DT-21, to .738 from the pivot:
+# the circle grew from 12 to 16 mm and the detail went from 2:1 to 3:2, so
+# its sheet circle stays the 48 mm one the layout below was measured around,
+# and its centre moved so the hole stands where it did on the sheet (8.77 mm
+# over the centre); the pivot axis stands 19.4 mm under it, the relief's far
+# side clipped by the circle.  The detail inherits the plan's
 # hidden-lines-removed style: the counterbore is on the underside, and its
 # size is stated by the native Hole Wizard callout on section C-C, where it
 # shows in solid lines.
@@ -335,9 +341,9 @@ SECTION_KEEP = {
 # callouts in and its native label fell 8.9 mm through the bottom border.
 # So the detail takes the band's left half and section C-C its right half.
 # Sheet +x is model +x (west) and sheet +y is model -z (south) in these plans.
-DETAIL_MODEL_Z = -6.0  # detail circle centre, between the pivot and the hole
-DETAIL_RADIUS_MM = 12.0
-DETAIL_SCALE = (2, 1)
+DETAIL_MODEL_Z = -12.9  # detail circle centre, between the pivot and the hole
+DETAIL_RADIUS_MM = 16.0
+DETAIL_SCALE = (3, 2)
 # The former B letter stood 0.28 mm off the relief-width arrow and 0.62 mm
 # over the pivot station witness. Its native anchor now puts the printed
 # box at about [189.2,138.4]..[192.8,144.6] mm, clear of both and the circle.
@@ -639,13 +645,16 @@ HOLDDOWN_STRIP_LOWER_LEFT = (0.1395, 0.0352)
 # (r8: rows 0.0696..0.0528 for y 0.064, underline from 0.1371 for x
 # 0.175).  The leader lands on the counterbore's sheet-right wall at the
 # underside (r8's tip).  At 1:1 (r8) that line ran across the strip's left
-# piece; here the underline's left end (~0.1564, y 0.0545) stands up and
+# piece; here the underline's left end (~0.1568, y 0.0545) stands up and
 # left of the hole so the leader drops through the Ø3.05 hole into the
-# counterbore, ~1.1 mm clear of the hole's left wall at the top face and of
-# its right wall at the step.  The block's right end (~0.209) stands 7 mm
-# off the title block, its top row (~0.0748) 5.7 mm under the plan
+# counterbore, clear of the hole's left wall at the top face and of its
+# right wall at the step.  C1 keyed's station (owner decision 2026-11-09, PR
+# #1992) widens the strip's east piece 0.28 mm, so the callout stands 0.4 mm
+# right of r8's, mid-way in the 0.4 mm of x that keeps every row width's
+# leader 0.5 mm clear of both walls.  The block's right end (~0.210) stands
+# 6 mm off the title block, its top row (~0.0748) 5.7 mm under the plan
 # captions (0.0805).
-HOLDDOWN_CALLOUT_XY = (0.1830, 0.0657)
+HOLDDOWN_CALLOUT_XY = (0.1834, 0.0657)
 # Face labels on both sections (machinist review r3 blocker): both sections
 # look south (sheet-up arrows), so each draws the top face at its head and
 # the underside at its foot (machinist review of e04fd60: A-A looking north
@@ -1098,7 +1107,7 @@ def _create_detail_view(
     # projection moved a correctly placed view 99 mm up and needed a second
     # move to bring it back; on three #1105 leaves the projection then read
     # "on target" while the outline sat 99 mm high, and the view stayed there.
-    # GetOutline is the ink (a 2:1 circle of DETAIL_RADIUS_MM, its label is
+    # GetOutline is the ink (the scaled circle of DETAIL_RADIUS_MM, its label is
     # placed separately), and SetViewPosition moves that ink by the
     # difference from the Position it reads, so place by the outline and only
     # verify the projection afterwards, once it has caught up.

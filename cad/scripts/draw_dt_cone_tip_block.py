@@ -60,6 +60,8 @@ from dt_cone_tip_block_spec import (
     ADJUSTER_AXIS_HEIGHT,
     ADJUSTER_BORE_DIA,
     ADJUSTER_CSK,
+    AXIS_HEIGHT_MATCH_MATE,
+    AXIS_HEIGHT_MATCH_REQUIREMENT,
     BLOCK_HEIGHT,
     BLOCK_X,
     BLOCK_Z,
@@ -117,6 +119,10 @@ PNG = OUTPUTS.png
 # already states (#1).
 DOWEL_PIN_NUMBER = _config.parts("dt-vn-locating-pin")["number"]
 PLATFORM_NUMBER = _config.parts("dt-cone-swing-platform")["number"]
+END_SCREW_NUMBER = _config.parts("dt-cone-tip-end-screw")["number"]
+POST_NUMBER = _config.parts("dt-cone-pivot-post")["number"]
+if POST_NUMBER != AXIS_HEIGHT_MATCH_MATE:
+    raise AssertionError("the axis height's matched mate is not the pivot post")
 DOWEL_NOTE_NUMBER = 1
 DOWEL_HOLE_DEPTH_TEXT = length_text(DOWEL_HOLE_DEPTH, DOWEL_HOLE_DEPTH_PLACES)
 DOWEL_HOLE_CALLOUT = "\n".join(
@@ -148,6 +154,22 @@ DOWEL_NOTE = textwrap.fill(
     subsequent_indent="   ",
     break_on_hyphens=False,
 ).replace(_NBSP, " ")
+# Owner decision 2026-11-09 (C1 keyed, via ImplementC1KeyedOpus; rule 19's
+# matched route): T006's pivot runs in the end screw's reamed hole, so the
+# adjuster axis is made to the measured MHA-DT-05 journal-axis height above
+# MHA-DT-20 within the match residual (dt_cone_tip_block_spec).  The
+# AxisHeight value keeps its general band (the absolute range the matched
+# value takes) and flags this note, worded like the cone gear's MADE TO THE
+# MEASURED LAND.
+AXIS_MATCH_NOTE_NUMBER = 2
+AXIS_HEIGHT_CALLOUT = f"MATCHED,\nSEE NOTE {AXIS_MATCH_NOTE_NUMBER}"
+AXIS_MATCH_NOTE = textwrap.fill(
+    AXIS_HEIGHT_MATCH_REQUIREMENT,
+    width=DOWEL_NOTE_WIDTH,
+    initial_indent=f"{AXIS_MATCH_NOTE_NUMBER}. ",
+    subsequent_indent="   ",
+    break_on_hyphens=False,
+)
 
 # User ruling 2026-09-29 (eight-views-4.png, lower right): the block is a
 # plain straight prism standing on the swing platform, held down by one
@@ -299,10 +321,12 @@ SLIT_ROW_LEFT = SLIT_W * _S / 2.0 + 0.0064 + TEXT_CLEARANCE + ROUND_OUT
 # above a dimension); below it, the full mate number gets its own row.
 DIMENSION_CALLOUTS = {
     # The adjuster thread runs through the block's depth: its length is the
-    # cup screw's engagement window (build_dt_drive_train_assembly's embed
+    # end screw's engagement window (build_dt_drive_train_assembly's embed
     # stack).  Two rows of words (round-1 farm review, dt-fab-4); the whole
     # value/mate block sits on a native offset shelf right of the plan.
-    "Depth": "SETS MHA-DT-VN-55\nENGAGEMENT",
+    "Depth": f"SETS {END_SCREW_NUMBER}\nENGAGEMENT",
+    # The matched axis height (AXIS_MATCH_NOTE).
+    "AxisHeight": AXIS_HEIGHT_CALLOUT,
     # Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
     # #2248): the locating dowel's press ream -- its depth,
     # the dowel pressed to its floor and the match-drilling through MHA-DT-20.
@@ -521,9 +545,9 @@ CAPTION_Y = _elevation_y(0.0, FRONT_CENTER) - 0.004
 # A one-line "VIEW B": six glyphs at the 287c captions' 2.6 mm pitch, rounded
 # out.  An estimate until a render measures it.
 VIEW_CAPTION_EXTENT = (0.0, 0.0036, 0.0160, 0.0)
-# The shaft tip the bore locates, named at the bore's callout (screen review
-# dt-fab-4: the location carries its value only, rule 4).
-BORE_FLAG_TEXT = "LOCATES MHA-DT-04 TIP"
+# The end screw the through thread carries, named at the bore's callout
+# (screen review dt-fab-4: the location carries its value only, rule 4).
+BORE_FLAG_TEXT = f"CARRIES {END_SCREW_NUMBER}"
 # Review C1: the left view sits right of the right view, out of third-angle
 # order, so it is a removed view named by a letter arrow on the view that
 # shows the face it looks at.  VIEW B looks at the -X (pinch-thread) face:
@@ -623,10 +647,12 @@ FOOT_TAP_CALLOUT_XY = (FOOT_TAP_CENTER[0] + 0.0373, _bottom_y(Z_NORTH) + 0.0100)
 # farm review, dt-fab-4: the seat that stands on MHA-DT-20).  The width
 # dimension that once ran under that foot reads in the bottom view, so the
 # leader reaches the foot edge-on with nothing dimensioned under it.  Blind
-# machinist review of c289ee94: 11.5 mm under the foot leaves ~2.5 mm from
-# the symbol's top to the foot.
+# machinist review of c289ee94: 11.5 mm under the foot left ~2.5 mm from the
+# symbol's top to the foot; C1 keyed's .430 depth (owner decision
+# 2026-11-09, PR #1992) lifts the bottom view's foot-tap callout, so the
+# symbol rises 1.1 mm to stay TEXT_CLEARANCE over it (~1.4 mm under the foot).
 FOOT_FINISH_DX = 0.034
-FOOT_FINISH_DROP = 0.0115
+FOOT_FINISH_DROP = 0.0104
 
 
 def _adjuster_axis_keep() -> dict[str, tuple[float, float]]:
@@ -657,6 +683,7 @@ def _sheet_notes() -> tuple[tuple[str, float, float], ...]:
         (BORE_FLAG_TEXT, FRONT_CENTER[0] + ADJUSTER_ENTRY_DX, ADJUSTER_ENTRY_Y),
         # The ream callout's SEE NOTE 1 (round 6, #2).
         (DOWEL_NOTE, *DOWEL_NOTE_XY),
+        (AXIS_MATCH_NOTE, *AXIS_MATCH_NOTE_XY),
     )
 
 
@@ -711,15 +738,14 @@ def _value_and_rows_extent(
 
 
 _VALUE_EXTENTS = {
-    # "5.9": three characters, 5.8 mm wide (I31's "6.0").
-    "PinchDepthCenter": (0.0033, 0.0019, 0.0033, 0.0019),
+    # The pinch hole's .215 depth station.
+    "PinchDepthCenter": _value_extent("PinchDepthCenter", BLOCK_Z / 2.0),
     # The locating dowel's station and its ream's banded size with rows.
     "DowelX": DOWEL_X_EXTENT,
     "DowelHoleDia": DOWEL_HOLE_EXTENT,
     **{
         name: _value_extent(name, nominal)
         for name, nominal in (
-            ("AxisHeight", ADJUSTER_AXIS_HEIGHT),
             ("PinchHeight", PINCH_HEIGHT),
             ("PassageCenter", BLOCK_X / 2.0),
             ("FootTapX", FOOT_TAP_X),
@@ -730,6 +756,7 @@ _VALUE_EXTENTS = {
         name: _value_and_rows_extent(name, nominal, text)
         for name, nominal, text in (
             ("Depth", BLOCK_Z, DIMENSION_CALLOUTS["Depth"]),
+            ("AxisHeight", ADJUSTER_AXIS_HEIGHT, DIMENSION_CALLOUTS["AxisHeight"]),
             ("Width", BLOCK_X, DIMENSION_CALLOUTS_ABOVE["Width"]),
             # "1.20" under its SLOT INTO BORE row.
             ("SlitW", SLIT_W, DIMENSION_CALLOUTS_ABOVE["SlitW"]),
@@ -781,11 +808,22 @@ BOTTOM_KEEP["DowelHoleDia"] = (
 # notes field).
 NOTE_GLYPH_WIDTH = 0.00264
 NOTE_ROW_HEIGHT = 0.00405
-DOWEL_NOTE_XY = (0.300, 0.100)
+DOWEL_NOTE_XY = (0.300, 0.125)
 DOWEL_NOTE_EXTENT = (
     0.0,
     len(DOWEL_NOTE.split("\n")) * NOTE_ROW_HEIGHT,
     max(len(line) for line in DOWEL_NOTE.split("\n")) * NOTE_GLYPH_WIDTH,
+    0.0,
+)
+# The matched axis height's note, one row clear under note 1.
+AXIS_MATCH_NOTE_XY = (
+    DOWEL_NOTE_XY[0],
+    DOWEL_NOTE_XY[1] - DOWEL_NOTE_EXTENT[1] - NOTE_ROW_HEIGHT,
+)
+AXIS_MATCH_NOTE_EXTENT = (
+    0.0,
+    len(AXIS_MATCH_NOTE.split("\n")) * NOTE_ROW_HEIGHT,
+    max(len(line) for line in AXIS_MATCH_NOTE.split("\n")) * NOTE_GLYPH_WIDTH,
     0.0,
 )
 # Free notes are placed by their upper-left corner.
@@ -793,6 +831,7 @@ _NOTE_EXTENTS = {
     BORE_FLAG_TEXT: ADJUSTER_ENTRY_EXTENT,
     "VIEW B": VIEW_CAPTION_EXTENT,
     DOWEL_NOTE: DOWEL_NOTE_EXTENT,
+    AXIS_MATCH_NOTE: AXIS_MATCH_NOTE_EXTENT,
 }
 # The locating-foot finish symbol: its leader lands midway along the right
 # half of the foot edge; measured on the 287c render, its ink (shoulder,

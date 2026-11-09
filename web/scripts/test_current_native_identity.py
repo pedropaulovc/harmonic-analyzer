@@ -249,8 +249,9 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
     def test_archive_only_identities_have_no_live_cad_metadata(self):
         mapping = json.loads(TABLE_PATH.read_text())
         # The three pre-cutover retirements plus the v39 MHA-DT-VN-66 loop link
-        # (retired 2026-11-08, #2144 9.2).
-        self.assertEqual(len(mapping["archiveOnlyVendors"]), 4)
+        # (retired 2026-11-08, #2144 9.2) and the v39 MHA-DT-VN-54 collar and
+        # MHA-DT-VN-55 adjuster (retired 2026-11-09, C1 keyed, PR #1992).
+        self.assertEqual(len(mapping["archiveOnlyVendors"]), 6)
         identity = CurrentNativeIdentity()
         for row in mapping["archiveOnlyVendors"]:
             self.assertEqual(row["status"], "archive-only")
@@ -281,20 +282,24 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
         cad_map = json.loads((ROOT / "cad/config/current-identity-map.json").read_text(encoding="utf-8"))
         identity = CurrentNativeIdentity()
         retired = cad_map["retired_identities"]
-        self.assertEqual(len(retired), 43)
+        self.assertEqual(len(retired), 45)
         # #2119: the 3/16 pen-rod set screw gave way to the shared MHA-SH-VN-54;
         # #290: the arm's spot face took the MHA-PD-VN-67 pivot shim's room;
         # #2144 item 11.4: the purchased MHA-SM-VN-56 shoulder screw retired the
         # made gooseneck spring screw;
         # #2144 9.2: the screwed jack chain took the MHA-DT-28 anchor eye's and
-        # the MHA-DT-VN-66 loop link's places.
+        # the MHA-DT-VN-66 loop link's places;
+        # PR #1992 (C1 keyed): the bonded tip and its end screw retired the
+        # MHA-DT-VN-54 stack collar and the MHA-DT-VN-55 cup adjuster.
         machine = [row for row in retired if "-tl-" not in row["old_stem"]]
         self.assertEqual([(row["old_stem"], [t["number"] for t in row["new_identities"]])
                           for row in machine], [("vn-pen-rod-set-screw", ["MHA-PN-VN-52"]),
                                                 ("vn-transgear-pivot-shim", ["MHA-PD-VN-67"]),
                                                 ("sm-gooseneck-spring-screw", ["MHA-SM-04"]),
                                                 ("vn-keeper-chain-link", ["MHA-DT-VN-66"]),
-                                                ("dt-crank-pin-eye", ["MHA-DT-28"])])
+                                                ("dt-crank-pin-eye", ["MHA-DT-28"]),
+                                                ("vn-cone-tip-collar", ["MHA-DT-VN-54"]),
+                                                ("vn-cone-tip-adjuster", ["MHA-DT-VN-55"])])
         oblique_reservations = {
             "ch-rocker-arm-tl-oblique-pivot-pin": "MHA-CH-06-TL-23",
             "ch-rocker-arm-tl-oblique-hub-pin": "MHA-CH-06-TL-25",
@@ -342,8 +347,9 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
             mirror = row["new_identities"][0]
             if len(row["new_identities"]) == 1 and (
                     row["old_stem"], mirror.get("parent"), mirror["stem"]) in archived:
-                # An archived v39 occurrence (the MHA-DT-VN-66 loop link) keeps
-                # its display name with no current Number.
+                # An archived v39 occurrence (the MHA-DT-VN-66 loop link, the
+                # MHA-DT-VN-54 collar, the MHA-DT-VN-55 adjuster) keeps its
+                # display name with no current Number.
                 parent = mirror["parent"]
                 self.assertEqual(identity.project_path(PREFIX + parent + "/" + row["old_stem"] + "-1"),
                                  PREFIX + parent + "/" + mirror["stem"] + "-1")

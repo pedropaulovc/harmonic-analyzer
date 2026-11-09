@@ -402,8 +402,6 @@ def platform_station(station):
 _ppv = platform_station(d.PIVOT_STATION)
 _pps = platform_station(d.POST_STATION)
 _ptp = platform_station(d.TIP_BLOCK_STATION)
-_pcl = platform_station(d.COLLAR_STATION)
-_pad = platform_station(d.ADJ_HEAD_STATION)
 expect(
     DT,
     "dt-cone-swing-platform-1",
@@ -424,20 +422,6 @@ expect(
     [_ptp[0], d.Y_BASE_TOP + d.PLAT_T, _ptp[2]],
     d.ROT_Y_INCLINE,
     "dt-cone-tip-block",
-)
-expect(
-    DT,
-    "dt-vn-cone-tip-collar-1",
-    [_pcl[0], d.Y_DRIVE, _pcl[2]],
-    d.ROT_SHAFT_NORTH,
-    "dt-vn-cone-tip-collar",
-)
-expect(
-    DT,
-    "dt-vn-cone-tip-adjuster-1",
-    [_pad[0], d.Y_DRIVE, _pad[2]],
-    d.ROT_SHAFT_SOUTH,
-    "dt-vn-cone-tip-adjuster",
 )
 expect(
     DT,
@@ -631,7 +615,9 @@ expect(
     d.ROT_Y_INCLINE,
     "crank-drive-gear 64T",
 )
-for j in range(20):
+# The MHA-DT-03 family is T120..T012 (COUNT - 1 instances); from T024 north
+# the feeler-set stations sit TIP_SET_SHIFT further on (_ladder_offset).
+for j in range(d.dt_cone_gear_stack.COUNT - 1):
     expect(
         DT,
         f"dt-cone-gear-{j + 1}",
@@ -640,12 +626,21 @@ for j in range(20):
             d.SHAFT_T120_STATION
             + d.GEAR_AXIS_SHIFT
             + (d.CONE_FACE_STATION_REFERENCE - d.CONE_FACE) / 2.0
-            + j * d.SEAT_PITCH,
+            + j * d.SEAT_PITCH
+            + (d.TIP_SET_SHIFT if j >= d.dt_cone_gear_stack.TIP_SET_FIRST_INDEX else 0.0),
             d.CONE_FACE,
         ),
         d.ROT_Y_INCLINE,
         f"cone-gear j={j}",
     )
+# T006 is MHA-DT-37 (owner decision C1 keyed, 2026-11-09, PR #1992).
+expect(
+    DT,
+    "dt-cone-tip-gear-1",
+    on_shaft(d.TIP_GEAR_SOUTH_STATION + d.CONE_FACE / 2.0, d.CONE_FACE),
+    d.ROT_Y_INCLINE,
+    "cone-tip-gear T006",
+)
 cylinder_rows = compose_rows(ROT_Y_180, d.rot_z_rows(-1.5))
 for j in range(20):
     expect(

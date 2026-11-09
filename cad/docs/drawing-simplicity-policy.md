@@ -106,8 +106,7 @@ reviews that read it. This policy file is not a review input.
   package's own declarations reach its reviewer. Precedents (kind `accept`):
   `dt-cone-pivot-post` RV-02; `dt-cone-swing-platform` RV-01 and RV-03;
   `dt-cone-tip-block` RV-01; `dt-pinion-pivot-block` RV-01;
-  `dt-pinion-spring` RV-02; `dt-vn-cone-tip-collar` RV-01;
-  `pn-pen-adjust-screw` RV-01; `pn-pen-frame` RV-02; `pn-pen-hanger` RV-01;
+  `dt-pinion-spring` RV-02; `pn-pen-adjust-screw` RV-01; `pn-pen-frame` RV-02; `pn-pen-hanger` RV-01;
   `pn-pen-rod` RV-02; `pn-pen-v-block` RV-02; `sm-summing-lever` RV-04.
   The cylinder-bank assembly settings also author their native dimension
   callout text in the builder; the drawing reads it back instead of calling

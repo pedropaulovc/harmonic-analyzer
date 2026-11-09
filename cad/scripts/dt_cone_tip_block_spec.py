@@ -10,7 +10,9 @@ import math
 from typing import Literal
 
 import _config
+import _mcmaster_91794a558 as end_screw_stock
 import _printed_tolerance
+import cone_tip_cluster
 import dt_vn_locating_pin_spec as locating_pin
 from _fit_deviations import deviations
 from _gtol_planar import PlanarFace
@@ -20,7 +22,8 @@ from _package_units import drawing_unit
 from _surface_finish import SEAT_UM, SurfaceFinishControl
 from _title_block_units import LENGTH_UNITS, render_number
 from _cone_axis_constants import CONE_AXIS_HEIGHT_MM, PLATFORM_THICKNESS_MM
-from cone_stations import PIVOT_STATION
+from cone_stack_end_play import SHAFT_END_PLAY
+from cone_stations import PIVOT_STATION, T006_NORTH_FACE
 
 # The sheet unit the registry row declares; every band below is read for it.
 UNIT = drawing_unit("parts/dt-cone-tip-block", _config.parts("dt-cone-tip-block"))
@@ -44,28 +47,32 @@ UNIT = drawing_unit("parts/dt-cone-tip-block", _config.parts("dt-cone-tip-block"
 # lower limit keeps the 5/8 pinch screw (McMaster 91794A112)
 # PINCH_SCREW_RECESS_MM short of the -X face (asserted with the screw below).
 BLOCK_X = 17.018  # .67 plan width across the shaft
-# Plan depth along the shaft, printed .XXX.  The north face stands the pivot
-# screw's head gap off the pivot (TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET)
-# and the block grows SOUTH (user ruling 2026-09-29): the depth must hold the
-# adjuster's embed window (below) open over the tip's axial stack, and stay
-# short enough that the MHA-DT-VN-54 stack collar never reaches the south face
-# (build_dt_drive_train_assembly's collar-to-block air).  The depth sits
-# between the two at print-worst, and its half (the pinch hole's and the foot
-# tap's station) stays on the .01 in grid.
-BLOCK_Z = 9.652  # .380
+# Plan depth along the shaft, printed .XXX: cone_tip_cluster's BLOCK_DEPTH_MM,
+# deep enough for 1.5 D of the 1/4-28 end screw's full thread past both mouth
+# countersinks at the printed limits (END_SCREW_EMBED_WINDOW below; owner
+# decision C1 keyed, 2026-11-09, PR #1992).  Its half, the pinch hole's and the
+# foot tap's station, is .215, so both print .XXX.
+BLOCK_Z = cone_tip_cluster.BLOCK_DEPTH_MM  # .430
 
-# User ruling 2026-09-29 (eight-views-4.png): the tip block is a straight
-# prism held by one screw in a fixed platform hole under its centre.  Its
-# north face stands TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET south of the pivot,
-# 0.80 off the pivot screw's head at nominal -- the gap
-# build_dt_drive_train_assembly proves at print-worst -- and the block grows
-# SOUTH from there (its depth closes the adjuster's embed window), so the
-# centre, and the platform hole under it, follow the depth.  On the .001 in
-# grid, with the half depth, so the platform's HoldDownZ prints exactly.
-TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET = 5.5626  # .219
-TIP_BLOCK_NORTH_FACE = PIVOT_STATION - TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET
-TIP_BLOCK_STATION = TIP_BLOCK_NORTH_FACE - BLOCK_Z / 2.0
-TIP_BLOCK_PIVOT_OFFSET = PIVOT_STATION - TIP_BLOCK_STATION
+# Owner decision C1 keyed (2026-11-09, PR #1992): MHA-DT-04 now ends inside
+# T024, so the block moved south to keep the end screw on T006's pivot (the
+# research put its south face .300 off the layout T006 north face).  It stays
+# a straight prism held by one screw in a fixed platform hole under its
+# centre (user ruling 2026-09-29), so the platform's HoldDownZ prints the
+# centre's offset from the pivot, on the .001 in grid so it prints exactly.
+# Owner ruling 2026-11-09 (relayed by ImplementC1KeyedOpus): .738, .033 south
+# of the research's station, so the end screw reaches the bushing with its
+# head clear at every limit of the tip's axial stack
+# (build_dt_drive_train_assembly's END_SCREW_EMBED_WORST_MM); the shallow
+# side's engagement shortfall there is a pending owner ruling.  The realized
+# south face stands TIP_BLOCK_GAP_MM (.26747) north of the layout T006 north
+# face.  Every consumer reads the block's stations from here.
+TIP_BLOCK_PIVOT_OFFSET = 18.7452  # .738
+TIP_BLOCK_STATION = PIVOT_STATION - TIP_BLOCK_PIVOT_OFFSET
+TIP_BLOCK_NORTH_FACE = TIP_BLOCK_STATION + BLOCK_Z / 2.0
+TIP_BLOCK_SOUTH_FACE = TIP_BLOCK_STATION - BLOCK_Z / 2.0
+TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET = PIVOT_STATION - TIP_BLOCK_NORTH_FACE  # .523
+TIP_BLOCK_GAP_MM = TIP_BLOCK_SOUTH_FACE - T006_NORTH_FACE  # .26747
 
 # The adjuster and cone journal share one height above the platform top.
 # Free material above the slit floor and the pinch screw's rise stay fixed.
@@ -100,50 +107,65 @@ BLOCK_WIDTH_BAND = (0.0, -0.508)  # +.000/-.020
 BLOCK_WIDTH_PLACES = 2
 BLOCK_DEPTH_PLACES = 3
 BLOCK_HEIGHT_PLACES = 2
-# .XX: the tip's vertical capture in the adjuster cup
-# (build_dt_drive_train_assembly) closes at the .XX band.
+# .XX: the tip's vertical alignment with the post journal
+# (build_dt_drive_train_assembly's vertical take-up) reads this band.
 AXIS_HEIGHT_PLACES = 2
 PINCH_HEIGHT_PLACES = 2
 PASSAGE_CENTER_PLACES = 3
-PINCH_DEPTH_PLACES = 2
+# .XXX: the pinch hole stands at the block's half depth, .215 (BLOCK_Z).
+PINCH_DEPTH_PLACES = 3
 SLIT_W_PLACES = 2
 # The slit depth does not print: its modelled floor stands wholly inside the
 # adjuster tap drill (checked below), so the print says SLOT INTO BORE on the
-# slit width instead.
+# slit width instead.  The floor stays 0.65 under the axis: inside the 1/4-28
+# tap drill by the margins checked below.
 SLIT_FLOOR = ADJUSTER_AXIS_HEIGHT - 0.65
 SLIT_W = 1.27  # .05
 SLIT_DEPTH = BLOCK_HEIGHT - SLIT_FLOOR
-# drawing-guidelines.md rule 18 (thread engagement) E11/W1 (Main, 2026-09-24): a #10-32 x 3/8 cup set screw (McMaster
-# 94025A164) in a thread tapped THROUGH the block, a 90-degree countersink at
-# both mouths, and no block growth.  A through tap has no floor to break out
-# and no tap lead to deduct; the shaft tip enters through the same thread.
-# ADJUSTER_EMBED is the depth from the north face at which the cup's apex
-# would meet the tip; the tip's flat end seats on the cup wall one seat depth
-# (stub radius / tan 45 deg) short of the apex, so the rim, and the thread
-# engagement, sit that much shallower.  User ruling 2026-09-29: the block is
-# fixed by its hold-down, so the tip's axial scatter lands on that
-# engagement; build_dt_drive_train_assembly sums the stack and asserts it stays
-# inside ADJUSTER_EMBED_WINDOW.  The value centres the engagement there: the
-# Ø1/32 in terminal stub seats 0.397 mm (its radius / tan 45 deg) short of the
-# apex, so 7.77 keeps main's 7.376 mm centred engagement (8.17 with the former
-# Ø1/16 stub's 0.794 mm seat depth).
-ADJUSTER_THREAD = "#10-32"
-ADJUSTER_SCREW_LENGTH = 9.525
-ADJUSTER_EMBED = 7.77
-# 90-degree countersink on each mouth to just over the .190 major, so
-# the first thread starts full rather than on a feather edge (Main,
-# 2026-09-24).  Its depth is the 45-degree break on the tap drill.
-ADJUSTER_CSK_DIA = 5.0038  # .197
-# ASME B1.1 #10-32 UNF-2B minimum minor diameter (0.1560 in): the tightest
-# envelope the shaft tip passes through.
-ADJUSTER_MINOR_MIN_DIA = 0.1560 * 25.4
-SHAFT_PASSAGE_DIA = ADJUSTER_MINOR_MIN_DIA
-PINCH_THREAD = "#4-40"  # cross-bore tapped hole that squeezes the top slit
+# Owner decision C1 keyed (2026-11-09, PR #1992): the end screw, McMaster
+# 91794A558 (1/4-28 x 5/8 slotted fillister, 18-8; MHA-DT-39 with its reamed
+# pivot hole), threads through the block from the north face; its end bears
+# on the brass bushing pressed on T006's pivot and sets the shaft's end play
+# (cone_stack_end_play.SHAFT_END_PLAY); the pinch slit locks it.  The thread
+# is tapped THROUGH with a 90-degree countersink at both mouths (rule 18 E11/W1,
+# Main 2026-09-24: no floor to break out, no tap lead to deduct).
+ADJUSTER_THREAD = cone_tip_cluster.ADJUSTER_THREAD
+if end_screw_stock.THREAD != ADJUSTER_THREAD or (
+    end_screw_stock.SKU != cone_tip_cluster.END_SCREW_SKU
+):
+    raise AssertionError("the end screw stock is not the tip cluster's 1/4-28 screw")
 ADJUSTER_BORE_SPEC = HoleSpec("tapped", ADJUSTER_THREAD)
 ADJUSTER_BORE_DIA = blind_cut_dia_mm(ADJUSTER_BORE_SPEC)
+_ADJ_MAJOR_MM = THREAD_MAJOR_MM[ADJUSTER_THREAD]
+_ADJ_TPI = int(ADJUSTER_THREAD.rsplit("-", 1)[1])
+ADJUSTER_PITCH_MM = 25.4 / _ADJ_TPI
+# ASME B1.1 unified-inch thread data, derived from the size and pitch (in
+# inches): the 2B minimum minor is the basic minor D - 1.082532 P and the 2B
+# minimum pitch diameter the basic D - 0.649519 P; the 2B pitch-diameter
+# tolerance is 1.30 x the 2A one, 0.0015 D^(1/3) + 0.0015 (9P)^(1/2)
+# + 0.015 P^(2/3) (length of engagement 9P).  The formula reads .0001 over
+# the 1/4-28 table (.0043), the conservative side for every wall and float.
+_D_IN, _P_IN = _ADJ_MAJOR_MM / 25.4, 1.0 / _ADJ_TPI
+ADJUSTER_MINOR_MIN_DIA = (_D_IN - 1.082532 * _P_IN) * 25.4
+if ADJUSTER_BORE_DIA < ADJUSTER_MINOR_MIN_DIA:
+    raise AssertionError("the adjuster tap drill cuts under the 2B minimum minor")
+_ADJ_PD_2B_TOL_IN = 1.30 * (
+    0.0015 * _D_IN ** (1.0 / 3.0) + 0.0015 * math.sqrt(9.0 * _P_IN) + 0.015 * _P_IN ** (2.0 / 3.0)
+)
+ADJUSTER_PITCH_DIA_LIMITS_MM = (
+    (_D_IN - 0.649519 * _P_IN) * 25.4,
+    (_D_IN - 0.649519 * _P_IN + _ADJ_PD_2B_TOL_IN) * 25.4,
+)
+# 90-degree countersink on each mouth to .007 in over the major, so the first
+# thread starts full rather than on a feather edge (Main, 2026-09-24).  Its
+# depth is the 45-degree break on the tap drill;
+# the callout prints its diameter .XXX, so the engagement books the deepest
+# countersink that band allows.
+ADJUSTER_CSK_DIA = _ADJ_MAJOR_MM + 0.007 * 25.4  # .257
 ADJUSTER_CSK = (ADJUSTER_CSK_DIA - ADJUSTER_BORE_DIA) / 2.0
-if ADJUSTER_CSK_DIA < THREAD_MAJOR_MM[ADJUSTER_THREAD]:
+if ADJUSTER_CSK_DIA < _ADJ_MAJOR_MM:
     raise AssertionError("adjuster countersink ends inside the thread major")
+PINCH_THREAD = "#4-40"  # cross-bore tapped hole that squeezes the top slit
 PINCH_BORE_SPEC = HoleSpec("tapped", PINCH_THREAD)
 PINCH_BORE_DIA = blind_cut_dia_mm(PINCH_BORE_SPEC)
 PINCH_CLEARANCE_SPEC = HoleSpec(
@@ -213,18 +235,16 @@ EDGE_BREAK_MAX_MM = max(
     _printed_tolerance.edge_break_chamfer_mm(unit=UNIT),
 )
 MIN_WEB_MM = WALL_TARGET_MM
-# ASME B1.1 #10-32 UNF-2B has no specified maximum major diameter; its
-# section 5.8.2(a) reference envelope (basic major + 0.14433757P + the 2B
-# pitch-diameter tolerance, 0.1736 - 0.1697 in) stands in for the finished
-# thread root.
-_ADJ_PITCH_MM = 25.4 / 32.0
+# ASME B1.1 UNF-2B has no specified maximum major diameter; its section
+# 5.8.2(a) reference envelope (basic major + 0.14433757P + the 2B
+# pitch-diameter tolerance) stands in for the finished thread root.
 ADJUSTER_ROOT_REF_DIA = (
-    THREAD_MAJOR_MM[ADJUSTER_THREAD] + 0.14433757 * _ADJ_PITCH_MM + 0.0039 * 25.4
+    _ADJ_MAJOR_MM + 0.14433757 * ADJUSTER_PITCH_MM + _ADJ_PD_2B_TOL_IN * 25.4
 )
 _root_r = ADJUSTER_ROOT_REF_DIA / 2.0
 _worst_clearance_radius = (PINCH_CLEARANCE_DIA + _DRILLED_HOLE_PLUS_MM) / 2.0
 _min_slit_half = _printed_limits(SLIT_W, SLIT_W_PLACES)[0] / 2.0
-_adjuster_major_radius = THREAD_MAJOR_MM[ADJUSTER_THREAD] / 2.0
+_adjuster_major_radius = _ADJ_MAJOR_MM / 2.0
 _pinch_major_radius = THREAD_MAJOR_MM[PINCH_THREAD] / 2.0
 _axis_limits = (
     ADJUSTER_AXIS_HEIGHT - AXIS_HEIGHT_TOL_MM,
@@ -376,55 +396,143 @@ if WORST_PINCH_TIP_RECESS_MM < PINCH_SCREW_RECESS_MM - 1e-9:
         f"pinch screw tip can stand {WORST_PINCH_TIP_RECESS_MM:.3f} inside the -X "
         f"face at the printed width minimum (< {PINCH_SCREW_RECESS_MM})"
     )
-# The adjuster's working window, cup rim measured in from the north face:
-# shallow end = ADJUSTER_MIN_ENGAGEMENT_D of full thread under the north
-# countersink; deep end = the cup rim still on full thread above the south
-# countersink with the block at its .XXX-short depth.  The screw is longer
-# than the window's deep end, so its head always stands proud and the rim's
-# depth is the engagement.  The tip's axial stack (shaft, post, platform,
-# hold-down and this block's tap station) moves the cup's seat about
-# ADJUSTER_EMBED; build_dt_drive_train_assembly asserts that band stays inside
-# this window.
-#
-# Pending exception ruling: MHA-DT-VN-55 engagement (#975).
-# The cup adjuster engages 1.0D at the worst case. It carries only
-# the shaft's end-play thrust -- the cone set's running push, no clamp load;
-# the pinch screw across the slit locks it -- and 1.5D would need a block deep
-# enough to push the MHA-DT-VN-54 stack collar into the block's south face at
-# print-worst (the collar-to-block air in build_dt_drive_train_assembly).
-ADJUSTER_MIN_ENGAGEMENT_D = 1.0
-ADJUSTER_EMBED_WINDOW = (
-    ADJUSTER_MIN_ENGAGEMENT_D * THREAD_MAJOR_MM[ADJUSTER_THREAD] + ADJUSTER_CSK,
-    _depth_limits[0] - ADJUSTER_CSK,
+# --- the end screw (owner decision C1 keyed, 2026-11-09, PR #1992) ----------
+# MHA-DT-00 runs the end screw in until the shaft just stops shuttling, then
+# backs it off for SHAFT_END_PLAY; the model sets it at the play's middle.
+# Its end face then stands on T006's pivot at the layout T006 north face plus
+# the tip set's shift (cone_tip_cluster.TIP_SET_SHIFT_MM, the shaft pushed onto
+# the MHA-DT-05 boss), the bushing's length and that play.
+END_SCREW_SKU = cone_tip_cluster.END_SCREW_SKU
+END_SCREW_LENGTH = end_screw_stock.SHANK_LEN  # 5/8 under the head
+# ASME B18.6.3 (cited, the build_pd_platen_clip precedent): length +0/-0.03 in
+# through 1 in; a point chamfer of at most 2P; on lengths of three diameters
+# and shorter, full form thread to within 1P of the head's bearing surface
+# (2P only past 3 D; B18.6.3 as tabled in Machinery's Handbook, 26th ed.,
+# Machine Screws).
+END_SCREW_LENGTH_MIN = END_SCREW_LENGTH - 0.03 * 25.4
+END_SCREW_POINT_MAX_MM = 2.0 * ADJUSTER_PITCH_MM
+END_SCREW_HEAD_RUNOUT_MM = ADJUSTER_PITCH_MM
+if END_SCREW_LENGTH > 3.0 * _ADJ_MAJOR_MM:
+    raise AssertionError("the end screw is past 3 D: B18.6.3's head runout is longer")
+END_SCREW_MODEL_END_PLAY_MM = (SHAFT_END_PLAY[0] + SHAFT_END_PLAY[1]) / 2.0  # 0.15
+END_SCREW_END_STATION = (
+    T006_NORTH_FACE
+    + cone_tip_cluster.TIP_SET_SHIFT_MM
+    + cone_tip_cluster.BUSHING_LENGTH_MM
+    + END_SCREW_MODEL_END_PLAY_MM
 )
-if ADJUSTER_MIN_ENGAGEMENT_D != 1.0:
+# The screw's end face measured in from the block's north face (the screw's
+# end stands END_SCREW_EMBED - BLOCK_Z proud of the south face toward the
+# cone, its head END_SCREW_LENGTH - END_SCREW_EMBED off the north face).
+END_SCREW_EMBED = TIP_BLOCK_NORTH_FACE - END_SCREW_END_STATION
+# drawing-guidelines.md rule 18: 1.5 D of full thread past both mouth
+# countersinks (the deepest the callout's .XXX diameter allows).  The block's
+# full thread is its depth less both; the screw's runs from 1P under its
+# head to 2P short of its end.  In embed (from the north face, south
+# positive) the window is: shallow, the screw's full thread ends 1.5 D past
+# the north countersink; deep, the shortest screw's head runout leaves 1.5 D
+# above the south countersink of the shallowest block, and its head stands
+# END_SCREW_HEAD_AIR_MM off the north face.  The screw's full thread
+# (L - 3P) is longer than 1.5 D, so inside the window the engagement is never
+# under it.  build_dt_drive_train_assembly sums the tip's axial stack (post,
+# shaft collar, gear stack and feeler, bushing, hold-down, this block's tap
+# station) about END_SCREW_EMBED and asserts it stays inside this window.
+END_SCREW_MIN_ENGAGEMENT_D = 1.5
+END_SCREW_HEAD_AIR_MM = 0.25
+_ENGAGEMENT_FLOOR_MM = END_SCREW_MIN_ENGAGEMENT_D * _ADJ_MAJOR_MM
+_csk_dia_max = _printed_limits(ADJUSTER_CSK_DIA, 3)[1]
+ADJUSTER_CSK_MAX = (_csk_dia_max - ADJUSTER_BORE_DIA) / 2.0
+END_SCREW_ENGAGEMENT_MIN_MM = _depth_limits[0] - 2.0 * ADJUSTER_CSK_MAX
+if END_SCREW_ENGAGEMENT_MIN_MM < _ENGAGEMENT_FLOOR_MM - 1e-9:
     raise AssertionError(
-        "the MHA-DT-VN-55 engagement baseline pending ruling #975 is 1.0D; "
-        "any other value needs the user's ruling"
+        f"the block's full thread {END_SCREW_ENGAGEMENT_MIN_MM:.3f} at its shallowest "
+        f"is under 1.5 D ({_ENGAGEMENT_FLOOR_MM:.3f})"
     )
-if not (
-    ADJUSTER_EMBED_WINDOW[0] < ADJUSTER_EMBED < ADJUSTER_EMBED_WINDOW[1]
-    and ADJUSTER_SCREW_LENGTH >= ADJUSTER_EMBED_WINDOW[1]
+if END_SCREW_LENGTH_MIN - END_SCREW_POINT_MAX_MM - END_SCREW_HEAD_RUNOUT_MM < (
+    _ENGAGEMENT_FLOOR_MM
 ):
-    raise AssertionError("adjuster embed leaves its working window")
-# The worst-case full-thread engagement the window guarantees, floored to the
-# printed inch places so the sheet never states more than the stack delivers.
-ADJUSTER_ENGAGEMENT_PLACES = 3
-ADJUSTER_ENGAGEMENT_MIN_MM = (
-    math.floor(
-        ADJUSTER_MIN_ENGAGEMENT_D * THREAD_MAJOR_MM[ADJUSTER_THREAD] / 25.4
-        * 10**ADJUSTER_ENGAGEMENT_PLACES + 1e-9
+    raise AssertionError("the end screw's own full thread is under 1.5 D")
+# The deepest the shortest screw can reach before its head comes within
+# END_SCREW_HEAD_AIR_MM of the north face.
+END_SCREW_REACH_MAX_EMBED_MM = END_SCREW_LENGTH_MIN - END_SCREW_HEAD_AIR_MM
+
+
+def end_screw_full_thread_mm(embed_mm: float) -> float:
+    """Least full thread the end screw shares with the block at ``embed_mm``
+    (its end face that far in from the north face): the screw's full thread
+    from its 2P point back, or the shortest screw's from 1P under its head,
+    whichever ends first, against the shallowest block's thread between its
+    deepest countersinks."""
+    return min(
+        embed_mm - ADJUSTER_CSK_MAX - END_SCREW_POINT_MAX_MM,
+        END_SCREW_LENGTH_MIN
+        - END_SCREW_HEAD_RUNOUT_MM
+        + _depth_limits[0]
+        - ADJUSTER_CSK_MAX
+        - embed_mm,
+        END_SCREW_ENGAGEMENT_MIN_MM,
     )
-    / 10**ADJUSTER_ENGAGEMENT_PLACES * 25.4
+
+
+END_SCREW_EMBED_WINDOW = (
+    ADJUSTER_CSK_MAX + _ENGAGEMENT_FLOOR_MM + END_SCREW_POINT_MAX_MM,
+    min(
+        END_SCREW_LENGTH_MIN
+        - END_SCREW_HEAD_RUNOUT_MM
+        + _depth_limits[0]
+        - ADJUSTER_CSK_MAX
+        - _ENGAGEMENT_FLOOR_MM,
+        END_SCREW_REACH_MAX_EMBED_MM,
+    ),
 )
-# The assembly sheet (MHA-DT-00, decimal inch) states the shortfall as a plain
-# fact at the step that sets the adjuster, worded like MHA-DT-VN-61's.
-# Pending exception ruling: MHA-DT-VN-55 engagement (#975).
-ADJUSTER_ENGAGEMENT_ASSEMBLY_FACT = (
-    "ENGAGEMENT "
-    f"{render_number(ADJUSTER_ENGAGEMENT_MIN_MM / 25.4, 'in', ADJUSTER_ENGAGEMENT_PLACES)} "
-    f"MIN ({ADJUSTER_MIN_ENGAGEMENT_D:.1f}D)."
+for _edge in END_SCREW_EMBED_WINDOW:
+    if end_screw_full_thread_mm(_edge) < _ENGAGEMENT_FLOOR_MM - 1e-9:
+        raise AssertionError("the end screw's window edge leaves under 1.5 D")
+# At the block's printed limits the screw must reach the bushing over the
+# whole set end play: the model's end play less the least lies at the deep
+# end, the most at the shallow end.
+END_SCREW_EMBED_RANGE_MM = (
+    END_SCREW_EMBED - (SHAFT_END_PLAY[1] - END_SCREW_MODEL_END_PLAY_MM),
+    END_SCREW_EMBED + (END_SCREW_MODEL_END_PLAY_MM - SHAFT_END_PLAY[0]),
 )
+if not (
+    END_SCREW_EMBED_WINDOW[0] <= END_SCREW_EMBED_RANGE_MM[0]
+    and END_SCREW_EMBED_RANGE_MM[1] <= END_SCREW_EMBED_WINDOW[1]
+):
+    raise AssertionError(
+        f"end screw embed {END_SCREW_EMBED_RANGE_MM[0]:.3f}..{END_SCREW_EMBED_RANGE_MM[1]:.3f} "
+        f"over the set end play leaves its 1.5D window {END_SCREW_EMBED_WINDOW[0]:.3f}.."
+        f"{END_SCREW_EMBED_WINDOW[1]:.3f}"
+    )
+# The nominal screw end proud of the south face, and head off the north face.
+END_SCREW_END_PROUD_MM = END_SCREW_EMBED - BLOCK_Z
+END_SCREW_HEAD_GAP_MM = END_SCREW_LENGTH - END_SCREW_EMBED
+if END_SCREW_END_PROUD_MM <= 0.0 or END_SCREW_HEAD_GAP_MM <= END_SCREW_HEAD_AIR_MM:
+    raise AssertionError("the end screw does not stand proud at both faces")
+# The end screw's radial float in the 1/4-28 thread: the 2B internal pitch
+# diameter (ADJUSTER_PITCH_DIA_LIMITS_MM) over the 2A external one (B1.1:
+# maximum = basic less the 0.300 x Td2 allowance; the stock row's minimum).
+_td2_2a_in = _ADJ_PD_2B_TOL_IN / 1.30
+_external_pd_max = ADJUSTER_PITCH_DIA_LIMITS_MM[0] - 0.300 * _td2_2a_in * 25.4
+END_SCREW_THREAD_FLOAT_MM = (
+    (ADJUSTER_PITCH_DIA_LIMITS_MM[0] - _external_pd_max) / 2.0,
+    (ADJUSTER_PITCH_DIA_LIMITS_MM[1] - end_screw_stock.EXTERNAL_PITCH_DIA_MIN_MM) / 2.0,
+)
+if END_SCREW_THREAD_FLOAT_MM[0] <= 0.0:
+    raise AssertionError("the 1/4-28 2A/2B fit leaves the end screw no float")
+# The vertical take-up (owner decision 2026-11-09 via ImplementC1KeyedOpus,
+# rule 19 matched fit): T006's pivot runs in the end screw's reamed hole, so
+# the end screw's axis must stand at the MHA-DT-05 journal's height.  The
+# post's .XX journal height and this block's .XX AxisHeight would leave the
+# tip +/-.020 off; instead AxisHeight is made to the measured MHA-DT-05
+# journal-axis height above MHA-DT-20 (its general band still bounds the
+# absolute value) within this match residual.  build_dt_drive_train_assembly
+# books it against the shaft's tilt in the journal, the screw's float in its
+# thread and the pivot's running clearance.  ASSUMPTION: the pinch locks the
+# screw where the seated pivot holds it (MHA-DT-00 steps 4N/4T turn MHA-DT-07
+# a full turn after locking: it never binds).
+AXIS_HEIGHT_MATCH_RESIDUAL_MM = 0.0762  # +/-.003
+AXIS_HEIGHT_MATCH_MATE = "MHA-DT-05"
 
 # --- hold-down (user ruling 2026-09-29) --------------------------------------
 # One McMaster 91251A108 #4-40 x 3/8 black-oxide alloy socket head cap screw
@@ -673,9 +781,11 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # height (the top ligament closes at 1.92 at .X if 46.95 prints 47.0) and the
 # slit width (the drill-to-slot point reaches past the far jaw's tap drill at .X).  2026-09-29:
 # with the block fixed by its hold-down, the depth, the passage centre and
-# the tap's stations print .XXX, and the axis height .XX (the embed window,
-# the collar-to-block air, the pivot head's air, the lateral stack and the
-# cup capture; build_dt_drive_train_assembly proves each looser grade fails).
+# the tap's stations print .XXX, and the axis height .XX (the end screw's
+# embed window, the pivot head's air and the lateral stack;
+# build_dt_drive_train_assembly proves each looser grade fails).  C1 keyed
+# (2026-11-09): the pinch hole's depth station, the block's half depth .215,
+# prints .XXX.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BlockProfile": {"Width": BLOCK_WIDTH_PLACES, "Depth": BLOCK_DEPTH_PLACES},
     "Block": {"BlockHt": BLOCK_HEIGHT_PLACES},
@@ -750,4 +860,12 @@ DOWEL_X_PRINTED_TEXT = f"({printed_value_text('DowelX', DOWEL_X)})"
 DOWEL_HOLE_PRINTED_TEXT = (
     f"Ø{printed_value_text('DowelHoleDia', DOWEL_HOLE_DIA)} "
     f"+{length_text(max(DOWEL_HOLE_BAND), DOWEL_HOLE_PLACES)}"
+)
+# The matched AxisHeight's requirement, as the sheet's numbered note states
+# it (the mate and the residual are this spec's; the drawing only wraps and
+# places it).
+AXIS_HEIGHT_MATCH_REQUIREMENT = (
+    f"AXIS HEIGHT MADE TO THE MEASURED {AXIS_HEIGHT_MATCH_MATE} JOURNAL AXIS "
+    f"HEIGHT ABOVE {_config.parts('dt-cone-swing-platform')['number']}, WITHIN "
+    f"\u00b1{length_text(AXIS_HEIGHT_MATCH_RESIDUAL_MM, 3)}."
 )

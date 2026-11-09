@@ -3838,7 +3838,7 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         SCRIPTS_DIR / "test_dt_drive_train_support_layout.py",
         # Native-STL gravity seam welding remains strict about holes and winding.
         SCRIPTS_DIR / "test_dt_swing_gravity_collector.py",
-        # The cone tip block's hold-down, embed-window and collar-air contracts
+        # The cone tip block's hold-down, end-screw embed and cone-tip air contracts
         # (I20/I22/I24/I31; prism ruling 2026-09-29) that
         # build_drive_train_assembly asserts at import.
         SCRIPTS_DIR / "test_drive_train_cone_tip_holddown.py",
@@ -3881,7 +3881,6 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         SCRIPTS_DIR / "test_dt_drive_train_steps.py",
         # The shared rule-22 step-structure lint's positive controls.
         SCRIPTS_DIR / "test_assembly_step_lint.py",
-        SCRIPTS_DIR / "test_drive_train_tip_adjuster_seat.py",
         # Supplier pose facts must stay independent of native replica recipes.
         SCRIPTS_DIR / "test_dt_vn_cone_pose_specs.py",
         SCRIPTS_DIR / "test_fit_bands.py",

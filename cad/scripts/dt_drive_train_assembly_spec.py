@@ -63,8 +63,9 @@ CLUSTERS: dict[Cluster, tuple[str, ...]] = {
         "dt-cone-swing-platform",
         "dt-cone-pivot-post",
         "dt-cone-tip-block",
-        "dt-vn-cone-tip-collar",
-        "dt-vn-cone-tip-adjuster",
+        "dt-cone-tip-gear",
+        "dt-cone-tip-bushing",
+        "dt-cone-tip-end-screw",
         "dt-vn-cone-tip-pinch-screw",
         "dt-vn-cone-tip-block-screw",
         "dt-vn-locating-pin",
@@ -187,6 +188,9 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     # balloon 16); 75 stands the head 8 mm of sheet higher, below the
     # MHA-DT-VN-61 heads that set the sheet's top.
     ExplodeStep("swing stop lifts", (SWING_STOP_SCREW_SELECTOR,), "y", 75.0),
+    # Owner decision C1 keyed (2026-11-09, PR #1992): T024, T018, T012 and
+    # MHA-DT-37 are bonded to the shaft and MHA-DT-38 is pressed on MHA-DT-37's
+    # pivot, so the shaft and its tip come off as one unit.
     ExplodeStep(
         "cone rotor withdraws",
         (
@@ -194,23 +198,22 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
             "dt-cone-gear",
             "dt-crank-drive-gear",
             "dt-vn-cone-shaft-key",
-            "dt-vn-cone-tip-collar",
+            "dt-cone-tip-gear",
+            "dt-cone-tip-bushing",
         ),
         "cone",
         50.0,
     ),
-    # The MHA-DT-VN-54 collar then slips off the tip stub past the shaft's end,
-    # and the tip block hardware stands clear beyond it (#1121): the collar's
-    # 11.5 width sat on the last 18.4 of the stub, the block 3.7 past it, so 20
-    # puts the collar 1.6 past the tip and the block 18.7 past the collar.
-    ExplodeStep("tip collar slips off", ("dt-vn-cone-tip-collar",), "cone", 20.0),
+    # The tip block hardware then stands clear beyond the tip: MHA-DT-39's end
+    # stands about 2.1 over T006's pivot and the block's south face about 3.1
+    # past MHA-DT-38, so 85 leaves about 33 between pivot and screw.
     # MHA-DT-VN-69 (rule-23 retention, owner ruling 2026-11-07) is pressed into
     # the block foot's blind ream, so it leaves with the block.
     ExplodeStep(
         "tip block slides off",
         (
             "dt-cone-tip-block",
-            "dt-vn-cone-tip-adjuster",
+            "dt-cone-tip-end-screw",
             "dt-vn-cone-tip-pinch-screw",
             "dt-vn-locating-pin",
         ),
@@ -226,11 +229,11 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     # The cone gears then slide on toward the tip, leaving MHA-DT-07 alone on
     # the MHA-DT-04 collar: unexploded, its balloon and the cone gear's met on
     # the stack's first disc (r15, 20261018T215310765Z, balloons 35 and 36).
-    # 6.9 of stub still stands past the tip gear; MHA-DT-VN-54 goes with the
-    # gears, ending 6.7 short of the tip block.
+    # MHA-DT-37 and MHA-DT-38 go with them, their pivot still about 21 short
+    # of MHA-DT-39.
     ExplodeStep(
         "cone gears slide toward the tip",
-        ("dt-cone-gear", "dt-vn-cone-tip-collar"),
+        ("dt-cone-gear", "dt-cone-tip-gear", "dt-cone-tip-bushing"),
         "cone",
         12.0,
     ),
@@ -245,7 +248,7 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     # MHA-DT-VN-60 comes down out of the dropped plate's counterbore: 50 carries
     # its tip ~7 below the plate's underside after the plate's 30.
     ExplodeStep("tip block screw drops", ("dt-vn-cone-tip-block-screw",), "y", -50.0),
-    ExplodeStep("tip adjuster backs out", ("dt-vn-cone-tip-adjuster",), "cone", 30.0),
+    ExplodeStep("tip end screw backs out", ("dt-cone-tip-end-screw",), "cone", 30.0),
     # crank, step 4 order: the MHA-DT-10 pinion slides north off the
     # crankshaft with its MHA-DT-29 cross pin, which then drives out of the
     # boss along its own (pinion-local X, 14 deg off world X) axis; the two

@@ -10,7 +10,6 @@ import math
 
 from dt_cone_gear_spec import (
     bore_dia_mm,
-    bore_flat_segment_area_mm2,
     keyed,
     keyway_area_outside_bore_mm2,
 )
@@ -20,9 +19,9 @@ R_CLEAR_MM = 60.0
 
 
 def bore_area_mm2(teeth: int) -> float:
-    """Area of the configuration's bore: the round bore plus the keyway's
-    area outside it (T030..T120), or less the segment the D's flat keeps."""
+    """Area of the configuration's bore: the round bore, plus the keyway's
+    area outside it on T030..T120."""
     round_bore = math.pi * (bore_dia_mm(teeth) / 2.0) ** 2
     if keyed(teeth):
         return round_bore + keyway_area_outside_bore_mm2(teeth)
-    return round_bore - bore_flat_segment_area_mm2(teeth)
+    return round_bore

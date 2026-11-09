@@ -21,7 +21,7 @@ PURE_SPECS = (
     "dt_vn_cone_pivot_screw_spec",
     "dt_vn_cone_lock_knob_spec",
     "dt_swing_stop_screw_spec",
-    "_mcmaster_94025a164",
+    "_mcmaster_91794a558",
     "sh_vn_fillister_screw_90280a108_spec",
     "sh_vn_brass_fillister_screw_spec",
     "sh_vn_clamp_screw_spec",
@@ -81,7 +81,7 @@ def test_pose_vendor_specs_load_no_native_module(module_name: str) -> None:
 @pytest.mark.parametrize(
     "module_name",
     (
-        "diagnostics.diag_build_94025A164",
+        "diagnostics.diag_build_91794A558",
         "diagnostics.diag_build_90114A511",
         "diagnostics.diag_mcmaster_fillister",
         "diagnostics.diag_mcmaster_dowel",
@@ -133,28 +133,6 @@ def test_native_load_probe_has_a_real_native_positive_control(module_name: str) 
                 "TIP_CHAMFER": 0.9525,
             },
         ),
-        (
-            "_mcmaster_94025a164",
-            "diagnostics.diag_build_94025A164",
-            {
-                "SS_MAJOR_R": 2.413,
-                "SS_LEN": 9.525,
-                "SS_HALF": 4.7625,
-                "SS_PITCH": 0.79375,
-                "SS_REVS": 14.0,
-                "SS_CHAM_R": 2.155222,
-                "SS_CHAM_H": 0.180498,
-                "SS_TIP_R": 1.2065,
-                "SS_CONE_Y": 3.556,
-                "SS_SLOT_W": 0.804333,
-                "SS_SLOT_D": 0.79375,
-                "SS_CUT_TOP_R": 2.455963,
-                "SS_CUT_TOP_W": 0.744141,
-                "SS_CUT_ROOT_R": 1.897444,
-                "SS_CUT_ROOT_W": 0.099219,
-                "SS_CUT_CY": 5.903515625,
-            },
-        ),
     ],
 )
 def test_native_recipes_load_the_vendor_scalars(
@@ -190,38 +168,6 @@ def _perturbed_recipe_values(spec_name: str, recipe_name: str) -> dict[str, list
         cwd=SCRIPTS, capture_output=True, text=True, check=True,
     )
     return json.loads(result.stdout.splitlines()[-1])
-
-
-_RECORDED_CUP = """
-import asyncio, contextlib, json, sys
-from unittest.mock import AsyncMock, MagicMock
-import _mcmaster_94025a164 as spec
-spec.SS_TIP_R += 0.5
-import _sketch
-import diagnostics.diag_build_94025A164 as recipe
-chains = []
-async def add_line_chain(_adapter, points, close=True):
-    chains.append(points)
-_sketch.add_line_chain = add_line_chain
-for name in ("check", "name_last_feature", "insert_helix", "offset_plane", "thread_sweep_cut_modern"):
-    setattr(recipe, name, MagicMock())
-recipe.no_sketch_inference = lambda _adapter: contextlib.nullcontext()
-recipe.volume_check = AsyncMock(side_effect=lambda _a, _l, expected, _t: expected)
-recipe.bodies = lambda _adapter: [object()]
-asyncio.run(recipe.build_94025A164(AsyncMock(currentSketchManager=MagicMock())))
-print(json.dumps({"tip": spec.SS_TIP_R, "half": spec.SS_HALF, "profile": chains[0]}))
-"""
-
-
-def test_the_native_cup_recipe_draws_the_spec_tip_radius() -> None:
-    """The real 94025A164 recipe, with recording doubles and a moved SS_TIP_R:
-    its revolve profile's cup rim lands on the moved value."""
-    result = subprocess.run(
-        [sys.executable, "-c", _RECORDED_CUP], cwd=SCRIPTS,
-        capture_output=True, text=True, check=True,
-    )
-    recorded = json.loads(result.stdout.splitlines()[-1])
-    assert [recorded["tip"], -recorded["half"]] in recorded["profile"]
 
 
 def test_same_sku_fillister_row_has_one_pure_authority() -> None:
@@ -270,7 +216,6 @@ def test_public_nominals_and_unknown_supplier_grades_are_not_conflated() -> None
     lock = _pure_spec("dt_vn_cone_lock_knob_spec")
     lock_vendor = _pure_spec("_mcmaster_93585a190")
     stop = _pure_spec("dt_swing_stop_screw_spec")
-    cup = _pure_spec("_mcmaster_94025a164")
     assert pivot.HEAD_H == pivot.HEAD_T
     assert pivot.THREAD_TAIL_LEN == pivot.THREAD_LEN
     assert pivot.THREAD_SOLID_DIA == pivot.THREAD_MAJOR
@@ -281,46 +226,13 @@ def test_public_nominals_and_unknown_supplier_grades_are_not_conflated() -> None
     assert lock.THREAD_PITCH == lock_vendor.PITCH == 1.27
     assert lock.THREAD == "1/4-20"
     assert stop.THREAD == "#4-40"
-    assert cup.THREAD == "#10-32"
-    assert cup.BODY_LEN == cup.SS_LEN == 9.525
-    assert cup.BODY_DIA == 2.0 * cup.SS_MAJOR_R == 4.826
-    assert cup.CUP_DIA == 2.0 * cup.SS_TIP_R == 2.413
-    assert cup.CUP_DEPTH == cup.SS_CUP_DEPTH == cup.SS_HALF - cup.SS_CONE_Y
-    assert cup.CUP_DEPTH == pytest.approx(1.2065, abs=1e-12)
-    assert cup.CUP_DEPTH == pytest.approx(cup.SS_TIP_R, abs=1e-12)
-    assert cup.SS_CUT_CY == cup.SS_HALF + cup.SS_PITCH + 7.0 * cup.SS_PITCH / 16.0
     for spec, names in (
         (pivot, ("HEAD_DIA_BAND", "HEAD_H_BAND")),
         (lock, ("HEAD_DIA_BAND", "HEAD_H_BAND", "STUD_DIA_BAND", "STUD_LEN_BAND")),
         (stop, ("SHANK_DIA_BAND",)),
-        (cup, ("BODY_DIA_BAND", "BODY_LEN_BAND", "CUP_DIA_BAND", "CUP_DEPTH_BAND")),
     ):
         for name in names:
             assert getattr(spec, name) is None, f"unprovided supplier grade: {name}"
-
-
-@pytest.mark.parametrize(
-    "consumer", ("build_dt_drive_train_assembly", "test_drive_train_tip_adjuster_seat"),
-)
-def test_adjuster_data_consumers_do_not_load_the_native_wrapper(consumer: str) -> None:
-    loaded = _loaded_roots(consumer)
-    assert "_mcmaster_94025a164" in loaded
-    assert "build_dt_vn_cone_tip_adjuster" not in loaded
-
-
-def test_adjuster_thread_limits_are_qualified_separately_from_its_cup() -> None:
-    cup = _pure_spec("_mcmaster_94025a164")
-    assert cup.THREAD == "#10-32"
-    assert cup.THREAD_CLASS == "2A"
-    assert "https://www.mcmaster.com/94025A164/" in cup.THREAD_FIT_SOURCE
-    assert "steelmasters.co.nz" in cup.THREAD_LIMITS_SOURCE
-    assert cup.THREAD_MAJOR_MAX_MM == 0.1891 * 25.4
-    assert cup.EXTERNAL_PITCH_DIA_MIN_MM == 0.1658 * 25.4
-    # Preserve the ideal supplier CAD instead of redimensioning it to a limit.
-    assert cup.BODY_DIA == 4.826
-    assert cup.THREAD_MAJOR_MAX_MM < cup.BODY_DIA
-    assert cup.CUP_DIA_BAND is None
-    assert cup.CUP_DEPTH_BAND is None
 
 
 def test_stop_thread_limits_are_separate_from_its_nominal_profile() -> None:

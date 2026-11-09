@@ -1,0 +1,31 @@
+dt-cone-tip-gear:
+  title: Cone Tip Gear
+  number: MHA-DT-37
+  description: "CONE TIP GEAR, T006, INTEGRAL SPIGOT AND PIVOT"
+  material: Brass
+  # The four cone-tip gears are the harder high-zinc yellow metal of the
+  # source machine (dimensions.yaml ch.12 p.21), the cone family's
+  # material_tip_specification (dt_cone_tip_gear_spec checks they agree).
+  material_specification: C67500 manganese bronze
+  finish: AS MACHINED, UNCOATED
+  quantity: 1
+  tolerance_class: machined_block
+  fit_class: gear_mesh
+  process: "turned between centres from bar, steady support for the Ø.0625 x .71 spigot (L/D 12); integral Ø.0625 pivot; gear cutting: six leaves, 48DP PA20, with the DT6-FORM1 custom fly cutter at standard depth"
+  drawing_unit: in
+  # T006 left the MHA-DT-03 family for its own part (owner decision C1 keyed,
+  # 2026-11-09, PR #1992, https://github.com/pedropaulovc/harmonic-analyzer/pull/1992):
+  # its spigot is bonded through T012 and T018 into the MHA-DT-04 socket, its
+  # pivot carries the pressed MHA-DT-38 bushing and runs in the MHA-DT-39 end
+  # screw. Its leaves are the family's T006: the custom DT6-FORM1 N6 PA20 tool,
+  # option (a) (user ruling 2026-10-10): root R1.10 with a drum-tip trochoid
+  # relief; it is the named contact-ratio exception (dt_cone_gear_spec,
+  # test_standard_mesh_checks). The R1.491 tool with root MIN 2.346 is retired.
+  # MHA-DT-03's RV-01 (the .031 D-bore) and RV-04 (T006's .0256 bore web)
+  # retired with the bore: the stems are integral, under the root envelope.
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "accept"
+      where: "sheet 1 and its continuation sheet 2: the tip Ø.1696 +.0000/-.0008 on the side view, the CIRCULAR TOOTH THICKNESS .0343 +.0000/-.0016 on the front view, and FORM TOLERANCE: X +.0008 / -.0000 on sheet 2, each flagged SEE NOTE 2 (accept over pins, then by backlash with MHA-DT-12 at assembly)"
+      finding: "the three T006 tooth bands are converted millimetre widths, not plain inch steps, and narrower than their shop-table rows (rule 4)"
+      reason: "Owner ruling 2026-11-08 (Pedro), #2144 item 9.3 (fan-out OQ-3: keep, with routes), recorded as MHA-DT-03 RV-05 and carried here unchanged when T006 became MHA-DT-37 (owner ruling 2026-11-09 via PR #1992 (https://github.com/pedropaulovc/harmonic-analyzer/pull/1992), C1 keyed). The bands are the custom DT6-FORM1 tooth's (dt_cone_gear_spec CUSTOM_SIX_*): widening the thickness to -.0020 fails the spec's tip-land minimum, and the over-pins then backlash acceptance in note 2 and GEAR DATA is the fit route. Accepts the notation and width of these three T006 bands only, no other band or callout departure."

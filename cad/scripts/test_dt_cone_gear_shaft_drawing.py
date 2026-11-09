@@ -7,8 +7,7 @@ import re
 from pathlib import Path
 
 import _config
-from _printed_tolerance import printed_band_mm, printed_deviations
-import _drawing_detail_projection
+from _printed_tolerance import printed_band_mm
 import _fit_shaft_h
 import build_dt_cone_gear_shaft as part
 import build_dt_drive_train_assembly as drive
@@ -22,8 +21,7 @@ import cone_land_key
 import cone_shaft_land_bands
 import gear_seat_fit
 import cone_stack_end_play
-import dt_cone_tip_block_spec
-import dt_vn_cone_tip_collar_spec
+import cone_tip_cluster
 import draw_dt_cone_gear_shaft as drawing
 import pytest
 from _drawing_annotation_extent import CLEAR_GAP_M
@@ -32,14 +30,12 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_types import DRAWING_TEMPLATES
 
 
-# Which NAMED band each land rides (U27, 2026-09-23): the two running lands
-# keep the shared h band, the three gear seats open to GEAR_SEAT_BAND.
+# Which NAMED band each land rides (U27, 2026-09-23): the running journal
+# keeps the shared h band, the two gear lands open to GEAR_SEAT_BAND.
 _EXPECTED_LAND_BANDS = (
     ("RUNNING_DIA_BAND", _fit_shaft_h.SHAFT_H),
     ("GEAR_SEAT_BAND", dt_cone_gear_shaft_spec.GEAR_SEAT_BAND),
     ("GEAR_SEAT_BAND", dt_cone_gear_shaft_spec.GEAR_SEAT_BAND),
-    ("GEAR_SEAT_BAND", dt_cone_gear_shaft_spec.GEAR_SEAT_BAND),
-    ("RUNNING_DIA_BAND", _fit_shaft_h.SHAFT_H),
 )
 
 
@@ -71,64 +67,32 @@ def test_section_fits_are_toleranced_on_the_model() -> None:
     forked = list(spec.SECTION_DIA_BANDS)
     forked[0] = (0.0, -0.02032)
     assert not _lands_ride_named_bands(tuple(forked))
-    # The custom collar preserves the terminal land's retained slip class.
-    tip_max = spec.SECTION_DIAS[-1] + spec.SECTION_DIA_BANDS[-1][0]
-    collar_min = dt_vn_cone_tip_collar_spec.BORE_DIA + dt_vn_cone_tip_collar_spec.BORE_DIA_BAND[1]
-    assert collar_min - tip_max >= 0.025 - 1e-9
-    # Every flat rides the one named across-flat band.
-    assert spec.FLAT_AF_BAND is cone_shaft_land_bands.FLAT_AF_BAND
-    # Applied in ONE loop per family over the named bands, so the AST reports
-    # the f-string sources rather than nine literal keys.
+    # The socket rides the tip cluster's reamed stem-bore band.
+    assert spec.SOCKET_DIA_BAND is cone_tip_cluster.STEM_BORE_BAND
+    assert spec.SOCKET_DIA == cone_tip_cluster.STEM_BORE_DIA_MM
+    # Applied in ONE loop over the named land bands, so the AST reports the
+    # f-string sources rather than literal keys.
     assert model_toleranced_dimensions(part) == {
         ("f'Sec{section}Profile'", "f'Sec{section}Dia'"): "*deviations(band)",
-        ("f'Sec{land}FlatProfile'", "f'Sec{land}AF'"): "*deviations(FLAT_AF_BAND)",
         ("Sec1KeyseatProfile", "name"): "*deviations(band)",
+        ("SocketProfile", "SocketDia"): "*deviations(SOCKET_DIA_BAND)",
         ("ShoulderFillets", "ShoulderR"): "*deviations(FILLET_R_BAND)",
     }
 
 
-def test_terminal_torque_corners_are_a_drawing_break_limit_not_geometry():
-    lands = cone_shaft_land_bands
-    assert dt_cone_gear_shaft_spec.TERMINAL_FLAT_EDGE_BREAK_MAX is lands.TERMINAL_FLAT_EDGE_BREAK_MAX
-    collar = dt_vn_cone_tip_collar_spec
-    # The stock point's landing books the stoned corners at their MAX ...
-    assert collar.FLAT_FACE_HALF_WIDTH_MIN_MM == pytest.approx(
-        lands.TERMINAL_HALF_CHORD_MIN_MM - lands.TERMINAL_FLAT_EDGE_BREAK_MAX
-    )
-    assert collar.SCREW_LANDING_MARGIN_MM > 0.0
-    # ... and the title block's R.010 corners would cost the landing that
-    # much. Since the collar sheet prints inch (#290) its tap centring books
-    # the inch .XX band (.010, not 0.51 mm), so the landing would survive
-    # even R.010; the .001 MAX stays the shaft sheet's own (stricter) limit.
-    widened = collar.SCREW_LANDING_MARGIN_MM + lands.TERMINAL_FLAT_EDGE_BREAK_MAX - 0.254
-    assert 0.0 < widened < collar.SCREW_LANDING_MARGIN_MM
-    # The model keeps the corners sharp; the limit is printed once, above the
-    # terminal across-flat.
-    assert "TerminalFlatEdgeBreak" not in dt_cone_gear_shaft_spec.DRAWING_DIMENSIONS
-    callout = drawing.TORQUE_CORNER_CALLOUT
-    assert f"{dt_cone_gear_shaft_spec.inch_text(lands.TERMINAL_FLAT_EDGE_BREAK_MAX, 3)} MAX" in callout
-    # Run 20261010T071427837Z: the two-line above callout was in COM but not
-    # in the PDF.  One line, behind main's printable-above guard.
-    assert drawing._printable_above_callouts({"Sec4AF": callout})
-    with pytest.raises(RuntimeError, match="do not print"):
-        drawing._printable_above_callouts({"Sec4AF": "TORQUE CORNERS:\nSTONE"})
-    assert "TerminalTorqueEdge" not in drawing.D_SECTION_KEEP
-
-
-def test_the_build_leaves_the_terminal_torque_corners_sharp(monkeypatch):
+def test_the_build_rounds_only_the_step_root(monkeypatch):
     """Run the real part build with recording doubles: no chamfer is authored
     by any route (adapter, helper or raw COM chain), and the one edge
-    rounding, the step-root fillet, picks no edge inside the terminal land."""
+    rounding picks only the land-1 to land-2 step's edge on land 2."""
     adapter, stubs, _dims, _gated = _stubbed_build(monkeypatch)
     operations = [str(c[0]) for c in adapter.mock_calls] + [
         f"{name}.{c[0]}" for name, stub in stubs.items() for c in stub.mock_calls
     ]
     assert not [op for op in operations if "chamfer" in op.lower()]
     fillets = adapter.add_fillet.await_args_list
-    assert fillets, "the step-root fillet is the positive control"
-    start, tip = sorted(part.SECTION_ENDS[-2:])
-    picks = [pick for call in fillets for pick in call.args[1]]
-    assert all(not start < pick[2] <= tip for pick in picks), picks
+    assert len(fillets) == 1, "the step-root fillet is the positive control"
+    picks = fillets[0].args[1]
+    assert picks == [[-part.SECTION_DIAS[2] / 2.0, 0.0, part.SECTION_ENDS[1]]]
 
 
 def _centre_mark_view(marks: list, deletes: bool):
@@ -169,11 +133,10 @@ def _centre_mark_view(marks: list, deletes: bool):
     return SimpleNamespace(currentModel=draw), view, events
 
 
-def test_the_full_section_loses_its_centre_mark_so_all_four_read_alike(monkeypatch):
-    """Machinist review r7: only the full A-A got SolidWorks' centre mark, so
-    one section in four carried one.  The mark is deleted and read back gone;
-    a partial section with none is left alone; a delete that does not land
-    fails the build."""
+def test_the_section_loses_its_centre_mark(monkeypatch):
+    """Machinist review r7: the full A-A got SolidWorks' centre mark.  The
+    mark is deleted and read back gone; a section with none is left alone; a
+    delete that does not land fails the build."""
     from types import SimpleNamespace
 
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
@@ -183,9 +146,9 @@ def test_the_full_section_loses_its_centre_mark_so_all_four_read_alike(monkeypat
     adapter, view, events = _centre_mark_view(marks, deletes=True)
     drawing._delete_centre_mark(adapter, view, a_a)
     assert marks == [] and events == ["select", "delete"]
-    # a partial section: nothing to delete, nothing selected
+    # no mark: nothing to delete, nothing selected
     adapter, view, events = _centre_mark_view([], deletes=True)
-    drawing._delete_centre_mark(adapter, view, drawing.D_SECTIONS[-1])
+    drawing._delete_centre_mark(adapter, view, a_a)
     assert events == []
     # the delete is VT_VOID: only the re-read proves it
     adapter, view, _events = _centre_mark_view([SimpleNamespace()], deletes=False)
@@ -196,78 +159,49 @@ def test_the_full_section_loses_its_centre_mark_so_all_four_read_alike(monkeypat
     assert "carries a centre mark again" in source
 
 
-def test_the_d_sections_print_the_corner_limit_clock_and_mates(monkeypatch):
-    """Run the real section loop with its native steps recorded: the corner
-    limit rides above the terminal flat's own across-flat and the shared
-    clock above the first flat's, once each, through the printable-above
-    guard; B, C and D name their gears after their across-flats."""
-    from collections import defaultdict
-
-    callouts = []
+def test_the_keyseat_section_flags_the_land_note(monkeypatch):
+    """Run the real section loop with its native steps recorded: A-A prints
+    the keyseat's S and width, the width flagged to the land note; nothing
+    rides above them."""
     suffixes = []
     monkeypatch.setattr(drawing, "_cut_endpoints", lambda *_a: ((0.0, 0.0), (1.0, 0.0)))
     monkeypatch.setattr(drawing, "create_section_view", lambda *_a, label, **_k: label)
     monkeypatch.setattr(drawing, "_prepare_d_section", lambda *_a: None)
+    monkeypatch.setattr(drawing, "_keyseat_width_text_position", lambda *_a: (0.0, 0.0))
     monkeypatch.setattr(
-        drawing, "_keyseat_side_x", lambda _a, _view, section, _sign: section.centre[0] + 0.0095
+        drawing, "curate_view_dimensions", lambda _a, _view, *, keep, **_k: list(keep)
     )
-    keeps = []
-    monkeypatch.setattr(
-        drawing,
-        "curate_view_dimensions",
-        lambda _a, _view, *, keep, **_k: keeps.append(dict(keep)) or list(keep),
-    )
-    inside = []
-    monkeypatch.setattr(drawing, "_set_arrows_inside", lambda dimension, _label: inside.append(dimension))
-    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
     monkeypatch.setattr(drawing, "dimension_name", lambda _a, dimension: dimension)
     monkeypatch.setattr(drawing, "_delete_centre_mark", lambda *_a: None)
     monkeypatch.setattr(drawing, "_section_face", lambda *_a: (0.0, 0.0, 1.0, 1.0))
     monkeypatch.setattr(drawing, "_place_view_caption", lambda *_a, **_k: None)
     monkeypatch.setattr(
-        drawing, "set_dimension_callouts",
-        lambda _a, dimensions, texts, *, location: callouts.append((dimensions, texts, location)),
+        drawing,
+        "set_dimension_callouts",
+        lambda *_a, **_k: pytest.fail("no callout rides a section dimension"),
     )
     monkeypatch.setattr(
         drawing,
         "_set_dimension_suffixes",
-        lambda _a, dimensions, texts: suffixes.append((dimensions, texts)),
+        lambda _a, dimensions, texts: suffixes.append((tuple(dimensions), texts)),
     )
-    placed = drawing._add_d_sections(object(), defaultdict(object), 1)
-    assert len(placed) == len(drawing.D_SECTIONS)
-    terminal = f"Sec{max(drawing.FLAT_LANDS)}AF"
-    # A-A's S carries the land note's flag above it, the same flag its width
-    # carries after (PR 2 r5 machinist review, clarity).
-    assert callouts == [
-        (["Sec1KeyseatS"], {"Sec1KeyseatS": "NOTE 1"}, "above"),
-        ([terminal], {terminal: drawing.TORQUE_CORNER_CALLOUT}, "above"),
+    placed = drawing._add_d_sections(object(), object(), 1)
+    assert len(placed) == len(drawing.D_SECTIONS) == 1
+    assert placed[0].dimensions == ("Sec1KeyseatS", "Sec1KeyseatWidth")
+    assert suffixes == [
+        (
+            ("Sec1KeyseatS", "Sec1KeyseatWidth"),
+            {"Sec1KeyseatWidth": f" NOTE {dt_cone_gear_shaft_spec.LAND_NOTE}"},
+        )
     ]
-    width_flag = dt_cone_gear_shaft_spec.FLAT_MATE_SUFFIXES["Sec1KeyseatWidth"]
-    assert width_flag.strip() == "NOTE 1"
-    assert [names for names, _texts in suffixes] == [
-        ["Sec1KeyseatWidth"], *([f"Sec{land}AF"] for land in (2, 3, 4))
-    ]
-    assert len({texts[names[0]] for names, texts in suffixes}) == 1
-    # A-A (machinist review of 5a4e41cb5f, clarity): the width's line rises at
-    # the keyseat's edge, the S text steps away from it and the S arrows
-    # stand inside, so neither crosses the other.
-    a_section = drawing.D_SECTIONS[0]
-    assert keeps[0]["Sec1KeyseatWidth"] == (
-        a_section.centre[0] + 0.0095, a_section.centre[1] + drawing.KEYSEAT_WIDTH_RISE
-    )
-    assert keeps[0]["Sec1KeyseatS"] == (
-        a_section.centre[0] - drawing.KEYSEAT_S_SHIFT,
-        a_section.centre[1] + 0.017 + drawing.KEYSEAT_S_FLAG_LIFT,
-    )
-    assert inside == ["Sec1KeyseatS"]
 
 
 def test_every_tight_band_names_its_mate_and_fit_route():
     """Rule 4: a band under its shop row names a fit route at the feature.
     The journal is a matched running fit to the MHA-DT-05 bore with the
-    printed limits' clearance; every land and flat links the numbered land
-    note, which names each mate by drawing number and mills the flats matched
-    to the measured D-bores with an acceptance.  Lengths carry no words."""
+    printed limits' clearance; land 1 and its keyseat link the land note,
+    land 2 and the socket the bond note, each naming its mates by drawing
+    number.  Lengths carry no words but the stack flag."""
     spec = dt_cone_gear_shaft_spec
     journal = drawing.DIMENSION_CALLOUTS["Sec0Dia"]
     assert _config.parts("dt-cone-pivot-post")["number"] in journal
@@ -280,33 +214,44 @@ def test_every_tight_band_names_its_mate_and_fit_route():
     assert x > drawing.BIG_END_X
     widest = max(map(len, drawing.DIMENSION_CALLOUTS["Sec0Dia"].split("\n")))
     assert x + widest * 0.00217 <= 0.3141 - 0.003
-    # Land diameters flag the land note; the stack's lengths flag the stack
-    # note, at every callout it serves (round 4).
-    land_suffixes = {f"Sec{land}Dia" for land in (2, 3, 4)}
-    assert set(drawing.DIMENSION_SUFFIXES) == land_suffixes | set(drawing.STACK_LENGTHS)
-    assert len({drawing.DIMENSION_SUFFIXES[name] for name in land_suffixes}) == 1
+    # Land 2 flags the bond note; the stack's lengths flag the stack note, at
+    # every callout it serves (round 4).
+    assert set(drawing.DIMENSION_SUFFIXES) == {"Sec2Dia"} | set(drawing.STACK_LENGTHS)
+    assert drawing.DIMENSION_SUFFIXES["Sec2Dia"] == f" SEE NOTE {spec.BOND_NOTE}"
     assert {drawing.DIMENSION_SUFFIXES[name] for name in drawing.STACK_LENGTHS} == {
         drawing.STACK_FLAG_SUFFIX
     }
     assert str(spec.STACK_NOTE) in drawing.STACK_FLAG_SUFFIX
     notes = spec.DRAWING_NOTES.splitlines()
-    land_note = " ".join(notes[:2])
-    assert notes[0].startswith("1. ") and notes[1].startswith("   ")
-    for mate in ("dt-cone-gear", "dt-crank-drive-gear", "dt-vn-cone-tip-collar"):
-        assert _config.parts(mate)["number"] in land_note
-    # Land 1's members by drawing number, no undefined gear code (machinist
-    # review of 5a4e41cb5f: T030-T120), and its key by its number (PR #1992).
-    assert not re.search(r"T\d{3}", land_note)
-    assert "A-A ALSO MHA-DT-07 AND KEY MHA-DT-VN-71" in land_note
-    # The flats' matched fit (rule 4): measured D-bores and its acceptance.
-    assert "MEASURED D-BORES: NO ROCK" in land_note
+    assert [note.split(".")[0] for note in notes] == [
+        str(spec.LAND_NOTE), str(spec.BOND_NOTE), str(spec.STACK_NOTE)
+    ]
+    # Land 1's mates and its key (owner decision 2026-11-09, PR #1992) by
+    # number.
+    for mate in ("dt-cone-gear", "dt-crank-drive-gear", "dt-vn-cone-shaft-key"):
+        assert _config.parts(mate)["number"] in notes[0]
+    # Land 2 and the socket are bonded fits: their mates by number; the
+    # compound is the assembly sheet's (rule 23).
+    for mate in ("dt-cone-gear", "dt-cone-tip-gear"):
+        assert _config.parts(mate)["number"] in notes[1]
+    assert "BONDED FIT" in notes[1] and "LOCTITE" not in spec.DRAWING_NOTES
     # The three-place lengths name the stack they set once (rule 4).
     for mate in ("dt-cone-gear", "dt-crank-drive-gear"):
         assert _config.parts(mate)["number"] in notes[2]
+    # Rule 7: notes carry no dimension and no method.
+    assert not re.search(r"\d?\.\d{2,}", spec.DRAWING_NOTES)
+    for word in ("TAILSTOCK", "MILL", "TURN"):
+        assert word not in spec.DRAWING_NOTES
+    # The socket's callout (rule 12): the process, its .XX depth, its flag.
+    assert spec.SOCKET_CALLOUT.split("\n") == [
+        f"REAM <HOLE-DEPTH> {spec.inch_text(spec.SOCKET_DEPTH, 2)}",
+        f"SEE NOTE {spec.BOND_NOTE}",
+    ]
+    assert drawing.SOCKET_CALLOUTS == {"SocketDia": spec.SOCKET_CALLOUT}
     # Every suffix is one line; every below callout carries at most two lines
     # of words (rule 7), a parenthesized REF clearance row beside them.
     assert not any("\n" in text for text in drawing.DIMENSION_SUFFIXES.values())
-    assert not any("\n" in text for text in spec.FLAT_MATE_SUFFIXES.values())
+    assert not any("\n" in text for text in spec.KEYSEAT_MATE_SUFFIXES.values())
     for text in spec.SEAT_MATE_CALLOUTS.values():
         assert len([row for row in text.split("\n") if not row.startswith("(")]) <= 2
 
@@ -323,31 +268,22 @@ def test_display_precision_is_owned_by_the_part() -> None:
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in (
         Path(part.__file__).read_text(encoding="utf-8")
     )
-    # Every diameter and across-flat carries its named band, so its places
-    # are only spelling.  The stations carry no band, so their places ARE the
-    # grade they are held to: three for the land steps booked in the setback;
-    # two for the tip (user ruling 2026-09-29), whose .XX band the cone-tip
-    # adjuster's embed window absorbs (build_drive_train_assembly), and for
-    # the journal length, which the bearing-span proof reads.
+    # Every diameter carries its named band, so its places are only spelling.
+    # The stations carry no band, so their places ARE the grade they are held
+    # to: three for the land step booked in the setback and for the tip booked
+    # in the recess proof; two for the journal length, which the bearing-span
+    # proof reads.
     by_name = dt_cone_gear_shaft_spec.DRAWING_PRECISION_BY_NAME
     assert by_name == {
         "Sec0Dia": 4,
         "Sec1Dia": 4,
         "Sec2Dia": 4,
-        "Sec3Dia": 4,
-        "Sec4Dia": 4,
         "Sec0End": 2,
         "Sec1End": 3,
         "Sec2End": 3,
-        "Sec3End": 3,
-        "Sec4End": 2,
         "Sec1KeyseatWidth": cone_land_key.KEYSEAT_PLACES,
         "Sec1KeyseatS": cone_land_key.KEYSEAT_PLACES,
-        # The keyseat end's centre from the collar face: the title block's .XX.
-        "Sec1KeyseatEndSet": 2,
-        "Sec2AF": 4,
-        "Sec3AF": 4,
-        "Sec4AF": 4,
+        "SocketDia": cone_tip_cluster.STEM_PLACES,
         "ShoulderR": 3,
         # #914: the collar web is the 64T's station toward MHA-DT-05, so it
         # prints .XXX (crank_boss_rim).  The collar diameter is the bar's as
@@ -401,30 +337,26 @@ def test_the_gears_are_a_touching_stack_on_the_collar() -> None:
     )
 
 
-def test_each_step_sits_one_setback_inside_the_larger_gear() -> None:
-    """The steps T030|T024, T024|T018 and T018|T012 sit 1.0 south of the
-    smaller gear's south face, inside the larger gear, and at print-worst
-    the step and its root stay south of the smaller gear (margins 0.072,
-    0.089, 0.107 with the .XXX step at its printed inch limits)."""
+def test_the_step_sits_one_setback_inside_t030() -> None:
+    """The step T030|T024 sits 1.0 south of T030's north face, inside T030,
+    and at print-worst the step and its root stay south of T024."""
     spec = dt_cone_gear_shaft_spec
-    for name, j, end in zip(("Sec1End", "Sec2End", "Sec3End"), (15, 16, 17), spec.SECTION_ENDS[1:4]):
-        station = end - spec.FRONT_STUB
-        south, north = spec.gear_faces(j)
-        assert station == pytest.approx(north - 1.0), name
-        assert south < station - _band(3) and station + _band(3) + spec.FILLET_RADIUS < north
-        margin = _setback_margin(
-            j,
-            spec.printed_length_deviations(name)[1],
-            -spec.printed_length_deviations("CollarWidth")[0],
-        )
-        assert margin >= 0.0, name
-        assert spec.SEAT_STEP_BUDGET[name]["margin"] == pytest.approx(margin), name
+    station = spec.SECTION_ENDS[1] - spec.FRONT_STUB
+    south, north = spec.gear_faces(15)
+    assert station == pytest.approx(north - 1.0)
+    assert south < station - _band(3) and station + _band(3) + spec.FILLET_RADIUS < north
+    margin = _setback_margin(
+        15,
+        spec.printed_length_deviations("Sec1End")[1],
+        -spec.printed_length_deviations("CollarWidth")[0],
+    )
+    assert margin >= 0.0
+    assert spec.SEAT_STEP_BUDGET["margin"] == pytest.approx(margin)
 
 
-def test_two_place_steps_would_reach_the_smaller_gear() -> None:
-    """Why Sec1End..Sec3End print three places: the .XX band eats the setback."""
-    for j in (15, 16, 17):
-        assert _setback_margin(j, _band(2)) < 0.0, j
+def test_a_two_place_step_would_reach_t024() -> None:
+    """Why Sec1End prints three places: the .XX band eats the setback."""
+    assert _setback_margin(15, _band(2)) < 0.0
 
 
 def test_gear_face_model_follows_the_drive_train() -> None:
@@ -460,19 +392,29 @@ def test_required_drawing_paths() -> None:
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert part.DRAWING_DIMENSIONS is dt_cone_gear_shaft_spec.DRAWING_DIMENSIONS
     marked = set().union(*dt_cone_gear_shaft_spec.DRAWING_DIMENSIONS.values())
-    # The sections print SECTION_DIMENSION_NAMES; the keyseat width's text is
+    # The section prints SECTION_DIMENSION_NAMES; the keyseat width's text is
     # placed at build time on the keyseat's side, the rest at D_SECTION_KEEP.
+    # The tip end view prints the socket.
     sections = set().union(*drawing.SECTION_DIMENSION_NAMES.values())
     assert set(drawing.D_SECTION_KEEP) <= sections
     assert (
-        set(drawing.SIDE_KEEP) | set(drawing.SIDE_DIAMETERS) | sections
+        set(drawing.SIDE_KEEP)
+        | set(drawing.SIDE_DIAMETERS)
+        | sections
+        | set(drawing.TIP_END_VIEW_KEEP)
         == marked
     )
-    # Nothing is imported twice, and the donor hands over exactly the six
-    # diameters it was placed for (five lands and the collar, #914).
+    # Nothing is imported twice, and the donor hands over exactly the four
+    # diameters it was placed for (three lands and the collar, #914).
     assert set(drawing.DONOR_KEEP) == set(drawing.SIDE_DIAMETERS)
-    assert not set(drawing.SIDE_KEEP) & set(drawing.DONOR_KEEP)
-    assert not set(drawing.D_SECTION_KEEP) & (set(drawing.SIDE_KEEP) | set(drawing.DONOR_KEEP))
+    assert len(drawing.DONOR_KEEP) == 4
+    keeps = (
+        set(drawing.SIDE_KEEP),
+        set(drawing.DONOR_KEEP),
+        set(drawing.D_SECTION_KEEP),
+        set(drawing.TIP_END_VIEW_KEEP),
+    )
+    assert sum(map(len, keeps)) == len(set().union(*keeps))
     assert part.SECTIONS is dt_cone_gear_shaft_spec.SECTIONS
     assert drawing.SHAFT_LENGTH == dt_cone_gear_shaft_spec.SHAFT_LENGTH
     assert drawing.SECTION_DIAS == dt_cone_gear_shaft_spec.SECTION_DIAS
@@ -749,8 +691,6 @@ def test_lengths_are_baseline_from_each_chucking_face() -> None:
     from_seat = {
         "Sec1End": spec.SECTION_KNOBS[1],
         "Sec2End": spec.SECTION_KNOBS[2],
-        "Sec3End": spec.SECTION_KNOBS[3],
-        "Sec4End": spec.SECTION_KNOBS[4],
     }
     tiers = [
         drawing.SIDE_KEEP[name][1]
@@ -801,8 +741,6 @@ def _length_texts_crossed(side_keep, overall_xy):
     from_seat = {
         "Sec1End": spec.SECTION_KNOBS[1],
         "Sec2End": spec.SECTION_KNOBS[2],
-        "Sec3End": spec.SECTION_KNOBS[3],
-        "Sec4End": spec.SECTION_KNOBS[4],
     }
     places = spec.DRAWING_PRECISION_BY_NAME
     texts = {
@@ -868,145 +806,63 @@ def test_the_collar_diameter_draws_nothing_inside_the_ring() -> None:
     assert 'set_near_side_diameter(moved, f"{name} near-side diameter")' in source
 
 
-def test_each_d_section_cuts_its_own_land_clear_of_its_neighbours() -> None:
-    """User ruling 2026-09-28: every flatted land shows its D end-on, with its
-    across-flat.  Each cutting line crosses the land it names at least 2 mm
-    (on its parent's sheet) from the land's ends, and past the land's
-    surface; on the side view it keeps 2 mm off that land's diameter line,
-    on the tip detail it stays inside the circle over the whole land.  Each D
-    is enlarged to 15 mm or more so its actual AF reads, and the four, each with
-    its across-flat over it and its caption under it, stand apart right of
-    the side view, inside the frame and off the title block (codex review,
-    #1128: in one row the captions ran onto the title block and below the
-    border)."""
+def test_the_keyseat_section_cuts_land_one_clear_of_its_neighbours() -> None:
+    """Section A-A crosses land 1 at least 2 mm from its ends and past its
+    surface, 2 mm off its diameter line; enlarged to 15 mm or more, with its
+    S over it and its caption under it, it stands right of the side view,
+    inside the frame and off the title block."""
     spec = dt_cone_gear_shaft_spec
     template = DRAWING_TEMPLATES[drawing.SPEC.layout]
     margin = 0.0127
     big_end = drawing.SIDE_CENTER[0] + spec.SHAFT_LENGTH / 2000.0
-    starts = (spec.COLLAR_END_STATION, *spec.SECTION_ENDS[1:-1])
-    sections = drawing.D_SECTIONS
-    assert tuple(section.land for section in sections) == (spec.KEYED_LAND, *spec.FLAT_LANDS)
+    (section,) = drawing.D_SECTIONS
+    assert section.land == spec.KEYED_LAND
+    enlarge = drawing.SIDE_SCALE[0] / drawing.SIDE_SCALE[1]
+    end = spec.SECTION_ENDS[section.land]
+    radius = spec.SECTION_DIAS[section.land] / 2.0
+    assert (section.station_mm - spec.COLLAR_END_STATION) * enlarge >= 2.0
+    assert (end - section.station_mm) * enlarge >= 2.0
+    assert section.reach * 1000.0 / enlarge > radius
+    cut_x = big_end - section.station_mm / 1000.0
+    assert abs(cut_x - drawing.SIDE_DIAMETERS["Sec1Dia"][0]) >= 0.002
+    across = spec.SECTION_DIAS[section.land] * section.scale[0] / section.scale[1]
+    assert across >= 15.0
+    half = across / 2000.0
+    x, y = section.centre
+    text_x, text_y = drawing.D_SECTION_KEEP["Sec1KeyseatS"]
+    assert text_x == x and text_y > y + half
     caption_w, caption_h = drawing.SECTION_CAPTION_SIZE
-    cells = []
-    for section, start in zip(sections, starts):
-        scale = drawing.CUT_PARENT_SCALE[section.parent]
-        enlarge = scale[0] / scale[1]
-        end = spec.SECTION_ENDS[section.land]
-        radius = spec.SECTION_DIAS[section.land] / 2.0
-        assert (section.station_mm - start) * enlarge >= 2.0, section
-        assert (end - section.station_mm) * enlarge >= 2.0, section
-        assert section.reach * 1000.0 / enlarge > radius, section
-        if section.parent is drawing.CutParent.SIDE:
-            cut_x = big_end - section.station_mm / 1000.0
-            dia_x = drawing.SIDE_DIAMETERS[f"Sec{section.land}Dia"][0]
-            assert abs(cut_x - dia_x) >= 0.002, section
-        else:
-            offset = abs(section.station_mm - drawing.TIP_DETAIL_STATION_MM)
-            chord = math.sqrt((drawing.TIP_DETAIL_RADIUS * 1000.0) ** 2 - offset**2)
-            assert chord >= radius, section
-        across = spec.SECTION_DIAS[section.land] * section.scale[0] / section.scale[1]
-        assert across >= 15.0, section
-        half = across / 2000.0
-        x, y = section.centre
-        name = drawing.SECTION_DIMENSION_NAMES[section.land][0]
-        text_x, text_y = drawing.D_SECTION_KEEP[name]
-        assert text_x == x and text_y > y + half, section
-        # The terminal land's across-flat carries a one-line callout,
-        # centred on its text (20261010T071427837Z: the torque run reached
-        # 6.9 mm past the right border, and over C-C's outline); every
-        # across-flat carries its gears after the value, the whole line centred.
-        callout_x, callout_y = drawing.SECTION_CALLOUT_REACH.get(name, (0.0, 0.005))
-        line = "8.763 -0.01" + spec.FLAT_MATE_SUFFIXES.get(name, "")
-        text_half = len(line) * drawing.AF_CHAR_WIDTH / 2.0
-        reach_x, reach_y = max(callout_x, text_half), callout_y
-        cell = (
-            min(x - caption_w / 2.0, text_x - reach_x),
-            y - half - drawing.SECTION_CAPTION_GAP - caption_h,
-            max(x + caption_w / 2.0, text_x + reach_x),
-            text_y + reach_y,
-        )
-        assert cell[0] > big_end + 0.02, section
-        assert margin <= cell[0] and cell[2] <= template.width_m - margin - CLEAR_GAP_M, section
-        assert margin <= cell[1] and cell[3] <= template.height_m - margin, section
-        assert cell[1] > template.title_block_top_m, section
-        if section.land == max(spec.FLAT_LANDS):
-            assert text_x - reach_x > drawing.SECTION_C_OUTLINE_RIGHT + CLEAR_GAP_M
-        cells.append(cell)
-    for index, a in enumerate(cells):
-        for b in cells[index + 1 :]:
-            assert a[2] < b[0] or b[2] < a[0] or a[3] < b[1] or b[3] < a[1], (a, b)
-    # A-A's keyseat width text rides above B's cell: its line stands at the
-    # text's left edge on the keyseat's side, the text 46.1 mm wide, 4.5 mm
-    # under and 3.5 mm over its position (PR #2331 farm proofs: 7f1dedc
-    # measured 0.3466..0.3927; 5994f29 r2 0.1905..0.1985 at 0.195).  The row
-    # it rides is bounded by B's measured cell top and the pictorial's
+    cell = (
+        x - caption_w / 2.0,
+        y - half - drawing.SECTION_CAPTION_GAP - caption_h,
+        x + caption_w / 2.0,
+        text_y + 0.005,
+    )
+    assert cell[0] > big_end + 0.02
+    assert margin <= cell[0] and cell[2] <= template.width_m - margin - CLEAR_GAP_M
+    assert margin <= cell[1] and cell[3] <= template.height_m - margin
+    assert cell[1] > template.title_block_top_m
+    # The keyseat width's text rides above the section (PR #2331's farm fix,
+    # 5994f29c83): its line stands at the text's left edge on the keyseat's
+    # side (either side of A), the text 46.1 mm wide, 4.5 mm under and 3.5 mm
+    # over its position (PR #2331 farm proofs: 7f1dedc measured 0.3466..0.3927;
+    # 5994f29 r2 0.1905..0.1985 at 0.195).  Either way it stays inside the
+    # frame, above A's cell, and far right of the tip end view's socket text;
+    # its row is bounded by A's measured S text top and the pictorial's
     # measured outline bottom (5994f29 r2), each kept CLEAR_GAP_M plus 1 mm off.
-    b_cell_top, iso_bottom = 0.1855, 0.2001
-    keyed = next(s for s in sections if s.land == spec.KEYED_LAND)
-    keyed_half = spec.SECTION_DIAS[spec.KEYED_LAND] / 2000.0 * keyed.scale[0] / keyed.scale[1]
-    rise_y = keyed.centre[1] + drawing.KEYSEAT_WIDTH_RISE
-    assert rise_y - 0.0045 >= b_cell_top + CLEAR_GAP_M + 0.001
+    s_text_top, iso_bottom = 0.1855, 0.2001
+    rise_y = y + drawing.KEYSEAT_WIDTH_RISE
+    assert rise_y - 0.0045 >= s_text_top + CLEAR_GAP_M + 0.001
     assert rise_y + 0.0035 <= iso_bottom - CLEAR_GAP_M - 0.001
+    socket_x, _socket_y = drawing.TIP_END_VIEW_KEEP["SocketDia"]
     for side in (-1.0, 1.0):
-        left = keyed.centre[0] + side * keyed_half
+        left = x + side * half
         rider = (left, rise_y - 0.0045, left + 0.0461, rise_y + 0.0035)
+        assert rider[0] > big_end + 0.02
         assert rider[2] <= template.width_m - margin - CLEAR_GAP_M
-        for index, cell in enumerate(cells):
-            if sections[index] is keyed:
-                continue
-            assert rider[2] < cell[0] or cell[2] < rider[0] or rider[3] < cell[1] or (
-                cell[3] < rider[1]
-            ), (rider, cell)
-    # The width's line rises at the keyseat's edge.  The S text (5a4e41cb5f
-    # r3 layout audit: 0.3227..0.3501 about its 0.3371 position, 14.4 mm left
-    # and 13.0 mm right) steps away from it, ending CLEAR_GAP_M plus 1 mm short
-    # of that line, its left end clear of the Ø.4825 block (<= 0.3111, above);
-    # with its arrows inside, its dimension line ends at the floor's
-    # extension line, inside the land's edge.
-    keyseat_x = keyed.centre[0] + keyed_half
-    s_x = keyed.centre[0] - drawing.KEYSEAT_S_SHIFT
-    assert s_x + 0.0130 <= keyseat_x - CLEAR_GAP_M - 0.001
-    assert s_x - 0.0144 >= 0.3111 + CLEAR_GAP_M
-    # With its NOTE flag above, S's block is centred on its position, the
-    # value pushed down by the flag's row: PR 1 r9 (9b8efb7876) measured
-    # 0.3170..0.3424 x 0.1747..0.1872 about (0.3301, 0.182), its foot 0.2 mm
-    # off the face (the proof refused it).  Lifted, the block clears the
-    # face, the Ø.4825 text (to 0.3144) and the width's line by CLEAR_GAP_M
-    # and stays under the pictorial's outline (0.2001).
-    s_y = keyed.centre[1] + 0.017 + drawing.KEYSEAT_S_FLAG_LIFT
-    block = (s_x - 0.0131, s_y - 0.0073, s_x + 0.0123, s_y + 0.0052)
-    face_top = keyed.centre[1] + keyed_half
-    assert block[1] - face_top >= CLEAR_GAP_M + 0.001
-    assert block[0] >= 0.3144 + CLEAR_GAP_M
-    assert block[2] <= keyseat_x - CLEAR_GAP_M
-    assert block[3] <= 0.2001 - CLEAR_GAP_M
-    floor_x = keyed.centre[0] + (
-        cone_land_key.KEYSEAT_FLOOR_OFFSET_MM / 1000.0 * keyed.scale[0] / keyed.scale[1]
-    )
-    assert floor_x < keyseat_x
-    assert drawing.ARROWS_INSIDE == 0
-
-
-# How far past its line a detail cutting line's letter reaches toward the big
-# end: 19.9..21.3 mm measured (leaves 20260929T221513Z-1-22b951a7 and
-# 20260929T235413Z-1-6ebc5952), SolidWorks' own placement, varying by seat.
-_SECTION_LETTER_RUN_M = 0.0213
-
-
-def test_each_detail_cutting_line_clears_the_next_by_a_margin() -> None:
-    """Every arrow looks toward the big end, so each detail line's arrows and
-    letters run toward its big-end neighbour's line.  At 24 mm apart D's letter
-    crowded C's arrow at 1.7 mm on one seat (#1136); the worst measured letter
-    must now clear the next line's arrow by the proof's 2 mm and 1.5 mm more."""
-    enlarge = drawing.TIP_DETAIL_SCALE[0] / drawing.TIP_DETAIL_SCALE[1]
-    lines = sorted(
-        (s for s in drawing.D_SECTIONS if s.parent is drawing.CutParent.TIP_DETAIL),
-        key=lambda section: section.station_mm,
-    )
-    for ahead, behind in zip(lines, lines[1:]):
-        spacing = (behind.station_mm - ahead.station_mm) * enlarge / 1000.0
-        gap = spacing - _SECTION_LETTER_RUN_M - drawing.SECTION_ARROW_HALF_WIDTH
-        assert gap >= CLEAR_GAP_M + 0.0015, (behind.label, ahead.label, gap)
+        assert rider[3] <= template.height_m - margin
+        assert rider[1] > cell[3], (rider, cell)
+        assert rider[0] > socket_x + drawing.DIAMETER_TEXT_WIDTH + 0.1
 
 
 # How far above a side-view cutting line's lower end its letter's top stands:
@@ -1019,11 +875,9 @@ def test_each_side_view_cutting_line_letter_clears_its_land() -> None:
     the land it cuts.  At a 12.5 mm reach A's letter stood 1.4 mm under land
     1 on one seat and the section proof refused it (19e33c6c2); the worst
     measured letter must clear the land by the proof's 2 mm and 1.5 mm more."""
-    lines = [s for s in drawing.D_SECTIONS if s.parent is drawing.CutParent.SIDE]
-    assert lines
-    scale = drawing.CUT_PARENT_SCALE[drawing.CutParent.SIDE]
+    scale = drawing.SIDE_SCALE
     axis_y = drawing.SIDE_CENTER[1]
-    for section in lines:
+    for section in drawing.D_SECTIONS:
         half = dt_cone_gear_shaft_spec.SECTION_DIAS[section.land] / 2000.0
         land_bottom = axis_y - half * scale[0] / scale[1]
         letter_top = axis_y - section.reach + _SECTION_LETTER_RISE_M
@@ -1031,185 +885,37 @@ def test_each_side_view_cutting_line_letter_clears_its_land() -> None:
         assert gap >= CLEAR_GAP_M + 0.0015, (section.label, gap)
 
 
-def test_the_tip_detail_stands_in_the_frame_above_the_side_view() -> None:
-    """The tip detail's cutting lines, letters included, run inside the
-    frame's top and clear above the side view's highest diameter text; its
-    circle stays off the R0.10 step at the Ø6.350 to Ø9.525 shoulder."""
+def test_the_tip_end_view_carries_the_socket_callout_in_the_frame() -> None:
+    """Rules 9 and 12: the socket is a standard blind ream, so its callout on
+    the end view facing it defines it.  The view is projected left of the
+    side view on its axis at the sheet scale (third angle, no label), clear
+    of the tip; the callout's text stands inside the frame, above the view
+    and left of land 2's diameter line, off the note block."""
+    spec = dt_cone_gear_shaft_spec
     template = DRAWING_TEMPLATES[drawing.SPEC.layout]
-    letter = 0.00635
-    reach = max(
-        section.reach
-        for section in drawing.D_SECTIONS
-        if section.parent is drawing.CutParent.TIP_DETAIL
+    margin = 0.0127
+    x, y = drawing.TIP_END_VIEW_CENTER
+    assert y == drawing.SIDE_CENTER[1]
+    half = spec.COLLAR_DIA / 2000.0
+    assert x - half >= margin
+    assert x + half < drawing.TIP_END_X - drawing.AXIS_OVERRUN - CLEAR_GAP_M
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert '"*Front", *TIP_END_VIEW_CENTER, scale=SIDE_SCALE' in source
+    assert set(drawing.TIP_END_VIEW_KEEP) == {"SocketDia"}
+    text_x, text_y = drawing.TIP_END_VIEW_KEEP["SocketDia"]
+    lines = 1 + len(spec.SOCKET_CALLOUT.split("\n"))
+    width = max(
+        drawing.DIAMETER_TEXT_WIDTH,
+        *(len(line) * drawing.CALLOUT_CHAR_WIDTH for line in spec.SOCKET_CALLOUT.split("\n")),
     )
-    top = drawing.TIP_DETAIL_CENTER[1] + reach + letter
-    bottom = drawing.TIP_DETAIL_CENTER[1] - reach - letter
-    highest_text = max(y for _x, y in drawing.SIDE_DIAMETERS.values()) + letter
-    assert top <= template.height_m - 0.0127
-    assert bottom > highest_text + 0.002
-    circle = drawing.TIP_DETAIL_RADIUS * 1000.0
-    shoulder = dt_cone_gear_shaft_spec.SECTION_ENDS[1]
-    assert drawing.TIP_DETAIL_STATION_MM - circle >= shoulder + 2.0
-
-
-# Tip detail E as swmaker000004 read it on leaf 20261009T165136Z-1-acbeda8d:
-# CreateDetailViewAt4's Position and outline (bit-identical on all seven leaves
-# that logged them), and the tip centre's offset from Position once the
-# transform is current (every passing leaf: centre (0.09999997441408104,
-# 0.236) at Position (0.24755930006504057, 0.23600000000000002)).
-_SEAT_TIP_POSITION = (0.24717657096805057, 0.23644341806020072)
-_SEAT_TIP_OUTLINE = (
-    0.07242928077353916,
-    0.2232354181522899,
-    0.1268052610324808,
-    0.24965141796811155,
-)
-_SEAT_TIP_CENTRE_FROM_POSITION = (
-    0.09999997441408104 - 0.24755930006504057,
-    0.236 - 0.23600000000000002,
-)
-
-
-class _SeatTipDetail:
-    """A fresh detail whose ModelToViewTransform stays where
-    CreateDetailViewAt4 first put the view (TIP_DETAIL_CENTER) through every
-    rebuild, while Position and the outline follow SetViewPosition; only
-    UpdateViewDisplayGeometry brings it up to date, unless ``refreshes`` is
-    False."""
-
-    def __init__(self, events: list[str], *, refreshes: bool) -> None:
-        self.events = events
-        self.refreshes = refreshes
-        self.ScaleRatio = (4.0, 1.0)
-        self.position = _SEAT_TIP_POSITION
-        self.outline = _SEAT_TIP_OUTLINE
-        self.transform_at = drawing.TIP_DETAIL_CENTER
-
-    @property
-    def Position(self) -> tuple[float, float]:  # noqa: N802
-        return self.position
-
-    def GetOutline(self) -> tuple[float, ...]:  # noqa: N802
-        return self.outline
-
-    def SetViewPosition(self, xy, _keep_relative) -> bool:  # noqa: N802
-        dx, dy = xy[0] - self.position[0], xy[1] - self.position[1]
-        x0, y0, x1, y1 = self.outline
-        self.outline = (x0 + dx, y0 + dy, x1 + dx, y1 + dy)
-        self.position = (float(xy[0]), float(xy[1]))
-        return True
-
-    def UpdateViewDisplayGeometry(self) -> None:  # noqa: N802
-        self.events.append("update display geometry")
-        if self.refreshes:
-            self.transform_at = self.position
-
-    def project_centre(self) -> tuple[float, float]:
-        self.events.append("project tip centre")
-        return (
-            self.transform_at[0] + _SEAT_TIP_CENTRE_FROM_POSITION[0],
-            self.transform_at[1] + _SEAT_TIP_CENTRE_FROM_POSITION[1],
-        )
-
-
-def _tip_detail_on_seat(monkeypatch, *, refreshes: bool):
-    """Run _create_tip_detail against the swmaker000004 seat, COM-free."""
-    from types import SimpleNamespace
-
-    events: list[str] = []
-    detail = _SeatTipDetail(events, refreshes=refreshes)
-    circle = SimpleNamespace(Select4=lambda _append, _data: True)
-    draw = SimpleNamespace(
-        ActivateView=lambda _name: True,
-        ClearSelection2=lambda _all: None,
-        SketchManager=SimpleNamespace(AddToDB=False, CreateCircle=lambda *_: circle),
-        SelectionManager=SimpleNamespace(CreateSelectData=SimpleNamespace),
-        CreateDetailViewAt4=lambda *_: detail,
-    )
-    side = object()
-
-    def points_in_view(_adapter, view, points, *, label, names=None):
-        if view is detail:
-            return [detail.project_centre() for _point in points]
-        return [(0.078, 0.15), (0.078, 0.159)][: len(points)]
-
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
-    monkeypatch.setattr(
-        drawing,
-        "_sw_type_info",
-        SimpleNamespace(early_bound_or_flag=lambda obj, *_members: obj),
-    )
-    monkeypatch.setattr(drawing, "view_name", lambda _adapter, _view: "Drawing View1")
-    monkeypatch.setattr(drawing, "model_points_in_view", points_in_view)
-    monkeypatch.setattr(
-        drawing,
-        "_sheet_segment_in_parent_sketch",
-        lambda _adapter, _parent, sheet: [(x, y, 0.0) for x, y in sheet],
-    )
-    monkeypatch.setattr(drawing, "double_array", list)
-    clock = [0.0]
-
-    def rebuild(_adapter, *, label):
-        events.append(f"rebuild {label}")
-        clock[0] += 0.15
-
-    monkeypatch.setattr(drawing, "rebuild_drawing", rebuild)
-    monkeypatch.setattr(_drawing_detail_projection, "rebuild_drawing", rebuild)
-    monkeypatch.setattr(
-        _drawing_detail_projection, "_early_bound", lambda obj, _interface: obj
-    )
-    monkeypatch.setattr(
-        _drawing_detail_projection,
-        "model_point_in_view",
-        lambda _adapter, view, _xyz, *, label: points_in_view(
-            _adapter, view, (_xyz,), label=label
-        )[0],
-    )
-    monkeypatch.setattr(
-        _drawing_detail_projection,
-        "time",
-        SimpleNamespace(perf_counter=lambda: clock[0]),
-    )
-    adapter = SimpleNamespace(currentModel=draw)
-    return drawing._create_tip_detail(adapter, side, -1), detail, events
-
-
-def test_the_tip_detail_projects_only_behind_the_display_barrier(monkeypatch) -> None:
-    """Leaf 20261009T165136Z-1-acbeda8d: three settle rebuilds left the tip
-    detail's transform where CreateDetailViewAt4 first put the view, so the
-    centre read (-0.0476, 0.236) under ink centred on (0.1, 0.236).  The
-    settled projection is read behind UpdateViewDisplayGeometry, so a seat
-    whose rebuilds never refresh the transform reads it current; the one read
-    before the barrier is the span's stale control."""
-    built, detail, events = _tip_detail_on_seat(monkeypatch, refreshes=True)
-    assert built is detail
-    reads = [
-        index for index, event in enumerate(events) if event == "project tip centre"
-    ]
-    placed = events.index("rebuild place tip detail")
-    assert reads == [placed + 1, placed + 3]
-    assert events[placed + 2] == "update display geometry"
-    assert "rebuild settle tip detail" not in events
-    assert detail.project_centre() == pytest.approx(drawing.TIP_DETAIL_CENTER, abs=1e-7)
-
-
-def test_a_tip_detail_transform_that_never_catches_up_still_fails(monkeypatch) -> None:
-    """The check is not loosened: a transform the barrier cannot refresh
-    reproduces the farm's numbers and fails once the settle budget has run
-    out, naming the ink it disagrees with."""
-    with pytest.raises(RuntimeError) as failure:
-        _tip_detail_on_seat(monkeypatch, refreshes=False)
-    message = str(failure.value)
-    projected = re.search(r"projects its centre to \(([^,]+), ([^)]+)\)", message)
-    assert projected is not None, message
-    assert float(projected[1]) == pytest.approx(-0.04755932565095955, abs=1e-15)
-    assert float(projected[2]) == pytest.approx(drawing.TIP_DETAIL_CENTER[1], abs=1e-12)
-    assert "outline (0.0728120098" in message and "Position (0.2475593000" in message
-    assert "rebuilds and 5.10 s" in message
+    assert margin <= text_x and text_y <= template.height_m - margin
+    assert text_y - lines * 0.005 > y + half + CLEAR_GAP_M
+    assert text_x + width < drawing.SIDE_DIAMETERS["Sec2Dia"][0] + 0.010
+    assert text_y - lines * 0.005 > drawing.NOTES_XY[1]
 
 
 def test_stacked_tip_diameters_never_run_a_line_through_a_text() -> None:
-    """Three lands 6.9 mm apart carry three texts; each line clears the others.
+    """Each diameter's line clears every other diameter's text.
 
     A dragged diameter's text hangs to the RIGHT of its dimension line, so the
     text at (x, y) spans x..x+width, its mate suffix included; any other line
@@ -1230,151 +936,121 @@ def test_stacked_tip_diameters_never_run_a_line_through_a_text() -> None:
 
 
 def test_sections_are_a_monotonic_stepped_shaft() -> None:
-    """The v2 journal and four legacy gear sections step down monotonically."""
-    sections = dt_cone_gear_shaft_spec.SECTIONS
-    assert len(sections) == 5
-    dias = dt_cone_gear_shaft_spec.SECTION_DIAS
-    ends = dt_cone_gear_shaft_spec.SECTION_ENDS
+    """The v2 journal, the keyed land 1 and the round land 2 step down
+    monotonically (owner decision C1 keyed, 2026-11-09, PR #1992)."""
+    spec = dt_cone_gear_shaft_spec
+    sections = spec.SECTIONS
+    assert len(sections) == 3
+    dias = spec.SECTION_DIAS
+    ends = spec.SECTION_ENDS
     assert all(a > b for a, b in zip(dias, dias[1:]))
     assert all(a < b for a, b in zip(ends, ends[1:]))
     # The integral bearing journal fits the v2 post at 0.0127 diametral
-    # clearance; every downstream gear seat keeps its existing diameter.
-    assert dt_cone_gear_shaft_spec.JOURNAL_BORE_DIA == pytest.approx(12.2682)
-    assert dt_cone_gear_shaft_spec.JOURNAL_CLEARANCE == pytest.approx(0.0127)
-    assert dt_cone_gear_shaft_spec.JOURNAL_DIA == pytest.approx(12.2555)
-    assert dt_cone_gear_shaft_spec.JOURNAL_END == pytest.approx(43.18)
-    assert dias[-1] == cone_shaft_land_bands.TERMINAL_DIA_MM
-    assert dias[:-1] == pytest.approx((12.2555, 9.525, 6.35, 3.175))
-    assert dt_cone_gear_shaft_spec.FRONT_STUB == pytest.approx(
+    # clearance; the gear lands keep their diameters.
+    assert spec.JOURNAL_BORE_DIA == pytest.approx(12.2682)
+    assert spec.JOURNAL_CLEARANCE == pytest.approx(0.0127)
+    assert spec.JOURNAL_DIA == pytest.approx(12.2555)
+    assert spec.JOURNAL_END == pytest.approx(43.18)
+    assert dias == pytest.approx((12.2555, 9.525, 6.35))
+    assert spec.FRONT_STUB == pytest.approx(
         -cone_line.POST_STATION
         + dt_cone_pivot_post_spec.CONE_BOSS_LENGTH / 2.0
-        + dt_cone_gear_shaft_spec.JOURNAL_PROUD
+        + spec.JOURNAL_PROUD
     )
     # Convert the local collar face back to the shared cone station: it must
     # bear on the post's north boss face, independent of the incline/grid.
-    assert (
-        dt_cone_gear_shaft_spec.COLLAR_START_STATION
-        - dt_cone_gear_shaft_spec.FRONT_STUB
-    ) == pytest.approx(
+    assert spec.COLLAR_START_STATION - spec.FRONT_STUB == pytest.approx(
         cone_line.POST_STATION + dt_cone_pivot_post_spec.CONE_BOSS_LENGTH / 2.0
     )
-    # The tip chain (user ruling 2026-09-29): the MHA-DT-VN-54 collar stands one
-    # feeler off T006's north face; the block's north face stands the
-    # pivot-screw head's air south of the pivot and the block grows south.
-    # Every length is its owner's, not a copy.
-    assert dt_cone_gear_shaft_spec.T006_NORTH_FACE_STATION == pytest.approx(
-        cone_line.T006_NORTH_FACE
+    assert spec.T006_NORTH_FACE_STATION == pytest.approx(cone_line.T006_NORTH_FACE)
+    # Land 1 ends one setback behind T030's north face; land 2 ends the tip
+    # cluster's recess inside T024's bore, T024 one feeler north of layout.
+    assert ends[1] == pytest.approx(spec.FRONT_STUB + spec.seat_step_station(15))
+    assert spec.T024_NORTH_FACE_STATION == pytest.approx(
+        spec.gear_faces(16)[1] + cone_stack_end_play.STACK_FEELER
     )
-    assert dt_cone_gear_shaft_spec.TIP_COLLAR_WIDTH == dt_vn_cone_tip_collar_spec.WIDTH
-    assert dt_cone_gear_shaft_spec.TIP_COLLAR_START_STATION == pytest.approx(
-        dt_cone_gear_shaft_spec.T006_NORTH_FACE_STATION + cone_stack_end_play.COLLAR_FEELER
+    assert spec.TIP_END_STATION == pytest.approx(
+        spec.T024_NORTH_FACE_STATION - cone_tip_cluster.TIP_END_RECESS_MM
     )
-    assert dt_cone_gear_shaft_spec.TIP_BLOCK_LENGTH == dt_cone_tip_block_spec.BLOCK_Z
-    assert dt_cone_gear_shaft_spec.TIP_BLOCK_NORTH_FACE_STATION == pytest.approx(
-        dt_cone_tip_block_spec.TIP_BLOCK_NORTH_FACE
-    )
-    assert dt_cone_gear_shaft_spec.TIP_BLOCK_SOUTH_FACE_STATION + (
-        dt_cone_gear_shaft_spec.TIP_BLOCK_LENGTH / 2.0
-    ) == pytest.approx(dt_cone_tip_block_spec.TIP_BLOCK_STATION)
-    assert dt_cone_gear_shaft_spec.TIP_BLOCK_NORTH_FACE_STATION == pytest.approx(
-        cone_line.PIVOT_STATION - dt_cone_tip_block_spec.TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET
-    )
-    # drawing-guidelines.md rule 18 (thread engagement) E11: #10-32 94025A164 at the block spec's fit-up embed.
-    assert dt_cone_gear_shaft_spec.ADJUSTER_EMBED == dt_cone_tip_block_spec.ADJUSTER_EMBED
-    assert dt_cone_gear_shaft_spec.ADJUSTER_CUP_RIM_STATION == pytest.approx(
-        dt_cone_tip_block_spec.TIP_BLOCK_NORTH_FACE - dt_cone_tip_block_spec.ADJUSTER_EMBED
-    )
-    # Vendor Sketch2 Line7: the pure stock spec owns the actual cup, not this shaft.
-    import _mcmaster_94025a164
-    assert dt_cone_gear_shaft_spec.CUP_DEPTH == _mcmaster_94025a164.CUP_DEPTH
-    assert dt_cone_gear_shaft_spec.T006_TIP_STATION == pytest.approx(
-        dt_cone_gear_shaft_spec.ADJUSTER_CUP_RIM_STATION
-        + _mcmaster_94025a164.CUP_DEPTH
-    )
-    assert dt_cone_gear_shaft_spec.SHAFT_LENGTH == (
-        dt_cone_gear_shaft_spec.FRONT_STUB + dt_cone_gear_shaft_spec.T006_TIP_STATION
-    )
-    # Each land step sits one setback behind the larger gear's north face
-    # (T030|T024, T024|T018, T018|T012), so the actual terminal land carries
-    # T012 and T006 and runs on to the retained cup apex.
-    assert ends[1:-1] == pytest.approx(
-        tuple(
-            dt_cone_gear_shaft_spec.FRONT_STUB + dt_cone_gear_shaft_spec.seat_step_station(j)
-            for j in (15, 16, 17)
-        )
+    assert spec.SHAFT_LENGTH == ends[-1] == spec.FRONT_STUB + spec.TIP_END_STATION
+    assert spec.SOCKET_FLOOR_STATION == pytest.approx(
+        spec.TIP_END_STATION - cone_tip_cluster.SOCKET_DEPTH_MM
     )
     # Native station knobs and printed baselines share the collar's tip-side
     # face (rule 11, round 6).
-    assert dt_cone_gear_shaft_spec.SECTION_KNOBS[1:] == pytest.approx(
-        tuple(end - dt_cone_gear_shaft_spec.COLLAR_END_STATION for end in ends[1:])
-    )
-    # The terminal stub starts at the T018 interface setback and extends to
-    # the cup apex, rather than a frozen shaft-length snapshot.
-    assert dt_cone_gear_shaft_spec.TIP_STUB_START_STATION == pytest.approx(
-        cone_line.T006_NORTH_FACE
-        - 2.0 * dt_cone_gear_spec.SEAT_PITCH
-        - dt_cone_gear_shaft_spec.SEAT_STEP_SETBACK
-    )
-    assert dt_cone_gear_shaft_spec.TIP_STUB_LENGTH == pytest.approx(
-        dt_cone_gear_shaft_spec.T006_TIP_STATION
-        - dt_cone_gear_shaft_spec.TIP_STUB_START_STATION
-    )
-    assert ends[-1] - ends[-2] == pytest.approx(
-        dt_cone_gear_shaft_spec.TIP_STUB_LENGTH
-    )
-    assert (
-        dt_cone_gear_shaft_spec.TIP_STUB_START_STATION
-        <= dt_cone_gear_shaft_spec.TIP_COLLAR_START_STATION
-    )
-    assert (
-        dt_cone_gear_shaft_spec.TIP_COLLAR_END_STATION
-        <= dt_cone_gear_shaft_spec.TIP_BLOCK_SOUTH_FACE_STATION
+    assert spec.SECTION_KNOBS[1:] == pytest.approx(
+        tuple(end - spec.COLLAR_END_STATION for end in ends[1:])
     )
 
 
-def test_custom_tip_collar_stays_wholly_on_the_terminal_land_at_printed_limits() -> None:
-    """Use the accepted stack owner, not a second axial budget or a stock width."""
-    import dt_cone_gear_stack as stack
+def test_the_swing_platform_pivot_station_is_bit_identical() -> None:
+    """C1 keyed (owner decision 2026-11-09, PR #1992) moves no drilled hole in
+    the harmonic base: the pivot keeps origin/main's exact float, its 8.0
+    extension a literal now that the collar shift it summed is retired."""
+    import cone_stations
 
-    shaft = dt_cone_gear_shaft_spec
-    collar = dt_vn_cone_tip_collar_spec
-    face_upper, face_lower = stack.face_band(stack.COUNT - 1, "north")
-    collar_south_min = (
-        shaft.TIP_COLLAR_START_STATION - shaft.printed_band("CollarWidth")
-        + face_lower - cone_stack_end_play.COLLAR_FEELER_BAND
-    )
-    collar_north_max = (
-        shaft.TIP_COLLAR_END_STATION + shaft.printed_band("CollarWidth")
-        + face_upper + cone_stack_end_play.COLLAR_FEELER_BAND + collar.WIDTH_BAND_MM
-    )
-    root_north_max = (
-        shaft.TIP_STUB_START_STATION + shaft.printed_band("Sec3End")
-        + shaft.FILLET_RADIUS + shaft.printed_band("ShoulderR")
-    )
-    shaft_tip_min = shaft.SHAFT_LENGTH - shaft.printed_band("Sec4End")
-    assert shaft.TIP_COLLAR_END_STATION - shaft.TIP_COLLAR_START_STATION == pytest.approx(collar.WIDTH)
-    assert collar_south_min >= root_north_max
-    assert collar_north_max <= shaft_tip_min
+    assert cone_stations.TIP_END_EXTENSION_MM == 8.0
+    assert cone_stations.PIVOT_STATION == 160.02197937541507
+    assert cone_line.PIVOT_STATION == cone_stations.PIVOT_STATION
 
 
-def test_lands_two_to_four_carry_one_d_flat() -> None:
-    """User ruling 2026-09-28: lands 2-4 are Ds whose across-flat is their
-    section's; the flat's plane is the AF less the round half-diameter.
-    Land 1 is round and keyed (owner decision 2026-11-09, PR #1992)."""
+def test_the_shaft_end_stays_inside_t024_at_every_limit() -> None:
+    """T024's north face moves with T030's (the stack on the collar), the
+    feeler set and its own face width; the end moves with Sec2End's printed
+    .XXX.  At every limit the end stays inside T024's bore, so T018 butts
+    T024, and T024 keeps a bonded length on land 2."""
     spec = dt_cone_gear_shaft_spec
-    assert spec.FLAT_LANDS == (2, 3, 4)
-    assert spec.SECTION_FLAT_AF is cone_shaft_land_bands.SECTION_FLAT_AF
-    assert spec.FLAT_OFFSETS == pytest.approx(tuple(
-        None if af is None else af - dia / 2.0
-        for af, dia in zip(cone_shaft_land_bands.SECTION_FLAT_AF, spec.SECTION_DIAS)
-    ))
-    assert spec.SECTION_FLAT_AF[-1] == cone_shaft_land_bands.TERMINAL_FLAT_AF_MM
-    # Each flat's plane stays OUTSIDE the next land's round, and each bore's
-    # flat lets the next land pass (every flat runs off its land into air).
-    for land in spec.FLAT_LANDS[:-1]:
-        assert spec.FLAT_OFFSETS[land] > spec.SECTION_DIAS[land + 1] / 2.0, land
-    # The tip land's flat runs out through the end face (the end is a D).
-    assert max(spec.FLAT_LANDS) == len(spec.SECTIONS) - 1
+    north = dt_cone_gear_stack.face_band(15, "north")
+    band = cone_stack_end_play.STACK_FEELER_BAND
+    width = dt_cone_gear_spec.FACE_WIDTH_BAND
+    assert spec.T024_NORTH_FACE_DEVIATION_MM == pytest.approx(
+        (north[1] - band + width[1], north[0] + band + width[0])
+    )
+    end_lower, end_upper = spec.printed_length_deviations("Sec2End")
+    assert end_upper == pytest.approx(-end_lower, abs=0.01)
+    recess = cone_tip_cluster.TIP_END_RECESS_MM
+    low, high = spec.TIP_END_RECESS_LIMITS_MM
+    assert low == pytest.approx(recess + spec.T024_NORTH_FACE_DEVIATION_MM[0] - end_upper)
+    assert high == pytest.approx(recess + spec.T024_NORTH_FACE_DEVIATION_MM[1] - end_lower)
+    assert 0.0 < low < high
+    assert spec.T024_BOND_LENGTH_MIN_MM == pytest.approx(
+        spec.CONE_GEAR_FACE_WIDTH + width[1] - high
+    )
+    assert spec.T024_BOND_LENGTH_MIN_MM > 0.5 * spec.CONE_GEAR_FACE_WIDTH
+    # Positive control: at .XX the end could stand proud of T024.
+    assert recess + spec.T024_NORTH_FACE_DEVIATION_MM[0] - _band(2) < 0.0
+
+
+def test_the_spigot_keeps_floor_air_and_engagement_in_the_socket() -> None:
+    """Over the recess range, with the spigot and socket depth at their .XX
+    limits and T012/T018 at their face-width limits, T006's spigot never
+    bottoms and keeps 1.5 D in the socket."""
+    spec = dt_cone_gear_shaft_spec
+    tip = cone_tip_cluster
+    width = (
+        spec.CONE_GEAR_FACE_WIDTH + dt_cone_gear_spec.FACE_WIDTH_BAND[1],
+        spec.CONE_GEAR_FACE_WIDTH + dt_cone_gear_spec.FACE_WIDTH_BAND[0],
+    )
+    spigot_band = _band(2) + 0.01  # .XX plus the inch rounding of .71
+    depth_lower, _depth_upper = spec.printed_length_deviations("SocketDepth")
+    low, high = spec.TIP_END_RECESS_LIMITS_MM
+    air = low + 2.0 * width[0] - tip.SPIGOT_LENGTH_MM - spigot_band + spec.SOCKET_DEPTH + depth_lower
+    engagement = tip.SPIGOT_LENGTH_MM - spigot_band - 2.0 * width[1] - high
+    assert spec.SPIGOT_FLOOR_AIR_MIN_MM >= air - 1e-9
+    assert spec.SPIGOT_ENGAGEMENT_MIN_MM >= engagement - 1e-9
+    assert spec.SPIGOT_FLOOR_AIR_MIN_MM > 0.0
+    assert spec.SPIGOT_ENGAGEMENT_MIN_MM >= tip.SPIGOT_SOCKET_ENGAGEMENT_MIN_MM
+    assert tip.SPIGOT_SOCKET_ENGAGEMENT_MIN_MM == pytest.approx(1.5 * tip.STEM_DIA_MM)
+
+
+def test_the_socket_wall_holds_the_rule_17_target() -> None:
+    """Land 2 at its least printed diameter round the socket at its largest
+    reamed size keeps rule 17's .080 target."""
+    spec = dt_cone_gear_shaft_spec
+    land_min = cone_shaft_land_bands.land_finished_dia_limits_mm(spec.SECTION_DIAS[2], 2)[0]
+    socket_max = spec.SOCKET_DIA + max(spec.SOCKET_DIA_BAND)
+    assert spec.SOCKET_WALL_MIN_MM == pytest.approx((land_min - socket_max) / 2.0)
+    assert spec.SOCKET_WALL_MIN_MM >= 2.032
 
 
 def test_land_one_keyseat_runs_off_over_land_two_with_the_key_bands() -> None:
@@ -1385,7 +1061,6 @@ def test_land_one_keyseat_runs_off_over_land_two_with_the_key_bands() -> None:
     spec = dt_cone_gear_shaft_spec
     key = cone_land_key
     assert spec.SECTION_DIAS[spec.KEYED_LAND] == key.LAND_DIA_MM
-    assert spec.FLAT_OFFSETS[spec.KEYED_LAND] is None
     land2_max = (spec.SECTION_DIAS[2] + spec.SECTION_DIA_BANDS[2][0]) / 2.0
     land1_max = spec.SECTION_DIAS[1] + spec.SECTION_DIA_BANDS[1][0]
     floor_min = key.limits(key.KEYSEAT_S_MM, key.KEYSEAT_S_BAND)[0] - land1_max / 2.0
@@ -1412,109 +1087,25 @@ def test_land_one_keyseat_runs_off_over_land_two_with_the_key_bands() -> None:
     assert part.keyseat_area() == pytest.approx(numeric, rel=1e-6)
 
 
-def test_each_cut_is_made_over_exactly_its_land(monkeypatch) -> None:
-    """Land 1's keyseat and each flat are sketched on their land's end plane
-    and cut blind back over the land (the tip's from the end face): every
-    flat stops at the step behind it; the keyseat stops one end-mill radius
-    short of the collar face, where the end mill's semicircle closes it
-    (Codjiflo P2 on #2331, rule 16)."""
+def test_each_cut_is_made_over_exactly_its_feature(monkeypatch) -> None:
+    """Land 1's keyseat is sketched on its end plane and cut blind back over
+    the land to the collar face; the socket is sketched on land 2's end plane
+    (the shaft's end) and cut blind its depth back into land 2."""
     adapter, stubs, _sketch_dims, _gated = _stubbed_build(monkeypatch)
     spec = dt_cone_gear_shaft_spec
-    key = cone_land_key
-    lands = (spec.KEYED_LAND, *spec.FLAT_LANDS)
     sketched = [c.args[0] for c in adapter.create_sketch.call_args_list]
-    for land in lands:
-        assert f"Sec{land}EndPlane" in sketched, land
+    assert sketched.count("Sec1EndPlane") == 2  # the land's profile and the keyseat
+    assert sketched.count("Sec2EndPlane") == 2  # the land's profile and the socket
     cuts = [c.args[0] for c in adapter.create_cut_extrude.call_args_list]
-    assert len(cuts) == len(lands) + 1
-    keyseat, end, *flats = cuts
-    assert keyseat.depth == pytest.approx(
-        spec.SECTION_ENDS[1] - spec.COLLAR_END_STATION - key.KEY_END_SET_MM
+    assert [params.depth for params in cuts] == pytest.approx(
+        [spec.SECTION_ENDS[1] - spec.COLLAR_END_STATION, spec.SOCKET_DEPTH]
     )
-    assert not keyseat.reverse_direction
-    for params, land, start in zip(flats, spec.FLAT_LANDS, spec.SECTION_ENDS[1:-1], strict=True):
-        assert params.depth == pytest.approx(spec.SECTION_ENDS[land] - start), land
-        assert not params.reverse_direction, land
-    # The end: a Ø W plunge, mid-plane from a plane 1 mm outside land 1 on
-    # +X, reaching the floor; centred one radius north of the collar face.
-    reach = spec.SECTION_DIAS[1] / 2.0 + 1.0
-    assert ("Right Plane", reach) in _planes(adapter)
-    assert "Sec1KeyseatEndPlane" in sketched
-    assert end.both_directions
-    assert end.depth == pytest.approx(2.0 * (reach - key.KEYSEAT_FLOOR_OFFSET_MM))
-    # Ø W, centred on the axis line one radius (the sheet's Sec1KeyseatEndSet)
-    # along the shaft from a construction line on the collar face.
-    (circle,) = adapter.add_circle.call_args_list
-    assert circle.args == pytest.approx(
-        (
-            -(spec.COLLAR_END_STATION + key.KEY_END_SET_MM),
-            0.0,
-            key.KEYSEAT_WIDTH_MM / 2.0,
-        )
-    )
-    (end_set,) = [
-        c
-        for c in stubs["dimension_between"].call_args_list
-        if c.args[5] == "Sec1 keyseat end set"
-    ]
-    assert end_set.args[3] == "horizontal_distance"
-    assert end_set.args[4] == pytest.approx(key.KEY_END_SET_MM)
-    (collar_line,) = [
-        c.args[1]
-        for c in stubs["add_line_chain"].call_args_list
-        if c.args[1][0] == pytest.approx((-spec.COLLAR_END_STATION, 0.0))
-    ]
-    assert collar_line[1] == pytest.approx(
-        (-spec.COLLAR_END_STATION, -spec.SECTION_DIAS[1] / 2.0)
-    )
-    records = {
-        c.args[0]: c.args[1] if len(c.args) > 1 else None
-        for c in _sketch_dims.return_value.record.call_args_list
-    }
-    assert records["Sec1KeyseatCollarFace"] == '"SecEnd0" + "CollarWidth"'
-    assert records["Sec1KeyseatCollarRise"] == '"SecDia1" / 2'
-    assert records["Sec1KeyseatEndSet"] == '"Sec1KeyseatEndSet"'
-    assert records["Sec1KeyseatEndDia"] == '"Sec1KeyseatW"'
-    # The tip flat's cut starts at the end face: it runs out through the tip.
-    assert spec.SECTION_ENDS[-1] == pytest.approx(spec.SHAFT_LENGTH)
+    assert not any(params.reverse_direction for params in cuts)
     named = [c.args[1] for c in stubs["name_last_feature"].call_args_list]
-    assert [
-        "Sec1Keyseat",
-        "Sec1KeyseatEnd",
-        *(f"Sec{land}Flat" for land in spec.FLAT_LANDS),
-    ] == [name for name in named if name.endswith(("Flat", "Keyseat", "KeyseatEnd"))]
-
-
-def test_the_keyseat_end_is_the_end_mill_radius_and_clears_the_key() -> None:
-    """The end's radius is half the keyseat, its centre KEY_END_SET (.05) from
-    the collar face, so in the model the radius stands clear of that face;
-    the key's square south end sits on the radius's centre line, where the
-    keyseat is full width, so the key's corners clear the end at every
-    limit; and the end's volume is the exact half-disc integral."""
-    key = cone_land_key
-    spec = dt_cone_gear_shaft_spec
-    assert key.KEY_END_SET_MM == pytest.approx(0.05 * 25.4)
-    assert key.KEY_END_SET_MM > key.KEYSEAT_WIDTH_MM / 2.0
-    assert part.KEYSEAT_END_STATION == pytest.approx(
-        spec.COLLAR_END_STATION + key.KEY_END_SET_MM
-    )
-    # The key's widest half-width fits the end's least radius on its south line.
-    key_half_max = key.limits(key.KEY_SIZE_MM, key.KEY_STOCK_BAND)[1] / 2.0
-    end_radius_min = key.limits(key.KEYSEAT_WIDTH_MM, key.KEYSEAT_WIDTH_BAND)[0] / 2.0
-    assert key_half_max <= end_radius_min
-    # Volume: closed form of the half disc times the floor-to-round height,
-    # checked against a finer midpoint sum.
-    assert part.keyseat_end_volume() == pytest.approx(
-        part.keyseat_end_volume(steps=40000), rel=1e-5
-    )
-    radius = spec.SECTION_DIAS[1] / 2.0
-    half = key.KEYSEAT_WIDTH_MM / 2.0
-    floor = key.KEYSEAT_FLOOR_OFFSET_MM
-    assert (
-        math.pi / 2.0 * half**2 * (math.sqrt(radius**2 - half**2) - floor)
-        < part.keyseat_end_volume()
-        < math.pi / 2.0 * half**2 * (radius - floor)
-    )
+    assert [name for name in named if name in {"Sec1Keyseat", "SocketProfile", "Socket"}] == [
+        "Sec1Keyseat", "SocketProfile", "Socket"
+    ]
+    assert not [name for name in named if "Flat" in name or name.startswith(("Sec3", "Sec4"))]
 
 
 def test_the_keyseat_end_is_located_from_the_collar_face_on_the_sheet() -> None:
@@ -1580,9 +1171,10 @@ def test_the_keyseat_end_is_located_from_the_collar_face_on_the_sheet() -> None:
 def test_shoulder_roots_are_modelled_not_noted() -> None:
     """The root radius is geometry with a size, not a sentence in a note block."""
     assert dt_cone_gear_shaft_spec.FILLET_RADIUS == pytest.approx(0.1016)
-    # Its run along the smaller land is booked in every step's setback.
-    for budget in dt_cone_gear_shaft_spec.SEAT_STEP_BUDGET.values():
-        assert budget["fillet"] == dt_cone_gear_shaft_spec.FILLET_RADIUS
+    # Its run along land 2 is booked in the step's setback.
+    assert dt_cone_gear_shaft_spec.SEAT_STEP_BUDGET["fillet"] == (
+        dt_cone_gear_shaft_spec.FILLET_RADIUS
+    )
     # A single limit, R.004 MAX, never the title block's +-.005: the setback
     # books the printed maximum, which is the model radius.
     assert dt_cone_gear_shaft_spec.printed_length_deviations("ShoulderR") == pytest.approx(
@@ -1590,20 +1182,17 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
     )
     assert dt_cone_gear_shaft_spec.FILLET_R_TOL_TYPE == 6  # swTolMAX
     source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "add_fillet(FILLET_RADIUS, fillet_edges, propagate=False)" in source
+    assert "await adapter.add_fillet(\n            FILLET_RADIUS," in source
     assert 'name_last_feature(adapter, "ShoulderFillets")' in source
     assert 'name_dimensions(adapter, "ShoulderFillets", ["ShoulderR"])' in source
     assert "tolerance.Type = FILLET_R_TOL_TYPE" in source
     assert "_shoulder_root_max_limit(adapter)" in source
-    # One feature, one dimension, one quantity prefix -- not three dimensions
-    # (the gear-seat steps; the collar's roots stay sharp, #914).
-    assert drawing.DIMENSION_CALLOUTS["ShoulderR"] == "3X"
-    # The notes are numbered flag notes (rule 7): the land note (mates by
-    # drawing number, fit and across-flat clearance, the flats' clock), the
-    # collar's tight limits, and the tailstock line, a user-ruled process
-    # requirement (U40, 2026-09-23: the slender tip land is only turnable
-    # supported), so "TURN" is allowed in that one line only.  No design
-    # rationale, joint method or check of its own.
+    # One root, one dimension, no quantity prefix (the collar's roots stay
+    # sharp, #914).
+    assert "ShoulderR" not in drawing.DIMENSION_CALLOUTS
+    # The notes are numbered flag notes (rule 7): the land note, the bond
+    # note and the stack note, each naming mates by drawing number.  No
+    # design rationale, process, joint method or check of its own.
     notes = dt_cone_gear_shaft_spec.DRAWING_NOTES
     # The sheet's note text runs ~2.7 mm per character; a line from the
     # note anchor must end before the title block at x = 0.216 m (the
@@ -1613,11 +1202,7 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
     )
     numbered = [line.split(".")[0] for line in notes.splitlines() if not line.startswith(" ")]
     assert numbered == ["1", "2", "3"]
-    # Rule 7: at most four short lines, the RV-02 tailstock line included
-    # (Codjiflo P2 on #2331).
-    assert len(notes.splitlines()) <= 4
-    tailstock = [line for line in notes.splitlines() if "TAILSTOCK" in line.upper()]
-    assert len(tailstock) == 1
+    assert len(notes.splitlines()) == 3
     for forbidden in (
         "R0.",
         "MUST",
@@ -1628,16 +1213,15 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
         "SOLDER",
         "BRAZE",
         "LOCTITE",
-        "BOND",
         "RETAIN",
         "ADHESIVE",
+        "TAILSTOCK",
+        "TURN",
         "64T",
         "CLEAR OF",
     ):
         assert forbidden not in notes.upper()
-    # U40: "TURN" appears only in the ruled tailstock line.
-    assert "TURN" not in notes.upper().replace(tailstock[0].upper(), "")
-    # The extension lines stop short of every across-flat's text foot.
+    # The extension lines stop short of every section dimension's text foot.
     assert 0.0 < drawing.WITNESS_LINE_EXTENSION <= 0.0005
     drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "_pin_witness_line_extension(drawing_model)" in drawing_source
@@ -1662,8 +1246,8 @@ def test_the_sheet_carries_no_datums_or_feature_control_frames() -> None:
         "add_datum_feature(",
     ):
         assert banned not in source
-    # Only the journal that runs keeps its roughness symbol: the tip land's
-    # parts are locked to it and the tip bears with its end (rule 6, r5).
+    # Only the journal that runs keeps its roughness symbol: every other
+    # land's parts are fixed to it (rule 6, r5).
     assert source.count("add_surface_finish(") == 1
     assert tuple(control.key for control in dt_cone_gear_shaft_spec.SURFACE_FINISHES) == (
         "pivot_journal",
@@ -1677,8 +1261,9 @@ def test_view_scales_are_explicit() -> None:
     assert drawing.SIDE_SCALE == (1, 1)  # full length, no reduction
     assert drawing.ISO_SCALE == (1, 2)  # reduced pictorial
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    # The end view is gone: its only content was a pile of leadered diameters.
-    assert '"*Front"' in source  # the donor, and only as a donor
+    # The donor end view hands its diameters over and is deleted; the tip end
+    # view, at the sheet scale, carries only the socket.
+    assert source.count('"*Front"') == 2
     assert "delete_view(adapter, donor)" in source
 
 
@@ -1701,29 +1286,26 @@ def test_part_stamps_make_critical_properties() -> None:
     assert int(config["quantity"]) == 1
 
 
-def test_configured_tip_gears_require_tip_first_shaft_assembly() -> None:
-    """The current cone tips cannot pass over the next inboard gear bore."""
+def test_t024_tips_clear_the_keyed_land() -> None:
+    """T024, the first gear on, slides over land 2 and stops at T030; its
+    tips stand outside the keyed land it stops short of."""
     spec = dt_cone_gear_shaft_spec
     assert spec.outside_dia_mm is dt_cone_gear_spec.outside_dia_mm
-    for teeth, next_bore_land in ((6, 4), (12, 3), (18, 2), (24, 1)):
-        tip_dia = dt_cone_gear_spec.outside_dia_mm(teeth)
-        assert tip_dia > spec.SECTION_DIAS[next_bore_land], teeth
+    assert dt_cone_gear_spec.outside_dia_mm(24) > spec.SECTION_DIAS[1]
 
 
-def test_shaft_loading_preflight_reads_each_accepted_tip(monkeypatch) -> None:
+def test_shaft_loading_preflight_reads_t024s_accepted_tip(monkeypatch) -> None:
     spec = dt_cone_gear_shaft_spec
-    rows = ((6, 4), (12, 3), (18, 2), (24, 1))
-    by_teeth = {teeth: spec.SECTION_DIAS[land] + 1.0 for teeth, land in rows}
     calls = []
-    monkeypatch.setattr(spec, "outside_dia_mm", lambda teeth: calls.append(teeth) or by_teeth[teeth])
+    tip = {"dia": spec.SECTION_DIAS[1] + 1.0}
+    monkeypatch.setattr(
+        spec, "outside_dia_mm", lambda teeth: calls.append(teeth) or tip["dia"]
+    )
     spec.validate_gear_loading_clearances()
-    assert calls == [teeth for teeth, _land in rows]
-    for teeth, land in rows:
-        previous = by_teeth[teeth]
-        by_teeth[teeth] = spec.SECTION_DIAS[land]
-        with pytest.raises(AssertionError, match=f"T{teeth:03d}"):
-            spec.validate_gear_loading_clearances()
-        by_teeth[teeth] = previous
+    assert calls == [24]
+    tip["dia"] = spec.SECTION_DIAS[1]
+    with pytest.raises(AssertionError, match="T024"):
+        spec.validate_gear_loading_clearances()
 
 
 def test_refused_cutter_family_reaches_no_native_shaft_geometry(monkeypatch) -> None:
@@ -1758,15 +1340,17 @@ def test_every_station_knob_owns_its_plane_and_depth(monkeypatch) -> None:
     for global_name, _value, names in part.STATION_OWNERS:
         for name in names:
             assert owners[name] == f'"{global_name}"', name
-    # Each flat's length follows its land's knobs; its sketch is sized by the
-    # land's diameter and across-flat globals.
-    for land in dt_cone_gear_shaft_spec.FLAT_LANDS:
-        assert owners[f"Sec{land}FlatLength@Sec{land}Flat"] == part.flat_length_expression(
-            land
-        )
-        assert records[f"Sec{land}AF"] == f'"SecAF{land}"'
-        assert records[f"Sec{land}FarSide"] == f'"SecDia{land}" / 2'
-    assert owners["Sec1KeyseatLength@Sec1Keyseat"] == part.KEYSEAT_LENGTH_EXPRESSION
+    # The keyseat's length follows land 1's knob; its sketch is sized by the
+    # land's diameter and the key globals.  The socket's diameter is its
+    # global's.
+    assert owners["Sec1KeyseatLength@Sec1Keyseat"] == '"SecEnd1"'
+    (socket,) = [
+        c
+        for c in stubs["define_circle"].call_args_list
+        if c.kwargs["names"][2] == "SocketDia"
+    ]
+    assert socket.kwargs["drives"] == (None, None, '"SocketDia"')
+    assert socket.args[3] == pytest.approx(dt_cone_gear_shaft_spec.SOCKET_DIA / 2.0)
     assert records["Sec1KeyseatWidth"] == '"Sec1KeyseatW"'
     assert records["Sec1KeyseatS"] == '"Sec1KeyseatS"'
     assert records["Sec1FarSide"] == '"SecDia1" / 2'
@@ -1785,7 +1369,12 @@ def test_station_owners_cover_every_knob_once() -> None:
         spec.COLLAR_THICKNESS,
         ("CollarStation@CollarEndPlane", "CollarWidth@Collar"),
     )
-    assert set(rows) == {*(f"SecEnd{i}" for i in range(len(spec.SECTIONS))), "CollarWidth"}
+    assert rows["SocketDepth"] == (spec.SOCKET_DEPTH, ("SocketDepth@Socket",))
+    assert set(rows) == {
+        *(f"SecEnd{i}" for i in range(len(spec.SECTIONS))),
+        "CollarWidth",
+        "SocketDepth",
+    }
 
 
 class _Dim:
@@ -1843,8 +1432,8 @@ def test_station_gate_accepts_single_ownership_at_driven_state_1(
     [
         ({"Sec2Station@Sec2EndPlane": ('"SecEnd1"', 1)}, 'not "SecEnd2"'),
         (
-            {"Sec3Station@Sec3EndPlane": ('"SecEnd3"', 2)},
-            "SecEnd3: DrivenState differs",
+            {"Sec2Station@Sec2EndPlane": ('"SecEnd2"', 2)},
+            "SecEnd2: DrivenState differs",
         ),
         ({"CollarWidth@Collar": ('"SecEnd0"', 1)}, 'not "CollarWidth"'),
     ],
@@ -1861,14 +1450,14 @@ def test_station_gate_rejects_a_wrong_owner_or_state(
 def test_station_gate_rejects_a_missing_or_moved_dimension(monkeypatch) -> None:
     dims, equations = _machine()
     del equations['"Sec1Station@Sec1EndPlane"']
-    dims["Sec4Station@Sec4EndPlane"] = _Dim(
-        dt_cone_gear_shaft_spec.SECTION_KNOBS[4] + 1e-3
+    dims["Sec2Station@Sec2EndPlane"] = _Dim(
+        dt_cone_gear_shaft_spec.SECTION_KNOBS[2] + 1e-3
     )
     del dims["CollarFaceStation@CollarFace"]
     adapter = _gate_fixture(monkeypatch, dims, equations)
     with pytest.raises(RuntimeError, match="expected one equation") as raised:
         part._assert_stations_single_owned(adapter)
-    assert "Sec4Station@Sec4EndPlane: reads" in str(raised.value)
+    assert "Sec2Station@Sec2EndPlane: reads" in str(raised.value)
     assert "CollarFaceStation@CollarFace not found" in str(raised.value)
 
 
@@ -1877,20 +1466,20 @@ def test_station_gate_proves_the_depth_owner_too(monkeypatch) -> None:
     but is driven by the wrong global, or has lost its equation, must fail --
     as must a knob defined twice."""
     dims, equations = _machine({"Sec2End@Sec2": ('"SecEnd1"', 1)})
-    del equations['"Sec3End@Sec3"']
-    equations['"SecEnd4"'] *= 2
+    del equations['"SocketDepth@Socket"']
+    equations['"CollarWidth"'] *= 2
     adapter = _gate_fixture(monkeypatch, dims, equations)
     with pytest.raises(RuntimeError) as raised:
         part._assert_stations_single_owned(adapter)
     message = str(raised.value)
     assert "Sec2End@Sec2: owned by" in message
-    assert "Sec3End@Sec3: expected one equation" in message
-    assert "SecEnd4: expected one definition" in message
+    assert "SocketDepth@Socket: expected one equation" in message
+    assert "CollarWidth: expected one definition" in message
     assert "Sec1" not in message.replace("SecEnd1", "")
 
 
 # #914 (user ruling 2026-09-25): an integral collar captures the shaft.  The
-# tip adjuster pushes the shaft south; the collar's south face bears on the
+# tip end screw pushes the shaft south; the collar's south face bears on the
 # post's north boss face, and the 64T stands on its north face.
 def test_collar_fills_the_gap_between_the_post_boss_and_the_64t() -> None:
     spec = dt_cone_gear_shaft_spec
@@ -2055,7 +1644,7 @@ def test_the_build_hides_every_plane_it_creates(monkeypatch) -> None:
 def test_every_land_is_placed_from_its_chucking_origin(monkeypatch) -> None:
     """Rule 11 (round 6): the collar's thrust face comes first, from the front
     face by the journal, then its tip-side face one web on; the collar is
-    turned onto the journal, and lands 1-4 end on planes offset from the
+    turned onto the journal, and lands 1-2 end on planes offset from the
     tip-side face and extrude back to it, so each depth IS the shoulder's
     station from that face.  The front-to-tip overall is only a reference."""
     spec = dt_cone_gear_shaft_spec
@@ -2068,7 +1657,7 @@ def test_every_land_is_placed_from_its_chucking_origin(monkeypatch) -> None:
     for i in range(1, len(spec.SECTIONS)):
         assert (spec.SECTION_ORIGINS[i], spec.SECTION_KNOBS[i]) in planes, i
     extrusions = [c.args[0] for c in adapter.create_extrusion.call_args_list]
-    # journal, collar, then the four gear lands
+    # journal, collar, then the two gear lands
     assert [e.depth for e in extrusions[: len(spec.SECTIONS) + 1]] == [
         spec.SECTION_KNOBS[0],
         spec.COLLAR_THICKNESS,
@@ -2079,14 +1668,13 @@ def test_every_land_is_placed_from_its_chucking_origin(monkeypatch) -> None:
         True,
         True,
         True,
-        True,
-        True,
     ]
     knobs = {c.args[1]: c.args[2] for c in stubs["set_global"].call_args_list}
     for i, knob in enumerate(spec.SECTION_KNOBS):
         assert knobs[f"SecEnd{i}"] == f"{knob}mm"
-    for land in spec.FLAT_LANDS:
-        assert knobs[f"SecAF{land}"] == f"{spec.SECTION_FLAT_AF[land]}mm"
+    assert knobs["SocketDia"] == f"{spec.SOCKET_DIA}mm"
+    assert knobs["SocketDepth"] == f"{spec.SOCKET_DEPTH}mm"
+    assert not [name for name in knobs if name.startswith("SecAF")]
     assert knobs["Sec1KeyseatW"] == f"{cone_land_key.KEYSEAT_WIDTH_MM}mm"
     assert knobs["Sec1KeyseatS"] == f"{cone_land_key.KEYSEAT_S_MM}mm"
     assert knobs["Sec1KeyseatEndSet"] == f"{cone_land_key.KEY_END_SET_MM}mm"
@@ -2115,13 +1703,8 @@ def test_build_turns_the_collar_between_the_journal_and_the_64t(monkeypatch) -> 
     assert [spec.JOURNAL_DIA / 2.0, 0.0, spec.COLLAR_START_STATION] not in edges
     assert [land, 0.0, spec.COLLAR_END_STATION] not in edges
     assert [land, 0.0, spec.JOURNAL_END] not in edges
-    # Each flatted step root is two edges: the round arc and the flat's line.
-    assert len(edges) == 2 * (len(spec.SECTIONS) - 2)
-    for step in (1, 2, 3):
-        station = spec.SECTION_ENDS[step]
-        assert [-spec.SECTION_DIAS[step + 1] / 2.0, 0.0, station] in edges, step
-        assert [spec.FLAT_OFFSETS[step + 1], 0.0, station] in edges, step
-    assert spec.FILLET_CALLOUT == f"{len(edges) // 2}X"
+    # The one step root is a full circle on land 2.
+    assert edges == [[-spec.SECTION_DIAS[2] / 2.0, 0.0, spec.SECTION_ENDS[1]]]
     named = [c.args[1] for c in stubs["name_last_feature"].call_args_list]
     assert "CollarFace" in named
 
@@ -2171,39 +1754,20 @@ def test_each_chucking_measures_from_its_own_collar_face() -> None:
     spec = dt_cone_gear_shaft_spec
     assert spec.DATUM_STATION == spec.COLLAR_END_STATION
     assert spec.COLLAR_END_STATION - spec.COLLAR_START_STATION == spec.COLLAR_THICKNESS
-    assert spec.SECTION_ORIGINS == (
-        "Front Plane",
-        "CollarEndPlane",
-        "CollarEndPlane",
-        "CollarEndPlane",
-        "CollarEndPlane",
-    )
+    assert spec.SECTION_ORIGINS == ("Front Plane", "CollarEndPlane", "CollarEndPlane")
     assert spec.SECTION_KNOBS[0] == spec.JOURNAL_END
-    for i in (1, 2, 3, 4):
+    for i in (1, 2):
         assert spec.SECTION_KNOBS[i] == pytest.approx(
             spec.SECTION_ENDS[i] - spec.COLLAR_END_STATION
         )
-    # The tip prints at two places (user ruling 2026-09-29): the adjuster's
-    # embed window absorbs its band and the web's.
-    assert spec.DRAWING_PRECISION_BY_NAME["Sec4End"] == 2
+    # The tip prints at three places: the recess proof books its band.
+    assert spec.DRAWING_PRECISION_BY_NAME["Sec2End"] == 3
     # The journal, the web and the tip station chain the two ends; the
     # front-to-tip overall is a reference, its places handed over by the spec.
-    assert spec.SECTION_KNOBS[0] + spec.COLLAR_THICKNESS + spec.SECTION_KNOBS[4] == (
+    assert spec.SECTION_KNOBS[0] + spec.COLLAR_THICKNESS + spec.SECTION_KNOBS[2] == (
         pytest.approx(spec.SHAFT_LENGTH)
     )
     assert spec.DRAWING_REFERENCE_PRECISION == 2
-    # Note 2 prints the stack lengths as their dimensions print them.
-    assert spec.STACK_LENGTHS_TEXT == "4.576, 4.847, 5.118 AND .125"
-    import build_dt_drive_train_assembly as bdt
-
-    # The post bears on the thrust face and the tip runs from the other, so
-    # the tip-embed stack charges the web's band with the tip station's.
-    assert bdt.TIP_EMBED_BAND_MM == pytest.approx(
-        bdt.shaft_printed_band("CollarWidth")
-        + bdt.shaft_printed_band("Sec4End")
-        + bdt.POST_BOSS_FACE_AXIAL_BAND_MM
-        + bdt.TIP_NORTH_FACE_BAND_MM
-    )
 
 
 class _Curve:
@@ -2226,7 +1790,8 @@ class _Edge:
 def test_the_overall_reference_picks_each_end_face_circle(monkeypatch) -> None:
     """The REF overall runs between the two END-FACE circles, picked by
     station and diameter: the journal's own circle at the collar face and
-    the tip land's start circle share those diameters at other stations."""
+    land 2's start circle share those diameters at other stations, and the
+    socket's mouth shares the tip's station."""
     spec = dt_cone_gear_shaft_spec
     length = spec.SHAFT_LENGTH / 1000.0
     journal_r = spec.SECTION_DIAS[0] / 2000.0
@@ -2237,7 +1802,8 @@ def test_the_overall_reference_picks_each_end_face_circle(monkeypatch) -> None:
         _Edge(None),
         _Edge(_Curve(0.0, journal_r, circle=False)),
         _Edge(_Curve(spec.COLLAR_START_STATION / 1000.0, journal_r)),
-        _Edge(_Curve(spec.SECTION_ENDS[3] / 1000.0, tip_r)),
+        _Edge(_Curve(spec.SECTION_ENDS[1] / 1000.0, tip_r)),
+        _Edge(_Curve(-length, spec.SOCKET_DIA / 2000.0)),
         front,
         tip,
     ]

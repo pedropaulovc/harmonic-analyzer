@@ -29,8 +29,11 @@ palette:                              # name: [r, g, b]
 # Cu-Zn / manganese bronze — both more golden and markedly harder than the
 # ~70/30 alpha brass of the larger gears), cut from drawn rod on a wheel-cutting
 # engine and soldered to the shaft. Modeled as the muntz_yellow appearance over
-# the brass material on those four configurations (applied in the Phase 3 rebuild).
-cone_tip_gear_configs: [T006, T012, T018, T024]
+# the brass material on those four gears (applied in the Phase 3 rebuild). Since
+# owner decision C1 keyed (2026-11-09, PR #1992) T006 is its own part,
+# dt-cone-tip-gear, which the assembly colours directly; the three listed here
+# are MHA-DT-03 configurations.
+cone_tip_gear_configs: [T012, T018, T024]
 
 # Parts that take the cast-iron green frame appearance (memory: M6.x green castings).
 casting_green_parts:

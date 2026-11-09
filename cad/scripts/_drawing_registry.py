@@ -71,13 +71,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
-        name="dt_vn_cone_tip_collar",
-        part="dt_vn_cone_tip_collar",
-        artifact_stem="dt-vn-cone-tip-collar",
-        script_name="draw_dt_vn_cone_tip_collar.py",
-        layout=DrawingLayout.LANDSCAPE,
-    ),
-    DrawingSpec(
         name="ch_fulcrum_shaft",
         part="ch_fulcrum_shaft",
         artifact_stem="ch-fulcrum-shaft",
@@ -688,6 +681,27 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="dt_cone_tip_gear",
+        part="dt_cone_tip_gear",
+        artifact_stem="dt-cone-tip-gear",
+        script_name="draw_dt_cone_tip_gear.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="dt_cone_tip_bushing",
+        part="dt_cone_tip_bushing",
+        artifact_stem="dt-cone-tip-bushing",
+        script_name="draw_dt_cone_tip_bushing.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="dt_cone_tip_end_screw",
+        part="dt_cone_tip_end_screw",
+        artifact_stem="dt-cone-tip-end-screw",
+        script_name="draw_dt_cone_tip_end_screw.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="dt_cylinder_end_disc",
         part="dt_cylinder_end_disc",
         artifact_stem="dt-cylinder-end-disc",
@@ -909,13 +923,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="dt_vn_cone_pivot_screw",
         artifact_stem="dt-vn-cone-pivot-screw",
         script_name="draw_dt_vn_cone_pivot_screw.py",
-        layout=DrawingLayout.LANDSCAPE,
-    ),
-    DrawingSpec(
-        name="dt_vn_cone_tip_adjuster",
-        part="dt_vn_cone_tip_adjuster",
-        artifact_stem="dt-vn-cone-tip-adjuster",
-        script_name="draw_dt_vn_cone_tip_adjuster.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(

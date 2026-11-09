@@ -127,11 +127,13 @@ entries or current Number lookups. Their full prior/current identity pairs stay
 in the CAD map's `retired_identities` as historical release-pairing and permanent
 Number reservations, not live CAD aliases. Authority validation rejects
 active/retired stem and Number collisions and reappearing retired registries.
-Four explicitly historical-only vendor occurrences expose null current Number,
+Six explicitly historical-only vendor occurrences expose null current Number,
 registry and builder fields, while their exact archived source lookup remains
 available. Three predate the cutover and stay outside the retirement collection;
-the v39 `vn-keeper-chain-link` (MHA-DT-VN-66, retired 2026-11-08) is the exact
-mirror of its `retired_identities` reservation and is the only archive-only row
+the v39 `vn-keeper-chain-link` (MHA-DT-VN-66, retired 2026-11-08),
+`vn-cone-tip-collar` (MHA-DT-VN-54) and `vn-cone-tip-adjuster` (MHA-DT-VN-55,
+both retired 2026-11-09, C1 keyed, PR #1992) are exact mirrors of their
+`retired_identities` reservations and are the only archive-only rows
 authority validation lets share a reserved stem and Number.
 Raw model/evidence digests remain archival; runtime track comparison instead uses
 the digest of the current projected metadata. No identity projection refits,

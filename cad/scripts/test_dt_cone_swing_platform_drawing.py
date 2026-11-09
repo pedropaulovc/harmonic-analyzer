@@ -155,16 +155,13 @@ def test_geometry_cascade_and_interference_guards_stay_explicit() -> None:
     assert spec.crank_gear_platform_clearance() >= 0.5
 
 
-def test_stepped_collar_extension_keeps_post_and_tip_attachment_laws() -> None:
+def test_tip_extension_keeps_post_and_tip_attachment_laws() -> None:
     from dt_cone_swing_platform_crank_axis import CRANK_AXIS_OFF
 
-    # The retained 7.5 extension plus the custom collar body's northward shift.
-    from cone_shaft_land_bands import TIP_COLLAR_BODY_NORTH_SHIFT_MM
-
-    assert cone_line.TIP_END_EXTENSION_MM == 7.5 + TIP_COLLAR_BODY_NORTH_SHIFT_MM
-    assert cone_line.PIVOT_STATION - cone_line.T006_NORTH_FACE == pytest.approx(
-        23.0 + cone_line.TIP_END_EXTENSION_MM
-    )
+    # C1 keyed (owner decision 2026-11-09, PR #1992) keeps the swing pivot
+    # bit-identical: the tip extension stays the literal 8.0 mm.
+    assert cone_line.TIP_END_EXTENSION_MM == 8.0
+    assert cone_line.PIVOT_STATION - cone_line.T006_NORTH_FACE == pytest.approx(31.0)
     assert cone_line.PIVOT_STATION - block.TIP_BLOCK_NORTH_FACE == pytest.approx(
         block.TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET
     )
@@ -1229,18 +1226,19 @@ def test_holddown_section_arrows_clear_the_profile_plan() -> None:
     half = 9.0 * 0.0005
     length, head = 0.0126, 0.0015
     line_y = py - spec.HOLDDOWN_LOCAL_Z * 0.0005
-    # Positive control: the default north-looking arrows hit the R8 leader
-    # and the 8.0 extension line.
+    # Positive control: the default north-looking arrows hit the R8 leader.
+    # (At the pre-C1-keyed .409 station they also crossed the 8.0 extension
+    # line; the .738 cut line stands north of its end.)
     down = (px + half - head, line_y - length, px + half + head, line_y)
-    assert _segment_hits_box(nw_extension, down)
     old_r8_leader = (drawing._planned(0.135, 0.118), arc_tip("NW", 1.0, -1.0))
     assert _segment_hits_box(old_r8_leader, down)
 
 
 def test_holddown_hole_is_the_ruled_counterbore_for_the_tip_block_screw() -> None:
     """One #4 socket-head counterbore, close clearance, drilled from under,
-    .409 south of the pivot and .04 to -x of the cone axis, the block's
-    foot tap offset the same way, so the block itself stays centred."""
+    .738 south of the pivot (C1 keyed, owner decision 2026-11-09, PR #1992)
+    and .04 to -x of the cone axis, the block's foot tap offset the same way,
+    so the block itself stays centred."""
     import dt_cone_tip_block_spec as block
 
     hole = spec.HOLDDOWN_HOLE_SPEC
@@ -1253,7 +1251,7 @@ def test_holddown_hole_is_the_ruled_counterbore_for_the_tip_block_screw() -> Non
     assert spec.HOLDDOWN_CLEARANCE_DIA == pytest.approx(3.048)
     assert spec.HOLDDOWN_LOCAL_X == -1.016
     assert spec.HOLDDOWN_LOCAL_Z == -block.TIP_BLOCK_PIVOT_OFFSET
-    assert spec.HOLDDOWN_LOCAL_Z == pytest.approx(-10.3886)
+    assert spec.HOLDDOWN_LOCAL_Z == pytest.approx(-0.738 * 25.4)
     assert block.FOOT_TAP_OFFSET_X == spec.HOLDDOWN_LOCAL_X
 
 

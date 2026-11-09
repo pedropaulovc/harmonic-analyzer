@@ -8,18 +8,12 @@ closed-form standard check of the drum mesh (dt_mesh_checks).
 from __future__ import annotations
 
 import math
-import re
-import textwrap
-from dataclasses import replace
 
-import _config
 import cone_set_stack
 import dt_cone_gear_spec as spec
 import dt_mesh_checks
 
 CYLINDER_MATE_NUMBER = "MHA-DT-12"
-CUTTER_DETAIL_SHEET = "DT6-FORM1"
-CUTTER_DETAIL_LINE_CHARS = 108
 # The teeth's do-not-cut (rule 7): flagged to the teeth in sheet note 2, not
 # an unflagged line in the general block (repeat review of 218c85b6).
 TOOTH_EDGE_NOTE = "NO EDGE BREAK ON TEETH."
@@ -56,45 +50,29 @@ REFERENCE_SKETCHES = (*spec.REFERENCE_SKETCHES, BLANK_DIA_REFERENCE_SKETCH)
 
 def root_to_bore_web_min_mm(teeth: int) -> float:
     """Print-worst radial ligament: to the keyway's top corner on a keyed
-    gear; on a D the fitted flat only leaves more metal than the round bore."""
-    if spec.keyed(teeth):
-        return spec.keyway_web_min_mm(teeth)
-    minimum, _maximum = spec.floor_limits_mm(teeth)
-    bore_maximum = spec.inch_grid_mm(
-        spec.bore_dia_mm(teeth) + spec.BORE_DIA_BAND[0], spec.BORE_BAND_PLACES, math.ceil
-    )
-    return (minimum - bore_maximum) / 2.0
+    gear, to the largest printed round bore on T012..T024."""
+    return spec.web_min_mm(teeth)
 
 
 def cutter_description(teeth: int) -> str:
-    template = spec.stock_form_profile(teeth).template
-    if template.cutter_number is None:
-        # The tool is ground to the T006 tooth space; sheet 21 defines that
-        # space as T006 geometry (ENFORCE round 1 of #971: as a tool sheet it
-        # carried the gear's title block and no tool material).
-        return f"NOT STOCK; FORM = TOOTH SPACE, SHEET {len(spec.CONFIGURATION_TEETH) + 1}"
     # A numbered stock cutter is ground for the lowest count of its range,
     # so its number and range say all a handbook reader needs; "TEMPLATE nT"
     # was a private phrase (rule 26, screen of f21dfcdd2ba7).
+    template = spec.stock_form_profile(teeth).template
     minimum, maximum = template.teeth_range
     teeth_range = f"{minimum}T AND UP" if maximum is None else f"{minimum}-{maximum}T"
     return f"#{template.cutter_number} INVOLUTE GEAR CUTTER, {teeth_range}"
 
 
-def _tooth_form(template) -> str:
-    # Standard words only (rule 26): the stock cutter's own form is what it
-    # cuts, so "FINITE", "RADIAL BELOW BASE" and "ABOVE-BASE ROOT ARC" told
-    # the builder nothing a handbook defines.
-    if template.relief is not None:
-        return (
-            f"INVOLUTE; RELIEF BELOW R{spec.inch_text(template.relief_junction_radius_mm, 4)}"
-            f", SHEET {len(spec.CONFIGURATION_TEETH) + 1}"
-        )
-    return "INVOLUTE, AS CUT BY THE CUTTER"
+# Standard words only (rule 26): the stock cutter's own form is what it cuts,
+# so "FINITE", "RADIAL BELOW BASE" and "ABOVE-BASE ROOT ARC" told the builder
+# nothing a handbook defines.
+TOOTH_FORM = "INVOLUTE, AS CUT BY THE CUTTER"
 
 
 def gear_data(teeth: int) -> str:
     """One physical recipe with its reference sizes, in decimal inch."""
+    spec.material_specification(teeth)  # MHA-DT-03 configurations only
     profile = spec.stock_form_profile(teeth)
     mesh = dt_mesh_checks.cone_check(teeth)
     inch = spec.inch_text
@@ -126,7 +104,7 @@ def gear_data(teeth: int) -> str:
         # the custom-cutter sheets (ENFORCE round 3 of #971).
         ("WHOLE DEPTH MAX / CUTTER ROOT ARC R (REF)",
          f"{inch(whole_depth_max, 4)} / {inch(profile.template.root_radius_mm, 4)}"),
-        ("TOOTH FORM", _tooth_form(profile.template)),
+        ("TOOTH FORM", TOOTH_FORM),
         ("MATE", f"{CYLINDER_MATE_NUMBER}, 120T"),
         # The fit route of the tip, thickness and root bands (drawing-
         # guidelines "What the shop holds"): the cone mesh is set at assembly,
@@ -135,14 +113,13 @@ def gear_data(teeth: int) -> str:
          f"{inch(minimum, 3)} TO {inch(maximum, 3)}"),
         ("ROOT RADIAL MIN/MAX (REF)",
          f"{inch(profile.root_radius_min_mm, 4)} / {inch(profile.root_radius_max_mm, 4)}"),
-        # Pending exception ruling: MHA-DT-03 web (#971).
+        # The bore's worst ligament (RV-03 on T012, RV-07 on T030).
         ("WEB MIN (REF)", inch(web, 4)),
         # cone_set_stack books each gear's tooth runout about its bore.
         ("TOOTH CUTTING SETUP, ACCEPT AT SETUP",
          f"{inch(cone_set_stack.TOOTH_RUNOUT_TIR_MM, 3)} TIR MAX TO FINISHED BORE"),
         # The measurable acceptance of the circular tooth thickness band
-        # (spec.over_pins_limits_mm): every sheet, not only T006 (ENFORCE
-        # round 1 of #971).
+        # (spec.over_pins_limits_mm): every sheet (ENFORCE round 1 of #971).
         (
             f"OVER 2 PINS \u00d8{inch(pin, 3)}, OPPOSITE GAPS",
             f"{inch(low, spec.OVER_PINS_PLACES)} TO {inch(high, spec.OVER_PINS_PLACES)}",
@@ -151,66 +128,7 @@ def gear_data(teeth: int) -> str:
     return "\n".join(("GEAR DATA", *(f"{label}:  {value}" for label, value in rows)))
 
 
-def custom_cutter_detail() -> str:
-    """Complete finite DT6-FORM1 grinding profile, stamped into the native model.
-
-    Coordinates are the uninstalled normal tool plane, not a guessed ideal-N
-    or extrapolated profile. Each equation is copied verbatim from the same
-    core descriptors used by the native cut, at T=0 and finite tool-tip support.
-    Only the outside-blank sketch-closing rays/arc are omitted from the grind.
-    """
-    installed = spec.stock_form_profile(6)
-    template = installed.template
-    if template.cutter_number is not None or template.name != CUTTER_DETAIL_SHEET:
-        raise ValueError("T006 must use the specified DT6-FORM1 custom cutter")
-    tool = replace(installed, blank_radius_mm=template.tip_radius_mm, radial_translation_mm=0.0)
-    lines = [
-        "DT6-FORM1 - FINITE CUSTOM GROUND FORM",
-        "NORMAL TOOL PLANE; GAP BISECTOR +X; X,Y IN mm",
-        "t=0..1 ON EACH SEGMENT; NO UPPER CONTINUATION",
-        "TRIGONOMETRIC ARGUMENTS IN RADIANS",
-        f"DP={template.diametral_pitch:.17g}; PA={template.pressure_angle_deg:.17g} DEG",
-        f"N={template.reference_teeth}; ROOT R={template.root_radius_mm:.17g}",
-        f"BASE R={template.base_radius_mm:.17g}; FINITE TIP R={template.tip_radius_mm:.17g}",
-        f"TOOL PITCH TOOTH THICKNESS={tool.pitch_tooth_thickness_mm:.17g}",
-        "ROOT ARC; DRUM-TIP TROCHOID RELIEF TO TIF; N6 WORKING INVOLUTE",
-        f"TIF R={template.relief_junction_radius_mm:.4f}",
-        "LOWER FLANK MIRRORS UPPER; ALL SEGMENTS REQUIRED",
-    ]
-    for segment in tool.native_segments(unit_scale=1.0, clearance_radius_mm=template.tip_radius_mm + 1.0):
-        if segment.kind not in {"root_arc", "relief", "flank"}:
-            continue
-        lines.append(f"{segment.name} ({segment.kind})")
-        for coordinate, equation in (("X", segment.x), ("Y", segment.y)):
-            # Break only between tokens: never split a numeric literal or an
-            # exponent. Removing whitespace recovers the exact core expression.
-            tokens = re.findall(
-                r"(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?|[A-Za-z_]\w*|[^\s]",
-                equation,
-            )
-            lines.extend(textwrap.wrap(
-                f"{coordinate}(t)= " + " ".join(tokens),
-                width=CUTTER_DETAIL_LINE_CHARS, subsequent_indent="  ",
-                break_long_words=False, break_on_hyphens=False,
-            ))
-    lines.extend((
-        "INSTALLED T, PLUNGE, BLANK OD AND GRADES: SHEET T006",
-        "INDEX GAP BY pi/6 FROM D-FLAT NORMAL (+X TOOTH ZERO)",
-    ))
-    lines.extend(textwrap.wrap(
-        f"PROFILE SOURCE: {template.source}", width=CUTTER_DETAIL_LINE_CHARS,
-        subsequent_indent="  ", break_long_words=False, break_on_hyphens=False,
-    ))
-    return "\n".join(lines)
-
-
-# The quantity in plain words (rule 26: "T-CONFIGURATION SHEET" was a private
-# label, and the tooth-space sheet, which makes no gear, muddled the count).
-T006_NUMBER = spec.configuration_number(str(_config.parts("dt-cone-gear")["number"]), 6)
-DRAWING_NOTES = (
-    f"QTY 1 PER DRAWING NUMBER; SHEET {len(spec.CONFIGURATION_TEETH) + 1} "
-    f"CONTINUES {T006_NUMBER}."
-)
+DRAWING_NOTES = "QTY 1 PER DRAWING NUMBER."
 
 
 def drawing_notes(teeth: int) -> str:
