@@ -1336,7 +1336,7 @@ def test_drawing_side_callout_precision_is_the_declared_exception() -> None:
     }["RV-02"]
     assert entry.kind == "accept"
     assert entry.reason.startswith(
-        "Delegated ruling 2026-11-02 (Main), following owner precedent"
+        "Owner ruling 2026-11-08 (Pedro), #2144 item 1.2"
     )
     assert "#2144" in entry.reason and "20261102T230110877Z" in entry.reason
     assert "draw_dt_cone_pivot_post.build" in entry.where

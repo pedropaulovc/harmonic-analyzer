@@ -153,7 +153,7 @@ RECEIVER_WALL_FLOOR = WALL_FLOOR_MM
 # face at the height's printed minimum, the tap's major at its Ø.008 zone.
 # The finished worst case also pays the title block's outside edge break and
 # the tap's mouth break (Codjiflo, #2124): .080 unbroken, .060 finished.
-# Delegated ruling 2026-11-03 (pd-platen-guide.yaml RV-01): accepted at the
+# Owner ruling 2026-11-08 (Pedro), #2144 item 2.1 (pd-platen-guide.yaml RV-01): accepted at the
 # floor; the sheet states it (TAP_EDGE_WALL_TEXT, rule 20).
 _HEIGHT_DEV = printed_deviations(GUIDE_HEIGHT, GUIDE_DEPTH_PLACES, unit=UNIT)
 _TAP_REACH = THREAD_MAJOR_MM[TAPPED_HOLE_SPEC.size] / 2.0 + _POSITION_RADIAL

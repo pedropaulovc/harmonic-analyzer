@@ -49,8 +49,10 @@ from fr_frame_attachment_spec import (
     TOP_FRAME_MID_Y,
     TOP_FRAME_RAIL_TOP_Y,
     TOP_FRAME_UNDERSIDE_Y,
+    TOP_SCREW_SEAT_Z,
     TOP_SCREW_Y,
 )
+from fr_frame_cross_screw import far_wall_start_max_mm
 from frame_column_stations import COLUMN_X
 
 UNIT = drawing_unit("parts/fr-top-frame", _config.parts("fr-top-frame"))
@@ -754,3 +756,18 @@ DRAWING_NOTES_C = (
     f"Ra {ra(SEAT_UM, unit=UNIT)}; BOSS BOTTOMS AND\n"
     "HUB GUSSETS EXCLUDED."
 )
+# Far-wall engagement (rule 18, print worst): every counterbore floor is
+# located from its own socket axis ("4X COUNTERBORE FLOOR FROM SOCKET AXIS",
+# .XX), so the seat-to-axis stack is that one band at its most outboard; the
+# shared joint adds the match-bored socket ceiling and the far mouth's edge
+# break.  Pure data here, so the MHA-FR-00 sheet's cross-screw thread check
+# reads it without reaching build_fr_top_frame (whose COUNTERBORE_MAX_FLOOR_
+# OFFSET is this same printed limit, asserted there).
+TOP_CROSS_SCREW_FAR_WALL_START_MAX = far_wall_start_max_mm(
+    printed_limit(
+        TOP_SCREW_SEAT_Z - abs(FRONT_COLUMN_Z),
+        DRAWING_REFERENCE_PRECISION["counterbore floor from socket axis"],
+        1.0,
+    ),
+    unit=UNIT,
+)  # 30.018

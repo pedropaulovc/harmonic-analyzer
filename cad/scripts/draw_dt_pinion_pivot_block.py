@@ -363,8 +363,8 @@ async def build(adapter: Any) -> dict[str, str]:
         process="DRILL",
     )
     # This render-time precision write is the declared exception RV-01 in
-    # cad/config/parts/dt-pinion-pivot-block.yaml (delegated ruling
-    # 2026-11-02, owner review #2144): a part-authored precision does not
+    # cad/config/parts/dt-pinion-pivot-block.yaml (Owner ruling
+    # 2026-11-08 (Pedro), #2144 item 1.2): a part-authored precision does not
     # reach the callout (run 20261102T230110877Z).
     set_hole_callout_precision(
         screw_callout, {"hw-diam": SCREW_HOLE_CALLOUT_PRECISION}, label="hold-down screw hole"
