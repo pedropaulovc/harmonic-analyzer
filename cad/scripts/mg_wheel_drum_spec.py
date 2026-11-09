@@ -9,8 +9,6 @@ the drawing and the offline lockstep test.
 from __future__ import annotations
 
 from _surface_finish import SurfaceFinishControl
-from _title_block_units import MM_PER_INCH, render_number
-from mg_magnifying_wheel_geom import DRUM_PRESS, DRUM_RECESS
 from mg_wheel_drum_geom import (  # noqa: F401 (re-export)
     DRUM_BORE,
     DRUM_BORE_BAND,
@@ -36,28 +34,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Drum": {"DrumLen": DRUM_LEN_PLACES},
 }
 
-
-def _inch(value_mm: float, digits: int) -> str:
-    return render_number(abs(value_mm) / MM_PER_INCH, "in", digits)
-
-
-# Each band's need, printed on its own callout (drawing-guidelines.md rule 4 (tighten only for function, and name the mate) and drawing-guidelines.md rule 7 (notes: few, flagged, never a method)): the
-# bore's diametral interference on the wheel spigot, which is turned to it
-# (the bore keeps its ream band: the drum is made first), with the seating
-# stop, and how far the length leaves the drum's front face under the
-# spigot's, so the front washer bears on the iron (DRUM_RECESS refuses a drum
-# proud of the spigot). No general note.
-# The mate prints by its drawing number (drawing-guidelines.md rule 4): the
-# spigot is turned to the interference in this bore.
-PRESS_CALLOUT = (
-    "PRESS ON MHA-MG-05 WHEEL\n"
-    "SPIGOT, HARD AGAINST BOSS\n"
-    f"{_inch(DRUM_PRESS[0], 4)}-{_inch(DRUM_PRESS[1], 4)} DIAMETRAL INTERFERENCE"
-)
-RECESS_CALLOUT = (
-    f"FRONT FACE {_inch(DRUM_RECESS[0], 3)}-{_inch(DRUM_RECESS[1], 3)} BELOW\n"
-    "WHEEL SPIGOT FACE"
-)
 # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the bore is
 # pressed on the wheel's spigot and neither runs nor slides; the drum seats
 # axially on its face against the boss, so no surface carries a symbol.

@@ -17,7 +17,7 @@ from frame_column_stations import COLUMN_X
 from _hole_spec import HoleSpec, blind_cut_dia_mm
 from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
-from _printed_tolerance import drilled_oversize_mm, printed_deviations
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm, printed_deviations
 
 # #290: the bar's sheet prints decimal inch. The stations and the section's
 # top other subsystems read keep their millimetre nominals and print rounded
@@ -68,11 +68,16 @@ AXLE_BORE_X = WHEEL_X - WHEEL_BAR_X0  # -56
 AXLE_BORE_DIA = 4.7371  # .1865
 AXLE_BORE_BAND = (0.0127, 0.0)  # (upper, lower) deviations: +.0005/0, reamed
 AXLE_BORE_PLACES = 4
-# Printed depth band (+/-.004 on the .374 the 9.5 mm stock prints): with the
-# axle's press gauge and shank it places the axle's back end in the bore
-# (mg_wheel_axle_spec.BACK_END_SUNK_MIN / BACK_END_SUNK_MAX).
-BAR_DEPTH_BAND = (0.1016, -0.1016)
+# Printed depth: .374 (the 9.5 mm stock) at the title block's .XXX, no band
+# of its own, loosened from a converted-mm +/-.004 (delegated ruling
+# 2026-11-07, Main, no precedent, PROVISIONAL pending owner confirmation;
+# owner review #2144). Its three places carry a function: with the axle's
+# press gauge and shank it places the axle's back end in the bore
+# (mg_wheel_axle_spec.BACK_END_SUNK_MIN / BACK_END_SUNK_MAX), and the sheet
+# names that stack on it.
 BAR_DEPTH_PLACES = 3
+_BAR_DEPTH_ROW = printed_band_mm(BAR_DEPTH_PLACES, unit=UNIT)
+BAR_DEPTH_BAND = (_BAR_DEPTH_ROW, -_BAR_DEPTH_ROW)
 
 # All four bores share one row, BAR_TOP_ABOVE_ROW under the top face; this is
 # the row's height over the bottom face (the bar's underside below the axle).

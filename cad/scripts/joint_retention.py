@@ -1972,7 +1972,7 @@ JOINTS: tuple[Joint, ...] = (
             "build_mg_magnifier_assembly.py:build (lock_mates 'wheel-axle nut locked to the axle' / 'wheel-axle locknut locked to the axle' at NUT_D / LOCKNUT_D); "
             "build_mg_vn_wheel_axle_nut.py + diagnostics/diag_build_92671A005.py; "
             "mg_vn_wheel_axle_nut_spec.py THREAD/COUNT; mg_wheel_axle_spec.py THREAD_CALLOUT; "
-            "mg_wheel_group.py NUT_D/LOCKNUT_D/ENDSHAKE; config parts/mg-vn-wheel-axle-nut.yaml installation_notes"
+            "mg_wheel_group.py NUT_D/LOCKNUT_D/ENDSHAKE; mg_magnifier_assembly_sheet.STEP_TEXT endshake-set/locknut-jammed"
         ),
     ),
     Joint(

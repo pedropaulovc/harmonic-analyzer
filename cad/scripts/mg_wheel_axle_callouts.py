@@ -27,8 +27,6 @@ CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
 
 BAR = "MHA-MG-08"  # wheel bar
 WHEEL = "MHA-MG-05"  # magnifying wheel
-ASSEMBLY = "MHA-MG-00"
-NUT = "MHA-MG-VN-52"
 
 
 def _limits(low_mm: float, high_mm: float) -> str:
@@ -40,13 +38,14 @@ def _limits(low_mm: float, high_mm: float) -> str:
 
 
 # The shank's stock Ø is an untoleranced REF (the drill rod's supplier limits
-# govern); its callout states both of its fits (drawing-guidelines.md rule 4;
-# the matched-fit pattern: the nominal stays a reference, the fit is stated on
-# its dimension): the press in the bar's reamed bore, and the wheel that runs
-# on it, which is what the journal's Ra 63 uin marks (rule 6). The press
-# follows from the stock and the bore limits; the running clearance is
-# mg_wheel_group.HUB_RUNNING, a literal so the wheel stays out of this part's
-# recipe (test_mg_wheel_axle_drawing pins it).
+# govern; purchased precision stock is its fit route). Its callout names both
+# fits by their standard names with each range as REF (drawing-guidelines.md
+# rule 4), one line each (rule 7): the press in the bar's reamed bore, whose
+# limits print on the bar's own sheet, and the wheel that runs on it, which is
+# what the journal's Ra 63 uin marks (rule 6). The press follows from the
+# stock and the bore limits; the running clearance is mg_wheel_group.HUB_RUNNING,
+# a literal so the wheel stays out of this part's recipe
+# (test_mg_wheel_axle_drawing pins it).
 PIN_LIMITS = (PIN_DIA - PIN_DIA_TOL, PIN_DIA + PIN_DIA_TOL)
 PRESS_LIMITS = (
     PIN_LIMITS[0] - BAR_BORE_LIMITS[1],
@@ -57,28 +56,13 @@ if PRESS_LIMITS[0] <= 0.0:
 RUNNING_CLEARANCE_TEXT = ".0008-.0017"
 PIN_DIA_CALLOUT = "\n".join(
     (
-        f"{_limits(*PRESS_LIMITS)} DIAMETRAL INTERFERENCE IN",
-        f"{BAR} <MOD-DIAM>{_limits(*BAR_BORE_LIMITS)} REAMED BORE;",
-        f"{RUNNING_CLEARANCE_TEXT} RUNNING CLEARANCE IN",
-        f"{WHEEL} BORE",
+        f"PRESS FIT IN {BAR} (INTERFERENCE {_limits(*PRESS_LIMITS)})",
+        f"RUNNING FIT IN {WHEEL} (CLEARANCE {RUNNING_CLEARANCE_TEXT})",
     )
 )
-SHANK_LENGTH_CALLOUT = "FROM SHANK STEP"
-# The thread length's band names the stack it sets and its mate (rule 4: a
-# width that sets a stack names the stack): the MHA-MG-00 nut stack and its
-# MHA-MG-VN-52 locknut, and the feature the length ends on. The assembled
-# ".114 MAX past the locknut" is checked on MHA-MG-00 (its press-gauge
-# acceptance, mg_magnifier_assembly_spec), not on this part (run
-# 20261027T030250671Z review).
-THREAD_LENGTH_CALLOUT = "\n".join(
-    (
-        "FROM SHANK STEP TO THREAD END;",
-        f"SETS {ASSEMBLY} NUT STACK,",
-        f"LOCKNUT {NUT}",
-    )
-)
-# The relief's width limit keeps the first nut on full thread.
-RELIEF_WIDTH_CALLOUT = f"FIRST NUT {NUT}\nON FULL THREAD"
+# The lengths carry their values and bands only (rule 7): the extension lines
+# show the step they read from; the nut stack is MHA-MG-00's.
+
 # One radius prints for both roots (one fillet feature): its count rides
 # above the value.
 RELIEF_ROOTS_CALLOUT = "2X"
@@ -86,12 +70,7 @@ RELIEF_ROOTS_CALLOUT = "2X"
 # lane -> (feature, dimension) -> text.
 CALLOUTS: dict[int, dict[tuple[str, str], str]] = {
     CALLOUT_ABOVE: {("ReliefRoots", "ReliefRootR"): RELIEF_ROOTS_CALLOUT},
-    CALLOUT_BELOW: {
-        ("PinProfile", "PinDia"): PIN_DIA_CALLOUT,
-        ("PinProfile", "ShankLength"): SHANK_LENGTH_CALLOUT,
-        ("PinProfile", "ThreadLength"): THREAD_LENGTH_CALLOUT,
-        ("PinProfile", "ReliefWidth"): RELIEF_WIDTH_CALLOUT,
-    },
+    CALLOUT_BELOW: {("PinProfile", "PinDia"): PIN_DIA_CALLOUT},
 }
 if any("\n" in text for text in CALLOUTS[CALLOUT_ABOVE].values()):
     raise AssertionError("an above-callout with a line break never prints")

@@ -71,9 +71,10 @@ BRACKET_HOLE_POINTS = tuple(
 # MHA-MG-01 keeps its millimetre stations; the lever's taps sit at the
 # nearest .001 in to them, off its own free-edge corner and actual top (rule
 # 3: the model is the printed nominal; today 1.120 / .581 from the +X edge,
-# .128 below the top, in SCREW_MACHINE_X order).  Each lever tap then stands
-# at most LEVER_STATION_OFFSET_MAX off its bracket hole (half a grid step per
-# axis at worst), charged to the head and shank float below.
+# .128 below the top, in SCREW_MACHINE_X order).  Each lever tap's printed
+# station stands at most LEVER_STATION_OFFSET_MAX off its bracket hole (half a
+# grid step per axis at worst); the taps are spotted through the bracket's
+# holes at assembly (SPOT_TRANSFER_ERROR below), so the offset is not charged.
 _MM_PER_IN = 25.4
 LEVER_RECEIVER_FROM_EDGE_IN = tuple(
     round((lever.PLATE_W - (x - LEVER_ORIGIN_X)) / _MM_PER_IN, 3) for x in SCREW_MACHINE_X
@@ -122,11 +123,16 @@ FLANGE_THICKNESS_BAND = FOOT_GRIP_TOL
 # to stop inside the rib. Ordinary printed depths remain independently bounded.
 # #290: the receiver taps and coordinates print on the lever's decimal-inch
 # sheet (lever.UNIT); the bracket's own bands (LINEAR_BAND, the drilled
-# clearance) stay on its millimetre sheet.  The full-thread and coordinate
+# clearance) stay on its own sheet.  The full-thread and receiver coordinate
 # bands are +/-.002 in, the nearest exact inch decimals to the former 0.05 mm.
 THREAD_DEPTH_BAND = 0.0508  # native metadata only; the drawing prints .195 MIN
 LINEAR_BAND = printed_band_mm(2)  # PRINTED title-block .XX band, not the unrounded .02 in
 POSITION_BAND = 0.0508
+# One master (owner ruling 2026-11-08, #2144 item 11.1): MHA-MG-01's foot
+# holes are drilled to the title block's .XXX row, and the MHA-SM-03 taps are
+# spotted through them at assembly.
+BRACKET_POSITION_PLACES = 3
+BRACKET_POSITION_BAND = printed_band_mm(BRACKET_POSITION_PLACES, unit=BRACKET_UNIT)
 DRILLED_DIAMETER_PLUS = drilled_oversize_mm()
 # The lever sheet prints the receiver tap drill's diameter at three places
 # (its drilled-hole row sizes the pilot) but the routine tap-drill depth at
@@ -140,8 +146,11 @@ DRILL_DEPTH_BAND = printed_band_mm(RECEIVER_DRILL_DEPTH_PLACES, unit=lever.UNIT)
 # the lever's rule-17 wall target on its inch sheet.
 RECEIVER_PILOT_WALL_MIN = WALL_TARGET_MM
 HEAD_FLOAT_MIN = (COUNTERBORE_DIA - SCREW_HEAD_DIA) / 2.0
-# Both rows' location bands plus the lever grid's nominal offset.
-HEAD_POSITION_MISMATCH_MAX = 2.0 * POSITION_BAND + LEVER_STATION_OFFSET_MAX
+# The taps are spotted with the clearance drill through the bracket's own
+# holes, so a screw's head and shank are off by at most the drilled hole's
+# radial play: the drilled band, halved.
+SPOT_TRANSFER_ERROR = (CLEARANCE_HOLE_DEVIATIONS[1] - CLEARANCE_HOLE_DEVIATIONS[0]) / 2.0
+HEAD_POSITION_MISMATCH_MAX = SPOT_TRANSFER_ERROR
 # The shank's least radial float in the printed clearance hole.
 SHANK_FLOAT_MIN = (CLEARANCE_DIA + CLEARANCE_HOLE_DEVIATIONS[0] - SCREW_MAJOR_DIA) / 2.0
 EDGE_BREAK = edge_break_chamfer_mm()
@@ -197,17 +206,17 @@ DRILL_WANDER_MAX = math.tan(math.radians(DRILL_WANDER_DEG)) * (
     DRILL_DEPTH_MAX + DRILL_POINT_DEPTH_MAX
 )
 COUNTERBORE_END_WALL_MIN = min(
-    min(SCREW_MACHINE_X) - SIDE_PLATE_MACHINE_X[0] - POSITION_BAND,
+    min(SCREW_MACHINE_X) - SIDE_PLATE_MACHINE_X[0] - BRACKET_POSITION_BAND,
     SIDE_PLATE_MACHINE_X[1] - SIDE_PLATE_MACHINE_X[0]
     + SIDE_PLATE_LENGTH_DEVIATIONS[0]
-    - (max(SCREW_MACHINE_X) - SIDE_PLATE_MACHINE_X[0]) - POSITION_BAND,
+    - (max(SCREW_MACHINE_X) - SIDE_PLATE_MACHINE_X[0]) - BRACKET_POSITION_BAND,
 ) - (COUNTERBORE_DIA + DRILLED_DIAMETER_PLUS) / 2.0
 # Charge BOTH real flange edges: the relocated row is no longer centred.
 COUNTERBORE_HEIGHT_WALL_MIN = min(
     min(
         SIDE_PLATE_HEIGHT + SIDE_PLATE_HEIGHT_DEVIATIONS[0]
-        - (y - SIDE_PLATE_Y[0]) - POSITION_BAND,
-        y - SIDE_PLATE_Y[0] - POSITION_BAND,
+        - (y - SIDE_PLATE_Y[0]) - BRACKET_POSITION_BAND,
+        y - SIDE_PLATE_Y[0] - BRACKET_POSITION_BAND,
     )
     - (COUNTERBORE_DIA + DRILLED_DIAMETER_PLUS) / 2.0
     for _x, y, _z in BRACKET_HOLE_POINTS
@@ -219,8 +228,8 @@ CLEARANCE_HOLE_RADIUS_MAX = (CLEARANCE_DIA + CLEARANCE_HOLE_DEVIATIONS[1]) / 2.0
 CLEARANCE_HOLE_HEIGHT_WALL_MIN = min(
     min(
         SIDE_PLATE_HEIGHT + SIDE_PLATE_HEIGHT_DEVIATIONS[0]
-        - (y - SIDE_PLATE_Y[0]) - POSITION_BAND,
-        y - SIDE_PLATE_Y[0] - POSITION_BAND,
+        - (y - SIDE_PLATE_Y[0]) - BRACKET_POSITION_BAND,
+        y - SIDE_PLATE_Y[0] - BRACKET_POSITION_BAND,
     ) - CLEARANCE_HOLE_RADIUS_MAX
     for _x, y, _z in BRACKET_HOLE_POINTS
 )

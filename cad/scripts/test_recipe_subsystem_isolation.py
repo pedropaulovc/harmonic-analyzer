@@ -226,8 +226,6 @@ def test_transgear_pivot_isolation(part_closures, contract: Contract) -> None:
                 ("build_mg_wheel_axle", "mg_magnifying_wheel_geom"),
                 # The spacer contacts the wheel hub's back face.
                 ("build_mg_wheel_axle_spacer", "mg_magnifying_wheel_geom"),
-                # The drum press-fits the wheel spigot.
-                ("build_mg_wheel_drum", "mg_magnifying_wheel_geom"),
                 # The wire wraps/ties the wheel and clears its hub, spokes and rim.
                 ("build_sh_vn_music_wire", "mg_magnifying_wheel_geom"),
             ),

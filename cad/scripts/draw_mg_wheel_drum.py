@@ -31,14 +31,14 @@ from _drawing_dimensions import (
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
+from _title_block_units import MM_PER_INCH, render_number
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name
 from _drawing_registry import DRAWINGS_BY_NAME
+from mg_magnifying_wheel_geom import DRUM_PRESS
 from mg_wheel_drum_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     DRUM_LEN,
-    PRESS_CALLOUT,
-    RECESS_CALLOUT,
 )
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 
@@ -77,12 +77,12 @@ DRAWING_PRECISION_BY_NAME = {
 # Both diameters import on the face view, where every diameter line runs
 # through the centre: two would cross there. The bore keeps the face view;
 # the O.D. is a donor there and moves onto the side view, right of the ring.
-# The bore's four-line callout stands up and right of the face view; the
-# length's two-line callout hangs under the side view, above the title
+# The bore's three-line callout stands up and right of the face view; the
+# length's one-line callout hangs under the side view, above the title
 # block, so the two text blocks never share a row.  The length's block is
-# wider than the ring (about 66 mm), so it stands LEFT of the side view's
+# wider than the ring (about 76 mm), so it stands LEFT of the side view's
 # extension lines rather than centred between them.
-_RECESS_BLOCK_HALF = 0.034
+_RECESS_BLOCK_HALF = 0.039
 FRONT_KEEP = {
     "DrumOd": (0.060, 0.090),
     "DrumBore": (0.150, 0.228),
@@ -94,10 +94,24 @@ RIGHT_KEEP = {
     ),
 }
 OD_ON_SIDE = (RIGHT_CENTER[0] + DRUM_LEN / 2.0 * _S + 0.030, RIGHT_CENTER[1])
-# Each band's need prints on its own callout (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).
+
+
+def _inch(value_mm: float, digits: int) -> str:
+    return render_number(abs(value_mm) / MM_PER_INCH, "in", digits)
+
+
+# Each band names its mate once, on its own callout (rules 4 and 7): the
+# reamed bore's standard fit on the wheel spigot, which is turned to it, with
+# the interference as REF; the length's tight band sets the drum's stack on
+# that spigot. Seating against the boss and the front-face recess are the
+# assembly's drum-pressed step, not part-sheet text.
 DIMENSION_CALLOUTS = {
-    "DrumBore": f"REAM THRU\n{PRESS_CALLOUT}",
-    "DrumLen": RECESS_CALLOUT,
+    "DrumBore": (
+        "REAM THRU\n"
+        "PRESS FIT ON MHA-MG-05 WHEEL SPIGOT\n"
+        f"(INTERFERENCE {_inch(DRUM_PRESS[0], 4)}-{_inch(DRUM_PRESS[1], 4)})"
+    ),
+    "DrumLen": "SETS STACK ON MHA-MG-05 SPIGOT",
 }
 
 
