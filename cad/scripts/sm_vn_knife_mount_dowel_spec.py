@@ -102,8 +102,9 @@ PER_MOUNT = 1
 MOUNTS = 2
 QUANTITY = PER_MOUNT * MOUNTS
 # 7.632 for the #10-24 hex bolt that replaced the #6-32 screw (the user's
-# knife-hanger regression fix): the crossbar's Ø6.045 #10 loose clearance
-# hole, drilled from the underside under a shallow top spotface, and its then
+# knife-hanger regression fix): the crossbar's then Ø6.045 #10 loose clearance
+# hole (since a C drill Ø6.147, owner ruling 2026-11-06), drilled from the
+# underside under a then shallow top spotface, and its then
 # slot, shortened to 3.95, each kept 2.0 of wall at the print-worst plus
 # drill drift, inside to the hole and outside to the 25 crossbar's face.
 # History: 7.100, not the original 1/4 in, because at 6.350 the crossbar's

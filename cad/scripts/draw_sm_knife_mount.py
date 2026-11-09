@@ -385,9 +385,9 @@ PIN_DATUM_B_XY = (
 # (sm_knife_mount_spec.STUD_TAP_DIA_BAND, indexed, not printed), and the
 # thread its UNC with no class, the title block's thread row's 2B
 # (drawing-guidelines.md rule 2 (the title block is the general
-# specification)).  The full thread prints 9.65 with its own native +/-0.13
-# (sm_knife_mount_spec.STUD_TAP_THREAD_DEPTH_BAND: bare, two places would
-# claim the .XX row's +/-0.51), and the drill depth an explicit +/-0.05, the
+# specification)).  The full thread prints .375 bare, taking the title
+# block's three-place .XXX +/-.005 (sm_knife_mount_spec.STUD_TAP_THREAD_DEPTH_BAND),
+# and the drill depth .438 with an explicit +/-.002, the
 # band the crown web and the tap's runout leave between them
 # (sm_knife_mount_spec.STUD_TAP_DRILL_DEPTH_BAND).  The drill row also
 # dimensions the drill's point -- SolidWorks' drill-angle variable after the
