@@ -48,7 +48,10 @@ def test_policy_migrated_sheet_carries_no_gdt_and_model_owned_places() -> None:
     assert "draw_dt_crankshaft.py" in PRECISION_MIGRATED_DRAWINGS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
-    assert set(drawing.END_KEEP) | set(drawing.SIDE_KEEP) == marked
+    # The 16T pin hole's REF witness is not printed: its size is on the hole's
+    # callout (rule 9: no dimension on its hidden edges).
+    assert drawing.UNPRINTED_DIMENSIONS <= spec.REFERENCE_DIMENSIONS
+    assert set(drawing.END_KEEP) | set(drawing.SIDE_KEEP) == marked - drawing.UNPRINTED_DIMENSIONS
     assert {
         "Depth",
         "PinionSeatStation",
@@ -182,29 +185,37 @@ def test_drive_pin_depth_prints_its_band_after_the_native_depth() -> None:
     )
     assert floor >= spec.WALL_FLOOR_MM
     band = notes.DRIVE_PIN_DEPTH_BAND
-    # The farm's native split: the process and diameter modifier in the
-    # prefix, the depth in a later compartment.
+    process = spec.DRIVE_PIN_HOLE_PROCESS
+    # The farm's native split: the count and diameter modifier in the
+    # prefix, the depth in a later compartment.  Rule 26: size, process,
+    # depth (round-3 machinist review), so REAM joins the depth's part.
     depth = "<HOLE-DEPTH> <hw-depth>"
 
-    def parts(prefix: str = "REAM <MOD-DIAM>", suffix: str = depth) -> dict:
+    def parts(prefix: str = "2X <MOD-DIAM>", suffix: str = depth) -> dict:
         return {5: prefix, 6: suffix, 7: "", 8: ""}
 
-    assert drawing._depth_banded_definition(parts(), band) == (6, f"{depth} {band}")
-    whole = "REAM <MOD-DIAM><hw-diam> <HOLE-DEPTH> <hw-depth>"
-    assert drawing._depth_banded_definition(parts(prefix=whole, suffix=""), band) == (
+    assert drawing._depth_banded_definition(parts(), band, process) == (
+        6,
+        f" {process} {depth} {band}",
+    )
+    whole = "2X <MOD-DIAM><hw-diam> <HOLE-DEPTH> <hw-depth>"
+    assert drawing._depth_banded_definition(
+        parts(prefix=whole, suffix=""), band, process
+    ) == (
         5,
-        f"{whole} {band}",
+        f"2X <MOD-DIAM><hw-diam> {process} <HOLE-DEPTH> <hw-depth> {band}",
     )
     for broken in (
         parts(suffix="THRU ALL"),
         parts(suffix=f"{depth} {band}"),
         parts(suffix=f"{depth} PRESS FIT"),
         parts(suffix=f"<HOLE-DEPTH> 1.0 {depth}"),
-        parts(prefix=f"REAM {depth}"),
-        {5: "REAM <MOD-DIAM>", 6: depth},
+        parts(prefix=f"2X {depth}"),
+        parts(prefix=f"2X {process} <MOD-DIAM>"),
+        {5: "2X <MOD-DIAM>", 6: depth},
     ):
         with pytest.raises(RuntimeError):
-            drawing._depth_banded_definition(broken, band)
+            drawing._depth_banded_definition(broken, band, process)
 
 
 class _Sheet:
@@ -234,7 +245,7 @@ def test_typed_depth_band_refuses_a_non_inch_sheet() -> None:
 
     with pytest.raises(RuntimeError, match="typed depth band is inches"):
         drawing._band_hole_depth(
-            _Callout(), notes.DRIVE_PIN_DEPTH_BAND, _Sheet(0), "mm sheet"
+            _Callout(), notes.DRIVE_PIN_DEPTH_BAND, "REAM", _Sheet(0), "mm sheet"
         )
 
 
@@ -255,14 +266,17 @@ def test_mha024_station_and_notes_belong_to_hub_and_shaft() -> None:
     assert drawing._PIN_HOLE_DIA == blind_cut_dia_mm(spec.PIN_HOLE_SPEC)
     assert spec.PIN_HOLE_HEIGHT == geometry.SERVICE_PIN_STATION == pytest.approx(13.462)
     # The drill size reads first (the prefix of the native callout); the
-    # matched fit, naming both mating parts, reads under it.
+    # callout links numbered note 1, the matched taper ream naming both mating
+    # parts and its acceptance.
     assert spec.CROSS_HOLE_PROCESS == "#9 DRILL"
-    callout = notes.CROSS_HOLE_CALLOUT
-    assert "TAPER-REAM" in callout
-    assert "LIGHT DRIVE FIT" in callout
-    assert "MHA-DT-31" in callout
-    assert "MHA-DT-09" in callout
-    assert "MHA-DT-06" not in callout
+    assert notes.CROSS_HOLE_CALLOUT == f"SEE NOTE {notes.CROSS_HOLE_NOTE_NUMBER}"
+    note = " ".join(notes.CROSS_HOLE_NOTE.split())
+    assert note.startswith(f"{notes.CROSS_HOLE_NOTE_NUMBER}. ")
+    assert note in " ".join(notes.SHEET_NOTES.split())
+    assert "TAPER-REAM" in note
+    assert "MHA-DT-31" in note
+    assert "MHA-DT-09" in note
+    assert "MHA-DT-06" not in note
 
 
 def test_shaft_end_fiducial_is_a_simple_punch_not_a_dimensioned_dimple() -> None:
@@ -270,7 +284,7 @@ def test_shaft_end_fiducial_is_a_simple_punch_not_a_dimensioned_dimple() -> None
     assert spec.FIDUCIAL_MODEL_DEPTH == geometry.FIDUCIAL_MODEL_DEPTH == 0.2
     assert spec.SHAFT_FIDUCIAL_RADIUS == geometry.SHAFT_FIDUCIAL_RADIUS == 2.5
     assert "PUNCH" in notes.FIDUCIAL_NOTE
-    assert "BY EYE" in notes.FIDUCIAL_NOTE
+    assert "BY EYE" not in notes.FIDUCIAL_NOTE
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert all("Fiducial" not in name for name in marked)
     assert "DIMPLE" not in notes.FIDUCIAL_NOTE
@@ -304,27 +318,20 @@ def test_horizontal_profile_and_left_end_view_are_third_angle_aligned() -> None:
 
 
 # Measured on the 19e33c6c2 stack-top render (3.5 mm text, 2:1 sheet): the
-# "7.000 ±0.025" value is 27.5 mm wide, and the uppercase callout rows run
-# 2.75 mm a character ("SPROCKET MHA-PD-09", 44 mm).
+# "7.000 ±0.025" value is 27.5 mm wide.
 _PIN_VALUE_TEXT_WIDTH = 0.0275
-_CALLOUT_CHAR_WIDTH = 0.00275
 
 
-def test_pin_location_texts_end_before_the_dome_extension_lines() -> None:
-    # Machinist review of 19e33c6c2: the text block runs right from the
-    # dimension line beside the end view, and the old two-row callout carried
-    # the value and its mate note across the dome tip's and dome root's
-    # extension lines.  Every row must end, with air, before the dome tip;
-    # both pin locations name the mate (machinist review of 902433a8d).
-    rows = notes.DRIVE_PIN_LOCATION_CALLOUT.splitlines()
-    assert "MHA-PD-09" in rows and "SPROCKET" in " ".join(rows)
-    block = max(
-        _PIN_VALUE_TEXT_WIDTH,
-        max(len(row) for row in rows) * _CALLOUT_CHAR_WIDTH,
-    )
+def test_pin_locations_print_value_and_band_only() -> None:
+    # Rule 7: a location dimension carries its value and band and nothing
+    # else; the sprocket the band serves is named once, on the REAM callout.
+    # Machinist review of 19e33c6c2: the value must end, with air, before the
+    # dome tip's extension lines.
+    assert "MHA-PD-09" in notes.DRIVE_PIN_CALLOUT
     for name, (x, _y) in drawing.END_PIN_KEEP.items():
-        assert drawing.CALLOUTS_BELOW[name] == notes.DRIVE_PIN_LOCATION_CALLOUT
-        assert x + block + 0.001 < drawing.DOME_TIP_X, name
+        assert name not in drawing.CALLOUTS_BELOW
+        assert name not in drawing.CALLOUTS_ABOVE
+        assert x + _PIN_VALUE_TEXT_WIDTH + 0.001 < drawing.DOME_TIP_X, name
 
 
 def test_blind_pin_holes_bottom_in_the_collar_body_not_the_spigot_end() -> None:
@@ -519,7 +526,7 @@ def test_retention_pin_note_clears_the_profile_and_title_block() -> None:
     # The note block (top-left anchored; sized for up to 3.5 mm note text)
     # stays inside its field: right of the cross-hole callout's text, above
     # the diameter row, left of the isometric and inside the border.
-    lines = drawing.CRANKSHAFT_PIN_HOLE_PROCESS.split("\n")
+    lines = notes.PINION_PIN_CALLOUT.replace("<MOD-DIAM>", "D").split("\n")
     height = 0.0035
     char_w, line_h = 0.8 * height, 1.7 * height
     x0, y0 = drawing.PINION_PIN_NOTE_XY
@@ -536,6 +543,10 @@ def test_retention_pin_note_clears_the_profile_and_title_block() -> None:
     for name, (dx, dy) in drawing.DIAMETER_POSITIONS.items():
         if dx > x0 - 0.030:
             assert bottom > dy + 0.010, name
+    # The leader starts at the end of the last row (farm round 1), so that
+    # row is the longest: the leader then drops from the text's right end,
+    # right of the Ø.3125's block and still left of the isometric.
+    assert len(lines[-1]) == max(map(len, lines))
 
 
 def test_note_text_is_shifted_into_its_field_from_the_measured_box() -> None:
@@ -837,7 +848,6 @@ def test_centres_note_refuses_missing_inserted_note(
 
 def test_centres_note_is_only_the_attached_note_and_build_places_it() -> None:
     # The unleadered general-note row is gone, not kept beside the leadered one.
-    assert not hasattr(drawing, "add_note")
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
     users = [
         node

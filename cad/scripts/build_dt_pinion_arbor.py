@@ -52,14 +52,10 @@ from dt_pinion_arbor_spec import (
     BACK_CAP_SAG,
     BACK_JOURNAL_FROM_HEAD_REAR,
     BACK_JOURNAL_Z,
-    BOND_ZONE_DIA_FROM_HEAD_REAR,
-    BOND_ZONE_DIA_Z,
     CROSS_HOLE_DIA,
     CROSS_HOLE_DIA_BAND,
     CROSS_HOLE_STATION,
-    DRAWING_DIMENSIONS,
     DRAWING_NOTES,
-    DRAWING_PRECISION,
     DRUM_STATION,
     EXPOSED_SHAFT_LEN,
     FRONT_JOURNAL_FROM_HEAD_REAR,
@@ -80,12 +76,20 @@ from dt_pinion_arbor_spec import (
     OVERALL_LEN,
     PIN_STATION_FROM_HEAD_REAR,
     PIN_Z,
-    REFERENCE_SKETCHES,
     SHAFT_DIA,
     SHAFT_DIA_BAND,
     SHAFT_LEN,
     SURFACE_FINISHES,
     UNIT,
+)
+# The sheet's marked set: the spec's plus the two plain spans' diameters
+# (dt_pinion_arbor_notes), so dt_pinion_arbor_spec's other readers keep theirs.
+from dt_pinion_arbor_notes import (
+    BACK_STUB_DIA_PREFIX,
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION,
+    REFERENCE_SKETCHES,
+    SPAN_REFERENCES,
 )
 
 PART_NAME = "dt-pinion-arbor"
@@ -128,8 +132,9 @@ JOURNAL_DIA_POINT_LEN = 1.0
 # machinist might cut (Main, c3419623).
 DRUM_STATION_POINT_X = SHAFT_R
 DRUM_STATION_POINT_LEN = 1.0
-# The bond-zone diameter's construction witness: a short run of the flank.
-BOND_ZONE_WITNESS_LEN = 4.0
+# Each plain Ø5/16 span (the bond zone and, fan-out dt-fab-3 round 3, the
+# collar's span and the back stub) is dimensioned on a short construction
+# witness run along its flank (dt_pinion_arbor_notes.SPAN_REFERENCES).
 
 
 def _perpendicular_cylinder_intersection(hole_radius: float, body_radius: float) -> float:
@@ -446,18 +451,19 @@ async def _add_journal_land(
     return drive_jobs
 
 
-async def _add_bond_zone_reference(adapter) -> list[tuple[str, str]]:
-    """Dimension the Ø5/16 bond zone on its own flank, like a journal land.
+async def _add_span_reference(
+    adapter, *, feature_name: str, dimension_name: str, station: float, witness_len: float
+) -> list[tuple[str, str]]:
+    """Dimension a plain Ø5/16 span on its own flank, like a journal land.
 
     A Top-plane sketch with no model geometry: the turning axis from the head
-    shoulder to the bond-zone station, a construction witness on the flank
+    shoulder to the span's station, a construction witness on the flank
     there, and the diameter between them.  The profile view prints it as a
-    local diameter whose witnesses stay on the bond zone, where the end-on
-    shaft circle's ran along the neck face and out through the detail fence.
+    local diameter whose witnesses stay on the span, where the end-on shaft
+    circle's ran along the neck face and out through the detail fence.
     """
-    feature_name = "BondZoneReference"
     start_v = -HEAD_REAR_Z
-    end_v = -BOND_ZONE_DIA_Z
+    end_v = -(HEAD_REAR_Z + station)
     dims = SketchDims()
     check(f"create sketch {feature_name}", await adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
@@ -467,7 +473,7 @@ async def _add_bond_zone_reference(adapter) -> list[tuple[str, str]]:
     )
     witness = check(
         f"{feature_name} flank witness",
-        await adapter.add_line(SHAFT_R, end_v, SHAFT_R, end_v - BOND_ZONE_WITNESS_LEN),
+        await adapter.add_line(SHAFT_R, end_v, SHAFT_R, end_v - witness_len),
     )
     set_sketch_direct_db(adapter, False)
     segment = _early_bound(adapter._sketch_entities[witness], "ISketchSegment")
@@ -492,14 +498,14 @@ async def _add_bond_zone_reference(adapter) -> list[tuple[str, str]]:
     check(
         f"{feature_name} station",
         await adapter.add_sketch_dimension(
-            f"{axis}.start", f"{axis}.end", "vertical_distance", BOND_ZONE_DIA_FROM_HEAD_REAR
+            f"{axis}.start", f"{axis}.end", "vertical_distance", station
         ),
     )
     dims.record(None, None)
     check(
         f"{feature_name} witness length",
         await adapter.add_sketch_dimension(
-            f"{witness}.start", f"{witness}.end", "vertical_distance", BOND_ZONE_WITNESS_LEN
+            f"{witness}.start", f"{witness}.end", "vertical_distance", witness_len
         ),
     )
     dims.record(None, None)
@@ -508,9 +514,9 @@ async def _add_bond_zone_reference(adapter) -> list[tuple[str, str]]:
         axis,
         f"{witness}.start",
         (SHAFT_R + 5.0, end_v),
-        "BondZoneDia",
+        dimension_name,
     )
-    dims.record("BondZoneDia", '"ShaftDia"')
+    dims.record(dimension_name, '"ShaftDia"')
     await ensure_fully_defined(adapter, feature_name)
     check(f"exit sketch {feature_name}", await adapter.exit_sketch())
     name_last_feature(adapter, feature_name)
@@ -889,7 +895,14 @@ async def build(adapter) -> dict[str, str]:
     )
     if len(_shaft_faces(adapter)) != 5:
         raise RuntimeError("the Ø5/16 shaft must read as two journal lands and three plain zones")
-    drive_jobs += await _add_bond_zone_reference(adapter)
+    for feature_name, dimension_name, station, witness_len in SPAN_REFERENCES:
+        drive_jobs += await _add_span_reference(
+            adapter,
+            feature_name=feature_name,
+            dimension_name=dimension_name,
+            station=station,
+            witness_len=witness_len,
+        )
 
     await force_rebuild(adapter)
     for dimension_name, expression in drive_jobs:
@@ -902,12 +915,12 @@ async def build(adapter) -> dict[str, str]:
 
     # The bands are millimetres; UNIT prints them in inches.  The drum
     # station's .XX band is the title block's, so it rides no dimension.
+    # Spelled out per span: _drawing_contract reads each call's literal names.
     set_dimension_bilateral_tolerance(
-        adapter,
-        "BondZoneReference",
-        "BondZoneDia",
-        *deviations(SHAFT_DIA_BAND),
-        display_unit=UNIT,
+        adapter, "BondZoneReference", "BondZoneDia", *deviations(SHAFT_DIA_BAND), display_unit=UNIT
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "BackStubReference", "BackStubDia", *deviations(SHAFT_DIA_BAND), display_unit=UNIT
     )
     set_dimension_bilateral_tolerance(
         adapter,
@@ -940,6 +953,8 @@ async def build(adapter) -> dict[str, str]:
     # A diametric linear dimension on a side-view sketch prints no Ø by itself.
     for prefix in ("FrontJournal", "BackJournal", "BondZone"):
         set_dimension_prefix(adapter, f"{prefix}Reference", f"{prefix}Dia", "<MOD-DIAM>")
+    # One size for both spans outside the journals (dt_pinion_arbor_notes).
+    set_dimension_prefix(adapter, "BackStubReference", "BackStubDia", BACK_STUB_DIA_PREFIX)
     set_dimension_prefix(adapter, "FrontCapProfile", "HeadCapR", "SR")
     set_dimension_prefix(adapter, "BackCapProfile", "BackCapR", "SR")
     clear_dimensions_for_drawing(adapter)

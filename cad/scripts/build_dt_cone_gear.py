@@ -29,7 +29,8 @@ from _document_units import apply_package_model_units
 from _part_properties import part_drawing_unit
 from _single_limit_tolerance import set_single_limit
 from _drawing_precision import _named_dimension, apply_drawing_precision
-from _drawing_dimension_insert import add_angular_reference_dimension
+from _drawing_dimension_insert import add_angular_reference_dimension, add_diametric_linear_dimension
+from _drawing_prefix import set_dimension_prefix
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension_symmetric_angular_tolerance
 from _simplified_part import (
@@ -49,7 +50,15 @@ from _cone_gear_readback import (
     _gap_floor_tolerance,
     assert_saved_configuration_topology,
 )
-from dt_cone_gear_notes import custom_cutter_detail, drawing_notes, gear_data
+from dt_cone_gear_notes import (
+    BLANK_DIA_REFERENCE_SKETCH,
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION,
+    REFERENCE_SKETCHES,
+    custom_cutter_detail,
+    drawing_notes,
+    gear_data,
+)
 from dt_cone_gear_spec import (
     BLANK_DIA_BAND,
     BORE_AF_BAND,
@@ -58,13 +67,10 @@ from dt_cone_gear_spec import (
     CONFIGS,
     DEFAULT_TEETH,
     DIAMETRAL_PITCH,
-    DRAWING_DIMENSIONS,
-    DRAWING_PRECISION,
     FACE_WIDTH,
     FLAT_CLOCK_TOLERANCE_DEG,
     GAP_FLOOR_SKETCH,
     MM_PER_IN,
-    REFERENCE_SKETCHES,
     SIMPLIFIED_FEATURES_BY_CONFIGURATION,
     TOOTH_REFERENCE_SKETCH,
     TOOTH_THICKNESS_BAND,
@@ -303,6 +309,73 @@ async def _author_web_reference(adapter: Any) -> None:
     check("exit_sketch web reference", await adapter.exit_sketch())
     name_last_feature(adapter, WEB_REFERENCE_SKETCH)
     name_dimensions(adapter, WEB_REFERENCE_SKETCH, ["WebBoreX", "WebBoreY", "WebMin"])
+
+
+# Sketch-only length of the tip-diameter witness stub: short, because the side
+# view shows the sketch, and on T006 (8:1) the stub stands just off the
+# silhouette, its tips at 60 and 120 deg.
+_BLANK_WITNESS_STUB_MM = 0.25
+
+
+@_telemetry.traced("part.cone_gear.blank_dia_reference")
+async def _author_blank_dia_reference(adapter: Any, radius: float) -> SketchDims:
+    """Hidden Right-plane witness of the tip diameter for the side view
+    (rule 11), dt_alignment_pinion's OutsideDiaReference.
+
+    An axis centerline across the face width (sketch u = model -Z) and a
+    short construction stub at the tip radius on the front face; the doubled
+    centerline-to-stub dimension is the printed tip diameter, driven by the
+    blank's own 2 * "Ra" so every configuration prints its own blank.
+    """
+    ref = SketchDims()
+    check("create_sketch blank-dia reference", await adapter.create_sketch("Right"))
+    # Inference suppressed: the witness lies on the tip silhouette.
+    set_sketch_direct_db(adapter, True)
+    axis = check(
+        "blank-dia reference axis",
+        await adapter.add_centerline(0.0, 0.0, -FACE_WIDTH, 0.0),
+    )
+    witness = check(
+        "blank-dia witness stub",
+        await adapter.add_line(0.0, radius, -_BLANK_WITNESS_STUB_MM, radius),
+    )
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, witness)
+    for label, line in (("axis", axis), ("witness", witness)):
+        check(
+            f"blank-dia reference {label} horizontal",
+            await adapter.add_sketch_constraint(line, None, "horizontal"),
+        )
+    check(
+        "blank-dia reference axis starts at the front face",
+        await adapter.add_sketch_constraint(f"{axis}.start", "origin", "coincident"),
+    )
+    check(
+        "blank-dia witness starts at the front face",
+        await adapter.add_sketch_constraint(f"{witness}.start", "origin", "vertical_points"),
+    )
+    # The span and the stub's length only define the sketch: auto-named,
+    # unmarked. FACE_WIDTH is one value across all configurations.
+    await dimension_between(
+        adapter, f"{axis}.start", f"{axis}.end", "horizontal_distance", FACE_WIDTH,
+        "blank-dia reference span",
+    )
+    ref.record(None, None)
+    await dimension_between(
+        adapter, f"{witness}.start", f"{witness}.end", "horizontal_distance",
+        _BLANK_WITNESS_STUB_MM, "blank-dia witness stub length",
+    )
+    ref.record(None, None)
+    # Centerline to the witness's start POINT (build_dt_alignment_pinion: a
+    # centerline-to-line pick made a plain linear dimension).
+    await add_diametric_linear_dimension(
+        adapter, axis, f"{witness}.start", (-FACE_WIDTH / 2.0, radius + 5.0), "BlankDia"
+    )
+    ref.record("BlankDia", '2 * "Ra"')
+    await ensure_fully_defined(adapter, "blank-dia reference sketch")
+    check("exit_sketch blank-dia reference", await adapter.exit_sketch())
+    name_last_feature(adapter, BLANK_DIA_REFERENCE_SKETCH)
+    return ref
 
 
 def _set_gap_floor_limits(adapter: Any) -> None:
@@ -804,6 +877,8 @@ async def build(adapter) -> dict[str, str]:
     floor_dim = f"FloorDia@{floor_sketch}"
     drive_jobs += floor_reference.apply(adapter, floor_sketch)
     await _author_web_reference(adapter)
+    blank_reference = await _author_blank_dia_reference(adapter, ra_default_mm)
+    drive_jobs += blank_reference.apply(adapter, BLANK_DIA_REFERENCE_SKETCH)
 
     await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
@@ -1094,10 +1169,15 @@ async def build(adapter) -> dict[str, str]:
     places = {
         name: decimals for names in DRAWING_PRECISION.values() for name, decimals in names.items()
     }
+    # The tip diameter prints off its side-view witness (dt_cone_gear_notes);
+    # BlankProfile's driving circle stays unmarked and unbanded.
     set_dimension_bilateral_tolerance(
-        adapter, "BlankProfile", "BlankDia", *deviations(BLANK_DIA_BAND),
+        adapter, BLANK_DIA_REFERENCE_SKETCH, "BlankDia", *deviations(BLANK_DIA_BAND),
         places=places["BlankDia"], display_unit=UNIT,
     )
+    # A diametric linear size prints bare (".694" read as a height,
+    # draw_dt_alignment_pinion r6); the model carries SolidWorks' own Ø token.
+    set_dimension_prefix(adapter, BLANK_DIA_REFERENCE_SKETCH, "BlankDia", "<MOD-DIAM>")
     set_dimension_bilateral_tolerance(
         adapter, "Blank", "FaceWidth", *deviations(FACE_WIDTH_BAND),
         places=places["FaceWidth"], display_unit=UNIT,

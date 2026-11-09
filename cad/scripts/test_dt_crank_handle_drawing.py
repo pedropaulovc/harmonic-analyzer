@@ -14,6 +14,7 @@ import dt_crank_handle_ferrule_spec as ferrule
 import dt_crank_handle_pivot_screw_spec as screw
 import dt_crank_handle_spec
 import draw_dt_crank_handle as drawing
+import dt_crank_handle_notes as notes
 import build_dt_crank_handle as handle
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -63,18 +64,35 @@ def test_butt_callouts_clear_ruling_b_native_text_envelopes() -> None:
 
 def test_section_callouts_keep_clean_lanes_on_farm_envelopes() -> None:
     # MHA-DT-08 machinist review of 1bdd4e8d7, envelopes measured on its farm
-    # r1 sheet: the fitted tenon's six-row block is 32.4 mm tall centred on
-    # its keep, under the shoulder and waist shelves' shoulder lines (2.9 mm
-    # under their keeps); the caption hangs from its top, the 1:1 isometric
-    # reaches 15.2 mm above its centre.
+    # r1 sheet: a callout row is ~5.4 mm tall, a block centred on its keep,
+    # under the shoulder and waist shelves' shoulder lines (2.9 mm under their
+    # keeps).  Below the tenon's three-row block, top down: the numbered
+    # notes (top-left anchored, 2.5 mm characters), the caption (one row,
+    # top-anchored), the isometric's note; the 1:1 isometric (49 x 35 mm,
+    # +15.2/-20 mm about its centre) stands right of the notes, under the
+    # reamed bore's four-row block and left of the title block.
     keep = drawing.FRONT_KEEP
     shelf_line = drawing._BELOW - 0.0029
     assert keep["ShoulderDia"][1] == keep["WaistDia"][1] == drawing._BELOW
-    tenon_top = keep["TenonDia"][1] + 0.0162
-    tenon_bottom = keep["TenonDia"][1] - 0.0162
+    row = 0.0054
+    tenon_rows = 1 + len(drawing.TENON_CALLOUT.splitlines())
+    tenon_top = keep["TenonDia"][1] + tenon_rows * row / 2.0
+    tenon_bottom = keep["TenonDia"][1] - tenon_rows * row / 2.0
     assert shelf_line - tenon_top >= 0.0035
-    assert tenon_bottom - drawing.CAPTION_XY[1] >= 0.0035
-    assert tenon_bottom - (drawing.ISO_CENTER[1] + 0.0152) >= 0.0035
+    notes_x, notes_y = drawing.NOTES_XY
+    note_rows = drawing.SHEET_NOTES.splitlines()
+    assert tenon_bottom - notes_y >= 0.0035
+    notes_bottom = notes_y - len(note_rows) * 0.0056
+    assert notes_bottom - drawing.CAPTION_XY[1] >= 0.0035
+    assert drawing.CAPTION_XY[1] - 0.008 - drawing.ISO_NOTE_POS[1] >= 0.0035
+    notes_right = notes_x + max(map(len, note_rows)) * 0.0026
+    iso_left, iso_right = drawing.ISO_CENTER[0] - 0.0245, drawing.ISO_CENTER[0] + 0.0245
+    assert iso_left - notes_right >= 0.0035
+    assert 0.216 - iso_right >= 0.0035
+    pivot_rows = 1 + len(drawing.PIVOT_BORE_CALLOUT.splitlines())
+    pivot_bottom = keep["PivotBoreDia"][1] - pivot_rows * row / 2.0
+    assert pivot_bottom - (drawing.ISO_CENTER[1] + 0.0152) >= 0.0035
+    assert drawing.ISO_CENTER[1] - 0.020 > 0.0143
     # The counterbore floor's 25.4 x 14.5 mm block centres on its keep; its
     # leader leaves the shoulder line's right end for the corner arc, whose
     # span is the upper-left quarter about its centre.  It stands left of the
@@ -111,8 +129,8 @@ def test_every_profile_size_is_a_model_dimension() -> None:
     build_source = Path(handle.__file__).read_text(encoding="utf-8")
     assert "_make_driven(adapter, reference, name)" in build_source
     assert "PivotBoreProfile" not in build_source
-    assert drawing.PIVOT_BORE_CALLOUT.startswith("REAM THRU")
-    assert "PIVOT SCREW MHA-DT-32 SHOULDER" in drawing.PIVOT_BORE_CALLOUT.replace("\n", " ")
+    assert drawing.PIVOT_BORE_CALLOUT.startswith("REAM THRU, RUNNING FIT ON\n")
+    assert "MHA-DT-32 PIVOT SCREW" in drawing.PIVOT_BORE_CALLOUT
     # The fitted sizes and the small corner features print at three places,
     # the routine contour at the title block's two.
     three = {
@@ -194,10 +212,6 @@ def test_cup_limits_drive_the_counterbore_crest_dome_and_fit_note(
     assert math.dist(fresh["DOME_CENTER"], fresh["END_ROUND_CENTER"]) == pytest.approx(
         fresh["DOME_R"] - fresh["END_ROUND_R"]
     )
-    assert (
-        f'<MOD-DIAM>{spec.inch_text(fresh["COUNTERBORE_DIA_MAX"], 3)} MAX'
-        in fresh["COUNTERBORE_FIT_NOTE"]
-    )
     for name in (
         "HANDLE_LENGTH", "HANDLE_MAX_DIA", "SHOULDER_X", "SHOULDER_R",
         "TENON_X0", "TENON_LENGTH", "TENON_DIA", "WAIST_X", "WAIST_R",
@@ -208,8 +222,11 @@ def test_cup_limits_drive_the_counterbore_crest_dome_and_fit_note(
 
 
 def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
-    # User ruling 2026-09-29 (after the machinist reviews): turned and bored to
-    # suit, so the sizes print as references and the callouts carry the fit.
+    # User ruling 2026-09-29 (after the machinist reviews): fitted to the
+    # ferrule and cup, so the sizes print as references and the callouts
+    # carry the fit: rule 4's standard name (both epoxied: bonded) with the
+    # mate's number and the clearance as a reference, rule 7's two word rows,
+    # the rest in the numbered note each flags.
     spec = dt_crank_handle_spec
     # The counterbore depth seats the cup face flush, so it is fitted too.
     assert spec.REFERENCE_DIMENSIONS == {
@@ -219,25 +236,39 @@ def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
     assert spec.COUNTERBORE_DIA == pytest.approx(
         cup.BODY_DIA + sum(spec.COUNTERBORE_GLUE_LINE) / 2.0
     )
-    assert drawing.DIMENSION_CALLOUTS["TenonDia"] == spec.TENON_FIT_NOTE
-    assert drawing.DIMENSION_CALLOUTS["CounterboreDia"] == spec.COUNTERBORE_FIT_NOTE
-    # Rule 4: a matched pair names its mate by name and number.
-    assert "MHA-DT-34" in spec.TENON_FIT_NOTE
-    assert spec.FERRULE_NAME in spec.TENON_FIT_NOTE
-    assert "DIAMETRAL CLEARANCE" in spec.TENON_FIT_NOTE
-    assert "MHA-DT-35" in spec.COUNTERBORE_FIT_NOTE
-    assert spec.CUP_NAME in spec.COUNTERBORE_FIT_NOTE
+    callouts = drawing.DIMENSION_CALLOUTS
+    assert callouts["TenonDia"] == drawing.TENON_CALLOUT
+    assert callouts["CounterboreDia"] == drawing.COUNTERBORE_CALLOUT
+    # Rule 4: the mate by name and full number (round 1 f08277cd); rule 7:
+    # two rows of words, the clearance REF on its own row.
+    for callout, mate, note in (
+        (drawing.TENON_CALLOUT, "MHA-DT-34 FERRULE", 1),
+        (drawing.COUNTERBORE_CALLOUT, "MHA-DT-35 BUTT CUP", 2),
+    ):
+        rows = callout.splitlines()
+        assert len(rows) == 3
+        assert rows[0].startswith("BONDED FIT") and rows[0].endswith(mate)
+        assert rows[1] == f"WITH EPOXY, SEE NOTE {note}"
+        assert rows[2] == "(CLEARANCE .002-.006)"
+    for callout in callouts.values():
+        assert "TO SUIT" not in callout and "DIAMETRAL" not in callout
+    assert drawing.SHEET_NOTES.startswith("1. ")
+    assert "\n2. " in drawing.SHEET_NOTES
     # F12 (#290): the reamed bore's running clearance on the shoulder, at
     # the places that print it exactly.
-    assert drawing.DIMENSION_CALLOUTS["PivotBoreDia"] == drawing.PIVOT_BORE_CALLOUT
+    assert callouts["PivotBoreDia"] == drawing.PIVOT_BORE_CALLOUT
     assert screw.DIAMETRAL_CLEARANCE_MIN == pytest.approx(0.0050 * IN)
     assert screw.DIAMETRAL_CLEARANCE_MAX == pytest.approx(0.0075 * IN)
-    assert ".0050-.0075" in drawing.PIVOT_BORE_CALLOUT
+    assert "(CLEARANCE .0050-.0075)" in drawing.PIVOT_BORE_CALLOUT
+    # The bonded-fit clearance alone controls the counterbore (round 1
+    # f08277cd): the largest cup plus the widest glue line stays under the
+    # Ø.435 the butt wall is budgeted at, so no second limit prints.
     assert (
-        f"<MOD-DIAM>{spec.inch_text(spec.COUNTERBORE_DIA_MAX, 3)} MAX"
-        in spec.COUNTERBORE_FIT_NOTE
+        cup.BODY_DIA + cup.BODY_DIA_TOL + spec.COUNTERBORE_GLUE_LINE[1]
+        < spec.COUNTERBORE_DIA_MAX
     )
-    assert "FLUSH" in spec.COUNTERBORE_FIT_NOTE
+    assert "MAX" not in notes.COUNTERBORE_NOTE
+    assert "FLUSH" in notes.COUNTERBORE_NOTE
     # The fitted tenon keeps its ferrule seat and the wall floor over the
     # bore, with the bore eccentricity budgeted (local review of 1f3067ef2),
     # the contour at the title block's .XX band; the root relief (owner
@@ -319,16 +350,24 @@ def test_inside_corners_print_a_max_radius_their_mates_clear() -> None:
     assert all(spec.DRAWING_PRECISION_BY_NAME[name] == 3 for name in corners)
     assert spec.TENON_ROOT_RELIEF_MIN >= spec.TENON_ROOT_ROUND_REACH
     assert cup.BODY_CHAMFER_MIN >= spec.INSIDE_CORNER_R_MAX
-    assert drawing.DIMENSION_CALLOUTS["TenonRootRadius"] == spec.TENON_ROOT_CALLOUT
+    assert drawing.DIMENSION_CALLOUTS["TenonRootRadius"] == drawing.TENON_ROOT_CALLOUT
     assert (
         drawing.DIMENSION_CALLOUTS["CounterboreFloorRadius"]
-        == spec.COUNTERBORE_FLOOR_CALLOUT
+        == drawing.COUNTERBORE_FLOOR_CALLOUT
     )
-    assert spec.FERRULE_NAME in spec.TENON_ROOT_CALLOUT
-    assert spec.CUP_NAME in spec.COUNTERBORE_FLOOR_CALLOUT
-    # The blocks stand in narrow gaps: no row longer than "R.012 MAX".
-    for callout in (spec.TENON_ROOT_CALLOUT, spec.COUNTERBORE_FLOOR_CALLOUT):
-        assert max(len(row) for row in callout.split("\n")) <= len("R.012 MAX")
+    # Rule 4: each corner's mate by drawing number, once: the tenon root and
+    # its relief share note 3 (round 2 d6ae2a44), which names the ferrule;
+    # the counterbore floor names the cup at its callout.
+    assert drawing.TENON_ROOT_CALLOUT == "SEE NOTE 3"
+    assert drawing.TENON_ROOT_RELIEF_CALLOUT == "X 45°\nSEE NOTE 3"
+    assert drawing.SHEET_NOTES.splitlines()[2] == (
+        f"3. {spec.FERRULE_NUMBER} FERRULE SEATS ON TENON SHOULDER."
+    )
+    assert drawing.SHEET_NOTES.count(spec.FERRULE_NUMBER) == 1
+    assert spec.CUP_NUMBER in drawing.COUNTERBORE_FLOOR_CALLOUT
+    # The blocks stand in narrow gaps: no row longer than "SEE NOTE 3".
+    for callout in (drawing.TENON_ROOT_CALLOUT, drawing.COUNTERBORE_FLOOR_CALLOUT):
+        assert max(len(row) for row in callout.split("\n")) <= len("SEE NOTE 3")
     assert set(drawing.INSIDE_CORNER_ARC_EXTENSION) == corners
     build_source = Path(handle.__file__).read_text(encoding="utf-8")
     assert '("InsideCornerR", INSIDE_CORNER_R_MAX)' in build_source
@@ -396,14 +435,16 @@ def test_tenon_wall_charges_both_breaks_at_its_free_end() -> None:
     assert spec.TENON_WALL_ACCEPTED_MM == pytest.approx(0.040 * IN)
     assert spec.TENON_WALL_ACCEPTED_MM <= spec.TENON_WALL_MIN < WALL_FLOOR_MM
     assert spec.TENON_GLUE_LENGTH_MIN <= spec.TENON_LENGTH - brk
-    rows = spec.TENON_FIT_NOTE.splitlines()
-    assert rows[-2:] == ["WALL .060 MIN;", "WALL .040 MIN AT TENON END"]
+    # The shortfalls print exactly as declared, in the numbered note the
+    # tenon's callout flags (rule 7: it counts as at the callout).
+    assert "SEE NOTE 1" in drawing.TENON_CALLOUT
     exceptions = {
         row["id"]: row for row in _config.parts("dt-crank-handle")["machinist_exceptions"]
     }
-    assert set(exceptions) == {"RV-01", "RV-02"}
-    assert exceptions["RV-01"]["where"] == "tenon callout: " + rows[-2].rstrip(";")
-    assert exceptions["RV-02"]["where"] == "tenon callout: " + rows[-1]
+    assert {"RV-01", "RV-02"} <= set(exceptions)
+    for rule, text in (("RV-01", "WALL .060 MIN"), ("RV-02", "WALL .040 MIN AT TENON END")):
+        assert exceptions[rule]["where"] == "tenon callout: " + text
+        assert text in notes.TENON_NOTE
 
 
 def test_tenon_root_relief_clears_the_ferrule_seat_and_keeps_the_tenon() -> None:
@@ -429,11 +470,12 @@ def test_tenon_root_relief_clears_the_ferrule_seat_and_keeps_the_tenon() -> None
     assert "TenonRootRelief" in spec.DRAWING_DIMENSIONS["HandleProfile"]
     assert spec.DRAWING_PRECISION_BY_NAME["TenonRootRelief"] == 3
     assert (
-        drawing.DIMENSION_CALLOUTS["TenonRootRelief"] == spec.TENON_ROOT_RELIEF_CALLOUT
+        drawing.DIMENSION_CALLOUTS["TenonRootRelief"] == drawing.TENON_ROOT_RELIEF_CALLOUT
     )
-    # The band names the seat it serves and the cone's angle (rule 4).
-    relief_callout = spec.TENON_ROOT_RELIEF_CALLOUT.replace("\n", " ")
-    assert "45 DEG" in relief_callout and spec.FERRULE_NUMBER in relief_callout
+    # The band flags the note naming the seat it serves (rule 4), with the
+    # cone's angle.
+    rows = drawing.TENON_ROOT_RELIEF_CALLOUT.splitlines()
+    assert rows == ["X 45°", "SEE NOTE 3"]
     # The profile: the tenon OD runs on behind the seat face into the root
     # round, which the relief line leaves at 45 degrees for the shoulder face.
     relief = spec.TENON_ROOT_RELIEF

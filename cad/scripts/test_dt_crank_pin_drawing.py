@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import build_dt_crank_pin as part
+import dt_crank_pin_notes as notes
 import dt_crank_pin_spec
 import draw_dt_crank_pin as drawing
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -39,7 +40,8 @@ def test_cross_hole_prints_natively_not_in_a_note() -> None:
     for value in (spec.RING_HOLE_DIA, spec.RING_HOLE_X, spec.PIN_LENGTH):
         inch = value / 25.4
         for places in (2, 3):
-            assert f"{inch:.{places}f}".lstrip("0") not in spec.DRAWING_NOTES
+            for text in (notes.TAPER_CALLOUT, notes.TAPER_NOTE):
+                assert f"{inch:.{places}f}".lstrip("0") not in text
 
 
 def test_cross_hole_station_text_clears_its_extension_lines() -> None:
@@ -69,19 +71,22 @@ def test_end_diameters_are_drawing_native_true_diameter_callouts() -> None:
     # Custom 1:48 taper over 45 mm -> 0.9375 on diameter.
     taper_on_dia = dt_crank_pin_spec.BIG_END_DIA - dt_crank_pin_spec.SMALL_END_DIA
     assert round(taper_on_dia, 4) == round(dt_crank_pin_spec.PIN_LENGTH / 48.0, 4)
-    assert "1:48" in dt_crank_pin_spec.DRAWING_NOTES
+    assert "1:48" in notes.TAPER_CALLOUT
 
 
 def test_matched_taper_fit_names_both_mates() -> None:
     """Rule 4: the hub and shaft are taper-reamed together to suit the pin,
-    so the fit names both mates by name and number."""
+    so the fit names both mates by name and number and states the
+    acceptance, in the numbered note the taper callout links (rule 7)."""
     import _config
 
-    notes = " ".join(dt_crank_pin_spec.DRAWING_NOTES.split())
+    assert notes.TAPER_CALLOUT.splitlines()[-1] == f"SEE NOTE {notes.TAPER_NOTE_NUMBER}"
+    note = " ".join(notes.TAPER_NOTE.split())
+    assert note.startswith(f"{notes.TAPER_NOTE_NUMBER}. ")
     for stem, name in (("dt-crank-hub", "CRANK HUB"), ("dt-crankshaft", "CRANKSHAFT")):
-        assert f"{name} {_config.parts(stem)['number']}" in notes
-    assert "LIGHT DRIVE FIT" in notes
-    assert len(dt_crank_pin_spec.DRAWING_NOTES.splitlines()) <= 4
+        assert f"{name} {_config.parts(stem)['number']}" in note
+    assert f"KEEPER RING {_config.parts('dt-crank-pin-ring')['number']}" in note
+    assert len(notes.TAPER_NOTE.splitlines()) <= 4
 
 
 def test_web_shortfall_is_stated_on_the_hole_callout() -> None:
@@ -91,14 +96,14 @@ def test_web_shortfall_is_stated_on_the_hole_callout() -> None:
 
 
 def test_the_one_note_is_flagged_on_the_taper() -> None:
-    notes = dt_crank_pin_spec.DRAWING_NOTES
-    # Deburr/edge-break is a title-block note; repeating it here would duplicate it.
-    assert "DEBURR" not in notes
-    assert "X.XX" not in notes
+    for text in (notes.TAPER_CALLOUT, notes.TAPER_NOTE):
+        # Deburr/edge-break is a title-block note; repeating it here would duplicate it.
+        assert "DEBURR" not in text
+        assert "X.XX" not in text
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'property_link("Manufacturing Notes")' in source
+    assert "        TAPER_CALLOUT,\n        text_xy=TAPER_NOTE_XY," in source
     assert "attach_xy=TAPER_SILHOUETTE_PICK" in source
-    assert "def _manufacturing_notes" not in source
+    assert "add_note(adapter, TAPER_NOTE, *NOTES_XY)" in source
 
 
 def test_pinned_taper_carries_no_roughness_symbol() -> None:
@@ -110,13 +115,12 @@ def test_pinned_taper_carries_no_roughness_symbol() -> None:
 
 
 def test_view_scales_are_explicit() -> None:
+    # Rule 9: every orthographic view is at the sheet scale, so the end view
+    # is a projected view with no label and no scale caption.
     assert drawing.SHEET_SCALE == (2.0, 1.0)
-    assert drawing.END_VIEW_SCALE == 4.0
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("scale=(2, 1)") == 2
-    assert source.count("scale=(4, 1)") == 1
-    assert dt_crank_pin_spec.END_VIEW_NOTE == "END VIEW SCALE 4:1"
-    assert 'add_property_linked_note(adapter, "End View Note"' in source
+    assert source.count("scale=(2, 1)") == 3
+    assert "End View Note" not in source
 
 
 def test_part_stamps_make_critical_properties() -> None:

@@ -119,7 +119,9 @@ RELIEF_WIDTH_CALLOUT = "TOP RELIEF\nCTR ON PIVOT\nOPEN THRU\nPIVOT END"
 PIVOT_BORE_CALLOUT_BELOW = ("RUNNING FIT ON MHA-DT-VN-52 SHOULDER",)
 POST_MOUNT_LOCATING_CALLOUT = "LOCATES MHA-DT-05 CONE PIVOT POST"
 # A drawing number identifies the hold-down's mate without lengthening its
-# leader shelf into the title block.
+# leader shelf into the title block.  Its stations print at the shop's
+# drilled-hole row (HOLDDOWN_STATION_TOL_MM), so the hole is drilled to them
+# and no assembly spot is named.
 HOLDDOWN_CALLOUT_BELOW = ("FROM UNDERSIDE", "LOCATES MHA-DT-21")
 # The process belongs to the THRU row, not the counterbore-diameter row.
 HOLDDOWN_PROCESS = "DRILL"
