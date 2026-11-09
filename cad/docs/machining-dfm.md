@@ -426,9 +426,11 @@ rib/nut, screw-head/knife-mount and installed-neighbour clearances.
 
 The middle rib's negative-X contour retains its nominal geometry but is now
 controlled by **MiddleRibCounterAngle@MiddleRibProfile**, driven from the
-explicit-degree **CounterFlankAngle** global. Its exact value is
-`degrees(asin(RIB_WRAP_R / abs(TIP_X)))` (**11.53695903281549°**), not a rounded
-model input. One upper-flank angle to an on-axis construction ray controls
+**CounterFlankAngle** native equation
+`atn("ArcR" / sqr("SumH" * "SumH" - "ArcR" * "ArcR"))`. In SolidWorks' degree
+dialect this is `degrees(asin(RIB_WRAP_R / abs(TIP_X)))`
+(**11.53695903281549°**), without a rounded degree literal.
+One upper-flank angle to an on-axis construction ray controls
 both tangents through their shared apex and coradial wrap arcs; no second
 angle or mirror relation is added. Native readback requires both counter
 planes, their derived apex at **X=−76.20, Y=0 mm** within **0.000001 mm**,

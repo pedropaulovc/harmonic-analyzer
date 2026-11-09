@@ -2429,7 +2429,6 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "RibBlendR", f"{RIB_BLEND_R}mm")
     await set_global(adapter, "RibPad", f"{RIB_PAD}mm")
     await set_global(adapter, "SumH", f"{SUM_H}mm")
-    await set_global(adapter, "CounterFlankAngle", f"{COUNTER_FLANK_ANGLE_DEG}deg")
     await set_global(adapter, "AnchorR", f"{ANCHOR_R}mm")
     await set_global(adapter, "AnchorH", f"{ANCHOR_H}mm")
     # (The old HoleDia/AnchorBoreR knobs are gone: both anchor seats are native
@@ -2447,6 +2446,11 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "HexDepth", f"{HEX_DEPTH}mm")
     await set_global(adapter, "KnifeRidgeR", f"{KNIFE_RIDGE_R}mm")
     await set_global(adapter, "ArcR", '"CylR" + "RibPad"')
+    # Keep the derivation native: a degree literal was rounded to angular places.
+    await set_global(
+        adapter, "CounterFlankAngle",
+        'atn("ArcR" / sqr("SumH" * "SumH" - "ArcR" * "ArcR"))',
+    )
     # On its printed 1.41 grid (rule 3), not offset from the hole column.
     await set_global(adapter, "RibReach", f"{RIB_REACH}mm")
     await set_global(adapter, "CoefficientBottomY", '"CoefficientTopY" - "CoefficientT"')

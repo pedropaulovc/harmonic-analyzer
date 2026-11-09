@@ -324,6 +324,29 @@ def test_extracted_sketch_contract_rejects_real_primitive_mutations(mutation: st
         _assert_recorded_sketch(recorder, profile.PROFILE, True, jobs)
 
 
+def test_counter_angle_global_uses_native_expression_after_its_lengths() -> None:
+    build = next(node for node in _tree(RECIPE).body if isinstance(node, Function) and node.name == "build")
+    globals_ = {
+        ast.literal_eval(call.args[1]): call
+        for call in ast.walk(build)
+        if isinstance(call, ast.Call) and isinstance(call.func, ast.Name)
+        and call.func.id == "set_global"
+    }
+    counter = globals_["CounterFlankAngle"]
+    expression = ast.literal_eval(counter.args[2])
+    assert isinstance(expression, str) and "deg" not in expression
+    assert globals_["ArcR"].lineno < counter.lineno
+    assert globals_["SumH"].lineno < counter.lineno
+    expression = expression.replace('"ArcR"', "radius").replace('"SumH"', "reach")
+    for radius, reach in ((spec.RIB_WRAP_R, abs(spec.TIP_X)), (0.6, 3.0)):
+        degrees = eval(expression, {"__builtins__": {}}, {
+            "radius": radius, "reach": reach, "sqr": math.sqrt,
+            "atn": lambda value: math.degrees(math.atan(value)),
+        })
+        assert degrees == pytest.approx(spec.COUNTER_FLANK_ANGLE_DEG, abs=1e-12)
+        assert -radius / math.sin(math.radians(degrees)) == pytest.approx(-reach, abs=1e-6)
+
+
 @pytest.mark.parametrize("damage", [
     None, "rounded_upper", "rounded_lower", "missing_lower", "reference", "wrong_angle", "missing_angle", "nan_angle",
 ])
