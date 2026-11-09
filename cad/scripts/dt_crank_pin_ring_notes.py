@@ -18,9 +18,10 @@ prints as REFERENCE.
 
 drawing-guidelines.md rule 7 (notes: few, flagged, never a method): owner
 ruling 2026-11-08 (D6) closes the ring with pliers, not solder, once it is
-threaded through the taper pin's cross-hole and the keeper chain's far link,
-since a closed ring passes neither; the note states that and the butt gap's
-band, which no model dimension carries. The title block owns the brass wire.
+threaded through the taper pin's cross-hole and the keeper chain's far link.
+Threading, closing and the butt gap's acceptance are assembly actions, so
+they print on MHA-DT-00 (round-1 review of this sheet); the part note only
+says what the joint is. The title block owns the brass wire.
 """
 
 from __future__ import annotations
@@ -60,13 +61,4 @@ if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
     raise AssertionError("every marked ring dimension needs authored places")
 if not REFERENCE_DIMENSIONS <= set(DRAWING_PRECISION_BY_NAME):
     raise AssertionError("every reference ring dimension must be marked")
-# The gap's band in the sheet's inch: closed (0) up to its upper limit.
-if ring.BUTT_GAP_BAND[0] != 0.0:
-    raise AssertionError("the butt-gap note prints a band from closed")
-_GAP_MAX_IN = f"{ring.BUTT_GAP_BAND[1] / 25.4:.3f}".removeprefix("0")
-DRAWING_NOTES = "\n".join(
-    (
-        "1. THREAD THROUGH THE MHA-DT-09 CROSS-HOLE AND MHA-DT-VN-65 FAR LINK.",
-        f"2. CLOSE WITH PLIERS; BUTT GAP 0-{_GAP_MAX_IN}.",
-    )
-)
+DRAWING_NOTES = "1. BUTT JOINT, ENDS CUT SQUARE, NOT SOLDERED."

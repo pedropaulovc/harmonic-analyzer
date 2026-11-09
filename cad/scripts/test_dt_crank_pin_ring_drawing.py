@@ -11,7 +11,6 @@ butt gap, not a solder bead.
 from __future__ import annotations
 
 import math
-import re
 from pathlib import Path
 
 import pytest
@@ -168,13 +167,6 @@ def test_notes_are_few_and_carry_no_part_sizes() -> None:
         assert not any(ch.isdigit() for ch in callout), callout
     assert '"Manufacturing Notes": DRAWING_NOTES' in _build_source()
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in _source()
-
-
-def test_part_numbers_in_the_notes_are_live() -> None:
-    named = set(re.findall(r"MHA-[A-Z]+(?:-VN)?-\d+", notes.DRAWING_NOTES))
-    assert named
-    registry = {str(row["number"]) for row in _config.parts().values()}
-    assert named <= registry, named - registry
 
 
 def test_views_are_in_projection_and_clear_of_the_title_block() -> None:

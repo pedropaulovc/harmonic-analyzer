@@ -132,6 +132,26 @@ SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 # Derived spans.
 ARM_END_X = ARM_C2C + END_RADIUS
 HALF_WIDTH = ARM_WIDTH / 2.0
+# The bore and pivot axis from the top long edge: a machinist sets the bore
+# from an edge, not from a drawn centreline (fan-out round 5, rule 10;
+# Main 2026-11-07).  Half the as-rolled width at the title block's .XX: a
+# ±.002 band named no mate (fan-out round 6, rule 4), so it loosens to the
+# row (L2, Owner ruling 2026-11-08 (Pedro), #2144 item 6.3) once the one stack it feeds passes.  That stack is the cheek round
+# the hub seat: the hub's ARM_CHEEK_WORST_MM assumes a centred bore in the
+# thinnest bar, so the near side loses the .XX offset plus half the mill's
+# width band.  Its construction line stands two thirds of the way from the
+# anchor tap to the pivot, in the arm's only empty span above the top edge.
+AXIS_FROM_EDGE_STATION_X = (ANCHOR_SCREW_X + 2.0 * ARM_C2C) / 3.0
+ARM_CHEEK_OFF_CENTRE_WORST_MM = (
+    dt_crank_hub_geometry.ARM_CHEEK_WORST_MM
+    - dt_crank_hub_geometry.GENERAL_2PL_TOL_MM
+    - ARM_WIDTH_STOCK_MINUS / 2.0
+)
+if ARM_CHEEK_OFF_CENTRE_WORST_MM < WALL_TARGET_MM:
+    raise AssertionError(
+        f"hub-seat cheek {ARM_CHEEK_OFF_CENTRE_WORST_MM:.3f} mm with the axis at"
+        " .XX from the top edge is under the .080 in target"
+    )
 
 # The anchor is located from its near edge (AnchorOffset), printed .XXX: at
 # .XX its band takes the tap wall under the rule 17 floor (drawing-guidelines.md
@@ -219,6 +239,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "PivotStation",
         "AnchorStation",
         "AnchorOffset",
+        "AxisFromEdge",
         "Width",
     },
 }
@@ -237,17 +258,44 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     for name, places in dimensions.items()
 }
 
-# The one sheet-derived dimension: the parenthesised extreme-to-extreme
-# overall, a read-only sum of the two end radii and the pivot station with no model
-# dimension to import. Its places are still specification, so the sheet
-# reads them here instead of typing a literal (drawing-simplicity-policy.md `How the repository implements the guidelines`).
-DRAWING_REFERENCE_PRECISION: dict[str, int] = {"overall length reference": 2}
+# The sheet-derived reference dimensions: the parenthesised extreme-to-extreme
+# overall, a read-only sum of the two end radii and the pivot station, and the
+# MHA-DT-VN-59 seam's station from the bore axis (the seat radius), neither
+# with a model dimension to import.  Their places are still specification,
+# so the sheet reads them here instead of typing a literal
+# (drawing-simplicity-policy.md `How the repository implements the guidelines`).
+DRAWING_REFERENCE_PRECISION: dict[str, int] = {
+    "overall length reference": 2,
+    "seam station reference": 2,
+}
 
 # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): one
 # short line.  The section line is a requirement, not a convenience: the U29
 # cheek around the hub seat reaches its wall only at the mill's width
 # tolerance.  The fiducial and the pivot tap's mouth limit are flagged at
 # their features (dt_crank_arm_notes).
-STOCK_NOTE = "WIDTH AND THICKNESS: CF FLAT BAR AS SUPPLIED."
-DRAWING_NOTES = STOCK_NOTE
+STOCK_NOTE = "1. WIDTH AND THICKNESS: CF FLAT BAR AS SUPPLIED."
+# The hub-seat press fit's acceptance, flagged from the seat callout (SEE NOTE
+# 2): the callout's two word rows name the fit and its mate, and its width is
+# bounded by the border and the seam leader.
+_PRESS_LOW_IN, _PRESS_HIGH_IN = (
+    f"{value / 25.4:.4f}".lstrip("0")
+    for value in dt_crank_hub_geometry.SEAT_PRESS_INTERFERENCE
+)
+SEAT_PRESS_NOTE = (
+    f"2. HUB SEAT: {_PRESS_LOW_IN}-{_PRESS_HIGH_IN} DIAMETRAL INTERFERENCE"
+    " ON MHA-DT-31."
+)
+# The MHA-DT-VN-59 pin hole across the bore/hub joint, flagged from its ream
+# callout (SEE NOTE 3): the callout keeps size, process and depth; the
+# assembly-made ream, its pin and fit, and the owner's permanent pair
+# (rulings 2026-11-01, as the hub's sheet prints it) are two rows too many
+# for the callout (rule 7).  Plain words, not the private "seam" (rule 26,
+# fan-out round 3).  The rows stay short of the title block (x 0.216 at the
+# render's 2.67 mm per character).
+SEAM_NOTE = (
+    "3. REAM ACROSS THE BORE/HUB JOINT WITH CRANK HUB MHA-DT-31 AT ASSEMBLY;\n"
+    "   PIN MHA-DT-VN-59, LIGHT DRIVE FIT; PERMANENT PAIR."
+)
+DRAWING_NOTES = "\n".join((STOCK_NOTE, SEAT_PRESS_NOTE, SEAM_NOTE))
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

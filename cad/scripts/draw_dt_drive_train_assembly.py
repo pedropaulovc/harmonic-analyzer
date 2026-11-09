@@ -108,6 +108,7 @@ from dt_cone_tip_block_spec import ADJUSTER_ENGAGEMENT_ASSEMBLY_FACT, ADJUSTER_T
 import dt_crank_drive_gear_spec as gear64
 import dt_crank_handle_pivot_screw_spec as handle_screw
 from dt_crank_hub_notes import FRONT_FACE_DATUM as HUB_FRONT_FACE_DATUM
+from dt_crank_pin_ring_spec import BUTT_GAP_BAND as RING_BUTT_GAP_BAND
 import dt_crank_pinion_spec as pinion
 from dt_crank_pinion_spec import SEAT_FEELER_MM as PINION_SEAT_FEELER
 from dt_crankshaft_spec import SHAFT_END_PROUD_RANGE as CRANK_END_PROUD_RANGE
@@ -986,8 +987,10 @@ CONE_CRANK_STEPS = _note_text(
         # setting, stated here, not on MHA-DT-31.
         "   SCREW THE END LINK OF MHA-DT-VN-65 FLAT TO MHA-DT-06 WITH MHA-DT-VN-70",
         "   THROUGH ITS EYE; THREAD MHA-DT-27 THROUGH THE PIN'S CROSS-HOLE AND THE",
-        "   FAR LINK'S EYE AND CLOSE IT WITH PLIERS; HANG MHA-DT-27 FROM THE PIN HEAD,",
-        "   CLEAR OF THE HUB.",
+        "   FAR LINK'S EYE, CLOSE IT WITH PLIERS (BUTT GAP 0-"
+        + f"{RING_BUTT_GAP_BAND[1] / 25.4:.3f}".removeprefix("0")
+        + "); HANG MHA-DT-27",
+        "   FROM THE PIN HEAD, CLEAR OF THE HUB.",
         # Local review of 747487c71: the cup cures centred on the screw, or
         # its offset can bind the head and shoulder.  Owner ruling 2026-10-24
         # (#1900): the ferrule cures centred on the pivot bore, the offset

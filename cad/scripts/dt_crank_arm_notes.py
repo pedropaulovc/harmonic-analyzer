@@ -10,38 +10,40 @@ import math
 
 from dt_crank_arm_spec import ANCHOR_TAP_WALL_MIN
 from dt_crank_handle_pivot_screw_spec import TAPPED_MOUTH_DIA_MAX
-from dt_crank_hub_geometry import SEAT_PRESS_INTERFERENCE
+from dt_crank_hub_geometry import AXIAL_PIN_DIA, FIDUCIAL_MODEL_DIA, SEAM_DEPTH
 from dt_crank_hub_notes import inch_text as _inch
-from dt_crank_hub_notes import seam_callout
 
 
-# Short lines: the callout is centred under the diameter, so its widest line
-# sets how close to the left border the hub-end dimension can stand.  The
-# bore is made first and keeps its printed band; the hub is turned to suit
-# it, and the interference it is turned to is the fit's acceptance (#984
-# machinist review r1: "LIGHT PRESS FIT" alone gave none).
-_PRESS_LOW, _PRESS_HIGH = SEAT_PRESS_INTERFERENCE
-HUB_SEAT_CALLOUT = "\n".join(
+# The bore is made first and keeps its printed band; the hub is made to the
+# measured bore, and the interference it is made to is the fit's acceptance,
+# flagged to note 2 (rule 4: the standard fit name, its mate by name and
+# number).  The faces-flush stop is the MHA-DT-00 press step's (rule 7).
+# Rows <= 24 characters: the block is centred under the diameter, so its
+# widest row sets how close to the left border the hub-end dimension stands.
+HUB_SEAT_CALLOUT = "PRESS FIT ON CRANK HUB\nMHA-DT-31, SEE NOTE 2"
+# The MHA-DT-VN-59 seam: size, process and depth (rule 26: a depth is never
+# deferred), then the flag to note 3, which carries the assembly-made ream,
+# its mate, pin and fit and the permanent pair (rules 4 and 7).  The depth
+# is the model's SeamDepth global, from the front face the front view shows.
+# Its station from the bore axis is a reference dimension on the view (rule
+# 26: a location is a dimension).
+SEAM_CALLOUT = "\n".join(
     (
-        "MHA-DT-31 HUB TURNED TO",
-        "SUIT FOR A LIGHT PRESS:",
-        f"{_inch(_PRESS_LOW, 4)}-{_inch(_PRESS_HIGH, 4)} DIAMETRAL",
-        "INTERFERENCE; FACES FLUSH",
+        f"(<MOD-DIAM>{_inch(AXIAL_PIN_DIA, 3)}) REAM <HOLE-DEPTH> "
+        f"{_inch(SEAM_DEPTH, 2)}",
+        "SEE NOTE 3",
     )
 )
-# The MHA-DT-VN-59 seam is match-drilled with the hub at assembly; its callout
-# sits on the seam itself, the same requirement the hub's sheet prints (the
-# blind pin makes the pair permanent; owner ruling 2026-11-01).  One drilling
-# makes both halves, so its depth prints once, natively on the hub's sheet,
-# where it enters from the faced outboard end.
-SEAM_CALLOUT = seam_callout("CRANK HUB MHA-DT-31", depth=" <HOLE-DEPTH> PER MHA-DT-31")
 # The handle-pivot tap's mouth limit rides its own callout, under the native
 # size, on the face the front view shows: the MHA-DT-32 shoulder seats
 # round it (#984 machinist review r1: as a general note it named neither of
-# the two identical taps nor the face).
+# the two identical taps nor the face).  A mouth chamfer prints as a
+# countersink, in symbol form at the tapped-hole 90 degrees (rule 26), on the
+# near side (the face the view shows; fan-out round 3: the face was not
+# drawn), after the native size and process rows and before the mate.
 PIVOT_TAP_ROWS = (
-    "FOR MHA-DT-32 HANDLE PIVOT;\n"
-    f"MOUTH <MOD-DIAM>{_inch(TAPPED_MOUTH_DIA_MAX, 3)} MAX, NEAR SIDE"
+    f"<HOLE-SINK><MOD-DIAM>{_inch(TAPPED_MOUTH_DIA_MAX, 3)} MAX X 90\u00b0 NEAR SIDE\n"
+    "FOR MHA-DT-32 HANDLE PIVOT"
 )
 # The keeper-chain anchor tap's wall to its near edge is under the .080
 # target, so its callout states it (drawing-guidelines.md rule 20), floored to
@@ -51,8 +53,10 @@ ANCHOR_TAP_ROWS = f"WALL {_ANCHOR_WALL_IN:.3f} MIN".replace(" 0.", " .")
 # The punched fiducial is flagged at the mark, not in the general notes
 # (#984 machinist review r2/r3: an unlabelled crosshair could read as an
 # undimensioned hole).  Its location is the two imported ordinates from the
-# hub-seat axis; the callout states only what it is for (machinist review
-# 2026-10-27: "LOCATE BY EYE" placed it in words).  Short lines keep the
-# block's right end left of the mark, so its leader descends away from the
-# block and the FiducialX ordinate.
-FIDUCIAL_CALLOUT = "PUNCH MARK:\nALIGNS WITH\nMHA-DT-11\nDOME MARK"
+# hub-seat axis; the callout gives its size and process, then two short rows
+# of what it is for (rule 7; machinist review 2026-10-27: "LOCATE BY EYE"
+# placed it in words).  Short lines keep the block's right end left of the
+# mark, so its leader descends away from the block and the FiducialX ordinate.
+FIDUCIAL_CALLOUT = (
+    f"<MOD-DIAM>{_inch(FIDUCIAL_MODEL_DIA, 2)} PUNCH\nMATCH MARK\nTO MHA-DT-11"
+)
