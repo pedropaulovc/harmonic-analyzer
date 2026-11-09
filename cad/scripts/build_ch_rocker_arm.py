@@ -176,16 +176,6 @@ ROD_TIP_X = TOP_END_X + TIP_FACE * _RAD_X
 ROD_TIP_Y = TOP_END_Y + TIP_FACE * _RAD_Y
 
 
-def _bottom_point(x: float) -> tuple[float, float]:
-    return (x, CENTER_Y - math.sqrt(R_BOTTOM**2 - x * x))
-
-
-def _mid_y(x: float) -> float:
-    by = _bottom_point(x)[1]
-    ty = CENTER_Y - math.sqrt(R_TOP**2 - x * x)
-    return (by + ty) / 2.0
-
-
 def _as_construction(adapter, entity_id: str) -> None:
     """Flag a registered sketch line as construction geometry.
 
@@ -516,7 +506,7 @@ async def build(adapter) -> dict[str, str]:
     hub = SketchDims()
     check("create_sketch hub", await adapter.create_sketch("Front"))
     await define_circle(
-        adapter, 0.0, _mid_y(0.0), HUB_DIA / 2.0, "hub",
+        adapter, 0.0, PIVOT_MID_Y, HUB_DIA / 2.0, "hub",
         dims=hub,
         names=("HubX", "HubZ", "HubDia"),
         drives=(None, '"ArmDepth" / 2', '"HubDia"'),
@@ -548,8 +538,8 @@ async def build(adapter) -> dict[str, str]:
         await adapter.add_fillet(
             HUB_ROOT_RADIUS_MAX,
             [
-                [HUB_DIA / 2.0, _mid_y(0.0), ARM_THICKNESS / 2.0],
-                [HUB_DIA / 2.0, _mid_y(0.0), -ARM_THICKNESS / 2.0],
+                [HUB_DIA / 2.0, PIVOT_MID_Y, ARM_THICKNESS / 2.0],
+                [HUB_DIA / 2.0, PIVOT_MID_Y, -ARM_THICKNESS / 2.0],
             ],
             propagate=False,
         ),
@@ -565,11 +555,11 @@ async def build(adapter) -> dict[str, str]:
     # Pivot pin hole on the axis (x 0), mid-depth. On-axis centre: define_circle
     # records only the centre-Z dim (the X is a relation) + the diameter -- TWO
     # dims, so the "X" name/drive slot is ignored. The centre sits at
-    # _mid_y(0) = ArmDepth/2 (positive), so its unsigned dim drives positive.
+    # PIVOT_MID_Y = ArmDepth/2 (positive), so its unsigned dim drives positive.
     pivot = SketchDims()
     check("create_sketch pivot hole", await adapter.create_sketch("Front"))
     await define_circle(
-        adapter, 0.0, _mid_y(0.0), PIVOT_HOLE_DIA / 2.0, "pivot hole",
+        adapter, 0.0, PIVOT_MID_Y, PIVOT_HOLE_DIA / 2.0, "pivot hole",
         dims=pivot,
         names=("PivotX", "PivotZ", "PivotDia"),
         drives=(None, '"ArmDepth" / 2', '"PivotHoleDia"'),
@@ -589,7 +579,7 @@ async def build(adapter) -> dict[str, str]:
     # NAME (Right ∩ Top+8), view-independent -- an internal bore wall never
     # selects by screen-projected point. See _bore_axis.name_bore_axis.
     await name_bore_axis(
-        adapter, "Right Plane", 0.0, "Top Plane", _mid_y(0.0), "pivot bore"
+        adapter, "Right Plane", 0.0, "Top Plane", PIVOT_MID_Y, "pivot bore"
     )
 
     # REFERENCE sketch (drawing-simplicity-policy.md `How the repository implements the guidelines`, Codex #936 PRRT_kwDOPHDy386mV3AO): the
