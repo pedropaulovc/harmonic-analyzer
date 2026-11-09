@@ -42,6 +42,11 @@ EXTERNAL_NUMBERS = frozenset(
         drawing.NORTH_BRACKET_SCREW,
         # Step 5's paper-drive T12, named on sheet 12's interface line.
         drawing.CRANK_CHAIN_WHEEL,
+        # Step 8A's MHA-CH-00 connecting rod and rocker arm pairs.
+        drawing.CONNECTING_ROD,
+        drawing.ROCKER_ARM,
+        # Check 5's feed sense, named on sheet 14's interface lines.
+        drawing.PLATEN_NUMBER,
     }
 )
 # Named installation assemblies are external interfaces, not drive-train BOM rows.
@@ -187,8 +192,7 @@ def test_package_text_cites_only_bom_or_external_part_numbers() -> None:
         drawing.CHECKS,
         drawing.SETUP_NOTES,
         drawing.INTERFACE_NOTES,
-        drawing.FIT_PLACEHOLDER,
-        drawing.CRANK_END_FIT_NOTES,
+        drawing.DIRECTION_NOTES,
         *drawing.BOM_DESCRIPTIONS.values(),
     )
     cited = set(re.findall(r"MHA-(?!VN-)[A-Z]{2}-(?:[0-9]{2}(?:-TL-(?:[0-9]{2}|VN-[5-9][0-9]))?|VN-[5-9][0-9])(?:-T[0-9]{3})?(?![A-Z0-9-])", "\n".join(texts)))
@@ -255,19 +259,24 @@ def test_sheet_numbers_are_pinned_where_the_sheets_cite_them() -> None:
         drawing.CHECKS_SHEET,
         drawing.BANK_SETTINGS_SHEET,
     ) == (7, 8, 9, 10, 11, 12, 13), "the numbered steps read in sheet order"
-    assert len(names) == drawing.BANK_SETTINGS_SHEET
+    assert len(names) == drawing.SETTING_SHEET == drawing.BANK_SETTINGS_SHEET + 1
     assert names[drawing.FULL_DETAIL_SHEET - 1] == "FULL-DETAIL SIDE VIEW"
     assert f"FULL DETAIL: SHEET {drawing.FULL_DETAIL_SHEET}." in drawing.ASSEMBLED_HEADING
     assert names[drawing.SEQUENCE_SHEET - 1] == "ASSEMBLY SEQUENCE"
-    assert names[drawing.BANK_SHEET - 1] == "ASSEMBLY SEQUENCE CONT. - CYLINDER BANK"
+    assert names[drawing.BANK_SHEET - 1] == "ASSEMBLY SEQUENCE CONT. - CRANK + CYLINDER BANK"
     assert names[drawing.CHECKS_SHEET - 1] == "CHECKS + SETUP"
-    assert names[drawing.FIT_SHEET - 1] == "ASSEMBLY SEQUENCE CONT. + FIT"
-    assert names[drawing.BANK_SETTINGS_SHEET - 1] == "CYLINDER BANK + DRUM STATION SETTINGS"
+    assert names[drawing.FIT_SHEET - 1] == "ASSEMBLY SEQUENCE CONT. - CYLINDER BANK + PINION RIG"
+    assert names[drawing.BANK_SETTINGS_SHEET - 1] == "CYLINDER BANK + MHA-DT-01 STATION SETTINGS"
+    assert names[drawing.SETTING_SHEET - 1] == "SETTING TABLES + CONE STATIONS"
     assert sorted(drawing.CLUSTER_SHEETS.values()) == [3, 4, 5, 6]
     assert set(drawing.SHEET_SCALES) == set(names)
     assert "BALLOONS ON SHEETS 3-6" in drawing.BOM_REFERENCE_NOTES
-    assert f"STATIONS: SHEET {drawing.FIT_SHEET}" in drawing.BOM_REFERENCE_NOTES
-    assert f"CYLINDER BANK: SHEET {drawing.BANK_SHEET}." in drawing.CONE_CRANK_STEPS
+    assert f"STATIONS: SHEET {drawing.SETTING_SHEET}" in drawing.BOM_REFERENCE_NOTES
+    fields = {field.label: field for field in drawing.package_note_fields(_drawing_facts())}
+    sequence_right = fields[f"sheet {drawing.SEQUENCE_SHEET} right note field"].blocks[-1][1]
+    assert sequence_right.endswith(
+        f"CONT. STEP {drawing.CRANK_CONTINUED_FROM}: SHEET {drawing.BANK_SHEET}."
+    )
     assert all(text.count(",") <= 1 for text in drawing.BOM_DESCRIPTIONS.values())
 
 
@@ -562,14 +571,14 @@ def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
     t012 = f"{feeler(set_stack.feeler_gap_mm(12))} AT T012"
     t120 = f"{feeler(set_stack.feeler_gap_mm(120))} AT T120"
     order = [
-        check.index("TO THE MHA-SH-VN-52 STOP, CLEAR OF EVERY MHA-DT-12"),
-        check.index("(MHA-DT-VN-62) TO SNUG-LOOSE"),
+        check.index("OUT TO THE MHA-SH-VN-52 STOP"),
+        check.index("EASE MHA-DT-VN-62 UNTIL EACH MHA-DT-02 MOVES"),
         check.index(t012),
         check.index(t120),
         check.index("TIGHTEN MHA-DT-VN-62"),
         # CodeRabbit on #1272: the shims block the swing, so they come out
         # before the T120 feeler set.
-        check.index("SWING OUT AND REMOVE THE SHIMS"),
+        check.index("SWING THE CONE SET OUT. 4L. REMOVE THE LEAVES"),
         check.index(f"{feeler(set_stack.feeler_gap_mm(120))} FEELER IS SNUG T120 TIP TO ROOT"),
         check.index("TIGHTEN MHA-DT-VN-51"),
     ]
@@ -592,8 +601,8 @@ def test_cone_swing_check_requires_installed_stop_inspection_and_seating() -> No
     minimum = float(printed.group(1)) * 25.4
     assert 1.5 * stop_screw.SHANK_DIA - 1e-9 <= minimum
     assert minimum <= stop_screw.MIN_USEFUL_ENGAGEMENT_MM + 1e-9
-    assert "HEAD FULLY SEATED" in check
-    assert "MHA-DT-20 REMAINS SEATED THROUGH P1" in check
+    assert "CHECK THAT ITS HEAD IS FULLY SEATED" in check
+    assert "CHECK THAT MHA-DT-20 AND THE MHA-DT-VN-52 SHOULDER STAY SEATED" in check
 
 
 def test_cone_swing_check_requires_pivot_thread_engagement() -> None:
@@ -607,11 +616,17 @@ def test_cone_swing_check_requires_pivot_thread_engagement() -> None:
     minimum = float(printed.group(1)) * 25.4
     assert pivot_screw.THREAD_SOLID_DIA - 1e-9 <= minimum
     assert minimum <= pivot_screw.MIN_USEFUL_ENGAGEMENT_MM + 1e-9
-    assert "SHOULDER FULLY SEATED" in check
+    assert "MHA-DT-VN-52 SHOULDER STAY SEATED" in check
 
 
 def _flat(text: str) -> str:
     return " ".join(text.split())
+
+
+def _unlettered(text: str) -> str:
+    """Printed text with its lettered sub-step heads (16A., 21B. ...) removed,
+    so a fit-up step's one-thing lines read back word for word."""
+    return _flat(re.sub(r"(?m)\b\d+[A-HJ-NP-Z]\. ", "", text))
 
 
 def _rig_step_body(key: str) -> str:
@@ -631,13 +646,13 @@ def test_rig_is_located_by_its_parked_tip_gap() -> None:
 
     feeler = f"{tip_gap.TIP_GAP_SETTING_TEXT} FEELER"
     located = _rig_step_body("rig-located")
-    for phrase in ("TRANSFERRED", tip_gap.TIP_GAP_FEELER_TEXT, tip_gap.TIP_GAP_ACCEPT_TEXT):
+    for phrase in ("UNDRILLED SEATS", tip_gap.TIP_GAP_FEELER_TEXT, tip_gap.TIP_GAP_ACCEPT_TEXT):
         assert phrase in located, phrase
     check = _flat(drawing.CHECKS)
     assert feeler in check
     assert (
-        f"{tip_gap.TIP_GAP_ACCEPT_TEXT} (SHEET {drawing.FIT_SHEET}, "
-        f"STEP {steps.step_number('rig-located')})"
+        f"{tip_gap.TIP_GAP_ACCEPT_TEXT} (SHEET {drawing.CONTINUATION_SHEET}, "
+        f"STEP {steps.step_number('rig-located')}E)"
     ) in check
     # The inch acceptance rounds inward, inside the spec's window.
     printed = re.search(r"ACCEPT (\.\d{3})-(\.\d{3})", tip_gap.TIP_GAP_ACCEPT_TEXT)
@@ -645,7 +660,8 @@ def test_rig_is_located_by_its_parked_tip_gap() -> None:
     low, high = (float(value) * 25.4 for value in printed.groups())
     assert tip_gap.TIP_GAP_ACCEPT[0] - 1e-9 <= low < high <= tip_gap.TIP_GAP_ACCEPT[1] + 1e-9
     assert f"SEE SHEET {drawing.CHECKS_SHEET}" in drawing.ASSEMBLED_HEADING
-    assert f"PINION RIG: CONT. ON SHEET {drawing.FIT_SHEET}." in drawing.BANK_STEPS
+    fields = {field.label: field for field in drawing.package_note_fields(_drawing_facts())}
+    assert "pinion rig sequence" in dict(fields[f"sheet {drawing.FIT_SHEET} left note field"].blocks)
     # The seats are spotted after RIG SET, and drilled per the base's own
     # transfer callouts, not a second copy of their sizes.
     seats = _rig_step_body("rig-seats-transferred")
@@ -657,8 +673,8 @@ def test_rig_is_located_by_its_parked_tip_gap() -> None:
 def test_the_rig_steps_print_the_fitup_sequence_once_in_order() -> None:
     """Codex #858 (PRRT_kwDOPHDy386mTbPB): the fit-up that produces the
     modelled pin stations reaches the fitter.  Each pinion_rig_fitup step
-    prints once, word for word, in its own step, in ASSEMBLY_SEQUENCE order;
-    nothing is pending."""
+    prints once, word for word or as its RIG_REWORDINGS re-break, in its own
+    step, in ASSEMBLY_SEQUENCE order; nothing is pending."""
     import dt_drive_train_steps as steps
     import pinion_rig_fitup as fitup
 
@@ -672,10 +688,17 @@ def test_the_rig_steps_print_the_fitup_sequence_once_in_order() -> None:
         "cam-collars-set",
         "lever-pin-set",
     )
-    flat = _flat(RIG_STEPS)
+    flat = _unlettered(RIG_STEPS)
     for key, step in zip(keys, fitup.ASSEMBLY_SEQUENCE, strict=True):
-        assert flat.count(_flat(step)) == 1, key
-        assert _flat(step) in _rig_step_body(key), key
+        if key == "lever-pin-set":
+            # Rubric sample round 6 (rule 22): the sheet re-composes the lever
+            # pin set from the same spec constants as one-thing lines, the
+            # hole's drill folded into the match-drill
+            # (test_lever_pin_step_states_existing_drill_size_and_slip_fit).
+            continue
+        printed = _flat(drawing._reworded(_flat(step), *drawing.RIG_REWORDINGS.get(key, ())))
+        assert flat.count(printed) == 1, key
+        assert printed in _unlettered(_rig_step_body(key)), key
     numbers = [steps.step_number(key) for key in keys]
     assert numbers == sorted(numbers)
     printed = [int(n) for n in re.findall(r"^(\d+)\. ", RIG_STEPS, re.MULTILINE)]
@@ -694,9 +717,24 @@ def test_lever_pin_step_states_existing_drill_size_and_slip_fit() -> None:
 
     assert pin.PIN_DIA == 25.4 / 16.0
     step = _rig_step_body(pin.LEVER_PIN_SET_STEP_KEY)
-    assert step.endswith(_flat(drawing.LEVER_PIN_HOLE_FIT))
-    assert "MHA-DT-16'S PRINTED STATION: #51 DRILL THRU" in step
-    assert "MHA-DT-30 SLIP FIT" in step
+    assert step.startswith(f"{pin.LEVER_PIN_SET_NAME}, GRIP PARKED: MATCH-DRILL #51 THRU")
+    assert f"{pin.LEVER_NUMBER}'S HUB AT ITS PRINTED STATION AND {pin.LIFT_ROD_NUMBER} TOGETHER" in step
+    assert f"INSERT {pin.PIN_NUMBER}, A SLIDING FIT." in step
+    assert "TRIM BOTH ENDS." in step
+    assert f"PEEN BOTH ENDS FLUSH WITH THE HUB (SHEET {drawing.FULL_DETAIL_SHEET})." in step
+    # Round 9 (rule 23): the cross pin's own bench check, 22D.
+    assert (
+        f"22D. CHECK THAT {pin.LEVER_NUMBER} DOES NOT TURN OR SLIDE ON {pin.LIFT_ROD_NUMBER} BY HAND."
+    ) in _flat(RIG_STEPS)
+    # Round 7 (#3): view E calls the peen out at the hub, citing 22C.
+    assert drawing.LEVER_PIN_PEEN_NOTE.split("\n") == [
+        f"PEEN {pin.PIN_NUMBER}",
+        "FLUSH BOTH ENDS",
+        "(STEP 22C)",
+    ]
+    assert "PEEN BOTH ENDS" in [
+        line.split(". ", 1)[1] for line in RIG_STEPS.splitlines() if line.startswith("22C. ")
+    ][0]
     assert "LIGHT HAMMER" not in step
     assert "REAM" not in step
 
@@ -721,16 +759,98 @@ def test_the_tip_gap_feeler_is_the_rest_gap_in_gage_leaves() -> None:
             tip_gap.TIP_GAP_FEELER + tip_gap.TIP_GAP_ACCEPT_BAND,
         )
     )
-    # The inch sheet prints the setting to the thousandth, then the leaves
-    # by their stamped metric size.
-    printed = re.search(
-        r"^(\.\d{3}) FEELER \(([\d.+ ]+) MM STARRETT 66MA LEAVES\)$", tip_gap.TIP_GAP_FEELER_TEXT
-    )
+    # The inch sheet prints the setting to the thousandth; the feeler stack
+    # table (sheet 14) lists the leaves by their stamped metric size.
+    printed = re.search(r"^(\.\d{3}) FEELER$", tip_gap.TIP_GAP_FEELER_TEXT)
     assert printed is not None
     assert float(printed.group(1)) * 25.4 == pytest.approx(tip_gap.TIP_GAP_FEELER, abs=0.0127)
-    leaves = [float(leaf) for leaf in printed.group(2).split(" + ")]
+    (row,) = (row for row in drawing.FEELER_STACK_ROWS if row[0] == printed.group(1))
+    leaves = [float(leaf) for leaf in row[1].split(" + ")]
     assert math.isclose(sum(leaves), tip_gap.TIP_GAP_FEELER, abs_tol=1e-9)
     assert set(leaves) <= set(fitup.FEELER_GAGE_LEAVES_MM)
+    assert "CHECK 7" in row[2]
+
+
+def test_every_set_feeler_the_steps_and_checks_print_has_a_leaf_row() -> None:
+    """Rubric sample round 16 (#0, 3/3 runs): each feeler a step or check
+    sets is a sheet 14 row citing it; check cites carry CHECK.  The table
+    stays left of the cone station table."""
+    rows = {row[0]: row[2] for row in drawing.FEELER_STACK_ROWS}
+    assert "4H, 4J" in rows[".004"]
+    assert "CHECK 4D" in rows[".018"] and "3A" in rows[".018"]
+    assert rows[".020"] == "CHECK 4D, 4M"
+    assert "4F" in rows[".010"]
+    checks = " ".join(drawing.CHECKS.split())
+    assert "RADIAL SHIMS" not in checks and "SWING IN ON FEELER LEAVES" in checks
+    widths = drawing.table_column_widths(drawing.FEELER_STACK_HEADER, drawing.FEELER_STACK_ROWS)
+    assert drawing.SETTING_TABLE_LEFT + sum(widths) <= drawing.STATION_TABLE_FIELD[0]
+
+
+def test_the_pivot_seat_is_transferred_and_trusted() -> None:
+    """Owner ruling 2026-11-08 (Pedro): step 23 transfer-punches D1 through
+    the MHA-DT-20 pivot bore with the cone set at its working position,
+    lifts off, spot-drills, drills and taps; the swing check is the only
+    acceptance, and DT-00 prints no offset from the pedestal seats."""
+    import dt_drive_train_steps as steps
+    import dt_vn_cone_pivot_screw_spec as pivot_screw
+
+    step = _rig_step_body("other-base-mounting")
+    number = steps.step_number("other-base-mounting")
+    route = [
+        f"{number}A. CLAMP MHA-DT-20 TO MHA-FR-01.",
+        f"{number}B. TRANSFER-PUNCH MHA-FR-01 THRU THE MHA-DT-20 PIVOT BORE.",
+        f"{number}C. LIFT MHA-DT-20 AND THE LEAVES OFF.",
+        f"{number}D. SPOT-DRILL THE PUNCH MARK.",
+        f"{number}E. DRILL AND TAP {pivot_screw.THREAD} THERE PER MHA-FR-01.",
+        "CHECK THAT MHA-DT-20 SWINGS FREELY UNDER THE HEAD.",
+    ]
+    assert step.startswith(
+        "CONE SET ON THE BASE: SET MHA-DT-20 ON THE CHECK 4D FEELER LEAVES."
+    )
+    positions = [step.index(part) for part in route]
+    assert positions == sorted(positions)
+    assert step.count("CHECK THAT") == 1
+    for absent in ("PUNCH MARK IS", "PLUG", "DRO", "MHA-DT-02 SEAT", "1.030", ".482"):
+        assert absent not in step
+    # The pivot seat is cut once, here: the bank no longer drills it.
+    assert "PIVOT SEAT" not in drawing.BANK_STEPS
+
+
+def test_one_code_key_defines_every_code_and_every_step_sheet_points_to_it() -> None:
+    """Owner ruling 2026-11-08 (Pedro; rubric sample round 20 #2): one
+    labelled key, built from the placed cone gears and the MHA-DT-12 count,
+    defines the Tnnn codes and GEAR 0-19; each step sheet points to it."""
+    facts = _drawing_facts()
+    fields = drawing.package_note_fields(facts)
+    keys = [
+        (field, text)
+        for field in fields
+        for _label, text in field.blocks
+        if text.startswith(drawing.CODE_KEY_HEADING)
+    ]
+    assert len(keys) == 1
+    key_field, key = keys[0]
+    assert key_field.sheet == drawing.SETTING_SHEET
+    assert drawing.CODE_KEY_POINTER == f"(CODES: SHEET {drawing.SETTING_SHEET} KEY)"
+    keyed = set(re.findall(r"\bT\d{3}\b", key))
+    assert keyed == {code for _station, code in facts.cone_rows()}
+    last_gear = facts.count("dt-cylinder-gear") - 1
+    assert f"GEAR 0-{last_gear} = MHA-DT-12 FROM THE FRONT" in key
+    step_sheets = (
+        drawing.SEQUENCE_SHEET,
+        drawing.BANK_SHEET,
+        drawing.FIT_SHEET,
+        drawing.CONTINUATION_SHEET,
+        drawing.CHECKS_SHEET,
+    )
+    for sheet in step_sheets:
+        blocks = [field.blocks for field in fields if field.sheet == sheet]
+        texts = [text for block in blocks for _label, text in block]
+        assert any(drawing.CODE_KEY_POINTER in text for text in texts), sheet
+        printed = " ".join(texts)
+        assert set(re.findall(r"(?<!MHA-PD-09 )\bT\d{3}\b", printed)) <= keyed, sheet
+        gears = {int(n) for n in re.findall(r"\bGEARS? (\d+)\b", printed)}
+        assert all(0 <= gear <= last_gear for gear in gears), sheet
 
 
 @pytest.mark.parametrize("setting", (0.05, 0.95, 1.0, 1.05, 2.0, 2.5, 2.95))
@@ -754,11 +874,11 @@ def test_the_spring_is_stationed_east_west_where_its_preload_is_gated() -> None:
 
     located = _rig_step_body("rig-located")
     assert drawing.SPRING_EAST_WEST in located
-    printed = re.search(r"FOOT HOLE CENTRE (\d*\.\d+) EAST OF THE MHA-DT-19 AXIS", located)
+    printed = re.search(r"FOOT HOLE CENTRE (\d*\.\d+) RIGHT OF THE MHA-DT-19 AXIS", located)
     assert printed is not None
     # The inch sheet's .XX: within half a hundredth of the gated station.
     assert float(printed.group(1)) * 25.4 == pytest.approx(SCREW_EAST_OF_PIVOT, abs=0.127)
-    assert "CREST BEARING ON THE PARKED BACK MHA-DT-14 FLANK" in located
+    assert "UNTIL ITS CREST BEARS ON THE PARKED BACK MHA-DT-14 FLANK" in located
     assert "TERMINAL FLAT" not in _flat(RIG_STEPS)
     assert "TERMINAL FLAT" not in Path(drawing.__file__).read_text(encoding="utf-8")
     assert steps.step_number("rig-located") < steps.step_number("rig-set")
@@ -776,7 +896,7 @@ def test_drum_is_bonded_after_the_arbor_passes_the_front_strap() -> None:
     import dt_drive_train_steps as steps
 
     assert "FRONT MHA-DT-14 ON BEHIND IT" in _rig_step_body("arbor-collar-pinned")
-    assert "BOND WITH LOCTITE 638" in _rig_step_body("drum-bonded")
+    assert "BOND MHA-DT-22 INTO MHA-DT-01 WITH LOCTITE 638" in _rig_step_body("drum-bonded")
     assert "IN THE BACK MHA-DT-14 TOP BORE" in _rig_step_body("cluster-hung")
     order = [
         steps.step_number(key)
@@ -795,7 +915,7 @@ def test_torque_shaft_pins_go_in_before_the_cams() -> None:
     assert "DRIVE MHA-DT-VN-63 PINS" in _rig_step_body("straps-pinned-to-torque-shaft")
     cams = _rig_step_body("cams-and-lever-fitted")
     assert "FIT 2X MHA-DT-23" in cams and "LOOSE" in cams and "MHA-DT-30" not in cams
-    assert _flat(fitup.COLLAR_SET_STEP) in _rig_step_body("cam-collars-set")
+    assert _flat(fitup.COLLAR_SET_STEP) in _unlettered(_rig_step_body("cam-collars-set"))
     order = [
         steps.step_number(key)
         for key in (
@@ -832,6 +952,9 @@ def test_explode_plan_resolves_every_step_on_the_built_census() -> None:
     assert not any(i.name == "dt-cylinder-end-disc-2" for i in _instances())
     assert moved["spring foot screw lifts"] == (FOOT_NAME,)
     assert moved["spring steps east"] == ("dt-pinion-spring-1", FOOT_NAME)
+    # The MHA-DT-VN-69 tip dowel is pressed in the block foot (owner ruling
+    # 2026-11-07, PR #2248), so it leaves with the block.
+    assert "dt-vn-locating-pin-1" in moved["tip block slides off"]
     assert moved["block screws lift"] == tuple(f"dt-vn-slotted-screw-{i}" for i in range(1, 5))
     # The rig sheet's MHA-DT-VN-57 balloon is pinned to the front block's west screw.
     rig_anchors = drawing.DRIVE_TRAIN_BALLOON_ANCHORS["pinion-rig"]
@@ -918,8 +1041,10 @@ def test_source_refusals_and_bom_order() -> None:
 def test_cone_station_rows_run_front_to_back() -> None:
     rows = drawing.cone_station_rows([(30.0, "T006"), (-25.0, "T120"), (0.0, "T060")])
     assert rows == [(1, "T120"), (2, "T060"), (3, "T006")]
-    table = drawing.station_table_text(rows)
-    assert table.splitlines()[1].startswith("STN  1  T120")
+    table = drawing.code_key_text(rows, 3).splitlines()
+    assert table[1] == "TNNN = MHA-DT-03 WITH NNN TEETH, BY STATION, FRONT TO BACK:"
+    assert table[2].startswith("STN  1  T120")
+    assert table[-1] == "GEAR 0-2 = MHA-DT-12 FROM THE FRONT, GEAR 0 ON MHA-DT-26."
 
 
 def test_bom_split_keeps_the_first_column_no_taller() -> None:
@@ -1192,6 +1317,102 @@ def test_a_ring_no_ladder_scale_fits_raises_naming_the_cluster_and_overflow() ->
 def test_a_preferred_scale_off_the_ladder_is_refused() -> None:
     with pytest.raises(ValueError, match="not on the ladder"):
         drawing.cluster_ring_scale(CONE_CRANK_OUTLINE_1_3, (3.0, 7.0), label="odd")
+
+
+# R9 (20261107T062630010Z) cluster_ring_fit telemetry: the pinion rig's
+# outline at the 1:3 it stepped down to; round 10 (20261107T084706335Z) the
+# cone set's at 1:2.5.
+PINION_RIG_OUTLINE_R9_1_3 = (0.1681, 0.1106, 0.2669, 0.2094)
+CONE_SET_OUTLINE_R10_1_2_5 = (0.0761, 0.0565, 0.2189, 0.2215)
+
+
+def _rescaled(
+    outline: tuple[float, ...], scale: tuple[float, float], to: tuple[float, float]
+) -> tuple[float, float, float, float]:
+    x0, y0, x1, y1 = outline
+    k = (to[0] / to[1]) / (scale[0] / scale[1])
+    cx, cy, hw, hh = (x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) / 2 * k, (y1 - y0) / 2 * k
+    return (cx - hw, cy - hh, cx + hw, cy + hh)
+
+
+RAISED_CASES = [
+    ("cone-set", CONE_SET_OUTLINE_R10_1_2_5, (1.0, 2.5), (1.0, 2.5), 0.040),
+    ("pinion-rig", PINION_RIG_OUTLINE_R9_1_3, (1.0, 3.0), (1.0, 2.0), 0.0),
+]
+
+
+@pytest.mark.parametrize(("cluster", "outline", "read_at", "expected", "_off"), RAISED_CASES)
+def test_the_cone_set_and_rig_rise_to_a_readable_scale(
+    cluster: str,
+    outline: tuple[float, ...],
+    read_at: tuple[float, float],
+    expected: tuple[float, float],
+    _off: float,
+) -> None:
+    """Rubric sample round 9 printed both at 1:3, too small to read; raised
+    over the title block, the ladder from the 1:2 preference stops at 1:2.5
+    (cone set) and 1:2 (rig)."""
+    preferred = _rescaled(outline, read_at, (1.0, 2.0))
+    assert drawing.cluster_ring_scale(preferred, (1.0, 2.0), label=cluster, cluster=cluster) == expected
+    # The shared region would not have held it.
+    assert drawing.cluster_ring_scale(preferred, (1.0, 2.0), label=cluster) != expected
+
+
+@pytest.mark.parametrize(("cluster", "outline", "read_at", "scale", "off_centre"), RAISED_CASES)
+def test_a_raised_ring_stands_near_the_centre_clear_of_heading_and_title_block(
+    cluster: str,
+    outline: tuple[float, ...],
+    read_at: tuple[float, float],
+    scale: tuple[float, float],
+    off_centre: float,
+) -> None:
+    """Round 12 (20261107T121145212Z, gating 3/3, rule 15): slid left of the
+    title block, both rings left the sheet's right half empty.  Raised, the
+    rig stands centred and the cone set within 40 mm of centre, and neither
+    the view's box nor any balloon the ellipse can carry touches the title
+    block, the sheet heading or the frame."""
+    fitted = _rescaled(outline, read_at, scale)
+    shift, overflows, slide = drawing.raised_ring_fit(fitted, cluster)
+    assert overflows == []
+    assert 0.0 <= slide <= off_centre + 1e-9
+    margin, r = drawing.CLUSTER_BALLOON_MARGINS[cluster], drawing.BALLOON_DIAMETER / 2.0
+    box = (fitted[0] + shift[0], fitted[1] + shift[1], fitted[2] + shift[0], fitted[3] + shift[1])
+    cx, cy = (box[0] + box[2]) / 2, (box[1] + box[3]) / 2
+    rx, ry = (box[2] - box[0]) / 2 + margin, (box[3] - box[1]) / 2 + margin
+    keep_outs = (_title_block_keep_out(), drawing.cluster_heading_keep_out(cluster))
+    shapes = [box] + [
+        (cx + rx * math.cos(a) - r, cy + ry * math.sin(a) - r, cx + rx * math.cos(a) + r, cy + ry * math.sin(a) + r)
+        for a in (math.radians(d / 4) for d in range(1440))
+    ]
+    for shape in shapes:
+        for keep in keep_outs:
+            assert not drawing._boxes_overlap(shape, keep), (shape, keep)
+    assert cy + ry + r <= drawing.RAISED_RING_TOP + 1e-9
+
+
+def test_the_cluster_heading_keep_out_covers_round_12s_printed_heading() -> None:
+    """Round 12's sheet 4 heading printed to x 188.2 mm, down to y 253.5 mm."""
+    left, bottom, right, _top = drawing.cluster_heading_keep_out("cone-set")
+    clearance = drawing.CLUSTER_TITLE_BLOCK_CLEARANCE
+    assert right - clearance >= 0.1882 and bottom + clearance <= 0.2535
+
+
+def test_the_bank_and_crank_keep_their_proven_ring_region() -> None:
+    for cluster in ("cylinder-bank", "crank"):
+        assert drawing.CLUSTER_RING_REGIONS[cluster] == drawing.CLUSTER_RING_REGION
+        assert cluster not in drawing.RAISED_RING_CLUSTERS
+        assert drawing.CLUSTER_BALLOON_MARGINS[cluster] == drawing.CLUSTER_BALLOON_MARGIN
+    assert set(drawing.CLUSTER_RING_REGIONS) == set(drawing.CLUSTER_SCALES)
+    assert set(drawing.CLUSTER_BALLOON_MARGINS) == set(drawing.CLUSTER_SCALES)
+
+
+def test_view_labels_print_a_scale_only_where_it_differs_from_the_sheet() -> None:
+    """Rule 9 (rubric sample round 11 #0): every repeated label scale went."""
+    assert drawing.view_label("ISOMETRIC", (1.0, 3.0), (1.0, 3.0)) == "ISOMETRIC"
+    assert drawing.view_label("DETAIL A", (4.0, 1.0), (1.0, 1.0)) == "DETAIL A 4:1"
+    assert drawing.SHEET_SCALES[drawing.SHEET_NAMES[drawing.BANK_SETTINGS_SHEET - 1]] == (1.0, 1.0)
+    for text in (drawing.BANK_VIEW_CAPTION, drawing.DRUM_VIEW_CAPTION, drawing.BOM_REFERENCE_NOTES):
+        assert not re.search(r"\b\d+(?:\.\d+)?:\d+(?:\.\d+)?\b", text), text
 
 
 def test_the_sheet_scales_follow_the_chosen_cluster_and_full_detail_scales() -> None:

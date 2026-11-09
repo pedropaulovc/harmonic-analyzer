@@ -232,7 +232,9 @@ def test_pin_hole_callout_links_the_pins_drive_fit_note() -> None:
     )
     for text in (notes.DRAWING_NOTES, *drawing.DIMENSION_CALLOUTS.values()):
         assert "LIGHT HAMMER FIT" not in text and "FLUSH" not in text
-    assert "FLUSH BOTH SIDES" in assembly._PINION_PIN_FIT
+    assert "FLUSH BOTH SIDES" in spec.PIN_FIT_LINES[1]
+    assembly_source = Path(assembly.__file__).read_text(encoding="utf-8")
+    assert "IN: {pinion.PIN_FIT_LINES[1]}." in assembly_source
     assert drawing.REFERENCE_DIMENSIONS == ("PinHoleDia",)
     assert "add_leader_note(\n        adapter,\n        PIN_HOLE" not in _source().replace(
         "\r\n", "\n"
@@ -1154,9 +1156,10 @@ def test_t120_fit_up_closes_and_both_sheets_state_it() -> None:
     check = step.index(f"{sheet.T120_FITUP_FEELER_TEXT} FEELER")
     drill = step.index("MATCH-DRILL")
     # The push names both parts the check closes on, before the reading; the
-    # wording around them is free (Codex P3 on #1154, review 4).
+    # wording around them is free (Codex P3 on #1154, review 4). It is its
+    # own sub-step, one sentence (rule 22).
     push = step.index("PUSH")
-    sentence = step[push : step.index(";", push)]
+    sentence = step[push : step.index(".", push)]
     assert all(part in sentence for part in spec.T120_FITUP_PUSHED)
     assert push < check < drill
     assert check < step.index(turn_down) < drill

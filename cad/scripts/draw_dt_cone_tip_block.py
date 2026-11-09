@@ -8,6 +8,7 @@ from enum import Enum
 import math
 import re
 import sys
+import textwrap
 from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -32,6 +33,7 @@ from _drawing_dimensions import (
     assert_imported_precision,
     offset_dimension_text,
     set_dimension_callouts,
+    set_reference_dimension,
 )
 from _drawing_edges import visible_view_entities
 from _drawing_finish import add_surface_finish
@@ -52,6 +54,7 @@ from _paths import CAD_ROOT
 from _part_properties import part_drawing_unit
 from _session import run_build
 from _surface_finish import surface_finish_by_key
+import _config
 import _telemetry
 from dt_cone_tip_block_spec import (
     ADJUSTER_AXIS_HEIGHT,
@@ -60,6 +63,12 @@ from dt_cone_tip_block_spec import (
     BLOCK_HEIGHT,
     BLOCK_X,
     BLOCK_Z,
+    DOWEL_HOLE_DEPTH,
+    DOWEL_HOLE_DEPTH_PLACES,
+    DOWEL_HOLE_DIA,
+    DOWEL_HOLE_PRINTED_TEXT,
+    DOWEL_X,
+    DOWEL_X_PRINTED_TEXT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
@@ -79,6 +88,7 @@ from dt_cone_tip_block_spec import (
     length_text,
     printed_value_text,
 )
+from dt_drive_train_steps import step_ref
 
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -95,6 +105,49 @@ OUTPUTS = DrawingOutputs(
 SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
+
+# Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
+# #2248).  The press ream's callout, under its banded diameter on
+# the bottom view: the process and its depth (rule 12; no view shows the
+# blind hole's floor, hidden lines removed and no section cut, so the depth
+# rides the callout at its .XX with the native depth symbol), then the flag
+# to the numbered note that carries the rest.  Machinist review of round 6:
+# four rows of words under the size (#2, rule 7 allows two), depth in words
+# (#3), and "TO FLOOR", an assembly instruction that the MHA-DT-00 step
+# already states (#1).
+DOWEL_PIN_NUMBER = _config.parts("dt-vn-locating-pin")["number"]
+PLATFORM_NUMBER = _config.parts("dt-cone-swing-platform")["number"]
+DOWEL_NOTE_NUMBER = 1
+DOWEL_HOLE_DEPTH_TEXT = length_text(DOWEL_HOLE_DEPTH, DOWEL_HOLE_DEPTH_PLACES)
+DOWEL_HOLE_CALLOUT = "\n".join(
+    (
+        f"REAM <HOLE-DEPTH> {DOWEL_HOLE_DEPTH_TEXT}",
+        f"SEE NOTE {DOWEL_NOTE_NUMBER}",
+    )
+)
+# The callout as it prints (the native token is one depth glyph), for its
+# ink estimate.
+DOWEL_HOLE_CALLOUT_PRINTED = DOWEL_HOLE_CALLOUT.replace("<HOLE-DEPTH>", "\u21a7")
+# The numbered note the callout flags: the fit and its mate, where and
+# through what the hole is match-drilled (the lift rod's made-at-assembly
+# precedent, dt_pinion_lift_rod_spec.PIN_HOLE_CALLOUT; MHA-DT-00 step
+# post-and-tip-block points back at this callout), and the pair's
+# disassembly (round 6, #0: the dowel is pressed into a blind ream, so the
+# sheet declares the press fit permanent; the dowel only slips in MHA-DT-20,
+# so the two lift off it together).  Round 7 (#0, #1): the note is the
+# requirement only, four rows at most (rule 7), clear of the border.
+# Wrapped to a hanging indent under its number, at most DOWEL_NOTE_WIDTH
+# characters a row; the step reference never breaks across rows.
+DOWEL_NOTE_WIDTH = 30
+_NBSP = "\u00a0"
+DOWEL_NOTE = textwrap.fill(
+    f"PRESS FIT FOR {DOWEL_PIN_NUMBER}, PERMANENT. MATCH-DRILLED UP THRU "
+    f"{PLATFORM_NUMBER} AT {step_ref('post-and-tip-block').replace(' ', _NBSP)}.",
+    width=DOWEL_NOTE_WIDTH,
+    initial_indent=f"{DOWEL_NOTE_NUMBER}. ",
+    subsequent_indent="   ",
+    break_on_hyphens=False,
+).replace(_NBSP, " ")
 
 # User ruling 2026-09-29 (eight-views-4.png, lower right): the block is a
 # plain straight prism standing on the swing platform, held down by one
@@ -153,6 +206,8 @@ def _right_x(model_z: float) -> float:
 # these sizes rather than centred on a feature.
 VALUE_TEXT_HALF_WIDTH = 0.0046
 VALUE_TEXT_HALF_HEIGHT = 0.0019
+# A value's glyph, from the four-character value's measured width.
+_VALUE_GLYPH_WIDTH = 2.0 * VALUE_TEXT_HALF_WIDTH / 4.0
 ARROW_LENGTH = 0.0034
 # An inside arrowhead is about 0.6 mm across (287c).
 ARROW_HALF_WIDTH = 0.0003
@@ -248,6 +303,10 @@ DIMENSION_CALLOUTS = {
     # stack).  Two rows of words (round-1 farm review, dt-fab-4); the whole
     # value/mate block sits on a native offset shelf right of the plan.
     "Depth": "SETS MHA-DT-VN-55\nENGAGEMENT",
+    # Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
+    # #2248): the locating dowel's press ream -- its depth,
+    # the dowel pressed to its floor and the match-drilling through MHA-DT-20.
+    "DowelHoleDia": DOWEL_HOLE_CALLOUT,
 }
 DIMENSION_CALLOUTS_ABOVE = {
     # The +X face stands over the platform's narrow west edge
@@ -323,6 +382,7 @@ ARROWS_INSIDE = (
     "PinchDepthCenter",
     "Width",
     "FootTapX",
+    "DowelX",
     "Depth",
 )
 _DIM_ARROWS_OUTSIDE = 1
@@ -372,6 +432,51 @@ _BOTTOM_RIGHT = BOTTOM_CENTER[0] + BLOCK_X * _S / 2.0
 FOOT_TAP_CENTER = (_BOTTOM_LEFT + FOOT_TAP_X * _S, _bottom_y(Z_NORTH - FOOT_TAP_Z))
 FOOT_TAP_X_RISE = 0.0078
 FOOT_TAP_Z_LINE_X = _BOTTOM_LEFT - 0.013
+# Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
+# #2248): the locating dowel's press ream, on the tap's line.  Machinist
+# review of round 6, #9: its station is a baseline from the -X face (the
+# FootTapX datum), printed as a reference.  Its line runs 1.5 mm under the
+# view's south edge, 2 mm over the width's line (round-1 farm review,
+# dt-fab-4: the width reads under this view, where the BOTTOM VIEW caption
+# stood); inside its span the value would stand on that edge.  Its value
+# hangs LEFT of the view, past FootTapZ's line and that line's lower outside
+# arrow by an arrow's clearance, so the space right of the view is the
+# width's and the ream callout's (round 6, #4: on the r6 render the ream's
+# leader ran through the old ".228 ±.01" value and its line).
+DOWEL_CENTER = (_BOTTOM_LEFT + DOWEL_X * _S, FOOT_TAP_CENTER[1])
+DOWEL_X_EXTENT = (
+    len(DOWEL_X_PRINTED_TEXT) * _VALUE_GLYPH_WIDTH / 2.0,
+    VALUE_TEXT_HALF_HEIGHT,
+    len(DOWEL_X_PRINTED_TEXT) * _VALUE_GLYPH_WIDTH / 2.0,
+    VALUE_TEXT_HALF_HEIGHT,
+)
+DOWEL_X_TEXT_RIGHT = (
+    FOOT_TAP_Z_LINE_X
+    - _drawing_leaders.ARROW_TEXT_CLEARANCE
+    - ARROW_HALF_WIDTH
+    - ROUND_OUT
+)
+DOWEL_X_TEXT_RISE = 0.0013
+# The ream's size and its two callout rows, measured on the r6 render (run
+# 20261107T030627004Z): its callout rows printed 2.71 mm a glyph and 5.3 mm
+# a line, the size row two lines (its stacked band), and SolidWorks centred
+# the block, from the last row's underline to the band's top, on the
+# dimension's point.  The leader leaves that underline's near (left) end.
+DOWEL_CALLOUT_GLYPH_WIDTH = 0.00271
+DOWEL_CALLOUT_LINE_PITCH = 0.0053
+_DOWEL_HOLE_HALF_WIDTH = max(
+    len(line) * DOWEL_CALLOUT_GLYPH_WIDTH / 2.0
+    for line in (DOWEL_HOLE_PRINTED_TEXT, *DOWEL_HOLE_CALLOUT_PRINTED.split("\n"))
+)
+_DOWEL_HOLE_HALF_HEIGHT = (
+    (2 + len(DOWEL_HOLE_CALLOUT.split("\n"))) * DOWEL_CALLOUT_LINE_PITCH / 2.0
+)
+DOWEL_HOLE_EXTENT = (
+    _DOWEL_HOLE_HALF_WIDTH,
+    _DOWEL_HOLE_HALF_HEIGHT,
+    _DOWEL_HOLE_HALF_WIDTH,
+    _DOWEL_HOLE_HALF_HEIGHT,
+)
 BOTTOM_KEEP = {
     "FootTapX": (
         (_BOTTOM_LEFT + FOOT_TAP_CENTER[0]) / 2.0,
@@ -387,6 +492,10 @@ BOTTOM_KEEP = {
         + ROUND_OUT
         + _callout_half_width(DIMENSION_CALLOUTS_ABOVE["Width"]),
         _bottom_y(Z_SOUTH) - WIDTH_LINE_DROP + TWO_ROW_LINE_DROP,
+    ),
+    "DowelX": (
+        DOWEL_X_TEXT_RIGHT - DOWEL_X_EXTENT[2],
+        _bottom_y(Z_SOUTH) + DOWEL_X_TEXT_RISE,
     ),
 }
 # Round-1 farm review (dt-fab-4, rule 7): VIEW B's far-jaw thread is located
@@ -546,6 +655,8 @@ def _sheet_notes() -> tuple[tuple[str, float, float], ...]:
         ("VIEW B", LEFT_CENTER[0] - VIEW_CAPTION_EXTENT[2] / 2.0, CAPTION_Y),
         # Review: named above the thread callout it describes.
         (BORE_FLAG_TEXT, FRONT_CENTER[0] + ADJUSTER_ENTRY_DX, ADJUSTER_ENTRY_Y),
+        # The ream callout's SEE NOTE 1 (round 6, #2).
+        (DOWEL_NOTE, *DOWEL_NOTE_XY),
     )
 
 
@@ -580,8 +691,6 @@ _VALUE_EXTENT = (
     VALUE_TEXT_HALF_WIDTH,
     VALUE_TEXT_HALF_HEIGHT,
 )
-# A value's glyph, from the four-character value's measured width.
-_VALUE_GLYPH_WIDTH = 2.0 * VALUE_TEXT_HALF_WIDTH / 4.0
 
 
 def _value_extent(name: str, nominal: float) -> tuple[float, float, float, float]:
@@ -604,6 +713,9 @@ def _value_and_rows_extent(
 _VALUE_EXTENTS = {
     # "5.9": three characters, 5.8 mm wide (I31's "6.0").
     "PinchDepthCenter": (0.0033, 0.0019, 0.0033, 0.0019),
+    # The locating dowel's station and its ream's banded size with rows.
+    "DowelX": DOWEL_X_EXTENT,
+    "DowelHoleDia": DOWEL_HOLE_EXTENT,
     **{
         name: _value_extent(name, nominal)
         for name, nominal in (
@@ -636,10 +748,51 @@ _VALUE_EXTENTS = {
 # line prints 57.6 mm wide.
 FOOT_TAP_QUALIFIER = "LOCATES ON MHA-DT-20"
 FOOT_TAP_CALLOUT_EXTENT = (0.0293, 0.0086, 0.0293, 0.0080)
+# The locating dowel's ream callout (rule-23 retention, owner ruling
+# 2026-11-07 (MHA-DT-00 rubric sample, PR #2248)).  Right of the bottom view
+# the width's value and row (round-1 farm review, dt-fab-4) stand under the
+# hold-down tap's callout, leaving 15 mm between them, too little for the
+# ream's 21 mm block.  So the block stands right of the tap's callout, a text
+# clearance past it, and its leader -- from the underline's left end --
+# runs midway between the width's row and the tap callout's shoulder, under
+# the view's +X face, to the rim right of the station's dowel witness: it
+# crosses no text and no dimension line.  Placed once the texts it clears
+# are boxed, hence after BOTTOM_KEEP.
+DOWEL_HOLE_TEXT_LEFT = (
+    FOOT_TAP_CALLOUT_XY[0] + FOOT_TAP_CALLOUT_EXTENT[2] + TEXT_CLEARANCE + ROUND_OUT
+)
+DOWEL_HOLE_LEADER_Y = (
+    BOTTOM_KEEP["Width"][1]
+    + _VALUE_EXTENTS["Width"][3]
+    + FOOT_TAP_CALLOUT_XY[1]
+    - FOOT_TAP_CALLOUT_EXTENT[1]
+) / 2.0
+BOTTOM_KEEP["DowelHoleDia"] = (
+    DOWEL_HOLE_TEXT_LEFT + DOWEL_HOLE_EXTENT[0],
+    DOWEL_HOLE_LEADER_Y + DOWEL_HOLE_EXTENT[1],
+)
+# The ream's numbered note (DOWEL_NOTE), by its upper-left corner.  The
+# sheet's free-note text prints 2.64 mm a glyph and 4.05 mm a row (the old
+# captions' measured extents).  The note is 79 mm wide: no gap beside the
+# ream's block or under the view row holds it short of the title block, so
+# it stands in the open field over the title block, right of VIEW B's
+# height dimension and under the isometric, with room right and below for
+# an estimate that prints wide or tall (draw_pd_transgear_knob_shaft's
+# notes field).
+NOTE_GLYPH_WIDTH = 0.00264
+NOTE_ROW_HEIGHT = 0.00405
+DOWEL_NOTE_XY = (0.300, 0.100)
+DOWEL_NOTE_EXTENT = (
+    0.0,
+    len(DOWEL_NOTE.split("\n")) * NOTE_ROW_HEIGHT,
+    max(len(line) for line in DOWEL_NOTE.split("\n")) * NOTE_GLYPH_WIDTH,
+    0.0,
+)
 # Free notes are placed by their upper-left corner.
 _NOTE_EXTENTS = {
     BORE_FLAG_TEXT: ADJUSTER_ENTRY_EXTENT,
     "VIEW B": VIEW_CAPTION_EXTENT,
+    DOWEL_NOTE: DOWEL_NOTE_EXTENT,
 }
 # The locating-foot finish symbol: its leader lands midway along the right
 # half of the foot edge; measured on the 287c render, its ink (shoulder,
@@ -985,6 +1138,18 @@ def sheet_dimension_ink() -> dict[str, DimensionInk]:
         set_sides["FootTapZ"],
         texts["FootTapZ"],
     )
+    # The locating dowel's REF station from the -X face: the -X witness runs
+    # down the face from the tap's line, the dowel's from its centre, the
+    # value left of the span (rule-23 retention, owner ruling 2026-11-07
+    # (MHA-DT-00 rubric sample, PR #2248); round 6, #9).
+    ink["DowelX"] = _dimension_ink(
+        h,
+        (_BOTTOM_LEFT, DOWEL_CENTER[0]),
+        (tap_y, tap_y),
+        drop("DowelX"),
+        set_sides["DowelX"],
+        texts["DowelX"],
+    )
     return ink
 
 
@@ -1032,6 +1197,16 @@ def sheet_leaders() -> dict[str, Leader]:
             FOOT_TAP_CALLOUT_EXTENT,
             FOOT_TAP_CENTER,
             FOOT_BORE_DIA * _S / 2.0,
+        ),
+        # The ream's diameter: SolidWorks runs its leader from the near end of
+        # the underline under its last row (r6 render) to the rim.
+        "DowelHoleDia": _leader_to_circle(
+            (
+                BOTTOM_KEEP["DowelHoleDia"][0] - DOWEL_HOLE_EXTENT[0],
+                BOTTOM_KEEP["DowelHoleDia"][1] - DOWEL_HOLE_EXTENT[1],
+            ),
+            DOWEL_CENTER,
+            DOWEL_HOLE_DIA * _S / 2.0,
         ),
         "foot finish": Leader((finish[0] + FOOT_FINISH_LEADER_DX, finish[1]), finish_tip),
         "view B letter": Leader((view_b_text[0] + VIEW_B_LEADER_DX, view_b_tip[1]), view_b_tip),
@@ -1854,6 +2029,16 @@ async def build(adapter: Any) -> dict[str, str]:
     ]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS_ABOVE, location="above")
+    # The locating dowel's station from the -X face is a reference (round 6,
+    # #9): the hole is match-drilled from MHA-DT-20, so it carries no band.
+    dowel_station = [
+        item for item in bottom_annotations if dimension_name(adapter, item) == "DowelX"
+    ]
+    if len(dowel_station) != 1:
+        raise RuntimeError("expected one locating dowel station on the bottom view")
+    set_reference_dimension(
+        adapter, dowel_station[0], label="locating dowel reference station"
+    )
     _set_arrow_sides(
         adapter,
         annotations,

@@ -784,8 +784,8 @@ def test_part_sheet_carries_no_assembly_procedure() -> None:
     for word in ("FEELER", "LEAF", "SNUG", "SWING", "SEAT", "T006"):
         assert word not in printed
     step = (
-        f"PUSH MHA-DT-VN-54 ONTO A {inch_text(COLLAR_FEELER, FEELER_PLACES)} FEELER ON T006; "
-        "LOCK ITS SET SCREW ON THE FLAT."
+        f"PUSH MHA-DT-VN-54 ONTO A {inch_text(COLLAR_FEELER, FEELER_PLACES)} FEELER ON T006. "
+        "3B. LOCK ITS SET SCREW ON THE FLAT."
     )
     assert step in " ".join(assembly.CONE_CRANK_STEPS.split())
 

@@ -2261,6 +2261,18 @@
       ]
     },
     {
+      "old_stem": "dt-vn-locating-pin",
+      "old_number": null,
+      "introduced": "2026-11-07",
+      "new_identities": [
+        {
+          "parent": "dt-drive-train",
+          "stem": "dt-vn-locating-pin",
+          "number": "MHA-DT-VN-69"
+        }
+      ]
+    },
+    {
       "old_stem": "sm-vn-gooseneck-shoulder-screw",
       "old_number": null,
       "introduced": "2026-11-08",

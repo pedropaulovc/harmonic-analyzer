@@ -17,6 +17,7 @@ _STOCK_REQUIREMENTS = {
     "dt-vn-cone-tip-pinch-screw": (("91794A112",), "MHA-DT-VN-56", 1),
     "dt-vn-crank-seat-drive-pin": (("98381A434",), "MHA-DT-VN-67", 2),
     "dt-vn-keeper-chain-screw": (("92443A077",), "MHA-DT-VN-70", 1),
+    "dt-vn-locating-pin": (("98381A417",), "MHA-DT-VN-69", 1),
     "sh-vn-brass-fillister-screw": (("90114A511",), "MHA-SH-VN-51", 14),
     "sh-vn-fillister-screw-90280a108": (("90280A108",), "MHA-SH-VN-52", 4),
     "pd-vn-guide-lock-screw": (("91792A108",), "MHA-PD-VN-60", 8),

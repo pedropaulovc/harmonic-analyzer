@@ -19,7 +19,6 @@ from _printed_tolerance import drilled_oversize_mm
 import dt_crank_handle_spec as _handle
 import dt_crank_pinion_spec as pinion
 import dt_pinion_lever_geometry as _lever
-import dt_pinion_lever_pin_spec as _lever_pin
 
 MM_PER_IN = 25.4
 
@@ -76,17 +75,26 @@ HANDLE_FERRULE_CURE = (
 T120_FITUP_FEELER_TEXT = inch_text(pinion.T120_FITUP_FEELER_MM, FEELER_PLACES)
 if float(T120_FITUP_FEELER_TEXT) * MM_PER_IN < pinion.T120_FITUP_FEELER_MM - 1e-9:
     raise AssertionError("the printed T120 fit-up feeler is thinner than its check")
-T120_FITUP_ASSEMBLY_CHECK = "\n".join(
-    (
-        f"   PUSH {pinion.T120_FITUP_PUSHED[0]} AND {pinion.T120_FITUP_PUSHED[1]} TOWARD EACH OTHER;",
-        "   TURN MHA-DT-07 SLOWLY BY HAND, READING A",
-        f"   {T120_FITUP_FEELER_TEXT} FEELER ALL ROUND. MHA-DT-10 BAND TO T120 TIPS:",
-        "   IF THE FEELER STOPS, TURN THE MHA-DT-10 BAND DOWN,",
-        f"   Ø{inch_min_text(pinion.TURNED_DIA_FITUP_MIN, 3)} MIN.",
-        "   MHA-DT-10 SHOULDER TO T120 SOUTH FACE: IF THE FEELER STOPS,",
-        "   FACE THE MHA-DT-10 SHOULDER BACK,",
-        f"   {inch_min_text(pinion.SHOULDER_LENGTH_FITUP_MIN, 3)} MIN. RESET, RECHECK.",
-    )
+# A check and its remedy are separate steps, and each check does one thing
+# (drawing-guidelines rule 22): push, then the band, then the shoulder.
+T120_FITUP_PUSH = (
+    f"PUSH {pinion.T120_FITUP_PUSHED[0]} AND {pinion.T120_FITUP_PUSHED[1]} TOWARD EACH OTHER."
+)
+T120_FITUP_BAND_CHECK = (
+    f"TURN MHA-DT-07 SLOWLY BY HAND: A {T120_FITUP_FEELER_TEXT} FEELER PASSES ALL ROUND "
+    "BETWEEN THE MHA-DT-10 BAND AND THE T120 TIPS."
+)
+T120_FITUP_SHOULDER_CHECK = (
+    f"TURN IT AGAIN: THE {T120_FITUP_FEELER_TEXT} FEELER PASSES ALL ROUND BETWEEN THE "
+    "MHA-DT-10 SHOULDER AND THE T120 FRONT FACE."
+)
+T120_FITUP_BAND_REMEDY = (
+    "IF IT STOPS AT THE BAND, TURN MHA-DT-10'S BAND DOWN, "
+    f"Ø{inch_min_text(pinion.TURNED_DIA_FITUP_MIN, 3)} MIN."
+)
+T120_FITUP_SHOULDER_REMEDY = (
+    "IF IT STOPS AT THE SHOULDER, FACE THE SHOULDER BACK, "
+    f"{inch_min_text(pinion.SHOULDER_LENGTH_FITUP_MIN, 3)} MIN."
 )
 
 # The lever and lift-rod prints defer this hole to assembly. The pin contract
@@ -104,10 +112,3 @@ if not (
         f"LEVER PIN SET's {LEVER_PIN_HOLE_DRILL} drill ({_LEVER_PIN_DRILL_MM} mm) "
         "cuts outside the lever and lift rod's drilled pin-hole limits"
     )
-LEVER_PIN_HOLE_FIT = "\n".join(
-    (
-        f"HOLE AT {_lever_pin.LEVER_NUMBER}'S PRINTED STATION: "
-        f"{LEVER_PIN_HOLE_DRILL} DRILL THRU;",
-        f"{_lever_pin.PIN_NUMBER} SLIP FIT.",
-    )
-)

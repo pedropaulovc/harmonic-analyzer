@@ -61,6 +61,7 @@ DRIVE_TRAIN_BALLOON_ANCHORS: dict[str, dict[str, BalloonAnchor]] = {
         "dt-vn-post-mount-screw": BalloonAnchor(),
         "dt-cone-tip-block": BalloonAnchor(),
         "dt-vn-cone-tip-block-screw": BalloonAnchor(),
+        "dt-vn-locating-pin": BalloonAnchor(),
         "dt-vn-cone-tip-collar": BalloonAnchor(),
         "dt-vn-cone-tip-adjuster": BalloonAnchor(),
         "dt-vn-cone-tip-pinch-screw": BalloonAnchor(),

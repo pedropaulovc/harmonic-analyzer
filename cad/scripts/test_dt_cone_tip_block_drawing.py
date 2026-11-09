@@ -13,6 +13,7 @@ import dt_cone_tip_block_spec
 import draw_dt_cone_tip_block as drawing
 from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DRAWING_TEMPLATES
 from _hole_spec import blind_cut_dia_mm
 from _inch_wall_limits import WALL_TARGET_MM
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
@@ -234,7 +235,8 @@ def test_only_views_dimensioning_hidden_sketches_opt_in() -> None:
     """The opt-in import goes where a kept dimension lives on a hidden sketch.
 
     Right (PinchDepthCenter, and r3's PinchHeight) and the bottom view (the
-    hold-down tap's two stations) always do; the adjuster elevation
+    hold-down tap's two stations and the locating dowel's) always do; the
+    adjuster elevation
     (AxisHeight/PassageCenter) opts in at build time; the plan, left and the
     base front keep only solid-feature dimensions and stay on
     _drawing_dimension_import's targeted import.
@@ -254,6 +256,7 @@ def test_only_views_dimensioning_hidden_sketches_opt_in() -> None:
     assert hidden_owners(drawing.BOTTOM_KEEP) == {
         "FootTapXReference",
         "FootTapZReference",
+        "DowelXReference",
     }
     assert hidden_owners({"AxisHeight": 0, "PassageCenter": 0}) == {
         "AxisHeightReference",
@@ -296,7 +299,13 @@ def test_every_marked_dimension_is_kept_in_exactly_one_view() -> None:
     assert "SlitDepth" not in marked
     assert "SlitDepth" not in dt_cone_tip_block_spec.DRAWING_PRECISION_BY_NAME
     assert set(drawing.TOP_KEEP) == {"Depth"}
-    assert set(drawing.BOTTOM_KEEP) == {"FootTapX", "FootTapZ", "Width"}
+    assert set(drawing.BOTTOM_KEEP) == {
+        "FootTapX",
+        "FootTapZ",
+        "Width",
+        "DowelX",
+        "DowelHoleDia",
+    }
     assert drawing.LEFT_KEEP == {}
 
 
@@ -435,6 +444,7 @@ def test_sheet_ink_is_clear_and_the_build_places_what_it_audits() -> None:
         "PinchDepthCenter",
         "Width",
         "FootTapX",
+        "DowelX",
         "Depth",
     )
     # d84a42ca7: the 4.875's inside arrows struck its "5".  The plan depth's
@@ -770,7 +780,9 @@ def test_every_three_place_size_names_its_mate_at_its_dimension() -> None:
     function is a tight band, and its dimension names the mate it serves.
     The tap's two stations locate one hole, named on that hole's callout;
     the bore's location names its mate on the bore's callout (rule 4: a
-    location carries its value only)."""
+    location carries its value only).  The locating dowel's station
+    (rule-23 retention, owner ruling 2026-11-07) prints as a reference with
+    no band (round 6, #9), so it holds nothing and names nothing."""
     grades = dt_cone_tip_block_spec.DRAWING_PRECISION_BY_NAME
     texts = {**drawing.DIMENSION_CALLOUTS, **drawing.DIMENSION_CALLOUTS_ABOVE}
     assert "PassageCenter" not in texts
@@ -778,7 +790,9 @@ def test_every_three_place_size_names_its_mate_at_its_dimension() -> None:
         texts[name] = drawing.FOOT_TAP_QUALIFIER
     texts["PassageCenter"] = drawing.BORE_FLAG_TEXT
     three_place = {name for name, places in grades.items() if places == 3}
-    assert three_place == {"Depth", "PassageCenter", "FootTapX", "FootTapZ"}
+    assert three_place == {"Depth", "PassageCenter", "FootTapX", "FootTapZ", "DowelX"}
+    three_place.discard("DowelX")
+    assert "DowelX" not in texts
     # The width's band is its own, one-sided; its reason still names the edge.
     assert "MHA-DT-20" in texts["Width"]
     for name in three_place:
@@ -1102,3 +1116,172 @@ def test_drawing_side_callout_precision_is_the_declared_exception() -> None:
         **drawing.PINCH_CLEARANCE_PRECISION,
     }
     assert all(name in entry.where for name in written)
+
+
+# --- the locating dowel (rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00
+# rubric sample, PR #2248)) ---------------------------------------------------
+# MHA-DT-VN-69 is pressed into a blind ream in the foot, up through a slip
+# ream in MHA-DT-20.
+_DOWEL_MUTATIONS = {
+    "pin stands proud of the plate's underside": (
+        "DOWEL_HOLE_DEPTH = 4.064",
+        "DOWEL_HOLE_DEPTH = 3.556",
+    ),
+    "pin barely engages the plate": (
+        "DOWEL_HOLE_DEPTH = 4.064",
+        "DOWEL_HOLE_DEPTH = 7.62",
+    ),
+    "station band eats the +X face web": (
+        "DOWEL_X_TOL_MM = 0.254",
+        "DOWEL_X_TOL_MM = 0.3",
+    ),
+    "dowel crowds the +X face": (
+        "DOWEL_FROM_TAP = 5.7912",
+        "DOWEL_FROM_TAP = 6.0",
+    ),
+}
+
+
+@pytest.mark.parametrize("mutation", sorted(_DOWEL_MUTATIONS))
+def test_spec_refuses_a_locating_dowel_that_cannot_locate(mutation: str) -> None:
+    with pytest.raises(AssertionError):
+        _import_mutant(*_DOWEL_MUTATIONS[mutation])
+
+
+def test_locating_dowel_keeps_every_limit_at_the_printed_extremes() -> None:
+    """Recomputed from the print and the pin's catalogue limits: the press
+    ream is the pin's shared contract, its shallowest floor grips 1.5D and
+    keeps the longest pin's lower end inside the thinnest plate, the
+    shortest pin still engages the plate 1.5D, and the +X face keeps the
+    wall target at the width's lower limit and both station bands."""
+    import dt_vn_locating_pin_spec as pin
+
+    spec = dt_cone_tip_block_spec
+    assert spec.DOWEL_HOLE_DIA == pin.PRESS_HOLE_DIA
+    assert spec.DOWEL_HOLE_BAND == pin.PRESS_HOLE_BAND
+    hole_max = spec.DOWEL_HOLE_LIMITS[1]
+    depth_min = _on_print(spec.DOWEL_HOLE_DEPTH, 2) - _GENERAL[2]
+    depth_max = _on_print(spec.DOWEL_HOLE_DEPTH, 2) + _GENERAL[2]
+    assert spec.DOWEL_HOLE_DEPTH_LIMITS == pytest.approx((depth_min, depth_max))
+    assert depth_min >= 1.5 * pin.DIA
+    plate, band = 0.25 * 25.4, spec.PLATE_STOCK_BAND_MM
+    length_min, length_max = pin.LENGTH_LIMITS_MM
+    end = (plate - band + depth_min - length_max, plate + band + depth_max - length_min)
+    assert spec.DOWEL_END_ABOVE_UNDERSIDE_RANGE_MM == pytest.approx(end)
+    assert end[0] >= 0.0
+    assert spec.DOWEL_END_ABOVE_UNDERSIDE == pytest.approx(
+        plate + spec.DOWEL_HOLE_DEPTH - pin.LENGTH
+    )
+    assert length_min - depth_max >= 1.5 * pin.DIA
+    tap_high = _printed("FootTapX", spec.FOOT_TAP_X)[1]
+    width_min = _printed("Width", spec.BLOCK_X)[0]
+    plus_x_web = width_min - tap_high - (spec.DOWEL_FROM_TAP + spec.DOWEL_X_TOL_MM) - hole_max / 2.0
+    assert round(plus_x_web, 6) >= WALL_TARGET_MM
+    assert spec.WORST_DOWEL_WEBS_MM["+X face"] == pytest.approx(plus_x_web)
+    assert min(spec.WORST_DOWEL_WEBS_MM.values()) >= WALL_TARGET_MM - 1e-6
+
+
+def test_dowel_hole_callout_keeps_two_rows_and_flags_its_note() -> None:
+    """Machinist review of round 6 (#1, #2, #3): under its banded size the
+    callout keeps to two rows, the ream with the native depth symbol and the
+    flag to note 1; the note names the fit and its dowel, where and through
+    what the hole is match-drilled (the step's own text points at this
+    callout), and declares the block and dowel a permanent pair (#0).  No
+    assembly instruction ("TO FLOOR") rides the part sheet."""
+    import dt_drive_train_steps
+
+    spec = dt_cone_tip_block_spec
+    callout = drawing.DOWEL_HOLE_CALLOUT
+    assert drawing.DIMENSION_CALLOUTS["DowelHoleDia"] == callout
+    assert callout.split("\n") == [
+        f"REAM <HOLE-DEPTH> {spec.length_text(spec.DOWEL_HOLE_DEPTH, 2)}",
+        f"SEE NOTE {drawing.DOWEL_NOTE_NUMBER}",
+    ]
+    assert "DEEP" not in callout and "FLOOR" not in callout
+    note = drawing.DOWEL_NOTE
+    assert note.startswith(f"{drawing.DOWEL_NOTE_NUMBER}. ")
+    assert all(line.startswith("   ") for line in note.split("\n")[1:])
+    assert max(map(len, note.split("\n"))) <= drawing.DOWEL_NOTE_WIDTH
+    flat = " ".join(line.strip() for line in note.split("\n"))
+    step = dt_drive_train_steps.step_ref("post-and-tip-block")
+    for phrase in (
+        "PRESS FIT FOR MHA-DT-VN-69",
+        f"MATCH-DRILLED UP THRU MHA-DT-20 AT {step}",
+        "MHA-DT-VN-69, PERMANENT.",
+    ):
+        assert phrase in flat, phrase
+    # Round 7 (#0): rule 7's four short rows, no lift-off narration.
+    assert len(note.split("\n")) <= 4
+    assert "TOGETHER" not in note
+    assert "FLOOR" not in note
+    assert any(text == note for text, _x, _y in drawing._sheet_notes())
+    assert spec.DRAWING_PRECISION_BY_NAME["DowelHoleDia"] == 4
+    assert spec.DRAWING_PRECISION_BY_NAME["DowelX"] == 3
+
+
+def test_build_models_the_dowel_ream_on_a_named_axis() -> None:
+    """Round 6, #9: the station prints from the -X face (FootTapX's datum) as
+    a reference with no band; DOWEL_FROM_TAP stays the relation the cut is
+    placed by, and the drawing parenthesises the station."""
+    spec = dt_cone_tip_block_spec
+    banded = model_toleranced_dimensions(part)
+    assert banded[("DowelProfile", "DowelHoleDia")] == "*deviations(DOWEL_HOLE_BAND)"
+    assert ("DowelXReference", "DowelX") not in banded
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    cut = source[source.index('"cut dowel ream"') : source.index('"DowelHole")')]
+    assert "depth=DOWEL_HOLE_DEPTH, reverse_direction=True" in cut
+    assert 'name_last_feature(adapter, "dowel axis")' in source
+    start = source.rindex(
+        "_author_reference_dimension(", 0, source.index('feature_name="DowelXReference"')
+    )
+    reference = source[start : source.index("\n    )\n", start)]
+    assert "start=(DATUM_FACE_X, 0.0)" in reference
+    assert "value_mm=DOWEL_X," in reference
+    assert 'drive_expression=\'"FootTapX" + "DowelFromTap"\'' in reference
+    assert spec.DOWEL_X == pytest.approx(spec.FOOT_TAP_X + spec.DOWEL_FROM_TAP)
+    assert spec.DOWEL_Z == spec.FOOT_TAP_Z
+    assert spec.DOWEL_X_PRINTED_TEXT == "(.523)"
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "dimension_name(adapter, item) == \"DowelX\"" in drawing_source
+    assert "set_reference_dimension(\n        adapter, dowel_station[0]" in drawing_source
+    # The print's witnesses leave the -X face and the dowel's centre.
+    ink = drawing.sheet_dimension_ink()["DowelX"]
+    witnesses = sorted({round(a[0], 9) for a, b in ink.lines if a[0] == b[0]})
+    left = drawing.BOTTOM_CENTER[0] - spec.BLOCK_X * drawing._S / 2.0
+    assert witnesses == pytest.approx([left, left + spec.DOWEL_X * drawing._S])
+
+
+def test_dowel_leader_crosses_no_text_and_no_dimension_line() -> None:
+    """Round 6, #4: on the r6 render the ream's leader ran through the
+    ".228" value and its dimension line.  The REF station's value now hangs
+    left of the view, the ream's block stands right of the hold-down tap's
+    callout (the width's value and row, dt-fab-4, fill the space right of
+    the view), and its leader runs midway between the width's row and the
+    tap callout's shoulder to the rim right of the station's dowel witness;
+    the note it flags stands in the open field over the title block."""
+    texts = drawing.sheet_text_boxes()
+    leader = drawing.sheet_leaders()["DowelHoleDia"]
+    for name, box in texts.items():
+        if name != "DowelHoleDia":
+            assert drawing._drawing_leaders.distance_to_box(leader.segment(), box) > 0.0, name
+    for owner, ink in drawing.sheet_dimension_ink().items():
+        for segment in ink.segments():
+            assert not drawing._drawing_leaders.leader_crossings(
+                {"leader": [leader.segment()], owner: [segment]}
+            ), owner
+    station = texts["DowelX"]
+    view = drawing.sheet_view_silhouettes()["bottom"]
+    assert station[2] < drawing.FOOT_TAP_Z_LINE_X - drawing.ARROW_TEXT_CLEARANCE
+    assert texts["DowelHoleDia"][0] > view[2]
+    assert texts["DowelHoleDia"][0] >= texts["foot tap callout"][2] + drawing.TEXT_CLEARANCE
+    assert leader.start[1] > texts["Width"][3] + drawing.TEXT_CLEARANCE
+    assert leader.start[1] < texts["foot tap callout"][1] - drawing.TEXT_CLEARANCE
+    assert leader.tip[0] > drawing.DOWEL_CENTER[0]
+    note = texts[drawing.DOWEL_NOTE]
+    template = DRAWING_TEMPLATES[DRAWINGS_BY_NAME["dt_cone_tip_block"].layout]
+    # Over the title block, inside the sheet's inner border (12.7 mm), and
+    # under the isometric (38 x 108 mm about ISO_CENTER).
+    assert note[1] > template.title_block_top_m + drawing.TEXT_CLEARANCE
+    assert note[2] < template.width_m - 0.0127 - drawing.TEXT_CLEARANCE
+    assert note[3] < drawing.ISO_CENTER[1] - 0.054 - drawing.TEXT_CLEARANCE
+    assert note[0] > texts["ViewBPinchHeight"][2] + drawing.TEXT_CLEARANCE

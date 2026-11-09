@@ -889,9 +889,11 @@ def test_drum_station_is_the_assembly_setting_not_printed_here() -> None:
     assert bond is spec.ASSEMBLY_STEP
     printed = package.rig_steps(pivot_blocks=2, cams=2, slotted=4)
     sheet = package.SHEET_NAMES[package.BANK_SETTINGS_SHEET - 1]
-    assert "DRUM STATION" in sheet
+    assert "MHA-DT-01 STATION SETTINGS" in sheet
+    # Round 13: the station is named by its view on that sheet.
     assert (
-        f"DRUM STATION SETTING: SHEET {package.BANK_SETTINGS_SHEET}."
+        f"SET MHA-DT-01 AT ITS VIEW {package.DRUM_VIEW_LETTER} STATION "
+        f"(SHEET {package.BANK_SETTINGS_SHEET})."
         in " ".join(printed.split())
     )
     # One band: the assembly setting reads the arbor's, and every stack does.

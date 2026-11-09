@@ -108,6 +108,7 @@ recipes:
 | 98296A026 | — (diagnostic recipe; former `vn-transgear-collar-cross-pin`, MHA-VN-037 retired) | 1050-1095 Spring Steel Slotted Spring Pin |
 | 98296A027 | `dt-vn-pinion-strap-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
 | 98296A031 | `pd-vn-transgear-knob-cup-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
+| 98381A417 | `dt-vn-locating-pin` (MHA-DT-VN-69; catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
 | 98381A433 | `pd-vn-transgear-knob-drive-pin` (catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
 | 98381A434 | `dt-vn-crank-seat-drive-pin` (crank only; catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
 | 98381A435 | `pd-vn-transgear-arm-plate-locating-pin` (MHA-PD-VN-64; catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
@@ -1210,6 +1211,20 @@ Catalog specifications checked on September 10, 2026:
   as installed, a 1/16 in tube with the catalog wall, without slot or
   chamfer; `diag_build_98296A026.py`, `diag_build_98296A027.py` and
   `diag_build_98296A031.py` are its per-size runs.
+- [98381A417](https://www.mcmaster.com/98381A417/) (`dt-vn-locating-pin`,
+  MHA-DT-VN-69, quantity one; rule-23 retention, owner ruling 2026-11-07,
+  MHA-DT-00 rubric sample, PR #2248) was read live on November 7,
+  2026: alloy steel dowel pin, 1/16 in diameter, Tolerance Rating Standard,
+  diameter +0.0001 to +0.0003 in over nominal (the family band, positive; a
+  search-index summary filing it under "undersized" is wrong), 3/8 in long,
+  end shape "Round x Chamfer", Rockwell C47 minimum, ASME B18.8.2, 750 lbf
+  double shear, $12.74 per package of 50. No recommended hole size is stated;
+  `dt_vn_locating_pin_spec.py` owns the .0620 REAM_H7 press hole and checks
+  the press window (.0001 to .0008 in). It is the tip-block locating dowel:
+  pressed to the floor of the MHA-DT-21 foot's blind .0620 ream, a slip fit
+  in the MHA-DT-20 plate's .0630 thru ream, match-drilled at MHA-DT-00
+  step 2. `diag_build_98381A417.py` models the plain nominal cylinder;
+  catalogue-only, no vendor model, no replica gate.
 - [98381A434](https://www.mcmaster.com/98381A434/) (`dt-vn-crank-seat-drive-pin`,
   MHA-DT-VN-67, crank only) was read live on September 30, 2026: alloy steel dowel pin,
   unplated, 3/32 in diameter (+0.0001 to +0.0003 in), 1/4 in long, end shape

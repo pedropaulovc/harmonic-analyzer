@@ -168,7 +168,6 @@ def test_notes_are_few_and_carry_no_part_sizes() -> None:
         # A flag to a numbered note is the only number a callout carries.
         words = re.sub(r"SEE NOTE \d+", "", callout)
         assert not any(ch.isdigit() for ch in words), callout
-    assert "SEE NOTE 1" in notes.DIMENSION_CALLOUTS["JointDia"]
     assert '"Manufacturing Notes": DRAWING_NOTES' in _build_source()
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in _source()
 

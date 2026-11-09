@@ -1290,7 +1290,8 @@ def test_set_pin_never_stands_proud_and_keeps_its_webs() -> None:
 
     step_line = FITUP.SHAFT_DRILL_STEP.split("\n")[-1]
     assert step_line == (
-        f"BOTH ENDS 0 TO {inch_max_text(pin.PIN_SUB_FLUSH_MAX, 3)} BELOW THE "
+        f"DRIVE {FITUP.STRAP_PIN_NUMBER} PINS, BOTH ENDS 0 TO "
+        f"{inch_max_text(pin.PIN_SUB_FLUSH_MAX, 3)} BELOW THE "
         f"{_config.parts('dt-pinion-bracket')['number']} EDGES."
     )
     printed = float(inch_max_text(pin.PIN_SUB_FLUSH_MAX, 3)) * 25.4
@@ -1767,8 +1768,11 @@ def test_every_fit_up_setting_is_a_gage_leaf_and_the_prints_name_it() -> None:
     # The collars' set is an assembly step: nothing is cut, so MHA-DT-23's own
     # print stays free of it (drawing-guidelines.md rule 7 (notes: few, flagged, never a method), as MHA-DT-18 keeps its feeler).
     assert "LEAF" not in dt_pinion_cam_spec.DRAWING_NOTES
-    assert "(0.90 MM LEAF) OFF BACK MHA-DT-18" in FITUP.COLLAR_SET_STEP
-    assert "(0.25 MM LEAF) OFF FRONT MHA-DT-18" in FITUP.COLLAR_SET_STEP
+    # The prints give the inch setting; the leaves are in sheet 14's table.
+    back = FITUP.inch_text(FITUP.BACK_COLLAR_LEAF_F, FITUP.FEELER_PLACES)
+    front = FITUP.inch_text(FITUP.FRONT_COLLAR_LEAF, FITUP.FEELER_PLACES)
+    assert f"BACK MHA-DT-23 {back} OFF THE BACK MHA-DT-18 ON A FEELER" in FITUP.COLLAR_SET_STEP
+    assert f"FRONT MHA-DT-23 {front} OFF THE FRONT MHA-DT-18 ON A FEELER" in FITUP.COLLAR_SET_STEP
     # The fit-up module no longer claims MHA-DT-00 prints the feeler band.
     assert "MHA-DT-00 prints" not in (FITUP.__doc__ or "")
 
@@ -1834,9 +1838,10 @@ def test_assembly_poses_print_once_on_their_rig_steps() -> None:
         "pinion_rig_fitup.SHAFT_DRILL_STEP": (
             FITUP.SHAFT_DRILL_STEP,
             (
-                "REAR END FLUSH WITH MHA-DT-18 REAR FACE",
-                "STRAPS ON BACK STOP, MHA-DT-01 ON BACK STRAP",
-                "FEELER AT MHA-DT-01 FRONT END",
+                "REAR END FLUSH WITH THE MHA-DT-18 REAR FACE",
+                "THE BACK MHA-DT-14 HARD ON THE BACK MHA-DT-18 INNER FACE",
+                "PUSH MHA-DT-01 BACK, HARD ON THE BACK MHA-DT-14",
+                "OFF THE MHA-DT-01 FRONT END ON A",
             ),
         ),
         "dt_pinion_lever_pin_spec.ASSEMBLY_STEP": (
@@ -1886,7 +1891,8 @@ def test_assembly_poses_print_once_on_their_rig_steps() -> None:
     ):
         callout = importlib.import_module(drawing).DIMENSION_CALLOUTS["PinHoleDia"]
         assert callout.startswith("MATCH-DRILL THRU AT ASSEMBLY"), drawing
-    assert FITUP.SHAFT_DRILL_STEP.startswith(f"{FITUP.SHAFT_DRILL_NAME}: MATCH-DRILL")
+    assert FITUP.SHAFT_DRILL_STEP.startswith(f"{FITUP.SHAFT_DRILL_NAME}: PUSH THE BACK")
+    assert "\nMATCH-DRILL MHA-DT-19 THRU" in FITUP.SHAFT_DRILL_STEP
     # The steps' pin numbers are the registry's.
     assert FITUP.STRAP_PIN_NUMBER == _config.parts("dt-vn-pinion-strap-pin")["number"]
     assert (

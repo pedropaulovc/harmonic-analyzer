@@ -502,6 +502,17 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 2.3622,
                 3.95,
             ),
+            # Owner ruling 2026-11-07 (PR #2248): MHA-DT-VN-69 1/16 dowel
+            # (1.5875) pressed to the floor of MHA-DT-21's .0620 (1.5748) foot
+            # ream, .16 (4.064) deep.
+            **_expected_numbered_pairs(
+                "dt-vn-locating-pin",
+                range(1, 2),
+                "dt-cone-tip-block",
+                1.5875,
+                1.5748,
+                4.064,
+            ),
         },
         "fr-frame": {
             **_expected_numbered_pairs(

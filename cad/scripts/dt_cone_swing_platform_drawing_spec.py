@@ -37,6 +37,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     # The tip-block hold-down's two stations from the pivot bore; the native
     # Hole Wizard callout carries its sizes.
     "HoldDownHole": {"HoldDownX", "HoldDownZ"},
+    # Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
+    # #2248): the tip-block locating dowel's slip ream, its
+    # size, its controlling station from the hold-down hole (on the hold-down
+    # line by relation) and its REF station from the pivot-bore axis
+    # (machinist review of round 6, #6), all in detail B with the hold-down's.
+    "TipDowelProfile": {"TipDowelX", "TipDowelPivotX", "TipDowelDia"},
     "CornerNE": {"CornerNER"},
     "CornerNW": {"CornerNWR"},
     "CornerSW": {"CornerSWR"},
@@ -77,6 +83,10 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "LockNotchCapEProfile": {"CapECx": 2, "CapECz": 2, "CapEDia": 2},
     # Banded on the part (HOLDDOWN_STATION_TOL_MM).
     "HoldDownHole": {"HoldDownX": 2, "HoldDownZ": 3},
+    # Banded on the part: the station with the hold-down's +/-.004
+    # (TIP_DOWEL_STATION_TOL_MM), the ream with its REAM_H7 at four places.
+    # The pivot-axis station is a reference: no band, printed in parentheses.
+    "TipDowelProfile": {"TipDowelX": 3, "TipDowelPivotX": 3, "TipDowelDia": 4},
     "CornerNE": {"CornerNER": 2},
     "CornerNW": {"CornerNWR": 2},
     "CornerSW": {"CornerSWR": 2},

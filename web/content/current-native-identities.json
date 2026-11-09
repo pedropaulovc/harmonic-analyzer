@@ -592,6 +592,17 @@
       ]
     },
     {
+      "sourceStem": "dt-vn-locating-pin",
+      "sourceNumber": null,
+      "identities": [
+        {
+          "parent": "dt-drive-train",
+          "stem": "dt-vn-locating-pin",
+          "number": "MHA-DT-VN-69"
+        }
+      ]
+    },
+    {
       "sourceStem": "sm-vn-gooseneck-shoulder-screw",
       "sourceNumber": null,
       "identities": [
@@ -1054,7 +1065,7 @@
       "status": "archive-only"
     }
   ],
-  "currentRegistryMapSha256": "db5d0ab73284c44dc35d9e0af72257ff06ae5d4685eda186a8fdaceeada9e77a",
+  "currentRegistryMapSha256": "2e8cd865827512f031625ef29f050431cd197dd313758c0cb03a7e23e6c8ac6d",
   "nativeIdentities": [
     {
       "sourceStem": "ch-rocker-arm-tl-oblique-feed-lever",
