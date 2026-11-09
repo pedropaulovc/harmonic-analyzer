@@ -164,6 +164,10 @@ from sm_summing_lever_spec import (
     KNIFE_RIDGE_R_BAND,
     KNIFE_RIDGE_R_PLACES,
     KNIFE_RIDGE_R_TOL_TYPE,
+    KNIFE_SHOULDER_R,
+    KNIFE_SHOULDER_R_BAND,
+    KNIFE_SHOULDER_R_PLACES,
+    KNIFE_SHOULDER_R_TOL_TYPE,
     PLATE_W_DEVIATIONS,
     RIDGE_ANGLE_DEG,
     RIDGE_FROM_SIDE_TOL,
@@ -227,6 +231,10 @@ KNIFE_LATERAL_FACES = 6  # per stub: two flanks, two sides, two lower faces
 # --- derived ---------------------------------------------------------------
 SUM_BASE = PLATE_L / 2.0  # summation plate base length             76.20
 TIP_X = SX * SUM_H  # summation tip / anchor x (counter-spring arm) -76.20
+# The counter web's +Z side arc (_summation_plate's p2, top_int, p3).
+SUMMATION_SIDE_POINTS = (
+    (0.0, SUM_BASE), (SX * SUM_H / 2.0, SUM_BASE / 2.0 - SUM_CURV), (TIP_X, ANCHOR_R),
+)
 ARC_R = RIB_WRAP_R
 RIB_OFFSET = PLATE_L / 2.0 - RIB_T  # both edge-rib inner caps; outside ends fixed
 # No plain anchor bore: the counter anchor's seat is the native COUNTER_HOLE_SPEC
@@ -726,24 +734,26 @@ async def _measured_volume(adapter, label: str) -> float:
     return float(mass.data.volume)
 
 
-def _knife_ridge_max_limit(adapter) -> None:
-    """KnifeRidgeRadius as the single limit "R.004 MAX" carrying the band's
+def _knife_radius_max_limit(
+    adapter, feature: str, name: str, nominal: float, band, tol_type: int, places: int,
+) -> None:
+    """A knife radius as the single limit "R... MAX" carrying the band's
     deviations (build_ch_pivot_bracket._corner_radius_max_limit's recipe)."""
-    lower, upper = deviations(KNIFE_RIDGE_R_BAND)
-    _, dimension = _named_dimension(adapter, "KnifeRidgeFillet", "KnifeRidgeRadius")
-    label = "KnifeRidgeRadius@KnifeRidgeFillet"
+    lower, upper = deviations(band)
+    _, dimension = _named_dimension(adapter, feature, name)
+    label = f"{name}@{feature}"
     value = float(dimension.SystemValue)
-    if not math.isclose(value, KNIFE_RIDGE_R / 1000.0, abs_tol=1e-9):
+    if not math.isclose(value, nominal / 1000.0, abs_tol=1e-9):
         raise RuntimeError(
             f"{label}: nominal {value * 1000.0:.7f} is not the band's max "
-            f"{KNIFE_RIDGE_R}"
+            f"{nominal}"
         )
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    tolerance.Type = KNIFE_RIDGE_R_TOL_TYPE
+    tolerance.Type = tol_type
     if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
         raise RuntimeError(f"{label}: SetValues rejected {lower:+g}/{upper:+g} mm")
     if (
-        int(tolerance.Type) != KNIFE_RIDGE_R_TOL_TYPE
+        int(tolerance.Type) != tol_type
         or not math.isclose(
             float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
         )
@@ -752,10 +762,8 @@ def _knife_ridge_max_limit(adapter) -> None:
         )
     ):
         raise RuntimeError(f"{label}: MAX-limit tolerance readback changed")
-    set_dimension_display_precision(
-        adapter, "KnifeRidgeFillet", "KnifeRidgeRadius", KNIFE_RIDGE_R_PLACES
-    )
-    _telemetry.success(f"{label}: single limit {KNIFE_RIDGE_R:g} MAX")
+    set_dimension_display_precision(adapter, feature, name, places)
+    _telemetry.success(f"{label}: single limit {nominal:g} MAX")
 
 
 def _assert_edge_rib_end_planes(adapter) -> None:
@@ -1373,41 +1381,67 @@ def _assert_receiver_profile_walls(adapter) -> None:
     )
 
 
-def coefficient_underside_root_geometry() -> tuple[
+def summation_side_half_width(x: float) -> float:
+    """Counter-web planform half-width (Z) on its side arc at X."""
+    start, interior, end = SUMMATION_SIDE_POINTS
+    if not end[0] <= x <= start[0]:
+        raise ValueError(f"counter-web side arc does not span X{x}")
+    cx, cz = _circumcenter(start, end, interior)
+    radius = math.hypot(start[0] - cx, start[1] - cz)
+    return cz + math.copysign(math.sqrt(radius**2 - (x - cx) ** 2), interior[1] - cz)
+
+
+def longitudinal_root_families() -> tuple[tuple[str, float, float], ...]:
+    """Name, X side and face level of each plate/web-to-pivot-cylinder junction."""
+    return (
+        ("CoefficientUndersideRootFillets", 1.0, COEFFICIENT_BOTTOM_Y),
+        ("CoefficientTopRootFillets", 1.0, COEFFICIENT_TOP_Y),
+        ("CounterWebTopRootFillets", -1.0, COUNTER_WEB_T / 2.0),
+        ("CounterWebUndersideRootFillets", -1.0, -COUNTER_WEB_T / 2.0),
+    )
+
+
+def longitudinal_root_geometry(x_sign: float, face_y: float) -> tuple[
     float, tuple[float, float], tuple[float, float], tuple[tuple[float, float], ...]
 ]:
-    """Nominal lower junction, tangent R.040 cylinder and two inboard edge runs.
+    """Signed junction X, tangent R.040 cylinder and two inboard edge runs.
 
     The fillet circle is externally tangent to the pivot cylinder and tangent
-    to the plate underside. Its centre is R below the underside, at distance
-    CylR + R from the pivot axis. Cap-root corner patches get a one-radius
-    neighbourhood in the native audit; neither outside body end is selected.
+    to the plate or web face. Its centre is R beyond that face, at distance
+    CylR + R from the pivot axis. Coefficient runs end at the edge-rib caps;
+    counter-web runs end where the web's side arc leaves the cylinder.
+    Cap-root corner patches get a one-radius neighbourhood in the native
+    audit; neither outside body end is selected.
     """
-    bottom, radius = COEFFICIENT_BOTTOM_Y, RIB_BLEND_R
-    runs = (
-        (-RIB_OFFSET, -RIB_T / 2.0),
-        (RIB_T / 2.0, RIB_OFFSET),
-    )
+    radius = RIB_BLEND_R
     if (
-        not all(math.isfinite(value) for value in (bottom, radius, CYL_R, PLATE_L))
-        or not -CYL_R < bottom < 0.0
+        not all(math.isfinite(value) for value in (face_y, radius, CYL_R, PLATE_L))
+        or not 0.0 < abs(face_y) < CYL_R
         or radius <= 0.0
-        or any(
-            not all(math.isfinite(value) for value in (start, end))
-            or not -PLATE_L / 2.0 < start - radius < end + radius < PLATE_L / 2.0
-            or end - start <= 4.0 * radius
-            for start, end in runs
-        )
     ):
-        raise ValueError("lower plate/cylinder blend violates inboard tangent-run premises")
-    edge_x = math.sqrt(CYL_R**2 - bottom**2)
-    center_y = bottom - radius
-    center_x = math.sqrt((CYL_R + radius)**2 - center_y**2)
-    tangent = (
-        center_x * CYL_R / (CYL_R + radius),
-        center_y * CYL_R / (CYL_R + radius),
-    )
-    return edge_x, (center_x, center_y), tangent, runs
+        raise ValueError("plate/cylinder blend violates inboard tangent-run premises")
+    edge_x = math.copysign(math.sqrt(CYL_R**2 - face_y**2), x_sign)
+    end = RIB_OFFSET if x_sign > 0.0 else min(RIB_OFFSET, summation_side_half_width(edge_x))
+    runs = ((-end, -RIB_T / 2.0), (RIB_T / 2.0, end))
+    if any(
+        not all(math.isfinite(value) for value in (start, stop))
+        or not -PLATE_L / 2.0 < start - radius < stop + radius < PLATE_L / 2.0
+        or stop - start <= 4.0 * radius
+        for start, stop in runs
+    ):
+        raise ValueError("plate/cylinder blend violates inboard tangent-run premises")
+    center_y = face_y + math.copysign(radius, face_y)
+    center_x = math.copysign(math.sqrt((CYL_R + radius) ** 2 - center_y**2), x_sign)
+    scale = CYL_R / (CYL_R + radius)
+    return edge_x, (center_x, center_y), (center_x * scale, center_y * scale), runs
+
+
+def counter_flank_crease_x() -> float:
+    """X where each negative-X middle-rib flank sinks into a counter-web face."""
+    crease = TIP_X + COUNTER_WEB_T / 2.0 / math.tan(math.radians(COUNTER_FLANK_ANGLE_DEG))
+    if not TIP_X + ANCHOR_R < crease < 0.0:
+        raise ValueError(f"counter flank crease X{crease} is not between boss and pivot")
+    return crease
 
 
 def rib_root_edge_families() -> tuple[tuple[str, list[list[float]], float], ...]:
@@ -1432,24 +1466,47 @@ def rib_root_edge_families() -> tuple[tuple[str, list[list[float]], float], ...]
         [-30.0, sign * COUNTER_WEB_T / 2.0, z]
         for z in middle_caps for sign in (-1.0, 1.0)
     ]
-    edge_x, _, _, longitudinal_runs = coefficient_underside_root_geometry()
-    longitudinal_picks = [
-        [edge_x, COEFFICIENT_BOTTOM_Y, (start + end) / 2.0]
-        for start, end in longitudinal_runs
-    ]
-    return (
+    families = [
         ("RibCylinderRootFillets", cylinder_picks, 4.0 * math.tau * CYL_R),
         ("RibCounterRootFillets", counter_picks, 4.0 * SUM_H),
         ("RibRootFillets", plate_picks, 8.0 * RIB_REACH),
-        # Keep the established cap-root operations and their bounds unchanged.
-        # Mid-run longitudinal edges survive those rounds; the last operation
-        # joins their corner patches without tangent propagation.
-        (
-            "CoefficientUndersideRootFillets",
-            longitudinal_picks,
-            sum(end - start for start, end in longitudinal_runs) + 4.0 * RIB_BLEND_R,
-        ),
-    )
+    ]
+    # Keep the established cap-root operations and their bounds unchanged.
+    # Mid-run longitudinal edges survive those rounds; each later operation
+    # joins their corner patches without tangent propagation.
+    for name, x_sign, face_y in longitudinal_root_families():
+        edge_x, _, _, runs = longitudinal_root_geometry(x_sign, face_y)
+        families.append((
+            name,
+            [[edge_x, face_y, (start + end) / 2.0] for start, end in runs],
+            sum(end - start for start, end in runs) + 4.0 * RIB_BLEND_R,
+        ))
+    # The boss rim on both web faces, the web side's two creases into the
+    # boss at its Z extremes, and both middle-rib flank creases into the web.
+    # The flank stays inside the web wherever it meets the boss.
+    crease_x = counter_flank_crease_x()
+    web_picks = [[TIP_X + ANCHOR_R, sign * COUNTER_WEB_T / 2.0, 0.0] for sign in (1.0, -1.0)]
+    web_picks += [[TIP_X, 0.0, sign * ANCHOR_R] for sign in (1.0, -1.0)]
+    web_picks += [[crease_x, sign * COUNTER_WEB_T / 2.0, 0.0] for sign in (1.0, -1.0)]
+    families.append((
+        "CounterWebJunctionFillets",
+        web_picks,
+        math.tau * ANCHOR_R + 2.0 * COUNTER_WEB_T + 2.0 * RIB_T + 12.0 * RIB_BLEND_R,
+    ))
+    return tuple(families)
+
+
+def knife_shoulder_picks() -> list[list[float]]:
+    """Each stub root's six lateral-face edges and ridge round at the body end."""
+    w2, h2, h4 = HEX_W / 2.0, HEX_H / 2.0, HEX_H / 4.0
+    half = math.radians(RIDGE_ANGLE_DEG) / 2.0
+    crest = h2 - KNIFE_RIDGE_R / math.sin(half) + KNIFE_RIDGE_R
+    flank = (h2 + h4) / 2.0
+    section = [
+        (-w2 / 2.0, flank), (-w2, 0.0), (-w2 / 2.0, -flank),
+        (w2 / 2.0, -flank), (w2, 0.0), (w2 / 2.0, flank), (0.0, crest),
+    ]
+    return [[x, y, side * HEX_Z_INNER] for side in (1.0, -1.0) for x, y in section]
 
 
 def _assert_root_feature_bounds(adapter, name: str, minimum_faces: int) -> None:
@@ -1457,14 +1514,25 @@ def _assert_root_feature_bounds(adapter, name: str, minimum_faces: int) -> None:
     raw = _early_bound(adapter.currentModel, "IPartDoc").FeatureByName(name)
     feature = _early_bound(raw, "IFeature")
     count = 0
-    underside = name == "CoefficientUndersideRootFillets"
-    if underside:
-        _, center, tangent, runs = coefficient_underside_root_geometry()
+    knife = name == "KnifeShoulderFillets"
+    expected_radius = KNIFE_SHOULDER_R if knife else RIB_BLEND_R
+    longitudinal = {
+        family: (x_sign, face_y) for family, x_sign, face_y in longitudinal_root_families()
+    }.get(name)
+    # (x, y, z) limits; None leaves an axis to the common reach/entry checks.
+    envelope = (None, None, None)
+    if longitudinal is not None:
+        x_sign, face_y = longitudinal
+        _, center, tangent, runs = longitudinal_root_geometry(x_sign, face_y)
+        y_sign = math.copysign(1.0, face_y)
         # A finite one-radius cap-corner neighbourhood surrounds the exact
-        # straight-run tangent section. This is not an allowance for the old
-        # families, whose reach/entry/radius bounds below remain unchanged.
-        lower_bounds = (tangent[0] - RIB_BLEND_R, tangent[1] - RIB_BLEND_R)
-        upper_bounds = (center[0] + RIB_BLEND_R, COEFFICIENT_BOTTOM_Y + RIB_BLEND_R)
+        # straight-run tangent section. This is not an allowance for the
+        # cap-root families, whose reach/entry/radius bounds remain unchanged.
+        envelope = (
+            tuple(sorted((tangent[0] - x_sign * RIB_BLEND_R, center[0] + x_sign * RIB_BLEND_R))),
+            tuple(sorted((tangent[1] + y_sign * RIB_BLEND_R, face_y - y_sign * RIB_BLEND_R))),
+            None,
+        )
         covered_runs = set()
         from magnifying_bracket_joint_layout import (
             DRILL_WANDER_MAX, POSITION_BAND, receiver_pilot_radius_max,
@@ -1479,10 +1547,24 @@ def _assert_root_feature_bounds(adapter, name: str, minimum_faces: int) -> None:
             + PLATE_W_DEVIATIONS[0] - POSITION_BAND - pilot_radius
         )
         if (
-            upper_bounds[0] >= min(receiver_inner_x, PLATE_W, RIB_REACH)
-            or upper_bounds[1] >= COEFFICIENT_TOP_Y
+            envelope[0][1] >= min(receiver_inner_x, PLATE_W, RIB_REACH)
+            or not COEFFICIENT_BOTTOM_Y < face_y - y_sign * RIB_BLEND_R < COEFFICIENT_TOP_Y
         ):
-            raise RuntimeError(f"{name}: lower-junction envelope reaches a retained interface")
+            raise RuntimeError(f"{name}: junction envelope reaches a retained interface")
+    elif name == "CounterWebJunctionFillets":
+        # Outside the boss and its tap, below its top seat, inboard of the pivot.
+        envelope = (
+            (TIP_X - RIB_BLEND_R, counter_flank_crease_x() + RIB_BLEND_R),
+            (-COUNTER_WEB_T / 2.0 - RIB_BLEND_R, COUNTER_WEB_T / 2.0 + RIB_BLEND_R),
+            (-ANCHOR_R - RIB_BLEND_R, ANCHOR_R + RIB_BLEND_R),
+        )
+    elif knife:
+        # Around each hexagon, inside one radius of the body end face.
+        envelope = (
+            (-HEX_W / 2.0 - KNIFE_SHOULDER_R, HEX_W / 2.0 + KNIFE_SHOULDER_R),
+            (-HEX_H / 2.0 - KNIFE_SHOULDER_R, HEX_H / 2.0 + KNIFE_SHOULDER_R),
+            None,
+        )
     for raw_face in feature.GetFaces() or ():
         face = _early_bound(raw_face, "IFace2")
         surface = _early_bound(face.GetSurface(), "ISurface")
@@ -1492,7 +1574,7 @@ def _assert_root_feature_bounds(adapter, name: str, minimum_faces: int) -> None:
         elif surface.IsTorus():
             radius = float(surface.TorusParams[7]) * 1000.0
         # A transition patch can be nonanalytic. It must pass the same exact
-        # bounds, but cannot stand in for a proved cylindrical/toroidal R.040.
+        # bounds, but cannot stand in for a proved cylindrical/toroidal radius.
         # IFace2.GetBox is approximate. A temporary, unsaved sheet body of
         # this actual trimmed fillet face gives exact directional extrema,
         # without confusing its envelope with the plate's X44.45 free edge.
@@ -1501,38 +1583,44 @@ def _assert_root_feature_bounds(adapter, name: str, minimum_faces: int) -> None:
             raise RuntimeError(f"{name}: cannot extract native root face for exact bounds")
         sheet = _early_bound(sheet_raw, "IBody2")
         extrema = []
-        directions = [
+        for direction, axis in (
             ((1.0, 0.0, 0.0), 0), ((0.0, 0.0, -1.0), 2), ((0.0, 0.0, 1.0), 2),
-        ]
-        if underside:
-            directions += [
-                ((-1.0, 0.0, 0.0), 0), ((0.0, -1.0, 0.0), 1), ((0.0, 1.0, 0.0), 1),
-            ]
-        for direction, axis in directions:
+            ((-1.0, 0.0, 0.0), 0), ((0.0, -1.0, 0.0), 1), ((0.0, 1.0, 0.0), 1),
+        ):
             result = sheet.GetExtremePoint(direction[0], direction[1], direction[2])
             if result is None or len(result) != 4 or not result[0] or not all(
                 math.isfinite(float(value)) for value in result[1:]
             ):
                 raise RuntimeError(f"{name}: invalid exact native root extreme {result}")
             extrema.append(float(result[axis + 1]) * 1000.0)
-        x_max, z_min, z_max = extrema[:3]
+        x_max, z_min, z_max, x_min, y_min, y_max = extrema
         if x_max > RIB_REACH + 1e-5:
             raise RuntimeError(
-                f"{name}: R{RIB_BLEND_R} root face grows beyond X{RIB_REACH}: {extrema}"
+                f"{name}: R{expected_radius} root face grows beyond X{RIB_REACH}: {extrema}"
             )
-        if z_min <= -PLATE_L / 2.0 + 1e-5 or z_max >= PLATE_L / 2.0 - 1e-5:
-            raise RuntimeError(f"{name}: root blend reaches an outside entry/knife cap: {extrema}")
-        if underside:
-            x_min, y_min, y_max = extrema[3:]
+        if knife:
+            near, far = sorted((abs(z_min), abs(z_max)))
             if (
-                x_min < lower_bounds[0] - 1e-5 or x_max > upper_bounds[0] + 1e-5
-                or y_min < lower_bounds[1] - 1e-5 or y_max > upper_bounds[1] + 1e-5
-                or not any(
-                    start - RIB_BLEND_R - 1e-5 <= z_min <= z_max <= end + RIB_BLEND_R + 1e-5
-                    for start, end in runs
-                )
+                z_min * z_max <= 0.0 or near < HEX_Z_INNER - 1e-5
+                or far > HEX_Z_INNER + KNIFE_SHOULDER_R + 1e-5
             ):
-                raise RuntimeError(f"{name}: native face escapes the lower-junction envelope: {extrema}")
+                raise RuntimeError(f"{name}: shoulder blend leaves the stub root: {extrema}")
+        elif z_min <= -PLATE_L / 2.0 + 1e-5 or z_max >= PLATE_L / 2.0 - 1e-5:
+            raise RuntimeError(f"{name}: root blend reaches an outside entry/knife cap: {extrema}")
+        if any(
+            limits is not None
+            and not limits[0] - 1e-5 <= low <= high <= limits[1] + 1e-5
+            for limits, low, high in zip(
+                envelope, (x_min, y_min, z_min), (x_max, y_max, z_max), strict=True,
+            )
+        ):
+            raise RuntimeError(f"{name}: native face escapes the junction envelope: {extrema}")
+        if longitudinal is not None:
+            if not any(
+                start - RIB_BLEND_R - 1e-5 <= z_min <= z_max <= end + RIB_BLEND_R + 1e-5
+                for start, end in runs
+            ):
+                raise RuntimeError(f"{name}: native face escapes the junction envelope: {extrema}")
             if surface.IsCylinder() and z_max - z_min > 4.0 * RIB_BLEND_R:
                 parameters = tuple(float(value) for value in surface.CylinderParams)
                 if (
@@ -1542,24 +1630,24 @@ def _assert_root_feature_bounds(adapter, name: str, minimum_faces: int) -> None:
                     or abs(parameters[3]) > 1e-6 or abs(parameters[4]) > 1e-6
                     or not math.isclose(abs(parameters[5]), 1.0, abs_tol=1e-6)
                 ):
-                    raise RuntimeError(f"{name}: native cylinder is not the lower tangent blend: {parameters}")
+                    raise RuntimeError(f"{name}: native cylinder is not the tangent junction blend: {parameters}")
                 for index, (start, end) in enumerate(runs):
                     if z_min <= start + 2.0 * RIB_BLEND_R and z_max >= end - 2.0 * RIB_BLEND_R:
                         covered_runs.add(index)
         if radius is not None:
             if not math.isfinite(radius) or not math.isclose(
-                radius, RIB_BLEND_R, abs_tol=1e-5
+                radius, expected_radius, abs_tol=1e-5
             ):
                 raise RuntimeError(
-                    f"{name}: native root radius {radius} is not R{RIB_BLEND_R}"
+                    f"{name}: native root radius {radius} is not R{expected_radius}"
                 )
             count += 1
     if count < minimum_faces:
         raise RuntimeError(
-            f"{name}: only {count} native R{RIB_BLEND_R} root surfaces "
+            f"{name}: only {count} native R{expected_radius} root surfaces "
             f"for {minimum_faces} selected reentrant roots"
         )
-    if underside and covered_runs != set(range(len(runs))):
+    if longitudinal is not None and covered_runs != set(range(len(runs))):
         raise RuntimeError(f"{name}: missing native longitudinal blend run: {sorted(covered_runs)}")
 
 
@@ -1589,12 +1677,38 @@ async def _rib_root_fillets(adapter, drive_jobs: list[tuple[str, str]]) -> None:
         )
 
 
-def _rib_radius_max_limits(adapter) -> None:
-    """Band every modeled rib blend under the title-block R.040 MAX ceiling.
+async def _knife_shoulder_fillets(adapter, drive_jobs: list[tuple[str, str]]) -> None:
+    """Bounded R.020 stub roots at the body end faces, without propagation."""
+    name, picks = "KnifeShoulderFillets", knife_shoulder_picks()
+    before = await _measured_volume(adapter, f"before {name}")
+    check(
+        f"{name}: selected stub roots R{KNIFE_SHOULDER_R}",
+        await adapter.add_fillet(KNIFE_SHOULDER_R, picks, propagate=False),
+    )
+    name_last_feature(adapter, name)
+    [radius] = name_dimensions(adapter, name, ["KnifeShoulderRadius"])
+    drive_jobs.append((radius, '"KnifeShoulderR"'))
+    after = await _measured_volume(adapter, f"after {name}")
+    addition = after - before
+    # Both hexagon perimeters plus one-radius corner neighbourhoods.
+    perimeter = 2.0 * (HEX_H + 4.0 * math.hypot(HEX_W / 2.0, HEX_H / 4.0))
+    upper_bound = 2.0 * KNIFE_SHOULDER_R**2 * (perimeter + 14.0 * KNIFE_SHOULDER_R)
+    if not 0.0 < addition <= upper_bound:
+        raise RuntimeError(
+            f"{name}: native stub roots added {addition:.6f} mm^3, "
+            f"outside (0, {upper_bound:.6f}]; no redesign/fallback allowed"
+        )
+    # Twelve lateral roots; the ridge-round patch may be nonanalytic.
+    _assert_root_feature_bounds(adapter, name, 12)
+    _telemetry.success(f"{name}: bounded native R.020 stub roots added {addition:.6f} mm^3")
 
-    Profile blends, perpendicular rib-side roots and the changed longitudinal
-    coefficient underside remain native controls without a duplicate drawing
-    callout. Unchanged body junctions are not given a modeled-fillet claim.
+
+def _rib_radius_max_limits(adapter) -> None:
+    """Band every modeled rib and junction blend under the R.040 MAX ceiling.
+
+    Profile blends, perpendicular rib-side roots and the longitudinal, boss
+    and crease junction blends remain native controls without a duplicate
+    drawing callout.
     """
     owners = [
         (f"{stem}Profile", f"{stem}{side}BlendR")
@@ -2457,6 +2571,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "HexH", f"{HEX_H}mm")
     await set_global(adapter, "HexDepth", f"{HEX_DEPTH}mm")
     await set_global(adapter, "KnifeRidgeR", f"{KNIFE_RIDGE_R}mm")
+    await set_global(adapter, "KnifeShoulderR", f"{KNIFE_SHOULDER_R}mm")
     await set_global(adapter, "ArcR", '"CylR" + "RibPad"')
     # Keep the derivation native: a degree literal was rounded to angular places.
     await set_global(
@@ -2495,6 +2610,7 @@ async def build(adapter) -> dict[str, str]:
     await _summation_anchor(adapter, drive_jobs)
     await _middle_rib(adapter, drive_jobs)
     await _rib_root_fillets(adapter, drive_jobs)
+    await _knife_shoulder_fillets(adapter, drive_jobs)
     await _counter_anchor_tap(adapter, drive_jobs)
     await _bracket_mounting_taps(adapter)
     await _knife_envelope_reference(adapter, drive_jobs)
@@ -2547,7 +2663,14 @@ async def build(adapter) -> dict[str, str]:
     # stamp the make-critical title-block properties.
     clear_dimensions_for_drawing(adapter)
     _drawing_dimension_contract(adapter)
-    _knife_ridge_max_limit(adapter)
+    _knife_radius_max_limit(
+        adapter, "KnifeRidgeFillet", "KnifeRidgeRadius", KNIFE_RIDGE_R,
+        KNIFE_RIDGE_R_BAND, KNIFE_RIDGE_R_TOL_TYPE, KNIFE_RIDGE_R_PLACES,
+    )
+    _knife_radius_max_limit(
+        adapter, "KnifeShoulderFillets", "KnifeShoulderRadius", KNIFE_SHOULDER_R,
+        KNIFE_SHOULDER_R_BAND, KNIFE_SHOULDER_R_TOL_TYPE, KNIFE_SHOULDER_R_PLACES,
+    )
     _rib_radius_max_limits(adapter)
     _receiver_model_bands(adapter)
     await _receiver_coordinate_dimensions(adapter)
@@ -2572,6 +2695,7 @@ async def build(adapter) -> dict[str, str]:
     _assert_edge_rib_end_planes(adapter)
     for name, picks, _ in rib_root_edge_families():
         _assert_root_feature_bounds(adapter, name, len(picks))
+    _assert_root_feature_bounds(adapter, "KnifeShoulderFillets", 12)
     name_octant_views(
         adapter,
         octants={"REAR-BOTTOM-RIGHT": RECEIVER_ISOMETRIC_OCTANT},

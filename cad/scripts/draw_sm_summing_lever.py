@@ -130,6 +130,8 @@ from sm_summing_lever_spec import (
     KNIFE_RIDGE_R,
     KNIFE_RIDGE_R_TOL_TYPE,
     KNIFE_RIDGE_TANGENT_XY,
+    KNIFE_SHOULDER_R,
+    KNIFE_SHOULDER_R_TOL_TYPE,
     PLATE_L,
     PLATE_W,
     RIB_REACH,
@@ -715,35 +717,34 @@ def _add_view_arrow(
     )
 
 
-def _assert_knife_ridge_radius(adapter: Any, annotations: list[Any]) -> None:
-    """Prove Detail D's KnifeRidgeRadius prints the part's R MAX: radial,
-    measuring KNIFE_RIDGE_R, the native swTolMAX the part set
+def _assert_knife_radius(
+    adapter: Any, annotations: list[Any], name: str, nominal: float, tol_type: int,
+    *, label: str,
+) -> None:
+    """Prove a knife radius prints the part's R MAX: radial, measuring its
+    nominal, the native swTolMAX the part set
     (draw_ch_pivot_bracket._dress_corner_radius's readback)."""
     found = [
         annotation
         for annotation in annotations
-        if dimension_name(adapter, annotation) == "KnifeRidgeRadius"
+        if dimension_name(adapter, annotation) == name
     ]
     if len(found) != 1:
-        raise RuntimeError(
-            f"expected one KnifeRidgeRadius in the ridge detail, found {len(found)}"
-        )
+        raise RuntimeError(f"expected one {name} in the {label}, found {len(found)}")
     annotation = _early_bound(found[0], "IAnnotation")
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
     if bool(display.Diametric):
-        raise RuntimeError("the imported knife-ridge radius is not radial")
+        raise RuntimeError(f"the imported {name} is not radial")
     dimension = _early_bound(display.GetDimension2(0), "IDimension")
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    if int(tolerance.Type) != KNIFE_RIDGE_R_TOL_TYPE:
-        raise RuntimeError(
-            f"KnifeRidgeRadius lost its native MAX type: {int(tolerance.Type)}"
-        )
+    if int(tolerance.Type) != tol_type:
+        raise RuntimeError(f"{name} lost its native MAX type: {int(tolerance.Type)}")
     if not math.isclose(
-        float(dimension.SystemValue), KNIFE_RIDGE_R / 1000.0,
+        float(dimension.SystemValue), nominal / 1000.0,
         rel_tol=0.0, abs_tol=_NATIVE_NOMINAL_TOL_M,
     ):
-        raise RuntimeError("KnifeRidgeRadius does not measure the ridge round")
-    _telemetry.info(f"knife ridge radius: text {display.GetText(1)!r}, MAX type")
+        raise RuntimeError(f"{name} does not measure its round")
+    _telemetry.info(f"{name}: text {display.GetText(1)!r}, MAX type")
 
 
 def _assert_counter_flank_angle(adapter: Any, annotations: list[Any]) -> None:
@@ -1798,6 +1799,9 @@ TOP_KEEP = {
     # to target 3.3 mm box clearance. Both stubs are one prism, so the length
     # remains the hidden KnifeStubReference's, along its -X side.
     "KnifeStubLength": (0.2185, 0.1735),
+    # The #1625 stub-root limit, above the length and under the 20X frame,
+    # its leader down to the -Z stub's root arc.
+    "KnifeShoulderRadius": (0.2185, 0.1845),
     # One model-owned 3X thickness sizes all three ribs, above its span.
     # R2's native text hangs LEFT of this anchor: x 191.1396..209.5 mm
     # crossed the boss-X witness at x 197.2187. Move the complete native
@@ -2059,7 +2063,12 @@ async def build(adapter: Any) -> dict[str, str]:
         label="front",
     )
     _attach_radial_leaders(
-        adapter, top_annotations, ("SummationArcRadius",), label="top"
+        adapter, top_annotations, ("SummationArcRadius", "KnifeShoulderRadius"),
+        label="top",
+    )
+    _assert_knife_radius(
+        adapter, top_annotations, "KnifeShoulderRadius", KNIFE_SHOULDER_R,
+        KNIFE_SHOULDER_R_TOL_TYPE, label="plan",
     )
     _shorten_radii(adapter, top_annotations, ("SummationArcRadius",), label="top")
     _apply_callouts(
@@ -2339,7 +2348,10 @@ async def build(adapter: Any) -> dict[str, str]:
     _attach_radial_leaders(
         adapter, detail_annotations, ("KnifeRidgeRadius",), label="knife detail",
     )
-    _assert_knife_ridge_radius(adapter, detail_annotations)
+    _assert_knife_radius(
+        adapter, detail_annotations, "KnifeRidgeRadius", KNIFE_RIDGE_R,
+        KNIFE_RIDGE_R_TOL_TYPE, label="ridge detail",
+    )
     _ridge_datum(adapter, detail)
     _apply_callouts(adapter, detail_annotations, label="knife detail")
     _clear_ridge_witnesses(adapter, detail, detail_annotations)

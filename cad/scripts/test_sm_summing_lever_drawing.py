@@ -2953,13 +2953,26 @@ def test_plate_thickness_settled_witness_movement_records_original_and_current_i
     )
 
 
+def _knife_radius_check(name: str, nominal_mm: float, max_type: int):
+    def check(adapter, annotations):
+        drawing._assert_knife_radius(adapter, annotations, name, nominal_mm, max_type, label="test")
+    return check
+
+
 @pytest.mark.parametrize(
     ("name", "feature", "check_radius", "value_m", "max_type"),
     [
-        ("KnifeRidgeRadius", "KnifeRidgeFillet", drawing._assert_knife_ridge_radius,
+        ("KnifeRidgeRadius", "KnifeRidgeFillet",
+         _knife_radius_check("KnifeRidgeRadius", sm_summing_lever_spec.KNIFE_RIDGE_R, drawing.KNIFE_RIDGE_R_TOL_TYPE),
          sm_summing_lever_spec.KNIFE_RIDGE_R / 1000.0, drawing.KNIFE_RIDGE_R_TOL_TYPE),
-        ("KnifeRidgeRadius", "KnifeRidgeFillet", drawing._assert_knife_ridge_radius,
+        ("KnifeRidgeRadius", "KnifeRidgeFillet",
+         _knife_radius_check("KnifeRidgeRadius", sm_summing_lever_spec.KNIFE_RIDGE_R, drawing.KNIFE_RIDGE_R_TOL_TYPE),
          0.0001016004, drawing.KNIFE_RIDGE_R_TOL_TYPE),
+        ("KnifeShoulderRadius", "KnifeShoulderFillets",
+         _knife_radius_check(
+             "KnifeShoulderRadius", sm_summing_lever_spec.KNIFE_SHOULDER_R, drawing.KNIFE_SHOULDER_R_TOL_TYPE,
+         ),
+         sm_summing_lever_spec.KNIFE_SHOULDER_R / 1000.0, drawing.KNIFE_SHOULDER_R_TOL_TYPE),
     ],
 )
 @pytest.mark.parametrize("damage", [None, "value", "band", "diameter", "missing", "duplicate"])
@@ -2993,7 +3006,8 @@ def test_imported_radii_keep_the_native_model_value_and_max_band(
 @pytest.mark.parametrize(
     ("name", "feature", "check_radius", "nominal_m", "max_type"),
     [
-        ("KnifeRidgeRadius", "KnifeRidgeFillet", drawing._assert_knife_ridge_radius,
+        ("KnifeRidgeRadius", "KnifeRidgeFillet",
+         _knife_radius_check("KnifeRidgeRadius", sm_summing_lever_spec.KNIFE_RIDGE_R, drawing.KNIFE_RIDGE_R_TOL_TYPE),
          sm_summing_lever_spec.KNIFE_RIDGE_R / 1000.0, drawing.KNIFE_RIDGE_R_TOL_TYPE),
     ],
 )

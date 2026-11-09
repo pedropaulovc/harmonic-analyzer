@@ -38,6 +38,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "MiddleRibProfile": {"MiddleRibCounterAngle"},
     "KnifeStubReference": {"KnifeStubLength"},
     "KnifeRidgeFillet": {"KnifeRidgeRadius"},
+    "KnifeShoulderFillets": {"KnifeShoulderRadius"},
     "KnifeEnvelopeReference": {
         "HexWidth",
         "HexHeight",
@@ -64,6 +65,7 @@ DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
     ("SummationPlateProfile", "SummationArcRadius"): "2X R",
     ("KnifeStubReference", "KnifeStubLength"): "2X ",
     ("KnifeRidgeFillet", "KnifeRidgeRadius"): "EACH STUB R",
+    ("KnifeShoulderFillets", "KnifeShoulderRadius"): "EACH STUB R",
     ("KnifeEnvelopeReference", "HexWidth"): "EACH STUB (",
     ("KnifeEnvelopeReference", "HexHeight"): "EACH STUB ",
     ("KnifeEnvelopeReference", "RidgeFromLeft"): "EACH STUB ",

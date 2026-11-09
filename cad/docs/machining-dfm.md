@@ -448,63 +448,56 @@ the negative-X middle-rib contour is unchanged. The title block's
 callout repeats that ceiling (drawing-guidelines rule 2). The bounded native
 R.040 controls and geometry guards cover the modeled profile transitions
 and rib inner-cap side roots against the plate, pivot cylinder and counter
-web. A fourth family, **CoefficientUndersideRootFillets**, implements the
-owner's **2026-10-21 model-the-blend** decision at the moved lower
-plate/cylinder junction. All four families disable tangent propagation;
-the established three families retain their separate picks and added-volume
-bounds. This is not a general body-fillet claim. The following baseline
-sharp junctions were outside that proof:
+web. Further families model every remaining inside corner, all without
+tangent propagation:
 
-- Historically, longitudinal coefficient-plate **top**-to-pivot-cylinder
-  junctions between rib caps were near X=+12.44 mm.
-- Historically, longitudinal counter-web face-to-pivot-cylinder junctions
-  were near X=−12.44 mm.
-- Boss-to-counter-web and boss-to-negative-X-middle-rib-flank junctions.
-- The obtuse crease where each negative-X middle-rib tangent flank sinks
-  into a counter-web face.
-- Knife-stub-to-end-rib shoulders.
+- **CoefficientUndersideRootFillets** and **CoefficientTopRootFillets**: both
+  coefficient faces to the pivot cylinder between rib caps, at X≈+12.21 mm.
+- **CounterWebTopRootFillets** and **CounterWebUndersideRootFillets**: both
+  counter-web faces to the cylinder at X≈−12.21 mm, from the middle-rib caps
+  to where the web's side arc leaves the cylinder (|Z|≈56.79 mm).
+- **CounterWebJunctionFillets**: the boss rim on both web faces, the two
+  web-side creases into the boss at its Z extremes, and both creases at
+  X≈−59.06 mm where the negative-X middle-rib flanks sink into the web
+  faces. With the 7.00 web the flank stays inside the web wherever it meets
+  the boss (1.94 mm above Y0 at the boss rim), so no flank-to-boss junction
+  exists.
+- **KnifeShoulderFillets** at the #1625 local **R.020 MAX**, tighter than the
+  title block: each stub's six lateral faces and ridge round into the body
+  end face, modelled at the printed limit. They occupy |Z| 76.20–76.71 mm;
+  the knife-mount blocks start at |Z|≈80.07 mm, so the seat and rock are
+  unaffected. The plan prints one native **EACH STUB R.020 MAX**.
 
-The preceding list records the baseline **RV-02** scope from **b2c8d954**:
-the owner's **2026-10-18 R.040 MAX** inside-corner ceiling, now carried by
-the shop-wide title-block row. It is not a new exception for junctions moved
-by #2129. With both plate and web at **Y=±3.50 mm**, their nominal cylinder
-intersections are **X≈±12.21 mm**. The lower coefficient junction retains
-its implemented native **R.040 MAX** fillet contract, whose picks derive
-from the current bottom face. Changed junctions require native geometry
-and manufacturing review; historical sharp-junction acceptance is not proof.
+These remove the former **RV-02** sharp-junction exception (b2c8d954,
+2026-10-18) by owner ruling 2026-11-09.
 
-The lower-junction picks derive from **sqrt(CylR² − BottomY²), BottomY** and
-the midpoints of the actual two inboard cap intervals:
-**Z=−71.20..−2.50** and **+2.50..+71.20 mm**. They are applied after the
-three cap-root families, while these mid-run edges still exist. Its added
+The longitudinal picks derive from **sqrt(CylR² − FaceY²), FaceY** and the
+midpoints of the actual two inboard runs. They are applied after the three
+cap-root families, while these mid-run edges still exist. Each family's added
 native volume must be strictly positive and no more than
-**2R² × (sum of run lengths + 4R)**, including one-radius end-corner
-neighbourhoods; at R = 1.016 mm the current upper bound is **292.05 mm³**. Exact six-direction
-sheet-body extrema bound every new surface to the lower tangent section
-plus those finite corner neighbourhoods. Both runs must contain native
-**R.040 cylinders parallel to Z at the derived tangent centre**; a nonanalytic
-corner patch cannot replace a missing run or evade the bounds. The new
-family participates in the existing native radius/MAX-band readback, and
-all four feature-envelope audits run again on the final rebuilt model.
+**2R² × (sum of selected edge lengths + corner neighbourhoods)**. Exact
+six-direction sheet-body extrema bound every new surface: a longitudinal face
+to its own tangent section plus finite corner neighbourhoods, and both runs
+must contain native **R.040 cylinders parallel to Z at the derived tangent
+centre**; the web family to the web faces ±R, outside the boss's top seat and
+inboard of the crease; the knife roots to one shoulder radius off the end face
+around each hexagon. A nonanalytic corner patch cannot replace a missing run
+or evade the bounds. Every family participates in the native radius/MAX-band
+readback, and all envelope audits run again on the final rebuilt model.
 
-The complete bounded lower-blend envelope is X-disjoint from both receiver
+The complete bounded coefficient-blend envelopes are X-disjoint from both receiver
 pilots, charging the printed pilot radius, drill wander, ordinary free-edge
 variation and actual-axis position bands.
-Its Z envelope stays inside the rib caps' finite neighbourhoods and away from
-the receiver entry/body-end/knife faces; its X reach stays clear of the spring
-and nut lane, outer plate edge, and its Y envelope cannot reach the top seat.
+Their Z envelopes stay inside the rib caps' finite neighbourhoods and away from
+the receiver entry/body-end/knife faces; their X reach stays clear of the spring
+and nut lane and outer plate edge, and neither Y envelope reaches the opposite seat.
 The analytic section adds material only. Receiver wall proofs therefore take
-**no extra wall credit** for this blend and retain their independent pilot
-and connected-material gates. **Fresh native fillet topology, corner integration,
-saved-feature surfaces/radii and installed clearance verification are pending**;
-the source implementation and fail-closed guards do not claim a native pass.
+**no extra wall credit** for these blends and retain their independent pilot
+and connected-material gates.
 
 There is no end ledge or reference-only **(0.44)** contract: the former
-pad-step scope and RV-04 ledge exception are removed. The unchanged knife
-roots retain their separate local **R.020 MAX** debt (#1625); knife
-material/hardness remains #1611. Neither the retained RV-02 authorization
-nor the changed-rib proof claims that those unchanged junctions are modeled
-with fillets or that the knife roots are manufacturable.
+pad-step scope and RV-04 ledge exception are removed. Knife
+material/hardness remains #1611.
 
 The screw/grip, engagement, tip-gap and bottoming-tap-lead guards are retained.
 The bounded **.26 ±.01 in** drill (6.604 mm model depth) now runs into the connected coefficient
@@ -620,7 +613,7 @@ probe, not evidence that it has been run for option A.
 
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
-| **`sm-summing-lever`** | machined-from-solid organic first-class lever; coefficient slab and counter web both 7.00 thick, centered Y±3.50 | solid pivot cylinder Ø25.4×152.4 (**no bore**); 2× unchanged hex knife trunnions protruding 21.717 each end; 20× #6-32 through-taps in the 7.00 slab @ 7.0565 pitch (Ø2.705 tap drill), anchors locked by underside MHA-CH-14 jam nuts; one #10-24 tap through the Ø19.05×19.05 summation-anchor boss with its retained top jam nut; shared R15.24 tangent positive ribs, bounded R.040 MAX side roots/profile blends and a separately bounded lower longitudinal plate/cylinder blend, not general body fillets | delicate knife ridge; slender trunnions and cantilevered faces complicate workholding; small through-taps require controlled tapping; independent pilot wall guards retain the .080 in (2.032 mm) pilot floor; historical RV-02 junction scope does not qualify junctions moved by #2129; separate knife-root/tool-access debt remains | multiple setups; native/CAM route not yet qualified | **machined from solid**, per registry; spring seats and matched bracket rows follow the centered plate; mounts stay fixed; evaluate hardened knife insert separately (§6) |
+| **`sm-summing-lever`** | machined-from-solid organic first-class lever; coefficient slab and counter web both 7.00 thick, centered Y±3.50 | solid pivot cylinder Ø25.4×152.4 (**no bore**); 2× unchanged hex knife trunnions protruding 21.717 each end; 20× #6-32 through-taps in the 7.00 slab @ 7.0565 pitch (Ø2.705 tap drill), anchors locked by underside MHA-CH-14 jam nuts; one #10-24 tap through the Ø19.05×19.05 summation-anchor boss with its retained top jam nut; shared R15.24 tangent positive ribs; bounded R.040 MAX side roots, profile blends, longitudinal plate/web, boss and crease blends at every inside corner; R.020 MAX knife-stub roots | delicate knife ridge; slender trunnions and cantilevered faces complicate workholding; small through-taps require controlled tapping; independent pilot wall guards retain the .080 in (2.032 mm) pilot floor | multiple setups; native/CAM route not yet qualified | **machined from solid**, per registry; spring seats and matched bracket rows follow the centered plate; mounts stay fixed; evaluate hardened knife insert separately (§6) |
 | **`sm-knife-mount`** | rectangular block 25.4 ±0.8 wide ×29.6×14.0 (bar/plate), O1 hardened and drawn back to 40-45 HRC, the bore and B cut to their printed bands after heat treatment (owner ruling 2026-11-08, SM-02 harden less; supersedes H3's sizes-after-hardening); **2 identical** | unchanged Ø12.00 +0.03/0 reamed through bore and pose, centre 20.616 BASIC below the top face (`BORE_CY` −5.75 from the knife-edge origin, block top +14.866, clamped to the casting underside); #10-24 UNC-2B bottoming tap on the bore axis: #25 Ø3.7973 under the title-block DRILLED HOLES +0.10/0 row, cylindrical drill depth .438 ±.002 (11.1252 ±0.0508), full thread .375 ±.005 (9.525 ±0.127); fully charged drill-point crown web 2.1060 (≥2.032), no break-in (conservative proof envelope Ø3.924, above accepted MAX Ø3.8989; point MIN 117°); one MHA-SM-VN-53 slip hole cut from the top seat to a flat floor 9.398 deep (owner ruling 2026-10-24, T+H3): datum B, a Ø.1280 ±.0007 blind flat-bottom reamed round hole 7.62 (.300) +X of the tap axis, ⊥Ø.001 to A. Owner ruling 2026-11-08 (Pedro), #2144 item 11.3 (scheme S1) deletes the −X slot (datum C) and its notch: the tap is spotted through MHA-FR-02's #10 hole, and the bore carries ⌖Ø.008 to A and B plus a separate ∥.002 to A, its yaw about B set at MHA-SM-00 by a Ø.4720 class ZZ minus gauge pin through both mounts' bores: knife rock 7.76° worst against the 5.0° floor, the far-end offset 0.0470 being the pin's .0017 diametral clearance in the largest bore plus the lever ridge's yaw from that clearance over its 159.90 minimum mouth span; bore floor and pose unchanged | hold the explicit tap/drill depth bands and accepted pilot diameter/point-angle bounds to preserve ≥2.0 crown web; all joint webs ≥2.0 at printed worst cases | 1–2 (square block, bore one axis) | **CNC-REPEAT** (×2) or manual. Modified #10-24 hex-head Bolt MHA-SM-VN-52 (92314A253, cut under head at MHA-SM-00 step 4 to its hole's measured crossbar-underside-to-washer-top stack plus .351 ±.005 in (8.9154 ±0.127); 46.70 nominal, printed (1.84) as a reference) and new 18-8 SAE washer MHA-SM-VN-54 (96659A104) clamp the block to the top-frame's integral crossbar through a letter C drill Ø6.147 (.242) #10 clearance on D within ⌖ .010 | D (owner ruling 2026-11-06). Crossbar width 25.0 ±0.8, symmetric about X=−15; washer seat on the whole faced top (no SPOTFACE), 36.50 (title-block .XXX ±0.13) above faced underside. Nominal reach 8.9173, range 8.7884–9.0424; full-form engagement MIN 7.730067 ≥7.239, tip air MIN 0.3556. The bolt goes in plain, without threadlocker (coordinator ruling 2026-10-16: a doweled static clamp needs no lock). One MHA-SM-VN-53 dowel per mount (98381A473, 1/8 ×3/4) presses 11.94 to the floor of a Ø3.150 +0.013/0 blind ream in the crossbar's faced underside (0.015–0.033 interference), .300 ±.005 (7.62 ±0.127) +X of its bolt axis at the same Z and ⊥Ø0.025 (.001) to A (owner ruling 2026-11-06), pierced by a #51 (Ø1.70) knockout drilled up from its floor on the ream's axis; its proud end slips .0020–.0036 into the block's B, so the block fits one way round only (owner ruling 2026-11-08 (Pedro), #2144 item 11.3: the −X reams and their ⌖ frames are deleted). The #10 holes' ⌖ .010 | D to the bar's two-face width median datum D limits their X shift to ±0.127, retaining the Z socket station and ≥2.0 webs. The former #6 socket-head counterbore route is obsolete |
 
 The Ø6.045 hanger clearance hole carries a **native explicit +0.13/0

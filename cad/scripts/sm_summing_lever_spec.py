@@ -85,6 +85,13 @@ KNIFE_RIDGE_TANGENT_XY = (
     _RIDGE_SETBACK * math.sin(_RIDGE_HALF),
     HEX_H / 2.0 - _RIDGE_SETBACK * math.cos(_RIDGE_HALF),
 )
+# Each stub root blends into the body end face at the #1625 local limit,
+# R.020 MAX, tighter than the title block's inside-corner row; modelled at
+# its printed limit like the ridge round.
+KNIFE_SHOULDER_R = 0.508  # .020
+KNIFE_SHOULDER_R_PLACES = 3
+KNIFE_SHOULDER_R_BAND = (0.0, -KNIFE_SHOULDER_R)  # (upper, lower)
+KNIFE_SHOULDER_R_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "R.020 MAX"
 # Code review C09 (owner ruling T1, 2026-10-17): the included angle with
 # HexWidth and HexHeight left the ridge's position between the sides and each
 # flank's own angle free; one flank could take the whole angle band.  Detail D
@@ -237,6 +244,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "MiddleRibProfile": {"MiddleRibCounterAngle": 1},
     "KnifeStubReference": {"KnifeStubLength": 2},
     "KnifeRidgeFillet": {"KnifeRidgeRadius": KNIFE_RIDGE_R_PLACES},
+    "KnifeShoulderFillets": {"KnifeShoulderRadius": KNIFE_SHOULDER_R_PLACES},
     "KnifeEnvelopeReference": {
         name: KNIFE_ENVELOPE_PLACES
         for name in ("HexWidth", "HexHeight", "RidgeFromLeft", "RidgeFromRight")
