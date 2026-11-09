@@ -247,8 +247,16 @@ _STEP_TEXT: dict[str, tuple[str, ...]] = {
         # Owner ruling 2026-11-08 (Pedro), #2144 item 11.1, via FoMg: the
         # joint's friction cannot hold JOINT_MZ, so the flange is settled
         # nose down onto the shanks before tightening
-        # (mg_magnifying_bracket_arm_check).
-        "ROTATE MHA-MG-01 NOSE DOWN UNTIL BOTH SCREWS BEAR, THEN TIGHTEN.",
+        # (mg_magnifying_bracket_arm_check). Setting and tightening are
+        # separate sub-steps, and a hold check with its remedy follows, as
+        # every other retention on these sheets does (rule 22; review of
+        # the pd DETAIL rename). Each takes one printed line, so the step
+        # still ends sheet 4's second column.
+        "ROTATE MHA-MG-01 NOSE DOWN UNTIL BOTH SCREWS BEAR.",
+        "TIGHTEN BOTH SCREWS.",
+        "CHECK: FIRM HAND PRESSURE DOES NOT MOVE MHA-MG-01.",
+        "IF IT MOVES, SLACKEN BOTH SCREWS AND REPEAT "
+        f"{_n('magnifier-bracket-screwed')}C-{_n('magnifier-bracket-screwed')}D.",
     ),
     "lever-wire-fitted": ("LEVER WIRE: FIT IT PER MHA-MG-00 SHEET 5.",),
     "pen-hung": (
