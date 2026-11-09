@@ -158,15 +158,15 @@ def test_notes_state_stock_process_and_intent_without_sizes() -> None:
     assert all(re.match(r"\d\. ", line) for line in lines)
     assert drawing.NOTES_XY[0] + 0.00242 * max(map(len, lines)) < 0.214
     notes = " ".join(spec.DRAWING_NOTES.split())
-    # The joint's window in inches, rounded inward at four places.
-    window = "-".join(
-        f"{inches:.4f}".lstrip("0")
-        for inches in (
-            math.ceil(round(joint.BRAZE_CLEARANCE_MIN / 25.4 * 1e4, 6)) / 1e4,
-            math.floor(round(joint.BRAZE_CLEARANCE_MAX / 25.4 * 1e4, 6)) / 1e4,
-        )
-    )
-    assert window == ".0040-.0098"
+    # Each window prints in plain inch steps, rounded inward at three places
+    # (integration review at 8fb7fb46f7: .0040-.0098 read as converted mm).
+    # The shank's stays inside BAg-7's window and LOCTITE 638's 0.25 mm gap
+    # fill; the brazed-only sleeve takes BAg-7's .004-.010 diametral.
+    assert spec.SHANK_CLEARANCE_WINDOW == ".004-.009"
+    assert spec.SLEEVE_CLEARANCE_WINDOW == ".004-.010"
+    assert 0.009 * 25.4 <= joint.BRAZE_CLEARANCE_MAX <= joint.LOCTITE_638_GAP_MAX
+    assert joint.BRAZE_CLEARANCE_MIN <= 0.004 * 25.4
+    assert spec.SLEEVE_CLEARANCE_MAX == pytest.approx(0.010 * 25.4)
     # Every SEE NOTE n a callout prints names a note on the sheet.
     numbers = {line.split(".", 1)[0] for line in lines}
     printed = " ".join(spec.DIMENSION_CALLOUTS_BY_NAME.values())
@@ -176,7 +176,8 @@ def test_notes_state_stock_process_and_intent_without_sizes() -> None:
         assert len(text.splitlines()) <= 2, name
     # Both fit windows print as the acceptance of a matched fit (fan-out
     # policy 1): the shank turned to suit the tube, the sleeve selected.
-    assert notes.count(f"CLEARANCE {window};") == 2
+    assert notes.count(f"TUBE ID, CLEARANCE {spec.SHANK_CLEARANCE_WINDOW};") == 1
+    assert notes.count(f"ON TUBE, CLEARANCE {spec.SLEEVE_CLEARANCE_WINDOW};") == 1
     assert "REF" not in notes
     assert "DIAMETRAL" not in notes
     # Both blocks sit beside the narrow end view: the shank's leader shoulder
@@ -341,7 +342,9 @@ def test_sheet_places_every_marked_dimension_at_its_places() -> None:
     } == spec.ONE_PLACE_DIMENSIONS
     # Section A-A keeps only the end piece: its crop runs past the shank,
     # short of the bend; its full cut's line runs past where the plane leaves
-    # the bend's outer wall, short of the leg.
+    # the bend's outer wall, short of the leg, so the cut imports.  The line
+    # it prints is then the short partial one (rule 9): across the end piece
+    # and its joint, on past the crop to the bend tangent.
     start, end = drawing.SECTION_CROP_X_MM
     assert start < geom.ARM_END_X < part.SHANK_END_X < end < -geom.BEND_R
     bend_cut_end = -geom.BEND_R + math.sqrt(
@@ -349,6 +352,9 @@ def test_sheet_places_every_marked_dimension_at_its_places() -> None:
     )
     line_start, line_end = drawing.SECTION_LINE_X_MM
     assert line_start == start and bend_cut_end < line_end < 0.0
+    short_start, short_end = drawing.SECTION_SHORT_X_MM
+    assert short_start == start and end < short_end == -geom.BEND_R
+    assert drawing.TUBE_BREAK_X < end < short_end
 
 
 @pytest.fixture
