@@ -39,7 +39,6 @@ import _telemetry
 import sm_summing_assembly_sheet as notes
 import sm_summing_assembly_spec as spec
 import sm_summing_explode_spec as explode
-import sm_vn_boss_hook_jam_nut_spec as jam_nut
 from _check import check
 from _com import _early_bound
 from _drawing_balloons import (
@@ -216,7 +215,6 @@ PART_ROWS = {
     "sm-vn-knife-mount-dowel": _config.parts("sm-vn-knife-mount-dowel"),
     "sm-summing-lever": _config.parts("sm-summing-lever"),
     "sm-vn-boss-hook": _config.parts("sm-vn-boss-hook"),
-    "sm-vn-boss-hook-jam-nut": _config.parts("sm-vn-boss-hook-jam-nut"),
     "sm-vn-counter-spring": _config.parts("sm-vn-counter-spring"),
     "sm-gooseneck": _config.parts("sm-gooseneck"),
     "sm-vn-gooseneck-shoulder-screw": _config.parts("sm-vn-gooseneck-shoulder-screw"),
@@ -237,8 +235,8 @@ BOM_NORMALIZED_ALIASES = {
 }
 # One balloon per BOM row, each on its own family's visible edge: every family
 # is separated from its neighbours in the explode. The eyebolt's walked
-# anchor was its shank's cut end, so leader 6 ran beside the jam nut's leader
-# 7 (machinist review on main and #1945); it is pinned to the open eye
+# anchor was its shank's cut end, beside the since-retired jam nut's leader
+# (machinist review on main and #1945); it is pinned to the open eye
 # instead: the eye tip's dome-root circle, on its +Z side, which faces the
 # +X+Y+Z isometric viewer (the eyebolt is placed unrotated, so part and
 # machine axes agree).
@@ -247,27 +245,8 @@ EYEBOLT_BALLOON_POINT_MM = (
     ANCHOR_9490T1.eye_open_tip_mm[1],
     ANCHOR_9490T1.wire_radius_mm,
 )
-# The jam nut's walked anchor landed at its underside, so leader 7 read as
-# ending on the eyebolt shank below the nut (machinist review on 6d7f35476).
-# It is pinned to the hex's vertical corner edge between the two flats facing
-# the +X+Y+Z isometric viewer. At half height that edge's point sat on the
-# nut's lower outline, where leader 7's arrowhead, rising from below right,
-# closed over the cut end of the shank (integration review at 8fb7fb46f7),
-# so the point stands at JAM_NUT_ANCHOR_HEIGHT of the nut's thickness. The
-# right-hand silhouette corner is not used: its leader sorts right of leader
-# 6's on the balloon ring and crosses it (farm run 20261109T140046294Z). The
-# builder places the nut with ROT_X_NEG90, part (x, y, z) -> machine
-# (x, z, -y), so the part corner at 120 deg from +Y, (r sin 120, r cos 120),
-# lands at machine (+X, +Z).
-JAM_NUT_ANCHOR_HEIGHT = 0.85
-JAM_NUT_BALLOON_POINT_MM = (
-    jam_nut.ACROSS_CORNERS / 2.0 * math.sin(math.radians(120.0)),
-    jam_nut.ACROSS_CORNERS / 2.0 * math.cos(math.radians(120.0)),
-    jam_nut.THICKNESS * JAM_NUT_ANCHOR_HEIGHT,
-)
 BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS} | {
     spec.BOSS_HOOK: BalloonAnchor(point_mm=EYEBOLT_BALLOON_POINT_MM),
-    spec.BOSS_JAM_NUT: BalloonAnchor(point_mm=JAM_NUT_BALLOON_POINT_MM),
 }
 
 EXPLODED_VIEW_NAMES = {

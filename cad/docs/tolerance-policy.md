@@ -605,17 +605,20 @@ are the concrete realizations of the classes above, being lifted into `tolerance
   #747. The minimum magnifier pose remains #748 and the cam-home phase remains
   #749; this preload correction changes neither limitation.
   Lower anchors are **9489T111 #6-32**, supplied hex nuts discarded, shanks
-  trimmed to **18.6 mm** (**31.3 mm** overall to eye crown), each locked by
-  an **MHA-CH-14 jam nut** on the coefficient plate underside. The neck seats
-  on the plate top; one turn maximum back-out is retained for preload
-  trim, then the nut is tightened while holding eye clocking. The uniform
-  **7.00 mm** coefficient plate spans local **Y=−3.50..+3.50 mm**.
-  The world top is **983.1932 mm** and nut seat **976.1932 mm** at the level pose;
-  all twenty X/Z stations and the **Ø.006 RFS** pattern remain unchanged.
-  Worst-case anchor sizing retains two full turns beyond the jam nut through
-  the 6.49–7.51 mm plate limits. The counter **9490T1 #10-24** keeps its
-  boss-through trim and top jam nut; neither counter anchor nor boss pose
-  changes. Existing upper lever holes are retained, with no upper pins.
+  trimmed to **12.192 mm** (**24.892 mm**, .98 in, overall to eye crown) and
+  left bare in the coefficient-plate tap: nothing torques the hooks, so no jam
+  nut (owner, #2326). The neck seats on the plate top; one turn maximum
+  back-out is retained for preload trim while holding eye clocking. The
+  uniform **7.00 mm** coefficient plate spans local **Y=−3.50..+3.50 mm**.
+  The world top is **983.1932 mm** at the level pose; all twenty X/Z
+  stations are unchanged and the pattern is located **Ø.010 RFS**, the shop
+  table's floor for a tap with no fit word (#2326). The shortest in-band
+  anchor, backed out its full turn, keeps full thread through the thickest
+  in-band plate (6.858–7.366 mm limits); its cut end hangs **2.017 mm** below the plate
+  underside nominally, **2.413 mm** at most. The counter **9490T1 #10-24**
+  keeps its boss-through trim with its eye **3.836 mm** above the boss top,
+  no jam nut; neither counter anchor nor boss pose changes. Existing upper
+  lever holes are retained, with no upper pins.
   View G's actual-edge boss-top/coefficient-top location is
   **9.525−3.50 = 6.025 mm**, printed **.24** under the `.XX` ±.01 in band.
   The **19.05 mm** boss and **7.00 mm** web remain centered on Y=0; the web

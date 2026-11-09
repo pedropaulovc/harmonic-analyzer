@@ -21,7 +21,6 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _sm_summing_explode import station_of, summing_exploded_view_name
 from _cone_axis_constants import SUMMING_Z
 import sm_summing_lever_spec
-import sm_vn_boss_hook_jam_nut_spec as jam_nut
 from stock_anchor_geom import ANCHOR_9490T1
 
 
@@ -150,15 +149,9 @@ def test_dowels_leave_the_mounts_with_the_crossbar_not_with_the_mounts() -> None
     assert dowel_top < builder.HANGER_WASHER_Y
 
 
-def test_jam_nut_explodes_threaded_on_the_eyebolt_shank() -> None:
-    # Fitted, the nut's underside is on the boss top face, ANCHOR_H above the
-    # eyebolt's cut end (flush with the boss underside).
-    seated_above_cut_end = sm_summing_lever_spec.ANCHOR_H
-    drop = explode.BOSS_HOOK_LIFT - explode.BOSS_JAM_NUT_LIFT
-    assert drop > 0.0, "the nut moves down the shank, off its seat"
-    # Still threaded: a full nut thickness of shank under it.
-    assert seated_above_cut_end - drop > jam_nut.THICKNESS
-    # The cut end itself clears the boss top face.
+def test_boss_hook_unscrews_clear_of_the_boss() -> None:
+    # The cut end, flush with the boss underside when fitted, clears the boss
+    # top face.
     assert explode.BOSS_HOOK_LIFT > sm_summing_lever_spec.ANCHOR_H
 
 
@@ -174,36 +167,6 @@ def test_eyebolt_balloon_lands_on_the_eye_facing_the_viewer() -> None:
     # Its outward normal faces the +X+Y+Z isometric viewer.
     assert sum(offset) > 0.0
     assert drawing.BALLOON_ANCHORS[spec.BOSS_HOOK].point_mm == point
-
-
-def test_jam_nut_balloon_lands_high_on_the_hex_corner_facing_the_viewer() -> None:
-    x, y, z = drawing.JAM_NUT_BALLOON_POINT_MM
-    # A hex corner (corners at 0, 60, ... deg from part +Y), in the nut's
-    # upper half, clear of its lower outline and the shank's cut end below.
-    assert math.hypot(x, y) == pytest.approx(jam_nut.ACROSS_CORNERS / 2.0)
-    sixths = math.degrees(math.atan2(x, y)) / 60.0
-    assert sixths == pytest.approx(round(sixths), abs=1e-9)
-    assert 0.75 * jam_nut.THICKNESS <= z < jam_nut.THICKNESS
-
-    def toward_viewer(px: float, py: float) -> float:
-        # Row-vector placement (the builder's JAM_NUT_ROWS), dotted with the
-        # +X+Y+Z isometric view direction in the horizontal plane.
-        rows = builder.JAM_NUT_ROWS
-        machine = [px * rows[0][i] + py * rows[1][i] for i in range(3)]
-        return machine[0] + machine[2]
-
-    corners = [
-        (
-            jam_nut.ACROSS_CORNERS / 2.0 * math.sin(math.radians(60.0 * k)),
-            jam_nut.ACROSS_CORNERS / 2.0 * math.cos(math.radians(60.0 * k)),
-        )
-        for k in range(6)
-    ]
-    assert toward_viewer(x, y) == pytest.approx(
-        max(toward_viewer(*corner) for corner in corners)
-    )
-    assert drawing.BALLOON_ANCHORS[spec.BOSS_JAM_NUT].point_mm == (x, y, z)
-    assert drawing.BALLOON_ANCHORS[spec.BOSS_JAM_NUT].instance is None
 
 
 def test_settings_are_derived_from_the_placed_geometry() -> None:
@@ -308,11 +271,9 @@ def test_retention_rows_cite_the_package_steps() -> None:
     assert rows["sm-summing/boss-hook-in-lever"].installed_at == "MHA-SM-00 STEP 2"
     assert rows["sm-summing/gooseneck-shoulder-screw"].installed_at == "MHA-SM-00 STEP 8"
     hook = rows["sm-summing/boss-hook-in-lever"]
-    assert hook.lock is joint_retention.Lock.JAM_NUT
-    assert hook.lock_part == "sm_vn_boss_hook_jam_nut"
-    assert hook.lock_step == "MHA-SM-00 STEP 2"
-    nut = rows["sm-summing/boss-hook-jam-nut-on-hook"]
-    assert nut.installed_at == "MHA-SM-00 STEP 2"
+    assert hook.lock is joint_retention.Lock.NONE
+    assert joint_retention.RULINGS[hook.exception].joint == hook.id
+    assert "sm-summing/boss-hook-jam-nut-on-hook" not in rows
 
 
 def _step_group(number: str) -> list[str]:
@@ -336,7 +297,7 @@ def test_step_five_runs_each_hanger_bolt_home_by_hand_then_sets_the_gauge_pin() 
     # seat flat to the crossbar underside.  Owner ruling 2026-11-08 (Pedro),
     # #2144 item 11.3: with both bolts finger-tight the gauge pin through
     # both bores sets the mounts' yaw before they are tightened, and it must
-    # slide back out (check 6).
+    # slide back out (check 5).
     step = " ".join(_step_group("5"))
     assert step.startswith("5. ")
     assert "MHA-SM-VN-52" in step
@@ -348,7 +309,7 @@ def test_step_five_runs_each_hanger_bolt_home_by_hand_then_sets_the_gauge_pin() 
     assert spec.KNIFE_GAUGE_BAR_DIA == pytest.approx(2.0 * builder.knife_mount.BORE_R_MIN)
     assert notes.KNIFE_GAUGE_BAR not in " ".join(notes.BOM_DESCRIPTIONS.values())
     assert any(
-        check.startswith("6. AFTER STEP 5") and notes.KNIFE_GAUGE_BAR in check
+        check.startswith("5. AFTER STEP 5") and notes.KNIFE_GAUGE_BAR in check
         for check in notes.ASSEMBLY_CHECKS
     )
 

@@ -15,8 +15,8 @@ sm-summing-lever:
   # cylinder families, the boss/crease and side-arc web families and the knife-stub roots
   # join every remaining inside corner without tangent propagation.
   # No R.040 blend reaches the receiver entry caps; the knife seat clears the stub roots.
-  # Spring and nut seats rise .038 (0.96 mm) with the plate top; the Ø.006
-  # pattern and #1769 footprint are unchanged.
+  # Spring seats rise .038 (0.96 mm) with the plate top; the #1769 footprint is
+  # unchanged and the spring pattern is Ø.010 (#2326).
   # The .354 receiver extends inward only; entry face and axes stay fixed.
   # Pad/ledge and sharp-junction (former RV-02) exceptions are eliminated.
   # Knife hardness debt (#1611) stays separate.
@@ -25,9 +25,9 @@ sm-summing-lever:
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"
-      where: "the knife-seat and 20-hole spring-pattern position frame (Ø.006 RFS to A|B|C; datum C, the coefficient-plate top the taps run through, clocks the pattern about A)"
+      where: "the knife-seat and 20-hole spring-pattern position frame (Ø.010 RFS to A|B|C; datum C, the coefficient-plate top the taps run through, clocks the pattern about A)"
       finding: "pattern position frame over-specified (rule 5)"
-      reason: "one pattern control keeps the 20 channels spring geometry consistent; its Ø.006 zone, tightened from Ø.012 by owner ruling on code review C06, keeps neighbouring MHA-CH-14 jam nuts .010 apart with both taps at their worst (owner-accepted)"
+      reason: "one pattern control keeps the 20 channels spring geometry consistent (owner-accepted); its Ø.010 zone is the drawing guidelines' cap for a tap with no ream or register word, no longer tightened for neighbouring jam nuts, which #2326 removed"
     - id: "RV-03"
       kind: "accept"
       where: "front view, 2X R5.47 web arcs; words added to the Ø.75 callout: 'WEB ARCS RUN FROM QUADRANTS TO AXIS A AT ENDS'"

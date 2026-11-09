@@ -706,36 +706,34 @@ def test_per_channel_joints_follow_the_built_channel_count(monkeypatch) -> None:
         for j in jr.JOINTS
         if j.assembly == "ha_harmonic_analyzer" and j.per_channel
     )
-    # Each channel anchor and its jam nut.
-    assert per_channel == 2
+    # Each channel anchor in its coefficient-plate tap.
+    assert per_channel == 1
     monkeypatch.setattr(jr._config, "active_count", lambda: 5)
     data = jr.report([])
     assert data["per_assembly"]["ha_harmonic_analyzer"]["instances"] == before - (
         per_channel * (built - 5)
     )
-    for joint_id in (
-        "ha-harmonic-analyzer/channel-anchor-in-summing-plate",
-        "ha-harmonic-analyzer/channel-anchor-jam-nut-on-anchor",
-    ):
-        row = next(j for j in data["joints"] if j["id"] == joint_id)
-        assert row["instances"] == 5
+    row = next(
+        j
+        for j in data["joints"]
+        if j["id"] == "ha-harmonic-analyzer/channel-anchor-in-summing-plate"
+    )
+    assert row["instances"] == 5
 
 
-def test_channel_anchors_are_locked_by_their_jam_nuts() -> None:
+def test_channel_anchors_stand_bare_under_the_owner_ruling() -> None:
+    # #2326: nothing torques the hooks, so no jam nut; the owner's ruling
+    # waives the rule-23 lock on exactly this joint.
     rows = {j.id: j for j in jr.JOINTS}
     anchor = rows["ha-harmonic-analyzer/channel-anchor-in-summing-plate"]
     assert anchor.exposure is Exposure.ADJUSTER
-    assert anchor.lock is Lock.JAM_NUT
-    assert anchor.lock_part == "ch_anchor_jam_nut"
-    assert set(anchor.lock_binds) == {"ch_vn_spring_hook", "sm_summing_lever"}
-    assert anchor.exception == ""
-    nut = rows["ha-harmonic-analyzer/channel-anchor-jam-nut-on-anchor"]
-    assert nut.member == "ch_anchor_jam_nut"
-    assert nut.receiver == "ch_vn_spring_hook"
-    assert nut.exposure is Exposure.STATIC_CLAMP
-    for row in (anchor, nut):
-        text = " ".join((row.axial_capture, row.evidence, row.exposure_reason))
-        for banned in ("THREADLOCK", "LOCTITE", "NYLON", "NYLOC"):
-            assert banned not in text.upper()
+    assert anchor.lock is Lock.NONE
+    assert anchor.lock_part == ""
+    assert jr.RULINGS[anchor.exception].joint == anchor.id
+    assert "#2326" in jr.RULINGS[anchor.exception].granted
+    assert "ha-harmonic-analyzer/channel-anchor-jam-nut-on-anchor" not in rows
+    text = " ".join((anchor.axial_capture, anchor.evidence, anchor.exposure_reason))
+    for banned in ("THREADLOCK", "LOCTITE", "NYLON", "NYLOC"):
+        assert banned not in text.upper()
 
 

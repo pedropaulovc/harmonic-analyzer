@@ -213,16 +213,14 @@ def test_new_washers_add_two_instances_to_the_one_dowel_per_mount_recipe() -> No
         "sm-vn-knife-mount-dowel": 2,
         "sm-summing-lever": 1,
         "sm-vn-boss-hook": 1,
-        "sm-vn-boss-hook-jam-nut": 1,
         "sm-vn-counter-spring": 1,
         "sm-gooseneck": 1,
         "sm-vn-gooseneck-shoulder-screw": 1,
     }
     # Owner ruling 2026-11-08 (Pedro), #2144 item 11.3: one dowel per mount
     # takes the former thirteen-component recipe to eleven.
-    assert sum(counts.values()) == 14
-    added = counts["sm-vn-knife-hanger-washer"] + counts["sm-vn-boss-hook-jam-nut"]
-    assert sum(counts.values()) - added == 11
+    assert sum(counts.values()) == 13
+    assert sum(counts.values()) - counts["sm-vn-knife-hanger-washer"] == 11
 
 
 def test_washer_seat_pairs_allow_exact_contacts_but_no_solid_overlap() -> None:

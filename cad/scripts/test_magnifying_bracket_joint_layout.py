@@ -546,7 +546,7 @@ def test_printed_pilot_clears_pivot_and_native_spring_tap_geometry() -> None:
         assert wall.lower_mm >= 2.0
         assert wall.minimum_mm >= 2.0
         assert wall.minimum_mm == pytest.approx(min(wall.upper_mm, wall.lower_mm))
-    # The native spring frame is Ø0.15 RFS (code review C06), not MMC.
+    # The native spring frame is Ø.010 RFS (#2326), not MMC.
     # Separate X/Z extremes conservatively bound the pilot and its wander.
     spring_position = float(lever.GEOMETRIC_TOLERANCES_MM["spring-hole pattern position"]) / 2.0
     spring_dx_min = (
@@ -567,19 +567,20 @@ def test_printed_pilot_clears_pivot_and_native_spring_tap_geometry() -> None:
     assert spring_web_min >= 2.0
 
 
-def test_real_jam_nut_footprint_stays_clear_of_every_rib_at_ordinary_bands() -> None:
-    import ch_anchor_jam_nut_spec as nut
+def test_protruding_anchor_shank_stays_clear_of_every_rib_at_ordinary_bands() -> None:
+    from stock_anchor_geom import ANCHOR_9489T111
 
     position_radius = float(lever.GEOMETRIC_TOLERANCES_MM["spring-hole pattern position"]) / 2.0
-    nut_inner_x = lever.HOLE_X - position_radius - nut.OD_MAX / 2.0
+    shank_inner_x = lever.HOLE_X - position_radius - ANCHOR_9489T111.thread_major_dia_mm / 2.0
     reach_max = lever.RIB_REACH + lever.RIB_REACH_DEVIATIONS[1]
-    # The rib stays clear of the nut; a rib grown just past it would intrude.
-    assert nut_inner_x > reach_max
+    # The rib stays clear of the cut shank below the plate; a rib grown just
+    # past it would intrude.
+    assert shank_inner_x > reach_max
     # This is positive geometric separation, not a newly invented clearance floor.
     section = lever_profile.RibProfile(reach=reach_max, blend_radius=0.0)
-    probe = (nut_inner_x, lever.COEFFICIENT_BOTTOM_Y - 1e-4)
+    probe = (shank_inner_x, lever.COEFFICIENT_BOTTOM_Y - 1e-4)
     assert section.signed_boundary_distance(*probe) < 0.0
-    intrusion = lever_profile.RibProfile(reach=nut_inner_x + 0.01, blend_radius=0.0)
+    intrusion = lever_profile.RibProfile(reach=shank_inner_x + 0.01, blend_radius=0.0)
     assert intrusion.signed_boundary_distance(*probe) > 0.0
 
 

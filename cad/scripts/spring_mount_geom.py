@@ -37,15 +37,15 @@ KNIFE_CONTACT_Y = KNIFE[1] + sm_summing_lever_spec.HEX_H / 2.0
 COLUMN_X = -197.0
 MIN_CLEARANCE_MM = 0.25
 # The coefficient slab is centred on the knife/trunnion axis (#2129).
-# Both spring-anchor and jam-nut seats follow its authored faces.
+# The spring-anchor seats follow its authored faces.
 PLATE_TOP_Y = KNIFE[1] + sm_summing_lever_spec.COEFFICIENT_TOP_Y
 PLATE_BOTTOM_Y = KNIFE[1] + sm_summing_lever_spec.COEFFICIENT_BOTTOM_Y
 CHANNEL_ANCHOR_XY = (
     KNIFE[0] + sm_summing_lever_spec.HOLE_X,
     PLATE_TOP_Y - ANCHOR_9489T111.thread_start_y_mm,
 )
-# The trimmed anchor fills the boss and stands its jam-nut thread above the
-# boss top face (sm_vn_boss_hook_spec), so the eye rides that much higher.
+# The trimmed anchor fills the boss and stands its eye EYE_STANDOFF_MM above
+# the boss top face (sm_vn_boss_hook_spec), at the calibrated counter seat.
 COUNTER_SHANK_LENGTH_MM = sm_vn_boss_hook_spec.SHANK_LENGTH_MM
 COUNTER_BOSS_TOP_Y = KNIFE[1] + sm_summing_lever_spec.ANCHOR_H / 2.0
 COUNTER_ANCHOR_XY = (

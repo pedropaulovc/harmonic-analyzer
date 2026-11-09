@@ -49,7 +49,7 @@ where the counter-spring boss-hook attaches (local x -76 -> machine -91).
 Sketches follow the repo fully-defined convention (cad/scripts/_sketch.py).
 The common rib profile has native tangent constraints, defining dimensions,
 face/profile readback and exact incremental-volume gates. Bounded internal
-root fillets are selected explicitly and cannot grow into the spring-nut lane.
+root fillets are selected explicitly and cannot grow into the spring-anchor lane.
 
 Dimensions: cad/DIMENSIONS.md ch. 18 (legacy KCL values + M6.4 registration;
 low/med confidence).
@@ -236,8 +236,9 @@ RIB_OFFSET = PLATE_L / 2.0 - RIB_T  # both edge-rib inner caps; outside ends fix
 # No plain anchor bore: the counter anchor's seat is the native COUNTER_HOLE_SPEC
 # tap through the boss, authored after the ribs (see _counter_anchor_tap).
 # In X, all ribs stop at 35.814 (1.41) before the unchanged spring-hole column
-# and worst jam-nut footprint at 36.449. The pilot continues beyond the 5.08 mm
-# entry rib into the connected coefficient plate, not an enlarged receiver.
+# and the worst protruding anchor-shank footprint at 37.970. The pilot
+# continues beyond the 5.08 mm entry rib into the connected coefficient plate,
+# not an enlarged receiver.
 # The shared positive-X branch meets both plate faces with R.040 tangent
 # transitions, with no separate pad, ledge or vertical tip face.
 if RIB_REACH > HOLE_X - blind_cut_dia_mm(HOLE_SPEC) / 2.0 - 2.0:
