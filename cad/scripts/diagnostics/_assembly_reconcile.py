@@ -30,8 +30,11 @@ MATES = (
      "mover_plane": "Top Plane", "base_plane": "Top Plane", "alignment": "aligned"},
     {"key": "right", "name": "ReconcileRight", "type": "MateCoincident", "mate_type": "coincident",
      "mover_plane": "Right Plane", "base_plane": "Right Plane", "alignment": "aligned"},
+    # FlipDimension is not sign-defined by the SDK. Native attempt 2 (fa373f7279)
+    # observed flip=False place the mover at z=-d for this [mover, base] Front
+    # plane order, so +Z requires flip=True; validation reads both back.
     {"key": "distance", "name": "ReconcileDistance", "type": "MateDistanceDim", "mate_type": "distance",
-     "mover_plane": "Front Plane", "base_plane": "Front Plane", "alignment": "aligned", "flip": False},
+     "mover_plane": "Front Plane", "base_plane": "Front Plane", "alignment": "aligned", "flip": True},
 )
 DIMENSIONS = {"distance": "D1@ReconcileDistance"}
 _KEYS = {"schema", "child", "configurations", "components", "mates", "dimensions", "parameters_mm"}

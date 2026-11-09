@@ -1582,8 +1582,10 @@ planner `_assembly_reconcile.py`) reuses the qualified cylinder above as a
 scratch child, inserted twice with explicit `Default` assembly and child
 configurations. `base` is fixed at the origin; `mover` is fully constrained by
 `ReconcileTop`/`ReconcileRight` coincident planes and the `ReconcileDistance`
-Front-plane distance mate (aligned, unflipped, mover on +Z). The incremental
-edit changes only `D1@ReconcileDistance` from 30 mm to 40 mm with
+Front-plane distance mate (aligned, mover on +Z). `FlipDimension` has no
+documented sign; attempt 2 showed `False` puts the mover at -Z for the
+mover-first/base-second plane order, so the recipe declares `True`. The
+incremental edit changes only `D1@ReconcileDistance` from 30 mm to 40 mm with
 `SetSystemValue3`; it never reinserts components or re-mates. Any other recipe
 change returns `full_build` with no edits; malformed recipes raise.
 

@@ -47,7 +47,7 @@ def test_distance_change_is_the_only_edit_without_mutating_inputs():
     lambda value: value["mates"][0].update(name="Coincident1"),
     lambda value: value["mates"][0].update(base_plane="Front Plane"),
     lambda value: value["mates"][1].update(alignment="anti_aligned"),
-    lambda value: value["mates"][2].update(flip=True),
+    lambda value: value["mates"][2].update(flip=not value["mates"][2]["flip"]),
     lambda value: value["mates"][2].update(type="MateCoincident"),
     lambda value: value["mates"][2].update(unsupported_option=True),
     lambda value: value["dimensions"].update(distance="D1@OtherMate"),
@@ -62,7 +62,7 @@ def test_structural_change_refuses_entire_parameter_edit(change):
 
 def test_matching_but_unsupported_structures_do_not_become_noop():
     unsupported = recipe()
-    unsupported["mates"][2]["flip"] = True
+    unsupported["mates"][2]["flip"] = not unsupported["mates"][2]["flip"]
     result = plan(unsupported, copy.deepcopy(unsupported))
     assert result.decision == "full_build"
     assert result.edits == ()
@@ -99,11 +99,12 @@ def test_non_object_recipe_fails(value):
 
 def test_recipe_instances_do_not_share_structural_containers():
     first = recipe()
-    first["mates"][2]["flip"] = True
+    declared_flip = first["mates"][2]["flip"]
+    first["mates"][2]["flip"] = not declared_flip
     first["components"][0]["initial_translation_mm"].append(1.0)
     first["child"]["features"][1]["depends_on"].clear()
     second = recipe()
-    assert second["mates"][2]["flip"] is False
+    assert second["mates"][2]["flip"] is declared_flip
     assert second["components"][0]["initial_translation_mm"] == [0.0, 0.0, 0.0]
     assert second["child"]["features"][1]["depends_on"] == ["profile"]
 

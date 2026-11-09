@@ -286,7 +286,9 @@ class Harness:
                 raise RuntimeError(f"AddComponent5 failed for {item['key']}")
             components[item["key"]] = _early_bound(raw, "IComponent2")
         distance_m = spec["parameters_mm"]["distance"] / 1000
-        # The mover starts on the intended +Z side; flip=False keeps that side.
+        # The mover starts on the intended +Z side. The recipe's FlipDimension
+        # (True for this [mover, base] order, natively observed) selects that
+        # side; the signed transform and Flipped readbacks verify it.
         self.place(components["base"], [0.0, 0.0, 0.0])
         self.place(components["mover"], [0.0, 0.0, distance_m])
         self.set_fixed(components["base"], True)
@@ -772,7 +774,8 @@ async def benchmark(adapter: Any, out: Path, trials: int) -> dict[str, str]:
         protected = {name: digest(out / name) for name in
                      (manifest["assembly_file"], manifest["child_file"], fixture["path"])}
         structural_spec = recipe(TARGET_DISTANCE_MM)
-        structural_spec["mates"][2]["flip"] = True
+        # Invert whatever flip the recipe currently declares: a real structural change.
+        structural_spec["mates"][2]["flip"] = not structural_spec["mates"][2]["flip"]
         with harness.phase("diff", "structural_refusal"):
             structural = plan(manifest["recipe"], structural_spec)
             if structural.decision != "full_build" or structural.edits:
