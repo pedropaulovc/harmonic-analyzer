@@ -210,6 +210,12 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
         "cone",
         85.0,
     ),
+    # ...then drops out of the foot's blind ream along its own (plate-normal)
+    # axis, below the block: seated, only its stub under the foot showed and
+    # its balloon read as landing on a part already in its mate (integration
+    # proof 20261109T105251629Z, balloon 11).  15 clears the .16 ream depth
+    # (dt_cone_tip_block_spec.DOWEL_HOLE_DEPTH) by about 11.
+    ExplodeStep("tip dowel drops", ("dt-vn-locating-pin",), "y", -15.0),
     # The cone gears then slide on toward the tip, leaving MHA-DT-07 alone on
     # the MHA-DT-04 collar: unexploded, its balloon and the cone gear's met on
     # the stack's first disc (r15, 20261018T215310765Z, balloons 35 and 36).
@@ -329,6 +335,19 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     # instances pin the straps to the torque shaft and stay with them.
     ExplodeStep(
         "arbor collar pin", ("dt-vn-pinion-strap-pin",), "z", -50.0, roles=(COLLAR_PIN_ROLE,)
+    ),
+    # The collar pin then drives out of its cross hole along world -X, 25 deg
+    # off its own axis (as MHA-DT-29 drives out 14 deg off): seated, it showed
+    # only as a flush end, and the balloon fell on a strap pin's flush end
+    # instead (integration proof 20261109T105251629Z, balloon 20).  25 carries
+    # it about 22.7 along its axis, past the collar's Ø.59 radius plus the
+    # pin's half length (13.8).
+    ExplodeStep(
+        "collar pin drives out",
+        ("dt-vn-pinion-strap-pin",),
+        "x",
+        -25.0,
+        roles=(COLLAR_PIN_ROLE,),
     ),
     ExplodeStep("grip crossrod", ("dt-pinion-handle",), "y", 25.0),
 )

@@ -17,12 +17,19 @@ family walks.
 
 Keyed by cluster, then family; a cluster sheet shows only its own cluster.
 
-The pedestal hold-down screw is pinned to the south screw,
-pedestal-hold-down-screw-1: the north one hides behind its strap in the
-exploded view (r6b item 26). The pin replaces a head-rim pick that took the
-screw's largest listed circle by entity, whose leader SolidWorks ended on
-the pedestal's top face (run
+The pedestal hold-down screw is pinned to the north screw,
+pedestal-hold-down-screw-2, the one standing lifted clear of its pedestal at
+the sheet's lower left. The south one, -1, now shows only a head sliver
+behind its pedestal (integration proof 20261109T105251629Z, balloon 33);
+in r6b (item 26) it was the north one that hid. The pin replaces a head-rim
+pick that took the screw's largest listed circle by entity, whose leader
+SolidWorks ended on the pedestal's top face (run
 20260928T194845954Z-44f5de00de924735961d14f4aad40337, item 32).
+
+MHA-DT-VN-63 is pinned to the collar pin, pinion-strap-pin-3, which drives
+out of the MHA-DT-33 cross hole in the explode; the two strap pins stay
+flush in their straps, where the balloon landed on a pin end (integration
+proof 20261109T105251629Z, balloon 20).
 
 The single south end disc uses a walked edge on cylinder-end-disc-1.
 There is no north disc: MHA-DT-VN-68 bears directly between gear 19 and
@@ -53,7 +60,7 @@ DRIVE_TRAIN_BALLOON_ANCHORS: dict[str, dict[str, BalloonAnchor]] = {
         "dt-vn-cylinder-bank-spring": BalloonAnchor(),
         "sh-vn-arbor-set-screw": BalloonAnchor(),
         "dt-cylinder-gear": BalloonAnchor(),
-        "dt-vn-pedestal-hold-down-screw": BalloonAnchor(instance="dt-vn-pedestal-hold-down-screw-1"),
+        "dt-vn-pedestal-hold-down-screw": BalloonAnchor(instance="dt-vn-pedestal-hold-down-screw-2"),
     },
     "cone-set": {
         "dt-cone-swing-platform": BalloonAnchor(),
@@ -92,7 +99,7 @@ DRIVE_TRAIN_BALLOON_ANCHORS: dict[str, dict[str, BalloonAnchor]] = {
     "pinion-rig": {
         "dt-alignment-pinion": BalloonAnchor(),
         "dt-pinion-bracket": BalloonAnchor(),
-        "dt-vn-pinion-strap-pin": BalloonAnchor(),
+        "dt-vn-pinion-strap-pin": BalloonAnchor(instance="dt-vn-pinion-strap-pin-3"),
         "dt-pinion-pivot-block": BalloonAnchor(),
         "dt-pinion-pivot-shaft": BalloonAnchor(),
         "dt-pinion-lift-rod": BalloonAnchor(),
