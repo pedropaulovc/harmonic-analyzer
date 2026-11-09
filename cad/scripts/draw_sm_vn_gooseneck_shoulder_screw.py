@@ -44,11 +44,12 @@ LENGTH_LANE = 0.008  # horizontal length lines, out from the head's rim
 # the axis, clear of its short 7.9 mm span.
 SHELVES = {"SupplierShoulderDiameter": (False, "right")}
 # Note anchors are their text's top-left corner.  The thread note's rows stand
-# above the head's rim, its left edge just past the shoulder step, so its
-# leader drops almost straight onto the thread next to the shoulder.
-THREAD_NOTE_RIGHT = 0.002  # right of the shoulder step
+# above the head's rim, its left edge right of the (.375) shoulder length's
+# outside arrow and tail, so its leader drops almost straight onto the thread's
+# middle without crossing that dimension line (integration review, rule 14).
+THREAD_NOTE_RIGHT = 0.010  # right of the shoulder step, past the length tail
 THREAD_NOTE_RISE = 0.021  # above the head rim
-THREAD_LANDING = 0.2  # of the thread length, from the shoulder
+THREAD_LANDING = 0.6  # of the thread length, from the shoulder
 _REFERENCES = {
     name: {
         "label": f"{name}@{part.REFERENCE_FEATURE}", "units": "in",

@@ -99,7 +99,6 @@ from sm_knife_mount_spec import (
     DRAWING_REFERENCE_PRECISION,
     GEOMETRIC_TOLERANCES_IN,
     HOLE_ROW_FACE_DISTANCE,
-    PIN_DEPTH_CALLOUT,
     PIN_HOLE_DEPTH,
     PIN_HOLE_DEPTH_PLACES,
     PIN_HOLE_DIA,
@@ -210,8 +209,8 @@ FRONT_KEEP = {
     "BoreDia": (FRONT_CENTER[0] - 0.0565, _front_y(BORE_CY) + BORE_DIA_TEXT_RISE),
 }
 # B's floor depth stands right of the section, its witness lines off the
-# cut top seat and that floor; "FLAT BOTTOM" with it; its corner is the
-# title block's (sm_knife_mount_spec.PIN_DEPTH_CALLOUT).  The
+# cut top seat and that floor, its value alone (the hole callout says FLAT
+# BOTTOM; sm_knife_mount_spec, DOWEL_HOLE_FLOOR_CORNER_R_MAX).  The
 # dimension line stands at BLK_HALF_X + 12.0, x
 # 349.4 mm (farm run 20261027T175429300Z), 14.9 mm right of the 7.632
 # BASIC's shoulder end (x 334.5 mm, farm run 20261027T133857303Z); its
@@ -226,11 +225,11 @@ FRONT_KEEP = {
 # the offset y and the rows' 5.56 mm under each other, 3.5 mm tall, the
 # widest 41.94 mm; the leader left the dimension line's midpoint for the
 # underline's left end, the underline under the last row.  This block's
-# two rows keep that 42 mm band centred on the same x.
+# one row keeps that 42 mm band centred on the same x.
 DEPTH_VALUE_RISE = 0.00278
 DEPTH_ROW_PITCH = 0.00556
 DEPTH_TEXT_HEIGHT = 0.0035
-DEPTH_TEXT_ROWS = 1 + len(PIN_DEPTH_CALLOUT.splitlines())
+DEPTH_TEXT_ROWS = 1
 DEPTH_ROW_HALF_WIDTH = 0.021
 # The underline's left end 5.9 mm right of the dimension line (the F-F
 # jog's 5.88), 4.9 mm past the witness lines' ends; the block's rows centred
@@ -349,7 +348,6 @@ PIN_HOLE_CALLOUT = "\n".join(
 DIMENSION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
     "PinHoleDia": PIN_HOLE_CALLOUT,
-    "PinHoleDepth": PIN_DEPTH_CALLOUT,
 }
 _GTOL_ROW = 0.007
 DATUM_TAG_BOX = 0.007
@@ -478,20 +476,26 @@ _DRILL_ANGLE_VARIABLE = 16  # swCalloutVariable_e.swCalloutVariable_Drill_Angle
 # lower-left rim, nearer its block.
 TAP_CALLOUT_RIM_SIDE = -1.0
 # The bore's frames (Owner ruling 2026-11-08 (Pedro), #2144 item 11.3):
-# ⌖Ø.008|A|B and, directly under it, ∥.002|A -- two frames, each with its
-# own leader to the bore's crown, because a stacked lower frame takes its
-# upper's Ø (_drawing_gdt.add_feature_control_frame) and an axis held
-# parallel to a datum plane takes a two-plane zone, not a Ø.  They stand
-# above the block's upper-right corner, right of the datum-A tag, where the
-# former two-row composite frame stood.  The former top row, measured on
-# farm run 20261027T154115830Z, ran x 150.0..191.6 mm, y 166.6..173.6, its
-# leader off the left end at y 170.1; the ∥ row stands one 7.0 mm row under
-# it, so its bottom, y 159.6, stands 5.0 mm over the block's top edge (y
-# 154.6) and the 20.616 BASIC's top extension line, nothing else within x
-# 150..192 under it (datum A's tag ends at x 126.5, the right view's Ra 3.2
-# starts at x 214.0).  Neither row is wider than the former A|B|C rows.
+# ⌖Ø.008|A|B and ∥.002|A -- two frames, each with its own leader to the
+# bore's crown, because a stacked lower frame takes its upper's Ø
+# (_drawing_gdt.add_feature_control_frame) and an axis held parallel to a
+# datum plane takes a two-plane zone, not a Ø.  The ⌖ frame stands above
+# the block's upper-right corner, right of the datum-A tag, where the former
+# two-row composite frame stood (farm run 20261027T154115830Z: x
+# 150.0..191.6 mm, y 166.6..173.6, its leader off the left end at y 170.1).
+# The ∥ frame cannot share that side: one row under it at the same x its
+# leader ran flatter, 36.7 mm over the part, 11.5 mm past the crown's 25.2
+# mm approach (integration farm run 20261109T062834910Z, leader-over-part,
+# limit 10); 9 mm left, its 6.4 mm leader shoulder crossed the ⌖ leader
+# (farm run 20261109T082115744Z, leader-crosses-leader).  So it stands
+# mirrored, left of the datum-A tag (x 118..126.5), one row under the ⌖ frame:
+# its left edge at x 78, its right end (about x 106..109) and shoulder stop
+# short of the tag's stem, and its leader drops almost plumb to the crown
+# (about 29 mm over the part, a 4 mm detour).  Its bottom, y 159.6, stands
+# 9.6 mm over the ream note (top y 150, right end x 84) and its top, y
+# 166.6, 5 mm under the tap callout's last row (bottom about y 172).
 BORE_FRAME_XY = (FRONT_CENTER[0] + 0.035, _front_y(BLK_TOP) + 0.019)
-BORE_PARALLELISM_FRAME_XY = (BORE_FRAME_XY[0], BORE_FRAME_XY[1] - 0.007)
+BORE_PARALLELISM_FRAME_XY = (FRONT_CENTER[0] - 0.037, BORE_FRAME_XY[1] - 0.007)
 BORE_BASIC_TEXT_XY = (
     _sheet_x(BLK_HALF_X) + 0.012,
     _front_y(BLK_TOP - BORE_CENTRE_DEPTH / 2.0),

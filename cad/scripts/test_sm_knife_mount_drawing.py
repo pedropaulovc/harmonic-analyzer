@@ -135,25 +135,21 @@ def test_dowel_hole_depth_is_dimensioned_on_the_section_not_a_hidden_edge() -> N
     assert end[0] > sm_knife_mount_spec.BLK_HALF_X
     assert start[0] < 0.0 < sm_knife_mount_spec.PIN_HOLE_X < end[0]
     # One hole, one floor (Owner ruling 2026-11-08 (Pedro), #2144 item
-    # 11.3): the depth states, under the value, that the floor is flat.
+    # 11.3): the depth prints its value alone, the hole callout states the
+    # flat floor (machinist review, farm run 20261109T083029873Z, rule 7).
     # Nothing seats on it, so its corner is the title block's (machinist
     # review, farm run 20261027T233328148Z: a local CORNER R0.1 MAX named no
     # function).
-    from _layout_audit import TEXT_ROW_LIMIT
     from _layout_geometry import ARROW_TEXT_CLEARANCE_M
     from _printed_tolerance import inside_corner_radius_mm
 
-    callout = sm_knife_mount_spec.PIN_DEPTH_CALLOUT
-    depth_rows = callout.splitlines()
-    assert "FLAT BOTTOM" in depth_rows[0]
-    assert "2X" not in callout.split()
-    assert "CORNER" not in callout
+    assert not hasattr(sm_knife_mount_spec, "PIN_DEPTH_CALLOUT")
+    assert "PinHoleDepth" not in drawing.DIMENSION_CALLOUTS
+    assert "FLAT BOTTOM" in drawing.PIN_HOLE_CALLOUT.splitlines()[0]
     corner = sm_knife_mount_spec.DOWEL_HOLE_FLOOR_CORNER_R_MAX
     assert corner == inside_corner_radius_mm(unit=sm_knife_mount_spec.UNIT)
     assert 0.0 <= sm_knife_mount_spec.DOWEL_HOLE_CORNER_RECESS < 0.001
-    assert 1 + len(depth_rows) <= TEXT_ROW_LIMIT
-    assert drawing.DEPTH_TEXT_ROWS == 1 + len(depth_rows)
-    assert drawing.DIMENSION_CALLOUTS["PinHoleDepth"] is callout
+    assert drawing.DEPTH_TEXT_ROWS == 1
     assert sm_knife_mount_spec.PIN_HOLE_DEPTH == pytest.approx(9.398)  # .37
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("create_section_view(") == 1
@@ -188,9 +184,12 @@ def test_dowel_hole_depth_is_dimensioned_on_the_section_not_a_hidden_edge() -> N
     )
     assert line_y == pytest.approx((top_y + floor_y) / 2.0)
     rows_top = y + drawing.DEPTH_VALUE_RISE + drawing.DEPTH_TEXT_HEIGHT
-    underline_y = y + drawing.DEPTH_VALUE_RISE - len(depth_rows) * drawing.DEPTH_ROW_PITCH
+    underline_y = (
+        y
+        + drawing.DEPTH_VALUE_RISE
+        - (drawing.DEPTH_TEXT_ROWS - 1) * drawing.DEPTH_ROW_PITCH
+    )
     half_width = drawing.DEPTH_ROW_HALF_WIDTH
-    assert 2.0 * half_width >= max(len(row) for row in depth_rows) * 0.00280
     rows_left, rows_right = x - half_width, x + half_width
     # Wholly right of the witness lines' ends (1 mm past the dimension
     # line) and between their heights, so nothing it owns or crosses runs
@@ -623,13 +622,12 @@ def test_the_sheet_carries_no_notes_block() -> None:
     assert drawing_source.count("add_property_linked_note(") == 1
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in drawing_source
     # No quantity rides above B's Ø (the 2X pattern is gone); the slip
-    # hole's callout names its fit on its mate (rule 4), and the depth states
-    # its one floor.
+    # hole's callout names its fit on its mate (rule 4) and its flat floor;
+    # the section's depth prints its value alone.
     assert not hasattr(drawing, "CALLOUTS_ABOVE")
     assert drawing.DIMENSION_CALLOUTS == {
         "BoreDia": drawing.BORE_CALLOUT,
         "PinHoleDia": drawing.PIN_HOLE_CALLOUT,
-        "PinHoleDepth": sm_knife_mount_spec.PIN_DEPTH_CALLOUT,
     }
     dowel_number = _config.parts("sm-vn-knife-mount-dowel")["number"]
     assert sm_knife_mount_spec.DOWEL_NUMBER == dowel_number
@@ -751,11 +749,15 @@ def test_native_gdt_and_bore_geometry() -> None:
     assert "_GTOL_TEXT_CALLOUT_ABOVE" not in source
     for gone in ("PIN_FRAME_QUANTITY", "PIN_SPAN_TEXT_XY", "PIN_DATUM_B_RIM_DEG"):
         assert not hasattr(drawing, gone)
-    # The ∥ frame stands one row under the ⌖ frame, both leaders on the
-    # bore's crown.
+    # The ∥ frame stands mirrored, left of the datum-A tag and one row under
+    # the ⌖ frame's height, so its leader drops almost plumb to the bore's
+    # crown: under the ⌖ frame it overran the leader-over-part detour
+    # (integration run 20261109T062834910Z), 9 mm left its shoulder crossed
+    # the ⌖ leader (run 20261109T082115744Z).
     assert drawing.BORE_PARALLELISM_FRAME_XY == pytest.approx(
-        (drawing.BORE_FRAME_XY[0], drawing.BORE_FRAME_XY[1] - 0.007)
+        (drawing.FRONT_CENTER[0] - 0.037, drawing.BORE_FRAME_XY[1] - 0.007)
     )
+    assert drawing.BORE_PARALLELISM_FRAME_XY[0] + 0.031 < drawing.FRONT_CENTER[0]
     bore_frame = source[source.index("    # The bore (Owner ruling") :]
     bore_frame = bore_frame[: bore_frame.index("    bore_basic = ")]
     assert bore_frame.count("edge_xy=bore_crown,") == 2
