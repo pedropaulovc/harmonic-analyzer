@@ -60,7 +60,7 @@ SEQUENCE: tuple[str, ...] = (
     "latch-pin-pressed",
     # The plate's knob bore K is set on the mill DRO from the arm's empty
     # reamed pin bore S, the pin's running axis once pressed (one turned
-    # shank Ø, pd_transgear_pin_spec), at MHA-PD-00 VIEW K's model
+    # shank Ø, pd_transgear_pin_spec), at MHA-PD-00 DETAIL K's model
     # dimensions, before the two locating holes receive their separate final
     # press/slip reams. The arm lies flat on parallels, plate up, with no
     # pin yet: its head is not concentric to the shank by any drawing
@@ -87,7 +87,7 @@ SEQUENCE: tuple[str, ...] = (
     # R9-68: on the pin between the two bushings, as made, the ring last.
     "disc-cluster-hung",
     # #2124: the ring gap read on a feeler, cluster rearward, and closed into
-    # VIEW E's window with MHA-PD-VN-68 shims under the rear bushing.
+    # DETAIL E's window with MHA-PD-VN-68 shims under the rear bushing.
     "disc-cluster-shimmed",
     # Knob stack, front to rear (contract §1). R9-70 (N-A): the collar's pilot
     # faced on the bench to stand proud of every removable wheel, the
@@ -137,13 +137,18 @@ def step_ref(key: str) -> str:
     return f"{DRAWING_NUMBER} STEP {step_number(key)}"
 
 
-# The assembly sheet's view of the reducer's S-K setting: the arm and plate
-# are match-drilled at it (pd_paper_drive_knob_setting_spec).
-KNOB_SETTING_VIEW_NAME = "VIEW K"
+# The assembly sheet's enlargements of sheet 1's detail circles K and E
+# (rule 9: a detail is labelled DETAIL, not VIEW; integration review at
+# 8fb7fb46f7): K, the reducer's S-K setting, at which the arm and plate are
+# match-drilled (pd_paper_drive_knob_setting_spec); E, the cluster's shimmed
+# ring gap (pd_paper_drive_cluster_float_spec, whose own VIEW_NAME no sheet
+# reads any more: #2323).
+KNOB_SETTING_VIEW_NAME = "DETAIL K"
+CLUSTER_FLOAT_VIEW_NAME = "DETAIL E"
 
 
 def knob_setting_ref() -> str:
-    """The pointer the arm and plate sheets print: ``MHA-PD-00 VIEW K``."""
+    """The pointer the arm and plate sheets print: ``MHA-PD-00 DETAIL K``."""
     return f"{DRAWING_NUMBER} {KNOB_SETTING_VIEW_NAME}"
 
 

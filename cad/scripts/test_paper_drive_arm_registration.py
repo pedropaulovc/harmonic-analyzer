@@ -239,7 +239,7 @@ def test_setup_must_hold_the_drawn_centre_distance_band_along_s_k() -> None:
 def test_a_full_division_setting_lands_k_in_the_band_and_the_circle() -> None:
     """Owner ruling 2026-11-08 (Pedro), #2144 item 5.3: MHA-PD-00 reads S and K
     true on a full division of the shop's test indicator. Signed worst case
-    (the PD-00 VIEW K budget): the DRO, zeroed on S, errs once on the S-to-K
+    (the PD-00 DETAIL K budget): the DRO, zeroed on S, errs once on the S-to-K
     move; the indicator centres S and K within half a division each; the
     pivot-and-pin tram turns K about S by its lever. Along S-K, the dialled
     mid-band aim plus that error stays inside the mesh's set band; in all,

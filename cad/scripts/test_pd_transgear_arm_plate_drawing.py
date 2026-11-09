@@ -861,7 +861,7 @@ def test_the_callouts_name_each_fit_and_the_matched_pair() -> None:
     assert note.startswith(f"{notes.LOCATOR_NOTE_NUMBER}. ")
     for required in (numbers["ARM_NUMBER"], steps.knob_setting_ref()):
         assert required in note, required
-    # The S-K setting's value is VIEW K's native dimension, not sheet text.
+    # The S-K setting's value is DETAIL K's native dimension, not sheet text.
     for text in (locator, note):
         assert f"{disc.CENTRE_DISTANCE:.3f}" not in text
     assert drawing.DIMENSION_CALLOUTS["LocatorDia1"] == drawing.LOCATOR_CALLOUT

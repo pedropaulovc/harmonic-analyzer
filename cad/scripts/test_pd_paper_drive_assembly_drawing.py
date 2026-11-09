@@ -56,7 +56,7 @@ STEP_HEAD = re.compile(r"^(\d+)([A-Z]?)\. ", re.MULTILINE)
 # #945 moves these into _drawing_common.
 NOTE_CHAR_WIDTH = 0.00276
 NOTE_LINE_PITCH = 0.0045
-# Dimension text runs larger: VIEW K's "ALONG ARM" callout spanned 27.9 mm and
+# Dimension text runs larger: DETAIL K's "ALONG ARM" callout spanned 27.9 mm and
 # its two rows 9.2 mm on run 20261028T000650671Z's sheet 5.
 DIM_CHAR_WIDTH = 0.0031
 DIM_LINE_PITCH = 0.0047
@@ -267,7 +267,7 @@ def test_the_steps_fit_their_fields() -> None:
         len(notes.platen_steps.splitlines()) * NOTE_LINE_PITCH
     )
     assert notes.exploded_caption_xy[1] - NOTE_LINE_PITCH > template.title_block_top_m
-    # VIEW K and VIEW E stand under the columns that share their sheets.
+    # DETAIL K and DETAIL E stand under the columns that share their sheets.
     assert drawing.KNOB_SETTING_CENTER[1] + drawing.KNOB_SETTING_RADIUS < (
         drawing.KNOB_SETTING_FIELD_TOP
     )
@@ -388,7 +388,7 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
         f"{_number('pd-vn-transgear-arm-plate-locating-pin')} DOWELS"
     ) in located
     # The setting's identities, in operation order: S (the arm's empty pin
-    # bore, the pressed pin's running axis), K set at VIEW K's model
+    # bore, the pressed pin's running axis), K set at DETAIL K's model
     # dimensions, then each part reamed to its own drawing, then the dowels.
     order = [
         "PIN BORE S",
@@ -668,7 +668,7 @@ def test_the_jig_bored_k_lands_in_the_set_band_with_margin_at_both_ends() -> Non
     assert centring == pytest.approx(division / 2.0)
     assert radial_err == pytest.approx(0.0199, abs=1e-4)
     # The printed values are the display's own counts: the operator dials
-    # exactly what VIEW K prints.
+    # exactly what DETAIL K prints.
     # The 5 um scale's inch-mode count, .0002.
     count = round(mill["resolution_mm"]["value"] / 25.4, 4) * 25.4
     assert knob_setting.DRO_COUNT_MM == pytest.approx(count)
@@ -713,7 +713,7 @@ def test_the_matched_plate_is_refitted_on_its_dowels_and_re_read() -> None:
 
 
 def test_the_plate_recheck_names_its_bore_and_acceptance() -> None:
-    """The re-check can print on the sheet after VIEW K and the TRUE key, so it
+    """The re-check can print on the sheet after DETAIL K and the TRUE key, so it
     names the bore's part and points at the step and sheet that define TRUE
     (integration review, run 20261109T062834910Z)."""
     sheet = drawing.SHEET_NAMES.index(drawing.KNOB_SETTING_SHEET) + 1

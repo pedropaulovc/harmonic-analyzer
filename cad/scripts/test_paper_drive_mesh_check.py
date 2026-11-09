@@ -23,7 +23,7 @@ def test_reducer_centre_band_is_plus_only_inside_the_gate_window() -> None:
     # Fine-pitch practice: nominal +x/-0. The nominal is the midpoint of the
     # centres the gates allow (interference below, CR 1.2 above); the
     # allowance is the catalogue +0.002 in, the band's own value, not
-    # MHA-PD-00 VIEW K's wider setting circle (owner ruling 2026-11-08,
+    # MHA-PD-00 DETAIL K's wider setting circle (owner ruling 2026-11-08,
     # #2144 item 5.3).
     low, high = disc.CENTRE_DISTANCE_WINDOW
     assert mesh.reducer_runout_shift_mm() == pytest.approx(

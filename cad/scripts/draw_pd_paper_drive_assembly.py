@@ -8,7 +8,7 @@ the disc cluster and the knob stack apart along their axes on
 PAPER_DRIVE_EXPLODED, seen from above, and balloons every part it shows.
 Sheet 4 balloons the bar, its clamps and the platen group on
 PAPER_DRIVE_EXPLODED and prints their steps. Sheet 5 prints the transgear's
-assembly steps and VIEW K, the plate's knob-bore setting from the arm's pin bore as the
+assembly steps and DETAIL K, the plate's knob-bore setting from the arm's pin bore as the
 assembly's own model dimensions; sheet 6 continues the steps; sheet 7 prints the chain fit-up
 (CONTRACT-paper-drive.md §13.2). Sheet 8 carries the complete native BOM,
 split horizontally into two pieces at measured row heights, and an assembly
@@ -552,7 +552,7 @@ FITUP_NOTE_LIMITS = ((0.210, 0.075), (0.418, 0.072))
 FITUP_TRANSGEAR_KEY = "latch-pin-pressed"
 FITUP_CHAIN_KEY = "loaded-rack-geometry-checked"
 
-# Sheet 5's VIEW K: K's DRO setting from the arm's pin bore S, the
+# Sheet 5's DETAIL K: K's DRO setting from the arm's pin bore S, the
 # assembly's hidden KnobSettingReference chain
 # (pd_paper_drive_knob_setting_spec) on the arm and plate seen from the
 # machine front at 1:1 as the arm-plate-located step sets them, before the pin is pressed;
@@ -599,10 +599,10 @@ KNOB_SETTING_INSTANCES = frozenset({"pd-transgear-arm-1", "pd-transgear-arm-plat
 # owner ruling 2026-11-08 (Pedro), #2144 item 5.3). The pivot lever amplifies
 # the across error, so one division (.0005) puts K up to .0022 off, inside
 # the .004 radius (test_the_jig_bored_k_lands_in_the_set_band_with_margin_at_both_ends).
-# The knob-bore point's label inside VIEW K. VIEW K keeps its letter (other
-# sheets cite "MHA-PD-00 VIEW K"), so the point takes a letter used nowhere
-# else on the package (machinist review round 7, rules 9 and 26: K meant
-# both the view and the bore).
+# The knob-bore point's label inside DETAIL K. DETAIL K keeps its letter
+# (other sheets cite "MHA-PD-00 DETAIL K"), so the point takes a letter used
+# nowhere else on the package (machinist review round 7, rules 9 and 26: K
+# meant both the view and the bore).
 KNOB_BORE_LETTER = "N"
 KNOB_SETTING_TRUE_SWEEP_DIVISIONS = 1
 KNOB_SETTING_INDICATOR_DIVISION_IN = 0.0005
@@ -614,7 +614,7 @@ KNOB_SETTING_TRUE = (
     f"TRUE: SWEEP UNDER {_KNOB_SETTING_SWEEP_TEXT}, ONE DIVISION ON A "
     f"{_KNOB_SETTING_DIVISION_TEXT} TEST INDICATOR, SO {KNOB_BORE_LETTER} ENDS WITHIN "
     f"{steps.inch_text(registration.REDUCER_AXIS_SETUP_RADIUS_MM, 3)} OF ITS "
-    "VIEW K SETTING"
+    f"{KNOB_SETTING_VIEW_NAME} SETTING"
 )
 # The second column's steps end above this on sheet 5.
 KNOB_SETTING_FIELD_TOP = 0.144
@@ -649,24 +649,22 @@ KNOB_SETTING_MESH_LINES = (
     f"{knob_shaft.TEETH}T",
     f"TO {_config.parts('pd-rack-pinion')['number']} {disc.TEETH}T MESH",
 )
-# Machinist review round 10: the caption names VIEW K's parent and that it
-# looks the same way (the sheet 1 front view's circle K, *Front here too), so
-# ALONG and ACROSS read as the step 9B setup sees the arm.
-KNOB_SETTING_PARENT_LINES = (
-    f"DETAIL OF CIRCLE {KNOB_SETTING_VIEW_NAME[-1]},",
-    "SHEET 1 FRONT VIEW",
-)
+# The caption is the detail's own label, scale and step (rule 9); a DETAIL
+# enlarges its parent's circle as that view sees it (the sheet 1 front view's
+# circle K, *Front here too), so ALONG and ACROSS read as the step 9B setup
+# sees the arm. Its parent is no longer named in prose (integration review
+# at 8fb7fb46f7: "VIEW K" plus "DETAIL OF CIRCLE K, SHEET 1 FRONT VIEW" read
+# as an arrow view explained in words).
 KNOB_SETTING_CAPTION = "\n".join(
     (
         f"{KNOB_SETTING_VIEW_NAME}, 1:1 (STEP {steps.step_number('arm-plate-located')})",
-        *KNOB_SETTING_PARENT_LINES,
         *KNOB_SETTING_MESH_LINES,
         *(f"{letter}: {name}" for letter, name in KNOB_SETTING_LEGEND.items()),
         *KNOB_SETTING_PIVOT_LINES,
     )
 )
-# Raised a line for the two parent lines (round 10), still under the steps'
-# field top.
+# Under the steps' field top (raised a line in round 10 for two parent lines
+# the caption no longer carries, so it now ends two lines higher).
 KNOB_SETTING_CAPTION_XY = (0.213, 0.139)
 # Each letter's centre stands this far off its circle's centre (sheet m): S
 # inward and away from Q (at 15:150 S-N spans most of the crop, so S's
@@ -686,13 +684,13 @@ for _point in (knob_setting.S_XY, knob_setting.K_XY, KNOB_SETTING_TAP_XY):
     ) / 1000.0 >= KNOB_SETTING_RADIUS:
         raise AssertionError("the knob setting circle must frame S, T and K")
 
-# Sheet 6's VIEW E: the cluster's shimmed ring gap, the assembly's hidden
+# Sheet 6's DETAIL E: the cluster's shimmed ring gap, the assembly's hidden
 # ClusterFloatSetting line (pd_paper_drive_cluster_float_spec) between the
 # MHA-PD-VN-61 ring and the MHA-PD-25 front bushing on the pin, seen from the
 # side at 5:1 and cropped to a circle on the gap. It stands in sheet 6's left
 # field, under the knob stack's column and over the reference isometric's
 # caption; the shimming step on sheet 5 cites it.
-CLUSTER_FLOAT_VIEW_NAME = cluster_float.VIEW_NAME
+CLUSTER_FLOAT_VIEW_NAME = steps.CLUSTER_FLOAT_VIEW_NAME
 CLUSTER_FLOAT_SHEET = "ASSEMBLY AND FIT-UP (CONT.)"
 CLUSTER_FLOAT_ORIENTATION = "*Right"
 CLUSTER_FLOAT_SCALE = (5.0, 1.0)
@@ -730,11 +728,11 @@ _CLUSTER_FLOAT_TEXT_REACH_MM = math.dist(
 )
 _CLUSTER_FLOAT_M_PER_MM = CLUSTER_FLOAT_SCALE[0] / CLUSTER_FLOAT_SCALE[1] / 1000.0
 if _CLUSTER_FLOAT_TEXT_REACH_MM * _CLUSTER_FLOAT_M_PER_MM >= CLUSTER_FLOAT_RADIUS:
-    raise AssertionError("VIEW E's circle must frame the ring gap's text")
-# The step column over VIEW E ends this far above its circle.
+    raise AssertionError("DETAIL E's circle must frame the ring gap's text")
+# The step column over DETAIL E ends this far above its circle.
 CLUSTER_FLOAT_FIELD_TOP = CLUSTER_FLOAT_CENTER[1] + CLUSTER_FLOAT_RADIUS + 0.004
 
-# Sheet 1's marks for the lettered views. VIEW K and VIEW E are enlargements
+# Sheet 1's marks for the lettered views. DETAIL K and DETAIL E enlarge parts
 # of the front and right views, so each takes a boundary circle there: the
 # crop's own model circle at sheet 1's scale, never under 3 mm across the
 # sheet so its letter has something to name. VIEW B, a *Top locator, takes a
@@ -756,8 +754,8 @@ CLUSTER_FLOAT_PARENT_RADIUS = max(
     CLUSTER_FLOAT_RADIUS / _CLUSTER_FLOAT_M_PER_MM * _ASSEMBLED_M_PER_MM,
 )
 # Each boundary's letter stands in clear sheet, pointing back to the circle's
-# rim: VIEW K's right of the circle, under the MHA-PD-07 bar and right of the
-# chain's top run; VIEW E's left of the right view, beyond the knob's
+# rim: DETAIL K's right of the circle, under the MHA-PD-07 bar and right of
+# the chain's top run; DETAIL E's left of the right view, beyond the knob's
 # thumbnut (round 2: letters set just past the circle landed on the chain and
 # the sprocket; round 3: K at (8, 10) mm sat on the bar's lower edge).
 KNOB_SETTING_LETTER_OFFSET = (0.019, 0.0058)
@@ -1043,7 +1041,7 @@ BOM_DESCRIPTIONS = {
         f"RETAINING RING, MCMASTER {_SKU['pd-vn-transgear-retaining-ring']}"
     ),
     # QTY counts the kit: the stack's nominal shims plus the spares stored in
-    # the spare T18's bore, so the fit-up's 0 to SHIM_COUNT_MAX (VIEW E) is
+    # the spare T18's bore, so the fit-up's 0 to SHIM_COUNT_MAX (DETAIL E) is
     # supplied (Codjiflo and machinist review, #2124).
     "pd-vn-transgear-cluster-shim": (
         f"SHIM, MCMASTER {_SKU['pd-vn-transgear-cluster-shim']}"
@@ -1102,7 +1100,7 @@ TRANSGEAR_QUANTITIES = {
     "pd-transgear-disc-hub": 1,
     "pd-transgear-front-bushing": 1,
     "pd-vn-transgear-retaining-ring": 1,
-    # The kit: the stack's nominal count plus the spares (VIEW E sets the
+    # The kit: the stack's nominal count plus the spares (DETAIL E sets the
     # fitted count).
     "pd-vn-transgear-cluster-shim": cluster_fit.SHIM_COUNT_MAX,
     "pd-rack-pinion": 1,
@@ -1941,7 +1939,7 @@ def _step_text(
             f"TAP THE PLATE UNTIL ITS KNOB BORE {KNOB_BORE_LETTER} INDICATES TRUE.",
             "TIGHTEN THE CLAMPS.",
             # Named in full: the continued column on the next sheet has no
-            # VIEW K key (integration review, run 20261109T062834910Z).
+            # DETAIL K key (integration review, run 20261109T062834910Z).
             f"CHECK: RE-INDICATED, {n['pd-transgear-arm-plate']} KNOB BORE "
             f"{KNOB_BORE_LETTER} IS STILL TRUE PER {s('arm-plate-located', 2)} "
             f"(SHEET {SHEET_NAMES.index(KNOB_SETTING_SHEET) + 1}).",
@@ -2451,8 +2449,8 @@ class StepSlot:
 
 _TITLE_BLOCK_TOP = DRAWING_TEMPLATES[SPEC.layout].title_block_top_m
 # The step columns in reading order. Sheet 4's one column stands left of the
-# platen exploded view, its caption one line under the steps; VIEW K fills
-# sheet 5's right column below its steps and VIEW E sheet 6's left column.
+# platen exploded view, its caption one line under the steps; DETAIL K fills
+# sheet 5's right column below its steps and DETAIL E sheet 6's left column.
 STEP_SLOTS: tuple[StepSlot, ...] = (
     StepSlot("PLATEN AND SUPPORT", PLATEN_NOTE_XY, _TITLE_BLOCK_TOP + 2 * STEP_LINE_PITCH),
     StepSlot("ASSEMBLY AND FIT-UP", FITUP_NOTE_XY[0], FITUP_NOTE_LIMITS[0][1]),
@@ -3876,8 +3874,8 @@ def _crop_to_circle(
 
 
 def _mark_parent_views(adapter: Any, front: Any, right: Any) -> None:
-    """Sheet 1's front and right views locate the lettered views: VIEW K's
-    boundary on the front view, VIEW E's on the right view, each lettered
+    """Sheet 1's front and right views locate the lettered views: DETAIL K's
+    boundary on the front view, DETAIL E's on the right view, each lettered
     in clear sheet with a pointer to its rim; VIEW B's viewing arrow points
     down onto the arm's pivot in the front view."""
     for parent, letter, model_mm, radius, offset in (
@@ -4047,7 +4045,7 @@ def _place_exploded_sheet(
 
 
 def _place_knob_setting_view(adapter: Any) -> None:
-    """Sheet 5's VIEW K: the arm and plate from the machine front at
+    """Sheet 5's DETAIL K: the arm and plate from the machine front at
     1:1, cropped on S-K's midpoint, carrying the assembly's set band S to N
     and its two K setting dimensions from S (pd_paper_drive_knob_setting_spec)
     that the arm-plate-located step cites."""
@@ -4143,7 +4141,7 @@ def _place_knob_setting_view(adapter: Any) -> None:
 
 
 def _place_cluster_float_view(adapter: Any) -> None:
-    """Sheet 6's VIEW E: the pin's front end from the side at 5:1, cropped on
+    """Sheet 6's DETAIL E: the pin's front end from the side at 5:1, cropped on
     the ring gap, carrying the assembly's shimmed ring-gap window
     (pd_paper_drive_cluster_float_spec) that the shimming step cites."""
     label = "cluster float view"

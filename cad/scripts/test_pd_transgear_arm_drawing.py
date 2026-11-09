@@ -887,7 +887,7 @@ def test_every_sheet_one_note_link_names_the_notes_sheet() -> None:
 def test_the_locating_holes_name_their_dowel_press_and_match_drill() -> None:
     """Machinist review (blocker and clarity): the reamed sockets named no
     dowel or fit, the mouth break no reason, and the match-drill sat in a
-    general note with the pair's setting. The setting is MHA-PD-00 VIEW K's
+    general note with the pair's setting. The setting is MHA-PD-00 DETAIL K's
     native S-K dimension; the callout points at it and prints no centre
     distance of its own (#1388 policy)."""
     import pd_vn_transgear_arm_plate_locating_pin_spec as dowel
