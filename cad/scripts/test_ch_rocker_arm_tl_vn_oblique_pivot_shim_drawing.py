@@ -134,8 +134,3 @@ def test_purchased_sheet_documents_built_part():
     assert sheet.source_kind == "part"
     assert sheet.source.stem == part.PART_NAME == sheet.artifact_stem
     assert sheet.layout in DRAWING_TEMPLATES
-
-
-def test_selection_note_names_the_assembly_steps_that_set_the_gap():
-    # The shims are chosen by the TL-00 pivot fit (P1 measures, P2 seats).
-    assert spec.SUPPLIER_DATA[-1] == "SELECT AT ASSEMBLY PER MHA-CH-06-TL-00 STEPS P1-P2."

@@ -119,7 +119,9 @@ DRAWING_REFERENCE_PRECISION = {
 }
 # Supplier sizes the part witnesses natively; all print untoleranced REF.
 SUPPLIER_MODEL_REFERENCES = ("supplier thickness",)
-SUPPLIER_BORE_CALLOUT = "FOR 5/16 SCREW SIZE"
+# No qualifier under the (Ø.34): the ITEM line already names the 5/16 screw
+# size (machinist review, farm run 20261108T031012373Z: a reason repeated).
+SUPPLIER_BORE_CALLOUT = None
 SUPPLIER_DATA = (
     "SOLD AS TWO-PIECE WEDGE-LOCK PAIRS, 5 PAIRS PER PACKAGE.",
     "REFERENCE THICKNESS IS THE TWO-PIECE PAIR STACK.",

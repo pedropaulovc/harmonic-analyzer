@@ -17,16 +17,17 @@ KIT LISTING (``rail.SOURCE_URL``, read 2026-11-04, owner decisions on issue
 sold by XIQI), 2 rails and 4 HGH15CA carriages, two shipped on each rail; the
 jig uses two. They are generic HIWIN-style HGH15CA blocks, NUIBBYED-branded,
 not genuine HIWIN, with no maker part number. The listing states no carriage
-dimension, preload or accuracy class. The owner's acceptance (``DRAWING_NOTES``)
-replaces the earlier Z0 preload requirement: Z0 preload and C accuracy are not
-required, and the pair is accepted at the MHA-CH-06-TL-00 fit-up by its
-lateral play: the carrier rocked by hand sideways to the rail, at most
+dimension, preload or accuracy class. The owner's description
+(``DRAWING_NOTES``) drops the earlier Z0 preload requirement: Z0 preload and
+C accuracy are not required, and the pair is accepted at the
+MHA-CH-06-TL-00 fit-up (its steps 1 and 14C, not this part sheet: rule 7) by
+its lateral play: the carrier rocked by hand sideways to the rail, at most
 ``trammel.CARRIAGE_PLAY_TIR_MAX`` TIR read at the shoulder-screw head (the
 trammel spec's docstring carries the radius budget). Owner P1-A (2026-11-07,
 PR #2236 comment 4504212381) sets that acceptance to 0.02 mm. Of the four
-kit carriages the two tightest are kept, one per rail. If none passes, the
-jig assembly's preparation step calls for a preloaded (Z0/ZA) HGH15CA carriage;
-the rail-kit footer already uses all three permitted note lines.
+kit carriages the two tightest are kept, one per rail. If no carriage on a
+rail passes, the jig assembly's preparation step replaces the
+MHA-CH-06-TL-VN-83 kit (owner ruling 2026-11-08: no fallback carriage).
 
 REFERENCE GEOMETRY. Every number here is HIWIN's HGH15CA, the style the kit
 copies; HIWIN is not the supplier. The first pass was datasheet-built: no
@@ -349,23 +350,15 @@ CAP_INTERNAL_MM3 = (A_CAP_OUTLINE - REFERENCE_CHANNEL_MM2) * 2.0 * CAP_LENGTH - 
 )
 
 # The owner's description note for the kit carriages (#2177), the rail named
-# by its item on the kit drawing's reference sheet and the play acceptance
-# read from the trammel calculator. Rule 7: a matched-fit statement with its
-# mate and acceptance, three lines beside the footer's general line. The style
-# designation (HGH15CA) prints in the ITEM row. The check names its home, the
-# TL-00 jig where the carriage is fitted, how the carrier is rocked and where
-# the indicator reads (machinist review 20261104T194839817Z: the sheet draws
-# no pivot).
+# by its item on the kit drawing's reference sheet. Rule 7: two lines beside
+# the footer's general line. The style designation (HGH15CA) prints in the
+# ITEM row. The sideways-play acceptance is an assembly check, so it is
+# MHA-CH-06-TL-00's (steps 1 and 14C), not this part sheet's.
 ITEM_TAG = "[2]"
-JIG_NUMBER = "MHA-CH-06-TL-00"
-PLAY_ACCEPTANCE = (
-    f"ROCK SIDEWAYS, {trammel.CARRIAGE_PLAY_TIR_MAX:.2f} MM TIR MAX AT SHOULDER SCREW"
-)
 DRAWING_NOTES = "\n".join(
     (
         f"{ITEM_TAG} GENERIC HIWIN-STYLE, NUIBBYED-BRANDED, NOT GENUINE HIWIN;",
         f"MATCHED KIT WITH RAIL {rail.ITEM_TAG}. Z0 PRELOAD, C ACCURACY NOT REQUIRED.",
-        f"IN {JIG_NUMBER}: {PLAY_ACCEPTANCE}.",
     )
 )
 # The member's native BOM row under the kit's one Number.

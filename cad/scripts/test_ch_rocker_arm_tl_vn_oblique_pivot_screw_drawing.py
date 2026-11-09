@@ -122,7 +122,6 @@ def test_cut_length_names_its_three_place_reason():
     # is the block spec's proof, never a printed figure.
     assert spec.CUT_NOTE == "TIP STAYS INSIDE\nMHA-CH-06-TL-22 PIVOT BLOCK"
     assert not any(ch.isdigit() for ch in spec.CUT_NOTE.split("\n")[0])
-    assert spec.CUT_CALLOUT == "CUT"
 
 
 def test_end_chamfer_prints_as_one_native_dimension():

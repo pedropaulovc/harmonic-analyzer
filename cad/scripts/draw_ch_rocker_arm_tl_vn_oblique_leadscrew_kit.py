@@ -105,7 +105,6 @@ from ch_rocker_arm_tl_vn_oblique_leadscrew_kit_leadscrew_spec import (
     DIMENSION_TOLERANCE_TYPES,
     DRAWING_DIMENSIONS,
     FLAT_AF,
-    FLAT_AF_CALLOUT,
     FLAT_LENGTH,
     FLAT_LENGTH_CALLOUT,
     FLAT_STARTS,
@@ -113,7 +112,6 @@ from ch_rocker_arm_tl_vn_oblique_leadscrew_kit_leadscrew_spec import (
     KP08_SET_SCREW_SPACING_DEG,
     LENGTH,
     MAJOR_DIA,
-    OPEN_FLAT_CALLOUT,
     PRINTED_LENGTH_FLAT,
     control_si,
 )
@@ -360,7 +358,7 @@ _NEAR_XY = (0.051, DETAIL_ROW_Y)
 # D: the far KP08's two flats (375.5 .. 383.5); its station is the main
 # view's. The printed flat length (every KP08 flat's) stands under the
 # fence, right of the flat: the flat length's text (widest row
-# "4X, KP08 FLATS", about 29 mm) is wider than the flat's 24 mm at 3:1, so
+# "4X FLATS FOR", about 26 mm) is wider than the flat's 24 mm at 3:1, so
 # it stands right of the flat's far-end extension line, its dimension line
 # run out to it (review jbf-r17, rule 14: both extension lines crossed the
 # text), left of fence E.
@@ -372,11 +370,19 @@ _FAR_XY = (0.099, DETAIL_ROW_Y)
 # flat runs out through the cut end (owner ruling 2026-11-05), so the
 # detail shows no land past it. The fence's radius 7 holds the flat's start
 # corners and the far end's (each 6.40 off its centre) whole.
-# The across-flat's text (its widest row, "C, D, E", about 15 mm wide, centred
-# on its dimension line) stands between D's fence and E's.
+# The across-flat's text ("C, D, E" over "SEE NOTE 1", about 24 mm wide,
+# centred on its dimension line) stands midway between D's fence and E's.
+# "3X IN LINE", 1.5 mm off E's fence, was struck by it (machinist review,
+# farm run 20261108T031012373Z): E stands 4 mm further right (its settled
+# frame's right 11.6 mm short of the title block) and the line midway, for
+# 31 mm of text room.
 _WHEEL_CENTRE_MM = (FLAT_STARTS["Handwheel"] + LENGTH) / 2.0
 _WHEEL_RADIUS_MM = 7.0
-_WHEEL_XY = (0.1695, DETAIL_ROW_Y)
+_WHEEL_XY = (0.1735, DETAIL_ROW_Y)
+_DE_GAP_MID_X = (
+    _FAR_XY[0] + 6.0 * _DETAIL_PER_MODEL_MM
+    + _WHEEL_XY[0] - _WHEEL_RADIUS_MM * _DETAIL_PER_MODEL_MM
+) / 2.0
 # The across-flat runs from the far crest (clock 180, radius -4) to the flat
 # (FLAT_AF - 4 toward clock 0): its middle stands at half their sum.
 _AF_MID_RADIUS_MM = (FLAT_AF - MAJOR_DIA) / 2.0
@@ -431,7 +437,7 @@ END_DETAILS = (
             "FlatAF": detail_xy(
                 _WHEEL_CENTRE_MM,
                 _WHEEL_XY,
-                _WHEEL_CENTRE_MM - _WHEEL_RADIUS_MM - 3.5,
+                _WHEEL_CENTRE_MM - (_WHEEL_XY[0] - _DE_GAP_MID_X) / _DETAIL_PER_MODEL_MM,
                 _AF_MID_RADIUS_MM,
             ),
         },
@@ -440,22 +446,43 @@ END_DETAILS = (
 # Every closed flat is one size: the printed one says how many
 # (pivot-shaft style) and which (review bought-r16, rule 1: "3X" and "5X" on
 # detail E's one flat left the reader to work out which flats they cover).
-# The length is every KP08 flat's; the handwheel's runs to the end, which its
-# station says. The across-flat is each clock-0 flat's, one in each detail
-# (the clock flats print their own in sections A-A and B-B). The
-# across-flat's rows stay narrower than the 25 mm between fences D and E.
+# The length is every KP08 flat's, the pillow blocks named by their
+# same-parent short drawing number (rule 4).
+# The handwheel's flat runs to the end, which detail E shows; its start
+# station prints bare (rule 7: a location carries no words). Detail E's
+# across-flat is the handwheel flat's. Sections A-A and B-B print each KP08
+# station's two flats as one "2X" across-flat: both flats are one size
+# (machinist review, farm run 20261108T043255012Z, 2 of 3 runs: with the
+# section's one 7.28 the second flat at C and D read unsized). The angle
+# between the stations' flats is free: each KP08 ring and the handwheel turn
+# to them at fit-up (the leadscrew spec; MHA-CH-06-TL-00 step 8 tightens
+# their set screws on the flats). Note 1 says so in words, linked from
+# detail E's across-flat (owner ruling via Main, 2026-11-08): "3X IN LINE"
+# read as a private phrase and a section would draw an angle the print does
+# not control (farm runs 20261108T015328529Z and 20261108T031012373Z).
+FLAT_CLOCK_STEP = "MHA-CH-06-TL-00 STEP 8"
+KP08_FLATS_PER_STATION = 2  # one per inner-ring set screw (the leadscrew spec)
+SECTION_AF_PREFIX = f"{KP08_FLATS_PER_STATION}X "
+_JIG_PREFIX = "MHA-CH-06-"
+
+
+def short_number(number: str) -> str:
+    """A jig mate's same-parent short form (``TL-VN-56`` for MHA-CH-06-TL-VN-56)."""
+    if not number.startswith(_JIG_PREFIX):
+        raise ValueError(f"{number} is not in the oblique jig's parent MHA-CH-06")
+    return number.removeprefix(_JIG_PREFIX)
+
+
+KP08_NUMBER = _config.parts("ch-rocker-arm-tl-vn-oblique-pillow-block")["number"]
 FLAT_CALLOUTS = {
-    "FlatLength": f"{FLAT_LENGTH_CALLOUT}, KP08 FLATS",
-    "FlatAF": "\n".join(
-        (FLAT_AF_CALLOUT, ", ".join(detail.label for detail in END_DETAILS))
-    ),
-    "HandwheelFlatStation": OPEN_FLAT_CALLOUT,
+    "FlatLength": f"{FLAT_LENGTH_CALLOUT} FLATS FOR\n{short_number(KP08_NUMBER)}",
+    "FlatAF": "SEE NOTE 1",
 }
 # The cylinder face on the axis, 50 mm right of centre: 2 mm from either
 # silhouette and clear of the dimension above.
 CENTERLINE_PICK = (MAIN_CENTER[0] + 0.050, MAIN_CENTER[1])
-# Right of the details and over the title block (top-left anchored, three
-# rows about 13 mm tall and 70 mm wide): under the handwheel station's text
+# Right of the details and over the title block (top-left anchored, five
+# rows about 22 mm tall and 105 mm wide): under the handwheel station's text
 # (0.128) and left of the isometric.
 NOTES_XY = (0.230, 0.105)
 # The catalogue designation in plain text: the material is the title block's
@@ -463,13 +490,20 @@ NOTES_XY = (0.230, 0.105)
 # nowhere: the item's thread designation and the SKU identify the stock, and
 # a note row typing spec numbers no native dimension owns breaks model
 # ownership (rule 7; review of a numeric STOCK row and, before it, a 1:10
-# gauge sketch that read as a confusing pseudo-view).
+# gauge sketch that read as a confusing pseudo-view). Note 1 follows: the
+# across-flat's flats and their free angle.
 LEADSCREW_ITEM = "[1] TR8X2 LEAD SCREW"
+FLAT_CLOCK_NOTE = (
+    f"1. FLATS AT {', '.join(d.label for d in END_DETAILS[:-1])} "
+    f"AND {END_DETAILS[-1].label}: ANGLE BETWEEN STATIONS FREE,\n"
+    f"SET AT {FLAT_CLOCK_STEP}."
+)
 NOTES = "\n".join(
     (
         f"ITEM: {LEADSCREW_ITEM}",
         f"SUPPLIER: {property_link('Supplier')}",
         f"SKU: {property_link('Supplier SKUs')}",
+        FLAT_CLOCK_NOTE,
     )
 )
 EXPECTED_CONTROLS = {
@@ -499,9 +533,15 @@ REWORK_SECTION_OVERRUN = 0.008
 # the countersink's past the body's end and above it. That callout prints on
 # a leader whose shoulder starts at the text point and runs right under the
 # block (run 20261105T010614057Z: shoulder 0.331 to 0.425, past the border at
-# 0.419), so the point sits just clear of the body's end.
+# 0.419), so the point sits just clear of the body's end. Its rows hang over
+# the shoulder from the dimension line, so the shoulder stands over the upper
+# outside arrow's tail: at 1.0 mm past the rim the last row straddled the
+# upper extension line and the arrow struck its first letter (rule 14,
+# machinist review, farm runs 20261108T000844770Z and 20261108T015328529Z;
+# the arrow's tail stood 7 mm over the shoulder on the sheet). 3.5 mm lifts
+# it 10 mm, the tail then 3 mm under it.
 FLANGE_THICK_TEXT_MM = (feed_nut.FLANGE_DIA / 2.0 + 6.0, feed_nut.FLANGE_THICK / 2.0)
-CSK_DIA_TEXT_MM = (feed_nut.FLANGE_DIA / 2.0 + 1.0, feed_nut.LENGTH + 2.0)
+CSK_DIA_TEXT_MM = (feed_nut.FLANGE_DIA / 2.0 + 3.5, feed_nut.LENGTH + 2.0)
 # The faced length's line stands 2.5 mm under the flange's rim, its witnesses
 # down from the body's -X silhouette, over the section's caption
 # (REWORK_CAPTION_TOP). Its offset text block is CENTRED on its point (run
@@ -549,32 +589,30 @@ RECEIPT_TEXT_XY = {
 RECEIPT_HOLE_MODEL = (0.0, 0.0, feed_nut.HOLE_PCD / 2000.0)
 # Rule 4: each band tighter than the title block's names its mate. The faced
 # seat bears on TL-32's lug face and the flange is the four nut screws' grip;
-# the countersinks seat those screws' 82° heads, which stand proud of the
-# head face at every countersink in the band (the spec's HEAD_PROUD_MIN). The
-# faced length keeps the nut clear of the KP08 at the travel end; the flange
-# OD sits within the lug face; the body clears the screws' heads; the holes
-# and their PCD match the lug's transferred taps.
-# Rule 17: the countersink's callout states its walls as a plain fact
-# (RV-01, as dt-cone-gear-tl-index-plate prints WEB .03 MIN).
+# the countersinks seat those screws' 82° heads. The faced length keeps the
+# nut clear of the KP08 at the travel end; the flange OD sits within the lug
+# face; the body clears the screws' heads; the holes and their PCD match the
+# lug's transferred taps.
+# Rule 17: the countersink's and the body's callouts state their walls as a
+# plain fact (RV-01, RV-02, as dt-cone-gear-tl-index-plate prints WEB .03
+# MIN). Rule 7: each leadered callout is its size line plus at most two
+# lines of words, its mate named once by its same-parent short number.
 FEED_BLOCK_NUMBER = _config.parts("ch-rocker-arm-tl-oblique-feed-block")["number"]
 NUT_SCREW_NUMBER = _config.parts("ch-rocker-arm-tl-vn-oblique-riser-screw")["number"]
-KP08_NUMBER = _config.parts("ch-rocker-arm-tl-vn-oblique-pillow-block")["number"]
 if feed_nut.SCREW_SKU not in _config.parts("ch-rocker-arm-tl-vn-oblique-riser-screw")[
     "supplier_skus"
 ]:
     raise AssertionError("the nut screws' number is not the screw the spec sizes")
-if feed_nut.HEAD_PROUD_MIN <= 0.0:
-    raise AssertionError("the callout says the heads stand proud")
 # One line: SolidWorks keeps a line-broken ABOVE callout but never prints it
 # (run 20261105T010614057Z printed this one's limits alone).
 FLANGE_THICK_CALLOUT = (
     f"SEAT FACE ON {FEED_BLOCK_NUMBER} LUG, "
     f"GRIP OF {feed_nut.SCREW_COUNT}X {NUT_SCREW_NUMBER}"
 )
+# The size line is the dimension's own: "4X ⌵ Ø4.76/4.50 X 82°", the
+# countersink symbol in the model's prefix and the angle this sheet's suffix.
 CSK_SCREW_CALLOUT = (
-    f"{feed_nut.CSK_CALLOUT} FOR {feed_nut.SCREW_THREAD} FLAT HEAD\n"
-    f"{feed_nut.SCREW_SKU} ({NUT_SCREW_NUMBER})\n"
-    "HEAD PROUD OF FACE\n"
+    f"FOR {short_number(NUT_SCREW_NUMBER)} ({feed_nut.SCREW_SKU})\n"
     f"{feed_nut.CSK_WALL_TEXT}"
 )
 # name -> (callout lane, text); swDimensionTextCalloutAbove 3, Below 4.
@@ -589,14 +627,17 @@ RECEIPT_CALLOUTS = {
     # countersink's callout states its walls (RV-01).
     "ReceiptBodyDia": (
         "below",
-        f"CLEARS HEADS OF {feed_nut.SCREW_COUNT}X\n{NUT_SCREW_NUMBER}\n"
+        f"CLEARS HEADS OF {feed_nut.SCREW_COUNT}X {short_number(NUT_SCREW_NUMBER)}\n"
         f"{feed_nut.THREAD_WALL_TEXT}",
     ),
     # The supplied holes are received, not cut (the band feeds RV-01's walls).
     "ReceiptHoleDia": (
         "below", f"AS SUPPLIED, MATCHES TAPS IN\n{FEED_BLOCK_NUMBER} LUG",
     ),
-    "ReceiptHolePcd": ("below", f"PCD, MATCHES TAPS IN\n{FEED_BLOCK_NUMBER} LUG"),
+    # A location carries no words (rule 7): the PCD names itself; the 4X
+    # hole size callout names the mate once (machinist review, farm run
+    # 20261108T031012373Z).
+    "ReceiptHolePcd": ("below", "PCD"),
 }
 _CALLOUT_TEXT_PARTS = {"above": 3, "below": 4}
 if any(
@@ -872,6 +913,23 @@ def _trim_centre_mark(adapter: Any, view: Any, section: ClockSection) -> None:
         raise RuntimeError(f"{label} kept its document display or its extended lines")
 
 
+def caption_without_scale(linked_text: str) -> str:
+    """A section caption's linked fields with its scale line removed: the label
+    line (``<VLNAME>`` and ``<VLLABEL>``) alone (draw_pd_transgear_disc_hub's
+    recipe). Any other field layout fails loud rather than print the scale."""
+    lines = [line for line in linked_text.replace("\r\n", "\n").split("\n") if line.strip()]
+    scale_lines = [line for line in lines if "<VLSCALE" in line]
+    kept = [line for line in lines if "<VLSCALE" not in line]
+    if (
+        len(scale_lines) != 1
+        or len(kept) != 1
+        or "<VLNAME>" not in kept[0]
+        or "<VLLABEL>" not in kept[0]
+    ):
+        raise RuntimeError(f"caption scale line is not separable: {linked_text!r}")
+    return kept[0]
+
+
 def _place_view_caption(
     adapter: Any,
     view: Any,
@@ -879,23 +937,37 @@ def _place_view_caption(
     *,
     label: str,
     sheet_scale: tuple[float, float],
+    scale_shown: bool = True,
 ) -> None:
     """Move a view's native caption so its box's top centre lands on
     ``target``, its linked fields intact (draw_dt_cone_gear_shaft's
     ``_place_view_caption``: the move is measured by ``INote.GetExtent``, the
     sheet's ``sheet_scale`` pinned first so finalization cannot move it
-    after)."""
+    after). A view drawn at the sheet's own scale passes ``scale_shown=False``:
+    its caption drops the scale line, which would restate the title block
+    (rule 9; SolidWorks links one for a section given its own ratio)."""
     ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
     sheet = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
     if not sheet.SetScale(*sheet_scale, False, False):
         raise RuntimeError(f"cannot pin sheet scale before {label} placement")
-    notes = tuple(_read_member(_early_bound(view, "IView"), "GetNotes") or ())
+    native_view = _early_bound(view, "IView")
+    notes = tuple(_read_member(native_view, "GetNotes") or ())
     if len(notes) != 1:
         raise RuntimeError(f"expected one native {label}, found {len(notes)} notes")
     note = _early_bound(notes[0], "INote")
     linked = str(note.PropertyLinkedText or "")
     if not linked:
         raise RuntimeError(f"{label} carries no linked view fields")
+    if not scale_shown:
+        ratio = tuple(float(value) for value in native_view.ScaleRatio)
+        if not math.isclose(ratio[0] / ratio[1], sheet_scale[0] / sheet_scale[1]):
+            raise RuntimeError(f"{label}: view scale {ratio} is not the sheet's {sheet_scale}")
+        if "<VLSCALE" in linked:
+            linked = caption_without_scale(linked)
+            note.PropertyLinkedText = linked
+            rebuild_drawing(adapter, label=f"{label} without scale")
+            if str(note.PropertyLinkedText or "") != linked:
+                raise RuntimeError(f"{label} kept its scale line")
     annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
     for _attempt in range(4):
         extent = tuple(float(value) for value in note.GetExtent())
@@ -941,6 +1013,19 @@ def _offset_angle_text(
     if not bool(display.OffsetText):
         raise RuntimeError(f"{name} text did not stay offset")
     _require_position(annotation, text_xy, f"{name} text")
+
+
+def _prefix_section_af(adapter: Any, annotations: list[Any], name: str) -> None:
+    """Prefix the section's across-flat ``SECTION_AF_PREFIX``: both of the
+    station's flats are that size. Read back, since SetText is void."""
+    matches = [item for item in annotations if dimension_name(adapter, item) == name]
+    if len(matches) != 1:
+        raise RuntimeError(f"section needs one native {name}, got {len(matches)}")
+    annotation = _early_bound(matches[0], "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    display.SetText(1, SECTION_AF_PREFIX)  # swDimensionTextPrefix
+    if str(display.GetText(1) or "") != SECTION_AF_PREFIX:
+        raise RuntimeError(f"{name} prefix did not persist as {SECTION_AF_PREFIX!r}")
 
 
 def _require_position(annotation: Any, target: tuple[float, float], label: str) -> None:
@@ -1010,6 +1095,7 @@ def _add_clock_sections(adapter: Any, main: Any) -> list[Any]:
             dimensions_by_feature=DRAWING_DIMENSIONS,
         )
         _offset_angle_text(adapter, view_annotations, angle, arc, angle_text)
+        _prefix_section_af(adapter, view_annotations, f"{section.flat}ClockAF")
         annotations += view_annotations
         _trim_centre_mark(adapter, view, section)
         face_half = MAJOR_DIA / 2000.0 * SECTION_SCALE[0] / SECTION_SCALE[1]
@@ -1350,6 +1436,7 @@ def _append_leadscrew_sheet(adapter: Any) -> tuple[Callable[[], None], ...]:
             f"ITEM: {LEADSCREW_ITEM}",
             f"SUPPLIER: {properties['Supplier']}",
             f"SKU: {properties['Supplier SKUs']}",
+            FLAT_CLOCK_NOTE,
         )
     )
     printed = str(_early_bound(note, "INote").GetText() or "")
@@ -1450,6 +1537,40 @@ def _set_callouts(
         if texts:
             set_dimension_callouts(adapter, annotations, texts, location=lane)
     _assert_callouts(adapter, annotations, callouts)
+
+
+def _countersink_display(adapter: Any, annotations: list[Any]) -> Any:
+    matches = [
+        annotation
+        for annotation in annotations
+        if dimension_name(
+            adapter,
+            _sw_type_info.early_bound_or_flag(
+                annotation, "IAnnotation", "GetSpecificAnnotation"
+            ),
+        )
+        == "CskDia"
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(f"section F-F needs one CskDia, got {len(matches)}")
+    annotation = _early_bound(matches[0], "IAnnotation")
+    return _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+
+
+def _assert_countersink_text(adapter: Any, annotations: list[Any]) -> None:
+    """The countersink's size line reads "4X ⌵ Ø4.76/4.50 X 82°": the
+    model's symbol prefix and this sheet's angle suffix (rule 26)."""
+    display = _countersink_display(adapter, annotations)
+    printed = (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
+    if printed != (feed_nut.CSK_PREFIX, feed_nut.CSK_SUFFIX):
+        raise RuntimeError(f"CskDia prints prefix/suffix {printed!r}")
+
+
+def _set_countersink_angle(adapter: Any, annotations: list[Any]) -> None:
+    display = _countersink_display(adapter, annotations)
+    display.SetText(2, feed_nut.CSK_SUFFIX)  # swDimensionTextSuffix
+    rebuild_drawing(adapter, label="countersink angle suffix")
+    _assert_countersink_text(adapter, annotations)
 
 
 # The sheet's leadered dimension callouts, each read back as SolidWorks draws
@@ -1901,6 +2022,7 @@ def _append_feed_nut_rework_sheet(adapter: Any) -> tuple[Callable[[], None], ...
         REWORK_CAPTION_TOP,
         label="section F-F caption",
         sheet_scale=REWORK_SCALE,
+        scale_shown=False,
     )
     verify_machining_controls(
         annotations,
@@ -1909,6 +2031,7 @@ def _append_feed_nut_rework_sheet(adapter: Any) -> tuple[Callable[[], None], ...
         precision=REWORK_PRECISION,
     )
     _set_callouts(adapter, annotations, REWORK_CALLOUTS)
+    _set_countersink_angle(adapter, annotations)
     receipt = _receipt_dimensions(adapter, end)
     spigot, spigot_tip = _add_spigot_note(adapter, section)
     note = _literal_note(adapter, REWORK_ITEM, *ITEM_LABEL_XY)
@@ -1940,6 +2063,7 @@ def _append_feed_nut_rework_sheet(adapter: Any) -> tuple[Callable[[], None], ...
             precision=RECEIPT_PRECISION,
         )
         _assert_callouts(adapter, annotations, REWORK_CALLOUTS)
+        _assert_countersink_text(adapter, annotations)
         _assert_callouts(adapter, receipt, RECEIPT_CALLOUTS)
         _assert_spigot_note(adapter, spigot, spigot_tip)
         _assert_rework_ink(adapter, [*annotations, *receipt], spigot, end, section)

@@ -54,6 +54,16 @@ LIFTED = "SupplierHeadHeight"
 # one projection line: left, the 20 mm lane (14 mm out) and its 62 mm
 # qualifier; right, the cut length's lane (6 mm) and its 24 mm text.
 _SIDE_ROOM = (0.082, 0.036)
+# The cut-to-fit requirement is the footer's numbered NOTE 1 (the part yaml's
+# installation_notes); the cut length and the general line link to it by
+# number, not by an unnumbered "NOTE ABOVE" (machinist review 2026-11-07).
+# "SEE NOTE 1" is no wider than the "CUT TO FIT" it replaces, so the right
+# shelf's lane is unchanged.
+FORMATS = {
+    **supplier.SUPPLIER_REFERENCE_FORMATS,
+    "CutLength": (*supplier.SUPPLIER_REFERENCE_FORMATS["CutLength"][:3], "SEE NOTE 1"),
+}
+GENERAL_TEXT = "PURCHASED PART, CUT AT ASSEMBLY PER NOTE 1. VIEWS ARE REFERENCE ONLY."
 
 
 def _margins() -> dict[str, tuple[float, float, float, float]]:
@@ -174,7 +184,7 @@ async def build(adapter: Any) -> dict[str, str]:
             adapter,
             views,
             dimensions=supplier.SUPPLIER_REFERENCE_DIMENSIONS,
-            formats=supplier.SUPPLIER_REFERENCE_FORMATS,
+            formats=FORMATS,
             starts=supplier.SUPPLIER_REFERENCE_STARTS,
             planes=supplier.SUPPLIER_REFERENCE_PLANES,
             sides=supplier.SUPPLIER_REFERENCE_SIDES,
@@ -204,6 +214,7 @@ async def build(adapter: Any) -> dict[str, str]:
         SPEC,
         item=ITEM,
         cut_to_suit=True,
+        general_text=GENERAL_TEXT,
         title_block_setup=partial(
             fit_purchased_title_block, spec=SPEC, material_property="Material"
         ),

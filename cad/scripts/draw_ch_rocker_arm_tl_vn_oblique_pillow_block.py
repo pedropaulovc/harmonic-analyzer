@@ -61,12 +61,16 @@ def _assert_line_broken(display: Any) -> None:
         raise RuntimeError(f"{BROKEN_LINE}: broken dimension line did not persist")
 
 
-# The hole's shelved text reaches 26 mm past its 6 mm lane: the lane plan's
-# 26 mm left reserve put its ink 5 mm past the Front cell (farm run
-# 20261101T115426386Z). 34 mm holds it; the empty right keeps the plan's
-# 20 mm, so the 121 mm-wide 2:1 plan view still fits the 180 mm cell. The
-# fit centres Front and Top on their shared column, so they stay aligned.
-_HOLE_TEXT_ROOM_M = 0.034
+# The hole's shelved text reaches past its 6 mm lane: the lane plan's 26 mm
+# left reserve put its ink 5 mm past the Front cell (farm run
+# 20261101T115426386Z). Its "2X, SEE NOTE 1" callout (14 characters, about
+# 36 mm at 2.55 mm a character) shelves left of the line, so 50 mm holds it;
+# the empty right (no reference there) keeps 4 mm, so the 121 mm-wide 2:1
+# plan view still fits the 180 mm cell (50 + 121 + 4 = 175, as 34 + 121 + 20
+# was). The fit centres Front and Top on their shared column, so they stay
+# aligned.
+_HOLE_TEXT_ROOM_M = 0.050
+_EMPTY_RIGHT_M = 0.004
 
 
 def _margins() -> dict[str, tuple[float, float, float, float]]:
@@ -75,8 +79,8 @@ def _margins() -> dict[str, tuple[float, float, float, float]]:
         planes=supplier.SUPPLIER_REFERENCE_PLANES,
         sides=supplier.SUPPLIER_REFERENCE_SIDES,
     )
-    _left, bottom, right, top = margins["*Front"]
-    return {**margins, "*Front": (_HOLE_TEXT_ROOM_M, bottom, right, top)}
+    _left, bottom, _right, top = margins["*Front"]
+    return {**margins, "*Front": (_HOLE_TEXT_ROOM_M, bottom, _EMPTY_RIGHT_M, top)}
 
 
 SUPPLIER_MARGINS = _margins()

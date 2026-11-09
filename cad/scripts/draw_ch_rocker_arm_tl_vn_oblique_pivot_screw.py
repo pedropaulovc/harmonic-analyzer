@@ -49,23 +49,30 @@ GENERAL_TEXT = "PURCHASED PART AS SUPPLIED; SHORTEN THREADED END AND CHAMFER AT 
 VIEW_LAYOUT = "standard"
 # The Right view carries every dimension: the head Ø left of the head, the
 # shoulder Ø right of the thread end, the shoulder length above, the cut
-# (.570 CUT) on its own line under the thread, the end chamfer (.03 X 45°) on
-# the thread's upper silhouette, the cut note right of the thread end under
-# the shoulder Ø with a short leader to the tip's end face, the thread
-# leader above-right.
+# (.570) on its own line under the thread, its value left of the step under
+# the shoulder, the end chamfer (.03 X 45°) on the thread's upper silhouette,
+# the cut note right of the thread end under the shoulder Ø with a short
+# leader to the tip's end face, the thread leader above-right.
 SUPPLIER_MARGINS = {"*Right": (0.020, 0.020, 0.060, 0.012)}
 DIAMETER_LANE = 0.014  # vertical diameter lines, out from the head / thread end
 LENGTH_LANE = 0.008  # horizontal length lines, out from the head's rim
+# The cut's 14.5 mm span holds its arrows but not its value too: centred,
+# SolidWorks set the value outside right, under the cut note's first line
+# (machinist review, farm run 20261108T000844770Z). Its value stands outside
+# left instead, under the shoulder, where nothing else prints.
+CUT_TEXT_LEFT = 0.012  # the value's centre, left of the step
 # The shoulder Ø's value and callout shelve right of its dimension line, at
 # the axis, clear of its short 9.5 mm span. The chamfer's ".03 X 45°", far
 # wider than its 0.76 mm leg, shelves right of the tip, above the reach of the
 # shoulder Ø's upper arrow (at 11 mm it struck the '3', farm run
-# 20261103T090917552Z) and under the thread note.
+# 20261103T090917552Z; at 14 mm its line met the arrow's tail in a T,
+# machinist review, farm run 20261108T015328529Z: the tail reaches 11 mm, so
+# 18 mm leaves 4 mm) and under the thread note.
 SHELVES = {
     "SupplierShoulderDiameter": (False, "right"),
     part.CHAMFER_LEG_DIMENSION: (True, "right"),
 }
-CHAMFER_RISE = 0.014  # the chamfer's text, above the axis
+CHAMFER_RISE = 0.018  # the chamfer's text, above the axis
 # Note anchors are their text's top-left corner (farm run 20261101T194619431Z).
 # The cut note's top sits under the shoulder Ø's shelved text: under the screw
 # its leader crossed its own text and the cut's dimension line (machinist
@@ -77,7 +84,7 @@ CHAMFER_RISE = 0.014  # the chamfer's text, above the axis
 CUT_NOTE_RIGHT = 0.008  # right of the thread tip
 CUT_NOTE_DROP = 0.014  # below the axis
 THREAD_NOTE_RIGHT = 0.002  # right of the shoulder step
-THREAD_NOTE_RISE = 0.021  # above the head rim
+THREAD_NOTE_RISE = 0.025  # above the head rim, 4 mm over the chamfer's rise
 THREAD_LANDING = 0.2  # of the thread length, from the shoulder
 # Every carrier lies on a Right-view edge; construction curves print as the
 # continuous thick outline on this sheet (``_construction_line_font``), not as
@@ -94,7 +101,7 @@ _REFERENCES = {
 # Shop sizes: owner feature, model value (m), places, suffix, callout below.
 _SHOP = {
     part.CUT_DIMENSION: (part.CUT_FEATURE, part.CUT_THREAD_LENGTH / 1000.0,
-                         part.CUT_THREAD_PLACES, "", part.CUT_CALLOUT),
+                         part.CUT_THREAD_PLACES, "", ""),
     part.CHAMFER_LEG_DIMENSION: (part.CHAMFER_REFERENCE_FEATURE, part.CUT_CHAMFER / 1000.0,
                                  part.CHAMFER_PLACES, part.CHAMFER_SUFFIX, ""),
 }
@@ -153,7 +160,7 @@ def _place_dimensions(adapter, right) -> dict[str, object]:
         "SupplierHeadDiameter": (at["head"][0] - DIAMETER_LANE, axis_y),
         "SupplierShoulderDiameter": (at["tip"][0] + DIAMETER_LANE, axis_y),
         "SupplierShoulderLength": ((at["joint"][0] + at["step"][0]) / 2.0, axis_y + rim + LENGTH_LANE),
-        part.CUT_DIMENSION: ((at["step"][0] + at["tip"][0]) / 2.0, axis_y - rim - LENGTH_LANE),
+        part.CUT_DIMENSION: (at["step"][0] - CUT_TEXT_LEFT, axis_y - rim - LENGTH_LANE),
         part.CHAMFER_LEG_DIMENSION: (at["tip"][0], axis_y + CHAMFER_RISE),
     }
     by_feature = {
