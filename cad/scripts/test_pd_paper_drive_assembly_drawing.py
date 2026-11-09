@@ -1660,10 +1660,17 @@ def test_the_cluster_is_shimmed_to_view_e_after_it_is_hung() -> None:
     low_count, high_count = cluster_fit.SHIM_COUNT_RANGE
     assert f"UP TO {high_count} IN ALL" in " ".join(shimmed.split())
     # Rounds 9-10: the gap is corrected either way, one action a sub-step. The
-    # bare stack is never under the window (printed), so an under gap is an
-    # overshoot and one shim comes off; shims target the window's middle.
+    # bare stack is never under the window (transgear_cluster_fit), so an
+    # under gap is an overshoot and one shim comes off; shims target the
+    # window's middle. The check is the reading alone, and the sub-step after
+    # it names the reading it passes on (integration review at 8fb7fb46f7).
     flat = " ".join(shimmed.split())
-    assert "WITH NO SHIMS IT NEVER READS UNDER" in flat
+    view = drawing.CLUSTER_FLOAT_VIEW_NAME
+    next_step = steps.step_number("disc-cluster-shimmed") + 1
+    assert "NEVER READS UNDER" not in flat
+    assert f"THE GAP READS {view} (SHEET " in flat
+    assert f"IF THE GAP READS {view}, GO TO STEP {next_step}." in flat
+    assert "IF IT DOES" not in flat
     assert "IF IT READ UNDER, TAKE ONE SHIM OFF." in flat
     middle = disc.inch_text(sum(cluster_fit.RING_FLOAT_RANGE) / 2.0, 3)
     assert f"TOTALLING THE GAP LESS {middle}" in flat

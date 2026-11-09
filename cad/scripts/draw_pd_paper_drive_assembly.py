@@ -2083,10 +2083,13 @@ def _step_text(
             # goes back on to re-read. The bare stack is never under the
             # window (transgear_cluster_fit.UNSHIMMED_FLOAT_RANGE), so an
             # under gap is an overshoot: one shim comes off. The shims are
-            # sized to bring the gap to the window's middle.
-            f"CHECK: THE GAP READS {CLUSTER_FLOAT_VIEW_NAME} (SHEET {float_sheet}); "
-            "WITH NO SHIMS IT NEVER READS UNDER.",
-            f"IF IT DOES, GO TO STEP {steps.step_number('disc-cluster-shimmed') + 1}.",
+            # sized to bring the gap to the window's middle. The check is the
+            # reading alone and the next sub-step names what it passes on
+            # (machinist review of fanout/integration 8fb7fb46f7: a bare-stack
+            # remark between them left "IF IT DOES" pointing at either).
+            f"CHECK: THE GAP READS {CLUSTER_FLOAT_VIEW_NAME} (SHEET {float_sheet}).",
+            f"IF THE GAP READS {CLUSTER_FLOAT_VIEW_NAME}, GO TO STEP "
+            f"{steps.step_number('disc-cluster-shimmed') + 1}.",
             "IF NOT, REMOVE THE RING, THE "
             f"{n['pd-transgear-front-bushing']} BUSHING, THE SLEEVE WITH HUB AND DISC, "
             f"AND THE {n['pd-transgear-rear-bushing']} BUSHING.",
