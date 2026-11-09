@@ -41,15 +41,21 @@ SUPPLIER_MARGINS = {"*Right": (0.020, 0.020, 0.060, 0.012)}
 DIAMETER_LANE = 0.014  # vertical diameter lines, out from the head / thread end
 LENGTH_LANE = 0.008  # horizontal length lines, out from the head's rim
 # The shoulder Ø's value and callout shelve right of its dimension line, at
-# the axis, clear of its short 7.9 mm span.
-SHELVES = {"SupplierShoulderDiameter": (False, "right")}
-# Note anchors are their text's top-left corner.  The thread note's rows stand
-# above the head's rim, its left edge right of the (.375) shoulder length's
-# outside arrow and tail, so its leader drops almost straight onto the thread's
-# middle without crossing that dimension line (integration review, rule 14).
-THREAD_NOTE_RIGHT = 0.010  # right of the shoulder step, past the length tail
-THREAD_NOTE_RISE = 0.021  # above the head rim
-THREAD_LANDING = 0.6  # of the thread length, from the shoulder
+# the axis, clear of its short 7.9 mm span.  The (.375) shoulder length's
+# value shelves right of the shoulder step, over the thread: left of its
+# witnesses it stood over the head and its line ran across the (Ø.375) HEAD
+# dimension line (integration review, rule 14).
+SHELVES = {
+    "SupplierShoulderDiameter": (False, "right"),
+    "SupplierShoulderLength": (True, "right"),
+}
+# Note anchors are their text's top-left corner.  The thread note stands below
+# the head's rim, its left edge just past the shoulder step, so its leader
+# rises almost straight onto the thread's lower silhouette; the shelved
+# shoulder length keeps the lane above the thread (rule 14).
+THREAD_NOTE_RIGHT = 0.003  # right of the shoulder step
+THREAD_NOTE_DROP = 0.008  # below the head rim
+THREAD_LANDING = 0.3  # of the thread length, from the shoulder
 _REFERENCES = {
     name: {
         "label": f"{name}@{part.REFERENCE_FEATURE}", "units": "in",
@@ -106,17 +112,17 @@ def _place_dimensions(adapter, right) -> dict[str, object]:
 
 
 def _add_thread_note(adapter, right) -> None:
-    """Lead the thread note to the thread's upper silhouette."""
+    """Lead the thread note, from below, to the thread's lower silhouette."""
     at, scale = _right_stations(adapter, right)
     rim = part.HEAD_DIA / 2000.0 * scale
     thread = model_point_in_view(
         adapter, right,
-        (0.0, part.MAJOR_DIA / 2000.0, -part.THREAD_LENGTH * THREAD_LANDING / 1000.0),
+        (0.0, -part.MAJOR_DIA / 2000.0, -part.THREAD_LENGTH * THREAD_LANDING / 1000.0),
         label="shoulder screw thread silhouette",
     )
     add_attached_note(
         adapter, right, text=part.THREAD_NOTE, entity_xy=thread,
-        note_xy=(at["step"][0] + THREAD_NOTE_RIGHT, at["step"][1] + rim + THREAD_NOTE_RISE),
+        note_xy=(at["step"][0] + THREAD_NOTE_RIGHT, at["step"][1] - rim - THREAD_NOTE_DROP),
         label="shoulder screw thread", entity_type="SILHOUETTE",
     )
 
