@@ -176,13 +176,14 @@ def test_eyebolt_balloon_lands_on_the_eye_facing_the_viewer() -> None:
     assert drawing.BALLOON_ANCHORS[spec.BOSS_HOOK].point_mm == point
 
 
-def test_jam_nut_balloon_lands_on_the_hex_corner_facing_the_viewer() -> None:
+def test_jam_nut_balloon_lands_high_on_the_hex_corner_facing_the_viewer() -> None:
     x, y, z = drawing.JAM_NUT_BALLOON_POINT_MM
-    # A hex corner (corners at 0, 60, ... deg from part +Y), at half height.
+    # A hex corner (corners at 0, 60, ... deg from part +Y), in the nut's
+    # upper half, clear of its lower outline and the shank's cut end below.
     assert math.hypot(x, y) == pytest.approx(jam_nut.ACROSS_CORNERS / 2.0)
     sixths = math.degrees(math.atan2(x, y)) / 60.0
     assert sixths == pytest.approx(round(sixths), abs=1e-9)
-    assert z == pytest.approx(jam_nut.THICKNESS / 2.0)
+    assert 0.75 * jam_nut.THICKNESS <= z < jam_nut.THICKNESS
 
     def toward_viewer(px: float, py: float) -> float:
         # Row-vector placement (the builder's JAM_NUT_ROWS), dotted with the

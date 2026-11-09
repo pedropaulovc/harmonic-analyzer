@@ -249,15 +249,21 @@ EYEBOLT_BALLOON_POINT_MM = (
 )
 # The jam nut's walked anchor landed at its underside, so leader 7 read as
 # ending on the eyebolt shank below the nut (machinist review on 6d7f35476).
-# It is pinned to the hex instead: the vertical corner edge at half height
-# between the two flats facing the +X+Y+Z isometric viewer. The builder
-# places the nut with ROT_X_NEG90, part (x, y, z) -> machine (x, z, -y), so
-# the part corner at 120 deg from +Y, (r sin 120, r cos 120), lands at
-# machine (+X, +Z).
+# It is pinned to the hex's vertical corner edge between the two flats facing
+# the +X+Y+Z isometric viewer. At half height that edge's point sat on the
+# nut's lower outline, where leader 7's arrowhead, rising from below right,
+# closed over the cut end of the shank (integration review at 8fb7fb46f7),
+# so the point stands at JAM_NUT_ANCHOR_HEIGHT of the nut's thickness. The
+# right-hand silhouette corner is not used: its leader sorts right of leader
+# 6's on the balloon ring and crosses it (farm run 20261109T140046294Z). The
+# builder places the nut with ROT_X_NEG90, part (x, y, z) -> machine
+# (x, z, -y), so the part corner at 120 deg from +Y, (r sin 120, r cos 120),
+# lands at machine (+X, +Z).
+JAM_NUT_ANCHOR_HEIGHT = 0.85
 JAM_NUT_BALLOON_POINT_MM = (
     jam_nut.ACROSS_CORNERS / 2.0 * math.sin(math.radians(120.0)),
     jam_nut.ACROSS_CORNERS / 2.0 * math.cos(math.radians(120.0)),
-    jam_nut.THICKNESS / 2.0,
+    jam_nut.THICKNESS * JAM_NUT_ANCHOR_HEIGHT,
 )
 BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS} | {
     spec.BOSS_HOOK: BalloonAnchor(point_mm=EYEBOLT_BALLOON_POINT_MM),
