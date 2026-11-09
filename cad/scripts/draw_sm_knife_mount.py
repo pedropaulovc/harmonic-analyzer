@@ -487,11 +487,21 @@ TAP_CALLOUT_RIM_SIDE = -1.0
 # farm run 20261027T154115830Z, ran x 150.0..191.6 mm, y 166.6..173.6, its
 # leader off the left end at y 170.1; the ∥ row stands one 7.0 mm row under
 # it, so its bottom, y 159.6, stands 5.0 mm over the block's top edge (y
-# 154.6) and the 20.616 BASIC's top extension line, nothing else within x
-# 150..192 under it (datum A's tag ends at x 126.5, the right view's Ra 3.2
-# starts at x 214.0).  Neither row is wider than the former A|B|C rows.
+# 154.6) and the 20.616 BASIC's top extension line.  Lower, its leader to the
+# crown ran flatter: at the ⌖ frame's x it entered the top edge at x 137.2
+# and ran 36.7 mm over the part, 11.5 mm past the crown's 25.2 mm approach
+# (integration farm run 20261109T062834910Z, leader-over-part, limit 10).
+# The ∥ frame therefore stands 9.0 mm left of the ⌖ frame, so its leader
+# enters about 7 mm further left (about 33 mm over the part, a 7.7 mm
+# detour); nothing else stands within x 141..192 between y 159.6 and the ⌖
+# frame (datum A's tag ends at x 126.5, the right view's Ra 3.2 starts at x
+# 214.0).  Neither row is wider than the former A|B|C rows.
 BORE_FRAME_XY = (FRONT_CENTER[0] + 0.035, _front_y(BLK_TOP) + 0.019)
-BORE_PARALLELISM_FRAME_XY = (BORE_FRAME_XY[0], BORE_FRAME_XY[1] - 0.007)
+BORE_PARALLELISM_FRAME_SHIFT_X = -0.009
+BORE_PARALLELISM_FRAME_XY = (
+    BORE_FRAME_XY[0] + BORE_PARALLELISM_FRAME_SHIFT_X,
+    BORE_FRAME_XY[1] - 0.007,
+)
 BORE_BASIC_TEXT_XY = (
     _sheet_x(BLK_HALF_X) + 0.012,
     _front_y(BLK_TOP - BORE_CENTRE_DEPTH / 2.0),

@@ -751,10 +751,12 @@ def test_native_gdt_and_bore_geometry() -> None:
     assert "_GTOL_TEXT_CALLOUT_ABOVE" not in source
     for gone in ("PIN_FRAME_QUANTITY", "PIN_SPAN_TEXT_XY", "PIN_DATUM_B_RIM_DEG"):
         assert not hasattr(drawing, gone)
-    # The ∥ frame stands one row under the ⌖ frame, both leaders on the
-    # bore's crown.
+    # The ∥ frame stands one row under the ⌖ frame and 9 mm left of it, so
+    # its leader to the bore's crown enters the top edge inside the 10 mm
+    # leader-over-part detour (integration run 20261109T062834910Z: 11.5 at
+    # the ⌖ frame's x).
     assert drawing.BORE_PARALLELISM_FRAME_XY == pytest.approx(
-        (drawing.BORE_FRAME_XY[0], drawing.BORE_FRAME_XY[1] - 0.007)
+        (drawing.BORE_FRAME_XY[0] - 0.009, drawing.BORE_FRAME_XY[1] - 0.007)
     )
     bore_frame = source[source.index("    # The bore (Owner ruling") :]
     bore_frame = bore_frame[: bore_frame.index("    bore_basic = ")]
