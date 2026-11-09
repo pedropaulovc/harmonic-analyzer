@@ -1,7 +1,7 @@
 r"""Create the curated machinist drawing for the platen guide.
 
 The SLDPRT remains authoritative.  This recipe supplies only the platen-guide
-views, dimensions, hole table, tap-row note and surface symbol;
+views, dimensions, hole table, tap-wall note and surface symbol;
 sheet/template and export behavior lives in ``_drawing_common``.
 Leader behavior lives in ``_drawing_attachment``.
 
@@ -133,21 +133,45 @@ BAR_SLIDE_STATION_MM = (FRONT_X[0] + REAR_X[0]) / 2.0
 BAR_SLIDE_FINISH_XY = (FRONT_LEFT_X_M + BAR_SLIDE_STATION_MM / 1000.0 + 0.003, 0.075)
 FINISH_CHAR_HEIGHT = 0.0025
 # Owner ruling 2026-11-08 (Pedro, #2144 item 2.3): the taps are noncritical,
-# so they print plain hole-table coordinates with no position frame. The
-# stations take the title block's .XXX; this note gives the tap row its
-# ±.004 and the reason for it, the taps' finished wall to the edges at the
-# floor (rule 20; owner ruling RV-01 in pd-platen-guide.yaml). The block's
-# top-left stands where round 5/6 shipped it: right of the A3 tag (text ends
-# ~0.1435), 2.1 mm under the 10.62 line (~0.1321); its two lines (5.5 mm
-# pitch, ~0.121 bottom) end left of the 10.62's right extension line
-# (x 0.325) and, for the second, of the A7 tag (x ~0.246).
+# so they print plain hole-table coordinates with no position frame, and the
+# LOC columns are not basic (rule 5: a basic only feeds a frame). The
+# stations take the title block's .XXX ±.005; the tap row prints its band
+# (TAP_Y_BAND_TEXT, the shop's ±.005 row) on every Y LOC value (rule 3: a
+# band goes on the dimension itself, never in a note; integration review
+# 20261109T062834910Z). The native LOC
+# cells are generated and cannot be edited (ITableAnnotation
+# IsCellTextEditable: only the header row and custom columns can), so a
+# custom Y LOC column after the native one prints each row's banded value
+# and the native column, still model-linked and checked against TAP_Y, is
+# hidden (as the oblique carrier hides its generated SIZE). That column's
+# header points to numbered note 1, the taps' finished wall to the edges, .001
+# under the floor (rule 7: a location's reason sits on a linked flag note;
+# rule 20; RV-01 in pd-platen-guide.yaml, pending owner confirmation).
 HOLE_TAGS = tuple(f"A{index}" for index in range(1, len(HOLE_STATIONS_MM) + 1))
 PLATEN_NUMBER = _config.parts("pd-platen")["number"]
 LOCK_NUMBER = _config.parts("pd-guide-lock")["number"]
-TAP_ROW_NOTE = (
-    f"{HOLE_TAGS[0]}-{HOLE_TAGS[-1]}: Y LOC {TAP_Y_BAND_TEXT}\n{TAP_EDGE_WALL_TEXT}"
+TAP_WALL_NOTE_NUMBER = 1
+TAP_WALL_NOTE = (
+    f"{TAP_WALL_NOTE_NUMBER}. {HOLE_TAGS[0]}-{HOLE_TAGS[-1]}: {TAP_EDGE_WALL_TEXT}."
 )
-TAP_ROW_NOTE_XY = (0.146, 0.1300)
+# Top-left anchored beside the table's top-right corner (the table ends
+# ~0.195 with its MATE column; the banded Y LOC column takes the native
+# one's width), level with its header; its ~91 mm line ends ~0.296, above
+# the isometric (top ~0.216) and inside the top zone margin (0.2667).
+TAP_WALL_NOTE_XY = (0.205, 0.255)
+HOLE_TABLE_NATIVE_Y_COLUMN = 2
+HOLE_TABLE_BANDED_Y_COLUMN = 3
+HOLE_TABLE_BANDED_Y_HEADING = f"Y LOC\nSEE NOTE {TAP_WALL_NOTE_NUMBER}"
+# The physical (IncludeHidden=True) columns once the banded Y LOC is in and
+# the native one hidden.
+HOLE_TABLE_PHYSICAL_COLUMNS = (
+    "TAG",
+    "X LOC",
+    "Y LOC",
+    " ".join(HOLE_TABLE_BANDED_Y_HEADING.split()),
+    "SIZE",
+    "MATE",
+)
 # Rule 10 / rule 4: the tagged table names each tap's mate in its own column,
 # the platen's holes for the platen-screw taps and the guide lock's for the
 # lock taps (round 2). The column follows the fr_harmonic_base NOTE column:
@@ -310,13 +334,13 @@ def _normalised(cells: tuple[tuple[str, ...], ...]) -> tuple[tuple[str, ...], ..
     return tuple(tuple(" ".join(value.split()) for value in row) for row in cells)
 
 
-def _size_cells_merged(table: Any) -> bool | None:
-    """Whether every hole row's SIZE cell (column 3) is one merged cell;
+def _size_cells_merged(table: Any, column: int = 3) -> bool | None:
+    """Whether every hole row's SIZE cell (``column``) is one merged cell;
     None when SolidWorks will not report it (the probe is telemetry only)."""
     last = int(table.RowCount) - 1
     try:
         for row in range(2, last + 1):
-            state = table.IsCellMerged(row, 3)
+            state = table.IsCellMerged(row, column)
             merged = state[0] if isinstance(state, tuple) else state
             if not merged:
                 return False
@@ -359,22 +383,107 @@ def _check_mate_column(
     )
     if tuple(row[4] for row in cells) != expected:
         raise RuntimeError(f"hole-table MATE cells differ: {cells!r}")
-    merged_after = _size_cells_merged(table)
-    if size_merged and merged_after is False:
-        try:
-            restored = table.MergeCells(1, 3, int(table.RowCount) - 1, 3)
-        except Exception as error:  # noqa: BLE001 - logged; the table stays valid
-            restored = repr(error)
-        merged_after = _size_cells_merged(table)
-        _telemetry.info(
-            f"hole-table SIZE merge restored after the MATE column: "
-            f"MergeCells={restored!r}, merged={merged_after!r}"
-        )
+    merged_after = _restore_size_merge(table, size_merged, 3, stage="the MATE column")
     _telemetry.info(
         "hole-table mates: "
         f"{ {tag: HOLE_TABLE_MATES[station] for station, (_row, tag) in rows.items()}!r}; "
         f"SIZE merged before={size_merged!r} after={merged_after!r}"
     )
+
+
+def _restore_size_merge(
+    table: Any, size_merged: bool | None, column: int, *, stage: str
+) -> bool | None:
+    """Merge the tag group's one SIZE again if an inserted column split it."""
+    merged_after = _size_cells_merged(table, column)
+    if size_merged and merged_after is False:
+        try:
+            restored = table.MergeCells(1, column, int(table.RowCount) - 1, column)
+        except Exception as error:  # noqa: BLE001 - logged; the table stays valid
+            restored = repr(error)
+        merged_after = _size_cells_merged(table, column)
+        _telemetry.info(
+            f"hole-table SIZE merge restored after {stage}: "
+            f"MergeCells={restored!r}, merged={merged_after!r}"
+        )
+    return merged_after
+
+
+def _band_y_column(table: Any) -> None:
+    """Print the tap row's band on every Y LOC value (rule 3).
+
+    The custom column goes in after the native Y LOC at that column's width,
+    each row reads TAP_Y_BAND_TEXT, the SIZE merge the insert may split is
+    restored, and the native column is hidden last, so every index here is
+    the same in the visible and the physical domain.
+    """
+    if int(table.ColumnCount) != 5:
+        raise RuntimeError("the banded Y LOC column expects TAG/X LOC/Y LOC/SIZE/MATE")
+    native, banded = HOLE_TABLE_NATIVE_Y_COLUMN, HOLE_TABLE_BANDED_Y_COLUMN
+    width = float(table.GetColumnWidth(native))
+    size_merged = _size_cells_merged(table, 3)
+    inserted = table.InsertColumn2(
+        _INSERT_COLUMN_AFTER,
+        native,
+        HOLE_TABLE_BANDED_Y_HEADING,
+        _INSERT_COLUMN_DEFAULT_WIDTH,
+    )
+    if inserted is not True:
+        raise RuntimeError("native hole table refused the banded Y LOC column")
+    if table.SetColumnTitle2(banded, HOLE_TABLE_BANDED_Y_HEADING, False) is not True:
+        raise RuntimeError("native hole-table banded Y LOC title did not set")
+    for _station, (row, tag) in _hole_table_rows(table).items():
+        if table.IsCellTextEditable(row, banded) is not True:
+            raise RuntimeError(f"native hole-table banded Y LOC cell of {tag} is not editable")
+        table.SetText2(row, banded, False, TAP_Y_BAND_TEXT)
+    actual = float(table.SetColumnWidth(banded, width, _TABLE_SIZE_CAN_CHANGE))
+    if abs(actual - width) > 1e-6:
+        raise RuntimeError(f"hole-table banded Y LOC width did not persist: {actual!r}")
+    merged = _restore_size_merge(table, size_merged, 4, stage="the banded Y LOC column")
+    _telemetry.info(
+        f"hole-table banded Y LOC: width={width!r}, SIZE merged "
+        f"before={size_merged!r} after={merged!r}"
+    )
+    table.SetColumnHidden(native, True)  # VT_VOID; _check_banded_y_column reads it back
+
+
+def _check_banded_y_column(table: Any) -> None:
+    """After the rebuild, only the native Y LOC is hidden; every row keeps its
+    tag, X LOC and mate, its native Y LOC is the model's tap row, and its
+    printed Y LOC is that row with its band."""
+    columns = int(table.TotalColumnCount)
+    hidden = tuple(table.ColumnHidden(column) for column in range(columns))
+    cells = _normalised(
+        tuple(
+            tuple(
+                str(table.DisplayedText2(row, column, True) or "").strip()
+                for column in range(columns)
+            )
+            for row in range(int(table.RowCount))
+        )
+    )
+    _telemetry.info(f"hole-table banded Y LOC cells: {cells!r}; hidden={hidden!r}")
+    if columns != len(HOLE_TABLE_PHYSICAL_COLUMNS) or hidden != tuple(
+        column == HOLE_TABLE_NATIVE_Y_COLUMN for column in range(columns)
+    ):
+        raise RuntimeError(f"hole table is not native-Y-only hidden: hidden={hidden!r}")
+    if tuple(value.upper() for value in cells[0]) != HOLE_TABLE_PHYSICAL_COLUMNS:
+        raise RuntimeError(f"hole-table header after the banded Y LOC: {cells[0]!r}")
+    tap_y_in = round(TAP_Y / 25.4, 3)
+    rows = _hole_table_rows(table)
+    for station, (row, tag) in rows.items():
+        native_y, banded_y, mate = (
+            cells[row][HOLE_TABLE_NATIVE_Y_COLUMN],
+            cells[row][HOLE_TABLE_BANDED_Y_COLUMN],
+            cells[row][5],
+        )
+        if round(float(native_y), 4) != tap_y_in or banded_y != TAP_Y_BAND_TEXT:
+            raise RuntimeError(
+                f"hole-table {tag} Y LOC native={native_y!r} printed={banded_y!r}; "
+                f"expected {tap_y_in:.3f} and {TAP_Y_BAND_TEXT!r}"
+            )
+        if mate != HOLE_TABLE_MATES[station]:
+            raise RuntimeError(f"hole-table {tag} lost its MATE: {cells[row]!r}")
 
 
 def _place_hole_tags(view: Any, table: Any) -> None:
@@ -438,8 +547,8 @@ async def build(adapter: Any) -> dict[str, str]:
             "Isometric View Note",
         ),
     )
-    # Three places by default: the hole tables' basic stations sit on the
-    # .001 grid (the platen's guide holes) and print in full.
+    # Three places by default: the hole table's stations sit on the .001
+    # grid (the platen's guide holes) and print in full.
     drawing_model, _sheet = new_project_drawing(
         adapter,
         property_view=PART_STEM,
@@ -529,13 +638,14 @@ async def build(adapter: Any) -> dict[str, str]:
             front, HOLE_STATIONS_MM, label="platen-guide front"
         ),
         # X LOC = the station from the left face at .XXX (the title block's
-        # ±.005); Y LOC = the tap row above the bottom face, its ±.004 on the
-        # sheet's tap-row note (owner ruling 2026-11-08).
+        # ±.005); Y LOC = the tap row above the bottom face, printed with its
+        # ±.005 by the banded column below. Neither is basic: no frame.
         expected_locations_mm=tuple((station, TAP_Y) for station in HOLE_STATIONS_MM),
         anchor_xy=(HOLE_TABLE_X_M, HOLE_TABLE_Y_M),
         label="platen-guide taps",
         unit="in",
         location_places=3,
+        basic_locations=False,
     )
     # The nine taps are one size: the table prints that size once, the SIZE
     # cells of tag group A merged natively (rule 10: the size callout once per
@@ -557,11 +667,14 @@ async def build(adapter: Any) -> dict[str, str]:
     drawing_model.EditRebuild3()
     _check_mate_column(hole_table, generated, size_merged)
     _place_hole_tags(front, hole_table)
-
-    # Owner ruling 2026-11-08: plain coordinates, no datums or position
-    # frame. The note stands where round 5/6 shipped it, under the 10.62 line.
-    if add_note(adapter, TAP_ROW_NOTE, *TAP_ROW_NOTE_XY) is None:
-        raise RuntimeError("tap-row band and wall note was not inserted")
+    # The tap row's band on every printed Y LOC (rule 3), the native column
+    # hidden; read back after a rebuild.
+    _band_y_column(hole_table)
+    drawing_model.EditRebuild3()
+    _check_banded_y_column(hole_table)
+    # Note 1, which the banded Y LOC header cites: the taps' finished wall.
+    if add_note(adapter, TAP_WALL_NOTE, *TAP_WALL_NOTE_XY) is None:
+        raise RuntimeError("tap wall note 1 was not inserted")
     # The platen hangs by the top rail's bottom face on the bar's top
     # edge and slides along it: the one running surface takes the part-owned
     # Ra symbol, landed on that face's edge in the front view.

@@ -37,22 +37,25 @@ LOCK_TAP_SPEC = HoleSpec("tapped", "#4-40")
 # Owner ruling 2026-11-08 (Pedro, #2144 item 2.3: "these are noncritical
 # holes, why use GD&T in the first place"): the 9X #4-40 taps print plain
 # coordinates, no position frame or datums. Their stations print .XXX at the
-# title block's ±.005 (TAP_STATION_PLACES); the tap row prints .140 ±.004
-# (TAP_Y_BAND), the band that holds each tap major's .060 wall floor to the
-# bottom and top faces at the height's .XX minimum (RV-01;
-# build_pd_platen_guide asserts both walls). The platen screws float in
-# MHA-PD-02's .144 holes over both patterns' coordinate bands
+# title block's ±.005 (TAP_STATION_PLACES). The tap row prints .140 ±.005
+# (TAP_Y_BAND), the shop's drilled-hole location row, with no fit route
+# (integration review 20261109T062834910Z: ±.004 was narrower than that row).
+# At it each tap major's finished wall to the bottom and top faces at the
+# height's .XX minimum is .059, .001 under the .060 floor: Delegated ruling
+# 2026-11-09 (Main), pending owner confirmation; owner review #2144 item 2.3
+# (RV-01; build_pd_platen_guide asserts both walls). The platen screws float
+# in MHA-PD-02's .144 holes over both patterns' coordinate bands
 # (test_pd_platen_refit); MHA-PD-12's .125 holes, with only .013 of float,
 # are transferred from the lock taps at assembly.
 GUIDE_HEIGHT = 7.366  # .29
 TAP_Y = 3.556  # .140
-TAP_Y_BAND = 0.1016  # ±.004
+TAP_Y_BAND = 0.127  # ±.005
 TAP_STATION_PLACES = 3
 TAP_STATION_BAND = printed_band_mm(TAP_STATION_PLACES, unit=UNIT)  # ±.005
 # The farthest one tap's axis stands from its nominal: both coordinate bands
 # at once (a square zone's corner).
 TAP_POSITION_RADIAL = math.hypot(TAP_STATION_BAND, TAP_Y_BAND)
-# The tap row's band, printed on the hole table's note with its reason: the
+# The tap row's band, printed on every hole-table Y LOC; note 1 states the
 # taps' finished wall to the edges (TAP_EDGE_WALL_TEXT in the builder).
 TAP_Y_BAND_TEXT = f"{TAP_Y / 25.4:.3f} ±{TAP_Y_BAND / 25.4:.3f}".replace("0.", ".")
 

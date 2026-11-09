@@ -48,11 +48,11 @@ SHEET_MAX = (1.0 / 16.0 + 0.005) * IN
 # put each hole's axis within .001 per axis of its actual tap. The holes print
 # plain at the title block's .XXX ±.005 from the plate's edges. The guide
 # taps print plain coordinates (owner ruling 2026-11-08, #2144 item 2.3):
-# stations at the title block's .XXX ±.005, the row ±.004.
+# stations at the title block's .XXX ±.005, the row ±.005 (RV-01 .059 wall).
 TRANSFER = 0.001 * IN
 PLACEMENT = printed_band_mm(3, unit="in")
 TAP_X_BAND = 0.005 * IN
-TAP_Y_BAND = 0.004 * IN
+TAP_Y_BAND = 0.005 * IN
 
 
 def _reload_screw_spec() -> None:

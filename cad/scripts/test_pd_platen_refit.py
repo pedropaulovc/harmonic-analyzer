@@ -341,11 +341,13 @@ def test_platen_guide_holes_float_over_the_fixed_guide_screws() -> None:
     # #4 loose (user ruling 2026-10-14): the screws are fixed in the guide's
     # taps and pass this plate's .XXX hole coordinates. Owner ruling
     # 2026-11-08: the taps print plain coordinates too (.XXX ±.005 stations,
-    # .140 ±.004 row), so each pattern's square zone spends its diagonal:
-    # .028 for two ±.005 patterns, of the .032 the .144 hole leaves.
+    # .140 ±.005 row, the shop's drilled-hole row; delegated ruling
+    # 2026-11-09 pending owner confirmation), so each pattern's square zone
+    # spends its diagonal: .028 for two ±.005 patterns, of the .032 the .144
+    # hole leaves.
     assert platen.GUIDE_HOLE_DIA == platen.CLEARANCE_MM[("#4", "loose")]
     tap_zone = 2.0 * guide_spec.TAP_POSITION_RADIAL
-    assert tap_zone <= 2.0 * math.sqrt(2.0) * 0.005 * 25.4
+    assert tap_zone == pytest.approx(2.0 * math.sqrt(2.0) * 0.005 * 25.4)
     hole_zone = 2.0 * math.sqrt(2.0) * printed_band_mm(3, unit=platen.UNIT)
     float_ = platen.GUIDE_HOLE_DIA - fillister.SHANK_DIA
     assert float_ == pytest.approx(0.032 * 25.4, abs=1e-3)

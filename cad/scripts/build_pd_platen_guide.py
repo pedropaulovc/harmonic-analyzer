@@ -152,11 +152,14 @@ LOCK_TAP_EXIT_WALL_MIN = (
 RECEIVER_WALL_FLOOR = WALL_FLOOR_MM
 # Owner ruling 2026-11-01 (B2): each tap row's wall to the bottom and top
 # faces at the height's printed minimum, the tap's major at the row's
-# .140 ±.004 (owner ruling 2026-11-08: the band that holds this floor).
+# .140 ±.005, the shop's drilled-hole location row (integration review
+# 20261109T062834910Z; no fit route on noncritical taps).
 # The finished worst case also pays the title block's outside edge break and
-# the tap's mouth break (Codjiflo, #2124): .080 unbroken, .060 finished.
-# Owner ruling 2026-11-08 (pd-platen-guide.yaml RV-01): accepted at the
-# floor; the sheet states it (TAP_EDGE_WALL_TEXT, rule 20).
+# the tap's mouth break (Codjiflo, #2124): .079 unbroken, .059 finished, .001
+# under the .060 floor. For this pattern only, RV-01 in pd-platen-guide.yaml
+# accepts .059: Delegated ruling 2026-11-09 (Main), pending owner
+# confirmation; owner review #2144 item 2.3. The sheet states it
+# (TAP_EDGE_WALL_TEXT, rule 20). The floor stays WALL_FLOOR_MM everywhere else.
 _HEIGHT_DEV = printed_deviations(GUIDE_HEIGHT, GUIDE_DEPTH_PLACES, unit=UNIT)
 _TAP_REACH = THREAD_MAJOR_MM[TAPPED_HOLE_SPEC.size] / 2.0 + TAP_Y_BAND
 _EDGE_BREAK = max(edge_break_radius_mm(unit=UNIT), edge_break_chamfer_mm(unit=UNIT))
@@ -165,11 +168,13 @@ TAP_EDGE_WALL_MIN = (
     - _EDGE_BREAK
     - TAP_MOUTH_BREAK
 )
+TAP_EDGE_WALL_ACCEPTED = 0.059 * 25.4  # RV-01, this tap pattern only
 # THREAD_MAJOR_MM rounds the #4-40's .1120 major up to 2.845 (2.8448), so the
-# .060 walls land 0.0001 under 1.524 in millimetres.
-if TAP_EDGE_WALL_MIN < WALL_FLOOR_MM - 0.0005:
+# .059 walls land 0.0001 under 1.4986 in millimetres.
+if TAP_EDGE_WALL_MIN < TAP_EDGE_WALL_ACCEPTED - 0.0005:
     raise AssertionError(
-        f"MHA-PD-11 platen guide tap wall {TAP_EDGE_WALL_MIN:.3f} < {WALL_FLOOR_MM}"
+        f"MHA-PD-11 platen guide tap wall {TAP_EDGE_WALL_MIN:.4f} < "
+        f"{TAP_EDGE_WALL_ACCEPTED:.4f} (RV-01)"
     )
 # Printed on the tap pattern's note, floored to .001 in (after absorbing the
 # major's 0.0001 rounding).
