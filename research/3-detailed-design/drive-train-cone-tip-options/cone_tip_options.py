@@ -75,12 +75,14 @@ BUSH_D, BUSH_L = (
     0.160 * IN,
 )  # brass bushing, pressed on the pivot against T006
 END_PLAY = 0.010 * IN
-BLOCK_GAP = 0.200 * IN  # T006 north face to the moved block's south face
+BLOCK_GAP = 0.300 * IN  # T006 north face to the moved block's south face
 BLOCK_DEPTH = 0.430 * IN  # 1.5D of 1/4-28 past both mouth countersinks
 BLOCK_S = T006_N + BLOCK_GAP
 BLOCK_N = BLOCK_S + BLOCK_DEPTH
 END_FACE = T006_N + BUSH_L + END_PLAY
 PIVOT_END = END_FACE + 0.120 * IN
+SCREW_LEN = 0.625 * IN  # stock 1/4-28 × 5/8 slotted round-head screw, under the head
+SCREW_HEAD = END_FACE + SCREW_LEN
 SCREW_MINOR = (0.250 - 1.22687 / 28) * IN  # 1/4-28 external basic minor
 
 web = lambda t, bore: (G[t]["root_min"] - bore) / 2.0
@@ -349,8 +351,20 @@ def tip_block(ax, south, north, adjuster):
         )
         return
     rect(
-        ax, END_FACE, north, 6.35, "#cfcec8", BLOCK_E, lw=0.7, z=2.55
-    )  # 1/4-28 end screw
+        ax, END_FACE, SCREW_HEAD, 6.35, "#cfcec8", BLOCK_E, lw=0.7, z=2.55
+    )  # stock screw
+    ax.add_patch(
+        Rectangle(
+            (END_FACE, -3.175),
+            south - END_FACE,
+            6.35,
+            fc="none",
+            ec=BLOCK_E,
+            lw=0,
+            hatch="////",
+            zorder=2.56,
+        )
+    )  # threads standing proud of the block's south face
     rect(
         ax,
         END_FACE,
@@ -361,18 +375,15 @@ def tip_block(ax, south, north, adjuster):
         lw=0.6,
         ls=(0, (2, 1.2)),
         z=2.7,
-    )
+    )  # reamed pivot hole
+    hr, hh = 0.472 * IN / 2, 0.175 * IN  # 1/4 round head: Ø.472 × .175 (ASME B18.6.3)
+    dome = [
+        [SCREW_HEAD + hh * math.sin(a), hr * math.cos(a)]
+        for a in [math.pi * i / 24 for i in range(25)]
+    ]
     ax.add_patch(
         Polygon(
-            [
-                [north, -4.6],
-                [north + 1.3, -4.6],
-                [north + 2.8, -2.6],
-                [north + 3.2, 0],
-                [north + 2.8, 2.6],
-                [north + 1.3, 4.6],
-                [north, 4.6],
-            ],
+            [[SCREW_HEAD, -hr], *dome[::-1], [SCREW_HEAD, hr]],
             closed=True,
             fc=BLOCK,
             ec=BLOCK_E,
@@ -380,7 +391,13 @@ def tip_block(ax, south, north, adjuster):
             zorder=2.6,
         )
     )  # domed slotted head, outboard
-    ax.plot([north + 1.6, north + 3.2], [0, 0], color="#efeee9", lw=1.0, zorder=2.7)
+    ax.plot(
+        [SCREW_HEAD + hh * 0.55, SCREW_HEAD + hh],
+        [0, 0],
+        color="#efeee9",
+        lw=1.0,
+        zorder=2.7,
+    )
 
 
 def tip_end(ax):
@@ -528,8 +545,8 @@ fig.text(
     "Black strokes = soft-solder joints. Grey bar = 1/16 key. Dashed = bores, seats and today's block position.\n"
     "Owner direction (2026-11-09): T006's web is best effort (rule 17), and soft solder may carry the tip's drive torque, which is minimal "
     "(rule 23 otherwise excludes solder). Both are recorded as owner exceptions below.\n"
-    "Real tip (book pp.17–21, engineerguy video 4 at 6:36–6:39): a small brass bushing fixed on the pivot turns with the cone and bears on a "
-    "long end screw through a black split block, locked by a side pinch screw.",
+    "Real tip (book pp.17–21; engineerguy video 4 at 6:36–6:47): a small brass bushing fixed on the pivot turns with the cone and bears on the "
+    "threaded end of a domed screw, which stands a few threads proud of a black split block locked by a side pinch screw.",
     fontsize=8.6,
     color=INK2,
     va="top",
@@ -701,8 +718,8 @@ note(
 note(
     ax,
     (BLOCK_S + 1.0, 3.2),
-    (26.0, -13.0),
-    f"bushing, 1/4-28 end screw (wall {inch(N['end_screw_wall'])}),\nblock {inch(BLOCK_DEPTH, 2)} deep: as A",
+    (22.0, -12.4),
+    f"stock 1/4-28 × 5/8 domed screw, reamed\nØ1/16 × .12 (wall {inch(N['end_screw_wall'])}); bushing bears\non its threaded end; block {inch(BLOCK_DEPTH, 2)} deep",
     None,
 )
 
@@ -763,7 +780,7 @@ ax.plot([0, 3.0], [root30, root30], color=INK2, lw=0.5, zorder=8)
 note(
     ax,
     (2.6, (KEY_TOP + root30) / 2),
-    (9.2, 7.6),
+    (7.4, 7.6),
     f"web {inch(N['t030_web_keyed'], 4)}: keyway at its limits\n(bore +.0018, broach .0635, .002 over\nthe key) to T030's minimum root",
     "warn",
     fs=7.2,
@@ -771,7 +788,7 @@ note(
 note(
     ax,
     (0.3, KEYSEAT_BOTTOM + KEY / 2),
-    (9.2, 2.4),
+    (7.4, 2.4),
     f"1/16 square key stock, one piece\nin a keyseat {inch(N['keyseat_depth'], 3)} deep × {inch(N['keyseat_len'], 2)} long,\nmilled along land 1",
     None,
     fs=7.2,
@@ -839,8 +856,8 @@ note(
 note(
     ax,
     (BLOCK_S + 1.0, 3.2),
-    (26.0, -13.0),
-    f"bushing, 1/4-28 end screw (wall {inch(N['end_screw_wall'])}),\nblock {inch(BLOCK_DEPTH, 2)} deep: as A",
+    (22.0, -12.4),
+    f"stock 1/4-28 × 5/8 domed screw, reamed\nØ1/16 × .12 (wall {inch(N['end_screw_wall'])}); bushing bears\non its threaded end; block {inch(BLOCK_DEPTH, 2)} deep",
     None,
 )
 
@@ -1192,7 +1209,8 @@ ax.text(
     f"4  Mill DT-04's 1/16 keyseat {inch(N['keyseat_depth'], 3)} deep along land 1; ream the socket Ø.0625 × .19 in land 2.\n"
     "5  Thread T018, T012 on T006's spigot and sweat, pin-phased. Key T030–T120 on, slide T024 onto land 2,\n"
     "    push the spigot home; phase and sweat T030 | T024 | T018. Reheat to take it apart.\n"
-    "6  Set end play at the end screw; tighten the pinch screw.\n"
+    "6  Ream Ø1/16 × .12 into the end of a stock 1/4-28 × 5/8 slotted round-head screw; set end play with it\n"
+    "    against the bushing face; tighten the pinch screw.\n"
     f"T006 sits inside T012's root ({inch(G[6]['od'])} < {inch(G[12]['root_min'])}), so T012 never blocks T006's cutter once T006 is done.\n"
     "C1 on flats: T024 rides land 2's flat and drives, T030 is not joined. C2: T018 keeps its D-bore; the jig trues T012, T006.",
     transform=ax.transAxes,

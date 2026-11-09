@@ -23,7 +23,7 @@ import dt_cone_tip_block_spec as tip
 import dt_tip_collar_air as air
 
 IN = 25.4
-BLOCK_GAP = 0.200 * IN  # T006 north face to the block's south face
+BLOCK_GAP = 0.300 * IN  # T006 north face to the block's south face
 BLOCK_DEPTH = 0.430 * IN
 BUSH_D, BUSH_L = 0.225 * IN, 0.160 * IN
 DRUM_TIP_R = (122.0 / cone_line.DP_TRAIN) * IN / 2.0

@@ -21,7 +21,7 @@
 ![Cone tip in axial section (DT-04 and the T006 spigot visible inside the gears): main today, webs by
 option, options C1 keyed (with a section across the land-1 key), C1 on flats, C2, A and B, details of where the
 spigot meets DT-04 in C1 keyed and C2, cutter
-run-out, and the exceptions each option still needs](drive-train-cone-tip-options/cone-tip-options-2026-11-09-r4.png)
+run-out, and the exceptions each option still needs](drive-train-cone-tip-options/cone-tip-options-2026-11-09-r5.png)
 
 ## Where main stands
 
@@ -64,24 +64,51 @@ which matches the book's "more yellow ... harder metal". This review keeps it.
 ## Moving the tip block
 
 Options A, B, C1 and C2 end the shaft about .29 past T006's north face, not 1.32 past it. MHA-DT-21
-therefore moves .42 south, so its adjuster still reaches the pivot. The moved block's south face
-sits .200 from T006's north face.
+therefore moves .32 south, so its adjuster still reaches the pivot. The moved block's south face
+sits .300 from T006's north face, so the end screw stands a few threads proud of it toward the
+cone, as on the original (engineerguy video 4, 6:41–6:47).
 
 - **Drum bank.** The nominal air from the moved block's south face to G19's back face is
-  .195 (4.95 mm), over the P1 swing angles the VN-54 air proof sweeps. That is more than VN-54's
+  .289 (7.35 mm), over the P1 swing angles the VN-54 air proof sweeps. That is more than VN-54's
   body has today (.144 nominal, .092 proved worst case).
 - **Bushing.** The Ø.225 × .160 brass bushing on the pivot has .055 nominal air (VN-54's nose
   has .069 nominal and .026 proved worst case). Estimate: about .01 at the worst case. Before
   CAD, add the bushing and the block as tiers in `dt_tip_collar_air`'s proof.
 - **Platform.** The block still sits on MHA-DT-20. Its .335 half width is inside the plate's
-  .42–.47 west and .63 east half widths at the new station. The hold-down hole in DT-20 moves
-  .42 south with it.
-- **Adjuster.** A long 1/4-28 slotted, domed end screw replaces VN-55, in the period form. Its
-  inner end has a Ø.0625 reamed pivot hole (wall .072) and takes the bushing's thrust, and the
-  existing pinch slit locks it (rule 23, adjuster). DT-21 deepens from .380 to .430, so the screw
-  gets 1.5D past both mouth countersinks. That retires DT-00 DT-03.
+  .41–.46 west and .63 east half widths at the new station. The hold-down hole in DT-20 moves
+  .32 south with it.
+- **End screw, as on the original.** A stock 1/4-28 × 5/8 slotted round-head machine screw
+  (ASME B18.6.3; zinc-plated steel round head, or McMaster 91794A558 18-8 fillister) replaces
+  VN-55. Its threaded end gets one added operation: drill and ream Ø1/16 × .12 for the pivot
+  (wall .072, rule 17 minor). The bushing's face bears on the screw's end and the existing pinch
+  slit locks it (rule 23, adjuster). DT-21 deepens from .380 to .430, so the screw gets 1.5D past
+  both mouth countersinks. That retires DT-00 DT-03.
   - A #10-32 screw would leave .043 of wall round the pivot hole.
   - A 5/16-24 screw would clear the .080 target, with DT-21 about .52 deep.
+  - A cone pivot in a centre-drilled screw was considered: the video shows the bushing bearing
+    on the screw's end, which a cone would fight, so the flat face and reamed hole stay.
+
+## Axial retention of the gears
+
+Main has two floats: the gear stack between DT-04's thrust collar and the VN-54 set-screw collar,
+and the shaft between the MHA-DT-05 boss and the VN-55 cup (`cone_stack_end_play.py`). With VN-54
+gone, C1 keyed has one captured chain instead:
+
+```
+DT-05 boss | DT-04 collar | 64T | T120 … T036 | T030 ~ T024 ~ T018 ~ T012 ~ T006 | bushing | end screw | DT-21
+```
+
+(`|` is a contact face, `~` a soldered face.) The end screw sets one end play for the shaft and
+the stack together.
+
+- **T024** rides the round Ø.250 land (radial), is turned by its solder face to T030, which is
+  keyed, and is held axially by the chain.
+- **T018** rides T006's spigot, which is centred by the socket in DT-04 (radial), is turned by its
+  solder faces to T024 and T012, and is held axially by the chain.
+- Whichever way the stack is pushed (end screw south, the collar north, the 64T's helix thrust),
+  the soldered faces are in compression. Solder carries torque, never pull.
+- Sweat T030–T006 off the shaft, on a stepped arbor that copies land 1 with its key, land 2 and
+  the socket. Sweating on DT-04 risks solder wicking into the keyway and onto the shaft.
 
 ## Options
 
@@ -188,8 +215,9 @@ Two owner rulings also need amending, not excepting:
 1. C1 keyed, C1 on flats, C2, A or B. C1 keyed is recommended: a fit centres the tip, every bore
    has a stock reamer or broach, and the solder is period. B retires RV-03 too but needs
    planing.
-2. Move DT-21 .42 south and deepen it to .430 for a 1/4-28 end screw (or .52 for 5/16-24),
-   replacing VN-54 and VN-55 with the brass bushing and end screw.
+2. Move DT-21 .32 south and deepen it to .430 for a 1/4-28 end screw (or .52 for 5/16-24),
+   replacing VN-54 and VN-55 with the brass bushing and a stock round-head end screw reamed
+   Ø1/16.
 3. Record the solder exception, the T012 .0646 web and, for C1 keyed, the T030 .0641 web.
 
 ## Drive-train DFM recommendations (replaces v45 §6)
@@ -239,10 +267,10 @@ D=research/3-detailed-design/drive-train-cone-tip-options
 uv run --frozen python $D/dump_geometry.py > geometry.json
 uv run --frozen python $D/block_air.py > air.json
 uv run --no-project --with matplotlib python $D/cone_tip_options.py geometry.json air.json \
-  cone-tip-options-2026-11-09-r4.png
+  cone-tip-options-2026-11-09-r5.png
 ```
 
-The last command also writes `cone-tip-options-2026-11-09-r4.numbers.json` with every web, wall, air and
+The last command also writes `cone-tip-options-2026-11-09-r5.numbers.json` with every web, wall, air and
 run-out quoted above. The air figures are nominal, through `dt_tip_collar_air`'s own pose and
 support functions. The contact zone is the v45 surface-sampled measurement; the cone stations
 have not changed since.
