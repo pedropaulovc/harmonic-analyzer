@@ -243,10 +243,14 @@ def test_tap_walls_to_the_edges_pay_both_breaks_and_print_at_the_floor() -> None
     assert unbroken == pytest.approx(0.080 * 25.4, abs=1e-3)
     assert guide.TAP_EDGE_WALL_MIN == pytest.approx(unbroken - 2.0 * 0.010 * 25.4)
     assert guide.TAP_EDGE_WALL_MIN >= WALL_FLOOR_MM - 0.0005
-    # Rule 20: the sheet states the shortfall at the tap row's note, and the
-    # package declares it (owner ruling RV-01).
+    # Rule 20: the sheet states the shortfall in note 1, which the banded
+    # Y LOC header cites, and the package declares it (owner ruling RV-01).
     assert guide.TAP_EDGE_WALL_TEXT == "WALL .060 MIN, TAPS TO EDGES"
-    assert drawing.TAP_ROW_NOTE.split("\n")[1:] == [guide.TAP_EDGE_WALL_TEXT]
+    assert drawing.TAP_WALL_NOTE == "1. A1-A9: WALL .060 MIN, TAPS TO EDGES."
+    assert drawing.HOLE_TABLE_BANDED_Y_HEADING.endswith(
+        f"SEE NOTE {drawing.TAP_WALL_NOTE_NUMBER}"
+    )
+    assert drawing.TAP_WALL_NOTE.startswith(f"{drawing.TAP_WALL_NOTE_NUMBER}. ")
     exceptions = _config.parts("pd-platen-guide")["machinist_exceptions"]
     (entry,) = [entry for entry in exceptions if entry["id"] == "RV-01"]
     assert entry["kind"] == "minor" and ".060" in entry["where"]
@@ -255,9 +259,10 @@ def test_tap_walls_to_the_edges_pay_both_breaks_and_print_at_the_floor() -> None
 
 def test_the_taps_print_plain_coordinates_without_gdt() -> None:
     """Owner ruling 2026-11-08 (#2144 item 2.3): noncritical holes, no
-    position frame or datums, no spot-through route. The stations take the
-    title block's .XXX ±.005; the tap row's ±.004 is on the note at the
-    table, with its reason."""
+    position frame or datums, no spot-through route. The LOC columns are not
+    basic (integration review 20261109T062834910Z): the stations take the
+    title block's .XXX ±.005, and the tap row's ±.004 prints on every Y LOC
+    value, never in a note."""
     from pd_platen_guide_spec import (
         TAP_STATION_BAND,
         TAP_STATION_PLACES,
@@ -270,10 +275,12 @@ def test_the_taps_print_plain_coordinates_without_gdt() -> None:
     assert TAP_STATION_BAND == pytest.approx(0.005 * 25.4)
     assert TAP_Y_BAND == pytest.approx(0.004 * 25.4)
     assert TAP_Y_BAND_TEXT == ".140 ±.004"
-    assert drawing.TAP_ROW_NOTE.split("\n")[0] == "A1-A9: Y LOC .140 ±.004"
+    assert "±" not in drawing.TAP_WALL_NOTE and "LOC" not in drawing.TAP_WALL_NOTE
+    assert not hasattr(drawing, "TAP_ROW_NOTE")
     assert len(drawing.HOLE_TAGS) == len(drawing.HOLE_STATIONS_MM) == 9
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    for gone in ("add_feature_control_frame", "add_datum_feature", "SPOT THRU"):
+    assert "basic_locations=False" in source
+    for gone in ("add_feature_control_frame", "add_datum_feature", "SPOT THRU", "BASIC)"):
         assert gone not in source
     exceptions = _config.parts("pd-platen-guide")["machinist_exceptions"]
     assert [entry["id"] for entry in exceptions] == ["RV-01"]
@@ -283,7 +290,8 @@ class _FakeHoleTable:
     """Native hole table stand-in: TAG / X LOC / Y LOC / SIZE, rows unordered,
     the SIZE cells merged.  Like the farm's SolidWorks (round 3), inserting a
     column re-renders the generated cells (.140 for 0.140, the size's CRLF)
-    and splits the SIZE merge."""
+    and splits the SIZE merge.  Only the header row and inserted (custom)
+    columns are editable; hidden columns stay in the physical domain."""
 
     def __init__(self) -> None:
         stations = list(reversed(drawing.HOLE_STATIONS_MM))
@@ -294,6 +302,8 @@ class _FakeHoleTable:
         self.widths = [0.02, 0.03, 0.03, 0.06]
         self.size_merged = True
         self.merge_calls: list[tuple[int, int, int, int]] = []
+        self.custom: set[int] = set()
+        self.hidden: set[int] = set()
 
     @property
     def RowCount(self) -> int:
@@ -301,28 +311,38 @@ class _FakeHoleTable:
 
     @property
     def ColumnCount(self) -> int:
+        return len(self.cells[0]) - len(self.hidden)
+
+    @property
+    def TotalColumnCount(self) -> int:
         return len(self.cells[0])
+
+    def _size_column(self) -> int:
+        return [" ".join(title.split()) for title in self.cells[0]].index("SIZE")
 
     def DisplayedText2(self, row: int, column: int, _hidden: bool) -> str:
         return self.cells[row][column]
 
     def InsertColumn2(self, where: int, index: int, title: str, _width: int) -> bool:
-        assert (where, index) == (3, 3)
+        assert where == 3  # after
+        size = self._size_column()
         for row in self.cells[1:]:
             row[2] = ".140"
-            row[3] = "4-40 UNC - 2B\r\nTHRU ALL"
+            row[size] = "4-40 UNC - 2B\r\nTHRU ALL"
         for row in self.cells:
-            row.append("")
-        self.widths.append(0.01)
+            row.insert(index + 1, "")
+        self.cells[0][index + 1] = title
+        self.widths.insert(index + 1, 0.01)
+        self.custom = {c + 1 if c > index else c for c in self.custom} | {index + 1}
         self.size_merged = False
         return True
 
     def IsCellMerged(self, row: int, column: int) -> tuple[bool, int, int]:
-        return (column == 3 and row > 0 and self.size_merged, 1, 3)
+        return (column == self._size_column() and row > 0 and self.size_merged, 1, column)
 
     def MergeCells(self, *cells: int) -> bool:
         self.merge_calls.append(cells)
-        self.size_merged = True
+        self.size_merged = cells[1] == cells[3] == self._size_column()
         return True
 
     def SetColumnTitle2(self, column: int, title: str, _flag: bool) -> bool:
@@ -330,14 +350,23 @@ class _FakeHoleTable:
         return True
 
     def IsCellTextEditable(self, row: int, column: int) -> bool:
-        return row > 0 and column == 4
+        return row > 0 and column in self.custom
 
     def SetText2(self, row: int, column: int, _flag: bool, text: str) -> None:
         self.cells[row][column] = text
 
+    def GetColumnWidth(self, column: int) -> float:
+        return self.widths[column]
+
     def SetColumnWidth(self, column: int, width: float, _change: int) -> float:
         self.widths[column] = width
         return width
+
+    def ColumnHidden(self, column: int) -> bool:
+        return column in self.hidden
+
+    def SetColumnHidden(self, column: int, hidden: bool) -> None:
+        (self.hidden.add if hidden else self.hidden.discard)(column)
 
 
 def test_the_hole_table_names_each_taps_mate() -> None:
@@ -369,6 +398,35 @@ def test_the_hole_table_names_each_taps_mate() -> None:
         drawing._check_mate_column(table, generated, size_merged)
 
 
+def test_the_y_loc_column_prints_the_tap_row_band() -> None:
+    """Integration review 20261109T062834910Z (rule 3): every printed Y LOC
+    reads .140 ±.004 from a custom column at the native one's width; the
+    native Y LOC, still checked against the model's tap row, is hidden; the
+    SIZE merge and the mates survive."""
+    table = _FakeHoleTable()
+    generated, size_merged = drawing._add_mate_column(table)
+    drawing._check_mate_column(table, generated, size_merged)
+    native_width = table.widths[drawing.HOLE_TABLE_NATIVE_Y_COLUMN]
+    drawing._band_y_column(table)
+    drawing._check_banded_y_column(table)
+    assert table.hidden == {drawing.HOLE_TABLE_NATIVE_Y_COLUMN}
+    assert drawing.HOLE_TABLE_PHYSICAL_COLUMNS == (
+        "TAG", "X LOC", "Y LOC", "Y LOC SEE NOTE 1", "SIZE", "MATE"
+    )
+    banded = drawing.HOLE_TABLE_BANDED_Y_COLUMN
+    assert table.widths[banded] == native_width
+    assert {row[banded] for row in table.cells[1:]} == {".140 ±.004"}
+    assert table.merge_calls[-1] == (1, 4, table.RowCount - 1, 4)
+    assert table.size_merged
+    table.cells[2][banded] = ".140"
+    with pytest.raises(RuntimeError, match="Y LOC native"):
+        drawing._check_banded_y_column(table)
+    table.cells[2][banded] = ".140 ±.004"
+    table.SetColumnHidden(drawing.HOLE_TABLE_NATIVE_Y_COLUMN, False)
+    with pytest.raises(RuntimeError, match="native-Y-only hidden"):
+        drawing._check_banded_y_column(table)
+
+
 def test_drawing_contract_imports_without_pywin32() -> None:
     script = """
 import builtins
@@ -396,8 +454,8 @@ def test_required_drawing_paths() -> None:
 
 
 def test_sheet_carries_no_notes_block() -> None:
-    # The tap-row note at the hole table carries the only words the taps
-    # need (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).
+    # Note 1 at the hole table carries the only words the taps need
+    # (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).
     assert not hasattr(guide, "DRAWING_NOTES")
     for module in (guide, drawing):
         assert "Manufacturing Notes" not in Path(module.__file__).read_text(
