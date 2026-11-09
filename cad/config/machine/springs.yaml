@@ -16,6 +16,16 @@
 # top_frame_plane), so every channel and counter record's eye, centre and
 # gooseneck heights moved by exactly that; lengths, axes and measured contact
 # distances are unchanged, and the native contact gates re-certify every seat.
+# 2026-11-09 (owner ruling 2026-11-08 (Pedro), #2144 item 10.3): the bar foot
+# rides the rocker's mid-zone R799.746 top edge, .254 nearer the arc centre, so
+# each channel lever tilts ~0.115 deg further and its spring hole moves by
+# channel_kinematics.spring_hole_xy's delta (+0.3501..+0.3522 mm in Y,
+# +0.0003..+0.0022 mm in X). Each channel record's upper eye moved by exactly
+# its hole's delta; the lower eye stays on its fixed anchor. The 9432K31 hooks
+# are rigid (ch_vn_channel_spring_stock_geom length law) and each turns about
+# its own eye centre, so the length grows by the eye-span change, axis and
+# centre follow the eyes, and the measured contact distances are unchanged.
+# The native contact gates re-certify every seat.
 # channels.yaml must exactly match a preset vector below. Custom stations require
 # new native calibration; builds never interpolate or search for a replacement.
 springs:
@@ -28,209 +38,209 @@ springs:
   channel_seats:
   - amplitude_mm: 0.0
     pose:
-      length_mm: 64.93079699486107
+      length_mm: 65.28089841792786
       lower_eye_xy:
       - 24.850000010863187
       - 997.4477783835578
       upper_eye_xy:
-      - 24.8500001252341
-      - 1057.349375378419
+      - 24.850336583860678
+      - 1057.6994768005457
       axis_xy:
-      - 1.9093131979792686e-09
-      - 1.0
+      - 5.586116347387293e-06
+      - 0.9999999999843976
       centre_xy:
-      - 24.850000068048644
-      - 1027.3985768809885
+      - 24.850168297361932
+      - 1027.5736275920517
       clocking: standard
     final_distance_mm:
       lower: 1.1109769709494631e-07
       upper: 2.961724356629923e-05
   - amplitude_mm: 4.2105263157894735
     pose:
-      length_mm: 64.97704618689352
+      length_mm: 65.32716169903065
       lower_eye_xy:
       - 24.850000362593388
       - 997.4477792234043
       upper_eye_xy:
-      - 24.850004183032798
-      - 1057.3956254102977
+      - 24.85043317369939
+      - 1057.7457409208816
       axis_xy:
-      - 6.372938565486108e-08
-      - 0.999999999999998
+      - 7.177872913220951e-06
+      - 0.999999999974239
       centre_xy:
-      - 24.850002272813093
-      - 1027.421702316851
+      - 24.85021676814639
+      - 1027.5967600721428
       clocking: standard
     final_distance_mm:
       lower: 1.26367758580048e-05
       upper: 2.9458463343690474e-05
   - amplitude_mm: 4.705882352941177
     pose:
-      length_mm: 64.98251104051681
+      length_mm: 65.3326289153018
       lower_eye_xy:
       - 24.850000470014283
       - 997.4477781802772
       upper_eye_xy:
-      - 24.85000542273863
-      - 1057.401089220794
+      - 24.850445346876622
+      - 1057.751207093938
       axis_xy:
-      - 8.260968845396646e-08
-      - 0.9999999999999966
+      - 7.3773062384879575e-06
+      - 0.9999999999727877
       centre_xy:
-      - 24.850002946376456
-      - 1027.4244337005355
+      - 24.850222908445453
+      - 1027.5994926371077
       clocking: standard
     final_distance_mm:
       lower: 1.6549091350503127e-06
       upper: 2.9443237317228304e-05
   - amplitude_mm: 5.333333333333333
     pose:
-      length_mm: 64.9894364943326
+      length_mm: 65.33955757548964
       lower_eye_xy:
       - 24.85000062621062
       - 997.4477803946359
       upper_eye_xy:
-      - 24.85000722559652
-      - 1057.4080168889682
+      - 24.850461013186496
+      - 1057.7581379683684
       axis_xy:
-      - 1.1006270639441437e-07
-      - 0.9999999999999939
+      - 7.633630347842135e-06
+      - 0.9999999999708638
       centre_xy:
-      - 24.85000392590357
-      - 1027.4278986418021
+      - 24.85023081969856
+      - 1027.6029591815022
       clocking: standard
     final_distance_mm:
       lower: 4.889807345532299e-06
       upper: 2.9425022140950423e-05
   - amplitude_mm: 6.153846153846154
     pose:
-      length_mm: 64.99850847975388
+      length_mm: 65.34863411332088
       lower_eye_xy:
       - 24.850000864518197
       - 997.4477792064955
       upper_eye_xy:
-      - 24.85000997671374
-      - 1057.4170876862488
+      - 24.850481917743043
+      - 1057.7672133178983
       axis_xy:
-      - 1.5194765080460836e-07
-      - 0.9999999999999883
+      - 7.975095123436504e-06
+      - 0.9999999999681989
       centre_xy:
-      - 24.850005420615968
-      - 1027.4324334463722
+      - 24.85024139113062
+      - 1027.607496262197
       clocking: standard
     final_distance_mm:
       lower: 1.2920141735148562e-05
       upper: 2.9403026410186676e-05
   - amplitude_mm: 7.2727272727272725
     pose:
-      length_mm: 65.01089841000363
+      length_mm: 65.36103090907926
       lower_eye_xy:
       - 24.850001251929612
       - 997.4477796243997
       upper_eye_xy:
-      - 24.85001445024467
-      - 1057.4294780344019
+      - 24.85051119048363
+      - 1057.779610531324
       axis_xy:
-      - 2.2003903539171584e-07
-      - 0.9999999999999757
+      - 8.452230710289418e-06
+      - 0.9999999999642799
       centre_xy:
-      - 24.850007851087142
-      - 1027.4386288294008
+      - 24.85025622120662
+      - 1027.6136950778618
       clocking: standard
     final_distance_mm:
       lower: 1.5649432855069296e-07
       upper: 2.9376380573660586e-05
   - amplitude_mm: 8.88888888888889
     pose:
-      length_mm: 65.02883892104853
+      length_mm: 65.3789826766077
       lower_eye_xy:
       - 24.85000193944521
       - 997.4477792323689
       upper_eye_xy:
-      - 24.850022391926423
-      - 1057.447418153414
+      - 24.850555044262883
+      - 1057.797561906442
       axis_xy:
-      - 3.408767382450345e-07
-      - 0.9999999999999419
+      - 9.164984414884712e-06
+      - 0.9999999999580015
       centre_xy:
-      - 24.85001216568582
-      - 1027.4475986928915
+      - 24.85027849185405
+      - 1027.6226705694055
       clocking: standard
     final_distance_mm:
       lower: 1.8955117110657985e-06
       upper: 2.9344977342370864e-05
   - amplitude_mm: 11.428571428571429
     pose:
-      length_mm: 65.05713310857455
+      length_mm: 65.40729775256224
       lower_eye_xy:
       - 24.850003327814395
       - 997.4477792555435
       upper_eye_xy:
-      - 24.85003843793603
-      - 1057.4757123641077
+      - 24.850627742077926
+      - 1057.825877004877
       axis_xy:
-      - 5.848963943111284e-07
-      - 0.9999999999998289
+      - 1.034173461524513e-05
+      - 0.9999999999465242
       centre_xy:
-      - 24.850020882875214
-      - 1027.4617458098255
+      - 24.850315534946162
+      - 1027.6368281302102
       clocking: standard
     final_distance_mm:
       lower: 1.5050796114650213e-06
       upper: 2.9313656586954828e-05
   - amplitude_mm: 16.0
     pose:
-      length_mm: 65.10837994579342
+      length_mm: 65.45859206142721
       lower_eye_xy:
       - 24.850006788475223
       - 997.4477782230686
       upper_eye_xy:
-      - 24.850078471473253
-      - 1057.5269581688194
+      - 24.85077042802739
+      - 1057.877170279671
       axis_xy:
-      - 1.1931420850548034e-06
-      - 0.9999999999992883
+      - 1.2636889535291411e-05
+      - 0.9999999999201545
       centre_xy:
-      - 24.85004262997424
-      - 1027.4873681959439
+      - 24.850388608251308
+      - 1027.6624742513698
       clocking: standard
     final_distance_mm:
       lower: 1.4708837114222307e-05
       upper: 2.9322927737348514e-05
   - amplitude_mm: 26.666666666666668
     pose:
-      length_mm: 65.22953660733397
+      length_mm: 65.57990899368174
       lower_eye_xy:
       - 24.850019804607257
       - 997.4477790785489
       upper_eye_xy:
-      - 24.850229353329006
-      - 1057.6481156855182
+      - 24.851164292676565
+      - 1057.9984880614145
       axis_xy:
-      - 3.4808563133989472e-06
-      - 0.9999999999939418
+      - 1.8901315745569445e-05
+      - 0.9999999998213701
       centre_xy:
-      - 24.85012457896813
-      - 1027.5479473820335
+      - 24.85059204864191
+      - 1027.7231335699817
       clocking: standard
     final_distance_mm:
       lower: 4.380256792275446e-07
       upper: 2.9935371370898667e-05
   - amplitude_mm: 80.0
     pose:
-      length_mm: 65.86895680747244
+      length_mm: 66.22118873350126
       lower_eye_xy:
       - 24.850199760710996
       - 997.4477804300043
       upper_eye_xy:
-      - 24.852335839674748
-      - 1058.287537199978
+      - 24.854564284012223
+      - 1058.6397690078556
       axis_xy:
-      - 3.510991949741111e-05
-      - 0.9999999993836469
+      - 7.132507688604614e-05
+      - 0.9999999974563667
       centre_xy:
-      - 24.851267800192872
-      - 1027.867658814991
+      - 24.85238202236161
+      - 1028.0437747189299
       clocking: standard
     final_distance_mm:
       lower: 9.351314142065883e-06
