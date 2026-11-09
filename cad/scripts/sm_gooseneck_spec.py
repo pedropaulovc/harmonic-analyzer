@@ -83,13 +83,16 @@ for _name, _mm, _inches in (
 # print states the radius, not the tool (rule 7, codjiflo on #1997).
 if not math.isclose(geom.BEND_R, 3.000 * geom.MM_PER_IN, abs_tol=1e-9):
     raise AssertionError("gooseneck bend radius is no longer the 3 in CLR die's")
-# The sleeve's select-fit window is the end piece's cited braze window
-# (sm_gooseneck_spring_joint.BRAZE_CLEARANCE_MIN/MAX), since the sleeve's
-# stock bore is not machined (owner ruling 2026-10-27, "select-fit from
-# stock, stock wall printed, no hone"); nominal stock over nominal tube sits
-# inside it.
+# The sleeve's joint is BAg-7 alone (note 2), so its select-fit window is the
+# filler maker's flux-brazed window, .002-.005 in per side, .004-.010
+# diametral (Lucas-Milhaupt, as cited in sm_gooseneck_spring_joint); the end
+# piece's narrower window also admits LOCTITE 638.  The sleeve's stock bore
+# is not machined (owner ruling 2026-10-27, "select-fit from stock, stock
+# wall printed, no hone"); nominal stock over nominal tube sits inside it.
+SLEEVE_CLEARANCE_MIN = BRAZE_CLEARANCE_MIN  # .004 in
+SLEEVE_CLEARANCE_MAX = 0.254  # .010 in
 if not (
-    BRAZE_CLEARANCE_MIN <= geom.SLEEVE_BORE_DIA - geom.TUBE_DIA <= BRAZE_CLEARANCE_MAX
+    SLEEVE_CLEARANCE_MIN <= geom.SLEEVE_BORE_DIA - geom.TUBE_DIA <= SLEEVE_CLEARANCE_MAX
 ):
     raise AssertionError("gooseneck sleeve stock does not select-fit the tube")
 
@@ -111,21 +114,29 @@ PLUG_DIA_CALLOUT = "FLUSH WITH TUBE OD"
 # keeps the block clear of the bend's inner edge (farm run
 # 20261107T102825912Z).
 BEND_RADIUS_CALLOUT = "TUBE CENTERLINE"
-# The window is the joint's, braze or retaining compound (owner ruling
-# 2026-10-27 on #1997, sm_gooseneck_spring_joint), printed in inches rounded
-# inward at four places.  It is the acceptance of a matched fit (fan-out
-# policy 1; machinist review 20261107T102825912Z: as REF beside a .XXX shank
-# it set no limit): the shank is turned to the measured tube ID (its Ø a
-# reference, REFERENCE_DIMENSIONS; round 2: "TO SUIT" is a rule-26 private
-# phrase), and the sleeve's stock is selected on the tube (owner ruling
-# 2026-10-27: select-fit from stock, no hone).
-_BRAZE_WINDOW = "-".join(
-    f"{inches:.4f}".removeprefix("0")
-    for inches in (
-        math.ceil(round(BRAZE_CLEARANCE_MIN / geom.MM_PER_IN * 1e4, 6)) / 1e4,
-        math.floor(round(BRAZE_CLEARANCE_MAX / geom.MM_PER_IN * 1e4, 6)) / 1e4,
+# Each window is printed in inches rounded inward at three places, plain
+# inch steps (machinist review of fanout/integration 8fb7fb46f7: the shank
+# joint's .0040-.0098 read as converted millimetres).  The shank's is the
+# joint's, braze or retaining compound (owner ruling 2026-10-27 on #1997,
+# sm_gooseneck_spring_joint), .004-.009; the sleeve's is BAg-7's, .004-.010.
+# Each is the acceptance of a matched fit (fan-out policy 1; machinist review
+# 20261107T102825912Z: as REF beside a .XXX shank it set no limit): the
+# shank is turned to the measured tube ID (its Ø a reference,
+# REFERENCE_DIMENSIONS; round 2: "TO SUIT" is a rule-26 private phrase), and
+# the sleeve's stock is selected on the tube (owner ruling 2026-10-27:
+# select-fit from stock, no hone).
+def _clearance_window(low_mm: float, high_mm: float) -> str:
+    return "-".join(
+        f"{inches:.3f}".removeprefix("0")
+        for inches in (
+            math.ceil(round(low_mm / geom.MM_PER_IN * 1e3, 6)) / 1e3,
+            math.floor(round(high_mm / geom.MM_PER_IN * 1e3, 6)) / 1e3,
+        )
     )
-)
+
+
+SHANK_CLEARANCE_WINDOW = _clearance_window(BRAZE_CLEARANCE_MIN, BRAZE_CLEARANCE_MAX)
+SLEEVE_CLEARANCE_WINDOW = _clearance_window(SLEEVE_CLEARANCE_MIN, SLEEVE_CLEARANCE_MAX)
 SHANK_FIT_CALLOUT = f"SEE NOTE {SHANK_FIT_NOTE}"
 # The tube and the sleeve are cut from stock as supplied: each reference Ø
 # names its stock wall (hidden on the elevation, cut by no section, rule 9),
@@ -252,9 +263,9 @@ if set(DIMENSION_CALLOUTS_BY_NAME) - set(DRAWING_PRECISION_BY_NAME):
 # left of the title block.
 DRAWING_NOTES = "\n".join(
     (
-        f"{SHANK_FIT_NOTE}. TURN TO MEASURED TUBE ID, CLEARANCE {_BRAZE_WINDOW}; "
-        "BAg-7 FULL LAP OR LOCTITE 638",
-        f"{SLEEVE_FIT_NOTE}. SELECT-FIT ON TUBE, CLEARANCE {_BRAZE_WINDOW}; "
+        f"{SHANK_FIT_NOTE}. TURN TO MEASURED TUBE ID, CLEARANCE "
+        f"{SHANK_CLEARANCE_WINDOW}; BAg-7 FULL LAP OR LOCTITE 638",
+        f"{SLEEVE_FIT_NOTE}. SELECT-FIT ON TUBE, CLEARANCE {SLEEVE_CLEARANCE_WINDOW}; "
         "LOWER ENDS FLUSH; BAg-7 FILLETS",
         "3. JOIN END PIECE, COOL OR FULLY CURE, THEN BEND: OVALITY 5% MAX, NO KINKS",
     )

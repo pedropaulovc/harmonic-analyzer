@@ -223,11 +223,15 @@ def test_sheet_notes_state_supplier_data_and_where_used_only():
     )
 
 
-def test_thread_note_clears_the_shoulder_length_dimension():
-    """Integration review (run 20261109T062834910Z, rule 14): the thread note
-    stands right of the (.375) shoulder length's outside arrow and tail, so its
-    leader reaches the thread's middle without crossing that dimension line."""
+def test_shoulder_length_and_thread_note_keep_their_own_lanes():
+    """Integration review (run 20261109T062834910Z and the #2316 combined
+    proof, rule 14): the (.375) shoulder length's value shelves right of the
+    shoulder step, over the thread, not over the head across the (Ø.375) HEAD
+    line; the thread note stands below the view, so its leader rises onto the
+    thread without crossing the length's dimension line above it."""
     import draw_sm_vn_gooseneck_shoulder_screw as drawing
 
-    assert drawing.THREAD_NOTE_RIGHT >= 0.010
-    assert 0.5 <= drawing.THREAD_LANDING < 1.0
+    assert drawing.SHELVES["SupplierShoulderLength"] == (True, "right")
+    assert drawing.THREAD_NOTE_DROP > 0.0
+    assert 0.0 < drawing.THREAD_NOTE_RIGHT
+    assert 0.0 < drawing.THREAD_LANDING < 1.0

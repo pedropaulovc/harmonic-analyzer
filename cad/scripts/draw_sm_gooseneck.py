@@ -204,21 +204,32 @@ FRONT_KEEP = {
 TAP_CALLOUT_XY = (0.158, 0.254)
 
 
-# Section A-A: a full section on the horizontal plane through the arm axis,
-# cut faces only, cropped to the end piece and the tube over its shank.  A
-# PARTIAL (removed) section along the same span does not import the end
+# Section A-A: a section on the horizontal plane through the arm axis, cut
+# faces only, cropped to the end piece and the tube over its shank.  A
+# PARTIAL (removed) section created along that span does not import the end
 # piece's Ø; the full section does (probe farm runs 20261027T211151181Z,
 # 20261027T213158937Z).  The plane also cuts the bend's top, out to where the
-# bend's outer wall drops below it, so the cutting line runs from outside the
-# end face to past that and the crop keeps only SECTION_CROP_X_MM: to just
-# past the braze shank, short of the bend tangent.  The view is turned until
-# model +X runs right and model -Z up (looking down on the arm-axis plane,
-# where the end piece's sketch lies), and set so the end face's centre lands
-# on SECTION_FACE_XY.
+# bend's outer wall drops below it, so the section is cut full through a line
+# that runs past that, and its dimensions are imported.  Rule 9 (machinist
+# review of fanout/integration 8fb7fb46f7): a section that shows one feature
+# has a short cutting plane across that feature only, so the section is then
+# made partial and its line shortened to SECTION_SHORT_X_MM, across the end
+# piece and its joint with the tube, on to the bend tangent.  A section view
+# moves with its line's midpoint (the carrier's A-A jumped off the sheet,
+# farm runs to 20261109T0636Z), so the long line is centred on the short
+# one: it runs as far left of the end face, into empty sheet, as it must run
+# right to pass the bend's cut.  The crop keeps only SECTION_CROP_X_MM: to
+# just past the braze shank, short of the bend tangent, so the crop, not the
+# short cut, ends the tube.  The view is turned until model +X runs right
+# and model -Z up (looking down on the arm-axis plane, where the end piece's
+# sketch lies), and set so the end face's centre lands on SECTION_FACE_XY.
 _BEND_CUT_END_X = -BEND_R + math.sqrt((BEND_R + _TUBE_R) ** 2 - BEND_R**2)
-SECTION_LINE_X_MM = (ARM_END_X - 2.0, _BEND_CUT_END_X + 10.0)
 SECTION_CROP_X_MM = (ARM_END_X - 2.0, TUBE_END_X + PLUG_SHANK_LENGTH + 0.8)
-if SECTION_CROP_X_MM[1] >= -BEND_R:
+SECTION_SHORT_X_MM = (SECTION_CROP_X_MM[0], -BEND_R)
+_SHORT_MID_X = sum(SECTION_SHORT_X_MM) / 2.0
+_LONG_HALF = _BEND_CUT_END_X + 10.0 - _SHORT_MID_X
+SECTION_LINE_X_MM = (_SHORT_MID_X - _LONG_HALF, _SHORT_MID_X + _LONG_HALF)
+if SECTION_CROP_X_MM[1] >= SECTION_SHORT_X_MM[1]:
     raise AssertionError("section A-A's crop reaches the bend")
 if SECTION_LINE_X_MM[1] >= 0.0:
     raise AssertionError("section A-A's cutting line reaches the leg")
@@ -376,7 +387,8 @@ def _crop_section(adapter: Any, section: Any) -> None:
     a sheet rectangle sketched direct to the database in the view's own sketch
     and handed to ``IView.Crop2`` with no boundary drawn
     (draw_dt_cone_swing_platform ``_crop_section_to_fence``).  The crop is
-    proved by the outline still holding the fence and losing the bend."""
+    proved by the view reading cropped and its outline holding the fence
+    within the outline's pad."""
     left, right = (_section_x(x) for x in SECTION_CROP_X_MM)
     half = (_TUBE_R + 1.0) * _SECTION_S
     foot, head = _SY0 - half, _SY0 + half
@@ -423,9 +435,8 @@ def _crop_section(adapter: Any, section: Any) -> None:
     if not bool(native.IsCropped()):
         raise RuntimeError("section A-A did not retain its crop")
     after = tuple(float(value) for value in native.GetOutline())
-    # The outline pads past the fence (draw_dt_cone_swing_platform), and the
-    # full cut runs on over the bend: 0.345 m wide before the probe's crop
-    # (farm run 20261027T213158937Z), 0.108 after.
+    # The outline pads past the fence (draw_dt_cone_swing_platform): 0.108
+    # wide after the probe's crop (farm run 20261027T213158937Z).
     if (
         len(after) != 4
         or after[0] > left
@@ -433,7 +444,6 @@ def _crop_section(adapter: Any, section: Any) -> None:
         or after[2] < right
         or after[3] < head
         or after[2] - after[0] > (right - left) + 0.03
-        or after[2] - after[0] > 0.75 * (before[2] - before[0])
     ):
         raise RuntimeError(
             f"section A-A crop is not its fence {(left, foot, right, head)}: "
@@ -627,8 +637,110 @@ def _hide_section_cosmetic_threads(adapter: Any, section: Any) -> None:
     rebuild_drawing(adapter, label="section A-A cosmetic threads hidden")
 
 
-def _end_piece_section(adapter: Any, front: Any) -> Any:
-    """Section A-A along the arm axis, cropped to the end piece."""
+def _section_line(section: Any) -> tuple[float, ...]:
+    """A-A's cutting line as IDrSection GetLineInfo reports it."""
+    definition = _early_bound(_early_bound(section, "IView").GetSection(), "IDrSection")
+    reported = tuple(float(value) for value in definition.GetLineInfo())
+    if len(reported) != 6 or not all(map(math.isfinite, reported)):
+        raise RuntimeError(f"section A-A: unreadable cutting line {reported!r}")
+    return reported
+
+
+def _section_line_ends(
+    adapter: Any, front: Any, sheet: list[tuple[float, float]], reported: tuple[float, ...]
+) -> tuple[tuple[float, ...], tuple[float, ...]]:
+    """A-A's reported line ends as (outside the end face, past the bend's
+    cut). GetLineInfo answers in the parent's sketch frame or the sheet's, so
+    the ``sheet`` ends the line was created through are mapped into the
+    elevation's sketch frame and both frames are matched in either order
+    (draw_ch_rocker_arm_tl_oblique_carrier ``_section_line_frame``)."""
+    sketch = _early_bound(_early_bound(front, "IView").GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    in_sketch = []
+    for x, y in sheet:
+        point = _early_bound(
+            math_utility.CreatePoint(double_array([float(x), float(y), 0.0])),
+            "IMathPoint",
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        in_sketch.append(tuple(float(value) for value in projected.ArrayData))
+    start, end = reported[:3], reported[3:]
+    for frame in (in_sketch, [(x, y, 0.0) for x, y in sheet]):
+        for first, second in ((start, end), (end, start)):
+            if (
+                math.dist(first[:2], frame[0][:2]) <= 1e-6
+                and math.dist(second[:2], frame[1][:2]) <= 1e-6
+            ):
+                return first, second
+    raise RuntimeError(
+        f"section A-A line {reported!r} matches neither its sketch ends "
+        f"{in_sketch!r} nor its sheet ends {sheet!r}"
+    )
+
+
+def _shorten_section_line(
+    adapter: Any,
+    front: Any,
+    section: Any,
+    sheet: list[tuple[float, float]],
+    annotations: list[Any],
+) -> None:
+    """Make A-A partial and shorten its drawn line to SECTION_SHORT_X_MM
+    (rule 9), once the full cut has imported its dimensions. IDrSection
+    SetLineInfo takes the frame GetLineInfo reports, so the new ends are the
+    full line's interpolated at their model X; a full section whose line
+    stops inside the part cuts nothing, so the section is made partial
+    first (draw_ch_rocker_arm_tl_oblique_carrier ``_set_section_line``).
+    Read back: the mode, the line in either direction, a cut that still
+    hatches (IView GetFaceHatchCount, as the carrier reads it: the face
+    hatch objects are read once the view is placed again), and every
+    imported dimension still shown."""
+    native = _early_bound(section, "IView")
+    definition = _early_bound(native.GetSection(), "IDrSection")
+    full = _section_line(section)
+    near, far = _section_line_ends(adapter, front, sheet, full)
+    x0, x1 = SECTION_LINE_X_MM
+    short = tuple(
+        a + (x - x0) / (x1 - x0) * (b - a)
+        for x in SECTION_SHORT_X_MM
+        for a, b in zip(near, far, strict=True)
+    )
+    native.UpdateViewDisplayGeometry()
+    before = (tuple(float(v) for v in native.GetOutline()), int(native.GetFaceHatchCount()))
+    definition.SetPartialSection(True)  # void put: read back below
+    if not definition.SetLineInfo(double_array(list(short))):
+        raise RuntimeError("section A-A refused its short cutting line")
+    rebuild_drawing(adapter, label="section A-A short line")
+    if not bool(definition.GetPartialSection()):
+        raise RuntimeError("section A-A short line: the section is not partial")
+    applied = _section_line(section)
+    native.UpdateViewDisplayGeometry()
+    after = (tuple(float(v) for v in native.GetOutline()), int(native.GetFaceHatchCount()))
+    _telemetry.info(
+        f"section A-A line {full!r} -> {applied!r} (partial); "
+        f"outline, face hatches {before} -> {after}"
+    )
+    if not any(
+        all(abs(a - b) <= 1e-8 for a, b in zip(applied, wanted))
+        for wanted in (short, short[3:] + short[:3])
+    ):
+        raise RuntimeError(f"section A-A short line did not persist: {applied!r}")
+    if after[1] < 1:
+        raise RuntimeError(f"section A-A short line lost its cut: {before} -> {after}")
+    hidden = [
+        index
+        for index, annotation in enumerate(annotations)
+        if int(_early_bound(annotation, "IAnnotation").Visible) != 1
+    ]
+    if hidden:
+        raise RuntimeError(f"section A-A short line hid dimensions {hidden}")
+
+
+def _end_piece_section(adapter: Any, front: Any) -> tuple[Any, list[Any]]:
+    """Section A-A along the arm axis, cropped to the end piece, and its
+    curated dimensions: imported while the cut is full, then the line is
+    shortened across the end piece (``_shorten_section_line``)."""
     line = model_points_in_view(
         adapter,
         front,
@@ -662,8 +774,26 @@ def _end_piece_section(adapter: Any, front: Any) -> Any:
     # before placing so the display change cannot shift the placed ink.
     set_hidden_lines_removed(adapter, section)
     _place_section(adapter, native)
-    # Hatched before the crop: a cropped view's hatch reads are not relied on.
+    annotations = curate_view_dimensions(
+        adapter,
+        section,
+        keep=SECTION_KEEP,
+        view_label="end piece section A-A",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    # Hatched while the cut is full: the shortened partial cut returned no
+    # face hatch objects before it was placed again (farm run
+    # 20261109T140046294Z).  Once placed, the turn is read and set again where
+    # SolidWorks returns the partial cut's hatches.
     _hatch_tube_apart(adapter, section)
+    _shorten_section_line(adapter, front, section, list(line), annotations)
+    # The view moves with its line's midpoint: turned and placed again.
+    _orient_section(adapter, native, cut)
+    _place_section(adapter, native)
+    try:
+        _hatch_tube_apart(adapter, section)
+    except RuntimeError as error:
+        _telemetry.warn(f"section A-A: tube hatch not re-set on the short cut ({error})")
     _crop_section(adapter, section)
     # The crop must not move the placed ink.
     _place_section(adapter, native)
@@ -671,7 +801,7 @@ def _end_piece_section(adapter: Any, front: Any) -> Any:
     position_section_caption(
         adapter, section, SECTION_CAPTION_XY, label="gooseneck end piece"
     )
-    return section
+    return section, annotations
 
 
 def _assert_part_callouts(adapter: Any, annotations: list[Any]) -> None:
@@ -769,21 +899,15 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, end, iso):
         set_hidden_lines_removed(adapter, view)
     # The section derives from the elevation BEFORE the elevation shows the
-    # hidden StationReference, so the section never inherits its lines.
-    section = _end_piece_section(adapter, front)
+    # hidden StationReference, so the section never inherits its lines; its
+    # dimensions are curated while its cut is full (_end_piece_section).
+    section, section_annotations = _end_piece_section(adapter, front)
 
     front_annotations = curate_view_dimensions(
         adapter,
         front,
         keep=FRONT_KEEP,
         view_label="elevation",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
-    section_annotations = curate_view_dimensions(
-        adapter,
-        section,
-        keep=SECTION_KEEP,
-        view_label="end piece section A-A",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     annotations = [*front_annotations, *section_annotations]
