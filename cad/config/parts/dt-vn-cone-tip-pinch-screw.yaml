@@ -9,10 +9,6 @@ dt-vn-cone-tip-pinch-screw:
   material: 18-8 stainless steel
   material_specification: 18-8 stainless steel, McMaster-Carr 91794A112 (#4-40 x 5/8 in)
   finish: plain
-  installation_notes: |-
-    INSTALLATION - CONE TIP BLOCK MHA-DT-21 PINCH
-    HEAD ON THE CLEARANCE-HOLE JAW; THREADS
-    INTO THE FAR JAW ONLY.
   quantity: 1
   tolerance_class: machined_block
   fit_class: fastener_clearance

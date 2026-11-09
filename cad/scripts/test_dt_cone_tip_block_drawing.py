@@ -961,9 +961,9 @@ def test_pinch_screw_is_the_5_8_stainless_fillister() -> None:
     """The hardware follows the ruling: 91794A112 everywhere and 15.875 under
     the head.  The stainless-over-steel (galvanic) choice is design
     rationale, not a machinist instruction: the material rides the title
-    block and the purchased-part ID, so the installation note no longer
-    restates it.  The sentence was deleted per the codex machinist review
-    of MHA-DT-VN-56 and Main's ruling (a)."""
+    block and the purchased-part ID.  The sheet carries no installation
+    note at all: the MHA-DT-00 tip-adjuster step tightens it across the slit
+    (delegated ruling F6, 2026-11-07)."""
     import _config
     from _fastener_catalog import fastener
     from _mcmaster_91794a112 import FILLISTER_SIZE
@@ -971,10 +971,7 @@ def test_pinch_screw_is_the_5_8_stainless_fillister() -> None:
     config = _config.parts("dt-vn-cone-tip-pinch-screw")
     assert config["supplier_skus"] == ["91794A112"]
     assert "18-8 stainless" in config["material"]
-    notes = config["installation_notes"].upper()
-    assert "STAINLESS" not in notes
-    assert "18-8" not in notes
-    assert " STEEL" not in notes
+    assert "installation_notes" not in config
     assert fastener("dt-vn-cone-tip-pinch-screw").skus == ("91794A112",)
     assert fastener("dt-vn-cone-tip-pinch-screw").material == "AISI 304"
     assert FILLISTER_SIZE[1] == dt_cone_tip_block_spec.PINCH_SCREW_LENGTH
