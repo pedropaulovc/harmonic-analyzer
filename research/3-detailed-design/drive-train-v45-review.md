@@ -388,6 +388,9 @@ Severity: **BLOCKER** (can't be made or will not work as drawn), **MAJOR**, **MI
 
 ## 6. What would help a novice (prioritised)
 
+> **Superseded.** [Cone tip options and drive-train DFM](drive-train-cone-tip-options.md)
+> replaces this list, judged against main and the 2026-11-08 machinist-review rubric.
+
 1. **Rework the cone tip (§7).**
    - Drop the Ø0.794 mm journal, the T006/T012 D-bores and VN-54.
    - Replace VN-54 with the original's small brass bushing. Fix it on the shaft so it turns
@@ -420,6 +423,10 @@ Severity: **BLOCKER** (can't be made or will not work as drawn), **MAJOR**, **MI
    revision letter distinct from the build number.
 
 ## 7. Cone-tip options (period-accurate)
+
+> **Superseded.** [Cone tip options and drive-train DFM](drive-train-cone-tip-options.md)
+> re-judges these options under rules 17 and 23: T006 cannot carry any bore, and solder does not
+> hold a drive-torque joint, so option C is rejected and option A changes. Kept for provenance.
 
 ![Cone tip: v45 vs three period-accurate options, why a one-piece tip can't be milled, and
 c.1898 fixing methods](drive-train-v45-review/cone-tip-options.png)
