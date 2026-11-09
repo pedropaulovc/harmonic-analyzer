@@ -1543,6 +1543,37 @@ The `plan` command reads the manifest's saved recipe and emits `incremental`,
 `noop`, or `full_build` without loading native bindings. Standalone benchmark
 execution is rejected unless the canonical COM seat lock is held.
 
+#### Native measurements, 2026-11-09
+
+Commit `43c0755791cacce5d5055e810b30c547f4b1bc05` passed on
+`swmaker00000a@10`, run `20261109T153914987Z-984d7dd4736f48d3b532ef168238a4e9`.
+Three trials changed a saved cylinder from 20 mm diameter and 12 mm depth to
+24 mm and 15 mm, alternating clean/incremental order.
+
+| operation | median seconds | observed range, seconds |
+|---|---:|---:|
+| clean creation, validation, save and reopen | 5.353 | 5.305 to 5.528 |
+| parameter reconciliation, validation, save and reopen | 3.379 | 3.377 to 3.435 |
+| no-op with open and readback validation | 2.938 | 2.912 to 2.961 |
+
+Reconciliation used 36.9% less operation time (1.58x speedup). The 124 retained
+OTel spans attribute the gain to authoring: median creation took 3.089 s,
+while dimension edits took 0.0179 s. Explicit rebuilds were 0.0666 s clean and
+0.0707 s incremental. Incremental baseline copy/open added 1.148 s.
+
+Both keyed features retained native identity after save/reopen. Dimensions,
+exact bounds and volume matched clean creation; no-op files stayed byte-identical.
+Structural changes returned `full_build` without edits. The two inspected
+isometric PNGs were byte-identical and passed the content checks.
+
+This proves a parameter-only, two-feature experiment, not arbitrary topology,
+assembly-mate or drawing-reference preservation. Timings exclude farm overhead:
+the enclosing farm span was 488.6 s, including 107.7 s of source acquisition and
+57.4 s of worker execution. These phase measurements do not account for the
+whole farm span and must not be summed as an exhaustive breakdown.
+Source, native evidence and earlier attempts are recorded in
+[PR #2322](https://github.com/pedropaulovc/harmonic-analyzer/pull/2322).
+
 ### Readiness is not proof of a build
 
 `farm-launch started` means the wrapper initialized its log and startup record.
