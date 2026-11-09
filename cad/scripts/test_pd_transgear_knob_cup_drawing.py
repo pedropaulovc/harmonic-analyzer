@@ -88,11 +88,16 @@ def test_bore_callout_names_its_journal_and_stands_clear_below_the_bore() -> Non
     callout = " ".join(drawing.BORE_CALLOUT.split())
     assert "REAM THRU" in callout
     assert shaft in callout
-    assert drawing.DIMENSION_CALLOUTS["BoreDia"] == drawing.BORE_CALLOUT
+    # Every printed row stands a space off the dimension line, and a closing
+    # no-break-space row keeps the shelf off the parentheses' tails.
+    printed = drawing.DIMENSION_CALLOUTS["BoreDia"]
+    rows = printed.splitlines()
+    assert rows[:-1] == [f" {row}" for row in drawing.BORE_CALLOUT.splitlines()]
+    assert rows[-1] == "\u00a0"
     assert "PIN HOLE" not in callout
 
     anchor = drawing.SECTION_KEEP["BoreDia"]
-    half = _block_half_width(drawing.BORE_CALLOUT, anchor)
+    half = _block_half_width(printed, anchor)
     # Right of the front face, left of the isometric (about the O.D. wide).
     assert anchor[0] - half > drawing.FRONT_FACE_X + 0.010
     assert anchor[0] + half < drawing.ISO_CENTER[0] - drawing.HALF_OD - 0.010
