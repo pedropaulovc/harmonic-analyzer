@@ -278,7 +278,7 @@ springs:
         upper_support:
           component: sm-vn-gooseneck-shoulder-screw
           number: MHA-SM-VN-56
-          supplier_sku: 91259A535
+          supplier_sku: 91829A566
           thread: '#10-24'
           pitch_mm: 1.0583333333333333
           major_dia_mm: 4.826
@@ -287,6 +287,8 @@ springs:
           shoulder_length_mm: 9.524999999999999
           head_dia_mm: 9.524999999999999
           head_height_mm: 4.762499999999999
+          drive_slot_width_mm: 1.524
+          drive_slot_depth_mm: 1.905
           eye_gap_mm: 4.88061
           arm_end_x_mm: -103.359695
           spring_eye_x_mm: -105.8
@@ -339,7 +341,7 @@ springs:
         upper_support:
           component: sm-vn-gooseneck-shoulder-screw
           number: MHA-SM-VN-56
-          supplier_sku: 91259A535
+          supplier_sku: 91829A566
           thread: '#10-24'
           pitch_mm: 1.0583333333333333
           major_dia_mm: 4.826
@@ -348,6 +350,8 @@ springs:
           shoulder_length_mm: 9.524999999999999
           head_dia_mm: 9.524999999999999
           head_height_mm: 4.762499999999999
+          drive_slot_width_mm: 1.524
+          drive_slot_depth_mm: 1.905
           eye_gap_mm: 4.88061
           arm_end_x_mm: -103.359695
           spring_eye_x_mm: -105.8
