@@ -87,18 +87,42 @@ CORNER_R = 1.778  # .07
 # Screw-hole layout on the guide-side band (matches the guide's hole pitch:
 # the two stations sit x +-.276 about the hole pattern's centre, the lock
 # station, on the rail's tap row past the lip). R9-49: 1/8 DRILL
-# (.125) over the #4-40 majors carries this plate's coordinate bands and
-# the rail taps' Ø.008 position (pd_vn_guide_lock_screw_spec.LOCK_SET_OFFSET);
-# the #4 close .120 left too little.
+# (.125) over the #4-40 majors carries the transfer's error
+# (pd_vn_guide_lock_screw_spec.LOCK_SET_OFFSET).
 HOLE_XY = ((3.9878, HOLE_Y), (18.0086, HOLE_Y))  # .157, .709
 # Plate-frame x of the hole pattern's centre: the assembly puts it on the
 # lock station (the plate's own centre stands right of it).
 HOLE_PATTERN_X = (HOLE_XY[0][0] + HOLE_XY[1][0]) / 2.0
 HOLE_SPEC = HoleSpec("drilled_fractional", "1/8")
-# ± on each printed hole coordinate (drawing-guidelines.md rule 5 (avoid excessive GD&T): no frame on this plate). Its
-# radial reach, hypot(.001, .001), is what the set window spends.
-HOLE_LOCATION_BAND = 0.0254  # ±.001
 HOLE_LOCATION_PLACES = 3
+# The holes are TRANSFERRED from the MHA-PD-11 lock-screw taps at assembly:
+# the plate sits on the rail, guide-side edge lapping datum B, is struck
+# through the taps with #4-40 transfer screws and drilled at the marks
+# (delegated ruling 2026-11-07 (Main), no precedent; owner review #2144;
+# pending owner confirmation). The taps set the positions, so the hole
+# coordinates print plain at the title block's .XXX (drawing-guidelines.md
+# rule 5 (avoid excessive GD&T): no frame on this plate). Two bands follow:
+# - HOLE_PLACEMENT_BAND, that .XXX row: the plate is placed by hand when
+#   struck, so each hole stands up to this from its drawn place relative to
+#   the plate's edges (per axis). The ligaments, the corner-radius check and
+#   the set plate's edge reach spend it.
+# - HOLE_TRANSFER_BAND, per axis: the model premise that the transfer
+#   screw's point and the drill on its mark put each hole's axis within this
+#   of its actual tap's axis. The hole-over-screw fit and the set window
+#   spend it, and nothing of the taps' own Ø.008 position: each hole follows
+#   its tap.
+HOLE_PLACEMENT_BAND = max(
+    abs(deviation)
+    for xy in HOLE_XY
+    for value in xy
+    for deviation in printed_deviations(value, HOLE_LOCATION_PLACES, unit=UNIT)
+)
+HOLE_TRANSFER_BAND = 0.0254  # .001
+# The MHA-PD-00 transfer step checks each struck mark from the plate's edges
+# (guide-side .155, left .157 / .709) to this band before drilling: the
+# placement band less the transfer's own error, so the drilled holes land
+# within the placement band the walls below are judged at.
+TRANSFER_MARK_BAND = HOLE_PLACEMENT_BAND - HOLE_TRANSFER_BAND
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows. ``build_pd_guide_lock`` marks exactly these; ``draw_pd_guide_lock``
@@ -142,8 +166,9 @@ if DRAWING_PRECISION.keys() != DRAWING_DIMENSIONS.keys() or any(
     raise AssertionError("every marked guide-lock dimension needs authored places")
 
 # Edge ligaments of the screw holes at the printed worst case: the largest
-# drilled hole, its coordinate band, and the plate's printed outline bands.
-# The holes locate from the plate's corner (x from the left edge, y from the
+# drilled hole, its placement band (the .XXX row the transferred holes keep
+# from the plate's edges), and the plate's printed outline bands. The holes
+# locate from the plate's corner (x from the left edge, y from the
 # guide-side edge), so the right and far ligaments also spend the outline's.
 # Finished, each also pays the title block's outside edge break and the
 # hole's mouth break (Codjiflo, #2124): the guide-side and left walls land
@@ -163,15 +188,15 @@ _HEIGHT_MIN = (
     )[0]
 )
 HOLE_LIGAMENTS_WORST: dict[str, float] = {
-    "guide-side edge": min(y for _, y in HOLE_XY) - HOLE_LOCATION_BAND - _HOLE_R_MAX,
+    "guide-side edge": min(y for _, y in HOLE_XY) - HOLE_PLACEMENT_BAND - _HOLE_R_MAX,
     "far edge": _HEIGHT_MIN
     - max(y for _, y in HOLE_XY)
-    - HOLE_LOCATION_BAND
+    - HOLE_PLACEMENT_BAND
     - _HOLE_R_MAX,
-    "left edge": min(x for x, _ in HOLE_XY) - HOLE_LOCATION_BAND - _HOLE_R_MAX,
+    "left edge": min(x for x, _ in HOLE_XY) - HOLE_PLACEMENT_BAND - _HOLE_R_MAX,
     "right edge": _WIDTH_MIN
     - max(x for x, _ in HOLE_XY)
-    - HOLE_LOCATION_BAND
+    - HOLE_PLACEMENT_BAND
     - _HOLE_R_MAX,
 }
 _EDGE_BREAK = max(edge_break_radius_mm(unit=UNIT), edge_break_chamfer_mm(unit=UNIT))
@@ -198,8 +223,8 @@ _, _CORNER_R_UPPER = printed_deviations(
 )
 _CORNER_R_MAX = CORNER_R + _CORNER_R_UPPER
 _HOLE_EDGE_OFFSETS_MIN = (
-    min(x for x, _ in HOLE_XY) - HOLE_LOCATION_BAND,
-    _WIDTH_MIN - max(x for x, _ in HOLE_XY) - HOLE_LOCATION_BAND,
+    min(x for x, _ in HOLE_XY) - HOLE_PLACEMENT_BAND,
+    _WIDTH_MIN - max(x for x, _ in HOLE_XY) - HOLE_PLACEMENT_BAND,
 )
 if min(_HOLE_EDGE_OFFSETS_MIN) <= _CORNER_R_MAX:
     raise AssertionError(

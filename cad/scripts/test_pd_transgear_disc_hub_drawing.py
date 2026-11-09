@@ -310,7 +310,7 @@ def test_the_spigot_seats_on_the_step_square_and_clear_of_the_disc() -> None:
     gap = (
         spec.SPIGOT_LENGTH_MIN
         - disc.FACE_WIDTH_MAX
-        - float(disc.GEOMETRIC_TOLERANCES_MM["disc rear face parallelism to front"])
+        - disc.REAR_FACE_PARALLELISM_BOUND_MM
         - tilt * disc.BORE_DIA_MAX / 2.0
     )
     assert spec.DISC_STEP_GAP_WORST == pytest.approx(gap)
@@ -649,7 +649,7 @@ def test_finished_walls_over_the_bore_pay_both_end_breaks() -> None:
         }
     )
     assert finished["hub wall over the bore"] == pytest.approx(0.078 * IN, abs=1e-3)
-    assert finished["spigot wall over the bore"] == pytest.approx(0.0731 * IN, abs=1e-3)
+    assert finished["spigot wall over the bore"] == pytest.approx(0.0730 * IN, abs=1e-3)
     for wall in finished.values():
         assert 0.060 * IN - 1e-9 <= wall < WALL_FLOOR
     assert spec.FLAT_WALL_FINISHED == pytest.approx(spec.FLAT_WALL_WORST - breaks)

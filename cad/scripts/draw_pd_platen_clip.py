@@ -266,15 +266,13 @@ DIMENSION_AFFIXES = {
     )
     for name in sorted({*_COUNTS, *REFERENCE_DIMENSIONS})
 }
-# What each callout-bearing size is for: the hole row's .XXX height, with the
-# hole stations, matches the platen's tap pattern (the holes float over the
-# shanks by both patterns' zones only at .XXX; the r7 review read a bare .XXX
-# row as over-spec).  The sheet is the stock's;
+# What each callout-bearing size is for.  The hole row's .XXX location
+# carries its value only (rule 7): the hole callout names the platen whose
+# taps the pattern matches (pd-platen-clip RV-01).  The sheet is the stock's;
 # the slit and the spring rail end in full rounds; the developed finger is
 # measured along the bows from the bridge to the tip, not across the formed
 # profile (r2 read it as a span); the rise is each bow's crest height.
 DIMENSION_CALLOUTS = {
-    "LeftZ": "MATCHES\nMHA-PD-02",  # pd-platen-clip RV-01
     # The holes' finished walls at the floor (rule 20; pd-platen-clip RV-02).
     "RailWidth": f"SCREW RAIL\n{HOLE_WALL_TEXT}",
     "SheetDepth": "SHEET STOCK",
@@ -304,7 +302,10 @@ HOLE_EDGE_XY = (
     _plan_y(HOLE_Y) - HOLE_R_SHEET * _DIAG,
 )
 HOLE_CALLOUT_XY = (0.360, 0.098)
-HOLE_CALLOUT_PROCESS = "PATTERN MATCHES MHA-PD-02\nDRILL"  # pd-platen-clip RV-01
+# Size, then process, then depth (rule 26): the native through extent becomes
+# DRILL THRU, and the mate the pattern matches follows on its own line.
+HOLE_EXTENT_TEXT = "DRILL THRU"
+HOLE_CALLOUT_MATE = "PATTERN MATCHES MHA-PD-02"  # pd-platen-clip RV-01
 # Where the slit-side corner radius lands (its leader target), for the layout
 # tests: the screw rail's top-right corner.
 SLIT_CORNER_XY = (
@@ -338,6 +339,53 @@ def _set_dimension_affixes(
             raise RuntimeError(f"dimension affixes {affix!r} read back {written!r}")
     if remaining:
         raise RuntimeError(f"dimension affixes not applied: {sorted(remaining)}")
+
+
+def hole_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
+    """Swap the one native through extent for DRILL THRU and add the mate row.
+
+    The plain through-hole format is ``<MOD-DIAM> <hw-diam> <hw-thru>``
+    (draw_fr_top_frame._hanger_hole_callout_definitions); the size stays the
+    Hole Wizard variable, so the printed order is size, process, depth.
+    """
+    native = "\n".join(definitions.values())
+    if (
+        set(definitions) != {5, 6, 7, 8}
+        or native.count("<hw-diam>") != 1
+        or native.count("<hw-thru>") != 1
+        or any(token in native for token in ("<hw-thruholedia>", "<HOLE-SPOT>", "<HOLE-SINK>"))
+    ):
+        raise RuntimeError(f"unexpected native platen-clip hole callout: {definitions!r}")
+    return {
+        part: (
+            text.replace("<hw-thru>", HOLE_EXTENT_TEXT).rstrip("\r\n")
+            + "\n"
+            + HOLE_CALLOUT_MATE
+            if "<hw-thru>" in text
+            else text
+        )
+        for part, text in definitions.items()
+    }
+
+
+def _set_hole_callout(display: Any) -> None:
+    """Edit only native definition fields and require their exact readback."""
+    display = _early_bound(display, "IDisplayDimension")
+    definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
+    updated = hole_callout_definitions(definitions)
+    for definition, writable in ((5, 1), (6, 2), (7, 3), (8, 4)):
+        if updated[definition] != definitions[definition]:
+            display.SetText(writable, updated[definition])
+    persisted = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
+    resolved = "\n".join(str(display.GetText(part) or "") for part in (1, 2, 3, 4))
+    if (
+        {part: text.replace("\r", "") for part, text in persisted.items()} != updated
+        or resolved.count(HOLE_EXTENT_TEXT) != 1
+    ):
+        raise RuntimeError(
+            f"platen-clip hole callout definition did not persist: {persisted!r}, "
+            f"resolved {resolved!r}"
+        )
 
 
 def _radius_leader_outside(adapter: Any, annotations: list[Any], name: str) -> None:
@@ -472,8 +520,8 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=HOLE_EDGE_XY,
         callout_xy=HOLE_CALLOUT_XY,
         label="platen-clip screw holes",
-        process=HOLE_CALLOUT_PROCESS,
     )
+    _set_hole_callout(callout)
     set_hole_callout_precision(
         callout, HOLE_CALLOUT_PRECISION, label="platen-clip screw holes"
     )

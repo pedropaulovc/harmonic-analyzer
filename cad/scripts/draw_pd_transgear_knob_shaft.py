@@ -1,17 +1,22 @@
 r"""Create the manufacturing drawing for the transgear knob shaft (MHA-PD-08).
 
 A turned side view, aligned rear and front end views, a 10:1 detail of the
-front neck, a 4:1 view from the stud tip, and an isometric.
-The side view imports the source-owned turned sizes and unchanged
-stations, and a reference overall length; each tight band names its mate.
-The front end view carries the D-flat's distance from the axis, where the
-flat shows true, and the leadered tooth-edge and bearing-face notes.  The
-4:1 view carries the gear's native acceptance dimensions: the span over two
-teeth (LIMITS) and the root envelope (MIN).  The rear view
-identifies the actual running journal datum. The
-#8-32 thread callout belongs to its real thread blank. Cutter identity and
-approved inspection controls are properties of the saved source, never
-values retyped here.
+front neck, VIEW C (the gear end from the stud tip at 4:1, named by a viewing
+arrow on the side view), and an isometric.
+The side view imports the source-owned turned sizes; each chucking's
+lengths run from its faced end: the stud's stations from the tip face, the
+controlled overall to the rear face, the journal a reference.  Each tight
+band names its mate once: the journal's running fit and the D-section's
+sliding fit are numbered notes their callouts link by "SEE NOTE n"
+(drawing-guidelines.md rule 4), and the mesh with the disc is the gear data
+block's, the span's matched fit accepted by its backlash row.  The front
+end view carries the D-flat's distance from the
+axis, where the flat shows true, and the leadered tooth-edge note.  VIEW C
+carries the gear's native acceptance dimensions: the span over two teeth
+(LIMITS) and the root envelope (MIN).  The rear view identifies the actual
+running journal datum.  The #8-32 thread callout belongs to its real thread
+blank.  Cutter identity and approved inspection controls are properties of
+the saved source, never values retyped here.
 The source-linked formed-flank callout carries radial TIR, the paid
 pitch-index range at REF pitch diameter, all-space/wrap receiving and the
 certified pin. Neither span thickness nor a pin-centre radius substitutes
@@ -41,6 +46,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
     view_name,
 )
@@ -52,8 +58,7 @@ from _drawing_dimensions import (
 )
 from _drawing_finish import add_surface_finish
 from _drawing_gdt import add_datum_feature, add_feature_control_frame
-from _drawing_leader_notes import add_attached_note
-from _drawing_notes import add_property_linked_note
+from _drawing_leader_notes import add_attached_note, add_leader_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
@@ -65,14 +70,17 @@ from _part_properties import part_drawing_unit
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
+import paper_drive_mesh_check as mesh_check
+import pd_rack_pinion_spec as disc
 from paper_drive_stock_drawing import add_toothspace_callout, require_source_control
+from pd_transgear_arm_plate_geometry import BORE_DIA as ARM_PLATE_BORE_DIA
+from pd_transgear_arm_plate_geometry import BORE_DIA_LIMITS as ARM_PLATE_BORE_LIMITS
 from pd_transgear_knob_shaft_spec import (
-    BEARING_FACE_NOTE,
-    DISC_NUMBER,
-    DRIVE_COLLAR_NUMBER,
     CORE_DIA,
     CORE_FRONT_Z,
+    CORE_FRONT_FROM_TIP,
     CUTTER_NUMBER,
+    CUTTER_TOOTH_RANGE,
     FRONT_CORNER_RADIUS,
     FRONT_RELIEF_DIA,
     FRONT_RELIEF_WIDTH,
@@ -82,6 +90,7 @@ from pd_transgear_knob_shaft_spec import (
     FACE_WIDTH,
     FACE_WIDTH_CALLOUT,
     JOURNAL_DIA,
+    JOURNAL_DIA_BAND,
     OUTSIDE_DIA,
     PLAIN_CORE,
     PRESSURE_ANGLE_DEG,
@@ -90,6 +99,7 @@ from pd_transgear_knob_shaft_spec import (
     GEOMETRIC_TOLERANCES_MM,
     PART_DATUMS,
     REAR_END_Z,
+    PITCH_DIA,
     SURFACE_FINISHES,
     STOCK_PROFILE,
     GAP_AZIMUTH_DEG,
@@ -97,13 +107,17 @@ from pd_transgear_knob_shaft_spec import (
     TOOTH_SPACE_GAUGE_PIN_DIA_MM,
     TOOTH_SPACE_CALLOUT,
     TOOTH_SPACE_CALLOUT_PROPERTY,
-    TOOTH_EDGE_NOTE,
     TEETH,
+    THREAD_END_FROM_TIP,
     THREAD_CALLOUT,
     TIP_CHAMFER,
     TIP_CHAMFER_CALLOUT,
     TIP_STATION,
+    WHOLE_DEPTH,
     TIP_Z,
+    inch_ceil_mm,
+    inch_floor_mm,
+    inch_text,
 )
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -166,15 +180,129 @@ HALF_OD = OUTSIDE_DIA * _S / 2000.0
 _ABOVE_Y = SIDE_CENTER[1] + HALF_OD + 0.016
 _ROW_PITCH = 0.010
 _ROW_Y = tuple(SIDE_CENTER[1] - HALF_OD - 0.016 - i * _ROW_PITCH for i in range(6))
-# Mates named at their tight bands (drawing-guidelines rule 4).
-ARM_PLATE_NUMBER = _config.parts("pd-transgear-arm-plate")["number"]
-KNOB_CUP_NUMBER = _config.parts("pd-transgear-knob-cup")["number"]
+# Mates named once at their tight bands (drawing-guidelines rule 4), by the
+# config's part name (less the family's "TRANSGEAR") and number.
 THUMBNUT_NUMBER = _config.parts("pd-transgear-thumbnut")["number"]
-# The flat's limits hang right of their line, every row centred on the
-# shoulder under the widest: at 16 characters ("MHA-PD-22 D-BORE") that
-# shoulder ran 43.3 mm (run 20261031T233549214Z), so no row runs past 12
-# characters (~33 mm).
-COLLAR_SLIDING_FIT = f"SLIDES IN\nDRIVE COLLAR\n{DRIVE_COLLAR_NUMBER}"
+
+
+def _mate_name(part: dict) -> str:
+    """A mate as the shop reads it: its config title, less the family word
+    every part on the sheet shares, and its part number. Callers read the row
+    by a literal key, so the drawing's config inputs stay per-row."""
+    title = part["title"].upper().removeprefix("TRANSGEAR ")
+    return f"{title} {part['number']}"
+
+
+def _fit_range_text(low_mm: float, high_mm: float) -> str:
+    """A clearance range from both parts' printed limits, to .0001 in."""
+    return f"{inch_text(low_mm, 4)}-{inch_text(high_mm, 4)}"
+
+
+# The journal keeps its g6 limits under the arm plate's reamed H7 bore: a
+# matched running fit (rule 4), its clearance from both parts' limits as REF.
+JOURNAL_CLEARANCE_MM = (
+    ARM_PLATE_BORE_DIA + min(ARM_PLATE_BORE_LIMITS) - (JOURNAL_DIA + max(JOURNAL_DIA_BAND)),
+    ARM_PLATE_BORE_DIA + max(ARM_PLATE_BORE_LIMITS) - (JOURNAL_DIA + min(JOURNAL_DIA_BAND)),
+)
+# The numbered notes the bands link by "SEE NOTE n": the journal's running
+# fit; the D-section's one sliding fit, which its Ø and its flat's distance
+# from the axis link; the tip stations' stacks (round 2: printed .XXX with
+# no stated function), which those stations link; and the neck's mate,
+# which its Ø limits and the flat's end limits link (round 2: the flat end's
+# .005 band named no mate).  The overall prints .XXX plain: the title
+# block's ±.005 is the band the knob cup's pin wall needs.  They stand in
+# the open field right of the overall's tip witness line, over the title
+# block; at 2.2 mm a line runs ~1.5 mm a character, so no line runs past 70
+# characters (~105 mm).
+JOURNAL_FIT_NOTE = 1
+D_SECTION_FIT_NOTE = 2
+STATIONS_NOTE = 3
+NECK_NOTE = 4
+NOTES_LINE_CHARS_MAX = 70
+_COLLAR = _mate_name(_config.parts("pd-transgear-drive-collar"))
+NOTE_TEXTS = (
+    (
+        JOURNAL_FIT_NOTE,
+        f"RUNNING FIT IN {_mate_name(_config.parts('pd-transgear-arm-plate'))}: "
+        "TURN TO MEASURED "
+        f"BORE (CLEARANCE {_fit_range_text(*JOURNAL_CLEARANCE_MM)}).",
+    ),
+    (D_SECTION_FIT_NOTE, f"SLIDING FIT ON {_COLLAR}: SLIDES IN, NO ROCK."),
+    (
+        STATIONS_NOTE,
+        f"{inch_text(TIP_STATION, 3)}/{inch_text(CORE_FRONT_FROM_TIP, 3)} LOCATE THE "
+        f"D-FLAT SEAT UNDER {_COLLAR}, {inch_text(THREAD_END_FROM_TIP, 3)} THE FULL "
+        f"THREAD FOR {_mate_name(_config.parts('pd-transgear-thumbnut'))}.",
+    ),
+    (NECK_NOTE, f"NECK AND D-FLAT END UNDER {_COLLAR}."),
+)
+# Rule 7: a note runs to four short lines at most.
+NOTE_LINES_MAX = 4
+NOTE_LINES = tuple(
+    tuple(
+        textwrap.wrap(f"{number}. {text}", NOTES_LINE_CHARS_MAX, break_on_hyphens=False)
+    )
+    for number, text in NOTE_TEXTS
+)
+if max(map(len, NOTE_LINES)) > NOTE_LINES_MAX:
+    raise AssertionError("a numbered note runs past four lines")
+NOTES = "\n".join(("NOTES:", *(line for lines in NOTE_LINES for line in lines)))
+if max(map(len, NOTES.splitlines())) > NOTES_LINE_CHARS_MAX:
+    raise AssertionError("a numbered note line runs past the open field")
+JOURNAL_FIT_LINK = f"SEE NOTE {JOURNAL_FIT_NOTE}"
+D_SECTION_FIT_LINK = f"SEE NOTE {D_SECTION_FIT_NOTE}"
+STATIONS_LINK = f"SEE NOTE {STATIONS_NOTE}"
+NECK_LINK = f"SEE NOTE {NECK_NOTE}"
+
+
+def reducer_feeler_backlash_mm() -> tuple[float, float]:
+    """The 15T:150T mesh's normal (feeler) backlash over the disc's set band.
+
+    paper_drive_mesh_check's circular backlash at each end of the set band
+    (the tight end at the low centre less the runout shift, the loose end at
+    the high centre plus it), each times the cosine of its operating pressure
+    angle; MHA-PD-06's gear data prints the same range (rule 25).
+    """
+    low, high = disc.CENTRE_DISTANCE_WINDOW
+    shift = mesh_check.reducer_runout_shift_mm()
+    tight = mesh_check.reducer_mesh(low).backlash_mm[0]
+    loose = mesh_check.reducer_mesh(high).backlash_mm[1]
+    return (
+        tight * math.cos(mesh_check._operating_angle(low - shift)),
+        loose * math.cos(mesh_check._operating_angle(high + shift)),
+    )
+
+
+# The gear's tip and span bands are set by the mesh with MHA-PD-06, which the
+# GEAR DATA block names (MATES WITH); their fit route is the matched-fit
+# backlash acceptance, the block's last row as MHA-PD-06's block words it,
+# rounded INWARD to .001 so an accepted mesh never leaves the range the mesh
+# check passes.  The span's limits still print and control (the mesh check
+# derives its gates from SPAN_LIMITS), so the span is not a reference.
+_BACKLASH_MM = reducer_feeler_backlash_mm()
+BACKLASH_ACCEPT_MM = (
+    inch_ceil_mm(_BACKLASH_MM[0], 3),
+    inch_floor_mm(_BACKLASH_MM[1], 3),
+)
+BACKLASH_ACCEPT_TEXT = "-".join(inch_text(value, 3) for value in BACKLASH_ACCEPT_MM)
+# What a machinist needs to cut and check the teeth (Main ruling 2026-10-10):
+# the cutting rows, the mate and the backlash acceptance that is the span
+# band's fit route (rule 4).  The span prints in VIEW C with its limits, not
+# again here.  The last row breaks after "MATE" so the block ends left of
+# the overall's rear witness line (REAR_X).
+GEAR_DATA_ROWS = (
+    ("NUMBER OF TEETH", f"{TEETH}"),
+    ("DIAMETRAL PITCH", f"{DIAMETRAL_PITCH:.2f}"),
+    ("PRESSURE ANGLE", f"{PRESSURE_ANGLE_DEG:.1f} DEG"),
+    ("PITCH DIAMETER (REF)", inch_text(PITCH_DIA, 4)),
+    ("WHOLE DEPTH (REF)", inch_text(WHOLE_DEPTH, 4)),
+    ("CUTTER", f"#{CUTTER_NUMBER}, {CUTTER_TOOTH_RANGE[0]}-{CUTTER_TOOTH_RANGE[1]}T"),
+    ("MATES WITH", _mate_name(_config.parts("pd-rack-pinion"))),
+    ("SPAN MATCHED FIT", f"BACKLASH WITH MATE\n   {BACKLASH_ACCEPT_TEXT}, FEELER"),
+)
+GEAR_DATA_NOTE = "\n".join(
+    ("GEAR DATA", *(f"{label}:  {value}" for label, value in GEAR_DATA_ROWS))
+)
 # An above callout prints only as ONE line (a line break there is stored but
 # never printed: farm run 20261031T205208603Z's four mate callouts went
 # unmatched), set as one run centred on its dimension's text: 40 characters
@@ -209,75 +337,106 @@ SIDE_KEEP: dict[str, tuple[float, float]] = {
     # 4 mm left of mid-journal, right of detail B's crop: its one-line run
     # hangs right of the line and ends 6.7 mm short of the pinion's line.
     "JournalDia": ((PINION_REAR_X + REAR_X) / 2.0 - 0.004, _DIA_ROW_Y[0]),
-    # Its two-line text (45.7 mm wide with "DISC CLUSTER STACK") is wider
-    # than the 17.7 mm between its witness lines, so it stands outside right
-    # of F's (214.4): text ~218.6..264.3 mm, under the empty rows past F.
-    "FaceWidth": (F_X + 0.027, _ROW_Y[4]),
-    "CoreFront": ((F_X + CORE_END_X) / 2.0, _ROW_Y[0]),
-    "PlainCore": ((F_X + THREAD_END_X) / 2.0, _ROW_Y[1]),
-    "JournalLength": ((PINION_REAR_X + REAR_X) / 2.0, _ROW_Y[0]),
+    # Its three-line block (~58 mm wide with "DISC CLUSTER STACK WITH") is
+    # wider than the 17.7 mm between its witness lines, so it stands outside
+    # right of F's (217.7): text ~218.6..277 mm, left of the tip's witness
+    # line (289.4), over the overall's line on the last row.
+    "FaceWidth": (F_X + 0.030, _ROW_Y[4]),
+    # The stud chucking's stations run from the faced tip (rule 11): the
+    # thread's end, the core's front and F stack outward on rows 0-2 from the
+    # tip's witness line; each starts right of the next one's foot, so no
+    # witness line crosses a dimension line.
+    "ThreadEndFromTip": ((THREAD_END_X + TIP_X) / 2.0, _ROW_Y[0]),
+    "CoreFromTip": ((CORE_END_X + TIP_X) / 2.0, _ROW_Y[1]),
     "TipStation": ((F_X + TIP_X) / 2.0, _ROW_Y[2]),
-    # Reference overall, tip face to rear face, on the last row: under the
-    # face width's callout and clear of the gear data block's right edge.
-    "OverallLength": ((REAR_X + TIP_X) / 2.0, _ROW_Y[5]),
+    # The journal, the rest of the overall, as a reference.
+    "JournalLength": ((PINION_REAR_X + REAR_X) / 2.0, _ROW_Y[0]),
+    # The controlled overall, tip face to rear face, on the last row, its
+    # rear witness line right of the gear data block.  Its text, with its
+    # function on the value's line, centres between the rear witness line
+    # and the pinion's rear witness line (round 3: "2.792 SEE NOTE 3" left
+    # of F ran into the face width's left witness line and arrow, which drop
+    # to the overall text's height); OVERALL_TEXT_* below check both ends.
+    "OverallLength": ((REAR_X + PINION_REAR_X) / 2.0, _ROW_Y[5]),
 }
 END_KEEP: dict[str, tuple[float, float]] = {
     # The flat's distance from the axis, where the flat shows true (machinist
     # review r7: in the side view its line ran over the #8-32 thread, level
     # with the thread's lower edge, so it read as the thread's radius).  The
-    # line stands 5 mm right of the tooth tips; the limits and the collar's
-    # rows hang right of it (32.8 mm, from 12.8 mm under the keep to 12.9 mm
-    # over it in run 20261101T022045634Z), their top 2.7 mm under the flat's
-    # arrow, under the bearing-face note's leader (y >= 168 at the line) and
-    # over the tooth-space note (y <= 112.4).
+    # line stands 5 mm right of the tooth tips; the limits and the note link
+    # hang right of it, their top under the flat's arrow and over the
+    # tooth-space note (y <= 112.4).
     "FlatToAxis": (FRONT_CENTER[0] + HALF_OD + 0.005, FRONT_CENTER[1] - 0.022),
 }
 # Callouts over the vertical Ø texts (a below-callout there would sit on
-# the Ø's own line), each one line.
+# the Ø's own line), each one line.  Every kept tight band prints its
+# matched-fit route at its callout (delegated ruling 2026-11-07 (Main) F5):
+# the tooth tips link the gear data block, which names the mesh mate and its
+# backlash acceptance; the thread relief's is a plain clearance.
+GEAR_DATA_LINK = "SEE GEAR DATA"
 DIMENSION_CALLOUTS_ABOVE = {
-    "JournalDia": f"RUNS IN ARM PLATE {ARM_PLATE_NUMBER}",
-    "OutsideDia": f"MESHES WITH DISC {DISC_NUMBER}",
-    "CoreDia": f"SLIDES IN DRIVE COLLAR {DRIVE_COLLAR_NUMBER}",
+    "JournalDia": JOURNAL_FIT_LINK,
+    "OutsideDia": GEAR_DATA_LINK,
+    "CoreDia": D_SECTION_FIT_LINK,
     "ReliefDia": f"CLEARS THUMBNUT {THUMBNUT_NUMBER}",
 }
 if any("\n" in text for text in DIMENSION_CALLOUTS_ABOVE.values()):
     raise AssertionError("an above-callout with a line break does not print")
 # The face width's ±band names the disc cluster stack (rule 4); its one
-# line hangs into the empty sixth baseline row below it.  The flat's and
-# the journal length's callouts hang under their texts, past the ends of
-# their witness lines.  Under a horizontal dimension the rows stack between
-# its value and its dimension line, the block centred on the keep (run
-# 20261101T035809796Z: the journal length's two rows put its line 8.3 mm
-# under its keep).  Detail B's neck width and the D-flat tool's end state
-# their functions (machinist review r8): the narrowest neck less the
-# farthest tool end leaves a full D up to the core's step (the spec's
-# CORE_FLAT_REACH_PAST_SHOULDER_MIN; "D-FLAT RUNOUT" named no job, review of
-# farm run 20261101T121701269Z), and the tool end leaves a full flat under
-# the collar.  Two rows of at most 7 characters: the block stands between
-# the step's witness line and the journal Ø's line, under the crop.  The neck
-# Ø's LIMITS state both jobs (owner ruling r8), MAX on the value's line
-# (DIMENSION_SUFFIXES) and MIN in the row under it.
-NECK_DIA_JOBS = (f"MAX CLEARS {DRIVE_COLLAR_NUMBER};", "MIN CARRIES DRIVE TORQUE")
+# line hangs into the empty sixth baseline row below it.  The flat's link
+# hangs under its text, past the end of its witness line.  The span's
+# limits still control: its callout names the matched fit and links the
+# GEAR DATA block's backlash acceptance, worded as MHA-PD-06's span callout
+# (two lines of words under "SPAN 2 TEETH" and its limits).  Lengths and
+# locations print their values alone.
+SPAN_CALLOUT = f"MATCHED FIT,\n{GEAR_DATA_LINK}"
 DIMENSION_CALLOUTS_BELOW = {
     "FaceWidth": FACE_WIDTH_CALLOUT,
-    "FlatToAxis": COLLAR_SLIDING_FIT,
-    "JournalLength": f"SETS PIN WALL IN\nKNOB CUP {KNOB_CUP_NUMBER}",
-    "FrontReliefWidth": "FULL D\nTO STEP",
-    "FlatEnd": f"FULL FLAT FOR\nCOLLAR {DRIVE_COLLAR_NUMBER}",
-    "FrontReliefDia": NECK_DIA_JOBS[1],
-    # The span's LIMITS are set by the disc mesh, like the tooth tips.
-    "ToothSpan": f"MESHES WITH DISC {DISC_NUMBER}",
+    "FlatToAxis": D_SECTION_FIT_LINK,
+    "ToothSpan": SPAN_CALLOUT,
 }
-# Detail B's neck Ø: its text hangs left of its line under the border.  The
-# whole job statement on one line (~126 mm) would cross the border, and two
-# rows under the value would top out past it (DETAIL_KEEP), so the MAX job
-# runs on the value's line: the 30 characters of "3.950 CLEARS COLLAR
-# MHA-PD-22" ran 77.7 mm (run 20261101T035809796Z), so this ~73 mm line
-# starts ~18 mm inside the border.
-DIMENSION_SUFFIXES = {"FrontReliefDia": f" {NECK_DIA_JOBS[0]}"}
-# Reference sizes (parenthesized): the overall, and the thread blank the
-# #8-32 UNC-2A class governs.  Name -> diameter glyph.
-REFERENCE_DIMENSIONS = {"OverallLength": False, "ThreadBlankDia": True}
+# Each .XXX tip station links the stacks note on its value's line; detail
+# B's neck Ø (LIMITS) and the D-flat end's limits link the neck note, which
+# names both features and MHA-PD-22 once.  At nominal the flat's end stands
+# on the neck corner's R.004 tangent, so the note names the D-flat end in
+# words (round-4 repeat read a bare link as locating that tangent; round 5
+# read a bare `FLAT END` label as coined and unlinked).  (A row under the
+# neck Ø would top out past the border, and the side rows stand 10 mm apart.)
+DIMENSION_SUFFIXES = {
+    "ThreadEndFromTip": f" {STATIONS_LINK}",
+    "CoreFromTip": f" {STATIONS_LINK}",
+    "TipStation": f" {STATIONS_LINK}",
+    "FrontReliefDia": f" {NECK_LINK}",
+    "FlatEnd": f" {NECK_LINK}",
+    # Round 7: the neck width keeps .XXX (at .XX its least, .006, falls
+    # under the flat end's .007) and links the neck note like its neighbours.
+    "FrontReliefWidth": f" {NECK_LINK}",
+    # Round 6: the overall keeps .XXX (the knob cup's pin wall fails at .XX)
+    # and states that function once, at the dimension, not in a note (r3).
+    "OverallLength": (
+        f" SETS PIN WALL IN {_config.parts('pd-transgear-knob-cup')['number']}"
+    ),
+}
+# The overall's one-line text (~2.75 mm a character, centred on its keep;
+# the round-6 render's digits ran 2.32 mm) ends 5 mm short of the face
+# width's left witness line (the pinion's rear face, which drops to the
+# text's height with its arrow) and starts 5 mm right of the rear witness
+# line.  It sits over the overall's line; SPAN 2 TEETH and the GEAR DATA
+# block stand under that line and left of the rear witness line.
+OVERALL_TEXT_CHARS = len(inch_text(REAR_END_Z - TIP_Z, 3)) + len(
+    DIMENSION_SUFFIXES["OverallLength"]
+)
+_OVERALL_HALF = OVERALL_TEXT_CHARS * 0.00275 / 2.0
+OVERALL_TEXT_LEFT = SIDE_KEEP["OverallLength"][0] - _OVERALL_HALF
+OVERALL_TEXT_RIGHT = SIDE_KEEP["OverallLength"][0] + _OVERALL_HALF
+if OVERALL_TEXT_RIGHT > PINION_REAR_X - 0.005:
+    raise AssertionError("the overall's text runs into the face width's witness line")
+if OVERALL_TEXT_LEFT < REAR_X + 0.005:
+    raise AssertionError("the overall's text runs over the rear witness line")
+# Reference sizes (parenthesized): the journal (the rest of the controlled
+# overall), and the thread blank the #8-32 UNC-2A class governs.  Name ->
+# diameter glyph.
+REFERENCE_DIMENSIONS = {"JournalLength": False, "ThreadBlankDia": True}
 
 # The thread callout lands on the edge where the thread blank meets the tip
 # chamfer and stands up and left, clear of the tooth-tip Ø over the pinion.
@@ -308,30 +467,39 @@ JOURNAL_FINISH_PICK = (REAR_X + 0.018, _sheet_y(-JOURNAL_DIA / 2.0))
 JOURNAL_FINISH_SYMBOL = (REAR_X + 0.023, JOURNAL_FINISH_PICK[1] - 0.0135)
 # A point on the journal's face for the turning axis.
 CENTERLINE_PICK = ((PINION_REAR_X + REAR_X) / 2.0, SIDE_CENTER[1] + 0.003)
-# Lower left, under the journal's 40.938 row (y 0.133).
+# Lower left, under the journal's 40.938 row (y 0.133), at MHA-PD-06's
+# block height.  A line of capitals runs ~0.68 of the height a character
+# (round-1 render: 39 characters at 2.5 mm ran 66 mm), so the block's
+# widest line ends left of the overall's and the journal's rear witness line
+# (REAR_X), which drops past the block to the last row (round 1: the
+# backlash row ran under it).
 GEAR_DATA_XY = (0.016, 0.118)
-GEAR_DATA_CHAR_HEIGHT = 0.0025
+GEAR_DATA_CHAR_HEIGHT = 0.0022
+NOTE_CHAR_WIDTH_PER_HEIGHT = 0.68
+NOTE_LINE_PITCH_PER_HEIGHT = 1.24
+GEAR_DATA_RIGHT = GEAR_DATA_XY[0] + max(
+    map(len, GEAR_DATA_NOTE.splitlines())
+) * NOTE_CHAR_WIDTH_PER_HEIGHT * GEAR_DATA_CHAR_HEIGHT
+if GEAR_DATA_RIGHT > REAR_X - 0.003:
+    raise AssertionError("the GEAR DATA block runs under the rear witness line")
+# The numbered notes in the open field right of the overall's tip witness
+# line (289.4) at the gear data's height: their top under the tooth-space
+# note (bottom ~0.106), their bottom over the title block (top ~0.0663),
+# their right end inside the border (0.4191 - 0.0127).
+NOTES_XY = (0.300, 0.100)
+TITLE_BLOCK_TOP = 0.0663
+NOTES_CHAR_HEIGHT = GEAR_DATA_CHAR_HEIGHT
 DATUM_A_SYMBOL = (END_CENTER[0] - 0.017, END_CENTER[1] - 0.018)
-# The two shop notes stand by the front end view, each leader on the
+# The edge-break note stands by the front end view, its leader on the
 # feature it names (machinist review r8).  That view is mirrored (sheet
-# angle = 180 deg - model angle), and the span's dimension no longer stands
-# over it.  The edge-break note lands on tooth 5's tip (teeth centre on
-# 2*pi*k/TEETH, model 120 deg, sheet 60 deg: ~(341.8, 171.7) mm) and
-# stands over it, its three ~60 mm lines from 186.5 to 199 mm, under the
-# isometric (from 202.5).  The bearing note lands on F's annulus between
-# the core (R2.425) and the root (R3.30) at model 155 deg (sheet 25 deg:
-# ~(343.0, 163.7)) and stands right of the gear on two lines, its top 7 mm
-# under the edge-break note: three lines 4.4 mm under it read as one block
-# (farm run 20261101T081735465Z, 5.66 mm row pitch).  Its left end stands
-# left of the flat's upper arrow stub (x 353.5, top 166.3), so its leader
-# never reaches the stub.  Anchors are top-left.
-TOOTH_EDGE_LEADER_NOTE = "\n".join(textwrap.wrap(TOOTH_EDGE_NOTE, 23))
+# angle = 180 deg - model angle).  The note lands on tooth 5's tip (teeth
+# centre on 2*pi*k/TEETH, model 120 deg, sheet 60 deg: ~(341.8, 171.7) mm)
+# and stands over it on one line, under the isometric (from 202.5).  The
+# title block's .010 edge break is a fifth of this fine tooth's whole depth,
+# so the teeth take this one exception.  Anchors are top-left.
+TOOTH_EDGE_NOTE = "NO EDGE BREAK ON TEETH"
 TOOTH_EDGE_TOOTH = 5
 TOOTH_EDGE_NOTE_XY = (0.345, 0.200)
-BEARING_LANDING_RADIUS_MM = 2.9
-BEARING_LANDING_DEG = 155.0
-BEARING_LEADER_NOTE = " ".join(BEARING_FACE_NOTE.split()).replace(" BEARS", "\nBEARS")
-BEARING_NOTE_XY = (0.3485, 0.180)
 
 # --- Detail B: the front neck at 10:1 -----------------------------------------
 # At 3:1 the 0.400 neck is 1.2 mm of sheet: its Ø, width, corner R and
@@ -383,7 +551,7 @@ _DETAIL_TOP = DETAIL_CENTER[1] + DETAIL_CROP_RADIUS
 _DETAIL_BOTTOM = DETAIL_CENTER[1] - DETAIL_CROP_RADIUS
 # The neck frame's leader lands on the straight floor 0.27 from F and climbs
 # plumb through the neck's air to a frame RIGHT of it (the neck Ø's block
-# took the lane left of it, owner ruling r8: LIMITS and two rows).  A frame
+# took the lane left of it: LIMITS and its reason).  A frame
 # prints 31.3 mm wide and 7 mm tall with a 6.3 mm shoulder at mid-height
 # (stack PDF: box x 0.1884-0.2197, shoulder to 0.2260), so its left edge
 # stands one shoulder right of the landing.  Its row is the top one, 1.5 mm
@@ -413,39 +581,61 @@ DETAIL_KEEP: dict[str, tuple[float, float]] = {
     # Its line rises through the neck's air 0.14 from F, 1.3 mm left of the
     # neck frame's plumb leader, to its shoulder 1.5 mm over the crop's top;
     # the text hangs LEFT of the line over the shoulder.  LIMITS stack two
-    # 4.5 mm rows and the second job row stacks under them, so the block
-    # runs from ~7.8 mm under its keep to ~5.7 mm over it (run
-    # 20261101T035809796Z: the flat's LIMITS and three rows ran from 13.3
-    # under to 11.2 over).  Two rows under the value would top out ~5 mm
-    # past the border, so the MAX job rides the value's line as a suffix
-    # (~73 mm from the line, starting ~18 mm inside the border).
+    # 4.5 mm rows, so the block runs from ~2.3 mm under its keep to ~5.7 mm
+    # over it (run 20261101T035809796Z).  A row under the value would top
+    # out past the border, so the one reason rides the value's line as a
+    # suffix, starting well inside the border.
     "FrontReliefDia": (_detail_xy(-0.14, 0.0)[0], _DETAIL_TOP + 0.0093),
-    # Under the crop, right of the step's witness line (centred on the 4 mm
-    # span it would sit on both witness lines): value and its two rows (~3.0
-    # mm a character: "TO STEP" ~109.5..130.5 mm) from ~177.5 to 192 mm,
-    # clear of the tool end's outer arrow (y 173.5), the crop (from y 195.0
-    # there), the step's witness line (x 107) and the journal Ø's line (x
-    # 134.3).
-    "FrontReliefWidth": (_STEP_X + 0.013, _DETAIL_BOTTOM - 0.0087),
+    # Under the crop, LEFT of F's witness line (round 7: with its note link
+    # the ~39 mm text no longer fits the 23 mm between the step's witness
+    # line and the journal Ø's column on the right), its line running out
+    # past F over the flat end's block, as the flat end's own text stands
+    # outside its witness lines.  DETAIL_TEXT_* below check it against the
+    # round-6 render's measures.
+    "FrontReliefWidth": (_F_DETAIL_X - 0.0225, _DETAIL_BOTTOM - 0.0060),
     # Left of the crop: the leader runs from the corner 12-24 deg below
     # level, inside the corner's own quadrant, through the pinion's blank
     # interior under its root and over the axis.  Its 23.5 mm text, centred
     # on the keep, ends 2.5 mm short of the crop circle (at 32.5 mm in, run
     # 20261031T233549214Z, the circle crossed its last letter).
     "FrontCornerRadius": (_CORNER_CENTER[0] - 0.0365, _CORNER_CENTER[1] - 0.006),
-    # The D-flat tool's end from F, under the crop: its prefixed text
-    # (~52 mm, centred on the keep) and two rows stand left of F's witness
-    # line, the block's line at its foot (y ~173.5) over the end view's teeth
-    # (top 0.1735) and the journal's outline (top 0.169), its top (~193)
-    # under the crop.  5 mm further left than farm run 20261101T095301211Z,
-    # where the neck width's outer arrow line ran 2.3 mm into its limits (4 mm
-    # left, run 20261101T111116817Z, left that arrow 1.74 mm from them).
-    "FlatEnd": (_F_DETAIL_X - 0.0315, _DETAIL_BOTTOM - 0.0110),
+    # The D-flat tool's end from F, under the crop: its limits and the neck
+    # note's link on the value's line, left of F's witness line, on its own
+    # dimension line 9 mm under the neck width's (round 1: at 2.3 mm the two
+    # read as one line carrying .007/.002 and .016).  The line (~174) stays
+    # over the end view's teeth (top 0.1735) and the journal's outline
+    # (0.169); the ~39 mm text, centred on the keep, ends 5.5 mm left of F
+    # and right of the end view's tooth tips (x ~0.0585).
+    "FlatEnd": (_F_DETAIL_X - 0.025, _DETAIL_BOTTOM - 0.0160),
     # Left of the crop, just over the tool's end arc (centre ~0.105, 0.2003):
     # the leader enters the arc's own quadrant from the left, under the
     # detail label.
     "FlatToolRadius": (_F_DETAIL_X - 0.031, _DETAIL_BOTTOM + 0.0085),
 }
+# Round-6 render, detail B: a one-line value's text ran keep - 1.9 mm to
+# keep + 1.5 mm over its line at keep - 2.8 mm (.016 at keep y 185.8: text
+# 183.9-187.3, line 183.0); the flat end's stacked limits ran to keep +
+# 4.3 mm (182.8 at keep 178.5); ".007 SEE NOTE 4" ran 34.7 mm, so 2.6 mm a
+# character covers it.
+DETAIL_CHAR_WIDTH = 0.0026
+_WIDTH_X, _WIDTH_Y = DETAIL_KEEP["FrontReliefWidth"]
+_WIDTH_HALF = (
+    len(inch_text(FRONT_RELIEF_WIDTH, 3) + DIMENSION_SUFFIXES["FrontReliefWidth"])
+    * DETAIL_CHAR_WIDTH / 2.0
+)
+DETAIL_TEXT_WIDTH_BOX = (
+    _WIDTH_X - _WIDTH_HALF, _WIDTH_Y - 0.0028, _WIDTH_X + _WIDTH_HALF, _WIDTH_Y + 0.0015
+)
+DETAIL_TEXT_FLAT_END_TOP = DETAIL_KEEP["FlatEnd"][1] + 0.0043
+_left, _line, _right, _top = DETAIL_TEXT_WIDTH_BOX
+if _right > _F_DETAIL_X - 0.003:
+    raise AssertionError("the neck width's text runs into F's witness line")
+if _line < DETAIL_TEXT_FLAT_END_TOP + 0.002:
+    raise AssertionError("the neck width's line runs into the flat end's limits")
+if math.dist((_right, _top), DETAIL_CENTER) < DETAIL_CROP_RADIUS + 0.003:
+    raise AssertionError("the neck width's text runs into detail B's crop")
+if _left < END_CENTER[0] + HALF_OD + 0.002:
+    raise AssertionError("the neck width's text runs over the end view")
 # Top-left anchors.  The label stands left of the crop, 3 mm under the
 # corner R's text (its limits print to 5 mm under its point).
 DETAIL_LABEL_XY = (0.042, _CORNER_CENTER[1] - 0.014)
@@ -473,7 +663,7 @@ CONTROL_VIEWS = {"core_total_runout": "detail", "front_neck_total_runout": "deta
 TOOTH_SPACE_GAP_INDEX = 9
 TOOTHSPACE_NOTE_XY = (0.330, 0.115)
 
-# --- The gear end, enlarged 4:1 -------------------------------------------------
+# --- VIEW C: the gear end, enlarged 4:1 ---------------------------------------
 # The span over two teeth and the root envelope print as the part's native
 # dimensions (codjiflo P2 on cb74f3d8d: as gear-data text alone no feature
 # dimension carried them).  At 3:1 the span's dimension crossed the bores and
@@ -483,14 +673,30 @@ TOOTHSPACE_NOTE_XY = (0.330, 0.115)
 # 20261101T210436532Z) the span's limits stood 1.5 mm under the (70.74) text
 # and the root's 63 mm text, centred on its point, ran into the teeth; at 4:1
 # the tooth tips reach 17.96 mm round the axis, x 142-178 and y 18-54 mm.
+# Off its parent's projection line the view is a removed view: a letter and
+# a viewing arrow on the side view name it (drawing-guidelines.md rule 9).
 ENLARGED_SCALE = (4, 1)
 _ES = ENLARGED_SCALE[0] / ENLARGED_SCALE[1]
 ENLARGED_CENTER = (0.160, 0.036)
 ENLARGED_HALF_OD = OUTSIDE_DIA * _ES / 2000.0
-ENLARGED_LABEL_TEXT = f"VIEW FROM STUD TIP\nSCALE {ENLARGED_SCALE[0]} : {ENLARGED_SCALE[1]}"
+ENLARGED_LETTER = "C"  # A is the journal datum, B the neck detail.
+ENLARGED_LABEL_TEXT = (
+    f"VIEW {ENLARGED_LETTER}\nSCALE {ENLARGED_SCALE[0]} : {ENLARGED_SCALE[1]}"
+)
 # Top-left anchor: left of the view, over the root's text, under the
-# gear data block (bottom ~0.083) and the (70.74) row.
+# numbered notes (bottom ~0.056) and the (70.74) row.
 ENLARGED_LABEL_XY = (0.060, 0.052)
+# VIEW C's viewing arrow on the side view: a letter note whose straight
+# leader points -X, square onto the stud's tip face 0.8 mm over the axis
+# (clear of the turning axis's centreline),
+# its tip just right of the face, the letter right of it in the open field
+# short of the front end view's teeth (from ~321 mm), level with the tip
+# (draw_fr_top_frame's VIEW G arrow, turned end for end).
+VIEW_ARROW_FACE_RADIUS_MM = 0.8
+VIEW_ARROW_TIP_GAP = 0.0035
+VIEW_ARROW_LENGTH = 0.013
+VIEW_ARROW_SQUARE_TOL = 0.0003
+VIEW_LETTER_HEIGHT = 0.005
 
 
 def _enlarged_sheet_angle(model_deg: float) -> float:
@@ -502,7 +708,7 @@ def _enlarged_sheet_angle(model_deg: float) -> float:
 # (paper_drive_stock_native.author_span), model 36 deg, sheet 144 deg.  Its
 # dimension line stands 26 mm out along that bisector, 8 mm past the tips,
 # and its text 18.5 mm along the line up and right, over the teeth: the
-# block (limits and mate row) runs ~6.7 mm under to ~7.3 mm over its point
+# block (then limits and a mate row) ran ~6.7 mm under to ~7.3 mm over its point
 # (run 20261101T210436532Z).  At 19.8 mm (run 20261101T214844567Z) it
 # topped out 3.22 mm under the (70.74) text (from 77.8 mm), close enough to
 # read as one callout (the audit wants 3.57); here it stands ~4.3 mm under
@@ -761,7 +967,7 @@ def _plain_text(text: str) -> str:
 
 def _label_views(adapter: Any, detail: Any, side: Any, enlarged: Any) -> None:
     """Label detail B beside its crop, letter its mark on the side view and
-    label the 4:1 view from the stud tip: both differ from the sheet's 3:1.
+    label VIEW C: both differ from the sheet's 3:1.
 
     A note lands in the ACTIVE view, so each view is activated first; a
     note that did not land in its view raises.
@@ -805,9 +1011,9 @@ def _set_dimension_suffixes(adapter: Any, annotations: list[Any]) -> None:
         raise RuntimeError(f"dimension suffixes not applied: {sorted(remaining)}")
 
 
-def _add_shop_notes(adapter: Any, front: Any) -> None:
-    """Leader the edge-break note to a tooth tip and the bearing note to F's
-    face, both in the front end view (TOOTH_EDGE_NOTE_XY, BEARING_NOTE_XY)."""
+def _add_tooth_edge_note(adapter: Any, front: Any) -> None:
+    """Leader the edge-break note to a tooth tip in the front end view
+    (TOOTH_EDGE_NOTE_XY)."""
     tip_r = OUTSIDE_DIA / 2000.0
     tooth = TOOTH_EDGE_TOOTH * 2.0 * math.pi / TEETH
     tooth_tip = model_point_in_view(
@@ -819,33 +1025,80 @@ def _add_shop_notes(adapter: Any, front: Any) -> None:
     add_attached_note(
         adapter,
         front,
-        text=TOOTH_EDGE_LEADER_NOTE,
+        text=TOOTH_EDGE_NOTE,
         entity_xy=tooth_tip,
         note_xy=TOOTH_EDGE_NOTE_XY,
         label="MHA-PD-08 tooth edge note",
     )
-    # F is picked at its landing like the tooth tip above: in the front end
-    # view the only face at BEARING_LANDING_RADIUS_MM is F, between the core
-    # and the tooth roots.  The resolved source face read IsSame to neither a
-    # direct selection (run 20261101T061718881Z) nor the face the pick
-    # attached (run 20261101T074739942Z), so the pick alone places it.
-    face_r = BEARING_LANDING_RADIUS_MM / 1000.0
-    angle = math.radians(BEARING_LANDING_DEG)
-    landing = model_point_in_view(
+
+
+def _add_view_arrow(adapter: Any, side: Any) -> None:
+    """VIEW C's lettered viewing arrow on the side view, square onto the stud
+    tip face (draw_fr_top_frame._add_view_arrow, pointing -X)."""
+    face = model_point_in_view(
         adapter,
-        front,
-        (face_r * math.cos(angle), face_r * math.sin(angle), 0.0),
-        label="bearing-face note landing",
+        side,
+        (0.0, VIEW_ARROW_FACE_RADIUS_MM / 1000.0, TIP_Z / 1000.0),
+        label="view C arrow tip face",
     )
-    add_attached_note(
-        adapter,
-        front,
-        text=BEARING_LEADER_NOTE,
-        entity_xy=landing,
-        entity_type="FACE",
-        note_xy=BEARING_NOTE_XY,
-        label="MHA-PD-08 bearing face note",
+    tip_xy = (face[0] + VIEW_ARROW_TIP_GAP, face[1])
+    text_xy = (tip_xy[0] + VIEW_ARROW_LENGTH, tip_xy[1] + VIEW_LETTER_HEIGHT / 2.0)
+    label = f"view {ENLARGED_LETTER} viewing arrow"
+    note = add_leader_note(
+        adapter, ENLARGED_LETTER, text_xy=text_xy, attach_xy=tip_xy, view=side, label=label,
     )
+    # add_note leaves text at the document height; size the letter here and
+    # prove the leader tip did not move with it.
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    text_format = annotation.GetTextFormat(0)
+    if text_format is None:
+        raise RuntimeError(f"{label} note has no text format")
+    text_format.CharHeight = VIEW_LETTER_HEIGHT
+    if not annotation.SetTextFormat(0, False, text_format):
+        raise RuntimeError(f"failed to size the {label} letter")
+    rebuild_drawing(adapter, label=f"{label} letter")
+    points = list(annotation.GetLeaderPointsAtIndex(0) or ())
+    if len(points) < 6 or math.dist((points[-3], points[-2]), tip_xy) > 0.001:
+        raise RuntimeError(f"{label} tip moved when its letter was sized")
+    # The leader leaves the letter's nearer side at the text's mid-height:
+    # slide the letter by any miss in y so the arrow stands square.
+    miss = tip_xy[1] - points[1]
+    if abs(miss) > VIEW_ARROW_SQUARE_TOL:
+        x, y, z = (float(value) for value in annotation.GetPosition())
+        if not annotation.SetPosition2(x, y + miss, z):
+            raise RuntimeError(f"failed to square the {label}")
+        rebuild_drawing(adapter, label=f"square {label}")
+        points = list(annotation.GetLeaderPointsAtIndex(0) or ())
+        if (
+            len(points) < 6
+            or math.dist((points[-3], points[-2]), tip_xy) > 0.001
+            or abs(tip_xy[1] - points[1]) > VIEW_ARROW_SQUARE_TOL
+        ):
+            raise RuntimeError(f"{label} did not square: leader {points}")
+    _telemetry.info(
+        f"{label}: leader {points[0]:.5f},{points[1]:.5f} -> "
+        f"{points[-3]:.5f},{points[-2]:.5f} (square when the y agree)"
+    )
+
+
+def _add_sheet_note(
+    adapter: Any, text: str, xy: tuple[float, float], *, char_height: float, label: str
+) -> None:
+    """A sheet note at ``xy`` (top-left) at ``char_height``; its last line is
+    read back, so a note that lost its own text raises."""
+    note = add_note(adapter, text, *xy)
+    if note is None:
+        raise RuntimeError(f"failed to add the {label}")
+    annotation = _early_bound(_early_bound(note, "INote").GetAnnotation(), "IAnnotation")
+    text_format = annotation.GetTextFormat(0)
+    if text_format is None:
+        raise RuntimeError(f"{label} has no text format")
+    text_format.CharHeight = float(char_height)
+    if annotation.SetTextFormat(0, False, text_format) is not True:
+        raise RuntimeError(f"failed to set the {label} text height")
+    got = str(_early_bound(note, "INote").GetText() or "").splitlines()
+    if not got or got[-1].strip() != text.splitlines()[-1].strip():
+        raise RuntimeError(f"{label} reads back {got!r}")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -862,7 +1115,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Gear Data",
             TOOTH_SPACE_CALLOUT_PROPERTY,
         ),
         required=(
@@ -870,7 +1122,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Gear Data",
             TOOTH_SPACE_CALLOUT_PROPERTY,
         ),
     )
@@ -1038,13 +1289,22 @@ async def build(adapter: Any) -> dict[str, str]:
         property_name=TOOTH_SPACE_CALLOUT_PROPERTY,
         note_xy=TOOTHSPACE_NOTE_XY,
     )
-    _add_shop_notes(adapter, front)
+    _add_tooth_edge_note(adapter, front)
+    _add_view_arrow(adapter, side)
     # The mark and the labels go on once every pick is done, so no
     # coordinate pick in the side view meets the mark circle.
     _mark_detail_on_side(adapter, side)
     _label_views(adapter, detail, side, enlarged)
-    add_property_linked_note(
-        adapter, "Gear Data", *GEAR_DATA_XY, char_height=GEAR_DATA_CHAR_HEIGHT
+    # The GEAR DATA block, its matched-fit backlash acceptance as the last row.
+    _add_sheet_note(
+        adapter,
+        GEAR_DATA_NOTE,
+        GEAR_DATA_XY,
+        char_height=GEAR_DATA_CHAR_HEIGHT,
+        label="gear data block",
+    )
+    _add_sheet_note(
+        adapter, NOTES, NOTES_XY, char_height=NOTES_CHAR_HEIGHT, label="numbered notes"
     )
     return await finalize_drawing(
         adapter,

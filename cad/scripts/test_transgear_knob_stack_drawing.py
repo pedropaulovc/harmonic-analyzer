@@ -117,7 +117,7 @@ def test_fitted_rear_face_reacts_on_actual_f_at_every_printed_corner(
         + shaft.TOOTH_SPACE_RUNOUT_TIR_MM / 2.0
     )
     assert collar.D_CENTRE_FLOAT_MAX == pytest.approx(centre_float)
-    assert inner == pytest.approx(2.814658, abs=1e-6)
+    assert inner == pytest.approx(2.815058, abs=1e-6)
     assert collar.FRONT_BEARING_INNER_RADIUS_MAX == pytest.approx(inner)
     areas = [
         shaft.gear_bearing_area_lower(profile, inner)
@@ -159,8 +159,8 @@ def test_thread_blank_lies_inside_the_2a_major() -> None:
 def test_relief_keeps_the_single_point_exit_below_the_thread_root() -> None:
     """R9-53: retain the relief's shoulder stations and floor below the
     thread-root estimate and the nut's smallest minor, without a die-lead minimum."""
-    core_max = _limits(shaft.CORE_FRONT_FROM_F, _stud_places("CoreFront"))[1]
-    thread_end_min = _limits(shaft.PLAIN_CORE, _stud_places("PlainCore"))[0]
+    core_max = _limits(shaft.CORE_FRONT_FROM_F, shaft.CORE_FRONT_FROM_F_PLACES)[1]
+    thread_end_min = _limits(shaft.PLAIN_CORE, shaft.PLAIN_CORE_PLACES)[0]
     assert thread_end_min - core_max == pytest.approx(1.778)
     assert thread_end_min - core_max > 0.0
     relief_max = _limits(shaft.RELIEF_DIA, _stud_places("ReliefDia"))[1]
@@ -179,7 +179,7 @@ def test_thumbnut_runs_clear_of_the_core_step_at_the_rearward_stop(
     only on full thread or relief."""
     seat = collar.LENGTH_FITTED_MIN
     nut_seat = seat + collar.PILOT_LENGTH_FITTED_MIN
-    core_max = _limits(shaft.CORE_FRONT_FROM_F, _stud_places("CoreFront"))[1]
+    core_max = _limits(shaft.CORE_FRONT_FROM_F, shaft.CORE_FRONT_FROM_F_PLACES)[1]
     assert nut_seat - core_max == pytest.approx(collar.NUT_CORE_STEP_AIR)
     assert nut_seat - core_max == pytest.approx(1.049)
     assert nut_seat - core_max > 0.0
@@ -203,7 +203,7 @@ def test_thumbnut_engages_one_and_a_half_diameters_over_the_travel(
     end; each countersink's loss counted from the tap drill at its smallest
     printed angle (R9-63). Least 12.41359 at the shortest fitted body."""
     tip_min = _limits(shaft.TIP_STATION, shaft.TIP_STATION_PLACES)[0]
-    thread_end_max = _limits(shaft.PLAIN_CORE, _stud_places("PlainCore"))[1]
+    thread_end_max = _limits(shaft.PLAIN_CORE, shaft.PLAIN_CORE_PLACES)[1]
     nut_min = _limits(nut.OVERALL_LENGTH, nut.OVERALL_LENGTH_PLACES, nut.UNIT)[0]
     assert nut_min == pytest.approx(nut.OVERALL_LENGTH + nut.OVERALL_LENGTH_LO)
     pilot = (collar.PILOT_LENGTH_FITTED_MIN, collar.PILOT_LENGTH_FITTED_MAX)

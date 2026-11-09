@@ -188,14 +188,15 @@ def test_walls_hold_at_the_worst_case_the_sheet_prints() -> None:
     assert walls["journal"] == pytest.approx((6.3119 - 1.651) / 2.0, abs=1e-9)
     assert walls["front"] == pytest.approx(3.048 - 0.1016 - 0.8255, abs=1e-9)
     assert walls["ring"] == pytest.approx((18.796 - 6.3373) / 2.0, abs=1e-9)
-    # #2169: the 1.62 ±.01 journal (.264 behind the cup's face, its ±.005
-    # station band), less the .010 rear-end break, leaves the end wall at
-    # .0825.
+    # #2169: the journal (.264 behind the cup's face, its ±.005 station
+    # band) at ±.011 since MHA-PD-08 prints its overall and face width with
+    # the journal REF (fan-out 2026-11-07), less the .010 rear-end break,
+    # leaves the end wall at .0815.
     assert knob_shaft.EDGE_BREAK_MAX == pytest.approx(0.254, abs=1e-9)
     assert walls["end"] == pytest.approx(
-        (6.7056 - 0.254 - 0.127) - 3.048 - 0.1016 - 0.8255 - 0.254, abs=1e-9
+        (6.7056 - 0.2794 - 0.127) - 3.048 - 0.1016 - 0.8255 - 0.254, abs=1e-9
     )
-    assert walls["end"] == pytest.approx(0.0825 * 25.4, abs=1e-9)
+    assert walls["end"] == pytest.approx(0.0815 * 25.4, abs=1e-9)
     assert {k: w for k, w in walls.items() if w < spec.WALL_FLOOR} == {}
     assert spec.JOURNAL_PIN_WALL_WORST == pytest.approx(walls["journal"])
     assert spec.FRONT_PIN_WALL_WORST == pytest.approx(walls["front"])
@@ -234,9 +235,9 @@ def test_cup_bore_refuses_binding_on_the_actual_journal(monkeypatch) -> None:
 def test_the_journal_end_stays_inside_the_shortest_cup() -> None:
     length_min = spec.LENGTH - _band(spec.LENGTH_PLACES)
     assert length_min - knob_shaft.JOURNAL_REAR_EXTENSION_MAX > 0.0
-    # #2169: the longest 1.62 journal at the farthest cup station stays .031
-    # inside the shortest .32 cup; nominal cover is .056.
-    assert spec.JOURNAL_END_INSET_WORST == pytest.approx(0.031 * 25.4, abs=1e-9)
+    # #2169: the longest 1.62 journal (±.011) at the farthest cup station
+    # stays .030 inside the shortest .32 cup; nominal cover is .056.
+    assert spec.JOURNAL_END_INSET_WORST == pytest.approx(0.030 * 25.4, abs=1e-9)
     assert spec.JOURNAL_END_INSET == pytest.approx(0.056 * 25.4, abs=1e-9)
 
 

@@ -183,9 +183,10 @@ def _printed_proud_range(pin_length: float, hole_depth: float) -> tuple[float, f
 # deeper it stops short of the face.  #290: the tip station and the hole
 # depth print rounded to .XX inch (reach 0.376 / 0.372), the hook its formed
 # .XX ±.02 (FORMED_BAND .024 with the rounding, MHA-PD-14).
-_PINNED_FAR_FACE_MARGIN = 0.890
-_PINNED_OLD_PIN_MARGIN = 0.015
-_PINNED_DEEPER_OLD_PIN_MARGIN = -0.035
+# MHA-PD-20 faces at ⊥ .001 (delegated ruling 2026-11-07) open the pivot fit.
+_PINNED_FAR_FACE_MARGIN = 0.880
+_PINNED_OLD_PIN_MARGIN = 0.005
+_PINNED_DEEPER_OLD_PIN_MARGIN = -0.045
 
 
 def _worst_far_face_margin(
@@ -542,7 +543,7 @@ def test_the_latch_pin_hole_names_its_press_on_mha_169() -> None:
 def test_the_pivot_bore_is_reamed_as_the_shoulder_running_fit() -> None:
     """A model reference cannot masquerade as a universal ±.130 bore zone."""
     lower, upper = geometry.PIVOT_BORE_DIAMETRAL_CLEARANCE
-    assert (lower, upper) == pytest.approx((0.14224, 0.16256))
+    assert (lower, upper) == pytest.approx((0.16256, 0.18288))
     assert geometry.PIVOT_BORE_DIA == pytest.approx(pivot_screw.SHOULDER_DIA + (lower + upper) / 2.0)
     assert joints.SHOULDER_RADIAL_CLEARANCE == pytest.approx(lower / 2.0)
     assert joints.PIVOT_RADIAL_FLOAT_MAX == pytest.approx(upper / 2.0)
@@ -552,7 +553,7 @@ def test_the_pivot_bore_is_reamed_as_the_shoulder_running_fit() -> None:
     flat = " ".join(spec.PIVOT_BORE_CALLOUT.split())
     for fact in (
         "MEASURED SHOULDER",
-        ".0056-.0064 DIAMETRAL CLEARANCE",
+        ".0064-.0072 DIAMETRAL CLEARANCE",
         screw,
         "MATCHED SET",
     ):
