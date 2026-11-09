@@ -2,9 +2,10 @@ r"""Create the drawing for the oblique-trammel jig's feed lever (MHA-CH-06-TL-26
 
 An 11.8 x 1 x 1/2 in flat at 1:1: the top view carries the length, the stock
 width, both bolt-hole stations from the inner end, their shared row from the
-back side, the native 2X 5/16 clearance callout and the grip-end radius; the
-front view carries the stock thickness; the shaded iso rides top-right at 1:4.
-No datums (drawing-guidelines.md rule 5).
+back side, the native 2X 5/16 clearance callout (``2X Ø.344 DRILL THRU ALL``:
+size, then process, rule 26) and the grip-end radius; the front view carries
+the stock thickness; the shaded iso rides top-right at 1:4. No datums
+(drawing-guidelines.md rule 5).
 
 Run with SolidWorks open::
 
@@ -57,7 +58,6 @@ from ch_rocker_arm_tl_oblique_feed_lever_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     HOLE_CALLOUT_PRECISION,
-    HOLE_CALLOUT_PROCESS,
     HOLE_DIA,
     HOLE_X,
     HOLE_Y,
@@ -131,6 +131,15 @@ FRONT_KEEP: dict[str, tuple[float, float, float]] = {
 # the view over the lever's inner half.
 HOLE_EDGE_MODEL = (HOLE_X[1] + 0.6 * _R, _H, -HOLE_Y - 0.8 * _R)
 HOLE_CALLOUT_MODEL = (70.0, _H, -_W - 22.0)
+HOLE_CALLOUT_LABEL = "feed lever bolt holes"
+# The process follows the size (rule 26): ``2X Ø.344 DRILL THRU ALL``, not
+# a prefix ahead of the count (``DRILL 2X Ø.344 THRU ALL``).
+DRILL_TEXT = " DRILL"
+_CALLOUT_PARTS = (5, 6, 7, 8)  # swDimensionTextParts_e definitions: prefix..below
+# The simple-hole size variable: a plain drilled hole's callout carries
+# hw-diam (HOLE_CALLOUT_PRECISION); a clearance wizard's may carry
+# hw-thruholedia (draw_ch_rocker_arm_tl_oblique_base_bar). Exactly one must.
+_SIZE_TOKENS = ("<hw-diam>", "<hw-thruholedia>")
 
 
 part_metadata(
@@ -270,6 +279,72 @@ def _set_dimension_prefixes(
         raise RuntimeError(f"dimension prefixes not applied: {sorted(remaining)}")
 
 
+def _only_token(definitions: dict[int, str], token: str) -> tuple[int, int]:
+    """The one upper part (5..7) holding ``token`` once, and its index there."""
+    holders = [part for part in _CALLOUT_PARTS[:3] if token in definitions[part]]
+    if len(holders) != 1 or definitions[holders[0]].count(token) != 1:
+        raise RuntimeError(
+            f"{HOLE_CALLOUT_LABEL}: no single {token} in the callout: {definitions!r}"
+        )
+    return holders[0], definitions[holders[0]].index(token)
+
+
+def drill_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
+    """``DRILL`` right after the hole's size variable; every other part as
+    read, so the count, size and THRU stay Hole Wizard variables."""
+    if set(definitions) != set(_CALLOUT_PARTS):
+        raise RuntimeError(
+            f"{HOLE_CALLOUT_LABEL}: unexpected hole callout parts: {definitions!r}"
+        )
+    if any(DRILL_TEXT.strip() in text for text in definitions.values()):
+        raise RuntimeError(f"{HOLE_CALLOUT_LABEL}: callout already says DRILL: {definitions!r}")
+    tokens = [
+        token
+        for token in _SIZE_TOKENS
+        if any(token in definitions[part] for part in _CALLOUT_PARTS)
+    ]
+    if len(tokens) != 1:
+        raise RuntimeError(
+            f"{HOLE_CALLOUT_LABEL}: expected one size variable of {_SIZE_TOKENS}: "
+            f"{definitions!r}"
+        )
+    (token,) = tokens
+    part, index = _only_token(definitions, token)
+    at = index + len(token)
+    text = definitions[part]
+    return {**definitions, part: text[:at] + DRILL_TEXT + text[at:]}
+
+
+def _write_drill_after_size(display: Any) -> None:
+    """Write ``drill_callout_definitions`` into the native hole callout; prove it.
+
+    Only parts whose definition changes are written, each through its
+    writable twin (definition 5..8 -> writable 1..4;
+    draw_ch_rocker_arm_tl_oblique_base_bar's _rewrite_hole_callout).
+    Multi-line text reads back with CR LF, so both sides compare without CR.
+    """
+    native = _early_bound(display, "IDisplayDimension")
+    if not native.IsHoleCallout():
+        raise RuntimeError(f"{HOLE_CALLOUT_LABEL}: DRILL needs a native hole callout")
+
+    def read(parts: tuple[int, ...]) -> dict[int, str]:
+        return {part: str(native.GetText(part) or "").replace("\r", "") for part in parts}
+
+    definitions = read(_CALLOUT_PARTS)
+    updated = drill_callout_definitions(definitions)
+    for definition_part in _CALLOUT_PARTS:
+        if updated[definition_part] != definitions[definition_part]:
+            native.SetText(definition_part - 4, updated[definition_part])
+    persisted = read(_CALLOUT_PARTS)
+    if persisted != updated:
+        raise RuntimeError(
+            f"{HOLE_CALLOUT_LABEL}: hole callout rows did not persist: "
+            f"definitions={persisted!r}, expected={updated!r}, "
+            f"resolved={read((1, 2, 3, 4))!r}"
+        )
+    _telemetry.info(f"{HOLE_CALLOUT_LABEL} callout: definitions={persisted!r}")
+
+
 _STOCK_SIZES = {"LeverWidth": LEVER_WIDTH, "LeverThick": LEVER_THICK}
 
 
@@ -372,11 +447,11 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         edge_xy=on_top(HOLE_EDGE_MODEL),
         callout_xy=on_top(HOLE_CALLOUT_MODEL),
-        label="feed lever bolt holes",
-        process=HOLE_CALLOUT_PROCESS,
+        label=HOLE_CALLOUT_LABEL,
     )
+    _write_drill_after_size(hole_callout)
     set_hole_callout_precision(
-        hole_callout, HOLE_CALLOUT_PRECISION, label="feed lever bolt holes"
+        hole_callout, HOLE_CALLOUT_PRECISION, label=HOLE_CALLOUT_LABEL
     )
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 

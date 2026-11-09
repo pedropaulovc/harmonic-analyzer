@@ -142,27 +142,11 @@ def test_both_patterns_fit_their_mates_at_three_places() -> None:
     assert 2.0 * math.hypot(two, two) > spec.BAR_SCREW_FLOAT
 
 
-def test_every_tight_band_names_its_mate() -> None:
-    for name in ("KP08Tap1X", "KP08Tap2X", "HoleRowY"):
-        assert spec.CALLOUTS_BELOW[name] == spec.MATE_CALLOUT == spec.ROW_CALLOUT
-    assert spec.MATE_CALLOUT == "KP08 + MHA-CH-06-TL-20"
-    # Every three-place dimension on the sheet carries its mate.
-    three_place = {
-        name for name, places in spec.DRAWING_PRECISION_BY_NAME.items() if places == 3
-    }
-    assert three_place <= set(spec.CALLOUTS_BELOW)
-    for name, feature in _features().items():
-        if name.startswith("tap_"):
-            assert feature["note"].startswith(f"{spec.MATE_CALLOUT}; "), name
-
-
 def test_no_vendor_sku_on_the_sheet() -> None:
     texts = (
-        spec.MATE_CALLOUT,
-        spec.ROW_CALLOUT,
-        drawing.THREAD_LIMIT_CALLOUT,
-        spec.CALLOUTS_BELOW[spec.BAR_THREAD_DEPTH_DIMENSION],
-        spec.CALLOUTS_BELOW[spec.KP08_THREAD_DEPTH_DIMENSION],
+        drawing.HOLE_MATE,
+        *drawing.CALLOUT_TEXT_ROWS,
+        *drawing.SECTION_DEPTH_CALLOUTS.values(),
         spec.DRAWING_NOTES,
         spec.ISOMETRIC_VIEW_NOTE,
     )
@@ -276,21 +260,14 @@ def test_thickest_kp08_foot_keeps_the_kp08_screw_at_one_and_a_half_d() -> None:
     assert spec.KP08_SCREW_LENGTH_MM - spec.KP08_FOOT_THICK_MAX < spec.KP08_REACH_MAX
 
 
-def test_threads_are_stated_by_native_callouts_and_section_limits() -> None:
+def test_threads_are_stated_by_the_native_callout_and_section_limits() -> None:
     assert drawing.TAP_FEATURES == ("BarTaps", "KP08Taps")
-    pointer = drawing.THREAD_LIMIT_CALLOUT
-    assert drawing.callout_states_its_thread([f"8-32 UNC\n{pointer}", "", "", ""])
-    assert not drawing.callout_states_its_thread([pointer, "", "", ""])
-    assert not drawing.callout_states_its_thread(["8-32 UNC THRU ALL", "", "", ""])
-    assert not drawing.callout_states_its_thread(
-        [f"8-32 UNC <hw-threaddepth>\n{pointer}", "", "", ""]
-    )
     for stray in ("#8-32 Tapped Hole", "8-32 Tapped Hole1", "#8-32 UNC - 2B"):
         assert drawing.stray_thread_notes([spec.ISOMETRIC_VIEW_NOTE, stray]) == [stray]
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "_require_thread_depths(section)" in source
     assert "_require_threads_drawn(adapter, section)" in source
-    assert "_require_threads_stated_by_callouts_only(adapter, callouts)" in source
+    assert "_require_threads_stated_by_the_callout_only(adapter, callout)" in source
 
 
 def test_bottom_blind_precursor_leaves_real_material_for_the_top_wizard() -> None:
@@ -393,11 +370,58 @@ def test_row_is_located_from_the_faced_low_side() -> None:
     assert drawing._FROM_LOW_SIDE[0] == "bracket_low_side"
 
 
-def test_every_hole_has_its_own_callout() -> None:
-    called = sorted(x for x, _xy, _side in drawing.TAP_CALLOUTS)
-    assert called == sorted(spec.HOLE_X)
-    assert drawing.CALLOUT_ROWS == 3
-    assert drawing.CALLOUT_GLYPHS >= len(drawing.THREAD_LIMIT_CALLOUT)
+def test_identical_holes_take_one_2x_callout() -> None:
+    # Rule 10: one nX callout, its leader on one of the holes.
+    x, _xy, side = drawing.TAP_CALLOUT
+    assert x == spec.HOLE_X[0] and side == 1
+    assert drawing.CALLOUT_ROWS == 4
+    assert drawing.CALLOUT_GLYPHS == max(len(row) for row in drawing.CALLOUT_TEXT_ROWS)
+    sheet = Path(drawing.__file__).read_text(encoding="utf-8")
+    body = sheet[sheet.index("async def build") :]
+    assert body.count("add_native_hole_callout(") == 1
+    assert "BOTH HOLES" not in sheet and "SECTION A-A\"" not in sheet
+
+
+def test_callout_rows_read_size_process_depth_and_name_faces_by_view() -> None:
+    # Rule 26: size first, then process, then depth; each face named by the
+    # plan's view; the depths REF to the section's controlling LIMITs.
+    drill, front, back, mate = drawing.CALLOUT_TEXT_ROWS
+    assert drill == "2X Ø.136 #29 DRILL THRU ALL"
+    assert front == "8-32 UNC ↧ (.429-.555) FROM FRONT FACE"
+    assert back == "8-32 UNC ↧ (.370-.496) FROM BACK FACE"
+    # The front face is the KP08's (the plan looks at model +Z); its band is
+    # the KP08 thread's, the back face's the bar screw's.
+    assert spec.KP08_TAP_FACE[0] == (0.0, 0.0, 1.0)
+    for limits, text in (
+        (spec.KP08_THREAD_LIMITS, drawing.FRONT_DEPTH_REF),
+        (spec.BAR_THREAD_LIMITS, drawing.BACK_DEPTH_REF),
+    ):
+        low, high = (float(v) * 25.4 for v in text.strip("()").split("-"))
+        assert (low, high) == pytest.approx(limits)
+    assert mate == drawing.HOLE_MATE
+
+
+def test_the_mates_are_named_once_by_drawing_number_on_the_2x_callout() -> None:
+    # Rules 4 and 7: the three-place stations and row serve both patterns;
+    # their mates sit once on the hole callout, never on a location.
+    sheet = Path(drawing.__file__).read_text(encoding="utf-8")
+    body = sheet[sheet.index("async def build") :]
+    assert "set_dimension_callouts(adapter, annotations, SECTION_DEPTH_CALLOUTS)" in body
+    assert "CALLOUTS_BELOW" not in sheet and "MATE_CALLOUT" not in sheet
+    assert not set(drawing.SECTION_DEPTH_CALLOUTS) & {*drawing.STATION_ORDER, "HoleRowY"}
+    # Short forms complete to the registered numbers from the sheet's own
+    # MHA-CH-06- prefix; the catalogue code only follows its number.
+    prefix = spec.NUMBER.rsplit("TL-", 1)[0]
+    numbers = re.findall(r"\bTL-[A-Z0-9-]*\d", drawing.HOLE_MATE)
+    assert {prefix + short for short in numbers} == {
+        _config.parts("ch-rocker-arm-tl-oblique-base-bar")["number"],
+        _config.parts("ch-rocker-arm-tl-vn-oblique-pillow-block")["number"],
+    }
+    assert drawing.HOLE_MATE.index("TL-VN-56") < drawing.HOLE_MATE.index("(KP08)")
+    assert "\n" not in drawing.HOLE_MATE  # one line of words (rule 7)
+    for name, feature in _features().items():
+        if name.startswith("tap_"):
+            assert feature["note"].startswith(f"{drawing.HOLE_MATE}; "), name
 
 
 # Exact definitions captured by native-failure-a8b2ac4c-end-bracket.log.
@@ -413,35 +437,23 @@ _NATIVE_TAP_TOKENS = (
 )
 
 
-def test_single_hole_definitions_drop_exactly_the_count() -> None:
-    definitions = dict(_NATIVE_TAP_CALLOUT)
-    updated = drawing.single_hole_definitions(definitions)
-    assert updated == {**definitions, 7: "<MOD-DIAM> <hw-tapdrldia> <hw-thru>"}
-    with pytest.raises(RuntimeError):
-        drawing.single_hole_definitions(updated)  # no count left to drop
-    with pytest.raises(RuntimeError):
-        drawing.single_hole_definitions({**definitions, 5: "<NUM_INST>X THRU"})
-    with pytest.raises(RuntimeError):
-        drawing.single_hole_definitions({5: "", 6: "", 7: ""})
-    assert drawing._PRINTED_COUNT.search("x\n2X Ø3.45 THRU ALL")
-    assert not drawing._PRINTED_COUNT.search("Ø3.45 THRU ALL\n8-32 UNC THRU ALL")
-
-
 def test_observed_native_callout_is_the_positive_transformation_control() -> None:
-    first = drawing.thread_limit_definitions(_NATIVE_TAP_CALLOUT, include_drill=True)
-    second = drawing.thread_limit_definitions(_NATIVE_TAP_CALLOUT, include_drill=False)
-    thread_text = "<hw-threaddesc> <hw-threadclass>\n" + drawing.THREAD_LIMIT_CALLOUT
-    assert first == {
-        5: thread_text, 6: "",
-        7: "#29 DRILL <MOD-DIAM> <hw-tapdrldia> <hw-thru>; BOTH HOLES", 8: "",
+    updated = drawing.two_hole_definitions(_NATIVE_TAP_CALLOUT)
+    assert updated == {
+        5: (
+            "<hw-threaddesc> <hw-threadclass> <HOLE-DEPTH> (.429-.555) FROM FRONT FACE\n"
+            "8-32 UNC <HOLE-DEPTH> (.370-.496) FROM BACK FACE"
+        ),
+        6: "",
+        7: "<NUM_INST>X <MOD-DIAM> <hw-tapdrldia> #29 DRILL <hw-thru>",
+        8: drawing.HOLE_MATE,
     }
-    assert second == {5: thread_text, 6: "", 7: "", 8: ""}
-    all_text = "\n".join((*first.values(), *second.values()))
-    assert all_text.count("#29 DRILL") == all_text.count("<hw-thru>") == 1
-    assert all_text.count("<hw-threaddesc>") == 2
-    assert all_text.count(drawing.THREAD_LIMIT_CALLOUT) == 2
-    assert "<hw-threaddepth>" not in all_text and "<HOLE-DEPTH>" not in all_text
-    assert not re.search(r"\d*\.\d", all_text)
+    text = "\n".join(updated.values())
+    assert "<hw-threaddepth>" not in text
+    with pytest.raises(RuntimeError):  # a second pass is refused, never stacked
+        drawing.two_hole_definitions(updated)
+    with pytest.raises(RuntimeError, match="already carries"):
+        drawing.two_hole_definitions({**_NATIVE_TAP_CALLOUT, 8: drawing.HOLE_MATE})
 
 
 @pytest.mark.parametrize("rotation", range(4))
@@ -452,37 +464,27 @@ def test_callout_tokens_can_move_between_native_text_parts(rotation, whitespace)
         parts[(index + rotation) % 4]: text.replace(" ", whitespace)
         for index, text in enumerate(_NATIVE_TAP_CALLOUT.values())
     }
-    for include_drill in (True, False):
-        updated = drawing.thread_limit_definitions(definitions, include_drill=include_drill)
-        updated = drawing.omit_thread_class_definitions(updated)
-        text = "\n".join(updated.values())
-        assert text.count("<hw-threaddesc>") == 1
-        assert text.count(drawing.THREAD_LIMIT_CALLOUT) == 1
-        assert text.count("<hw-thru>") == int(include_drill)
-        assert text.count("<hw-tapdrldia>") == int(include_drill)
-        for removed in ("<hw-threaddepth>", "<HOLE-DEPTH>", "<hw-threadclass>", "<NUM_INST>"):
-            assert removed not in text
-
-
-@pytest.mark.parametrize("layout", ["split", "combined"])
-def test_depth_removal_does_not_erase_other_tokens_in_its_text_part(layout) -> None:
-    definitions = (
-        {
-            5: "KEEP A <hw-threadclass> <MOD-DIAM>",
-            6: "KEEP B <hw-threaddepth> <NUM_INST>X",
-            7: "KEEP C <hw-tapdrldia> <hw-threaddesc>",
-            8: "KEEP D <hw-thru> <HOLE-DEPTH>",
-        }
-        if layout == "split" else
-        {5: "KEEP " + " ".join(_NATIVE_TAP_CALLOUT.values()), 6: "", 7: "", 8: ""}
+    updated = drawing.omit_thread_class_definitions(
+        drawing.two_hole_definitions(definitions)
     )
-    updated = drawing.thread_limit_definitions(definitions, include_drill=False)
     text = "\n".join(updated.values())
-    assert text.count("KEEP") == (4 if layout == "split" else 1)
-    assert text.count("<hw-threaddesc>") == text.count("<hw-threadclass>") == 1
-    assert text.count(drawing.THREAD_LIMIT_CALLOUT) == 1
-    for removed in ("<hw-threaddepth>", "<HOLE-DEPTH>", "<MOD-DIAM>", "<hw-tapdrldia>", "<hw-thru>"):
+    for kept in ("<hw-threaddesc>", "<NUM_INST>", "<MOD-DIAM>", "<hw-tapdrldia>", "<hw-thru>"):
+        assert text.count(kept) == 1, kept
+    assert text.count("<HOLE-DEPTH>") == 2
+    assert text.count(drawing.HOLE_MATE) == 1
+    for removed in ("<hw-threaddepth>", "<hw-threadclass>"):
         assert removed not in text
+
+
+def test_a_depth_symbol_apart_from_its_depth_is_refused() -> None:
+    split = {
+        5: "<hw-threaddesc> <hw-threadclass> <hw-threaddepth>",
+        6: "",
+        7: "<NUM_INST>X <MOD-DIAM> <hw-tapdrldia> <hw-thru> <HOLE-DEPTH>",
+        8: "",
+    }
+    with pytest.raises(RuntimeError, match="native pair"):
+        drawing.two_hole_definitions(split)
 
 
 @pytest.mark.parametrize("token", _NATIVE_TAP_TOKENS)
@@ -494,7 +496,7 @@ def test_missing_or_duplicate_native_callout_tokens_are_refused(token, defect) -
     else:
         definitions[8] = token
     with pytest.raises(RuntimeError, match="exactly one"):
-        drawing.thread_limit_definitions(definitions, include_drill=True)
+        drawing.two_hole_definitions(definitions)
 
 
 @pytest.mark.parametrize("old,wrong", [
@@ -508,18 +510,19 @@ def test_synthetic_or_wrong_token_spellings_are_not_native_proof(old, wrong) -> 
         part: text.replace(old, wrong) for part, text in _NATIVE_TAP_CALLOUT.items()
     }
     with pytest.raises(RuntimeError):
-        drawing.thread_limit_definitions(definitions, include_drill=True)
+        drawing.two_hole_definitions(definitions)
 
 
 def test_unexpected_native_depth_token_is_not_silently_left_on_the_sheet() -> None:
     with pytest.raises(RuntimeError, match="unexpected opposed-thread"):
-        drawing.thread_limit_definitions(
-            {**_NATIVE_TAP_CALLOUT, 8: "<hw-tapdrldepth>"}, include_drill=True,
-        )
+        drawing.two_hole_definitions({**_NATIVE_TAP_CALLOUT, 8: "<hw-tapdrldepth>"})
 
 
 @pytest.mark.parametrize("thru_text", ["THRU", "THRU ALL"])
-def test_native_callout_rewrite_and_class_omission_keep_one_shared_drill(monkeypatch, thru_text) -> None:
+@pytest.mark.parametrize("persist", [True, False])
+def test_native_callout_rewrite_and_class_omission_settle_one_complete_callout(
+    monkeypatch, thru_text, persist,
+) -> None:
     from types import SimpleNamespace
 
     class Display:
@@ -543,22 +546,36 @@ def test_native_callout_rewrite_and_class_omission_keep_one_shared_drill(monkeyp
             return text
 
         def SetText(self, part, text):
-            self.definitions[part + 4] = text  # native setter returns void
+            if persist:
+                self.definitions[part + 4] = text  # native setter returns void
 
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
     # Native thread/class data is deliberately NOT in prefix part 5.
     moved = {5: "", 6: _NATIVE_TAP_CALLOUT[7], 7: "", 8: _NATIVE_TAP_CALLOUT[5]}
-    callouts = []
-    for index in range(2):
-        display = Display(moved)
-        drawing._call_out_one_hole(display, label=str(index), include_drill=index == 0)
-        drawing._omit_tap_thread_class(display, label=str(index))
-        callouts.append((str(index), display))
+    display = Display(moved)
+    if not persist:
+        with pytest.raises(RuntimeError, match="did not persist"):
+            drawing._call_out_both_holes(display, label="2X")
+        return
+    drawing._call_out_both_holes(display, label="2X")
+    drawing._omit_tap_thread_class(display, label="2X")
     adapter = SimpleNamespace(currentModel=SimpleNamespace(GetFirstView=lambda: None))
-    drawing._require_threads_stated_by_callouts_only(adapter, callouts)
-    for _label, display in callouts:
-        assert ".433" not in "\n".join(display.GetText(part) for part in (1, 2, 3, 4))
-        assert "<hw-threaddesc>" in "\n".join(display.definitions.values())
+    drawing._require_threads_stated_by_the_callout_only(adapter, display)
+    resolved = [display.GetText(part) for part in (1, 2, 3, 4)]
+    assert ".433" not in "\n".join(resolved)
+    assert drawing.callout_is_complete(resolved)
+    # Negative controls: a lost count, mate, face depth or drill is refused,
+    # and a pointer to a view is not a depth.
+    joined = "\n".join(resolved)
+    for broken in (
+        joined.replace("2X ", ""),
+        joined.replace(drawing.HOLE_MATE, ""),
+        joined.replace(drawing.FRONT_DEPTH_TEXT, "SECTION A-A"),
+        joined.replace(drawing.BACK_FACE, ""),
+        joined.replace(drawing.DRILL_PROCESS, ""),
+        joined + "\nBOTH HOLES",
+    ):
+        assert not drawing.callout_is_complete([broken]), broken
 
 
 def test_both_full_thread_depths_have_part_owned_limit_dimensions() -> None:
@@ -572,9 +589,18 @@ def test_both_full_thread_depths_have_part_owned_limit_dimensions() -> None:
         assert spec.DRAWING_PRECISION[reference][name] == 3
         assert name in drawing.SECTION_KEEP and name in drawing.SECTION_TEXT
         assert bounds[0] < nominal < bounds[1]
-        label = spec.CALLOUTS_BELOW[name]
-        assert "FULL THREAD" in label and "BOTH HOLES" in label
+        label = drawing.SECTION_DEPTH_CALLOUTS[name]
+        assert "FULL THREAD" in label and "BOTH" not in label
+        # Faces named by the plan's view, never the section's up and down.
+        assert re.search(r"\bFROM (FRONT|BACK) FACE\b", label)
+        assert not re.search(r"\b(TOP|BOTTOM)\b", label)
         assert not re.search(r"\d*\.\d", label)
+    assert drawing.SECTION_DEPTH_CALLOUTS[spec.KP08_THREAD_DEPTH_DIMENSION].endswith(
+        drawing.FRONT_FACE
+    )
+    assert drawing.SECTION_DEPTH_CALLOUTS[spec.BAR_THREAD_DEPTH_DIMENSION].endswith(
+        drawing.BACK_FACE
+    )
     assert spec.BAR_THREAD_WITNESS_X == pytest.approx(
         spec.HOLE_X[-1] + spec.THREAD_MAJOR / 2.0
     )
@@ -595,21 +621,18 @@ def _plan(name: str) -> tuple[float, float]:
     return x, y
 
 
-_STATION_MATES = {"KP08Tap1X": spec.MATE_CALLOUT, "KP08Tap2X": spec.MATE_CALLOUT}
 _STATION_X = {"KP08Tap1X": spec.HOLE_X[0], "KP08Tap2X": spec.HOLE_X[1]}
 
 
 def _block(name: str) -> tuple[float, float, float, float]:
     """A text block's (left, right, bottom, top), model mm: a station's value
-    over its mate (the mate the wider line), the length one line."""
+    and band, the length its value, each one line."""
     x, y = _plan(name)
     if name == "BracketLength":
-        half, half_high = drawing.text_half("2.71"), drawing.text_half_high(1)
+        half = drawing.text_half("2.71")
     else:
-        half, half_high = (
-            drawing.text_half(_STATION_MATES[name]),
-            drawing.text_half_high(2),
-        )
+        half = drawing.STATION_GLYPHS[name] * drawing.GLYPH / 2.0
+    half_high = drawing.text_half_high(1)
     return x - half, x + half, y - half_high, y + half_high
 
 
@@ -622,14 +645,16 @@ def _lane(name: str) -> float:
 def test_station_stacks_run_shortest_nearest_in_clear_lanes() -> None:
     order = list(drawing.STATION_ORDER)
     assert order == sorted(_STATION_X, key=_STATION_X.get)
-    assert set(order) == set(_STATION_MATES)
+    assert set(order) == set(drawing.STATION_GLYPHS)
+    # "13.925 ±.13 mm": the value, its band and the unit label, no words.
+    assert drawing.STATION_GLYPHS == {"KP08Tap1X": 14, "KP08Tap2X": 14}
     lanes = [_lane(n) for n in (*order, "BracketLength")]
     assert lanes == sorted(lanes, reverse=True)
-    for name in order:
-        assert _plan(name)[1] == pytest.approx(_lane(name) + drawing.TWO_LINE_DROP)
-    assert _plan("BracketLength")[1] == pytest.approx(
-        drawing.LENGTH_LANE + drawing.TEXT_DROP
-    )
+    for name in (*order, "BracketLength"):
+        assert _plan(name)[1] == pytest.approx(_lane(name) + drawing.TEXT_DROP)
+    # Stacked station blocks stand the layout audit's row pitch apart.
+    for upper, lower in zip(order, order[1:]):
+        assert _block(upper)[2] - _block(lower)[3] >= drawing.STACK_PITCH - 1e-9
     # The first block clears the row's dimension line tail under the plan.
     assert _block(order[0])[3] <= -spec.HALF_WIDTH - drawing.ROW_TAIL - (
         drawing.TEXT_GAP - 1e-9
@@ -687,9 +712,8 @@ def test_station_blocks_cross_no_extension_or_dimension_line() -> None:
 
 def test_row_block_sits_between_its_extension_lines_off_the_part() -> None:
     x, y = _plan("HoleRowY")
-    rows = drawing._ROW_ROWS
-    assert rows == 2
-    half_high = drawing.text_half_high(rows)
+    assert drawing._ROW_TEXT == ".250"  # its value alone (rule 7)
+    half_high = drawing.text_half_high(1)
     assert y - half_high >= -spec.HOLE_ROW_Y + 0.25
     assert y + half_high <= -0.25
     half = drawing.text_half(drawing._ROW_TEXT)
@@ -722,17 +746,10 @@ def _cross(p, q, r, s) -> bool:
     )
 
 
-def _box_edges(box: tuple[float, ...]) -> list[tuple[tuple[float, float], ...]]:
-    left, right, bottom, top = box
-    corners = [(left, bottom), (right, bottom), (right, top), (left, top)]
-    return [(corners[i], corners[(i + 1) % 4]) for i in range(4)]
-
-
-def test_each_leader_lands_on_its_own_hole_crossing_nothing() -> None:
-    callouts = drawing.TAP_CALLOUTS
-    leaders = [_leader(x, xy) for x, xy, _side in callouts]
-    blocks = [_callout_block(xy) for _x, xy, _side in callouts]
-    holes = [(x, spec.TAP_DRILL / 2.0) for x, _xy, _side in callouts]
+def test_the_leader_lands_on_its_hole_crossing_nothing() -> None:
+    x, xy, side = drawing.TAP_CALLOUT
+    leader = _leader(x, xy)
+    (sx, _sy), _centre = leader
     width_ext = (
         (spec.BRACKET_LENGTH + 0.5, spec.HALF_WIDTH),
         (
@@ -740,63 +757,44 @@ def test_each_leader_lands_on_its_own_hole_crossing_nothing() -> None:
             spec.HALF_WIDTH,
         ),
     )
-    for i, ((x, xy, side), leader) in enumerate(zip(callouts, leaders, strict=True)):
-        (sx, sy), _centre = leader
-        # The edge pick is the rim on the leader's side, off the centre lines.
-        ex, ey, _ez = drawing.tap_edge_model(x, side)
-        assert math.hypot(ex - x, ey) == pytest.approx(spec.TAP_DRILL / 2.0)
-        assert (sx - x) * side > 0 and ey > 0
-        assert not _cross(*leader, *width_ext), i
-        for j, other in enumerate(leaders):
-            if j != i:
-                assert not _cross(*leader, *other), (i, j)
-        for j, box in enumerate(blocks):
-            if j != i:
-                assert not any(_cross(*leader, *edge) for edge in _box_edges(box)), (
-                    i,
-                    j,
-                )
-        # No other hole under the leader.
-        for j, (hx, radius) in enumerate(holes):
-            if j != i:
-                (ax, ay), (bx, by) = leader
-                t = max(
-                    0.0,
-                    min(
-                        1.0,
-                        ((hx - ax) * (bx - ax) + (0 - ay) * (by - ay))
-                        / ((bx - ax) ** 2 + (by - ay) ** 2),
-                    ),
-                )
-                gap = math.hypot(ax + t * (bx - ax) - hx, ay + t * (by - ay))
-                assert gap >= radius + 1.0, (i, j)
+    # The edge pick is the rim on the leader's side, off the centre lines.
+    ex, ey, _ez = drawing.tap_edge_model(x, side)
+    assert math.hypot(ex - x, ey) == pytest.approx(spec.TAP_DRILL / 2.0)
+    assert (sx - x) * side > 0 and ey > 0
+    assert not _cross(*leader, *width_ext)
+    # The block stops short of the width's upper extension line.
+    assert _callout_block(xy)[1] < spec.BRACKET_LENGTH + 0.5
+    # The other hole is nowhere under the leader.
+    (ax, ay), (bx, by) = leader
+    for hx in spec.HOLE_X:
+        if hx == x:
+            continue
+        t = max(
+            0.0,
+            min(
+                1.0,
+                ((hx - ax) * (bx - ax) + (0 - ay) * (by - ay))
+                / ((bx - ax) ** 2 + (by - ay) ** 2),
+            ),
+        )
+        gap = math.hypot(ax + t * (bx - ax) - hx, ay + t * (by - ay))
+        assert gap >= spec.TAP_DRILL / 2.0 + 1.0, hx
 
 
-def test_tap_callouts_stand_over_the_plan_inside_the_sheet() -> None:
-    gap = drawing.TEXT_GAP - 1e-9
-    blocks = [_callout_block(xy) for _x, xy, _side in drawing.TAP_CALLOUTS]
+def test_tap_callout_stands_over_the_plan_inside_the_sheet() -> None:
+    left, right, bottom, top = _callout_block(drawing.TAP_CALLOUT[1])
     end_top = drawing.END_CENTER[1] + spec.HALF_WIDTH * drawing._S / 1000.0
     end_left = drawing.END_CENTER[0] - spec.BRACKET_THICK / 2.0 * drawing._S / 1000.0
-    for i, box in enumerate(blocks):
-        left, right, bottom, top = box
-        assert bottom >= spec.HALF_WIDTH + 1.0, i
-        (sheet_left, sheet_bottom), (sheet_right, sheet_top) = (
-            drawing.plan_sheet(left, bottom),
-            drawing.plan_sheet(right, top),
-        )
-        assert sheet_left >= LEFT_BORDER + 0.01, i
-        assert sheet_top <= TOP_BORDER - 0.01, i
-        if sheet_right > end_left - 0.01:  # over the end view
-            assert sheet_bottom >= end_top + 0.01, i
-        assert sheet_right <= drawing.ISO_CENTER[0] - drawing.ISO_HALF[0] - 0.01, i
-        for other in blocks[i + 1 :]:
-            l2, r2, b2, t2 = other
-            if right + gap <= l2 or r2 + gap <= left:
-                continue
-            # Stacked blocks stand the layout audit's row pitch apart (c4-r8:
-            # 2.82 sheet mm, and it merged each side's three into one).
-            pitch = drawing.STACK_PITCH
-            assert top + pitch <= b2 or t2 + pitch <= bottom, i
+    assert bottom >= spec.HALF_WIDTH + 1.0
+    (sheet_left, sheet_bottom), (sheet_right, sheet_top) = (
+        drawing.plan_sheet(left, bottom),
+        drawing.plan_sheet(right, top),
+    )
+    assert sheet_left >= LEFT_BORDER + 0.01
+    assert sheet_top <= TOP_BORDER - 0.01
+    if sheet_right > end_left - 0.01:  # over the end view
+        assert sheet_bottom >= end_top + 0.01
+    assert sheet_right <= drawing.ISO_CENTER[0] - drawing.ISO_HALF[0] - 0.01
 
 
 def test_views_clear_each_other_the_border_and_the_title_block() -> None:
@@ -1023,8 +1021,8 @@ def test_section_refuses_unowned_or_lost_full_thread_limits(monkeypatch, failure
 def test_both_section_limit_blocks_stand_clear_of_the_body_and_title_block() -> None:
     scale = drawing._S / 1000.0
     for name, (text_x, _y, text_z) in drawing.SECTION_TEXT.items():
-        half = drawing.text_half(spec.CALLOUTS_BELOW[name])
-        rows = 2 + len(spec.CALLOUTS_BELOW[name].splitlines())
+        half = drawing.text_half(drawing.SECTION_DEPTH_CALLOUTS[name])
+        rows = 2 + len(drawing.SECTION_DEPTH_CALLOUTS[name].splitlines())
         half_high = drawing.text_half_high(rows)
         if name == spec.BAR_THREAD_DEPTH_DIMENSION:
             assert text_x - half >= spec.BRACKET_LENGTH + drawing.DEPTH_LANE

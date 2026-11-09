@@ -2,15 +2,16 @@
 
 Frame: carriage-pattern centre, bottom Z0; +X away from spindle. New
 6061 1 x 3-1/2 inch stock is shared with TL-32. No cartridge hardware.
-The print locates every X from the -X (left) edge, never from the frame
-centre: ``PLAN_DATUM_REFERENCE`` carries those ordinates.
+The print locates every X from the -X (left) edge and every Y from the -Y
+edge, never from the frame centre or chained through the seat:
+``PLAN_DATUM_REFERENCE`` carries those ordinates, ``BlockSideY`` the seat's Y.
 
 Issue #290: the sheet prints decimal inch. Lengths stay physical millimetres,
 each fabricated nominal the exact millimetres of its printed inch value. Exempt:
 the HGH15CA's 26 x 26 M4 pattern (vendor), and the seat's station
 ``BORE_X``, the trammel calculator's ``PIN_OFFSET`` (kinematic). The -X edge
-puts the seat station on the .XX grid; the hole columns print the
-three-place rounding of their exact vendor offsets from it.
+puts the seat station on the .XX grid; the hole columns and rows print the
+three-place rounding of their exact vendor offsets from the -X and -Y edges.
 
 The seat takes the TL-VN-77 inch shoulder screw (owner ruling 2026-10-30: the
 metric shop tap becomes an extended-thread 5/16-18 precision shoulder screw): a
@@ -89,11 +90,16 @@ CBORE_FLOOR_REFERENCE = "CboreFloorReference"
 CARRIAGE_THREAD_DEPTH = 5.0  # the HGH15CA's M4 x 5 (vendor)
 CBORE_SECTION_PLANE = "CboreSectionPlane"
 CBORE_SECTION_X = -BOLT_X  # B-B cuts the column clear of the +X feed lug
-# Hidden reference sketch on the top face: a plain line on the -X edge and
-# construction circles on the bore and one hole per column, so the plan's X
-# ordinates start on that edge (rule 10) while staying model dimensions.
+# Hidden reference sketch on the top face: plain lines on the -X edge and the
+# +X end, construction circles on the bore, one hole per column and one per
+# row, so the plan's X ordinates start on the -X edge and its Y ordinates on
+# the -Y edge (rule 10: one origin; farm r3 20261108T014606685Z read rows
+# chained .512 through the seat axis) while staying model dimensions.
 PLAN_DATUM_REFERENCE = "PlanDatumReference"
 PLAN_DATUM_HOLES = ((-BOLT_X, BOLT_Y), (BOLT_X, BOLT_Y))
+PLAN_DATUM_ROW_HOLE = (BOLT_X, -BOLT_Y)  # under PLAN_DATUM_HOLES[1]
+# The two hole rows from the -Y edge: hole 2's (+Y) and the row hole's (-Y).
+PLAN_ROW_HOLES = {"PlanHole2Y": PLAN_DATUM_HOLES[1], "PlanHole3Y": PLAN_DATUM_ROW_HOLE}
 DRAWING_VALUES = {
     "BlockLength": BLOCK_LENGTH, "BlockWidth": BLOCK_WIDTH,
     "BlockHeight": BLOCK_HEIGHT, "BlockSideY": BLOCK_WIDTH / 2,
@@ -103,9 +109,9 @@ DRAWING_VALUES = {
     "CarriageDrills1Dia": HOLE_DIA,
     # The counterbore prints on hole 3, the drill on hole 1: one leader each.
     "CarriageCounterbores3Dia": CBORE_DIA,
-    "CarriageDrills3Y": BOLT_Y, "CarriageDrills4Y": BOLT_Y,
     "PlanBoreX": BORE_X - BLOCK_X0,
     **{f"PlanHole{i}X": x - BLOCK_X0 for i, (x, _y) in enumerate(PLAN_DATUM_HOLES, 1)},
+    **{name: y + BLOCK_WIDTH / 2 for name, (_x, y) in PLAN_ROW_HOLES.items()},
 }
 DRAWING_DIMENSIONS = {
     "BlockProfile": ("BlockLength", "BlockWidth", "BlockSideY"),
@@ -116,16 +122,16 @@ DRAWING_DIMENSIONS = {
     "TopBore": ("TopBoreDepth",),
     "PivotTapProfile": ("TapDrillDia",),
     CBORE_FLOOR_REFERENCE: ("CboreFloor",),
-    "CarriageDrillProfile": ("CarriageDrills3Y", "CarriageDrills4Y", "CarriageDrills1Dia"),
+    "CarriageDrillProfile": ("CarriageDrills1Dia",),
     "CarriageCboreProfile": ("CarriageCounterbores3Dia",),
-    PLAN_DATUM_REFERENCE: ("PlanBoreX", "PlanHole1X", "PlanHole2X"),
+    PLAN_DATUM_REFERENCE: ("PlanBoreX", "PlanHole1X", "PlanHole2X", *PLAN_ROW_HOLES),
 }
 # Three places: the carriage pattern's fits, the seat depth and counterbore
 # floor that set the stacks, the tap drill's letter size, and the drilled
 # clearance holes (inch drill sizes print three places; the DRILLED HOLES row
 # bands them).
 THREE_PLACE_DIMENSIONS = frozenset({
-    "CboreFloor", "TopBoreDepth", "TapDrillDia", "CarriageDrills3Y", "CarriageDrills4Y",
+    "CboreFloor", "TopBoreDepth", "TapDrillDia", *PLAN_ROW_HOLES,
     "PlanHole1X", "PlanHole2X", "CarriageDrills1Dia",
 })
 
@@ -152,16 +158,19 @@ def _band(name: str) -> float:
 
 
 # The outline sets the counterbore walls (rule 17, worst case at the printed
-# bands): the +X end wall through BlockLength less the hole column, the -Y side
-# wall through BlockWidth less BlockSideY and the row. At .X (±.1) both would
-# fall under the floor, so both print at two places and their callouts name
-# the wall they set.
+# bands): the +X end wall through BlockLength less the hole column, the +Y
+# side wall through BlockWidth less the +Y row; the near walls through the -X
+# column and the -Y row alone, each from its own edge. At .X (±.1) the outline
+# walls would fall under the floor, so the overalls print at two places.
 _CBORE_R_MAX = (CBORE_DIA + _band("CarriageCounterbores3Dia")) / 2
-_ROW_BAND = max(_band(name) for name in ("CarriageDrills3Y", "CarriageDrills4Y"))
+_ROW_BAND = max(_band(name) for name in PLAN_ROW_HOLES)
 CBORE_END_WALL_MIN = BLOCK_X1 - BOLT_X - _CBORE_R_MAX - _band("BlockLength") - _band("PlanHole2X")
-CBORE_SIDE_WALL_MIN = (BLOCK_WIDTH / 2 - BOLT_Y - _CBORE_R_MAX - _ROW_BAND
-                       - _band("BlockWidth") - _band("BlockSideY"))
+CBORE_SIDE_WALL_MIN = (BLOCK_WIDTH / 2 - BOLT_Y - _CBORE_R_MAX
+                       - _band("BlockWidth") - _band("PlanHole2Y"))
 CBORE_NEAR_END_WALL_MIN = -BLOCK_X0 - BOLT_X - _CBORE_R_MAX - _band("PlanHole1X")
+CBORE_NEAR_SIDE_WALL_MIN = BLOCK_WIDTH / 2 - BOLT_Y - _CBORE_R_MAX - _band("PlanHole3Y")
+# Seat to hole: both from the same edges, so each axis charges the seat's
+# ordinate and the hole's.
 _BORE_COLUMN_BAND = _band("PlanBoreX") + max(_band("PlanHole1X"), _band("PlanHole2X"))
 _BORE_ROW_BAND = _band("BlockSideY") + _ROW_BAND
 _BORE_BOLT_DISTANCE_MIN = math.hypot(BOLT_X - _BORE_COLUMN_BAND, BOLT_Y - _BORE_ROW_BAND)
@@ -226,10 +235,7 @@ CALLOUTS_BELOW = {
     # is a plain fact with its ratio; cutting is assembly step 5's.
     "CboreFloor": f"FLOOR FOR M4 X 20 CUT\nENGAGES {ENGAGEMENT_TEXT} MIN ({ENGAGEMENT_DIAMETERS})",
     "BlockLength": "SETS COUNTERBORE END WALL",
-    # Two narrow rows between the row (CarriageDrills3Y/4Y) values and the
-    # BlockSideY and TL-32 PlanOverallY dimension lines (x 231 and 285 on TL-32's
-    # sheet). One 26-character row spanned x 225..294 and met all three
-    # (layout audit, farm run 20261031T200222206Z).
+    # Both sheets print _oblique_block_drawing.BLOCK_CALLOUTS over these.
     "BlockWidth": "SETS COUNTERBORE\nSIDE WALL",
 }
 REFERENCE_SKETCHES = (CBORE_FLOOR_REFERENCE, PLAN_DATUM_REFERENCE)
@@ -242,7 +248,8 @@ WALLS_MM = {
 assert min(WALLS_MM.values()) >= WALL_TARGET_MM
 assert CBORE_END_WALL_MIN >= WALL_TARGET_MM
 assert CBORE_SIDE_WALL_MIN >= WALL_TARGET_MM
-assert min(CBORE_NEAR_END_WALL_MIN, BORE_CBORE_WEB_MIN, SHIM_CBORE_GAP_MIN, BORE_END_WALL_MIN) >= WALL_TARGET_MM
+assert min(CBORE_NEAR_END_WALL_MIN, CBORE_NEAR_SIDE_WALL_MIN, BORE_CBORE_WEB_MIN, SHIM_CBORE_GAP_MIN,
+           BORE_END_WALL_MIN) >= WALL_TARGET_MM
 assert BORE_X == BORE_Y == 0.0 and BLOCK_X1 == -BLOCK_X0
 # 0.045: the worst-case reach margin, the long cut on a misread floor still
 # stopping short of the carriage's M4 x 5 thread end.

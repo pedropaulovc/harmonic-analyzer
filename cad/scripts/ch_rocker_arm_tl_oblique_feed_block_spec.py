@@ -34,7 +34,7 @@ import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as lead
 from _hole_spec import HoleSpec, TAP_DRILL_MM, THREAD_MAJOR_MM
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _package_units import drawing_unit
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _printed_tolerance import printed_band_mm
 
 PART_NAME = "ch-rocker-arm-tl-oblique-feed-block"
 UNIT = drawing_unit(
@@ -111,10 +111,19 @@ CBORE_FLOOR_REFERENCE = pivot.CBORE_FLOOR_REFERENCE
 # B-B prints the block height from the floor sketch's interior line (TL-22,
 # whose sections never imported it, prints the Block extrusion's depth on a
 # standard Right view).
-DRAWING_VALUES = {k: v for k, v in pivot.DRAWING_VALUES.items() if k != "BlockHeight"} | {
+# The plan's Y ordinates run from the full-width +Y edge, BlockSideY's and
+# the hole rows' witnesses leaving the +X/+Y corner: the L's -Y edge is only
+# the step left of the lug, and a +X/-Y witness left the lug's right edge,
+# where no -Y edge exists (restack farm r4 20261108T055431582Z). The 1.58
+# has no -Y end on the +X side either, so the plan prints the lug's length
+# from the step face instead (3.47 - 1.89 locates the step); BlockWidth
+# still drives BlockProfile. Main-approved 2026-11-08, dimensioning only.
+PLAN_ROW_HOLES_FROM_TOP = {name: BLOCK_WIDTH / 2 - y for name, (_x, y) in pivot.PLAN_ROW_HOLES.items()}
+DRAWING_VALUES = {k: v for k, v in pivot.DRAWING_VALUES.items() if k != "BlockHeight"} | PLAN_ROW_HOLES_FROM_TOP | {
     "SectionBlockHeight": BLOCK_HEIGHT,
     "PlanLugX": LUG_X0 - BLOCK_X0,
     "PlanOverallY": BLOCK_WIDTH / 2 - LUG_Y0,
+    "PlanLugLength": LUG_LENGTH,
     "NutClearanceDia": SCREW_CLEARANCE_DIA,
     "NutCentreZ": NUT_AXIS_Z, "NutCentreY": NUT_AXIS_Y - LUG_Y0,
 }
@@ -122,23 +131,34 @@ DRAWING_VALUES = {k: v for k, v in pivot.DRAWING_VALUES.items() if k != "BlockHe
 # taps' clocking band; the taps' transfer callout locates them.
 NUT_PATTERN_PRINTED = ("NutCentreZ", "NutCentreY", NUT_CLOCK_DIMENSION)
 DRAWING_DIMENSIONS = {k: v for k, v in pivot.DRAWING_DIMENSIONS.items() if k != "Block"} | {
+    "BlockProfile": tuple(name for name in pivot.DRAWING_DIMENSIONS["BlockProfile"] if name != "BlockWidth"),
     CBORE_FLOOR_REFERENCE: pivot.DRAWING_DIMENSIONS[CBORE_FLOOR_REFERENCE] + ("SectionBlockHeight",),
-    PLAN_DATUM_REFERENCE: pivot.DRAWING_DIMENSIONS[PLAN_DATUM_REFERENCE] + ("PlanLugX", "PlanOverallY"),
+    PLAN_DATUM_REFERENCE: pivot.DRAWING_DIMENSIONS[PLAN_DATUM_REFERENCE] + ("PlanLugX", "PlanOverallY",
+                                                                            "PlanLugLength"),
     "NutClearanceProfile": ("NutClearanceDia",),
     "NutPatternReference": NUT_PATTERN_PRINTED,
 }
 # The axis is the leadscrew's closure (not on the .01 grid): three places;
-# its height is the KP08 vendor line's, exact millimetres with the millimetre
-# title block's three-place band (owner ruling 4).
+# its height is the KP08 vendor line's, exact millimetres (owner ruling 4).
+# Owner ruling 2026-11-08 (Pedro), A2 option (i): the Ø.351 leadscrew
+# clearance alone is located ±.002 in Y and Z on VIEW D (±.05 mm on its
+# millimetre height), so its wall to the THRU taps holds the .060 floor with
+# rule 17's drill wander charged; no geometry changes.
 NUT_PATTERN_PLACES = 3
 METRIC_UNIT = "mm"
 METRIC_BAND = printed_band_mm(NUT_PATTERN_PLACES, unit=METRIC_UNIT)  # 0.13
-METRIC_DIMENSIONS = {("NutPatternReference", "NutCentreZ"): (NUT_PATTERN_PLACES, METRIC_BAND)}
+NUT_CLEARANCE_BAND_Z = 0.05  # mm, NutCentreZ (.002 in is 0.0508)
+NUT_CLEARANCE_BAND_Y = 0.002 * 25.4  # NutCentreY, inch
+METRIC_DIMENSIONS = {("NutPatternReference", "NutCentreZ"): (NUT_PATTERN_PLACES, NUT_CLEARANCE_BAND_Z)}
+INCH_TOLERANCED_DIMENSIONS = {("NutPatternReference", "NutCentreY"): (NUT_PATTERN_PLACES, NUT_CLEARANCE_BAND_Y)}
 # The leadscrew clearance is drilled: inch drill sizes print three places.
 THREE_PLACE_DIMENSIONS = pivot.THREE_PLACE_DIMENSIONS | {
     "NutClearanceDia", "NutCentreZ", "NutCentreY",
 }
 DRAWING_PRECISION = {k: v for k, v in pivot.DRAWING_PRECISION.items() if k != "Block"} | {
+    "BlockProfile": {name: places for name, places in pivot.DRAWING_PRECISION["BlockProfile"].items()
+                     if name in DRAWING_DIMENSIONS["BlockProfile"]},
+} | {
     feature: {
         name: (
             0 if name == NUT_CLOCK_DIMENSION
@@ -169,15 +189,15 @@ NUT_CLOCK_REFERENCE = f"{NUMBER} SHEET {NUT_CLOCK_SHEET} {NUT_CLOCK_VIEW}"
 
 # --- The leadscrew in the lug: the vertical stack the clearance absorbs ---------
 # The KP08s seat on TL-28's as-bought 1 in thickness (±.012) and the lug's
-# clearance stands 12.400 ±.13 mm over the carriage face, so the leadscrew may
-# run LEADSCREW_OFFSET_Z (.435 mm) off the clearance's axis vertically
+# clearance stands 12.400 ±.05 mm over the carriage face, so the leadscrew may
+# run LEADSCREW_OFFSET_Z (.355 mm) off the clearance's axis vertically
 # (Codjiflo P1 on #2112); laterally the KP08s float to centre it, within the
-# clearance's own station band. The Ø.351 clears the Tr8's major at both, by
-# 0.005 mm at the KP08's nominal 15 axis height, which is UNVERIFIED until the
-# pillow blocks are measured (#2184).
+# clearance's own ±.002 station. The Ø.351 clears the Tr8's major at both
+# at the KP08's nominal 15 axis height, which is UNVERIFIED until the pillow
+# blocks are measured (#2184).
 _AXIS_Y_BAND = printed_band_mm(NUT_PATTERN_PLACES, unit=UNIT)  # .005
-LEADSCREW_OFFSET_Z = end_bracket.THICK_STOCK_BAND + METRIC_BAND  # .435 mm
-LEADSCREW_OFFSET_Y = _AXIS_Y_BAND
+LEADSCREW_OFFSET_Z = end_bracket.THICK_STOCK_BAND + NUT_CLEARANCE_BAND_Z  # .355 mm
+LEADSCREW_OFFSET_Y = NUT_CLEARANCE_BAND_Y
 LEADSCREW_OFFSET = math.hypot(LEADSCREW_OFFSET_Y, LEADSCREW_OFFSET_Z)
 LEADSCREW_RADIAL_CLEARANCE = (SCREW_CLEARANCE_DIA - lead.SCREW_MAJOR_DIA) / 2
 assert LEADSCREW_RADIAL_CLEARANCE > LEADSCREW_OFFSET, (LEADSCREW_RADIAL_CLEARANCE, LEADSCREW_OFFSET)
@@ -242,16 +262,27 @@ if HEAD_TO_BODY_SHARP_CENTRED >= 0.0:
 # below from Y: the band is symmetric about 45°, so the two are the same
 # set, and |cos|, |sin| put the same set in every quadrant.
 NUT_TAP_MAJOR = THREAD_MAJOR_MM[feed_nut.SCREW_THREAD]
-_CLEARANCE_R = (SCREW_CLEARANCE_DIA + drilled_oversize_mm(unit=UNIT)) / 2
+# The ±.002 station is a bored hole's (drawing-guidelines' shop table: a
+# drilled hole holds ±.005; restack farm r1 20261108T040030048Z asked for the
+# route), so the Ø.351 is bored at its station and its size takes the title
+# block's .XXX ±.005, not DRILLED HOLES' +.004.
+NUT_CLEARANCE_PROCESS = "BORE"
+_CLEARANCE_R = (SCREW_CLEARANCE_DIA + printed_band_mm(3, unit=UNIT)) / 2
 _TAP_RADIUS = feed_nut.HOLE_PCD / 2 + feed_nut.HOLE_STATION_BAND + FIT_UP_RESIDUAL
 _TAP_RADIUS_MIN = feed_nut.HOLE_PCD / 2 - feed_nut.HOLE_STATION_BAND - FIT_UP_RESIDUAL
 _CLOCK_STEPS = 100  # 0.1° across the ±5° band; both limits included
+# Rule 17's wander on the THRU taps (.770 deep, about 8.7 D of the #43): the
+# fleet's 0.3° drift (fr_top_frame_spec.KEEPER_TAP_DRILL_WANDER_DEG),
+# charged in any direction at the -X face, the deepest point from the
+# spotted +X nut face (machinist review, farm r1 20261107T221729532Z).
+NUT_TAP_DRILL_WANDER_DEG = 0.3
+NUT_TAP_WANDER = LUG_WIDTH * math.tan(math.radians(NUT_TAP_DRILL_WANDER_DEG))  # 0.102
 
 
 def lug_walls_mm(clock_tol_deg: float = NUT_CLOCK_TOL_DEG) -> dict[str, float]:
     """The lug's tap walls, mm, with every tap anywhere within
     ``NUT_CLOCK_DEG`` ± ``clock_tol_deg`` (a wider band is the test's
-    negative control)."""
+    negative control), each with the THRU taps' wander charged."""
     clockings = tuple(
         math.radians(NUT_CLOCK_DEG + clock_tol_deg * (2 * k / _CLOCK_STEPS - 1))
         for k in range(_CLOCK_STEPS + 1)
@@ -263,15 +294,16 @@ def lug_walls_mm(clock_tol_deg: float = NUT_CLOCK_TOL_DEG) -> dict[str, float]:
         LEADSCREW_OFFSET_Y * abs(math.cos(a)) + LEADSCREW_OFFSET_Z * abs(math.sin(a))
         for a in clockings
     )
+    tap = NUT_TAP_MAJOR / 2 + NUT_TAP_WANDER
     return {
         "taps to the leadscrew clearance": _TAP_RADIUS_MIN - offset_toward_tap
-        - NUT_TAP_MAJOR / 2 - _CLEARANCE_R,
+        - tap - _CLEARANCE_R,
         "taps to the lug end": (NUT_AXIS_Y - LUG_Y0) - _AXIS_Y_BAND - LEADSCREW_OFFSET_Y
-        - reach_y - NUT_TAP_MAJOR / 2,
+        - reach_y - tap,
         "taps to the bottom face": NUT_AXIS_Z - METRIC_BAND - LEADSCREW_OFFSET_Z
-        - reach_z - NUT_TAP_MAJOR / 2,
+        - reach_z - tap,
         "taps to the top face": BLOCK_HEIGHT - NUT_AXIS_Z - METRIC_BAND - LEADSCREW_OFFSET_Z
-        - reach_z - NUT_TAP_MAJOR / 2,
+        - reach_z - tap,
     }
 
 
@@ -279,8 +311,10 @@ LUG_WALLS_MM = lug_walls_mm()
 # Owner ruling 2026-11-04 (#2177, option B): the clearance-to-tap wall's
 # shortfall under the .080 target, over the .060 floor, is accepted and
 # stated as plain fact on the clearance callout, floored to three places (a
-# MIN never rounds up), the riser RV-01 precedent. The window refuses a wall
-# under the floor and a stale statement once the wall reaches the target.
+# MIN never rounds up), the riser RV-01 precedent; with the wander charged
+# it holds by the ±.002 clearance station (owner ruling 2026-11-08 (Pedro),
+# A2 option (i)). The window refuses a wall under the floor and a stale
+# statement once the wall reaches the target.
 NUT_WALL_MIN_MM = min(LUG_WALLS_MM.values())
 if not WALL_FLOOR_MM <= NUT_WALL_MIN_MM < WALL_TARGET_MM:
     raise AssertionError("the TL-32 clearance-to-tap wall no longer matches its stated shortfall")
@@ -312,7 +346,9 @@ CALLOUTS_ABOVE = dict(pivot.CALLOUTS_ABOVE) | {
     "CarriageCounterbores3Dia": "4X COUNTERBORE",
     "NutClearanceDia": "DRILL THRU",
 }
-CALLOUTS_BELOW = dict(pivot.CALLOUTS_BELOW) | {
+# BlockWidth prints nowhere on TL-32 (PlanLugLength replaces it), so it
+# carries no callout.
+CALLOUTS_BELOW = {k: v for k, v in pivot.CALLOUTS_BELOW.items() if k != "BlockWidth"} | {
     "NutClearanceDia": f"LEADSCREW CLEARANCE\n{NUT_WALL_MIN_TEXT}",
     # r2 review: "BOTTOM" named no face a view defines; the face the
     # counterbored screws pull onto the HGH15CA-style carriage does.

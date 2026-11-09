@@ -86,8 +86,91 @@ def test_outline_bands_keep_the_counterbore_walls_at_target():
     assert math.isclose(spec.BLOCK_LENGTH / INCH, 1.64)
     assert math.isclose(spec.PLAN_BORE_X / INCH, .82)
     assert spec.BLOCK_X0 == -spec.BLOCK_X1
-    assert min(spec.CBORE_NEAR_END_WALL_MIN, spec.BORE_CBORE_WEB_MIN,
+    assert min(spec.CBORE_NEAR_END_WALL_MIN, spec.CBORE_NEAR_SIDE_WALL_MIN, spec.BORE_CBORE_WEB_MIN,
                spec.SHIM_CBORE_GAP_MIN, spec.BORE_END_WALL_MIN) >= WALL_TARGET_MM
+
+
+def test_plan_locates_every_hole_from_the_minus_x_and_minus_y_edges():
+    """Farm r3 20261108T014606685Z (rule 10): the rows printed .512 either
+    side of the seat axis while the seat stood .79 from the -Y edge. Every
+    plan Y now runs from the -Y edge, every X from the -X edge, at three
+    places for the vendor pattern; the stacks charge the edge, not the seat."""
+    import _oblique_block_drawing as drawing
+
+    printed = set().union(*spec.DRAWING_DIMENSIONS.values())
+    assert not {'CarriageDrills3Y', 'CarriageDrills4Y'} & (printed | set(drawing.PLAN_KEEP))
+    assert spec.DRAWING_DIMENSIONS['CarriageDrillProfile'] == ('CarriageDrills1Dia',)
+    half = spec.BLOCK_WIDTH / 2
+    rows = {name: spec.DRAWING_VALUES[name] for name in spec.PLAN_ROW_HOLES}
+    assert rows == {'PlanHole2Y': half + spec.BOLT_Y, 'PlanHole3Y': half - spec.BOLT_Y}
+    assert [round(v / INCH, 3) for v in rows.values()] == [1.302, .278]
+    assert spec.DRAWING_VALUES['BlockSideY'] == half
+    assert all(spec.DRAWING_PRECISION_BY_NAME[name] == 3 for name in rows)
+    assert set(spec.PLAN_ROW_HOLES) <= set(spec.DRAWING_DIMENSIONS[spec.PLAN_DATUM_REFERENCE])
+    # The model names the row hole after the column holes (PlanHole3).
+    assert list(spec.PLAN_ROW_HOLES) == ['PlanHole2Y', f'PlanHole{len(spec.PLAN_DATUM_HOLES) + 1}Y']
+    assert spec.PLAN_ROW_HOLES['PlanHole3Y'] == spec.PLAN_DATUM_ROW_HOLE
+    assert spec.PLAN_DATUM_ROW_HOLE[0] in {x for x, _y in spec.PLAN_DATUM_HOLES}
+    assert {y for _x, y in spec.PLAN_ROW_HOLES.values()} == {spec.BOLT_Y, -spec.BOLT_Y}
+    model = Path(__file__).with_name('_oblique_pivot_block_model.py').read_text(encoding='utf-8')
+    body = model[model.index('async def _plan_datum_reference'):model.index('async def _driving_angle')]
+    assert 'x_base = (f"{edge}.end", edge_end)' in body
+    # TL-22 keeps the -Y edge's +X corner; TL-32 (feed) flips to the +Y one.
+    assert 'y_base = (f"{end}.end", end_end) if feed else (f"{end}.start", end_start)' in body
+    assert drawing.PLAN_ARROWS_INSIDE == ('PlanHole3Y',)
+    assert 'spec.PLAN_DATUM_ROW_HOLE' in body
+
+
+@pytest.mark.parametrize("feed", [False, True])
+def test_y_baseline_lanes_keep_each_text_off_the_other_lines(feed):
+    """The Y dims stand shortest nearest right of the plan; no text box meets
+    another dimension's line or witness, nor its own witnesses. TL-22's run
+    from its -Y edge; TL-32's from its full-width +Y edge (restack farm r4
+    20261108T055431582Z: the L has no -Y edge at its +X end). Text metrics
+    from the retained pivot PDFs (3.0 mm a character, a 6.38 mm row box)."""
+    import _oblique_block_drawing as drawing
+    import ch_rocker_arm_tl_oblique_feed_block_spec as feed_spec
+
+    keep = drawing.FEED_PLAN_KEEP if feed else drawing.PLAN_KEEP
+    values = (feed_spec if feed else spec).DRAWING_VALUES
+    centre_y = (drawing.FEED_PLAN_XY if feed else drawing.PLAN_XY)[1] * 1000
+    # TL-32's view centres the L (block plus lug), TL-22's the block.
+    top = centre_y + (feed_spec.PLAN_OVERALL_Y if feed else spec.BLOCK_WIDTH) / 2
+    base = top - spec.BLOCK_WIDTH
+    right = drawing.PLAN_XY[0] * 1000 + spec.BLOCK_LENGTH / 2
+    if feed:
+        edge, names = top, ('PlanHole2Y', 'BlockSideY', 'PlanHole3Y')
+        dims = {name: top - values[name] for name in names}
+    else:
+        edge, names = base, ('PlanHole3Y', 'BlockSideY', 'PlanHole2Y', 'BlockWidth')
+        dims = {name: base + values[name] for name in names}
+    lanes = [keep[name][0] * 1000 for name in dims]
+    assert lanes == sorted(lanes) and lanes[0] - right >= 10.0
+    assert all(math.isclose(b - a, 20.0) for a, b in zip(lanes, lanes[1:]))
+    text = {name: f'{values[name] / INCH:.3f}'.lstrip('0') if name in spec.PLAN_ROW_HOLES
+            else f'{values[name] / INCH:.2f}'.lstrip('0') for name in dims}
+    assert sorted(text.values()) == sorted(['.278', '.79', '1.302'] + ([] if feed else ['1.58']))
+    boxes = {}
+    for name in dims:
+        x, y = (v * 1000 for v in keep[name])
+        half_w = len(text[name]) * 3.0 / 2
+        boxes[name] = (x - half_w, y - 3.19, x + half_w, y + 3.19)
+    for name, (x0, y0, x1, y1) in boxes.items():
+        for other, feature_y in dims.items():
+            if other == name:
+                continue
+            lane = keep[other][0] * 1000
+            low, high = sorted((edge, feature_y))
+            # Its dimension line (lane, edge..feature) and its feature witness.
+            assert not (x0 <= lane <= x1 and y0 <= high and low <= y1), (name, other)
+            assert not (y0 <= feature_y <= y1 and x0 <= lane + 1.0), (name, other, 'witness')
+            ox0, oy0, ox1, oy1 = boxes[other]
+            assert x1 <= ox0 or ox1 <= x0 or y1 <= oy0 or oy1 <= y0
+        # Its own witnesses: the text never straddles the edge's or its
+        # feature's line, and (.278, 7 mm span) stands clear past the
+        # feature, toward the block's middle, not over the edge.
+        assert not y0 <= edge <= y1 and not y0 <= dims[name] <= y1, name
+        assert (y1 < edge) if feed else (y0 > edge), name
 
 
 def test_native_builder_owns_real_solids_dimensions_and_final_volume():
@@ -303,36 +386,83 @@ def test_b_letters_clear_upper_witnesses_border_and_lower_drill_leader():
     assert leader_at_arrow_left - (lower_end + 1.25) - .175 >= 3.0
 
 
-def test_block_length_reason_rides_its_value_row_clear_of_the_dimension():
-    """TL-22 printed the same top tier as TL-32 (c40296ac PDFs: the 1.64 over
-    SETS COUNTERBORE END WALL centred at (240, 258.5) mm, its underline on
-    the y253.5 dimension line), so its leader ran along the line too. Both
-    sheets now print the reason on the value's row, over the span. Text
-    metrics come from those PDFs: 2.74 mm a character, a 6.38 mm row box,
-    and a centre-anchored block."""
+def test_printed_callouts_read_size_process_depth_and_name_each_mate_once():
+    """Machinist review of 957501d1 (TL-22 and TL-32): size first, the
+    counterbore by its symbol with its depth REF against B-B's floor, mates
+    by MHA number, no reason on the overalls or the seat depth, and no
+    assembly instruction on the floor."""
     import _oblique_block_drawing as drawing
 
-    reason = spec.CALLOUTS_BELOW['BlockLength']
-    assert reason == 'SETS COUNTERBORE END WALL' and 'BlockLength' not in spec.CALLOUTS_SUFFIX
-    char_mm, row_mm = (274.22 - 205.78) / len(reason), 258.90 - 252.52
-    width = (len('1.64 ') + len(reason)) * char_mm
-    x, y = (value * 1000 for value in drawing.BLOCK_LENGTH_TEXT_XY)
-    left, right, bottom, top = x - width / 2, x + width / 2, y - row_mm / 2, y + row_mm / 2
-    span_left = drawing.PLAN_XY[0] * 1000 - spec.BLOCK_LENGTH / 2
-    span_right = span_left + spec.BLOCK_LENGTH
-    cut_x = drawing.PLAN_XY[0] * 1000 + spec.CBORE_SECTION_X
-    line_y = drawing.PLAN_KEEP['BlockLength'][1] * 1000
-    assert left - cut_x >= 4.0
-    assert span_left < left < (span_left + span_right) / 2 < right
-    assert 266.7 - top >= 2.0
-    # The underline (~0.7 under the box) clears the extension lines' 1 mm
-    # overrun by 3 mm; the old block's underline was under it.
-    assert bottom + .7 - (line_y + 1.0) >= 3.0
-    assert 258.5 - (264.46 - 252.52) / 2 + .7 - (line_y + 1.0) < 0.0
-    source = (Path(drawing.__file__)).read_text(encoding='utf-8')
-    body = source[source.index('def draw_block'):]
-    call = "\n    _inline_below_callout(adapter, plan_annotations, 'BlockLength', contract.CALLOUTS_BELOW['BlockLength'])\n"
-    assert call in body and 'if is_feed:' + call not in body
+    printed = drawing.BLOCK_CALLOUTS
+    # Every printed dimension is imported on both sheets, so the applier
+    # finds it; each exists in the part's own dimension set. TL-32 prints no
+    # 1.58 (no -Y end at the L's +X side): draw_block drops its text.
+    assert set(printed) <= set(drawing.PLAN_KEEP | drawing.SIDE_KEEP | drawing.FLOOR_KEEP)
+    assert set(printed) - set(drawing.FEED_PLAN_KEEP | drawing.FEED_SIDE_KEEP | drawing.FEED_FLOOR_KEEP) == {
+        'BlockWidth'}
+    source = Path(drawing.__file__).read_text(encoding='utf-8')
+    assert "    if is_feed:\n        del printed['BlockWidth']" in source
+    assert set(printed) <= set(spec.DRAWING_PRECISION_BY_NAME)
+    assert all(set(parts) <= set(drawing.TEXT_PARTS) for parts in printed.values())
+    # No process or count stands above a size.
+    assert all(parts.get('above', '') == '' for parts in printed.values())
+    words = '\n'.join(text for parts in printed.values() for text in parts.values())
+    for retired in ('SETS ', 'FROM TOP', 'SECTION', 'HGH15CA', 'M4 X 20', 'COUNTERBORE', 'BELOW SHOULDER'):
+        assert retired not in words
+    assert printed['CarriageCounterbores3Dia'] == {
+        'prefix': '4X <HOLE-SPOT><MOD-DIAM>', 'suffix': ' <HOLE-DEPTH> (.390)', 'above': '', 'below': ''}
+    assert math.isclose((spec.BLOCK_HEIGHT - spec.CBORE_FLOOR) / INCH, .390)
+    assert printed['BoreDia']['suffix'] == ' REAM <HOLE-DEPTH> (.359)'
+    assert math.isclose(spec.BORE_DEPTH / INCH, .359, abs_tol=5e-5)
+    assert printed['TapDrillDia'] == {'suffix': ' DRILL THRU', 'above': '', 'below': '5/16-18 UNC THRU'}
+    assert printed['CarriageDrills1Dia']['prefix'] == '4X <MOD-DIAM>'
+    for name in ('TopBoreDepth', 'BlockLength', 'BlockWidth'):
+        assert printed[name] == {'below': ''}
+    # Mates by their registry numbers; the carriage is the rail kit's member.
+    screw = _config.parts('ch-rocker-arm-tl-vn-oblique-pivot-screw')['number']
+    kit = _config.parts('ch-rocker-arm-tl-vn-oblique-rail-kit')['number']
+    assert (drawing.PIVOT_SCREW_NUMBER, drawing.CARRIAGE_NUMBER) == (screw, kit)
+    assert printed['BoreDia']['below'] == f'LOCATING FIT ON {screw} SHOULDER'
+    assert printed['CarriageDrills1Dia']['below'] == f'MATCHES {kit} CARRIAGE'
+    # The floor keeps RV-01's plain fact, in the words its exception quotes.
+    (engagement,) = _config.parts(spec.PART_NAME)['machinist_exceptions']
+    assert printed['CboreFloor'] == {'below': f'ENGAGES {spec.ENGAGEMENT_TEXT} MIN ({spec.ENGAGEMENT_DIAMETERS})'}
+    assert printed['CboreFloor']['below'] in engagement['where']
+
+
+def test_sheet_callout_overrides_replace_only_the_parts_they_name():
+    import _oblique_block_drawing as drawing
+
+    merged = drawing.block_callouts({'BoreDia': {'below': 'X'}, 'NutCentreY': {'above': ''}})
+    assert merged['BoreDia'] == {**drawing.BLOCK_CALLOUTS['BoreDia'], 'below': 'X'}
+    assert merged['NutCentreY'] == {'above': ''}
+    assert drawing.block_callouts() == drawing.BLOCK_CALLOUTS
+    assert drawing.BLOCK_CALLOUTS['BoreDia']['below'] != 'X'
+    with pytest.raises(ValueError):
+        drawing.block_callouts({'BoreDia': {'callout': ''}})
+
+
+def test_sections_print_no_sheet_scale_and_b_b_joins_its_pieces():
+    """SCALE 1 : 1 printed under both sections of the 1:1 sheet, and B-B's
+    cut face alone left three hatched pieces (machinist review of 957501d1):
+    each section is cut on the pinned sheet and its caption refuses a scale
+    field; B-B prints the material beyond the cut, hidden lines removed."""
+    import _oblique_block_drawing as drawing
+
+    source = Path(drawing.__file__).read_text(encoding='utf-8')
+    body = source[source.index('async def draw_block'):]
+    pin = '    _pin_sheet_scale(adapter, SHEET_SCALE)\n'
+    assert body.count('create_section_view(') == 2
+    assert pin + '    side = create_section_view(' in body
+    assert pin + '    floor = create_section_view(' in body
+    assert "_section_caption(side, 'A')" in body
+    beyond = source[source.index('def _section_with_material_beyond'):source.index('def _pin_sheet_scale')]
+    assert 'SetDisplayOnlySurfaceCut(False)' in beyond and 'set_hidden_lines_removed(adapter, view)' in beyond
+    assert 'SetDisplayOnlySurfaceCut(True)' not in source
+    assert "'<VLSCALEV>' in linked" in source
+    # B-B looks -X from the -X column: TL-32's lug stands behind its plane.
+    import ch_rocker_arm_tl_oblique_feed_block_spec as feed
+    assert spec.CBORE_SECTION_X < feed.LUG_X0
 
 
 _PIVOT_GENERATED_TEXT = (
@@ -742,15 +872,21 @@ def test_stacked_callout_keeps_imported_precision_gate_and_is_pivot_only(feed):
     assert ast.unparse(precision.value) == 'assert_imported_precision(adapter, annotations, precision)'
     calls, proof = [], object()
 
-    def stack(*args):
-        calls.append(args)
+    def stack(*args, **kwargs):
+        calls.append((args, kwargs))
         return proof
 
+    printed = {}
     env = dict(is_feed=feed, adapter=object(), plan=object(), annotations=[],
-               contract=object(), _stack_pivot_callout=stack)
+               contract=object(), printed=printed, _stack_pivot_callout=stack)
     exec(compile(ast.Module(body=[initial, conditional], type_ignores=[]), '<pivot-routing>', 'exec'), env)
     assert len(calls) == (0 if feed else 1)
     assert env['settled_checks'] == (() if feed else (proof,))
+    # The proof runs after the sheet writes its callouts and reads them.
+    assert all(kwargs == {'printed': printed} for _args, kwargs in calls)
+    body = ast.unparse(build)
+    assert body.index('_set_callouts(adapter, annotations, printed)') < body.index(
+        '_stack_pivot_callout(')
     finalizer = next(node for node in ast.walk(build) if isinstance(node, ast.Call)
                      and isinstance(node.func, ast.Name) and node.func.id == 'finalize_drawing')
     assert ast.unparse(next(keyword.value for keyword in finalizer.keywords
@@ -770,6 +906,21 @@ def test_stacked_callout_keeps_imported_precision_gate_and_is_pivot_only(feed):
                _assert_pivot_pdf_text=lambda *args: pdf_calls.append(args))
     exec(compile(ast.Module(body=[pdf_guard], type_ignores=[]), '<pivot-pdf-routing>', 'exec'), env)
     assert pdf_calls == ([] if feed else [(outputs.pdf, report_path, env['contract'])])
+
+
+def test_pivot_stack_sources_read_the_sheets_printed_rows():
+    """The owner's generated note (stack 1ee5e10933) checks its three hidden
+    or REF sources' above/below rows; this sheet writes BLOCK_CALLOUTS first
+    (no 'SETS ...' reason under A-A's .359), so the check reads the printed
+    rows, the model's CALLOUTS_* where the sheet writes none."""
+    import _oblique_block_drawing as drawing
+
+    printed = drawing.block_callouts()
+    assert drawing._printed_rows('TopBoreDepth', spec, printed) == (spec.CALLOUTS_ABOVE.get('TopBoreDepth', ''), '')
+    assert drawing._printed_rows('BoreDia', spec, printed) == ('', printed['BoreDia']['below'])
+    assert drawing._printed_rows('BoreDia', spec, None) == (spec.CALLOUTS_ABOVE['BoreDia'], spec.CALLOUTS_BELOW['BoreDia'])
+    source = Path(drawing.__file__).read_text(encoding='utf-8')
+    assert 'PIVOT_STACK_CALLOUTS' not in source and '    printed = block_callouts(callouts)\n' in source
 
 
 @pytest.mark.parametrize('fault', (
