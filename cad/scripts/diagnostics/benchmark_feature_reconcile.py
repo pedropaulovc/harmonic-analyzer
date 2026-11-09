@@ -32,6 +32,33 @@ def write_json(path: Path, value: Any) -> None:
     path.write_text(json.dumps(value, indent=2, allow_nan=False) + "\n", encoding="utf-8")
 
 
+def image_content_evidence(path: Path) -> dict[str, Any]:
+    """Reject blank/gradient-only captures without claiming visual equivalence."""
+    from PIL import Image, ImageFilter
+
+    with Image.open(path) as image:
+        dimensions = list(image.size)
+        if image.format != "PNG" or min(dimensions) <= 4:
+            raise RuntimeError(f"Invalid PNG proof: {path}")
+        image.verify()
+    with Image.open(path) as image:
+        grey = image.convert("L")
+        low, high = grey.getextrema()
+        # Exclude FIND_EDGES' artificial image-frame boundary. Smooth viewport
+        # backgrounds must not pass merely because they contain a grey gradient.
+        edges = grey.filter(ImageFilter.FIND_EDGES).crop((2, 2, grey.width - 2, grey.height - 2))
+        strong_edges = sum(edges.histogram()[12:])
+        required_edges = max(64, math.ceil(edges.width * edges.height * 0.0005))
+        evidence = {
+            "dimensions": dimensions, "luminance_range": high - low,
+            "strong_edge_pixels": strong_edges, "required_edge_pixels": required_edges,
+            "edge_threshold": 12,
+        }
+        if high - low < 12 or strong_edges < required_edges:
+            raise RuntimeError(f"Blank or background-only PNG proof: {path}, evidence={evidence}")
+        return evidence
+
+
 class Benchmark:
     def __init__(self, adapter: Any, out: Path):
         self.adapter = adapter
@@ -256,8 +283,8 @@ class Benchmark:
                     raise RuntimeError("Baseline bytes no longer match persisted manifest")
                 shutil.copyfile(source, path)
                 await self.open(path)
-        with self.phase("diff", case):
-            decision = plan(manifest["recipe"], spec) if manifest else None
+        with self.phase("diff", case, skipped=mode == "clean"):
+            decision = plan(manifest["recipe"], spec) if mode != "clean" else None
             if decision and decision.decision == "full_build":
                 raise RuntimeError("Structural plan must be handled before native mutation")
         dimensions = []
@@ -312,14 +339,52 @@ class Benchmark:
         """Capture a saved trial outside all timed operation rows; never save it."""
         import _telemetry
         from _check import check
-        from PIL import Image
+        from _com import _early_bound
 
         native = self.out / row["path"]
         image_path = self.out / f"visual-{row['mode']}.png"
         original_hash = digest(native)
         with _telemetry.span(f"{PREFIX}.render", mode=row["mode"], timed_trial=False):
             await self.open(native)
+            view = None
+            prior_graphics_updates = None
             try:
+                # OpenDoc6 loads geometry but does not promise a foreground,
+                # fully refreshed graphics window. Do not inherit the adapter's
+                # best-effort activation/error suppression for visual evidence.
+                original_document = self.model()
+                activated = self.adapter.swApp.ActivateDoc3(native.name, False, 1, 0)
+                if not isinstance(activated, (tuple, list)) or len(activated) != 2:
+                    raise RuntimeError(f"Unexpected ActivateDoc3 readback: {activated!r}")
+                document, errors = activated
+                if document is None or int(errors) != 0:
+                    raise RuntimeError(f"Capture activation failed/warned: {native}, errors={errors}")
+                document = _early_bound(document, "IModelDoc2")
+                active = self.adapter.swApp.ActiveDoc
+                if active is None:
+                    raise RuntimeError(f"No active document after capture activation: {native}")
+                active = _early_bound(active, "IModelDoc2")
+                if (Path(active.GetPathName()).resolve() != native.resolve()
+                        or int(self.adapter.swApp.IsSame(active, document)) != 1
+                        or int(self.adapter.swApp.IsSame(original_document, document)) != 1):
+                    raise RuntimeError(f"Capture activated the wrong native document: {native}")
+                self.adapter.currentModel = document
+                raw_view = document.ActiveView
+                if raw_view is None:
+                    raise RuntimeError(f"Capture target has no active model view: {native}")
+                view = _early_bound(raw_view, "IModelView")
+                prior_graphics_updates = bool(view.EnableGraphicsUpdate)
+                view.EnableGraphicsUpdate = True
+                if not view.EnableGraphicsUpdate:
+                    raise RuntimeError(f"Capture target refused graphics updates: {native}")
+                document.ClearSelection2(True)
+                document.ShowNamedView2("", 7)  # swIsometricView
+                document.ViewZoomtofit2()
+                document.GraphicsRedraw2()  # documented immediate display update
+                _telemetry.event(f"{PREFIX}.capture_prepared",
+                    native_file=native.name, activation_errors=int(errors),
+                    active_path=active.GetPathName(), graphics_updates=True,
+                    prior_graphics_updates=prior_graphics_updates)
                 # export_image may fall back to an existence-based SaveAs capture.
                 # Remove our prior image so stale bytes cannot masquerade as proof.
                 image_path.unlink(missing_ok=True)
@@ -328,20 +393,26 @@ class Benchmark:
                     "format_type": "png",
                     "width": 1600,
                     "height": 1000,
-                    "view_orientation": "isometric",
+                    "view_orientation": "current",
                 }))
-                with Image.open(image_path) as image:
-                    dimensions = list(image.size)
-                    if image.format != "PNG" or min(dimensions) <= 0:
-                        raise RuntimeError(f"Invalid PNG proof: {image_path}")
-                    image.verify()
+                content = image_content_evidence(image_path)
+                dimensions = content["dimensions"]
             finally:
-                self.close()
+                if view is not None and prior_graphics_updates is not None:
+                    try:
+                        view.EnableGraphicsUpdate = prior_graphics_updates
+                        if bool(view.EnableGraphicsUpdate) != prior_graphics_updates:
+                            raise RuntimeError(f"Could not restore graphics updates: {native}")
+                    finally:
+                        self.close()
+                else:
+                    self.close()
             if digest(native) != original_hash:
                 raise RuntimeError(f"Rendering changed native bytes: {native}")
         return {"mode": row["mode"], "native_file": native.name,
                 "native_sha256": original_hash, "image_file": image_path.name,
                 "image_sha256": digest(image_path), "image_dimensions": dimensions,
+                "image_content": content,
                 "orientation": "isometric", "included_in_trial_timings": False}
 
 

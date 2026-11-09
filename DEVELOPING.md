@@ -1496,8 +1496,12 @@ Declared outputs under `cad/out/reports/feature-reconcile/` include
 `report.json`, `spans.jsonl`, `baseline-manifest.json`, `target-recipe.json`,
 the baseline and all nine trial native parts, plus `visual-clean.png` and
 `visual-incremental.png`. The two native isometric viewport captures are produced
-after all timed trials, without saving the source parts; image validation and
-native byte-identity checks are mandatory. The directory is archived by the
+after all timed trials, without saving the source parts. Capture explicitly
+activates and checks the target document, enables its graphics updates with
+restoration, stages an isometric fitted view, and forces an immediate redraw.
+PNG validation rejects flat/gradient-only backgrounds using luminance and
+interior edge-content gates; it is not a claim of visual geometry equivalence.
+Native byte-identity checks remain mandatory. The directory is archived by the
 ordinary leaf cache, so raw benchmark OTel spans survive worker cleanup.
 The report carries trace/span IDs, per-phase wall timings, individual results
 and medians; it reports initial baseline creation separately. Native validation

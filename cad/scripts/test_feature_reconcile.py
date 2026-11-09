@@ -88,3 +88,32 @@ def test_malformed_recipe_is_not_silently_treated_as_full_build(mutate):
     mutate(after)
     with pytest.raises(ValueError):
         plan(recipe(), after)
+
+
+@pytest.mark.parametrize("background", ["flat", "gradient"])
+def test_visual_evidence_rejects_blank_backgrounds(tmp_path, background):
+    from PIL import Image
+    from diagnostics.benchmark_feature_reconcile import image_content_evidence
+
+    image = (Image.new("RGB", (400, 300), (180, 180, 180)) if background == "flat"
+             else Image.linear_gradient("L").resize((400, 300)).convert("RGB"))
+    path = tmp_path / "blank.png"
+    image.save(path)
+    with pytest.raises(RuntimeError, match="Blank or background-only"):
+        image_content_evidence(path)
+
+
+def test_visual_evidence_accepts_nontrivial_object_pixels(tmp_path):
+    from PIL import Image, ImageDraw
+    from diagnostics.benchmark_feature_reconcile import image_content_evidence
+
+    image = Image.new("RGB", (400, 300), (180, 180, 180))
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((100, 80, 300, 220), fill=(70, 70, 70))
+    draw.ellipse((100, 40, 300, 120), fill=(120, 120, 120), outline=(20, 20, 20))
+    path = tmp_path / "object.png"
+    image.save(path)
+    evidence = image_content_evidence(path)
+    assert evidence["dimensions"] == [400, 300]
+    assert evidence["luminance_range"] == 160
+    assert evidence["strong_edge_pixels"] >= evidence["required_edge_pixels"]
