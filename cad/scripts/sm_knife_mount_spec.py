@@ -576,16 +576,17 @@ PIN_SLIP_PRINTED = (
     math.floor(DOWEL.SLIP_CLEARANCE_MIN / DOWEL.MM_PER_IN * 1e4 + 1e-6) / 1e4,
     math.ceil(DOWEL.SLIP_CLEARANCE_MAX / DOWEL.MM_PER_IN * 1e4 - 1e-6) / 1e4,
 )  # (.0020, .0036)
-# The hole's floor depth, the fr_top_frame HANGER_PIN_DEPTH_CALLOUT
-# precedent.  Nothing seats on the
-# floor (the longest proud pin stands SLIP_DEPTH_CLEARANCE_MIN off the
+# The hole's floor depth prints its value alone: the slip hole's callout
+# already reads "REAM ↧ (.37) FLAT BOTTOM", so a second "FLAT BOTTOM" under
+# the section's controlling .37 was a note on a location dimension
+# (machinist review, farm run 20261109T083029873Z, rule 7).  Nothing seats on
+# the floor (the longest proud pin stands SLIP_DEPTH_CLEARANCE_MIN off the
 # shallowest), so its corner takes the title block's INSIDE CORNERS R.040
 # MAX and the row prints no limit of its own (machinist review, farm run
 # 20261027T233328148Z: a local CORNER R0.1 MAX named no function, rule 1).
 # The angular-fit proof (build_sm_summing_assembly) charges the hole's
 # straight wall short of that corner, 9.398 - 0.254 - 1.016 - 0.5 = 7.628.
 DOWEL_HOLE_FLOOR_CORNER_R_MAX = inside_corner_radius_mm(unit=UNIT)  # 1.016
-PIN_DEPTH_CALLOUT = "FLAT BOTTOM"
 # The longest proud pin's crowned end stays above the shallowest straight
 # wall's end (its crown centre 7.707 deep, the corner's 8.128): pushed against
 # the wall there, the crown meets no corner arc (DOWEL_HOLE_CORNER_RECESS 0),

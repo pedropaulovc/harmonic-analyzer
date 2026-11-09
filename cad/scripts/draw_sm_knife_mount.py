@@ -99,7 +99,6 @@ from sm_knife_mount_spec import (
     DRAWING_REFERENCE_PRECISION,
     GEOMETRIC_TOLERANCES_IN,
     HOLE_ROW_FACE_DISTANCE,
-    PIN_DEPTH_CALLOUT,
     PIN_HOLE_DEPTH,
     PIN_HOLE_DEPTH_PLACES,
     PIN_HOLE_DIA,
@@ -210,8 +209,8 @@ FRONT_KEEP = {
     "BoreDia": (FRONT_CENTER[0] - 0.0565, _front_y(BORE_CY) + BORE_DIA_TEXT_RISE),
 }
 # B's floor depth stands right of the section, its witness lines off the
-# cut top seat and that floor; "FLAT BOTTOM" with it; its corner is the
-# title block's (sm_knife_mount_spec.PIN_DEPTH_CALLOUT).  The
+# cut top seat and that floor, its value alone (the hole callout says FLAT
+# BOTTOM; sm_knife_mount_spec, DOWEL_HOLE_FLOOR_CORNER_R_MAX).  The
 # dimension line stands at BLK_HALF_X + 12.0, x
 # 349.4 mm (farm run 20261027T175429300Z), 14.9 mm right of the 7.632
 # BASIC's shoulder end (x 334.5 mm, farm run 20261027T133857303Z); its
@@ -226,11 +225,11 @@ FRONT_KEEP = {
 # the offset y and the rows' 5.56 mm under each other, 3.5 mm tall, the
 # widest 41.94 mm; the leader left the dimension line's midpoint for the
 # underline's left end, the underline under the last row.  This block's
-# two rows keep that 42 mm band centred on the same x.
+# one row keeps that 42 mm band centred on the same x.
 DEPTH_VALUE_RISE = 0.00278
 DEPTH_ROW_PITCH = 0.00556
 DEPTH_TEXT_HEIGHT = 0.0035
-DEPTH_TEXT_ROWS = 1 + len(PIN_DEPTH_CALLOUT.splitlines())
+DEPTH_TEXT_ROWS = 1
 DEPTH_ROW_HALF_WIDTH = 0.021
 # The underline's left end 5.9 mm right of the dimension line (the F-F
 # jog's 5.88), 4.9 mm past the witness lines' ends; the block's rows centred
@@ -349,7 +348,6 @@ PIN_HOLE_CALLOUT = "\n".join(
 DIMENSION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
     "PinHoleDia": PIN_HOLE_CALLOUT,
-    "PinHoleDepth": PIN_DEPTH_CALLOUT,
 }
 _GTOL_ROW = 0.007
 DATUM_TAG_BOX = 0.007
