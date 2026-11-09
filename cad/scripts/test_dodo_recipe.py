@@ -1614,7 +1614,7 @@ def test_assembly_depends_on_exact_child_execution_identities():
     [
         (
             "dt_drive_train",
-            ("sh_vn_brass_fillister_screw", "sh_vn_fillister_screw_90280a108"),
+            ("sh_vn_fillister_screw_90280a108",),
         ),
         (
             "pd_paper_drive",

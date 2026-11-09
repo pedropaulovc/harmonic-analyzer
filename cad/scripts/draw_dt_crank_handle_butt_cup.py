@@ -23,10 +23,12 @@ from __future__ import annotations
 
 import argparse
 import math
+import re
 import sys
 from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     dimension_name,
     place_view,
@@ -61,11 +63,12 @@ from _session import run_build
 import _telemetry
 from dt_crank_handle_butt_cup_notes import (
     BODY_CHAMFER_CALLOUT,
-    BODY_FIT_CALLOUT,
     FLOOR_HOLE_CALLOUT,
-    POCKET_DEPTH_CALLOUT,
+    HANDLE_NUMBER,
     POCKET_FIT_CALLOUT,
-    POCKET_FLOOR_RADIUS_CALLOUT,
+    POCKET_FLAG,
+    POCKET_NOTE,
+    POCKET_NOTE_TEXT,
 )
 from dt_crank_handle_butt_cup_spec import (
     BODY_DIA,
@@ -79,6 +82,7 @@ from dt_crank_handle_butt_cup_spec import (
     REFERENCE_DIMENSIONS,
 )
 from _fit_deviations import deviations
+from dt_crank_handle_spec import COUNTERBORE_GLUE_LINE
 
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -110,6 +114,9 @@ ISO_CENTER = (0.368, 0.215)
 # Below the floor end, clear of the floor-hole callout.
 CAPTION_XY = (0.160, 0.114)
 ISO_NOTE_POS = (0.335, 0.170)
+# The pocket's numbered flag note: under the end view, left of the section's
+# caption and above the title block.
+POCKET_NOTE_POS = (0.030, 0.090)
 
 _S = VIEW_SCALE[0] / 1000.0
 BODY_R = BODY_DIA * _S / 2.0  # 0.0268
@@ -160,13 +167,34 @@ SECTION_KEEP = {
         SECTION_CENTER[1] + BODY_R + 0.041,
     ),
 }
+# The body is bonded in the MHA-DT-08 counterbore: a matched bonded fit,
+# turned to the measured counterbore, whose diametral clearance is the
+# handle's glue line, REF (rules 4 and 26; rule 23: epoxy, wood to metal).
+# The fit lives on flag note 2: printed on the dimension (round 2) its two
+# lines ran into the floor-hole dimension line, and the .XXX grade alone
+# cannot give a .004-wide clearance, so the matched route must be printed.
+_MM_PER_IN = 25.4
+BODY_NOTE = POCKET_NOTE + 1
+BODY_FLAG = f"SEE NOTE {BODY_NOTE}"
+BODY_NOTE_TEXT = "\n".join(
+    (
+        f"{BODY_NOTE}. BODY: BONDED FIT IN {HANDLE_NUMBER} CRANK HANDLE, EPOXY:",
+        "   TURN TO THE MEASURED COUNTERBORE (CLEARANCE "
+        + "-".join(
+            f"{value / _MM_PER_IN:.3f}".removeprefix("0")
+            for value in COUNTERBORE_GLUE_LINE
+        )
+        + ").",
+    )
+)
+NOTES_TEXT = f"{POCKET_NOTE_TEXT}\n{BODY_NOTE_TEXT}"
 DIMENSION_CALLOUTS = {
     "BodyChamfer": BODY_CHAMFER_CALLOUT,
-    "BodyDia": BODY_FIT_CALLOUT,
+    "BodyDia": BODY_FLAG,
     "FloorHoleDia": FLOOR_HOLE_CALLOUT,
-    "PocketDepth": POCKET_DEPTH_CALLOUT,
+    "PocketDepth": POCKET_FLAG,
     "PocketDia": POCKET_FIT_CALLOUT,
-    "PocketFloorRadius": POCKET_FLOOR_RADIUS_CALLOUT,
+    "PocketFloorRadius": POCKET_FLAG,
 }
 # *Left reverses *Right's horizontal basis.  Reverse the cut as well to
 # retain the section's physical viewing direction and +X-right orientation.
@@ -218,6 +246,48 @@ def _dress_pocket_floor_radius(annotation: Any) -> None:
         or bool(display.SolidLeader)
     ):
         raise RuntimeError(f"{label}: radial leader style did not persist")
+
+
+_CAPTION_SCALE_LINE = re.compile(r"[^\r\n]*<VLSCALE[^\r\n]*")
+
+
+def _drop_section_caption_scale(adapter: Any, section: Any) -> None:
+    """Remove the scale line from section A-A's native caption.
+
+    ASME Y14.3 (drawing-guidelines.md rule 9): a view states its scale only
+    when it differs from the sheet's.  The section is drawn at the sheet's
+    5:1 (asserted here), yet its native caption printed SCALE 5 : 1 (fan-out
+    screen); tying the view to the sheet scale read back 4:1 on the farm.
+    So the caption keeps its label fields and loses only the scale line.
+    """
+    bound = _early_bound(section, "IView")
+    ratio = tuple(float(value) for value in bound.ScaleRatio)
+    if not math.isclose(ratio[0] / ratio[1], SHEET_SCALE[0] / SHEET_SCALE[1]):
+        raise RuntimeError(f"butt cup section is not at the sheet scale: {ratio}")
+    notes = [_early_bound(raw, "INote") for raw in (bound.GetNotes() or ())]
+    captions = [
+        note for note in notes if "<VLLABEL>" in str(note.PropertyLinkedText or "")
+    ]
+    if len(captions) != 1:
+        raise RuntimeError(
+            f"butt cup section: expected one caption, found {len(captions)}"
+        )
+    note = captions[0]
+    linked = str(note.PropertyLinkedText or "")
+    if "<VLSCALE" not in linked:
+        return
+    stripped = _CAPTION_SCALE_LINE.sub("", linked).strip("\r\n")
+    note.PropertyLinkedText = stripped
+    rebuild_drawing(adapter, label="butt cup section caption without scale")
+    after = str(note.PropertyLinkedText or "")
+    if (
+        after != stripped
+        or "<VLLABEL>" not in after
+        or "SCALE" in str(note.GetText() or "")
+    ):
+        raise RuntimeError(
+            f"butt cup section caption kept its scale: {after!r} / {note.GetText()!r}"
+        )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -273,6 +343,7 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=VIEW_SCALE,
         label="butt cup longitudinal section",
     )
+    _drop_section_caption_scale(adapter, section)
     position_section_caption(adapter, section, CAPTION_XY, label="butt cup")
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
     for view in (end, section, iso):
@@ -300,6 +371,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_POS)
+    if add_note(adapter, NOTES_TEXT, *POCKET_NOTE_POS) is None:
+        raise RuntimeError("failed to add the pocket and body flag notes")
     rebuild_drawing(adapter, label="crank-handle-butt-cup layout audit")
     check_drawing_layout(adapter, layout=SPEC.layout, stem=PART_STEM)
     return await finalize_drawing(

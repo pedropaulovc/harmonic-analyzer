@@ -91,7 +91,12 @@ def test_running_fit_names_its_mate_and_the_sheet_carries_no_gdt() -> None:
     import _config
 
     block = _config.parts("dt-pinion-pivot-block")["number"]
-    assert drawing.DIMENSION_CALLOUTS["ShaftDia"] == f"RUNNING FIT IN\n{block} BORES"
+    # The band is narrower than the turned-diameter row, so the callout names
+    # the matched-fit route with the clearance the printed limits give.
+    shaft_dia = drawing.DIMENSION_CALLOUTS["ShaftDia"]
+    assert len(shaft_dia.split("\n")) <= 2
+    assert block in shaft_dia
+    assert "CLEARANCE" in shaft_dia
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "add_feature_control_frame(" not in source
     assert "add_datum_feature(" not in source
@@ -102,12 +107,11 @@ def test_running_fit_names_its_mate_and_the_sheet_carries_no_gdt() -> None:
     assert "leader_attach_xy=BEARING_FINISH_EDGE" in source
     assert drawing.BEARING_FINISH_EDGE[1] == drawing.SHAFT_UPPER_FLANK_Y
     assert "char_height=FINISH_CHAR_HEIGHT" in source
-    # The diameter stands outside the front end, short of DETAIL A's fence
-    # (inside the border: left of the back end it ran over it, r3); the
-    # pin-hole callout under the bar, left of the front hole it leads to.
+    # The diameter's two fit lines stand right of the front end, over DETAIL
+    # A, clear of the pin-hole leader (round 1) and the border (r3).
     assert drawing.PROFILE_KEEP["ShaftDia"][0] > drawing.FRONT_END_X
-    assert drawing.PROFILE_KEEP["ShaftDia"][0] < (
-        drawing.DETAIL_CENTER[0] - drawing._DETAIL_FENCE_R - 0.020
+    assert drawing.DETAIL_CENTER[1] + drawing._DETAIL_FENCE_R < (
+        drawing.PROFILE_KEEP["ShaftDia"][1] - 0.008
     )
     assert drawing.PROFILE_KEEP["PinHoleDia"][1] < drawing.SHAFT_LOWER_FLANK_Y
     assert drawing.PROFILE_KEEP["PinHoleDia"][0] < drawing.FRONT_PIN_X - 0.030
@@ -154,28 +158,17 @@ def test_set_pin_holes_print_only_size_and_the_match_drill() -> None:
     assert not any(name.startswith("PinHole") and name.endswith("Z") for name in marked)
     callout = drawing.DIMENSION_CALLOUTS["PinHoleDia"]
     # The hole specification only (Main's re-ruling, 2026-09-26): the
-    # drilling pose is MHA-DT-00's SHAFT DRILL SET, and the sheet points at
-    # that step through the registry, so a renumbered sequence carries it
-    # (Codex #858, PRRT_kwDOPHDy386mTbPB).  The pointer is sheet text: the
-    # part's spec never reads the registry (Main's TbPB ruling 1).
+    # drilling pose is MHA-DT-00's SHAFT DRILL SET, whose step names the hole;
+    # the callout keeps the match-drill, its strap and the pin's fit (rule 7:
+    # at most two lines of words).
     import _config
-    import dt_drive_train_steps
 
-    key = drawing.SHAFT_DRILL_STEP_KEY
-    assert key == "straps-pinned-to-torque-shaft"
-    assert dt_pinion_pivot_shaft_spec.PIN_HOLE_CALLOUT.split("\n") == [
-        "MATCH-DRILL THRU AT ASSEMBLY",
-        "IN MHA-DT-14 CROSS HOLES, 2 PL",
-    ]
     pin = _config.parts("dt-vn-pinion-strap-pin")["number"]
-    assert callout == (
-        f"{dt_pinion_pivot_shaft_spec.PIN_HOLE_CALLOUT},\n"
-        f"PRESS FIT FOR {pin} SPRING PIN,\n"
-        f"PER {dt_drive_train_steps.step_ref(key)}"
-    )
-    assert "dt_drive_train_steps" not in Path(
-        dt_pinion_pivot_shaft_spec.__file__
-    ).read_text(encoding="utf-8")
+    strap = _config.parts("dt-pinion-bracket")["number"]
+    assert len(callout.split("\n")) <= 2
+    assert strap in callout and pin in callout
+    # Sheet text: a wording edit never re-keys the part.
+    assert not hasattr(dt_pinion_pivot_shaft_spec, "PIN_HOLE_CALLOUT")
     assert dt_pinion_pivot_shaft_spec.PIN_HOLE_DIA == 25.4 / 16.0
     assert dt_pinion_pivot_shaft_spec.PIN_HOLE_BAND == pytest.approx(
         (0.0025 * 25.4, 0.0)

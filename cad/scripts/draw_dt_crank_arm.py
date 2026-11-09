@@ -72,6 +72,7 @@ from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
 from dt_crank_arm_notes import (
+    ANCHOR_TAP_ROWS,
     FIDUCIAL_CALLOUT,
     HUB_SEAT_CALLOUT,
     PIVOT_TAP_ROWS,
@@ -505,9 +506,10 @@ async def build(adapter: Any) -> dict[str, str]:
         _sheet_x(ARM_C2C),
         FRONT_CENTER[1] + _HANDLE_PIVOT_HOLE_DIA * SHEET_SCALE[0] / 2000.0,
     )
-    # Anchor tap: size and THRU on a native Hole Wizard callout; its
-    # station from the bore axis and its offset from the top long edge are the
-    # part's StationReference dims imported above.
+    # Anchor tap (#2-56, MHA-DT-VN-70): size and THRU on a native Hole Wizard
+    # callout, its edge wall under them (rule 20); its station from the bore
+    # axis and its .XXX offset from the top long edge are the part's
+    # StationReference dims imported above.
     anchor_edge = (
         _sheet_x(ANCHOR_SCREW_X),
         FRONT_CENTER[1]
@@ -522,6 +524,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _omit_title_block_thread_class(anchor_callout)
     _tap_drill_precision(anchor_callout, "anchor tap")
+    _append_callout_rows(anchor_callout, ANCHOR_TAP_ROWS)
     # The true overall (boss extreme to handle-end extreme), as a reference
     # below the pivot station so nobody saws the stock a radius short
     # (Harvey #25).  Both ends are arcs, each picked on its outer flank and
@@ -598,7 +601,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # the hole's top rim, clear of the full principal view.  Thread and tap
     # drill ride the native callout; the class is the title block's.  The
     # mate and mouth limit follow the thread row, so the callout names this
-    # tap, not the identical anchor.
+    # tap and its face.
     pivot_callout = add_native_hole_callout(
         adapter,
         front,

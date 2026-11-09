@@ -108,6 +108,7 @@ from dt_cone_tip_block_spec import ADJUSTER_ENGAGEMENT_ASSEMBLY_FACT, ADJUSTER_T
 import dt_crank_drive_gear_spec as gear64
 import dt_crank_handle_pivot_screw_spec as handle_screw
 from dt_crank_hub_notes import FRONT_FACE_DATUM as HUB_FRONT_FACE_DATUM
+from dt_crank_pin_ring_spec import BUTT_GAP_BAND as RING_BUTT_GAP_BAND
 import dt_crank_pinion_spec as pinion
 from dt_crank_pinion_spec import SEAT_FEELER_MM as PINION_SEAT_FEELER
 from dt_crankshaft_spec import SHAFT_END_PROUD_RANGE as CRANK_END_PROUD_RANGE
@@ -157,7 +158,6 @@ import rocker_bank_layout as rockers
 import dt_vn_cone_lock_knob_spec as lock_knob
 import dt_vn_cone_pivot_screw_spec as pivot_screw
 import dt_vn_cone_tip_collar_spec as tip_collar
-from dt_vn_keeper_chain_spec import BEAD_COUNT as KEEPER_CHAIN_BEADS
 import dt_vn_post_mount_screw_spec as post_screw
 import dt_swing_stop_screw_spec as stop_screw
 
@@ -566,10 +566,8 @@ BOM_PART_NUMBERS = {
     "dt-crank-arm": "MHA-DT-06",
     "dt-crank-pin": "MHA-DT-09",
     "dt-crank-pin-ring": "MHA-DT-27",
-    "dt-crank-pin-eye": "MHA-DT-28",
     "dt-vn-keeper-chain": "MHA-DT-VN-65",
-    "dt-vn-keeper-chain-link": "MHA-DT-VN-66",
-    "sh-vn-brass-fillister-screw": "MHA-SH-VN-51",
+    "dt-vn-keeper-chain-screw": "MHA-DT-VN-70",
     "dt-crank-handle": "MHA-DT-08",
     "dt-crank-handle-ferrule": "MHA-DT-34",
     "dt-crank-handle-butt-cup": "MHA-DT-35",
@@ -621,10 +619,10 @@ BOM_DESCRIPTIONS = {
     "dt-crank-arm": "CRANK ARM",
     "dt-crank-pin": "CRANK TAPER PIN, 1:48",
     "dt-crank-pin-ring": "TAPER PIN KEEPER RING",
-    "dt-crank-pin-eye": "KEEPER CHAIN ANCHOR EYE",
-    "dt-vn-keeper-chain": "#3 BRASS BEAD CHAIN, MCMASTER 3606T118",
-    "dt-vn-keeper-chain-link": "LOOP LINK, MCMASTER 3606T811",
-    "sh-vn-brass-fillister-screw": "#4-40 BRASS FILLISTER, MCMASTER 90114A511",
+    "dt-vn-keeper-chain": "#18 BRASS JACK CHAIN, MCMASTER 3603T354",
+    # With "BRASS" the row runs 44 characters, past the column's one-line
+    # limit; the registry's material row names the brass.
+    "dt-vn-keeper-chain-screw": "#2-56 BINDING HEAD, MCMASTER 92443A077",
     "dt-crank-handle": "CRANK HANDLE",
     "dt-crank-handle-ferrule": "CRANK HANDLE FERRULE",
     "dt-crank-handle-butt-cup": "CRANK HANDLE BUTT CUP",
@@ -981,14 +979,19 @@ CONE_CRANK_STEPS = _note_text(
         "   MATCH-DRILL/REAM THE SEAM PER MHA-DT-31; DRIVE MHA-DT-VN-59 FLUSH. SLIDE",
         f"   ONTO MHA-DT-11, SET HUB FRONT FACE FLUSH WITH THE {HUB_FRONT_FACE_DATUM},",
         "   PUNCH MARKS ALIGNED; ONLY THEN TAPER-REAM 1:48 THROUGH HUB AND",
-        "   SHAFT; LIGHT-DRIVE MHA-DT-09, REMOVABLE BY TAP ON SMALL END. HANG",
-        # Codex #1140: the keeper chain's length and topology belong on the
-        # sheet; the bead count is the spec's solve, never a typed number.
-        # Pipeline review of 49287772c: the ream's acceptance (the ring clear
-        # of the hub) is an assembly setting, stated here, not on MHA-DT-31.
-        "   MHA-DT-27 FROM THE PIN HEAD, CLEAR OF THE HUB; CLAMP MHA-DT-28 UNDER MHA-SH-VN-51. CUT MHA-DT-VN-65",
-        f"   TO {KEEPER_CHAIN_BEADS} BEADS; THREAD IT THROUGH THE MHA-DT-28 LOOP AND MHA-DT-27; SNAP",
-        "   ONE END BEAD INTO EACH DOME OF MHA-DT-VN-66.",
+        "   SHAFT; LIGHT-DRIVE MHA-DT-09, REMOVABLE BY TAP ON SMALL END.",
+        # Owner ruling 2026-11-08 (#2144 item 9.2): one open strand of jack
+        # chain, its end link screwed flat to the arm through its eye, the
+        # ring closed with pliers through the far link's eye; the cut length
+        # prints on MHA-DT-VN-65's own sheet.  Pipeline review of 49287772c:
+        # the ream's acceptance (the ring clear of the hub) is an assembly
+        # setting, stated here, not on MHA-DT-31.
+        "   SCREW THE END LINK OF MHA-DT-VN-65 FLAT TO MHA-DT-06 WITH MHA-DT-VN-70",
+        "   THROUGH ITS EYE; THREAD MHA-DT-27 THROUGH THE PIN'S CROSS-HOLE AND THE",
+        "   FAR LINK'S EYE, CLOSE IT WITH PLIERS (BUTT GAP 0-"
+        + f"{RING_BUTT_GAP_BAND[1] / 25.4:.3f}".removeprefix("0")
+        + "); HANG MHA-DT-27",
+        "   FROM THE PIN HEAD, CLEAR OF THE HUB.",
         # Local review of 747487c71: the cup cures centred on the screw, or
         # its offset can bind the head and shoulder.  Owner ruling 2026-10-24
         # (#1900): the ferrule cures centred on the pivot bore, the offset

@@ -39,6 +39,12 @@ import _drawing_hidden_sketches as hidden_sketches
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leader_notes import add_leader_note
 import _drawing_leaders
+from _drawing_attachment import _is_same_attachment
+from _drawing_edge_dimensions import (
+    add_edge_dimension,
+    assert_dimension_measures,
+)
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
@@ -56,6 +62,7 @@ from dt_cone_tip_block_spec import (
     BLOCK_Z,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    DRAWING_REFERENCE_PRECISION,
     FOOT_BORE_DIA,
     FOOT_DEPTH,
     FOOT_DEPTH_PLACES,
@@ -109,10 +116,10 @@ _S = SHEET_SCALE[0] / SHEET_SCALE[1] / 1000.0
 FRONT_CENTER = (0.072, 0.132)
 TOP_CENTER = (FRONT_CENTER[0], 0.2395)
 BOTTOM_CENTER = (FRONT_CENTER[0], 0.0382)
-# The right view and the removed views B and C stand on the front view's
-# projection row; their x follows from the adjuster callout between the front
-# and right views (RIGHT_CENTER, below).
-# The 2:1 isometric (38 x 108 mm) stands right of VIEW C, past its top.
+# The right view and the removed VIEW B stand on the front view's projection
+# row; their x follows from the adjuster callout between the front and right
+# views (RIGHT_CENTER, below).
+# The 2:1 isometric (38 x 108 mm) stands right of the row, past its top.
 ISO_CENTER = (0.365, 0.209)
 # Every view centres on the prism, whose centre is the model origin.
 Z_NORTH = BLOCK_Z / 2.0
@@ -159,8 +166,8 @@ ROUND_OUT = 0.0001
 # and its leader climbed ~28 mm over the front view to the rim, ~16 mm
 # further than the hole's approach from the right face, reading as an edge of
 # the part.  The short way in is from the right face, so the callout stands
-# right of the hole with its ADJUSTER ENTRY name over it (review: named above
-# the thread callout it describes): the name's top keeps the height it took
+# right of the hole with the shaft-tip flag over it (review: named above
+# the thread callout it describes): the flag's top keeps the height it took
 # an arrow clearance (plus half an arrowhead) under the slit floor's depth
 # witness, which no longer prints (machinist review of e04fd60ab: the floor
 # stands inside the bore, dt_cone_tip_block_spec), so the right-hand views
@@ -177,8 +184,10 @@ ROUND_OUT = 0.0001
 # render the shoulder ran 29.0 mm right of the callout's point, 1.2 mm past
 # I31's 27.8, and stopped 0.3 mm short of the right view's north face.
 ADJUSTER_CALLOUT_EXTENT = (0.0295, 0.0086, 0.0290, 0.0078)
-# The name's ink from its upper-left corner (287c: 36.3 x 3.4 mm).
-ADJUSTER_ENTRY_EXTENT = (0.0, 0.0036, 0.0365, 0.0)
+# The flag's ink from its upper-left corner: ADJUSTER ENTRY's fourteen
+# glyphs measured 36.3 x 3.4 mm (287c); its 21 glyphs at that pitch, rounded
+# out.  An estimate until a render measures it.
+ADJUSTER_ENTRY_EXTENT = (0.0, 0.0036, 0.0560, 0.0)
 ADJUSTER_LEADER_ANGLE = math.radians(37.0)
 ADJUSTER_FLOOR_GAP = _drawing_leaders.ARROW_TEXT_CLEARANCE + ARROW_HALF_WIDTH + ROUND_OUT
 ADJUSTER_ENTRY_Y = _elevation_y(BLOCK_HEIGHT - SLIT_DEPTH, FRONT_CENTER) - ADJUSTER_FLOOR_GAP
@@ -217,7 +226,6 @@ _RIGHT_NORTH_FACE_X = (
 VIEW_ROW_PITCH = 0.072
 RIGHT_CENTER = (_RIGHT_NORTH_FACE_X + Z_NORTH * _S, FRONT_CENTER[1])
 LEFT_CENTER = (RIGHT_CENTER[0] + VIEW_ROW_PITCH, FRONT_CENTER[1])
-BACK_CENTER = (RIGHT_CENTER[0] + 2.0 * VIEW_ROW_PITCH, FRONT_CENTER[1])
 # The 1.2 slot prints 2.4 mm wide, narrower than its value, so the arrows
 # stand outside the slot walls and the text sits right of the right arrow's
 # tail on the extended dimension line.  Right, because on the adjuster
@@ -237,9 +245,9 @@ SLIT_ROW_LEFT = SLIT_W * _S / 2.0 + 0.0064 + TEXT_CLEARANCE + ROUND_OUT
 DIMENSION_CALLOUTS = {
     # The adjuster thread runs through the block's depth: its length is the
     # cup screw's engagement window (build_dt_drive_train_assembly's embed
-    # stack).  Separate the full number at the existing font size; the whole
+    # stack).  Two rows of words (round-1 farm review, dt-fab-4); the whole
     # value/mate block sits on a native offset shelf right of the plan.
-    "Depth": "SETS\nMHA-DT-VN-55\nENGAGEMENT",
+    "Depth": "SETS MHA-DT-VN-55\nENGAGEMENT",
 }
 DIMENSION_CALLOUTS_ABOVE = {
     # The +X face stands over the platform's narrow west edge
@@ -247,7 +255,8 @@ DIMENSION_CALLOUTS_ABOVE = {
     # rule 4's few words of reason name the edge it keeps inside (machinist
     # review of c4c0e848a: "STAYS ON" named no feature).
     "Width": "WITHIN MHA-DT-20 EDGE",
-    "PassageCenter": "LOCATES MHA-DT-04 TIP",
+    # Screen review (dt-fab-4): a location carries its value only; the
+    # shaft-tip function moved to the bore's callout (BORE_FLAG_TEXT).
     # Machinist review of e04fd60ab (clarity, gating): the slit depth's floor
     # stands inside the Ø4.04 bore, so its lower extension line ended on no
     # drawn edge and its 15.2 read against 52.7 - 38.10 = 14.6 to the bore
@@ -277,19 +286,11 @@ AXIS_HEIGHT_LINE_DX = 0.031
 BLOCK_HEIGHT_LINE_DX = 0.052
 # The width's value and its function line are wider than its span, so they
 # stand right of the +X extension line on the extended dimension line, 3.5
-# mm under the foot (5 until the tap's callout grew a mate line, machinist
-# review of c4c0e848a): the hold-down tap's callout below keeps the air the
-# view-crowding check asks (the shorter box's height) under them.
+# mm under the bottom view's south edge.  Round-1 farm review (dt-fab-4):
+# the width moved off the front view's foot, which now carries the seat's
+# finish symbol; the base sketch's width reads in the view of the foot.
 WIDTH_LINE_DROP = 0.0035
 FRONT_KEEP = {
-    "Width": (
-        FRONT_CENTER[0]
-        + BLOCK_X * _S / 2.0
-        + TEXT_CLEARANCE
-        + ROUND_OUT
-        + _callout_half_width(DIMENSION_CALLOUTS_ABOVE["Width"]),
-        _elevation_y(0.0, FRONT_CENTER) - WIDTH_LINE_DROP + TWO_ROW_LINE_DROP,
-    ),
     "BlockHt": (FRONT_CENTER[0] - BLOCK_HEIGHT_LINE_DX, FRONT_CENTER[1]),
     "SlitW": (
         FRONT_CENTER[0]
@@ -300,8 +301,9 @@ FRONT_KEEP = {
 }
 # PassageCenter stands above SlitW on the adjuster elevation, its line
 # 21.2 mm over the block's top; the plan's north edge is the ceiling for
-# both.
-PASSAGE_CENTER_RISE = 0.0212 + TWO_ROW_LINE_DROP
+# both.  A single-row value prints its line 2.8 mm under it
+# (HORIZONTAL_LINE_DROP, defined with the ink audit below).
+PASSAGE_CENTER_RISE = 0.0212 + 0.0028
 # swDimensionArrowsSide_e, set rather than left to the document's smart
 # arrows: swDimArrowsOutside = 1, swDimArrowsInside = 0.  The 4.875's short
 # span leaves no room for inside arrows (d84a42ca7: the 4.875's line and
@@ -379,20 +381,49 @@ BOTTOM_KEEP = {
         FOOT_TAP_Z_LINE_X,
         (_bottom_y(Z_NORTH) + FOOT_TAP_CENTER[1]) / 2.0,
     ),
+    "Width": (
+        _BOTTOM_RIGHT
+        + TEXT_CLEARANCE
+        + ROUND_OUT
+        + _callout_half_width(DIMENSION_CALLOUTS_ABOVE["Width"]),
+        _bottom_y(Z_SOUTH) - WIDTH_LINE_DROP + TWO_ROW_LINE_DROP,
+    ),
 }
-# The bottom-row captions sit just under the views' feet.
+# Round-1 farm review (dt-fab-4, rule 7): VIEW B's far-jaw thread is located
+# in its own view by two driven drawing dimensions that mirror the right
+# view's stations: from the north face (VIEW B's right edge, as it looks from
+# -X) and from the foot, both to the hole's centre.  The depth's value stands
+# over the view as the right view's does; the height's line stands right of
+# the view, clear of the thread callout's leader from the upper left.
+_LEFT_NORTH_X = LEFT_CENTER[0] + Z_NORTH * _S
+VIEW_B_DIMENSIONS = {
+    "ViewBPinchDepth": (
+        LEFT_CENTER[0] + BLOCK_Z * _S / 4.0,
+        _elevation_y(BLOCK_HEIGHT, LEFT_CENTER) + 0.007,
+    ),
+    "ViewBPinchHeight": (
+        _LEFT_NORTH_X + 0.010,
+        _elevation_y(PINCH_HEIGHT / 2.0, LEFT_CENTER),
+    ),
+}
+# VIEW B's letter caption sits just under its foot; the projected right and
+# bottom views carry none (rule 9).
 CAPTION_Y = _elevation_y(0.0, FRONT_CENTER) - 0.004
-BOTTOM_CAPTION_XY = (BOTTOM_CENTER[0] - 0.0168, _bottom_y(Z_SOUTH) - 0.004)
-# Review C1: the left and rear views sit right of the right view, out of
-# third-angle order, so each is a removed view named by a letter arrow on the
-# view that shows the face it looks at.  VIEW B looks at the -X (pinch-thread)
-# face: the arrow meets the front view's left edge between the axis-height
-# and block-top extension lines.  VIEW C looks at the -Z (shaft-entry) face,
-# from the plan's upper (south) end, left of the A-A cutting-plane stem.
-# Each pair is (note upper-left, leader tip), sheet metres.
-# The letters match the A-A cutting-plane letters (~5 mm, run 6cab17f6), and
-# each note sits square to its face so the leader reads as a viewing arrow:
-# B level with its tip, C centred above its tip.
+# A one-line "VIEW B": six glyphs at the 287c captions' 2.6 mm pitch, rounded
+# out.  An estimate until a render measures it.
+VIEW_CAPTION_EXTENT = (0.0, 0.0036, 0.0160, 0.0)
+# The shaft tip the bore locates, named at the bore's callout (screen review
+# dt-fab-4: the location carries its value only, rule 4).
+BORE_FLAG_TEXT = "LOCATES MHA-DT-04 TIP"
+# Review C1: the left view sits right of the right view, out of third-angle
+# order, so it is a removed view named by a letter arrow on the view that
+# shows the face it looks at.  VIEW B looks at the -X (pinch-thread) face:
+# the arrow meets the front view's left edge between the axis-height and
+# block-top extension lines.  The pair is (note upper-left, leader tip),
+# sheet metres.  The letter is ~5 mm (run 6cab17f6) and sits square to its
+# face, level with its tip, so the leader reads as a viewing arrow.  Round-1
+# farm review (dt-fab-4): the rear view (VIEW C) repeated the front view's
+# outline and through bore, so it and its arrow are gone.
 VIEW_LETTER_HEIGHT = 0.005
 _VIEW_B_TIP_Y = _elevation_y((ADJUSTER_AXIS_HEIGHT + BLOCK_HEIGHT) / 2.0, FRONT_CENTER)
 VIEW_B_ARROW = (
@@ -401,11 +432,6 @@ VIEW_B_ARROW = (
         _VIEW_B_TIP_Y + VIEW_LETTER_HEIGHT / 2.0,
     ),
     (FRONT_CENTER[0] - BLOCK_X * _S / 2.0, _VIEW_B_TIP_Y),
-)
-# 287c: at +0.013 the letter C stood 0.5 mm under an arrow tail.
-VIEW_C_ARROW = (
-    (TOP_CENTER[0] - 0.006 - 0.0018, _plan_y(Z_SOUTH) + 0.0105),
-    (TOP_CENTER[0] - 0.006, _plan_y(Z_SOUTH)),
 )
 # The adjuster's hole callout is placed with the view row (ADJUSTER_CALLOUT_*,
 # above).
@@ -424,25 +450,58 @@ VIEW_C_ARROW = (
 # it.  The shoulder's right end now stands far enough right that the leader
 # meets the rim PINCH_CLEARANCE_LEADER_ANGLE off vertical (17.4 mm past the
 # centre); it still enters through the view's top, under a millimetre
-# longer over the part than the hole's approach from the south face.  The
-# literals are PINCH_CLEARANCE_CALLOUT_EXTENT's drop (0.0030) and right
-# reach (0.0264), defined with the other callout extents below.
-PINCH_CLEARANCE_CALLOUT_Y = 0.2013
+# longer over the part than the hole's approach from the south face.
+#
+# Round 8 (fit-up route): the callout gains the joint drill's line over its
+# own and "THIS JAW " in its own.  On the round-8 render (run
+# 20261107T184300356Z) the callout glyphs printed 2.35 mm wide and its rows
+# 5.7 mm apart; SolidWorks centres a callout's lines on the commanded point.
+# The point rises half a row and slides left half the growth so the
+# shoulder's right end, where the leader leaves, keeps its place.
+CALLOUT_TEXT_GLYPH = 0.00235
+CALLOUT_TEXT_ROW = 0.0057
+_PINCH_CLEARANCE_GROWTH = 0.0196 + len("THIS JAW ") * CALLOUT_TEXT_GLYPH
+PINCH_CLEARANCE_CALLOUT_EXTENT = (
+    0.0150 + _PINCH_CLEARANCE_GROWTH / 2.0,
+    0.0030 + CALLOUT_TEXT_ROW / 2.0,
+    0.0166 + _PINCH_CLEARANCE_GROWTH / 2.0,
+    0.0023 + CALLOUT_TEXT_ROW / 2.0,
+)
+_PINCH_CLEARANCE_SHOULDER_Y = 0.2013 - 0.0030
+PINCH_CLEARANCE_CALLOUT_Y = _PINCH_CLEARANCE_SHOULDER_Y + PINCH_CLEARANCE_CALLOUT_EXTENT[1]
 PINCH_CLEARANCE_LEADER_ANGLE = math.radians(35.0)
 _PINCH_CLEARANCE_SHOULDER_DX = (
-    PINCH_CLEARANCE_CALLOUT_Y - 0.0030 - _elevation_y(PINCH_HEIGHT, RIGHT_CENTER)
+    _PINCH_CLEARANCE_SHOULDER_Y - _elevation_y(PINCH_HEIGHT, RIGHT_CENTER)
 ) * math.tan(PINCH_CLEARANCE_LEADER_ANGLE)
 PINCH_CLEARANCE_CALLOUT_XY = (
-    RIGHT_CENTER[0] + _PINCH_CLEARANCE_SHOULDER_DX - 0.0264,
+    RIGHT_CENTER[0] + _PINCH_CLEARANCE_SHOULDER_DX - PINCH_CLEARANCE_CALLOUT_EXTENT[2],
     PINCH_CLEARANCE_CALLOUT_Y,
 )
-# The pinch thread callout stands above VIEW B, its shoulder's left end far
-# enough right of the hole that the leader drops steeply through the 2:1
-# view's top (16 mm right of centre ran 4.2 mm longer than the hole's
-# shortest approach; so did 19 mm once the prism's depth fell to 9.75).
-PINCH_THREAD_CALLOUT_XY = (LEFT_CENTER[0] + 0.015, 0.1978)
+# The pinch thread callout stands above VIEW B, its shoulder's left end left
+# of the hole so the leader drops steeply through the 2:1 view's top.  Its
+# shoulder (0.0085 under its point) stands a text clearance over VIEW B's own
+# depth value (round-1 farm review, dt-fab-4), whose line and arrows run
+# right of the hole's centre.  Round 8: its longest line grows from "4-40 UNC
+# - 2B TO SLOT" to "Ø .089 DRILL THRU BOTH JAWS", six glyphs; the point slides
+# right half that so the shoulder's left end, where the leader leaves, keeps
+# its place.
+_PINCH_THREAD_GROWTH = 6 * CALLOUT_TEXT_GLYPH
+PINCH_THREAD_CALLOUT_EXTENT = (
+    0.0322 + _PINCH_THREAD_GROWTH / 2.0,
+    0.0085,
+    0.0310 + _PINCH_THREAD_GROWTH / 2.0,
+    0.0078,
+)
+PINCH_THREAD_CALLOUT_XY = (
+    LEFT_CENTER[0] + 0.015 + _PINCH_THREAD_GROWTH / 2.0,
+    VIEW_B_DIMENSIONS["ViewBPinchDepth"][1]
+    + VALUE_TEXT_HALF_HEIGHT
+    + TEXT_CLEARANCE
+    + ROUND_OUT
+    + PINCH_THREAD_CALLOUT_EXTENT[1],
+)
 # The hold-down tap's callout stands above the bottom view, right of the
-# FootTapX value and under the front view's Width text, so its leader drops
+# FootTapX value and under the front view's foot finish, so its leader drops
 # steeply (53 degrees) through the view's north edge.  With the tap 1.00
 # toward -X (2026-09-29) a callout right of the view ran 5.4 mm longer over
 # the part than the tap's shortest approach.  SolidWorks centres the block
@@ -451,62 +510,42 @@ PINCH_THREAD_CALLOUT_XY = (LEFT_CENTER[0] + 0.015, 0.1978)
 # the edge the shoulder clears it by 1.65, as the two-line block's did, and
 # the block's left end stands 8.5 mm right of the tap.
 FOOT_TAP_CALLOUT_XY = (FOOT_TAP_CENTER[0] + 0.0373, _bottom_y(Z_NORTH) + 0.0100)
-# The locating foot's finish symbol, on the elevation named here.  On the
-# front view (287c) its "Ra 3.2" stood 0.2 mm off an arrow, and no leader can
-# reach that foot without crossing the width's extension or dimension line.
-# VIEW C shows the same foot edge-on with nothing dimensioned under it.
-# Blind machinist review of c289ee94: 13 mm under the foot its shoulder
-# printed 1.2 mm over the title block's top line and read as touching it;
-# 11.5 mm splits the air, ~2.7 mm to that line and ~2.5 mm from the symbol's
-# top to the foot.
-FOOT_FINISH_CENTER = BACK_CENTER
+# The locating foot's finish symbol, on the front view's foot edge (round-1
+# farm review, dt-fab-4: the seat that stands on MHA-DT-20).  The width
+# dimension that once ran under that foot reads in the bottom view, so the
+# leader reaches the foot edge-on with nothing dimensioned under it.  Blind
+# machinist review of c289ee94: 11.5 mm under the foot leaves ~2.5 mm from
+# the symbol's top to the foot.
 FOOT_FINISH_DX = 0.034
 FOOT_FINISH_DROP = 0.0115
 
 
-def _adjuster_axis_keep(
-    adjuster_center: tuple[float, float],
-) -> dict[str, tuple[float, float]]:
-    """The adjuster-axis values, kept on whichever elevation shows its entry."""
+def _adjuster_axis_keep() -> dict[str, tuple[float, float]]:
+    """The adjuster-axis values, kept on the front view."""
     # r3: PassageCenter measures from the -X face (PASSAGE_CENTER_DATUM), so
-    # its value stands over the -X half of whichever elevation shows it.
-    minus_x_side = -1.0 if adjuster_center == FRONT_CENTER else 1.0
+    # its value stands over the front view's -X (left) half.
     return {
         "AxisHeight": (
-            adjuster_center[0] - AXIS_HEIGHT_LINE_DX,
-            _elevation_y(ADJUSTER_AXIS_HEIGHT / 2.0, adjuster_center),
+            FRONT_CENTER[0] - AXIS_HEIGHT_LINE_DX,
+            _elevation_y(ADJUSTER_AXIS_HEIGHT / 2.0, FRONT_CENTER),
         ),
         "PassageCenter": (
-            adjuster_center[0] + minus_x_side * BLOCK_X * _S / 4.0,
-            _elevation_y(BLOCK_HEIGHT, adjuster_center) + PASSAGE_CENTER_RISE,
+            FRONT_CENTER[0] - BLOCK_X * _S / 4.0,
+            _elevation_y(BLOCK_HEIGHT, FRONT_CENTER) + PASSAGE_CENTER_RISE,
         ),
     }
 
 
-def _adjuster_callout_xy(adjuster_center: tuple[float, float]) -> tuple[float, float]:
-    return (adjuster_center[0] + ADJUSTER_CALLOUT_DX, ADJUSTER_CALLOUT_Y)
+ADJUSTER_CALLOUT_XY = (FRONT_CENTER[0] + ADJUSTER_CALLOUT_DX, ADJUSTER_CALLOUT_Y)
 
 
-def _sheet_notes(
-    adjuster_center: tuple[float, float],
-) -> tuple[tuple[str, float, float], ...]:
+def _sheet_notes() -> tuple[tuple[str, float, float], ...]:
     """Every free note this sheet adds: (text, upper-left x, upper-left y)."""
-    # The through thread shows the same rim from both ends; VIEW C (the
-    # opposite elevation) is the shaft's entry.
-    shaft_entry_center = BACK_CENTER if adjuster_center == FRONT_CENTER else FRONT_CENTER
     return (
-        ("VIEW C\nSHAFT ENTRY", shaft_entry_center[0] - 0.021, CAPTION_Y),
-        # 8.5 mm right of its old place (machinist review of c4c0e848a): the
-        # Width's mate line ends above its upper-left corner.
-        ("RIGHT VIEW\nPINCH CLEARANCE ENTRY", RIGHT_CENTER[0] - 0.0175, CAPTION_Y),
-        ("VIEW B\nPINCH THREAD ENTRY", LEFT_CENTER[0] - 0.023, CAPTION_Y),
-        ("BOTTOM VIEW\nHOLD-DOWN TAP", *BOTTOM_CAPTION_XY),
+        # The removed view's caption is its letter, centred under it.
+        ("VIEW B", LEFT_CENTER[0] - VIEW_CAPTION_EXTENT[2] / 2.0, CAPTION_Y),
         # Review: named above the thread callout it describes.
-        (
-            "ADJUSTER ENTRY",
-            adjuster_center[0] + ADJUSTER_ENTRY_DX,
-            ADJUSTER_ENTRY_Y,
-        ),
+        (BORE_FLAG_TEXT, FRONT_CENTER[0] + ADJUSTER_ENTRY_DX, ADJUSTER_ENTRY_Y),
     )
 
 
@@ -570,6 +609,7 @@ _VALUE_EXTENTS = {
         for name, nominal in (
             ("AxisHeight", ADJUSTER_AXIS_HEIGHT),
             ("PinchHeight", PINCH_HEIGHT),
+            ("PassageCenter", BLOCK_X / 2.0),
             ("FootTapX", FOOT_TAP_X),
             ("FootTapZ", FOOT_TAP_Z),
         )
@@ -579,27 +619,16 @@ _VALUE_EXTENTS = {
         for name, nominal, text in (
             ("Depth", BLOCK_Z, DIMENSION_CALLOUTS["Depth"]),
             ("Width", BLOCK_X, DIMENSION_CALLOUTS_ABOVE["Width"]),
-            ("PassageCenter", BLOCK_X / 2.0, DIMENSION_CALLOUTS_ABOVE["PassageCenter"]),
             # "1.20" under its SLOT INTO BORE row.
             ("SlitW", SLIT_W, DIMENSION_CALLOUTS_ABOVE["SlitW"]),
         )
     },
 }
 # Hole callouts: every line plus the shoulder the leader leaves from
-# (ADJUSTER_CALLOUT_EXTENT is with the adjuster callout's placement).
-# r3: "Ø 3.26 ↓ 6.9" measured 28.5 mm of text (I31); "Ø 2.26 TO SLOT" on
-# the same sheet 33.7 mm.  "Ø 3.26 DRILL TO SLOT" adds "DRILL " (six glyphs at
-# the 2.4 mm that line averages) to the latter: 19.6 mm over the old text,
-# split both sides of the commanded point as SolidWorks centres it.  An
-# estimate until a render measures it.
-_PINCH_CLEARANCE_TEXT_GROWTH = 0.0196
-PINCH_CLEARANCE_CALLOUT_EXTENT = (
-    0.0150 + _PINCH_CLEARANCE_TEXT_GROWTH / 2.0,
-    0.0030,
-    0.0166 + _PINCH_CLEARANCE_TEXT_GROWTH / 2.0,
-    0.0023,
-)
-PINCH_THREAD_CALLOUT_EXTENT = (0.0322, 0.0085, 0.0310, 0.0078)
+# (ADJUSTER_CALLOUT_EXTENT is with the adjuster callout's placement, the
+# pinch callouts' with theirs).  r3: "Ø 3.26 ↓ 6.9" measured 28.5 mm of text
+# (I31); "Ø 2.26 TO SLOT" on the same sheet 33.7 mm; "DRILL " added 19.6 mm,
+# the 0.0196 in the pinch clearance callout's growth.
 # The hold-down tap's lines (the tap drill and its depth, the thread and its
 # full-thread depth, then the mate its stations locate on) plus the
 # shoulder, measured on the c4c0e848a render: SolidWorks centres the block
@@ -609,12 +638,8 @@ FOOT_TAP_QUALIFIER = "LOCATES ON MHA-DT-20"
 FOOT_TAP_CALLOUT_EXTENT = (0.0293, 0.0086, 0.0293, 0.0080)
 # Free notes are placed by their upper-left corner.
 _NOTE_EXTENTS = {
-    "ADJUSTER ENTRY": ADJUSTER_ENTRY_EXTENT,
-    "RIGHT VIEW\nPINCH CLEARANCE ENTRY": (0.0, 0.0081, 0.0581, 0.0),
-    "VIEW B\nPINCH THREAD ENTRY": (0.0, 0.0081, 0.0476, 0.0),
-    "VIEW C\nSHAFT ENTRY": (0.0, 0.0081, 0.0278, 0.0),
-    # Thirteen glyphs of "HOLD-DOWN TAP" at SHAFT ENTRY's width per glyph.
-    "BOTTOM VIEW\nHOLD-DOWN TAP": (0.0, 0.0081, 0.0335, 0.0),
+    BORE_FLAG_TEXT: ADJUSTER_ENTRY_EXTENT,
+    "VIEW B": VIEW_CAPTION_EXTENT,
 }
 # The locating-foot finish symbol: its leader lands midway along the right
 # half of the foot edge; measured on the 287c render, its ink (shoulder,
@@ -622,13 +647,10 @@ _NOTE_EXTENTS = {
 # its leader leaves from the shoulder's left end.
 FOOT_FINISH_EXTENT = (0.0072, 0.0003, 0.0178, 0.0087)
 FOOT_FINISH_LEADER_DX = -0.0067
-# A view letter's ink from its note's upper-left corner (287c: C 64.5-69.2 x
-# 254.4-259.3 mm, B 48.3-52.8 x 150.7-155.5 mm).  C's leader leaves the
-# letter's left side at mid-height; B's leaves its right side level with
-# the tip.
+# A view letter's ink from its note's upper-left corner (287c: B 48.3-52.8 x
+# 150.7-155.5 mm); its leader leaves its right side level with the tip.
 VIEW_LETTER_EXTENT = (0.0, 0.0053, 0.0051, 0.0)
 VIEW_B_LEADER_DX = 0.0058
-VIEW_C_LEADER_DX = -0.0005
 
 # Dimension ink, measured on the 287c render (run mha092-287c): a horizontal
 # dimension's line prints 2.7-2.8 mm under its value's centre (4.5 mm under
@@ -707,31 +729,35 @@ def _extent_box(
 
 def _foot_finish_placement() -> tuple[Point, Point]:
     """(symbol point, leader tip) of the locating-foot finish."""
-    foot = _elevation_y(0.0, FOOT_FINISH_CENTER)
+    foot = _elevation_y(0.0, FRONT_CENTER)
     return (
-        (FOOT_FINISH_CENTER[0] + FOOT_FINISH_DX, foot - FOOT_FINISH_DROP),
-        (FOOT_FINISH_CENTER[0] + BLOCK_X * _S / 4.0, foot),
+        (FRONT_CENTER[0] + FOOT_FINISH_DX, foot - FOOT_FINISH_DROP),
+        (FRONT_CENTER[0] + BLOCK_X * _S / 4.0, foot),
     )
 
 
-def sheet_text_boxes(adjuster_center: tuple[float, float] = FRONT_CENTER) -> dict[str, Box]:
-    """Every text block this module places, keyed by dimension or note name."""
-    keeps = {
+def _sheet_keeps() -> dict[str, tuple[float, float]]:
+    """Every dimension's commanded text point, imported or driven."""
+    return {
         **FRONT_KEEP,
-        **_adjuster_axis_keep(adjuster_center),
+        **_adjuster_axis_keep(),
         **TOP_KEEP,
         **RIGHT_KEEP,
         **LEFT_KEEP,
         **BOTTOM_KEEP,
+        **VIEW_B_DIMENSIONS,
     }
+
+
+def sheet_text_boxes() -> dict[str, Box]:
+    """Every text block this module places, keyed by dimension or note name."""
+    keeps = _sheet_keeps()
     keeps.update(TOP_TEXT_OFFSETS)
     boxes = {
         name: _extent_box(point, _VALUE_EXTENTS.get(name, _VALUE_EXTENT))
         for name, point in keeps.items()
     }
-    boxes["adjuster callout"] = _extent_box(
-        _adjuster_callout_xy(adjuster_center), ADJUSTER_CALLOUT_EXTENT
-    )
+    boxes["adjuster callout"] = _extent_box(ADJUSTER_CALLOUT_XY, ADJUSTER_CALLOUT_EXTENT)
     boxes["pinch clearance callout"] = _extent_box(
         PINCH_CLEARANCE_CALLOUT_XY, PINCH_CLEARANCE_CALLOUT_EXTENT
     )
@@ -740,10 +766,9 @@ def sheet_text_boxes(adjuster_center: tuple[float, float] = FRONT_CENTER) -> dic
     )
     boxes["foot tap callout"] = _extent_box(FOOT_TAP_CALLOUT_XY, FOOT_TAP_CALLOUT_EXTENT)
     boxes["foot finish"] = _extent_box(_foot_finish_placement()[0], FOOT_FINISH_EXTENT)
-    for label, (text_xy, _tip) in (("view B letter", VIEW_B_ARROW), ("view C letter", VIEW_C_ARROW)):
-        boxes[label] = _extent_box(text_xy, VIEW_LETTER_EXTENT)
-    for text, x, y in _sheet_notes(adjuster_center):
-        boxes[text.split("\n")[0]] = _extent_box((x, y), _NOTE_EXTENTS[text])
+    boxes["view B letter"] = _extent_box(VIEW_B_ARROW[0], VIEW_LETTER_EXTENT)
+    for text, x, y in _sheet_notes():
+        boxes[text] = _extent_box((x, y), _NOTE_EXTENTS[text])
     return boxes
 
 
@@ -755,7 +780,6 @@ def sheet_view_silhouettes() -> dict[str, Box]:
     half_z = BLOCK_Z * _S / 2.0
     return {
         "front": (FRONT_CENTER[0] - half_x, foot, FRONT_CENTER[0] + half_x, top),
-        "back": (BACK_CENTER[0] - half_x, foot, BACK_CENTER[0] + half_x, top),
         "right": (RIGHT_CENTER[0] - half_z, foot, RIGHT_CENTER[0] + half_z, top),
         "view B": (LEFT_CENTER[0] - half_z, foot, LEFT_CENTER[0] + half_z, top),
         "plan": (
@@ -828,18 +852,10 @@ def _dimension_ink(
     return DimensionInk(tuple(lines), tuple(arrow_ink))
 
 
-def sheet_dimension_ink(
-    adjuster_center: tuple[float, float] = FRONT_CENTER,
-) -> dict[str, DimensionInk]:
+def sheet_dimension_ink() -> dict[str, DimensionInk]:
     """Every kept dimension's printed lines and arrows."""
-    texts = sheet_text_boxes(adjuster_center)
-    keeps = {
-        **FRONT_KEEP,
-        **_adjuster_axis_keep(adjuster_center),
-        **TOP_KEEP,
-        **RIGHT_KEEP,
-        **BOTTOM_KEEP,
-    }
+    texts = sheet_text_boxes()
+    keeps = _sheet_keeps()
     half_x = BLOCK_X * _S / 2.0
     # Each spec's side is the smart side it printed on 287c, unless the
     # module sets it.
@@ -857,24 +873,30 @@ def sheet_dimension_ink(
     front_x = FRONT_CENTER[0]
     foot = _elevation_y(0.0, FRONT_CENTER)
     top = _elevation_y(BLOCK_HEIGHT, FRONT_CENTER)
-    ax = adjuster_center[0]
-    plus_x = 1.0 if adjuster_center == FRONT_CENTER else -1.0
     slit = SLIT_W * _S / 2.0
     north = _right_x(Z_NORTH)
+    pinch_y = _elevation_y(PINCH_HEIGHT, RIGHT_CENTER)
     tap_x, tap_y = FOOT_TAP_CENTER
+    bottom_south = _bottom_y(Z_SOUTH)
     specs = {
-        "Width": (h, (front_x - half_x, front_x + half_x), (foot, foot), drop("Width"), out),
+        "Width": (
+            h,
+            (_BOTTOM_LEFT, _BOTTOM_RIGHT),
+            (bottom_south, bottom_south),
+            drop("Width"),
+            out,
+        ),
         "BlockHt": (v, (foot, top), (front_x - half_x,) * 2, keeps["BlockHt"][0], inside),
         "SlitW": (h, (front_x - slit, front_x + slit), (top, top), drop("SlitW"), out),
         "AxisHeight": (
             v,
-            (foot, _elevation_y(ADJUSTER_AXIS_HEIGHT, adjuster_center)),
-            (ax - half_x,) * 2,
+            (foot, _elevation_y(ADJUSTER_AXIS_HEIGHT, FRONT_CENTER)),
+            (front_x - half_x,) * 2,
             keeps["AxisHeight"][0],
             inside,
         ),
         "PassageCenter": (
-            h, (ax - plus_x * half_x, ax), (top, top), drop("PassageCenter"), out
+            h, (front_x - half_x, front_x), (top, top), drop("PassageCenter"), out
         ),
         "Depth": (
             v,
@@ -899,6 +921,23 @@ def sheet_dimension_ink(
             (foot, _elevation_y(PINCH_HEIGHT, RIGHT_CENTER)),
             (_right_x(Z_SOUTH),) * 2,
             keeps["PinchHeight"][0],
+            inside,
+        ),
+        # VIEW B's driven stations: the north face's witness leaves its top
+        # corner, the hole's its centre; the height's from the foot's north
+        # corner and the hole's centre.
+        "ViewBPinchDepth": (
+            h,
+            (LEFT_CENTER[0], _LEFT_NORTH_X),
+            (pinch_y, top),
+            drop("ViewBPinchDepth"),
+            inside,
+        ),
+        "ViewBPinchHeight": (
+            v,
+            (foot, pinch_y),
+            (_LEFT_NORTH_X, LEFT_CENTER[0]),
+            keeps["ViewBPinchHeight"][0],
             inside,
         ),
     }
@@ -964,17 +1003,16 @@ def _callout_leader(
     return _leader_to_circle((x, callout[1] - down), center, radius)
 
 
-def sheet_leaders(adjuster_center: tuple[float, float] = FRONT_CENTER) -> dict[str, Leader]:
+def sheet_leaders() -> dict[str, Leader]:
     """Every leader this module places, keyed like its text block."""
     pinch_y = _elevation_y(PINCH_HEIGHT, RIGHT_CENTER)
     finish, finish_tip = _foot_finish_placement()
     view_b_text, view_b_tip = VIEW_B_ARROW
-    view_c_text, view_c_tip = VIEW_C_ARROW
     return {
         "adjuster callout": _callout_leader(
-            _adjuster_callout_xy(adjuster_center),
+            ADJUSTER_CALLOUT_XY,
             ADJUSTER_CALLOUT_EXTENT,
-            (adjuster_center[0], _elevation_y(ADJUSTER_AXIS_HEIGHT, adjuster_center)),
+            (FRONT_CENTER[0], _elevation_y(ADJUSTER_AXIS_HEIGHT, FRONT_CENTER)),
             ADJUSTER_BORE_DIA * _S / 2.0,
         ),
         "pinch clearance callout": _callout_leader(
@@ -997,10 +1035,6 @@ def sheet_leaders(adjuster_center: tuple[float, float] = FRONT_CENTER) -> dict[s
         ),
         "foot finish": Leader((finish[0] + FOOT_FINISH_LEADER_DX, finish[1]), finish_tip),
         "view B letter": Leader((view_b_text[0] + VIEW_B_LEADER_DX, view_b_tip[1]), view_b_tip),
-        "view C letter": Leader(
-            (view_c_text[0] + VIEW_C_LEADER_DX, view_c_text[1] - VIEW_LETTER_HEIGHT / 2.0),
-            view_c_tip,
-        ),
     }
 
 
@@ -1129,13 +1163,13 @@ def sheet_ink_collisions(
     return findings
 
 
-def assert_sheet_ink_clear(adjuster_center: tuple[float, float] = FRONT_CENTER) -> None:
+def assert_sheet_ink_clear() -> None:
     """Refuse a placement whose own ink collides before any COM work is spent."""
     findings = sheet_ink_collisions(
-        sheet_text_boxes(adjuster_center),
+        sheet_text_boxes(),
         sheet_view_silhouettes(),
-        sheet_dimension_ink(adjuster_center),
-        sheet_leaders(adjuster_center),
+        sheet_dimension_ink(),
+        sheet_leaders(),
     )
     if findings:
         raise RuntimeError(
@@ -1221,41 +1255,129 @@ def _circle_entity(
         )
     return edge
 
-def _preferred_entry_circle(
-    adapter: Any,
-    candidates: tuple[
-        tuple[Any, tuple[float, float]],
-        tuple[Any, tuple[float, float]],
-    ],
-    *,
-    radius_mm: float,
-    center_y_mm: float,
-    label: str,
-) -> tuple[Any, tuple[float, float], Any]:
-    """Use the first opposed view that exposes the requested real model edge."""
-    matches: list[tuple[Any, tuple[float, float], Any]] = []
-    for view, center in candidates:
-        try:
-            edge = _circle_entity(
-                adapter,
-                view,
-                radius_mm=radius_mm,
-                center_y_mm=center_y_mm,
-                label=label,
-            )
-        except RuntimeError:
-            continue
-        matches.append((view, center, edge))
-    if not matches:
-        raise RuntimeError(f"{label} is absent from both opposed views")
-    # The through thread exposes the same tap-drill rim from both sides.
-    # Both selections still belong to the same native Hole Wizard feature; the
-    # caller's candidate order supplies a stable sheet-side preference.
-    return matches[0]
 
-# Hole-callout order: drill line, thread line, then the prose (Main eye-pass
-# af561fa7); the caption already names the pinch-thread jaw.
-_PINCH_THREAD_QUALIFIER = "COAXIAL WITH CLEARANCE"
+def _view_b_face_edge(adapter: Any, view: Any, *, along: int, label: str) -> Any:
+    """VIEW B's visible straight edge on the -X face running along model
+    axis ``along`` (1: the north face's vertical edge; 2: the foot edge).
+
+    Picked by model geometry, not a sheet hit-test: round 2's coordinate pick
+    beside the hole's centre mark left three entities selected (farm run
+    20261107T104940656Z).  The north edge lies on z = Z_NORTH, the foot edge
+    on y = 0; of the coincident projections the -X face's (least x) is the
+    one VIEW B looks at.
+    """
+    candidates: list[tuple[float, float, Any]] = []
+    for raw_edge in visible_view_entities(view, 1, label=f"{label} edges"):
+        edge = _early_bound(raw_edge, "IEdge")
+        start, end = edge.GetStartVertex(), edge.GetEndVertex()
+        if start is None or end is None:
+            continue
+        p0 = tuple(float(v) * 1000.0 for v in _early_bound(start, "IVertex").GetPoint())
+        p1 = tuple(float(v) * 1000.0 for v in _early_bound(end, "IVertex").GetPoint())
+        across = [axis for axis in range(3) if axis != along]
+        if any(abs(p0[axis] - p1[axis]) > 0.01 for axis in across):
+            continue
+        on_plane = abs(p0[2] - Z_NORTH) < 0.01 if along == 1 else abs(p0[1]) < 0.01
+        if not on_plane:
+            continue
+        candidates.append((abs(p1[along] - p0[along]), p0[0], edge))
+    full = BLOCK_HEIGHT if along == 1 else BLOCK_Z
+    spanning = [item for item in candidates if abs(item[0] - full) < 0.01]
+    if not spanning:
+        raise RuntimeError(
+            f"{label}: no visible {full:.2f} mm edge; spans "
+            f"{sorted(round(item[0], 3) for item in candidates)!r}"
+        )
+    return min(spanning, key=lambda item: item[1])[2]
+
+
+def _check_face_attachment(adapter: Any, dimension: Any, face_edge: Any, label: str) -> None:
+    """The dimension hangs on the face edge it was given plus one other entity.
+
+    The hole end is a point pick, which may resolve to the drill circle or the
+    concentric cosmetic-thread circle; both share the centre, so the value
+    readback guards that end and only the face edge's identity is checked.
+    """
+    display = _early_bound(dimension, "IDisplayDimension")
+    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    attached = [item for item in (annotation.GetAttachedEntities3() or ()) if item is not None]
+    types = tuple(int(t) for t in (annotation.GetAttachedEntityTypes() or ()))
+    faces = [item for item in attached if _is_same_attachment(adapter, item, face_edge, "EDGE")]
+    if bool(annotation.IsDangling()) or len(attached) != 2 or len(faces) != 1:
+        raise RuntimeError(
+            f"{label} is not attached to its face edge and one hole entity: "
+            f"attachments={len(attached)}, face matches={len(faces)}, types={types}"
+        )
+    _telemetry.debug(f"{label}: attachment types {types}")
+
+
+def _add_view_b_pinch_dimensions(adapter: Any, view: Any, thread_edge: Any) -> None:
+    """Locate VIEW B's far-jaw thread in its own view (VIEW_B_DIMENSIONS).
+
+    Each runs from a face edge (picked by entity) to the thread's circle,
+    which SolidWorks dimensions at its centre.  The circle is picked by sheet
+    point on its rim at 45 deg, clear of the 0/90/180/270 deg centre-mark arms
+    (none exist yet: this runs before the centre marks), so
+    add_edge_dimension's entity pick never meets the round-2 failure (farm
+    run 20261107T104940656Z: the entity pick left three entities selected).
+    """
+    curve = _early_bound(_early_bound(thread_edge, "IEdge").GetCurve(), "ICurve")
+    params = tuple(float(value) for value in curve.CircleParams)
+    centre = model_point_in_view(adapter, view, params[:3], label="VIEW B thread centre")
+    rim_offset = params[6] * 1000.0 * _S / math.sqrt(2.0)
+    rim_xy = (centre[0] + rim_offset, centre[1] + rim_offset)
+    north = _view_b_face_edge(adapter, view, along=1, label="VIEW B north face")
+    foot = _view_b_face_edge(adapter, view, along=2, label="VIEW B foot")
+    for name, face_edge, face_xy, orientation, expected_mm in (
+        (
+            "ViewBPinchDepth",
+            north,
+            (_LEFT_NORTH_X, _elevation_y(BLOCK_HEIGHT / 2.0, LEFT_CENTER)),
+            "horizontal",
+            BLOCK_Z / 2.0,
+        ),
+        (
+            "ViewBPinchHeight",
+            foot,
+            (LEFT_CENTER[0] - BLOCK_Z * _S / 4.0, _elevation_y(0.0, LEFT_CENTER)),
+            "vertical",
+            PINCH_HEIGHT,
+        ),
+    ):
+        label = f"VIEW B {name}"
+        dimension = add_edge_dimension(
+            adapter,
+            view,
+            p0=face_xy,
+            p1=rim_xy,
+            text_xy=VIEW_B_DIMENSIONS[name],
+            label=label,
+            orientation=orientation,
+            entities=(face_edge, None),
+        )
+        assert_dimension_measures(adapter, dimension, expected_mm=expected_mm, label=label)
+        _check_face_attachment(adapter, dimension, face_edge, label)
+        display = _early_bound(dimension, "IDisplayDimension")
+        places = DRAWING_REFERENCE_PRECISION[name]
+        display.SetPrecision3(DRAWING_REFERENCE_PRECISION[name], -1, -1, -1)
+        if int(display.GetPrimaryPrecision2()) != places:
+            raise RuntimeError(f"{label} did not keep {places} decimal places")
+        display.ArrowSide = _DIM_ARROWS_INSIDE
+        if int(display.ArrowSide) != _DIM_ARROWS_INSIDE:
+            raise RuntimeError(f"{label} did not keep its arrows inside")
+    rebuild_drawing(adapter, label="VIEW B pinch stations")
+
+
+# Round-8 farm review (dt-fab-4, rules 4/19): the clearance and the tap are
+# one feature on one axis.  Their .19/1.85 stations stay loose; the fit-up
+# route at both callouts holds the axes together: one Ø tap-drill hole drilled
+# through both jaws in one pass, the near jaw opened to clearance up to the
+# slot, the far jaw tapped up to the slot.  Both callouts name the joint
+# drill by the same words, and each keeps to two lines (rule 7).
+PINCH_JOINT_DRILL_TEXT = "DRILL THRU BOTH JAWS"
+PINCH_TAP_EXTENT_TEXT = "TAP TO SLOT"
+# Hole-callout order: drill line, then thread line.  VIEW B's own driven
+# stations locate the far-jaw thread (_add_view_b_pinch_dimensions).
 _PINCH_THREAD_NATIVE_TOKENS = frozenset(
     {"<hw-thrutapdrldia>", "<hw-threaddesc>", "<hw-threadclass>"}
 )
@@ -1276,23 +1398,26 @@ def _pinch_thread_callout_definitions(
             "unexpected native pinch-thread callout definition: "
             f"missing={sorted(missing)!r}, definitions={definitions!r}"
         )
-    # The tap drill's line says DRILL as the clearance hole's does (rule 12,
-    # machinist review of 04848e25c); the thread's TO SLOT stands bare.
+    # The tap drill's line is the joint drill both callouts name; the
+    # thread's line says TAP (rule 12).
     updated = {
         part: text.replace(
-            "<hw-thru>", "TO SLOT" if "<hw-threadclass>" in text else "DRILL TO SLOT"
+            "<hw-thru>",
+            PINCH_TAP_EXTENT_TEXT
+            if "<hw-threadclass>" in text
+            else PINCH_JOINT_DRILL_TEXT,
         )
         for part, text in definitions.items()
     }
     thread_parts = [part for part, text in updated.items() if "<hw-threadclass>" in text]
     if len(thread_parts) != 1:
         raise RuntimeError(f"pinch thread line is not in one callout part: {updated!r}")
-    thread_part = thread_parts[0]
-    updated[thread_part] = f"{updated[thread_part].rstrip()}\n{_PINCH_THREAD_QUALIFIER}"
     rewritten = "\n".join(updated.values())
     if (
         "THRU ALL" in rewritten
-        or rewritten.count("TO SLOT") != 2
+        or "<hw-thru>" in rewritten
+        or rewritten.count(PINCH_TAP_EXTENT_TEXT) != 1
+        or rewritten.count(PINCH_JOINT_DRILL_TEXT) != 1
         or any(token not in rewritten for token in _PINCH_THREAD_NATIVE_TOKENS)
     ):
         raise RuntimeError(f"pinch-thread callout rewrite lost semantics: {updated!r}")
@@ -1301,13 +1426,23 @@ def _pinch_thread_callout_definitions(
 
 # r3 blocker: the near jaw is drilled full diameter until it opens into the
 # slit, so the native blind depth ("<HOLE-DEPTH> <hw-depth>") becomes the
-# instruction; the diameter stays the Hole Wizard variable.
-PINCH_CLEARANCE_EXTENT_TEXT = "DRILL TO SLOT"
+# instruction; the diameter stays the Hole Wizard variable.  Round 8: the
+# joint drill's line stands over it, its Ø the tap drill's (the clearance
+# hole's Hole Wizard has no tap-drill variable, so it prints from the spec).
+PINCH_CLEARANCE_EXTENT_TEXT = "DRILL THIS JAW TO SLOT"
 _BLIND_DEPTH_TOKENS = re.compile(r"<HOLE-DEPTH>\s*<hw-depth>")
 
 
+def _pinch_joint_drill_line() -> str:
+    return (
+        f"<MOD-DIAM>{length_text(PINCH_BORE_DIA, HOLE_CALLOUT_PLACES)} "
+        f"{PINCH_JOINT_DRILL_TEXT}"
+    )
+
+
 def _pinch_clearance_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
-    """Swap the one native blind-depth pair for DRILL TO SLOT, loudly."""
+    """Put the joint drill over the clearance line and swap the one native
+    blind-depth pair for DRILL THIS JAW TO SLOT, loudly."""
     if set(definitions) != {5, 6, 7, 8}:
         raise RuntimeError(f"unexpected pinch clearance callout parts: {definitions!r}")
     hits = {
@@ -1318,7 +1453,12 @@ def _pinch_clearance_callout_definitions(definitions: dict[int, str]) -> dict[in
             f"pinch clearance callout has no single blind depth to replace: {definitions!r}"
         )
     updated = {
-        part: _BLIND_DEPTH_TOKENS.sub(PINCH_CLEARANCE_EXTENT_TEXT, text)
+        part: (
+            f"{_pinch_joint_drill_line()}\n"
+            f"{_BLIND_DEPTH_TOKENS.sub(PINCH_CLEARANCE_EXTENT_TEXT, text)}"
+            if hits[part]
+            else text
+        )
         for part, text in definitions.items()
     }
     rewritten = "\n".join(updated.values())
@@ -1328,16 +1468,22 @@ def _pinch_clearance_callout_definitions(definitions: dict[int, str]) -> dict[in
 
 
 def _pinch_clearance_callout_resolved(resolved_parts: dict[int, str]) -> bool:
-    joined = "\n".join(resolved_parts.values())
-    return (
-        joined.count(PINCH_CLEARANCE_EXTENT_TEXT) == 1
-        and "<HOLE-DEPTH>" not in joined
-        and length_text(PINCH_CLEARANCE_DIA, HOLE_CALLOUT_PLACES) in joined
+    """The joint drill's line, then the clearance line, in one part."""
+    joint = f"{length_text(PINCH_BORE_DIA, HOLE_CALLOUT_PLACES)} {PINCH_JOINT_DRILL_TEXT}"
+    clearance = (
+        f"{length_text(PINCH_CLEARANCE_DIA, HOLE_CALLOUT_PLACES)} "
+        f"{PINCH_CLEARANCE_EXTENT_TEXT}"
     )
+    parts = [text for text in resolved_parts.values() if text.strip()]
+    if len(parts) != 1 or "<HOLE-DEPTH>" in parts[0]:
+        return False
+    lines = [line.rstrip() for line in parts[0].strip().split("\n")]
+    return len(lines) == 2 and lines[0].endswith(joint) and lines[1].endswith(clearance)
 
 
 def _set_pinch_clearance_callout_text(display: Any) -> None:
-    """State DRILL TO SLOT without severing the diameter's Hole Wizard variable."""
+    """State the joint drill and the clearance extent without severing the
+    diameter's Hole Wizard variable."""
     definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
     updated = _pinch_clearance_callout_definitions(definitions)
     for definition_part, writable_part in ((5, 1), (6, 2), (7, 3), (8, 4)):
@@ -1347,29 +1493,29 @@ def _set_pinch_clearance_callout_text(display: Any) -> None:
     resolved_parts = {part: str(display.GetText(part) or "") for part in (1, 2, 3, 4)}
     if persisted != updated or not _pinch_clearance_callout_resolved(resolved_parts):
         raise RuntimeError(
-            "pinch clearance DRILL TO SLOT did not persist: "
+            "pinch clearance fit-up lines did not persist: "
             f"definitions={persisted!r}, resolved={resolved_parts!r}"
         )
 
 
 def _pinch_thread_callout_resolved(resolved_parts: dict[int, str]) -> bool:
-    """Whether the resolved callout keeps both extents and qualifies the thread.
+    """Whether the resolved callout keeps the joint drill and the tap extent.
 
     GetText(1..4) resolves definition parts 5..8 in part order, which is not
     the sheet's line order: af561fa7 printed part 7 (the tap drill) above
-    part 5 (the thread).  So the check is per part -- the qualifier ends the
-    thread's own part, which then prints last -- not by string position.
+    part 5 (the thread).  So the check is per part, not by string position.
     """
     joined = "\n".join(resolved_parts.values())
     thread = [text for text in resolved_parts.values() if "UNC" in text]
     drill = [text for text in resolved_parts.values() if text.strip() and "UNC" not in text]
     return (
         "THRU ALL" not in joined
-        and joined.count("TO SLOT") == 2
         and len(thread) == 1
-        and thread[0].rstrip().endswith(f"TO SLOT\n{_PINCH_THREAD_QUALIFIER}")
+        and thread[0].rstrip().endswith(PINCH_TAP_EXTENT_TEXT)
         and len(drill) == 1
-        and drill[0].rstrip().endswith("DRILL TO SLOT")
+        and drill[0].rstrip().endswith(
+            f"{length_text(PINCH_BORE_DIA, HOLE_CALLOUT_PLACES)} {PINCH_JOINT_DRILL_TEXT}"
+        )
     )
 
 
@@ -1448,9 +1594,12 @@ def _check_foot_tap_callout(display: Any) -> None:
 
 
 # E11/W1: the through thread's two countersinks are one chamfer feature; the
-# callout names them under the thread line, so the hole reads in one place.
+# callout names them under the thread line, so the hole reads in one place,
+# with the countersink symbol (<HOLE-SINK>, as draw_fr_top_frame's callouts)
+# and the ASME Ø X angle order.
 _CSK_DIA_TEXT = length_text(ADJUSTER_BORE_DIA + 2.0 * ADJUSTER_CSK, HOLE_CALLOUT_PLACES)
-ADJUSTER_CSK_QUALIFIER = f"90\u00b0 CSK \u00d8{_CSK_DIA_TEXT} BOTH ENDS"
+_CSK_TAIL = " X 90\u00b0 BOTH ENDS"
+ADJUSTER_CSK_QUALIFIER = f"<HOLE-SINK><MOD-DIAM>{_CSK_DIA_TEXT}{_CSK_TAIL}"
 
 
 def _adjuster_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
@@ -1476,10 +1625,13 @@ def _set_adjuster_callout_text(display: Any) -> None:
     persisted = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
     resolved = {part: str(display.GetText(part) or "") for part in (1, 2, 3, 4)}
     thread = [text for text in resolved.values() if "UNF" in text]
+    # The resolved text may print the symbol tags as glyphs, so the check is
+    # on the countersink line's value and tail.
+    csk_line = thread[0].rstrip().rsplit("\n", 1)[-1] if len(thread) == 1 else ""
     if (
         persisted != updated
         or len(thread) != 1
-        or not thread[0].rstrip().endswith(ADJUSTER_CSK_QUALIFIER)
+        or not csk_line.endswith(f"{_CSK_DIA_TEXT}{_CSK_TAIL}")
     ):
         raise RuntimeError(
             "adjuster countersink line did not persist: "
@@ -1618,20 +1770,19 @@ async def build(adapter: Any) -> dict[str, str]:
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=SHEET_SCALE)
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=SHEET_SCALE)
     left = place_view(adapter, str(SOURCE), "*Left", *LEFT_CENTER, scale=SHEET_SCALE)
-    back = place_view(adapter, str(SOURCE), "*Back", *BACK_CENTER, scale=SHEET_SCALE)
+    assert_sheet_ink_clear()
     bottom = place_view(adapter, str(SOURCE), "*Bottom", *BOTTOM_CENTER, scale=SHEET_SCALE)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=SHEET_SCALE)
-    for view in (front, top, right, left, back, bottom, iso):
+    for view in (front, top, right, left, bottom, iso):
         set_hidden_lines_removed(adapter, view)
 
-    adjuster_view, adjuster_center, adjuster_edge = _preferred_entry_circle(
+    adjuster_edge = _circle_entity(
         adapter,
-        ((front, FRONT_CENTER), (back, BACK_CENTER)),
+        front,
         radius_mm=ADJUSTER_BORE_DIA / 2.0,
         center_y_mm=ADJUSTER_AXIS_HEIGHT,
         label="through adjuster thread",
     )
-    assert_sheet_ink_clear(adjuster_center)
     pinch_clearance_edge = _circle_entity(
         adapter,
         right,
@@ -1653,27 +1804,16 @@ async def build(adapter: Any) -> dict[str, str]:
         center_y_mm=0.0,
         label="hold-down foot tap",
     )
-    front_keep = dict(FRONT_KEEP)
-    back_keep: dict[str, tuple[float, float]] = {}
-    adjuster_axis_keep = _adjuster_axis_keep(adjuster_center)
-    if adjuster_view is front:
-        front_keep.update(adjuster_axis_keep)
-    else:
-        back_keep.update(adjuster_axis_keep)
-
     # Views that dimension part-hidden reference sketches (995a7c94) import
     # through the opt-in helper, which shows each owner sketch in that view
-    # only.  AxisHeight/PassageCenter go to whichever elevation shows the
-    # adjuster entry, so only that one opts in; the other shows no sketch.
-    # The right view's pinch stations and the bottom view's tap stations
-    # always do; the plan's depth is the block's own edge.
-    adjuster_curate = hidden_sketches.curate_view_dimensions
-    front_curate = adjuster_curate if adjuster_view is front else curate_view_dimensions
-    back_curate = curate_view_dimensions if adjuster_view is front else adjuster_curate
-    front_annotations = front_curate(
+    # only: the front view's AxisHeight/PassageCenter, the right view's pinch
+    # stations and the bottom view's tap stations.  The plan's depth is the
+    # block's own edge, and VIEW B keeps no model dimension (its stations are
+    # driven, _add_view_b_pinch_dimensions).
+    front_annotations = hidden_sketches.curate_view_dimensions(
         adapter,
         front,
-        keep=front_keep,
+        keep={**FRONT_KEEP, **_adjuster_axis_keep()},
         view_label="adjuster entry elevation",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
@@ -1698,13 +1838,6 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="pinch threaded entry",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    back_annotations = back_curate(
-        adapter,
-        back,
-        keep=back_keep,
-        view_label="adjuster threaded entry",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
     bottom_annotations = hidden_sketches.curate_view_dimensions(
         adapter,
         bottom,
@@ -1717,7 +1850,6 @@ async def build(adapter: Any) -> dict[str, str]:
         *top_annotations,
         *right_annotations,
         *left_annotations,
-        *back_annotations,
         *bottom_annotations,
     ]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
@@ -1733,11 +1865,13 @@ async def build(adapter: Any) -> dict[str, str]:
     offset_dimension_text(adapter, top_annotations, TOP_TEXT_OFFSETS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
 
+    # VIEW B's stations go on before any centre mark exists, so neither pick
+    # can meet a centre-mark line.
+    _add_view_b_pinch_dimensions(adapter, left, pinch_thread_edge)
     for view, label in (
         (front, "adjuster entry elevation"),
         (right, "pinch clearance entry"),
         (left, "pinch threaded entry"),
-        (back, "adjuster threaded entry"),
         (bottom, "hold-down tap"),
     ):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
@@ -1745,9 +1879,9 @@ async def build(adapter: Any) -> dict[str, str]:
 
     adjuster_callout = add_native_hole_callout(
         adapter,
-        adjuster_view,
+        front,
         edge=adjuster_edge,
-        callout_xy=_adjuster_callout_xy(adjuster_center),
+        callout_xy=ADJUSTER_CALLOUT_XY,
         label="through adjuster thread",
     )
     # These four render-time precision writes are the declared exception
@@ -1796,50 +1930,46 @@ async def build(adapter: Any) -> dict[str, str]:
     # Main eye-pass af561fa7: the shaded pictorial carries no thread ink.
     _hide_cosmetic_threads(adapter, iso, label="isometric")
 
-    for text, x, y in _sheet_notes(adjuster_center):
+    for text, x, y in _sheet_notes():
         if add_note(adapter, text, x, y) is None:
             raise RuntimeError(f"failed to add the {text.lower()!r} note")
     # C1 verdict (2026-09-23): the native projected-view arrow is not
     # switchable through the documented API -- IProjectionArrow.Visible is
     # get-only and no document preference or IView member sets it; only the
     # PropertyManager "Arrow" box does.  Untested: an IProjectionArrow.SetLabel
-    # side effect, a PropertyManager RunCommand route.  So each removed view
+    # side effect, a PropertyManager RunCommand route.  So the removed view
     # is named by a letter note whose straight leader is the viewing arrow.
-    for letter, view, (text_xy, tip_xy) in (
-        ("B", front, VIEW_B_ARROW),
-        ("C", top, VIEW_C_ARROW),
-    ):
-        note = add_leader_note(
-            adapter,
-            letter,
-            text_xy=text_xy,
-            attach_xy=tip_xy,
-            view=view,
-            label=f"view {letter} viewing arrow",
-        )
-        # add_note leaves text at the document height; size the letter here
-        # (the add_surface_finish char_height recipe) and prove the leader
-        # tip did not move with it.
-        annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
-        text_format = annotation.GetTextFormat(0)
-        if text_format is None:
-            raise RuntimeError(f"view {letter} arrow note has no text format")
-        text_format.CharHeight = VIEW_LETTER_HEIGHT
-        if not annotation.SetTextFormat(0, False, text_format):
-            raise RuntimeError(f"failed to size the view {letter} arrow letter")
-        rebuild_drawing(adapter, label=f"view {letter} arrow letter")
-        points = list(annotation.GetLeaderPointsAtIndex(0) or ())
-        if len(points) < 6 or math.dist((points[-3], points[-2]), tip_xy) > 0.001:
-            raise RuntimeError(f"view {letter} arrow tip moved when its letter was sized")
+    text_xy, tip_xy = VIEW_B_ARROW
+    note = add_leader_note(
+        adapter,
+        "B",
+        text_xy=text_xy,
+        attach_xy=tip_xy,
+        view=front,
+        label="view B viewing arrow",
+    )
+    # add_note leaves text at the document height; size the letter here
+    # (the add_surface_finish char_height recipe) and prove the leader
+    # tip did not move with it.
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    text_format = annotation.GetTextFormat(0)
+    if text_format is None:
+        raise RuntimeError("view B arrow note has no text format")
+    text_format.CharHeight = VIEW_LETTER_HEIGHT
+    if not annotation.SetTextFormat(0, False, text_format):
+        raise RuntimeError("failed to size the view B arrow letter")
+    rebuild_drawing(adapter, label="view B arrow letter")
+    points = list(annotation.GetLeaderPointsAtIndex(0) or ())
+    if len(points) < 6 or math.dist((points[-3], points[-2]), tip_xy) > 0.001:
+        raise RuntimeError("view B arrow tip moved when its letter was sized")
 
-    foot_view = {FRONT_CENTER: front, BACK_CENTER: back}[FOOT_FINISH_CENTER]
-    foot_edge = _foot_edge(adapter, foot_view)
+    foot_edge = _foot_edge(adapter, front)
     # Onto the foot edge itself, midway along its right half: at the corner
     # vertex (run 6cab17f6) it could name the side face as well as the seat.
     foot_symbol, foot_right = _foot_finish_placement()
     foot_finish = add_surface_finish(
         adapter,
-        foot_view,
+        front,
         edge_entity=foot_edge,
         symbol_xy=foot_symbol,
         leader_attach_xy=foot_right,
@@ -1871,7 +2001,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # Annotation insertion can regenerate a view with inherited display state;
     # every manufacturing view is explicitly HLR at export.
-    for view in (front, top, right, left, back, bottom):
+    for view in (front, top, right, left, bottom):
         set_hidden_lines_removed(adapter, view)
 
     return await finalize_drawing(

@@ -149,6 +149,10 @@ NOT_FIT_BANDS: dict[tuple[str, str], str] = {
     ("build_dt_drive_train_assembly", "ARBOR_PED_NORTH_Z_BAND"): (
         "plan z extent of the north pedestal foot (clearance geometry)"
     ),
+    ("dt_crank_pin_ring_spec", "BUTT_GAP_BAND"): (
+        "pliers-closed butt gap between the keeper ring's own wire ends (note: GAP 0-.010); "
+        "no mating part"
+    ),
     # The 16T/T120 and row checks (c'' variant B): print-worst (lower, upper)
     # deviations already derived by printed_deviations/deviations from each
     # printed band, corners of the clearance scans rather than fits.

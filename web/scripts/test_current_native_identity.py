@@ -248,7 +248,9 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
 
     def test_archive_only_identities_have_no_live_cad_metadata(self):
         mapping = json.loads(TABLE_PATH.read_text())
-        self.assertEqual(len(mapping["archiveOnlyVendors"]), 3)
+        # The three pre-cutover retirements plus the v39 MHA-DT-VN-66 loop link
+        # (retired 2026-11-08, #2144 9.2).
+        self.assertEqual(len(mapping["archiveOnlyVendors"]), 4)
         identity = CurrentNativeIdentity()
         for row in mapping["archiveOnlyVendors"]:
             self.assertEqual(row["status"], "archive-only")
@@ -279,13 +281,17 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
         cad_map = json.loads((ROOT / "cad/config/current-identity-map.json").read_text(encoding="utf-8"))
         identity = CurrentNativeIdentity()
         retired = cad_map["retired_identities"]
-        self.assertEqual(len(retired), 40)
+        self.assertEqual(len(retired), 42)
         # #2119: the 3/16 pen-rod set screw gave way to the shared MHA-SH-VN-54;
-        # #290: the arm's spot face took the MHA-PD-VN-67 pivot shim's room.
+        # #290: the arm's spot face took the MHA-PD-VN-67 pivot shim's room;
+        # #2144 9.2: the screwed jack chain took the MHA-DT-28 anchor eye's and
+        # the MHA-DT-VN-66 loop link's places.
         machine = [row for row in retired if "-tl-" not in row["old_stem"]]
         self.assertEqual([(row["old_stem"], [t["number"] for t in row["new_identities"]])
                           for row in machine], [("vn-pen-rod-set-screw", ["MHA-PN-VN-52"]),
-                                                ("vn-transgear-pivot-shim", ["MHA-PD-VN-67"])])
+                                                ("vn-transgear-pivot-shim", ["MHA-PD-VN-67"]),
+                                                ("vn-keeper-chain-link", ["MHA-DT-VN-66"]),
+                                                ("dt-crank-pin-eye", ["MHA-DT-28"])])
         oblique_reservations = {
             "ch-rocker-arm-tl-oblique-pivot-pin": "MHA-CH-06-TL-23",
             "ch-rocker-arm-tl-oblique-hub-pin": "MHA-CH-06-TL-25",
@@ -326,8 +332,25 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
         self.assertEqual(actual_oblique, oblique_reservations)
         active_numbers = {target["number"] for row in cad_map["parts_and_assemblies"]
                           for target in row["new_identities"]}
+        archived = {(row["sourceStem"], row["parent"], row["stem"])
+                    for row in json.loads(TABLE_PATH.read_text(encoding="utf-8"))["archiveOnlyVendors"]}
         for row in retired:
             self.assertEqual(row["status"], "retired")
+            mirror = row["new_identities"][0]
+            if len(row["new_identities"]) == 1 and (
+                    row["old_stem"], mirror.get("parent"), mirror["stem"]) in archived:
+                # An archived v39 occurrence (the MHA-DT-VN-66 loop link) keeps
+                # its display name with no current Number.
+                parent = mirror["parent"]
+                self.assertEqual(identity.project_path(PREFIX + parent + "/" + row["old_stem"] + "-1"),
+                                 PREFIX + parent + "/" + mirror["stem"] + "-1")
+                self.assertIsNone(identity.project_number(row["old_number"], row["old_stem"], parent))
+                with self.assertRaisesRegex(ValueError, "does not identify"):
+                    identity.project_number(mirror["number"], mirror["stem"], parent)
+                self.assertNotIn(mirror["number"], active_numbers)
+                for reserved_stem in {row["old_stem"], mirror["stem"]}:
+                    self.assertFalse((ROOT / "cad/config/parts" / (reserved_stem + ".yaml")).exists())
+                continue
             self.assertNotIn(row["old_stem"], identity.sources)
             self.assertNotIn(row["old_stem"], identity.stems)
             for target in row["new_identities"]:

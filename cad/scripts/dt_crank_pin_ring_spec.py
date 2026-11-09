@@ -58,14 +58,18 @@ ARC_SAGITTA = MEAN_R - math.sqrt(MEAN_R**2 - (PIN_DIA_AT_HOLE / 2.0) ** 2)
 RING_CENTRE_X = MEAN_R - ARC_SAGITTA / 2.0
 RING_FAR_X = RING_CENTRE_X + MEAN_R  # the wire centreline's far point along +X
 V_RING = 2.0 * math.pi**2 * MEAN_R * (WIRE_DIA / 2.0) ** 2
-# The silver-soldered butt joint, on the ring's side away from the arm: a
-# JOINT_DIA bead centred on the wire centreline. It also gives the drawings a
-# real edge to balloon, which a plain torus lacks.
-JOINT_DIA = 1.27  # .05
-_JOINT_H = math.sqrt((JOINT_DIA / 2.0) ** 2 - (WIRE_DIA / 2.0) ** 2)
-# The bead less the wire it swallows (a straight-wire approximation; the ring's
-# 5 mm bend changes it by well under 0.1 %).
-V_JOINT = 4.0 / 3.0 * math.pi * _JOINT_H**3
+# Owner ruling 2026-11-08 (#2144 item 9.2, D6): the ring is opened, threaded
+# through the pin's cross-hole and the keeper chain's far link's eye, and
+# closed with pliers, its ends butted, not soldered. The butt gap sits on the
+# ring's side away from the arm (local +Z, where the solder bead was), square
+# to the wire: BUTT_GAP nominal in a 0-.010 band. Its cut faces also give the
+# drawings a real edge to balloon, which a plain torus lacks.
+BUTT_GAP_BAND = (0.0, 0.254)  # 0-.010 in
+BUTT_GAP = sum(BUTT_GAP_BAND) / 2.0  # .005
+# The gap's wire, a straight-wire approximation (the ring's 6 mm bend changes
+# it by under 0.02 %).
+V_GAP = math.pi * (WIRE_DIA / 2.0) ** 2 * BUTT_GAP
+V_RING_CLOSED = V_RING - V_GAP
 
 HOLE_AIR = RING_HOLE_DIA / 2.0 - WIRE_DIA / 2.0 - ARC_SAGITTA / 2.0
 if HOLE_AIR < RING_HOLE_AIR - 1e-9:

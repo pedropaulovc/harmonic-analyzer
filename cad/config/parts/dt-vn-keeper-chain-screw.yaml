@@ -1,0 +1,14 @@
+dt-vn-keeper-chain-screw:
+  title: Brass Binding Head Slotted Screw
+  number: MHA-DT-VN-70
+  stock_name: Brass Binding Head Slotted Screw
+  supplier: McMaster-Carr
+  supplier_skus: [92443A077]
+  material: Brass
+  material_specification: "Brass, slotted binding head, ASME B18.6.3; McMaster-Carr 92443A077"
+  finish: plain
+  quantity: 1
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: purchased
+  drawing_unit: in

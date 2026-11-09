@@ -108,10 +108,10 @@ _INSERTED_SOURCES = {
     "dt_vn_cone_tip_adjuster dt_cone_tip_block dt_vn_cone_tip_block_screw dt_vn_cone_tip_collar dt_vn_cone_tip_pinch_screw "
     "dt_crank_arm dt_crank_drive_gear dt_crank_handle dt_crank_handle_butt_cup dt_crank_handle_ferrule "
     "dt_crank_handle_pivot_screw dt_crank_hub dt_vn_crank_hub_pin dt_crank_pin "
-    "dt_crank_pin_eye dt_crank_pin_ring dt_vn_crank_seat_drive_pin "
+    "dt_crank_pin_ring dt_vn_crank_seat_drive_pin "
     "dt_crank_pinion dt_crank_pinion_pin dt_crankshaft dt_cylinder_end_disc dt_cylinder_gear "
     "dt_vn_cylinder_bank_spring dt_cylinder_gear_shaft "
-    "sh_vn_brass_fillister_screw sh_vn_fillister_screw_90280a108 dt_vn_keeper_chain dt_vn_keeper_chain_link dt_vn_pedestal_hold_down_screw dt_pinion_arbor dt_pinion_arbor_collar dt_pinion_bracket dt_pinion_cam "
+    "sh_vn_fillister_screw_90280a108 dt_vn_keeper_chain dt_vn_keeper_chain_screw dt_vn_pedestal_hold_down_screw dt_pinion_arbor dt_pinion_arbor_collar dt_pinion_bracket dt_pinion_cam "
     "dt_pinion_cam_pin dt_pinion_handle dt_pinion_lever dt_pinion_lever_pin dt_pinion_lift_rod "
     "dt_pinion_pivot_block dt_pinion_pivot_shaft dt_pinion_spring dt_vn_pinion_strap_pin dt_vn_post_mount_screw dt_vn_slotted_screw",
     "ch_channel": "ch_amplitude_bar ch_bar_pivot_pin ch_channel_lever ch_vn_channel_spring_installed ch_connecting_rod "
@@ -170,7 +170,7 @@ def test_all_assembly_references_match_inserted_source_manifests(assembly):
     ("producer", "consumers"),
     [
         ("sh_vn_chain_link", {"pd_paper_drive"}),
-        ("sh_vn_brass_fillister_screw", {"fr_frame", "dt_drive_train", "pd_paper_drive"}),
+        ("sh_vn_brass_fillister_screw", {"fr_frame", "pd_paper_drive"}),
         ("sh_vn_fillister_screw_90280a108", {"dt_drive_train", "pd_paper_drive"}),
         ("sh_vn_clamp_screw", {"mg_magnifier", "pd_paper_drive"}),
         ("sh_vn_arbor_set_screw", {"ch_channel", "dt_drive_train", "pn_pen"}),
@@ -325,6 +325,11 @@ def test_plain_pivot_components_are_first_class_jig_only_targets() -> None:
         ("ch_rocker_arm_tl_vn_oblique_pivot_cotter", "MHA-CH-06-TL-VN-75"),
         ("ch_rocker_arm_tl_vn_oblique_pivot_lock_wire", "MHA-CH-06-TL-VN-76"),
         ("pd_vn_transgear_pivot_shim", "MHA-PD-VN-67"),
+        # Owner ruling 2026-11-08 (#2144 item 9.2): the jack chain's end link is
+        # screwed to the arm and the ring threads its far link, so neither the
+        # formed anchor eye nor the bead chain's loop link remains.
+        ("dt_crank_pin_eye", "MHA-DT-28"),
+        ("dt_vn_keeper_chain_link", "MHA-DT-VN-66"),
     ],
 )
 def test_retired_orphan_families_are_not_allocated(stem, number) -> None:

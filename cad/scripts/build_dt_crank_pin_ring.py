@@ -2,9 +2,9 @@ r"""Reproduction script: crank-pin keeper ring (book ch. 11, p. 14).
 
 The round brass wire ring hanging from the crank taper pin's head
 (page002_img01), threaded through the pin's cross-hole. A torus of MEAN_R on
-the wire centreline, with a small bead at its silver-soldered joint; the
-cross-hole is sized for its arc (see
-``dt_crank_pin_ring_spec``), and the keeper chain (MHA-DT-VN-65) loops its far side.
+the wire centreline, opened by its pliers-closed butt gap; the cross-hole is
+sized for its arc (see ``dt_crank_pin_ring_spec``), and the keeper chain's
+(MHA-DT-VN-65) far link hangs from its far side.
 
 Layout: the origin is on the cross-hole axis (local Z) and the ring lies in
 the local XZ plane, its centre RING_CENTRE_X along local +X. The drive train
@@ -15,6 +15,9 @@ end, clear of the crank arm (owner ruling 2026-10-15 A1).
 on the ring's inside edge whose one diameter carries the ring's controlling
 size, since a torus has no edge to dimension; the drawing's top view prints
 it (``dt_crank_pin_ring_notes``).
+
+``ButtGap``: a BUTT_GAP slot cut square across the wire at the ring's +Z
+side (owner ruling 2026-11-08, D6: closed with pliers, not soldered).
 
 Run (SolidWorks already open)::
 
@@ -45,8 +48,10 @@ from _saved_part_guard import require_saved_drawing_properties
 from _session import run_build
 from _sketch import (
     SketchDims,
+    add_line_chain,
     anchor_point_to_origin,
     blank_reference_sketches,
+    dimension_between,
     ensure_fully_defined,
     set_sketch_direct_db,
 )
@@ -59,11 +64,11 @@ from dt_crank_pin_ring_notes import (
 )
 from dt_crank_pin_ring_spec import (
     ARC_SAGITTA,
-    JOINT_DIA,
+    BUTT_GAP,
     MEAN_R,
     RING_CENTRE_X,
-    V_JOINT,
     V_RING,
+    V_RING_CLOSED,
     WIRE_DIA,
 )
 
@@ -78,51 +83,56 @@ _SAVED_DRAWING_PROPERTIES = (
 )
 
 
-async def _solder_joint(adapter) -> None:
-    """The silver-soldered joint: a bead on the wire at the ring's +Z side.
+async def _butt_gap(adapter) -> None:
+    """The pliers-closed butt gap: a BUTT_GAP slot across the wire at the
+    ring's +Z side, cut through the wire both ways from the ring's plane.
 
-    A Top-plane sketch maps (x, y) -> global (X, -Z), so the joint centre
-    (RING_CENTRE_X, 0, MEAN_R) sits at sketch (RING_CENTRE_X, -MEAN_R); a half
-    disc about a vertical centerline through it revolves into the bead.
+    A Top-plane sketch maps (x, y) -> global (X, -Z), so the wire's +Z crossing
+    (RING_CENTRE_X, 0, MEAN_R) sits at sketch (RING_CENTRE_X, -MEAN_R); the
+    slot's sides stand BUTT_GAP apart across it and run a wire diameter past
+    the wire either way.
     """
-    from solidworks_mcp.adapters.base import RevolveParameters
+    from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    r = JOINT_DIA / 2.0
-    cx, cy = RING_CENTRE_X, -MEAN_R
-    joint = SketchDims()
-    check("create_sketch joint", await adapter.create_sketch("Top"))
-    set_sketch_direct_db(adapter, True)
-    check("joint axis", await adapter.add_centerline(cx, cy - r, cx, cy + r))
-    arc = check("joint arc", await adapter.add_arc(cx, cy, cx, cy - r, cx, cy + r))
-    closer = check("joint chord", await adapter.add_line(cx, cy + r, cx, cy - r))
-    set_sketch_direct_db(adapter, False)
-    await anchor_point_to_origin(adapter, f"{arc}.center", cx, cy, "joint centre")
-    joint.record(None)
-    joint.record(None)
-    # A diameter, as the drawing's top view prints the bead.
-    check(
-        "joint diameter",
-        await adapter.add_sketch_dimension(arc, None, "diameter", JOINT_DIA),
+    x0, x1 = RING_CENTRE_X - BUTT_GAP / 2.0, RING_CENTRE_X + BUTT_GAP / 2.0
+    y0, y1 = -MEAN_R - WIRE_DIA, -MEAN_R + WIRE_DIA
+    check("create_sketch butt gap", await adapter.create_sketch("Top"))
+    edges = await add_line_chain(adapter, [(x0, y0), (x1, y0), (x1, y1), (x0, y1)])
+    for edge, direction in zip(
+        edges, ("horizontal", "vertical", "horizontal", "vertical"), strict=True
+    ):
+        check(f"butt gap {direction}", await adapter.add_sketch_constraint(edge, None, direction))
+    await anchor_point_to_origin(adapter, f"{edges[0]}.start", x0, y0, "butt gap corner")
+    await dimension_between(
+        adapter, f"{edges[0]}.start", f"{edges[0]}.end", "horizontal_distance", BUTT_GAP, "butt gap"
     )
-    joint.record("JointDia")
-    check("joint chord vertical", await adapter.add_sketch_constraint(closer, None, "vertical"))
-    check(
-        "joint arc start under centre",
-        await adapter.add_sketch_constraint(f"{arc}.start", f"{arc}.center", "vertical_points"),
+    await dimension_between(
+        adapter, f"{edges[1]}.start", f"{edges[1]}.end", "vertical_distance", y1 - y0, "butt gap reach"
     )
-    await ensure_fully_defined(adapter, "joint sketch")
-    check("exit_sketch joint", await adapter.exit_sketch())
-    name_last_feature(adapter, "JointProfile")
-    joint.apply(adapter, "JointProfile")
-    check("revolve joint", await adapter.create_revolve(RevolveParameters(angle=360.0)))
-    name_last_feature(adapter, "SolderJoint")
-    want = V_RING + V_JOINT
-    await volume_check(adapter, "keeper ring with joint", want, 0.005 * want)
+    await ensure_fully_defined(adapter, "butt gap sketch")
+    check("exit_sketch butt gap", await adapter.exit_sketch())
+    name_last_feature(adapter, "ButtGapProfile")
+    check(
+        "cut butt gap",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=2.0 * WIRE_DIA, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "ButtGap")
+    await volume_check(adapter, "keeper ring with its butt gap", V_RING_CLOSED, 0.005 * V_RING)
     bodies = list(_early_bound(adapter.currentModel, "IPartDoc").GetBodies2(0, True) or ())
     if len(bodies) != 1:
-        raise RuntimeError(f"keeper ring has {len(bodies)} bodies after its joint, expected one")
+        raise RuntimeError(f"keeper ring has {len(bodies)} bodies after its butt gap, expected one")
     if not _early_bound(bodies[0], "IBody2").GetEdges():
-        raise RuntimeError("keeper ring's solder joint left no edge on the ring")
+        raise RuntimeError("keeper ring's butt gap left no edge on the ring")
+    # Cut on the +Z side, the gap leaves the centre of mass that far toward -Z.
+    mass = await adapter.get_mass_properties()
+    if not mass.is_success:
+        raise RuntimeError(f"keeper ring: get_mass_properties failed: {mass.error}")
+    com_z = float(mass.data.center_of_mass[2])
+    want_z = -(V_RING - V_RING_CLOSED) * MEAN_R / V_RING_CLOSED
+    if abs(com_z - want_z) > 0.25 * abs(want_z):
+        raise RuntimeError(f"keeper ring's butt gap is off its side: COM z {com_z} != {want_z}")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -139,7 +149,7 @@ async def build(adapter) -> dict[str, str]:
     # x = RING_CENTRE_X is the torus axis (parallel to Y, through the ring
     # centre), and the wire circle at the ring's crown, x = -ARC_SAGITTA / 2 on
     # the hole's Z = 0 section, revolves about it into the ring in the XZ plane.
-    # A plain torus has no edges; the solder joint below adds them.
+    # A plain torus has no edges; the butt gap below adds them.
     prof = SketchDims()
     check("create_sketch wire", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
@@ -195,7 +205,7 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(
         adapter, "driven keeper ring (equations neutral)", V_RING, 0.005 * V_RING
     )
-    await _solder_joint(adapter)
+    await _butt_gap(adapter)
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

@@ -6,10 +6,10 @@ that module, so prose living there re-keyed both parts, their drawings and the
 drive train on every wording edit.  The cup's part builder and drawing script
 import this module; the mating parts never do.
 
-Owner ruling B on #1375 restores the pocket-wall floor by enlarging the body,
-so no general note remains.  Every requirement that has a feature sits on that
-feature's callout (rule 7: flag it where it applies), naming the mate that
-sets it (rule 4).
+Owner ruling B on #1375 restores the pocket-wall floor by enlarging the body.
+Every requirement that has a feature sits on that feature's callout (rule 7:
+flag it where it applies), naming the mate that sets it (rule 4); the pocket's
+three tight dimensions share one numbered flag note.
 """
 
 from __future__ import annotations
@@ -33,34 +33,29 @@ SCREW_NUMBER = "MHA-DT-32"
 SCREW_NAME = "PIVOT SCREW"
 
 FLOOR_HOLE_CALLOUT = "DRILL THRU"
-# The body is epoxied into the MHA-DT-08 counterbore, which is bored to suit
-# it; the band's mate is that bore (r1 finding 3).
-BODY_FIT_CALLOUT = f"EPOXY FIT IN {HANDLE_NUMBER}"
-# Matched fit on the first-made MHA-DT-32 head: name and number and the
-# diametral clearance (rule 4; r1 finding 2).  The largest head plus the
-# widest clearance is the largest bore, so no separate cap prints (#290 review
-# of eb22a22f1 called a Ø MAX row over-specification); the governing wall it
-# leaves, at the face with both edges broken (#2170), is stated as a plain
-# fact (rule 20).
-POCKET_FIT_CALLOUT = "\n".join(
+# The pocket is one feature with three tight dimensions (its reference
+# diameter, its depth and its floor corner): it names its mate once, on one
+# numbered flag note linked to all three (drawing-guidelines.md rule 4).  The
+# matched fit on the first-made MHA-DT-32 head states the diametral clearance
+# as REF; the largest head plus the widest clearance is the largest bore, so
+# no separate cap prints (#290 review of eb22a22f1 called a Ø MAX row
+# over-specification).  The governing wall the bore leaves, at the face with
+# both edges broken (#2170), is stated as a plain fact on the bore's own
+# callout (rule 20; RV-01).
+POCKET_NOTE = 1
+POCKET_FLAG = f"SEE NOTE {POCKET_NOTE}"
+POCKET_FIT_CALLOUT = "\n".join((POCKET_FLAG, f"WALL {inch_text(POCKET_WALL_MIN, 3)} MIN"))
+POCKET_NOTE_TEXT = "\n".join(
     (
-        f"BORE TO SUIT {SCREW_NUMBER}",
-        f"{SCREW_NAME} HEAD, {inch_text(POCKET_CLEARANCE[0], 3)}-"
-        f"{inch_text(POCKET_CLEARANCE[1], 3)}",
-        "DIAMETRAL CLEARANCE;",
-        f"WALL {inch_text(POCKET_WALL_MIN, 3)} MIN",
+        f"{POCKET_NOTE}. POCKET FOR {SCREW_NUMBER} {SCREW_NAME} HEAD: BORE TO THE",
+        "   MEASURED HEAD, RUNNING FIT (CLEARANCE "
+        f"{inch_text(POCKET_CLEARANCE[0], 3)}-{inch_text(POCKET_CLEARANCE[1], 3)}).",
     )
 )
-# The depth band's mate and reason (r1 finding 4).  The floor corner's
-# separate model-owned radial MAX dimension controls head seating (finding 5).
-POCKET_DEPTH_CALLOUT = "\n".join((f"KEEPS {SCREW_NUMBER} HEAD", "BELOW FACE"))
-# The local corner limit is tighter than the title block: identify the head
-# and its flat seating function at the radius itself (rules 4 and 7).
-POCKET_FLOOR_RADIUS_CALLOUT = "\n".join((f"{SCREW_NUMBER} HEAD", "SEATS ON FLOOR"))
 # The bottom chamfer's band reason: it clears the rounded corner of the
 # MHA-DT-08 counterbore floor, so the cup seats with its face flush.
 BODY_CHAMFER_CALLOUT = "\n".join(
-    ("X 45 DEG", f"CLEARS {HANDLE_NUMBER}", "COUNTERBORE CORNER")
+    ("X 45°", f"CLEARS {HANDLE_NUMBER}", "COUNTERBORE CORNER")
 )
 
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 4:1"

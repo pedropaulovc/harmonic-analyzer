@@ -20,9 +20,11 @@ const archivedOnly = new Set([
   'vn-transgear-collar-cross-pin/pd-paper-drive/pd-vn-transgear-collar-cross-pin',
   'vn-latch-hook-rivet/pd-paper-drive/pd-vn-latch-hook-rivet',
   'vn-pedestal-hold-down-screw/ch-channel/ch-vn-pedestal-hold-down-screw',
+  // Retired 2026-11-08 (#2144 9.2); the archived loop link keeps its display name.
+  'vn-keeper-chain-link/dt-drive-train/dt-vn-keeper-chain-link',
 ])
 
-/** Active rows equal current CAD; retired reservations and three archive occurrences are not live identities. */
+/** Active rows equal current CAD; retired reservations and four archive occurrences are not live identities. */
 export function validateCurrentNativeIdentityProjection(table, cadMap, archivedMap) {
   if (cadMap.schema_version !== 1 || !Array.isArray(cadMap.parts_and_assemblies)
     || !Array.isArray(cadMap.retired_identities)) fail('invalid current CAD map')
@@ -58,7 +60,13 @@ export function validateCurrentNativeIdentityProjection(table, cadMap, archivedM
     .some(stem => reservedStems.has(stem)))) fail('historical alias reactivates a retired identity')
   const currentRows = [...table.machineVendors, ...table.nativeIdentities,
     ...table.toolingVendors.map(row => ({ sourceStem: row.sourceStem, sourceNumber: row.sourceNumber, identities: [row] }))]
-  for (const row of [...currentRows, ...table.archiveOnlyVendors.map(target => ({
+  // An archived occurrence of a retired identity may stay displayable only as
+  // that reservation's exact mirror, without a Number.
+  const archivedRetirement = target => target.number === null && cadMap.retired_identities.some(row =>
+    row.old_stem === target.sourceStem && row.old_number === target.sourceNumber
+    && row.new_identities.length === 1 && row.new_identities[0].parent === target.parent
+    && row.new_identities[0].stem === target.stem)
+  for (const row of [...currentRows, ...table.archiveOnlyVendors.filter(target => !archivedRetirement(target)).map(target => ({
     sourceStem: target.sourceStem, sourceNumber: target.sourceNumber, identities: [target],
   }))]) {
     if ([row.sourceStem, ...row.identities.map(target => target.stem)].some(stem => reservedStems.has(stem))
@@ -95,7 +103,7 @@ export function validateCurrentNativeIdentityProjection(table, cadMap, archivedM
     || table.archiveOnlyVendors.some(row => !archivedOnly.has(`${row.sourceStem}/${row.parent}/${row.stem}`)
       || row.status !== 'archive-only' || row.number !== null || row.registry !== null || row.builder !== null
       || currentRows.some(source => source.identities.some(target => target.stem === row.stem && target.parent === row.parent)))) {
-    fail('archive-only identities must remain exactly the three historical occurrences, without live CAD entries')
+    fail('archive-only identities must remain exactly the four historical occurrences, without live CAD entries')
   }
   if (archivedMap) {
     const numbers = sorted(archivedMap.rows.map(row => ({ sourceStem: row.new_stem, sourceNumber: row.new_number })))

@@ -1,10 +1,11 @@
 """Offline contracts for the crank-pin keeper ring (MHA-DT-27) part and drawing.
 
 A ``visual_noncritical`` formed-wire ring under ``cad/docs/drawing-guidelines.md``
-(#1076): three native model dimensions whose places the PART owns -- the
+(#1076): two native model dimensions whose places the PART owns -- the
 inside diameter from a blanked reference sketch in the ring's plane, and the
-wire and the solder bead as REFERENCE -- every one at the title block's one
-place, no GD&T, no roughness symbol, and at most four note lines.
+wire as REFERENCE -- no GD&T, no roughness symbol, and at most four note
+lines. Owner ruling 2026-11-08 (D6): the ring closes with pliers, leaving a
+butt gap, not a solder bead.
 """
 
 from __future__ import annotations
@@ -47,8 +48,24 @@ def test_required_drawing_paths() -> None:
 def test_printed_sizes_derive_from_the_ring_spec() -> None:
     assert notes.RING_ID == pytest.approx(2.0 * spec.MEAN_R - spec.WIRE_DIA)
     assert notes.RING_ID == pytest.approx(0.43 * 25.4)
-    # The bead is bigger than the wire it joins, so it reads on the sheet.
-    assert spec.JOINT_DIA > spec.WIRE_DIA
+
+
+def test_pliers_closed_butt_gap_replaces_the_solder_bead() -> None:
+    # D6: 0-.010 band, .005 nominal; the gap only removes its own wire.
+    assert spec.BUTT_GAP_BAND == pytest.approx((0.0, 0.010 * 25.4))
+    low, high = spec.BUTT_GAP_BAND
+    assert low < spec.BUTT_GAP < high
+    assert spec.BUTT_GAP == pytest.approx(0.005 * 25.4)
+    wire_area = math.pi * (spec.WIRE_DIA / 2.0) ** 2
+    assert spec.V_RING - spec.V_RING_CLOSED == pytest.approx(wire_area * spec.BUTT_GAP)
+    assert not hasattr(spec, "JOINT_DIA") and not hasattr(spec, "V_JOINT")
+    # The gap is cut square across the wire on the ring's side away from the
+    # cross-hole (its crown) and the chain (its far side).
+    build = "".join(_build_source().split())
+    assert 'name_last_feature(adapter,"ButtGap")' in build
+    assert "awaitadapter.create_cut_extrude(" in build
+    assert "await_butt_gap(adapter)" in build
+    assert "_solder_joint" not in build
 
 
 def _band(places: int) -> float:
@@ -80,20 +97,16 @@ def test_marked_dimension_set_lives_in_the_notes_module() -> None:
     assert notes.DRAWING_DIMENSIONS == {
         "WireProfile": {"WireDia"},
         "RingReference": {"RingID"},
-        "JointProfile": {"JointDia"},
     }
     marked = set().union(*notes.DRAWING_DIMENSIONS.values())
     assert set(drawing.TOP_KEEP) | set(drawing.FRONT_KEEP) == marked
     assert not set(drawing.TOP_KEEP) & set(drawing.FRONT_KEEP)
-    assert notes.REFERENCE_DIMENSIONS == {"WireDia", "JointDia"}
+    assert notes.REFERENCE_DIMENSIONS == {"WireDia"}
     assert set(notes.DIMENSION_CALLOUTS) <= marked
-    # Drawing-only data stays out of the spec the drive train imports.
-    for name in ("DRAWING_DIMENSIONS", "DRAWING_PRECISION", "DRAWING_NOTES"):
-        assert not hasattr(spec, name), name
 
 
 def test_precision_is_authored_on_the_part_at_the_title_block_place() -> None:
-    assert notes.DRAWING_PRECISION_BY_NAME == {"WireDia": 3, "RingID": 2, "JointDia": 2}
+    assert notes.DRAWING_PRECISION_BY_NAME == {"WireDia": 3, "RingID": 2}
     assert "draw_dt_crank_pin_ring.py" in PRECISION_MIGRATED_DRAWINGS
     source = _source()
     assert "set_dimension_precision" not in source
@@ -117,11 +130,6 @@ def test_ring_reference_sketch_carries_the_inside_diameter() -> None:
     assert 'names=("RingCx",None,"RingID")' in build
     assert 'drives=(None,None,\'2*"MeanR"-"WireDia"\')' in build
     assert 'name_last_feature(adapter,"RingReference")' in build
-    assert 'blank_reference_sketches(adapter,("RingReference",))' in build
-    # The bead prints as the diameter the spec names.
-    assert 'add_sketch_dimension(arc,None,"diameter",JOINT_DIA)' in build
-    assert 'joint.record("JointDia")' in build
-    assert 'joint.apply(adapter,"JointProfile")' in build
     assert '"radial"' not in build
 
 
@@ -140,7 +148,7 @@ def test_print_carries_no_gdt_roughness_or_hole_callouts() -> None:
     assert '"*Isometric"' in source
 
 
-def test_notes_are_few_and_carry_no_values() -> None:
+def test_notes_are_few_and_carry_no_part_sizes() -> None:
     lines = notes.DRAWING_NOTES.splitlines()
     assert 1 <= len(lines) <= 4  # drawing-guidelines.md rule 7
     for number, line in enumerate(lines, start=1):
@@ -152,12 +160,10 @@ def test_notes_are_few_and_carry_no_values() -> None:
         "\u00d8",
         "MM",
         f"{spec.WIRE_DIA:.1f}",
-        f"{spec.JOINT_DIA:.1f}",
         f"{notes.RING_ID:.1f}",
         f"{2.0 * spec.MEAN_R:g}",
     ):
         assert value not in text, value
-    assert "MHA-DT-09" in text and "CROSS-HOLE" in text
     for callout in notes.DIMENSION_CALLOUTS.values():
         # A flag to a numbered note is the only number a callout carries.
         words = re.sub(r"SEE NOTE \d+", "", callout)
@@ -165,10 +171,6 @@ def test_notes_are_few_and_carry_no_values() -> None:
     assert "SEE NOTE 1" in notes.DIMENSION_CALLOUTS["JointDia"]
     assert '"Manufacturing Notes": DRAWING_NOTES' in _build_source()
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in _source()
-
-
-def test_mating_part_number_in_the_notes_is_live() -> None:
-    assert _config.parts("dt-crank-pin")["number"] == "MHA-DT-09"
 
 
 def test_views_are_in_projection_and_clear_of_the_title_block() -> None:

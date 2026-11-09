@@ -196,7 +196,7 @@ network data or recovers files from Git.
 
 Current consumers use `current-native-identity.mjs` and the independently pinned
 `content/current-native-identities.json` at archive ingestion. Current Numbers
-have two identity digits (`MHA-DT-28`, assembly `MHA-DT-00`), while configuration
+have two identity digits (`MHA-DT-27`, assembly `MHA-DT-00`), while configuration
 qualifiers such as `T006` retain all three digits. Repeated supplier-qualified
 SKUs share one native part per SKU across consumers:
 
@@ -237,9 +237,12 @@ raw-map checks never normalize newlines or accept a platform-specific pin.
 The current-source executed-input closure also requires independent live-consumer
 seals for the current map and its Node authority helper at build and publication;
 these supplement rather than replace raw-map authentication.
-The table's three historical-only vendor occurrences remain separate and unchanged,
-with no current Number, registry or builder path. They identify archived machine
-geometry, not invented CAD parts; retired standalone tooling is not added to them.
+The table's four historical-only vendor occurrences remain separate, with no
+current Number, registry or builder path: the three pre-cutover retirements and
+the v39 `vn-keeper-chain-link` (MHA-DT-VN-66, retired 2026-11-08), whose row
+mirrors its `retired_identities` reservation exactly. They identify archived
+machine geometry, not invented CAD parts; retired standalone tooling is not
+added to them.
 Browser loading verifies the current table's semantic digest before projecting
 the already byte-verified model's names and declared identity extras. Archived
 GLB bytes, source names, hashes, URLs, inventory matrices and measured geometry

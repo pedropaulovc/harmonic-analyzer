@@ -91,6 +91,15 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "98381A434",
         material="Alloy Steel",
     ),
+    # MHA-DT-VN-70 (owner ruling 2026-11-08, #2144 item 9.2): the brass #2-56
+    # x 1/4 binding head that clamps the 3603T354 keeper chain's end link to
+    # the MHA-DT-06 arm through the link's eye.
+    "dt-vn-keeper-chain-screw": _stock(
+        "dt-vn-keeper-chain-screw",
+        "Brass Binding Head Slotted Screw",
+        "92443A077",
+        material="Brass",
+    ),
     "sh-vn-brass-fillister-screw": _stock(
         "sh-vn-brass-fillister-screw",
         "Brass Fillister Head Slotted Screw",

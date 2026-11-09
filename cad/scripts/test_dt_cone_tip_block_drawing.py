@@ -52,7 +52,7 @@ def test_adjuster_embed_band_stays_inside_its_engagement_window() -> None:
     assert low == pytest.approx(1.0 * 4.826 + spec.ADJUSTER_CSK, abs=1e-3)
     assert high == pytest.approx(spec.BLOCK_Z - 0.127 - spec.ADJUSTER_CSK)
     assert low < spec.ADJUSTER_EMBED < high
-    assert drawing.ADJUSTER_CSK_QUALIFIER == "90° CSK Ø.197 BOTH ENDS"
+    assert drawing._CSK_DIA_TEXT == ".197"
 
 
 def test_adjuster_callout_names_both_countersinks_under_the_thread() -> None:
@@ -65,7 +65,7 @@ def test_adjuster_callout_names_both_countersinks_under_the_thread() -> None:
     rewritten = drawing._adjuster_callout_definitions(native)
     assert rewritten[5] == native[5]
     assert rewritten[7] == (
-        "<hw-threaddesc> <hw-threadclass> <hw-thru>\n90° CSK Ø.197 BOTH ENDS"
+        f"<hw-threaddesc> <hw-threadclass> <hw-thru>\n{drawing.ADJUSTER_CSK_QUALIFIER}"
     )
     with pytest.raises(RuntimeError):
         drawing._adjuster_callout_definitions({**native, 5: native[7]})
@@ -91,7 +91,8 @@ def test_pinch_joint_uses_entry_clearance_and_opposite_jaw_thread() -> None:
 
 
 def test_pinch_thread_callout_keeps_native_variables_but_limits_both_extents() -> None:
-    """The print must describe the remaining threaded jaw, not the pre-clearance cut."""
+    """The far jaw is tapped to the slot in the joint drill both callouts
+    name (round-8 farm review: one feature on one axis, a fit-up route)."""
     original = {
         5: "<hw-threaddesc> <hw-threadclass> <hw-thru>",
         6: "",
@@ -101,16 +102,27 @@ def test_pinch_thread_callout_keeps_native_variables_but_limits_both_extents() -
     rewritten = drawing._pinch_thread_callout_definitions(original)
     text = "\n".join(rewritten.values())
     assert "THRU ALL" not in text
-    assert text.count("TO SLOT") == 2
-    assert drawing._PINCH_THREAD_QUALIFIER in text
     assert all(token in text for token in drawing._PINCH_THREAD_NATIVE_TOKENS)
-    # Drill line, thread line, then the prose (Main eye-pass af561fa7).
-    assert rewritten[5] == (
-        "<hw-threaddesc> <hw-threadclass> TO SLOT\nCOAXIAL WITH CLEARANCE"
+    # Two lines, each its own part; the drill line is the joint drill.
+    assert rewritten[5] == f"<hw-threaddesc> <hw-threadclass> {drawing.PINCH_TAP_EXTENT_TEXT}"
+    assert rewritten[7] == (
+        f"<MOD-DIAM> <hw-thrutapdrldia> {drawing.PINCH_JOINT_DRILL_TEXT}"
     )
-    # Rule 12 (machinist review of 04848e25c): the tap drill says DRILL.
-    assert rewritten[7] == "<MOD-DIAM> <hw-thrutapdrldia> DRILL TO SLOT"
-    assert "LEFT-JAW" not in text
+    with pytest.raises(RuntimeError):
+        drawing._pinch_thread_callout_definitions({**original, 7: ""})
+
+
+def test_pinch_clearance_and_tap_share_one_joint_drill() -> None:
+    """Round-8 farm review (rules 4/19): the clearance's .19/1.85 and the
+    tap's carry loose bands, so both callouts name one tap-drill hole drilled
+    through both jaws, the clearance opened from it in the near jaw."""
+    spec = dt_cone_tip_block_spec
+    tap_drill = drawing.length_text(spec.PINCH_BORE_DIA, drawing.HOLE_CALLOUT_PLACES)
+    assert drawing._pinch_joint_drill_line() == (
+        f"<MOD-DIAM>{tap_drill} {drawing.PINCH_JOINT_DRILL_TEXT}"
+    )
+    # The far jaw's native tap-drill Ø prints at the same places.
+    assert drawing.THRU_TAP_DRILL_PRECISION == {"hw-thrutapdrldia": drawing.HOLE_CALLOUT_PLACES}
 
 
 def test_pinch_spacing_closes_every_print_tolerance_stack() -> None:
@@ -171,22 +183,19 @@ def test_block_stands_on_the_platform_and_keeps_every_axis_relation() -> None:
 
 
 def test_pinch_thread_readback_checks_the_thread_part_not_string_order() -> None:
-    """c6981bac (run 244bc8bb) resolved exactly this and was wrongly refused."""
+    """c6981bac (run 244bc8bb) resolved the thread part before the drill's."""
     resolved = {
-        1: "4-40 UNC - 2B TO SLOT\nCOAXIAL WITH CLEARANCE",
+        1: f"4-40 UNC - 2B {drawing.PINCH_TAP_EXTENT_TEXT}",
         2: "",
-        3: "<MOD-DIAM> 2.26 DRILL TO SLOT",
+        3: f"<MOD-DIAM> .089 {drawing.PINCH_JOINT_DRILL_TEXT}",
         4: "",
     }
     assert drawing._pinch_thread_callout_resolved(resolved)
     assert not drawing._pinch_thread_callout_resolved(
-        {**resolved, 1: "COAXIAL WITH CLEARANCE\n4-40 UNC - 2B TO SLOT"}
+        {**resolved, 3: "<MOD-DIAM> .089 THRU ALL"}
     )
     assert not drawing._pinch_thread_callout_resolved(
-        {**resolved, 3: "<MOD-DIAM> 2.26 THRU ALL"}
-    )
-    assert not drawing._pinch_thread_callout_resolved(
-        {**resolved, 3: "<MOD-DIAM> 2.26 TO SLOT"}
+        {**resolved, 1: "4-40 UNC - 2B THRU ALL"}
     )
 
 
@@ -264,9 +273,10 @@ def test_only_views_dimensioning_hidden_sketches_opt_in() -> None:
 
 def test_every_marked_dimension_is_kept_in_exactly_one_view() -> None:
     """Every marked dimension lands on one view; the bottom view carries the
-    hold-down tap's two stations (2026-09-29).  The slit's depth runs to a
-    floor inside the bore that no view draws, so the part no longer marks it
-    (machinist review of e04fd60ab)."""
+    hold-down tap's two stations (2026-09-29) and the width of the foot that
+    stands on MHA-DT-20 (round-1 farm review, dt-fab-4).  The slit's depth
+    runs to a floor inside the bore that no view draws, so the part no longer
+    marks it (machinist review of e04fd60ab)."""
     adjuster_axis = {"AxisHeight", "PassageCenter"}
     kept = [
         *drawing.FRONT_KEEP,
@@ -286,7 +296,22 @@ def test_every_marked_dimension_is_kept_in_exactly_one_view() -> None:
     assert "SlitDepth" not in marked
     assert "SlitDepth" not in dt_cone_tip_block_spec.DRAWING_PRECISION_BY_NAME
     assert set(drawing.TOP_KEEP) == {"Depth"}
-    assert set(drawing.BOTTOM_KEEP) == {"FootTapX", "FootTapZ"}
+    assert set(drawing.BOTTOM_KEEP) == {"FootTapX", "FootTapZ", "Width"}
+    assert drawing.LEFT_KEEP == {}
+
+
+def test_view_b_locates_its_thread_with_its_own_driven_stations() -> None:
+    """Round-1 farm review (dt-fab-4, rule 7): VIEW B's far-jaw thread is
+    located in VIEW B, to the right view's stations and places."""
+    assert set(drawing.VIEW_B_DIMENSIONS) == {"ViewBPinchDepth", "ViewBPinchHeight"}
+    assert dt_cone_tip_block_spec.DRAWING_REFERENCE_PRECISION == {
+        "ViewBPinchDepth": dt_cone_tip_block_spec.PINCH_DEPTH_PLACES,
+        "ViewBPinchHeight": dt_cone_tip_block_spec.PINCH_HEIGHT_PLACES,
+    }
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    body = source[source.index("async def build(") :]
+    assert "_add_view_b_pinch_dimensions(adapter, left, pinch_thread_edge)" in body
+    assert "CreateCenterLine" not in source
 
 
 def test_slot_width_text_stands_right_of_its_outside_arrows() -> None:
@@ -298,7 +323,7 @@ def test_slot_width_text_stands_right_of_its_outside_arrows() -> None:
     right_wall = slot_x + part.SLIT_W * drawing._S / 2.0
     arrow_tail = right_wall + drawing.ARROW_LENGTH
     assert text_x - drawing.VALUE_TEXT_HALF_WIDTH >= arrow_tail + 0.001
-    passage_x = drawing._adjuster_axis_keep(drawing.FRONT_CENTER)["PassageCenter"][0]
+    passage_x = drawing._adjuster_axis_keep()["PassageCenter"][0]
     assert passage_x < slot_x < text_x
     assert "SlitW" in drawing.ARROWS_OUTSIDE
     # Machinist review of e04fd60ab: the width states the slit's extent, and
@@ -381,16 +406,16 @@ def test_sheet_ink_is_clear_and_the_build_places_what_it_audits() -> None:
     drawing.assert_sheet_ink_clear()
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     body = source[source.index("async def build(") :]
-    assert "assert_sheet_ink_clear(adjuster_center)" in body
-    assert body.index("assert_sheet_ink_clear(") < body.index("curate(")
+    assert "assert_sheet_ink_clear()" in body
+    assert body.index("assert_sheet_ink_clear(") < body.index("curate_view_dimensions(")
     for placed in (
-        "callout_xy=_adjuster_callout_xy(adjuster_center)",
+        "callout_xy=ADJUSTER_CALLOUT_XY",
         "callout_xy=PINCH_CLEARANCE_CALLOUT_XY",
         "callout_xy=PINCH_THREAD_CALLOUT_XY",
         "callout_xy=FOOT_TAP_CALLOUT_XY",
-        "for text, x, y in _sheet_notes(adjuster_center):",
-        "adjuster_axis_keep = _adjuster_axis_keep(adjuster_center)",
-        "[FOOT_FINISH_CENTER]",
+        "for text, x, y in _sheet_notes():",
+        "keep={**FRONT_KEEP, **_adjuster_axis_keep()}",
+        "foot_edge = _foot_edge(adapter, front)",
         "foot_symbol, foot_right = _foot_finish_placement()",
         "symbol_xy=foot_symbol",
         "leader_attach_xy=foot_right",
@@ -400,8 +425,11 @@ def test_sheet_ink_is_clear_and_the_build_places_what_it_audits() -> None:
     ):
         assert placed in body, placed
     assert body.count("add_note(adapter,") == 1
-    # The foot's Ra 3.2 sits on VIEW C, where nothing is dimensioned under it.
-    assert drawing.FOOT_FINISH_CENTER == drawing.BACK_CENTER
+    # Round-1 farm review (dt-fab-4): the rear view (VIEW C) is gone; the
+    # foot's finish sits on the front view, the width moved under the bottom
+    # view, so nothing is dimensioned under the front view's foot.
+    assert '"*Back"' not in body
+    assert "Width" not in drawing.FRONT_KEEP
     assert drawing.ARROWS_INSIDE == (
         "PinchHeight",
         "PinchDepthCenter",
@@ -658,7 +686,7 @@ def test_pinch_clearance_print_breaks_into_the_slit_at_the_worst_case() -> None:
         floor = round(depth, 1) - _GENERAL[1]
         assert floor >= near_wall + 0.25, (floor, near_wall)
         return
-    assert drawing.PINCH_CLEARANCE_EXTENT_TEXT == "DRILL TO SLOT"
+    assert drawing.PINCH_CLEARANCE_EXTENT_TEXT.endswith("TO SLOT")
     clearance_max = spec.PINCH_CLEARANCE_DIA + _DRILLED_PLUS
     point = (clearance_max / 2.0) / math.tan(math.radians(118.0 / 2.0))
     slit_min = _printed("SlitW", spec.SLIT_W)[0]
@@ -668,20 +696,38 @@ def test_pinch_clearance_print_breaks_into_the_slit_at_the_worst_case() -> None:
 
 
 def test_pinch_clearance_callout_rewrites_the_blind_depth_to_drill_to_slot() -> None:
-    """The native blind depth pair becomes the instruction; the diameter
-    stays its Hole Wizard variable, and any other shape fails loud."""
+    """The native blind depth pair becomes the instruction under the joint
+    drill's line; the diameter stays its Hole Wizard variable, and any other
+    shape fails loud."""
     native = {5: "<MOD-DIAM><hw-diam> <HOLE-DEPTH> <hw-depth>", 6: "", 7: "", 8: ""}
     rewritten = drawing._pinch_clearance_callout_definitions(native)
-    assert rewritten == {5: "<MOD-DIAM><hw-diam> DRILL TO SLOT", 6: "", 7: "", 8: ""}
+    assert rewritten == {
+        5: (
+            f"{drawing._pinch_joint_drill_line()}\n"
+            f"<MOD-DIAM><hw-diam> {drawing.PINCH_CLEARANCE_EXTENT_TEXT}"
+        ),
+        6: "",
+        7: "",
+        8: "",
+    }
     with pytest.raises(RuntimeError):
         drawing._pinch_clearance_callout_definitions({**native, 5: "<MOD-DIAM><hw-diam>"})
     with pytest.raises(RuntimeError):
         drawing._pinch_clearance_callout_definitions({**native, 7: native[5]})
+    joint = f"<MOD-DIAM>.089 {drawing.PINCH_JOINT_DRILL_TEXT}"
+    clearance = f"<MOD-DIAM> .129 {drawing.PINCH_CLEARANCE_EXTENT_TEXT}"
     assert drawing._pinch_clearance_callout_resolved(
-        {1: "<MOD-DIAM> .129 DRILL TO SLOT", 2: "", 3: "", 4: ""}
+        {1: f"{joint}\n{clearance}", 2: "", 3: "", 4: ""}
+    )
+    # Clearance first, or no joint drill, fails.
+    assert not drawing._pinch_clearance_callout_resolved(
+        {1: f"{clearance}\n{joint}", 2: "", 3: "", 4: ""}
     )
     assert not drawing._pinch_clearance_callout_resolved(
-        {1: "<MOD-DIAM> .129 <HOLE-DEPTH> .272", 2: "", 3: "", 4: ""}
+        {1: clearance, 2: "", 3: "", 4: ""}
+    )
+    assert not drawing._pinch_clearance_callout_resolved(
+        {1: f"{joint}\n<MOD-DIAM> .129 <HOLE-DEPTH> .272", 2: "", 3: "", 4: ""}
     )
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     body = source[source.index("async def build(") :]
@@ -722,11 +768,15 @@ def test_r3_prints_no_two_place_dimension_it_does_not_need() -> None:
 def test_every_three_place_size_names_its_mate_at_its_dimension() -> None:
     """Rules 3/4 (machinist review of d84a42ca7): a three-place size given a
     function is a tight band, and its dimension names the mate it serves.
-    The tap's two stations locate one hole, named on that hole's callout."""
+    The tap's two stations locate one hole, named on that hole's callout;
+    the bore's location names its mate on the bore's callout (rule 4: a
+    location carries its value only)."""
     grades = dt_cone_tip_block_spec.DRAWING_PRECISION_BY_NAME
     texts = {**drawing.DIMENSION_CALLOUTS, **drawing.DIMENSION_CALLOUTS_ABOVE}
+    assert "PassageCenter" not in texts
     for name in ("FootTapX", "FootTapZ"):
         texts[name] = drawing.FOOT_TAP_QUALIFIER
+    texts["PassageCenter"] = drawing.BORE_FLAG_TEXT
     three_place = {name for name, places in grades.items() if places == 3}
     assert three_place == {"Depth", "PassageCenter", "FootTapX", "FootTapZ"}
     # The width's band is its own, one-sided; its reason still names the edge.

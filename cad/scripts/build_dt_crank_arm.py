@@ -294,14 +294,15 @@ async def build(adapter) -> dict[str, str]:
     vol = await _volume(adapter)
     _telemetry.info(f"volume after punch witness: {vol:.1f} mm^3")
 
-    # Keeper-ring anchor: a #4-40 tap through the arm (ch11 p.14), the
-    # brass fillister-screw clamps the wire eyelet's tail under its head.
+    # Keeper-chain anchor: a #2-56 tap through the arm (ch11 p.14; owner
+    # ruling 2026-11-08), .11 from the +Y edge; the MHA-DT-VN-70 binding-head
+    # screw clamps the jack chain's end link through its eye.
     anchor_cut = wizard_holes(
         adapter,
         ANCHOR_HOLE_SPEC,
         [[ANCHOR_SCREW_X, ANCHOR_SCREW_Y, ARM_THICKNESS]],
         (0.0, 0.0, 1.0),
-        "keeper-ring anchor tap (#4-40)",
+        f"keeper-chain anchor tap ({ANCHOR_HOLE_SPEC.size})",
         name="AnchorTap",
         placement_dims=[(("AnchorX", '"AnchorScrewX"'), ("AnchorY", '"AnchorScrewY"'))],
     )

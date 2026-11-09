@@ -41,7 +41,7 @@ from dt_crank_drive_gear_spec import FACE_WIDTH as GEAR64_FACE_WIDTH
 from dt_crank_drive_gear_spec import LAYOUT_FACE_WIDTH as GEAR64_LAYOUT_FACE_WIDTH
 from dt_crank_drive_gear_spec import SOUTH_FACE_SHIFT_NORTH as GEAR64_SOUTH_FACE_SHIFT_NORTH
 from dt_crank_drive_gear_spec import LAYOUT_CENTRE_STATION as GEAR64_LAYOUT_CENTRE_STATION
-from gear_seat_fit import flat_bore_af_band, seat_bore_band
+from gear_seat_fit import FLAT_AF_CLEARANCE, flat_bore_af_band, seat_bore_band
 
 
 MM_PER_IN = 25.4
@@ -171,19 +171,15 @@ if THRUST_RING_MIN - 2.0 * THRUST_EDGE_BREAK_MAX < THRUST_RING_FLOOR - 1e-9:
 COLLAR_ROOT_RADIUS_MAX = 0.0508  # .002
 # The callout under the collar's reference diameter: the stock statement in
 # the U41 plate's form ("1/4 PLATE AS SUPPLIED"), so the bar size stays out
-# of the MATERIAL cell, then each tighter-than-title-block limit followed by
-# its reason (machinist review r1, run 20261018T054926125Z: a tight break and
-# a sharp root need their function at the callout).  The edge break keeps the
-# MHA-DT-05 thrust ring above its floor (above); "SEATS" alone did not say
-# why the OD edge matters, since the 64T's seat annulus sits inside it
-# (machinist review, PR #2107).  The roots' reason is that both faces seat.
+# of the MATERIAL cell, with the collar's two limits tighter than the title
+# block at the feature they govern (rule 3: never in a note) and their one
+# reason naming both faces' mates once by drawing number.  The OD edge break
+# keeps the MHA-DT-05 thrust ring above its floor (above); the sharp roots
+# let both faces seat.  Two lines of words (rule 7).
 COLLAR_STOCK_CALLOUT = "\n".join(
     (
-        "5/8 BAR AS SUPPLIED",
-        f"EDGE BREAK {inch_text(THRUST_EDGE_BREAK_MAX, 3)} MAX",
-        "FOR MHA-DT-05 THRUST RING",
-        f"ROOTS R{inch_text(COLLAR_ROOT_RADIUS_MAX, 3)} MAX",
-        "SEATS MHA-DT-05 AND 64T",
+        f"5/8 BAR AS SUPPLIED, EDGE BREAK {inch_text(THRUST_EDGE_BREAK_MAX, 3)} MAX",
+        f"ROOTS R{inch_text(COLLAR_ROOT_RADIUS_MAX, 3)} MAX, SEATS MHA-DT-05 AND MHA-DT-07",
     )
 )
 # The same break on the post's journal rims, the ring's other bounding edge;
@@ -202,58 +198,43 @@ def _gear(teeth: int) -> str:
     return f"T{teeth:03d}"
 
 
-def _land_1_gears() -> str:
-    teeth = SECTION_CONE_GEAR_TEETH[1]
-    return f"{_gear(min(teeth))}-{_gear(max(teeth))}"
-
-
-# Each tight band names its mate at its own callout (drawing-guidelines.md
-# rule 4; machinist review r1 found the mates only in a general note).  The
-# journal runs in the post bore; every gear land's seat and flat slide in
-# the D-bores of the gears it carries (cone_shaft_land_bands
-# .SECTION_CONE_GEAR_TEETH, the 64T on land 1 too).  Two lines below the
-# journal's and land 1's diameters, where the side view has room; one-line
-# suffixes on the stepped tip, whose texts climb over each other, and on
-# every across-flat (machinist review r2: A-A's too).
+# Each tight band names its mate and fit route (drawing-guidelines.md rule
+# 4).  The journal's .0008 band is under the turned-diameter row, so it is a
+# matched running fit to the MHA-DT-05 bore, the form the reviewer accepted
+# on MHA-DT-19's pivot shaft, its clearance the printed limits'
+# (JOURNAL_DIAMETRAL_CLEARANCE_MM) as a REF row of its own: two lines of
+# words (rule 7) narrow enough to stand between the faced end and section
+# A-A (round 3's 33-character line crowded section A's letter).  Every gear
+# land and its flat slide in the bores of the gears it carries; those mates
+# (MHA-DT-03, MHA-DT-07 on land 1, MHA-DT-VN-54 on the terminal land) and
+# the flats' matched fit are flag note LAND_NOTE, linked from each land's
+# diameter and across-flat: the stepped tip's texts climb over each other
+# and have no room for the names.
+LAND_NOTE = 1
+LAND_FLAG = f"SEE NOTE {LAND_NOTE}"
+JOURNAL_FIT_CALLOUT = (
+    "RUNNING FIT, MATCHED\n"
+    "TO MHA-DT-05 BORE\n"
+    f"(CLEARANCE {inch_text(JOURNAL_DIAMETRAL_CLEARANCE_MM[0], 4)}"
+    f"-{inch_text(JOURNAL_DIAMETRAL_CLEARANCE_MM[1], 4)})"
+)
 SEAT_MATE_CALLOUTS = {
-    "Sec0Dia": "RUNNING FIT IN\nMHA-DT-05 BORE",
-    "Sec1Dia": f"SLIDES IN 64T AND\n{_land_1_gears()}",
+    "Sec0Dia": JOURNAL_FIT_CALLOUT,
+    "Sec1Dia": LAND_FLAG,
 }
 # The terminal land's band also carries the MHA-DT-VN-54 collar, whose bore
 # clearance is derived from this diameter (dt_vn_cone_tip_collar_spec; codex
-# review of #1644 at fd9aa2df7), so its callout names the collar too.
+# review of #1644 at fd9aa2df7); LAND_NOTE names it with D-D's gears.
 TERMINAL_LAND = 4
-SEAT_MATE_SUFFIXES = {
-    f"Sec{land}Dia": " SLIDES IN "
-    + ", ".join(
-        (
-            *(_gear(t) for t in SECTION_CONE_GEAR_TEETH[land]),
-            *(("MHA-DT-VN-54",) if land == TERMINAL_LAND else ()),
-        )
-    )
-    for land in (2, 3, TERMINAL_LAND)
-}
-FLAT_MATE_SUFFIXES = {
-    "Sec1AF": f" 64T, {_land_1_gears()}",
-    **{
-        f"Sec{land}AF": " " + ", ".join(_gear(t) for t in SECTION_CONE_GEAR_TEETH[land])
-        for land in (2, 3, 4)
-    },
-}
-# The flats' one shared clock (each turns every gear on its land), flagged on
-# the first flat's section rather than left as a general note.
-FLATS_IN_LINE_CALLOUT = "4 FLATS IN LINE"
-# Why the three land steps and the collar web print three places: each step
-# stands SEAT_STEP_SETBACK inside the bore of the smallest gear on the larger
-# land (the step proof below), and the web is the 64T's station toward
-# MHA-DT-05.  One-line suffixes: a length tier carries one line.
-LENGTH_FUNCTION_SUFFIXES = {
-    **{
-        f"Sec{land}End": f" INSIDE {_gear(min(SECTION_CONE_GEAR_TEETH[land]))} BORE"
-        for land in (1, 2, 3)
-    },
-    "CollarWidth": " LOCATES 64T GEAR",
-}
+SEAT_MATE_SUFFIXES = {f"Sec{land}Dia": f" {LAND_FLAG}" for land in (2, 3, TERMINAL_LAND)}
+# An across-flat line is centred on its section; with "SEE" B-B's would
+# overrun the sheet border by 0.6 mm, so the flats carry the bare flag.
+FLAT_MATE_SUFFIXES = {f"Sec{land}AF": f" NOTE {LAND_NOTE}" for land in (1, 2, 3, 4)}
+# Every D-bore's across-flat band is gear_seat_fit.flat_bore_af_band of the
+# land's (the 64T's too), so one clearance serves all four flats.
+FLAT_AF_CLEARANCE_TEXT = (
+    f"{inch_text(FLAT_AF_CLEARANCE[0], 4)}-{inch_text(FLAT_AF_CLEARANCE[1], 4)}"
+)
 
 # Station layout.  Every cone gear station was laid out on a 6.5 reference
 # face one exact-tracking seat pitch (dt_cone_gear_spec.SEAT_PITCH) from the next;
@@ -405,26 +386,26 @@ for _land in FLAT_LANDS[:-1]:
             f"(radius {_next_radius_max:.4f})"
         )
 
-# One length origin (#914 option A, Main ruling 2026-09-25): the collar's
-# thrust face, the face the post bears on.  drawing-guidelines.md rule 14 (keep text off the part) allows one
-# origin per view, baseline from it.  The journal runs back from it to the
-# front stub, and the three land steps and the tip run forward from it.
-# Measuring the steps from the same face as the gear stack keeps the
-# journal's .X length out from between them.  The tip is a station too (#917
-# R5 (a), Main 2026-09-26): the collar is what the tip cup's embed is set
-# against, and front-to-tip as the controlling length stacked the journal's
-# .X on the overall's, doubling the collar-to-tip band; the front-to-tip
-# overall is a reference.  Each land's end plane is offset from
+# Two length origins, one per chucking (drawing-guidelines.md rule 11; Main's
+# delegated ruling (b), 2026-11-07, round 6).  The journal-side chucking faces
+# the collar's thrust face, the face the post bears on: the journal runs back
+# from it to the front stub and the collar web forward to the collar's
+# tip-side face.  The tip-side chucking faces that tip-side face, the seat the
+# gear stack is pushed onto (MHA-DT-07 first): the three land steps and the
+# tip run forward from it, so a step and the gear it stands behind share one
+# face and the collar web never enters between them.  The journal (1.70) and
+# the web (.125) chain the two origins and the front stub to the tip; the
+# front-to-tip overall is a reference.  Each land's end plane is offset from
 # SECTION_ORIGINS[i] by SECTION_KNOBS[i], the value its SecEnd{i} global
 # carries; land 0 is the journal, extruded from the front face.  Each flat is
-# cut from the collar face to its land's end by the same knob.
-DATUM_STATION = COLLAR_START_STATION
+# cut back from its land's end plane over its land.
+DATUM_STATION = COLLAR_END_STATION
 SECTION_ORIGINS = (
     "Front Plane",
-    "CollarFace",
-    "CollarFace",
-    "CollarFace",
-    "CollarFace",
+    "CollarEndPlane",
+    "CollarEndPlane",
+    "CollarEndPlane",
+    "CollarEndPlane",
 )
 SECTION_KNOBS = tuple(
     end if origin == "Front Plane" else end - DATUM_STATION
@@ -469,39 +450,36 @@ SURFACE_FINISHES = (
     ),
 )
 
-# What the native dimensions cannot say.  The seats, flats, steps and web
-# name their gears at their own callouts (SEAT_MATE_CALLOUTS and the suffixes
-# above); the note gives those gears' drawing numbers once.  Why the seat
-# band sits below nominal is cone_shaft_land_bands.GEAR_SEAT_BAND's comment,
-# and the fit-up lives only at the drive-train assembly step --
-# drawing-guidelines.md rule 7 (notes: few, flagged, never a method) keeps it
-# off the sheet (Main, 2026-09-26).  No check the shop cannot make (codex,
-# 375a122c), no digits but the mates' names and numbers, no method words but
-# one.  Lines stay short: the note block starts 58 mm in and the title block
-# begins at 216 mm.  The tailstock line is that one process word, by user
-# ruling (U40, 2026-09-23): the slender terminal land cannot be turned
-# unsupported, so the support IS the requirement, not a method preference
-# (exception RV-02 in cad/config/parts/dt-cone-gear-shaft.yaml).  The flats'
-# shared clock is FLATS_IN_LINE_CALLOUT on section A-A; its tolerance is the
-# title block's angle, which error_budget.yaml books per land as
-# cone_land_clock.  The across-flats name their gears in suffixes and have no
-# room left for a fit word (B-B's line would overrun the border, A-A's crowd
-# B-B, and an above-callout cannot break a line), so FLAT_FIT_NOTE states the
-# fit those names need once, under the gear key (drawing-guidelines.md rule
-# 4; machinist review r4b, 20261018T072511131Z).
-FLAT_FIT_NOTE = "FLATS: SLIDING FIT IN THE NAMED GEARS' D-BORES."
-# What the step roots' MAX keeps clear, named once here: the smaller gear
-# seated past each step.  No room at the radius itself: its text sits
-# between the Ø.2500 line and section A-A's arrow.
-FILLET_FUNCTION_NOTE = "STEP ROOTS: CLEAR OF THE SMALLER GEAR'S BORE."
+# The sheet's numbered flag notes, four lines (drawing-guidelines.md rule 7:
+# few, flagged, never a method).  Note LAND_NOTE is linked from every land's
+# diameter and across-flat: it names each land's mates once by drawing number
+# (rule 4; sections A-A to D-D cut lands 1 to 4), and gives the flats' .0004
+# bands, under the milled-width row, their fit route: each flat is milled
+# matched to its gears' measured D-bores, with the acceptance and the
+# printed limits' across-flat clearance as REF.  The flats' common clock is
+# the aligned sections' and the title block's angle (error_budget.yaml books
+# it per land as cone_land_clock).  Note STACK_NOTE names, once, the stack the
+# three-place lengths set (rule 4): each step stands SEAT_STEP_SETBACK behind
+# the smaller gear's south face (the proof below) and the collar web is the
+# MHA-DT-07 station and the stack's origin.  The tailstock line is the one
+# process word, by user ruling (U40, 2026-09-23): the slender terminal land
+# cannot be turned unsupported, so the support IS the requirement (exception
+# RV-02 in cad/config/parts/dt-cone-gear-shaft.yaml).  Lines stay short: the
+# note block starts 20 mm in and the title block begins at 216 mm.
+STACK_NOTE = 2
+TAILSTOCK_NOTE = 3
+# The printed step lengths (from the collar's tip-side face, SECTION_KNOBS)
+# and the collar web, as their dimensions print them.
+STACK_LENGTHS_TEXT = ", ".join(
+    inch_text(SECTION_KNOBS[land], 3) for land in (1, 2, 3)
+) + f" AND {inch_text(COLLAR_THICKNESS, 3)}"
 DRAWING_NOTES = "\n".join(
     (
-        f"{_gear(min(min(g) for g in SECTION_CONE_GEAR_TEETH if g))}"
-        f"-{_gear(max(max(g) for g in SECTION_CONE_GEAR_TEETH if g))}"
-        ": MHA-DT-03 CONE GEARS. 64T: MHA-DT-07.",
-        FLAT_FIT_NOTE,
-        FILLET_FUNCTION_NOTE,
-        "TURN THE TIP LAND WITH TAILSTOCK SUPPORT.",
+        f"{LAND_NOTE}. SLIDING FIT IN MHA-DT-03, A-A ALSO MHA-DT-07, D-D ALSO MHA-DT-VN-54;",
+        "   MILL FLATS TO MEASURED D-BORES: NO ROCK "
+        f"(CLEARANCE {FLAT_AF_CLEARANCE_TEXT} REF).",
+        f"{STACK_NOTE}. {STACK_LENGTHS_TEXT} SET THE MHA-DT-07 AND MHA-DT-03 STACK.",
+        f"{TAILSTOCK_NOTE}. TURN THE TIP LAND WITH TAILSTOCK SUPPORT.",
     )
 )
 
@@ -533,20 +511,21 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # (SECTION_DIA_BANDS, FLAT_AF_BAND), so their places are only the number's
 # spelling.
 #
-# Land steps Sec1End..Sec3End: three places, which is the title-block .XXX
-# general grade (+-.005) and no explicit band.  This is a location
-# requirement, not a spelling: each step sits SEAT_STEP_SETBACK behind the
-# smaller gear's south face, and the proof below books the step's printed
-# limit with the collar's, the stack's and the fillet's in that 1.0 mm; the
-# .XX grade (+-.01) alone would take half of it.
+# Land steps Sec1End..Sec3End (from the collar's tip-side face): three
+# places, which is the title-block .XXX general grade (+-.005) and no
+# explicit band.  This is a location requirement, not a spelling: each step
+# sits SEAT_STEP_SETBACK behind the smaller gear's south face, and the proof
+# below books the step's printed limit with the stack's and the fillet's in
+# that 1.0 mm; the .XX grade (+-.01) alone would take half of it.
 #
-# Tip station Sec4End (collar face to the tip): two places, the title
-# block's .XX grade (+-.01), by user ruling 2026-09-29.  The tip block is
-# fixed by its hold-down, so this band lands on the adjuster's embed;
+# Tip station Sec4End (collar's tip-side face to the tip): two places, the
+# title block's .XX grade (+-.01), by user ruling 2026-09-29.  The tip block
+# is fixed by its hold-down, so this band, with the collar web's (the post
+# bears on the other collar face), lands on the adjuster's embed;
 # build_dt_drive_train_assembly closes that stack by the block's depth and the
 # 1.0D adjuster engagement instead of a tighter length.  Journal length
-# Sec0End (collar face back to the front stub): two places, the .XX grade,
-# since the journal's guaranteed bearing span below reads it (never .X).
+# Sec0End (collar thrust face back to the front stub): two places, the .XX
+# grade, since the journal's guaranteed bearing span below reads it (never .X).
 # Step radius: three places; nothing depends on it beyond the setback proof.
 #
 # Collar (#914): the diameter is the bar's as supplied (STOCK_DIA), so it
@@ -639,15 +618,15 @@ if JOURNAL_SUPPORT_SPAN_MIN_MM <= 0.0:
 # The setback proof (user ruling 2026-09-28).  Each step and its root fillet
 # must stay south of the smaller gear's south face -- the larger gear's north
 # face -- with the stack pushed onto the collar at its shortest: the step at
-# the north end of its printed limits, the fillet's R.004 +.000 run
-# along the smaller land, the collar web's printed short limit (the stack
-# stands on the collar's north face, the steps are measured from its south
-# face), the stack's own shortfall up to that face
-# (dt_cone_gear_stack.face_band) and the fleet's MARGIN_SPARE.  The fillet
-# runs the same .004 along the flat's root
-# as along the round's, so the one budget covers the smaller gear's round
-# bore and its flat alike.  In service the stack only floats north, off the
-# step.
+# the north end of its printed limits, the fillet's R.004 +.000 run along the
+# smaller land, the stack's own shortfall up to that face
+# (dt_cone_gear_stack.face_band) and the fleet's MARGIN_SPARE.  The steps and
+# the stack share the collar's tip-side face (round 6), so the collar web no
+# longer stands between them; its printed short limit is still charged, as a
+# second spare, so the re-datum loosens no proof (FoDtFab4's condition).  The
+# fillet runs the same .004 along the flat's root as along the round's, so the
+# one budget covers the smaller gear's round bore and its flat alike.  In
+# service the stack only floats north, off the step.
 SEAT_STEP_BUDGET: dict[str, dict[str, float]] = {}
 for _name, _j, _end in zip(("Sec1End", "Sec2End", "Sec3End"), SEAT_STEP_GEARS, SECTION_ENDS[1:4]):
     if abs(_end - FRONT_STUB - seat_step_station(_j)) > 1e-9:
