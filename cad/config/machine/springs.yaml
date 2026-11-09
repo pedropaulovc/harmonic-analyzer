@@ -267,21 +267,21 @@ springs:
       - 0
       counter:
         pose:
-          length_mm: 349.6883238652763
+          length_mm: 351.74539965437026
           lower_eye_xy:
           - -91.19999999999999
-          - 1010.3360723439637
+          - 1010.336072343978
           upper_eye_xy:
           - -91.2
-          - 1350.5247962092399
+          - 1352.5818719983483
           axis_xy:
-          - -4.0756005577648575e-17
+          - -4.0516972122611463e-17
           - 1.0
           centre_xy:
           - -91.19999999999999
-          - 1180.4304342766018
+          - 1181.4589721711632
           clocking: half_turn
-        gooseneck_origin_y_mm: 1188.7946231750816
+        gooseneck_origin_y_mm: 1190.8516989643383
         upper_support:
           component: sm-vn-gooseneck-shoulder-screw
           number: MHA-SM-VN-56
@@ -305,8 +305,8 @@ springs:
           plug_length_mm: 26.0
           plug_edge_break_mm: 0.25
         final_distance_mm:
-          lower: 3.786505264997067e-06
-          upper: 3.495255072355111e-05
+          lower: 3.786502649535992e-06
+          upper: 3.4952976191402e-05
     square:
       amplitudes_mm:
       - 0
@@ -331,21 +331,21 @@ springs:
       - 80
       counter:
         pose:
-          length_mm: 350.25920746501583
+          length_mm: 352.3170075884562
           lower_eye_xy:
           - -91.19999999999999
-          - 1010.3360723439789
+          - 1010.3360723440048
           upper_eye_xy:
           - -91.2
-          - 1351.0956798089949
+          - 1353.153479932461
           axis_xy:
-          - -4.0689386269266524e-17
+          - -4.0451047931693116e-17
           - 1.0
           centre_xy:
           - -91.19999999999999
-          - 1180.715876076487
+          - 1181.744776138233
           clocking: half_turn
-        gooseneck_origin_y_mm: 1189.3655067749376
+        gooseneck_origin_y_mm: 1191.4233068986196
         upper_support:
           component: sm-vn-gooseneck-shoulder-screw
           number: MHA-SM-VN-56
@@ -369,5 +369,5 @@ springs:
           plug_length_mm: 26.0
           plug_edge_break_mm: 0.25
         final_distance_mm:
-          lower: 3.7864995231656218e-06
-          upper: 3.495284450951821e-05
+          lower: 3.786498099335672e-06
+          upper: 3.495344851399961e-05
