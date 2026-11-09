@@ -35,6 +35,7 @@ BRONZE, BRONZE_E = "#d9a24a", "#7a5212"  # C67500 manganese bronze: T006-T024, t
 BLOCK, BLOCK_E = "#77766f", "#2f2e2b"
 INTEGRAL_E = "#1d5aa3"  # blue outline = part with integral teeth
 SOLDER = "#2b2a28"
+BOND = "#c2272d"  # LOCTITE 638 bonded slip fit
 KEY_FILL = "#a3a29c"
 CONTACT = "#1baf7a"
 BAD, GOOD, WARN = "#d03b3b", "#0c8a0c", "#b8860b"
@@ -376,23 +377,30 @@ def tip_block(ax, south, north, adjuster):
         ls=(0, (2, 1.2)),
         z=2.7,
     )  # reamed pivot hole
-    hr, hh = 0.472 * IN / 2, 0.175 * IN  # 1/4 round head: Ø.472 × .175 (ASME B18.6.3)
-    dome = [
-        [SCREW_HEAD + hh * math.sin(a), hr * math.cos(a)]
+    # 1/4-28 slotted fillister head (ASME B18.6.3): Ø.375, .172 high with an oval crown
+    hr, hs, hc = 0.375 * IN / 2, 0.122 * IN, 0.050 * IN
+    crown = [
+        [SCREW_HEAD + hs + hc * math.sin(a), hr * math.cos(a)]
         for a in [math.pi * i / 24 for i in range(25)]
     ]
     ax.add_patch(
         Polygon(
-            [[SCREW_HEAD, -hr], *dome[::-1], [SCREW_HEAD, hr]],
+            [
+                [SCREW_HEAD, -hr],
+                [SCREW_HEAD + hs, -hr],
+                *crown[::-1],
+                [SCREW_HEAD + hs, hr],
+                [SCREW_HEAD, hr],
+            ],
             closed=True,
             fc=BLOCK,
             ec=BLOCK_E,
             lw=0.9,
             zorder=2.6,
         )
-    )  # domed slotted head, outboard
+    )  # slotted fillister head, outboard
     ax.plot(
-        [SCREW_HEAD + hh * 0.55, SCREW_HEAD + hh],
+        [SCREW_HEAD + hs * 0.45, SCREW_HEAD + hs + hc],
         [0, 0],
         color="#efeee9",
         lw=1.0,
@@ -465,8 +473,16 @@ def draw_c1(ax):
     solder_face(ax, X[6], G[6]["od"] - 0.4, STEM / 2)
 
 
+def bond(ax, x0, x1, r):
+    """LOCTITE 638 bonded slip fit along a cylindrical interface of radius r."""
+    for s in (1, -1):
+        ax.plot(
+            [x0, x1], [s * r] * 2, color=BOND, lw=2.2, zorder=6, solid_capstyle="butt"
+        )
+
+
 def draw_c1k(ax):
-    """C1 keyed: a 1/16 key in land 1 drives T030 on; T024 is round on land 2 and sweated."""
+    """C1 keyed: a 1/16 key in land 1 drives T030 on; the tip is bonded with LOCTITE 638."""
     rect(ax, -17, ENDS[1], DIAS[1], STEEL, STEEL_E)
     rect(
         ax, ENDS[1], X[18], DIAS[2], STEEL, STEEL_E
@@ -491,10 +507,12 @@ def draw_c1k(ax):
     gear(ax, 12, BRONZE, BRONZE_E, bore=STEM)
     rect(ax, X[18] - SOCKET, X[6], STEM, BRONZE, INTEGRAL_E, lw=1.2, z=3.25)  # spigot
     gear(ax, 6, BRONZE, BRONZE_E, integral=True)
-    solder_face(ax, X[24], G[24]["od"] - 0.6, DIAS[1] / 2)
-    solder_face(ax, X[18], G[18]["od"] - 0.6, DIAS[2] / 2)
-    solder_face(ax, X[12], G[12]["od"] - 0.6, STEM / 2)
-    solder_face(ax, X[6], G[6]["od"] - 0.4, STEM / 2)
+    for x0, x1, r in (
+        (X[24], X[18], DIAS[2] / 2),  # T024 on land 2
+        (X[18] - SOCKET, X[18], STEM / 2),  # spigot in the socket
+        (X[18], X[6], STEM / 2),  # T018, T012 on the spigot
+    ):
+        bond(ax, x0, x1, r)
 
 
 def draw_c2(ax):
@@ -542,11 +560,11 @@ fig.text(
     f"Green bars: where the 120T cylinder gear touches each band ({inch(CONTACT_ZONE[0])}–{inch(CONTACT_ZONE[1])} from its big-end face, v45 GLB). "
     "Fill = material: manganese bronze C67500 for T006–T024 and new tip parts (main's tip specification),\n"
     "brass C36000 from T030 and for the bushing, steel for DT-04 and the screws. Blue outline = part with integral teeth. "
-    "Black strokes = soft-solder joints. Grey bar = 1/16 key. Dashed = bores, seats and today's block position.\n"
+    "Black strokes = soft-solder joints; red lines = LOCTITE 638 bonded slip fits. Grey bar = 1/16 key. Dashed = bores, seats and today's block position.\n"
     "Owner direction (2026-11-09): T006's web is best effort (rule 17), and soft solder may carry the tip's drive torque, which is minimal "
     "(rule 23 otherwise excludes solder). Both are recorded as owner exceptions below.\n"
     "Real tip (book pp.17–21; engineerguy video 4 at 6:36–6:47): a small brass bushing fixed on the pivot turns with the cone and bears on the "
-    "threaded end of a domed screw, which stands a few threads proud of a black split block locked by a side pinch screw.",
+    "threaded end of a slotted fillister-head screw, which stands a few threads proud of a black split block locked by a side pinch screw.",
     fontsize=8.6,
     color=INK2,
     va="top",
@@ -696,8 +714,8 @@ note(
     ax,
     (X[24], 5.2),
     (-1.0, 10.4),
-    "T030 | T024 | T018 | T012 | T006 sweated face to face;\nT024 reamed round on land 2",
-    "warn",
+    "LOCTITE 638 bonded slip fits: T024 on land 2, T018 and T012\non the spigot, the spigot in DT-04's socket",
+    "good",
 )
 note(
     ax,
@@ -719,7 +737,7 @@ note(
     ax,
     (BLOCK_S + 1.0, 3.2),
     (22.0, -12.4),
-    f"stock 1/4-28 × 5/8 domed screw, reamed\nØ1/16 × .12 (wall {inch(N['end_screw_wall'])}); bushing bears\non its threaded end; block {inch(BLOCK_DEPTH, 2)} deep",
+    f"stock 1/4-28 × 5/8 fillister screw, reamed\nØ1/16 × .12 (wall {inch(N['end_screw_wall'])}); bushing bears\non its threaded end; block {inch(BLOCK_DEPTH, 2)} deep",
     None,
 )
 
@@ -857,7 +875,7 @@ note(
     ax,
     (BLOCK_S + 1.0, 3.2),
     (22.0, -12.4),
-    f"stock 1/4-28 × 5/8 domed screw, reamed\nØ1/16 × .12 (wall {inch(N['end_screw_wall'])}); bushing bears\non its threaded end; block {inch(BLOCK_DEPTH, 2)} deep",
+    f"stock 1/4-28 × 5/8 fillister screw, reamed\nØ1/16 × .12 (wall {inch(N['end_screw_wall'])}); bushing bears\non its threaded end; block {inch(BLOCK_DEPTH, 2)} deep",
     None,
 )
 
@@ -1042,7 +1060,7 @@ ax = fig.add_subplot(gs[4, 0])
 junction(
     ax,
     "9 · C1 keyed detail: T006's spigot in DT-04's socket",
-    "The spigot ends .19 inside DT-04's round Ø.250 land, under T024: a reamed fit, not the solder, centres the cluster",
+    "The spigot ends .19 inside DT-04's round Ø.250 land, under T024: the reamed fit centres the cluster and LOCTITE 638 holds it",
     "good",
     draw_c1k,
 )
@@ -1052,7 +1070,7 @@ note(
     ax,
     (X[18] - SOCKET / 2, -1.7),
     (-7.3, -8.3),
-    f"socket Ø.0625 reamed in DT-04's Ø.250 land;\nspigot slip fit, locates only;\nwall to the round land {inch(N['socket_wall_round'], 4)}",
+    f"socket Ø.0625 reamed in DT-04's Ø.250 land;\nspigot bonded in it (LOCTITE 638);\nwall to the round land {inch(N['socket_wall_round'], 4)}",
     "good",
     fs=7.2,
 )
@@ -1076,8 +1094,8 @@ note(
     ax,
     (X[18], -4.2),
     (4.2, -7.8),
-    "T024 | T018 face sweated: torque comes\nfrom T030's key through T030 | T024",
-    "warn",
+    "T024 bonded on land 2, T018 and T012 on the\nspigot: DT-04 drives the tip through the bonds",
+    "good",
     fs=7.2,
 )
 
@@ -1207,9 +1225,9 @@ ax.text(
     "3  Ream T024 Ø.250 and T018, T012 Ø.0625; cut each alone on a mandrel. Broach T030–T120 and the 64T\n"
     "    for the 1/16 key (A broach, 3/8 A bushing).\n"
     f"4  Mill DT-04's 1/16 keyseat {inch(N['keyseat_depth'], 3)} deep along land 1; ream the socket Ø.0625 × .19 in land 2.\n"
-    "5  Thread T018, T012 on T006's spigot and sweat, pin-phased. Key T030–T120 on, slide T024 onto land 2,\n"
-    "    push the spigot home; phase and sweat T030 | T024 | T018. Reheat to take it apart.\n"
-    "6  Ream Ø1/16 × .12 into the end of a stock 1/4-28 × 5/8 slotted round-head screw; set end play with it\n"
+    "5  Bond T018, T012 on T006's spigot with LOCTITE 638, pin-phased. Key T030–T120 on; bond T024 on land 2\n"
+    "    and the spigot in the socket, phased to T024. Cure before load. About 250 °C releases the bonds.\n"
+    "6  Ream Ø1/16 × .12 into the end of a stock 1/4-28 × 5/8 slotted fillister screw; set end play with it\n"
     "    against the bushing face; tighten the pinch screw.\n"
     f"T006 sits inside T012's root ({inch(G[6]['od'])} < {inch(G[12]['root_min'])}), so T012 never blocks T006's cutter once T006 is done.\n"
     "C1 on flats: T024 rides land 2's flat and drives, T030 is not joined. C2: T018 keeps its D-bore; the jig trues T012, T006.",
@@ -1244,7 +1262,7 @@ rows = [
         "C1 keyed (recommended)",
         "DT-03 RV-01, RV-02, RV-04; DT-04 RV-01, RV-02;\nVN-54 RV-01; DT-00 DT-03",
         "DT-21 RV-01 and DT-20 RV-03 (callout places,\nre-scoped to the moved holes)",
-        f"DT-03 RV-03 → T012 web {inch(N['t012_web_reamed_116'], 4)}; new DT-03: T030 web\n{inch(N['t030_web_keyed'], 4)} to the keyway (rule 17 minor); new DT-00: solder on\nT030-T024-T018-T012-T006 (rule 23); end-screw wall {inch(N['end_screw_wall'])}",
+        f"DT-03 RV-03 → T012 web {inch(N['t012_web_reamed_116'], 4)}; new DT-03: T030 web\n{inch(N['t030_web_keyed'], 4)} to the keyway (rule 17 minor); end-screw wall {inch(N['end_screw_wall'])};\nLOCTITE 638 bonded slip fits count (rule 23): no exception",
         "DT-04: 1/16 keyseat in land 1, round land 2, socket;\nT030–T120, 64T broached; T024–T012 round; T006 a\npart; VN-54, VN-55 out; end screw, bushing; DT-21 moved",
     ],
     [
