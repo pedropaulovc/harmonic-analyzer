@@ -330,7 +330,10 @@ CAP_RECESS_DIAMETER_MIN = printed_limit(
 CAP_RECESS_DIAMETER_MAX = printed_limit(
     CAP_RECESS_DIAMETER, CAP_RECESS_DIAMETER_PLACES, 1.0
 )  # 27.6352
-CAP_RECESS_DEPTH_BAND = (0.3048, 0.0)  # +.012/0
+# The recess depth keeps its .642 minimum under a unilateral band in a plain
+# inch step, +.010/0 (machinist review of fanout/integration 8fb7fb46f7 read
+# +.012/0 as a converted 0.3 mm); the proofs below charge its deepest floor.
+CAP_RECESS_DEPTH_BAND = (0.254, 0.0)  # +.010/0
 # The smallest printed recess round the largest MHA-FR-VN-54 skirt.
 CAP_RECESS_DIAMETRAL_CLEARANCE = CAP_RECESS_DIAMETER_MIN - CAP_MAX_OUTER_DIAMETER
 if CAP_RECESS_DIAMETRAL_CLEARANCE <= 0.0:
@@ -1228,7 +1231,7 @@ COUNTERBORE_PRINTED_NEAR_WALL = (
 # corner against the counterbore's outboard-most floor rim, with the tap
 # axis at the high end of its station below the boss top.  The floor's
 # station prints .XX and stands at .65 (TOP_SCREW_SEAT_Z), so this meets
-# drawing-guidelines.md rule 17 (walls and webs)'s .080 target: 2.82 (2.04
+# drawing-guidelines.md rule 17 (walls and webs)'s .080 target: 2.85 (2.04
 # at the metric 16.35).  At 16.1 it left 1.518 at .X (codex review of
 # 67d8b2c6) and 1.80 at .XX (080fda97).
 _AXIS_PLACES = DRAWING_REFERENCE_PRECISION["cross screw axis from boss top"]
@@ -1250,7 +1253,7 @@ if min(COUNTERBORE_PRINTED_NEAR_WALL, COUNTERBORE_PRINTED_CAP_LIGAMENT) < WALL_T
 # smallest printed counterbore floor, and where it crosses under the cap
 # recess (between the bore and the recess wall) the recess's deepest printed
 # floor stays .080 above its highest crown, the axis at the high end of its
-# station: land 1.65, ligament 3.33.
+# station: land 1.65, ligament 3.38.
 SIDE_CLEARANCE_MAX_RADIUS = (
     NEAR_WALL_CLEARANCE_DIAMETER + PRINTED_DRILLED_HOLE_PLUS_MM
 ) / 2.0

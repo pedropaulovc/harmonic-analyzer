@@ -72,7 +72,7 @@ def test_nominal_corner_bores_and_cap_recesses_clear_the_installed_stack() -> No
         abs_tol=1e-9,
     )
     assert part.CAP_RECESS_FLOOR_Y - (spec.SCREW_AXIS_Y + part.SIDE_TAP_DRILL_DIA / 2.0) > 0.0
-    assert part.CAP_RECESS_DEPTH_BAND == pytest.approx((0.3048, 0.0))
+    assert part.CAP_RECESS_DEPTH_BAND == pytest.approx((0.254, 0.0))
     recess_floor_world = TOP_FRAME_MID_Y + part.CAP_RECESS_FLOOR_Y
     assert math.isclose(CAP_MOUTH_Y - recess_floor_world, 1.45415, abs_tol=1e-6)
     assert math.isclose(
@@ -167,7 +167,7 @@ def test_counterbore_floor_keeps_rule_12_target_to_the_cap_recess() -> None:
     )
     ligament = math.hypot(floor_offset - recess_radius, recess_floor - rim)
     assert ligament == pytest.approx(part.COUNTERBORE_PRINTED_CAP_LIGAMENT)
-    assert ligament == pytest.approx(2.823, abs=5e-4)
+    assert ligament == pytest.approx(2.849, abs=5e-4)
     assert ligament >= 2.032
     assert part.COUNTERBORE_PRINTED_NEAR_WALL >= 2.032
     assert part.COUNTERBORE_PRINTED_HEAD_RECESS > 0.0
@@ -4942,8 +4942,8 @@ def test_cap_recess_bands_preserve_the_counterbore_ligament() -> None:
     assert part.CAP_RECESS_DIAMETER_MAX == pytest.approx(
         part.CAP_RECESS_DIAMETER + spec.PRINTED_LINEAR_BAND_MM[3]
     )
-    assert part.CAP_RECESS_DEPTH_BAND == pytest.approx((0.3048, 0.0))
-    assert part.COUNTERBORE_PRINTED_CAP_LIGAMENT == pytest.approx(2.822944618656192)
+    assert part.CAP_RECESS_DEPTH_BAND == pytest.approx((0.254, 0.0))
+    assert part.COUNTERBORE_PRINTED_CAP_LIGAMENT == pytest.approx(2.848879218218974)
 
 
 def test_ream_size_parks_above_the_plan_right_of_the_rear_frame() -> None:
