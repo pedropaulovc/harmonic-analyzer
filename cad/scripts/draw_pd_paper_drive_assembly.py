@@ -1799,7 +1799,7 @@ def _step_text(
     # stake, 22D/22E cross-pin, 15C-15F tapped disc) release and renew named
     # parts. Owner ruling 2026-11-08 (auto-selected after timeout), pending
     # owner confirmation (#2144): renew, the bar's staked tap re-chased and
-    # re-staked on fresh metal, 31D's cluster re-faced without renewal.
+    # re-staked on fresh metal, 31E's cluster re-faced without renewal.
     knob_stack_off = (
         f"REMOVE THE {n['pd-transgear-thumbnut']} THUMBNUT, THE {knob_short} AND "
         "THE COLLAR."
@@ -1939,7 +1939,11 @@ def _step_text(
             "SETTINGS FROM S.",
             f"TAP THE PLATE UNTIL ITS KNOB BORE {KNOB_BORE_LETTER} INDICATES TRUE.",
             "TIGHTEN THE CLAMPS.",
-            f"CHECK: RE-INDICATED, {KNOB_BORE_LETTER} IS STILL TRUE.",
+            # Named in full: the continued column on the next sheet has no
+            # VIEW K key (integration review, run 20261109T062834910Z).
+            f"CHECK: RE-INDICATED, {n['pd-transgear-arm-plate']} KNOB BORE "
+            f"{KNOB_BORE_LETTER} IS STILL TRUE PER {s('arm-plate-located', 2)} "
+            f"(SHEET {SHEET_NAMES.index(KNOB_SETTING_SHEET) + 1}).",
             f"IF NOT, REPEAT {s('arm-plate-located', 5)}-{s('arm-plate-located', 7)}.",
             f"MATCH-DRILL 2 {PLATE_DOWEL_PILOT_TEXT} PILOTS THROUGH THE PLATE AND "
             f"THE ARM AT {n['pd-transgear-arm-plate']}'S 2 LOCATING-HOLE PLACES.",
@@ -2298,6 +2302,13 @@ def _step_text(
             f"BETWEEN THE {n['pd-transgear-drive-collar']} COLLAR AND THE "
             f"{n['pd-rack-pinion']} DISC ALL ROUND THE OVERLAP (CLEARANCE "
             f"{steps.COLLAR_DISC_AIR_TEXT}).",
+            # The feeler check above only passes or fails, so the shortfall the
+            # re-face takes out is read here, before the stack comes off: the
+            # true air is at least this reading, so facing the step by the
+            # minimum less the reading leaves at least the minimum (integration
+            # review, run 20261109T062834910Z).
+            "IF SHORT, READ THE THICKEST FEELER THAT ENTERS ALL ROUND THE "
+            "OVERLAP (NONE: READ 0).",
             f"IF SHORT, {knob_stack_off}",
             f"STRIP THE CLUSTER ({s('disc-cluster-hung', 4)} BACK TO "
             f"{s('disc-cluster-hung', 1)}), KEEPING ITS SHIMS.",
@@ -2312,7 +2323,8 @@ def _step_text(
             # spigot end is never re-faced, as that would take the disc off
             # its screws.
             f"RE-FACE THE {n['pd-transgear-feed-pinion']} STEP FACE SQUARE ON A "
-            f"MANDREL BY THE AMOUNT {s('collar-disc-air-inspected', 2)} READ SHORT; "
+            f"MANDREL BY {steps.COLLAR_DISC_AIR_TEXT.split()[0]} LESS THE "
+            f"{s('collar-disc-air-inspected', 3)} READING; "
             f"THE {n['pd-transgear-disc-hub']} SPIGOT END SEATS ON IT, SO HUB AND "
             "DISC SET BACK BY THAT AMOUNT.",
             "REFIT THE HUB'S D-BORE ON THE D-FLAT, SPIGOT TO THE STEP FACE, DISC "
