@@ -344,16 +344,18 @@ def test_sheet_places_every_marked_dimension_at_its_places() -> None:
     # short of the bend; its full cut's line runs past where the plane leaves
     # the bend's outer wall, short of the leg, so the cut imports.  The line
     # it prints is then the short partial one (rule 9): across the end piece
-    # and its joint, on past the crop to the bend tangent.
+    # and its joint, on past the crop to the bend tangent.  The long line is
+    # centred on the short one, so shortening it does not move the view.
     start, end = drawing.SECTION_CROP_X_MM
     assert start < geom.ARM_END_X < part.SHANK_END_X < end < -geom.BEND_R
     bend_cut_end = -geom.BEND_R + math.sqrt(
         (geom.BEND_R + geom.TUBE_DIA / 2.0) ** 2 - geom.BEND_R**2
     )
     line_start, line_end = drawing.SECTION_LINE_X_MM
-    assert line_start == start and bend_cut_end < line_end < 0.0
+    assert line_start < start and bend_cut_end < line_end < 0.0
     short_start, short_end = drawing.SECTION_SHORT_X_MM
     assert short_start == start and end < short_end == -geom.BEND_R
+    assert line_start + line_end == pytest.approx(short_start + short_end)
     assert drawing.TUBE_BREAK_X < end < short_end
 
 

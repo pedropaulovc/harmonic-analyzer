@@ -210,22 +210,25 @@ TAP_CALLOUT_XY = (0.158, 0.254)
 # piece's Ø; the full section does (probe farm runs 20261027T211151181Z,
 # 20261027T213158937Z).  The plane also cuts the bend's top, out to where the
 # bend's outer wall drops below it, so the section is cut full through a line
-# from outside the end face to past that, and its dimensions are imported.
-# Rule 9 (machinist review of fanout/integration 8fb7fb46f7): a section that
-# shows one feature has a short cutting plane across that feature only, so
-# the section is then made partial and its line shortened to
-# SECTION_SHORT_X_MM, across the end piece and its joint with the tube
-# (draw_ch_rocker_arm_tl_oblique_carrier's A-A), and the crop keeps only
-# SECTION_CROP_X_MM: to just past the braze shank, short of the bend
-# tangent.  The short cut runs on to the bend tangent, past the crop, so the
-# crop, not the cut, ends the tube.  The view is turned until model +X runs
-# right and model -Z up (looking down on the arm-axis plane, where the end
-# piece's sketch lies), and set so the end face's centre lands on
-# SECTION_FACE_XY.
+# that runs past that, and its dimensions are imported.  Rule 9 (machinist
+# review of fanout/integration 8fb7fb46f7): a section that shows one feature
+# has a short cutting plane across that feature only, so the section is then
+# made partial and its line shortened to SECTION_SHORT_X_MM, across the end
+# piece and its joint with the tube, on to the bend tangent.  A section view
+# moves with its line's midpoint (the carrier's A-A jumped off the sheet,
+# farm runs to 20261109T0636Z), so the long line is centred on the short
+# one: it runs as far left of the end face, into empty sheet, as it must run
+# right to pass the bend's cut.  The crop keeps only SECTION_CROP_X_MM: to
+# just past the braze shank, short of the bend tangent, so the crop, not the
+# short cut, ends the tube.  The view is turned until model +X runs right
+# and model -Z up (looking down on the arm-axis plane, where the end piece's
+# sketch lies), and set so the end face's centre lands on SECTION_FACE_XY.
 _BEND_CUT_END_X = -BEND_R + math.sqrt((BEND_R + _TUBE_R) ** 2 - BEND_R**2)
-SECTION_LINE_X_MM = (ARM_END_X - 2.0, _BEND_CUT_END_X + 10.0)
 SECTION_CROP_X_MM = (ARM_END_X - 2.0, TUBE_END_X + PLUG_SHANK_LENGTH + 0.8)
 SECTION_SHORT_X_MM = (SECTION_CROP_X_MM[0], -BEND_R)
+_SHORT_MID_X = sum(SECTION_SHORT_X_MM) / 2.0
+_LONG_HALF = _BEND_CUT_END_X + 10.0 - _SHORT_MID_X
+SECTION_LINE_X_MM = (_SHORT_MID_X - _LONG_HALF, _SHORT_MID_X + _LONG_HALF)
 if SECTION_CROP_X_MM[1] >= SECTION_SHORT_X_MM[1]:
     raise AssertionError("section A-A's crop reaches the bend")
 if SECTION_LINE_X_MM[1] >= 0.0:
@@ -689,8 +692,10 @@ def _shorten_section_line(
     full line's interpolated at their model X; a full section whose line
     stops inside the part cuts nothing, so the section is made partial
     first (draw_ch_rocker_arm_tl_oblique_carrier ``_set_section_line``).
-    Read back: the mode, the line in either direction, both bodies still
-    cut, and every imported dimension still shown."""
+    Read back: the mode, the line in either direction, a cut that still
+    hatches (IView GetFaceHatchCount, as the carrier reads it: the face
+    hatch objects are read once the view is placed again), and every
+    imported dimension still shown."""
     native = _early_bound(section, "IView")
     definition = _early_bound(native.GetSection(), "IDrSection")
     full = _section_line(section)
@@ -701,6 +706,8 @@ def _shorten_section_line(
         for x in SECTION_SHORT_X_MM
         for a, b in zip(near, far, strict=True)
     )
+    native.UpdateViewDisplayGeometry()
+    before = (tuple(float(v) for v in native.GetOutline()), int(native.GetFaceHatchCount()))
     definition.SetPartialSection(True)  # void put: read back below
     if not definition.SetLineInfo(double_array(list(short))):
         raise RuntimeError("section A-A refused its short cutting line")
@@ -708,14 +715,19 @@ def _shorten_section_line(
     if not bool(definition.GetPartialSection()):
         raise RuntimeError("section A-A short line: the section is not partial")
     applied = _section_line(section)
+    native.UpdateViewDisplayGeometry()
+    after = (tuple(float(v) for v in native.GetOutline()), int(native.GetFaceHatchCount()))
+    _telemetry.info(
+        f"section A-A line {full!r} -> {applied!r} (partial); "
+        f"outline, face hatches {before} -> {after}"
+    )
     if not any(
         all(abs(a - b) <= 1e-8 for a, b in zip(applied, wanted))
         for wanted in (short, short[3:] + short[:3])
     ):
         raise RuntimeError(f"section A-A short line did not persist: {applied!r}")
-    _telemetry.info(f"section A-A line {full!r} -> {applied!r} (partial)")
-    # Both bodies still cut: _split_hatches fails on a missing one.
-    _split_hatches(_section_face_hatches(adapter, section))
+    if after[1] < 1:
+        raise RuntimeError(f"section A-A short line lost its cut: {before} -> {after}")
     hidden = [
         index
         for index, annotation in enumerate(annotations)
@@ -769,12 +781,19 @@ def _end_piece_section(adapter: Any, front: Any) -> tuple[Any, list[Any]]:
         view_label="end piece section A-A",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    # Hatched while the cut is full: the shortened partial cut returned no
+    # face hatch objects before it was placed again (farm run
+    # 20261109T140046294Z).  Once placed, the turn is read and set again where
+    # SolidWorks returns the partial cut's hatches.
+    _hatch_tube_apart(adapter, section)
     _shorten_section_line(adapter, front, section, list(line), annotations)
     # The view moves with its line's midpoint: turned and placed again.
     _orient_section(adapter, native, cut)
     _place_section(adapter, native)
-    # Hatched before the crop: a cropped view's hatch reads are not relied on.
-    _hatch_tube_apart(adapter, section)
+    try:
+        _hatch_tube_apart(adapter, section)
+    except RuntimeError as error:
+        _telemetry.warn(f"section A-A: tube hatch not re-set on the short cut ({error})")
     _crop_section(adapter, section)
     # The crop must not move the placed ink.
     _place_section(adapter, native)
