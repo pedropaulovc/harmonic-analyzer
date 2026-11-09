@@ -1604,7 +1604,9 @@ There is no repository assembly template. The run resolves the seat's assembly
 template with `GetDocumentTemplate`, records the raw `swDefaultTemplateAssembly`
 preference (which can be empty), and requires an existing `.ASMDOT`. It records
 path, size and SHA-256, creates every assembly with `NewDocument` on that exact
-path, and fails if the resolved template, preference or bytes change.
+path, and fails if the resolved template path, size or bytes change. The raw
+default preference is observational: before/after values are retained, but
+creation never consults it after the template path is pinned.
 That template is seat-local and not in the recipe cache key, so only fresh
 forced native runs count as benchmark evidence. Before any document work,
 every native enum literal the benchmark uses is checked against the seat's

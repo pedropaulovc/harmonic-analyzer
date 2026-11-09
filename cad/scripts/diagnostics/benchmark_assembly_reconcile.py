@@ -806,8 +806,17 @@ async def benchmark(adapter: Any, out: Path, trials: int) -> dict[str, str]:
             if any(digest(out / name) != value for name, value in protected.items()):
                 raise RuntimeError("Trials mutated the baseline assembly, child or fixture")
         visual_proof = [await harness.render(pair[mode], configuration) for mode in ("clean", "incremental")]
-        if pin_assembly_template(adapter) != template:
-            raise RuntimeError("Seat assembly template preference or bytes changed during the benchmark")
+        template_after = pin_assembly_template(adapter)
+        _telemetry.event(f"{PREFIX}.template_provenance",
+                         before=json.dumps(template, sort_keys=True),
+                         after=json.dumps(template_after, sort_keys=True))
+        # Creation uses the explicitly pinned path, never the mutable default
+        # preference. Compare actual input identity; retain preference drift
+        # as evidence rather than misclassifying it as changed model input.
+        if (native_path(template_after["path"]) != native_path(template["path"])
+                or template_after["sha256"] != template["sha256"]
+                or template_after["bytes"] != template["bytes"]):
+            raise RuntimeError(f"Assembly template input changed: before={template!r}, after={template_after!r}")
     if retained.error or retained.count < len(harness.phases) + 1:
         raise RuntimeError(f"Incomplete retained OTel evidence: {retained.count}, {retained.error}")
     modes = {row["case"]: row["mode"] for row in results}
@@ -821,6 +830,7 @@ async def benchmark(adapter: Any, out: Path, trials: int) -> dict[str, str]:
         "experimental_limits": "Only one generated cylinder inserted twice, base fixed, mover constrained by Top/Right coincident and one Front distance mate; only the named distance value is reconciled.",
         "trace_id": f"{root_context.trace_id:032x}", "trials": trials, "orders": orders,
         "assembly_template": template, "seat_working_directory": cwd, "native_literals": native_literals,
+        "assembly_template_after": template_after,
         "fixture_child": fixture, "initial_baseline": initial,
         "structural_decision": asdict(structural), "results": results,
         "trial_seconds": [{"case": row["case"], "mode": row["mode"], "seconds": row["seconds"]} for row in results],
