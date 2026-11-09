@@ -370,7 +370,7 @@ DETAIL_HOLDDOWN_X = DETAIL_CENTER[0] + HOLDDOWN_LOCAL_X * _DETAIL_S
 # (" 1.00 ±0.1 ", spaces included) 21.96 x 3.5 mm, centred on the keep x
 # and standing on the dimension line, 2.78 mm under the keep y.  Its line
 # passed 1.1 mm under the hole's rim until round 7: that band now carries
-# the tip dowel's REF station from the pivot (TipDowelPivotX, below), so
+# the tip dowel's station from the pivot (TipDowelPivotX, below), so
 # HoldDownX's line runs a text height plus 1.1 mm lower, 1.3 mm over the top
 # relief's crown, and its outside arrow tails keep 1.5 mm over the relief's
 # arc.  Its frame's lower-left corner stands 1 mm off the circle and its
@@ -378,16 +378,20 @@ DETAIL_HOLDDOWN_X = DETAIL_CENTER[0] + HOLDDOWN_LOCAL_X * _DETAIL_S
 HOLDDOWN_X_TEXT_SIZE = (0.02196, 0.0035)
 HOLDDOWN_X_LINE_DROP = 0.00278
 # Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
-# #2248); machinist review of round 6, #6.  The tip dowel's REF station
-# from the pivot-bore axis (" (.188) ", 8 glyphs at HoldDownX's measured
-# 2.0 mm), on HoldDownX's former line 1.1 mm under the hold-down's rim.  Its
-# 9.6 mm span cannot hold its text, which hangs right, outside the circle,
-# where HoldDownX's stood.  Its pivot witness rises on HoldDownX's, and its
-# dowel witness drops from the ream only to this line, short of HoldDownX's
-# line under it, so neither witness crosses a dimension line.  The
-# controlling station stays TipDowelX from the hold-down hole (the stack
-# reason is at dt_cone_swing_platform_spec.TIP_DOWEL_STATION_TOL_MM).
-TIP_DOWEL_PIVOT_X_TEXT_SIZE = (0.0160, 0.0035)
+# #2248); machinist review of round 6, #6.  The tip dowel's controlling
+# station from the pivot-bore axis, the origin that locates every hole on
+# this plate (rule 10), at the title block's .XXX (" .188 ", 6 glyphs at
+# HoldDownX's measured 2.0 mm), on HoldDownX's former line 1.1 mm under the
+# hold-down's rim.  Its 9.6 mm span cannot hold its text, which hangs right,
+# outside the circle, where HoldDownX's stood.  Its pivot witness rises on
+# HoldDownX's, and its dowel witness drops from the ream only to this line,
+# short of HoldDownX's line under it, so neither witness crosses a dimension
+# line.  Until the integration proof (run 20261109T062834910Z) it printed as
+# a REF, which left the ream located only by a chain through the hold-down
+# hole.  TipDowelX stays as the banded hole-to-hole relation rule 10 allows
+# beside the origin's station (the stack reason is at
+# dt_cone_swing_platform_spec.TIP_DOWEL_STATION_TOL_MM).
+TIP_DOWEL_PIVOT_X_TEXT_SIZE = (0.0120, 0.0035)
 TIP_DOWEL_PIVOT_X_LINE_Y = (
     DETAIL_HOLDDOWN_Y - HOLDDOWN_CLEARANCE_DIA / 2.0 * _DETAIL_S - 0.0011
 )
@@ -444,7 +448,7 @@ _TIP_DOWEL_X_TEXT_X = (
 # round 6, #7; two rows under the size, rule 7; round 8, #2: the order of
 # operations is MHA-DT-00 step 2's, not this sheet's).
 TIP_DOWEL_PIN_NUMBER = _config.parts("dt-vn-locating-pin")["number"]
-TIP_DOWEL_NOTE_NUMBER = 1
+TIP_DOWEL_NOTE_NUMBER = 3
 TIP_DOWEL_CALLOUT = "\n".join(
     (
         "MATCH-REAM THRU",
@@ -459,8 +463,8 @@ TIP_DOWEL_CALLOUT = "\n".join(
 # indent; the step reference never breaks across rows.  Round 7's layout
 # audit measured 62 characters at 107.7 mm (x 221.6..329.3 mm), 7.6 mm into
 # the box of the section A-A label above it (from x 321.7 mm).  The callout's
-# SEE NOTE 1 names the hole, so the note opens on the fit; its longest row
-# is 48 characters, about 85 mm.
+# SEE NOTE 3 names the hole, so the note opens on the fit; its longest row
+# is 50 characters, about 97 mm.
 TIP_DOWEL_NOTE_WIDTH = 55
 _NBSP = "\u00a0"
 TIP_DOWEL_NOTE = textwrap.fill(
@@ -476,8 +480,9 @@ TIP_DOWEL_NOTE = textwrap.fill(
 TIP_DOWEL_NOTE_CHAR_HEIGHT = 0.0025
 TIP_DOWEL_NOTE_GLYPH_WIDTH = 0.00193
 TIP_DOWEL_NOTE_ROW_HEIGHT = 0.0044
-# Upper-left, in the band between the title block (top 0.066) and the
-# engagement note (ink from 0.0760 on the r6 render), left-aligned with it.
+# Upper-left, on sheet 2 with detail B (the callout's own sheet, rule 7),
+# in the band between the title block (top 0.066) and note 2 (ink from
+# 0.0760, as on the r6 render), left-aligned with it.
 TIP_DOWEL_NOTE_XY = (0.222, 0.0745)
 TIP_DOWEL_CALLOUT_SIZE = (0.0475, 0.0210)
 _TIP_DOWEL_CALLOUT_BOTTOM = (
@@ -529,18 +534,22 @@ RELIEF_TIP_INSET_MM = 1.0
 # the isometric's ink, ~0.189), to free the field the relief note stands in.
 ISO_CAPTION_UPPER_LEFT = (0.315, 0.180)
 # The MHA-DT-VN-61 named-exception note (2.5 mm text, one line), anchored
-# upper-left in the empty band above the title block (0.066), left of the
-# A-A label (x >= 0.342), 4.3 mm over the title block so note 1 fits above
-# it under the pivot bore callout (bottom ~0.0906).  A sheet must state the
-# shortfall (owner exception RV-02).
-ENGAGEMENT_NOTE_XY = (0.222, 0.0747)
+# upper-left on sheet 2 in the empty band above the title block (0.066), its
+# ink 0.0760..0.0795 (the r6 render's), so note 3 fits under it and the
+# pivot bore callout (bottom ~0.0906) stands clear over it.  A sheet must
+# state the shortfall (owner exception RV-02).
+ENGAGEMENT_NOTE_XY = (0.222, 0.0795)
 # Numbered notes, flagged from the feature each governs (rule 7): a callout
-# keeps its size/process rows and at most two rows of words.  Note 1 is the
-# top relief's matched depth, flagged from the leader on section A-A's
-# relief floor; note 2 the post-mount taps' engagement shortfall (owner
-# exception RV-02, value unchanged), flagged from their callout.  Both stand
-# in the band over the title block (top 0.066) freed by the plan captions,
-# note 1 above note 2.  Rows end left of the A-A label (x 0.342).
+# keeps its size/process rows and at most two rows of words.  Each sheet
+# carries the notes its own flags name, numbered once across the drawing.
+# Sheet 1: note 1, the top relief's matched depth, flagged from the leader on
+# section A-A's relief floor.  Sheet 2: note 2, the post-mount taps'
+# engagement shortfall (owner exception RV-02, value unchanged), flagged
+# from their callout, over note 3 (TIP_DOWEL_NOTE), flagged from the
+# dowel ream in detail B.  Each stands in the band over the title block
+# (top 0.066) freed by the plan captions; rows end left of the A-A label
+# (x 0.342).  The integration proof (run 20261109T062834910Z) printed the
+# dowel note on sheet 1 as a second note 1, its flag on sheet 2.
 RELIEF_NOTE_NUMBER = 1
 ENGAGEMENT_NOTE_NUMBER = 2
 RELIEF_FLAG = f"SEE NOTE {RELIEF_NOTE_NUMBER}"
@@ -556,10 +565,10 @@ RELIEF_NOTE = textwrap.fill(
     break_on_hyphens=False,
 )
 ENGAGEMENT_NOTE = f"{ENGAGEMENT_NOTE_NUMBER}. {POST_MOUNT_ENGAGEMENT_NOTE}"
-RELIEF_NOTE_XY_UPPER_LEFT = (
-    ENGAGEMENT_NOTE_XY[0],
-    ENGAGEMENT_NOTE_XY[1] + len(RELIEF_NOTE.split("\n")) * NOTE_ROW_HEIGHT,
-)
+# Sheet 1's only note, where the integration proof (run
+# 20261109T062834910Z) printed it: ink 0.0756..0.0835, under section A-A's
+# label and over the title block.
+RELIEF_NOTE_XY_UPPER_LEFT = (0.222, 0.0835)
 # The pivot relief's width names the feature only: the .42 is centred on the
 # pivot bore's centre line and the open end shows in the plan (rule 26: a
 # location is a dimension, not a sentence).
@@ -599,7 +608,7 @@ HOLDDOWN_CROP_MARGIN_MM = 0.25
 # The strip's lower-left (east underside) corner on the sheet, where the
 # view is moved once cropped.  Detail B's texts right of its circle clear
 # C-C's padded box (inset left 0.1306, inset top 0.0496): TipDowelPivotX's
-# (x ..0.1241, y 0.0496..0.0531) and HoldDownX's (x ..0.1305, y
+# (x ..0.1201, y 0.0496..0.0531) and HoldDownX's (x ..0.1305, y
 # 0.0450..0.0485) both end left of the inset.  The padded box's foot
 # (0.0283) stands 0.7 mm over the native label's top (0.0291), inside the
 # blocking audit's 1.5 mm.
@@ -2272,8 +2281,8 @@ def _add_sized_note(
 
 def _place_holes_sheet(adapter: Any) -> list[Any]:
     """Sheet 2 (active): the hole pattern and lock notch on one unlabelled
-    principal plan, detail B cut from it, the plan's hole callouts and note 2.
-    Returns the plan's and detail's curated dimensions."""
+    principal plan, detail B cut from it, the plan's hole callouts and notes
+    2 and 3.  Returns the plan's and detail's curated dimensions."""
     plan = place_view(adapter, str(SOURCE), "*Top", *FEATURE_CENTER, scale=(1, 2))
     set_hidden_lines_removed(adapter, plan)
     detail = _create_detail_view(
@@ -2314,21 +2323,13 @@ def _place_holes_sheet(adapter: Any) -> list[Any]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     # The locating dowel's slip ream: made at assembly, its process under its
-    # banded size and the flag to note 1 (rule-23 retention, owner ruling
+    # banded size and the flag to note 3 (rule-23 retention, owner ruling
     # 2026-11-07 (MHA-DT-00 rubric sample, PR #2248); round 6, #7).
     set_dimension_callouts(adapter, detail_annotations, {"TipDowelDia": TIP_DOWEL_CALLOUT})
-    # Its station from the pivot-bore axis is a reference (round 6, #6); the
-    # chained TipDowelX controls (dt_cone_swing_platform_spec.
-    # TIP_DOWEL_STATION_TOL_MM says why).
-    tip_dowel_pivot = [
-        item for item in detail_annotations
-        if dimension_name(adapter, item) == "TipDowelPivotX"
-    ]
-    if len(tip_dowel_pivot) != 1:
-        raise RuntimeError("expected one tip dowel pivot-axis station in detail B")
-    set_reference_dimension(
-        adapter, tip_dowel_pivot[0], label="tip dowel pivot-axis reference station"
-    )
+    # Its station from the pivot-bore axis (TipDowelPivotX) prints as a
+    # controlling .XXX dimension, not a REF: the origin locates the ream, and
+    # TipDowelX is the banded relation to the hold-down hole
+    # (dt_cone_swing_platform_spec.TIP_DOWEL_STATION_TOL_MM says why).
     north_edge = [a for a in plan_annotations if dimension_name(adapter, a) == "NorthEdgeZ"]
     if len(north_edge) != 1:
         raise RuntimeError("expected one NorthEdgeZ on the hole-pattern plan")
@@ -2385,6 +2386,14 @@ def _place_holes_sheet(adapter: Any) -> list[Any]:
     _add_sized_note(
         adapter, ENGAGEMENT_NOTE, *ENGAGEMENT_NOTE_XY,
         char_height=NOTE_CHAR_HEIGHT, label="post-mount engagement note",
+    )
+    # Note 3, which detail B's dowel ream flags, under note 2 on this sheet.
+    _add_sized_note(
+        adapter,
+        TIP_DOWEL_NOTE,
+        *TIP_DOWEL_NOTE_XY,
+        char_height=TIP_DOWEL_NOTE_CHAR_HEIGHT,
+        label="tip dowel hole note",
     )
     # Annotation insertion can invalidate the exported display geometry.
     for view in (plan, detail):
@@ -2585,6 +2594,7 @@ async def build(adapter: Any) -> dict[str, str]:
                 print(f"PlateThk witness {witness_index}: old_gap_m={old_gap} gap_m={actual_gap}")
             rebuild_drawing(adapter, label="plate thickness cut-edge witness gaps")
     _crop_pivot_section(adapter, section)
+
     # U41: the thickness is the stock's, a reference with no band.
     thickness_annotations = [
         item for item in section_annotations
@@ -2644,13 +2654,6 @@ async def build(adapter: Any) -> dict[str, str]:
     _add_sized_note(
         adapter, RELIEF_NOTE, *RELIEF_NOTE_XY_UPPER_LEFT,
         char_height=NOTE_CHAR_HEIGHT, label="top relief note",
-    )
-    _add_sized_note(
-        adapter,
-        TIP_DOWEL_NOTE,
-        *TIP_DOWEL_NOTE_XY,
-        char_height=TIP_DOWEL_NOTE_CHAR_HEIGHT,
-        label="tip dowel hole note",
     )
     add_leader_note(
         adapter,
