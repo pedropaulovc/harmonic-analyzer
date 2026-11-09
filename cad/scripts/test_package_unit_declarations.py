@@ -45,6 +45,11 @@ METRIC_PACKAGES: dict[str, str] = {
         "NUIBBYED HGR15 rail and HGH15CA carriage kit, 450 mm (Amazon B0C4DJNL33), "
         "a metric-only vendor line (owner ruling 4, 2026-11-01)"
     ),
+    "parts/sm-vn-gooseneck-shoulder-washer": (
+        "DIN 125 M6 washer (McMaster-Carr 93475A250), 6.4 ID x 12.0 OD, the "
+        "only stock bore and OD inside the counter eye's retention and half-turn "
+        "clearance window (owner ruling 2026-11-08, #2144 item 11.4)"
+    ),
 }
 
 _UNITS = ("in", "mm")
