@@ -7,3 +7,9 @@ dt-crank-arm:
   tolerance_class: machined_block
   process: "machined (steel)"
   drawing_unit: in
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "accept"
+      where: "keeper-chain anchor: #2-56 UNC - 2B THRU tap .110 from the -X edge (AnchorOffset .XXX), callout WALL .062 MIN"
+      finding: "the tap's finished wall to the edge, after the .010 edge break and the .010 tap-mouth break, is about .042, under the .060 rule-17 floor (rule 20)"
+      reason: "Owner ruling 2026-11-08 (Pedro, #2144 item 9.2): the .042 finished wall is accepted as a minor exception under rule 20; the callout stays WALL .062 MIN. The edge position is set by the owner's jack-chain ruling: the end link's standing eye must hang past the edge (dt_crank_arm_spec.standing_eye_face_reach). Accepts this wall only, no other band or callout departure."
