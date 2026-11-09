@@ -12,8 +12,8 @@ reaching to the tapped counter-spring anchor boss on the -X arm.  Both spring
 anchors are purchased eyebolts that thread straight into those taps, so the
 print controls thread identity and position, never a seat bore. Sheet 1
 shows the 1:2 end profile and top plan and a 1:4 shaded isometric.
-The plan's reference reach locates the visible middle-rib/web intersection,
-not the theoretical taper apex buried inside the counter web.
+The end profile's reference angle measures the visible counter flank against
+the web top, without reconstructing the taper apex buried inside the web.
 Sheet 2 shows VIEW F at 1:1, a complete 10:1 knife detail D cut from that
 view, and a shaded underside isometric. VIEW F carries the blind bracket
 receivers, the uniform coefficient plate's visible free-end thickness and
@@ -44,6 +44,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 
 from _check import check
 from _com import _early_bound, _read_member
+from _drawing_attachment import _is_same_attachment
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -82,6 +83,7 @@ from _named_views import octant_view_name
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
+from _supplier_dimensions import _measured_supplier_value
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from magnifying_bracket_joint_layout import (
@@ -132,6 +134,7 @@ from sm_summing_lever_spec import (
     KNIFE_RIDGE_TANGENT_XY,
     PLATE_L,
     PLATE_W,
+    RIB_BLEND_R,
     RIB_REACH,
     RIB_T,
     RIB_WRAP_R,
@@ -2148,37 +2151,50 @@ async def build(adapter: Any) -> dict[str, str]:
         entity_types=ridge_entity_types,
     )
 
-    # The negative flank is tangent to the pivot wrap and meets the web top
-    # before its theoretical apex reaches the boss axis. Dimension that real
-    # visible vertex, using the existing pivot reference rather than a sketch
-    # of the buried apex. Parentheses retain the sheet's inch units/precision
-    # without imposing another tolerance on this derived intersection.
-    counter_tip_label = "middle rib at counter web top"
-    counter_tip_x = TIP_X + COUNTER_WEB_T / 2.0 * math.sqrt(
-        TIP_X**2 - RIB_WRAP_R**2
-    ) / RIB_WRAP_R
-    counter_tip_point = (counter_tip_x, COUNTER_WEB_T / 2.0, RIB_T / 2.0)
-    counter_tip_vertex = top_edges.exact_vertex_at(
-        counter_tip_point, label=counter_tip_label,
+    # Both rays are real straight edges in the end profile, not the Top
+    # projection (which collapses their angle). The web-top ray is the
+    # existing root round's tangent edge, not its removed theoretical sharp.
+    counter_angle_label = "counter flank to web top"
+    tangent_x = RIB_WRAP_R**2 / TIP_X
+    tangent_y = RIB_WRAP_R * math.sqrt(1.0 - RIB_WRAP_R**2 / TIP_X**2)
+    counter_angle = math.degrees(math.atan2(tangent_y, tangent_x - TIP_X))
+    flank_point = (
+        (TIP_X + tangent_x) / 2.0, tangent_y / 2.0, RIB_T / 2.0,
     )
-    counter_tip_xy = model_point_in_view(
-        adapter, top, _metres(counter_tip_point), label=counter_tip_label,
+    web_point = (flank_point[0], COUNTER_WEB_T / 2.0, RIB_T / 2.0 + RIB_BLEND_R)
+    counter_edges = scan_view_edges(front, label=counter_angle_label)
+    flank_edge = counter_edges.exact_line_through(flank_point, label="counter flank")
+    web_edge = counter_edges.exact_line_through(web_point, label="counter web top")
+    flank_xy = model_point_in_view(
+        adapter, front, _metres(flank_point), label=counter_angle_label,
     )
-    counter_tip_dimension = add_edge_dimension(
-        adapter, top, p0=ridge_dim_edge, p1=counter_tip_xy,
-        text_xy=(0.216, 0.0883), label=counter_tip_label,
-        orientation="horizontal", entity_types=("SKETCHSEGMENT", "VERTEX"),
-        entities=(ridge_axis, counter_tip_vertex),
+    web_xy = model_point_in_view(
+        adapter, front, _metres(web_point), label=counter_angle_label,
     )
-    assert_dimension_measures(
-        adapter, counter_tip_dimension, expected_mm=-counter_tip_x,
-        label=counter_tip_label, entities=(ridge_axis, counter_tip_vertex),
-        entity_types=("SKETCHSEGMENT", "VERTEX"),
+    counter_dimension = _early_bound(
+        add_edge_dimension(
+            adapter, front, p0=web_xy, p1=flank_xy,
+            text_xy=(0.275, 0.245), label=counter_angle_label,
+            orientation="angular", entity_types=("EDGE", "EDGE"),
+            entities=(web_edge.edge, flank_edge.edge),
+        ),
+        "IDisplayDimension",
     )
-    set_reference_dimension(
-        adapter, _early_bound(counter_tip_dimension, "IDisplayDimension").GetAnnotation(),
-        label=counter_tip_label,
+    _measured_supplier_value(
+        counter_dimension, label=counter_angle_label, presentation="angle",
+        expected_mm=None, expected_degrees=counter_angle,
     )
+    counter_annotation = _early_bound(counter_dimension.GetAnnotation(), "IAnnotation")
+    counter_attached = tuple(counter_annotation.GetAttachedEntities3() or ())
+    if len(counter_attached) != 2 or counter_annotation.IsDangling() or not all(
+        any(_is_same_attachment(adapter, attached, edge, "EDGE") for attached in counter_attached)
+        for edge in (web_edge.edge, flank_edge.edge)
+    ):
+        raise RuntimeError(f"{counter_angle_label}: lost named edge attachments")
+    counter_dimension.SetPrecision3(1, -1, -1, -1)  # leave tolerance precision unchanged
+    if counter_dimension.GetPrimaryPrecision2() != 1:
+        raise RuntimeError(f"{counter_angle_label}: angle precision did not take")
+    set_reference_dimension(adapter, counter_annotation, label=counter_angle_label)
 
     # Anchor-tap pattern control: datum B on the plate end the seed hole is
     # located from, BASIC row-X / start-Z / pitch coordinates off A|B, datum C

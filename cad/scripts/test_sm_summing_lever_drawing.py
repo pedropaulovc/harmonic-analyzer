@@ -898,34 +898,55 @@ def _drawing_function(name: str) -> ast.FunctionDef | ast.AsyncFunctionDef:
     )
 
 
-@pytest.mark.parametrize("endpoint", ["visible", "buried", "underside", "wrong_attachment"])
-def test_counter_taper_reference_uses_visible_web_top_vertex(identity, endpoint) -> None:
-    """The derived reference reaches the web intersection, never the buried apex."""
+@pytest.mark.parametrize("case", [
+    "visible", "hidden_flank", "sharp_root", "underside", "wrong_attachment",
+    "dangling", "extra_attachment", "wrong_angle", "supplement", "nonfinite", "linear",
+    "precision_ignored",
+])
+def test_counter_taper_reference_uses_visible_edge_angle(identity, monkeypatch, case) -> None:
+    """The native acute angle belongs to two real edges, never a buried vertex."""
+    import _supplier_dimensions
+
+    monkeypatch.setattr(_supplier_dimensions, "_early_bound", lambda value, _kind: value)
     spec = sm_summing_lever_spec
     tangent_x = spec.RIB_WRAP_R**2 / spec.TIP_X
     tangent_y = spec.RIB_WRAP_R * math.sqrt(
         1.0 - spec.RIB_WRAP_R**2 / spec.TIP_X**2
     )
-    x = spec.TIP_X + (tangent_x - spec.TIP_X) * (
+    expected = math.atan2(tangent_y, tangent_x - spec.TIP_X)
+    assert math.degrees(expected) == pytest.approx(11.53695903281549, abs=1e-12)
+    intersection_x = spec.TIP_X + (tangent_x - spec.TIP_X) * (
         spec.COUNTER_WEB_T / 2.0 / tangent_y
     )
-    assert f"{-x / 25.4:.2f}" == "2.32"
-    y = spec.COUNTER_WEB_T / 2.0
-    if endpoint == "buried":
-        x, y = spec.TIP_X, 0.0
-    elif endpoint == "underside":
-        y = -y
-    vertex, other_vertex, axis = object(), object(), object()
-    edge = ViewEdge(
-        object(), ((x, y, spec.RIB_T / 2.0), (x, y, -spec.RIB_T / 2.0)),
-        None, (vertex, other_vertex),
+    z = spec.RIB_T / 2.0
+    flank = _line(
+        (intersection_x, spec.COUNTER_WEB_T / 2.0, z),
+        (tangent_x, tangent_y, z),
     )
-    attached = other_vertex if endpoint == "wrong_attachment" else vertex
-    display = _dimension(-x, (axis, attached))
+    web_y = -spec.COUNTER_WEB_T / 2.0 if case == "underside" else spec.COUNTER_WEB_T / 2.0
+    web_z = z if case == "sharp_root" else z + spec.RIB_BLEND_R
+    web = _line((intersection_x + 5.0, web_y, web_z), (tangent_x - 15.0, web_y, web_z))
+    edges = (web,) if case == "hidden_flank" else (flank, web)
+    attached = (flank.edge, object() if case == "wrong_attachment" else web.edge)
+    if case == "extra_attachment":
+        attached += (object(),)
+    value = {
+        "wrong_angle": expected + 1e-4,
+        "supplement": math.pi - expected,
+        "nonfinite": math.nan,
+    }.get(case, expected)
+    display = _dimension(value * 1000.0, attached)
+    display.Type2 = 2 if case == "linear" else 3
+    display.GetAnnotation().IsDangling = lambda: case == "dangling"
     picks, references = [], []
+    precision_writes = []
+    display.SetPrecision3 = lambda *args: precision_writes.append(args)
+    display.GetPrimaryPrecision2 = lambda: (
+        0 if case == "precision_ignored" or not precision_writes else precision_writes[-1][0]
+    )
 
     def add(adapter, view, **kwargs):
-        assert adapter is identity and view is top
+        assert adapter is identity and view is front
         picks.append(kwargs)
         return display
 
@@ -933,11 +954,15 @@ def test_counter_taper_reference_uses_visible_web_top_vertex(identity, endpoint)
         assert adapter is identity and annotation is display.GetAnnotation()
         references.append(kwargs)
 
+    def scan(view, **kwargs):
+        assert view is front
+        return ViewEdges(label=kwargs["label"], edges=edges)
+
     body = _drawing_function("build").body
     start = next(
         index for index, node in enumerate(body)
         if isinstance(node, ast.Assign)
-        and any(isinstance(target, ast.Name) and target.id == "counter_tip_label"
+        and any(isinstance(target, ast.Name) and target.id == "counter_angle_label"
                 for target in node.targets)
     )
     stop = next(
@@ -947,34 +972,50 @@ def test_counter_taper_reference_uses_visible_web_top_vertex(identity, endpoint)
         and _call_name(body[index].value) == "set_reference_dimension"
     )
     block = ast.Module(body=body[start:stop + 1], type_ignores=[])
-    top = object()
+    front = object()
     scope = {
-        **vars(drawing), "adapter": identity, "top": top,
-        "top_edges": ViewEdges(label="top", edges=(edge,)),
-        "ridge_axis": axis, "ridge_dim_edge": (0.235, 0.175),
+        **vars(drawing), "adapter": identity, "front": front,
+        "scan_view_edges": scan,
         "model_point_in_view": lambda _adapter, _view, point, **_kw: point[:2],
         "add_edge_dimension": add, "set_reference_dimension": reference,
         "_early_bound": lambda value, _kind: value,
     }
     code = compile(block, "<counter taper reference>", "exec")
-    if endpoint != "visible":
-        match = "unmatched picks" if endpoint == "wrong_attachment" else "no exact visible vertex"
+    if case != "visible":
+        match = (
+            "no exact visible line" if case in ("hidden_flank", "sharp_root", "underside")
+            else "lost named edge attachments" if case in (
+                "wrong_attachment", "dangling", "extra_attachment",
+            )
+            else "native dimension type" if case == "linear"
+            else "angle precision did not take" if case == "precision_ignored"
+            else "native value"
+        )
         with pytest.raises(RuntimeError, match=match):
             exec(code, scope)
         assert not references
         return
     exec(code, scope)
     assert len(picks) == len(references) == 1
-    assert picks[0]["entities"] == (axis, vertex)
-    assert picks[0]["entity_types"] == ("SKETCHSEGMENT", "VERTEX")
-    assert picks[0]["orientation"] == "horizontal"
-    assert picks[0]["p1"] == pytest.approx((x / 1000.0, y / 1000.0))
-    # Only the existing parenthesis formatter may change the presentation:
-    # no unit, precision, tolerance or numeric-text override in this block.
+    assert precision_writes == [(1, -1, -1, -1)]
+    assert picks[0]["entities"] == (web.edge, flank.edge)
+    assert picks[0]["entity_types"] == ("EDGE", "EDGE")
+    assert picks[0]["orientation"] == "angular"
+    assert picks[0]["p0"] == pytest.approx(
+        ((spec.TIP_X + tangent_x) / 2000.0, spec.COUNTER_WEB_T / 2000.0),
+    )
+    assert picks[0]["p1"] == pytest.approx(
+        ((spec.TIP_X + tangent_x) / 2000.0, tangent_y / 2000.0),
+    )
+    # One-decimal angular precision and existing parentheses only:
+    # no unit, tolerance or numeric-text override in this block.
     assert {_call_name(call) for call in _calls_in_order(block)} == {
-        "sqrt", "exact_vertex_at", "model_point_in_view", "_metres",
-        "add_edge_dimension", "assert_dimension_measures",
-        "set_reference_dimension", "_early_bound", "GetAnnotation",
+        "sqrt", "degrees", "atan2", "scan_view_edges", "exact_line_through",
+        "model_point_in_view", "_metres", "add_edge_dimension",
+        "_measured_supplier_value", "set_reference_dimension", "_early_bound",
+        "GetAnnotation", "GetAttachedEntities3", "IsDangling",
+        "SetPrecision3", "GetPrimaryPrecision2",
+        "tuple", "len", "all", "any", "_is_same_attachment", "RuntimeError",
     }
 
 
