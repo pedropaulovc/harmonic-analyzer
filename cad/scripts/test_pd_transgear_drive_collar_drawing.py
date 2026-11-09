@@ -314,31 +314,34 @@ def test_fits_carry_named_bands_and_the_lengths_print_their_places() -> None:
 
 
 def test_every_tight_band_names_its_registered_mate_at_its_callout() -> None:
-    """drawing-guidelines.md rule 4: the mate's name and part number and the
-    fit print at the callout itself, not in a general note."""
+    """drawing-guidelines.md rule 4: the mate's drawing number prints at the
+    callout itself or in the numbered note it links to; a location dimension
+    carries only its value and band (rule 7)."""
     mates = {
-        "BoreDia": ("pd-transgear-knob-shaft", "SLIDING FIT"),
-        "FlatToAxis": ("pd-transgear-knob-shaft", "SLIDES ON"),
-        "PinPosDia": ("pd-vn-transgear-knob-drive-pin", "PRESS FIT"),
-        "PinPosY": ("pd-transgear-removable", "LOCATES SPROCKET"),
-        "PinNegY": ("pd-transgear-removable", "LOCATES SPROCKET"),
-        "PilotDia": ("pd-transgear-removable", "CLEARS SPROCKET"),
-        "CollarDia": ("pd-transgear-removable", "CLEARS #25 CHAIN"),
-        "BoreEntryBreak": ("pd-transgear-knob-shaft", "CLEARS"),
+        "PinPosDia": "pd-vn-transgear-knob-drive-pin",
+        "PilotDia": "pd-transgear-removable",
+        "CollarDia": "pd-transgear-removable",
+        "BoreEntryBreak": "pd-transgear-knob-shaft",
     }
-    for name, (stem, fit) in mates.items():
+    for name, stem in mates.items():
         callout = " ".join(drawing.DIMENSION_CALLOUTS_BELOW[name].split())
         assert _config.parts(stem)["number"] in callout, name
-        assert fit in callout, name
-    assert "KNOB SHAFT" in spec.BORE_CALLOUT and "KNOB SHAFT" in spec.FLAT_CALLOUT
-    assert "DOWEL" in spec.PIN_HOLE_CALLOUT
-    # The D-bore's diametral clearance prints at its callout.
-    assert "CLEARANCE ON DIA." in spec.BORE_CALLOUT
-    assert spec.BORE_CALLOUT.splitlines()[0] == "TRUE D THRU"
-    # The D's acute inside corners take their limit from the shaft they
-    # slide on, not the title block's inside-corner radius (r10 review).
-    assert "CORNERS CLEAR D-CORE" in " ".join(spec.BORE_CALLOUT.split())
-    assert spec.PIN_HOLE_CALLOUT.splitlines()[0] == "2X REAM THROUGH"
+    assert _config.parts("pd-transgear-removable")["number"] in (
+        drawing.DIMENSION_CALLOUTS_BELOW["PinPosDia"]
+    )
+    # The D-bore's Ø and flat link one numbered note naming the shaft.
+    link = f"SEE NOTE {drawing.D_BORE_NOTE}"
+    assert link in drawing.DIMENSION_CALLOUTS_BELOW["BoreDia"]
+    assert drawing.DIMENSION_CALLOUTS_BELOW["FlatToAxis"].strip() == link
+    note = " ".join(drawing.FIT_NOTES.split())
+    assert f"{drawing.D_BORE_NOTE}. " in note
+    assert _config.parts("pd-transgear-knob-shaft")["number"] in note
+    assert "PinPosY" not in drawing.DIMENSION_CALLOUTS_BELOW
+    assert "PinNegY" not in drawing.DIMENSION_CALLOUTS_BELOW
+    # Rule 7: size and process lines plus at most two lines of words.
+    assert all(
+        len(text.splitlines()) <= 3 for text in drawing.DIMENSION_CALLOUTS_BELOW.values()
+    )
     # The locations' tight band is the sprocket's own (until D14 carries the
     # shared interface in inch, no looser than it): the dowels must enter its
     # drilled holes, each part spending half the 0.119 clearance.
@@ -489,14 +492,12 @@ def test_notes_and_recipe_have_no_obsolete_front_pin_or_slot() -> None:
     assert f"{_in(spec.DRIVE_PIN_COLLAR_RIM_WORST)} MIN" in notes
     assert f"{_in(spec.BODY_BLANK_LENGTH_MIN)} MIN" in notes
     # drawing-guidelines.md rule 7 (notes: few, flagged, never a method):
-    # three numbered notes on at most four lines, no method words in the
-    # bore callout; the D-bore's fit prints at its own callout.
+    # the part's note 1, then the drawing's numbered fit notes, each linked
+    # from its feature by SEE NOTE n.
     assert [line[:3] for line in notes.splitlines() if not line.startswith(" ")] == [
-        "1. ", "2. ", "3. "
+        "1. ", "2. ", "3. ", "4. "
     ]
-    assert len(notes.splitlines()) <= 4
-    assert "D-BORE" not in notes
-    assert "BROACH" not in spec.BORE_CALLOUT and "EDM" not in spec.BORE_CALLOUT
+    assert "BROACH" not in notes and "EDM" not in notes
     assert drawing.NOTES_TEXT.startswith('$PRPSHEET:"Manufacturing Notes"\n2. ')
     assert "SLOT" not in notes
     assert "SPRING PIN" not in notes
@@ -920,15 +921,8 @@ def test_native_rear_entry_has_both_actual_legs_on_both_d_edges(monkeypatch) -> 
     ) == pytest.approx((0.1524, 0.254))
     assert spec.DRAWING_DIMENSIONS["RearBoreChamfer"] == {"BoreEntryBreak"}
     callout = drawing.DIMENSION_CALLOUTS_BELOW["BoreEntryBreak"]
-    assert callout == spec.BORE_ENTRY_BREAK_CALLOUT
-    assert callout.splitlines()[0] == "X 45 DEG, BOTH LEGS"
-    # The model breaks the rear end only (both D edges there), cut after the
-    # rear face is faced to fit; the band clears the shaft's root corner.
-    assert "REAR END ARC AND FLAT" in callout
-    assert "AFTER REAR FACE FIT" in callout
+    # The band clears the shaft's root corner: its mate by drawing number.
     assert "MHA-PD-08" in callout
-    # The MAX's own job, so the band's upper limit is not read as idle.
-    assert callout.splitlines()[-1].startswith("MAX ")
     assert max(map(len, callout.splitlines())) <= 21
     assert spec.BORE_ENTRY_BREAK_ANGLE_BAND_DEG == _config.title_block("angular")["value_deg"]
     assert spec.BORE_ENTRY_BREAK_ANGLE_LIMITS == pytest.approx((44.0, 46.0))

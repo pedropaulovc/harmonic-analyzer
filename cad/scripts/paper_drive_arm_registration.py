@@ -28,12 +28,14 @@ from _gear_quality import (
 ARM_LOCATOR_SITES_MM = ARM.LOCATOR_SITES_MM
 PLATE_LOCATOR_SITES_MM = PLATE.LOCATOR_SITES_MM
 LOCATOR_PAIR_BASELINE_MM = ARM.LOCATOR_PAIR_BASELINE_MM
-# K's drawn setting circle about S (MHA-PD-00 VIEW K); its radius is the
-# set band, the band's far end at its edge.
+# K's drawn setting circle about S (MHA-PD-00 VIEW K), Ø.008:
+# stock_form_quality.reducer_k_setting_diameter_mm (owner ruling 2026-11-08
+# (Pedro), #2144 item 5.3). It bounds K's whole landing error, across S-K
+# included; along S-K the set band below is tighter, and both are checked.
 REDUCER_AXIS_SETUP_RADIUS_MM = reducer_k_setting_diameter_mm() / 2.0
 # The drawn matched setting: K held this band (upper, lower) from
-# CENTRE_DISTANCE along S-K (the reducer's set band, printed on the arm
-# and plate sheets).
+# CENTRE_DISTANCE along S-K (the reducer's set band,
+# pd_rack_pinion_spec.CENTRE_DISTANCE_SET_BAND_IN, which the mesh sets).
 REDUCER_CENTRE_DISTANCE_SET_BAND_MM = ARM.DISC.CENTRE_DISTANCE_SET_BAND
 # Unit vector S -> K in the arm frame (x along the arm, y across), the
 # frame of every K reading below.
@@ -127,6 +129,16 @@ S_PROJECTED_HEIGHT_MM = (
 K_PROJECTED_HEIGHT_MM = (
     math.ceil(1000.0 * (PLATE_MOUNT_MACHINE_Z_MM - CHAIN_PLANE_MACHINE_Z_LIMITS_MM[0]) / 25.4)
     * 25.4 / 1000.0
+)
+# The pin S's axis zone at the farthest chain plane: MHA-PD-18's plain
+# ⊥ .001 over the bore (no projected zone, rule 26), run on from the thinnest
+# stock to S_PROJECTED_HEIGHT_MM (owner ruling 2026-11-08 (Pedro), #2144
+# item 4.1).  Wider than K's AXIS_PROJECTED_ZONE_DIAMETER_MM; the meshes and
+# the platen air charge it, and MHA-PD-00's collar feeler accepts the collar
+# air it closes (pd_cluster_air.ASSEMBLY_ACCEPTED_COLLAR_SOURCES).
+S_AXIS_ZONE_DIAMETER_MM = (
+    ARM.PIN_BORE_PERPENDICULARITY_MM * S_PROJECTED_HEIGHT_MM
+    / (ARM.THICKNESS - ARM.THICKNESS_BAND)
 )
 KNOB_JOURNAL_CONTACT_START_LOCAL_Z_MM = SHAFT.PINION_REAR_Z + RING.LENGTH
 KNOB_JOURNAL_CONTACT_END_LOCAL_Z_MM = KNOB_JOURNAL_CONTACT_START_LOCAL_Z_MM + PLATE.HUB_TO_BOSS

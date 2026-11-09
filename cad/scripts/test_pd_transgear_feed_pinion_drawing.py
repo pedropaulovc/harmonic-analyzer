@@ -233,7 +233,8 @@ def test_step_face_air_is_accepted_at_assembly_at_the_floor() -> None:
     import pd_transgear_drive_collar_spec as collar
 
     label = "sleeve step face perpendicularity"
-    assert air.ASSEMBLY_ACCEPTED_COLLAR_SOURCES == {label}
+    # MHA-PD-00's feeler accepts other sources too (hub spigot end, pin S).
+    assert label in air.ASSEMBLY_ACCEPTED_COLLAR_SOURCES
     assert label not in air.COLLAR_AIR.terms
     assert air.COLLAR_AIR.statistical_mm >= air.COLLAR_AIR_MIN
     assert air.COLLAR_AIR_MIN == collar.COLLAR_DISC_AIR_MIN

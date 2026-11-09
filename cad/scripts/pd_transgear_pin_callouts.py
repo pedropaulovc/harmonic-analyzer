@@ -11,10 +11,11 @@ fit, the bushings and the paper-drive assembly import.
 
 from __future__ import annotations
 
+import pd_transgear_arm_geometry as ARM
 import pd_vn_transgear_retaining_ring_spec as RING
-from pd_cluster_stack_band import STACK_NAME
 from pd_transgear_pin_spec import (
     ARM_NUMBER,
+    FRONT_BUSHING_NUMBER,
     PRESS_INTERFERENCE,
     RING_NUMBER,
     RUNNING_MATES,
@@ -22,32 +23,47 @@ from pd_transgear_pin_spec import (
     inch_text,
 )
 
+# The sheet's notes, the part's Manufacturing Notes property.  The press into
+# the arm is the MHA-PD-00 assembly's pin-pressed step; the part sheet gives
+# the fit (rule 23).  The shank's .0002 band is narrower than the shop's
+# turned-diameter row, so numbered note 1, linked from the shank Ø by SEE
+# NOTE 1, names its fit route: the shank is turned to the measured arm ream
+# (rule 4: standard fit names, the interference as REF).  The note prints the
+# arm's undersize ream limits, so the route and the shank's band agree on
+# the sheet (round 1: without them a 1/8 ream read as .1250 and up).  The
+# ring groove's Ø and width name their ring once, in note 2 (rule 4).  Kept
+# here, not in the widely imported spec, so the wording re-keys only this
+# part.
+SHANK_FIT_NOTE = 1
+RING_GROOVE_NOTE = 2
+DRAWING_NOTES = "\n".join((
+    f"{SHANK_FIT_NOTE}. PRESS FIT IN THE Ø{inch_text(ARM.PIN_BORE_DIA_MIN, 4)}-"
+    f"{inch_text(ARM.PIN_BORE_DIA_MAX, 4)} REAM OF {ARM_NUMBER}:",
+    "    TURN SHANK TO MEASURED REAM (INTERFERENCE "
+    f"{inch_text(PRESS_INTERFERENCE[0], 4)}-{inch_text(PRESS_INTERFERENCE[1], 4)}).",
+    f"    RUNNING FIT IN {', '.join(RUNNING_MATES[:-1])} AND {RUNNING_MATES[-1]}.",
+    f"{RING_GROOVE_NOTE}. RING GROOVE Ø AND WIDTH: FOR RING {RING_NUMBER}",
+    f"    (McMASTER {RING.SKU}).",
+    "1/4 IN BAR STOCK OK.",
+))
+
 TEXT_PREFIX = 1  # swDimensionTextPrefix
 TEXT_SUFFIX = 2  # swDimensionTextSuffix
 CALLOUT_ABOVE = 3  # swDimensionTextCalloutAbove
 CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
 
-# The ring the groove takes, named once above the groove Ø (one line: an
-# above-callout holding a line break is stored but never printed).
-GROOVE_CALLOUT = f"FOR {RING_NUMBER} RING, McMASTER {RING.SKU}"
-# The groove width's catalogue band names the same ring at its own callout
-# (rule 4: every tight band names its mate).
-GROOVE_WIDTH_CALLOUT = f"FOR {RING_NUMBER} RING"
-# The shank's band names its two fits at the Ø (rule 4, review of 6de7230aa
-# and the 2026-10-23 ENFORCE review): the press in the arm's ream and the
-# running bores whose bearing surface the Ra 63 marks.
-SHANK_CALLOUT = "\n".join(
-    (
-        f"PRESS FIT IN {ARM_NUMBER} REAM,",
-        f"{inch_text(PRESS_INTERFERENCE[0], 4)}-{inch_text(PRESS_INTERFERENCE[1], 4)} "
-        "DIAMETRAL INTERFERENCE;",
-        f"RUNS IN {', '.join(RUNNING_MATES)}",
-    )
-)
-# The +/-.001 station names the stack it serves and what it sets (rule 4): a
-# term of the disc cluster's stack (``transgear_cluster_fit.GS``) that sets
-# the collar-to-disc air; the end float is shimmed at assembly.
-GROOVE_STATION_CALLOUT = f"TO RING LOAD WALL;\n{STACK_NAME},\nSETS COLLAR TO DISC AIR"
+# The ring the groove takes is named once, in note 2, which both of the
+# groove's catalogue bands, Ø and width, link to (rule 4: one feature with
+# several tight dimensions names its mate once, on one note linked to all).
+GROOVE_CALLOUT = f"SEE NOTE {RING_GROOVE_NOTE}"
+# The shank's band and its fits are numbered note 1 (rule 7: a callout carries
+# at most two lines of words; the fit route is the note's).
+SHANK_CALLOUT = f"SEE NOTE {SHANK_FIT_NOTE}"
+# The +/-.001 station names the stack it sets once, by drawing number (rule
+# 4): the groove's load wall holds the ring that stops the front bushing and
+# the sleeve (``transgear_cluster_fit.SLEEVE_REAR_FORWARD_CHAIN``); the end
+# float is shimmed at assembly.
+GROOVE_STATION_CALLOUT = f"SETS STACK OF MHA-PD-10 AND {FRONT_BUSHING_NUMBER}"
 
 # lane -> (feature, dimension) -> text.
 CALLOUTS: dict[int, dict[tuple[str, str], str]] = {
@@ -55,7 +71,7 @@ CALLOUTS: dict[int, dict[tuple[str, str], str]] = {
     CALLOUT_BELOW: {
         ("PinProfile", "ShankDia"): SHANK_CALLOUT,
         ("PinProfile", "GrooveStation"): GROOVE_STATION_CALLOUT,
-        ("PinProfile", "GrooveWidth"): GROOVE_WIDTH_CALLOUT,
+        ("PinProfile", "GrooveWidth"): GROOVE_CALLOUT,
     },
     # The root radius is a single limit, its own one-line "R.005 MAX" (a
     # local MAX under the title block's inside corner needs no reason): the

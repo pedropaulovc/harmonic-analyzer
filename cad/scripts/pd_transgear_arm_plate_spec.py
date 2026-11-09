@@ -27,7 +27,6 @@ from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 import pd_transgear_arm_plate_geometry as PLATE
-import _transgear_arm_plate_locating_interface as LOCATING_PIN
 import paper_drive_arm_registration as REGISTRATION
 from pd_transgear_arm_plate_geometry import (
     BAND_XX,
@@ -35,7 +34,6 @@ from pd_transgear_arm_plate_geometry import (
     BORE_DIA,
     BORE_DIA_LIMITS,
     BOSS_FACE_Z,
-    CSK_ANGLE_DEG,
     CSK_DIA_BAND,
     REDUCER_POSITION_DIAMETER,
     REDUCER_POSITION_RADIUS,  # noqa: F401 - the drawing test reads it off the spec
@@ -117,43 +115,63 @@ PART_DATUMS = (
         ),
     ),
 )
-# The frames print in inches (#290), floored to four places so each printed
-# zone stays inside the zones the reducer stacks were judged at.
-GEOMETRIC_TOLERANCES_IN = {"position": ".0039", "projected_axis": ".0019"}
+# The frames print in inches (#290), plain (rule 26 bars the projected-zone
+# modifier; fan-out Q2-A and L1, delegated ruling 2026-11-07 (Main), no
+# precedent; owner review #2144; pending owner confirmation).  The locating
+# dowel reams are a reamed pattern, Ø.004 (the shop row), inside K's setting
+# circle the reducer stacks were judged at.  The screw holes print the
+# drilled-hole row, Ø.014: the arm's taps are spotted through them at
+# assembly, so they are the joint's master
+# (pd_transgear_arm_plate_geometry.SCREW_HOLE_POSITION_DIAMETER_MM).  The
+# knob bore K prints a plain perpendicularity to A over its own length; that
+# tilt, carried to K's projected height
+# (paper_drive_arm_registration.K_PROJECTED_HEIGHT_MM), stays inside the
+# reducer axes' tilt budget (AXIS_PROJECTED_ZONE_DIAMETER_MM) that the
+# collar and platen air stacks charge (pd_cluster_air).  ⊥ Ø.002 is a plain
+# inch step no tighter than the shop row (.001 per inch over the bore,
+# .0011).
+GEOMETRIC_TOLERANCES_IN = {"locator_position": ".004", "screw_position": ".014", "knob_axis": ".002"}
 GEOMETRIC_TOLERANCES_MM = {key: float(value) * 25.4 for key, value in GEOMETRIC_TOLERANCES_IN.items()}
+# The bore's shortest cylinder: the hub-to-boss length at its lower limit
+# less the title block's edge break at both mouths.
+KNOB_BORE_LENGTH_MIN_MM = (
+    PLATE.HUB_TO_BOSS - HUB_TO_BOSS_BAND - 2.0 * PLATE.OUTLINE_EDGE_BREAK_MAX_MM
+)
+KNOB_AXIS_ZONE_AT_PROJECTED_HEIGHT_MM = (
+    GEOMETRIC_TOLERANCES_MM["knob_axis"] * REGISTRATION.K_PROJECTED_HEIGHT_MM
+    / KNOB_BORE_LENGTH_MIN_MM
+)
 if (
-    GEOMETRIC_TOLERANCES_MM["position"] > REDUCER_POSITION_DIAMETER
-    or GEOMETRIC_TOLERANCES_MM["projected_axis"] > REGISTRATION.AXIS_PROJECTED_ZONE_DIAMETER_MM
+    GEOMETRIC_TOLERANCES_MM["locator_position"] > REDUCER_POSITION_DIAMETER
+    or GEOMETRIC_TOLERANCES_MM["screw_position"] > PLATE.SCREW_HOLE_POSITION_DIAMETER_MM
+    or KNOB_AXIS_ZONE_AT_PROJECTED_HEIGHT_MM > REGISTRATION.AXIS_PROJECTED_ZONE_DIAMETER_MM
 ):
-    raise AssertionError("MHA-PD-19 prints a reducer zone wider than its stacks assume")
+    raise AssertionError("MHA-PD-19 prints a zone wider than its stacks assume")
 GEOMETRIC_CONTROLS = tuple(
     GeometricControl(
         f"plate_hole_{index}_position", "position",
-        GEOMETRIC_TOLERANCES_IN["position"],
+        GEOMETRIC_TOLERANCES_IN["screw_position"],
         CylinderFace(
             SCREW_HOLE_DIA, contains_x_mm=x, contains_y_mm=y,
             contains_z_mm=THICKNESS_OVER_ARM / 2.0,
         ),
         ("A", "B", "C"), "diametral",
-        projected_zone_height_mm=PLATE.CLAMP_PLATE_PROJECTED_HEIGHT_MM,
-        projection_unit=UNIT,
     )
     for index, (x, y) in enumerate(SCREW_HOLES, 1)
 )
-# Each countersink is coaxial with its drilled hole (the plan's 2X CSK
-# callout on the drilled hole's centre) and so rides the hole's frame; it
-# carries no position frame of its own.
+# Each countersink is coaxial with its drilled hole (one hole callout on
+# the drilled hole carries it) and so rides the hole's frame; it carries no
+# position frame of its own.
 GEOMETRIC_CONTROLS += (
     GeometricControl(
-        "knob_projected_axis", "perpendicularity",
-        GEOMETRIC_TOLERANCES_IN["projected_axis"],
+        "knob_axis_perpendicularity", "perpendicularity",
+        GEOMETRIC_TOLERANCES_IN["knob_axis"],
         CylinderFace(BORE_DIA), ("A",), "diametral",
-        projected_zone_height_mm=REGISTRATION.K_PROJECTED_HEIGHT_MM,
-        projection_unit=UNIT,
     ),
     *(
         GeometricControl(
-            f"plate_locator_{index}_position", "position", GEOMETRIC_TOLERANCES_IN["position"],
+            f"plate_locator_{index}_position", "position",
+            GEOMETRIC_TOLERANCES_IN["locator_position"],
             CylinderFace(
                 PLATE.LOCATOR_HOLE_DIA_MM, contains_x_mm=x, contains_y_mm=y,
                 contains_z_mm=THICKNESS_OVER_ARM / 2.0,
@@ -170,23 +188,6 @@ THRUST_RING_NUMBER = "MHA-PD-15"
 KNOB_CUP_NUMBER = "MHA-PD-16"
 ARM_NUMBER = "MHA-PD-18"
 DOWEL_NUMBER = "MHA-PD-VN-64"
-
-# The locating holes: the size, its fit on the dowel, the matched pair and the
-# mouth break. The dowel engagement pays the arm's mouth break, which is
-# tighter than the title block's edge break (the wall budgets and the full-
-# cylinder span in _transgear_arm_plate_locating_interface are judged at it).
-# The match-drill pointer names the MHA-PD-00 view whose native S-K dimension
-# sets the pair (rule 7: no method notes; #1388 policy: the setting's value
-# lives on the assembly sheet, not here); the draw script fills the sheet
-# and view, from a module this part-build input must not import.  All of it
-# below the size: the layout audit reads an above-callout as one line.
-_MOUTH_BREAK_TEXT = f"{LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM / 25.4:.3f}".removeprefix("0")
-LOCATOR_CALLOUT = (
-    f"2X REAM THRU, SLIP FIT\nON DOWEL {DOWEL_NUMBER};\n"
-    f"MATCH-DRILL WITH ARM\n{ARM_NUMBER}, {{assembly}}\n"
-    "{view}; BREAK EDGE\n"
-    f"{_MOUTH_BREAK_TEXT} MAX, DOWEL CONTACT"
-)
 
 # The bore is the knob shaft's running surface (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)): MACHINED, on
 # the exact native bore face the part build resolves. The hub face and the
@@ -215,51 +216,48 @@ FINISH_CAPTIONS = {
 # shaft's g6 journal it runs on.  The screw holes are clearance, drilled;
 # both countersinks take the oval heads, each coaxial with its drilled hole:
 # the seat and wall budgets bound both axes inside the plate by the hole's
-# projected zone, extrapolated from face A
-# (pd_transgear_arm_plate_geometry.SCREW_AXIS_RADIUS_IN_PLATE_MM).
-BORE_CALLOUT = f"REAM THRU\nRUNNING FIT ON\nKNOB SHAFT\n{KNOB_SHAFT_NUMBER}"
-SCREW_HOLE_CALLOUT = "DRILL THRU"
-# Size-independent: the callout is fixed text on the native countersink
-# dimension, so a printed hole size here would not follow a unit change of
-# the drill callout's own native value (codjiflo review of fad938fc9).  The
-# .XXX diameter seats the screw's oval head and bounds the walls beside it
-# (pd_transgear_arm_plate_geometry.WALLS), so the callout names the screw.
+# zone and the drill's run-off
+# (pd_transgear_arm_plate_geometry.SCREW_AXIS_RADIUS_IN_PLATE_MM).  The
+# locating holes', the screw holes' and the hub station's callouts are
+# ``pd_transgear_arm_plate_notes``'s (their wording is sheet-only).
+# Two lines of words under REAM THRU (rule 7).
+BORE_CALLOUT = f"REAM THRU\nRUNNING FIT ON\nKNOB SHAFT {KNOB_SHAFT_NUMBER}"
+# The countersink's .XXX diameter seats the screw's oval head and bounds the
+# walls beside it (pd_transgear_arm_plate_geometry.WALLS), so the screw-hole
+# callout names the screw.
 SCREW_NUMBER = "MHA-PD-VN-56"
-CSK_CALLOUT = (
-    f"{CSK_ANGLE_DEG:.0f}\u00b0 CSK, HEAD\nSEAT FOR {SCREW_NUMBER}\n"
-    "COAXIAL WITH\nDRILLED HOLE"
-)
-HOLE_COUNT_CALLOUT = f"{len(SCREW_HOLES)}X"
-# The hub face's station from mounting face A sets the knob shaft's 12T plane
-# through the thrust ring (the chain plane and the disc-to-platen air,
-# contract §13) and, as the disc cluster's printed stack's first term, the
-# collar's air to the disc (#2038: its ±0.02 is that stack's band); the
-# hub-to-boss band sets the cup's station on the shaft and so the cup pin's
-# end wall (pd_transgear_knob_shaft_spec.CUP_FACE_STATION_BAND).  Short
-# lines, between the dimension's own witness lines.
-HUB_STATION_CALLOUT = f"SETS 12T PLANE\nAND COLLAR AIR\nOF {KNOB_SHAFT_NUMBER}"
+# The hub-to-boss band sets the cup's station on the shaft and so the cup
+# pin's end wall (pd_transgear_knob_shaft_spec.CUP_FACE_STATION_BAND).
+# Short lines, between the dimension's own witness lines.
 HUB_TO_BOSS_CALLOUT = f"SETS CUP {KNOB_CUP_NUMBER}\nON SHAFT {KNOB_SHAFT_NUMBER}"
 # The over-arm thickness bounds the countersink floor and the screw's thread
 # reach into the arm (transgear_hanger_joints._PLATE_MIN/_PLATE_MAX): .XXX.
 # Three short lines (12 characters at most), so the block stands clear of
 # the hub-to-boss dimension's boss-face witness line.
 THICKNESS_CALLOUT = f"SETS SCREW\nREACH IN ARM\n{ARM_NUMBER}"
+# The hub face's station sets the knob shaft's integral 15T (and so its mesh
+# with the reducer disc) and, through the drive collar seated on the 15T's
+# front face F, the removable chain sprocket's plane
+# (paper_drive_arm_registration.KNOB_F_MACHINE_Z_MM,
+# transgear_cluster_fit.F_CHAIN): its callout names both by drawing number.
+SPROCKET_NUMBER = "MHA-PD-09"
+# The overall width and height, printed as references (drawing-guidelines.md
+# rule 10): the side edges and the end round's extreme under the -X top
+# corner, at the outline's own .XX places.  They restate the toleranced
+# outline, so they carry no band.
+OVERALL_WIDTH_MM = EDGE_PLUS_X - PLATE.EDGE_MINUS_X
+OVERALL_HEIGHT_MM = PLATE.TOP_LEFT[1] + PLATE.END_R
+DRAWING_REFERENCE_PRECISION = {
+    "OverallWidth": PLATE.OUTLINE_PLACES,
+    "OverallHeight": PLATE.OUTLINE_PLACES,
+}
 
 # Two sheets (drawing-guidelines.md rule 15): the rear face's plan with the
-# isometric and section D-D through the screw holes, then mounting face A's
-# view with every frame and datum and section A-A on the knob bore. The face
-# views say which face they show; each projected zone is a chain line from
-# face A with its height (ASME Y14.5-2018 §6.4.7), the knob bore's toward the
-# hub and each screw hole's out of face A into the mating arm MHA-PD-18
-# (coordinator ruling 2026-10-27, #2017).
+# isometric, then mounting face A's view with every frame and datum and
+# section A-A on the knob bore. The face views say which face they show.
 SHEET_NAMES = ("REAR FACE", "FACE A")
 REAR_VIEW_LABEL = "REAR VIEW"
 FRONT_VIEW_LABEL = "FRONT VIEW (FACE A)"
-KNOB_ZONE_HEIGHT = REGISTRATION.K_PROJECTED_HEIGHT_MM
-SCREW_ZONE_HEIGHT = PLATE.CLAMP_PLATE_PROJECTED_HEIGHT_MM
-# The chain lines' heights print as references at the frames' .001 grid
-# (Ⓟ .276 and Ⓟ 1.587), each frame stating its zone.
-DRAWING_REFERENCE_PRECISION: dict[str, int] = {"KnobZone": 3, "ScrewZone": 3}
 
 ISO_VIEW_SCALE = (1, 1)
 ISOMETRIC_VIEW_NOTE = f"ISOMETRIC VIEW SCALE {ISO_VIEW_SCALE[0]}:{ISO_VIEW_SCALE[1]}"

@@ -93,14 +93,13 @@ MANUFACTURING_NOTES_XY = (0.018, 0.060)
 # stack into one vertical chain right of the teeth.  Each one's text sits
 # beyond its own hole, above the chain for +Y and below it for -Y: printed
 # inside the chain, each text was struck by the other's outside arrow tail.
-# Each carries its mate callout in the below lane (a linear dimension's above
-# lane does not print), so the +Y text stands high enough for its callout
-# rows to clear its hole's extension line; the bore callout drops below the
-# -Y rows.
+# The locations carry only value and band (rule 7); the 2X pin-hole callout
+# names the pins' parts, its widest row 23 characters, so it stands 10 mm
+# further right than the one-row DRILL THRU did, inside the left border.
 _PIN_CHAIN_X = FRONT_CENTER[0] + 0.070
 FRONT_KEEP = {
     "BoreDiaDim": (FRONT_CENTER[0] + 0.070, FRONT_CENTER[1] - 0.060),
-    "PinPosDia": (FRONT_CENTER[0] - 0.075, FRONT_CENTER[1] + 0.060),
+    "PinPosDia": (FRONT_CENTER[0] - 0.065, FRONT_CENTER[1] + 0.060),
     "PinPosY": (_PIN_CHAIN_X, FRONT_CENTER[1] + 0.040),
     "PinNegY": (_PIN_CHAIN_X, FRONT_CENTER[1] - 0.021),
 }
@@ -116,15 +115,18 @@ TOP_KEEP = {
 # dimension by the part build and imported verbatim: text set here would
 # write through to the built part.  The sheet only reads the rows back.
 
-# The face and edge views draw the saved T24; each is labelled with it,
-# under the view and flush with its left tip like the configuration views.
+# The face and edge views draw the saved T24; each is labelled with it.  The
+# face view's label stands under the view, flush with its left tip like the
+# configuration views; the edge view's stands left of its left tip, level
+# with it (round 1: under the edge view it sat on the 2X pin-hole callout's
+# size line and read as part of it).
 MAIN_VIEW_LABEL = DEFAULT_CONFIG
 _T24_TIP_X = FRONT_CENTER[0] - outside_dia(TEETH[DEFAULT_CONFIG]) * _S / 2000.0
 FRONT_LABEL_XY = (
     _T24_TIP_X,
     FRONT_CENTER[1] - outside_dia(TEETH[DEFAULT_CONFIG]) * _S / 2000.0 - 0.010,
 )
-TOP_LABEL_XY = (_T24_TIP_X, TOP_CENTER[1] - PLATE * _S / 2000.0 - 0.008)
+TOP_LABEL_XY = (_T24_TIP_X - 0.014, TOP_CENTER[1] + 0.002)
 
 # T12 and T18 differ from the T24 only in their teeth, so each is drawn once
 # more as a small edge view of its own configuration, carrying its outside

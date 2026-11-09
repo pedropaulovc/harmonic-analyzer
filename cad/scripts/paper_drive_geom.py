@@ -35,7 +35,6 @@ from _gear_quality import (
     recording_paper_left_inset_deviation_mm,
     recording_paper_width_deviation_mm,
     recording_pen_x_deviation_mm,
-    reducer_axis_projected_zone_diameter_mm,
     reducer_position_diameter_mm,
     toothspace_runout_tir_mm,
 )
@@ -154,8 +153,10 @@ def _loaded_hanger_bounds() -> tuple[float, float, float]:
 
 
 def _rotating_stud_error_change_mm(angle_change: float) -> float:
-    """Fixed S position, projected-axis and spacer tilt rotate with the arm."""
-    projected_radius = reducer_axis_projected_zone_diameter_mm() / 2.0
+    """Fixed S position, axis zone and spacer tilt rotate with the arm."""
+    import paper_drive_arm_registration as registration
+
+    projected_radius = registration.S_AXIS_ZONE_DIAMETER_MM / 2.0
     position_radius = reducer_position_diameter_mm() / 2.0
     tilt = (
         math.atan(spacer.FRONT_FACE_PERPENDICULARITY / spacer.FACE_PERPENDICULARITY_ZONE_DIA)
@@ -392,7 +393,7 @@ def reducer_axis_tilt_maxima_rad() -> tuple[float, float]:
     )
     disc = (
         common
-        + math.atan(registration.AXIS_PROJECTED_ZONE_DIAMETER_MM / registration.S_PROJECTED_HEIGHT_MM)
+        + math.atan(registration.S_AXIS_ZONE_DIAMETER_MM / registration.S_PROJECTED_HEIGHT_MM)
         + math.atan(pd_transgear_feed_pinion_spec.BORE_DIAMETRAL_CLEARANCE[1] / feed_span)
     )
     if not all(math.isfinite(angle) and 0.0 < angle < math.pi / 6 for angle in (driver, disc)):

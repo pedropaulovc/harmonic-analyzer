@@ -64,7 +64,8 @@ def test_printed_guide_and_screw_numbers_resolve_to_the_registered_parts() -> No
     registered = {row["number"] for row in _config.parts().values()}
     printed = set(
         re.findall(
-            r"\bMHA-[A-Z0-9]+(?:-[A-Z0-9]+)+\b", draw.GUIDE_CALLOUT_PROCESS
+            r"\bMHA-[A-Z0-9]+(?:-[A-Z0-9]+)+\b",
+            draw.GUIDE_CALLOUT_PROCESS + draw.GUIDE_CBORE_SUFFIX,
         )
     )
     assert printed <= registered, printed - registered
@@ -203,6 +204,10 @@ def test_shallowest_printed_counterbore_still_sinks_the_head():
     assert _limits(spec.CBORE_DIA, spec.GUIDE_CALLOUT_PRECISION["hw-cbdia"])[0] > 4.6482
 
 
+def _overlap(a, b) -> bool:
+    return a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]
+
+
 def test_views_and_annotations_stay_in_the_field():
     boxes = _view_boxes()
     names = list(boxes)
@@ -222,7 +227,8 @@ def test_views_and_annotations_stay_in_the_field():
         *draw.RIGHT_KEEP.values(),
         draw.ISO_CENTER,
         draw.ISO_NOTE_XY,
-        draw.RIGHT_NOTE_XY,
+        draw.RIGHT_CAPTION_XY,
+        draw.VIEW_ARROW_TEXT_XY,
         draw.GUIDE_CALLOUT_XY,
         draw.SOCKET_CALLOUT_XY,
         draw.SECTION_CAPTION_XY,
@@ -246,20 +252,235 @@ def test_views_and_annotations_stay_in_the_field():
     for xy in points:
         assert _inside(xy, BORDER), xy
         assert not _inside(xy, TITLE_BLOCK), xy
+    # The hole table stands inside the border, right of VIEW B and above the
+    # title block, clear of every view and every placed text point, under the
+    # thickness's two-row function text over VIEW B (centred on its point).
+    table = draw.HOLE_TABLE_BOX
+    gap = 0.002
+    assert table[0] >= BORDER[0] + gap and table[1] >= BORDER[1] + gap
+    assert table[2] <= BORDER[2] - gap and table[3] <= BORDER[3] - gap
+    assert table[1] >= TITLE_BLOCK[3] + gap or table[2] <= TITLE_BLOCK[0] - gap
+    for name, box in boxes.items():
+        assert not _overlap(table, box), name
+    for xy in points:
+        assert not _inside(xy, table), xy
+    assert table[0] > boxes["right"][2] + 0.010
+    assert table[3] < draw.RIGHT_KEEP["Depth"][1] - 0.008
+    # VIEW B's caption ("SCALE 1:1", ~23 mm from its top-left point) and the
+    # table keep more than the clear gap between them.
+    assert draw.RIGHT_CAPTION_XY[0] + 0.023 + gap < table[0]
 
 
-def test_x_stations_stack_smallest_nearest_below_the_front_view():
-    values = {
-        "Socket3X": min(x for x, _ in spec.SOCKET_XY),
-        "Socket1X": max(x for x, _ in spec.SOCKET_XY),
-        **{f"Guide{i}X": x for i, x in enumerate(spec.GUIDE_HOLE_X, start=1)},
-        "Width": spec.PLATE_WIDTH,
+def test_hole_table_plans_its_natural_rows_with_margin():
+    # Rows print at their natural ~11 mm (round 2 read 15 rows back at
+    # 0.1644 m; a forced 6 mm never took), so the planned box is 15 x 11 mm and
+    # still stands at least 5 mm over the title block's clearance line.
+    assert draw.HOLE_TABLE_ROW_PITCH >= 0.011
+    assert draw.HOLE_TABLE_BOX[3] - draw.HOLE_TABLE_BOX[1] == pytest.approx(
+        draw.HOLE_TABLE_ROWS * draw.HOLE_TABLE_ROW_PITCH
+    )
+    assert draw.HOLE_TABLE_ROWS * 0.01096 < draw.HOLE_TABLE_BOX[3] - draw.HOLE_TABLE_BOX[1]
+    assert draw.HOLE_TABLE_BOX[1] - (TITLE_BLOCK[3] + 0.002) >= 0.005
+    assert draw.HOLE_TABLE_BOX[2] - draw.HOLE_TABLE_BOX[0] == pytest.approx(
+        sum(draw.HOLE_TABLE_WIDTHS.values())
+    )
+
+
+def test_isometric_and_section_share_the_field_under_the_front_view():
+    # Estimated ink (sheet m) from the v48 render and round 2 telemetry: the
+    # 1:4 isometric ~50 x 57 mm round its centre and its ~60 mm note row; the
+    # section's caption (~46 mm, two rows from its top centre), its cropped
+    # outline and its floor value's three rows hanging under the cut.
+    iso = (
+        draw.ISO_CENTER[0] - 0.025,
+        draw.ISO_CENTER[1] - 0.0285,
+        draw.ISO_CENTER[0] + 0.025,
+        draw.ISO_CENTER[1] + 0.0285,
+    )
+    iso_note = (
+        draw.ISO_NOTE_XY[0],
+        draw.ISO_NOTE_XY[1] - 0.005,
+        draw.ISO_NOTE_XY[0] + 0.060,
+        draw.ISO_NOTE_XY[1],
+    )
+    cx, cy = draw.SECTION_CENTER
+    caption = (
+        draw.SECTION_CAPTION_XY[0] - 0.023,
+        draw.SECTION_CAPTION_XY[1] - 0.016,
+        draw.SECTION_CAPTION_XY[0] + 0.023,
+        draw.SECTION_CAPTION_XY[1],
+    )
+    cut = (cx - 0.010, cy - 0.018, cx + 0.010, cy + 0.018)
+    floor = (
+        draw.SECTION_TEXT_RIGHT - 2.0 * draw._SECTION_TEXT_HALF_WIDTH,
+        cy - 0.040,
+        draw.SECTION_TEXT_RIGHT,
+        cy - 0.018,
+    )
+    assert iso[1] > iso_note[3] and caption[1] > cut[1]
+    groups = {
+        "isometric": (iso[0], iso_note[1], max(iso[2], iso_note[2]), iso[3]),
+        "section A-A": (
+            min(caption[0], cut[0], floor[0]),
+            floor[1],
+            max(caption[2], cut[2], floor[2]),
+            caption[3],
+        ),
     }
-    rows = sorted(values, key=values.get)
-    heights = [draw.FRONT_KEEP[name][1] for name in rows]
-    assert heights == sorted(heights, reverse=True)
-    assert heights[0] < draw.BOTTOM_EDGE_Y - TEXT_HALF_H
-    assert all(a - b >= 0.006 for a, b in zip(heights, heights[1:]))
+    width_text_bottom = draw.FRONT_KEEP["Width"][1] - 2.0 * TEXT_HALF_H
+    front = _view_boxes()["front"]
+    for name, box in groups.items():
+        assert box[0] > BORDER[0] + 0.010 and box[1] > BORDER[1] + 0.010, name
+        assert box[2] < TITLE_BLOCK[0] - 0.010, name
+        assert box[3] < width_text_bottom - 0.010 and box[3] < front[1], name
+        assert not _overlap(box, draw.HOLE_TABLE_BOX), name
+    assert groups["isometric"][2] + 0.010 < groups["section A-A"][0]
+
+
+def test_hole_table_replaces_every_hole_location_dimension():
+    # Rule 10: fourteen hole axes on one view are located by one tagged table,
+    # not by individual dimensions; the views keep the rest, each name once.
+    marked = set().union(*spec.DRAWING_DIMENSIONS.values())
+    assert not draw.PRINTED_DIMENSIONS & draw.HOLE_TABLE_LOCATED
+    assert draw.PRINTED_DIMENSIONS | draw.HOLE_TABLE_LOCATED == marked
+    assert set(draw.FRONT_KEEP) >= {"Width", "Height"}
+    assert set(draw.DIMENSION_PREFIXES) <= draw.PRINTED_DIMENSIONS
+    assert set(draw.PRINTED_PRECISION) == draw.PRINTED_DIMENSIONS
+    stations = set(spec.GUIDE_HOLE_XY) | set(spec.SOCKET_XY)
+    assert set(draw.HOLE_TABLE_MATES) == stations
+    assert len(stations) == len(spec.GUIDE_HOLE_XY) + len(spec.SOCKET_XY) == 14
+    assert draw.HOLE_TABLE_ROWS == 1 + len(stations)
+
+
+def test_hole_table_locations_print_every_station_at_the_part_places():
+    # Each row's .XXX LOC cells convert back to its model station inside the
+    # insertion check's tolerance (so the corner origin is proved), and no two
+    # stations print the same pair of cells.
+    scale = 25.4
+    places = spec.POSITION_PLACES
+    assert {spec.DRAWING_PRECISION_BY_NAME[n] for n in draw.HOLE_TABLE_LOCATED} == {
+        places
+    }
+    printed = set()
+    for station in draw.HOLE_TABLE_MATES:
+        cells = tuple(round(value / scale, places) for value in station)
+        assert all(
+            abs(cell * scale - value) <= draw._HOLE_TABLE_TOLERANCE_MM
+            for cell, value in zip(cells, station)
+        ), station
+        printed.add(cells)
+    assert len(printed) == len(draw.HOLE_TABLE_MATES)
+    # The origin is the plate's lower-left corner, on the sheet.
+    assert (draw.LEFT_EDGE_X, draw.BOTTOM_EDGE_Y) == (
+        draw._front_x(0.0),
+        draw._front_y(0.0),
+    )
+
+
+def test_hole_table_mates_match_the_registered_patterns_and_callouts():
+    # Every row's MATE cell is its group's mate part number alone, which the
+    # group's size callout names too; the guide screw stays on that callout.
+    registered = {row["number"] for row in _config.parts().values()}
+    guide = _config.parts("pd-platen-guide")["number"]
+    clip = _config.parts("pd-platen-clip")["number"]
+    pattern = r"\bMHA-[A-Z0-9]+(?:-[A-Z0-9]+)+\b"
+    for station, mate in draw.HOLE_TABLE_MATES.items():
+        assert mate in registered, mate
+        if station in spec.SOCKET_XY:
+            assert mate == clip
+            assert mate in re.findall(pattern, draw.SOCKET_CALLOUT_PROCESS)
+        else:
+            assert mate == guide
+            assert mate in re.findall(pattern, draw.GUIDE_CALLOUT_PROCESS)
+    assert _config.parts("sh-vn-brass-fillister-screw")["number"] in (
+        draw.GUIDE_CBORE_SUFFIX
+    )
+    # A number fits its MATE cell at ~2.55 mm a character plus the cell's air.
+    widest = max(len(mate) for mate in draw.HOLE_TABLE_MATES.values())
+    assert widest * 0.00255 + 0.004 <= draw.HOLE_TABLE_WIDTHS[draw._HOLE_TABLE_MATE_INDEX]
+
+
+def test_counterbore_side_follows_its_symbol_row_not_words():
+    # Round 4 (rule 26): the counterbore is its symbol, never the word C'BORE;
+    # its side and screw follow its depth on the symbol row.
+    assert "C'BORE" not in draw.GUIDE_CALLOUT_PROCESS + draw.GUIDE_CBORE_SUFFIX
+    assert "DRILL" not in draw.GUIDE_CALLOUT_PROCESS
+    row = "<HOLE-CBORE> <MOD-DIAM><hw-cbdia> <HOLE-DEPTH> <hw-cbdepth>"
+    definitions = {5: "<MOD-DIAM><hw-diam> <hw-thru>", 6: "", 7: "", 8: row}
+    part, updated = draw.counterbore_side_definition(definitions)
+    assert (part, updated) == (8, f"{row} {draw.GUIDE_CBORE_SUFFIX}")
+    with pytest.raises(RuntimeError, match="single counterbore depth"):
+        draw.counterbore_side_definition({**definitions, 8: f"{row} {draw.GUIDE_CBORE_SUFFIX}"})
+    with pytest.raises(RuntimeError, match="does not close"):
+        draw.counterbore_side_definition({**definitions, 8: f"{row}\nMORE TEXT"})
+
+
+def _tag_box(station, width=0.008, height=0.0035):
+    """A tag's estimated text box (three characters) from its near corner."""
+    (x, y), (sx, sy) = draw.hole_tag_corner(station)
+    xs = sorted((x, x + sx * width))
+    ys = sorted((y, y + sy * height))
+    return (xs[0], ys[0], xs[1], ys[1])
+
+
+def test_hole_tags_stand_clear_inside_the_plate():
+    plate = (draw.LEFT_EDGE_X, draw.BOTTOM_EDGE_Y, draw.RIGHT_EDGE_X, draw.TOP_EDGE_Y)
+    rims = {
+        **{s: spec.GUIDE_HOLE_DIA / 2.0 * draw._S for s in spec.GUIDE_HOLE_XY},
+        **{s: spec.SOCKET_BOSS_DIA / 2.0 * draw._S for s in spec.SOCKET_XY},
+    }
+    holes = {
+        s: (
+            draw._front_x(s[0]) - r,
+            draw._front_y(s[1]) - r,
+            draw._front_x(s[0]) + r,
+            draw._front_y(s[1]) + r,
+        )
+        for s, r in rims.items()
+    }
+    # Section A-A's cutting line and its arrows, which point right.
+    cut_x = draw._front_x(spec.CBORE_SECTION_X)
+    cut_y = draw._front_y(spec.CBORE_SECTION_HOLE_Y)
+    half = draw.SECTION_SPAN * draw._S
+    cut = (cut_x - 0.0005, cut_y - half - 0.001, cut_x + 0.015, cut_y + half + 0.001)
+    tags = {station: _tag_box(station) for station in draw.HOLE_TABLE_MATES}
+    for station, box in tags.items():
+        assert _inside(box[:2], plate) and _inside(box[2:], plate), station
+        assert not _overlap(box, cut), station
+        for other, hole in holes.items():
+            assert not _overlap(box, hole), (station, other)
+        for other, other_box in tags.items():
+            assert other == station or not _overlap(box, other_box), (station, other)
+
+
+def test_view_b_is_lettered_with_its_scale_and_arrow():
+    # Rules 9, 26: the 1:1 right side is not projected at the sheet's 1:2, so
+    # it is named by a letter, with its scale, and a lettered arrow on the
+    # front view's right edge looks at it.
+    assert draw.RIGHT_SCALE != draw.VIEW_SCALE
+    lines = draw.RIGHT_CAPTION.split("\n")
+    assert lines[0].split() == ["VIEW", draw.VIEW_LETTER]
+    assert f"{draw.RIGHT_SCALE[0]}:{draw.RIGHT_SCALE[1]}" in lines[1]
+    tip_x, tip_y = draw.VIEW_ARROW_TIP
+    assert tip_x == pytest.approx(draw.RIGHT_EDGE_X)
+    low, high = sorted({y for _, y in spec.SOCKET_XY})
+    boss_r = spec.SOCKET_BOSS_DIA / 2.0 * draw._S
+    assert draw._front_y(low) + boss_r < tip_y < draw._front_y(high) - boss_r
+    text_x, text_y = draw.VIEW_ARROW_TEXT_XY
+    assert tip_x < text_x < draw.FRONT_KEEP["Height"][0] - 0.010
+    assert text_y - draw.VIEW_LETTER_HEIGHT < tip_y < text_y
+    right = _view_boxes()["right"]
+    assert draw.RIGHT_CAPTION_XY[1] < right[1]
+    assert right[0] - 0.015 < draw.RIGHT_CAPTION_XY[0] < right[2]
+
+
+def test_thickness_callout_names_its_mate_in_plain_words():
+    # Rule 26: AIR is a shop-private word; the callout names what the band is
+    # spent on and the part by number.
+    callout = draw.DIMENSION_CALLOUTS_ABOVE["Depth"]
+    assert "AIR" not in callout.split()
+    assert draw.DISC_NUMBER in callout
+    assert draw.DISC_NUMBER in {row["number"] for row in _config.parts().values()}
 
 
 def test_callout_picks_lie_on_their_hole_rims():
@@ -277,3 +498,27 @@ def test_callout_picks_lie_on_their_hole_rims():
     # Both callouts stand above the plate.
     assert draw.GUIDE_CALLOUT_XY[1] > draw.TOP_EDGE_Y
     assert draw.SOCKET_CALLOUT_XY[1] > draw.TOP_EDGE_Y
+
+
+def test_guide_leader_clears_the_socket_tags_and_the_callouts_clear_each_other():
+    # The leader leaves the guide text's left end, at its bottom row (round 3
+    # read it 11.2 mm under the callout point), for the pick: it must pass
+    # right of the upper left socket's tag box (round 3: it ran through A2).
+    # A two-character tag prints ~5.8 x 3.5 mm.
+    tag_w, tag_h, air = 0.006, 0.0035, 0.0015
+    top = (
+        draw.GUIDE_CALLOUT_XY[0] - draw.GUIDE_CALLOUT_HALF_WIDTH,
+        draw.GUIDE_CALLOUT_XY[1] - 0.0112,
+    )
+    pick = draw.GUIDE_EDGE_XY
+    for station in spec.SOCKET_XY:
+        (cx, cy), (sx, sy) = draw.hole_tag_corner(station)
+        if sx < 0:
+            continue
+        for y in (cy, cy + sy * tag_h):
+            t = (y - pick[1]) / (top[1] - pick[1])
+            if 0.0 <= t <= 1.0:
+                assert pick[0] + t * (top[0] - pick[0]) > cx + tag_w + air, station
+    guide_right = draw.GUIDE_CALLOUT_XY[0] + draw.GUIDE_CALLOUT_HALF_WIDTH
+    socket_left = draw.SOCKET_CALLOUT_XY[0] - draw.SOCKET_CALLOUT_HALF_WIDTH
+    assert socket_left - guide_right >= 0.004

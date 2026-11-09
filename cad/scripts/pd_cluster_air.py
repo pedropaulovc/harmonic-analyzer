@@ -53,14 +53,21 @@ PLATEN_AIR_MIN = 0.03  # R9-68
 # turned a full turn, .004 MIN at the overlap); if it is short, the MHA-PD-10
 # step face is re-faced square on a mandrel by the amount read short, which
 # sets the hub, seated on it by its spigot end, and the disc back by that
-# much.  That acceptance guarantees the air the squareness of the two seat
-# faces closes, the step face's (.001, delegated ruling 2026-11-07 (Main),
-# owner review #2144) and the hub spigot end's (.001, owner ruling
-# 2026-11-08 (Pedro), #2144 item 3.2), so the collar gate drops those terms;
-# every other source still clears the same floor by stack, and the platen
-# stack still charges them.
+# much.  The same re-facing sets back a disc whose pin S stands tilted.
+# That acceptance guarantees the air the squareness of the two seat faces and
+# of S closes: the step face's (.001, delegated ruling 2026-11-07 (Main),
+# owner review #2144), the hub spigot end's (.001, owner ruling 2026-11-08
+# (Pedro), #2144 item 3.2) and MHA-PD-18's pin bore S (⊥ .001, the reamed
+# row, owner ruling 2026-11-08 (Pedro), #2144 item 4.1: its axis zone at the
+# chain plane, paper_drive_arm_registration.S_AXIS_ZONE_DIAMETER_MM).  So the
+# collar gate drops those terms; every other source still clears the same
+# floor by stack, and the platen stack and the meshes still charge them.
 ASSEMBLY_ACCEPTED_COLLAR_SOURCES = frozenset(
-    {"sleeve step face perpendicularity", "hub spigot end perpendicularity"}
+    {
+        "sleeve step face perpendicularity",
+        "hub spigot end perpendicularity",
+        "pin S projected axis zone",
+    }
 )
 
 # --- classification ------------------------------------------------------------
@@ -222,7 +229,7 @@ KNOB_JOURNAL_TILT = math.atan(
     / REGISTRATION.KNOB_JOURNAL_CONTACT_SPAN_MIN_MM
 )
 S_ZONE_TILT = math.atan(
-    REGISTRATION.AXIS_PROJECTED_ZONE_DIAMETER_MM / REGISTRATION.S_PROJECTED_HEIGHT_MM
+    REGISTRATION.S_AXIS_ZONE_DIAMETER_MM / REGISTRATION.S_PROJECTED_HEIGHT_MM
 )
 K_ZONE_TILT = math.atan(
     REGISTRATION.AXIS_PROJECTED_ZONE_DIAMETER_MM / REGISTRATION.K_PROJECTED_HEIGHT_MM

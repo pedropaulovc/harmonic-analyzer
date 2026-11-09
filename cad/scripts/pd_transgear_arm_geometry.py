@@ -81,10 +81,12 @@ STOCK_SKU = "9517K466"
 STOCK_THICKNESS_IN = Fraction(5, 16)
 THICKNESS = float(STOCK_THICKNESS_IN) * MM_PER_IN  # 7.9375
 THICKNESS_BAND = 0.001 * MM_PER_IN  # ±0.0254
-# Actual graded seated bearing-contact cap from the reviewed 3D stack
-# (14.7), rounded UP to the inch sheet's .001 grid: .580.
-# Not a whole-crown cap or native IPS physical-unit proof.
-CLAMP_TAP_PROJECTED_HEIGHT_MM = 14.732
+# The pin bore S's perpendicularity to face A, over the bore: ⊥ .001, the
+# shop's reamed-hole row (owner ruling 2026-11-08 (Pedro), #2144 item 4.1).
+# Its axis zone run on to the chain plane is
+# paper_drive_arm_registration.S_AXIS_ZONE_DIAMETER_MM.
+PIN_BORE_PERPENDICULARITY_IN = ".001"
+PIN_BORE_PERPENDICULARITY_MM = float(PIN_BORE_PERPENDICULARITY_IN) * MM_PER_IN
 
 # --- Outline: hull of r12.5 about P and r7 about T, cut square through T ----
 PIVOT_END_R = 12.5
@@ -303,8 +305,11 @@ LOCATOR_HOLE_PRINTED_LIMITS_MM = (min(_LOCATOR_PRINTED), max(_LOCATOR_PRINTED))
 LOCATOR_PROUD_MM = LOCATING_PIN.PROUD_MM
 LOCATOR_PROUD_BAND_MM = LOCATING_PIN.PROUD_TOLERANCE_MM
 PLATE_TAP_SPEC = HoleSpec("tapped", "#8-32")
-PLATE_TAP_ENTRY_BREAK_MAX_MM = 0.1016  # .004
-PLATE_TAP_EXIT_BREAK_MAX_MM = 0.1016  # .004
+# The tap mouths take the title block's ordinary edge break (.010 chamfer):
+# no band is tightened to protect the thread (fan-out screen, gating); the
+# plate screw still engages 1.5D (transgear_hanger_joints).
+PLATE_TAP_ENTRY_BREAK_MAX_MM = edge_break_chamfer_mm(unit=UNIT)
+PLATE_TAP_EXIT_BREAK_MAX_MM = edge_break_chamfer_mm(unit=UNIT)
 TAP_EDGE_BREAK_ANGLE_DEG = 90.0
 PLATE_TAP_MOUTH_DIA_MAX_MM = (
     blind_cut_dia_mm(PLATE_TAP_SPEC)
@@ -348,6 +353,17 @@ LATCH_PIN_HEIGHT_PLACES = 3
 LATCH_PIN_HEIGHT_BAND = printed_reach_mm(PIN_HOLE_Z, LATCH_PIN_HEIGHT_PLACES)
 REDUCER_POSITION_DIAMETER = reducer_position_diameter_mm()
 REDUCER_POSITION_RADIUS = REDUCER_POSITION_DIAMETER / 2.0
+# The plate taps are spotted and drilled through MHA-PD-19's screw holes at
+# assembly, the plate doweled on (MHA-PD-00): PD-19's holes are the master
+# for this joint, screws clamp only (the dowels locate), and the arm sheet
+# prints no frame on them (fan-out Q2-A, L1; delegated ruling 2026-11-07
+# (Main), no precedent; owner review #2144). Plain ⌖ zones without the
+# projected modifier (rule 26) could not keep the screw entering PD-19's
+# hole above Ø.002. The tap's location on the arm is the plate hole's
+# through the dowels; this radius (Ø.040) bounds it for the arm's walls,
+# which keep over 6 mm to spare (transgear_hanger_joints checks the chain,
+# PD-19's screw-hole zone included, against it).
+PLATE_TAP_LOCATION_RADIUS_MM = 0.508
 # The dowel's full-diameter grip runs the through ream between its two
 # mouth breaks, on the thinnest stock (as the plate's slip holes).
 LOCATOR_FULL_CYLINDER_SPAN_MIN_MM = (
@@ -413,7 +429,7 @@ WALLS: dict[str, tuple[float, float]] = {
         edge_half_width(PLATE_TAP_STATIONS[1]) - _tap_major(PLATE_TAP_SPEC) / 2.0,
         edge_half_width(PLATE_TAP_STATIONS[1])
         - OUTLINE_BAND
-        - REDUCER_POSITION_RADIUS
+        - PLATE_TAP_LOCATION_RADIUS_MM
         - _tap_major(PLATE_TAP_SPEC) / 2.0
         - _TAP_OVERSIZE_R,
     ),
@@ -463,7 +479,7 @@ for _index, (_x, _y) in enumerate(LOCATOR_SITES_MM, 1):
     _tap_air = min(math.hypot(_x - station, _y) for station in PLATE_TAP_STATIONS)
     WALLS[f"locator {_index} to tap mouth"] = (
         _tap_air - (LOCATOR_HOLE_DIA_MM + PLATE_TAP_MOUTH_DIA_MAX_MM) / 2.0,
-        _tap_air - LOCATOR_MOUTH_POSITION_RADIUS_MM - REDUCER_POSITION_RADIUS
+        _tap_air - LOCATOR_MOUTH_POSITION_RADIUS_MM - PLATE_TAP_LOCATION_RADIUS_MM
         - (LOCATING_PIN.PRESS_HOLE_LIMITS_MM[1] + PLATE_TAP_MOUTH_DIA_MAX_MM) / 2.0
         - LOCATING_PIN.HOLE_MOUTH_BREAK_RADIAL_MAX_MM - LOCATOR_RUN_OFF_MM,
     )

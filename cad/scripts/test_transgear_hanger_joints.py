@@ -150,20 +150,42 @@ def test_plate_weight_input_is_the_native_recipe_volume() -> None:
     assert plate.nominal_material_properties()["volume_mm3"] == pytest.approx(native, rel=1e-12)
 
 
-def test_reference_entry_pays_published_fillet_and_independent_critical_axes() -> None:
-    """Reference datum pose only, not an ISO pin-end whole-body certificate."""
+def test_reference_entry_pays_published_fillet_and_the_transferred_tap_axis() -> None:
+    """Reference datum pose only, not an ISO pin-end whole-body certificate.
+
+    The arm's taps are spotted and drilled through MHA-PD-19's screw holes at
+    assembly (Q2-A): the spotting drill centres within half the hole's
+    drilled growth, and the tap drill runs off at most DRILL_RUN_OFF_DEG
+    through the arm. Inside the plate the screw's axis is the tap's,
+    extrapolated from the thinnest stock's rear face to the seated contact;
+    the plate hole's own zone does not enter (it guided the spot)."""
     import pd_vn_transgear_arm_plate_screw_spec as screw
-    angle = (math.atan(arm.REDUCER_POSITION_DIAMETER / arm.CLAMP_TAP_PROJECTED_HEIGHT_MM)
-             + registration.ARM_PLATE_TILT_MAX_RAD)
-    required = (screw.THREAD_MAJOR / 2.0 + screw.UNDER_HEAD_FILLET_RADIUS_MAX_MM) / math.cos(angle)
-    # The plate hole's zone runs into the arm: inside the plate its axis is
-    # extrapolated to the deepest stock's rear face.
-    in_plate = plate.REDUCER_POSITION_RADIUS + (
-        plate.THICKNESS_OVER_ARM + plate.THICKNESS_OVER_ARM_BAND
-    ) * plate.REDUCER_POSITION_DIAMETER / plate.CLAMP_PLATE_PROJECTED_HEIGHT_MM
-    expected = plate.SCREW_HOLE_DIA / 2.0 - required - arm.REDUCER_POSITION_RADIUS - in_plate
+    tilt = math.radians(arm.DRILL_RUN_OFF_DEG)
+    centring = plate.DRILL_GROWTH / 2.0
+    in_plate = centring + (
+        joints.PLATE_SCREW_CONTACT_ARM_LOCAL_Z_MAX_MM - (arm.THICKNESS - arm.THICKNESS_BAND)
+    ) * math.tan(tilt)
+    required = (screw.THREAD_MAJOR / 2.0 + screw.UNDER_HEAD_FILLET_RADIUS_MAX_MM) / math.cos(
+        tilt + registration.ARM_PLATE_TILT_MAX_RAD
+    )
+    expected = plate.SCREW_HOLE_DIA / 2.0 - required - in_plate
     assert joints.PLATE_SCREW_REFERENCE_ENTRY_MARGIN_MM == pytest.approx(expected)
     assert expected > 0.0
+    # The tap's location on the arm, through the plate hole's own zone and
+    # the dowels' relative travel, stays inside the radius the arm's walls pay.
+    location = (
+        plate.SCREW_HOLE_POSITION_RADIUS_MM
+        + registration.LOCATOR_GEAR_PLANE_TRAVEL_MAX_MM / 2.0
+        + centring
+        + (arm.THICKNESS + arm.THICKNESS_BAND) * math.tan(tilt)
+    )
+    assert joints.PLATE_TAP_LOCATION_RADIUS_MAX_MM == pytest.approx(location)
+    assert joints.PLATE_TAP_LOCATION_RADIUS_MAX_MM <= arm.PLATE_TAP_LOCATION_RADIUS_MM
+    # The run-off tilts the screw's axis as well, and it still engages 1.5D.
+    assert joints.PLATE_SCREW_AXIS_TILT_MAX_RAD == pytest.approx(
+        joints.PLATE_SCREW_THREAD_TILT_MAX_RAD + tilt
+    )
+    assert joints.PLATE_SCREW_ENGAGEMENT_WORST / screw.THREAD_MAJOR >= 1.5
 
 
 def test_published_standard_stock_and_entire_head_bounds_do_not_use_receiving_caps(monkeypatch) -> None:
@@ -195,7 +217,6 @@ def test_published_standard_stock_and_entire_head_bounds_do_not_use_receiving_ca
         proud - joints.PLATE_SCREW_CUT_PROUD_MAX - screw.POINT_CHAMFER_LENGTH_MAX_MM,
     )
     assert joints.PLATE_SCREW_STOCK_LEAD_MARGIN_MM > 0.0
-    assert joints.PLATE_SCREW_CONTACT_ARM_LOCAL_Z_MAX_MM <= arm.CLAMP_TAP_PROJECTED_HEIGHT_MM
     assert joints.PLATE_SCREW_WHOLE_HEAD_ARM_LOCAL_Z_MAX_MM > joints.PLATE_SCREW_CONTACT_ARM_LOCAL_Z_MAX_MM
     assert joints.PLATE_SCREW_WHOLE_HEAD_RADIAL_SUPPORT_MAX_MM > screw.HEAD_RADIUS_FROM_THREAD_AXIS_MAX_MM
     monkeypatch.setattr(screw, "STOCK_OVERALL_LENGTH_MIN_MM", 0.5 * 25.4)

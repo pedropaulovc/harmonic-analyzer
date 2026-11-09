@@ -88,23 +88,32 @@ def test_hub_never_stands_proud_of_the_nose():
     assert least >= -1e-9
 
 
-def test_mha_pd_00_feels_the_air_the_seat_faces_squareness_closes():
-    """Owner ruling 2026-11-08 (#2144 item 3.2) and the MHA-PD-10 step face
-    route: the hub spigot end and the sleeve step face print ⊥ .001, and
-    their collar-air terms are accepted by MHA-PD-00's .004 feeler (re-face
-    the step if short), so the stack gate drops them; with them the air is
-    under the floor, which is why the feeler check carries it."""
+def test_mha_pd_00_feels_the_air_its_feeler_accepted_sources_close():
+    """Owner rulings 2026-11-08 (#2144 items 3.2 and 4.1) and the MHA-PD-10
+    step face route: the hub spigot end, the sleeve step face and MHA-PD-18's
+    pin bore S print ⊥ .001, and their collar-air terms are accepted by
+    MHA-PD-00's .004 feeler (re-face the step if short, which sets back a
+    disc on a tilted S too), so the stack gate drops them; with them the air
+    is under the floor, which is why the feeler check carries it."""
+    import paper_drive_arm_registration as registration
     import pd_transgear_disc_hub_spec as hub
 
     assert hub.GEOMETRIC_TOLERANCES_IN["spigot end perpendicularity to bore"] == ".001"
     assert AIR.ASSEMBLY_ACCEPTED_COLLAR_SOURCES == {
         "sleeve step face perpendicularity",
         "hub spigot end perpendicularity",
+        "pin S projected axis zone",
     }
     every = AIR.COLLAR_AIR_UNACCEPTED
     assert set(every.terms) - set(AIR.COLLAR_AIR.terms) == AIR.ASSEMBLY_ACCEPTED_COLLAR_SOURCES
     assert every.terms["hub spigot end perpendicularity"] == pytest.approx(
         AIR.SPIGOT_SLOPE * AIR.Q_FROM_DISC_AXIS
+    )
+    assert AIR.S_ZONE_TILT == pytest.approx(
+        math.atan(registration.S_AXIS_ZONE_DIAMETER_MM / registration.S_PROJECTED_HEIGHT_MM)
+    )
+    assert every.terms["pin S projected axis zone"] == pytest.approx(
+        AIR.S_ZONE_TILT * AIR.DISC_TILT_LEVER
     )
     assert every.statistical_mm < AIR.COLLAR_AIR_MIN
     assert AIR.COLLAR_AIR.statistical_mm >= AIR.COLLAR_AIR_MIN
@@ -124,15 +133,17 @@ def test_collar_air_is_the_statistical_stack():
     assert stack.statistical_mm == pytest.approx(expected)
     assert stack.nominal_mm == pytest.approx(FIT.M_FWD_NOMINAL)
     assert stack.statistical_mm >= AIR.COLLAR_AIR_MIN
-    # The study's caveats are budgeted, not left out.
+    # The study's caveats are budgeted, not left out: the gated stack charges
+    # the first four, and the S zone stands in the every-source stack MHA-PD-00's
+    # feeler accepts.
     for source in (
         "hub rock on the sleeve boss",
         "sleeve cocking on the pin",
         "knob journal tilt in the plate bore",
-        "pin S projected axis zone",
         "knob K projected axis zone",
     ):
         assert stack.terms[source] > 0.0, source
+    assert AIR.COLLAR_AIR_UNACCEPTED.terms["pin S projected axis zone"] > 0.0
     for label, _, band in (term for term, _ in FIT.M_FWD_CHAIN):
         assert stack.terms[label] == band
     # Service motions add arithmetically; only made sizes are RSS'd.

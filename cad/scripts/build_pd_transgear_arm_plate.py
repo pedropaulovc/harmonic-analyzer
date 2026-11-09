@@ -80,7 +80,6 @@ from _document_units import apply_package_model_units
 from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from _part_properties import part_drawing_unit
-from _native_projected_zone import require_saved_projected_gtols
 from _saved_part_guard import require_saved_drawing_properties
 from _visibility import blank_reference_geometry
 from pd_transgear_arm_plate_geometry import (
@@ -955,9 +954,6 @@ async def build(adapter: Any) -> dict[str, str]:
     blank_reference_sketches(adapter, ("CountersinkReference",))
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
-    require_saved_projected_gtols(
-        adapter, artefacts["part"], GEOMETRIC_CONTROLS, label="saved transgear arm plate projected axes",
-    )
     return artefacts
 
 

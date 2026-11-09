@@ -1,15 +1,11 @@
-"""Registration receiver/geometry regressions and the arm files' saved-GTOL
-audit (real builds, seat stubbed), not operating-domain proof."""
+"""Registration receiver/geometry regressions, not operating-domain proof."""
 from __future__ import annotations
 
-import asyncio
 import importlib
 import math
 from dataclasses import replace
-from pathlib import Path
 
 from types import SimpleNamespace
-from unittest.mock import MagicMock
 import pytest
 
 import paper_drive_arm_registration as registration
@@ -19,69 +15,24 @@ import pd_transgear_arm_spec as arm_spec
 import pd_transgear_arm_plate_spec as plate_spec
 import _transgear_arm_plate_locating_interface as pin
 from _printed_tolerance import edge_break_chamfer_mm, edge_break_radius_mm
-from _test_stubbed_build import keyed_artefacts, offline_adapter, seat_calls, stub_seat
-
-
-def _arm_part_seat(module, seat) -> None:
-    seat._mass.side_effect = [
-        (1.0, [0.0, 0.0, module.THICKNESS / 2.0]),
-        (module.V_PIN + 1.0, [1.0, 0.0, 0.0]),
-        (1.0, [0.0, 0.0, 0.0]),
-    ]
-    seat._open_end_face_sketch.return_value = (module.PIN_HOLE_Z, 0.0, True)
-    seat._pin_section_sketch.return_value = (lambda y_mm, z_mm: (z_mm, y_mm), True)
-    seat.name_bore_axis.side_effect = [f"Axis{k}" for k in range(1, 9)]
-
-
-def _plate_part_seat(module, seat) -> None:
-    lowered = (
-        module.V_PLATE * module.THICKNESS_OVER_ARM / 2.0
-        - module.V_LOWER * module.NOTCH_DEPTH / 2.0
-    ) / (module.V_PLATE + module.V_LOWER)
-    seat._mass.side_effect = [
-        (1.0, [0.0, 0.0, module.THICKNESS_OVER_ARM / 2.0]),
-        (1.0, [0.0, 0.0, lowered]),
-    ]
-    seat.name_bore_axis.side_effect = [f"Axis{k}" for k in range(1, 9)]
-    seat._sketch_mapper.side_effect = lambda _a, *, u_axis, v_axis, label: (
-        lambda xyz: (xyz[u_axis], xyz[v_axis])
-    )
-
-
-def _drawing_seat(module, seat) -> None:
-    seat.new_project_drawing.return_value = (MagicMock(), MagicMock())
 
 
 @pytest.mark.parametrize(
-    ("module_name", "export", "key", "prepare"),
+    ("module_name", "spec"),
     [
-        ("build_pd_transgear_arm", "save_part_and_images", "part", _arm_part_seat),
-        ("build_pd_transgear_arm_plate", "save_part_and_images", "part", _plate_part_seat),
-        ("draw_pd_transgear_arm", "finalize_drawing", "drawing", _drawing_seat),
-        ("draw_pd_transgear_arm_plate", "finalize_drawing", "drawing", _drawing_seat),
+        ("build_pd_transgear_arm_plate", plate_spec),
+        ("draw_pd_transgear_arm_plate", plate_spec),
+        ("build_pd_transgear_arm", arm_spec),
+        ("draw_pd_transgear_arm", arm_spec),
     ],
 )
-def test_saved_arm_files_are_audited_for_their_projected_gtols(
-    monkeypatch: pytest.MonkeyPatch, module_name, export, key, prepare
-) -> None:
-    # Each arm part and drawing audits the file it SAVED, not the open model:
-    # its own projected-zone controls, read from the path the export returns.
+def test_arm_and_plate_files_print_no_projected_zone_to_audit(module_name, spec) -> None:
+    # Fan-out Q2-A (delegated ruling 2026-11-07 (Main), no precedent; owner
+    # review #2144; pending owner confirmation): the frames are plain.
     module = importlib.import_module(module_name)
-    if hasattr(module, "SOURCE"):
-        monkeypatch.setattr(module, "SOURCE", Path(__file__))
-    if hasattr(module, "hidden_sketches"):
-        monkeypatch.setattr(module, "hidden_sketches", MagicMock())
-    seat = stub_seat(monkeypatch, module)
-    prepare(module, seat)
-    getattr(seat, export).return_value = keyed_artefacts()
-    adapter = offline_adapter()
-    asyncio.run(module.build(adapter))
-    calls = seat_calls(seat, export, "require_saved_projected_gtols")
-    assert [name for name, _args, _kwargs in calls] == [export, "require_saved_projected_gtols"]
-    _name, args, _kwargs = calls[1]
-    assert args[0] is adapter
-    assert args[1] == f"<{key}>"
-    assert args[2] is module.GEOMETRIC_CONTROLS
+    assert not hasattr(module, "require_saved_projected_gtols")
+    assert all(control.projected_zone_height_mm is None for control in spec.GEOMETRIC_CONTROLS)
+
 
 
 def _readings() -> tuple[registration.RegistrationReading, ...]:
@@ -175,60 +126,84 @@ def test_three_accessible_rear_indicator_sites_bound_every_tilt_direction() -> N
 
 
 
-def test_native_controls_reference_actual_bores_and_project_past_real_chain_plane() -> None:
-    # The arm's pattern is located from S (Ø.0019, inside the 0.05 stack
-    # zone); the plate's from its own knob bore K, so it carries K's Ø.0039
-    # setting circle about S.
+def test_native_controls_reference_actual_bores_and_reach_the_real_chain_plane() -> None:
+    # The arm's pattern is located from S (Ø.004, the reducer's position
+    # zone); the plate's dowel reams from its own knob bore K, at the
+    # reamed-pattern row Ø.004, inside K's Ø.004 setting circle about S.
     for spec, geometry, prefix, zone in (
-        (arm_spec, arm, "arm", ".0019"), (plate_spec, plate, "plate", ".0039"),
+        (arm_spec, arm, "arm", ".004"), (plate_spec, plate, "plate", ".004"),
     ):
         controls = {control.key: control for control in spec.GEOMETRIC_CONTROLS}
         for index, xy in enumerate(geometry.LOCATOR_SITES_MM, 1):
             control = controls[f"{prefix}_locator_{index}_position"]
             assert control.datums == ("A", "B", "C") and control.tolerance_zone == "diametral"
             assert control.tolerance == zone
+            assert float(zone) * 25.4 <= geometry.REDUCER_POSITION_DIAMETER + 1e-12
             assert (control.face.contains_x_mm, control.face.contains_y_mm) == xy
             assert control.face.diameter_mm == geometry.LOCATOR_HOLE_DIA_MM
         assert {(feature, name) for feature, name in spec.BASIC_REDUCER_DIMENSIONS if feature == "LocatorProfile"} == {
             ("LocatorProfile", name) for name in ("LocatorX1", "LocatorY1", "LocatorX2", "LocatorY2")
         }
-    arm_control = next(control for control in arm_spec.GEOMETRIC_CONTROLS if control.key == "feed_stud_projected_axis")
-    plate_control = next(control for control in plate_spec.GEOMETRIC_CONTROLS if control.key == "knob_projected_axis")
-    for control, datum_z, height, zone in (
-        (arm_control, registration.ARM_FRONT_MACHINE_Z_MM, registration.S_PROJECTED_HEIGHT_MM, ".0019"),
-        (plate_control, registration.PLATE_MOUNT_MACHINE_Z_MM, registration.K_PROJECTED_HEIGHT_MM, ".0019"),
+    # The arm's pin bore S has a plain ⊥ .001 over the bore, the reamed row
+    # (no projected zone, rule 26; owner ruling 2026-11-08, #2144 item 4.1).
+    # Run on from the thinnest stock to the chain plane it is S's own axis
+    # zone, wider than K's budget; the stacks charge that wider zone.
+    arm_control = next(
+        control for control in arm_spec.GEOMETRIC_CONTROLS if control.key == "feed_stud_perpendicularity"
+    )
+    assert arm_control.projected_zone_height_mm is None
+    assert arm_control.characteristic == "perpendicularity"
+    assert arm_control.tolerance == ".001" and arm_control.datums == ("A",)
+    assert registration.S_AXIS_ZONE_DIAMETER_MM == pytest.approx(
+        float(arm_control.tolerance) * 25.4 * registration.S_PROJECTED_HEIGHT_MM
+        / (arm.THICKNESS - arm.THICKNESS_BAND)
+    )
+    assert registration.S_AXIS_ZONE_DIAMETER_MM > registration.AXIS_PROJECTED_ZONE_DIAMETER_MM
+    # K prints a plain ⊥ Ø.002 to A over its bore (fan-out Q2-A, rule 26);
+    # carried to K's projected height past the real chain plane, that tilt
+    # stays inside the axes' tilt budget the air stacks charge.
+    plate_control = next(
+        control for control in plate_spec.GEOMETRIC_CONTROLS
+        if control.key == "knob_axis_perpendicularity"
+    )
+    assert plate_control.projected_zone_height_mm is None
+    assert plate_control.tolerance == ".002" and plate_control.datums == ("A",)
+    tilt_zone = float(plate_control.tolerance) * 25.4 * registration.K_PROJECTED_HEIGHT_MM / plate_spec.KNOB_BORE_LENGTH_MIN_MM
+    assert tilt_zone <= registration.AXIS_PROJECTED_ZONE_DIAMETER_MM
+    for datum_z, height in (
+        (registration.ARM_FRONT_MACHINE_Z_MM, registration.S_PROJECTED_HEIGHT_MM),
+        (registration.PLATE_MOUNT_MACHINE_Z_MM, registration.K_PROJECTED_HEIGHT_MM),
     ):
-        assert control.projected_zone_height_mm == height
-        assert control.tolerance == zone and control.datums == ("A",)
         assert datum_z - height <= registration.CHAIN_PLANE_MACHINE_Z_LIMITS_MM[0]
         assert datum_z - height < registration.gear_plane_machine_z_mm() < datum_z
 
 
-def test_clamp_axes_have_real_projected_zones_and_each_countersink_rides_its_hole() -> None:
+def test_clamp_holes_have_real_projected_zones_and_the_arm_taps_no_frame() -> None:
     from _gtol_cylinder import CylinderFace
     arm_controls = {control.key: control for control in arm_spec.GEOMETRIC_CONTROLS}
     plate_controls = {control.key: control for control in plate_spec.GEOMETRIC_CONTROLS}
     # The cones are coaxial with their holes (the plan's 2X CSK callout): no frame of their own.
     assert not any("countersink" in key for key in plate_controls)
+    # The arm's taps are spotted through the plate's holes at assembly: the
+    # plate's holes are the master and the taps carry no frame.
+    assert not any("tap" in key for key in arm_controls)
     for index, (x, y) in enumerate(plate.SCREW_HOLES, 1):
-        tap = arm_controls[f"plate_tap_{index}_position"]
         hole = plate_controls[f"plate_hole_{index}_position"]
-        assert tap.projected_zone_height_mm == arm.CLAMP_TAP_PROJECTED_HEIGHT_MM
-        assert hole.projected_zone_height_mm == plate.CLAMP_PLATE_PROJECTED_HEIGHT_MM
+        # The plate's holes are the master the taps are spotted through:
+        # plain, at the drilled-hole row (fan-out Q2-A and L1).
+        assert hole.projected_zone_height_mm is None
         assert isinstance(hole.face, CylinderFace)
         assert (hole.face.contains_x_mm, hole.face.contains_y_mm) == (x, y)
-        for control, zone in ((tap, ".0019"), (hole, ".0039")):
-            assert control.datums == ("A", "B", "C")
-            assert control.tolerance == zone and control.tolerance_zone == "diametral"
+        assert hole.datums == ("A", "B", "C")
+        assert hole.tolerance == ".014" and hole.tolerance_zone == "diametral"
 
 
 def test_measured_receiver_pays_full_two_pose_travel_and_uncertainty() -> None:
     widths = _receive()
     assert widths == pytest.approx((0.062, 0.054))
     assert math.hypot(*widths) <= registration.LOCATOR_GEAR_PLANE_TRAVEL_MAX_MM
-    # Both reamed patterns at their Ø.004 position row; K's setting circle Ø.004.
+    # Both reamed patterns at their Ø.004 position row.
     assert registration.LOCATOR_GEAR_PLANE_TRAVEL_MAX_MM == pytest.approx(2.0 * 0.1016)
-    assert registration.REDUCER_AXIS_SETUP_RADIUS_MM == pytest.approx(0.0508)
     assert registration.LOCATOR_COORDINATE_TRAVEL_MAX_MM <= (
         registration.LOCATOR_GEAR_PLANE_TRAVEL_MAX_MM / math.sqrt(2.0)
     )
@@ -237,8 +212,10 @@ def test_measured_receiver_pays_full_two_pose_travel_and_uncertainty() -> None:
 def test_setup_must_hold_the_drawn_centre_distance_band_along_s_k() -> None:
     import pd_rack_pinion_spec as disc
     high, low = disc.CENTRE_DISTANCE_SET_BAND
-    # +x/-0: never closer than nominal; the top is K's setting circle radius.
-    assert (high, low) == (registration.REDUCER_AXIS_SETUP_RADIUS_MM, 0.0)
+    # +x/-0: never closer than nominal. Along S-K the set band is the tighter
+    # limit: its top lies inside K's setting circle (owner ruling 2026-11-08,
+    # #2144 item 5.3), so the receiver checks both.
+    assert low == 0.0 and 0.0 < high < registration.REDUCER_AXIS_SETUP_RADIUS_MM
     uncertainty = 0.001
     s_to_k = (arm.KNOB_BORE_STATION - arm.PIN_STATION, arm.KNOB_BORE_OFFSET)
     assert math.hypot(*s_to_k) == pytest.approx(disc.CENTRE_DISTANCE)
@@ -249,11 +226,52 @@ def test_setup_must_hold_the_drawn_centre_distance_band_along_s_k() -> None:
     for along in (low, low - 0.002):
         with pytest.raises(ValueError, match="centre distance"):
             _receive(setup_error_xy_mm=_setup(0.0, along))
-    # The top of the band is the position circle's own limit.
-    with pytest.raises(ValueError, match="position circle"):
+    # Past the band's top, still inside the circle: refused by the band.
+    with pytest.raises(ValueError, match="centre distance"):
         _receive(setup_error_xy_mm=_setup(0.0, high))
-    # The same error across S-K is only a clocking error: accepted.
-    _receive(setup_error_xy_mm=_setup(high / 2.0, 0.002))
+    # Across S-K an error is only a clocking error: accepted up to the
+    # circle, refused past it.
+    _receive(setup_error_xy_mm=_setup(high, 0.002))
+    with pytest.raises(ValueError, match="position circle"):
+        _receive(setup_error_xy_mm=_setup(registration.REDUCER_AXIS_SETUP_RADIUS_MM, 0.002))
+
+
+def test_a_full_division_setting_lands_k_in_the_band_and_the_circle() -> None:
+    """Owner ruling 2026-11-08 (Pedro), #2144 item 5.3: MHA-PD-00 reads S and K
+    true on a full division of the shop's test indicator. Signed worst case
+    (the PD-00 VIEW K budget): the DRO, zeroed on S, errs once on the S-to-K
+    move; the indicator centres S and K within half a division each; the
+    pivot-and-pin tram turns K about S by its lever. Along S-K, the dialled
+    mid-band aim plus that error stays inside the mesh's set band; in all,
+    K stays inside its setting circle."""
+    import tomllib
+
+    from _process_plans import PROCESS_ROOT
+    import pd_paper_drive_knob_setting_spec as knob_setting
+    import pd_rack_pinion_spec as disc
+
+    inventory = tomllib.loads((PROCESS_ROOT / "shop" / "inventory.toml").read_text(encoding="utf-8"))
+    dro_accuracy = 0.0002 * 25.4
+    assert any(
+        cite.startswith("DRO accuracy") and ".0002” Accuracy" in cite
+        for cite in inventory["machines"]["PM-30MV"]["cite"]
+    )
+    division = inventory["gauges"]["dti"]["resolution_in"]["value"] * 25.4
+    centring = division / 2.0
+    ux, uy = registration.S_TO_K_UNIT
+    dro = dro_accuracy * (abs(ux) + abs(uy))
+    lever = knob_setting.K_SET_CENTRE_DISTANCE_MM / arm.PIN_STATION
+    radial_err = dro + 2.0 * centring
+    tangential_err = radial_err + 2.0 * centring * lever
+    low, high = disc.CENTRE_DISTANCE_WINDOW
+    x, y = knob_setting.K_FROM_S_ALONG_MM, knob_setting.K_FROM_S_ACROSS_MM
+    radial = math.hypot(x, y) - low
+    tangential = abs(x * uy - y * ux)
+    assert 0.0 < radial - radial_err and radial + radial_err < high - low
+    landing = math.hypot(radial + radial_err, tangential + tangential_err)
+    assert landing < registration.REDUCER_AXIS_SETUP_RADIUS_MM
+    # The set band alone would not hold it: the circle is why it grew.
+    assert landing > high - low
 
 
 def test_loaded_envelope_is_anchored_to_the_setup_reading() -> None:

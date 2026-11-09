@@ -3,25 +3,24 @@ r"""Create the manufacturing drawing for the transgear arm plate (MHA-PD-19).
 Two sheets.  Sheet 1 (REAR FACE): the plan is ``*Front``, labelled REAR VIEW,
 looking at the rear face: the outline from the bore axis K (the end radius,
 the top corners, the kink), the reamed bore with its finish, both screw
-holes with their countersinks, the locating holes, and the BASIC hole
-positions from the bore (the countersink Ø from the blanked
-``CountersinkReference`` sketch round the +X hole, shown in this view only:
-the drill callout leads to the -X hole from the upper left, the countersink
-callout to the +X hole from the upper right).  Section D-D cuts the plan
-through both screw holes, face A up; a chain line on each hole's axis draws
-its projected tolerance zone from face A outward, into the arm's side, with
-the zone's height.  The isometric stands above it.
+holes, the locating holes, and the BASIC hole positions from the bore, with
+the overall height as a reference.  One hole callout on the drill Ø
+(leading to the -X hole from the upper left) carries the countersink in
+symbol form; the locating holes' callout points at the numbered sheet note
+under the plan for their match-drilling.  The isometric stands upper right.
 
 Sheet 2 (FACE A): the back view (``*Back``), labelled FRONT VIEW (FACE A),
 looks at the mounting face A.  It carries the notch face's two corner
 heights (the only view where that edge is a solid line), the side edges
-from K, the locator heights, datums B and C and every feature control
-frame.  Section A-A cuts it on the bore axis along Y -- the plane of the
+from K and the overall width as a reference, the locator heights, datums B
+and C and every feature control frame, one frame for each 2X group.
+Section A-A cuts it on the bore axis along Y -- the plane of the
 revolved hub and boss -- so the thickness over the arm, the notch depth and
 the hub face's station (a baseline from face A), the hub-to-boss length and
-both diameters print on solid cut edges; datum A tags face A, the thrust
-faces carry their finish with what each one runs against, and a chain line
-on the axis draws the knob bore's projected zone from face A toward the hub.
+both diameters print on solid cut edges; datum A tags face A, and the
+thrust faces carry their finish with what each one runs against.  Every
+frame is plain (rule 26 bars the projected-zone modifier); the section is
+drawn at the sheet's scale, so its caption carries no scale.
 
 Every kept dimension's text point is a model point (mm) projected through
 its view, so the placement holds whichever way SolidWorks orients the
@@ -60,28 +59,39 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_attachment import _assert_attached_to
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_arc_endpoints_to_max,
+    set_dimension_callouts,
+    set_reference_dimension,
+)
+from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_edges import scan_view_edges
 from _drawing_finish import add_surface_finish
 from _drawing_gdt import PmiDrawingPlacement, project_part_pmi
 import _drawing_hidden_sketches as hidden_sketches
 from _drawing_notes import add_property_linked_note
-from _drawing_projection import model_point_in_view, model_points_in_view
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
 from _machinist_review_mode import MachinistReviewMode
-from _native_projected_zone import require_saved_projected_gtols
 from _paths import CAD_ROOT
 from _part_properties import part_drawing_unit
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 from _section_axis import position_section_caption
 import _telemetry
-import _transgear_zone_line as zone_lines
-import pd_paper_drive_assembly_steps as assembly_steps
+from pd_transgear_arm_plate_notes import (
+    HOLE_COUNT_CALLOUT,
+    HUB_STATION_CALLOUT,
+    LOCATOR_CALLOUT,
+    LOCATOR_COUNT_CALLOUT,
+    LOCATOR_NOTE,
+    SCREW_HOLE_CALLOUT,
+)
 from pd_transgear_arm_plate_geometry import (
     LOCATOR_SITES_MM,
     LOCATOR_HOLE_DIA_MM,
@@ -107,23 +117,18 @@ from pd_transgear_arm_plate_geometry import (
 )
 from pd_transgear_arm_plate_spec import (
     BORE_CALLOUT,
-    CSK_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
     FINISH_CAPTIONS,
     FRONT_VIEW_LABEL,
     GEOMETRIC_CONTROLS,
-    HOLE_COUNT_CALLOUT,
-    HUB_STATION_CALLOUT,
     HUB_TO_BOSS_CALLOUT,
     ISO_VIEW_SCALE,
-    KNOB_ZONE_HEIGHT,
-    LOCATOR_CALLOUT,
+    OVERALL_HEIGHT_MM,
+    OVERALL_WIDTH_MM,
     PART_DATUMS,
     REAR_VIEW_LABEL,
-    SCREW_HOLE_CALLOUT,
-    SCREW_ZONE_HEIGHT,
     SHEET_NAMES,
     SURFACE_FINISHES,
     THICKNESS_CALLOUT,
@@ -146,24 +151,24 @@ PNG = OUTPUTS.png
 
 # The plate is 56 x 38 in plan and 29 deep, drawn at 2:1 on two B sheets
 # (the title block fills x > 0.216 below y 0.066).  Sheet 1: the plan on the
-# left with its callouts above and beside it, the isometric upper right and
-# section D-D under it.  Sheet 2: the face-A view on the left under its three
-# rows of frames, section A-A to its right with its hub-side zone line and
-# hub diameter clear of the view's right-hand heights.  A view's centre is
-# its outline's; K stands (_TOP + _BOTTOM) / 2 below it in both face views.
+# left with its callouts above and beside it, the isometric upper right.
+# Sheet 2: the face-A view on the left under its three rows of frames,
+# section A-A to its right with its hub diameter clear of the view's
+# right-hand heights.  A view's centre is its outline's; K stands
+# (_TOP + _BOTTOM) / 2 below it in both face views.
 SHEET_SCALE = (2.0, 1.0)
 VIEW_SCALE = (2, 1)
+# Section A-A stands at the sheet's scale, so its native caption drops the
+# scale line the title block already states (ASME Y14.3; machinist review
+# of the fan-out screen, run 20261107T081227004Z).
+if VIEW_SCALE[0] / VIEW_SCALE[1] != SHEET_SCALE[0] / SHEET_SCALE[1]:
+    raise AssertionError("the section's caption assumes it shares the sheet's scale")
 # 6 mm lower since #2034 (the plate 6.4 longer, 12.8 on the sheet): on the
 # old centre the locating-hole callout's top line crossed the upper border
 # (preview run 20261028T064655627Z).
 PLAN_CENTER = (0.105, 0.126)
 ISO_CENTER = (0.320, 0.200)
 ISO_NOTE_XY = (0.285, 0.252)
-# 30 mm higher than the outline alone needs: the view's caption keeps the
-# offset SOLIDWORKS gave it below the full section, before only the cut face
-# printed, which put it on the title block (machinist review, run
-# 20261027T180704579Z).
-SCREW_SECTION_CENTER = (0.305, 0.140)
 REAR_LABEL_XY = (0.093, 0.032)
 # Section A-A stands 5 mm under its old line since #2034: there the
 # hub-to-boss text crossed the upper border by 3.7 (preview run
@@ -187,30 +192,23 @@ _BOTTOM = -END_R
 # The face-A view centres its outline, _BOTTOM.._TOP about K; section A-A's
 # cuts the top edge at x = 0, _SECTION_TOP, lower than the corner.  The view
 # stands that half-difference above the section's centre, so K is level in
-# both; its label keeps its 4 mm under the side widths' extension-line ends
-# (#2034, whose taller face put them through it).
+# both; its label stands under the overall width (OVERALL_WIDTH_TEXT_XY).
 BACK_CENTER = (
     0.135,
     KNOB_SECTION_CENTER[1] + (_TOP - _SECTION_TOP) / 2.0 * SHEET_SCALE[0] / 1000.0,
 )
-FRONT_LABEL_XY = (0.110, BACK_CENTER[1] - 0.076)
 _Z_PLAN = BOSS_FACE_Z
 _SCREW_Y = SCREW_HOLES[0][1]
 
-# The cutting lines, past both ends of the plate.  A-A runs down the face-A
-# view on the bore axis (its arrows point at the view's +X side, the hub
-# then stands left in the section); D-D runs across the plan through both
-# screw-hole axes, left to right (its arrows point down the plan, so face A
-# stands up in the section and the screw holes' zones rise from it, away
-# from the view's caption).
+# The cutting line, past the plate's ends: A-A runs down the face-A view on
+# the bore axis (its arrows point at the view's +X side, the hub then stands
+# left in the section).  Section D-D through a screw hole carried only the
+# hole's projected-zone height; with plain frames (fan-out Q2-A) the hole
+# callout defines the countersink and the sheet has no D-D.
 SECTION_LINE_OVERRUN_MM = 3.0
 KNOB_SECTION_LINE_MODEL = (
     (0.0, _SECTION_TOP + SECTION_LINE_OVERRUN_MM, 0.0),
     (0.0, _BOTTOM - SECTION_LINE_OVERRUN_MM, 0.0),
-)
-SCREW_SECTION_LINE_MODEL = (
-    (EDGE_MINUS_X - SECTION_LINE_OVERRUN_MM, _SCREW_Y, _Z_PLAN),
-    (EDGE_PLUS_X + SECTION_LINE_OVERRUN_MM, _SCREW_Y, _Z_PLAN),
 )
 
 # Per-view survivors of the marked-dimension import, each at the MODEL point
@@ -245,18 +243,24 @@ PLAN_KEEP: dict[str, tuple[float, float, float]] = {
     "KinkRightY": (EDGE_PLUS_X + 5.0, KINK_RIGHT[1] / 2.0, _Z_PLAN),
     "ScrewHoleY": (EDGE_PLUS_X + 9.5, _SCREW_Y / 2.0, _Z_PLAN),
     "EndR": (0.7071 * END_R + 6.0, -0.7071 * END_R - 6.0, _Z_PLAN),
-    "BoreDia": (EDGE_MINUS_X - 4.0, _BOTTOM - 6.0, _Z_PLAN),
-    "ScrewHoleDia": (EDGE_MINUS_X - 6.0, _TOP + 8.0, _Z_PLAN),
-    # Four mm higher than the drill callout: its three lines under the
-    # value end clear of the plate's +X top corner.
-    "CskDia": (EDGE_PLUS_X + 8.0, _TOP + 12.0, _Z_PLAN),
+    # Low enough that its top line stands clear under the overall height's
+    # lower witness line, which runs left from the end round's extreme.
+    "BoreDia": (EDGE_MINUS_X - 4.0, _BOTTOM - 9.0, _Z_PLAN),
+    # Its three short lines end left of hole 1's witness line (the .4281's:
+    # at 24 characters a line from EDGE_MINUS_X - 6 that line ran through
+    # the 82° and the screw's number, fan-out round 2), its shelf above the
+    # overall height's upper witness line at the top corner.
+    "ScrewHoleDia": (EDGE_MINUS_X - 7.45, _TOP + 11.0, _Z_PLAN),
     # Text right of K's witness line, which struck it between the two; the
     # reamed-hole leader runs on the left.
     "LocatorX1": (4.5, PLAN_ROWS[2], _Z_PLAN),
-    # Under the border and high enough that its six lines clear the
-    # screw-hole callout; far enough left that its leader runs down to
-    # locator 1 left of every location dimension line, with air to the
-    # left border (run 20261027T165127867Z: its shelf met the border).
+    # Under the border and high enough that its lines clear the screw-hole
+    # callout; far enough left that its leader runs down to locator 1 left
+    # of every location dimension line, with air to the left border (run
+    # 20261027T165127867Z: its shelf met the border).  Its shelf, under the
+    # whole block, ends left of hole 1's witness line (LOCATOR_SHELF_*
+    # below; round 1 layout audit on 41ad5cf: the 27-character fit line's
+    # shelf ran across that line, shoulder-crosses-line).
     "LocatorDia1": (EDGE_MINUS_X - 9.3, _TOP + 31.0, _Z_PLAN),
 }
 # Face-A view: the notch face's corner heights and the locator heights,
@@ -284,7 +288,7 @@ BACK_KEEP: dict[str, tuple[float, float, float]] = {
 # carry what they set on two short lines under their values, between their
 # witness lines (SOLIDWORKS prints no callout above a linear dimension: run
 # 20261027T130144223Z; below the view, the hub-to-boss lines met the view's
-# caption).  The hub diameter stands beyond the knob zone's chain line, its
+# caption).  The hub diameter stands 25.5 out from the hub face, its
 # text above the axis: below it, datum B's tag (face-A view) sat on it and
 # read as naming the hub (machinist review, run 20261027T152452686Z); its
 # witness lines stop short of the hub face, not on through the hatched hub
@@ -295,12 +299,12 @@ BACK_KEEP: dict[str, tuple[float, float, float]] = {
 # the hub-to-boss dimension's boss-face witness line (at +6 that line ran
 # through the text: machinist review of ae9ed661a), in the open sheet above
 # the boss; between the plate's own witness lines they would cross face A's.
-# The hub station's callout takes three lines (it also sets the disc
-# cluster's collar air, #2038).  SOLIDWORKS centres the value-and-callout
-# block on its position, so the third line raised the value half a line: at
-# +19.5 the hub-to-boss dimension line ran through it (run
-# 20261028T111221004Z, layout audit text-on-line).  At +17.9 the value
-# clears that line and the block's foot clears the front face's value.
+# The hub station's callout takes two lines.  SOLIDWORKS centres the
+# value-and-callout block on its position, so each line raises the value
+# half a line: with three, at +19.5 the hub-to-boss dimension line ran
+# through it (run 20261028T111221004Z, layout audit text-on-line).  At +17.9
+# the value clears that line and the block's foot clears the front face's
+# value.
 HUB_DIA_TEXT_STANDOFF_MM = 25.5
 HUB_DIA_WITNESS_MAX_M = (HUB_DIA_TEXT_STANDOFF_MM * SHEET_SCALE[0] - 1.0) / 1000.0
 SECTION_KEEP: dict[str, tuple[float, float, float]] = {
@@ -364,23 +368,94 @@ def _set_arrow_sides(adapter: Any, annotations: list[Any], sides: dict[str, int]
             raise RuntimeError(f"{name} did not keep its arrows on side {side}")
 
 
-def _locator_callout() -> str:
-    """The locating holes' callout, naming MHA-PD-00 VIEW K's setting."""
-    return LOCATOR_CALLOUT.format(
-        assembly=assembly_steps.DRAWING_NUMBER,
-        view=assembly_steps.KNOB_SETTING_VIEW_NAME,
-    )
+@_telemetry.traced("drawing.transgear_arm_plate.group_frames")
+def _one_frame_per_group(adapter: Any, frames: dict[str, Any]) -> None:
+    """One frame for each 2X group (``frame_groups``): the other holes'
+    identical frames are hidden on the sheet (``IAnnotation::Visible`` =
+    swAnnotationHidden, drawing-local), and the shown frame carries the
+    count above it (``IGtol::SetText(swGTolTextCalloutAbove)``).  After one
+    rebuild each is read back: hidden frames hidden, each shown frame
+    visible with its count; anything else fails the build."""
+    groups = []
+    for shown_key, hidden_keys, count in frame_groups():
+        hidden = {key: _early_bound(frames[key], "IAnnotation") for key in hidden_keys}
+        for annotation in hidden.values():
+            annotation.Visible = _ANNOTATION_HIDDEN
+        shown = _early_bound(frames[shown_key], "IAnnotation")
+        gtol = _early_bound(shown.GetSpecificAnnotation(), "IGtol")
+        if not gtol.SetText(_GTOL_CALLOUT_ABOVE, count):
+            raise RuntimeError(f"{shown_key}: the group's {count} was refused")
+        groups.append((shown_key, shown, gtol, hidden, count))
+    rebuild_drawing(adapter, label="2X group frames")
+    for shown_key, shown, gtol, hidden, count in groups:
+        for key, annotation in hidden.items():
+            if int(annotation.Visible) != _ANNOTATION_HIDDEN:
+                raise RuntimeError(f"{key}: the repeated frame did not stay hidden")
+        above = str(gtol.GetText(_GTOL_CALLOUT_ABOVE) or "")
+        if int(shown.Visible) != _ANNOTATION_VISIBLE or above != count:
+            raise RuntimeError(
+                f"{shown_key}: the group's frame reads visible={shown.Visible!r}, "
+                f"above={above!r}, not {count!r}"
+            )
+        _telemetry.info(f"2X group: {shown_key} prints {count}; hidden {sorted(hidden)}")
 
+
+@_telemetry.traced("drawing.transgear_arm_plate.overall_reference", label_param="label")
+def _overall_reference(
+    adapter: Any,
+    view: Any,
+    *,
+    name: str,
+    label: str,
+    entities: tuple[Any, Any],
+    entity_types: tuple[str, str],
+    picks: tuple[tuple[float, float], tuple[float, float]],
+    text_xy: tuple[float, float],
+    orientation: str,
+    expected_mm: float,
+    to_arc_extreme: bool = False,
+) -> None:
+    """A native overall dimension across two named view entities, measured
+    (attached entities and value, after any arc end moves to the round's
+    extreme), then parenthesised as a reference at the spec's places."""
+    dimension = add_edge_dimension(
+        adapter, view, p0=picks[0], p1=picks[1], text_xy=text_xy, label=label,
+        orientation=orientation, entities=entities, entity_types=entity_types,
+    )
+    if to_arc_extreme:
+        set_arc_endpoints_to_max(adapter, dimension, label=label)
+    display = _early_bound(dimension, "IDisplayDimension")
+    assert_dimension_measures(
+        adapter, display, expected_mm=expected_mm, label=label,
+        entities=entities, entity_types=entity_types,
+    )
+    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    if annotation is None:
+        raise RuntimeError(f"{label} has no native annotation")
+    display = _early_bound(
+        set_reference_dimension(adapter, annotation, label=label), "IDisplayDimension"
+    )
+    display.SetPrecision3(DRAWING_REFERENCE_PRECISION[name], -1, -1, -1)
+    applied = int(display.GetPrimaryPrecision2())
+    if applied != DRAWING_REFERENCE_PRECISION[name]:
+        raise RuntimeError(
+            f"{label} prints {applied} decimal places, not {DRAWING_REFERENCE_PRECISION[name]}"
+        )
+
+
+
+# Under the plan, right of the view label and the bore's finish symbol,
+# left of the title block, above the border.
+LOCATOR_NOTE_XY = (0.125, 0.045)
 
 PLAN_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
     "ScrewHoleDia": SCREW_HOLE_CALLOUT,
-    "CskDia": CSK_CALLOUT,
-    "LocatorDia1": _locator_callout(),
+    "LocatorDia1": LOCATOR_CALLOUT,
 }
 PLAN_CALLOUTS_ABOVE = {
     "ScrewHoleDia": HOLE_COUNT_CALLOUT,
-    "CskDia": HOLE_COUNT_CALLOUT,
+    "LocatorDia1": LOCATOR_COUNT_CALLOUT,
 }
 SECTION_CALLOUTS = {
     "ThicknessOverArm": THICKNESS_CALLOUT,
@@ -398,30 +473,96 @@ CALLOUTS_ABOVE = PLAN_CALLOUTS_ABOVE
 BORE_FINISH_MODEL = (3.0, _BOTTOM - 9.5, _Z_PLAN)
 FINISH_CHAR_HEIGHT = 0.0025
 # Position frames, sheet metres, offsets from the face-A view's K. A frame's
-# xy is its top-left corner; it is about 59 mm wide with a projected zone
-# (44 mm without), and its leader leaves the end nearer the feature through
-# a 6.3 mm shoulder (measured on run 20261009T214031408Z). The hole and
-# locator frames stand in three rows above the view, which mirrors X, so
-# its hole frames sit outboard of their own holes (no crossing) and the two
-# through-bore locator leaders drop between the hole leaders; hole 2's
-# frame stands far enough left that its leader passes left of the A-A
-# cutting line's top letter (run 20261027T125555391Z). The knob
-# bore's frame stands left of the end round, its leader under the side
-# heights' witness lines; datum B's tag right of it.
+# xy is its top-left corner; a position frame is about 44 mm wide (59 mm it
+# was with the projected zone, which rule 26 bars), and its leader leaves
+# the end nearer the feature through a 6.3 mm shoulder (measured on run
+# 20261009T214031408Z). The hole and locator frames stand in three rows
+# above the view, which mirrors X, so its hole frames sit outboard of their
+# own holes (no crossing) and the two through-bore locator leaders drop
+# between the hole leaders; hole 2's frame stands far enough left that its
+# leader passes left of the A-A cutting line's top letter (run
+# 20261027T125555391Z). The knob bore's frame stands left of the end round,
+# its leader under the side heights' witness lines; datum B's tag right of
+# it.  The frames left of their features keep their right ends (and so their
+# leaders) where the wider projected-zone frames had them: 15 mm right.
 # K on the sheet: the view centres the outline, which spans _BOTTOM.._TOP
 # about K (a fixed 0.1286 put K 6 mm off once #2034 lengthened the plate).
 _BACK_K = (
     BACK_CENTER[0],
     BACK_CENTER[1] - (_TOP + _BOTTOM) / 2.0 * SHEET_SCALE[0] / 1000.0,
 )
-FRAME_ROWS = (0.262, 0.250, 0.238)
+# Each 2X group prints one frame (``frame_groups``): the shown locator frame
+# stands on the top row low enough that the count above it stays inside
+# the upper border, the shown hole frame on the bottom row with its count
+# under the locator frame.  The hidden frames keep their old rows: a
+# projected frame needs a placement, and hidden it prints nothing.
+FRAME_ROWS = (0.256, 0.247, 0.238)
+_PROJECTED_CELL_WIDTH = 0.015
 FRAME_XY = {
     "plate_hole_1_position": (_BACK_K[0] + 0.02875, FRAME_ROWS[2]),
-    "plate_hole_2_position": (_BACK_K[0] - 0.10185, FRAME_ROWS[2]),
+    "plate_hole_2_position": (_BACK_K[0] - 0.10185 + _PROJECTED_CELL_WIDTH, FRAME_ROWS[2]),
     "plate_locator_1_position": (_BACK_K[0] + 0.01055, FRAME_ROWS[0]),
     "plate_locator_2_position": (_BACK_K[0] + 0.01905, FRAME_ROWS[1]),
-    "knob_projected_axis": (_BACK_K[0] - 0.115, _BACK_K[1] - 0.008),
+    "knob_axis_perpendicularity": (
+        _BACK_K[0] - 0.115 + _PROJECTED_CELL_WIDTH, _BACK_K[1] - 0.008,
+    ),
 }
+# The overall references (pd_transgear_arm_plate_spec.OVERALL_*_MM).  The
+# width stands under the face-A view's side widths, one 12 mm row lower,
+# across the two side edges; the view's label under it.  The height stands
+# on the plan left of the top corner's height (1.67), from the -X top
+# corner to the end round's extreme below K, its text clear of the left
+# border; its lower witness line runs over the bore callout's block.
+OVERALL_WIDTH_TEXT_XY = (
+    _BACK_K[0], _BACK_K[1] + (_BOTTOM - 13.0) * SHEET_SCALE[0] / 1000.0,
+)
+FRONT_LABEL_XY = (0.110, OVERALL_WIDTH_TEXT_XY[1] - 0.008)
+# Model points on the face-A view's face A (z = 0): each side edge between
+# the top corner and the notch face's corner (datum C's edge on +X).
+OVERALL_WIDTH_EDGES_MODEL = (
+    (EDGE_PLUS_X, (TOP_RIGHT[1] + NOTCH_RIGHT[1]) / 2.0, 0.0),
+    (EDGE_MINUS_X, (TOP_LEFT[1] + NOTCH_LEFT[1]) / 2.0, 0.0),
+)
+OVERALL_HEIGHT_TEXT_MODEL = (EDGE_MINUS_X - 21.0, (_TOP + _BOTTOM) / 2.0, _Z_PLAN)
+# The plan looks at the rear face: its -X top corner and the end round.
+OVERALL_HEIGHT_CORNER_MODEL = (EDGE_MINUS_X, _TOP, REAR_FACE_Z)
+OVERALL_HEIGHT_ROUND_MODEL = ((0.0, 0.0, REAR_FACE_Z), END_R)
+
+
+def frame_groups() -> tuple[tuple[str, tuple[str, ...], str], ...]:
+    """Each 2X group's one printed frame: the key whose frame prints, the
+    keys whose identical frames are hidden, and the count text above it.
+
+    Machinist screen (clarity, fan-out round 2): identical frames were
+    repeated on each dowel ream and each screw hole instead of given once
+    for the 2X group.  Every member must be the same control at its own
+    site, or one frame cannot speak for them all.
+    """
+    groups = []
+    for prefix, sites in (
+        ("plate_locator_", LOCATOR_SITES_MM),
+        ("plate_hole_", SCREW_HOLES),
+    ):
+        group = [c for c in GEOMETRIC_CONTROLS if c.key.startswith(prefix)]
+        if len(group) != len(sites) or len(group) < 2:
+            raise AssertionError(f"MHA-PD-19's {prefix}* group is not one control per hole")
+        shown, *hidden = group
+        for other in hidden:
+            if (
+                other.characteristic, other.tolerance, other.datums, other.tolerance_zone,
+                other.projected_zone_height_mm, other.face.diameter_mm,
+            ) != (
+                shown.characteristic, shown.tolerance, shown.datums, shown.tolerance_zone,
+                shown.projected_zone_height_mm, shown.face.diameter_mm,
+            ):
+                raise AssertionError(f"{other.key} is not {shown.key}'s control at its own site")
+        groups.append((shown.key, tuple(other.key for other in hidden), f"{len(group)}X"))
+    return tuple(groups)
+
+
+_ANNOTATION_VISIBLE = 1  # swAnnotationVisibilityState_e.swAnnotationVisible
+_ANNOTATION_HIDDEN = 3  # swAnnotationVisibilityState_e.swAnnotationHidden
+_GTOL_CALLOUT_ABOVE = 3  # swGTolTextParts_e.swGTolTextCalloutAbove
 DATUM_B_XY = (_BACK_K[0] + 0.058, _BACK_K[1] - 0.014)
 # C is the vertical +X side face (sheet left in the face-A view), square to
 # the X hole coordinates.  The tag stands well below the top corner so its
@@ -460,34 +601,6 @@ FACE_FINISHES: dict[str, tuple[_ModelPoint, _ModelPoint, _ModelPoint]] = {
         (0.0, 4.0, BOSS_FACE_Z + 3.0),
     ),
 }
-# Each projected zone: a chain line from face A along its feature's axis,
-# for the zone's height, dimensioned as a reference (the frame states the
-# height).  (start, end, dimension text) model points, mm.  The knob bore's
-# runs out of A toward the hub in section A-A, just off the axis, its height
-# above it beyond the hub face (the hub face's finish symbol stands below
-# it).  Each screw hole's runs on its axis out of A into the arm's side (the
-# mating part: ASME Y14.5 projected tolerance zone), clear of the hatching,
-# its height beside it beyond the zone's end.
-CHAIN_LINE_OFFSET_MM = 1.2
-# Each screw hole's axis in section D-D, from face A (where its zone's chain
-# line continues it) past the rear face.
-SCREW_AXES = tuple(
-    ((x, _SCREW_Y, 0.0), (x, _SCREW_Y, REAR_FACE_Z + 1.5)) for x, _y in SCREW_HOLES
-)
-KNOB_ZONE = (
-    (0.0, CHAIN_LINE_OFFSET_MM, 0.0),
-    (0.0, CHAIN_LINE_OFFSET_MM, -KNOB_ZONE_HEIGHT),
-    (0.0, 4.0, -0.75 * KNOB_ZONE_HEIGHT),
-)
-SCREW_ZONES = tuple(
-    (
-        (x, _SCREW_Y, 0.0),
-        (x, _SCREW_Y, -SCREW_ZONE_HEIGHT),
-        (x - 2.0, _SCREW_Y, -SCREW_ZONE_HEIGHT - 3.0),
-    )
-    for x, _y in SCREW_HOLES
-)
-ZONE_LENGTH_TOL_M = 1e-7
 # A placed note reads back its own SetPosition point; a refused move leaves
 # it at the default drop, centimetres away.
 NOTE_POSITION_TOL_M = 1e-5
@@ -585,18 +698,61 @@ def _cut(
     )
 
 
-def _show_cut_faces_only(adapter: Any, view: Any, label: str) -> None:
-    """Only the cut face prints: past D-D's plane (looking down the plan)
-    the notch section and the hub stood in the view and under the zones'
-    chain lines, and pushed its caption onto the title block (run
-    20261027T175228772Z)."""
-    section = _early_bound(_early_bound(view, "IView").GetSection(), "IDrSection")
-    # R2026x declares SetDisplayOnlySurfaceCut as a void setter; only its
-    # dedicated bool getter may be truth-tested.
-    section.SetDisplayOnlySurfaceCut(True)
-    rebuild_drawing(adapter, label=f"{label} cut faces only")
-    if section.GetDisplayOnlySurfaceCut() is not True:
-        raise RuntimeError(f"{label} retained geometry beyond the cutting plane")
+_CAPTION_SCALE_FIELDS = ("<VLSCALE>", "<VLSCALEV>")
+_CAPTION_NAME_FIELDS = ("<VLNAME>", "<VLLABEL>")
+
+
+def _caption_without_scale(linked_text: str) -> str:
+    """A native view caption's linked text less its scale: a line holding
+    only the scale (its word and value fields) goes; scale fields sharing
+    the name line go alone."""
+    kept = []
+    for line in linked_text.splitlines(keepends=True):
+        if not any(field in line for field in _CAPTION_SCALE_FIELDS):
+            kept.append(line)
+        elif any(field in line for field in _CAPTION_NAME_FIELDS):
+            for field in _CAPTION_SCALE_FIELDS:
+                line = line.replace(field, "")
+            kept.append(line)
+    return "".join(kept).rstrip("\r\n")
+
+
+@_telemetry.traced("drawing.plate_section_caption_scale", label_param="label")
+def _drop_caption_scale(adapter: Any, view: Any, label: str) -> Callable[[], None]:
+    """Drop the scale from a section's native caption: the section stands at
+    the sheet's scale, which the title block states (machinist review of the
+    fan-out screen, run 20261107T081227004Z: both captions printed SCALE
+    2 : 1 under a 2:1 title block).  The caption is found by its label field
+    (``_section_axis.position_section_caption``); its linked text is read
+    back, and the returned check re-proves it after the finalizer's
+    settling rebuild and sheet-scale reset."""
+    bound = _early_bound(view, "IView")
+    ratio = tuple(float(value) for value in bound.ScaleRatio)
+    if not math.isclose(ratio[0] / ratio[1], SHEET_SCALE[0] / SHEET_SCALE[1]):
+        raise RuntimeError(f"{label} stands at {ratio!r}, not the sheet's scale")
+    captions = [
+        note for note in (_early_bound(raw, "INote") for raw in (bound.GetNotes() or ()))
+        if "<VLLABEL>" in str(note.PropertyLinkedText or "")
+    ]
+    if len(captions) != 1:
+        raise RuntimeError(f"{label}: expected one native linked caption, found {len(captions)}")
+    note = captions[0]
+    linked_text = str(note.PropertyLinkedText or "")
+    wanted = _caption_without_scale(linked_text)
+    if "<VLLABEL>" not in wanted:
+        raise RuntimeError(f"{label}: caption {linked_text!r} lost its label dropping the scale")
+    if wanted != linked_text:
+        note.PropertyLinkedText = wanted
+        rebuild_drawing(adapter, label=f"{label} caption scale")
+    _telemetry.info(f"{label} caption {linked_text!r} -> {wanted!r}")
+
+    def settled() -> None:
+        reads = str(note.PropertyLinkedText or "")
+        if reads != wanted or any(field in reads for field in _CAPTION_SCALE_FIELDS):
+            raise RuntimeError(f"{label} caption reads {reads!r}, not {wanted!r}")
+
+    settled()
+    return settled
 
 
 def _require_note_in_view(
@@ -647,141 +803,6 @@ def _add_linked_note(
     )
 
 
-def _sheet_points(
-    adapter: Any,
-    view: Any,
-    points_mm: tuple[_ModelPoint, ...],
-    *,
-    label: str,
-    names: tuple[str, ...],
-) -> list[tuple[float, float]]:
-    """Model points (mm) on the sheet (m), through one projection read."""
-    return model_points_in_view(
-        adapter, view, [tuple(value / 1000.0 for value in point) for point in points_mm],
-        label=label, names=names,
-    )
-
-
-@_telemetry.traced("drawing.axis_line", label_param="label")
-def _add_axis_line(
-    adapter: Any, view: Any, axis: tuple[_ModelPoint, _ModelPoint], *, label: str
-) -> None:
-    """A hole's axis as a thin black centre line in ``view``'s sketch."""
-    start, end = _sheet_points(adapter, view, axis, label=label, names=("start", "end"))
-    sketched = zone_lines.sketch_lines(
-        adapter, view, {"axis": (start, end)},
-        style=zone_lines.CENTER_LINE_STYLE, width=zone_lines.CENTER_LINE_WEIGHT,
-        label=label,
-    )
-    zone_lines.require_placed(
-        adapter, sketched,
-        style=zone_lines.CENTER_LINE_STYLE, width=zone_lines.CENTER_LINE_WEIGHT,
-        label=label, stage="as sketched",
-    )
-
-
-@_telemetry.traced("drawing.projected_zone_line", label_param="label")
-def _add_zone_line(
-    adapter: Any,
-    view: Any,
-    zone: tuple[_ModelPoint, _ModelPoint, _ModelPoint],
-    *,
-    height_mm: float,
-    precision_key: str,
-    label: str,
-) -> Callable[[], None]:
-    """A thick chain line in ``view``'s sketch along a projected zone, and its
-    height as a driven linear reference dimension; the returned check
-    re-proves, after the finalizer's settling rebuild (``settled_checks``),
-    that both ends still sit on the freshly projected zone (face A and the
-    zone's height) and the dimension's type, state, tolerance, text and length.
-
-    The line is created direct to the database (``_transgear_zone_line``,
-    shared with the arm): an inferred endpoint would snap onto the hole wall
-    or face A and change the length.
-    """
-    roles = ("start", "end", "height text")
-    chain = {
-        "style": zone_lines.CHAIN_LINE_STYLE, "width": zone_lines.CHAIN_LINE_WEIGHT,
-        "label": label,
-    }
-    start, end, text = _sheet_points(adapter, view, zone, label=label, names=roles)
-    sketched = zone_lines.sketch_lines(adapter, view, {"zone": (start, end)}, **chain)
-    zone_lines.require_placed(adapter, sketched, stage="as sketched", **chain)
-    segment = sketched["zone"].segment
-    across = abs(end[0] - start[0]) >= abs(end[1] - start[1])
-    # swDimensionType_e: swLinearDimension, or its horizontal/vertical form.
-    linear_types = (2, 11) if across else (2, 12)
-    with zone_lines.dimension_input_suppressed(adapter):
-        display = zone_lines.dimension_line(
-            adapter, view, segment, vertical=not across, at=text, label=f"{label} chain",
-        )
-    dimension = _early_bound(display.GetDimension2(0), "IDimension")
-    # A drawing-sketch dimension is created driving: editing it would move
-    # the zone line. Driven, it only reports the line's length.
-    dimension.DrivenState = 1  # swDimensionDrivenState_e.swDimensionDriven
-    display.SetPrecision3(DRAWING_REFERENCE_PRECISION[precision_key], -1, -1, -1)
-    # The repository's reference form (set_reference_dimension): bracketing
-    # text, never the native parentheses as well.
-    display.ShowParenthesis = False
-    display.SetText(1, "(")  # swDimensionTextPrefix
-    display.SetText(2, ")")  # swDimensionTextSuffix
-    wanted = (
-        1,  # driven
-        0,  # swTolNONE
-        False,
-        DRAWING_REFERENCE_PRECISION[precision_key],
-        "(",
-        ")",
-    )
-
-    def applied() -> tuple[Any, ...]:
-        return (
-            int(dimension.DrivenState),
-            int(_early_bound(dimension.Tolerance, "IDimensionTolerance").Type),
-            bool(display.ShowParenthesis),
-            int(display.GetPrimaryPrecision2()),
-            str(display.GetText(1) or ""),
-            str(display.GetText(2) or ""),
-        )
-
-    def require_linear(stage: str) -> None:
-        if int(display.Type2) not in linear_types:
-            raise RuntimeError(
-                f"{label}: {stage}, native type {int(display.Type2)} is not {linear_types}"
-            )
-
-    require_linear("as dimensioned")
-    placed = applied()
-    if placed != wanted:
-        raise RuntimeError(f"{label}: reads {placed}, not {wanted}")
-
-    def settled() -> None:
-        fresh = _sheet_points(adapter, view, zone, label=label, names=roles)
-        zone_lines.require_placed(
-            adapter, sketched, stage="settled",
-            ends={"zone": tuple(zone_lines.sheet_to_sketch(adapter, view, fresh[:2]))},
-            **chain,
-        )
-        require_linear("settled")
-        state = applied()
-        length = float(dimension.SystemValue)
-        if state != wanted or not math.isclose(
-            length, height_mm / 1000.0, abs_tol=ZONE_LENGTH_TOL_M
-        ):
-            raise RuntimeError(
-                f"{label}: settled at {state} over {length * 1000.0:.4f} mm, "
-                f"not {wanted} over {height_mm:.4f} mm"
-            )
-        _telemetry.info(
-            f"{label}: settled on the zone, {length * 1000.0:.4f} mm, linear, driven, "
-            "no tolerance"
-        )
-
-    _telemetry.info(f"{label}: chain {start!r} -> {end!r}, height text at {text!r}")
-    return settled
-
-
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -823,20 +844,15 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     create_blank_drawing_sheets(adapter, SHEET_NAMES, label="arm-plate sheets")
 
-    # --- Sheet 1: the rear face, its screw-hole section and the isometric. --
+    # --- Sheet 1: the rear face and the isometric. ----------------------------
     _activate_sheet(adapter, SHEET_NAMES[0])
     # Explicit per-view scale: a view placed without one can silently
     # auto-scale, which shifts every coordinate-based pick on it.
     plan = place_view(adapter, str(SOURCE), "*Front", *PLAN_CENTER, scale=VIEW_SCALE)
-    screw_section = _cut(
-        adapter, plan, SCREW_SECTION_LINE_MODEL, SCREW_SECTION_CENTER, "D",
-        "plate section through the screw holes",
-    )
-    _show_cut_faces_only(adapter, screw_section, "plate section D-D")
     iso = place_view(
         adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_VIEW_SCALE
     )
-    for view in (plan, screw_section, iso):
+    for view in (plan, iso):
         set_hidden_lines_removed(adapter, view)
     plan_annotations = _curated(adapter, ((plan, PLAN_KEEP, "plan"),))
     # Decimal places and the explicit bands are authored on the part; the
@@ -863,21 +879,27 @@ async def build(adapter: Any) -> dict[str, str]:
         char_height=FINISH_CHAR_HEIGHT,
         leader_attach_xy=_bore_landing(adapter, plan, bore_finish_xy),
     )
-    # Each hole's axis in section D-D, continued out of face A by its zone's
-    # chain line (ASME Y14.5-2018 6.4.7).
-    # Sketched: InsertCenterLine2 found no cylinder at a pick inside the
-    # cut hole (run 20261027T155333783Z).
-    for index, axis in enumerate(SCREW_AXES, 1):
-        _add_axis_line(
-            adapter, screw_section, axis, label=f"screw hole {index} axis in section D-D"
-        )
-    zone_checks = [
-        _add_zone_line(
-            adapter, screw_section, zone, height_mm=SCREW_ZONE_HEIGHT,
-            precision_key="ScrewZone", label=f"screw hole {index} projected zone",
-        )
-        for index, zone in enumerate(SCREW_ZONES, 1)
-    ]
+    # The overall height, a reference: the -X top corner to the end round's
+    # extreme below K, both on the rear face the plan looks at.
+    plan_edges = scan_view_edges(plan, label="plate rear-face outline")
+    round_centre, round_radius = OVERALL_HEIGHT_ROUND_MODEL
+    height_entities = (
+        plan_edges.exact_vertex_at(OVERALL_HEIGHT_CORNER_MODEL, label="plate -X top corner"),
+        plan_edges.circle_at(
+            round_centre, round_radius, axis=(0.0, 0.0, 1.0), label="plate end round",
+        ).edge,
+    )
+    _overall_reference(
+        adapter, plan, name="OverallHeight", label="overall height reference",
+        entities=height_entities, entity_types=("VERTEX", "EDGE"),
+        picks=(
+            _sheet_xy(adapter, plan, OVERALL_HEIGHT_CORNER_MODEL, "plate -X top corner"),
+            _sheet_xy(adapter, plan, (0.0, _BOTTOM, REAR_FACE_Z), "plate end round extreme"),
+        ),
+        text_xy=_sheet_xy(adapter, plan, OVERALL_HEIGHT_TEXT_MODEL, "overall height text"),
+        orientation="vertical", expected_mm=OVERALL_HEIGHT_MM, to_arc_extreme=True,
+    )
+    _add_note(adapter, plan, LOCATOR_NOTE, LOCATOR_NOTE_XY, "locating-hole note")
     _add_note(adapter, plan, REAR_VIEW_LABEL, REAR_LABEL_XY, "rear view label")
     _add_linked_note(
         adapter, iso, "Isometric View Note", ISO_NOTE_XY, "isometric view note"
@@ -892,6 +914,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     for view in (back, knob_section):
         set_hidden_lines_removed(adapter, view)
+    caption_check = _drop_caption_scale(adapter, knob_section, "plate section A-A")
     position_section_caption(
         adapter, knob_section, KNOB_SECTION_CAPTION_XY, label="plate section A-A"
     )
@@ -946,8 +969,8 @@ async def build(adapter: Any) -> dict[str, str]:
             )
             for index, (x, y) in enumerate(SCREW_HOLES, 1)
         },
-        "knob_projected_axis": PmiDrawingPlacement(
-            back, FRAME_XY["knob_projected_axis"], edge_entity=bore_edge,
+        "knob_axis_perpendicularity": PmiDrawingPlacement(
+            back, FRAME_XY["knob_axis_perpendicularity"], edge_entity=bore_edge,
         ),
         **{
             f"plate_locator_{index}_position": PmiDrawingPlacement(
@@ -964,6 +987,22 @@ async def build(adapter: Any) -> dict[str, str]:
         controls=GEOMETRIC_CONTROLS, label="plate actual-bore locating frame",
     )
     _assert_datum_b_on_bore(adapter, projected, bore_edge)
+    _one_frame_per_group(adapter, projected)
+    # The overall width, a reference: across the side edges on face A.
+    _overall_reference(
+        adapter, back, name="OverallWidth", label="overall width reference",
+        entities=tuple(
+            back_edges.exact_line_through(point, label=f"plate side edge {index}").edge
+            for index, point in enumerate(OVERALL_WIDTH_EDGES_MODEL, 1)
+        ),
+        entity_types=("EDGE", "EDGE"),
+        picks=tuple(
+            _sheet_xy(adapter, back, point, f"plate side edge {index}")
+            for index, point in enumerate(OVERALL_WIDTH_EDGES_MODEL, 1)
+        ),
+        text_xy=OVERALL_WIDTH_TEXT_XY,
+        orientation="horizontal", expected_mm=OVERALL_WIDTH_MM,
+    )
     if not auto_center_marks(adapter, back, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME centre marks to the face A view")
     for key, label in (
@@ -985,10 +1024,6 @@ async def build(adapter: Any) -> dict[str, str]:
             _sheet_xy(adapter, knob_section, caption, f"{label} caption"),
             f"{label} caption",
         )
-    zone_checks.append(_add_zone_line(
-        adapter, knob_section, KNOB_ZONE, height_mm=KNOB_ZONE_HEIGHT,
-        precision_key="KnobZone", label="knob bore projected zone",
-    ))
     _add_note(adapter, back, FRONT_VIEW_LABEL, FRONT_LABEL_XY, "front view label")
 
     artefacts = await finalize_drawing(
@@ -999,11 +1034,7 @@ async def build(adapter: Any) -> dict[str, str]:
         layout=SPEC.layout,
         expected_sheet_names=SHEET_NAMES,
         sheet_scales={name: SHEET_SCALE for name in SHEET_NAMES},
-        settled_checks=tuple(zone_checks),
-    )
-    require_saved_projected_gtols(
-        adapter, artefacts["drawing"], GEOMETRIC_CONTROLS,
-        label="saved transgear arm plate drawing projected axes",
+        settled_checks=(caption_check,),
     )
     return artefacts
 
