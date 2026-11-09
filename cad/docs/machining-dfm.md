@@ -600,27 +600,30 @@ probe, not evidence that it has been run for option A.
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
 | **`sm-summing-lever`** | machined-from-solid organic first-class lever; uniform 7.00 coefficient slab, retained centered 5.08 counter web | solid pivot cylinder Ø25.4×152.4 (**no bore**); 2× unchanged hex knife trunnions protruding 21.717 each end; 20× #6-32 through-taps in the 7.00 slab @ 7.0565 pitch (Ø2.705 tap drill), anchors locked by underside MHA-CH-14 jam nuts; one #10-24 tap through the Ø19.05×19.05 summation-anchor boss with its retained top jam nut; shared R15.24 tangent positive ribs, bounded R.040 MAX side roots/profile blends and a separately bounded lower longitudinal plate/cylinder blend, not general body fillets | delicate knife ridge; slender trunnions and cantilevered faces complicate workholding; small through-taps require controlled tapping; independent pilot wall guards retain the .080 in (2.032 mm) pilot floor; unchanged top-plate/cylinder, counter-web/cylinder, boss/counter-web, boss/middle-rib-flank, middle-rib-flank/counter-web and knife-stub shoulder junctions retain baseline RV-02 only; separate knife-root/tool-access debt remains | multiple setups; native/CAM route not yet qualified | **machined from solid**, per registry; preserve all spring/bracket/mount seats; evaluate hardened knife insert separately (§6) |
-| **`sm-knife-mount`** | rectangular block 25.4 ±0.8 wide ×29.6×14.0 (bar/plate), O1 hardened and drawn back to 40-45 HRC, the bore and B cut to their printed bands after heat treatment (owner ruling 2026-11-08, SM-02 harden less; supersedes H3's sizes-after-hardening); **2 identical** | unchanged Ø12.00 +0.03/0 reamed through bore and pose, centre 20.616 BASIC below the top face (`BORE_CY` −5.75 from the knife-edge origin, block top +14.866, clamped to the casting underside); #10-24 UNC-2B bottoming tap on the bore axis: #25 Ø3.7973 under the title-block DRILLED HOLES +0.10/0 row, cylindrical drill depth 11.24 ±0.05, full thread 9.65 ±0.13; fully charged drill-point crown web 2.0077656525, no break-in (conservative proof envelope Ø3.927, above accepted MAX Ø3.8973; point MIN 117°); one MHA-SM-VN-53 slip hole cut from the top seat to a flat floor 9.398 deep (owner ruling 2026-10-24, T+H3): datum B, a Ø.1280 ±.0007 blind flat-bottom reamed round hole 7.62 (.300) +X of the tap axis, ⊥Ø.001 to A. Owner ruling 2026-11-08 (Pedro), #2144 item 11.3 (scheme S1) deletes the −X slot (datum C) and its notch: the tap is spotted through MHA-FR-02's #10 hole, and the bore carries ⌖Ø.008 to A and B plus a separate ∥.002 to A, its yaw about B set at MHA-SM-00 by a Ø.4720 class ZZ minus gauge pin through both mounts' bores: knife rock 7.76° worst against the 5.0° floor, the far-end offset 0.0470 being the pin's .0017 diametral clearance in the largest bore plus the lever ridge's yaw from that clearance over its 159.90 minimum mouth span; bore floor and pose unchanged | hold the explicit tap/drill depth bands and accepted pilot diameter/point-angle bounds to preserve ≥2.0 crown web; all joint webs ≥2.0 at printed worst cases | 1–2 (square block, bore one axis) | **CNC-REPEAT** (×2) or manual. Modified #10-24 hex-head Bolt MHA-SM-VN-52 (92314A253, cut under head at MHA-SM-00 step 4 to its hole's measured crossbar-underside-to-washer-top stack plus .351 ±.006 in (8.9154 ±0.1524); 46.70 nominal, printed (1.84) as a reference) and new 18-8 SAE washer MHA-SM-VN-54 (96659A104) clamp the block to the top-frame's integral crossbar through Ø6.045 #10 loose clearance. Crossbar width 25.0 ±0.8, symmetric about X=−15; washer seat on the whole faced top (no SPOTFACE), 36.50 (title-block ±0.51) above faced underside. Nominal reach 8.9173, range 8.763–9.0678; full-form engagement MIN 7.704667 ≥7.239, tip air MIN 0.4522. Retain removable medium-strength threadlocker. One MHA-SM-VN-53 dowel per mount (98381A473, 1/8 ×3/4) presses to the floor of a blind ream in the crossbar's faced underside, .300 ±.005 (7.62 ±0.127) +X of its bolt axis at the same Z and ⊥Ø.0008 to A, pierced by a #51 (Ø1.70) knockout drilled up from its floor on the ream's axis; its proud end slips .0020–.0036 into the block's B, so the block fits one way round only (owner ruling 2026-11-08 (Pedro), #2144 item 11.3: the −X reams and their ⌖ frames are deleted). One native linear pattern position control ⌖0.10 to the bar's two-face width median datum D limits X shift to ±0.05, retaining the Z socket station and ≥2.0 webs. The former #6 socket-head counterbore route is obsolete |
+| **`sm-knife-mount`** | rectangular block 25.4 ±0.8 wide ×29.6×14.0 (bar/plate), O1 hardened and drawn back to 40-45 HRC, the bore and B cut to their printed bands after heat treatment (owner ruling 2026-11-08, SM-02 harden less; supersedes H3's sizes-after-hardening); **2 identical** | unchanged Ø12.00 +0.03/0 reamed through bore and pose, centre 20.616 BASIC below the top face (`BORE_CY` −5.75 from the knife-edge origin, block top +14.866, clamped to the casting underside); #10-24 UNC-2B bottoming tap on the bore axis: #25 Ø3.7973 under the title-block DRILLED HOLES +0.10/0 row, cylindrical drill depth 11.24 ±0.05, full thread 9.65 ±0.13; fully charged drill-point crown web 2.0077656525, no break-in (conservative proof envelope Ø3.927, above accepted MAX Ø3.8973; point MIN 117°); one MHA-SM-VN-53 slip hole cut from the top seat to a flat floor 9.398 deep (owner ruling 2026-10-24, T+H3): datum B, a Ø.1280 ±.0007 blind flat-bottom reamed round hole 7.62 (.300) +X of the tap axis, ⊥Ø.001 to A. Owner ruling 2026-11-08 (Pedro), #2144 item 11.3 (scheme S1) deletes the −X slot (datum C) and its notch: the tap is spotted through MHA-FR-02's #10 hole, and the bore carries ⌖Ø.008 to A and B plus a separate ∥.002 to A, its yaw about B set at MHA-SM-00 by a Ø.4720 class ZZ minus gauge pin through both mounts' bores: knife rock 7.76° worst against the 5.0° floor, the far-end offset 0.0470 being the pin's .0017 diametral clearance in the largest bore plus the lever ridge's yaw from that clearance over its 159.90 minimum mouth span; bore floor and pose unchanged | hold the explicit tap/drill depth bands and accepted pilot diameter/point-angle bounds to preserve ≥2.0 crown web; all joint webs ≥2.0 at printed worst cases | 1–2 (square block, bore one axis) | **CNC-REPEAT** (×2) or manual. Modified #10-24 hex-head Bolt MHA-SM-VN-52 (92314A253, cut under head at MHA-SM-00 step 4 to its hole's measured crossbar-underside-to-washer-top stack plus .351 ±.006 in (8.9154 ±0.1524); 46.70 nominal, printed (1.84) as a reference) and new 18-8 SAE washer MHA-SM-VN-54 (96659A104) clamp the block to the top-frame's integral crossbar through a letter C drill Ø6.147 (.242) #10 clearance on D within ⌖ .010 | D (owner ruling 2026-11-06). Crossbar width 25.0 ±0.8, symmetric about X=−15; washer seat on the whole faced top (no SPOTFACE), 36.50 (title-block ±0.51) above faced underside. Nominal reach 8.9173, range 8.763–9.0678; full-form engagement MIN 7.704667 ≥7.239, tip air MIN 0.4522. Retain removable medium-strength threadlocker. One MHA-SM-VN-53 dowel per mount (98381A473, 1/8 ×3/4) presses 11.94 to the floor of a Ø3.150 +0.013/0 blind ream in the crossbar's faced underside (0.015–0.033 interference), .300 ±.005 (7.62 ±0.127) +X of its bolt axis at the same Z and ⊥Ø0.025 (.001) to A (owner ruling 2026-11-06), pierced by a #51 (Ø1.70) knockout drilled up from its floor on the ream's axis; its proud end slips .0020–.0036 into the block's B, so the block fits one way round only (owner ruling 2026-11-08 (Pedro), #2144 item 11.3: the −X reams and their ⌖ frames are deleted). The #10 holes' ⌖ .010 | D to the bar's two-face width median datum D limits their X shift to ±0.127, retaining the Z socket station and ≥2.0 webs. The former #6 socket-head counterbore route is obsolete |
 
-The Ø6.045 hanger clearance hole carries a **native explicit +0.13/0
-diameter band** (MIN 6.045, MAX 6.175), not the symmetric general ±0.13
-band: undersize would fail bolt float. With this maximum hole diameter and
-the MHA-SM-VN-53 press reams (owner ruling 2026-10-24, T+H3; one per
-station, .300 ±.005 from the bolt axis, since owner ruling 2026-11-08
-(Pedro), #2144 item 11.3), the worst-case screw-to-ream web is
-2.7108745078 mm and the outer ream web 3.0032122539 mm. The #51
-knockouts (Ø1.70, DRILLED HOLES +0.10/0) keep 3.4250608650 mm to the bar face
-and 3.0047816361 mm to the screw hole. The ream floors print **2X FLAT BOTTOM, CORNER R.003 MAX**. The
-pressed end bears only inside its ASME B18.8.2 point (Ø2.794 MIN) and
-outside that corner, a 0.313152237 mm bearing land on the ream floor at
-the drawn coaxiality's implied ±0.13 per axis, under the 0.4 target by owner
-ruling 2026-10-27 (machinist exception RV-06). The largest end flat (Ø3.048) sits on the fillet, which
-holds it at most 0.009017859 mm off the floor. Each knockout is a ~15 D
-run (25.81 mm from the shallowest floor to the top at the grip's far limit):
-the shop drills it with a pecked **taper-length #51** (2 in flute, 3-3/4 in
-overall), whose flutes clear the 37.01 mm from the underside, and removes a
-dowel from the faced top with an extra-long 1/16 in pin punch or drill-rod
-drift of at least **37.01 mm** reach (`HANGER_KNOCKOUT_PUNCH_REACH_MIN`).
+The Ø6.147 hanger clearance hole is a letter **C DRILL** (.242) under
+the title block's **DRILLED HOLES +0.10/0** row (MIN 6.147, MAX 6.248;
+owner ruling 2026-11-06); the native #10 loose clearance row carries the
+drill size as its diameter override. Undersize would fail bolt float. With
+this maximum hole diameter, the hole axis within ±0.127 of D and the
+MHA-SM-VN-53 press reams (owner ruling 2026-10-24, T+H3; one per station,
+.300 ±.005 from the bolt axis, since owner ruling 2026-11-08 (Pedro), #2144
+item 11.3), the worst-case screw-to-ream web is 2.659975 mm and the
+ream-to-bar-face web 2.927012 mm. The #51 knockouts (Ø1.70, DRILLED HOLES
++0.10/0) keep 3.348861 mm to the bar face and 2.953882 mm to the screw hole.
+The ream floors print **2X FLAT BOTTOM, CORNER R.003 MAX**. The pressed end
+bears only inside its ASME B18.8.2 point (Ø2.794 MIN) and outside that
+corner, a 0.315695 mm bearing land on the ream floor at the drawn
+coaxiality's implied ±0.13 per axis, under the 0.4 target by owner ruling
+2026-10-27 (machinist exception RV-06). The largest end flat (Ø3.048) sits
+on the fillet, which holds it at most 0.004356 mm off the floor. Each
+knockout is a ~15 D run (24.94 mm from the shallowest floor to the top at
+the grip's far limit): the shop drills it with a pecked **taper-length #51**
+(2 in flute, 3-3/4 in overall), whose flutes clear the 36.63 mm from the
+underside, and removes a dowel from the faced top with an extra-long 1/16
+in pin punch or drill-rod drift of at least **36.63 mm** reach
+(`HANGER_KNOCKOUT_PUNCH_REACH_MIN`).
 
 The washer-seat grip is the model's actual driving thickness dimension
 `HangerGrip@Crossbar`, **36.50 mm** from the finished underside to the
@@ -664,25 +667,29 @@ The top-frame's live view identifiers are **H-H** (front/rear rail section),
 **DETAIL J** (underside hub enlargement) and **K-K** (set-screw boss
 section); DETAIL L retired with the crossbar's dowel slot.
 Datum A is new: the faced underside on F-F, to which the two press reams
-carry **2X ⊥Ø.0008** (RV-05). The press reams are no datums: owner ruling
-2026-11-08 (Pedro), #2144 item 11.3 deletes the −X reams, their ⌖ frames and
-datums B and C from this part. Datum D and A-A/E-E/F-F/VIEW G
+carry **2X ⊥Ø0.025** (.001, RV-05; owner ruling 2026-11-06). The press
+reams are no datums: owner ruling 2026-11-06 retired the crossbar's datums B
+and C and the ▷ modifier, and owner ruling 2026-11-08 (Pedro), #2144 item
+11.3 deletes the −X reams and every ream position frame (the 2X ⌖Ø0.10
+(.004) | A | D, SEP REQT pair frame with them). Datum D and A-A/E-E/F-F/VIEW G
 are unchanged. Section stations, endpoints,
 profiles, orientations and scales retain the historical B/E/D placement
 calibration; old B/D glyph bounds do not establish H/K glyph clearance.
 
 Owner ruling 2026-10-24 (T+H3) retires the crossbar's dowel slot and round
 slip holes, and owner ruling 2026-11-08 (Pedro), #2144 item 11.3 (scheme S1)
-leaves one dowel per mount. Each knife-mount station carries one blind
-flat-floor press ream from the faced underside, into which its
-MHA-SM-VN-53 dowel presses to the floor; it is
+leaves one dowel per mount. Each knife-mount station carries one
+**Ø3.150 +0.013/0 mm** (.1240 +.0005/0) blind press ream, **11.94 ±0.25 mm**
+deep from the faced underside to a flat floor, into which its MHA-SM-VN-53
+dowel presses to the floor; it is
 pierced on its axis by a **#51 knockout** drilled up from its floor on the
 ream's axis (no setup note), which exits at the faced top under the MHA-SM-VN-54 washer
 (the washer keeps a continuous bearing ring inside the knockout). The ream
 stands **.300 ±.005 in** (.XXX) from its bolt axis at the same Z on F-F, with
 no position frame: the bolt-float stack charges exactly that band. The
-former −X ream, its **BASIC 15.264 mm** span and its ⌖ frames to B and C
-are deleted, so the block fits one way round only, and the MHA-SM-02 slot
+former −X ream, its BASIC span and its ⌖ frame (owner ruling 2026-11-06's
+BASIC 7.620 either side of D under 2X ⌖Ø0.10 | A | D, SEP REQT) are
+deleted, so the block fits one way round only, and the MHA-SM-02 slot
 (datum C) is gone too. The block may turn about its one dowel; a Ø.4720
 gauge pin through both mounts' bores sets that turn at MHA-SM-00 step 5.
 The F-F and underside-locator annotations belong to `draw_fr_top_frame`
@@ -708,18 +715,25 @@ print's limits, not on the nominal model. Each corner's crop chord ends on
 the smallest printed corner-boss barrel at the farthest printed rail faces
 (`CORNER_CROP_BOSS_R_MIN`, `CORNER_CROP_FACE_OFFSETS`), so no conforming
 casting keeps a flange nib outside a barrel. The 1/16 in × 45° break goes
-only on edges that hold its print-worst leg and sliver land at those limits.
-The crossbar flange underside (`T_FLANGE_SHELF_PRINTED_MIN`) and the hub
+only on edges that hold its print-worst leg and sliver land at those limits;
+the crossbar flange underside (`T_FLANGE_SHELF_PRINTED_MIN`) and the hub
 rib's outer bottom beside the set-screw boss (`HUB_RIB_STUB_PRINTED_MIN`)
-do not, so they stay sharp. The rib's inner bottom, the V-gussets and the
-knife-seat bottoms also stay sharp, as the sheet notes say. No band is
+do. The model leaves the rest unbroken at .06: the crossbar's front side
+bottoms and the gusset hypotenuses under the knife seats, the rib's inner
+bottom and the V-gussets. Owner ruling 2026-11-07 scopes general note 1 to
+the convex cast edges the views show chamfered, so those edges take the
+title block's .010 break and nothing on the sheet reads SHARP. That break
+(`TITLE_BLOCK_EDGE_BREAK_MAX`, 0.254) stays inside the knife seats' 0.5
+edge-break clearance, and the dowel reams' underside mouths keep their wall
+to the crossbar side inside it (`PIN_HOLE_MOUTH_BAR_WALL`). No band is
 tightened to recover a break.
 
 The grip no longer sets **MHA-SM-VN-52 thread engagement**: MHA-SM-00 step 4
 cuts each bolt to its own hole's measured stack plus **.351 ±.006 in** (8.9154 ±0.1524 mm)
 reach. The crossbar median datum D controls the hanger axes in X only:
 their BASIC X location is on D.
-The socket-to-D locator retains its ordinary location band; the front and
+The D locator from the left bosses' tangent (the hole table's boss-corner
+origin, owner ruling 2026-11-07) retains its ordinary location band; the front and
 rear Z station dimensions likewise remain ordinary toleranced dimensions.
 
 The mount's tap is spotted through MHA-FR-02's #10 hole and charged its
@@ -731,36 +745,40 @@ simulator, which within ⊥Ø.001 to A may sit t/2 off the pin root:
 **0.2489 mm**. The Z leg is the ream's implied-zero SAME Z (0.127), the
 same three block terms, and the turn the gauge pin gives the block about
 its dowel: the pin line runs through both bores, each off its station by
-the #10 hole's centring to D, the ream's station, B's slip and simulator
-and the bore's ⌖Ø.008 radius (0.338 in all), at opposite limits over the
-174.12 station spacing, a **0.222°** turn that moves the tap 7.62 from B
-across by 0.0296: **hypot(0.2489, 0.2785) = 0.3735 mm**. Full-crossbar
-drill drift over the printed grip's thickest end is **0.1918 mm**;
-together they consume 0.5653 of the **0.6095 mm** radial float, leaving
-**0.0442 mm**. The rear mount, re-hung on the lever's stub at MHA-SM-00
+the #10 hole's ⌖ .010 | D centring (0.127, owner ruling 2026-11-06), the
+ream's station, B's slip and simulator and the bore's ⌖Ø.008 radius (0.414
+in all), at opposite limits over the 174.12 station spacing, a **0.272°**
+turn that moves the tap 7.62 from B across by 0.0362:
+**hypot(0.2489, 0.2852) = 0.3785 mm**. Full-crossbar drill drift over the
+printed grip's thickest **36.63 mm** (36.50 + 0.13) is **0.1918 mm**;
+together they consume 0.5703 of the **0.6604 mm** radial float (the C
+drill's Ø6.147 minimum less the bolt's 4.826 major, halved), leaving
+**0.0901 mm**. The rear mount, re-hung on the lever's stub at MHA-SM-00
 step 6 and swung about its dowel until the rock gauge passes, may turn
-**0.651°** inside its bolt float, above the 0.222° the pin line can ask of
+**1.114°** inside its bolt float, above the 0.272° the pin line can ask of
 it (`build_sm_summing_assembly.KNIFE_REAR_YAW_RANGE_DEG`). The block
 carries no dowel-pattern frame: datum B is its round hole.
 
 Owner ruling 2026-10-27 (#2016 option A) bounds the pin-to-hole tilt the
-slip fit must take: the crossbar ream carries **⊥Ø.0008** to the faced
-underside and the block's round hole B **⊥Ø.001** to A (the slot and its ⊥
-are gone, owner ruling 2026-11-08 (Pedro), #2144 item 11.3). At the
-shortest printed depths less the floors' corners (the ream's CORNER R.003
-MAX; the block's title-block R.040 MAX, since nothing seats on its floor)
-and less a 0.5 lead allowance, they tilt the pin against its hole by
-0.1048° + 0.1908°. The lead allowance is
+slip fit must take: the crossbar ream carries **⊥Ø0.025** (.001, owner
+ruling 2026-11-06) to the faced underside and the block's round hole B
+**⊥Ø.001** to A (the slot and its ⊥ are gone, owner ruling 2026-11-08
+(Pedro), #2144 item 11.3). At the shortest printed depths less the floors'
+corners (the ream's CORNER R.003 MAX; the block's title-block R.040 MAX,
+since nothing seats on its floor) and less a 0.5 lead allowance (11.11 ream
+wall, 7.63 hole wall), they tilt the pin against its hole by 0.1310° +
+0.1908°. The lead allowance is
 conservatism beyond the print, not an undersize tail: each hole's size band
 applies over its full depth, so a conforming ream is full size to its floor
 corner, the pin bottoms and the proud length holds.
-An assumed conformity of the clamped seats across the block's shortest
-seat depth adds 0.0418°; this is an assumption about
+An assumed 0.01 conformity of the clamped seats across the block's shortest
+13.72 seat depth adds 0.0418°; this is an assumption about
 ordinary face-milled seats drawn flat by the bolt, not a drawing control.
-The charge totals **0.3374°**, inside the **0.4032°** the tightest slip
+The charge totals **0.3636°**, inside the **0.4032°** the tightest slip
 (.0020 clearance) takes over the longest proud pin short of its rounded
 free end (`build_sm_summing_assembly.KNIFE_DOWEL_TILT_CHARGED_DEG` and
-`KNIFE_DOWEL_TILT_ALLOWED_DEG`).
+`KNIFE_DOWEL_TILT_ALLOWED_DEG`), a margin of 0.040°: the seats bind past
+.00077 in (0.0195 mm).
 
 The earlier 2.020267 mm crown-web proof was undercharged: it used the
 nominal Ø3.797 pilot and an exact 118° point, omitting physical drill
