@@ -424,6 +424,19 @@ printed rib reach (**1.41 ±.01 in**, at most 36.068 mm) gives
 X clearance. Native full-interference validation must still qualify the
 rib/nut, screw-head/knife-mount and installed-neighbour clearances.
 
+The middle rib's negative-X contour retains its nominal geometry but is now
+controlled by **MiddleRibCounterAngle@MiddleRibProfile**, driven from the
+explicit-degree **CounterFlankAngle** global. Its exact value is
+`degrees(asin(RIB_WRAP_R / abs(TIP_X)))` (**11.53695903281549°**), not a rounded
+model input. One upper-flank angle to an on-axis construction ray controls
+both tangents through their shared apex and coradial wrap arcs; no second
+angle or mirror relation is added. Native readback requires both counter
+planes, their derived apex at **X=−76.20, Y=0 mm** within **0.000001 mm**,
+and the driving angle. The drawing imports one decimal under the ordinary
+title-block angular band, without a tighter local tolerance or reference
+parentheses. **SumH** remains the web/boss authority, not a second rib-apex
+dimension.
+
 All three positive-X ribs now share the **R15.24** wrap, tangent flanks and
 **R.040** transitions into the coefficient top/bottom faces at **X=35.814 mm**;
 the negative-X middle-rib contour is unchanged. The title block's

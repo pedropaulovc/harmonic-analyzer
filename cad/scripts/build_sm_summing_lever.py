@@ -146,6 +146,7 @@ from sm_summing_lever_spec import (
     COEFFICIENT_BOTTOM_Y,
     COEFFICIENT_T,
     COEFFICIENT_TOP_Y,
+    COUNTER_FLANK_ANGLE_DEG,
     COUNTER_WEB_T,
     CHANNEL_PITCH,
     CHANNEL_Z0,
@@ -809,6 +810,47 @@ def _assert_edge_rib_end_planes(adapter) -> None:
         )
 
 
+def _add_driving_counter_angle(adapter, flank: str, baseline: str) -> None:
+    """Drive the upper counter tangent from its on-axis construction ray.
+
+    Select two segments, not the adapter's segment/vertex angular route.
+    Front-plane sketch/model XY coincide; place text inside the acute wedge
+    before making the measured angle driving, never its supplement.
+    """
+    from solidworks_mcp.adapters import sw_type_info as _sw_type_info
+    from solidworks_mcp.adapters.solidworks.sketch import _select_sketch_entities
+
+    half = math.radians(COUNTER_FLANK_ANGLE_DEG / 2.0)
+    model = adapter.currentModel
+    model.ClearSelection2(True)
+    _select_sketch_entities(adapter, [flank, baseline], 0)
+    extension = _sw_type_info.early_bound_or_flag(
+        model.Extension, "IModelDocExtension", "AddSpecificDimension"
+    )
+    display, status = extension.AddSpecificDimension(
+        TIP_X / 1000.0 + 0.020 * math.cos(half),
+        0.020 * math.sin(half), 0.0,
+        3,  # swDimensionType_e.swAngularDimension
+        0,
+    )
+    model.ClearSelection2(True)
+    if display is None or int(status) != 0:  # swAddSpecificDimension_Success
+        raise RuntimeError(f"counter angle: AddSpecificDimension failed ({status})")
+    display = _early_bound(display, "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    if (
+        int(display.Type2) != 3
+        or not math.isclose(
+            float(dimension.SystemValue), math.radians(COUNTER_FLANK_ANGLE_DEG),
+            rel_tol=0.0, abs_tol=1e-10,
+        )
+    ):
+        raise RuntimeError("counter angle: native dimension is not the nominal acute angle")
+    dimension.DrivenState = 2  # swDimensionDrivenState_e.swDimensionDriving
+    if int(dimension.DrivenState) != 2:
+        raise RuntimeError("counter angle: native dimension did not become driving")
+
+
 async def _rib_profile_sketch(
     adapter, stem: str, drive_jobs: list[tuple[str, str]], *, middle: bool = False
 ) -> None:
@@ -854,6 +896,8 @@ async def _rib_profile_sketch(
         negative_top = await line(top, (TIP_X, 0.0), "counter upper tangent")
         negative_bottom = await line((TIP_X, 0.0), bottom, "counter lower tangent")
         lower_wrap = await arc((0.0, 0.0), bottom, LOWER.wrap_xy, "lower wrap")
+        counter_axis = await line((TIP_X, 0.0), (0.0, 0.0), "counter axis")
+        _as_construction(adapter, counter_axis)
     else:
         wrap = await arc((0.0, 0.0), UPPER.wrap_xy, LOWER.wrap_xy, "pivot wrap")
         lower_wrap = wrap
@@ -908,10 +952,16 @@ async def _rib_profile_sketch(
     ]
     if middle:
         pairs += [(wrap, negative_top), (lower_wrap, negative_bottom)]
-        await anchor_point_to_origin(
-            adapter, f"{negative_top}.end", TIP_X, 0.0, f"{stem} counter tip"
+        check(
+            f"{stem} counter axis origin",
+            await adapter.add_sketch_constraint(f"{counter_axis}.end", "origin", "coincident"),
         )
-        rib.record(f"{stem}CounterReach", '"SumH"')
+        check(
+            f"{stem} counter axis horizontal",
+            await adapter.add_sketch_constraint(counter_axis, None, "horizontal"),
+        )
+        _add_driving_counter_angle(adapter, negative_top, counter_axis)
+        rib.record(f"{stem}CounterAngle", '"CounterFlankAngle"')
     for index, (first, second) in enumerate(pairs):
         check(
             f"{stem} tangent {index}",
@@ -931,6 +981,7 @@ def _assert_native_rib_profile(adapter, stem: str) -> None:
         raise RuntimeError(f"{stem}: missing native profile feature")
     found_flanks: set[int] = set()
     found_blends: set[int] = set()
+    found_counter: set[int] = set()
     for raw_face in _early_bound(raw, "IFeature").GetFaces() or ():
         face = _early_bound(raw_face, "IFace2")
         surface = _early_bound(face.GetSurface(), "ISurface")
@@ -943,6 +994,18 @@ def _assert_native_rib_profile(adapter, stem: str) -> None:
                 offset = sum(a * b for a, b in zip(expected, point, strict=True)) * 1000.0
                 if aligned > 1.0 - 1e-8 and abs(offset - ARC_R) < 1e-5:
                     found_flanks.add(index)
+            if stem == "MiddleRib":
+                for index, sign in enumerate((1.0, -1.0)):
+                    expected = (ARC_R / TIP_X, sign * math.sqrt(1.0 - (ARC_R / TIP_X)**2), 0.0)
+                    aligned = abs(sum(a * b for a, b in zip(normal, expected, strict=True)))
+                    offset = sum(a * b for a, b in zip(expected, point, strict=True)) * 1000.0
+                    if aligned > 1.0 - 1e-8 and abs(offset - ARC_R) < 1e-5:
+                        # Plane intersection with y=0, in MILLIMETRES. A
+                        # rounded 11.537-degree driver must fail this gate.
+                        apex_x = (point[0] + normal[1] * point[1] / normal[0]) * 1000.0
+                        if not math.isfinite(apex_x) or abs(apex_x - TIP_X) > 1e-6:
+                            raise RuntimeError(f"{stem}: counter apex {apex_x:.9f} mm, expected {TIP_X}")
+                        found_counter.add(index)
         elif surface.IsCylinder():
             values = tuple(float(value) for value in surface.CylinderParams)
             if len(values) != 7 or abs(abs(values[5]) - 1.0) > 1e-8:
@@ -958,6 +1021,21 @@ def _assert_native_rib_profile(adapter, stem: str) -> None:
             f"{stem}: native tangent profile lost flanks {found_flanks} "
             f"or bounded blends {found_blends}"
         )
+    if stem == "MiddleRib":
+        if found_counter != {0, 1}:
+            raise RuntimeError(f"{stem}: missing native counter planes {found_counter}")
+        raw_dimension = adapter.currentModel.Parameter("MiddleRibCounterAngle@MiddleRibProfile")
+        if raw_dimension is None:
+            raise RuntimeError(f"{stem}: missing native driving counter angle")
+        dimension = _early_bound(raw_dimension, "IDimension")
+        if (
+            int(dimension.DrivenState) != 2
+            or not math.isclose(
+                float(dimension.SystemValue), math.radians(COUNTER_FLANK_ANGLE_DEG),
+                rel_tol=0.0, abs_tol=1e-10,
+            )
+        ):
+            raise RuntimeError(f"{stem}: counter angle is not the nominal native driver")
     _telemetry.success(f"{stem}: both native tangent flanks and R.040 profile blends")
 
 
@@ -2351,6 +2429,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "RibBlendR", f"{RIB_BLEND_R}mm")
     await set_global(adapter, "RibPad", f"{RIB_PAD}mm")
     await set_global(adapter, "SumH", f"{SUM_H}mm")
+    await set_global(adapter, "CounterFlankAngle", f"{COUNTER_FLANK_ANGLE_DEG}deg")
     await set_global(adapter, "AnchorR", f"{ANCHOR_R}mm")
     await set_global(adapter, "AnchorH", f"{ANCHOR_H}mm")
     # (The old HoleDia/AnchorBoreR knobs are gone: both anchor seats are native

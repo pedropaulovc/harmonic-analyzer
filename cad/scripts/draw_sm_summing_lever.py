@@ -12,8 +12,8 @@ reaching to the tapped counter-spring anchor boss on the -X arm.  Both spring
 anchors are purchased eyebolts that thread straight into those taps, so the
 print controls thread identity and position, never a seat bore. Sheet 1
 shows the 1:2 end profile and top plan and a 1:4 shaded isometric.
-The end profile's reference angle measures the visible counter flank against
-the coplanar coefficient/web top, without reconstructing the buried taper apex.
+The end profile imports the driving middle-rib counter-flank angle, controlling
+both symmetric flanks under the title block's ordinary angular tolerance.
 Sheet 2 shows VIEW F at 1:1, a complete 10:1 knife detail D cut from that
 view, and a shaded underside isometric. VIEW F carries the blind bracket
 receivers, the uniform coefficient plate's visible free-end thickness and
@@ -44,7 +44,6 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 
 from _check import check
 from _com import _early_bound, _read_member
-from _drawing_attachment import _is_same_attachment
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -58,7 +57,6 @@ from _drawing_dimensions import (
     assert_imported_precision,
     offset_dimension_text,
     set_dimension_callouts,
-    set_reference_dimension,
 )
 from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_edges import ViewEdge, ViewEdges, scan_view_edges
@@ -83,7 +81,6 @@ from _named_views import octant_view_name
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
-from _supplier_dimensions import _measured_supplier_value
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from magnifying_bracket_joint_layout import (
@@ -117,6 +114,7 @@ from sm_summing_lever_spec import (
     COEFFICIENT_BOTTOM_Y,
     COEFFICIENT_T,
     COEFFICIENT_TOP_Y,
+    COUNTER_FLANK_ANGLE_DEG,
     COUNTER_HOLE_SPEC,
     COUNTER_WEB_T,
     DRAWING_PRECISION,
@@ -135,8 +133,6 @@ from sm_summing_lever_spec import (
     PLATE_L,
     PLATE_W,
     RIB_REACH,
-    RIB_T,
-    RIB_WRAP_R,
     RIDGE_ANGLE_DEG,
     SURFACE_FINISHES,
     TIP_X,
@@ -748,6 +744,36 @@ def _assert_knife_ridge_radius(adapter: Any, annotations: list[Any]) -> None:
     ):
         raise RuntimeError("KnifeRidgeRadius does not measure the ridge round")
     _telemetry.info(f"knife ridge radius: text {display.GetText(1)!r}, MAX type")
+
+
+def _assert_counter_flank_angle(adapter: Any, annotations: list[Any]) -> None:
+    """Keep the model's driving angle, one decimal and ordinary angular band."""
+    name = "MiddleRibCounterAngle"
+    found = [raw for raw in annotations if dimension_name(adapter, raw) == name]
+    if len(found) != 1:
+        raise RuntimeError(f"expected one imported {name}, found {len(found)}")
+    annotation = _early_bound(found[0], "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    full_name = dimension.FullName
+    if (
+        not isinstance(full_name, str)
+        or full_name.split("@")[:2] != [name, "MiddleRibProfile"]
+        or annotation.IsDangling()
+    ):
+        raise RuntimeError(f"{name}: lost native model association")
+    if int(display.Type2) != 3 or int(dimension.DrivenState) != 2:
+        raise RuntimeError(f"{name}: expected the native driving angular dimension")
+    if not math.isclose(
+        float(dimension.SystemValue), math.radians(COUNTER_FLANK_ANGLE_DEG),
+        rel_tol=0.0, abs_tol=1e-8,
+    ):
+        raise RuntimeError(f"{name}: native angle differs from the source control")
+    if int(dimension.GetToleranceType()) != 0:
+        raise RuntimeError(f"{name}: expected the ordinary title-block angular band")
+    if (display.GetText(1), display.GetText(2) or "") != ("2X ", ""):
+        raise RuntimeError(f"{name}: expected two flanks without reference parentheses")
+    assert_imported_precision(adapter, found, DRAWING_PRECISION["MiddleRibProfile"])
 
 
 def _assert_spring_row_locators(adapter: Any, annotations: list[Any]) -> None:
@@ -1701,6 +1727,7 @@ FRONT_KEEP = {
     "WebThickness": (0.168, 0.258),
     "EdgeRibFrontArcR": (0.1948, 0.2120),
     "RibReach": (0.2443, 0.254),
+    "MiddleRibCounterAngle": (0.216, 0.2378),
 }
 # The native boss-top span is ANCHOR_H/2 - COEFFICIENT_TOP_Y (6.025 mm).
 # Its ordinary .XX text is above the profile and right of RibReach's callout.
@@ -2008,6 +2035,11 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="front",
         dimensions_by_feature=DIMENSIONS_BY_FEATURE,
     )
+    _assert_counter_flank_angle(adapter, front_annotations)
+    # Retain the acute arc on the counter arm and the boss-side text shelf.
+    offset_dimension_text(
+        adapter, front_annotations, {"MiddleRibCounterAngle": (0.206, 0.249)},
+    )
     # The cylinder's diameter lives in a reference sketch the part saves
     # hidden (its band shows no silhouette to dimension): the hidden-owner
     # curate shows it in the plan, the one view that dimensions it.
@@ -2148,60 +2180,6 @@ async def build(adapter: Any) -> dict[str, str]:
         label="anchor tap X location",
         entities=(ridge_axis, anchor_rim.edge),
         entity_types=ridge_entity_types,
-    )
-
-    # Both rays are real straight edges in the end profile, not the Top
-    # projection (which collapses their angle). The visible coefficient-top
-    # end edge shares the web-top plane, as the builder and face check prove;
-    # the counter root's round tangent is not a visible edge in this view.
-    counter_angle_label = "counter flank to web top"
-    tangent_x = RIB_WRAP_R**2 / TIP_X
-    tangent_y = RIB_WRAP_R * math.sqrt(1.0 - RIB_WRAP_R**2 / TIP_X**2)
-    counter_angle = math.degrees(math.atan2(tangent_y, tangent_x - TIP_X))
-    flank_point = (
-        (TIP_X + tangent_x) / 2.0, tangent_y / 2.0, RIB_T / 2.0,
-    )
-    web_point = (
-        (RIB_REACH + PLATE_W) / 2.0, COEFFICIENT_TOP_Y, PLATE_L / 2.0,
-    )
-    counter_edges = scan_view_edges(front, label=counter_angle_label)
-    flank_edge = counter_edges.exact_line_through(flank_point, label="counter flank")
-    web_edge = counter_edges.exact_line_through(web_point, label="coefficient top end edge")
-    flank_xy = model_point_in_view(
-        adapter, front, _metres(flank_point), label=counter_angle_label,
-    )
-    web_xy = model_point_in_view(
-        adapter, front, _metres(web_point), label=counter_angle_label,
-    )
-    counter_dimension = _early_bound(
-        add_edge_dimension(
-            adapter, front, p0=web_xy, p1=flank_xy,
-            text_xy=(0.216, 0.2378), label=counter_angle_label,
-            orientation="angular", entity_types=("EDGE", "EDGE"),
-            entities=(web_edge.edge, flank_edge.edge),
-        ),
-        "IDisplayDimension",
-    )
-    _measured_supplier_value(
-        counter_dimension, label=counter_angle_label, presentation="angle",
-        expected_mm=None, expected_degrees=counter_angle,
-    )
-    counter_annotation = _early_bound(counter_dimension.GetAnnotation(), "IAnnotation")
-    counter_attached = tuple(counter_annotation.GetAttachedEntities3() or ())
-    if len(counter_attached) != 2 or counter_annotation.IsDangling() or not all(
-        any(_is_same_attachment(adapter, attached, edge, "EDGE") for attached in counter_attached)
-        for edge in (web_edge.edge, flank_edge.edge)
-    ):
-        raise RuntimeError(f"{counter_angle_label}: lost named edge attachments")
-    counter_dimension.SetPrecision3(1, -1, -1, -1)  # leave tolerance precision unchanged
-    if counter_dimension.GetPrimaryPrecision2() != 1:
-        raise RuntimeError(f"{counter_angle_label}: angle precision did not take")
-    set_reference_dimension(adapter, counter_annotation, label=counter_angle_label)
-    # Keep the acute arc on the counter arm, with its text above the
-    # boss-side flank rather than over the coefficient arm.
-    offset_dimension_text(
-        adapter, [counter_annotation],
-        {dimension_name(adapter, counter_annotation): (0.206, 0.249)},
     )
 
     # Anchor-tap pattern control: datum B on the plate end the seed hole is

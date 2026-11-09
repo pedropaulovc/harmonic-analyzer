@@ -825,10 +825,11 @@ def test_the_knife_edge_prints_its_ridge_and_flanks_to_the_sides() -> None:
     assert set(knife) <= set(drawing.DETAIL_KEEP)
     assert "KnifeRidgeRadius" in drawing.DETAIL_KEEP
     prefixes = notes.DIMENSION_PREFIXES
-    assert prefixes[("KnifeEnvelopeReference", "HexWidth")] == "2X ("
-    assert prefixes[("KnifeEnvelopeReference", "RidgeFromLeft")] == "2X "
-    assert prefixes[("KnifeEnvelopeReference", "RidgeFromRight")] == "2X "
-    assert prefixes[("KnifeEnvelopeReference", "FlankToSide")] == "4X "
+    assert prefixes[("KnifeEnvelopeReference", "HexWidth")] == "2X (1 PER STUB)\n("
+    for name in ("HexHeight", "RidgeFromLeft", "RidgeFromRight"):
+        assert prefixes[("KnifeEnvelopeReference", name)] == "2X (1 PER STUB)\n"
+    assert prefixes[("KnifeEnvelopeReference", "FlankToSide")] == "4X (2 PER STUB)\n"
+    assert prefixes[("KnifeRidgeFillet", "KnifeRidgeRadius")] == "2X (1 PER STUB)\nR"
     # The knife envelope's bands link one note naming their seat once (rule
     # 4); the 2X counts say both stubs.
     seat_bands = ("RidgeFromLeft", "RidgeFromRight", "FlankToSide", "HexHeight")
@@ -898,131 +899,72 @@ def _drawing_function(name: str) -> ast.FunctionDef | ast.AsyncFunctionDef:
     )
 
 
-@pytest.mark.parametrize("case", [
-    "visible", "hidden_flank", "hidden_root", "underside", "wrong_attachment",
-    "dangling", "extra_attachment", "wrong_angle", "supplement", "nonfinite", "linear",
-    "precision_ignored",
-])
-def test_counter_taper_reference_uses_visible_edge_angle(identity, monkeypatch, case) -> None:
-    """Use the visible coefficient top coplanar with the web, not its hidden root."""
-    import _supplier_dimensions
+def test_counter_flank_import_contract() -> None:
+    name = "MiddleRibCounterAngle"
+    assert notes.DRAWING_DIMENSIONS["MiddleRibProfile"] == {name}
+    assert notes.DIMENSION_PREFIXES[("MiddleRibProfile", name)] == "2X "
+    assert sm_summing_lever_spec.DRAWING_PRECISION["MiddleRibProfile"] == {name: 1}
+    assert drawing.FRONT_KEEP[name] == (0.216, 0.2378)
+    calls = _calls_in_order(_drawing_function("build"))
+    assert sum(_call_name(call) == "_assert_counter_flank_angle" for call in calls) == 1
+    assert not any(_call_name(call) == "set_reference_dimension" for call in calls)
+    offsets = [
+        call for call in calls if _call_name(call) == "offset_dimension_text"
+        and len(call.args) == 3 and isinstance(call.args[2], ast.Dict)
+        and any(isinstance(key, ast.Constant) and key.value == name for key in call.args[2].keys)
+    ]
+    assert len(offsets) == 1
+    assert ast.literal_eval(offsets[0].args[2]) == {name: (0.206, 0.249)}
 
-    monkeypatch.setattr(_supplier_dimensions, "_early_bound", lambda value, _kind: value)
-    spec = sm_summing_lever_spec
-    tangent_x = spec.RIB_WRAP_R**2 / spec.TIP_X
-    tangent_y = spec.RIB_WRAP_R * math.sqrt(
-        1.0 - spec.RIB_WRAP_R**2 / spec.TIP_X**2
-    )
-    expected = math.atan2(tangent_y, tangent_x - spec.TIP_X)
-    assert math.degrees(expected) == pytest.approx(11.53695903281549, abs=1e-12)
-    intersection_x = spec.TIP_X + (tangent_x - spec.TIP_X) * (
-        spec.COUNTER_WEB_T / 2.0 / tangent_y
-    )
-    z = spec.RIB_T / 2.0
-    flank = _line(
-        (intersection_x, spec.COUNTER_WEB_T / 2.0, z),
-        (tangent_x, tangent_y, z),
-    )
-    assert spec.COEFFICIENT_TOP_Y == pytest.approx(spec.COUNTER_WEB_T / 2.0, abs=1e-12)
-    web_y = spec.COEFFICIENT_BOTTOM_Y if case == "underside" else spec.COEFFICIENT_TOP_Y
-    web_z = spec.PLATE_L / 2.0
-    web = _line((spec.RIB_REACH, web_y, web_z), (spec.PLATE_W, web_y, web_z))
-    if case == "hidden_root":
-        web_z = z + spec.RIB_BLEND_R
-        web = _line(
-            (intersection_x + 5.0, web_y, web_z), (tangent_x - 15.0, web_y, web_z),
-        )
-    edges = (web,) if case == "hidden_flank" else (flank, web)
-    attached = (flank.edge, object() if case == "wrong_attachment" else web.edge)
-    if case == "extra_attachment":
-        attached += (object(),)
+
+@pytest.mark.parametrize("case", [
+    "native", "missing", "duplicate", "wrong_feature", "dangling", "reference",
+    "linear", "wrong_angle", "rounded_angle", "supplement", "nonfinite",
+    "tighter_band", "parentheses", "wrong_count", "precision",
+])
+def test_counter_flank_import_reads_native_driving_control(monkeypatch, case) -> None:
+    import _drawing_dimensions as dimensions
+
+    name = "MiddleRibCounterAngle"
+    expected = math.radians(sm_summing_lever_spec.COUNTER_FLANK_ANGLE_DEG)
     value = {
         "wrong_angle": expected + 1e-4,
+        "rounded_angle": math.radians(11.537),
         "supplement": math.pi - expected,
         "nonfinite": math.nan,
     }.get(case, expected)
-    display = _dimension(value * 1000.0, attached)
-    display.Type2 = 2 if case == "linear" else 3
-    display.GetAnnotation().IsDangling = lambda: case == "dangling"
-    picks, references = [], []
-    precision_writes = []
-    display.SetPrecision3 = lambda *args: precision_writes.append(args)
-    display.GetPrimaryPrecision2 = lambda: (
-        0 if case == "precision_ignored" or not precision_writes else precision_writes[-1][0]
+    native = SimpleNamespace(
+        FullName=f"{name}@{'OtherProfile' if case == 'wrong_feature' else 'MiddleRibProfile'}@sm-summing-lever",
+        SystemValue=value,
+        DrivenState=1 if case == "reference" else 2,
+        GetToleranceType=lambda: 2 if case == "tighter_band" else 0,
     )
-
-    def add(adapter, view, **kwargs):
-        assert adapter is identity and view is front
-        picks.append(kwargs)
-        return display
-
-    def reference(adapter, annotation, **kwargs):
-        assert adapter is identity and annotation is display.GetAnnotation()
-        references.append(kwargs)
-
-    def scan(view, **kwargs):
-        assert view is front
-        return ViewEdges(label=kwargs["label"], edges=edges)
-
-    body = _drawing_function("build").body
-    start = next(
-        index for index, node in enumerate(body)
-        if isinstance(node, ast.Assign)
-        and any(isinstance(target, ast.Name) and target.id == "counter_angle_label"
-                for target in node.targets)
+    display = SimpleNamespace(
+        Type2=2 if case == "linear" else 3,
+        GetDimension2=lambda _index: native,
+        GetPrimaryPrecision2=lambda: 2 if case == "precision" else 1,
+        GetText=lambda index: (
+            ("2X (" if case == "parentheses" else "1X " if case == "wrong_count" else "2X ")
+            if index == 1 else ")" if case == "parentheses" else ""
+        ),
     )
-    stop = next(
-        index for index in range(start, len(body))
-        if isinstance(body[index], ast.Expr)
-        and isinstance(body[index].value, ast.Call)
-        and _call_name(body[index].value) == "set_reference_dimension"
+    annotation = SimpleNamespace(
+        GetSpecificAnnotation=lambda: display,
+        IsDangling=lambda: case == "dangling",
     )
-    block = ast.Module(body=body[start:stop + 1], type_ignores=[])
-    front = object()
-    scope = {
-        **vars(drawing), "adapter": identity, "front": front,
-        "scan_view_edges": scan,
-        "model_point_in_view": lambda _adapter, _view, point, **_kw: point[:2],
-        "add_edge_dimension": add, "set_reference_dimension": reference,
-        "_early_bound": lambda value, _kind: value,
-    }
-    code = compile(block, "<counter taper reference>", "exec")
-    if case != "visible":
-        match = (
-            "no exact visible line" if case in ("hidden_flank", "hidden_root", "underside")
-            else "lost named edge attachments" if case in (
-                "wrong_attachment", "dangling", "extra_attachment",
-            )
-            else "native dimension type" if case == "linear"
-            else "angle precision did not take" if case == "precision_ignored"
-            else "native value"
-        )
-        with pytest.raises(RuntimeError, match=match):
-            exec(code, scope)
-        assert not references
-        return
-    exec(code, scope)
-    assert len(picks) == len(references) == 1
-    assert precision_writes == [(1, -1, -1, -1)]
-    assert picks[0]["entities"] == (web.edge, flank.edge)
-    assert picks[0]["entity_types"] == ("EDGE", "EDGE")
-    assert picks[0]["orientation"] == "angular"
-    assert picks[0]["p0"] == pytest.approx(
-        ((spec.RIB_REACH + spec.PLATE_W) / 2000.0, spec.COEFFICIENT_TOP_Y / 1000.0),
+    adapter = SimpleNamespace(_attempt=lambda action: action())
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(drawing, "dimension_name", lambda *_args: name)
+    monkeypatch.setattr(dimensions, "dimension_name", lambda *_args: name)
+    monkeypatch.setattr(
+        dimensions._sw_type_info, "early_bound_or_flag", lambda value, *_args: value,
     )
-    assert picks[0]["p1"] == pytest.approx(
-        ((spec.TIP_X + tangent_x) / 2000.0, tangent_y / 2000.0),
-    )
-    # One-decimal angular precision and existing parentheses only:
-    # no unit, tolerance or numeric-text override in this block.
-    assert {_call_name(call) for call in _calls_in_order(block)} == {
-        "sqrt", "degrees", "atan2", "scan_view_edges", "exact_line_through",
-        "model_point_in_view", "_metres", "add_edge_dimension",
-        "_measured_supplier_value", "set_reference_dimension", "_early_bound",
-        "GetAnnotation", "GetAttachedEntities3", "IsDangling",
-        "SetPrecision3", "GetPrimaryPrecision2",
-        "tuple", "len", "all", "any", "_is_same_attachment", "RuntimeError",
-    }
+    annotations = [] if case == "missing" else [annotation] * (2 if case == "duplicate" else 1)
+    if case == "native":
+        drawing._assert_counter_flank_angle(adapter, annotations)
+    else:
+        with pytest.raises(RuntimeError):
+            drawing._assert_counter_flank_angle(adapter, annotations)
 
 
 def test_layout_retains_six_views_on_two_sheets_without_a_section() -> None:
@@ -1370,8 +1312,8 @@ def test_the_between_stub_ridge_bound_holds_only_with_the_sides_in_one_plane() -
     assert spec.KNIFE_STUB_RIDGE_OFFSET_MAX == 2.0 * spec.RIDGE_FROM_SIDE_TOL
     assert spec.KNIFE_RIDGE_CONTACT_SPAN == pytest.approx(spec.HEX_Z_INNER + spec.HEX_Z_OUTER)
     assert spec.KNIFE_HOOK_ARM_SPREAD_MAX == pytest.approx(0.078, abs=5e-4)
-    assert notes.DIMENSION_PREFIXES[("KnifeEnvelopeReference", "RidgeFromLeft")] == "2X "
-    assert notes.DIMENSION_PREFIXES[("KnifeEnvelopeReference", "RidgeFromRight")] == "2X "
+    assert notes.DIMENSION_PREFIXES[("KnifeEnvelopeReference", "RidgeFromLeft")] == "2X (1 PER STUB)\n"
+    assert notes.DIMENSION_PREFIXES[("KnifeEnvelopeReference", "RidgeFromRight")] == "2X (1 PER STUB)\n"
     assert lever_build.KNIFE_SIDE_PLANE_TOL == 1e-6
     assert "_assert_knife_sides_coplanar" in [
         _call_name(call) for call in _calls_in_order(_builder_function("build"))
@@ -1392,7 +1334,7 @@ _BORDER_LEFT_M = 0.0127
 
 def _detail_block(name: str, value: str) -> tuple[float, float, float, float, int]:
     """(left, right, bottom, top, lines) of a Detail D dimension's text."""
-    lines = [value, *notes.DIMENSION_CALLOUTS_BELOW.get(name, "").split("\n")]
+    lines = [*value.split("\n"), *notes.DIMENSION_CALLOUTS_BELOW.get(name, "").split("\n")]
     lines = [line for line in lines if line]
     # The angular arc keeps its native exterior seed; only its text is offset.
     x, y = drawing.FLANK_TEXT_XY if name == "FlankToSide" else drawing.DETAIL_KEEP[name]
@@ -1474,12 +1416,12 @@ def test_back_projected_knife_detail_uses_model_owned_spans_and_exterior_angle()
     assert shoulder[0] < vertex[0]  # the model's +X flank, not its opposite
     assert spec.HEX_H / 2.0 < drawing.DETAIL_RADIUS_MM - 0.5
     blocks = {
-        "HexWidth": _detail_block("HexWidth", "2X (8.080)"),
-        "HexHeight": _detail_block("HexHeight", "2X 10.268"),
-        "RidgeFromLeft": _detail_block("RidgeFromLeft", "2X 4.040 ±0.05"),
-        "RidgeFromRight": _detail_block("RidgeFromRight", "2X 4.040 ±0.05"),
-        "FlankToSide": _detail_block("FlankToSide", "4X 122.4° ±0.5°"),
-        "KnifeRidgeRadius": _detail_block("KnifeRidgeRadius", "2X R0.1 MAX"),
+        "HexWidth": _detail_block("HexWidth", "2X (1 PER STUB)\n(8.080)"),
+        "HexHeight": _detail_block("HexHeight", "2X (1 PER STUB)\n10.268"),
+        "RidgeFromLeft": _detail_block("RidgeFromLeft", "2X (1 PER STUB)\n4.040 ±0.05"),
+        "RidgeFromRight": _detail_block("RidgeFromRight", "2X (1 PER STUB)\n4.040 ±0.05"),
+        "FlankToSide": _detail_block("FlankToSide", "4X (2 PER STUB)\n122.4° ±0.5°"),
+        "KnifeRidgeRadius": _detail_block("KnifeRidgeRadius", "2X (1 PER STUB)\nR0.1 MAX"),
     }
     for name, (left, _right, _bottom, top, _lines) in blocks.items():
         assert top < _BORDER_TOP_M - 0.004, name

@@ -81,6 +81,17 @@ def test_defining_dimensions_derive_the_approved_g1_profile() -> None:
         profile.rib_bounds(spec.RIB_REACH + 0.01)
 
 
+def test_counter_angle_preserves_the_nominal_apex_without_display_rounding() -> None:
+    assert spec.COUNTER_FLANK_ANGLE_DEG == math.degrees(
+        math.asin(spec.RIB_WRAP_R / abs(spec.TIP_X))
+    )
+    apex_mm = -spec.RIB_WRAP_R / math.sin(math.radians(spec.COUNTER_FLANK_ANGLE_DEG))
+    assert abs(apex_mm - spec.TIP_X) <= 1e-6
+    rounded_apex_mm = -spec.RIB_WRAP_R / math.sin(math.radians(11.537))
+    assert abs(rounded_apex_mm - spec.TIP_X) > 1e-6
+    assert spec.DRAWING_PRECISION["MiddleRibProfile"] == {"MiddleRibCounterAngle": 1}
+
+
 def test_uniform_ribs_and_relocated_row_preserve_other_installed_interfaces() -> None:
     assert (spec.PLATE_W, spec.PLATE_L, spec.CYL_R) == pytest.approx((44.45, 152.4, 12.7))
     assert (spec.HOLE_X, spec.HOLE_COUNT, spec.HOLE_Z_OFFSET) == pytest.approx((39.85, 20, -3.52825))

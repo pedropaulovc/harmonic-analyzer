@@ -149,6 +149,8 @@ class _SketchRecorder:
         self.dimensions = []
         self.distances = []
         self.records = []
+        self.construction = []
+        self.angles = []
 
     def _result(self, value):
         return SimpleNamespace(is_success=True, data=value, error=None)
@@ -223,6 +225,8 @@ def _extracted_sketch(section: profile.RibProfile, *, mutation: str | None = Non
     globals_ = {
         "math": math, "SketchDims": Dims, "check": check,
         "set_sketch_direct_db": lambda adapter, value: None,
+        "_as_construction": lambda adapter, entity: recorder.construction.append(entity),
+        "_add_driving_counter_angle": lambda adapter, flank, baseline: recorder.angles.append((flank, baseline)),
         "anchor_point_to_origin": anchor, "dimension_between": distance,
         "ensure_fully_defined": fully_defined,
         "name_last_feature": lambda adapter, name: None,
@@ -245,7 +249,7 @@ def _assert_recorded_sketch(
 ) -> None:
     lines = {key: values for key, (kind, values) in recorder.primitives.items() if kind == "line"}
     arcs = {key: values for key, (kind, values) in recorder.primitives.items() if kind == "arc"}
-    assert len(lines) == (5 if middle else 3)
+    assert len(lines) == (6 if middle else 3)
     assert len(arcs) == (4 if middle else 3)
     tangencies = [(a, b) for a, b, relation in recorder.constraints if relation == "tangent"]
     assert len(tangencies) == (6 if middle else 4)
@@ -282,7 +286,20 @@ def _assert_recorded_sketch(
     assert equations.count('"RibBlendR"') == 2
     assert equations.count('"ArcR"') == 1
     assert '"RibReach"' in equations and '"CoefficientTopY"' in equations and '"CoefficientT"' in equations
-    assert ('"SumH"' in equations) == middle
+    assert ('"CounterFlankAngle"' in equations) == middle
+    assert '"SumH"' not in equations
+    assert len(jobs) == (7 if middle else 6)
+    if middle:
+        assert len(recorder.angles) == 1
+        flank, baseline = recorder.angles[0]
+        assert recorder.construction == [baseline]
+        assert lines[baseline] == (spec.TIP_X, 0.0, 0.0, 0.0)
+        assert lines[flank][2:] == lines[baseline][:2]
+        assert (f"{baseline}.end", "origin", "coincident") in recorder.constraints
+        assert (baseline, None, "horizontal") in recorder.constraints
+        assert ("MiddleRibCounterAngle@MiddleRibProfile", '"CounterFlankAngle"') in jobs
+    else:
+        assert not recorder.angles and not recorder.construction
 
 
 @pytest.mark.parametrize("middle,stem", [(False, "EdgeRibFront"), (False, "EdgeRibBack"), (True, "MiddleRib")])
@@ -305,6 +322,66 @@ def test_extracted_sketch_contract_rejects_real_primitive_mutations(mutation: st
     asyncio.run(helper(recorder, "MiddleRib", jobs, middle=True))
     with pytest.raises(AssertionError):
         _assert_recorded_sketch(recorder, profile.PROFILE, True, jobs)
+
+
+@pytest.mark.parametrize("damage", [
+    None, "rounded_upper", "rounded_lower", "missing_lower", "reference", "wrong_angle", "missing_angle", "nan_angle",
+])
+def test_native_counter_profile_requires_both_nominal_planes_and_driver(damage) -> None:
+    faces = []
+
+    def plane(normal, point):
+        surface = SimpleNamespace(
+            IsPlane=lambda: True, PlaneParams=(*normal, *point),
+        )
+        faces.append(SimpleNamespace(GetSurface=lambda: surface))
+
+    for branch in (profile.UPPER, profile.LOWER):
+        plane((*branch.normal_xy, 0.0), (*(
+            value / 1000.0 for value in branch.wrap_xy
+        ), 0.0))
+        surface = SimpleNamespace(
+            IsPlane=lambda: False, IsCylinder=lambda: True,
+            CylinderParams=(
+                *(value / 1000.0 for value in branch.center_xy), 0.0,
+                0.0, 0.0, 1.0, spec.RIB_BLEND_R / 1000.0,
+            ),
+        )
+        faces.append(SimpleNamespace(GetSurface=lambda surface=surface: surface))
+    for sign, side in ((1.0, "upper"), (-1.0, "lower")):
+        if damage == "missing_lower" and side == "lower":
+            continue
+        angle = math.radians(11.537 if damage == f"rounded_{side}" else spec.COUNTER_FLANK_ANGLE_DEG)
+        normal = (-math.sin(angle), sign * math.cos(angle), 0.0)
+        plane(normal, tuple(spec.RIB_WRAP_R * value / 1000.0 for value in normal))
+    dimension = SimpleNamespace(
+        DrivenState=1 if damage == "reference" else 2,
+        SystemValue=math.radians(11.537 if damage == "wrong_angle" else spec.COUNTER_FLANK_ANGLE_DEG),
+    )
+    if damage == "nan_angle":
+        dimension.SystemValue = math.nan
+
+    def parameter(name):
+        assert name == "MiddleRibCounterAngle@MiddleRibProfile"
+        return None if damage == "missing_angle" else dimension
+
+    model = SimpleNamespace(
+        FeatureByName=lambda name: SimpleNamespace(GetFaces=lambda: faces),
+        Parameter=parameter,
+    )
+    namespace = _source_helpers(
+        ("_assert_native_rib_profile",),
+        UPPER=profile.UPPER, LOWER=profile.LOWER,
+        ARC_R=spec.RIB_WRAP_R, TIP_X=spec.TIP_X,
+        COUNTER_FLANK_ANGLE_DEG=spec.COUNTER_FLANK_ANGLE_DEG,
+    )
+    check = namespace["_assert_native_rib_profile"]
+    adapter = SimpleNamespace(currentModel=model)
+    if damage is None:
+        check(adapter, "MiddleRib")
+    else:
+        with pytest.raises(RuntimeError):
+            check(adapter, "MiddleRib")
 
 
 def _source_helpers(names: tuple[str, ...], **bindings):
