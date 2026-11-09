@@ -110,3 +110,20 @@ def test_purchased_sheet_documents_the_built_part() -> None:
     assert sheet.source_kind == "part"
     assert sheet.source.stem == part.PART_NAME == sheet.artifact_stem
     assert sheet.layout in DRAWING_TEMPLATES
+
+
+def test_the_sheet_prints_no_supplier_application_hole() -> None:
+    """MHA-PD-00 specifies the match-drilled hole; the pin sheet's reference
+    drops only the application hole, every other source field unchanged."""
+    from dataclasses import fields
+
+    from _supplier_pin_model import declares_application_hole
+    import draw_pd_vn_transgear_knob_cup_pin as drawing
+
+    assert declares_application_hole(spec.SUPPLIER_REFERENCE)
+    assert not declares_application_hole(drawing.SHEET_REFERENCE)
+    for field in fields(spec.SUPPLIER_REFERENCE):
+        if not field.name.startswith("application_hole"):
+            assert getattr(drawing.SHEET_REFERENCE, field.name) == getattr(
+                spec.SUPPLIER_REFERENCE, field.name
+            ), field.name

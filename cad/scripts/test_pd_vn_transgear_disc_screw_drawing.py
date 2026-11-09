@@ -351,25 +351,19 @@ def test_stock_build_uses_its_registered_recipe_head_up_on_the_origin(
 _DIMENSION = re.compile(r"\d")
 
 
-def test_sheet_states_the_cut_and_no_dimension_in_the_registry_names() -> None:
+def test_sheet_points_to_the_cut_step_and_no_dimension_in_the_registry_names() -> None:
     """The purchased sheet prints the registry's stock name, supplier and SKU
-    besides its fixed footer, so none of those may carry a size (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)); the
-    installation note states the cut to fit (R9-47, as the paper-drive
-    assembly step prints it) and the cut end's break."""
+    besides its fixed footer, so none of those may carry a size (rule 7); the
+    tip cut (R9-47) is MHA-PD-00's step, which the general line cites by
+    number."""
+    import pd_paper_drive_assembly_steps as steps
+
     row = _config.parts(part.PART_NAME)
     for field in ("title", "supplier", "finish"):
         assert not _DIMENSION.search(str(row[field])), (field, row[field])
-    lines = row["installation_notes"].splitlines()
-    assert len(lines) <= 4
-    assert all(len(line) <= 70 for line in lines), lines
-    flat = " ".join(lines)
-    assert flat.endswith(
-        f"CUT EACH TIP {screw.TIP_BELOW_REAR_FACE_TEXT} BELOW THE MHA-PD-06 DISC "
-        "REAR FACE AT ASSEMBLY."
-    )
-    # The cut end's break is the title block's edge break; the note repeats
-    # nothing of it (machinist review r8).
-    assert "BREAK" not in flat
+    assert "installation_notes" not in row
+    assert drawing.CUT_STEP == steps.step_number("disc-screws-cut")
+    assert f"MHA-PD-00 STEP {drawing.CUT_STEP}" in drawing.GENERAL_TEXT
 
 
 def test_the_cut_screw_carries_no_stock_length_reference() -> None:

@@ -1907,7 +1907,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _set_mount_hole_process(mount_callout)
     # This render-time precision write is the declared exception RV-02 in
-    # cad/config/parts/dt-cone-pivot-post.yaml (Owner ruling 2026-11-08 (Pedro), #2144 item 1.2): a part-authored precision does not reach the
+    # cad/config/parts/dt-cone-pivot-post.yaml (Owner ruling 2026-11-08
+    # (Pedro), #2144 item 1.2): a part-authored precision does not reach the
     # callout (run 20261102T230110877Z).
     set_hole_callout_precision(
         mount_callout, MOUNT_HOLE_PRECISION, label="mounting counterbores"

@@ -32,8 +32,7 @@ SOURCE_FEATURES = {
     "free_top": (stock.SECTION_FEATURE,),
 }
 
-# The TOP lane keeps 10 mm above and below the source ink: the connecting
-# link's 8.5 mm pin length then fits at 2:1 in the 40 mm cell, not 1:4.
+# The TOP lane keeps 10 mm above and below the source ink.
 SUPPLIER_MARGINS = {
     "free_front": (0.030, 0.020, 0.030, 0.020),
     "free_top": (0.030, 0.010, 0.045, 0.010),
@@ -136,46 +135,17 @@ def annotate_chain_stock(
     views: Mapping[str, Any],
     *,
     reference_bounds: Callable[[str], tuple[float, float, float, float]],
-    connecting: bool = False,
 ) -> tuple[Callable[[], None], ...]:
     """Import exact source dimensions and re-resolve them after final rebuild."""
     front = (
         (stock.PIN_DIMENSION, stock.PIN_DIAMETER, 3, "diameter", "PIN"),
-        (
-            stock.ROLLER_DIMENSION,
-            stock.ROLLER_DIAMETER,
-            3,
-            "diameter",
-            "FOR ROLLER" if connecting else "ROLLER",
-        ),
+        (stock.ROLLER_DIMENSION, stock.ROLLER_DIAMETER, 3, "diameter", "ROLLER"),
         (stock.PITCH_DIMENSION, stock.PITCH, 3, "length", "PITCH"),
     )
-    top = (
-        (
-            stock.WIDTH_DIMENSION,
-            stock.ROLLER_WIDTH,
-            3,
-            "length",
-            "FOR ROLLER WIDTH" if connecting else "ROLLER WIDTH",
-        ),
-    )
-    if connecting:
-        top += (
-            (stock.PLATE_DIMENSION, stock.PLATE_THICKNESS, 3, "length", "PLATE"),
-            (
-                stock.LENGTH_DIMENSION,
-                stock.CONNECTING_PIN_LENGTH,
-                3,
-                "length",
-                "OVERALL PIN",
-            ),
-        )
+    top = ((stock.WIDTH_DIMENSION, stock.ROLLER_WIDTH, 3, "length", "ROLLER WIDTH"),)
     expected_by_view = {"free_front": front, "free_top": top}
-    # Sheet-metre x offsets from each TOP dimension line to its shelved text.
+    # Sheet-metre x offset from the TOP dimension line to its shelved text.
     shelves = {stock.WIDTH_DIMENSION: -0.024}
-    if connecting:
-        shelves[stock.PLATE_DIMENSION] = -0.010
-        shelves[stock.LENGTH_DIMENSION] = 0.024
     options_by_view = {}
     for key, rows in expected_by_view.items():
         view = _early_bound(views[key], "IView")
@@ -189,23 +159,6 @@ def annotate_chain_stock(
             }
         else:
             positions = {stock.WIDTH_DIMENSION: (xmin - 0.014, middle[1])}
-            if connecting:
-                # The TOP ink runs roller (x 0) to pin (3 pitches), so the plate
-                # span (1 pitch) is a third of the way across; its outline runs
-                # right of it. The plate dimension line stands 3 mm left of the
-                # span. The span is too short for inside arrows, and left to
-                # itself SolidWorks hung the two-row REF on whichever side it
-                # chose (left at 1:4, over the pin outline at 2:1, run
-                # 20261101T075339529Z), so it is shelved up-left over the
-                # roller, short of the roller-width line, inside the 40 mm
-                # TOP cell.
-                plate_x = xmin + (xmax - xmin) / 3.0
-                positions.update(
-                    {
-                        stock.PLATE_DIMENSION: (plate_x - 0.003, ymax + 0.004),
-                        stock.LENGTH_DIMENSION: (xmax + 0.020, middle[1]),
-                    }
-                )
         imported = curate_view_dimensions(
             adapter,
             view,
@@ -236,8 +189,7 @@ def annotate_chain_stock(
         options_by_view[key] = options
         if key == "free_top":
             # Keep the native vertical lines/witnesses where curation put them;
-            # shelf the complete two-row labels off them: width to the left,
-            # plate up-left over the roller, pin length to the right.
+            # shelf the complete two-row label left of them.
             offset_dimension_text(
                 adapter,
                 imported,

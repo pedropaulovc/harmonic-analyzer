@@ -1,9 +1,18 @@
-"""Supplier nominal/application diagrams beside the unchanged installed 9715K43 cone."""
+"""The installed 9715K43 curved disc spring, with its catalogue sizes as REF data.
+
+The sheet draws the installed cone as projected views and an isometric.
+The supplier's ID, OD, free height and strip thickness print as footer
+reference data, not as dimension diagrams. The free-state diagrams read as
+lines over no spring under prose captions (machinist review, fan-out
+2026-11-07, rules 9/26), as the extension springs' gauge views did
+(cb2c145caf). The catalogue application gauges (working height, 0.190 shaft)
+are not printed. The pivot stack's installed room belongs to MHA-PD-00, from
+MHA-PD-VN-57 and the MHA-PD-18 spot face.
+"""
 
 from __future__ import annotations
 
 import argparse
-from functools import partial
 import sys
 from typing import Any
 
@@ -12,13 +21,7 @@ from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
-from _supplier_disc_spring_drawing import (
-    prepare_supplier_disc_diagram,
-    supplier_disc_reference_features,
-    supplier_disc_spring_dimensions,
-)
-from _supplier_spring_drawing import build_supplier_spring_drawing
-from _supplier_spring_reference import SUPPLIER_DIAGRAM_CONFIGURATION
+from _purchased_fastener_drawing import build_purchased_fastener_drawing
 import pd_vn_transgear_pivot_spring_spec as supplier_spec
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -29,25 +32,22 @@ SPEC = DRAWINGS_BY_NAME["pd_vn_transgear_pivot_spring"]
 ITEM = "CURVED DISC SPRING"
 
 
+def _inch(value_mm: float) -> str:
+    text = f"{value_mm / supplier_spec.MM_PER_IN:.3f}"
+    return text[1:] if text.startswith("0.") else text
+
+
+# The catalogue sizes, inch REF at the catalogue's three places.
+SUPPLIER_DATA = (
+    f"ID (Ø{_inch(supplier_spec.ID)}), OD (Ø{_inch(supplier_spec.OD)}).",
+    f"FREE HEIGHT ({_inch(supplier_spec.FREE_HEIGHT)}), "
+    f"THICKNESS ({_inch(supplier_spec.THICKNESS)}).",
+)
+
+
 async def build(adapter: Any) -> dict[str, str]:
-    settled_checks = []
-    return await build_supplier_spring_drawing(
-        adapter, SPEC, item=ITEM,
-        stock_configuration=SUPPLIER_DIAGRAM_CONFIGURATION,
-        prepare_views=partial(prepare_supplier_disc_diagram, spec=supplier_spec),
-        supplier_reference_features=supplier_disc_reference_features(supplier_spec),
-        stock_caption="SUPPLIER NOMINAL DIMENSION DIAGRAM — NOT PART SHAPE",
-        supplier_margins={
-            "free_front": (0.035, 0.0, 0.035, 0.0),
-            "free_top": (0.040, 0.0, 0.040, 0.018),
-            "free_right": (0.035, 0.0, 0.0, 0.0),
-        },
-        supplier_dimensions=partial(
-            supplier_disc_spring_dimensions, spec=supplier_spec, settled_checks=settled_checks,
-        ),
-        right_caption="SUPPLIER APPLICATION GAUGES — NOT PART SHAPE",
-        installed_caption="INSTALLED CONICAL REPRESENTATION",
-        settled_checks=settled_checks,
+    return await build_purchased_fastener_drawing(
+        adapter, SPEC, item=ITEM, supplier_data=SUPPLIER_DATA,
         unit=part_drawing_unit(SPEC.artifact_stem),
     )
 

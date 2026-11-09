@@ -31,6 +31,12 @@ MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 SPEC = DRAWINGS_BY_NAME["pd_vn_transgear_disc_screw"]
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "#0-80 x 1/4 FILLISTER HEAD SLOTTED SCREW"
+# The tip cut is assembly work (MHA-PD-00 step "disc-screws-cut" prints the
+# window below the disc's rear face): the part sheet only points to it. The
+# step number is a literal so a renumbered MHA-PD-00 does not re-key this
+# sheet; test_pd_vn_transgear_disc_screw_drawing pins it to the key.
+CUT_STEP = 16
+GENERAL_TEXT = f"PURCHASED PART, CUT AT ASSEMBLY PER MHA-PD-00 STEP {CUT_STEP}. VIEWS SHOW IT CUT."
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -62,7 +68,7 @@ async def build(adapter: Any) -> dict[str, str]:
         settled = True
 
     return await build_purchased_fastener_drawing(
-        adapter, SPEC, item=ITEM, cut_to_suit=True,
+        adapter, SPEC, item=ITEM, general_text=GENERAL_TEXT,
         supplier_margins=supplier_screw_margins(
             SUPPLIER_REFERENCE_DIMENSIONS, planes=SUPPLIER_REFERENCE_PLANES,
             sides=SUPPLIER_REFERENCE_SIDES,
