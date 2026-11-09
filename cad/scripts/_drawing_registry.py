@@ -569,13 +569,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
-        name="sm_vn_gooseneck_shoulder_washer",
-        part="sm_vn_gooseneck_shoulder_washer",
-        artifact_stem="sm-vn-gooseneck-shoulder-washer",
-        script_name="draw_sm_vn_gooseneck_shoulder_washer.py",
-        layout=DrawingLayout.LANDSCAPE,
-    ),
-    DrawingSpec(
         name="ms_stick",
         part="ms_stick",
         artifact_stem="ms-stick",

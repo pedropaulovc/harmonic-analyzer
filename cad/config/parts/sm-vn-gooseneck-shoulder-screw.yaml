@@ -5,14 +5,14 @@ sm-vn-gooseneck-shoulder-screw:
   supplier: McMaster-Carr
   supplier_skus: [91829A566]
   material: AISI 304
-  # Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: keep the slotted design;
-  # slotted McMaster 91829A566 found by vendor search, pending owner confirmation.
+  # Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: bare slotted McMaster
+  # 91829A566, washer dropped.
   material_specification: "Slotted 18-8 stainless steel precision shoulder screw, passivated, 70,000 psi tensile, Rockwell B55; McMaster-Carr 91829A566"
   finish: passivated
   installation_notes: |-
     INSTALLATION - MHA-SM-01 END PIECE
-    MHA-SM-VN-57 WASHER UNDER THE HEAD; UPPER EYE OF MHA-SM-VN-51
-    ON THE SHOULDER. SEAT THE SHOULDER ON THE END FACE.
+    UPPER EYE OF MHA-SM-VN-51 ON THE SHOULDER UNDER THE HEAD.
+    SEAT THE SHOULDER ON THE END FACE.
   quantity: 1
   tolerance_class: machined_block
   process: purchased

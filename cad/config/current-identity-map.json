@@ -2292,18 +2292,6 @@
           "number": "MHA-SM-VN-56"
         }
       ]
-    },
-    {
-      "old_stem": "sm-vn-gooseneck-shoulder-washer",
-      "old_number": null,
-      "introduced": "2026-11-08",
-      "new_identities": [
-        {
-          "parent": "sm-summing",
-          "stem": "sm-vn-gooseneck-shoulder-washer",
-          "number": "MHA-SM-VN-57"
-        }
-      ]
     }
   ],
   "retired_identities": [

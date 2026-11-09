@@ -2,15 +2,14 @@
 
 Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: option A, a purchased
 shoulder screw, the counter spring's upper eye riding free on its shoulder
-under a thin washer (MHA-SM-VN-57), the shoulder end seated on the MHA-SM-01
+under its head, the shoulder end seated on the MHA-SM-01
 end face and the thread in that end piece's plain blind tap.  This supersedes
 #1951's clamped eye and retires the made MHA-SM-04.  The ruling named
 91259A576 (5/16 shoulder); its Ø7.94 shoulder drops the arm 0.79 mm against
 the plumb spring and the leading half-turn then meets the tube, so the 1/4
 shoulder keeps the retired screw's Ø6.35 support.  Owner ruling 2026-11-08
-(Pedro, #2144 item 11.4): keep the slotted design; slotted McMaster 91829A566
-found by vendor search, pending owner confirmation (it replaces the socket
-91259A535 drafted before that direction).
+(Pedro), #2144 item 11.4: bare slotted McMaster 91829A566, washer dropped
+(it replaces the socket 91259A535 drafted before that direction).
 
 Source: https://www.mcmaster.com/91829A566/, read live 2026-11-08; page-stated
 fields only: slotted 18-8 stainless steel precision shoulder screw,

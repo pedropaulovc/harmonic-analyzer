@@ -427,9 +427,6 @@ def test_cross_numbered_fit_pairs_use_fixed_runtime_oracles() -> None:
             frozenset(("sm-vn-gooseneck-shoulder-screw-1", "sm-gooseneck-1")): _annulus_limit(
                 4.826, 3.797, 9.525
             ),
-            frozenset(
-                ("sm-vn-gooseneck-shoulder-screw-1", "sm-vn-gooseneck-shoulder-washer-1")
-            ): 0.0,
         }
     )
     # Owner ruling 2026-10-24 (T+H3): the four knife-mount dowels press into
@@ -600,9 +597,6 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(("sm-vn-gooseneck-shoulder-screw-1", "sm-gooseneck-1")): _annulus_limit(
                 4.826, 3.797, 9.525
             ),
-            frozenset(
-                ("sm-vn-gooseneck-shoulder-screw-1", "sm-vn-gooseneck-shoulder-washer-1")
-            ): 0.0,
         },
         "pn-pen": {
             # #4-40 thumb screw through the stirrup's .24 bottom rail.

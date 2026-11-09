@@ -707,7 +707,6 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "dt_vn_keeper_chain_link",  # snap loop link
         "sm_vn_knife_mount_dowel",  # MHA-SM-VN-53 1/8 dowels, two pressed into the crossbar's blind underside reams per knife mount, slip in the knife mount's round hole and slot
         "sm_vn_knife_hanger_washer",  # new 18-8 SAE washer (McMaster 96659A104), hex-head bearing on the faced crossbar top; no thread
-        "sm_vn_gooseneck_shoulder_washer",  # MHA-SM-VN-57 washer loose on the shoulder under the head, retains the upper eye (#2144 item 11.4); no thread
         "pd_latch_hook",  # MHA-PD-14 formed spring-steel hook: screw holes drilled thru, latch-pin hole match-drilled at assembly; no thread
         "sh_vn_music_wire",  # LeverWire and PenWire members, wrapped/tied, no thread
         "mg_magnifying_wheel",  # reamed .1890 running bore + two Ø1 wire-tie holes; no thread
@@ -776,7 +775,6 @@ UNTHREADED_STOCK: dict[str, str] = {
     "dt_vn_keeper_chain_link": "plain chain link",
     "sm_vn_knife_mount_dowel": "dowel pin pressed into a blind reamed hole",
     "sm_vn_knife_hanger_washer": "plain SAE washer under the knife-hanger hex head; no thread",
-    "sm_vn_gooseneck_shoulder_washer": "plain washer loose on the gooseneck shoulder screw under its head (#2144 item 11.4); no thread",
     "dt_vn_pinion_strap_pin": "slotted spring pin pressed into a plain hole",
     "pd_vn_transgear_knob_drive_pin": "dowel pin pressed into a plain hole",
     "pd_vn_transgear_knob_cup_pin": "slotted spring pin in a hole match-drilled at assembly",
@@ -1577,7 +1575,7 @@ JOINTS: tuple[Joint, ...] = (
             "clamped eye: the shoulder screw is tightened until its shoulder seats on "
             "the end piece's face, so screw and end piece never move relative to each "
             "other. The supplier upper eye rides free on the ground shoulder under the "
-            "washer; nothing clamps it, so its swing turns the eye on the shoulder, "
+            "head; nothing clamps it, so its swing turns the eye on the shoulder, "
             "whose drag is the eye load times friction at the shoulder radius, far "
             "below the seated shoulder's breakaway friction. No operating torque "
             "reaches the screw axis."
@@ -1585,20 +1583,22 @@ JOINTS: tuple[Joint, ...] = (
         axial_capture=(
             "purchased MHA-SM-VN-56 shoulder seated on the face of MHA-SM-01's solid "
             "Ø12.70 end piece, its thread in the end piece's plain blind tap (no "
-            "counterbore); the MHA-SM-VN-57 washer under the head retains the eye. "
+            "counterbore); the head retains the loaded eye (plumb pull, owner ruling "
+            "2026-11-08 (Pedro), #2144 item 11.4: bare slotted McMaster 91829A566, "
+            "washer dropped). "
             "The deepest screw tip stays inside the tap's full thread, and the "
             "bottoming tap's lead inside its drill."
         ),
         lock=Lock.NONE,
         evidence=(
-            "owner ruling 2026-11-08 (Pedro), #2144 item 11.4: purchased shoulder "
-            "screw with a washer under the head, plain tap in the end piece, the eye "
-            "free on the shoulder; sm-summing.yaml SM-01 (pending owner "
+            "owner ruling 2026-11-08 (Pedro), #2144 item 11.4: bare slotted "
+            "purchased shoulder screw, washer dropped, plain tap in the end piece, "
+            "the eye free on the shoulder; sm-summing.yaml SM-01 (pending owner "
             "confirmation) and sm-gooseneck.yaml RV-04 (engagement under 1.5D); "
             "sm_gooseneck_spring_joint.py ENGAGEMENT_MIN/PLUG_WALL_MIN/"
-            "DRILL_POINT_SHANK_WALL_MIN/WASHER_RETENTION_MIN/EYE_AXIAL_PLAY_MIN/"
+            "DRILL_POINT_SHANK_WALL_MIN/LOADED_RETENTION_MIN/EYE_AXIAL_PLAY_MIN/"
             "EYE_AXIAL_PLAY_MAX/TIP_THREAD_MARGIN_MIN/TAP_LEAD_DRILL_MARGIN_MIN; "
-            "build_sm_summing_assembly.py shoulder screw and washer lock_mates "
+            "build_sm_summing_assembly.py shoulder screw lock_mate "
             "(CAD restraint, not mechanical locking hardware); the installation "
             "step is in the summing assembly's Manufacturing Notes property "
             "(UPPER_EYE_NOTES) and printed as MHA-SM-00 step 8 "

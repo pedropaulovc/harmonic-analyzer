@@ -4,10 +4,10 @@ Owner ruling 2026-11-08 (Pedro), #2144 item 11.4, supersedes #1951's clamped
 eye: the purchased MHA-SM-VN-56 shoulder screw seats on the flush end face of
 MHA-SM-01's solid Ø.500 end piece, its thread in a plain blind tap (no
 counterbore, frames or datums), and the MHA-SM-VN-51 upper eye rides free on
-its shoulder under the MHA-SM-VN-57 washer.  One owner minor stands against
-rule 18: the catalogue thread's engagement (sm-gooseneck RV-04, pending the
-owner's confirmation).  The sheet prints decimal inch (#290): every term is
-charged at the limits it prints.
+its shoulder under its head (bare slotted McMaster 91829A566, washer
+dropped).  One owner minor stands against rule 18: the catalogue thread's
+engagement (sm-gooseneck RV-04, accepted).  The sheet prints decimal inch
+(#290): every term is charged at the limits it prints.
 """
 
 from __future__ import annotations
@@ -25,7 +25,6 @@ import sm_gooseneck_spec as gooseneck_spec
 import sm_gooseneck_spring_joint as joint
 import sm_vn_counter_spring_stock_geom as spring
 import sm_vn_gooseneck_shoulder_screw_spec as screw
-import sm_vn_gooseneck_shoulder_washer_spec as washer
 from _buildgraph import config_files_of
 
 IN = 25.4
@@ -33,82 +32,58 @@ IN = 25.4
 EDGE_BREAK = 0.010 * IN
 
 
-def test_catalogue_screw_and_washer_are_the_ruled_parts() -> None:
-    # Owner ruling 2026-11-08 (Pedro, #2144 item 11.4): keep the slotted
-    # design; slotted McMaster 91829A566 found by vendor search, pending owner
-    # confirmation, read live 2026-11-08 (1/4 -.001/0 x 3/8 +.002/0 precision
-    # shoulder, 10-24 x 3/8 thread); the washer McMaster 93475A250 (DIN 125
-    # M6), read live the same day.
+def test_catalogue_screw_is_the_ruled_part() -> None:
+    # Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: bare slotted McMaster
+    # 91829A566, washer dropped; read live 2026-11-08 (1/4 -.001/0 x 3/8
+    # +.002/0 precision shoulder, 10-24 x 3/8 thread).
     assert screw.SKU == "91829A566"
     assert screw.SHOULDER_DIA == pytest.approx(0.250 * IN)
     assert screw.SHOULDER_LENGTH == pytest.approx(0.375 * IN)
     assert screw.THREAD == "#10-24" and screw.THREAD_CLASS == "2A"
     assert screw.THREAD_LENGTH == pytest.approx(0.375 * IN)
-    assert washer.SKU == "93475A250"
-    assert (washer.ID, washer.OD, washer.THICKNESS) == pytest.approx((6.4, 12.0, 1.6))
-    # The OD window: 1.0 of the eye kept at the least OD (.453), clear of the
-    # leading half-turn at the largest (about .476).
-    assert 0.453 * IN <= washer.OD_MIN < washer.OD_MAX <= 0.476 * IN
-    for row, spec in (
-        ("sm-vn-gooseneck-shoulder-screw", screw),
-        ("sm-vn-gooseneck-shoulder-washer", washer),
-    ):
-        registry = _config.parts(row)
-        assert registry["supplier_skus"] == [spec.SKU]
-        assert registry["drawing_unit"] == spec.UNIT
-        assert registry["process"] == "purchased"
-
-
-def test_washer_slides_on_the_shoulder_and_the_head_bears_on_it() -> None:
-    shoulder_max = screw.SHOULDER_DIA + max(screw.SHOULDER_DIA_BAND)
-    shoulder_min = screw.SHOULDER_DIA + min(screw.SHOULDER_DIA_BAND)
-    assert joint.WASHER_SHOULDER_CLEARANCE_MIN == pytest.approx(washer.ID_MIN - shoulder_max)
-    assert joint.WASHER_SHOULDER_CLEARANCE_MIN > 0.0
-    float_max = (washer.ID_MAX - shoulder_min) / 2.0
-    assert joint.WASHER_FLOAT_MAX == pytest.approx(float_max)
-    overlap = screw.HEAD_DIA_MIN / 2.0 - washer.ID_MAX / 2.0 - float_max
-    assert joint.HEAD_WASHER_OVERLAP_MIN == pytest.approx(overlap)
-    assert joint.HEAD_WASHER_OVERLAP_MIN > 0.0
-    # The precision shoulder (6.35 MAX) in the DIN 125 M6 bore (6.40 MIN).
-    assert joint.WASHER_SHOULDER_CLEARANCE_MIN == pytest.approx(0.05)
+    registry = _config.parts("sm-vn-gooseneck-shoulder-screw")
+    assert registry["supplier_skus"] == [screw.SKU]
+    assert registry["drawing_unit"] == screw.UNIT
+    assert registry["process"] == "purchased"
 
 
 def test_the_slotted_screw_carries_the_counter_spring() -> None:
-    # 18-8 at the page's 70,000 psi: the spring's catalogue maximum load hung
-    # at the washer's face bends the undercut land (Ø3.3528) to about a third
-    # of the tensile rating; direct shear is negligible.
+    # 18-8 at the page's 70,000 psi: the spring's catalogue maximum load, all
+    # of it on the loop's head-side wire at the longest eye space, bends the
+    # undercut land (Ø3.3528) to 34 % of the tensile rating; direct shear is
+    # negligible.
     import spring_mount_geom
 
     assert screw.TENSILE_STRENGTH_MPA == pytest.approx(482.633, abs=1e-3)
-    assert joint.LOAD_LEVER_MAX == joint.EYE_SPACE_MAX
+    assert joint.LOAD_LEVER_MAX == joint.EYE_SPACE_MAX - spring.WIRE_RADIUS_MM
     bending, shear = joint.root_stress_mpa(spring_mount_geom.COUNTER_MAXIMUM_LOAD_N)
-    assert bending == pytest.approx(153.1, abs=0.1)
-    assert screw.TENSILE_STRENGTH_MPA / bending >= 3.0
+    assert bending == pytest.approx(164.37, abs=0.01)
+    assert screw.TENSILE_STRENGTH_MPA / bending >= 2.9
     assert shear < 10.0
 
 
-def test_the_eye_rides_free_between_end_face_and_washer() -> None:
+def test_the_eye_rides_free_between_end_face_and_head() -> None:
     # The loop's free envelope is the eye gap the native seat rests on the
-    # end face, and its room is the shoulder less the washer and the head
-    # fillet's stand-off, at the worst limits.
+    # end face, and its room is the shoulder less the head fillet's
+    # stand-off, at the worst limits (owner ruling 2026-11-08 (Pedro), #2144
+    # item 11.4: bare slotted McMaster 91829A566, washer dropped).
     assert joint.LOOP_ENVELOPE == gooseneck.SPRING_EYE_GAP
     space_min = (
         screw.SHOULDER_LENGTH
         + min(screw.SHOULDER_LENGTH_BAND)
-        - washer.THICKNESS_MAX
-        - joint.WASHER_SEAT_STANDOFF_MAX
+        - joint.HEAD_SEAT_STANDOFF_MAX
     )
-    space_max = screw.SHOULDER_LENGTH + max(screw.SHOULDER_LENGTH_BAND) - washer.THICKNESS_MIN
+    space_max = screw.SHOULDER_LENGTH + max(screw.SHOULDER_LENGTH_BAND)
     assert joint.EYE_AXIAL_PLAY_MIN == pytest.approx(space_min - gooseneck.SPRING_EYE_GAP)
     assert joint.EYE_AXIAL_PLAY_MAX == pytest.approx(space_max - gooseneck.SPRING_EYE_GAP)
     assert 0.0 < joint.EYE_AXIAL_PLAY_MIN < joint.EYE_AXIAL_PLAY_MAX
-    assert joint.EYE_AXIAL_PLAY_MIN == pytest.approx(2.741, abs=0.001)
-    assert joint.EYE_AXIAL_PLAY_MAX == pytest.approx(3.295, abs=0.001)
+    assert joint.EYE_AXIAL_PLAY_MIN == pytest.approx(4.541, abs=0.001)
+    assert joint.EYE_AXIAL_PLAY_MAX == pytest.approx(4.695, abs=0.001)
     # B18.3's head fillet (Ø.276 MAX transition from the Ø.227 MIN neck) can
-    # stand the washer's inner edge off the head face, never by more than the
+    # stand the loop's wire off the head face, never by more than the
     # fillet's radius.
     fillet_r = (screw.HEAD_FILLET_TRANSITION_DIA_MAX - screw.SHOULDER_NECK_DIA_MIN) / 2.0
-    assert 0.0 < joint.WASHER_SEAT_STANDOFF_MAX < fillet_r
+    assert 0.0 < joint.HEAD_SEAT_STANDOFF_MAX < fillet_r
     # The eye swivels on the largest shoulder, and the round wire rides over
     # the under-head neck's step.
     assert joint.EYE_SHOULDER_CLEARANCE_MIN == pytest.approx(
@@ -118,10 +93,19 @@ def test_the_eye_rides_free_between_end_face_and_washer() -> None:
     assert joint.SHOULDER_NECK_STEP_MAX < spring.WIRE_RADIUS_MM
 
 
-def test_the_washer_retains_the_eye_the_bare_head_would_not() -> None:
-    assert joint.WASHER_RETENTION_MIN == pytest.approx((washer.OD_MIN - spring.EYE_ID_MM) / 2.0)
-    assert joint.WASHER_RETENTION_MIN >= joint.RETENTION_TARGET == 1.0
-    assert joint.HEAD_ONLY_RETENTION_MIN < joint.RETENTION_TARGET
+def test_the_bare_head_retains_the_loaded_eye() -> None:
+    # LOADED basis (owner ruling 2026-11-08 (Pedro), #2144 item 11.4): the
+    # plumb pull bears the eye's inner top on the shoulder's top, so the head
+    # laps the pull-side wire by its radius less the shoulder's.
+    assert joint.LOADED_RETENTION == pytest.approx((3 / 8 - 1 / 4) / 2.0 * IN)
+    assert joint.LOADED_RETENTION == pytest.approx(1.5875)
+    shoulder_max = screw.SHOULDER_DIA + max(screw.SHOULDER_DIA_BAND)
+    assert joint.LOADED_RETENTION_MIN == pytest.approx((screw.HEAD_DIA_MIN - shoulder_max) / 2.0)
+    assert (screw.HEAD_DIA_MIN, shoulder_max) == pytest.approx((9.0678, 6.35))
+    assert joint.LOADED_RETENTION_MIN == pytest.approx(1.3589, abs=1e-4)
+    assert joint.LOADED_RETENTION_MIN >= joint.RETENTION_TARGET == 1.0
+    assert not hasattr(joint, "HEAD_ONLY_RETENTION_MIN")
+    assert not any(name.startswith("WASHER") for name in vars(joint))
 
 
 def test_plain_tap_depths_and_the_screw_tip() -> None:
@@ -231,10 +215,10 @@ def test_engagement_minor_is_declared_and_required(monkeypatch) -> None:
 
 
 def test_registry_reads_stay_scoped() -> None:
-    # The joint and the two vendor specs read no registry row, so the channel
+    # The joint and the vendor spec read no registry row, so the channel
     # seats importing the joint through settled_spring_seats never re-key on
     # a part's row; the gooseneck spec reads its own row and the screw's.
-    for module in (joint, screw, washer):
+    for module in (joint, screw):
         tokens = config_files_of(Path(module.__file__))
         assert "**" not in tokens
         assert not {token for token in tokens if token.startswith("parts/")}

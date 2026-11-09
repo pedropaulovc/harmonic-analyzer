@@ -251,23 +251,14 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "catalogue OD band, upper limit indexed for the carrier's thrust-seat "
         "chamfer-mouth check; the sheet prints it as untoleranced REF"
     ),
-    # #2144 item 11.4: McMaster 91829A566 / 93475A250 catalogue bands, indexed
+    # #2144 item 11.4: McMaster 91829A566 catalogue bands, indexed
     # into MIN/MAX limits that sm_gooseneck_spring_joint charges; the sheets
     # print them as untoleranced REF.
     ("sm_vn_gooseneck_shoulder_screw_spec", "SHOULDER_DIA_BAND"): (
-        "catalogue shoulder band, indexed for the washer and eye clearances"
+        "catalogue shoulder band, indexed for the eye clearance and head retention"
     ),
     ("sm_vn_gooseneck_shoulder_screw_spec", "SHOULDER_LENGTH_BAND"): (
         "catalogue shoulder-length band, indexed for the eye's axial play"
-    ),
-    ("sm_vn_gooseneck_shoulder_washer_spec", "ID_BAND"): (
-        "catalogue bore band, indexed for the washer's float on the shoulder"
-    ),
-    ("sm_vn_gooseneck_shoulder_washer_spec", "OD_BAND"): (
-        "catalogue OD band, indexed for the eye retention and half-turn clearance"
-    ),
-    ("sm_vn_gooseneck_shoulder_washer_spec", "THICKNESS_BAND"): (
-        "catalogue thickness band, indexed for the eye's axial play"
     ),
     ("mg_wheel_axle_spec", "THREAD_LEN_BAND"): (
         "equal band indexed into the native symmetric (+/-) tolerance"

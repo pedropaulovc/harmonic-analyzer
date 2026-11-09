@@ -92,7 +92,6 @@ recipes:
 | 92916A480 | `mg-vn-wheel-axle-back-washer` (catalogue-only; no vendor model) | Brass Washer for Number 10 Screw Size |
 | 93075A194 | — (diagnostic recipe; `pn-vn-hanger-screw` until the 2026-10-14 through-strap nut stack) | Low-Strength Zinc-Plated Steel Hex Head Screw |
 | 93075A199 | `pn-vn-hanger-screw` | Low-Strength Zinc-Plated Steel Hex Head Screw |
-| 93475A250 | `sm-vn-gooseneck-shoulder-washer` (MHA-SM-VN-57; catalogue-only, no vendor model) | 18-8 Stainless Steel General Purpose Washer for M6, 6.4 mm ID, 12.0 mm OD |
 | 93585A190 | `dt-vn-cone-lock-knob` | Stainless Steel High-Profile Knurled-Head Thumb Screw |
 | 94025A150 | — (diagnostic recipe; `dt-vn-cone-tip-adjuster` until drawing-guidelines.md rule 18 (thread engagement) E11) | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
 | 94025A164 | `dt-vn-cone-tip-adjuster` | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
@@ -1113,36 +1112,28 @@ Catalog specifications checked on September 10, 2026:
   revised datum and machinist-driven sheet edits require a fresh scoped
   native proof and sheet review before they are reported verified.
 - [91829A566](https://www.mcmaster.com/91829A566/) supplies the new
-  `sm-vn-gooseneck-shoulder-screw`, **MHA-SM-VN-56**, one, and
-  [93475A250](https://www.mcmaster.com/93475A250/) the new
-  `sm-vn-gooseneck-shoulder-washer`, **MHA-SM-VN-57**, one (owner ruling
-  2026-11-08 (Pedro, #2144 item 11.4): keep the slotted design; slotted
-  McMaster 91829A566 found by vendor search, pending owner confirmation;
-  the washer found for its shoulder). They replace the shop-turned MHA-SM-04
-  clamp screw, whose Number is retired and never reissued. The shoulder
-  seats on MHA-SM-01's end face in a plain blind #10-24 tap; the counter
-  spring's upper eye rides free on the shoulder under the washer,
-  superseding #1951's clamped eye. The ruling named 91259A576 (5/16
-  shoulder); its Ø7.94 shoulder drops the arm 0.794 mm against the plumb
-  spring and the leading half-turn then meets the tube, so the 1/4 shoulder
-  keeps the retired screw's Ø6.35 support; the socket 91259A535 drafted
-  next gave way to the slotted design. Live on 2026-11-08, 91829A566:
-  slotted 18-8 stainless precision shoulder screw, passivated, smooth head;
-  shoulder Ø.250 −.001/0 × .375 +.002/0; 10-24 UNC-2A thread 3/8 long; head
-  Ø3/8 × 3/16; 70,000 psi tensile, Rockwell B55, shear not rated; $4.22
-  each (1–4). Its 2-D drawing dimensions only those sizes; the slot (.060 ×
-  .075) and thread undercut (2.3368 span, Ø3.3528 land) are taken from the
-  same family's harvested 91829A560 vendor model (identical head and
-  thread), and the drawing scaled to its head confirms them. The
+  `sm-vn-gooseneck-shoulder-screw`, **MHA-SM-VN-56**, one (owner ruling
+  2026-11-08 (Pedro), #2144 item 11.4: bare slotted McMaster 91829A566,
+  washer dropped). It replaces the shop-turned MHA-SM-04 clamp screw, whose
+  Number is retired and never reissued. The shoulder seats on MHA-SM-01's
+  end face in a plain blind #10-24 tap; the counter spring's upper eye rides
+  free on the shoulder under the head, superseding #1951's clamped eye, and
+  the head retains it on the loaded basis (plumb pull: 1.588 lap nominal,
+  1.359 at the least head over the largest shoulder). The ruling named
+  91259A576 (5/16 shoulder); its Ø7.94 shoulder drops the arm 0.794 mm
+  against the plumb spring and the leading half-turn then meets the tube, so
+  the 1/4 shoulder keeps the retired screw's Ø6.35 support; the socket
+  91259A535 drafted next gave way to the slotted design. Live on 2026-11-08,
+  91829A566: slotted 18-8 stainless precision shoulder screw, passivated,
+  smooth head; shoulder Ø.250 −.001/0 × .375 +.002/0; 10-24 UNC-2A thread
+  3/8 long; head Ø3/8 × 3/16; 70,000 psi tensile, Rockwell B55, shear not
+  rated; $4.22 each (1–4). Its 2-D drawing dimensions only those sizes; the
+  slot (.060 × .075) and thread undercut (2.3368 span, Ø3.3528 land) are
+  taken from the same family's harvested 91829A560 vendor model (identical
+  head and thread), and the drawing scaled to its head confirms them. The
   under-head neck, fillet and least head Ø are charged at ASME B18.3's 1/4
-  row as a conservative allowance. Live
-  on 2026-11-08, 93475A250: 18-8 stainless general purpose washer for M6,
-  DIN 125; ID 6.4, OD 12.0, thickness 1.4 to 1.8 mm; $6.19 per pack of 100.
-  The page states no ID/OD tolerance; ISO 7089 grade A gives 6.40–6.62 and
-  11.57–12.00. That OD keeps at least 1.04 of the Ø.374 eye yet stays clear
-  of the leading half-turn (the 98126A907 1/2 OD ring shim first drafted
-  meets it). No vendor CAD download, hash or measured vendor geometry is
-  claimed.
+  row as a conservative allowance. No vendor CAD download, hash or measured
+  vendor geometry is claimed.
 - [91255A106](https://www.mcmaster.com/91255A106/) (`pd-vn-guide-lock-screw`,
   MHA-PD-VN-60, eight) holds the four guide locks to the platen guides per ruling
   R9-31 (September 30, 2026): these screws ride the platen, and the MHA-SH-VN-51 (then MHA-PD-VN-52)

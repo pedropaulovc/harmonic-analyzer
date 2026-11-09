@@ -36,8 +36,7 @@ The screws, and the small parts that do not belong anywhere else.
 | `mg-vn-wheel-axle-nut` | 2 | brass | McMaster 92671A005, #4-40 hex (nut + jam nut) |
 | `mg-vn-wheel-axle-back-washer` | 1 | brass | McMaster 92916A480, #10 |
 | `mg-vn-wheel-axle-front-washer` | 1 | brass | McMaster 92916A250, #4 |
-| `sm-vn-gooseneck-shoulder-screw` (MHA-SM-VN-56) | 1 | 18-8 stainless steel, passivated, 70,000 psi, Rockwell B55 | McMaster 91829A566 slotted precision shoulder screw, 1/4 in × 3/8 in shoulder, 10-24 thread 3/8 in long (owner ruling 2026-11-08 (Pedro, #2144 item 11.4): keep the slotted design; slotted McMaster 91829A566 found by vendor search, pending owner confirmation); shoulder seated on the gooseneck end face, the counter spring's upper eye rides free on it (owner ruling 2026-11-08 (Pedro), #2144 item 11.4); dimensions: `sm_vn_gooseneck_shoulder_screw_spec.py` |
-| `sm-vn-gooseneck-shoulder-washer` (MHA-SM-VN-57) | 1 | 18-8 stainless steel, DIN 125 | McMaster 93475A250 flat washer for M6, 6.4 mm ID × 12.0 mm OD × 1.6 mm (found by vendor search for the 91829A566 shoulder, pending owner confirmation); under the shoulder screw's head, retains the eye; dimensions: `sm_vn_gooseneck_shoulder_washer_spec.py` |
+| `sm-vn-gooseneck-shoulder-screw` (MHA-SM-VN-56) | 1 | 18-8 stainless steel, passivated, 70,000 psi, Rockwell B55 | McMaster 91829A566 slotted precision shoulder screw, 1/4 in × 3/8 in shoulder, 10-24 thread 3/8 in long (owner ruling 2026-11-08 (Pedro), #2144 item 11.4: bare slotted McMaster 91829A566, washer dropped); shoulder seated on the gooseneck end face, the counter spring's upper eye rides free on it under the head; dimensions: `sm_vn_gooseneck_shoulder_screw_spec.py` |
 | `pd-guide-lock` | TODO | TODO | TODO |
 | `sh-column-clamp-front` | TODO | TODO | TODO |
 | `sh-column-clamp-back` | TODO | TODO | TODO |

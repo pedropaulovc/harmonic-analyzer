@@ -22,7 +22,6 @@ import ch_vn_channel_spring_stock_geom as channel_stock
 import sm_vn_counter_spring_stock_geom as counter_stock
 import sm_gooseneck_geom
 import sm_vn_gooseneck_shoulder_screw_spec as shoulder_screw
-import sm_vn_gooseneck_shoulder_washer_spec as shoulder_washer
 import sm_summing_lever_spec
 import sm_vn_boss_hook_spec
 from _hole_spec import blind_cut_dia_mm
@@ -404,17 +403,17 @@ def counter_half_turn_clearances(
     *,
     eye_shift: float = 0.0,
 ) -> tuple[float, float]:
-    """Lower bounds on raised half-turn clearance to the arm and the retainer.
+    """Lower bounds on raised half-turn clearance to the arm and the head.
 
     The arm is the Ø12.70 tube and its end piece, turned flush with it (no
     step), so it is one cylinder of radius TUBE_DIA/2 up to the end face.  The
-    retainer is MHA-SM-VN-57's washer (Ø OD x THICKNESS, under the head) and
-    MHA-SM-VN-56's head (Ø HEAD_DIA x HEAD_HEIGHT), the shoulder seated on the
-    end face.  ``pose`` is the native-seat placement, the loop on the end
+    retainer is MHA-SM-VN-56's head (Ø HEAD_DIA x HEAD_HEIGHT), the shoulder
+    seated on the end face (owner ruling 2026-11-08 (Pedro), #2144 item 11.4:
+    bare slotted McMaster 91829A566, washer dropped).  ``pose`` is the native-seat placement, the loop on the end
     face.  Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: the eye rides
     free on the shoulder, so the loop and its hanging coil may slide
     outward by ``eye_shift`` (0 up to sm_gooseneck_spring_joint's
-    EYE_AXIAL_PLAY_MAX; a rigid-shift bound) toward the washer.
+    EYE_AXIAL_PLAY_MAX; a rigid-shift bound) toward the head.
     Distance to the solid cylinders is 1-Lipschitz. Subtract half the sampled
     centreline arc step, so a narrow collision between samples cannot pass.
     Native interference checks separately cover the transition and full bodies.
@@ -425,12 +424,8 @@ def counter_half_turn_clearances(
     start_x = counter_stock.coil_end_x_mm(pose.length_mm) + wire
     rows = pose.rotation_rows
     head_x = GOOSENECK_END_X + shoulder_screw.SHOULDER_LENGTH
-    washer_x = head_x - shoulder_washer.THICKNESS
-    retainers = (
-        (washer_x, shoulder_washer.THICKNESS, shoulder_washer.OD / 2.0),
-        (head_x, shoulder_screw.HEAD_HEIGHT, shoulder_screw.HEAD_DIA / 2.0),
-    )
-    tube_gap = retainer_gap = math.inf
+    head_r = shoulder_screw.HEAD_DIA / 2.0
+    tube_gap = head_gap = math.inf
     steps = 1024
     for index in range(steps + 1):
         angle = math.pi * index / steps
@@ -455,17 +450,16 @@ def counter_half_turn_clearances(
             )
             - wire,
         )
-        for start, length, rim in retainers:
-            retainer_gap = min(
-                retainer_gap,
-                math.hypot(
-                    max(start - x, x - start - length, 0.0),
-                    max(radial - rim, 0.0),
-                )
-                - wire,
+        head_gap = min(
+            head_gap,
+            math.hypot(
+                max(head_x - x, x - head_x - shoulder_screw.HEAD_HEIGHT, 0.0),
+                max(radial - head_r, 0.0),
             )
+            - wire,
+        )
     sampling_bound = math.hypot(wire, math.pi * radius) / (2.0 * steps)
-    return tube_gap - sampling_bound, retainer_gap - sampling_bound
+    return tube_gap - sampling_bound, head_gap - sampling_bound
 
 
 def _reference_counter_pose() -> SpringPose:

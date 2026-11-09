@@ -211,7 +211,6 @@ PART_ROWS = {
     "sm-vn-counter-spring": _config.parts("sm-vn-counter-spring"),
     "sm-gooseneck": _config.parts("sm-gooseneck"),
     "sm-vn-gooseneck-shoulder-screw": _config.parts("sm-vn-gooseneck-shoulder-screw"),
-    "sm-vn-gooseneck-shoulder-washer": _config.parts("sm-vn-gooseneck-shoulder-washer"),
 }
 if set(PART_ROWS) != set(BOM_COMPONENTS):
     raise AssertionError("BOM registry rows must cover exactly the assembly families")

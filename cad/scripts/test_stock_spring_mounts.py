@@ -69,9 +69,10 @@ def test_uniform_plate_preserves_anchor_and_nut_installation_coordinates() -> No
 
 
 def test_counter_leading_half_turn_clears_tube_and_retainer() -> None:
-    """The extra half-turn must face the open side, not penetrate the tube,
-    the washer or the head, wherever the free eye rides on the shoulder (owner
-    ruling 2026-11-08 (Pedro), #2144 item 11.4)."""
+    """The extra half-turn must face the open side, not penetrate the tube
+    or the head, wherever the free eye rides on the shoulder (owner ruling
+    2026-11-08 (Pedro), #2144 item 11.4: bare slotted McMaster 91829A566,
+    washer dropped)."""
     import sm_gooseneck_spring_joint as spring_joint
 
     pose = spring_mount_geom.COUNTER_REFERENCE_POSE
@@ -79,11 +80,11 @@ def test_counter_leading_half_turn_clears_tube_and_retainer() -> None:
     steps = 8
     for index in range(steps + 1):
         shift = spring_joint.EYE_AXIAL_PLAY_MAX * index / steps
-        tube_gap, retainer_gap = spring_mount_geom.counter_half_turn_clearances(
+        tube_gap, head_gap = spring_mount_geom.counter_half_turn_clearances(
             pose, screw_y, eye_shift=shift
         )
         assert tube_gap >= spring_mount_geom.MIN_CLEARANCE_MM, shift
-        assert retainer_gap >= spring_mount_geom.MIN_CLEARANCE_MM, shift
+        assert head_gap >= spring_mount_geom.MIN_CLEARANCE_MM, shift
 
 
 def test_counter_upper_loop_rides_on_the_shoulder_and_clears_the_tube() -> None:

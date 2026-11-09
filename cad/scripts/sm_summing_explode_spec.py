@@ -26,7 +26,6 @@ from sm_summing_assembly_spec import (
     HANGER_WASHER,
     KNIFE_MOUNT,
     SPRING_SCREW,
-    SPRING_WASHER,
 )
 
 EXPLODED_VIEW_NAME = "SM_EXPLODED"
@@ -49,11 +48,8 @@ DOWEL_LIFT = 20.0
 BOSS_HOOK_LIFT = 35.0
 BOSS_JAM_NUT_LIFT = 23.0
 EXPLODE_STEPS: tuple[tuple[str, tuple[str, ...], str | None, str, float], ...] = (
-    ("gooseneck lifts", (GOOSENECK, SPRING_SCREW, SPRING_WASHER), None, "y", 80.0),
+    ("gooseneck lifts", (GOOSENECK, SPRING_SCREW), None, "y", 80.0),
     ("shoulder screw backs out", (SPRING_SCREW,), None, "x", 35.0),
-    # The washer stays on the screw's thread, short of its shoulder end, clear
-    # of the head, so it reads as the screw's washer (#2144 item 11.4).
-    ("washer rides the screw", (SPRING_WASHER,), None, "x", 25.0),
     ("counter spring lifts off hook", (COUNTER_SPRING,), None, "y", 55.0),
     ("boss hook unscrews", (BOSS_HOOK,), None, "y", BOSS_HOOK_LIFT),
     ("jam nut rides the shank", (BOSS_JAM_NUT,), None, "y", BOSS_JAM_NUT_LIFT),

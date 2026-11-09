@@ -66,9 +66,4 @@ ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
             THREAD_MAJOR_MM["#10-24"], TAP_DRILL_MM["#10-24"], _GOOSENECK_THREAD_LENGTH
         )
     ),
-    # The washer on the shoulder under the head: face and bore contacts, no
-    # interference fit.
-    frozenset(
-        ("sm-vn-gooseneck-shoulder-screw-1", "sm-vn-gooseneck-shoulder-washer-1")
-    ): 0.0,
 }

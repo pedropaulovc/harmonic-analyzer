@@ -178,12 +178,13 @@ def counter_upper_support_geometry() -> dict[str, str | float]:
     Older integral-shank, die-relief and clamped-eye certificates do not
     measure this support: owner ruling 2026-11-08 (Pedro), #2144 item 11.4
     (superseding #1951's clamped eye) seats the purchased MHA-SM-VN-56
-    slotted shoulder screw (McMaster 91829A566; owner ruling 2026-11-08: keep
-    the slotted design, SKU pending owner confirmation) on the flush end face
-    of the Ø12.70 tube arm's end piece, its plain #10-24 tap without a
-    counterbore, and the loop rides free on the Ø6.35 shoulder, resting on
-    that end face.  The washer under the head only retains the loop and is not
-    in the fixture.
+    slotted shoulder screw (McMaster 91829A566) on the flush end face of the
+    Ø12.70 tube arm's end piece, its plain #10-24 tap without a counterbore,
+    and the loop rides free on the Ø6.35 shoulder, resting on that end face.
+    Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: bare slotted McMaster
+    91829A566, washer dropped; the head retains the loaded eye
+    (``eye_retainer``), so a certificate gated on the former washer cannot
+    stand.
     Channel measurements are unchanged; the analytic force and clearance model
     never depends on a native certificate.
     """
@@ -203,6 +204,7 @@ def counter_upper_support_geometry() -> dict[str, str | float]:
         "head_height_mm": shoulder_screw.HEAD_HEIGHT,
         "drive_slot_width_mm": shoulder_screw.SLOT_WIDTH,
         "drive_slot_depth_mm": shoulder_screw.SLOT_DEPTH,
+        "eye_retainer": "head",
         "eye_gap_mm": sm_gooseneck_geom.SPRING_EYE_GAP,
         "arm_end_x_mm": sm_gooseneck_geom.ARM_END_X,
         "spring_eye_x_mm": sm_gooseneck_geom.SPRING_EYE_X,

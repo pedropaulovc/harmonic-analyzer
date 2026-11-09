@@ -7,7 +7,9 @@ build_sm_summing_assembly gates the settled placement with the same check.
 
 Owner ruling 2026-11-08 (Pedro), #2144 item 11.4, superseding #1951's clamped
 eye: the upper eye rides free on MHA-SM-VN-56's shoulder, seated on the
-MHA-SM-01 end face, retained by the MHA-SM-VN-57 washer under the head.
+MHA-SM-01 end face, retained by the screw's head on the LOADED basis (owner
+ruling 2026-11-08 (Pedro), #2144 item 11.4: bare slotted McMaster 91829A566,
+washer dropped).
 """
 
 from __future__ import annotations
@@ -35,12 +37,18 @@ def assert_counter_spring_top_hang(
     """
     ux, uy = pose.axis_xy
     screw_y = gooseneck_y + sm_gooseneck_geom.ARM_Y
-    # The washer under the head retains the free eye over the rule's 1.0 mm
-    # radial at its smallest OD (sm_gooseneck_spring_joint).
-    retention = spring_joint.WASHER_RETENTION_MIN
+    # Retention is on the LOADED basis (sm_gooseneck_spring_joint): the pull
+    # is plumb, so the eye's inner top bears on the shoulder's top and the
+    # head laps its pull-side wire.  A tilted pull voids that basis.
+    if abs(ux) > 1e-9:
+        raise RuntimeError(
+            f"counter pull is not plumb (axis x {ux:.3e}): the loaded-basis "
+            "retention of the free eye under the bare head does not hold"
+        )
+    retention = spring_joint.LOADED_RETENTION_MIN
     if retention < spring_joint.RETENTION_TARGET:
         raise RuntimeError(
-            f"counter eye worst washer retention only {retention:.3f} mm radial"
+            f"counter eye worst loaded head retention only {retention:.3f} mm radial"
         )
     band = (
         abs(ux) * counter_stock.COIL_MEAN_RADIUS_MM
@@ -75,7 +83,7 @@ def assert_counter_spring_top_hang(
     # The native seat certificate is taken with the loop on the end face, but
     # the free eye slides out along the shoulder up to EYE_AXIAL_PLAY_MAX
     # (sm_gooseneck_spring_joint). The independent bound of that envelope: the
-    # half-turn against the arm and the washer/head at EYE_SHIFT_SAMPLES evenly
+    # half-turn against the arm and the head at EYE_SHIFT_SAMPLES evenly
     # spaced shifts, both ends included, each the rigid shift
     # counter_half_turn_clearances bounds.
     steps = EYE_SHIFT_SAMPLES - 1
@@ -97,13 +105,13 @@ def assert_counter_spring_top_hang(
         raise RuntimeError(
             f"counter coil/support clearance: main {main_coil_gap:.3f}, "
             f"half-turn/tube {tube_gap:.3f} at eye shift {tube_at:.4f}, "
-            f"half-turn/washer-head {head_gap:.3f} at eye shift {head_at:.4f} mm "
+            f"half-turn/head {head_gap:.3f} at eye shift {head_at:.4f} mm "
             f"(shift 0..{spring_joint.EYE_AXIAL_PLAY_MAX:.4f})"
         )
     log(
-        f"counter upper support: washer retention {retention:.3f}, loop face gap "
+        f"counter upper support: loaded head retention {retention:.3f}, loop face gap "
         f"{face_gap:.9f}, axial play {spring_joint.EYE_AXIAL_PLAY_MIN:.4f}.."
         f"{spring_joint.EYE_AXIAL_PLAY_MAX:.4f}, main coil {main_coil_gap:.3f}, "
-        f"least half-turn tube/washer-head {tube_gap:.3f}/{head_gap:.3f} mm at "
+        f"least half-turn tube/head {tube_gap:.3f}/{head_gap:.3f} mm at "
         f"eye shifts {tube_at:.4f}/{head_at:.4f}"
     )

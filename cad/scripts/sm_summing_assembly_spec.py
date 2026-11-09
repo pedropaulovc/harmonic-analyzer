@@ -39,7 +39,6 @@ BOSS_JAM_NUT = "sm-vn-boss-hook-jam-nut"
 COUNTER_SPRING = "sm-vn-counter-spring"
 GOOSENECK = "sm-gooseneck"
 SPRING_SCREW = "sm-vn-gooseneck-shoulder-screw"
-SPRING_WASHER = "sm-vn-gooseneck-shoulder-washer"
 
 # Every component family and its count, in the builder's insertion order: the
 # builder places, the explode moves and the drawing's BOM proves exactly this.
@@ -54,7 +53,6 @@ QUANTITIES = {
     COUNTER_SPRING: 1,
     GOOSENECK: 1,
     SPRING_SCREW: 1,
-    SPRING_WASHER: 1,
 }
 
 # --- Knife-hanger bolt fit-up ---------------------------------------------------

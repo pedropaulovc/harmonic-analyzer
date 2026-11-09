@@ -2,9 +2,8 @@
 
 Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: the counter spring's upper
 eye rides free on the shoulder of the slotted McMaster 91829A566 (read live
-2026-11-08; owner ruling 2026-11-08 (Pedro, #2144 item 11.4): keep the
-slotted design; found by vendor search, pending owner confirmation), seated
-on the MHA-SM-01 end face.
+2026-11-08; owner ruling 2026-11-08 (Pedro), #2144 item 11.4: bare slotted
+McMaster 91829A566, washer dropped), seated on the MHA-SM-01 end face.
 """
 from __future__ import annotations
 

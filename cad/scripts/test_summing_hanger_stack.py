@@ -217,17 +217,11 @@ def test_new_washers_add_two_instances_to_the_one_dowel_per_mount_recipe() -> No
         "sm-vn-counter-spring": 1,
         "sm-gooseneck": 1,
         "sm-vn-gooseneck-shoulder-screw": 1,
-        "sm-vn-gooseneck-shoulder-washer": 1,
     }
     # Owner ruling 2026-11-08 (Pedro), #2144 item 11.3: one dowel per mount
     # takes the former thirteen-component recipe to eleven.
-    # Item 11.4 adds the shoulder screw's washer to the hardware.
-    assert sum(counts.values()) == 15
-    added = (
-        counts["sm-vn-knife-hanger-washer"]
-        + counts["sm-vn-boss-hook-jam-nut"]
-        + counts["sm-vn-gooseneck-shoulder-washer"]
-    )
+    assert sum(counts.values()) == 14
+    added = counts["sm-vn-knife-hanger-washer"] + counts["sm-vn-boss-hook-jam-nut"]
     assert sum(counts.values()) - added == 11
 
 

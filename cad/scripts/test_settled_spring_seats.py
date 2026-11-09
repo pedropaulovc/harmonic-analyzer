@@ -245,6 +245,9 @@ def test_isolated_counter_provenance_identifies_the_whole_support(
     # The slotted head's driver slot (#2144 item 11.4), not the retired
     # clamped eye's slot.
     assert (support["drive_slot_width_mm"], support["drive_slot_depth_mm"]) == (1.524, 1.905)
+    # Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: washer dropped, the
+    # bare head retains the loaded eye.
+    assert support["eye_retainer"] == "head"
     assert support["thread"] == "#10-24"
     assert support["pitch_mm"] == pytest.approx(25.4 / 24.0)
     assert support["major_dia_mm"] == pytest.approx(4.826)

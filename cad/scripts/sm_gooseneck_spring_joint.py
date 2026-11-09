@@ -3,19 +3,18 @@
 Owner ruling 2026-11-08 (Pedro), #2144 item 11.4, supersedes #1951's clamped
 eye: the whole gooseneck is still 1/2 in tube ending flush in the solid
 Ø.500 end piece (sm_gooseneck_geom), but the counter spring's upper eye now
-rides FREE on the 1/4 shoulder of a purchased shoulder screw (MHA-SM-VN-56)
-under an MHA-SM-VN-57 washer beneath its head.  Owner ruling 2026-11-08
-(Pedro, #2144 item 11.4): keep the slotted design; slotted McMaster 91829A566
-found by vendor search, pending owner confirmation, with the McMaster
-93475A250 washer found for that shoulder (the ruling's 91259A576 5/16
-shoulder drops the arm 0.79 mm and its leading half-turn meets the tube).
+rides FREE on the 1/4 shoulder of a purchased shoulder screw (MHA-SM-VN-56),
+between the end face and the head.  Owner ruling 2026-11-08 (Pedro), #2144
+item 11.4: bare slotted McMaster 91829A566, washer dropped (the ruling's
+first 91259A576 5/16 shoulder dropped the arm 0.79 mm and its leading
+half-turn met the tube).
 The shoulder end seats on the end face and the 10-24 thread runs into a plain
 #10-24 UNC blind tap: no counterbore, no position frames, no datums.  The
 tap's axis carries the implied-zero coaxial offset of the title block's .XXX
 row.
 
-One owner minor (cad/config/parts/sm-gooseneck.yaml RV-04, drafted pending
-the owner's confirmation) stands against rule 18: the catalogue screw's 3/8
+One owner minor (cad/config/parts/sm-gooseneck.yaml RV-04, accepted with the
+bare slotted screw) stands against rule 18: the catalogue screw's 3/8
 thread, less its undercut and tip lead, engages ENGAGEMENT_MIN (1.16D) of
 full thread, under 1.5D.  The check raises unless that declaration is
 present (sm_gooseneck_spec).  MHA-SM-01 prints decimal inch (#290): every term
@@ -29,7 +28,6 @@ import math
 import sm_gooseneck_geom as gooseneck
 import sm_vn_counter_spring_stock_geom as spring
 import sm_vn_gooseneck_shoulder_screw_spec as screw
-import sm_vn_gooseneck_shoulder_washer_spec as washer
 from _hole_spec import DRILL_POINT_H, HoleSpec, blind_cut_dia_mm
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _printed_tolerance import (
@@ -134,78 +132,74 @@ def owner_minor(row: dict, exception_id: str, part: str) -> None:
 # Owner ruling 2026-11-08 (Pedro), #2144 item 11.4, supersedes #1951's clamped
 # eye: the loop is no longer clamped (the clamp preload, coil-bound gap and
 # clamped-gap stacks are gone); it hangs on the shoulder between the end face
-# and the washer, free to slide and swivel.  The catalogue limits:
+# and the head, free to slide and swivel.  The catalogue limits:
 SHOULDER_DIA_MIN = screw.SHOULDER_DIA + screw.SHOULDER_DIA_BAND[1]
 SHOULDER_DIA_MAX = screw.SHOULDER_DIA + screw.SHOULDER_DIA_BAND[0]
 SHOULDER_LENGTH_MIN = screw.SHOULDER_LENGTH + screw.SHOULDER_LENGTH_BAND[1]
 SHOULDER_LENGTH_MAX = screw.SHOULDER_LENGTH + screw.SHOULDER_LENGTH_BAND[0]
-# The washer slides onto the shoulder at its tightest pair, and its float on
-# the shoulder (the loose pair, half the diametral clearance) still leaves the
-# head (Ø.357 MIN, the spec's B18.3 allowance) bearing on it all round.
-WASHER_SHOULDER_CLEARANCE_MIN = washer.ID_MIN - SHOULDER_DIA_MAX
-WASHER_FLOAT_MAX = (washer.ID_MAX - SHOULDER_DIA_MIN) / 2.0
-HEAD_WASHER_OVERLAP_MIN = screw.HEAD_DIA_MIN / 2.0 - (
-    washer.ID_MAX / 2.0 + WASHER_FLOAT_MAX
-)
-# The washer's bore can sit on the screw's head fillet, charged at B18.3's
-# 1/4 row (the spec's allowance): from the under-head neck (Ø.227 MIN) to the
-# head face inside Ø.276 MAX: its
-# largest radius is the difference, and the washer's inner edge can come no
-# nearer the axis than the shoulder's smallest surface.  The fillet's height
-# there stands the washer off the head face.
+# The loop's head-side wire can sit on the screw's head fillet, charged at
+# B18.3's 1/4 row (the spec's allowance): from the under-head neck (Ø.227
+# MIN) to the head face inside Ø.276 MAX.  Its largest radius is the
+# difference; the wire can come no nearer the axis than the shoulder's
+# smallest surface, and the fillet's height there stands the loop off the
+# head face (a bound: the round wire touches farther out).
 _FILLET_R_MAX = (screw.HEAD_FILLET_TRANSITION_DIA_MAX - screw.SHOULDER_NECK_DIA_MIN) / 2.0
 _FILLET_OUTER_R = screw.HEAD_FILLET_TRANSITION_DIA_MAX / 2.0
-_WASHER_EDGE_R = SHOULDER_DIA_MIN / 2.0
-WASHER_SEAT_STANDOFF_MAX = (
+_WIRE_EDGE_R = SHOULDER_DIA_MIN / 2.0
+HEAD_SEAT_STANDOFF_MAX = (
     _FILLET_R_MAX
-    - math.sqrt(max(0.0, _FILLET_R_MAX**2 - (_FILLET_OUTER_R - _WASHER_EDGE_R) ** 2))
-    if _WASHER_EDGE_R < _FILLET_OUTER_R
+    - math.sqrt(max(0.0, _FILLET_R_MAX**2 - (_FILLET_OUTER_R - _WIRE_EDGE_R) ** 2))
+    if _WIRE_EDGE_R < _FILLET_OUTER_R
     else 0.0
 )
 # The loop's FREE envelope along the shoulder (LOOP_RISE + wire, the
 # 1330K524's 1.75 turns of 1.6002 wire): sm_gooseneck_geom.SPRING_EYE_GAP.
 LOOP_ENVELOPE = gooseneck.SPRING_EYE_GAP
-# The eye's room: the end face to the washer's face, at the worst limits.
-EYE_SPACE_MIN = SHOULDER_LENGTH_MIN - washer.THICKNESS_MAX - WASHER_SEAT_STANDOFF_MAX
-EYE_SPACE_MAX = SHOULDER_LENGTH_MAX - washer.THICKNESS_MIN
+# The eye's room: the end face to the head face, at the worst limits.
+EYE_SPACE_MIN = SHOULDER_LENGTH_MIN - HEAD_SEAT_STANDOFF_MAX
+EYE_SPACE_MAX = SHOULDER_LENGTH_MAX
 # The eye's axial play along the shoulder: positive at the tightest stack, so
-# the loop never jams between the washer and the end face.
+# the loop never jams between the head and the end face.
 EYE_AXIAL_PLAY_MIN = EYE_SPACE_MIN - LOOP_ENVELOPE
 EYE_AXIAL_PLAY_MAX = EYE_SPACE_MAX - LOOP_ENVELOPE
 # The eye rides free on the shoulder: the Ø.374 eye over the largest
 # shoulder.
 EYE_SHOULDER_CLEARANCE_MIN = spring.EYE_ID_MM - SHOULDER_DIA_MAX
-# Retention: the washer's worst-case overlap of the eye's ID; the 1.0 check
-# is the one the retired made screw's head was held to.  The bare head
-# (Ø.357 MIN) would keep only HEAD_ONLY_RETENTION_MIN, under the eye's own
-# radius, which is why the washer is there.
+# Retention, LOADED basis (owner ruling 2026-11-08 (Pedro), #2144 item 11.4:
+# bare slotted McMaster 91829A566, washer dropped).  The counter spring's pull
+# is plumb (spring_mount_geom.counter_pose: upper eye X = anchor X, axis
+# (0, 1); _counter_spring_hang refuses any other pose), so the eye's inner top
+# bears on the shoulder's top and the head laps the pull-side wire by the
+# head's radius less the shoulder's.  The 1.0 check is the one the retired
+# made screw's head was held to; the least lap takes the head's least Ø (the
+# spec's B18.3 allowance) over the largest shoulder.
 RETENTION_TARGET = 1.0
-WASHER_RETENTION = (washer.OD - spring.EYE_ID_MM) / 2.0
-WASHER_RETENTION_MIN = (washer.OD_MIN - spring.EYE_ID_MM) / 2.0
-HEAD_ONLY_RETENTION_MIN = (screw.HEAD_DIA_MIN - spring.EYE_ID_MM) / 2.0
-# The washer (1.8 MAX) covers less than the under-head neck allowance (.093
-# MAX wide), so the loop's head-side wire can bear over the neck.  Its
-# step down from the shoulder is under the wire's radius, so the round wire
-# rides back up onto the shoulder as the loop slides: it cannot wedge there.
+LOADED_RETENTION = (screw.HEAD_DIA - screw.SHOULDER_DIA) / 2.0
+LOADED_RETENTION_MIN = (screw.HEAD_DIA_MIN - SHOULDER_DIA_MAX) / 2.0
+# The loop's head-side wire can bear over the under-head neck allowance
+# (.093 MAX wide).  Its step down from the shoulder is under the wire's
+# radius, so the round wire rides back up onto the shoulder as the loop
+# slides: it cannot wedge there.
 SHOULDER_NECK_STEP_MAX = (SHOULDER_DIA_MAX - screw.SHOULDER_NECK_DIA_MIN) / 2.0
 WIRE_R = spring.WIRE_RADIUS_MM
 
 # --- The screw's strength under the counter spring ---------------------------
 # The slotted 18-8 screw is rated 70,000 psi tensile (Rockwell B55, shear not
-# rated).  The eye's pull bends it as a cantilever off the end face: the load
-# can act no farther out than the washer's face (EYE_SPACE_MAX), and the
-# least section at that face is the thread's undercut land (Ø3.3528), which
-# the end piece's tap mouth actually supports, so the root stress below is a
-# bound.  Callers pass the spring's catalogue maximum load (spring_mount_geom
-# reads it from the registry; this module reads no row).
-LOAD_LEVER_MAX = EYE_SPACE_MAX
+# rated).  The eye's pull bends it as a cantilever off the end face: at worst
+# the whole pull rides the loop's head-side wire, its centre one wire radius
+# off the head face at the longest eye space, and the least section there is
+# the thread's undercut land (Ø3.3528), which the end piece's tap mouth
+# actually supports, so the root stress below is a bound.  Callers pass the
+# spring's catalogue maximum load (spring_mount_geom reads it from the
+# registry; this module reads no row).
+LOAD_LEVER_MAX = EYE_SPACE_MAX - WIRE_R
 _ROOT_SECTION_MODULUS = math.pi * screw.THREAD_NECK_DIA_MIN**3 / 32.0
 _ROOT_AREA = math.pi * screw.THREAD_NECK_DIA_MIN**2 / 4.0
 
 
 def root_stress_mpa(load_n: float) -> tuple[float, float]:
     """Bending and direct-shear stress (MPa) at the undercut land for ``load_n``
-    hung at the washer's face."""
+    hung on the loop's head-side wire."""
     return load_n * LOAD_LEVER_MAX / _ROOT_SECTION_MODULUS, load_n / _ROOT_AREA
 
 
@@ -310,14 +304,12 @@ DRILL_POINT_SHANK_WALL_MIN = (
 
 if TAP_SPEC.size != screw.THREAD_SIZE or TAP_SPEC.thread_class != "2B":
     raise AssertionError("gooseneck shoulder screw does not match its blind tap")
-if min(WASHER_SHOULDER_CLEARANCE_MIN, HEAD_WASHER_OVERLAP_MIN) <= 0.0:
-    raise AssertionError("gooseneck washer does not slide on the shoulder under the head")
 if EYE_AXIAL_PLAY_MIN <= 0.0:
-    raise AssertionError("gooseneck spring loop jams between the washer and the end face")
+    raise AssertionError("gooseneck spring loop jams between the head and the end face")
 if EYE_SHOULDER_CLEARANCE_MIN <= 0.0:
     raise AssertionError("gooseneck spring eye does not ride free on the shoulder")
-if WASHER_RETENTION_MIN < RETENTION_TARGET:
-    raise AssertionError("gooseneck washer does not retain the spring eye")
+if LOADED_RETENTION_MIN < RETENTION_TARGET:
+    raise AssertionError("gooseneck shoulder screw's head does not retain the loaded spring eye")
 if SHOULDER_NECK_STEP_MAX >= WIRE_R:
     raise AssertionError("gooseneck spring wire can wedge in the shoulder's neck")
 if ENGAGEMENT_MIN <= 0.0:

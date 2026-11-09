@@ -34,14 +34,13 @@ boss-hook / counter-spring / gooseneck chain.
   boss top face + counter-spring + gooseneck -- the counter-balance hung from
   the east column; the gooseneck's brazed O15.875 sleeve is the post the
   top-frame rail hub's set screw grips (no separate clamp part).
-* sm-vn-gooseneck-shoulder-screw + sm-vn-gooseneck-shoulder-washer --
-  purchased MHA-SM-VN-56 shoulder screw, head outboard, its shoulder seated
-  on the face of the gooseneck's flush end piece and its 10-24 thread in the
-  end piece's plain blind tap; MHA-SM-VN-57 under its head.  Owner ruling
-  2026-11-08 (Pedro), #2144 item 11.4, superseding #1951's clamped eye: the
-  supplier upper loop rides free on the shoulder between the end face and
-  the washer.  Both locked to the fixed gooseneck with no additional
-  operational DOF.
+* sm-vn-gooseneck-shoulder-screw -- purchased MHA-SM-VN-56 slotted shoulder
+  screw, head outboard, its shoulder seated on the face of the gooseneck's
+  flush end piece and its 10-24 thread in the end piece's plain blind tap.
+  Owner ruling 2026-11-08 (Pedro), #2144 item 11.4, superseding #1951's
+  clamped eye: the supplier upper loop rides free on the shoulder between the
+  end face and the head (bare slotted McMaster 91829A566, washer dropped).
+  Locked to the fixed gooseneck with no additional operational DOF.
 
 Cross-subassembly fits (checked at the top level): the channel springs
 (ch-channel.SLDASM) thread the summing-lever plate's O4.5 holes -- gated
@@ -557,8 +556,6 @@ import spring_mount_geom as spring_mounts  # noqa: E402
 import sm_summing_lever_spec  # noqa: E402
 from stock_anchor_geom import ANCHOR_9490T1  # noqa: E402
 import sm_vn_boss_hook_jam_nut_spec as jam_nut  # noqa: E402
-import sm_vn_gooseneck_shoulder_screw_spec as shoulder_screw  # noqa: E402
-import sm_vn_gooseneck_shoulder_washer_spec as shoulder_washer  # noqa: E402
 
 BOSS_HOOK_POS = (*spring_mounts.COUNTER_ANCHOR_XY, SUMMING_Z)
 # MHA-SM-VN-55 on the anchor axis, its z = 0 face on the boss top face:
@@ -574,7 +571,7 @@ JAM_NUT_ROWS = ROT_X_NEG90
 
 UPPER_EYE_NOTES = (
     "MHA-SM-VN-56: SEAT SHOULDER ON END PIECE FACE.\n"
-    "MHA-SM-VN-57 UNDER THE HEAD; UPPER EYE RIDES FREE ON SHOULDER.\n"
+    "UPPER EYE RIDES FREE ON SHOULDER UNDER THE HEAD.\n"
     "NO THREADLOCKER."
 )
 
@@ -989,20 +986,12 @@ async def build(adapter) -> dict[str, str]:
     )
     # The shoulder screw's origin is its shoulder end face, local +Z to the
     # head; ROT_Y_POS90 maps +Z to machine +X, so the shoulder seats on the
-    # end face and the thread runs into the blind tap.  The washer's bottom
-    # face (its origin) sits under the head on the same axis.  These mates
-    # record the seated pose, not a mechanical screw lock; the eye rides free
-    # on the shoulder (#2144 item 11.4) and adds no operational DOF.
+    # end face and the thread runs into the blind tap.  The mate records the
+    # seated pose, not a mechanical screw lock; the eye rides free on the
+    # shoulder (#2144 item 11.4) and adds no operational DOF.
     screw_rows = ROT_Y_POS90
     screw_y = gooseneck_origin_y + sm_gooseneck_geom.ARM_Y
     screw_position = [spring_mounts.GOOSENECK_END_X, screw_y, SUMMING_Z]
-    washer_position = [
-        spring_mounts.GOOSENECK_END_X
-        + shoulder_screw.SHOULDER_LENGTH
-        - shoulder_washer.THICKNESS,
-        screw_y,
-        SUMMING_Z,
-    ]
     # Literal stems, one call each: _buildgraph's source-expression contract
     # and the hanger-stack recipe count read them.
     screw_component = await place_component(
@@ -1013,25 +1002,13 @@ async def build(adapter) -> dict[str, str]:
         screw_rows,
         ground=False,
     )
-    washer_component = await place_component(
+    await lock_mate(
         adapter,
-        "sm-vn-gooseneck-shoulder-washer",
-        washer_position,
-        euler_from_rows(screw_rows),
-        screw_rows,
-        ground=False,
+        named_ref(f"Front Plane@{screw_component}", "PLANE"),
+        named_ref(f"Front Plane@{gooseneck}", "PLANE"),
+        label="shoulder screw seated on end piece",
     )
-    for component, position, label in (
-        (screw_component, screw_position, "shoulder screw seated on end piece"),
-        (washer_component, washer_position, "shoulder washer under the head"),
-    ):
-        await lock_mate(
-            adapter,
-            named_ref(f"Front Plane@{component}", "PLANE"),
-            named_ref(f"Front Plane@{gooseneck}", "PLANE"),
-            label=label,
-        )
-        assert_component_placed(adapter, component, position, screw_rows)
+    assert_component_placed(adapter, screw_component, screw_position, screw_rows)
 
     # Certify the AS-BUILT model.  The lever rock remains the sole intended
     # freed DOF; the exact allowed-stem set rejects any free screw, dowel, or

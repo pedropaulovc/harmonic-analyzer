@@ -603,17 +603,6 @@
       ]
     },
     {
-      "sourceStem": "sm-vn-gooseneck-shoulder-washer",
-      "sourceNumber": null,
-      "identities": [
-        {
-          "parent": "sm-summing",
-          "stem": "sm-vn-gooseneck-shoulder-washer",
-          "number": "MHA-SM-VN-57"
-        }
-      ]
-    },
-    {
       "sourceStem": "vn-magnifying-bracket-screw",
       "sourceNumber": "MHA-VN-050",
       "identities": [
@@ -1055,7 +1044,7 @@
       "status": "archive-only"
     }
   ],
-  "currentRegistryMapSha256": "89a8ce9c3e46291030d91e54c9361a2e53181b2c7a34612db95d1ed20b94da5d",
+  "currentRegistryMapSha256": "44b26018ca5089b05eecabce6b696414414525cc44ce57e9e5e94883d54c84cb",
   "nativeIdentities": [
     {
       "sourceStem": "ch-rocker-arm-tl-oblique-feed-lever",

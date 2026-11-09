@@ -220,19 +220,13 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
     ),
     # Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: the counter spring's
     # upper eye rides free on this shoulder screw's 1/4 shoulder, seated on
-    # the MHA-SM-01 end face, under the MHA-SM-VN-57 washer.  Owner ruling
-    # 2026-11-08 (Pedro, #2144 item 11.4): keep the slotted design; slotted
-    # McMaster 91829A566 found by vendor search, pending owner confirmation.
+    # the MHA-SM-01 end face, retained by its head.  Owner ruling 2026-11-08
+    # (Pedro), #2144 item 11.4: bare slotted McMaster 91829A566, washer
+    # dropped.
     "sm-vn-gooseneck-shoulder-screw": _stock(
         "sm-vn-gooseneck-shoulder-screw",
         "Slotted 18-8 Stainless Steel Precision Shoulder Screw, 1/4 x 3/8 in Shoulder, 10-24",
         "91829A566",
-        material="AISI 304",
-    ),
-    "sm-vn-gooseneck-shoulder-washer": _stock(
-        "sm-vn-gooseneck-shoulder-washer",
-        "18-8 Stainless Steel Washer for M6, 6.4 mm ID x 12.0 mm OD x 1.6 mm",
-        "93475A250",
         material="AISI 304",
     ),
     # The four platen-clip screws: brass #2-56 x 1/4, whose head stays inside
