@@ -1757,7 +1757,7 @@ DETAIL_KEEP = {
     # (machinist review 41bbeec): seeded nearer the upper end, it lands on
     # the arc's upper part, below and right of the shelf, outside the arc.
     "FlankToSide": (0.0653, 0.1918),
-    "KnifeRidgeRadius": (0.182, 0.219),
+    "KnifeRidgeRadius": (0.186, 0.219),
 }
 # Keep the native arc radius. R3's low shelf routed through the final SEAT T.
 # Above the height's Y201.3401 witness, the two-row block stays left of the

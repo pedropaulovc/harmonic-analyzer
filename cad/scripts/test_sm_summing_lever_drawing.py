@@ -1429,7 +1429,7 @@ def test_back_projected_knife_detail_uses_model_owned_spans_and_exterior_angle()
             "FlankToSide", f"2X PER STUB {spec.KNIFE_FLANK_TO_SIDE_DEG:.1f}° ±{flank_band}°",
         ),
         "KnifeRidgeRadius": _detail_block(
-            "KnifeRidgeRadius", f"EACH STUB R{inch(spec.KNIFE_RIDGE_R, spec.KNIFE_RIDGE_R_PLACES)} MAX",
+            "KnifeRidgeRadius", f"EACH STUB R{inch(spec.KNIFE_RIDGE_R, spec.KNIFE_RIDGE_R_PLACES)} max.",
         ),
     }
     for name, (left, _right, _bottom, top, _lines) in blocks.items():
@@ -1474,6 +1474,9 @@ def test_back_projected_knife_detail_uses_model_owned_spans_and_exterior_angle()
     # R7's complete R0.1 text must clear the x155.4 width witness, not
     # merely sit to the right of the ridge centre.
     assert blocks["KnifeRidgeRadius"][0] > 0.1554 + 0.002
+    # Native single-line shoulder starts 27.8 mm left of the keep; its
+    # underline overhang, not only the glyph box, must clear the witness.
+    assert drawing.DETAIL_KEEP["KnifeRidgeRadius"][0] - 0.0278 > 0.1554 + 0.002
     assert blocks["KnifeRidgeRadius"][2] > datum_foot + 0.007 + 0.004
     assert blocks["KnifeRidgeRadius"][3] < pair_line - 0.004
 
