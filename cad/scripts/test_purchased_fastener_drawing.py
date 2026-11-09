@@ -567,6 +567,9 @@ def test_isometric_only_member_shows_its_isometric_and_cites_its_sheet(
     assert "[1] RAIL  QTY 2 INSTALLED, SEE SHEET 2" in texts
     assert "[2] CARRIAGE  QTY 2 INSTALLED" in texts
     assert "ISOMETRIC  1:2" in texts
+    # ASME Y14.3: a view at the sheet's scale states none; a different one does.
+    assert "FRONT" in texts
+    assert not any(text.startswith("FRONT  ") for text in texts)
     # The sheet's scale is the first orthographic member's, not the isometric's.
     assert finalizations[0]["sheet_scales"]["REFERENCE"] == (1, 1)
 

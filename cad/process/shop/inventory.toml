@@ -4893,6 +4893,17 @@ oal_mm = { value = 101.52, measured = { status = "measured", by = "placeholder (
 # note, not a certificate; range_mm/sizes_mm/resolution_mm/pieces are plain
 # numbers in the schema.
 
+# Owned by the shop (Pedro, 2026-11-08): a Mitutoyo shop-grade 81-piece inch gauge
+# block set, for setting DRO stations and indicator zeros against a wrung stack.
+# Standard 81-piece inch composition: .1001-.1009 by .0001 (9); .101-.149 by .001 (49);
+# .050-.950 by .050 (19); 1, 2, 3, 4 (4). Model number not yet recorded.
+[gauges.gauge-blocks-mitutoyo]
+name = "Mitutoyo 81-piece inch gauge block set, shop grade"
+kind = "gauge_block_set"
+make = "Mitutoyo"
+present = true
+note = "owner-confirmed 2026-11-08: 81-piece inch set, shop grade; largest block 4 in; model number to be recorded"
+
 # --- pivot-bracket additions ---
 [gauges.radius-gauge]
 kind = "radius_gauge"

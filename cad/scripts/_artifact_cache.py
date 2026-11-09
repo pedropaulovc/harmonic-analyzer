@@ -62,6 +62,9 @@ Design notes / invariants:
   Restores replace only the declared output inventory, including absent optional
   outputs and whole directory contents. Validate ownership and stage the complete
   archive before removing anything; a failed replacement is never a cache HIT.
+  Ownership checks ignore Windows case and extended-length path spelling, but
+  reject parent traversal and filesystem aliases (symlinks/junctions), even
+  when an alias points to another output inside ``cad/out``.
 
 * **Observable.** A cache miss must be explainable WITHOUT scrollback archaeology
   (issue #73). Three knobs, all best-effort and never able to fail a build:
@@ -417,15 +420,36 @@ def _pack(outputs: list[Path]) -> BinaryIO:
 
 
 def _restore_path(path: Path) -> Path:
-    """A replacement target must be a strict, unaliased child of cad/out/."""
-    target = Path(os.path.abspath(path))
+    r"""Return a strict, unaliased child of cad/out/ in the root's namespace.
+
+    Windows case and ``\\?\`` spelling are not filesystem aliases. Normalize
+    those for comparison only; resolving a symlink/junction must still change
+    the normalized target, even when it points elsewhere inside cad/out/.
+    """
+    def normalized(candidate: Path) -> Path:
+        spelling = os.path.normcase(os.path.abspath(candidate))
+        if os.name == "nt":
+            if spelling.startswith("\\\\?\\unc\\"):
+                spelling = "\\\\" + spelling[8:]
+            elif spelling.startswith("\\\\?\\"):
+                spelling = spelling[4:]
+        return Path(spelling)
+
+    target = normalized(path)
+    root = normalized(_CACHE_OUTPUT_ROOT)
     if (
-        target == _CACHE_OUTPUT_ROOT
-        or not target.is_relative_to(_CACHE_OUTPUT_ROOT)
-        or target.resolve() != target
+        ".." in path.parts
+        or target == root
+        or not target.is_relative_to(root)
+        or normalized(path.resolve()) != target
     ):
         raise RuntimeError(f"unsafe cache output path: {path}")
-    return target
+    # Keep REPO_ROOT's namespace for _unpack's later relative_to(REPO_ROOT),
+    # including when the configured checkout itself has an extended prefix,
+    # and keep the caller's spelling below the root: the path tag feeds
+    # downstream cache keys, so lowercasing it (normcase) re-keys every
+    # dependent of a restored output.
+    return _CACHE_OUTPUT_ROOT.joinpath(*Path(os.path.abspath(path)).parts[-len(target.relative_to(root).parts):])
 
 
 def _unpack(blob: BinaryIO, outputs: list[Path]) -> None:
