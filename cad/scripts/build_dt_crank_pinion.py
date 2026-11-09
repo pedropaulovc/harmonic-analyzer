@@ -62,14 +62,13 @@ from _gtol_cylinder import CylinderFace
 from _gtol_face_resolve import resolve_faces
 from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
-from dt_crank_pinion_notes import GEAR_DATA
+from dt_crank_pinion_notes import DRAWING_NOTES, GEAR_DATA
 from dt_crank_pinion_spec import (
     BORE_DIA,
     BORE_DIA_BAND,
     BOSS_DIA,
     BOSS_LENGTH,
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     DRAWING_PRECISION,
     FACE_WIDTH,
     FACE_WIDTH_LIMITS,

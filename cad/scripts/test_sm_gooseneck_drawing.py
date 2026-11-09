@@ -13,7 +13,6 @@ import pytest
 
 from _hole_spec import DRILL_POINT_H
 import build_sm_gooseneck as part
-import build_sm_gooseneck_spring_screw as screw_part
 import draw_sm_gooseneck as drawing
 import sm_gooseneck_geom as geom
 import sm_gooseneck_spec as spec
@@ -53,7 +52,7 @@ def test_end_piece_is_flush_and_the_tube_ends_on_its_head() -> None:
 
 def test_blind_tap_stays_inside_the_solid_end_piece() -> None:
     assert joint.TAP_SPEC.kind.startswith("tapped")
-    assert joint.TAP_SPEC.size == "1/4-28"
+    assert joint.TAP_SPEC.size == "#10-24"
     assert joint.TAP_SPEC.end == "blind"
     assert joint.TAP_SPEC.thread_class == "2B"
     assert part.TAP_DRILL_DIA == joint.TAP_DRILL_DIA
@@ -72,40 +71,32 @@ def test_blind_tap_stays_inside_the_solid_end_piece() -> None:
     assert taps[0].lineno > max(node.lineno for node in sweeps)
 
 
-def test_tap_starts_on_the_counterbore_floor_of_the_unmerged_end_piece() -> None:
+def test_tap_starts_on_the_end_face_of_the_unmerged_end_piece() -> None:
+    # Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: a plain tap, no
+    # counterbore, both depths from the end face.
     source = Path(part.__file__).read_text(encoding="utf-8")
     sweep = source.index("create_sweep")
     end_piece = source.index('name_last_feature(adapter, "EndPiece")')
-    counterbore = source.index('name_last_feature(adapter, "Counterbore")')
     tap = source.index('name="ThreadBore"')
-    assert sweep < end_piece < counterbore < tap
+    assert sweep < end_piece < tap
+    assert "Counterbore" not in source
     # The end piece is its own body, so section A-A hatches it apart from the
     # tube (machinist review of 3c0b5d87c).
     revolve = source.rindex("create_revolve", 0, end_piece)
     assert "merge_result=False" in source[revolve:end_piece]
     assert "len(bodies) != 2" in source
-    assert "[[COUNTERBORE_FLOOR_X, ARM_Y, 0.0]]" in source
-    assert joint.TAP_SPEC.depth_mm == joint.TAP_DRILL_DEPTH_FROM_FLOOR
-    assert joint.TAP_SPEC.overrides_mm == {
-        "ThreadDepth": joint.TAP_THREAD_DEPTH_FROM_FLOOR
-    }
-    assert joint.TAP_DRILL_DEPTH == pytest.approx(
-        joint.COUNTERBORE_DEPTH + joint.TAP_DRILL_DEPTH_FROM_FLOOR
-    )
-    assert part.COUNTERBORE_R * 2.0 == joint.COUNTERBORE_DIA
-    assert part.COUNTERBORE_FLOOR_X == pytest.approx(
-        geom.ARM_END_X + joint.COUNTERBORE_DEPTH
-    )
+    assert "[[ARM_END_X, ARM_Y, 0.0]]" in source
+    assert joint.TAP_SPEC.depth_mm == joint.TAP_DRILL_DEPTH
+    assert joint.TAP_SPEC.overrides_mm == {"ThreadDepth": joint.TAP_THREAD_DEPTH}
+    assert part.V_TAP > 0.0
 
 
-@pytest.mark.parametrize("builder", [part, screw_part], ids=lambda m: m.__name__)
-def test_every_direct_db_block_restores_inference_in_finally(builder) -> None:
+def test_every_direct_db_block_restores_inference_in_finally() -> None:
     # Sketch inference is session state on the persistent seat: each block
     # that turns it off must restore it even when a native segment is
     # rejected, so every True is followed at once by a try whose finally
-    # restores it, and nothing restores it outside a finally.  Shared by the
-    # MHA-SM-01 post and the MHA-SM-04 screw builders.
-    tree = ast.parse(Path(builder.__file__).read_text(encoding="utf-8"))
+    # restores it, and nothing restores it outside a finally.
+    tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
 
     def toggle(node: ast.AST) -> str | None:
         if (
@@ -140,86 +131,22 @@ def test_every_direct_db_block_restores_inference_in_finally(builder) -> None:
     assert on == restored == len(offs) >= 1
 
 
-def test_counterbore_callouts_floor_the_wall_from_the_joint() -> None:
-    # A stated minimum is rounded DOWN, so the print never promises more
-    # wall than the joint's worst case leaves (drawing-guidelines rule 20):
-    # inches, to the sheet's .001.
-    floored = math.floor(joint.COUNTERBORE_WALL_MIN / 25.4 * 1000.0) / 1000.0
-    assert spec.COUNTERBORE_WALL_CALLOUT == (
-        f"C'BORE WALL {floored:.3f} MIN".replace(" 0.", " .")
-    )
-    assert floored * 25.4 <= joint.COUNTERBORE_WALL_MIN
-    callouts = spec.DIMENSION_CALLOUTS_BY_NAME
-    # The wall rides under the head Ø, its outer bound, with the Ø max's job:
-    # the stated wall holds at the counterbore's largest size (owner ruling
-    # on machinist review r7: keep both bands, state each max's job).
-    plug_rows = callouts["PlugDia"].splitlines()
-    wall_row = plug_rows.index(spec.COUNTERBORE_WALL_CALLOUT)
-    assert plug_rows[wall_row + 1 :] == ["AT C'BORE MAX"]
-    # Each LIMIT band names its mate and its max's job on its own callout
-    # (machinist review r8, farm run 20261101T035809796Z).
-    assert callouts["CounterboreDia"] == spec.COUNTERBORE_DIA_CALLOUT
-    assert spec.COUNTERBORE_DIA_CALLOUT.splitlines() == [
-        f"MIN CLEARS {spec.SCREW_NUMBER}",
-        "RUN-OUT; MAX SETS WALL",
-    ]
-    # The axis limit, a radial offset between named axes, rides the floor
-    # corner's block under its reason.
-    assert spec.COUNTERBORE_AXIS_CALLOUT.splitlines() == [
-        "C'BORE AXIS TO TAP AXIS",
-        f"{joint.COUNTERBORE_AXIS_OFFSET_MAX / 25.4:.3f} MAX RADIAL".lstrip("0"),
-    ]
-    assert "WITHIN" not in spec.COUNTERBORE_AXIS_CALLOUT
-    assert callouts["CounterboreFloorCornerR"] == spec.COUNTERBORE_FLOOR_CALLOUT
-    assert spec.COUNTERBORE_FLOOR_CALLOUT.splitlines() == [
-        "CLEARS RUN-OUT;",
-        *spec.COUNTERBORE_AXIS_CALLOUT.splitlines(),
-    ]
-    # The floor corner's limit is its own native radial dimension, not text
-    # under the depth (codjiflo P2 on #1997); the depth names its MIN's mate
-    # in one row above its stacked pair (rule 4).
-    assert "CounterboreDepth" not in callouts
-    assert spec.DIMENSION_CALLOUTS_ABOVE_BY_NAME == {
-        "CounterboreDepth": f"MIN CLEARS {spec.SCREW_NUMBER} RUN-OUT"
-    }
-    assert "\n" not in spec.COUNTERBORE_DEPTH_CALLOUT
+def test_end_piece_carries_no_counterbore_frames_or_datums() -> None:
+    # Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: plain #10-24 tap; no
+    # counterbore, frames, datums or RV-01.
     marked = {name for names in spec.DRAWING_DIMENSIONS.values() for name in names}
-    assert set(callouts) | set(spec.DIMENSION_CALLOUTS_ABOVE_BY_NAME) <= marked
-    for by_feature in (spec.DIMENSION_CALLOUTS, spec.DIMENSION_CALLOUTS_ABOVE):
-        for feature, by_name in by_feature.items():
-            assert set(by_name) <= set(spec.DRAWING_DIMENSIONS[feature])
-
-
-def test_counterbore_blocks_stand_between_their_neighbours() -> None:
-    # r8 (farm run 20261101T035809796Z) inked the Ø's stacked pair and two
-    # rows 19.2 mm tall, centred 0.45 mm above the keep, rows 5.6 mm apart;
-    # the extension lines stand on the modelled Ø (its MIN) at 3:1.
-    rows = len(spec.COUNTERBORE_DIA_CALLOUT.splitlines())
-    height = 0.0137 + (rows - 1) * 0.0056
-    centre = drawing.SECTION_KEEP["CounterboreDia"][1] + 0.00045
-    half_span = joint.COUNTERBORE_DIA / 2.0 * drawing._SECTION_S
-    lower, upper = drawing._SY0 - half_span, drawing._SY0 + half_span
-    clearance = 0.0007
-    assert centre - height / 2.0 >= lower + clearance
-    assert centre + height / 2.0 <= upper - clearance
-    # Positive control: cca02b34c's single value and three rows (~20.4 mm)
-    # was struck by the lower line.
-    assert 0.0036 + 3 * 0.0056 > upper - lower - 2 * clearance
-    # The floor corner's block (value 3.6 mm, rows 5.56 mm apart, centred on
-    # its keep, its shoulder 0.9 mm under) between the Ø's upper dimension
-    # line, which ends 6.3 mm over the upper extension line, and the depth's
-    # shoulder (r8: y 243.7 mm, 6.3 mm under the depth's keep y 250.05).
-    floor_rows = len(spec.COUNTERBORE_FLOOR_CALLOUT.splitlines())
-    floor_height = 0.0036 + floor_rows * 0.00556
-    floor_y = drawing.SECTION_KEEP["CounterboreFloorCornerR"][1]
-    shoulder = floor_y - floor_height / 2.0 - 0.0009
-    assert shoulder >= upper + 0.0063 + 0.0025
-    assert floor_y + floor_height / 2.0 <= 0.2437 - 0.0025
-    # Each row no longer than r8's 55.5 mm "C'BORE AXIS TO TAP AXIS" (23
-    # characters), which stood inside the left border and the end face.
-    for callout in (spec.COUNTERBORE_DIA_CALLOUT, spec.COUNTERBORE_FLOOR_CALLOUT):
-        assert max(map(len, callout.splitlines())) <= spec.COUNTERBORE_ROW_MAX_CHARS
-    assert spec.COUNTERBORE_ROW_MAX_CHARS == len("C'BORE AXIS TO TAP AXIS")
+    assert not any("Counterbore" in name for name in marked)
+    assert "CounterboreProfile" not in spec.DRAWING_DIMENSIONS
+    for name in ("GEOMETRIC_TOLERANCES_IN", "DIMENSION_CALLOUTS_ABOVE", "COUNTERBORE_NOTE"):
+        assert not hasattr(spec, name)
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    for token in ("add_feature_control_frame", "add_datum_feature", "CreateDetailViewAt"):
+        assert token not in source
+    assert spec.PLUG_DIA_CALLOUT == "FLUSH WITH TUBE OD"
+    callouts = spec.DIMENSION_CALLOUTS_BY_NAME
+    assert set(callouts) <= marked
+    for feature, by_name in spec.DIMENSION_CALLOUTS.items():
+        assert set(by_name) <= set(spec.DRAWING_DIMENSIONS[feature])
 
 
 def test_notes_state_stock_process_and_intent_without_sizes() -> None:
@@ -231,46 +158,33 @@ def test_notes_state_stock_process_and_intent_without_sizes() -> None:
     assert all(re.match(r"\d\. ", line) for line in lines)
     assert drawing.NOTES_XY[0] + 0.00242 * max(map(len, lines)) < 0.214
     notes = " ".join(spec.DRAWING_NOTES.split())
-    # The joint's window in inches, rounded inward at four places.
-    window = "-".join(
-        f"{inches:.4f}".lstrip("0")
-        for inches in (
-            math.ceil(round(joint.BRAZE_CLEARANCE_MIN / 25.4 * 1e4, 6)) / 1e4,
-            math.floor(round(joint.BRAZE_CLEARANCE_MAX / 25.4 * 1e4, 6)) / 1e4,
-        )
-    )
-    assert window == ".0040-.0098"
-    for phrase in (
-        "TUBE 1/2 OD X 0.065 WALL, ONLINEMETALS 7322",
-        "SLEEVE 5/8 OD X 0.058 WALL, 7324",
-        # The stock is as supplied: its catalogue tolerance governs, unprinted.
-        "BOTH AS SUPPLIED, SUPPLIER TOL.",
-        "BRAZE FILLER BAg-7 (AWS A5.8)",
-        # Owner ruling 2026-10-27 (#1997): join before bending.
-        "JOIN END PIECE, COOL OR FULLY CURE, THEN BEND",
-        "OVALITY 5% MAX",
-    ):
-        assert phrase in notes, phrase
-    # The shank and sleeve callouts state the joint's window and its joint on
-    # their own features (rule 7: leadered where it applies), not in a note.
-    shank = " ".join(spec.SHANK_FIT_CALLOUT.split())
-    sleeve = " ".join(spec.SLEEVE_FIT_CALLOUT.split())
-    assert f"FIT TO TUBE BORE, {window} DIAMETRAL CLEARANCE" in shank
-    assert "FULL-PENETRATION BRAZE OR LOCTITE 638" in shank
-    assert f"STOCK; FIT ON TUBE, {window} DIAMETRAL CLEARANCE;" in sleeve
-    assert "FILLET-BRAZE EACH END" in sleeve
-    assert "LOCTITE" not in notes and "FILLET" not in notes
+    # Each window prints in plain inch steps, rounded inward at three places
+    # (integration review at 8fb7fb46f7: .0040-.0098 read as converted mm).
+    # The shank's stays inside BAg-7's window and LOCTITE 638's 0.25 mm gap
+    # fill; the brazed-only sleeve takes BAg-7's .004-.010 diametral.
+    assert spec.SHANK_CLEARANCE_WINDOW == ".004-.009"
+    assert spec.SLEEVE_CLEARANCE_WINDOW == ".004-.010"
+    assert 0.009 * 25.4 <= joint.BRAZE_CLEARANCE_MAX <= joint.LOCTITE_638_GAP_MAX
+    assert joint.BRAZE_CLEARANCE_MIN <= 0.004 * 25.4
+    assert spec.SLEEVE_CLEARANCE_MAX == pytest.approx(0.010 * 25.4)
+    # Every SEE NOTE n a callout prints names a note on the sheet.
+    numbers = {line.split(".", 1)[0] for line in lines}
+    printed = " ".join(spec.DIMENSION_CALLOUTS_BY_NAME.values())
+    assert set(re.findall(r"SEE NOTE (\d)", printed)) <= numbers
+    # A callout carries at most two lines of words (rule 7).
+    for name, text in spec.DIMENSION_CALLOUTS_BY_NAME.items():
+        assert len(text.splitlines()) <= 2, name
+    # Both fit windows print as the acceptance of a matched fit (fan-out
+    # policy 1): the shank turned to suit the tube, the sleeve selected.
+    assert notes.count(f"TUBE ID, CLEARANCE {spec.SHANK_CLEARANCE_WINDOW};") == 1
+    assert notes.count(f"ON TUBE, CLEARANCE {spec.SLEEVE_CLEARANCE_WINDOW};") == 1
+    assert "REF" not in notes
+    assert "DIAMETRAL" not in notes
     # Both blocks sit beside the narrow end view: the shank's leader shoulder
     # ends left of it and the sleeve fits between it and the elevation's leg
-    # (Opus reviews at 7fe9d97bd and 85e75a2b5), so the shank rows stay under
-    # the old 19-character width and the sleeve's about the window's.
-    shank_rows = spec.SHANK_FIT_CALLOUT.splitlines()
-    assert max(map(len, shank_rows)) < 19
-    sleeve_rows = spec.SLEEVE_FIT_CALLOUT.splitlines()
-    assert max(map(len, sleeve_rows)) <= len(window) + 1
-    assert spec.DIMENSION_CALLOUTS["SleeveProfile"] == {
-        "SleeveDia": spec.SLEEVE_FIT_CALLOUT
-    }
+    # (Opus reviews at 7fe9d97bd and 85e75a2b5).
+    for text in (spec.SHANK_FIT_CALLOUT, spec.SLEEVE_FIT_CALLOUT):
+        assert max(map(len, text.splitlines())) < 19
     # A note names no tool (rule 7): R3.0 is the native bend radius.
     assert "DIE" not in notes
     # Sizes and tolerances are native model dimensions, never note text.
@@ -287,10 +201,12 @@ def test_stock_diameters_print_as_untoleranced_references() -> None:
         "TubeOdReference": frozenset({"TubeOdRef"}),
         "SleeveProfile": frozenset({"SleeveDia"}),
         "OverallReference": frozenset({"OverallHeight", "OverallReach"}),
+        # Turned to the measured tube ID (note 2): the fit governs.
+        "EndPieceProfile": frozenset({"PlugShankDia"}),
     }
     for feature, names in spec.REFERENCE_DIMENSIONS.items():
         assert names <= spec.DRAWING_DIMENSIONS[feature]
-        assert set(names) <= set(drawing.FRONT_KEEP)
+        assert set(names) <= set(drawing.FRONT_KEEP) | set(drawing.SECTION_KEEP)
     # The reference line runs on the bare leg, between the sleeve and the bend.
     low = spec.TUBE_OD_REF_Y - spec.TUBE_OD_REF_SPAN / 2.0
     high = spec.TUBE_OD_REF_Y + spec.TUBE_OD_REF_SPAN / 2.0
@@ -320,10 +236,11 @@ def test_only_the_reference_value_is_bracketed_when_a_callout_rides_it(
 
     monkeypatch.setattr(part, "_named_dimensions", named)
     part._author_reference_dimensions(None)
-    sleeve = displays["SleeveDia"]
-    assert (sleeve.GetText(1), sleeve.GetText(2)) == ("(<MOD-DIAM>", ")")
-    assert not sleeve.ShowParenthesis
-    for name in ("TubeOdRef", "OverallHeight", "OverallReach"):
+    for name in ("SleeveDia", "TubeOdRef", "PlugShankDia"):
+        display = displays[name]
+        assert (display.GetText(1), display.GetText(2)) == ("(<MOD-DIAM>", ")")
+        assert not display.ShowParenthesis
+    for name in ("OverallHeight", "OverallReach"):
         assert displays[name].ShowParenthesis
         assert displays[name].text == {}
 
@@ -392,51 +309,54 @@ def test_overall_references_stand_clear_of_the_elevation_dimensions() -> None:
 
 
 def test_tap_callout_states_geometry_and_its_mate_within_four_rows() -> None:
-    # The native callout's two rows plus these stay within the layout
+    # The native callout's two rows plus these two stay within the layout
     # audit's four-row limit; each row is finished geometry, not method.
     rows = spec.TAP_CALLOUT_BELOW.splitlines()
-    assert len(rows) == 2
-    # The counterbore depth's max sets the drill's deepest point, depths
-    # running from its floor (owner ruling via Main on machinist review r7:
-    # this job replaces the floor datum's wording).  The row is the drilled
-    # hole's finished extent, not a process step: no wander.
-    assert rows[0] == f"FOR {spec.SCREW_NUMBER}; DEEPEST DRILL AT C'BORE MAX"
-    axis_limit = f"{joint.THREAD_AXIS_OFFSET_MAX / 25.4:.3f}".lstrip("0")
-    assert rows[1] == f"THREAD AXIS TO TUBE OD AXIS {axis_limit} MAX RADIAL"
-    assert joint.TAP_DRILL_DEPTH_MAX > joint.COUNTERBORE_DEPTH_MAX
-    # At most three characters past r7's 39-character row (103.9 mm, x 106.1-
-    # 210.0 mm; ~105.3 mm in Century Gothic's metrics): ~1 mm more each side
-    # stays left of the arm straight's text.
-    assert len(rows[0]) <= len(f"FOR {spec.SCREW_NUMBER}; DEPTHS FROM C'BORE FLOOR") + 3
+    assert rows == [
+        f"FOR {spec.SCREW_NUMBER}",
+        f"ENGAGEMENT {f'{joint.ENGAGEMENT_CALLOUT_MIN:.3f}'.lstrip('0')} MIN "
+        f"({joint.ENGAGEMENT_CALLOUT_D:.2f}D)",
+    ]
+    assert rows[1] == "ENGAGEMENT .220 MIN (1.16D)"
+    assert spec.SCREW_NUMBER == "MHA-SM-VN-56"
+    # No row longer than r7's 39-character row, which stood left of the arm
+    # straight's text.
+    assert max(map(len, rows)) <= 39
+    assert "AXIS" not in spec.TAP_CALLOUT_BELOW
+    assert "C'BORE" not in spec.TAP_CALLOUT_BELOW
     assert "WANDER" not in spec.TAP_CALLOUT_BELOW
     assert "BRAZE" not in spec.TAP_CALLOUT_BELOW
-    assert spec.SCREW_NUMBER in spec.DIMENSION_CALLOUTS_BY_NAME["CounterboreDia"]
     printed = " ".join((spec.DRAWING_NOTES, spec.TAP_CALLOUT_BELOW)).upper()
     assert "PURCHASED" not in printed and "INTEGRAL" not in printed
-    assert "THREADLOCKER" not in printed  # spring-eye clamping belongs to the assembly
+    assert "THREADLOCKER" not in printed  # the spring eye belongs to the assembly
 
 
 def test_sheet_places_every_marked_dimension_at_its_places() -> None:
     marked = {name for names in spec.DRAWING_DIMENSIONS.values() for name in names}
     assert set(drawing.FRONT_KEEP) | set(drawing.SECTION_KEEP) == marked
     assert not set(drawing.FRONT_KEEP) & set(drawing.SECTION_KEEP)
-    assert set(spec.DRAWING_DIMENSIONS["EndPieceProfile"]) | set(
-        spec.DRAWING_DIMENSIONS["CounterboreProfile"]
-    ) == set(drawing.SECTION_KEEP)
+    assert set(spec.DRAWING_DIMENSIONS["EndPieceProfile"]) == set(drawing.SECTION_KEEP)
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
     assert {
         name for name, places in spec.DRAWING_PRECISION_BY_NAME.items() if places == 1
     } == spec.ONE_PLACE_DIMENSIONS
     # Section A-A keeps only the end piece: its crop runs past the shank,
     # short of the bend; its full cut's line runs past where the plane leaves
-    # the bend's outer wall, short of the leg.
+    # the bend's outer wall, short of the leg, so the cut imports.  The line
+    # it prints is then the short partial one (rule 9): across the end piece
+    # and its joint, on past the crop to the bend tangent.  The long line is
+    # centred on the short one, so shortening it does not move the view.
     start, end = drawing.SECTION_CROP_X_MM
     assert start < geom.ARM_END_X < part.SHANK_END_X < end < -geom.BEND_R
     bend_cut_end = -geom.BEND_R + math.sqrt(
         (geom.BEND_R + geom.TUBE_DIA / 2.0) ** 2 - geom.BEND_R**2
     )
     line_start, line_end = drawing.SECTION_LINE_X_MM
-    assert line_start == start and bend_cut_end < line_end < 0.0
+    assert line_start < start and bend_cut_end < line_end < 0.0
+    short_start, short_end = drawing.SECTION_SHORT_X_MM
+    assert short_start == start and end < short_end == -geom.BEND_R
+    assert line_start + line_end == pytest.approx(short_start + short_end)
+    assert drawing.TUBE_BREAK_X < end < short_end
 
 
 @pytest.fixture
@@ -444,13 +364,13 @@ def saved_tap(monkeypatch):
     """Read-only saved feature with independently specified native tap metadata."""
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
     definition = SimpleNamespace(
-        FastenerSize="1/4-28",
+        FastenerSize="#10-24",
         ThreadClass="2B",
         ThreadEndCondition=0,  # blind
         EndCondition=0,
-        TapDrillDiameter=0.00541,  # native model length units are metres
-        TapDrillDepth=0.017272,  # .68 in
-        ThreadDepth=0.014732,  # .58 in
+        TapDrillDiameter=0.003797,  # native model length units are metres
+        TapDrillDepth=0.014224,  # .56 in
+        ThreadDepth=0.011176,  # .44 in
     )
     feature = SimpleNamespace(
         GetTypeName2=lambda: "HoleWzd",
@@ -481,13 +401,13 @@ def test_saved_native_receiver_accepts_the_blind_tap(saved_tap, field, offset_mm
         ("EndCondition", 1, "EndCondition"),
         ("EndCondition", 2, "EndCondition"),
         ("TapDrillDiameter", 0.0, "tap drill"),
-        ("TapDrillDiameter", 0.005404, "tap drill"),
-        ("TapDrillDiameter", 0.005416, "tap drill"),
+        ("TapDrillDiameter", 0.003791, "tap drill"),
+        ("TapDrillDiameter", 0.003803, "tap drill"),
         ("TapDrillDiameter", math.nan, "tap drill"),
-        ("TapDrillDepth", 0.0171, "tap drill depth"),
+        ("TapDrillDepth", 0.0141, "tap drill depth"),
         ("TapDrillDepth", 0.0200, "tap drill depth"),
-        ("ThreadDepth", 0.0147, "thread depth"),
-        ("ThreadDepth", 0.0122, "thread depth"),
+        ("ThreadDepth", 0.0113, "thread depth"),
+        ("ThreadDepth", 0.0105, "thread depth"),
     ],
 )
 def test_saved_native_receiver_rejects_lost_thread_metadata(

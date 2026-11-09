@@ -93,17 +93,15 @@ from magnifying_bracket_joint_layout import (
 from sm_summing_lever_notes import (
     BACK_VIEW_LETTER,
     BASIC_PLACES,
-    BOSS_Z_CALLOUT,
     BRACKET_TAP_CALLOUT_PROCESS,
     BRACKET_TAP_PRECISION,
     COUNTER_TAP_PRECISION,
     CYLINDER_REFERENCE_Z,
-    DIMENSION_CALLOUTS_ABOVE,
     DIMENSION_CALLOUTS_BELOW,
     DRAWING_DIMENSIONS,
     FRONT_VIEW_LETTER,
     SPRING_ROW_LOCATORS,
-    SPRING_TAP_CALLOUT_PROCESS,
+    SPRING_TAP_CALLOUT_BELOW,
     SPRING_TAP_PRECISION,
     RECEIVER_ISOMETRIC_OCTANT,
 )
@@ -654,15 +652,11 @@ def _shorten_radii(
 
 
 def _apply_callouts(adapter: Any, annotations: list[Any], *, label: str) -> None:
-    """Write the notes module's callout text onto the dimensions this sheet
-    kept, above or below the value."""
+    """Write the notes module's callout text under the value of each
+    dimension this sheet kept."""
     present = {dimension_name(adapter, annotation) for annotation in annotations}
-    for location, callouts in (
-        ("above", DIMENSION_CALLOUTS_ABOVE),
-        ("below", DIMENSION_CALLOUTS_BELOW),
-    ):
-        wanted = {name: text for name, text in callouts.items() if name in present}
-        set_dimension_callouts(adapter, annotations, wanted, location=location)
+    wanted = {name: text for name, text in DIMENSION_CALLOUTS_BELOW.items() if name in present}
+    set_dimension_callouts(adapter, annotations, wanted, location="below")
     _telemetry.info(f"{label}: callouts on {sorted(present)}")
 
 
@@ -1694,8 +1688,7 @@ def _receiver_axis_centerline(adapter: Any, back: Any) -> Any:
 
 
 # VIEW G carries the shared positive rib profile and its derived reach.
-# The title block owns the R.040 MAX ceiling. The web's flush caption stands
-# entirely above the boss's upper witness; 19.05 has no centering caption.
+# The title block owns the R.040 MAX ceiling. 19.05 has no centering caption.
 FRONT_KEEP = {
     "AnchorHeight": (0.145, 0.235),
     "WebThickness": (0.168, 0.258),
@@ -1719,8 +1712,10 @@ KNIFE_HEIGHT_LOCATION_XY = (0.4035, 0.128)
 DETAIL_KEEP = {
     "HexWidth": (0.203, 0.083),
     "HexHeight": (0.0342, DETAIL_CENTER[1]),
-    "RidgeFromLeft": (0.201, 0.2483),
-    "RidgeFromRight": (0.044, 0.25105),
+    # Each two-row block (value, SEE NOTE 1) keeps the pair's shared line at
+    # y 0.240, where the three- and four-row blocks hung it.
+    "RidgeFromLeft": (0.201, 0.2456),
+    "RidgeFromRight": (0.044, 0.2456),
     # 120 deg about the shoulder (74.5999, 175.6701) mm at the same 18.57 mm
     # radius. At 153.6 deg (58, 184) the offset connector landed by the lower
     # arrow (58.3, 166.7) and crossed its own arc up to the shelf above
@@ -1743,8 +1738,7 @@ TOP_KEEP = {
     # Keep the existing bottom dimension line and full width value.
     "PlateWidth": (0.266, 0.0813),
     # Right of the -Z rib's three lines (they end at x 0.4007; at 0.395 its
-    # line crossed "DRILL", farm r7).  Its two callout lines (BODY END FACES,
-    # 9 characters) end 2.9 mm inside the border.
+    # line crossed "DRILL", farm r7); the value ends inside the border.
     "PlateLength": (0.405, TOP_CENTER[1]),
     # The boss's diameter names the web arcs' ends under its value; its
     # four lines stand left of its leader, above the anchor tap's callout.
@@ -1819,6 +1813,9 @@ MOUNTING_CALLOUT_XY = (BACK_CENTER[0] + 0.025, BACK_CENTER[1] - 0.035)
 # Keep the caption below the complete receiver callout; native regeneration
 # must check its clearance after any wording change.
 BACK_VIEW_NOTE_XY = (BACK_CENTER[0] - 0.075, BACK_CENTER[1] - 0.066)
+# Detail D's one numbered note, in the open band under its label, left of
+# the title block (its top-left corner).
+NOTES_XY = (0.016, 0.040)
 # Sheet 1's plan names sheet 2's view: a letter arrow onto the -Z end, the
 # face VIEW F looks at (fr_rocker_arm_support's VIEW B arrow).  Its tip is
 # on the receiver rib's outer edge at model x 21.4 (sheet x 0.246), between
@@ -1915,6 +1912,26 @@ def _dress_bracket_depth_callout(callout: Any) -> None:
         raise RuntimeError(f"bracket tap callout omits native depths: {required_depths}")
 
 
+def _set_callout_below(display: Any, text: str, *, label: str) -> None:
+    """Write ``text`` under a native hole callout and read it back.
+
+    swDimensionTextCalloutBelowDefinition (8) pairs with the writable
+    swDimensionTextCalloutBelow (4); the prefix, size and depth definitions
+    stay untouched, so the Hole Wizard variables stay associative
+    (draw_sm_gooseneck._set_tap_callout_below)."""
+    definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
+    below = definitions[8].replace("\r", "").rstrip()
+    updated = f"{below}\n{text}" if below else text
+    display.SetText(4, updated)
+    if str(display.GetText(8) or "").replace("\r", "") != updated or any(
+        str(display.GetText(part) or "") != definitions[part] for part in (5, 6, 7)
+    ):
+        raise RuntimeError(
+            f"{label} callout row or native definitions did not persist: "
+            f"{[str(display.GetText(part) or '') for part in (5, 6, 7, 8)]!r}"
+        )
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -1930,6 +1947,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
+            "Manufacturing Notes",
             "Isometric View Note",
             "Back View Note",
             "Front View Note",
@@ -1940,6 +1958,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
+            "Manufacturing Notes",
             "Isometric View Note",
             "Back View Note",
             "Front View Note",
@@ -2182,20 +2201,15 @@ async def build(adapter: Any) -> dict[str, str]:
         entities=(end_edge.edge, anchor_rim.edge),
     )
     # The mid rib shares the boss's station (machinist review r6: its 5.08
-    # thickness had no location along the plate), so this one 76.20 names
-    # both under its value.
-    boss_z_display = _early_bound(boss_z, "IDisplayDimension")
-    boss_z_display.SetText(4, BOSS_Z_CALLOUT)  # swDimensionTextCalloutBelow
-    if "MID RIB" not in str(boss_z_display.GetText(4) or ""):
-        raise RuntimeError(
-            f"anchor boss Z callout did not persist: {boss_z_display.GetText(4)!r}"
-        )
+    # thickness had no location along the plate); the plan draws the rib
+    # through the boss, so this one 3.00 locates both and carries no words
+    # (rule 7).
     # The row X, start Z and pitch are the part's own BASIC locators
     # (SpringRowCoordinates: X off datum A's -Z ridge axis, start Z off datum
     # B's end, each to a hole centre), imported with the plan's dimensions.
     _assert_spring_row_locators(adapter, top_annotations)
-    # The 20X callout hangs on hole 7, with its complete process line in the
-    # open field right of the column and clear of the mid-rib witnesses.
+    # The 20X callout hangs on hole 7, in the open field right of the column
+    # and clear of the mid-rib witnesses.
     callout_hole_z = HOLE_Z_LAST - (HOLE_COUNT // 2 - 3) * CHANNEL_PITCH
     callout_rim = top_edges.circle_at(
         (HOLE_X, COEFFICIENT_TOP_Y, callout_hole_z),
@@ -2209,11 +2223,11 @@ async def build(adapter: Any) -> dict[str, str]:
         edge=callout_rim.edge,
         callout_xy=(0.310, _top_xy(HOLE_X, -callout_hole_z)[1] + 0.0015),
         label="spring-hole pattern",
-        process=SPRING_TAP_CALLOUT_PROCESS,
     )
     set_hole_callout_precision(
         spring_callout, SPRING_TAP_PRECISION, label="spring-hole pattern"
     )
+    _set_callout_below(spring_callout, SPRING_TAP_CALLOUT_BELOW, label="spring-hole pattern")
     # The Top view reverses model Z, so -HOLE_Z_FIRST prints the seed hole at
     # the TOP of the column. The frame sits above the +Z trunnion stub with
     # its right stub ending over the rim, so the leader drops just past the
@@ -2309,6 +2323,7 @@ async def build(adapter: Any) -> dict[str, str]:
     check_knife_height = _knife_height_location_check(adapter, back)
     # Keep the removed-view identity below the actual end profile.
     add_property_linked_note(adapter, "Back View Note", *BACK_VIEW_NOTE_XY)
+    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     # The existing sheet-2 pictorial now shows the continuous backing from
     # below, through the part's persisted and natively read-back octant view.
     add_property_linked_note(adapter, "Receiver Isometric View Note", 0.322, 0.205)

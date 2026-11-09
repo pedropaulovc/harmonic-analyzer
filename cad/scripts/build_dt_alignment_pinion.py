@@ -70,7 +70,6 @@ from dt_alignment_pinion_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
-    END_VIEW_NOTE,
     FACE_WIDTH,
     GEAR_DATA,
     ISOMETRIC_VIEW_NOTE,
@@ -214,7 +213,6 @@ async def build(adapter) -> dict[str, str]:
             "Gear Data": GEAR_DATA,
             "Manufacturing Notes": DRAWING_NOTES,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
-            "End View Note": END_VIEW_NOTE,
         },
     )
     blank_reference_sketches(adapter, REFERENCE_SKETCHES)

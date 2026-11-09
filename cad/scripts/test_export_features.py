@@ -401,9 +401,9 @@ def _assert_rocker_print_authority() -> None:
         for node in ast.walk(dressing) if isinstance(node, ast.Assign)
         for target in node.targets if isinstance(target, ast.Name)
     }
-    prefix = eval(compile(ast.Expression(assignments["ream_prefix"]), draw.__file__, "eval"), {}, {"prefix": ""})
-    suffix = eval(compile(ast.Expression(assignments["through_suffix"]), draw.__file__, "eval"), {}, {"suffix": ""})
-    assert prefix.split()[0] == pivot["process"].upper(), "pivot process drifted from its native dimension text"
+    # Size, then process, then depth (rule 26): REAM THRU follows the limits.
+    suffix = eval(compile(ast.Expression(assignments["ream_suffix"]), draw.__file__, "eval"), {}, {"suffix": ""})
+    assert suffix.split()[0] == pivot["process"].upper(), "pivot process drifted from its native dimension text"
     assert pivot["thru"] and "THRU" in suffix, "hole end drifted from its native dimension text"
     # Both ends are dimensioned on the views (J and K LAND rows, both tapers,
     # 2X 5.59): the symmetry is cited to those natives, not a mirror note.
@@ -501,12 +501,13 @@ def test_unknown_requirements_and_references_do_not_acquire_acceptance_bands() -
     assert features["profile_outer"]["bottom_radius"] == rocker_interface.R_BOTTOM
     assert features["top_edge"]["arc_len"] == rocker.TOP_ARC_LEN
     assert features["profile_outer"]["bottom_arc_len"] == rocker.BOT_ARC_LEN
-    for name, outside, suffix in (
-        ("top_edge", rocker.TOP_EDGE_BAND[0], ""),
-        ("profile_outer", rocker.TOP_EDGE_BAND[1], ", BETWEEN J AND K"),
-    ):
+    for name in ("top_edge", "profile_outer"):
         assert features[name]["dimension_type"] == "basic"
-        assert features[name]["surface_profile_u"] == outside
+        # Equal-bilateral frames (#2144 item 10.3): no U, prechips reads t / 2.
+        assert "surface_profile_u" not in features[name]
+        assert features[name]["note"].startswith(
+            f"SURFACE PROFILE {rocker.GEOMETRIC_TOLERANCES_IN['top edge surface profile']} TO A|B|C"
+        )
         assert set(exporter._cite(rocker, "TOP_EDGE_BAND")) <= set(features[name]["cite"]["note"])
     assert "depth_ref" not in features["profile_outer"]["requirements"]
     assert "centre_from_pivot_ref" not in features["top_edge"]["requirements"]
@@ -520,11 +521,11 @@ def test_unknown_requirements_and_references_do_not_acquire_acceptance_bands() -
 def test_rocker_profile_zones_export_the_printed_frames_and_govern_their_own_basics() -> None:
     draw = importlib.import_module("draw_ch_rocker_arm")
     features = exporter.requirement_manifest("ch_rocker_arm")["features"]
-    zone_fields = ("surface_profile", "surface_profile_u", "surface_profile_datums")
-    for name, frame in (("top_edge", "TopRadius"), ("profile_outer", "BottomRadius"), ("tip_land_pos_x", "BottomRadius"), ("tip_land_neg_x", "BottomRadius")):
+    zone_fields = ("surface_profile", "surface_profile_datums")
+    for name in ("top_edge", "profile_outer", "tip_land_pos_x", "tip_land_neg_x"):
         fields = features[name]
         assert fields["surface_profile"] == float(draw.ARC_PROFILE_ZONE_MM) == rocker.TOP_EDGE_BAND[0] - rocker.TOP_EDGE_BAND[1]
-        assert fields["surface_profile_u"] == float(draw.ARC_PROFILE_OUTSIDE_MM[frame])
+        assert "surface_profile_u" not in fields
         assert fields["surface_profile_datums"] == list(draw.ARC_PROFILE_DATUMS)
         # Each governed key is one of the feature's own BASIC requirements.
         assert set(fields["surface_profile_governs"]) <= set(fields["requirements"]) - {"surface_profile"}

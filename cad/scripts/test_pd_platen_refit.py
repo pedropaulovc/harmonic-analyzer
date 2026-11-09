@@ -14,6 +14,7 @@ import _sprocket_seat_geometry as band
 import pd_platen_spec as platen
 import build_pd_platen_clip as clip
 import build_pd_platen_guide as guide
+import pd_platen_guide_spec as guide_spec
 import _recording_geometry as paper_geometry
 import paper_drive_geom as feed_geometry
 import pd_platen_rack_spec as rack
@@ -338,11 +339,20 @@ def test_outboard_clip_sockets_hold_their_edges_at_the_printed_worst_case() -> N
 
 def test_platen_guide_holes_float_over_the_fixed_guide_screws() -> None:
     # #4 loose (user ruling 2026-10-14): the screws are fixed in the guide's
-    # taps (their position zone) and pass this plate's .XXX hole coordinates.
+    # taps and pass this plate's .XXX hole coordinates. Owner ruling
+    # 2026-11-08: the taps print plain coordinates too (.XXX ±.005 stations,
+    # .140 ±.005 row, the shop's drilled-hole row; delegated ruling
+    # 2026-11-09 pending owner confirmation), so each pattern's square zone
+    # spends its diagonal: .028 for two ±.005 patterns, of the .032 the .144
+    # hole leaves.
     assert platen.GUIDE_HOLE_DIA == platen.CLEARANCE_MM[("#4", "loose")]
-    tap_zone = float(guide.GEOMETRIC_TOLERANCES_MM["guide hole-pattern position"])
+    tap_zone = 2.0 * guide_spec.TAP_POSITION_RADIAL
+    assert tap_zone == pytest.approx(2.0 * math.sqrt(2.0) * 0.005 * 25.4)
     hole_zone = 2.0 * math.sqrt(2.0) * printed_band_mm(3, unit=platen.UNIT)
-    assert platen.GUIDE_HOLE_DIA - fillister.SHANK_DIA >= tap_zone + hole_zone
+    float_ = platen.GUIDE_HOLE_DIA - fillister.SHANK_DIA
+    assert float_ == pytest.approx(0.032 * 25.4, abs=1e-3)
+    assert float_ >= 2.0 * math.sqrt(2.0) * 0.005 * 25.4 * 2.0
+    assert float_ >= tap_zone + hole_zone
     # The stock head still bears on the counterbore floor around the hole.
     assert fillister.HEAD_DIA - platen.GUIDE_HOLE_DIA >= 0.5
     assert platen.CBORE_DIA > fillister.HEAD_DIA

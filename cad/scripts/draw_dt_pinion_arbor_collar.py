@@ -50,13 +50,14 @@ from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
 from diagnostics.drawing_layout_audit import collect_document
+import dt_vn_pinion_strap_pin_spec as _pin
 from dt_pinion_arbor_collar_spec import (
-    BORE_CALLOUT,
+    ARBOR_NUMBER,
     COLLAR_LEN,
     COLLAR_OD,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
-    PIN_HOLE_CALLOUT,
+    PIN_NUMBER,
 )
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -97,17 +98,24 @@ END_KEEP = {
     "BoreDia": (0.040, 0.210),
     "CollarOd": (0.040, 0.120),  # moved onto the profile below
 }
-# Length under the profile, pin station over it from the right end face, the
-# pin hole's leader up-left to its circle, and the OD right of the part.
+# Length and pin station under the profile, the shorter station nearer the
+# part, both from the right end face; the pin hole's leader runs up-left to
+# its circle (round 1 review: with the station above the profile the leader
+# crossed its dimension line); the OD right of the part.
 PROFILE_KEEP = {
     "Depth": (PROFILE_CENTER[0], _PROFILE_BOTTOM - 0.022),
-    "PinHoleCz": (_PROFILE_RIGHT - 0.012, _PROFILE_TOP + 0.020),
+    "PinHoleCz": (_PROFILE_RIGHT - 0.012, _PROFILE_BOTTOM - 0.010),
     "PinHoleDia": (0.160, _PROFILE_TOP + 0.030),
 }
 OD_ON_PROFILE = (_PROFILE_RIGHT + 0.025, PROFILE_CENTER[1])
+# The bore prints the model's three-place Ø.313 under DRILLED HOLES, so its
+# callout names no fractional drill: a named 5/16 drill would be .3125, and
+# the rounded decimal under it read as two controlling numbers (rule 3).  The
+# pin hole's +.0025/0 band is the spring pin's: its callout names the pin and
+# the standard fit (rule 4).
 DIMENSION_CALLOUTS = {
-    "BoreDia": BORE_CALLOUT,
-    "PinHoleDia": PIN_HOLE_CALLOUT,
+    "BoreDia": f"DRILL THRU\nSLIDES ON {ARBOR_NUMBER}",
+    "PinHoleDia": f"{_pin.DRILL_THRU_CALLOUT}\nPRESS FIT ON {PIN_NUMBER} SPRING PIN",
 }
 # Text on a line, text on text and a mark printed twice over itself are
 # defects; leader crossings stay logged.

@@ -1,14 +1,15 @@
 r"""Create the manufacturing drawing for the crank-pin keeper ring (MHA-DT-27).
 
-Under ``cad/docs/drawing-guidelines.md``: a round brass wire ring, its ends
-butted and silver-soldered, closed through the taper pin's cross-hole. The
-top view shows the ring at true shape with its one controlling size, the
-inside diameter, from the part's blanked ``RingReference`` sketch (a torus has
-no edge to dimension), and the solder bead as REFERENCE. The front view, below
-it in projection, shows the ring edge-on with the wire's stock diameter as
-REFERENCE. An isometric and the property-linked notes complete the sheet. No
-datums, no frames, no roughness symbol: the part is ``visual_noncritical``,
-so every value takes the title block's one-place band.
+Under ``cad/docs/drawing-guidelines.md``: a round brass wire ring, threaded
+through the taper pin's cross-hole and the keeper chain's far link and closed
+with pliers, its ends butted (owner ruling 2026-11-08). The top view shows the
+ring at true shape with its one controlling size, the inside diameter, from
+the part's blanked ``RingReference`` sketch (a torus has no edge to
+dimension), and its butt gap. The front view, below it in projection, shows
+the ring edge-on with the wire's stock diameter as REFERENCE. An isometric
+and the property-linked notes (the closure and the gap's band) complete the
+sheet. No datums, no frames, no roughness symbol: the part is
+``visual_noncritical``, so every value takes the title block's band.
 
 The decimal places are the PART's (``dt_crank_pin_ring_notes``, applied
 natively by ``build_dt_crank_pin_ring``); this script only reads them back.
@@ -87,13 +88,11 @@ HALF_OD = (MEAN_R + WIRE_DIA / 2.0) * _S  # 0.0325
 HALF_ID = RING_ID / 2.0 * _S  # 0.0275
 HALF_WIRE = WIRE_DIA / 2.0 * _S  # 0.0025
 
-# Top view: the inside diameter's text up and left of the ring; the bead,
-# at the ring's bottom (the joint's side), labelled down and right in the
-# open band between the two views. Front view: the wire's diameter at the
-# ring's left end (the crown, where the wire circle lies), labelled left.
+# Top view: the inside diameter's text up and left of the ring. Front view:
+# the wire's diameter at the ring's left end (the crown, where the wire circle
+# lies), labelled left.
 TOP_KEEP = {
     "RingID": (TOP_CENTER[0] - HALF_OD - 0.012, TOP_CENTER[1] + HALF_OD + 0.008),
-    "JointDia": (TOP_CENTER[0] + HALF_OD + 0.022, TOP_CENTER[1] - HALF_OD - 0.012),
 }
 # The wire's callout block (18-character rows) stands up and left, clear of
 # the edge view's left end.
@@ -140,7 +139,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Crank Pin Keeper Ring Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "crank pin keeper ring; formed brass wire; silver-soldered",
+            3: "crank pin keeper ring; formed brass wire; closed with pliers",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -174,8 +173,8 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     # Descriptive words only; every value and its places are the model's.
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    # The wire is purchased stock and the bead the joint's size: both are
-    # native diameters, so the plural helper keeps their Ø inside "( )".
+    # The wire is purchased stock: a native diameter, so the plural helper
+    # keeps its Ø inside "( )".
     set_reference_dimensions(adapter, annotations, REFERENCE_DIMENSIONS)
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
 

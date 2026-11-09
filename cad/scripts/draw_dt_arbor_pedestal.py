@@ -5,7 +5,8 @@ from __future__ import annotations
 import argparse
 import re
 import sys
-from math import sqrt
+from collections.abc import Callable
+from math import atan, degrees, pi, radians, sqrt
 from typing import Any, Literal
 
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -34,6 +35,7 @@ from _drawing_dimensions import (
     set_reference_dimension,
 )
 from _drawing_edges import visible_view_entities
+from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
@@ -64,6 +66,8 @@ from dt_arbor_pedestal_spec import (
     STRAP_INNER_Z,
     STRAP_ROOT_Z,
     SURFACE_FINISHES,
+    TAPER_TANGENT_X,
+    TAPER_TANGENT_Y,
     TOP_RADIUS,
 )
 
@@ -195,7 +199,31 @@ ARBOR_NUMBER = str(_config.parts("dt-cylinder-gear-shaft")["number"])
 DIMENSION_CALLOUTS = {
     "BoreDia": f"REAM THRU\nSLIDING FIT ON\nARBOR {ARBOR_NUMBER}",
 }
-CROWN_CALLOUT = "SIDES TANGENT FROM FOOT CORNERS"
+CROWN_CALLOUT = "SIDES TANGENT"
+# The flanks run straight from the .20 foot top, at the foot's full width, up
+# to tangency with the crown.  The words alone left the taper unprinted: the
+# fan-out local repeat of e308920ca9 (2 of 3 runs) asked for the side angle
+# off a line the shop can touch.  A driven angle between the seat and the
+# east flank prints it as a reference (the .94 width, .20 step, 1.75 axis and
+# R.43 crown already fix the flank); measured on the open side, it reads just
+# over a right angle.
+_FLANK_RUN_PER_RISE = (FOOT_WIDTH / 2.0 - TAPER_TANGENT_X) / (
+    TAPER_TANGENT_Y - FOOT_HEIGHT
+)
+FLANK_ANGLE_DEG = 90.0 + degrees(atan(_FLANK_RUN_PER_RISE))
+_FLANK_PICK_Y = 25.4  # model mm, mid-flank
+SEAT_ANGLE_PICK = (FRONT_CENTER[0] + (FOOT_WIDTH / 2.0 - 2.0) * _S, _front_y(0.0))
+FLANK_ANGLE_PICK = (
+    FRONT_CENTER[0]
+    + (FOOT_WIDTH / 2.0 - (_FLANK_PICK_Y - FOOT_HEIGHT) * _FLANK_RUN_PER_RISE) * _S,
+    _front_y(_FLANK_PICK_Y),
+)
+# East of the elevation, above the foot-height lane and below the bore
+# callout block: the arc sweeps from the seat's extension up to the flank.
+FLANK_ANGLE_XY = (
+    FRONT_CENTER[0] + FOOT_WIDTH * _S / 2.0 + 0.020,
+    _front_y(FOOT_HEIGHT) + 0.036,
+)
 # The apex tap runs down to the arbor bore and stops there; the MHA-SH-VN-54 cup
 # point's spot is drilled into the arbor at fit-up through this hole. Both
 # native extents (the tap drill's and the thread's ``<hw-thru>``) say TO BORE,
@@ -210,6 +238,11 @@ CROWN_CALLOUT = "SIDES TANGENT FROM FOOT CORNERS"
 SET_SCREW_PROCESS = "TAP"
 # Hole Wizard drill sizes print .XXX on the inch sheet, by native variable.
 HOLD_DOWN_PRECISION = {"hw-diam": HOLE_CALLOUT_PRECISION}
+# The hold-down hole reads size, then process, then extent (rule 26 (standard
+# forms only)): DRILL follows the native diameter variable instead of a prefix
+# ahead of it (fan-out screen 20261107T081227004Z: "DRILL Ø .180 THRU ALL").
+HOLD_DOWN_PROCESS = "DRILL"
+_HOLD_DOWN_DIAMETER = "<hw-diam>"
 SET_SCREW_PRECISION = {"hw-tapdrldia": HOLE_CALLOUT_PRECISION}
 SET_SCREW_EXTENT = "TO BORE"
 _THREAD_CLASS = re.compile(r"\s*(?:-\s*)?<hw-threadclass>\s*", re.IGNORECASE)
@@ -318,10 +351,19 @@ def _set_reference_precision(display: Any, label: str) -> None:
 
 
 @_telemetry.traced("drawing.arbor.front_entity_scan")
-def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any]:
-    """Return the foot-seat, arbor-bore and crown entities."""
+def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any]:
+    """Return the foot-seat, arbor-bore, crown and east-flank entities."""
     foot_candidates: list[tuple[float, Any]] = []
     bore_candidates: list[tuple[float, float, Any]] = []
+    flank_ends = (
+        (FOOT_WIDTH / 2.0, FOOT_HEIGHT),
+        (TAPER_TANGENT_X, TAPER_TANGENT_Y),
+    )
+
+    def _at(point: tuple[float, ...], target: tuple[float, float]) -> bool:
+        return abs(point[0] - target[0]) <= 0.01 and abs(point[1] - target[1]) <= 0.01
+
+    flank_edges: list[Any] = []
     for raw_edge in visible_view_entities(view, 1, label="pedestal front edges"):
         edge = _early_bound(raw_edge, "IEdge")
         curve = edge.GetCurve()
@@ -340,6 +382,11 @@ def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any]:
         p1 = tuple(float(value) * 1000.0 for value in end.GetPoint())
         if abs(p0[1]) <= 0.01 and abs(p1[1]) <= 0.01:
             foot_candidates.append((abs(p1[0] - p0[0]), edge))
+        if any(
+            _at(p0, first) and _at(p1, second)
+            for first, second in (flank_ends, flank_ends[::-1])
+        ):
+            flank_edges.append(edge)
     if not foot_candidates:
         raise RuntimeError("front view has no model edge on the foot-seat plane")
     foot_span, foot_edge = max(foot_candidates, key=lambda item: item[0])
@@ -361,7 +408,9 @@ def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any]:
     )
     if abs(dome_radius - TOP_RADIUS) > 0.01 or abs(dome_height - BORE_HEIGHT) > 0.01:
         raise RuntimeError("front view has no circular dome edge")
-    return foot_edge, bore_edge, dome_edge
+    if not flank_edges:
+        raise RuntimeError("front view has no east flank edge")
+    return foot_edge, bore_edge, dome_edge, flank_edges[0]
 
 
 _ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
@@ -384,11 +433,12 @@ def _show_crown_radius(adapter: Any, annotations: list[Any]) -> None:
         display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
         if bool(display.Diametric):
             raise RuntimeError("the imported crown dimension is not radial")
-        # The crown is what places the tapered flanks: each side runs from a
-        # foot corner up to tangency with this radius, whose centre is
-        # the bore's (the shared centre mark says so). The Fable round-2
-        # review could not tell where the flanks start, so the words name
-        # both ends. Words only -- every digit on this sheet is a dimension.
+        # The crown is what places the tapered flanks: each side runs from
+        # the .20 foot top up to tangency with this radius, whose centre is
+        # the bore's (the shared centre mark says so). The words say the
+        # flanks are tangent; the reference flank angle (_add_flank_angle)
+        # prints their lean. Words only -- every digit on this sheet is a
+        # dimension.
         display.SetText(4, CROWN_CALLOUT)
         # The leader runs from the text toward the crown centre; with the
         # default "extend to the opposite side" it kept going through the bore
@@ -457,24 +507,58 @@ def set_screw_callout_definitions(definitions: dict[int, str]) -> dict[int, str]
     return updated
 
 
-@_telemetry.traced("drawing.arbor.tap_callout_text")
-def _set_tap_callout_text(display: Any) -> None:
-    """Write the rewritten definitions and prove they persisted."""
+def hold_down_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
+    """Put DRILL after the hold-down hole's one native diameter variable."""
+    if set(definitions) != {5, 6, 7, 8}:
+        raise RuntimeError(f"unexpected hold-down callout parts: {definitions!r}")
+    joined = "\n".join(definitions.values())
+    if joined.count(_HOLD_DOWN_DIAMETER) != 1 or HOLD_DOWN_PROCESS in joined:
+        raise RuntimeError(f"hold-down callout lacks one bare diameter: {definitions!r}")
+    return {
+        part: text.replace(
+            _HOLD_DOWN_DIAMETER, f"{_HOLD_DOWN_DIAMETER} {HOLD_DOWN_PROCESS}"
+        )
+        for part, text in definitions.items()
+    }
+
+
+def _rewrite_callout_definitions(
+    display: Any, rewrite: Callable[[dict[int, str]], dict[int, str]]
+) -> dict[int, str]:
+    """Write a native hole callout's rewritten definitions, prove they
+    persisted and return the resolved text parts."""
     native = _early_bound(display, "IDisplayDimension")
     definitions = {part: str(native.GetText(part) or "") for part in (5, 6, 7, 8)}
-    updated = set_screw_callout_definitions(definitions)
+    updated = rewrite(definitions)
     for definition_part, writable_part in ((5, 1), (6, 2), (7, 3), (8, 4)):
         if updated[definition_part] != definitions[definition_part]:
             native.SetText(writable_part, updated[definition_part])
     persisted = {part: str(native.GetText(part) or "") for part in (5, 6, 7, 8)}
-    resolved = {part: str(native.GetText(part) or "") for part in (1, 2, 3, 4)}
+    if persisted != updated:
+        raise RuntimeError(f"callout definitions did not persist: {persisted!r}")
+    return {part: str(native.GetText(part) or "") for part in (1, 2, 3, 4)}
+
+
+@_telemetry.traced("drawing.arbor.tap_callout_text")
+def _set_tap_callout_text(display: Any) -> None:
+    """Write the rewritten tap definitions and prove they resolved."""
+    resolved = _rewrite_callout_definitions(display, set_screw_callout_definitions)
     joined = "\n".join(resolved.values())
-    if persisted != updated or joined.count(SET_SCREW_EXTENT) != 2 or "2B" in joined:
-        raise RuntimeError(
-            "apex tap callout text did not persist: "
-            f"definitions={persisted!r}, resolved={resolved!r}"
-        )
+    if joined.count(SET_SCREW_EXTENT) != 2 or "2B" in joined:
+        raise RuntimeError(f"apex tap callout text did not resolve: {resolved!r}")
     _telemetry.info(f"apex tap callout: {resolved!r}")
+
+
+@_telemetry.traced("drawing.arbor.hold_down_callout_text")
+def _set_hold_down_callout_text(display: Any) -> None:
+    """Write the size-first hold-down definitions and prove they resolved."""
+    resolved = _rewrite_callout_definitions(display, hold_down_callout_definitions)
+    joined = "\n".join(resolved.values())
+    if joined.count(f" {HOLD_DOWN_PROCESS}") != 1 or joined.lstrip().startswith(
+        HOLD_DOWN_PROCESS
+    ):
+        raise RuntimeError(f"hold-down callout text did not resolve: {resolved!r}")
+    _telemetry.info(f"hold-down callout: {resolved!r}")
 
 
 @_telemetry.traced("drawing.diameter_second_arrow", label_param="label")
@@ -541,6 +625,44 @@ def _add_entity_dimension(
         set_arc_endpoints_to_max(adapter, display, label=label)
     elif arc_endpoint is not None:
         raise ValueError(f"unsupported arc endpoint: {arc_endpoint}")
+    return display
+
+
+@_telemetry.traced("drawing.arbor.flank_angle")
+def _add_flank_angle(adapter: Any, view: Any, seat: Any, flank: Any) -> Any:
+    """Print the east flank's angle off the seat as a reference dimension."""
+    display = _early_bound(
+        add_edge_dimension(
+            adapter,
+            view,
+            p0=SEAT_ANGLE_PICK,
+            p1=FLANK_ANGLE_PICK,
+            text_xy=FLANK_ANGLE_XY,
+            label="flank angle",
+            orientation="angular",
+            entity_types=("EDGE", "EDGE"),
+            entities=(seat, flank),
+        ),
+        "IDisplayDimension",
+    )
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    expected = radians(FLANK_ANGLE_DEG)
+    actual = abs(float(dimension.SystemValue))
+    # Measured on the closed side (inside the part) it reads the supplement;
+    # flip it to the open side the text stands in.
+    if abs(actual - expected) > 1e-5:
+        if abs((pi - actual) - expected) > 1e-5 or not display.SupplementaryAngle():
+            raise RuntimeError(
+                f"flank angle measured {degrees(actual):.4f} deg, "
+                f"expected {FLANK_ANGLE_DEG:.4f} deg"
+            )
+        actual = abs(float(dimension.SystemValue))
+        if abs(actual - expected) > 1e-5:
+            raise RuntimeError(
+                f"flank angle reads {degrees(actual):.4f} deg after flipping, "
+                f"expected {FLANK_ANGLE_DEG:.4f} deg"
+            )
+    set_reference_dimension(adapter, display.GetAnnotation(), label="flank angle")
     return display
 
 
@@ -631,7 +753,9 @@ async def build(adapter: Any) -> dict[str, str]:
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center marks to {label} view")
 
-    foot_entity, bore_entity, dome_entity = _front_entities(adapter, front)
+    foot_entity, bore_entity, dome_entity, flank_entity = _front_entities(
+        adapter, front
+    )
     # Attach on the bore's 3 o'clock point and keep the symbol above that
     # height: left to itself the leader reached into the circle and crossed
     # the diameter dimension's line, which leaves the bore at 315 deg.
@@ -679,6 +803,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _set_reference_precision(overall, "overall height")
     _show_crown_radius(adapter, front_annotations)
+    _add_flank_angle(adapter, front, foot_entity, flank_entity)
     adapter.currentModel.GraphicsRedraw2()
     hold_down_callout = add_native_hole_callout(
         adapter,
@@ -686,8 +811,8 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=HOLD_DOWN_EDGE_XY,
         callout_xy=HOLD_DOWN_CALLOUT_XY,
         label="flange hold-down hole",
-        process="DRILL",
     )
+    _set_hold_down_callout_text(hold_down_callout)
     set_hole_callout_precision(
         hold_down_callout, HOLD_DOWN_PRECISION, label="flange hold-down hole"
     )

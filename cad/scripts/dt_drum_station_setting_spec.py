@@ -42,9 +42,11 @@ ARBOR_NUMBER = _config.parts("dt-pinion-arbor")["number"]
 DRUM_NUMBER = _config.parts("dt-alignment-pinion")["number"]
 # What is set (the drum's front end), from where (the arbor head's rear face)
 # and when (the bond); widest line on top, clear of the extension lines.
+# Rubric sample round 13 (rule 26): the station is named by part number, not
+# as the private "drum station".
 DIMENSION_CALLOUTS = {
     DIMENSION: (
-        "DRUM STATION, SET AT BOND:\n"
+        f"{DRUM_NUMBER} STATION, SET AT BOND:\n"
         f"{ARBOR_NUMBER} HEAD REAR FACE\n"
         f"TO {DRUM_NUMBER} FRONT END"
     ),

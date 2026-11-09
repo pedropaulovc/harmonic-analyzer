@@ -1,29 +1,26 @@
-"""Native supplier stock/application diagrams for connecting link 6261K108.
+"""Create the four-view purchased-reference sheet for connecting link 6261K108.
 
-The installed clipless clearance stand-in remains unchanged and undimensioned.
-All nominal source sizes belong to a zero-body construction reference state.
+Identification only: the link as installed (two side plates and two pins,
+the spring clip not modelled), its stock and ordering SKU. The roller-chain
+family diagrams that MHA-SH-VN-50's sheet carries describe an inner link's
+roller, which a connecting link does not have; beside this part's own
+pictorial they read as contradictory projections (machinist review, fan-out
+2026-11-07, rule 25). ITEM names the replacement, so the sheet prints no
+supplier sizes.
 """
 
 from __future__ import annotations
 
 import argparse
 import sys
-from collections.abc import Callable
 from typing import Any
 
-from _machinist_review_mode import MachinistReviewMode
 import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
+from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
-from _supplier_chain_dimensions import (
-    SOURCE_FEATURES,
-    SUPPLIER_MARGINS,
-    annotate_chain_stock,
-    prepare_chain_diagrams,
-)
-from _supplier_chain_stock import SUPPLIER_REFERENCE_CONFIGURATION
-from _supplier_spring_drawing import build_supplier_spring_drawing
+from _purchased_part_drawing import build_purchased_part_drawing
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
@@ -34,34 +31,9 @@ PART_STEM = SPEC.artifact_stem
 ITEM = "ANSI #25 ROLLER CHAIN, CONNECTING LINK"
 
 
-def _supplier_dimensions(
-    adapter: Any,
-    views: dict[str, Any],
-    *,
-    reference_bounds: Callable[[str], tuple[float, float, float, float]],
-) -> tuple[Callable[[], None], ...]:
-    return annotate_chain_stock(
-        adapter,
-        views,
-        reference_bounds=reference_bounds,
-        connecting=True,
-    )
-
-
 async def build(adapter: Any) -> dict[str, str]:
-    return await build_supplier_spring_drawing(
-        adapter,
-        SPEC,
-        item=ITEM,
-        supplier_dimensions=_supplier_dimensions,
-        supplier_margins=SUPPLIER_MARGINS,
-        stock_configuration=SUPPLIER_REFERENCE_CONFIGURATION,
-        prepare_views=prepare_chain_diagrams,
-        supplier_reference_features=SOURCE_FEATURES,
-        include_right=False,
-        stock_caption="SUPPLIER NOMINAL / APPLICATION DIAGRAM — NOT INSTALLED",
-        spring_metadata=True,
-        unit=part_drawing_unit(PART_STEM),
+    return await build_purchased_part_drawing(
+        adapter, SPEC, item=ITEM, unit=part_drawing_unit(PART_STEM)
     )
 
 

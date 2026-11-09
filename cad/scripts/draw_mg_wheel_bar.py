@@ -120,25 +120,22 @@ FRONT_KEEP = {
     "ClampStation1": (LEFT_END + 0.082, _BAR_BOTTOM - 0.038),
     "ClampStation2": (LEFT_END + 0.152, _BAR_BOTTOM - 0.046),
     "Length": (FRONT_CENTER[0], _BAR_BOTTOM - 0.054),
-    # The bar height and the clamp row's drop from the top face off the right
-    # end, in the open sheet between the bar and the end view: off the left
-    # end the height's text sat on the border's zone letter and frame line.
-    # Both share the top face's extension line: the shorter row nearer the
-    # bar, its text (the band and its mate) above the top face; the height's
-    # line outside it, its text under the bottom face.
+    # The bar height and the row's drop from the top face off the right end,
+    # in the open sheet between the bar and the end view: off the left end
+    # the height's text sat on the border's zone letter and frame line. Both
+    # share the top face's extension line: the shorter row nearer the bar,
+    # its value above the top face; the height's line outside it, its text
+    # under the bottom face. The one row height, measured at the outer clamp
+    # hole, locates all four holes on their shared centreline.
     "Side": (RIGHT_END + 0.040, _BAR_BOTTOM - 0.014),
     "ClampRowFromTop": (RIGHT_END + 0.021, _BAR_TOP + 0.015),
-    # The hanger and axle row's drop off the left end, its text above the top
-    # face and left of the bar, clear of the hanger callout's leader. Both
-    # drops are measured at a hole (the hanger's, the outer clamp's), their
-    # extension lines running out past the bar's ends.
-    "BoreRowFromTop": (LEFT_END - 0.018, _BAR_TOP + 0.008),
     # The reamed Ø up and right of the bore, the press lines standing clear
     # of the bar.
     "AxleBoreDia": (AXLE_BORE_SHEET_X + 0.035, FRONT_CENTER[1] + 0.042),
 }
-# The bar depth (the extrude's banded model dimension) under the end view,
-# its text right of the extension lines: the callout is wider than the 9.5.
+# The bar depth (the extrude's model dimension at the title block's .XXX, a
+# three-place size naming its stack) under the end view, its text right of the
+# extension lines: the callout is wider than the 9.5.
 RIGHT_KEEP = {
     "BarDepth": (
         RIGHT_CENTER[0] + BAR_DEPTH / 2000.0 + 0.034,
@@ -151,9 +148,12 @@ HANGER_CALLOUT_XY = (_sheet_x(SCREW_HOLE_X) + 0.025, FRONT_CENTER[1] + 0.035)
 CLAMP_CALLOUT_XY = (_sheet_x(CLAMP_HOLE_X[0]) + 0.010, FRONT_CENTER[1] + 0.035)
 # Each clearance hole's native drill size prints .XXX.
 HOLE_CALLOUT_PRECISION = {"hw-diam": 3}
-# Each band's mate prints under its value, authored on the part's dimension
-# (mg_wheel_bar_callouts): the bore's press fit on the axle, the depth's
-# axle back end, the row's MHA-SH-02 taps.
+# The one native through extent reads DRILL THRU ALL, after the size
+# (rule 26: size, then process, then depth).
+DRILL_EXTENT = "DRILL <hw-thru>"
+# Each mate prints under its value, authored on the part's dimension
+# (mg_wheel_bar_callouts): the bore's press fit on the axle and the depth's
+# axle-end stack.
 DRAWING_PRECISION_BY_NAME = {
     name: places
     for names in DRAWING_PRECISION.values()
@@ -229,6 +229,37 @@ def _add_below_rows(display: Any, rows: str, *, label: str) -> None:
         raise RuntimeError(
             f"{label}: callout rows or native definitions did not persist: "
             f"definition={definition!r} resolved={resolved!r}"
+        )
+
+
+@_telemetry.traced("drawing.mg_wheel_bar.drill_extent", label_param="label")
+def _drill_after_size(display: Any, *, label: str) -> None:
+    """Put DRILL between the native size and its through extent.
+
+    Only the one ``<hw-thru>`` token's definition text changes, so the
+    quantity, diameter and extent stay Hole Wizard variables
+    (draw_fr_top_frame._set_hanger_hole_callout)."""
+    display = _early_bound(display, "IDisplayDimension")
+    definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
+    native = "\n".join(definitions.values())
+    if (
+        native.count("<hw-diam>") != 1
+        or native.count("<hw-thru>") != 1
+        or "DRILL" in native
+        or native.index("<hw-diam>") > native.index("<hw-thru>")
+    ):
+        raise RuntimeError(f"{label}: unexpected native hole callout {definitions!r}")
+    updated = {
+        part: text.replace("<hw-thru>", DRILL_EXTENT) for part, text in definitions.items()
+    }
+    for definition, writable in ((5, 1), (6, 2), (7, 3), (8, 4)):
+        if updated[definition] != definitions[definition]:
+            display.SetText(writable, updated[definition])
+    persisted = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
+    resolved = "\n".join(str(display.GetText(part) or "") for part in (1, 2, 3, 4))
+    if persisted != updated or resolved.count("DRILL") != 1:
+        raise RuntimeError(
+            f"{label}: drill extent did not persist: {persisted!r}, resolved {resolved!r}"
         )
 
 
@@ -348,8 +379,8 @@ async def build(adapter: Any) -> dict[str, str]:
             edge=edge,
             callout_xy=callout_xy,
             label=label,
-            process="DRILL",
         )
+        _drill_after_size(callout, label=label)
         set_hole_callout_precision(callout, HOLE_CALLOUT_PRECISION, label=label)
         _add_below_rows(callout, rows, label=label)
 

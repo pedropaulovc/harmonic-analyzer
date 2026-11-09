@@ -238,6 +238,23 @@ def test_source_census_rejects_missing_and_extra_physical_occurrences(
     drawing._validate_source(model)
 
 
+def _native_rows(drawing) -> tuple[str, ...]:
+    """The BOM rows in native item order. The magnifier's source assembly
+    numbers its families as notes.ITEM_NUMBERS pins (its steps cite those
+    items, and its builder refuses a BOM whose numbers moved); the pen's
+    rows number in BOM order."""
+    if drawing is not magnifier:
+        return drawing.BOM_COMPONENTS
+    return tuple(
+        sorted(
+            drawing.BOM_COMPONENTS,
+            key=lambda logical: drawing.notes.ITEM_NUMBERS[
+                drawing.BOM_COMPONENT_IDENTITIES[logical][0]
+            ],
+        )
+    )
+
+
 @pytest.mark.parametrize("drawing,member,_assembly", CONSUMERS)
 def test_source_census_requires_the_wire_presentation_to_be_collapsed(
     monkeypatch, drawing, member, _assembly
@@ -286,7 +303,7 @@ class _Bom:
         self.components = {}
         self.writes = []
         self.title_writes = []
-        for item, logical in enumerate(drawing.BOM_COMPONENTS, 1):
+        for item, logical in enumerate(_native_rows(drawing), 1):
             stem, configuration = drawing.BOM_COMPONENT_IDENTITIES[logical]
             configuration = (
                 member if logical == drawing.WIRE_ROW else (configuration or "Default")
@@ -492,7 +509,7 @@ def test_bom_uses_native_member_identity_and_preserves_associative_numbers(
     adapter = SimpleNamespace(currentModel=SimpleNamespace(EditRebuild3=lambda: True))
     items = dict(drawing._validate_bom(adapter, table))
     assert items == {
-        logical: str(item) for item, logical in enumerate(drawing.BOM_COMPONENTS, 1)
+        logical: str(item) for item, logical in enumerate(_native_rows(drawing), 1)
     }
     assert table.cells[int(items[drawing.WIRE_ROW])][1] == "MHA-SH-VN-56"
     assert all(
@@ -538,9 +555,9 @@ def test_bom_uses_native_member_identity_and_preserves_associative_numbers(
         (row, number, quantity) for row, _members, number, quantity in snapshot
     ] == [
         (item, drawing.BOM_PART_NUMBERS[logical], str(drawing.BOM_QUANTITIES[logical]))
-        for item, logical in enumerate(drawing.BOM_COMPONENTS, 1)
+        for item, logical in enumerate(_native_rows(drawing), 1)
     ]
-    for item, logical in enumerate(drawing.BOM_COMPONENTS, 1):
+    for item, logical in enumerate(_native_rows(drawing), 1):
         assert table.DisplayedText2(item, quantity_column, True) == str(
             drawing.BOM_QUANTITIES[logical]
         )
@@ -693,7 +710,7 @@ def test_bom_requires_native_number_getter_even_when_raw_metadata_looks_bound(
     with pytest.raises(RuntimeError, match=message):
         drawing._validate_bom(adapter, table)
     assert [row[1] for row in table.cells[1:]] == [
-        drawing.BOM_PART_NUMBERS[logical] for logical in drawing.BOM_COMPONENTS
+        drawing.BOM_PART_NUMBERS[logical] for logical in _native_rows(drawing)
     ]
     assert all(column != 1 for _row, column, _include_hidden, _text in table.writes)
 
@@ -808,11 +825,12 @@ def test_bom_does_not_accept_rebuild_damage_as_its_settled_baseline(
 
 
 def test_wire_application_instructions_stay_with_the_assembly_consumers():
-    magnifier_steps = " ".join(magnifier.notes.ASSEMBLY_STEPS)
-    pen_steps = " ".join(pen.notes.ASSEMBLY_STEPS)
-    assert (
-        "HOOK THE MHA-SH-VN-56 LEVER WIRE IN THE MHA-MG-06 OUTPUT FIXTURE SPIGOT GROOVE"
-        in magnifier_steps
+    notes = magnifier.notes
+    # The magnifier steps name parts by BOM item (rule 22): the wire hooks
+    # in the output fixture's spigot groove and wraps on the drum.
+    wire, fixture, drum = (
+        f"ITEM {notes.ITEM_NUMBERS[stem]}" for stem in (notes.WIRE, notes.FIXTURE, notes.DRUM)
     )
-    assert "WRAP IT CLOCKWISE DOWN THE MHA-MG-10 DRUM" in magnifier_steps
-    assert "SEAT THE PEN WIRE IN THE MHA-MG-05 WHEEL RIM GROOVE" in pen_steps
+    hooked = notes.STEP_TEXT[magnifier.steps.WIRE_HOOKED_KEY]
+    assert hooked.startswith(f"HOOK {wire} ") and "SPIGOT GROOVE" in hooked and fixture in hooked
+    assert notes.STEP_TEXT["lever-wire-wrapped"].startswith(f"WRAP THE WIRE ROUND {drum} ")

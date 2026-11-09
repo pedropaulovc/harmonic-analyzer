@@ -79,15 +79,29 @@ def test_bom_rows_come_from_the_part_registry() -> None:
     assert drawing.BOM_SKUS[spec.KNIFE_MOUNT] == "-"
     assert drawing.BOM_SKUS[spec.BOSS_HOOK] == "9490T1"
     assert set(drawing.BALLOON_ANCHORS) == set(notes.BOM_ORDER)
-    assert spec.QUANTITIES[spec.DOWEL] == builder.knife_dowel.PER_MOUNT * 2
+    # Owner ruling 2026-11-08 (Pedro), #2144 item 11.3: one dowel per mount.
+    assert builder.knife_dowel.PER_MOUNT == 1
+    assert spec.QUANTITIES[spec.DOWEL] == builder.knife_dowel.PER_MOUNT * 2 == 2
 
 
 def test_every_bom_part_is_installed_by_a_numbered_step() -> None:
     steps = " ".join(notes.ASSEMBLY_STEPS)
     for stem in notes.BOM_ORDER:
         assert drawing.BOM_PART_NUMBERS[stem] in steps, stem
-    numbers = [line.split(".", 1)[0] for line in notes.ASSEMBLY_STEPS]
-    assert numbers == [str(index) for index in range(1, len(notes.ASSEMBLY_STEPS) + 1)]
+    # Numbered steps run 1..n; a step's own sub-steps follow it lettered
+    # A, B, ... (no I or O), so other sheets' step citations stay put.
+    labels = [line.split(". ", 1)[0] for line in notes.ASSEMBLY_STEPS]
+    numbers = [label for label in labels if label.isdigit()]
+    assert numbers == [str(index) for index in range(1, len(numbers) + 1)]
+    letters = "ABCDEFGHJKLMNPQRSTUVWXYZ"
+    expected = []
+    for label in labels:
+        if label.isdigit():
+            group, index = label, 0
+        else:
+            expected.append(f"{group}{letters[index]}")
+            index += 1
+    assert [label for label in labels if not label.isdigit()] == expected
 
 
 def test_explode_moves_only_contracted_families_with_split_stations() -> None:
@@ -119,7 +133,7 @@ def test_station_slide_clears_the_hex_trunnion() -> None:
 
 def test_dowels_leave_the_mounts_with_the_crossbar_not_with_the_mounts() -> None:
     # Owner ruling 2026-10-24 (T+H3): the dowels press into the crossbar, so
-    # the explode lifts them out of the mounts' round hole and slot before any
+    # the explode lifts them out of the mounts' round holes before any
     # station slides, and no station slide carries them.
     labels = [label for label, *_ in explode.EXPLODE_STEPS]
     dowel_steps = [
@@ -162,13 +176,14 @@ def test_eyebolt_balloon_lands_on_the_eye_facing_the_viewer() -> None:
     assert drawing.BALLOON_ANCHORS[spec.BOSS_HOOK].point_mm == point
 
 
-def test_jam_nut_balloon_lands_on_the_hex_corner_facing_the_viewer() -> None:
+def test_jam_nut_balloon_lands_high_on_the_hex_corner_facing_the_viewer() -> None:
     x, y, z = drawing.JAM_NUT_BALLOON_POINT_MM
-    # A hex corner (corners at 0, 60, ... deg from part +Y), at half height.
+    # A hex corner (corners at 0, 60, ... deg from part +Y), in the nut's
+    # upper half, clear of its lower outline and the shank's cut end below.
     assert math.hypot(x, y) == pytest.approx(jam_nut.ACROSS_CORNERS / 2.0)
     sixths = math.degrees(math.atan2(x, y)) / 60.0
     assert sixths == pytest.approx(round(sixths), abs=1e-9)
-    assert z == pytest.approx(jam_nut.THICKNESS / 2.0)
+    assert 0.75 * jam_nut.THICKNESS <= z < jam_nut.THICKNESS
 
     def toward_viewer(px: float, py: float) -> float:
         # Row-vector placement (the builder's JAM_NUT_ROWS), dotted with the
@@ -291,7 +306,7 @@ def test_retention_rows_cite_the_package_steps() -> None:
     assert hanger.exposure is joint_retention.Exposure.STATIC_CLAMP
     assert hanger.lock is joint_retention.Lock.NONE
     assert rows["sm-summing/boss-hook-in-lever"].installed_at == "MHA-SM-00 STEP 2"
-    assert rows["sm-summing/gooseneck-spring-screw"].installed_at == "MHA-SM-00 STEP 8"
+    assert rows["sm-summing/gooseneck-shoulder-screw"].installed_at == "MHA-SM-00 STEP 8"
     hook = rows["sm-summing/boss-hook-in-lever"]
     assert hook.lock is joint_retention.Lock.JAM_NUT
     assert hook.lock_part == "sm_vn_boss_hook_jam_nut"
@@ -300,15 +315,63 @@ def test_retention_rows_cite_the_package_steps() -> None:
     assert nut.installed_at == "MHA-SM-00 STEP 2"
 
 
-def test_step_six_runs_each_hanger_bolt_home_by_hand_before_drawing_up() -> None:
+def _step_group(number: str) -> list[str]:
+    """The numbered step and its lettered sub-steps, in order."""
+    return [s for s in notes.ASSEMBLY_STEPS if drawing._step_group(s) == number]
+
+
+def test_steps_five_and_six_do_one_thing_a_sub_step() -> None:
+    # Rule 22 (integration review at 8fb7fb46f7): each sub-step of the
+    # hanger fit-up does one thing; its label is its only ". ".
+    for number in ("5", "6"):
+        group = _step_group(number)
+        assert len(group) > 1
+        for line in group:
+            assert line.count(". ") == 1, line
+
+
+def test_step_five_runs_each_hanger_bolt_home_by_hand_then_sets_the_gauge_pin() -> None:
     # Owner ruling 2026-10-27 (#2018 option C): accepted as is.  Each cut
     # bolt is run in by hand to its washer before it draws the mount's top
-    # seat flat to the crossbar underside.
-    step = notes.ASSEMBLY_STEPS[5]
-    assert step.startswith("6. ")
+    # seat flat to the crossbar underside.  Owner ruling 2026-11-08 (Pedro),
+    # #2144 item 11.3: with both bolts finger-tight the gauge pin through
+    # both bores sets the mounts' yaw before they are tightened, and it must
+    # slide back out (check 6).
+    step = " ".join(_step_group("5"))
+    assert step.startswith("5. ")
     assert "MHA-SM-VN-52" in step
     assert "WASHER" in step
-    assert step.index("BY HAND") < step.index("TIGHTEN")
+    assert "WITHOUT THE LEVER" in step
+    assert step.index("BY HAND") < step.index(notes.KNIFE_GAUGE_BAR) < step.index("TIGHTEN")
+    assert step.index("TIGHTEN") < step.index("WITHDRAW THE PIN")
+    assert notes.KNIFE_GAUGE_BAR == "Ø.4720 CLASS ZZ MINUS GAUGE PIN"
+    assert spec.KNIFE_GAUGE_BAR_DIA == pytest.approx(2.0 * builder.knife_mount.BORE_R_MIN)
+    assert notes.KNIFE_GAUGE_BAR not in " ".join(notes.BOM_DESCRIPTIONS.values())
+    assert any(
+        check.startswith("6. AFTER STEP 5") and notes.KNIFE_GAUGE_BAR in check
+        for check in notes.ASSEMBLY_CHECKS
+    )
+
+
+def test_rear_mount_is_rehung_on_the_lever_and_swung_to_the_rock_gauge() -> None:
+    # Coordinator ruling on the SM-00 order for #2144 item 11.3: the lever's
+    # rigid stubs cannot enter two fixed bores, so the rear mount comes off,
+    # takes its stub, is re-hung finger-tight and swung until check 2 passes.
+    step = " ".join(_step_group("6"))
+    assert step.startswith("6. ") and "REAR MOUNT" in step
+    assert (
+        step.index("LIFT THE REAR MOUNT OFF")
+        < step.index("RE-HANG")
+        < step.index("BY HAND")
+        < step.index("SWING THE REAR MOUNT ABOUT ITS DOWEL")
+        < step.index("(CHECK 2)")
+        < step.index("TIGHTEN")
+    )
+    # The cut stays at step 4 and the hanger joint completes at step 6, the
+    # steps the purchased-part sheets and joint_retention cite.
+    cut = next(s for s in notes.ASSEMBLY_STEPS if s.startswith("4. "))
+    assert "CUT AN" in cut
+    assert builder.KNIFE_REAR_YAW_RANGE_DEG > builder.KNIFE_BAR_YAW_DEG
 
 
 def test_hanger_fit_up_reach_matches_the_builder_band() -> None:
@@ -329,17 +392,30 @@ def test_steps_and_checks_stay_above_the_inner_border() -> None:
     assert drawing.STEPS_XY[0] > drawing.SHEET_INNER_BORDER[0]
     assert drawing.STEPS_XY[1] < drawing.SHEET_INNER_BORDER[3]
     assert drawing.STEPS_RIGHT < drawing.TITLE_BLOCK[0]
+    split = notes.ASSEMBLY_STEPS.index(
+        next(
+            s
+            for s in notes.ASSEMBLY_STEPS
+            if s.startswith(f"{drawing.STEPS_CONTINUED_FROM}. ")
+        )
+    )
     assert (
         drawing.STEPS_NOTE.split()
-        == " ".join(("ASSEMBLY SEQUENCE", *notes.ASSEMBLY_STEPS)).split()
+        == " ".join(("ASSEMBLY SEQUENCE", *notes.ASSEMBLY_STEPS[:split])).split()
     )
     assert (
         drawing.CHECKS_NOTE.split()
-        == " ".join(("ASSEMBLY SEQUENCE (CONT.)", *notes.ASSEMBLY_CHECKS)).split()
+        == " ".join(
+            (
+                "ASSEMBLY SEQUENCE (CONT.)",
+                *notes.ASSEMBLY_STEPS[split:],
+                *notes.ASSEMBLY_CHECKS,
+            )
+        ).split()
     )
     for number in drawing.BOM_PART_NUMBERS.values():
         if any(number in step for step in notes.ASSEMBLY_STEPS):
-            assert number in drawing.STEPS_NOTE
+            assert number in drawing.STEPS_NOTE + drawing.CHECKS_NOTE
 
 
 def test_one_blank_line_separates_consecutive_numbered_steps() -> None:
@@ -348,7 +424,13 @@ def test_one_blank_line_separates_consecutive_numbered_steps() -> None:
         starts = [i for i, line in enumerate(lines) if re.match(r"\d+\. ", line)]
         assert len(starts) > 1
         for previous, start in zip(starts, starts[1:]):
-            assert lines[start - 1] == ""
-            assert "" not in lines[previous : start - 1]
-        # The heading runs straight into step 1.
-        assert lines[starts[0] - 1].endswith(("SEQUENCE", "CHECKS:"))
+            # A blank line, or the CHECKS heading after its own blank line.
+            gap = lines[previous + 1 : start]
+            assert gap.count("") == 1
+            assert lines[start - 1] in ("", "CHECKS:")
+        # A lettered sub-step runs straight on from its step.
+        for index, line in enumerate(lines):
+            if re.match(r"\d+[A-Z]\. ", line):
+                assert lines[index - 1] != ""
+        # The heading runs straight into the first step.
+        assert lines[starts[0] - 1].endswith(("SEQUENCE", "(CONT.)", "CHECKS:"))

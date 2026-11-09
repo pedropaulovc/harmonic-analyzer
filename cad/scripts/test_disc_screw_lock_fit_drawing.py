@@ -165,34 +165,29 @@ def test_fit_up_adjustments_are_complete_and_ordered_before_installation() -> No
     text = drawing._step_text(
         operating_domain=SimpleNamespace(axis_from_left_end_limits_mm=(0.0, 1.0))
     )
-    printed = drawing._step_column("", steps.SEQUENCE, text)
 
     def printed_step(key: str) -> str:
-        match = re.search(
-            rf"^{steps.step_number(key)}\. (.*?)(?=^\d+\. |\Z)",
-            printed,
-            re.MULTILINE | re.DOTALL,
-        )
-        assert match is not None, key
-        return " ".join(match.group(1).split())
+        return " ".join(" ".join(text[key]).split())
 
     lock_step = printed_step("lock-seats-faced")
-    float_window = re.search(
-        r"\bIS (\d*\.\d+-\d*\.\d+): THE PLATEN'S FORE-AFT FLOAT\b",
-        lock_step,
-    )
+    float_window = re.search(r"\bTHE GAP IS (\d*\.\d+) TO (\d*\.\d+) AT EVERY LOCK\b", lock_step)
     assert float_window is not None
-    _inside(_inch_window(float_window.group(1)), guide.LOCK_GAP_FIT, 0.001 * IN)
-    assert re.search(r"\bELSE\b.*\bSTOP\b.*\bREPORT\b", lock_step)
+    _inside(
+        _inch_window(f"{float_window.group(1)}-{float_window.group(2)}"),
+        guide.LOCK_GAP_FIT,
+        0.001 * IN,
+    )
+    assert f"REPEAT FROM STEP {steps.step_number('guides-screwed')}" in lock_step
 
     cut_step = printed_step("disc-screws-cut")
     assert drawing.BOM_PART_NUMBERS["pd-vn-transgear-disc-screw"] in cut_step
     tip_window = re.search(
-        r"\bCUT\b.*\bTIPS (\d*\.\d+-\d*\.\d+) BELOW DISC REAR FACE\b",
+        r"\bCUT\b.*\bTIPS (\d*\.\d+-\d*\.\d+) BELOW THE DISC REAR FACE\b",
         cut_step,
     )
     assert tip_window is not None
     _inside(_inch_window(tip_window.group(1)), screw.TIP_BELOW_REAR_FACE, 0.001 * IN)
-    # The cut end's break is the title block's edge break, so no limit here.
-    assert re.search(r"\bBREAK THE CUT END\.", cut_step)
+    # The cut end's break is the title block's edge break, which no step
+    # restates (rule 2).
+    assert "BREAK" not in cut_step
     assert " IN " not in f" {cut_step} " and " IN " not in f" {lock_step} "

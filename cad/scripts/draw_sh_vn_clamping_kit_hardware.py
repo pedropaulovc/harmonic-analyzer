@@ -39,7 +39,6 @@ from _drawing_common import (
 )
 from _drawing_dimensions import (
     assert_imported_precision,
-    set_dimension_callouts,
     set_reference_dimension,
 )
 from _drawing_hidden_sketches import curate_view_dimensions
@@ -59,7 +58,6 @@ from _purchased_fastener_drawing import _box, _inside
 import sh_vn_clamping_kit_hold_down_stud_spec as stud
 import sh_vn_clamping_kit_t_nut_spec as tnut
 import sh_vn_clamping_kit_flange_nut_spec as flange_nut
-from ch_rocker_arm_tl_oblique_jig_assembly_spec import HOLD_DOWN_REFERENCE
 from _layout_audit import display_box, estimated_text_runs
 from _drawing_layout_audit import annotation_display
 from _machinist_review_mode import MachinistReviewMode
@@ -92,19 +90,17 @@ ISO_CENTER = (0.330, 0.170)
 FRONT_KEEP = {"FinishedLength": (0.060, FRONT_CENTER[1])}
 END_KEEP: dict[str, tuple[float, float]] = {}
 # The side-view attached callout reads this unchanged native source control;
-# no duplicate imported chamfer dimension is printed in the end view.
-END_VIEW_LABEL = "CUT END VIEW"
-END_VIEW_LABEL_XY = (0.092, 0.224)
+# no duplicate imported chamfer dimension is printed in the end view. That
+# view is the projected top view, so it carries no label (rule 9).
 # Sheet 1's item label, in the same top band; right of the cut-end view.
 # Sheet 1 carries the quantity, so this sheet needs no registry read.
 ITEM_LABEL = VARIANTS[0][1]
 ITEM_LABEL_XY = (0.150, 0.262)
 STOCK_NOTE_XY = (0.025, 0.077)
 THREAD_NOTE_XY = (0.065, 0.180)
-THREAD_CALLOUT = f"{stud.THREAD}\nEXISTING THREAD\nNOT MODELLED"
+THREAD_CALLOUT = f"{stud.THREAD} UNC\nEXISTING THREAD"
 LOWER_END_NOTE_XY = (0.155, 0.083)
 CHAMFER_NOTE_XY = (0.155, 0.225)
-ASSEMBLY_REFERENCE_XY = (0.025, 0.056)
 STUD_REWORK_PROPERTIES = {
     "Stock Length": f"{stud.STOCK_LENGTH} IN STOCK",
     "Stock Note": stud.STOCK_NOTE,
@@ -139,7 +135,7 @@ part_metadata(
 requirement(
     "finished_upper_end", kind="face",
     faces=(PlanarFace((0.0, 1.0, 0.0), stud.LENGTH),),
-    requirements=("length", "note"),
+    requirements=("length",),
     fields={
         "normal": ([0.0, 1.0, 0.0], ("__frame__",)),
         "length": (
@@ -147,7 +143,6 @@ requirement(
             ("LENGTH", "LENGTH_BAND"),
         ),
         "length_nominal": (stud.LENGTH, ("LENGTH",)),
-        "note": (stud.DIMENSION_CALLOUTS["FinishedLength"], ("DIMENSION_CALLOUTS",)),
     },
     precision={"length": stud.LENGTH_PLACES},
 )
@@ -469,23 +464,6 @@ def read_saved_cut_end_angle(model: Any) -> float:
     return float(angle)
 
 
-def set_machining_callouts(adapter: Any, annotations: list[Any]) -> None:
-    """Read back the printed length callout without replacing its native size."""
-    callouts = {"FinishedLength": stud.DIMENSION_CALLOUTS["FinishedLength"]}
-    set_dimension_callouts(adapter, annotations, callouts)
-    remaining = dict(callouts)
-    for annotation in annotations:
-        name = dimension_name(adapter, annotation)
-        expected = remaining.pop(name, None)
-        if expected is None:
-            continue
-        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-        if display.GetText(4) != expected:  # swDimensionTextCalloutBelow
-            raise RuntimeError(f"{name}: native machining callout did not persist")
-    if remaining:
-        raise RuntimeError(f"missing native machining callouts: {sorted(remaining)}")
-
-
 def assert_machining_controls(adapter: Any, annotations: list[Any]) -> None:
     """Read the printed source-owned length driver, precision and tolerance."""
     remaining = {
@@ -626,20 +604,12 @@ def append_stud_rework_sheets(adapter: Any) -> tuple[Callable[[], None], ...]:
     )
     annotations = [*front_annotations, *end_annotations]
     assert_machining_controls(adapter, annotations)
-    set_machining_callouts(adapter, annotations)
-    if add_note(adapter, END_VIEW_LABEL, *END_VIEW_LABEL_XY) is None:
-        raise RuntimeError("failed to label the permanent stud cut-end view")
     if add_note(adapter, ITEM_LABEL, *ITEM_LABEL_XY) is None:
         raise RuntimeError("failed to label the stud REWORK sheet's item")
     settled_notes = add_rework_notes(adapter, front)
     add_property_linked_note(
         adapter, f"{stud.CONFIGURATION} Rework Stock Note", *STOCK_NOTE_XY
     )
-    if add_note(
-        adapter, f"INSTALLED ACCEPTANCE:\n{HOLD_DOWN_REFERENCE}",
-        *ASSEMBLY_REFERENCE_XY,
-    ) is None:
-        raise RuntimeError("failed to add the hold-down assembly acceptance reference")
     assert_rework_view_controls(adapter, front, end)
 
     def settled() -> None:

@@ -8,9 +8,10 @@ only the #47 rod-pin hole is added after joining (it is located from the
 joined part's reamed bore, so it is not on this detail).
 
 Frame: the MHA-CH-06 frame, so every value below is the finished part's own
-(``ch_rocker_arm_spec``): origin on the bottom arc's midpoint, +X the rod
-side, the hub hole on the mirror axis PIVOT_MID_Y up, the arcs' shared centre
-CENTER_Y up. Nothing here is a new number.
+(``ch_rocker_arm_spec``): origin on the mirror axis at the book bottom edge
+(``_rocker_interface``), +X the rod side, the hub hole on the mirror axis
+PIVOT_MID_Y up, the arcs' shared centre CENTER_Y up. Nothing here is a new
+number.
 """
 
 from __future__ import annotations
@@ -24,6 +25,8 @@ from ch_rocker_arm_spec import (
     ARM_THICKNESS,
     ARM_THICKNESS_BAND,
     BOT_END_X,
+    BOTTOM_EDGE_BAND,
+    BOTTOM_EDGE_BELOW_PIVOT,
     HUB_DIA,
     R_TOP,
     ROD_TIP_X,
@@ -76,13 +79,12 @@ UNIT = drawing_unit("parts/ch-rocker-strap", _config.parts("ch-rocker-strap"))
 HOLE_DIA = HUB_DIA
 
 # The bottom edge's depth under the hole, on the mirror axis -- the
-# finished part's lower profile (draw_ch_rocker_arm: zone TOP_EDGE_BAND[0],
-# wholly in material, U0) said as a +/- from the hole the hub fills. It may
-# only come out shallow, the top edge only high: the arcs' radial width is
-# held from the hole, not stacked from two radii (r1 machinist review: two
-# one-place radii left a .031 worst-case wall under the hole).
-BOTTOM_EDGE_BELOW_PIVOT = PIVOT_MID_Y
-BOTTOM_EDGE_BAND = (TOP_EDGE_BAND[1], -TOP_EDGE_BAND[0])  # (upper, lower)
+# finished part's lower profile (draw_ch_rocker_arm: the arc-system zone,
+# equal-bilateral about the mid-zone nominal) said as a +/- from the hole the
+# hub fills, as the top edge's height is: the arcs' radial width is held from
+# the hole, not stacked from two radii (r1 machinist review: two one-place
+# radii left a .031 worst-case wall under the hole). BOTTOM_EDGE_BELOW_PIVOT
+# and BOTTOM_EDGE_BAND are the arm's (ch_rocker_arm_spec).
 
 # The sheet's one pure reference dimension: the parenthesised overall length
 # across both tip corners, a band-free restatement of the two 5.76 offsets.

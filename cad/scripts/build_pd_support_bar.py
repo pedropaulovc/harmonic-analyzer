@@ -89,8 +89,8 @@ from _column_clamp_interface import BAR_DEPTH
 from frame_column_stations import COLUMN_X  # frame column line (frame assembly)
 from pd_support_bar_spec import (
     BACK_FACE_Z,
-    BAR_HEIGHT,
     BAR_BAND_PLACES,
+    BAR_HEIGHT,
     BRACKET_TAP_CSK_DIA,
     BRACKET_TAP_SPEC,
     BRACKET_TAP_X,
@@ -103,6 +103,9 @@ from pd_support_bar_spec import (
     UNIT,
 )
 from pd_support_bar_drawing_spec import (
+    BANDED_HANGER_NAMES,
+    CLAMP_CENTRELINE_OVERRUN,
+    CLAMP_EAST_HEIGHT_NAME,
     CLAMP_HOLE_CALLOUT_PLACES,
     CLAMP_POSITION_PLACES,
     CLAMP_SLOT_CBORE_WIDTH_LIMITS,
@@ -112,10 +115,12 @@ from pd_support_bar_drawing_spec import (
     CLAMP_STATION_NAMES,
     DIMENSION_PREFIXES,
     DRAWING_DIMENSIONS,
+    HANGER_HEIGHT_X,
     HANGER_STATION_NAMES,
     ISOMETRIC_VIEW_NOTE,
     SHEET_PRECISION,
     SURFACE_FINISHES,
+    TAP_CENTRELINE_OVERRUN,
 )
 
 PART_NAME = "pd-support-bar"
@@ -177,8 +182,10 @@ CLAMP_STATIONS = tuple(x - CLAMP_ROW_START_X for x in CLAMP_ROW_X)
 # the basic major by CLAMP_HOLE_FLOAT. A coordinate ±band is a diametral zone of
 # 2·√2·band (the rounding to the printed places included), and the bar's
 # zone plus the tap's must stay inside the float. The row height and
-# stations, at .XXX, take the widest band that does: ±.006 (the .XX row's
-# ±.01 would need more than the whole float).
+# stations print .XXX with no band of their own: the title block's ±.005
+# holds the stack (delegated ruling 2026-11-07, FoPdFab2 Q2, as on the MHA-MG
+# wheel bar; the ±.007 it replaces was the widest .XXX band that fit). The
+# .XX row's ±.01 would need more than the whole float.
 CLAMP_HOLE_FLOAT = CLAMP_HOLE_DIA - CLAMP_SCREW_MAJOR
 BACK_ARC_TAP_ZONE = 2.0 * math.hypot(
     BACK_ARC_TAP_STATION_BAND, BACK_ARC_TAP_HEIGHT_BAND
@@ -201,21 +208,12 @@ def clamp_position_zone(band: float) -> float:
     )
 
 
-# One step of the printed places, in millimetres.
-_CLAMP_POSITION_STEP = 25.4 * 10.0**-CLAMP_POSITION_PLACES
-CLAMP_POSITION_BAND = _CLAMP_POSITION_STEP * max(
-    (
-        k
-        for k in range(1, math.ceil(CLAMP_HOLE_FLOAT / _CLAMP_POSITION_STEP))
-        if clamp_position_zone(k * _CLAMP_POSITION_STEP) + BACK_ARC_TAP_ZONE
-        <= CLAMP_HOLE_FLOAT + 1e-9
-    ),
-    default=0,
-)
-if CLAMP_POSITION_BAND <= 0.0:
+CLAMP_POSITION_BAND = printed_band_mm(CLAMP_POSITION_PLACES, unit=UNIT)
+if clamp_position_zone(CLAMP_POSITION_BAND) + BACK_ARC_TAP_ZONE > CLAMP_HOLE_FLOAT:
     raise AssertionError(
-        "MHA-SH-VN-53 screws in the MHA-SH-02 taps through the support bar: no "
-        f".XXX clamp-hole position band fits the {CLAMP_HOLE_FLOAT:.4f} float"
+        "MHA-SH-VN-53 screws in the MHA-SH-02 taps through the support bar: the "
+        f".XXX title-block clamp-hole position over-runs the {CLAMP_HOLE_FLOAT:.4f} "
+        "float"
     )
 
 # --- West clamp slots: owner ruling 2026-10-15, option A (PR #1471 r3) -------
@@ -376,22 +374,38 @@ BAR_HALF_HEIGHT_EQUATION = '"BarHeight" / 2'
 @dataclass(frozen=True)
 class ReferenceRow:
     """One hole row's hidden reference sketch: its feature name, the prefix of
-    its anchor dimensions, its height dimension's name, the holes' model y and
-    each hole's (station dimension name, model x)."""
+    its anchor dimensions, its height dimension's name, the holes' model y,
+    each hole's (station dimension name, model x), and the row's drawn
+    centrelines as (start x, end x) runs along the bar (``ROW_CENTRELINES``).
+    The height reads off the last run's end: a rise on the +X end's edge when
+    the run reaches it, else a point under a stub on the top face. Every
+    other run carrying holes names its own height (``run_heights``, read off
+    a stub over its end the same way), so no run's holes are left without a
+    height (round 7 review blocker: the round pair's run had none)."""
 
     feature: str
     prefix: str
     height_name: str
     row_y: float
     holes: tuple[tuple[str, float], ...]
+    runs: tuple[tuple[float, float], ...]
+    run_heights: tuple[str, ...] = ()
 
 
+# The rows' drawn centrelines (pd_support_bar_drawing_spec.HANGER_HEIGHT_X and
+# the overruns): the taps' one run from just short of the pivot to where the
+# .571 reads off it; the clamp holes' east run from END A past the round pair,
+# its own .551 reading off its end (CLAMP_EAST_HEIGHT_NAME), and their west run
+# from short of the slots to the +X end, where the other .551 reads off it.
+_CLAMP_EAST = tuple(x for x in CLAMP_ROW_X if x < 0.0)
+_CLAMP_WEST = tuple(x for x in CLAMP_ROW_X if x > 0.0)
 HANGER_ROW = ReferenceRow(
     "HangerRowReference",
     "Hanger",
     "HangerRowHeight",
     HANGER_TAP_Y,
     tuple(zip(HANGER_STATION_NAMES, (PIVOT_TAP_X, *BRACKET_TAP_X), strict=True)),
+    ((PIVOT_TAP_X - TAP_CENTRELINE_OVERRUN, HANGER_HEIGHT_X),),
 )
 CLAMP_ROW = ReferenceRow(
     "ClampRowReference",
@@ -399,7 +413,38 @@ CLAMP_ROW = ReferenceRow(
     "ClampRowHeight",
     CLAMP_TAP_Y,
     tuple(zip(CLAMP_STATION_NAMES, CLAMP_ROW_X, strict=True)),
+    (
+        (LEFT_END_X, max(_CLAMP_EAST) + CLAMP_CENTRELINE_OVERRUN),
+        (min(_CLAMP_WEST) - CLAMP_CENTRELINE_OVERRUN, BAR_LENGTH / 2.0),
+    ),
+    (CLAMP_EAST_HEIGHT_NAME,),
 )
+ROW_CENTRELINES = (HANGER_ROW, CLAMP_ROW)
+
+
+def _run_holes(row: ReferenceRow, run: tuple[float, float]) -> list[tuple[str, float]]:
+    return [(name, x) for name, x in row.holes if run[0] < x < run[1]]
+
+
+# Rule 26: every hole on exactly one of its row's runs, inside the bar, and
+# no stretch of the bar under two rows' runs (round 4 machinist review: one
+# line through both rows read as one row).
+for _row in ROW_CENTRELINES:
+    if sorted(n for run in _row.runs for n, _ in _run_holes(_row, run)) != sorted(
+        n for n, _ in _row.holes
+    ):
+        raise AssertionError(f"{_row.feature}: a hole is on no centreline run, or on two")
+    if not all(LEFT_END_X <= a < b <= BAR_LENGTH / 2.0 for a, b in _row.runs):
+        raise AssertionError(f"{_row.feature}: a centreline run leaves the bar")
+    if len(_row.run_heights) != len(_row.runs) - 1:
+        raise AssertionError(f"{_row.feature}: a run carries holes but no height")
+for _a in HANGER_ROW.runs:
+    for _b in CLAMP_ROW.runs:
+        if _a[0] < _b[1] and _b[0] < _a[1]:
+            raise AssertionError(
+                f"the tap and clamp rows' centrelines share the bar over {_a} and {_b}"
+            )
+
 
 
 def _plus_mm(equation: str, offset_mm: float) -> str:
@@ -584,75 +629,222 @@ async def _author_clamp_slot_profile(
     return dims.apply(adapter, feature), w_out > 0.0
 
 
+# The tap row's height reads off a stub on the top face over its run's end:
+# a plain line, which prints inside the top edge's stroke.
+HEIGHT_STUB_LENGTH = 5.0
+
+
 async def _author_row(adapter, row: ReferenceRow) -> list[tuple[str, str]]:
     """One hole row as model dimensions on a hidden Front-plane sketch (the
-    build_mg_wheel_bar BoreRowReference pattern): a construction chain on the
-    row from the left bar end through each hole to a rise at the right end
-    that drops from the top face to the row, so the stations read from the
-    end and the row's height from the top face. Every dimension is driven
-    from the bar globals (``row_equations``). The rise lies on the bar's end
-    edge, so it is a plain sketch line, which prints inside that edge's
-    heavier stroke; as construction geometry its grey dashes showed along the
-    end (machinist review round 2)."""
+    build_mg_wheel_bar BoreRowReference pattern): construction runs on the
+    row through its holes only (``row.runs``), so each row draws its own
+    centrelines (rule 26), the stations reading from END A and the height
+    from the top face. A row whose first run does not start at END A drops a
+    plain line down END A's edge to the row, the stations' origin; a row
+    whose last run reaches the +X end reads its height off a rise down that
+    edge, any other off a stub on the top face over the run's end; every
+    other run reads its own height (``row.run_heights``) off a stub over its
+    end. Lines on the bar's edges are plain sketch lines, which print inside
+    the edges' heavier strokes; as construction geometry their grey dashes
+    showed along the end (machinist review round 2). Every dimension is
+    driven from the bar globals (``row_equations``) or holds a fixed offset
+    from the bar's centre, where the holes stand."""
     feature = row.feature
     rise_x = BAR_LENGTH / 2.0
     row_y = row.row_y
-    start_x = LEFT_END_X
-    equations = row_equations(row)
     top_y = BAR_HEIGHT / 2.0
-    row_xs = (start_x, *(x for _, x in row.holes), rise_x)
+    end_x = row.runs[-1][1]
+    on_rise = end_x == rise_x
+    equations = row_equations(row)
     dims = SketchDims()
     check(f"create_sketch {feature}", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    rise = check(
-        f"{feature} rise", await adapter.add_line(rise_x, top_y, rise_x, row_y)
-    )
-    legs = [
-        check(f"{feature} leg {index}", await adapter.add_line(x0, row_y, x1, row_y))
-        for index, (x0, x1) in enumerate(zip(row_xs, row_xs[1:]))
+    drop = None
+    if row.runs[0][0] != LEFT_END_X:
+        drop = check(
+            f"{feature} END A drop",
+            await adapter.add_line(LEFT_END_X, top_y, LEFT_END_X, row_y),
+        )
+    if on_rise:
+        top = check(f"{feature} rise", await adapter.add_line(rise_x, top_y, rise_x, row_y))
+    else:
+        top = check(
+            f"{feature} height stub",
+            await adapter.add_line(end_x - HEIGHT_STUB_LENGTH, top_y, end_x, top_y),
+        )
+    early = [
+        check(
+            f"{feature} run {index} height stub",
+            await adapter.add_line(x - HEIGHT_STUB_LENGTH, top_y, x, top_y),
+        )
+        for index, (_x0, x) in enumerate(row.runs[:-1])
     ]
+    runs = []
+    for index, run in enumerate(row.runs):
+        xs = (run[0], *(x for _, x in _run_holes(row, run)), run[1])
+        runs.append(
+            [
+                check(
+                    f"{feature} run {index} leg {leg}",
+                    await adapter.add_line(x0, row_y, x1, row_y),
+                )
+                for leg, (x0, x1) in enumerate(zip(xs, xs[1:]))
+            ]
+        )
     set_sketch_direct_db(adapter, False)
+    if drop is not None:
+        check(
+            f"{feature} END A drop vertical",
+            await adapter.add_sketch_constraint(drop, None, "vertical"),
+        )
     check(
-        f"{feature} rise vertical",
-        await adapter.add_sketch_constraint(rise, None, "vertical"),
+        f"{feature} {'rise vertical' if on_rise else 'stub horizontal'}",
+        await adapter.add_sketch_constraint(
+            top, None, "vertical" if on_rise else "horizontal"
+        ),
     )
-    for index, leg in enumerate(legs):
-        _as_construction(adapter, leg, f"{feature} leg {index}")
+    for index, stub in enumerate(early):
         check(
-            f"{feature} leg {index} horizontal",
-            await adapter.add_sketch_constraint(leg, None, "horizontal"),
+            f"{feature} run {index} stub horizontal",
+            await adapter.add_sketch_constraint(stub, None, "horizontal"),
         )
-    for index, (leg, after) in enumerate(zip(legs, [*legs[1:], None])):
-        end = f"{rise}.end" if after is None else f"{after}.start"
-        check(
-            f"{feature} leg {index} chained",
-            await adapter.add_sketch_constraint(f"{leg}.end", end, "coincident"),
-        )
-    await anchor_point_to_origin(
-        adapter, f"{rise}.start", rise_x, top_y, f"{feature} top corner"
-    )
-    dims.record(f"{row.prefix}RiseX", BAR_HALF_LENGTH_EQUATION)
-    dims.record(f"{row.prefix}RiseY", BAR_HALF_HEIGHT_EQUATION)
-    await dimension_between(
-        adapter,
-        f"{rise}.start",
-        f"{rise}.end",
-        "vertical_distance",
-        top_y - row_y,
-        f"{feature} height",
-    )
-    dims.record(row.height_name, equations[row.height_name])
-    start = f"{legs[0]}.start"
-    await dimension_between(
-        adapter, start, "origin", "horizontal_distance", abs(start_x), f"{feature} end"
-    )
-    dims.record(f"{row.prefix}StartX", BAR_HALF_LENGTH_EQUATION)
-    # Each hole ends one leg; the last leg runs on to the rise.
-    for leg, (name, x) in zip(legs[:-1], row.holes, strict=True):
+    for index, legs in enumerate(runs):
+        for leg_index, leg in enumerate(legs):
+            label = f"{feature} run {index} leg {leg_index}"
+            _as_construction(adapter, leg, label)
+            check(
+                f"{label} horizontal",
+                await adapter.add_sketch_constraint(leg, None, "horizontal"),
+            )
+        ends = [f"{after}.start" for after in legs[1:]]
+        if on_rise and index == len(runs) - 1:
+            ends.append(f"{top}.end")
+        for leg_index, (leg, end) in enumerate(zip(legs, ends)):
+            check(
+                f"{feature} run {index} leg {leg_index} chained",
+                await adapter.add_sketch_constraint(f"{leg}.end", end, "coincident"),
+            )
+
+    async def stub_height(
+        stub: str, run_end: str, x: float, prefix: str, name: str, label: str
+    ) -> None:
+        """A run's height off the stub on the top face over its end: the stub
+        held at its fixed offset from the bar's centre on the top face."""
+        await anchor_point_to_origin(adapter, f"{stub}.end", x, top_y, label)
+        dims.record(f"{prefix}StubX", f"{abs(x):.10g}mm")
+        dims.record(f"{prefix}StubY", BAR_HALF_HEIGHT_EQUATION)
         await dimension_between(
-            adapter, start, f"{leg}.end", "horizontal_distance", x - start_x, name
+            adapter,
+            f"{stub}.start",
+            f"{stub}.end",
+            "horizontal_distance",
+            HEIGHT_STUB_LENGTH,
+            f"{label} length",
         )
-        dims.record(name, equations[name])
+        dims.record(f"{prefix}StubLength", f"{HEIGHT_STUB_LENGTH:.10g}mm")
+        await dimension_between(
+            adapter, f"{stub}.end", run_end, "vertical_distance", top_y - row_y, name
+        )
+        dims.record(name, equations[row.height_name])
+
+    if on_rise:
+        await anchor_point_to_origin(
+            adapter, f"{top}.start", rise_x, top_y, f"{feature} top corner"
+        )
+        dims.record(f"{row.prefix}RiseX", BAR_HALF_LENGTH_EQUATION)
+        dims.record(f"{row.prefix}RiseY", BAR_HALF_HEIGHT_EQUATION)
+        await dimension_between(
+            adapter,
+            f"{top}.start",
+            f"{top}.end",
+            "vertical_distance",
+            top_y - row_y,
+            f"{feature} height",
+        )
+        dims.record(row.height_name, equations[row.height_name])
+    else:
+        await stub_height(
+            top,
+            f"{runs[-1][-1]}.end",
+            end_x,
+            row.prefix,
+            row.height_name,
+            f"{feature} height stub",
+        )
+    for index, (stub, name) in enumerate(zip(early, row.run_heights, strict=True)):
+        await stub_height(
+            stub,
+            f"{runs[index][-1]}.end",
+            row.runs[index][1],
+            f"{row.prefix}Run{index}",
+            name,
+            f"{feature} run {index} height stub",
+        )
+    if drop is not None:
+        await anchor_point_to_origin(
+            adapter, f"{drop}.start", LEFT_END_X, top_y, f"{feature} END A corner"
+        )
+        dims.record(f"{row.prefix}StartX", BAR_HALF_LENGTH_EQUATION)
+        dims.record(f"{row.prefix}StartY", BAR_HALF_HEIGHT_EQUATION)
+        await dimension_between(
+            adapter,
+            f"{drop}.start",
+            f"{drop}.end",
+            "vertical_distance",
+            top_y - row_y,
+            f"{feature} END A drop",
+        )
+        dims.record(f"{row.prefix}StartDrop", equations[row.height_name])
+        start = f"{drop}.end"
+    else:
+        start = f"{runs[0][0]}.start"
+        await dimension_between(
+            adapter,
+            start,
+            "origin",
+            "horizontal_distance",
+            abs(LEFT_END_X),
+            f"{feature} end",
+        )
+        dims.record(f"{row.prefix}StartX", BAR_HALF_LENGTH_EQUATION)
+    for index, (run, legs) in enumerate(zip(row.runs, runs, strict=True)):
+        if f"{legs[0]}.start" != start:
+            await dimension_between(
+                adapter,
+                start,
+                f"{legs[0]}.start",
+                "horizontal_distance",
+                run[0] - LEFT_END_X,
+                f"{feature} run {index} start",
+            )
+            dims.record(
+                f"{row.prefix}Run{index}StartX",
+                _plus_mm(BAR_HALF_LENGTH_EQUATION, run[0]),
+            )
+        # Each hole ends one leg; the last leg runs on to the run's end.
+        for leg, (name, x) in zip(legs[:-1], _run_holes(row, run), strict=True):
+            await dimension_between(
+                adapter,
+                start,
+                f"{leg}.end",
+                "horizontal_distance",
+                x - LEFT_END_X,
+                name,
+            )
+            dims.record(name, equations[name])
+        if not (on_rise and index == len(runs) - 1):
+            await dimension_between(
+                adapter,
+                start,
+                f"{legs[-1]}.end",
+                "horizontal_distance",
+                run[1] - LEFT_END_X,
+                f"{feature} run {index} end",
+            )
+            dims.record(
+                f"{row.prefix}Run{index}EndX",
+                _plus_mm(BAR_HALF_LENGTH_EQUATION, run[1]),
+            )
     await ensure_fully_defined(adapter, f"{feature} sketch")
     check(f"exit_sketch {feature}", await adapter.exit_sketch())
     name_last_feature(adapter, feature)
@@ -952,37 +1144,33 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "driven bar (equations neutral)", expected, 0.005 * expected)
 
     # The bottom rail's running clearance under the bar spends the height's
-    # .XXX band, and the pivot screw's tip recess and the bracket-screw tips
-    # the thickness's (pd_support_bar_spec.BAR_HEIGHT_BAND, BAR_DEPTH_BAND).
+    # band, and the pivot screw's tip recess and the bracket-screw tips the
+    # thickness's (pd_support_bar_spec.BAR_HEIGHT_BAND, BAR_DEPTH_BAND).
     # Both are the title block's .XXX row, so the model dimensions carry
     # them as their three places alone: an explicit ±.005 would restate the
-    # title block (drawing-guidelines rule 2; r4 machinist review).
+    # title block (drawing-guidelines rule 2; r4 machinist review); each
+    # names the stack it sets on the sheet (rule 4).
     apply_drawing_precision(
         adapter,
         {"BarProfile": {"Height": BAR_BAND_PLACES}, "Bar": {"Depth": BAR_BAND_PLACES}},
     )
 
     # The rest of the print's places, then its bands and limits: the hanger
-    # holes' row and stations carry the pivot and hook positions' ±.002
+    # row's height and the pivot's station carry the pivot position's ±.002
     # (HOLE_POSITION_TOL; paper_drive_geom and transgear_hanger_joints read
-    # HOLE_POSITION_BAND, its printed reach), the clamp holes' row and
-    # stations the MHA-SH-02 taps' CLAMP_POSITION_BAND; the countersinks their
-    # single MAX limits. The bands are millimetres; UNIT prints them in inches.
+    # HOLE_POSITION_BAND, its printed reach, which the hook taps spotted
+    # through MHA-PD-14 still land within); the hook taps' stations print
+    # .XXX alone, as the drawing's REF (HOOK_TAP_REFERENCE_NAMES); the clamp
+    # holes' row and stations print .XXX alone, under the title block's
+    # CLAMP_POSITION_BAND; the countersinks their single MAX limits. The
+    # bands are millimetres; UNIT prints them in inches.
     apply_drawing_precision(adapter, SHEET_PRECISION)
-    for name in ("HangerRowHeight", *HANGER_STATION_NAMES):
+    for name in BANDED_HANGER_NAMES:
         set_dimension_symmetric_tolerance(
             adapter,
             "HangerRowReference",
             name,
             HOLE_POSITION_TOL,
-            display_unit=UNIT,
-        )
-    for name in ("ClampRowHeight", *CLAMP_STATION_NAMES):
-        set_dimension_symmetric_tolerance(
-            adapter,
-            "ClampRowReference",
-            name,
-            CLAMP_POSITION_BAND,
             display_unit=UNIT,
         )
     _max_limit(adapter, "CountersinkReference", "PivotCskDia", PIVOT_TAP_CSK_DIA)

@@ -12,13 +12,12 @@ offline drawing test.
 
 from __future__ import annotations
 
+import math
+
 # LINEAR_BAND is re-exported for test_ch_vn_spring_hook_drawing (the bracket
 # side's millimetre .XX row); the lever's own plate band is
 # COEFFICIENT_T_DEVIATIONS.
-from magnifying_bracket_joint_layout import (
-    LINEAR_BAND as LINEAR_BAND,
-    SCREW_THREAD,
-)
+from magnifying_bracket_joint_layout import LINEAR_BAND as LINEAR_BAND
 from sm_summing_lever_spec import COEFFICIENT_T, COEFFICIENT_T_DEVIATIONS, HOLE_SPEC
 
 # --- Marked-dimension contract.  build_sm_summing_lever marks exactly these. ---
@@ -55,6 +54,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # opening parenthesis marks it a reference (its suffix closes it).
 DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
     ("EdgeRibFront", "EdgeRibThickness"): "3X ",
+    ("EdgeRibFrontProfile", "RibReach"): "3X ",
+    ("EdgeRibFrontProfile", "EdgeRibFrontArcR"): "3X R",
     ("SummationPlateProfile", "SummationArcRadius"): "2X R",
     ("KnifeStubReference", "KnifeStubLength"): "2X ",
     ("KnifeRidgeFillet", "KnifeRidgeRadius"): "2X R",
@@ -81,72 +82,45 @@ CYLINDER_REFERENCE_Z = 45.6
 KNIFE_MOUNT_NUMBER = "MHA-SM-02"  # sm-knife-mount: the knife-edge seat
 BRACKET_NUMBER = "MHA-MG-01"  # mg-magnifying-bracket
 
-# Drawing-side callout text keyed on the parametric dimension name: each tight
-# band names its mate and function (drawing-guidelines rule 4). One 3X
-# thickness sizes both end ribs and the middle rib; their profile is shared.
-# A vertical dimension whose text stands above its span takes its callout above
-# the value, one whose text hangs below takes it below, so the dimension line
-# never runs through its own callout.  Callouts above are single lines: a
-# multi-line one never printed (farm r4/r5 2026-10-16, text-unmatched).
-# The mid rib runs tangent from the boss axis to the rib arc; the boss axis is
-# located by the 76.20s in the plan, so the rib arc's callout in the front
-# profile, where those tangents show, gives its apex words, not a third 76.20.
-# Each summation-web side arc rises from the boss's quadrant and meets axis A
-# at the plate end inside the cylinder; the radius's text has room only for
-# its value (inside the arc, clear of the trunnion stub), so the boss's
-# diameter names both ends.  The three receiver coordinates are one bracket
-# hole pattern, each tight station naming the mate and that the pattern
-# locates it (rule 7: flagged where it applies; machinist review r14 could
-# not tell from MATCHES whether the screws locate or only clamp).  The two
-# left of VIEW F have room for one line only. The ridge-to-side pair and the
-# flank-to-side angle hold the knife edge for the trunnion's worst-case free
-# rock in the knife mount's bore
-# (``build_sm_summing_assembly.KNIFE_FREE_ROCK_WORST_DEG``, code review C09).
-# Each names that seat, as the vertex height does. Detail D carries the whole
-# knife envelope, its ridge round and datum A together at 10:1.
-# Both stubs are one prism, so their side faces share two planes
-# (``build_sm_summing_lever._hex_knife``), which ties the +Z ridge to datum A
-# on the -Z ridge within
-# ``sm_summing_lever_spec.KNIFE_STUB_RIDGE_OFFSET_MAX``. The model
-# carries that; the print carries the owner's C09 wording, KNIFE EDGE
-# SYMMETRIC TO SIDES, BOTH STUBS, split across the pair, and no coplanarity
-# requirement of its own (machinist review bdc033f13: "SIDES IN ONE PLANE"
-# stated a requirement with no limit).  Lines of at most
-# RIDGE_CALLOUT_MAX_CHARS keep each ridge block outside its dimension span.
-# Back reverses the model sides: the longer BOTH STUBS block is on sheet
-# left, so its unchanged wording wraps across three short callout lines.
-RIDGE_CALLOUT_MAX_CHARS = 30
-DIMENSION_CALLOUTS_ABOVE: dict[str, str] = {
-    "RibReach": "ALL POSITIVE RIBS",
-    "ReceiverY0": f"LOCATES {BRACKET_NUMBER}",
-}
+# Drawing-side callout text keyed on the parametric dimension name.  Novice
+# rubric (fan-out of #2223, rules 4, 7 and 26): a location or size carries
+# its value and band only, counts replace "ALL RIBS" words (the 3X prefixes
+# above), and project labels (COEFFICIENT TOP, POSITIVE RIBS, MID RIB) do
+# not print.  Every callout hangs below its value.  Each summation-web side
+# arc rises from the boss's
+# quadrant and meets axis A at the plate end inside the cylinder; the
+# radius's text has room only for its value (inside the arc, clear of the
+# trunnion stub), so the boss's diameter names both ends (owner RV-03).  The
+# three receiver coordinates are one bracket hole pattern whose mate the tap
+# callout names once (rule 7: a location carries no words).  The
+# ridge-to-side pair, the flank-to-side angle and the vertex height hold the
+# knife edge for the trunnion's worst-case free rock in the knife mount's
+# bore (``build_sm_summing_assembly.KNIFE_FREE_ROCK_WORST_DEG``, code review
+# C09): one feature, so each links one numbered note naming its seat once
+# (rule 4).  Detail D carries the whole knife envelope, its ridge round and
+# datum A together at 10:1.  Both stubs are one prism, so their side faces
+# share two planes (``build_sm_summing_lever._hex_knife``), which ties the +Z
+# ridge to datum A on the -Z ridge within
+# ``sm_summing_lever_spec.KNIFE_STUB_RIDGE_OFFSET_MAX``; the 2X counts say
+# both stubs, and the two ridge-to-side limits state the symmetry.
+KNIFE_SEAT_NOTE = 1
+KNIFE_SEAT_NOTE_LINK = f"SEE NOTE {KNIFE_SEAT_NOTE}"
+DRAWING_NOTES = f"{KNIFE_SEAT_NOTE}. KNIFE-EDGE SEAT IN {KNIFE_MOUNT_NUMBER}"
 DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
-    "RidgeFromLeft": f"{KNIFE_MOUNT_NUMBER} SEAT;\nSYMMETRIC TO SIDES",
-    "RidgeFromRight": f"KNIFE-EDGE SEAT\nIN {KNIFE_MOUNT_NUMBER};\nBOTH STUBS",
-    "FlankToSide": f"{KNIFE_MOUNT_NUMBER} SEAT",
-    "HexHeight": f"VERTEX UP\nKNIFE-EDGE SEAT\nIN {KNIFE_MOUNT_NUMBER}",
-    "EdgeRibFrontArcR": "ALL RIBS\nMID RIB APEX\nAT BOSS AXIS",
+    "RidgeFromLeft": KNIFE_SEAT_NOTE_LINK,
+    "RidgeFromRight": KNIFE_SEAT_NOTE_LINK,
+    "FlankToSide": KNIFE_SEAT_NOTE_LINK,
+    "HexHeight": KNIFE_SEAT_NOTE_LINK,
     "AnchorOuterDia": "WEB ARCS RUN\nFROM QUADRANTS\nTO AXIS A AT ENDS",
-    # Both locations start on real faces, not the asymmetric plate's midplane:
-    # View G measures boss top from coefficient top; the web shares that top.
-    "WebThickness": "TOP FACE FLUSH WITH\nCOEFFICIENT TOP",
-    "ReceiverX0": f"LOCATES {BRACKET_NUMBER}\n{SCREW_THREAD} SCREW PATTERN",
-    "ReceiverX1": f"LOCATES {BRACKET_NUMBER}",
-    # The plan's 152.4 is the body's end-face span, not the part's overall:
-    # the stubs stand 2X 21.72 past it (machinist review 20261018 read it
-    # as the overall; drawing-guidelines: nothing reads like an overall that
-    # is not one).  Short lines: the block stands 14 mm from the border.
-    "PlateLength": "BODY\nEND FACES",
 }
 
-# The two blind taps fasten the magnifying bracket. Their native callout owns
-# the pilot and full-thread depths; no additional cavity or wall limit prints.
-BRACKET_TAP_CALLOUT_PROCESS = f"FASTENS {BRACKET_NUMBER}\n"
-# Under the plan's boss Z location (datum B to the boss axis): the mid rib
-# is centred on the same station.
-BOSS_Z_CALLOUT = "BOSS AXIS AND\nMID RIB CENTRE"
-# The 20X 6-32 threads run through the uniform coefficient plate.
-SPRING_TAP_CALLOUT_PROCESS = "THREAD THRU COEFFICIENT PLATE\n"
+# The two blind taps fasten the magnifying bracket and are spotted through
+# its holes at assembly (owner ruling 2026-11-08 (#2144 item 11.1), Pedro;
+# formerly delegated ruling sm Q7; MHA-SM-00 carries the step): their stations
+# print REF (build_sm_summing_lever._receiver_coordinate_dimensions).  Their
+# native callout owns the pilot and full-thread depths; no additional cavity
+# or wall limit prints.
+BRACKET_TAP_CALLOUT_PROCESS = f"SPOT THRU {BRACKET_NUMBER} AT ASSEMBLY\n"
 
 # --- Decimal places, #290. ---
 # The spring pattern's BASIC row X, start Z and pitch are calibrated stations
@@ -172,7 +146,7 @@ BRACKET_TAP_PRECISION = {
     "hw-tapdrldepth": 2,
     "hw-threaddepth": 3,
 }
-# The receiver coordinates (1.120 / .581 / .128) sit on the .001 grid; the
+# The receiver stations (1.120 / .581 / .128, REF) sit on the .001 grid; the
 # lever's taps are modelled there (magnifying_bracket_joint_layout).
 RECEIVER_COORDINATE_PLACES = 3
 
@@ -193,6 +167,13 @@ if SPRING_TAP_ENGAGEMENT_MIN < 1.5 * SPRING_TAP_MAJOR_DIA:
         f"20X {HOLE_SPEC.size} keeps {SPRING_TAP_ENGAGEMENT_MIN:.3f} of full "
         f"thread, under 1.5D"
     )
+# The full thread the plate leaves prints under the 20X callout, floored to
+# .XX: the plate's thickness is on VIEW F (sheet 2), and machinist review
+# round 3 (farm run 20261107T121714736Z, r1) read VIEW G's .20 counter web
+# as the plate and called the taps short of 1.5D.
+SPRING_TAP_CALLOUT_BELOW = (
+    f"FULL THREAD {math.floor(SPRING_TAP_ENGAGEMENT_MIN / 25.4 * 100.0) / 100.0:.2f} MIN"
+).replace(" 0.", " .")
 
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"
 # Sheet 2 looks from +X/-Y/-Z: the existing pictorial shows the coefficient
@@ -215,4 +196,5 @@ BACK_VIEW_NOTE = f"VIEW {BACK_VIEW_LETTER} SCALE 1:1 ROTATED 180°"
 # -Z end, so as VIEW F's mirror missing its taps): it is a removed view too,
 # named by a letter arrow onto the +Z end.
 FRONT_VIEW_LETTER = "G"
-FRONT_VIEW_NOTE = f"VIEW {FRONT_VIEW_LETTER} SCALE 1:2"
+# A removed view at the sheet's scale: its letter only (rule 9).
+FRONT_VIEW_NOTE = f"VIEW {FRONT_VIEW_LETTER}"

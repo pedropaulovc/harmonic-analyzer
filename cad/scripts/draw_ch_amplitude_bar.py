@@ -8,9 +8,10 @@ Dimension import and curation live in ``_drawing_dimension_import``.
 The bar is ~31.8 in long but only 1/4 in square, so the print shows a 1:4
 full-length front view (overall length only) and enlarged cropped model views
 of its two ends: a 4:1 detail of each end notch (centring ledge, width and
-depth, and at the foot the floor's Ra symbol), the 4:1 right side of the top
-end's detail (the reamed pin hole, located from the bar's top edge, and the
-square stock), and a 3:1 isometric of each end.  The sheet runs at 1:4.
+depth, and at the foot the floor's Ra symbol), VIEW C, the 4:1 right side of
+the top end's detail (the reamed pin hole, located from the bar's top edge,
+and the square stock), and a 3:1 isometric of each end.  The sheet runs at
+1:4; one numbered note states the pin hole's matched press fit.
 
 Run with SolidWorks open::
 
@@ -40,6 +41,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
@@ -49,6 +51,8 @@ from _drawing_dimensions import (
     set_reference_dimension,
 )
 from _drawing_curve_quality import set_precise_curve_quality
+from _drawing_leader_notes import add_leader_note
+from _drawing_notes import add_property_linked_note
 from _drawing_edges import visible_view_entities
 from _drawing_finish import add_surface_finish
 from _drawing_projection import model_point_in_view
@@ -219,12 +223,16 @@ DETAIL_B = CroppedView(
     (0.150, 0.196),
     letter="B",
 )
-# DETAIL B's right side, projected on its row (third angle): the reamed pin
-# hole, located from the back end of the bar's top edge, and that edge's
-# length -- the square stock. Machinist round 1 (#1293): the hole was a note.
+# DETAIL B's right side, on its row at its scale: the reamed pin hole,
+# located from the back end of the bar's top edge, and that edge's length --
+# the square stock. Machinist round 1 (#1293): the hole was a note. A view of
+# a detail is not a projected principal view, so it is VIEW C, named by a
+# viewing arrow on DETAIL B (rule 9; fan-out screen 2026-11-07 named the
+# prose title "RIGHT SIDE OF DETAIL B").
+VIEW_C_LETTER = "C"
 TOP_SIDE = CroppedView(
     "B right side",
-    "RIGHT SIDE OF DETAIL B",
+    f"VIEW {VIEW_C_LETTER}",
     "*Right",
     (4, 1),
     (BAR_WIDTH, BAR_LENGTH - 7.0, BAR_DEPTH / 2.0),
@@ -257,8 +265,7 @@ CROPPED_VIEWS = (DETAIL_A, DETAIL_B, TOP_SIDE, TOP_ISO, FOOT_ISO)
 # far outside the bar's end.
 DETAIL_A_FENCE_TEXT_GAP = 0.020
 DETAIL_ROW_GAP = 0.012
-# DETAIL A's width row hangs under its ledge row and the ledge's one-line
-# callout.
+# DETAIL A's width row hangs under its ledge row.
 DETAIL_A_WIDTH_ROW_GAP = 0.032
 # A width's text block (value, +0.3/0.0 stack, two callout lines) prints
 # ~50 mm wide, far wider than the 12.4 mm mouth at 4:1: centred on the mouth it
@@ -268,8 +275,9 @@ DETAIL_A_WIDTH_ROW_GAP = 0.032
 # the dimension line runs out to it.
 WIDTH_TEXT_OFFSET = 0.030
 # A depth's ROOTS callout (~40 mm) rides one line over its value; the top
-# notch's depth stands this far east of the bar so the callout clears it.
-DETAIL_B_DEPTH_TEXT_GAP = 0.022
+# notch's depth stands this far east of the bar so the callout clears it and
+# VIEW C's arrow and letter fit between the bar and its dimension line.
+DETAIL_B_DEPTH_TEXT_GAP = 0.028
 # The foot depth's text stands this far over the notch floor, outside its
 # 9.5 mm span: inside it, the ROOTS line sat on the floor's witness (r1).
 DETAIL_A_DEPTH_TEXT_RISE = 0.008
@@ -284,7 +292,7 @@ _DETAIL_A_ROW_Y = DETAIL_A.sheet_xy(0.0, 0.0)[1] - DETAIL_ROW_GAP
 _DETAIL_A_WIDTH_ROW_Y = DETAIL_A.sheet_xy(0.0, 0.0)[1] - DETAIL_A_WIDTH_ROW_GAP
 DETAIL_A_KEEP = {
     # Left of the fence, over the notch floor: the depth and its band, the
-    # mate callout above it, hanging west of the dimension line.
+    # ROOTS callout above it, hanging west of the dimension line.
     "BottomNotchHeight": (
         _DETAIL_A_FENCE_X - DETAIL_A_DEPTH_LINE_GAP,
         DETAIL_A.sheet_xy(0.0, BOTTOM_NOTCH_HEIGHT)[1] + DETAIL_A_DEPTH_TEXT_RISE,
@@ -299,12 +307,14 @@ DETAIL_A_KEEP = {
         _DETAIL_A_WIDTH_ROW_Y,
     ),
 }
-# The ledge's text and its callout stand wholly east of the bar's right-face
-# witness (r6, c8fafeb80: centred 10 mm out, that witness struck the leading
-# '1' of 1.60): the callout's half-width plus a 2 mm gap.
+# The ledge's text stands wholly east of the bar's right-face witness (r6,
+# c8fafeb80: centred 10 mm out, that witness struck the leading '1' of 1.60):
+# the value's half-width plus a 2 mm gap. The value and its band print as
+# ten characters (.XXX, a space, the ± band).
+LEDGE_TEXT_CHARS = 10
 _DETAIL_B_TEXT_X = (
     DETAIL_B.sheet_xy(BAR_WIDTH, 0.0)[0]
-    + len(DIMENSION_CALLOUTS["TopRightLedge"]) * 0.0026 / 2.0
+    + LEDGE_TEXT_CHARS * 0.0026 / 2.0
     + 0.002
 )
 _DETAIL_B_ROW_Y = DETAIL_B.sheet_xy(0.0, BAR_LENGTH)[1] + DETAIL_ROW_GAP
@@ -315,7 +325,7 @@ DETAIL_B_KEEP = {
     ),
     # One row over the open end, chained on the ledge's inner witness: the
     # width's text west of the bar with its callout under it, the ledge's east
-    # of it with its callout over it.
+    # of it.
     "TopNotchWidth": (
         DETAIL_B.sheet_xy(0.0, 0.0)[0] - WIDTH_TEXT_OFFSET,
         _DETAIL_B_ROW_Y,
@@ -351,9 +361,28 @@ TOP_SIDE_KEEP = {
 # Callouts that stack over their value; the rest hang under it. SOLIDWORKS
 # drops a multi-line callout above a value from the print (r1: the two-line
 # TopNotchWidth callout never reached the PDF), so these are one line each.
-CALLOUTS_ABOVE = frozenset(
-    {"BottomNotchHeight", "TopRightLedge", "BarSection", "TopPinX"}
+CALLOUTS_ABOVE = frozenset({"BottomNotchHeight", "BarSection", "TopPinX"})
+
+# VIEW C's viewing arrow on DETAIL B: level, looking -X onto the bar's right
+# face (the *Right view's direction), its tip just off the face between the
+# notch floor's witness and the depth's text, its letter at the tail
+# (draw_fr_top_frame._add_view_arrow, mirrored: the letter stands east).
+VIEW_LETTER_HEIGHT = 0.005
+VIEW_ARROW_TIP_GAP = 0.0035
+VIEW_ARROW_LENGTH = 0.010
+VIEW_ARROW_SQUARE_TOL = 0.0003
+VIEW_ARROW_RISE_MM = 2.5  # over the notch floor, in part millimetres
+_VIEW_C_TIP = (
+    DETAIL_B.sheet_xy(BAR_WIDTH, 0.0)[0] + VIEW_ARROW_TIP_GAP,
+    DETAIL_B.sheet_xy(0.0, BAR_LENGTH - TOP_NOTCH_HEIGHT + VIEW_ARROW_RISE_MM)[1],
 )
+VIEW_C_ARROW = (
+    (_VIEW_C_TIP[0] + VIEW_ARROW_LENGTH, _VIEW_C_TIP[1] + VIEW_LETTER_HEIGHT / 2.0),
+    _VIEW_C_TIP,
+)
+# The pin hole's matched-fit note, linked from its callout: under DETAIL A's
+# label, right of the front view's foot, left of the title block (upper-left).
+NOTES_XY = (0.075, 0.046)
 
 # The foot notch floor's Ra (Main ruling B, 2026-09-27). The symbol is ~17 mm
 # wide at the fleet's 2.5 mm height, wider than the 12.7 mm mouth, so it
@@ -691,6 +720,51 @@ def _letter_detail(
     )
 
 
+def _add_view_arrow(adapter: Any, parent: Any) -> None:
+    """VIEW C's level letter arrow on DETAIL B, square onto the bar's right
+    face (draw_fr_top_frame._add_view_arrow, mirrored: the letter stands east
+    of the tip, so it still slides only in y)."""
+    text_xy, tip_xy = VIEW_C_ARROW
+    label = f"view {VIEW_C_LETTER} viewing arrow"
+    note = add_leader_note(
+        adapter, VIEW_C_LETTER, text_xy=text_xy, attach_xy=tip_xy, view=parent, label=label
+    )
+    # add_note leaves text at the document height; size the letter here and
+    # prove the leader tip did not move with it.
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    text_format = annotation.GetTextFormat(0)
+    if text_format is None:
+        raise RuntimeError(f"{label} note has no text format")
+    text_format.CharHeight = VIEW_LETTER_HEIGHT
+    if not annotation.SetTextFormat(0, False, text_format):
+        raise RuntimeError(f"failed to size the {label} letter")
+    rebuild_drawing(adapter, label=f"{label} letter")
+    points = list(annotation.GetLeaderPointsAtIndex(0) or ())
+    if len(points) < 6 or math.dist((points[-3], points[-2]), tip_xy) > 0.001:
+        raise RuntimeError(f"{label} tip moved when its letter was sized")
+    # The leader leaves the letter's nearer side at the text's mid-height:
+    # slide the letter by any miss in y so the arrow stands level.
+    miss = tip_xy[1] - points[1]
+    if abs(miss) > VIEW_ARROW_SQUARE_TOL:
+        x, y, z = (float(value) for value in annotation.GetPosition())
+        if not annotation.SetPosition2(x, y + miss, z):
+            raise RuntimeError(f"failed to square the {label}")
+        rebuild_drawing(adapter, label=f"square {label}")
+        points = list(annotation.GetLeaderPointsAtIndex(0) or ())
+        if (
+            len(points) < 6
+            or math.dist((points[-3], points[-2]), tip_xy) > 0.001
+            or abs(tip_xy[1] - points[1]) > VIEW_ARROW_SQUARE_TOL
+        ):
+            raise RuntimeError(f"{label} did not square: leader {points}")
+    if points[0] <= tip_xy[0]:
+        raise RuntimeError(f"{label} does not run west onto the face: leader {points}")
+    _telemetry.info(
+        f"amplitude-bar: {label}: leader {points[0]:.5f},{points[1]:.5f} -> "
+        f"{points[-3]:.5f},{points[-2]:.5f} (level when the y agree)"
+    )
+
+
 def _notch_floor_edge(view: Any) -> Any:
     """The foot notch floor's near edge in DETAIL A: edge-on it IS the floor's
     line, and its faces include the floor the control names."""
@@ -735,12 +809,14 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
+            "Manufacturing Notes",
         ),
         required=(
             "Number",
             "Material Specification",
             "Finish",
             "Quantity",
+            "Manufacturing Notes",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -842,6 +918,7 @@ async def build(adapter: Any) -> dict[str, str]:
         if spec.letter is not None:
             mark = _mark_detail_on_front(adapter, front, spec)
             _letter_detail(adapter, front, spec, mark)
+    _add_view_arrow(adapter, views[DETAIL_B.name])
 
     add_surface_finish(
         adapter,
@@ -853,6 +930,11 @@ async def build(adapter: Any) -> dict[str, str]:
         leader_attach_xy=FLOOR_FINISH_ATTACH,
         char_height=FINISH_CHAR_HEIGHT,
     )
+    # The pin hole's matched-fit note belongs to the sheet, not a view.
+    ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
+    if not ddoc.ActivateSheet(sheet.GetName()):
+        raise RuntimeError("failed to activate the sheet for the notes")
+    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
 
     return await finalize_drawing(
         adapter,

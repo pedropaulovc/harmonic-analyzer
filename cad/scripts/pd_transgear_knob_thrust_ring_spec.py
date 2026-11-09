@@ -80,10 +80,11 @@ if WALL_WORST < WALL_FLOOR - 1e-9:
 BORE_CALLOUT = "DRILL THRU"
 # drawing-guidelines.md rule 4: the length's ± band names the stack it
 # serves -- the ring spaces the knob shaft's pinion from the arm plate's hub,
-# a term of the disc cluster's printed stack.
+# a term of the disc cluster's printed stack -- in at most two lines of
+# words (rule 7).
 LENGTH_CALLOUT = (
-    f"SPACES {_config.parts('pd-transgear-knob-shaft')['number']} PINION\n"
-    f"FROM {_config.parts('pd-transgear-arm-plate')['number']} HUB\n"
+    f"SPACES {_config.parts('pd-transgear-knob-shaft')['number']} FROM "
+    f"{_config.parts('pd-transgear-arm-plate')['number']}\n"
     f"{STACK_NAME}"
 )
 # Below-text the part build authors on its source dimensions; the drawing

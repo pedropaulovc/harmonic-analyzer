@@ -163,34 +163,50 @@ if PIN_HOLE_WALL_MIN < WALL_FLOOR_MM:
 # sheet, rounded down): it limits the cutter's corner at an unmodelled root,
 # so it rides each notch's depth.
 ROOT_CALLOUT = "ROOTS R.015 MAX"
-# Each line stays within ~20 characters (~48 mm at the sheet's dimension
-# font): the callouts sit between a notch's crop circle and its neighbours.
+# The reamed press hole's band (.0004 wide) is narrower than the shop's
+# reamer row, so the hole is made to its pin: a matched press fit, stated
+# once in the numbered sheet note its callout links (drawing-guidelines.md
+# rules 4 and 7). The acceptance is the ANSI FN2 window the pin budget is
+# held to (ch_bar_pivot_pin_spec.PRESS_INTERFERENCE_MAX), rounded inward.
+# Pending owner confirmation (fan-out Q1, delegated ruling 2026-11-07, #2144).
+TOP_PIN_NAME = "BAR PIVOT PIN"
+PIN_FIT_NOTE_NUMBER = 1
+PIN_FIT_INTERFERENCE = (".0002", ".0008")
+DRAWING_NOTES = (
+    f"{PIN_FIT_NOTE_NUMBER}. MATCHED PRESS FIT ON {TOP_PIN_NAME} {TOP_PIN_NUMBER}:"
+    f"\n    REAM {PIN_FIT_INTERFERENCE[0]}-{PIN_FIT_INTERFERENCE[1]}"
+    " UNDER THE MEASURED PIN."
+)
+# Each line stays within ~21 characters (~55 mm at the sheet's dimension
+# font): the callouts sit between a notch's crop circle and its neighbours,
+# DETAIL A's west of it beside the full-length view. A location dimension
+# (each notch's centring ledge) carries its value and band only; each notch
+# names its mate once, on its width, by the standard fit its running floor
+# gives (rules 4 and 7; fan-out round 1: STRADDLES and RIDES are not fit
+# names), the fit word then the mate's number.
 DIMENSION_CALLOUTS: dict[str, str] = {
     "TopNotchWidth": (
-        f"STRADDLES {LEVER_NUMBER}\n"
+        f"RUNNING FIT {LEVER_NUMBER}\n"
         f"CHEEK WALL {inch_text(TOP_CHEEK_WALL_MIN, WALL_PLACES)} MIN"
     ),
     "BottomNotchWidth": (
-        f"RIDES {ROCKER_ARM_NUMBER}\n"
+        f"RUNNING FIT {ROCKER_ARM_NUMBER}\n"
         f"CHEEK WALL {inch_text(BOTTOM_CHEEK_WALL_MIN, WALL_PLACES)} MIN"
-        f"\n{ROOT_CALLOUT}"
     ),
-    "TopRightLedge": "CENTRES ON LEVER",
-    "BottomLeftLedge": "CENTRES ON ROCKER",
     "TopNotchHeight": ROOT_CALLOUT,
-    # The foot notch's roof seats the bar on the rocker's top edge; its
-    # shallow-only band keeps the cheeks off the rocker hub (machinist r5).
-    # One line over its value (a two-line callout above printed nothing, r1),
-    # so the foot's ROOTS limit rides the width below.
-    "BottomNotchHeight": f"SITS ON {ROCKER_ARM_NUMBER}",
-    "TopPinDia": f"THRU, REAM\nPRESS FIT {TOP_PIN_NUMBER}",
+    # One line over its value (a two-line callout above printed nothing, r1).
+    "BottomNotchHeight": ROOT_CALLOUT,
+    "TopPinDia": (
+        f"REAM THRU\nSEE NOTE {PIN_FIT_NOTE_NUMBER}"
+    ),
     "TopPinX": f"HOLE WALL {inch_text(PIN_HOLE_WALL_MIN, WALL_PLACES)} MIN",
     "BarSection": "1/4 SQ STOCK",
 }
 if not set(DIMENSION_CALLOUTS) <= set(DRAWING_PRECISION_BY_NAME):
     raise AssertionError("a callout names a dimension the sheet does not print")
 
-# No general note: the title-block QTY owns the count, the FINISH field the
-# plating, and the views both notches' depth and common plane (machinist
-# round 2, #1293: "BOTH END NOTCHES THRU THE FULL DEPTH, IN ONE COMMON PLANE"
-# repeated what the front view and the isometrics show).
+# The one sheet note is the pin hole's matched fit. The title-block QTY owns
+# the count, the FINISH field the plating, and the views both notches' depth
+# and common plane (machinist round 2, #1293: "BOTH END NOTCHES THRU THE FULL
+# DEPTH, IN ONE COMMON PLANE" repeated what the front view and the isometrics
+# show).

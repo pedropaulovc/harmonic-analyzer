@@ -52,32 +52,24 @@ def test_bands_are_native_on_the_model_from_named_constants() -> None:
         ("Hub", "HubLength"): "*deviations(HUB_LENGTH_BAND)",
         ("LeverBody", "LeverThick"): "LEVER_THICKNESS_TOLERANCE",
         ("PlateOffsetReference", "PlateOffset"): "PLATE_OFFSET_TOLERANCE",
-        ("BarPinHole", "BarPinCx"): "BAR_PIN_X_TOLERANCE",
-        ("SpringHole", "SpringCx"): "LEVER_SPRING_X_TOLERANCE",
     }
+    # The drilled arms print plain, at the title block's .XXX row (Q1-A).
+    assert spec.BAR_PIN_X_TOLERANCE == spec.LEVER_SPRING_X_TOLERANCE == pytest.approx(0.127)
 
 
 def test_every_tight_band_names_its_mate_or_function() -> None:
     callouts = {**drawing.FRONT_CALLOUTS, **drawing.TOP_CALLOUTS}
-    for name in (
-        "FulcrumDia",
-        "LeverThick",
-        "PlateOffset",
-        "HubLength",
-        "BarPinCx",
-        "SpringCx",
-    ):
+    for name in ("FulcrumDia", "LeverThick", "HubLength", "PlateOffset"):
         assert callouts[name]
     assert drawing.SHAFT_NUMBER in callouts["FulcrumDia"]
     assert "REAM" in callouts["FulcrumDia"]
     assert drawing.BAR_NUMBER in callouts["LeverThick"]
+    assert drawing.SHAFT_NUMBER in callouts["HubLength"]
+    # The plate's tight offset names the bars it spaces (rule 4).
     assert drawing.BAR_NUMBER in callouts["PlateOffset"]
-    # Machinist r5: each hole's mate rides its own hole callout.
-    assert callouts["BarPinCx"] == callouts["SpringCx"] == "SETS LEVER RATIO"
-    assert drawing.HOLE_MATES == {
-        "bar-pin hole": f"RUNS ON PIN\n{drawing.PIN_NUMBER}",
-        "spring-eye hole": f"HOOKS SPRING\n{drawing.SPRING_NUMBER}",
-    }
+    # Rule 7: a hole location carries its value and band only.
+    for location in ("BarPinCx", "SpringCx"):
+        assert location not in callouts
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     for label in drawing.HOLE_MATES:
         assert f'_callout, label="{label}")' in source
@@ -100,7 +92,7 @@ def test_twenty_long_hubs_still_float_between_the_keepers() -> None:
     stations = drawing.STATIONS
     # The pitch prints .278 (7.0612) +.001/.000: each hub may come out the
     # printed maximum, past the 7.0565 model.
-    _lower, upper = printed_deviations(
+    lower, upper = printed_deviations(
         spec.HUB_LENGTH,
         notes.DRAWING_PRECISION["Hub"]["HubLength"],
         (spec.HUB_LENGTH_BAND[1], spec.HUB_LENGTH_BAND[0]),

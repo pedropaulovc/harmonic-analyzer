@@ -115,11 +115,10 @@ def test_every_tight_band_states_its_mate_or_function_at_the_callout() -> None:
     assert "MHA-DT-03" in callouts["OutsideDia"]
     assert "MHA-CH-03" in callouts["CamDia"]
     assert "MHA-CH-03" in callouts["FaceWidth"]
-    assert "GAIN" in callouts["CamCy"]
-    assert "PHASE" in callouts["NotchPhase"]
-    assert "FLANKS" in callouts["NotchWidth"]
-    assert "NO MATING PART" in callouts["NotchWidth"]
+    assert "MHA-DT-03" in callouts["NotchWidth"]
     assert "MHA-DT-13" in notes.BORE_FIT_CALLOUT
+    # Rule 7: a location carries its value and band and nothing else.
+    assert not {"CamCy", "NotchPhase", "NotchDepth"} & set(callouts)
 
 
 def _kerf_flank_hits(width: float) -> int:
@@ -199,7 +198,7 @@ def test_worst_case_cam_wall_is_printed_and_clears_the_floor() -> None:
     # Rule 17 (inch): under the .080 target, over the .060 floor (#992).
     assert WALL_FLOOR_MM < spec.CAM_WALL_MIN_MM < WALL_TARGET_MM
     printed = notes.inch_text(spec.CAM_WALL_MIN_MM, 3)
-    assert f"{printed} MIN WALL" in notes.BORE_FIT_CALLOUT
+    assert f"WALL {printed} MIN" in notes.CAM_WALL_NOTE
 
 
 def test_cam_and_notch_oracles_use_actual_off_centre_root_material() -> None:

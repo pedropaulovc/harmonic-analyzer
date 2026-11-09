@@ -22,40 +22,42 @@ def test_both_meshes_pass_the_standard_gates() -> None:
 def test_reducer_centre_band_is_plus_only_inside_the_gate_window() -> None:
     # Fine-pitch practice: nominal +x/-0. The nominal is the midpoint of the
     # centres the gates allow (interference below, CR 1.2 above); the
-    # allowance is the radius of K's drawn setting circle, the catalogue
-    # +0.002 in.
-    import _gear_quality
-
+    # allowance is the catalogue +0.002 in, the band's own value, not
+    # MHA-PD-00 DETAIL K's wider setting circle (owner ruling 2026-11-08,
+    # #2144 item 5.3).
     low, high = disc.CENTRE_DISTANCE_WINDOW
     assert mesh.reducer_runout_shift_mm() == pytest.approx(
         (knob.TOOTH_SPACE_RUNOUT_TIR_MM + disc.TOOTH_SPACE_RUNOUT_TIR_MM) / 2.0
     )
     assert low == disc.CENTRE_DISTANCE
     assert disc.CENTRE_DISTANCE_SET_BAND == pytest.approx((high - low, 0.0))
-    assert high - low == pytest.approx(_gear_quality.reducer_k_setting_diameter_mm() / 2.0)
-    assert high - low <= 0.002 * 25.4
-    assert mesh.reducer_mesh(low).failures() == []
+    assert high - low <= 0.002 * 25.4 + 1e-9
+    # Both ends of the set band hold the contact-ratio floors.
+    assert all(check.failures() == [] for check in mesh.reducer_band_meshes())
     # The gate window around the set band, each edge where its gate bites.
-    usable_low, usable_high = 43.734, 43.845
+    usable_low, usable_high = 43.735, 43.845
     assert mesh.reducer_mesh(usable_low).failures() == []
     assert mesh.reducer_mesh(usable_low - 0.001).failures() != []
     assert mesh.reducer_mesh(usable_high).failures() == []
     assert mesh.reducer_mesh(usable_high + 0.001).contact_ratio_min < mesh.CONTACT_RATIO_FLOOR
     assert usable_low < low < high < usable_high
-    assert disc.CENTRE_DISTANCE_SET_TEXT == "43.794 +0.050/-0"
+    assert disc.CENTRE_DISTANCE_SET_TEXT == "43.794 +0.051/-0"
 
 
 def test_reducer_band_ends_both_pass_the_design_floors() -> None:
     nominal, top = mesh.reducer_band_meshes()
     assert nominal.failures() == [] and top.failures() == []
     assert nominal.contact_ratio_min == pytest.approx(1.2945, abs=5e-4)
-    assert nominal.runout_contact_ratio_min == pytest.approx(1.2034, abs=5e-4)
-    assert top.contact_ratio_min == pytest.approx(1.2034, abs=5e-4)
-    assert top.runout_contact_ratio_min == pytest.approx(1.1131, abs=5e-4)
+    assert nominal.runout_contact_ratio_min == pytest.approx(1.2018, abs=5e-4)
+    # K's setting radius is .002 in exactly (0.0508), the band's top.
+    assert top.contact_ratio_min == pytest.approx(1.2018, abs=5e-4)
+    # F3's .002 tooth-space TIR with K's .002 setting radius: 1.110 at the
+    # band's top, on the 1.10 floor.
+    assert top.runout_contact_ratio_min == pytest.approx(1.1100, abs=5e-4)
     assert top.contact_ratio_min >= mesh.CONTACT_RATIO_FLOOR
     assert top.runout_contact_ratio_min >= mesh.RUNOUT_CONTACT_RATIO_FLOOR
     assert top.backlash_mm[0] > nominal.backlash_mm[0] > 0.0
-    assert top.label.endswith("at +0.050")
+    assert top.label.endswith("at +0.051")
 
 
 def _min_tips() -> tuple[float, float]:

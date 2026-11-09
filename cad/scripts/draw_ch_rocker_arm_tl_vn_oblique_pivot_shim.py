@@ -126,7 +126,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, SPEC, item=ITEM, cut_to_suit=False, number_fit=NumberFit.SHRINK_TO_CELL,
         supplier_dimensions=supplier_dimensions,
         supplier_margins=SUPPLIER_MARGINS,
-        settled_checks=(assert_supplier_dimensions,), supplier_data=part.SUPPLIER_DATA,
+        settled_checks=(assert_supplier_dimensions,),
         unit=part_drawing_unit(part.PART_NAME),
     )
 

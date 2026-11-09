@@ -65,7 +65,6 @@ from pd_guide_lock_spec import HOLE_XY as LOCK_HOLE_XY, LOCK_THICK
 from pd_platen_guide_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
-    GEOMETRIC_TOLERANCES_MM,
     GUIDE_DEPTH_BAND,
     GUIDE_DEPTH_PLACES,
     GUIDE_HEIGHT,
@@ -73,7 +72,9 @@ from pd_platen_guide_spec import (
     LOCK_TAP_SPEC,
     SURFACE_FINISHES,
     TAPPED_HOLE_SPEC,
+    TAP_STATION_BAND,
     TAP_Y,
+    TAP_Y_BAND,
     UNIT,
 )
 from _column_clamp_interface import BAR_DEPTH
@@ -139,35 +140,41 @@ LOCK_SCREW_TIP_INSIDE_MIN = LOCK_SEAT_DEPTH_MIN - TIP_REACH_MAX
 GUIDE_SCREW_TIP_INSIDE_MIN = LOCK_SEAT_DEPTH_MIN - GUIDE_SCREW_THREAD_ENGAGEMENT
 GUIDE_SCREW_BOTTOM_CLEARANCE = GUIDE_SCREW_TIP_INSIDE_MIN
 # Each row's through taps exit the opposite face beside the other row's taps:
-# the least wall between the two thread majors, each at its printed position
-# and with its mouth broken at the title block's row.
-_POSITION_RADIAL = GEOMETRIC_TOLERANCES_MM["guide hole-pattern position"] / 2.0
+# the least wall between the two thread majors, each station at its printed
+# .XXX band (owner ruling 2026-11-08) and with its mouth broken at the title
+# block's row. Both rows share one .140 row, so only the stations close them.
 LOCK_TAP_EXIT_WALL_MIN = (
     _MIN_OPPOSED_RECEIVER_C2C
-    - 2.0 * _POSITION_RADIAL
+    - 2.0 * TAP_STATION_BAND
     - THREAD_MAJOR_MM[LOCK_TAP_SPEC.size]
     - 2.0 * TAP_MOUTH_BREAK
 )
 RECEIVER_WALL_FLOOR = WALL_FLOOR_MM
-# Owner ruling 2026-11-01 (B2): each tap row's wall to datum B and to the top
-# face at the height's printed minimum, the tap's major at its Ø.008 zone.
+# Owner ruling 2026-11-01 (B2): each tap row's wall to the bottom and top
+# faces at the height's printed minimum, the tap's major at the row's
+# .140 ±.005, the shop's drilled-hole location row (integration review
+# 20261109T062834910Z; no fit route on noncritical taps).
 # The finished worst case also pays the title block's outside edge break and
-# the tap's mouth break (Codjiflo, #2124): .080 unbroken, .060 finished.
-# Delegated ruling 2026-11-03 (pd-platen-guide.yaml RV-01): accepted at the
-# floor; the sheet states it (TAP_EDGE_WALL_TEXT, rule 20).
+# the tap's mouth break (Codjiflo, #2124): .079 unbroken, .059 finished, .001
+# under the .060 floor. For this pattern only, RV-01 in pd-platen-guide.yaml
+# accepts .059: Delegated ruling 2026-11-09 (Main), pending owner
+# confirmation; owner review #2144 item 2.3. The sheet states it
+# (TAP_EDGE_WALL_TEXT, rule 20). The floor stays WALL_FLOOR_MM everywhere else.
 _HEIGHT_DEV = printed_deviations(GUIDE_HEIGHT, GUIDE_DEPTH_PLACES, unit=UNIT)
-_TAP_REACH = THREAD_MAJOR_MM[TAPPED_HOLE_SPEC.size] / 2.0 + _POSITION_RADIAL
+_TAP_REACH = THREAD_MAJOR_MM[TAPPED_HOLE_SPEC.size] / 2.0 + TAP_Y_BAND
 _EDGE_BREAK = max(edge_break_radius_mm(unit=UNIT), edge_break_chamfer_mm(unit=UNIT))
 TAP_EDGE_WALL_MIN = (
     min(TAP_Y - _TAP_REACH, GUIDE_HEIGHT + _HEIGHT_DEV[0] - TAP_Y - _TAP_REACH)
     - _EDGE_BREAK
     - TAP_MOUTH_BREAK
 )
+TAP_EDGE_WALL_ACCEPTED = 0.059 * 25.4  # RV-01, this tap pattern only
 # THREAD_MAJOR_MM rounds the #4-40's .1120 major up to 2.845 (2.8448), so the
-# .060 walls land 0.0001 under 1.524 in millimetres.
-if TAP_EDGE_WALL_MIN < WALL_FLOOR_MM - 0.0005:
+# .059 walls land 0.0001 under 1.4986 in millimetres.
+if TAP_EDGE_WALL_MIN < TAP_EDGE_WALL_ACCEPTED - 0.0005:
     raise AssertionError(
-        f"MHA-PD-11 platen guide tap wall {TAP_EDGE_WALL_MIN:.3f} < {WALL_FLOOR_MM}"
+        f"MHA-PD-11 platen guide tap wall {TAP_EDGE_WALL_MIN:.4f} < "
+        f"{TAP_EDGE_WALL_ACCEPTED:.4f} (RV-01)"
     )
 # Printed on the tap pattern's note, floored to .001 in (after absorbing the
 # major's 0.0001 rounding).

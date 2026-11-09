@@ -55,16 +55,17 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
-from dt_drive_train_steps import step_ref
+from dt_pinion_pivot_block_spec import BORE_DIA as BLOCK_BORE_DIA
+from dt_pinion_pivot_block_spec import BORE_DIA_BAND as BLOCK_BORE_BAND
 from dt_pinion_pivot_shaft_spec import (
     CAP_SAG,
     CROWN_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     OVERALL_LEN,
-    PIN_HOLE_CALLOUT,
     PIN_HOLE_Z,
     SHAFT_DIA as SHAFT_DIA,
+    SHAFT_DIA_BAND,
     SHAFT_LEN,
     SURFACE_FINISHES,
 )
@@ -108,26 +109,45 @@ ISO_CENTER = (0.150, 0.110)
 ISO_SCALE = (1, 2)
 ISO_NOTE_XY = (0.115, 0.082)
 
-# The O.D.'s band is for the two pivot-block bores it runs in; the callout
-# names them (drawing-guidelines.md rule 4 (tighten only for function, and
-# name the mate)).
-SHAFT_FIT_CALLOUT = (
-    f"RUNNING FIT IN\n{_config.parts('dt-pinion-pivot-block')['number']} BORES"
+# The O.D.'s band is narrower than the shop table's turned-diameter row, so
+# its callout names the fit route: a running fit turned to the measured
+# pivot-block bores, with the diametral clearance the printed limits give as
+# REF (drawing-guidelines.md rule 4 (tighten only for function, and name the
+# mate)).
+_MM_PER_IN = 25.4
+if BLOCK_BORE_DIA != SHAFT_DIA:
+    raise AssertionError("the shaft and the pivot-block bores share one nominal")
+SHAFT_CLEARANCE_IN = (
+    (BLOCK_BORE_BAND[1] - SHAFT_DIA_BAND[0]) / _MM_PER_IN,
+    (BLOCK_BORE_BAND[0] - SHAFT_DIA_BAND[1]) / _MM_PER_IN,
 )
-# The holes are drilled at MHA-DT-00's SHAFT DRILL SET, so the callout points
-# at that step through the registry (Codex #858, PRRT_kwDOPHDy386mTbPB). The
-# +0.06/0 band is the spring pin's hole, so the callout names the pin and its
-# fit (rule 4; r3 review), with the fleet's "FOR <pin> SPRING PIN" wording.
-SHAFT_DRILL_STEP_KEY = "straps-pinned-to-torque-shaft"
+# A matched pair names its mate by name and number (rule 4).
+_BLOCK = _config.parts("dt-pinion-pivot-block")
+SHAFT_FIT_CALLOUT = "\n".join(
+    (
+        f"RUNNING FIT, MATCHED TO {_BLOCK['number']}",
+        f"{str(_BLOCK['title']).upper().removeprefix('PINION ')} BORES (CLEARANCE "
+        + "-".join(f"{value:.4f}".removeprefix("0") for value in SHAFT_CLEARANCE_IN)
+        + ")",
+    )
+)
+# The spring pin's +.0025/0 band is the pin's hole: the callout names the pin
+# and its fit, and the match-drill with its strap, in two lines of words
+# (rule 7).  The drilling set-up is MHA-DT-00's step, which names the hole,
+# so the part sheet carries no pointer to it.
+STRAP_NUMBER = _config.parts("dt-pinion-bracket")["number"]
 STRAP_PIN_NUMBER = _config.parts("dt-vn-pinion-strap-pin")["number"]
-PIN_HOLE_FIT = f"PRESS FIT FOR {STRAP_PIN_NUMBER} SPRING PIN"
+PIN_HOLE_CALLOUT = "\n".join(
+    (
+        f"MATCH-DRILL THRU AT ASSEMBLY IN {STRAP_NUMBER}, 2 PL",
+        f"PRESS FIT ON {STRAP_PIN_NUMBER} SPRING PIN",
+    )
+)
 DIMENSION_CALLOUTS = {
     "ShaftDia": SHAFT_FIT_CALLOUT,
     # The overall (reference) runs tip to tip over it; this is the cylinder.
     "ShaftLength": "CYLINDRICAL BODY",
-    "PinHoleDia": (
-        f"{PIN_HOLE_CALLOUT},\n{PIN_HOLE_FIT},\nPER {step_ref(SHAFT_DRILL_STEP_KEY)}"
-    ),
+    "PinHoleDia": PIN_HOLE_CALLOUT,
 }
 
 PROFILE_KEEP = {
@@ -135,11 +155,10 @@ PROFILE_KEEP = {
     # the body length under it, end face to end face.
     "OverallLength": (PROFILE_CENTER[0], 0.252),
     "ShaftLength": (PROFILE_CENTER[0], 0.234),
-    # Right of the front end, between it and DETAIL A's fence, under the
-    # bar's centre: outside the witness pair. Left of the back end (r3) the
-    # fit callout ran over the inner border into the zone margin; the text
-    # runs away from the dimension line (r3 audit: 43 mm wide there), so
-    # 12 mm out it ends ~12 mm short of the fence.
+    # Right of the front end, outside the witness pair, over DETAIL A (which
+    # stands lower): the two fit lines run ~90 mm.  Under the front end the
+    # pin-hole leader crossed its dimension line (round 1 review), and left
+    # of the back end (r3) the callout ran over the inner border.
     "ShaftDia": (FRONT_END_X + 0.012, PROFILE_CENTER[1] - 0.012),
     # Option E-a: the set-pin holes read as solid circles in the side view.
     # Only the size prints; the match-drill callout carries the location.
@@ -157,7 +176,9 @@ PROFILE_KEEP = {
 DETAIL_SCALE = (5, 1)
 DETAIL_RADIUS_MM = 5.0
 DETAIL_FENCE_Z_MM = 1.0
-DETAIL_CENTER = (0.355, 0.200)
+# Round 2: 60 mm lower than the bar, so the journal's two fit lines run over
+# it, right of the front end; its label still clears the title block's top.
+DETAIL_CENTER = (0.355, 0.140)
 _DETAIL_MM = DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
 _DETAIL_FENCE_R = DETAIL_RADIUS_MM * _DETAIL_MM
 if DETAIL_RADIUS_MM <= abs(

@@ -54,19 +54,18 @@ def _screw(thread: str, length_mm: float, kind: str) -> str:
 
 
 DIMENSION_CALLOUTS = {
-    SPRING_SET_DIMENSION: "SPRING-SET BLADE",
-    # The accepted stack caps the hubs' summed excess, so each strap stays on
+    # Set on a feeler gauge leaf (the right-bracket spring-set step).
+    SPRING_SET_DIMENSION: "FEELER GAUGE",
+    # The accepted stack caps the hubs' summed excess, so each arm stays on
     # its rod's cam plane and under its bar's foot notch (test_channel_axial_
     # budget); r10 machinist review: name what the tight band sets (rule 4).
-    STACK_LENGTH_DIMENSION: "STACK, CLOSED UP: STRAP PITCH TO RODS AND BARS",
+    STACK_LENGTH_DIMENSION: "HUB STACK, HUBS IN CONTACT: SETS ARM PITCH",
     LUG_SPAN_DIMENSION: "LUG SPAN",
-    # The keeper plan view: what each fit-up band sets (step 10's reason).
-    # The faces are named by bank end as the steps and the lever bank view
-    # name them (042726e review); the frame's front is the south end, which
-    # the plan view's label states (draw_ch_channel_assembly.KEEPER_PLAN).
+    # View F: what each fit-up band sets. Both Z settings run to a lug inner
+    # face; the view's own projection shows which.
     KEEPER_X_DIMENSION: "LUG CENTRE",
-    KEEPER_FRONT_Z_DIMENSION: "SOUTH LUG INNER FACE",
-    KEEPER_REAR_Z_DIMENSION: "NORTH LUG INNER FACE",
+    KEEPER_FRONT_Z_DIMENSION: "LUG INNER FACE",
+    KEEPER_REAR_Z_DIMENSION: "LUG INNER FACE",
 }
 if set(DIMENSION_CALLOUTS) != set(DIMENSION_FEATURE):
     raise AssertionError("every marked dimension carries a callout")

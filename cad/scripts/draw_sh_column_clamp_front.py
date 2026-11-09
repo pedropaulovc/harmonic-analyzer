@@ -37,10 +37,13 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     view_name,
 )
 
+import _config
 from _check import check
 from _column_clamp_drawing import (
     add_bore_axis_centerline,
     set_dimension_prefixes,
+    set_drill_thru,
+    set_hole_callout_below,
 )
 from _com import _early_bound
 from _drawing_common import (
@@ -72,7 +75,6 @@ from sh_column_clamp_front_spec import (
     BACK_ARC_MATE,
     BORE_CLEARANCE_TEXT,
     COLUMN_BORE,
-    COLUMN_MATE,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     EAR_HOLE_CALLOUT_PLACES,
@@ -138,8 +140,8 @@ def _face_xy(y_mm: float, z_mm: float) -> tuple[float, float]:
 # side face on a dimension line left of the split face with its value on that
 # line, and the bore's reference Ø leadered in through the upper half of the
 # open mouth from above left, clear of that dimension.  Split-face view: the
-# ear-hole station from the bore centerline left of it, its mate callout under
-# the value; under the view, the ears' shared height off the bottom face
+# ear-hole station from the bore centerline left of it; under the view, the
+# ears' shared height off the bottom face
 # (EarHoleHeight, from the part's hidden EarHeightReference sketch: its
 # witnesses leave the bottom face and ear 1's centre), and the height below
 # it.  The ears' height spans only 16 mm of sheet between its witnesses, far
@@ -163,23 +165,27 @@ FACE_KEEP = {
 # Both ear holes stand on the one station and the one height the part prints
 # (EarHole1Z, EarHoleHeight).
 DIMENSION_PREFIXES = {"EarHole1Z": "2X ", "EarHoleHeight": "2X "}
-# The bands tighter than the title block name their mate and why
-# (drawing-guidelines.md rule 4): the bore is matched to the purchased column
-# (sh_column_clamp_fit's grip budget), the depth at three places sets the clamp
-# screws' engagement in the back arc's taps (sh_column_clamp_front_spec), and
-# the ear stations and height line up with those taps.  The bore callout also says where
-# the axis lies (on the split face; round-3 review).  All under the value: SOLIDWORKS prints nothing of an
-# above-callout holding a line break
+# The bands tighter than the title block name their mate once
+# (drawing-guidelines.md rules 4 and 7): the bore is a sliding fit matched to
+# the purchased column, its clearance the acceptance (sh_column_clamp_fit);
+# the depth at three places sets the clamp screws' engagement in the back
+# arc's taps (sh_column_clamp_front_spec); the ear stations and height name
+# those taps once, on the hole callout (HOLE_CALLOUT_BELOW).  The bore axis on
+# the split face is drawn: the top view's centre mark.  All under the value:
+# SOLIDWORKS prints nothing of an above-callout holding a line break
 # (draw_dt_cone_gear_shaft._printable_above_callouts).
+COLUMN_NUMBER = _config.parts("fr-tube-frame")["number"]
+# A matched pair names its mate by number and name and says which clearance
+# (rule 4); the ~76 mm widest row stays between the split-face view (right
+# edge x 0.111) and the plan (left edge x 0.205).
 DIMENSION_CALLOUTS = {
     "BoreDia": (
-        f"{BORE_CLEARANCE_TEXT} DIAMETRAL\nCLEARANCE ON\n{COLUMN_MATE}\n"
-        "AXIS ON SPLIT FACE"
+        f"SLIDING FIT ON {COLUMN_NUMBER} COLUMN\n"
+        f"CLEARANCE {BORE_CLEARANCE_TEXT} DIAMETRAL"
     ),
     "Depth": f"SETS SCREW ENGAGEMENT\nIN {BACK_ARC_MATE}",
-    "EarHole1Z": f"ALIGNS WITH\n{BACK_ARC_MATE} TAPS",
-    "EarHoleHeight": f"ALIGNS WITH\n{BACK_ARC_MATE} TAPS",
 }
+HOLE_CALLOUT_BELOW = f"MATCHES {BACK_ARC_MATE} TAPS"
 
 # Model points (mm) the sheet picks project from, on the split face (X = 0).
 # The drill callout lands on ear 2's rim up and right of its centre; the bore
@@ -191,7 +197,6 @@ _RELIEF_EDGES_MM = tuple((0.0, -4.0, s * COLUMN_BORE / 2.0) for s in (1.0, -1.0)
 # The relief arc's far point on the top face, where its centre mark picks it.
 _RELIEF_ARC_MM = (COLUMN_BORE / 2.0, ARC_HEIGHT / 2.0, 0.0)
 HOLE_CALLOUT_XY = (0.110, 0.250)
-HOLE_CALLOUT_PROCESS = "DRILL"
 # Native Hole Wizard drill diameter at the sheet's .XXX (Ø.196).
 HOLE_CALLOUT_PRECISION = {"hw-diam": EAR_HOLE_CALLOUT_PLACES}
 # A turned view that is off by a sign misplaces every recipe position, so the
@@ -354,9 +359,10 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=ear_2_rim,
         callout_xy=HOLE_CALLOUT_XY,
         label="ear holes",
-        process=HOLE_CALLOUT_PROCESS,
     )
+    set_drill_thru(ear_holes, label="ear holes")
     set_hole_callout_precision(ear_holes, HOLE_CALLOUT_PRECISION, label="ear holes")
+    set_hole_callout_below(ear_holes, HOLE_CALLOUT_BELOW, label="ear holes")
     # sh-column-clamp-front RV-01 (EAR_WALL_NOTE) and RV-02 (SCREW_LINE_NOTE).
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)

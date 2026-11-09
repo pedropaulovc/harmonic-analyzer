@@ -10,31 +10,87 @@ does not rebuild the magnifier assembly. No SolidWorks.
 
 from __future__ import annotations
 
+import math
+
+import ha_harmonic_analyzer_assembly_steps as _ha_steps
 import mg_magnifier_assembly_steps as _steps
 import sh_vn_clamp_screw_spec as _clamp_screw
+import mg_wheel_axle_spec as _axle
 import mg_vn_magnifying_bracket_screw_spec as _bracket_screw
 from _inch_fraction import inch_fraction
 from sh_vn_thumb_screw_spec import SHANK_LEN as _THUMB_SHANK_LEN
 from sh_vn_thumb_screw_spec import THREAD as _THUMB_THREAD
 from mg_magnifier_assembly_spec import (
+    ENDSHAKE,
     ENDSHAKE_DIMENSION,
+    ENDSHAKE_TOL,
     FEATURE,
     PRESS_GAUGE_DIMENSION,
+    THREAD_PAST_LOCKNUT_MIN_TEXT,
+    THREAD_PAST_LOCKNUT_TEXT,
+    UNIT,
 )
+from _title_block_units import LENGTH_UNITS, render_number
 from sh_vn_music_wire_lever_spec import BOM_DESCRIPTION as _WIRE_BOM_DESCRIPTION
-from mg_magnifying_wheel_geom import TIE1_CLOCK_DEG as _TIE1_CLOCK_DEG
+from mg_magnifying_wheel_geom import DRUM_RECESS as _DRUM_RECESS
+from mg_magnifying_wheel_geom import SPOKE_COUNT as _SPOKE_COUNT
+from mg_magnifying_wheel_geom import TIE1_X as _TIE1_X
+from mg_magnifying_wheel_geom import TIE1_Y as _TIE1_Y
 
-# TIE 1's rest clock position, seen from the front, as a clock-face hour.
-TIE1_REST_HOUR = round((90.0 - _TIE1_CLOCK_DEG) / 30.0) % 12 or 12
-_TIE1_HOUR_OFF = ((90.0 - _TIE1_CLOCK_DEG) - 30.0 * TIE1_REST_HOUR + 180.0) % 360.0
-if abs(_TIE1_HOUR_OFF - 180.0) > 1.0:
-    raise AssertionError(f"TIE 1 at {_TIE1_CLOCK_DEG:.1f} deg is not on a clock hour")
-
-# The axle-stack dimensions the AXLE AS PRESSED and WHEEL ENDSHAKE details
-# import (the builder marks the banded ones, DIMENSION_TOLERANCES).
+# The axle-stack dimensions DETAIL A and DETAIL B import (the builder marks
+# the banded ones, DIMENSION_TOLERANCES).
 DRAWING_DIMENSIONS = {FEATURE: {PRESS_GAUGE_DIMENSION, ENDSHAKE_DIMENSION}}
 
-THREAD_PROJECTION_DETAIL_TITLE = "LEVER TIP DETAIL"
+# Every view other than the three principal ones carries a letter (rule 9,
+# rule 26), its boundary or viewing arrow on the right side view (MG LEFT).
+PRESS_DETAIL_LETTER = "A"
+ENDSHAKE_DETAIL_LETTER = "B"
+LEVER_TIP_VIEW_LETTER = "C"
+WHEEL_REST_VIEW_LETTER = "D"
+PRESS_DETAIL_TITLE = f"DETAIL {PRESS_DETAIL_LETTER}"
+ENDSHAKE_DETAIL_TITLE = f"DETAIL {ENDSHAKE_DETAIL_LETTER}"
+THREAD_PROJECTION_DETAIL_TITLE = f"VIEW {LEVER_TIP_VIEW_LETTER}"
+WHEEL_REST_VIEW_TITLE = f"VIEW {WHEEL_REST_VIEW_LETTER}"
+# VIEW D prints on the last sheet, beside the wire steps that turn the wheel.
+WHEEL_REST_VIEW_SHEET = 5
+
+# TIE 1's rest position: the wheel sits at its part frame in the assembly, so
+# TIE 1's axis runs from the axle axis at this angle below the wheel bar's
+# bottom edge (the bar runs along local X). It lies midway between two
+# spokes, so two spokes then lie along the bar (mg_magnifying_wheel_geom).
+TIE1_ANGLE_DEG = math.degrees(math.atan2(-_TIE1_Y, _TIE1_X))
+_SPOKE_PITCH_DEG = 360.0 / _SPOKE_COUNT
+if abs(TIE1_ANGLE_DEG % _SPOKE_PITCH_DEG - _SPOKE_PITCH_DEG / 2.0) > 1.0:
+    raise AssertionError(f"TIE 1 at {TIE1_ANGLE_DEG:.2f} deg is not midway between spokes")
+
+# The endshake's feeler-gauge check: the band's low limit enters, its high
+# limit does not (machinist review r1: a no-go one thousandth over the band
+# passed gaps the band rejects).
+_INCH = LENGTH_UNITS[UNIT]
+if UNIT != "in":
+    raise AssertionError("the endshake feeler check reads inch leaves")
+ENDSHAKE_GO_TEXT = render_number((ENDSHAKE - ENDSHAKE_TOL) / _INCH, UNIT, 3)
+ENDSHAKE_NO_GO_TEXT = render_number((ENDSHAKE + ENDSHAKE_TOL) / _INCH, UNIT, 3)
+# The pressed axle's plain end below the bar's far face: the window the axle
+# spec proves from the printed shank, gauge and bar depth (mg_wheel_axle_spec;
+# the bar sheet names the stack, MHA-MG-00's press step accepts it).
+BACK_END_SUNK_TEXT = (
+    f"{render_number(_axle.BACK_END_SUNK_MIN / _INCH, UNIT, 3)}-"
+    f"{render_number(_axle.BACK_END_SUNK_MAX / _INCH, UNIT, 3)}"
+)
+# The pressed drum's front face below the wheel's spigot face, hard against
+# the boss: the window the printed spigot and drum lengths prove
+# (mg_magnifying_wheel_geom.DRUM_RECESS). Delegated ruling (assembly-step
+# moves): MHA-MG-00's press step accepts it.
+# The geom asserts the near limit >= -1e-9 mm; rounding (and + 0.0, for -0.0)
+# drops float residue that render_number would reject as a negative magnitude.
+DRUM_RECESS_TEXT = "-".join(
+    render_number(round(limit / _INCH, 6) + 0.0, UNIT, 3) for limit in _DRUM_RECESS
+)
+
+# The summing lever (cad/config/parts/sm-summing-lever.yaml), the mate the
+# bracket screws to at MHA-HA-00; rule 4 names it by its drawing number.
+SUMMING_LEVER_NUMBER = "MHA-SM-03"
 
 # --- Fitter package -----------------------------------------------------------
 DRAWING_NUMBER = _steps.DRAWING_NUMBER
@@ -126,100 +182,299 @@ if set(BOM_DESCRIPTIONS) != set(BOM_ORDER) or len(set(BOM_ORDER)) != len(BOM_ORD
 
 EXPLODED_CAPTION = "EXPLODED VIEW - ASSEMBLY SEQUENCE ON SHEETS 4-5"
 
-# One line per step key (mg_magnifier_assembly_steps.SEQUENCE). Settings are
+# The BOM's item numbers, as the native table numbers the families (component
+# order in the source assembly); the drawing proves the inserted table prints
+# exactly these. Steps name parts by item (drawing-guidelines.md rule 22).
+ITEM_NUMBERS = {
+    WHEEL_BAR: 1,
+    CLAMP_FRONT: 2,
+    CLAMP_BACK: 3,
+    CLAMP_SCREW: 4,
+    LEVER: 5,
+    BRACKET: 6,
+    BRACKET_SCREW: 7,
+    CLAMP: 8,
+    THUMB_SCREW: 9,
+    ROD: 10,
+    FIXTURE: 11,
+    AXLE: 12,
+    SPACER: 13,
+    BACK_WASHER: 14,
+    WHEEL: 15,
+    DRUM: 16,
+    FRONT_WASHER: 17,
+    NUT: 18,
+    WIRE: 19,
+}
+if set(ITEM_NUMBERS) != set(BOM_ORDER) or sorted(ITEM_NUMBERS.values()) != list(
+    range(1, len(BOM_ORDER) + 1)
+):
+    raise AssertionError("every BOM family needs exactly one contiguous item number")
+
+
+def _item(stem: str) -> str:
+    return f"ITEM {ITEM_NUMBERS[stem]}"
+
+
+def _step(key: str) -> str:
+    return f"STEP {_steps.step_number(key)}"
+
+
+_AXLE, _BAR, _WHEEL, _DRUM = _item(AXLE), _item(WHEEL_BAR), _item(WHEEL), _item(DRUM)
+_NUT, _WASHER, _LEVER, _BRACKET = _item(NUT), _item(FRONT_WASHER), _item(LEVER), _item(BRACKET)
+_CLAMP, _THUMB, _ROD, _FIXTURE = _item(CLAMP), _item(THUMB_SCREW), _item(ROD), _item(FIXTURE)
+_WIRE = _item(WIRE)
+# The wheel stack on the axle, bar side first (sheet 2 shows the order).
+_STACK = (
+    f"ITEMS {ITEM_NUMBERS[SPACER]}, {ITEM_NUMBERS[BACK_WASHER]}, "
+    f"{ITEM_NUMBERS[WHEEL]} ({_DRUM} AWAY FROM {_BAR}) AND {ITEM_NUMBERS[FRONT_WASHER]}"
+)
+
+# Rule 23: a specified anaerobic bond equals a press fit. The one bond in this
+# package is the slip-fit drum's fallback (owner ruling 2026-11-07); its
+# degrease, apply, keep-off and cure rules
+# print once, as a general note with the checks on sheet 5, in two lines
+# (the sheet 5 column has under three to spare).
+BOND_GRADE = "LOCTITE 638"
+BOND_NOTE_REF = "NOTE 1 (SHEET 5)"
+BOND_NOTE = (
+    f"NOTE 1, {BOND_GRADE} BOND: DEGREASE; APPLY TO THE SPIGOT ONLY, NONE IN THE "
+    "AXLE BORE OR WIRE SEATS; CURE 24 H AT ROOM TEMPERATURE BEFORE LOAD OR OIL. "
+    f"ACCEPT: {_DRUM} DOES NOT TURN BY HAND."
+)
+
+# One line per step key (mg_magnifier_assembly_steps.SEQUENCE); each step does
+# one thing, a check and its remedy are separate steps (rule 22). Settings are
 # named, never valued: their values print as the model dimensions on sheet 1.
-# Ends and sides name physical features rather than ambiguous compass words.
+# Ends and sides name physical features or a lettered view, never a compass,
+# a clock or the machine's front and back (the principal views print unnamed).
+# The wheel's lever-wire tie hole by its plain name (rule 26), on VIEW D's
+# leader and in the steps; MHA-MG-05 keys it as TIE 1 on its own sheet.
+WIRE_TIE_HOLE = "WIRE TIE HOLE"
+_TIE_HOLE = f"THE {WIRE_TIE_HOLE}"
 STEP_TEXT = {
-    # Machinist review (run 20261024T053015093Z, 2 of 3 runs): "NOT PAST IT"
-    # read as forbidding the further press the same step then calls for. The
-    # REF depth is the first stop; the ACCEPT limit governs any further press.
-    # Same five printed rows as before (sheet 4's column has no row to spare).
+    _steps.DRUM_PRESSED_KEY: (
+        f"PRESS {_DRUM} ONTO THE SPIGOT OF {_WHEEL} UNTIL IT IS HARD AGAINST THE "
+        f"BOSS, ITS OUTER FACE {DRUM_RECESS_TEXT} BELOW THE END OF THE SPIGOT "
+        "(CALIPER DEPTH ROD)."
+    ),
+    _steps.DRUM_HELD_KEY: f"CHECK {_DRUM} DOES NOT TURN OR SLIDE BY HAND.",
+    # A press that goes on by hand is a slip fit (rule 23). Owner ruling
+    # 2026-11-07: a bond equals a press, so a slip drum is bonded rather than
+    # the wheel remade (BOND_NOTE); a slip axle is remade.
+    "drum-pulled-off": f"IF IT DOES, OR {_DRUM} SLID ON BY HAND, PULL {_DRUM} OFF.",
+    "drum-bonded": (
+        f"IF {_DRUM} CAME OFF, BOND IT TO {_WHEEL} WITH {BOND_GRADE}, "
+        f"{BOND_NOTE_REF}."
+    ),
+    # The press goes to a first setting: the plain end's window below the
+    # bar's far face (the bar's depth stack, which MHA-MG-08 names; the spec
+    # proves the window), read with a depth rod. The only acceptance of the
+    # axle's position is the thread end past the second nut: the number pair
+    # a depth rod reads there (owner ruling 2026-11-06 Q1), printed in the
+    # check from the spec's constants and read where DETAIL B draws the nuts.
+    # Farm rounds 1-3 gated it as a callout on DETAIL A, which draws no nut,
+    # and r3 read two acceptances; Main chose option A on 2026-11-08.
     _steps.AXLE_PRESSED_KEY: (
-        "PRESS THE MHA-MG-07 WHEEL AXLE INTO THE MHA-MG-08 WHEEL BAR FROM ITS "
-        "FRONT FACE, FIRST UNTIL ITS STEP REACHES THE REF DEPTH (SHEET 1, AXLE "
-        "AS PRESSED). TRIAL-FIT THE STEP "
-        f"{_steps.step_number('wheel-stacked')} STACK AND BOTH NUTS AT THE "
-        "ENDSHAKE; WHILE THE THREAD END STANDS MORE THAN THE ACCEPT LIMIT PAST "
-        "THE LOCKNUT, TAKE THEM OFF, PRESS A LITTLE FURTHER AND TRIAL-FIT AGAIN. "
-        "TAKE THE TRIAL PARTS OFF."
+        f"PRESS {_AXLE} INTO {_BAR}, THREADED END OUT, TO A FIRST SETTING: ITS "
+        f"PLAIN END {BACK_END_SUNK_TEXT} BELOW THE FAR FACE OF {_BAR} (CALIPER "
+        "DEPTH ROD)."
+    ),
+    _steps.AXLE_HELD_KEY: f"CHECK {_AXLE} DOES NOT TURN OR SLIDE BY HAND.",
+    "axle-pressed-out": f"IF IT DOES, OR {_AXLE} SLID IN BY HAND, PRESS {_AXLE} OUT.",
+    "axle-remade": f"IF {_AXLE} CAME OUT, REMAKE IT TO ITS PRESS SIZE.",
+    "axle-repressed": (
+        f"IF {_AXLE} WAS REMADE, RETURN TO {_step(_steps.AXLE_PRESSED_KEY)}."
+    ),
+    _steps.AXLE_TRIAL_KEY: f"TRIAL-FIT {_STACK} ON {_AXLE}, IN THAT ORDER.",
+    "trial-nuts-jammed": (
+        f"JAM BOTH {_NUT} NUTS ON {_AXLE} WITH {_WHEEL} JUST FREE."
+    ),
+    _steps.AXLE_CHECKED_KEY: (
+        f"CHECK THE THREAD END IN {ENDSHAKE_DETAIL_TITLE} STANDS "
+        f"{THREAD_PAST_LOCKNUT_MIN_TEXT}-{THREAD_PAST_LOCKNUT_TEXT} PAST THE "
+        "SECOND NUT (CALIPER DEPTH ROD)."
+    ),
+    "trial-parts-removed-to-press": (
+        f"IF IT FAILS, REMOVE THE TRIAL NUTS AND PARTS FROM {_AXLE}."
+    ),
+    "axle-pressed-further": (
+        f"IF {_step(_steps.AXLE_CHECKED_KEY)} READ OVER THE MAX, PRESS {_AXLE} IN "
+        "BY THE EXCESS."
+    ),
+    "axle-pressed-back": (
+        f"IF {_step(_steps.AXLE_CHECKED_KEY)} READ UNDER THE MIN, PRESS {_AXLE} "
+        "OUT TOWARD ITS THREADED END BY THE SHORTFALL."
+    ),
+    # A re-press goes back through the hold check before the trial fit.
+    "axle-rechecked": (
+        f"IF {_AXLE} WAS PRESSED AGAIN, RETURN TO {_step(_steps.AXLE_HELD_KEY)}."
+    ),
+    "trial-parts-removed": f"REMOVE THE TRIAL NUTS AND PARTS FROM {_AXLE}.",
+    "column-clamps-fitted": (
+        f"FIT {_item(CLAMP_FRONT)} AND {_item(CLAMP_BACK)} TO {_BAR} AS THE "
+        "SHEET 2 EXPLODED VIEW SHOWS."
     ),
     _steps.COLUMN_CLAMP_STARTED_KEY: (
-        "FIT THE MHA-SH-01 FRONT AND MHA-SH-02 BACK COLUMN CLAMPS BEHIND THE "
-        "BAR; START BOTH MHA-SH-VN-53 SCREWS THROUGH THE BAR AND THE FRONT CLAMP "
-        "INTO THE BACK CLAMP, LOOSE. MHA-HA-00 SETS THE BAR ON THE FRONT "
-        "COLUMN AND TIGHTENS THEM."
+        f"START BOTH {_item(CLAMP_SCREW)} SCREWS THROUGH ITEMS "
+        f"{ITEM_NUMBERS[WHEEL_BAR]} AND {ITEM_NUMBERS[CLAMP_FRONT]} INTO "
+        f"{_item(CLAMP_BACK)}."
     ),
-    "drum-pressed": (
-        "PRESS THE MHA-MG-10 DRUM ON THE MHA-MG-05 WHEEL'S FRONT SPIGOT, HARD "
-        "AGAINST THE BOSS; ITS FRONT FACE STAYS BELOW THE SPIGOT FACE."
+    # Rule 23 at the package boundary: the screws are seated and accepted at
+    # the MHA-HA-00 step that clamps the bar, cited by number.
+    "column-clamp-screws-left-loose": (
+        f"LEAVE THEM LOOSE FOR {_ha_steps.step_ref('magnifier-bar-clamped')} "
+        "TO TIGHTEN."
     ),
-    "wheel-stacked": (
-        "LIGHT OIL ON THE AXLE; ON IT, IN ORDER: THE MHA-MG-11 SPACER, THE "
-        "MHA-MG-VN-54 BACK WASHER, THE WHEEL WITH ITS DRUM FORWARD, THE "
-        "MHA-MG-VN-55 FRONT WASHER."
-    ),
+    "axle-oiled": f"WIPE LIGHT MACHINE OIL ON {_AXLE}.",
+    # The stack the washer and nut sheets once described in INSTALLATION
+    # notes (F6): the order here, the nut and locknut in the next two steps.
+    "wheel-stacked": f"SLIDE {_STACK} ONTO {_AXLE}, IN THAT ORDER.",
     _steps.ENDSHAKE_SET_KEY: (
-        "RUN THE FIRST MHA-MG-VN-52 NUT DOWN ON THE FRONT WASHER TO THE WHEEL "
-        "ENDSHAKE (SHEET 1): THE WHEEL TURNS FREE WITHOUT RATTLE."
+        f"RUN ONE {_NUT} NUT DOWN ONTO {_WASHER} UNTIL {_WHEEL} TURNS FREE "
+        "WITHOUT RATTLE."
+    ),
+    _steps.ENDSHAKE_CHECKED_KEY: (
+        f"CHECK THE {ENDSHAKE_DETAIL_TITLE} ENDSHAKE WITH FEELER GAUGES BETWEEN "
+        f"{_WASHER} AND THE SPIGOT FACE, {_WHEEL} PUSHED TOWARD {_BAR}: "
+        f"{ENDSHAKE_GO_TEXT} ENTERS, {ENDSHAKE_NO_GO_TEXT} DOES NOT."
+    ),
+    "endshake-loosened": (
+        f"IF {ENDSHAKE_GO_TEXT} DOES NOT ENTER, LOOSEN THE NUT SLIGHTLY."
+    ),
+    "endshake-tightened": f"IF {ENDSHAKE_NO_GO_TEXT} ENTERS, TIGHTEN THE NUT SLIGHTLY.",
+    "endshake-repeated": (
+        f"REPEAT {_steps.step_number(_steps.ENDSHAKE_CHECKED_KEY)}-"
+        f"{_steps.step_number('endshake-tightened')} UNTIL BOTH FEELERS PASS."
     ),
     _steps.LOCKNUT_JAMMED_KEY: (
-        "HOLD THE FIRST NUT; JAM THE SECOND MHA-MG-VN-52 NUT AGAINST IT. RECHECK "
-        "THE ENDSHAKE; CHECK THE AXLE AS PRESSED ACCEPTANCE (SHEET 1)."
+        f"HOLD THE FIRST NUT AND JAM THE SECOND {_NUT} NUT AGAINST IT."
     ),
+    "endshake-rechecked": (
+        f"CHECK THE ENDSHAKE AGAIN AS IN {_step(_steps.ENDSHAKE_CHECKED_KEY)}."
+    ),
+    "locknut-loosened": "IF IT FAILS, LOOSEN THE SECOND NUT.",
+    "locknut-reset": (
+        f"IF THE SECOND NUT WAS LOOSENED, RETURN TO {_step(_steps.ENDSHAKE_SET_KEY)}."
+    ),
+    _steps.AXLE_ACCEPTED_KEY: (
+        "CHECK THE THREAD END PAST THE SECOND NUT AGAIN, AS IN "
+        f"{_step(_steps.AXLE_CHECKED_KEY)}."
+    ),
+    # The final reading's own remedy: strip the stack back to the bare axle
+    # and take the trial-fit loop again (machinist review, stab-split s2).
+    "axle-stack-removed": (
+        f"IF IT FAILS, REMOVE ITEMS {ITEM_NUMBERS[NUT]}, "
+        f"{ITEM_NUMBERS[FRONT_WASHER]}, {ITEM_NUMBERS[WHEEL]}, "
+        f"{ITEM_NUMBERS[BACK_WASHER]} AND {ITEM_NUMBERS[SPACER]}."
+    ),
+    "axle-reset": (
+        f"IF THEY WERE REMOVED, RETURN TO {_step(_steps.AXLE_TRIAL_KEY)}."
+    ),
+    # The setting names the instrument that reads it (rule 22).
     _steps.LEVER_THREADED_KEY: (
-        "SCREW THE MHA-MG-03 LEVER INTO THE MHA-MG-01 BRACKET TO THE FLAT LEVER "
-        "TIP PROUD OF FAR BRACKET FACE SETTING "
-        f"(SHEET 1, {THREAD_PROJECTION_DETAIL_TITLE}). "
-        "THE PLAIN ROD HAS NO SHOULDER. NO LOCKNUT, SET SCREW OR ADHESIVE. "
-        "THE TWO MHA-MG-VN-53 SCREWS GO WITH THE LEVER: "
-        "MHA-HA-00 DRIVES THEM INTO THE SUMMING LEVER."
+        f"SCREW {_LEVER} INTO {_BRACKET} UNTIL ITS FLAT TIP STANDS PROUD OF THE "
+        f"FAR FACE AS {THREAD_PROJECTION_DETAIL_TITLE} SETS IT (CALIPER DEPTH ROD)."
+    ),
+    "clamp-thumb-screw-started": (
+        f"START ONE {_THUMB} INTO THE TAP OF {_CLAMP} THAT BREAKS INTO ITS CROSS "
+        "BORE, SHORT OF THE BORE."
     ),
     _steps.CLAMP_SET_KEY: (
-        "SLIDE THE MHA-MG-02 CLAMP ONTO THE LEVER FROM ITS DOMED FREE END, "
-        "THE END NEARER THE BORE UP, TO THE CLAMP STATION (SHEET 1); KEEP ITS "
-        "ENTIRE BORE ON THE PLAIN BODY, CLEAR OF THE AS-MADE RUNOUT AND THREAD; "
-        "TIGHTEN ITS MHA-SH-VN-55 THUMB SCREW BY HAND."
+        f"SLIDE {_CLAMP} ONTO {_LEVER} FROM ITS DOMED FREE END, {_THUMB} UP, TO "
+        "THE CLAMP STATION (SHEET 1)."
+    ),
+    "clamp-thumb-screw-tightened": f"TIGHTEN THAT {_THUMB} BY HAND.",
+    # Rule 23 (adjustable clamp): a thumb screw on the round holds a light-load
+    # setting that must stay adjustable when a step sets it and checks it holds.
+    _steps.CLAMP_HELD_KEY: f"CHECK {_CLAMP} DOES NOT SLIP ON {_LEVER} BY HAND.",
+    "clamp-reset": f"IF IT SLIPS, RETURN TO {_step(_steps.CLAMP_SET_KEY)}.",
+    "fixture-thumb-screw-started": (
+        f"START THE OTHER {_THUMB} INTO THE TAP IN THE SPIGOT FACE OF {_FIXTURE}, "
+        "SHORT OF ITS BORE."
+    ),
+    "rod-through-fixture": (
+        f"PASS THE THREADED END OF {_ROD} UP THROUGH THE BORE OF {_FIXTURE}."
     ),
     # #1559: the rod is retained by its own thread, seated on its shoulder.
+    "rod-seated": (
+        f"SCREW {_ROD} BY HAND INTO THE BOTTOM TAP OF {_CLAMP} UNTIL ITS SHOULDER "
+        "SEATS."
+    ),
     _steps.FIXTURE_SET_KEY: (
-        "PASS THE MHA-MG-04 ROD'S THREADED END UP THROUGH THE MHA-MG-06 "
-        "FIXTURE; SCREW IT INTO THE CLAMP'S BOTTOM TAP BY HAND UNTIL ITS "
-        "SHOULDER SEATS. SET THE FIXTURE AT THE FIXTURE DROP (SHEET 1), SPIGOT "
-        "TOWARD THE BRACKET; TIGHTEN ITS MHA-SH-VN-55 THUMB SCREW BY HAND."
+        f"SLIDE {_FIXTURE} TO THE FIXTURE DROP (SHEET 1), ITS SPIGOT TOWARD "
+        f"{_BRACKET}."
     ),
-    # Machinist review r3: the step must name how the upper end is secured
-    # and the state the wire is tied in. The upper end takes the tie-1
-    # method; the state is the rest pose the wire run is derived at
-    # (sh_vn_music_wire_lever_geom), which MHA-HA-00 sets as every channel amplitude
-    # at zero with the plate top level (its pen wire is tied in the same
-    # state), with TIE 1 at its rest hour (mg_wheel_group.LEVER_WIRE_WRAP_DEG).
+    "fixture-thumb-screw-tightened": f"TIGHTEN THE {_THUMB} IN {_FIXTURE} BY HAND.",
+    _steps.FIXTURE_HELD_KEY: f"CHECK {_FIXTURE} DOES NOT SLIP ON {_ROD} BY HAND.",
+    "fixture-reset": f"IF IT SLIPS, RETURN TO {_step(_steps.FIXTURE_SET_KEY)}.",
+    # The wire is tied in the rest pose its run is derived at
+    # (sh_vn_music_wire_lever_geom), which MHA-HA-00 sets as every channel
+    # amplitude at zero with the plate top level; the hook, rod and drum lane
+    # share one plumb plane (option A1).
     _steps.WIRE_HOOKED_KEY: (
-        "AFTER MHA-HA-00 HAS CLAMPED THE BAR AND SCREWED THE BRACKET TO THE "
-        "SUMMING LEVER: HOOK THE MHA-SH-VN-56 LEVER WIRE IN THE MHA-MG-06 "
-        "OUTPUT FIXTURE SPIGOT GROOVE; LAY IT ONCE ROUND THE GROOVE, TWIST THE "
-        "END BACK ON THE WIRE AT LEAST THREE TURNS AND TRIM THE TAIL; "
-        "THE WIRE LEAVES THE GROOVE AT ITS FRONT."
+        f"HOOK {_WIRE} LEVER WIRE ONCE ROUND THE SPIGOT GROOVE OF {_FIXTURE}."
     ),
-    _steps.WIRE_TIED_KEY: (
-        "WITH EVERY CHANNEL AMPLITUDE AT ZERO AND THE MHA-SM-03 PLATE TOP "
-        "LEVEL (MHA-HA-00), TURN THE WHEEL TO BRING TIE 1, THE AXIAL HOLE IN "
-        f"THE WHEEL BOSS, TO {TIE1_REST_HOUR} O'CLOCK SEEN FROM THE FRONT. "
-        "LEAD THE WIRE DOWN "
-        "TO THE DRUM'S RIGHT SIDE; WRAP IT CLOCKWISE DOWN THE MHA-MG-10 DRUM TO TIE 1; "
-        "PASS IT THROUGH TAUT, TWIST THE TAIL BACK ON ITSELF AT LEAST THREE "
-        "TURNS AND TRIM THE TAIL."
+    "lever-wire-led-down": (
+        f"LEAD THE WIRE STRAIGHT DOWN TO {_DRUM}, AS THE RIGHT SIDE VIEW ON "
+        "SHEET 1 SHOWS."
     ),
+    "lever-wire-hook-twisted": (
+        "TWIST THE WIRE END ROUND THE WIRE AT THE GROOVE AT LEAST THREE TURNS."
+    ),
+    "lever-wire-hook-trimmed": "TRIM THE WIRE TAIL CLOSE TO THE TWIST.",
+    "machine-at-rest": (
+        "SET MHA-HA-00 AT REST: EVERY CHANNEL AMPLITUDE AT ZERO AND THE "
+        "MHA-SM-03 PLATE TOP LEVEL."
+    ),
+    _steps.WHEEL_TURNED_KEY: (
+        f"TURN {_WHEEL} UNTIL ITS {WIRE_TIE_HOLE} STANDS AT THE "
+        f"{WHEEL_REST_VIEW_TITLE} ANGLE BELOW THE BOTTOM EDGE OF {_BAR} "
+        "(PROTRACTOR)."
+    ),
+    "lever-wire-wrapped": (
+        f"WRAP THE WIRE ROUND {_DRUM} TO {_TIE_HOLE}, CLOCKWISE AS SEEN IN "
+        f"{WHEEL_REST_VIEW_TITLE}."
+    ),
+    "lever-wire-through-tie": f"PASS THE WIRE END THROUGH {_TIE_HOLE} AND PULL IT TAUT.",
+    "lever-wire-tie-twisted": (
+        "TWIST THE WIRE TAIL ROUND THE WIRE AT LEAST THREE TURNS."
+    ),
+    _steps.WIRE_TIED_KEY: "TRIM THE WIRE TAIL CLOSE TO THE TWIST.",
 }
 if tuple(STEP_TEXT) != _steps.SEQUENCE:
     raise AssertionError("STEP_TEXT must follow mg_magnifier_assembly_steps.SEQUENCE")
 ASSEMBLY_STEPS = tuple(
     f"{_steps.step_number(key)}. {text}" for key, text in STEP_TEXT.items()
 )
+# The sequence prints in three titled groups, each opening at a numbered
+# step; the wire group's title states when its steps run, so no step carries
+# a precondition clause.
+STEP_GROUPS = (
+    ("WHEEL GROUP (EXPLODED ON SHEET 2):", _steps.DRUM_PRESSED_KEY),
+    ("LEVER GROUP (EXPLODED ON SHEET 3):", _steps.LEVER_THREADED_KEY),
+    (
+        "LEVER WIRE, ON THE MACHINE, AFTER MHA-HA-00 HAS CLAMPED "
+        f"{_BAR} IN PLACE AND SCREWED {_BRACKET} TO {SUMMING_LEVER_NUMBER}:",
+        _steps.WIRE_HOOKED_KEY,
+    ),
+)
+_GROUP_INDICES = [_steps.SEQUENCE.index(key) for _title, key in STEP_GROUPS]
+if (
+    STEP_GROUPS[0][1] != _steps.SEQUENCE[0]
+    or _GROUP_INDICES != sorted(_GROUP_INDICES)
+    or not all(_steps.step_number(key).isdigit() for _title, key in STEP_GROUPS)
+):
+    raise AssertionError("the step groups must open numbered steps in order")
 ASSEMBLY_CHECKS = (
-    "CHECK: WITH BOTH NUTS SET THE WHEEL TURNS FREE, NO RATTLE.",
-    "CHECK: THE CLAMP AND THE FIXTURE HOLD THEIR SETTINGS WHEN THE LEVER IS "
+    f"CHECK: WITH BOTH {_NUT} NUTS SET, {_WHEEL} TURNS FREE, NO RATTLE.",
+    f"CHECK: {_CLAMP} AND {_FIXTURE} HOLD THEIR SETTINGS WHEN {_LEVER} IS "
     "ROCKED BY HAND.",
-    "CHECK: THE LEVER WIRE CLEARS THE WHEEL RIM, SPOKES AND BOSS AND, "
-    "ROCKED THROUGH THE LEVER'S TRAVEL, STAYS WRAPPED ON THE DRUM SHORT OF "
-    "TIE 1.",
+    f"CHECK: {_WIRE} CLEARS THE RIM, SPOKES AND BOSS OF {_WHEEL}.",
+    f"CHECK: WITH {_LEVER} ROCKED BY HAND TO EACH END OF ITS TRAVEL ON THE "
+    f"MACHINE, {_WIRE} STAYS WRAPPED ON {_DRUM} SHORT OF {_TIE_HOLE}.",
+    f"LOOSE ITEMS: BOTH {_item(BRACKET_SCREW)} SCREWS GO WITH THE ASSEMBLY; "
+    f"{_ha_steps.step_ref('magnifier-bracket-screwed')} DRIVES THEM THROUGH "
+    f"{_BRACKET} INTO {SUMMING_LEVER_NUMBER} UNTIL THE HEADS SEAT.",
+    BOND_NOTE,
 )

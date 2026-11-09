@@ -37,8 +37,9 @@ _ROLE_SELECTORS = {
 # the integration head needs no plan edit; an absent pending family is not an
 # error. Empty since the crank-hub cluster (MHA-DT-31/138, #831) landed.
 PENDING_STEMS: frozenset[str] = frozenset()
-# Retired by the integral-arbor ruling (U11); refused if it reappears.
-RETIRED_STEMS = frozenset({"pinion-handle-pin"})
+# Retired by the integral-arbor ruling (U11) and the keeper-chain ruling
+# (2026-11-08, #2144 item 9.2); refused if they reappear.
+RETIRED_STEMS = frozenset({"pinion-handle-pin", "dt-crank-pin-eye", "dt-vn-keeper-chain-link"})
 
 # The cone set and the crank are separate sheets: on one 1:4 view their 31
 # balloons converged at the crank column and the tip block (machinist review of
@@ -65,6 +66,7 @@ CLUSTERS: dict[Cluster, tuple[str, ...]] = {
         "dt-vn-cone-tip-adjuster",
         "dt-vn-cone-tip-pinch-screw",
         "dt-vn-cone-tip-block-screw",
+        "dt-vn-locating-pin",
         "dt-vn-post-mount-screw",
         "dt-vn-cone-lock-knob",
         "dt-vn-cone-pivot-screw",
@@ -77,10 +79,8 @@ CLUSTERS: dict[Cluster, tuple[str, ...]] = {
         "dt-crank-arm",
         "dt-crank-pin",
         "dt-crank-pin-ring",
-        "dt-crank-pin-eye",
         "dt-vn-keeper-chain",
-        "dt-vn-keeper-chain-link",
-        "sh-vn-brass-fillister-screw",
+        "dt-vn-keeper-chain-screw",
         "dt-crank-handle",
         "dt-crank-handle-ferrule",
         "dt-crank-handle-butt-cup",
@@ -197,12 +197,25 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     # 11.5 width sat on the last 18.4 of the stub, the block 3.7 past it, so 20
     # puts the collar 1.6 past the tip and the block 18.7 past the collar.
     ExplodeStep("tip collar slips off", ("dt-vn-cone-tip-collar",), "cone", 20.0),
+    # MHA-DT-VN-69 (rule-23 retention, owner ruling 2026-11-07) is pressed into
+    # the block foot's blind ream, so it leaves with the block.
     ExplodeStep(
         "tip block slides off",
-        ("dt-cone-tip-block", "dt-vn-cone-tip-adjuster", "dt-vn-cone-tip-pinch-screw"),
+        (
+            "dt-cone-tip-block",
+            "dt-vn-cone-tip-adjuster",
+            "dt-vn-cone-tip-pinch-screw",
+            "dt-vn-locating-pin",
+        ),
         "cone",
         85.0,
     ),
+    # ...then drops out of the foot's blind ream along its own (plate-normal)
+    # axis, below the block: seated, only its stub under the foot showed and
+    # its balloon read as landing on a part already in its mate (integration
+    # proof 20261109T105251629Z, balloon 11).  15 clears the .16 ream depth
+    # (dt_cone_tip_block_spec.DOWEL_HOLE_DEPTH) by about 11.
+    ExplodeStep("tip dowel drops", ("dt-vn-locating-pin",), "y", -15.0),
     # The cone gears then slide on toward the tip, leaving MHA-DT-07 alone on
     # the MHA-DT-04 collar: unexploded, its balloon and the cone gear's met on
     # the stack's first disc (r15, 20261018T215310765Z, balloons 35 and 36).
@@ -235,10 +248,8 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
             "dt-crank-arm",
             "dt-crank-pin",
             "dt-crank-pin-ring",
-            "dt-crank-pin-eye",
             "dt-vn-keeper-chain",
-            "dt-vn-keeper-chain-link",
-            "sh-vn-brass-fillister-screw",
+            "dt-vn-keeper-chain-screw",
             "dt-crank-handle",
             "dt-crank-handle-ferrule",
             "dt-crank-handle-butt-cup",
@@ -263,19 +274,19 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
         -35.0,
     ),
     ExplodeStep("handle screw backs out", ("dt-crank-handle-pivot-screw",), "z", -80.0),
-    # The keeper chain stays tied to the pin: pin, ring, chain and links come
-    # out together, then the chain drops clear of the arm.
+    # The keeper chain stays tied to the pin: pin, ring and chain come out
+    # together, then the chain drops clear of the arm and its anchor screw
+    # comes forward off the arm face.
     ExplodeStep(
         "taper pin",
-        ("dt-crank-pin", "dt-crank-pin-ring", "dt-vn-keeper-chain", "dt-vn-keeper-chain-link"),
+        ("dt-crank-pin", "dt-crank-pin-ring", "dt-vn-keeper-chain"),
         "x",
         -25.0,
     ),
-    ExplodeStep("keeper chain", ("dt-vn-keeper-chain", "dt-vn-keeper-chain-link"), "y", -20.0),
-    ExplodeStep("anchor screw", ("sh-vn-brass-fillister-screw",), "z", -35.0),
-    ExplodeStep("anchor eyelet", ("dt-crank-pin-eye",), "z", -18.0),
+    ExplodeStep("keeper chain", ("dt-vn-keeper-chain",), "y", -20.0),
+    ExplodeStep("anchor screw", ("dt-vn-keeper-chain-screw",), "z", -35.0),
     # MHA-DT-VN-59 comes forward out of the arm/hub seam, past the anchor screw
-    # head (#1121): it sits 11 from the screw axis.
+    # head (#1121): it sits 14 from the screw axis.
     ExplodeStep("hub seam pin", ("dt-vn-crank-hub-pin",), "z", -55.0),
     # alignment pinion rig, steps 15-18 order: the base-mounted MHA-DT-18 pair
     # and MHA-DT-24 drop with their screws, then the screws lift out of them;
@@ -324,6 +335,19 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     # instances pin the straps to the torque shaft and stay with them.
     ExplodeStep(
         "arbor collar pin", ("dt-vn-pinion-strap-pin",), "z", -50.0, roles=(COLLAR_PIN_ROLE,)
+    ),
+    # The collar pin then drives out of its cross hole along world -X, 25 deg
+    # off its own axis (as MHA-DT-29 drives out 14 deg off): seated, it showed
+    # only as a flush end, and the balloon fell on a strap pin's flush end
+    # instead (integration proof 20261109T105251629Z, balloon 20).  25 carries
+    # it about 22.7 along its axis, past the collar's Ø.59 radius plus the
+    # pin's half length (13.8).
+    ExplodeStep(
+        "collar pin drives out",
+        ("dt-vn-pinion-strap-pin",),
+        "x",
+        -25.0,
+        roles=(COLLAR_PIN_ROLE,),
     ),
     ExplodeStep("grip crossrod", ("dt-pinion-handle",), "y", 25.0),
 )

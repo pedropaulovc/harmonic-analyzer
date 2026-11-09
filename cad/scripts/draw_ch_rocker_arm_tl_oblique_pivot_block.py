@@ -2,8 +2,8 @@
 
 Both sheets print decimal inch (each part's ``drawing_unit``). All sizes
 import native model dimensions; no bearing/cartridge sheets survive.
-Plan X locations run from the -X (left) edge through the hidden
-``PlanDatumReference`` sketch; Y from the shoulder seat's axis. Section B-B
+Plan X locations run from the -X (left) edge and Y locations from the -Y
+edge through the hidden ``PlanDatumReference`` sketch. Section B-B
 shows the floor from the carriage seat, not a competing counterbore-depth
 tolerance chain. TL-32's nut face is VIEW D on its own 2:1 sheet, its arrow on
 the plan. The layout notes below give sheet millimetres.

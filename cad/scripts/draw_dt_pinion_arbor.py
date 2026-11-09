@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import math
 import sys
-import textwrap
 from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
@@ -53,29 +52,95 @@ from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from diagnostics.drawing_layout_audit import collect_document
-from dt_pinion_arbor_pin_spec import PIN_HOLE_CALLOUT as _PIN_HOLE_CALLOUT
+from dt_pinion_arbor_pin_spec import PIN_NUMBER as _PIN_NUMBER
+from dt_vn_pinion_strap_pin_spec import DRILL_THRU_CALLOUT as _PIN_DRILL_THRU_CALLOUT
 from dt_pinion_arbor_spec import (
     BACK_JOURNAL_Z,
-    BOND_ZONE_CALLOUT,
     BOND_ZONE_DIA_Z,
-    CROSS_HOLE_CALLOUT,
-    DRAWING_DIMENSIONS,
-    DRAWING_PRECISION_BY_NAME,
-    DRUM_STATION,
-    DRUM_STATION_CALLOUT,
+    CROSSROD_NUMBER,
+    DRUM_NUMBER,
     FRONT_JOURNAL_Z,
     HEAD_CAP_SAG,
     HEAD_CENTER_Z,
-    HEAD_DIA,
     HEAD_FRONT_Z,
     HEAD_REAR_Z,
-    JOURNAL_CALLOUT,
+    JOURNAL_DIA_BAND,
     JOURNAL_LEN,
     OVERALL_LEN,
     PIN_Z,
+    RETAINING_COMPOUND,
     SHAFT_DIA,
+    SHAFT_DIA_BAND,
+    STRAP_NUMBER,
     SURFACE_FINISHES,
 )
+from dt_pinion_arbor_notes import (
+    BACK_STUB_DIA_Z,
+    BOND_ZONE_WITNESS_LEN,
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION_BY_NAME,
+    SPAN_WITNESS_LEN,
+)
+from _fit_ream_slide import REAM_SLIDE
+from dt_pinion_arbor_collar_spec import (
+    BORE as COLLAR_BORE,
+    BORE_BAND as COLLAR_BORE_BAND,
+    COLLAR_NUMBER,
+)
+from dt_pinion_bracket_geometry import ARBOR_BORE as STRAP_BORE
+
+
+def _inch(value_mm: float) -> str:
+    return f"{value_mm / 25.4:.4f}".lstrip("0")
+
+
+# Rule 4: each fit by its standard name; rule 7: a callout's words in two
+# rows at most, the rest in the numbered note it flags (SEE NOTE n).
+# The journals' .0008-wide band is narrower than the turned row, so it names
+# its matched-fit route (coordinator policy 1): running in the MHA-DT-14
+# REAM_SLIDE bore, turned to the measured bore, the clearance its limits and
+# the bore's give.
+JOURNAL_CLEARANCE = (
+    STRAP_BORE + REAM_SLIDE[1] - (SHAFT_DIA + JOURNAL_DIA_BAND[0]),
+    STRAP_BORE + REAM_SLIDE[0] - (SHAFT_DIA + JOURNAL_DIA_BAND[1]),
+)
+JOURNAL_CALLOUT = "RUNNING FIT,\nSEE NOTE 1"
+# Every Ø5/16 span's size is on the view (round 3 of fan-out dt-fab-3).  The
+# drum's span between the journals (the drum, 2.40-8.04 from the head rear
+# face, rests on both lands' inner ends:
+# dt_pinion_arbor_spec.DRUM_*_END_ON_JOURNAL_MIN) is its bonded fit, reason
+# once at its callout.  The two spans outside the journals (the collar's, by
+# the head, with its pin hole; the back stub) take the same -.0004/-.0038:
+# MHA-DT-33 slides over both from the back crown to its pin station, the
+# band's upper limit its slide-on clearance
+# (dt_pinion_arbor_collar_spec.SLIDE_CLEARANCE_MIN).  One 2X diameter on the
+# back stub sizes both and flags note 2, which names them and that sliding
+# fit (round 5: the collar span's own block had no open space between the
+# front land's and the neck's witnesses, whichever side SolidWorks put it).
+# The title block's .XX or .XXX on the back stub (Ø.32 or Ø.317 max) would
+# stop the collar (bore .3125 min) and the drum (.3135 min) passing it, so it
+# keeps the band.
+STRAP_NAME = "PINION BRACKET STRAP"
+COLLAR_NAME = "PINION ARBOR RETENTION COLLAR"
+COLLAR_CLEARANCE = (
+    COLLAR_BORE + COLLAR_BORE_BAND[1] - (SHAFT_DIA + SHAFT_DIA_BAND[0]),
+    COLLAR_BORE + COLLAR_BORE_BAND[0] - (SHAFT_DIA + SHAFT_DIA_BAND[1]),
+)
+BOND_ZONE_CALLOUT = f"BONDED FIT IN {DRUM_NUMBER},\n{RETAINING_COMPOUND}"
+SPAN_CALLOUT = "SEE NOTE 2"
+CROSS_HOLE_CALLOUT = f"REAM THRU, BONDED FIT ON\n{CROSSROD_NUMBER}, {RETAINING_COMPOUND}"
+# Rule 7: the notes block stays at four short rows; the widest (66
+# characters, ~172 mm) ends ~24 mm left of the title block (x 0.216).
+SHEET_NOTES = (
+    f"1. JOURNALS (2X): RUNNING FIT IN {STRAP_NUMBER} {STRAP_NAME},\n"
+    f"   TURN TO MEASURED BORE (CLEARANCE {_inch(JOURNAL_CLEARANCE[0])}-"
+    f"{_inch(JOURNAL_CLEARANCE[1])}).\n"
+    f"2. SPANS (2X) OUTSIDE THE JOURNALS: SLIDING FIT IN {COLLAR_NUMBER}\n"
+    f"   {COLLAR_NAME} (CLEARANCE {_inch(COLLAR_CLEARANCE[0])}-"
+    f"{_inch(COLLAR_CLEARANCE[1])})."
+)
+# Under the property-linked inside-corner note (top-left at y 0.060).
+NOTES_XY = (0.020, 0.052)
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
@@ -242,53 +307,50 @@ def _diameter_block_size(callout: str) -> tuple[float, float]:
     return (max(width, _callout_width(callout)), height + CALLOUT_LINE_PITCH * lines)
 
 
-# The drum station's text block ends 4 mm left of its drum-end witness:
-# between that witness and the head face, the neck-end witness drops
-# through.  Its dimension line stays at y ~0.1174 over the 199.0 row, so the
-# three-line callout (r1 of #1685) rises 5.6 mm above its one-line spot.
-DRUM_STATION_TEXT_WIDTH = _callout_width(DRUM_STATION_CALLOUT)
-DRUM_STATION_WITNESS_X = _sheet_x(HEAD_REAR_Z + DRUM_STATION)
-DRUM_STATION_TEXT_XY = (
-    DRUM_STATION_WITNESS_X - 0.004 - DRUM_STATION_TEXT_WIDTH / 2.0,
-    0.1286,
-)
 # The front land's diameter text hangs LEFT of its line (x-0.026 .. x+0.001,
-# measured at 4e97c4d8), and the drum station's witness drops through the
-# whole band below the shaft (run 059b5b0f: text-on-line at x 246.0).  Its
-# line stands on the land 1 mm crown side of its measuring point, the text
-# block ending ~2.4 mm short of that witness.
+# measured at 4e97c4d8).  Its line stands on the land 1 mm crown side of its
+# measuring point.
 JOURNAL_DIA_TEXT_OVERHANG = 0.001
 FRONT_JOURNAL_DIA_X = FRONT_JOURNAL_DIA_POINT_X - JOURNAL_DIA_LINE_OFFSET
 # The bond-zone diameter stands over the part's witness and hangs its text
 # right of its line BELOW the shaft, in the open run between the back land's
-# head end and the drum station's text, a gap over the drum station's block
-# and 10 mm short of the front land's.  Above the shaft (r1 of #1685) the
-# two-line callout naming its scope and drum no longer fit under detail A.
-# Its lines name every Ø5/16 span but the lands, so it no longer reads as the
-# front "JOURNAL" shelf's pair (Main and Fable, 63468ee9).  Its arrows sit
-# inside the flanks (ARROWS_INSIDE): an outside tail would rise into the back
-# Ra symbol over the shaft.  r3 added a third line (the drum's ends on the
-# journals), so the shoulder drops one line pitch and the top stays put; the
-# block now ends left of the drum station's text instead of over it.
-BOND_ZONE_TEXT_XY = (_sheet_x(BOND_ZONE_DIA_Z), 0.1474)
-# The drum-station and bond-zone reference sketches stand alone, so the
-# profile shows them, and each ends on a short construction witness lying ON
+# head end and the front land's.  Above the shaft (r1 of #1685) the callout
+# no longer fit under detail A.  Its arrows sit inside the flanks
+# (ARROWS_INSIDE): an outside tail would rise into the back Ra symbol over
+# the shaft.  Two callout rows now (r3 had three): one pitch up keeps the
+# block's top, so its witnesses stay short.
+BOND_ZONE_TEXT_XY = (_sheet_x(BOND_ZONE_DIA_Z), 0.1474 + 0.0028)
+# The bond-zone reference sketch is part-hidden; the profile shows it for its
+# dimension's import, and it ends on a short construction witness lying ON
 # the lower Ø5/16 outline.  The view paints that witness construction grey over
 # the black silhouette, which at 1:1 read as a break in the outline, i.e. a
-# groove or relief to a machinist (Main, 5471a6ef).  Each is re-coloured in
+# groove or relief to a machinist (Main, 5471a6ef), so it is re-coloured in
 # the view to the outline's black; the model sketch and its dimension are
-# untouched.  The spans (model z, mm) mirror build_pinion_arbor's
-# DRUM_STATION_POINT_LEN / BOND_ZONE_WITNESS_LEN, pinned by test.
+# untouched.  The drum station's sketch stays hidden: its dimension does not
+# print (UNPRINTED_DIMENSIONS).  The spans (model z, mm) are the builder's,
+# both read from dt_pinion_arbor_notes: the bond zone's and, round 3 of
+# fan-out dt-fab-3, the back stub's.
 REFERENCE_WITNESS_COLOR = 0  # COLORREF black, the outline's colour.
-DRUM_STATION_POINT_LEN = 1.0
-BOND_ZONE_WITNESS_LEN = 4.0
 REFERENCE_WITNESSES = {
-    "DrumStationReference": (
-        HEAD_REAR_Z + DRUM_STATION - DRUM_STATION_POINT_LEN,
-        HEAD_REAR_Z + DRUM_STATION,
-    ),
     "BondZoneReference": (BOND_ZONE_DIA_Z, BOND_ZONE_DIA_Z + BOND_ZONE_WITNESS_LEN),
+    "BackStubReference": (BACK_STUB_DIA_Z, BACK_STUB_DIA_Z + SPAN_WITNESS_LEN),
 }
+# The back stub's 2X diameter (line at x ~0.086, between the back crown's
+# rim witness at x 0.0796 and the back land's crown end at x 0.0875) rises
+# above the shaft, past the back land's diameter block (top y ~0.210), into
+# open sheet (round-3/6 PDFs: no line in x 0.040-0.133 over y 0.225-0.260).
+# SolidWorks ran it right of its line in rounds 4, 5 and 6 (x 86.1-124.2 mm,
+# y 228.7-244.7 mm in round 6).
+BACK_STUB_TEXT_XY = (_sheet_x(BACK_STUB_DIA_Z), 0.2360)
+# The (.05) back-crown sag REF sits over that block.  At y 0.220 (round 6)
+# its dimension line ran at y 217.2 mm and its right arrow tail, 6.4 mm past
+# the rim witness, ended on the 2X block's vertical leader (x 86.1, y
+# 174.0-228.7 mm), so the two read as one line (machinist review C1, rule
+# 14).  Any row under the block's shoulder meets that leader, so the row
+# rises over the block: the line ~2.8 mm under the text position runs at
+# ~250 mm, ~10 mm over the block's "2X" and 21 mm over the leader's top,
+# its text ~11 mm under the sheet's zone border.
+BACK_CAP_SAG_TEXT_XY = (0.055, 0.253)
 SW_SEL_EXT_SKETCH_SEGS = 24  # swSelectType_e.swSelEXTSKETCHSEGS
 REFERENCE_WITNESS_LEN_TOL = 0.01  # mm; the witnesses are fully defined sketch lengths
 # Exported-raster proof that the outline stays unbroken over each witness:
@@ -321,16 +383,22 @@ DIAMETER_BLOCK_SIZE = (0.027, 0.014)
 # it, crossing the 38.0 line 6 mm inside that witness and passing 5 mm
 # right of the 19.0's head-end witness; the underline still starts right of
 # detail A's view box (x 0.1928).
-# Reflow across the old line break: FOR stays on the drill row, leaving the
-# full vendor number and SPRING PIN together below it.  Two rows preserve
-# the measured underline height between the crown-sag and cross-hole text.
-PIN_HOLE_CALLOUT = textwrap.fill(
-    _PIN_HOLE_CALLOUT, width=24, break_long_words=False, break_on_hyphens=False
-)
+# Two rows preserve the measured underline height between the crown-sag and
+# cross-hole text.  The band is ASME B18.8.2's recommended hole for the 1/16
+# slotted spring pin (.062-.065; the title block's DRILLED HOLES row would
+# open it to .0665), which the pin grips by compressing into: the press fit
+# the MHA-DT-33 collar and MHA-DT-19 sheets name for the same pin.  The
+# second row names that fit and the mate (rule 4; integration proof
+# 20261109T105251629Z, 3 of 3 runs: the pin's number alone named no fit).
+# A third row would run into the MHA-DT-15 bore callout above, so the row
+# drops "SPRING PIN" (the number names the pin) and, 25 characters wide,
+# moves the bend half a millimetre nearer the hole to keep the underline
+# right of detail A's view box.
+PIN_HOLE_CALLOUT = f"{_PIN_DRILL_THRU_CALLOUT}\nPRESS FIT ON {_PIN_NUMBER}"
 PIN_HOLE_CALLOUT_ADVANCE = 0.00267
 PIN_HOLE_CALLOUT_CENTRE_DX = 0.00075
 PIN_HOLE_LEADER_ARROW_DX = -0.0004
-PIN_HOLE_LEADER_RUN = 0.009
+PIN_HOLE_LEADER_RUN = 0.0085
 PIN_HOLE_CALLOUT_WIDTH = PIN_HOLE_CALLOUT_ADVANCE * max(
     len(line) for line in PIN_HOLE_CALLOUT.split("\n")
 )
@@ -354,21 +422,18 @@ PRINCIPAL_KEEP = {
     # station's text.
     "FrontJournalDia": (FRONT_JOURNAL_DIA_X, 0.1515),
     "BondZoneDia": BOND_ZONE_TEXT_XY,
+    "BackStubDia": BACK_STUB_TEXT_XY,
     "BackJournalDia": (BACK_JOURNAL_TEXT_X, BACK_JOURNAL_DIA_Y),
     # y 0.140, not 0.130: lifts the dimension line to y ~0.1372 so its head-end
     # witness stops at ~0.1362, leaving room for the front Ra's shoulder to
     # pass beneath it (audit leader-crosses-line). Text stays 7.4 mm off the Ra.
     "FrontJournalFromHeadRear": (0.283, 0.140),
-    # The drum station stacks between the two land stations, its text left of
-    # its own drum-end witness.  The back station's text moves left to clear
-    # it.
-    "DrumStationFromHeadRear": DRUM_STATION_TEXT_XY,
     "BackJournalFromHeadRear": (0.160, 0.115),
     # Right of the overall-length witness at the front crown apex (x 0.3215).
     "NeckLen": (0.340, 0.100),
     "BackRimFromHeadRear": (0.205, 0.095),
     "OverallLen": (0.205, 0.080),
-    "BackCapSagDim": (0.055, 0.220),
+    "BackCapSagDim": BACK_CAP_SAG_TEXT_XY,
     # Radial leader down-left from the back crown, below the shaft axis and
     # clear of the (1.2) sag reference above it and the overall witnesses.
     "BackCapR": (0.045, 0.140),
@@ -467,31 +532,33 @@ def _detail_x(model_z: float) -> float:
 
 
 DIMENSION_CALLOUTS = {
-    # One name for the axial datum every station runs from (Fable m1): the
-    # head end has two shoulders, Ø5/16-Ø.41 and Ø.41-Ø.59.
-    # <MOD-DIAM> carries its own leading gap, so no space before it.
-    "BackRimFromHeadRear": (
-        f"FROM BACK CROWN ROOT TO<MOD-DIAM>{HEAD_DIA / 25.4:.2f} HEAD REAR FACE"
-    ).replace(">0.", ">."),
-    "DrumStationFromHeadRear": DRUM_STATION_CALLOUT,
-    "OverallLen": "OVERALL",
-    "BackCapSagDim": "BACK CROWN",
     "CrossHoleDia": CROSS_HOLE_CALLOUT,
     "FrontJournalDia": JOURNAL_CALLOUT,
     "BackJournalDia": JOURNAL_CALLOUT,
     "BondZoneDia": BOND_ZONE_CALLOUT,
-    "PinStationFromHeadRear": "COLLAR PIN",
+    "BackStubDia": SPAN_CALLOUT,
     "PinHoleDia": PIN_HOLE_CALLOUT,
 }
-# Printed in parentheses as references (dimension name -> native label).  The
-# drum station ends on no feature of this part: it prints (2.40) with its
-# DRUM STATION callout, and MHA-DT-00's drum-station setting carries its band
-# (farm run 20261103T022858451Z, Main's ruling (a)).
+# Printed in parentheses as references (dimension name -> native label).
+# Rule 7: a length carries its value and band only, so none of these (nor
+# the stations) carries words.  The drum station (2.40) no longer prints: it
+# ends on no feature of this part and is MHA-DT-00's drum-station setting
+# (dt_drum_station_setting_spec), an assembly instruction here.
 REFERENCE_LENGTHS = {
     "HeadCapSagDim": "front-crown height reference",
     "BackCapSagDim": "back-crown descriptive reference",
     "OverallLen": "overall length reference",
-    "DrumStationFromHeadRear": "drum station reference",
+}
+# Marked in the model (dt_pinion_arbor_notes.DRAWING_DIMENSIONS) but not
+# imported: the drum station is MHA-DT-00's setting, not this part's.  Its
+# feature owns nothing else, so the targeted import never brings it in, and
+# its sketch stays as the part saved it, hidden.  The precision readback
+# covers only what prints (round 1 f08277cd: the seat raised on it).
+UNPRINTED_DIMENSIONS = frozenset({"DrumStationFromHeadRear"})
+PRINTED_PRECISION_BY_NAME = {
+    name: places
+    for name, places in DRAWING_PRECISION_BY_NAME.items()
+    if name not in UNPRINTED_DIMENSIONS
 }
 # The turning axis runs the full part and this far past each crown.
 AXIS_OVERSHOOT_MM = 3.0
@@ -1290,7 +1357,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _radius_leader_outside(adapter, detail_annotations, "HeadCapR")
     for name in ARROWS_INSIDE:
         _arrows_inside(adapter, principal_annotations, name)
-    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    assert_imported_precision(adapter, annotations, PRINTED_PRECISION_BY_NAME)
     for name, label in REFERENCE_LENGTHS.items():
         matches = [
             annotation
@@ -1319,6 +1386,8 @@ async def build(adapter: Any) -> dict[str, str]:
             char_height=0.0025,
         )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
+    if add_note(adapter, SHEET_NOTES, *NOTES_XY) is None:
+        raise RuntimeError("failed to add the pinion arbor's numbered notes")
     add_property_linked_note(adapter, "Isometric View Note", 0.335, 0.255)
     _label_detail(adapter, detail, principal, mark_center)
     rebuild_drawing(adapter, label="pinion arbor layout audit")

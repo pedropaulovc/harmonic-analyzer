@@ -211,8 +211,6 @@ FINITE_GROUND_TIP_AIR_MIN = min(
 TOOTHSPACE_GAUGE_DIA_IN = 1.0 / 16.0
 TOOTHSPACE_GAUGE_DIA_MM = TOOTHSPACE_GAUGE_DIA_IN * MM_PER_IN
 TOOTH_SPACE_RUNOUT_TIR_MM = toothspace_runout_tir_mm()
-# The printed limit never exceeds the booked one: floored to four inch places.
-TOOTH_SPACE_RUNOUT_TIR_TEXT = inch_text(inch_floor_mm(TOOTH_SPACE_RUNOUT_TIR_MM, 4), 4)
 if not math.isfinite(TOOTH_SPACE_RUNOUT_TIR_MM) or TOOTH_SPACE_RUNOUT_TIR_MM <= 0.0:
     raise ValueError("feed toothspace inspection requires a positive configured TIR limit")
 # The actual rear-face flank edge of the indexed straight stock pass.
@@ -270,20 +268,17 @@ BOSS_DIA_PLACES = 4
 # --- the step face: the hub's seat ----------------------------------------------
 # The hub's spigot bears on the step face's tooth ends, so the face is held
 # square to the bore (datum A), faced in the setup that reams the bore; the
-# zone is the face's extent, the 12T's tip circle.
+# zone is the face's extent, the 12T's tip circle.  It prints at the shop's
+# .001 row; the collar-to-disc air it closes is accepted at MHA-PD-00 by a
+# feeler, the face re-faced square on a mandrel if short (pd_cluster_air;
+# Owner ruling 2026-11-08 (Pedro), #2144 item 3.4).
 BORE_DATUM = "A"
 # Spacing is held by the dividing head and is not inspected; one pin in
 # every space on a radial indicator catches eccentricity and gross slips.
 TOOTH_SPACE_CALLOUT_PROPERTY = "Tooth Space Inspection"
-TOOTH_SPACE_CALLOUT = "\n".join(
-    (
-        f"TOOTH SPACE RUNOUT {TOOTH_SPACE_RUNOUT_TIR_TEXT} TIR TO {BORE_DATUM}",
-        f"\u00d8{inch_text(TOOTHSPACE_GAUGE_DIA_MM, 4)} PIN, ALL {TEETH} SPACES",
-    )
-)
 # The frame prints GEOMETRIC_TOLERANCES_IN; readers take the derived mm.
 GEOMETRIC_TOLERANCES_IN: dict[str, str] = {
-    "step face perpendicularity to bore": ".0002",
+    "step face perpendicularity to bore": ".001",
 }
 GEOMETRIC_TOLERANCES_MM: dict[str, float] = {
     key: float(value) * MM_PER_IN for key, value in GEOMETRIC_TOLERANCES_IN.items()
@@ -295,10 +290,12 @@ STEP_FACE_PERPENDICULARITY_ZONE_DIA = OUTSIDE_DIA
 
 # --- D-flat (local -Y): drive only ------------------------------------------------
 # The hub drives through it.  The flat plane prints from the boss axis at
-# .138 0/-.0006: the hub's flat sits .0008...0020 off it (the hub owns its
-# band and checks the pair).
+# .138 0/-.001, the shop's .0001-place row (Owner ruling 2026-11-08
+# (Pedro), #2144 item 3.4):
+# the hub's flat sits pd_transgear_disc_hub_spec.FLAT_CLEARANCE off it (the
+# hub owns its band and checks the pair).
 FLAT_TO_AXIS = 3.5052  # .138
-FLAT_TO_AXIS_BAND = (0.0, -0.01524)  # (upper, lower) deviations: 0/-.0006
+FLAT_TO_AXIS_BAND = (0.0, -0.0254)  # (upper, lower) deviations: 0/-.001
 FLAT_TO_AXIS_PLACES = 4
 FLAT_DEPTH = BOSS_DIA / 2.0 - FLAT_TO_AXIS  # .0185
 # The flat runs from the nose rearward to an end wall at FLAT_END_STATION,
@@ -315,7 +312,7 @@ FLAT_DEPTH = BOSS_DIA / 2.0 - FLAT_TO_AXIS  # .0185
 # run-out (asserted below).  The hub's check keeps its conservative
 # STATION_TOL allowance on top of the MAX.  The MAX stands far enough behind
 # the hub's flat that the title block's R.040 inside corner, where the
-# flat's floor meets the wall, stays under the flats' .0008 minimum clearance
+# flat's floor meets the wall, stays under the flats' minimum clearance
 # where the hub's flat starts (codjiflo P2 on edb402b/482fbdc: at 16.6 an
 # R1.0 corner rose 0.21 there; #2006).  The drawing test holds that envelope.
 FLAT_END_STATION = 16.002  # .63
@@ -347,18 +344,6 @@ BORE_DIAMETRAL_CLEARANCE = (
 )
 if BORE_DIAMETRAL_CLEARANCE[0] <= 0.0:
     raise AssertionError(f"sleeve bore binds on the pin: {BORE_DIAMETRAL_CLEARANCE}")
-BORE_PROCESS_CALLOUT = "REAM THRU"
-# The bore's fit prints under its size on the section's own dimension, as
-# the boss's does: a separate fit note crowded the end view (run
-# 20261101T054343686Z failed the layout audit on it).
-BORE_FIT_CALLOUT = "\n".join(
-    (
-        f"MATE PIN {PIN_NUMBER},",
-        f"{inch_text(BORE_DIAMETRAL_CLEARANCE[0], 4)}-"
-        f"{inch_text(BORE_DIAMETRAL_CLEARANCE[1], 4)} DIA CLR",
-    )
-)
-BORE_CALLOUT = f"{BORE_PROCESS_CALLOUT}\n{BORE_FIT_CALLOUT}"
 
 # --- the hub and disc on the step ------------------------------------------------
 # The hub's spigot seats on the step face and passes the disc's bore; the
@@ -564,7 +549,7 @@ for _name, _nominal, _worst in WALLS:
 # under the .080 target and keeps the .060 floor: owner minor RV-03.
 FLAT_WALL = FLAT_TO_AXIS - BORE_DIA / 2.0
 FLAT_WALL_WORST = round(FLAT_TO_AXIS + FLAT_TO_AXIS_BAND[1] - _BORE_MAX / 2.0, 6)
-FLAT_WALL_PRINTED = inch_floor_mm(FLAT_WALL_WORST, 3)  # .074
+FLAT_WALL_PRINTED = inch_floor_mm(FLAT_WALL_WORST, 3)  # .073
 if FLAT_WALL_WORST < WALL_FLOOR:
     raise AssertionError(f"the D-flat wall {FLAT_WALL_WORST:.3f} is under the floor")
 
@@ -642,36 +627,14 @@ ROOT_DIA_DEVIATIONS = (0.0, 0.0)
 RADIAL_SETTING_DEVIATIONS = deviations(RADIAL_SETTING_BAND)
 
 
-def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> str:
-    """Render an aligned gear data block for a property-linked note."""
-    return "\n".join([title] + [f"{label}:  {value}" for label, value in rows])
-
-
-# What a machinist needs to cut and check the teeth; design parameters stay
-# in this module (Main ruling 2026-10-10).
-GEAR_DATA = gear_data_note(
-    [
-        ("NUMBER OF TEETH", f"{TEETH}"),
-        ("DIAMETRAL PITCH", f"{DIAMETRAL_PITCH:.2f}"),
-        ("PRESSURE ANGLE", f"{PRESSURE_ANGLE_DEG:.1f} DEG"),
-        ("PITCH DIAMETER (REF)", inch_text(PITCH_DIA, 4)),
-        ("WHOLE DEPTH (REF)", inch_text(WHOLE_DEPTH, 4)),
-        ("CUTTER", f"#{CUTTER_NUMBER}, {CUTTER_TOOTH_RANGE[0]}-{CUTTER_TOOTH_RANGE[1]}T"),
-        (
-            f"SPAN OVER {SPAN_TEETH} TEETH",
-            f"{inch_text(min(SPAN_LIMITS), SPAN_PLACES)}-{inch_text(max(SPAN_LIMITS), SPAN_PLACES)}",
-        ),
-        ("MATES WITH", f"PLATEN RACK {RACK_NUMBER}"),
-    ]
-)
-
 # The title block's .010 edge break is 14% of this fine tooth's whole depth,
 # and the tooth ends seat the hub's spigot.  The drawing flags it at the
 # teeth with a leader (rule 7; 2026-10-27 ENFORCE review, r2, r3: loose in
 # the notes block it reached no feature), so the notes block omits it.
 TOOTH_EDGE_NOTE = "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
 # Emits approved declaration pd-transgear-feed-pinion RV-03 (owner ruling
-# 2026-10-27, #1378).
+# 2026-10-27, #1378, re-ruled at .073 MIN by delegated ruling 2026-11-07
+# (Main), no precedent; owner review #2144).
 # A shop note states the requirement, not the measuring method or the cutter
 # choice (Main ruling 2026-10-10): the run-out length is dimensioned.
 FLAT_WALL_NOTE = f"D-FLAT WALL TO BORE {inch_text(FLAT_WALL_PRINTED, 3)} MIN."

@@ -1,7 +1,15 @@
 """Manufacturing drawing of the custom collar; its set screw is stock.
 
 Native model dimensions own every made size, its places and its band.
-The radial through tap is a native Hole Wizard callout.
+The radial through tap is a native Hole Wizard callout, seen in VIEW A
+(lettered with its viewing arrow on the turning view); the bore's REAM
+callout sits in DETAIL B, a native 40:1 detail of the end view. Sheet 2
+shows the stock set screw, a member of MHA-DT-VN-54, for reference.
+
+The sheet's words are this recipe's (fan-out screen 20261107T081227004Z):
+the part's saved view-note, title and stock-sheet properties are not read, so
+their spec constants stay unchanged and the part, MHA-DT-04 and MHA-DT-00
+keep their keys.
 """
 
 from __future__ import annotations
@@ -14,7 +22,7 @@ from typing import Any
 import _telemetry
 import dt_vn_cone_tip_collar_spec as spec
 from _check import check
-from _com import _early_bound
+from _com import _early_bound, _read_member
 from _drawing_attachment import _is_same_attachment
 from _paths import CAD_ROOT
 from _session import run_build
@@ -26,9 +34,11 @@ from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, move_model_dimension, set_dimension_callouts
 import _drawing_hidden_sketches as hidden_sketches
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
+from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
@@ -36,8 +46,10 @@ from _layout_geometry import format_findings
 from _supplier_dimensions import assert_supplier_reference_dimension, supplier_reference_dimension
 from diagnostics.drawing_layout_audit import audit_document
 from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import dimension_name, place_view, view_name
+from solidworks_mcp.adapters.solidworks.drawing import add_note, dimension_name, place_view, view_name
 
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 SPEC = DRAWINGS_BY_NAME["dt_vn_cone_tip_collar"]
 PART_STEM = SPEC.artifact_stem
 SOURCE = CAD_ROOT / "out" / "sldprt" / f"{PART_STEM}.SLDPRT"
@@ -46,18 +58,30 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 SHEET_SCALE = (4, 1)
-# Keep the custom-machined sheet's views, controls and four-note contract intact.
+# Sheet 1 makes the collar; sheet 2 shows its stock set screw for reference.
 SHEET_NAMES = ("COLLAR", f"{spec.SET_SCREW_SKU}-STOCK")
 STOCK_SCALE = (12, 1)
 SHEET_SCALES = {SHEET_NAMES[0]: SHEET_SCALE, SHEET_NAMES[1]: STOCK_SCALE}
-STOCK_SIDE_CENTER = (0.230, 0.155)
-STOCK_END_CENTER = (0.085, 0.155)
-STOCK_ISO_CENTER = (0.345, 0.210)
+# Third angle: the socket end is the side view's right end, so its end view
+# (*Right) stands right of the side view on its axis (screen r1-r3 blocker:
+# left of it, it claimed the flat point's end). The diameter reads left of the
+# side view, clear of the end view; the socket's across-flats text stands right
+# of its extension lines and the end view's centre mark (rule 14: three lines
+# struck it under the view).
+STOCK_SIDE_CENTER = (0.180, 0.155)
+STOCK_END_CENTER = (0.300, 0.155)
+STOCK_ISO_CENTER = (0.345, 0.222)
 STOCK_SIDE_KEEP = {
     "ScrewLength": (STOCK_SIDE_CENTER[0], STOCK_SIDE_CENTER[1] + 0.035),
-    "ScrewMajorDia": (STOCK_SIDE_CENTER[0] + 0.070, STOCK_SIDE_CENTER[1]),
+    "ScrewMajorDia": (STOCK_SIDE_CENTER[0] - 0.070, STOCK_SIDE_CENTER[1]),
 }
-STOCK_END_KEEP = {"SocketAF": (STOCK_END_CENTER[0], STOCK_END_CENTER[1] - 0.035)}
+STOCK_END_KEEP = {"SocketAF": (STOCK_END_CENTER[0] + 0.032, STOCK_END_CENTER[1] - 0.030)}
+# Rule 4: the stock screw is a member of MHA-DT-VN-54 (the collar with its set
+# screw), named as a kit member with its catalogue code after the number.
+STOCK_TITLE = "\n".join((
+    "SET SCREW OF MHA-DT-VN-54: #2-56 X 5/16 FLAT POINT, McMASTER 94355A213.",
+    "AS SUPPLIED; VIEWS ARE REFERENCE ONLY.",
+))
 END_CENTER = (0.080, 0.170)
 SIDE_CENTER = (0.205, 0.170)
 # The radial tap view stands over the end view, left of the turning view.
@@ -95,45 +119,63 @@ NOSE_DIA_ON_SIDE = (0.160, SIDE_CENTER[1])
 # body top at x ~221, left of CollarDia's top extension line (x >= 228), and
 # passes NoseLength's text at x ~230. At (165, 198) it crossed NoseLength's
 # extension line; at (282, 205), CollarDia's dimension line (main's review).
-# The function lines of CollarWidth and NoseLength
-# (spec.AXIAL_FUNCTION_CALLOUTS): CollarWidth's below its value, into the
-# open field under the view; NoseLength's ABOVE its value, out of its
-# extension lines' reach, centred between them: at x 182 its 53.5 mm block
-# ([153.6, 207.1] mm) stood 5.7 mm from the tap callout ([94.4, 150.4] x
-# [226.2, 235.3] mm), under one text height.
+# The .XXX nose length, width and tap station hold the 2-56 tap's walls to
+# the shoulder and the end face (spec.WORST_WALLS_MM; at .XX they fall below
+# the wall target). They print bare: any stated reason is design rationale
+# (rule 7; screen and round 1), so the sheet relies on exception RV-02 in
+# cad/config/parts/dt-vn-cone-tip-collar.yaml (PROVISIONAL, pending owner
+# confirmation).
 SIDE_KEEP = {"CollarWidth": (0.205, 0.110), "CollarDia": (0.250, SIDE_CENTER[1]),
              "NoseLength": (0.189, 0.218), "ShoulderRadius": (0.262, 0.232)}
 # TapStation reads right of the tap centre's extension line, under the hole
-# callout's leader and above the end view's top (y 205 mm at x 80 mm), so its
-# function line clears both extension lines and the left border.  The
-# two-line TAP ROOT gauge reads right of the view, above the hole callout:
-# left of the view (main's place) its leader crossed TapStation's extension
-# line off the nose face (run 20261101T183557651Z).  It bounds the envelope
-# the wall budget books (spec.THREAD_ENVELOPE_DIA).
-TAP_KEEP = {
-    "TapStation": (TAP_CENTER[0] + 0.040, TAP_CENTER[1] - 0.024),
-    "TapRootLimit": (TAP_CENTER[0] + 0.033, TAP_CENTER[1] + 0.012),
-}
+# callout's leader and above the end view's top (y 205 mm at x 80 mm). The
+# thread's envelope is the 2-56 UNC-2B callout's and the title block's thread
+# row (round 1: a separate Ø.09 MAX gauge on the tap was over-specification).
+TAP_KEEP = {"TapStation": (TAP_CENTER[0] + 0.040, TAP_CENTER[1] - 0.024)}
 # Right of the view: the hole callout's text starting past the view's right
 # edge. The view note goes over the view, 3.7 mm inside the top border.
 TAP_CALLOUT_XY = (TAP_CENTER[0] + 0.0553, TAP_CENTER[1] - 0.0062)
 # The tap drill's size prints three inch places, as every Hole Wizard callout
 # on an inch sheet does (#290, draw_dt_cone_tip_block). It is written at
 # render time, the declared exception RV-01 in
-# cad/config/parts/dt-vn-cone-tip-collar.yaml (delegated ruling 2026-11-02,
-# owner review #2144): a part-authored precision does not reach the callout.
+# cad/config/parts/dt-vn-cone-tip-collar.yaml (Owner ruling 2026-11-08
+# (Pedro), #2144 item 1.2): a part-authored precision does not reach the callout.
 TAP_CALLOUT_PRECISION = {"hw-thrutapdrldia": 3}
 TAP_NOTE_XY = (TAP_CENTER[0] - 0.030, TAP_CENTER[1] + 0.025)
-# Lower left, under the end view whose bore it enlarges, in the field the
-# assembly-procedure notes left: between the isometric and the title block
-# its REAM callout pressed against the isometric's label (main's review).
-# BoreDia's five-line block (value, REAM THRU, the two-line fit statement)
-# reads right of the circle, above the title block (y 64 mm) and below
-# CollarWidth's block; the note under the circle, centred on it.
+# Rule 9: the radial tap view is VIEW A, its viewing arrow on the turning
+# view's mounting flat at the tap station, looking up at the flat. One caption
+# line: a second would reach the view's top under the border.
+VIEW_A_LETTER = "A"
+VIEW_A_CAPTION = (
+    f"VIEW {VIEW_A_LETTER}  SCALE {spec.RADIAL_TAP_VIEW_SCALE[0]}:{spec.RADIAL_TAP_VIEW_SCALE[1]}"
+)
+# The letter hangs this far under the flat, its leader's arrow on the flat;
+# it stands between CollarWidth's extension lines, over its text (y ~116 mm).
+VIEW_ARROW_RUN = 0.010
+VIEW_LETTER_HALF_WIDTH = 0.0015
+# Rule 9: the enlarged bore is DETAIL B, a native 40:1 detail whose circle
+# rides the end view's bore: the bore's largest limit plus a 3 mm sheet margin
+# at 40:1, the frame the old cropped view had. Lower left, under the end view,
+# between the isometric and the title block (main's review: there its REAM
+# callout pressed against the isometric's label). BoreDia's four-line block
+# (value, REAM THRU, the fit and its REF clearance) reads right of the circle,
+# above the title block (y 64 mm) and below CollarWidth's block; the native
+# label hangs 5 mm under the circle.
+BORE_DETAIL_LETTER = "B"
+BORE_FENCE_RADIUS_MM = spec.BORE_FINISHED_DIA_LIMITS_MM[1] / 2.0 + 0.075
 BORE_CENTER = (0.050, 0.074)
 BORE_KEEP = {"BoreDia": (0.150, 0.083)}
-BORE_NOTE_XY = (BORE_CENTER[0] - 0.031, BORE_CENTER[1] - 0.026)
-# The one stock line, under the bore view's label.
+# Rule 4: the standard fit name with its mate's number, the clearance as REF
+# (test_bore_callout_states_the_journal_fit pins both to the spec's limits).
+BORE_CALLOUT = "\n".join((
+    "REAM THRU",
+    "SLIDING FIT ON MHA-DT-04 TERMINAL JOURNAL",
+    "(CLEARANCE .0010-.0038)",
+))
+# The circle's letter on the end view: up-right of the bore, off the centre
+# mark's lines and inside the nose circle.
+BORE_LETTER_OFFSET = (0.0045, 0.0045)
+# The one stock note (spec.DRAWING_NOTES), under the detail's label.
 NOTES_XY = (0.016, 0.030)
 # swAnnotationType_e
 _NOTE = 6
@@ -157,6 +199,25 @@ def _placed_note(adapter, property_name, x, y) -> str:
     if annotation is None:
         raise RuntimeError(f"collar note {property_name!r} has no annotation")
     return _note_name(annotation)
+
+
+def _literal_note(adapter, text, x, y) -> str:
+    """Place one note with this recipe's text and return its annotation name."""
+    note = add_note(adapter, text, x, y)
+    if note is None:
+        raise RuntimeError(f"failed to add collar note {text!r}")
+    annotation = _early_bound(note, "INote").GetAnnotation()
+    if annotation is None:
+        raise RuntimeError(f"collar note {text!r} has no annotation")
+    return _note_name(annotation)
+
+
+def _sheet_context(adapter) -> None:
+    """Leave every view so the next free note belongs to the sheet."""
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    drawing.ActivateView("")
+    if drawing.ActiveDrawingView is not None:
+        raise RuntimeError("collar notes: cannot leave view context for the sheet")
 
 
 def _sheet_views(adapter, sheet_name):
@@ -253,11 +314,9 @@ def _assert_settled_annotations(adapter, placed: frozenset[str], callout: str) -
         raise RuntimeError(f"collar tap callout {callout} ({thread} THRU) not settled: {found}")
 
 
-def bore_crop_radius_m() -> float:
-    """Sheet radius of the 40:1 bore view's circular crop."""
-    return spec.BORE_FINISHED_DIA_LIMITS_MM[1] * spec.BORE_VIEW_SCALE[0] / (
-        2000.0 * spec.BORE_VIEW_SCALE[1]
-    ) + 0.003
+def bore_detail_radius_m() -> float:
+    """Sheet radius of detail B's circle at 40:1."""
+    return BORE_FENCE_RADIUS_MM * spec.BORE_VIEW_SCALE[0] / (1000.0 * spec.BORE_VIEW_SCALE[1])
 
 
 def _configuration(adapter, views, name):
@@ -289,14 +348,6 @@ def _nose_dia_onto_side(adapter, end_marks, end, side):
     return [a for a in end_marks if a is not donors[0]], moved
 
 
-def _side_callouts():
-    """The turning view's function lines: (below their values, above them).
-    NoseLength's reads above: below it, 3.500's two extension lines ran up
-    through the function line (r4 review)."""
-    below = _function_callouts(SIDE_KEEP)
-    return below, {"NoseLength": below.pop("NoseLength")}
-
-
 def _precision(keep):
     """The part-authored places of only the names this view keeps
     (main's per-view form, draw_ch_connecting_rod)."""
@@ -304,17 +355,7 @@ def _precision(keep):
 
 
 # Native tolerance types the part authors: MAX 6.
-TAP_DIMENSION_TYPES = {"TapRootLimit": 6}
 SIDE_DIMENSION_TYPES = {"ShoulderRadius": 6}
-
-
-def _function_callouts(keep):
-    """The .XXX lengths' function lines, for only the names this view keeps."""
-    return {
-        name: text
-        for name, text in spec.AXIAL_FUNCTION_CALLOUTS.items()
-        if name in keep
-    }
 
 
 def _assert_functional_dimension_types(adapter, annotations, expected):
@@ -346,56 +387,136 @@ def _centre_view(adapter, view, model_mm, sheet_xy, *, label):
         raise RuntimeError(f"{label} did not remain centred")
 
 
-def _bore_view(adapter):
-    """Native circular crop, using the existing cone/arbor drawing sequence."""
-    view = _early_bound(place_view(
-        adapter, str(SOURCE), "*Bottom", *BORE_CENTER, scale=spec.BORE_VIEW_SCALE,
-    ), "IView")
-    _configuration(adapter, (view,), "Collar")
-    if tuple(float(value) for value in view.ScaleRatio) != tuple(spec.BORE_VIEW_SCALE):
-        raise RuntimeError("collar bore view lost its source scale")
-    _centre_view(adapter, view, (0.0, 0.0, 0.0), BORE_CENTER, label="collar bore axis")
+@_telemetry.traced("cone_tip_collar.bore_detail")
+def _bore_detail(adapter, end):
+    """Native 40:1 DETAIL B of the end view's bore (rule 9: its circle and
+    letter on the parent; draw_dt_crank_handle_pivot_screw's detail A): fence,
+    scale, outline, label and letter each read back. Returns the detail and
+    its native label's annotation name."""
     draw = adapter.currentModel
-    if not _early_bound(draw, "IDrawingDoc").ActivateView(view_name(adapter, view)):
-        raise RuntimeError("cannot activate collar bore crop")
-    before = tuple(float(value) for value in view.GetOutline())
-    sketch = _early_bound(view.GetSketch(), "ISketch")
+    drawing = _early_bound(draw, "IDrawingDoc")
+    parent = _early_bound(end, "IView")
+    if not drawing.ActivateView(view_name(adapter, end)):
+        raise RuntimeError("failed to activate detail B's parent end view")
+    draw.ClearSelection2(True)
+    # The bore axis is the model's Y axis through the origin.
+    axis = model_point_in_view(adapter, end, (0.0, 0.0, 0.0), label="detail B fence centre")
+    radius = BORE_FENCE_RADIUS_MM * SHEET_SCALE[0] / (1000.0 * SHEET_SCALE[1])
+    sketch = _early_bound(parent.GetSketch(), "ISketch")
     transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
     utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    radius = bore_crop_radius_m()
     points = []
-    for x, y in (BORE_CENTER, (BORE_CENTER[0] + radius, BORE_CENTER[1])):
+    for x, y in (axis[:2], (axis[0] + radius, axis[1])):
         point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
         projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
         points.append(tuple(float(value) for value in projected.ArrayData))
+    # Straight to the database: an inferred circle snaps onto nearby edges
+    # (draw_dt_pinion_lever r2), and this one sits just outside the bore.
     manager = _early_bound(draw.SketchManager, "ISketchManager")
     previous = bool(manager.AddToDB)
-    manager.AddToDB = False
+    manager.AddToDB = True
     try:
-        circle = manager.CreateCircle(*points[0], *points[1])
+        fence = manager.CreateCircle(*points[0], *points[1])
     finally:
         manager.AddToDB = previous
-    if circle is None:
-        raise RuntimeError("cannot sketch collar bore crop circle")
-    status = int(view.Crop2(False, False, 1))
+    if fence is None:
+        raise RuntimeError("failed to create detail B's fence")
+    arc = _early_bound(fence, "ISketchArc")
+    placed = _early_bound(arc.GetCenterPoint2(), "ISketchPoint")
+    placed_centre = [float(adapter._get_attr_or_call(placed, coordinate)) for coordinate in "XY"]
+    if math.dist(placed_centre, points[0][:2]) > 1e-9 or not math.isclose(
+        float(arc.GetRadius()), math.dist(points[0][:2], points[1][:2]), abs_tol=1e-9
+    ):
+        raise RuntimeError("detail B's fence moved from where it was placed")
     draw.ClearSelection2(True)
-    rebuild_drawing(adapter, label="collar bore crop")
-    view.UpdateViewDisplayGeometry()
-    after = tuple(float(value) for value in view.GetOutline())
-    if status != 1 or not view.IsCropped():
-        raise RuntimeError(f"collar bore crop failed: {status}")
-    if len(before) != 4 or len(after) != 4 or after[2] - after[0] >= before[2] - before[0]:
-        raise RuntimeError("collar bore crop did not reduce the native outline")
-    if bool(view.CropViewJaggedOutline) or bool(view.CropViewNoOutline):
-        raise RuntimeError("collar bore crop lost its plain circle boundary")
-    set_hidden_lines_removed(adapter, view)
+    if not _early_bound(fence, "ISketchSegment").Select4(False, None):
+        raise RuntimeError("failed to select detail B's fence")
+    detail = drawing.CreateDetailViewAt4(
+        *BORE_CENTER,
+        0.0,
+        0,  # swDetViewSTANDARD
+        *spec.BORE_VIEW_SCALE,
+        BORE_DETAIL_LETTER,
+        1,  # swDetCircleCIRCLE
+        True,
+        False,
+        False,
+        5,
+    )
+    if detail is None:
+        raise RuntimeError("CreateDetailViewAt4 returned no detail B")
+    detail = _early_bound(detail, "IView")
+    detail.ScaleRatio = double_array([float(value) for value in spec.BORE_VIEW_SCALE])
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label="collar detail B")
+    ratio = tuple(float(value) for value in detail.ScaleRatio)
+    if len(ratio) != 2 or not math.isclose(
+        ratio[0] / ratio[1], spec.BORE_VIEW_SCALE[0] / spec.BORE_VIEW_SCALE[1]
+    ):
+        raise RuntimeError(f"detail B scale {ratio!r}, expected {spec.BORE_VIEW_SCALE!r}")
+    outline = tuple(float(value) for value in detail.GetOutline())
+    position = tuple(float(value) for value in detail.Position)
+    if len(outline) != 4 or len(position) != 2:
+        raise RuntimeError("detail B has invalid bounds")
+    span = 2.0 * bore_detail_radius_m()
+    if min(outline[2] - outline[0], outline[3] - outline[1]) < 0.95 * span:
+        raise RuntimeError(f"detail B is smaller than its fence: {outline}")
+    target = [
+        position[axis_index] + BORE_CENTER[axis_index]
+        - (outline[axis_index] + outline[axis_index + 2]) / 2.0
+        for axis_index in range(2)
+    ]
+    if not detail.SetViewPosition(double_array(target), False):
+        raise RuntimeError("failed to position detail B")
+    rebuild_drawing(adapter, label="collar detail B position")
+    notes = tuple(_read_member(detail, "GetNotes") or ())
+    if len(notes) != 1:
+        raise RuntimeError(f"expected one native detail B label, found {len(notes)}")
+    label = _early_bound(_read_member(_early_bound(notes[0], "INote"), "GetAnnotation"), "IAnnotation")
+    label_xyz = (BORE_CENTER[0], BORE_CENTER[1] - bore_detail_radius_m() - 0.005, 0.0)
+    if not label.SetPosition2(*label_xyz):
+        raise RuntimeError("failed to position detail B's label")
+    rebuild_drawing(adapter, label="collar detail B label")
+    actual = tuple(float(value) for value in _read_member(label, "GetPosition"))
+    if math.dist(actual, label_xyz) > 1e-8:
+        raise RuntimeError(f"detail B's label position did not persist: {actual}")
+    circles = tuple(_read_member(parent, "GetDetailCircles") or ())
+    if len(circles) != 1:
+        raise RuntimeError(f"expected one detail circle on the end view, found {len(circles)}")
+    circle = _early_bound(circles[0], "IDetailCircle")
+    letter_xy = (axis[0] + BORE_LETTER_OFFSET[0], axis[1] + BORE_LETTER_OFFSET[1])
+    circle.SetLabelPosition(*letter_xy)
+    rebuild_drawing(adapter, label="collar detail B letter")
+    letter = tuple(float(value) for value in circle.GetLabelPosition())
+    if len(letter) != 2 or math.dist(letter, letter_xy) > 1e-8:
+        raise RuntimeError(f"detail B's letter did not persist: {letter}")
+    set_hidden_lines_removed(adapter, detail)
     marks = curate_view_dimensions(
-        adapter, view, keep=BORE_KEEP, view_label="collar enlarged bore",
+        adapter, detail, keep=BORE_KEEP, view_label="collar bore detail B",
         dimensions_by_feature=spec.DRAWING_DIMENSIONS,
     )
     assert_imported_precision(adapter, marks, _precision(BORE_KEEP))
-    set_dimension_callouts(adapter, marks, {"BoreDia": spec.BORE_CALLOUT})
-    return view, _placed_note(adapter, "Bore View Note", *BORE_NOTE_XY)
+    set_dimension_callouts(adapter, marks, {"BoreDia": BORE_CALLOUT})
+    return detail, _note_name(label)
+
+
+def _view_a_arrow(adapter, side) -> str:
+    """VIEW A's letter and arrow: a leader note owned by the turning view, its
+    arrow on the mounting flat at the tap station (the tap view looks up at
+    the flat). Returns its annotation name."""
+    tip = model_point_in_view(
+        adapter, side, (spec.FLAT_DISTANCE / 1000.0, spec.TAP_STATION / 1000.0, 0.0),
+        label="VIEW A arrow tip on the mounting flat",
+    )
+    note = add_leader_note(
+        adapter, VIEW_A_LETTER,
+        text_xy=(tip[0] - VIEW_LETTER_HALF_WIDTH, tip[1] - VIEW_ARROW_RUN),
+        attach_xy=tuple(tip[:2]), view=side, label=f"view {VIEW_A_LETTER} viewing arrow",
+    )
+    annotation = _early_bound(note, "INote").GetAnnotation()
+    if annotation is None:
+        raise RuntimeError("VIEW A's arrow note has no annotation")
+    return _note_name(annotation)
 
 
 def _supplier_dimension(adapter, annotation):
@@ -451,7 +572,7 @@ def _stock_reference_sheet(adapter):
             tuple(annotation.GetAttachedEntities3() or ()),
             tuple(int(kind) for kind in (annotation.GetAttachedEntityTypes() or ())),
         )
-    placed = frozenset({_placed_note(adapter, "Supplier Reference Title", 0.016, 0.252)})
+    placed = frozenset({_literal_note(adapter, STOCK_TITLE, 0.016, 0.252)})
     _delete_unplaced_notes(adapter, placed, sheet_name=SHEET_NAMES[1])
     return placed, identities, frozenset(view_name(adapter, v) for v in (side, end, iso))
 
@@ -460,7 +581,7 @@ def _assert_stock_references(adapter, placed, identities, expected_views):
     """Re-enumerate native dimensions after final rebuild; never repair source state."""
     notes = _sheet_notes(adapter, SHEET_NAMES[1])
     if set(notes) != placed or any(
-        _note_text(annotation).replace("\r", "") != spec.SET_SCREW_SUPPLIER_TITLE
+        _note_text(annotation).replace("\r", "") != STOCK_TITLE
         for _owner, annotation in notes.values()
     ):
         raise RuntimeError("stock set-screw reference title notes changed")
@@ -523,10 +644,8 @@ async def build(adapter: Any) -> dict[str, str]:
     check("open custom collar", await adapter.open_model(str(SOURCE)))
     read_required_properties(adapter.currentModel, (
         "Number", "Revision", "Title", "Material Specification", "Finish",
-        "Quantity", "Manufacturing Notes", "Isometric View Note",
-        "Radial Tap View Note", "Bore View Note", "Supplier Reference Title",
-    ), required=("Number", "Material Specification", "Manufacturing Notes",
-                 "Radial Tap View Note", "Bore View Note", "Supplier Reference Title"))
+        "Quantity", "Isometric View Note",
+    ), required=("Number", "Material Specification", "Isometric View Note"))
     drawing, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout,
         unit=part_drawing_unit(PART_STEM),
@@ -548,6 +667,10 @@ async def build(adapter: Any) -> dict[str, str]:
         _quarter_turn(adapter, view, label)
     for view in (end, side, tap, iso):
         set_hidden_lines_removed(adapter, view)
+    # Detail B first: a native detail imports nothing after its parent's
+    # import and deletions (draw_dt_crank_handle_pivot_screw), and the end
+    # view's import then skips the bore size the detail already shows.
+    _bore, bore_label = _bore_detail(adapter, end)
     end_marks = curate_view_dimensions(adapter, end, keep=END_KEEP,
                                       view_label="collar end", dimensions_by_feature=spec.DRAWING_DIMENSIONS)
     side_marks = curate_view_dimensions(adapter, side, keep=SIDE_KEEP,
@@ -556,20 +679,11 @@ async def build(adapter: Any) -> dict[str, str]:
     marks = [*end_marks, *side_marks, nose_dia]
     assert_imported_precision(adapter, marks, _precision(END_KEEP | SIDE_KEEP))
     _assert_functional_dimension_types(adapter, side_marks, SIDE_DIMENSION_TYPES)
-    side_callouts, above = _side_callouts()
-    set_dimension_callouts(adapter, side_marks, side_callouts)
-    set_dimension_callouts(adapter, side_marks, above, location="above")
-    # TapRootGauge is a blanked sketch: the hidden-owner importer shows it in
-    # this view for the import (draw_ch_rocker_arm_tl_pivot_screw).
-    tap_marks = hidden_sketches.curate_view_dimensions(
+    tap_marks = curate_view_dimensions(
         adapter, tap, keep=TAP_KEEP, view_label="collar radial process controls",
         dimensions_by_feature=spec.DRAWING_DIMENSIONS,
     )
     assert_imported_precision(adapter, tap_marks, _precision(TAP_KEEP))
-    _assert_functional_dimension_types(adapter, tap_marks, TAP_DIMENSION_TYPES)
-    set_dimension_callouts(
-        adapter, tap_marks, {**_function_callouts(TAP_KEEP), "TapRootLimit": "TAP ROOT"}
-    )
     # Source geometry is asymmetric and the views are rotated: use the native
     # model-to-sheet transform rather than assuming the view's box centre is
     # the bore origin or that world +Y still projects vertically.
@@ -582,16 +696,18 @@ async def build(adapter: Any) -> dict[str, str]:
         tap, (spec.FLAT_DISTANCE, spec.TAP_STATION, spec.TAP_DRILL_DIA / 2.0),
         "collar tap outer mouth",
     )
-    placed = {
-        _placed_note(adapter, "Manufacturing Notes", *NOTES_XY),
+    view_a_arrow = _view_a_arrow(adapter, side)
+    _sheet_context(adapter)
+    placed = frozenset({
+        _literal_note(adapter, spec.DRAWING_NOTES, *NOTES_XY),
         _placed_note(adapter, "Isometric View Note", 0.310, 0.160),
-        _placed_note(adapter, "Radial Tap View Note", *TAP_NOTE_XY),
-    }
-    _bore, bore_note = _bore_view(adapter)
-    placed = frozenset(placed | {bore_note})
-    if len(placed) != 4:
+        _literal_note(adapter, VIEW_A_CAPTION, *TAP_NOTE_XY),
+        view_a_arrow,
+        bore_label,
+    })
+    if len(placed) != 5:
         raise RuntimeError(
-            f"collar notes do not have four distinct names: {sorted(placed)}"
+            f"collar notes do not have five distinct names: {sorted(placed)}"
         )
     # In the radial projection the tap mouth is a real circle on the flat.
     callout = add_native_hole_callout(

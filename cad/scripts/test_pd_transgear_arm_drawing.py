@@ -6,7 +6,6 @@ import asyncio
 import ast
 import itertools
 import math
-import re
 import runpy
 from fractions import Fraction
 from pathlib import Path
@@ -18,6 +17,7 @@ import _config
 import _drawing_dimensions
 import build_pd_transgear_arm as part
 import draw_pd_transgear_arm as drawing
+import pd_transgear_arm_notes as arm_notes
 import pd_latch_hook_geometry as hook
 import pd_latch_hook_spec as hook_spec
 import pd_rack_pinion_spec as disc
@@ -65,7 +65,7 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
         for feature, names in spec.DRAWING_DIMENSIONS.items()
         for name in names
     }
-    assert set(drawing.DIMENSION_CALLOUTS) <= marked
+    assert set(arm_notes.DIMENSION_CALLOUTS) <= marked
 
 
 def test_locating_sockets_print_in_the_front_view() -> None:
@@ -179,13 +179,16 @@ def _printed_proud_range(pin_length: float, hole_depth: float) -> tuple[float, f
 
 
 # The worst far-face margin this test's restatement finds at the printed
-# reaches, and the retired 3/4 pin's: it barely clears in a 6.20 hole; 0.05
-# deeper it stops short of the face.  #290: the tip station and the hole
+# reaches, and the retired 3/4 pin's: it stops short of the face in a 6.20
+# hole and further short 0.05 deeper.  #290: the tip station and the hole
 # depth print rounded to .XX inch (reach 0.376 / 0.372), the hook its formed
-# .XX ±.02 (FORMED_BAND .024 with the rounding, MHA-PD-14).
-_PINNED_FAR_FACE_MARGIN = 0.890
-_PINNED_OLD_PIN_MARGIN = 0.015
-_PINNED_DEEPER_OLD_PIN_MARGIN = -0.035
+# .XX ±.02 (FORMED_BAND .024 with the rounding, MHA-PD-14).  The hook's
+# screw holes take the title block's ±.005 (delegated ruling 2026-11-07, the
+# bar's taps spotted through them), so the hook's screw drift grew; MHA-PD-20
+# faces at ⊥ .001 (delegated ruling 2026-11-07) open the pivot fit.
+_PINNED_FAR_FACE_MARGIN = 0.646
+_PINNED_OLD_PIN_MARGIN = -0.229
+_PINNED_DEEPER_OLD_PIN_MARGIN = -0.279
 
 
 def _worst_far_face_margin(
@@ -284,8 +287,8 @@ def test_the_latch_pin_full_diameter_passes_the_hook_at_the_printed_tip_band() -
     # The screws' float turns the hook about the pin as well as sliding it,
     # so the drift along U at the hole exceeds the pure slide.
     assert joints.HOOK_DRIFT_ALONG_U > joints.HOOK_SCREW_SHIFT
-    # Negative control: the 3/4 pin barely clears in a 6.20 hole and stops
-    # short 0.05 deeper with the bends and the grade; without them it cleared.
+    # Negative control: the 3/4 pin stops short in a 6.20 hole, and further
+    # short 0.05 deeper, with the bends and the grade; without them it cleared.
     old = _printed_proud_range(0.75 * 25.4, 6.20)
     assert _worst_far_face_margin(printed, old) == pytest.approx(
         _PINNED_OLD_PIN_MARGIN, abs=1e-3
@@ -326,45 +329,48 @@ def test_the_section_cuts_through_the_pivot_and_the_square_end() -> None:
     assert x1 > drawing._front_x(geometry.TIP_STATION)
 
 
-def test_the_qualifier_lines_ride_the_tap_thread_compartment() -> None:
+def test_the_tap_callout_drops_the_title_block_thread_class() -> None:
     definitions = {
         5: "",
         6: "<MOD-DIAM><hw-tapdrilldia> THRU\n<hw-tapsize> - <hw-threadclass> THRU",
         7: "",
         8: "",
     }
-    updated = drawing.tap_callout_definitions(definitions, drawing.PLATE_TAP_QUALIFIER)
+    updated = drawing.tap_callout_definitions(definitions, arm_notes.PLATE_TAP_QUALIFIER)
     assert "<hw-threadclass>" not in updated[6].lower()
-    assert updated[6].endswith(f"\n{drawing.PLATE_TAP_QUALIFIER}")
+    assert "<hw-tapsize>" in updated[6]
+    assert updated[6].endswith(f"\n{arm_notes.PLATE_TAP_QUALIFIER}")
     assert {part: updated[part] for part in (5, 7, 8)} == {5: "", 7: "", 8: ""}
     with pytest.raises(RuntimeError):
         drawing.tap_callout_definitions({5: "", 6: "", 7: "", 8: ""}, "X")
 
 
-_ENGAGEMENT_LINE = re.compile(r"ENGAGEMENT (\.\d{3}) MIN \((\d\.\d{2})D\)")
+@pytest.mark.parametrize("persist", (False, True))
+def test_the_tap_callout_text_is_proved_by_its_readback(monkeypatch, persist) -> None:
+    """IDisplayDimension::SetText is void: only the definitions and the
+    resolved text read back prove the qualifier line took."""
+    thread = "<MOD-DIAM><hw-tapdrilldia> THRU\n<hw-tapsize> - <hw-threadclass> THRU"
 
+    class NativeCallout:
+        def __init__(self):
+            self.text = {6: thread, 2: thread}
 
-def test_each_tap_callout_states_its_worst_case_full_thread_engagement() -> None:
-    """Review of 19e33c6c2 (blocker): the sheet gave no engagement, so a blind
-    reviewer charged 1.5 incomplete pitches at each end of the 5/16 stock.
-    Each callout states the build's worst case, floored, at 1.5D or more."""
-    worst = {
-        "plate taps": (
-            joints.PLATE_SCREW_ENGAGEMENT_WORST,
-            joints.PLATE_SCREW.THREAD_MAJOR,
-        ),
-    }
-    assert {row[0] for row in drawing.TAP_CALLOUTS} == set(worst)
-    for label, *_, qualifier in drawing.TAP_CALLOUTS:
-        match = _ENGAGEMENT_LINE.fullmatch(qualifier.splitlines()[-1])
-        assert match, label
-        printed_mm, printed_d = float(match[1]) * 25.4, float(match[2])
-        worst_mm, major = worst[label]
-        assert worst_mm - 0.0254 < printed_mm <= worst_mm + 1e-9, label
-        assert worst_mm / major - 0.01 < printed_d <= worst_mm / major, label
-        assert printed_d >= joints.ENGAGEMENT_TARGET_D, label
-    # A MIN never rounds up.
-    assert spec.engagement_line(7.749, 1.599) == "ENGAGEMENT .305 MIN (1.59D)"
+        def SetText(self, part, text):
+            if persist:
+                self.text[part] = text
+                self.text[part + 4] = text
+
+        def GetText(self, part):
+            return self.text.get(part, "")
+
+    callout = NativeCallout()
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    if not persist:
+        with pytest.raises(RuntimeError, match="did not persist"):
+            drawing._set_tap_callout_text(callout, arm_notes.PLATE_TAP_QUALIFIER, label="taps")
+        return
+    drawing._set_tap_callout_text(callout, arm_notes.PLATE_TAP_QUALIFIER, label="taps")
+    assert callout.text[2].endswith(arm_notes.PLATE_TAP_QUALIFIER)
 
 
 def test_the_pin_bore_presses_the_mha_179_pin_at_every_limit() -> None:
@@ -374,11 +380,9 @@ def test_the_pin_bore_presses_the_mha_179_pin_at_every_limit() -> None:
     loosest = cluster_pin.DIA_MIN - geometry.PIN_BORE_DIA_MAX
     tightest = cluster_pin.DIA_MAX - geometry.PIN_BORE_DIA_MIN
     assert (loosest, tightest) == pytest.approx((0.00762, 0.0254))
-    assert spec.PIN_BORE_CALLOUT.splitlines()[2] == ".0003/.0010 INTERFERENCE"
     # #2174: the rear mouth's band is its own native leg dimension's, in
     # section D-D, not callout text.
-    assert len(spec.PIN_BORE_CALLOUT.splitlines()) == 3
-    assert "MOUTH" not in spec.PIN_BORE_CALLOUT
+    assert "MOUTH" not in arm_notes.PIN_BORE_CALLOUT
     assert spec.PIN_PRESS_INTERFERENCE == pytest.approx((loosest, tightest))
     assert min(geometry.PIN_BORE_DIA_BAND) == 0.0 < max(geometry.PIN_BORE_DIA_BAND)
 
@@ -398,9 +402,12 @@ def test_the_rear_mouth_prints_its_modelled_band_on_its_native_leg_in_d_d() -> N
         (geometry.PIN_MOUTH_CHAMFER - tolerance, geometry.PIN_MOUTH_CHAMFER + tolerance)
     )
     assert geometry.PIN_MOUTH_CHAMFER_LIMITS == pytest.approx((0.1524, 0.254))
-    assert spec.PIN_MOUTH_CALLOUT.splitlines()[0] == "X 45\u00b0 REAR MOUTH"
-    assert cluster_pin.PIN_NUMBER in spec.PIN_MOUTH_CALLOUT
-    lines = [".008 \u00b1.002", *spec.PIN_MOUTH_CALLOUT.splitlines()]
+    # Round 4: the mouth is named by the datum its face is opposite, never by
+    # the undefined direction word REAR.
+    assert arm_notes.PIN_MOUTH_CALLOUT.splitlines()[0] == "X 45\u00b0 MOUTH OPPOSITE DATUM A"
+    assert "REAR" not in arm_notes.PIN_MOUTH_CALLOUT
+    assert cluster_pin.PIN_NUMBER in arm_notes.PIN_MOUTH_CALLOUT
+    lines = [".008 \u00b1.002", *arm_notes.PIN_MOUTH_CALLOUT.splitlines()]
     width = max(map(len, lines)) * _CAPS_CHAR_WIDTH
     half_height = len(lines) * _LINE_PITCH / 2.0
     x, y = drawing.PIN_MOUTH_TEXT_XY
@@ -461,7 +468,7 @@ def test_each_import_phase_proves_the_precision_of_the_dimensions_it_imports(
     monkeypatch.setattr(
         _drawing_dimensions._sw_type_info, "early_bound_or_flag", lambda obj, *_: obj
     )
-    sheets = SimpleNamespace(ActivateSheet=lambda _name: True)
+    sheets = SimpleNamespace(ActivateSheet=lambda _name: True, ActivateView=lambda _name: True)
     returns = {
         "new_project_drawing": (object(), object()),
         "_early_bound": sheets,
@@ -473,16 +480,17 @@ def test_each_import_phase_proves_the_precision_of_the_dimensions_it_imports(
         "auto_center_marks": True,
         "add_native_hole_callout": object(),
         "_rear_rim": object(),
-        "_pin_zone_section": object(),
+        "_pin_bore_section": object(),
+        "add_note": object(),
     }
     for name in (
         "check", "read_required_properties", "create_blank_drawing_sheets",
         "stamp_drawing_summary", "set_hidden_lines_removed", "set_dimension_callouts",
-        "set_reference_dimensions", "_set_stock_text", "_end_radius_to_arc",
-        "offset_dimension_text", "project_part_pmi", "_add_projected_zone_chains",
-        "_overall_reference", "_set_tap_callout_text", "set_hole_callout_precision",
-        "_match_pin_section_caption", "add_property_linked_note",
-        "require_saved_projected_gtols", *returns,
+        "set_reference_dimensions", "_reference_linear_dimensions", "_set_stock_text",
+        "_end_radius_to_arc", "offset_dimension_text", "project_part_pmi",
+        "_one_frame_per_dowel_group", "_overall_reference", "_set_tap_callout_text",
+        "set_hole_callout_precision", "_section_captions_without_scale",
+        "add_property_linked_note", *returns,
     ):
         monkeypatch.setattr(
             drawing, name, lambda *_a, _r=returns.get(name), **_k: _r
@@ -529,33 +537,31 @@ def test_the_latch_pin_hole_names_its_press_on_mha_169() -> None:
     low, high = spec.LATCH_PIN_PRESS_PRINTED
     assert 0.0 < low <= loosest + 1e-9
     assert loosest < tightest <= high + 1e-9 < tightest + 0.00254
-    lines = spec.PIN_HOLE_CALLOUT.splitlines()
-    assert lines[1] == f"PRESS FIT PIN {spec.LATCH_PIN_NUMBER}"
-    assert lines[2] == ".0006/.0013 INTERFERENCE"
-    # The owner-accepted ligament shortfall prints as a plain fact, rounded
-    # down so the sheet never promises more wall than the budget holds.
+    # The callout links the note that names the pin and carries the press
+    # and the owner-accepted ligament shortfall (RV-04), the wall rounded
+    # down so the sheet never promises more than the budget holds.
+    assert spec.LATCH_PIN_NUMBER in arm_notes.NOTES[arm_notes.LATCH_PIN_NOTE - 1]
+    assert f"SEE NOTE {arm_notes.LATCH_PIN_NOTE}" in arm_notes.PIN_HOLE_CALLOUT
+    note = " ".join(arm_notes.NOTES[arm_notes.LATCH_PIN_NOTE - 1].split())
+    assert ".0006-.0013" in note
     worst = geometry.WALLS["pin hole to faces"][1]
     assert spec.LATCH_PIN_WALL_PRINTED <= worst < spec.LATCH_PIN_WALL_PRINTED + 0.0254
-    assert "PIN HOLE TO FACES .065 MIN" in lines
+    assert ".065 MIN" in note
 
 
 def test_the_pivot_bore_is_reamed_as_the_shoulder_running_fit() -> None:
     """A model reference cannot masquerade as a universal ±.130 bore zone."""
     lower, upper = geometry.PIVOT_BORE_DIAMETRAL_CLEARANCE
-    assert (lower, upper) == pytest.approx((0.14224, 0.16256))
+    assert (lower, upper) == pytest.approx((0.16256, 0.18288))
     assert geometry.PIVOT_BORE_DIA == pytest.approx(pivot_screw.SHOULDER_DIA + (lower + upper) / 2.0)
     assert joints.SHOULDER_RADIAL_CLEARANCE == pytest.approx(lower / 2.0)
     assert joints.PIVOT_RADIAL_FLOAT_MAX == pytest.approx(upper / 2.0)
     screw = _config.parts("pd-vn-transgear-pivot-screw")["number"]
     # The fit's facts, not its wording: reamed to the measured shoulder, the
-    # diametral clearance band, the named screw and the matched set.
-    flat = " ".join(spec.PIVOT_BORE_CALLOUT.split())
-    for fact in (
-        "MEASURED SHOULDER",
-        ".0056-.0064 DIAMETRAL CLEARANCE",
-        screw,
-        "MATCHED SET",
-    ):
+    # clearance band and the named screw, in the note the bore's callout links.
+    assert f"SEE NOTE {arm_notes.PIVOT_NOTE}" in arm_notes.PIVOT_BORE_CALLOUT
+    flat = " ".join(arm_notes.NOTES[arm_notes.PIVOT_NOTE - 1].split())
+    for fact in ("MEASURED SHOULDER", ".0064-.0072", screw):
         assert fact in flat, fact
     assert screw == "MHA-PD-VN-57"
     # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the matched fit rides the callout; no inspection-method note.
@@ -563,7 +569,7 @@ def test_the_pivot_bore_is_reamed_as_the_shoulder_running_fit() -> None:
     assert "Pivot Fit Inspection" not in part._SAVED_DRAWING_PROPERTIES
     # Machinist review: the implied 90° to the front face is the title
     # block's angular row; a line restating it adds nothing.
-    assert "90°" not in spec.PIVOT_BORE_CALLOUT
+    assert "90°" not in flat
     assert geometry.PIVOT_AXIS_BINDING_SWEEP_MAX < lower
     assert lower - geometry.PIVOT_AXIS_BINDING_SWEEP_MAX >= 0.004
 
@@ -662,7 +668,7 @@ def test_the_section_texts_stand_inside_the_left_border_and_off_the_section() ->
     right end up through the text, so the text stands right of its line,
     clear of section A-A's caption (centred under the section, about 46 mm
     wide); the isometric moved to sheet 2 (review of 67d749fb4)."""
-    lines = ["6.40 \u00b10.05", *spec.FLOOR_DEPTH_CALLOUT.splitlines()]
+    lines = [".2717 \u00b1.002", *arm_notes.SPRING_CALLOUT.splitlines()]
     width = max(map(len, lines)) * _CAPS_CHAR_WIDTH
     half_height = len(lines) * _LINE_PITCH / 2.0
     x, y = drawing.FLOOR_TEXT_XY
@@ -674,9 +680,8 @@ def test_the_section_texts_stand_inside_the_left_border_and_off_the_section() ->
     assert floor[1] > _BORDER + 0.0015
     assert floor[3] < section_bottom - 0.008
     assert floor[2] < drawing.SECTION_CENTER[0] - 0.023 - 0.005
-    # Too wide to hang left of its line inside the border: hence the leader.
+    # It stands off its line on a leader, right of the line.
     line_x = drawing.SECTION_KEEP["FloorDepth"][0]
-    assert line_x - width < _BORDER
     assert floor[0] > line_x + 0.005
     # The line stands off the pivot end it dimensions.
     pivot_end_x = drawing._front_x(-geometry.PIVOT_END_R)
@@ -695,7 +700,7 @@ def test_the_section_texts_stand_inside_the_left_border_and_off_the_section() ->
 
 def _counterbore_box() -> tuple[float, ...]:
     return _centred_box(
-        ["+0.1", "\u00d811.500 0.0", *spec.SPOT_FACE_CALLOUT.splitlines()],
+        ["+.004", "\u00d8.453 .000", *arm_notes.SPRING_CALLOUT.splitlines()],
         drawing.SECTION_KEEP["SpotFaceDia"],
     )
 
@@ -712,12 +717,18 @@ def test_the_end_width_text_clears_the_section_arrow_and_the_end_view() -> None:
 
 
 def test_the_tap_callouts_stand_inside_the_upper_border() -> None:
-    """Review of 19e33c6c2: both tap callouts touched the upper border."""
+    """Review of 19e33c6c2: both tap callouts touched the upper border. The
+    transfer line under the thread keeps the block inside it, and clear of
+    the locating holes' callout to its right."""
     sheet_top = DRAWING_TEMPLATES[drawing.SPEC.layout].height_m - _BORDER
+    locator_lines = [".0930", *arm_notes.LOCATOR_CALLOUT_TEXT.splitlines()]
+    locator = _centred_box(locator_lines, drawing.FRONT_KEEP["LocatorDia1"])
     for label, _station, _radius, xy, qualifier in drawing.TAP_CALLOUTS:
         # Drill and thread lines, then the qualifier's.
-        lines = ["\u00d83.45 THRU ALL", "8-32 UNC THRU ALL", *qualifier.splitlines()]
-        assert _centred_box(lines, xy)[3] + 0.001 < sheet_top - 0.003, label
+        lines = ["\u00d8 .136 THRU ALL", "8-32 UNC THRU ALL", *qualifier.splitlines()]
+        box = _centred_box(lines, xy)
+        assert box[3] + 0.001 < sheet_top - 0.003, label
+        assert box[2] + 0.005 < locator[0], label
 
 
 # "\u2316 \u00d80.050 A B C" as rendered on the stack sheet (1c103499e).
@@ -850,18 +861,33 @@ def test_the_counterbore_and_its_floor_name_the_pivot_spring() -> None:
     ±0.05 named no mate. The spring seats in it; the floor sets its room."""
     spring = _config.parts("pd-vn-transgear-pivot-spring")["number"]
     assert spring == "MHA-PD-VN-63"
-    # The mate is named on the counterbore, and again on the floor whose
-    # band sets its preload (review of 2ac1bdb28: a tight band names its
-    # mate at its own callout).
-    assert spring in " ".join(spec.SPOT_FACE_CALLOUT.split())
-    floor = " ".join(spec.FLOOR_DEPTH_CALLOUT.split())
-    assert spring in floor and "PRELOAD" in floor
+    # The counterbore's Ø and its floor link one note naming the spring they
+    # seat and preload.
+    assert arm_notes.DIMENSION_CALLOUTS["SpotFaceDia"] == arm_notes.SPRING_CALLOUT
+    assert arm_notes.DIMENSION_CALLOUTS["FloorDepth"] == arm_notes.SPRING_CALLOUT
+    assert arm_notes.SPRING_CALLOUT == f"SEE NOTE {arm_notes.SPRING_NOTE}, SHEET 2"
+    note = " ".join(arm_notes.NOTES[arm_notes.SPRING_NOTE - 1].split())
+    assert spring in note and "PRELOAD" in note
+
+
+def test_every_sheet_one_note_link_names_the_notes_sheet() -> None:
+    """Round 4 (clarity, rule 7): sheet 1's flags pointed to notes printed only
+    on sheet 2. Every link names that sheet."""
+    links = [
+        line
+        for text in arm_notes.DIMENSION_CALLOUTS.values()
+        for line in text.splitlines()
+        if "SEE NOTE" in line
+    ]
+    assert len(links) == 5
+    assert all(line.endswith(f", SHEET {arm_notes.NOTES_SHEET}") for line in links)
+    assert arm_notes.NOTES_SHEET == 2 == len(drawing.SHEET_NAMES)
 
 
 def test_the_locating_holes_name_their_dowel_press_and_match_drill() -> None:
     """Machinist review (blocker and clarity): the reamed sockets named no
     dowel or fit, the mouth break no reason, and the match-drill sat in a
-    general note with the pair's setting. The setting is MHA-PD-00 VIEW K's
+    general note with the pair's setting. The setting is MHA-PD-00 DETAIL K's
     native S-K dimension; the callout points at it and prints no centre
     distance of its own (#1388 policy)."""
     import pd_vn_transgear_arm_plate_locating_pin_spec as dowel
@@ -877,7 +903,9 @@ def test_the_locating_holes_name_their_dowel_press_and_match_drill() -> None:
     assert max(geometry.LOCATOR_HOLE_PRINTED_LIMITS_MM) <= max(interface.PRESS_HOLE_LIMITS_MM) + 1e-9
     assert _config.parts("pd-vn-transgear-arm-plate-locating-pin")["number"] == dowel.PART_NUMBER
     plate = _config.parts("pd-transgear-arm-plate")["number"]
-    flat = " ".join(drawing.LOCATOR_CALLOUT_TEXT.split())
+    flat = " ".join(
+        (arm_notes.LOCATOR_CALLOUT_TEXT + " " + arm_notes.NOTES[arm_notes.LOCATOR_NOTE - 1]).split()
+    )
     # The contract, not the wording: the through ream, the mouth break's
     # limit, the dowel and its interference, and the match-drill partner and
     # the assembly view that sets it.
@@ -885,13 +913,14 @@ def test_the_locating_holes_name_their_dowel_press_and_match_drill() -> None:
         "THRU",
         ".002 MAX",
         dowel.PART_NUMBER,
-        ".0003/.0011",
+        ".0003-.0011",
         plate,
         knob_setting_ref(),
     ):
         assert fact in flat, fact
     assert f"{disc.CENTRE_DISTANCE:.3f}" not in flat
-    assert drawing.DIMENSION_CALLOUTS["LocatorDia1"] == drawing.LOCATOR_CALLOUT_TEXT
+    assert f"SEE NOTE {arm_notes.LOCATOR_NOTE}" in arm_notes.LOCATOR_CALLOUT_TEXT
+    assert arm_notes.DIMENSION_CALLOUTS["LocatorDia1"] == arm_notes.LOCATOR_CALLOUT_TEXT
 
 
 def test_the_locating_dowels_punch_out_from_the_front() -> None:
@@ -901,7 +930,7 @@ def test_the_locating_dowels_punch_out_from_the_front() -> None:
     stock, so a punch from the front drives it out."""
     import pd_vn_transgear_arm_plate_locating_pin_spec as dowel
 
-    assert "LocatorDepth" not in drawing.DIMENSION_CALLOUTS
+    assert "LocatorDepth" not in arm_notes.DIMENSION_CALLOUTS
     assert "LocatorHoles" not in spec.DRAWING_DIMENSIONS
     deepest = max(dowel.INSERTION_LIMITS_MM)
     front_break = geometry.LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM
@@ -911,113 +940,213 @@ def test_the_locating_dowels_punch_out_from_the_front() -> None:
     assert geometry.LOCATOR_FULL_CYLINDER_SPAN_MIN_MM == pytest.approx(thinnest - 2.0 * front_break)
 
 
-def test_each_projected_zone_is_a_dimensioned_chain_line_from_its_mating_face() -> None:
-    """Machinist review of f4a5f03a1 (clarity, rule 7; all three runs): the
-    frames gave each zone's height, but where it starts and which way it
-    runs was printed only in general note 1. Each zone is drawn at its
-    feature as a chain line on its own side, dimensioned with its height as
-    the frame prints it, and the note is gone. Review of d5d1298b0: the pin
-    bore's 32.6 rose through the plan's dimension lines (gating), so it is
-    drawn in section D-D; no MIN. Review r7 (gating): each zone starts at the
-    face its mating part seats on and runs outward, clear of the part (the
-    taps' ran through the stock from face A), and D-D names its face."""
+def test_no_frame_carries_a_projected_zone_and_the_controls_are_as_ruled() -> None:
+    """Delegated ruling 2026-11-07 (Main, no precedent; owner review #2144):
+    rule 26 bars the projected-zone modifier, so no frame on MHA-PD-18
+    carries one. The pin bore S (datum C) takes ⌖ Ø.004 to A|B and a plain
+    ⊥ Ø.001 to A, the reamed row (owner ruling 2026-11-08, #2144 item 4.1);
+    the 2X dowel reams ⌖ Ø.004 to A|B|C; the plate taps take no frame. The
+    bore's axis, run on from the thinnest stock to the chain plane, is the S
+    axis zone the stacks charge."""
     import paper_drive_arm_registration as registration
+    from _gtol_frame import gtol_frame_signature
 
-    projected = {
-        control.key: control
-        for control in spec.GEOMETRIC_CONTROLS
-        if control.projected_zone_height_mm is not None
-    }
-    assert set(drawing.PROJECTED_ZONE_CHAINS) == set(projected)
-    assert set(spec.PROJECTED_ZONE_DIRECTION) == set(projected)
-    # Face A is z = 0 with its outward normal -Z, so +Z runs rearward.
-    face_a = spec.PART_DATUMS[0].face
-    assert (face_a.normal, face_a.offset_mm) == ((0.0, 0.0, -1.0), 0.0)
-    assert spec.PROJECTED_ZONE_REARWARD > 0.0 > spec.PROJECTED_ZONE_FORWARD
-    taps = [key for key in projected if key.startswith("plate_tap_")]
-    assert len(taps) == len(geometry.PLATE_TAP_STATIONS)
-    for key in taps:
-        # Rearward from the rear face, where the MHA-PD-19 plate seats, past
-        # the seated screw head's contact.
-        assert spec.PROJECTED_ZONE_DIRECTION[key] == spec.PROJECTED_ZONE_REARWARD
-        assert spec.PROJECTED_ZONE_START_Z[key] == geometry.THICKNESS
-        height = projected[key].projected_zone_height_mm
-        assert geometry.THICKNESS + height >= joints.PLATE_SCREW_CONTACT_ARM_LOCAL_Z_MAX_MM
-    # The pin bore's runs forward, to the chain plane in front of face A
-    # (machine +Z runs rearward too).
-    assert (
-        registration.CHAIN_PLANE_MACHINE_Z_LIMITS_MM[0] < registration.ARM_FRONT_MACHINE_Z_MM
+    controls = {control.key: control for control in spec.GEOMETRIC_CONTROLS}
+    for control in controls.values():
+        assert control.projected_zone_height_mm is None, control.key
+        assert gtol_frame_signature(control.frame_xml).projected_zone_height_mm is None
+        assert "ProjectedToleranceZone" not in control.frame_xml, control.key
+        assert control.tolerance_zone == "diametral", control.key
+    locators = [f"arm_locator_{index}_position" for index in range(1, len(geometry.LOCATOR_SITES_MM) + 1)]
+    assert set(controls) == {"feed_stud_position", "feed_stud_perpendicularity", *locators}
+    position, square = controls["feed_stud_position"], controls["feed_stud_perpendicularity"]
+    assert (position.characteristic, position.tolerance, position.datums) == ("position", ".004", ("A", "B"))
+    assert (square.characteristic, square.tolerance, square.datums) == ("perpendicularity", ".001", ("A",))
+    for control in (position, square):
+        assert control.face.diameter_mm == geometry.PIN_BORE_DIA
+        assert control.face.contains_x_mm == geometry.PIN_STATION
+    for key, xy in zip(locators, geometry.LOCATOR_SITES_MM, strict=True):
+        control = controls[key]
+        assert (control.characteristic, control.tolerance, control.datums) == ("position", ".004", ("A", "B", "C"))
+        assert (control.face.contains_x_mm, control.face.contains_y_mm) == xy
+    assert float(position.tolerance) * 25.4 <= geometry.REDUCER_POSITION_DIAMETER + 1e-12
+    thinnest = geometry.THICKNESS - geometry.THICKNESS_BAND
+    assert registration.S_AXIS_ZONE_DIAMETER_MM == pytest.approx(
+        float(square.tolerance) * 25.4 * registration.S_PROJECTED_HEIGHT_MM / thinnest
     )
-    assert spec.PROJECTED_ZONE_DIRECTION["feed_stud_projected_axis"] == spec.PROJECTED_ZONE_FORWARD
-    assert spec.PROJECTED_ZONE_START_Z["feed_stud_projected_axis"] == 0.0
-    assert (
-        projected["feed_stud_projected_axis"].projected_zone_height_mm
-        == registration.S_PROJECTED_HEIGHT_MM
+    # The datums the frames name are the part's: A the front face, B the
+    # pivot bore, C the pin bore.
+    assert [datum.letter for datum in spec.PART_DATUMS] == ["A", "B", "C"]
+    assert spec.PART_DATUMS[2].face.diameter_mm == geometry.PIN_BORE_DIA
+    # No projected-zone machinery is left on the spec or the sheet.
+    for name in ("PROJECTED_ZONE_DIRECTION", "PROJECTED_ZONE_START_Z", "PROJECTED_ZONE_NOTE"):
+        assert not hasattr(spec, name), name
+    for name in ("PROJECTED_ZONE_CHAINS", "ZoneChain", "projected_zone_count", "_add_projected_zone_chains"):
+        assert not hasattr(drawing, name), name
+
+
+def test_the_plate_taps_are_transferred_from_the_plate_with_no_frame() -> None:
+    """Q2-A: the 2X 8-32 taps are spotted and drilled through MHA-PD-19's
+    screw holes at assembly with the plate doweled on, so PD-19's holes are
+    the master: no frame, the transfer named on the tap callout, and their
+    stations printed as references rather than BASIC."""
+    assert not any("tap" in control.key for control in spec.GEOMETRIC_CONTROLS)
+    stations = set(drawing.TAP_STATION_REFERENCES)
+    assert stations == {f"PlateTapStation{index}" for index in range(1, len(geometry.PLATE_TAP_STATIONS) + 1)}
+    assert stations <= spec.DRAWING_DIMENSIONS["StationReference"]
+    assert stations.isdisjoint(name for _feature, name in spec.BASIC_REDUCER_DIMENSIONS)
+    assert ("StationReference", "PinStation") in spec.BASIC_REDUCER_DIMENSIONS
+    plate = _config.parts("pd-transgear-arm-plate")["number"]
+    assert {row[4] for row in drawing.TAP_CALLOUTS} == {arm_notes.PLATE_TAP_QUALIFIER}
+    assert plate in arm_notes.PLATE_TAP_QUALIFIER and "SPOT" in arm_notes.PLATE_TAP_QUALIFIER
+    # The arm's walls pay the transferred taps' location.
+    assert joints.PLATE_TAP_LOCATION_RADIUS_MAX_MM <= geometry.PLATE_TAP_LOCATION_RADIUS_MM
+
+
+def test_the_tap_stations_and_pin_hole_depth_print_as_linear_references(monkeypatch) -> None:
+    """Parenthesised without a diameter glyph (``set_reference_dimension``,
+    not the diameter form); a reference the import lost fails the build.
+    The latch-pin hole's depth is its callout's, so A-A's depth is a
+    reference too."""
+    assert drawing.LINEAR_REFERENCES == (*drawing.TAP_STATION_REFERENCES, "PinHoleDepth")
+    marked: list[tuple[str, dict]] = []
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, annotation: annotation)
+    monkeypatch.setattr(
+        drawing, "set_reference_dimension",
+        lambda _adapter, annotation, **kwargs: marked.append((annotation, kwargs)),
     )
-    # Each line stands on its own hole's axis, in a view that cuts the hole
-    # on that axis: the taps' in section A-A, the pin bore's in section D-D.
-    stations = dict(zip(taps, geometry.PLATE_TAP_STATIONS))
-    for key, chain in drawing.PROJECTED_ZONE_CHAINS.items():
-        assert chain.x_mm == projected[key].face.contains_x_mm
-        assert chain.view == ("A-A" if key in stations else "D-D"), key
-        assert key not in stations or chain.x_mm == stations[key]
-    # Every zone's height is printed: by its own dimension, or by one that
-    # counts it ("2X") because it has the same height the same way.
-    counts = {
-        key: drawing.projected_zone_count(key)
-        for key, chain in drawing.PROJECTED_ZONE_CHAINS.items() if chain.dimension is not None
+    drawing._reference_linear_dimensions(object(), ["PinStation", *drawing.LINEAR_REFERENCES])
+    assert [name for name, _kwargs in marked] == list(drawing.LINEAR_REFERENCES)
+    assert all(not kwargs.get("diameter", False) for _name, kwargs in marked)
+    with pytest.raises(RuntimeError, match="never reached the sheet"):
+        drawing._reference_linear_dimensions(object(), ["PinStation", drawing.TAP_STATION_REFERENCES[0]])
+
+
+def test_the_dowel_group_prints_one_frame_with_its_count() -> None:
+    """Machinist screen (clarity): identical frames were repeated on each
+    hole instead of given once for the 2X group. The first socket's frame
+    prints, with the count above it; the others' identical frames are
+    hidden. The count stands clear of the latch-pin callout above it."""
+    shown, hidden, count = drawing.dowel_group_frames()
+    assert shown == "arm_locator_1_position"
+    assert hidden == tuple(
+        f"arm_locator_{index}_position" for index in range(2, len(geometry.LOCATOR_SITES_MM) + 1)
+    )
+    assert count == f"{len(geometry.LOCATOR_SITES_MM)}X" == "2X"
+    left, top = drawing._locator_frame_xy(geometry.LOCATOR_SITES_MM[0][1])
+    latch_lines = [".1240", *arm_notes.PIN_HOLE_CALLOUT.splitlines()]
+    latch = _centred_box(latch_lines, drawing.END_KEEP["PinHoleDia"])
+    assert top + _LINE_PITCH < latch[1] - 0.002
+    sheet_right = DRAWING_TEMPLATES[drawing.SPEC.layout].width_m - _BORDER
+    assert left + len(count) * _CHAR_WIDTH < sheet_right
+
+
+def test_latch_pin_callout_stands_right_of_its_hole() -> None:
+    """Round 3 (clarity): the latch-pin leader rose up-left from the text's
+    left end through the "B" of BLIND. The text now starts at the hole's
+    axis, so the leader rises straight up from its left end, and its right
+    end stays inside the border."""
+    lines = [
+        line.replace("<HOLE-DEPTH>", "\N{DOWNWARDS ARROW}")
+        for line in arm_notes.PIN_HOLE_CALLOUT.splitlines()
+    ]
+    left, _bottom, right, _top = _centred_box(lines, drawing.END_KEEP["PinHoleDia"])
+    assert left >= drawing.END_CENTER[0] - 0.001
+    sheet_right = DRAWING_TEMPLATES[drawing.SPEC.layout].width_m - _BORDER
+    assert right <= sheet_right - 0.001
+
+
+class _FakeGtol:
+    def __init__(self, *, accept: bool, keep: bool):
+        self.accept, self.keep, self.text = accept, keep, {}
+
+    def SetText(self, part, text):
+        if self.keep:
+            self.text[part] = text
+        return self.accept
+
+    def GetText(self, part):
+        return self.text.get(part, "")
+
+
+class _FakeFrame:
+    def __init__(self, gtol=None, *, sticky: bool = True):
+        self._visible, self.gtol, self.sticky = 1, gtol, sticky
+
+    @property
+    def Visible(self):
+        return self._visible
+
+    @Visible.setter
+    def Visible(self, value):
+        if self.sticky:
+            self._visible = value
+
+    def GetSpecificAnnotation(self):
+        return self.gtol
+
+
+@pytest.mark.parametrize("defect", (None, "hide-lost", "count-refused", "count-lost"))
+def test_the_dowel_group_frame_is_proved_by_readback(monkeypatch, defect) -> None:
+    """IAnnotation::Visible and IGtol::SetText are read back after the
+    rebuild: a frame that stays shown, or a count refused or lost, fails."""
+    gtol = _FakeGtol(accept=defect != "count-refused", keep=defect != "count-lost")
+    frames = {
+        "arm_locator_1_position": _FakeFrame(gtol),
+        "arm_locator_2_position": _FakeFrame(sticky=defect != "hide-lost"),
     }
-    assert sum(counts.values()) == len(projected)
-    assert counts == {"plate_tap_1_position": 2, "feed_stud_projected_axis": 1}
-    for control in projected.values():
-        # The frame and its chain line print the height on the .001 in grid.
-        inches = control.projected_zone_height_mm / 25.4
-        assert inches == pytest.approx(round(inches, spec.DRAWING_REFERENCE_PRECISION), abs=1e-9)
-        assert control.projection_unit == "in"
-    assert not hasattr(spec, "PROJECTED_ZONE_HEIGHT_SUFFIX")
-    # Section A-A (2:1, face A up): the taps' dimension line runs beside tap
-    # 1's chain line, below the rear face, so its arrows land on the zone's
-    # own ends; the "2X" value stands between the taps, within the zones.
-    tap = drawing.PROJECTED_ZONE_CHAINS["plate_tap_1_position"]
-    assert tap.dimension is not None and tap.dimension[1] == 0.0
-    assert tap.dimension[0] >= 0.001
-    assert tap.face_callout == ""
-    rear_y = drawing.SECTION_CENTER[1] - geometry.THICKNESS * drawing._S / 2000.0
-    tap_end_y = rear_y - projected["plate_tap_1_position"].projected_zone_height_mm * drawing._S / 1000.0
-    assert tap.text_xy is not None
-    assert tap_end_y < tap.text_xy[1] < rear_y - 0.004
-    tap_x = [drawing._front_x(station) for station in geometry.PLATE_TAP_STATIONS]
-    assert tap.text_xy[0] == pytest.approx(sum(tap_x) / 2.0)
-    # Section D-D (rule 15: its own sheet at the sheet's 2:1, not shrunk
-    # into a corner of sheet 1; looking toward the pivot, forward to the
-    # right): the cut face and the 32.6 line under the sheet-2 plan (on
-    # sheet 1's plan centre) and over the title block, with room for the
-    # caption under them; D is not a datum letter.
+    rebuilt = []
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda _adapter, *, label: rebuilt.append(label))
+    if defect is not None:
+        with pytest.raises(RuntimeError):
+            drawing._one_frame_per_dowel_group(object(), frames)
+        return
+    drawing._one_frame_per_dowel_group(object(), frames)
+    assert frames["arm_locator_2_position"].Visible == 3  # swAnnotationHidden
+    assert frames["arm_locator_1_position"].Visible == 1
+    assert gtol.text == {3: "2X"}  # swGTolTextCalloutAbove
+    assert rebuilt
+
+
+def test_section_d_d_carries_the_rear_mouth_on_its_own_sheet() -> None:
+    """Section D-D (rule 15: its own sheet at the sheet's 2:1, looking toward
+    the pivot, the rear face left): its cut face under the sheet-2 plan (on
+    sheet 1's plan centre) and over the title block, with room for the
+    caption under it; D is not a datum letter."""
     assert drawing.PIN_SECTION_LABEL not in {datum.letter for datum in spec.PART_DATUMS}
     assert len(drawing.SHEET_NAMES) == 2
-    pin_height = projected["feed_stud_projected_axis"].projected_zone_height_mm * drawing._S / 1000.0
     thickness = geometry.THICKNESS * drawing._S / 1000.0
-    centre_x, axis_y = drawing.PIN_SECTION_ZONE_CENTER
-    face_x = centre_x - (pin_height - thickness) / 2.0
-    left, right = face_x - thickness, face_x + pin_height
+    centre_x, axis_y = drawing.PIN_SECTION_CENTER
+    assert drawing.PIN_SECTION_REAR_X == pytest.approx(centre_x - thickness / 2.0)
     half = geometry.edge_half_width(geometry.PIN_STATION) * drawing._S / 1000.0
-    assert left > _BORDER + 0.020 and right < 0.4318 - _BORDER - 0.020
+    assert drawing.PIN_SECTION_REAR_X > _BORDER + 0.020
+    assert centre_x + thickness / 2.0 < 0.4318 - _BORDER - 0.020
     plan_bottom = drawing._front_y(-geometry.PIVOT_END_R)
     assert axis_y + half + 0.020 < plan_bottom
-    pin = drawing.PROJECTED_ZONE_CHAINS["feed_stud_projected_axis"]
-    assert pin.dimension is not None and pin.dimension[0] == 0.0
-    # Its dimension line clears the bore's mouth, beside the cut face; no
-    # datum tag stands in D-D, so the value names its start face.
-    assert geometry.PIN_BORE_DIA * drawing._S / 2000.0 < pin.dimension[1] < half
-    assert pin.face_callout
     caption_top = axis_y - half - drawing._PIN_CAPTION_GAP_M
     title_block_top = 0.065
     assert caption_top - 0.016 > title_block_top + 0.005
-    # No general notes remain (rule 7).
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "add_note(" not in source
-    assert not hasattr(drawing, "NOTES_TEXT")
-    assert not hasattr(spec, "PROJECTED_ZONE_NOTE")
+
+
+def test_sheet_one_captions_hang_under_their_own_cuts() -> None:
+    """Round 4 (clarity): B-B's caption sat against section A-A's right end
+    beside its (.33), and A-A's on the title block's top edge. Each now hangs
+    under its own cut: B-B's stacked name (~32 mm wide) stands ~10 mm right
+    of A-A's end, and A-A's one line stays above the title block."""
+    targets = drawing.section_caption_targets()
+    assert {label: sheet for label, (sheet, _xy) in targets.items()} == {
+        "A-A": 0, "B-B": 0, "D-D": 1,
+    }
+    assert drawing.SECTION_CAPTION_TEXTS["B-B"].splitlines() == ["<VLNAME>", "<VLLABEL>"]
+    section_right = drawing._front_x(geometry.TIP_STATION)
+    bb_x, bb_top = targets["B-B"][1]
+    assert bb_x - 0.032 / 2.0 > section_right + 0.008
+    a_a_bottom = drawing.SECTION_CENTER[1] - geometry.THICKNESS * drawing._S / 2000.0
+    assert bb_top < drawing.LOCATOR_SECTION_CENTER[1] and bb_top - 0.016 > 0.065 + 0.005
+    aa_x, aa_top = targets["A-A"][1]
+    assert aa_top < a_a_bottom
+    assert aa_top - 0.008 > 0.065 + 0.003
 
 
 def test_the_rear_face_has_no_frame_and_the_stock_band_carries_its_parallelism() -> None:

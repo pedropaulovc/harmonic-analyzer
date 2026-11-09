@@ -210,7 +210,7 @@ def test_counter_rejects_nonfinite_gooseneck_origin(isolated_calibration, goosen
 
 def test_counter_record_without_support_certificate_is_rejected(isolated_calibration):
     # A record measured before the made support existed carries no
-    # upper_support at all; it must not certify the MHA-SM-04 clamp.
+    # upper_support at all; it must not certify the shoulder-screw support.
     _, counter_record = isolated_calibration
     del counter_record["upper_support"]
 
@@ -230,35 +230,39 @@ def test_counter_record_tagged_for_another_support_is_rejected(isolated_calibrat
         counter_seat()
 
 
-def test_isolated_counter_provenance_identifies_the_whole_made_support(
+def test_isolated_counter_provenance_identifies_the_whole_support(
     isolated_calibration,
 ):
+    # Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: the purchased
+    # MHA-SM-VN-56 shoulder screw seated on the plain-tapped end face; the
+    # eye rides free on its shoulder.
     _, record = isolated_calibration
     support = record["upper_support"]
-    assert support["component"] == "sm-gooseneck-spring-screw"
-    assert support["number"] == "MHA-SM-04"
-    assert "sku" not in support
-    assert support["thread"] == "1/4-28 UNF"
-    assert support["major_dia_mm"] == pytest.approx(6.35)
-    assert support["body_dia_mm"] == pytest.approx(6.35)
-    assert support["plain_length_min_mm"] == 3.60
-    assert support["full_thread_station_max_mm"] == 5.71
-    assert support["underhead_length_mm"] == 19.5
-    assert support["head_dia_mm"] == 11.5
-    assert support["head_height_mm"] == 6.6
-    assert support["head_relief_chamfer_mm"] == 1.45
-    assert support["slot_width_mm"] == 1.6
-    assert support["slot_depth_mm"] == 2.0
+    assert support["component"] == "sm-vn-gooseneck-shoulder-screw"
+    assert support["number"] == "MHA-SM-VN-56"
+    assert support["number"] == _config.parts(support["component"])["number"]
+    assert support["supplier_sku"] == "91829A566"
+    # The slotted head's driver slot (#2144 item 11.4), not the retired
+    # clamped eye's slot.
+    assert (support["drive_slot_width_mm"], support["drive_slot_depth_mm"]) == (1.524, 1.905)
+    # Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: washer dropped, the
+    # bare head retains the loaded eye.
+    assert support["eye_retainer"] == "head"
+    assert support["thread"] == "#10-24"
+    assert support["pitch_mm"] == pytest.approx(25.4 / 24.0)
+    assert support["major_dia_mm"] == pytest.approx(4.826)
+    assert support["thread_length_mm"] == pytest.approx(9.525)
+    assert support["shoulder_dia_mm"] == pytest.approx(6.35)
+    assert support["shoulder_length_mm"] == pytest.approx(9.525)
+    assert support["head_dia_mm"] == pytest.approx(9.525)
+    assert support["head_height_mm"] == pytest.approx(4.7625)
+    assert support["eye_gap_mm"] == pytest.approx(4.88061)
     assert not any(
-        key.startswith(("relief_", "crown_", "seat_", "shoulder_")) for key in support
+        key.startswith(("plug_counterbore", "clamp_", "body_", "slot_")) for key in support
     )
-    assert support["tip_chamfer_mm"] == 0.5
-    assert support["underhead_corner_r_mm"] == 0.50
     assert support["tube_dia_mm"] == pytest.approx(12.70)
     assert support["plug_head_length_mm"] == 21.50
     assert support["plug_length_mm"] == 26.00
-    assert support["plug_counterbore_dia_mm"] == 7.00
-    assert support["plug_counterbore_depth_mm"] == 2.78
     assert support["plug_edge_break_mm"] == 0.25
     counter_seat()
 
@@ -266,26 +270,21 @@ def test_isolated_counter_provenance_identifies_the_whole_made_support(
 @pytest.mark.parametrize(
     "field",
     [
+        "pitch_mm",
         "major_dia_mm",
-        "body_dia_mm",
-        "plain_length_min_mm",
-        "full_thread_station_max_mm",
-        "underhead_length_mm",
+        "thread_length_mm",
+        "shoulder_dia_mm",
+        "shoulder_length_mm",
         "head_dia_mm",
         "head_height_mm",
-        "head_relief_chamfer_mm",
-        "slot_width_mm",
-        "slot_depth_mm",
-        "tip_chamfer_mm",
-        "underhead_corner_r_mm",
-        "clamp_gap_mm",
+        "drive_slot_width_mm",
+        "drive_slot_depth_mm",
+        "eye_gap_mm",
         "arm_end_x_mm",
         "spring_eye_x_mm",
         "tube_dia_mm",
         "plug_head_length_mm",
         "plug_length_mm",
-        "plug_counterbore_dia_mm",
-        "plug_counterbore_depth_mm",
         "plug_edge_break_mm",
     ],
 )

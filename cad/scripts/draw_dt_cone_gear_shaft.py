@@ -1,7 +1,9 @@
 r"""Create the cone-gear-shaft manufacturing drawing under drawing-guidelines.md.
 
-The turned shaft is shown horizontally at 1:1 with baseline lengths from the
-collar's thrust face below it and every diameter above it on that same side
+The turned shaft is shown horizontally at 1:1 with baseline lengths below it,
+one origin per chucking (rule 11): the journal and the collar web from the
+collar's thrust face, the gear lands and the tip from its tip-side face; every
+diameter is above it on that same side
 view, each dimension line inside the land it measures (the 3.2 mm collar
 instead takes one near-side arrow on its rim).  The two short lands
 ahead of the tip are 6.9 mm long, so the three tip-end diameter texts climb
@@ -10,14 +12,11 @@ its line above every line it spans.  Each gear land's D-flat is shown in its
 own enlarged cut-only section, A-A to D-D, carrying its across-flat; B-B to
 D-D are cut on DETAIL E, the stepped tip at 4:1, where their arrows and
 letters have room.  A standard isometric supplies pictorial clarity.  Every
-tight band names its mate at its own callout (a seat's gears below or after
-its diameter, a flat's after its across-flat), the steps and the collar web
-say what their three places locate, and the note gives the gears' drawing
-numbers and the tailstock support the tip land needs (U40).  Source geometry
-and native model fits stay authoritative.  A separate setup sheet supplements
-these controls with parenthesized, unbanded native measurements from the
-collar's north / 64T-seat face; it creates no acceptance limits.  These pure
-references and the front-to-tip overall take their display precision from the spec.
+tight band names its mate at its own callout or in the numbered land note
+linked from each land's diameter and across-flat, and the notes give the
+collar's tight limits and the tailstock support the tip land needs (U40).
+Source geometry and native model fits stay authoritative.  The front-to-tip
+overall is a reference and takes its display precision from the spec.
 
 Run with SolidWorks open::
 
@@ -37,7 +36,6 @@ from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
-    add_note,
     delete_view,
     dimension_name,
     iter_views,
@@ -70,10 +68,9 @@ from _drawing_common import (
 from _drawing_detail_projection import settle_detail_projection
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import set_dimension_callouts, set_reference_dimension
-from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
+from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_edges import visible_view_entities
 from _drawing_finish import add_surface_finish
-from _drawing_leader_notes import add_attached_note
 from _drawing_leaders import (
     Segment,
     dimension_segments,
@@ -108,11 +105,10 @@ from dt_cone_gear_shaft_spec import (
     FILLET_CALLOUT,
     FLAT_LANDS,
     FLAT_MATE_SUFFIXES,
-    FLATS_IN_LINE_CALLOUT,
     JOURNAL_DIA,
-    LENGTH_FUNCTION_SUFFIXES,
     SEAT_MATE_CALLOUTS,
     SEAT_MATE_SUFFIXES,
+    STACK_NOTE,
     SECTION_DIAS,
     SECTION_ENDS,
     SHAFT_LENGTH,
@@ -139,19 +135,10 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (1.0, 1.0)
 SIDE_SCALE = (1, 1)
 ISO_SCALE = (1, 2)
-SHEET_NAMES = ("Shaft Controls", "Setup References")
-SETUP_SCALE = (3, 2)
-SETUP_CENTER = (0.210, 0.183)
-SETUP_REFERENCE_LANDS = (1, 2, 3, 4)
-SETUP_REFERENCE_TIERS = (0.157, 0.139, 0.121, 0.103)
-SETUP_NOTE_XY = (0.065, 0.245)
-SETUP_NOTE = (
-    "SUPPLEMENTARY SETUP REFERENCES ONLY\n"
-    "PARENTHESIZED VALUES ARE NOT ACCEPTANCE LIMITS\n"
-    "ALL DIMENSIONAL REQUIREMENTS: SHEET 1"
-)
-SETUP_SEAT_NOTE_XY = (0.310, 0.215)
-SETUP_SEAT_NOTE = "COLLAR NORTH FACE\n64T SEAT"
+# One sheet: the tip-side lengths run from the collar's tip-side face (rule
+# 11, round 6), so the old setup sheet's references from that face would only
+# repeat them.
+SHEET_NAMES = ("Shaft Controls",)
 
 
 # Landscape sheet, 0.4318 x 0.2794 m, title block bottom right (x > ~0.216,
@@ -169,25 +156,28 @@ SETUP_SEAT_NOTE = "COLLAR NORTH FACE\n64T SEAT"
 BIG_END_X = 0.2526
 SIDE_CENTER = (BIG_END_X - SHAFT_LENGTH / 2000.0, 0.150)
 TIP_END_X = BIG_END_X - SHAFT_LENGTH / 1000.0
-ISO_CENTER = (0.363, 0.232)
-NOTES_XY = (0.058, 0.060)
+# 10 mm right of round 2's (0.363): the collar's two-line callout, its limits
+# now at the feature, reaches x ~0.330 under the pictorial's low end.
+ISO_CENTER = (0.373, 0.232)
+# At the left frame, as the other part sheets' note blocks: the four note
+# lines run up to 72 characters before the title block.
+NOTES_XY = (0.020, 0.060)
 # Off-sheet-left donor: the five diameters are model dimensions of circular
 # profile sketches, so they can only be IMPORTED into a view that faces those
 # circles.  They are imported here, dragged onto the shoulder each one
 # belongs to, and this view is then deleted.
 DONOR_CENTER = (0.360, 0.090)
 
-# Lengths (option A, #914): ONE origin, the collar's thrust face at sheet x
-# 0.2096.  Everything measured from it is baseline below the shaft, one tier
-# per dimension, the shortest nearest the part: the collar web, the three
-# land steps, then the tip (#917 R5 (a)).  Every tier is one line of text.
-# The journal runs the other way from the same origin on the first tier, and
-# the front-to-tip overall, a reference, hangs lowest, above the title block.
+# Lengths, one origin per chucking (rule 11, round 6): the collar's thrust
+# face at sheet x 0.2096 for the journal (to the right) and the collar web,
+# both on the first tier; its tip-side face, one web left, for the three land
+# steps and the tip (#917 R5 (a)), baseline below the shaft, one tier each,
+# the shortest nearest the part.  Every tier is one line of text.  The
+# front-to-tip overall, a reference, hangs lowest, above the title block.
 # A station's text is centred in its span when it fits there with
 # STATION_TEXT_CLEARANCE to spare; the web's 3.18 span is narrower than its
 # text, so the text stands LEFT of the collar's north witness line (the 916a
-# render had the web text touch that line), far enough left for its function
-# suffix (LENGTH_FUNCTION_SUFFIXES) to end clear of it.  The one radius rides
+# render had the web text touch that line).  The one radius rides
 # above the 3/8-to-1/4 in step it attaches to (the fillet's first edge),
 # right of the Ø.2500 line.  With its stacked +.000/-.002 band its text is
 # 23.4 mm wide and its shoulder 25.4 mm, so it stands 0.4 mm nearer that line
@@ -197,7 +187,10 @@ DONOR_CENTER = (0.360, 0.090)
 SIDE_KEEP = {
     "CollarWidth": (0.1740, 0.1355),
     "Sec0End": (0.2311, 0.1355),
-    "Sec1End": (0.1498, 0.1275),
+    # Its " SEE NOTE 2" flag (round 4) widens the text to ~37 mm; 6 mm right
+    # of the bare value's centre it starts right of section A's lower letter
+    # (x <= 0.1353), one tier above it.
+    "Sec1End": (0.1560, 0.1275),
     "Sec2End": (0.1464, 0.1195),
     "Sec3End": (0.1429, 0.1115),
     "Sec4End": (0.1314, 0.1035),
@@ -232,12 +225,20 @@ STATION_TEXT_CLEARANCE = 0.002
 # tip face when its station moves.  With its suffix the Ø6.350 text runs over
 # A-A's upper letter, so the three tip-end texts stand 2.5 mm higher than
 # r1's (the tip detail with them); Ø9.525 stands right of all three suffixes,
-# its two mate lines centred on it clear above A-A's letter.  The journal's
-# inch size (four-place value, five-place band) widened Ø12.2555's box to
-# 40 mm, so it stands 4.5 mm nearer the end again, clear of both A-A's box
-# and its "4 FLATS IN LINE" callout (#290 batch 0).
+# its two mate lines centred on it clear above A-A's letter.
 SIDE_DIAMETERS = {
-    "Sec0Dia": (0.2615, 0.1715),
+    # The journal's text stands just off the faced end, where rounds 1 and 2
+    # proved it hangs RIGHT of its line (r2 render 20261107T104940656Z: ink
+    # from 0.2575).  Dragged onto the journal instead (round 3, 0.2190) the
+    # proof's box hung LEFT, 0.1325..0.2041, onto section A's lower letter.
+    # Its widest line, "(CLEARANCE .0010-.0023)", boxes 23 x 2.17 mm in the
+    # proof's estimator (round 3: 33 characters 0.0716 wide), so the block
+    # ends ~0.307, 6.7 mm short of section A-A's box (x 0.3141).  The round 3
+    # box stood 10.1 mm below and 9.1 mm above the text position over four
+    # rows; at 0.1785 a fifth row of 5.3 mm, grown either way, stays 7 mm
+    # above the journal's upper extension line (0.1561) and 7 mm below the
+    # collar callout (bottom ~0.200 on round 2).
+    "Sec0Dia": (0.2575, 0.1785),
     "Sec1Dia": (0.1600, 0.1800),
     "Sec2Dia": (BIG_END_X - (2.0 * SECTION_ENDS[2] + SECTION_ENDS[1]) / 3000.0, 0.1785),
     "Sec3Dia": (BIG_END_X - (2.0 * SECTION_ENDS[3] + SECTION_ENDS[2]) / 3000.0, 0.1905),
@@ -255,11 +256,18 @@ NEAR_SIDE_DIAMETERS = ("CollarDia",)
 REFERENCE_DIAMETERS = ("CollarDia",)
 # Sheet width of one diameter text with its stacked band, for the layout test.
 DIAMETER_TEXT_WIDTH = 0.032
-# One-line suffixes after a dimension's value: the tip-end seats' gears and
-# what the three-place steps and web locate (machinist review r1).
-DIMENSION_SUFFIXES = {**SEAT_MATE_SUFFIXES, **LENGTH_FUNCTION_SUFFIXES}
-# The collar prints its reference diameter over the stock statement, its
-# break and root limit, each with its reason, lines as wide as "5/8 BAR AS
+# One-line suffixes after a dimension's value: the tip-end seats' flag to
+# the land note, and the stack's three-place lengths' flag to the stack note
+# (round 4 review: a note naming the mates must be linked at each callout it
+# serves, rule 7).  Other lengths carry their value and band only.
+STACK_FLAG_SUFFIX = f" SEE NOTE {STACK_NOTE}"
+STACK_LENGTHS = ("Sec1End", "Sec2End", "Sec3End", "CollarWidth")
+DIMENSION_SUFFIXES = {
+    **SEAT_MATE_SUFFIXES,
+    **{name: STACK_FLAG_SUFFIX for name in STACK_LENGTHS},
+}
+# The collar prints its reference diameter over the stock line with its edge
+# break and the roots line with its mates, lines as wide as "5/8 BAR AS
 # SUPPLIED" or wider.  At LENGTH_CHAR_WIDTH a line
 # that long is wider than the whole journal land, so hanging right from its
 # rim arrow the block ran under the pivot-journal finish and that finish's
@@ -283,8 +291,12 @@ DIMENSION_CALLOUTS = {
     "CollarDia": COLLAR_STOCK_CALLOUT,
     **SEAT_MATE_CALLOUTS,
 }
-# The pivot-journal finish symbol, above whose ink the collar's text must stand.
+# The pivot-journal finish symbol, above whose ink the collar's text must
+# stand; its leader lands on the journal's top flank
+# PIVOT_FINISH_ATTACH_INSET in from the faced end (round 2's placement, left
+# of the journal's text).
 PIVOT_FINISH_XY = (0.2400, 0.1800)
+PIVOT_FINISH_ATTACH_INSET = 0.020
 
 
 class CutParent(Enum):
@@ -368,8 +380,8 @@ PARTIAL_CUT_PARENTS = frozenset({CutParent.TIP_DETAIL})
 # centred over its text and SECTION_CALLOUT_REACH either side of it, so D
 # stands between C-C's outline and the right border and A's stays left of
 # B's cell; C stands left of A's column, its cell clear of D's callout and
-# of the side view's big end.  Every across-flat names its gears after its
-# value (FLAT_MATE_SUFFIXES), the whole line centred on the text position
+# of the side view's big end.  Every across-flat flags the land note after
+# its value (FLAT_MATE_SUFFIXES), the whole line centred on the text position
 # (r2, 20261018T062935602Z: B's "5.842 -0.01 T024" read 376.0..410.5 mm
 # about its 393 mm centre), so A's 56 mm line pushes A-A 3 mm right of r2's
 # and B-B 1 mm right: r3 (20261018T065854075Z) measured A's box ending at
@@ -417,8 +429,9 @@ D_SECTION_KEEP = {
     f"Sec{section.land}AF": (section.centre[0], section.centre[1] + 0.017)
     for section in D_SECTIONS
 }
+# The terminal flat's torque corners ride above its across-flat; the flats'
+# shared clock is in the land note (spec LAND_NOTE) with their fit.
 SECTION_ABOVE_CALLOUTS = {
-    f"Sec{min(FLAT_LANDS)}AF": FLATS_IN_LINE_CALLOUT,
     f"Sec{max(FLAT_LANDS)}AF": TORQUE_CORNER_CALLOUT,
 }
 # An above callout is centred on its dimension's text, set as one run: a
@@ -558,10 +571,11 @@ def _end_circle(view: Any, *, station_mm: float, diameter_mm: float, label: str)
 def _add_overall_reference(adapter: Any, side: Any) -> Any:
     """Dimension front stub to tip as a REFERENCE (#917 R5 (a)).
 
-    The tip is a station from the collar face, so the overall is the
-    read-only sum of the journal and the tip station: a sheet-derived
-    dimension between the two end faces, parenthesized, with the places the
-    spec hands over, and its value proved against the part.
+    The journal and the collar web chain the front stub to the collar's
+    tip-side face, the tip is a station from that face (rule 11, round 6), so
+    the overall is the read-only sum of the three: a sheet-derived dimension
+    between the two end faces, parenthesized, with the places the spec hands
+    over, and its value proved against the part.
     """
     front = _end_circle(
         side, station_mm=0.0, diameter_mm=SECTION_DIAS[0], label="front end face"
@@ -598,95 +612,6 @@ def _add_overall_reference(adapter: Any, side: Any) -> Any:
     if int(display.GetPrimaryPrecision2()) != DRAWING_REFERENCE_PRECISION:
         raise RuntimeError("front-to-tip overall reference precision did not persist")
     return display
-
-
-class SetupReference(NamedTuple):
-    """One native setup measurement, retaining both exact entity attachments."""
-
-    land: int
-    display: Any
-    entities: tuple[Any, Any]
-
-
-def _assert_setup_references(adapter: Any, references: Sequence[SetupReference]) -> None:
-    """Prove the supplementary sheet still measures the unrounded geometry.
-
-    These are NOT independent controls.  Both original stations use the
-    journal-side collar face: S-to-shoulder = SecNEnd - CollarWidth, and
-    S-to-tip = Sec4End - CollarWidth.  Their worst-case derived uncertainty
-    is therefore +/-0.26 and +/-0.64 mm respectively, not the title block's
-    one-place band.  SEAT_STEP_BUDGET already books the collar's +/-0.13;
-    no budget, correlation or model dimension changes for this presentation.
-    """
-    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
-    if not drawing.ActivateSheet(SHEET_NAMES[1]):
-        raise RuntimeError("failed to activate setup reference sheet")
-    with _telemetry.span("drawing.assert_setup_references"):
-        for reference in references:
-            label = f"64T-seat to land {reference.land} end reference"
-            display = _early_bound(reference.display, "IDisplayDimension")
-            assert_dimension_measures(
-                adapter,
-                display,
-                expected_mm=SECTION_ENDS[reference.land] - COLLAR_END_STATION,
-                entities=reference.entities,
-                label=label,
-            )
-            dimension = _early_bound(display.GetDimension2(0), "IDimension")
-            tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-            if (
-                int(tolerance.Type) != 0  # swTolNONE: a pure reference takes no band
-                or not bool(display.ShowDimensionValue)
-                or (str(display.GetText(1) or ""), str(display.GetText(2) or "")) != ("(", ")")
-                or int(display.GetPrimaryPrecision2()) != DRAWING_REFERENCE_PRECISION
-            ):
-                raise RuntimeError(f"{label} is not an unbanded native reference")
-
-
-@_telemetry.traced("drawing.setup_reference_sheet")
-def _add_setup_sheet(adapter: Any) -> list[SetupReference]:
-    """Add a separate native side view; sheet 1 keeps every existing control."""
-    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
-    if not drawing.ActivateSheet(SHEET_NAMES[1]):
-        raise RuntimeError("failed to activate setup reference sheet")
-    side = place_view(adapter, str(SOURCE), "*Right", *SETUP_CENTER, scale=SETUP_SCALE)
-    set_hidden_lines_removed(adapter, side)
-    seat = _end_circle(
-        side, station_mm=COLLAR_END_STATION, diameter_mm=COLLAR_DIA,
-        label="collar north / 64T-seat face",
-    )
-    ratio = SETUP_SCALE[0] / SETUP_SCALE[1]
-    front_x = SETUP_CENTER[0] + ratio * SHAFT_LENGTH / 2000.0
-    seat_x = front_x - ratio * COLLAR_END_STATION / 1000.0
-    references = []
-    for land, tier in zip(SETUP_REFERENCE_LANDS, SETUP_REFERENCE_TIERS, strict=True):
-        label = f"64T-seat to land {land} end reference"
-        end = _end_circle(
-            side, station_mm=SECTION_ENDS[land], diameter_mm=SECTION_DIAS[land],
-            label=label,
-        )
-        expected = SECTION_ENDS[land] - COLLAR_END_STATION
-        display = add_edge_dimension(
-            adapter, side, p0=(0.0, 0.0), p1=(0.0, 0.0),
-            text_xy=(seat_x - ratio * expected / 2000.0, tier),
-            label=label, orientation="horizontal", entities=(seat, end),
-        )
-        assert_dimension_measures(
-            adapter, display, expected_mm=expected, entities=(seat, end), label=label,
-        )
-        display = _early_bound(display, "IDisplayDimension")
-        set_reference_dimension(adapter, display.GetAnnotation(), label=label)
-        display.SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)
-        references.append(SetupReference(land, display, (seat, end)))
-    add_attached_note(
-        adapter, side, text=SETUP_SEAT_NOTE, note_xy=SETUP_SEAT_NOTE_XY,
-        entity=seat, attached_to=seat, label="setup reference origin",
-    )
-    drawing.EditSheet()
-    if add_note(adapter, SETUP_NOTE, *SETUP_NOTE_XY) is None:
-        raise RuntimeError("failed to add setup reference-only note")
-    _assert_setup_references(adapter, references)
-    return references
 
 
 # A centreline runs a short way past the part it marks.
@@ -1256,8 +1181,7 @@ def _add_d_sections(
         )
         if name in SECTION_ABOVE_CALLOUTS:
             # The terminal flat's torque corners stay sharp in the model, so
-            # their break limit rides above that flat's own across-flat; the
-            # flats' shared clock rides above the first flat's.
+            # their break limit rides above that flat's own across-flat.
             set_dimension_callouts(
                 adapter,
                 [across_flat],
@@ -1679,9 +1603,12 @@ async def build(adapter: Any) -> dict[str, str]:
         )
 
     # Leader anchor for the land that RUNS (sheet metres): the journal's top
-    # flank, 20 mm in from the faced end.
+    # flank, PIVOT_FINISH_ATTACH_INSET in from the faced end.
     big_end_x = SIDE_CENTER[0] + SHAFT_LENGTH / 2000.0
-    pivot_top = (big_end_x - 0.020, SIDE_CENTER[1] + SECTION_DIAS[0] / 2000.0)
+    pivot_top = (
+        big_end_x - PIVOT_FINISH_ATTACH_INSET,
+        SIDE_CENTER[1] + SECTION_DIAS[0] / 2000.0,
+    )
     pivot_finish = add_surface_finish(
         adapter,
         side,
@@ -1705,7 +1632,6 @@ async def build(adapter: Any) -> dict[str, str]:
         sign=sign,
     )
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
-    setup_references = _add_setup_sheet(adapter)
 
     return await finalize_drawing(
         adapter,
@@ -1714,8 +1640,7 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=SHEET_SCALE,
         layout=SPEC.layout,
         expected_sheet_names=SHEET_NAMES,
-        sheet_scales={SHEET_NAMES[0]: SHEET_SCALE, SHEET_NAMES[1]: SETUP_SCALE},
-        settled_checks=(lambda: _assert_setup_references(adapter, setup_references),),
+        sheet_scales={SHEET_NAMES[0]: SHEET_SCALE},
     )
 
 

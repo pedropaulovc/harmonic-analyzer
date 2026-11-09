@@ -1323,33 +1323,12 @@
       ]
     },
     {
-      "old_stem": "vn-keeper-chain-link",
-      "old_number": "MHA-VN-036",
-      "new_identities": [
-        {
-          "parent": "dt-drive-train",
-          "stem": "dt-vn-keeper-chain-link",
-          "number": "MHA-DT-VN-66"
-        }
-      ]
-    },
-    {
       "old_stem": "dt-crank-hub",
       "old_number": "MHA-DT-031",
       "new_identities": [
         {
           "stem": "dt-crank-hub",
           "number": "MHA-DT-31"
-        }
-      ]
-    },
-    {
-      "old_stem": "dt-crank-pin-eye",
-      "old_number": "MHA-DT-028",
-      "new_identities": [
-        {
-          "stem": "dt-crank-pin-eye",
-          "number": "MHA-DT-28"
         }
       ]
     },
@@ -1936,16 +1915,6 @@
       ]
     },
     {
-      "old_stem": "sm-gooseneck-spring-screw",
-      "old_number": "MHA-SM-004",
-      "new_identities": [
-        {
-          "stem": "sm-gooseneck-spring-screw",
-          "number": "MHA-SM-04"
-        }
-      ]
-    },
-    {
       "old_stem": "sm-gooseneck",
       "old_number": "MHA-SM-001",
       "new_identities": [
@@ -2288,6 +2257,42 @@
         {
           "stem": "ch-rocker-arm-tl-oblique-hub-washer",
           "number": "MHA-CH-06-TL-52"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-vn-locating-pin",
+      "old_number": null,
+      "introduced": "2026-11-07",
+      "new_identities": [
+        {
+          "parent": "dt-drive-train",
+          "stem": "dt-vn-locating-pin",
+          "number": "MHA-DT-VN-69"
+        }
+      ]
+    },
+    {
+      "old_stem": "sm-vn-gooseneck-shoulder-screw",
+      "old_number": null,
+      "introduced": "2026-11-08",
+      "new_identities": [
+        {
+          "parent": "sm-summing",
+          "stem": "sm-vn-gooseneck-shoulder-screw",
+          "number": "MHA-SM-VN-56"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-vn-keeper-chain-screw",
+      "old_number": null,
+      "introduced": "2026-11-08",
+      "new_identities": [
+        {
+          "parent": "dt-drive-train",
+          "stem": "dt-vn-keeper-chain-screw",
+          "number": "MHA-DT-VN-70"
         }
       ]
     }
@@ -2754,6 +2759,40 @@
           "parent": "pd-paper-drive",
           "stem": "pd-vn-transgear-pivot-shim",
           "number": "MHA-PD-VN-67"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "sm-gooseneck-spring-screw",
+      "old_number": "MHA-SM-004",
+      "new_identities": [
+        {
+          "stem": "sm-gooseneck-spring-screw",
+          "number": "MHA-SM-04"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "vn-keeper-chain-link",
+      "old_number": "MHA-VN-036",
+      "new_identities": [
+        {
+          "parent": "dt-drive-train",
+          "stem": "dt-vn-keeper-chain-link",
+          "number": "MHA-DT-VN-66"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "dt-crank-pin-eye",
+      "old_number": "MHA-DT-028",
+      "new_identities": [
+        {
+          "stem": "dt-crank-pin-eye",
+          "number": "MHA-DT-28"
         }
       ],
       "status": "retired"

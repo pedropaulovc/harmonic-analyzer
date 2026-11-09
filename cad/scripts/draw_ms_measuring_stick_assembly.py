@@ -1,9 +1,9 @@
 r"""Create the three-sheet measuring-stick fitter package (MHA-MS-00).
 
-Sheet 1 shows the stick clamped at its stop mark (upright elevation and an
-aligned third-angle graduated-underside view below it, both at full size), a
-reference overall and near-face setting dimensions, an upright clamp
-section, and the clamp setup note; sheet 2 the builder-owned ``MS_EXPLODED``
+Sheet 1 shows the stick clamped at its stop mark (upright elevation and its
+projected third-angle bottom view below it, both at full size), a reference
+overall and the near-face setting dimension, and an upright clamp section;
+sheet 2 the builder-owned ``MS_EXPLODED``
 presentation with
 the BOM (numbers, descriptions, vendor SKU, quantity) and a balloon on every
 component, both plate screws included; sheet 3 the finished isometric beside
@@ -119,12 +119,10 @@ TITLE_BLOCK = (
 )
 
 # Sheet 1: the 7.95-in stick at full size, working elevation screw-up.
-# The graduated underside sits below Front in aligned third-angle projection.
-# Section A-A uses native end-only cutting-line style: its upper arrow sits
-# above the setting witnesses, below the overall reference dimension.
+# The graduated underside is the projected bottom view, below Front in
+# aligned third-angle projection; a principal view carries no caption.
 FRONT_CENTER = (0.135, 0.190)
 UNDERSIDE_CENTER = (FRONT_CENTER[0], 0.130)
-UNDERSIDE_CAPTION_XY = (0.035, 0.145)
 CLAMP_SECTION_CENTER = (0.340, 0.165)
 CLAMP_SECTION_SCALE = (4.0, 1.0)
 CLAMP_SECTION_LABEL = "A"
@@ -136,8 +134,11 @@ STOP_POSITION_TEXT_Y = 0.220
 # callout clears the section-A label standing over the block's near face.
 STOP_POSITION_TEXT_FRACTION = 0.42
 OVERALL_LENGTH_TEXT_Y = 0.257
-SETUP_NOTE_XY = (0.030, 0.100)
-SETUP_NOTE_WIDTH = 52  # characters; default-format note text
+NOTE_LINE_PITCH = 0.0046  # default-format note line pitch, as measured on MHA-MG-00
+# Owner ruling 2026-11-06 (option C): the drawn stop position is an example.
+# The note sits under the bottom view, where the deleted setup note stood.
+EXAMPLE_NOTE_XY = (0.030, 0.100)
+EXAMPLE_NOTE_WIDTH = 52  # characters; default-format note text
 
 # Sheet 2 alone is portrait: the native full-size exploded outline plus its
 # unchanged 24 mm balloon ring is 202.0739 mm high; landscape has 200.7 mm
@@ -161,9 +162,12 @@ EXPLODED_GROUP_SHIFT_Y = (
 EXPLODED_ISO_CENTER = (_EXPLODED_TEMPLATE.width_m / 2.0, 0.235 + EXPLODED_GROUP_SHIFT_Y)
 BALLOON_MARGIN = 0.012
 SECOND_SCREW_BALLOON_MARGIN = 0.024
+# PART NUMBER holds the longest number (MHA-SH-VN-55, 12 glyphs at ~2.9 mm
+# measured on the 1c08225 sheet 2) on one line: at 32 mm it broke after the
+# last hyphen (machinist review stability r3, clarity).
 BOM_COLUMN_WIDTHS = {
     "item": 0.012,
-    "part": 0.032,
+    "part": 0.042,
     "description": 0.066,
     "sku": 0.032,
     "quantity": 0.012,
@@ -182,8 +186,6 @@ EXPLODED_CAPTION_XY = (BOM_ANCHOR[0], 0.415 + EXPLODED_GROUP_SHIFT_Y)
 # Sheet 3: the order and checks down the left; the finished isometric right.
 ASSEMBLY_ISO_CENTER = (0.315, 0.170)
 STEPS_XY = (0.018, 0.258)
-# Leave space for the deeper pilot/full-thread instruction and centre setting.
-CHECKS_XY = (0.018, 0.105)
 STEPS_LINE_WIDTH = 58  # characters; default-format note text
 
 BOM_QUANTITIES = {stem: spec.QUANTITIES[stem] for stem in sheet.BOM_ORDER}
@@ -273,11 +275,21 @@ def _wrapped(lines: tuple[str, ...], *, width: int, heading: str | None = None) 
     return "\n".join(out)
 
 
-SETUP_NOTE = _wrapped((sheet.CLAMPED_SETUP_NOTE,), width=SETUP_NOTE_WIDTH)
 ASSEMBLY_STEPS = _wrapped(
     sheet.ASSEMBLY_STEPS, width=STEPS_LINE_WIDTH, heading="ASSEMBLY SEQUENCE"
 )
 ASSEMBLY_CHECKS = _wrapped(sheet.ASSEMBLY_CHECKS, width=STEPS_LINE_WIDTH)
+# The checks follow the sequence down the left column, one blank line below
+# it, and must end above the bottom border.
+CHECKS_XY = (
+    STEPS_XY[0],
+    STEPS_XY[1] - (ASSEMBLY_STEPS.count("\n") + 2) * NOTE_LINE_PITCH,
+)
+if CHECKS_XY[1] - (ASSEMBLY_CHECKS.count("\n") + 1) * NOTE_LINE_PITCH < (
+    SHEET_INNER_BORDER[1] + NOTE_LINE_PITCH
+):
+    raise AssertionError("the assembly checks run past the bottom border")
+EXAMPLE_NOTE = _wrapped((sheet.EXAMPLE_POSE_NOTE,), width=EXAMPLE_NOTE_WIDTH)
 
 
 def _activate_sheet(adapter: Any, name: str) -> Any:
@@ -467,10 +479,12 @@ def _validate_bom(adapter: Any, table: Any) -> tuple[tuple[str, str], ...]:
             f"measuring-stick BOM identities {sorted(actual)!r} != "
             f"{sorted(BOM_COMPONENTS)!r}"
         )
-    items = {values[1] for values in actual.values()}
-    if items != {str(item) for item in range(1, len(BOM_COMPONENTS) + 1)}:
+    numbered = {stem: values[1] for stem, values in actual.items()}
+    cited = {stem: str(item) for stem, item in sheet.ITEM_NUMBERS.items()}
+    if numbered != cited:
         raise RuntimeError(
-            f"measuring-stick BOM item numbers {sorted(items)!r} are not contiguous"
+            f"measuring-stick BOM numbers its items {numbered!r}, but the steps "
+            f"cite {cited!r}: the assembly must insert its families in that order"
         )
     for stem, (row_index, _item, description, quantity) in actual.items():
         number = BOM_PART_NUMBERS[stem]
@@ -891,15 +905,18 @@ def _add_assembly_dimensions(adapter: Any, front: Any) -> Callable[[], None]:
 
 
 def _place_clamped_sheet(adapter: Any) -> Callable[[], None]:
-    """Upright working elevation and clamp section, with the labelled
-    graduated-underside inspection and the near-face setting reference."""
+    """Upright working elevation, its projected bottom view (the graduated
+    underside) and clamp section, the near-face reference of the drawn pose
+    and the note that the pose is an example."""
     _activate_sheet(adapter, SHEET_NAMES[0])
-    # Native StandardWithoutConnector, as in draw_fr_rocker_arm_support:
-    # retain the full cutting plane and both arrows, not a hidden section line.
+    # Native StandardWithConnector, as in draw_fr_top_frame: one whole
+    # cutting-plane line joins both arrows (drawing guidelines: arrows standing
+    # alone are not a cutting plane). It runs across the clamp only, at the
+    # thumbscrew axis, because section A shows that one clamp.
     extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
-    if not extension.SetUserPreferenceInteger(542, 0, 1):
-        raise RuntimeError("failed to set end-only section cutting line")
-    if extension.GetUserPreferenceInteger(542, 0) != 1:
+    if not extension.SetUserPreferenceInteger(542, 0, 0):
+        raise RuntimeError("failed to set connected section cutting line")
+    if extension.GetUserPreferenceInteger(542, 0) != 0:
         raise RuntimeError("section cutting-line style did not persist")
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=SHEET_SCALE)
     underside = place_view(
@@ -910,11 +927,6 @@ def _place_clamped_sheet(adapter: Any) -> Callable[[], None]:
         set_hidden_lines_removed(adapter, view)
         apply_view_configuration(adapter, view, label=label)
         _assert_view_on_sheet(view, label=label)
-    _add_note_block(
-        adapter, SHEET_NAMES[0], sheet.UNDERSIDE_CAPTION,
-        UNDERSIDE_CAPTION_XY, label="graduated-underside caption",
-    )
-
     _left, y0, _right, y1 = _view_outline(front, label="clamped front")
     axis_point = tuple(value / 1000.0 for value in spec.THUMB_ORIGIN)
     station_x = model_point_in_view(
@@ -940,7 +952,7 @@ def _place_clamped_sheet(adapter: Any) -> Callable[[], None]:
     _assert_view_on_sheet(section, label="thumbscrew clamp section")
     settled = _add_assembly_dimensions(adapter, front)
     _add_note_block(
-        adapter, SHEET_NAMES[0], SETUP_NOTE, SETUP_NOTE_XY, label="clamped-setup note"
+        adapter, SHEET_NAMES[0], EXAMPLE_NOTE, EXAMPLE_NOTE_XY, label="example-pose note"
     )
     return settled
 

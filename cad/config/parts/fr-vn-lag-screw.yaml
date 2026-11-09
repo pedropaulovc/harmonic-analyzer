@@ -12,3 +12,9 @@ fr-vn-lag-screw:
   fit_class: fastener_clearance
   process: purchased
   drawing_unit: in
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "accept"
+      where: "title block PART field 'fr-vn-lag-screw'"
+      finding: "the PART field prints the CAD slug, whose word 'lag' names a wood screw, against the ITEM line and SKU of a 1/4-20 machine-thread hex head screw (rule 26)"
+      reason: "Owner ruling 2026-11-08 (Pedro), #2144 item 12.1. The PART cell prints the part slug fleet-wide (owner ruling 2026-09-26); renaming this identity re-keys the screw, the frame assembly and the harmonic-analyzer assembly for a label the ITEM line, the SKU 92240A540 and the drawn thread already resolve. Accepts the slug only, no other naming or callout departure."

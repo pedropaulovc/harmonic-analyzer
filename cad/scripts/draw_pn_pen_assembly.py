@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import math
+import re
 import sys
 import textwrap
 from dataclasses import dataclass
@@ -531,17 +532,30 @@ STEPS_TOP = SHEET_INNER_BORDER[3] - 0.005
 STEPS_LINE_WIDTH = 108  # characters
 
 
+_STEP_LABEL = re.compile(r"(\d+)[A-HJ-NP-Z]?")
+
+
+def _step_group(line: str) -> str | None:
+    """The step number a numbered line belongs to ("1" for "1" and "1A"), or
+    None for a heading or a plain line."""
+    number, sep, _rest = line.partition(". ")
+    match = _STEP_LABEL.fullmatch(number) if sep else None
+    return match.group(1) if match else None
+
+
 def _wrapped(lines: tuple[str, ...], *, width: int, heading: str | None = None) -> str:
-    """Wrap each numbered line under its own number, one blank line between a
-    step and whatever follows it; one note per block."""
+    """Wrap each numbered line under its own number or lettered sub-step
+    label, one blank line between a step group (a step and its lettered
+    sub-steps) and whatever follows it; one note per block."""
     out = [heading] if heading else []
-    after_step = False
+    group: str | None = None
     for line in lines:
-        if after_step:
+        number, _sep, rest = line.partition(". ")
+        current = _step_group(line)
+        if group is not None and current != group:
             out.append("")
-        number, sep, rest = line.partition(". ")
-        after_step = bool(sep and number.isdigit())
-        if after_step:
+        group = current
+        if current is not None:
             out += textwrap.wrap(
                 rest,
                 width=width,
@@ -560,7 +574,7 @@ def _wrapped(lines: tuple[str, ...], *, width: int, heading: str | None = None) 
 _GROUP_HEADINGS = tuple(
     index
     for index, line in enumerate(notes.ASSEMBLY_STEPS)
-    if not line.partition(". ")[0].isdigit()
+    if _step_group(line) is None
 )
 if len(_GROUP_HEADINGS) != 2 or _GROUP_HEADINGS[0] != 0:
     raise AssertionError("the pen sequence is a bench group then an at-machine group")
@@ -1333,6 +1347,14 @@ def _bom_column(
     return matches[0]
 
 
+def _exploded_caption(scale: tuple[float, float]) -> str:
+    """The exploded view's caption; its scale prints only when the fit chose
+    one other than the sheet's (rule 9)."""
+    if scale[0] / scale[1] == SHEET_SCALE[0] / SHEET_SCALE[1]:
+        return notes.EXPLODED_CAPTION
+    return f"{notes.EXPLODED_CAPTION}\nSCALE {_scale_text(scale)}"
+
+
 def _place_exploded_caption(adapter: Any, table: Any, scale: tuple[float, float]) -> None:
     """Place the caption below the rebuilt BOM, including every wrapped row."""
     table = _early_bound(table, "ITableAnnotation")
@@ -1350,7 +1372,7 @@ def _place_exploded_caption(adapter: Any, table: Any, scale: tuple[float, float]
     caption = _add_note_block(
         adapter,
         SHEET_NAMES[1],
-        f"{notes.EXPLODED_CAPTION}\nSCALE {_scale_text(scale)}",
+        _exploded_caption(scale),
         (position[0], bottom - NOTE_GAP),
         label="exploded-view caption",
     )

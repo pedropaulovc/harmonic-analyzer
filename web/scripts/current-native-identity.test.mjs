@@ -87,8 +87,11 @@ retiredTooling.push(...[
   status: 'retired',
 })))
 // Machine identities retired after the cutover: the 3/16 pen-rod set screw gave
-// way to the shared MHA-SH-VN-54 1/4 cup point (#2119, rule 18 engagement), and
-// the MHA-PD-VN-67 pivot shim to the arm's spot face (#290).
+// way to the shared MHA-SH-VN-54 1/4 cup point (#2119, rule 18 engagement),
+// the MHA-PD-VN-67 pivot shim to the arm's spot face (#290), the made
+// gooseneck spring screw to the purchased MHA-SM-VN-56 shoulder screw (owner
+// ruling 2026-11-08 (Pedro), #2144 item 11.4), and the MHA-DT-28 anchor eye
+// and MHA-DT-VN-66 loop link to the screwed jack chain (#2144 9.2).
 const retiredMachine = [{
   old_stem: 'vn-pen-rod-set-screw',
   old_number: 'MHA-VN-061',
@@ -98,6 +101,21 @@ const retiredMachine = [{
   old_stem: 'vn-transgear-pivot-shim',
   old_number: 'MHA-VN-069',
   new_identities: [{ parent: 'pd-paper-drive', stem: 'pd-vn-transgear-pivot-shim', number: 'MHA-PD-VN-67' }],
+  status: 'retired',
+}, {
+  old_stem: 'sm-gooseneck-spring-screw',
+  old_number: 'MHA-SM-004',
+  new_identities: [{ stem: 'sm-gooseneck-spring-screw', number: 'MHA-SM-04' }],
+  status: 'retired',
+}, {
+  old_stem: 'vn-keeper-chain-link',
+  old_number: 'MHA-VN-036',
+  new_identities: [{ parent: 'dt-drive-train', stem: 'dt-vn-keeper-chain-link', number: 'MHA-DT-VN-66' }],
+  status: 'retired',
+}, {
+  old_stem: 'dt-crank-pin-eye',
+  old_number: 'MHA-DT-028',
+  new_identities: [{ stem: 'dt-crank-pin-eye', number: 'MHA-DT-28' }],
   status: 'retired',
 }]
 
@@ -347,7 +365,7 @@ test('every active projected row equals CAD and historical-only occurrences stay
   assert.throws(() => validateCurrentNativeIdentityProjection(inventedHistoricalRegistry, cadMap), /archive-only identities/)
   const addedHistorical = structuredClone(table)
   addedHistorical.archiveOnlyVendors.push({ ...addedHistorical.archiveOnlyVendors[0] })
-  assert.throws(() => validateCurrentNativeIdentityProjection(addedHistorical, cadMap), /exactly the three historical/)
+  assert.throws(() => validateCurrentNativeIdentityProjection(addedHistorical, cadMap), /exactly the four historical/)
   for (const field of ['configuration', 'role', 'priorStem', 'priorNumber']) {
     const changed = structuredClone(table)
     changed.machineVendors.find(row => row.sourceStem === 'vn-chain-inner-link').identities[0][field] += 'Changed'
@@ -364,6 +382,18 @@ test('a retired machine vendor has no live projection or current Number lookup',
     const current = row.new_identities[0]
     assert.ok(!table.machineVendors.some(active => active.sourceStem === row.old_stem
       || active.identities.some(target => target.stem === current.stem || target.number === current.number)))
+    // The archived MHA-DT-VN-66 loop link (v39) stays displayable as an
+    // archive-only occurrence: its historical Number resolves to no current
+    // Number and its retired current Number identifies nothing.
+    const archived = table.archiveOnlyVendors.find(entry => entry.sourceStem === row.old_stem)
+    if (archived) {
+      assert.deepEqual([archived.parent, archived.stem, archived.number], [current.parent, current.stem, null])
+      assert.equal(projectCurrentNativeNumber(row.old_number, row.old_stem, current.parent), null)
+      assert.throws(() => projectCurrentNativeNumber(current.number, current.stem, current.parent), /does not identify/)
+      assert.equal(projectCurrentNativePath(path(current.parent, `${row.old_stem}-1`)),
+        path(current.parent, `${current.stem}-1`))
+      continue
+    }
     for (const number of [row.old_number, current.number]) {
       assert.throws(() => projectCurrentNativeNumber(number, current.stem), /unknown native identity/)
     }

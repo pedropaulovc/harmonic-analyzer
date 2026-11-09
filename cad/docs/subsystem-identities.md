@@ -28,7 +28,7 @@ Components of a built-up part are the detail parts a finished part may be made f
 |---|---|---:|---:|
 | `ha` / `HA` | Harmonic analyzer | 0 | 0 |
 | `ch` / `CH` | Channel | 13 | 7 |
-| `dt` / `DT` | Drive train | 35 | 15 |
+| `dt` / `DT` | Drive train | 34 | 15 |
 | `fr` / `FR` | Frame | 5 | 4 |
 | `mg` / `MG` | Magnifier | 10 | 4 |
 | `pd` / `PD` | Paper drive | 23 | 13 |
@@ -37,7 +37,7 @@ Components of a built-up part are the detail parts a finished part may be made f
 | `sm` / `SM` | Summing | 4 | 6 |
 | `sh` / `SH` | Shared parts | 2 | 7 (+1 tooling-only kit family) |
 
-The vendor column counts machine vendor families. The 2026-10-20 shared-vendor consolidation moved nineteen parent-scoped vendor identities into eight shared ones: CH lost 1 (8 to 7), DT lost 4 (19 to 15), FR lost 1 (5 to 4), MG lost 3 (7 to 4), PD lost 5 (18 to 13), PN lost 1 (8 to 7) and MS lost 1 (2 to 1); SM is unchanged. SH gained seven machine vendor families (MHA-SH-VN-50 to MHA-SH-VN-56) plus one tooling-only family, `sh-vn-clamping-kit-hardware` (MHA-SH-VN-57, `usage_scope: tooling`), which replaced three oblique-jig fixture identities and is listed separately because fixture hardware is excluded from machine counts. Count it neither as a machine vendor family nor twice. The 2026-10-31 retirement of the MHA-PD-VN-67 pivot shim took PD from 13 to 12.
+The vendor column counts machine vendor families. The 2026-10-20 shared-vendor consolidation moved nineteen parent-scoped vendor identities into eight shared ones: CH lost 1 (8 to 7), DT lost 4 (19 to 15), FR lost 1 (5 to 4), MG lost 3 (7 to 4), PD lost 5 (18 to 13), PN lost 1 (8 to 7) and MS lost 1 (2 to 1); SM is unchanged. SH gained seven machine vendor families (MHA-SH-VN-50 to MHA-SH-VN-56) plus one tooling-only family, `sh-vn-clamping-kit-hardware` (MHA-SH-VN-57, `usage_scope: tooling`), which replaced three oblique-jig fixture identities and is listed separately because fixture hardware is excluded from machine counts. Count it neither as a machine vendor family nor twice. The 2026-10-31 retirement of the MHA-PD-VN-67 pivot shim took PD from 13 to 12. The 2026-11-08 keeper-chain ruling (#2144 item 9.2) retired the MHA-DT-28 anchor eye and the MHA-DT-VN-66 loop link and added the MHA-DT-VN-70 keeper-chain screw: DT parts went from 35 to 34, and DT vendor families stayed at 15.
 
 SH contains fabricated parts used directly by several assemblies, currently the front and back column clamps, `sh-column-clamp-front` (MHA-SH-01) and `sh-column-clamp-back` (MHA-SH-02), and the shared vendor parts listed under [Shared vendor families](#shared-vendor-families). Each keeps one shared identity. The wheel axle nut, `mg-vn-wheel-axle-nut`, is a vendor part by commercial-process evidence. HA holds the top assembly only: its two former parts, the measuring stick and its stop, moved into the MS category on 2026-10-09 when the stop was re-derived as a block, a plate and stock screws inside their own `ms-measuring-stick` sub-assembly.
 
@@ -193,11 +193,16 @@ Do not cut an engaged thread, insert a stud deeper to rescue the cut, add a
 hold-down washer or force the assembly; reject an incompatible setup.
 Measure the actual complete-thread setback separately: the cut-end chamfer
 limit alone does not bound incomplete threads or establish nut engagement.
-The complete installed authority is **TL-00, HD1–HD4, sheet 9**. The stud's
-single REWORK sheet cites that authority rather than duplicating it. HD1/HD2
-retain actual B/D/H/N/W/U intervals and finished L limits; HD3 is the stud
-rework and realignment; HD4 repeats the installed checks after final
-clamping. Missing readings reject the setup.
+The complete installed authority is **TL-00, steps 13A–13F, sheet 9**. The
+stud's single REWORK sheet cites that authority rather than duplicating it.
+The studs are cut to the kit sheet's length at step 3 and accepted directly
+in place: 13A gauges .119 MIN under every moving block over both passes,
+13B–13D cut a replacement stud shorter by the missing clearance plus .010
+and refit it, 13E checks one complete pitch beyond each seated nut, and 13F
+stops the setup for the designer when a stud cannot pass (delegated ruling
+2026-11-07 (Main), no precedent; owner review #2144; pending owner
+confirmation). The earlier HD1/HD2 prediction from measured stack intervals
+is retired.
 
 These are actual fit-up requirements, not invented PM kit tolerance bands.
 The 22 mm insertion stack (assumed 14 mm throat + 8 mm foot), 28 mm nominal
@@ -314,7 +319,7 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | part | `pinion-cam-pin` | MHA-116 | `dt-pinion-cam-pin` | MHA-DT-025 | `dt-pinion-cam-pin` | MHA-DT-25 |
 | part | `cylinder-end-disc` | MHA-121 | `dt-cylinder-end-disc` | MHA-DT-026 | `dt-cylinder-end-disc` | MHA-DT-26 |
 | part | `crank-pin-ring` | MHA-128 | `dt-crank-pin-ring` | MHA-DT-027 | `dt-crank-pin-ring` | MHA-DT-27 |
-| part | `crank-pin-eye` | MHA-130 | `dt-crank-pin-eye` | MHA-DT-028 | `dt-crank-pin-eye` | MHA-DT-28 |
+| retired part | `crank-pin-eye` | MHA-130 | `dt-crank-pin-eye` | MHA-DT-028 | — | MHA-DT-28 (retired 2026-11-08; never reissued) |
 | part | `crank-pinion-pin` | MHA-134 | `dt-crank-pinion-pin` | MHA-DT-029 | `dt-crank-pinion-pin` | MHA-DT-29 |
 | part | `pinion-lever-pin` | MHA-135 | `dt-pinion-lever-pin` | MHA-DT-030 | `dt-pinion-lever-pin` | MHA-DT-30 |
 | part | `crank-hub` | MHA-137 | `dt-crank-hub` | MHA-DT-031 | `dt-crank-hub` | MHA-DT-31 |
@@ -377,7 +382,7 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | part | `gooseneck` | MHA-032 | `sm-gooseneck` | MHA-SM-001 | `sm-gooseneck` | MHA-SM-01 |
 | part | `knife-mount` | MHA-037 | `sm-knife-mount` | MHA-SM-002 | `sm-knife-mount` | MHA-SM-02 |
 | part | `summing-lever` | MHA-073 | `sm-summing-lever` | MHA-SM-003 | `sm-summing-lever` | MHA-SM-03 |
-| part | — | — | `sm-gooseneck-spring-screw` | MHA-SM-004 | `sm-gooseneck-spring-screw` | MHA-SM-04 |
+| retired part | — | — | `sm-gooseneck-spring-screw` | MHA-SM-004 | — (replaced by the purchased `sm-vn-gooseneck-shoulder-screw`, MHA-SM-VN-56) | MHA-SM-04 (retired 2026-11-08; never reissued) |
 | part | `boss-hook` | MHA-005 | `vn-boss-hook` | MHA-VN-001 | `sm-vn-boss-hook` | MHA-SM-VN-50 |
 | part | `channel-spring-installed` | MHA-011 | `vn-channel-spring-installed` | MHA-VN-004 | `ch-vn-channel-spring-installed` | MHA-CH-VN-50 |
 | part | `counter-spring` | MHA-019 | `vn-counter-spring` | MHA-VN-005 | `sm-vn-counter-spring` | MHA-SM-VN-51 |
@@ -410,7 +415,7 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | part | `pinion-strap-pin` | MHA-145 | `vn-pinion-strap-pin` | MHA-VN-033 | `dt-vn-pinion-strap-pin` | MHA-DT-VN-63 |
 | part | `arbor-set-screw` | MHA-147 | `vn-arbor-set-screw` | MHA-VN-034 | `sh-vn-arbor-set-screw` | MHA-SH-VN-54 |
 | part | `keeper-chain` | MHA-149 | `vn-keeper-chain` | MHA-VN-035 | `dt-vn-keeper-chain` | MHA-DT-VN-65 |
-| part | `keeper-chain-link` | MHA-150 | `vn-keeper-chain-link` | MHA-VN-036 | `dt-vn-keeper-chain-link` | MHA-DT-VN-66 |
+| retired vendor part | `keeper-chain-link` | MHA-150 | `vn-keeper-chain-link` | MHA-VN-036 | — | MHA-DT-VN-66 (retired 2026-11-08; never reissued) |
 | retired part | `transgear-collar-cross-pin` | MHA-154 | `vn-transgear-collar-cross-pin` | MHA-VN-037 | — | — (retired; MHA-VN-037 never reissued) |
 | part | `transgear-knob-drive-pin` | MHA-155 | `vn-transgear-knob-drive-pin` | MHA-VN-038 | `pd-vn-transgear-knob-drive-pin` | MHA-PD-VN-54 |
 | part | `transgear-disc-screw` | MHA-161 | `vn-transgear-disc-screw` | MHA-VN-039 | `pd-vn-transgear-disc-screw` | MHA-PD-VN-55 |
@@ -445,9 +450,12 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | part | — | — | `vn-rocker-thrust-washer` | MHA-VN-070 | `ch-vn-rocker-thrust-washer` | MHA-CH-VN-56 |
 | part | — | — | `vn-bracket-hold-down-screw` | MHA-VN-071 | `ch-vn-bracket-hold-down-screw` | MHA-CH-VN-57 |
 | part | — | — | `vn-boss-hook-jam-nut` | MHA-VN-072 | `sm-vn-boss-hook-jam-nut` | MHA-SM-VN-55 |
+| part | — | — | — | — | `sm-vn-gooseneck-shoulder-screw` | MHA-SM-VN-56 |
 | part | — | — | `vn-knife-hanger-washer` (new #10 family) | MHA-VN-060 | `sm-vn-knife-hanger-washer` | MHA-SM-VN-54 |
 | part | — | — | `vn-chain-connecting-link` | MHA-VN-068 | `pd-vn-chain-connecting-link` | MHA-PD-VN-66 |
 | part | — | — | — | — | `pd-vn-transgear-cluster-shim` | MHA-PD-VN-68 |
+| part | — | — | — | — | `dt-vn-keeper-chain-screw` | MHA-DT-VN-70 |
+| part | — | — | — | — | `dt-vn-locating-pin` | MHA-DT-VN-69 |
 | part | `column-clamp-front` | MHA-105 | `sh-column-clamp-front` | MHA-SH-001 | `sh-column-clamp-front` | MHA-SH-01 |
 | part | `column-clamp-back` | MHA-106 | `sh-column-clamp-back` | MHA-SH-002 | `sh-column-clamp-back` | MHA-SH-02 |
 | retired tooling part | — | — | `ch-rocker-arm-tl-vise-stop` | MHA-CH-006-TL-01 | — | MHA-CH-06-TL-01 (retired; never reissued) |
@@ -543,7 +551,7 @@ At the 2026-10-19 cutover, four category vendor families were in direct use by m
 | Current stem | Current Number | Supplier and SKU | Configurations (installed members) | Direct consumers |
 |---|---|---|---|---|
 | `sh-vn-chain-link` | MHA-SH-VN-50 | McMaster-Carr 6261K171, sold by the foot | `InnerLink` 33; `OuterLink` 32 | `pd-paper-drive` (one cut 66-pitch loop closed by `pd-vn-chain-connecting-link` MHA-PD-VN-66, which stays parent-scoped: 6261K108 has one consumer; #2034 shortened it from 68 pitches) |
-| `sh-vn-brass-fillister-screw` | MHA-SH-VN-51 | McMaster-Carr 90114A511 | `Default` | `dt-drive-train`, `fr-frame`, `pd-paper-drive` |
+| `sh-vn-brass-fillister-screw` | MHA-SH-VN-51 | McMaster-Carr 90114A511 | `Default` | `fr-frame`, `pd-paper-drive` (`dt-drive-train`'s one keeper-anchor screw gave way to MHA-DT-VN-70 on 2026-11-08) |
 | `sh-vn-fillister-screw-90280a108` | MHA-SH-VN-52 | McMaster-Carr 90280A108 | `Default` (foot's unshifted stock frame; the swing-stop's PROUD_LEN placement and application colours live in the consuming occurrences) | `dt-drive-train` (foot and swing-stop roles), `pd-paper-drive` (latch-hook screws) |
 | `sh-vn-clamp-screw` | MHA-SH-VN-53 | McMaster-Carr 90280A201 | `Default` | `mg-magnifier`, `pd-paper-drive` |
 | `sh-vn-arbor-set-screw` | MHA-SH-VN-54 | McMaster-Carr 91375A106 | `Default` (alloy steel, Rockwell C45, black oxide, unchanged) | `ch-channel`, `dt-drive-train`, `pn-pen` (rod set screw) |
@@ -652,6 +660,7 @@ A retired Number is never reused. A family added after a cutover takes the next 
 | added | `pd-vn-chain-connecting-link` | MHA-PD-VN-66 | McMaster 6261K108 clip-retained connecting link that joins the cut 6261K171 chain's two inner-link ends; MHA-PD-VN-51 keeps only the cut chain's 33 outer links |
 | retired | `pd-vn-transgear-pivot-shim` | MHA-PD-VN-67 | 2026-10-31 owner ruling (#290): the MHA-PD-18 spot face is 0.5 shallower (floor 6.4 to 6.9 from the front face), which gives the MHA-PD-VN-63 spring the room the 98055A098 shim restored; no registry, builder or drawing; Number never reissued |
 | added | `pd-vn-transgear-cluster-shim` | MHA-PD-VN-68 | 2026-11-01 owner ruling (#2124): 18-8 stainless shoulder shim, 1/8 ID x 1/4 OD x 0.005 in, McMaster-Carr 94773A606; shimmed between the MHA-PD-18 arm face and the MHA-PD-24 rear bushing to set the disc cluster's end float at assembly, so no cluster part is faced to fit |
+| added | `dt-vn-locating-pin` | MHA-DT-VN-69 | rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR #2248): alloy-steel dowel pin, 1/16 x 3/8, Round x Chamfer ends, McMaster-Carr 98381A417; one in MHA-DT-00, the tip-block locating dowel: pressed to the floor of the MHA-DT-21 foot's blind .0620 REAM_H7 ream and a slip fit in the MHA-DT-20 plate's .0630 thru ream, match-drilled at MHA-DT-00 step 2, locating the MHA-DT-21 cone tip block on the MHA-DT-20 platform |
 | retired | `ch-rocker-thrust-washer` | MHA-CH-09 | replaced by the purchased MHA-CH-VN-56 rocker thrust washer (owner, 2026-10-15: every washer is a purchased part) |
 | added | `ch-vn-rocker-thrust-washer` | MHA-CH-VN-56 | carbon-steel ring shim, 1/4 ID x 3/8 OD x 0.031 in, McMaster-Carr 3088A429; one each end of the rocker bank on the MHA-CH-05 pivot shaft, the north one against the datum MHA-CH-08 ear |
 | retired | `dt-crank-seat-washer` | MHA-DT-36 | deleted, owner ruling D1 2026-10-15: collar bears on the post boss |
@@ -747,3 +756,8 @@ A retired Number is never reused. A family added after a cutover takes the next 
 | retired | `ch-rocker-arm-tl-vn-oblique-cl-dowel` | MHA-CH-06-TL-VN-53 | 2026-11-07 owner ruling 4: the CL end clamp takes the common MHA-CH-06-TL-VN-61 screw; no registry, builder or drawing; Number never reissued |
 | retired | `ch-rocker-arm-tl-vn-oblique-clamp-screw` | MHA-CH-06-TL-VN-68 | 2026-11-07 owner ruling 4: the CR end clamp takes the common MHA-CH-06-TL-VN-61 screw; no registry, builder or drawing; Number never reissued |
 | added | `ch-rocker-arm-tl-oblique-hub-washer` | MHA-CH-06-TL-52 | 2026-11-06 turned C360 brass top-hat washer x1 (owner ruling 5, 2026-11-07: Ø11 flange, spigot Ø9.95 ±.05 x .35 long, 13/64 bore, flange edges broken .005 max), seated under the common MHA-CH-06-TL-VN-61 HUB clamp screw on the strap; TL-35 stays retired and is not reused |
+| retired | `dt-crank-pin-eye` | MHA-DT-28 | 2026-11-08 owner ruling (#2144 item 9.2): the 3603T354 jack chain's end link is screwed flat to the MHA-DT-06 arm through its own eye, so the formed brass anchor eye is not needed; no registry, builder or drawing; Number never reissued |
+| retired | `dt-vn-keeper-chain-link` | MHA-DT-VN-66 | 2026-11-08 owner ruling (#2144 item 9.2): the keeper is one open jack-chain strand, not a bead-chain loop, so the 3606T811 loop link is not needed; no registry, builder or drawing; Number never reissued |
+| added | `dt-vn-keeper-chain-screw` | MHA-DT-VN-70 | 2026-11-08 owner ruling (#2144 item 9.2): brass #2-56 x 1/4 slotted binding-head screw, McMaster-Carr 92443A077, x1; clamps the MHA-DT-VN-65 chain's end link to the MHA-DT-06 arm's #2-56 tap through the link's eye, in place of the MHA-SH-VN-51 fillister screw that clamped the MHA-DT-28 eye |
+| retired | `sm-gooseneck-spring-screw` | MHA-SM-04 | Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: the shop-turned 1/4-28 cheese-head screw that clamped the counter spring's upper eye gives way to the purchased MHA-SM-VN-56 shoulder screw, the eye riding free on its shoulder (superseding #1951's clamped eye); no registry, builder or drawing; stem and Number never reissued |
+| added | `sm-vn-gooseneck-shoulder-screw` | MHA-SM-VN-56 | Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: McMaster-Carr 91829A566 slotted 18-8 stainless precision shoulder screw, 1/4 x 3/8 in shoulder, 10-24 thread (owner ruling 2026-11-08 (Pedro), #2144 item 11.4: bare slotted McMaster 91829A566, washer dropped); its shoulder seats on the MHA-SM-01 end face in a plain blind tap, and the MHA-SM-VN-51 upper eye rides free on it |

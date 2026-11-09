@@ -1742,329 +1742,6 @@ def test_green_top_caption_clears_the_native_height_stack() -> None:
     assert all(sheet.box_gap(box, neighbor) >= 0.0035 for neighbor in neighbors)
 
 
-# Sheet-2 native extents from r2b, run
-# 20261019T211244551Z-fb69447dfb4048419fd6b021e4f5c124, in sheet metres.
-# Translations and the two offset-anchor readings below are offline controls,
-# not a claim that the proposed placement has already drawn on a native seat.
-_R2B_PIVOT_X_KEEP = (0.257, 0.145)
-_R2B_PIVOT_X_TEXT = (0.2448681, 0.1431558, 0.2690665, 0.1467211)
-_R2B_PIVOT_X_LINE_Y = 0.1422219
-_R2B_PIVOT_X_WITNESS_STARTS = (
-    (0.2583636, 0.1711521),
-    (0.2649016, 0.1740415),
-)
-_R2B_DATUM_X_TEXT = (0.2425598, 0.1438616, 0.2450907, 0.1472636)
-_R2B_DATUM_X_AXIS = (0.22285, 0.145605, 0.238901, 0.145605)
-_R2B_HOLE_PLAN = (0.22285, 0.1591, 0.33715, 0.2309)
-_R2B_D1_TEXT = (0.247406, 0.1834876, 0.251993, 0.1868896)
-_R2B_D1_Y = 0.1690524
-_R2B_PEDESTAL_Y = 0.1719847
-
-
-def _r2b_pivot_x_text_at(keep):
-    dx, dy = keep[0] - _R2B_PIVOT_X_KEEP[0], keep[1] - _R2B_PIVOT_X_KEEP[1]
-    return tuple(
-        value + (dx if index % 2 == 0 else dy)
-        for index, value in enumerate(_R2B_PIVOT_X_TEXT)
-    )
-
-
-def test_pivot_x_keep_replays_clearance_from_both_native_witnesses_and_datum() -> None:
-    import draw_fr_harmonic_base as sheet
-
-    for x, start_y in _R2B_PIVOT_X_WITNESS_STARTS:
-        witness = (x, start_y, x, _R2B_PIVOT_X_LINE_Y - 0.001)
-        assert sheet.segment_crosses_box(witness, _R2B_PIVOT_X_TEXT)
-    assert sheet.box_gap(_R2B_PIVOT_X_TEXT, _R2B_DATUM_X_TEXT) < 0.0
-
-    keep = sheet.HOLE_TOP_KEEP["PivotSeatX"]
-    box = _r2b_pivot_x_text_at(keep)
-    line_y = _R2B_PIVOT_X_LINE_Y + keep[1] - _R2B_PIVOT_X_KEEP[1]
-    assert _R2B_PIVOT_X_WITNESS_STARTS[0][0] - box[2] >= 0.0035
-    neighbors = {
-        "datum X letter": _R2B_DATUM_X_TEXT,
-        "datum zero": (0.2187063, 0.1437608, 0.2209937, 0.1473261),
-        "datum X axis": _R2B_DATUM_X_AXIS,
-        "datum vertical drop": (0.22285, 0.143605, 0.22285, 0.1581),
-        "plan": _R2B_HOLE_PLAN,
-    }
-    for label, neighbor in neighbors.items():
-        assert sheet.box_gap(box, neighbor) >= 0.0035, label
-    cross_tap_count = (0.2625209, 0.1208449, 0.2676798, 0.1243309)
-    for x, start_y in _R2B_PIVOT_X_WITNESS_STARTS:
-        witness = (x, line_y - 0.001, x, start_y)
-        assert not sheet.segment_crosses_box(witness, box)
-        assert sheet.box_gap(witness, cross_tap_count) >= 0.0035
-    tail = (0.2649016, line_y, 0.2712516, line_y)
-    spring_leader = (0.2717697, 0.1756206, 0.2809549, 0.131634)
-    assert not sheet.segment_crosses_box(spring_leader, tail)
-    # The restored flags-safe X line stays below the finite spring leader's
-    # native endpoint; extending that leader would invent an intersection.
-    assert min(spring_leader[1], spring_leader[3]) - line_y >= 0.002
-
-
-def test_pivot_y_line_replays_the_narrow_native_between_hole_window() -> None:
-    import draw_fr_harmonic_base as sheet
-
-    a1_text = (0.2345301, 0.1671557, 0.2393918, 0.1705577)
-    old_d1_witness = (0.256264, _R2B_D1_Y, 0.191, _R2B_D1_Y)
-    assert sheet.segment_crosses_box(old_d1_witness, a1_text)
-    x, y = sheet.HOLE_TOP_KEEP["PivotSeatY"]
-    # Native centre-mark arms plus their 1 mm witness gaps leave only this
-    # 2.38 mm window. A fully right-sided line would run through other ink.
-    assert 0.2604633 < x < 0.2628448
-    assert _R2B_D1_Y < y < _R2B_PEDESTAL_Y
-    # Replay either plausible D1 arm after moving the line across its hole.
-    # The pedestal's measured inner-arm start is 262.8448 mm, not 262.7 mm.
-    witnesses = (
-        (0.2604633, _R2B_D1_Y, x + 0.001, _R2B_D1_Y),
-        (0.256264, _R2B_D1_Y, x + 0.001, _R2B_D1_Y),
-        (x - 0.001, _R2B_PEDESTAL_Y, 0.2628448, _R2B_PEDESTAL_Y),
-    )
-    for witness in witnesses:
-        assert 0.256 < witness[0] <= witness[2] <= 0.2628448
-        assert not sheet.segment_crosses_box(witness, a1_text)
-        assert not sheet.segment_crosses_box(witness, _R2B_DATUM_X_TEXT)
-        assert not sheet.segment_crosses_box(witness, _R2B_DATUM_X_AXIS)
-    # The lower outside-arrow tail remains parallel between the X witnesses.
-    # This is line-to-line air, not the 3.5 mm text-clearance requirement.
-    assert x - _R2B_PIVOT_X_WITNESS_STARTS[0][0] >= 0.003
-    assert _R2B_PIVOT_X_WITNESS_STARTS[1][0] - x >= 0.003
-
-
-
-
-def _pivot_y_placement_fakes(monkeypatch, failure=None):
-    """Unit-only collaborators; they do not establish native layout success."""
-    from types import SimpleNamespace
-
-    import draw_fr_harmonic_base as sheet
-
-    events = []
-
-    class Display:
-        def __init__(self):
-            self.offset = True  # Prove the helper resets an inherited offset.
-
-        @property
-        def OffsetText(self):  # noqa: N802 - the COM member name
-            events.append(("offset-read", self.offset))
-            return self.offset
-
-        @OffsetText.setter
-        def OffsetText(self, value):  # noqa: N802 - the COM member name
-            events.append(("offset-set", value))
-            if not (failure == "reset" and not value):
-                self.offset = value
-
-    class Annotation:
-        name = "PivotSeatY"
-
-        def __init__(self):
-            self.display = Display()
-            self.stage = "line"
-            self.position = (0.192, 0.164, 0.0)
-
-        def GetSpecificAnnotation(self):  # noqa: N802 - the COM member name
-            return self.display
-
-        def SetPosition2(self, x, y, z):  # noqa: N802 - the COM member name
-            events.append(("line-set", (x, y, z)))
-            assert not self.display.offset
-            if failure == "line-set":
-                return False
-            self.position = (x, y, z)
-            return True
-
-        def GetPosition(self):  # noqa: N802 - the COM member name
-            position = self.position
-            if failure == f"{self.stage}-missing":
-                position = None
-            elif failure == f"{self.stage}-drift":
-                position = (position[0] + 0.001, position[1], position[2])
-            elif failure == f"{self.stage}-nan":
-                position = (math.nan, position[1], position[2])
-            events.append(("position-read", position))
-            return position
-
-    adapter = object()
-    annotation = Annotation()
-
-    def offset(adapter_arg, annotations, positions):
-        events.append(("offset-call", adapter_arg, annotations, positions))
-        assert adapter_arg is adapter
-        assert annotations == [annotation]
-        assert positions == {"PivotSeatY": sheet.PIVOT_SEAT_Y_TEXT_XY}
-        if failure == "offset-helper":
-            raise RuntimeError("offset helper refused")
-        annotation.display.OffsetText = True
-        if failure == "offset-state":
-            annotation.display.offset = False
-        annotation.stage = "text"
-        annotation.position = (*positions["PivotSeatY"], 0.0)
-
-    monkeypatch.setattr(sheet, "_early_bound", lambda obj, interface: obj)
-    monkeypatch.setattr(sheet, "dimension_name", lambda adapter, item: item.name)
-    monkeypatch.setattr(sheet, "offset_dimension_text", offset)
-    other = SimpleNamespace(name="PivotSeatX")
-    return adapter, annotation, other, events
-
-
-def test_pivot_y_placement_resets_then_places_line_offsets_and_reads_back(monkeypatch) -> None:
-    import draw_fr_harmonic_base as sheet
-
-    adapter, annotation, other, events = _pivot_y_placement_fakes(monkeypatch)
-    sheet._place_pivot_seat_y(adapter, [other, annotation])
-    assert events == [
-        ("offset-set", False),
-        ("offset-read", False),
-        ("line-set", (*sheet.HOLE_TOP_KEEP["PivotSeatY"], 0.0)),
-        ("position-read", (*sheet.HOLE_TOP_KEEP["PivotSeatY"], 0.0)),
-        ("offset-call", adapter, [annotation], {"PivotSeatY": sheet.PIVOT_SEAT_Y_TEXT_XY}),
-        ("offset-set", True),
-        ("offset-read", True),
-        ("position-read", (*sheet.PIVOT_SEAT_Y_TEXT_XY, 0.0)),
-    ]
-
-
-@pytest.mark.parametrize("count", (0, 2))
-def test_pivot_y_placement_requires_one_native_named_annotation(monkeypatch, count) -> None:
-    import draw_fr_harmonic_base as sheet
-
-    adapter, annotation, other, events = _pivot_y_placement_fakes(monkeypatch)
-    with pytest.raises(RuntimeError, match=f"one native PivotSeatY, got {count}"):
-        sheet._place_pivot_seat_y(adapter, [other, *([annotation] * count)])
-    assert events == []
-
-
-@pytest.mark.parametrize(
-    ("failure", "message", "last_event", "offset_called"),
-    (
-        ("reset", "offset could not be reset", "offset-read", False),
-        ("line-set", "failed to position .* line", "line-set", False),
-        ("line-missing", "line did not persist", "position-read", False),
-        ("line-drift", "line did not persist", "position-read", False),
-        ("line-nan", "line did not persist", "position-read", False),
-        ("offset-helper", "offset helper refused", "offset-call", True),
-        ("offset-state", "text did not stay offset", "offset-read", True),
-        ("text-missing", "text did not persist", "position-read", True),
-        ("text-drift", "text did not persist", "position-read", True),
-        ("text-nan", "text did not persist", "position-read", True),
-    ),
-)
-def test_pivot_y_placement_refuses_failed_state_without_com(
-    monkeypatch, failure, message, last_event, offset_called,
-) -> None:
-    import draw_fr_harmonic_base as sheet
-
-    adapter, annotation, other, events = _pivot_y_placement_fakes(monkeypatch, failure)
-    with pytest.raises(RuntimeError, match=message):
-        sheet._place_pivot_seat_y(adapter, [other, annotation])
-    assert events[-1][0] == last_event
-    assert any(event[0] == "offset-call" for event in events) is offset_called
-
-
-def _pivot_flag_fakes(monkeypatch, *, failed_name=None, readback=None):
-    from types import SimpleNamespace
-
-    import draw_fr_harmonic_base as sheet
-
-    events = []
-    adapter = object()
-    displays = {}
-
-    class Display:
-        def __init__(self, name):
-            self.name = name
-            self.text = ""
-
-        def GetText(self, part):  # noqa: N802 - the COM member name
-            events.append(("read", self.name, part))
-            assert part == 3
-            return readback if self.name == failed_name else self.text
-
-    annotations = []
-    for name in ("PivotSeatY", "Other", "PivotSeatX"):
-        display = Display(name)
-        displays[name] = display
-        annotations.append(SimpleNamespace(
-            name=name, GetSpecificAnnotation=lambda display=display: display
-        ))
-
-    def set_flags(actual_adapter, actual_annotations, callouts, *, location):
-        assert actual_adapter is adapter
-        assert actual_annotations is annotations
-        events.append(("set", dict(callouts), location))
-        for name, text in callouts.items():
-            displays[name].text = text
-
-    monkeypatch.setattr(sheet, "_early_bound", lambda obj, interface: obj)
-    monkeypatch.setattr(sheet, "dimension_name", lambda adapter, annotation: annotation.name)
-    monkeypatch.setattr(sheet, "set_dimension_callouts", set_flags)
-    return adapter, annotations, events
-
-
-def test_pivot_offsets_flag_exactly_both_native_above_compartments(monkeypatch) -> None:
-    import draw_fr_harmonic_base as sheet
-
-    adapter, annotations, events = _pivot_flag_fakes(monkeypatch)
-    sheet._flag_pivot_seat_dimensions(adapter, annotations)
-    assert sheet.PIVOT_SEAT_CALLOUTS == {"PivotSeatX": "SEE NOTE 1", "PivotSeatY": "SEE NOTE 1"}
-    assert events == [
-        ("set", sheet.PIVOT_SEAT_CALLOUTS, "above"),
-        ("read", "PivotSeatY", 3),
-        ("read", "PivotSeatX", 3),
-    ]
-
-
-@pytest.mark.parametrize("name", ("PivotSeatX", "PivotSeatY"))
-@pytest.mark.parametrize("actual", (None, "", "SEE D1", "SEE NOTE 2", "SEE NOTE 1\n", "SEE NOTE 1\r\n"))
-def test_pivot_flags_refuse_silent_or_multiline_native_readback(
-    monkeypatch, name, actual,
-) -> None:
-    import draw_fr_harmonic_base as sheet
-
-    adapter, annotations, events = _pivot_flag_fakes(
-        monkeypatch, failed_name=name, readback=actual
-    )
-    with pytest.raises(RuntimeError, match=f"native {name} ABOVE flag did not persist"):
-        sheet._flag_pivot_seat_dimensions(adapter, annotations)
-    assert events[-1] == ("read", name, 3)
-
-
-@pytest.mark.parametrize("name", ("PivotSeatX", "PivotSeatY"))
-@pytest.mark.parametrize("count", (0, 2))
-def test_pivot_flags_require_exactly_one_of_each_native_offset(monkeypatch, name, count) -> None:
-    import draw_fr_harmonic_base as sheet
-
-    adapter, annotations, events = _pivot_flag_fakes(monkeypatch)
-    selected = next(annotation for annotation in annotations if annotation.name == name)
-    annotations[:] = [annotation for annotation in annotations if annotation is not selected]
-    annotations.extend([selected] * count)
-    with pytest.raises(RuntimeError, match="missing native pivot offsets|duplicate native pivot offset"):
-        sheet._flag_pivot_seat_dimensions(adapter, annotations)
-    assert events == []
-
-
-@pytest.mark.parametrize(
-    "callouts",
-    (
-        {"PivotSeatX": "SEE NOTE 1"},
-        {"PivotSeatX": "SEE NOTE 1", "PivotSeatY": "SEE\nNOTE 1"},
-        {"PivotSeatX": "SEE\rNOTE 1", "PivotSeatY": "SEE NOTE 1"},
-        {"PivotSeatX": "", "PivotSeatY": "SEE NOTE 1"},
-    ),
-)
-def test_pivot_flags_refuse_missing_keys_or_nonprintable_caption_rows(monkeypatch, callouts) -> None:
-    import draw_fr_harmonic_base as sheet
-
-    adapter, annotations, events = _pivot_flag_fakes(monkeypatch)
-    monkeypatch.setattr(sheet, "PIVOT_SEAT_CALLOUTS", callouts)
-    with pytest.raises(RuntimeError, match="both one-line ABOVE flags"):
-        sheet._flag_pivot_seat_dimensions(adapter, annotations)
-    assert events == []
-
-
 class _NativeHoleTable:
     """Synthetic through-table at all real stations, not a captured native census."""
 
@@ -2170,17 +1847,17 @@ def test_hole_table_notes_ride_in_custom_column_only(pivot_tag, merged) -> None:
     assert len(generated) == len(sheet.TABLE_HOLES) + 1 == 12
     assert generated == tuple(tuple(row) for row in native)
     assert width == pytest.approx(native_width)
-    assert set(sheet.PIVOT_SEAT_CALLOUTS.values()) == {sheet.PIVOT_SEAT_FLAG}
     assert [row[:4] for row in table.cells] == native
-    # The pivot cites note 1; every other .XXX-located row names the part
-    # whose pattern it matches (review b12: the sockets match MHA-FR-02).
+    # The pivot cites note 1 and the sockets note 2 (their matched fit and
+    # MHA-FR-02 pattern); every other .XXX-located row names the part whose
+    # pattern it matches.
     row_of = {table.station_tags[station]: station for station in table.station_tags}
     expected_notes = {
         sheet.PIVOT_SCREW_XZ: "SEE NOTE 1",
         sheet.LOCK_KNOB_XZ: "MHA-DT-20",
         sheet.STOP_SCREW_XZ: "MHA-DT-20",
         **dict.fromkeys(sheet.HOLE_XZ, "MHA-FR-05"),
-        **dict.fromkeys(sheet.COLUMN_SOCKET_XZ, "MHA-FR-02"),
+        **dict.fromkeys(sheet.COLUMN_SOCKET_XZ, "SEE NOTE 2"),
     }
     assert [row[4] for row in table.cells] == [
         sheet.HOLE_TABLE_NOTE_COLUMN
@@ -2690,15 +2367,23 @@ def test_base_sheet_leaves_the_callout_prefix_to_the_shared_helper() -> None:
     # line-break rewrite expected the old "process.rstrip() + ' '" joint and
     # raised on the "\n" joint compose_hole_callout_prefix now writes. The
     # prefix is composed in one place: this sheet never writes the prefix
-    # compartment (swDimensionTextPrefix = 1) itself.
+    # compartment (swDimensionTextPrefix = 1) of a hole callout itself. Only
+    # _set_dimension_affixes writes it, on named model dimensions (counts and
+    # the spotface symbols), never on a hole callout.
     import ast
     import inspect
 
     import draw_fr_harmonic_base as sheet
 
+    module = ast.parse(inspect.getsource(sheet))
+    affix_writer = next(
+        node for node in module.body
+        if isinstance(node, ast.FunctionDef) and node.name == "_set_dimension_affixes"
+    )
+    module.body.remove(affix_writer)
     prefix_writes = [
         ast.unparse(node)
-        for node in ast.walk(ast.parse(inspect.getsource(sheet)))
+        for node in ast.walk(module)
         if isinstance(node, ast.Call)
         and getattr(node.func, "attr", "") == "SetText"
         and node.args
@@ -2706,6 +2391,12 @@ def test_base_sheet_leaves_the_callout_prefix_to_the_shared_helper() -> None:
         and node.args[0].value == 1
     ]
     assert prefix_writes == []
+    callers = {
+        ast.unparse(node.args[2])
+        for node in ast.walk(module)
+        if isinstance(node, ast.Call) and getattr(node.func, "id", "") == "_set_dimension_affixes"
+    }
+    assert callers == {"SECTION_AFFIXES", "UNDERSIDE_SECTION_AFFIXES", "HOLE_SIDE_AFFIXES"}
 
 
 # hb-render-4 (28d06157b) sheet-2 display data: the cross-tap block's six rows
@@ -2818,10 +2509,8 @@ def test_cross_tap_xs_are_baselines_from_the_flange_edge_on_the_front_view() -> 
     # are also the table's A1/A2 and A3/A4 X LOCs from the same flange edge.
     assert part.BOTTOM_LENGTH / 2.0 - part.COLUMN_X == pytest.approx(1.244 * 25.4, abs=0.003)
     assert part.BOTTOM_LENGTH / 2.0 + part.COLUMN_X == pytest.approx(16.756 * 25.4, abs=0.003)
-    # Review b12: the .XXX baselines state their function, the socket axes,
-    # in one callout above the far baseline (the near one's lane is the view).
-    assert sheet.CROSS_TAP_AXIS_CALLOUTS == {"CrossTapFarX": "4X TAPS ON SOCKET AXES"}
-    assert not set(sheet.CROSS_TAP_AXIS_CALLOUTS) & set(sheet.HOLE_SIDE_CALLOUTS)
+    # The .XXX baselines print their values only (rule 7): no caption.
+    assert not {"CrossTapX", "CrossTapFarX"} & set(sheet.HOLE_SIDE_CALLOUTS)
 
 
 def test_deck_land_worst_case_is_proven_instead_of_noted() -> None:
@@ -2990,38 +2679,37 @@ def _caption_section(*linked: str):
     return SimpleNamespace(GetNotes=lambda: notes)
 
 
-def test_section_captions_must_carry_the_rotation_scale_compartment(monkeypatch) -> None:
+def test_section_captions_carry_the_scale_compartment_only_when_scaled(monkeypatch) -> None:
     import draw_fr_harmonic_base as sheet
 
     monkeypatch.setattr(sheet, "_early_bound", lambda value, _name: value)
-    good = _caption_section("<VLNAME><VLLABEL>\r\n<VLSCALE><VLSCALEV>", "other")
-    sheet._require_section_caption_scale(None, good, label="A-A")
-    bad = (("<VLNAME><VLLABEL>",), ("<VLLABEL><VLSCALEV>",) * 2, ())
-    for linked in bad:
+    scaled = _caption_section("<VLNAME><VLLABEL>\r\n<VLSCALE><VLSCALEV>", "other")
+    plain = _caption_section("<VLNAME><VLLABEL>", "other")
+    sheet._require_section_caption_scale(None, scaled, label="B-B", scaled=True)
+    sheet._require_section_caption_scale(None, plain, label="A-A", scaled=False)
+    for linked in (("<VLNAME><VLLABEL>",), ("<VLLABEL><VLSCALEV>",) * 2, ()):
         with pytest.raises(RuntimeError, match="lacks the scale compartment"):
-            section = _caption_section(*linked)
-            sheet._require_section_caption_scale(None, section, label="A-A")
+            sheet._require_section_caption_scale(
+                None, _caption_section(*linked), label="B-B", scaled=True
+            )
+    with pytest.raises(RuntimeError, match="carries the scale compartment"):
+        sheet._require_section_caption_scale(None, scaled, label="A-A", scaled=False)
 
 
-def test_section_a_is_cut_off_sheet_scale_and_both_captions_are_checked() -> None:
+def test_both_sections_are_cut_at_their_sheet_scale_and_captions_checked() -> None:
     from pathlib import Path
 
     import draw_fr_harmonic_base as sheet
 
-    assert sheet.SECTION_CAPTION_SHEET_SCALE != sheet.SHEET_SCALE
     source = Path(sheet.__file__).read_text(encoding="utf-8")
-    off_scale = "_set_active_sheet_scale(adapter, SECTION_CAPTION_SHEET_SCALE)"
     pinned = "_set_active_sheet_scale(adapter, SHEET_SCALE)"
     a_cut = source.index('section_label="A",')
-    assert source.rindex(off_scale, 0, a_cut) > source.rindex("hole_top = ", 0, a_cut)
-    after_a = source[a_cut:]
-    a_check = '_require_section_caption_scale(adapter, section, label="section A-A")'
-    assert after_a.index(pinned) < after_a.index(a_check)
+    assert source.rindex(pinned, 0, a_cut) > source.rindex("hole_top = ", 0, a_cut)
+    assert 'label="section A-A", scaled=False)' in source[a_cut:]
     b_cut = source.index('section_label="B",')
     bottom_mapped = "_require_bottom_view_mapping(adapter, bottom)"
     assert source.rindex(pinned, 0, b_cut) > source.rindex(bottom_mapped, 0, b_cut)
-    b_check = '(adapter, underside_section, label="section B-B")'
-    assert "_require_section_caption_scale" + b_check in source
+    assert 'label="section B-B", scaled=True' in source[b_cut:]
 
 
 def _scaled_sheet(properties):
@@ -3127,52 +2815,40 @@ def test_cross_tap_remains_backed_when_the_pocket_ceiling_is_below_its_axis() ->
     assert min(part.cross_tap_backing_margins_mm(2.0).values()) < 0.0
 
 
-def test_stamped_id_leader_clears_the_socket_bores() -> None:
-    # 2026-09-25 Codex machinist review (hb-render-5, clarity): the stamped-ID
-    # leader ran through the A3 socket bore. The leader starts where SolidWorks
-    # put it on hb-render-5 (the last line's right end) and ends on the serial.
+def test_stamped_id_is_located_from_x0_y0_with_a_character_height() -> None:
+    # novice-rubric screen 20261107T081227004Z (blocker): APPROX AS SHOWN on a
+    # DO NOT SCALE sheet located the stamp by words only, with no height.
     import draw_fr_harmonic_base as sheet
 
-    def leader(anchor: tuple[float, float], serial_xz: tuple[float, float]):
-        start = (
-            anchor[0] + sheet.SERIAL_LEADER_START_OFFSET_M[0],
-            anchor[1] + sheet.SERIAL_LEADER_START_OFFSET_M[1],
-        )
-        return start, sheet._plan_xy(*serial_xz)
-
-    def clearance(anchor: tuple[float, float], serial_xz: tuple[float, float]) -> float:
-        start, tip = leader(anchor, serial_xz)
-        dx, dy = tip[0] - start[0], tip[1] - start[1]
-        gaps = []
-        for x, z in part.COLUMN_SOCKET_XZ:
-            cx, cy = sheet._plan_xy(x, z)
-            t = ((cx - start[0]) * dx + (cy - start[1]) * dy) / (dx * dx + dy * dy)
-            t = max(0.0, min(1.0, t))
-            gaps.append(
-                math.hypot(cx - start[0] - t * dx, cy - start[1] - t * dy)
-                - part.COLUMN_SOCKET_DIAMETER * sheet.VIEW_SCALE / 2000.0
-            )
-        return min(gaps)
-
-    # The reviewed sheet: through A3, to the serial on the old +X rim.
-    assert clearance((0.125, 0.130), (218.75, 62.0)) < 0.0
-    assert sheet.SERIAL_NOTE_XY == (0.098, 0.132)
-    assert clearance(sheet.SERIAL_NOTE_XY, part.SERIAL_XZ) >= 0.004
-    # The serial sits in the deck's NW corner, so the leader climbs across the
-    # flange, pad and deck lower edges. Each width dimension right of the plan
-    # starts its lower witness line where that edge's straight run ends at its
-    # corner radius; the leader crosses every edge at least 1.5 mm left of it.
-    start, tip = leader(sheet.SERIAL_NOTE_XY, part.SERIAL_XZ)
-    for half_x, half_z, corner in (
-        (part.DECK_HALF_X, part.DECK_HALF_Z, part.DECK_CORNER_R),
-        (part.TOP_LENGTH / 2.0, part.TOP_WIDTH / 2.0, part.PAD_CORNER_R),
-        (part.BOTTOM_LENGTH / 2.0, part.BOTTOM_WIDTH / 2.0, part.FLANGE_CORNER_R),
-    ):
-        witness_x, edge_y = sheet._plan_xy(half_x - corner, half_z)
-        assert start[1] < edge_y < tip[1]
-        rise = (edge_y - start[1]) / (tip[1] - start[1])
-        crossing_x = start[0] + (tip[0] - start[0]) * rise
-        assert crossing_x <= witness_x - 0.0015, (half_x, crossing_x, witness_x)
+    assert sheet.SERIAL_NOTE == 'STAMP "2"\n.14 HIGH'
+    rows = sheet.SERIAL_NOTE.split("\n")
+    x0, top = sheet.SERIAL_NOTE_XY
+    box = (
+        x0,
+        top - len(rows) * sheet.NOTE_ROW_M,
+        x0 + max(map(len, rows)) * sheet.NOTE_CHAR_M,
+        top,
+    )
+    # The note stands off the part (rule 14, run 20261107T121814924Z): below
+    # the plan's rear edge, above the X reference row, left of the X
+    # dimension's extension line at the serial, its leader reaching it.
+    serial = sheet._plan_xy(*part.SERIAL_XZ)
+    rear_edge_y = sheet._plan_xy(0.0, fr_harmonic_base_spec.BOTTOM_REAR_Z)[1]
+    assert box[3] < rear_edge_y - 0.003
+    assert box[1] > sheet.SERIAL_X_TEXT_XY[1] + 0.003
+    assert box[2] < serial[0] - 0.004
+    assert math.dist((box[2], box[3]), serial) < 0.015
+    # X runs on a third baseline row below DeckX, Y right of the plan, its
+    # text below the flange's rear edge and left of the moved chamfer text.
+    corner = sheet._plan_xy(-part.BOTTOM_LENGTH / 2.0, fr_harmonic_base_spec.BOTTOM_REAR_Z)
+    deck_x_row = sheet.GEOMETRY_TOP_KEEP["DeckX"][1]
+    assert deck_x_row - 0.0080 < sheet.SERIAL_X_TEXT_XY[1] < deck_x_row - 0.0058
+    assert corner[0] < sheet.SERIAL_X_TEXT_XY[0] < serial[0]
+    plan_right, _y = sheet._plan_xy(part.BOTTOM_LENGTH / 2.0, 0.0)
+    assert plan_right < sheet.SERIAL_Y_LINE_X < sheet.GEOMETRY_TOP_KEEP["DeckWid"][0]
+    assert sheet.SERIAL_Y_TEXT_XY[1] < corner[1] - 0.003
+    # One row above the chamfer's three-row block, which hangs from its value.
+    assert sheet.SERIAL_Y_TEXT_XY[1] - 0.002 > sheet.SIDE_KEEP["DeckEdgeChamfer"][1] + 0.002
 
 
 def test_deck_finish_leader_takes_the_nearest_face_edge() -> None:
@@ -3233,42 +2909,30 @@ def test_cross_tap_drill_keeps_the_bottoming_lead_past_the_deepest_thread() -> N
     assert CASTING_TAP_DRILL_DEPTH - (CASTING_FULL_THREAD_DEPTH + band) >= lead
 
 
-# hb-render-6 sheet 2: the hole table's right edge, the TOP VIEW caption's
-# bottom and the ORIGIN note's top, the neighbours of the socket-fit note.
-HB_RENDER_6_TABLE_RIGHT_X_M = 0.1626
-HB_RENDER_6_TOP_CAPTION_BOTTOM_Y_M = 0.2329
-HB_RENDER_6_ORIGIN_NOTE_TOP_Y_M = 0.1866
-SOCKET_FIT_MIN_MARGIN_M = 0.003
-
-
-def test_socket_fit_note_sits_on_a2_between_the_table_and_the_plan() -> None:
+def test_socket_note_two_is_flagged_from_the_rows_under_note_one() -> None:
+    # novice-rubric screen 20261107T081227004Z: the six-line leader note on A2
+    # broke rule 7's two lines, named MHA-FR-03 while the rows named MHA-FR-02,
+    # and used ASSIGNED / MATCH MARKS. Note 2 names both parts once.
     import draw_fr_harmonic_base as sheet
 
-    # The note hangs off the A2 rim between the table and plan.
-    assert sheet.SOCKET_FIT_STATION == (-part.COLUMN_X, part.FRAME_FRONT_COLUMN_Z)
-
-    rows = [row.replace("<MOD-DIAM>", "D") for row in sheet.SOCKET_FIT_NOTE.split("\n")]
-    x, y = sheet.SOCKET_FIT_NOTE_XY
-    box = (
-        x,
-        y - len(rows) * sheet.NOTE_ROW_M,
-        x + max(len(row) for row in rows) * sheet.NOTE_CHAR_M,
-        y,
-    )
-    plan_left = sheet._plan_xy(
-        -fr_harmonic_base_spec.BOTTOM_LENGTH / 2.0, 0.0, center=sheet.HOLE_TOP_CENTER
-    )[0]
-    margins = {
-        "hole table": box[0] - HB_RENDER_6_TABLE_RIGHT_X_M,
-        "plan west edge": plan_left - box[2],
-        "TOP VIEW caption": HB_RENDER_6_TOP_CAPTION_BOTTOM_Y_M - box[3],
-        "ORIGIN note": box[1] - HB_RENDER_6_ORIGIN_NOTE_TOP_Y_M,
+    note = sheet.socket_note(["A1", "A2", "A3", "A4"])
+    rows = note.split("\n")
+    assert rows[0].startswith("2. A1-A4: MATCHED FIT TO MHA-FR-03 TUBE: SLIDES IN BY HAND")
+    assert "MHA-FR-02" in rows[1]
+    assert len(rows) == 2
+    for word in ("ASSIGNED", "MATCH MARKS"):
+        assert word not in note
+    with pytest.raises(ValueError):
+        sheet.socket_note(["A1"])
+    assert set(sheet.HOLE_TABLE_ROW_NOTES[station] for station in part.COLUMN_SOCKET_XZ) == {
+        "SEE NOTE 2"
     }
-    assert {name: gap for name, gap in margins.items() if gap < SOCKET_FIT_MIN_MARGIN_M} == {}
-    # The A2 rim sits level with the note's top rows, so the leader runs
-    # nearly flat across the gap instead of down through the ORIGIN note.
-    a2 = sheet._plan_xy(*sheet.SOCKET_FIT_STATION, center=sheet.HOLE_TOP_CENTER)
-    assert box[1] < a2[1] < box[3]
+    # Under note 1's rows, left of the title block (x 0.215).
+    pivot_rows = sheet.pivot_seat_step("D1").count("\n") + 1
+    assert sheet.SOCKET_NOTE_XY[0] == sheet.PIVOT_SEAT_NOTE_XY[0]
+    assert sheet.SOCKET_NOTE_XY[1] <= sheet.PIVOT_SEAT_NOTE_XY[1] - (pivot_rows + 1) * sheet.NOTE_ROW_M
+    width = max(len(row.replace("<MOD-DIAM>", "D")) for row in rows) * sheet.NOTE_CHAR_M
+    assert sheet.SOCKET_NOTE_XY[0] + width < 0.215
 
 
 # hb-render-5's sheet frame: the drawable region starts 12.7 mm in from the
@@ -3331,7 +2995,8 @@ def test_underside_section_texts_sit_in_open_air() -> None:
     assert set(texts) == {"PocketDepth", "LugBottom", "RibRelief"}
 
     def rows(name: str) -> list[str]:
-        return ["00.0", *sheet.UNDERSIDE_SECTION_CALLOUTS.get(name, "").split("\n")]
+        prefix, suffix = sheet.UNDERSIDE_SECTION_AFFIXES.get(name, ("", ""))
+        return [f"{prefix}00.0{suffix}"]
 
     for name, (y, _z) in texts.items():
         half_w_mm = max(map(len, rows(name))) * _DIM_CHAR_M * 1000.0 / 2.0
@@ -3356,7 +3021,7 @@ def test_underside_section_texts_sit_in_open_air() -> None:
             continue
         reach_mm = len(rows(name)) * 5.8 / 2.0 + 0.6 + 2.0 + 3.5 / 2.0
         assert abs(z - other_z) * num / den > reach_mm, name
-    assert set(sheet.UNDERSIDE_SECTION_CALLOUTS) <= set(texts)
+    assert set(sheet.UNDERSIDE_SECTION_AFFIXES) <= set(texts)
 
 
 def test_underside_sheet_views_fit_the_border_clear_of_each_other() -> None:
@@ -3382,11 +3047,10 @@ def test_underside_sheet_views_fit_the_border_clear_of_each_other() -> None:
     cx, cy = sheet.UNDERSIDE_SECTION_CENTER
     half_h = fr_harmonic_base_spec.STACK_HEIGHT * s / 2.0
     half_z = fr_harmonic_base_spec.BOTTOM_REAR_Z * s
-    # The outside texts' widest row includes the lug-bottom caption.
+    # The outside texts' widest row includes a count prefix.
     widest = max(
-        len(row)
-        for text in sheet.UNDERSIDE_SECTION_CALLOUTS.values()
-        for row in text.split("\n")
+        len(f"{prefix}00.0{suffix}")
+        for prefix, suffix in sheet.UNDERSIDE_SECTION_AFFIXES.values()
     )
     section = (
         cx - half_h + sheet.UNDERSIDE_OUTSIDE_Y_MM * s - widest * _DIM_CHAR_M / 2.0,
@@ -3414,10 +3078,8 @@ def test_retained_underside_callouts_define_socket_bosses_ribs_and_lug_bottoms()
     }
     assert callouts["SocketBossDia"] == "4X SOCKET\nBOSSES"
     assert callouts["PocketFilletRadius"] == f"{part.POCKET_FILLET_COUNT}X POCKET\nCORNERS"
-    assert sheet.UNDERSIDE_SECTION_CALLOUTS == {
-        "LugBottom": "4X LUG\nBOTTOMS",
-        "RibRelief": "BOTH\nRIBS",
-    }
+    # Counts, not words, on section B-B's heights (rule 7).
+    assert sheet.UNDERSIDE_SECTION_AFFIXES == {"LugBottom": ("4X ", ""), "RibRelief": ("2X ", "")}
     # Sheet-3 texts above the view: inside the border, clear of the view, of
     # each other and of the view's note.
     keep = sheet.UNDERSIDE_BOTTOM_KEEP
@@ -3432,7 +3094,8 @@ def test_retained_underside_callouts_define_socket_bosses_ribs_and_lug_bottoms()
         assert boxes[name][1] > view_top + 0.010, name
         assert boxes[name][3] < _BORDER_INNER_M[3] - 0.002, name
     nx, ny = sheet.UNDERSIDE_BOTTOM_NOTE_XY
-    boxes["note"] = (nx, ny - _NOTE_LINE_MM / 1000.0, nx + 21 * _NOTE_CHAR_MM / 1000.0, ny)
+    label = "BOTTOM VIEW"
+    boxes["note"] = (nx, ny - _NOTE_LINE_MM / 1000.0, nx + len(label) * _NOTE_CHAR_MM / 1000.0, ny)
     for a in boxes:
         for b in boxes:
             if a < b:
@@ -3444,13 +3107,12 @@ def test_retained_underside_callouts_define_socket_bosses_ribs_and_lug_bottoms()
 
 def test_drawing_keeps_partition_the_part_precision_map() -> None:
     # assert_imported_precision proves every printed dimension at the end of
-    # the build; the seven keeps must name each map entry exactly once.
+    # the build; the keeps must name each shown map entry exactly once.
     import draw_fr_harmonic_base as sheet
 
     keeps = (
         sheet.GEOMETRY_TOP_KEEP,
         sheet.SIDE_KEEP,
-        sheet.HOLE_TOP_KEEP,
         sheet.SECTION_KEEP,
         sheet.HOLE_SIDE_KEEP,
         sheet.UNDERSIDE_BOTTOM_KEEP,
@@ -3459,7 +3121,11 @@ def test_drawing_keeps_partition_the_part_precision_map() -> None:
     )
     names = [name for keep in keeps for name in keep]
     assert len(names) == len(set(names))
-    assert set(names) == set(fr_harmonic_base_spec.DRAWING_PRECISION_BY_NAME)
+    assert set(names) == set(sheet.SHOWN_PRECISION_BY_NAME)
+    # Only D1's spec-owned offsets stay off the print (MHA-DT-00 check).
+    assert set(fr_harmonic_base_spec.DRAWING_PRECISION_BY_NAME) - set(names) == set(
+        fr_harmonic_base_spec.PIVOT_SEAT_DIMENSIONS
+    )
     assert set(sheet.UNDERSIDE_BOTTOM_CALLOUTS) <= set(sheet.UNDERSIDE_BOTTOM_KEEP)
 
 
@@ -3510,9 +3176,9 @@ def test_pad_deck_and_pocket_are_placed_from_x0_y0_as_baselines() -> None:
             if a < b:
                 assert _box_gap(texts[a], texts[b]) > 0.0015, (a, b)
     # The DeckX line runs ~2.8 mm under its text (plate-r1 render); its
-    # witness lines end 0.5 mm past it, clear above the stamped-ID note's top
-    # row (which reads ~0.6 mm above the note's anchor).
-    assert keep["DeckX"][1] - 0.0028 - 0.0005 > sheet.SERIAL_NOTE_XY[1] + 0.0006 + 0.0015
+    # witness lines end 0.5 mm past it, clear above the stamped-ID X
+    # reference's text on the next baseline row (~1.8 mm half height).
+    assert keep["DeckX"][1] - 0.0028 - 0.0005 > sheet.SERIAL_X_TEXT_XY[1] + 0.0018 + 0.0015
     # The deck Ra symbol and its leader stay above the corner group.
     assert sheet.DECK_FINISH_XY[1] > max(text[3] for text in texts.values()) + 0.020
 
@@ -3612,22 +3278,11 @@ def test_retained_lug_bottom_is_a_native_model_dimension_not_a_removed_cast_leve
 
     assert fr_harmonic_base_spec.DRAWING_DIMENSIONS["CrossTapLugs"] == {"LugBottom"}
     assert fr_harmonic_base_spec.DRAWING_PRECISION_BY_NAME["LugBottom"] == 2
-    assert sheet.UNDERSIDE_SECTION_CALLOUTS["LugBottom"] == "4X LUG\nBOTTOMS"
-    assert set(sheet.LUGS_LEVEL_NOTES) == {"cross-tap lug bottoms"}
-    text, _xy, (x, z) = sheet.LUGS_LEVEL_NOTES["cross-tap lug bottoms"]
-    assert text == "LUG BOTTOMS:\nSECTION B-B, SHEET 3"
-    assert any(
-        s[1] + 1.0 < x < s[2] - 1.0 and s[3] + 1.0 < z < s[4] - 1.0
-        for s in part.CROSS_TAP_LUG_SHAPES
-    )
-    # Review e409ce3: the arrow ended on the socket boss, not the lug face.
-    # The tip clears every boss and the pocket wall by a full corner fillet.
-    fillet = fr_harmonic_base_spec.POCKET_CORNER_FILLET_R
-    assert all(
-        math.dist((x, z), (bx, bz)) - r > fillet
-        for _kind, bx, bz, r in part.SOCKET_BOSS_SHAPES
-    )
-    assert abs(x) < fr_harmonic_base_spec.POCKET_HALF_X - fillet
+    assert sheet.UNDERSIDE_SECTION_AFFIXES["LugBottom"] == ("4X ", "")
+    # novice-rubric screen 20261107T081227004Z: sheet 4's LUG BOTTOMS pointer
+    # deferred to section B-B, which already defines the level.
+    assert not hasattr(sheet, "LUGS_LEVEL_NOTES")
+    assert sheet.LUGS_NOTE == "BOTTOM VIEW"
 
 
 def test_underside_lug_texts_fit_the_border_and_clear_every_retained_baseline() -> None:
@@ -3651,24 +3306,14 @@ def test_underside_lug_texts_fit_the_border_and_clear_every_retained_baseline() 
         sheet.LUGS_NOTE_XY[0] + max(map(len, rows)) * _NOTE_CHAR_MM / 1000.0,
         sheet.LUGS_NOTE_XY[1],
     )
-    level_notes, leaders = {}, {}
-    for label, (text, (x, y), tip_mm) in sheet.LUGS_LEVEL_NOTES.items():
-        rows = text.split("\n")
-        box = (x, y - len(rows) * _NOTE_LINE_MM / 1000.0, x + max(map(len, rows)) * _NOTE_CHAR_MM / 1000.0, y)
-        level_notes[label] = box
-        tip = sheet._lugs_xy(*tip_mm)
-        side = box[0] if abs(tip[0] - box[0]) < abs(tip[0] - box[2]) else box[2]
-        assert not box[0] < tip[0] < box[2], label
-        leaders[label] = [((side, (box[1] + box[3]) / 2.0), tip)]
-        assert view[0] < tip[0] < view[2] and view[1] < tip[1] < view[3], label
-    labelled = {"note": note, **boxes, **level_notes}
+    labelled = {"note": note, **boxes}
     for label, box in {"view": view, **labelled}.items():
         assert _BORDER_INNER_M[0] + 0.002 < box[0], label
         assert _BORDER_INNER_M[1] + 0.002 < box[1], label
         assert box[2] < _BORDER_INNER_M[2] - 0.002, label
         assert box[3] < _BORDER_INNER_M[3] - 0.002, label
         assert _box_gap(box, _TITLE_BLOCK_M) > 0.002, label
-    for label, box in {**boxes, **level_notes}.items():
+    for label, box in boxes.items():
         assert _box_gap(box, view) > 0.002, label
     for a in labelled:
         for b in labelled:
@@ -3691,18 +3336,6 @@ def test_underside_lug_texts_fit_the_border_and_clear_every_retained_baseline() 
             if other != name:
                 for segment in segments:
                     assert _segment_box_gap(segment, box) > 0.001, (name, other, segment)
-    for name, box in level_notes.items():
-        for other, segments in {**lines, **leaders}.items():
-            if other != name:
-                for segment in segments:
-                    assert _segment_box_gap(segment, box) > 0.001, (name, other, segment)
-    for label, (leader,) in leaders.items():
-        for name, box in {"note": note, **boxes}.items():
-            assert _segment_box_gap(leader, box) > 0.001, (label, name)
-        for other, segments in lines.items():
-            for (x0, y0), (x1, y1) in segments:
-                line_box = (min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1))
-                assert _segment_box_gap(leader, line_box) > 0.0005, (label, other)
 
 
 def test_nameplate_seats_are_transferred_through_the_plate() -> None:
@@ -3800,9 +3433,6 @@ def test_numbered_note_and_wider_flags_predict_clearance_in_the_proven_lanes() -
     import draw_fr_harmonic_base as sheet
 
     assert sheet.PIVOT_SEAT_NOTE_XY == (0.020, 0.100)
-    assert sheet.HOLE_TOP_KEEP["PivotSeatX"] == (0.2427, 0.1320)
-    assert sheet.HOLE_TOP_KEEP["PivotSeatY"] == (0.2616, 0.1705)
-    assert sheet.PIVOT_SEAT_Y_TEXT_XY == (0.2080, 0.1895)
     assert sheet.HOLE_TAG_STATION_POSITIONS[sheet.PIVOT_SCREW_XZ] == (0.2456, 0.1550)
     # The front cross-tap view and its spotface callout now sit on sheet 5,
     # so neither is this sheet-2 note's neighbour any longer.
@@ -3824,57 +3454,33 @@ def test_numbered_note_and_wider_flags_predict_clearance_in_the_proven_lanes() -
     assert note[0] - _BORDER_INNER_M[0] >= 0.0035
     assert note[1] - _BORDER_INNER_M[1] >= 0.0035
 
-    # The native R7 coupled replay below owns the Y value/flag and its route.
-    # Keep this older X control as a separate precision/layout regression.
-    x_flag = (0.2427 - 0.01235, 0.1347819, 0.2427 + 0.01235, 0.1382819)
-    x_value = (0.2291351, 0.1292219, 0.2562650, 0.1327219)
-    letters = {
-        "X": (0.242401, 0.142429, 0.245245, 0.148808),
-        "X zero": (0.218557, 0.142407, 0.221143, 0.148787),
-        "Y": (0.207974, 0.175453, 0.210736, 0.181833),
-        "Y zero": (0.208062, 0.152902, 0.210648, 0.159282),
-    }
-    witnesses = [
-        ((wx, x_value[1] - 0.001), (wx, end_y))
-        for wx, end_y in _R2B_PIVOT_X_WITNESS_STARTS
-    ]
-    for label, box in {"X value": x_value, "X flag": x_flag}.items():
-        for name, letter in letters.items():
-            assert _box_gap(box, letter) >= 0.0035, (label, name)
-        for witness in witnesses:
-            assert _segment_box_gap(witness, box) >= 0.002, label
-    tags = {
-        "D1": (0.2456, 0.1504743, 0.252004, 0.1539743),
-        "E1": (0.297, 0.1849743, 0.30209, 0.1884743),
-        "E2": (0.289, 0.2014743, 0.29409, 0.2049743),
-        "B1": (0.2467835, 0.1894801, 0.2520481, 0.1929801),
-    }
-    for box in (x_flag,):
-        for label, tag in tags.items():
-            assert _box_gap(box, tag) >= 0.0035, label
 
 
 @pytest.mark.parametrize("tag", ("D1", "Q7", "B12"))
-def test_pivot_seat_setup_identifies_its_mate_without_numeric_offsets(tag) -> None:
-    """Native tag presentation changes without moving ownership of offsets/bands."""
+def test_pivot_seat_note_names_its_transfer_route_without_numeric_offsets(tag) -> None:
+    """Native tag presentation changes without moving ownership of offsets/bands.
+
+    Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144:
+    D1 is spotted through the MHA-DT-20 pivot bore at assembly (novice-rubric
+    screen 20261107T081227004Z: the .002 band named no fit route)."""
     import re
 
     import cone_set_stack
     import draw_fr_harmonic_base as sheet
     import fr_harmonic_base_spec as base_spec
 
-    assert sheet.pivot_seat_step is base_spec.pivot_seat_step
     assert base_spec.PIVOT_SEAT_POSITION_BAND_MM == cone_set_stack.PIVOT_SEAT_POSITION_MM
     text = sheet.pivot_seat_step(tag)
+    # Two rows: run 20261107T171816615Z counted a third, repeating the
+    # banded offsets, over rule 7's four-line note block.
     assert text.split("\n") == [
-        f"1. {tag} IS LOCATED TO THE MHA-DT-02 SEAT;",
-        "DRILL AND TAP AT ASSEMBLY.",
+        f"1. {tag}: TRANSFER FROM MHA-DT-20 PIVOT BORE AT ASSEMBLY;",
         f"{tag} TABLE X/Y ARE REFERENCE.",
     ]
     # Only the note number and part/table identities may contain digits;
     # the native dimensions remain the sole owners of offsets and bands.
     identification = text.removeprefix("1. ")
-    for identity in (tag, "MHA-DT-02"):
+    for identity in (tag, "MHA-DT-20"):
         assert identity in identification
         identification = identification.replace(identity, "")
     assert not re.search(r"\d|<MOD-PM>|±", identification)
@@ -3919,13 +3525,13 @@ def test_numbered_pivot_note_is_created_once_as_an_ordinary_free_note() -> None:
     assert {keyword.arg for keyword in check.keywords} == {
         "sheet_name", "callouts", "views", "datum_origin", "hole_table"
     }
-    flags = [node for node in calls if getattr(node.func, "id", None) == "_flag_pivot_seat_dimensions"]
-    assert len(flags) == 1
-    assert [ast.unparse(arg) for arg in flags[0].args] == ["adapter", "hole_top_dimensions"]
+    # D1's banded offsets are an MHA-DT-00 check, not print dimensions.
+    assert not any(getattr(node.func, "id", None) == "_flag_pivot_seat_dimensions" for node in calls)
+    assert not hasattr(sheet, "HOLE_TOP_KEEP")
     assert not any(getattr(node.func, "attr", None) == "SetText2" for node in calls)
 
 
-def test_pivot_offsets_share_native_marks_precision_and_authoritative_band() -> None:
+def test_pivot_offsets_keep_the_part_band_but_stay_off_the_print() -> None:
     import ast
     import inspect
 
@@ -3939,7 +3545,9 @@ def test_pivot_offsets_share_native_marks_precision_and_authoritative_band() -> 
     )
     names = set(spec.PIVOT_SEAT_DIMENSIONS)
     assert names == spec.DRAWING_DIMENSIONS["PivotSeatReference"]
-    assert names == set(sheet.HOLE_TOP_KEEP)
+    # Run 20261107T191011860Z: the band is an MHA-DT-00 check after the
+    # MHA-DT-20 transfer, so the drawing imports neither offset.
+    assert not names & set(sheet.SHOWN_PRECISION_BY_NAME)
     assert spec.DRAWING_PRECISION["PivotSeatReference"] == dict.fromkeys(names, 3)
     # Both offsets, not their unprinted origin anchors, receive the unchanged
     # functional band. This checks bindings rather than a setter's formatting.
@@ -3961,39 +3569,6 @@ def test_pivot_offsets_share_native_marks_precision_and_authoritative_band() -> 
     assert setters[0].args[2].id == loops[0].target.id
     assert isinstance(setters[0].args[3], ast.Name)
     assert getattr(part, setters[0].args[3].id) == spec.PIVOT_SEAT_POSITION_BAND_MM
-    # A blanked owner needs the opt-in importer in this specific top view,
-    # and its result participates in the existing final precision readback.
-    drawing = ast.parse(inspect.getsource(sheet.build))
-    imports = [
-        node for node in ast.walk(drawing)
-        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call)
-        and any(
-            keyword.arg == "keep" and isinstance(keyword.value, ast.Name)
-            and keyword.value.id == "HOLE_TOP_KEEP"
-            for keyword in node.value.keywords
-        )
-    ]
-    assert len(imports) == 1
-    assert imports[0].value.func.id == "curate_hidden_owner_dimensions"
-    imported_name = imports[0].targets[0].id
-    body = drawing.body[0].body
-    placement = body[body.index(imports[0]) + 1]
-    assert isinstance(placement, ast.Expr) and isinstance(placement.value, ast.Call)
-    assert placement.value.func.id == "_place_pivot_seat_y"
-    assert [ast.unparse(argument) for argument in placement.value.args] == [
-        "adapter", imported_name,
-    ]
-    precision = [
-        node for node in ast.walk(drawing)
-        if isinstance(node, ast.Call)
-        and getattr(node.func, "id", None) == "assert_imported_precision"
-    ]
-    assert len(precision) == 1
-    assert any(
-        isinstance(node, ast.Starred) and isinstance(node.value, ast.Name)
-        and node.value.id == imported_name
-        for node in ast.walk(precision[0])
-    )
 
 
 def test_height_baselines_preserve_the_spotface_top_land_at_loose_limits() -> None:
@@ -4187,15 +3762,15 @@ def test_base_blanks_its_reference_sketches_through_the_shared_helper() -> None:
     assert hasattr(_sketch.blank_reference_sketches, "__wrapped__")
 
 
-def test_section_rib_relief_names_both_ribs() -> None:
+def test_section_rib_relief_counts_both_ribs() -> None:
     # plate-r5 review: B-B cuts only the long rib, so the cross rib's level
     # was in no view. Both ribs' reliefs are driven by "RibRelief", so the
-    # one printed height says it governs both.
+    # one printed height counts both (2X, a count rather than words: rule 7).
     import inspect
 
     import draw_fr_harmonic_base as sheet
 
-    assert sheet.UNDERSIDE_SECTION_CALLOUTS["RibRelief"] == "BOTH\nRIBS"
+    assert sheet.UNDERSIDE_SECTION_AFFIXES["RibRelief"] == ("2X ", "")
     # One loop builds both ribs: each relief is equated to "RibRelief".
     source = inspect.getsource(part)
     assert "(rib_dims[1], '\"RibRelief\"')" in source
@@ -5064,8 +4639,7 @@ def _native_r7_callouts():
     return boxes, lines, rows
 
 
-def test_native_r7_records_both_west_tag_strikes_and_the_interior_y_block() -> None:
-    from _layout_geometry import Box
+def test_native_r7_records_both_west_tag_strikes() -> None:
     import draw_fr_harmonic_base as sheet
 
     geometry = _native_r7_geometry()
@@ -5078,17 +4652,6 @@ def test_native_r7_records_both_west_tag_strikes_and_the_interior_y_block() -> N
         assert len(tag.text_boxes) == 1
         box = tag.text_boxes[0]
         assert sheet.segment_crosses_box(deck_edge, (box.xmin, box.ymin, box.xmax, box.ymax))
-    y = _native_r7_named(geometry, "dim PivotSeatY ")
-    assert len(y.text_boxes) == 2  # value AND the native ABOVE flag
-    part_box = Box(0.22285, 0.1591, 0.33715, 0.2309)
-    for box in y.text_boxes:
-        assert part_box.xmin < box.xmin < box.xmax < part_box.xmax
-        assert part_box.ymin < box.ymin < box.ymax < part_box.ymax
-    assert sheet.find_callout_clashes(
-        {"native R7 PivotSeatY row " + str(i): (box.xmin, box.ymin, box.xmax, box.ymax)
-         for i, box in enumerate(y.text_boxes)},
-        {"actual part": (part_box.xmin, part_box.ymin, part_box.xmax, part_box.ymax)},
-    )
 
 
 def _conditional_r7_exterior_layout():
@@ -5147,33 +4710,18 @@ def _conditional_r7_exterior_layout():
         text_boxes=tuple(Box(b.xmin + dx, b.ymin + dy, b.xmax + dx, b.ymax + dy) for b in origin.text_boxes),
         position=sheet.HOLE_ORIGIN_NOTE_XY,
     )
-    original_y = _native_r7_named(geometry, "dim PivotSeatY ")
-    raw_y = _native_r7_annotation(dump, "PivotSeatY")
-    x, y = sheet.PIVOT_SEAT_Y_TEXT_XY
-    dx, dy = x - raw_y["pos"][0], y - raw_y["pos"][1]
-    texts = tuple(Box(b.xmin + dx, b.ymin + dy, b.xmax + dx, b.ymax + dy) for b in original_y.text_boxes)
-    # R7 establishes the two-row text/shoulder alignment: width 24.5438 mm,
-    # lower shoulder 5.5562 mm below the top-centre annotation anchor.
-    assert raw_y["display"]["lines"][-1][4:9] == [
-        0.2612281, 0.1794438, 0.0, 0.2857719, 0.1794438,
-    ]
-    native_lines = raw_y["display"]["lines"]
-    fixed = tuple(Segment(*row[4:6], *row[7:9]) for row in native_lines[:4])
-    shoulder_y = native_lines[-1][5] + dy
-    # Text is now WEST of the line. The nearest native shoulder end must be
-    # its RIGHT end, not the LEFT end used by the observed east-side text.
-    shoulder_right = native_lines[-1][7] + dx
-    leader = Segment(0.2616, 0.1705186, shoulder_right, shoulder_y, "leader")
-    shoulder = Segment(native_lines[-1][4] + dx, shoulder_y, shoulder_right, shoulder_y, "shoulder")
-    replacements[original_y.label] = replace(
-        original_y, text_boxes=texts, segments=(*fixed, leader, shoulder), position=(x, y),
-    )
+    # D1's offsets left the print (run 20261107T191011860Z), so the native
+    # PivotSeatY block leaves the proposal.
     proposed = replace(
         geometry,
-        annotations=tuple(replacements.get(a.label, a) for a in geometry.annotations),
+        annotations=tuple(
+            replacements.get(a.label, a)
+            for a in geometry.annotations
+            if not a.label.startswith("dim PivotSeatY ")
+        ),
     )
-    assert len(proposed.annotations) == len(geometry.annotations)
-    return geometry, proposed, replacements, tag_envelopes, leader
+    assert len(proposed.annotations) == len(geometry.annotations) - 1
+    return geometry, proposed, replacements, tag_envelopes
 
 
 def test_conditional_r7_layout_couples_all_five_callouts_every_obstacle_and_new_routes() -> None:
@@ -5184,11 +4732,11 @@ def test_conditional_r7_layout_couples_all_five_callouts_every_obstacle_and_new_
     from _layout_geometry import find_leader_crossings, find_text_on_line
     import draw_fr_harmonic_base as sheet
 
-    observed, proposed, changed, envelopes, y_leader = _conditional_r7_exterior_layout()
+    observed, proposed, changed, envelopes = _conditional_r7_exterior_layout()
     callouts, callout_lines, rows = _native_r7_callouts()
     # Keep all native annotations: dimensions/centre marks, all eleven tags,
     # both axes and labels, section arrows/letters, free notes and every table.
-    assert len(observed.annotations) == len(proposed.annotations)
+    assert len(observed.annotations) == len(proposed.annotations) + 1
     texts = {
         f"{annotation.label} row {index}": (box.xmin, box.ymin, box.xmax, box.ymax)
         for annotation in proposed.annotations
@@ -5245,13 +4793,6 @@ def test_conditional_r7_layout_couples_all_five_callouts_every_obstacle_and_new_
             deck_west = sheet.HOLE_TOP_CENTER[0] - fr_harmonic_base_spec.DECK_HALF_X * sheet.VIEW_SCALE / 1000.0
             assert text.xmin - pad_west >= 0.0035
             assert deck_west - text.xmax >= 0.003
-    y = next(a for a in proposed.annotations if a.label.startswith("dim PivotSeatY "))
-    for box in y.text_boxes:
-        assert sheet.box_gap((box.xmin, box.ymin, box.xmax, box.ymax), obstacles["view holes top"]) > 0.002
-    foreign_texts = {name: box for name, box in texts.items() if not name.startswith(y.label + " row ")}
-    assert sheet.find_leader_crossings(
-        {"exterior PivotSeatY": [(y_leader.x0, y_leader.y0, y_leader.x1, y_leader.y1)]}, foreign_texts,
-    ) == []
     # All native leaders remain in the shared, unchanged coupled predicates.
     # Do not demand unrelated pre-existing R7 findings disappear.
     for predicate in (
@@ -5527,3 +5068,13 @@ def test_all_five_native_callouts_omit_only_after_quantity_and_precision_edits()
     )
     readback = next(c for c in calls if getattr(c.func, "id", None) == "_check_cross_tap_callout")
     assert aggregate.lineno < precision.lineno < tap_omission.lineno < readback.lineno
+
+
+def test_spotface_depth_count_and_symbol_ride_above_the_banded_value() -> None:
+    # Run 20261107T121814924Z (3/3): on one row '4X <spot> <depth> .169
+    # +.020/.000' ran through sheet 2's right border from the 382-418 mm column.
+    import draw_fr_harmonic_base as sheet
+
+    assert sheet.SECTION_AFFIXES == {"SpotFaceDepth": ("<HOLE-DEPTH> ", "")}
+    assert sheet.SECTION_ABOVE_CALLOUTS == {"SpotFaceDepth": "4X <HOLE-SPOT>"}
+    assert sheet.SECTION_KEEP["SpotFaceDepth"][0] <= 0.3845

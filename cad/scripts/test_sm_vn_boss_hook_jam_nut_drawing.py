@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import math
-import re
 from pathlib import Path
 
 import pytest
@@ -218,12 +217,3 @@ def test_purchased_sheet_documents_the_built_part() -> None:
         drawing.build.__code__.co_names.count("build_purchased_fastener_drawing") == 1
     )
 
-
-@pytest.mark.parametrize("stem", [STEM])
-def test_installation_note_fits_the_sheet(stem: str) -> None:
-    lines = _config.parts(stem)["installation_notes"].splitlines()
-    assert len(lines) <= 4
-    assert all(len(line) <= 70 for line in lines), lines
-    notes = " ".join(lines)
-    assert notes.startswith("INSTALLATION - ")
-    assert not re.search(r"\d+\.\d|\+/-|±|Ø|MAX|MIN| MM\b", notes)

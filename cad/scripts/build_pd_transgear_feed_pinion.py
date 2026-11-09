@@ -110,7 +110,6 @@ from pd_transgear_feed_pinion_spec import (
     FULL_DEPTH_PLACES,
     FULL_DEPTH_TOL_TYPE,
     GAP_FLOOR_WITNESS_Y,
-    GEAR_DATA,
     OUTSIDE_DIA,
     OUTSIDE_DIA_DEVIATIONS,
     OUTSIDE_DIA_PLACES,
@@ -129,7 +128,6 @@ from pd_transgear_feed_pinion_spec import (
     ROOT_DIA_TOL_TYPE,
     SURFACE_FINISHES,
     TEETH,
-    TOOTH_SPACE_CALLOUT,
     TOOTH_SPACE_CALLOUT_PROPERTY,
     TOOTH_SPACE_INSPECTION_PHASE_RAD,
     UNIT,
@@ -770,7 +768,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # Bands (pd_transgear_feed_pinion_spec), printed in inches: the reamed
-    # bore, the boss's SHAFT_H under the hub's bore, the flat's 0/-.0006
+    # bore, the boss's SHAFT_H under the hub's bore, the flat's 0/-.001
     # under the hub's flat, the standard tip class, the root as a physical
     # MIN floor, the flat's end wall as LIMITS between the step and the hub's
     # flat; the cutter's full depth as a MIN (it covers the rack) and its
@@ -855,13 +853,14 @@ async def build(adapter) -> dict[str, str]:
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     # Radial toothspace runout and calibrated all-space/wrap index are
     # distinct controls, saved together on the actual source toothpattern.
+    # The GEAR DATA block is the drawing's own note: its span row cites the
+    # MHA-PD-00 step that sets the mesh (draw_pd_transgear_feed_pinion).
     apply_drawing_properties(
         adapter,
         PART_NAME,
         {
-            "Gear Data": GEAR_DATA,
             "Manufacturing Notes": DRAWING_NOTES,
-            TOOTH_SPACE_CALLOUT_PROPERTY: TOOTH_SPACE_CALLOUT,
+            TOOTH_SPACE_CALLOUT_PROPERTY: callouts.TOOTH_SPACE_CALLOUT,
         },
     )
     return await save_simplified_part(

@@ -7,10 +7,6 @@ pd-vn-transgear-cluster-shim:
   material: AISI 304
   material_specification: "18-8 stainless steel shim for 1/8 in shoulder, 1/8 ID x 1/4 OD x .005 in; McMaster-Carr 94773A606"
   finish: AS SUPPLIED
-  installation_notes: |-
-    INSTALLATION - ON THE MHA-PD-23 PIN AT THE MHA-PD-18 ARM FACE, UNDER
-    THE MHA-PD-24 BUSHING, AS MANY AS THE MHA-PD-00 END-FLOAT FIT-UP
-    TAKES; THE BALANCE STORED IN THE SPARE T18'S BORE ON THE BASE DECK.
   quantity: 5
   tolerance_class: machined_block
   process: purchased

@@ -40,6 +40,7 @@ from _drawing_dimensions import (
 from _drawing_edge_dimensions import assert_dimension_measures
 from _drawing_edges import visible_view_entities
 from _drawing_finish import add_surface_finish
+from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -52,7 +53,7 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
-from dt_cylinder_gear_notes import BORE_FIT_CALLOUT, STACK_FIT_CALLOUT
+from dt_cylinder_gear_notes import BORE_FIT_CALLOUT, CAM_WALL_NOTE, STACK_FIT_CALLOUT
 from dt_cylinder_gear_spec import (
     BORE_DIA,
     CAM_DIA,
@@ -122,19 +123,18 @@ NOTCH_DETAIL_DIMENSIONS = {
 #   the bore then
 #   meets the cam diameter's diametral line only beyond the shoulder, never
 #   between it and the bore (r1: the 82 mm block's corner at x 98 crossed it).
-# * The cam diameter drops to the gear's lower right; its three mate rows
-#   hang to y ~216, left of the side view (194) and above the isometric (212).
-# * The eccentricity's text leaves its extension lines (y 270/283) for the
-#   free lane below them, so its two function rows sit on no line.  The
-#   text hangs RIGHT of its dimension line (r2: from x 174 its 35 mm shelf
-#   reached the side view's cam at 205.7), so the line stands just off the
-#   tips (153.4) and the shelf ends ~192, short of the side view (194).
-# * The notch phase's four rows (x ~112..150, y ~320..344) stay inside the
-#   (90°) arc (r 88.6 off the gear centre; r4b: a larger arc reached the side
-#   view and the gear data) with the cam finish symbol moved down out of them.
+# * The cam diameter drops below the gear's lower right: its two rows (the
+#   running fit, then the throw's reason, rule 7: a location carries no
+#   words) run under the tips, left of the face-width text (215) and above
+#   the isometric (192).
+# * The eccentricity prints its value and band alone (rule 7), in the free
+#   lane below its extension lines (y 270/283).
+# * The notch phase prints its value and band alone inside the (90°) arc
+#   (r 88.6 off the gear centre; r4b: a larger arc reached the side view and
+#   the gear data) with the cam finish symbol moved down out of it.
 FRONT_KEEP = {
     "BoreDia": (0.045, 0.338),
-    "CamDia": (0.166, 0.232),
+    "CamDia": (0.160, 0.222),
     "CamCy": (0.157, 0.257),
     "NotchPhase": (0.131, 0.332),
     "PatternNotchPhase": (0.178, 0.321),
@@ -144,7 +144,7 @@ FRONT_KEEP = {
 # 10.6 mm stack, its 29 mm value sat on the line and both extension-line
 # ends struck it (machinist r2, r4; offsetting it only added a shelf).
 RIGHT_KEEP = {
-    "OutsideDia": (0.248, RIGHT_CENTER[1]),
+    "OutsideDia": (0.238, RIGHT_CENTER[1]),
     "FaceWidth": (0.205, 0.220),
     "OverallThickness": (0.237, 0.363),
 }
@@ -159,14 +159,17 @@ CAM_REFERENCE_TEXT = (0.180, 0.336)
 CAM_FINISH_SYMBOL = (0.152, 0.303)
 DIMENSION_CALLOUTS = {
     "BoreDia": BORE_FIT_CALLOUT,
-    "OutsideDia": "MESHES WITH\nCONE GEARS\nMHA-DT-03",
+    "OutsideDia": "MESHES WITH CONE\nGEARS MHA-DT-03",
     "FaceWidth": "SETS ROD-RING SLOT\nFOR MHA-CH-03",
-    "CamDia": "RUNNING FIT IN\nCONNECTING ROD\nMHA-CH-03 RING",
-    "CamCy": "THROW SETS\nCHANNEL GAIN",
-    "NotchWidth": "ALIGNMENT NOTCH;\nNO MATING PART;\nMAX CLEARS FLANKS",
-    "NotchDepth": "FROM OD",
-    "NotchPhase": "NOTCH CCW FROM\nCAM LOBE; SETS\nCHANNEL PHASE",
+    "CamDia": "RUNNING FIT IN MHA-CH-03;\nTHROW SETS CHANNEL GAIN",
+    "NotchWidth": "ALIGNMENT NOTCH\nCAM PHASE FOR MHA-DT-03 MESH",
 }
+# The crescent wall's stated minimum (rule 20) lands on the cam OD at the
+# thin side, 10 degrees off the -Y axis so the pick misses the bore's centre
+# mark; the note stands under the gear's lowest teeth (r1: at y 0.232 the
+# tooth outline struck BORE), above the notch width's rows.
+CAM_WALL_PICK_DEG = -80.0
+CAM_WALL_NOTE_XY = (0.020, 0.216)
 # Decimal places are the part's (cylinder_gear_spec.DRAWING_PRECISION,
 # applied by build_cylinder_gear); the sheet only reads them back.
 
@@ -722,6 +725,25 @@ async def build(adapter: Any) -> dict[str, str]:
         label="cam follower finish",
         leader_attach_xy=cam_flank,
         char_height=0.0025,
+    )
+    # The crescent wall's stated minimum, at its leader on the thin side.
+    wall_angle = math.radians(CAM_WALL_PICK_DEG)
+    add_attached_note(
+        adapter,
+        front,
+        text=CAM_WALL_NOTE,
+        entity_xy=_project_mm(
+            adapter,
+            front,
+            (
+                CAM_DIA / 2.0 * math.cos(wall_angle),
+                ECCENTRICITY + CAM_DIA / 2.0 * math.sin(wall_angle),
+                OVERALL_THICKNESS,
+            ),
+            label="cam thin-side wall",
+        ),
+        note_xy=CAM_WALL_NOTE_XY,
+        label="cam wall shortfall note",
     )
 
     add_property_linked_note(adapter, "Gear Data", *GEAR_DATA_POS, char_height=0.0025)

@@ -130,7 +130,7 @@ def test_title_block_chamfer_band_leads_into_the_tap_inside_one_pitch() -> None:
     assert bolt.SHANK_DIA_MAX == pytest.approx(4.8006)
     tap_drill = TAP_DRILL_MM[bolt.THREAD]
     assert bolt.SHANK_DIA_MAX - 2 * bolt.CHAMFER_WIDTH_MIN < tap_drill
-    assert "1 PITCH MAX" in bolt.DIMENSION_CALLOUTS["ThreadLengthMin"]
+    assert "1 PITCH MAX" in bolt_drawing.DIMENSION_CALLOUTS["ThreadLengthMin"]
     assert bolt.CATALOG_LENGTH - bolt.LENGTH > bolt.PITCH
 
 
@@ -286,7 +286,7 @@ def test_native_controls_are_owned_and_printed_without_precision_rewrites() -> N
     assert bolt_drawing.EXPECTED_CONTROLS["ChamferAngle"] == pytest.approx(
         (math.radians(45.0), -math.radians(1.0), math.radians(1.0))
     )
-    assert "ChamferAngle" not in bolt.DIMENSION_CALLOUTS
+    assert "ChamferAngle" not in bolt_drawing.DIMENSION_CALLOUTS
     assert set(bolt.DRAWING_DIMENSIONS) == {
         "StockTrimProfile",
         "StockDeburrProfile",
@@ -305,28 +305,23 @@ def test_native_controls_are_owned_and_printed_without_precision_rewrites() -> N
     assert bolt_drawing.REFERENCE_NOMINAL == pytest.approx(0.04670)
     assert bolt.DIMENSION_TOLERANCE_TYPES["CutLength"] == 0
     assert bolt.DIMENSION_PRECISION["CutLength"] == 2
-    cut_callout = bolt.DIMENSION_CALLOUTS["CutLength"]
-    assert cut_callout.splitlines() == [
-        "UNDER HEAD TO FINISHED TIP",
-        "CUT AT ASSEMBLY",
-        "PER MHA-SM-00 STEP 4",
-    ]
+    cut_callout = bolt_drawing.DIMENSION_CALLOUTS["CutLength"]
+    # Rule 7: at most two lines of words under any control.
+    assert all(
+        len(text.splitlines()) <= 2 for text in bolt_drawing.DIMENSION_CALLOUTS.values()
+    )
+    assert "MHA-SM-00 STEP 4" in cut_callout
     for retired in ("THREAD ENGAGEMENT", "TIP CLEARANCE", "MATE:"):
         assert retired not in cut_callout
     assert bolt.DIMENSION_TOLERANCE_TYPES["ThreadLengthMin"] == 5
-    assert "1 PITCH MAX" in bolt.DIMENSION_CALLOUTS["ThreadLengthMin"]
-    assert "FULL FORM" in bolt.DIMENSION_CALLOUTS["ThreadLengthMin"]
-    assert "\n" in bolt.DIMENSION_CALLOUTS["ThreadLengthMin"]
-    assert all("\\n" not in text for text in bolt.DIMENSION_CALLOUTS.values())
+    assert "1 PITCH MAX" in bolt_drawing.DIMENSION_CALLOUTS["ThreadLengthMin"]
+    assert all("\\n" not in text for text in bolt_drawing.DIMENSION_CALLOUTS.values())
     # The title block's thread row gives class 2A; the callout does not.
-    assert bolt.DIMENSION_CALLOUTS["ThreadLengthMin"].startswith("#10-24 UNC ")
-    assert all("2A" not in text for text in bolt.DIMENSION_CALLOUTS.values())
-    chamfer_callout = bolt.DIMENSION_CALLOUTS["ChamferWidth"]
+    assert all("2A" not in text for text in bolt_drawing.DIMENSION_CALLOUTS.values())
+    chamfer_callout = bolt_drawing.DIMENSION_CALLOUTS["ChamferWidth"]
     # No literal angle: the 45 degrees is the native ChamferAngle's own text.
-    reason = chamfer_callout.replace("MHA-SM-02", "")
-    assert not any(character.isdigit() for character in reason)
+    assert not any(character.isdigit() for character in chamfer_callout)
     assert "DEG" not in chamfer_callout and "°" not in chamfer_callout
-    assert "MHA-SM-02" in chamfer_callout
     source = (SCRIPTS / "draw_sm_vn_knife_hanger_stud.py").read_text(encoding="utf-8")
     assert "build_purchased_fastener_drawing" not in source
     assert "_stock_trim_drawing" in source
@@ -629,9 +624,6 @@ def test_modified_stock_route_is_complete_not_the_old_socket_recipe() -> None:
     assert "COUNTERBORE" not in row["installation_notes"]
     assert "SPOTFACE" not in row["installation_notes"]
     assert "FACED TOP" in row["installation_notes"]
-    washer_notes = _config.parts(washer_part.PART_NAME)["installation_notes"]
-    assert "SPOTFACE" not in washer_notes
-    assert "SEATS ON THE FACED CROSSBAR TOP" in washer_notes
     for module in ("build_sm_vn_knife_hanger_stud", "draw_sm_vn_knife_hanger_stud"):
         tree = ast.parse((SCRIPTS / f"{module}.py").read_text(encoding="utf-8"))
         imports = {
@@ -1183,7 +1175,7 @@ def test_sheet_prints_purchased_note_and_chamfer_leader_with_native_readback(
         for name in keep:
             display = SimpleNamespace(
                 GetText=lambda _index, name=name: (
-                    bolt.DIMENSION_CALLOUTS.get(name, "").replace("\n", "\r\n")
+                    bolt_drawing.DIMENSION_CALLOUTS.get(name, "").replace("\n", "\r\n")
                     + (" WRONG" if fault == "callout" else "")
                 )
             )
@@ -1457,54 +1449,6 @@ def test_hanger_direct_adapter_calls_bind_to_the_vendored_sdk(recipe: str) -> No
                 f"{recipe}:{call.lineno}: {call.func.attr} cannot bind "
                 f"{source}:{method.lineno}: {error}"
             )
-
-
-@pytest.mark.parametrize("along_u", [True, False])
-def test_dowel_slot_stadium_closes_counter_clockwise(along_u: bool) -> None:
-    """The knife mount's datum-C slot (moved from build_fr_top_frame, owner
-    ruling 2026-10-24, T+H3) sketches as one closed CCW stadium."""
-    import build_sm_knife_mount as part
-    import sm_knife_mount_spec as knife_mount
-
-    centre = (5.0, -7.0)
-    half_flat, half_w = part.SLOT_FLAT / 2, knife_mount.SLOT_WIDTH / 2
-    p1, p2, p3, p4, c_b, c_a = part.slot_stadium_points(
-        centre, along_u=along_u, half_flat=half_flat, half_w=half_w
-    )
-    # Straight sides of the flat run, each end a half round about its centre.
-    assert math.dist(p1, p2) == pytest.approx(2 * half_flat)
-    assert math.dist(p3, p4) == pytest.approx(2 * half_flat)
-    assert math.dist(c_a, c_b) == pytest.approx(2 * half_flat)
-    for c, a, b in ((c_b, p2, p3), (c_a, p4, p1)):
-        assert math.dist(c, a) == pytest.approx(half_w)
-        assert math.dist(c, b) == pytest.approx(half_w)
-        # add_arc sweeps counter-clockwise from a to b: the half round
-        # bulges away from the slot's centre.
-        sweep_mid = (c[0] + (b[1] - a[1]) / 2, c[1] - (b[0] - a[0]) / 2)
-        assert math.dist(sweep_mid, centre) == pytest.approx(half_flat + half_w)
-    # The sides run along the slot (u when along_u), counter-clockwise.
-    axis = 0 if along_u else 1
-    assert p1[1 - axis] == pytest.approx(p2[1 - axis])
-    area2 = sum(
-        x0 * y1 - x1 * y0
-        for (x0, y0), (x1, y1) in zip((p1, p2, p3, p4), (p2, p3, p4, p1))
-    )
-    assert area2 > 0
-    # On the dowel line (model x along u), end b is the slot's inner end and
-    # end a its outer end, whose whole half round stands in air past the
-    # widest printed block's -X face.
-    _, _, _, _, inner, outer = (
-        point[0]
-        for point in part.slot_stadium_points(
-            ((part.SLOT_INNER_X + part.SLOT_OUTER_X) / 2.0, 0.0),
-            along_u=True,
-            half_flat=half_flat,
-            half_w=half_w,
-        )
-    )
-    assert inner == pytest.approx(part.SLOT_INNER_X)
-    assert outer == pytest.approx(part.SLOT_OUTER_X)
-    assert outer + half_w < -(knife_mount.BLK_HALF_X + knife_mount.BLOCK_SIZE_TOL / 2.0)
 
 
 def _stud_height_case(monkeypatch):

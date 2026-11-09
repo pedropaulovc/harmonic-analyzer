@@ -372,13 +372,14 @@ def _segment_distance(
 
 
 def test_section_a_crosses_the_plate_between_the_lettering_rows() -> None:
-    # Both ends stand off the outline, so the arrows and letters print off
-    # the plate (r2 review C3).
+    # A short partial plane: it starts off the outline, so that arrow and
+    # letter print off the plate (r2 review C3), and stops on the sunk field
+    # just past what the cropped section shows (rule 9).
     outline = _rings(part.OUTLINE_DXF)[0]
     y = drawing.SECTION_Y
-    assert drawing.SECTION_X_START < 0.0 < spec.PLATE_WIDTH < drawing.SECTION_X_END
-    for x in (drawing.SECTION_X_START, drawing.SECTION_X_END):
-        assert not dxf.point_in_ring(outline, (x, y))
+    assert drawing.SECTION_X_START < 0.0 < drawing.SECTION_CROP[1][0] < drawing.SECTION_X_END
+    assert drawing.SECTION_X_END < 0.1 * spec.PLATE_WIDTH
+    assert not dxf.point_in_ring(outline, (drawing.SECTION_X_START, y))
     # The only engraved rings the line meets are the border's (pinstripe and
     # field edges, which span the plate); every letter and the ornament
     # stand at least a millimetre clear of it.
@@ -470,11 +471,14 @@ def test_section_a_dimensions_each_depth_on_its_own_line() -> None:
     assert floor["callout"] == "FLOOR UNDER ENGRAVING"
 
 
-def test_sunk_field_depth_names_why_it_holds_three_places() -> None:
+def test_sunk_field_depth_holds_three_places_by_declared_exception() -> None:
     # PR #1468 r4 review: the field depth printed .XXX with no stated
     # function. The field must stay above the engraving's floor so the
     # lettering stays cut; .028 and .016 at .XXX (+-.005) leave .002, and at
     # .XX (+-.010) the field could cut below the engraving.
+    from _paths import CAD_ROOT
+    from machinist_exceptions import load_exceptions
+
     assert (0.028 - 0.005) - (0.016 + 0.005) == pytest.approx(0.002)
     assert (0.028 - 0.005) - (0.016 + 0.010) < 0.0
     assert print_spec.ENGRAVING_BELOW_FIELD_MIN == pytest.approx(0.002 * 25.4)
@@ -482,8 +486,17 @@ def test_sunk_field_depth_names_why_it_holds_three_places() -> None:
         "FieldDepth": 3,
         "EngravingDepth": 3,
     }
-    rows = print_spec.FIELD_DEPTH_CALLOUT.split("\n")
-    assert rows == ["SUNK FIELD DEPTH", "ENGRAVING BELOW IT"]
+    # The reason lives in RV-06, not on the sheet: printed, it read as a
+    # second datum (run 20261107T220230661Z) and as narration (run
+    # 20261107T234638358Z).
+    rows = drawing.SECTION_CALLOUTS["FieldDepth"].split("\n")
+    assert rows == ["SUNK FIELD DEPTH"]
+    declared = {
+        entry.id: entry
+        for entry in load_exceptions(CAD_ROOT / "config", "fr_nameplate", "part")
+    }
+    assert "SUNK FIELD DEPTH" in declared["RV-06"].where
+    assert ".002" in declared["RV-06"].reason
     # The three-row block (value and two callout rows, 4.5 mm each) keeps its
     # leader shelf above the field's outside arrow, ~5.7 mm long on the r4
     # render, at the decorated face.
@@ -743,12 +756,18 @@ def test_declared_exceptions_name_the_printed_minimums() -> None:
         "RV-01": "accept",
         "RV-02": "minor",
         "RV-03": "minor",
+        "RV-05": "minor",
+        "RV-06": "accept",
     }
-    for entry in declared.values():
-        assert entry.reason.endswith(("(owner-accepted)", "(owner-ruled shortfall)"))
+    for name in ("RV-01", "RV-02", "RV-03"):
+        assert declared[name].reason.endswith(("(owner-accepted)", "(owner-ruled shortfall)"))
+    for name in ("RV-05", "RV-06"):
+        assert "Owner ruling 2026-11-08 (Pedro), #2144 item 12.2" in declared[name].reason
     floor, screws = print_spec.MINIMUM_NOTES.splitlines()
     assert floor in declared["RV-02"].where
     assert screws in declared["RV-03"].where
+    # The sheet's rows state the same facts, the screws' naming its parts.
+    assert floor in drawing.MINIMUM_NOTES and screws in drawing.MINIMUM_NOTES
     # Each states its worst case in inches, rounded down to three places.
     for note, worst in (
         (floor, print_spec.ENGRAVING_FLOOR_MIN),
@@ -770,11 +789,8 @@ def test_notes_and_callouts_carry_no_numbers_and_stay_short() -> None:
     assert all(len(note) <= 60 for note in notes), notes
     texts = [
         *notes,
-        print_spec.FIELD_DEPTH_CALLOUT,
-        print_spec.ENGRAVING_DEPTH_CALLOUT,
+        *drawing.SECTION_CALLOUTS.values(),
         print_spec.FLOOR_UNDER_ENGRAVING_CALLOUT,
-        drawing.SCREW_HEAD_NOTE,
-        *print_spec.DIMENSION_CALLOUTS.values(),
     ]
     assert not any(re.search(r"\d", text) for text in texts), texts
     # Each vendored contour by the exact path cut_release stages it at.
@@ -790,7 +806,6 @@ def test_texts_stand_inside_the_border_and_off_the_title_block() -> None:
         drawing.FLOOR_REFERENCE["text_xy"],
         drawing.HOLE_CALLOUT_XY,
         drawing.NOTES_XY,
-        drawing.SCREW_HEAD_NOTE_XY,
         drawing.MINIMUM_NOTES_XY,
         drawing.ISO_NOTE_XY,
         drawing.SECTION_CENTER,
@@ -829,3 +844,25 @@ def test_part_registry_row_carries_the_title_block_facts() -> None:
     assert "brass" in str(row["material_specification"]).lower()
     assert row["finish"]
     assert int(row["quantity"]) == 1
+
+
+def test_hole_callout_names_the_transfer_route_under_the_native_size(monkeypatch) -> None:
+    # Run 20261107T102146937Z (blocker, rule 19): the tapped mate's position
+    # zone is far tighter than the plate's loose edge bands. MHA-FR-01's taps
+    # are spotted through these holes (fr-harmonic-base RV-01), so the callout
+    # names that route on its own row under the live format text.
+    assert drawing.HOLE_CALLOUT_ROUTE == "MHA-FR-01 TAPS SPOTTED THROUGH AT ASSEMBLY"
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    texts = {5: "<NUM_INST>X <MOD-DIAM><hw-diam> THRU ALL"}
+
+    def set_text(part: int, text: str) -> None:
+        assert part == 1
+        texts[5] = text
+
+    display = SimpleNamespace(GetText=lambda part: texts.get(part, ""), SetText=set_text)
+    drawing._append_hole_callout_row(display, drawing.HOLE_CALLOUT_ROUTE, label="holes")
+    assert texts[5] == (
+        "<NUM_INST>X <MOD-DIAM><hw-diam> THRU ALL\nMHA-FR-01 TAPS SPOTTED THROUGH AT ASSEMBLY"
+    )
+    with pytest.raises(RuntimeError, match="cannot take"):
+        drawing._append_hole_callout_row(display, drawing.HOLE_CALLOUT_ROUTE, label="holes")

@@ -181,8 +181,15 @@ def test_note_is_one_short_line_naming_the_end_bracket() -> None:
     assert "\n" not in note and len(note) <= 80
     assert note == note.upper()
     assert "MHA-CH-06-TL-28" in note
-    # The receipt check's pass condition: the bracket's screws pass the holes.
-    assert "#8-32 SCREWS MUST PASS BOTH HOLES" in note
+    # The receipt check's pass condition: the bracket's screws, named by
+    # their registered number, pass the holes. It is note 1, linked from the
+    # holes' callout, so the mates are at the callout (rule 7).
+    screw = _config.parts("ch-rocker-arm-tl-vn-oblique-bracket-screw")["number"]
+    assert spec.BRACKET_SCREW_NUMBER == screw
+    assert note.startswith("1. ")
+    assert f"2X HOLES PASS {screw} SCREWS" in note
+    assert spec.HOLE_CALLOUT.startswith("2X") and spec.HOLE_CALLOUT.endswith("SEE NOTE 1")
+    assert "\n" not in spec.HOLE_CALLOUT
 
 
 def test_sheet_is_the_registered_purchased_part_reference(monkeypatch) -> None:
@@ -240,8 +247,12 @@ def test_plan_view_carries_the_receipt_check_reference_sizes() -> None:
     assert spec.SUPPLIER_REFERENCE_PLANES == {}
     assert set(spec.SUPPLIER_REFERENCE_UNITS.values()) == {"mm"}
     assert spec.SUPPLIER_REFERENCE_FORMATS["SupplierBoltHoleDiameter"] == (
-        1, "diameter", None, "2X",
+        1, "diameter", None, spec.HOLE_CALLOUT,
     )
+    # The wider callout's room comes out of the empty right: the plan view's
+    # cell total is unchanged.
+    left, _, right, _ = draw.SUPPLIER_MARGINS["*Front"]
+    assert math.isclose(left + right, 0.034 + 0.020)
 
     def chord(name):
         (x, y), (value, orientation) = spec.SUPPLIER_REFERENCE_STARTS[name], rows[name]
@@ -267,7 +278,8 @@ def test_plan_view_carries_the_receipt_check_reference_sizes() -> None:
     left, bottom, right, top = draw.SUPPLIER_MARGINS["*Front"]
     # The hole text's left reserve; the plan view (55 x 13 at 2:1 plus 11.176
     # mm of native padding) still fits the 180 mm cell beside it.
-    assert (left, right) == (0.034, 0.020) and top >= bottom
+    assert (left, right) == (draw._HOLE_TEXT_ROOM_M, draw._EMPTY_RIGHT_M) and top >= bottom
+    assert left >= 0.050  # the 14-character "2X, SEE NOTE 1" shelf
     assert 0.180 - left - right >= 2 * spec.LENGTH / 1000.0 + 0.011176
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "supplier.SUPPLIER_REFERENCE_DIMENSIONS" in source

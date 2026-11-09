@@ -66,7 +66,7 @@ def test_every_cone_sheet_names_the_actual_finite_cutting_system() -> None:
         assert f"T{teeth:03d}" in data
         assert (
             f"DIAMETRAL PITCH / PRESSURE ANGLE:  "
-            f"{spec.DIAMETRAL_PITCH:.2f} / {spec.PRESSURE_ANGLE_DEG:.1f} DEG"
+            f"{spec.DIAMETRAL_PITCH:.2f} / {spec.PRESSURE_ANGLE_DEG:.1f}\u00b0"
         ) in data
         assert "CUTTER:" in data
         assert "PLUNGE" in data

@@ -183,12 +183,12 @@ def test_both_end_faces_hold_square_to_the_bore_datum() -> None:
     faces' perpendicularity to A over the smallest face it seats on."""
     assert spec.BORE_DATUM == "A"
     assert spec.GEOMETRIC_TOLERANCES_IN == {
-        "rear face perpendicularity to bore": ".0004",
-        "front face perpendicularity to bore": ".0004",
+        "rear face perpendicularity to bore": ".001",
+        "front face perpendicularity to bore": ".001",
         "o.d. circular runout to bore": ".016",
     }
-    assert spec.REAR_FACE_PERPENDICULARITY == pytest.approx(0.0004 * 25.4)
-    assert spec.FRONT_FACE_PERPENDICULARITY == pytest.approx(0.0004 * 25.4)
+    assert spec.REAR_FACE_PERPENDICULARITY == pytest.approx(0.001 * 25.4)
+    assert spec.FRONT_FACE_PERPENDICULARITY == pytest.approx(0.001 * 25.4)
     # The arm seats on the face's flat inside the O.D. rim's break.
     assert spec.FACE_PERPENDICULARITY_ZONE_DIA == pytest.approx(
         spec.OD - spec.OD_BAND - 2.0 * spec.EDGE_BREAK
@@ -535,24 +535,22 @@ def test_turned_part_diameters_follow_the_machinist() -> None:
 def test_the_bore_callout_names_ream_for_the_shoulder_press() -> None:
     """The bore is a light press on the MHA-PD-VN-57 shoulder: a fit bore, so it
     is reamed (drawing-guidelines.md rule 12 (hole and slot callouts say what to do)) and its one-sided band holds the press; its callout
-    rides the end-view diameter, the hole's defining view, and names the
-    shoulder and the interference both limits produce (rule 4)."""
+    rides the end-view diameter, the hole's defining view, names the fit by
+    its standard name on the screw, and gives the interference both limits
+    produce as REF (rule 4), in two lines of words (rule 7)."""
     drilled_growth = _config.title_block("drilled_hole")["plus_mm"]
     # The press band is tighter than a drill's oversize: only a reamer holds it.
     assert 0.0 < max(spec.BORE_DIA_BAND) < drilled_growth
     assert set(drawing.DIMENSION_CALLOUTS) == {"BoreDia", "RingLength"}
     assert "BoreDia" in drawing.END_KEEP and "RingLength" in drawing.PROFILE_KEEP
-    bore = " ".join(drawing.DIMENSION_CALLOUTS["BoreDia"].split())
-    # Process, fit and mate (rule 4), not their wording or wrapping.
-    assert bore.startswith("REAM THRU")
-    assert "DIAMETRAL INTERFERENCE" in bore
+    rows = drawing.DIMENSION_CALLOUTS["BoreDia"].split("\n")
+    assert rows[0] == "REAM THRU" and len(rows) == 3
     screw = _config.parts("pd-vn-transgear-pivot-screw")["number"]
-    # The mating feature is the screw's shoulder, not its thread.
-    assert re.search(rf"{re.escape(screw)}\s+SHOULDER\b", bore)
-    assert "THREAD" not in bore
+    assert rows[1] == f"PRESS FIT ON {screw}"
+    assert "DIAMETRAL" not in drawing.DIMENSION_CALLOUTS["BoreDia"]
     # The printed window encloses the spec's press at both limits; a sign
     # before either limit is never read as its magnitude.
-    (window,) = re.findall(r"(?<![-+\d.])(\d*\.\d+)-(\d*\.\d+)", bore)
+    (window,) = re.findall(r"^\(INTERFERENCE (\d*\.\d+)-(\d*\.\d+)\)$", rows[2])
     low, high = (float(v) * 25.4 for v in window)
     assert 0.0 < low <= spec.PRESS_INTERFERENCE[0] < spec.PRESS_INTERFERENCE[1] <= high
     assert high - spec.PRESS_INTERFERENCE[1] < 0.00254

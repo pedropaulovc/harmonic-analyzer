@@ -15,3 +15,8 @@ pd-transgear-removable:
       where: "the BORE TO DRIVE-PIN HOLE WEB .018 MIN note"
       finding: "bore-to-drive-pin web below the .060 floor (rule 17)"
       reason: "Owner ruling 2026-11-01: shared #25 sprocket-seat geometry; accepted as a permanent minor exception (revisit in #2141). The Ø.406 bore and the #40 drive-pin holes on R.2756 come from the shared sprocket seat (_sprocket_seat_geometry); .024 nominal, .018 MIN with both holes drilled oversize and the pin at its full location band (#1377)"
+    - id: "RV-02"
+      kind: "accept"
+      where: "the two #40 drive-pin holes' .2756 ±.0009 locations from the bore axis"
+      finding: "drilled-hole location band tighter than the ±.005 drilled-hole row, a converted-mm value, with no fit route (rules 3, 4)"
+      reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144 (fan-out F4). The band is the shared #25 sprocket seat's (_sprocket_seat_geometry.DRIVE_PIN_OFFSET_TOL), set by the dowel slip budget: the 3/32 pins of MHA-DT-11 and MHA-PD-22 enter these holes with .0039 diametral slip, and the pin and hole location bands spend .0036 of it, so neither can loosen; a cross-part transfer route was not taken now because it re-keys MHA-DT-11, MHA-PD-22 and both assemblies"

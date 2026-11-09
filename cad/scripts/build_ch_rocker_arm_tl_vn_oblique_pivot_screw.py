@@ -80,9 +80,8 @@ def _shop_cut_dimension(adapter) -> None:
         raise RuntimeError(part.CUT_DIMENSION + ": cut length changed")
     if display.SetPrecision3(part.CUT_THREAD_PLACES, -1, -1, -1) != 0:
         raise RuntimeError(part.CUT_DIMENSION + ": precision rejected")
-    display.SetText(4, part.CUT_CALLOUT)
     if (int(display.GetPrimaryPrecision2()) != part.CUT_THREAD_PLACES
-            or str(display.GetText(4) or "").replace("\r\n", "\n") != part.CUT_CALLOUT
+            or str(display.GetText(4) or "")
             or int(_early_bound(native.Tolerance, "IDimensionTolerance").Type) != 0):
         raise RuntimeError(part.CUT_DIMENSION + ": shop presentation did not persist")
     mark_dimensions_for_drawing(adapter, part.CUT_FEATURE, {part.CUT_DIMENSION})

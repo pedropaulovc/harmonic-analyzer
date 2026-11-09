@@ -1,8 +1,8 @@
 """Create the four-view purchased-reference sheet for the Sharpie Fine Point pen marker (MHA-PN-VN-56).
 
 Identification only: the marker as installed (uncapped), its stock and
-ordering item number, and its fitting note on a leader to the grip band; no
-fabrication dimensions.
+ordering item number, and its one fitting note (the mate its grip seats in)
+on a leader to the grip band; no fabrication dimensions.
 
 The shared purchased-part builder picks the largest scale that fits its
 fastener cells. For this marker that is 1:2: the 1:1 isometric outline
@@ -164,9 +164,9 @@ GRIP_TIP = (
     FRONT_CENTER[0] - BARREL_DIA / 2.0 * _MODEL_M,
     FRONT_CENTER[1] - _SIDE_HALF[1] + (BARREL_START_Y + BARREL_END_Y) / 2.0 * _MODEL_M,
 )
-# Its text (3.5 mm, top-left at GRIP_NOTE_XY) sits left of FRONT. It has three
-# lines of at most GRIP_NOTE_WIDTH characters, about 77 mm x 14 mm at the
-# repo's widest 2.75 mm per character (pen-hanger audit). So it spans
+# Its text (3.5 mm, top-left at GRIP_NOTE_XY) sits left of FRONT. It has at
+# most three lines of at most GRIP_NOTE_WIDTH characters, about 77 mm x 14 mm
+# at the repo's widest 2.75 mm per character (pen-hanger audit). So it spans
 # x 60..137 mm, y 136..150 mm, 31 mm clear of FRONT's outline. The leader
 # drops about 23 mm to the tip (y 112.75).
 GRIP_NOTE_WIDTH = 28
@@ -210,9 +210,8 @@ def _assert_grip_leader(note: Any) -> None:
 
 
 def grip_note(manufacturing_notes: str) -> str:
-    """The part's installation note, broken after its first clause for the leader."""
-    head, tail = manufacturing_notes.split("; ", 1)
-    return "\n".join((f"{head};", *textwrap.wrap(tail, GRIP_NOTE_WIDTH)))
+    """The part's grip note, wrapped to the leader's short lines."""
+    return "\n".join(textwrap.wrap(manufacturing_notes, GRIP_NOTE_WIDTH))
 
 
 def _center_outline(view: Any, name: str, center: tuple[float, float]) -> None:

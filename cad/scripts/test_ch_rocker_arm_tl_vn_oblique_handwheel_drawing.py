@@ -214,6 +214,6 @@ def test_note_is_one_short_line_naming_the_leadscrew_by_its_drawing_number() -> 
     number = _config.parts("ch-rocker-arm-tl-vn-oblique-leadscrew-kit")["number"]
     assert spec.LEADSCREW_NUMBER == number
     assert "\n" not in note and len(note) <= 80
-    assert f"LEADSCREW {number}" in note
+    assert f"LEADSCREW OF {number}" in note
     # The number is the only digits the note carries.
     assert not re.search(r"\d", note.replace(number, ""))

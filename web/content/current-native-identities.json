@@ -445,13 +445,13 @@
       ]
     },
     {
-      "sourceStem": "vn-keeper-chain-link",
-      "sourceNumber": "MHA-VN-036",
+      "sourceStem": "dt-vn-keeper-chain-screw",
+      "sourceNumber": null,
       "identities": [
         {
           "parent": "dt-drive-train",
-          "stem": "dt-vn-keeper-chain-link",
-          "number": "MHA-DT-VN-66"
+          "stem": "dt-vn-keeper-chain-screw",
+          "number": "MHA-DT-VN-70"
         }
       ]
     },
@@ -588,6 +588,28 @@
           "parent": "pd-paper-drive",
           "stem": "pd-vn-transgear-cluster-shim",
           "number": "MHA-PD-VN-68"
+        }
+      ]
+    },
+    {
+      "sourceStem": "dt-vn-locating-pin",
+      "sourceNumber": null,
+      "identities": [
+        {
+          "parent": "dt-drive-train",
+          "stem": "dt-vn-locating-pin",
+          "number": "MHA-DT-VN-69"
+        }
+      ]
+    },
+    {
+      "sourceStem": "sm-vn-gooseneck-shoulder-screw",
+      "sourceNumber": null,
+      "identities": [
+        {
+          "parent": "sm-summing",
+          "stem": "sm-vn-gooseneck-shoulder-screw",
+          "number": "MHA-SM-VN-56"
         }
       ]
     },
@@ -1031,9 +1053,19 @@
       "registry": null,
       "builder": null,
       "status": "archive-only"
+    },
+    {
+      "sourceStem": "vn-keeper-chain-link",
+      "sourceNumber": "MHA-VN-036",
+      "parent": "dt-drive-train",
+      "stem": "dt-vn-keeper-chain-link",
+      "number": null,
+      "registry": null,
+      "builder": null,
+      "status": "archive-only"
     }
   ],
-  "currentRegistryMapSha256": "47e96074f70b6740d35d120feea6c837ae28258c0c9059d923adb9cf47fa92db",
+  "currentRegistryMapSha256": "2e8cd865827512f031625ef29f050431cd197dd313758c0cb03a7e23e6c8ac6d",
   "nativeIdentities": [
     {
       "sourceStem": "ch-rocker-arm-tl-oblique-feed-lever",
@@ -1776,16 +1808,6 @@
       ]
     },
     {
-      "sourceStem": "dt-crank-pin-eye",
-      "sourceNumber": "MHA-DT-028",
-      "identities": [
-        {
-          "stem": "dt-crank-pin-eye",
-          "number": "MHA-DT-28"
-        }
-      ]
-    },
-    {
       "sourceStem": "dt-crank-handle",
       "sourceNumber": "MHA-DT-008",
       "identities": [
@@ -1992,16 +2014,6 @@
         {
           "stem": "sh-column-clamp-front",
           "number": "MHA-SH-01"
-        }
-      ]
-    },
-    {
-      "sourceStem": "sm-gooseneck-spring-screw",
-      "sourceNumber": "MHA-SM-004",
-      "identities": [
-        {
-          "stem": "sm-gooseneck-spring-screw",
-          "number": "MHA-SM-04"
         }
       ]
     },

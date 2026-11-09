@@ -1,17 +1,21 @@
 r"""Create the five-sheet magnifier fitter package (MHA-MG-00).
 
 Sheet 1, ASSEMBLED + SETTINGS: the preserved back, left and back-top-left
-views at 1:4, and every assembly setting printed as the assembly's own model
-dimension (mg_magnifier_assembly_spec). The back view prints the lever group's two
-operator settings, the clamp station and the fixture drop. Two cropped
-side-view details of the wheel axle print one stack setting each:
-- AXLE AS PRESSED (2:1) shows only the bar and the axle. It prints the press
-  gauge from the bar's front face to the shank step. The wheel hub hides the
-  step once it is fitted.
-- WHEEL ENDSHAKE (4:1) shows the stack. It prints the endshake between the
-  wheel's spigot face and the front washer.
-- LEVER TIP DETAIL (4:1) shows the flat threaded tip beyond the far bracket
+views at 1:4, printed as the unnamed third-angle front, right side and
+isometric views, and every assembly setting printed as the assembly's own
+model dimension (mg_magnifier_assembly_spec). The front view prints the lever
+group's two operator settings, the clamp station and the fixture drop. Every
+other view carries a letter (drawing-guidelines.md rules 9 and 26), its
+boundary circle or viewing arrow drawn on the right side view:
+- DETAIL A (2:1) shows only the bar and the axle. It prints the press gauge
+  from the bar's front face to the shank step. The wheel hub hides the step
+  once it is fitted.
+- DETAIL B (4:1) shows the stack. It prints the endshake between the wheel's
+  spigot face and the front washer.
+- VIEW C (4:1) looks at the flat threaded lever tip beyond the far bracket
   face, with the single imported ThreadProjection setting.
+- VIEW D (2:1, sheet 5) looks at the wheel hub at rest: TIE 1 and its angle
+  below the wheel bar's bottom edge, the angle the wire steps set.
 
 Each detail is an ordinary model view at its own physical orientation,
 dimensioned while uncropped and cropped after. On a native detail, the
@@ -24,15 +28,13 @@ presentation (mg_magnifier_explode_spec) with only the wheel group shown, the
 BOM (part number, description, vendor SKU, quantity) and one balloon per
 family. Sheet 3, LEVER GROUP: the same explode with only the lever group
 shown, ballooned from the same BOM. Sheet 4, ASSEMBLY STEPS: the finished
-assembly with the lever wire ballooned, beside the numbered sequence
-(mg_magnifier_assembly_steps), one blank line between steps. The instruction
-column uses the left 190 mm; the finished view is centred in the remaining
-right field. The spaced sequence no longer fits that column above the title
-block, so sheet 5, WIRE STEPS + CHECKS, continues it in the same column under
-ASSEMBLY SEQUENCE (CONT.): the two whole lever-wire steps, then the checks,
-beside an unballooned finished view laid out as sheet 4's.
-Step text names the settings and never values them. This recipe never edits
-the source assembly or its explodes.
+assembly with the lever wire ballooned, beside the wheel group's numbered
+steps (mg_magnifier_assembly_steps). The instruction column uses the left
+190 mm; the finished view is centred in the remaining right field. Sheet 5,
+LEVER + WIRE STEPS: the lever group's and the lever wire's steps under
+ASSEMBLY SEQUENCE (CONT.), then the checks, beside VIEW D.
+Steps name parts by BOM item and settings by their view, and never value
+them. This recipe never edits the source assembly or its explodes.
 """
 
 from __future__ import annotations
@@ -42,6 +44,7 @@ from dataclasses import dataclass
 import hashlib
 import math
 from pathlib import Path
+import re
 import sys
 import textwrap
 from typing import Any, Callable
@@ -69,7 +72,6 @@ from _com import _early_bound
 from _component_references import component_identity, component_reference_names
 from _drawing_annotation_extent import (
     CLEAR_GAP_M,
-    PLACE_SETTLE_M,
     callout_ink,
     boxes_clear,
     move_annotation,
@@ -96,7 +98,9 @@ from _drawing_common import (
 )
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision
+from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_hidden_sketches import _show_base_view_sketches
+from _drawing_leader_notes import add_leader_note
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_types import DRAWING_TEMPLATES, DrawingLayout
@@ -122,10 +126,12 @@ from _layout_audit import arrowhead_segments
 from _session import run_build
 from _mg_wheel_rim_geometry import RIM_AXIAL, RIM_OUTER_DIA
 from mg_lever_thread_joint import ROD_DIA as LEVER_ROD_DIA
+from mg_magnifying_clamp_geom import HEX_AF as CLAMP_HEX_AF
+from mg_magnifying_wheel_geom import TIE1_X, TIE1_Y, TIE_HOLE_DIA
 from mg_magnifying_vertical_rod_geom import ROD_DIA as VROD_DIA
 from mg_magnifying_vertical_rod_geom import SHOULDER_X as VROD_SHOULDER_X
 from mg_wheel_axle_spec import TIP_Y
-from mg_wheel_bar_geom import BORE_ROW_HEIGHT
+from mg_wheel_bar_geom import BAR_TOP_ABOVE_ROW, BORE_ROW_HEIGHT
 
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -148,8 +154,10 @@ SHEET_NAMES = (
     "WHEEL GROUP + BOM",
     "LEVER GROUP",
     "ASSEMBLY STEPS",
-    "WIRE STEPS + CHECKS",
+    "LEVER + WIRE STEPS",
 )
+if SHEET_NAMES.index("LEVER + WIRE STEPS") + 1 != notes.WHEEL_REST_VIEW_SHEET:
+    raise AssertionError("VIEW D's sheet number must match its arrow's reference")
 if SPEC.layout is not DrawingLayout.LANDSCAPE:
     raise AssertionError("the magnifier sheet coordinates are landscape")
 SHEET_LAYOUTS = {name: DrawingLayout.LANDSCAPE for name in SHEET_NAMES}
@@ -165,31 +173,29 @@ if any(
 ):
     raise AssertionError("a rescale on the exploded-view ladder would switch configuration")
 EXPLODED_SCALE = EXPLODED_SCALE_LADDER[0]
+# VIEW D, the wheel hub at rest, is sheet 5's only view.
+WHEEL_REST_SCALE = (2.0, 1.0)
 SHEET_SCALES = {
     SHEET_NAMES[0]: SHEET_SCALE,
     SHEET_NAMES[1]: EXPLODED_SCALE,
     SHEET_NAMES[2]: EXPLODED_SCALE,
     SHEET_NAMES[3]: SHEET_SCALE,
-    SHEET_NAMES[4]: SHEET_SCALE,
+    SHEET_NAMES[4]: WHEEL_REST_SCALE,
 }
 FRONT_CENTER = (0.070, 0.150)
 # Right sits 18 mm further right than r5's 0.150 so the fixture drop's
 # text block (left-justified at FIXTURE_DROP_RUN, ~42 mm wide) clears it:
 # r5's audit had "60.0" printing 4.0 mm over Drawing View2.
 RIGHT_CENTER = (0.168, 0.150)
-ISO_CENTER = (0.225, 0.140)
-# Machinist review r3 (run 20261016T120248930Z-2fa1ae0c1aaa4f1ea2370a197868591c):
-# the unlabelled principal view shows the bar in front of the wheel, while
-# step 11 leads the wire "seen from the front". The preserved MG BACK looks
-# from the bar side, +z (mg_magnifying_wheel_geom: the pen-side front view
-# mirrors local x), and MG LEFT from +x, the fitter's left as he faces the
-# machine front: the drum, at machine -z, prints on its right. Each caption is centred
-# under its view (caption_under); the side view's stays short so it ends left
-# of the isometric (r8's outlines: Right 153-183 mm, Isometric from 194 mm).
-ASSEMBLED_VIEW_CAPTIONS = {
-    stack.DRAWING_BACK_VIEW: "VIEW FROM THE BACK",
-    stack.DRAWING_LEFT_VIEW: "VIEW FROM THE LEFT",
-}
+# The isometric stands 8 mm right of r8's 0.225 so the right side view's
+# viewing arrows (C, D) and their letters have open paper on its right
+# (r8's outlines: Right 153-183 mm, Isometric from 194 mm).
+ISO_CENTER = (0.233, 0.140)
+# The preserved MG BACK looks from the bar side, +z (mg_magnifying_wheel_geom:
+# the pen-side front view mirrors local x), and MG LEFT from +x, the right
+# side view's third-angle direction for that front view: the drum, at machine
+# -z, prints on its right. Both print unnamed (rule 26: projected principal
+# views need no names); every other view takes a letter.
 
 # Sheet geometry, metres: the template's inner border and the title block in
 # its lower-right corner. Every view ring and note stays inside the border and
@@ -297,18 +303,16 @@ if any(
     raise AssertionError("a rescale on the lever ladder would switch configuration")
 LEVER_GROUP = "LEVER GROUP"
 LEVER_LABEL = "lever group exploded"
-# Sheet 4: the sequence and checks down a 190 mm left column, the finished
+# Sheet 4: the wheel group's steps down a 190 mm left column, the finished
 # assembly centred in the remaining field above the title block, its caption
-# centred over it. The wider column keeps full parent-scoped vendor Numbers
-# intact without reducing the default text size or its line pitch.
+# centred over it. The column is narrow enough to run down beside the title
+# block (BESIDE_TITLE_BLOCK below): one step per action needs the rows.
 # The lever wire's balloon stands right of the view (FINISHED_WIRE_BALLOON_*).
 STEPS_XY = (0.018, 0.2605)
-STEPS_LINE_WIDTH = 80  # characters; default-format note text (as MHA-MS-00)
-# R22 sheet 4: the full CHECK note's extent still crosses the tolerance
-# panel when the clamp check uses 80 columns. Wrap all checks at 72 so the
-# entire five-row note clears the panel, without moving it or the steps.
-# (The checks now print on sheet 5 and keep the same rows.)
-CHECKS_LINE_WIDTH = 72
+STEPS_LINE_WIDTH = 72  # characters; default-format note text (as MHA-MS-00)
+# Sheet 5: the lever group's and the wire's steps, then the checks, down a
+# 237 mm column (one step per action needs the rows), VIEW D right of it.
+CONTINUED_LINE_WIDTH = 100
 # Default-format note line pitch (the MHA-PD-00 stake note measured 0.0045).
 NOTE_LINE_PITCH = 0.0046
 # Machinist review r2: the caption at the field's left corner sat ~40 mm left
@@ -316,7 +320,10 @@ NOTE_LINE_PITCH = 0.0046
 # has settled. Its width is the character count at the r6 PDF's measured
 # pitch ("FINISHED ASSEMBLY (SCALE 1:4)": 29 characters, 68.8 mm).
 CAPTION_CHAR_WIDTH = 0.00237
-STEPS_RIGHT = STEPS_XY[0] + STEPS_LINE_WIDTH * CAPTION_CHAR_WIDTH
+# The note columns' widths are the native note's measured pitch: the
+# 80-character sequence of run 20261024T041027643Z spanned x 17.6-227.8 mm.
+NOTE_CHAR_WIDTH = (0.2278 - 0.0176) / 80
+STEPS_RIGHT = STEPS_XY[0] + STEPS_LINE_WIDTH * NOTE_CHAR_WIDTH
 CAPTION_GAP = 0.004
 FINISHED_FIELD = (
     STEPS_RIGHT + _PAD,
@@ -332,8 +339,14 @@ FINISHED_CENTER = (
 FINISHED_SCALE_LADDER = (SHEET_SCALE, (1.0, 5.0), (1.0, 6.0))
 FINISHED_LABEL = "finished assembly"
 FINISHED_CAPTION = "FINISHED ASSEMBLY"
-# Sheet 5's unballooned finished view: same field, ladder and caption.
-CHECKS_VIEW_LABEL = "checks finished assembly"
+# Sheet 5's VIEW D field, right of the continued column, above the title block.
+CONTINUED_RIGHT = STEPS_XY[0] + CONTINUED_LINE_WIDTH * NOTE_CHAR_WIDTH
+WHEEL_REST_FIELD = (
+    CONTINUED_RIGHT + _PAD,
+    TITLE_BLOCK[3] + _PAD,
+    INNER_BORDER[2] - _PAD,
+    INNER_BORDER[3] - _PAD,
+)
 # Machinist review r4 (run 20261016T123712799Z-1710842d83c44076818f6a515121cce5):
 # the wire's only model edges were its two end circles, so balloon 19 landed
 # on the drum end inside the wheel and read as pointing at a spoke. MHA-SH-VN-56
@@ -526,19 +539,13 @@ if explode.SOURCE_CONFIGURATION != ASSEMBLY_VIEW_CONFIGURATION:
     raise AssertionError("the magnifier explode is authored in Default")
 
 
-def _wrapped(lines: tuple[str, ...], *, width: int, heading: str | None = None) -> str:
-    """Wrap each numbered line under its own number; one note per block.
-
-    One blank line separates consecutive numbered steps; a heading and wrapped
-    continuation rows stay tight."""
-    out = [heading] if heading else []
-    stepped = False
+def _wrapped(lines: tuple[str, ...], *, width: int) -> str:
+    """Wrap each line, a numbered step under its own head (``12.`` or
+    ``12A.``); rows stay tight."""
+    out: list[str] = []
     for line in lines:
         number, sep, rest = line.partition(". ")
-        if sep and number.isdigit():
-            if stepped:
-                out.append("")
-            stepped = True
+        if sep and re.fullmatch(r"\d+[A-Z]?", number):
             out += textwrap.wrap(
                 rest,
                 width=width,
@@ -558,39 +565,77 @@ def _wrapped(lines: tuple[str, ...], *, width: int, heading: str | None = None) 
     return "\n".join(out)
 
 
-# The spaced sequence's native box runs ~12 mm right of the title block's left
-# edge (run 20261024T041027643Z: x 17.6-227.8 mm), so on both instruction
-# sheets every block must end above the title block. With all eleven steps
-# sheet 4's box reached y 25.3 mm, so the two whole lever-wire steps continue
-# on sheet 5 (MHA-HA-00 cites them there), followed by the checks.
-STEPS_SPLIT = steps.step_number(steps.WIRE_HOOKED_KEY) - 1
+def _sequence(
+    heading: str, groups: tuple[tuple[str, tuple[str, ...]], ...], *, width: int
+) -> str:
+    """One note: ``heading``, then each titled step group, a blank line
+    between groups. One step per action leaves no room for a blank line
+    between steps; the group titles carry the structure instead."""
+    out = [heading]
+    for index, (title, lines) in enumerate(groups):
+        if index:
+            out.append("")
+        out.append(_wrapped((title,), width=width))
+        out.append(_wrapped(lines, width=width))
+    return "\n".join(out)
+
+
+_GROUP_STARTS = (
+    *(steps.SEQUENCE.index(key) for _title, key in notes.STEP_GROUPS),
+    len(notes.ASSEMBLY_STEPS),
+)
+STEP_GROUP_LINES = tuple(
+    (title, notes.ASSEMBLY_STEPS[start:end])
+    for (title, _key), start, end in zip(
+        notes.STEP_GROUPS, _GROUP_STARTS, _GROUP_STARTS[1:], strict=False
+    )
+)
+# The sequence's native box runs 2.63 mm a character from x 17.6 mm (run
+# 20261024T041027643Z: 80 characters spanned x 17.6-227.8 mm). A block whose
+# box ends a pad short of the title block's left edge may run down beside it
+# to the bottom border; a wider one must end above the title block. Sheet 4
+# takes the wheel group; sheet 5 continues with the lever group and the lever
+# wire (MHA-HA-00 and MHA-SH-VN-56 cite the wire steps there), followed by the
+# checks.
+if notes.STEP_GROUPS[1][1] != steps.LEVER_THREADED_KEY:
+    raise AssertionError("sheet 5 continues the sequence at the lever group")
+STEPS_SPLIT = _GROUP_STARTS[1]
 CONTINUED_HEADING = "ASSEMBLY SEQUENCE (CONT.)"
-ASSEMBLY_STEPS = _wrapped(
-    notes.ASSEMBLY_STEPS[:STEPS_SPLIT],
-    width=STEPS_LINE_WIDTH,
-    heading="ASSEMBLY SEQUENCE",
+ASSEMBLY_STEPS = _sequence(
+    "ASSEMBLY SEQUENCE", STEP_GROUP_LINES[:1], width=STEPS_LINE_WIDTH
 )
-ASSEMBLY_STEPS_CONTINUED = _wrapped(
-    notes.ASSEMBLY_STEPS[STEPS_SPLIT:],
-    width=STEPS_LINE_WIDTH,
-    heading=CONTINUED_HEADING,
+ASSEMBLY_STEPS_CONTINUED = _sequence(
+    CONTINUED_HEADING, STEP_GROUP_LINES[1:], width=CONTINUED_LINE_WIDTH
 )
-ASSEMBLY_CHECKS = _wrapped(notes.ASSEMBLY_CHECKS, width=CHECKS_LINE_WIDTH)
+ASSEMBLY_CHECKS = _wrapped(notes.ASSEMBLY_CHECKS, width=CONTINUED_LINE_WIDTH)
 CHECKS_XY = (
     STEPS_XY[0],
     STEPS_XY[1]
     - (ASSEMBLY_STEPS_CONTINUED.count("\n") + 1) * NOTE_LINE_PITCH
     - 2 * _PAD,
 )
+
+
+def _note_floor(width: int) -> float:
+    """The lowest y a note block ``width`` characters wide may reach."""
+    right = STEPS_XY[0] + width * NOTE_CHAR_WIDTH
+    if right + _PAD < TITLE_BLOCK[0]:
+        return INNER_BORDER[1] + _PAD
+    return TITLE_BLOCK[3] + _PAD
+
+
+BESIDE_TITLE_BLOCK = _note_floor(STEPS_LINE_WIDTH) < TITLE_BLOCK[3]
+if not BESIDE_TITLE_BLOCK:
+    raise AssertionError("the sheet 4 column no longer clears the title block")
 if any(
-    top - (block.count("\n") + 1) * NOTE_LINE_PITCH < TITLE_BLOCK[3] + _PAD
-    for block, top in (
-        (ASSEMBLY_STEPS, STEPS_XY[1]),
-        (ASSEMBLY_STEPS_CONTINUED, STEPS_XY[1]),
-        (ASSEMBLY_CHECKS, CHECKS_XY[1]),
+    top - (block.count("\n") + 1) * NOTE_LINE_PITCH < _note_floor(width)
+    for block, top, width in (
+        (ASSEMBLY_STEPS, STEPS_XY[1], STEPS_LINE_WIDTH),
+        (ASSEMBLY_STEPS_CONTINUED, STEPS_XY[1], CONTINUED_LINE_WIDTH),
+        (ASSEMBLY_CHECKS, CHECKS_XY[1], CONTINUED_LINE_WIDTH),
     )
 ):
-    raise AssertionError("an assembly instruction note runs down beside the title block")
+    raise AssertionError("an assembly instruction note runs past its floor")
 
 CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 DETAIL_POSITION_TOL_M = 1e-4
@@ -623,6 +668,13 @@ class StackDetail:
     # run 20261012T192552713Z could not tell what the gauge presses).
     parts: str = ""
     orientation: str = stack.DRAWING_LEFT_VIEW
+    # The detail's letter stands outside its boundary on the right side view,
+    # toward this corner (x, y signs).
+    letter_corner: tuple[int, int] = (1, 1)
+
+    @property
+    def letter(self) -> str:
+        return self.title.removeprefix("DETAIL ")
 
     @property
     def mm(self) -> float:
@@ -663,7 +715,8 @@ class StackDetail:
 
 @dataclass(frozen=True)
 class LeverTipDetail:
-    """The actual tip/far-face interface, viewed from the nose side of the flange."""
+    """VIEW C: the actual tip/far-face interface, viewed from the nose side of
+    the flange (its viewing arrow is on the right side view)."""
 
     title: str = notes.THREAD_PROJECTION_DETAIL_TITLE
     orientation: str = "*Front"
@@ -683,7 +736,7 @@ class LeverTipDetail:
 
     @property
     def label_text(self) -> str:
-        return f"{self.title}\nVIEW FROM THE FRONT\nSCALE {self.scale[0]} : {self.scale[1]}"
+        return f"{self.title}\nSCALE {self.scale[0]} : {self.scale[1]}"
 
 
 LEVER_TIP = LeverTipDetail()
@@ -691,6 +744,144 @@ LEVER_TIP = LeverTipDetail()
 # machine -Z, sheet X reversed and Y retained. Current Back / saved MG BACK
 # sees the occluding flange at +Z. No component pose or artificial camera moves.
 LEVER_TIP_FIELD = (0.025, 0.014, 0.180, 0.075)
+
+
+# VIEW D (sheet 5): the wheel hub at rest from the machine front (*Front, as
+# VIEW C), 2:1, cropped round the axle. It shows TIE 1, the lever wire's
+# approach to the drum, and the angle the wire steps set: TIE 1's axis line
+# from the axle axis, below the wheel bar's bottom edge (a real edge, seen
+# through the spoke gap on the column-clamp side). The wheel sits at its part
+# frame, so local (x, y) are machine offsets from the axle; this view mirrors
+# x on the sheet. Model mm below; the crop holds every point.
+WHEEL_REST_CROP_MM = 30.0
+TIE1_DIRECTION = (
+    math.cos(math.radians(notes.TIE1_ANGLE_DEG)),
+    -math.sin(math.radians(notes.TIE1_ANGLE_DEG)),
+)
+TIE1_LINE_END_MM = 27.0  # the centreline from the axle axis through TIE 1
+BAR_BOTTOM_MM = -BORE_ROW_HEIGHT
+# Where TIE 1's line meets the bar's bottom edge: the angle's vertex.
+TIE1_VERTEX_MM = (BAR_BOTTOM_MM / TIE1_DIRECTION[1] * TIE1_DIRECTION[0], BAR_BOTTOM_MM)
+# The edge pick, beyond the vertex in the spoke gap; the line pick, beyond the
+# vertex on the line; the angle's text, in the wedge between them.
+TIE1_EDGE_PICK_MM = (26.0, BAR_BOTTOM_MM)
+TIE1_LINE_PICK_MM = (20.0 * TIE1_DIRECTION[0], 20.0 * TIE1_DIRECTION[1])
+TIE1_ARC_MM = 12.0
+_HALF = math.radians(notes.TIE1_ANGLE_DEG / 2.0)
+TIE1_ANGLE_TEXT_MM = (
+    TIE1_VERTEX_MM[0] + TIE1_ARC_MM * math.cos(_HALF),
+    TIE1_VERTEX_MM[1] - TIE1_ARC_MM * math.sin(_HALF),
+)
+if not (
+    TIE1_VERTEX_MM[0] < TIE1_LINE_PICK_MM[0]
+    and TIE1_VERTEX_MM[0] < TIE1_EDGE_PICK_MM[0]
+    and max(
+        math.hypot(*point)
+        for point in (TIE1_EDGE_PICK_MM, TIE1_ANGLE_TEXT_MM)
+    ) < WHEEL_REST_CROP_MM - 2.0
+    and TIE1_LINE_END_MM < WHEEL_REST_CROP_MM
+):
+    raise AssertionError("VIEW D's angle picks must lie past the vertex, inside the crop")
+# The tie hole's label stands outside the crop, down and toward the clamp side
+# (left on the sheet), a row under the view's label, which is centred under
+# the crop. Rule 26: the hole by its plain name, as the steps name it.
+TIE1_LABEL_OFFSET = (-0.060, -0.072)
+TIE1_LABEL = notes.WIRE_TIE_HOLE
+# The bar the angle is read from (machinist review fanout/mg-asm preview:
+# VIEW D's 30 deg read as off a spoke edge, item 1 unseen). A leader names it
+# on its top strip, between its top edge and the spoke lying along it; the
+# label stands outside the crop, up and to the left.
+BAR_LABEL = f"ITEM {notes.ITEM_NUMBERS['mg-wheel-bar']}"
+BAR_LABEL_ATTACH_MM = (27.0, BAR_TOP_ABOVE_ROW - 0.9)
+BAR_LABEL_OFFSET = (-0.068, 0.034)
+if math.hypot(*BAR_LABEL_ATTACH_MM) > WHEEL_REST_CROP_MM - 2.0:
+    raise AssertionError("VIEW D's bar label must point inside the crop")
+CONTINUOUS_LINE_STYLE = 0  # swLineStyles_e.swLineCONTINUOUS
+CENTER_LINE_STYLE = 4  # swLineStyles_e.swLineCENTER
+THIN_LINE_WEIGHT = 0  # swLineWeights_e.swLW_THIN
+TIE1_ANGLE_TOL_DEG = 0.05
+SEL_EDGES = 1  # swSelectType_e.swSelEDGES
+
+
+@dataclass(frozen=True)
+class WheelRestView:
+    """VIEW D: the wheel hub at rest, seen from the machine front."""
+
+    title: str = notes.WHEEL_REST_VIEW_TITLE
+    orientation: str = "*Front"
+    scale: tuple[int, int] = (2, 1)
+    # Right-aligned in its field: the column's long rows get the slack.
+    centre: tuple[float, float] = (
+        WHEEL_REST_FIELD[2] - WHEEL_REST_CROP_MM * WHEEL_REST_SCALE[0] / 1000.0,
+        0.170,
+    )
+    stems: frozenset[str] = frozenset(
+        {
+            "mg-wheel-bar",
+            "mg-wheel-axle",
+            "mg-magnifying-wheel",
+            "mg-wheel-drum",
+            "mg-vn-wheel-axle-front-washer",
+            "mg-vn-wheel-axle-nut",
+            notes.WIRE,
+        }
+    )
+
+    @property
+    def mm(self) -> float:
+        return self.scale[0] / self.scale[1] / 1000.0
+
+    @property
+    def crop_radius(self) -> float:
+        return WHEEL_REST_CROP_MM * self.mm
+
+    def model_m(self, local_mm: tuple[float, float]) -> tuple[float, float, float]:
+        """A wheel-frame (x, y) offset from the axle, as a machine point (m)."""
+        return (
+            (stack.AXLE_X + local_mm[0]) / 1000.0,
+            (stack.AXLE_Y + local_mm[1]) / 1000.0,
+            stack.BAR_FRONT_Z / 1000.0,
+        )
+
+    @property
+    def model_centre_m(self) -> tuple[float, float, float]:
+        return self.model_m((0.0, 0.0))
+
+    @property
+    def label_text(self) -> str:
+        # Sheet 5's title-block scale is VIEW D's, so the label prints none
+        # (rule 9).
+        return self.title
+
+    @property
+    def label_xy(self) -> tuple[float, float]:
+        return (
+            self.centre[0] - LABEL_INSET,
+            self.centre[1] - self.crop_radius - LABEL_GAP,
+        )
+
+
+WHEEL_REST = WheelRestView()
+if tuple(float(value) for value in WHEEL_REST.scale) != WHEEL_REST_SCALE:
+    raise AssertionError("VIEW D's scale is sheet 5's scale")
+REST_INK_LEFT = WHEEL_REST.centre[0] + min(TIE1_LABEL_OFFSET[0], BAR_LABEL_OFFSET[0])
+_rest_box = (
+    REST_INK_LEFT,
+    min(
+        WHEEL_REST.label_xy[1],
+        WHEEL_REST.centre[1] + TIE1_LABEL_OFFSET[1],
+    )
+    - NOTE_LINE_PITCH,
+    WHEEL_REST.centre[0] + WHEEL_REST.crop_radius,
+    WHEEL_REST.centre[1] + WHEEL_REST.crop_radius,
+)
+if (
+    _rest_box[0] < WHEEL_REST_FIELD[0]
+    or _rest_box[1] < WHEEL_REST_FIELD[1]
+    or _rest_box[2] > WHEEL_REST_FIELD[2]
+    or _rest_box[3] > WHEEL_REST_FIELD[3]
+):
+    raise AssertionError(f"VIEW D {_rest_box!r} leaves its field {WHEEL_REST_FIELD!r}")
 
 
 # The free field right of the isometric, above the title block. The gauge
@@ -703,22 +894,23 @@ LEVER_TIP_FIELD = (0.025, 0.014, 0.180, 0.075)
 # up to the spigot face, so its lowest edge is the circle's chord there.
 _PRESSED_MARGIN = 6.25
 PRESSED = StackDetail(
-    "AXLE AS PRESSED",
+    notes.PRESS_DETAIL_TITLE,
     (2, 1),
     stack.PRESS_GAUGE / 2.0,
     stack.PRESS_GAUGE / 2.0 + _PRESSED_MARGIN,
     (0.330, 0.200),
     frozenset({"mg-wheel-bar", "mg-wheel-axle"}),
     BORE_ROW_HEIGHT,
-    # The BOM's own part numbers and descriptions (machinist review r1).
-    f"{BOM_PART_NUMBERS['mg-wheel-axle']} {BOM_DESCRIPTIONS['mg-wheel-axle']} "
-    f"PRESSED\nINTO {BOM_PART_NUMBERS['mg-wheel-bar']} "
-    f"{BOM_DESCRIPTIONS['mg-wheel-bar']}",
+    # The BOM items it shows (machinist review r1); the rest are left out.
+    # The acceptance, both limits, is the model callout over the gauge.
+    f"ITEM {notes.ITEM_NUMBERS['mg-wheel-axle']} PRESSED INTO "
+    f"ITEM {notes.ITEM_NUMBERS['mg-wheel-bar']},\nOTHER PARTS NOT SHOWN",
+    letter_corner=(-1, 1),
 )
 _ENDSHAKE_CENTRE_D = (stack.HUB_FRONT_D + TIP_Y) / 2.0
 _ENDSHAKE_RADIUS = 7.0
 ENDSHAKE = StackDetail(
-    "WHEEL ENDSHAKE",
+    notes.ENDSHAKE_DETAIL_TITLE,
     (4, 1),
     _ENDSHAKE_CENTRE_D,
     _ENDSHAKE_RADIUS,
@@ -735,10 +927,90 @@ ENDSHAKE = StackDetail(
         }
     ),
     math.sqrt(_ENDSHAKE_RADIUS**2 - (_ENDSHAKE_CENTRE_D - stack.HUB_FRONT_D) ** 2),
+    letter_corner=(1, 1),
 )
-# The gauge's dimension line runs above the bar, inside the circle, its
-# callout above the value; the endshake's text stands right of the stack,
-# above the nuts and past the crop, with its callout below.
+if (PRESSED.letter, ENDSHAKE.letter) != (
+    notes.PRESS_DETAIL_LETTER,
+    notes.ENDSHAKE_DETAIL_LETTER,
+):
+    raise AssertionError("the axle details' letters drifted from their titles")
+
+
+# Each lettered view's mark on the right side view (MG LEFT, 1:4): a detail's
+# boundary circle with its letter outside it, and VIEW C's and VIEW D's
+# viewing arrows, a letter note whose straight leader is the arrow
+# (draw_ch_rocker_arm: the native projection arrow is not switchable). On
+# that view sheet x runs with machine -z, so an arrow from the right looks
+# from the machine front, as both views do. Sheet metres unless _MM.
+DETAIL_LETTER_GAP = 0.002
+# One default-format glyph's box, for placing a letter off its anchor.
+LETTER_BOX = (CAPTION_CHAR_WIDTH, 0.0035)
+VIEW_ARROW_RUN = 0.010
+VIEW_ARROW_CLEAR_MM = 2.0
+
+
+@dataclass(frozen=True)
+class ViewArrow:
+    """A viewing arrow on the right side view: its tip, a model point (mm)
+    just in front of the ink it names, and the sheet the view prints on when
+    that is not sheet 1."""
+
+    letter: str
+    tip_mm: tuple[float, float, float]
+    sheet_ref: str = ""
+
+    @property
+    def tip_m(self) -> tuple[float, float, float]:
+        return tuple(value / 1000.0 for value in self.tip_mm)  # type: ignore[return-value]
+
+
+VIEW_ARROWS = (
+    # VIEW C: at the lever axis, clear of the clamp's front flat. The lever
+    # group lies in the drum's wire lane (build_mg_magnifier_assembly
+    # LEVER_ROD_Z); round 1 put this tip at z 0, behind the lever, so the
+    # arrow pointed away from it.
+    ViewArrow(
+        notes.LEVER_TIP_VIEW_LETTER,
+        (
+            stack.THREADED_TIP_X,
+            stack.LEVER_AXIS_Y,
+            sh_vn_music_wire_lever_geom.DRUM_END_Z
+            - (CLAMP_HEX_AF / 2.0 + VIEW_ARROW_CLEAR_MM),
+        ),
+    ),
+    # VIEW D: at the axle, past DETAIL B's boundary in front of the nuts.
+    ViewArrow(
+        notes.WHEEL_REST_VIEW_LETTER,
+        (
+            stack.AXLE_X,
+            stack.AXLE_Y,
+            stack.BAR_FRONT_Z
+            - (_ENDSHAKE_CENTRE_D + _ENDSHAKE_RADIUS + 2.0 * VIEW_ARROW_CLEAR_MM),
+        ),
+        f"(SHEET {notes.WHEEL_REST_VIEW_SHEET})",
+    ),
+)
+if (
+    LEVER_TIP.title != f"VIEW {VIEW_ARROWS[0].letter}"
+    or WHEEL_REST.title != f"VIEW {VIEW_ARROWS[1].letter}"
+):
+    raise AssertionError("each lettered view needs its own viewing arrow")
+
+
+def boundary_letter_xy(
+    centre: tuple[float, float], radius: float, corner: tuple[int, int]
+) -> tuple[float, float]:
+    """Top-left of a detail letter standing off its boundary toward ``corner``."""
+    offset = radius + DETAIL_LETTER_GAP
+    return (
+        centre[0] + corner[0] * offset - (LETTER_BOX[0] if corner[0] < 0 else 0.0),
+        centre[1] + corner[1] * offset + (LETTER_BOX[1] if corner[1] > 0 else 0.0),
+    )
+
+
+# The gauge's dimension line runs above the bar, inside the circle, a bare
+# reference; the endshake's text stands right of the stack, above the nuts
+# and past the crop, with its callout below.
 GAUGE_RISE = 12.0
 ENDSHAKE_RISE = 5.5
 PRESSED_KEEP = {
@@ -755,15 +1027,18 @@ ENDSHAKE_KEEP = {
 def _assert_callouts(
     displays: list[tuple[str, Any]], callouts: dict[str, tuple[int, str]]
 ) -> None:
-    """Read inherited native setting text without writing the released model."""
+    """Read inherited native setting text without writing the released model.
+    A dimension with no callout (the bare press-gauge reference) must carry
+    none above or below."""
     for name, display in displays:
-        part, expected = callouts[name]
-        text = str(display.GetText(part) or "").replace("\r\n", "\n")
-        if text != expected:
-            location = {3: "above", 4: "below"}[part]
-            raise RuntimeError(
-                f"{name}: {location} callout reads {text!r}, not {expected!r}"
-            )
+        checks = (callouts[name],) if name in callouts else ((3, ""), (4, ""))
+        for part, expected in checks:
+            text = str(display.GetText(part) or "").replace("\r\n", "\n")
+            if text != expected:
+                location = {3: "above", 4: "below"}[part]
+                raise RuntimeError(
+                    f"{name}: {location} callout reads {text!r}, not {expected!r}"
+                )
 
 
 def _activate(adapter: Any, view: Any, *, label: str) -> str:
@@ -774,7 +1049,9 @@ def _activate(adapter: Any, view: Any, *, label: str) -> str:
     return name
 
 
-def _placed_detail(adapter: Any, detail: StackDetail | LeverTipDetail) -> Any:
+def _placed_detail(
+    adapter: Any, detail: StackDetail | LeverTipDetail | WheelRestView
+) -> Any:
     """Place an uncropped model view by its transformed physical centre."""
     view = _early_bound(
         place_view(
@@ -800,35 +1077,56 @@ def _placed_detail(adapter: Any, detail: StackDetail | LeverTipDetail) -> Any:
     return view
 
 
-def _crop(adapter: Any, view: Any, detail: StackDetail | LeverTipDetail) -> None:
-    """Create the ordinary native view crop and read back its persisted fence."""
+def _sketch_in_view(
+    adapter: Any,
+    view: Any,
+    kind: str,
+    sheet_points: tuple[tuple[float, float], tuple[float, float]],
+    *,
+    label: str,
+) -> Any:
+    """Sketch a ``kind`` ("circle": centre, rim point; "line": ends) at two
+    sheet points (m) in ``view``'s own sketch and return it, left selected
+    (draw_ch_channel_assembly._sketch_in_view, with deterministic creation)."""
     view = _early_bound(view, "IView")
-    _activate(adapter, view, label=detail.title)
+    _activate(adapter, view, label=label)
     sketch = _early_bound(view.GetSketch(), "ISketch")
     transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
     utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
     points = []
-    for x, y in (
-        detail.centre,
-        (detail.centre[0] + detail.crop_radius, detail.centre[1]),
-    ):
+    for x, y in sheet_points:
         point = _early_bound(
             utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
         )
         projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
         points.append(tuple(float(value) for value in projected.ArrayData))
     manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
+    create = getattr(manager, {"circle": "CreateCircle", "line": "CreateLine"}[kind])
     previous = bool(manager.AddToDB)
-    # Every detail uses deterministic creation; inference must not move a
-    # fence onto the model's nearby witnesses or visible edges.
+    # Deterministic creation: inference must not move a fence or a line onto
+    # the model's nearby witnesses or visible edges.
     manager.AddToDB = True
     try:
-        circle = manager.CreateCircle(*points[0], *points[1])
+        segment = create(*points[0], *points[1])
     finally:
         manager.AddToDB = previous
-    if circle is None:
-        raise RuntimeError(f"failed to sketch the {detail.title} crop circle")
-    segment = _early_bound(circle, "ISketchSegment")
+    if segment is None:
+        raise RuntimeError(f"failed to sketch the {label} {kind}")
+    return _early_bound(segment, "ISketchSegment")
+
+
+def _crop(
+    adapter: Any, view: Any, detail: StackDetail | LeverTipDetail | WheelRestView
+) -> None:
+    """Create the ordinary native view crop and read back its persisted fence."""
+    view = _early_bound(view, "IView")
+    segment = _sketch_in_view(
+        adapter,
+        view,
+        "circle",
+        (detail.centre, (detail.centre[0] + detail.crop_radius, detail.centre[1])),
+        label=f"{detail.title} crop",
+    )
     if not segment.Select4(False, null_callout()):
         raise RuntimeError(f"{detail.title}: cannot select the authored crop circle")
     status = int(view.Crop2(False, False, 1))
@@ -848,7 +1146,9 @@ def _crop(adapter: Any, view: Any, detail: StackDetail | LeverTipDetail) -> None
     _crop_box(view, detail)
 
 
-def _crop_box(view: Any, detail: StackDetail | LeverTipDetail) -> tuple[float, float, float, float]:
+def _crop_box(
+    view: Any, detail: StackDetail | LeverTipDetail | WheelRestView
+) -> tuple[float, float, float, float]:
     """Read the persisted native fence, not a nominal circle reconstructed in Python."""
     raw = tuple(float(value) for value in _early_bound(view, "IView").GetDetailCircleInfo2())
     # SDK: count, layer, centre[3], start[3], end[3], line type, ...
@@ -958,6 +1258,220 @@ def _stack_dimensions(
         source_step("stack settings settled readback")
 
     return settled
+
+
+def _ink_segment(adapter: Any, segment: Any, style: int, *, label: str) -> None:
+    """Print a view-sketch segment black and thin in ``style``: left alone
+    it prints in the sketch's grey or under-defined blue, which reads as a
+    hidden line (draw_pd_transgear_disc_hub)."""
+    segment = _early_bound(segment, "ISketchSegment")
+    segment.Color = 0  # COLORREF black
+    segment.Style = style
+    segment.Width = THIN_LINE_WEIGHT
+    adapter.currentModel.ClearSelection2(True)
+    rebuild_drawing(adapter, label=label)
+    font = (int(segment.Color), int(segment.Style), int(segment.Width))
+    if font != (0, style, THIN_LINE_WEIGHT):
+        raise RuntimeError(f"{label}: segment font reads {font!r}")
+
+
+def _mark_right_side_view(
+    adapter: Any, view: Any, source_step: Callable[[str], None]
+) -> None:
+    """DETAIL A's and B's boundaries and VIEW C's and D's viewing arrows on
+    the right side view (MG LEFT); every mark is view-owned, so it moves
+    with the view (draw_ch_channel_assembly._mark_detail)."""
+    numerator, denominator = SHEET_SCALE
+    for detail in (PRESSED, ENDSHAKE):
+        label = f"right side view {detail.title} boundary"
+        centre = model_point_in_view(adapter, view, detail.model_centre_m, label=label)
+        centre = (float(centre[0]), float(centre[1]))
+        radius = detail.radius_mm * numerator / denominator / 1000.0
+        boundary = _sketch_in_view(
+            adapter, view, "circle", (centre, (centre[0] + radius, centre[1])), label=label
+        )
+        _ink_segment(adapter, boundary, CONTINUOUS_LINE_STYLE, label=label)
+        _activate(adapter, view, label=label)
+        letter_xy = boundary_letter_xy(centre, radius, detail.letter_corner)
+        if add_note(adapter, detail.letter, *letter_xy) is None:
+            raise RuntimeError(f"failed to letter the {label}")
+        source_step(label)
+    for arrow in VIEW_ARROWS:
+        label = f"right side view VIEW {arrow.letter} viewing arrow"
+        tip = model_point_in_view(adapter, view, arrow.tip_m, label=label)
+        tip = (float(tip[0]), float(tip[1]))
+        text_xy = (tip[0] + VIEW_ARROW_RUN, tip[1] + LETTER_BOX[1] / 2.0)
+        add_leader_note(
+            adapter, arrow.letter, text_xy=text_xy, attach_xy=tip, view=view, label=label
+        )
+        if arrow.sheet_ref:
+            # Centred under its letter, clear of the arrow's leader.
+            _activate(adapter, view, label=label)
+            ref_xy = (
+                text_xy[0]
+                + (LETTER_BOX[0] - len(arrow.sheet_ref) * CAPTION_CHAR_WIDTH) / 2.0,
+                text_xy[1] - LETTER_BOX[1] - DETAIL_LETTER_GAP,
+            )
+            if add_note(adapter, arrow.sheet_ref, *ref_xy) is None:
+                raise RuntimeError(f"failed to place the {label} sheet reference")
+        source_step(label)
+
+
+def _assert_tie1_angle(display: Any, *, label: str) -> None:
+    """The driven angle reads TIE 1's rest angle at whole degrees."""
+    display = _early_bound(display, "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    measured = math.degrees(abs(float(dimension.SystemValue)))
+    precision = int(display.GetPrimaryPrecision2())
+    driven = int(dimension.DrivenState)
+    _telemetry.info(
+        f"{label}: {measured:.4f} deg, precision {precision}, driven state {driven}"
+    )
+    if (
+        abs(measured - notes.TIE1_ANGLE_DEG) > TIE1_ANGLE_TOL_DEG
+        or precision != 0
+        or driven != 1  # swDimensionDriven
+    ):
+        raise RuntimeError(
+            f"{label} reads {measured:.4f} deg at precision {precision}, driven "
+            f"state {driven}; expected {notes.TIE1_ANGLE_DEG:.4f} deg, 0 places, driven"
+        )
+
+
+def _pick_view_edge(
+    adapter: Any, view: Any, xy: tuple[float, float], *, label: str
+) -> Any:
+    """The model edge under sheet point ``xy`` in ``view``, as an entity.
+
+    Round 1 (run 20261106T210134118Z): a coordinate ``EDGE`` pick here left
+    two objects selected, so the angle's selection count read 3. Pick once,
+    log what came back, and keep the first edge; the angle readback proves
+    it is the bar's bottom edge."""
+    draw = adapter.currentModel
+    _activate(adapter, view, label=label)
+    if not draw.Extension.SelectByID2("", "EDGE", xy[0], xy[1], 0.0, False, 0, null_callout(), 0):
+        raise RuntimeError(f"{label}: no edge at sheet {xy!r}")
+    manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    count = int(manager.GetSelectedObjectCount2(-1))
+    kinds = [int(manager.GetSelectedObjectType3(index, -1)) for index in range(1, count + 1)]
+    _telemetry.info(f"{label}: pick at {xy!r} selected types {kinds}")
+    edges = [
+        manager.GetSelectedObject6(index, -1)
+        for index, kind in enumerate(kinds, start=1)
+        if kind == SEL_EDGES
+    ]
+    draw.ClearSelection2(True)
+    if not edges or edges[0] is None:
+        raise RuntimeError(f"{label}: pick at {xy!r} selected no edge (types {kinds})")
+    return edges[0]
+
+
+def _wheel_rest_view(
+    adapter: Any, source_step: Callable[[str], None]
+) -> Callable[[], None]:
+    """VIEW D on sheet 5: place, isolate and crop the hub view, then draw
+    the tie hole's axis line, dimension its angle from the bar's bottom edge,
+    point out the tie hole and the bar and label the view; the returned check
+    re-reads the crop and the angle once the drawing has settled."""
+    detail = WHEEL_REST
+    _activate_sheet(adapter, SHEET_NAMES[4])
+    view = _placed_detail(adapter, detail)
+    source_step(f"{detail.title} placement, configuration and isolation")
+    _crop(adapter, view, detail)
+    source_step(f"{detail.title} crop")
+    line_end = (TIE1_LINE_END_MM * TIE1_DIRECTION[0], TIE1_LINE_END_MM * TIE1_DIRECTION[1])
+    axle, tie, end, edge_pick, line_pick, text, bar = (
+        (float(point[0]), float(point[1]))
+        for point in model_points_in_view(
+            adapter,
+            view,
+            tuple(
+                detail.model_m(local)
+                for local in (
+                    (0.0, 0.0),
+                    (TIE1_X, TIE1_Y),
+                    line_end,
+                    TIE1_EDGE_PICK_MM,
+                    TIE1_LINE_PICK_MM,
+                    TIE1_ANGLE_TEXT_MM,
+                    BAR_LABEL_ATTACH_MM,
+                )
+            ),
+            label=detail.title,
+            names=(
+                "axle axis",
+                "TIE 1",
+                "TIE 1 line end",
+                "bar edge pick",
+                "line pick",
+                "angle text",
+                "bar label attach",
+            ),
+        )
+    )
+    axis_label = f"{detail.title} TIE 1 axis line"
+    segment = _sketch_in_view(adapter, view, "line", (axle, end), label=axis_label)
+    _ink_segment(adapter, segment, CENTER_LINE_STYLE, label=axis_label)
+    angle_label = f"{detail.title} TIE 1 angle"
+    edge = _pick_view_edge(adapter, view, edge_pick, label=f"{angle_label} bar edge")
+    display = _early_bound(
+        add_edge_dimension(
+            adapter,
+            view,
+            p0=line_pick,
+            p1=edge_pick,
+            text_xy=text,
+            label=angle_label,
+            orientation="angular",
+            entity_types=("SKETCHSEGMENT", "EDGE"),
+            entities=(segment, edge),
+        ),
+        "IDisplayDimension",
+    )
+    display.SetPrecision3(0, -1, -1, -1)  # whole degrees; -1: swDoNotChangePrecisionSetting
+    rebuild_drawing(adapter, label=angle_label)
+    _assert_tie1_angle(display, label=angle_label)
+    source_step(angle_label)
+    # TIE 1's label stands outside the crop on TIE 1's side of the axle; its
+    # leader ends on the hole's rim, toward the label.
+    side = math.copysign(1.0, tie[0] - axle[0])
+    label_xy = (
+        axle[0] + side * abs(TIE1_LABEL_OFFSET[0])
+        - (0.0 if side < 0 else len(TIE1_LABEL) * CAPTION_CHAR_WIDTH),
+        axle[1] + TIE1_LABEL_OFFSET[1],
+    )
+    toward = (label_xy[0] - tie[0], label_xy[1] - tie[1])
+    reach = math.hypot(*toward)
+    rim = TIE_HOLE_DIA / 2.0 * detail.mm
+    tip = (tie[0] + toward[0] / reach * rim, tie[1] + toward[1] / reach * rim)
+    add_leader_note(
+        adapter, TIE1_LABEL, text_xy=label_xy, attach_xy=tip, view=view,
+        label=f"{detail.title} TIE 1 label",
+    )
+    add_leader_note(
+        adapter,
+        BAR_LABEL,
+        text_xy=(axle[0] + BAR_LABEL_OFFSET[0], axle[1] + BAR_LABEL_OFFSET[1]),
+        attach_xy=bar,
+        view=view,
+        label=f"{detail.title} bar label",
+    )
+    _activate(adapter, view, label=detail.title)
+    caption = add_note(adapter, detail.label_text, *detail.label_xy)
+    if caption is None:
+        raise RuntimeError(f"failed to label {detail.title}")
+    if str(_early_bound(caption, "INote").GetText() or "").replace("\r\n", "\n") != detail.label_text:
+        raise RuntimeError(f"{detail.title}: native caption text changed")
+    source_step(f"{detail.title} TIE 1 label and caption")
+
+    def settled() -> None:
+        _activate_sheet(adapter, SHEET_NAMES[4])
+        _crop_box(view, detail)
+        _assert_tie1_angle(display, label=f"settled {angle_label}")
+        source_step(f"{detail.title} settled readback")
+
+    return settled
+
 
 
 def lever_keep(
@@ -1251,31 +1765,6 @@ def _projection_note_box(note: Any) -> tuple[float, float, float, float]:
     return extent[0], extent[1], extent[3], extent[4]
 
 
-def _fit_projection_back_caption(
-    adapter: Any, view: Any, neighbour_views: tuple[Any, ...], neighbour_notes: tuple[Any, ...],
-) -> None:
-    """One measured leftward move of the existing back caption, if necessary."""
-    outline = _view_outline(view, label=LEVER_TIP.title)
-    if not all(math.isfinite(value) for value in outline):
-        raise RuntimeError(f"{LEVER_TIP.title}: non-finite native view outline {outline!r}")
-    for note in neighbour_notes:
-        note = _early_bound(note, "INote")
-        if str(note.GetText() or "") != ASSEMBLED_VIEW_CAPTIONS[stack.DRAWING_BACK_VIEW]:
-            continue
-        box = _projection_note_box(note)
-        if not boxes_clear(box, outline):
-            dx = outline[0] - CLEAR_GAP_M - PLACE_SETTLE_M - box[2]
-            annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
-            move_annotation(adapter, annotation, dx, 0.0, label="assembled back caption")
-            box = _projection_note_box(note)
-        require_inside("assembled back caption", box, sheet_region(adapter))
-        if not boxes_clear(box, outline) or any(
-            not boxes_clear(box, _view_outline(other, label="back-caption neighbour"))
-            for other in neighbour_views
-        ):
-            raise RuntimeError(f"assembled back caption {box!r} crowds an actual native view outline")
-
-
 def _projection_layout(
     adapter: Any, view: Any, annotation: Any, caption: Any,
     neighbour_views: tuple[Any, ...], neighbour_notes: tuple[Any, ...],
@@ -1330,9 +1819,6 @@ def _projection_layout(
     if any(not boxes_clear(outline, box) for box in note_boxes):
         raise RuntimeError(f"{label}: neighbouring caption crowds the actual native view outline")
     region = sheet_region(adapter)
-    for note, box in zip(neighbour_notes, note_boxes, strict=True):
-        if str(_early_bound(note, "INote").GetText() or "") == ASSEMBLED_VIEW_CAPTIONS[stack.DRAWING_BACK_VIEW]:
-            require_inside("assembled back caption", box, region)
     neighbours = [
         TITLE_BLOCK,
         *(_view_outline(other, label="lever-tip neighbour") for other in neighbour_views),
@@ -1399,7 +1885,6 @@ def _thread_projection_detail(
     if str(caption.GetText() or "").replace("\r\n", "\n") != detail.label_text:
         raise RuntimeError(f"{detail.title}: native caption text changed")
     rebuild_drawing(adapter, label=f"settle {detail.title} caption")
-    _fit_projection_back_caption(adapter, view, neighbour_views, neighbour_notes)
     source_step("lever tip qualifier and caption placement")
 
     def settled() -> None:
@@ -1555,7 +2040,8 @@ def _assert_instruction_clearance(
     adapter: Any, sequence: Any, continued: Any, checks: Any
 ) -> None:
     """Read the settled native note boxes, not character-count width estimates:
-    steps 1-9 on sheet 4; the wire steps and the checks on sheet 5."""
+    the wheel group on sheet 4; the lever group, the wire and the checks on
+    sheet 5, left of VIEW D's field."""
     bounds: dict[str, Box] = {}
     for label, sheet_name, note in (
         ("assembly sequence", SHEET_NAMES[3], sequence),
@@ -1590,6 +2076,11 @@ def _assert_instruction_clearance(
             raise RuntimeError(
                 f"magnifier {label}: native note box {box!r} lacks "
                 f"{_PAD * 1000:.1f} mm title-block clearance"
+            )
+        if sheet_name == SHEET_NAMES[4] and padded[2] > REST_INK_LEFT:
+            raise RuntimeError(
+                f"magnifier {label}: native note box {box!r} runs into "
+                f"{WHEEL_REST.title}, whose ink starts at x {REST_INK_LEFT!r}"
             )
         bounds[label] = box
     gap = bounds["assembly sequence, continued"][1] - bounds["assembly checks"][3]
@@ -1719,8 +2210,11 @@ def _fit_ring(
     return scale
 
 
-def exploded_caption(group: str, scale: tuple[float, float]) -> str:
-    return f"{group} {notes.EXPLODED_CAPTION} (SCALE {scale_text(scale)})"
+def exploded_caption(group: str) -> str:
+    """An exploded view's caption. The view is its sheet's main view, so its
+    scale is the title block's (finalize_drawing ``sheet_scales``) and the
+    caption prints none (rule 9)."""
+    return f"{group} {notes.EXPLODED_CAPTION}"
 
 
 def _component_stem(component: Any) -> str:
@@ -1897,6 +2391,19 @@ def _validate_bom(adapter: Any, table: Any) -> dict[str, str]:
     items = {values[1] for values in actual.values()}
     if items != {str(item) for item in range(1, len(BOM_COMPONENTS) + 1)}:
         raise RuntimeError(f"magnifier BOM item numbers {sorted(items)!r} are not contiguous")
+    # The steps and checks name parts by these item numbers.
+    pinned = {BOM_ROW_KEYS[stem]: str(item) for stem, item in notes.ITEM_NUMBERS.items()}
+    numbered = {stem: values[1] for stem, values in actual.items()}
+    if numbered != pinned:
+        moved = sorted(
+            f"{stem}: {numbered.get(stem)!r} not {pinned.get(stem)!r}"
+            for stem in set(numbered) | set(pinned)
+            if numbered.get(stem) != pinned.get(stem)
+        )
+        raise RuntimeError(
+            "magnifier BOM item numbers moved from the ones its steps cite: "
+            + "; ".join(moved)
+        )
     for stem, (row_index, _item, description, quantity) in actual.items():
         number = BOM_PART_NUMBERS[stem]
         if contents[row_index][part_column] != number:
@@ -2214,11 +2721,11 @@ def _view_source_explode_offsets(
 def _place_assembled_sheet(
     adapter: Any, source_step: Callable[[str], None]
 ) -> tuple[Callable[[], None], ...]:
-    """Preserved assembled views, two base settings and three enlarged settings."""
+    """Preserved assembled views, two base settings and three enlarged
+    settings; the right side view carries the lettered views' marks."""
     _activate_sheet(adapter, SHEET_NAMES[0])
     source_step("assembled sheet activation")
-    front = None
-    captioned = []
+    placed = {}
     for name, centre in (
         (stack.DRAWING_BACK_VIEW, FRONT_CENTER),
         (stack.DRAWING_LEFT_VIEW, RIGHT_CENTER),
@@ -2231,22 +2738,11 @@ def _place_assembled_sheet(
         role = ViewRole.FULL_DETAIL if name == stack.DRAWING_ISOMETRIC_VIEW else ViewRole.PLAIN
         apply_view_configuration(adapter, view, role=role, label=f"{PDF_TITLE} {name}")
         source_step(f"assembled {name} view configuration")
-        if name == stack.DRAWING_BACK_VIEW:
-            front = view
-        if name in ASSEMBLED_VIEW_CAPTIONS:
-            captioned.append((view, name))
-    lever_settled = _lever_settings(adapter, front, source_step)
+        placed[name] = view
+    lever_settled = _lever_settings(adapter, placed[stack.DRAWING_BACK_VIEW], source_step)
     stack_settled = _stack_dimensions(adapter, source_step)
+    _mark_right_side_view(adapter, placed[stack.DRAWING_LEFT_VIEW], source_step)
     captions = []
-    for view, name in captioned:
-        captions.append(_add_note_block(
-            adapter,
-            SHEET_NAMES[0],
-            ASSEMBLED_VIEW_CAPTIONS[name],
-            caption_under(_view_outline(view, label=name), ASSEMBLED_VIEW_CAPTIONS[name]),
-            label=f"{name} caption",
-        ))
-        source_step(f"assembled {name} caption")
     # Only sheet 1 has model views at this point. Include the two existing
     # axle crops and their native labels, not only the three principal views.
     neighbours = tuple(
@@ -2449,10 +2945,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, SHEET_NAMES[3], FINISHED_FIELD, SHEET_SCALE, label=FINISHED_LABEL
     )
     source_step(f"{FINISHED_LABEL} view configuration")
-    checks_view = _place_collapsed_view(
-        adapter, SHEET_NAMES[4], FINISHED_FIELD, SHEET_SCALE, label=CHECKS_VIEW_LABEL
-    )
-    source_step(f"{CHECKS_VIEW_LABEL} view configuration")
+    wheel_rest_settled = _wheel_rest_view(adapter, source_step)
     assert_full_detail_view(adapter, label=PDF_TITLE)
 
     # The reference carries no balloons, so its ring is its outline: fit the
@@ -2501,13 +2994,6 @@ async def build(adapter: Any) -> dict[str, str]:
             FINISHED_SCALE_LADDER,
             FINISHED_FIELD,
             FINISHED_LABEL,
-        ),
-        (
-            SHEET_NAMES[4],
-            checks_view,
-            FINISHED_SCALE_LADDER,
-            FINISHED_FIELD,
-            CHECKS_VIEW_LABEL,
         ),
     ):
         _activate_sheet(adapter, sheet_name)
@@ -2583,12 +3069,12 @@ async def build(adapter: Any) -> dict[str, str]:
     _add_note_block(
         adapter,
         SHEET_NAMES[1],
-        exploded_caption(WHEEL_GROUP, scales[WHEEL_LABEL]),
+        exploded_caption(WHEEL_GROUP),
         WHEEL_CAPTION_XY,
         label="wheel caption",
     )
     source_step("wheel caption")
-    lever_caption = exploded_caption(LEVER_GROUP, scales[LEVER_LABEL])
+    lever_caption = exploded_caption(LEVER_GROUP)
     _add_note_block(
         adapter,
         SHEET_NAMES[2],
@@ -2597,19 +3083,17 @@ async def build(adapter: Any) -> dict[str, str]:
         label="lever caption",
     )
     source_step("lever caption")
-    for sheet_name, view, label in (
-        (SHEET_NAMES[3], finished, FINISHED_LABEL),
-        (SHEET_NAMES[4], checks_view, CHECKS_VIEW_LABEL),
-    ):
-        finished_caption = f"{FINISHED_CAPTION} (SCALE {scale_text(scales[label])})"
-        _add_note_block(
-            adapter,
-            sheet_name,
-            finished_caption,
-            caption_over(_view_outline(view, label=label), finished_caption),
-            label=f"{label} caption",
-        )
-        source_step(f"{label} caption")
+    # The finished view is sheet 4's main view: its scale is the title
+    # block's, so the caption prints none (rule 9).
+    finished_caption = FINISHED_CAPTION
+    _add_note_block(
+        adapter,
+        SHEET_NAMES[3],
+        finished_caption,
+        caption_over(_view_outline(finished, label=FINISHED_LABEL), finished_caption),
+        label=f"{FINISHED_LABEL} caption",
+    )
+    source_step(f"{FINISHED_LABEL} caption")
     sequence_note = _add_note_block(
         adapter, SHEET_NAMES[3], ASSEMBLY_STEPS, STEPS_XY, label="assembly sequence"
     )
@@ -2661,10 +3145,11 @@ async def build(adapter: Any) -> dict[str, str]:
                 SHEET_NAMES[1]: scales[WHEEL_LABEL],
                 SHEET_NAMES[2]: scales[LEVER_LABEL],
                 SHEET_NAMES[3]: scales[FINISHED_LABEL],
-                SHEET_NAMES[4]: scales[CHECKS_VIEW_LABEL],
+                SHEET_NAMES[4]: WHEEL_REST_SCALE,
             },
             settled_checks=(
                 *settled_checks,
+                wheel_rest_settled,
                 bom_settled,
                 lambda: assert_balloon_landings(adapter, landings),
                 lambda: _assert_instruction_clearance(

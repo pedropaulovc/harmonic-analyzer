@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import argparse
 import sys
-from functools import partial
 from typing import Any
 
 import _telemetry
 from _session import run_build
+from _construction_line_font import _construction_curves_as_outline
 from _drawing_registry import DRAWINGS_BY_NAME
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
@@ -59,14 +59,16 @@ async def build(adapter: Any) -> dict[str, str]:
     sides = supplier.SUPPLIER_REFERENCE_SIDES
     # The 18-character registry number overruns the template's DWG. NO.
     # cell into REV; fit it there, measured.
-    return await build_purchased_fastener_drawing(
-        adapter,
-        SPEC,
-        item=ITEM,
-        number_fit=NumberFit.SHRINK_TO_CELL,
-        view_layout=view_layout,
-        supplier_dimensions=partial(
-            annotate_supplier_screw,
+
+    def supplier_dimensions(adapter: Any, views: Any) -> Any:
+        # The thread chord lies on the head cone's edge with the major; as a
+        # construction line it printed a grey dashed chain over that edge
+        # (machinist review, farm run 20261108T015328529Z, 3/3 runs). It
+        # prints as the continuous outline, as on the pivot screw and shim.
+        checks.append(_construction_curves_as_outline(adapter))
+        return annotate_supplier_screw(
+            adapter,
+            views,
             dimensions=dimensions,
             formats=supplier.SUPPLIER_REFERENCE_FORMATS,
             starts=supplier.SUPPLIER_REFERENCE_STARTS,
@@ -74,7 +76,15 @@ async def build(adapter: Any) -> dict[str, str]:
             sides=sides,
             settled_checks=checks,
             layout=view_layout,
-        ),
+        )
+
+    return await build_purchased_fastener_drawing(
+        adapter,
+        SPEC,
+        item=ITEM,
+        number_fit=NumberFit.SHRINK_TO_CELL,
+        view_layout=view_layout,
+        supplier_dimensions=supplier_dimensions,
         supplier_margins=_aligned_margins(
             supplier_screw_margins(dimensions, planes=planes, sides=sides)
         ),

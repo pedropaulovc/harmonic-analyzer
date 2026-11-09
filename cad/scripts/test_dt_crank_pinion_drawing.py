@@ -37,6 +37,14 @@ def _build_source() -> str:
     return Path(part.__file__).read_text(encoding="utf-8")
 
 
+def _note(number: int) -> str:
+    """Numbered note ``number`` of the sheet's note block."""
+    (line,) = (
+        line for line in notes.DRAWING_NOTES.split("\n") if line.startswith(f"{number}. ")
+    )
+    return line
+
+
 def test_required_drawing_paths() -> None:
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/dt-crank-pinion.SLDDRW")
     assert drawing.PDF.as_posix().endswith("/pdf/dt-crank-pinion.pdf")
@@ -203,36 +211,42 @@ def test_the_pin_hole_is_located_from_the_boss_end_and_keeps_its_wall() -> None:
     assert "MID-LENGTH" not in drawing.DIMENSION_CALLOUTS["PinHoleDia"]
 
 
-def _assert_pin_fit_facts(note: str, mate_number: str) -> None:
-    """drawing-guidelines.md rule 7 (notes: few, flagged, never a method) (Main, 2026-09-25): at most four lines and --
-    because each sheet stands alone -- all the facts of the matched fit:
-    match drill at assembly with the named mate, ream to fit the named pin,
-    the fit's acceptance, flush both sides."""
-    lines = note.split("\n")
-    text = " ".join(lines)
-    assert len(lines) <= 4
-    assert lines[0] == f"MATCH DRILL AT ASSY WITH {mate_number}"
-    assert "REAM TO FIT" in text and f"PIN {spec.PIN_NUMBER}" in text
-    assert "LIGHT HAMMER FIT" in text and "NOT REMOVABLE BY HAND" in text
-    assert "FLUSH BOTH SIDES" in text
+def test_pin_hole_callout_links_the_pins_drive_fit_note() -> None:
+    # Machinist review of 4d4e038e3: the hole carries every fact of its
+    # matched fit. Screen of the novice rubric (#2223): the callout is its
+    # reference size, the process with its mate and one link (rule 7: at most
+    # two lines of words); the pin's fit takes its standard name with the
+    # acceptance in note 4 (rules 4 and 26: LIGHT HAMMER FIT is no standard
+    # name). FLUSH BOTH SIDES is an assembly instruction (rule 7): MHA-DT-00's
+    # pin step carries it.
+    import draw_dt_drive_train_assembly as assembly
 
-
-def test_both_sheets_carry_the_same_pin_fit_facts() -> None:
-    # Machinist review of 4d4e038e3: the shaft's bare transfer note gave no
-    # size, process or fit, and the pinion's four-line trim had dropped the
-    # fit's acceptance. Both sheets carry every fact; the pinion's rides its
-    # hole's reference diameter, the shaft's note still says where it runs.
-    _assert_pin_fit_facts(drawing.DIMENSION_CALLOUTS["PinHoleDia"], spec.CRANKSHAFT_NUMBER)
-    _assert_pin_fit_facts(spec.CRANKSHAFT_PIN_HOLE_PROCESS, spec.PINION_NUMBER)
-    assert "BOSS MID-LENGTH" in spec.CRANKSHAFT_PIN_HOLE_PROCESS
-    assert drawing.DIMENSION_CALLOUTS["PinHoleDia"] == spec.PIN_HOLE_PROCESS
-    assert drawing.REFERENCE_DIMENSIONS == ("PinHoleDia",)
-    crankshaft_drawing = Path(drawing.__file__).with_name("draw_dt_crankshaft.py").read_text(
-        encoding="utf-8"
+    callout = drawing.DIMENSION_CALLOUTS["PinHoleDia"]
+    assert callout == notes.PIN_HOLE_CALLOUT
+    assert callout.split("\n") == [
+        f"MATCH DRILL AND REAM THRU WITH {spec.CRANKSHAFT_NUMBER}",
+        f"SEE NOTE {notes.PIN_FIT_NOTE_NUMBER}",
+    ]
+    assert _note(notes.PIN_FIT_NOTE_NUMBER) == (
+        f"4. DRIVE FIT ON PIN {spec.PIN_NUMBER}; NOT REMOVABLE BY HAND."
     )
-    assert "text=CRANKSHAFT_PIN_HOLE_PROCESS," in crankshaft_drawing
+    for text in (notes.DRAWING_NOTES, *drawing.DIMENSION_CALLOUTS.values()):
+        assert "LIGHT HAMMER FIT" not in text and "FLUSH" not in text
+    assert "FLUSH BOTH SIDES" in spec.PIN_FIT_LINES[1]
+    assembly_source = Path(assembly.__file__).read_text(encoding="utf-8")
+    assert "IN: {pinion.PIN_FIT_LINES[1]}." in assembly_source
+    assert drawing.REFERENCE_DIMENSIONS == ("PinHoleDia",)
     assert "add_leader_note(\n        adapter,\n        PIN_HOLE" not in _source().replace(
         "\r\n", "\n"
+    )
+
+
+def test_curve_resolution_is_pinned_before_the_first_view() -> None:
+    # Fan-out r3 (rule 8): the isometric's tooth ends printed as polygons.
+    source = _source()
+    assert source.count('set_precise_curve_quality(adapter, label="crank-pinion")') == 1
+    assert source.index("set_precise_curve_quality(adapter") < source.index(
+        'place_view(adapter, str(SOURCE), "*Front"'
     )
 
 
@@ -289,33 +303,6 @@ def test_isometric_clears_the_boss_dia_text() -> None:
     assert "_isometric_clears_boss_dia(iso)" in _source()
 
 
-def test_bore_fit_leader_clears_the_cutting_line() -> None:
-    import math
-
-    import _drawing_leaders as leaders
-
-    cx, cy = drawing.FRONT_CENTER
-    reach = drawing.HALF_OD + 0.005  # the cutting line runs past the tips
-    chain = [((cx, cy - reach), (cx, cy + reach))]
-    arrows = [((cx, cy + side * reach), (cx + 0.012, cy + side * reach)) for side in (-1, 1)]
-    fit = [(drawing.BORE_FIT_NOTE, drawing.BORE_FIT_ATTACH)]
-    r = spec.BORE_DIA * drawing.VIEW_SCALE[0] / 2000.0
-    assert math.hypot(
-        drawing.BORE_FIT_ATTACH[0] - cx, drawing.BORE_FIT_ATTACH[1] - cy
-    ) == pytest.approx(r)
-    leaders.assert_leaders_clear(
-        {"BoreFit": fit, "SectionLine": chain + arrows},
-        centre=(cx, cy),
-        keep_out={},
-        lands_within={
-            "BoreFit": drawing.BORE_LANDING,
-            "SectionLine": drawing.SECTION_LINE_LANDING,
-        },
-        label="pinion end view layout",
-    )
-    assert "_bore_leader_clears_section_line(adapter, front, bore_fit)" in _source()
-
-
 def test_bore_band_is_derived_from_its_fit_class_not_written_by_hand() -> None:
     # A slip fit exists only if the size limits on BOTH mating features are
     # narrower than the clearance band they claim, so the bore's limits are
@@ -348,12 +335,12 @@ def test_tip_diameter_band_is_carried_by_the_fixed_centre_mesh() -> None:
     assert mesh.TIP_ROOT_BAND_RADIAL == pytest.approx(spec.OUTSIDE_DIA_TOLERANCE_MM / 2.0)
 
 
-def test_callouts_add_only_what_the_number_cannot_carry() -> None:
-    # The native bore limits govern. The fit pointer identifies the mate,
-    # publishes its shaft limits and states the resulting clearance, so the
-    # shop can verify that both statements are the same acceptance criterion.
-    # Machinist review r1 of #1652: every non-title-block band names, at its
-    # callout, the stack or mate it serves.
+def test_callouts_link_the_numbered_note_that_names_their_mate() -> None:
+    # The native limits govern. Machinist review r1 of #1652: every
+    # non-title-block band names the stack or mate it serves. Screen of the
+    # novice rubric (#2223): a mate serving several dimensions is named once,
+    # in one numbered note each of them links (rules 4 and 7), never in a
+    # private label (T120) or a leader of private words (BORE LIMITS GOVERN).
     callouts = drawing.DIMENSION_CALLOUTS
     assert set(callouts) == {
         "BoreDia",
@@ -364,16 +351,43 @@ def test_callouts_add_only_what_the_number_cannot_carry() -> None:
         "PinHoleDia",
         "ShoulderRadius",
     }
-    assert callouts["BoreDia"] == spec.BORE_PROCESS_CALLOUT
-    assert spec.MESH_GEAR_NUMBER in callouts["OutsideDia"]
-    for name in ("ShoulderLength", "FaceWidth"):
-        assert spec.MESH_GEAR_NUMBER in callouts[name], name
-        assert spec.CONE_GEAR_NUMBER in callouts[name], name
-    assert callouts["TurnedDia"] == spec.TURNED_DIA_FITUP_CALLOUT
-    assert spec.CONE_GEAR_NUMBER in callouts["TurnedDia"]
-    assert spec.MESH_GEAR_NUMBER in callouts["ShoulderRadius"]
+    mesh_link = f"SEE NOTE {notes.MESH_NOTE_NUMBER}"
+    for name in ("OutsideDia", "ShoulderLength", "FaceWidth"):
+        assert callouts[name] == mesh_link, name
+    assert callouts["TurnedDia"] == f"SEE NOTE {notes.TURNED_DIA_NOTE_NUMBER}"
     assert spec.BORE_PROCESS_CALLOUT == "REAM THRU"
-    assert spec.CRANKSHAFT_NUMBER in spec.BORE_FIT_CALLOUT
+    assert callouts["BoreDia"] == f"REAM THRU\nSEE NOTE {notes.BORE_FIT_NOTE_NUMBER}"
+    assert spec.MESH_GEAR_NUMBER in callouts["ShoulderRadius"]
+    assert _note(notes.MESH_NOTE_NUMBER) == (
+        "1. MESH WITH CRANK DRIVE GEAR MHA-DT-07; CLEARANCE TO 120T CONE GEAR MHA-DT-03."
+    )
+    low, high = spec.BORE_DIAMETRAL_CLEARANCE
+    assert _note(notes.BORE_FIT_NOTE_NUMBER) == (
+        f"3. SLIDING FIT ON CRANKSHAFT {spec.CRANKSHAFT_NUMBER} "
+        f"(CLEARANCE {spec.inch_text(low, 4)}-{spec.inch_text(high, 4)})."
+    )
+    # Each mate is named once among the notes, except the 120T cone gear:
+    # notes 1 (its clearance) and 2 (the feeler check the Ø.730 flags) each
+    # name it, since a mate must sit in the note its callout links (fan-out
+    # r2, rule 4).
+    for number in (spec.MESH_GEAR_NUMBER, spec.CRANKSHAFT_NUMBER):
+        assert notes.DRAWING_NOTES.count(number) == 1, number
+    assert notes.DRAWING_NOTES.count(spec.CONE_GEAR_NUMBER) == 2
+    assert spec.CONE_GEAR_NUMBER in _note(notes.TURNED_DIA_NOTE_NUMBER)
+    printed = (notes.DRAWING_NOTES, notes.GEAR_DATA, *callouts.values())
+    for private in ("T120", "BORE LIMITS GOVERN", "DIA CLR", "MATE SHAFT"):
+        assert not any(private in text for text in printed), private
+    assert "add_leader_note" not in _source()
+    assert spec.CONE_GEAR_NUMBER == _config.parts("dt-cone-gear")["number"]
+    assert spec.CRANKSHAFT_NUMBER == _config.parts("dt-crankshaft")["number"]
+
+
+def test_section_caption_prints_no_sheet_scale() -> None:
+    # Rule 9: a view's scale prints only when it differs from the sheet's;
+    # A-A is at the sheet's 3:1, so its caption keeps only name and letter.
+    assert drawing.SECTION_CAPTION_TEXT == "<VLNAME> <VLLABEL>"
+    assert "note.PropertyLinkedText = SECTION_CAPTION_TEXT" in _source()
+    assert "<VLSCALEV>" not in _source()
 
 
 def test_print_carries_no_gdt_basic_dimensions_or_roughness() -> None:
@@ -426,12 +440,36 @@ def test_tooth_system_and_pair_acceptance_match_current_geometry() -> None:
     assert spec.CUTTER_TEETH_RANGE[0] <= spec.TEETH <= spec.CUTTER_TEETH_RANGE[1]
     data = dict(line.partition(":")[::2] for line in notes.GEAR_DATA.splitlines()[1:])
     assert "NORMAL = TRANSVERSE" in notes.GEAR_DATA
-    assert f"#{spec.CUTTER_NUMBER}" in data["FORM CUTTER"]
-    assert f"{profile.template.reference_teeth}T REFERENCE" in data["FORM CUTTER"]
+    assert data["FORM CUTTER"].strip() == (
+        f"#{spec.CUTTER_NUMBER}, {spec.CUTTER_TEETH_RANGE[0]}-{spec.CUTTER_TEETH_RANGE[1]}T"
+    )
+    assert "REFERENCE" not in notes.GEAR_DATA
     assert data["TOOTH FORM"].strip() == "SPUR INVOLUTE, FULL DEPTH, AS CUT BY THE FORM CUTTER"
-    span_row = next(line for line in notes.GEAR_DATA.splitlines() if "BASE TANGENT SPAN" in line)
-    assert "ACCEPT ON THIS PART" in span_row and "REF" not in span_row
-    lower, upper = spec.BASE_TANGENT_SPAN_LIMITS_MM
+    # Screen of the novice rubric (#2223): the span's exact stock limits are
+    # .0007 wide, under the .002 milled-thickness row, so they print as the
+    # cut's reference and the fit route is the mesh with the made MHA-DT-07,
+    # accepted at assembly on the same backlash budget and in the same words
+    # as the 64T's own row (rules 4, 7 and 25).
+    import dt_crank_drive_gear_notes as mate_notes
+
+    rows = notes.GEAR_DATA.splitlines()[1:]
+    labels = [row.partition(":")[0] for row in rows]
+    assert notes.SPAN_LABEL == "BASE TANGENT SPAN OVER 2 TEETH (REF)"
+    assert data[notes.SPAN_LABEL].strip() == mate_notes.accept_limits_text(
+        spec.BASE_TANGENT_SPAN_LIMITS_MM, 4
+    )
+    assert notes.BACKLASH_LABEL == (
+        f"TRANSVERSE BACKLASH WITH {spec.MESH_GEAR_NUMBER}, ACCEPT AT ASSEMBLY"
+    )
+    assert labels.index(notes.BACKLASH_LABEL) == labels.index(notes.SPAN_LABEL) + 1
+    backlash = data[notes.BACKLASH_LABEL].strip()
+    assert backlash == mate_notes.accept_limits_text(mate_notes.GEAR_MESH_BACKLASH_MM, 3)
+    mate_data = dict(
+        line.partition(":")[::2] for line in mate_notes.GEAR_DATA.splitlines()[1:]
+    )
+    mate_label = notes.BACKLASH_LABEL.replace(spec.MESH_GEAR_NUMBER, spec.PINION_NUMBER)
+    assert mate_data[mate_label].strip() == backlash
+    assert not any("ACCEPT ON THIS PART" in row for row in rows)
     width_row = next(line for line in notes.GEAR_DATA.splitlines() if "CIRCULAR PITCH THICKNESS" in line)
     assert "REF" in width_row and "ACCEPT" not in width_row
     for obsolete in ("NONSTANDARD", "SAME CUTTER", "LONG ADDENDUM", "CONTACT RATIO"):
@@ -439,24 +477,37 @@ def test_tooth_system_and_pair_acceptance_match_current_geometry() -> None:
 
 
 def test_notes_carry_the_tooth_edge_override_not_an_obsolete_boss_shortfall() -> None:
-    import dt_crank_pinion_notes
-
-    assert "TOOTH EDGES:  DO NOT BREAK OR CHAMFER FLANKS, TIPS OR ROOTS" in (
-        dt_crank_pinion_notes.GEAR_DATA
-    )
-    lines = spec.DRAWING_NOTES.split("\n")
+    assert "TOOTH EDGES:  DO NOT BREAK OR CHAMFER FLANKS, TIPS OR ROOTS" in notes.GEAR_DATA
+    lines = notes.DRAWING_NOTES.split("\n")
     assert spec.BOSS_WALL_WORST >= 2.0
     assert not any(line.startswith("BOSS WALL") for line in lines)
-    # The T120 fit-up may turn the band down; the sheet states its floor on
-    # the turned diameter's own callout (machinist review r1 of #1652).
-    floor = f"Ø{spec.inch_text(spec.TURNED_DIA_FITUP_MIN, spec.TURNED_DIA_PLACES)} MIN"
-    assert floor not in spec.DRAWING_NOTES
-    assert floor in spec.TURNED_DIA_FITUP_CALLOUT
-    assert "MHA-DT-00" in spec.TURNED_DIA_FITUP_CALLOUT
+    # The cutter runout into the boss is a tooth fact, a gear-data row.
+    assert (
+        "TEETH:  FULL LENGTH OF TURNED BAND; CUTTER RUNOUT INTO BOSS OK"
+        in notes.GEAR_DATA
+    )
+    # Four numbered notes, each a single line, numbered in order.
     assert len(lines) <= 4
+    assert [line.split(".", 1)[0] for line in lines] == ["1", "2", "3", "4"]
+    # The T120 fit-up may turn the band down; note 2, which the turned
+    # diameter alone links, states the fitted floor and the check that sets
+    # it (rule 19; machinist review r1 of #1652), and leaves the supply size
+    # to that diameter (fan-out r4, rule 7: no second controlling value).
+    supply = (
+        f"Ø{spec.inch_text(spec.TURNED_DIA, spec.TURNED_DIA_PLACES)} "
+        f"±{spec.inch_text(spec.TURNED_DIA_TOLERANCE_MM, spec.TURNED_DIA_PLACES)}"
+    )
+    floor = f"Ø{spec.inch_text(spec.TURNED_DIA_FITUP_MIN, spec.TURNED_DIA_PLACES)} MIN"
+    # Fan-out r2 (rule 4): the gear the feeler check reads against is named
+    # by its number in the note the Ø.730 flags.
+    assert _note(notes.TURNED_DIA_NOTE_NUMBER) == (
+        f"2. FITTED AT ASSEMBLY TO {floor} "
+        "TO PASS MHA-DT-00 FEELER CHECK TO 120T GEAR MHA-DT-03."
+    )
+    assert supply not in notes.DRAWING_NOTES
     assert not hasattr(spec, "BOSS_WALL_EXCEPTION")
     for internal in ("EXCEPTION", "ACCEPTED", "RULING", "POLICY", "RULE "):
-        assert internal not in spec.DRAWING_NOTES
+        assert internal not in notes.DRAWING_NOTES
     policy = (
         Path(spec.__file__).parents[1] / "docs" / "drawing-simplicity-policy.md"
     ).read_text(encoding="utf-8")
@@ -464,11 +515,10 @@ def test_notes_carry_the_tooth_edge_override_not_an_obsolete_boss_shortfall() ->
         line.startswith("| MHA-DT-10 crank pinion boss |")
         for line in policy.splitlines()
     )
-    notes = spec.DRAWING_NOTES
-    assert spec.PIN_NUMBER not in notes
-    assert "LIGHT DRIVE FIT" not in notes
-    assert "FLUSH" not in notes
-    assert "SUBSTITUTE" not in notes
+    note_text = notes.DRAWING_NOTES
+    assert "LIGHT DRIVE FIT" not in note_text
+    assert "FLUSH" not in note_text
+    assert "SUBSTITUTE" not in note_text
     # Retired with the migration: generic method narration, heat-treatment
     # negatives, duplicate bore-fit text and pair commissioning protocol.
     for banned in (
@@ -479,12 +529,11 @@ def test_notes_carry_the_tooth_edge_override_not_an_obsolete_boss_shortfall() ->
         "ROOT DIAMETER",
         "COMMISSIONING",
         "ACCEPTANCE",
-        "MHA-DT-07",
         "N*m",
         "RPM",
         "+/-",
     ):
-        assert banned not in notes, banned
+        assert banned not in note_text, banned
 
 
 def test_sheet_runs_at_3_to_1_with_every_view_at_sheet_scale() -> None:
@@ -498,6 +547,14 @@ def test_sheet_runs_at_3_to_1_with_every_view_at_sheet_scale() -> None:
     assert not hasattr(spec, "ISOMETRIC_VIEW_NOTE")
 
 
+# The property-linked notes print at 2.5 mm: 1.74 mm a character on a
+# 3.5 mm pitch, descenders 0.6 mm under the last row (the 64T's gear data on
+# farm run 20261001T110844152Z). The section caption is one row of 6.35 mm
+# SECTION letters, placed by its top.
+_NOTE_CHAR_WIDTH = 0.00174
+_NOTE_LINE_PITCH = 0.0035
+_NOTE_DESCENDER = 0.0006
+_CAPTION_ROW = 0.007
 
 
 def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
@@ -547,7 +604,7 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
     hole_x, hole_y = drawing._side_x(spec.PIN_STATION), drawing.RIGHT_CENTER[1]
     text_x, text_y = drawing.RIGHT_KEEP["PinHoleDia"]
     attach_x = text_x - drawing.PIN_HOLE_LINE_RUN_IN
-    attach_y = text_y - 0.0111  # the underline, 88d48ad2a7b4 audit
+    attach_y = text_y - drawing.PIN_HOLE_UNDERLINE_DROP  # the block's last row
     boss_top = drawing.RIGHT_CENTER[1] + half_boss
 
     def pin_line_x(y: float) -> float:
@@ -569,20 +626,19 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
     assert shoulder_right + 0.003 < pin_line_x(elbow_y)
     block_top = radius_y + drawing.RADIUS_SHOULDER_DROP
     assert text_right + 0.003 < pin_line_x(block_top)
-    assert block_top + 0.002 < drawing._TOP_ROW_Y - 0.0111
-    # The bore-fit note stays left of the end view; its short pointer enters
-    # radially through the upper-left tooth gap and lands on the bore circle.
-    assert drawing.BORE_FIT_NOTE[0] < drawing.FRONT_CENTER[0] - half_od
-    bore_dx = drawing.BORE_FIT_ATTACH[0] - drawing.FRONT_CENTER[0]
-    bore_dy = drawing.BORE_FIT_ATTACH[1] - drawing.FRONT_CENTER[1]
-    assert math.hypot(bore_dx, bore_dy) == pytest.approx(
-        spec.BORE_DIA * drawing.VIEW_SCALE[0] / 2000.0
-    )
-    assert bore_dx < 0 < bore_dy
+    assert block_top + 0.002 < drawing._TOP_ROW_Y - drawing.PIN_HOLE_UNDERLINE_DROP
+    # The pin hole's underline ends PIN_HOLE_LINE_RUN_IN left of the keep,
+    # the 88d48ad2a7b4 audit's 55.4 mm for its 43-character row scaled to
+    # this callout's widest row; one row fewer lifts that underline by half a
+    # row.
+    widest = max(len(row) for row in drawing.DIMENSION_CALLOUTS["PinHoleDia"].splitlines())
+    assert widest == drawing.PIN_HOLE_WIDEST_ROW == 40
+    assert drawing.PIN_HOLE_LINE_RUN_IN == pytest.approx(0.0554 * 40 / 43)
+    assert text_x - drawing.PIN_HOLE_LINE_RUN_IN == pytest.approx(0.322 - 0.0554)
+    assert drawing.PIN_HOLE_UNDERLINE_DROP == pytest.approx(3 * 0.0027781)
     positions = (
         *drawing.FRONT_KEEP.values(),
         *drawing.RIGHT_KEEP.values(),
-        drawing.BORE_FIT_NOTE,
         (0.016, 0.258),  # gear-data note anchor
         drawing.MANUFACTURING_NOTES_XY,
     )
@@ -590,6 +646,16 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
         assert 0.012 < x < 0.420
         assert 0.012 < y < 0.267
         assert not (x > 0.216 and y < 0.070), (x, y)  # title-block keep-out
+    # The numbered notes stand under the one-row section caption and the
+    # length stack, left of the title block, inside the border.
+    notes_left, notes_top = drawing.MANUFACTURING_NOTES_XY
+    note_lines = notes.DRAWING_NOTES.splitlines()
+    notes_right = notes_left + _NOTE_CHAR_WIDTH * max(len(line) for line in note_lines)
+    notes_bottom = notes_top - _NOTE_LINE_PITCH * len(note_lines) - _NOTE_DESCENDER
+    assert notes_right < 0.216 - 0.003
+    assert notes_bottom > 0.0127 + 0.003
+    assert notes_top < drawing.SECTION_CAPTION_XY[1] - _CAPTION_ROW - 0.002
+    assert notes_top < drawing.RIGHT_KEEP["OverallLength"][1] - 0.010
     # The three views march left to right without overlapping: face view,
     # longitudinal section (half the overall length each side), isometric.
     half_len = spec.OVERALL_LENGTH * drawing.VIEW_SCALE[0] / 2000.0
@@ -1075,13 +1141,13 @@ def test_t120_fit_up_closes_and_both_sheets_state_it() -> None:
     assert spec.SHOULDER_LENGTH_FITUP_MIN == pytest.approx(
         spec.SHOULDER_LENGTH + spec.SHOULDER_LENGTH_LIMITS[0]
     )
-    # The part sheet permits the turn-down to its floor, on the turned
-    # diameter's own callout.
+    # The part sheet permits the turn-down to its floor, in the numbered note
+    # the turned diameter links.
     # Both sheets print decimal inch; the assembly's minimum rounds up.
     turn_down = f"Ø{sheet.inch_min_text(spec.TURNED_DIA_FITUP_MIN, 3)} MIN"
     assert (
         f"Ø{spec.inch_text(spec.TURNED_DIA_FITUP_MIN, spec.TURNED_DIA_PLACES)} MIN"
-        in spec.TURNED_DIA_FITUP_CALLOUT
+        in _note(notes.TURNED_DIA_NOTE_NUMBER)
     )
     # The drive-train crank step checks the pair before the pin is drilled.
     number = dt_drive_train_steps.step_number("crank-mesh-checked")
@@ -1090,9 +1156,10 @@ def test_t120_fit_up_closes_and_both_sheets_state_it() -> None:
     check = step.index(f"{sheet.T120_FITUP_FEELER_TEXT} FEELER")
     drill = step.index("MATCH-DRILL")
     # The push names both parts the check closes on, before the reading; the
-    # wording around them is free (Codex P3 on #1154, review 4).
+    # wording around them is free (Codex P3 on #1154, review 4). It is its
+    # own sub-step, one sentence (rule 22).
     push = step.index("PUSH")
-    sentence = step[push : step.index(";", push)]
+    sentence = step[push : step.index(".", push)]
     assert all(part in sentence for part in spec.T120_FITUP_PUSHED)
     assert push < check < drill
     assert check < step.index(turn_down) < drill
@@ -1229,10 +1296,11 @@ def test_each_t120_cut_answers_only_its_own_failed_reading() -> None:
         assert all(reading["turned band radial"] >= feeler for _, reading in witnesses)
     # Both sheets give each cut its own condition: the turn-down floor is
     # stated with the band and its check only, the facing floor with the
-    # shoulder only.  The part sheet states the turn-down on the turned
-    # diameter's own callout and points at the MHA-DT-00 T120 check, which
-    # carries the band-only condition, by name and never by step number (a
-    # sequence edit must not re-key the part).
+    # shoulder only.  The part sheet states the turn-down in numbered note 2,
+    # which the turned diameter alone links, and points at the MHA-DT-00
+    # feeler check to the 120T gear, which carries the band-only condition,
+    # by name and never by step number (a sequence edit must not re-key the
+    # part).
     turn_down = f"Ø{spec.TURNED_DIA_FITUP_MIN:.2f} MIN"
     face_back = f"{spec.SHOULDER_LENGTH_FITUP_MIN:.2f} MIN"
     for floor, own, other in (
@@ -1242,17 +1310,17 @@ def test_each_t120_cut_answers_only_its_own_failed_reading() -> None:
         for sentence in _sentences(_crank_step()):
             if floor in sentence:
                 assert own in sentence and other not in sentence, sentence
-    callout = " ".join(spec.TURNED_DIA_FITUP_CALLOUT.split("\n"))
-    assert drawing.DIMENSION_CALLOUTS["TurnedDia"] == spec.TURNED_DIA_FITUP_CALLOUT
-    assert "SHOULDER" not in callout and face_back not in callout
-    for text in (spec.DRAWING_NOTES, *drawing.DIMENSION_CALLOUTS.values()):
+    note = _note(notes.TURNED_DIA_NOTE_NUMBER)
+    assert drawing.DIMENSION_CALLOUTS["TurnedDia"] == f"SEE NOTE {notes.TURNED_DIA_NOTE_NUMBER}"
+    assert "SHOULDER" not in note and face_back not in note
+    for text in (notes.DRAWING_NOTES, *drawing.DIMENSION_CALLOUTS.values()):
         assert face_back not in text
     import dt_drive_train_steps
 
-    assert f"Ø{spec.inch_text(spec.TURNED_DIA_FITUP_MIN, spec.TURNED_DIA_PLACES)} MIN" in callout
-    assert dt_drive_train_steps.DRAWING_NUMBER in callout and "T120" in callout
-    assert turn_down not in spec.DRAWING_NOTES
-    assert not re.search(r"STEP\s+\d", callout)
+    assert f"Ø{spec.inch_text(spec.TURNED_DIA_FITUP_MIN, spec.TURNED_DIA_PLACES)} MIN" in note
+    assert dt_drive_train_steps.DRAWING_NUMBER in note and "120T GEAR" in note
+    assert turn_down not in notes.DRAWING_NOTES
+    assert not re.search(r"STEP\s+\d", note)
 
 
 def test_crank_step_runs_free_only_after_the_t120_check_closes() -> None:

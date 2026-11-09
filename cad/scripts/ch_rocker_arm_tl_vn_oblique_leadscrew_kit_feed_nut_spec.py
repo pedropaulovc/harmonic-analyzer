@@ -319,9 +319,10 @@ def _wall_text(wall: float) -> str:
     return f"{math.floor(wall * 100.0 + 1e-9) / 100.0:.2f}"
 
 
+# The countersink callout's last row: the two stated walls, each named.
 CSK_WALL_TEXT = (
-    f"MIN WALL {_wall_text(CSK_WALL_TO_BODY)} TO BODY, "
-    f"{_wall_text(CSK_WALL_TO_OD)} TO OD"
+    f"MIN WALL: BODY {_wall_text(CSK_WALL_TO_BODY)}, "
+    f"OD {_wall_text(CSK_WALL_TO_OD)}"
 )
 
 # --- The thread's body wall: a second stated rule-17 shortfall (RV-02) --------
@@ -567,12 +568,15 @@ DRAWING_PRECISION = {
 # as build_sm_gooseneck / build_mg_magnifying_wheel print their diameters.
 # A diameter's own Ø is its default prefix, which a set prefix replaces (run
 # 20261105T023247678Z printed "4X 3.60/3.46"), so the hole's count carries
-# the token too.
-CSK_PREFIX = f"{SCREW_COUNT}X <MOD-DIAM>"
-CSK_CALLOUT = f"{CSK_ANGLE:.0f}° CSK"
+# the token too. The countersink's prefix carries the Y14.5 countersink
+# symbol and the drawing adds its angle as the suffix: "4X ⌵ Ø4.76/4.50 X
+# 82°", never "82° CSK" in words (rule 26).
+HOLE_PREFIX = f"{SCREW_COUNT}X <MOD-DIAM>"
+CSK_PREFIX = f"{SCREW_COUNT}X <HOLE-SINK><MOD-DIAM>"
+CSK_SUFFIX = f" X {CSK_ANGLE:.0f}°"
 DIMENSION_PREFIXES = {
     ("Countersink1Profile", "CskDia"): CSK_PREFIX,
-    (RECEIPT_SKETCH, "ReceiptHoleDia"): CSK_PREFIX,
+    (RECEIPT_SKETCH, "ReceiptHoleDia"): HOLE_PREFIX,
 }
 
 # --- Supplier reference sizes (the dimension image's, mm) ---------------------------

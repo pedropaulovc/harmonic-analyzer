@@ -124,9 +124,9 @@ def test_blank_and_holes_are_the_part_sheet() -> None:
 def test_hub_relief_cuts_the_12_mm_drill_and_prints_its_design_nominal() -> None:
     """The owner's literal 12 mm relief stays the model's cut (its reamer
     clearance is the drill's); the inch sheet prints the floored three-place
-    design nominal .472 from a blanked reference circle, as the #30 holes do,
-    so the DRILLED HOLES +.004/0 band contains the actual drill and every
-    exported endpoint is a printed value."""
+    design nominal .472 in the table, as the #30 holes do, so the DRILLED
+    HOLES +.004/0 band contains the actual drill and every exported endpoint
+    is a printed value. No millimetre value prints on the inch sheet."""
     assert spec.HUB_DIA_PRINTED == pytest.approx(0.472 * INCH)
     assert _on_inch_grid(spec.HUB_DIA_PRINTED, spec.HUB_PLACES)
     assert spec.DRAWING_PRECISION_BY_NAME["HubDia"] == spec.HUB_PLACES == 3
@@ -146,15 +146,20 @@ def test_hub_relief_cuts_the_12_mm_drill_and_prints_its_design_nominal() -> None
     assert lo <= spec.HUB_DIA <= hi
     assert feature["dia_nominal"] == spec.HUB_DIA_PRINTED
     assert lo > strap.HOLE_DIA
-    assert spec.CALLOUTS_BELOW["HubDia"].split("\n")[0] == "12 MM DRILL THRU"
+    assert drawing.PLAIN_CUT_SIZES["HUB"] == "\u00d8.472 DRILL THRU"
+    # The native SIZE may print the cut's inch rounding, never millimetres.
+    assert drawing.native_size_problem("HUB", "\u00d8.472 THRU ALL") is None
+    assert drawing.native_size_problem("HUB", "<MOD-DIAM>.4724 THRU ALL") is None
+    assert drawing.native_size_problem("HUB", "\u00d812 MM THRU ALL") is not None
+    assert drawing.native_size_problem("HUB", "\u00d812.00 THRU ALL") is not None
+    assert drawing.native_size_problem("HUB", "\u00d8.47 THRU ALL") is not None
 
 
 def test_blank_sizes_are_finished_native_dimensions_not_stock() -> None:
     dimensions = {"BlankLength", "BlankWidth", "BlankThick"}
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert dimensions <= marked
-    assert not dimensions & spec.REFERENCE_DIMENSIONS
-    assert not dimensions & set(spec.CALLOUTS_BELOW)
+    assert set(drawing.PLAN_KEEP) | set(drawing.SECTION_KEEP) == dimensions
     for name in dimensions:
         assert spec.DRAWING_PRECISION_BY_NAME[name] in (
             spec.BLANK_PLACES,
@@ -188,9 +193,10 @@ def test_the_screw_hole_has_one_callout_naming_its_countersink() -> None:
     assert lo <= spec.SCREW_DIA <= hi
     assert (lo, hi) == pytest.approx((0.128 * INCH, 0.132 * INCH))
     assert round(spec.SCREW_DIA / INCH, 3) * INCH > spec.SCREW_DIA
-    assert spec.CALLOUTS_ABOVE["ScrewDia"] == "4X"
-    rows = spec.CALLOUTS_BELOW["ScrewDia"].split("\n")
-    assert rows[0] == "#30 DRILL THRU" and rows[1] == spec.CSK_CALLOUT
+    assert drawing.CSK_TEXT == "<HOLE-SINK> \u00d8.25 X 82\u00b0"
+    notes = drawing.row_notes({tag: "\u00d8.129 THRU ALL" for tag in drawing.TABLE_HOLES})
+    assert {tag for tag, note in notes.items() if note} == {"R1", "R2", "R3", "R4"}
+    assert all(notes[f"R{i}"] == drawing.CSK_TEXT for i in range(1, 5))
     assert "CskDia" not in set().union(*spec.DRAWING_DIMENSIONS.values())
 
 
@@ -236,41 +242,131 @@ def test_stop_holes_cut_the_actual_30_drill_and_print_the_design_nominal() -> No
     source = inspect.getsource(part.build)
     assert 'name="StopHoles"' in source and "STOP_SPEC" in source
     assert "SharedCoordinate(0)" in source[source.index('name="StopHoles"') :]
-    assert spec.CALLOUTS_ABOVE["StopDia"] == "2X"
-    assert spec.CALLOUTS_BELOW["StopDia"].split("\n")[0] == "#30 DRILL THRU"
+    # The wizard's native SIZE: the actual #30 rounded, or its drill number.
+    for text in ("\u00d8.129 THRU ALL", "\u00d8.1285 THRU ALL", "\u00d8.128 THRU", "#30 THRU ALL"):
+        assert drawing.native_size_problem("P1", text) is None, text
+    for text in ("\u00d8.13 THRU ALL", "#29 THRU ALL", "\u00d83.26 THRU ALL", "", "\u00d8.129"):
+        assert drawing.native_size_problem("P1", text) is not None, text
     assert spec.WALLS_MM["stop 1 to edges"] >= WALL_TARGET_MM
     assert spec.WALLS_MM["stop 2 to edges"] >= WALL_TARGET_MM
 
 
-def test_hole_locations_are_reference_values_from_the_carrier() -> None:
-    """TrammelJig ruling: the carrier-located holes are spotted from TL-21 at
-    assembly, so their stations print as parenthesised 2-place references and
-    each such callout ends in the location rows (review r7: not a general
-    note). The end-stop holes are drilled at ordinary .XX stations that keep
-    the title block's band, and their callout names the pins instead."""
-    stations = set().union(*spec.DRAWING_DIMENSIONS.values()) - {
-        "BlankLength",
-        "BlankWidth",
-        "BlankThick",
-        *spec.HOLE_CALLOUTS,
-        *_STOP_STATIONS,
-    }
-    assert spec.REFERENCE_DIMENSIONS == stations
-    assert not _STOP_STATIONS & spec.REFERENCE_DIMENSIONS
-    assert all(spec.DRAWING_PRECISION_BY_NAME[n] == 2 for n in stations)
-    carrier_number = _config.parts("ch-rocker-arm-tl-oblique-carrier")["number"]
-    rows = [f"LOCATE FROM {carrier_number}", "AT ASSEMBLY"]
-    assert set(spec.HOLE_CALLOUTS) == {"ScrewDia", "HubDia", "ClampDia", "StopDia"}
-    for name in set(spec.HOLE_CALLOUTS) - {"StopDia"}:
-        assert spec.CALLOUTS_BELOW[name].split("\n")[-2:] == rows, name
-    assert "LOCATE" not in spec.CALLOUTS_BELOW["StopDia"]
-    assert spec.DRAWING_NOTES == ""
+def test_spotted_holes_print_reference_table_locations_from_the_carrier() -> None:
+    """TrammelJig ruling (L1 route): the carrier-located holes are spotted
+    from TL-21 at assembly, so their table locations are REF (one note) and
+    each row's MATE names the TL-21 hole it is spotted from, by the carrier
+    table's own tag. The end-stop holes are drilled at ordinary .XX table
+    locations that keep the title block's band."""
+    assert drawing.SPOTTED == ("R1", "R2", "R3", "R4", "HUB", "CL", "CR")
+    assert set(drawing.SPOTTED) <= set(carrier_spec.TABLE_HOLES)
+    for tag in drawing.SPOTTED:
+        x, y, _dia = carrier_spec.TABLE_HOLES[tag]
+        assert _close(spec.to_riser((x, y)), drawing.TABLE_HOLES[tag][0], 1e-9), tag
+        assert drawing.ROW_MATES[tag].split("\n")[0] == f"TL-21 {tag}"
+    assert drawing.SPOT_NOTE == (
+        "R1-R4, HUB, CL, CR: X/Y LOC REF; SPOT FROM TL-21 AT ASSEMBLY"
+    )
+    assert drawing.CARRIER_SHORT == "TL-21"
+    assert spec.CARRIER_NUMBER == "MHA-CH-06-TL-21"
+    assert drawing.TABLE_LOCATION_PLACES == spec.STATION_PLACES == 2
     assert not any("Location" in p for p in part._SAVED_DRAWING_PROPERTIES)
     for name, feature in _features().items():
         if name.startswith("stop_hole_"):
             assert {"station", "height"} <= set(feature["requirements"]), name
+            assert feature["precision"]["station"] == drawing.TABLE_LOCATION_PLACES
+            assert feature["precision"]["height"] == drawing.TABLE_LOCATION_PLACES
         elif name.endswith("_hole") or re.fullmatch(r"screw_hole_\d", name):
             assert "station" not in feature and "width" not in feature, name
+
+
+def test_the_table_runs_from_the_blank_corner_and_identifies_every_row() -> None:
+    """Rule 10 / owner review: X/Y LOC from the blank's lower-left corner (the
+    model origin, an edge finder's pickup), never a hole centre; the nine
+    .XX locations are distinct, so each generated row is one hole."""
+    assert len(drawing.TABLE_HOLES) == len(spec.HOLES) == 9
+    assert _close(spec.to_riser(spec.BLANK_ORIGIN), (0.0, 0.0), 1e-9)
+    for tag, (xy, _dia) in drawing.TABLE_HOLES.items():
+        assert drawing.table_location(tag) == xy
+        assert 0.0 < xy[0] < spec.BLANK_LENGTH and 0.0 < xy[1] < spec.BLANK_WIDTH
+    printed = drawing._PRINTED_LOCATIONS
+    assert len(set(printed.values())) == 9
+    assert printed["P1"] == (0.29, 0.19) and printed["P2"] == (13.51, 0.19)
+    for (x, y), tag in zip(spec.STOP_PIN_HOLES, ("P1", "P2"), strict=True):
+        assert _on_inch_grid(x, 2) and _on_inch_grid(y, 2), tag
+
+
+class _FakeTable:
+    """Generated TAG/X/Y cells, as SolidWorks prints them (leading zeros vary)."""
+
+    def __init__(self, rows: list[tuple[str, str, str]]) -> None:
+        self.cells = [["TAG", "X LOC", "Y LOC"], *[list(row) for row in rows]]
+        self.RowCount = len(self.cells)
+
+    def DisplayedText2(self, row: int, column: int, _calc: bool) -> str:
+        return self.cells[row][column]
+
+
+def _generated_rows(fmt: str = "{:.2f}") -> list[tuple[str, str, str]]:
+    return [
+        (
+            f"A{index}",
+            fmt.format(x / INCH),
+            fmt.format(y / INCH),
+        )
+        for index, ((x, y), _dia) in enumerate(drawing.TABLE_HOLES.values(), start=1)
+    ]
+
+
+@pytest.mark.parametrize("fmt", ["{:.2f}", "{:.2f}_strip"])
+def test_row_identity_reads_each_rows_own_corner_cells(fmt: str) -> None:
+    rows = _generated_rows("{:.2f}")
+    if fmt.endswith("_strip"):
+        rows = [(tag, x.lstrip("0"), y.lstrip("0")) for tag, x, y in rows]
+    table = _FakeTable(list(reversed(rows)))
+    holes = drawing._row_holes(table)
+    assert sorted(holes.values()) == sorted(drawing.TABLE_HOLES)
+    assert holes[1] == list(drawing.TABLE_HOLES)[-1]
+
+
+@pytest.mark.parametrize("fault", ["precision", "moved", "duplicate", "missing"])
+def test_row_identity_refuses_a_wrong_table(fault: str) -> None:
+    rows = _generated_rows()
+    if fault == "precision":
+        rows[0] = (rows[0][0], f"{float(rows[0][1]):.3f}", rows[0][2])
+    elif fault == "moved":
+        rows[0] = (rows[0][0], f"{float(rows[0][1]) + 0.02:.2f}", rows[0][2])
+    elif fault == "duplicate":
+        rows[1] = rows[0]
+    else:
+        rows.pop()
+    with pytest.raises(RuntimeError):
+        drawing._row_holes(_FakeTable(rows))
+
+
+def test_generated_table_cells_are_only_read() -> None:
+    """Farm r1: generated hole-table cells refuse SetText2. Only the inserted
+    NOTE and MATE columns are written; SIZE is read, checked and frozen."""
+    source = inspect.getsource(drawing._hole_table)
+    writes = re.findall(r"_write_cell\(table, row, (\w+)", source)
+    assert set(writes) == {"_TABLE_NOTE_COLUMN", "_TABLE_MATE_COLUMN"}
+    assert drawing._TABLE_SIZE_COLUMN == 3
+    assert (drawing._TABLE_NOTE_COLUMN, drawing._TABLE_MATE_COLUMN) == (4, 5)
+    assert len(drawing.TABLE_WIDTHS) == 6
+    assert source.index("generated = _native_sizes(table)") < source.index("InsertColumn2")
+
+
+def test_view_circles_identify_their_holes_by_centre_axis_and_size() -> None:
+    for tag, ((x, y), dia) in drawing.TABLE_HOLES.items():
+        circle = (x / 1000.0, y / 1000.0, spec.THICKNESS / 1000.0, 0.0, 0.0, 1.0, dia / 2000.0)
+        assert drawing._hole_tag(circle) == tag
+    (x, y), dia = drawing.TABLE_HOLES["R1"]
+    # The wizard's exact #30 still reads as its hole; the countersink's mouth
+    # on the same axis does not.
+    actual = spec.SCREW_DRILL_DIA / 2000.0
+    assert drawing._hole_tag((x / 1000.0, y / 1000.0, 0.005, 0.0, 0.0, 1.0, actual)) == "R1"
+    mouth = spec.CSK_DIA / 2000.0
+    assert drawing._hole_tag((x / 1000.0, y / 1000.0, 0.006, 0.0, 0.0, 1.0, mouth)) is None
+    assert drawing._hole_tag((x / 1000.0, 0.0, 0.006, 1.0, 0.0, 0.0, dia / 2000.0)) is None
 
 
 def test_clamp_holes_pass_their_mates_and_meet_the_band_wall_target() -> None:
@@ -289,45 +385,16 @@ def test_clamp_holes_pass_their_mates_and_meet_the_band_wall_target() -> None:
     assert inner == pytest.approx(radius - hole_r - error - trammel.RISER_INNER_RADIUS)
     assert outer == pytest.approx(trammel.RISER_OUTER_RADIUS - radius - hole_r - error)
     assert min(inner, outer) >= WALL_TARGET_MM
-    assert not any("WALL" in row for row in spec.CALLOUTS_BELOW["ClampDia"].split("\n"))
+    assert drawing.PLAIN_CUT_SIZES["CL"] == drawing.PLAIN_CUT_SIZES["CR"] == (
+        "\u00d8.196 DRILL THRU"
+    )
+    assert drawing.native_size_problem("CL", "\u00d8.196 THRU ALL") is None
+    assert drawing.native_size_problem("CL", "\u00d8.20 THRU ALL") is not None
+    assert drawing.ROW_MATES["CL"] == "TL-21 CL" and drawing.ROW_MATES["CR"] == "TL-21 CR"
     riser = _config.parts("ch-rocker-arm-tl-oblique-riser")
     assert not riser.get("machinist_exceptions")
     # The self-cut stays the approved 9/16 cutter on the strap cutter's centres.
     assert trammel.RISER_CUTTER_IN == "9/16"
-
-
-def test_each_row_count_matches_the_holes_on_that_row() -> None:
-    """Review r5: a 2X row height names exactly the two holes on its row, and
-    its dimension stands right of the view so the extension line from the
-    dimensioned left hole runs through its partner."""
-    rows = {
-        "ScrewInnerY": [
-            xy for xy in spec.SCREW_HOLES if xy[1] == spec.GLOBALS["ScrewInnerY"]
-        ],
-        "ScrewOuterY": [
-            xy for xy in spec.SCREW_HOLES if xy[1] == spec.GLOBALS["ScrewOuterY"]
-        ],
-        "ClampY": [spec.CL_HOLE, spec.CR_HOLE],
-        "StopY": list(spec.STOP_PIN_HOLES),
-    }
-    all_holes = [
-        *spec.SCREW_HOLES,
-        spec.HUB_HOLE,
-        spec.CL_HOLE,
-        spec.CR_HOLE,
-        *spec.STOP_PIN_HOLES,
-    ]
-    assert set(rows) == set(spec.ROW_COUNTS)
-    for name, holes in rows.items():
-        on_row = [xy for xy in all_holes if xy[1] == spec.GLOBALS[name]]
-        assert on_row == holes and len(holes) == 2, name
-        assert spec.ROW_COUNTS[name] == "2X"
-        assert drawing.PLAN_KEEP[name][0] > spec.BLANK_LENGTH
-    assert [xy for xy in all_holes if xy[1] == spec.GLOBALS["HubY"]] == [spec.HUB_HOLE]
-    assert "HubY" not in spec.ROW_COUNTS
-    assert not set(spec.ROW_COUNTS) & set(spec.CALLOUTS_ABOVE)
-    # The ordinary stop row is counted in the drawing, not parenthesised.
-    assert "StopY" not in spec.REFERENCE_DIMENSIONS
 
 
 # Sheet text at the template's height: about 2.05 mm a character, 4.5 mm tall
@@ -336,146 +403,15 @@ _CHAR_MM, _TEXT_MM, _AIR_MM = 2.05, 4.5, 2.26
 _PLAN_SCALE = drawing.VIEW_SCALE[0] / drawing.VIEW_SCALE[1]
 
 
-def test_row_heights_stand_a_text_width_apart() -> None:
-    """jig-r6: the right-hand row heights overprinted each other. Each one-line
-    "2X (dd.dd)" clears its neighbour's, and the first clears the outline."""
-    names = ["ClampY", "ScrewOuterY", "ScrewInnerY"]
-    xs = [drawing.PLAN_KEEP[n][0] * _PLAN_SCALE for n in names]
-    assert xs == sorted(xs)
-    half = len("2X (00.00)") * _CHAR_MM / 2.0
-    assert xs[0] - half - spec.BLANK_LENGTH * _PLAN_SCALE >= _AIR_MM
-    assert all(b - a >= 2.0 * half + _AIR_MM for a, b in zip(xs, xs[1:]))
-    width_x = drawing.PLAN_KEEP["BlankWidth"][0] * _PLAN_SCALE
-    width_text = f"{spec.BLANK_WIDTH:.{spec.DRAWING_PRECISION_BY_NAME['BlankWidth']}f}"
-    assert width_x - xs[-1] >= half + len(width_text) * _CHAR_MM / 2.0 + _AIR_MM
-    # Each count's text fits between its own extension lines.
-    for name in names:
-        assert spec.GLOBALS[name] * _PLAN_SCALE > _TEXT_MM + 1.0, name
-
-
-# Native run 26bb's right-end ink (PDF/PNG crop, paper mm at 1:2): an
-# outside row-height text starts 1.5 mm right of its dimension line and its
-# shelf ends 15.6 mm right of it; an extension line overshoots its dimension
-# line by 1.0 mm; an outside arrow's tail reaches 6.3 mm past the edge it
-# points at. The (.64) text sat centred on its own line.
-_OUTSIDE_TEXT_LEAD_MM = 1.5
-_OUTSIDE_SHELF_END_MM = 15.6
-_EXTENSION_OVERSHOOT_MM = 1.0
-_ARROW_TAIL_MM = 6.3
-
-
-def _right_of_outline(name: str) -> float:
-    """A right-hand row height's dimension line, paper mm off the outline."""
-    return (drawing.PLAN_KEEP[name][0] - spec.BLANK_LENGTH) * _PLAN_SCALE
-
-
-def test_stop_and_clamp_row_heights_do_not_strike_each_other() -> None:
-    """Machinist review of native run 26bb (FIX): the .19 dimension line and
-    its stop extension line ran through "2X (.64)", and the (.64) lower arrow
-    ran down through "2X .19". The stops' row stands nearest the outline with
-    its text on a shelf below the edge; the CL/CR row stands clear of that
-    shelf, its centred text clear of the stops' lines."""
-    stop_x = _right_of_outline("StopY")
-    clamp_x = _right_of_outline("ClampY")
-    stop_text = f"2X .{round(spec.GLOBALS['StopY'] / INCH * 100):02d}"
-    assert stop_text == "2X .19"
-    # The span is too short for the text: it stands outside, below the edge.
-    assert spec.GLOBALS["StopY"] * _PLAN_SCALE < _TEXT_MM
-    _x, y, _ = drawing.PLAN_KEEP["StopY"]
-    assert y * _PLAN_SCALE + _TEXT_MM / 2.0 <= -_AIR_MM
-    # Its text clears the right end's extension line (the length's).
-    assert stop_x + _OUTSIDE_TEXT_LEAD_MM >= _AIR_MM
-    # The CL/CR row's lower arrow tail drops right of the stops' shelf.
-    assert clamp_x - (stop_x + _OUTSIDE_SHELF_END_MM) >= _AIR_MM
-    # The stops' dimension and extension lines end left of "2X (.64)".
-    clamp_half = len("2X (.64)") * _CHAR_MM / 2.0
-    assert (clamp_x - clamp_half) - (stop_x + _EXTENSION_OVERSHOOT_MM) >= _AIR_MM
-    # The stops' upper arrow tail rises past the stop row into the band of
-    # the CL/CR text; it must stand left of that text too (same check), and
-    # the CL/CR lower arrow tail stays above the stop callout block.
-    stop_block_top = drawing.PLAN_KEEP["StopDia"][1] * _PLAN_SCALE + 2.0 * _TEXT_MM
-    assert -_ARROW_TAIL_MM - stop_block_top >= _AIR_MM
-
-
 def test_stock_width_stands_clear_of_section_a_a() -> None:
-    """Shifting the row heights outboard keeps the stock width's text left of
-    section A-A, which shows the thickness across at 2:1."""
+    """The stock width's text stands left of section A-A, which shows the
+    cross-section upright at 2:1."""
     plan_left = drawing.PLAN_CENTER[0] * 1000.0 - spec.BLANK_LENGTH * _PLAN_SCALE / 2.0
     width_x = plan_left + drawing.PLAN_KEEP["BlankWidth"][0] * _PLAN_SCALE
     width_text = f"{spec.BLANK_WIDTH / INCH:.2f}".lstrip("0")
     section_scale = drawing.SECTION_SCALE[0] / drawing.SECTION_SCALE[1]
     section_left = drawing.SECTION_CENTER[0] * 1000.0 - spec.THICKNESS * section_scale / 2.0
     assert section_left - (width_x + len(width_text) * _CHAR_MM / 2.0) >= _AIR_MM
-
-
-# Native run 26bb: the stop block's widest row and shelf spanned 48.7 mm,
-# centred on its requested X (237.2-285.9 on paper, only 1.6 mm right of the
-# right end's extension line at 237.6).
-_STOP_BLOCK_HALF_MM = 24.4
-
-
-def test_stop_callout_block_stands_below_right_of_stop_two() -> None:
-    """The stop holes' block hangs off stop 2 (the reference circle's hole),
-    right of every X-stack extension line and left of section A-A, under the
-    stops' row-height shelf."""
-    x, y, _ = drawing.PLAN_KEEP["StopDia"]
-    stop_x, stop_y = spec.STOP_PIN_HOLES[1]
-    assert x > spec.BLANK_LENGTH > stop_x and y < drawing.PLAN_KEEP["StopY"][1]
-    block_left = (x - spec.BLANK_LENGTH) * _PLAN_SCALE - _STOP_BLOCK_HALF_MM
-    block_right = (x - spec.BLANK_LENGTH) * _PLAN_SCALE + _STOP_BLOCK_HALF_MM
-    assert block_left >= _AIR_MM + 2.0  # off the length's extension line
-    plan_right = drawing.PLAN_CENTER[0] * 1000.0 + spec.BLANK_LENGTH * _PLAN_SCALE / 2.0
-    section_scale = drawing.SECTION_SCALE[0] / drawing.SECTION_SCALE[1]
-    section_left = drawing.SECTION_CENTER[0] * 1000.0 - spec.THICKNESS * section_scale / 2.0
-    assert section_left - (plan_right + block_right) >= _AIR_MM
-    assert stop_y > 0.0
-
-
-def test_x_stack_rows_leave_air_and_the_section_letters_clear() -> None:
-    """jig-r6: the X stack's texts stood 0.48 mm apart, CL's text sat on the
-    baseline extension, and the section letter sat on HubX's extension."""
-    order = (
-        "Stop1X",
-        "ClX",
-        "Screw3X",
-        "Screw1X",
-        "HubX",
-        "Screw2X",
-        "Screw4X",
-        "CrX",
-        "Stop2X",
-        "BlankLength",
-    )
-    rows = [drawing.PLAN_KEEP[n][1] * _PLAN_SCALE for n in order]
-    assert all(a - b - _TEXT_MM >= 4.52 for a, b in zip(rows, rows[1:]))
-    # Nearest the part first, length last.
-    lengths = [spec.GLOBALS[n] for n in order]
-    assert lengths == sorted(lengths)
-    for name, text in (("Stop1X", ".29"), ("ClX", "(9.11)")):
-        right = drawing.PLAN_KEEP[name][0] * _PLAN_SCALE + len(text) * _CHAR_MM / 2.0
-        assert right <= -_AIR_MM, name
-    # Review r7: the HUB row height's dimension line and arrows ran down
-    # through "(9.11)"; its line and its own text stand left of CL's text.
-    cl_text_left = (
-        drawing.PLAN_KEEP["ClX"][0] * _PLAN_SCALE - len("(9.11)") * _CHAR_MM / 2.0
-    )
-    hub_x = drawing.PLAN_KEEP["HubY"][0] * _PLAN_SCALE
-    assert cl_text_left - (hub_x + len("(29.53)") * _CHAR_MM / 2.0) >= _AIR_MM
-    # The arrows point +X; each letter stands 14-20 mm (sheet) past the line.
-    cut = drawing.CUT_X * _PLAN_SCALE
-    stations = sorted(
-        x * _PLAN_SCALE
-        for x, _y in (
-            *spec.SCREW_HOLES,
-            spec.HUB_HOLE,
-            spec.CL_HOLE,
-            spec.CR_HOLE,
-            *spec.STOP_PIN_HOLES,
-        )
-    )
-    assert not [s for s in stations if cut + 12.0 < s < cut + 22.0]
-    assert -drawing.CUT_Y[0] * _PLAN_SCALE >= 6.0
-    assert (drawing.CUT_Y[1] - spec.BLANK_WIDTH) * _PLAN_SCALE >= 6.0
 
 
 def test_walls_hold_rule_17_at_worst_case() -> None:
@@ -488,20 +424,90 @@ def test_drilled_holes_carry_the_title_block_band_only() -> None:
 
 
 def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
+    """The overalls and thickness print as imported dimensions at their model
+    places; every other marked station or size prints as a table row."""
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    assert set(drawing.PLAN_KEEP) | set(drawing.SECTION_KEEP) == marked
+    printed = set(drawing.PLAN_KEEP) | set(drawing.SECTION_KEEP)
     assert not set(drawing.PLAN_KEEP) & set(drawing.SECTION_KEEP)
+    assert printed < marked
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
-    assert set(spec.CALLOUTS_ABOVE) | set(spec.CALLOUTS_BELOW) <= marked
+    assert drawing.IMPORTED_PRECISION == {
+        name: spec.DRAWING_PRECISION_BY_NAME[name] for name in printed
+    }
 
 
-def test_sheet_carries_no_notes_and_short_callouts() -> None:
-    """No general notes; callout rows stay short (the location row, naming the
-    carrier's number, is the longest)."""
+_DRAWING_NUMBER = re.compile(r"MHA-[A-Z]{2}(?:-[A-Z]{2})*-\d{2}(?:-[A-Z]{2})*(?:-\d{2})?")
+
+
+def test_table_cells_and_notes_stay_short_and_name_mates_by_number() -> None:
+    """Rule 7: a cell carries its size and process lines plus at most two
+    lines of words, and the sheet at most four note lines. Rule 4: every mate
+    is a drawing number or a same-parent short form, never a generic noun
+    (review: "CL AND CR CLAMPS", "HUB REAMER RELIEF"). Rule 26: size first,
+    no millimetres on the inch sheet, the countersink as its symbol."""
+    assert len(drawing.TABLE_NOTES) <= 4
     assert spec.DRAWING_NOTES == ""
-    for text in (*spec.CALLOUTS_ABOVE.values(), *spec.CALLOUTS_BELOW.values()):
+    for tag, mate in drawing.ROW_MATES.items():
+        lines = mate.split("\n")
+        assert len(lines) <= 2, tag
+        assert lines[0].startswith("TL-21 ") or _DRAWING_NUMBER.search(lines[0]), tag
+        assert "CLAMPS" not in mate and "RELIEF" not in mate, tag
+    assert drawing.ROW_MATES["HUB"].split("\n")[1] == "PASSES MHA-CH-13 REAMER"
+    assert drawing.STRAP_NUMBER == _config.parts("ch-rocker-strap")["number"]
+    assert drawing.ROW_MATES["P1"] == "CLEARS MHA-SM-VN-53 STOP PIN"
+    # A plain cut's blank native SIZE moves to its NOTE cell, size first; a
+    # wizard row never prints a blank SIZE.
+    blank = {tag: "" for tag in drawing.TABLE_HOLES}
+    notes = drawing.row_notes(blank)
+    for tag in ("HUB", "CL", "CR"):
+        assert drawing.native_size_problem(tag, "") is None
+        assert notes[tag] == drawing.PLAIN_CUT_SIZES[tag]
+        assert notes[tag].startswith("\u00d8.") and notes[tag].endswith("DRILL THRU")
+    for tag in ("R1", "P1"):
+        assert drawing.native_size_problem(tag, "") is not None
+    assert not notes["P1"] and not notes["P2"]
+    for note in notes.values():
+        assert " MM" not in note and "CSK" not in note
+        glyphs = len(note.replace("<HOLE-SINK>", "V"))
+        assert glyphs * _CHAR_MM <= drawing.TABLE_WIDTHS[drawing._TABLE_NOTE_COLUMN] * 1000.0
+    for text in (*drawing.TABLE_NOTES, *drawing.ROW_MATES.values()):
         for line in text.split("\n"):
-            assert len(line.replace("<MOD-DIAM>", " Ø")) <= 28, line
+            assert len(line) <= 60, line
+
+
+def test_the_table_and_its_notes_stand_clear_of_the_views_and_title_block() -> None:
+    """Under the plan's length line (sheet y 0.180), left of the isometric, the
+    MATE column wide enough for its longest line at about 2.05 mm a
+    character."""
+    plan_bottom = drawing.PLAN_CENTER[1] * 1000.0 - spec.BLANK_WIDTH * _PLAN_SCALE / 2.0
+    length_line = plan_bottom + drawing.PLAN_KEEP["BlankLength"][1] * _PLAN_SCALE
+    assert length_line - drawing.TABLE_ANCHOR[1] * 1000.0 >= _AIR_MM
+    right = (drawing.TABLE_ANCHOR[0] + sum(drawing.TABLE_WIDTHS)) * 1000.0
+    assert drawing.ISO_NOTE_XY[0] * 1000.0 - right >= 30.0
+    longest = max(
+        len(line) for mate in drawing.ROW_MATES.values() for line in mate.split("\n")
+    )
+    assert drawing.TABLE_WIDTHS[drawing._TABLE_MATE_COLUMN] * 1000.0 >= longest * _CHAR_MM
+    assert drawing.TABLE_ANCHOR[0] * 1000.0 >= 12.7 + _AIR_MM
+
+
+def test_tags_stand_off_the_part_and_clear_the_section_letters() -> None:
+    """Rule 14: each tag sits outside the outline on its own leader, apart
+    from its neighbours, and clear of A-A's line (through R3) and letters
+    (arrows +X, letters 12-22 mm sheet right of the line)."""
+    cut = drawing.CUT_X
+    for tag, (x, y) in drawing.TAG_XY_MM.items():
+        assert y > spec.BLANK_WIDTH or y < 0.0, tag
+        assert -10.0 <= x * _PLAN_SCALE and x <= spec.BLANK_LENGTH, tag
+        assert abs(x - cut) * _PLAN_SCALE >= 6.0, tag
+        assert not cut + 22.0 < x < cut + 46.0, tag
+    for side in (lambda y: y > 0.0, lambda y: y < 0.0):
+        xs = sorted(x for x, y in drawing.TAG_XY_MM.values() if side(y))
+        assert all((b - a) * _PLAN_SCALE >= 3 * _CHAR_MM + _AIR_MM for a, b in zip(xs, xs[1:]))
+    assert drawing.SECTION_LINE_STYLE_PREFERENCE == 542
+    assert drawing.SECTION_LINE_STYLE == 0
+    assert -drawing.CUT_Y[0] * _PLAN_SCALE >= 6.0
+    assert (drawing.CUT_Y[1] - spec.BLANK_WIDTH) * _PLAN_SCALE >= 6.0
 
 
 def test_number_is_the_parent_number_plus_a_tool_suffix() -> None:
@@ -528,39 +534,6 @@ def test_every_exported_band_endpoint_is_a_printed_value() -> None:
                 assert _on_inch_grid(nominal, places), (name, requirement)
             checked += 1
     assert checked
-
-
-# The retained 0c3 native/PDF ink below was measured on the 41.148 wide blank.
-# The plan view centres on its outline, so the 42.926 blank lifts everything
-# above the outline's centre by a quarter of the growth on paper at 1:2.
-_RETAINED_0C3_WIDTH = 41.148
-_WIDTH_LIFT = (spec.BLANK_WIDTH - _RETAINED_0C3_WIDTH) / 2.0 * _PLAN_SCALE
-
-
-def test_clamp_callout_has_border_air_and_clears_the_cutting_plane() -> None:
-    # Retained 0c3 native/PDF ink, in paper mm at the unchanged 1:2 scale.
-    # The old shelf started at 13.0891 against the 12.7 inner border.
-    # Translate the entire associative block, not only its diameter row.
-    x, y, _ = drawing.PLAN_KEEP["ClampDia"]
-    dx = (x - (-26.0)) * _PLAN_SCALE
-    dy = (y - (drawing._CALLOUT_Y + 10.0)) * _PLAN_SCALE
-    assert (dx, dy) == pytest.approx((3.0, 1.0))
-    lift = dy + _WIDTH_LIFT
-    assert 13.0891 + dx - 12.7 >= _AIR_MM  # shelf, farther left than the ink
-    assert 266.7 - (262.7036 + lift) >= _AIR_MM  # top of the full block
-    assert 104.4326 - (87.2384 + dx) >= _AIR_MM  # upper section letter A
-    # Keep the leader's closest approach to the upper A-A tail clear too:
-    # shifting only X would repair the border but reintroduce review r12.
-    # The CL hole and the cut's tail rise with the outline's top half.
-    circle = (69.55255, 201.89715 + _WIDTH_LIFT)
-    elbow = (87.2384 + dx, 224.8134 + lift)
-    cut_tail = (90.2203, 222.287 + _WIDTH_LIFT)
-    vx, vy = elbow[0] - circle[0], elbow[1] - circle[1]
-    tx, ty = cut_tail[0] - circle[0], cut_tail[1] - circle[1]
-    assert 0.0 < (tx * vx + ty * vy) / (vx * vx + vy * vy) < 1.0
-    assert abs(vx * ty - vy * tx) / math.hypot(vx, vy) >= _AIR_MM
-    assert elbow[1] - cut_tail[1] >= _AIR_MM
-    assert x < drawing.CUT_X
 
 
 def test_one_sheet_and_no_left_clamp_remnants() -> None:

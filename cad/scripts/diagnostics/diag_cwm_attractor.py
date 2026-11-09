@@ -95,13 +95,12 @@ from _cwm import (  # noqa: E402
 from solidworks_mcp.adapters.solidworks.assembly import (  # noqa: E402
     _create_math_transform,
 )
-from _rocker_interface import ROD_HOLE_X, ROD_HOLE_Y  # noqa: E402
-from build_ch_rocker_arm import _mid_y  # noqa: E402
+from _rocker_interface import PIVOT_MID_Y, ROD_HOLE_X, ROD_HOLE_Y  # noqa: E402
 from build_ch_connecting_rod import CENTER_DISTANCE as ROD_C2C  # noqa: E402
 
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
 SHAFT_R = 6.35 / 2.0
-PIVOT_Y = _mid_y(0.0)  # 8.0 -- rocker pivot bore at local (0, 8)
+PIVOT_Y = PIVOT_MID_Y  # 8.0 -- rocker pivot bore at local (0, 8)
 # Dim VALUES stay positive; the flip rule's natural side for these distance
 # refs is -Z (measured: seeding at +Z0 raised flip-seed MISS off by 2*Z0), so
 # the design frame marches -Z. Don't touch the channel flip seeds for a diagnostic.

@@ -5,10 +5,10 @@ tapered support castings. The FRONT PROFILE is now two concentric arcs of
 DIFFERENT arc length (a tapered curved strap), per the ch.30 back-view
 sketch:
 
-  * Top edge  = concave-up arc, R = 800 mm (= amplitude-bar length, the book's
-    nonlinearity rationale), arc length 11.5" (292.1 mm).
-  * Bottom edge = concentric arc, R = 816 mm (top + 16 mm depth), arc length
-    10.5" (266.7 mm).
+  * Top edge  = concave-up arc, book R = 800 mm (= amplitude-bar length, the
+    book's nonlinearity rationale), arc length 11.5" (292.1 mm).
+  * Bottom edge = concentric arc, book R = 816 mm (top + 16 mm depth), arc
+    length 10.5" (266.7 mm).
   * Because the two arcs subtend DIFFERENT angles on their radii, the end faces
     are NOT radial -- they slant inward, so the strap TAPERS toward each tip
     (the "square ends" of the sketch are approximate; a shorter lower edge below
@@ -16,6 +16,10 @@ sketch:
   * Each tip has a 0.22" (5.588 mm) face PERPENDICULAR to the top edge (a radial
     segment, the sketch's 90deg right-angle mark), cut into the front profile --
     not a 3D chamfer feature.
+  * The model is that book outline with every edge at the middle of its print
+    zone (owner ruling 2026-11-08, #2144 item 10.3): R799.746 / R815.746 about
+    the same centre, the lands and tapers .010 into the material
+    (ch_rocker_arm_spec._mid_zone_outline).
 
 The perpendicular top-to-bottom DEPTH stays 16 mm (p.29 end-face callout); the
 plate THICKNESS (Z) is the p.27 callout's 2.5 mm on the inch grid, .098.
@@ -107,6 +111,9 @@ from ch_rocker_arm_spec import (
     PIVOT_HOLE_BAND,
     PIVOT_HOLE_DIA,
     ROD_HOLE_SPEC,
+    BOT_ARC_LEN,
+    TIP_FACE,
+    TOP_ARC_LEN,
     SURFACE_FINISHES,
     TOP_EDGE_ABOVE_PIVOT,
     TOP_EDGE_BAND,
@@ -118,15 +125,14 @@ PART_NAME = "ch-rocker-arm"
 MATERIAL = "Plain Carbon Steel"  # see _appearance.apply_material docstring
 
 ARM_THICKNESS = 2.4892  # .098; ch14: p.27 photo callout 2.5 mm (plate thickness, Z)
-TOP_ARC_LEN = 292.1  # top edge arc length = 11.5" (ch.30 back view, manual)
-BOT_ARC_LEN = 266.7  # bottom edge arc length = 10.5" (ch.30 back-view sketch)
-TIP_FACE = 5.588  # 0.22" tip face, PERPENDICULAR to the top edge (ch.30 sketch)
 # The hub length IS the station pitch: hub faces of neighbouring arms touch.
 if abs(HUB_LENGTH - _config.machine("channels", "station_pitch_mm")) > 1e-6:
     raise AssertionError("ch_rocker_arm_spec.HUB_LENGTH must equal the channel station pitch")
 HUB_PROUD = (HUB_LENGTH - ARM_THICKNESS) / 2.0  # 2.278 each face
 if ARM_THICKNESS != SPEC_ARM_THICKNESS:
     raise AssertionError("ch_rocker_arm_spec.ARM_THICKNESS drifted from the build")
+# The lower arc's midpoint below the pivot axis: ArmDepth under the top edge.
+BOTTOM_EDGE_BELOW_PIVOT = ARM_DEPTH - TOP_EDGE_ABOVE_PIVOT  # 7.746, .305
 # The rod-pin native drill identity is part-owned by ch_rocker_arm_spec.
 # The interface's rod-pin position follows the bottom-arc end (132.76): solved
 # so the pin sits DIRECTLY ABOVE the phased cam
@@ -143,8 +149,9 @@ if ARM_THICKNESS != SPEC_ARM_THICKNESS:
 # unchanged-length rod plumb and the neutral arm level.
 THROUGH_CUT_DEPTH = 20.0  # mid-plane total; > thickness
 
-# Arc centre sits ARM_DEPTH above the pivot's bottom edge: bottom edge is an
-# R816 arc, top edge the concentric R800 arc through (0, 16).
+# Arc centre sits CENTER_Y above the frame origin (the book bottom edge): the
+# bottom edge is the mid-zone R815.746 arc, the top edge the concentric
+# R799.746 arc through (0, 16.254).
 R_TOP = CURVE_RADIUS
 if abs(CENTER_Y - PIVOT_MID_Y - R_TOP - TOP_EDGE_ABOVE_PIVOT) > 1e-9:
     raise AssertionError("the CenterY equation must rebuild the modelled centre")
@@ -167,16 +174,6 @@ _RAD_X = TOP_END_X / R_TOP  # = sin(alpha_top)
 _RAD_Y = (TOP_END_Y - CENTER_Y) / R_TOP  # = -cos(alpha_top)
 ROD_TIP_X = TOP_END_X + TIP_FACE * _RAD_X
 ROD_TIP_Y = TOP_END_Y + TIP_FACE * _RAD_Y
-
-
-def _bottom_point(x: float) -> tuple[float, float]:
-    return (x, CENTER_Y - math.sqrt(R_BOTTOM**2 - x * x))
-
-
-def _mid_y(x: float) -> float:
-    by = _bottom_point(x)[1]
-    ty = CENTER_Y - math.sqrt(R_TOP**2 - x * x)
-    return (by + ty) / 2.0
 
 
 def _as_construction(adapter, entity_id: str) -> None:
@@ -348,7 +345,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "ThroughCutDepth", f"{THROUGH_CUT_DEPTH}mm")
     # The top edge's height over the pivot axis is the print's controlled
     # value (ch_rocker_arm_spec.TOP_EDGE_BAND), so the arcs' shared centre is
-    # derived from it: the pivot (ArmDepth / 2), up to the top edge, up R800.
+    # derived from it: the pivot (ArmDepth / 2), up to the top edge, up RTop.
     await set_global(adapter, "TopAbovePivot", f"{TOP_EDGE_ABOVE_PIVOT}mm")
     await set_global(adapter, "RTop", '"CurveRadius"')
     await set_global(adapter, "RBottom", '"CurveRadius" + "ArmDepth"')
@@ -391,7 +388,7 @@ async def build(adapter) -> dict[str, str]:
     ]
     set_sketch_direct_db(adapter, False)
     bottom_arc, top_arc, rod_tip_line, _rod_end, tail_tip_line, _tail_end = entities
-    # Two concentric arcs (top R800, bottom R816), each tip a short face square to
+    # Two concentric arcs (top RTop, bottom RBottom), each tip a short face square to
     # the top edge, then a tapered end face down to the bottom arc. The top arc
     # (11.5" arc-len) and bottom arc (10.5") subtend DIFFERENT angles on their
     # radii, so the end faces slant inward (the profile tapers). The tip faces are
@@ -509,7 +506,7 @@ async def build(adapter) -> dict[str, str]:
     hub = SketchDims()
     check("create_sketch hub", await adapter.create_sketch("Front"))
     await define_circle(
-        adapter, 0.0, _mid_y(0.0), HUB_DIA / 2.0, "hub",
+        adapter, 0.0, PIVOT_MID_Y, HUB_DIA / 2.0, "hub",
         dims=hub,
         names=("HubX", "HubZ", "HubDia"),
         drives=(None, '"ArmDepth" / 2', '"HubDia"'),
@@ -541,8 +538,8 @@ async def build(adapter) -> dict[str, str]:
         await adapter.add_fillet(
             HUB_ROOT_RADIUS_MAX,
             [
-                [HUB_DIA / 2.0, _mid_y(0.0), ARM_THICKNESS / 2.0],
-                [HUB_DIA / 2.0, _mid_y(0.0), -ARM_THICKNESS / 2.0],
+                [HUB_DIA / 2.0, PIVOT_MID_Y, ARM_THICKNESS / 2.0],
+                [HUB_DIA / 2.0, PIVOT_MID_Y, -ARM_THICKNESS / 2.0],
             ],
             propagate=False,
         ),
@@ -558,11 +555,11 @@ async def build(adapter) -> dict[str, str]:
     # Pivot pin hole on the axis (x 0), mid-depth. On-axis centre: define_circle
     # records only the centre-Z dim (the X is a relation) + the diameter -- TWO
     # dims, so the "X" name/drive slot is ignored. The centre sits at
-    # _mid_y(0) = ArmDepth/2 (positive), so its unsigned dim drives positive.
+    # PIVOT_MID_Y = ArmDepth/2 (positive), so its unsigned dim drives positive.
     pivot = SketchDims()
     check("create_sketch pivot hole", await adapter.create_sketch("Front"))
     await define_circle(
-        adapter, 0.0, _mid_y(0.0), PIVOT_HOLE_DIA / 2.0, "pivot hole",
+        adapter, 0.0, PIVOT_MID_Y, PIVOT_HOLE_DIA / 2.0, "pivot hole",
         dims=pivot,
         names=("PivotX", "PivotZ", "PivotDia"),
         drives=(None, '"ArmDepth" / 2', '"PivotHoleDia"'),
@@ -582,11 +579,11 @@ async def build(adapter) -> dict[str, str]:
     # NAME (Right ∩ Top+8), view-independent -- an internal bore wall never
     # selects by screen-projected point. See _bore_axis.name_bore_axis.
     await name_bore_axis(
-        adapter, "Right Plane", 0.0, "Top Plane", _mid_y(0.0), "pivot bore"
+        adapter, "Right Plane", 0.0, "Top Plane", PIVOT_MID_Y, "pivot bore"
     )
 
     # REFERENCE sketch (drawing-simplicity-policy.md `How the repository implements the guidelines`, Codex #936 PRRT_kwDOPHDy386mV3AO): the
-    # sheet prints the top edge's height over the pivot axis with a one-sided
+    # sheet prints the top edge's height over the pivot axis with a bilateral
     # band, yet no strap dimension carries it (the arcs are placed by their
     # shared centre). A construction line on the mirror axis, from the pivot
     # centre to the top edge: its foot's height is the pivot's (ArmDepth / 2),
@@ -627,6 +624,43 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "TopEdgeReference")
     drive_jobs += top_ref.apply(adapter, "TopEdgeReference")
 
+    # REFERENCE sketch for the lower arc, the top one's mirror: the sheet
+    # locates the lower arc by its own BASIC from A down the mirror axis
+    # (drawing-guidelines rule 26: a location is a dimension, not words), no
+    # "concentric" prose. A construction line from the pivot centre down to
+    # the lower arc's midpoint, .254 above the frame origin.
+    bottom_ref = SketchDims()
+    check("create_sketch bottom edge reference", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    bottom_line = check(
+        "bottom edge reference line",
+        await adapter.add_line(0.0, PIVOT_MID_Y, 0.0, PIVOT_MID_Y - BOTTOM_EDGE_BELOW_PIVOT),
+    )
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, bottom_line)
+    check(
+        "bottom edge reference vertical",
+        await adapter.add_sketch_constraint(bottom_line, None, "vertical"),
+    )
+    await anchor_point_to_origin(
+        adapter, f"{bottom_line}.start", 0.0, PIVOT_MID_Y, "bottom edge reference foot"
+    )
+    bottom_ref.record("PivotY", '"ArmDepth" / 2')
+    await dimension_between(
+        adapter,
+        f"{bottom_line}.start",
+        f"{bottom_line}.end",
+        "vertical_distance",
+        BOTTOM_EDGE_BELOW_PIVOT,
+        "bottom edge below the pivot",
+    )
+    # The lower arc's midpoint sits ArmDepth below the top edge.
+    bottom_ref.record("BottomBelowPivot", '"ArmDepth" - "TopAbovePivot"')
+    await ensure_fully_defined(adapter, "bottom edge reference sketch")
+    check("exit_sketch bottom edge reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "BottomEdgeReference")
+    drive_jobs += bottom_ref.apply(adapter, "BottomEdgeReference")
+
     # Connecting-rod pin hole near the rod-side tip, low in the strap.
     rod_cut = wizard_holes(
         adapter,
@@ -650,7 +684,7 @@ async def build(adapter) -> dict[str, str]:
         drive_a='"RodHoleX"',
         drive_jobs=drive_jobs,
     )
-    # Named axis on the R800 top-edge arc CENTRE (Axis3 = Right ∩ Top+816, a
+    # Named axis on the top-edge arc CENTRE (Axis3 = Right ∩ Top+816, a
     # free-space datum 808 above the pivot bore, along Z like the bores). The
     # channel assembly holds the amplitude bar's foot axis at its as-solved
     # radius from this line (the J5 foot-on-arc coupling), so swinging the
@@ -701,7 +735,7 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "Hub", "HubLength", *deviations(HUB_LENGTH_BAND), display_unit=UNIT
     )
-    # The top edge may only come out high (ch_rocker_arm_spec.TOP_EDGE_BAND).
+    # The top edge's arc-system zone, bilateral (ch_rocker_arm_spec.TOP_EDGE_BAND).
     set_dimension_bilateral_tolerance(
         adapter, "TopEdgeReference", "TopAbovePivot", *deviations(TOP_EDGE_BAND),
         display_unit=UNIT,
@@ -733,6 +767,7 @@ async def build(adapter) -> dict[str, str]:
     # so no assembly instance renders it (#880). The drawing shows it in its
     # view through _drawing_hidden_sketches to import its dimension.
     blank_sketch(adapter, "TopEdgeReference")
+    blank_sketch(adapter, "BottomEdgeReference")
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(
         adapter,

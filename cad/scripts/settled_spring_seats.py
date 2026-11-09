@@ -13,7 +13,7 @@ from numbers import Real
 import _config
 from spring_mount_geom import SpringPose
 import sm_gooseneck_geom
-import sm_gooseneck_spring_screw_geom as spring_screw
+import sm_vn_gooseneck_shoulder_screw_spec as shoulder_screw
 import sm_gooseneck_spring_joint as spring_joint
 
 _UNIT_AXIS_ABS_TOL = 1e-12
@@ -175,39 +175,42 @@ def channel_seat(amplitude_mm: float) -> SettledSpring:
 def counter_upper_support_geometry() -> dict[str, str | float]:
     """Identify the actual upper support measured by the native fixture.
 
-    Older integral-shank, purchased-screw and #6-32 die-relief certificates
-    do not measure this made support: owner ruling 2026-10-27 (#1951) seats
-    the loop on the plain Ø6.35 body of a
-    1/4-28 slotted cheese-head screw, clamped to the flush end piece of the
-    Ø12.70 tube arm, whose arm-end counterbore (codjiflo P1 on #1997) shapes
-    the face the loop is clamped to. Channel measurements are unchanged; the
-    analytic force and clearance model never depends on a native certificate.
+    Older integral-shank, die-relief and clamped-eye certificates do not
+    measure this support: owner ruling 2026-11-08 (Pedro), #2144 item 11.4
+    (superseding #1951's clamped eye) seats the purchased MHA-SM-VN-56
+    slotted shoulder screw (McMaster 91829A566) on the flush end face of the
+    Ø12.70 tube arm's end piece, its plain #10-24 tap without a counterbore,
+    and the loop rides free on the Ø6.35 shoulder, resting on that end face.
+    Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: bare slotted McMaster
+    91829A566, washer dropped; the head retains the loaded eye
+    (``eye_retainer``), so a certificate gated on the former washer cannot
+    stand.
+    Channel measurements are unchanged; the analytic force and clearance model
+    never depends on a native certificate.
     """
     return {
-        "component": "sm-gooseneck-spring-screw",
-        "number": "MHA-SM-04",
-        "thread": spring_screw.THREAD,
-        "pitch_mm": spring_screw.PITCH,
-        "underhead_length_mm": spring_screw.LENGTH,
-        "major_dia_mm": spring_screw.MAJOR_DIA,
-        "body_dia_mm": spring_screw.BODY_DIA,
-        "plain_length_min_mm": spring_screw.PLAIN_LENGTH_MIN,
-        "full_thread_station_max_mm": spring_screw.FULL_THREAD_STATION_MAX,
-        "head_dia_mm": spring_screw.HEAD_DIA,
-        "head_height_mm": spring_screw.HEAD_H,
-        "head_relief_chamfer_mm": spring_screw.HEAD_RELIEF_CHAMFER,
-        "slot_width_mm": spring_screw.SLOT_WIDTH,
-        "slot_depth_mm": spring_screw.SLOT_DEPTH,
-        "tip_chamfer_mm": spring_screw.TIP_CHAMFER,
-        "underhead_corner_r_mm": spring_screw.UNDERHEAD_CORNER_R,
-        "clamp_gap_mm": sm_gooseneck_geom.SPRING_EYE_GAP,
+        "component": shoulder_screw.PART_NAME,
+        # A literal, as the identity is (test-pinned to the registry row), so
+        # the channel seats importing this module never re-key on that row.
+        "number": "MHA-SM-VN-56",
+        "supplier_sku": shoulder_screw.SKU,
+        "thread": shoulder_screw.THREAD,
+        "pitch_mm": shoulder_screw.PITCH,
+        "major_dia_mm": shoulder_screw.MAJOR_DIA,
+        "thread_length_mm": shoulder_screw.THREAD_LENGTH,
+        "shoulder_dia_mm": shoulder_screw.SHOULDER_DIA,
+        "shoulder_length_mm": shoulder_screw.SHOULDER_LENGTH,
+        "head_dia_mm": shoulder_screw.HEAD_DIA,
+        "head_height_mm": shoulder_screw.HEAD_HEIGHT,
+        "drive_slot_width_mm": shoulder_screw.SLOT_WIDTH,
+        "drive_slot_depth_mm": shoulder_screw.SLOT_DEPTH,
+        "eye_retainer": "head",
+        "eye_gap_mm": sm_gooseneck_geom.SPRING_EYE_GAP,
         "arm_end_x_mm": sm_gooseneck_geom.ARM_END_X,
         "spring_eye_x_mm": sm_gooseneck_geom.SPRING_EYE_X,
         "tube_dia_mm": sm_gooseneck_geom.TUBE_DIA,
         "plug_head_length_mm": sm_gooseneck_geom.PLUG_HEAD_LENGTH,
         "plug_length_mm": sm_gooseneck_geom.PLUG_LENGTH,
-        "plug_counterbore_dia_mm": spring_joint.COUNTERBORE_DIA,
-        "plug_counterbore_depth_mm": spring_joint.COUNTERBORE_DEPTH,
         "plug_edge_break_mm": spring_joint.CALIBRATED_EDGE_BREAK,
     }
 
@@ -218,12 +221,13 @@ def counter_seat() -> tuple[SettledSpring, float]:
     if record.get("upper_support") != counter_upper_support_geometry():
         raise ValueError(
             "Stale counter native calibration: upper support must be the "
-            "made MHA-SM-04 cheese-head screw (plain Ø6.35 body, 1/4-28 "
-            "thread) in its clamped gap. Rebuild sm-gooseneck-spring-screw and "
-            "sm-gooseneck, "
-            "then run diagnostics/calibrate_spring_seats.py --presets neutral "
-            "square --write on a licensed farm/native seat; older support "
-            "measurements cannot certify this joint."
+            "purchased MHA-SM-VN-56 shoulder screw (McMaster 91829A566, Ø6.35 "
+            "shoulder, 10-24 thread) seated on the end face, the eye free on "
+            "its shoulder (#2144 item 11.4). Rebuild sm-vn-gooseneck-shoulder-"
+            "screw and sm-gooseneck, then run diagnostics/calibrate_spring_seats.py "
+            "--presets neutral square --counter-only --write on a licensed "
+            "farm/native seat; older support measurements cannot certify this "
+            "joint."
         )
     return (
         _spring(record, expected_clocking="half_turn"),

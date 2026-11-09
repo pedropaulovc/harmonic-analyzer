@@ -120,7 +120,6 @@ from ch_pivot_bracket_spec import (
     FOOT_Z0,
     HOLE_DIA,
     SET_SCREW_HOLE_SPEC,
-    SET_SCREW_STATION_BAND,
     UNIT,
 )
 
@@ -587,20 +586,13 @@ async def build(adapter) -> dict[str, str]:
     # guidelines`); the drawing reads them back instead of rewriting them.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     _corner_radius_max_limit(adapter)
-    # Two lengths carry +/-.004 natively (ch_pivot_bracket_spec): the apex
-    # tap's station from the ear's inboard face -- the face fit-up sets and
-    # the S4 hold touches Z0 on -- and the ear thickness. The foot length and
-    # the hold-down station ride the title block. The cross-bore holds the
-    # drilled-hole row's +.004/0 its set-screw thread is counted at.
+    # The ear thickness carries +/-.004 natively (ch_pivot_bracket_spec). The
+    # apex tap's station from the ear's inboard face (the face fit-up sets and
+    # the S4 hold touches Z0 on), the foot length and the hold-down station
+    # ride the title block. The cross-bore holds the drilled-hole row's
+    # +.004/0 its set-screw thread is counted at.
     set_dimension_symmetric_tolerance(
         adapter, "Ear", "EarThick", EAR_T_BAND, display_unit=UNIT
-    )
-    set_dimension_symmetric_tolerance(
-        adapter,
-        "SetScrewReference",
-        "SetScrewLocation",
-        SET_SCREW_STATION_BAND,
-        display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
         adapter,

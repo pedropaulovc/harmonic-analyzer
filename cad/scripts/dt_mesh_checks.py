@@ -7,7 +7,7 @@ Every value comes from the part specs and config:
   cone's running mean and RSS half-range). Gated (test_standard_mesh_checks,
   user ruling 2026-10-10): nominal contact ratio >= 1.0 at the mean centre,
   and no binding and no interference at the RSS corner. The RSS contact
-  ratio and the arithmetic worst-corner interference are reported only;
+  ratio is reported only;
 * the T006 shortfall (pending exception ruling #971): its DT6-FORM1 relief must stay clear of every
   printed drum-tip corner's path over the RSS centre range
   (``t006_relief_clearance_mm``).
@@ -53,7 +53,6 @@ class ConeMeshCheck:
     backlash_corner_min_mm: float  # every printed corner pair at the RSS-closed centre
     interference_margin_rss_mm: float
     root_clearance_rss_mm: float
-    interference_margin_worst_mm: float  # REF: arithmetic worst corner, a fit-up note
 
     def text(self) -> str:
         lo, hi = self.centre.rss_range_mm
@@ -62,8 +61,7 @@ class ConeMeshCheck:
             f"contact ratio {self.contact_ratio_nominal:.3f} nominal, "
             f"{self.contact_ratio_rss:.3f} RSS (REF); "
             f"backlash {self.backlash_nominal_mm:.3f} nominal, {self.backlash_rss_mm:.3f} RSS; "
-            f"interference margin {self.interference_margin_rss_mm:.3f} RSS, "
-            f"{self.interference_margin_worst_mm:.3f} worst corner (REF); "
+            f"interference margin {self.interference_margin_rss_mm:.3f} RSS; "
             f"root clearance {self.root_clearance_rss_mm:.3f} RSS"
         )
 
@@ -100,7 +98,6 @@ def cone_check(teeth: int) -> ConeMeshCheck:
         (max(drum_thickness) - min(drum_thickness)) / 2.0,
     )
     pairs = [(a, b) for a in gear_corners for b in drum_corners]
-    worst = mean - sum(value for _name, value in centre.terms)
     return ConeMeshCheck(
         f"cone T{teeth:03d}/drum",
         centre,
@@ -111,7 +108,6 @@ def cone_check(teeth: int) -> ConeMeshCheck:
         min(backlash(a, b, lo, alpha) for a, b in pairs),
         min(interference_margin(a, b, lo, alpha) for a, b in pairs),
         min(root_clearance(a, b, lo) for a, b in pairs),
-        min(interference_margin(a, b, worst, alpha) for a, b in pairs),
     )
 
 

@@ -113,19 +113,29 @@ CAPTION_XY = (SECTION_CENTER[0], SECTION_CENTER[1] - HALF_OD - 0.010)
 SHAFT_NUMBER = _config.parts("pd-transgear-knob-shaft")["number"]
 PLATE_NUMBER = _config.parts("pd-transgear-arm-plate")["number"]
 PIN_NUMBER = _config.parts("pd-vn-transgear-knob-cup-pin")["number"]
-# drawing-guidelines.md rule 4: the reamed bore's band names its mate and the
-# fit it keeps -- the cup slides on the knob shaft's journal to its feeler
-# setting before it is pinned (machinist review: the band named no mate).
+# drawing-guidelines.md rule 4: the reamed bore's band names its mate with a
+# standard fit name and the clearance as REF -- the cup slides on the knob
+# shaft's journal to its feeler setting before it is pinned.  Rule 7: the
+# process line plus two lines of words, each within the 24 characters that
+# fit between the front face and the isometric.
 BORE_CALLOUT = (
-    f"REAM THRU; SLIDES ON\n{SHAFT_NUMBER} JOURNAL,\n"
-    f"{BORE_CLEARANCE_TEXT}\n"
-    "DIAMETRAL CLEARANCE"
+    "REAM THRU\n"
+    f"SLIDING FIT ON {SHAFT_NUMBER}\n"
+    f"(CLEARANCE {BORE_CLEARANCE_TEXT})"
 )
-DIMENSION_CALLOUTS = {"BoreDia": BORE_CALLOUT}
+# The block hangs right of its own vertical dimension line, which drops to
+# the shelf under the block's last row: the line struck the S of SLIDING and
+# the shelf both parentheses' tails (machinist review r1-r3, text on lines).
+# A leading space on every row holds the ink off the line
+# (draw_ch_fulcrum_shaft's across-flat block), and a closing no-break-space
+# row drops the shelf a row below the parentheses.
+BORE_CALLOUT_ROWS = "\n".join(f" {row}" for row in BORE_CALLOUT.splitlines()) + "\n\u00a0"
+DIMENSION_CALLOUTS = {"BoreDia": BORE_CALLOUT_ROWS}
 
 # Half the height of the bore's value-and-callout block: 31 mm on the
-# eecbf88 render (the stacked band over four callout rows).
-BORE_BLOCK_HALF_HEIGHT = 0.0155
+# eecbf88 render for the stacked band over four callout rows; three rows and
+# the shelf row now.
+BORE_BLOCK_HALF_HEIGHT = 0.0153
 # The O.D. on the rear-face side, between the face view and the section.
 # The bore right of the front face: its block (taller than the 24 mm between
 # the bore's extension lines) stands below the lower one, clear of the

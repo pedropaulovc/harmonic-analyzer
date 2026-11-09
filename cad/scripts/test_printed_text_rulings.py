@@ -142,7 +142,7 @@ def test_the_internal_reference_pattern_catches_what_it_forbids() -> None:
 
 def test_the_scan_reaches_known_printed_text() -> None:
     constants = printed_constants()
-    assert "sm_knife_mount_spec.PIN_HOLE_CALLOUT" in constants
+    assert "draw_sm_knife_mount.PIN_HOLE_CALLOUT" in constants
     assert "draw_dt_drive_train_assembly.CHECKS" in constants
     assert "sm-knife-mount.material_specification" in printed_registry_fields()
 
@@ -163,7 +163,7 @@ def test_knife_mount_prints_its_heat_treatment_in_finish_only() -> None:
     # FINISH carries the hardness and the unpainted state, no sheet text does.
     assert re.search(r"\bO1\b", row["material_specification"])
     assert "HRC" not in row["material_specification"].upper()
-    assert re.search(r"58-60\s*HRC", row["finish"], re.IGNORECASE)
+    assert re.search(r"40-45\s*HRC", row["finish"], re.IGNORECASE)
     assert "UNPAINTED" in row["finish"].upper()
     texts = {
         name: text.upper()

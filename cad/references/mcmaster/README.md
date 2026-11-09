@@ -16,8 +16,9 @@ recipes:
 | part number | production part stem(s) | stock item |
 |---|---|---|
 | 3088A429 | `ch-vn-rocker-thrust-washer` (MHA-CH-VN-56; catalogue-only, vendor model refused) | Carbon Steel Round Shim, 1/4" ID x 3/8" OD, 0.031" Thick |
-| 3606T118 | `dt-vn-keeper-chain` (catalogue-only; no vendor model) | Bead Chain, Unfinished Brass, Trade Size 3 |
-| 3606T811 | `dt-vn-keeper-chain-link` (catalogue-only; no vendor model) | Loop Link for Brass Trade Size 3 Bead Chain |
+| 3603T354 | `dt-vn-keeper-chain` (MHA-DT-VN-65; modelled from the catalogue, the reference STEP is evidence only) | Jack Chain, Brass, Trade Size 18 |
+| 3606T118 | — (`dt-vn-keeper-chain` until 2026-11-08; replaced by 3603T354) | Bead Chain, Unfinished Brass, Trade Size 3 |
+| 3606T811 | — (`dt-vn-keeper-chain-link` MHA-DT-VN-66 until 2026-11-08; retired) | Loop Link for Brass Trade Size 3 Bead Chain |
 | 5972K41 | — (retired TL-VN-52, 2026-10-23; owned 6200-2RS shop stock, no jig identity) | Steel Ball Bearing |
 | 6261K108 | `pd-vn-chain-connecting-link` (installed clearance stand-in; separate native supplier reference diagram) | Connecting Link for ANSI Number 25 Single Strand Roller Chain |
 | 6261K171 | `sh-vn-chain-link` (MHA-SH-VN-50; `InnerLink` and `OuterLink` installed configurations; separate family reference diagram) | Roller Chain, Single Strand, ANSI Number 25, 1/4" Pitch |
@@ -76,7 +77,9 @@ recipes:
 | 91794A080 | `ch-vn-frame-side-screw` (catalogue-only; no vendor model) | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 92240A540 | `fr-vn-lag-screw` | 18-8 Stainless Steel Hex Head Screw |
 | 91829A560 | `dt-vn-cone-pivot-screw` | Slotted 18-8 Stainless Steel Precision Shoulder Screw |
+| 91829A566 | `sm-vn-gooseneck-shoulder-screw` (MHA-SM-VN-56; catalogue-only, datasheet-built with the 91829A560 family's slot) | Slotted 18-8 Stainless Steel Precision Shoulder Screw, 1/4" Shoulder × 3/8", 10-24 Thread |
 | 92314A253 | `sm-vn-knife-hanger-stud` (modified stock; catalogue-only, no vendor model) | 18-8 Stainless Steel Hex Head Screw, #10-24 × 2 in, cut to length |
+| 92443A077 | `dt-vn-keeper-chain-screw` (MHA-DT-VN-70; catalogue-only, no vendor model) | Brass Binding Head Slotted Screw |
 | 92446A077 | `pd-vn-platen-clip-screw` (catalogue-only; no vendor model) | Brass Pan Head Slotted Screw |
 | 91882A221 | `sh-vn-thumb-screw` (MHA-SH-VN-55; shared by mg and ms) | Steel Raised Knurled-Head Thumb Screw |
 | 91882A425 | — (diagnostic recipe; `dt-vn-cone-lock-knob` until 2026-09-29) | Steel Raised Knurled-Head Thumb Screw |
@@ -105,6 +108,7 @@ recipes:
 | 98296A026 | — (diagnostic recipe; former `vn-transgear-collar-cross-pin`, MHA-VN-037 retired) | 1050-1095 Spring Steel Slotted Spring Pin |
 | 98296A027 | `dt-vn-pinion-strap-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
 | 98296A031 | `pd-vn-transgear-knob-cup-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
+| 98381A417 | `dt-vn-locating-pin` (MHA-DT-VN-69; catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
 | 98381A433 | `pd-vn-transgear-knob-drive-pin` (catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
 | 98381A434 | `dt-vn-crank-seat-drive-pin` (crank only; catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
 | 98381A435 | `pd-vn-transgear-arm-plate-locating-pin` (MHA-PD-VN-64; catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
@@ -580,6 +584,33 @@ Live catalog verification on October 11, 2026:
   of `diag_mcmaster_fillister.py`, as 91792A108 does [INFERENCE]. It is
   catalogue-only: the SLDPRT download is not harvested, so it has no replica
   gate.
+- [92443A077](https://www.mcmaster.com/92443A077/) (`dt-vn-keeper-chain-screw`,
+  MHA-DT-VN-70, one) clamps the end link of the MHA-DT-VN-65 jack chain
+  flat to the MHA-DT-06 crank arm's #2-56 tap, through the link's eye (owner
+  ruling 2026-11-08, #2144 item 9.2). It replaces the MHA-SH-VN-51 fillister
+  that clamped the retired MHA-DT-28 anchor eye. The live page, titled “Brass
+  Binding Head Slotted Screws, 2-56 Thread Size, 1/4" Long”, and its 2-D
+  drawing were read on November 8, 2026: brass, Rockwell B40, 50,000 psi
+  tensile strength, #2-56 UNC class 2A, fully threaded, flat tip,
+  ASME B18.6.3, slotted binding head 0.181 in (4.5974 mm) across and
+  0.05 in (1.27 mm) high, 0.25 in (6.35 mm) under the head, screw size
+  decimal 0.086 in, $8.37 per pack of 100. The page states no head band.
+  The STEP files were downloaded for measurement only: threaded
+  `92443A077_Brass Binding Head Slotted Screws.STEP` (SHA-256
+  `8ed25d4841466b73574958efbd1f25206d927f810bfc04cdb434257af98571da`) and
+  no-threads STEP (SHA-256
+  `b199cfaad793fda844fc6b655b831ad9dc959ba0ec486c426e737949263592a8`). The
+  no-threads STEP measures the head at Ø0.1797 × 0.0493 in and the shank at
+  Ø0.086, and `_mcmaster_92443a077.py` uses the Ø0.1797 head as its least
+  head. The 2-D drawing was saved as a GIF (SHA-256
+  `a56c54cb271af20a505cae5d2a308176cd16a873cc0c9a3d1e46ac32148acaab`), but
+  its CAD2 address could not be read back: a direct request returned 404,
+  and the browser capture lists only the STEP and SLDPRT paths. So the
+  catalogue module names no `SUPPLIER_DRAWING_URL`. The drawing sizes no
+  crown, slot, undercut or tip, so `diag_build_92443A077.py` builds the head
+  on the shared slotted-head laws of `diag_mcmaster_fillister.py` at the
+  catalogue diameter and height, as 92446A077 does [INFERENCE]. It is
+  catalogue-only: no vendor model is committed, so it has no replica gate.
 
 Live catalogue verification on October 9, 2026:
 
@@ -1004,7 +1035,7 @@ Catalog specifications checked on September 10, 2026:
   accepted practice, not a guaranteed stress or material allowable.
   MHA-SM-00 step 4 cuts each bolt from the 50.8 mm stock to its own
   hole's measured crossbar-underside-to-washer-top stack plus
-  **.351 ±.006 in** (8.9154 ±0.1524 mm) under the head (46.70 mm nominal, printed
+  **.351 ±.005 in** (8.9154 ±0.127 mm) under the head (46.70 mm nominal, printed
   (1.84) as a reference on the part drawing).
   Finished-part acceptance retains a threaded tail **.418 MIN (10.6172 mm)
   from the cut end**, with **MAX 1 P cut chamfer**, leaving at least
@@ -1073,7 +1104,7 @@ Catalog specifications checked on September 10, 2026:
   model's actual `HangerGrip@Crossbar` driving dimension, printed bare by
   section F-F under the title block's .XX ±0.51 mm band.
   There are no hanger spotfaces, separate floor driver or cleanup offset.
-  The two Ø6.045 +0.13/0 clearance holes are drilled from the finished
+  The two letter C drill Ø6.147 (.242) +0.10/0 clearance holes are drilled from the finished
   underside; their charged drift grows toward the top washer seat.
   The external-hex bolt remains
   92314A253. After the bolt's trim equations, its deburr revolve explicitly
@@ -1090,16 +1121,16 @@ Catalog specifications checked on September 10, 2026:
   attachment, label and dangling guards remain mandatory. Stale handles
   are a possibility, not a demonstrated root cause; the final-source
   selection and median-plane datum layout require the scoped native proof.
-  The washer seats on the **whole faced top**, **36.50 ±0.51 mm
+  The washer seats on the **whole faced top**, **36.50 ±0.13 mm
   above the finished crossbar underside**. Cut to the measured stack, the
-  bolt's tip reach is .351 ±.006 in (8.9154 ±0.1524 mm; 8.9173 mm modelled
-  nominal), bounded by 8.763–9.0678 mm. Subtracting one #10-24
-  pitch gives minimum full-form engagement 7.704667 mm, above 1.5D =
-  7.239 mm. Full-thread depth **9.65 ±0.13 mm** (MIN 9.52) leaves
-  0.4522 mm tip air at maximum reach; the inspected full-form tail leaves
-  9.558867 − 9.0678 = 0.491067 mm coverage beyond maximum reach.
+  bolt's tip reach is .351 ±.005 in (8.9154 ±0.127 mm; 8.9173 mm modelled
+  nominal), bounded by 8.7884–9.0424 mm. Subtracting one #10-24
+  pitch gives minimum full-form engagement 7.730067 mm, above 1.5D =
+  7.239 mm. Full-thread depth **.375 ±.005 in** (9.525 ±0.127 mm, MIN 9.398)
+  leaves 0.3556 mm tip air at maximum reach; the inspected full-form tail
+  leaves 9.558867 − 9.0424 = 0.516467 mm coverage beyond maximum reach.
   These are the stated stack margins, not extra tolerance reserves.
-  The receiver's cylindrical drill depth is **11.24 ±0.05 mm**. Its
+  The receiver's cylindrical drill depth is **.438 ±.002 in** (11.1252 ±0.0508 mm). Its
   corrected crown proof charges physical pilot oversize and point-angle
   variation, not nominal diameter and an exact point angle; see the
   [machining route and charged bounds](../../docs/machining-dfm.md#summing-lever--knife-edge-t1--least-forgiving-interface).
@@ -1110,6 +1141,29 @@ Catalog specifications checked on September 10, 2026:
   R3 proved the prior native joint geometry and assembly soundness; the
   revised datum and machinist-driven sheet edits require a fresh scoped
   native proof and sheet review before they are reported verified.
+- [91829A566](https://www.mcmaster.com/91829A566/) supplies the new
+  `sm-vn-gooseneck-shoulder-screw`, **MHA-SM-VN-56**, one (owner ruling
+  2026-11-08 (Pedro), #2144 item 11.4: bare slotted McMaster 91829A566,
+  washer dropped). It replaces the shop-turned MHA-SM-04 clamp screw, whose
+  Number is retired and never reissued. The shoulder seats on MHA-SM-01's
+  end face in a plain blind #10-24 tap; the counter spring's upper eye rides
+  free on the shoulder under the head, superseding #1951's clamped eye, and
+  the head retains it on the loaded basis (plumb pull: 1.588 lap nominal,
+  1.359 at the least head over the largest shoulder). The ruling named
+  91259A576 (5/16 shoulder); its Ø7.94 shoulder drops the arm 0.794 mm
+  against the plumb spring and the leading half-turn then meets the tube, so
+  the 1/4 shoulder keeps the retired screw's Ø6.35 support; the socket
+  91259A535 drafted next gave way to the slotted design. Live on 2026-11-08,
+  91829A566: slotted 18-8 stainless precision shoulder screw, passivated,
+  smooth head; shoulder Ø.250 −.001/0 × .375 +.002/0; 10-24 UNC-2A thread
+  3/8 long; head Ø3/8 × 3/16; 70,000 psi tensile, Rockwell B55, shear not
+  rated; $4.22 each (1–4). Its 2-D drawing dimensions only those sizes; the
+  slot (.060 × .075) and thread undercut (2.3368 span, Ø3.3528 land) are
+  taken from the same family's harvested 91829A560 vendor model (identical
+  head and thread), and the drawing scaled to its head confirms them. The
+  under-head neck, fillet and least head Ø are charged at ASME B18.3's 1/4
+  row as a conservative allowance. No vendor CAD download, hash or measured
+  vendor geometry is claimed.
 - [91255A106](https://www.mcmaster.com/91255A106/) (`pd-vn-guide-lock-screw`,
   MHA-PD-VN-60, eight) holds the four guide locks to the platen guides per ruling
   R9-31 (September 30, 2026): these screws ride the platen, and the MHA-SH-VN-51 (then MHA-PD-VN-52)
@@ -1157,6 +1211,20 @@ Catalog specifications checked on September 10, 2026:
   as installed, a 1/16 in tube with the catalog wall, without slot or
   chamfer; `diag_build_98296A026.py`, `diag_build_98296A027.py` and
   `diag_build_98296A031.py` are its per-size runs.
+- [98381A417](https://www.mcmaster.com/98381A417/) (`dt-vn-locating-pin`,
+  MHA-DT-VN-69, quantity one; rule-23 retention, owner ruling 2026-11-07,
+  MHA-DT-00 rubric sample, PR #2248) was read live on November 7,
+  2026: alloy steel dowel pin, 1/16 in diameter, Tolerance Rating Standard,
+  diameter +0.0001 to +0.0003 in over nominal (the family band, positive; a
+  search-index summary filing it under "undersized" is wrong), 3/8 in long,
+  end shape "Round x Chamfer", Rockwell C47 minimum, ASME B18.8.2, 750 lbf
+  double shear, $12.74 per package of 50. No recommended hole size is stated;
+  `dt_vn_locating_pin_spec.py` owns the .0620 REAM_H7 press hole and checks
+  the press window (.0001 to .0008 in). It is the tip-block locating dowel:
+  pressed to the floor of the MHA-DT-21 foot's blind .0620 ream, a slip fit
+  in the MHA-DT-20 plate's .0630 thru ream, match-drilled at MHA-DT-00
+  step 2. `diag_build_98381A417.py` models the plain nominal cylinder;
+  catalogue-only, no vendor model, no replica gate.
 - [98381A434](https://www.mcmaster.com/98381A434/) (`dt-vn-crank-seat-drive-pin`,
   MHA-DT-VN-67, crank only) was read live on September 30, 2026: alloy steel dowel pin,
   unplated, 3/32 in diameter (+0.0001 to +0.0003 in), 1/4 in long, end shape
@@ -1589,21 +1657,31 @@ Catalog specifications checked on September 10, 2026:
   details are family assumptions, not measurements of a vendor solid.
   No vendor solid was downloaded and no replica equivalence is claimed.
 
-- [3606T118](https://www.mcmaster.com/3606T118/) (`dt-vn-keeper-chain`, MHA-DT-VN-65)
-  and [3606T811](https://www.mcmaster.com/3606T811/) (`dt-vn-keeper-chain-link`,
-  MHA-DT-VN-66) tie the crank's taper pin to the arm as one loop through the eye
-  and the ring. Both product pages were read on September 29, 2026. 3606T118 is
-  unfinished brass bead chain, trade size 3, 3/32 in beads, 20 lbf, not for
-  lifting. 3606T811 is the brass loop link that joins the cut ends into a loop.
-  The October 19 source audit found no engineering drawing/CAD for either
-  item and no numeric supplier size beyond the bead diameter. The sheet
-  imports the exact 3/32-in native diameter driving `SeedProfile`, not the
-  smaller sphere/rod intersection circle. The 3.2426-mm pitch is a trade-size-3
-  average of 94 beads per foot (Ball Chain Mfg. and Frank Winne size charts),
-  not a McMaster manufacturing dimension. The 9-mm generic capsule, rod, wall,
-  crimps and mouths are project clearance assumptions in
-  `dt_vn_keeper_chain_spec.py`, not verified dimensions of 3606T811's pictured
-  loop link. Its supplier numeric coverage correctly remains empty.
+- [3603T354](https://www.mcmaster.com/3603T354/) (`dt-vn-keeper-chain`,
+  MHA-DT-VN-65) ties the crank's taper pin to the arm as one open strand (owner
+  ruling 2026-11-08, #2144 item 9.2): the end link's eye is screwed flat to the
+  arm by `dt-vn-keeper-chain-screw` (92443A077) and the keeper ring MHA-DT-27
+  is threaded through the far link's eye and closed with pliers. The product
+  page and 2-D PDF were read live on November 8, 2026: #18 single jack chain,
+  brass (solid, not plated), listed thickness 0.05 in, wire 0.047 in on the
+  2-D PDF, inside length 0.39 in, sold per foot ($0.73/ft) in 10 ft and
+  longer lengths, cut to `dt_vn_keeper_chain_spec.LINK_COUNT` links.
+  McMaster publishes no eye inside diameter. The modelled .115 in is the
+  Peco Fasteners #18 single-jack sheet's minimum eye; the Eastools #18 table
+  gives .110 in, and McMaster's reference STEP
+  (`3603T354_Jack Chain.STEP`, SHA-256
+  `d8396f4e411f91cf8e9198d30bdf8b7a4e1346b97d022d81a2f007995f24152d`) has one
+  .1535 in round eye and one .138 × .0715 in lens eye. The spec asserts every
+  fit at the limit that governs it and flags a sample to gauge before
+  purchase; an eye over .134 in needs a #2 washer under the screw head. No
+  vendor solid is used: each link is two perpendicular tori and a neck. The
+  sheet imports only the 0.047 in wire, from the native diameter of the
+  `CatalogueReference` circle on the end link's neck section. Evidence:
+  `C:/farm-runs/owner-rulings/dt28-vendor-findings.md`.
+- [3606T118](https://www.mcmaster.com/3606T118/) bead chain and
+  [3606T811](https://www.mcmaster.com/3606T811/) loop link were the keeper
+  chain and its joint (one loop through the retired MHA-DT-28 wire eye and
+  the ring) until the 2026-11-08 ruling replaced both with 3603T354.
 
 - [6261K171](https://www.mcmaster.com/6261K171/) (`sh-vn-chain-link`,
   MHA-SH-VN-50, in its `InnerLink` and `OuterLink` configurations; the

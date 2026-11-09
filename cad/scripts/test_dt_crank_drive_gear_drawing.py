@@ -270,7 +270,7 @@ def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
         "PRESSURE ANGLE, TRANSVERSE (REF)",
         "PITCH DIAMETER (REF)",
         "ROOT DIAMETER (REF)",
-        "FORM CUTTER / REFERENCE TEETH / VIRTUAL TEETH (REF)",
+        "FORM CUTTER:  #2, 55-134T, FOR 69.185 VIRTUAL TEETH (REF)",
         "HELIX AT PITCH DIA",
         "LEAD (in/rev, REF)",
         f"BASE TANGENT SPAN OVER {spec.BASE_TANGENT_SPAN_TEETH} TEETH, NORMAL, ACCEPT ON THIS PART",
@@ -486,6 +486,51 @@ def test_notes_do_not_substitute_for_native_fit_dimensions() -> None:
     assert not hasattr(notes, "ATTACHMENT_ALTERNATIVE")
 
 
+def test_both_d_bore_dimensions_link_one_matched_fit_note() -> None:
+    # Screen of the novice rubric (#2223): the round and across-flat bands
+    # (.0008 and .0004 wide) are narrower than the turned-diameter and
+    # milled-width rows, so the fit route is a matched fit to the measured
+    # MHA-DT-04 land with an acceptance (rule 4). One feature, two tight
+    # dimensions: the mate and standard fit name print once, in note 1, and
+    # both dimensions link it. The limits stay (fleet gear_seat_fit); the
+    # clearances print as reference. No process word (RV-01).
+    link = f"SEE NOTE {drawing.BORE_FIT_NOTE_NUMBER}"
+    assert drawing.DIMENSION_CALLOUTS["BoreDia"] == f"THRU\n{link}"
+    assert drawing.DIMENSION_CALLOUTS["BoreAF"] == f"BORE ACROSS FLAT\n{link}"
+    for name in ("BoreDia", "BoreAF"):
+        callout = drawing.DIMENSION_CALLOUTS[name]
+        assert notes.SHAFT_MATE_NUMBER not in callout, name
+        assert "CLEARANCE" not in callout and "REAM" not in callout, name
+    note = " ".join(line.strip() for line in drawing.BORE_FIT_NOTE.splitlines())
+    round_low, round_high = gear_seat_fit.GEAR_SEAT_CLEARANCE
+    flat_low, flat_high = gear_seat_fit.FLAT_AF_CLEARANCE
+    assert note == (
+        "1. SLIDING FIT ON CONE GEAR SHAFT MHA-DT-04, MADE TO ITS MEASURED LAND "
+        f"(CLEARANCE {spec.inch_text(round_low, 4)}-{spec.inch_text(round_high, 4)}, "
+        f"ACROSS FLAT {spec.inch_text(flat_low, 4)}-{spec.inch_text(flat_high, 4)}); "
+        "SLIDES ON, NO ROCK."
+    )
+    assert note.startswith(f"{drawing.BORE_FIT_NOTE_NUMBER}. ")
+    for private in ("DIAMETRAL", "AF CLEARANCE", "REAM"):
+        assert private not in drawing.SHEET_NOTES, private
+    assert len(drawing.SHEET_NOTES.splitlines()) <= 4
+    assert "add_note(adapter, SHEET_NOTES, *NOTES_XY)" in _source()
+
+
+def test_section_caption_prints_no_sheet_scale_and_names_the_turn() -> None:
+    # Rule 9: a view's scale prints only when it differs from the sheet's;
+    # A-A is at the sheet's 3:2, so its caption keeps only its name and
+    # letter. A rotated view says so, in a note under the caption.
+    assert drawing.SECTION_CAPTION_TEXT == "<VLNAME> <VLLABEL>"
+    assert drawing.ROTATION_NOTE == "ROTATED 90\N{DEGREE SIGN} CCW"
+    source = _source()
+    assert "note.PropertyLinkedText = SECTION_CAPTION_TEXT" in source
+    assert "add_note(adapter, ROTATION_NOTE, *ROTATION_NOTE_XY)" in source
+    assert "SetUserPreferenceString(84" not in source
+    assert "SCALE" not in drawing.ROTATION_NOTE
+
+
+
 def test_sheet_runs_at_3_to_2_with_every_view_at_sheet_scale() -> None:
     # A 65 mm disc on a B sheet: at 1:1 two thirds of the sheet was empty and
     # the 64 teeth did not read as teeth. One scale for every view means the
@@ -523,9 +568,15 @@ _LINE_HEIGHT = 0.005
 _TITLE_BLOCK_TOP = 0.0647
 # Outline pad the layout audit adds round an uncropped view (cone-gear T084).
 _VIEW_OUTLINE_PAD = 0.0056
-# The native section caption, "SECTION A-A" over its scale, stands 16.5 mm
-# tall on the crank-pinion sheet and is placed by its top centre.
-_CAPTION_HEIGHT = 0.0165
+# The native section caption, "SECTION A-A" alone, stands about 7 mm tall
+# (its 6.35 mm SECTION letters) and is placed by its top centre; the turn's
+# note hangs under it at the default note height.
+_CAPTION_HEIGHT = 0.007
+_NOTE_HEIGHT = 0.0035
+# A free note at the document's default height: capitals about 2.6 mm a
+# character (draw_mg_magnifying_wheel's rotation note) on a 6 mm line pitch.
+_NOTE_CHAR_DEFAULT = 0.0026
+_NOTE_PITCH_DEFAULT = 0.006
 
 
 def _text_box(xy: tuple[float, float], callout: str, value: str) -> tuple[float, ...]:
@@ -586,11 +637,28 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
     assert chamfer[3] < af[1] - 0.003
     # The chamfer's leg dimension runs off the south face at bore height.
     assert sy - half_od < drawing.SECTION_KEEP["BoreSouthChamferSize"][1] < sy
-    # The caption hangs under the section and over the title block.
+    # The caption hangs under the section and over the title block, the
+    # turn's note centred under it and still clear of the title block.
     cap_x, cap_top = drawing.SECTION_CAPTION_XY
     assert cap_x == pytest.approx(sx)
     assert cap_top < sy - half_od - 0.005
-    assert cap_top - _CAPTION_HEIGHT > _TITLE_BLOCK_TOP + 0.003
+    rotation_x, rotation_top = drawing.ROTATION_NOTE_XY
+    rotation_width = len(drawing.ROTATION_NOTE) * drawing.ROTATION_NOTE_CHAR
+    assert rotation_x + rotation_width / 2.0 == pytest.approx(cap_x)
+    assert rotation_top < cap_top - _CAPTION_HEIGHT
+    assert rotation_top - _NOTE_HEIGHT > _TITLE_BLOCK_TOP + 0.003
+    assert rotation_top - _NOTE_HEIGHT > 0.070  # the title-block keep-out's top
+    # The numbered notes stand at the lower left: under the round bore's
+    # callout and the face view, left of the title block, inside the border.
+    notes_left, notes_top = drawing.NOTES_XY
+    note_lines = drawing.SHEET_NOTES.splitlines()
+    notes_right = notes_left + _NOTE_CHAR_DEFAULT * max(len(line) for line in note_lines)
+    notes_bottom = notes_top - _NOTE_PITCH_DEFAULT * len(note_lines)
+    bore = _text_box(drawing.FRONT_KEEP["BoreDia"], drawing.BORE_CALLOUT, "9.525 +0.046")
+    assert notes_top < bore[1] - 0.003
+    assert notes_top < drawing.FRONT_CENTER[1] - half_od - 0.005
+    assert notes_left > 0.0127 and notes_bottom > 0.0127 + 0.003
+    assert notes_right < 0.216 - 0.003  # left of the title block
 
 
 # The gear-data block at its 2.5 mm note height, measured on farm run

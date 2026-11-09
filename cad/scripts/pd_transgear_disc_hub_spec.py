@@ -1,10 +1,10 @@
 r"""MHA-PD-17 transgear-disc-hub: the brass hub and flange in front of the reducer disc.
 
-The retained Ø.52 turned hub has a .313 +.0010/+.0005 bore (an owned .3135
-reamer) on the pinion sleeve's (MHA-PD-10) .313 +.0005/.0000 boss and drives
-through its D-flat, with a Ø1.05 × .094 flange and a Ø.501 SHAFT_H rear
-spigot.  The spigot passes the reducer disc's (MHA-PD-06)
-bore, which pilots on it, and its end seats on the sleeve's step face (the
+The retained Ø.52 turned hub has a .313 +.0010/+.0005 D-bore (fitted to the
+measured boss) on the pinion sleeve's (MHA-PD-10) .313 +.0005/.0000 boss and drives
+through its D-flat, with a Ø1.05 × .094 flange and a Ø.501 +.000/-.001 rear
+spigot.  The spigot passes the reducer disc's (MHA-PD-06) bore, which it
+clears (the disc is centred at assembly), and its end seats on the sleeve's step face (the
 12T's tooth ends); the flange's rear face clamps the disc's front face, the
 spigot's length ahead of the step.  Three #0-80 fillister screws (MHA-PD-VN-55)
 pass the flange's #51 holes on the Ø.75 circle into the disc's taps
@@ -58,6 +58,7 @@ from __future__ import annotations
 
 import math
 
+import _config
 import pd_rack_pinion_spec as DISC
 import transgear_cluster_fit as FIT
 import pd_transgear_feed_pinion_spec as SLEEVE
@@ -91,7 +92,7 @@ MM_PER_IN = 25.4
 
 # The mating parts the sheet names, by name and number (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)): the
 # feed pinion whose boss and flat the hub's bore slides on, the disc that
-# pilots on the spigot, and the disc screws.
+# the spigot clears, and the disc screws.
 SLEEVE_NUMBER = "MHA-PD-10"
 SLEEVE_NAME = "FEED PINION"
 DISC_NUMBER = "MHA-PD-06"
@@ -124,7 +125,7 @@ FLANGE_THICK = 2.3876  # .094
 FLANGE_THICK_PLACES = 3  # the screw-tip-to-platen stack reads it (R9-5)
 HUB_DIA = 13.208  # .52
 HUB_DIA_PLACES = 2
-# The spigot (``pd_transgear_disc_hub_geometry``): its SHAFT_H band is the
+# The spigot (``pd_transgear_disc_hub_geometry``): its turned-row band is the
 # model's, its length the cluster's printed band.
 SPIGOT_DIA_DEVIATIONS = deviations(SPIGOT_DIA_BAND)
 SPIGOT_DIA_MIN = SPIGOT_DIA + SPIGOT_DIA_BAND[1]
@@ -152,16 +153,20 @@ HUB_FRONT_Z = SPIGOT_LENGTH - HUB_LENGTH
 
 # --- bore on the sleeve's boss and flat (MHA-PD-10) ---------------------------
 # Round over the whole length: it locates on the boss's +.0005/.0000 band,
-# .313 +.0010/+.0005.  The flat at local -Y only drives the disc's torque;
-# its plane sits FLAT_TO_AXIS from the axis, printed +.0014/+.0008 above the
-# sleeve flat's 0/-.0006 for a .0008-.0020 clearance.
+# .313 +.0010/+.0005, fitted to the measured boss (BORE_FIT_TEXT).  The flat
+# at local -Y only drives the disc's torque; its plane sits FLAT_TO_AXIS from
+# the axis, printed +.0015/+.0005 above the sleeve flat's band, fitted to the
+# measured flat.
 BORE_DIA = SLEEVE.BOSS_DIA
 BORE_PLACES = 4
 BORE_BAND = (0.0254, 0.0127)  # (upper, lower) deviations: +.0010/+.0005
 BORE_DEVIATIONS = deviations(BORE_BAND)
 FLAT_TO_AXIS = SLEEVE.FLAT_TO_AXIS
 FLAT_TO_AXIS_PLACES = 4
-FLAT_TO_AXIS_BAND = (0.03556, 0.02032)  # (upper, lower) deviations: +.0014/+.0008
+# Owner ruling 2026-11-08 (Pedro, #2144 item 3.2): +.0015/+.0005, the plain
+# inch steps that loosen the former converted +.0014/+.0008 (the clearance
+# and the flat wall still hold).
+FLAT_TO_AXIS_BAND = (0.0381, 0.0127)  # (upper, lower) deviations: +.0015/+.0005
 FLAT_TO_AXIS_DEVIATIONS = deviations(FLAT_TO_AXIS_BAND)
 if not 0.0 < FLAT_TO_AXIS < BORE_DIA / 2.0:
     raise AssertionError("MHA-PD-17 bore flat must cut the round bore")
@@ -190,7 +195,7 @@ BOSS_CLEARANCE = BOSS_CLEARANCE_LIMITS[1]
 FLAT_CLEARANCE = (
     round(FLAT_TO_AXIS_BAND[1] - SLEEVE.FLAT_TO_AXIS_BAND[0], 6),
     round(FLAT_TO_AXIS_BAND[0] - SLEEVE.FLAT_TO_AXIS_BAND[1], 6),
-)  # .0008 .. .0020
+)  # .0005 .. .0021
 if BOSS_CLEARANCE_LIMITS[0] < 0.0:
     raise AssertionError(f"MHA-PD-17 binds on the sleeve's boss: {BOSS_CLEARANCE_LIMITS}")
 if FLAT_CLEARANCE[0] <= 0.0:
@@ -308,12 +313,16 @@ SEAT_ISLAND_FRACTION = SEAT_CONTACT_AREA / SEAT_ANNULUS_AREA
 # step, so both are held square to A: the paper-drive assembly's disc tilt
 # reads each value over its zone (the flange's diameter; the seat's contact
 # circle) plus the hub's rock on the boss, the greatest clearance over the
-# shortest round engagement, unpreloaded on the step.
+# shortest round engagement, unpreloaded on the step.  Both print at the
+# shop's .001 row (owner ruling 2026-11-08 (Pedro), #2144 item 3.2, for the
+# spigot end): the collar-to-disc air the spigot end's squareness closes is
+# felt at MHA-PD-00 and recovered there if short (pd_cluster_air.
+# ASSEMBLY_ACCEPTED_COLLAR_SOURCES); the platen air still charges it.
 BORE_DATUM = "A"
 # The frame prints GEOMETRIC_TOLERANCES_IN; readers take the derived mm.
 GEOMETRIC_TOLERANCES_IN: dict[str, str] = {
     "flange rear face perpendicularity to bore": ".001",
-    "spigot end perpendicularity to bore": ".0002",
+    "spigot end perpendicularity to bore": ".001",
 }
 GEOMETRIC_TOLERANCES_MM: dict[str, float] = {
     key: float(value) * MM_PER_IN for key, value in GEOMETRIC_TOLERANCES_IN.items()
@@ -343,7 +352,7 @@ DISC_STEP_GAP_NOMINAL = SPIGOT_LENGTH - DISC.FACE_WIDTH  # .026
 DISC_STEP_GAP_WORST = (
     SPIGOT_LENGTH_MIN
     - DISC.FACE_WIDTH_MAX
-    - float(DISC.GEOMETRIC_TOLERANCES_MM["disc rear face parallelism to front"])
+    - DISC.REAR_FACE_PARALLELISM_BOUND_MM
     - DISC_TILT_MAX * DISC.BORE_DIA_MAX / 2.0
 )
 if DISC_STEP_GAP_WORST <= 0.0:
@@ -496,22 +505,54 @@ BORE_WALL_FINISHED_MIN = min(BORE_WALLS_FINISHED.values())
 BORE_WALL_TEXT = f"WALL {inch_text(DISC.inch_floor_mm(BORE_WALL_FINISHED_MIN, 3), 3)} MIN"
 
 # --- sheet --------------------------------------------------------------------
-# No loose notes: each requirement is flagged at its feature (rule 7).
-# The two printed stack lengths name the stack they serve (rule 4); the
-# overall's reason is the nose it must never pass.
-HUB_LENGTH_CALLOUT = f"{STACK_NAME},\nNOT PROUD OF {SLEEVE_NAME} {SLEEVE_NUMBER} NOSE"
-SPIGOT_LENGTH_CALLOUT = STACK_NAME
+# Each requirement is flagged at its feature (rule 7): a callout carries at
+# most two lines of words, and the requirements several dimensions share are
+# numbered notes their callouts link, each stated once.
+COLLAR_NUMBER = _config.parts("pd-transgear-drive-collar")["number"]
+# The D-bore is one feature with two bands finer than their rows (the round's
+# .0005, the flat's .0010): one matched fit to the measured sleeve boss and
+# flat, named once and linked from both.  No process word: a reamer or a
+# boring bar would cut the flat away, so the D is the shop's to make.  The
+# flat is blind: the D-bore runs from the hub front face back to the
+# flange's rear face (the model's Front plane), where the round spigot bore
+# takes over.  That internal step is drawn in solid lines on SECTION A-A,
+# cut through the bore's axis square to the flat (rule 9), level with the
+# flange's rear face the edge view's spigot length locates.
+BORE_FIT_NOTE = 1
+BORE_FIT_TEXT = (
+    f"SLIDING FIT ON {SLEEVE_NAME} {SLEEVE_NUMBER} BOSS AND FLAT: FIT TO THE "
+    f"MEASURED BOSS, CLEARANCE {inch_text(BOSS_CLEARANCE_LIMITS[0], 4)}-"
+    f"{inch_text(BOSS_CLEARANCE_LIMITS[1], 4)} ON THE ROUND AND "
+    f"{inch_text(FLAT_CLEARANCE[0], 4)}-{inch_text(FLAT_CLEARANCE[1], 4)} "
+    "ON THE FLAT."
+)
+# The section gives the flat's length from the hub front face, a faced end,
+# as a reference: the overall less the spigot length, both already printed
+# stack terms, so it adds no band to any stack (FLAT_END_CLEARANCE_WORST and
+# FLAT_DRIVE_LENGTH_MIN read the spigot's).  It prints at the places of the
+# two lengths it is the difference of.
+FLAT_LENGTH_REF = HUB_LENGTH - SPIGOT_LENGTH
+DRAWING_REFERENCE_PRECISION = HUB_LENGTH_PLACES
+if SPIGOT_LENGTH_PLACES != HUB_LENGTH_PLACES:
+    raise AssertionError("the flat's reference length mixes two printed rows")
+# The overall and the spigot's length both print the disc cluster's band and
+# serve one stack (rule 4): one note, named once, linked from both.
+STACK_NOTE = 2
+STACK_TEXT = f"{STACK_NAME}: SETS {COLLAR_NUMBER} TO {DISC_NUMBER} CLEARANCE."
+HUB_LENGTH_CALLOUT = f"SEE NOTE {STACK_NOTE}"
+SPIGOT_LENGTH_CALLOUT = f"SEE NOTE {STACK_NOTE}"
 # The flange's .XXX thickness sets the disc screws' reach (the cut window
 # in pd_vn_transgear_disc_screw_spec reads it).
 FLANGE_THICK_CALLOUT = f"SETS {SCREW_NAME}\n{SCREW_NUMBER} REACH"
-# The spigot's native SHAFT_H limits print with the dimension; the callout
-# names its sharp root, the mate and the clearance the pair gives.
+# The spigot slides into the disc's bore at assembly (the disc is then
+# centred and its taps transferred); its turned-row band keeps it clear at
+# the bore's least size.  The callout names the fit by its standard name
+# (rule 4) and the sharp root the disc's face seats past: two lines of words
+# (rule 7), so the clearance the limits give is not repeated as REF.
 SPIGOT_CALLOUT_BELOW = "\n".join(
     (
+        f"SLIDING FIT IN {DISC_NUMBER}",
         f"SPIGOT ROOT R{inch_text(CORNER_RADIUS_MAX, 3)} MAX",
-        f"(DIA CLR {inch_text(DISC.SPIGOT_DIAMETRAL_CLEARANCE[0], 4)}-"
-        f"{inch_text(DISC.SPIGOT_DIAMETRAL_CLEARANCE[1], 4)}",
-        f"IN {DISC_NAME} {DISC_NUMBER} BORE)",
     )
 )
 
@@ -519,18 +560,15 @@ SPIGOT_CALLOUT_BELOW = "\n".join(
 # (the title block's DRILLED HOLES row governs their sizes); the three screw
 # holes are one patterned feature, equally spaced on the printed circle.  The
 # oil hole is drilled with the hub seated on the sleeve, through both, at its
-# printed station (R9-60): the crank pinion's pin-hole wording
-# (dt_crank_pinion_spec.pin_hole_note).
+# printed station (R9-60): a match-drill at assembly with its mate.
 SCREW_HOLE_CALLOUT_ABOVE = f"{SCREW_COUNT}X"
 SCREW_HOLE_CALLOUT_BELOW = "DRILL THRU FLANGE, EQ SP"
 # The hole is drilled on +Y, through the round wall opposite the bore's
 # flat on -Y (the face view shows the flat), into the bore.
 OIL_HOLE_CALLOUT_BELOW = "\n".join(
     (
-        "MATCH DRILL AT ASSY WITH",
-        "HUB SEATED ON FEED PINION",
-        f"{SLEEVE_NUMBER}, THRU ONE WALL",
-        "OPPOSITE BORE FLAT",
+        f"MATCH-DRILL WITH {SLEEVE_NUMBER}",
+        "INTO BORE, OPPOSITE FLAT",
     )
 )
 

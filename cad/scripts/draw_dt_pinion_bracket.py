@@ -34,13 +34,16 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     dimension_name,
     place_view,
+    view_name,
 )
 
 from _check import check
@@ -76,14 +79,16 @@ from dt_pinion_bracket_spec import (
     ARBOR_BORE,
     C2C,
     CROSS_HOLE_CALLOUT,
+    CROSS_HOLE_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
     OVERALL_LENGTH,
     PIN_DROP,
-    PIN_SEAT_DEPTH_CALLOUT,
+    PIN_SEAT_CALLOUT,
     R_END,
     SURFACE_FINISHES,
+    THICKNESS,
 )
 
 
@@ -131,7 +136,63 @@ def _flank_y(model_y_mm: float) -> float:
 
 _CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
 FRONT_CENTER_MARKS = 2  # the pivot and arbor bores
-LEFT_CENTER_MARKS = 1  # the follower-seat mouth
+LEFT_CENTER_MARKS = 1  # the follower-seat mouth (the cross hole's comes after)
+# swCenterMarkStyle_e.swCenterMark_Single; swCenterMarkHandle_e Up/Left/Down/Right.
+_CENTER_MARK_SINGLE = 2
+_HANDLE_UP, _HANDLE_LEFT, _HANDLE_DOWN, _HANDLE_RIGHT = range(4)
+# The flank arms run this far past the bar's broad faces (model mm).
+_CROSS_ARM_OVERRUN_MM = 1.5
+
+
+def _centre_mark_cross_hole(adapter: Any, view: Any) -> None:
+    """Give the set-pin cross hole its own centre mark, its arms run out.
+
+    Fan-out round 2 (blocker, rule 10): no printed line tied the hole to
+    anything.  Its vertical arm runs up into the follower seat's centreline,
+    which the .180 from broad face A locates for both holes; its horizontal
+    arm draws the pivot-bore axis across the flank, the line the seat's .276
+    runs to.
+    """
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    name = view_name(adapter, view)
+    if not ddoc.ActivateView(name):
+        raise RuntimeError(f"failed to activate the seat flank view {name!r}")
+    draw.ClearSelection2(True)
+    # A rim point 60 degrees up from the hole's centre, clear of the bar's
+    # tangent edge through its centre and of the seat's centreline above.
+    rim = CROSS_HOLE_DIA * SHEET_SCALE[0] / 2000.0
+    pick = (
+        LEFT_CENTER[0] + rim * math.cos(math.radians(60.0)),
+        _flank_y(0.0) + rim * math.sin(math.radians(60.0)),
+    )
+    extension = _early_bound(draw.Extension, "IModelDocExtension")
+    if not extension.SelectByID2(
+        "", "EDGE", pick[0], pick[1], 0.0, False, 0, null_callout(), 0
+    ):
+        raise RuntimeError("failed to select the cross hole's rim")
+    mark = ddoc.InsertCenterMark3(_CENTER_MARK_SINGLE, False, False)
+    draw.ClearSelection2(True)
+    if mark is None:
+        raise RuntimeError("failed to centre-mark the cross hole")
+    mark = _early_bound(mark, "ICenterMark")
+    mark.UseDocDisplaySettings = False
+    mark.ShowLines = True
+    hole_r = CROSS_HOLE_DIA / 2.0
+    flank = THICKNESS / 2.0 - hole_r + _CROSS_ARM_OVERRUN_MM
+    arms = {
+        _HANDLE_UP: abs(PIN_DROP) - hole_r,
+        _HANDLE_LEFT: flank,
+        _HANDLE_DOWN: _CROSS_ARM_OVERRUN_MM,
+        _HANDLE_RIGHT: flank,
+    }
+    for handle, arm_mm in arms.items():
+        if not mark.SetExtendedLength(0, handle, arm_mm / 1000.0):
+            raise RuntimeError(f"cross hole centre mark arm {handle} did not extend")
+    if bool(mark.UseDocDisplaySettings) or not bool(mark.ShowLines):
+        raise RuntimeError("cross hole centre mark lost its extended lines")
+    if _center_mark_count(view) != LEFT_CENTER_MARKS + 1:
+        raise RuntimeError("the seat flank view does not carry the cross hole's mark")
 
 
 def _center_mark_count(view: Any) -> int:
@@ -237,18 +298,13 @@ LEFT_KEEP = {
     # sits down-right, under the 7.000, and its leader climbs at a slant,
     # right of the witness and clear of the 4.50 dimension line.
     "CrossHoleDia": (0.125, 0.078),
-    # Codex #858 P2, user ruling (a): both through-thickness stations run from
-    # broad face A (the view's left edge) -- the cross hole's under the view,
-    # left of both callout leaders, the seat's above it, under the 9.0.
-    # pc-ra eye pass: centred between its witnesses the seat's 4.50 was cut
-    # by the seat-axis witness, so its text sits left of face A, outside the
-    # extension lines.  pc-rc eye pass (nit D): centred, the cross hole's
-    # 4.50 threw its right arrow outside the span, where the THRU callout's
-    # leader cut through it -- so it sits left of face A too, arrows inside,
-    # nothing right of the hole's witness.  The seat's carries two reason
-    # rows (r1), so it stands further left and higher, its right end short
-    # of face A.
-    "CrossHoleCz": (0.058, 0.099),
+    # Codex #858 P2, user ruling (a): the seat's through-thickness station
+    # runs from broad face A (the view's left edge), above the view, under the
+    # 9.0; the cross hole shares its centreline, so it prints no station of
+    # its own (fan-out round 1: the .18 beside the .180 located one line
+    # twice).  pc-ra eye pass: centred between its witnesses the seat's 4.50
+    # was cut by the seat-axis witness, so its text sits left of face A,
+    # outside the extension lines, its right end short of face A.
     "PinSeatCz": (0.043, 0.2055),
 }
 SECTION_CENTER = (0.350, 0.115)
@@ -257,11 +313,9 @@ SECTION_CENTER = (0.350, 0.115)
 # audit, text-on-line); 0.250 puts it past the arrow and the extension line's
 # end.
 SECTION_LINE_X = (0.180, 0.250)
-# Right of the seat's witness lines (x <= 0.3394), callout below the value:
-# the above-lane callout never rendered and left a bare 66 mm dimension line.
-# Its widest row (24 characters, ~65 mm) starts right of the entry-face
-# witness: centred at 0.361 the floor-corner row sat on that witness (r4).
-SECTION_KEEP = {"PinSeatDepth": (0.374, 0.160)}
+# The seat depth's bare value stands between the seat's witness lines, above
+# the section (the callout rows it once carried moved to the seat callout).
+SECTION_KEEP = {"PinSeatDepth": (0.333, 0.158)}
 # The flank's top and bottom edges are the strap's two extreme lines.  The
 # overall sits on the view's clear left: on its right the follower-seat
 # leader crossed its dimension line (r1 machinist review, rule 14).
@@ -270,27 +324,23 @@ OVERALL_XY = (0.040, 0.150)
 ARBOR_FINISH_EDGE = (_front_x(-ARBOR_BORE / 2.0), _front_y(C2C))
 ARBOR_FINISH_XY = (0.155, 0.205)
 # A callout says only what a dimension cannot: how the feature is made, where
-# it stops, what it mates with and the fit it needs (rule 4), and -- for the
-# dimensions held finer than the general grade -- why they are held there.
-# Naming both follower-seat annotations ties the native diameter and native
-# depth together without copying either model value into note text; the
-# depth then reads explicitly from the depicted entry face.  The pivot bore
-# is a slide fit so the strap goes onto the shaft for fit-up, then pinned
-# (option E-a); the arbor runs in its bore; the follower stud slips into its
-# seat and is bonded (LOCTITE 638, dt_pinion_cam_pin_spec's bond gap).
+# it stops, what it mates with and the fit it needs (rule 4).  The seat's
+# mate rides its size callout.  The seat's depth rides its callout as REF
+# (rule 26: never deferred to a view) while Section B-B's .16 controls the
+# floor; the floor-corner allowance lets the builder pick a flat-bottom reamer
+# or end mill (rule 16).  The pivot bore is a sliding fit so the strap goes
+# onto the shaft for fit-up, then pinned (option E-a); the arbor runs in its
+# bore; the follower stud slips into its seat and is bonded (LOCTITE 638,
+# dt_pinion_cam_pin_spec's bond gap).  Both seat stations print bare (rule 7):
+# their .XXX bands (the follower height on the MHA-DT-23 cam, and owner
+# ruling (a) for the seat's webs to the broad faces) are accepted in the
+# part's machinist_exceptions (RV-01, RV-02), since neither has a mate to
+# name and the .XX row would thin a web under its floor (fan-out round 4).
 DIMENSION_CALLOUTS = {
-    "PivotBoreDia": "REAM THRU\nSLIDE FIT ON SHAFT\nMHA-DT-19, PINNED",
+    "PivotBoreDia": "REAM THRU\nSLIDING FIT ON\nSHAFT MHA-DT-19",
     "ArborBoreDia": "REAM THRU\nRUNNING FIT ON\nARBOR MHA-DT-22",
-    "PinSeatDia": "FOLLOWER SEAT FOR MHA-DT-25\nBONDED SLIP FIT\nBLIND FLAT-BOTTOM REAM",
+    "PinSeatDia": PIN_SEAT_CALLOUT,
     "CrossHoleDia": CROSS_HOLE_CALLOUT,
-    # The two held locations name what they serve (rules 3 and 4): the
-    # follower's height sets the drum's swing for a given cam lift
-    # (DRAWING_PRECISION), and the seat's station keeps it mid-bar
-    # (PIN_SEAT_WEB_WORST, user ruling (a)).  SOLIDWORKS starts the follower
-    # height's text at its bent dimension line, so that leg touched the leading
-    # S of SETS (r3 review, rule 14); the leading spaces stand the rows off it.
-    "PinSeatCy": "   SETS FOLLOWER HEIGHT\n   ON MHA-DT-23 CAM",
-    "PinSeatCz": "CENTRES MHA-DT-25\nFOLLOWER IN BAR",
 }
 
 
@@ -335,7 +385,8 @@ def _seat_depth_dimension(adapter: Any, section: Any) -> Any:
     The section plane runs through the seat axis, so the blind cut's own depth
     dimension lies in the view plane and imports as a native model dimension
     with the part-authored places (drawing-simplicity-policy.md `How the repository implements the guidelines`) -- the sheet never writes a
-    precision for a controlling dimension.
+    precision for a controlling dimension.  It carries its value alone
+    (rule 7); the seat callout states the depth as REF and the corner limit.
     """
     (annotation,) = curate_view_dimensions(
         adapter,
@@ -343,11 +394,6 @@ def _seat_depth_dimension(adapter: Any, section: Any) -> Any:
         keep=SECTION_KEEP,
         view_label="follower seat section",
         dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
-    set_dimension_callouts(
-        adapter,
-        [annotation],
-        {"PinSeatDepth": PIN_SEAT_DEPTH_CALLOUT},
     )
     return annotation
 
@@ -453,6 +499,7 @@ async def build(adapter: Any) -> dict[str, str]:
             raise RuntimeError(
                 f"expected {expected} centre marks in the {label} view, found {found}"
             )
+    _centre_mark_cross_hole(adapter, left)
     add_surface_finish(
         adapter,
         front,

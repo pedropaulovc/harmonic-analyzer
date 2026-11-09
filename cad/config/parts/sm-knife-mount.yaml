@@ -2,30 +2,38 @@ sm-knife-mount:
   number: MHA-SM-02
   material: AISI O1 tool steel
   material_specification: AISI O1 tool steel
-  finish: 58-60 HRC, unpainted; sizes apply after hardening
+  # Owner ruling 2026-11-08 (Pedro), SM-02 harden less: harden the O1, then draw it back to a hardness the shop can still ream, and cut the fit sizes to their printed bands after heat treatment (no allowance, no lap).
+  # 40-45 HRC: Cincinnati Tool Steel Co., AISI O1 data sheet (https://cintool.com/documents/Oil_Hardening/01.pdf), 1 in rounds oil-quenched from 1475 F and tempered 2 h: 900 F 47, 1000 F 44, 1100 F 39 HRC.
+  finish: "40-45 HRC, unpainted; fit sizes cut after hardening"
   quantity: 2
   tolerance_class: machined_block
   # Pedro's owner ruling, 2026-11-05 (coordinator session): tap annealed, inspect hardened.
-  process: "machined in the annealed condition; one blind #10-24 thread per mount (two mounts total), cut with a bottoming tap before hardening, then thread-gauge checked after heat treatment; all thread sizes apply after hardening"
+  # Delegated ruling sm Q5 (2026-11-07, Main) is superseded for the fit sizes by the 2026-11-08 owner ruling above.
+  process: "machined in the annealed condition with the fit sizes left under size; one blind #10-24 thread per mount (two mounts total), spotted through MHA-FR-02's #10 hole and cut with a bottoming tap before hardening; hardened, then tempered about 1000 F to 40-45 HRC; after heat treatment the MHA-SM-03 trunnion bore and the datum-B MHA-SM-VN-53 dowel hole are reamed to their printed bands, and the thread is gauge-checked"
   drawing_unit: in
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"
-      where: "the datum-C dowel slot's position frame (⌖ .002 | A | B on the slot width) and the #10-24 hanger-tap and knife-bore position frames to A|B|C"
-      finding: "position frames over-specified (rule 5); and the slot frame reads as incomplete or missing its basics because no boxed basic dimension locates the slot (rule 5)"
-      reason: "keep the knife bore square to the dowel line and let the crossbar clearance hole float round the bolt (owner-accepted knife-edge-system control). The slot frame moved here from MHA-FR-02 with the slot (owner ruling 2026-10-24 T+H3) and keeps that frame's owner ruling of 2026-10-24 under ASME Y14.5-2018: it controls only the slot WIDTH, its median plane centred on datum B's axis at an implied basic 0 across the dowel line and an implied basic 0 deg along it, which need no printed basic; the toleranced .57 (.XX) to the slot's half-round end sets the slot's position ALONG the slot and is the band the slot-pin margin and slot-to-tap web stacks charge, so a basic along-slot dimension is not required and the frame is complete as drawn"
+      where: "the knife-bore position frame ⌖ Ø.008 | A | B"
+      finding: "position frame over-specified (rule 5)"
+      reason: "Owner ruling 2026-11-08 (Pedro), #2144 item 11.3 (scheme S1): one dowel (datum B) and the screw hang the block, the slot and datum C are deleted, and the bore is located to A|B only; its yaw about B is left free on the part because the MHA-SM-00 gauge bar through both mounts' bores sets it at assembly (fit-up order owner-confirmed 2026-11-08 (Pedro), #2144 item 11.3) and the rock gauge proves the 5.0 deg free rock (build_sm_summing_assembly). The Ø.008 bounds the bore's offset off its station, which the hanger-bolt float and rear-mount yaw budgets charge (owner-accepted knife-edge-system control). The #10-24 tap carries no frame, it is spotted through MHA-FR-02's #10 hole (delegated ruling 2026-11-07 (Main), owner review #2144, sm Q3, pending owner confirmation)"
     - id: "RV-02"
       kind: "accept"
-      where: "the knife-bore position frame's composite lower segment, Ø.002 to A|B|C under the Ø.008 to A|B|C"
-      finding: "composite position frame over-specified (rule 5)"
-      reason: "the lower segment only orients: it holds the knife bore's axis parallel to the top seat and clocked to the B-C dowel line within Ø.002, the far-end offset the trunnion's rock budget charges, while the Ø.008 still locates the bore (owner-accepted knife-edge-system control, owner ruling 2026-10-27, #2016)"
+      where: "the knife-bore parallelism refinement ∥ .002 | A under the Ø.008 position frame"
+      finding: "orientation refinement over-specified (rule 5)"
+      reason: "Owner ruling 2026-11-08 (Pedro), #2144 item 11.3: the refinement holds the bore's axis parallel to the top seat (its pitch) so the gauge bar enters both mounts' bores and the trunnion's ridge bears along the bore; the yaw it leaves free is set by the gauge bar at MHA-SM-00 (owner-accepted knife-edge-system control, owner ruling 2026-10-27, #2016)"
     - id: "RV-03"
       kind: "accept"
-      where: "the datum-B dowel hole's and the datum-C dowel slot's perpendicularity refinements to A (⊥ Ø.0006 | A and ⊥ .0006 | A)"
+      where: "the datum-B dowel hole's perpendicularity refinement to A (⊥ Ø.001 | A)"
       finding: "orientation refinements over-specified (rule 5)"
-      reason: "owner ruling 2026-10-27 (#2016, option A): the hole and slot that slip onto the crossbar's pressed dowels are held square to the top seat so a dowel leaning within MHA-FR-02's ⊥ Ø.0008 still slides home without binding (the assembly's slip-tilt contract)"
+      reason: "owner ruling 2026-10-27 (#2016, option A): the hole that slips onto the crossbar's pressed dowel is held square to the top seat so a dowel leaning within MHA-FR-02's ⊥ Ø.001 still slides home without binding (the assembly's slip-tilt contract)"
     - id: "RV-04"
       kind: "accept"
       where: "the top seat (datum A) carries no flatness control"
       finding: "seat flatness unspecified for the knife-mount dowel slip-tilt fit (rules 1, 5)"
-      reason: "owner preference 2026-10-27 (no FCF on face-milled seats): the knife-mount slip-tilt proof (build_sm_summing_assembly, #2016) charges an assumed .0004 seat conformity over the .540 minimum seat, which a face-milled seat drawn flat by the bolt holds; the fit binds only past about .0017"
+      reason: "owner preference 2026-10-27 (no FCF on face-milled seats): the knife-mount slip-tilt proof (build_sm_summing_assembly, #2016) charges an assumed .0004 seat conformity over the .540 minimum seat, which a face-milled seat drawn flat by the bolt holds; the fit binds only past about .0008 (with the hole at ⊥ Ø.001, delegated ruling sm Q1, and MHA-FR-02's ream at ⊥ Ø.001, owner ruling 2026-11-06)"
+    - id: "RV-05"
+      kind: "accept"
+      where: "the datum-B slip hole Ø.1280 ±.0007, MHA-SM-VN-53 SLIDING FIT, CLEARANCE .0020-.0036"
+      finding: "converted-millimetre band, not a plain inch step (rule 4)"
+      reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144 (sm Q4): the band is the MHA-SM-VN-53 dowel's slip budget, whose .0020 minimum clearance sets the slip-tilt allowance the ⊥ Ø.001 refinement needs (at ±.001 the allowance drops to 0.343 deg, under the 0.364 deg charged with the ⊥ Ø.001 crossbar reams of #2244); the callout names the dowel and its sliding fit with the clearance as its acceptance"

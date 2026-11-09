@@ -7,27 +7,25 @@ carries the transgear pivot's #8-32 through tap and the latch hook's two
 carries the four clamp screws: two counterbored holes on the east column and
 two counterbored slots on the west one (owner ruling 2026-10-15, option A).
 
-* The upper view looks on the back face (model +Z, ``*Front``): the length,
-  the hanger row's banded stations from the left end, each naming its mate,
-  and its height from the top face (the part-hidden HangerRowReference
-  sketch), the pivot drill's Ø with its tap, both countersinks' MAX Ø
-  (CountersinkReference), the latch-hook taps' native callout (its thread
-  class left to the title block) and the top face's slide roughness.
-* The lower view looks on the front face (``*Back``, so the left end is on
-  the sheet's right): the banded height, the clamp row's banded stations
-  from the same end and its banded height (ClampRowReference), the round
-  counterbores' native callout (depth at .XX, sizes at .XXX) naming the back-arc taps the
-  row locates to, and the front face's slide roughness. Each
-  roughness symbol has its reason beside it; the sheet has no general note.
+* The principal view looks on the back face (model +Z, ``*Front``), with no
+  label: the length, the hanger row's banded stations from the left end and
+  its height from the top face (the part-hidden HangerRowReference sketch),
+  both countersinks' MAX Ø (CountersinkReference) each under its tap and
+  over the mate its banded row locates, and the top face's slide roughness.
+* VIEW D, below it, looks on the front face (``*Back``, a rear view, so the
+  left end is on the sheet's right), its viewing arrow on section A-A: the
+  height, the clamp row's banded stations from the same end and its banded
+  height (ClampRowReference), the round counterbores' native callout (size,
+  drill, counterbore; depth at .XX, sizes at .XXX) naming the back-arc taps
+  the row locates to, and the front face's slide roughness. Each roughness
+  symbol names the part that slides there; the sheet has no general note.
 * Detail C looks face-on at the outer slot: the slot's and its
-  counterbore's widths and travels, the slot's width naming the MHA-SH-02
-  taps it takes up and the counterbore's the MHA-SH-VN-53 head it holds.
+  counterbore's widths and travels, the slot's width naming the head its
+  upper limit seats and the counterbore's the MHA-SH-VN-53 head it clears.
   Section B-B cuts the inner slot across the bar for the counterbore's depth;
   its arrows face right, away from the outer slot's station witness.
-* Each face view carries its caption below its own dimension stack, with
-  native text clearance from detail C; section A-A cuts the pivot tap across
-  the bar: the banded thickness and the tap's countersunk mouths on both
-  faces.
+* Section A-A cuts the pivot tap across the bar: the thickness and the tap's
+  countersunk mouths on both faces.
 
 Every value and band is a native model dimension authored by
 ``build_pd_support_bar``; the sheet only places and curates them.
@@ -72,12 +70,18 @@ from _drawing_annotation_extent import (
     require_leader_clear,
     sheet_region,
 )
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_dimension_callouts,
+    set_reference_dimension,
+)
 from _drawing_edges import scan_view_edges
 from _drawing_finish import add_surface_finish
+import _drawing_dimension_import
 import _drawing_hidden_sketches as hidden_sketches
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_layout_audit import annotation_display
+from _drawing_leader_notes import add_leader_note
 from _drawing_leaders import dimension_segments, distance_to_box, leader_crossings
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
@@ -98,8 +102,11 @@ from build_pd_support_bar import (
     CLAMP_CBORE_DEPTH,
     CLAMP_CBORE_DIA,
     CLAMP_ROUND_X,
+    CLAMP_ROW,
     CLAMP_SLOT_WIDTH,
     CLAMP_SLOT_X,
+    HANGER_ROW,
+    MAX_SUFFIX,
 )
 from _column_clamp_interface import BAR_DEPTH
 from pd_support_bar_spec import (
@@ -109,20 +116,23 @@ from pd_support_bar_spec import (
     CLAMP_TAP_Y,
     HANGER_TAP_Y,
     PIVOT_TAP_X,
+    TAP_CSK_ANGLE_DEG,
 )
 from pd_support_bar_drawing_spec import (
     BACK_VIEW_CAPTION,
     CLAMP_CALLOUT_PRECISION,
+    CLAMP_EAST_HEIGHT_NAME,
     CLAMP_CBORE_CALLOUT,
+    CLAMP_HOLE_PROCESS,
     DIMENSION_CALLOUTS,
     DIMENSION_CALLOUTS_ABOVE,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
-    FACE_VIEW_CAPTION,
-    FRONT_FINISH_REASON,
+    FRONT_FACE_VIEW_LETTER,
+    HANGER_HEIGHT_X,
+    HOOK_TAP_REFERENCE_NAMES,
     STATION_END_LABEL,
     SURFACE_FINISHES,
-    TOP_FINISH_REASON,
 )
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -148,11 +158,12 @@ SECTION_SCALE = (2, 1)
 ISO_SCALE = (1, 4)
 _S = FACE_SCALE[0] / FACE_SCALE[1] / 1000.0  # sheet metres per model mm
 
-# The back face above, the front face below, both at 1:2 with their ends
-# aligned; section A-A right of the back face's end, the isometric under it
+# The back face above (the unlabelled principal view), VIEW D on the front
+# face below, both at 1:2 with their ends aligned; section A-A right of the
+# back face's end, carrying VIEW D's viewing arrow, the isometric under it
 # (its 1:4 diagonal runs down-right, under the section's caption and clear
-# of the title block), its scale note under its left half, right of the
-# front view's end extension lines.
+# of the title block), its scale note under its left half, right of VIEW D's
+# end extension lines.
 FACE_CENTER = (0.170, 0.222)
 BACK_CENTER = (0.170, 0.122)
 SECTION_CENTER = (0.385, 0.200)
@@ -184,58 +195,78 @@ def _back_x(model_x: float) -> float:
 
 
 # The hanger stations are baselines from the left end, stacked under the bar
-# shortest first (13 mm rows: each value carries its mate's line), the length
-# outermost; their texts step right so none crosses a longer row's extension
-# line, and stand clear of the pivot station's. The row's height (from the
-# top face, its rise on the right end) stands off the right end. The section
-# line runs up through the pivot, its arrows and letters left of it.
+# shortest first (13 mm rows), the length outermost; their texts step right
+# so none crosses a longer row's extension line, and stand clear of the
+# pivot station's. Each row draws its own centreline, only where its holes
+# are (build_pd_support_bar.ROW_CENTRELINES; round 4 machinist review: one
+# line through the .571 taps and the .551 clamp holes read as one row), and
+# both views show both rows' lines. The taps' height reads off their line's
+# right end (pd_support_bar_drawing_spec.HANGER_HEIGHT_X), between the hook
+# taps and the west slots: its line HANGER_ROW_LINE_SIDE right of that end,
+# its one-row text over the top face (HANGER_ROW_TEXT_RISE, centre), right
+# of the hook taps' leader and under both callouts' shoulders. The clamp
+# row's east run (the round pair's) reads its own .551 here the same way,
+# off its end over END A's half of the bar, its text right of the top slide
+# symbol's leader and under its shelf (round 7 review blocker: that run had
+# no height; VIEW D's END A side carries the round holes' callout and leader,
+# END A, the 1.010 and the stations).
+# The section line runs up through the pivot, its arrows and letters left of
+# it. Every location carries its value and band alone (rule 7; the hook
+# taps' stations REF, their callout's spotting route sets them): the mate
+# each row serves stands on its hole's countersink callout.
 # The pivot and the latch-hook pair each take ONE stacked callout on their
-# countersink's Ø (tap line, CSK Ø, faces and function; machinist review
+# countersink's Ø (tap line, countersink, faces and mate; machinist review
 # round 5: a tap callout and a countersink callout per hole put two leaders
 # and stacked arrowheads on each small hole, the pair's both on the left
-# hole, the pivot's on the A-A line). Each block (keep = its centre) stands
-# right of its hole, its bottom shelf ~6 mm over the top face, ~13 mm over
-# the hole: the pivot's left end 25 mm right of its hole, so the leader
-# meets the countersink ~62 deg off the A-A line; the pair's, on the right
-# hole (the reference circle's, build_pd_support_bar), 31 mm right of it, so
-# its leader never crosses the left hole and its block starts ~3 mm past
-# the pivot block's right end (its widest row ~69 mm, the pair's ~54 mm).
+# hole, the pivot's on the A-A line). Each four-row block (keep = its centre)
+# stands right of its hole, its bottom shelf ~11 mm over the top face (over
+# the .571 text), ~18 mm over the hole: the pivot's left end 25 mm right of
+# its hole, so the leader meets the countersink well off the A-A line; the
+# pair's, on the right hole (the reference circle's, build_pd_support_bar),
+# 66 mm right of it to its centre, so its leader never crosses the left hole
+# and passes ~2 mm under the pivot block, whose right end its block starts
+# ~5 mm past (widest rows ~53 mm, and ~82 mm for the pair's spotting route,
+# at 2.64 mm a character); it ends ~30 mm short of section A-A's .374.
 ROW_STEP = 0.013
+CSK_CALLOUT_RISE = 0.022
+HANGER_ROW_LINE_SIDE = 0.003
+HANGER_ROW_TEXT_RISE = 0.0055
 FRONT_KEEP = {
     "PivotTapStation": (LEFT_END + 0.042, FACE_BOTTOM - ROW_STEP),
     "BracketTapStation1": (LEFT_END + 0.115, FACE_BOTTOM - 2.0 * ROW_STEP),
     "BracketTapStation2": (LEFT_END + 0.118, FACE_BOTTOM - 3.0 * ROW_STEP),
     "Length": (FACE_CENTER[0], FACE_BOTTOM - 4.0 * ROW_STEP),
-    "HangerRowHeight": (RIGHT_END + 0.022, FACE_BOTTOM - 0.010),
-    "PivotCskDia": (_face_x(PIVOT_TAP_X) + 0.059, FACE_TOP + 0.017),
-    "BracketCskDia": (_face_x(BRACKET_TAP_X[1]) + 0.058, FACE_TOP + 0.0145),
+    "HangerRowHeight": (
+        _face_x(HANGER_HEIGHT_X) + HANGER_ROW_LINE_SIDE,
+        FACE_TOP + HANGER_ROW_TEXT_RISE,
+    ),
+    CLAMP_EAST_HEIGHT_NAME: (
+        _face_x(CLAMP_ROW.runs[0][1]) + HANGER_ROW_LINE_SIDE,
+        FACE_TOP + HANGER_ROW_TEXT_RISE,
+    ),
+    "PivotCskDia": (_face_x(PIVOT_TAP_X) + 0.059, FACE_TOP + CSK_CALLOUT_RISE),
+    "BracketCskDia": (_face_x(BRACKET_TAP_X[1]) + 0.066, FACE_TOP + CSK_CALLOUT_RISE),
 }
-# The top face's slide roughness on its edge, left of the section line.
+# The top face's slide roughness on its edge, left of the section line. Each
+# slide symbol carries its reason (SLIDES ON the mate) on its own shelf,
+# right of the symbol (round 6 of the fan-out: a reason standing beside the
+# symbol with no leader of its own read as loose text, rule 7); the ~35 mm
+# line at FINISH_CHAR_HEIGHT runs over the bar's left end, under the top
+# reason's old place and left of section A-A's cutting line (~0.124).
 TOP_FINISH_MODEL_X = -178.0
 TOP_FINISH_SYMBOL_XY = (LEFT_END + 0.030, FACE_TOP + 0.014)
-# Each finish's reason stands left of its symbol at the symbol's foot, its
-# right end ~6 mm short of the leader's knee, so it reads as the symbol's
-# (machinist review round 6: the top one, 18 mm over its symbol, floated).
-REASON_FROM_SYMBOL = (-0.0345, -0.001)
-TOP_REASON_TOP = (
-    TOP_FINISH_SYMBOL_XY[0] + REASON_FROM_SYMBOL[0],
-    TOP_FINISH_SYMBOL_XY[1] + REASON_FROM_SYMBOL[1],
-)
-# Under the length line, left of the round counterbores' callout.
-FACE_CAPTION_TOP = (0.150, FACE_BOTTOM - 4.0 * ROW_STEP - 0.008)
 
 # The clamp stations from the same left (x = -226) end, on the sheet's right
-# here, shortest nearest the bar. The first two spans (5.75 and 23.25 mm on
-# the sheet) are too short for their banded texts, which stand right of the
+# here, shortest nearest the bar. The first two rows' texts (spans of 5.75 and
+# 23.25 mm on the sheet, the first narrower than its text) stand right of the
 # end's extension line, under END A and left of the isometric view; the long
 # rows' texts stand between their holes and the end. The bar height reads off
 # that end too (the BarProfile dimension's model edge), the clamp row's height
 # off the other end, where its rise is: its text stands left of its dimension
 # line, so the line hugs the bar to keep the text inside the border (r5
-# audit: outside-border). Naming the MHA-SH-02 taps makes it four lines of
-# at most 11 characters: about 18-47 mm by 97-117 mm, under its lower
-# extension line (122 mm) and left of detail C's letter (51 mm). The long
-# rows stand 6 and 7 mm apart, not 8: 8 mm stepping put the 17.345 line a
+# audit: outside-border). Its one line (value and band) stands under its
+# lower extension line (122 mm) and left of detail C's letter (51 mm). The
+# long rows stand 6 and 7 mm apart, not 8: 8 mm stepping put the 17.345 line a
 # hairline over detail C's counterbore-width text, whose upper limit then
 # read as part of the 17.345 dimension (machinist review, 2026-10-23).
 BACK_KEEP = {
@@ -247,21 +278,18 @@ BACK_KEEP = {
     "ClampRowHeight": (LEFT_END - 0.010, BACK_BOTTOM - 0.008),
 }
 # The round counterbores' callout stands over the east pair, its leader
-# dropping to the inner one, between the face view's caption and the bar
+# dropping to the inner one, between the front finish's reason and the bar
 # height's text. Its text block centres 2.8 mm under this point, so its four
 # lines (the mate's under the size) run from ~156 down to ~136 mm: under the
-# face view's length line (160.2 mm, r7 audit text-on-line at +0.0216) and
-# over the bar.
+# principal view's length line (160.2 mm, r7 audit text-on-line at +0.0216)
+# and over the bar.
 CLAMP_CALLOUT_XY = (_back_x(max(CLAMP_ROUND_X)) - 0.005, BACK_TOP + 0.017)
 # The front face's slide roughness, seen face-on: a leader to a point clear
-# of the holes, the symbol above the view, left of the counterbores' callout.
+# of the holes, the symbol above the view where the old loose reason stood,
+# its ~35 mm reason line ending well left of the counterbores' callout
+# (~0.218) and under the principal view's length line.
 FRONT_FINISH_MODEL_XY = (-40.0, 6.0)
-FRONT_FINISH_SYMBOL_XY = (0.192, BACK_TOP + 0.014)
-# Its reason stands left of it, under the face view's caption.
-FRONT_REASON_TOP = (
-    FRONT_FINISH_SYMBOL_XY[0] + REASON_FROM_SYMBOL[0],
-    FRONT_FINISH_SYMBOL_XY[1] + REASON_FROM_SYMBOL[1],
-)
+FRONT_FINISH_SYMBOL_XY = (0.150, BACK_TOP + 0.014)
 # Centre the front caption under the native outer station span, then keep
 # its complete text block right of detail C's native dimension text.
 FRONT_CAPTION_AIR_M = 0.004
@@ -276,10 +304,9 @@ CAPTION_SETTLE_M = 0.0006
 # right, its text under the slot's lower edge the same way (inside its 4.98
 # span the block was struck by its own dimension line, r4), the slot's
 # travel below and the counterbore's above; its label over the detail
-# (DETAIL_LABEL_XY). The slot width's block centres on its point; its five
-# callout lines (the head's reason for the upper limit, then the take-up's)
-# put that point 5 mm higher than the three-line block's, off the border. It
-# is a cropped
+# (DETAIL_LABEL_XY). The slot width's block hangs from its point; its two
+# callout lines keep the point the five-line block (r7) stood on, so the
+# shorter block stays inside that block's tested envelope. It is a cropped
 # *Back model view, dimensioned uncropped then cropped (the
 # draw_ch_amplitude_bar notch details): a model view has no native label or
 # parent circle, so its label is a note in the native label's words and its
@@ -300,7 +327,7 @@ DETAIL_LABEL = f"DETAIL C\nSCALE {DETAIL_SCALE[0]} : {DETAIL_SCALE[1]}"
 # the title block, away from its view (machinist review round 7). Centred on
 # the detail, its ~27 mm block (y ~0.061..0.0705) clears the counterbore
 # width's upper extension line (~0.058) and shoulder (ends x ~0.107) and
-# stands left of the front caption (starts x ~0.149, bottom ~0.074).
+# stands left of VIEW D's caption (bottom ~0.074, centred on the clamp row).
 DETAIL_LABEL_XY = (DETAIL_CENTER[0], 0.0705)
 DETAIL_LETTER = "C"
 DETAIL_LETTER_TOP = (LEFT_END - 0.004, BACK_CENTER[1] - 0.0025)  # top centre
@@ -322,10 +349,16 @@ DETAIL_KEEP = {
 # and the through slot, so neither extension line crosses the cut: over the
 # top face (r6) the floor's extension line ran up through the hatch and read
 # as a seam (its 0.13 stroke from the floor's lower corner, PDF paths).
-# SLOT_DEPTH_SHELF_DROP seeds the dimension line through the open slot.
-# After the callout is hung, OffsetText keeps the original line in the open
-# slot while placing its native text right of B-B, below detail C's shelf.
-# Native segment readback must stay out of the actual section material.
+# SLOT_DEPTH_SHELF_DROP seeds the dimension line through the open slot: a
+# horizontal dimension's line runs about half its text block under the
+# block's centre (the anchor), ~2.9 mm for the bare .19 (round 1 of the
+# fan-out: anchored 11.2 over the clamp line, the 4-line block's seed, the
+# line stood ~8.4 over it, 5 mm into the upper bar). _seat_slot_depth_baseline
+# then measures the native line and moves it onto the clamp line, so the
+# seed need only land in the slot. After the callout is hung, OffsetText
+# keeps the original line in the open slot while placing its native text
+# right of B-B, below detail C's shelf. Native segment readback must stay
+# out of the actual section material.
 # The caption's top centre stands SLOT_CAPTION_DROP under the
 # section's centre: its block (r7: 14.6 tall, its top 0.05 under the anchor)
 # then has 3 mm of air under the cut and 3.4 over the inner border's edge
@@ -339,17 +372,26 @@ SLOT_SECTION_CAPTION_XY = (
     SLOT_SECTION_CENTER[1] - SLOT_CAPTION_DROP,
 )  # top centre
 SLOT_SECTION_KEEP_NAMES = ("ClampSlotCboreDepth",)
-SLOT_DEPTH_SHELF_DROP = 0.0112
+SLOT_DEPTH_SHELF_DROP = 0.0029
 SLOT_DEPTH_TEXT_SIDE = 0.018
 SLOT_CALLOUT_AIR_M = 0.003
 
 # Section A-A: the thickness up-left of the cut bar, its text outside the
-# extension lines since the 2:1 span is narrower than it. Nothing is
-# dimensioned under the cut bar, so its caption's top stands just under the
-# bar's foot at the native caption's x (r4 review: a 35 mm drop, kept from
-# when the thread and drill depths stood there, put it beside the isometric).
+# extension lines since the 2:1 span is narrower than it. The keep is the
+# text block's centre and the dimension line runs under its last row (round
+# 7 native: the two-row block 0.2297-0.2416, its line at 0.2301, the
+# extension lines rising to 0.2311). The three-row block (value, two
+# 17-character rows at 2.78 mm a character) centres SECTION_DEPTH_SIDE left
+# of the cut's left face, so its right end stands 4.4 mm short of the left
+# extension line (round 7: the 28-character row ran 11 mm across it) and its
+# left end 11 mm right of the hook taps' callout shoulder (0.3124); the rise
+# keeps the block's foot, and so its line, where the two-row block's were.
+# Nothing is dimensioned under the cut bar, so its caption's top stands just
+# under the bar's foot at the native caption's x (r4 review: a 35 mm drop,
+# kept from when the thread and drill depths stood there, put it beside the
+# isometric).
 SECTION_KEEP_NAMES = ("Depth",)
-SECTION_DEPTH_RISE = 0.010
+SECTION_DEPTH_RISE = 0.0128
 SECTION_DEPTH_SIDE = 0.028
 SECTION_CAPTION_GAP = 0.004
 SECTION_CAPTION_TOP_Y = (
@@ -367,6 +409,24 @@ SECTION_CAPTION_TOP_Y = (
 # bottom.
 SECTION_OVERRUN_TOP = 6.0
 SECTION_OVERRUN_FOOT = 13.0
+# VIEW D's viewing arrow on section A-A, which shows both faces edge-on: a
+# letter note whose straight leader points square at the front face from
+# outside the cut (draw_fr_top_frame._add_view_arrow's horizontal arrow), a
+# quarter of the bar's height over its centre, clear of the pivot tap's
+# countersunk mouth, its tip VIEW_ARROW_TIP_GAP off the face. The letter
+# stands VIEW_ARROW_LENGTH further out: right of the cut it has ~24 mm to
+# the border, left of it the hanger row height's one-line text ends ~29 mm
+# short of the cut.
+VIEW_ARROW_MODEL_Y = BAR_HEIGHT / 4.0
+VIEW_LETTER_HEIGHT = 0.005
+VIEW_ARROW_TIP_GAP = 0.0035
+VIEW_ARROW_LENGTH = 0.010
+VIEW_ARROW_SQUARE_TOL = 0.0003
+# Rule 26's countersink form, "⌵Ø.169 MAX X 90°": the part authors the
+# symbol prefix (DIMENSION_PREFIXES) and the single MAX limit's suffix
+# (build_pd_support_bar._max_limit); the sheet appends the included angle.
+COUNTERSINK_NAMES = ("PivotCskDia", "BracketCskDia")
+COUNTERSINK_SUFFIX = f"{MAX_SUFFIX} X {TAP_CSK_ANGLE_DEG:.0f}\u00b0"
 
 DRAWING_PRECISION_BY_NAME = {
     name: places
@@ -416,6 +476,73 @@ def _section_keep(adapter: Any, section: Any) -> dict[str, tuple[float, float]]:
     return {
         "Depth": (min(mouth, front) - SECTION_DEPTH_SIDE, top + SECTION_DEPTH_RISE),
     }
+
+
+def _view_arrow_points(
+    front: tuple[float, float], back: tuple[float, float]
+) -> tuple[tuple[float, float], tuple[float, float]]:
+    """VIEW D's arrow on section A-A as (letter, tip), from the front and
+    back faces' sheet points at one height: the tip VIEW_ARROW_TIP_GAP
+    outside the front face, the letter VIEW_ARROW_LENGTH further out on the
+    same side, its top half a letter over the tip so the arrow runs level."""
+    away = math.copysign(1.0, front[0] - back[0])
+    tip = (front[0] + away * VIEW_ARROW_TIP_GAP, front[1])
+    letter = (tip[0] + away * VIEW_ARROW_LENGTH, tip[1] + VIEW_LETTER_HEIGHT / 2.0)
+    return letter, tip
+
+
+def _add_view_arrow(adapter: Any, section: Any) -> None:
+    """VIEW D's lettered viewing arrow on section A-A, square onto the front
+    face it looks at (draw_fr_top_frame._add_view_arrow: the letter slides in
+    y until the leader runs level)."""
+
+    def point(z: float) -> tuple[float, float]:
+        return _sheet(
+            adapter, section, (PIVOT_TAP_X, VIEW_ARROW_MODEL_Y, z), "view D arrow"
+        )
+
+    text_xy, tip_xy = _view_arrow_points(point(-BAR_DEPTH / 2.0), point(BACK_FACE_Z))
+    label = f"view {FRONT_FACE_VIEW_LETTER} viewing arrow"
+    note = add_leader_note(
+        adapter,
+        FRONT_FACE_VIEW_LETTER,
+        text_xy=text_xy,
+        attach_xy=tip_xy,
+        view=section,
+        label=label,
+    )
+    # add_note leaves text at the document height; size the letter here and
+    # prove the leader tip did not move with it.
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    text_format = annotation.GetTextFormat(0)
+    if text_format is None:
+        raise RuntimeError(f"{label} note has no text format")
+    text_format.CharHeight = VIEW_LETTER_HEIGHT
+    if not annotation.SetTextFormat(0, False, text_format):
+        raise RuntimeError(f"failed to size the {label} letter")
+    rebuild_drawing(adapter, label=f"{label} letter")
+    points = list(annotation.GetLeaderPointsAtIndex(0) or ())
+    if len(points) < 6 or math.dist((points[-3], points[-2]), tip_xy) > 0.001:
+        raise RuntimeError(f"{label} tip moved when its letter was sized")
+    # The leader leaves the letter's nearer side at the text's mid-height:
+    # slide the letter by any miss in y so the arrow stands square.
+    miss = tip_xy[1] - points[1]
+    if abs(miss) > VIEW_ARROW_SQUARE_TOL:
+        x, y, z = (float(value) for value in annotation.GetPosition())
+        if not annotation.SetPosition2(x, y + miss, z):
+            raise RuntimeError(f"failed to square the {label}")
+        rebuild_drawing(adapter, label=f"square {label}")
+        points = list(annotation.GetLeaderPointsAtIndex(0) or ())
+        if (
+            len(points) < 6
+            or math.dist((points[-3], points[-2]), tip_xy) > 0.001
+            or abs(tip_xy[1] - points[1]) > VIEW_ARROW_SQUARE_TOL
+        ):
+            raise RuntimeError(f"{label} did not square: leader {points}")
+    _telemetry.info(
+        f"{label}: leader {points[0]:.5f},{points[1]:.5f} -> "
+        f"{points[-3]:.5f},{points[-2]:.5f} (square when the y agree)"
+    )
 
 
 def _move_caption(
@@ -473,6 +600,21 @@ def _activate(adapter: Any, view: Any, *, label: str) -> None:
     if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateView(name):
         raise RuntimeError(f"failed to activate the {label} {name!r}")
     adapter.currentModel.ClearSelection2(True)
+
+
+def _show_row_centrelines(adapter: Any, view: Any, sketch: str, *, label: str) -> None:
+    """Show the other hole row's reference sketch in ``view`` for its drawn
+    centrelines alone (rule 26: each row its own line; round 4 machinist
+    review), as the hidden-owner import shows a sketch it dimensions
+    (_drawing_hidden_sketches): its dimensions stay in the other view."""
+    _activate(adapter, view, label=label)
+    hidden_sketches._show_view_sketches(
+        adapter.currentModel,
+        (sketch,),
+        paths=_drawing_dimension_import._model_item_paths(adapter, view),
+        label=label,
+    )
+    _telemetry.info(f"{label}: showing {sketch} for its centrelines")
 
 
 def _sketch_circle(
@@ -856,15 +998,10 @@ def _assert_slot_depth_callout_clear(
     )
 
 
-def _place_slot_depth_callout(
-    adapter: Any,
-    section: Any,
-    detail_annotations: list[Any],
-    section_annotations: list[Any],
-    back_annotations: list[Any],
-) -> list[Any]:
-    """Move only the native depth text; retain its original dimension line."""
-    depth = _dimension_annotation(adapter, section_annotations, "ClampSlotCboreDepth")
+def _slot_depth_native_lines(
+    depth: Any,
+) -> tuple[list[Any], float]:
+    """The depth's two native witnesses and its baseline's sheet y."""
     original_lines = dimension_segments(depth)
     witnesses = [
         line
@@ -885,7 +1022,44 @@ def _place_slot_depth_callout(
         raise RuntimeError(
             "section B-B depth: no unambiguous native dimension baseline"
         )
-    baseline_y = widget[0][0][1]
+    return witnesses, widget[0][0][1]
+
+
+def _seat_slot_depth_baseline(
+    adapter: Any, section: Any, depth: Any
+) -> tuple[list[Any], float]:
+    """Put the depth's native baseline on the clamp line, through the open
+    slot, by measuring it: how far the line sits from the text's keep point
+    follows the text block's line count (round 1 of the fan-out: the bare
+    .19 left the 4-line block's SLOT_DEPTH_SHELF_DROP seed 5 mm into the
+    upper bar), so the seed is only a first guess."""
+    target = _sheet(adapter, section, (SLOT_SECTION_X, CLAMP_TAP_Y, 0.0), "B-B clamp line")[1]
+    for _attempt in range(4):
+        witnesses, baseline_y = _slot_depth_native_lines(depth)
+        error = target - baseline_y
+        if abs(error) <= CAPTION_SETTLE_M:
+            _telemetry.info(
+                f"section B-B depth baseline y={baseline_y:.5f} on the clamp line "
+                f"y={target:.5f}"
+            )
+            return witnesses, baseline_y
+        move_annotation(adapter, depth, 0.0, error, label="section B-B depth baseline")
+    raise RuntimeError(
+        f"section B-B depth baseline y={baseline_y:.5f} did not settle on the "
+        f"clamp line y={target:.5f}"
+    )
+
+
+def _place_slot_depth_callout(
+    adapter: Any,
+    section: Any,
+    detail_annotations: list[Any],
+    section_annotations: list[Any],
+    back_annotations: list[Any],
+) -> list[Any]:
+    """Move only the native depth text; retain its original dimension line."""
+    depth = _dimension_annotation(adapter, section_annotations, "ClampSlotCboreDepth")
+    witnesses, baseline_y = _seat_slot_depth_baseline(adapter, section, depth)
     annotation = _early_bound(depth, "IAnnotation")
     x, _y, z = (float(value) for value in annotation.GetPosition())
     # OffsetText can re-dress a line onto its annotation's creation-point y.
@@ -1186,23 +1360,122 @@ def _assert_slot_marker_clear(
     )
 
 
+def _through_extent_index(text: str) -> int:
+    """Where a hole callout part's through extent starts: the native
+    ``<hw-thru>`` token, else a literal THRU outside every ``<...>`` token
+    (``<hw-thruholedia>`` is the drilled size, not the extent); -1 if none."""
+    token = text.find("<hw-thru>")
+    if token >= 0:
+        return token
+    depth = 0
+    for index, character in enumerate(text):
+        if character == "<":
+            depth += 1
+        elif character == ">":
+            depth -= 1
+        elif depth == 0 and text.startswith("THRU", index):
+            return index
+    return -1
+
+
+def clamp_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
+    """The round counterbores' native callout parts (definitions 5..8) with
+    CLAMP_HOLE_PROCESS written into the one part holding the through row,
+    after the drilled size and before its THRU (rule 26: size, process,
+    depth; the counterbore reads by its own symbol), and the mate rows
+    (CLAMP_CBORE_CALLOUT) below. Every Hole Wizard variable stays, so the
+    sizes and depth stay associative (draw_dt_cone_swing_platform's
+    holddown_callout_definitions)."""
+    if set(definitions) != {5, 6, 7, 8}:
+        raise RuntimeError(f"unexpected clamp callout parts: {definitions!r}")
+    if definitions[8].strip():
+        raise RuntimeError(f"clamp callout already prints below: {definitions!r}")
+    extents = {
+        part: index
+        for part in (5, 6, 7)
+        if (index := _through_extent_index(definitions[part])) >= 0
+    }
+    if len(extents) != 1:
+        raise RuntimeError(f"clamp callout THRU row is not one part: {definitions!r}")
+    ((part, index),) = extents.items()
+    text = definitions[part]
+    head = text[:index]
+    if head and not head.endswith(" "):
+        head += " "
+    return {
+        **definitions,
+        part: f"{head}{CLAMP_HOLE_PROCESS} {text[index:]}",
+        8: CLAMP_CBORE_CALLOUT,
+    }
+
+
 def _name_clamp_screws(display: Any) -> None:
-    """Hang the back-arc taps the holes locate to and the screws' part number
-    under the counterbores' native callout; its sizes print .XXX, its depth
-    the .XX its head clearance takes."""
-    set_hole_callout_precision(
-        display,
-        CLAMP_CALLOUT_PRECISION,
-        label="clamp-screw counterbores",
-    )
-    display = _early_bound(display, "IDisplayDimension")
-    display.SetText(4, CLAMP_CBORE_CALLOUT)  # swDimensionTextCalloutBelow
-    # Multi-line text may read back with CR LF; draw_dt_crank_hub strips it too.
-    applied = str(display.GetText(4) or "").replace("\r", "")
-    if applied != CLAMP_CBORE_CALLOUT:
+    """Write the drill into the counterbores' native through row and hang the
+    back-arc taps the holes locate to and the screws' part number under it
+    (clamp_callout_definitions); its sizes print .XXX, its depth the .XX its
+    head clearance takes. Only changed parts are written, each through its
+    writable twin (definition 5..8 -> writable 1..4)."""
+    label = "clamp-screw counterbores"
+    native = _early_bound(display, "IDisplayDimension")
+
+    def read(parts: tuple[int, ...]) -> dict[int, str]:
+        # Multi-line text may read back with CR LF; draw_dt_crank_hub strips it.
+        return {
+            part: str(native.GetText(part) or "").replace("\r", "") for part in parts
+        }
+
+    definitions = read((5, 6, 7, 8))
+    updated = clamp_callout_definitions(definitions)
+    for definition_part, writable_part in ((5, 1), (6, 2), (7, 3), (8, 4)):
+        if updated[definition_part] != definitions[definition_part]:
+            native.SetText(writable_part, updated[definition_part])
+    persisted = read((5, 6, 7, 8))
+    if persisted != updated:
         raise RuntimeError(
-            f"clamp counterbore callout's mate lines did not persist: {applied!r}"
+            f"{label}: callout rows did not persist: definitions={persisted!r}, "
+            f"expected={updated!r}, resolved={read((1, 2, 3, 4))!r}"
         )
+    set_hole_callout_precision(display, CLAMP_CALLOUT_PRECISION, label=label)
+    _telemetry.info(f"{label} callout: definitions={persisted!r}")
+
+
+def _set_countersink_suffixes(adapter: Any, annotations: list[Any]) -> None:
+    """Append the included angle after each countersink's MAX limit, so it
+    reads "⌵Ø.169 MAX X 90°" (COUNTERSINK_SUFFIX); read back."""
+    for name in COUNTERSINK_NAMES:
+        annotation = _early_bound(
+            _dimension_annotation(adapter, annotations, name), "IAnnotation"
+        )
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        native = str(display.GetText(2) or "")  # swDimensionTextSuffix
+        if native != MAX_SUFFIX:
+            raise RuntimeError(f"{name}: expected the part's {MAX_SUFFIX!r}, got {native!r}")
+        display.SetText(2, COUNTERSINK_SUFFIX)
+        applied = str(display.GetText(2) or "")
+        if applied != COUNTERSINK_SUFFIX:
+            raise RuntimeError(f"{name}: countersink suffix did not persist: {applied!r}")
+
+
+def _reference_hook_tap_stations(adapter: Any, annotations: list[Any]) -> None:
+    """The hook taps' stations, "(11.459)" and "(11.735)": spotted through
+    MHA-PD-14 at assembly (their callout), so they print REF with no band
+    (round 3 machinist review). Each imports once and carries no band before
+    its parentheses go on (draw_fr_top_frame._reference_plan_outlines)."""
+    for name in HOOK_TAP_REFERENCE_NAMES:
+        matches = [
+            annotation
+            for annotation in annotations
+            if dimension_name(adapter, _early_bound(annotation, "IAnnotation")) == name
+        ]
+        if len(matches) != 1:
+            raise RuntimeError(f"back face imported {len(matches)} {name} dimensions, not 1")
+        annotation = _early_bound(matches[0], "IAnnotation")
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        dimension = _early_bound(display.GetDimension2(0), "IDimension")
+        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+        if int(tolerance.Type) != 0:  # swTolType_e.swTolNONE
+            raise RuntimeError(f"hook tap {name} carries a band; a reference takes none")
+        set_reference_dimension(adapter, annotation, label=f"hook tap {name}")
 
 
 def _place_caption(adapter: Any, text: str, top_centre: tuple[float, float]) -> None:
@@ -1369,6 +1642,11 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="section B-B",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    # Both face views draw both rows' centrelines, each row its own lines
+    # (rule 26): each view's import showed the rows it dimensions, the back
+    # face both (its tap row and the clamp row's east .551), VIEW D the clamp
+    # row alone.
+    _show_row_centrelines(adapter, back, HANGER_ROW.feature, label="front face")
 
     annotations = [
         *face_annotations,
@@ -1381,6 +1659,8 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(
         adapter, annotations, DIMENSION_CALLOUTS_ABOVE, location="above"
     )
+    _set_countersink_suffixes(adapter, annotations)
+    _reference_hook_tap_stations(adapter, annotations)
     # Places (and so each dimension's band or limit) are authored on the part;
     # the sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
@@ -1394,18 +1674,15 @@ async def build(adapter: Any) -> dict[str, str]:
             edge=_cbore_rim(back),
             callout_xy=CLAMP_CALLOUT_XY,
             label="clamp-screw counterbores",
-            process="DRILL, C'BORE",
         )
     )
     _add_slide_finishes(adapter, face, back)
     _move_caption(adapter, section, lambda x, _y: (x, SECTION_CAPTION_TOP_Y))
     _move_caption(adapter, slot_section, lambda _x, _y: SLOT_SECTION_CAPTION_XY)
-    _place_caption(adapter, FACE_VIEW_CAPTION, FACE_CAPTION_TOP)
+    _add_view_arrow(adapter, section)
     front_caption = _place_front_caption(
         adapter, back, back_annotations, detail_annotations
     )
-    _place_caption(adapter, TOP_FINISH_REASON, TOP_REASON_TOP)
-    _place_caption(adapter, FRONT_FINISH_REASON, FRONT_REASON_TOP)
     _place_caption(adapter, STATION_END_LABEL, FACE_END_LABEL_TOP)
     _place_caption(adapter, STATION_END_LABEL, BACK_END_LABEL_TOP)
     rebuild_drawing(adapter, label="slot callout clearance")

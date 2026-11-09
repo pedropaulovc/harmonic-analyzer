@@ -53,17 +53,15 @@ def test_every_marked_dimension_has_one_placement_and_model_places() -> None:
 
 
 def test_the_model_owns_every_band_the_sheet_prints() -> None:
-    """The screw positions their own ± band; every formed arm feature the
-    formed band.  The far face at the pin carries none (a reference).
-    Everything else, the drilled holes, the width and the inside bend
-    radius included, takes its title-block row."""
+    """Every formed arm feature, the far face at the pin included, carries
+    the formed band; the straight's length carries none (a reference).
+    Everything else, the screw-hole positions (the bar's taps are spotted
+    through them), the drilled holes, the width and the inside bend radius
+    included, takes its title-block row."""
     assert model_toleranced_dimensions(part) == {
-        # The position and formed loops share one key (both read below);
-        # the formed loop, the last, takes FORMED_TOL.
         ("feature_name", "dimension_name"): "FORMED_TOL",
     }
     source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "for feature_name, dimension_names in POSITION_DIMENSIONS.items()" in source
     assert "for feature_name, dimension_names in FORMED_DIMENSIONS.items()" in source
     assert spec.HOLE_GROWTH > 0.0
     # R.05 at the .XX row: R.06 at the top, R.04 (1.25 T) at the bottom.
@@ -71,8 +69,6 @@ def test_the_model_owns_every_band_the_sheet_prints() -> None:
     assert spec.INSIDE_BEND_R_MAX == pytest.approx(0.060 * 25.4)
     for feature, names in spec.FORMED_DIMENSIONS.items():
         assert names <= spec.DRAWING_DIMENSIONS[feature]
-    for feature, names in spec.POSITION_DIMENSIONS.items():
-        assert set(names) <= spec.DRAWING_DIMENSIONS[feature]
 
 
 def test_the_formed_band_the_assembly_reads_counts_the_xx_rounding() -> None:
@@ -84,20 +80,51 @@ def test_the_formed_band_the_assembly_reads_counts_the_xx_rounding() -> None:
         assert abs(printed - value) + spec.FORMED_TOL <= spec.FORMED_BAND + 1e-9
 
 
-def test_the_far_face_prints_as_a_reference_and_the_strip_widths_control() -> None:
-    """Review-3 #3: the match-drilled hole's far face is set at fit-up, so
-    its X and Y print in parentheses with no band; the straight's length
-    still controls the formed straight and keeps the formed band.  The arm's
-    strip widths control the front edge (review 2), not references."""
+def test_the_formed_profile_is_closed_by_controlling_values() -> None:
+    """Round 2 (20261107T113627364Z): with the far face and the straight
+    both references the straight's angle and the tab's direction were open.
+    The far face where the pin crosses the strip, X and Y, now controls at
+    the formed band beside the roll start, both radii and the tab end; with
+    the flat pattern's developed length that closes the profile, so the
+    straight's length stays a reference (no second value on one span).  The
+    arm's strip widths control the front edge (review 2), not references."""
+    arm = spec.FORMED_DIMENSIONS["ArmProfile"]
+    assert {"FaceX", "FaceY", "RollStart", "RollR", "TabR", "TabEndX"} == arm
+    assert spec.REFERENCE_DIMENSIONS == {"StraightLen"}
     assert spec.REFERENCE_DIMENSIONS <= spec.DRAWING_DIMENSIONS["ArmProfile"]
+    assert "FlatLength" in spec.DRAWING_DIMENSIONS[spec.FLAT_SKETCH]
     assert spec.ARM_WIDTH_DIMENSIONS <= spec.DRAWING_DIMENSIONS[spec.FLAT_SKETCH]
     assert not spec.ARM_WIDTH_DIMENSIONS & spec.REFERENCE_DIMENSIONS
-    assert not spec.REFERENCE_DIMENSIONS & spec.FORMED_DIMENSIONS["ArmProfile"]
-    assert "StraightLen" in spec.FORMED_DIMENSIONS["ArmProfile"]
-    assert not any(
-        "FaceX" in names or "FaceY" in names
-        for names in spec.POSITION_DIMENSIONS.values()
-    )
+    assert not spec.REFERENCE_DIMENSIONS & arm
+    # The spec's far face is the point the builder splits the straight at.
+    assert spec.FAR_FACE_POINT == part.FAR_FACE_POINT
+    assert spec.FORMED_VALUES["FaceX"] == pytest.approx(-part.FAR_FACE_POINT[0])
+    assert spec.FORMED_VALUES["FaceY"] == pytest.approx(-part.FAR_FACE_POINT[1])
+
+
+def test_location_dimensions_end_on_a_drawn_axis_not_on_words() -> None:
+    """Screen 20261107T081227004Z: (2.77) and 3.53 carried words saying
+    where they end (rule 7).  The far face's references end on the pin's
+    axis, drawn as a centreline through the far face point across the strip,
+    and the flat pattern's round stations on a centre mark at the round's
+    centre."""
+    worded = {*drawing.CALLOUTS_ABOVE, *drawing.CALLOUTS_BELOW}
+    assert not worded & {"FaceX", "FaceY", "DevRoundC", "FlatTabC"}
+    near, far = (end[:2] for end in drawing.PIN_AXIS_ENDS)
+    face = part.FAR_FACE_POINT
+    for end, run in (
+        (near, -(geom.SHEET_T + drawing.PIN_AXIS_OVERSHOOT_MM)),
+        (far, drawing.PIN_AXIS_OVERSHOOT_MM),
+    ):
+        assert end[0] == pytest.approx(face[0] + run * geom.ARM_U[0])
+        assert end[1] == pytest.approx(face[1] + run * geom.ARM_U[1])
+    assert {end[2] for end in drawing.PIN_AXIS_ENDS} == {geom.PIN_HOLE_ZL}
+    assert drawing.FLAT_ROUND_CENTRE == pytest.approx(part._FLAT_ROUND_C)
+    u, v = drawing.FLAT_ROUND_CENTRE
+    for arm in drawing.FLAT_ROUND_MARK_ENDS:
+        mid = tuple((a + b) / 2.0 for a, b in zip(*arm))
+        assert mid == pytest.approx((0.0, v, -u))
+        assert math.dist(*arm) == pytest.approx(2.0 * drawing.CENTRE_MARK_ARM_MM)
 
 
 def test_walls_hold_the_target_at_the_worst_case_the_sheet_prints() -> None:
@@ -110,8 +137,9 @@ def test_walls_hold_the_target_at_the_worst_case_the_sheet_prints() -> None:
 def test_finished_walls_pay_both_edge_breaks() -> None:
     """#2166 (Codjiflo on #2124): every wall also loses the title block's
     .010 in-plane break at both its edges.  The screw holes' walls to the
-    base's edges (the holes fixed on the MHA-PD-07 bar's taps) finish at
-    .063 (+Y edge), .071 (-Y edge) and .064 (-X end), over the .060 floor;
+    base's edges, at the title block's .XXX position row (delegated ruling
+    2026-11-07: the bar's taps are spotted through the holes), finish at
+    .060 (+Y edge), .068 (-Y edge) and .061 (-X end), at the .060 floor;
     the web and the pin hole's walls still hold the .080 target."""
     breaks = 2.0 * 0.010 * 25.4
     finished = spec.WALLS_FINISHED
@@ -124,12 +152,12 @@ def test_finished_walls_pay_both_edge_breaks() -> None:
         else:
             assert wall >= spec.WALL_TARGET - 1e-9, name
     assert finished["screw holes to the base's y edges"] == pytest.approx(
-        0.063 * 25.4, abs=1e-3
+        0.060 * 25.4, abs=1e-3
     )
     assert finished["far screw hole to the base's -X end"] == pytest.approx(
-        0.064 * 25.4, abs=1e-3
+        0.061 * 25.4, abs=1e-3
     )
-    assert spec.SCREW_HOLE_WALL_TEXT == "WALL .063 MIN TO EDGES"
+    assert spec.SCREW_HOLE_WALL_TEXT == "WALL .060 MIN TO EDGES"
     # The line is no wider than the callout's widest line already printed.
     assert len(spec.SCREW_HOLE_WALL_TEXT) <= len(spec.SCREW_HOLE_MATE)
 
@@ -141,24 +169,24 @@ def test_the_package_declares_the_screw_hole_wall_the_callout_prints() -> None:
     (entry,) = [entry for entry in exceptions if entry["id"] == "RV-01"]
     assert entry["kind"] == "minor"
     assert spec.SCREW_HOLE_WALL_TEXT in entry["where"]
-    assert "delegated ruling 2026-11-04" in entry["reason"]
+    assert entry["reason"].startswith("Owner ruling 2026-11-08 (Pedro)")
+    assert "Delegated ruling 2026-11-07" in entry["reason"]
     assert "#2144" in entry["reason"]
     assert drawing.CALLOUTS_BELOW["ScrewDia"].split("\n")[-1] == (
         spec.SCREW_HOLE_WALL_TEXT
     )
 
 
-def test_the_screw_position_band_is_the_widest_xxx_the_screw_stack_closes() -> None:
-    """The band is the fixed-fastener stack's: the bar taps' radial reach
-    plus the hole's printed reach stays inside the drilled hole's float over
-    the basic major, and one more .001 in step would not."""
+def test_the_screw_positions_take_the_title_block_row() -> None:
+    """Delegated ruling 2026-11-07 (Q1): the MHA-PD-07 taps are spotted
+    through these holes, so the positions spend no screw stack and take the
+    .XXX row; the screw still floats in the smallest drilled hole."""
     assert spec.POSITION_PLACES == 3
+    assert spec.POSITION_TOL == pytest.approx(0.005 * 25.4)
     assert spec.CLEARANCE_RADIAL_MIN == pytest.approx(
         (geom.SCREW_HOLE_DIA - spec.MAJOR_DIA) / 2.0
     )
-    assert spec.SCREW_POSITION_RADIAL == spec._position_radial(spec.POSITION_TOL)
-    assert spec.SCREW_POSITION_RADIAL <= spec.CLEARANCE_RADIAL_MIN
-    assert spec._position_radial(spec.POSITION_TOL + 0.0254) > spec.CLEARANCE_RADIAL_MIN
+    assert spec.CLEARANCE_RADIAL_MIN > 0.0
 
 
 def test_the_screw_head_clears_the_inside_bend_at_the_worst_case() -> None:
@@ -324,12 +352,12 @@ def _texts() -> dict[str, tuple[float, ...]]:
     below = {
         name: len(text.split("\n")) for name, text in drawing.CALLOUTS_BELOW.items()
     }
-    # Printed widths in characters: value and band (".498 ±.002",
-    # "Ø.128 +.004" over "0", "(R.225)", ".61", "(.58)").
+    # Printed widths in characters: value and band (".498", "Ø.128 +.004"
+    # over "0", "(R.225)", ".61", "(.58)").
     widths = {
-        "ScrewX1": 10, "ScrewX2": 10, "ScrewY": 10, "ScrewDia": 11,
-        "RollStart": 8, "FaceY": 7, "FaceX": 7, "TabEndX": 9,
-        "StraightLen": 9, "PinHoleDia": 5, "RollR": 10, "TabR": 9,
+        "ScrewX1": 4, "ScrewX2": 4, "ScrewY": 4, "ScrewDia": 11,
+        "RollStart": 8, "FaceY": 9, "FaceX": 8, "TabEndX": 9,
+        "StraightLen": 6, "RollR": 10, "TabR": 9,
         "Width": 3, "RootR": 4, "RoundR": 7,
         "FlatLength": 4, "FlatArmW": 3, "FlatLowW": 3, "FlatBendC": 5,
         "DevTaper1": 4, "DevTaper2": 4, "DevRoundC": 4,
@@ -469,11 +497,25 @@ def _iso_box() -> tuple[float, ...]:
     return (cx - half[0], cy - half[1], cx + half[0], cy + half[1])
 
 
+def _pin_note_box() -> tuple[float, ...]:
+    """The side view's pin-hole note at the dimension text's size (the
+    attached note takes the document's default), top-left anchored."""
+    lines = spec.PIN_HOLE_NOTE.split("\n")
+    x, y = drawing.PIN_NOTE_XY
+    return (
+        x,
+        y - len(lines) * _LINE_PITCH,
+        x + max(map(len, lines)) * _CHAR_WIDTH,
+        y,
+    )
+
+
 def _notes() -> dict[str, tuple[float, ...]]:
     return {
         "notes": _note_box(spec.DRAWING_NOTES, drawing.NOTES_XY),
         "iso note": _note_box(spec.ISOMETRIC_VIEW_NOTE, drawing.ISO_NOTE_XY),
         "flat note": _note_box(spec.FLAT_PATTERN_NOTE, drawing.FLAT_NOTE_XY),
+        "pin note": _pin_note_box(),
     }
 
 
@@ -558,58 +600,55 @@ def test_no_dimension_line_runs_through_another_text() -> None:
                 assert not _crosses(p, q, r, s), (line_name, name)
 
 
-def test_the_pin_hole_dimension_line_meets_its_value_not_its_callout() -> None:
-    """Review 964b60a3: the leader climbed through MATCH-DRILL / NOTE 3 hung
-    under the value.  The callout now prints above (one line: above-callouts
-    never print a second), and the text stands on the +N side wholly past
-    the upper extension line, so the dimension line rises from the hole into
-    the value's underside.  It crosses only the straight's roll-end extension
-    line (an extension line may cross a dimension line), runs through no
-    other text, and the hole's own extension lines cross nothing."""
-    assert all("\n" not in text for text in drawing.CALLOUTS_ABOVE.values())
-    assert drawing.CALLOUTS_ABOVE["PinHoleDia"] == spec.PIN_HOLE_CALLOUT
-    assert "PinHoleDia" not in drawing.CALLOUTS_BELOW
-    texts = {**_texts(), **_notes()}
-    box = texts.pop("PinHoleDia")
-    centre = drawing.FRONT_KEEP["PinHoleDia"]
-    hole = drawing._front(*geom.PIN_HOLE_L)
-    rel = [(centre[i] - hole[i]) / drawing._S for i in range(2)]
-    u = rel[0] * geom.ARM_U[0] + rel[1] * geom.ARM_U[1]
-    n = rel[0] * geom.ARM_N[0] + rel[1] * geom.ARM_N[1]
-    radius = geom.PIN_HOLE_DIA / 2.0
-    assert u < 0.0 and n > radius
-    # The value's underside is the box's lower line; the callout sits above.
-    value_top = box[1] + _LINE_PITCH
-    extension = {
-        side: (
-            drawing._front(*drawing._on(geom.PIN_HOLE_L, -0.5, side * radius)),
-            drawing._front(*drawing._on(geom.PIN_HOLE_L, u - 1.0, side * radius)),
-        )
-        for side in (-1, 1)
-    }
-    for p, q in extension.values():
-        assert not (_inside(p, box) or _inside(q, box))
-        assert not any(_crosses(p, q, r, s) for r, s in _box_edges(box))
-    dimension_line = (extension[-1][1], centre)
-    entered = [
-        i for i, (r, s) in enumerate(_box_edges(box)) if _crosses(*dimension_line, r, s)
+def test_the_pin_hole_is_called_out_on_the_side_view_at_its_rim() -> None:
+    """Round 2: the front view's Ø.128 ran to the edge-on hole's hidden
+    lines.  The front view draws no hidden lines and dimensions no pin hole;
+    the side view, where the hole shows its outline, carries its size first
+    and note 2 on a leader landing on the far face's rim (the face toward
+    the +X viewer), the note right of the strip and left of the flat
+    pattern, its leader level enough to cross no text."""
+    assert "PinHoleDia" not in drawing.FRONT_KEEP
+    assert "PinHoleProfile" not in spec.DRAWING_DIMENSIONS
+    assert spec.PIN_HOLE_NOTE.split("\n") == [
+        spec.PIN_HOLE_SIZE_TEXT,
+        spec.PIN_HOLE_CALLOUT,
     ]
-    assert entered == [0]  # the bottom edge, the value's underside
-    bottom_edge_x = dimension_line[0][0] + (box[1] - dimension_line[0][1]) * (
-        centre[0] - dimension_line[0][0]
-    ) / (centre[1] - dimension_line[0][1])
-    assert box[0] < bottom_edge_x < box[2] and centre[1] < value_top
-    crossed = []
-    for line_name, (r, s) in _front_lines().items():
-        for p, q in extension.values():
-            assert not _crosses(p, q, r, s), line_name
-        if _crosses(*dimension_line, r, s):
-            crossed.append(line_name)
-    assert crossed == ["StraightLen ext roll end"]
+    assert spec.PIN_HOLE_SIZE_TEXT.startswith("Ø.")
+    assert float(spec.PIN_HOLE_SIZE_TEXT[1:]) == pytest.approx(
+        round(geom.PIN_HOLE_DIA / 25.4, spec.HOLE_PLACES)
+    )
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "set_hidden_lines_visible" not in source
+    # The rim: on the far face (the strip's +U face, at the pin's height),
+    # its plane square to U, facing the side view's +X viewer.
+    centre = drawing.PIN_RIM_CENTRE
+    face = part.FAR_FACE_POINT
+    assert (centre[0] - face[0]) * geom.ARM_U[0] + (
+        centre[1] - face[1]
+    ) * geom.ARM_U[1] == pytest.approx(0.0, abs=1e-9)
+    assert math.dist(centre[:2], geom.PIN_HOLE_L) == pytest.approx(geom.HALF_T)
+    assert centre[2] == geom.PIN_HOLE_ZL
+    assert drawing.PIN_RIM_AXIS[0] > 0.0
+    landing = drawing.PIN_RIM_LANDING
+    assert math.dist(landing, centre) == pytest.approx(geom.PIN_HOLE_DIA / 2.0)
+    assert sum(
+        (a - b) * n for a, b, n in zip(landing, centre, drawing.PIN_RIM_AXIS)
+    ) == pytest.approx(0.0, abs=1e-9)
+    tip = drawing._right(landing[2], landing[1])
+    box = _pin_note_box()
+    # Right of the strip's band at the pin, left of the flat pattern.
+    strip_edge = max(
+        drawing._right(geom.z_local(z), 0.0)[0] for z in (geom.Z_FRONT_LOW, geom.Z_REAR)
+    )
+    flat_left = drawing._flat(part._FLAT["top_rear"][0], 0.0)[0]
+    assert strip_edge < box[0] and box[2] < flat_left - 0.002
+    assert box[1] < tip[1] < box[3]
+    leader = ((box[0], tip[1]), tip)
+    texts = {**_texts(), **_notes()}
+    texts.pop("pin note")
     for name, other in texts.items():
-        for p, q in (*extension.values(), dimension_line):
-            assert not (_inside(p, other) or _inside(q, other)), name
-            assert not any(_crosses(p, q, r, s) for r, s in _box_edges(other)), name
+        assert not (_inside(leader[0], other) or _inside(leader[1], other)), name
+        assert not any(_crosses(*leader, r, s) for r, s in _box_edges(other)), name
 
 
 def _overall_lines() -> dict[str, tuple[tuple[float, float], tuple[float, float]]]:
@@ -762,12 +801,12 @@ def test_the_inside_bend_leader_clears_every_dimension_line() -> None:
             )
 
 
-def test_the_screw_hole_callout_names_the_taps_its_bands_serve() -> None:
-    """Review 4: the ±.002 positions read as unexplained.  The 2X Ø.128
-    callout names the mate (MHA-PD-07's fixed taps); the holes are drilled
-    to the print, not match-drilled.  Its last line states the holes'
-    finished wall to the base's edges (#2166, rule 20)."""
-    assert spec.SCREW_HOLE_MATE == "LOCATE TO MHA-PD-07 TAPS"
+def test_the_screw_hole_callout_names_the_taps_it_serves() -> None:
+    """The 2X Ø.128 callout names the taps its holes serve (MHA-PD-07's,
+    spotted through these holes at assembly, delegated ruling 2026-11-07);
+    the holes are drilled to the print, not match-drilled.  Its last line
+    states the holes' finished wall to the base's edges (#2166, rule 20)."""
+    assert "MHA-PD-07" in spec.SCREW_HOLE_MATE
     assert drawing.CALLOUTS_BELOW["ScrewDia"].split("\n") == [
         spec.SCREW_HOLE_CALLOUT,
         spec.SCREW_HOLE_MATE,
@@ -797,7 +836,9 @@ def test_the_native_screw_callout_stack_clears_the_hole_row_extension() -> None:
 # in from its ends and 0.97..4.47 mm over its baseline.  The leader leaves
 # the last row's underline 1/16 in past the widest row's end and runs at the
 # far hole's centre, its arrow on the rim.  A changed row moves every row:
-# re-read them off a seat's audit dump, never estimate them.
+# re-read them off a seat's audit dump, never estimate them.  The drill row
+# then read "#30 DRILL THRU"; its width stays that seat's, an upper bound on
+# the shorter row the sheet prints now (screen 20261107T081227004Z, rule 3).
 _SCREW_VALUE_ROW = "<MOD-DIAM>.128"
 _SCREW_ROWS = {
     spec.PAIR_CALLOUT: (0.0083611, 0.0054299),

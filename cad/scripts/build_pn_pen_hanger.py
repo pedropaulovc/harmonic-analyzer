@@ -67,7 +67,6 @@ from pn_pen_hanger_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
-    FRONT_VIEW_NOTE,
     GUIDE_PLATE_DROPS,
     GUIDE_PLATE_T,
     GUIDE_PLATE_WIDTH,
@@ -311,8 +310,7 @@ async def build(adapter) -> dict[str, str]:
     # ch21 p.52 (img03) / ch30 plates: the hanger is BLACK-oxide steel, but
     # PANEL_BLACK shaded its 1:1 iso solid black with the black edges lost
     # (r12 review, rule 8).  BAR_STEEL, the darkest named tone light enough
-    # for black edges to read, as sm_gooseneck_spring_screw's black-oxide
-    # finish already renders in a named steel grey (POLISHED_STEEL).
+    # for black edges to read.
     await apply_color(adapter, BAR_STEEL)
     await report_mass_properties(adapter)
     for (feature_name, dimension_name), band in DRAWING_BANDS.items():
@@ -343,7 +341,6 @@ async def build(adapter) -> dict[str, str]:
         PART_NAME,
         {
             "Manufacturing Notes": DRAWING_NOTES,
-            "Front View Note": FRONT_VIEW_NOTE,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )

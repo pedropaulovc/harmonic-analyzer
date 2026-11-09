@@ -4,8 +4,9 @@ The large thin brass reducer disc carries 150 physical teeth (#2034: 15:150
 replaced the narrated 12:120 at the same 1:10 feed), cut by the finite PA20
 48DP stock #1/reference-135 master. It does not touch the rack: the finite
 stock #7/reference-14 knob pinion drives it 15:150.
-Its bore pilots on the brass hub's Ø.501 spigot, and three #0-80 fillister
-screws (MHA-PD-VN-55) clamp it to that hub's flange (MHA-PD-17).
+Its Ø.504 bore clears the brass hub's Ø.501 spigot (the disc is set central
+at assembly), and three #0-80 fillister screws (MHA-PD-VN-55) clamp it to
+that hub's flange (MHA-PD-17).
 
 Every size is ``pd_rack_pinion_spec``'s; the screw pattern is
 ``pd_transgear_disc_hub_geometry``'s (the one authority the flange shares).
@@ -17,7 +18,9 @@ document (#290); the model keeps millimetre globals.
 
 Features: ``GearBlank`` / ``GearBlankProfile`` (the toothed disc's blank,
 renamed so its depth prints as ``FaceWidth``), the tooth gap + pattern,
-``BoreProfile`` / ``Bore`` (hub-spigot bore through) and ``DiscTaps`` (native Hole
+``BoreProfile`` / ``Bore`` (hub-spigot bore through), ``BoreFrontChamfer``
+(the 45° chamfer on the bore's front edge that clears the spigot's root
+radius, its leg ``BoreFrontChamferSize``) and ``DiscTaps`` (native Hole
 Wizard #0-80 taps through, placed from the rear face on the bolt circle; no
 countersink, each mouth's .004 burr break is not modelled, R9-63).
 
@@ -60,11 +63,11 @@ from paper_drive_stock_native import apply_span_limits, author_span
 from pd_rack_pinion_spec import (
     BORE_DEVIATIONS,
     BORE_DIA,
+    BORE_FRONT_CHAMFER,
     DIAMETRAL_PITCH,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     FACE_WIDTH,
-    GEAR_DATA,
     OUTSIDE_DIA_BAND,
     OUTSIDE_DIA_PLACES,
     PRESSURE_ANGLE_DEG,  # noqa: F401 - the drawing test reads it off the part
@@ -101,6 +104,11 @@ BORE_DIAMETER = BORE_DIA
 _R_TAP = TAP_DRILL_DIA / 2.0
 V_BORE = math.pi * (BORE_DIAMETER / 2.0) ** 2 * FACE_WIDTH
 V_TAPS = len(TAP_CENTRES) * math.pi * _R_TAP**2 * FACE_WIDTH
+# The 45° ring removed at the bore's front edge: a right triangle of legs c
+# revolved about the axis, its centroid c/3 outside the bore radius.
+V_BORE_FRONT_CHAMFER = (
+    math.pi * BORE_FRONT_CHAMFER**2 * (BORE_DIAMETER / 2.0 + BORE_FRONT_CHAMFER / 3.0)
+)
 
 # The 0° centre lies on +X (y = 0); the 120° / 240° centres carry both
 # coordinates, each driven from the one "BoltCircleDia" global.
@@ -152,6 +160,7 @@ async def build(adapter) -> dict[str, str]:
     # authored by StockFormProfile through the shared native stock helper.
     await set_global(adapter, "FaceWidth", f"{FACE_WIDTH}mm")
     await set_global(adapter, "BoreDia", f"{BORE_DIAMETER}mm")
+    await set_global(adapter, "BoreFrontChamferSize", f"{BORE_FRONT_CHAMFER}mm")
     await set_global(adapter, "BoltCircleDia", f"{BOLT_CIRCLE_DIA}mm")
 
     drive_jobs: list[tuple[str, str]] = []
@@ -189,6 +198,21 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Bore")
     expected -= V_BORE
     await volume_check(adapter, "bore", expected, 0.01 * V_BORE)
+
+    # The front (z = 0) bore edge, picked on the x = 0 plane: the drawing's
+    # section A-A cuts there, and a chamfer's size imports into the section
+    # whose plane holds its picked edge point (draw_dt_crank_drive_gear).
+    check(
+        "chamfer bore front edge",
+        await adapter.add_chamfer(BORE_FRONT_CHAMFER, [[0.0, BORE_DIAMETER / 2.0, 0.0]]),
+    )
+    name_last_feature(adapter, "BoreFrontChamfer")
+    chamfer_dim = name_dimensions(adapter, "BoreFrontChamfer", ["BoreFrontChamferSize"])[0]
+    drive_jobs.append((chamfer_dim, '"BoreFrontChamferSize"'))
+    expected -= V_BORE_FRONT_CHAMFER
+    await volume_check(
+        adapter, "bore front chamfer", expected, 0.03 * V_BORE_FRONT_CHAMFER + 0.15
+    )
 
     # --- #0-80 taps through, placed from the rear face on the flange's bolt
     # circle.  The sheet prints no position:
@@ -267,10 +291,7 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_properties(
         adapter,
         PART_NAME,
-        {
-            "Gear Data": GEAR_DATA,
-            TOOTH_SPACE_CALLOUT_PROPERTY: TOOTH_SPACE_CALLOUT,
-        },
+        {TOOTH_SPACE_CALLOUT_PROPERTY: TOOTH_SPACE_CALLOUT},
     )
     return await save_simplified_part(adapter, PART_NAME, disc.tooth_features)
 

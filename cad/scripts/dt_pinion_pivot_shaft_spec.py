@@ -72,19 +72,12 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
 PIN_HOLE_DIA = _strap_pin.HOLE_DIA
 PIN_HOLE_BAND = _strap_pin.HOLE_BAND  # the spring pin's functional band
 PIN_HOLE_Z = TORQUE_SHAFT_PIN_HOLE_Z  # (front, back), pinion_rig_layout
-# The hole specification only.  The drilling set-up the pin-hole stations
-# and both bearing stacks assume is an assembly step: Main's re-ruling
-# (2026-09-26) moved it from this callout to MHA-DT-00's SHAFT DRILL SET
-# (pinion_rig_fitup.SHAFT_DRILL_STEP), where the fitter drills, superseding
-# the #858 restricted review's rulings 2 and 3.  The drawing adds the
-# pointer to that step (draw_dt_pinion_pivot_shaft): it is sheet text, so the
-# part never reads the assembly step registry.
-PIN_HOLE_CALLOUT = "\n".join(
-    (
-        "MATCH-DRILL THRU AT ASSEMBLY",
-        "IN MHA-DT-14 CROSS HOLES, 2 PL",
-    )
-)
+# The drilling set-up the pin-hole stations and both bearing stacks assume is
+# an assembly step: Main's re-ruling (2026-09-26) moved it to MHA-DT-00's
+# SHAFT DRILL SET (pinion_rig_fitup.SHAFT_DRILL_STEP), where the fitter
+# drills, superseding the #858 restricted review's rulings 2 and 3.  The
+# hole's callout is sheet text (draw_dt_pinion_pivot_shaft), so wording edits
+# never re-key the part.
 
 SURFACE_FINISHES = (
     SurfaceFinishControl(

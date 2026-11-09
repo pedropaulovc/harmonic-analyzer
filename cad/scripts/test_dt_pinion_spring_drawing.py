@@ -164,8 +164,9 @@ def test_preload_setting_formed_features_carry_the_formed_band() -> None:
     banded = set().union(*dt_pinion_spring_spec.FORMED_BANDED_DIMENSIONS.values())
     assert banded == set(geometry.FORMED_CONTACT_BANDS)
     assert not banded & {"FlatLen", dt_pinion_spring_spec.FREE_KINK_ANGLE}
-    for name in banded:
-        assert "MHA-DT-14" in drawing.DIMENSION_CALLOUTS[name]
+    # The band is wider than the .XXX row: no mate or reason (rule 4), and a
+    # location carries no words (rule 7).
+    assert not banded & set(drawing.DIMENSION_CALLOUTS)
     precision = dt_pinion_spring_spec.DRAWING_PRECISION_BY_NAME
     assert {name: precision[name] for name in banded} == dict.fromkeys(banded, 3)
     assert precision["FlatLen"] == 2
@@ -366,12 +367,13 @@ def test_front_qualifier_text_clears_its_rows_extension_lines() -> None:
         assert not crossed, (name, crossed)
     rows = {"FootLen", "FreeKinkH", "FreeKinkV"}
     assert set(drawing.FRONT_ROW_EXTENSION_X) == rows
-    # Positive control: pc-r12's centred kink-row text crossed both lines.
-    old_x = drawing._front_x(drawing._FOOT_MID_X)
-    half = drawing.QUALIFIER_HALF_WIDTH["FREE, TO KINK TANGENT"]
+    # Positive control: the foot row's bare value, centred between its own
+    # extension lines (10 mm apart), would cross both.
+    old_x = sum(drawing.FRONT_ROW_EXTENSION_X["FootLen"]) / 2.0
+    half = drawing.callout_half_width("FootLen")
     assert all(
         old_x - half < line < old_x + half
-        for line in drawing.FRONT_ROW_EXTENSION_X["FreeKinkH"]
+        for line in drawing.FRONT_ROW_EXTENSION_X["FootLen"]
     )
 
 
@@ -869,7 +871,7 @@ def test_clearance_hole_callout_prints_the_title_block_drilled_hole_places() -> 
     entry = exceptions["RV-02"]
     assert entry.kind == "accept"
     assert entry.reason.startswith(
-        "Delegated ruling 2026-11-02 (Main), following owner precedent"
+        "Owner ruling 2026-11-08 (Pedro), #2144 item 1.2"
     )
     assert "#2144" in entry.reason and "20261102T230110877Z" in entry.reason
     assert f"written as {dt_pinion_spring_spec.HOLE_CALLOUT_PRECISION} " in entry.where

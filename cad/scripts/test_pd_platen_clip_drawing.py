@@ -187,16 +187,26 @@ def test_length_line_clears_the_bridge_end_texts():
     assert length_line_y > bridge_text_top + 0.002
 
 
-def test_hole_row_names_the_tap_pattern_and_clears_the_rail_line():
-    # The .XXX hole row holds the pattern float with the platen's taps; it
-    # says so.  The screw rail's line stands inside the hole row's text span
-    # (its widest line needs that column to clear the border), so the hole
-    # row's block stands under the screw rail's, where that line has stopped.
-    assert "MHA-PD-02" in draw.DIMENSION_CALLOUTS["LeftZ"]
-    assert "MHA-PD-02" in draw.HOLE_CALLOUT_PROCESS
+def test_hole_row_location_is_bare_and_clears_the_rail_line():
+    # Rule 7: a location carries its value and band only; the hole callout
+    # names the platen whose taps the pattern matches.  The screw rail's line
+    # stands inside the hole row's text span (its widest line needs that
+    # column to clear the border), so the hole row's block stands under the
+    # screw rail's, where that line has stopped.
+    assert "LeftZ" not in draw.DIMENSION_CALLOUTS
+    assert "MHA-PD-02" in draw.HOLE_CALLOUT_MATE
     hole_row_top, _bottom, _width = _block("LeftZ")
     _top, rail_bottom, _width = _block("RailWidth")
     assert rail_bottom > hole_row_top + 0.003
+
+
+def test_hole_callout_prints_size_then_process_then_mate():
+    native = {5: "2X <MOD-DIAM><hw-diam> <hw-thru>", 6: "", 7: "", 8: ""}
+    updated = draw.hole_callout_definitions(native)
+    assert updated[5] == "2X <MOD-DIAM><hw-diam> DRILL THRU\nPATTERN MATCHES MHA-PD-02"
+    assert updated[6] == updated[7] == updated[8] == ""
+    with pytest.raises(RuntimeError):
+        draw.hole_callout_definitions({**native, 5: "2X <MOD-DIAM><hw-diam>"})
 
 
 def test_screw_rail_text_clears_the_left_border():
@@ -262,4 +272,3 @@ def test_callout_pick_lies_on_the_far_hole_rim():
     )
     assert math.dist(draw.HOLE_EDGE_XY, centre) == pytest.approx(draw.HOLE_R_SHEET)
     assert draw.HOLE_CALLOUT_XY[0] > draw.RIGHT_EDGE_X
-    assert draw.HOLE_CALLOUT_PROCESS.endswith("DRILL")

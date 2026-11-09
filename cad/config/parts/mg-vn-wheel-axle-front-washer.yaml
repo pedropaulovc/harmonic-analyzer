@@ -7,10 +7,6 @@ mg-vn-wheel-axle-front-washer:
   material: Brass
   material_specification: "Brass washer, #4, 0.120 ID x 0.281 OD; McMaster-Carr 92916A250"
   finish: plain; no coating
-  installation_notes: |-
-    INSTALLATION - ON THE MG-WHEEL-AXLE #4-40 END, BETWEEN THE
-    MHA-MG-05 WHEEL SPIGOT FACE AND THE FIRST MHA-MG-VN-52 NUT;
-    IT BEARS INSIDE THE SPIGOT END, CLEAR OF THE MHA-MG-10 DRUM.
   quantity: 1
   tolerance_class: machined_block
   drawing_unit: in

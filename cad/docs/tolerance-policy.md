@@ -122,10 +122,10 @@ own thin-only bands (thickness +0/−0.04, OD +0/−0.02) for its relief. Gates:
   (pedestal float booked 0 by that order). Each cone's centre is the set point
   plus its own RSS half-range. Gated: nominal contact ratio ≥ 1.0 at the mean
   centre, positive backlash and no interference at the RSS corner. Reported
-  only (REF): the RSS contact ratio and the arithmetic worst-corner
-  interference. T012's worst-corner overlap (0.32 mm, REF) is a fit-up note on
-  the assembly sheet: if T012 binds after the set, back the swing off or stone
-  its tip.
+  only (REF): the RSS contact ratio. The assembly sheet prints no T012
+  overlap figure (owner ruling 2026-11-08, Pedro): T012 must run free after
+  the set, and if it binds the MHA-DT-12 tip is stoned where it marks; the
+  swing is never backed off, as that would undo the T120 set.
 - **T006** (pending exception ruling #971): its DT6-FORM1 relief stands ≥ 0.010 mm clear of
   every printed drum-tip path over the RSS centre range and keeps ≥ 0.02 mm
   backlash; its contact ratio (≈ 0.77) is REF.

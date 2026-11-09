@@ -139,8 +139,19 @@ def test_sheet_runs_at_1_to_1_with_a_3_to_1_detail_of_section_a_a() -> None:
     assert drawing.DETAIL_RADIUS_MM > apex
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "scale=(1, 1)" in source
-    assert dt_pinion_lever_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:1"
-    assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
+    # The one pictorial is at the sheet scale: no label restates it (rule 9).
+    assert "Isometric View Note" not in source
+
+
+def test_hub_bore_names_its_fit_route_and_depth() -> None:
+    import _config
+
+    callout = drawing.DIMENSION_CALLOUTS["HubBore"]
+    assert "<HOLE-DEPTH>" in callout.split("\n")[0]
+    assert _config.parts("dt-pinion-lift-rod")["number"] in callout
+    assert "CLEARANCE" in callout
+    # Location and length dimensions carry no words (rule 7).
+    assert set(drawing.DIMENSION_CALLOUTS) == {"HubBore", "PinHoleDia"}
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:

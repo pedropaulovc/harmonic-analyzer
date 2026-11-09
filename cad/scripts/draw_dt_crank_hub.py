@@ -8,6 +8,7 @@ import sys
 from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     dimension_name,
     place_view,
@@ -25,14 +26,15 @@ from _drawing_common import (
 )
 from _drawing_dimensions import (
     assert_imported_precision,
+    set_arc_endpoints_to_center,
     set_dimension_callouts,
     set_reference_dimension,
     set_reference_dimensions,
 )
+from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leader_notes import add_attached_note
-from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm, drill_process
@@ -45,10 +47,10 @@ from dt_crank_hub_notes import (
     BORE_CALLOUT,
     CROSS_HOLE_CALLOUT,
     HUB_LENGTH_CALLOUT,
-    RELIEF_LENGTH_CALLOUT,
     SEAM_CALLOUT,
     SEAT_CALLOUT,
     SEAT_LENGTH_CALLOUT,
+    SHEET_NOTES,
 )
 from dt_crank_hub_spec import (
     AXIAL_PIN_DIA,
@@ -56,6 +58,7 @@ from dt_crank_hub_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     HUB_BARREL_DIA,
+    HUB_BORE_DIA,
     HUB_LENGTH,
     HUB_SEAT_LENGTH,
     REFERENCE_DIMENSIONS,
@@ -134,10 +137,10 @@ BARREL_FACE_PICK = ((RELIEF_X + SERVICE_PIN_CENTER[0]) / 2.0, SIDE_CENTER[1] + 0
 #   rule 17 (walls and webs)) and the relief from the rear face on
 #   rows below the profile; the toleranced overall, front face to rear
 #   face, on the row below them.  The barrel is the remainder, not printed.
-#   The two banded lengths carry the mate they serve under their text.  The
-#   seat length is a fit-up reference: its value and three-line callout
-#   print right of the outboard end, short of the end view, where the
-#   overall's text below cannot reach them.  The
+#   The banded lengths print their value and band only (rule 7: a reason on
+#   an overall or plain length is narration).  The seat length is a plain
+#   reference: its value prints right of the outboard end, short of the end
+#   view.  The
 #   seat and station row stands above the relief's: the overall's stacked
 #   +/- band reached the shared row's extension lines (farm run
 #   20261031T205208603Z).  The overall's text stands clear under the
@@ -148,22 +151,22 @@ BARREL_FACE_PICK = ((RELIEF_X + SERVICE_PIN_CENTER[0]) / 2.0, SIDE_CENTER[1] + 0
 #   light-press callout above.
 # - Cross-hole callout: above the barrel, its leader rising almost straight
 #   from the hole's top rim, clear of the barrel diameter's extension lines.
-#   It carries the ream's acceptance in words: MHA-DT-09's driven big end
-#   stands proud of the barrel (review of farm run 20261102T004131857Z: a
-#   MIN dimensioned to an outline of another part).
+#   It flags numbered note 1, which states the matched taper ream and its
+#   acceptance; the note block stands bottom left, under the side view and
+#   left of the title block.
 # - Bore callout: right of the end view, its leader entering the bore from the
 #   right, clear of the six-o'clock seam; the seam callout below the end view.
-# The overall's row stands under the seat length's three-line fit-up callout,
-# which hangs right of the outboard end over the overall's text.
 _ROW_Y = (0.120, 0.090)
 _STATION_ROW_Y = _ROW_Y[0] + 0.006
 END_KEEP = {
     "BoreDia": (END_CENTER[0] + 0.070, END_CENTER[1] - 0.020),
 }
-# The seat length is a fit-up reference (the seat is turned to suit the arm,
-# end flush; owner ruling 2026-11-01 on the r9 review), so nothing chains
-# through it: the cross-hole station prints from the faced outboard end.
-REFERENCE_LENGTHS = ("SeatLength",)
+# The seat length is a reference (the seat length is the arm's thickness as
+# made; owner ruling 2026-11-01 on the r9 review) flagged to numbered note 2,
+# so nothing chains through it: the cross-hole station prints from the faced
+# outboard end.  The seam depth prints in the seam callout (rule 26), so its
+# native side-view dimension is a reference too.
+REFERENCE_LENGTHS = ("SeatLength", "SeamDepth")
 # The hub's half of the seam is the arc bulging from the seat edge toward the
 # bore; the callout attaches 45 degrees up its right flank.
 SEAM_CENTER = (END_CENTER[0], END_CENTER[1] - AXIAL_PIN_RADIUS_FROM_AXIS * _S)
@@ -175,30 +178,46 @@ SEAM_EDGE_PICK = (
 # drops almost straight to it; a block centred under the view attached at its
 # far end and crossed both its own text and the bore leader (run a2e1cd67).
 SEAM_CALLOUT_XY = (0.303, 0.105)
+# The seam's radial station: a vertical dimension from the bore's axis to the
+# seam's centre (rule 10: from a real feature; rule 26: a location is a
+# dimension), picked on the bore 135 degrees round, clear of the centre mark
+# and of the bore callout's leader entering from the right, and on the seam
+# arc where its callout attaches.  The text stands left of the end view,
+# right of the seat diameter's dimension line (OUTBOARD_X + 0.020).
+BORE_EDGE_PICK = (
+    END_CENTER[0] - HUB_BORE_DIA / 2.0 * _S * math.cos(math.pi / 4.0),
+    END_CENTER[1] + HUB_BORE_DIA / 2.0 * _S * math.sin(math.pi / 4.0),
+)
+SEAM_STATION_TEXT_XY = (0.262, (END_CENTER[1] + SEAM_CENTER[1]) / 2.0)
+# The inch sheet's two places (swUnitsLinearDecimalPlaces, the document
+# default new_project_drawing sets): the seam station is a .XX location.
+SEAM_STATION_PLACES = 2
 SIDE_KEEP = {
     # Right of the seat diameter's dimension line (OUTBOARD_X + 0.020), which
-    # crossed its text there (farm run 20261101T074739942Z). The whole block
-    # starts right of that line, so none of it sits under the line's lower
-    # arrow (Opus review at 7fe9d97bd), and ends short of the end view.
+    # crossed its text there (farm run 20261101T074739942Z), so none of it
+    # sits under the line's lower arrow (Opus review at 7fe9d97bd), and short
+    # of the end view.
     "SeatLength": (OUTBOARD_X + 0.034, _STATION_ROW_Y),
     # The station from the faced outboard end, on its own row under the seat
-    # length's block, whose dimension line runs under its END FLUSH row at
-    # about y 0.115 (farm run 20261101T234626714Z: .53 sat on it at 0.113)
-    # (machinist review of the inch sheet: no chain through the shoulder).
+    # length's (farm run 20261101T234626714Z: .53 sat on that dimension line
+    # at 0.113) (machinist review of the inch sheet: no chain through the
+    # shoulder).
     "ServicePinStation": ((OUTBOARD_X + SERVICE_PIN_CENTER[0]) / 2.0, 0.104),
-    # The seam's depth from the faced outboard end, under the notch the seam
-    # cuts in the seat's bottom edge: between that edge and the seat length's
-    # dimension line, its right extension line shared with the seat length's
-    # (Codjiflo review of 831be7869: a depth typed into the seam note).
-    "SeamDepth": ((OUTBOARD_X + SEAM_END_X) / 2.0, SEAT_BOTTOM - 0.007),
-    # The toleranced .990 and its two-line callout fill the span between its
-    # extension lines and sat on its own dimension line (machinist review of
-    # the inch sheet, r2): they print right of the outboard face instead, the
-    # dimension line running out to them, clear of the seam callout.
+    # The seam's depth from the faced outboard end, level with the notch the
+    # seam cuts in the seat's bottom edge.  A reference: the seam callout
+    # carries the depth (rule 26).  "(.17)" is wider than its 8.6-mm span and
+    # sat struck by both extension lines (round-2 review, 2 of 3 runs), so it
+    # prints right of the outboard end, the dimension line running out to it,
+    # short of the seat diameter's dimension line (OUTBOARD_X + 0.020).
+    "SeamDepth": (OUTBOARD_X + 0.010, SEAT_BOTTOM - 0.007),
+    # The toleranced .990 and its two-line stack callout filled the span
+    # between its extension lines and sat on its own dimension line
+    # (machinist review of the inch sheet, r2): they print right of the
+    # outboard face instead, the dimension line running out to them, clear
+    # of the seam callout.
     "HubLength": (OUTBOARD_X + 0.032, _ROW_Y[1]),
-    # Its toleranced text and callout are wider than the relief: they print
-    # outside the span, left of the rear face, the dimension line running out
-    # to them, the callout ending short of the overall's dimension line.
+    # Its text prints outside the span, left of the rear face, the dimension
+    # line running out to it.
     "ReliefLength": (INBOARD_X - 0.030, _ROW_Y[0]),
     "ReliefDia": (INBOARD_X - 0.012, SIDE_CENTER[1]),
     "BarrelDia": (INBOARD_X - 0.034, SIDE_CENTER[1]),
@@ -206,12 +225,20 @@ SIDE_KEEP = {
 }
 HOLE_CALLOUT_XY = (0.150, 0.222)
 ISO_NOTE_XY = (0.345, 0.195)
+# The isometric is drawn at the sheet's 2:1, so its label states no scale
+# (rule 9: a view prints its scale only where it differs; integration proof
+# 20261109T105251629Z, 3 of 3 runs).  The part's "Isometric View Note"
+# property still reads SCALE 2:1: dt_crank_hub_spec is in every crank part's
+# closure, so the sheet prints its own label rather than re-key them.
+ISO_NOTE = "ISOMETRIC VIEW"
+# The numbered notes' top-left corner: under the overall's row (y 0.090) and
+# left of the title block (x 0.216).
+NOTES_XY = (0.020, 0.062)
 DIMENSION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
     "SeatDia": SEAT_CALLOUT,
     "SeatLength": SEAT_LENGTH_CALLOUT,
     "HubLength": HUB_LENGTH_CALLOUT,
-    "ReliefLength": RELIEF_LENGTH_CALLOUT,
 }
 
 
@@ -229,6 +256,37 @@ def _set_callout_below(display: Any, text: str, label: str) -> None:
         raise RuntimeError(f"{label}: callout-below text did not persist: {applied!r}")
 
 
+def _add_seam_station(adapter: Any, view: Any) -> None:
+    """Locate the seam's centre radially from the bore axis on the end view.
+
+    Picks the bore and the seam's hub-side arc, re-anchors both ends to the
+    arc centres and proves the measured value is the model's seam radius, so
+    a mis-pick can never print a wrong location (#1105).  The printed places
+    follow the inch sheet's document default; read back, never set.
+    """
+    label = "MHA-DT-VN-59 seam radial station"
+    dimension = add_edge_dimension(
+        adapter,
+        view,
+        p0=BORE_EDGE_PICK,
+        p1=SEAM_EDGE_PICK,
+        text_xy=SEAM_STATION_TEXT_XY,
+        label=label,
+        orientation="vertical",
+    )
+    set_arc_endpoints_to_center(adapter, dimension, label=label)
+    assert_dimension_measures(
+        adapter, dimension, expected_mm=AXIAL_PIN_RADIUS_FROM_AXIS, label=label
+    )
+    display = _early_bound(dimension, "IDisplayDimension")
+    places = int(display.GetPrimaryPrecision2())
+    if places == -2:  # swPrecisionFollowsDocumentSetting
+        extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
+        places = int(extension.GetUserPreferenceInteger(49, 0))  # swUnitsLinearDecimalPlaces
+    if places != SEAM_STATION_PLACES:
+        raise RuntimeError(f"{label} prints {places} places, not {SEAM_STATION_PLACES}")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -236,22 +294,8 @@ async def build(adapter: Any) -> dict[str, str]:
     check("open crank-hub source", await adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
-        (
-            "Number",
-            "Revision",
-            "Title",
-            "Material Specification",
-            "Finish",
-            "Quantity",
-            "Isometric View Note",
-        ),
-        required=(
-            "Number",
-            "Material Specification",
-            "Finish",
-            "Quantity",
-            "Isometric View Note",
-        ),
+        ("Number", "Revision", "Title", "Material Specification", "Finish", "Quantity"),
+        required=("Number", "Material Specification", "Finish", "Quantity"),
     )
     drawing_model, _sheet = new_project_drawing(
         adapter,
@@ -342,7 +386,11 @@ async def build(adapter: Any) -> dict[str, str]:
         note_xy=SEAM_CALLOUT_XY,
         label="MHA-DT-VN-59 seam callout",
     )
-    add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
+    _add_seam_station(adapter, front)
+    if add_note(adapter, SHEET_NOTES, *NOTES_XY) is None:
+        raise RuntimeError("failed to add the crank hub's numbered notes")
+    if add_note(adapter, ISO_NOTE, *ISO_NOTE_XY) is None:
+        raise RuntimeError("failed to add the crank hub's isometric label")
 
     return await finalize_drawing(
         adapter,

@@ -68,58 +68,53 @@ def test_uniform_plate_preserves_anchor_and_nut_installation_coordinates() -> No
         assert nut_position == pytest.approx(tap_bottom)
 
 
-def test_counter_leading_half_turn_clears_tube_and_head() -> None:
-    """The extra half-turn must face the open side, not penetrate the tube,
-    at the free gap and across the whole clamped-gap envelope."""
+def test_counter_leading_half_turn_clears_tube_and_retainer() -> None:
+    """The extra half-turn must face the open side, not penetrate the tube
+    or the head, wherever the free eye rides on the shoulder (owner ruling
+    2026-11-08 (Pedro), #2144 item 11.4: bare slotted McMaster 91829A566,
+    washer dropped)."""
     import sm_gooseneck_spring_joint as spring_joint
 
     pose = spring_mount_geom.COUNTER_REFERENCE_POSE
     screw_y = spring_mount_geom.GOOSENECK_ORIGIN_Y + sm_gooseneck_geom.ARM_Y
     steps = 8
-    least = spring_joint.CLAMPED_AXIS_GAP_MIN
-    gaps = [sm_gooseneck_geom.SPRING_EYE_GAP] + [
-        least + (spring_joint.CLAMPED_GAP_MAX - least) * index / steps
-        for index in range(steps + 1)
-    ]
-    for clamp_gap in gaps:
+    for index in range(steps + 1):
+        shift = spring_joint.EYE_AXIAL_PLAY_MAX * index / steps
         tube_gap, head_gap = spring_mount_geom.counter_half_turn_clearances(
-            pose, screw_y, clamp_gap=clamp_gap
+            pose, screw_y, eye_shift=shift
         )
-        assert tube_gap >= spring_mount_geom.MIN_CLEARANCE_MM, clamp_gap
-        assert head_gap >= spring_mount_geom.MIN_CLEARANCE_MM, clamp_gap
+        assert tube_gap >= spring_mount_geom.MIN_CLEARANCE_MM, shift
+        assert head_gap >= spring_mount_geom.MIN_CLEARANCE_MM, shift
 
 
-def test_counter_upper_loop_bears_on_the_plain_body_and_clears_the_tube() -> None:
-    """The MHA-SM-04 shank supports the plumb loop on its plain Ø6.35 body."""
-    import build_sm_summing_assembly as summing
+def test_counter_upper_loop_rides_on_the_shoulder_and_clears_the_tube() -> None:
+    """The MHA-SM-VN-56 shoulder carries the plumb loop, free (#2144 item 11.4)."""
     import sm_gooseneck_spring_joint as spring_joint
-    import sm_gooseneck_spring_screw_geom as spring_screw
+    import sm_vn_gooseneck_shoulder_screw_spec as shoulder_screw
     from _counter_spring_hang import assert_counter_spring_top_hang
 
     pose = spring_mount_geom.COUNTER_REFERENCE_POSE
     assert pose.axis_xy[1] == pytest.approx(1.0, abs=1e-6)
-    # Coil mean radius 5.5499 less wire radius 0.8001 less body radius 3.175.
-    assert spring_screw.BODY_DIA == pytest.approx(6.35)
+    # Coil mean radius 5.5499 less wire radius 0.8001 less shoulder radius.
     assert spring_mount_geom.counter_upper_support_offset(
         pose.axis_xy
-    ) == pytest.approx(1.5748, abs=1e-4)
+    ) == pytest.approx(5.5499 - 0.8001 - shoulder_screw.SHOULDER_DIA / 2.0, abs=1e-4)
     assert sm_gooseneck_geom.SPRING_EYE_GAP == pytest.approx(4.88061)
     assert spring_mount_geom.COUNTER_UPPER_EYE_X == pytest.approx(
         spring_mount_geom.COLUMN_X - sm_gooseneck_geom.SPRING_EYE_X
     )
-    # The end piece's tap is blind: the longest screw at the least gap on its
-    # axis stops short of the shallowest full thread, and the shortest screw
-    # at the free gap still engages 1.5D of full thread.
-    assert (
-        spring_screw.LENGTH
-        + spring_screw.LENGTH_UPPER
-        - spring_joint.CLAMPED_AXIS_GAP_MIN
-        < spring_joint.TAP_THREAD_DEPTH_MIN
-    )
-    assert spring_joint.ENGAGEMENT_MIN >= 1.5 * spring_screw.MAJOR_DIA
+    # The shoulder seats on the end face: the tip stops short of the
+    # shallowest full thread.
+    assert shoulder_screw.THREAD_LENGTH < spring_joint.TAP_THREAD_DEPTH_MIN
     assert_counter_spring_top_hang(pose, spring_mount_geom.GOOSENECK_ORIGIN_Y)
-    # The screw frame's head (+Z) points outboard (machine +X), so its shank
-    # runs into the end piece.
+
+
+def test_counter_shoulder_screw_head_points_outboard() -> None:
+    """The screw frame's head (+Z) points outboard (machine +X), so its thread
+    runs into the end piece.  Imports the summing build, so it waits on the
+    re-recorded counter calibration (settled_spring_seats)."""
+    import build_sm_summing_assembly as summing
+
     assert summing.ROT_Y_POS90[2] == [1.0, 0.0, 0.0]
 
 

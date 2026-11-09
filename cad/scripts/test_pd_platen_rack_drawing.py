@@ -246,19 +246,18 @@ def test_purchase_and_joint_properties_do_not_prescribe_tooth_manufacture() -> N
     assert f"{feed.DIAMETRAL_PITCH:g} DP" in spec.GEAR_DATA
     assert f"{feed.PRESSURE_ANGLE_DEG:g}\N{DEGREE SIGN} PA" in spec.GEAR_DATA
     assert spec.PURCHASED_RACK_MATERIAL.upper() not in spec.GEAR_DATA.upper()
-    assert "SOFT-SOLDERED" in spec.DRAWING_NOTES
-    assert "PHASE NOT CONTROLLED" in spec.DRAWING_NOTES
-    assert "SET MESH AT ASSEMBLY" in spec.DRAWING_NOTES
-    assert sum(len(block.splitlines()) for block in (spec.GEAR_DATA, spec.DRAWING_NOTES)) <= 4
+    # The sheet's own notes: the leadered joint and flush-end requirements and
+    # one general line; no assembly instruction on the part sheet (rule 7).
+    sheet_notes = (drawing.NOTES_TEXT, drawing.SOLDER_NOTE, drawing.FLUSH_NOTE)
+    assert "MESH" not in "\n".join(sheet_notes)
     text = "\n".join(
-        (spec.PURCHASED_RACK_NOTE, spec.GEAR_DATA, spec.DRAWING_NOTES)
+        (spec.PURCHASED_RACK_NOTE, spec.GEAR_DATA, *sheet_notes)
     ).upper()
     for claim in (
         "FORM CUTTER", "RACK FORM", "135T", "STOCKED", "DROP-IN", "BRAZE",
         "WAIVER", "ACCEPTED", "EXCEPTION",
     ):
         assert claim not in text
-    assert not any(char.isdigit() for char in spec.DRAWING_NOTES)
     row = _config.parts(builder.PART_NAME)
     assert row["finish"] == "rack as purchased; backer and solder fillet cleaned"
     installation = row["installation_notes"]
@@ -836,9 +835,17 @@ def test_the_stock_refs_carry_the_receiving_ceilings_the_cut_end_reserve_uses() 
     assert set(ceilings) <= spec.DRAWING_REFERENCE_DIMENSIONS
     step = 10.0 ** -spec.DRAWING_PRECISION_BY_NAME["RackHeight"]
     for name, ceiling_mm in ceilings.items():
-        printed = float(spec.DIMENSION_CALLOUTS[name].split()[1])
+        printed = float(spec.DIMENSION_CALLOUTS[name].split()[0])
         # Rounded down: never admits a section above the ceiling, never
         # rejects one more than a print step below it.
         assert printed * 25.4 <= ceiling_mm
         assert printed + step > ceiling_mm / 25.4
         assert printed > spec.RACK_HEIGHT / 25.4
+    # Each limit names the mate it protects (round 5: a supplier size's limit
+    # with no mate read as invented).
+    assert spec.DIMENSION_CALLOUTS["RackHeight"].splitlines()[1] == (
+        f"CLEARS {_config.parts('pd-platen-guide')['number']}"
+    )
+    assert spec.DIMENSION_CALLOUTS["RackDepth"].endswith(
+        f" FOR {_config.parts('pd-transgear-feed-pinion')['number']} MESH"
+    )

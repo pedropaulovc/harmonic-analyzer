@@ -4,10 +4,13 @@ Issue #290: the sheet prints decimal inch (``drawing_unit: in``); bands and
 limits stay physical millimetres, each the exact decimal of its inch value.
 """
 
+import math
+
 import _config
 from _gtol_planar import PlanarFace
 from _hole_spec import HoleSpec
 from _package_units import drawing_unit
+from _printed_tolerance import printed_band_mm
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 UNIT = drawing_unit("parts/pd-platen-guide", _config.parts("pd-platen-guide"))
@@ -27,13 +30,34 @@ TAPPED_HOLE_SPEC = HoleSpec("tapped", "#4-40")
 LOCK_TAP_SPEC = HoleSpec("tapped", "#4-40")
 
 # Owner ruling 2026-11-01 (option B2): the rail is .29 tall and both tap rows
-# stand .140 above datum B (local y 0, the bottom face), so each #4-40 major
-# with its Ø.008 position keeps .080 to datum B and to the top face at the
-# height's .XX minimum (build_pd_platen_guide asserts both walls). The bottom
-# rail's datum B stays on the frame's GUIDE_Y over the rack backer, so both
-# rails grow into the support bar's channel (pd_support_bar_spec.BAR_HEIGHT).
+# stand .140 above the bottom face (local y 0). The bottom rail's bottom face
+# stays on the frame's GUIDE_Y over the rack backer, so both rails grow into
+# the support bar's channel (pd_support_bar_spec.BAR_HEIGHT).
+#
+# Owner ruling 2026-11-08 (Pedro, #2144 item 2.3: "these are noncritical
+# holes, why use GD&T in the first place"): the 9X #4-40 taps print plain
+# coordinates, no position frame or datums. Their stations print .XXX at the
+# title block's ±.005 (TAP_STATION_PLACES). The tap row prints .140 ±.005
+# (TAP_Y_BAND), the shop's drilled-hole location row, with no fit route
+# (integration review 20261109T062834910Z: ±.004 was narrower than that row).
+# At it each tap major's finished wall to the bottom and top faces at the
+# height's .XX minimum is .059, .001 under the .060 floor: Delegated ruling
+# 2026-11-09 (Main), pending owner confirmation; owner review #2144 item 2.3
+# (RV-01; build_pd_platen_guide asserts both walls). The platen screws float
+# in MHA-PD-02's .144 holes over both patterns' coordinate bands
+# (test_pd_platen_refit); MHA-PD-12's .125 holes, with only .013 of float,
+# are transferred from the lock taps at assembly.
 GUIDE_HEIGHT = 7.366  # .29
 TAP_Y = 3.556  # .140
+TAP_Y_BAND = 0.127  # ±.005
+TAP_STATION_PLACES = 3
+TAP_STATION_BAND = printed_band_mm(TAP_STATION_PLACES, unit=UNIT)  # ±.005
+# The farthest one tap's axis stands from its nominal: both coordinate bands
+# at once (a square zone's corner).
+TAP_POSITION_RADIAL = math.hypot(TAP_STATION_BAND, TAP_Y_BAND)
+# The tap row's band, printed on every hole-table Y LOC; note 1 states the
+# taps' finished wall to the edges (TAP_EDGE_WALL_TEXT in the builder).
+TAP_Y_BAND_TEXT = f"{TAP_Y / 25.4:.3f} ±{TAP_Y_BAND / 25.4:.3f}".replace("0.", ".")
 
 # The rail's depth (``build_pd_platen_guide.GUIDE_DEPTH``) sets how far behind the
 # bar's back face the lock plates ride and how close their slotted pan heads
@@ -84,18 +108,8 @@ if {f: set(d) for f, d in DRAWING_PRECISION.items()} != DRAWING_DIMENSIONS:
 # under the max (build_pd_platen_guide asserts it), so the facing always cuts.
 LOCK_GAP_FIT = (0.0508, 0.2286)  # .002, .009
 
-
-# Manufacturing GD&T limits consumed by the part's drawing projection: the
-# printed inch zone, and its exact millimetres for the stacks.
-GEOMETRIC_TOLERANCES_IN: dict[str, str] = {
-    "guide hole-pattern position": ".008",
-}
-GEOMETRIC_TOLERANCES_MM: dict[str, float] = {
-    key: float(value) * 25.4 for key, value in GEOMETRIC_TOLERANCES_IN.items()
-}
-
 # The one running surface (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)): the platen HANGS by the top rail's
-# bottom face (local y 0, datum B) on the support bar's top edge and slides
+# bottom face (local y 0) on the support bar's top edge and slides
 # along it across the feed. Both rails are this part, so the face is cut on
 # both. Every other face is cast/machined per the title block. The symbol
 # names the bar it slides on.

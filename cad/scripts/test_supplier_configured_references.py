@@ -91,7 +91,6 @@ class _View:
 def _chain_sheet(
     monkeypatch,
     *,
-    connecting,
     position=(0.073, 0.119),
     scale=(1.0, 2.0),
     outline=(0.05, 0.12, 0.15, 0.16),
@@ -105,16 +104,10 @@ def _chain_sheet(
         (0.001, -chain_stock.ROLLER_DIAMETER / 2000),
         (0.001 + 2 * chain_stock.PITCH / 1000, chain_stock.ROLLER_DIAMETER / 2000),
     )
-    # The TOP ink: the roller outline alone, or roller to pin outline (three
-    # pitches across), whose pin length sets the height.
-    top_width, top_height = (
-        (3 * chain_stock.PITCH, chain_stock.CONNECTING_PIN_LENGTH)
-        if connecting
-        else (chain_stock.ROLLER_DIAMETER, chain_stock.ROLLER_WIDTH)
-    )
+    # The TOP ink: the roller outline alone.
     views["free_top"].source_points = (
-        (0.002, -top_height / 2000),
-        (0.002 + top_width / 1000, top_height / 2000),
+        (0.002, -chain_stock.ROLLER_WIDTH / 2000),
+        (0.002 + chain_stock.ROLLER_DIAMETER / 1000, chain_stock.ROLLER_WIDTH / 2000),
     )
     for view in views.values():
         view.Position = position
@@ -138,8 +131,6 @@ def _chain_sheet(
         chain_stock.ROLLER_DIMENSION: chain_stock.ROLLER_DIAMETER,
         chain_stock.PITCH_DIMENSION: chain_stock.PITCH,
         chain_stock.WIDTH_DIMENSION: chain_stock.ROLLER_WIDTH,
-        chain_stock.PLATE_DIMENSION: chain_stock.PLATE_THICKNESS,
-        chain_stock.LENGTH_DIMENSION: chain_stock.CONNECTING_PIN_LENGTH,
     }
     for module in (chain_dimensions, supplier_drawing):
         monkeypatch.setattr(module, "_early_bound", lambda value, _interface: value)
@@ -192,23 +183,16 @@ def _chain_sheet(
     checks = chain_dimensions.annotate_chain_stock(
         SimpleNamespace(_attempt=lambda operation: operation()),
         views,
-        connecting=connecting,
         reference_bounds=reference_bounds,
     )
     return views, checks[0]
 
 
-@pytest.mark.parametrize("connecting,expected_count", [(False, 4), (True, 6)])
 def test_supplier_inventory_retains_exact_nominals_and_reacquires_rebuilt_annotations(
     monkeypatch,
-    connecting,
-    expected_count,
 ):
-    views, settled = _chain_sheet(monkeypatch, connecting=connecting)
-    assert (
-        sum(view.GetDisplayDimensionCount() for view in views.values())
-        == expected_count
-    )
+    views, settled = _chain_sheet(monkeypatch)
+    assert sum(view.GetDisplayDimensionCount() for view in views.values()) == 4
     assert not views["installed_iso"].annotations
     pin = next(
         annotation.display
@@ -241,7 +225,7 @@ def test_supplier_inventory_retains_exact_nominals_and_reacquires_rebuilt_annota
     "fault", ["owner", "value", "band", "missing", "foreign", "configuration"]
 )
 def test_final_supplier_readback_rejects_source_or_inventory_drift(monkeypatch, fault):
-    views, settled = _chain_sheet(monkeypatch, connecting=True)
+    views, settled = _chain_sheet(monkeypatch)
     front = views["free_front"]
     display = front.annotations[0].display
     if fault == "owner":
@@ -262,27 +246,6 @@ def test_final_supplier_readback_rejects_source_or_inventory_drift(monkeypatch, 
         settled()
 
 
-def test_connecting_application_references_are_explicit_not_physical_roller_claims(
-    monkeypatch,
-):
-    views, settled = _chain_sheet(monkeypatch, connecting=True)
-    displays = {
-        annotation.display.native.FullName.split("@")[0]: annotation.display
-        for view in views.values()
-        for annotation in view.annotations
-    }
-    assert displays[chain_stock.ROLLER_DIMENSION].options["callout"] == "FOR ROLLER"
-    assert (
-        displays[chain_stock.WIDTH_DIMENSION].options["callout"] == "FOR ROLLER WIDTH"
-    )
-    assert displays[chain_stock.LENGTH_DIMENSION].native.value_mm == pytest.approx(
-        8.509
-    )
-    assert displays[chain_stock.PLATE_DIMENSION].native.value_mm == pytest.approx(0.762)
-    settled()
-
-
-@pytest.mark.parametrize("connecting", [False, True])
 @pytest.mark.parametrize(
     "position,scale,outline",
     [
@@ -292,14 +255,10 @@ def test_connecting_application_references_are_explicit_not_physical_roller_clai
     ids=["stale", "padded"],
 )
 def test_chain_annotation_positions_follow_source_ink_not_stale_outline(
-    monkeypatch, connecting, position, scale, outline
+    monkeypatch, position, scale, outline
 ):
     views, settled = _chain_sheet(
-        monkeypatch,
-        connecting=connecting,
-        position=position,
-        scale=scale,
-        outline=outline,
+        monkeypatch, position=position, scale=scale, outline=outline
     )
     ratio = scale[0] / scale[1]
     x, y = position
@@ -316,56 +275,24 @@ def test_chain_annotation_positions_follow_source_ink_not_stale_outline(
         ),
     }
     top_left = x + 0.002 * ratio
-    top_right = top_left + (
-        3 * chain_stock.PITCH if connecting else chain_stock.ROLLER_DIAMETER
-    ) / 1000 * ratio
-    plate_span_x = top_left + chain_stock.PITCH / 1000 * ratio
     expected_top = {chain_stock.WIDTH_DIMENSION: (top_left - 0.014, y)}
-    if connecting:
-        expected_top.update(
-            {
-                chain_stock.PLATE_DIMENSION: (
-                    plate_span_x - 0.003,
-                    y + chain_stock.CONNECTING_PIN_LENGTH / 2000 * ratio + 0.004,
-                ),
-                chain_stock.LENGTH_DIMENSION: (top_right + 0.020, y),
-            }
-        )
     for key, expected in (("free_front", expected_front), ("free_top", expected_top)):
         assert set(views[key].dimension_positions) == set(expected)
         for name, xy in expected.items():
             assert views[key].dimension_positions[name] == pytest.approx(xy)
-    if connecting and ratio == 2.0:
-        # At the 2:1 fit the shelved two-row plate REF (about 8 mm tall, 16 mm
-        # wide, centred 10 mm left of its line) sits above the roller outline,
-        # short of the roller-width line, inside a 40 mm cell centred on the ink;
-        # its line stands clear left of the plate outline it measures.
-        plate_x, plate_y = views["free_top"].dimension_positions[
-            chain_stock.PLATE_DIMENSION
-        ]
-        assert plate_y - 0.004 > y + chain_stock.ROLLER_WIDTH / 2000 * ratio + 0.001
-        assert plate_y + 0.004 < y + 0.020
-        assert plate_x - 0.010 - 0.008 > top_left - 0.014 + 0.002
-        assert plate_x < plate_span_x
     assert not views["installed_iso"].dimension_positions
     settled()
     assert all(view.outline_calls == 0 for view in views.values())
 
 
-@pytest.mark.parametrize("connecting", [False, True])
-def test_chain_top_shelves_text_without_moving_native_lines(monkeypatch, connecting):
-    views, settled = _chain_sheet(
-        monkeypatch, connecting=connecting, scale=(5.0, 1.0)
-    )
+def test_chain_top_shelves_text_without_moving_native_lines(monkeypatch):
+    views, settled = _chain_sheet(monkeypatch, scale=(5.0, 1.0))
     top = views["free_top"]
     by_name = {
         annotation.display.native.FullName.split("@")[0]: annotation
         for annotation in top.annotations
     }
     shelves = {chain_stock.WIDTH_DIMENSION: -0.024}
-    if connecting:
-        shelves[chain_stock.PLATE_DIMENSION] = -0.010
-        shelves[chain_stock.LENGTH_DIMENSION] = 0.024
     for name, dx in shelves.items():
         annotation = by_name[name]
         line = top.dimension_positions[name]
@@ -410,18 +337,6 @@ def test_chain_top_roller_square_projects_over_front_roller_circle():
     ) / 2
     roller_x = cells["free_front"][0] + (chain_stock.PITCH - front_ink_centre) / 1000 * 5
     assert cells["free_top"][0] == pytest.approx(roller_x)
-
-
-def test_connecting_link_top_fit_lane_accommodates_two_to_one_pin_length():
-    cells = supplier_drawing.supplier_fit_cells(
-        supplier_drawing.supplier_state_cells(0.08),
-        chain_dimensions.SUPPLIER_MARGINS,
-        label="connecting link reference",
-    )
-    top = next(box for name, _center, box in cells if name == "free_top")
-    available_height = top[3] - top[1]
-    assert chain_stock.CONNECTING_PIN_LENGTH / 1000 * 2 < available_height
-    assert chain_stock.CONNECTING_PIN_LENGTH / 1000 * 4 > available_height
 
 
 def test_wire_nominal_cannot_be_read_from_the_installed_envelope(monkeypatch):

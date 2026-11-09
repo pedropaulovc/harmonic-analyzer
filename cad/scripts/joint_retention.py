@@ -42,10 +42,11 @@ import _buildgraph
 import _config
 import ch_channel_assembly_steps
 import dt_drive_train_steps
+import fr_frame_assembly_steps
 import ha_harmonic_analyzer_assembly_steps
 import mg_magnifier_assembly_steps
 import pd_paper_drive_assembly_steps
-import sm_gooseneck_spring_screw_geom as gooseneck_screw
+import sm_vn_gooseneck_shoulder_screw_spec as gooseneck_screw
 
 
 class Enforcement(StrEnum):
@@ -287,6 +288,7 @@ STEP_LISTS: dict[str, tuple[str, ...]] = {
     "ch_channel": ch_channel_assembly_steps.SEQUENCE,
     "pd_paper_drive": pd_paper_drive_assembly_steps.SEQUENCE,
     "mg_magnifier": mg_magnifier_assembly_steps.SEQUENCE,
+    "fr_frame": fr_frame_assembly_steps.SEQUENCE,
 }
 
 
@@ -609,16 +611,17 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "dt_vn_cone_tip_block_screw",  # #4-40 SHCS (91251A108), member into cone_tip_block foot
         "dt_vn_cone_tip_collar",  # custom collar + stock #2-56 94355A213 flat-point screw on the shaft D-flat
         "dt_vn_cone_tip_pinch_screw",  # #4-40 fillister (91794A112), member into cone_tip_block far jaw; lock of cone_tip_adjuster
-        "dt_crank_arm",  # #4-40 through-taps, receiver of crank_handle_pivot_screw and MHA-SH-VN-51
+        "dt_crank_arm",  # #4-40 and #2-56 through-taps, receiver of crank_handle_pivot_screw and MHA-DT-VN-70
         "dt_crank_handle_pivot_screw",  # #4-40 made shoulder screw (MHA-DT-32), member into crank_arm
-        "sh_vn_brass_fillister_screw",  # #4-40 brass (90114A511), keeper eye, nameplate and paper guides
+        "sh_vn_brass_fillister_screw",  # #4-40 brass (90114A511), nameplate and paper guides
+        "dt_vn_keeper_chain_screw",  # #2-56 x 1/4 brass binding head (92443A077, MHA-DT-VN-70), member into crank_arm
         "sh_vn_fillister_screw_90280a108",  # #4-40 (90280A108), spring foot, swing stop and latch-hook bracket
         "fr_vn_frame_cross_screw",  # #10-32 UNF-2A x 1-3/4 (McMaster 90280A837), member: 4 into harmonic_base, 4 into top_frame
         "ch_vn_frame_side_screw",  # #2-56 fillister (McMaster 91794A080, MHA-CH-VN-52); member, x2 into top_frame KeeperTaps (top-level row)
         "ch_fulcrum_keeper",  # #1-72 UNF crown tap through to the shaft bore (receiver of MHA-CH-VN-55); its #2 foot hole is clearance only
         "ch_vn_fulcrum_set_screw",  # #1-72 UNF x 5/32 cup-point set screw (McMaster 91375A942, MHA-CH-VN-55), member: x2, one into each fulcrum_keeper crown tap
-        "sm_gooseneck",  # receiver: 1/4-28 blind-tapped solid end piece brazed into the 1/2 in tube arm; its sleeve is the post gripped by the frame's set screw
-        "sm_gooseneck_spring_screw",  # made MHA-SM-04 1/4-28 slotted cheese-head screw: clamps the counter-spring upper eye on its plain Ø6.35 body to the end piece
+        "sm_gooseneck",  # receiver: plain blind-tapped solid end piece brazed into the 1/2 in tube arm (#2144 item 11.4); its sleeve is the post gripped by the frame's set screw
+        "sm_vn_gooseneck_shoulder_screw",  # purchased MHA-SM-VN-56 shoulder screw, member: seated on the gooseneck end face; the counter-spring upper eye rides free on its shoulder
         "fr_vn_gooseneck_set_screw",  # 1/4-20 UNC x 3/4 square-head cup point (91410A540), member: into top_frame hub boss tap, grips summing gooseneck
         "pd_vn_guide_lock_screw",  # #4-40 slotted pan head (McMaster 91792A108, MHA-PD-VN-60, R9-31), member: 8 into the platen_guide rear through taps
         "pn_vn_hanger_screw",  # #8-32 UNC x 1 hex head (McMaster 93075A199), member through the pen-hanger strap's clearance hole into the hanger nut and jam nut
@@ -684,7 +687,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "dt_cone_gear",  # slides on the MHA-DT-04 D-flat, no thread
         "dt_cone_pivot_post",  # clamped part: counterbored clearance for MHA-DT-VN-61; journals only
         "ch_connecting_rod",  # strap bore on cam + reamed pin hole (pressed MHA-CH-10 pin)
-        "sm_vn_counter_spring",  # 1330K524 extension spring: upper eye clamped on the MHA-SM-04 screw, lower eye hooks the boss-hook eye, no thread
+        "sm_vn_counter_spring",  # 1330K524 extension spring: upper eye free on the MHA-SM-VN-56 shoulder, lower eye hooks the boss-hook eye, no thread
         "dt_crank_drive_gear",  # slides on the MHA-DT-04 D-flat against its collar, no thread
         "dt_crank_handle",  # oak handle, runs on the MHA-DT-32 shoulder
         "dt_crank_handle_butt_cup",  # bonded in the handle butt; pocket bored for the MHA-DT-32 head, no thread
@@ -692,8 +695,10 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "dt_crank_hub",  # pressed into crank_arm, seam-pinned, taper-pinned to crankshaft
         "dt_vn_crank_hub_pin",  # 5/32 dowel (McMaster 98381A487), driven into the blind seam
         "dt_crank_pin",  # 1:48 taper pin, light drive
-        "dt_crank_pin_eye",  # formed brass eye, clamped under fillister_screw (no thread of its own)
         "dt_vn_crank_seat_drive_pin",  # MHA-DT-VN-67 dowel pressed into match-drilled holes, no thread
+        # MHA-DT-VN-69 dowel (rule-23 retention, owner ruling 2026-11-07; MHA-DT-00
+        # rubric sample, PR #2248): pressed into a ream made at assembly, no thread
+        "dt_vn_locating_pin",
         "dt_crank_pin_ring",  # brass wire keeper ring
         "dt_crank_pinion",  # pinned by crank_pinion_pin
         "dt_crank_pinion_pin",  # plain 1/8 drill-rod drive pin
@@ -703,9 +708,8 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "dt_cylinder_gear_shaft",  # plain 3/8 arbor; MHA-SH-VN-54 cups bear in drilled spots, no thread ("NO FLATS; SET-SCREW SPOTS ARE DRILLED AT ASSEMBLY")
         "ch_fulcrum_shaft",  # plain Ø6.35 shaft with two set-screw flats, no threads
         "pd_guide_lock",  # 1/8 drill holes (R9-49) only; clamped by guide_lock_screw
-        "dt_vn_keeper_chain",  # bead chain
-        "dt_vn_keeper_chain_link",  # snap loop link
-        "sm_vn_knife_mount_dowel",  # MHA-SM-VN-53 1/8 dowels, two pressed into the crossbar's blind underside reams per knife mount, slip in the knife mount's round hole and slot
+        "dt_vn_keeper_chain",  # #18 brass jack chain, clamped under keeper_chain_screw
+        "sm_vn_knife_mount_dowel",  # MHA-SM-VN-53 1/8 dowels, one pressed into the crossbar's blind underside ream per knife mount, slipping into the knife mount's round hole B (#2144 item 11.3)
         "sm_vn_knife_hanger_washer",  # new 18-8 SAE washer (McMaster 96659A104), hex-head bearing on the faced crossbar top; no thread
         "pd_latch_hook",  # MHA-PD-14 formed spring-steel hook: screw holes drilled thru, latch-pin hole match-drilled at assembly; no thread
         "sh_vn_music_wire",  # LeverWire and PenWire members, wrapped/tied, no thread
@@ -755,8 +759,8 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "pd_vn_transgear_retaining_ring",  # MHA-PD-VN-61 external retaining ring (McMaster 97431A240) in the pin's groove
         "pd_vn_transgear_cluster_shim",  # MHA-PD-VN-68 shims (McMaster 94773A606) on the pin under the rear bushing; no thread
         "pd_vn_transgear_knob_drive_pin",  # MHA-PD-VN-54 dowel pressed into plain holes, no thread
-        "fr_tube_frame",  # columns: socket slip fit; cross holes enlarged so the MHA-FR-VN-53 shank passes "WITHOUT THREAD CONTACT" (MHA-FR-00 STEP 2/5)
-        "fr_vn_tube_frame_cap",  # McMaster 9275K141 push-on cap (MHA-FR-00 STEP 7)
+        "fr_tube_frame",  # columns: socket slip fit; cross holes opened to Ø.197 so a MHA-FR-VN-53 passes "ITS THREAD NOT CATCHING" (fr_frame_assembly_steps lower-/upper-holes-checked)
+        "fr_vn_tube_frame_cap",  # McMaster 9275K141 push-on cap (fr_frame_assembly_steps caps-pushed-on)
         "mg_vn_wheel_axle_back_washer",  # MHA-MG-VN-54 brass #10 washer (McMaster 92916A480) loose on the axle pin; no thread
         "mg_vn_wheel_axle_front_washer",  # MHA-MG-VN-55 brass #4 washer (McMaster 92916A250) loose on the axle's #4-40 end; no thread
         "mg_wheel_bar",  # #8 clearance holes (clamp screws) + #8 close clearance (pen-hanger screw, which runs into the hanger nut and jam nut in pen.SLDASM) + the reamed .1865 axle-pin press bore
@@ -770,9 +774,9 @@ UNTHREADED_STOCK: dict[str, str] = {
     "sm_vn_counter_spring": "extension spring; its hook ends hang in plain holes and eyes",
     "sh_vn_chain_link": "InnerLink and OuterLink roller-chain members; pins/rollers only, no thread",
     "pd_vn_chain_connecting_link": "clip-retained roller-chain link; pins only, no thread",
-    "dt_vn_keeper_chain": "chain; its end links hang on screws and eyes, carrying no thread",
+    "dt_vn_keeper_chain": "jack chain; its end link is clamped under a screw head and its far link threads a ring, carrying no thread",
     "dt_vn_crank_seat_drive_pin": "dowel pin pressed into a plain hole",
-    "dt_vn_keeper_chain_link": "plain chain link",
+    "dt_vn_locating_pin": "dowel pin pressed into a plain reamed hole",
     "sm_vn_knife_mount_dowel": "dowel pin pressed into a blind reamed hole",
     "sm_vn_knife_hanger_washer": "plain SAE washer under the knife-hanger hex head; no thread",
     "dt_vn_pinion_strap_pin": "slotted spring pin pressed into a plain hole",
@@ -802,12 +806,12 @@ JOINTS: tuple[Joint, ...] = (
         receiver="fr_harmonic_base",
         thread="#10-32 UNF-2A/2B",
         quantity=4,
-        installed_at="MHA-FR-00 STEP 6",
+        installed_at=fr_frame_assembly_steps.CROSS_SCREWS_DRIVEN_KEY,
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason="retains a tube_frame column in its base socket; base and columns never move relative to each other and no operating member bears on or turns about the horizontal screw axis (the screw passes clearance holes in both tube walls)",
         axial_capture="narrow fillister head seated on the Ø9 spotface of the base pad; the shank clears the near casting wall (#10 close) and engages only the far casting wall's blind 46 mm bottoming tap",
         lock=Lock.NONE,
-        evidence="build_fr_frame_assembly.py:build (lower cross screws, BASE_SCREW_Y/BASE_SCREW_SEAT_Z) + module asserts; fr_harmonic_base_fasteners.py:BASE_CROSS_TAP_SPEC, BASE_CROSS_CLEARANCE_SPEC, BASE_CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT; draw_fr_frame_assembly.py ASSEMBLY_STEPS 2, 6 ('TIGHTEN ONLY UNTIL EVERY HEAD SEATS'), ASSEMBLY_CHECKS 2",
+        evidence="build_fr_frame_assembly.py:build (lower cross screws, BASE_SCREW_Y/BASE_SCREW_SEAT_Z) + module asserts; fr_harmonic_base_fasteners.py:BASE_CROSS_TAP_SPEC, BASE_CROSS_CLEARANCE_SPEC, BASE_CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT; draw_fr_frame_assembly.py STEP_TEXT lower-holes-piloted, cross-screws-measured (CROSS_SCREW_FULL_THREAD_MIN_IN), cross-screws-driven ('ONLY UNTIL ITS HEAD SEATS'), cross-screw-heads-checked",
     ),
     Joint(
         id="fr-frame/cross-screw-in-top-frame",
@@ -816,12 +820,12 @@ JOINTS: tuple[Joint, ...] = (
         receiver="fr_top_frame",
         thread="#10-32 UNF-2A/2B",
         quantity=4,
-        installed_at="MHA-FR-00 STEP 6",
+        installed_at=fr_frame_assembly_steps.CROSS_SCREWS_DRIVEN_KEY,
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason="retains the top_frame casting on a tube_frame column; casting and columns are stationary relative to each other and no rotating/rocking member turns about the horizontal screw axis (clearance through both tube walls)",
         axial_capture="narrow fillister head seated flush in the Ø9 boss counterbore; the shank clears the near casting wall (#10 close, SideClearance) and engages only the far casting wall's blind 46 mm #10-32 bottoming tap (SideTaps)",
         lock=Lock.NONE,
-        evidence="build_fr_frame_assembly.py:build (upper cross screws, TOP_SCREW_Y/TOP_SCREW_SEAT_Z); build_fr_top_frame.py:SIDE_TAP_SPEC, SIDE_CLEARANCE_SPEC, TOP_CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT, step 13 SideTaps/SideClearance; draw_fr_frame_assembly.py ASSEMBLY_STEPS 5, 6, ASSEMBLY_CHECKS 2",
+        evidence="build_fr_frame_assembly.py:build (upper cross screws, TOP_SCREW_Y/TOP_SCREW_SEAT_Z); build_fr_top_frame.py:SIDE_TAP_SPEC, SIDE_CLEARANCE_SPEC, TOP_CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT, step 13 SideTaps/SideClearance; draw_fr_frame_assembly.py STEP_TEXT upper-holes-piloted, cross-screws-measured, cross-screws-driven, cross-screw-heads-checked",
     ),
     Joint(
         id="fr-frame/support-hold-down-in-base",
@@ -830,12 +834,12 @@ JOINTS: tuple[Joint, ...] = (
         receiver="fr_harmonic_base",
         thread="1/4-20 UNC-2A/2B",
         quantity=4,
-        installed_at="MHA-FR-00 STEP 8",
+        installed_at=fr_frame_assembly_steps.SUPPORT_SCREWED_KEY,
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason="clamps the rocker_arm_support foot to the base deck; the support never moves on the base, and the rocker pivot it carries turns about machine Z (horizontal), so the rocker's reaction reaches these vertical (Y-axis) screws as cyclic tension/shear, not as torque about their own axis",
         axial_capture="hex head's under-head washer face bears on the 6.35 support foot (5/16 clearance drill); unchanged 12.42 mm stock insertion into the through-tapped 1/4-20 UNC-2B deck seat, with useful engagement limited by retained casting",
         lock=Lock.NONE,
-        evidence="build_fr_frame_assembly.py:build (lag-screw seed + grid) and LAG_* asserts; fr_harmonic_base_fasteners.py:HOLD_DOWN_SEAT_SPEC/HOLD_DOWN_ENGAGEMENT; fr_rocker_arm_support_spec.py:HOLE_SPEC; draw_fr_frame_assembly.py ASSEMBLY_STEPS 8 ('DRAW DOWN EVENLY UNTIL ALL HEADS SEAT')",
+        evidence="build_fr_frame_assembly.py:build (lag-screw seed + grid) and LAG_* asserts; fr_harmonic_base_fasteners.py:HOLD_DOWN_SEAT_SPEC/HOLD_DOWN_ENGAGEMENT; fr_rocker_arm_support_spec.py:HOLE_SPEC; draw_fr_frame_assembly.py STEP_TEXT support-screwed ('EVENLY, UNTIL EVERY HEAD SEATS'), support-heads-checked",
     ),
     Joint(
         id="fr-frame/nameplate-screw-in-base",
@@ -844,12 +848,12 @@ JOINTS: tuple[Joint, ...] = (
         receiver="fr_harmonic_base",
         thread="#4-40 UNC",
         quantity=4,
-        installed_at="MHA-FR-00 STEP 9",
+        installed_at=fr_frame_assembly_steps.NAMEPLATE_SCREWED_KEY,
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason="holds the cosmetic nameplate flat on the base deck; plate and base never move relative to each other and nothing in operation touches or turns the plate",
-        axial_capture="fillister head seated flush on the plate's decorated face; unchanged 4.85 mm nominal stock insertion into the through-tapped #4-40 UNC-2B deck seat",
+        axial_capture="fillister head seated flush on the plate's engraved face; unchanged 4.85 mm nominal stock insertion into the through-tapped #4-40 UNC-2B deck seat",
         lock=Lock.NONE,
-        evidence="build_fr_frame_assembly.py:build (nameplate corner screws, NAMEPLATE_SCREW_* asserts); fr_harmonic_base_fasteners.py:NAMEPLATE_SEAT_SPEC; build_fr_harmonic_base.py:NAMEPLATE_SEAT_SPEC; draw_fr_frame_assembly.py ASSEMBLY_STEPS 9",
+        evidence="build_fr_frame_assembly.py:build (nameplate corner screws, NAMEPLATE_SCREW_* asserts); fr_harmonic_base_fasteners.py:NAMEPLATE_SEAT_SPEC; build_fr_harmonic_base.py:NAMEPLATE_SEAT_SPEC; draw_fr_frame_assembly.py STEP_TEXT nameplate-set to nameplate-heads-checked",
     ),
     Joint(
         id="ha-harmonic-analyzer/gooseneck-set-screw-in-top-frame",
@@ -858,12 +862,17 @@ JOINTS: tuple[Joint, ...] = (
         receiver="fr_top_frame",
         thread="1/4-20 UNC",
         quantity=1,
-        installed_at="MHA-FR-00 STEP 10",
+        # Started loose at MHA-FR-00 (a keyed sheet, cited by its printed
+        # pointer: this row's assembly keeps no step list); MHA-HA-00
+        # summing-levelled tightens it on the post.
+        installed_at=fr_frame_assembly_steps.step_ref(
+            fr_frame_assembly_steps.GOOSENECK_STARTED_KEY
+        ),
         exposure=Exposure.OSCILLATING,
         exposure_reason="cup point is the ONLY retention of the summing gooseneck post (MHA-SM-01) in the top_frame rail-hub bore, both its slid-to-level height and its rotation; the post's arm carries the counter-spring hung from the rocking summing lever, so the load it reacts cycles every stroke",
         axial_capture="threads into the through-to-bore 1/4-20 GooseneckTap through the east-rail hub boss's Ø10 spot face; square head standing proud outboard; cup point bears radially on the gooseneck's Ø15.875 sleeve (as modelled it stands 0.21 clear)",
         lock=Lock.NONE,
-        evidence="build_fr_frame_assembly.py:build (gooseneck-set-screw, SET_SCREW_TIP_X, McMaster 91410A540 SHANK_LEN) + module comment; build_fr_top_frame.py:SET_TAP_SPEC, step 8 SetBoss/SetSpotFace, step 14 GooseneckTap; build_sm_summing_assembly.py docstring + gooseneck placement; spring_mount_geom.py docstring ('setup slides the gooseneck until level'); draw_fr_frame_assembly.py ASSEMBLY_STEPS 10 ('START MHA-FR-VN-52 ... LEAVE ITS CUP POINT CLEAR'), ASSEMBLY_CHECKS 5",
+        evidence="build_fr_frame_assembly.py:build (gooseneck-set-screw, SET_SCREW_TIP_X, McMaster 91410A540 SHANK_LEN) + module comment; build_fr_top_frame.py:SET_TAP_SPEC, step 8 SetBoss/SetSpotFace, step 14 GooseneckTap; build_sm_summing_assembly.py docstring + gooseneck placement; spring_mount_geom.py docstring ('setup slides the gooseneck until level'); draw_fr_frame_assembly.py STEP_TEXT gooseneck-set-screw-started ('CUP POINT CLEAR OF THE BORE; MHA-HA-00 STEP n TIGHTENS IT ON THE POST'), post-bore-checked; ha_harmonic_analyzer_assembly_sheet.py summing-levelled ('TIGHTEN MHA-FR-VN-52 ON THE POST')",
         exception="U-MHA-FR-VN-52-no-lock",
     ),
     # --- drive_train (MHA-DT-00): cone set and crank, and their screws into the frame's base ---
@@ -908,27 +917,32 @@ JOINTS: tuple[Joint, ...] = (
         thread="#4-40",
         quantity=1,
         installed_at="post-and-tip-block",
-        exposure=Exposure.ROTATING_DRAG,
+        # Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample,
+        # PR #2248; owner question 2 option 0-A): the dowel
+        # takes the turning moment, so the screw is a static clamp.
+        exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
-            "The one screw is MHA-DT-21's only anchor, and MHA-DT-21 carries the running MHA-DT-04 tip "
-            "in the MHA-DT-VN-55 cup: the shaft's end-play thrust acts 1.0 off the screw axis "
-            "(dt_cone_tip_block_spec.FOOT_TAP_OFFSET_X) and the radial tip load acts off it along "
-            "the shaft, so a moment about the vertical screw axis varies with mesh load every "
-            "crank turn (and reverses with the crank); a single screw lets the block turn about "
-            "it, and the build's 'tip-block anti-spin' parallel mate has no physical "
-            "counterpart (no dowel, key, pocket or second screw)"
+            "MHA-DT-21 carries the running MHA-DT-04 tip in the MHA-DT-VN-55 cup: the shaft's "
+            "end-play thrust acts 1.0 off the screw axis (dt_cone_tip_block_spec.FOOT_TAP_OFFSET_X), "
+            "a moment about the vertical screw axis that varies every crank turn. The MHA-DT-VN-69 "
+            "dowel pressed in the foot and slip-fitted in MHA-DT-20, .228 from the screw, takes "
+            "that moment, so the block cannot turn about the screw and the screw only clamps "
+            "the foot down"
         ),
         axial_capture=(
             "SHCS head on the MHA-DT-20 underside counterbore floor, thread up into the blind #4-40 "
-            "tap in the MHA-DT-21 foot; tightened 'SNUG'"
+            "tap in the MHA-DT-21 foot; run in 'HELD SQUARE' (general note: snug); located against "
+            "turning by MHA-DT-VN-69"
         ),
         lock=Lock.NONE,
         evidence=(
             "build_dt_drive_train_assembly.py tip_holddown placement + lock_mate 'clamped in the "
-            "platform hold-down counterbore', parallel_mate 'tip-block anti-spin (rides the "
-            "plate)'; cone_tip_block_spec HOLDDOWN_THREAD / FOOT_TAP_OFFSET_X (user ruling "
+            "platform hold-down counterbore', tip dowel (dt-vn-locating-pin) lock_mate and station "
+            "assert; dt_cone_swing_platform_spec TIP_DOWEL_LOCAL_X/Z, dt_cone_tip_block_spec "
+            "DOWEL_X; cone_tip_block_spec HOLDDOWN_THREAD / FOOT_TAP_OFFSET_X (user ruling "
             "2026-09-29: one #4-40 SHCS); draw_dt_drive_train_assembly.py CONE_CRANK_STEPS 2 "
-            "(post-and-tip-block '... INTO THE MHA-DT-21 FOOT, SNUG')"
+            "(post-and-tip-block: square, run in, match-drill and ream, press MHA-DT-VN-69 to the "
+            "foot ream's floor; 'CHECK THAT MHA-DT-21 DOES NOT TURN ON MHA-DT-20 BY HAND')"
         ),
     ),
     Joint(
@@ -985,9 +999,8 @@ JOINTS: tuple[Joint, ...] = (
         evidence=(
             "build_dt_drive_train_assembly.py pinch_screw placement and 'pinch screw in the "
             "cross-bore' mates, head-on-+X assert; cone_tip_block_spec PINCH_THREAD, "
-            "WORST_PINCH_ENGAGEMENT_MM; config/parts/dt-vn-cone-tip-pinch-screw.yaml "
-            "installation_notes; CONE_CRANK_STEPS 3 (tip-adjuster-set 'TIGHTEN MHA-DT-VN-56 ACROSS "
-            "THE SLIT'); CONSUMABLES_NOTES '#4-40 ... SCREWS: SNUG'"
+            "WORST_PINCH_ENGAGEMENT_MM; CONE_CRANK_STEPS 3 (tip-adjuster-set 'TIGHTEN "
+            "MHA-DT-VN-56 ACROSS THE SLIT'); CONSUMABLES_NOTES '#4-40 ... SCREWS: SNUG'"
         ),
     ),
     Joint(
@@ -1198,8 +1211,10 @@ JOINTS: tuple[Joint, ...] = (
             "back to park, so the torque the screw carries reverses every engage/park cycle"
         ),
         axial_capture=(
-            "flat point clamped on the plain round Ø6.35 rod (slip-fit Ø.2510 reamed bore, no flat or spot); the collars "
-            "are set on 66MA leaves 0.25/0.90 off the MHA-DT-18 blocks and also carry the rod's axial location"
+            "flat point clamped on a .012-deep flat on the Ø6.35 rod (slip-fit Ø.2510 reamed bore; rule-23 "
+            "retention, owner ruling 2026-11-07, MHA-DT-00 rubric sample, PR #2248), the flats long enough for the "
+            "feeler-set range with the rod's rear rim set flush; the collars are set on 66MA leaves 0.25/0.90 off the "
+            "MHA-DT-18 blocks and also carry the rod's axial location"
         ),
         # Rule 23 staked tap mouth (#1176), as the channel's fulcrum set screws
         # (fulcrum-set-screws-staked); no threadlocker on any thread.
@@ -1209,36 +1224,38 @@ JOINTS: tuple[Joint, ...] = (
         lock_step="cam-collars-set",
         evidence=(
             "draw_dt_drive_train_assembly.py rig_steps 'cams-and-lever-fitted' (set screw loose) and 'cam-collars-set' "
-            "(pinion_rig_fitup COLLAR_SET_STEP: 'TIGHTEN THEIR SET SCREWS AND STAKE EACH TAP MOUTH AT 2 POINTS'); "
+            "(pinion_rig_fitup COLLAR_SET_STEP: 'TIGHTEN EACH SET SCREW ON ITS MHA-DT-17 FLAT.' / 'STAKE EACH TAP MOUTH AT 2 POINTS.'); "
+            "dt_pinion_lift_rod_spec flats; "
             "dt_pinion_cam_spec.DRAWING_NOTES; dt_pinion_cam_geometry SET_SCREW_Z/SET_SCREW_MAJOR_DIA (tap 45 deg or more "
             "off the follower contact, test_cam_set_screw_hole_stays_clear_of_the_follower); "
             "build_dt_drive_train_assembly.py cam-on-rod concentric, axial and CAM_ROD_PHASE_DEG anti-spin mates"
         ),
     ),
     Joint(
-        id="dt-drive-train/keeper-eye-anchor-screw",
+        id="dt-drive-train/keeper-chain-anchor-screw",
         assembly="dt_drive_train",
-        member="sh_vn_brass_fillister_screw",
+        member="dt_vn_keeper_chain_screw",
         receiver="dt_crank_arm",
-        thread="#4-40 UNC",
+        thread="#2-56 UNC",
         quantity=1,
         installed_at="crank-hub-fitted",
         exposure=Exposure.OSCILLATING,
         exposure_reason=(
-            "The screw alone clamps the straight tail of the MHA-DT-28 keeper eye on the continuously turning crank "
-            "arm; the MHA-DT-VN-65 chain hangs from the eye loop beside the screw, and as the arm turns, gravity on "
-            "the chain swings round the arm frame, so its pull on the loop puts a moment about the screw axis "
+            "The screw alone clamps the end link of the MHA-DT-VN-65 jack chain flat on the continuously turning "
+            "crank arm; the chain hangs from that link past the arm's edge, and as the arm turns, gravity on the "
+            "chain swings round the arm frame, so its pull on the clamped eye puts a moment about the screw axis "
             "that reverses once per crank turn"
         ),
-        axial_capture="fillister head clamps the 1.0 brass eye tail on the arm's outboard face; shank in the arm's #4-40 through tap, tip short of the inboard face",
+        axial_capture="binding head clamps the 1.19 jack-chain end link's eye on the arm's outboard face; shank in the arm's #2-56 through tap, tip short of the inboard face",
         lock=Lock.NONE,
         lock_part="",
         lock_binds=(),
         lock_step="",
         evidence=(
-            "draw_dt_drive_train_assembly.py CONE_CRANK_STEPS 6 ('CLAMP MHA-DT-28 UNDER MHA-SH-VN-51'); "
-            "build_dt_drive_train_assembly.py anchor block (~L722-766: ANCHOR_THREAD_ENGAGEMENT, through tap) and "
-            "placement (~L4400-4414); crank_pin_eye_spec docstring (tail clamped under the screw); CONSUMABLES_NOTES"
+            "draw_dt_drive_train_assembly.py CONE_CRANK_STEPS 6 ('SCREW THE END LINK OF MHA-DT-VN-65 FLAT TO "
+            "MHA-DT-06 WITH MHA-DT-VN-70'); build_dt_drive_train_assembly.py anchor block (ANCHOR_THREAD_ENGAGEMENT, "
+            "through tap) and dt-vn-keeper-chain-screw placement; dt_vn_keeper_chain_spec (end link clamped under "
+            "the screw); CONSUMABLES_NOTES"
         ),
     ),
     Joint(
@@ -1327,10 +1344,12 @@ JOINTS: tuple[Joint, ...] = (
         lock=Lock.STAKED,
         lock_part="ch_pivot_bracket:staked tap mouth",
         lock_binds=("sh_vn_arbor_set_screw", "ch_pivot_bracket"),
-        lock_step="set-screws-driven",
+        lock_step=ch_channel_assembly_steps.PIVOT_SET_SCREWS_STAKED_KEY,
         evidence=(
-            "draw_ch_channel_assembly.py _fitup_steps 'set-screws-driven' ('RUN ONE MHA-SH-VN-54 DOWN EACH APEX TAP "
-            "ONTO ITS FLAT, NORTH FIRST; SNUG, AND STAKE EACH TAP MOUTH AT 2 POINTS.'); build_ch_channel_assembly.py apex set screw "
+            "draw_ch_channel_assembly.py _fitup_text 'set-screws-driven' ('SNUG ONE ITEM 4 DOWN THE TAP AT THE TOP "
+            "OF EACH ITEM 3 EAR ONTO ITS FLAT, LEFT EAR FIRST.') and 'pivot-set-screws-staked' "
+            "('STAKE THE MOUTH OF EACH ITEM 4 TAP AT 2 POINTS, ONE EACH SIDE ALONG ITEM 1 (VIEW D).'); "
+            "build_ch_channel_assembly.py apex set screw "
             "placement (SET_SCREW_TIP_Y); ch_pivot_bracket_spec.SET_SCREW_HOLE_SPEC (#4-40 tapped, through_next) "
             "and SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT; ch_pivot_shaft_spec flats (FLAT_DEPTH, FLAT_LENGTH)"
         ),
@@ -1392,8 +1411,8 @@ JOINTS: tuple[Joint, ...] = (
         lock_step="",
         evidence=(
             "build_ch_channel_assembly.py BRACKET_SCREW_XZ loop + header; rocker_bracket_seat_layout.SEAT_SPEC; "
-            "draw_ch_channel_assembly.py _fitup_steps 'south-bracket-screwed' (MHA-CH-00 STEP 6: 'TRANSFER THE SOUTH "
-            "MHA-CH-08 FOOT HOLE INTO THE MHA-FR-05 RAIL, TAP AS MHA-FR-05, SCREW DOWN ONE MHA-CH-VN-57')"
+            "draw_ch_channel_assembly.py _fitup_text 'south-bracket-screwed' ('SCREW THE RIGHT ITEM 3 DOWN WITH ONE "
+            "ITEM 7'), after 'south-foot-tapped' taps the MHA-FR-05 rail through the transferred foot hole"
         ),
     ),
     Joint(
@@ -1404,7 +1423,7 @@ JOINTS: tuple[Joint, ...] = (
         thread="#2-56",
         quantity=2,
         installed_at=ch_channel_assembly_steps.step_ref(
-            ch_channel_assembly_steps.KEEPERS_SET_KEY
+            ch_channel_assembly_steps.KEEPERS_SCREWED_KEY
         ),
         exposure=Exposure.OSCILLATING,
         exposure_reason=(
@@ -1423,9 +1442,9 @@ JOINTS: tuple[Joint, ...] = (
         evidence=(
             "build_ch_channel_assembly.py keeper loop (frame-side-screw at FULCRUM_KEEPER_CENTRE_Z +- KEEPER_SCREW_Z_OFF) + header; "
             "ch_fulcrum_keeper_spec.py docstring/SCREW_X/SCREW_HOLE_SPEC/KEEPER_TAP_SPEC (#2-56 blind, 11.5 drill, "
-            "ThreadDepth 7.6; FOOT_SCREW_ENGAGEMENT_D) + DRAWING_NOTES 2; build_fr_top_frame.py step 'KeeperTaps' "
+            "ThreadDepth 7.6; FOOT_SCREW_ENGAGEMENT_D) + ch_fulcrum_keeper_notes.FOOT_HOLE_MATE; build_fr_top_frame.py step 'KeeperTaps' "
             "consumes KEEPER_TAP_SPEC; config parts/ch-vn-frame-side-screw.yaml (91794A080); draw_ch_channel_assembly.py "
-            "step fulcrum-keepers-set ('TRANSFER EACH FOOT HOLE INTO THE RAIL, TAP AS MHA-FR-02, SCREW DOWN ONE MHA-CH-VN-52')"
+            "step fulcrum-keepers-screwed ('SCREW EACH ITEM 8 DOWN WITH ONE ITEM 9'), after keeper-feet-tapped taps the rail"
         ),
     ),
     Joint(
@@ -1435,7 +1454,7 @@ JOINTS: tuple[Joint, ...] = (
         receiver="ch_fulcrum_keeper",
         thread="#1-72 UNF",
         quantity=2,
-        installed_at=ch_channel_assembly_steps.SET_SCREWS_STAKED_KEY,
+        installed_at=ch_channel_assembly_steps.FULCRUM_SET_SCREWS_DRIVEN_KEY,
         exposure=Exposure.OSCILLATING,
         exposure_reason=(
             "the two set screws alone hold the plain fulcrum_shaft axially and in rotation "
@@ -1449,10 +1468,12 @@ JOINTS: tuple[Joint, ...] = (
         lock_step=ch_channel_assembly_steps.SET_SCREWS_STAKED_KEY,
         evidence=(
             "build_ch_channel_assembly.py keeper loop (ch-vn-fulcrum-set-screw on each keeper's crown tap axis); "
-            "ch_fulcrum_keeper_spec.SET_SCREW_HOLE_SPEC (#1-72 tapped, through_next) + DRAWING_NOTES 2; "
-            "draw_ch_fulcrum_keeper.SET_SCREW_QUALIFIER ('STAKE AT ASSEMBLY PER MHA-CH-00 STEP 13'); "
-            "draw_ch_channel_assembly.py step fulcrum-set-screws-staked ('TIGHTEN ONE MHA-CH-VN-55 SET SCREW ONTO EACH "
-            "FLAT AND STAKE EACH TAP MOUTH AT 2 POINTS'); ch_fulcrum_shaft_spec FLAT_DEPTH / FLAT_PITCH / "
+            "ch_fulcrum_keeper_spec.SET_SCREW_HOLE_SPEC (#1-72 tapped, through_next); "
+            "ch_fulcrum_keeper_notes.SET_SCREW_QUALIFIER ('FOR MHA-CH-VN-55 SET SCREW, AT ASSEMBLY'); "
+            "draw_ch_channel_assembly.py steps fulcrum-set-screws-driven ('TIGHTEN ONE ITEM 10 SET SCREW ONTO EACH "
+            "FLAT.') and fulcrum-set-screws-staked ('STAKE THE MOUTH OF EACH ITEM 10 TAP AT 2 POINTS, "
+            "ONE EACH SIDE ALONG ITEM 2 (VIEW E).'); "
+            "ch_fulcrum_shaft_spec FLAT_DEPTH / FLAT_PITCH / "
             "FLAT_STATION_WINDOW_MM; config parts/ch-vn-fulcrum-set-screw.yaml (91375A942)"
         ),
     ),
@@ -1468,9 +1489,9 @@ JOINTS: tuple[Joint, ...] = (
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
             "clamps the knife-edge bearing block's top seat to the stationary crossbar underside (MOUNT_GAP 0); "
-            "block and casting never move relative to each other. The two pressed MHA-SM-VN-53 dowels, held in "
-            "the crossbar's underside reams and slipped into the block's round hole and slot (owner ruling "
-            "2026-10-24, T+H3), react any torque about the screw axis, and the lever rock (freed lever_rock DOF) "
+            "block and casting never move relative to each other. The one pressed MHA-SM-VN-53 dowel, held in "
+            "the crossbar's underside ream 7.62 off the screw axis and slipped into the block's round hole B "
+            "(owner rulings 2026-10-24, T+H3, and 2026-11-08, #2144 item 11.3), reacts any torque about the screw axis, and the lever rock (freed lever_rock DOF) "
             "acts about machine Z, perpendicular to the vertical (Y) screw, so it reaches the thread only as "
             "cyclic tension and shear, never as torque about its own axis"
         ),
@@ -1478,11 +1499,11 @@ JOINTS: tuple[Joint, ...] = (
             "plain hex head (92314A253) seated on a new 18-8 SAE washer (96659A104), whose lower "
             "bearing face seats on the crossbar's faced top; MHA-SM-00 step 4 cuts each bolt under "
             "the head to the crossbar-underside-to-washer-top height measured at its own hole plus "
-            ".351 +/-.006 in, so the bolt passes the O6.045 clearance hole and reaches 8.9173 nominal "
-            "(8.763..9.0678 worst case) into the 9.65 +/-0.13 full thread of the #10-24 bottoming tap, "
+            ".351 +/-.005 in, so the bolt passes the O6.147 (C drill) clearance hole and reaches 8.9173 nominal "
+            "(8.7884..9.0424 worst case) into the .375 +/-.005 (9.525 +/-0.127) full thread of the #10-24 bottoming tap, "
             "drawing the block up against the casting. The independently inspected full-form cut "
-            "tail covers the longest reach with 0.4910667 spare; one incomplete tip pitch leaves "
-            "7.7046667 full engagement, with 0.4522 minimum tip air"
+            "tail covers the longest reach with 0.5164667 spare; one incomplete tip pitch leaves "
+            "7.7300667 full engagement, with 0.3556 minimum tip air"
         ),
         lock=Lock.NONE,
         lock_part="",
@@ -1562,46 +1583,46 @@ JOINTS: tuple[Joint, ...] = (
         ),
     ),
     Joint(
-        id="sm-summing/gooseneck-spring-screw",
+        id="sm-summing/gooseneck-shoulder-screw",
         assembly="sm_summing",
-        member="sm_gooseneck_spring_screw",
+        member="sm_vn_gooseneck_shoulder_screw",
         receiver="sm_gooseneck",
-        thread=gooseneck_screw.THREAD,
+        thread=f"{gooseneck_screw.THREAD} UNC",
         quantity=1,
         installed_at="MHA-SM-00 STEP 8",
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
-            "user ruling 2026-09-21: tighten the head to clamp the supplier upper-eye "
-            "band against the end piece's face. Clamp preload prevents eye rotation "
-            "relative to the screw and end piece; the spring flexes below this static "
-            "joint, not by swivelling on the thread. No operating rubbing torque reaches "
-            "the screw axis."
+            "owner ruling 2026-11-08 (Pedro), #2144 item 11.4, superseding #1951's "
+            "clamped eye: the shoulder screw is tightened until its shoulder seats on "
+            "the end piece's face, so screw and end piece never move relative to each "
+            "other. The supplier upper eye rides free on the ground shoulder under the "
+            "head; nothing clamps it, so its swing turns the eye on the shoulder, "
+            "whose drag is the eye load times friction at the shoulder radius, far "
+            "below the seated shoulder's breakaway friction. No operating torque "
+            "reaches the screw axis."
         ),
         axial_capture=(
-            "made MHA-SM-04 slotted cheese head clamps the double-loop band, seated on "
-            "the screw's plain Ø6.35 body, to the face of MHA-SM-01's solid Ø12.70 "
-            "end piece; full thread engagement runs in the end piece's blind 1/4-28 "
-            "UNF-2B tap past its arm-end counterbore, which keeps the screw's thread "
-            "run-out out of the tap's full thread. The deepest screw tip stays inside "
-            "the tap's full thread, and the bottoming tap's lead inside its drill."
+            "purchased MHA-SM-VN-56 shoulder seated on the face of MHA-SM-01's solid "
+            "Ø12.70 end piece, its thread in the end piece's plain blind tap (no "
+            "counterbore); the head retains the loaded eye (plumb pull, owner ruling "
+            "2026-11-08 (Pedro), #2144 item 11.4: bare slotted McMaster 91829A566, "
+            "washer dropped). "
+            "The deepest screw tip stays inside the tap's full thread, and the "
+            "bottoming tap's lead inside its drill."
         ),
         lock=Lock.NONE,
         evidence=(
-            "user, 2026-09-21, binding upper-eye clamp ruling: static nonrotating "
-            "eye, no threadlocker; owner rulings 2026-10-27 (#1951): 1/4-28 UNF "
-            "screw with a plain Ø6.35 body and slotted cheese head, blind 1/4-28 "
-            "tap in the solid end piece; owner minors sm-gooseneck.yaml RV-01 "
-            "(counterbore wall 1.78 MIN under the 2.0 target) and "
-            "sm-gooseneck-spring-screw.yaml RV-01 (head retention 0.95 under the "
-            "1.0 check); sm_gooseneck_spring_joint.py "
-            "ENGAGEMENT_MIN/COUNTERBORE_DEPTH_MIN/SCREW_RUNOUT_INTRUSION_MAX/"
-            "PLUG_WALL_MIN/COUNTERBORE_WALL_MIN/DRILL_POINT_SHANK_WALL_MIN/"
-            "HEAD_RETENTION_MIN/LOOP_PLAIN_MARGIN_MIN/LOOP_CORNER_CLEARANCE_MIN/"
-            "TIP_THREAD_MARGIN_MIN/TAP_LEAD_DRILL_MARGIN_MIN; "
-            "build_sm_summing_assembly.py gooseneck spring screw lock_mate "
+            "owner ruling 2026-11-08 (Pedro), #2144 item 11.4: bare slotted "
+            "purchased shoulder screw, washer dropped, plain tap in the end piece, "
+            "the eye free on the shoulder; sm-summing.yaml SM-01 (pending owner "
+            "confirmation) and sm-gooseneck.yaml RV-04 (engagement under 1.5D); "
+            "sm_gooseneck_spring_joint.py ENGAGEMENT_MIN/PLUG_WALL_MIN/"
+            "DRILL_POINT_SHANK_WALL_MIN/LOADED_RETENTION_MIN/EYE_AXIAL_PLAY_MIN/"
+            "EYE_AXIAL_PLAY_MAX/TIP_THREAD_MARGIN_MIN/TAP_LEAD_DRILL_MARGIN_MIN; "
+            "build_sm_summing_assembly.py shoulder screw lock_mate "
             "(CAD restraint, not mechanical locking hardware); the installation "
             "step is in the summing assembly's Manufacturing Notes property "
-            "(UPPER_EYE_CLAMP_NOTES) and printed as MHA-SM-00 step 8 "
+            "(UPPER_EYE_NOTES) and printed as MHA-SM-00 step 8 "
             "(sm_summing_assembly_sheet.ASSEMBLY_STEPS 8, ASSEMBLY_CHECKS 3); "
             "_counter_spring_hang.assert_counter_spring_top_hang"
         ),
@@ -1631,8 +1652,8 @@ JOINTS: tuple[Joint, ...] = (
         lock_binds=("pn_vn_hanger_screw", "pn_vn_pen_hanger_nut"),
         lock_step=(
             "nut held on the strap front while the screw is tightened from behind the bar, then the thin "
-            "90760A009 nut jammed against it (pn-vn-pen-hanger-nut.yaml / pn-vn-pen-hanger-jam-nut.yaml "
-            "installation_notes; drawing-guidelines.md rule 23 (lock threaded joints exposed to operating loads))"
+            "90760A009 nut jammed against it (pn_pen_assembly_sheet.ASSEMBLY_STEPS 7, MHA-PN-00 step 7; "
+            "drawing-guidelines.md rule 23 (lock threaded joints exposed to operating loads))"
         ),
         evidence=(
             "build_pn_pen_assembly.py: M6.10 fastener block (HANGER_SCREW_POS, HANGER_NUT_POS, "
@@ -1823,7 +1844,8 @@ JOINTS: tuple[Joint, ...] = (
             "build_ha_harmonic_analyzer_assembly.py module docstring (channel spring anchors thread DOWN into "
             "the 20 #6-32 taps); build_ch_channel_assembly.py _assert_spring_mount and "
             "CHANNEL_ANCHOR_NUT_XY/CHANNEL_ANCHOR_NUT_ROWS; ch_vn_spring_hook_spec.py SHANK_LENGTH_MM/"
-            "PROTRUSION_MAX_MM/full_threads_past_nut_mm/ADJUSTMENT_TURNS/ANCHOR_INSTALL_STEP; "
+            "PROTRUSION_MAX_MM/full_threads_past_nut_mm/ADJUSTMENT_TURNS; "
+            "ha_harmonic_analyzer_assembly_sheet.py channel-anchors-set steps; "
             "sm_summing_lever_spec.HOLE_SPEC; stock_anchor_geom.ANCHOR_9489T111; ch_anchor_jam_nut_spec.py; "
             "cad/config/parts/ch-vn-spring-hook.yaml installation_notes"
         ),
@@ -1861,7 +1883,7 @@ JOINTS: tuple[Joint, ...] = (
         receiver="ms_stop_block",
         thread="#4-40 UNC",
         quantity=1,
-        installed_at="MHA-MS-00 STEP 5",
+        installed_at="MHA-MS-00 STEP 10",
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
             "hand-set operator clamp on a gauge: the stop is pinched at a chosen mark on the measuring "
@@ -1891,7 +1913,7 @@ JOINTS: tuple[Joint, ...] = (
         receiver="ms_stop_block",
         thread="#2-56 UNC",
         quantity=2,
-        installed_at="MHA-MS-00 STEP 4",
+        installed_at="MHA-MS-00 STEP 9",
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
             "cover-plate screws: the plate closes the block's window and never moves against the block; "
@@ -1963,7 +1985,7 @@ JOINTS: tuple[Joint, ...] = (
             "build_mg_magnifier_assembly.py:build (lock_mates 'wheel-axle nut locked to the axle' / 'wheel-axle locknut locked to the axle' at NUT_D / LOCKNUT_D); "
             "build_mg_vn_wheel_axle_nut.py + diagnostics/diag_build_92671A005.py; "
             "mg_vn_wheel_axle_nut_spec.py THREAD/COUNT; mg_wheel_axle_spec.py THREAD_CALLOUT; "
-            "mg_wheel_group.py NUT_D/LOCKNUT_D/ENDSHAKE; config parts/mg-vn-wheel-axle-nut.yaml installation_notes"
+            "mg_wheel_group.py NUT_D/LOCKNUT_D/ENDSHAKE; mg_magnifier_assembly_sheet.STEP_TEXT endshake-set/locknut-jammed"
         ),
     ),
     Joint(
@@ -2399,7 +2421,7 @@ REQUIRED_JOINTS: dict[str, Occurrence] = {
     "dt-drive-train/pinion-cam-set-screw": Occurrence(
         "dt_drive_train", "draw_dt_drive_train_assembly.py", "cam-collars-set"
     ),
-    "dt-drive-train/keeper-eye-anchor-screw": Occurrence(
+    "dt-drive-train/keeper-chain-anchor-screw": Occurrence(
         "dt_drive_train", "build_dt_drive_train_assembly.py", "ANCHOR_THREAD_ENGAGEMENT"
     ),
     "ha-harmonic-analyzer/cone-pivot-screw-in-base": Occurrence(
@@ -2462,8 +2484,8 @@ REQUIRED_JOINTS: dict[str, Occurrence] = {
     "sm-summing/boss-hook-jam-nut-on-hook": Occurrence(
         "sm_summing", "build_sm_summing_assembly.py", "JAM_NUT_POS"
     ),
-    "sm-summing/gooseneck-spring-screw": Occurrence(
-        "sm_summing", "build_sm_summing_assembly.py", '"sm-gooseneck-spring-screw"'
+    "sm-summing/gooseneck-shoulder-screw": Occurrence(
+        "sm_summing", "build_sm_summing_assembly.py", "shoulder screw seated on end piece"
     ),
     "pn-pen/hanger-screw-in-nut": Occurrence(
         "pn_pen", "build_pn_pen_assembly.py", "HANGER_NUT_POS"

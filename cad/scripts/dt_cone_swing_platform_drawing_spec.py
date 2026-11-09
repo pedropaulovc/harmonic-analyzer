@@ -37,6 +37,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     # The tip-block hold-down's two stations from the pivot bore; the native
     # Hole Wizard callout carries its sizes.
     "HoldDownHole": {"HoldDownX", "HoldDownZ"},
+    # Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
+    # #2248): the tip-block locating dowel's slip ream, its
+    # size, its controlling station from the hold-down hole (on the hold-down
+    # line by relation) and its REF station from the pivot-bore axis
+    # (machinist review of round 6, #6), all in detail B with the hold-down's.
+    "TipDowelProfile": {"TipDowelX", "TipDowelPivotX", "TipDowelDia"},
     "CornerNE": {"CornerNER"},
     "CornerNW": {"CornerNWR"},
     "CornerSW": {"CornerSWR"},
@@ -77,6 +83,10 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "LockNotchCapEProfile": {"CapECx": 2, "CapECz": 2, "CapEDia": 2},
     # Banded on the part (HOLDDOWN_STATION_TOL_MM).
     "HoldDownHole": {"HoldDownX": 2, "HoldDownZ": 3},
+    # Banded on the part: the station with the hold-down's +/-.004
+    # (TIP_DOWEL_STATION_TOL_MM), the ream with its REAM_H7 at four places.
+    # The pivot-axis station is a reference: no band, printed in parentheses.
+    "TipDowelProfile": {"TipDowelX": 3, "TipDowelPivotX": 3, "TipDowelDia": 4},
     "CornerNE": {"CornerNER": 2},
     "CornerNW": {"CornerNWR": 2},
     "CornerSW": {"CornerSWR": 2},
@@ -105,6 +115,14 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
     raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
 
 
+# The top relief's round end prints as a drawing-side radial on its arc in
+# detail B (draw_dt_cone_swing_platform._add_relief_end_radius), at the
+# places of the relief width it halves.
+DRAWING_REFERENCE_PRECISION: dict[str, int] = {
+    "top relief end": DRAWING_PRECISION_BY_NAME["PivotBearingReliefDia"],
+}
+
+
 # View scales differ from the sheet scale and therefore remain property-linked
 # labels.  The split plans are named so each dimension set has an unambiguous
 # owner; these are view captions, not manufacturing notes.
@@ -119,7 +137,9 @@ RELIEF_WIDTH_CALLOUT = "TOP RELIEF\nCTR ON PIVOT\nOPEN THRU\nPIVOT END"
 PIVOT_BORE_CALLOUT_BELOW = ("RUNNING FIT ON MHA-DT-VN-52 SHOULDER",)
 POST_MOUNT_LOCATING_CALLOUT = "LOCATES MHA-DT-05 CONE PIVOT POST"
 # A drawing number identifies the hold-down's mate without lengthening its
-# leader shelf into the title block.
+# leader shelf into the title block.  Its stations print at the shop's
+# drilled-hole row (HOLDDOWN_STATION_TOL_MM), so the hole is drilled to them
+# and no assembly spot is named.
 HOLDDOWN_CALLOUT_BELOW = ("FROM UNDERSIDE", "LOCATES MHA-DT-21")
 # The process belongs to the THRU row, not the counterbore-diameter row.
 HOLDDOWN_PROCESS = "DRILL"

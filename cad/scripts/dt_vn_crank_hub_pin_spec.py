@@ -35,17 +35,16 @@ if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
 ):
     raise AssertionError("every marked MHA-DT-VN-59 dimension needs authored places")
 
-# The fit, its mates (by name and number, rule 4) and the flush acceptance sit
-# under the diameter they govern; the seam's match-drill/ream is the arm's and
-# hub's callout, and the .17 seam keeps the cut pin out of the hub bore.  The
-# faced cut end is the one left flush, so the supplier's end leads into the
-# blind seam (machinist review of farm run 20261102T154950540Z: the sheet did
-# not say which end goes out).
+# The fit and its mates (by drawing number, rule 4) sit under the diameter
+# they govern, in two lines of words (rule 7); the seam's match-drill/ream is
+# the arm's and hub's callout, and the .17 seam keeps the cut pin out of the
+# hub bore.  Which end goes out and the flush acceptance are assembly facts:
+# MHA-DT-00 drives the pin (rule 7 narration, fan-out screen
+# 20261107T081227004Z).
 PIN_DIA_CALLOUT = "\n".join(
     (
-        "LIGHT DRIVE FIT IN SEAM OF CRANK ARM",
-        "MHA-DT-06 AND CRANK HUB MHA-DT-31;",
-        "FACED END OUT, FLUSH WITH FRONT FACES",
+        "PRESS FIT IN HOLE ACROSS JOINT",
+        "OF MHA-DT-06 AND MHA-DT-31",
     )
 )
 DRAWING_NOTES = f"CUT FROM McMASTER-CARR {SKU} DOWEL PIN; DIAMETER AS SUPPLIED."

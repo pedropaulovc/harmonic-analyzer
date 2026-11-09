@@ -128,15 +128,14 @@ TIP_X = _sheet_x(TIP_Y)
 
 # Rows below the profile (drawing-guidelines.md rule 11 (turned parts read like the lathe)): the shank and the thread both
 # baseline from the gauged step (the press gauge's face), each with the
-# dimension-origin circle on the step's extension line and named on its
-# callout, then the overall as a reference. The thread's block is the band's
-# two lines plus three callout lines.
+# dimension-origin circle on the step's extension line, then the overall as
+# a reference. The thread's block is its value and band on one line.
 _ROW_Y = (SIDE_CENTER[1] - 0.032, SIDE_CENTER[1] - 0.0588, SIDE_CENTER[1] - 0.0800)
-# The thread length spans about 25 mm of sheet, its ~78 mm callout block
-# wider: the block stands wholly left of the step's extension line (4 mm air,
+# The thread length spans about 25 mm of sheet, its ~26 mm text about as
+# wide: the text stands wholly left of the step's extension line (4 mm air,
 # room for the origin circle there), clear of the overall's extension line
 # dropping from the tip on the right.
-_THREAD_BLOCK_HALF = 0.041
+_THREAD_BLOCK_HALF = 0.014
 # The overall reference's value sits in a break of its dimension line: on
 # the unbroken line the parentheses' tails touched it (run
 # 20261027T030250671Z review; draw_ch_channel_assembly #1660 r8).
@@ -147,10 +146,10 @@ SIDE_KEEP = {
     "ThreadLength": (STEP_X - 0.004 - _THREAD_BLOCK_HALF, _ROW_Y[1]),
     "PinLength": ((BACK_X + TIP_X) / 2.0, _ROW_Y[2]),
     # The shank's dimension line crosses the shank near the step; its text
-    # runs left from the line, the stock-and-fit callout's five lines under
-    # it, so the block stands high enough to keep them off the shank and over
-    # the Ra, yet its fraction's numerator keeps about 8 mm under the top
-    # border (run 20261101T025747277Z: 4 mm at +.061, the Ra 16 mm below).
+    # runs left from the line, the stock fraction over the two fit lines, so
+    # the block stands high enough to keep them off the shank and over the
+    # Ra, yet its fraction's numerator keeps about 8 mm under the top border
+    # (run 20261101T025747277Z: 4 mm at +.061, the Ra 16 mm below).
     "PinDia": (STEP_X - 0.030, SIDE_CENTER[1] + 0.057),
     # Above-right of the tip: the leader lands on the dome's upper half, clear
     # of the overall's extension line dropping from the tip, and under the
@@ -214,11 +213,11 @@ RELIEF_ROOT_CENTRES_MM = tuple(
 ROOT_TIP_TOL_M = 0.0002
 DETAIL_KEEP = {
     # Under the crop: its extension lines fall from the floor's two ends
-    # through the groove's air; its text block (~58 mm wide: the LIMIT pair
-    # over its two-line mate callout) stands wholly right of the crop circle
-    # (rightmost x ~0.100), so a taller pair cannot reach the circle, and
-    # right of the flank's extension line (run 20261027T030250671Z: centred
-    # between the extension lines, both struck every line of it).
+    # through the groove's air; its LIMIT pair stands wholly right of the
+    # crop circle (rightmost x ~0.100), so a taller pair cannot reach the
+    # circle, and right of the flank's extension line (run
+    # 20261027T030250671Z: centred between the extension lines, both struck
+    # every line of it).
     "ReliefWidth": (0.1295, _DETAIL_BOTTOM - 0.010),
     # Over the crop: its line runs between the two floors 0.7 (7 mm of sheet)
     # from the step, inside the flat floor (the flank's root starts 0.89 from

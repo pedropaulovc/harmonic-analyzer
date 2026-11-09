@@ -67,10 +67,10 @@ def test_native_stock_source_is_the_selected_15t_48dp_master() -> None:
     assert spec.CUTTER_ARBOR_BORE == 22.225
     assert spec.CUTTER_SKU == "10-289-487"
     assert part.STOCK_PROFILE is profile
-    assert "PROFILE SHIFT" not in spec.GEAR_DATA
+    assert "PROFILE SHIFT" not in drawing.GEAR_DATA_NOTE
     # The inch sheet's gear block carries no mm reference rows.
-    assert "mm" not in spec.GEAR_DATA
-    assert "CUTTER:  #7, 14-16T" in spec.GEAR_DATA.splitlines()
+    assert "mm" not in drawing.GEAR_DATA_NOTE
+    assert "CUTTER:  #7, 14-16T" in drawing.GEAR_DATA_NOTE.splitlines()
 
 
 def test_span_is_actual_finite_contact_and_printed_limits_are_inverted() -> None:
@@ -90,9 +90,8 @@ def test_span_is_actual_finite_contact_and_printed_limits_are_inverted() -> None
         assert spec.SPAN_LIMITS[0] - error <= actual <= spec.SPAN_LIMITS[1] + error
         a, b = span_contact_points_mm(profile, 2)
         assert math.dist(a, b) == pytest.approx(actual, abs=1e-10)
-    assert spec.SPAN_PREFIX == "CONTROL SPAN 2 TEETH "
-    for note in (spec.TOOTH_EDGE_NOTE, spec.BEARING_FACE_NOTE):
-        assert "BISECTOR" not in note  # method, not requirement
+    assert spec.SPAN_PREFIX == "SPAN 2 TEETH "
+    assert "BISECTOR" not in drawing.TOOTH_EDGE_NOTE  # method, not requirement
     # Rounded limits, not the old provisional setting band, define acceptance.
     lo, hi = spec.RADIAL_SETTING_LIMITS
     assert lo < spec.RADIAL_SETTING < hi
@@ -192,6 +191,81 @@ def test_machine_and_float_stations_are_unchanged() -> None:
     assert spec.OVERALL_LENGTH == pytest.approx(70.9168, abs=0.005)
 
 
+def test_each_chucking_dimensions_from_its_faced_end() -> None:
+    # Stud chucking: F, the core's front and the thread's end from the tip
+    # face at .XXX; rear chucking: the controlled overall to the rear face,
+    # the journal (the rest) a reference.
+    assert spec.STUD_STATION_PLACES == 3
+    stations = spec.DRAWING_PRECISION["StudProfile"]
+    assert stations["TipStation"] == stations["CoreFromTip"] == stations["ThreadEndFromTip"] == 3
+    assert stations["OverallLength"] == 3
+    assert spec.CORE_FRONT_FROM_TIP == pytest.approx(0.730 * spec.MM_PER_IN)
+    assert spec.THREAD_END_FROM_TIP == pytest.approx(0.640 * spec.MM_PER_IN)
+    # Two .XXX stations apart, the F-referenced stations hold the .XX band
+    # their stacks charge, never looser.
+    xx = printed_band_mm(2, unit=spec.UNIT)
+    xxx = printed_band_mm(3, unit=spec.UNIT)
+    assert 2.0 * xxx <= xx + 1e-12
+    assert spec.CORE_FRONT_FROM_F_PLACES == spec.PLAIN_CORE_PLACES == spec.TIP_STATION_PLACES == 2
+    # The journal carries the overall's, F's and the face width's bands.
+    assert spec._JOURNAL_LENGTH_BAND == pytest.approx(2.0 * xxx + spec.FACE_WIDTH_BAND)
+    assert spec.JOURNAL_REAR_EXTENSION_MIN == pytest.approx(
+        spec.JOURNAL_REAR_EXTENSION - spec._JOURNAL_LENGTH_BAND - spec.CUP_FACE_STATION_BAND
+    )
+    assert drawing.REFERENCE_DIMENSIONS["JournalLength"] is False
+    assert "OverallLength" not in drawing.REFERENCE_DIMENSIONS
+    # The from-tip dimensions stack outward from the tip's witness line, each
+    # starting right of the next one's foot.
+    rows = [drawing.SIDE_KEEP[name][1] for name in ("ThreadEndFromTip", "CoreFromTip", "TipStation")]
+    assert rows == sorted(rows, reverse=True)
+    assert drawing.F_X < drawing.CORE_END_X < drawing.THREAD_END_X < drawing.TIP_X
+    # Round 2: each .XXX tip station names what it serves, by its link on the
+    # value's line to the stations note, which quotes the printed values and
+    # names the mates whose stacks need .XXX.  Round 6: the overall keeps
+    # .XXX (the knob cup's pin wall fails at .XX) and states that function
+    # once at the dimension, never in a note (r3).
+    note = dict(drawing.NOTE_TEXTS)[drawing.STATIONS_NOTE]
+    for name, value in (
+        ("TipStation", spec.TIP_STATION),
+        ("CoreFromTip", spec.CORE_FRONT_FROM_TIP),
+        ("ThreadEndFromTip", spec.THREAD_END_FROM_TIP),
+    ):
+        assert drawing.DIMENSION_SUFFIXES[name] == f" {drawing.STATIONS_LINK}", name
+        assert spec.inch_text(value, 3) in note, name
+    cup = _config.parts("pd-transgear-knob-cup")["number"]
+    assert drawing.DIMENSION_SUFFIXES["OverallLength"] == f" SETS PIN WALL IN {cup}"
+    assert "OverallLength" not in drawing.DIMENSION_CALLOUTS_BELOW
+    assert "OverallLength" not in drawing.DIMENSION_CALLOUTS_ABOVE
+    assert spec.inch_text(spec.OVERALL_LENGTH, 3) == "2.792"
+    assert "2.792" not in drawing.NOTES and cup not in drawing.NOTES
+    # At .XX the journal band would leave the cup's pin-hole end wall under
+    # its floor: the third place is the function the suffix states.
+    import pd_transgear_knob_cup_spec as cup_spec
+
+    xx_band = printed_band_mm(2, unit=spec.UNIT) + printed_band_mm(3, unit=spec.UNIT) + spec.FACE_WIDTH_BAND
+    xx_wall = cup_spec.END_PIN_WALL_WORST - (xx_band - spec._JOURNAL_LENGTH_BAND)
+    assert cup_spec.END_PIN_WALL_WORST >= cup_spec.WALL_FLOOR
+    assert xx_wall < cup_spec.WALL_FLOOR
+    for key in ("pd-transgear-drive-collar", "pd-transgear-thumbnut"):
+        assert _config.parts(key)["number"] in note, key
+    # Rule 7: each note runs to four short lines; no process or coined
+    # tool words.
+    assert drawing.NOTE_LINES_MAX == 4
+    assert all(len(lines) <= 4 for lines in drawing.NOTE_LINES)
+    assert "TOOL" not in drawing.NOTES and "FACED" not in drawing.NOTES
+    # Round 3/6: the overall's one-line text stands 5 mm clear of the face
+    # width's left witness line (the pinion's rear face, which drops with its
+    # arrow to the text's height) and of the rear witness line.
+    x, _y = drawing.SIDE_KEEP["OverallLength"]
+    chars = len("2.792 SETS PIN WALL IN MHA-PD-16")
+    assert drawing.OVERALL_TEXT_CHARS == chars
+    half = chars * 0.00275 / 2
+    assert x + half <= drawing.PINION_REAR_X - 0.005
+    assert x - half >= drawing.REAR_X + 0.005
+    # Left of it the GEAR DATA block ends before the rear witness line.
+    assert drawing.GEAR_DATA_RIGHT < drawing.REAR_X
+
+
 def test_d_flat_uses_signed_physical_round_tool_end_and_real_neck() -> None:
     assert spec.FRONT_RELIEF_DIA == 3.937
     assert spec.FRONT_RELIEF_WIDTH == 0.4064
@@ -211,9 +285,10 @@ def test_d_flat_uses_signed_physical_round_tool_end_and_real_neck() -> None:
     assert flat_min - (spec.FRONT_RELIEF_DIA_MAX / 2 + 0.050) > 0.0
 
 
-def test_neck_diameter_prints_limits_that_state_both_jobs() -> None:
-    # Owner ruling (machinist review r8): LIMITS on the neck; the maximum
-    # clears the collar, the minimum carries the drive torque.
+def test_neck_diameter_prints_limits_and_one_reason() -> None:
+    # LIMITS on the neck (owner ruling r8); its mate and reasons are the neck
+    # note's, which its Ø and the D-flat tool end's limits link (round 2:
+    # the tool end's .005 band named no mate).
     assert spec.FRONT_RELIEF_DIA_TOL_TYPE == 3
     assert spec.FRONT_RELIEF_DIA_PLACES == 3
     assert spec.FRONT_RELIEF_DIA_MAX == spec.FRONT_RELIEF_DIA == 3.937
@@ -222,12 +297,18 @@ def test_neck_diameter_prints_limits_that_state_both_jobs() -> None:
     assert hi == 0.0
     assert spec.FRONT_RELIEF_DIA + lo == pytest.approx(spec.FRONT_RELIEF_DIA_MIN)
     assert spec.FRONT_RELIEF_AREA_MIN == pytest.approx(math.pi * 3.81**2 / 4.0)
-    jobs = " ".join(drawing.NECK_DIA_JOBS)
-    assert jobs == f"MAX CLEARS {spec.DRIVE_COLLAR_NUMBER}; MIN CARRIES DRIVE TORQUE"
-    suffix = drawing.DIMENSION_SUFFIXES["FrontReliefDia"]
-    assert suffix == f" {drawing.NECK_DIA_JOBS[0]}"
-    row = drawing.DIMENSION_CALLOUTS_BELOW["FrontReliefDia"]
-    assert row == drawing.NECK_DIA_JOBS[1]
+    neck = dict(drawing.NOTE_TEXTS)[drawing.NECK_NOTE]
+    assert neck == f"NECK AND D-FLAT END UNDER DRIVE COLLAR {spec.DRIVE_COLLAR_NUMBER}."
+    assert drawing.DIMENSION_SUFFIXES["FrontReliefDia"] == f" {drawing.NECK_LINK}"
+    assert drawing.NECK_LINK == f"SEE NOTE {drawing.NECK_NOTE}"
+    # Rounds 4-5: the nominal flat end coincides with the neck corner's
+    # tangent, so its limits link the neck note, which names the D-flat end
+    # in words (a bare link read as the tangent; a bare label as coined).
+    # The link is the round-4-rendered suffix, so the text stays in its keep.
+    assert spec.CORE_FLAT_CUT_END_FROM_F == pytest.approx(spec.FRONT_CORNER_RADIUS)
+    assert drawing.DIMENSION_SUFFIXES["FlatEnd"] == f" {drawing.NECK_LINK}"
+    assert "D-FLAT END" in neck
+    assert "FrontReliefDia" not in drawing.DIMENSION_CALLOUTS_BELOW
     # Negative control: the two-place general band would put the neck's
     # crown into the torqued core-flat plane.
     flat_min = spec.CORE_FLAT_FROM_AXIS + min(spec.CORE_FLAT_BAND)
@@ -236,11 +317,11 @@ def test_neck_diameter_prints_limits_that_state_both_jobs() -> None:
     assert flat_min - two_place_max / 2 - runouts < 0.0
     assert flat_min - spec.FRONT_RELIEF_DIA_MAX / 2 - runouts > 0.0
     # The neck width keeps three places: two would leave the flat no reach
-    # past the core shoulder; its callout states that function.
+    # past the core shoulder.  A length carries its value alone.
     assert spec.FRONT_RELIEF_WIDTH_PLACES == 3
     assert spec.FRONT_RELIEF_WIDTH - printed_band_mm(2, unit=spec.UNIT) - 0.1778 < 0.1016
-    callout = drawing.DIMENSION_CALLOUTS_BELOW["FrontReliefWidth"]
-    assert "FULL D" in callout and "STEP" in callout
+    for name in ("FrontReliefWidth", "JournalLength"):
+        assert name not in drawing.DIMENSION_CALLOUTS_BELOW, name
 
 
 def test_neck_corner_radius_prints_a_maximum_from_sharp() -> None:
@@ -284,15 +365,15 @@ def test_every_native_dimension_is_placed_once_with_model_places() -> None:
     # The gear's acceptance prints as native dimensions in the 4:1 view from
     # the tip (codjiflo P2 on cb74f3d8d): the span over two teeth from its
     # driven carrier, the root envelope's MIN from its hidden circle.  The
-    # gear data keeps the span's limits beside the cutter, as the feed
-    # pinion's does, and no root row.
+    # gear data block carries neither, as MHA-PD-06's.
     assert spec.DRAWING_DIMENSIONS["SpanProfile"] == {"ToothSpan"}
     assert spec.DRAWING_DIMENSIONS["RootProfile"] == {"RootDia"}
     assert spec.DRAWING_PRECISION["SpanProfile"] == {"ToothSpan": spec.SPAN_PLACES}
     assert spec.DRAWING_PRECISION["RootProfile"] == {"RootDia": spec.ROOT_DIA_PLACES}
     assert set(drawing.ENLARGED_KEEP) == {"ToothSpan", "RootDia"}
-    assert f"SPAN OVER {spec.SPAN_TEETH} TEETH" in spec.GEAR_DATA
-    assert "ROOT" not in spec.GEAR_DATA
+    # The span prints in VIEW C with its limits, not again in the block.
+    assert "SPAN OVER" not in drawing.GEAR_DATA_NOTE
+    assert "ROOT" not in drawing.GEAR_DATA_NOTE
     assert "RootInspectionProfile" not in spec.DRAWING_DIMENSIONS
     assert "TipChamfer" not in marked  # "CHAMFER 45 DEG TO MINOR" sizes it
     assert not {"FullDepth", "CutterRunout"} & marked
@@ -302,39 +383,36 @@ def test_every_native_dimension_is_placed_once_with_model_places() -> None:
     assert "OverallLength" in drawing.SIDE_KEEP
     detail = {"FrontReliefDia", "FrontReliefWidth", "FrontCornerRadius"}
     assert set(drawing.DETAIL_KEEP) == detail | {"FlatEnd", "FlatToolRadius"}
-    # Three-place sizes keep only what a stack needs; the rest print .XX.
-    assert spec.DRAWING_PRECISION["StudProfile"]["CoreFront"] == 2
-    assert spec.DRAWING_PRECISION["StudProfile"]["PlainCore"] == 2
     assert spec.DRAWING_PRECISION["StudProfile"]["ThreadBlankDia"] == 3
-    assert spec.DRAWING_PRECISION["StudProfile"]["OverallLength"] == 2
-    # #2169: the cup-pin end wall holds at the .XX row.
+    # #2169: the cup-pin end wall holds with the journal as a reference.
     assert spec.DRAWING_PRECISION["JournalProfile"]["JournalLength"] == 2
-    references = {"OverallLength": False, "ThreadBlankDia": True}
+    references = {"JournalLength": False, "ThreadBlankDia": True}
     assert drawing.REFERENCE_DIMENSIONS == references
 
 
 def test_tool_end_limits_print_as_native_detail_dimensions() -> None:
     # The D-flat tool's end prints in detail B as the part's own FlatEnd
-    # (LIMIT from F, prefixed) and FlatToolRadius (MAX); no note repeats it.
+    # (LIMIT from F) and FlatToolRadius (MAX); no note repeats it.
     assert not hasattr(spec, "CORE_FLAT_TOOL_REACH_NOTE")
     assert not hasattr(spec, "DRAWING_NOTES")
-    assert spec.CORE_FLAT_CUT_END_PREFIX == "D-FLAT TOOL END "
     places = spec.DRAWING_PRECISION["CoreFlatProfile"]
     assert places == {"FlatEnd": 3, "FlatToolRadius": 3}
     flat_places = spec.DRAWING_PRECISION["CoreFlatReference"]
     assert flat_places == {"FlatToAxis": spec.CORE_FLAT_PLACES}
     assert spec.CORE_FLAT_TOOL_END_RADIUS_TOL_TYPE == 6
     assert spec.CORE_FLAT_CUT_END_TOL_TYPE == 3
-    # Each shop note is short and leadered to its feature (machinist review r8).
-    for note in (drawing.TOOTH_EDGE_LEADER_NOTE, spec.BEARING_FACE_NOTE):
-        assert len(note.splitlines()) <= 4
-    assert " ".join(drawing.TOOTH_EDGE_LEADER_NOTE.splitlines()) == spec.TOOTH_EDGE_NOTE
-    assert spec.DRIVE_COLLAR_NUMBER in spec.BEARING_FACE_NOTE
-    assert drawing.BEARING_LEADER_NOTE.split() == spec.BEARING_FACE_NOTE.split()
+    # The edge-break note is one short line leadered to a tooth; the collar's
+    # bearing on F is the paper-drive assembly step's, not this sheet's.
+    assert "\n" not in drawing.TOOTH_EDGE_NOTE
+    assert not hasattr(drawing, "BEARING_LEADER_NOTE")
+    # A location prints its value and band alone: no prefix, no link.
+    assert not hasattr(spec, "CORE_FLAT_CUT_END_PREFIX")
+    assert "FlatEnd" not in drawing.DIMENSION_CALLOUTS_BELOW
+    assert "FlatEnd" not in drawing.DIMENSION_CALLOUTS_ABOVE
 
 
 def test_the_tool_end_keeps_its_native_limits(monkeypatch) -> None:
-    # Its prefix is checked in the build-order test (set_dimension_prefix).
+    # The model prefixes only the root envelope (build-order test).
     limits: list[tuple[str, str, int]] = []
 
     def record(_adapter, feature, name, _nominal, _band, tol_type):
@@ -397,8 +475,12 @@ def test_supported_certified_pin_inspects_all_actual_finite_corners() -> None:
 def test_indicator_grade_has_one_live_source_and_span_does_not_certify_eccentricity() -> None:
     from _gear_quality import toothspace_runout_tir_mm
 
-    assert spec.TOOTH_SPACE_RUNOUT_TIR_MM == toothspace_runout_tir_mm() == 0.05
+    assert spec.TOOTH_SPACE_RUNOUT_TIR_MM == toothspace_runout_tir_mm() == 0.0508
     assert spec.TOOTH_SPACE_CALLOUT.splitlines()[0].startswith("TOOTH SPACE RUNOUT ")
+    # A plain .001 inch step that never exceeds the booked grade (F3).
+    printed = spec.TOOTH_SPACE_RUNOUT_TIR_TEXT
+    assert printed.startswith(".") and len(printed) == 4
+    assert float(printed) * spec.MM_PER_IN <= spec.TOOTH_SPACE_RUNOUT_TIR_MM + 1e-12
     assert spec.TOOTH_SPACE_CALLOUT_PROPERTY == "Tooth Space Inspection"
     assert all(word not in spec.TOOTH_SPACE_CALLOUT for word in ("CANDIDATE", "TODO", "GATE"))
     contact = toothspace_gauge_contact_mm(spec.STOCK_PROFILE, spec.TOOTH_SPACE_GAUGE_PIN_DIA_MM)
@@ -627,36 +709,105 @@ def test_part_record_and_running_finishes() -> None:
     assert set(faces) == {"journal"}
     assert faces["journal"].diameter_mm == spec.JOURNAL_DIA
     assert not hasattr(drawing, "CORE_FINISH_SYMBOL")
-    assert STACK_NAME in drawing.DIMENSION_CALLOUTS_BELOW["FaceWidth"]
+    # The face width's band names its stack and the parts it stacks with to
+    # place F, by drawing number (round 2 blocker), in two lines.
+    face = drawing.DIMENSION_CALLOUTS_BELOW["FaceWidth"]
+    assert face == spec.FACE_WIDTH_CALLOUT
+    assert face.splitlines() == [
+        f"{STACK_NAME} WITH",
+        f"{_config.parts('pd-transgear-knob-thrust-ring')['number']}, "
+        f"{_config.parts('pd-transgear-arm-plate')['number']}",
+    ]
+    import transgear_cluster_fit as cluster
+
+    members = {term[0].split()[0] for term, _sign in cluster.F_CHAIN}
+    assert members == {"MHA-PD-08", "MHA-PD-15", "MHA-PD-19"}
+    assert all(number in face for number in members - {"MHA-PD-08"})
     assert "TipChamfer" not in drawing.DIMENSION_CALLOUTS_BELOW
 
 
-def test_tight_bands_name_their_mates_by_name_and_number() -> None:
+def test_tight_bands_name_their_mates_once_by_name_and_number() -> None:
     above, below = drawing.DIMENSION_CALLOUTS_ABOVE, drawing.DIMENSION_CALLOUTS_BELOW
-    mates = {
-        "JournalDia": ("ARM PLATE", "pd-transgear-arm-plate"),
-        "CoreDia": ("DRIVE COLLAR", "pd-transgear-drive-collar"),
-        "FlatToAxis": ("DRIVE COLLAR", "pd-transgear-drive-collar"),
-        "ReliefDia": ("THUMBNUT", "pd-transgear-thumbnut"),
-        "JournalLength": ("KNOB CUP", "pd-transgear-knob-cup"),
-        # The D-flat tool's end leaves a full flat under the collar (r8).
-        "FlatEnd": ("COLLAR", "pd-transgear-drive-collar"),
+    callouts = {**above, **below}
+    # Each matched fit is one numbered note its dimensions link; the
+    # D-section's Ø and flat share one (rule 4: one feature names its mate
+    # once), each mate by its config title and number.
+    links = {
+        "JournalDia": (drawing.JOURNAL_FIT_NOTE, "pd-transgear-arm-plate", "RUNNING FIT IN"),
+        "CoreDia": (drawing.D_SECTION_FIT_NOTE, "pd-transgear-drive-collar", "SLIDING FIT ON"),
+        "FlatToAxis": (drawing.D_SECTION_FIT_NOTE, "pd-transgear-drive-collar", "SLIDING FIT ON"),
     }
-    for name, (mate, key) in mates.items():
-        text = " ".join({**above, **below}[name].split())
-        assert mate in text and _config.parts(key)["number"] in text, name
-    assert f"DISC {spec.DISC_NUMBER}" in above["OutsideDia"]
-    assert "ToothSpan" not in above
-    assert "FrontReliefDia" in drawing.DIMENSION_SUFFIXES
-    assert "MHA-PD-22" in drawing.DIMENSION_SUFFIXES["FrontReliefDia"]
-    # No fit callout carries a number of its own (the bands stay native).
-    suffixes = drawing.DIMENSION_SUFFIXES
-    for text in (*above.values(), *below.values(), *suffixes.values()):
-        for word in text.replace("\n", " ").split():
-            assert not word.replace(".", "").isdigit(), text
+    notes = dict(drawing.NOTE_TEXTS)
+    printed = " ".join(drawing.NOTES.split())
+    for name, (number, key, fit) in links.items():
+        assert callouts[name] == f"SEE NOTE {number}", name
+        part_ = _config.parts(key)
+        mate = f"{fit} {part_['title'].upper().removeprefix('TRANSGEAR ')} {part_['number']}"
+        assert notes[number].startswith(mate), name
+        assert f"{number}. {notes[number]}" in printed, name
+    # The fit mates are the notes'; only the face width's stack callout names
+    # MHA-PD-19, as a stack member.
+    for name, text in callouts.items():
+        assert "MHA-PD-22" not in text, name
+        assert name == "FaceWidth" or "MHA-PD-19" not in text, name
+    # The collar is the D-section's fit mate (note 2) and the neck's (note 4),
+    # and the stations note names what its lengths set under it.
+    assert sum("MHA-PD-22" in text for _number, text in drawing.NOTE_TEXTS) == 3
+    assert all(len(line) <= drawing.NOTES_LINE_CHARS_MAX for line in drawing.NOTES.splitlines())
+    # The journal's matched fit states its clearance from both parts' limits.
+    low, high = drawing.JOURNAL_CLEARANCE_MM
+    assert low == pytest.approx(
+        plate.BORE_DIA + min(plate.BORE_DIA_LIMITS) - spec.JOURNAL_DIA - max(spec.JOURNAL_DIA_BAND)
+    )
+    assert 0.0 < low < high
+    assert f"(CLEARANCE {drawing._fit_range_text(low, high)})" in printed
+    # The relief's plain clearance names its mate by number.
+    assert _config.parts("pd-transgear-thumbnut")["number"] in above["ReliefDia"]
+    # The mesh mate is the gear data block's alone; the tooth tips and the
+    # span link it as their route (F5), naming no mate themselves; the span's
+    # controlling limits name their matched fit, worded as MHA-PD-06's.
+    assert callouts["OutsideDia"] == drawing.GEAR_DATA_LINK
+    assert callouts["ToothSpan"] == "MATCHED FIT,\nSEE GEAR DATA"
+    disc_part = _config.parts("pd-rack-pinion")
+    assert f"MATES WITH:  {disc_part['title'].upper()} {disc_part['number']}" in (
+        drawing.GEAR_DATA_NOTE.splitlines()
+    )
+    assert drawing.DIMENSION_SUFFIXES["FrontReliefDia"] == f" {drawing.NECK_LINK}"
     # Vertical Ø callouts go above their text (a below one would sit on the
     # Ø's own line); no dimension carries both.
     assert not set(above) & set(below)
+
+
+def test_gear_data_backlash_is_the_mesh_check_range_rounded_inward() -> None:
+    import paper_drive_mesh_check as mesh_check
+
+    low, high = drawing.reducer_feeler_backlash_mm()
+    circular = [mesh.backlash_mm for mesh in mesh_check.reducer_band_meshes()]
+    # Normal (feeler) backlash is the circular less the cosine of the
+    # operating pressure angle; every band end passes the mesh check.
+    assert 0.0 < low < circular[0][0]
+    assert circular[1][1] * math.cos(math.radians(30.0)) < high < circular[1][1]
+    lo, hi = drawing.BACKLASH_ACCEPT_MM
+    assert low <= lo < hi <= high
+    lo_text, hi_text = drawing.BACKLASH_ACCEPT_TEXT.split("-")
+    assert len(lo_text) == len(hi_text) == 4  # .001 steps
+    # The block's last row, worded as MHA-PD-06's: the span's matched fit
+    # accepted by the feeler backlash with the mate.
+    rows = " ".join(" ".join(drawing.GEAR_DATA_NOTE.splitlines()[-2:]).split())
+    assert rows == f"SPAN MATCHED FIT: BACKLASH WITH MATE {drawing.BACKLASH_ACCEPT_TEXT}, FEELER"
+
+
+def test_gear_data_block_ends_left_of_the_rear_witness_line() -> None:
+    # Round 1: the backlash row ran under the overall's and the journal's
+    # rear witness line (REAR_X), which drops past the block to the last row.
+    widest = max(map(len, drawing.GEAR_DATA_NOTE.splitlines()))
+    right = drawing.GEAR_DATA_XY[0] + (
+        widest * drawing.NOTE_CHAR_WIDTH_PER_HEIGHT * drawing.GEAR_DATA_CHAR_HEIGHT
+    )
+    assert right == pytest.approx(drawing.GEAR_DATA_RIGHT)
+    assert right < drawing.REAR_X - 0.003
+    # The round-1 render's measure: 39 characters at 2.5 mm ran 66 mm.
+    assert 39 * drawing.NOTE_CHAR_WIDTH_PER_HEIGHT * 0.0025 >= 0.066
 
 
 def _inside(point_mm, focus_mm, radius_mm) -> bool:
@@ -756,7 +907,7 @@ def test_neck_detail_annotations_stay_clear_of_the_side_and_end_views() -> None:
         assert x < journal_line - 0.005 and y > journal_top + 0.005
     assert drawing.DETAIL_LABEL_XY[0] + 0.030 < center[0] - crop
     gear_top = drawing.GEAR_DATA_XY[1]
-    lines = len(spec.GEAR_DATA.splitlines())
+    lines = len(drawing.GEAR_DATA_NOTE.splitlines())
     assert gear_top < 0.140 - 0.010
     assert gear_top - lines * 1.4 * drawing.GEAR_DATA_CHAR_HEIGHT > 0.0127
     # The tool end's texts stand outside the crop.
@@ -764,13 +915,31 @@ def test_neck_detail_annotations_stay_clear_of_the_side_and_end_views() -> None:
         assert math.dist(drawing.DETAIL_KEEP[name], center) > crop, name
 
 
-def test_overall_reference_runs_on_the_last_row_clear_of_the_gear_data() -> None:
-    # Its rear witness line drops past the gear data block (right edge
-    # ~0.0732 on the baseline sheet) to the last row, inside the border.
+def test_controlled_overall_runs_on_the_last_row_clear_of_the_gear_data() -> None:
+    # Its rear witness line drops past the gear data block to the last row,
+    # inside the border.
     x, y = drawing.SIDE_KEEP["OverallLength"]
-    assert drawing.REAR_X - 0.0732 >= 0.003
+    assert drawing.REAR_X - drawing.GEAR_DATA_RIGHT >= 0.003
     assert y == drawing._ROW_Y[5] > 0.0127 + 0.005
     assert drawing.REAR_X < x < drawing.TIP_X
+
+
+def test_numbered_notes_stand_in_the_open_field_over_the_title_block() -> None:
+    # Four notes (round 2 added the stations' and the neck's) no longer fit
+    # under the gear data; at the gear data's height (~0.68 of it a
+    # character, ~1.24 of it a line) they stand right of the overall's tip
+    # witness line and the chamfer callout, under the tooth-space note (two
+    # ~3.9 mm lines from its anchor), over the title block, inside the border.
+    x, top = drawing.NOTES_XY
+    lines = drawing.NOTES.splitlines()
+    pitch = drawing.NOTE_LINE_PITCH_PER_HEIGHT * drawing.NOTES_CHAR_HEIGHT
+    assert drawing.NOTES_CHAR_HEIGHT == drawing.GEAR_DATA_CHAR_HEIGHT
+    assert x > drawing.TIP_X + 0.010
+    assert top < drawing.TOOTHSPACE_NOTE_XY[1] - 2 * 0.0039 - 0.003
+    bottom = top - len(lines) * pitch
+    assert bottom > drawing.TITLE_BLOCK_TOP + 0.003
+    right = x + max(map(len, lines)) * drawing.NOTE_CHAR_WIDTH_PER_HEIGHT * drawing.NOTES_CHAR_HEIGHT
+    assert right < 0.4191 - 0.0127 - 0.001
 
 
 def test_tooth_space_note_lands_low_right_away_from_the_span() -> None:
@@ -803,12 +972,13 @@ def test_tip_chamfer_callout_ends_short_of_the_tooth_space_leader() -> None:
 
 def _dia_block(name: str) -> tuple[float, float, float, float, float]:
     """(line x, left, right, bottom, top) of a vertical Ø text and its
-    one-line above callout: left of the view's centre it hangs right of its
-    line, else left; the block runs 7.3 mm under the keep to the callout's
-    row 8.7 mm over it (run 20261031T205208603Z, draw_dt_cone_gear_shaft)."""
+    one-line above callout, if any: left of the view's centre it hangs right
+    of its line, else left; the block runs 7.3 mm under the keep to the
+    callout's row 8.7 mm over it (run 20261031T205208603Z,
+    draw_dt_cone_gear_shaft)."""
     x, y = drawing.SIDE_KEEP[name]
     char_w = drawing.ABOVE_CALLOUT_CHAR_WIDTH
-    width = len(drawing.DIMENSION_CALLOUTS_ABOVE[name]) * char_w
+    width = len(drawing.DIMENSION_CALLOUTS_ABOVE.get(name, "")) * char_w
     left, right = (x, x + width) if x < drawing.SIDE_CENTER[0] else (x - width, x)
     return x, left, right, y - 0.0073, y + 0.0087 + 0.0036
 
@@ -886,19 +1056,13 @@ def test_core_frame_stands_in_detail_b_clear_of_every_dia_line() -> None:
 def test_run_233549_text_clears_the_border_lines_and_labels() -> None:
     # The neck Ø's one line hangs left of its keep at 2.75 mm a character
     # (36 characters read [7.0, 106.1] mm): it starts inside the border.
-    # Owner ruling r8: LIMITS (stacked, one value wide) with the MAX job on
-    # the value's line and the MIN job in the row under it.
+    # LIMITS (stacked, one value wide) with its one reason on the value's line.
     char_w = (0.1061 - 0.0070) / 36
     keep_x = drawing.DETAIL_KEEP["FrontReliefDia"][0]
     suffix = drawing.DIMENSION_SUFFIXES["FrontReliefDia"]
     text = f"\N{DIAMETER SIGN}3.95{suffix}"
     assert keep_x - len(text) * char_w > 0.0127 + 0.005
-    row = drawing.DIMENSION_CALLOUTS_BELOW["FrontReliefDia"]
-    assert len(row) <= len(text)  # centred under the wider value line
     assert keep_x - 36 * char_w < 0.0127
-    # Negative control: both jobs on the value's one line run past the border.
-    one_line = f"\N{DIAMETER SIGN}3.95 {' '.join(drawing.NECK_DIA_JOBS)}"
-    assert keep_x - len(one_line) * char_w < 0.0127
     # The corner R's 23.5 mm text, centred on its keep, ends short of the
     # crop circle at its own height (run: the circle crossed its last letter).
     center, crop = drawing.DETAIL_CENTER, drawing.DETAIL_CROP_RADIUS
@@ -944,14 +1108,12 @@ def test_run_022045_flat_prints_in_the_tip_end_view_clear_of_its_neighbours() ->
     # characters; the block hangs right of the line (32.8 mm, from 12.8 mm
     # under the keep to 12.9 mm over it in run 20261101T022045634Z).
     assert x > cx + drawing.HALF_OD + 0.003
-    assert max(map(len, drawing.COLLAR_SLIDING_FIT.splitlines())) <= 12
+    assert max(map(len, drawing.DIMENSION_CALLOUTS_BELOW["FlatToAxis"].splitlines())) <= 12
     # Its top stands under the flat's arrow, its bottom over the tooth-space
     # note (top 112.4 mm), its right end inside the border (419.1 mm).
     assert y + 0.0129 < flat_y - 0.002
     assert y - 0.0128 > 0.1124 + 0.005
     assert x + 0.0328 < 0.4191 - 0.005
-    # The bearing note's leader passes over the upper arrow's stub (6.3 mm
-    # over centre); test_run_035809_shop_notes_land_on_their_features.
 
 
 def _front_view_point(radius_mm: float, model_deg: float) -> tuple[float, float]:
@@ -962,9 +1124,9 @@ def _front_view_point(radius_mm: float, model_deg: float) -> tuple[float, float]
     return cx - r * math.cos(angle), cy + r * math.sin(angle)
 
 
-def test_run_035809_shop_notes_land_on_their_features() -> None:
-    # Machinist review r8: the edge-break and bearing notes sat in a free
-    # block; each now leaders to the feature it names in the front end view.
+def test_run_035809_tooth_edge_note_lands_on_a_tooth() -> None:
+    # Machinist review r8: the edge-break note sat in a free block; it now
+    # leaders to a tooth tip in the front end view.
     pitch = 360.0 / spec.TEETH
     tooth_deg = drawing.TOOTH_EDGE_TOOTH * pitch
     gap_deg = (0.5 + drawing.TOOTH_SPACE_GAP_INDEX) * pitch  # the toothspace gap
@@ -974,7 +1136,7 @@ def test_run_035809_shop_notes_land_on_their_features() -> None:
     # Upper right, clear of the centre mark's arms (to 13.6 mm out).
     assert tip[0] > cx + 0.005 and tip[1] > cy + 0.010
     char_w, pitch_y = 0.0026, 0.0045
-    lines = drawing.TOOTH_EDGE_LEADER_NOTE.splitlines()
+    lines = drawing.TOOTH_EDGE_NOTE.splitlines()
     x, top = drawing.TOOTH_EDGE_NOTE_XY
     bottom = top - len(lines) * pitch_y
     iso_bottom = 0.2025  # run 20261101T035809796Z's isometric outline
@@ -982,67 +1144,163 @@ def test_run_035809_shop_notes_land_on_their_features() -> None:
     assert top - 0.001 < iso_bottom - 0.003
     assert x + max(map(len, lines)) * char_w < 0.4191 - 0.005
     assert bottom > tip[1] + 0.010 and x > tip[0]
-    # The bearing note lands on F's annulus, between the core and the root,
-    # under the edge-break note and right of the gear.
-    r = drawing.BEARING_LANDING_RADIUS_MM
-    assert spec.CORE_DIA / 2.0 + 0.2 < r < spec.ROOT_DIA_EXACT_MIN / 2.0 - 0.2
-    landing = _front_view_point(r, drawing.BEARING_LANDING_DEG)
-    bx, btop = drawing.BEARING_NOTE_XY
-    blines = drawing.BEARING_LEADER_NOTE.splitlines()
-    bbottom = btop - len(blines) * pitch_y
-    # The audit merges blocks under its 5.66 mm row pitch (run
-    # 20261101T081735465Z: 4.4 mm apart).
-    assert btop < bottom - 0.006
-    # 2.84 mm a glyph, measured on that run's edge-break note.
-    assert bx + max(map(len, blines)) * 0.00284 < 0.4191 - 0.005
-    # The note's left end stands left of the flat's upper arrow stub (x
-    # 353.5, 6.3 mm over centre) and over it, so its leader, running down
-    # and left to F, never reaches the stub.
-    stub_x = drawing.END_KEEP["FlatToAxis"][0]
-    stub_top = cy + 0.0063
-    assert landing[0] < bx < stub_x
-    assert bbottom > stub_top + 0.002
-    # Right of the gear's tips at the note's lowest line.
-    assert bx > cx + spec.OUTSIDE_DIA / 2.0 * 0.003 * 0.75
-    assert landing[1] > cy + 0.002  # over the centre mark's level arm
 
 
-def test_run_035809_detail_b_function_rows_stand_clear() -> None:
-    # Machinist review r8: the neck width and the D-flat tool's end state
-    # their functions as rows under their values.  Each block stacks its
-    # value and rows over its dimension line, centred on the keep: rows
-    # push the line down and the value up by half a 5.5 mm row each (run
-    # 20261101T035809796Z: the tool end's 8 mm limits ran from its line at
-    # keep - 4.5 mm; the one-row width's line stood 2.8 mm under its keep and
-    # the journal length's, with two rows, 8.3 mm under its keep).
-    row, char_w = 0.0055, 0.0026
+def test_view_c_arrow_points_at_the_stud_tip_in_the_open_field() -> None:
+    # Rule 9: the removed enlarged view is VIEW C, named by a viewing arrow
+    # on its parent; the letter is the label's, and neither A (datum) nor B
+    # (detail).
+    assert drawing.ENLARGED_LABEL_TEXT.splitlines()[0] == f"VIEW {drawing.ENLARGED_LETTER}"
+    assert drawing.ENLARGED_LETTER not in {"A", drawing.DETAIL_LETTER}
+    # The tip face reaches the thread's basic minor radius; the arrow lands
+    # on it, over the axis.
+    assert 0.0 < drawing.VIEW_ARROW_FACE_RADIUS_MM < spec.THREAD_BASIC_MINOR / 2.0
+    tip_x = drawing.TIP_X + drawing.VIEW_ARROW_TIP_GAP
+    letter_right = tip_x + drawing.VIEW_ARROW_LENGTH + 0.004
+    # The letter stands short of the front end view's teeth.
+    assert letter_right < drawing.FRONT_CENTER[0] - drawing.HALF_OD - 0.003
+
+
+class _ArrowNote:
+    """A leader note whose leader leaves the letter ``drop`` under the
+    letter's nominal mid-height, wherever the letter stands."""
+
+    def __init__(self, tip, text_xy, drop: float) -> None:
+        self.tip, self.position, self.drop = tip, list(text_xy), drop
+        self.format = SimpleNamespace(CharHeight=0.0035)
+        self.moves: list[tuple[float, float]] = []
+
+    def GetAnnotation(self):
+        return self
+
+    def GetTextFormat(self, _index):
+        return self.format
+
+    def SetTextFormat(self, _index, _default, text_format):
+        self.format = text_format
+        return True
+
+    def GetLeaderPointsAtIndex(self, _index):
+        start_y = self.position[1] - drawing.VIEW_LETTER_HEIGHT / 2.0 - self.drop
+        return [self.position[0], start_y, 0.0, *self.tip, 0.0]
+
+    def GetPosition(self):
+        return (*self.position, 0.0)
+
+    def SetPosition2(self, x, y, _z):
+        self.moves.append((x, y))
+        self.position = [x, y]
+        return True
+
+
+def test_view_c_arrow_squares_its_letter_onto_the_tip_face(monkeypatch) -> None:
+    face = (0.290, 0.1624)
+    made: dict[str, object] = {}
+
+    def leader_note(_adapter, text, *, text_xy, attach_xy, view, label):
+        made.update(text=text, text_xy=text_xy, tip=attach_xy, view=view)
+        made["note"] = _ArrowNote(attach_xy, text_xy, drop=0.0006)
+        return made["note"]
+
+    projected = []
+    monkeypatch.setattr(
+        drawing, "model_point_in_view",
+        lambda _adapter, _view, point, *, label: projected.append(point) or face,
+    )
+    monkeypatch.setattr(drawing, "add_leader_note", leader_note)
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
+    side = object()
+    drawing._add_view_arrow(object(), side)
+    assert projected == [
+        (0.0, drawing.VIEW_ARROW_FACE_RADIUS_MM / 1000.0, spec.TIP_Z / 1000.0)
+    ]
+    assert made["text"] == drawing.ENLARGED_LETTER and made["view"] is side
+    tip = (face[0] + drawing.VIEW_ARROW_TIP_GAP, face[1])
+    assert made["tip"] == pytest.approx(tip)
+    # The letter stands right of the tip: the arrow points -X at the face.
+    assert made["text_xy"][0] > tip[0]
+    note = made["note"]
+    assert note.format.CharHeight == drawing.VIEW_LETTER_HEIGHT
+    # A 0.6 mm miss is slid out, square onto the face.
+    assert len(note.moves) == 1
+    assert note.GetLeaderPointsAtIndex(0)[1] == pytest.approx(tip[1])
+
+
+@pytest.mark.parametrize("readback, ok", [("A\r\nB LAST", True), ("A", False), ("", False)])
+def test_sheet_note_reads_back_its_last_line(monkeypatch, readback, ok) -> None:
+    note = SimpleNamespace(
+        GetAnnotation=lambda: annotation,
+        GetText=lambda: readback,
+    )
+    annotation = SimpleNamespace(
+        GetTextFormat=lambda _i: SimpleNamespace(CharHeight=0.0035),
+        SetTextFormat=lambda _i, _d, _f: True,
+    )
+    monkeypatch.setattr(drawing, "add_note", lambda _adapter, _text, _x, _y: note)
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    call = lambda: drawing._add_sheet_note(  # noqa: E731
+        object(), "A\nB LAST", (0.0, 0.0), char_height=0.0025, label="notes"
+    )
+    if ok:
+        call()
+    else:
+        with pytest.raises(RuntimeError, match="reads back"):
+            call()
+
+
+
+def test_run_035809_detail_b_blocks_stand_clear() -> None:
+    # The D-flat tool's end prints its limits and the neck note's link on the
+    # value's line (no prefix, no rows), the neck width its value alone, each
+    # on its own dimension line.  The tool end's stacked limits run from its
+    # line at keep - 4.5 mm to keep + 3.5 mm (run 20261101T035809796Z).
+    char_w = 0.0026
     center, crop = drawing.DETAIL_CENTER, drawing.DETAIL_CROP_RADIUS
     below = drawing.DIMENSION_CALLOUTS_BELOW
     fx, fy = drawing.DETAIL_KEEP["FlatEnd"]
-    flat_rows = below["FlatEnd"].splitlines()
-    flat_line = fy - 0.0045 - len(flat_rows) * row / 2
-    flat_top = fy + 0.0035 + len(flat_rows) * row / 2
+    assert "FlatEnd" not in below
+    flat_text = ".007" + drawing.DIMENSION_SUFFIXES["FlatEnd"]
+    flat_half = len(flat_text) * char_w / 2
+    flat_line = fy - 0.0045
+    flat_top = fy + 0.0035
     # Its line stays over the end view's teeth (top 0.1735) and the
-    # journal's outline (0.169); its limits' right end (~26 mm right of the
-    # keep) stands outside the crop; its rows end short of F's witness line.
+    # journal's outline (0.169); its text stands outside the crop, ends
+    # short of F's witness line and starts right of the end view's tooth
+    # tips (x ~0.0585).
     assert flat_line >= 0.1735 - 1e-9
-    assert math.dist((fx + 0.026, flat_top), center) > crop + 0.002
-    assert fx + max(map(len, flat_rows)) * char_w / 2 < drawing._F_DETAIL_X - 0.003
+    assert math.dist((fx + flat_half, flat_top), center) > crop + 0.002
+    assert fx + flat_half < drawing._F_DETAIL_X - 0.003
+    assert fx - flat_half > drawing.END_CENTER[0] + drawing.HALF_OD
     wx, wy = drawing.DETAIL_KEEP["FrontReliefWidth"]
-    width_rows = below["FrontReliefWidth"].splitlines()
-    width_line = wy - 0.0028 - len(width_rows) * row / 2
-    width_top = wy + 0.0007 + len(width_rows) * row / 2
-    half = max(len(r) for r in width_rows) * char_w / 2
-    # Over the tool end's outer arrow (on its line), right of the step's
-    # witness line, left of the journal Ø's line and under the crop.
-    assert width_line > flat_line + 0.003
-    assert wx - half > drawing._STEP_X + 0.003
-    assert wx + 0.0071 < drawing.SIDE_KEEP["JournalDia"][0] - 0.005
-    left = wx - half
-    crop_bottom = center[1] - math.sqrt(crop**2 - (left - center[0]) ** 2)
-    assert width_top < crop_bottom - 0.003
-    # The two blocks stand side by side, the tool end's left of F.
-    assert fx + 0.026 < left - 0.005
+    assert "FrontReliefWidth" not in below
+    # Round 7: the neck width (.XXX: at .XX its least falls under the flat
+    # end's .007) links the neck note on its value's line; its ~39 mm text
+    # stands left of F's witness line over the flat end's block (round 6
+    # measures: text keep - 1.9 to + 1.5 mm, line keep - 2.8 mm; the flat
+    # end's stacked limits to its keep + 4.3 mm).
+    assert spec.FRONT_RELIEF_WIDTH - printed_band_mm(2, unit=spec.UNIT) < max(
+        spec.CORE_FLAT_CUT_END_LIMITS
+    )
+    assert drawing.DIMENSION_SUFFIXES["FrontReliefWidth"] == f" {drawing.NECK_LINK}"
+    text = spec.inch_text(spec.FRONT_RELIEF_WIDTH, 3) + drawing.DIMENSION_SUFFIXES["FrontReliefWidth"]
+    assert text == ".016 SEE NOTE 4"
+    half = len(text) * char_w / 2
+    width_line, width_top = wy - 0.0028, wy + 0.0015
+    assert drawing.DETAIL_TEXT_WIDTH_BOX == pytest.approx((wx - half, width_line, wx + half, width_top))
+    flat_block_top = fy + 0.0043
+    assert drawing.DETAIL_TEXT_FLAT_END_TOP == pytest.approx(flat_block_top)
+    # Round 1: the two lines 2.3 mm apart read as one line carrying both
+    # values.  Each keeps its own line, the neck width's 2 mm over the flat
+    # end's block and 11 mm over its line.
+    assert width_line - flat_block_top >= 0.002
+    assert width_line - flat_line >= 0.004
+    # Left of F's witness line, outside the crop, right of the end view's
+    # tooth tips, under the flat end radius's text (keep - 2 mm).
+    assert wx + half <= drawing._F_DETAIL_X - 0.003
+    assert math.dist((wx + half, width_top), center) >= crop + 0.003
+    assert wx - half >= drawing.END_CENTER[0] + drawing.HALF_OD + 0.002
+    assert width_top < drawing.DETAIL_KEEP["FlatToolRadius"][1] - 0.002 - 0.005
 
 
 def test_flat_reference_sketch_carries_the_printed_flat_on_the_front_plane(
@@ -1471,7 +1729,7 @@ class _BuildRecorder:
             "assert_imported_precision", "add_view_centerline", "add_attached_note",
             "add_surface_finish", "add_datum_feature", "add_feature_control_frame",
             "add_toothspace_callout", "_mark_detail_on_side", "_label_views",
-            "add_property_linked_note", "visible_circle_edge",
+            "_add_sheet_note", "_add_view_arrow", "visible_circle_edge",
             "_set_dimension_suffixes", "set_reference_dimension",
         ):
             monkeypatch.setattr(drawing, name, self._recorder(name))
@@ -1589,6 +1847,10 @@ def test_build_dimensions_the_detail_before_the_side_and_marks_it_last(
     assert seat.index("_label_views") < seat.index("finalize_drawing")
     [(label_args, _kwargs)] = seat.made["_label_views"]
     assert label_args[1:] == (seat.detail, seat.views["*Right"], seat.enlarged)
+    # VIEW C's arrow stands on the side view, before its mark circle.
+    [(arrow_args, _kwargs)] = seat.made["_add_view_arrow"]
+    assert arrow_args[1] is seat.views["*Right"]
+    assert last_pick < seat.index("_add_view_arrow") < seat.index("_mark_detail_on_side")
 
 
 def test_build_takes_its_controls_and_callouts_from_the_spec(monkeypatch, tmp_path) -> None:
@@ -1611,8 +1873,13 @@ def test_build_takes_its_controls_and_callouts_from_the_spec(monkeypatch, tmp_pa
     assert callout["axial_station_mm"] == 0.0
     ((control, _kwargs),) = seat.made["require_source_control"]
     assert control == (spec.TOOTH_SPACE_CALLOUT_PROPERTY, spec.TOOTH_SPACE_CALLOUT)
-    notes = [args[1] for args, _kwargs in seat.made["add_property_linked_note"]]
-    assert notes == ["Gear Data"]
+    # The GEAR DATA block with its matched-fit backlash row, then the
+    # numbered notes.
+    notes = [(args[1], args[2]) for args, _kwargs in seat.made["_add_sheet_note"]]
+    assert notes == [
+        (drawing.GEAR_DATA_NOTE, drawing.GEAR_DATA_XY),
+        (drawing.NOTES, drawing.NOTES_XY),
+    ]
     # Mate callouts above the vertical Ø texts, below the horizontal ones.
     made = seat.made
     callouts = {
@@ -1627,30 +1894,21 @@ def test_build_takes_its_controls_and_callouts_from_the_spec(monkeypatch, tmp_pa
     }
     assert references == drawing.REFERENCE_DIMENSIONS
     # The thread and the tip chamfer each carry one attached callout; the
-    # two shop notes lead to a tooth tip and to F in the front end view.
+    # edge-break note leads to a tooth tip in the front end view.
     attached = seat.made["add_attached_note"]
     texts = [kwargs["text"] for _args, kwargs in attached]
     assert texts == [
         spec.THREAD_CALLOUT,
         drawing.TIP_CHAMFER_NOTE,
-        drawing.TOOTH_EDGE_LEADER_NOTE,
-        drawing.BEARING_LEADER_NOTE,
+        drawing.TOOTH_EDGE_NOTE,
     ]
-    (tooth_args, tooth), (bearing_args, bearing) = attached[2:]
-    assert tooth_args[1].name == bearing_args[1].name == "*Back"
+    tooth_args, tooth = attached[2]
+    assert tooth_args[1].name == "*Back"
     angle = drawing.TOOTH_EDGE_TOOTH * 2.0 * math.pi / spec.TEETH
     tip_r = spec.OUTSIDE_DIA / 2000.0
     tip = (tip_r * math.cos(angle), tip_r * math.sin(angle))
     assert tooth["entity_xy"] == pytest.approx(tip)
     assert tooth["note_xy"] == drawing.TOOTH_EDGE_NOTE_XY
-    # F is picked at its landing in the front end view, the tooth note's way.
-    assert bearing["entity_type"] == "FACE"
-    assert "entity" not in bearing and "leader_attach_xy" not in bearing
-    face = math.radians(drawing.BEARING_LANDING_DEG)
-    face_r = drawing.BEARING_LANDING_RADIUS_MM / 1000.0
-    face_point = (face_r * math.cos(face), face_r * math.sin(face))
-    assert bearing["entity_xy"] == pytest.approx(face_point)
-    assert bearing["note_xy"] == drawing.BEARING_NOTE_XY
     # The journal's finish lands on the journal's own side-view silhouette,
     # not on the end view's circle among the teeth.
     [(finish_args, finish)] = seat.made["add_surface_finish"]
@@ -1823,7 +2081,7 @@ def test_build_cuts_no_endcut_and_checks_the_full_face_oracle(
     assert not {"FullDepth", "CutterRunoutMax"} & set(globals_set)
     prefixed = [args[2] for name, args, _kwargs in seat.mock_calls if name == "set_dimension_prefix"]
     assert not {"FullDepth", "CutterRunout"} & set(prefixed)
-    assert prefixed == ["FlatEnd", "RootDia"]
+    assert prefixed == ["RootDia"]
     [root_prefix] = [
         args[1:] for name, args, _kwargs in seat.mock_calls
         if name == "set_dimension_prefix" and args[2] == "RootDia"

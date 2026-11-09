@@ -9,14 +9,16 @@ and the fit-up play acceptance in MHA-CH-06-TL-00).
 
 Sheet 2 shows nominal REF geometry for the matched rail/bar route. Trim the
 actual rail flush with its actual bar and transfer its eight mounting holes.
-Every printed station remains model-linked but is parenthesised and
-untoleranced; no supplier pitch accuracy or transfer-tool accuracy is claimed.
-Free screw insertion, retained actual walls and full travel accept the pair.
-Each value sits on its own dimension line, clear of every other line; a note
-under the stack flags them as the note's check, and the note says what to
-do when one is out of band. FRONT (the hole face) and TOP stand
-at the sheet's 1:2, the RIGHT end profile at 2:1 so its raceway grooves read,
-and the isometric at 1:4.
+The first hole's station and the length are model-linked, parenthesised and
+untoleranced; the flag under them gives the rest as one REF pattern
+(``8X HOLES ON (60.000) PITCH``, rule 10) with its match-transfer mate. The
+end wall is the model's ``EndWall`` reference, far end face to far
+counterbore edge, its callout ``2X, 2.0 MIN AFTER TRIM``. No supplier pitch
+accuracy or transfer-tool accuracy is claimed. Free screw insertion,
+retained actual walls and full travel accept the pair (the jig's steps).
+FRONT (the hole face) and TOP stand at the sheet's 1:2 and print no
+scale; the end profile is VIEW B at 2:1, so its raceway grooves read, named
+by a letter arrow on TOP's far end; the isometric at 1:4.
 """
 
 from __future__ import annotations
@@ -41,13 +43,14 @@ import ch_rocker_arm_tl_vn_oblique_rail_kit_rail_spec as rail
 from _com import _early_bound
 from _drawing_annotation_extent import CLEAR_GAP_M, boxes_clear
 from _drawing_common import read_required_properties
-from _drawing_dimension_import import curate_view_dimensions
+from _drawing_edges import scan_view_edges
+from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
     set_dimension_callouts,
     set_reference_dimension,
 )
-from _drawing_leader_notes import add_attached_note
+from _drawing_leader_notes import add_attached_note, add_leader_note
 from _drawing_layout_check import LeaderSegment, _segment_crosses_box
 from _drawing_leaders import Box, Segment, dimension_segments
 from _drawing_projection import model_points_in_view
@@ -59,16 +62,12 @@ from _layout_geometry import estimate_text_box
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _purchased_fastener_drawing import (
-    _FOOTER_RIGHT,
-    _NOTE_X,
-    _NOTES_BOTTOM,
     _box,
     _center_marks_without_lines,
     _inside,
     _literal_note,
     _purchased_title_block,
     _rebuild,
-    footer_top,
 )
 from _purchased_title_fit import fit_purchased_title_block
 from _purchased_variant_drawing import (
@@ -104,8 +103,12 @@ if SHEET_NAMES.index(RECEIPT_SHEET_NAME) + 2 != rail.RECEIPT_SHEET:
     raise AssertionError("the rail's receipt citations name the wrong sheet")
 # Sheet 2 draws the rail's orthographic views; sheet 1 shows its isometric.
 ISOMETRIC_ONLY = {rail.CONFIGURATION: rail.RECEIPT_SHEET}
+# Sheet 2 holds the rail's reference views and its trim requirement (note 1),
+# not a receipt check: every value there is REF, so "RECEIPT CHECK" asked the
+# builder for an acceptance the package never states (machinist review, farm
+# run 20261108T063332282Z, 2 of 3 runs; Main's ruling 2026-11-08, option a).
 GENERAL_TEXT = (
-    f"REFERENCE VIEWS; {rail.ITEM_TAG} RECEIPT CHECK PER SHEET {rail.RECEIPT_SHEET}; "
+    f"REFERENCE VIEWS; {rail.ITEM_TAG} TRIM PER SHEET {rail.RECEIPT_SHEET}; "
     f"{carriage.ITEM_TAG} AS SUPPLIED."
 )
 # Sheet 1's footer note is the carriage's: the rail's prints on its sheet.
@@ -119,8 +122,9 @@ SOURCE_PROPERTIES = ("Number", "Material Specification", "Finish", *NOTE_PROPERT
 
 # --- Sheet 2: the rail receipt check --------------------------------------------
 # ASME B landscape 431.8 x 279.4, all in sheet metres. The border is 12.7 mm
-# in; the title block fills x >= 215.9 mm below y = 65.1 mm; the receipt
-# note's three lines use the existing dynamic footer_top reserve.
+# in; the title block fills x >= 215.9 mm below y = 65.1 mm. The rail's one
+# requirement is the EndWall dimension's callout, so this sheet has no footer
+# note.
 #
 # The trimmed rail fits at 1:2, the largest project scale whose
 # length fits the drawable width with the profile beside it.
@@ -223,115 +227,138 @@ STATION_ROW_PITCH = 0.0085
 # 20 mm and up 4 mm: ink then clears both witnesses and TOP's caption.
 LENGTH_ROW_RISE = 0.020
 LENGTH_TEXT_SHIFT = 0.020
+# The first station alone locates the pattern; the flag gives the pitch
+# (rule 10: one regular pattern counts as one axis, so eight station
+# dimensions are not needed).
+DRAWN_STATIONS = rail.STATION_DIMENSIONS[:1]
 RECEIPT_DIMENSIONS = {
     name: (0.0, x, -(STATION_FIRST_DROP + index * STATION_ROW_PITCH))
     for index, (name, x) in enumerate(
-        zip(rail.STATION_DIMENSIONS, rail.HOLE_X, strict=True)
+        zip(DRAWN_STATIONS, rail.HOLE_X, strict=False)
     )
 }
 RECEIPT_DIMENSIONS["Length"] = (0.0, rail.LENGTH, LENGTH_ROW_RISE)
-STATION_NOMINALS = dict(zip(rail.STATION_DIMENSIONS, rail.HOLE_X, strict=True))
-# Native run 20261107T002231Z-1-4eb76c9d measured Station2's text
-# x=61.4..93.9 mm: only 1.4 mm from the common x=60 mm witnesses of
-# Stations3..8. Both short dimensions therefore use the OUTSIDE witness lane.
-# The widest short text is 32.5 mm. Half width + padded-cell reach + gap
-# is 16.25 + 7.59 + 2 = 25.84 mm; a 27 mm offset clears that whole cell.
-# The 2 mm FRONT/TOP shift also leaves the native text >6 mm inside the border.
-TEXT_OUTSIDE_START = dict.fromkeys(rail.STATION_DIMENSIONS[:2], 0.027)
-# Only Station1's 4.982 mm sheet span cannot fit the two native arrowheads.
-# Put its arrows outside; retain inside arrows on all longer stations.
-_DIM_ARROWS_INSIDE = 0  # swDimensionArrowsSide_e.swDimArrowsInside
+STATION_NOMINALS = dict(zip(DRAWN_STATIONS, rail.HOLE_X, strict=False))
+# The end wall (2X) at the FAR end, where its model chord runs, clear of
+# Station1's near-end stack: far counterbore edge (its start, the left
+# witness) to the far end face. Its value and its callout stack two rows over
+# its line (a callout under a station lifted that value 2.5 mm, run
+# 20261104T222143958Z); its text centre stands 5 mm deeper than Station1's,
+# as printed clear in farm run 20261108T055401995Z with a three-row block.
+END_WALL_NAME = rail.END_WALL_DIMENSION
+END_WALL_DROP = STATION_FIRST_DROP + 0.005
+RECEIPT_DIMENSIONS[END_WALL_NAME] = (
+    rail.LENGTH - rail.END_WALL, rail.LENGTH, -END_WALL_DROP
+)
+RECEIPT_NOMINALS = {
+    **STATION_NOMINALS, END_WALL_NAME: rail.END_WALL, "Length": rail.LENGTH,
+}
+RECEIPT_CALLOUTS_BELOW = {END_WALL_NAME: rail.END_WALL_CALLOUT}
+# Neither short span holds its text or its two native arrowheads: each text
+# stands outside its span's left witness, its arrows outside. The station's
+# 4.982 mm span: 27 mm, half its text + the padded cell's 7.59 mm reach + the
+# 2 mm gap. The end wall's 3.107 mm span: 19.5 mm. Its 14-character
+# callout row is 31 mm at the 2.23 mm a character "2X, 2.0 MIN" printed in
+# farm run 20261108T055401995Z: clear of the flag, 4.7 mm before the witness.
+TEXT_OUTSIDE_START = {**dict.fromkeys(DRAWN_STATIONS, 0.027), END_WALL_NAME: 0.0195}
 _DIM_ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
-STATION_ARROW_SIDES = dict.fromkeys(rail.STATION_DIMENSIONS, _DIM_ARROWS_INSIDE)
-STATION_ARROW_SIDES[rail.STATION_DIMENSIONS[0]] = _DIM_ARROWS_OUTSIDE
+RECEIPT_ARROW_SIDES = dict.fromkeys((*DRAWN_STATIONS, END_WALL_NAME), _DIM_ARROWS_OUTSIDE)
 _CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
 _TOL_NONE = 0  # swTolType_e.swTolNONE
+# Only the drawn dimensions' places: curation deletes the other stations, so
+# the readback must not expect them.
 FRONT_DIMENSION_PRECISION = {
     name: places
     for places_by_name in rail.DRAWING_PRECISION.values()
     for name, places in places_by_name.items()
+    if name in RECEIPT_DIMENSIONS
 }
-# The flag: a note of its own, centred under the stack (a callout on the last
-# station stacked that value onto the row over it, the same run). Its top
-# stands 4 mm under the last row's line, under its extension lines' overrun.
+# The flag: the hole pattern's callout, centred under the station (a callout
+# on the station stacked that value onto the row over it), its leader to one
+# hole's counterbore (rule 7: a match-transfer requirement is the feature's
+# callout, leadered; as loose text under the view it failed machinist review,
+# farm run 20261108T015328529Z). Its top stands 4 mm under the station's
+# line, under its extension lines' overrun; its two lines are the pattern
+# and its match-transfer mate.
 _LAST_ROW_LINE_DROP = (
     STATION_FIRST_DROP
-    + (len(rail.STATION_DIMENSIONS) - 1) * STATION_ROW_PITCH
+    + (len(DRAWN_STATIONS) - 1) * STATION_ROW_PITCH
     + TEXT_OVER_LINE
 )
 RECEIPT_FLAG_XY = (FRONT_CENTER[0], FRONT_CENTER[1] - _LAST_ROW_LINE_DROP - 0.004)
+# Its 42-character second line printed 109.7 mm wide from the anchor (the
+# farm run 20261108T031012373Z PDF: x 0.1245..0.2341; the 94.2 mm estimate
+# before it was short and the run 20261108T050910243Z readback failed on
+# it). The note's upper-left anchor stands 47 mm left of FRONT's centre. The
+# cell reaches 28 mm left of the text for the leader's start, 2.9 mm right
+# of it: the end wall's text stands beyond.
 RECEIPT_FLAG_CELL = (
     RECEIPT_FLAG_XY[0] - 0.075,
-    RECEIPT_FLAG_XY[1] - 0.0065,
-    RECEIPT_FLAG_XY[0] + 0.075,
+    RECEIPT_FLAG_XY[1] - 0.011,
+    RECEIPT_FLAG_XY[0] + 0.065,
     RECEIPT_FLAG_XY[1] + 0.001,
 )
-
-# Exactly one [A] flag per rail end, attached to the end counterbore's
-# lower rim. The complete leaders remain below the rail and the Length line.
-_NEAR_END_X = FRONT_CENTER[0] - _FRONT_HALF[0]
-WALL_FLAGS = (
-    ("near counterbore", (
-        _NEAR_END_X + rail.HOLE_X[0] * _sheet_mm(SHEET_SCALE),
-        FRONT_CENTER[1] - rail.CBORE_DIA / 2.0 * _sheet_mm(SHEET_SCALE),
-    ), (0.014, 0.158)),
-    ("far counterbore", (
-        _NEAR_END_X + rail.HOLE_X[-1] * _sheet_mm(SHEET_SCALE),
-        FRONT_CENTER[1] - rail.CBORE_DIA / 2.0 * _sheet_mm(SHEET_SCALE),
-    ), (0.300, 0.158)),
-)
+RECEIPT_FLAG_ANCHOR = (RECEIPT_FLAG_XY[0] - 0.047, RECEIPT_FLAG_XY[1])
+# The leader lands on the second hole's counterbore rim, down-right at 45°:
+# that hole stands left of the text's left edge, so the leader rises
+# up-left from the text's left side without crossing it (on the fourth
+# hole, over the text, it ran through the "8", farm run
+# 20261108T031012373Z), and right of the station's lines at the near end.
+# The rim is found from the hole's projected centre, not FRONT's nominal
+# centre: a 1.2 mm settle of the view put the nominal pick off the rim (farm
+# run 20261108T053341172Z, tip (0.09819, 0.15748)).
+RECEIPT_FLAG_HOLE = 1
+_FLAG_RIM = rail.CBORE_DIA / 2.0 * _sheet_mm(SHEET_SCALE) / math.sqrt(2.0)
 
 
-def wall_flag_regions(edge_xy: tuple[float, float], note_xy: tuple[float, float]) -> tuple[Box, Box]:
-    """Separate text lane from INote.GetExtent's text-plus-leader envelope.
+def flag_landing(hole_xy: tuple[float, float]) -> tuple[float, float]:
+    """The counterbore rim point, down-right at 45° of the hole's centre."""
+    return (hole_xy[0] + _FLAG_RIM, hole_xy[1] - _FLAG_RIM)
 
-    Same 1 mm tip reserve as draw_pn_vn_pen_marker.GRIP_NOTE_EXTENT; it is
-    not permission for the text anchor or the attached tip to leave its lane.
-    """
-    text = (note_xy[0] - 0.001, note_xy[1] - 0.007,
-            note_xy[0] + 0.012, note_xy[1] + 0.002)
-    envelope = (
-        min(text[0], edge_xy[0] - 0.001), min(text[1], edge_xy[1] - 0.001),
-        max(text[2], edge_xy[0] + 0.001), max(text[3], edge_xy[1] + 0.001),
+
+def flag_envelope(landing: tuple[float, float]) -> Box:
+    """The note's readback envelope: its text cell and the leader up to the
+    rim, with a 1 mm reserve round the tip."""
+    return (
+        min(RECEIPT_FLAG_CELL[0], landing[0] - 0.001),
+        RECEIPT_FLAG_CELL[1],
+        RECEIPT_FLAG_CELL[2],
+        landing[1] + 0.001,
     )
-    return text, envelope
 
 
-def assert_wall_flag_landing(note: Any, edge_xy: tuple[float, float], text_cell: Box) -> tuple[Segment, ...]:
-    """Read the settled text anchor and both leader endpoints independently."""
+# Where the rim stands with FRONT at its nominal centre.
+RECEIPT_FLAG_LANDING = flag_landing((
+    FRONT_CENTER[0] - _FRONT_HALF[0]
+    + rail.HOLE_X[RECEIPT_FLAG_HOLE] * _sheet_mm(SHEET_SCALE),
+    FRONT_CENTER[1],
+))
+RECEIPT_FLAG_ENVELOPE = flag_envelope(RECEIPT_FLAG_LANDING)
+
+
+def assert_leader_note_landing(
+    note: Any, edge_xy: tuple[float, float], text_cell: Box, *, what: str,
+) -> None:
+    """Read the settled text anchor and both leader endpoints independently:
+    the leader runs from inside ``text_cell`` to no more than 1 mm from ``edge_xy``."""
     annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
     anchor = tuple(float(v) for v in annotation.GetPosition() or ())[:2]
     if len(anchor) != 2 or not _inside((*anchor, *anchor), text_cell):
-        raise RuntimeError(f"rail wall flag text left its lane: {anchor!r}")
+        raise RuntimeError(f"{what} text left its lane: {anchor!r}")
     if int(annotation.GetLeaderCount()) != 1:
-        raise RuntimeError("rail wall flag must retain exactly one leader")
+        raise RuntimeError(f"{what} must retain exactly one leader")
     points = tuple(float(v) for v in annotation.GetLeaderPointsAtIndex(0) or ())
     if len(points) < 6:
-        raise RuntimeError("rail wall flag leader is unreadable")
+        raise RuntimeError(f"{what} leader is unreadable")
     if len(points) % 3:
-        raise RuntimeError("rail wall flag leader points are incomplete")
+        raise RuntimeError(f"{what} leader points are incomplete")
     ends = ((points[0], points[1]), (points[-3], points[-2]))
     if not any(
         _inside((*start, *start), text_cell) and math.dist(tip, edge_xy) <= 0.001
         for start, tip in (ends, ends[::-1])
     ):
-        raise RuntimeError(f"rail wall flag leader left its intended feature: {ends!r}")
-    vertices = tuple((points[i], points[i + 1]) for i in range(0, len(points), 3))
-    return tuple(zip(vertices, vertices[1:]))
+        raise RuntimeError(f"{what} leader left its intended feature: {ends!r}")
 
-
-def require_wall_leaders_clear(
-    leaders: tuple[Segment, ...], length_text: Box, length_segments: list[Segment],
-) -> None:
-    """Check actual settled leader paths, not just their bounding rectangles."""
-    horizontal = [segment for segment in length_segments if _horizontal(segment)]
-    for leader in leaders:
-        if _crosses(leader, length_text, gap=CLEAR_GAP_M):
-            raise RuntimeError("rail wall flag leader crosses Length text")
-        for (x0, y0), (x1, y1) in horizontal:
-            line_box = (min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1))
-            if _crosses(leader, line_box, gap=0.0001):
-                raise RuntimeError("rail wall flag leader crosses overall Length line")
 
 # View captions (3 mm text, top edge at y, centred on the view): each under
 # its view's outline, FRONT's under its stack's flag.
@@ -358,18 +385,76 @@ CAPTIONS = (
     ),
 )
 _CAPTION_HALF_WIDTH = 0.022  # "ISOMETRIC  1:4" at 3 mm is about 33 mm wide
-# The member this sheet checks, in the top band; sheet 1 carries its quantity.
-ITEM_LABEL = f"{VARIANTS[0][1]}: RECEIPT CHECK"
+# The member this sheet draws, in the top band; sheet 1 carries its quantity.
+ITEM_LABEL = f"{VARIANTS[0][1]}: REFERENCE VIEWS AND TRIM"
 ITEM_LABEL_XY = (0.050, 0.262)
 ITEM_LABEL_CELL = (0.045, 0.252, 0.200, 0.264)
-# The receipt note in the footer's notes lines (rule 7's budget).
-RECEIPT_NOTE_TOP = footer_top(rail.DRAWING_NOTES, label=PART_STEM)
-RECEIPT_NOTE_CELL = (0.015, _NOTES_BOTTOM - 0.001, _FOOTER_RIGHT, RECEIPT_NOTE_TOP + 0.001)
+# Note 1 (the trim and its end-wall minimum), upper-left anchored under
+# FRONT's near half: four 3 mm rows of at most 44 characters (88 mm at the
+# item label's measured 2.0 mm a character, farm run 20261108T055401995Z
+# PDF), left of the title block and clear under FRONT's caption.
+END_WALL_NOTE_XY = (0.020, 0.118)
+END_WALL_NOTE_CELL = (0.015, 0.090, 0.150, 0.120)
+
+
+# The end profile at 2:1 is not a projection at the sheet's 1:2, so it is a
+# lettered view (rule 9): VIEW B, named by a letter arrow looking along the
+# rail at TOP's far (+X) end, right of it and left of the isometric. The
+# letter matches draw_fr_tube_frame's VIEW A arrow: 5 mm, its leader
+# straight to the end face at mid-height.
+END_VIEW_LETTER = "B"
+VIEW_LETTER_HEIGHT = 0.005
+# The letter's upper-left, from the arrow tip; its readback cell, from the tip.
+# A 5 mm "B" is about 4 mm wide: 4 + 4 = 8 mm right of the tip, inside the
+# 9.5 mm reach, which ends short of the isometric's cell (TOP's far end stands
+# about 10.4 mm left of it).
+VIEW_ARROW_TEXT_OFFSET = (0.004, VIEW_LETTER_HEIGHT / 2.0)
+VIEW_ARROW_CELL_REACH = (-0.001, -0.005, 0.0095, 0.005)
 
 
 def caption_text(label: str, scale: tuple[int, int]) -> str:
-    printed_label = "END VIEW" if label == "RIGHT" else label
+    """A view's caption: its name, and its scale only where it differs from
+    the sheet's (rule 9: a scale equal to the sheet's restates the title
+    block)."""
+    printed_label = f"VIEW {END_VIEW_LETTER}" if label == "RIGHT" else label
+    if tuple(scale) == SHEET_SCALE:
+        return printed_label
     return f"{printed_label}  {scale[0]}:{scale[1]}"
+
+
+def view_arrow_points(top_outline: Box) -> tuple[tuple[float, float], tuple[float, float]]:
+    """The VIEW B letter's upper-left and its arrow tip: the tip on TOP's far
+    end face at mid-height, read from TOP's native outline less its pad."""
+    tip = (top_outline[2] - _OUTLINE_PAD, (top_outline[1] + top_outline[3]) / 2.0)
+    return (tip[0] + VIEW_ARROW_TEXT_OFFSET[0], tip[1] + VIEW_ARROW_TEXT_OFFSET[1]), tip
+
+
+def view_arrow_cell(tip: tuple[float, float]) -> Box:
+    left, bottom, right, top = VIEW_ARROW_CELL_REACH
+    return (tip[0] + left, tip[1] + bottom, tip[0] + right, tip[1] + top)
+
+
+def _add_view_arrow(adapter: Any, top: Any) -> tuple[Any, tuple[float, float]]:
+    """The letter arrow on TOP's far end that names VIEW B."""
+    text_xy, tip_xy = view_arrow_points(_box(top.GetOutline(), label="*Top"))
+    note = add_leader_note(
+        adapter,
+        END_VIEW_LETTER,
+        text_xy=text_xy,
+        attach_xy=tip_xy,
+        view=top,
+        label="view B viewing arrow",
+        height=VIEW_LETTER_HEIGHT,
+    )
+    return note, tip_xy
+
+
+def assert_view_arrow(note: Any, tip_xy: tuple[float, float]) -> None:
+    """The arrow's tip still lands on TOP's far end face."""
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    points = tuple(float(v) for v in annotation.GetLeaderPointsAtIndex(0) or ())
+    if len(points) < 6 or math.dist((points[-3], points[-2]), tip_xy) > 0.001:
+        raise RuntimeError(f"view B arrow tip left TOP's far end: {points!r}")
 
 
 def _center_outline(view: Any, name: str, center: tuple[float, float]) -> None:
@@ -391,9 +476,10 @@ def receipt_text_point(
     end: tuple[float, float],
     offset: float,
 ) -> tuple[float, float]:
-    """A dimension's text target: short stations outside the near witness,
-    long stations centred, Length shifted to keep its measured multiline
-    callout inside its witnesses. ``offset`` is normal to the rail."""
+    """A dimension's text target: short spans (the station, the end wall)
+    outside their left witness, long ones centred, Length shifted to keep its
+    measured multiline callout inside its witnesses. ``offset`` is normal to
+    the rail."""
     y = (start[1] + end[1]) / 2.0 + offset
     outside = TEXT_OUTSIDE_START.get(name)
     if outside is not None:
@@ -437,7 +523,8 @@ def _display(annotation: Any) -> Any:
 
 
 def assert_receipt_controls(adapter: Any, annotations: list[Any]) -> None:
-    """Every nominal model reference is untoleranced and parenthesised.
+    """Every nominal model reference is untoleranced and parenthesised, with
+    exactly its authored callouts and arrow side.
 
     Matching actual hardware is accepted by the fitting instructions."""
     found = {}
@@ -454,13 +541,14 @@ def assert_receipt_controls(adapter: Any, annotations: list[Any]) -> None:
         callout = str(display.GetText(_CALLOUT_BELOW) or "").replace("\r\n", "\n")
         above = str(display.GetText(3) or "").replace("\r\n", "\n")
         expected_above = rail.END_FIT_CALLOUT if name == "Length" else ""
+        expected_below = RECEIPT_CALLOUTS_BELOW.get(name, "")
         value = abs(float(dimension.SystemValue))
-        expected = rail.LENGTH if name == "Length" else STATION_NOMINALS[name]
+        expected = RECEIPT_NOMINALS[name]
         if (
             abs(value - expected / 1000.0) > 1e-8
             or int(tolerance.Type) != _TOL_NONE
             or brackets != ("(", ")")
-            or callout
+            or callout != expected_below
             or above != expected_above
         ):
             raise RuntimeError(
@@ -470,13 +558,13 @@ def assert_receipt_controls(adapter: Any, annotations: list[Any]) -> None:
             )
         if name == "Length":
             continue
-        if int(display.ArrowSide) != STATION_ARROW_SIDES[name]:
+        if int(display.ArrowSide) != RECEIPT_ARROW_SIDES[name]:
             raise RuntimeError(f"rail {name} did not keep its authored arrow side")
 
 
 @_telemetry.traced("drawing.rail_receipt_dimensions")
 def _receipt_dimensions(adapter: Any, front: Any) -> list[Any]:
-    """Import the rail's station and length dimensions into FRONT."""
+    """Import the rail's station, end-wall and length dimensions into FRONT."""
     annotations = curate_view_dimensions(
         adapter,
         front,
@@ -491,12 +579,14 @@ def _receipt_dimensions(adapter: Any, front: Any) -> list[Any]:
         if name == "Length":
             continue
         display = _display(annotation)
-        display.ArrowSide = STATION_ARROW_SIDES[name]
+        display.ArrowSide = RECEIPT_ARROW_SIDES[name]
     # Length witnesses identify both actual rail end faces. Put the fit flag
     # above its value, away from the proven eight station-text lanes below.
     set_dimension_callouts(
         adapter, annotations, {"Length": rail.END_FIT_CALLOUT}, location="above"
     )
+    # The end wall's acceptance under its value: 2X, the walls at both ends.
+    set_dimension_callouts(adapter, annotations, RECEIPT_CALLOUTS_BELOW, location="below")
     assert_receipt_controls(adapter, annotations)
     return annotations
 
@@ -528,7 +618,8 @@ def receipt_stack_findings(
     extension lines stay out of it. Every other dimension's text and lines,
     extension lines included, and the flag stay ``CLEAR_GAP_M`` clear of it.
     The station lines step outward from the part in station order, and the
-    flag stands under the last one, clear of every line.
+    flag stands under the last one, clear of every line. The end wall is no
+    station: it obeys only the clearance rules.
     """
     findings = []
     line_y = {}
@@ -635,7 +726,7 @@ def _source_properties(model: Any) -> dict[str, str]:
 
 
 def append_rail_receipt_sheet(adapter: Any) -> tuple[Callable[[], None], ...]:
-    """Author RAIL RECEIPT: the Rail member's views, stations and note."""
+    """Author RAIL RECEIPT: the Rail member's views, references and flag."""
     draw = adapter.currentModel
     document = _early_bound(draw, "IDrawingDoc")
     if not document.ActivateSheet(RECEIPT_SHEET_NAME):
@@ -677,7 +768,6 @@ def append_rail_receipt_sheet(adapter: Any) -> tuple[Callable[[], None], ...]:
     annotations = _receipt_dimensions(adapter, front)
 
     notes = []
-    wall_flags = []
     with _telemetry.span("drawing.rail_annotations"):
         centred = [
             (caption_text(label, scale), x, y, (
@@ -685,7 +775,6 @@ def append_rail_receipt_sheet(adapter: Any) -> tuple[Callable[[], None], ...]:
             ))
             for label, x, y, scale in CAPTIONS
         ]
-        centred.append((rail.RECEIPT_FLAG, *RECEIPT_FLAG_XY, RECEIPT_FLAG_CELL))
         for text, x, y, box in centred:
             note = _literal_note(adapter, text, x, y)
             bounds = _box(note.GetExtent(), label=text, kind="note")
@@ -693,19 +782,37 @@ def append_rail_receipt_sheet(adapter: Any) -> tuple[Callable[[], None], ...]:
             if not annotation.SetPosition(2 * x - (bounds[0] + bounds[2]) / 2, y, 0.0):
                 raise RuntimeError(f"{text}: failed to centre the note")
             notes.append((note, text, text, box))
-        flag_note = notes[-1][0]
+        (flag_hole,) = model_points_in_view(
+            adapter,
+            front,
+            [(rail.HOLE_X[RECEIPT_FLAG_HOLE] / 1000.0, 0.0, 0.0)],
+            label="rail hole pattern flag hole",
+            names=[f"hole {RECEIPT_FLAG_HOLE + 1}"],
+        )
+        landing = flag_landing(tuple(flag_hole))
+        # The rim itself, not a sheet pick: a pick on the rim attached 1.2 mm
+        # under it (farm runs 20261108T053341172Z and 20261108T054638879Z,
+        # tip (0.09819, 0.15748) both times).
+        rim = scan_view_edges(front, label="rail flag counterbore rim").circle_at(
+            (rail.HOLE_X[RECEIPT_FLAG_HOLE], 0.0, rail.HEIGHT),
+            rail.CBORE_DIA / 2.0,
+            axis=(0.0, 0.0, 1.0),
+            label="rail flag counterbore rim",
+        ).edge
+        flag_note = add_attached_note(
+            adapter, front, text=rail.RECEIPT_FLAG, entity=rim, attached_to=rim,
+            leader_attach_xy=landing, note_xy=RECEIPT_FLAG_ANCHOR,
+            label="rail hole pattern",
+        )
+        notes.append((flag_note, rail.RECEIPT_FLAG, rail.RECEIPT_FLAG, flag_envelope(landing)))
         note = _literal_note(adapter, ITEM_LABEL, *ITEM_LABEL_XY)
-        for label, edge_xy, note_xy in WALL_FLAGS:
-            wall_note = add_attached_note(
-                adapter, front, text="[A]", entity_xy=edge_xy,
-                note_xy=note_xy, label=f"rail wall {label}",
-            )
-            text_cell, box = wall_flag_regions(edge_xy, note_xy)
-            wall_flags.append((wall_note, edge_xy, text_cell))
-            notes.append((wall_note, "[A]", "[A]", box))
         notes.append((note, ITEM_LABEL, ITEM_LABEL, ITEM_LABEL_CELL))
-        note = _literal_note(adapter, rail.DRAWING_NOTES, _NOTE_X, RECEIPT_NOTE_TOP)
-        notes.append((note, rail.DRAWING_NOTES, rail.DRAWING_NOTES, RECEIPT_NOTE_CELL))
+        note = _literal_note(adapter, rail.END_WALL_NOTE, *END_WALL_NOTE_XY)
+        notes.append((note, rail.END_WALL_NOTE, rail.END_WALL_NOTE, END_WALL_NOTE_CELL))
+        arrow_note, arrow_tip = _add_view_arrow(adapter, views["*Top"])
+        notes.append(
+            (arrow_note, END_VIEW_LETTER, END_VIEW_LETTER, view_arrow_cell(arrow_tip))
+        )
         title_notes = _purchased_title_block(
             adapter,
             draw,
@@ -761,18 +868,17 @@ def append_rail_receipt_sheet(adapter: Any) -> tuple[Callable[[], None], ...]:
                     f"rail note leaves its reserved space/border: {linked_text!r}: {box!r}"
                 )
         title_fit()
-        length_annotation = next(
-            annotation for annotation in annotations
-            if dimension_name(adapter, annotation) == "Length"
+        assert_view_arrow(arrow_note, arrow_tip)
+        assert_leader_note_landing(
+            flag_note, landing, RECEIPT_FLAG_CELL, what="rail hole pattern callout",
         )
-        length_text, length_segments = _receipt_ink(length_annotation, label="Length wall-flag clearance")
-        for wall_note, edge_xy, text_cell in wall_flags:
-            leaders = assert_wall_flag_landing(wall_note, edge_xy, text_cell)
-            require_wall_leaders_clear(leaders, length_text, length_segments)
+        # The stack rule reads the flag's text: its extent less the leader's
+        # rise to the rim, which stands over the text's top.
+        flag_extent = _box(flag_note.GetExtent(), label=rail.RECEIPT_FLAG, kind="note")
         assert_receipt_stack_clear(
             adapter,
             annotations,
-            _box(flag_note.GetExtent(), label=rail.RECEIPT_FLAG, kind="note"),
+            (*flag_extent[:3], min(flag_extent[3], RECEIPT_FLAG_CELL[3])),
         )
 
     settled()

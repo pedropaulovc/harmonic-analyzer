@@ -60,10 +60,30 @@ def test_bottom_chamfer_clears_the_handle_counterbore_corner() -> None:
     import dt_crank_handle_spec as handle
 
     assert spec.BODY_CHAMFER_MIN >= handle.INSIDE_CORNER_R_MAX
-    assert notes.BODY_CHAMFER_CALLOUT.splitlines() == [
-        "X 45 DEG",
-        "CLEARS MHA-DT-08",
-        "COUNTERBORE CORNER",
+    assert _config.parts("dt-crank-handle")["number"] in notes.BODY_CHAMFER_CALLOUT
+
+
+def test_pocket_names_its_mate_once_on_one_flag_note() -> None:
+    # Rule 4: the pocket's diameter, depth and floor corner share one flag.
+    flags = {
+        drawing.DIMENSION_CALLOUTS[name].splitlines()[0]
+        for name in ("PocketDia", "PocketDepth", "PocketFloorRadius")
+    }
+    assert len(flags) == 1
+    pocket = notes.POCKET_NOTE_TEXT
+    assert pocket.startswith("1. ") and len(pocket.splitlines()) <= 2
+    assert _config.parts("dt-crank-handle-pivot-screw")["number"] in pocket
+    assert "CLEARANCE" in pocket
+    # The body's bond is a matched fit on flag note 2: the .XXX grade alone
+    # cannot give the glue line, so the route prints (round 2 review).
+    assert drawing.DIMENSION_CALLOUTS["BodyDia"] not in flags
+    body = drawing.BODY_NOTE_TEXT
+    assert body.startswith("2. ") and len(body.splitlines()) <= 2
+    assert _config.parts("dt-crank-handle")["number"] in body
+    assert "CLEARANCE" in body
+    assert drawing.NOTES_TEXT.splitlines() == [
+        *notes.POCKET_NOTE_TEXT.splitlines(),
+        *drawing.BODY_NOTE_TEXT.splitlines(),
     ]
 
 
@@ -90,7 +110,7 @@ def test_face_walls_charge_every_exposed_break() -> None:
     # Codjiflo on #2102 (#2170): at the outer face the pocket mouth and the OD
     # edge each take the title block's break, so the governing wall is the
     # straight one less both, and the callout prints that, not the straight.
-    # Main delegated ruling 2026-11-04 (#2170, option B): the body grows to
+    # Owner ruling 2026-11-08 (Pedro), #2144 item 7.1 (#2170, option B): the body grows to
     # .422, so the face holds the .060 floor (RV-01) and the straight the target.
     brk = edge_break_chamfer_mm(unit=spec.UNIT)
     assert spec.EDGE_BREAK_MAX_MM == brk == pytest.approx(0.010 * 25.4)
@@ -104,7 +124,7 @@ def test_face_walls_charge_every_exposed_break() -> None:
     }
     assert set(exceptions) == {"RV-01"}
     assert exceptions["RV-01"]["where"].endswith(notes.POCKET_FIT_CALLOUT.splitlines()[-1])
-    # #2196 (Main delegated ruling 2026-11-04): the .34 overall keeps the
+    # #2196 (Owner ruling 2026-11-08 (Pedro), #2144 item 7.3): the .34 overall keeps the
     # target at the floor hole's lip, both mouths broken; option B lifts the
     # bottom face's ring round the hole over it too.
     assert spec.OVERALL_LENGTH == pytest.approx(0.34 * 25.4)

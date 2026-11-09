@@ -237,14 +237,14 @@ FLAT_HOUSINGS = {
 # set screw: the "clock" flat.
 CLOCKED_FLATS = ("NearKP08", "FarKP08")
 FLAT_COUNT = len(FLAT_STATIONS) + len(CLOCKED_FLATS)  # 5
-# The flat whose across-flat prints, once for every clock-0 flat, and the
-# one whose length prints, once for every KP08 flat (``NX``). The open
-# flat's length is its run to the end (``OPEN_FLAT_CALLOUT``).
+# The flat whose across-flat prints, for every clock-0 flat (its detail
+# letters and the drawing's note 1 say which), and the one whose length
+# prints, once for every KP08 flat (``NX``). The open flat's start station
+# prints bare: a location carries no words (rule 7), and detail E shows it
+# running out through the end.
 PRINTED_FLAT = "Handwheel"
 PRINTED_LENGTH_FLAT = "FarKP08"
 FLAT_LENGTH_CALLOUT = f"{len(CLOSED_FLATS) + len(CLOCKED_FLATS)}X"  # 4X
-FLAT_AF_CALLOUT = f"{len(FLAT_STATIONS)}X"  # the clock flats print their own
-OPEN_FLAT_CALLOUT = "1X FLAT TO END"
 
 
 def flat_offset(depth: float) -> float:

@@ -18,11 +18,11 @@ Cross-subassembly fits proven by the top-level interference check:
   stopping 1/16 in above the plate's underside -- gated analytically by
   build_ch_channel_assembly._assert_spring_mount;
 * cut #10-24 plain hex bolts (sm-summing.SLDASM) pass the top-frame crossbar's
-  O6.045 loose clearance holes (fr-frame.SLDASM); each under-head face seats
-  on its new SAE washer, whose lower bearing face seats on the crossbar's
-  faced top 36.50 above the finished underside. Each knife-mount dowel,
-  pressed into an underside ream, stands in its mount's O3.25 slip hole or
-  slot short of its floor.
+  O6.147 (letter C drill) clearance holes (fr-frame.SLDASM); each under-head
+  face seats on its new SAE washer, whose lower bearing face seats on the
+  crossbar's faced top 36.50 above the finished underside. Each knife mount's
+  one dowel, pressed into an underside ream, stands in its mount's O3.25
+  slip hole B short of its floor.
   Knife-mount top seats touch the underside face to face (gap 0); bearing
   contacts allow zero solid overlap. The casting's set screw grips the
   gooseneck post at the east-rail hub;

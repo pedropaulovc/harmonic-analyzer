@@ -41,8 +41,9 @@ def test_hole_contract_is_part_owned_and_resolved() -> None:
     spec = pd_guide_lock_spec.HOLE_SPEC
     assert lock.HOLE_SPEC is spec
     assert drawing.HOLE_SPEC is spec
-    # R9-49: the fractional 1/8 drill carries both printed hole positions over
-    # the screw majors (guide_lock_screw_spec.LOCK_SET_OFFSET).
+    # R9-49: the fractional 1/8 drill, transferred from the guide's taps,
+    # carries the transfer's error over the screw majors
+    # (pd_vn_guide_lock_screw_spec.LOCK_SET_OFFSET).
     assert spec.kind == "drilled_fractional"
     assert spec.size == "1/8"
     assert lock.HOLE_DIA == blind_cut_dia_mm(spec)
@@ -56,10 +57,12 @@ def test_sheet_runs_at_4_to_1_with_2_to_1_isometric() -> None:
     assert pd_guide_lock_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 2:1"
 
 
-# Inch title block: .XX ±.01; drilled holes +.004/-0.
+# Inch title block: .XX ±.01, .XXX ±.005; drilled holes +.004/-0. The
+# transferred holes print plain at .XXX, so each stands up to its band from
+# its drawn place relative to the plate's edges.
 _TWO_PLACES = printed_band_mm(2, unit="in")
 _DRILLED_PLUS = drilled_oversize_mm(unit="in")
-_HOLE_BAND = pd_guide_lock_spec.HOLE_LOCATION_BAND
+_HOLE_BAND = printed_band_mm(3, unit="in")
 _CHAR_WIDTH = 0.00276  # sheet m per character of 3.5-mm note text
 
 
@@ -95,29 +98,37 @@ def test_screw_holes_reach_the_wall_target_at_the_printed_worst_case() -> None:
     assert min(worst.values()) >= WALL_TARGET_MM
     assert pd_guide_lock_spec.HOLE_LIGAMENTS_WORST == pytest.approx(worst)
     # Finished (Codjiflo, #2124): both .010 breaks off each ligament leave the
-    # guide-side wall at .0695, between the floor and the target (RV-01).
+    # guide-side wall at .0655 (the transferred holes at the .XXX ±.005
+    # placement band), between the floor and the target (RV-01).
+    assert pd_guide_lock_spec.HOLE_PLACEMENT_BAND == pytest.approx(0.005 * 25.4)
     finished = pd_guide_lock_spec.HOLE_LIGAMENTS_FINISHED
     assert finished == pytest.approx({k: v - 0.020 * 25.4 for k, v in worst.items()})
-    assert min(finished.values()) == pytest.approx(0.0695 * 25.4, abs=1e-3)
-    assert pd_guide_lock_spec.HOLE_WALL_TEXT == "WALL .069 MIN TO EDGES"
+    assert min(finished.values()) == pytest.approx(0.0655 * 25.4, abs=1e-3)
+    assert finished["left edge"] == pytest.approx(0.0675 * 25.4, abs=1e-3)
+    assert pd_guide_lock_spec.HOLE_WALL_TEXT == "WALL .065 MIN TO EDGES"
     assert pd_guide_lock_spec.HOLE_PATTERN_X == pytest.approx(0.433 * 25.4)
     assert pd_guide_lock_spec.DRAWING_PRECISION_BY_NAME["Height"] == 2
     assert pd_guide_lock_spec.DRAWING_PRECISION_BY_NAME["Width"] == 2
 
 
 def test_hole_coordinates_print_from_the_corner_without_a_frame() -> None:
-    """drawing-guidelines.md rule 5 (avoid excessive GD&T): no frame on this plate; each hole coordinate prints from the
-    plate's corner at .XXX under its own band, and the shared Y once, 2X."""
+    """drawing-guidelines.md rule 5 (avoid excessive GD&T): no frame on this
+    plate; each hole coordinate prints from the plate's corner, plain at the
+    title block's .XXX, and the shared Y once, 2X. Round-2 review: TRANSFER
+    FROM MHA-PD-11 sets the positions, so a ±.001 band on them would be a
+    second controlling value; the part carries none."""
+    import inspect
+
     holes = pd_guide_lock_spec.DRAWING_DIMENSIONS["ScrewHoles"]
     assert holes == {"Hole1X", "Hole2X", "Hole1Y"} <= set(drawing.FRONT_KEEP)
     assert {pd_guide_lock_spec.DRAWING_PRECISION_BY_NAME[name] for name in holes} == {3}
     assert drawing.DIMENSION_PREFIXES["Hole1Y"] == "2X "
     assert len({y for _, y in pd_guide_lock_spec.HOLE_XY}) == 1
+    assert "tolerance" not in inspect.getsource(lock).lower()
 
 
 def test_the_drill_callout_stands_between_the_plate_and_the_right_view() -> None:
-    text = f"2X {drawing.HOLE_CALLOUT_PROCESS} Ø.125 THRU ALL"
-    assert text.split()[1] == "DRILL"
+    text = f"2X Ø.125 {drawing.HOLE_EXTENT_TEXT}"
     half = len(text) * _CHAR_WIDTH / 2.0
     left, right = (
         drawing.HOLE_CALLOUT_XY[0] - half,
@@ -130,48 +141,35 @@ def test_the_drill_callout_stands_between_the_plate_and_the_right_view() -> None
     assert drawing.RIGHT_EDGE_X < left and right < right_view_left
 
 
-def test_the_drill_callout_names_the_mate_its_location_bands_serve() -> None:
-    """Machinist review ENFORCE r1-r3 (blocker): the banded hole coordinates
-    named no mate.  The callout names the platen guide's taps the pattern
-    lands on and the screws its holes clear, and its last row states the
+def test_the_drill_callout_prints_size_then_process_then_its_two_rows() -> None:
+    """Rule 26: size, then process, then depth.  Rule 7: two rows of words,
+    the route that sets the plain .XXX pattern (transferred from the mate's
+    taps at assembly; the mate named once, on the pattern callout) and the
     finished wall to the edges (Codjiflo, #2124: both .010 breaks charged,
     RV-01)."""
     import _config
 
     rows = drawing.HOLE_CALLOUT_BELOW.split("\n")
     assert rows == [
-        f"MATCHES {_config.parts('pd-platen-guide')['number']} TAPS,",
-        "CLEARANCE FIT ON",
-        f"{_config.parts('pd-vn-guide-lock-screw')['number']} SCREWS",
-        "WALL .069 MIN TO EDGES",
+        f"TRANSFER FROM {_config.parts('pd-platen-guide')['number']}",
+        "WALL .065 MIN TO EDGES",
     ]
     # Each row is no wider than the native row the plate and right view
     # already bound (test above).
-    assert max(len(row) for row in rows) <= len("2X DRILL Ø.125 THRU ALL")
+    assert max(len(row) for row in rows) <= len("2X Ø .125 DRILL THRU ALL")
+    native = {5: "2X <MOD-DIAM><hw-diam> <hw-thru>", 6: "", 7: "", 8: ""}
+    updated = drawing.hole_callout_definitions(native)
+    assert updated[5] == "2X <MOD-DIAM><hw-diam> DRILL THRU"
+    assert updated[8] == drawing.HOLE_CALLOUT_BELOW
+    with pytest.raises(RuntimeError):
+        drawing.hole_callout_definitions({**native, 5: "2X <MOD-DIAM><hw-diam>"})
 
 
-def test_the_hole_coordinates_name_the_taps_they_match() -> None:
-    """Machinist review ENFORCE at 2056e3344 (blocker): the 4.000 and 2X
-    3.700 ±0.035 edge locations gave no function; at eecbf880d the 18.000
-    still lacked it. The coordinates baseline the pattern from the corner,
-    and the set window spends each band (±0.065 is refused), so each names
-    the guide whose taps it matches."""
-    import _config
-
-    guide = _config.parts("pd-platen-guide")["number"]
-    assert drawing.DIMENSION_CALLOUTS_BELOW == {
-        "Hole1X": f"MATCHES\n{guide}",
-        "Hole2X": f"MATCHES\n{guide}",
-        "Hole1Y": f"MATCHES\n{guide}",
-    }
-    # Each block stays inside its value's width, the 4.000's left of the
-    # plate's left-edge extension line.
-    width = max(len(row) for row in f"MATCHES\n{guide}".split("\n")) * _CHAR_WIDTH
-    x_x, _ = drawing.FRONT_KEEP["Hole1X"]
-    assert width <= len("2X .155 ±.001") * _CHAR_WIDTH
-    assert width <= len(".157 ±.001") * _CHAR_WIDTH
-    assert width <= len(".709 ±.001") * _CHAR_WIDTH
-    assert x_x + width / 2.0 < drawing.LEFT_EDGE_X - 0.002
+def test_the_hole_coordinates_carry_their_value_only() -> None:
+    """Rule 7: a location dimension carries its value (at the title block's
+    band) and nothing else; the pattern callout names the mate once."""
+    assert not hasattr(drawing, "DIMENSION_CALLOUTS_BELOW")
+    assert set(drawing.DIMENSION_CALLOUTS) == {"Depth"}
 
 
 # A three-row block (value plus the two-row mate callout) centres on its text
@@ -188,7 +186,7 @@ def test_the_edge_coordinate_blocks_clear_each_other_and_the_18_000() -> None:
     y_x, y_y = drawing.FRONT_KEEP["Hole1Y"]
     x_x, x_y = drawing.FRONT_KEEP["Hole1X"]
     # The hole Y's line (at its text x) passes left of the whole 4.000 block.
-    assert x_x - len(".157 ±.001") * _CHAR_WIDTH / 2.0 > y_x
+    assert x_x - len(".157") * _CHAR_WIDTH / 2.0 > y_x
     # The 4.000's shelf, its dimension line, stands clear above the 18.000's
     # (the smaller dimension nearer the part); both three-row blocks hang
     # their shelves the same _BLOCK_SHELF below their text positions.
@@ -204,7 +202,7 @@ def test_the_18_000_block_stands_between_the_hole_extension_lines() -> None:
     block stands between hole 1's extension line (where the 4.000's line
     ends) and hole 2's."""
     x, y = drawing.FRONT_KEEP["Hole2X"]
-    half = len(".709 ±.001") * _CHAR_WIDTH / 2.0
+    half = len(".709") * _CHAR_WIDTH / 2.0
     assert x - half > drawing._sheet_x(pd_guide_lock_spec.HOLE_XY[0][0]) + 0.002
     assert x + half < drawing.HOLE_2_X_SHEET - 0.002
     assert y - _BLOCK_SHELF > drawing.FRONT_KEEP["Width"][1] + 0.003
@@ -230,7 +228,7 @@ def test_the_thickness_value_stands_outboard_of_its_extension_lines() -> None:
 
 def test_the_hole_y_text_stays_inside_the_border_and_under_the_plate() -> None:
     x, y = drawing.FRONT_KEEP["Hole1Y"]
-    half = len("2X .155±.001") * _CHAR_WIDTH / 2.0
+    half = len("2X .155") * _CHAR_WIDTH / 2.0
     assert x - 2.0 * half > 0.0127  # right-aligned or centred, inside
     assert y < drawing.BOTTOM_EDGE_Y - 0.004
     assert x + half < drawing.LEFT_EDGE_X  # clear of Hole1X's extension
@@ -241,7 +239,7 @@ def test_the_hole_1_x_text_stands_outboard_of_its_extension_lines() -> None:
     text sat on hole 1's own extension line. It now stands left of the plate's
     left edge, right of the 2X hole Y's dimension line."""
     x, y = drawing.FRONT_KEEP["Hole1X"]
-    half = len(".157 ±.001") * _CHAR_WIDTH / 2.0
+    half = len(".157") * _CHAR_WIDTH / 2.0
     assert x + half < drawing.LEFT_EDGE_X - 0.002
     assert y > drawing.FRONT_KEEP["Hole2X"][1] + 0.004
 

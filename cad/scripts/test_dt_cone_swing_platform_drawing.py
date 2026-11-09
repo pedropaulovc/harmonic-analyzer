@@ -27,8 +27,9 @@ import dt_post_mount_stack as post_mount
 from dt_cone_post_envelope import BLOCK_DIA
 import draw_dt_cone_swing_platform as drawing
 import pytest
+from _drawing_contract import model_toleranced_dimensions
 from _gtol_planar import PlanarFace
-from _hole_spec import CLEARANCE_MM, blind_cut_dia_mm
+from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, blind_cut_dia_mm
 from _inch_wall_limits import WALL_TARGET_MM
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from _surface_finish import MACHINED_UM, SEAT_UM
@@ -51,7 +52,7 @@ def test_every_marked_model_dimension_has_one_view_and_native_precision() -> Non
     assert sum(len(names) for names in view_sets) == len(kept)
     assert set(drawing_spec.DRAWING_PRECISION_BY_NAME) == marked
     assert drawing_spec.DRAWING_PRECISION_BY_NAME["PlateLenDim"] == 2
-    assert set(drawing_spec.DRAWING_PRECISION_BY_NAME.values()) == {2, 3}
+    assert set(drawing_spec.DRAWING_PRECISION_BY_NAME.values()) == {2, 3, 4}
 
 
 def test_pivot_is_the_reamed_h7_bore_on_the_stock_shoulder() -> None:
@@ -350,7 +351,8 @@ def _notch_cap_native_prediction(text_xy):
     The next native drawing/eye proof must confirm the reflected envelope.
     """
     per_mm = drawing.SHEET_SCALE[0] / drawing.SHEET_SCALE[1] / 1000.0
-    pivot = (0.256811, 0.126724)  # r15 notch-view pivot witnesses
+    # r15 notch-view pivot witnesses, translated onto the sheet-2 plan.
+    pivot = (0.256811 - drawing.NOTCH_SHIFT, 0.126724)
     centre = (
         pivot[0] + geometry.SLOT_E_X * per_mm,
         pivot[1] - geometry.SLOT_E_Z * per_mm,
@@ -371,7 +373,7 @@ def test_notch_diameter_shelf_ray_lands_inside_the_physical_concave_arc() -> Non
     fillet arc.  No saved/fixed tip is used for the new landing.
     """
     text = drawing.NOTCH_KEEP["CapEDia"]
-    assert text == pytest.approx((0.2355, 0.200))
+    assert text == pytest.approx((0.2355 - drawing.NOTCH_SHIFT, 0.200))
     pivot, centre, radius, knee, unit, tip = _notch_cap_native_prediction(text)
     scale = drawing.SHEET_SCALE[0] / drawing.SHEET_SCALE[1] / 1000.0
     mouth = (geometry.SLOT_TX, -geometry.SLOT_TZ)
@@ -433,7 +435,8 @@ def test_notch_diameter_saved_text_envelope_clears_the_actual_left_outline() -> 
     pivot, _centre, _radius, _knee, _unit, _tip = _notch_cap_native_prediction(text)
     left, right = text[0] - 0.008458, text[0] + 0.008458
     bottom, top = text[1] - 0.0028049, text[1] + 0.0007486
-    assert left - drawing.FEATURE_KEEP["PostMountWestZ"][0] >= 0.002
+    # Right of the 7.986 dimension line (x 0.130) it now shares the plan with.
+    assert left - drawing.FEATURE_KEEP["PostMountEastZ"][0] >= 0.002
     # NE -> SE is the left edge in this native plan; y grows toward SE.
     scale = drawing.SHEET_SCALE[0] / drawing.SHEET_SCALE[1] / 1000.0
     corners = {corner[0]: corner[1:] for corner in geometry.PLATE_CORNERS}
@@ -447,7 +450,9 @@ def test_notch_diameter_saved_text_envelope_clears_the_actual_left_outline() -> 
 
     assert min(left_outline(bottom), left_outline(top)) - right >= 0.002
     # Positive control: the originally proposed high station touches the edge.
-    assert left_outline(0.224 + 0.0007486) - (0.237 + 0.008458) < 0.002
+    assert left_outline(0.224 + 0.0007486) - (
+        0.237 - drawing.NOTCH_SHIFT + 0.008458
+    ) < 0.002
 
 
 def test_disengaged_collar_margin_survives_general_bands() -> None:
@@ -514,20 +519,92 @@ def test_plate_thickness_text_sits_beside_section_a_a() -> None:
     assert _boxes_overlap(old, witness_205)
 
 
+def _plan_annotations(*, thread_layer: str, note_layer: str, tap_callouts: int):
+    hidden = drawing._COSMETIC_THREAD_LAYER
+    note = types.SimpleNamespace(
+        GetAnnotation=lambda: types.SimpleNamespace(Layer=note_layer)
+    )
+    thread = types.SimpleNamespace(
+        GetType=lambda: 1,
+        Layer=thread_layer,
+        GetSpecificAnnotation=lambda: types.SimpleNamespace(ThreadCallout=note),
+    )
 
-def _notch_caption_box() -> tuple[float, float, float, float]:
-    """The lock-notch caption, 59.7 x 4.8 mm from its upper-left anchor."""
-    x, y = drawing.NOTCH_CAPTION_UPPER_LEFT
-    return (x, y - 0.0048, x + 0.0597, y)
+    def callout(text: str, layer: str = ""):
+        display = types.SimpleNamespace(
+            IsHoleCallout=lambda: True,
+            GetText=lambda part: text if part == 1 else "",
+        )
+        return types.SimpleNamespace(
+            GetType=lambda: 4, Layer=layer, GetSpecificAnnotation=lambda: display
+        )
+
+    return [
+        thread,
+        callout("<MOD-DIAM> .2500 REAM THRU ALL"),
+        callout("2X 1/4-20 UNC THRU ALL", layer=hidden),
+        *(callout("2X 1/4-20 UNC THRU ALL") for _ in range(tap_callouts)),
+    ]
 
 
-def test_lock_notch_caption_sits_under_its_own_view() -> None:
-    """Centred under the notch plan, under the 7.0 arrow tip (aa9766da:
-    y 0.1276), clear of the (6.35) stock text beside section A-A."""
-    box = _notch_caption_box()
-    assert (box[0] + box[2]) / 2.0 == pytest.approx(drawing.NOTCH_CENTER[0], abs=1e-4)
-    assert box[3] <= 0.1276 - 0.0015
-    assert not _boxes_overlap(box, _plate_thickness_text_box())
+@pytest.mark.parametrize(
+    ("thread_layer", "note_layer", "tap_callouts", "error"),
+    (
+        ("hidden", "hidden", 1, None),
+        ("", "hidden", 1, "a cosmetic thread prints"),
+        ("hidden", "", 1, "cosmetic thread callout prints"),
+        ("hidden", "hidden", 0, "0 visible 1/4-20 tap callouts"),
+        ("hidden", "hidden", 2, "2 visible 1/4-20 tap callouts"),
+    ),
+)
+def test_plan_prints_the_post_taps_exactly_once(
+    monkeypatch, thread_layer, note_layer, tap_callouts, error
+) -> None:
+    """Farm round 3: sheet 2's plan printed the model's "1/4-20 Tapped Hole"
+    thread callout beside the 2X Hole Wizard callout.  Both plans hide the
+    cosmetic threads, and the readback refuses any second tap callout."""
+    hidden = drawing._COSMETIC_THREAD_LAYER
+    layers = {"hidden": hidden, "": ""}
+    annotations = _plan_annotations(
+        thread_layer=layers[thread_layer],
+        note_layer=layers[note_layer],
+        tap_callouts=tap_callouts,
+    )
+    view = types.SimpleNamespace(GetAnnotations=lambda: annotations)
+    monkeypatch.setattr(drawing, "_early_bound", lambda item, _interface: item)
+    if error is None:
+        drawing._assert_one_post_tap_callout(view, label="plan")
+    else:
+        with pytest.raises(RuntimeError, match=error):
+            drawing._assert_one_post_tap_callout(view, label="plan")
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert '_hide_cosmetic_threads(adapter, plan, label="hole-pattern plan")' in source
+    assert '_hide_cosmetic_threads(adapter, profile, label="profile")' in source
+
+
+def test_hole_pattern_and_notch_share_one_plan_on_sheet_two() -> None:
+    """Rule 9: no prose-named or VIEW-labelled copies of the plan.  Sheet 2's
+    one unlabelled plan carries the hole and notch stations; their texts
+    stand clear of each other (offline envelope arithmetic; the native sheet
+    must still prove it)."""
+    assert drawing.SHEET_NAMES == ("PLATFORM", "HOLES")
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    for prose in ("Profile View Note", "Feature View Note", "Notch View Note", "VIEW D", "VIEW E"):
+        assert prose not in source
+    assert not set(drawing.FEATURE_KEEP) & set(drawing.NOTCH_KEEP)
+    # 8.41 stands outboard of the 7.756 text (centred 0.225, ~28 mm wide).
+    assert drawing.NOTCH_KEEP["CapECz"][0] - 0.0055 > drawing.FEATURE_KEEP["PostMountWestZ"][0] + 0.014 + 0.002
+    # .28 stands right of detail B's parent letter (x 0.1861..0.1897).
+    assert drawing.NOTCH_KEEP["NorthEdgeZ"][0] - 0.005 > 0.1897 + 0.002
+    # The taps' callout block (round 2: 88 mm wide, centred; rows 0.2433..
+    # 0.2651 for y 0.2545) stands up-left of the plan: inside the left
+    # border, left of the 1.30 text, and over the 7.986 line's top (0.2285).
+    x, y = drawing.POST_MOUNT_CALLOUT_XY
+    left, right = x - 0.044, x + 0.044 + 0.0016
+    assert left > 0.0127 + 0.005
+    assert right < drawing.NOTCH_KEEP["CapECx"][0] - 0.0055 - 0.005
+    assert y - 0.0112 > 0.2285 + 0.010
+    assert y + 0.0106 < 0.2667  # inner border, as round 2 printed it
 
 
 def test_section_a_a_group_stays_inside_the_border() -> None:
@@ -622,15 +699,31 @@ def test_post_screw_engagement_note_states_the_computed_exception() -> None:
     # their callout (Main, 2026-11-01).
     assert spec.POST_MOUNT_TAP_EDGE_BREAK == post_mount.PLATE_TAP_EDGE_BREAK_MM
     assert not any("BREAK" in row for row in drawing.POST_MOUNT_CALLOUT_BELOW)
-    # The note sits in the empty band above the title block (2.5 mm text,
-    # ~1.93 mm a character, 4.4 mm a line).
-    x, y = drawing.ENGAGEMENT_NOTE_XY
-    lines = spec.POST_MOUNT_ENGAGEMENT_NOTE.split("\n")
-    note = (x, y - 0.0044 * len(lines), x + max(map(len, lines)) * 0.00193, y)
-    assert note[0] > 0.2185 + 0.002  # plan caption row
-    assert note[3] <= 0.0853 - 0.004  # A-A label bottom (aa9766da render)
-    assert note[1] >= 0.066 + 0.004  # title block top
-    assert note[2] <= 0.4189 - 0.010  # border
+    assert drawing.ENGAGEMENT_NOTE == (
+        f"{drawing.ENGAGEMENT_NOTE_NUMBER}. {spec.POST_MOUNT_ENGAGEMENT_NOTE}"
+    )
+    assert (
+        f"SEE NOTE {drawing.ENGAGEMENT_NOTE_NUMBER}" in drawing.POST_MOUNT_CALLOUT_BELOW
+    )
+    # The notes sit in the empty band above the title block (2.5 mm text,
+    # ~1.93 mm a character, 4.4 mm a line): note 1 alone on sheet 1, note 2
+    # over note 3 on sheet 2.
+    def box(text: str, upper_left: tuple[float, float]) -> tuple[float, ...]:
+        rows = text.split("\n")
+        x, y = upper_left
+        return (x, y - 0.0044 * len(rows), x + max(map(len, rows)) * 0.00193, y)
+
+    engagement = box(drawing.ENGAGEMENT_NOTE, drawing.ENGAGEMENT_NOTE_XY)
+    relief = box(drawing.RELIEF_NOTE, drawing.RELIEF_NOTE_XY_UPPER_LEFT)
+    dowel = box(drawing.TIP_DOWEL_NOTE, drawing.TIP_DOWEL_NOTE_XY)
+    for note in (engagement, relief):
+        assert note[0] > 0.2185 + 0.002  # plan caption row
+        assert note[2] <= 0.342 - 0.002  # A-A label
+        assert note[1] >= 0.066 + 0.004  # title block top
+    assert engagement[1] >= dowel[3] - 1e-9
+    # Under sheet 2's pivot bore callout's bottom row (r11 0.0926, shifted).
+    shift = drawing.PIVOT_BORE_CALLOUT_XY[1] - 0.099
+    assert (0.0926 + shift) - engagement[3] > 0.00357
 
 
 # Detail B's "10.45" (12 x 5 mm, 81788ce9's "11.00") hangs outward from its
@@ -652,8 +745,25 @@ def _holddown_x_text_box() -> tuple[float, float, float, float]:
     return (x - w / 2.0, line_y, x + w / 2.0, line_y + h)
 
 
+def _tip_dowel_x_text_box() -> tuple[float, float, float, float]:
+    """TipDowelX's text frame, as HoldDownX's: centred on the keep x and
+    standing on its dimension line (rule-23 retention, owner ruling
+    2026-11-07)."""
+    x, y = drawing.DETAIL_KEEP["TipDowelX"]
+    w, h = drawing.TIP_DOWEL_X_TEXT_SIZE
+    line_y = y - drawing.HOLDDOWN_X_LINE_DROP
+    return (x - w / 2.0, line_y, x + w / 2.0, line_y + h)
+
+
+def _tip_dowel_callout_box() -> tuple[float, float, float, float]:
+    """The ream's value and its callout rows."""
+    x0, y0 = drawing.TIP_DOWEL_CALLOUT_LOWER_LEFT
+    w, h = drawing.TIP_DOWEL_CALLOUT_SIZE
+    return (x0, y0, x0 + w, y0 + h)
+
+
 # The hold-down callout's widest row: DRILL Ø3.05 THRU ALL at 50.0 mm (r8),
-# or the mate row LOCATES MHA-DT-21, not yet printed (~47..52 mm).  The
+# or the mate row LOCATES MHA-DT-21 (17 characters, ~41..47 mm).  The
 # underline's left end, where the leader leaves, stands 1.6 mm before it.
 _CALLOUT_HALF_WIDTHS = (0.0250, 0.0262)
 _CALLOUT_SHOULDER = 0.0016
@@ -801,7 +911,7 @@ def test_holddown_band_clears_border_title_block_and_captions() -> None:
         (0.1497, 0.0805, 0.2185, 0.0853),
     )
     x, y = drawing.ENGAGEMENT_NOTE_XY
-    lines = spec.POST_MOUNT_ENGAGEMENT_NOTE.split("\n")
+    lines = drawing.ENGAGEMENT_NOTE.split("\n")
     engagement = (x, y - 0.0044 * len(lines), x + max(map(len, lines)) * 0.00193, y)
     label_x, label_y = drawing.DETAIL_LABEL_LOWER_LEFT
     cx, cy = drawing.DETAIL_CENTER
@@ -814,6 +924,9 @@ def test_holddown_band_clears_border_title_block_and_captions() -> None:
         "detail outline": outline,
         "10.45": _holddown_z_text_box(),
         "1.00 ±0.1": _holddown_x_text_box(),
+        ".228 ±.004": _tip_dowel_x_text_box(),
+        "(.188)": _tip_dowel_pivot_x_text_box(),
+        "tip dowel ream": _tip_dowel_callout_box(),
         "C-C strip": _holddown_strip(),
         "C-C label": _holddown_label(),
         "hold-down callout": _holddown_callout_box(),
@@ -833,6 +946,9 @@ def test_holddown_band_clears_border_title_block_and_captions() -> None:
     # face labels are its own notes, standing in its padding beside the ink.
     own = {
         ("detail outline", "1.00 ±0.1"),
+        ("detail outline", ".228 ±.004"),
+        ("detail outline", "(.188)"),
+        ("detail outline", "tip dowel ream"),
         ("C-C strip", "C-C UNDERSIDE"),
     }
     for i, first in enumerate(names):
@@ -857,7 +973,15 @@ def test_holddown_band_clears_border_title_block_and_captions() -> None:
     inset = 0.002
     padded = _holddown_padded_outline()
     inner = (padded[0] + inset, padded[1] + inset, padded[2] - inset, padded[3] - inset)
-    for name in ("10.45", "1.00 ±0.1", "detail label", "C-C label"):
+    for name in (
+        "10.45",
+        "1.00 ±0.1",
+        ".228 ±.004",
+        "(.188)",
+        "tip dowel ream",
+        "detail label",
+        "C-C label",
+    ):
         assert not _boxes_overlap(ours[name], inner), name
     assert padded[2] < title_block[0] + 0.0015
     assert padded[0] > outline[2] - 0.0015
@@ -1145,7 +1269,7 @@ def test_holddown_x_is_a_banded_dimension_hanging_right_of_detail_b() -> None:
         "HoldDownX": 2,
         "HoldDownZ": 3,
     }
-    assert spec.HOLDDOWN_STATION_TOL_MM == 0.1016
+    assert spec.HOLDDOWN_STATION_TOL_MM == 0.127  # the +/-.005 drilled-hole row
     text = _holddown_x_text_box()
     cx, cy = drawing.DETAIL_CENTER
     for corner_x in (text[0], text[2]):
@@ -1236,6 +1360,295 @@ def test_holddown_web_guard_refuses_a_station_that_crowds_a_neighbour(
         _exec_mutated(checks, {})
 
 
+# --- the tip-block locating dowel (rule-23 retention, owner ruling 2026-11-07
+# (MHA-DT-00 rubric sample, PR #2248)) ----------------------------------------
+def test_tip_dowel_slip_ream_clears_the_pin_on_the_hold_down_line() -> None:
+    """The slip ream is .0630 REAM_H7, clear of the pin at both extremes and
+    opening the foot's .0620 press ream; it stands on the hold-down line at
+    MHA-DT-21's own centre distance from its foot tap, and its station band
+    plus the screw's float fits MHA-DT-21's print."""
+    import dt_vn_locating_pin_spec as pin
+    from _fit_ream_h7 import REAM_H7
+
+    assert spec.TIP_DOWEL_HOLE_DIA == pytest.approx(0.0630 * 25.4)
+    assert spec.TIP_DOWEL_HOLE_BAND == REAM_H7
+    hole_min, hole_max = spec.TIP_DOWEL_HOLE_LIMITS
+    assert (hole_min, hole_max) == pytest.approx((0.0630 * 25.4, 0.0635 * 25.4))
+    pin_min, pin_max = (pin.DIA + band * 25.4 for band in pin.DIA_BAND_IN)
+    assert hole_min - pin_max > 0.0
+    assert spec.TIP_DOWEL_SLIP_CLEARANCE_MM == pytest.approx(
+        (hole_min - pin_max, hole_max - pin_min)
+    )
+    assert hole_min > block.DOWEL_HOLE_LIMITS[1]
+    assert block.DOWEL_HOLE_DIA == pin.PRESS_HOLE_DIA
+    assert spec.TIP_DOWEL_FROM_HOLDDOWN == block.DOWEL_FROM_TAP
+    assert spec.TIP_DOWEL_LOCAL_X == pytest.approx(spec.HOLDDOWN_LOCAL_X + block.DOWEL_FROM_TAP)
+    assert spec.TIP_DOWEL_LOCAL_Z == spec.HOLDDOWN_LOCAL_Z
+    # Chained from the hold-down hole on its own +/-.004 band, which the webs
+    # need; the hold-down hole itself takes the shop's +/-.005 drilled row.
+    assert spec.TIP_DOWEL_STATION_TOL_MM == pytest.approx(0.004 * 25.4)
+    assert spec.TIP_DOWEL_STATION_TOL_MM < spec.HOLDDOWN_STATION_TOL_MM
+    major = THREAD_MAJOR_MM[block.HOLDDOWN_THREAD]
+    drilled = drilled_oversize_mm(unit=spec.UNIT)
+    float_mm = (spec.HOLDDOWN_CLEARANCE_DIA + drilled - major) / 2.0
+    assert spec.TIP_HOLDDOWN_SCREW_FLOAT_MM == pytest.approx(float_mm)
+    assert spec.TIP_DOWEL_STATION_TOL_MM + float_mm <= block.DOWEL_X_TOL_MM + 1e-9
+    # The pin's lower end, pressed to the foot's floor, stays inside the
+    # sliding underside at every limit.
+    assert block.PLATE_STOCK_BAND_MM == spec.PLATE_STOCK_BAND
+    assert spec.TIP_DOWEL_END_ABOVE_UNDERSIDE == block.DOWEL_END_ABOVE_UNDERSIDE
+    assert spec.TIP_DOWEL_END_ABOVE_UNDERSIDE_RANGE_MM == block.DOWEL_END_ABOVE_UNDERSIDE_RANGE_MM
+    assert spec.TIP_DOWEL_END_ABOVE_UNDERSIDE_RANGE_MM[0] >= 0.0
+
+
+def test_tip_dowel_webs_meet_the_wall_target_at_print_worst() -> None:
+    """Recomputed for the tightest web: the counterbore under the plate, at
+    the dowel's station band and both holes' upper limits."""
+    cbore_r = (spec.HOLDDOWN_CBORE_DIA + printed_band_mm(3, unit=spec.UNIT)) / 2.0
+    ream_r = (spec.TIP_DOWEL_HOLE_DIA + max(spec.TIP_DOWEL_HOLE_BAND)) / 2.0
+    web = spec.TIP_DOWEL_FROM_HOLDDOWN - spec.TIP_DOWEL_STATION_TOL_MM - cbore_r - ream_r
+    assert checks.TIP_DOWEL_WEBS["hold-down counterbore (underside)"] == pytest.approx(web)
+    assert web >= WALL_TARGET_MM
+    assert min(checks.TIP_DOWEL_WEBS.values()) >= WALL_TARGET_MM
+
+
+def test_tip_dowel_web_guard_refuses_a_dowel_that_crowds_the_counterbore(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _exec_mutated(checks, {})  # positive control: the shipped station passes
+    mutated = _exec_mutated(spec, {})
+    mutated.TIP_DOWEL_FROM_HOLDDOWN = 5.0  # 0.79 mm toward the hold-down hole
+    monkeypatch.setitem(sys.modules, spec.__name__, mutated)
+    with pytest.raises(AssertionError, match="tip-block locating dowel leaves a web"):
+        _exec_mutated(checks, {})
+
+
+def test_tip_dowel_ream_callout_flags_its_fit_note() -> None:
+    """Machinist review of round 6, #7: the slip ream states its fit and the
+    part it takes, by drawing number, and when it is match-reamed.  Under the
+    banded size the callout keeps two rows, the process and the flag to
+    note 3; the note carries the fit, MHA-DT-VN-69, and the match-ream at
+    the assembly step after MHA-DT-21's ream (the step's own "PER THEIR
+    CALLOUTS" points here)."""
+    import dt_drive_train_steps
+
+    callout = drawing.TIP_DOWEL_CALLOUT
+    assert callout.split("\n") == [
+        "MATCH-REAM THRU",
+        f"SEE NOTE {drawing.TIP_DOWEL_NOTE_NUMBER}",
+    ]
+    note = drawing.TIP_DOWEL_NOTE
+    rows = note.split("\n")
+    assert len(rows) == 2
+    assert rows[0].startswith(f"{drawing.TIP_DOWEL_NOTE_NUMBER}. ")
+    assert rows[1].startswith("   ")
+    assert max(map(len, rows)) <= drawing.TIP_DOWEL_NOTE_WIDTH
+    flat = " ".join(row.strip() for row in rows)
+    step = dt_drive_train_steps.step_ref("post-and-tip-block")
+    for phrase in (
+        "SLIDING FIT ON MHA-DT-VN-69",
+        f"MATCH-REAM THRU AT {step}.",
+    ):
+        assert phrase in flat, phrase
+    assert drawing_spec.DRAWING_DIMENSIONS["TipDowelProfile"] == {
+        "TipDowelX",
+        "TipDowelPivotX",
+        "TipDowelDia",
+    }
+    assert drawing_spec.DRAWING_PRECISION["TipDowelProfile"] == {
+        "TipDowelX": 3,
+        "TipDowelPivotX": 3,
+        "TipDowelDia": 4,
+    }
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert (
+        'set_dimension_callouts(adapter, detail_annotations, {"TipDowelDia": TIP_DOWEL_CALLOUT})'
+        in source
+    )
+    assert "_add_sized_note(\n        adapter,\n        TIP_DOWEL_NOTE," in source
+    # Each row fits the block the layout reserves, at the r6 render's
+    # measured callout text (2.87 mm a glyph; 5.45 mm a row, the size row
+    # with its stacked band 8.4 mm, the underline 1.7 mm under the last row).
+    assert max(map(len, callout.split("\n"))) * 0.00287 <= drawing.TIP_DOWEL_CALLOUT_SIZE[0]
+    rows_height = 0.0017 + 0.0084 + (len(callout.split("\n")) - 1) * 0.00545 + 0.0036
+    assert rows_height <= drawing.TIP_DOWEL_CALLOUT_SIZE[1] + 1e-9
+
+
+def test_each_sheet_prints_the_notes_its_flags_name() -> None:
+    """Rule 7, integration proof run 20261109T062834910Z: the dowel note
+    printed on sheet 1 as a second note 1 while its SEE NOTE 1 flag stood in
+    detail B on sheet 2.  The notes number once across the drawing; sheet 1
+    (section A-A's relief flag) carries note 1, sheet 2 (the post-mount tap
+    callout and detail B's ream) notes 2 and 3."""
+    import inspect
+
+    numbers = (
+        drawing.RELIEF_NOTE_NUMBER,
+        drawing.ENGAGEMENT_NOTE_NUMBER,
+        drawing.TIP_DOWEL_NOTE_NUMBER,
+    )
+    assert numbers == (1, 2, 3)
+    assert drawing.RELIEF_NOTE.startswith("1. ")
+    assert drawing.ENGAGEMENT_NOTE.startswith("2. ")
+    assert drawing.TIP_DOWEL_NOTE.startswith("3. ")
+    assert drawing.RELIEF_FLAG == "SEE NOTE 1"
+    assert "SEE NOTE 2" in drawing.POST_MOUNT_CALLOUT_BELOW
+    assert drawing.TIP_DOWEL_CALLOUT.split("\n")[-1] == "SEE NOTE 3"
+    sheet_two = inspect.getsource(drawing._place_holes_sheet)
+    sheet_one = inspect.getsource(drawing.build).split("_place_holes_sheet(adapter)")[0]
+    for name in ("ENGAGEMENT_NOTE,", "TIP_DOWEL_NOTE,", "TIP_DOWEL_CALLOUT"):
+        assert name in sheet_two and name not in sheet_one, name
+    assert "RELIEF_NOTE," in sheet_one and "RELIEF_NOTE," not in sheet_two
+
+
+def test_tip_dowel_note_stands_in_the_band_over_the_title_block() -> None:
+    """Sheet 2, under note 2 (ink 0.0760..0.0795, the r6 render's): the
+    title block's top line at 0.0648 (r6).  The note's first row inks 3.47
+    mm (the engagement note's), each further row 4.4 mm."""
+    x, y = drawing.TIP_DOWEL_NOTE_XY
+    rows = drawing.TIP_DOWEL_NOTE.split("\n")
+    bottom = y - 0.00347 - (len(rows) - 1) * drawing.TIP_DOWEL_NOTE_ROW_HEIGHT
+    right = x + max(map(len, rows)) * drawing.TIP_DOWEL_NOTE_GLYPH_WIDTH
+    assert x == drawing.ENGAGEMENT_NOTE_XY[0]
+    engagement_ink_bottom = drawing.ENGAGEMENT_NOTE_XY[1] - 0.0035
+    assert engagement_ink_bottom == pytest.approx(0.0760)
+    assert y <= engagement_ink_bottom - 0.0015
+    assert bottom >= 0.0648 + 0.0015
+    assert x > 0.2185 + 0.002  # plan caption row
+    assert right < 0.4191 - 0.002  # the sheet's inner border
+    # Clear of the pivot bore callout's left end (x ~0.1666) above, and of
+    # detail B's callout block (right end ~0.152) to the left.
+    assert x > 0.152 + 0.002
+    assert drawing.TIP_DOWEL_NOTE_CHAR_HEIGHT == 0.0025
+
+
+def test_build_cuts_the_tip_dowel_ream_on_a_named_axis() -> None:
+    banded = model_toleranced_dimensions(part)
+    assert banded[("TipDowelProfile", "TipDowelX")] == "TIP_DOWEL_STATION_TOL_MM"
+    assert banded[("TipDowelProfile", "TipDowelDia")] == "*deviations(TIP_DOWEL_HOLE_BAND)"
+    # Round 6, #6: the pivot-axis station is a reference, no band.
+    assert ("TipDowelProfile", "TipDowelPivotX") not in banded
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    for needed in (
+        'name_last_feature(adapter, "TipDowelHole")',
+        'name_last_feature(adapter, "tip dowel axis")',
+        '("tip dowel axis", "AXIS")',
+        'dims.record("TipDowelX", \'"TipDowelFromHoldDown"\')',
+        'dims.record("TipDowelPivotX", \'"TipDowelFromHoldDown" - "HoldDownLateral"\')',
+        'await anchor_point_to_origin(adapter, f"{circle}.center", *centre,',
+    ):
+        assert needed in source, needed
+    # The equations put the REF station where the spec does.
+    assert spec.TIP_DOWEL_FROM_HOLDDOWN - abs(spec.HOLDDOWN_LOCAL_X) == pytest.approx(
+        spec.TIP_DOWEL_LOCAL_X
+    )
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'dimension_name(adapter, item) == "TipDowelPivotX"' in drawing_source
+    assert "set_reference_dimension(\n        adapter, tip_dowel_pivot[0]" in drawing_source
+
+
+def test_tip_dowel_stays_chained_for_the_stack() -> None:
+    """Round 6, #6, delegated ruling 2026-11-07 (option A): from the pivot at
+    +/-.004, with HoldDownX's own +/-.004, the dowel-to-hold-down distance
+    takes both bands, and the plate's counterbore web and MHA-DT-21's +X
+    face web both fall under the wall target; the chained station holds
+    both, so it controls and the pivot-axis station is a reference.  One
+    locating scheme per hole (rule 10; integration proof 20261109T105251629Z
+    read a controlling .188 beside it as a second one).  The spacing matches
+    MHA-DT-21's tap-to-dowel spacing, which note 3 names (rule 4); the .228
+    itself carries only its value and band (rule 7)."""
+    assert spec.TIP_DOWEL_FROM_HOLDDOWN == block.DOWEL_FROM_TAP
+    flat = " ".join(row.strip() for row in drawing.TIP_DOWEL_NOTE.split("\n"))
+    assert f"SPACED TO MATCH {drawing.TIP_BLOCK_NUMBER}." in flat
+    assert drawing.TIP_BLOCK_NUMBER == "MHA-DT-21"
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert '{"TipDowelX":' not in drawing_source
+    web = checks.TIP_DOWEL_WEBS["hold-down counterbore (underside)"]
+    assert web >= WALL_TARGET_MM
+    assert web - spec.HOLDDOWN_STATION_TOL_MM < WALL_TARGET_MM
+    from_pivot_band = (
+        spec.TIP_DOWEL_STATION_TOL_MM + spec.HOLDDOWN_STATION_TOL_MM + spec.TIP_HOLDDOWN_SCREW_FLOAT_MM
+    )
+    plus_x = block.WORST_DOWEL_WEBS_MM["+X face"]
+    assert plus_x >= WALL_TARGET_MM - 1e-6
+    assert plus_x - (from_pivot_band - block.DOWEL_X_TOL_MM) < WALL_TARGET_MM
+
+
+def _tip_dowel_pivot_x_text_box() -> tuple[float, float, float, float]:
+    """TipDowelPivotX's text frame, as HoldDownX's: centred on the keep x and
+    standing on its dimension line."""
+    x, y = drawing.DETAIL_KEEP["TipDowelPivotX"]
+    w, h = drawing.TIP_DOWEL_PIVOT_X_TEXT_SIZE
+    line_y = y - drawing.HOLDDOWN_X_LINE_DROP
+    return (x - w / 2.0, line_y, x + w / 2.0, line_y + h)
+
+
+def test_tip_dowel_texts_stand_off_detail_b_circle() -> None:
+    """The new texts stand outside detail B's circle (HoldDownX's rule).  The
+    pivot-axis REF station takes HoldDownX's former band under the hold-down
+    hole and HoldDownX drops a text height, so the REF's dowel witness ends
+    above HoldDownX's line and crosses no dimension line.  The ream's leader
+    leaves its underline's left end (r6 render) and reaches the rim east of
+    the dowel's witnesses, under TipDowelX's line and over the REF text."""
+    cx, cy = drawing.DETAIL_CENTER
+    for box in (_tip_dowel_x_text_box(), _tip_dowel_callout_box(), _tip_dowel_pivot_x_text_box()):
+        for corner_x in (box[0], box[2]):
+            for corner_y in (box[1], box[3]):
+                assert (
+                    math.dist((corner_x, corner_y), (cx, cy))
+                    >= drawing.DETAIL_SHEET_RADIUS + 0.001 - 1e-9
+                )
+    assert _tip_dowel_x_text_box()[2] < drawing.DETAIL_HOLDDOWN_X
+    assert _tip_dowel_x_text_box()[1] > _holddown_z_text_box()[3]
+    pivot_text = _tip_dowel_pivot_x_text_box()
+    assert _tip_dowel_callout_box()[1] >= pivot_text[3] + 0.0015 - 1e-9
+    assert pivot_text[1] >= _holddown_x_text_box()[3] + 0.0011 - 1e-9
+    s = drawing._DETAIL_S
+    dowel = (drawing.DETAIL_TIP_DOWEL_X, drawing.DETAIL_HOLDDOWN_Y)
+    assert dowel[0] - cx == pytest.approx(spec.TIP_DOWEL_LOCAL_X * s)
+    r = spec.TIP_DOWEL_HOLE_DIA / 2.0 * s
+    # The REF's dowel witness overshoots its line by 1.3 mm and stops short
+    # of HoldDownX's line; HoldDownX's line clears the top relief's crown.
+    assert drawing.TIP_DOWEL_PIVOT_X_LINE_Y - 0.0013 > drawing.HOLDDOWN_X_LINE_Y + 0.001
+    crown = drawing.DETAIL_PIVOT_Y + spec.PIVOT_BEARING_RELIEF_DIAMETER / 2.0 * s
+    assert drawing.HOLDDOWN_X_LINE_Y > crown + 0.001
+    # The REF line passes 1.1 mm under the hold-down's rim, as HoldDownX's did.
+    rim = drawing.DETAIL_HOLDDOWN_Y - spec.HOLDDOWN_CLEARANCE_DIA / 2.0 * s
+    assert drawing.TIP_DOWEL_PIVOT_X_LINE_Y == pytest.approx(rim - 0.0011)
+    box = _tip_dowel_callout_box()
+    start = (box[0], box[1])
+    run = math.dist(start, dowel)
+    tip = tuple(d + (a - d) / run * r for a, d in zip(start, dowel))
+    assert tip[0] > dowel[0] + 0.0001
+    assert max(start[1], tip[1]) < drawing.TIP_DOWEL_X_LINE_Y - 0.001
+    assert min(start[1], tip[1]) > pivot_text[3]
+    assert start[0] < pivot_text[0]
+
+
+def test_relief_end_radius_stands_right_of_detail_b_under_holddown_x() -> None:
+    """The top relief's round end prints its radius in detail B (proof runs
+    20261109T134133430Z and 20261109T143813883Z: the .42 width alone, then a
+    sentence in note 1, left it unlocated).  Half the width at its places;
+    the text (four glyphs) stands outside the detail circle under HoldDownX,
+    and the leader rises from the pivot onto the arc's crown side."""
+    assert drawing.RELIEF_END_RADIUS_MM == pytest.approx(
+        part.PIVOT_BEARING_RELIEF_DIAMETER / 2.0
+    )
+    assert drawing.DRAWING_REFERENCE_PRECISION["top relief end"] == 2
+    assert "TOP RELIEF:" not in drawing.RELIEF_NOTE
+    x, y = drawing.RELIEF_END_TEXT_XY
+    w, h = 4 * 0.00287, 0.0035
+    box = (x - w / 2.0, y - h, x + w / 2.0, y + h)
+    cx, cy = drawing.DETAIL_CENTER
+    for corner_x in (box[0], box[2]):
+        for corner_y in (box[1], box[3]):
+            assert math.dist((corner_x, corner_y), (cx, cy)) > drawing.DETAIL_SHEET_RADIUS
+    assert box[3] < _holddown_x_text_box()[1]
+    assert y > drawing.DETAIL_PIVOT_Y
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "_add_relief_end_radius(adapter, detail)" in source
+
+
 def test_relief_width_text_sits_between_its_neighbours() -> None:
     """The 10.50 relief text clears the 195.09 line and the plate's west edge.
 
@@ -1244,7 +1657,7 @@ def test_relief_width_text_sits_between_its_neighbours() -> None:
     edge (x 0.1679 at that height).  Short lines keep the block ~34 mm wide
     at most; five of them still clear the 13.12 row above.
     """
-    lines = ("10.50", *drawing.RELIEF_WIDTH_CALLOUT.split("\n"))
+    lines = (".42", *drawing.RELIEF_WIDTH_CALLOUT.split("\n"))
     line_195, west_edge, char_w = 0.1300, 0.1679, 0.0028
 
     def block(x: float, texts) -> tuple[float, float]:
@@ -1258,14 +1671,13 @@ def test_relief_width_text_sits_between_its_neighbours() -> None:
     old_left, old_right = block(0.150, ("10.50", "TOP RELIEF", "OPEN TO NORTH EDGE"))
     assert old_left < line_195 and old_right > west_edge
     # The block stands on its shelf and grows up (aa9766da render: shelf
-    # 0.1438, 5.6 mm a line); the five lines top out under the 13.12 row's
-    # dimension line (0.1821) with 5 mm to spare.
+    # 0.1438, 5.6 mm a line), under the 13.12 row's dimension line.
+    # Rule 7/26: the width carries the feature name only; its centring on
+    # the pivot and its open end are geometry the plan shows.
     shelf, pitch, row_13_12 = 0.1438, 0.0056, 0.1821
     top = shelf + len(lines) * pitch
-    assert len(lines) == 5 and top <= row_13_12 - 0.005
-    # No compass word: sheet-down is model north (codex B2 on 68565ace).
-    assert not any(word in drawing.RELIEF_WIDTH_CALLOUT for word in ("NORTH", "SOUTH"))
-    assert "PIVOT" in drawing.RELIEF_WIDTH_CALLOUT.split("\n")[-1]
+    assert len(lines) == 2 and top <= row_13_12 - 0.005
+    assert drawing.RELIEF_WIDTH_CALLOUT == "TOP RELIEF"
 
 
 def test_crank_axis_follows_the_actual_train() -> None:
@@ -1274,8 +1686,8 @@ def test_crank_axis_follows_the_actual_train() -> None:
     assert crank_axis.CRANK_PLANE_ANGLE == cone_line.INCLINE_DEG
     assert spec.POST_CONE_BORE_HEIGHT > gear64.OUTSIDE_DIA / 2.0
     assert spec.crank_gear_platform_clearance() >= 0.5
-    assert len(drawing.SHEET_NAMES) == 1
-    assert drawing.SHEET_SCALES == {drawing.SHEET_NAMES[0]: drawing.SHEET_SCALE}
+    assert len(drawing.SHEET_NAMES) == 2
+    assert drawing.SHEET_SCALES == {name: drawing.SHEET_SCALE for name in drawing.SHEET_NAMES}
 
 
 def test_nominal_crank_axis_follows_the_post_station_and_the_swing() -> None:
@@ -1589,12 +2001,32 @@ def test_holddown_callout_drills_in_its_thru_row_and_names_face_and_mate() -> No
     and the +-0.1 stations of detail B named no mate (rule 4)."""
     updated = drawing.holddown_callout_definitions(dict(_CBORE_PARTS))
     assert updated[5] == _CBORE_PARTS[5]
-    assert updated[7] == "DRILL <MOD-DIAM><hw-diam> THRU ALL"
+    assert updated[7] == "<MOD-DIAM><hw-diam> DRILL THRU ALL"
     assert updated[8] == "FROM UNDERSIDE\nLOCATES MHA-DT-21"
     counted = drawing.holddown_callout_definitions(
         {**_CBORE_PARTS, 7: "<NUM_INST>X <MOD-DIAM><hw-diam> THRU ALL"}
     )
-    assert counted[7] == "<NUM_INST>X DRILL <MOD-DIAM><hw-diam> THRU ALL"
+    assert counted[7] == "<NUM_INST>X <MOD-DIAM><hw-diam> DRILL THRU ALL"
+    # Rule 26: the reamed pivot reads size, process, depth.
+    pivot = drawing.pivot_callout_definitions(
+        {5: "<MOD-DIAM><hw-diam> THRU ALL", 6: "", 7: "", 8: ""}
+    )
+    assert pivot[5] == "<MOD-DIAM><hw-diam> REAM THRU ALL"
+    assert pivot[8] == "RUNNING FIT ON MHA-DT-VN-52 SHOULDER"
+    # Round 1 seat: the Hole Wizard writes the depth as its <hw-thru> token.
+    native = drawing.pivot_callout_definitions(
+        {5: "<MOD-DIAM> <hw-diam> <hw-thru>", 6: "", 7: "", 8: ""}
+    )
+    assert native[5] == "<MOD-DIAM> <hw-diam> REAM <hw-thru>"
+    holddown = drawing.holddown_callout_definitions(
+        {
+            5: "<HOLE-CBORE><MOD-DIAM><hw-cbdia> <HOLE-DEPTH><hw-cbdepth>",
+            6: "",
+            7: "<MOD-DIAM><hw-thruholedia> <hw-thru>",
+            8: "",
+        }
+    )
+    assert holddown[7] == "<MOD-DIAM><hw-thruholedia> DRILL <hw-thru>"
     # Fail closed on a layout the rewrite was not written for.
     with pytest.raises(RuntimeError, match="already prints below"):
         drawing.holddown_callout_definitions({**_CBORE_PARTS, 8: "X"})
@@ -1726,7 +2158,8 @@ def test_relief_fit_note_stands_over_section_a_a_clear_of_its_neighbours() -> No
     """Rule 7: the relief fit is flagged by a leader at the relief on A-A
     (machinist review r1 read the note under C-C as C-C's)."""
     x, y = drawing.RELIEF_NOTE_XY
-    lines = spec.PIVOT_RELIEF_FIT_REQUIREMENT.split("\n")
+    lines = drawing.RELIEF_FLAG.split("\n")
+    assert drawing.RELIEF_FLAG == f"SEE NOTE {drawing.RELIEF_NOTE_NUMBER}"
     # r2 measured the note's rows at 2.8 mm a character, ~4.2 mm a row.
     right = x + max(map(len, lines)) * 0.0028
     bottom = y - len(lines) * 0.0042
@@ -1975,9 +2408,9 @@ def test_pivot_section_is_cropped_to_its_strip_after_its_dimensions(monkeypatch)
 @pytest.mark.parametrize(
     ("accepted", "persisted", "error"),
     (
-        (True, 1, None),
-        (False, 1, "failed to set"),
-        (True, 0, "did not persist"),
+        (True, 0, None),
+        (False, 0, "failed to set"),
+        (True, 1, "did not persist"),
     ),
 )
 def test_section_line_style_refuses_a_failed_native_setting(
@@ -1990,10 +2423,10 @@ def test_section_line_style_refuses_a_failed_native_setting(
     document = types.SimpleNamespace(Extension=extension)
     monkeypatch.setattr(drawing, "_early_bound", lambda item, _interface: item)
     if error is None:
-        drawing._set_end_only_section_lines(document)
+        drawing._set_connected_section_lines(document)
     else:
         with pytest.raises(RuntimeError, match=error):
-            drawing._set_end_only_section_lines(document)
+            drawing._set_connected_section_lines(document)
 
 
 @pytest.mark.parametrize(
@@ -2045,7 +2478,7 @@ def test_pivot_callout_has_a_full_text_height_between_the_identifier_and_caption
     assert (0.0926 + shift) - 0.085 > 0.00357
 
 
-def test_pivot_section_uses_profile_station_and_native_end_only_style():
+def test_pivot_section_uses_profile_station_and_native_connected_style():
     """Pin the actual A-A dataflow, not merely the presence of 'profile'."""
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
     build = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef) and node.name == "build")
@@ -2060,11 +2493,20 @@ def test_pivot_section_uses_profile_station_and_native_end_only_style():
         node for node in build.body
         if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call)
         and isinstance(node.value.func, ast.Name)
-        and node.value.func.id == "_set_end_only_section_lines"
+        and node.value.func.id == "_set_connected_section_lines"
     )
     assert style.lineno < aa.lineno < cc.lineno
     assert ast.unparse(cc.value.args[1]) == "profile"
-    assert ast.unparse(assignments["detail"].value.args[1]) == "feature"
+    holes = next(
+        node for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "_place_holes_sheet"
+    )
+    detail = next(
+        node for node in holes.body
+        if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name)
+        and node.targets[0].id == "detail"
+    )
+    assert ast.unparse(detail.value.args[1]) == "plan"
     assert "PostMount" not in " ".join(drawing.PROFILE_KEEP)
     assert {"PostMountWestZ", "PostMountEastZ"} <= drawing.FEATURE_KEEP.keys()
 
@@ -2078,7 +2520,8 @@ def test_pivot_section_uses_profile_station_and_native_end_only_style():
     namespace = {
         "adapter": object(), "profile": profile,
         "model_point_in_view": project, "SECTION_CENTER": drawing.SECTION_CENTER,
-        "PROFILE_CENTER": drawing.PROFILE_CENTER,
+        "PROFILE_PIVOT_XY": drawing.PROFILE_PIVOT_XY,
+        "PIVOT_SECTION_HALF_SPANS": drawing.PIVOT_SECTION_HALF_SPANS,
         "create_section_view": lambda *args, **kwargs: (args, kwargs),
     }
     selected = [
@@ -2090,39 +2533,39 @@ def test_pivot_section_uses_profile_station_and_native_end_only_style():
     args, kwargs = namespace["section"]
     assert projections == [(profile, (0.0, 0.0, 0.0))]
     assert args[1] is profile
-    assert kwargs.pop("line_start") == pytest.approx((0.029, 0.126724))
-    assert kwargs.pop("line_end") == pytest.approx((0.094, 0.126724))
+    left = drawing.PROFILE_PIVOT_XY[0] - drawing.PIVOT_SECTION_HALF_SPANS[0]
+    right = drawing.PROFILE_PIVOT_XY[0] + drawing.PIVOT_SECTION_HALF_SPANS[1]
+    assert kwargs.pop("line_start") == pytest.approx((left, 0.126724))
+    assert kwargs.pop("line_end") == pytest.approx((right, 0.126724))
     assert kwargs == {
         "view_xy": drawing.SECTION_CENTER, "section_label": "A",
         "scale": (2, 1), "label": "pivot bearing section",
     }
 
 
-def test_profile_a_a_saved_envelope_clears_post_mount_witnesses():
-    """r13/90da07a1: place the saved 6 mm end-only stubs outside the radii.
+def test_profile_a_a_line_is_whole_and_its_letters_clear_c_c():
+    """Rule 9: one connected line across the pivot end only.  Each A letter
+    (5.9 mm wide, centred on its end) keeps the layout audit's 3.09 mm of air
+    from its C neighbour; round 3 printed C's texts [55.8,61.7] and, on the
+    west side, centred 12 mm right of the pivot.
 
-    Offline envelope arithmetic only; the new saved native drawing must
-    still prove the actual section line, arrows, and attachment geometry.
+    Offline envelope arithmetic only; the saved native drawing must still
+    prove the section line, arrows and letters.
     """
-    left = drawing.PROFILE_CENTER[0] - 0.046
-    right = drawing.PROFILE_CENTER[0] + 0.019
-    stubs = ((left, left + 0.006), (right - 0.006, right))
-    old_stubs = ((0.1574343, 0.1634343), (0.1965657, 0.2025657))
-    witnesses = ((0.129, 0.1806485), (0.1806485, 0.226))
-    for old_stub, witness in zip(old_stubs, witnesses):
-        assert min(old_stub[1], witness[1]) - max(old_stub[0], witness[0]) == pytest.approx(0.006)
-    for stub in stubs:
-        for start, end in witnesses:
-            assert stub[1] < start or stub[0] > end
-    # Looking south, each end's arrow rises to its letter (31547443 render:
-    # the left end at x 0.029 printed its A over x 0.0262..0.0322).  At x
-    # 0.123 the right letter stood beside HOLE LOCATIONS' 202.84 line
-    # (x 0.1294) and read as that view's cut (machinist review, confirmed);
-    # now it stands by the plate, clear of C-C's right arrow (x 0.0834).
-    letter = (right - 0.0028, right + 0.0032)
-    assert witnesses[0][0] - letter[1] > 0.02
-    assert letter[0] - 0.0834 > 0.005
-    assert 0.1294 - (0.123 + 0.0032) < 0.005  # positive control: old end
+    pivot_x = drawing.PROFILE_PIVOT_XY[0]
+    left = pivot_x - drawing.PIVOT_SECTION_HALF_SPANS[0]
+    right = pivot_x + drawing.PIVOT_SECTION_HALF_SPANS[1]
+    half_letter, air = 0.00295, 0.00309
+    c_east = (0.0558, 0.0617)
+    c_west_left = pivot_x + 0.012 - half_letter
+    c_west_right = pivot_x + 0.012 + half_letter
+    assert c_east[0] - (left + half_letter) > air
+    assert (right - half_letter) - c_west_right > air
+    assert c_west_left > c_east[1]
+    # Positive control: round 3's ends left 0.07 mm.
+    assert c_east[0] - (pivot_x - 0.019 + half_letter) < air
+    # Across the pivot end only, not across the profile (r13: 0.029..0.094).
+    assert right - left < 0.094 - 0.029 - 0.015
 
 
 def test_profile_radius_saved_envelopes_clear_a_a_and_c_c():
@@ -2134,15 +2577,16 @@ def test_profile_radius_saved_envelopes_clear_a_a_and_c_c():
     """
     r10 = drawing.PROFILE_KEEP["CornerNER"]
     r8 = drawing.PROFILE_KEEP["CornerNWR"]
-    assert r10 == pytest.approx((0.045, 0.130))
+    assert r10 == pytest.approx((0.045, 0.1135))
     assert r8 == pytest.approx((0.137, 0.101))
     r10_box = (r10[0] - 0.0072358, r10[1] - 0.0027781,
                r10[0] + 0.0072357, r10[1] + 0.0007219)
-    left = drawing.PROFILE_CENTER[0] - 0.046
-    right = drawing.PROFILE_CENTER[0] + 0.019
-    assert r10_box[0] - (left + 0.006) > 0.002
-    # Positive control: the original profile end would nearly touch R10.
-    assert 0.0524343 - r10_box[2] < 0.002
+    left = drawing.PROFILE_PIVOT_XY[0] - drawing.PIVOT_SECTION_HALF_SPANS[0]
+    right = drawing.PROFILE_PIVOT_XY[0] + drawing.PIVOT_SECTION_HALF_SPANS[1]
+    # R10's text stands under the A-A line (y 0.126724), clear of it.
+    assert r10_box[3] < 0.126724 - 0.002
+    # Positive control: at its old station its shelf lay on that line.
+    assert abs((0.130 - 0.0027781) - 0.126724) < 0.001
 
     def ray(center, knee, radius):
         dx, dy = knee[0] - center[0], knee[1] - center[1]
@@ -2161,12 +2605,12 @@ def test_profile_radius_saved_envelopes_clear_a_a_and_c_c():
     # Positive controls: elevated shelves put rays on the wrong quadrants.
     assert 0.136 - 0.0027781 > r10_center[1]
     assert 0.142 - 0.0027781 > r8_center[1]
-    # A-A looks south: r13's sheet-down arrow envelopes mirrored about the
-    # cutting line (y 0.126724) to sheet-up.
+    # A-A looks south: each end's arrow rises from the connected line to its
+    # letter (r13's sheet-up arrow envelope, about 1.5 mm wide).
     line_y = 0.126724
     foot, head = 2 * line_y - 0.127486, 2 * line_y - 0.108374
-    aa_left = (left - 0.000762, foot, left + 0.006, head)
-    aa_right = (right - 0.006, foot, right + 0.0032523, head)
+    aa_left = (left - 0.000762, foot, left + 0.000762, head)
+    aa_right = (right - 0.000762, foot, right + 0.000762, head)
     assert not _boxes_overlap(aa_left, r10_box)
     cc_left = (0.058049, 0.131949, 0.059573, 0.143949)
     cc_right = (0.083049, 0.131949, 0.084573, 0.143949)
@@ -2868,7 +3312,7 @@ def test_pivot_callout_precision_write_is_the_declared_exception():
     entry = declared["RV-01"]
     assert entry.kind == "accept"
     assert entry.reason.startswith(
-        "Delegated ruling 2026-11-02 (Main), following owner precedent"
+        "Owner ruling 2026-11-08 (Pedro), #2144 item 1.2"
     )
     assert "#2144" in entry.reason
     places = _tolerance_places(*part.PIVOT_HOLE_BAND, display_unit=drawing.UNIT)
@@ -2895,7 +3339,7 @@ def test_drawing_side_callout_precision_is_the_declared_exception() -> None:
     }["RV-03"]
     assert entry.kind == "accept"
     assert entry.reason.startswith(
-        "Delegated ruling 2026-11-02 (Main), following owner precedent"
+        "Owner ruling 2026-11-08 (Pedro), #2144 item 1.2"
     )
     assert "#2144" in entry.reason and "20261102T230110877Z" in entry.reason
     assert "draw_dt_cone_swing_platform.build" in entry.where

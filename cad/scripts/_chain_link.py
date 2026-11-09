@@ -22,7 +22,6 @@ their registry stock data and member-specific reference-sheet notes.
 from __future__ import annotations
 
 import math
-from collections.abc import Awaitable, Callable
 from typing import Any
 
 import _config
@@ -39,7 +38,6 @@ from _feature_tree import feature_name_by_type
 from _part_checks import report_mass_properties
 from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
-from _rebuild import active_configuration_name
 from _saved_part_guard import require_saved_drawing_properties
 from _sketch import ensure_fully_defined, set_sketch_direct_db
 from _sketch_circle import define_circle
@@ -58,20 +56,18 @@ _ROWS = {
 LINKS_PER_KIND = LINK_COUNT // 2
 # The chain is sold by the foot; the loop is LINK_COUNT whole pitches of it.
 CHAIN_ORDER_FEET = math.ceil(LINK_COUNT * LINK_PITCH / 304.8)
-# One line each: the purchased sheet reserves ~0.21 m for the note. The
-# connecting link's clip orientation is an assembly fact (MHA-PD-00 step).
+# One line each: the purchased sheet reserves ~0.21 m for the note. Where the
+# connecting link goes and how its clip faces are assembly facts (MHA-PD-00
+# chain-closed step); its sheet says only what the stand-in leaves out.
 DRAWING_NOTES = {
     chain_spec.INNER_LINK_CONFIGURATION: (
         f"BREAK {CHAIN_ORDER_FEET} FT OF {CHAIN_SKU} TO {LINKS_PER_KIND} INNER + "
-        f"{LINKS_PER_KIND - 1} OUTER LINKS; {CONNECTING_LINK_SKU} CLOSES "
-        f"{LINK_COUNT} PITCHES."
+        f"{LINKS_PER_KIND - 1} OUTER LINKS."
     ),
     chain_spec.OUTER_LINK_CONFIGURATION: (
         f"{LINKS_PER_KIND - 1} PER LOOP, ALL IN THE CUT {CHAIN_SKU} CHAIN."
     ),
-    "pd-vn-chain-connecting-link": (
-        f"1 PER LOOP: JOINS THE TWO INNER-LINK ENDS OF THE CUT {CHAIN_SKU}."
-    ),
+    "pd-vn-chain-connecting-link": "SPRING CLIP NOT SHOWN.",
 }
 # Everything the purchased-part sheet reads from the saved part.
 DRAWING_PROPERTIES = (
@@ -218,22 +214,6 @@ async def author_link_geometry(
     return tuple(features)
 
 
-async def _run_before_save(
-    adapter: Any, before_save: Callable[[Any], Awaitable[None]]
-) -> None:
-    """A supplier diagram must return to the canonical installed state."""
-    model = adapter.currentModel
-    installed = active_configuration_name(adapter, model)
-    if not installed:
-        raise RuntimeError("chain reference callback has no installed configuration")
-    await before_save(adapter)
-    if (
-        int(adapter.swApp.IsSame(adapter.currentModel, model)) != 1
-        or active_configuration_name(adapter) != installed
-    ):
-        raise RuntimeError("chain reference callback changed the installed state")
-
-
 async def build_link(
     adapter: Any,
     *,
@@ -244,7 +224,6 @@ async def build_link(
     body_outer_r: float,
     body_bore_r: float | None,
     body_half_len: float,
-    before_save: Callable[[Any], Awaitable[None]] | None = None,
 ) -> dict[str, str]:
     """Build the separately purchased connecting link with the same authoring."""
     check("create_part", await adapter.create_part())
@@ -266,8 +245,6 @@ async def build_link(
         adapter, part_name, {"Manufacturing Notes": DRAWING_NOTES[part_name]}
     )
     await report_mass_properties(adapter)
-    if before_save is not None:
-        await _run_before_save(adapter, before_save)
     artefacts = await save_part_and_images(adapter, part_name)
     require_saved_drawing_properties(adapter, DRAWING_PROPERTIES)
     return artefacts

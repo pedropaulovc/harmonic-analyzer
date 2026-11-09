@@ -82,9 +82,9 @@ REFERENCE_FORMATS = {
 # three places on the Right view (not a parenthesised supplier reference).
 CUT_FEATURE = "ThreadEnvelope"
 CUT_DIMENSION = "CutThreadLength"
-# The value and a one-word callout sit on the dimension line between the
-# shoulder and the thread end (no wider than that 14.5 mm span).
-CUT_CALLOUT = "CUT"
+# The value alone sits on the dimension line between the shoulder and the
+# thread end: a length carries its value and nothing else (rule 7); the
+# footer's general line says the threaded end is shortened at assembly.
 # The end chamfer prints as one native dimension, ".03 X 45°", never note text
 # (Codjiflo #2112): its axial leg, with the angle riding as the suffix (as the
 # crank handle pivot screw's tip chamfer). The build names ThreadEndChamfer's

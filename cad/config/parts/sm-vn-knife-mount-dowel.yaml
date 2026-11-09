@@ -7,11 +7,7 @@ sm-vn-knife-mount-dowel:
   material: Alloy Steel
   material_specification: "Alloy steel dowel pin, 1/8 x 3/4, Round x Chamfer ends; McMaster-Carr 98381A473"
   finish: plain; no coating
-  installation_notes: |-
-    INSTALLATION - PRESS FIT IN THE MHA-FR-02 CROSSBAR UNDERSIDE REAM,
-    CHAMFER END FIRST. ONE PIN SLIPS INTO THE MHA-SM-02 KNIFE MOUNT
-    ROUND HOLE, ONE INTO ITS SLOT.
-  quantity: 4
+  quantity: 2
   tolerance_class: machined_block
   process: purchased
   drawing_unit: in

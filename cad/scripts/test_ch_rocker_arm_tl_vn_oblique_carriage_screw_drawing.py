@@ -34,11 +34,6 @@ def test_catalogue_row_is_the_registered_mcmaster_screw() -> None:
     assert row["number"] == "MHA-CH-06-TL-VN-64"
     assert row["process"] == "purchased"
     assert spec.SKU in row["material_specification"]
-    # Cut to fit at assembly (owner ruling 2026-11-01): the note names the
-    # jig step that owns the fit-up, the general line says "cut at assembly".
-    assert row["installation_notes"].strip() == (
-        "CUT EACH TO ITS OWN COUNTERBORE FLOOR PER MHA-CH-06-TL-00 STEP 5."
-    )
     for key in ("title", "stock_name", "supplier", "finish"):
         assert not any(ch.isdigit() for ch in row[key]), key
     # The cut end is bare steel; the finish cell says how to protect it.

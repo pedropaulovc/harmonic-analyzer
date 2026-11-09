@@ -160,7 +160,7 @@ _ROW_ABOVE_Y = AXIS_Y + 0.035
 # circle facing the corner; the text stands in the opposite quarter, so
 # SolidWorks ends the radial leader on the circle point facing the text and
 # the arc's extension line carries the arc out to it
-# (draw_sm_gooseneck_spring_screw._dress_underhead_corner).  The leader
+# (as the retired gooseneck spring-screw sheet dressed its under-head corner).  The leader
 # leaves the circle 10 degrees off the vertical, away from the head, and its
 # bend stands RADIAL_BEND_GAP right of the text's box and RADIAL_BEND_DROP
 # under its anchor (that sheet's rendered radial leaders).

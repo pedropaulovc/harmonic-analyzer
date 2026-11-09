@@ -10,13 +10,12 @@ The platform is an asymmetric steel wedge with a 1/4-in reamed H7 pivot
 bore on the stock screw shoulder, paired 1/4-20 post-mount taps, an open
 west-edge lock notch, four rounded plan corners and the counterbored #4
 clearance hole for the tip block's single hold-down screw, rising from the
-underside (user ruling 2026-09-29).  The three plan views run 1:2 and pivot
-section A-A 2:1.  Detail B enlarges a 12 mm radius around the pivot-to-hole
-region at 2:1 for the hole's station; section C-C (3:2, cropped to the
-strip), cut on the plate-profile plan through the hole's axis, shows the
-underside counterbore in solid lines and carries its native Hole Wizard
-callout. The isometric
-runs 1:3.
+underside (user ruling 2026-09-29).  Sheet 1 carries the 1:2 plate-profile
+plan, pivot section A-A at 2:1, section C-C (3:2, cropped to the strip, cut on
+the profile plan through the hold-down hole's axis, with the hole's native
+Hole Wizard callout) and the 1:3 isometric.  Sheet 2 carries one 1:2 plan
+with the hole pattern and lock notch, and detail B, which enlarges a 12 mm
+radius around the pivot-to-hole region at 2:1 for the hole's station.
 
 Run with SolidWorks open::
 
@@ -29,12 +28,14 @@ import argparse
 import math
 import re
 import sys
+import textwrap
 from collections.abc import Callable
 from typing import Any
 
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     dimension_name,
     place_view,
     view_name,
@@ -59,21 +60,22 @@ from _drawing_dimensions import (
     set_dimension_callouts,
     set_reference_dimension,
 )
-from _drawing_edges import visible_view_entities
+from _drawing_edge_dimensions import assert_dimension_measures
+from _drawing_edges import scan_view_edges, visible_view_entities
 from _drawing_finish import add_surface_finish
 from _drawing_hole_callout import (
     add_native_hole_callout,
-    compose_hole_callout_prefix,
     set_hole_callout_precision,
 )
 from _drawing_tolerances import _tolerance_places
 from _drawing_layout_collect import check_drawing_layout
 from _drawing_leader_notes import add_leader_note
-from _drawing_notes import add_property_linked_note, property_link
+from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_scan import _zoomed_on
 from _drawing_sections import create_section_view
+from _drawing_selection import _select_view_entity
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_callout_thread_class import omit_title_block_thread_class
@@ -83,6 +85,7 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _part_properties import part_drawing_unit
 from _surface_finish import surface_finish_by_key
+import _config
 import _telemetry
 import build_dt_cone_swing_platform as _part
 from diagnostics.drawing_layout_audit import (
@@ -94,15 +97,16 @@ from diagnostics.drawing_layout_audit import (
 from dt_cone_swing_platform_drawing_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    DRAWING_REFERENCE_PRECISION,
     HOLDDOWN_CALLOUT_BELOW,
     HOLDDOWN_PROCESS,
     PIVOT_BORE_CALLOUT_BELOW,
     PIVOT_PROCESS,
     POST_MOUNT_LOCATING_CALLOUT,
-    RELIEF_WIDTH_CALLOUT,
     TOP_FACE_LABEL,
     UNDERSIDE_LABEL,
 )
+from dt_drive_train_steps import step_ref
 from dt_cone_swing_platform_spec import (
     HOLDDOWN_CBORE_DIA,
     HOLDDOWN_CLEARANCE_DIA,
@@ -111,8 +115,10 @@ from dt_cone_swing_platform_spec import (
     PIVOT_BEARING_RELIEF_DEPTH,
     PLATE_STOCK_CALLOUT,
     PLATE_THICKNESS,
+    POST_MOUNT_ENGAGEMENT_NOTE,
     POST_MOUNT_SPEC,
     SURFACE_FINISHES,
+    TIP_DOWEL_LOCAL_X,
     UNIT,
 )
 from dt_cone_swing_platform_pivot_spec import PIVOT_HOLE_DIA
@@ -134,14 +140,18 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 2.0)  # title block states the principal (plan) scale; iso and section carry their own
-SHEET_NAMES = ("PLATFORM",)
-SHEET_SCALES = {SHEET_NAMES[0]: SHEET_SCALE}
+# Sheet 1 defines the plate: the principal profile plan, the sections cut
+# from it (A-A, C-C) and the isometric.  Sheet 2 holds the hole pattern and
+# the lock notch on ONE unlabelled principal plan, with detail B cut from it
+# (rule 9: no prose-named copies of the plan on one sheet; rule 15: a sheet
+# before cramming both dimension sets onto the A-A plan, whose cutting plane
+# would lie on their pivot-station witnesses, #1029).
+SHEET_NAMES = ("PLATFORM", "HOLES")
+SHEET_SCALES = {name: SHEET_SCALE for name in SHEET_NAMES}
 
 
-# Sheet layout (meters).  Three 1:2 plan views separate the profile, hole
-# pattern and lock-notch definitions instead of routing unrelated leaders
-# through one narrow 224-mm wedge.  The section and pictorial occupy the
-# right-hand field.
+# Sheet layout (meters).  Each sheet carries one 1:2 plan; the section and
+# pictorial occupy sheet 1's right-hand field.
 #
 # The plans and every annotation laid out on them stand PLAN_DROP lower than
 # at r1 (run 20261018T193840449Z): the post-mount taps' callout above the
@@ -156,8 +166,10 @@ def _planned(x: float, y: float) -> tuple[float, float]:
 
 
 PROFILE_CENTER = _planned(0.075, 0.190)
+# Sheet 2's plan stands where the hole-location plan stood on the one-sheet
+# package, so its proven annotation stations (FEATURE_KEEP, the callouts,
+# detail B and its parent letter) carry over unchanged.
 FEATURE_CENTER = _planned(0.180, 0.190)
-NOTCH_CENTER = _planned(0.260, 0.190)
 ISO_CENTER = (0.355, 0.205)
 # The section group sits up and right in the open field below the isometric,
 # clear of the lock-notch caption; every section annotation shares this shift.
@@ -253,7 +265,10 @@ PROFILE_KEEP = {
     # CornerNE/R10 is left and CornerNW/R8 is right in this view.  Keep
     # their shelves down/outward from the fillet centres so native radius
     # arrows remain on the trimmed arcs, not their circle extensions.
-    "CornerNER": _planned(0.045, 0.139),
+    # R10 stands under the A-A cutting plane (pivot station, y ~0.1267),
+    # whose connector line now runs across the pivot end: its shelf at
+    # ~0.1272 lay on that line.
+    "CornerNER": _planned(0.045, 0.1225),
     "CornerNWR": _planned(0.137, 0.110),
     "CornerSWR": _planned(0.110, 0.249),
     # R12's arrow lands at its arc's middle (corner_radius_text_xy); its
@@ -272,24 +287,25 @@ FEATURE_KEEP = {
     "PostMountEastX": _planned(0.205, 0.185),
     "PostMountEastZ": _planned(0.130, 0.175),
 }
+# The lock-notch dimensions join the hole-location plan on sheet 2.  Each
+# keeps its station relative to the pivot from the former notch plan
+# (centred NOTCH_SHIFT to the right), except where a hole-location
+# dimension already stands.
+NOTCH_SHIFT = 0.080
 NOTCH_KEEP = {
-    # Pivot-to-north-edge lives here, sharing the 205.81 pivot witness: in the
-    # profile the R8 corner ray has no path that clears this dimension.
-    "NorthEdgeZ": _planned(0.270, 0.150),
+    # Pivot-to-north-edge shares the 7.756 pivot witness.  Its text stands
+    # right of detail B's parent letter (x 0.1861..0.1897).
+    "NorthEdgeZ": _planned(0.205, 0.150),
     # Text between its witnesses: outside, it read as spanning from the corner.
-    "CapECx": _planned(0.2652, 0.258),
-    # 9 mm left of r1's line (0.305): PLAN_DROP brings its pivot witness down
-    # beside section A-A's PlateThk text (x >= 0.3035), and the pivot relief
-    # note stands right of the line (RELIEF_NOTE_XY).
-    "CapECz": _planned(0.296, 0.180),
+    "CapECx": _planned(0.2652 - NOTCH_SHIFT, 0.258),
+    # Outboard of the 7.756 line (x 0.225, text to ~0.239): the longer
+    # station stands outside the shorter one.
+    "CapECz": _planned(0.252, 0.180),
     # r15 native envelope: the shelf is 2.8049 mm below the position;
     # on the left it ends 10.0455 mm to the right.  Aim down-left at the
-    # physical concave cap, below the 33.00 line (y 246.2219 mm).
-    # The measured 16.916 mm text block needs this lower station: at y224
-    # the plan's left outline is x245.4, not x248.  Here both it and the
-    # neighbouring x225 station line clear the text by at least 2 mm.
-    # Saved-envelope prediction only; require a new native sheet eye proof.
-    "CapEDia": _planned(0.2355, 0.209),
+    # physical concave cap, below the 1.30 line.  Saved-envelope prediction
+    # only, translated with the plan; require a new native sheet eye proof.
+    "CapEDia": _planned(0.2355 - NOTCH_SHIFT, 0.209),
 }
 SECTION_KEEP = {
     # Outside its witnesses, the text hangs LEFT of the dimension line (away
@@ -355,15 +371,42 @@ DETAIL_HOLDDOWN_X = DETAIL_CENTER[0] + HOLDDOWN_LOCAL_X * _DETAIL_S
 # it, and its dimension line runs out across the plate edge and the outline
 # (user ruling 2026-09-30).  On that run the audit read the text frame
 # (" 1.00 ±0.1 ", spaces included) 21.96 x 3.5 mm, centred on the keep x
-# and standing on the dimension line, 2.78 mm under the keep y.  Here the
-# line passes 1.1 mm under the hole's rim, the frame's lower-left corner
-# stands 1 mm off the circle and its right end 4 mm short of section C-C's
-# view box.
+# and standing on the dimension line, 2.78 mm under the keep y.  Its line
+# passed 1.1 mm under the hole's rim until round 7: that band now carries
+# the tip dowel's REF station from the pivot (TipDowelPivotX, below), so
+# HoldDownX's line runs a text height plus 1.1 mm lower, 1.3 mm over the top
+# relief's crown, and its outside arrow tails keep 1.5 mm over the relief's
+# arc.  Its frame's lower-left corner stands 1 mm off the circle and its
+# right end short of section C-C's padded box.
 HOLDDOWN_X_TEXT_SIZE = (0.02196, 0.0035)
 HOLDDOWN_X_LINE_DROP = 0.00278
-HOLDDOWN_X_LINE_Y = (
+# Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
+# #2248); machinist review of round 6, #6.  The tip dowel's REF station
+# from the pivot-bore axis (" (.188) ", 8 glyphs at HoldDownX's measured
+# 2.0 mm), on HoldDownX's former line 1.1 mm under the hold-down's rim.  Its
+# 9.6 mm span cannot hold its text, which hangs right, outside the circle,
+# where HoldDownX's stood.  Its pivot witness rises on HoldDownX's, and its
+# dowel witness drops from the ream only to this line, short of HoldDownX's
+# line under it, so neither witness crosses a dimension line.  The
+# controlling station stays TipDowelX from the hold-down hole (the stack
+# reason is at dt_cone_swing_platform_spec.TIP_DOWEL_STATION_TOL_MM): one
+# locating scheme per hole (rule 10).  Integration proof 20261109T105251629Z
+# read a controlling .188 beside it as a second location, the judge's fix
+# for a spacing the owner needs held is this one, and note 3 names the mate
+# the spacing matches (TIP_DOWEL_NOTE).
+TIP_DOWEL_PIVOT_X_TEXT_SIZE = (0.0160, 0.0035)
+TIP_DOWEL_PIVOT_X_LINE_Y = (
     DETAIL_HOLDDOWN_Y - HOLDDOWN_CLEARANCE_DIA / 2.0 * _DETAIL_S - 0.0011
 )
+_TIP_DOWEL_PIVOT_X_TEXT_X = (
+    DETAIL_CENTER[0]
+    + math.sqrt(
+        (DETAIL_SHEET_RADIUS + 0.001) ** 2
+        - (TIP_DOWEL_PIVOT_X_LINE_Y - DETAIL_CENTER[1]) ** 2
+    )
+    + TIP_DOWEL_PIVOT_X_TEXT_SIZE[0] / 2.0
+)
+HOLDDOWN_X_LINE_Y = TIP_DOWEL_PIVOT_X_LINE_Y - HOLDDOWN_X_TEXT_SIZE[1] - 0.0011
 _HOLDDOWN_X_TEXT_X = (
     DETAIL_CENTER[0]
     + math.sqrt(
@@ -371,34 +414,126 @@ _HOLDDOWN_X_TEXT_X = (
     )
     + HOLDDOWN_X_TEXT_SIZE[0] / 2.0
 )
+# Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
+# #2248): the tip-block locating dowel's slip ream, on the
+# hold-down line TipDowelX west (sheet-right) of the hold-down hole, also in
+# detail B.  Its 11.6 mm span at 2:1 cannot hold " .228 ±.004 " (12 glyphs
+# at HoldDownX's measured 2.0 mm), so the line runs over both holes, 6.7 mm
+# above the hold-down's rim, and the text hangs LEFT, outside the circle
+# (1 mm off it at the frame's lower-right corner), above HoldDownZ's text.
+# The ream's value and two callout rows stand right of the circle, 1.5 mm
+# over TipDowelPivotX's text, left of the hold-down callout and under the
+# plan captions.  Measured on the r6 render (run 20261107T030627004Z):
+# SolidWorks centres the whole block, from the underline under its last row
+# to the top of its stacked band, on the dimension's point; rows print
+# 2.87 mm a glyph at a 5.45 mm pitch, the size row with its stacked band
+# 8.4 mm tall, the underline 1.7 mm under the last row.  The diameter's
+# leader leaves that underline's near (left) end for the ream's rim, east of
+# TipDowelX's dowel witness.
+DETAIL_TIP_DOWEL_X = DETAIL_CENTER[0] + TIP_DOWEL_LOCAL_X * _DETAIL_S
+TIP_DOWEL_X_TEXT_SIZE = (0.0240, 0.0035)
+TIP_DOWEL_X_LINE_Y = (
+    DETAIL_HOLDDOWN_Y + HOLDDOWN_CLEARANCE_DIA / 2.0 * _DETAIL_S + 0.0067
+)
+_TIP_DOWEL_X_TEXT_X = (
+    DETAIL_CENTER[0]
+    - math.sqrt(
+        (DETAIL_SHEET_RADIUS + 0.001) ** 2 - (TIP_DOWEL_X_LINE_Y - DETAIL_CENTER[1]) ** 2
+    )
+    - TIP_DOWEL_X_TEXT_SIZE[0] / 2.0
+)
+# Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
+# #2248).  The tip-block locating dowel's slip ream, under its
+# banded diameter in detail B, for MHA-DT-00 step post-and-tip-block ("DRILL
+# AND REAM UP THRU MHA-DT-20 INTO MHA-DT-21 PER THEIR CALLOUTS"): the
+# process, then the flag to the numbered note that states the fit, the part
+# that goes in the hole and where it is match-reamed (machinist review of
+# round 6, #7; two rows under the size, rule 7; round 8, #2: the order of
+# operations is MHA-DT-00 step 2's, not this sheet's).
+TIP_DOWEL_PIN_NUMBER = _config.parts("dt-vn-locating-pin")["number"]
+TIP_DOWEL_NOTE_NUMBER = 3
+TIP_DOWEL_CALLOUT = "\n".join(
+    (
+        "MATCH-REAM THRU",
+        f"SEE NOTE {TIP_DOWEL_NOTE_NUMBER}",
+    )
+)
+# The note the callout flags (the lift rod's made-at-assembly precedent,
+# dt_pinion_lift_rod_spec.PIN_HOLE_CALLOUT): the hole slips over the dowel
+# MHA-DT-21 holds pressed, and is reamed to size through with the block on,
+# after MHA-DT-21's press ream has been drilled and reamed up through this
+# plate.  Its banded spacing from the hold-down hole matches the block's own
+# tap-to-dowel spacing (dt_cone_tip_block_spec.DOWEL_FROM_TAP), so the note
+# names that mate (rule 4); words on the .228 itself read as a location
+# carrying words (rule 7; proof run 20261109T134133430Z, 3 of 3 runs).  Two
+# rows of at most TIP_DOWEL_NOTE_WIDTH characters under a hanging indent; the
+# step reference never breaks across rows.  Round 7's layout audit measured
+# 62 characters at 107.7 mm (x 221.6..329.3 mm), 7.6 mm into the box of the
+# section A-A label above it (from x 321.7 mm).  The callout's SEE NOTE 3
+# names the hole, so the note opens on the fit; its longest row is 50
+# characters, about 97 mm.
+TIP_DOWEL_NOTE_WIDTH = 55
+TIP_BLOCK_NUMBER = _config.parts("dt-cone-tip-block")["number"]
+_NBSP = "\u00a0"
+TIP_DOWEL_NOTE = textwrap.fill(
+    f"SLIDING FIT ON {TIP_DOWEL_PIN_NUMBER}, SPACED TO MATCH {TIP_BLOCK_NUMBER}. "
+    f"MATCH-REAM THRU AT {step_ref('post-and-tip-block').replace(' ', _NBSP)}.",
+    width=TIP_DOWEL_NOTE_WIDTH,
+    initial_indent=f"{TIP_DOWEL_NOTE_NUMBER}. ",
+    subsequent_indent="   ",
+    break_on_hyphens=False,
+).replace(_NBSP, " ")
+# The note's text height, the engagement note's (both stand in the band over
+# the title block), and its measured 1.93 mm a glyph and 4.4 mm a row.
+TIP_DOWEL_NOTE_CHAR_HEIGHT = 0.0025
+TIP_DOWEL_NOTE_GLYPH_WIDTH = 0.00193
+TIP_DOWEL_NOTE_ROW_HEIGHT = 0.0044
+# Upper-left, on sheet 2 with detail B (the callout's own sheet, rule 7),
+# in the band between the title block (top 0.066) and note 2 (ink from
+# 0.0760, as on the r6 render), left-aligned with it.
+TIP_DOWEL_NOTE_XY = (0.222, 0.0745)
+TIP_DOWEL_CALLOUT_SIZE = (0.0475, 0.0210)
+_TIP_DOWEL_CALLOUT_BOTTOM = (
+    TIP_DOWEL_PIVOT_X_LINE_Y + TIP_DOWEL_PIVOT_X_TEXT_SIZE[1] + 0.0015
+)
+TIP_DOWEL_CALLOUT_LOWER_LEFT = (
+    DETAIL_CENTER[0]
+    + math.sqrt(
+        (DETAIL_SHEET_RADIUS + 0.001) ** 2
+        - (_TIP_DOWEL_CALLOUT_BOTTOM - DETAIL_CENTER[1]) ** 2
+    ),
+    _TIP_DOWEL_CALLOUT_BOTTOM,
+)
 DETAIL_KEEP = {
     "HoldDownZ": (0.044, DETAIL_HOLDDOWN_Y + 0.0045),
     "HoldDownX": (_HOLDDOWN_X_TEXT_X, HOLDDOWN_X_LINE_Y + HOLDDOWN_X_LINE_DROP),
+    "TipDowelX": (_TIP_DOWEL_X_TEXT_X, TIP_DOWEL_X_LINE_Y + HOLDDOWN_X_LINE_DROP),
+    "TipDowelPivotX": (
+        _TIP_DOWEL_PIVOT_X_TEXT_X,
+        TIP_DOWEL_PIVOT_X_LINE_Y + HOLDDOWN_X_LINE_DROP,
+    ),
+    # The whole block's centre (r6 render).
+    "TipDowelDia": (
+        TIP_DOWEL_CALLOUT_LOWER_LEFT[0] + TIP_DOWEL_CALLOUT_SIZE[0] / 2.0,
+        TIP_DOWEL_CALLOUT_LOWER_LEFT[1] + TIP_DOWEL_CALLOUT_SIZE[1] / 2.0,
+    ),
 }
 # The native "DETAIL B / SCALE 2:1" label, moved by its measured extent:
 # lower left of its box, in the band's lower-left corner.  0.5 mm under r1's
 # 0.015: HoldDownZ's arrow stood 1.91 mm over the label's text (layout audit
 # arrow-near-text, clearance 2.0).
 DETAIL_LABEL_LOWER_LEFT = (0.016, 0.0145)
-# The pivot relief-fit note (2.5 mm text, six rows of at most 23
-# characters), anchored by its upper-left corner in the open field over
-# section A-A: right of the 213.56 dimension line (x 0.296), over the
-# PlateThk text (top 0.1366), under the isometric caption.  Its leader
-# leaves the note's right end and drops to the top relief's floor on the
-# left-hand piece (relief_floor_tip_xy), now at A-A's head: rule 7, a
-# matched fit is flagged at the feature (machinist review r1: under section
-# C-C it read as C-C's).  The note's right end (~0.357) stands over the
-# left-hand floor, so the leader falls nearly straight, between the seat's
-# Ra symbol (x <= ~0.353) and the TOP FACE label on the right-hand piece.
-# The layout audit boxes the note from its text to its tip (r2 of this fix:
-# 0.2999..0.3633 x 0.1259..0.1654), so no other note may stand over the
-# strip left of the tip.
-# r3 put the top row on the 213.56 text (bottom ~0.169, right end ~0.3025):
-# the note's top stands under it, its bottom row (~0.141) over the PlateThk
-# text.
-# r11 left 2.68 mm to the 213.56 text; 1.2 mm lower clears the 3.57 mm
-# text-separation threshold while preserving the relief-floor leader route.
-RELIEF_NOTE_XY = (0.300, 0.1653)
+# The pivot relief's flag to note 1 (2.5 mm text, one row "SEE NOTE 1",
+# ~19 mm), anchored by its upper-left corner in the open field over section
+# A-A: right of the 213.56 dimension line (x 0.296), under the 213.56 text
+# (bottom ~0.169) and the isometric caption, well over the PlateThk text
+# (top 0.1366).  Its leader leaves the flag's right end (~0.357, where the
+# former four-row note's ended) and drops to the top relief's floor on the
+# left-hand piece (relief_floor_tip_xy), at A-A's head: rule 7, a matched
+# fit is flagged at the feature (machinist review r1: under section C-C it
+# read as C-C's).  The leader falls nearly straight, between the seat's Ra
+# symbol (x <= ~0.353) and the TOP FACE label on the right-hand piece.
+RELIEF_NOTE_XY = (0.338, 0.1653)
 # The leader's tip, this far (model mm) into the relief floor from the bore
 # wall: mid-floor (the floor runs 2.075 from the bore to the relief wall), so
 # the leader meets the floor through the relief's open air, off the hatch.
@@ -407,11 +542,55 @@ RELIEF_TIP_INSET_MM = 1.0
 # the isometric's ink, ~0.189), to free the field the relief note stands in.
 ISO_CAPTION_UPPER_LEFT = (0.315, 0.180)
 # The MHA-DT-VN-61 named-exception note (2.5 mm text, one line), anchored
-# upper-left in the empty band above the title block (0.066): right of the
-# plan caption row (x <= 0.2185) and left of the A-A label (x >= 0.342). A
-# sheet must state the shortfall pending ruling #1019 (codex review of
-# 68565ace, blocker B1).
+# upper-left on sheet 2 in the empty band above the title block (0.066), its
+# ink 0.0760..0.0795 (the r6 render's), so note 3 fits under it and the
+# pivot bore callout (bottom ~0.0906) stands clear over it.  A sheet must
+# state the shortfall (owner exception RV-02).
 ENGAGEMENT_NOTE_XY = (0.222, 0.0795)
+# Numbered notes, flagged from the feature each governs (rule 7): a callout
+# keeps its size/process rows and at most two rows of words.  Each sheet
+# carries the notes its own flags name, numbered once across the drawing.
+# Sheet 1: note 1, the top relief's matched depth, flagged from the leader on
+# section A-A's relief floor.  Sheet 2: note 2, the post-mount taps'
+# engagement shortfall (owner exception RV-02, value unchanged), flagged
+# from their callout, over note 3 (TIP_DOWEL_NOTE), flagged from the
+# dowel ream in detail B.  Each stands in the band over the title block
+# (top 0.066) freed by the plan captions; rows end left of the A-A label
+# (x 0.342).  The integration proof (run 20261109T062834910Z) printed the
+# dowel note on sheet 1 as a second note 1, its flag on sheet 2.
+RELIEF_NOTE_NUMBER = 1
+ENGAGEMENT_NOTE_NUMBER = 2
+RELIEF_FLAG = f"SEE NOTE {RELIEF_NOTE_NUMBER}"
+NOTE_CHAR_HEIGHT = 0.0025
+NOTE_ROW_HEIGHT = 0.0044
+NOTE_WIDTH = 58
+RELIEF_NOTE = textwrap.fill(
+    "FIT TOP RELIEF DEPTH TO MHA-DT-VN-52 SHOULDER: "
+    "SWINGS FREE, NO AXIAL SHAKE.",
+    width=NOTE_WIDTH,
+    initial_indent=f"{RELIEF_NOTE_NUMBER}. ",
+    subsequent_indent="   ",
+    break_on_hyphens=False,
+)
+# The relief's round end, dimensioned in detail B on its arc (the .42 width
+# alone left its radius and centre unstated, and a sentence in note 1 that
+# located them read as a location in words: proof runs 20261109T134133430Z
+# and 20261109T143813883Z, rules 1, 7, 12 and 26).  The arc stands about the
+# pivot bore's centre mark; the value is half the width, at the width's
+# places (DRAWING_REFERENCE_PRECISION).  Its text stands right of the
+# plate's edge under HoldDownX's .04 (bottom about 0.046), the leader rising
+# about 10 degrees from the pivot onto the arc's east shoulder.
+RELIEF_END_RADIUS_MM = _part.PIVOT_BEARING_RELIEF_DIAMETER / 2.0
+RELIEF_END_TEXT_XY = (DETAIL_KEEP["HoldDownX"][0], DETAIL_PIVOT_Y + 0.0055)
+ENGAGEMENT_NOTE = f"{ENGAGEMENT_NOTE_NUMBER}. {POST_MOUNT_ENGAGEMENT_NOTE}"
+# Sheet 1's only note, where the integration proof (run
+# 20261109T062834910Z) printed it: ink 0.0756..0.0835, under section A-A's
+# label and over the title block.
+RELIEF_NOTE_XY_UPPER_LEFT = (0.222, 0.0835)
+# The pivot relief's width names the feature only: the .42 is centred on the
+# pivot bore's centre line and the open end shows in the plan (rule 26: a
+# location is a dimension, not a sentence).
+RELIEF_WIDTH_CALLOUT = "TOP RELIEF"
 # SECTION C-C cuts across the plate through the hold-down hole's axis, so
 # the counterbore opening from the underside shows in solid lines and the
 # native Hole Wizard callout lands on its wall.  Its cutting line lives on
@@ -445,11 +624,12 @@ HOLDDOWN_SECTION_LINE_X_MM = (-26.0, 24.0)
 HOLDDOWN_SECTION_SCALE = (3, 2)
 HOLDDOWN_CROP_MARGIN_MM = 0.25
 # The strip's lower-left (east underside) corner on the sheet, where the
-# view is moved once cropped.  Detail B's HoldDownX text (x ..0.1300, y
-# 0.0498..0.0533) clears C-C's padded box both ways: its inset left 0.1306
-# stands right of the text's end, its inset top 0.0496 under the text's
-# foot.  The padded box's foot (0.0283) stands 0.7 mm over the native
-# label's top (0.0291), inside the blocking audit's 1.5 mm.
+# view is moved once cropped.  Detail B's texts right of its circle clear
+# C-C's padded box (inset left 0.1306, inset top 0.0496): TipDowelPivotX's
+# (x ..0.1241, y 0.0496..0.0531) and HoldDownX's (x ..0.1305, y
+# 0.0450..0.0485) both end left of the inset.  The padded box's foot
+# (0.0283) stands 0.7 mm over the native label's top (0.0291), inside the
+# blocking audit's 1.5 mm.
 HOLDDOWN_STRIP_LOWER_LEFT = (0.1395, 0.0352)
 # The hold-down callout, above and right of the hole: DRILL Ø3.05 THRU ALL,
 # the Ø5.56 counterbore row and its 3.50 depth, then FROM UNDERSIDE and the
@@ -504,15 +684,20 @@ FACE_LABELS = (
 # Rows printed under native hole callouts (swDimensionTextCalloutBelow).
 # Each tight band names its mate at its own callout (rule 4; machinist
 # review r1 blocker: the +-0.1 stations named none).
-POST_MOUNT_CALLOUT_BELOW = (POST_MOUNT_LOCATING_CALLOUT,)
-# The post-mount taps' callout over the hole-location plan.  The block is
-# centred on the requested point: r3's four rows ran from the inner border
-# (top 0.2665, ~0.3 mm air) to their underline at 0.2453, 6.6 mm over the
-# plate's top edge (0.2387).  The underline runs 92 mm under the long
-# break row: r5, 3 mm lower, ran it (0.1530..0.2454 at y 0.2424) across
-# the notch view (x 0.2394 up, top 0.2444).  2 mm lower than r3 and 9 mm
-# left, the underline stops 3 mm short of that view.
-POST_MOUNT_CALLOUT_XY = (0.191, 0.2545)
+POST_MOUNT_CALLOUT_BELOW = (
+    POST_MOUNT_LOCATING_CALLOUT,
+    f"SEE NOTE {ENGAGEMENT_NOTE_NUMBER}",
+)
+# The post-mount taps' callout, up and LEFT of the sheet-2 plan, in the
+# field the profile plan leaves empty on that sheet: the 1.30 notch station
+# now owns the band over the plate's top edge.  Round 2 (run
+# 20261107T121234299Z) printed the four-row block 88 mm wide, x
+# 0.1468..0.2349 and y 0.2433..0.2651 for a request of (0.191, 0.2545).  At
+# x 0.105 it spans ~0.061..0.149, 25 mm left of the 1.30 text and over the
+# 7.986 line's top end (0.2285) by 15 mm.  Its leader leaves the underline's
+# right end and drops to the EAST (sheet-left) tap (_visible_plan_controls),
+# the near one, meeting that tap's 7.986 extension line only at the tap.
+POST_MOUNT_CALLOUT_XY = (0.105, 0.2545)
 # The reamed pivot bore's callout, below the A-A cutting line between its
 # arrows: right of the plate the 189.26 dimension line crosses any callout
 # wider than ~40 mm.  Its fit row hangs under it, over the plan caption row
@@ -520,11 +705,13 @@ POST_MOUNT_CALLOUT_XY = (0.191, 0.2545)
 # r11 left 2.16 mm to the A identifier; 2 mm lower gives more than one
 # text-height of separation without crowding the plan caption.
 PIVOT_BORE_CALLOUT_XY = (0.215, 0.097)
-# The lock-notch caption sits directly under its own view, not on the plan
-# caption row (aa9766da printed it there, where it read as a section's
-# caption).  Its 59.7 x 4.8 mm box, anchored upper-left and centred under
-# the notch plan, clears the 7.0 arrow tip (y 0.1276 at r1, less PLAN_DROP).
-NOTCH_CAPTION_UPPER_LEFT = (NOTCH_CENTER[0] - 0.02985, _planned(0.0, 0.1255)[1])
+# Section A-A's cutting plane on the profile, sheet metres either side of
+# the pivot (east, west).  Farm round 3 at (0.019, 0.018) printed each A
+# letter 0.07 mm from its C neighbour (layout audit text-clearance, gating:
+# 3.09 mm of air needed; A's text [49.8,55.7] mm against C's [55.8,61.7],
+# letters ~5.9 mm wide centred on each end).  Ends 23.5 / 22.5 mm out put
+# ~4.5 mm of air on both sides, still across the pivot end only.
+PIVOT_SECTION_HALF_SPANS = (0.0235, 0.0225)
 
 
 def plate_edge_mm(z_mm: float, side: int) -> float:
@@ -571,14 +758,16 @@ def holddown_section_line_model_points() -> tuple[tuple[float, float, float], ..
 
 
 
-def _set_end_only_section_lines(drawing_model: Any) -> None:
-    """Keep the pivot cut distinct from the coincident station witnesses (#1029)."""
-    # swDetailingSectionViewLineStyleDisplay = StandardWithoutConnector.
-    # Retain the actual full cutting plane; only its connector ink is omitted.
+def _set_connected_section_lines(drawing_model: Any) -> None:
+    """One whole cutting-plane line joins each pair of section arrows.
+
+    swDetailingSectionViewLineStyleDisplay = StandardWithConnector (0), as in
+    draw_fr_top_frame (rule 9: arrows standing alone are not a cutting plane).
+    """
     extension = _early_bound(drawing_model.Extension, "IModelDocExtension")
-    if not extension.SetUserPreferenceInteger(542, 0, 1):
-        raise RuntimeError("failed to set end-only section cutting lines")
-    if extension.GetUserPreferenceInteger(542, 0) != 1:
+    if not extension.SetUserPreferenceInteger(542, 0, 0):
+        raise RuntimeError("failed to set connected section cutting lines")
+    if extension.GetUserPreferenceInteger(542, 0) != 0:
         raise RuntimeError("section cutting-line style did not persist")
 
 
@@ -603,8 +792,12 @@ def _place_detail_parent_letter(adapter: Any, parent: Any) -> None:
 _COSMETIC_THREAD_LAYER = "COSMETIC-THREADS-HIDDEN"
 
 
-def _hide_profile_cosmetic_threads(adapter: Any, view: Any) -> None:
-    """Hide the redundant model cosmetic-thread callout in the profile view."""
+def _hide_cosmetic_threads(adapter: Any, view: Any, *, label: str) -> None:
+    """Hide a plan view's redundant model cosmetic-thread ink and its native
+    "1/4-20 Tapped Hole" callout note: the 2X Hole Wizard callout states the
+    taps.  SolidWorks shows the model's thread callout in the first view of
+    the part on EACH sheet, so both plans need it (farm round 3 printed it on
+    sheet 2's plan, a second leader to the west tap)."""
     draw = adapter.currentModel
     manager = _early_bound(draw.GetLayerManager(), "ILayerMgr")
     layer = manager.GetLayer(_COSMETIC_THREAD_LAYER)
@@ -636,7 +829,7 @@ def _hide_profile_cosmetic_threads(adapter: Any, view: Any) -> None:
             continue
         annotation.Layer = _COSMETIC_THREAD_LAYER
         if str(annotation.Layer or "") != _COSMETIC_THREAD_LAYER:
-            raise RuntimeError("profile cosmetic thread refused the hidden layer")
+            raise RuntimeError(f"{label} cosmetic thread refused the hidden layer")
         thread = _early_bound(annotation.GetSpecificAnnotation(), "ICThread")
         raw_callout = _read_member(thread, "ThreadCallout")
         if raw_callout is not None:
@@ -646,14 +839,97 @@ def _hide_profile_cosmetic_threads(adapter: Any, view: Any) -> None:
             )
             callout_annotation.Layer = _COSMETIC_THREAD_LAYER
             if str(callout_annotation.Layer or "") != _COSMETIC_THREAD_LAYER:
-                raise RuntimeError("profile thread callout refused the hidden layer")
+                raise RuntimeError(f"{label} thread callout refused the hidden layer")
             hidden_callouts += 1
         hidden += 1
     if not hidden:
-        raise RuntimeError("profile view has no cosmetic thread to hide")
+        raise RuntimeError(f"{label} has no cosmetic thread to hide")
     if not hidden_callouts:
-        raise RuntimeError("profile cosmetic threads have no callout note to hide")
-    rebuild_drawing(adapter, label="hide profile cosmetic threads")
+        raise RuntimeError(f"{label} cosmetic threads have no callout note to hide")
+    rebuild_drawing(adapter, label=f"hide {label} cosmetic threads")
+
+
+def _assert_one_post_tap_callout(view: Any, *, label: str) -> None:
+    """Readback: the plan prints the post taps exactly once, through the 2X
+    Hole Wizard callout.  Every cosmetic thread and its callout note stays on
+    the hidden layer, and exactly one visible hole callout names the thread."""
+    thread = POST_MOUNT_SPEC.size
+    tap_callouts = 0
+    for raw_annotation in _early_bound(view, "IView").GetAnnotations() or ():
+        annotation = _early_bound(raw_annotation, "IAnnotation")
+        kind = int(annotation.GetType())
+        if kind == 1:  # swCThread
+            if str(annotation.Layer or "") != _COSMETIC_THREAD_LAYER:
+                raise RuntimeError(f"{label}: a cosmetic thread prints")
+            raw_callout = _read_member(
+                _early_bound(annotation.GetSpecificAnnotation(), "ICThread"),
+                "ThreadCallout",
+            )
+            if raw_callout is not None:
+                note = _early_bound(
+                    _read_member(_early_bound(raw_callout, "INote"), "GetAnnotation"),
+                    "IAnnotation",
+                )
+                if str(note.Layer or "") != _COSMETIC_THREAD_LAYER:
+                    raise RuntimeError(f"{label}: a cosmetic thread callout prints")
+        elif kind == 4:  # swDisplayDimension
+            if str(annotation.Layer or "") == _COSMETIC_THREAD_LAYER:
+                continue
+            display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+            if not display.IsHoleCallout():
+                continue
+            if any(thread in str(display.GetText(part) or "") for part in (1, 2, 3, 4)):
+                tap_callouts += 1
+    if tap_callouts != 1:
+        raise RuntimeError(f"{label}: {tap_callouts} visible {thread} tap callouts, expected 1")
+
+
+# Sheet 2's .28 (NorthEdgeZ) extension line runs along the plate's north
+# edge from its sheet-left end to the dimension line (round 3: x 169.8..206.0
+# mm at y 123.2); the pivot ream's callout leader rises from the lower left
+# through that edge to the bore (x ~175.7 there), a gating leader crossing.
+# The extension line starts this far (sheet metres) right of the pivot axis,
+# past the leader and the bore rim, still collinear with the edge it names.
+NORTH_EDGE_WITNESS_START_PAST_PIVOT = 0.003
+
+
+def _start_witness_past(
+    adapter: Any, annotation: Any, *, witness_y: float, start_x: float, label: str
+) -> None:
+    """Widen the gap of the one extension line of ``annotation`` lying along
+    sheet ``witness_y`` until it starts at ``start_x`` (the PlateThk witness
+    recipe above).  Which of the two gaps owns that line is read back, never
+    assumed: the other is restored if the first did not move it."""
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+
+    def witness_start() -> float:
+        starts = [
+            min(segment.x0, segment.x1)
+            for segment in _display_lines(adapter, _display_data(adapter, annotation))
+            if abs(segment.y0 - segment.y1) < 1e-8 and abs(segment.y0 - witness_y) < 0.0005
+        ]
+        if len(starts) != 1:
+            raise RuntimeError(f"{label}: expected one extension line at y {witness_y}, read {starts}")
+        return starts[0]
+
+    widen = start_x - witness_start()
+    if widen <= 0.0:
+        return
+    for index in (0, 1):
+        ok, _use_doc, old_gap = display.GetWitnessLineGap(index, False, 0.0)
+        if ok is not True:
+            raise RuntimeError(f"{label}: witness gap {index} could not be read")
+        if display.SetWitnessLineGap(index, False, float(old_gap) + widen) is not True:
+            raise RuntimeError(f"{label}: witness gap {index} was refused")
+        rebuild_drawing(adapter, label=f"{label} witness gap {index}")
+        if abs(witness_start() - start_x) < 0.0003:
+            print(f"{label}: witness {index} now starts at {start_x}")
+            return
+        if display.SetWitnessLineGap(index, False, float(old_gap)) is not True:
+            raise RuntimeError(f"{label}: witness gap {index} could not be restored")
+        rebuild_drawing(adapter, label=f"{label} witness gap {index} restored")
+    raise RuntimeError(f"{label}: neither witness gap moved the line at y {witness_y}")
+
 
 
 def _position_section_label(adapter: Any, section: Any) -> None:
@@ -1155,27 +1431,49 @@ def callout_below_definitions(
     return {**definitions, 8: "\n".join(rows)}
 
 
-def holddown_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
-    """HOLDDOWN_PROCESS in the native THRU row; the face and mate below.
+def process_after_size(definitions: dict[int, str], process: str, *, label: str) -> dict[int, str]:
+    """``process`` in the one native THRU row, after the size and before THRU.
 
-    The process goes into the one part holding THRU, after any instance
-    count, so the drilled size reads first and the counterbore row stays
-    "⌴ Ø5.56 ↧3.50" (machinist review r1: "DRILL ⌴ Ø5.56" read as drilling
-    the counterbore).
+    Rule 26 orders a hole callout size, process, depth: ``Ø.2500 +.0005/.0000
+    REAM THRU ALL``, ``Ø.120 DRILL THRU ALL``.  The size and depth stay
+    native and associative: the Hole Wizard writes the depth as its
+    ``<hw-thru>`` variable (round 1 seat: ``<MOD-DIAM> <hw-diam> <hw-thru>``),
+    or as literal THRU text.
     """
-    updated = callout_below_definitions(definitions, HOLDDOWN_CALLOUT_BELOW)
-    thru_parts = [part for part in (5, 6, 7) if "THRU" in definitions[part].upper()]
+    # Exactly "<hw-thru>", so "<hw-thruholedia>" (the hold-down's drill size)
+    # is neither the depth token nor a second THRU row.
+    thru = re.compile(r"<hw-thru>|\bTHRU\b")
+    thru_parts = [part for part in (5, 6, 7) if thru.search(definitions[part])]
     if len(thru_parts) != 1:
-        raise RuntimeError(f"hold-down THRU row is not one upper part: {definitions!r}")
+        raise RuntimeError(f"{label}: THRU row is not one upper part: {definitions!r}")
     part = thru_parts[0]
-    text = definitions[part]
-    count = re.match(r"\s*<NUM_INST>X ", text)
-    updated[part] = (
-        f"{text[: count.end()]}{HOLDDOWN_PROCESS} {text[count.end() :]}"
-        if count
-        else compose_hole_callout_prefix(HOLDDOWN_PROCESS, text)
+    updated, count = thru.subn(
+        lambda match: f"{process} {match.group(0)}", definitions[part], count=1
     )
-    return updated
+    if count != 1:
+        raise RuntimeError(f"{label}: no THRU token in {definitions[part]!r}")
+    return {**definitions, part: updated}
+
+
+def holddown_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
+    """HOLDDOWN_PROCESS after the drilled size in the native THRU row; the
+    face and mate below.  The counterbore row stays "⌴ Ø5.56 ↧3.50"
+    (machinist review r1: "DRILL ⌴ Ø5.56" read as drilling the counterbore).
+    """
+    return process_after_size(
+        callout_below_definitions(definitions, HOLDDOWN_CALLOUT_BELOW),
+        HOLDDOWN_PROCESS,
+        label="hold-down",
+    )
+
+
+def pivot_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
+    """PIVOT_PROCESS after the reamed size; the running fit below."""
+    return process_after_size(
+        callout_below_definitions(definitions, PIVOT_BORE_CALLOUT_BELOW),
+        PIVOT_PROCESS,
+        label="pivot",
+    )
 
 
 def _omit_post_mount_thread_class(display: Any) -> None:
@@ -1246,8 +1544,8 @@ def _print_pivot_band_exactly(display: Any) -> None:
     band's four places.
 
     This render-time precision write is the declared exception RV-01 in
-    ``cad/config/parts/dt-cone-swing-platform.yaml`` (delegated ruling
-    2026-11-02, owner review #2144): a hole callout does not inherit the
+    ``cad/config/parts/dt-cone-swing-platform.yaml`` (Owner ruling
+    2026-11-08 (Pedro), #2144 item 1.2): a hole callout does not inherit the
     part's places.  With the Hole Wizard diameter's tolerance precision
     authored as 4 on the part (read back 4), the callout's ``<hw-diam>``
     still reported -1, the document default (farm run 20261102T230110877Z).
@@ -1270,8 +1568,7 @@ def _print_pivot_band_exactly(display: Any) -> None:
 
 # Hole Wizard callouts print three inch places (#290). Both maps are written
 # at render time, the declared exception RV-03 in
-# cad/config/parts/dt-cone-swing-platform.yaml (delegated ruling 2026-11-02,
-# owner review #2144): a part-authored precision does not reach the callout
+# cad/config/parts/dt-cone-swing-platform.yaml (Owner ruling 2026-11-08 (Pedro), #2144 item 1.2): a part-authored precision does not reach the callout
 # (run 20261102T230110877Z).
 HOLDDOWN_CALLOUT_PRECISION = {"hw-thruholedia": 3, "hw-cbdia": 3, "hw-cbdepth": 3}
 # The through taps' drill prints .201, not .20 (rule 3; machinist review of
@@ -1391,16 +1688,14 @@ def _add_face_labels(adapter: Any, sections: dict[str, Any]) -> None:
 
 
 def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any]:
-    """Return the pivot and post-mount rims from the plan view.
-
-    The north-end and long-straight-side edges were dropped with the GD&T that
-    referenced them (see ``build``) -- nothing else on this sheet attaches to
-    them.
+    """Return the pivot rim and the EAST (sheet-left, model -x) post-mount
+    rim from the plan view: the taps' callout stands up and left of the
+    plan (POST_MOUNT_CALLOUT_XY), so its leader drops to the nearer tap.
     """
     expected_radius_m = PIVOT_HOLE_DIA / 2000.0
     expected_mount_radius_m = blind_cut_dia_mm(POST_MOUNT_SPEC) / 2000.0
     pivot_edges: list[Any] = []
-    mount_edges: list[Any] = []
+    mount_edges: list[tuple[float, Any]] = []
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
     for component in components:
         edges = (
@@ -1418,10 +1713,54 @@ def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any]:
             if abs(values[6] - expected_radius_m) <= 1e-6:
                 pivot_edges.append(edge)
             if abs(values[6] - expected_mount_radius_m) <= 1e-6:
-                mount_edges.append(edge)
+                mount_edges.append((values[0], edge))
     if not pivot_edges or len(mount_edges) < 2:
         raise RuntimeError("cone-platform plan view is missing pivot/mount controls")
-    return pivot_edges[0], mount_edges[0]
+    return pivot_edges[0], min(mount_edges, key=lambda item: item[0])[1]
+
+
+def _add_relief_end_radius(adapter: Any, detail: Any) -> None:
+    """Dimension the top relief's round end on its arc in detail B.
+
+    The arc is picked as a native entity from the detail's edge scan (the
+    rim at the plate top, or the floor's rim under it: both project onto the
+    same curve), so a moved relief fails loud in ``circle_at``; the radial
+    must attach to that arc and measure half the relief width.  Its centre
+    is the pivot bore's, whose centre mark the arc surrounds in the view.
+    """
+    label = "top relief end"
+    edges = scan_view_edges(detail, label="hold-down station detail edges")
+    arc = None
+    misses: list[str] = []
+    for rim_y in (PLATE_THICKNESS, PLATE_THICKNESS - _part.PIVOT_BEARING_RELIEF_DEPTH):
+        try:
+            arc = edges.circle_at(
+                (0.0, rim_y, 0.0), RELIEF_END_RADIUS_MM, axis=(0.0, 1.0, 0.0), label=label
+            ).edge
+            break
+        except RuntimeError as error:
+            misses.append(str(error))
+    if arc is None:
+        raise RuntimeError("; ".join(misses))
+    draw = adapter.currentModel
+    _select_view_entity(adapter, detail, "EDGE", None, label=label, entity=arc)
+    display = draw.AddRadialDimension2(*RELIEF_END_TEXT_XY, 0.0)
+    draw.ClearSelection2(True)
+    if display is None:
+        raise RuntimeError(f"failed to dimension the {label}")
+    display = _early_bound(display, "IDisplayDimension")
+    assert_dimension_measures(
+        adapter,
+        display,
+        expected_mm=RELIEF_END_RADIUS_MM,
+        label=label,
+        entities=(arc,),
+        entity_types=("EDGE",),
+    )
+    places = DRAWING_REFERENCE_PRECISION[label]
+    display.SetPrecision3(DRAWING_REFERENCE_PRECISION[label], -1, -1, -1)
+    if int(display.GetPrimaryPrecision2()) != places:
+        raise RuntimeError(f"{label}: {places} decimal places did not persist")
 
 
 # swSFSymType_e.swSFBasic: the any-process symbol (open vee, no bar).
@@ -1984,6 +2323,163 @@ def _add_profile_virtual_sharps(adapter: Any, view: Any) -> None:
         _insert_profile_virtual_sharp(adapter, view, index)
 
 
+def _add_sized_note(
+    adapter: Any, text: str, x: float, y: float, *, char_height: float, label: str
+) -> Any:
+    """One free note, upper-left at (x, y), sized as add_property_linked_note
+    sizes a linked note (its char_height recipe)."""
+    note = add_note(adapter, text, x, y)
+    if note is None:
+        raise RuntimeError(f"failed to add the {label}")
+    annotation = _early_bound(_early_bound(note, "INote").GetAnnotation(), "IAnnotation")
+    text_format = annotation.GetTextFormat(0)
+    if text_format is None:
+        raise RuntimeError(f"the {label} has no text format")
+    text_format.CharHeight = float(char_height)
+    if annotation.SetTextFormat(0, False, text_format) is not True:
+        raise RuntimeError(f"failed to set the {label}'s text height")
+    return note
+
+
+def _place_holes_sheet(adapter: Any) -> list[Any]:
+    """Sheet 2 (active): the hole pattern and lock notch on one unlabelled
+    principal plan, detail B cut from it, the plan's hole callouts and notes
+    2 and 3.  Returns the plan's and detail's curated dimensions."""
+    plan = place_view(adapter, str(SOURCE), "*Top", *FEATURE_CENTER, scale=(1, 2))
+    set_hidden_lines_removed(adapter, plan)
+    detail = _create_detail_view(
+        adapter,
+        plan,
+        model_center_mm=(0.0, PLATE_THICKNESS, DETAIL_MODEL_Z),
+        radius_mm=DETAIL_RADIUS_MM,
+        view_xy=DETAIL_CENTER,
+        detail_label="B",
+        scale=DETAIL_SCALE,
+        label="hold-down station detail",
+    )
+    _place_detail_parent_letter(adapter, plan)
+    # Hidden lines removed: HoldDownZ and HoldDownX run between the pivot bore
+    # and the hold-down hole's visible top-face rims, never to the underside
+    # counterbore.
+    set_hidden_lines_removed(adapter, detail)
+    plan_annotations = curate_view_dimensions(
+        adapter,
+        plan,
+        keep={**FEATURE_KEEP, **NOTCH_KEEP},
+        view_label="hole-pattern plan",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    _hide_cosmetic_threads(adapter, plan, label="hole-pattern plan")
+    # Name the relief so the reader ties the width to note 1's depth; its
+    # open end and round end show in the plan (rule 17 W18).
+    set_dimension_callouts(
+        adapter,
+        plan_annotations,
+        {"PivotBearingReliefDia": RELIEF_WIDTH_CALLOUT},
+    )
+    detail_annotations = curate_view_dimensions(
+        adapter,
+        detail,
+        keep=DETAIL_KEEP,
+        view_label="hold-down station detail",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    # The locating dowel's slip ream: made at assembly, its process under its
+    # banded size and the flag to note 3 (rule-23 retention, owner ruling
+    # 2026-11-07 (MHA-DT-00 rubric sample, PR #2248); round 6, #7).
+    set_dimension_callouts(adapter, detail_annotations, {"TipDowelDia": TIP_DOWEL_CALLOUT})
+    _add_relief_end_radius(adapter, detail)
+    # Its station from the pivot-bore axis is a reference (round 6, #6); the
+    # chained TipDowelX controls (dt_cone_swing_platform_spec.
+    # TIP_DOWEL_STATION_TOL_MM says why).
+    tip_dowel_pivot = [
+        item for item in detail_annotations
+        if dimension_name(adapter, item) == "TipDowelPivotX"
+    ]
+    if len(tip_dowel_pivot) != 1:
+        raise RuntimeError("expected one tip dowel pivot-axis station in detail B")
+    set_reference_dimension(
+        adapter, tip_dowel_pivot[0], label="tip dowel pivot-axis reference station"
+    )
+    north_edge = [a for a in plan_annotations if dimension_name(adapter, a) == "NorthEdgeZ"]
+    if len(north_edge) != 1:
+        raise RuntimeError("expected one NorthEdgeZ on the hole-pattern plan")
+    plan_pivot = model_point_in_view(adapter, plan, (0.0, 0.0, 0.0), label="plan pivot")
+    north_edge_point = model_point_in_view(
+        adapter,
+        plan,
+        (0.0, PLATE_THICKNESS / 1000.0, _part.NORTH_OVERHANG / 1000.0),
+        label="plan north edge",
+    )
+    _start_witness_past(
+        adapter,
+        north_edge[0],
+        witness_y=north_edge_point[1],
+        start_x=plan_pivot[0] + NORTH_EDGE_WITNESS_START_PAST_PIVOT,
+        label="NorthEdgeZ north-edge witness",
+    )
+    # No explicit AutoInsertCenterMarks2: the template centre-marks every
+    # hole as the plan is placed, and r1's explicit call printed each of the
+    # four marks twice (layout audit duplicate-annotation; fleet issue #913).
+    pivot_edge, mount_edge = _visible_plan_controls(adapter, plan)
+    pivot_callout = add_native_hole_callout(
+        adapter,
+        plan,
+        callout_xy=PIVOT_BORE_CALLOUT_XY,
+        label="pivot reamed bore",
+        edge=pivot_edge,
+    )
+    _rewrite_hole_callout(
+        pivot_callout,
+        pivot_callout_definitions,
+        label="pivot reamed bore",
+    )
+    _print_pivot_band_exactly(pivot_callout)
+    post_mount_callout = add_native_hole_callout(
+        adapter,
+        plan,
+        callout_xy=POST_MOUNT_CALLOUT_XY,
+        label="v2 post-mount tapped holes",
+        edge=mount_edge,
+    )
+    _rewrite_hole_callout(
+        post_mount_callout,
+        lambda definitions: callout_below_definitions(
+            definitions, POST_MOUNT_CALLOUT_BELOW
+        ),
+        label="v2 post-mount tapped holes",
+    )
+    _omit_post_mount_thread_class(post_mount_callout)
+    set_hole_callout_precision(
+        post_mount_callout, POST_MOUNT_CALLOUT_PRECISION, label="v2 post-mount tapped holes"
+    )
+    rebuild_drawing(adapter, label="plan hole callout rows")
+    _add_sized_note(
+        adapter, ENGAGEMENT_NOTE, *ENGAGEMENT_NOTE_XY,
+        char_height=NOTE_CHAR_HEIGHT, label="post-mount engagement note",
+    )
+    # Note 3, which detail B's dowel ream flags, under note 2 on this sheet.
+    _add_sized_note(
+        adapter,
+        TIP_DOWEL_NOTE,
+        *TIP_DOWEL_NOTE_XY,
+        char_height=TIP_DOWEL_NOTE_CHAR_HEIGHT,
+        label="tip dowel hole note",
+    )
+    # Annotation insertion can invalidate the exported display geometry.
+    for view in (plan, detail):
+        set_hidden_lines_removed(adapter, view)
+    # Last, after every annotation and display-mode regen could re-lay it.
+    _position_view_label(
+        adapter,
+        detail,
+        DETAIL_LABEL_LOWER_LEFT,
+        label="detail B label",
+    )
+    _assert_one_post_tap_callout(plan, label="hole-pattern plan")
+    return [*plan_annotations, *detail_annotations]
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -1998,24 +2494,14 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Profile View Note",
-            "Feature View Note",
-            "Notch View Note",
             "Isometric View Note",
-            "Pivot Relief Fit",
-            "Post Mount Engagement",
         ),
         required=(
             "Number",
             "Material Specification",
             "Finish",
             "Quantity",
-            "Profile View Note",
-            "Feature View Note",
-            "Notch View Note",
             "Isometric View Note",
-            "Pivot Relief Fit",
-            "Post Mount Engagement",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -2028,7 +2514,7 @@ async def build(adapter: Any) -> dict[str, str]:
     create_blank_drawing_sheets(
         adapter, SHEET_NAMES, label="cone swing platform package"
     )
-    _set_end_only_section_lines(drawing_model)
+    _set_connected_section_lines(drawing_model)
     ddoc = _early_bound(drawing_model, "IDrawingDoc")
     if not ddoc.ActivateSheet(SHEET_NAMES[0]):
         raise RuntimeError("failed to activate the platform sheet")
@@ -2046,29 +2532,23 @@ async def build(adapter: Any) -> dict[str, str]:
     profile = place_view(
         adapter, str(SOURCE), "*Top", *PROFILE_CENTER, scale=(1, 2)
     )
-    feature = place_view(
-        adapter, str(SOURCE), "*Top", *FEATURE_CENTER, scale=(1, 2)
-    )
-    notch = place_view(adapter, str(SOURCE), "*Top", *NOTCH_CENTER, scale=(1, 2))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 3))
-    for view in (profile, feature, notch, iso):
+    for view in (profile, iso):
         set_hidden_lines_removed(adapter, view)
 
-    # Keep the transverse pivot plane, but put its native end-only indicator
-    # on the profile: the feature plan's PostMount Z witnesses are collinear.
+    # The transverse pivot plane lives on the profile plan, which carries no
+    # pivot-station witnesses for the whole cutting-plane line to lie on.
     profile_section_pivot = model_point_in_view(
         adapter, profile, (0.0, 0.0, 0.0), label="pivot section station"
     )
     section = create_section_view(
         adapter,
         profile,
-        # End-only ends: the left one clears R10's text.  The right one
-        # stands 18 mm off the plate's edge (R8's leader runs ~8 mm under
-        # its stub): at x 0.123 its sheet-up arrow and letter stood beside
-        # HOLE LOCATIONS' 202.84 line and read as that view's cut (machinist
-        # review of 31547443, confirmed r1-r3).
-        line_start=(PROFILE_CENTER[0] - 0.046, profile_section_pivot[1]),
-        line_end=(PROFILE_CENTER[0] + 0.019, profile_section_pivot[1]),
+        # One whole cutting-plane line across the pivot end only (rule 9):
+        # each end just clears C-C's arrows at the hold-down station (model
+        # x -26/+24) so the A and C letters stand apart.
+        line_start=(PROFILE_PIVOT_XY[0] - PIVOT_SECTION_HALF_SPANS[0], profile_section_pivot[1]),
+        line_end=(PROFILE_PIVOT_XY[0] + PIVOT_SECTION_HALF_SPANS[1], profile_section_pivot[1]),
         view_xy=SECTION_CENTER,
         section_label="A",
         scale=(2, 1),
@@ -2091,21 +2571,6 @@ async def build(adapter: Any) -> dict[str, str]:
         label="section A-A pivot hole",
     )
 
-    detail = _create_detail_view(
-        adapter,
-        feature,
-        model_center_mm=(0.0, PLATE_THICKNESS, DETAIL_MODEL_Z),
-        radius_mm=DETAIL_RADIUS_MM,
-        view_xy=DETAIL_CENTER,
-        detail_label="B",
-        scale=DETAIL_SCALE,
-        label="hold-down station detail",
-    )
-    _place_detail_parent_letter(adapter, feature)
-    # Hidden lines removed: HoldDownZ and HoldDownX run between the pivot bore
-    # and the hold-down hole's visible top-face rims, never to the underside
-    # counterbore.
-    set_hidden_lines_removed(adapter, detail)
     profile_pivot = model_point_in_view(
         adapter, profile, (0.0, PLATE_THICKNESS / 1000.0, 0.0), label="profile pivot"
     )
@@ -2155,28 +2620,7 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     _add_profile_virtual_sharps(adapter, profile)
-    _hide_profile_cosmetic_threads(adapter, profile)
-    feature_annotations = curate_view_dimensions(
-        adapter,
-        feature,
-        keep=FEATURE_KEEP,
-        view_label="feature plan",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
-    # Name the relief so the reader ties the width to the fit note; it is
-    # open through the north edge (drawing-guidelines.md rule 17 (walls and webs) W18), round-ended at the pivot.
-    set_dimension_callouts(
-        adapter,
-        feature_annotations,
-        {"PivotBearingReliefDia": RELIEF_WIDTH_CALLOUT},
-    )
-    notch_annotations = curate_view_dimensions(
-        adapter,
-        notch,
-        keep=NOTCH_KEEP,
-        view_label="notch plan",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
+    _hide_cosmetic_threads(adapter, profile, label="profile")
     section_annotations = curate_view_dimensions(
         adapter,
         section,
@@ -2221,13 +2665,7 @@ async def build(adapter: Any) -> dict[str, str]:
                 print(f"PlateThk witness {witness_index}: old_gap_m={old_gap} gap_m={actual_gap}")
             rebuild_drawing(adapter, label="plate thickness cut-edge witness gaps")
     _crop_pivot_section(adapter, section)
-    detail_annotations = curate_view_dimensions(
-        adapter,
-        detail,
-        keep=DETAIL_KEEP,
-        view_label="hold-down station detail",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
+
     # U41: the thickness is the stock's, a reference with no band.
     thickness_annotations = [
         item for item in section_annotations
@@ -2250,52 +2688,7 @@ async def build(adapter: Any) -> dict[str, str]:
     relief_reference = set_reference_dimension(
         adapter, relief_annotations[0], label="matched pivot relief reference depth"
     )
-    annotations = [
-        *profile_annotations,
-        *feature_annotations,
-        *notch_annotations,
-        *section_annotations,
-        *detail_annotations,
-    ]
-    # No explicit AutoInsertCenterMarks2: the template centre-marks every
-    # hole as the plan is placed, and r1's explicit call printed each of the
-    # four marks twice (layout audit duplicate-annotation; fleet issue #913).
-    pivot_edge, mount_edge = _visible_plan_controls(adapter, feature)
-    pivot_callout = add_native_hole_callout(
-        adapter,
-        feature,
-        callout_xy=PIVOT_BORE_CALLOUT_XY,
-        label="pivot reamed bore",
-        edge=pivot_edge,
-        process=PIVOT_PROCESS,
-    )
-    _rewrite_hole_callout(
-        pivot_callout,
-        lambda definitions: callout_below_definitions(
-            definitions, PIVOT_BORE_CALLOUT_BELOW
-        ),
-        label="pivot reamed bore",
-    )
-    _print_pivot_band_exactly(pivot_callout)
-    post_mount_callout = add_native_hole_callout(
-        adapter,
-        feature,
-        callout_xy=POST_MOUNT_CALLOUT_XY,
-        label="v2 post-mount tapped holes",
-        edge=mount_edge,
-    )
-    _rewrite_hole_callout(
-        post_mount_callout,
-        lambda definitions: callout_below_definitions(
-            definitions, POST_MOUNT_CALLOUT_BELOW
-        ),
-        label="v2 post-mount tapped holes",
-    )
-    _omit_post_mount_thread_class(post_mount_callout)
-    set_hole_callout_precision(
-        post_mount_callout, POST_MOUNT_CALLOUT_PRECISION, label="v2 post-mount tapped holes"
-    )
-    rebuild_drawing(adapter, label="plan hole callout rows")
+    annotations = [*profile_annotations, *section_annotations]
     # The section shows the top seat at its head and the base slide at its
     # foot.  Arrows land mid-face so neither symbol reads as controlling a
     # corner, hole wall or outer edge: both on the left-hand piece, the
@@ -2328,21 +2721,19 @@ async def build(adapter: Any) -> dict[str, str]:
     ):
         _set_any_process_finish(adapter, symbol, label=label)
 
-    add_property_linked_note(adapter, "Profile View Note", 0.045, 0.085)
-    add_property_linked_note(adapter, "Feature View Note", 0.150, 0.085)
-    add_property_linked_note(adapter, "Notch View Note", *NOTCH_CAPTION_UPPER_LEFT)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_CAPTION_UPPER_LEFT)
-    add_property_linked_note(
-        adapter, "Post Mount Engagement", *ENGAGEMENT_NOTE_XY, char_height=0.0025
+    _add_sized_note(
+        adapter, RELIEF_NOTE, *RELIEF_NOTE_XY_UPPER_LEFT,
+        char_height=NOTE_CHAR_HEIGHT, label="top relief note",
     )
     add_leader_note(
         adapter,
-        property_link("Pivot Relief Fit"),
+        RELIEF_FLAG,
         text_xy=RELIEF_NOTE_XY,
         attach_xy=relief_floor_tip_xy(adapter, section),
-        label="pivot relief fit",
+        label="pivot relief fit flag",
         view=section,
-        height=0.0025,
+        height=NOTE_CHAR_HEIGHT,
     )
     # The hold-down's size, from the underside, where section C-C shows its
     # counterbore in solid lines (user ruling 2026-09-29).
@@ -2350,21 +2741,19 @@ async def build(adapter: Any) -> dict[str, str]:
     _add_face_labels(adapter, {"A-A": section, "C-C": holddown_section})
 
     # Annotation insertion can invalidate the exported display geometry.
-    for view in (profile, feature, notch, section, detail, holddown_section, iso):
+    for view in (profile, section, holddown_section, iso):
         set_hidden_lines_removed(adapter, view)
     # Last, after every annotation and display-mode regen could re-lay it.
-    _position_view_label(
-        adapter,
-        detail,
-        DETAIL_LABEL_LOWER_LEFT,
-        label="detail B label",
-    )
     _position_view_label(
         adapter,
         holddown_section,
         HOLDDOWN_SECTION_LABEL_LOWER_LEFT,
         label="section C-C label",
     )
+
+    if not ddoc.ActivateSheet(SHEET_NAMES[1]):
+        raise RuntimeError("failed to activate the hole-pattern sheet")
+    annotations += _place_holes_sheet(adapter)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     if (str(relief_reference.GetText(1)), str(relief_reference.GetText(2))) != ("(", ")"):
         raise RuntimeError("pivot relief reference state did not persist")

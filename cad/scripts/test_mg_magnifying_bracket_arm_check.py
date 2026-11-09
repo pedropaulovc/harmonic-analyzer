@@ -137,7 +137,7 @@ def test_shifted_row_uses_nearer_flange_edge_for_prying_and_actual_torque_for_sh
     nominal_edge = min(arm.JOINT[1] - lower, upper - arm.JOINT[1])
     assert nominal_edge == pytest.approx(4.79)
     # The 4.79 mm ordinate prints .189 with the shared mounting band.
-    row_min, row_max = (0.189 * IN - joint.POSITION_BAND, 0.189 * IN + joint.POSITION_BAND)
+    row_min, row_max = (0.189 * IN - joint.BRACKET_POSITION_BAND, 0.189 * IN + joint.BRACKET_POSITION_BAND)
     nearest_edge = min(
         row_min,
         joint.SIDE_PLATE_HEIGHT + joint.SIDE_PLATE_HEIGHT_DEVIATIONS[0] - row_max,
@@ -168,7 +168,7 @@ def test_shifted_row_uses_nearer_flange_edge_for_prying_and_actual_torque_for_sh
 def test_prying_demand_bounds_every_accepted_foot_width_and_row_corner() -> None:
     # The lower-edge ordinate and overall .XX width are independent controls.
     # Width variation is not a symmetric displacement of both nominal edges.
-    rows = (0.189 * IN - joint.POSITION_BAND, 0.189 * IN + joint.POSITION_BAND)
+    rows = (0.189 * IN - joint.BRACKET_POSITION_BAND, 0.189 * IN + joint.BRACKET_POSITION_BAND)
     corner_arms = [
         min(row_from_lower, width - row_from_lower)
         for width, row_from_lower in itertools.product((0.42 * IN, 0.44 * IN), rows)
@@ -211,6 +211,25 @@ def test_flange_joint_retains_screw_margins() -> None:
     assert arm.SCREW_SHEAR_STRESS < arm.SCREW_SHEAR_ALLOWABLE
     assert arm.JOINT_TENSION_INCREMENT_N < arm.SCREW_PRELOAD_N
     assert joint.ENGAGEMENT_MIN >= 1.5 * joint.SCREW_MAJOR_DIA
+
+
+def test_flange_settles_onto_the_shanks_by_the_spotted_holes_play() -> None:
+    # Owner ruling 2026-11-08 (#2144 item 11.1): friction cannot hold the
+    # least in-plane torque, so the flange is pre-settled nose down at assembly.
+    assert arm.JOINT_FRICTION_MOMENT < abs(arm.JOINT_MZ_MIN_TENSION) < abs(arm.JOINT_MZ)
+    least, greatest = (math.degrees(angle) for angle in arm.SETTLE_ROTATION_RAD)
+    assert least == pytest.approx(1.70, abs=0.01)
+    assert greatest == pytest.approx(2.12, abs=0.01)
+    hole_max = joint.CLEARANCE_DIA + joint.CLEARANCE_HOLE_DEVIATIONS[1]
+    assert arm.SETTLE_ROTATION_RAD[1] == pytest.approx(
+        (hole_max - joint.SCREW_MAJOR_DIA) / arm.SCREW_PITCH_X
+    )
+    # Rotating clockwise (the load's sense) moves the hook by theta x r.
+    hx, hy = arm.HOOK[0] - arm.JOINT[0], arm.HOOK[1] - arm.JOINT[1]
+    theta = -arm.SETTLE_ROTATION_RAD[1]
+    expected = -(theta * -hy * arm.WIRE_DIR[0] + theta * hx * arm.WIRE_DIR[1])
+    assert arm.HOOK_SETTLE_ALONG_WIRE == pytest.approx(expected)
+    assert arm.HOOK_SETTLE_ALONG_WIRE != 0.0
 
 
 def test_reported_material_demand_combines_bending_and_torsion_without_certifying_generic_steel() -> None:

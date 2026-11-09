@@ -88,7 +88,6 @@ from pd_latch_hook_geometry import (
     DEV_TAPER,
     DEV_TIP,
     EAR_HEIGHT,
-    FAR_FACE_STATION,
     FLAT_BEND_C,
     FLAT_LENGTH,
     INNER_ROLL_END,
@@ -131,21 +130,18 @@ from pd_latch_hook_geometry import (
     VOLUME,
     WIDTH,
     Z_FRONT,
-    on_arm,
-    to_local,
     z_local,
 )
 from pd_latch_hook_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
+    FAR_FACE_POINT,
     FLAT_PATTERN_NOTE,
     FLAT_SKETCH,
     FORMED_DIMENSIONS,
     FORMED_TOL,
     ISOMETRIC_VIEW_NOTE,
-    POSITION_DIMENSIONS,
-    POSITION_TOL,
     REFERENCE_SKETCHES,
     UNIT,
 )
@@ -172,9 +168,9 @@ _L_POINTS = [
 ]
 V_SHARP_L = (BASE_LENGTH + EAR_HEIGHT - SHEET_T) * SHEET_T * WIDTH
 
-# The arm's far (+U) face where the pin crosses it: the outer straight is
-# split there so the sheet locates the latching face from the origin.
-FAR_FACE_POINT = to_local(*on_arm(FAR_FACE_STATION))
+# The arm's far (+U) face where the pin crosses it (FAR_FACE_POINT, the
+# spec's): the outer straight is split there so the sheet locates the
+# latching face from the origin.
 ARM_FRONT_Z = z_local(Z_FRONT)  # the front edge above the taper: 5.588 (.22)
 
 # Right-Plane sketches: sketch (x, y) = (-Z, Y).
@@ -1022,20 +1018,12 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)
     await report_mass_properties(adapter)
-    # The drilled holes, the width and the inside bend radius take the title
-    # block's rows (DRILLED HOLES, .XX).
-    # Screw-hole positions from the formed ear and the low-Y edge.
-    for feature_name, dimension_names in POSITION_DIMENSIONS.items():
-        for dimension_name in dimension_names:
-            set_dimension_symmetric_tolerance(
-                adapter,
-                feature_name,
-                dimension_name,
-                POSITION_TOL,
-                display_unit=UNIT,
-            )
-    # Every hand-formed arm feature carries the one formed band; the far face
-    # at the pin carries none (the sheet prints it as a reference).
+    # The drilled holes, the width, the inside bend radius and the screw-hole
+    # positions (the bar's taps are spotted through them at assembly) take
+    # the title block's rows (DRILLED HOLES, .XX, .XXX): no explicit band.
+    # Every hand-formed arm feature, the far face at the pin included, carries
+    # the one formed band; the straight's length carries none (the sheet
+    # prints it as a reference).
     for feature_name, dimension_names in FORMED_DIMENSIONS.items():
         for dimension_name in sorted(dimension_names):
             set_dimension_symmetric_tolerance(

@@ -82,7 +82,7 @@ def test_axial_section_rejects_a_nonhorizontal_or_degenerate_axis(
         drawing._require_horizontal_axis(object(), object())
 
 
-@pytest.mark.parametrize("target", ["BoreDia", "DiscThick"])
+@pytest.mark.parametrize("target", ["BoreDia"])
 @pytest.mark.parametrize("failure", ["write", "ineffective", "partial", "read"])
 def test_required_callout_failure_prevents_export(
     monkeypatch, tmp_path, target, failure

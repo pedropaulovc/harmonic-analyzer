@@ -152,8 +152,8 @@ def test_unseated_lever_exception_reaches_only_its_actual_review_packages(monkey
 
 
 def test_pinion_cam_inch_set_screws_remain_staked_at_fitup() -> None:
+    import dt_drive_train_steps as steps
     import dt_pinion_cam_geometry as geometry
-    import dt_pinion_cam_spec as spec
 
     row = next(
         joint
@@ -166,7 +166,9 @@ def test_pinion_cam_inch_set_screws_remain_staked_at_fitup() -> None:
     assert row.quantity == 2
     assert row.exposure is Exposure.OSCILLATING
     assert row.lock is Lock.STAKED
-    assert row.lock_step == spec.SET_SCREW_STAKE_STEP_KEY
+    # The stake is MHA-DT-00's step; the cam sheet gives only the tap.
+    assert row.lock_step == "cam-collars-set"
+    assert steps.step_number(row.lock_step)
     assert row.lock_binds == (row.member, row.receiver)
     assert jr.REQUIRED_JOINTS[row.id].anchor == row.lock_step
 
@@ -367,10 +369,11 @@ def test_the_thumbnut_rocked_by_the_free_t24_is_waived_only_by_its_ruling() -> N
     assert f"\u00b1{rock:.1f}\u00b0 per reversal" in jr.RULINGS[row.exception].granted
 
 
-def test_the_knife_hanger_is_a_plain_clamp_keyed_by_its_two_dowels() -> None:
-    """The cut #10-24 hex bolt clamps through a new SAE washer; the two
-    pressed dowels react torque, so the static clamp takes no lock and no
-    threadlocker (period hardware). The plain washer is not a thread lock."""
+def test_the_knife_hanger_is_a_plain_clamp_keyed_by_its_dowel() -> None:
+    """The cut #10-24 hex bolt clamps through a new SAE washer; the one
+    pressed dowel per mount, off the screw axis, reacts torque (#2144 item
+    11.3, scheme S1), so the static clamp takes no lock and no threadlocker
+    (period hardware). The plain washer is not a thread lock."""
     (row,) = [j for j in jr.JOINTS if j.id == "sm-summing/knife-hanger-in-mount"]
     assert row.thread == "#10-24 UNC"
     assert row.exposure is Exposure.STATIC_CLAMP
@@ -389,11 +392,12 @@ def test_the_knife_hanger_is_a_plain_clamp_keyed_by_its_two_dowels() -> None:
     )
     assert row.quantity == 2
     assert not row.lock_part and not row.lock_binds
-    assert "two pressed MHA-SM-VN-53 dowels" in row.exposure_reason
+    assert "one pressed MHA-SM-VN-53 dowel" in row.exposure_reason
     # Owner ruling 2026-10-24 (T+H3): the crossbar holds the press and the
-    # block takes the slip.
-    assert "held in the crossbar's underside reams" in row.exposure_reason
-    assert "the block's round hole and slot" in row.exposure_reason
+    # block takes the slip; #2144 item 11.3 (S1) deleted the slot.
+    assert "held in the crossbar's underside ream" in row.exposure_reason
+    assert "the block's round hole B" in row.exposure_reason
+    assert "slot" not in row.exposure_reason
     # The axial-capture narration is prose (AGENTS.md: never pin wording);
     # the stack it reports is checked in test_knife_hanger_worst_case.
     assert row.axial_capture
@@ -405,14 +409,18 @@ def test_the_channel_apex_set_screws_are_staked_like_the_keeper_screws() -> None
     """PR #1317 Codex review: the MHA-CH-VN-53 cups hold the rocked MHA-CH-05
     shaft, an exposed joint. Its Loctite 222 waiver was retired (2026-10-16,
     the user's standing no-threadlocker rule): each is snugged and its tap
-    mouth staked at 2 points, as the fulcrum keeper set screws are."""
+    mouth staked, as the fulcrum keeper set screws are, the stake a step of
+    its own after the screws are driven."""
+    import ch_channel_assembly_steps as steps
     import draw_ch_channel_assembly as channel
 
     joint_id = "ch-channel/pivot-bracket-apex-set-screw"
     (row,) = [j for j in jr.JOINTS if j.id == joint_id]
     assert row.exposure is Exposure.OSCILLATING
     assert row.lock is Lock.STAKED
-    assert row.lock_step == row.installed_at == "set-screws-driven"
+    assert row.installed_at == "set-screws-driven"
+    assert row.lock_step == steps.PIVOT_SET_SCREWS_STAKED_KEY
+    assert steps.step_number(row.lock_step) > steps.step_number(row.installed_at)
     assert row.exception == ""
     assert "U-MHA-CH-VN-53-channel-threadlocker" not in jr.RULINGS
     assert not [r for r in jr.RULINGS.values() if r.joint == joint_id]
@@ -420,15 +428,10 @@ def test_the_channel_apex_set_screws_are_staked_like_the_keeper_screws() -> None
         j for j in jr.JOINTS if j.id == "ch-channel/fulcrum-shaft-set-screw-in-keeper"
     ]
     assert keeper.lock is Lock.STAKED
-    rocker_fitup, fulcrum_fitup, _hookup = (
-        " ".join(n.split()) for n in channel.FITUP_NOTES
-    )
-    assert "SNUG, AND STAKE EACH TAP MOUTH AT 2 POINTS." in rocker_fitup
-    assert "STAKE EACH TAP MOUTH AT 2 POINTS." in fulcrum_fitup
+    assert steps.step_number(keeper.lock_step) > steps.step_number(keeper.installed_at)
     for banned in ("LOCTITE", "THREADLOCK"):
-        assert banned not in rocker_fitup.upper()
+        assert banned not in channel.FITUP_STEPS.upper()
         assert banned not in row.evidence.upper()
-    assert jr._config.parts("sh-vn-arbor-set-screw")["number"] not in fulcrum_fitup
 
     findings = jr.audit(
         jr.JOINTS,

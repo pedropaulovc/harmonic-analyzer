@@ -399,14 +399,17 @@ def test_bar_foot_cheeks_clear_the_hub_at_the_worst_case(
     test_amplitude_bars_clear_both_thrust_faces_at_the_worst_case, and are
     smaller than the hub). Worst case: the notch at its deepest, the
     rocker's top edge at its lowest, and the hub at maximum material and off
-    the bore axis by the printed coaxiality's radius. The one-sided bands
-    (user ruling 2026-09-26) put no term on the notch or the edge; PR #1354's
-    spec-owned Ø.004 coaxiality spends .002 of the air."""
+    the bore axis by the printed coaxiality's radius. The notch's one-sided
+    band (user ruling 2026-09-26) puts no term on it; the edge drops by its
+    zone's lower half, about the mid-zone nominal (owner ruling 2026-11-08,
+    #2144 item 10.3), to where the former one-sided band's nominal sat. PR
+    #1354's spec-owned Ø.004 coaxiality spends .002 of the air."""
     # (upper, lower) deviations: the notch deepens by its upper one, the edge
     # drops by its lower one.
     notch_deeper = bar.BOTTOM_NOTCH_DEPTH_BAND[0]
     edge_lower = -arm.TOP_EDGE_BAND[1]
-    assert notch_deeper == edge_lower == 0.0
+    assert notch_deeper == 0.0
+    assert edge_lower == pytest.approx(0.254)
     worst = _cheek_cap(monkeypatch, notch_deeper, edge_lower)
     nominal = _cheek_cap(monkeypatch, 0.0, 0.0)
     assert worst == pytest.approx(nominal - notch_deeper - edge_lower, abs=1e-6)
@@ -450,8 +453,9 @@ def test_bar_foot_cheeks_clear_the_hub_at_the_worst_case(
     fault_clearance = worst - (printed_hub_max_material_r + looser / 2.0)
     assert fault_clearance == pytest.approx(-eccentricity)
     assert fault_clearance < 0.0
-    # Bilateral .XX on both formerly one-sided features closes the air.
-    assert _cheek_cap(monkeypatch, arm.LINEAR_2PL, arm.LINEAR_2PL) - hub_top < 0.0
+    # A bilateral .XX on the notch, with the edge's zone widened .XX below its
+    # lower limit, closes the air.
+    assert _cheek_cap(monkeypatch, arm.LINEAR_2PL, edge_lower + arm.LINEAR_2PL) - hub_top < 0.0
     # The washer's edge, off the axis by its bore's float on the thinnest shaft.
     washer_float = (washer.ID_MAX - (shaft.SHAFT_DIA + shaft.SHAFT_DIA_BAND[1])) / 2.0
     assert washer.OD_MAX / 2.0 + washer_float <= hub_max_material_r
@@ -493,29 +497,31 @@ def test_hub_root_fillet_clears_a_cheek_running_on_the_strap_face(
     assert arm_notes.HUB_ROOT_R_TOL_TYPE == 6  # swTolType_e.swTolMAX
 
 
-def test_the_one_sided_bands_lift_the_bar_about_1_mm_at_rest(
+def test_the_bands_spread_the_bar_about_1_mm_at_rest(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The shallow-notch and high-edge limits can only lift a bar: at most
-    1.016 (.020 + .020) at rest, a steady ~0.45 deg on its channel lever, and
-    at most 0.0036 of fundamental at any station (0.04 % of the d = 88 term),
-    from the exact chain in error_budget (rocker_arm_spec states both)."""
+    """From the deep-notch, low-edge limits to the shallow-notch, high-edge
+    ones a bar rests at most 1.016 (.020 + .020) higher, a steady ~0.45 deg
+    on its channel lever, and at most 0.0036 of fundamental at any station
+    (0.04 % of the d = 88 term), from the exact chain in error_budget
+    (rocker_arm_spec states both)."""
     notch_shallower = -bar.BOTTOM_NOTCH_DEPTH_BAND[1]
-    edge_higher = arm.TOP_EDGE_BAND[0]
-    lift = notch_shallower + edge_higher
+    edge_higher, edge_low = arm.TOP_EDGE_BAND
+    lift = notch_shallower + edge_higher - edge_low
     assert lift == pytest.approx(1.016)
     with monkeypatch.context() as patch:
+        patch.setitem(ck.ARC, "acy", ck.ARC["acy"] + edge_low)
         base = ck.solve_state(0.0)
         patch.setattr(ck, "_CONTACT_OFF_Y", ck._CONTACT_OFF_Y - notch_shallower)
-        patch.setitem(ck.ARC, "acy", ck.ARC["acy"] + edge_higher)
+        patch.setitem(ck.ARC, "acy", ck.ARC["acy"] + edge_higher - edge_low)
         up = ck.solve_state(0.0)
     assert up["bar_bottom"] - base["bar_bottom"] == pytest.approx(lift, abs=1e-3)
     assert abs(up["lever_tilt"] - base["lever_tilt"]) == pytest.approx(0.45, abs=0.01)
 
-    nom = error_budget.nominal()
+    nom = replace(error_budget.nominal(), arc_cy=error_budget.nominal().arc_cy + edge_low)
     lifted = replace(
         nom,
-        arc_cy=nom.arc_cy + edge_higher,
+        arc_cy=nom.arc_cy + edge_higher - edge_low,
         contact_dy=nom.contact_dy - notch_shallower,
     )
     theta = np.arange(720) * 2.0 * math.pi / 720

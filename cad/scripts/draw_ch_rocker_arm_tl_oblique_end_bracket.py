@@ -1,19 +1,19 @@
 r"""Create the drawing for the oblique-trammel jig's end bracket (MHA-CH-06-TL-28).
 
 One part, two off (the title block's quantity). A 2.71 x 1/2 x 1 in flat at
-2:1: the plan (the *Front view, looking down on the top face) carries the
-two hole stations from the inner end and the length, all stacked below it,
-the row's station from the -Y side face (left), the stock width (right) and
-one native callout per hole over it, each leader on its own hole; the end
-view, projected right of the plan, carries the stock thickness and section
-A-A's cutting line; section A-A, cut along the hole row and placed under the
-plan, draws both faces' threads solid and carries two part-owned LIMIT
-dimensions for independent full-thread LIMIT bands about one common modeled
-depth. Each plan callout identifies its thread; the first alone states
-#29 DRILL THRU for BOTH HOLES, retaining the native drill-diameter token.
-The shaded isometric rides top right at 1:1. The KP08's 42 mm bolt span
-prints exact millimetres, labelled mm. No hand-formatted depth substitutes
-for either native dimension or its model-owned limits.
+2:1: the plan (the *Front view, looking at the KP08's face: the FRONT FACE;
+the base bar's is the BACK FACE) carries the two hole stations from the
+inner end and the length, all stacked below it, the row's station from the
+-Y side face (left), the stock width (right) and one native 2X callout over
+it for the two identical holes (rule 10): drill, then each face's thread
+with its full-thread depth as REF from its face, then the mates, named once
+(rules 4, 7, 26). Every location prints its value and band alone (rule 7).
+The end view, projected right of the plan, carries the stock thickness and
+section A-A's cutting line; section A-A, cut along the hole row and placed
+under the plan, draws both faces' threads solid and carries the two
+part-owned LIMIT dimensions that control the full-thread depths the
+callout repeats as REF (rule 26). The shaded isometric rides top right at
+1:1. The KP08's 42 mm bolt span prints exact millimetres, labelled mm.
 
 Run with SolidWorks open::
 
@@ -82,7 +82,6 @@ from ch_rocker_arm_tl_oblique_end_bracket_spec import (
     BRACKET_LENGTH,
     BRACKET_THICK,
     BRACKET_WIDTH,
-    CALLOUTS_BELOW,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     HALF_WIDTH,
@@ -93,9 +92,7 @@ from ch_rocker_arm_tl_oblique_end_bracket_spec import (
     KP08_THREAD_DEPTH_DIMENSION,
     KP08_THREAD_REFERENCE,
     KP08_THREAD_LIMITS,
-    MATE_CALLOUT,
     METRIC_DIMENSIONS,
-    ROW_CALLOUT,
     STOCK_CALLOUTS,
     STOCK_FRACTION_DENOMINATORS,
     TAP_CALLOUT_PLACES,
@@ -119,10 +116,8 @@ SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 # view projects right of it on its centreline (third angle). The 1/2 x 1 bar
 # on edge makes the end view 50.8 wide (outline x 267.6..318.4), so the 1:1
 # iso stands 20 further right, its note under it, all above the title block
-# (x 216 on, up to y 70) and under the 267 border. The two hole callouts
-# stand in two tiers a layout-audit row pitch apart (c4-r8: at 6 the audit
-# merged stacked blocks), both up-left of their holes so they clear the end
-# view; the plan drops 4 to keep the top tier under the border.
+# (x 216 on, up to y 70) and under the 267 border. The one 2X hole callout
+# stands up-right of the inner hole, over the plan, clear of the end view.
 SHEET_SCALE = (2.0, 1.0)
 VIEW_SCALE = (2, 1)
 ISO_SCALE = (1, 1)
@@ -137,16 +132,14 @@ ISO_HALF = (0.030, 0.025)  # the iso's half extents (sheet m)
 # view at run time (draw_ch_rocker_arm_tl_oblique_feed_lever). In the plan
 # model +X runs right and +Y up; text sizes are sheet mm halved at 2:1.
 # A keep point is its text block's centre; SolidWorks hangs the dimension
-# line about TEXT_DROP below a one-line block and TWO_LINE_DROP below a
-# two-line one (base bar readback), so every station's text sits on the
-# part side of its line under the plan.
+# line about TEXT_DROP below a one-line block (base bar readback), so every
+# station's text sits on the part side of its line under the plan.
 _H = BRACKET_THICK
 _L = BRACKET_LENGTH
 _HW = HALF_WIDTH
 STACK_FIRST = 8.0 / _S
 STACK_LANE = 6.0 / _S  # ASME Y14.5's 6 sheet mm between one-line lanes
 TEXT_DROP = 2.7 / _S
-TWO_LINE_DROP = 5.6 / _S
 TEXT_GAP = 2.5 / _S  # a text's clearance from the line it sits beside
 EXT_OVERSHOOT = 1.5 / _S  # an extension line's run past its dimension line
 SIDE_LANE = 8.0 / _S  # first side-dimension line off the part
@@ -169,16 +162,21 @@ def text_half_high(rows: int) -> float:
     return ((rows - 1) * ROW_PITCH + 3.5 / _S) / 2.0
 
 
-# A two-line block's far edge from its own line, plus the gap to the next.
-MATE_LANE = TWO_LINE_DROP + text_half_high(2) + TEXT_GAP
 # c4-r3: the row's station dimension line ran 6.35 sheet mm past the -Y side.
 ROW_TAIL = 6.35 / _S
 # The dimension lines below the plan, nearest first, shortest span nearest:
 # the first block clears the row station's line tail, each next one the line
-# above it; the length's one-line block clears the last station's line.
+# above it, a block plus the audit's row pitch under the block above; the
+# length's block clears the last station's line. Every block is one line: a
+# location prints its value and band alone (rule 7).
 STATION_ORDER = ("KP08Tap1X", "KP08Tap2X")
-_FIRST_LANE = -_HW - ROW_TAIL - TEXT_GAP - (TWO_LINE_DROP + text_half_high(2))
-STATION_LANES = tuple(_FIRST_LANE - i * MATE_LANE for i in range(len(STATION_ORDER)))
+_FIRST_LANE = -_HW - ROW_TAIL - TEXT_GAP - (TEXT_DROP + text_half_high(1))
+STATION_PITCH = max(
+    TEXT_DROP + text_half_high(1) + TEXT_GAP, 2.0 * text_half_high(1) + STACK_PITCH
+)
+STATION_LANES = tuple(
+    _FIRST_LANE - i * STATION_PITCH for i in range(len(STATION_ORDER))
+)
 LENGTH_LANE = STATION_LANES[-1] - (TEXT_GAP + TEXT_DROP + text_half_high(1))
 
 
@@ -190,28 +188,33 @@ def plan_sheet(x: float, y: float) -> tuple[float, float]:
     )
 
 
-_ROW_TEXT = "\n".join((f"{HOLE_ROW_Y / 25.4:.3f}".lstrip("0"), ROW_CALLOUT))
-_ROW_ROWS = _ROW_TEXT.count("\n") + 1
+_ROW_TEXT = f"{HOLE_ROW_Y / 25.4:.3f}".lstrip("0")
+# A station prints its exact millimetres, then its band and unit label
+# (owner ruling 4): this many glyphs after the value (" ±.13 mm").
+_STATION_BAND_GLYPHS = 8
+STATION_GLYPHS = {
+    name: len(f"{x:.3f}") + _STATION_BAND_GLYPHS
+    for name, x in zip(STATION_ORDER, HOLE_X, strict=True)
+}
 
 
-def _outboard_left(mate: str) -> float:
+def _outboard_left(glyphs: int) -> float:
     """Centre X of a station block standing left of the inner end's line."""
-    return -(TEXT_GAP + text_half(mate))
+    return -(TEXT_GAP + glyphs * GLYPH / 2.0)
 
 
-_STATIONS = dict.fromkeys(STATION_ORDER, MATE_CALLOUT)
-# The plan. Every station is a DRO absolute from the inner end carrying its
-# mate on a second line. The blocks are wider than their spans, so each
-# stands left of the inner end's extension line, where none of the other
-# stations' extension lines (at X 13.925 and 55.925) pass (c4-r3: stacks
-# over the plan crowded the tap callouts off their holes).
-# Left of the plan: the row's station from the -Y side face, its three-line
-# block between its own extension lines. Right of it: the stock width.
+# The plan. Every station is a DRO absolute from the inner end. The blocks
+# are wider than the inner station's span, so each stands left of the inner
+# end's extension line, where none of the other stations' extension lines
+# (at X 13.925 and 55.925) pass (c4-r3: stacks over the plan crowded the tap
+# callout off its hole).
+# Left of the plan: the row's station from the -Y side face, between its own
+# extension lines. Right of it: the stock width.
 PLAN_KEEP: dict[str, tuple[float, float, float]] = {
     **{
         name: (
-            _outboard_left(_STATIONS[name]),
-            STATION_LANES[lane] + TWO_LINE_DROP,
+            _outboard_left(STATION_GLYPHS[name]),
+            STATION_LANES[lane] + TEXT_DROP,
             _H,
         )
         for lane, name in enumerate(STATION_ORDER)
@@ -232,8 +235,10 @@ END_KEEP: dict[str, tuple[float, float, float]] = {
 # the sheet scale, +Z up, its centre (mid-length, mid-height) on
 # SECTION_CENTER: its top 10 under the plan's lowest text (sheet y 0.142),
 # its foot 15 over the title block's top; the caption under it, left of the
-# title block. Independent top/bottom full-thread LIMIT dimensions stand
-# left/right of the section, each on a native OffsetText leader.
+# title block. Each face's full-thread LIMIT dimension stands beside the
+# section on its own side, on a native OffsetText leader, its row below
+# naming its face by the plan's view (rule 26: never TOP or BOTTOM, which
+# read as the section's own up and down).
 SECTION_LABEL = "A"
 SECTION_OVERRUN = 2.0
 SECTION_LINE_MODEL_MM = (
@@ -248,53 +253,73 @@ SECTION_KEEP: dict[str, tuple[float, float, float]] = {
     BAR_THREAD_DEPTH_DIMENSION: (_L + DEPTH_LANE, 0.0, MODELED_THREAD_DEPTH / 2.0),
     KP08_THREAD_DEPTH_DIMENSION: (-DEPTH_LANE, 0.0, _H - MODELED_THREAD_DEPTH / 2.0),
 }
+SECTION_DEPTH_CALLOUTS = {
+    BAR_THREAD_DEPTH_DIMENSION: "FULL THREAD\nFROM BACK FACE",
+    KP08_THREAD_DEPTH_DIMENSION: "FULL THREAD\nFROM FRONT FACE",
+}
 SECTION_TEXT = {
     BAR_THREAD_DEPTH_DIMENSION: (
         _L + DEPTH_LANE + TEXT_GAP
-        + text_half(CALLOUTS_BELOW[BAR_THREAD_DEPTH_DIMENSION]), 0.0, _H / 2.0,
+        + text_half(SECTION_DEPTH_CALLOUTS[BAR_THREAD_DEPTH_DIMENSION]), 0.0, _H / 2.0,
     ),
     KP08_THREAD_DEPTH_DIMENSION: (
         -DEPTH_LANE - TEXT_GAP
-        - text_half(CALLOUTS_BELOW[KP08_THREAD_DEPTH_DIMENSION]), 0.0, _H / 2.0,
+        - text_half(SECTION_DEPTH_CALLOUTS[KP08_THREAD_DEPTH_DIMENSION]), 0.0, _H / 2.0,
     ),
 }
 _TEXT_SETTLE_M = 0.0005
 
-# One native callout per hole over the plan, its count dropped (c4-r3: a 2X
-# callout's leader lands on one hole only, leaving the other's thread to a
-# guess). Each leader runs from its shelf's near end to its hole's centre;
-# both callouts stand up-left of their holes, the outer hole's a tier higher
-# so its leader passes over the inner hole's block and no leader crosses
-# another, a callout or a line (every station hangs under the plan). The
-# tiers clear the +Y side by 10.4 sheet mm and stand a block plus the audit's
-# row pitch apart (c4-r8). Each tuple: the hole's X, the text block's centre
-# (model X, Y) and the side (-1 left) whose upper rim the edge pick takes.
-# The larger callout has the native drill row plus a thread identity and a
-# section pointer. The other identifies its own hole but does not repeat
-# the one through-drilling requirement.
-THREAD_LIMIT_CALLOUT = "BOTH FACES: SECTION A-A"
+
+def _inch(value_mm: float) -> str:
+    return f"{value_mm / 25.4:.3f}".lstrip("0")
+
+
+# The two identical holes take one native 2X callout over the plan (rule
+# 10), its leader from the shelf's near end to the inner hole's centre, the
+# block up-right of that hole, clear of the +Y side, the width's extension
+# line and the end view, so the leader crosses no other line (every station
+# hangs under the plan). Its rows, size before process before depth (rule
+# 26): the native count, drill size and THRU with the drill named; each
+# face's thread with its full-thread depth as REF (the section's LIMIT
+# dimensions control it, rule 26) from its face, named by the plan's view
+# (the plan looks at the KP08's face); the mates both patterns serve, named
+# once by drawing number in the jig's short form, the pillow block's
+# catalogue code after its number (rules 4, 7): TL-20 is base bar 1, whose
+# clearance holes take the screws up into the back threads, and TL-VN-56
+# the KP08 pillow block, whose Ø5 holes take the screws down.
 DRILL_PROCESS = "#29 DRILL"
-CALLOUT_ROWS = 3
-CALLOUT_GLYPHS = len("#29 DRILL Ø.136 THRU ALL; BOTH HOLES")
-_TIER_PITCH = 2.0 * text_half_high(CALLOUT_ROWS) + STACK_PITCH + 0.1
-TAP_TIERS = tuple(
-    _HW + 5.0 + text_half_high(CALLOUT_ROWS) + 0.2 + k * _TIER_PITCH
-    for k in range(len(HOLE_X))
+_THREAD_TEXT = part_spec.SCREW.lstrip("#")  # "8-32"
+FRONT_DEPTH_REF = f"({_inch(KP08_THREAD_LIMITS[0])}-{_inch(KP08_THREAD_LIMITS[1])})"
+BACK_DEPTH_REF = f"({_inch(BAR_THREAD_LIMITS[0])}-{_inch(BAR_THREAD_LIMITS[1])})"
+FRONT_FACE = "FROM FRONT FACE"
+BACK_FACE = "FROM BACK FACE"
+FRONT_DEPTH_TEXT = f"{FRONT_DEPTH_REF} {FRONT_FACE}"
+BACK_THREAD_ROW = f"{_THREAD_TEXT} UNC <HOLE-DEPTH> {BACK_DEPTH_REF} {BACK_FACE}"
+HOLE_MATE = "MATCHES TL-20 AND TL-VN-56 (KP08)"
+# The rows as printed, the depth symbol one glyph.
+CALLOUT_TEXT_ROWS = (
+    f"{len(HOLE_X)}X Ø{_inch(TAP_DRILL)} {DRILL_PROCESS} THRU ALL",
+    f"{_THREAD_TEXT} UNC ↧ {FRONT_DEPTH_TEXT}",
+    BACK_THREAD_ROW.replace("<HOLE-DEPTH>", "↧"),
+    HOLE_MATE,
 )
+CALLOUT_ROWS = len(CALLOUT_TEXT_ROWS)
+CALLOUT_GLYPHS = max(len(row) for row in CALLOUT_TEXT_ROWS)
+TAP_TIER = _HW + 5.0 + text_half_high(CALLOUT_ROWS) + 0.2
 
 
 def _tap_callout(
-    x: float, tier: int, side: int, run: float
+    x: float, side: int, run: float
 ) -> tuple[float, tuple[float, float], int]:
-    """A callout ``run`` past its hole on ``side``, its shelf's near end there."""
+    """A callout ``run`` past its hole on ``side``, its shelf's near end there.
+    The tuple: the hole's X, the text block's centre (model X, Y) and the side
+    (+1 right) whose upper rim the edge pick takes."""
     half = CALLOUT_GLYPHS * GLYPH / 2.0
-    return x, (x + side * (run + half), TAP_TIERS[tier]), side
+    return x, (x + side * (run + half), TAP_TIER), side
 
 
-TAP_CALLOUTS: tuple[tuple[float, tuple[float, float], int], ...] = (
-    # A 2.5 sheet mm shelf run keeps the full block 10.116 mm inside the border.
-    _tap_callout(HOLE_X[0], 0, -1, TEXT_GAP),
-    _tap_callout(HOLE_X[1], 1, -1, 3.0),
+TAP_CALLOUT: tuple[float, tuple[float, float], int] = _tap_callout(
+    HOLE_X[0], 1, TEXT_GAP
 )
 
 
@@ -437,13 +462,13 @@ for _index, _x in enumerate(part_spec.HOLE_X, start=1):
             # prechips has no per-face thread-depth field. This cited note
             # carries both independently model-owned section LIMIT bands.
             "note": (
-                f"{MATE_CALLOUT}; FULL THREAD "
+                f"{HOLE_MATE}; FULL THREAD "
                 f"{part_spec.KP08_THREAD_LIMITS[0]:.3f} TO "
                 f"{part_spec.KP08_THREAD_LIMITS[1]:.3f} mm FROM THE TOP FACE AND "
                 f"{part_spec.BAR_THREAD_LIMITS[0]:.3f} TO "
                 f"{part_spec.BAR_THREAD_LIMITS[1]:.3f} mm FROM THE BOTTOM FACE",
                 (
-                    "MATE_CALLOUT",
+                    ("draw_ch_rocker_arm_tl_oblique_end_bracket", "HOLE_MATE"),
                     "KP08_PATTERN_ALLOWANCE",
                     "BAR_PATTERN_ALLOWANCE",
                     "POSITION_RADIUS",
@@ -840,19 +865,12 @@ def _omit_tap_thread_class(display: Any, *, label: str) -> None:
         raise RuntimeError(f"{label}: callout still prints its class: {resolved!r}")
 
 
-_COUNT = re.compile(r"<NUM_INST>[ \t]*X[ \t]*")
-_PRINTED_COUNT = re.compile(r"^\s*\d+X\s", re.MULTILINE)
-
-
-def single_hole_definitions(definitions: dict[int, str]) -> dict[int, str]:
-    """Drop the instance count: this callout's leader names one hole."""
-    if set(definitions) != {5, 6, 7, 8}:
-        raise RuntimeError(f"unexpected hole-callout parts: {definitions!r}")
-    counts = [part for part, text in definitions.items() for _ in _COUNT.finditer(text)]
-    if len(counts) != 1:
-        raise RuntimeError(f"hole callout lacks one instance count: {definitions!r}")
-    (part,) = counts
-    return {**definitions, part: _COUNT.sub("", definitions[part], count=1)}
+_NATIVE_TOKENS = (
+    "<hw-threaddesc>", "<hw-threadclass>", "<HOLE-DEPTH>", "<hw-threaddepth>",
+    "<NUM_INST>", "<MOD-DIAM>", "<hw-tapdrldia>", "<hw-thru>",
+)
+_NATIVE_DEPTH = re.compile(r"<HOLE-DEPTH>[ \t]*<hw-threaddepth>")
+_COUNT = re.compile(r"<NUM_INST>[ \t]*X")
 
 
 def _unique_callout_token_parts(
@@ -884,57 +902,55 @@ def omit_thread_class_definitions(definitions: dict[int, str]) -> dict[int, str]
     return {**definitions, part: before + after}
 
 
-def thread_limit_definitions(
-    definitions: dict[int, str], *, include_drill: bool
-) -> dict[int, str]:
-    """Preserve native tokens without guessing their text part or whitespace.
+def two_hole_definitions(definitions: dict[int, str]) -> dict[int, str]:
+    """The one 2X callout's definitions, every native token kept but the
+    model's shared thread depth.
 
     Run a8b2ac4c returned hw-threaddesc, a spaced depth pair and hw-thru,
     not the synthetic hw-thread/adjacent-depth/literal-THRU-ALL fixture.
-    The model nominal is omitted; both source-owned LIMIT dimensions remain
-    untouched. Drill tokens may share a text part with thread tokens.
+    The native count stays (rule 10). The drill is named after its size
+    (rule 26). The native depth symbol takes the front face's full-thread
+    band as REF in place of the modeled nominal, the back face's thread row
+    follows, both REF to the section's part-owned LIMIT dimensions (rule 26:
+    a REF depth is complete when a controlling dimension locates it). The
+    mates sit below, once (rules 4, 7).
     """
-    required = (
-        "<hw-threaddesc>", "<hw-threadclass>", "<HOLE-DEPTH>", "<hw-threaddepth>",
-        "<NUM_INST>", "<MOD-DIAM>", "<hw-tapdrldia>", "<hw-thru>",
-    )
-    owners = _unique_callout_token_parts(definitions, required)
+    owners = _unique_callout_token_parts(definitions, _NATIVE_TOKENS)
     unknown = {
         token for text in definitions.values() for token in re.findall(r"<[^>]+>", text)
-        if token not in required
+        if token not in _NATIVE_TOKENS
     }
     if unknown:
         raise RuntimeError(f"unexpected opposed-thread callout tokens: {sorted(unknown)}")
-    updated = single_hole_definitions(definitions)
-    depth_symbol_part = owners["<HOLE-DEPTH>"]
-    updated[depth_symbol_part] = updated[depth_symbol_part].replace("<HOLE-DEPTH>", "", 1)
     depth_part = owners["<hw-threaddepth>"]
+    if owners["<HOLE-DEPTH>"] != depth_part or not _NATIVE_DEPTH.search(
+        definitions[depth_part]
+    ):
+        raise RuntimeError(f"hole callout's thread depth is not one native pair: {definitions!r}")
+    if not _COUNT.search(definitions[owners["<NUM_INST>"]]):
+        raise RuntimeError(f"hole callout lacks its instance count: {definitions!r}")
+    joined = "\n".join(definitions.values())
+    if any(word in joined for word in (DRILL_PROCESS, FRONT_FACE, BACK_FACE, HOLE_MATE)):
+        raise RuntimeError(f"hole callout already carries its rows: {definitions!r}")
+    updated = dict(definitions)
     updated[depth_part] = updated[depth_part].replace(
-        "<hw-threaddepth>", f"\n{THREAD_LIMIT_CALLOUT}", 1
+        "<hw-threaddepth>", f"{FRONT_DEPTH_TEXT}\n{BACK_THREAD_ROW}", 1
     )
-    if include_drill:
-        diameter_part = owners["<MOD-DIAM>"]
-        updated[diameter_part] = updated[diameter_part].replace(
-            "<MOD-DIAM>", f"{DRILL_PROCESS} <MOD-DIAM>", 1
-        )
-        thru_part = owners["<hw-thru>"]
-        updated[thru_part] = updated[thru_part].replace(
-            "<hw-thru>", "<hw-thru>; BOTH HOLES", 1
-        )
-    else:
-        for token in ("<MOD-DIAM>", "<hw-tapdrldia>", "<hw-thru>"):
-            part = owners[token]
-            updated[part] = updated[part].replace(token, "", 1)
-    updated = {
+    drill_part = owners["<hw-tapdrldia>"]
+    updated[drill_part] = updated[drill_part].replace(
+        "<hw-tapdrldia>", f"<hw-tapdrldia> {DRILL_PROCESS}", 1
+    )
+    below = updated[8].rstrip()
+    updated[8] = f"{below}\n{HOLE_MATE}" if below else HOLE_MATE
+    return {
         part: "\n".join(line.rstrip(" \t") for line in text.split("\n")).strip()
         for part, text in updated.items()
     }
-    return updated
 
 
-@_telemetry.traced("drawing.end_bracket.single_hole_callout")
-def _call_out_one_hole(display: Any, *, label: str, include_drill: bool) -> None:
-    """State native thread identity and exactly one shared through-drill row."""
+@_telemetry.traced("drawing.end_bracket.two_hole_callout")
+def _call_out_both_holes(display: Any, *, label: str) -> None:
+    """Write ``two_hole_definitions`` through each writable twin; prove it."""
     native = _early_bound(display, "IDisplayDimension")
 
     def read(parts: tuple[int, ...]) -> dict[int, str]:
@@ -943,19 +959,15 @@ def _call_out_one_hole(display: Any, *, label: str, include_drill: bool) -> None
         }
 
     definitions = read((5, 6, 7, 8))
-    updated = thread_limit_definitions(definitions, include_drill=include_drill)
+    updated = two_hole_definitions(definitions)
     for definition_part, writable_part in ((5, 1), (6, 2), (7, 3), (8, 4)):
         if updated[definition_part] != definitions[definition_part]:
             native.SetText(writable_part, updated[definition_part])
     persisted = read((5, 6, 7, 8))
     resolved = read((1, 2, 3, 4))
-    if (
-        persisted != updated
-        or any(_PRINTED_COUNT.search(text) for text in resolved.values())
-        or sum(text.count(THREAD_LIMIT_CALLOUT) for text in resolved.values()) != 1
-    ):
+    if persisted != updated or not callout_is_complete(list(resolved.values())):
         raise RuntimeError(
-            f"{label}: callout prints a count or misses the section pointer: "
+            f"{label}: 2X callout rows did not persist: "
             f"definitions={persisted!r}, resolved={resolved!r}"
         )
     _telemetry.info(f"{label}: {resolved!r}")
@@ -975,21 +987,31 @@ def _activate_view(adapter: Any, view: Any, *, label: str) -> None:
 # the features that carry such a note: the two tap features (BarTaps,
 # KP08Taps) and the part's bottom cosmetic threads (BarFaceThread1/2, whose
 # callout text is the same "#8-32 Tapped Hole"). The contract is what the
-# settled sheet says: each hole's callout states its thread and points at
-# A-A, and no note anywhere repeats a thread.
+# settled sheet says: the one 2X callout states the drill, both faces'
+# threads and depths and the mates, and no note anywhere repeats a thread.
 TAP_FEATURES = ("BarTaps", "KP08Taps")
 BAR_FACE_THREADS = tuple(f"BarFaceThread{k}" for k in range(1, len(HOLE_X) + 1))
 REDUNDANT_THREAD_NOTES = range(1, len(TAP_FEATURES) + len(BAR_FACE_THREADS) + 1)
-_THREAD_TEXT = part_spec.SCREW.lstrip("#")  # "8-32"
+_COUNT_ROW = re.compile(rf"^\s*{len(HOLE_X)}X\s", re.MULTILINE)
 
 
-def callout_states_its_thread(resolved: list[str]) -> bool:
-    """Each hole names its thread and the independent section LIMIT bands."""
+def callout_is_complete(resolved: list[str]) -> bool:
+    """The 2X callout's resolved rows: the count, one drill THRU, both faces'
+    threads with their REF depths from their faces, the mates once; no
+    modeled nominal depth and no deferral to a view."""
     text = "\n".join(resolved)
     return (
-        f"{_THREAD_TEXT} UNC" in text
-        and text.count(THREAD_LIMIT_CALLOUT) == 1
+        _COUNT_ROW.search(text) is not None
+        and text.count(DRILL_PROCESS) == 1
+        and len(re.findall(r"\bTHRU(?:\s+ALL)?\b", text)) == 1
+        and text.count(f"{_THREAD_TEXT} UNC") == 2
+        and text.count(FRONT_DEPTH_TEXT) == 1
+        and text.count(f"{BACK_DEPTH_REF} {BACK_FACE}") == 1
+        and text.count(HOLE_MATE) == 1
         and "<hw-threaddepth>" not in text
+        and _inch(MODELED_THREAD_DEPTH) not in text
+        and "SECTION" not in text
+        and "BOTH" not in text
     )
 
 
@@ -1002,32 +1024,15 @@ def stray_thread_notes(texts: list[str]) -> list[str]:
     ]
 
 
-def _require_threads_stated_by_callouts_only(
-    adapter: Any, callouts: list[tuple[str, Any]]
-) -> None:
-    """After the final rebuild: both callouts still state their thread, and no
-    note on the sheet (any view, or the sheet itself) repeats one."""
-    drill_callouts = []
-    for label, display in callouts:
-        native = _early_bound(display, "IDisplayDimension")
-        resolved = [
-            str(native.GetText(part) or "").replace("\r", "") for part in (1, 2, 3, 4)
-        ]
-        if not callout_states_its_thread(resolved):
-            raise RuntimeError(
-                f"{label}: settled callout lost its thread: {resolved!r}"
-            )
-        text = "\n".join(resolved)
-        if DRILL_PROCESS in text or re.search(r"\bTHRU\b", text):
-            drill_callouts.append(text)
-    if (
-        len(callouts) != len(HOLE_X)
-        or len(drill_callouts) != 1
-        or drill_callouts[0].count(DRILL_PROCESS) != 1
-        or len(re.findall(r"\bTHRU(?:\s+ALL)?\b", drill_callouts[0])) != 1
-        or drill_callouts[0].count("BOTH HOLES") != 1
-    ):
-        raise RuntimeError(f"expected one #29 DRILL THRU for both holes: {drill_callouts}")
+def _require_threads_stated_by_the_callout_only(adapter: Any, callout: Any) -> None:
+    """After the final rebuild: the 2X callout is still complete, and no note
+    on the sheet (any view, or the sheet itself) repeats a thread."""
+    native = _early_bound(callout, "IDisplayDimension")
+    resolved = [
+        str(native.GetText(part) or "").replace("\r", "") for part in (1, 2, 3, 4)
+    ]
+    if not callout_is_complete(resolved):
+        raise RuntimeError(f"the settled 2X callout lost a row: {resolved!r}")
     texts: list[str] = []
     node = _early_bound(adapter.currentModel, "IDrawingDoc").GetFirstView()  # sheet
     while node is not None:
@@ -1164,7 +1169,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # the bottom thread's drawn end (BAR_THREAD_WITNESS_X).
     _section_threads_on_visible_layer(adapter, section)
     # Places are authored on the part; the sheet only proves the import kept
-    # them, then writes the mate callouts and the stock references.
+    # them, then names each section depth's face and writes the stock
+    # references. No location carries words (rule 7): the mates sit once on
+    # the 2X callout.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     print_imported_metric_dimensions(
         adapter,
@@ -1174,7 +1181,7 @@ async def build(adapter: Any) -> dict[str, str]:
             for (_feature, name), (places, _band) in METRIC_DIMENSIONS.items()
         },
     )
-    set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
+    set_dimension_callouts(adapter, annotations, SECTION_DEPTH_CALLOUTS)
     # The depth's text, rows and all, off its line onto its leader.
     _offset_depth_text(
         adapter,
@@ -1190,24 +1197,19 @@ async def build(adapter: Any) -> dict[str, str]:
 
     if not auto_center_marks(adapter, plan, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the plan")
-    callouts: list[tuple[str, Any]] = []
-    for index, (x, (text_x, text_y), side) in enumerate(TAP_CALLOUTS):
-        label = f"screw hole at {x:.3f} mm"
-        callout = add_native_hole_callout(
-            adapter,
-            plan,
-            edge_xy=on_plan(tap_edge_model(x, side)),
-            callout_xy=on_plan((text_x, text_y, _H)),
-            label=label,
-        )
-        # Format native length variables before the second callout's
-        # redundant drill/depth rows are removed.
-        set_callout_lengths_to_three_places(callout, label=label)
-        _call_out_one_hole(
-            callout, label=label, include_drill=index == 0
-        )
-        _omit_tap_thread_class(callout, label=label)
-        callouts.append((label, callout))
+    x, (text_x, text_y), side = TAP_CALLOUT
+    label = "2X screw holes"
+    callout = add_native_hole_callout(
+        adapter,
+        plan,
+        edge_xy=on_plan(tap_edge_model(x, side)),
+        callout_xy=on_plan((text_x, text_y, _H)),
+        label=label,
+    )
+    # Format native length variables before the modeled depth leaves.
+    set_callout_lengths_to_three_places(callout, label=label)
+    _call_out_both_holes(callout, label=label)
+    _omit_tap_thread_class(callout, label=label)
 
     # The property-linked blocks land in the active view: the plan.
     _activate_view(adapter, plan, label="plan")
@@ -1219,13 +1221,13 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Rocker Oblique Trammel End Bracket Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
-        # SolidWorks' own "... Tapped Hole" notes repeat what each callout
+        # SolidWorks' own "... Tapped Hole" notes repeat what the callout
         # states: swept, at most one per thread feature (REDUNDANT_THREAD_NOTES),
-        # and the settled sheet proves none survives and both callouts do.
+        # and the settled sheet proves none survives and the callout does.
         redundant_note_substrings=("Tapped Hole",),
         expected_redundant_notes=REDUNDANT_THREAD_NOTES,
         settled_checks=(
-            lambda: _require_threads_stated_by_callouts_only(adapter, callouts),
+            lambda: _require_threads_stated_by_the_callout_only(adapter, callout),
             lambda: _require_thread_depths(section),
             lambda: _require_threads_drawn(adapter, section),
         ),

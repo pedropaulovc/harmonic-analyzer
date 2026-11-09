@@ -100,7 +100,7 @@ CROWN_TOP_Y = SHAFT_AXIS_H + CROWN_R  # 32.185: the set-screw tap's entry
 # on it. Each keeper prints LugRise at .XX, so two keepers bored apart could
 # sit 2 x .01 out of line -- far past any slide clearance, and a reamer only
 # follows the holes it is given. So the two are drilled and reamed through in
-# one pass AT THEIR INSTALLED SPACING (BORE_PAIR_CALLOUT,
+# one pass AT THEIR INSTALLED SPACING (ch_fulcrum_keeper_notes.BORE_CALLOUT,
 # ch_channel_assembly_steps.KEEPERS_PAIR_REAMED_KEY): feet outboard and down on
 # one flat, inner lug faces KEEPER_INNER_FACE_SPAN_MM apart as KEEPERS_SET_KEY
 # sets them, the bore axis set parallel to the flat. Both
@@ -110,7 +110,7 @@ CROWN_TOP_Y = SHAFT_AXIS_H + CROWN_R  # 32.185: the set-screw tap's entry
 # clearance -- on any one plane both bores keep it, so the shaft just lies at
 # that tilt -- and a span error delta moves a bore only delta x tilt off it.
 # Each crown is then rounded: a full round tangent to both side faces,
-# centred at the bore's height (CROWN_ROUND_CALLOUT). The bore keeps within
+# centred at the bore's height (ch_fulcrum_keeper_notes.CROWN_CALLOUT). The bore keeps within
 # BORE_CENTRE_BAND_MM of the width's centre plane, so the crown thread's worst
 # case below spends that offset under the round. ch_fulcrum_shaft_spec pins
 # the nominal to its SHAFT_DIA.
@@ -180,28 +180,6 @@ if BORE_DIA_BAND[1] - SHAFT_H[0] < (
     BORE_RUNNING_MIN_CLEARANCE_MM + BORE_SEAT_ALLOWANCE_MM
 ):
     raise AssertionError("the keeper bore band does not cover the rail-seat budget")
-# The pair-ream instruction on the bore callout, short enough to stand in one
-# clear block beside the end view (machinist review r13: four 75-97 mm rows
-# overprinted the crown, the bore and the width dimension). The mate is the
-# OTHER keeper of the pair, which the quantity note (QUANTITY_NOTE) states.
-# Machinist review r1 (MR-fleet, 991a56e) asked the supply condition: the
-# keeper ships with no bore at all (the pair-ream drills it) and its crown is
-# rounded only after the ream, so both callouts say so.
-QUANTITY_NOTE = 2
-BORE_PAIR_CALLOUT = (
-    "SUPPLIED UNDRILLED; PAIR-REAM WITH\n"
-    f"THE OTHER MHA-CH-07 (NOTE {QUANTITY_NOTE}) AT\n"
-    "INSTALLED SPACING; THE MHA-CH-04\n"
-    "SHAFT SLIDES THROUGH BOTH"
-)
-# The crown is a full round tangent to both side faces (Main ruling B+,
-# 2026-10-15, after MR-fleet r8 (7b21790) read "R7.0 MIN" as ambiguous; owner
-# ruling Q10-B, 2026-10-15: it follows the 14.0 width, centred on the width's
-# centre plane at the bore's height): its radius is the width's half, so the
-# print gives it as a reference and the width's band governs it
-# (CROWN_LEAST_R below).
-CROWN_ROUND_CALLOUT = "FULL ROUND TANGENT TO BOTH\nSIDES, CENTER AT BORE HEIGHT"
-
 # --- Fit-up on the top frame (MHA-CH-00): the pair goes on with the shaft
 # through both bores and is set by DRO, the lug centres on the fulcrum line
 # within KEEPER_FITUP_X_BAND_MM and the lug INNER faces off the front column
@@ -550,8 +528,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "SupplyHeightReference": {"SupplyHeight": 1},
     "OverallLengthReference": {"OverallLength": OVERALL_LENGTH_PLACES},
 }
-# The function the three-place size serves, printed under it.
-FOOT_SCREW_SIDE_CALLOUT = "CENTERS MHA-FR-02\nTAP IN RAIL WEB"
 if {f: set(names) for f, names in DRAWING_PRECISION.items()} != DRAWING_DIMENSIONS:
     raise AssertionError("DRAWING_PRECISION and DRAWING_DIMENSIONS disagree")
 if DRAWING_PRECISION["LugBody"]["LugThickness"] != 2 or (
@@ -584,7 +560,8 @@ if BORE_SIDE_WALL_MM < WALL_TARGET_MM:
 KEEPER_SCREW_TRANSVERSE_BAND_MM = _BAND_BY_PLACES[
     DRAWING_PRECISION["FootScrewSideReference"]["ScrewFromSide"]
 ]
-# The keeper is supplied square-topped (BORE_PAIR_CALLOUT: undrilled) and
+# The keeper is supplied square-topped and undrilled (the bore is line-reamed
+# at assembly, ch_fulcrum_keeper_notes.BORE_CALLOUT) and
 # the pair-ream step rounds each crown about its own bore (MR-fleet r3,
 # cb6e11e: the blank's height was printed nowhere). The blank must reach the
 # crown apex of a bore at the top of its printed LugRise band (.99 +.01)
@@ -607,23 +584,4 @@ SUPPLY_HEIGHT_TOL_TYPE = 5  # swTolType_e.swTolMIN: prints "1.3 MIN"
 SUPPLY_HEIGHT_CALLOUT = "SUPPLY HEIGHT,\nSQUARE TOP"
 if not CROWN_TOP_Y < SUPPLY_HEIGHT_MIN:
     raise AssertionError("the supplied blank does not reach the crown apex")
-
-# True free-text instructions only (native dims and callouts carry the rest;
-# the bore's pair reaming is its callout, BORE_PAIR_CALLOUT). The material
-# and finish are the title block's. Brackets carry no frames and no datums
-# (policy). The plan's foot hole stays located off the foot tip: from the
-# inner lug face (.47 at .XX) the .65's band would join the tip wall's
-# stack (FOOT_TIP_WALL_MM; owner ruling 2026-10-28, review exception RV-03).
-# A note saying so (MR-fleet r7, cc1a81a) drew three findings of its own, so
-# none is printed; note 1 states only the resulting tip wall, the shortfall
-# rule 20 asks the sheet to print (Codjiflo #2108), inside rule 7's four
-# lines (#2108 review: five drew a finding).
-DRAWING_NOTES = "\n".join(
-    (
-        "1. CROWN TAP FOR MHA-CH-VN-55 CUP-POINT SET SCREW; FOOT HOLE FOR",
-        f"   MHA-CH-VN-52 #2-56 FILLISTER, HEAD FLUSH; TIP WALL {FOOT_TIP_WALL_TEXT} MIN.",
-        f"{QUANTITY_NOTE}. 2 REQUIRED, ONE PER MHA-CH-04 FULCRUM-SHAFT END (SECOND",
-        "   IS THIS PART FLIPPED 180 DEG ABOUT VERTICAL).",
-    )
-)
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

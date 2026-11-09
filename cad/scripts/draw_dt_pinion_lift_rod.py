@@ -5,8 +5,14 @@ match-drilled at assembly near its flat front end (U36).  The 1:1 side view
 carries everything the lathe needs -- the bearing diameter and its mate, the
 body length, the crown and the (overall) -- plus the bearing finish; a 5:1
 detail of the front end carries the pin hole and its station from the front
-face.  No end view: the diameter lives on the side view (drawing-guidelines.md
-rule 11 (turned parts read like the lathe); machinist review r1, #1013).
+face.  VIEW B, the rod turned square to its two set-screw flats' plane
+(rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
+#2248)), carries their lengths, their stations off the crown rim and the
+across-flat size.  A bare 1:1 end view, projected right of the side view,
+carries no size: it is VIEW B's arrow parent, because VIEW B's line of sight
+lies in the end view's plane and not in the side view's.  The diameter stays
+on the side view (drawing-guidelines.md rule 11 (turned parts read like the
+lathe); machinist review r1, #1013).
 
 Run with SolidWorks open::
 
@@ -22,6 +28,7 @@ from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     dimension_name,
     place_view,
@@ -35,6 +42,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
@@ -44,6 +52,7 @@ from _drawing_dimensions import (
     set_reference_dimension,
 )
 from _drawing_finish import add_surface_finish
+from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -54,18 +63,63 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
+import dt_pinion_cam_spec
+import dt_pinion_lift_rod_spec
 from dt_pinion_lever_geometry import ROD_PIN_HOLE_FROM_END
 from dt_pinion_lift_rod_spec import (
+    ACROSS_FLAT_CALLOUT,
+    BACK_FLAT_EDGE_FROM_RIM,
+    BACK_FLAT_LEN,
     CAP_SAG,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_DIMENSIONS,
+    FLAT_NORMAL_LOCAL,
+    FLATS_VIEW,
+    FRONT_FLAT_EDGE_FROM_RIM,
+    FRONT_FLAT_LEN,
     PIN_HOLE_CALLOUT,
     ROD_DIA,
     ROD_DIA_CALLOUT,
     ROD_LEN,
     SURFACE_FINISHES,
 )
+
+# The rod spec restates the cam's print grades and screw (the cam spec reads
+# the rod spec, so the rod spec cannot read it back); prove them here, where
+# both import, before the flats they size reach the sheet.
+_CAM_RESTATED = {
+    "unit": (dt_pinion_lift_rod_spec.CAM_UNIT, dt_pinion_cam_spec.UNIT),
+    "length places": (
+        dt_pinion_lift_rod_spec.CAM_LENGTH_PLACES,
+        dt_pinion_cam_spec.LENGTH_PLACES,
+    ),
+    "tap station places": (
+        dt_pinion_lift_rod_spec.CAM_SET_SCREW_Z_PLACES,
+        dt_pinion_cam_spec.SET_SCREW_Z_PLACES,
+    ),
+    "screw major max": (
+        dt_pinion_lift_rod_spec.CAM_SET_SCREW_MAJOR_MAX,
+        dt_pinion_cam_spec.SET_SCREW_MAJOR_MAX_MM,
+    ),
+    "screw pitch": (
+        dt_pinion_lift_rod_spec.CAM_SET_SCREW_PITCH,
+        dt_pinion_cam_spec.SET_SCREW_PITCH_MM,
+    ),
+}
+_CAM_DRIFT = {
+    name: pair
+    for name, pair in _CAM_RESTATED.items()
+    if (
+        abs(pair[0] - pair[1]) > 1e-9
+        if isinstance(pair[0], float)
+        else pair[0] != pair[1]
+    )
+}
+if _CAM_DRIFT:
+    raise AssertionError(
+        f"dt_pinion_lift_rod_spec's restated MHA-DT-23 values drifted: {_CAM_DRIFT}"
+    )
 
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -88,7 +142,10 @@ SHEET_SCALE = (1.0, 1.0)
 # box (and its centre) span ROD_LEN + CAP_SAG.
 HALF_SPAN = (ROD_LEN + CAP_SAG) / 2000.0
 RIGHT_CENTER = (0.200, 0.215)
-ISO_CENTER = (0.135, 0.125)
+# Under VIEW B, left of the title block (the 1:2 pictorial spans ~0.072 x
+# 0.042).
+ISO_CENTER = (0.140, 0.088)
+ISO_NOTE_XY = (0.110, 0.060)
 DETAIL_CENTER = (0.335, 0.132)
 DETAIL_SCALE = (5, 1)
 DETAIL_RADIUS_MM = 7.0
@@ -96,6 +153,88 @@ DETAIL_RADIUS_MM = 7.0
 # and crowded the pin-hole callout (r7 slice3 eye-pass), so it goes in the
 # clear band between the circle (x <= 0.370) and the right border (0.419).
 DETAIL_LABEL_XY = (0.391, 0.150)
+
+# VIEW B: the named FLATS_VIEW, square to the set-screw flats' plane at 1:1
+# under the side view, flats up and the crown end left as on the side view.
+# Its sizes all sit above the rod: the lengths on the flats and the two
+# stations stacked over them off the crown rim.  The one across-flat size
+# sits off the crown end.
+#
+# Its viewing arrow (round-6 review #1).  VIEW B looks along the flats
+# (FLAT_NORMAL_LOCAL x Z), which is the side view's own line of sight turned
+# 180 - ROD_PHASE_DEG about the rod axis.  No arrow in the side view's plane
+# can name that direction: any such arrow would look along +-Y and see the
+# flats nearly face-on.  The end view from the flat front end (*Back, third
+# angle right of the side view, unlabelled, sheet x = model -X, y = +Y) holds
+# that line of sight in its plane, so it carries the B arrow parallel to the
+# flats.  The arrow comes from the eye's side and points at the rod's centre.
+# Projected straight along that arrow, the view would lay the flat end left
+# and the flats down.  VIEW B keeps the side view's crown-left, flats-up
+# reading, so it is turned 180 deg and says so.  It prints no clocking
+# angle: the cams are staked on the flats before the pin hole is
+# match-drilled, so the sheet does not control that angle.
+END_CENTER = (0.340, RIGHT_CENTER[1])
+VIEW_LETTER = "B"
+VIEW_LETTER_HEIGHT = 0.005  # draw_dt_cone_tip_block's arrow letters
+# The eye's direction from the rod in the end view's sheet axes: the
+# FLATS_VIEW toward-viewer row (-Z) x n = (n_y, -n_x, 0), mapped through
+# *Back's sheet x = -X.
+VIEW_B_EYE = (-FLAT_NORMAL_LOCAL[1], -FLAT_NORMAL_LOCAL[0])
+_ARROW_TIP_R = ROD_DIA * SHEET_SCALE[0] / 2000.0 + 0.0015
+_ARROW_LENGTH = 0.010
+VIEW_B_ARROW_TIP = (
+    END_CENTER[0] + VIEW_B_EYE[0] * _ARROW_TIP_R,
+    END_CENTER[1] + VIEW_B_EYE[1] * _ARROW_TIP_R,
+)
+VIEW_B_ARROW_TAIL = (
+    VIEW_B_ARROW_TIP[0] + VIEW_B_EYE[0] * _ARROW_LENGTH,
+    VIEW_B_ARROW_TIP[1] + VIEW_B_EYE[1] * _ARROW_LENGTH,
+)
+# The leader leaves the letter's left side at mid-height
+# (draw_dt_cone_tip_block VIEW_C_LEADER_DX), so the letter's upper-left sits
+# half a height above the tail.  The build reads the leader back and slides
+# the letter by any miss.
+VIEW_B_LETTER_XY = (
+    VIEW_B_ARROW_TAIL[0] + 0.0005,
+    VIEW_B_ARROW_TAIL[1] + VIEW_LETTER_HEIGHT / 2.0,
+)
+VIEW_ARROW_ANGLE_TOL_DEG = 1.0
+FLATS_CENTER = (0.190, 0.140)
+FLATS_LABEL = f"VIEW {VIEW_LETTER}\nROTATED 180°"
+FLATS_LABEL_XY = (0.178, 0.130)
+_FLATS_TOP = FLATS_CENTER[1] + ROD_DIA * SHEET_SCALE[0] / 2000.0
+
+
+def _flats_view_x(z_mm: float) -> float:
+    """Sheet x of the part station ``z_mm`` (from the flat front end) in VIEW B."""
+    return FLATS_CENTER[0] + HALF_SPAN - z_mm * SHEET_SCALE[0] / 1000.0
+
+
+_RIM_X = _flats_view_x(ROD_LEN)
+_BACK_FLAT_X = _flats_view_x(ROD_LEN - BACK_FLAT_EDGE_FROM_RIM)
+_FRONT_FLAT_X = _flats_view_x(ROD_LEN - FRONT_FLAT_EDGE_FROM_RIM)
+FLATS_KEEP = {
+    # Each length right of its short flat (which runs screen-right from its
+    # rim-side edge), clear of that edge's station witness.
+    "BackFlatLen": (_BACK_FLAT_X + BACK_FLAT_LEN / 1000.0 + 0.008, _FLATS_TOP + 0.009),
+    "FrontFlatLen": (_FRONT_FLAT_X + FRONT_FLAT_LEN / 1000.0 + 0.008, _FLATS_TOP + 0.009),
+    # The short station's bare value outside its 15 mm span, left of the
+    # crown, its right end ~8 mm short of the rim witness (round-6 review #4:
+    # the witness ran through the old "FROM CROWN RIM" words).
+    "BackFlatFromRim": (_RIM_X - 0.013, _FLATS_TOP + 0.017),
+    "FrontFlatFromRim": ((_RIM_X + _FRONT_FLAT_X) / 2.0, _FLATS_TOP + 0.023),
+    # Round-6 review #4: the 6 mm span is shorter than its text, so a text
+    # centred on the span was struck by its own dimension line and both
+    # witnesses.  The text (the value, then its two callout lines) stands
+    # below the lower witness (y ~0.137) on its own dimension line, which
+    # runs down to it ~11 mm left of the crown apex.  R7 review #1: the
+    # offset-text leader crossed the callout and ended in open space.  R8
+    # render: SolidWorks hangs the text LEFT of this x on a shelf, so its
+    # widest line (~41 mm, "FOR 2X MHA-DT-23") spans x ~0.038..0.080.  That
+    # leaves ~25 mm to the inner border (0.0127); the one ~80 mm line ran
+    # through the border (R8 review #0).
+    "AcrossFlat": (_RIM_X - 0.012, FLATS_CENTER[1] - 0.013),
+}
 
 # The rod's flank in the *Right view: the bearing finish leader drops onto it.
 ROD_FLANK_Y = RIGHT_CENTER[1] + ROD_DIA * SHEET_SCALE[0] / 2000.0
@@ -112,22 +251,28 @@ RIGHT_KEEP = {
     "CapR": (RIGHT_CENTER[0] - HALF_SPAN - 0.012, RIGHT_CENTER[1] + 0.024),
 }
 DETAIL_KEEP = {
-    # r7 eye-pass: above the detail the callout ran over the DETAIL A label
-    # and past the right border; the open field left of the detail fits it.
-    "PinHoleDia": (DETAIL_CENTER[0] - 0.090, DETAIL_CENTER[1] + 0.028),
+    # r7 eye-pass: the callout once ran over the DETAIL A label and past the
+    # right border; with the label right of the circle and VIEW B's stations
+    # in the field left of the detail, it sits above the circle (top y
+    # 0.167), right of the side view's front-end witness (x 0.2995).
+    "PinHoleDia": (DETAIL_CENTER[0] + 0.010, DETAIL_CENTER[1] + 0.051),
     # Below the fence (bottom y 0.0975) and OUTSIDE the witness lines (hole
     # axis 0.335, front end 0.355): between them the text was struck by both.
     "PinHoleZ": (DETAIL_CENTER[0] + 0.047, DETAIL_CENTER[1] - 0.045),
 }
+# The pin station is a location: it carries its value and band only, its
+# extension lines already running to the flat end (rule 7; fan-out screen
+# 20261107T081227004Z: "FROM FLAT END" under the .16).
 DIMENSION_CALLOUTS = {
     # Below the value: SolidWorks stores a multi-line ABOVE callout but prints
     # none of it (r2 layout audit text-unmatched; draw_dt_cone_gear_shaft).
     "RodDia": ROD_DIA_CALLOUT,
     # The match-drill and its mate only: MHA-DT-00 names the hole in its step.
     "PinHoleDia": PIN_HOLE_CALLOUT,
-    # The rod has one flat end and one crowned end; "front" named nothing on
-    # the sheet (machinist review r2).
-    "PinHoleZ": "FROM FLAT END",
+    # The one across-flat size names the cams it seats.  The stations (off
+    # the crown rim) and the pin station (off the flat end) carry no words:
+    # their extension lines land on that rim and that end (round-6 review #3).
+    "AcrossFlat": ACROSS_FLAT_CALLOUT,
 }
 
 
@@ -220,6 +365,55 @@ def _show_as_reference(
         set_reference_dimension(adapter, found[0], label=f"MHA-DT-17 {name}")
 
 
+def _view_b_arrow(adapter: Any, end: Any) -> None:
+    """VIEW B's lettered viewing arrow on the end view, parallel to the flats.
+
+    A letter note whose straight leader is the arrow (draw_dt_cone_tip_block:
+    the native projected-view arrow is not switchable through the API).  The
+    leader leaves the letter's near side, so the leader is read back and the
+    letter slid by any miss until the arrow lies along VIEW_B_EYE.
+    """
+    label = f"view {VIEW_LETTER} viewing arrow"
+    note = add_leader_note(
+        adapter,
+        VIEW_LETTER,
+        text_xy=VIEW_B_LETTER_XY,
+        attach_xy=VIEW_B_ARROW_TIP,
+        view=end,
+        label=label,
+        height=VIEW_LETTER_HEIGHT,
+    )
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    want = math.atan2(-VIEW_B_EYE[1], -VIEW_B_EYE[0])
+
+    def leader_start() -> tuple[float, float]:
+        points = [float(value) for value in annotation.GetLeaderPointsAtIndex(0) or ()]
+        if len(points) < 6 or math.dist((points[-3], points[-2]), VIEW_B_ARROW_TIP) > 0.001:
+            raise RuntimeError(f"{label} tip moved: leader {points}")
+        return points[0], points[1]
+
+    def miss_deg(start: tuple[float, float]) -> float:
+        got = math.atan2(VIEW_B_ARROW_TIP[1] - start[1], VIEW_B_ARROW_TIP[0] - start[0])
+        return abs(math.degrees((got - want + math.pi) % (2.0 * math.pi) - math.pi))
+
+    start = leader_start()
+    if miss_deg(start) > VIEW_ARROW_ANGLE_TOL_DEG:
+        x, y, z = (float(value) for value in annotation.GetPosition())
+        dx, dy = VIEW_B_ARROW_TAIL[0] - start[0], VIEW_B_ARROW_TAIL[1] - start[1]
+        if not annotation.SetPosition2(x + dx, y + dy, z):
+            raise RuntimeError(f"failed to align the {label}")
+        rebuild_drawing(adapter, label=f"align {label}")
+        start = leader_start()
+        if miss_deg(start) > VIEW_ARROW_ANGLE_TOL_DEG:
+            raise RuntimeError(
+                f"{label} is {miss_deg(start):.1f} deg off the flats: leader from {start}"
+            )
+    _telemetry.info(
+        f"{label}: leader {start[0]:.5f},{start[1]:.5f} -> "
+        f"{VIEW_B_ARROW_TIP[0]:.5f},{VIEW_B_ARROW_TIP[1]:.5f}"
+    )
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -264,8 +458,13 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(1, 1))
+    # Third-angle right of the side view, at its height: the flat front end.
+    end = place_view(adapter, str(SOURCE), "*Back", *END_CENTER, scale=(1, 1))
+    # The part's named view square to the flats' plane (build_dt_pinion_lift_rod
+    # _name_flats_view), placed like a standard one (draw_dt_cone_pivot_post).
+    flats = place_view(adapter, str(SOURCE), FLATS_VIEW, *FLATS_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
-    for view in (right, iso):
+    for view in (right, end, flats, iso):
         set_hidden_lines_removed(adapter, view)
 
     right_annotations = curate_view_dimensions(
@@ -284,7 +483,14 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="front-end detail",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    annotations = [*right_annotations, *detail_annotations]
+    flats_annotations = curate_view_dimensions(
+        adapter,
+        flats,
+        keep=FLATS_KEEP,
+        view_label="set-screw flats",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    annotations = [*right_annotations, *detail_annotations, *flats_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _show_as_reference(adapter, right_annotations, DRAWING_REFERENCE_DIMENSIONS)
@@ -305,8 +511,10 @@ async def build(adapter: Any) -> dict[str, str]:
         char_height=0.0025,  # the pivot-block size; the default read oversized
     )
 
-    # Under the 1:2 isometric (x 0.098-0.172, bottom y ~0.104).
-    add_property_linked_note(adapter, "Isometric View Note", 0.105, 0.097)
+    _view_b_arrow(adapter, end)
+    add_note(adapter, FLATS_LABEL, *FLATS_LABEL_XY)
+    # Under the 1:2 isometric (x ~0.104-0.176, bottom y ~0.067).
+    add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(
         adapter,

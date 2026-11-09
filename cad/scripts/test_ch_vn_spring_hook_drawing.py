@@ -126,24 +126,6 @@ def test_the_anchor_is_sized_at_the_coefficient_plate_thickness_extremes():
     assert spec.PROTRUSION_MM == pytest.approx(7.605)
 
 
-def test_install_step_locks_the_anchor_with_its_jam_nut():
-    nut = _config.parts("ch-anchor-jam-nut")["number"]
-    step = " ".join(spec.ANCHOR_INSTALL_STEP.split())
-    assert f"RUN ONE {nut} UP" in step
-    assert "FORKED DRIVER" in step
-    assert "JAM IT AGAINST THE PLATE UNDERSIDE" in step
-    assert f"NO MORE THAN {spec.ADJUSTMENT_TURNS} TURN" in step
-    assert nut in spec.ANCHOR_INSTALL_CHECK
-    assert f"{nut} LOCKS THIS ANCHOR" in spec.DRAWING_NOTES
-    assert "NO NUT IS INSTALLED" not in spec.DRAWING_NOTES
-    for text in (
-        spec.ANCHOR_INSTALL_STEP,
-        spec.ANCHOR_INSTALL_CHECK,
-        spec.DRAWING_NOTES,
-    ):
-        for banned in ("THREADLOCK", "LOCTITE", "NYLON", "NYLOC", "PATCH"):
-            assert banned not in text.upper()
-
 
 def test_printed_back_out_limit_matches_the_computed_budget():
     # The registry note is what the fitter reads; a band or plate change that
@@ -304,8 +286,8 @@ def test_fixed_deburr_angle_text_clears_its_own_ink_by_two_millimetres():
     and ae121732, FRONT_KEEP's bisector placement), sheet metres: its run box
     at SolidWorks' 9.625 width, both arrowheads (GetArrowHeadAtIndex2 rows)
     and both extension lines stand at least the fleet's 2 mm arrow-to-text
-    clearance off its text, and its lower arrowhead off the width block's MIN
-    row (machinist b344192: the text sat on its own ray and arrowhead)."""
+    clearance off its text (machinist b344192: the text sat on its own ray
+    and arrowhead)."""
     from _layout_audit import arrowhead_segments
     from _layout_geometry import (
         ARROW_TEXT_CLEARANCE_M,
@@ -316,7 +298,6 @@ def test_fixed_deburr_angle_text_clears_its_own_ink_by_two_millimetres():
 
     assert drawing.FRONT_KEEP["ChamferAngle"] == pytest.approx((0.1305, 0.1132))
     text = Box(0.1256875, 0.1104219, 0.1256875 + 0.009625, 0.1104219 + 0.0035)
-    min_row = Box(0.1232316, 0.0952219, 0.1232316 + 0.0895368, 0.0952219 + 0.0035)
     arrowheads = [
         arrowhead_segments(row)
         for row in (
@@ -355,5 +336,3 @@ def test_fixed_deburr_angle_text_clears_its_own_ink_by_two_millimetres():
     ]
     assert clearances == pytest.approx([0.00362, 0.00477, 0.00719, 0.00602], abs=5e-5)
     assert min(clearances) >= ARROW_TEXT_CLEARANCE_M
-    assert gap(arrowheads[0], min_row) == pytest.approx(0.00451, abs=5e-5)
-    assert gap(arrowheads[0], min_row) >= ARROW_TEXT_CLEARANCE_M

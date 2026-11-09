@@ -166,7 +166,7 @@ def test_one_number_two_members_the_second_plain_and_turned_over() -> None:
     assert "create_blank_drawing_sheets(adapter, SHEET_NAMES" in sheet
     assert "expected_sheet_names=SHEET_NAMES" in sheet
     assert "expected_redundant_notes=len(SHEET_NAMES)" in sheet
-    assert spec.BRACKET_CALLOUT_PROCESS.startswith("BAR 1 ONLY; NONE ON BAR 2\n")
+    assert drawing.BRACKET_CALLOUT_BELOW[-1] == "BAR 1 ONLY"
     for token in ('"LH"', '"RH"', "OPPOSITE HAND"):
         assert token not in sheet, token
 
@@ -191,7 +191,7 @@ def test_bar_2_sheet_dimensions_every_feature_it_keeps() -> None:
         "label=\"end bracket holes\""
     )
     assert member.count("add_native_hole_callout(") == 2
-    assert "if name in names" in member
+    assert "if name in printed" in member
 
 
 def test_each_member_exports_its_own_step_and_png() -> None:
@@ -267,12 +267,21 @@ def test_plan_uses_actual_rail_as_template_not_nominal_stations() -> None:
 
 
 def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
+    """Every marked dimension prints once, except rail stations 2-8: the
+    rail holes print as one pattern (rule 10), hole 1's station and the
+    pitch on the tap callout. The model still marks them until its next
+    re-key (spec ``DRAWING_DIMENSIONS``); the plan's import deletes them."""
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    assert set(drawing.FRONT_KEEP) | set(drawing.END_KEEP) == marked
+    pattern = spec.DRAWING_DIMENSIONS["RailHoles"] - {drawing.RAIL_STATION_PRINTED}
+    assert len(pattern) == len(spec.RAIL_HOLE_X) - 1
+    assert set(drawing.FRONT_KEEP) | set(drawing.END_KEEP) == marked - pattern
     assert not set(drawing.FRONT_KEEP) & set(drawing.END_KEEP)
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
     assert not hasattr(spec, "STOCK_DIMENSIONS")
-    assert set(drawing.CALLOUTS_BELOW) <= marked
+    # Rule 7: no location dimension carries words.
+    assert not hasattr(drawing, "CALLOUTS_BELOW")
+    sheet = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "set_dimension_callouts(" not in sheet
 
 
 def test_milled_width_is_accepted_within_the_xx_band() -> None:
@@ -303,7 +312,11 @@ def test_slot_run_is_centre_to_centre_with_centre_marks() -> None:
     assert drawing.FRONT_KEEP["SlotRun"][0] > drawing._RIGHT
 
 
-def test_rail_hole_stations_are_matched_references_that_name_the_mate() -> None:
+def test_rail_holes_print_as_one_matched_pattern_named_on_their_callout() -> None:
+    """Pre-screen 957501d1 (rule 10, rule 7): eight stacked stations counted
+    as eight hole axes, and the mate rode the last station. The pattern
+    prints hole 1's REF station and the pitch, and the tap callout names the
+    matched rail once with the pair's acceptance."""
     stations = {f"RailHole{k}X" for k in range(1, 9)}
     assert spec.DRAWING_DIMENSIONS["RailHoles"] == stations
     assert spec.RAIL_REFERENCE_DIMENSIONS == {
@@ -312,21 +325,90 @@ def test_rail_hole_stations_are_matched_references_that_name_the_mate() -> None:
     assert not any(feature == "RailHoles" for feature, _ in spec.METRIC_DIMENSIONS)
     assert all(spec.DRAWING_PRECISION_BY_NAME[name] == 3 for name in stations)
     assert all(x == round(x, 3) for x in spec.RAIL_HOLE_X)
-    rail_number = _config.parts("ch-rocker-arm-tl-vn-oblique-rail-kit")["number"]
-    assert drawing.CALLOUTS_BELOW["RailHole8X"] == spec.RAIL_MATE_CALLOUT
-    assert spec.RAIL_MATE_CALLOUT == (
-        f"MATCHES HGR15 RAIL {rail_number}; ALL 8 SCREWS START BY HAND"
+    assert stations & set(drawing.FRONT_KEEP) == {drawing.RAIL_STATION_PRINTED}
+    assert drawing.RAIL_STATION_PRINTED == "RailHole1X"
+    # One regular pattern: the printed pitch steps every station from hole 1.
+    assert drawing.RAIL_PITCH == pytest.approx(60.0)
+    assert drawing.RAIL_PITCH_TEXT == " ON (60.000 mm) PITCH"
+    assert spec.RAIL_HOLE_X == pytest.approx(
+        tuple(spec.RAIL_HOLE_X[0] + k * drawing.RAIL_PITCH for k in range(8))
     )
-    assert "RECEIVED" not in spec.RAIL_MATE_CALLOUT
-    assert "\n" not in spec.RAIL_MATE_CALLOUT
-    assert not (stations - {"RailHole8X"}) & set(drawing.CALLOUTS_BELOW)
-    # One line at about 2.6 mm a glyph, centred under the 435.00's text, stays
-    # between the end face's and hole 8's extension lines, the only lines in
-    # that gap.
-    half = len(spec.RAIL_MATE_CALLOUT) * 0.0026 / 2.0
-    centre = drawing.FRONT_KEEP["RailHole8X"][0]
-    assert centre - half >= drawing._LEFT + 0.002
-    assert centre + half <= drawing._sheet_x(drawing.FRONT_CENTER, spec.RAIL_HOLE_X[-1]) - 0.002
+    # The mate by the kit member and its full number (rule 4), with the
+    # matched pair's acceptance; two lines of words at most (rule 7), and no
+    # assembly instruction (rule 7's "ALL 8 SCREWS START BY HAND").
+    rail_number = _config.parts("ch-rocker-arm-tl-vn-oblique-rail-kit")["number"]
+    assert drawing.RAIL_TAP_CALLOUT_BELOW == (
+        f"MATCHES HGR15 RAIL OF {rail_number}",
+        "SCREWS ENTER FREE, NO FORCING",
+    )
+    text = " ".join(drawing.RAIL_TAP_CALLOUT_BELOW)
+    assert "START BY HAND" not in text and "RECEIVED" not in text
+    sheet = Path(drawing.__file__).read_text(encoding="utf-8")
+    member = sheet[sheet.index("def _draw_member_sheet") : sheet.index("async def build")]
+    assert member.index("_omit_tap_thread_class(tap_callout)") < member.index(
+        "_rewrite_hole_callout(tap_callout, rail_tap_callout_definitions"
+    )
+
+
+class _Callout:
+    """A native hole callout's four definitions (5..8), each written through
+    its writable twin (1..4) and read back with CR LF, as SolidWorks does."""
+
+    def __init__(self, definitions: dict[int, str], *, accepts: bool = True) -> None:
+        self.definitions = dict(definitions)
+        self.accepts = accepts
+
+    def IsHoleCallout(self) -> bool:
+        return True
+
+    def SetText(self, part: int, text: str) -> None:
+        assert 1 <= part <= 4
+        if self.accepts:
+            self.definitions[part + 4] = text
+
+    def GetText(self, part: int) -> str:
+        return self.definitions.get(part, "").replace("\n", "\r\n")
+
+
+_NATIVE_TAP = {
+    5: "<hw-threaddesc> <hw-thru>",
+    6: "",
+    7: "<NUM_INST>X <MOD-DIAM><hw-thrutapdrldia> <hw-thru>",
+    8: "",
+}
+
+
+def test_tap_callout_puts_the_pitch_on_the_count_row_and_the_mate_below() -> None:
+    callout = _Callout(_NATIVE_TAP)
+    drawing._rewrite_hole_callout(
+        callout, drawing.rail_tap_callout_definitions, label="rail screw taps"
+    )
+    assert callout.definitions == {
+        5: "<hw-threaddesc> <hw-thru>",
+        6: "",
+        7: "<NUM_INST>X <MOD-DIAM><hw-thrutapdrldia> <hw-thru> ON (60.000 mm) PITCH",
+        8: "\n".join(drawing.RAIL_TAP_CALLOUT_BELOW),
+    }
+    # The count row and the thread row in one definition: the pitch ends
+    # the count row, the thread row stays below it.
+    one = {**_NATIVE_TAP, 5: f"{_NATIVE_TAP[7]}\n{_NATIVE_TAP[5]}", 7: ""}
+    assert drawing.rail_tap_callout_definitions(one)[5] == (
+        f"{_NATIVE_TAP[7]} ON (60.000 mm) PITCH\n{_NATIVE_TAP[5]}"
+    )
+    for refused in (
+        {**_NATIVE_TAP, 8: "PRINTED BELOW"},
+        {**_NATIVE_TAP, 7: "<MOD-DIAM><hw-thrutapdrldia> <hw-thru>"},
+        {**_NATIVE_TAP, 5: "<NUM_INST>X <hw-threaddesc>"},
+        {5: "", 6: "", 7: _NATIVE_TAP[7]},
+    ):
+        with pytest.raises(RuntimeError):
+            drawing.rail_tap_callout_definitions(refused)
+    with pytest.raises(RuntimeError, match="did not persist"):
+        drawing._rewrite_hole_callout(
+            _Callout(_NATIVE_TAP, accepts=False),
+            drawing.rail_tap_callout_definitions,
+            label="rail screw taps",
+        )
 
 
 def test_rail_row_is_located_from_the_faced_low_side() -> None:
@@ -363,7 +445,7 @@ def test_side_lanes_clear_each_other_and_the_border() -> None:
     # line.
     assert row_x + drawing._RAIL_ROW_TEXT_HALF <= rise_x - 0.0025 + 1e-12
     assert row_x - drawing._RAIL_ROW_TEXT_HALF >= width_x + 0.002
-    # The row's three-line block sits inside its span, above the near rise's
+    # The row's one-line text sits inside its span, above the near rise's
     # upper extension line (the 49.4's text rides inside its own span) and
     # clear of the row's upper arrowhead (2026-10-30 machinist review: the
     # arrowhead struck "88.90"); the width's text rides above the row's
@@ -380,30 +462,56 @@ def test_side_lanes_clear_each_other_and_the_border() -> None:
     assert width_x - drawing._BAR_WIDTH_TEXT_HALF >= 0.0124 + 0.002
 
 
-def test_rail_row_names_what_it_buys() -> None:
-    """r3 blocker: the row's ±0.08 named no mate; c3-r7 dropped the band (the
-    slots set the bar's place, one DRO setting lines the holes up). The
-    callout keeps the reason, in the station stack's words."""
-    assert drawing.CALLOUTS_BELOW["RailRowY"] == spec.RAIL_ROW_CALLOUT
-    lines = spec.RAIL_ROW_CALLOUT.split("\n")
-    assert lines == ["HOLES IN LINE", "FOR HGR15 RAIL"]
-    assert "HGR15" in spec.RAIL_MATE_CALLOUT and "HGR15R" not in spec.RAIL_MATE_CALLOUT
-    widest = max(len(line) for line in lines)
-    # The lane is sized for the widest line as measured on the r4 sheet,
-    # about 2.6 mm a glyph (r1-r3 assumed 2.2 and the block overran).
-    assert 2 * drawing._RAIL_ROW_TEXT_HALF >= widest * 0.0026
+def test_rail_row_is_a_drawn_centreline_and_its_height_carries_no_words() -> None:
+    """Pre-screen 957501d1 (rules 7 and 26): "HOLES IN LINE / FOR HGR15
+    RAIL" sat on the 3.50 and no line joined the holes. One centre line runs
+    through all eight centres, past holes 1 and 8 and inside the bar's ends;
+    the 3.50 prints bare."""
+    start, end = drawing.RAIL_ROW_CENTRELINE
+    assert start[1] == end[1] == 0.0  # the row, which the 3.50 locates
+    assert start[0] < spec.RAIL_HOLE_X[0] and end[0] > spec.RAIL_HOLE_X[-1]
+    assert 0.0 < start[0] and end[0] < spec.BAR_LENGTH
+    # The overshoot reaches past a centre mark's arm (2.5 on the sheet).
+    assert drawing.RAIL_ROW_OVERSHOOT * drawing._S / 1000.0 > 0.0025
+    assert 2 * drawing._RAIL_ROW_TEXT_HALF >= len("3.50") * 0.0026
+    sheet = Path(drawing.__file__).read_text(encoding="utf-8")
+    member = sheet[sheet.index("def _draw_member_sheet") : sheet.index("async def build")]
+    assert member.index('_delete_dangling_center_marks(adapter, front, label="plan")') < (
+        member.index("_add_rail_row_centreline(adapter, front)")
+    )
+    assert "zone_lines.CENTER_LINE_STYLE" in sheet
     # The screw's nominal radial float is not a transfer-tool accuracy claim.
     assert spec.RAIL_SCREW_CLEARANCE > 0.0
 
 
-def test_tap_callout_has_clear_air_under_the_border() -> None:
-    """r3: the callout's first line touched the 267 mm border. Its two lines
-    span about 4.8 above and below the keep point."""
+def test_tap_callout_clears_the_border_and_the_seat_labels() -> None:
+    """r3: the callout's first line touched the 267 mm border. Its four lines
+    span about 10.5 above and below the keep point (r1 sheet); its widest is
+    the mate."""
     x, y = drawing.TAP_CALLOUT_XY
-    assert y + 0.0048 <= 0.267 - 0.004
-    # Clear of the station stack's outermost extension line (hole 8).
+    half_h = 0.0105
+    widest = max(
+        len(f"8X Ø.136 THRU ALL{drawing.RAIL_PITCH_TEXT}"),
+        *map(len, drawing.RAIL_TAP_CALLOUT_BELOW),
+    )
+    half_w = widest * 0.0026 / 2.0
+    assert y + half_h <= 0.267 - 0.004
+    assert x + half_w <= 0.4194 - 0.005
+    # Above the plan and its one station lane, and above both seat labels.
+    assert y - half_h >= drawing._above_line(0) + 0.008
+    label_top = max(
+        drawing.seat_label_xy(key, text)[1]
+        for labels in drawing.SEAT_LABELS.values()
+        for key, text in labels.items()
+    )
+    assert y - half_h >= label_top + 0.005
+    # The leader runs down to hole 8 left of the top seat's label.
     hole_8 = drawing._sheet_x(drawing.FRONT_CENTER, spec.RAIL_HOLE_X[-1])
-    assert x - 0.022 >= hole_8 + 0.010
+    left_label = min(
+        drawing.seat_label_xy("top_seat", text)[0]
+        for text in (drawing.RAIL_SEAT_LABEL, drawing.TABLE_SEAT_LABEL)
+    )
+    assert x - half_w <= hole_8 <= left_label - 0.010
 
 
 def test_short_span_texts_print_beside_their_spans() -> None:
@@ -498,49 +606,19 @@ def test_short_span_texts_print_beside_their_spans() -> None:
     assert rise_y < run_low
 
 
-def test_rail_hole_stack_has_clear_lanes_inside_the_sheet() -> None:
-    # c4-r8: with the plan centred at y 0.1725 the seven-lane stack's top
-    # block (400.00) printed about 0.4 under the 267 border; the kit rail's
-    # eighth lane (#2177) stands one stack lane higher, and the drop keeps 3
-    # or more.
-    r8_air, r8_centre_y = 0.0004, 0.1725
-    extra_lanes = len(spec.RAIL_HOLE_X) - 7
-    assert extra_lanes == 1
-    assert (
-        r8_air
-        + (r8_centre_y - drawing.FRONT_CENTER[1])
-        - extra_lanes * drawing.STACK_LANE
-        >= 0.003
-    )
-    count = len(spec.RAIL_HOLE_X)
-    lines = [drawing._above_line(k) for k in range(count)]
-    assert lines[0] - drawing._TOP >= 0.008
-    assert all(b - a >= 0.006 - 1e-12 for a, b in zip(lines, lines[1:]))
-    keeps = [drawing.FRONT_KEEP[f"RailHole{k}X"] for k in range(1, count + 1)]
-    assert [y for _x, y in keeps] == sorted(y for _x, y in keeps)
-    # The two-line top block (value + mate) stays under the 267 mm border.
-    assert keeps[-1][1] + 0.0046 <= 0.265
-    # A station text (15.00 ±0.08 mm, owner ruling 4's mm label) wider than
-    # its span with a gap each side stands left of the end face's extension
-    # line, above the width's upper extension line along the top edge and
-    # inside the left border: the 15 and the 75 (37.5 on the sheet). Every
-    # other one stands mid-span, clear of both its extension lines.
+def test_rail_station_prints_left_of_the_end_face_in_the_first_lane() -> None:
+    """Hole 1's REF station (owner ruling 4's mm label) is wider than its
+    span with a gap each side, so it stands left of the end face's extension
+    line, in the first lane above the top edge, inside the left border."""
+    x, y = drawing.FRONT_KEEP[drawing.RAIL_STATION_PRINTED]
     half = drawing._RAIL_HOLE_TEXT_HALF
-    left = [
-        name
-        for name, (x, _y) in zip(range(1, count + 1), keeps, strict=True)
-        if x < drawing._LEFT
-    ]
-    assert left == [1, 2]
-    for k, ((x, y), station) in enumerate(zip(keeps, spec.RAIL_HOLE_X), start=1):
-        if k in left:
-            assert x + half <= drawing._LEFT - 0.002
-            assert x - half >= 0.010 + 0.005
-            assert y - 0.00175 >= drawing._TOP + 0.002
-        else:
-            hole = drawing._sheet_x(drawing.FRONT_CENTER, station)
-            assert x - half >= drawing._LEFT + 0.002
-            assert x + half <= hole - 0.002
+    assert half >= len("(9.964 mm)") * 0.0026 / 2.0
+    assert spec.RAIL_HOLE_X[0] * drawing._S / 1000.0 < 2 * (half + drawing._TEXT_GAP)
+    assert drawing._above_line(0) - drawing._TOP >= 0.008
+    assert y == pytest.approx(drawing._above_line(0) + drawing.TEXT_DROP)
+    assert x + half <= drawing._LEFT - 0.002
+    assert x - half >= 0.010 + 0.005
+    assert y - 0.00175 >= drawing._TOP + 0.002
 
 
 def test_end_view_projects_on_the_plans_centreline() -> None:
@@ -695,10 +773,11 @@ def test_bracket_hole_float_bounds_the_lost_motion_on_reversal() -> None:
 
 
 def test_counterbore_three_places_hold_the_head_float_and_the_screw_reach() -> None:
-    """Machinist review 84d5991d45: ⌴ Ø.313 ↧ .189 at .XXX with no stated
-    function. Both sizes hold a load-path control, so they keep ±.005 and
-    the callout names each; the review's .31 at ±.01 breaks the head float,
-    and the depth bounds the reach TL-28's tip gap is taken on."""
+    """Machinist review 84d5991d45: ⌴ Ø.313 ↧ .189 at .XXX. Both sizes hold
+    a load-path control, so they keep ±.005; the review's .31 at ±.01 breaks
+    the head float, and the depth bounds the reach TL-28's tip gap is taken
+    on. The callout no longer narrates either (pre-screen 957501d1, rule 7:
+    design rationale)."""
     head = spec.BRACKET_SCREW_HEAD_DIA  # .270, ASME B18.3 max
     hole_max = spec.BRACKET_HOLE_DIA + drilled_oversize_mm(unit=spec.UNIT)
     travel = (hole_max - 0.1585 * 25.4) / 2.0  # the 3A screw's whole float
@@ -725,10 +804,9 @@ def test_counterbore_three_places_hold_the_head_float_and_the_screw_reach() -> N
     assert spec.BRACKET_CALLOUT_PRECISION["hw-cbdepth"] == (
         spec.BRACKET_CALLOUT_PRECISION["hw-cbdia"]
     )
-    # The callout names both functions, right above the counterbore's row.
-    lines = spec.BRACKET_CALLOUT_PROCESS.split("\n")
-    assert lines[-3:] == ["HEAD CLEAR AT FULL FLOAT", "DEPTH SETS SCREW REACH", ""]
     assert set(spec.BRACKET_CALLOUT_PRECISION.values()) == {3}
+    words = " ".join(drawing.BRACKET_CALLOUT_BELOW)
+    assert "FLOAT" not in words and "REACH" not in words
 
 
 def test_bracket_hole_walls_meet_rule_17() -> None:
@@ -782,7 +860,8 @@ def test_bracket_pattern_holds_the_tl28_float_and_names_it() -> None:
     """Rows and stations at exact millimetres with ±0.13 mm: the pair's
     spacing change at the printed limits stays inside the screw float the
     TL-28 pair leaves; the tight band names its mate, and the plan, looking
-    at the top, says the counterbores are on the far side and bar 2 has none."""
+    at the top, says the counterbores are on the far side and the holes are
+    bar 1's."""
     assert spec.bracket_pair_spacing_error(leadscrew.BASE_BAR_HOLES) == pytest.approx(
         0.261, abs=1e-3
     )
@@ -792,22 +871,53 @@ def test_bracket_pattern_holds_the_tl28_float_and_names_it() -> None:
         assert spec.DRAWING_PRECISION_BY_NAME[name] == 2
     for name in ("BracketRow1Y", "BracketRow2Y"):
         assert spec.DRAWING_PRECISION_BY_NAME[name] == spec.BRACKET_ROW_PLACES == 3
-    lines = spec.BRACKET_CALLOUT_PROCESS.split("\n")
-    assert lines == [
-        "BAR 1 ONLY; NONE ON BAR 2",
-        "MATCHES MHA-CH-06-TL-28",
-        "DRILL, C'BORE FAR SIDE",
-        "HEAD CLEAR AT FULL FLOAT",
-        "DEPTH SETS SCREW REACH",
-        "",
-    ]
+    # Two lines of words (rule 7): the mate, then the member.
+    assert drawing.BRACKET_CALLOUT_BELOW == ("MATCHES MHA-CH-06-TL-28", "BAR 1 ONLY")
     assert "MHA-CH-06-TL-28" == spec.BRACKET_MATE
     # Every Hole Wizard length prints .XXX (#290).
     assert set(spec.BRACKET_CALLOUT_PRECISION.values()) == {3}
     # Rule 12: the size and a process word, no screw in the place of a size;
     # plain physical facts, no rule or ruling words.
-    assert "SHCS" not in spec.BRACKET_CALLOUT_PROCESS
-    assert "RULING" not in spec.BRACKET_CALLOUT_PROCESS
+    words = " ".join(drawing.BRACKET_CALLOUT_BELOW)
+    assert "SHCS" not in words and "RULING" not in words and "C'BORE" not in words
+
+
+_NATIVE_CBORE = {
+    5: "<HOLE-CBORE><MOD-DIAM><hw-cbdia> <HOLE-DEPTH><hw-cbdepth>",
+    6: "",
+    7: "<NUM_INST>X <MOD-DIAM><hw-thruholedia> THRU ALL",
+    8: "",
+}
+
+
+def test_bracket_callout_reads_size_process_depth_far_side_then_two_lines() -> None:
+    """Pre-screen 957501d1 (rules 7 and 26): five lines of words, and the
+    counterbore written in words beside its symbol. The drill word follows
+    the size, FAR SIDE follows the counterbore's depth, and the mate and the
+    member stand below."""
+    callout = _Callout(_NATIVE_CBORE)
+    drawing._rewrite_hole_callout(
+        callout, drawing.bracket_callout_definitions, label="end bracket holes"
+    )
+    assert callout.definitions == {
+        5: "<HOLE-CBORE><MOD-DIAM><hw-cbdia> <HOLE-DEPTH><hw-cbdepth> FAR SIDE",
+        6: "",
+        7: "<NUM_INST>X <MOD-DIAM><hw-thruholedia> DRILL THRU ALL",
+        8: "MATCHES MHA-CH-06-TL-28\nBAR 1 ONLY",
+    }
+    for refused in (
+        {**_NATIVE_CBORE, 8: "PRINTED BELOW"},
+        {**_NATIVE_CBORE, 5: "<HOLE-CBORE><MOD-DIAM><hw-cbdia>"},
+        {**_NATIVE_CBORE, 7: "<NUM_INST>X <MOD-DIAM><hw-diam> THRU ALL"},
+    ):
+        with pytest.raises(RuntimeError):
+            drawing.bracket_callout_definitions(refused)
+    sheet = Path(drawing.__file__).read_text(encoding="utf-8")
+    member = sheet[sheet.index("def _draw_member_sheet") : sheet.index("async def build")]
+    assert "process=" not in member
+    assert member.index("bracket_callout_definitions") < member.index(
+        "set_hole_callout_precision("
+    )
 
 
 def test_bracket_dimensions_and_callout_lay_out_clear() -> None:
@@ -857,11 +967,16 @@ def test_bracket_dimensions_and_callout_lay_out_clear() -> None:
     )
     cx, cy = drawing.BRACKET_CALLOUT_XY
     # Five rows measured 0.025 tall under the 23-glyph "MATCHES
-    # MHA-CH-06-TL-28"; the counterbore's two function rows make seven, the
-    # widest "HEAD CLEAR AT FULL FLOAT" (24 glyphs).
-    rows = 2 + len(spec.BRACKET_CALLOUT_PROCESS.rstrip("\n").split("\n"))
-    assert rows == 7
-    widest = max(len(line) for line in spec.BRACKET_CALLOUT_PROCESS.split("\n"))
+    # MHA-CH-06-TL-28"; two native rows and two of words make four, the
+    # widest the 23-glyph "⌴ Ø.313 ↧ .189 FAR SIDE" and "4X Ø.189 DRILL THRU
+    # ALL" or the mate.
+    rows = 2 + len(drawing.BRACKET_CALLOUT_BELOW)
+    assert rows == 4
+    widest = max(
+        len("4X Ø.189 DRILL THRU ALL"),
+        len("⌴ Ø.313 ↧ .189 FAR SIDE"),
+        *map(len, drawing.BRACKET_CALLOUT_BELOW),
+    )
     half_w, half_h = 0.027 * max(widest, 23) / 23, 0.0125 * rows / 5
     land = (cx - half_w, cy)
     slope = (land[1] - hole[1]) / (land[0] - hole[0])
@@ -1137,14 +1252,13 @@ def test_base_bar_reference_text_is_owned_by_the_model() -> None:
 def test_notes_follow_the_simplicity_policy() -> None:
     assert not re.search(r"\d", spec.DRAWING_NOTES)
     assert "REFERENCE" not in spec.DRAWING_NOTES
-    assert not re.search(r"\d", spec.SEAT_FINISH_REASON)
 
 
 def test_both_faced_seats_carry_the_part_owned_seat_finish() -> None:
     """Owner ruling 2026-10-30: both large faces are static locating seats
     (rule 6, Ra 3.2), the table under one bar and the rail on the other, so
     the part owns both controls, authors them on the model and the sheet
-    places each from its control, under the one reason."""
+    places each from its control, each labelled with what it seats."""
     by_key = {control.key: control for control in spec.SURFACE_FINISHES}
     assert set(by_key) == {"top_seat", "underside_seat"}
     assert all(control.roughness_um == SEAT_UM for control in by_key.values())
@@ -1160,10 +1274,46 @@ def test_both_faced_seats_carry_the_part_owned_seat_finish() -> None:
     assert sheet.count("add_surface_finish(") == 1  # one loop over both seats
     assert "surface_finish_by_key(SURFACE_FINISHES, key)" in sheet
     assert "roughness_ra=" not in sheet
-    assert spec.SEAT_FINISH_REASON == "TABLE AND RAIL SEATS"
+    assert sheet.count("_add_view_note(") == 3  # the definition and two calls
+    assert "SEAT_LABELS[configuration][key]" in sheet
 
 
-def test_seat_symbols_stand_above_the_end_view_outboard_of_their_edges() -> None:
+def test_each_seat_names_its_own_mate_on_each_member() -> None:
+    """Pre-screen 957501d1 blocker: "TABLE AND RAIL SEATS" over both symbols
+    named the table by a generic noun and did not say which face seats
+    which. Each symbol carries its own label: the rail as the kit's member
+    by its same-parent number (rule 4); the mill table, which has no drawing
+    number (farm r1), as shop equipment under the declared RV-02. Bar 2 is
+    bar 1 turned over, so the roles swap."""
+    from machinist_exceptions import load_exceptions
+
+    rail_number = _config.parts("ch-rocker-arm-tl-vn-oblique-rail-kit")["number"]
+    own = _config.parts(spec.PART_NAME)["number"]
+    short = drawing.RAIL_SHORT_NUMBER
+    assert short == "TL-VN-83"
+    assert rail_number == own.rsplit("-TL-", 1)[0] + "-" + short
+    assert drawing.RAIL_SEAT_LABEL.split("\n") == ["SEATS", "RAIL OF", short]
+    table = " ".join(drawing.TABLE_SEAT_LABEL.split("\n"))
+    assert table == "SEATS ON PM-30MV MILL TABLE (SHOP EQUIPMENT)"
+    rail = drawing.RAIL_SEAT_LABEL
+    assert drawing.SEAT_LABELS == {
+        spec.BAR1: {"top_seat": rail, "underside_seat": drawing.TABLE_SEAT_LABEL},
+        spec.BAR2: {"top_seat": drawing.TABLE_SEAT_LABEL, "underside_seat": rail},
+    }
+    assert "TABLE AND RAIL" not in rail + table
+    declared = {
+        entry.id: entry for entry in load_exceptions(_config.CONFIG_DIR, STEM, "part")
+    }
+    assert set(declared) == {"RV-01", "RV-02"}
+    shop = declared["RV-02"]
+    assert shop.kind == "minor"
+    assert table.removeprefix("SEATS ON ") in shop.where
+    assert "Owner ruling 2026-11-08 (Pedro), #2144 item 1.3" in (
+        shop.reason
+    )
+
+
+def test_seat_symbols_and_labels_stand_above_the_end_view() -> None:
     top_x, top_y = drawing.TOP_SEAT_FINISH_XY
     under_x, under_y = drawing.UNDERSIDE_SEAT_FINISH_XY
     half_thick = spec.BAR_THICK * drawing._S / 2000.0
@@ -1172,13 +1322,33 @@ def test_seat_symbols_stand_above_the_end_view_outboard_of_their_edges() -> None
     assert under_x > drawing.END_CENTER[0] + half_thick
     end_top = drawing.END_CENTER[1] + drawing._HALF_W_SHEET
     assert min(top_y, under_y) > end_top
-    # Clear of the far rise's dimension line and under the reason, which
-    # stays under the tap callout's block and inside the right border.
+    # Clear of the far rise's dimension line and its text.
     assert top_x > drawing._RIGHT + drawing._FAR_RISE_LANE
-    reason_x, reason_y = drawing.SEAT_REASON_XY
-    assert reason_y - 0.0035 > max(top_y, under_y)
-    assert reason_y + 0.002 <= drawing.TAP_CALLOUT_XY[1] - 0.0048
-    assert reason_x + 2 * drawing._SEAT_REASON_HALF <= 0.4191 - 0.005
+    rise_text_top = drawing.FRONT_KEEP["FarSlotRise"][1] + 0.00175
+    symbol_top = top_y + drawing._SEAT_SYMBOL_TOP_UP
+    tap_foot = drawing.TAP_CALLOUT_XY[1] - 0.0105
+    hole_8 = drawing._sheet_x(drawing.FRONT_CENTER, spec.RAIL_HOLE_X[-1])
+    for text in (drawing.RAIL_SEAT_LABEL, drawing.TABLE_SEAT_LABEL):
+        width = drawing.seat_label_width(text)
+        height = drawing.seat_label_height(text)
+        assert width <= 0.0027 * 12 + 1e-12
+        # The top seat's label ends left of its symbol's V arm, level with
+        # the symbol, above the end view's top and the far rise's text, and
+        # right of the tap callout's leader to hole 8.
+        left_x, left_top = drawing.seat_label_xy("top_seat", text)
+        assert left_x + width <= top_x - 0.003
+        assert left_top - height < top_y < left_top
+        assert left_top - height > max(end_top, rise_text_top) + 0.002
+        assert left_x >= hole_8 + 0.020
+        # The underside's stands on its symbol from its V, inside the right
+        # border, under the tap callout's foot.
+        right_x, right_top = drawing.seat_label_xy("underside_seat", text)
+        assert under_x - 0.003 <= right_x <= under_x
+        assert right_x + width <= 0.4194 - 0.005
+        assert right_top - height >= symbol_top + 0.0015
+        assert right_top <= tap_foot - 0.005
+    with pytest.raises(KeyError):
+        drawing.seat_label_xy("side", drawing.RAIL_SEAT_LABEL)
 
 
 def test_isometric_is_in_the_hidden_lines_removed_loop() -> None:

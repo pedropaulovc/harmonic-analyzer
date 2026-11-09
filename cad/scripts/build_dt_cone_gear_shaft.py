@@ -128,9 +128,10 @@ MATERIAL = "Plain Carbon Steel"  # see _appearance.apply_material docstring
 # Every length knob and the dimensions it is the ONE owner of (the seat-side
 # gate proves it): SecEnd{i} owns land i's end plane and its depth, SecEnd0
 # the journal and the CollarFace plane, CollarWidth the collar's plane and
-# web (#914 option A: all of them but the journal and the overall length
-# measured from the collar face).  A flat's length is its land's, so it is
-# driven by the two knobs that bound the land, not owned by either.
+# web (rule 11, round 6: the journal and web run from the collar's thrust
+# face, the gear lands and the tip from its tip-side face, CollarEndPlane).
+# A flat's length is its land's, so it is driven by the knobs that bound the
+# land, not owned by either.
 STATION_OWNERS: tuple[tuple[str, float, tuple[str, ...]], ...] = (
     (
         "SecEnd0",
@@ -171,9 +172,10 @@ async def build(adapter) -> dict[str, str]:
     # markable manufacturing dimensions for the drawing. A land sketched on its
     # own offset plane has that plane's offset driven by the same SecEnd{i}, so
     # the knob moves the shoulder and the depth back to its origin together.
-    # Option A (#914): the collar's thrust face is the one length origin, so
-    # SecEnd1..3 are shoulder stations FROM the collar face; SecEnd0 is the
-    # journal (front stub to collar face) and SecEnd4 is collar face to tip.
+    # Rule 11 (round 6): two origins, one per chucking.  SecEnd0 is the
+    # journal (front stub to the collar's thrust face) and CollarWidth the web;
+    # SecEnd1..3 are shoulder stations and SecEnd4 the tip FROM the collar's
+    # tip-side face.
     for i, (dia_in, _end_z) in enumerate(SECTIONS):
         await set_global(adapter, f"SecDia{i}", f"{dia_in * IN}mm")
         await set_global(adapter, f"SecEnd{i}", f"{SECTION_KNOBS[i]}mm")
@@ -184,11 +186,11 @@ async def build(adapter) -> dict[str, str]:
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # The collar's south face -- the thrust face the post bears on and the
-    # drawing's one length origin -- as a named plane, placed from the front
-    # face by the journal and owned like the journal by SecEnd0.  The drive
-    # train seats on it by name: a point pick there is ambiguous (the post
-    # face lies under it).
+    # The collar's south face -- the thrust face the post bears on, the
+    # journal-side origin -- as a named plane, placed from the front face by
+    # the journal and owned like the journal by SecEnd0.  The drive train
+    # seats on it by name: a point pick there is ambiguous (the post face lies
+    # under it).
     check(
         "create_plane CollarFace",
         await adapter.create_plane(
@@ -200,16 +202,35 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "CollarFace")
     face_dim = name_dimensions(adapter, "CollarFace", ["CollarFaceStation"])
     drive_jobs += [(face_dim[0], '"SecEnd0"')]
+    # The collar's north face, the tip-side origin the gear lands and the tip
+    # are measured from, one web on from the thrust face and owned by
+    # CollarWidth.  The drive train seats the 64T on it by name.
+    check(
+        "create_plane CollarEndPlane",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset", base_plane="CollarFace", offset=COLLAR_THICKNESS
+            )
+        ),
+    )
+    name_last_feature(adapter, "CollarEndPlane")
+    plane_dim = name_dimensions(adapter, "CollarEndPlane", ["CollarStation"])
+    drive_jobs += [(plane_dim[0], '"CollarWidth"')]
 
     volume = 0.0
     prev_end = 0.0
     for i, (dia_in, end_z) in enumerate(SECTIONS):
         label = f"section d{dia_in:g}in to z={end_z:g}"
         knob = SECTION_KNOBS[i]
+        if i == 1:
+            # The collar joins the journal before the gear lands start at its
+            # tip-side face, so the body stays one solid.
+            volume = await _add_collar(adapter, drive_jobs, volume)
+            prev_end = COLLAR_END_STATION
         # Each land is a cylinder from its origin (the large-end face, or the
-        # collar face for the gear-seat lands) to its own end station, so
-        # every smaller land is contained in its larger neighbour and the
-        # running volume stays exact per section.
+        # collar's tip-side face for the gear-seat lands) to its own end
+        # station, so every smaller land is contained in its larger neighbour
+        # and the running volume stays exact per section.
         #
         # WHERE the profile circle sits is a drawing decision: a diameter
         # dimension can only be dragged into the side view at the station its
@@ -272,51 +293,6 @@ async def build(adapter) -> dict[str, str]:
         adapter, tuple((f"Sec{i}EndPlane", "PLANE") for i in range(1, len(SECTIONS)))
     )
 
-    # Thrust collar (#914): the ring from the collar face to the 64T, the one
-    # land that is not contained in its neighbour, so it is sketched on a
-    # plane one web north of the collar face and extruded back onto it.
-    # CollarWidth drives both, so the knob moves the collar rather than only a
-    # depth.
-    label = f"collar d{COLLAR_DIA:g}mm to z={COLLAR_END_STATION:g}"
-    check(
-        f"create_plane end of {label}",
-        await adapter.create_plane(
-            CreatePlaneParameters(
-                mode="offset", base_plane="CollarFace", offset=COLLAR_THICKNESS
-            )
-        ),
-    )
-    name_last_feature(adapter, "CollarEndPlane")
-    plane_dim = name_dimensions(adapter, "CollarEndPlane", ["CollarStation"])
-    drive_jobs += [(plane_dim[0], '"CollarWidth"')]
-    collar = SketchDims()
-    check(f"create_sketch {label}", await adapter.create_sketch("CollarEndPlane"))
-    await define_circle(
-        adapter,
-        0.0,
-        0.0,
-        COLLAR_DIA / 2.0,
-        label,
-        dims=collar,
-        names=("CollarCx", "CollarCz", "CollarDia"),
-        drives=(None, None, '"CollarDia"'),
-    )
-    await ensure_fully_defined(adapter, f"{label} sketch")
-    check(f"exit_sketch {label}", await adapter.exit_sketch())
-    name_last_feature(adapter, "CollarProfile")
-    drive_jobs += collar.apply(adapter, "CollarProfile")
-    check(
-        f"extrude {label}",
-        await adapter.create_extrusion(
-            ExtrusionParameters(depth=COLLAR_THICKNESS, reverse_direction=True)
-        ),
-    )
-    name_last_feature(adapter, "Collar")
-    width_dim = name_dimensions(adapter, "Collar", ["CollarWidth"])
-    drive_jobs += [(width_dim[0], '"CollarWidth"')]
-    land_dia = SECTIONS[1][0] * IN
-    volume += math.pi / 4.0 * (COLLAR_DIA**2 - land_dia**2) * COLLAR_THICKNESS
-    await volume_check(adapter, label, volume, 0.005 * volume)
     # The collar's two planes stay as named mate references (the drive train
     # seats the post's boss face on CollarFace and the 64T on CollarEndPlane,
     # both by name), so they are hidden, not removed: shown, they would render
@@ -446,10 +422,55 @@ def _flat_start_station(land: int) -> float:
 
 
 def flat_length_expression(land: int) -> str:
-    """The flat length's equation: the land's own length, from the two knobs
-    that bound it (the gear-seat knobs are measured from the collar face)."""
-    start = '"CollarWidth"' if land == 1 else f'"SecEnd{land - 1}"'
-    return f'"SecEnd{land}" - {start}'
+    """The flat length's equation: the land's own length, from the knobs that
+    bound it (the gear-seat knobs are measured from the collar's tip-side
+    face, where land 1's flat starts)."""
+    if land == 1:
+        return '"SecEnd1"'
+    return f'"SecEnd{land}" - "SecEnd{land - 1}"'
+
+
+async def _add_collar(
+    adapter: Any, drive_jobs: list[tuple[str, str]], volume: float
+) -> float:
+    """The thrust collar (#914): the full Ø5/8 disc from CollarEndPlane back
+    onto the collar face, joined to the journal; returns the running volume.
+
+    Built before the gear lands, which start at its tip-side face, so nothing
+    else lies inside it.  CollarWidth drives the plane (above) and the depth,
+    so the knob moves the collar rather than only a depth.
+    """
+    from solidworks_mcp.adapters.base import ExtrusionParameters
+
+    label = f"collar d{COLLAR_DIA:g}mm to z={COLLAR_END_STATION:g}"
+    collar = SketchDims()
+    check(f"create_sketch {label}", await adapter.create_sketch("CollarEndPlane"))
+    await define_circle(
+        adapter,
+        0.0,
+        0.0,
+        COLLAR_DIA / 2.0,
+        label,
+        dims=collar,
+        names=("CollarCx", "CollarCz", "CollarDia"),
+        drives=(None, None, '"CollarDia"'),
+    )
+    await ensure_fully_defined(adapter, f"{label} sketch")
+    check(f"exit_sketch {label}", await adapter.exit_sketch())
+    name_last_feature(adapter, "CollarProfile")
+    drive_jobs += collar.apply(adapter, "CollarProfile")
+    check(
+        f"extrude {label}",
+        await adapter.create_extrusion(
+            ExtrusionParameters(depth=COLLAR_THICKNESS, reverse_direction=True)
+        ),
+    )
+    name_last_feature(adapter, "Collar")
+    width_dim = name_dimensions(adapter, "Collar", ["CollarWidth"])
+    drive_jobs += [(width_dim[0], '"CollarWidth"')]
+    volume += math.pi / 4.0 * COLLAR_DIA**2 * COLLAR_THICKNESS
+    await volume_check(adapter, label, volume, 0.005 * volume)
+    return volume
 
 
 def flat_segment_area(land: int) -> float:

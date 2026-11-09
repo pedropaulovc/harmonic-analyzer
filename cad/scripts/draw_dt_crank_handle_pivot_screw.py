@@ -29,6 +29,7 @@ from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     dimension_name,
     place_view,
@@ -64,27 +65,30 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
+from dt_crank_handle_pivot_screw_notes import (
+    HEAD_DIA_CALLOUT,
+    HEAD_LENGTH_CALLOUT,
+    RELIEF_LEAD_CALLOUT,
+    SHOULDER_FIT_CALLOUT,
+    SHOULDER_LENGTH_CALLOUT,
+    SHOULDER_LENGTH_NOTE,
+    THREAD_NOTE,
+)
 from dt_crank_handle_pivot_screw_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     HEAD_DIA,
-    HEAD_DIA_CALLOUT,
     HEAD_LENGTH,
-    HEAD_LENGTH_CALLOUT,
     OVERALL_LENGTH,
     REFERENCE_DIMENSIONS,
     RELIEF_CALLOUT,
     RELIEF_DIA,
     RELIEF_END_STATION,
     RELIEF_LEAD,
-    RELIEF_LEAD_CALLOUT,
     SEAT_EDGE_NOTE,
     SEAT_STATION,
     SHOULDER_DIA,
-    SHOULDER_FIT_CALLOUT,
-    SHOULDER_LENGTH_CALLOUT,
     SURFACE_FINISHES,
-    THREAD_CALLOUT,
     THREAD_MODEL_DIA,
     THREAD_SIZE,
     TIP_CHAMFER,
@@ -167,8 +171,11 @@ SIDE_KEEP = {
     "OverallLength": ((TIP_X + HEAD_FACE_X) / 2.0, _ROW_Y[2]),
     # Diameters on the side view (drawing-guidelines.md rule 11 (turned parts read like the lathe)).  The shoulder's dimension line
     # crosses the shoulder right of the relief Ø's callout below it; the
-    # head's stands clear of the head face, left of the end view.
-    "ShoulderDia": (SEAT_X + 0.075, SIDE_CENTER[1] + 0.030),
+    # head's stands clear of the head face, left of the end view.  Fan-out
+    # r1 (57234c1d71): at + 0.075 the 59-mm RUNNING FIT callout ended 3.6 mm
+    # under the Ra 63 leader, so the line stands 3 mm right of the relief
+    # callout's 46-mm block and the callout wraps at its 21-character row.
+    "ShoulderDia": (SEAT_X + 0.062, SIDE_CENTER[1] + 0.030),
     # Above the head, so the callout under the value stands clear of its
     # extension lines and of the slot depth's text left of it.
     "HeadDia": (HEAD_FACE_X + 0.014, SIDE_CENTER[1] + 0.032),
@@ -308,6 +315,11 @@ SEAT_EDGE_NOTE_XY = (SEAT_X + 0.024, SIDE_CENTER[1] + 0.060)
 # review of f166646c4), beside detail A's fence.
 _ARROWS_INSIDE = 0  # swDimArrowsSide_e.swDimArrowsInside
 ISO_NOTE_XY = (0.352, 0.200)
+# Numbered note 1's upper-left corner: right of the head length's callout
+# (text ends near x 0.305), under the end view (bottom near y 0.158) and
+# above the title block; its widest line (~36 characters at ~2.7 mm) ends
+# short of the right border (0.4191).
+NOTES_XY = (0.315, 0.145)
 
 
 def _set_relief_arrows_inside(adapter: Any, annotations: list[Any]) -> None:
@@ -558,7 +570,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_attached_note(
         adapter,
         side,
-        text=THREAD_CALLOUT,
+        text=THREAD_NOTE,
         entity_xy=THREAD_PICK,
         note_xy=THREAD_NOTE_XY,
         label="MHA-DT-32 thread callout",
@@ -584,6 +596,8 @@ async def build(adapter: Any) -> dict[str, str]:
         char_height=0.0025,
     )
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
+    if add_note(adapter, SHOULDER_LENGTH_NOTE, *NOTES_XY) is None:
+        raise RuntimeError("failed to add the pivot screw's numbered note")
 
     return await finalize_drawing(
         adapter,

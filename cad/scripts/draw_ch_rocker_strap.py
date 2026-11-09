@@ -4,19 +4,19 @@ Under ``cad/docs/drawing-guidelines.md``, in decimal inch (the part's
 ``drawing_unit: in``): the flat strap of the built-up rocker arm MHA-CH-06
 (``ch_rocker_strap_spec``), every size a native model dimension of its one
 profile sketch, located from the Ø.4000 hub hole's centre (rule 10): the top
-edge's height over the hole with the MHA-CH-06 band and mate, the R31.5 top
-edge (its centre, ~32 in off the sheet, stated on it as above the hole), the
-bottom edge's depth under the hole, both tip corners' and both taper feet's
+edge's height over the hole and the bottom edge's depth under it, both on the
+hole's vertical centreline (its centre mark's extended arms), which is the
+part's symmetry axis and so carries both arcs' centres (~32 in off the
+sheet); each arc's own radius; both tip corners' and both taper feet's
 offsets, and the 2X radial tip land; the parenthesised overall length across
 the tip corners ties the two offsets together (rule 10: the overall size is
 conspicuous). The hole's press band names the MHA-CH-12 hub and the fit
 (rule 4) and keeps both its edges sharp (the title block's break would groove
-the pressed root); the thickness,
-on the end view, names the rod fork it runs in. One property-linked note names
-the joint the finish field's "after joining" refers to. No datums, no frames,
-no roughness symbol (rule 6: a pressed bore carries none). The decimal places
-and bands are the PART's (``ch_rocker_strap_notes.DRAWING_PRECISION``); this
-script only reads them back off the sheet.
+the pressed root); the thickness, on the end view, names the rod fork it
+runs in. No notes, no datums, no frames, no roughness symbol (rule 6: a
+pressed bore carries none). The decimal places and bands are the PART's
+(``ch_rocker_strap_notes.DRAWING_PRECISION``); this script only reads them
+back off the sheet.
 
 Run with SolidWorks open::
 
@@ -26,6 +26,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -56,18 +57,24 @@ from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _part_properties import part_drawing_unit
 from _session import run_build
+from ch_rocker_arm_spec import _ALPHA_TOP
 from ch_rocker_strap_notes import (
     DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    TIP_LAND_ANGLE_PREFIX,
 )
 from ch_rocker_strap_spec import (
     ARM_THICKNESS,
     BOT_END_X,
+    BOTTOM_EDGE_BELOW_PIVOT,
     DRAWING_REFERENCE_PRECISION,
+    HOLE_DIA,
     PIVOT_MID_Y,
     ROD_TIP_X,
     ROD_TIP_Y,
+    TOP_EDGE_ABOVE_PIVOT,
+    TOP_END_X,
     TOP_END_Y,
 )
 
@@ -100,7 +107,6 @@ FRONT_CENTER = (0.185, 0.185)
 RIGHT_CENTER = (0.385, FRONT_CENTER[1])  # projected: same row as the front
 ISO_CENTER = (0.135, 0.082)
 ISO_CAPTION_XY = (0.105, 0.052)  # centred under the pictorial's low end
-NOTES_XY = (0.020, 0.040)
 
 
 def _front(x_mm: float, y_mm: float) -> tuple[float, float]:
@@ -115,17 +121,17 @@ def _front(x_mm: float, y_mm: float) -> tuple[float, float]:
 _HOLE = _front(0.0, PIVOT_MID_Y)
 # The tip corners' offsets on one dimension line above the strap, the taper
 # feet's on one below it, each pair meeting on the hole centre's extension
-# line. Between the strap and the lower line: the R800's text (far left,
+# line. Between the strap and the lower line: the R31.5's text (far left,
 # below both arcs, so its leader stays outside its circle --
 # draw_ch_rocker_arm _dress_arc_radii), the bottom edge's depth under the
-# hole and the hole's callout (right, its leader short). The top edge's
-# height reads left of the hole, under the upper line. A vertical dimension's
-# text stands LEFT of its dimension line, ending at the requested x (r3: the
-# depth's ~55 mm rows ran x 0.093..0.147 over the R800 at x 0.100), so the
-# depth's line sits 12 mm left of the hole (rows ~0.118..0.173) and the R800
-# block (centred on its x, ~47 mm wide with its CENTRE ABOVE HOLE row) moves
-# to x 0.090, right of the left foot's extension line at x 0.052, raised so
-# its leader up to the top arc clears those rows (top ~0.171).
+# hole, the hole's callout (right, its leader short) and the R32.1's text
+# right of that callout, short of the end view's thickness block. The top
+# edge's height reads left of the hole, under the upper line. A vertical
+# dimension's text stands LEFT of its dimension line, ending at the requested
+# x (r3: the depth's ~55 mm rows ran x 0.093..0.147 over the R31.5 at x
+# 0.100), so the depth's line sits 12 mm left of the hole and the R31.5
+# moves to x 0.090, right of the left foot's extension line at x 0.052,
+# raised so its leader up to the top arc clears those rows.
 TIP_LINE_Y = 0.232
 FOOT_LINE_Y = 0.125
 # The overall length (ENFORCE r3: only the two 146.25 offsets gave it) on its
@@ -138,6 +144,7 @@ FRONT_KEEP = {
     "BottomTailX": (FRONT_CENTER[0] - BOT_END_X / 2000.0, FOOT_LINE_Y),
     "BottomRodX": (FRONT_CENTER[0] + BOT_END_X / 2000.0, FOOT_LINE_Y),
     "TopRadius": (FRONT_CENTER[0] - 0.095, 0.166),
+    "BottomRadius": (FRONT_CENTER[0] + 0.115, 0.166),
     "BottomBelowPivot": (_HOLE[0] - 0.012, 0.160),
     # The callout's rows stack UP from the requested y: with its sharp-edge
     # row at 0.160 (strap-sharp-r1) the +0.018 limit sat on the strap's bottom
@@ -148,19 +155,68 @@ FRONT_KEEP = {
     # The land's two extension lines run ~5.6 mm apart, rising ~10 deg to the
     # right (perpendicular to the radial land); the upper one passes y ~0.206
     # at x 0.365. Between them (r1, r2) a line struck the text, so it stands
-    # above both, the dimension line carried up to it, high enough (r3 -> r4)
-    # that its RADIAL row below the value clears that line too.
+    # above both, the dimension line carried up to it.
     "RodTipLen": (_front(ROD_TIP_X, 0.0)[0] + 0.031, 0.226),
+    # The land's angle from vertical (r4: "RADIAL" named a centre the sheet
+    # does not show). Inside the 10.5 deg wedge (25 mm down its bisector, r5)
+    # the ~18 mm text was struck by its own arc and extension line, so it
+    # stands right of the land's extension line at the same 25 mm radius,
+    # 2 mm clear of it, the arc carried out (detail E on MHA-CH-06): above the
+    # thickness callout (y < 0.159), left of the end view.
+    "TipLandAngle": (
+        _front(TOP_END_X, TOP_END_Y)[0] + 0.025 * math.sin(_ALPHA_TOP) + 0.002 + 0.009,
+        _front(TOP_END_X, TOP_END_Y)[1] - 0.025 * math.cos(_ALPHA_TOP),
+    ),
 }
 # The 2.5 mm end view is narrower than its four-row callout: centred over it
 # (r1) both extension lines ran through the text, so the text stands below
 # the view, left of its left extension line, the dimension line carried out.
 RIGHT_KEEP = {"StrapThickness": (RIGHT_CENTER[0] - 0.027, 0.150)}
-ARC_RADIUS_NAMES = ("TopRadius",)
+ARC_RADIUS_NAMES = ("TopRadius", "BottomRadius")
+# The hub hole's template centre mark, its vertical arms extended past both
+# edges: the drawn centreline the edges' heights stand on, the part's
+# symmetry axis and so the line both arcs' centres lie on (rule 26: a
+# location is a dimension or a drawn line, never "CENTRE ABOVE HOLE").
+# Extended lengths run from the hole's rim, in sheet metres (the view is
+# 1:1); swCenterMarkHandle_e Up 0, Left 1, Down 2, Right 3.
+CENTRE_LINE_OVERRUN_MM = 3.0
+CENTRE_MARK_ARMS_MM = {
+    0: TOP_EDGE_ABOVE_PIVOT - HOLE_DIA / 2.0 + CENTRE_LINE_OVERRUN_MM,
+    1: CENTRE_LINE_OVERRUN_MM,
+    2: BOTTOM_EDGE_BELOW_PIVOT - HOLE_DIA / 2.0 + CENTRE_LINE_OVERRUN_MM,
+    3: CENTRE_LINE_OVERRUN_MM,
+}
+
+
+@_telemetry.traced("drawing.strap_hole_centreline")
+def _extend_hole_centreline(front: Any) -> None:
+    """Extend the template's one centre mark (the hub hole's) per
+    CENTRE_MARK_ARMS_MM (draw_dt_cone_gear_tl_index_plate._centre_mark_bore)."""
+    view = _early_bound(front, "IView")
+    raw = view.GetFirstCenterMark2()
+    if raw is None:
+        raise RuntimeError("the strap front view has no hub-hole centre mark")
+    mark = _early_bound(raw, "ICenterMark")
+    if mark.GetNext() is not None:
+        raise RuntimeError("the strap front view carries more than one centre mark")
+    mark.UseDocDisplaySettings = False
+    mark.ShowLines = True
+    for handle, arm_mm in CENTRE_MARK_ARMS_MM.items():
+        if not mark.SetExtendedLength(0, handle, arm_mm / 1000.0):
+            raise RuntimeError(f"hub-hole centre mark arm {handle} did not extend")
+    if bool(mark.UseDocDisplaySettings) or not bool(mark.ShowLines):
+        raise RuntimeError("hub-hole centre mark lost its extended lines")
+    _telemetry.success(
+        "hub-hole centre mark arms: "
+        + ", ".join(
+            f"{float(mark.GetExtendedLength(0, handle)):.4f}"
+            for handle in CENTRE_MARK_ARMS_MM
+        )
+    )
 
 
 def _exterior_radius_leaders(adapter: Any, annotations: list[Any]) -> None:
-    """Exterior leader on the top radius (draw_ch_rocker_arm._dress_arc_radii):
+    """Exterior leader on each radius (draw_ch_rocker_arm._dress_arc_radii):
     the ~32 in centre is off the sheet, so no centre-directed leader."""
     remaining = set(ARC_RADIUS_NAMES)
     for annotation in annotations:
@@ -182,6 +238,30 @@ def _exterior_radius_leaders(adapter: Any, annotations: list[Any]) -> None:
         remaining.remove(name)
     if remaining:
         raise RuntimeError(f"strap radius dimensions missing: {sorted(remaining)}")
+
+
+def _dress_tip_land_angle(adapter: Any, annotations: list[Any]) -> None:
+    """The imported land angle still measures the real radial land from
+    vertical (draw_ch_rocker_arm._dress_detail_dimensions) and counts both
+    ends."""
+    for annotation in annotations:
+        if dimension_name(adapter, annotation) != "TipLandAngle":
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        model_dimension = _early_bound(display.GetDimension2(0), "IDimension")
+        actual = None if model_dimension is None else model_dimension.SystemValue
+        if (
+            int(display.Type2) != 3  # swAngularDimension
+            or type(actual) not in (int, float)
+            or not math.isfinite(actual)
+            or not math.isclose(abs(actual), _ALPHA_TOP, abs_tol=1e-8)
+        ):
+            raise RuntimeError("tip-land angle lost its native radial-land measurement")
+        display.SetText(1, TIP_LAND_ANGLE_PREFIX)
+        if str(display.GetText(1) or "") != TIP_LAND_ANGLE_PREFIX:
+            raise RuntimeError("tip land angle lost its 2X count")
+        return
+    raise RuntimeError("strap tip land angle dimension missing")
 
 
 @_telemetry.traced("drawing.strap_overall_length")
@@ -254,7 +334,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
         ),
         required=(
@@ -262,7 +341,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
         ),
     )
@@ -310,12 +388,14 @@ async def build(adapter: Any) -> dict[str, str]:
     annotations = [*front_annotations, *right_annotations]
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _exterior_radius_leaders(adapter, front_annotations)
+    _dress_tip_land_angle(adapter, front_annotations)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     _add_overall_length(adapter, front)
     # The template centre-marks the hub hole as the view is placed
-    # (draw_mg_wheel_drum: a second AutoInsertCenterMarks2 printed a duplicate).
+    # (draw_mg_wheel_drum: a second AutoInsertCenterMarks2 printed a
+    # duplicate); its vertical arms become the drawn centreline.
+    _extend_hole_centreline(front)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_CAPTION_XY)
-    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
 
     return await finalize_drawing(
         adapter,

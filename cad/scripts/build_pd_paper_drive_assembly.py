@@ -752,9 +752,7 @@ _FLANGE_AT_RIM = (
     * DISC_HUB.FLANGE_FACE_PERPENDICULARITY
     / DISC_HUB.FLANGE_FACE_PERPENDICULARITY_ZONE_DIA
 )
-_DISC_REAR_PARALLELISM = float(
-    DISC_SPEC.GEOMETRIC_TOLERANCES_MM["disc rear face parallelism to front"]
-)
+_DISC_REAR_PARALLELISM = DISC_SPEC.REAR_FACE_PARALLELISM_BOUND_MM
 DISC_MOUNT_WOBBLE = (
     DISC_HUB_ROCK_AT_RIM
     + _STEP_AT_RIM
@@ -2450,7 +2448,7 @@ async def _author_knob_setting_reference(adapter) -> None:
     # associative model dimension, never a note (#1388).
     set_dimension_bilateral_tolerance(
         adapter, spec.FEATURE, spec.CENTRE_DIMENSION, *KNOB_SETTING.CENTRE_TOLERANCE_MM,
-        places=spec.PLACES, display_unit=assembly_contract(ASM_NAME).drawing_unit,
+        places=spec.TOLERANCE_PLACES, display_unit=assembly_contract(ASM_NAME).drawing_unit,
     )
     for name in sorted(spec.REFERENCE_DIMENSIONS):
         # A reference value through the native prefix/suffix channel (the

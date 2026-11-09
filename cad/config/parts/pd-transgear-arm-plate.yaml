@@ -17,7 +17,8 @@ pd-transgear-arm-plate:
     through the plate and through the arm in that setting.
     Ream plate holes .0945 through and arm holes .0930
     separately; never pass the larger plate reamer into an arm press seat.
-    Mouth breaks .002 MAX. Reassemble the original matched pair and inspect
+    Arm-hole mouth breaks .002 MAX (plate holes per the title block).
+    Reassemble the original matched pair and inspect
     the actual hole positions, S-K setting and complete loaded
     free-motion envelope; do not accept an arbitrary as-made bolted pose.
   installation_notes: |-
@@ -31,3 +32,8 @@ pd-transgear-arm-plate:
       where: "the locating-pattern and running-axis position controls"
       finding: "position controls over-specified (rule 5)"
       reason: "required by the whole-stack stock-form gate including the rigid two-hole registration yaw; stock dowels in reamed holes locate, the screws clamp (owner-accepted)"
+    - id: "RV-02"
+      kind: "accept"
+      where: "the knob bore's perpendicularity frame to datum A (face-A view)"
+      finding: "perpendicularity frame on a running bore (rule 5)"
+      reason: "owner ruling 2026-11-08 (Pedro), #2144 item 4.1: K stays a plain ⊥ Ø.002 A, no projected zone (rule 26). Knob axis K carried from the bore to the chain plane must stay inside the reducer's axis zone the air stacks and meshes charge, and this frame is what bounds it: Ø.002 over the shortest bore (28.47 mm) projects to 0.0719 mm at K_PROJECTED_HEIGHT_MM (40.31 mm) against the 0.0832 mm zone (paper_drive_arm_registration.AXIS_PROJECTED_ZONE_DIAMETER_MM)"

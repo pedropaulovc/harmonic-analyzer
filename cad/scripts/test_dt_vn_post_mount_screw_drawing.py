@@ -121,19 +121,24 @@ def test_cut_length_prints_as_a_reference_without_a_band() -> None:
 def test_cut_to_fit_acceptance_prints_on_the_delegating_callout() -> None:
     """Codex P1 on #857: the callout delegated the cut to assembly, but no
     MHA-DT-00 step stated the acceptance the 0.90D worst case depends on.  The
-    acceptance is a spec band -- upper 0 (never proud), lower the most a
-    screw may be cut short -- and the callout prints it, generated from that
-    band at its own places, not a literal."""
+    acceptance is a spec band -- upper 0 (flush), lower the most a screw may
+    be cut short -- and the sheet prints it, generated from that band at its
+    own places, not a literal.  Rule 7 (novice rubric): a callout carries at
+    most two lines of words, and round 1 showed the acceptance cannot sit
+    between the extension lines (rule 14), so the callout links to numbered
+    note 1 and the note carries it; NEVER PROUD only restated the flush limit."""
     lower, upper = deviations(spec.POST_SCREW_CUT_TO_FIT_BAND)
     assert upper == 0.0
     assert spec.POST_SCREW_CUT_TO_FIT_SHORT == -lower
     places = spec.CUT_TO_FIT_SHORT_PLACES
     callout = drawing.DIMENSION_CALLOUTS["CutLength"]
-    assert callout == spec.CUT_TO_FIT_CALLOUT
-    flat = " ".join(callout.split())
-    assert flat.startswith("CUT TO FIT AT ASSEMBLY")
-    assert f"FLUSH TO {spec.inch_text(-lower, places)} SHORT OF MHA-DT-20 UNDERSIDE" in flat
-    assert "NEVER PROUD" in flat
+    assert callout == drawing.CUT_LENGTH_CALLOUT == "SEE NOTE 1"
+    lines = drawing.CUT_LENGTH_NOTE.splitlines()
+    assert len(lines) == 2
+    assert lines[0] == (
+        f"1. CUT END FLUSH TO {spec.inch_text(-lower, places)} SHORT OF MHA-DT-20 UNDERSIDE."
+    )
+    assert "NEVER PROUD" not in drawing.CUT_LENGTH_NOTE
     # The printed allowance is the one the named exception's worst case
     # spends: thinnest plate, full allowance, both breaks at their maximum.
     assert spec.POST_MOUNT_ENGAGEMENT_WORST == pytest.approx(
@@ -148,22 +153,20 @@ def test_cut_to_fit_acceptance_prints_on_the_delegating_callout() -> None:
     assert not any(ch.isdigit() for ch in spec.MANUFACTURING_NOTES)
 
 
-def test_engagement_minimum_prints_on_the_cut_length_callout() -> None:
+def test_engagement_minimum_prints_on_the_cut_length_note() -> None:
     """Codex P2 on #857 (PRRT_kwDOPHDy386mOxdw): MHA-DT-VN-61 stated its 0.90D
     engagement shortfall nowhere, yet the policy's named-exceptions section
-    wants every affected sheet to state it.  The callout that delegates the
-    cut carries the worst-case minimum as a plain fact, floored from the
-    spec's worst case -- never a literal."""
-    callout = drawing.DIMENSION_CALLOUTS["CutLength"]
+    wants every affected sheet to state it.  Note 1, which the cut length's
+    callout links to, carries the worst-case minimum as a plain fact,
+    floored from the spec's worst case -- never a literal."""
     printed = spec.POST_MOUNT_ENGAGEMENT_PRINTED
     assert printed == math.floor(
         spec.POST_MOUNT_ENGAGEMENT_WORST / spec.THREAD_DIA_MM * 100.0
     ) / 100.0
     assert printed >= spec.MIN_ENGAGEMENT_DIAMETERS
-    fact = f"ENGAGEMENT {printed:.2f}D MIN"
-    assert fact in callout.splitlines()
+    fact = f"ENGAGEMENT {printed:.2f}D MIN."
     # It closes the acceptance the cut delegates to assembly.
-    assert callout.splitlines()[-1] == fact
+    assert drawing.CUT_LENGTH_NOTE.splitlines()[-1].strip() == fact
 
 
 def test_engagement_shortfall_is_declared_for_the_blind_reviewer() -> None:
@@ -189,6 +192,7 @@ def _mha142_printed_strings() -> dict[str, str]:
     config = _config.parts("dt-vn-post-mount-screw")
     printed = {
         "CutLength callout": drawing.DIMENSION_CALLOUTS["CutLength"],
+        "cut-length note": drawing.CUT_LENGTH_NOTE,
         "manufacturing notes": spec.MANUFACTURING_NOTES,
     }
     for index, text in drawing.DRAWING_SUMMARY.items():
@@ -324,8 +328,8 @@ def test_cut_end_features_are_driven_by_the_model_dimensions() -> None:
 
 def _printed_cut_short_allowance() -> float:
     """The acceptance the sheet prints: "END FLUSH TO <x> SHORT"."""
-    match = re.search(r"END FLUSH TO (\d*\.\d+) SHORT", spec.CUT_TO_FIT_CALLOUT)
-    assert match, spec.CUT_TO_FIT_CALLOUT
+    match = re.search(r"END FLUSH TO (\d*\.\d+) SHORT", drawing.CUT_LENGTH_NOTE)
+    assert match, drawing.CUT_LENGTH_NOTE
     return round(float(match.group(1)) * IN, 9)
 
 
@@ -365,21 +369,115 @@ def test_engagement_exception_is_held_by_the_model() -> None:
 
 
 def test_sheet_layout_keeps_notes_clear_of_the_view() -> None:
-    """1:1 Front view spans ~92 mm around its centre; the note block sits
-    between it and the stock rows, the cut length left of the shank."""
-    half_h = (spec.CUT_LENGTH_MM + part.HEAD_H) / 2000.0
-    view_bottom = drawing.FRONT_CENTER[1] - half_h
+    """The 1:1 Front lies head left on a horizontal axis (as sheet 2 draws
+    the supplied stock); the cut length and its one word line read below the
+    shank between its own extension lines (round 1: a wider callout was
+    struck by them, rule 14), above note 1 and the reference note."""
+    head_r = part.HEAD_DIA / 2000.0
+    assert drawing.FRONT_AXIS_MID[1] == drawing.FRONT_CENTER[1]
+    x, y = drawing.FRONT_KEEP["CutLength"]
+    assert x == drawing.FRONT_AXIS_MID[0]
+    assert y + 0.004 < drawing.FRONT_AXIS_MID[1] - head_r
+    lines = drawing.DIMENSION_CALLOUTS["CutLength"].splitlines()
+    # The widest callout line (~2.85 mm per capital, warm-c486) fits well
+    # inside the extension lines, which stand CUT_LENGTH_MM apart.
+    widest = max(len(line) for line in lines)
+    assert widest * 0.00285 < spec.CUT_LENGTH_MM / 1000.0 - 0.020
+    # Value line plus the callout's lines, ~4.5 mm each, then note 1 (two
+    # lines), then the reference note, then the stock rows.
+    callout_bottom = y - (1 + len(lines)) * 0.0045
+    note_x, note_y = drawing.CUT_LENGTH_NOTE_XY
+    assert note_x == drawing.NOTES_XY[0]
+    assert note_y + 0.004 < callout_bottom
+    note_lines = len(drawing.CUT_LENGTH_NOTE.splitlines())
     notes_y = drawing.NOTES_XY[1]
-    assert notes_y + 0.004 < view_bottom
-    lines = len(spec.MANUFACTURING_NOTES.splitlines())
-    assert notes_y - lines * 0.0045 > max(y for _, _, y in drawing.STOCK_ROWS) + 0.003
-    # The widest callout line (~2.85 mm per capital, warm-c486) clears the
-    # head's silhouette, the widest part of the view.
-    x, _ = drawing.FRONT_KEEP["CutLength"]
-    widest = max(len(line) for line in drawing.DIMENSION_CALLOUTS["CutLength"].splitlines())
-    assert x + widest * 0.00285 / 2.0 < drawing.FRONT_CENTER[0] - part.HEAD_DIA / 2000.0 - 0.003
-    assert x - widest * 0.00285 / 2.0 > 0.015  # inside the border
+    assert notes_y + 0.003 < note_y - note_lines * 0.0045
+    notes = len(spec.MANUFACTURING_NOTES.splitlines())
+    assert notes_y - notes * 0.0045 > max(y for _, _, y in drawing.STOCK_ROWS) + 0.003
+    # Note 1's long line (~2.2 mm per capital at 3 mm) stays left of the
+    # title block.
+    longest = max(len(line) for line in drawing.CUT_LENGTH_NOTE.splitlines())
+    assert note_x + longest * 0.0025 < drawing.ISO_CENTER[0]
+    # The head, ~6 mm left of the under-head face, stays inside the border.
+    left = drawing.FRONT_AXIS_MID[0] - spec.CUT_LENGTH_MM / 2000.0 - part.HEAD_H / 1000.0
+    assert left > 0.015
     assert not hasattr(drawing, "BREAK_TEXT")
+
+
+@pytest.mark.parametrize("initial_angle", [0.0, 0.3, -2.0])
+def test_front_turns_head_left_from_its_measured_axis(monkeypatch, initial_angle) -> None:
+    """The finished Front's turn is measured from its projected axis (under-
+    head face to cut end), whatever angle the view starts at, and the axis
+    midpoint lands on FRONT_AXIS_MID."""
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(drawing, "double_array", lambda values: list(values))
+    monkeypatch.setattr(drawing._telemetry, "info", lambda *_args: None)
+    view = SimpleNamespace(Angle=initial_angle, Position=(0.2, 0.1))
+
+    def set_position(values, _move_children):
+        view.Position = tuple(values)
+        return True
+
+    view.SetViewPosition = set_position
+    view.UpdateViewDisplayGeometry = lambda: None
+
+    def project(_adapter, actual, points, *, label):
+        assert actual is view and label
+        c, s = math.cos(actual.Angle), math.sin(actual.Angle)
+        return [
+            (actual.Position[0] + x * c - y * s, actual.Position[1] + x * s + y * c)
+            for x, y, _z in points
+        ]
+
+    monkeypatch.setattr(drawing, "model_points_in_view", project)
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(EditRebuild3=lambda: True))
+    drawing._lay_front_head_left(adapter, view)
+    length = spec.CUT_LENGTH_MM / 1000.0
+    head, tip = project(adapter, view, ((0.0, 0.0, 0.0), (0.0, -length, 0.0)), label="check")
+    assert tip[0] - head[0] == pytest.approx(length, abs=1e-12)
+    assert tip[1] == pytest.approx(head[1], abs=1e-12)
+    assert ((head[0] + tip[0]) / 2.0, head[1]) == pytest.approx(drawing.FRONT_AXIS_MID)
+
+    view.SetViewPosition = lambda *_args: False
+    view.Angle = initial_angle
+    with pytest.raises(RuntimeError, match="cannot position"):
+        drawing._lay_front_head_left(adapter, view)
+
+
+def test_detail_a_boundary_circles_the_head_on_the_full_view() -> None:
+    """Rule 9: the 6:1 head view is DETAIL A of the full 2:1 view, with its
+    boundary on that parent; the full view, the sheet's principal view,
+    carries no caption and no scale (it is the sheet's)."""
+    head = next(
+        row.expected_mm for row in spec.SUPPLIER_PROFILE_DIMENSIONS
+        if row.name == "SupplierHeadHeight"
+    )
+    length = next(
+        row.expected_mm for row in spec.SUPPLIER_PROFILE_DIMENSIONS
+        if row.name == "SupplierStockLength"
+    )
+    ratio = drawing.STOCK_SCALE[0] / drawing.STOCK_SCALE[1]
+    # The full view centres (L - H) / 2; the head's centre is -H / 2.
+    expected_x = drawing.STOCK_CENTER[0] + ratio * (-head / 2.0 - (length - head) / 2.0) / 1000.0
+    assert drawing.DETAIL_BOUNDARY_CENTER == pytest.approx((expected_x, drawing.STOCK_CENTER[1]))
+    assert drawing.DETAIL_BOUNDARY_RADIUS_M == pytest.approx(
+        drawing.STOCK_HEAD_RADIUS_MM * ratio / 1000.0
+    )
+    cx, cy = drawing.DETAIL_BOUNDARY_CENTER
+    r = drawing.DETAIL_BOUNDARY_RADIUS_M
+    left, bottom, right, top = drawing.STOCK_VIEW_CELL
+    assert left < cx - r and cx + r < right and bottom < cy - r and cy + r < top
+    texts = [text for text, *_ in drawing.STOCK_NOTES]
+    assert texts == [
+        spec.SUPPLIER_STOCK_TITLE, "DETAIL A  SCALE 6:1", drawing.DETAIL_LETTER,
+    ]
+    assert not any("2:1" in text or "ENVELOPE  SCALE" in text for text in texts)
+    # The letter stands outside the boundary, clear of the head view's cell.
+    _, x, y, (lx, ly, ux, uy) = drawing.STOCK_NOTES[2]
+    assert lx <= x <= ux and ly <= y <= uy
+    corners = [(px, py) for px in (lx, ux) for py in (ly, uy)]
+    assert min(math.dist(corner, (cx, cy)) for corner in corners) > r
+    assert uy < drawing.STOCK_HEAD_CELL[1]
 
 
 def test_stock_build_uses_its_registered_recipe() -> None:
@@ -1396,22 +1494,27 @@ def _supplier_ink_seat(monkeypatch, cropped):
             0.0,
         )
 
-    # Crop sketch coordinates are rotated and translated independently of source.
+    # Crop sketch coordinates are rotated and translated independently of
+    # source. The head view's circle is its crop; the full view's is DETAIL
+    # A's boundary, the one drawing-sketch segment its settled guard allows.
+    anchor = drawing.STOCK_HEAD_CENTER if cropped else drawing.DETAIL_BOUNDARY_CENTER
     circle = _Arc(
         (0.017, -0.023, 0.0),
         drawing.STOCK_HEAD_RADIUS_MM
         * drawing.STOCK_HEAD_SCALE[0]
         / drawing.STOCK_HEAD_SCALE[1]
-        / 1000.0,
+        / 1000.0
+        if cropped
+        else drawing.DETAIL_BOUNDARY_RADIUS_M,
     )
     circle.GetType = lambda: 1
     circle.IsCircle = lambda: 1
-    drawing_segments = [circle] if cropped else []
+    drawing_segments = [circle]
 
     def crop_to_sheet(xyz):
         return (
-            drawing.STOCK_HEAD_CENTER[0] - (xyz[1] + 0.023),
-            drawing.STOCK_HEAD_CENTER[1] + (xyz[0] - 0.017),
+            anchor[0] - (xyz[1] + 0.023),
+            anchor[1] + (xyz[0] - 0.017),
             xyz[2],
         )
 
@@ -1516,6 +1619,9 @@ def test_supplier_profile_ink_projects_immutable_target_without_live_source_read
     [
         ("configuration", "configuration"),
         ("drawing-geometry", "drawing-sketch geometry"),
+        ("no-boundary", "drawing-sketch geometry"),
+        ("boundary-shifted", "boundary moved"),
+        ("boundary-size", "boundary moved"),
     ],
 )
 def test_supplier_profile_ink_rejects_current_view_inventory_changes(
@@ -1524,8 +1630,14 @@ def test_supplier_profile_ink_rejects_current_view_inventory_changes(
     seat = _supplier_ink_seat(monkeypatch, False)
     if fault == "configuration":
         seat.view.ReferencedConfiguration = "Default"
-    else:
+    elif fault == "drawing-geometry":
         seat.drawing_segments.append(seat.circle)
+    elif fault == "no-boundary":
+        seat.drawing_segments.clear()
+    elif fault == "boundary-shifted":
+        seat.circle.center = (0.018, -0.023, 0.0)
+    else:
+        seat.circle.radius *= 1.1
     with pytest.raises(RuntimeError, match=reason):
         drawing._assert_supplier_profile_ink(
             seat.adapter, seat.view, seat.cell, seat.geometry, cropped=False
@@ -2790,6 +2902,18 @@ def _readonly_msc_build(monkeypatch, tmp_path):
         "add_property_linked_note",
     ):
         monkeypatch.setattr(drawing, name, lambda *_args, **_kwargs: None)
+
+    def turn_front(_adapter, front):
+        assert front is placed[0]
+        assert state.sheet == drawing.SHEET_NAMES[0] and state.captured
+        state.events.append(("front-turn",))
+
+    monkeypatch.setattr(drawing, "_lay_front_head_left", turn_front)
+    monkeypatch.setattr(
+        drawing,
+        "_literal_note",
+        lambda _adapter, text, *_xy: SimpleNamespace(GetText=lambda: text.replace("\n", "\r\n")),
+    )
     monkeypatch.setattr(drawing, "_present_supplier_stock_sheet", supplier_presentation)
     monkeypatch.setattr(
         drawing,
@@ -2828,6 +2952,7 @@ def test_msc_readonly_build_captures_clean_before_any_presentation(
     assert (
         kinds.index("prepare-supplier")
         < kinds.index("capture")
+        < kinds.index("front-turn")
         < kinds.index("front-import")
         < kinds.index("front-presentation")
         < kinds.index("supplier-presentation")

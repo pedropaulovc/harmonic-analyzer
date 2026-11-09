@@ -17,6 +17,7 @@ from _com import _com_invoke, _early_bound, _read_member
 from _cone_gear_geometry import R_CLEAR_MM, bore_area_mm2
 from _drawing_precision import _named_dimension
 from _fit_deviations import deviations
+from dt_cone_gear_notes import BLANK_DIA_REFERENCE_SKETCH
 from dt_cone_gear_spec import (
     BORE_DIA_BAND,
     CONFIGS,
@@ -43,9 +44,10 @@ _TOL_LIMIT = 3  # swTolType_e.swTolLIMIT
 
 
 # The two bilateral bands T006 overrides (pending exception ruling #971); every other
-# configuration carries the shared band.
+# configuration carries the shared band. The tip diameter's band rides the
+# side view's witness, the printed dimension (dt_cone_gear_notes).
 _BANDED_DIMENSIONS = (
-    ("BlankProfile", "BlankDia", blank_dia_band),
+    (BLANK_DIA_REFERENCE_SKETCH, "BlankDia", blank_dia_band),
     (TOOTH_REFERENCE_SKETCH, "ToothThickness", tooth_thickness_band),
 )
 

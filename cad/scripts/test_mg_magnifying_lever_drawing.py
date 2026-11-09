@@ -905,7 +905,7 @@ def test_real_recipe_selects_and_verifies_the_visible_free_hemisphere_face(monke
         assert captured["imports"] == [(detail, ("ThreadExtent",)), (front, ("RodProfile",))]
         assert deleted == ["TipChamfer"] and annotations["TipChamfer"].position is None
         fit = qualifiers["RodDia"]
-        assert fit == spec.ROD_DIA_CALLOUT and "BRASS" not in fit
+        assert fit == drawing.ROD_DIA_CALLOUT and "BRASS" not in fit
         stock = captured["stock"]
         assert (stock["units"], stock["expected_mm"], stock["fraction_denominator"]) == ("in", joint.ROD_DIA, 4)
         assert {name: dimension.SystemValue * 1000.0 for name, dimension in dimensions.items()} == pytest.approx(values)
@@ -1045,7 +1045,7 @@ def _assert_finish_ink_routes(annotations, finish, seat_note_xy, project, front)
 
     # Measured R24 ink: an 86.9 mm block for the 34-glyph "MHA-MG-02 CLAMP
     # BORE - SLIDING FIT" row; the stated-clearance row scales it by glyphs.
-    width = 0.0868955 * max(map(len, spec.ROD_DIA_CALLOUT.splitlines())) / 34
+    width = 0.0868955 * max(map(len, drawing.ROD_DIA_CALLOUT.splitlines())) / 34
 
     def diameter_ink(x, y):
         underline = y - 0.0100819

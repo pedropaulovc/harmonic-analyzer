@@ -59,13 +59,13 @@ def test_drive_train_recipe_depends_on_geometry_not_drawing_notes() -> None:
     assert "dt_pinion_cam_spec.py" not in dependency_names
 
 
-def test_eccentricity_is_dimensioned_and_called_out() -> None:
+def test_eccentricity_is_dimensioned_as_a_flagged_location() -> None:
     # The whole point of the cam: bore and OD are NOT concentric, so the offset
-    # must be an explicit dimension, not implied by graphical alignment.
-    eccentricity = drawing.DIMENSION_CALLOUTS["CollarCy"]
-    assert "ECCENTRICITY" in eccentricity
-    assert "BORE AXIS TO OD AXIS" in eccentricity
-    assert "BOTH END FACES" not in eccentricity
+    # must be an explicit dimension, not implied by graphical alignment.  It is
+    # a location, so it carries its value, band and the flag to the note that
+    # names what it sets (rules 4 and 7; fan-out r1).
+    assert "CollarCy" in drawing.FRONT_KEEP
+    assert drawing.DIMENSION_CALLOUTS["CollarCy"] == "SEE NOTE 1"
     assert dt_pinion_cam_geometry.CAM_OD == 14.6
 
 
@@ -126,8 +126,12 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     assert round(bore_max - rod_min, 6) == 0.05842
     assert dt_pinion_cam_spec.LIFT_ROD_NUMBER in drawing.DIMENSION_CALLOUTS["BoreDia"]
     bore = drawing.DIMENSION_CALLOUTS["BoreDia"]
-    assert "SLIP FIT" in bore
-    assert "DIAMETRAL CLEARANCE" not in bore
+    # A standard fit name with its REF clearance (rule 4), not SLIP FIT.
+    assert bore.splitlines() == [
+        "REAM THRU",
+        "SLIDING FIT ON LIFT ROD MHA-DT-17",
+        "(CLEARANCE .0010-.0023)",
+    ]
     assert "LOCK AFTER POSITIONING" not in bore
     assert "LINEAR +/-" not in notes
     assert "BRASS" not in notes
@@ -137,9 +141,11 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
 def test_cam_attachment_is_fully_released_for_manufacture() -> None:
     notes = dt_pinion_cam_spec.DRAWING_NOTES
     assert "RELEASE HOLD" not in notes
-    assert "ASME B18.3 #2-56 UNC X 3/16" in notes
-    assert "FLAT-POINT SOCKET SET SCREW LOOSE" in notes
-    assert len(notes.splitlines()) == 2
+    lines = notes.splitlines()
+    assert lines[1] == (
+        "2. SUPPLY ASME B18.3 #2-56 UNC X 3/16 FLAT-POINT SOCKET SET SCREW LOOSE."
+    )
+    assert len(lines) == 2
     tap = drawing.DIMENSION_CALLOUTS["TapDrillDia"]
     assert "#2-56 UNC" in tap
     assert "2B" not in tap  # Title block owns the default unified thread class.
@@ -148,35 +154,43 @@ def test_cam_attachment_is_fully_released_for_manufacture() -> None:
     assert "OPTIONAL" not in tap
 
 
-def test_both_tight_collar_bands_name_the_follower_pin_they_serve() -> None:
+def test_the_od_and_offset_flag_the_follower_pin_note_once() -> None:
     # Rule 4: the OD and eccentricity bands exist for the MHA-DT-25 follower
-    # pin that rides the OD, so each callout names it (ENFORCE r1 blockers).
+    # pin that rides the OD (ENFORCE r1 blockers); the one reason sits in
+    # numbered note 1, which both dimensions flag (fan-out r1: on the OD's
+    # callout alone, the .079 named no mate).
     import _config
 
     pin = _config.parts("dt-pinion-cam-pin")["number"]
     assert dt_pinion_cam_spec.FOLLOWER_PIN_NUMBER == pin
     for name in ("CollarOd", "CollarCy"):
-        assert pin in drawing.DIMENSION_CALLOUTS[name], name
-
-
-def test_od_callout_claims_the_follower_arc_the_assembly_proves() -> None:
-    # ENFORCE r8: the callout's "clear of the tap" is the MHA-DT-00 layout proof,
-    # not a free claim; keep the proof present while the sheet states it.
-    import test_dt_drive_train_support_layout as layout
-
-    assert drawing.DIMENSION_CALLOUTS["CollarOd"].endswith(
-        "ON AN ARC CLEAR\nOF THE TAP"
+        assert drawing.DIMENSION_CALLOUTS[name] == "SEE NOTE 1"
+    assert dt_pinion_cam_spec.DRAWING_NOTES.splitlines()[0] == (
+        f"1. \N{LATIN CAPITAL LETTER O WITH STROKE}.575 AND .079 SET THE LIFT OF FOLLOWER PIN {pin}."
     )
-    assert callable(layout.test_cam_set_screw_hole_stays_clear_of_the_follower)
 
 
-def test_tap_callout_points_at_the_drive_train_step_that_stakes_it() -> None:
-    # Rule 23 (#1176): the stake is performed at MHA-DT-00's cam-collars-set
-    # step; the pointer follows the step registry, never a typed number.
-    import dt_drive_train_steps as steps
+def test_tap_callout_gives_the_tap_only() -> None:
+    # Rule 7: the stake is an assembly instruction; MHA-DT-00's
+    # cam-collars-set step carries it (rule 23).
+    assert drawing.DIMENSION_CALLOUTS["TapDrillDia"] == "TAP DRILL THRU TO BORE\n#2-56 UNC"
 
-    tap = drawing.DIMENSION_CALLOUTS["TapDrillDia"]
-    assert tap.endswith(f"STAKE AT ASSEMBLY PER\n{steps.step_ref('cam-collars-set')}")
+
+def test_set_screw_view_is_lettered_with_its_arrow_on_the_front_view() -> None:
+    # Rule 9: a removed view carries a letter and a viewing arrow on its
+    # parent (fan-out screen 20261107T081227004Z: prose label, no arrow).
+    assert drawing.SET_SCREW_VIEW_LABEL == "VIEW A"
+    text_xy, tip_xy = drawing.SET_SCREW_VIEW_ARROW
+    # Square under the tap's mouth at the bottom of the OD, looking up.
+    assert tip_xy[0] == pytest.approx(drawing.FRONT_CENTER[0])
+    od_bottom = drawing._front_y(-dt_pinion_cam_geometry.ECC - dt_pinion_cam_geometry.CAM_OD / 2.0)
+    assert tip_xy[1] == pytest.approx(od_bottom)
+    assert text_xy[1] < tip_xy[1] - drawing.VIEW_LETTER_HEIGHT
+    # The label stands under the view, inside the border and left of the
+    # title block's top edge.
+    x, y = drawing.SET_SCREW_VIEW_LABEL_XY
+    assert y < drawing.BOTTOM_CENTER[1] - 0.016
+    assert x > drawing.BOTTOM_CENTER[0] - 0.015
 
 
 def test_part_recipe_does_not_reach_the_assembly_sequence() -> None:
@@ -283,7 +297,7 @@ def test_the_print_carries_no_gdt_and_dimensions_on_solid_edges() -> None:
     assert "BoreDia" in drawing.FRONT_KEEP
     assert "CollarOd" not in drawing.FRONT_KEEP
     assert drawing.DIMENSION_CALLOUTS["BoreDia"].startswith("REAM THRU")
-    assert "BOTH END FACES" not in drawing.DIMENSION_CALLOUTS["CollarCy"]
+    assert drawing.DIMENSION_CALLOUTS["CollarCy"] == "SEE NOTE 1"
     assert "TapCz" not in drawing.DIMENSION_CALLOUTS
 
 
@@ -350,7 +364,7 @@ def test_front_view_shows_which_side_the_set_screw_enters() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "set_hidden_lines_visible(adapter, front)" in source
     assert "for view in (side, bottom, iso):" in source
-    assert "VIEW ALONG SET-SCREW AXIS" in source
+    assert "_add_view_arrow(adapter, front)" in source
     import dt_pinion_cam_geometry as geometry
     import build_dt_pinion_cam
 

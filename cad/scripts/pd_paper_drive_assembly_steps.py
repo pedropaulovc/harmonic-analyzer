@@ -25,7 +25,6 @@ import dt_drive_train_steps
 import pd_transgear_drive_collar_spec as collar
 import paper_drive_mesh_check as mesh_check
 import paper_drive_rack_setup as rack_setup
-import pd_transgear_removable_spec as removable
 import _sprocket_seat_geometry as seat_geometry
 import paper_drive_geom as paper_geometry
 import _paper_drive_placement as paper_placement
@@ -61,7 +60,7 @@ SEQUENCE: tuple[str, ...] = (
     "latch-pin-pressed",
     # The plate's knob bore K is set on the mill DRO from the arm's empty
     # reamed pin bore S, the pin's running axis once pressed (one turned
-    # shank Ø, pd_transgear_pin_spec), at MHA-PD-00 VIEW K's model
+    # shank Ø, pd_transgear_pin_spec), at MHA-PD-00 DETAIL K's model
     # dimensions, before the two locating holes receive their separate final
     # press/slip reams. The arm lies flat on parallels, plate up, with no
     # pin yet: its head is not concentric to the shank by any drawing
@@ -88,7 +87,7 @@ SEQUENCE: tuple[str, ...] = (
     # R9-68: on the pin between the two bushings, as made, the ring last.
     "disc-cluster-hung",
     # #2124: the ring gap read on a feeler, cluster rearward, and closed into
-    # VIEW E's window with MHA-PD-VN-68 shims under the rear bushing.
+    # DETAIL E's window with MHA-PD-VN-68 shims under the rear bushing.
     "disc-cluster-shimmed",
     # Knob stack, front to rear (contract §1). R9-70 (N-A): the collar's pilot
     # faced on the bench to stand proud of every removable wheel, the
@@ -138,13 +137,18 @@ def step_ref(key: str) -> str:
     return f"{DRAWING_NUMBER} STEP {step_number(key)}"
 
 
-# The assembly sheet's view of the reducer's S-K setting: the arm and plate
-# are match-drilled at it (pd_paper_drive_knob_setting_spec).
-KNOB_SETTING_VIEW_NAME = "VIEW K"
+# The assembly sheet's enlargements of sheet 1's detail circles K and E
+# (rule 9: a detail is labelled DETAIL, not VIEW; integration review at
+# 8fb7fb46f7): K, the reducer's S-K setting, at which the arm and plate are
+# match-drilled (pd_paper_drive_knob_setting_spec); E, the cluster's shimmed
+# ring gap (pd_paper_drive_cluster_float_spec, whose own VIEW_NAME no sheet
+# reads any more: #2323).
+KNOB_SETTING_VIEW_NAME = "DETAIL K"
+CLUSTER_FLOAT_VIEW_NAME = "DETAIL E"
 
 
 def knob_setting_ref() -> str:
-    """The pointer the arm and plate sheets print: ``MHA-PD-00 VIEW K``."""
+    """The pointer the arm and plate sheets print: ``MHA-PD-00 DETAIL K``."""
     return f"{DRAWING_NUMBER} {KNOB_SETTING_VIEW_NAME}"
 
 
@@ -175,11 +179,6 @@ def inch_min_text(limit_mm: float, places: int) -> str:
 PAPER_FEED_REFERENCE_PLACES = 4
 PAPER_TRAVEL_PER_CRANK_TEXT = inch_text(
     paper_geometry.NET_RACK_TRAVEL_PER_CRANK_REV, PAPER_FEED_REFERENCE_PLACES
-)
-PAPER_FEED_REFERENCE_TEXT = (
-    f"FEED SETUP: {removable.CRANK_CONFIG} CRANK / "
-    f"{removable.KNOB_CONFIG} KNOB.\n"
-    f"PLATEN TRAVEL {PAPER_TRAVEL_PER_CRANK_TEXT} PER CRANK REV (REF)."
 )
 
 # The bar's top above the base deck: the builder's BAR_TOP_Y less the deck's
@@ -242,10 +241,6 @@ COLLAR_DISC_AIR_MIN = collar.COLLAR_DISC_AIR_MIN
 OFFSET_ACCEPT_TEXT = (
     f"{inch_text(collar.FIT_UP_OFFSET_TARGET, 3)} \u00b1{inch_text(OFFSET_ACCEPT_TOL, 3)}"
 )
-# The knob wheel floats collar.KNOB_FLOAT_RANGE forward of its seat (the collar's
-# front face) under the thumbnut; the setting and its acceptance read it
-# held back on that seat, the pose ACCEPTED_CHAIN_OFFSET_IN_SERVICE assumes.
-KNOB_HELD_BACK_TEXT = f"{removable.KNOB_CONFIG} HELD BACK ON ITS SEAT"
 COLLAR_DISC_AIR_TEXT = inch_min_text(COLLAR_DISC_AIR_MIN, 3)
 RACK_CREST_TEXT = f"{inch_text(RACK_CREST_DROP, 3)} \u00b1{inch_text(RACK_CREST_TOL, 3)}"
 RACK_DATUM_BACKLASH_TEXT = inch_window(rack_setup.RACK_DATUM_BACKLASH_RANGE, 4, " TO ")

@@ -42,6 +42,9 @@ from sh_vn_arbor_set_screw_spec import THREAD as _ARBOR_SET_SCREW_THREAD
 from _sprocket_seat_geometry import DRIVE_PIN_DIA as _SEAT_PIN_DIA
 from _sprocket_seat_geometry import DRIVE_PIN_HOLE_DIA as _SEAT_PIN_HOLE_DIA
 from dt_vn_crank_seat_drive_pin_spec import PRESS_DEPTH as _CRANK_SEAT_PIN_DEPTH
+from dt_cone_tip_block_spec import DOWEL_HOLE_DEPTH as _TIP_DOWEL_PRESS_DEPTH
+from dt_vn_locating_pin_spec import DIA as _LOCATING_PIN_DIA
+from dt_vn_locating_pin_spec import PRESS_HOLE_DIA as _LOCATING_PIN_PRESS_HOLE_DIA
 
 
 # Crank taper pin in its PILOT holes (ch11 p.14): released drawings drill the
@@ -114,10 +117,11 @@ _ADJUSTER_THRUST_GATE_LIMIT_MM3 = 0.13 * 8.0 * 1.10
 ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
     frozenset(("dt-crank-pin-1", "dt-crank-hub-1")): 1.10 * _CRANK_PIN_HUB_MM3,
     frozenset(("dt-crank-pin-1", "dt-crankshaft-1")): 1.10 * _CRANK_PIN_SHAFT_MM3,
-    # Stock 6.35 shank minus the 1.0 eye wire and 0.02 face clearance.
+    # MHA-DT-VN-70 #2-56 major in the arm's #50 tap drill: the stock 6.35
+    # shank minus the 1.194 jack-chain wire under its head and 0.02 face air.
     frozenset(
-        ("sh-vn-brass-fillister-screw-1", "dt-crank-arm-1")
-    ): smooth_annulus_limit_mm3(2.8448, 2.261, 5.33),
+        ("dt-vn-keeper-chain-screw-1", "dt-crank-arm-1")
+    ): smooth_annulus_limit_mm3(THREAD_MAJOR_MM["#2-56"], TAP_DRILL_MM["#2-56"], 5.14),
     # MHA-DT-32 #6-32 major in the arm's #36 tap drill: the full thread past the
     # 1.5 relief (6.5 of the 8.0 arm) plus its 0.5 lead cone.  The size is
     # named here, not imported from dt_crank_handle_pivot_screw_spec, so this
@@ -176,6 +180,18 @@ ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
         "dt-crankshaft",
         smooth_annulus_limit_mm3(
             _SEAT_PIN_DIA, _SEAT_PIN_HOLE_DIA, _CRANK_SEAT_PIN_DEPTH
+        ),
+    ),
+    # The MHA-DT-VN-69 tip dowel (rule-23 retention, owner ruling 2026-11-07
+    # (MHA-DT-00 rubric sample, PR #2248)) pressed up to the floor
+    # of the MHA-DT-21 foot's blind .0620 ream: the press fit over the ream's
+    # depth.  Its lower end is a slip fit in the MHA-DT-20 plate.
+    **numbered_pairs(
+        "dt-vn-locating-pin",
+        range(1, 2),
+        "dt-cone-tip-block",
+        smooth_annulus_limit_mm3(
+            _LOCATING_PIN_DIA, _LOCATING_PIN_PRESS_HOLE_DIA, _TIP_DOWEL_PRESS_DEPTH
         ),
     ),
 }

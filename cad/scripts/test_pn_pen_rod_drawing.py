@@ -320,7 +320,8 @@ def test_bands_are_model_owned_and_name_their_mates() -> None:
     )
     assert spec.DIMENSION_CALLOUTS["Depth"].startswith("SQ")
     assert spec.PEN_HANGER_NUMBER in spec.DIMENSION_CALLOUTS["Depth"]
-    assert spec.PEN_V_BLOCK_NUMBER in spec.DIMENSION_CALLOUTS["PivotDia"]
+    # The pivot's mate rides note 1, which its SEE NOTE links (rule 7).
+    assert spec.PEN_V_BLOCK_NUMBER in spec.DRAWING_NOTES
     assert drawing.DIMENSION_CALLOUTS is spec.DIMENSION_CALLOUTS
     assert "set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)" in (
         _DRAWING_SOURCE
@@ -509,15 +510,57 @@ def test_no_gdt_or_part_pmi() -> None:
         assert token not in _PART_SOURCE
 
 
-def test_no_free_manufacturing_note() -> None:
-    """Rules 7/16/25: the shoulder's requirement is the R MAX dimension and its
-    callout, so no leaderless sheet note remains."""
-    assert not hasattr(spec, "DRAWING_NOTES")
-    assert "Manufacturing Notes" not in _PART_SOURCE
-    assert "Manufacturing Notes" not in _DRAWING_SOURCE
-    assert "NOTES_XY =" not in _DRAWING_SOURCE
+def test_pivot_fit_route_is_note_1_linked_from_the_diameter() -> None:
+    """The pivot's .0003 band is narrower than the turned-diameter row, so
+    its matched-fit route (mate, clearance) is a numbered note the diameter
+    links to (drawing-guidelines.md rules 4 and 7)."""
+    assert spec.DIMENSION_CALLOUTS["PivotDia"] == f"SEE NOTE {spec.PIVOT_FIT_NOTE}"
+    lines = spec.DRAWING_NOTES.splitlines()
+    assert len(lines) <= 4
+    assert lines[0].startswith(f"{spec.PIVOT_FIT_NOTE}. ")
+    assert spec.PEN_V_BLOCK_NUMBER in spec.DRAWING_NOTES
+    # The stated clearance is what the printed limits give in the REAM_H7 bore.
+    from _fit_deviations import deviations
+    from pn_pen_v_block_spec import PIVOT_BORE_BAND, PIVOT_BORE_DIA
+
+    bore_low, bore_high = deviations(PIVOT_BORE_BAND)
+    pin_low, pin_high = deviations(spec.PIVOT_BAND)
+    assert spec.PIVOT_DIA == PIVOT_BORE_DIA
+    assert spec.PIVOT_CLEARANCE_MM == pytest.approx(
+        (bore_low - pin_high, bore_high - pin_low)
+    )
+    clearance = "-".join(spec._inch_text(mm) for mm in spec.PIVOT_CLEARANCE_MM)
+    assert f"(CLEARANCE {clearance})" in spec.DRAWING_NOTES
+    assert '"Manufacturing Notes": DRAWING_NOTES' in _PART_SOURCE
+    assert (
+        'add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)'
+        in _DRAWING_SOURCE
+    )
+    # Note 1 stands in the field under the side view, right of the tap's
+    # callout and under the R MAX block, left of the title block's top.
+    x, y = drawing.NOTES_XY
+    r_x, r_y = drawing.SIDE_KEEP["ShoulderRadius"]
+    assert y < r_y - 0.00835 - 0.010
+    assert x > drawing.TAP_CALLOUT_XY[0] + 0.0228 + 0.010
+    assert y - 0.010 > 0.0655 + 0.010
     for note in (spec.END_VIEW_NOTE, spec.ISOMETRIC_VIEW_NOTE):
         assert not re.search(r"\d\.\d|\+/-|±", note), note
+
+
+def test_end_view_is_lettered_view_a_with_its_arrow_on_the_side_view() -> None:
+    """Rule 9: the rescaled end view stands off projection, so it is VIEW A,
+    its viewing arrow on the side view pointing onto the tapped top face."""
+    assert spec.END_VIEW_NOTE.startswith(f"VIEW {spec.END_VIEW_LETTER} ")
+    text_xy, tip_xy = drawing.VIEW_A_ARROW
+    top_face_x = drawing._sx(spec.SQUARE_LENGTH)
+    assert tip_xy == pytest.approx(
+        (top_face_x + drawing.VIEW_ARROW_TIP_GAP, drawing._sy(0.0))
+    )
+    # The letter right of the tip, level with it, short of the isometric.
+    assert text_xy[0] > tip_xy[0]
+    assert text_xy[1] - drawing.VIEW_LETTER_HEIGHT / 2.0 == pytest.approx(tip_xy[1])
+    assert text_xy[0] + 0.005 < drawing.ISO_CENTER[0] - 0.0091 - 0.010
+    assert "_add_view_arrow(adapter, side)" in _DRAWING_SOURCE
 
 
 def test_view_scales_and_notes_are_explicit() -> None:
@@ -526,8 +569,12 @@ def test_view_scales_and_notes_are_explicit() -> None:
     assert drawing.END_SCALE == (5, 1)
     assert drawing.ISO_SCALE == (1, 1)
     # Every view off the sheet scale says its own scale.
-    assert spec.END_VIEW_NOTE == "VIEW FROM SQUARE END SCALE 5:1"
-    assert spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:1"
+    assert spec.END_VIEW_NOTE.endswith(
+        f" SCALE {drawing.END_SCALE[0]}:{drawing.END_SCALE[1]}"
+    )
+    assert spec.ISOMETRIC_VIEW_NOTE.endswith(
+        f" SCALE {drawing.ISO_SCALE[0]}:{drawing.ISO_SCALE[1]}"
+    )
     for retired in ("TOP_VIEW_NOTE", "BOTTOM_VIEW_NOTE"):
         assert not hasattr(spec, retired)
     views = {

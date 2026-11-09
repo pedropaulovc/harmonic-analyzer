@@ -181,11 +181,11 @@ TAP_VOLUME_MM3 = tap_volume(SET_SCREW_MINOR_DIA)
 VOLUME_MM3 = WHEEL_VOLUME_MM3 + GRIP_VOLUME_MM3 - SET_SCREW_COUNT * TAP_VOLUME_MM3
 
 # The note names the leadscrew by its kit's drawing number, read from the
-# registry: the screw is the leadscrew kit's LeadScrew configuration.
+# registry: the screw is the leadscrew kit's LeadScrew configuration. Sliding
+# the wheel on and locking its set screw is MHA-CH-06-TL-00 step 8T, not this
+# part sheet (rule 7: no assembly instruction on a part sheet).
 LEADSCREW_NUMBER = _config.parts("ch-rocker-arm-tl-vn-oblique-leadscrew-kit")["number"]
-DRAWING_NOTES = (
-    f"SLIDE ONTO LEADSCREW {LEADSCREW_NUMBER} FAR END; LOCK A SET SCREW ON ITS FLAT."
-)
+DRAWING_NOTES = f"BORE FITS THE LEADSCREW OF {LEADSCREW_NUMBER}."
 
 # --- Self-checks ----------------------------------------------------------------
 if not GRIP_OFFSET + _GRIP_R <= _WHEEL_R:

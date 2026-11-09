@@ -117,4 +117,7 @@ VOLUME_MM3, CG_Y = volume_and_cg_y()
 # jetpens.com: the barrel with its ink, uncapped as used.
 MASS_G = 7.0
 
-DRAWING_NOTES = "USED UNCAPPED; THE GRIP UNDER THE CAP SEATS IN THE V-BLOCK GROOVE."
+# The grip's one fitting fact, on its leader: the mate it seats in, by its
+# drawing number (drawing-guidelines.md rule 4). Uncapping is MHA-PN-00 step 5.
+V_BLOCK_NUMBER = "MHA-PN-05"
+DRAWING_NOTES = f"GRIP SEATS IN V-GROOVE OF {V_BLOCK_NUMBER}"

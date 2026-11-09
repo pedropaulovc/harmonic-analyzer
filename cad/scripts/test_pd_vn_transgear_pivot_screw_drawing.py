@@ -83,11 +83,14 @@ def test_fitted_length_is_a_reference_set_by_the_bar() -> None:
     assert screw.TIP_Y == pytest.approx(screw.SHOULDER_END_Y - screw.FITTED_THREAD_LEN)
     assert screw.REFERENCE_DIMENSIONS == (("StockTrimProfile", "CutLength"),)
     assert screw.DIMENSION_TOLERANCE_TYPES["CutLength"] == 0
-    callout = screw.DIMENSION_CALLOUTS["CutLength"]
-    # The fit-up's mate by name and number (machinist review of run
-    # 20261103T023833324Z: the number alone named no part).
-    assert ".008-.020 BELOW SUPPORT BAR" in callout
-    assert "MHA-PD-07 FRONT FACE AS FITTED" in callout
+    # The fit-up's mate by name and number lives in linked numbered note 1;
+    # the reference length carries only its link (rule 7, machinist review
+    # rubric v2: a callout carries at most two lines of words).
+    assert drawing.DIMENSION_CALLOUTS["CutLength"] == f"SEE NOTE {drawing.FIT_UP_NOTE}"
+    assert drawing.FIT_UP_NOTE_TEXT.startswith(f"{drawing.FIT_UP_NOTE}. ")
+    note = " ".join(drawing.FIT_UP_NOTE_TEXT.split())
+    assert "TIP FACED AT ASSEMBLY .008-.020 BELOW" in note
+    assert "FRONT FACE OF SUPPORT BAR MHA-PD-07." in note
     # Facing only shortens: the nominal fit is inside the catalogue length,
     # and every stock length reaches the thinnest bar's deepest recess.
     assert screw.FITTED_THREAD_LEN < screw.THREAD_LEN
@@ -128,7 +131,7 @@ def test_chamfer_max_keeps_the_tip_inside_the_charged_pitch() -> None:
     # "Past the thread root" fits under the maximum: tip Ø 4.1656 - 1.2192 =
     # 2.9464 clears the deepest estimated 2A root Ø3.038.
     screw.require_chamfer_past_root(screw.CHAMFER_WIDTH)
-    assert "THREAD ROOT" in screw.DIMENSION_CALLOUTS["ChamferWidth"]
+    assert "THREAD ROOT" in drawing.DIMENSION_CALLOUTS["ChamferWidth"]
 
 
 def test_minor_diameter_is_the_external_2a_root() -> None:
@@ -420,12 +423,14 @@ def test_native_controls_are_owned_and_the_length_prints_as_reference() -> None:
         "ChamferAngle": 11,
         "ThreadLengthMin": 5,
     }
-    assert "ChamferAngle" not in screw.DIMENSION_CALLOUTS
-    assert all("\\n" not in text for text in screw.DIMENSION_CALLOUTS.values())
-    assert screw.DIMENSION_CALLOUTS["ThreadLengthMin"].startswith("#8-32 UNC ")
-    assert "1 PITCH MAX" in screw.DIMENSION_CALLOUTS["ThreadLengthMin"]
-    assert all("2A" not in text for text in screw.DIMENSION_CALLOUTS.values())
-    reason = screw.DIMENSION_CALLOUTS["ChamferWidth"].replace("MHA-PD-07", "")
+    assert "ChamferAngle" not in drawing.DIMENSION_CALLOUTS
+    assert all("\\n" not in text for text in drawing.DIMENSION_CALLOUTS.values())
+    # Rule 7: size and process lines plus at most two lines of words.
+    assert all(len(text.splitlines()) <= 2 for text in drawing.DIMENSION_CALLOUTS.values())
+    assert drawing.DIMENSION_CALLOUTS["ThreadLengthMin"].startswith("#8-32 UNC ")
+    assert "1 PITCH MAX" in drawing.DIMENSION_CALLOUTS["ThreadLengthMin"]
+    assert all("2A" not in text for text in drawing.DIMENSION_CALLOUTS.values())
+    reason = drawing.DIMENSION_CALLOUTS["ChamferWidth"].replace("MHA-PD-07", "")
     assert not any(character.isdigit() for character in reason)
     assert drawing.ISO_SCALE == drawing.SHEET_SCALE
 
@@ -1701,7 +1706,7 @@ def _record_drawing_build(
     controls = []
     for name in ("CutLength", *drawing.EXPECTED_CONTROLS):
         display = SimpleNamespace(
-            GetText=lambda _index, name=name: screw.DIMENSION_CALLOUTS.get(name, "")
+            GetText=lambda _index, name=name: drawing.DIMENSION_CALLOUTS.get(name, "")
         )
         controls.append(SimpleNamespace(
             name=name, GetSpecificAnnotation=lambda display=display: display,
@@ -1773,6 +1778,7 @@ def _record_drawing_build(
     monkeypatch.setattr(drawing, "_assert_paper_layout", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(drawing, "_place_purchased_note", lambda *_args: (lambda: None, {}))
     monkeypatch.setattr(drawing, "_clear_socket_text", lambda *_args: None)
+    monkeypatch.setattr(drawing, "_add_fit_up_note", lambda *_args: lambda: None)
     monkeypatch.setattr(drawing, "_head_height_entities", lambda *_args: (object(), head_entity))
 
     def project_head(_adapter, view, point, *, label):

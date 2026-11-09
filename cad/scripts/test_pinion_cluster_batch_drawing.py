@@ -421,10 +421,11 @@ def test_cross_numbered_fit_pairs_use_fixed_runtime_oracles() -> None:
             frozenset(("sm-vn-boss-hook-1", "sm-summing-lever-1")): _annulus_limit(
                 4.826, 3.797, 19.05
             ),
-            # MHA-SM-04 1/4-28 major in the #3 drill of the blind end-piece
-            # tap: counterbore floor (2.78) to the free-gap tip (14.62).
-            frozenset(("sm-gooseneck-spring-screw-1", "sm-gooseneck-1")): _annulus_limit(
-                6.35, 5.41, 11.84
+            # MHA-SM-VN-56 10-24 major in the #25 drill of the blind end-piece
+            # tap: the shoulder seats on the end face, so the whole 3/8
+            # thread stands in the tap (#2144 item 11.4).
+            frozenset(("sm-vn-gooseneck-shoulder-screw-1", "sm-gooseneck-1")): _annulus_limit(
+                4.826, 3.797, 9.525
             ),
         }
     )
@@ -458,8 +459,10 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(("dt-vn-cone-tip-block-screw-1", "dt-cone-tip-block-1")): 6.22435,
             # 1/16 in tip land: 0.13 observed at Ø0.79, scaled by r^3 (x8).
             frozenset(("dt-vn-cone-tip-adjuster-1", "dt-cone-gear-shaft-1")): 1.144,
-            frozenset(("sh-vn-brass-fillister-screw-1", "dt-crank-arm-1")): _annulus_limit(
-                2.8448, 2.261, 5.33
+            # MHA-DT-VN-70 #2-56 major 2.184 in the #50 tap drill 1.778: the
+            # 6.35 shank less the 1.194 chain wire and 0.02 air, within 5.14.
+            frozenset(("dt-vn-keeper-chain-screw-1", "dt-crank-arm-1")): _annulus_limit(
+                2.184, 1.778, 5.14
             ),
             # MHA-DT-32 #4-40 major 2.845 in the #43 tap drill 2.261: 6.5 of
             # full thread past the 1.5 relief plus the lead cone, within 7.0.
@@ -498,6 +501,17 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 2.38125,
                 2.3622,
                 3.95,
+            ),
+            # Owner ruling 2026-11-07 (PR #2248): MHA-DT-VN-69 1/16 dowel
+            # (1.5875) pressed to the floor of MHA-DT-21's .0620 (1.5748) foot
+            # ream, .16 (4.064) deep.
+            **_expected_numbered_pairs(
+                "dt-vn-locating-pin",
+                range(1, 2),
+                "dt-cone-tip-block",
+                1.5875,
+                1.5748,
+                4.064,
             ),
         },
         "fr-frame": {
@@ -592,9 +606,9 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(("sm-vn-boss-hook-1", "sm-summing-lever-1")): _annulus_limit(
                 4.826, 3.797, 19.05
             ),
-            # MHA-SM-04 1/4-28 major, #3 drill, 14.62 tip reach less 2.78 counterbore.
-            frozenset(("sm-gooseneck-spring-screw-1", "sm-gooseneck-1")): _annulus_limit(
-                6.35, 5.41, 11.84
+            # MHA-SM-VN-56 10-24 major, #25 drill, 3/8 thread seated (#2144 item 11.4).
+            frozenset(("sm-vn-gooseneck-shoulder-screw-1", "sm-gooseneck-1")): _annulus_limit(
+                4.826, 3.797, 9.525
             ),
         },
         "pn-pen": {

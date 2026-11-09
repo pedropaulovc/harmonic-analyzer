@@ -673,12 +673,13 @@ GEAR_DATA = f"{PURCHASED_RACK_NOTE}; {DP:g} DP, {PA_DEG:g}\N{DEGREE SIGN} PA"
 # review round 6), no alloy ratio: notes carry no numbers.
 
 
-def _receiving_ceiling_text(limit_mm: float) -> str:
+def _receiving_ceiling_text(limit_mm: float, purpose: str) -> str:
     """An incoming maximum at the stock REF's places, rounded down so the
-    print never admits a section the cut-end envelope refuses."""
+    print never admits a section the cut-end envelope refuses, followed by
+    the mate it protects."""
     scale = 10**_PLACES["RackHeight"]
     value = math.floor(round(limit_mm / MM_PER_IN * scale, 9)) / scale
-    return f"RECEIVE {value:.{_PLACES['RackHeight']}f} MAX".replace(" 0.", " .")
+    return f"{value:.{_PLACES['RackHeight']}f} MAX{purpose}".removeprefix("0")
 
 
 # The two stock sizes carry their receiving maxima as callout text on the
@@ -687,10 +688,27 @@ def _receiving_ceiling_text(limit_mm: float) -> str:
 # a functional acceptance rides its native callout (rule 4's DIAMETRAL
 # CLEARANCE callouts); owner review on #2144.  The rack-travel cut-end
 # reserve (paper_drive_geom.feed_rack_cut_end_section_maxima_mm) is paid at
-# these ceilings, so a larger section must be rejected on receipt.
+# these ceilings, so a larger section must be rejected on receipt.  Each
+# limit names the mate it protects (novice-rubric fan-out round 5: a limit on
+# a supplier size with no mate read as invented): the height keeps air under
+# the bottom guide rail (build_pd_paper_drive_assembly
+# RACK_BACKER_RAIL_AIR_WORST), the face width bounds the feed pinion's mesh
+# offset across the face (paper_drive_geom.feed_lateral_deviation_mm).  The
+# sheet parenthesizes only the REF value, so the plain limit reads outside
+# the parentheses (round 1: a limit inside a reference's parentheses, and
+# RECEIVE, read as neither REF nor limit).  The height's limit stacks on two
+# lines under its value, right of the rack (round 2: one line ran from the
+# rack's outline to the border); an above-callout holding a line break never
+# prints, so it goes below.
+GUIDE_RAIL_NUMBER = _config.parts("pd-platen-guide")["number"]
+FEED_PINION_NUMBER = _config.parts("pd-transgear-feed-pinion")["number"]
 DIMENSION_CALLOUTS = {
-    "RackHeight": _receiving_ceiling_text(quality.rack_stock_height_max_mm()),
-    "RackDepth": _receiving_ceiling_text(quality.rack_face_width_max_mm()),
+    "RackHeight": _receiving_ceiling_text(
+        quality.rack_stock_height_max_mm(), f"\nCLEARS {GUIDE_RAIL_NUMBER}"
+    ),
+    "RackDepth": _receiving_ceiling_text(
+        quality.rack_face_width_max_mm(), f" FOR {FEED_PINION_NUMBER} MESH"
+    ),
 }
 DRAWING_NOTES = "\n".join(
     (

@@ -464,9 +464,7 @@ def _assert_explode_source_guards(steps) -> None:
     )
     stop = next(
         node.lineno for node in tree.body
-        if isinstance(node, ast.Assign)
-        and any(isinstance(target, ast.Name) and target.id == "PLAN_VIEW_LABEL"
-                for target in node.targets)
+        if isinstance(node, ast.ClassDef) and node.name == "PlanTag"
     )
     body = [node for node in tree.body if start <= node.lineno < stop]
     namespace = dict(vars(spec), EXPLODE_STEPS=steps)
@@ -533,7 +531,13 @@ def test_explode_selectors_resolve_to_the_placed_occurrences() -> None:
         ]
 
     assert names("riser screws lift out") == [f"{spec.RISER_SCREW}-{n}" for n in range(1, 5)]
-    assert names("nut screws back out") == [f"{spec.RISER_SCREW}-{n}" for n in range(5, 9)]
+    nut_screws = [f"{spec.RISER_SCREW}-{n}" for n in range(5, 9)]
+    for key in "xy":
+        assert names(f"nut screws back out along {key}") == nut_screws
+        assert names(f"feed nut backs off along {key}") == [
+            *(component.Name2 for component in groups[spec.FEED_NUT]),
+            *nut_screws,
+        ]
     # Rail screws lift; the bracket family's lower TL-28 screws drop.
     assert names("rail screws lift out") == [f"{spec.RAIL_SCREW}-{n}" for n in range(1, 17)]
     assert names("bar screws drop out") == [f"{spec.PILLOW_BLOCK_SCREW}-{n}" for n in range(5, 9)]
@@ -550,6 +554,87 @@ def test_explode_selectors_resolve_to_the_placed_occurrences() -> None:
             "not placed", spec.NUT_SCREW_INSTANCES[:1], groups, {}, member_names
         )
 
+
+def test_feed_nut_and_its_screws_explode_along_their_axis_clear_of_the_lug() -> None:
+    """TL-00 review ce83ac3b (sheet 5): the nut and its four flat heads
+    explode off the lug's +X face along the screws' axis, away from the
+    spindle, the screws past the nut's body end."""
+    axis = spec.NUT_EXPLODE_AXIS
+
+    def part_axis(placement, k):
+        origin = spec.frame_point(placement, (0.0, 0.0, 0.0))
+        tip = spec.frame_point(placement, tuple(float(i == k) for i in range(3)))
+        return [t - o for t, o in zip(tip, origin)]
+
+    # The pose proof: the nut's and every nut screw's part +Y (head up) is
+    # the feed block's +X, horizontal, away from the spindle and off the
+    # machine axes on the oblique rail, so each move is two native steps.
+    for placement in (*spec.FEED_NUT_PLACEMENTS, *spec.NUT_SCREW_PLACEMENTS):
+        assert part_axis(placement, 1) == pytest.approx(axis, abs=1e-12)
+    assert part_axis(spec.FEED_BLOCK_PLACEMENTS[0], 0) == pytest.approx(axis, abs=1e-12)
+    assert axis[2] == 0.0 and math.hypot(*axis) == pytest.approx(1.0)
+    assert sum(a * r for a, r in zip(axis, spec.rail_direction(spec.leadscrew.RAIL))) > 0.0
+    assert abs(axis[0]) > 1e-3 and abs(axis[1]) > 1e-3
+    nut = spec.instance_name(spec.FEED_NUT, 0)
+    lift = dict(zip("xyz", (0.0, 0.0, 90.0)))  # the blocks lift off with them
+    for name, along in (
+        (nut, spec.FEED_NUT_BACK_OFF),
+        *((screw, spec.FEED_NUT_BACK_OFF + spec.NUT_SCREW_BACK_OUT)
+          for screw in spec.NUT_SCREW_INSTANCES),
+    ):
+        for k, key in enumerate("xyz"):
+            assert spec.explode_shift(name, key) == pytest.approx(
+                along * axis[k] + lift[key], abs=1e-9
+            )
+    # Along the axis from the lug face: the nut's seat face stands off it,
+    # its body end past that, and each screw's tip past the body end.
+    seat = spec.FEED_NUT_BACK_OFF
+    body_end = seat + spec.feed_nut.LENGTH_MAX
+    tip = (
+        spec.feed_nut.SCREW_GRIP - spec.riser_screw.DIMS.length
+        + spec.FEED_NUT_BACK_OFF + spec.NUT_SCREW_BACK_OUT
+    )
+    assert seat > 0.0
+    assert tip - body_end >= spec.NUT_SCREW_EXPLODED_CLEARANCE
+
+
+def _assert_feed_nut_explode_guards(**overrides) -> None:
+    """Exercise the feed nut's explode assertions with altered inputs only."""
+    path = Path(spec.__file__)
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+
+    def assigns(node, name):
+        return isinstance(node, ast.Assign) and any(
+            isinstance(target, ast.Name) and target.id == name for target in node.targets
+        )
+
+    start = next(node.lineno for node in tree.body if assigns(node, "NUT_EXPLODE_AXIS"))
+    stop = next(node.lineno for node in tree.body if assigns(node, "_NUT_SCREW_MOVES"))
+    body = [node for node in tree.body if start <= node.lineno < stop]
+    exec(
+        compile(ast.Module(body=body, type_ignores=[]), str(path), "exec"),
+        dict(vars(spec), **overrides),
+    )
+
+
+@pytest.mark.parametrize(
+    ("overrides", "message"),
+    (
+        # A nut screw no longer on the nut's axis: here the block's +Y.
+        ({"NUT_SCREW_PLACEMENTS": spec.FEED_BLOCK_PLACEMENTS}, "share one axis"),
+        # A screw too long to stand past the nut's body end.
+        (
+            {"riser_screw": types.SimpleNamespace(DIMS=types.SimpleNamespace(
+                length=spec.riser_screw.DIMS.length + 10.0
+            ))},
+            "stand clear",
+        ),
+    ),
+)
+def test_feed_nut_explode_guards_refuse_an_off_axis_or_buried_screw(overrides, message) -> None:
+    _assert_feed_nut_explode_guards()
+    with pytest.raises(AssertionError, match=message):
+        _assert_feed_nut_explode_guards(**overrides)
 
 
 def test_named_views_are_the_machine_frame() -> None:
@@ -1185,10 +1270,11 @@ def test_bom_follows_the_part_registry() -> None:
         )
         if stem in SHARED_VENDOR_FAMILIES:
             # The machine's registry row is untouched: its own number and
-            # quantity (the knife mounts' four); the jig consumes the riser's
-            # two stop holes' worth, bought as the same stock pin.
+            # quantity (the knife mounts' two, one per mount since owner
+            # ruling 2026-11-08 (Pedro), #2144 item 11.3); the jig consumes
+            # the riser's two stop holes' worth, bought as the same stock pin.
             assert configuration is None and row["process"] == "purchased", stem
-            assert number == "MHA-SM-VN-53" and quantity == spec.stop_pin.QUANTITY == 4
+            assert number == "MHA-SM-VN-53" and quantity == spec.stop_pin.QUANTITY == 2
             assert spec.QUANTITIES[stem] == len(riser.STOP_PIN_HOLES) == 2
             continue
         assert quantity == spec.QUANTITIES[stem], stem
@@ -1664,7 +1750,7 @@ def test_a200_shares_the_short_sku_but_not_the_explode_direction() -> None:
     explode = {name: (members, axis, travel) for name, members, axis, travel in spec.EXPLODE_STEPS}
     assert explode["kp08 screws lift out"] == (spec.KP08_SCREW_INSTANCES, "z", 40.0)
     assert explode["bar screws drop out"] == (spec.BAR_SCREW_INSTANCES, "z", -40.0)
-    fitting = next(step for step in spec.ASSEMBLY_STEPS if step.startswith("2. "))
+    fitting = next(step for step in spec.ASSEMBLY_STEPS if step.startswith("2B. "))
     assert f"{spec._item(spec.PILLOW_BLOCK_SCREW)} FROM BELOW" in fitting
     assert spec._torque(leadscrew.BAR_SCREW_TORQUE_NM) in fitting
     assert fasteners.BRACKET_TO_BAR.thread_depth_mm == end_bracket.BAR_THREAD_LIMITS[0]
@@ -1677,13 +1763,10 @@ def test_carriage_screws_are_cut_to_fit_under_a_confirmed_owner_exception() -> N
     from _paths import CAD_ROOT
     from machinist_exceptions import load_exceptions
 
-    step = next(text for text in spec.ASSEMBLY_STEPS if text.startswith("5. "))
-    assert (
-        "MEASURE EACH BLOCK'S 4 COUNTERBORE FLOOR HEIGHTS ABOVE ITS BOTTOM TO .001. "
-        f"CUT EACH M4 X 20 SHCS {spec._item(spec.CARRIAGE_SCREW)} TO ITS OWN FLOOR "
-        "HEIGHT + .189 (+/-.005) UNDER THE HEAD;"
-    ) in step
-    assert "EACH TIP ENGAGES .183-.195 OF THE CARRIAGE'S M4 X 5 AND NEVER BOTTOMS." in step
+    steps = {text.split(". ", 1)[0]: text for text in spec.ASSEMBLY_STEPS}
+    assert spec._item(spec.CARRIAGE_SCREW) in steps["5A"]
+    # RV-05's where: the cut to floor + .189 and the .183-.195 engagement.
+    assert "+ .189" in steps["5A"] and ".183-.195" in steps["5C"]
     entries = {
         entry.id: entry
         for entry in load_exceptions(CAD_ROOT / "config", "ch_rocker_arm_tl_oblique_jig_assembly", "assembly")
@@ -1799,27 +1882,34 @@ def test_bracket_slip_stop_and_lost_motion_follow_ruling_b() -> None:
 @pytest.mark.parametrize(
     ("nm", "printed"),
     (
-        (0.4, "0.4 N·m (3.5 IN·LBF)"),
-        (2.8, "2.8 N·m (25 IN·LBF)"),
-        (4.0, "4.0 N·m (35 IN·LBF)"),
-        (16.5, "16.5 N·m (150 IN·LBF)"),
+        (0.4, "3.5 IN·LBF"),
+        (2.8, "25 IN·LBF"),
+        (4.0, "35 IN·LBF"),
+        (16.5, "150 IN·LBF"),
     ),
 )
-def test_printed_torque_leads_with_n_m_and_rounds_in_lbf(nm, printed) -> None:
-    """Owner ruling 3 (2026-11-01): the N·m source value first, its in·lbf
-    conversion in parentheses rounded to the nearest two significant figures."""
+def test_printed_torque_is_inch_rounded_to_two_significant_figures(nm, printed) -> None:
+    """Rule 26 prints inch only; owner ruling 3 (2026-11-01) keeps the
+    conversion rounded to the nearest two significant figures."""
     assert spec._torque(nm) == printed
-    in_lbf = float(printed.split("(", 1)[1].split(" ", 1)[0])
+    in_lbf = float(printed.split(" ", 1)[0])
     exact = nm / (4.4482216152605 * 0.0254)
     half_step = 0.5 * 10 ** (math.floor(math.log10(exact)) - 1)
     assert abs(in_lbf - exact) <= half_step
 
 
+def _step_groups() -> dict[str, str]:
+    """Each top-level step with its lettered sub-steps, joined."""
+    groups: dict[str, list[str]] = {}
+    for text in (*spec.ASSEMBLY_STEPS, *spec.OPERATION_STEPS):
+        head = text.split(". ", 1)[0]
+        groups.setdefault(re.match(r"\d+", head).group(0), []).append(text)
+    return {number: " ".join(texts) for number, texts in groups.items()}
+
+
 def test_rail_preparation_precedes_fastening_and_table_mounting() -> None:
-    preparation, fitting, mounting = spec.ASSEMBLY_STEPS[:3]
-    assert [step.split(". ", 1)[0] for step in (preparation, fitting, mounting)] == [
-        "1", "2", "3",
-    ]
+    groups = _step_groups()
+    preparation, fitting, mounting = groups["1"], groups["2"], groups["3"]
     # Use the actual component roles, not exact instruction prose.
     for family, step in (
         (spec.CARRIAGE, preparation),
@@ -1828,24 +1918,69 @@ def test_rail_preparation_precedes_fastening_and_table_mounting() -> None:
     ):
         citation = spec._item(family)
         assert citation in step
-        assert sum(citation in candidate for candidate in spec.ASSEMBLY_STEPS[:3]) == 1
-    assert spec._item(spec.RAIL) in fitting
+        assert sum(citation in groups[number] for number in ("1", "2", "3")) == 1
+    assert spec._item(spec.RAIL) in preparation
     assert spec._item(spec.RAIL_SCREW) in fitting
     assert spec._item(spec.HOLD_DOWN_STUD) in mounting
 
 
 def test_step_10_taps_the_carrier_hub_in_situ_at_the_recorded_dro() -> None:
     """Owner ruling 3 (2026-11-07): the carrier's HUB #8-32 tap is made in
-    situ at the step 10 DRO position, every strap's hub hole is drilled and
-    reamed at the same setting, and there is no counterbore or precision bore."""
-    step = next(text for text in spec.ASSEMBLY_STEPS if text.startswith("10. "))
-    assert "THE DRO READS X 0, Y .5125 ±.0005. RECORD IT" in step
-    assert f"TAP THE CARRIER'S HUB {carrier.HUB_THREAD} THRU THERE, NO COUNTERBORE" in step
-    assert "(O5)" in step
-    assert "REAM THE HUB THERE" not in step and "SLIP FIT" not in step
-    o5 = next(text for text in spec.OPERATION_STEPS if text.startswith("O5. "))
-    assert "STEP 10 DRO POSITION (X 0, Y .5125 ±.0005)" in o5
+    situ at the step 10 position, every strap's hub hole is drilled and
+    reamed at the same setting, and there is no counterbore or precision bore.
+    A3 option C (owner, 2026-11-08): the hub is set from the origin stops by a
+    gauge stack in Y, so its ±.0005 needs no exception."""
+    steps = {text.split(". ", 1)[0]: text for text in (*spec.ASSEMBLY_STEPS, *spec.OPERATION_STEPS)}
+    assert "ORIGIN" in steps["10C"] and "STEP 6F" in steps["10C"]
+    assert "X 0, Y .5125 ±.0005" in steps["10D"] and "GAUGE STACK" in steps["10D"]
+    assert spec.gauge_stack(spec._HUB_Y_TEXT) == (1005, 1120, 3000)
+    assert "RECORD" in steps["10E"] and "STEP 20" in steps["10E"]
+    assert carrier.HUB_THREAD in steps["10F"] and "NO COUNTERBORE" in steps["10F"]
+    assert "STEP 10E" in steps["20"]
+    assert all("REAM" not in steps[head] for head in ("10C", "10D", "10E", "10F"))
+    # The origin stops hold through step 14's recheck (as in step 6H, which
+    # returns by them); every move uses its own setting stop and indicator.
+    assert "UNTIL STEP 14 PASSES" in steps["6A"]
+    assert "SETTING STOP" in spec.RAIL_SETTING_TITLE and "SETTING INDICATOR" in spec.RAIL_SETTING_TITLE
     assert spec.carrier.HUB_RADIAL_STACK < 0.25
+    from _paths import CAD_ROOT
+    from machinist_exceptions import load_exceptions
+
+    exceptions = load_exceptions(CAD_ROOT / "config", "ch_rocker_arm_tl_oblique_jig_assembly", "assembly")
+    assert not any("HUB" in row.where for row in exceptions)
+
+
+def test_rail_setting_chain_uses_the_gauge_block_set_and_closes_the_stack() -> None:
+    """A3 option C (owner, 2026-11-08): the stack's stations 4.00, 8.00,
+    12.00 and 15.00, each table move one stack from the shop's 81-piece inch
+    set (none over 4 in) at the alignment row's ±.0005; the chain's computed
+    radial error (0.026 mm) closes with the shoulder and printed play."""
+    inch = spec.trammel.INCH
+    assert spec.CHAIN_STATIONS == pytest.approx(tuple(s * inch for s in (4.0, 8.0, 12.0, 15.0)))
+    assert spec.STATION_BAND == pytest.approx(0.0005 * inch)
+    assert len(spec.GAUGE_BLOCKS_TENTHS) == len(set(spec.GAUGE_BLOCKS_TENTHS)) == 81
+    assert spec.GAUGE_STACK_MAX == pytest.approx(4.0 * inch)
+    assert spec.CHAIN_STATION_RADIUS == pytest.approx(0.0258, abs=0.0005)
+    assert spec.CHAIN_RADIAL_STACK == pytest.approx(0.1583, abs=0.0005)
+    assert spec.CHAIN_RADIAL_STACK <= spec.trammel.TOP_EDGE_HALF_BAND
+    assert [row[1] for row in spec.RAIL_SETTING_ROWS] == ["ORIGIN", "S 4.00", "S 8.00", "S 12.00"]
+    for (near, far), row in zip(spec._CHAIN_LINKS, spec.RAIL_SETTING_ROWS, strict=True):
+        for rail, (x_cell, y_cell) in zip((1, 2), (row[2:4], row[4:6]), strict=True):
+            fx, fy = spec.trammel.rail_point(rail, far)
+            nx, ny = spec.trammel.rail_point(rail, near) if near else (0.0, 0.0)
+            assert float(x_cell) == pytest.approx((fx - nx) / inch, abs=5e-5)
+            assert float(y_cell) == pytest.approx((fy - ny) / inch, abs=5e-5)
+            for cell in (x_cell, y_cell):
+                blocks = spec.gauge_stack(cell)
+                assert sum(blocks) == round(abs(float(cell)) * 10000) <= 40000
+                assert set(blocks) <= set(spec.GAUGE_BLOCKS_TENTHS)
+        assert row[6:] == ("±.0005", "6H")
+    with pytest.raises(AssertionError, match="no gauge-block stack"):
+        spec.gauge_stack("11.0000")
+    steps = {text.split(". ", 1)[0]: text for text in spec.ASSEMBLY_STEPS}
+    assert steps["6H"].startswith("6H. CHECK") and "±.0005" in steps["6H"]
+    assert "GAUGE-BLOCK STACK" in spec.RAIL_SETTING_TITLE
+    assert "INCREMENTAL" not in " ".join(spec.ASSEMBLY_STEPS)
 
 
 def test_step_11_sets_the_stop_axes_before_spotting_the_riser() -> None:
@@ -1863,36 +1998,70 @@ def test_step_11_sets_the_stop_axes_before_spotting_the_riser() -> None:
         assert dro_point == pytest.approx(origin[:2], abs=1e-9)
         assert dro_point[1] < 0.0 < carrier_point[1]
     assert spec._STOP_AXIS_BAND == pytest.approx(0.254)
-    assert spec._STOP_DRO == "X ±6.61, Y -.57 ±.01"
-    step = next(text for text in spec.ASSEMBLY_STEPS if text.startswith("11. "))
-    assert spec._STOP_DRO in step
-    assert spec._item(spec.STOP_PIN) in step
+    assert spec._STOP_DRO == "X -6.61 AND X 6.61, Y -.57"
+    steps = {text.split(". ", 1)[0]: text for text in spec.ASSEMBLY_STEPS}
+    assert spec._STOP_DRO in steps["11A"]
+    assert spec._item(spec.STOP_PIN) in steps["11"]
+    # The axes are set before the riser is spotted from the carrier.
+    order = list(steps)
+    assert order.index("11A") < order.index("11C")
+
+
+def test_step_6_places_the_origin_from_the_middle_t_slot() -> None:
+    """Restack r3: the origin is located from a table feature the builder can
+    touch, the middle T-slot the table is centred on, at the table's centre."""
+    steps = {text.split(". ", 1)[0]: text for text in spec.ASSEMBLY_STEPS}
+    assert spec._ORIGIN_FROM_SLOT == "1.244"
+    assert (
+        f"SPINDLE AXIS {spec._ORIGIN_FROM_SLOT} TOWARD THE COLUMN FROM THE MIDDLE "
+        "T-SLOT CENTRELINE, AT THE TABLE'S LENGTHWISE MIDPOINT."
+    ) in steps["6"]
+    assert -trammel.TABLE_CENTRE_Y == pytest.approx(1.244 * trammel.INCH, abs=0.0005 * trammel.INCH)
 
 
 def test_r4_operation_order_cites_the_plan_and_retains_all_clamps() -> None:
     steps = {text.split(". ", 1)[0]: text for text in spec.OPERATION_STEPS}
-    assert list(steps) == ["O1", "O2", "O3", "O4", "O5", "O6"]
+    numbers = list(dict.fromkeys(re.match(r"\d+", head).group(0) for head in steps))
+    assert numbers == [str(n) for n in range(15, 22)]
     assert spec.PROCESS_PLAN == "MHA-CH-06 PLAN"
-    assert "SELF-CUT THE 6061 RISER WITH THE 9/16 CUTTER BEFORE LOADING WORK" in steps["O3"]
-    assert "THE TOP-HAT WASHER AND CL, CR AND HUB SCREWS OUT" in steps["O3"]
-    assert "KEEP ALL FOUR RISER SCREWS AND BOTH STOP PINS FITTED" in steps["O3"]
-    assert "CLEARS THE 3/8 STRAP CUTTER BY 2.38 MM PER SIDE" in steps["O3"]
-    assert "PER MHA-CH-06 PLAN S0-S1" in steps["O4"]
-    assert "TRANSFERRED AND DRILLED OFF-JIG PER S2 OP20" in steps["O4"]
-    assert "RAW EDGE TOWARD -Y AGAINST BOTH STOP PINS" in steps["O4"]
-    assert "PER MHA-CH-06 PLAN S2 OP30-OP40" in steps["O5"]
-    assert f"TORQUE {spec._torque(spec.holding.HUB_TORQUE_NM)}" in steps["O6"]
-    assert "PER MHA-CH-06 PLAN S3 OP10-OP20" in steps["O6"]
-    assert "THE HEAD NEED NOT BEAR FULLY ON THE FLANGE" in steps["O6"]
-    assert "ACCEPTED" not in steps["O6"] and "CENTRE" not in steps["O6"]
-    assert "RETAINING ALL THREE CLAMPS THROUGH BOTH PASSES" in steps["O6"]
-    assert "NEVER A FULL-WIDTH SLOT OR PLUNGE" in steps["O6"]
+    # The riser is cut before the first strap; the strap is prepared, drilled
+    # and reamed, then cut per the plan's sections.
+    assert "BEFORE THE FIRST STRAP" in steps["18"]
+    assert "PLAN S0-S1 AND S2 OP20" in steps["19"]
+    assert "PLAN S2 OP30-OP40" in steps["20A"]
+    assert "PLAN S3 OP10-OP20" in steps["21F"]
+    assert spec._torque(spec.holding.HUB_TORQUE_NM) in steps["21A"]
+    assert "HEAD SEATED ON THE FLANGE" in steps["21A"]
+    assert steps["21B"] == "21B. CHECK THE WASHER AND STRAP BY HAND: NEITHER TURNS NOR LIFTS."
+    assert spec._item(spec.HUB_WASHER) in steps["21"]
     for text in steps.values():
         # The plan prints the blank, chords and the hub tool envelope.
         assert "350 MM" not in text and "REAMER" not in text
-    clamps = f"{spec._CLAMP_SCREW} {spec._item(spec.RAIL_SCREW)}"
-    assert clamps in steps["O4"] and clamps in steps["O6"]
-    assert spec._item(spec.HUB_WASHER) in steps["O6"]
+    assert f"{spec._CLAMP_SCREW} {spec._item(spec.RAIL_SCREW)}" in steps["19B"]
+    assert "ALL 3 CLAMP SCREWS" in steps["21F"]
+
+
+def test_riser_groove_has_a_depth_and_a_bench_acceptance() -> None:
+    """TL-00 round 2: the in-place riser cut is a groove .215 ±.010 deep from
+    the riser top, never through the thinnest printed riser to the carrier,
+    checked at both pass ends with its remedies."""
+    inch = spec.trammel.INCH
+    steps = {text.split(". ", 1)[0]: text for text in spec.OPERATION_STEPS}
+    assert ".215 DEEP FROM THE RISER TOP" in steps["18"]
+    assert steps["18A"].startswith("18A. CHECK") and ".205-.225" in steps["18A"]
+    assert steps["18B"].startswith("18B. IF ") and steps["18C"].startswith("18C. IF ")
+    assert spec.RISER_GROOVE_DEPTH + spec.RISER_GROOVE_BAND < spec.riser.THICKNESS - spec.riser.THICKNESS_BAND
+    assert spec.RISER_GROOVE_DEPTH == pytest.approx(0.215 * inch)
+
+
+def test_clamp_screw_clearance_is_checked_once_they_are_fitted() -> None:
+    """TL-00 round 2: 17A ran before the strap clamp screws and washer were
+    fitted; their closest approach is checked at 21C, after 21A-21B."""
+    steps = {text.split(". ", 1)[0]: text for text in spec.OPERATION_STEPS}
+    assert "CLAMP" not in steps["17A"] and "WASHER" not in steps["17A"]
+    assert "STEPS 17-17A" in steps["21C"] and "3 CLAMP SCREWS FITTED" in steps["21C"]
+    order = list(steps)
+    assert order.index("21A") < order.index("21C") < order.index("21F")
 
 
 def test_r4_holding_hardware_placements_close_on_actual_seats() -> None:
@@ -1917,69 +2086,54 @@ def test_r4_holding_hardware_placements_close_on_actual_seats() -> None:
     assert spec.PART_TOP_Z == spec.holding.PART_TOP_Z
 
 
-def test_steps_13b_and_13c_split_o1_around_the_stud_rework() -> None:
-    """Review jig-asm r1/r2: the carrier stays off from 13B through HD3, so
-    13B gives O1's removal half only and 13C its refit half only."""
+def test_stud_steps_cut_to_the_kit_sheet_and_accept_directly() -> None:
+    """Q3 (Delegated ruling 2026-11-07 (Main), no precedent; owner review
+    #2144; pending owner confirmation): the studs are cut to the kit length,
+    checked directly for clearance and projection, with a cut-shorter remedy."""
     steps = {text.split(". ", 1)[0]: text for text in spec.ASSEMBLY_STEPS}
-    assert "PER O1" not in steps["13B"] and "PER O1" not in steps["13C"]
-    assert "REMOVE BOTH SHOULDER SCREWS AND LIFT IT OFF; KEEP IT OFF" in steps["13B"]
-    assert steps["13B"].endswith("REWORK STUDS PER HD2-HD3.")
-    assert "LOWER THE CARRIER ONTO THEM, REFIT BOTH SCREWS PER P2 AND CHECK P1-P3" in steps["13C"]
-    assert steps["13C"].endswith("DO HD4 AND THE CHECKS.")
-    # The strap clamps' timing is stated.
-    assert (
-        f"THE CL, CR AND HUB {spec._CLAMP_SCREW} {spec._item(spec.RAIL_SCREW)} "
-        "ARE FITTED AT EACH WORK LOADING"
-    ) in steps["12"]
-
-
-def test_kp08_row_and_stud_cut_timing_read_plainly() -> None:
-    """The table-mounting step retains the later stud-rework references."""
-    assert spec.BOM_DESCRIPTIONS[spec.PILLOW_BLOCK] == "KP08 PILLOW BLOCK, 8 MM BORE"
-    step = next(text for text in spec.ASSEMBLY_STEPS if text.startswith("3. "))
-    assert spec._item(spec.HOLD_DOWN_STUD) in step
-    assert "13B/HD3" in step and "HD1" in step
-    assert spec._length(spec.hold_down_stud.LENGTH, spec.hold_down_stud.LENGTH_PLACES) in step
-    assert spec.BOM_DESCRIPTIONS[spec.HOLD_DOWN_STUD].endswith("CUT 2.25 IN")
-
-
-def test_caption_names_the_fitted_strap_holding() -> None:
-    assert spec.ASSEMBLED_CAPTION.endswith(
-        "NO STRAP SHOWN; ITS CLAMPS AND STOP PINS AS FITTED."
+    assert spec.STUD_REWORK_SHEET in steps["3"]
+    assert spec._item(spec.HOLD_DOWN_STUD) in steps["3"]
+    assert f"{spec._STUD_CLEARANCE} MIN" in steps["13A"]
+    assert steps["13B"].startswith("13B. IF ")
+    assert spec._STUD_PITCH in steps["13E"]
+    assert steps["13F"].startswith("13F. IF ")
+    assert spec.HOLD_DOWN_REFERENCE.endswith(
+        f"STEPS {spec.HOLD_DOWN_STEPS_REFERENCE} (SHEET {spec.HOLD_DOWN_SHEET_NUMBER})"
     )
-    assert not hasattr(spec, "CL_TIP_REFERENCE")
-    assert not hasattr(spec, "DRAWING_DIMENSIONS")
+    assert not hasattr(spec, "HOLD_DOWN_STEPS") and not hasattr(spec, "_STUD_LIMITS")
+
+
+def test_kp08_row_reads_by_item() -> None:
+    assert spec.BOM_DESCRIPTIONS[spec.PILLOW_BLOCK] == "KP08 PILLOW BLOCK, 8 MM BORE"
+    for text in (*spec.ASSEMBLY_STEPS, *spec.OPERATION_STEPS):
+        assert "KP08" not in text
 
 
 def test_general_torque_note_covers_every_fastener_no_step_torques() -> None:
     """Review jig-asm r1 (rule 24): one general note for the screws and nuts
     whose steps give no torque, with no invented figure."""
-    torqued = {
-        spec.LEVER_SCREW: "12. ",
-        spec.PIVOT_SCREW: "P2. ",
-        spec.PILLOW_BLOCK_SCREW: "F1B. ",
+    steps = {
+        text.split(". ", 1)[0]: text for text in (*spec.ASSEMBLY_STEPS, *spec.OPERATION_STEPS)
     }
-    steps = (*spec.ASSEMBLY_STEPS, *spec.PIVOT_FIT_STEPS, *spec.FEED_FIT_STEPS,
-             *spec.OPERATION_STEPS)
-    for label in torqued.values():
-        step = next(text for text in steps if text.startswith(label))
-        assert "N·m" in step
-    loading = next(text for text in steps if text.startswith("O6. "))
-    assert spec._item(spec.RAIL_SCREW) in loading
-    assert spec._item(spec.HUB_WASHER) in loading
-    assert spec._torque(spec.holding.HUB_TORQUE_NM) in loading
-    # O6 torques the common family's hub clamp; its rail/end-clamp instances
-    # use the general snug note. Step 2 torques the bracket family's lower
-    # screws separately from F1B's upper KP08 screws.
-    fitting = next(text for text in steps if text.startswith("2. "))
-    assert spec._item(spec.RAIL_SCREW) in fitting
-    assert spec._item(spec.PILLOW_BLOCK_SCREW) in fitting
-    assert spec._torque(leadscrew.BAR_SCREW_TORQUE_NM) in fitting
-    # The riser screw family's four feed-nut screws take F2's torque; its
+    torqued = {
+        spec.LEVER_SCREW: ("12", spec.LEVER_SCREW_TORQUE_NM),
+        spec.PIVOT_SCREW: ("9M", spec.PIVOT_SCREW_TORQUE_NM),
+        spec.PILLOW_BLOCK_SCREW: ("8C", spec.KP08_SCREW_TORQUE_NM),
+    }
+    for head, nm in torqued.values():
+        assert spec._torque(nm) in steps[head]
+    assert spec._item(spec.RAIL_SCREW) in steps["21A"]
+    assert spec._torque(spec.holding.HUB_TORQUE_NM) in steps["21A"]
+    # The common family's hub clamp takes 21A's torque; its rail/end-clamp
+    # instances use the general snug note. Step 2B torques the bracket
+    # family's lower screws separately from 8C's upper KP08 screws.
+    assert spec._item(spec.RAIL_SCREW) in steps["2A"]
+    assert spec._item(spec.PILLOW_BLOCK_SCREW) in steps["2B"]
+    assert spec._torque(leadscrew.BAR_SCREW_TORQUE_NM) in steps["2B"]
+    # The riser screw family's four feed-nut screws take 8N's torque; its
     # four riser screws, with no stated torque, stay on the general note.
-    f2 = next(text for text in steps if text.startswith("F2. "))
-    assert spec._item(spec.RISER_SCREW) in f2
-    assert spec._torque(spec.NUT_SCREW_TORQUE_NM) in f2
+    assert spec._item(spec.RISER_SCREW) in steps["8L"]
+    assert spec._torque(spec.NUT_SCREW_TORQUE_NM) in steps["8N"]
     threaded = {
         spec.RAIL_SCREW, spec.CARRIAGE_SCREW,
         spec.PILLOW_BLOCK_SCREW, spec.RISER_SCREW,
@@ -1994,8 +2148,8 @@ def test_general_torque_note_covers_every_fastener_no_step_torques() -> None:
 
 
 def test_sweep_limits_are_witness_marked_and_every_pass_runs_mark_to_mark() -> None:
-    """Review jig-asm r2: step 6 and HD3 set each pin at each sweep limit as at
-    a station and mark the bars; step 9, HD1 and HD4 sweep to those marks."""
+    """Review jig-asm r2: each sweep limit is a pass-table row, set in X
+    only and witness-marked (step 6N-6P); every complete pass runs mark to mark."""
     hundredth = spec.trammel.INCH / 100.0
     gap = spec.leadscrew.FEED_GAP
     for name, (lo, hi) in spec.SWEEP_LIMITS.items():
@@ -2008,25 +2162,18 @@ def test_sweep_limits_are_witness_marked_and_every_pass_runs_mark_to_mark() -> N
             assert lo_s <= centre <= hi_s
             travel = spec.trammel.CARRIAGE_TRAVEL
             assert travel[0] - gap < centre < travel[1] + gap
-    header, *rows = spec.SWEEP_NOTE_LINES
-    assert header.startswith(
-        "SWEEP LIMITS, EACH PIN AT S: INNER 2.96 TO 14.87, OUTER 3.06 TO 15.33;"
+    limits = [row for row in spec.PASS_TABLE_ROWS if row[0].endswith(" LIMIT")]
+    assert sorted(float(row[1]) for row in limits) == sorted(
+        round(s / spec.trammel.INCH, 2) for pair in spec.SWEEP_LIMITS.values() for s in pair
     )
-    assert "WITNESS-MARK" in header and "MARK TO MARK" in header
-    assert [row.split(":")[0] for row in rows] == [
-        "S  2.96", "S  3.06", "S 14.87", "S 15.33"
-    ]
-    assert rows[0] == spec._station_row(spec.SWEEP_LIMITS["inner"][0])
-    steps = {
-        text.split(". ", 1)[0]: text
-        for text in (*spec.ASSEMBLY_STEPS, *spec.HOLD_DOWN_STEPS)
-    }
-    assert "SET EACH SWEEP LIMIT (SHEET 1) THE SAME WAY" in steps["6"]
-    assert "WITNESS-MARK EACH BAR AT ITS CARRIAGE'S SPINDLE-END FACE" in steps["6"]
-    assert "RENEW THE SWEEP-LIMIT MARKS" in steps["HD3"]
-    assert "MARK TO MARK (STEP 6)" in steps["9"]
-    assert "COMPLETE PASSES, MARK TO MARK" in steps["HD1"]
-    assert "COMPLETE PASS TO THE HD3 MARKS" in steps["HD4"]
+    # A pass row is set in X only at the long-travel row; its Y is REF.
+    for row in spec.PASS_TABLE_ROWS:
+        assert row[3].startswith("(") and row[5].startswith("(")
+        assert row[6] == "X ±.004"
+    steps = {text.split(". ", 1)[0]: text for text in spec.ASSEMBLY_STEPS}
+    assert "LIMIT ROW" in steps["6N"] and "X ONLY" in steps["6N"]
+    assert "WITNESS-MARK" in steps["6P"]
+    assert "MARK TO MARK" in steps["9N"] and "MARK TO MARK" in steps["13A"]
 
 
 def test_lever_screw_torque_is_capped_by_the_carrier_thread() -> None:
@@ -2189,12 +2336,12 @@ def test_kp08_screws_torque_inside_the_foot_thread_and_screw_budgets() -> None:
     )
     assert min(margins.values()) > 1.0
     assert spec.KP08_SCREW_ENGAGEMENT_MIN >= 2.0 * row.major_mm
-    # Step 7 fits them loose; F1B tightens them once the KP08s are aligned.
+    # Step 7A fits them loose; 8C tightens them once the pillow blocks are aligned.
     assert spec.PILLOW_BLOCK_SCREW not in spec.SNUG_FASTENERS
-    f1 = next(text for text in spec.FEED_FIT_STEPS if text.startswith("F1B. "))
-    assert f"TIGHTEN THE KP08 SCREWS TO {spec._torque(spec.KP08_SCREW_TORQUE_NM)}" in f1
-    seven = next(text for text in spec.ASSEMBLY_STEPS if text.startswith("7. "))
-    assert f"{spec._item(spec.PILLOW_BLOCK_SCREW)}, LOOSE" in seven
+    steps = {text.split(". ", 1)[0]: text for text in spec.ASSEMBLY_STEPS}
+    assert spec._torque(spec.KP08_SCREW_TORQUE_NM) in steps["8C"]
+    assert f"{spec._item(spec.PILLOW_BLOCK_SCREW)}, LOOSE" in steps["7A"]
+    seven = steps["7"]
     # Both 5/8 screws stay outside the opposed hand-tap cuts and keep
     # 1.5 D of full thread: the KP08 foot under them is checked first
     # (#2184 leaves it UNVERIFIED) between the end bracket's least foot
@@ -2236,54 +2383,55 @@ def test_kit_rails_and_carriages_carry_the_owner_note_and_the_play_check() -> No
     assert spec.BOM_DESCRIPTIONS[spec.CARRIAGE] == f"{carriage.STYLE} CARRIAGE, KIT"
     for description in spec.BOM_DESCRIPTIONS.values():
         assert "Z0" not in description and "PRELOAD" not in description
-    tir = f"{trammel.CARRIAGE_PLAY_TIR_MAX:.2f} MM TIR MAX"
-    assert tir == "0.02 MM TIR MAX"
+
     rail_item, carriage_item = spec.ITEM_NUMBERS[spec.RAIL], spec.ITEM_NUMBERS[spec.CARRIAGE]
-    note = spec.BOM_NOTE.split("\n")
-    kit = note.index(
-        f"ITEMS {rail_item}-{carriage_item}: HIWIN-STYLE "
-        f"{guide_rail.STYLE} RAIL / {carriage.STYLE} CARRIAGE, A MATCHED KIT,"
-    )
-    assert note[kit + 1:kit + 3] == [
-        "NUIBBYED-BRANDED, NOT GENUINE HIWIN. Z0 PRELOAD AND C ACCURACY NOT",
-        f"REQUIRED; ACCEPT BY FIT-UP PLAY CHECK ({tir} AT THE PIVOT).",
-    ]
-    # The kit lines print no wider than the shim buy list above them.
-    assert max(map(len, note[kit:])) <= len(note[kit - 1])
     assert int(carriage_item) == int(rail_item) + 1
-    # The printed check reads the trammel's budgeted play: lateral play moves
-    # the cut radius 1:1 and stays inside the shoulder term's band.
-    check = next(text for text in spec.ASSEMBLY_CHECKS if "TIR" in text)
-    assert check.endswith(f"HAND: {tir}.")
-    assert "SHOULDER-SCREW HEAD" in check and "SIDEWAYS TO RAIL" in check
+    # The printed check reads the owner's play (P1-A, 2026-11-07: 0.02 mm)
+    # converted to four places, .0008 TIR, accepted by RV-06; its radius
+    # sits inside the shoulder allowance and, with it, the half band.
+    steps = {text.split(". ", 1)[0]: text for text in spec.ASSEMBLY_STEPS}
+    check = steps["14C"]
+    assert check.endswith(f"{spec._PLAY_TIR}.") and spec._PLAY_TIR == ".0008 TIR MAX"
+    assert "SHOULDER-SCREW HEAD" in check and "SIDEWAYS" in check
+    play = trammel.CARRIAGE_PLAY_RADIUS_PER_PLAY * spec.CARRIAGE_PLAY_TIR_PRINTED
+    assert play == pytest.approx(0.02032, abs=1e-9)
+    assert abs(spec.CARRIAGE_PLAY_TIR_PRINTED - trammel.CARRIAGE_PLAY_TIR_MAX) <= 0.00005 * trammel.INCH
+    from _paths import CAD_ROOT
+    from machinist_exceptions import load_exceptions
+
+    rows = {
+        row.id: row
+        for row in load_exceptions(CAD_ROOT / "config", "ch_rocker_arm_tl_oblique_jig_assembly", "assembly")
+    }
+    accept = rows["RV-06"]
+    assert ".0008" in accept.where and "P1-A" in accept.reason and "4504212381" in accept.reason
+    assert "RV-07" not in rows
+    assert play <= trammel.RADIUS_FROM_SHOULDER_CLEARANCE
     assert trammel.CARRIAGE_PLAY_RADIUS == pytest.approx(
         trammel.CARRIAGE_PLAY_RADIUS_PER_PLAY * trammel.CARRIAGE_PLAY_TIR_MAX
     )
     # Carriage selection is preparation step 1, ahead of rail fitting.
-    preparation = next(text for text in spec.ASSEMBLY_STEPS if text.startswith("1. "))
-    assert spec._item(spec.CARRIAGE) in preparation
-    assert carriage.STYLE in preparation
-    assert "ROCK ALL 4 SIDEWAYS UNDER AN INDICATOR; KEEP THE 2 TIGHTEST, ONE PER RAIL." in preparation
-    assert "ONLY ONTO A KIT FALSE RAIL" in preparation
-    assert "IF NONE MEETS 0.02 MM, FIT A PRELOADED (Z0/ZA) HGH15CA CARRIAGE." in preparation
+    assert spec._item(spec.CARRIAGE) in _step_groups()["1"]
+    # Owner ruling 2026-11-08 (Pedro): kit carriages only; a rail with no
+    # passing kit carriage gets a new rail kit, never another carriage.
+    check = next(text for text in spec.ASSEMBLY_STEPS if text.startswith("1. "))
+    remedy = next(text for text in spec.ASSEMBLY_STEPS if text.startswith("1A. "))
+    assert check.endswith(f"{spec._PLAY_TIR}.")
+    assert remedy == "1A. IF NO CARRIAGE ON A RAIL PASSES, REPLACE THE MHA-CH-06-TL-VN-83 KIT."
+    assert "HIWIN" not in spec.BOM_NOTE and "ALTERNATE" not in spec.BOM_NOTE
     assert trammel.RAIL_HOLE_COUNT == 8
 
 
 def test_rail_preparation_cites_numbered_documents_and_the_stated_wall() -> None:
     # TL-00 review 62753c5e: every document step 1 uses is cited by Number
-    # and sheet, and the trimmed rail's wall check names its stated minimum.
-    preparation = next(text for text in spec.ASSEMBLY_STEPS if text.startswith("1. "))
+    # and sheet; the trimmed rail's wall check cites its stated minimum.
+    preparation = _step_groups()["1"]
     assert spec.BASE_BAR_NUMBER == "MHA-CH-06-TL-20"
     assert spec.RAIL_RECEIPT_REFERENCE == "MHA-CH-06-TL-VN-83 SHEET 2"
-    assert preparation.startswith(
-        "1. PREPARE RAILS PER THE MHA-CH-06-TL-20 PROCESS PLAN AND MHA-CH-06-TL-VN-83 SHEET 2. "
-    )
-    assert "CHECK EACH END COUNTERBORE WALL 2.0 MM MIN (MHA-CH-06-TL-VN-83 SHEET 2 NOTE [A])." in preparation
-    assert f"[A] WALL FROM EACH END COUNTERBORE TO RAIL END: {guide_rail.WALL_ACCEPTANCE_MM:.1f} MIN." in (
-        guide_rail.DRAWING_NOTES
-    )
-    for unnumbered in ("BASE-BAR PLAN", "BASE-BAR PROCESS PLAN", "RAIL SHEET", "RETAINED WALLS"):
-        assert unnumbered not in preparation
+    assert f"{spec.BASE_BAR_NUMBER} PROCESS PLAN" in preparation
+    assert f"{spec.RAIL_RECEIPT_REFERENCE} NOTE 1" in preparation
+    assert f"{guide_rail.WALL_ACCEPTANCE_MM:.1f} MIN" in guide_rail.DRAWING_NOTES
+    assert " MM MIN" not in preparation
 
 
 def test_bom_note_names_the_base_bar_rows_as_two_configurations() -> None:
@@ -2300,170 +2448,72 @@ def test_bom_note_names_the_base_bar_rows_as_two_configurations() -> None:
     assert len(line) <= len(buy)
 
 
-# The feed fit-up's one linear order (TL-00 review, farm 20261104T210601055Z,
-# blocker: step 8 and F1 sent the fitter to each other).
-_FEED_SEQUENCE = ("7", "F1A", "8A", "F1B", "F2", "8B", "F3", "9")
-_STEP_REFERENCE = re.compile(r"\b(F\d[A-Z]?|\d+[A-Z])\b")
-
-
-def _feed_steps() -> dict[str, str]:
-    return {
-        text.split(". ", 1)[0]: text
-        for text in (*spec.ASSEMBLY_STEPS, *spec.FEED_FIT_STEPS)
-    }
-
-
-def test_feed_fit_up_reads_in_one_order_with_one_way_references() -> None:
-    steps = _feed_steps()
-    assert [label for label in steps if label.startswith("F")] == ["F1A", "F1B", "F2", "F3"]
-    order = {label: index for index, label in enumerate(_FEED_SEQUENCE)}
-    seen = set()
-    for label in _FEED_SEQUENCE:
-        body = steps[label].split(". ", 1)[1]
-        for match in _STEP_REFERENCE.finditer(body):
-            target = match[1]
-            before = body[:match.start()]
-            seen.add((label, target))
-            assert target in order, (label, target)
-            if before.endswith("AFTER STEP "):
-                assert order[target] < order[label], (label, target)
-            elif before.endswith(("BEFORE STEP ", "GO TO STEP ")):
-                assert order[target] > order[label], (label, target)
-            elif before.endswith(("REPEAT ", "REPEAT F1B-")):
-                # F3's failure path only: redo the seat and transfer.
-                assert label == "F3" and target in ("F1B", "F2"), (label, target)
-            elif before == "COMPLETE ":
-                # A prerequisite opening the step: done before it.
-                assert order[target] < order[label], (label, target)
-            else:
-                # A hand-off ("COMPLETE F1B-F2."): the next steps in order.
-                assert order[target] > order[label], (label, target)
-    # Every hand-off and position marker that makes the chain, and no others.
-    assert seen == {
-        ("F1A", "8A"),
-        ("8A", "F1A"), ("8A", "F1B"), ("8A", "F2"),
-        ("F1B", "8A"),
-        ("F2", "8B"),
-        ("8B", "F3"),
-        ("F3", "8B"), ("F3", "F1B"), ("F3", "F2"),
-    }
-
-
-def test_f1_f2_prepare_seat_and_transfer_from_the_nut() -> None:
-    # Owner ruling 2026-11-04 (option B) and Main's tightening procedure: F1A
-    # measures and reworks the nut before step 8A threads it; F1B aligns the
-    # KP08s, then clocks and seats the nut on the leadscrew; F2 transfers the
-    # taps through it and screws it down with the leadscrew still in it.
-    steps = _feed_steps()
-    f1a, f1b, f2 = steps["F1A"], steps["F1B"], steps["F2"]
-    clearance = spec._length(feed_block.SCREW_CLEARANCE_DIA, feed_block.NUT_PATTERN_PLACES)
-    clock = f"{feed_block.NUT_CLOCK_DEG:.0f}°"
-    band = f"±{feed_block.NUT_CLOCK_TOL_DEG:.0f}°"
-    order = (
-        f"BEFORE STEP 8A, MEASURE THE FEED NUT {spec._item(spec.FEED_NUT)} TO THE "
-        f"RECEIPT LIMITS ON {feed_nut.REWORK_SHEET_REFERENCE}",
-        "REJECT ONE OUTSIDE THEM",
-        "FACE AND COUNTERSINK IT PER THAT SHEET",
-        "REJECT ONE OUTSIDE ITS FACED LENGTH",
-    )
-    positions = [f1a.index(phrase) for phrase in order]
-    assert positions == sorted(positions)
+def test_feed_nut_is_reworked_seated_and_transferred_in_one_order() -> None:
+    # Owner ruling 2026-11-04 (option B) and Main's tightening procedure: the
+    # nut is measured and reworked before the leadscrew is threaded; the
+    # pillow blocks are aligned and tightened, then the nut is clocked and
+    # seated on the leadscrew, the taps transferred through it and it is
+    # screwed down with the leadscrew still in it.
+    steps = {text.split(". ", 1)[0]: text for text in spec.ASSEMBLY_STEPS}
+    heads = list(steps)
+    sequence = ("7B", "7C", "7D", "7E", "7F", "8A", "8B", "8C", "8D", "8E", "8F",
+                "8G", "8H", "8J", "8K", "8L", "8M", "8N", "8P", "8Q", "8R", "8S")
+    assert [head for head in heads if head in sequence] == list(sequence)
+    assert spec._item(spec.FEED_NUT) in steps["7B"]
+    assert feed_nut.REWORK_SHEET_REFERENCE in steps["7B"]
     assert feed_nut.REWORK_SHEET_REFERENCE == f"{feed_nut.NUMBER} SHEET {feed_nut.REWORK_SHEET}"
+    assert steps["7C"].startswith("7C. IF ") and steps["7F"].startswith("7F. IF ")
     # Codjiflo P2 and 4475311251: every receipt and rework limit is the kit
-    # sheet's native dimension, not TL-00 text; F1A types none of them.
+    # sheet's native dimension, not TL-00 text.
     limits = {
         f"{round(nominal + deviation, 6):.{places}f}"
         for nominal, lower, upper, places in feed_nut.NATIVE_CONTROLS.values()
         for deviation in (lower, upper)
     }
-    assert limits == {
-        "3.3", "3.7", "4.50", "4.76", "13.2", "13.8", "21.8", "22.2",
-        "10.0", "10.3", "3.46", "3.60", "15.9", "16.1",
-    }
+    preparation = " ".join(steps[head] for head in ("7B", "7C", "7D", "7E", "7F"))
     for typed in (
         *limits,
         f"Ø{feed_nut.CSK_DIA:.1f}", feed_nut.CSK_CUTTER_TEXT,
         f"{feed_nut.CSK_ANGLE:.0f}°", "LATHE", "SPIGOT",
     ):
-        assert typed not in f1a, typed
-    order = (
-        "AFTER STEP 8A",
-        f"ALIGN EACH KP08 SO THE SCREW RUNS CENTRED IN THE LUG'S Ø{clearance} CLEARANCE",
-        f"TIGHTEN THE KP08 SCREWS TO {spec._torque(spec.KP08_SCREW_TORQUE_NM)}",
-        f"{leadscrew.NEAR_STUB:.1f} MM PAST THE NEAR BLOCK",
-        f"TURN THE NUT UNTIL ALL {feed_nut.SCREW_COUNT} HOLES CENTRE WITHIN THE TAP "
-        f"CLOCKING ON {feed_block.NUT_CLOCK_REFERENCE}",
-        "MITRE SQUARE ON THE LUG'S TOP EDGE THROUGH THE SCREW AXIS",
-        f"REJECT A NUT WHOSE {feed_nut.SCREW_COUNT} HOLES CANNOT ALL BE SET WITHIN IT",
-        "TURN THE SCREW, NEVER SLIDE IT, UNTIL THE NUT SEATS FLAT ON THE LUG FACE",
-    )
-    positions = [f1b.index(phrase) for phrase in order]
-    assert positions == sorted(positions)
-    # Codjiflo 4477879822 and 4477879826 on #2187: every hole, not one, is
-    # set within TL-32's native NutClock, which F1B cites and never types.
-    assert feed_block.NUT_CLOCK_REFERENCE == f"{feed_block.NUMBER} SHEET 2 VIEW D"
-    assert clock not in f1b and band not in f1b
-    # Rule 25: a supplied nut (its spigot on, SUPPLIED_LENGTH long) passes the
-    # incoming checks; the faced-length limit, which it exceeds, is checked
-    # once, after the rework.
+        assert typed not in preparation, typed
+    # Rule 25: the faced length is checked once, after the rework.
     assert feed_nut.SUPPLIED_LENGTH > feed_nut.LENGTH_MAX
-    assert f1a.count("FACED LENGTH") == 1 and "FACED LENGTH" not in f1b
-    assert f1a.index("FACE AND COUNTERSINK") < f1a.index("FACED LENGTH")
-    # F2's drills are TL-32's: the spot enters the least nut hole, the tap
+    assert "FACED LENGTH" in steps["7E"] and "FACE" in steps["7D"]
+    # Codjiflo 4477879822/4477879826 on #2187: every hole is set within
+    # TL-32's native NutClock, cited and never typed.
+    assert feed_block.NUT_CLOCK_REFERENCE == f"{feed_block.NUMBER} SHEET 2 VIEW D"
+    assert feed_block.NUT_CLOCK_REFERENCE in steps["8D"]
+    clock = f"{feed_block.NUT_CLOCK_DEG:.0f}°"
+    band = f"±{feed_block.NUT_CLOCK_TOL_DEG:.0f}°"
+    assert all(clock not in steps[h] and band not in steps[h] for h in ("8D", "8E"))
+    assert "NEVER" in steps["8G"] and "SLIDE" in steps["8G"]
+    # The drills are TL-32's: the spot enters the least nut hole, the tap
     # drill is the lug's.
     assert spec.NUMBER_DRILL_MM[spec._SPOT_DRILL] == pytest.approx(feed_block.TRANSFER_SPOT_DIA, abs=1e-3)
     assert spec.NUMBER_DRILL_MM[spec._TAP_DRILL] == feed_block.NUT_TAP_DRILL
-    # Owner ruling 2026-11-04 (#2177 option 3): F2 calipers the nut screws'
-    # heads to the limit TL-32's head-to-body stack-up is built on, before
-    # they go in; an oversize head is replaced, the nut body is never cut.
+    assert spec._SPOT_DRILL in steps["8J"]
+    assert spec._TAP_DRILL in steps["8K"] and feed_nut.SCREW_THREAD in steps["8K"]
+    # Owner ruling 2026-11-04 (#2177 option 3): the nut screws' heads are
+    # calipered to the limit TL-32's head-to-body stack-up is built on; an
+    # oversize head is replaced, the nut body never cut.
     head_limit = spec._bound(feed_nut.SCREW_HEAD_DIA_MAX, 3, up=False)
-    assert head_limit == ".212"
-    assert feed_block.HEAD_TO_BODY_TERMS["head radius (F2 limit Ø.212, the catalogue's)"] == (
-        -feed_nut.SCREW_HEAD_DIA_MAX / 2.0
-    )
+    assert head_limit == ".212" and f"Ø{head_limit} MAX" in steps["8L"]
+    assert spec._item(spec.RISER_SCREW) in steps["8L"]
     assert feed_block.HEAD_TO_BODY_SHARP_CENTRED < 0.0 < feed_block.HEAD_TO_BODY_MIN
-    order = (
-        f"SPOT THE {feed_nut.SCREW_COUNT} TAPS THROUGH THE NUT'S HOLES WITH A {spec._SPOT_DRILL} DRILL",
-        f"DRILL {spec._TAP_DRILL} AND TAP {feed_nut.SCREW_THREAD} THRU",
-        f"CALIPER {feed_nut.SCREW_COUNT} FLAT HEADS {spec._item(spec.RISER_SCREW)}: "
-        f"HEAD Ø{head_limit} MAX, AS B18.6.3'S MAX "
-        f"{spec._length(feed_block.HEAD_DIA_SHARP_MAX, 3)} REACHES THE NUT BODY",
-        "REJECT ONE OVER AND FIT A REPLACEMENT THAT PASSES; NEVER MACHINE THE NUT BODY",
-        "WITH THE SCREW A FEW TURNS IN THE NUT",
-        f"CROSSWISE IN 2 STAGES TO {spec._torque(spec.NUT_SCREW_TORQUE_NM)}",
-        f"OPEN THE COUNTERSINKS PER {feed_nut.REWORK_SHEET_REFERENCE}",
-        "GO TO STEP 8B",
-    )
-    positions = [f2.index(phrase) for phrase in order]
-    assert positions == sorted(positions)
-    # 4475311242: the opening stays within the sheet's CskDia band, typed
-    # nowhere in TL-00.
-    remedy = f2[f2.index("OPEN THE COUNTERSINKS") :]
+    assert steps["8M"].startswith("8M. IF ") and "NEVER MACHINE THE NUT BODY" in steps["8M"]
+    assert spec._torque(spec.NUT_SCREW_TORQUE_NM) == "2.7 IN·LBF"
+    assert spec._torque(spec.NUT_SCREW_TORQUE_NM) in steps["8N"]
+    # 4475311242: the countersink opening stays within the sheet's band,
+    # typed nowhere in TL-00.
+    remedy = steps["8R"]
+    assert feed_nut.REWORK_SHEET_REFERENCE in remedy
     assert not re.search(r"\d\.\d", remedy.replace(feed_nut.REWORK_SHEET_REFERENCE, ""))
-    assert "B18.6.3'S MAX .225" in f2
-    assert spec._torque(spec.NUT_SCREW_TORQUE_NM) == "0.3 N·m (2.7 IN·LBF)"
+    assert spec._item(spec.HANDWHEEL) in steps["8S"]
     # The fit-up acts on what it finds; it never stops to report.
-    for text in (steps["7"], steps["8A"], steps["8B"], *spec.FEED_FIT_STEPS):
-        assert "REPORT" not in text and "STOP" not in text
-    # 8A threads the reworked nut and hands off to F1B-F2; 8B fits the
-    # handwheel and hands off to F3, which checks the travel.
-    eight_a, eight_b = steps["8A"], steps["8B"]
-    assert (
-        eight_a.index("COMPLETE F1A (SHEET 8)")
-        < eight_a.index(f"THREAD THE LEADSCREW {spec._item(spec.LEADSCREW)}")
-        < eight_a.index(f"THE FEED NUT {spec._item(spec.FEED_NUT)}")
-        < eight_a.index("COMPLETE F1B-F2")
-    )
-    assert eight_b.index(f"PUSH THE HANDWHEEL {spec._item(spec.HANDWHEEL)} ON") < eight_b.index(
-        "COMPLETE F3"
-    )
-    assert steps["F3"].startswith("F3. AFTER STEP 8B, WITH THE HANDWHEEL AND ALL SET SCREWS TIGHT")
-    assert "NO BINDING" in steps["F3"]
-    assert "FEED END TO END BY HANDWHEEL" in steps["F3"]
-    assert "NUT OR LUG CONTACT WITH A KP08" in steps["F3"]
-    assert "NO MOVING PART CONTACT" in steps["F3"]
-    assert steps["7"].endswith(f"{spec._item(spec.PILLOW_BLOCK_SCREW)}, LOOSE.")
-    for text in (*spec.ASSEMBLY_STEPS, *spec.FEED_FIT_STEPS):
+    for head in sequence:
+        assert "REPORT" not in steps[head] and "STOP" not in steps[head]
+    for text in spec.ASSEMBLY_STEPS:
         for stale in ("PRINT-DRILLED", "TRANSFER SPOTTING", "LOOSE HOLES", "DOWEL PIN"):
             assert stale not in text
 
@@ -2735,21 +2785,22 @@ def test_stop_pins_govern_the_tooling_top_and_the_holding_check_prints_it() -> N
     )
     washer = spec._component_local_boxes()[spec.HUB_WASHER]
     assert washer[2] == (-spec.hub_washer.SPIGOT_LENGTH, spec.hub_washer.THICK)
-    (check,) = spec.CAPTURE_CHECKS[3:4]
-    assert check.startswith("CLAMP HEADS FROM TABLE: CL/CR ")
-    assert "THE STOP PIN TOPS STAND TALLEST" in check
-    assert "REMAINS TALLEST" not in check
-    assert "TOP-HAT WASHER 1.5 MM MIN TO BOTH CUTTER FLANKS" in check
-    assert "BOTH STOP PINS AT FULL HEIGHT" in spec.CAPTURE_CHECKS[0]
+    assert "THE STOP PIN TOPS STAND TALLEST" in spec.REFERENCE_HEIGHTS
+    assert f"FIXTURE TOP {spec._length(spec.TOOLING_TOP_Z_MAX, 3)} MAX" in spec.REFERENCE_HEIGHTS
+    steps = {text.split(". ", 1)[0]: text for text in spec.OPERATION_STEPS}
+    assert "BOTH STOP PINS AT FULL HEIGHT" in steps["17A"]
+    # Q5 (Owner ruling 2026-11-08 (Pedro), #2144 item 13.2): the washer clearance prints inch,
+    # rounded up from the holding proof's minimum, every designed gap above it.
+    printed = f"{spec._length(spec.WASHER_CLEARANCE_PRINTED, 3)} MIN"
+    assert printed == ".060 MIN" and printed in steps["21D"]
+    assert spec.WASHER_CLEARANCE_PRINTED >= spec.holding.WASHER_CLEARANCE_MIN
+    assert min(spec.holding.WASHER_GAPS_MIN.values()) >= spec.WASHER_CLEARANCE_PRINTED
 
 
-def test_hold_down_inch_limits_lie_on_the_safe_side_of_the_kit_limits() -> None:
-    """HD2 checks with the kit's stud limits: LMIN low, LMAX high and the
-    clearance high, so a passing setup passes the kit's."""
+def test_hold_down_clearance_prints_on_the_safe_side_of_the_kit() -> None:
+    """13A gauges the kit's stud clearance rounded up, so a passing setup
+    passes the kit's."""
     assert spec.CLAMPING_KIT_NUMBER == _config.parts(spec.CLAMPING_KIT)["number"]
-    low, high = (float(text) * 25.4 for text in spec._STUD_LIMITS.split("/"))
-    assert low <= hold_down_stud.LENGTH_LIMITS[0] + 1e-9
-    assert high >= hold_down_stud.LENGTH_LIMITS[1] - 1e-9
     assert float(spec._STUD_CLEARANCE) * 25.4 >= hold_down_stud.CLEARANCE_MIN
 
 

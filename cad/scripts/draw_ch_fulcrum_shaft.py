@@ -32,13 +32,12 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
+from ch_fulcrum_shaft_notes import ACROSS_FLAT_CALLOUT, SHAFT_DIA_CALLOUT
 from ch_fulcrum_shaft_spec import (
-    ACROSS_FLAT_CALLOUT,
     DRAWING_DIMENSIONS,
     FLAT_FROM_END,
     FLAT_LENGTH,
     SHAFT_DIA,
-    SHAFT_DIA_CALLOUT,
     SHAFT_LENGTH,
     SURFACE_FINISHES,
 )

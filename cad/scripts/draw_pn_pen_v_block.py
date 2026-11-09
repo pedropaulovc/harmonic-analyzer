@@ -177,8 +177,8 @@ RIGHT_CENTER = (0.232, FRONT_CENTER[1])
 SECTION_CENTER = (0.350, FRONT_CENTER[1])
 ISO_CENTER = (0.315, 0.097)
 ISO_NOTE_XY = (0.350, 0.097)
-# The tap's callout rows centre on this point.  Ending "INTO PIVOT BORE" both
-# rows run 28 characters ("DRILL Ø 2.26 INTO PIVOT BORE" from r14), ~71 mm:
+# The tap's callout rows centre on this point.  Ending "INTO PIVOT BORE" the
+# rows run at most 27 characters ("Ø .089 DRILL INTO PIVOT BORE"), ~71 mm:
 # x ~0.165..0.236 at y ~0.249 / 0.255, over the end view (top 0.228), right of
 # section line A's top end and label (x 0.105) and 66 mm left of the pivot
 # chamfer's line (from x ~0.302, SECTION_KEEP).  The leader runs from the
@@ -406,11 +406,13 @@ SECTION_KEEP = {
         _sy(BLOCK_HEIGHT) + 0.023,
     ),
 }
-# The native SECTION A-A / SCALE caption's top centre, lowered 23 mm under the
-# bottom face (default ~17 mm) so it stands ~4 mm under the far wall's line
-# (~0.137): its rows ~0.127..0.133 and ~0.118..0.122, over the iso's note
-# (top 0.097) and clear of the iso's sloping top at its left end.
+# The native SECTION A-A caption's top centre, lowered 23 mm under the bottom
+# face (default ~17 mm) so it stands ~4 mm under the far wall's line (~0.137):
+# its one row ~0.127..0.133, over the iso's note (top 0.097) and clear of the
+# iso's sloping top at its left end.  The section is at the sheet's 4:1, so
+# the caption states no scale (rule 9): the title block does.
 SECTION_CAPTION_XY = (SECTION_CENTER[0], _sy(0.0) - 0.023)
+SECTION_CAPTION_TEXT = "<VLNAME> <VLLABEL>"
 # Section A-A cuts the set-screw tap on its axis: its cosmetic thread's major
 # diameter prints there as two lines 5.7 mm either side of the axis (y 0.204,
 # so 0.198 / 0.210) from the front face (x 0.306) to the bore wall (x 0.342),
@@ -650,6 +652,7 @@ async def build(adapter: Any) -> dict[str, str]:
             view_label="section A-A",
             dimensions_by_feature=DRAWING_DIMENSIONS,
         )
+    _drop_section_caption_scale(adapter, section)
     position_section_caption(
         adapter, section, SECTION_CAPTION_XY, label="v-block section A-A"
     )
@@ -698,12 +701,11 @@ async def build(adapter: Any) -> dict[str, str]:
         edge=tap_rim.edge,
         callout_xy=TAP_CALLOUT_XY,
         label="rod set-screw tap into the pivot bore",
-        process="TAP",
     )
     # The title block's THREADS row owns the general thread class (rule 2).
     omit_title_block_thread_class(tap_callout, label="rod set-screw tap")
-    # Both rows end where the hole does, in the pivot bore, not through; the
-    # drill row opens with its process word (rule 12).
+    # Both rows end where the hole does, in the pivot bore, not through, and
+    # read size first (rule 26): the drill row's DRILL follows its size.
     drill_variable = _set_tap_callout_text(tap_callout)
     set_hole_callout_precision(
         tap_callout, {drill_variable: TAP_DRILL_PLACES}, label="rod set-screw tap"
@@ -729,12 +731,13 @@ async def build(adapter: Any) -> dict[str, str]:
 
 # The tap runs from the front face into the pivot bore (Hole Wizard "up to
 # next"), which the native callout prints as THRU on both its drill row
-# ("Ø2.26 THRU", callout-above) and its thread row ("TAP 4-40 UNC THRU",
-# prefix).  The block is not drilled through, so both rows name where the hole
-# ends instead (draw_dt_cone_tip_block's pinch-thread "TO SLOT" recipe): only
-# the extent variable is replaced, the size and thread variables stay live.
-# r13: "Ø 2.26 INTO PIVOT BORE" carried no process word, so the drill row
-# opens with DRILL (rule 12).
+# ("Ø2.26 THRU", callout-above) and its thread row ("4-40 UNC THRU").  The
+# block is not drilled through, so both rows name where the hole ends instead
+# (draw_dt_cone_tip_block's pinch-thread "TO SLOT" recipe): only the extent
+# variable is replaced, the size and thread variables stay live.  r13: "Ø
+# 2.26 INTO PIVOT BORE" carried no process word, so the drill row says DRILL,
+# after its size (fan-out screen 20261107T081227004Z, rule 26: size first,
+# then process, then depth).
 _TAP_END = "INTO PIVOT BORE"
 # The tap's drill diameter prints .XXX, under whichever drill-size variable
 # the native callout carries (_tap_drill_variable).
@@ -742,32 +745,35 @@ TAP_DRILL_PLACES = 3
 _TAP_DRILL_VARIABLES = ("hw-tapdrldia", "hw-thrutapdrldia")
 _THRU_TOKEN = "<hw-thru>"
 _DRILL_WORD = "DRILL"
-# The drill row's size variable: <hw-tapdrldia> (or <hw-thrutapdrldia> for a
-# through tap); the thread row carries <hw-threaddesc>.
-_TAP_DRILL_TOKEN = "tapdrldia>"
 # swDimensionTextParts_e: each definition part and the part SetText writes.
 _DEFINITION_TO_WRITABLE = {5: 1, 6: 2, 7: 3, 8: 4}
 
 
 def _tap_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
-    """Replace the native THRU extent on both rows with ``_TAP_END`` and open
-    the drill row with ``_DRILL_WORD``; every native variable stays."""
+    """Replace the native THRU extent on both rows with ``_TAP_END`` and put
+    ``_DRILL_WORD`` after the drill row's size; every native variable stays."""
     if set(definitions) != set(_DEFINITION_TO_WRITABLE):
         raise RuntimeError(f"unexpected tap callout definition parts: {definitions!r}")
     original = "\n".join(definitions.values())
-    if original.count(_THRU_TOKEN) != 2 or "<hw-threaddesc>" not in original:
+    if (
+        original.count(_THRU_TOKEN) != 2
+        or "<hw-threaddesc>" not in original
+        or "TAP" in original
+        or _DRILL_WORD in original
+    ):
         raise RuntimeError(f"unexpected native tap callout definition: {definitions!r}")
     updated = {}
     drill_rows = 0
     for part, text in definitions.items():
         rows = text.replace(_THRU_TOKEN, _TAP_END).split("\n")
         for index, row in enumerate(rows):
-            if _TAP_DRILL_TOKEN not in row:
+            sizes = [name for name in _TAP_DRILL_VARIABLES if f"<{name}>" in row]
+            if not sizes:
                 continue
-            if "<hw-threaddesc>" in row or "TAP" in row or _DRILL_WORD in row:
+            if "<hw-threaddesc>" in row or len(sizes) != 1:
                 raise RuntimeError(f"tap drill row shares its text: {definitions!r}")
-            body = row.lstrip()
-            rows[index] = f"{row[: len(row) - len(body)]}{_DRILL_WORD} {body}"
+            token = f"<{sizes[0]}>"
+            rows[index] = row.replace(token, f"{token} {_DRILL_WORD}", 1)
             drill_rows += 1
         updated[part] = "\n".join(rows)
     rewritten = "\n".join(updated.values())
@@ -790,14 +796,17 @@ def _tap_drill_variable(definitions: dict[int, str]) -> str:
 
 
 def _tap_callout_resolved(resolved: str) -> bool:
-    """Both rows end in the bore; exactly one row, the drill's, opens DRILL."""
-    drill = [row for row in resolved.split("\n") if _DRILL_WORD in row]
+    """Both rows end in the bore, size first: exactly one row, the drill's,
+    carries DRILL after its size, and no row opens with a process word."""
+    rows = [row.strip() for row in resolved.split("\n") if row.strip()]
+    drill = [row for row in rows if _DRILL_WORD in row]
     return (
         resolved.count(_TAP_END) == 2
         and "THRU" not in resolved
+        and "TAP" not in resolved
         and len(drill) == 1
-        and drill[0].lstrip().startswith(f"{_DRILL_WORD} ")
-        and _TAP_END in drill[0]
+        and not drill[0].startswith(_DRILL_WORD)
+        and f" {_DRILL_WORD} {_TAP_END}" in drill[0]
         and "UNC" not in drill[0]
     )
 
@@ -825,6 +834,41 @@ def _set_tap_callout_text(display: Any) -> str:
             f"definitions={persisted!r}, resolved={resolved!r}"
         )
     return _tap_drill_variable(persisted)
+
+
+def _drop_section_caption_scale(adapter: Any, section: Any) -> None:
+    """Give section A-A's native caption its name and label fields only.
+
+    The section stands at the sheet's 4:1 (asserted), which the title block
+    states, yet its caption printed SCALE 4 : 1 (fan-out screen
+    20261107T081227004Z; rule 9 prints a view's scale only when it differs).
+    draw_dt_cone_pivot_post's ``_show_section_scale_in_caption`` recipe: the
+    caption is found by its label field and relinked to SECTION_CAPTION_TEXT.
+    """
+    native = _early_bound(section, "IView")
+    ratio = tuple(float(value) for value in native.ScaleRatio)
+    if not math.isclose(ratio[0] / ratio[1], SHEET_SCALE[0] / SHEET_SCALE[1]):
+        raise RuntimeError(f"v-block section A-A is not at the sheet scale: {ratio!r}")
+    notes = [_early_bound(raw, "INote") for raw in (native.GetNotes() or ())]
+    captions = [
+        note for note in notes if "<VLLABEL>" in str(note.PropertyLinkedText or "")
+    ]
+    if len(captions) != 1:
+        raise RuntimeError(
+            f"v-block section A-A: expected one native caption, found {len(captions)}"
+        )
+    note = captions[0]
+    before = str(note.PropertyLinkedText or "")
+    if before != SECTION_CAPTION_TEXT:
+        note.PropertyLinkedText = SECTION_CAPTION_TEXT
+        rebuild_drawing(adapter, label="v-block section A-A caption without scale")
+    after = str(note.PropertyLinkedText or "")
+    if after != SECTION_CAPTION_TEXT or "SCALE" in str(note.GetText() or ""):
+        raise RuntimeError(
+            "v-block section A-A caption kept its scale: "
+            f"{before!r} -> {after!r} / {note.GetText()!r}"
+        )
+    _telemetry.info(f"v-block section A-A caption {before!r} -> {after!r}")
 
 
 # ASME Y14.2 runs a centreline a short, uniform distance past its feature: 3 mm

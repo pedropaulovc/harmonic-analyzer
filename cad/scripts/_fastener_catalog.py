@@ -91,6 +91,24 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "98381A434",
         material="Alloy Steel",
     ),
+    # MHA-DT-VN-70 (owner ruling 2026-11-08, #2144 item 9.2): the brass #2-56
+    # x 1/4 binding head that clamps the 3603T354 keeper chain's end link to
+    # the MHA-DT-06 arm through the link's eye.
+    "dt-vn-keeper-chain-screw": _stock(
+        "dt-vn-keeper-chain-screw",
+        "Brass Binding Head Slotted Screw",
+        "92443A077",
+        material="Brass",
+    ),
+    # MHA-DT-VN-69: rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00
+    # rubric sample, PR #2248); one, the tip-block locating dowel, locates
+    # the MHA-DT-21 tip block on MHA-DT-20.
+    "dt-vn-locating-pin": _stock(
+        "dt-vn-locating-pin",
+        "Alloy Steel Dowel Pin",
+        "98381A417",
+        material="Alloy Steel",
+    ),
     "sh-vn-brass-fillister-screw": _stock(
         "sh-vn-brass-fillister-screw",
         "Brass Fillister Head Slotted Screw",
@@ -217,6 +235,17 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "sm-vn-boss-hook-jam-nut",
         "#10-24 Zinc-Plated Steel Narrow-Profile Hex Nut",
         "90760A140",
+    ),
+    # Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: the counter spring's
+    # upper eye rides free on this shoulder screw's 1/4 shoulder, seated on
+    # the MHA-SM-01 end face, retained by its head.  Owner ruling 2026-11-08
+    # (Pedro), #2144 item 11.4: bare slotted McMaster 91829A566, washer
+    # dropped.
+    "sm-vn-gooseneck-shoulder-screw": _stock(
+        "sm-vn-gooseneck-shoulder-screw",
+        "Slotted 18-8 Stainless Steel Precision Shoulder Screw, 1/4 x 3/8 in Shoulder, 10-24",
+        "91829A566",
+        material="AISI 304",
     ),
     # The four platen-clip screws: brass #2-56 x 1/4, whose head stays inside
     # the clip's rail where the MHA-PD-VN-52 #4-40 head would overhang. A pan

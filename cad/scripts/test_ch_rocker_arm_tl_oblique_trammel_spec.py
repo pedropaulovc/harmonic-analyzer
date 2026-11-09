@@ -63,10 +63,12 @@ def test_outputs_are_derived_not_typed() -> None:
 
 
 def test_inputs_come_from_the_rocker_spec() -> None:
-    assert trammel.R_INNER == rocker.R_TOP == 800.0
-    assert trammel.R_OUTER == rocker_interface.R_BOTTOM == 816.0
-    assert rocker.TOP_EDGE_ABOVE_PIVOT == rocker_interface.PIVOT_MID_Y
-    # The hub aims at the middle of the strap's one-sided top-edge band.
+    # The book radii about a centre raised by the arcs' mid-zone shift.
+    shift = rocker_interface.PROFILE_MID_ZONE_SHIFT
+    assert (trammel.R_INNER, trammel.R_OUTER) == (800.0, 816.0)
+    assert (rocker.R_TOP + shift, rocker_interface.R_BOTTOM + shift) == pytest.approx((800.0, 816.0))
+    assert rocker.TOP_EDGE_ABOVE_PIVOT == pytest.approx(rocker_interface.PIVOT_MID_Y + shift)
+    # The hub aims at the middle of the strap's top-edge band.
     low, high = sorted(rocker.TOP_EDGE_BAND)
     assert trammel.HUB_TO_TOP_EDGE == pytest.approx(
         rocker.TOP_EDGE_ABOVE_PIVOT + (low + high) / 2.0
