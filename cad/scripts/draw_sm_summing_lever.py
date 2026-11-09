@@ -1125,6 +1125,11 @@ def _place_flank_text(
     display.OffsetText = False
     if display.OffsetText is not False:
         raise RuntimeError(f"{name}: inherited text offset could not be reset")
+    # Set rather than left smart: smart drew the lower corner's arrows
+    # outside with no arc between them (run 20261109T204025899Z).
+    display.ArrowSide = 0  # swDimensionArrowsSide_e.swDimArrowsInside
+    if int(display.ArrowSide) != 0:
+        raise RuntimeError(f"{name}: arrows did not stay inside the exterior arc")
     arc_xy = DETAIL_KEEP[name]
     if annotation.SetPosition2(*arc_xy, 0.0) is not True:
         raise RuntimeError(f"{name}: native exterior arc placement was refused")
