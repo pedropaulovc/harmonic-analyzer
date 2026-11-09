@@ -537,6 +537,7 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | retired tooling part | — | — | `dt-cone-pivot-post-tl-cap-jaw-button` | MHA-DT-005-TL-03 | — | MHA-DT-05-TL-03 (retired 2026-10-21; never reissued) |
 | retired tooling part | — | — | `dt-cone-pivot-post-tl-soft-jaw` | MHA-DT-005-TL-04 | — | MHA-DT-05-TL-04 (retired 2026-10-21; never reissued) |
 | new tooling part (2026-11-02) | — | — | — | — | `dt-cone-gear-tl-index-plate` | MHA-DT-03-TL-01 |
+| new tooling part (2026-11-09) | — | — | — | — | `dt-cone-gear-tl-phasing-comb` | MHA-DT-03-TL-02 |
 | assembly | `frame` | MHA-A04 | `fr-frame` | MHA-FR-000 | `fr-frame` | MHA-FR-00 |
 | assembly | `drive-train` | MHA-A03 | `dt-drive-train` | MHA-DT-000 | `dt-drive-train` | MHA-DT-00 |
 | assembly | `channel` | MHA-A02 | `ch-channel` | MHA-CH-000 | `ch-channel` | MHA-CH-00 |
@@ -739,6 +740,7 @@ A retired Number is never reused. A family added after a cutover takes the next 
 | added | `ch-rocker-arm-tl-vn-oblique-hub-pin` | MHA-CH-06-TL-VN-80 | McMaster 23065A855-23065A4 Class Z NO-GO .4000 plug gauge x1, 2 in supply, abrasive-cut to .79 and bonded (was McMaster 2281A11-6410N695 Ø10.2000 until 2026-10-31) |
 | added | `dt-cone-gear-tl-index-plate` | MHA-DT-03-TL-01 | 2026-11-02 BS-0 dividing-head index plate with 57-, 51- and 24-hole circles for the 114T, 102T and 96T cone gears the stock plates cannot index; best-guess sizes pending measurement (#2157) |
 | added | `dt-cone-gear-tl-indexing` | MHA-DT-03-TL-00 | 2026-11-02 one-part tooling assembly holding the index plate on the BS-0 head, so the plate belongs to a registered fixture kit; never in a machine assembly or BOM |
+| added | `dt-cone-gear-tl-phasing-comb` | MHA-DT-03-TL-02 | Owner ruling 2026-11-09 (C1 keyed, [PR #1992](https://github.com/pedropaulovc/harmonic-analyzer/pull/1992), tip phasing option b1): flat .070 in steel comb with one fork per cone gear T030, T024, T018, T012 and T006 straddling its phase-0 tooth at shop-row bands, clocking the LOCTITE 638-bonded tip gears to the keyed T030 at MHA-DT-00 step 1; enrolled in the `dt-cone-gear-tl-indexing` kit (MHA-DT-03-TL-00 was already that kit's assembly Number); never in a machine assembly or BOM |
 | retired | `ch-rocker-arm-tl-vn-oblique-leadscrew-nut` | MHA-CH-06-TL-VN-55 | 2026-11-01 owner ruling (item 4): the shop-made TL-27 feed nut replaces the bought flange nut, so TL-32's lug needs no spigot recess; no registry, builder or drawing; Number never reissued |
 | added | `ch-rocker-arm-tl-oblique-feed-nut` | MHA-CH-06-TL-27 | 2026-11-01 shop-made Tr8x2 RH nut from brass 360-H02 3/4 × 1-1/4 in bar, faced to .40, on two TL-VN-66 screws into TL-32's lug |
 | added | `ch-rocker-arm-tl-vn-oblique-nut-dowel` | MHA-CH-06-TL-VN-81 | 2026-11-03 Main ruling on Codjiflo P1: McMaster 98381A438 3/32 x 1/2 alloy-steel dowel x1 (ASME B18.8.2, +.0001/+.0003), the TL-27 feed nut's positive anti-rotation key, slip in the nut and pressed into the TL-32 lug; bought fixture hardware modelled for the jig assembly |

@@ -64,7 +64,8 @@ BLOCK_Z = cone_tip_cluster.BLOCK_DEPTH_MM  # .430
 # of the research's station, so the end screw reaches the bushing with its
 # head clear at every limit of the tip's axial stack
 # (build_dt_drive_train_assembly's END_SCREW_EMBED_WORST_MM); the shallow
-# side's engagement shortfall there is a pending owner ruling.  The realized
+# side's 1.39D engagement there is an owner exception (ruling 2026-11-09,
+# dt-drive-train DT-07).  The realized
 # south face stands TIP_BLOCK_GAP_MM (.26747) north of the layout T006 north
 # face.  Every consumer reads the block's stations from here.
 TIP_BLOCK_PIVOT_OFFSET = 18.7452  # .738

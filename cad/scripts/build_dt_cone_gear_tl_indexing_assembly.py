@@ -1,13 +1,15 @@
 r"""Reproduction script: dt-cone-gear-tl-indexing.SLDASM (MHA-DT-03-TL-00).
 
-The cone gear's dividing-head indexing kit, a shop fixture: the custom index
-plate dt-cone-gear-tl-index-plate (MHA-DT-03-TL-01) that lets the PM BS-0
-dividing head (40:1 worm) index the 96, 102 and 114 tooth cone gears. The
-head and the plate screws it already carries are the owner's equipment and
-are not modelled, so the kit holds the one plate, fixed in its own part frame
-(0 DOF). The ``_tl_`` stem keeps the kit out of every machine assembly and
-BOM (``_buildgraph.is_shop_fixture``); it exists so the plate belongs to a
-registered assembly (test_part_coverage.py) and carries a fitter sheet.
+The cone gears' shop kit, a shop fixture: the custom index plate
+dt-cone-gear-tl-index-plate (MHA-DT-03-TL-01) that lets the PM BS-0 dividing
+head (40:1 worm) index the 96, 102 and 114 tooth cone gears, and the tip
+gears' phasing comb dt-cone-gear-tl-phasing-comb (MHA-DT-03-TL-02) that
+MHA-DT-00 step 1 engages while the tip gears' bonds grab. The head and the
+plate screws it already carries are the owner's equipment and are not
+modelled, so the kit holds the two parts, each fixed (0 DOF). The ``_tl_``
+stem keeps the kit out of every machine assembly and BOM
+(``_buildgraph.is_shop_fixture``); it exists so its parts belong to a
+registered assembly (test_part_coverage.py) and carry a fitter sheet.
 
 Run (SolidWorks already open)::
 
@@ -34,6 +36,8 @@ from _session import run_build
 from _transforms import IDENTITY, euler_from_rows
 
 ASM_NAME = "dt-cone-gear-tl-indexing"
+# The comb's model origin (mm) in the kit frame: under the plate's rim.
+COMB_POSITION_MM = (-11.0, -62.0, 0.0)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -51,6 +55,16 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         "dt-cone-gear-tl-index-plate",
         [0.0, 0.0, 0.0],
+        euler_from_rows(rows),
+        rows,
+    )
+    # The comb lies in the plate's front plane, below the plate (its model
+    # frame: x along its length, y up, its thickness about z0), centred
+    # under the bore, so the front view balloons it beside the plate.
+    await place_component(
+        adapter,
+        "dt-cone-gear-tl-phasing-comb",
+        list(COMB_POSITION_MM),
         euler_from_rows(rows),
         rows,
     )

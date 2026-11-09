@@ -604,6 +604,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="dt_cone_gear_tl_phasing_comb",
+        part="dt_cone_gear_tl_phasing_comb",
+        artifact_stem="dt-cone-gear-tl-phasing-comb",
+        script_name="draw_dt_cone_gear_tl_phasing_comb.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="dt_crank_drive_gear",
         part="dt_crank_drive_gear",
         artifact_stem="dt-crank-drive-gear",

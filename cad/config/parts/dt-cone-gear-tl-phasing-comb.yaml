@@ -1,0 +1,16 @@
+dt-cone-gear-tl-phasing-comb:
+  title: Cone Tip Gear Phasing Comb
+  # Shop tooling: the parent MHA-DT-03 Number plus -TL-nn (subsystem-identities.md).
+  # Owner ruling 2026-11-09 (b1) via PR #1992
+  # (https://github.com/pedropaulovc/harmonic-analyzer/pull/1992): one flat
+  # plate in the cone's +X radial plane whose forks straddle the phase-0 tooth
+  # of T030 (keyed, over the key) and of the bonded T024, T018, T012 and T006
+  # while LOCTITE 638 grabs (MHA-DT-00 step 1). Never in the drive-train BOM.
+  number: MHA-DT-03-TL-02
+  material: LOW-CARBON STEEL, E.G. 1018 CF
+  material_specification: low-carbon cold-finished steel flat, 3/32 in, ASTM A108 (1018)
+  finish: as machined
+  quantity: 1
+  tolerance_class: machined_block
+  drawing_unit: in
+  process: "mill 3/32 in flat to thickness, then saw and mill the plate's stepped edge; mill each fork's slot; break edges, not the slot edges"

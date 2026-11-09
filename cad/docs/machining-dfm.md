@@ -40,8 +40,9 @@ its first-root position; no second general note restates that location.
      on round land 2 one 0.45 ±0.10 feeler off T030 (0.35–0.55 mm stack float); T018 and T012 bonded on the
      MHA-DT-37 spigot, whose end is bonded in the reamed Ø.0625 × .20 in socket in MHA-DT-04's end; land 2
      ends .025 in inside T024's bore so T018 always butts T024. Degrease, phase each bonded gear to the keyed
-     stack by pin within the compound's fixture time (a phasing-pin jig is the research's DFM
-     recommendation #4), and let it cure before load; a bonded slip fit has nothing to adjust afterwards.
+     stack within the compound's fixture time with the MHA-DT-03-TL-02 phasing comb (owner ruling
+     2026-11-09: one fork per gear on its +X tooth, T030 to T006), and let it cure before load; a bonded
+     slip fit has nothing to adjust afterwards.
      The MHA-DT-38 brass bushing is pressed on the pivot against the leaves, made to its measured bore.
      The MHA-DT-39 end screw (stock 91794A558 with a reamed Ø.0630 × .12 in pivot hole, wall to the 2A
      thread root .067 in MIN, RV-01) threads into MHA-DT-21: run it in until the shaft stops shuttling, back
@@ -49,7 +50,7 @@ its first-root position; no second general note restates that location.
      its thread so it runs true. MHA-DT-21's axis height is made to the measured MHA-DT-05 journal-axis
      height above MHA-DT-20 (matched fit, ±.003 in) so the pivot enters the end screw; tighten the block's
      hold-down with the pivot running free in MHA-DT-39. At the print-worst stack the end screw keeps 1.39D
-     of full thread in the block, under rule 18's 1.5D (pending owner ruling, dt-drive-train DT-07).
+     of full thread in the block, under rule 18's 1.5D (accepted by owner ruling 2026-11-09, dt-drive-train DT-07).
      `dt_cone_tip_air.py` owns the cone-tip air to G19 over the whole swing: the bushing, the end
      screw's proud end and MHA-DT-21's south face where it stands over G19. Use worst-case arithmetic
      over every source if it clears everywhere; otherwise use the statistical method everywhere: nominal

@@ -1574,14 +1574,15 @@ def test_reference_inputs_stay_on_the_lifting_side():
         assert np.all(x >= 0.0), name
 
 
-def test_cone_phase_follows_gear_ratio_key_lever_and_bond_pin(budget):
+def test_cone_phase_follows_gear_ratio_key_lever_and_bond_comb(budget):
     """Owner decision C1 keyed (2026-11-09, PR #1992): the keyed gears turn by
     half their keyway clearance over the key's lowest top less the edge break
     and are indexed off the keyway; the bonded T006..T024 carry no keyway
-    terms, only their tooth space's play about the phasing pin, a pitch arc
+    terms, only their tooth space's play about the phasing comb's fork, a pitch arc
     over each gear's pitch radius.  No term carries a residual."""
     import cone_land_key
     import dt_cone_gear_spec
+    import dt_cone_gear_tl_phasing_comb_spec as comb
     import cone_shaft_land_bands
     import gear_seat_fit
 
@@ -1596,7 +1597,10 @@ def test_cone_phase_follows_gear_ratio_key_lever_and_bond_pin(budget):
     assert clock == dt_cone_gear_spec.FLAT_CLOCK_TOLERANCE_DEG
     way_lo, way_hi = cone_land_key.KEYWAY_SIDE_CLEARANCE_MM
     assert key_play == pytest.approx((way_hi - way_lo) / 2.0)
-    assert bond == pytest.approx(max(dt_cone_gear_spec.TOOTH_THICKNESS_BAND))
+    # The booked bound is the phasing comb's proved worst phase, rounded up
+    # to the thousandth (owner ruling 2026-11-09: comb at shop rows).
+    worst = max(comb.PHASE_ERROR_MM.values())
+    assert worst <= bond < worst + 0.001
     edge_break = _config.title_block("edge_break")
     lever_loss = max(edge_break["radius_mm"], edge_break["chamfer_max_mm"])
     land_band = cone_shaft_land_bands.SECTION_DIA_BANDS[dt_cone_gear_spec.KEYED_LAND]
@@ -1634,8 +1638,8 @@ def test_cone_phase_follows_gear_ratio_key_lever_and_bond_pin(budget):
 
 
 def test_bond_phase_propagates_through_physical_readout(nom):
-    """A pair holding a bonded and a keyed gear retains the bonded gear's pin
-    play through the physical readout."""
+    """A pair holding a bonded and a keyed gear retains the bonded gear's
+    phasing-comb fork play through the physical readout."""
     x = np.zeros(eb.N_ELEMENTS)
     x[[0, 19]] = 1.0  # T006 (bonded) and T120 (keyed)
     bond = np.zeros((1, eb.N_ELEMENTS))

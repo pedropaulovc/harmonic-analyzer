@@ -1255,8 +1255,9 @@ CONE_CRANK_STEPS = _note_text(
         # the key; T024 is bonded (LOCTITE 638) on the round land 2 one
         # STACK_FEELER off T030, T012 and T018 on MHA-DT-37's spigot and the
         # spigot in MHA-DT-04's socket, all four (T024..T006) phased to the
-        # keyed T030 by a pin through their lined-up tooth spaces inside the
-        # compound's fixture time (cone_tip_cluster, cone_stack_end_play;
+        # keyed T030 by the forks of the MHA-DT-03-TL-02 phasing comb (owner
+        # ruling 2026-11-09; a shop tool, never in this BOM) engaged inside
+        # the compound's fixture time (cone_tip_cluster, cone_stack_end_play;
         # error_budget cone_tip_bond_clock).  The stack is first closed dry
         # and measured; MHA-DT-38 is pressed on the loose MHA-DT-37 so the
         # press never loads a bond.  A keyway goes on its key only one way and
@@ -1279,9 +1280,12 @@ CONE_CRANK_STEPS = _note_text(
         # collar, so the feeler sets the stack float (cone_stack_end_play).
         f"1M. BOND T024 ON A {inch_text(STACK_FEELER, FEELER_PLACES)} FEELER ON T030 PER THE SHEET 1 NOTE.",
         "1N. BOND T012 AND T018 ON, THEN THE SPIGOT IN, PER THE SHEET 1 NOTE.",
-        "1P. ALIGN THE BONDED GEARS' TOOTH SPACES WITH T030'S ON A PIN AT ONCE.",
+        # T030's keyway centreline runs through its phase-0 tooth, so the comb
+        # names the physical tooth over the key (dt_cone_gear_spec); its other
+        # forks take the bonded gears' teeth at the same time.
+        "1P. ENGAGE MHA-DT-03-TL-02 ON T030'S TOOTH OVER THE KEY AT ONCE.",
         # The sheet 1 note's cure and hand acceptance close the bonds.
-        "1Q. REMOVE THE PIN AND THE FEELER ONCE THE BONDS GRAB.",
+        "1Q. REMOVE MHA-DT-03-TL-02 AND THE FEELER ONCE THE BONDS GRAB.",
         # U37c cut-to-fit acceptance survives the taller post and longer stock:
         # MHA-DT-VN-61's registry/spec own the selected screw and reference length.
         # Each screw is cut against its own matched post/platform hole, never

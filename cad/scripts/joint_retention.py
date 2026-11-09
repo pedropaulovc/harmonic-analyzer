@@ -975,8 +975,8 @@ JOINTS: tuple[Joint, ...] = (
         axial_capture=(
             "fillister head clear of the block's north face; thread engagement only in the "
             "block's 1/4-28 through-tap: 1.39D full thread at the printed limits, asserted "
-            ">= 1.0D and pending owner ruling (MHA-DT-00 DT-07); its reamed end hole carries "
-            "T006's pivot"
+            ">= 1.0D and accepted by owner ruling 2026-11-09 (MHA-DT-00 DT-07); its reamed end "
+            "hole carries T006's pivot"
         ),
         lock=Lock.PINCH_CLAMP,
         lock_part="dt_vn_cone_tip_pinch_screw",

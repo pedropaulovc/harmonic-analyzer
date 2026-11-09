@@ -47,6 +47,9 @@ EXTERNAL_NUMBERS = frozenset(
         drawing.ROCKER_ARM,
         # Check 5's feed sense, named on sheet 14's interface lines.
         drawing.PLATEN_NUMBER,
+        # Step 1P's phasing comb: a shop tool in the cone-gear indexing kit,
+        # never a drive-train BOM row (owner ruling 2026-11-09, PR #1992).
+        _config.parts("dt-cone-gear-tl-phasing-comb")["number"],
     }
 )
 # Named installation assemblies are external interfaces, not drive-train BOM rows.

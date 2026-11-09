@@ -1,13 +1,17 @@
 number: MHA-DT-03-TL-00
-# Cone-gear dividing-head indexing kit contract -- per-assembly build data read
-# through cad/scripts/_assembly_contract.py. A shop fixture (TL-00): it never
-# enters a machine assembly or BOM. Its one component is the custom index plate
-# dt-cone-gear-tl-index-plate (MHA-DT-03-TL-01) that fits the PM BS-0 head; the
-# head itself and its plate screws are the owner's equipment, not modelled.
+# Cone-gear shop kit contract -- per-assembly build data read through
+# cad/scripts/_assembly_contract.py. A shop fixture (TL-00): it never enters a
+# machine assembly or BOM. Its components are the custom index plate
+# dt-cone-gear-tl-index-plate (MHA-DT-03-TL-01) that fits the PM BS-0 head and
+# the tip gears' phasing comb dt-cone-gear-tl-phasing-comb (MHA-DT-03-TL-02;
+# owner ruling 2026-11-09 (b1) via PR #1992,
+# https://github.com/pedropaulovc/harmonic-analyzer/pull/1992) that MHA-DT-00
+# step 1 engages; the head itself and its plate screws are the owner's
+# equipment, not modelled.
 #
-# flip_invert / allowed_free_stems / required_free_stems: none, the plate is
-#   fixed at the kit origin.
-# free_dof: the plate is fixed, so 0 (verify:soundness).
+# flip_invert / allowed_free_stems / required_free_stems: none, both parts are
+#   fixed in the kit frame.
+# free_dof: both parts are fixed, so 0 (verify:soundness).
 flip_invert: []
 allowed_free_stems: []
 required_free_stems: []
@@ -25,4 +29,4 @@ machinist_exceptions:
     kind: "accept"
     where: "fitting steps 1-4, exploded view and parts list: the PM BS-0 dividing head and its three #8 flat head plate screws"
     finding: "the dividing head and its plate screws have no drawing number and no parts-list row (rules 4 and 22)"
-    reason: "Owner ruling 2026-11-08 (Pedro), #2144 item 1.3 (FoDtFab1 Q2: name the head as shop equipment, PM BS-0 DIVIDING HEAD (SHOP EQUIPMENT); no new identity). The head and the screws it already carries are the owner's shop equipment, not kit items: the sheet names them as shop equipment and shows them in the exploded view, and the parts list holds only item 1, the one part the kit supplies."
+    reason: "Owner ruling 2026-11-08 (Pedro), #2144 item 1.3 (FoDtFab1 Q2: name the head as shop equipment, PM BS-0 DIVIDING HEAD (SHOP EQUIPMENT); no new identity). The head and the screws it already carries are the owner's shop equipment, not kit items: the sheet names them as shop equipment and shows them in the exploded view, and the parts list holds only the parts the kit supplies (item 1; item 2, the phasing comb, joined by owner ruling 2026-11-09 (b1) via PR #1992 (https://github.com/pedropaulovc/harmonic-analyzer/pull/1992))."

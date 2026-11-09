@@ -2152,6 +2152,17 @@
       ]
     },
     {
+      "old_stem": "dt-cone-gear-tl-phasing-comb",
+      "old_number": null,
+      "introduced": "2026-11-09",
+      "new_identities": [
+        {
+          "stem": "dt-cone-gear-tl-phasing-comb",
+          "number": "MHA-DT-03-TL-02"
+        }
+      ]
+    },
+    {
       "old_stem": "dt-cone-gear-tl-indexing",
       "old_number": null,
       "introduced": "2026-11-02",

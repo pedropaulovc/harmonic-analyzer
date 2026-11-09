@@ -2675,9 +2675,9 @@ PIVOT_HEAD_WORST_GAP = tip_pivot_head_worst_gap_mm(TIP_NORTH_FACE_BAND_MM)
 # still stand off MHA-DT-21's north face, or the screw cannot be set.  Thread
 # engagement is rule 18: the block's 1.5D window cannot hold the whole stack
 # at the printed limits (the shallow end falls short), so the worst full
-# thread in D is booked against END_SCREW_ENGAGEMENT_FLOOR_D, the 1.0D the
-# owner accepted for the old tip adjuster, and recorded as a rule-18
-# shortfall PENDING OWNER RULING in cad/config/assemblies/dt-drive-train.yaml.
+# thread in D is booked against END_SCREW_ENGAGEMENT_FLOOR_D (1.0D) and the
+# 1.39D shortfall is the owner's rule-18 exception (ruling 2026-11-09 via PR
+# #1992: keep 91794A558 at this block station; dt-drive-train.yaml DT-07).
 END_SCREW_EMBED_BAND_MM = (
     POST_BOSS_FACE_AXIAL_BAND_MM
     + shaft_printed_band("CollarWidth")

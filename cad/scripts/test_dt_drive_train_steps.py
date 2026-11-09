@@ -88,7 +88,7 @@ def test_the_tip_is_measured_dry_then_bonded_on_the_feeler() -> None:
     """Owner decision C1 keyed (2026-11-09, PR #1992): the stack is measured
     dry, MHA-DT-38 is pressed on the loose MHA-DT-37, and only then is T024
     bonded one STACK_FEELER off T030 with the bonded gears phased to T030 by
-    a pin."""
+    the MHA-DT-03-TL-02 phasing comb (owner ruling 2026-11-09)."""
     stack = _step_body("cone-gears-stacked")
     order = (
         "THEN T024, DRY",
@@ -97,8 +97,8 @@ def test_the_tip_is_measured_dry_then_bonded_on_the_feeler() -> None:
         f"BOND T024 ON A "
         f"{sheet.inch_text(cone_stack_end_play.STACK_FEELER, sheet.FEELER_PLACES)} FEELER ON T030",
         "BOND T012 AND T018 ON, THEN THE SPIGOT IN",
-        "WITH T030'S ON A PIN AT ONCE",
-        "REMOVE THE PIN AND THE FEELER",
+        "ENGAGE MHA-DT-03-TL-02 ON T030'S TOOTH OVER THE KEY",
+        "REMOVE MHA-DT-03-TL-02 AND THE FEELER",
     )
     positions = [stack.find(phrase) for phrase in order]
     assert -1 not in positions, positions
