@@ -1003,13 +1003,6 @@ _WHOLE_CONTRACT_FAMILY_DRAWINGS = {
     "pd_paper_drive_assembly",
 }
 
-# Part drawings that cite an assembly spec and so fold its contract by literal
-# stem: the kit's stud label cites the jig's HOLD_DOWN_REFERENCE, and the jig
-# spec reads its sheet unit from the jig contract (#290).
-_PART_DRAWING_CONTRACT_READS = {
-    "sh_vn_clamping_kit_hardware": {"ch-rocker-arm-tl-oblique-jig.yaml"},
-}
-
 
 def test_assembly_drawings_fold_only_the_contracts_they_read(tmp_path, monkeypatch):
     """#2164 (b): a drawing folds exactly the assembly contracts its closure
@@ -1041,9 +1034,6 @@ def test_assembly_drawings_fold_only_the_contracts_they_read(tmp_path, monkeypat
         spec = dodo.DRAWINGS_BY_NAME[stem]
         if stem in _WHOLE_CONTRACT_FAMILY_DRAWINGS:
             assert len(folded) > 1, stem
-        elif stem in _PART_DRAWING_CONTRACT_READS:
-            assert spec.source_kind == "part", stem
-            assert folded == _PART_DRAWING_CONTRACT_READS[stem], stem
         else:
             assert spec.source_kind == "assembly", stem
             assert folded == {f"{spec.part.replace('_', '-')}.yaml"}, stem

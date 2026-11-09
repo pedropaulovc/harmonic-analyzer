@@ -114,9 +114,9 @@ def test_fit_budget_closes_at_the_printed_limits() -> None:
     assert fit.COLUMN_DIA == OUTER_DIA == 25.4
     low, high = fit.BORE_DIAMETRAL_CLEARANCE
     assert low < spec.COLUMN_BORE - OUTER_DIA < high
-    # Faces stay apart with both bores at their loosest and the offset least:
-    # (.020 - .004) - .012 = .004.
-    assert math.isclose(fit.GRIP_GAP_MIN, _in(0.004))
+    # Faces stay apart with both bores at their loosest and the offset least
+    # (the title block's .XXX row): (.020 - .005) - .012 = .003.
+    assert math.isclose(fit.GRIP_GAP_MIN, _in(0.003))
     assert fit.GRIP_GAP_MIN > 0.0
     # The ear stations' worst mismatch alone never binds the screw.
     assert fit.EAR_STATION_MISMATCH_MAX < fit.SCREW_FLOAT
@@ -150,8 +150,8 @@ def test_walls_at_the_largest_column_and_drill_wander() -> None:
     r_bore = _in(1.005 + 0.012) / 2.0
     wander = _in(0.600) * math.tan(math.radians(0.3))
     reach = 4.166 / 2.0 + wander
-    back_wall = _in(0.020 - 0.004) + _in(0.590 - 0.010) - r_bore
-    assert math.isclose(spec.WALLS_WORST["back wall"], back_wall)  # 2.2225 (.0875)
+    back_wall = _in(0.020 - 0.005) + _in(0.590 - 0.010) - r_bore
+    assert math.isclose(spec.WALLS_WORST["back wall"], back_wall)  # 2.1971 (.0865)
     assert math.isclose(
         spec.WALLS_WORST["ear to bore"], _in(0.689 - 0.004) - reach - r_bore
     )  # 2.320 (.0914), the least ear wall
@@ -165,9 +165,12 @@ def test_walls_at_the_largest_column_and_drill_wander() -> None:
         _in(1.880) - _in(0.955) - _in(0.693) - reach,
     )
     # Every wall meets the .080 target, so the back wall's old shortfall
-    # (sh-column-clamp-back RV-01) is retired and nothing is declared.
+    # (sh-column-clamp-back RV-01) is retired and no shortfall is declared;
+    # the one entry accepts the ±.004 tap locations (delegated ruling L3).
     assert min(spec.WALLS_WORST.values()) >= _in(0.080)
-    assert not load_exceptions(CAD_ROOT / "config", "sh_column_clamp_back", "part")
+    entries = load_exceptions(CAD_ROOT / "config", "sh_column_clamp_back", "part")
+    assert [(entry.id, entry.kind) for entry in entries] == [("RV-02", "accept")]
+    assert "#2144" in entries[0].reason
 
 
 def test_screw_line_shortfall_is_the_owner_ruled_one() -> None:
@@ -192,17 +195,25 @@ def test_screw_line_shortfall_is_the_owner_ruled_one() -> None:
 
 
 def test_tight_bands_name_their_mate() -> None:
-    bore = drawing.DIMENSION_CALLOUTS["BoreDia"]
-    assert "DIAMETRAL" in bore and "MHA-FR-03" in bore
+    # The bore cites its flag note, which names the column and the clearance.
+    assert drawing.DIMENSION_CALLOUTS["BoreDia"] == f"SEE NOTE {drawing.BORE_NOTE}"
+    notes = drawing.DRAWING_NOTES.split("\n")
+    assert [line.split(". ")[0] for line in notes] == [
+        str(drawing.GRIP_NOTE), str(drawing.BORE_NOTE),
+    ]
+    assert "MHA-FR-03" in notes[1] and spec.BORE_CLEARANCE_TEXT in notes[1]
     low, high = spec.BORE_DIAMETRAL_CLEARANCE
     assert math.isclose(low, _in(0.004)) and math.isclose(high, _in(0.012))
-    assert "MHA-SH-01" in drawing.DIMENSION_CALLOUTS["GripOffset"]
-    assert "MHA-SH-01" in drawing.DIMENSION_CALLOUTS["EarHole1Z"]
-    assert "MHA-SH-01" in drawing.DIMENSION_CALLOUTS["EarHoleHeight"]
-    # The grip offset says what it locates: the bore axis, off the split face.
-    assert "BORE AXIS" in drawing.DIMENSION_CALLOUTS["GripOffset"]
+    # Rule 7: locations carry only value and band. The grip offset cites its
+    # numbered note; the tap locations' mate is named once, under the tap.
+    assert drawing.DIMENSION_CALLOUTS["GripOffset"] == f"SEE NOTE {drawing.GRIP_NOTE}"
+    assert drawing.DRAWING_NOTES.startswith(f"{drawing.GRIP_NOTE}. ")
+    assert "MHA-SH-01" in drawing.DRAWING_NOTES
+    assert not {"EarHole1Z", "EarHoleHeight"} & set(drawing.DIMENSION_CALLOUTS)
+    assert "MHA-SH-01" in drawing.HOLE_CALLOUT_BELOW
     source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "GRIP_OFFSET_BAND" in source and "EAR_STATION_BAND" in source
+    assert '"GripOffset", GRIP_OFFSET_BAND' not in source
+    assert "EAR_STATION_BAND" in source
     assert "EAR_HEIGHT_BAND" in source
     assert spec.EAR_HEIGHT_BAND is fit.EAR_HEIGHT_BAND
 
@@ -244,7 +255,7 @@ def test_ear_height_text_stands_outside_its_witnesses() -> None:
     ear_x = drawing._face_xy(0.0, spec.EAR_HOLE_Z)[0]
     text_x = drawing.FACE_KEEP["EarHoleHeight"][0]
     outward = math.copysign(1.0, bottom_x - ear_x)
-    lines = ["2X .315 ±.004", *drawing.DIMENSION_CALLOUTS["EarHoleHeight"].split("\n")]
+    lines = ["2X .315 ±.004"]
     half_block = max(len(line) for line in lines) * 0.00265 / 2.0
     assert outward * (text_x - bottom_x) >= half_block + 0.003
 

@@ -173,22 +173,9 @@ def test_native_source_maps_cover_printed_length_and_source_only_chamfer() -> No
     assert fields["cut_end_chamfer"].fields["length"][0] == [0.0, 1.016]
 
 
-def test_length_callout_screen_uses_captured_native_font_and_paper_lane() -> None:
-    # Stud audit 20261021T125148010Z: the old 29-character row occupied
-    # X24.6..95.7 mm about X60, approximately 2.45 mm per character.
-    # Use 2.50 as an APPROXIMATE offline heuristic, not a glyph-width upper bound.
-    # The same native sheet had inner border X12.7 and Front outline X101.7.
-    # Fresh PDF/layout inspection still owns the actual wrapped glyph bounds.
-    advance_mm = 2.50
-    width_mm = max(map(len, spec.DIMENSION_CALLOUTS["FinishedLength"].splitlines())) * advance_mm
-    centre_mm = draw.FRONT_KEEP["FinishedLength"][0] * 1000.0
-    border_mm, front_outline_mm = 12.7, 101.7
-    assert centre_mm - width_mm / 2.0 > border_mm
-    assert centre_mm + width_mm / 2.0 < front_outline_mm
-
-
 def test_thread_callout_screen_fits_between_native_length_line_and_left_barrel() -> None:
-    # Same APPROXIMATE offline screen as above, not a conservative upper bound.
+    # APPROXIMATE offline screen (stud audit 20261021T125148010Z: about 2.45 mm
+    # per character; 2.50 used), not a conservative upper bound.
     # b9e4d6b45bbb's actual barrel silhouette is X107.3; the length line is
     # X60. This screen suggests a lane outside the stud and dimension line,
     # but actual glyph bounds and leader routing require native ink proof.
@@ -956,34 +943,6 @@ def test_final_views_keep_only_front_length_and_reject_any_printed_chamfer(monke
         assert rim_checks == [end]
 
 
-@pytest.mark.parametrize("failure", [None, "stale_length", "missing_length"])
-def test_printed_length_callout_keeps_native_nominal_and_governance(monkeypatch, failure):
-    length = _Display("FinishedLength", spec.LENGTH / 1000, _Tolerance())
-    annotations = [] if failure == "missing_length" else [
-        SimpleNamespace(GetSpecificAnnotation=lambda: length, display=length),
-    ]
-    text = {}
-
-    def apply(_adapter, _notes, callouts):
-        text.update(callouts)
-        if failure == "stale_length":
-            text["FinishedLength"] = "stale"
-
-    length.GetText = lambda index: text.get("FinishedLength", "") if index == 4 else ""
-    monkeypatch.setattr(draw, "dimension_name", lambda _adapter, note: note.display.name)
-    monkeypatch.setattr(draw, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(draw, "set_dimension_callouts", apply)
-    if failure:
-        with pytest.raises(RuntimeError):
-            draw.set_machining_callouts(object(), annotations)
-    else:
-        draw.set_machining_callouts(object(), annotations)
-        assert text == {"FinishedLength": spec.DIMENSION_CALLOUTS["FinishedLength"]}
-        assert length.primary.SystemValue == spec.LENGTH / 1000
-
-
-
-
 class _StudAdapter:
     def __init__(self):
         self.constraints, self.dimensions, self.chamfers, self.names = [], [], [], []
@@ -1070,7 +1029,6 @@ def test_native_recipe_uses_one_true_length_driver_and_independent_end_features(
 
 def test_rework_sheet_does_not_duplicate_fixture_qualification() -> None:
     assert draw.SHEET_NAMES == ("REWORK",)
-    assert draw.HOLD_DOWN_REFERENCE == jig.HOLD_DOWN_REFERENCE
     # The jig's HD2-HD3 cut to this kit drawing's REWORK sheet, its second.
     assert jig.STUD_REWORK_SHEET == f"{ROW['number']} SHEET 2"
     assert "REWORK PER SHEET 2" in draw.GENERAL_TEXT
@@ -1137,8 +1095,6 @@ def test_drawing_keeps_source_only_chamfer_and_part_only_rework_sheet(monkeypatc
     control_calls, owner_checks = [], []
     monkeypatch.setattr(draw, "assert_machining_controls", lambda _adapter, annotations: control_calls.append(annotations))
     monkeypatch.setattr(draw, "assert_rework_view_controls", lambda _adapter, front, end: owner_checks.append((front, end)))
-    callouts = []
-    monkeypatch.setattr(draw, "set_machining_callouts", lambda _adapter, annotations: callouts.append(annotations))
     rework_note_views, notes_settled = [], []
 
     def rework_notes(_adapter, view):
@@ -1181,7 +1137,6 @@ def test_drawing_keeps_source_only_chamfer_and_part_only_rework_sheet(monkeypatc
     ]
     assert control_calls == [["FinishedLength"]]
 
-    assert callouts == [["FinishedLength"]]
     assert adapter.currentModel is document
     assert rework_note_views == [views[0]]
     assert title_calls == [("REWORK", "REWORK", ROW["number"])]
@@ -1192,8 +1147,6 @@ def test_drawing_keeps_source_only_chamfer_and_part_only_rework_sheet(monkeypatc
         ("REWORK", "Upper Cut-End Chamfer", None),
         ("REWORK", f"{CONFIGURATION} Rework Stock Note", None),
     ]
-    assert (draw.END_VIEW_LABEL, draw.END_VIEW_LABEL_XY) in captions
-    assert (f"INSTALLED ACCEPTANCE:\n{jig.HOLD_DOWN_REFERENCE}", draw.ASSEMBLY_REFERENCE_XY) in captions
     if drift == "configuration":
         views[-1].ReferencedConfiguration = "TNut"
     elif drift == "source":

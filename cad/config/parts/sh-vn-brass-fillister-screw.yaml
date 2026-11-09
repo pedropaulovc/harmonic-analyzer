@@ -13,3 +13,9 @@ sh-vn-brass-fillister-screw:
   fit_class: fastener_clearance
   process: purchased
   drawing_unit: in
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "minor"
+      where: "TOP view: the faint grey dashed SupplierReference construction lines at the head's left edge, down the thread's right side and across the shank"
+      finding: "stray supplier-reference construction lines clutter the view"
+      reason: "Owner ruling 2026-11-01: \"Stray supplier-reference construction lines on purchased screw sheets accepted as a minor exception until the shared helper can hide them (#2143)\""
