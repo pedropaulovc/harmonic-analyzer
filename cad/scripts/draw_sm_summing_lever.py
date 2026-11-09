@@ -13,7 +13,7 @@ anchors are purchased eyebolts that thread straight into those taps, so the
 print controls thread identity and position, never a seat bore. Sheet 1
 shows the 1:2 end profile and top plan and a 1:4 shaded isometric.
 The end profile's reference angle measures the visible counter flank against
-the web top, without reconstructing the taper apex buried inside the web.
+the coplanar coefficient/web top, without reconstructing the buried taper apex.
 Sheet 2 shows VIEW F at 1:1, a complete 10:1 knife detail D cut from that
 view, and a shaded underside isometric. VIEW F carries the blind bracket
 receivers, the uniform coefficient plate's visible free-end thickness and
@@ -134,7 +134,6 @@ from sm_summing_lever_spec import (
     KNIFE_RIDGE_TANGENT_XY,
     PLATE_L,
     PLATE_W,
-    RIB_BLEND_R,
     RIB_REACH,
     RIB_T,
     RIB_WRAP_R,
@@ -2152,8 +2151,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     # Both rays are real straight edges in the end profile, not the Top
-    # projection (which collapses their angle). The web-top ray is the
-    # existing root round's tangent edge, not its removed theoretical sharp.
+    # projection (which collapses their angle). The visible coefficient-top
+    # end edge shares the web-top plane, as the builder and face check prove;
+    # the counter root's round tangent is not a visible edge in this view.
     counter_angle_label = "counter flank to web top"
     tangent_x = RIB_WRAP_R**2 / TIP_X
     tangent_y = RIB_WRAP_R * math.sqrt(1.0 - RIB_WRAP_R**2 / TIP_X**2)
@@ -2161,10 +2161,12 @@ async def build(adapter: Any) -> dict[str, str]:
     flank_point = (
         (TIP_X + tangent_x) / 2.0, tangent_y / 2.0, RIB_T / 2.0,
     )
-    web_point = (flank_point[0], COUNTER_WEB_T / 2.0, RIB_T / 2.0 + RIB_BLEND_R)
+    web_point = (
+        (RIB_REACH + PLATE_W) / 2.0, COEFFICIENT_TOP_Y, PLATE_L / 2.0,
+    )
     counter_edges = scan_view_edges(front, label=counter_angle_label)
     flank_edge = counter_edges.exact_line_through(flank_point, label="counter flank")
-    web_edge = counter_edges.exact_line_through(web_point, label="counter web top")
+    web_edge = counter_edges.exact_line_through(web_point, label="coefficient top end edge")
     flank_xy = model_point_in_view(
         adapter, front, _metres(flank_point), label=counter_angle_label,
     )

@@ -899,12 +899,12 @@ def _drawing_function(name: str) -> ast.FunctionDef | ast.AsyncFunctionDef:
 
 
 @pytest.mark.parametrize("case", [
-    "visible", "hidden_flank", "sharp_root", "underside", "wrong_attachment",
+    "visible", "hidden_flank", "hidden_root", "underside", "wrong_attachment",
     "dangling", "extra_attachment", "wrong_angle", "supplement", "nonfinite", "linear",
     "precision_ignored",
 ])
 def test_counter_taper_reference_uses_visible_edge_angle(identity, monkeypatch, case) -> None:
-    """The native acute angle belongs to two real edges, never a buried vertex."""
+    """Use the visible coefficient top coplanar with the web, not its hidden root."""
     import _supplier_dimensions
 
     monkeypatch.setattr(_supplier_dimensions, "_early_bound", lambda value, _kind: value)
@@ -923,9 +923,15 @@ def test_counter_taper_reference_uses_visible_edge_angle(identity, monkeypatch, 
         (intersection_x, spec.COUNTER_WEB_T / 2.0, z),
         (tangent_x, tangent_y, z),
     )
-    web_y = -spec.COUNTER_WEB_T / 2.0 if case == "underside" else spec.COUNTER_WEB_T / 2.0
-    web_z = z if case == "sharp_root" else z + spec.RIB_BLEND_R
-    web = _line((intersection_x + 5.0, web_y, web_z), (tangent_x - 15.0, web_y, web_z))
+    assert spec.COEFFICIENT_TOP_Y == pytest.approx(spec.COUNTER_WEB_T / 2.0, abs=1e-12)
+    web_y = spec.COEFFICIENT_BOTTOM_Y if case == "underside" else spec.COEFFICIENT_TOP_Y
+    web_z = spec.PLATE_L / 2.0
+    web = _line((spec.RIB_REACH, web_y, web_z), (spec.PLATE_W, web_y, web_z))
+    if case == "hidden_root":
+        web_z = z + spec.RIB_BLEND_R
+        web = _line(
+            (intersection_x + 5.0, web_y, web_z), (tangent_x - 15.0, web_y, web_z),
+        )
     edges = (web,) if case == "hidden_flank" else (flank, web)
     attached = (flank.edge, object() if case == "wrong_attachment" else web.edge)
     if case == "extra_attachment":
@@ -983,7 +989,7 @@ def test_counter_taper_reference_uses_visible_edge_angle(identity, monkeypatch, 
     code = compile(block, "<counter taper reference>", "exec")
     if case != "visible":
         match = (
-            "no exact visible line" if case in ("hidden_flank", "sharp_root", "underside")
+            "no exact visible line" if case in ("hidden_flank", "hidden_root", "underside")
             else "lost named edge attachments" if case in (
                 "wrong_attachment", "dangling", "extra_attachment",
             )
@@ -1002,7 +1008,7 @@ def test_counter_taper_reference_uses_visible_edge_angle(identity, monkeypatch, 
     assert picks[0]["entity_types"] == ("EDGE", "EDGE")
     assert picks[0]["orientation"] == "angular"
     assert picks[0]["p0"] == pytest.approx(
-        ((spec.TIP_X + tangent_x) / 2000.0, spec.COUNTER_WEB_T / 2000.0),
+        ((spec.RIB_REACH + spec.PLATE_W) / 2000.0, spec.COEFFICIENT_TOP_Y / 1000.0),
     )
     assert picks[0]["p1"] == pytest.approx(
         ((spec.TIP_X + tangent_x) / 2000.0, tangent_y / 2000.0),
