@@ -1035,7 +1035,7 @@ Catalog specifications checked on September 10, 2026:
   accepted practice, not a guaranteed stress or material allowable.
   MHA-SM-00 step 4 cuts each bolt from the 50.8 mm stock to its own
   hole's measured crossbar-underside-to-washer-top stack plus
-  **.351 ±.006 in** (8.9154 ±0.1524 mm) under the head (46.70 mm nominal, printed
+  **.351 ±.005 in** (8.9154 ±0.127 mm) under the head (46.70 mm nominal, printed
   (1.84) as a reference on the part drawing).
   Finished-part acceptance retains a threaded tail **.418 MIN (10.6172 mm)
   from the cut end**, with **MAX 1 P cut chamfer**, leaving at least
@@ -1104,7 +1104,7 @@ Catalog specifications checked on September 10, 2026:
   model's actual `HangerGrip@Crossbar` driving dimension, printed bare by
   section F-F under the title block's .XX ±0.51 mm band.
   There are no hanger spotfaces, separate floor driver or cleanup offset.
-  The two Ø6.045 +0.13/0 clearance holes are drilled from the finished
+  The two letter C drill Ø6.147 (.242) +0.10/0 clearance holes are drilled from the finished
   underside; their charged drift grows toward the top washer seat.
   The external-hex bolt remains
   92314A253. After the bolt's trim equations, its deburr revolve explicitly
@@ -1121,16 +1121,16 @@ Catalog specifications checked on September 10, 2026:
   attachment, label and dangling guards remain mandatory. Stale handles
   are a possibility, not a demonstrated root cause; the final-source
   selection and median-plane datum layout require the scoped native proof.
-  The washer seats on the **whole faced top**, **36.50 ±0.51 mm
+  The washer seats on the **whole faced top**, **36.50 ±0.13 mm
   above the finished crossbar underside**. Cut to the measured stack, the
-  bolt's tip reach is .351 ±.006 in (8.9154 ±0.1524 mm; 8.9173 mm modelled
-  nominal), bounded by 8.763–9.0678 mm. Subtracting one #10-24
-  pitch gives minimum full-form engagement 7.704667 mm, above 1.5D =
-  7.239 mm. Full-thread depth **9.65 ±0.13 mm** (MIN 9.52) leaves
-  0.4522 mm tip air at maximum reach; the inspected full-form tail leaves
-  9.558867 − 9.0678 = 0.491067 mm coverage beyond maximum reach.
+  bolt's tip reach is .351 ±.005 in (8.9154 ±0.127 mm; 8.9173 mm modelled
+  nominal), bounded by 8.7884–9.0424 mm. Subtracting one #10-24
+  pitch gives minimum full-form engagement 7.730067 mm, above 1.5D =
+  7.239 mm. Full-thread depth **.375 ±.005 in** (9.525 ±0.127 mm, MIN 9.398)
+  leaves 0.3556 mm tip air at maximum reach; the inspected full-form tail
+  leaves 9.558867 − 9.0424 = 0.516467 mm coverage beyond maximum reach.
   These are the stated stack margins, not extra tolerance reserves.
-  The receiver's cylindrical drill depth is **11.24 ±0.05 mm**. Its
+  The receiver's cylindrical drill depth is **.438 ±.002 in** (11.1252 ±0.0508 mm). Its
   corrected crown proof charges physical pilot oversize and point-angle
   variation, not nominal diameter and an exact point angle; see the
   [machining route and charged bounds](../../docs/machining-dfm.md#summing-lever--knife-edge-t1--least-forgiving-interface).

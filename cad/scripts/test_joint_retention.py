@@ -369,10 +369,11 @@ def test_the_thumbnut_rocked_by_the_free_t24_is_waived_only_by_its_ruling() -> N
     assert f"\u00b1{rock:.1f}\u00b0 per reversal" in jr.RULINGS[row.exception].granted
 
 
-def test_the_knife_hanger_is_a_plain_clamp_keyed_by_its_two_dowels() -> None:
-    """The cut #10-24 hex bolt clamps through a new SAE washer; the two
-    pressed dowels react torque, so the static clamp takes no lock and no
-    threadlocker (period hardware). The plain washer is not a thread lock."""
+def test_the_knife_hanger_is_a_plain_clamp_keyed_by_its_dowel() -> None:
+    """The cut #10-24 hex bolt clamps through a new SAE washer; the one
+    pressed dowel per mount, off the screw axis, reacts torque (#2144 item
+    11.3, scheme S1), so the static clamp takes no lock and no threadlocker
+    (period hardware). The plain washer is not a thread lock."""
     (row,) = [j for j in jr.JOINTS if j.id == "sm-summing/knife-hanger-in-mount"]
     assert row.thread == "#10-24 UNC"
     assert row.exposure is Exposure.STATIC_CLAMP
@@ -391,11 +392,12 @@ def test_the_knife_hanger_is_a_plain_clamp_keyed_by_its_two_dowels() -> None:
     )
     assert row.quantity == 2
     assert not row.lock_part and not row.lock_binds
-    assert "two pressed MHA-SM-VN-53 dowels" in row.exposure_reason
+    assert "one pressed MHA-SM-VN-53 dowel" in row.exposure_reason
     # Owner ruling 2026-10-24 (T+H3): the crossbar holds the press and the
-    # block takes the slip.
-    assert "held in the crossbar's underside reams" in row.exposure_reason
-    assert "the block's round hole and slot" in row.exposure_reason
+    # block takes the slip; #2144 item 11.3 (S1) deleted the slot.
+    assert "held in the crossbar's underside ream" in row.exposure_reason
+    assert "the block's round hole B" in row.exposure_reason
+    assert "slot" not in row.exposure_reason
     # The axial-capture narration is prose (AGENTS.md: never pin wording);
     # the stack it reports is checked in test_knife_hanger_worst_case.
     assert row.axial_capture

@@ -13,7 +13,7 @@ boss-hook / counter-spring / gooseneck chain.
   to the crossbar underside (``MOUNT_GAP`` 0).
 * knife-hanger-stud x2 -- McMaster 92314A253 #10-24 plain hex bolts from
   2 in stock, each cut at this assembly to the stack measured at its hole
-  plus the .351 +/-.006 in fit-up reach (46.70 mm nominal under the head);
+  plus the .351 +/-.005 in fit-up reach (46.70 mm nominal under the head);
   each passes the crossbar's #10 clearance hole (C drill) and threads into the
   knife-mount tap.
 * knife-hanger-washer x2 -- new McMaster 96659A104 18-8 SAE washers,
@@ -175,7 +175,7 @@ HANGER_CUT_LENGTH_MAX = (
 # 7.7300667 >= 1.5D = 7.239.
 HANGER_ENGAGEMENT_MIN = HANGER_REACH_MIN - hanger_screw.INCOMPLETE_TIP_LEN_MAX
 HANGER_ENGAGEMENT_FLOOR = hanger_screw.ENGAGEMENT_MIN_D * hanger_screw.SHANK_DIA
-# Longest reach under the shallowest full tap: 9.52 - 9.0424 = 0.4776 air.
+# Longest reach under the shallowest full tap: 9.398 - 9.0424 = 0.3556 air.
 HANGER_TIP_CLEARANCE = knife_mount.STUD_TAP_THREAD_DEPTH_MIN - HANGER_REACH_MAX
 # Modified-part inspection acceptance, not a vendor thread-to-head claim:
 # the useful full-form tail (.418 MIN, 10.6172, less one incomplete pitch)
