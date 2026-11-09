@@ -79,14 +79,14 @@ def test_lock_and_guide_hole_positions_fit_the_fixed_fastener_stack() -> None:
     """R9-49: the hole-over-screw radial clearance covers the radial reach of
     the lock's ±.001 hole coordinates plus half the transfer's Ø.008, with
     the 1/8 drill at its smallest and the screw major at its largest. The
-    guide's .XXX tap coordinates (±.005 stations, ±.004 row) would not fit:
+    guide's .XXX tap coordinates (±.005 stations, ±.005 row) would not fit:
     hence the transfer."""
     hole_min = 0.125 * IN
     radial = (2.0 * LOCK_BAND**2) ** 0.5 + GUIDE_ZONE / 2.0
     # The printed bands, untightened.
     assert lock.HOLE_LOCATION_BAND == pytest.approx(LOCK_BAND)
     assert screw.LOCK_TRANSFER_ZONE == pytest.approx(GUIDE_ZONE)
-    assert guide.TAP_POSITION_RADIAL == pytest.approx(math.hypot(0.005, 0.004) * IN)
+    assert guide.TAP_POSITION_RADIAL == pytest.approx(math.hypot(0.005, 0.005) * IN)
     untransferred = (2.0 * LOCK_BAND**2) ** 0.5 + guide.TAP_POSITION_RADIAL
     assert (hole_min - MAJOR_MAX) / 2.0 < untransferred
     assert blind_cut_dia_mm(lock.HOLE_SPEC) == pytest.approx(hole_min)

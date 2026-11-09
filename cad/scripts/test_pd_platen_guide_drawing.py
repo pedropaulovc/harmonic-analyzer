@@ -232,37 +232,47 @@ def test_lock_through_tap_exits_clear_the_front_taps() -> None:
     assert guide.LOCK_TAP_EXIT_WALL_MIN == pytest.approx(wall)
 
 
-def test_tap_walls_to_the_edges_pay_both_breaks_and_print_at_the_floor() -> None:
-    # Codjiflo (#2124): .080 unbroken from each tap's major at the row's
-    # .140 ±.004 (owner ruling 2026-11-08) to the bottom face and to the .29
-    # top face at its minimum, less the title block's .010 outside edge break
-    # and the tap's .010 mouth break.
+def test_tap_walls_to_the_edges_pay_both_breaks_and_print_under_the_floor() -> None:
+    # Codjiflo (#2124): .079 unbroken from each tap's major at the row's
+    # .140 ±.005 (the shop's drilled-hole row, integration review
+    # 20261109T062834910Z) to the bottom face and to the .29 top face at its
+    # minimum, less the title block's .010 outside edge break and the tap's
+    # .010 mouth break: .059, .001 under the .060 floor, which stays.
     from _inch_wall_limits import WALL_FLOOR_MM
 
-    unbroken = guide.TAP_Y - THREAD_MAJOR_MM["#4-40"] / 2.0 - 0.004 * 25.4
-    assert unbroken == pytest.approx(0.080 * 25.4, abs=1e-3)
+    unbroken = guide.TAP_Y - THREAD_MAJOR_MM["#4-40"] / 2.0 - 0.005 * 25.4
+    assert unbroken == pytest.approx(0.079 * 25.4, abs=1e-3)
     assert guide.TAP_EDGE_WALL_MIN == pytest.approx(unbroken - 2.0 * 0.010 * 25.4)
-    assert guide.TAP_EDGE_WALL_MIN >= WALL_FLOOR_MM - 0.0005
+    assert guide.TAP_EDGE_WALL_MIN == pytest.approx(0.059 * 25.4, abs=5e-4)
+    assert WALL_FLOOR_MM == pytest.approx(0.060 * 25.4)
+    assert guide.TAP_EDGE_WALL_MIN < WALL_FLOOR_MM - 0.0005
+    assert guide.TAP_EDGE_WALL_ACCEPTED == pytest.approx(0.059 * 25.4)
     # Rule 20: the sheet states the shortfall in note 1, which the banded
-    # Y LOC header cites, and the package declares it (owner ruling RV-01).
-    assert guide.TAP_EDGE_WALL_TEXT == "WALL .060 MIN, TAPS TO EDGES"
-    assert drawing.TAP_WALL_NOTE == "1. A1-A9: WALL .060 MIN, TAPS TO EDGES."
+    # Y LOC header cites, and the package declares it (RV-01, delegated
+    # ruling 2026-11-09 pending owner confirmation).
+    assert guide.TAP_EDGE_WALL_TEXT == "WALL .059 MIN, TAPS TO EDGES"
+    assert drawing.TAP_WALL_NOTE == "1. A1-A9: WALL .059 MIN, TAPS TO EDGES."
     assert drawing.HOLE_TABLE_BANDED_Y_HEADING.endswith(
         f"SEE NOTE {drawing.TAP_WALL_NOTE_NUMBER}"
     )
     assert drawing.TAP_WALL_NOTE.startswith(f"{drawing.TAP_WALL_NOTE_NUMBER}. ")
     exceptions = _config.parts("pd-platen-guide")["machinist_exceptions"]
     (entry,) = [entry for entry in exceptions if entry["id"] == "RV-01"]
-    assert entry["kind"] == "minor" and ".060" in entry["where"]
+    assert entry["kind"] == "minor"
+    assert "WALL .059 MIN" in entry["where"] and ".140 ±.005" in entry["where"]
     assert entry["reason"].startswith("Owner ruling 2026-11-08 (Pedro)")
+    assert (
+        "Delegated ruling 2026-11-09 (Main), pending owner confirmation; "
+        "owner review #2144 item 2.3"
+    ) in entry["reason"]
 
 
 def test_the_taps_print_plain_coordinates_without_gdt() -> None:
     """Owner ruling 2026-11-08 (#2144 item 2.3): noncritical holes, no
     position frame or datums, no spot-through route. The LOC columns are not
     basic (integration review 20261109T062834910Z): the stations take the
-    title block's .XXX ±.005, and the tap row's ±.004 prints on every Y LOC
-    value, never in a note."""
+    title block's .XXX ±.005, and the tap row's band, the shop's drilled-hole
+    row ±.005, prints on every Y LOC value, never in a note."""
     from pd_platen_guide_spec import (
         TAP_STATION_BAND,
         TAP_STATION_PLACES,
@@ -273,8 +283,8 @@ def test_the_taps_print_plain_coordinates_without_gdt() -> None:
     assert not hasattr(guide, "GEOMETRIC_TOLERANCES_MM")
     assert TAP_STATION_PLACES == 3
     assert TAP_STATION_BAND == pytest.approx(0.005 * 25.4)
-    assert TAP_Y_BAND == pytest.approx(0.004 * 25.4)
-    assert TAP_Y_BAND_TEXT == ".140 ±.004"
+    assert TAP_Y_BAND == pytest.approx(0.005 * 25.4)
+    assert TAP_Y_BAND_TEXT == ".140 ±.005"
     assert "±" not in drawing.TAP_WALL_NOTE and "LOC" not in drawing.TAP_WALL_NOTE
     assert not hasattr(drawing, "TAP_ROW_NOTE")
     assert len(drawing.HOLE_TAGS) == len(drawing.HOLE_STATIONS_MM) == 9
@@ -400,7 +410,7 @@ def test_the_hole_table_names_each_taps_mate() -> None:
 
 def test_the_y_loc_column_prints_the_tap_row_band() -> None:
     """Integration review 20261109T062834910Z (rule 3): every printed Y LOC
-    reads .140 ±.004 from a custom column at the native one's width; the
+    reads .140 ±.005 from a custom column at the native one's width; the
     native Y LOC, still checked against the model's tap row, is hidden; the
     SIZE merge and the mates survive."""
     table = _FakeHoleTable()
@@ -415,13 +425,13 @@ def test_the_y_loc_column_prints_the_tap_row_band() -> None:
     )
     banded = drawing.HOLE_TABLE_BANDED_Y_COLUMN
     assert table.widths[banded] == native_width
-    assert {row[banded] for row in table.cells[1:]} == {".140 ±.004"}
+    assert {row[banded] for row in table.cells[1:]} == {".140 ±.005"}
     assert table.merge_calls[-1] == (1, 4, table.RowCount - 1, 4)
     assert table.size_merged
     table.cells[2][banded] = ".140"
     with pytest.raises(RuntimeError, match="Y LOC native"):
         drawing._check_banded_y_column(table)
-    table.cells[2][banded] = ".140 ±.004"
+    table.cells[2][banded] = ".140 ±.005"
     table.SetColumnHidden(drawing.HOLE_TABLE_NATIVE_Y_COLUMN, False)
     with pytest.raises(RuntimeError, match="native-Y-only hidden"):
         drawing._check_banded_y_column(table)

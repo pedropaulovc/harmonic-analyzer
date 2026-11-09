@@ -135,17 +135,18 @@ FINISH_CHAR_HEIGHT = 0.0025
 # Owner ruling 2026-11-08 (Pedro, #2144 item 2.3): the taps are noncritical,
 # so they print plain hole-table coordinates with no position frame, and the
 # LOC columns are not basic (rule 5: a basic only feeds a frame). The
-# stations take the title block's .XXX ±.005; the tap row takes its ±.004 on
-# every Y LOC value (rule 3: a tighter band goes on the dimension itself,
-# never in a note; integration review 20261109T062834910Z). The native LOC
+# stations take the title block's .XXX ±.005; the tap row prints its band
+# (TAP_Y_BAND_TEXT, the shop's ±.005 row) on every Y LOC value (rule 3: a
+# band goes on the dimension itself, never in a note; integration review
+# 20261109T062834910Z). The native LOC
 # cells are generated and cannot be edited (ITableAnnotation
 # IsCellTextEditable: only the header row and custom columns can), so a
 # custom Y LOC column after the native one prints each row's banded value
 # and the native column, still model-linked and checked against TAP_Y, is
 # hidden (as the oblique carrier hides its generated SIZE). That column's
-# header points to numbered note 1, the taps' finished wall to the edges at
-# the floor the band holds (rule 7: a location's reason sits on a linked
-# flag note; rule 20; owner ruling RV-01 in pd-platen-guide.yaml).
+# header points to numbered note 1, the taps' finished wall to the edges, .001
+# under the floor (rule 7: a location's reason sits on a linked flag note;
+# rule 20; RV-01 in pd-platen-guide.yaml, pending owner confirmation).
 HOLE_TAGS = tuple(f"A{index}" for index in range(1, len(HOLE_STATIONS_MM) + 1))
 PLATEN_NUMBER = _config.parts("pd-platen")["number"]
 LOCK_NUMBER = _config.parts("pd-guide-lock")["number"]
@@ -638,7 +639,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         # X LOC = the station from the left face at .XXX (the title block's
         # ±.005); Y LOC = the tap row above the bottom face, printed with its
-        # ±.004 by the banded column below. Neither is basic: no frame.
+        # ±.005 by the banded column below. Neither is basic: no frame.
         expected_locations_mm=tuple((station, TAP_Y) for station in HOLE_STATIONS_MM),
         anchor_xy=(HOLE_TABLE_X_M, HOLE_TABLE_Y_M),
         label="platen-guide taps",
