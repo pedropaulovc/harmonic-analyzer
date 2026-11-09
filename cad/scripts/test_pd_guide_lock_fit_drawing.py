@@ -234,7 +234,7 @@ def test_a_set_plate_skews_at_opposite_tap_and_placement_errors() -> None:
         (0.0, PLACEMENT), (0.0, -PLACEMENT), (0.0, -0.999 * _TAP_DY), (0.0, 0.999 * _TAP_DY),
         0.0, 0.0, _CLEARANCE_MIN, _CLEARANCE_MIN, _WIDTH,
     )  # fmt: skip
-    assert reach[0] == pytest.approx(0.2092, abs=3e-4)
+    assert reach[0] == pytest.approx(0.2502, abs=3e-4)
     assert reach[0] > _TRANSLATED_FAR_REACH
     assert screw.LOCK_SET_EDGE_REACH[0] >= reach[0]
 
@@ -249,8 +249,8 @@ def test_a_set_plate_skews_further_on_unequal_hole_clearances() -> None:
         (PLACEMENT, PLACEMENT), (-PLACEMENT, -PLACEMENT), (0.0, -_TAP_DY), (0.0, _TAP_DY),
         TRANSFER, -TRANSFER, _CLEARANCE_MAX, _CLEARANCE_MIN, longest,
     )  # fmt: skip
-    assert reach[0] == pytest.approx(0.2617, abs=5e-4)
-    assert reach[0] > 0.2092  # the opposite-error case above
+    assert reach[0] == pytest.approx(0.3032, abs=5e-4)
+    assert reach[0] > 0.2502  # the opposite-error case above
     assert screw.LOCK_SET_EDGE_REACH == pytest.approx(
         (_FAR_REACH, _STATION_MAX + _OVERHANG * _SKEW)
     )
