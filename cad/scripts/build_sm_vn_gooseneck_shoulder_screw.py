@@ -36,7 +36,9 @@ from _sketch_rectangle import define_centered_rectangle
 from _supplier_screw_reference import _linear
 from _visibility import blank_reference_geometry
 
-PART_NAME = part.PART_NAME
+PART_NAME = "sm-vn-gooseneck-shoulder-screw"
+if PART_NAME != part.PART_NAME:
+    raise AssertionError(f"builder PART_NAME {PART_NAME!r} != spec {part.PART_NAME!r}")
 SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material
 AXIS_NAME = part.AXIS_NAME
