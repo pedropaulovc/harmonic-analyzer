@@ -6,10 +6,11 @@ wording edit rebuilds the drawing alone. Printed dimensions interpolate a
 symbol of ``ms_measuring_stick_assembly_spec`` or a part/vendor spec; mate
 drawing numbers come from the part registry.
 
-The near-face setting is a native reference dimension of the saved clamped
-pose, not an acceptance band; step 5 and the setup note name the
-stick-mark/thumbscrew-axis indexing it shows without repeating its value.
-Printed lengths are in the assembly contract's ``drawing_unit``.
+Owner ruling 2026-11-06 (option C): the stop has no as-shipped setting; it
+clamps anywhere along the stick. The saved pose (STOP_MARK on the thumbscrew
+axis) and its sheet-1 near-face reference only show an example position, and
+the sheet-1 note says so. Printed lengths are in the assembly contract's
+``drawing_unit``.
 """
 
 from __future__ import annotations
@@ -32,6 +33,34 @@ BLOCK_DRAWING_NUMBER = str(_config.parts("ms-stop-block")["number"])
 UNIT = assembly_contract("ms-measuring-stick").drawing_unit
 
 BOM_ORDER = (spec.STICK, spec.BLOCK, spec.PLATE, spec.PLATE_SCREW, spec.THUMB_SCREW)
+# The native BOM numbers the families in the builder's insertion order (block,
+# plate, stick, thumbscrew, plate screws); the steps cite these numbers and the
+# recipe refuses a BOM that numbers otherwise (rule 22: steps name item numbers).
+ITEM_NUMBERS = {
+    spec.BLOCK: 1,
+    spec.PLATE: 2,
+    spec.STICK: 3,
+    spec.THUMB_SCREW: 4,
+    spec.PLATE_SCREW: 5,
+}
+# The short noun each step prints after the item number.
+_ITEM_NOUNS = {
+    spec.BLOCK: "BLOCK",
+    spec.PLATE: "PLATE",
+    spec.STICK: "STICK",
+    spec.THUMB_SCREW: "THUMBSCREW",
+    spec.PLATE_SCREW: "FILLISTER SCREWS",
+}
+
+
+def _ref(stem: str) -> str:
+    """``stem``'s bare item reference, ``ITEM 2``."""
+    return f"ITEM {ITEM_NUMBERS[stem]}"
+
+
+def _item(stem: str) -> str:
+    """``stem`` named with its item number, ``ITEM 2 PLATE``."""
+    return f"{_ref(stem)} {_ITEM_NOUNS[stem]}"
 
 
 def _inch_fraction(length_mm: float) -> str:
@@ -49,8 +78,7 @@ def _hole(length_mm: float) -> str:
     )
 
 
-# BOM DESCRIPTION cells (the parts carry no Description property); the steps
-# below name the parts the same way.
+# BOM DESCRIPTION cells (the parts carry no Description property).
 BOM_DESCRIPTIONS = {
     spec.STICK: "GRADUATED STICK",
     spec.BLOCK: "STOP BLOCK",
@@ -65,47 +93,59 @@ BOM_DESCRIPTIONS = {
 }
 
 EXPLODED_CAPTION = "EXPLODED VIEW - ASSEMBLY SEQUENCE ON SHEET 3"
-UNDERSIDE_CAPTION = "GRADUATED UNDERSIDE"
 DRAWING_DIMENSIONS = {spec.SETTING_FEATURE: {spec.SETTING_DIMENSION}}
 # Components own material and finish; no assembly coating operation is required.
-# The fitter's order; the explode (ms_measuring_stick_explode_spec) runs steps
-# 2-5 backwards. Each line names the parts as the BOM's DESCRIPTION column
-# does. The block and its cover are a match-drilled pair (step 1): neither is
-# interchangeable.
+# The fitter's order, one action a step; the explode
+# (ms_measuring_stick_explode_spec) runs steps 7-10 backwards. The block and
+# its cover are a match-drilled pair (steps 1-6): neither is interchangeable.
 # The block's own tapped-hole callout states the drill and full-thread depths;
-# step 1 points to it instead of restating them.
+# steps 3 and 5 point to it instead of restating them.
+_BLOCK, _PLATE, _STICK = _item(spec.BLOCK), _item(spec.PLATE), _item(spec.STICK)
+_THUMB, _SCREWS = _item(spec.THUMB_SCREW), _item(spec.PLATE_SCREW)
 ASSEMBLY_STEPS = (
-    "1. PLATE IS MASTER: LAY OUT STOP COVER PLATE HOLES PER "
-    f"{PLATE_DRAWING_NUMBER}; LEAVE UNDRILLED. "
-    f"CLAMP PLATE AND BLOCK WITH {stop.MATCH_DRILL_DATUM_ALIGNMENT}; PILOT "
-    f"DIA {_hole(stop.PLATE_TAP_DRILL_DIA)} THROUGH PLATE INTO BLOCK TO THE "
-    f"{BLOCK_DRAWING_NUMBER} TAP DRILL DEPTH (DEPTH EXCLUDES PLATE). REMOVE "
-    f"PLATE; OPEN ITS HOLES TO DIA {_hole(stop.PLATE_CLEARANCE_DIA)}; "
-    f"BOTTOMING-TAP BLOCK {plate_screw.THREAD} TO THE {BLOCK_DRAWING_NUMBER} "
-    "FULL THREAD DEPTH. MARK BLOCK AND PLATE AS A PAIR.",
-    f"2. START THE {thumb.THREAD} KNURLED THUMBSCREW DOWN INTO THE STOP BLOCK "
-    "FROM ITS TAPPED FACE; KEEP THE TIP CLEAR OF THE WINDOW.",
-    "3. LAY THE STICK IN THE OPEN WINDOW, GRADUATED FACE OPPOSITE THE THUMBSCREW.",
-    "4. FIT ITS OWN STOP COVER PLATE OVER THE WINDOW, PAIR MARKS TOGETHER; DRIVE "
-    f"BOTH {plate_screw.THREAD} BRASS FILLISTER SCREWS UNTIL THE HEADS SEAT.",
-    "5. USE THE NEAR-FACE REFERENCE DIMENSION ON SHEET 1 FOR THE SHOWN POSE "
-    f"(STICK GRADUATION {stop.STOP_MARK:.1f} ON THUMBSCREW AXIS); "
-    "TURN THE THUMBSCREW IN BY HAND UNTIL ITS TIP CLAMPS THE PLAIN FACE; "
-    "THUMBSCREW ABOVE THE STICK.",
+    f"1. LAY OUT THE TWO HOLES OF {_PLATE} PER {PLATE_DRAWING_NUMBER}; "
+    "DO NOT DRILL THEM YET.",
+    f"2. CLAMP {_PLATE} TO {_BLOCK}, LEFT ENDS AND TOP EDGES FLUSH AS IN THE "
+    f"SHEET 1 FRONT VIEW (TOP OF {_ref(spec.BLOCK)}: ITS {thumb.THREAD} "
+    f"TAPPED FACE). THESE ARE THE {stop.LOCATING_END_NOTE} AND "
+    f"{stop.LOCATING_EDGE_NOTE} ON {BLOCK_DRAWING_NUMBER} AND "
+    f"{PLATE_DRAWING_NUMBER}.",
+    f"3. AT EACH LAID-OUT HOLE, DRILL Ø{_hole(stop.PLATE_TAP_DRILL_DIA)} "
+    f"THROUGH {_PLATE} AND INTO {_BLOCK} TO THE {BLOCK_DRAWING_NUMBER} TAP "
+    f"DRILL DEPTH, MEASURED FROM THE {_ref(spec.BLOCK)} FACE UNDER "
+    f"{_ref(spec.PLATE)}.",
+    f"4. WITH {_PLATE} OFF {_ref(spec.BLOCK)}, OPEN ITS TWO HOLES TO "
+    f"Ø{_hole(stop.PLATE_CLEARANCE_DIA)} THRU.",
+    f"5. TAP BOTH HOLES IN {_BLOCK} {plate_screw.THREAD} WITH A BOTTOMING TAP "
+    f"TO THE {BLOCK_DRAWING_NUMBER} FULL THREAD DEPTH.",
+    f"6. MARK {_BLOCK} AND {_PLATE} AS A MATCHED PAIR.",
+    f"7. START THE {_THUMB} INTO THE TAPPED HOLE IN THE TOP OF {_BLOCK}; "
+    "KEEP ITS TIP CLEAR OF THE WINDOW.",
+    f"8. WITH {_ref(spec.THUMB_SCREW)} ON TOP, LAY {_STICK} IN THE OPEN "
+    f"WINDOW OF {_ref(spec.BLOCK)}, GRADUATED FACE DOWN.",
+    f"9. FIT {_PLATE} OVER THE WINDOW, PAIR MARKS TOGETHER; DRIVE BOTH "
+    f"{_SCREWS} UNTIL THEIR HEADS SEAT.",
+    f"10. WITH {_ref(spec.BLOCK)} AT ANY POSITION ALONG {_ref(spec.STICK)}, "
+    f"TURN THE {_THUMB} IN BY HAND UNTIL ITS TIP CLAMPS THE TOP FACE OF "
+    f"{_ref(spec.STICK)}.",
 )
 ASSEMBLY_CHECKS = (
-    "CHECK: WITH THE THUMBSCREW BACKED OFF THE STICK SLIDES FREELY IN THE WINDOW.",
-    "CHECK: CLAMPED, THE STOP DOES NOT MOVE ALONG THE STICK.",
-    "CHECK: BOTH SCREW HEADS SEAT ON THE COVER AND THE COVER LIES FLAT ON THE BLOCK.",
+    f"CHECK: WITH {_ref(spec.THUMB_SCREW)} BACKED OFF, {_STICK} SLIDES FREELY "
+    "IN THE WINDOW.",
+    f"CHECK: WITH {_ref(spec.THUMB_SCREW)} TIGHT, {_BLOCK} DOES NOT MOVE ALONG "
+    f"{_ref(spec.STICK)}.",
+    f"CHECK: BOTH {_ref(spec.PLATE_SCREW)} HEADS SEAT ON {_PLATE}.",
+    f"CHECK: {_ref(spec.PLATE)} LIES FLAT ON {_ref(spec.BLOCK)}.",
 )
-CLAMPED_SETUP_NOTE = (
-    "CLAMPED SETUP: NEAR-FACE REFERENCE DIMENSION SHOWS THE SAVED POSE, "
-    f"STICK GRADUATION {stop.STOP_MARK:.1f} ON THUMBSCREW AXIS. "
-    "GRADUATED FACE AGAINST THE FIXED WINDOW WALL; THUMBSCREW ON THE PLAIN FACE."
+# Sheet 1: the pose drawn (and its near-face reference) is one example.
+EXAMPLE_POSE_NOTE = (
+    f"STOP SHOWN CLAMPED AT AN EXAMPLE POSITION. {_ref(spec.BLOCK)} CLAMPS "
+    f"AT ANY POSITION ALONG {_ref(spec.STICK)} (SHEET 3, STEP 10)."
 )
 
 # Both dimensions are reference: the assembly pose, not component sizes.
 REFERENCE_OVERALL_LENGTH = spec.STICK_X_MAX - spec.STICK_X_MIN
 DRAWING_REFERENCE_PRECISION = 1
 
-assert sorted(spec.QUANTITIES) == sorted(BOM_ORDER)
+assert sorted(spec.QUANTITIES) == sorted(BOM_ORDER) == sorted(ITEM_NUMBERS)
+assert sorted(ITEM_NUMBERS.values()) == list(range(1, len(BOM_ORDER) + 1))
