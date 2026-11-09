@@ -1654,8 +1654,41 @@ uv run --frozen python cad/scripts/diagnostics/benchmark_assembly_reconcile.py p
   <retained-output>/reports/assembly-reconcile/target-recipe.json
 ```
 
-No assembly measurements are claimed until a native run succeeds and its
-evidence is retained.
+Native source `f986275856c4b0dad71d10f7a7885d1290552b7e` passed on
+`swmaker000004@4`, run `20261109T165730103Z-137e9e1bf4b1422f8230e11b394c3f11`.
+Three alternating clean/incremental pairs and no-op trials produced:
+
+| assembly operation | median seconds | observed range, seconds |
+|---|---:|---:|
+| clean creation | 7.165 | 7.154 to 7.214 |
+| retained-mate reconciliation | 4.914 | 4.905 to 4.966 |
+| no-op with isolated reference retargeting and validation | 3.877 | 3.869 to 3.902 |
+
+Reconciliation used 31.4% less operation time (1.46x speedup). The 145 retained
+OTel spans attribute 3.831 s to clean creation (including per-mate solves),
+versus 0.00380 s for the retained dimension edit. Incremental reference
+retargeting took 0.0472 s, initial open 1.166 s and baseline validation 0.637 s.
+The separate explicit rebuild took 0.121 s clean and 0.102 s incremental.
+These operation times include isolation, validation, save and reopen, but
+exclude fixture creation, renders, farm scheduling and worker startup.
+
+Both occurrences and all three mates resolved directly through their persistent
+references after save/reopen. The base stayed at the origin, the fully
+constrained mover reached +40 mm on Z with identity rotation, all mates were
+healthy and child geometry stayed unchanged. No-op assembly bytes stayed
+unchanged after the separately timed reference retarget. The two native PNGs
+were inspected and byte-identical. Structural mate changes returned `full_build`
+without edit instructions.
+
+The default template preference changed from empty to the resolved template
+path during native work; the explicitly used template path, size and hash
+remained identical. That observed preference initialization explains the
+prior whole-metadata comparison failure. The enclosing farm span took 469.5 s,
+with 333.3 s source acquisition and 81.0 s worker execution; the speedup above
+is not a farm-wall-time claim. This remains a two-occurrence, three-plane-mate
+experiment on a frozen baseline, not current-main qualification or proof for
+arbitrary component replacement, mate topology or nested assemblies.
+[Native assemblies, children, manifests, report and raw spans](https://github.com/user-attachments/files/34589963/native4-assembly-evidence.zip).
 
 ### Readiness is not proof of a build
 
