@@ -88,13 +88,8 @@ from ms_stick_spec import (
     DRAWING_PRECISION,
     DRAWING_TOLERANCES,
     DRAWING_VALUES_BY_NAME,
-    DRAWING_NOTES,
     MIN_LIMIT_DEVIATIONS_MM,
     MIN_LIMIT_TOL_TYPE,
-    NUMERAL_PLACEMENT_NOTE,
-    SECTION_PARENT_VIEW_NOTE,
-    FRONT_VIEW_NOTE,
-    ISOMETRIC_VIEW_NOTE,
     HALF_TICK_LENGTH,
     MINOR_TICK_LENGTH,
     NUMERAL_LAYER_DXFS,
@@ -446,19 +441,23 @@ def _assert_layer_placement(adapter, sketch_name: str, path) -> None:
 
 @_telemetry.traced("dim.ms_stick_text")
 def author_dimension_callouts(adapter) -> None:
-    """Write each callout below its source dimension and read it back: the
-    drawing imports this text and never sets it (#1942)."""
-    by_feature: dict[str, dict[str, str]] = {}
-    for name, text in callouts.CALLOUTS.items():
-        by_feature.setdefault(callouts.FEATURE_OF[name], {})[name] = text
-    for feature, texts in by_feature.items():
-        displays = _named_dimensions(adapter, feature, set(texts))
-        for name, text in texts.items():
+    """Write each callout below, each prefix ahead of and each suffix after
+    its source dimension and read them back: the drawing imports this text
+    and never sets it (#1942)."""
+    by_feature: dict[str, set[str]] = {}
+    for name, feature in callouts.FEATURE_OF.items():
+        by_feature.setdefault(feature, set()).add(name)
+    for feature, names in by_feature.items():
+        displays = _named_dimensions(adapter, feature, names)
+        for name in sorted(names):
             display, _dimension = displays[name]
-            display.SetText(callouts.CALLOUT_BELOW, text)
-            printed = str(display.GetText(callouts.CALLOUT_BELOW) or "")
-            if callouts.callout_rows(printed) != callouts.callout_rows(text):
-                raise RuntimeError(f"{name}@{feature}: callout did not persist: {printed!r}")
+            for part_id, texts in callouts.LANES:
+                if name not in texts:
+                    continue
+                display.SetText(part_id, texts[name])
+                printed = str(display.GetText(part_id) or "")
+                if callouts.callout_rows(printed) != callouts.callout_rows(texts[name]):
+                    raise RuntimeError(f"{name}@{feature}: callout did not persist (text part {part_id}): {printed!r}")
 
 
 async def _cut_tick(
@@ -555,6 +554,9 @@ async def _manufacturing_chords(adapter, drive_jobs: list[tuple[str, str]]) -> N
     edge_y = '"BodyWidth"'
     glyph_x = SCALE_START_X + TICK_WIDTH / 2.0 + NUMERAL_GAP_MM
     glyph_y = BODY_WIDTH - TICK_LENGTH - NUMERAL_GAP_MM
+    # The 10's +X ink edge, short of the last full tick's -X edge.
+    last_tick_x = f'{scale_x} + {DIVISION_COUNT - 1} * "DivisionSpacing"'
+    glyph_10_x = SCALE_START_X + (DIVISION_COUNT - 1) * DIVISION_SPACING - TICK_WIDTH / 2.0 - NUMERAL_GAP_MM
     bindings = {
         "ScaleStartReference": (scale_x, None, edge_y),
         "FullLengthReference": ('"TickLength"', scale_x, '"BodyWidth" - "TickLength"'),
@@ -581,6 +583,10 @@ async def _manufacturing_chords(adapter, drive_jobs: list[tuple[str, str]]) -> N
         "NumeralYGapReference": (
             f'"BodyWidth" - "TickLength" - {glyph_y}mm',
             f"{glyph_x}mm", f"{glyph_y}mm",
+        ),
+        "Numeral10GapReference": (
+            f'{last_tick_x} - "TickWidth" / 2 - {glyph_10_x}mm',
+            f"{glyph_10_x}mm", f"{glyph_y}mm",
         ),
     }
     for feature, (name, start, end) in REFERENCE_DIMENSIONS.items():
@@ -917,11 +923,11 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         PART_NAME,
         {
-            "Manufacturing Notes": DRAWING_NOTES,
-            "Front View Note": FRONT_VIEW_NOTE,
-            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
-            "Numeral Placement Note": NUMERAL_PLACEMENT_NOTE,
-            "Section Parent View Note": SECTION_PARENT_VIEW_NOTE,
+            "Manufacturing Notes": callouts.DRAWING_NOTES,
+            "Isometric View Note": callouts.ISOMETRIC_VIEW_NOTE,
+            "Parent View Note": callouts.PARENT_VIEW_NOTE,
+            "Bottom Parent View Note": callouts.BOTTOM_PARENT_VIEW_NOTE,
+            "Section Parent View Note": callouts.SECTION_PARENT_VIEW_NOTE,
         },
     )
     name_octant_views(
