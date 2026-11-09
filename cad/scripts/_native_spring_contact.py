@@ -333,7 +333,7 @@ _CHANNEL_CONTACT_FAMILIES = (
 _SUMMING_CONTACT_FAMILIES = (
     "sm-vn-counter-spring",
     "sm-vn-boss-hook",
-    "sm-gooseneck-spring-screw",
+    "sm-vn-gooseneck-shoulder-screw",
 )
 _STATION_LOOKUP_TOLERANCE_MM = 1e-3
 
@@ -555,9 +555,11 @@ def assert_assembly_spring_contacts(
         )
         screw = _match_station_family(
             counter,
-            "sm-gooseneck-spring-screw",
+            "sm-vn-gooseneck-shoulder-screw",
             _ordered_family(
-                "sm-gooseneck-spring-screw", found["sm-gooseneck-spring-screw"], 1
+                "sm-vn-gooseneck-shoulder-screw",
+                found["sm-vn-gooseneck-shoulder-screw"],
+                1,
             ),
         )
         counter_instance = counter[0]

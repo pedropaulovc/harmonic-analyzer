@@ -2033,7 +2033,7 @@ def test_omp_rpc_actual_session_readiness_precedes_prompt_and_reaps_on_failure(
     assert dict(os.environ) == before
 
 
-# Observed on farm run 20261028T113956431Z (judge, sm_gooseneck_spring_screw):
+# Observed on farm run 20261028T113956431Z (judge, the retired gooseneck spring-screw sheet):
 # OMP closed the cluster object before "reason", twice in a row.
 _OMP_MALFORMED_JUDGMENT = (
     '```json\n{"clusters":[{"member_ids":["r1.minor.1"],"decision":"not_gating","category":"minor",'

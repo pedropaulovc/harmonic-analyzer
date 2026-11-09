@@ -10,8 +10,9 @@ uses, on the same native fixtures as the production seats:
 * channel: ``ch-channel-lever`` (at the station's solved tilt) + ``ch-vn-spring-hook``
   + one ``9432K31`` length variant, per distinct calibrated amplitude;
 * counter: ``sm-vn-boss-hook`` + one ``1330K524`` at the preset's balance length +
-  ``sm-gooseneck`` + made ``sm-gooseneck-spring-screw`` (MHA-SM-04), per preset
-  (the gooseneck and screw move together; the screw is the upper contact surface).
+  ``sm-gooseneck`` + purchased ``sm-vn-gooseneck-shoulder-screw`` (MHA-SM-VN-56),
+  per preset (the gooseneck and screw move together; the screw's shoulder is
+  the upper contact surface, owner ruling 2026-11-08 (Pedro), #2144 item 11.4).
 
 Each contact's native collision/clear boundary is located to 1e-6 mm, and the
 component is then seated ``springs.boolean_stability_mm`` past it, on the clear
@@ -30,7 +31,7 @@ never from the table being replaced, so a stale table cannot bias the new one.
 
 Run on a licensed farm/native seat (the parts must already be built):
 ``ch-channel-lever``, ``ch-vn-spring-hook``, ``sm-vn-boss-hook``, ``sm-gooseneck``
-and ``sm-gooseneck-spring-screw``. The counter refuses support parts that doit
+and ``sm-vn-gooseneck-shoulder-screw``. The counter refuses support parts that doit
 would rebuild (``_require_current_support_parts``), so build those two through
 doit first. The driver builds the supplier spring length variants itself; no
 summing assembly is needed to replace a stale seat::
@@ -331,7 +332,7 @@ async def _build_counter_variant(adapter, name: str, length_mm: float) -> None:
 
 # The saved parts the counter fixture measures as the upper contact; the
 # emitted upper_support certificate states THEIR recipe's geometry.
-_SUPPORT_PART_STEMS = ("sm_gooseneck", "sm_gooseneck_spring_screw")
+_SUPPORT_PART_STEMS = ("sm_gooseneck", "sm_vn_gooseneck_shoulder_screw")
 
 
 def _require_current_support_parts() -> None:
@@ -352,7 +353,7 @@ def _require_current_support_parts() -> None:
     except (OSError, ValueError) as exc:
         raise RuntimeError(
             f"cannot prove the counter support parts are current ({ledger}: {exc}); "
-            "build sm-gooseneck and sm-gooseneck-spring-screw through doit first"
+            "build sm-gooseneck and sm-vn-gooseneck-shoulder-screw through doit first"
         ) from exc
     producers = [
         (
@@ -420,10 +421,11 @@ async def _calibrate_counter(
                     "ground": True,
                 },
                 {
-                    "part": "sm-gooseneck-spring-screw",
+                    # The shoulder's end face seats on the end piece's end
+                    # face (the screw's origin); the loop rests beside it.
+                    "part": "sm-vn-gooseneck-shoulder-screw",
                     "position": [
-                        spring_mounts.GOOSENECK_END_X
-                        + sm_gooseneck_geom.SPRING_EYE_GAP,
+                        spring_mounts.GOOSENECK_END_X,
                         gooseneck_y + sm_gooseneck_geom.ARM_Y,
                         SUMMING_Z,
                     ],
@@ -462,7 +464,7 @@ async def _calibrate_counter(
         # that, as a channel refit's does.  Unhinted, ClosestDistance (which
         # over-reports the Boolean's boundary by ~2.8e-5 mm) steers the first
         # trial past it, and inside the modeller's ~1e-5 mm precision the
-        # native verdict need not be monotonic: the loop on the plain Ø6.35
+        # native verdict need not be monotonic: the loop on the retired screw's Ø6.35
         # body read CLEAR 10-12e-6 mm inside its outer boundary in a 2e-6 mm
         # sweep, identically before and after landing (farm run
         # 20261027T205137862Z), and the unhinted bisection closed on that
@@ -492,10 +494,13 @@ async def _calibrate_counter(
                 raise RuntimeError(
                     f"{preset} counter {label}: landed pose is not seated ({contact!r})"
                 )
-        # The fixture variant has the same made-screw receiver joint as production;
-        # allow only that exact thread/end-piece overlap, never spring/support masks.
+        # The fixture variant has the same shoulder-screw receiver joint as
+        # production; allow only that exact thread/end-piece overlap, never
+        # spring/support masks.
         screw_pair = frozenset((screw, gooseneck))
-        production_pair = frozenset(("sm-gooseneck-spring-screw-1", "sm-gooseneck-1"))
+        production_pair = frozenset(
+            ("sm-vn-gooseneck-shoulder-screw-1", "sm-gooseneck-1")
+        )
         check_no_interference(
             adapter,
             allowed_pairs={

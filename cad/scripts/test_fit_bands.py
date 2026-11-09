@@ -80,10 +80,6 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
     # set_single_limit converts each caller's single-limit band.
     ("_single_limit_tolerance", "band"): (
         "(__import__('pn_pen_hanger_spec').SLOT_CORNER_R_BAND,"
-        " __import__('sm_gooseneck_spring_screw_geom').PLAIN_LENGTH_MIN_BAND,"
-        " __import__('sm_gooseneck_spring_screw_geom').FULL_THREAD_STATION_MAX_BAND,"
-        " __import__('sm_gooseneck_spring_screw_geom').UNDERHEAD_CORNER_R_BAND,"
-        " __import__('sm_gooseneck_spring_joint').COUNTERBORE_FLOOR_CORNER_R_BAND,"
         " __import__('dt_pinion_cam_spec').THIN_WALL_MIN_BAND,"
         " __import__('pn_pen_frame_spec').TAP_WALL_MIN_BAND,"
         " __import__('pn_pen_rod_spec').TAP_WALL_MIN_BAND,"
@@ -114,11 +110,6 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
         " blank_dia_band(12), tooth_thickness_band(12))",
         "each",
     ),
-    # for dim_name, band in (("PinHoleDia", PIN_HOLE_DIA_BAND), ("SlotWidth",
-    # SLOT_WIDTH_BAND)): deviations(band), then the symmetric setter -- the
-    # knife mount's datum-B hole and datum-C slot slip bands (owner ruling
-    # 2026-10-24, T+H3), both the dowel spec's SLIP_HOLE_DIA_BAND.
-    ("build_sm_knife_mount", "band"): ("(PIN_HOLE_DIA_BAND, SLOT_WIDTH_BAND)", "each"),
 }
 
 # Consumer modules that cannot be imported without SolidWorks, with the reason.
@@ -263,6 +254,15 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ("ch_rocker_arm_tl_vn_oblique_pivot_spacer_spec", "OD_BAND"): (
         "catalogue OD band, upper limit indexed for the carrier's thrust-seat "
         "chamfer-mouth check; the sheet prints it as untoleranced REF"
+    ),
+    # #2144 item 11.4: McMaster 91829A566 catalogue bands, indexed
+    # into MIN/MAX limits that sm_gooseneck_spring_joint charges; the sheets
+    # print them as untoleranced REF.
+    ("sm_vn_gooseneck_shoulder_screw_spec", "SHOULDER_DIA_BAND"): (
+        "catalogue shoulder band, indexed for the eye clearance and head retention"
+    ),
+    ("sm_vn_gooseneck_shoulder_screw_spec", "SHOULDER_LENGTH_BAND"): (
+        "catalogue shoulder-length band, indexed for the eye's axial play"
     ),
     ("mg_wheel_axle_spec", "THREAD_LEN_BAND"): (
         "equal band indexed into the native symmetric (+/-) tolerance"

@@ -6,26 +6,24 @@ trunnion's top vertex rides its upper inner wall in line contact (ch18 p.42:
 unpainted hardened steel, close bore -- 2026-09-02 user re-read).  Every face
 and the bore are real edges, so
 the block dimensions ride the auto-imported profile marks (block + bore) with the
-depth added across the right-view section.  The MHA-SM-VN-53 dowels press into
-the crossbar and slip into this block (owner ruling 2026-10-24, T+H3): its
-round slip hole, datum B, prints its reamed Ø, band and mate and a ⊥Ø0.015
-frame to A that carries B, located on the +X side and front faces at general
-tolerance; its slot, datum C, open to the -X face, prints its width, band and
-mate under a position frame to A|B stacked over a ⊥0.015 frame to A, the
-stack carrying C (owner ruling 2026-10-27, #2016), its half-round end
-located from B, all
-in the top view.  Their shared flat-floor depth is in section A-A, cut from
-the top view through the tap and dowel axes (drawing-guidelines.md rule 9
-(show internal shape in solid lines): the floor is hidden in the front view,
-so it is dimensioned where the cut shows it); the tap axis, run on through
-the bore's centre, stands BASIC 7.632 from B's axis there.  The reamed bore
-carries a composite position frame to A|B|C (owner ruling 2026-10-27,
-#2016), its centre a BASIC height under A; the
-#10-24 tap a position frame to the same A|B|C, its #25
-pilot at three places under the title block's DRILLED HOLES row, its full
-thread at two with its own native +/-0.13, its class the title block's
-thread row, its drill depth banded, its drill point dimensioned (under the
-general angular band) and its mating bolt named on its hole callout.
+depth added across the right-view section.  The MHA-SM-VN-53 dowel presses
+into the crossbar and slips into this block (owner ruling 2026-10-24,
+T+H3): its round slip hole, datum B, prints its reamed Ø, band and mate and
+a ⊥Ø0.015 frame to A that carries B, located on the +X side and front faces
+at general tolerance, in the top view.  Owner ruling 2026-11-08 (Pedro),
+#2144 item 11.3 (scheme S1): datum C, the -X slot and its frames are
+deleted.  B's flat-floor depth is in section A-A, cut from the top view
+through the tap and dowel axes (drawing-guidelines.md rule 9 (show internal
+shape in solid lines): the floor is hidden in the front view, so it is
+dimensioned where the cut shows it); the tap axis, run on through the
+bore's centre, stands BASIC .300 from B's axis there.  The reamed bore
+carries ⌖Ø.008|A|B and a separate ∥.002|A, its centre a BASIC height under
+A (its yaw is set at MHA-SM-00 by a gauge bar); the #10-24 tap, spotted
+through MHA-FR-02, its #25 pilot at three places under the title block's
+DRILLED HOLES row, its full thread at two with its own native +/-0.13, its
+class the title block's thread row, its drill depth banded, its drill point
+dimensioned (under the general angular band) and its mating bolt named on
+its hole callout.
 The bore carries Ra 1.6, the top seat Ra 3.2.  Every view is
 hidden-lines-removed.
 
@@ -95,21 +93,20 @@ from sm_knife_mount_spec import (
     BLK_HALF_X,
     BLK_TOP,
     BORE_CY,
+    DOWEL_NUMBER,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
     GEOMETRIC_TOLERANCES_IN,
     HOLE_ROW_FACE_DISTANCE,
     PIN_DEPTH_CALLOUT,
-    PIN_HOLE_CALLOUT,
     PIN_HOLE_DEPTH,
+    PIN_HOLE_DEPTH_PLACES,
     PIN_HOLE_DIA,
     PIN_HOLE_SIDE_DISTANCE,
     PIN_HOLE_X,
+    PIN_SLIP_PRINTED,
     R_BORE,
-    SLOT_END_FROM_B,
-    SLOT_WIDTH,
-    SLOT_WIDTH_CALLOUT,
     STUD_TAP_DIA,
     STUD_TAP_DRILL_DEPTH,
     STUD_TAP_DRILL_DEPTH_BAND,
@@ -117,14 +114,15 @@ from sm_knife_mount_spec import (
     STUD_TAP_POINT_ANGLE_DEG,
     STUD_TAP_POINT_ANGLE_PLACES,
     STUD_TAP_THREAD_DEPTH,
-    STUD_TAP_THREAD_DEPTH_BAND,
     STUD_TAP_THREAD_DEPTH_PLACES,
     SUPPORT_Z_THICK,
     SURFACE_FINISHES,
     UNIT,
     TAP_CALLOUT_REASON,
+    TAP_CALLOUT_ROUTE,
     TAP_DRILL_CALLOUT,
 )
+import sm_vn_knife_mount_dowel_spec as DOWEL
 
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
@@ -148,8 +146,9 @@ _BLOCK_CY = (BLK_TOP + BLK_BOT) / 2.0  # block centre height (model mm)
 
 # The front and right views stand 15 mm under their former 0.140 (owner
 # ruling 2026-10-24, T+H3): the band between the front and top views takes
-# the tap's callout and frame lowered under the datum-C slot frame and its
-# tag, left of the top view.  The 25.4 under the front view stays ~67 mm
+# the tap's callout, left of the top view (it stood under the former datum-C
+# slot frame, deleted by Owner ruling 2026-11-08 (Pedro), #2144 item 11.3;
+# the band is left as it was).  The 25.4 under the front view stays ~67 mm
 # over the border.
 FRONT_CENTER = (0.115, 0.125)
 RIGHT_CENTER = (0.220, 0.125)
@@ -190,7 +189,7 @@ def _sheet_x(model_x_mm: float) -> float:
 # The 29.6 height's dimension line stands at sheet x 0.024, 65.6 mm off the
 # block's -X face (its text 6 mm inside the border), and the bore's Ø, its
 # bored band and its three callout
-# rows (BORE THRU, then the knife seat's mate, BORE_CALLOUT below) sit in
+# rows (REAM THRU, then the knife seat's mate, BORE_CALLOUT below) sit in
 # the band between them: the 5ff8fba5d render ran the
 # height line (then x 0.063) 3.62 mm through the Ø (text 58.5..75.3 mm).
 # BORE_DIA_TEXT_HALF_WIDTH is half the widest row, "MHA-SM-03 TRUNNION": 18
@@ -210,10 +209,9 @@ FRONT_KEEP = {
     "BlockHeight": (FRONT_CENTER[0] - 0.091, FRONT_CENTER[1]),
     "BoreDia": (FRONT_CENTER[0] - 0.0565, _front_y(BORE_CY) + BORE_DIA_TEXT_RISE),
 }
-# The hole and slot floor depth stands right of the section, its witness
-# lines off the cut top seat and that floor; "2X FLAT BOTTOM" with it
-# states that the slot's floor, cut in the same pass, is the same; its
-# corner is the title block's (sm_knife_mount_spec.PIN_DEPTH_CALLOUT).  The
+# B's floor depth stands right of the section, its witness lines off the
+# cut top seat and that floor; "FLAT BOTTOM" with it; its corner is the
+# title block's (sm_knife_mount_spec.PIN_DEPTH_CALLOUT).  The
 # dimension line stands at BLK_HALF_X + 12.0, x
 # 349.4 mm (farm run 20261027T175429300Z), 14.9 mm right of the 7.632
 # BASIC's shoulder end (x 334.5 mm, farm run 20261027T133857303Z); its
@@ -228,7 +226,7 @@ FRONT_KEEP = {
 # the offset y and the rows' 5.56 mm under each other, 3.5 mm tall, the
 # widest 41.94 mm; the leader left the dimension line's midpoint for the
 # underline's left end, the underline under the last row.  This block's
-# two rows keep that 42 mm slot centred on the same x.
+# two rows keep that 42 mm band centred on the same x.
 DEPTH_VALUE_RISE = 0.00278
 DEPTH_ROW_PITCH = 0.00556
 DEPTH_TEXT_HEIGHT = 0.0035
@@ -254,8 +252,9 @@ PIN_DEPTH_OFFSET_XY = (
 )
 # Datum A's tag on the front view's top edge, 8 mm right of centre (build()).
 DATUM_A_X = FRONT_CENTER[0] + 0.008
-# The tap and bore frames reference A|B|C, so the tap axis stands BASIC
-# 7.632 from datum B's axis (blind machinist review, 2026-10-10: the implied
+# The bore frame references A|B, its vertical centre plane BASIC from datum
+# B's axis through the tap axis, so the tap axis stands BASIC .300 from B
+# (blind machinist review, 2026-10-10: the implied
 # centre left the tap and bore with no explicit horizontal location).  It is
 # dimensioned in section A-A, the one view that cuts the tap, the bore and
 # B's hole together, between two owned axes: the tap's, run on down through
@@ -283,24 +282,16 @@ TOP_HALF_Z = SUPPORT_Z_THICK / 2.0 * SHEET_SCALE[0] / 1000.0
 # shoulder at (146.4, 222.2) mm landed the arrow at -38.6 deg).  The dda9a33a8
 # render measured a 5-row label at 84.5 mm wide, its shoulder 1.6 mm past it
 # and 12.86 mm under the text position; four rows stand a half row (~2.1 mm)
-# less.  The widest row, "0.047-0.093 DIAMETRAL CLEARANCE", is 31 capitals
-# at ~2.52 mm (78 mm).  The shoulder starts 22 mm under the hole row, so the
+# less.  The widest row, "REAM ↧ (.37) FLAT BOTTOM", is 24 characters at
+# ~2.52 mm (60 mm).  The shoulder starts 22 mm under the hole row, so the
 # leader rises at ~-58 deg into the hole across the front-face edge inside
 # the block (x 139.1 mm), under the B row's 7.0 and its witness line.
-PIN_CALLOUT_HALF_WIDTH = 0.039
+PIN_CALLOUT_HALF_WIDTH = 0.030
 PIN_CALLOUT_SHOULDER_OVERHANG = 0.0016
 PIN_CALLOUT_SHOULDER_DROP = 0.0105
 PIN_CALLOUT_SHOULDER_START = (_sheet_x(BLK_HALF_X) + 0.0165, TOP_CENTER[1] - 0.036)
-# The slot's inner end, its half-round end's centre from B's axis
-# (SlotEndFromB, a model dimension), runs above the top view between the two
-# centres, where the dowel pair's BASIC span stood, its value 1 mm right of
-# centre so the side-face 5.07's left arrow (a row up) stands clear of it.
-SLOT_END_TEXT_XY = (
-    _sheet_x((PIN_HOLE_X + PIN_HOLE_X - SLOT_END_FROM_B) / 2.0) + 0.001,
-    TOP_CENTER[1] + TOP_HALF_Z + 0.0075,
-)
 # B's face locations (blind machinist review, 2026-10-09), both in the top
-# view: its axis from the +X side face, a row above the slot end's (under
+# view: its axis from the +X side face, a row above the view (under
 # the view, the 20261010T001553082Z render ran a frame's leader across its
 # side-face extension line; on the next row down, 20261010T002544960Z, the
 # two dimensions' outside arrows met under it and its right arrow ran into
@@ -315,21 +306,12 @@ PIN_SIDE_TEXT_XY = (
 # witness line from B's axis riding the cutting line's end.  The banded
 # ".275 ±.010" (21.4 mm wide) centres on its line: at 9.6 mm it ran 1 mm
 # across the +X face edge (layout audit, farm run 20261103T044301495Z).
-# Left of the block the datum-C slot's width and frame take the band (a
-# vertical row dimension there would cross the slot width's witness lines).
+# Left of the block the band stays open (the datum-C slot's width and frame
+# stood there until Owner ruling 2026-11-08 (Pedro), #2144 item 11.3).
 ROW_FACE_TEXT_XY = (
     _sheet_x(BLK_HALF_X) + 0.0135,
     TOP_CENTER[1] - TOP_HALF_Z + HOLE_ROW_FACE_DISTANCE * SHEET_SCALE[0] / 1000.0 / 2.0,
 )
-# The slot's width (SlotWidth, a model dimension) stands left of the block.
-# SolidWorks prints a vertical dimension's text left of its dimension line,
-# so the line stands at the text position's x and the three rows (the width,
-# OPEN-END SLOT, the mate, ~59 mm) end just left of it.  At 43.6 mm off the
-# -X face the rows ran 25.8 mm past the left border (layout audit, farm run
-# 20261027T030041319Z: box x -13.1..82.1 mm, its right end the extension
-# lines from the slot's sides).  At 11.6 mm off the face the line stands
-# 6.6 mm left of the A-A cutting line's end (84.6 mm) and the rows ~17..76.
-SLOT_WIDTH_TEXT_XY = (_sheet_x(-BLK_HALF_X) - 0.0116, TOP_CENTER[1] + 0.017)
 TOP_KEEP = {
     "PinHoleDia": (
         PIN_CALLOUT_SHOULDER_START[0]
@@ -337,54 +319,41 @@ TOP_KEEP = {
         + PIN_CALLOUT_HALF_WIDTH,
         PIN_CALLOUT_SHOULDER_START[1] + PIN_CALLOUT_SHOULDER_DROP,
     ),
-    "SlotWidth": SLOT_WIDTH_TEXT_XY,
-    "SlotEndFromB": SLOT_END_TEXT_XY,
     "HoleRowFace": ROW_FACE_TEXT_XY,
 }
-# The knife bore is reamed (Ra 1.6, +0.03/0 band): the process is stated
+# The knife bore is reamed (Ra 63 µin, +.0015/0 band): the process is stated
 # (blind machinist review, 2026-10-09: a bare THRU left drill or ream open),
-# and the band's mate under it (ENFORCE review, 2026-10-24, rule 4): the
-# summing lever's hex trunnion, whose top ridge rocks on the bore's crown,
-# the knife seat.  The mate's number is drawing text only, read here, not in
-# sm_knife_mount_spec: the spec is in MHA-FR-02's and the frame assembly's
-# import closure, which must not key on the lever's registry row.  Datum
-# B's slip band and the slot's name their mate (owner ruling 2026-10-24,
-# T+H3); the floor depth states it holds for both.
+# and the band's mate and fit under it (rule 4): the summing lever's hex
+# trunnion, whose top ridge rocks on the bore's crown.  The mate's number is
+# drawing text only, read here, not in sm_knife_mount_spec: the spec is in
+# MHA-FR-02's and the frame assembly's import closure, which must not key on
+# the lever's registry row.  Datum B's slip hole is a matched fit on the
+# MHA-SM-VN-53 dowel (fan-out policy 1: its ±.0007 band sits under the shop
+# rows, so it names the dowel and its standard fit, with the slip clearance
+# as its acceptance; machinist review 20261107T102825912Z; round 2,
+# 20261107T110808280Z: "TO SUIT" is a rule-26 private phrase); B's ream
+# states its depth as REF, which the section's floor depth controls (rule
+# 26: a depth is never deferred to a view).  These rows are drawing text,
+# so the frame's import closure keeps its key.
 LEVER_NUMBER = str(_config.parts("sm-summing-lever")["number"])
-BORE_CALLOUT = "\n".join(("BORE THRU", "KNIFE SEAT FOR", f"{LEVER_NUMBER} TRUNNION"))
+# The bore is reamed to size after heat treatment, like datum B (Owner
+# ruling 2026-11-08 (Pedro), SM-02 harden less): a 12 mm H7 reamer (.4724-
+# .4731) cuts inside the +.0015/0 band.
+BORE_CALLOUT = "\n".join(("REAM THRU", "RUNNING FIT ON", f"{LEVER_NUMBER} TRUNNION"))
+_SLIP_FIT = f"{DOWEL_NUMBER} SLIDING FIT"
+_SLIP_CLEARANCE = "CLEARANCE {:.4f}-{:.4f}".format(*PIN_SLIP_PRINTED).replace("0.", ".")
+_PIN_DEPTH_REF = f"{PIN_HOLE_DEPTH / DOWEL.MM_PER_IN:.{PIN_HOLE_DEPTH_PLACES}f}".lstrip("0")
+PIN_HOLE_CALLOUT = "\n".join(
+    (f"REAM <HOLE-DEPTH> ({_PIN_DEPTH_REF}) FLAT BOTTOM", _SLIP_FIT, _SLIP_CLEARANCE)
+)
 DIMENSION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
     "PinHoleDia": PIN_HOLE_CALLOUT,
-    "SlotWidth": SLOT_WIDTH_CALLOUT,
     "PinHoleDepth": PIN_DEPTH_CALLOUT,
 }
-# Datum C's frames stand left of and under the slot: its width's ⌖0.05 to
-# A|B and, stacked under it on the same leader, its ⊥0.015 to A (owner
-# ruling 2026-10-27, #2016: a width, so a planar zone, no Ø); datum C's
-# symbol hangs under the stack.  The stack's top stands 6 mm over the single
-# frame farm run 20261027T133857303Z printed (top 214.0 mm), so the C box
-# (195..202 mm, 1 mm lower than that run's) stands 4.7 mm over the tap
-# callout's printed top row (190.3 mm), 3.6 over its TAP_CALLOUT_TOP_REACH
-# envelope.  The stack also stands 5 mm further right, so the leader's root
-# (the upper row's mid-height, 6.35 mm right of its right end) climbs more
-# steeply.  The leader lands on the slot's lower (front) wall
-# SLOT_FRAME_WALL_X along the line, 4.2 mm inside the -X face, and passes
-# ~3 mm under the end of the slot width's lower arrow tail (78.0, 225.41 mm
-# in that run).  The stack is
-# ~34.7 mm wide: the ⊥ glyph widens the symbol column to 8.4 mm and
-# "0.015" the value column to ~14.5 (farm run 20261024T121140093Z printed
-# the bore's stacked ⌖/⊥ frames with an 8.4 symbol column; "0.05" took an
-# 11.9 column in run 20261027T133857303Z, at 2.6 mm a digit).
-SLOT_FRAME_XY = (_sheet_x(-BLK_HALF_X) - 0.0646, TOP_CENTER[1] - 0.015)
 _GTOL_ROW = 0.007
-SLOT_FRAME_SIZE = (0.0347, 2 * _GTOL_ROW)
-SLOT_FRAME_WALL_X = -(BLK_HALF_X - 4.2)
 DATUM_TAG_BOX = 0.007
 DATUM_TAG_STEM = 0.004
-SLOT_DATUM_C_XY = (
-    SLOT_FRAME_XY[0] + SLOT_FRAME_SIZE[0] / 2.0,
-    SLOT_FRAME_XY[1] - SLOT_FRAME_SIZE[1] - DATUM_TAG_STEM - DATUM_TAG_BOX,
-)
 # Datum B's hole carries ⊥Ø0.015 to A (owner ruling 2026-10-27, #2016), and
 # datum B's symbol hangs under that frame (ASME Y14.5: the datum feature
 # symbol on the feature's frame).  The frame stands in the band between the
@@ -396,12 +365,8 @@ SLOT_DATUM_C_XY = (
 # ~2.5 mm left of B's vertical centre line (the centre mark's arm and the
 # 14.40's witness line, x 130.26 mm) and ~4 mm round the rim from the Ø's
 # arrow (131.9, 232.2 mm).  B's symbol hangs under the frame's middle on a
-# stem 1 mm shorter than C's, its box (178..185 mm) left of the bore frame
-# (x from 150.0, top 173.62 mm).  A tag on a frame is positioned relative
-# to that frame (_drawing_gdt.add_frame_datum_feature), so on equal stems B
-# and C both read (0, -4) mm in the view and the layout audit took one for a
-# duplicate of the other (duplicate-annotation, farm run
-# 20261027T162806664Z).
+# stem 1 mm shorter than the default, its box (178..185 mm) left of the bore
+# frame (x from 150.0, top 173.62 mm).
 PIN_FRAME_XY = (0.1295, 0.195)
 PIN_FRAME_SIZE = (0.0334, _GTOL_ROW)
 PIN_FRAME_RIM_DEG = -140.0
@@ -428,21 +393,20 @@ PIN_DATUM_B_XY = (
 # dimensions the drill's point -- SolidWorks' drill-angle variable after the
 # drill depth, ``X 118°`` -- so the title block's angular band governs the
 # point the crown web charges (sm_knife_mount_spec.STUD_TAP_POINT_ANGLE_MIN_DEG).
-# Three printed rows: the drill row, the thread, and under it the reason the
-# thread's band is there, naming the bolt
-# (sm_knife_mount_spec.TAP_CALLOUT_REASON, in the below definition; no tap
-# tool is named, rule 7); both bands are symmetric, printed inline, so none
-# stacks a row of its own.  Farm build
+# Four printed rows: the drill row, the thread, under it the reason the
+# thread's band is there, naming the bolt, and the route that places the tap
+# (sm_knife_mount_spec.TAP_CALLOUT_REASON and TAP_CALLOUT_ROUTE, in the below
+# definition; no tap tool is named, rule 7); both bands are symmetric,
+# printed inline, so none stacks a row of its own.  Farm build
 # 20261013T225639.450330Z (c673e62ee) printed five, the pilot's stacked
 # +0.10 and the mate each a row of its own (tall-block), at anchor (58.6,
 # 209.0) mm: block x 20.0..97.1 (77.1 wide, the drill row the widest), top
 # 217.4 (the +0.10 row 213.8..217.4), and RD4's (the 7.0's) outside tail
 # (77.6, 221.0)->(77.6, 214.7) ran through that top row (text-on-line).  The
-# three rows stand inside that envelope whichever way SolidWorks restacks
-# them, so the block and its frame move down together by 6.0 mm: the top
-# stays at or under 211.4, 3.3 mm under the tail's end (arrow-near-text gates
-# under ARROW_TEXT_CLEARANCE_M, 2 mm), and the frame keeps the 15.6 mm under
-# the anchor it printed at with no finding against the block.  The reason
+# four rows stand inside that envelope whichever way SolidWorks restacks
+# them, so the block moved down by 6.0 mm: the top stays at or under 211.4,
+# 3.3 mm under the tail's end (arrow-near-text gates under
+# ARROW_TEXT_CLEARANCE_M, 2 mm).  The reason
 # row, 16.13 em of Century Gothic, prints ~78 mm at the 4.83 mm an em the
 # drill row's 15.97 em and 77.1 mm give: the widest row, inside the 88 mm the
 # half width allows, its left end ~19.6 mm, 6.9 mm inside the 12.7 mm inner
@@ -450,23 +414,22 @@ PIN_DATUM_B_XY = (
 # end, where the leader leaves, ~97.6.
 TAP_CALLOUT_HALF_WIDTH = 0.044
 TAP_CALLOUT_TOP_REACH = 0.0084
-# T+H3 (2026-10-24): 20 mm lower again, under datum C's tag (bottom ~196 mm),
-# its frame ~5.8 mm over the lowered front view's top edge.
+# T+H3 (2026-10-24): 20 mm lower again, over the lowered front view's top
+# edge (it cleared the former datum-C tag, bottom ~196 mm).
 TAP_CALLOUT_XY = (_sheet_x(-BLK_HALF_X) - 0.031, TOP_CENTER[1] - TOP_HALF_Z - 0.038)
-# Each native length the callout prints and its own band, (upper, lower) mm.
-# The full thread's band and the drill depth's are symmetric, +/-.005 and
-# +/-.002.
-TAP_CALLOUT_BANDS: dict[str, tuple[float, tuple[float, float]]] = {
-    "hw-threaddepth": (
-        STUD_TAP_THREAD_DEPTH,
-        (STUD_TAP_THREAD_DEPTH_BAND, -STUD_TAP_THREAD_DEPTH_BAND),
-    ),
+# Each native length the callout prints and its own band, (upper, lower) mm,
+# or None where the title block's .XXX row is the band: the full thread's
+# +/-.005 is that row, so it prints none of its own (rule 2; machinist review
+# round 3, farm run 20261107T121714736Z: ".375±.005" restated the title
+# block).  The drill depth keeps its symmetric +/-.002.
+TAP_CALLOUT_BANDS: dict[str, tuple[float, tuple[float, float] | None]] = {
+    "hw-threaddepth": (STUD_TAP_THREAD_DEPTH, None),
     "hw-tapdrldepth": (
         STUD_TAP_DRILL_DEPTH,
         (STUD_TAP_DRILL_DEPTH_BAND, -STUD_TAP_DRILL_DEPTH_BAND),
     ),
 }
-# Both bands print their deviations at three places, ±.005 and ±.002.
+# The drill depth's band prints its deviations at three places, ±.002.
 TAP_CALLOUT_BAND_PLACES = 3
 # swTolType_e: no band of its own, bilateral, symmetric.
 _TOL_NONE = 0
@@ -510,40 +473,25 @@ TAP_POINT_ANGLE_VARIABLE = "hw-drlang"
 TAP_POINT_ANGLE_TOKEN = f"<{TAP_POINT_ANGLE_VARIABLE}>"
 _CALLOUT_ANGLE_VARIABLE = 2  # swCalloutVariableType_e.swCalloutVariableType_Angle
 _DRILL_ANGLE_VARIABLE = 16  # swCalloutVariable_e.swCalloutVariable_Drill_Angle
-# The tap's position frame hangs under its callout block, on its own leader
-# to the tap.  The two leaders land on the tap's two lower rims (model x
-# side): the callout's on the lower-left, nearer its block, the frame's on
-# the lower-right, so the frame's leader, climbing from the frame's right
-# end, stays right of the callout's.  Both on the lower-left rim, it crossed
-# the callout's 2 mm short of the tip (leader-crosses-leader, farm run
-# 20261009T164113078Z).  The frame's top keeps TAP_FRAME_DROP under the
-# callout's anchor, where c673e62ee printed it under the five-row block.
-# Moved down with the block, it also moves left: its leader leaves a 6.35
-# shoulder off the frame's right end (113.5, 163.9 mm at farm run
-# 20261027T133857303Z) and climbs to the tap's lower-right rim (117.6,
-# 232.2), passing datum B's former bare tag box (x 116.5..123.5, y
-# 207.7..214.7) 0.08 mm off its left edge; in farm run 20261027T143609236Z
-# it crossed it (leader-crosses-line).  10 mm further left the leader stands
-# right of the callout's leader root (102.6) and, at datum B's frame's
-# leader shoulder (PIN_FRAME_XY), ~14 mm left of it.
-TAP_FRAME_DROP = 0.0156
-TAP_FRAME_XY = (
-    _sheet_x(-BLK_HALF_X) - 0.034,
-    TAP_CALLOUT_XY[1] - TAP_FRAME_DROP,
-)
+# The tap carries no position frame (delegated ruling sm Q3: it is spotted
+# through MHA-FR-02's #10 hole); the callout's leader lands on the tap's
+# lower-left rim, nearer its block.
 TAP_CALLOUT_RIM_SIDE = -1.0
-TAP_FRAME_RIM_SIDE = 1.0
-# The bore's composite frame stands above the block's upper-right corner,
-# right of the datum-A tag; its BASIC height under A runs down the block's
-# right side.  Its top row, measured on farm run 20261027T154115830Z, ran x
-# 150.0..191.6 mm, y 166.6..173.6, its leader off the left end at y 170.1;
-# the lower segment adds one 7.0 mm row under it, as main's stacked ⊥ frame
-# did (farm run 20261024T121140093Z: 14.0 mm, the view then 15 mm higher),
-# so its bottom, y 159.6, stands 5.0 mm over the block's top edge (y 154.6)
-# and the 20.616 BASIC's top extension line, nothing else within x 150..192
-# under it (datum A's tag ends at x 126.5, the right view's Ra 3.2 starts at
-# x 214.0).
+# The bore's frames (Owner ruling 2026-11-08 (Pedro), #2144 item 11.3):
+# ⌖Ø.008|A|B and, directly under it, ∥.002|A -- two frames, each with its
+# own leader to the bore's crown, because a stacked lower frame takes its
+# upper's Ø (_drawing_gdt.add_feature_control_frame) and an axis held
+# parallel to a datum plane takes a two-plane zone, not a Ø.  They stand
+# above the block's upper-right corner, right of the datum-A tag, where the
+# former two-row composite frame stood.  The former top row, measured on
+# farm run 20261027T154115830Z, ran x 150.0..191.6 mm, y 166.6..173.6, its
+# leader off the left end at y 170.1; the ∥ row stands one 7.0 mm row under
+# it, so its bottom, y 159.6, stands 5.0 mm over the block's top edge (y
+# 154.6) and the 20.616 BASIC's top extension line, nothing else within x
+# 150..192 under it (datum A's tag ends at x 126.5, the right view's Ra 3.2
+# starts at x 214.0).  Neither row is wider than the former A|B|C rows.
 BORE_FRAME_XY = (FRONT_CENTER[0] + 0.035, _front_y(BLK_TOP) + 0.019)
+BORE_PARALLELISM_FRAME_XY = (BORE_FRAME_XY[0], BORE_FRAME_XY[1] - 0.007)
 BORE_BASIC_TEXT_XY = (
     _sheet_x(BLK_HALF_X) + 0.012,
     _front_y(BLK_TOP - BORE_CENTRE_DEPTH / 2.0),
@@ -697,15 +645,15 @@ def tap_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
     native size run ``<MOD-DIAM> <hw-tapdrldia>`` become ``#25 DRILL``; the
     drill's point dimensioned right after the drill depth,
     ``<hw-tapdrldepth> X <hw-drlang>``; the thread's class variable dropped
-    with its separator; and the reason row (``TAP_CALLOUT_REASON``) written
-    into the empty below definition, under the thread.  Every other
-    character is as it was.
+    with its separator; and the reason row (``TAP_CALLOUT_REASON``) and the
+    route row (``TAP_CALLOUT_ROUTE``) written into the empty below
+    definition, under the thread.  Every other character is as it was.
 
     The drill's size run, the drill depth and the thread class must each be
-    defined exactly once, the drill angle, the drill's name and the reason
-    not yet, and the below definition empty, so the block prints three rows.
-    The depth and angle variables stay in the definition, so the printed
-    depths and angle are the Hole Wizard feature's own.
+    defined exactly once, the drill angle, the drill's name, the reason and
+    the route not yet, and the below definition empty, so the block prints
+    four rows.  The depth and angle variables stay in the definition, so the
+    printed depths and angle are the Hole Wizard feature's own.
     """
     joined = "\n".join(definitions.values())
     if (
@@ -715,6 +663,7 @@ def tap_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
         or TAP_POINT_ANGLE_TOKEN in joined
         or TAP_DRILL_CALLOUT in joined
         or TAP_CALLOUT_REASON in joined
+        or TAP_CALLOUT_ROUTE in joined
         or definitions[_CALLOUT_BELOW_DEFINITION].strip()
     ):
         raise RuntimeError(
@@ -732,7 +681,7 @@ def tap_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
         )
         for part, text in definitions.items()
     }
-    wanted[_CALLOUT_BELOW_DEFINITION] = TAP_CALLOUT_REASON
+    wanted[_CALLOUT_BELOW_DEFINITION] = f"{TAP_CALLOUT_REASON}\n{TAP_CALLOUT_ROUTE}"
     return wanted
 
 
@@ -796,8 +745,8 @@ def tap_callout_tolerance(band: tuple[float, float]) -> tuple[int, float, float]
 
 
 def _band_tap_callout(callout: Any) -> None:
-    """Author the tap's bands on its hole callout -- the full thread's
-    +/-0.13, the drill depth's +/-0.05 -- and prove the drill point its
+    """Author the tap's bands on its hole callout -- the full thread at the
+    title block's .XXX, the drill depth's +/-0.05 -- and prove the drill point its
     118 deg.  The pilot prints its drill's name, no Ø, so the title block's
     DRILLED HOLES row governs it (``_prove_tap_drill`` read its Ø).
 
@@ -831,6 +780,14 @@ def _band_tap_callout(callout: Any) -> None:
                 f"knife-hanger tap callout {variable_name} reads "
                 f"{actual:g}, expected {nominal:g} mm"
             )
+        if band is None:
+            # The title block's row governs: no band of the callout's own.
+            variable.ToleranceType = _TOL_NONE
+            if int(variable.ToleranceType) != _TOL_NONE:
+                raise RuntimeError(
+                    f"knife-hanger tap callout {variable_name} kept a band of its own"
+                )
+            continue
         kind, lower, upper = tap_callout_tolerance(band)
         variable.ToleranceType = kind
         variable.ToleranceMin = lower / 1000.0
@@ -1262,8 +1219,8 @@ async def build(adapter: Any) -> dict[str, str]:
     set_basic_dimension(adapter, station, label="dowel hole from tap axis")
 
     # Datum A = the block top seat (clamped to the top-frame casting underside;
-    # carries the #10-24 knife-hanger-bolt tap and the MHA-SM-VN-53 slip hole
-    # and slot), tagged DATUM_A_X right of the view's centre: on the centre,
+    # carries the #10-24 knife-hanger-bolt tap and the MHA-SM-VN-53 slip
+    # hole), tagged DATUM_A_X right of the view's centre: on the centre,
     # the tap frame's leader, climbing past at x ~114 mm from the lowered
     # frame to the tap's rim, ran through its box (layout audit, farm run
     # 20261027T030041319Z).  Ra 1.6 (MACHINED_UM) on the bore's working upper
@@ -1320,73 +1277,32 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=PIN_DATUM_B_XY,
         label="datum B slip hole",
     )
-    # Datum C = the slot's width, ⌖0.05 to A|B (the crossbar's former slot
-    # frame, moved with the slot) and, stacked under it, ⊥0.015 to A (owner
-    # ruling 2026-10-27, #2016; a width: no Ø), its symbol on that stack
-    # (add_frame_datum_feature: a frame's datum identifier read back and
-    # printed nothing, run 20261009T171439353Z).  The leader lands on the
-    # slot's front wall SLOT_FRAME_WALL_X along the line, inside the -X face.
-    slot_wall = min(
-        (
-            model_point_in_view(
-                adapter,
-                top,
-                (
-                    SLOT_FRAME_WALL_X / 1000.0,
-                    BLK_TOP / 1000.0,
-                    z_side * SLOT_WIDTH / 2.0 / 1000.0,
-                ),
-                label=f"dowel slot wall z{z_side:+.0f}",
-            )
-            for z_side in (1.0, -1.0)
-        ),
-        key=lambda point: point[1],
-    )
-    slot_frame = add_feature_control_frame(
-        adapter,
-        top,
-        edge_xy=slot_wall,
-        leader_attach_xy=slot_wall,
-        frame_xy=SLOT_FRAME_XY,
-        characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_IN["dowel slot position"],
-        datums=("A", "B"),
-        lower_frame=(
-            "perpendicularity",
-            GEOMETRIC_TOLERANCES_IN["dowel slot perpendicularity"],
-            ("A",),
-        ),
-        label="dowel slot position",
-    )
-    add_frame_datum_feature(
-        adapter,
-        top,
-        slot_frame,
-        datum="C",
-        symbol_xy=SLOT_DATUM_C_XY,
-        label="dowel slot datum C",
-    )
-    # The bore: composite position to A|B|C (owner ruling 2026-10-27, #2016),
-    # Ø0.20 locating it over Ø0.05 holding its axis parallel to A and clocked
-    # to the B-C line, the refinement the rock budget charges as the far
-    # end's offset (sm_knife_mount_spec).  Its centre is BASIC under A;
-    # across, BASIC 7.632 from B's axis.
+    # The bore (Owner ruling 2026-11-08 (Pedro), #2144 item 11.3): ⌖Ø.008|A|B
+    # locates it and a separate ∥.002|A under it holds its axis parallel to
+    # the top seat; its yaw about B is set at MHA-SM-00 by the gauge bar, not
+    # by this part.  Its centre is BASIC under A; across, BASIC .300 from
+    # B's axis.
+    bore_crown = (FRONT_CENTER[0], _front_y(BORE_CY) + R_BORE * SHEET_SCALE[0] / 1000.0)
     add_feature_control_frame(
         adapter,
         front,
-        edge_xy=(FRONT_CENTER[0], _front_y(BORE_CY) + R_BORE * SHEET_SCALE[0] / 1000.0),
+        edge_xy=bore_crown,
         frame_xy=BORE_FRAME_XY,
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_IN["knife-bore position"],
-        datums=("A", "B", "C"),
+        datums=("A", "B"),
         diameter=True,
-        lower_frame=(
-            "position",
-            GEOMETRIC_TOLERANCES_IN["knife-bore orientation"],
-            ("A", "B", "C"),
-        ),
-        composite=True,
         label="knife-bore position",
+    )
+    add_feature_control_frame(
+        adapter,
+        front,
+        edge_xy=bore_crown,
+        frame_xy=BORE_PARALLELISM_FRAME_XY,
+        characteristic="parallelism",
+        tolerance=GEOMETRIC_TOLERANCES_IN["knife-bore parallelism"],
+        datums=("A",),
+        label="knife-bore parallelism",
     )
     bore_basic = add_edge_dimension(
         adapter,
@@ -1407,19 +1323,6 @@ async def build(adapter: Any) -> dict[str, str]:
         )
     _set_sheet_precision(bore_basic, label="knife-bore centre from top seat")
     set_basic_dimension(adapter, bore_basic, label="knife-bore centre from top seat")
-    # The #10-24 tap: Ø0.14 to A|B|C, the bolt axis the crossbar's clearance
-    # hole floats round (build_sm_summing_assembly's knife-hanger stack).
-    add_feature_control_frame(
-        adapter,
-        top,
-        edge_xy=_tap_lower_rim(adapter, top, TAP_FRAME_RIM_SIDE),
-        frame_xy=TAP_FRAME_XY,
-        characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_IN["knife-hanger tap position"],
-        datums=("A", "B", "C"),
-        diameter=True,
-        label="knife-hanger tap position",
-    )
     add_surface_finish(
         adapter,
         front,
@@ -1445,8 +1348,7 @@ async def build(adapter: Any) -> dict[str, str]:
         char_height=0.0025,
     )
     # Every datum a frame names is printed (A on the front view, B on its
-    # hole's ⊥ frame, C on the slot's stack), so no frame references a datum
-    # the sheet never names.
+    # hole's ⊥ frame), so no frame references a datum the sheet never names.
     assert_frame_datums_defined(
         (front, right, top, section), label="sm-knife-mount frame datums"
     )

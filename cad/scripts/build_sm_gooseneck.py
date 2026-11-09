@@ -3,12 +3,12 @@ r"""Build MHA-SM-01, the gooseneck: a bent 1/2 in tube with a brazed end piece.
 Owner rulings 2026-10-27 (#1951): the whole gooseneck is 1/2 in x 0.065 in
 4130-N seamless tube, bent R3.0 (the 1/2 in x 3 in CLR die).  Its arm ends
 flush, with no step, in a SOLID Ø.500 end piece silver-brazed on a shank
-inside the tube bore and tapped 1/4-28 UNF-2B BLIND for the MHA-SM-04 spring
-screw; an arm-end counterbore clears that screw's thread run-out
-(``sm_gooseneck_spring_joint``).  A 5/8 in x 0.058 in 4130-N sleeve,
-select-fitted from stock and brazed, covers the leg from its foot: the post
-the east top-frame hub's Ø17 bore and set screw take.  The made MHA-SM-04
-screw is a separate component, not part of this weldment.  Decimal-inch
+inside the tube bore.  Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: the
+end piece is tapped plain #10-24 UNC-2B BLIND for the purchased MHA-SM-VN-56
+shoulder screw, with no counterbore (``sm_gooseneck_spring_joint``).  A 5/8 in
+x 0.058 in 4130-N sleeve, select-fitted from stock and brazed, covers the leg
+from its foot: the post the east top-frame hub's Ø17 bore and set screw take.
+The screw is a separate component, not part of this weldment.  Decimal-inch
 document and sheet (#290, the registry row's drawing_unit).
 
 One weldment part of two solid bodies, the tube (its sleeve merged on) and
@@ -24,12 +24,9 @@ draws their joint (machinist review of 3c0b5d87c), built in this order:
    (the horizontal plane through the arm axis, so section A-A on the print
    carries its dimensions), NOT merged: its head bears on the tube end and
    its shank stands in the bore at the joint's nominal braze clearance.
-4. ``Counterbore``: a revolved cut Ø COUNTERBORE_DIA x COUNTERBORE_DEPTH
-   from the end face, its floor corner round at its printed R.004 MAX; its
-   Ø and depth carry native LIMIT bands.  Then ``ThreadBore``: the native blind
-   bottoming tap from ``TAP_SPEC``, started on the counterbore floor, both
-   depths from it.  ``SpringScrewAxis`` is their hidden, equation-driven
-   assembly reference.
+4. ``ThreadBore``: the native blind bottoming tap from ``TAP_SPEC``, started
+   on the end face, both depths from it.  ``SpringScrewAxis`` is its hidden,
+   equation-driven assembly reference.
 5. ``Sleeve``: Ø SLEEVE_DIA from LEG_BOTTOM to SLEEVE_TOP, its bore the tube
    OD, revolved onto the leg.
 6. ``StationReference``: a hidden construction sketch on the Front plane
@@ -67,12 +64,9 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import (
-    _named_dimension,
     _named_dimensions,
     apply_drawing_precision,
 )
-from _drawing_prefix import set_dimension_prefix
-from _drawing_tolerances import _set_tolerance_precision
 from _extrude import extrude_at_offset
 from _feature_tree import name_last_feature
 from _holes import blind_hole_volume_mm3, wizard_holes
@@ -91,21 +85,16 @@ from _sketch import (
     set_sketch_direct_db,
 )
 from _sketch_circle import define_circle
-from _single_limit_tolerance import set_single_limit
 from _visibility import blank_reference_geometry
 from sm_gooseneck_spec import (
     DIMENSION_CALLOUTS,
-    DIMENSION_CALLOUTS_ABOVE,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
-    DRAWING_PRECISION_BY_NAME,
-    ELEVATION_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
     REFERENCE_DIMENSIONS,
     TUBE_OD_REF_SPAN,
     TUBE_OD_REF_Y,
-    UNIT,
 )
 
 # The form nominals live in sm_gooseneck_geom -- the prose-free module the
@@ -131,17 +120,8 @@ from sm_gooseneck_geom import (
     WALL_T,
 )
 from sm_gooseneck_spring_joint import (
-    COUNTERBORE_DEPTH,
-    COUNTERBORE_DEPTH_MAX,
-    COUNTERBORE_DEPTH_MIN,
-    COUNTERBORE_DIA,
-    COUNTERBORE_DIA_MAX,
-    COUNTERBORE_DIA_MIN,
-    COUNTERBORE_FLOOR_CORNER_R_BAND,
-    COUNTERBORE_FLOOR_CORNER_R_MAX,
-    COUNTERBORE_FLOOR_CORNER_R_TOL_TYPE,
     PLUG_SHANK_DIA,
-    TAP_DRILL_DEPTH_FROM_FLOOR,
+    TAP_DRILL_DEPTH,
     TAP_DRILL_DIA,
     TAP_SPEC,
 )
@@ -158,20 +138,8 @@ PLUG_R = PLUG_DIA / 2.0
 SHANK_R = PLUG_SHANK_DIA / 2.0
 # The shank's inner end, inside the straight tube short of the bend.
 SHANK_END_X = TUBE_END_X + PLUG_SHANK_LENGTH
-COUNTERBORE_R = COUNTERBORE_DIA / 2.0
-COUNTERBORE_FLOOR_X = ARM_END_X + COUNTERBORE_DEPTH
-# The floor corner's round (ArmAxisPlane sketch u along the arm, v radial):
-# its tangent points on the floor and on the wall, the quarter CCW between.
-_CB_CORNER_R = COUNTERBORE_FLOOR_CORNER_R_MAX
-COUNTERBORE_CORNER_CENTER = (
-    COUNTERBORE_FLOOR_X - _CB_CORNER_R,
-    COUNTERBORE_R - _CB_CORNER_R,
-)
-COUNTERBORE_CORNER_FLOOR_TANGENT = (COUNTERBORE_FLOOR_X, COUNTERBORE_R - _CB_CORNER_R)
-COUNTERBORE_CORNER_WALL_TANGENT = (COUNTERBORE_FLOOR_X - _CB_CORNER_R, COUNTERBORE_R)
 TAP_DRILL_R = TAP_DRILL_DIA / 2.0
 SLEEVE_R = SLEEVE_DIA / 2.0
-_SW_TOL_LIMIT = 3  # swTolType_e.swTolLIMIT
 
 if not math.isclose(PLUG_DIA, TUBE_DIA, abs_tol=1e-9):
     raise AssertionError("gooseneck end piece is not flush with the tube OD")
@@ -179,30 +147,18 @@ if not TAP_DRILL_R < SHANK_R < TUBE_IR:
     raise AssertionError("gooseneck braze shank does not sit clear in the tube bore")
 if SHANK_END_X >= -BEND_R:
     raise AssertionError("gooseneck braze shank reaches past the bend tangent")
-if not TAP_DRILL_R < COUNTERBORE_R < PLUG_R:
-    raise AssertionError("gooseneck counterbore does not sit between tap and OD")
 if not math.isclose(TUBE_END_X - ARM_END_X, PLUG_HEAD_LENGTH, abs_tol=1e-9):
     raise AssertionError("gooseneck tube does not end on the end piece's head")
 
 # Analytic volumes, mm^3.
 V_END_PIECE = math.pi * (PLUG_R**2 * PLUG_HEAD_LENGTH + SHANK_R**2 * PLUG_SHANK_LENGTH)
-# The cut less the floor corner's round, the spandrel (1 - pi/4) r^2 revolved
-# about its centroid's radius (Pappus).
-_CB_CORNER_SPANDREL = (1.0 - math.pi / 4.0) * _CB_CORNER_R**2
-_CB_CORNER_CENTROID_R = (
-    COUNTERBORE_R - (10.0 - 3.0 * math.pi) / (12.0 - 3.0 * math.pi) * _CB_CORNER_R
-)
-V_COUNTERBORE = (
-    math.pi * COUNTERBORE_R**2 * COUNTERBORE_DEPTH
-    - 2.0 * math.pi * _CB_CORNER_CENTROID_R * _CB_CORNER_SPANDREL
-)
-V_TAP = blind_hole_volume_mm3(TAP_DRILL_DIA, TAP_DRILL_DEPTH_FROM_FLOOR)
+V_TAP = blind_hole_volume_mm3(TAP_DRILL_DIA, TAP_DRILL_DEPTH)
 V_LEG = RING_AREA * (LEG_TOP - LEG_BOTTOM)
 # Quarter torus with an annular cross-section (Pappus): (pi/2) * BendR * ring.
 V_BEND = math.pi / 2.0 * BEND_R * RING_AREA
 V_ARM = RING_AREA * TUBE_STRAIGHT
 V_SLEEVE = math.pi * (SLEEVE_R**2 - TUBE_R**2) * SLEEVE_LENGTH
-V_FINAL = V_END_PIECE - V_TAP - V_COUNTERBORE + V_LEG + V_BEND + V_ARM + V_SLEEVE
+V_FINAL = V_END_PIECE - V_TAP + V_LEG + V_BEND + V_ARM + V_SLEEVE
 
 
 def _finite(label: str, volume: float) -> float:
@@ -233,64 +189,18 @@ def _construction(adapter, line: str, label: str) -> None:
         raise RuntimeError(f"{label} {line} did not take the construction flag")
 
 
-@_telemetry.traced("part.limit_band", label_param="name")
-def _limit_band(
-    adapter, feature: str, name: str, model: float, limits: tuple[float, float]
-) -> None:
-    """A dimension as a native LIMIT band: SOLIDWORKS prints the upper and
-    lower limits, the model value plus each deviation, at the dimension's
-    own places (build_sm_gooseneck_spring_screw._limit_band).  #290: the
-    calibrated mm model is off the inch grid, so the deviations are not; the
-    printed ``limits`` (mm, lower and upper) are, and they set the places.
-    The deviations come from the spec's ``model``, never the read-back
-    SystemValue, whose inch-document float noise would need more than eight
-    places."""
-    label = f"{name}@{feature}"
-    display, dimension = _named_dimension(adapter, feature, name)
-    value = float(dimension.SystemValue) * 1000.0
-    if not math.isclose(value, model, abs_tol=1e-6):
-        raise RuntimeError(f"{label}: nominal {value!r} mm is not the spec's {model!r}")
-    lower, upper = (limit - model for limit in limits)  # native API order, mm
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    tolerance.Type = _SW_TOL_LIMIT
-    if tolerance.SetValues(lower / 1000.0, upper / 1000.0) is not True:
-        raise RuntimeError(f"{label}: LIMIT deviations were rejected")
-    if (
-        int(tolerance.Type) != _SW_TOL_LIMIT
-        or not math.isclose(
-            float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
-        )
-        or not math.isclose(
-            float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
-        )
-    ):
-        raise RuntimeError(f"{label}: LIMIT tolerance readback changed")
-    places = _set_tolerance_precision(
-        display,
-        limits,
-        display_unit=UNIT,
-        label=label,
-        places=DRAWING_PRECISION_BY_NAME[name],
-    )
-    _telemetry.success(
-        f"{label}: LIMIT {limits[1] / 25.4:.{places}f}/{limits[0] / 25.4:.{places}f} in"
-    )
-
-
 @_telemetry.traced("part.dimension_callouts")
 def _author_dimension_callouts(adapter) -> None:
-    """Persist each printed callout on its source dimension, below or above
-    the value (build_sm_gooseneck_spring_screw._author_dimension_callouts):
-    the drawing imports and reads them back, never writing them itself."""
-    # swDimensionTextCalloutBelow = 4, swDimensionTextCalloutAbove = 3.
-    for slot, by_feature in ((4, DIMENSION_CALLOUTS), (3, DIMENSION_CALLOUTS_ABOVE)):
-        for feature, callouts in by_feature.items():
-            resolved = _named_dimensions(adapter, feature, set(callouts))
-            for name, text in callouts.items():
-                display, _dimension = resolved[name]
-                display.SetText(slot, text)
-                if str(display.GetText(slot) or "").replace("\r\n", "\n") != text:
-                    raise RuntimeError(f"{name}@{feature}: callout did not persist")
+    """Persist each printed callout below its source dimension: the drawing
+    imports and reads them back, never writing them itself."""
+    # swDimensionTextCalloutBelow = 4.
+    for feature, callouts in DIMENSION_CALLOUTS.items():
+        resolved = _named_dimensions(adapter, feature, set(callouts))
+        for name, text in callouts.items():
+            display, _dimension = resolved[name]
+            display.SetText(4, text)
+            if str(display.GetText(4) or "").replace("\r\n", "\n") != text:
+                raise RuntimeError(f"{name}@{feature}: callout did not persist")
 
 
 @_telemetry.traced("part.reference_dimensions")
@@ -550,9 +460,6 @@ async def build(adapter) -> dict[str, str]:
         ("PlugHeadLength", PLUG_HEAD_LENGTH),
         ("PlugShankLength", PLUG_SHANK_LENGTH),
         ("PlugShankDia", PLUG_SHANK_DIA),
-        ("CounterboreDia", COUNTERBORE_DIA),
-        ("CounterboreDepth", COUNTERBORE_DEPTH),
-        ("CounterboreFloorCornerR", COUNTERBORE_FLOOR_CORNER_R_MAX),
         ("SleeveDia", SLEEVE_DIA),
         ("SleeveTop", SLEEVE_TOP),
     ):
@@ -872,121 +779,24 @@ async def build(adapter) -> dict[str, str]:
         adapter, "solid end piece", vol + V_END_PIECE, 0.005 * V_END_PIECE
     )
 
-    # 4. The arm-end counterbore: its flat floor sits past the screw's clamped
-    # run-out, so the fat incomplete threads never reach the end piece's full
-    # 2B thread.  The cutter's mouth lies on the end face, so its depth
-    # dimension runs face to floor; the floor corner is modelled at its
-    # printed limit, R.004 MAX, a native radial dimension (codjiflo P2 on
-    # #1997).  It is cut FIRST: its floor is the tap's start face.
-    counterbore = SketchDims()
-    check("create_sketch counterbore", await adapter.create_sketch("ArmAxisPlane"))
-    set_sketch_direct_db(adapter, True)
-    try:
-        counterbore_axis = check(
-            "counterbore axis centerline",
-            await adapter.add_centerline(ARM_END_X, 0.0, COUNTERBORE_FLOOR_X, 0.0),
-        )
-        (floor,) = await add_line_chain(
-            adapter,
-            [(COUNTERBORE_FLOOR_X, 0.0), COUNTERBORE_CORNER_FLOOR_TANGENT],
-            close=False,
-        )
-        floor_corner = check(
-            "counterbore floor corner arc",
-            await adapter.add_arc(
-                *COUNTERBORE_CORNER_CENTER,
-                *COUNTERBORE_CORNER_FLOOR_TANGENT,
-                *COUNTERBORE_CORNER_WALL_TANGENT,
-            ),
-        )
-        wall, mouth, counterbore_floor_axis = await add_line_chain(
-            adapter,
-            [
-                COUNTERBORE_CORNER_WALL_TANGENT,
-                (ARM_END_X, COUNTERBORE_R),
-                (ARM_END_X, 0.0),
-                (COUNTERBORE_FLOOR_X, 0.0),
-            ],
-            close=False,
-        )
-    finally:
-        # Session state on the seat (as the end piece above).
-        set_sketch_direct_db(adapter, False)
-    for line, relation in (
-        (floor, "vertical"),
-        (wall, "horizontal"),
-        (mouth, "vertical"),
-        (counterbore_floor_axis, "horizontal"),
-    ):
-        check(
-            f"counterbore {relation} {line}",
-            await adapter.add_sketch_constraint(line, None, relation),
-        )
-    for first, second in ((floor, floor_corner), (floor_corner, wall)):
-        check(
-            f"counterbore floor corner tangent {first} {second}",
-            await adapter.add_sketch_constraint(first, second, "tangent"),
-        )
-    await anchor_point_to_origin(
-        adapter, f"{mouth}.end", ARM_END_X, 0.0, "counterbore mouth centre"
-    )
-    counterbore.record("CounterboreFaceStation", '-"ArmEndX"')
-    # Face to floor: from the mouth's rim to the floor's tangent point.
-    await dimension_between(
-        adapter,
-        f"{mouth}.start",
-        f"{floor}.end",
-        "horizontal_distance",
-        COUNTERBORE_DEPTH,
-        "counterbore depth",
-    )
-    counterbore.record("CounterboreDepth", '"CounterboreDepth"')
-    await add_diametric_linear_dimension(
-        adapter,
-        counterbore_axis,
-        wall,
-        (ARM_END_X + COUNTERBORE_DEPTH / 2.0, COUNTERBORE_R + 4.0),
-        "CounterboreDia",
-    )
-    counterbore.record("CounterboreDia", '"CounterboreDia"')
-    check(
-        "counterbore floor corner radius",
-        await adapter.add_sketch_dimension(
-            floor_corner, None, "radial", COUNTERBORE_FLOOR_CORNER_R_MAX
-        ),
-    )
-    counterbore.record("CounterboreFloorCornerR", '"CounterboreFloorCornerR"')
-    await ensure_fully_defined(adapter, "counterbore sketch")
-    check("exit_sketch counterbore", await adapter.exit_sketch())
-    name_last_feature(adapter, "CounterboreProfile")
-    drive_jobs += counterbore.apply(adapter, "CounterboreProfile")
-    check(
-        "revolve counterbore",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
-    )
-    name_last_feature(adapter, "Counterbore")
-    vol = await _volume_check(
-        adapter, "arm-end counterbore", vol - V_COUNTERBORE, 0.02 * V_COUNTERBORE
-    )
-
-    # 4b. The native blind bottoming tap, started on the counterbore floor
-    # (west-facing), both depths from that floor (sm_gooseneck_spring_joint).
-    # If the wizard's table drill differs from TAP_DRILL_DIA, wizard_holes
-    # fails loud (the joint's walls are budgeted on that drill).
+    # 4. The native blind bottoming tap, started on the end face (west-facing),
+    # both depths from it (sm_gooseneck_spring_joint; owner ruling 2026-11-08
+    # (Pedro), #2144 item 11.4: plain tap, no counterbore).  If the wizard's
+    # table drill differs from TAP_DRILL_DIA, wizard_holes fails loud (the
+    # joint's walls are budgeted on that drill).
     tap = wizard_holes(
         adapter,
         TAP_SPEC,
-        [[COUNTERBORE_FLOOR_X, ARM_Y, 0.0]],
+        [[ARM_END_X, ARM_Y, 0.0]],
         (-1.0, 0.0, 0.0),
         f"gooseneck end piece ({TAP_SPEC.size} blind)",
         name="ThreadBore",
         expect_dia_mm=TAP_DRILL_DIA,
         placement_dims=[((None, None), ("TapAxisY", '"ArmY"'))],
     )
-    if abs(tap.depth_mm - TAP_DRILL_DEPTH_FROM_FLOOR) > 0.005:
+    if abs(tap.depth_mm - TAP_DRILL_DEPTH) > 0.005:
         raise RuntimeError(
-            f"gooseneck tap drill depth {tap.depth_mm:.3f} != "
-            f"{TAP_DRILL_DEPTH_FROM_FLOOR:.3f} mm"
+            f"gooseneck tap drill depth {tap.depth_mm:.3f} != {TAP_DRILL_DEPTH:.3f} mm"
         )
     drive_jobs += tap.placement_drive_jobs
     vol = await _volume_check(adapter, "end piece blind tap", vol - V_TAP, 0.02 * V_TAP)
@@ -1168,36 +978,6 @@ async def build(adapter) -> dict[str, str]:
     if len(bodies) != 2:
         raise RuntimeError(f"gooseneck: expected two solid bodies, found {len(bodies)}")
 
-    # Model-owned limits: the counterbore depth prints as its LIMIT band from
-    # the end face, .108/.112 (sm_gooseneck_spring_joint), the calibrated 2.78
-    # model inside it; its Ø as LIMIT .279/.275 about the calibrated 7.00, the
-    # lower limit the one the run-out clearance is budgeted on (codjiflo P1 on
-    # #1997).
-    _limit_band(
-        adapter,
-        "CounterboreProfile",
-        "CounterboreDepth",
-        COUNTERBORE_DEPTH,
-        (COUNTERBORE_DEPTH_MIN, COUNTERBORE_DEPTH_MAX),
-    )
-    _limit_band(
-        adapter,
-        "CounterboreProfile",
-        "CounterboreDia",
-        COUNTERBORE_DIA,
-        (COUNTERBORE_DIA_MIN, COUNTERBORE_DIA_MAX),
-    )
-    # The floor corner's R.004 MAX (codjiflo P1 round 5, P2 on #1997): the
-    # modelled radius is the limit, the band runs from sharp up to it.
-    set_single_limit(
-        adapter,
-        "CounterboreProfile",
-        "CounterboreFloorCornerR",
-        limit=COUNTERBORE_FLOOR_CORNER_R_MAX,
-        band=COUNTERBORE_FLOOR_CORNER_R_BAND,
-        tol_type=COUNTERBORE_FLOOR_CORNER_R_TOL_TYPE,
-    )
-
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     clear_dimensions_for_drawing(adapter)
@@ -1206,9 +986,10 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     _author_dimension_callouts(adapter)
     _author_reference_dimensions(adapter)
-    # A sketch-only diametric dimension prints no Ø of its own (farm run
-    # 20261031T233549214Z printed "(12.70)"); the revolve's sleeve Ø does.
-    set_dimension_prefix(adapter, "TubeOdReference", "TubeOdRef", "<MOD-DIAM>")
+    # The tube's stock Ø, a sketch-only diametric dimension, prints no Ø of
+    # its own (farm run 20261031T233549214Z printed "(12.70)"); it carries
+    # its wall callout, so _author_reference_dimensions writes its
+    # "(<MOD-DIAM>" prefix with the sleeve's.
     # The reference sketches own printed dimensions and only reference lines:
     # hide them so no assembly instance renders them (#880).  The drawing shows
     # them per view through _drawing_hidden_sketches to import those dimensions.
@@ -1220,7 +1001,6 @@ async def build(adapter) -> dict[str, str]:
         PART_NAME,
         {
             "Manufacturing Notes": DRAWING_NOTES,
-            "Elevation View Note": ELEVATION_VIEW_NOTE,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )

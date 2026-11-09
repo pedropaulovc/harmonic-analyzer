@@ -274,36 +274,32 @@ springs:
           - -91.19999999999999
           - 1180.4304342766018
           clocking: half_turn
-        gooseneck_origin_y_mm: 1188.794622901882
+        gooseneck_origin_y_mm: 1188.7946231750816
         upper_support:
-          component: sm-gooseneck-spring-screw
-          number: MHA-SM-04
-          thread: 1/4-28 UNF
-          pitch_mm: 0.9071428571428571
-          underhead_length_mm: 19.5
-          major_dia_mm: 6.35
-          body_dia_mm: 6.35
-          plain_length_min_mm: 3.6
-          full_thread_station_max_mm: 5.71
-          head_dia_mm: 11.5
-          head_height_mm: 6.6
-          head_relief_chamfer_mm: 1.45
-          slot_width_mm: 1.6
-          slot_depth_mm: 2.0
-          tip_chamfer_mm: 0.5
-          underhead_corner_r_mm: 0.5
-          clamp_gap_mm: 4.88061
+          component: sm-vn-gooseneck-shoulder-screw
+          number: MHA-SM-VN-56
+          supplier_sku: 91829A566
+          thread: '#10-24'
+          pitch_mm: 1.0583333333333333
+          major_dia_mm: 4.826
+          thread_length_mm: 9.524999999999999
+          shoulder_dia_mm: 6.35
+          shoulder_length_mm: 9.524999999999999
+          head_dia_mm: 9.524999999999999
+          head_height_mm: 4.762499999999999
+          drive_slot_width_mm: 1.524
+          drive_slot_depth_mm: 1.905
+          eye_retainer: head
+          eye_gap_mm: 4.88061
           arm_end_x_mm: -103.359695
           spring_eye_x_mm: -105.8
           tube_dia_mm: 12.7
           plug_head_length_mm: 21.5
           plug_length_mm: 26.0
-          plug_counterbore_dia_mm: 7.0
-          plug_counterbore_depth_mm: 2.78
           plug_edge_break_mm: 0.25
         final_distance_mm:
           lower: 3.786505264997067e-06
-          upper: 3.417009698190465e-05
+          upper: 3.495255072355111e-05
     square:
       amplitudes_mm:
       - 0
@@ -342,33 +338,29 @@ springs:
           - -91.19999999999999
           - 1180.715876076487
           clocking: half_turn
-        gooseneck_origin_y_mm: 1189.3655065016126
+        gooseneck_origin_y_mm: 1189.3655067749376
         upper_support:
-          component: sm-gooseneck-spring-screw
-          number: MHA-SM-04
-          thread: 1/4-28 UNF
-          pitch_mm: 0.9071428571428571
-          underhead_length_mm: 19.5
-          major_dia_mm: 6.35
-          body_dia_mm: 6.35
-          plain_length_min_mm: 3.6
-          full_thread_station_max_mm: 5.71
-          head_dia_mm: 11.5
-          head_height_mm: 6.6
-          head_relief_chamfer_mm: 1.45
-          slot_width_mm: 1.6
-          slot_depth_mm: 2.0
-          tip_chamfer_mm: 0.5
-          underhead_corner_r_mm: 0.5
-          clamp_gap_mm: 4.88061
+          component: sm-vn-gooseneck-shoulder-screw
+          number: MHA-SM-VN-56
+          supplier_sku: 91829A566
+          thread: '#10-24'
+          pitch_mm: 1.0583333333333333
+          major_dia_mm: 4.826
+          thread_length_mm: 9.524999999999999
+          shoulder_dia_mm: 6.35
+          shoulder_length_mm: 9.524999999999999
+          head_dia_mm: 9.524999999999999
+          head_height_mm: 4.762499999999999
+          drive_slot_width_mm: 1.524
+          drive_slot_depth_mm: 1.905
+          eye_retainer: head
+          eye_gap_mm: 4.88061
           arm_end_x_mm: -103.359695
           spring_eye_x_mm: -105.8
           tube_dia_mm: 12.7
           plug_head_length_mm: 21.5
           plug_length_mm: 26.0
-          plug_counterbore_dia_mm: 7.0
-          plug_counterbore_depth_mm: 2.78
           plug_edge_break_mm: 0.25
         final_distance_mm:
           lower: 3.7864995231656218e-06
-          upper: 3.417003702568946e-05
+          upper: 3.495284450951821e-05

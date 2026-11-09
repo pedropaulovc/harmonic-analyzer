@@ -143,18 +143,39 @@ def spring_deformation_contract(cad: Path, stock, counter) -> tuple[dict, dict]:
     return tuple(contracts)
 
 
-def counter_screw_diameter(goose, import_made_screw) -> float:
+# The archived made-screw module of releases before the shoulder screw (owner
+# ruling 2026-11-08 (Pedro), #2144 item 11.4 retired the made screw); read only
+# from those archived trees.
+RETIRED_COUNTER_SCREW_MODULE = "sm_gooseneck_spring_screw_geom"
+COUNTER_SHOULDER_SCREW_MODULE = "sm_vn_gooseneck_shoulder_screw_spec"
+
+
+def counter_screw_diameter(goose, import_support_screw) -> float:
     """The shank the counter eye hangs on, for every archived support layout.
 
-    Releases before MHA-SM-04 model it as the gooseneck's integral screw shank;
-    #6-32 trees seat the eye on the separate made screw's thread major;
-    cheese-head trees (owner ruling 2026-10-27 (#1951)) on its plain BODY_DIA.
-    ``import_made_screw`` loads that release's screw module.
+    Releases before the made spring screw model it as the gooseneck's integral
+    screw shank; #6-32 trees seat the eye on the separate made screw's thread
+    major; cheese-head trees (owner ruling 2026-10-27 (#1951)) on its plain
+    BODY_DIA; shoulder-screw trees (#2144 item 11.4) on its SHOULDER_DIA.
+    ``import_support_screw`` loads that release's screw module.
     """
     if hasattr(goose, "SCREW_SHANK_DIA"):
         return goose.SCREW_SHANK_DIA
-    made_screw = import_made_screw()
-    return getattr(made_screw, "BODY_DIA", made_screw.MAJOR_DIA)
+    screw = import_support_screw()
+    for name in ("SHOULDER_DIA", "BODY_DIA"):
+        if hasattr(screw, name):
+            return getattr(screw, name)
+    return screw.MAJOR_DIA
+
+
+def import_counter_support_screw(identity_map, cad: Path):
+    """The release's counter support-screw module: the purchased shoulder
+    screw's spec where the tree has one, else the retired made screw."""
+    current = cad / "scripts" / f"{COUNTER_SHOULDER_SCREW_MODULE}.py"
+    name = (
+        COUNTER_SHOULDER_SCREW_MODULE if current.is_file() else RETIRED_COUNTER_SCREW_MODULE
+    )
+    return identity_map.import_module(cad, name)
 
 
 def main() -> None:
@@ -380,7 +401,7 @@ def export_snapshot(
     goose = modules["sm_gooseneck_geom"]
     counter_screw_dia = counter_screw_diameter(
         goose,
-        lambda: identity_map.import_module(cad, "sm_gooseneck_spring_screw_geom"),
+        lambda: import_counter_support_screw(identity_map, cad),
     )
     mag = modules["mg_magnifying_lever_geom"]
     lw = modules["mg_lever_wire_geom"]

@@ -421,10 +421,11 @@ def test_cross_numbered_fit_pairs_use_fixed_runtime_oracles() -> None:
             frozenset(("sm-vn-boss-hook-1", "sm-summing-lever-1")): _annulus_limit(
                 4.826, 3.797, 19.05
             ),
-            # MHA-SM-04 1/4-28 major in the #3 drill of the blind end-piece
-            # tap: counterbore floor (2.78) to the free-gap tip (14.62).
-            frozenset(("sm-gooseneck-spring-screw-1", "sm-gooseneck-1")): _annulus_limit(
-                6.35, 5.41, 11.84
+            # MHA-SM-VN-56 10-24 major in the #25 drill of the blind end-piece
+            # tap: the shoulder seats on the end face, so the whole 3/8
+            # thread stands in the tap (#2144 item 11.4).
+            frozenset(("sm-vn-gooseneck-shoulder-screw-1", "sm-gooseneck-1")): _annulus_limit(
+                4.826, 3.797, 9.525
             ),
         }
     )
@@ -594,9 +595,9 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(("sm-vn-boss-hook-1", "sm-summing-lever-1")): _annulus_limit(
                 4.826, 3.797, 19.05
             ),
-            # MHA-SM-04 1/4-28 major, #3 drill, 14.62 tip reach less 2.78 counterbore.
-            frozenset(("sm-gooseneck-spring-screw-1", "sm-gooseneck-1")): _annulus_limit(
-                6.35, 5.41, 11.84
+            # MHA-SM-VN-56 10-24 major, #25 drill, 3/8 thread seated (#2144 item 11.4).
+            frozenset(("sm-vn-gooseneck-shoulder-screw-1", "sm-gooseneck-1")): _annulus_limit(
+                4.826, 3.797, 9.525
             ),
         },
         "pn-pen": {

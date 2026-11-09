@@ -46,7 +46,7 @@ import fr_frame_assembly_steps
 import ha_harmonic_analyzer_assembly_steps
 import mg_magnifier_assembly_steps
 import pd_paper_drive_assembly_steps
-import sm_gooseneck_spring_screw_geom as gooseneck_screw
+import sm_vn_gooseneck_shoulder_screw_spec as gooseneck_screw
 
 
 class Enforcement(StrEnum):
@@ -620,8 +620,8 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "ch_vn_frame_side_screw",  # #2-56 fillister (McMaster 91794A080, MHA-CH-VN-52); member, x2 into top_frame KeeperTaps (top-level row)
         "ch_fulcrum_keeper",  # #1-72 UNF crown tap through to the shaft bore (receiver of MHA-CH-VN-55); its #2 foot hole is clearance only
         "ch_vn_fulcrum_set_screw",  # #1-72 UNF x 5/32 cup-point set screw (McMaster 91375A942, MHA-CH-VN-55), member: x2, one into each fulcrum_keeper crown tap
-        "sm_gooseneck",  # receiver: 1/4-28 blind-tapped solid end piece brazed into the 1/2 in tube arm; its sleeve is the post gripped by the frame's set screw
-        "sm_gooseneck_spring_screw",  # made MHA-SM-04 1/4-28 slotted cheese-head screw: clamps the counter-spring upper eye on its plain Ø6.35 body to the end piece
+        "sm_gooseneck",  # receiver: plain blind-tapped solid end piece brazed into the 1/2 in tube arm (#2144 item 11.4); its sleeve is the post gripped by the frame's set screw
+        "sm_vn_gooseneck_shoulder_screw",  # purchased MHA-SM-VN-56 shoulder screw, member: seated on the gooseneck end face; the counter-spring upper eye rides free on its shoulder
         "fr_vn_gooseneck_set_screw",  # 1/4-20 UNC x 3/4 square-head cup point (91410A540), member: into top_frame hub boss tap, grips summing gooseneck
         "pd_vn_guide_lock_screw",  # #4-40 slotted pan head (McMaster 91792A108, MHA-PD-VN-60, R9-31), member: 8 into the platen_guide rear through taps
         "pn_vn_hanger_screw",  # #8-32 UNC x 1 hex head (McMaster 93075A199), member through the pen-hanger strap's clearance hole into the hanger nut and jam nut
@@ -687,7 +687,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "dt_cone_gear",  # slides on the MHA-DT-04 D-flat, no thread
         "dt_cone_pivot_post",  # clamped part: counterbored clearance for MHA-DT-VN-61; journals only
         "ch_connecting_rod",  # strap bore on cam + reamed pin hole (pressed MHA-CH-10 pin)
-        "sm_vn_counter_spring",  # 1330K524 extension spring: upper eye clamped on the MHA-SM-04 screw, lower eye hooks the boss-hook eye, no thread
+        "sm_vn_counter_spring",  # 1330K524 extension spring: upper eye free on the MHA-SM-VN-56 shoulder, lower eye hooks the boss-hook eye, no thread
         "dt_crank_drive_gear",  # slides on the MHA-DT-04 D-flat against its collar, no thread
         "dt_crank_handle",  # oak handle, runs on the MHA-DT-32 shoulder
         "dt_crank_handle_butt_cup",  # bonded in the handle butt; pocket bored for the MHA-DT-32 head, no thread
@@ -1571,46 +1571,46 @@ JOINTS: tuple[Joint, ...] = (
         ),
     ),
     Joint(
-        id="sm-summing/gooseneck-spring-screw",
+        id="sm-summing/gooseneck-shoulder-screw",
         assembly="sm_summing",
-        member="sm_gooseneck_spring_screw",
+        member="sm_vn_gooseneck_shoulder_screw",
         receiver="sm_gooseneck",
-        thread=gooseneck_screw.THREAD,
+        thread=f"{gooseneck_screw.THREAD} UNC",
         quantity=1,
         installed_at="MHA-SM-00 STEP 8",
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
-            "user ruling 2026-09-21: tighten the head to clamp the supplier upper-eye "
-            "band against the end piece's face. Clamp preload prevents eye rotation "
-            "relative to the screw and end piece; the spring flexes below this static "
-            "joint, not by swivelling on the thread. No operating rubbing torque reaches "
-            "the screw axis."
+            "owner ruling 2026-11-08 (Pedro), #2144 item 11.4, superseding #1951's "
+            "clamped eye: the shoulder screw is tightened until its shoulder seats on "
+            "the end piece's face, so screw and end piece never move relative to each "
+            "other. The supplier upper eye rides free on the ground shoulder under the "
+            "head; nothing clamps it, so its swing turns the eye on the shoulder, "
+            "whose drag is the eye load times friction at the shoulder radius, far "
+            "below the seated shoulder's breakaway friction. No operating torque "
+            "reaches the screw axis."
         ),
         axial_capture=(
-            "made MHA-SM-04 slotted cheese head clamps the double-loop band, seated on "
-            "the screw's plain Ø6.35 body, to the face of MHA-SM-01's solid Ø12.70 "
-            "end piece; full thread engagement runs in the end piece's blind 1/4-28 "
-            "UNF-2B tap past its arm-end counterbore, which keeps the screw's thread "
-            "run-out out of the tap's full thread. The deepest screw tip stays inside "
-            "the tap's full thread, and the bottoming tap's lead inside its drill."
+            "purchased MHA-SM-VN-56 shoulder seated on the face of MHA-SM-01's solid "
+            "Ø12.70 end piece, its thread in the end piece's plain blind tap (no "
+            "counterbore); the head retains the loaded eye (plumb pull, owner ruling "
+            "2026-11-08 (Pedro), #2144 item 11.4: bare slotted McMaster 91829A566, "
+            "washer dropped). "
+            "The deepest screw tip stays inside the tap's full thread, and the "
+            "bottoming tap's lead inside its drill."
         ),
         lock=Lock.NONE,
         evidence=(
-            "user, 2026-09-21, binding upper-eye clamp ruling: static nonrotating "
-            "eye, no threadlocker; owner rulings 2026-10-27 (#1951): 1/4-28 UNF "
-            "screw with a plain Ø6.35 body and slotted cheese head, blind 1/4-28 "
-            "tap in the solid end piece; owner minors sm-gooseneck.yaml RV-01 "
-            "(counterbore wall 1.78 MIN under the 2.0 target) and "
-            "sm-gooseneck-spring-screw.yaml RV-01 (head retention 0.95 under the "
-            "1.0 check); sm_gooseneck_spring_joint.py "
-            "ENGAGEMENT_MIN/COUNTERBORE_DEPTH_MIN/SCREW_RUNOUT_INTRUSION_MAX/"
-            "PLUG_WALL_MIN/COUNTERBORE_WALL_MIN/DRILL_POINT_SHANK_WALL_MIN/"
-            "HEAD_RETENTION_MIN/LOOP_PLAIN_MARGIN_MIN/LOOP_CORNER_CLEARANCE_MIN/"
-            "TIP_THREAD_MARGIN_MIN/TAP_LEAD_DRILL_MARGIN_MIN; "
-            "build_sm_summing_assembly.py gooseneck spring screw lock_mate "
+            "owner ruling 2026-11-08 (Pedro), #2144 item 11.4: bare slotted "
+            "purchased shoulder screw, washer dropped, plain tap in the end piece, "
+            "the eye free on the shoulder; sm-summing.yaml SM-01 (pending owner "
+            "confirmation) and sm-gooseneck.yaml RV-04 (engagement under 1.5D); "
+            "sm_gooseneck_spring_joint.py ENGAGEMENT_MIN/PLUG_WALL_MIN/"
+            "DRILL_POINT_SHANK_WALL_MIN/LOADED_RETENTION_MIN/EYE_AXIAL_PLAY_MIN/"
+            "EYE_AXIAL_PLAY_MAX/TIP_THREAD_MARGIN_MIN/TAP_LEAD_DRILL_MARGIN_MIN; "
+            "build_sm_summing_assembly.py shoulder screw lock_mate "
             "(CAD restraint, not mechanical locking hardware); the installation "
             "step is in the summing assembly's Manufacturing Notes property "
-            "(UPPER_EYE_CLAMP_NOTES) and printed as MHA-SM-00 step 8 "
+            "(UPPER_EYE_NOTES) and printed as MHA-SM-00 step 8 "
             "(sm_summing_assembly_sheet.ASSEMBLY_STEPS 8, ASSEMBLY_CHECKS 3); "
             "_counter_spring_hang.assert_counter_spring_top_hang"
         ),
@@ -2472,8 +2472,8 @@ REQUIRED_JOINTS: dict[str, Occurrence] = {
     "sm-summing/boss-hook-jam-nut-on-hook": Occurrence(
         "sm_summing", "build_sm_summing_assembly.py", "JAM_NUT_POS"
     ),
-    "sm-summing/gooseneck-spring-screw": Occurrence(
-        "sm_summing", "build_sm_summing_assembly.py", '"sm-gooseneck-spring-screw"'
+    "sm-summing/gooseneck-shoulder-screw": Occurrence(
+        "sm_summing", "build_sm_summing_assembly.py", "shoulder screw seated on end piece"
     ),
     "pn-pen/hanger-screw-in-nut": Occurrence(
         "pn_pen", "build_pn_pen_assembly.py", "HANGER_NUT_POS"

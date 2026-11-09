@@ -85,7 +85,7 @@ FULL_FORM_TAIL_MIN = THREAD_LENGTH_MIN - INCOMPLETE_TIP_LEN_MAX
 # The table publishes only the UNR reference MAXIMUM: the 2A major max
 # 0.1631 in (0.164 basic less the 0.0009 allowance) less 1.226869 P is
 # 0.1248 in = 3.170.  DERIVED ESTIMATE of the minimum, the repo's deepest-root
-# construction (sm_gooseneck_spring_screw_geom, dt_crank_handle_pivot_screw_spec):
+# construction (dt_crank_handle_pivot_screw_spec):
 # a full basic half-depth 0.649519 P below the 2A pitch-diameter minimum
 # 0.1399 in is 0.1196 in = 3.038 (the UNR 0.108 P least root radius gives the
 # same 0.1196 in).

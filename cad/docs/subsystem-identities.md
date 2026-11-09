@@ -377,7 +377,7 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | part | `gooseneck` | MHA-032 | `sm-gooseneck` | MHA-SM-001 | `sm-gooseneck` | MHA-SM-01 |
 | part | `knife-mount` | MHA-037 | `sm-knife-mount` | MHA-SM-002 | `sm-knife-mount` | MHA-SM-02 |
 | part | `summing-lever` | MHA-073 | `sm-summing-lever` | MHA-SM-003 | `sm-summing-lever` | MHA-SM-03 |
-| part | — | — | `sm-gooseneck-spring-screw` | MHA-SM-004 | `sm-gooseneck-spring-screw` | MHA-SM-04 |
+| retired part | — | — | `sm-gooseneck-spring-screw` | MHA-SM-004 | — (replaced by the purchased `sm-vn-gooseneck-shoulder-screw`, MHA-SM-VN-56) | MHA-SM-04 (retired 2026-11-08; never reissued) |
 | part | `boss-hook` | MHA-005 | `vn-boss-hook` | MHA-VN-001 | `sm-vn-boss-hook` | MHA-SM-VN-50 |
 | part | `channel-spring-installed` | MHA-011 | `vn-channel-spring-installed` | MHA-VN-004 | `ch-vn-channel-spring-installed` | MHA-CH-VN-50 |
 | part | `counter-spring` | MHA-019 | `vn-counter-spring` | MHA-VN-005 | `sm-vn-counter-spring` | MHA-SM-VN-51 |
@@ -445,6 +445,7 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | part | — | — | `vn-rocker-thrust-washer` | MHA-VN-070 | `ch-vn-rocker-thrust-washer` | MHA-CH-VN-56 |
 | part | — | — | `vn-bracket-hold-down-screw` | MHA-VN-071 | `ch-vn-bracket-hold-down-screw` | MHA-CH-VN-57 |
 | part | — | — | `vn-boss-hook-jam-nut` | MHA-VN-072 | `sm-vn-boss-hook-jam-nut` | MHA-SM-VN-55 |
+| part | — | — | — | — | `sm-vn-gooseneck-shoulder-screw` | MHA-SM-VN-56 |
 | part | — | — | `vn-knife-hanger-washer` (new #10 family) | MHA-VN-060 | `sm-vn-knife-hanger-washer` | MHA-SM-VN-54 |
 | part | — | — | `vn-chain-connecting-link` | MHA-VN-068 | `pd-vn-chain-connecting-link` | MHA-PD-VN-66 |
 | part | — | — | — | — | `pd-vn-transgear-cluster-shim` | MHA-PD-VN-68 |
@@ -751,3 +752,5 @@ A retired Number is never reused. A family added after a cutover takes the next 
 | retired | `dt-crank-pin-eye` | MHA-DT-28 | 2026-11-08 owner ruling (#2144 item 9.2): the 3603T354 jack chain's end link is screwed flat to the MHA-DT-06 arm through its own eye, so the formed brass anchor eye is not needed; no registry, builder or drawing; Number never reissued |
 | retired | `dt-vn-keeper-chain-link` | MHA-DT-VN-66 | 2026-11-08 owner ruling (#2144 item 9.2): the keeper is one open jack-chain strand, not a bead-chain loop, so the 3606T811 loop link is not needed; no registry, builder or drawing; Number never reissued |
 | added | `dt-vn-keeper-chain-screw` | MHA-DT-VN-70 | 2026-11-08 owner ruling (#2144 item 9.2): brass #2-56 x 1/4 slotted binding-head screw, McMaster-Carr 92443A077, x1; clamps the MHA-DT-VN-65 chain's end link to the MHA-DT-06 arm's #2-56 tap through the link's eye, in place of the MHA-SH-VN-51 fillister screw that clamped the MHA-DT-28 eye |
+| retired | `sm-gooseneck-spring-screw` | MHA-SM-04 | Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: the shop-turned 1/4-28 cheese-head screw that clamped the counter spring's upper eye gives way to the purchased MHA-SM-VN-56 shoulder screw, the eye riding free on its shoulder (superseding #1951's clamped eye); no registry, builder or drawing; stem and Number never reissued |
+| added | `sm-vn-gooseneck-shoulder-screw` | MHA-SM-VN-56 | Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: McMaster-Carr 91829A566 slotted 18-8 stainless precision shoulder screw, 1/4 x 3/8 in shoulder, 10-24 thread (owner ruling 2026-11-08 (Pedro), #2144 item 11.4: bare slotted McMaster 91829A566, washer dropped); its shoulder seats on the MHA-SM-01 end face in a plain blind tap, and the MHA-SM-VN-51 upper eye rides free on it |

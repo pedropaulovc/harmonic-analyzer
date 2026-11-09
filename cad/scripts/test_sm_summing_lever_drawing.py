@@ -750,10 +750,7 @@ def test_marked_dimensions_are_all_placed_and_their_callouts_land() -> None:
     assert marked <= set(keeps)
     for feature, names in notes.DRAWING_DIMENSIONS.items():
         assert drawing.DIMENSIONS_BY_FEATURE[feature] == names
-    above = set(notes.DIMENSION_CALLOUTS_ABOVE)
-    below = set(notes.DIMENSION_CALLOUTS_BELOW)
-    assert not above & below
-    assert above | below <= set(keeps)
+    assert set(notes.DIMENSION_CALLOUTS_BELOW) <= set(keeps)
     for name, _prefix in notes.DIMENSION_PREFIXES:
         assert name in notes.DRAWING_DIMENSIONS
 
@@ -831,22 +828,14 @@ def test_the_knife_edge_prints_its_ridge_and_flanks_to_the_sides() -> None:
     assert prefixes[("KnifeEnvelopeReference", "RidgeFromLeft")] == "2X "
     assert prefixes[("KnifeEnvelopeReference", "RidgeFromRight")] == "2X "
     assert prefixes[("KnifeEnvelopeReference", "FlankToSide")] == "4X "
-    # Each band on the knife edge names its seat, as the vertex height does
-    # (machinist review 20261018), and the pair states the symmetry.
+    # The knife envelope's bands link one note naming their seat once (rule
+    # 4); the 2X counts say both stubs.
     seat_bands = ("RidgeFromLeft", "RidgeFromRight", "FlankToSide", "HexHeight")
     for name in seat_bands:
-        callout = notes.DIMENSION_CALLOUTS_BELOW[name]
-        assert notes.KNIFE_MOUNT_NUMBER in callout, name
-        assert "MILL" not in callout and "PASS" not in callout, name
-    pair = " ".join(
-        " ".join(notes.DIMENSION_CALLOUTS_BELOW[name].split())
-        for name in ("RidgeFromLeft", "RidgeFromRight")
-    )
-    assert "SYMMETRIC TO SIDES" in pair and "BOTH STUBS" in pair
-    # The model holds the sides in one plane; the print states no limitless
-    # coplanarity requirement (machinist review bdc033f13).
-    assert "PLANE" not in pair
-    every_callout = {**notes.DIMENSION_CALLOUTS_ABOVE, **notes.DIMENSION_CALLOUTS_BELOW}
+        assert notes.DIMENSION_CALLOUTS_BELOW[name] == notes.KNIFE_SEAT_NOTE_LINK, name
+    assert notes.DRAWING_NOTES.count(notes.KNIFE_MOUNT_NUMBER) == 1
+    assert notes.DRAWING_NOTES.startswith(f"{notes.KNIFE_SEAT_NOTE}. ")
+    every_callout = notes.DIMENSION_CALLOUTS_BELOW
     assert "HexWidth" not in every_callout
     assert (spec.RIDGE_FROM_SIDE, spec.RIDGE_FROM_SIDE_TOL) == (4.040, 0.0508)
     assert (spec.KNIFE_FLANK_TO_SIDE_DEG, spec.KNIFE_FLANK_TO_SIDE_TOL_DEG) == (122.4, 0.5)
@@ -1253,9 +1242,8 @@ def test_the_between_stub_ridge_bound_holds_only_with_the_sides_in_one_plane() -
     assert spec.KNIFE_STUB_RIDGE_OFFSET_MAX == 2.0 * spec.RIDGE_FROM_SIDE_TOL
     assert spec.KNIFE_RIDGE_CONTACT_SPAN == pytest.approx(spec.HEX_Z_INNER + spec.HEX_Z_OUTER)
     assert spec.KNIFE_HOOK_ARM_SPREAD_MAX == pytest.approx(0.078, abs=5e-4)
-    callout = " ".join(notes.DIMENSION_CALLOUTS_BELOW["RidgeFromRight"].split())
-    assert "BOTH STUBS" in callout and "PLANE" not in callout
     assert notes.DIMENSION_PREFIXES[("KnifeEnvelopeReference", "RidgeFromLeft")] == "2X "
+    assert notes.DIMENSION_PREFIXES[("KnifeEnvelopeReference", "RidgeFromRight")] == "2X "
     assert lever_build.KNIFE_SIDE_PLANE_TOL == 1e-6
     assert "_assert_knife_sides_coplanar" in [
         _call_name(call) for call in _calls_in_order(_builder_function("build"))
@@ -1514,30 +1502,24 @@ def test_datum_c_is_the_coefficient_top_the_spring_taps_pierce(monkeypatch) -> N
 
 
 
-def test_the_ridge_callouts_fit_detail_d() -> None:
-    """Reflow preserves every word while the complete projected blocks fit."""
-    right = notes.DIMENSION_CALLOUTS_BELOW["RidgeFromRight"]
-    assert " ".join(right.split()) == (
-        f"KNIFE-EDGE SEAT IN {notes.KNIFE_MOUNT_NUMBER}; BOTH STUBS"
-    )
-    for name in ("RidgeFromLeft", "RidgeFromRight", "FlankToSide"):
-        assert max(map(len, notes.DIMENSION_CALLOUTS_BELOW[name].split("\n"))) <= (
-            notes.RIDGE_CALLOUT_MAX_CHARS
-        )
-
-
 def test_notes_are_short_stated_shortfalls() -> None:
     for text in (
         notes.ISOMETRIC_VIEW_NOTE,
         notes.BACK_VIEW_NOTE,
         notes.FRONT_VIEW_NOTE,
+        notes.DRAWING_NOTES,
     ):
         assert len(text.splitlines()) <= 4
         for word in ("RULE", "EXCEPTION", "RULING", "NYLON", "LOCTITE", "THREADLOCK"):
             assert word not in text.upper()
     # The uniform plate retains 1.5D of full #6-32 thread at its lower limit.
     assert notes.SPRING_TAP_ENGAGEMENT_MIN >= 1.5 * notes.SPRING_TAP_MAJOR_DIA
-    assert not hasattr(notes, "DRAWING_NOTES")
+    # The 20X callout prints that full thread (round 3 read VIEW G's .20 web
+    # as the plate): floored, never rounded up, and still 1.5D.
+    printed = float(notes.SPRING_TAP_CALLOUT_BELOW.split()[2])
+    assert notes.SPRING_TAP_CALLOUT_BELOW == "FULL THREAD .22 MIN"
+    assert printed * 25.4 <= notes.SPRING_TAP_ENGAGEMENT_MIN
+    assert printed >= 1.5 * 0.138
     assert not hasattr(notes, "BRACKET_RECEIVER_NOTE")
     assert "summation anchor position" not in sm_summing_lever_spec.GEOMETRIC_TOLERANCES_MM
 

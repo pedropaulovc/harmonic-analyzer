@@ -5,9 +5,11 @@ part's marked dimensions and the end piece's native tap callout, and links
 the notes; sheet/template and export behaviour lives in ``_drawing_common``.
 
 The gooseneck is a 1/2 in 4130-N tube bent R3.0, its arm ending flush in a
-solid Ø.500 end piece brazed on a shank inside the tube and tapped 1/4-28
-blind, with a 5/8 in sleeve brazed over the leg (owner rulings 2026-10-27,
-#1951).  The made MHA-SM-04 spring screw is NOT part of this weldment.  The
+solid Ø.500 end piece brazed on a shank inside the tube, with a 5/8 in sleeve
+brazed over the leg (owner rulings 2026-10-27, #1951).  Owner ruling
+2026-11-08 (Pedro), #2144 item 11.4: the end piece takes a plain #10-24 blind
+tap for the purchased MHA-SM-VN-56 shoulder screw, with no counterbore,
+frames or datums; the screw is NOT part of this weldment.  The
 sheet carries, at 1:3:
 
 * the ELEVATION (``*Front``): the leg length (foot to the bend tangent) and
@@ -17,14 +19,13 @@ sheet carries, at 1:3:
   tube; the reference overall height and reach to real faces, from the
   part's hidden ``OverallReference``;
 * the END VIEW (``*Left``, third-angle left of the elevation): the end face,
-  carrying the native blind-tap callout with its depth datum and the thread
-  axis's location limit;
+  carrying the native blind-tap callout, which names the screw and states its
+  engagement (owner minor sm-gooseneck RV-04);
 
 and at 3:1 SECTION A-A, a full section on the arm axis (cut faces only)
 cropped to the end piece, the tube's cut walls hatched across the end
-piece's and ended in a freehand break: the head Ø (flush) and length, the
-braze shank Ø (its fit) and length, and the counterbore's LIMIT Ø (with the
-stated wall) and depth (with its floor-corner limit, which names the mate).
+piece's and ended in a freehand break: the head Ø (flush) and length and the
+braze shank Ø (its fit) and length.
 The isometric is at 1:4.  The sheet prints decimal inch (#290, the registry
 row's drawing_unit).
 
@@ -90,7 +91,6 @@ from sm_gooseneck_geom import (
     TUBE_END_X,
 )
 from sm_gooseneck_spec import (
-    DIMENSION_CALLOUTS_ABOVE_BY_NAME,
     DIMENSION_CALLOUTS_BY_NAME,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -99,10 +99,10 @@ from sm_gooseneck_spec import (
     TUBE_OD_REF_Y,
 )
 from sm_gooseneck_spring_joint import (
-    TAP_DRILL_DEPTH_FROM_FLOOR,
+    TAP_DRILL_DEPTH,
     TAP_DRILL_DIA,
     TAP_SPEC,
-    TAP_THREAD_DEPTH_FROM_FLOOR,
+    TAP_THREAD_DEPTH,
 )
 
 
@@ -162,12 +162,14 @@ SLEEVE_TOP_Y = _front_y(SLEEVE_TOP)
 # The elevation's dimensions: both vertical runs on the leg's right, the
 # sleeve's inside the leg's; the sleeve's Ø with its fit callout on the leg's
 # left, between the end view's leg and the elevation's, above the title block
-# (top y 0.066); the arm straight over the arm; the bend radius
-# right of the bend, its line 10 degrees above the leg's tangent so it passes
-# under section line A's right arrow and label (at about 40 degrees it ran
-# through the label, farm run 20261027T224212504Z) and over the leg length's
-# upper extension line.  The tube's reference Ø crosses the bare leg on its
-# left, level with the hidden reference line, opposite the leg length.
+# (top y 0.066); the arm straight over the arm; the bend radius inside the
+# bend, its block centred 25 mm right of the leg's axis so the 37.5-mm
+# "TUBE CENTERLINE" row clears the bend's inner edge by 3.6 mm (farm run
+# 20261107T102825912Z: "TO TUBE CENTERLINE" centred 19 mm right ran under
+# the arc) and ends 8 mm short of the overall height's line, its bottom row
+# over the leg length's upper extension line.  The tube's reference Ø crosses
+# the bare leg on its left, level with the hidden reference line, opposite
+# the leg length.
 # The reference overall height (foot face to the arm's top) stands outermost
 # on the leg's right, beyond the leg length (its text ended at x 0.310 in farm
 # run 20261101T004958072Z) and clear of the isometric (left edge x 0.358),
@@ -184,7 +186,7 @@ FRONT_KEEP = {
     "LegLength": (LEG_AXIS_X + 0.034, (SLEEVE_TOP_Y + BEND_TANGENT_Y) / 2.0),
     "TubeOdRef": (LEG_AXIS_X - 0.030, _front_y(TUBE_OD_REF_Y)),
     "ArmStraight": (END_FACE_X - 0.010, ARM_AXIS_Y + 0.014),
-    "BendRadius": (LEG_AXIS_X + 0.019, ARM_AXIS_Y - 0.0176),
+    "BendRadius": (LEG_AXIS_X + 0.025, ARM_AXIS_Y - 0.0176),
     "OverallHeight": (
         LEG_AXIS_X + 0.052,
         (FOOT_Y + _front_y(ARM_Y + _TUBE_R)) / 2.0,
@@ -199,20 +201,20 @@ FRONT_KEEP = {
 # The tap's native callout stands up and left of it, clear of the section's
 # upper dimensions and of the elevation's arm-straight text, its top inside
 # the border (at 0.266 it crossed it, farm run 20261027T224212504Z).
-TAP_CALLOUT_XY = (0.158, 0.252)
+TAP_CALLOUT_XY = (0.158, 0.254)
+
 
 # Section A-A: a full section on the horizontal plane through the arm axis,
 # cut faces only, cropped to the end piece and the tube over its shank.  A
 # PARTIAL (removed) section along the same span does not import the end
-# piece's Ø or the counterbore's Ø; the full section imports all six
-# (probe farm runs 20261027T211151181Z, 20261027T213158937Z).  The plane
-# also cuts the bend's top, out to where the bend's outer wall drops below
-# it, so the cutting line runs from outside the end face to past that and the
-# crop keeps only SECTION_CROP_X_MM: to just past the braze shank, short of
-# the bend tangent.  The view is turned until model +X runs right and model
-# -Z up (looking down on the arm-axis plane, where the end piece's and
-# counterbore's sketches lie), and set so the end face's centre lands on
-# SECTION_FACE_XY.
+# piece's Ø; the full section does (probe farm runs 20261027T211151181Z,
+# 20261027T213158937Z).  The plane also cuts the bend's top, out to where the
+# bend's outer wall drops below it, so the cutting line runs from outside the
+# end face to past that and the crop keeps only SECTION_CROP_X_MM: to just
+# past the braze shank, short of the bend tangent.  The view is turned until
+# model +X runs right and model -Z up (looking down on the arm-axis plane,
+# where the end piece's sketch lies), and set so the end face's centre lands
+# on SECTION_FACE_XY.
 _BEND_CUT_END_X = -BEND_R + math.sqrt((BEND_R + _TUBE_R) ** 2 - BEND_R**2)
 SECTION_LINE_X_MM = (ARM_END_X - 2.0, _BEND_CUT_END_X + 10.0)
 SECTION_CROP_X_MM = (ARM_END_X - 2.0, TUBE_END_X + PLUG_SHANK_LENGTH + 0.8)
@@ -233,33 +235,11 @@ def _section_x(model_x: float) -> float:
 
 
 # Section A-A's dimensions: the two lengths in one row over the part; the
-# counterbore depth's LIMIT pair above them, left of the face; the
-# counterbore Ø's LIMIT pair (with its mate and max rows) left of the end
-# face, between its extension lines; the head and shank Ø below the part, the
-# head's block carrying the counterbore wall and its "AT C'BORE MAX" two rows
-# lower, the shank's longer fit callout lower.  The Ø's block centres on its
-# keep, 0.45 mm high: r8 (farm run 20261101T035809796Z) inked the pair and two
-# rows y 190.4-209.6 between the extension lines at 189.5 and 210.5.  The
-# head's block, value and four rows, inked y 148.9-174.8, 6 mm under the part
-# (180.95), its last row x 94.8-129.9, left of the shank's line (x 146.2).
-# Each Ø's text
-# starts at its dimension line and runs right, so the head's line stands
-# near the end face and its text ends short of the shank's line (at
-# ARM_END_X + 10 the shank's line ran through it, farm run
-# 20261027T224212504Z).  The floor corner's
-# "R.004 MAX" block stands up-left of the end face, between the
-# counterbore Ø and the depth: its arc lies on the sketch's +v side, model -Z,
-# the section's top (ArmAxisPlane is offset from the Top plane), so its leader
-# runs down-right through the counterbore's mouth to the corner, above the
-# Ø's upper extension line.  Its leader's shoulder underlines the whole
-# block, so the block ends short of the end face's extension lines (x 0.075;
-# a 21-character row reached 0.0754 and crossed them, farm run
-# 20261028T083207316Z).  With the counterbore's axis limit (r8: the Ø's rows
-# carry its mate and max) the block runs to value and three rows, ~20.3 mm
-# of ink (r8: value and two rows 14.7 mm, centred on the keep, shoulder 0.9
-# mm under): centred at keep y 230.65 its shoulder (~219.6) stands 2.8 mm
-# over the Ø's upper dimension line (its end at 216.8) and its top (~240.8)
-# 2.9 mm under the depth's shoulder (243.7).
+# head and shank Ø below the part, the shank's longer fit callout lower.
+# Each Ø's text starts at its dimension line and runs right, so the head's
+# line stands near the end face and its text ends short of the shank's line
+# (at ARM_END_X + 10 the shank's line ran through it, farm run
+# 20261027T224212504Z).
 SECTION_KEEP = {
     "PlugHeadLength": (
         _section_x(ARM_END_X + PLUG_HEAD_LENGTH / 2.0),
@@ -269,9 +249,6 @@ SECTION_KEEP = {
         _section_x(TUBE_END_X + PLUG_SHANK_LENGTH / 2.0),
         _SY0 + _SECTION_HALF + 0.010,
     ),
-    "CounterboreDepth": (_SX0 - 0.012, _SY0 + _SECTION_HALF + 0.032),
-    "CounterboreDia": (_SX0 - 0.030, _SY0 - 0.0005),
-    "CounterboreFloorCornerR": (_SX0 - 0.032, _SY0 + _SECTION_HALF + 0.0116),
     "PlugDia": (_section_x(ARM_END_X + 4.0), _SY0 - _SECTION_HALF - 0.019),
     # 1.5 mm left of the shank's centre: the four-place braze window ran
     # the text 0.26 mm onto the elevation (#290 batch 0).
@@ -285,15 +262,12 @@ if set(FRONT_KEEP) | set(SECTION_KEEP) != {
 }:
     raise AssertionError("the gooseneck sheet does not place every marked dimension")
 
-# The four note lines run long, so they sit in the bottom left, under the
+# The three note lines run long, so they sit in the bottom left, under the
 # end view's foot (y ~0.067) and left of the title block (x 0.216); the
-# isometric's note sits under it.  The elevation's foot stands on the title
-# block's top and its bounding box spans the end face to the leg, so its note
-# stands over the view's upper right, right of the arm straight and clear of
-# the border (left of the foot it printed inside the view's box, farm run
-# 20261027T233507330Z).
+# isometric's note sits under it.  The elevation is a projected principal
+# view at the sheet's scale, so it carries no label (drawing-guidelines.md
+# rule 9).
 NOTES_XY = (0.016, 0.062)
-ELEVATION_NOTE_XY = (0.262, 0.262)
 ISO_NOTE_XY = (0.345, 0.085)
 TAPPED_HOLE_NOTE = "Tapped Hole"
 
@@ -316,8 +290,8 @@ def _require_saved_tap(model: Any) -> None:
     _verify_tap_metadata(definition, TAP_SPEC, "saved gooseneck ThreadBore")
     for member, expected, what in (
         ("TapDrillDiameter", TAP_DRILL_DIA, "tap drill"),
-        ("TapDrillDepth", TAP_DRILL_DEPTH_FROM_FLOOR, "tap drill depth"),
-        ("ThreadDepth", TAP_THREAD_DEPTH_FROM_FLOOR, "thread depth"),
+        ("TapDrillDepth", TAP_DRILL_DEPTH, "tap drill depth"),
+        ("ThreadDepth", TAP_THREAD_DEPTH, "thread depth"),
     ):
         value = float(getattr(definition, member)) * 1000.0
         if not math.isfinite(value) or abs(value - expected) > DIAMETER_TOLERANCE_MM:
@@ -701,13 +675,11 @@ def _end_piece_section(adapter: Any, front: Any) -> Any:
 
 
 def _assert_part_callouts(adapter: Any, annotations: list[Any]) -> None:
-    """The part authors every callout below or above its dimension's value;
-    the import must carry each one unchanged (the drawing never writes them,
+    """The part authors every callout below its dimension's value; the
+    import must carry each one unchanged (the drawing never writes them,
     #1942)."""
-    # swDimensionTextCalloutBelow = 4, swDimensionTextCalloutAbove = 3.
-    expected = {
-        (4, name): text for name, text in DIMENSION_CALLOUTS_BY_NAME.items()
-    } | {(3, name): text for name, text in DIMENSION_CALLOUTS_ABOVE_BY_NAME.items()}
+    # swDimensionTextCalloutBelow = 4.
+    expected = {(4, name): text for name, text in DIMENSION_CALLOUTS_BY_NAME.items()}
     found: dict[tuple[int, str], str] = {}
     for raw in annotations:
         annotation = _early_bound(raw, "IAnnotation")
@@ -762,7 +734,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
-            "Elevation View Note",
             "Isometric View Note",
         ),
         required=(
@@ -771,7 +742,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
-            "Elevation View Note",
             "Isometric View Note",
         ),
     )
@@ -823,11 +793,13 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # The end piece's blind tap, natively called out on the end face: the
     # title block's THREADS row owns the 2B class (drawing-guidelines.md
-    # rule 2), its depths print at two places, its location limits below.
+    # rule 2), its depths print at two places, and the screw and its
+    # engagement print under the native rows.
+    tap_edge = visible_circle_edge(adapter, end, TAP_DRILL_DIA)
     tap_callout = add_native_hole_callout(
         adapter,
         end,
-        edge=visible_circle_edge(adapter, end, TAP_DRILL_DIA),
+        edge=tap_edge,
         callout_xy=TAP_CALLOUT_XY,
         label=f"gooseneck end piece {TAP_SPEC.size} blind tap",
     )
@@ -839,10 +811,9 @@ async def build(adapter: Any) -> dict[str, str]:
     rebuild_drawing(adapter, label="gooseneck tap callout")
 
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
-    add_property_linked_note(adapter, "Elevation View Note", *ELEVATION_NOTE_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
-    # SolidWorks pins its own "1/4-28 Tapped Hole" note beside a tap's native
+    # SolidWorks pins its own "#10-24 Tapped Hole" note beside a tap's native
     # callout; the callout already states the thread, so any such label goes,
     # and finalize_drawing's count then proves none is left.
     removed_tap_labels = remove_notes_matching(adapter, TAPPED_HOLE_NOTE)

@@ -77,6 +77,7 @@ recipes:
 | 91794A080 | `ch-vn-frame-side-screw` (catalogue-only; no vendor model) | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 92240A540 | `fr-vn-lag-screw` | 18-8 Stainless Steel Hex Head Screw |
 | 91829A560 | `dt-vn-cone-pivot-screw` | Slotted 18-8 Stainless Steel Precision Shoulder Screw |
+| 91829A566 | `sm-vn-gooseneck-shoulder-screw` (MHA-SM-VN-56; catalogue-only, datasheet-built with the 91829A560 family's slot) | Slotted 18-8 Stainless Steel Precision Shoulder Screw, 1/4" Shoulder × 3/8", 10-24 Thread |
 | 92314A253 | `sm-vn-knife-hanger-stud` (modified stock; catalogue-only, no vendor model) | 18-8 Stainless Steel Hex Head Screw, #10-24 × 2 in, cut to length |
 | 92443A077 | `dt-vn-keeper-chain-screw` (MHA-DT-VN-70; catalogue-only, no vendor model) | Brass Binding Head Slotted Screw |
 | 92446A077 | `pd-vn-platen-clip-screw` (catalogue-only; no vendor model) | Brass Pan Head Slotted Screw |
@@ -1139,6 +1140,29 @@ Catalog specifications checked on September 10, 2026:
   R3 proved the prior native joint geometry and assembly soundness; the
   revised datum and machinist-driven sheet edits require a fresh scoped
   native proof and sheet review before they are reported verified.
+- [91829A566](https://www.mcmaster.com/91829A566/) supplies the new
+  `sm-vn-gooseneck-shoulder-screw`, **MHA-SM-VN-56**, one (owner ruling
+  2026-11-08 (Pedro), #2144 item 11.4: bare slotted McMaster 91829A566,
+  washer dropped). It replaces the shop-turned MHA-SM-04 clamp screw, whose
+  Number is retired and never reissued. The shoulder seats on MHA-SM-01's
+  end face in a plain blind #10-24 tap; the counter spring's upper eye rides
+  free on the shoulder under the head, superseding #1951's clamped eye, and
+  the head retains it on the loaded basis (plumb pull: 1.588 lap nominal,
+  1.359 at the least head over the largest shoulder). The ruling named
+  91259A576 (5/16 shoulder); its Ø7.94 shoulder drops the arm 0.794 mm
+  against the plumb spring and the leading half-turn then meets the tube, so
+  the 1/4 shoulder keeps the retired screw's Ø6.35 support; the socket
+  91259A535 drafted next gave way to the slotted design. Live on 2026-11-08,
+  91829A566: slotted 18-8 stainless precision shoulder screw, passivated,
+  smooth head; shoulder Ø.250 −.001/0 × .375 +.002/0; 10-24 UNC-2A thread
+  3/8 long; head Ø3/8 × 3/16; 70,000 psi tensile, Rockwell B55, shear not
+  rated; $4.22 each (1–4). Its 2-D drawing dimensions only those sizes; the
+  slot (.060 × .075) and thread undercut (2.3368 span, Ø3.3528 land) are
+  taken from the same family's harvested 91829A560 vendor model (identical
+  head and thread), and the drawing scaled to its head confirms them. The
+  under-head neck, fillet and least head Ø are charged at ASME B18.3's 1/4
+  row as a conservative allowance. No vendor CAD download, hash or measured
+  vendor geometry is claimed.
 - [91255A106](https://www.mcmaster.com/91255A106/) (`pd-vn-guide-lock-screw`,
   MHA-PD-VN-60, eight) holds the four guide locks to the platen guides per ruling
   R9-31 (September 30, 2026): these screws ride the platen, and the MHA-SH-VN-51 (then MHA-PD-VN-52)

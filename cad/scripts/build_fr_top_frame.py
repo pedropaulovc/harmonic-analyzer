@@ -187,7 +187,6 @@ from fr_top_frame_spec import (
     HANGER_CROSSBAR_WIDTH,
     HANGER_CROSSBAR_WIDTH_PLACES,
     HANGER_CROSSBAR_CENTER_TOL,
-    HANGER_DATUM_LINE_YAW_SHIFT,
     FRONT_COLUMN_Z,
     GOOSENECK_BORE_DIA,
     GOOSENECK_X,
@@ -221,14 +220,11 @@ from fr_top_frame_spec import (
     HANGER_PIN_HOLE_DIA_MAX,
     HANGER_PIN_HOLE_DIA_PLACES,
     HANGER_PIN_X,
-    HANGER_NEG_PIN_X_TOL,
     HANGER_PIN_X_TOL,
     HANGER_X,
-    PIN_HOLE_NEG_X,
     PIN_HOLE_X,
     STUD_Z_FRONT,
     STUD_Z_REAR,
-    HANGER_PRESS_HOLE_POSITION_TOL,
     KEEPER_TAP_CALLOUT_PRECISION,
     KEEPER_TAP_DRILL_WANDER_DEG,
     DRILL_DRIFT_PER_MM,
@@ -329,8 +325,8 @@ INNER_Z = abs(FRONT_COLUMN_Z) - RAIL_W_FR / 2.0  # 92.964
 
 # --- Integral crossbar (old top-crossbar, merged) ---------------------------
 # Centred on the spec's hanger x (HANGER_X, the knife's); the hanger
-# stations and their reams (PIN_HOLE_NEG_X, PIN_HOLE_X: -X then +X, the +X
-# ream datum B front / C rear) are the spec's.
+# stations and their one ream each (PIN_HOLE_X, +X of the screw axis; Owner
+# ruling 2026-11-08 (Pedro), #2144 item 11.3) are the spec's.
 BAR_X0, BAR_X1 = (
     HANGER_X - HANGER_CROSSBAR_WIDTH / 2.0,
     HANGER_X + HANGER_CROSSBAR_WIDTH / 2.0,
@@ -375,12 +371,11 @@ def swept_contours_disjoint(
     )
 
 
-# The ream sketch's contours in model (x, z): both reams at both stations,
+# The ream sketch's contours in model (x, z): the one ream at each station,
 # one closed circle each.
 HANGER_PIN_CONTOURS = tuple(
-    ((x, z), (x, z), HANGER_PIN_HOLE_DIA / 2.0)
+    ((PIN_HOLE_X, z), (PIN_HOLE_X, z), HANGER_PIN_HOLE_DIA / 2.0)
     for z in (STUD_Z_FRONT, STUD_Z_REAR)
-    for x in (PIN_HOLE_NEG_X, PIN_HOLE_X)
 )
 if not swept_contours_disjoint(HANGER_PIN_CONTOURS):
     raise AssertionError(
@@ -758,15 +753,14 @@ if abs(FRONT_COLUMN_Z + REAR_COLUMN_Z) > 1e-12 or abs(FRAME_CENTER_Z) > 1e-12:
 if STUD_Z_REAR + HANGER_WASHER.OD_MAX / 2.0 >= INNER_Z + GUSSET:
     raise AssertionError("rear hanger washer overhangs the junction material")
 # Dowel press reams (drawing-guidelines.md rule 17 (walls and webs),
-# print-worst): the largest ream keeps a wall to the crossbar's +X / -X face
-# and to the largest drilled screw clearance hole.  The -X ream, BASIC from
-# the +X one inside its Ø.002 zone, stands farthest from nominal: the +X
-# ream's .XXX station plus the zone's radius (HANGER_NEG_PIN_X_TOL), so one
-# pair of walls at that limit serves both sides.  Their blind floors stay
-# below the finished top (the knockouts' own walls follow the washer stack
-# below).  The #10 holes are drilled from the faced underside and the reams
-# cut from it.  Every hole's drift is greatest at the deepest printed floor;
-# charge both axes toward each other.
+# print-worst): the largest ream keeps a wall to the crossbar's +X face and
+# to the largest drilled screw clearance hole, the ream at its .XXX station
+# limit (HANGER_PIN_X_TOL; Owner ruling 2026-11-08 (Pedro), #2144 item 11.3:
+# the -X ream is gone).  Its blind floor stays below the finished top (the
+# knockouts' own walls follow the washer stack below).  The #10 holes are
+# drilled from the faced underside and the reams cut from it.  Every hole's
+# drift is greatest at the deepest printed floor; charge both axes toward
+# each other.
 _PIN_HOLE_MAX_R = HANGER_PIN_HOLE_DIA_MAX / 2.0
 _CLEARANCE_MAX_R = HANGER_CLEARANCE_DIA_MAX / 2.0
 _REAM_FLOOR_DEPTH_MAX = HANGER_PIN_HOLE_DEPTH + HANGER_PIN_HOLE_DEPTH_TOL  # 12.8
@@ -783,17 +777,17 @@ _BAR_FACE_REACH = HANGER_BAR_HALF_WIDTH_MIN - HANGER_CROSSBAR_CENTER_TOL  # 12.0
 PIN_HOLE_BAR_WALL = (
     _BAR_FACE_REACH
     - HANGER_PIN_X
-    - HANGER_NEG_PIN_X_TOL
+    - HANGER_PIN_X_TOL
     - _PIN_HOLE_MAX_R
     - HANGER_DRIFT_AT_REAM_FLOOR
-)  # 2.608
+)  # 3.003
 PIN_HOLE_SCREW_WALL = (
     HANGER_PIN_X
-    - HANGER_NEG_PIN_X_TOL
+    - HANGER_PIN_X_TOL
     - _PIN_HOLE_MAX_R
     - _CLEARANCE_MAX_R
     - 2.0 * HANGER_DRIFT_AT_REAM_FLOOR
-)  # 2.668
+)  # 2.711
 PIN_HOLE_FLOOR_MARGIN = HANGER_GRIP - HANGER_GRIP_TOL - _REAM_FLOOR_DEPTH_MAX
 for _label, _value in (
     ("ream wall to the crossbar side face", PIN_HOLE_BAR_WALL),
@@ -831,38 +825,37 @@ _FR_RAIL_HALF_WIDTH_MIN = (
     - PRINTED_LINEAR_BAND_MM[DRAWING_REFERENCE_PRECISION["front rear flange width"]]
 ) / 2.0
 # Match the assembly's tap/dowel mismatch without importing a COM recipe
-# (the T+H3 contract, build_sm_summing_assembly's stack), for the knife
-# mount fitted either way round: along the line the round-hole pin may
-# stand on the -X ream, the +X ream's .XXX station plus the -X ream's zone
-# radius from the screw axis; the pair shift (the -X pin's worst offset
-# across the dowel line from the +X pin) is both slips' halves plus the
-# -X ream's zone radius; across the line the round-hole pin may stand on
-# the -X ream, so its zone's radius is charged as well, and the B-C datum
-# line's yaw turns the pair and the tap 7.62 along it (codjiflo round 4).
-# The block's datum simulators (codjiflo round 5): within ⊥.0006 to A, B's
-# and C's simulators each sit up to t/2 off their feature's centre where the
-# pin roots, t/2 along the line for B and t (B's plus C's) in the pair shift.
+# (build_sm_summing_assembly.HANGER_SCREW_MISMATCH; Owner ruling 2026-11-08
+# (Pedro), #2144 item 11.3, scheme S1).  Along the dowel line: the ream's
+# .XXX station, the spotted tap's residual (the former Ø.005 zone's
+# radius), B's slip on its pin and B's datum simulator t/2 (codjiflo round
+# 5).  Across it: the ream's implied-zero .XXX "SAME Z", the same three
+# block terms, and the turn the gauge bar gives the block about its dowel,
+# which moves the tap across by PIN_HOLE_X times the bar line's yaw
+# (HANGER_BAR_YAW_SHIFT).  The bar line passes through both bores, each off
+# its station by the hole's centring to datum D, the ream's .XXX station,
+# B's slip and simulator and the bore's ⌖Ø.008|A|B radius, at opposite
+# limits over the stations' spacing.
 _KNIFE_DOWEL_SLIP_MAX = KNIFE_DOWEL.SLIP_CLEARANCE_MAX
 _KNIFE_DOWEL_HOLE_PERP = KNIFE_MOUNT.DOWEL_HOLE_PERPENDICULARITY_TOL
-_KNIFE_DOWEL_SLOT_PERP = KNIFE_MOUNT.DOWEL_SLOT_PERPENDICULARITY_TOL
-_HANGER_PAIR_SHIFT = (
-    _KNIFE_DOWEL_SLIP_MAX / 2.0
+_HANGER_BLOCK_SHIFT = (
+    HANGER_PIN_X_TOL
+    + KNIFE_MOUNT.STUD_TAP_POSITION_TOL / 2.0
     + _KNIFE_DOWEL_SLIP_MAX / 2.0
-    + HANGER_PRESS_HOLE_POSITION_TOL / 2.0
     + _KNIFE_DOWEL_HOLE_PERP / 2.0
-    + _KNIFE_DOWEL_SLOT_PERP / 2.0
-)  # 0.132
-HANGER_SEAT_BOLT_MISMATCH = math.hypot(
-    HANGER_PIN_X_TOL
-    + HANGER_PRESS_HOLE_POSITION_TOL / 2.0
-    + KNIFE_MOUNT.STUD_TAP_POSITION_TOL / 2.0
+)  # 0.2489
+_HANGER_BORE_LINE_OFFSET = (
+    HANGER_CROSSBAR_CENTER_TOL
+    + HANGER_PIN_X_TOL
     + _KNIFE_DOWEL_SLIP_MAX / 2.0
-    + _KNIFE_DOWEL_HOLE_PERP / 2.0,  # 0.27873
-    HANGER_PIN_X_TOL
-    + HANGER_PRESS_HOLE_POSITION_TOL / 2.0
-    + KNIFE_MOUNT.STUD_TAP_POSITION_TOL / 2.0
-    + _HANGER_PAIR_SHIFT / 2.0
-    + HANGER_DATUM_LINE_YAW_SHIFT,  # 0.3026
+    + _KNIFE_DOWEL_HOLE_PERP / 2.0
+    + KNIFE_MOUNT.KNIFE_BORE_POSITION_TOL / 2.0
+)  # 0.3378, each station
+HANGER_BAR_YAW_SHIFT = (
+    HANGER_PIN_X * 2.0 * _HANGER_BORE_LINE_OFFSET / (STUD_Z_REAR - STUD_Z_FRONT)
+)  # 0.0296
+HANGER_SEAT_BOLT_MISMATCH = math.hypot(
+    _HANGER_BLOCK_SHIFT, _HANGER_BLOCK_SHIFT + HANGER_BAR_YAW_SHIFT
 )
 # The washer's centre wanders from the nominal axis by its own float on the
 # bolt, the bolt's seat mismatch, the hole's drift at the top and the
@@ -923,22 +916,22 @@ for _label, _value, _minimum in (
 # that centre by the drawn coaxiality's implied ±.005 along each axis
 # (owner ruling 2026-10-27, no setup note), and it drifts further over its
 # longest printed run, so it stands farthest off its station where it
-# leaves the faced top.  Each wall here is judged along one axis.  Each
-# stands on its ream's station, the -X one's the farthest from nominal
-# (HANGER_NEG_PIN_X_TOL).  Toward the #10 hole, whose underside-entry drift
-# is also greatest at the top, both holes' maxima are charged at once.
+# leaves the faced top.  Each wall here is judged along one axis, the ream
+# at its .XXX station limit (HANGER_PIN_X_TOL).  Toward the #10 hole, whose
+# underside-entry drift is also greatest at the top, both holes' maxima are
+# charged at once.
 HANGER_KNOCKOUT_DRIFT = DRILL_DRIFT_PER_MM * HANGER_KNOCKOUT_LENGTH_MAX  # 0.135
 HANGER_KNOCKOUT_SHIFT_AT_TOP = (
     HANGER_DRIFT_AT_REAM_FLOOR + HANGER_KNOCKOUT_COAXIAL_TOL + HANGER_KNOCKOUT_DRIFT
 )  # 0.332
 _KNOCKOUT_MAX_R = HANGER_KNOCKOUT_DIA_MAX / 2.0
 _KNOCKOUT_NEAR_AXIS_MIN = (
-    HANGER_PIN_X - HANGER_NEG_PIN_X_TOL - HANGER_KNOCKOUT_SHIFT_AT_TOP
-)  # 7.275
+    HANGER_PIN_X - HANGER_PIN_X_TOL - HANGER_KNOCKOUT_SHIFT_AT_TOP
+)  # 7.172
 KNOCKOUT_BAR_WALL = (
     _BAR_FACE_REACH
     - HANGER_PIN_X
-    - HANGER_NEG_PIN_X_TOL
+    - HANGER_PIN_X_TOL
     - _KNOCKOUT_MAX_R
     - HANGER_KNOCKOUT_SHIFT_AT_TOP
 )
@@ -954,7 +947,7 @@ KNOCKOUT_TOP_BREAK_LAND = (
     _BAR_FACE_REACH
     - EDGE_BREAK_PRINTED_MAX
     - HANGER_PIN_X
-    - HANGER_NEG_PIN_X_TOL
+    - HANGER_PIN_X_TOL
     - _KNOCKOUT_MAX_R
     - HANGER_KNOCKOUT_SHIFT_AT_TOP
 )
@@ -994,14 +987,8 @@ BAR_POCKET_HOLE_WALLS = {
     - DRILL_DRIFT_PER_MM
     * (HANGER_GRIP + HANGER_GRIP_TOL - (FLANGE - PRINTED_LINEAR_BAND_MM[FLANGE_THICKNESS_PLACES]))
     - _POCKET_END,
-    "+X dowel ream": _POCKET_STATION
+    "dowel ream": _POCKET_STATION
     - HANGER_PIN_X_TOL  # SAME Z at the ream's general .XXX band
-    - _PIN_HOLE_MAX_R
-    - HANGER_DRIFT_AT_REAM_FLOOR
-    - _POCKET_END,
-    "-X dowel ream": _POCKET_STATION
-    - HANGER_PIN_X_TOL
-    - HANGER_PRESS_HOLE_POSITION_TOL / 2.0  # its across-line position radius
     - _PIN_HOLE_MAX_R
     - HANGER_DRIFT_AT_REAM_FLOOR
     - _POCKET_END,
@@ -1009,7 +996,6 @@ BAR_POCKET_HOLE_WALLS = {
     # shift at the top off its ream's station.
     "dowel knockout": _POCKET_STATION
     - HANGER_PIN_X_TOL
-    - HANGER_PRESS_HOLE_POSITION_TOL / 2.0
     - _KNOCKOUT_MAX_R
     - HANGER_KNOCKOUT_SHIFT_AT_TOP
     - _POCKET_END,
@@ -1027,14 +1013,14 @@ for _label, _value in BAR_POCKET_HOLE_WALLS.items():
 # stations from the sockets, the dowel-hole station from the hanger axis and
 # half the dowel slip; the block's +X face 5.65 (.XX) off its round hole,
 # its widest .X width, the worse .X row-to-face reach either side; the
-# whole turned through the title-block angle about the round dowel -- for
-# BOTH ways round the mount fits: its round hole (datum B) on the +X pin at
-# the +X ream's .XXX band, or turned 180 deg onto the -X pin at that ream's
-# band plus its zone radius (HANGER_NEG_PIN_X_TOL; codjiflo, PR #1978).  The
-# pin's envelope is the same in both plan coordinates: along the dowel line
-# its station band, across it the +X ream's implied-zero .XXX "SAME Z"
-# station (plus, on the -X pin, that ream's zone radius), each with the
-# round hole's slip (codjiflo round 2).
+# whole turned through the title-block angle about the round dowel, which
+# also covers the yaw the MHA-SM-00 gauge bar sets (HANGER_BAR_YAW_SHIFT's
+# turn, under 0.2 deg).  Owner ruling 2026-11-08 (Pedro), #2144 item 11.3:
+# one dowel, so the block fits one way round only, its round hole (datum B)
+# on the ream's pin.  The pin's envelope is the same in both plan
+# coordinates: along the dowel line its station band, across it the ream's
+# implied-zero .XXX "SAME Z" station, each with the round hole's slip
+# (codjiflo round 2).
 # _external_edge_breaks keeps every finished edge-break band 0.5 off both hulls.
 # The front hull overhangs the crossbar's sharp sides short of the gusset
 # legs (the 25.4-wide block on the 25.146-wide bar); that overhang is not a break.
@@ -1059,8 +1045,8 @@ def _convex_hull(points: list[tuple[float, float]]) -> list[tuple[float, float]]
 
 
 def _knife_seat_footprint(station_z: float, z_label: str) -> list[tuple[float, float]]:
-    """Print-worst (x, z) hull of one knife-mount block's top seat, over both
-    orientations of the block on its two pins."""
+    """Print-worst (x, z) hull of one knife-mount block's top seat on its
+    one pin."""
     slip = KNIFE_DOWEL.SLIP_CLEARANCE_MAX / 2.0
     hanger_band = (
         PRINTED_LINEAR_BAND_MM[
@@ -1078,31 +1064,23 @@ def _knife_seat_footprint(station_z: float, z_label: str) -> list[tuple[float, f
     width = 2.0 * KNIFE_MOUNT.BLK_HALF_X + KNIFE_MOUNT.BLOCK_SIZE_TOL
     turn = math.radians(angular_band_deg())
     corners = []
-    # (round-hole pin, its pin-position band in both plan coordinates, the
-    # block's +X face toward +X or, turned 180 deg about the pin, toward -X).
-    for pin_x, pin_tol, sense in (
-        (PIN_HOLE_X, HANGER_PIN_X_TOL, 1.0),
-        (PIN_HOLE_NEG_X, HANGER_NEG_PIN_X_TOL, -1.0),
-    ):
-        x_band = hanger_band + pin_tol
-        z_band = station_z_band + pin_tol
-        for dx in (-x_band, x_band):
-            for dz in (-z_band, z_band):
-                for side in (
-                    KNIFE_MOUNT.PIN_HOLE_SIDE_DISTANCE - KNIFE_MOUNT.PIN_HOLE_SIDE_TOL,
-                    KNIFE_MOUNT.PIN_HOLE_SIDE_DISTANCE + KNIFE_MOUNT.PIN_HOLE_SIDE_TOL,
-                ):
-                    for u in (side, side - width):
-                        for v in (-reach, reach):
-                            for t in (-turn, turn):
-                                corners.append(
-                                    (
-                                        pin_x + dx
-                                        + sense * (u * math.cos(t) - v * math.sin(t)),
-                                        station_z + dz
-                                        + sense * (u * math.sin(t) + v * math.cos(t)),
-                                    )
+    x_band = hanger_band + HANGER_PIN_X_TOL
+    z_band = station_z_band + HANGER_PIN_X_TOL
+    for dx in (-x_band, x_band):
+        for dz in (-z_band, z_band):
+            for side in (
+                KNIFE_MOUNT.PIN_HOLE_SIDE_DISTANCE - KNIFE_MOUNT.PIN_HOLE_SIDE_TOL,
+                KNIFE_MOUNT.PIN_HOLE_SIDE_DISTANCE + KNIFE_MOUNT.PIN_HOLE_SIDE_TOL,
+            ):
+                for u in (side, side - width):
+                    for v in (-reach, reach):
+                        for t in (-turn, turn):
+                            corners.append(
+                                (
+                                    PIN_HOLE_X + dx + u * math.cos(t) - v * math.sin(t),
+                                    station_z + dz + u * math.sin(t) + v * math.cos(t),
                                 )
+                            )
     return _convex_hull(corners)
 
 
@@ -3236,39 +3214,32 @@ async def build(adapter) -> dict[str, str]:
     # 12b. Dowel press reams (owner ruling 2026-10-24, T+H3): blind and
     #      flat-floored (a plain cut-extrude -- a wizard drill point would
     #      leave a cone under the pressed dowel's end), cut HangerPinHoleDepth
-    #      up from the crossbar underside, HANGER_PIN_X either side of each
-    #      screw axis: four circles, one sketch.  The rear +X circle owns the
+    #      up from the crossbar underside, HANGER_PIN_X +X of each screw axis
+    #      (Owner ruling 2026-11-08 (Pedro), #2144 item 11.3: one per
+    #      station): two circles, one sketch.  The rear circle owns the
     #      marked HangerPinHoleDia, which the underside locator dimensions.
     pins = SketchDims()
     pin_stations = [
-        (station, side, x, z)
+        (station, PIN_HOLE_X, z)
         for station, z in (("Front", STUD_Z_FRONT), ("Rear", STUD_Z_REAR))
-        for side, x in (("Neg", PIN_HOLE_NEG_X), ("", PIN_HOLE_X))
     ]
-    pin_dia_names = {
-        ("Rear", ""): "HangerPinHoleDia",
-        ("Front", ""): "HangerPinHole1Dia",
-        ("Front", "Neg"): "HangerPinHole2Dia",
-        ("Rear", "Neg"): "HangerPinHole3Dia",
-    }
+    pin_dia_names = {"Rear": "HangerPinHoleDia", "Front": "HangerPinHole1Dia"}
     sketch_centres, u_is_x, normal_out = _open_underside_sketch(
-        adapter, [(x, -HALF_H, z) for _station, _side, x, z in pin_stations]
+        adapter, [(x, -HALF_H, z) for _station, x, z in pin_stations]
     )
-    for (u, v), (station, side, _x, _z) in zip(
-        sketch_centres, pin_stations, strict=True
-    ):
-        x_name, z_name = f"Pin{side}{station}X", f"Pin{side}{station}Z"
+    for (u, v), (station, _x, _z) in zip(sketch_centres, pin_stations, strict=True):
+        x_name, z_name = f"Pin{station}X", f"Pin{station}Z"
         await define_circle(
             adapter,
             u,
             v,
             HANGER_PIN_HOLE_DIA / 2.0,
-            f"dowel ream ({station.lower()}{' -X' if side else ' +X'})",
+            f"dowel ream ({station.lower()})",
             dims=pins,
             names=(
-                (x_name, z_name, pin_dia_names[station, side])
+                (x_name, z_name, pin_dia_names[station])
                 if u_is_x
-                else (z_name, x_name, pin_dia_names[station, side])
+                else (z_name, x_name, pin_dia_names[station])
             ),
             drives=(None, None, '"HangerPinHoleDia"'),
         )
@@ -3314,14 +3285,14 @@ async def build(adapter) -> dict[str, str]:
     wizard_holes(
         adapter,
         HANGER_KNOCKOUT_SPEC,
-        [[x, HALF_H, z] for _station, _side, x, z in pin_stations],
+        [[x, HALF_H, z] for _station, x, z in pin_stations],
         (0.0, 1.0, 0.0),
         "dowel ream knockouts (#51 drill)",
         name="HangerKnockouts",
         expect_dia_mm=HANGER_KNOCKOUT_DIA,
         placement_dims=[
-            ((f"Knockout{side}{station}X", None), (f"Knockout{side}{station}Z", None))
-            for station, side, _x, _z in pin_stations
+            ((f"Knockout{station}X", None), (f"Knockout{station}Z", None))
+            for station, _x, _z in pin_stations
         ],
     )
     v_knockouts = (
@@ -3570,14 +3541,9 @@ async def build(adapter) -> dict[str, str]:
         places=DRAWING_PRECISION["CapRecesses"]["CapRecessDepth"],
         display_unit=UNIT,
     )
-    # Explicit press band on all four dowel reams (the dowel spec's
+    # Explicit press band on both dowel reams (the dowel spec's
     # REAM_H7 +.0005/0), printed at the nominal's four places.
-    for pin_dia_name in (
-        "HangerPinHoleDia",
-        "HangerPinHole1Dia",
-        "HangerPinHole2Dia",
-        "HangerPinHole3Dia",
-    ):
+    for pin_dia_name in ("HangerPinHoleDia", "HangerPinHole1Dia"):
         set_dimension_bilateral_tolerance(
             adapter,
             "HangerPinProfile",

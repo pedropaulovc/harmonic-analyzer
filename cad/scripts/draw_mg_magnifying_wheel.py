@@ -387,7 +387,7 @@ FRONT_KEEP = {
     ),
 }
 # The spoke root's text hangs off its dimension line on an OffsetText leader
-# (draw_sm_gooseneck_spring_screw): the leader runs down-right across the
+# (as the retired gooseneck spring-screw sheet did): the leader runs down-right across the
 # 300-360 window and the rim to the LEFT end of the callout line, one text
 # line under the point the value centres on.
 # That end stands under the tip width's line, 14 mm below its block's foot:

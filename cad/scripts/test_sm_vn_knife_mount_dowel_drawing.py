@@ -29,7 +29,8 @@ def test_catalogue_row_is_the_registered_mcmaster_dowel() -> None:
     assert stock.supplier == row["supplier"] == "McMaster-Carr"
     assert stock.stock_name == row["stock_name"]
     assert row["number"] == "MHA-SM-VN-53"
-    assert int(row["quantity"]) == spec.QUANTITY == 4  # two per knife mount
+    # One per knife mount: Owner ruling 2026-11-08 (Pedro), #2144 item 11.3.
+    assert int(row["quantity"]) == spec.QUANTITY == 2
     metadata = recipe_declaration(spec.SKU, recipe.build_98381A473)
     assert metadata.module == recipe.__name__
     assert getattr(recipe, metadata.callable_name) is recipe.build_98381A473
@@ -74,7 +75,7 @@ def test_the_chamfered_end_is_the_pressed_end() -> None:
     assert (spec.DIA / 2.0, spec.CHAMFER_LEN) in section
 
 
-def test_the_installation_note_names_both_holes_and_fits_the_sheet() -> None:
+def test_the_installation_note_names_one_pin_per_mount_and_fits_the_sheet() -> None:
     from _purchased_fastener_drawing import note_lines
 
     lines = note_lines(_config.parts(STEM)["installation_notes"], label=STEM)
@@ -83,9 +84,12 @@ def test_the_installation_note_names_both_holes_and_fits_the_sheet() -> None:
     assert "MHA-SM-02" in flat and "MHA-FR-02" in flat
     assert "UNDERSIDE REAM, CHAMFER END FIRST." in flat
     # Owner ruling 2026-10-24 (T+H3): the crossbar holds the press, the knife
-    # mount the slip.
+    # mount the slip.  Owner ruling 2026-11-08 (Pedro), #2144 item 11.3: one
+    # pin per mount, into its round hole; no slot remains.
     assert "PRESS FIT IN THE MHA-FR-02 CROSSBAR" in flat
-    assert "INTO THE MHA-SM-02 KNIFE MOUNT" in flat
+    assert "ONE PIN PER MHA-SM-02 KNIFE MOUNT" in flat
+    assert "ROUND HOLE" in flat and "SLOT" not in flat
+    assert _config.parts(STEM)["quantity"] == spec.QUANTITY == 2
 
 
 def test_purchased_sheet_documents_the_built_part() -> None:
