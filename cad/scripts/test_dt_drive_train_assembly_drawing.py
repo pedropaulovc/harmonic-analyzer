@@ -953,12 +953,28 @@ def test_explode_plan_resolves_every_step_on_the_built_census() -> None:
     assert moved["spring foot screw lifts"] == (FOOT_NAME,)
     assert moved["spring steps east"] == ("dt-pinion-spring-1", FOOT_NAME)
     # The MHA-DT-VN-69 tip dowel is pressed in the block foot (owner ruling
-    # 2026-11-07, PR #2248), so it leaves with the block.
+    # 2026-11-07, PR #2248), so it leaves with the block, then drops out of
+    # the foot's blind ream past its depth (integration proof
+    # 20261109T105251629Z, balloon 11 on the seated stub).
+    import dt_cone_tip_block_spec as tip_block
+
     assert "dt-vn-locating-pin-1" in moved["tip block slides off"]
+    assert moved["tip dowel drops"] == ("dt-vn-locating-pin-1",)
+    drop = {step.label: step for step in spec.EXPLODE_STEPS}["tip dowel drops"]
+    assert drop.axis == "y" and -drop.distance_mm > tip_block.DOWEL_HOLE_DEPTH + 10.0
     assert moved["block screws lift"] == tuple(f"dt-vn-slotted-screw-{i}" for i in range(1, 5))
     # The rig sheet's MHA-DT-VN-57 balloon is pinned to the front block's west screw.
     rig_anchors = drawing.DRIVE_TRAIN_BALLOON_ANCHORS["pinion-rig"]
     assert rig_anchors["dt-vn-slotted-screw"].instance == "dt-vn-slotted-screw-3"
+    # MHA-DT-VN-63 balloons the collar pin, the one instance that drives out of
+    # its hole; MHA-DT-VN-62 the north screw, lifted clear of its pedestal
+    # (integration proof 20261109T105251629Z, balloons 20 and 33).
+    assert rig_anchors["dt-vn-pinion-strap-pin"].instance == "dt-vn-pinion-strap-pin-3"
+    assert moved["collar pin drives out"] == ("dt-vn-pinion-strap-pin-3",)
+    bank_anchors = drawing.DRIVE_TRAIN_BALLOON_ANCHORS["cylinder-bank"]
+    pinned = bank_anchors["dt-vn-pedestal-hold-down-screw"].instance
+    assert pinned == "dt-vn-pedestal-hold-down-screw-2"
+    assert pinned in moved["north pedestal"] and pinned in moved["pedestal screws lift"]
 
 
 def test_bank_spring_explode_clears_arbor_and_pedestal_in_isometric() -> None:
