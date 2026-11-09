@@ -1003,27 +1003,28 @@ async def build(adapter) -> dict[str, str]:
         screw_y,
         SUMMING_Z,
     ]
-    # Literal stems: _buildgraph's source-expression contract reads them.
-    for stem, position, label in (
-        (
-            "sm-vn-gooseneck-shoulder-screw",
-            screw_position,
-            "shoulder screw seated on end piece",
-        ),
-        (
-            "sm-vn-gooseneck-shoulder-washer",
-            washer_position,
-            "shoulder washer under the head",
-        ),
+    # Literal stems, one call each: _buildgraph's source-expression contract
+    # and the hanger-stack recipe count read them.
+    screw_component = await place_component(
+        adapter,
+        "sm-vn-gooseneck-shoulder-screw",
+        screw_position,
+        euler_from_rows(screw_rows),
+        screw_rows,
+        ground=False,
+    )
+    washer_component = await place_component(
+        adapter,
+        "sm-vn-gooseneck-shoulder-washer",
+        washer_position,
+        euler_from_rows(screw_rows),
+        screw_rows,
+        ground=False,
+    )
+    for component, position, label in (
+        (screw_component, screw_position, "shoulder screw seated on end piece"),
+        (washer_component, washer_position, "shoulder washer under the head"),
     ):
-        component = await place_component(
-            adapter,
-            stem,
-            position,
-            euler_from_rows(screw_rows),
-            screw_rows,
-            ground=False,
-        )
         await lock_mate(
             adapter,
             named_ref(f"Front Plane@{component}", "PLANE"),
