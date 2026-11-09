@@ -243,7 +243,12 @@ _STEP_TEXT: dict[str, tuple[str, ...]] = {
     "magnifier-bracket-screwed": (
         "MAGNIFIER BRACKET: SEAT THE MHA-MG-01 BRACKET FLANGE ON ITS SEATS ON "
         "MHA-SM-03.",
-        "DRIVE BOTH MHA-MG-VN-53 #2-56 SCREWS UNTIL THE HEADS SEAT ON THE FLANGE.",
+        "DRIVE BOTH MHA-MG-VN-53 #2-56 SCREWS UNTIL THE HEADS TOUCH THE FLANGE.",
+        # Owner ruling 2026-11-08 (Pedro), #2144 item 11.1, via FoMg: the
+        # joint's friction cannot hold JOINT_MZ, so the flange is settled
+        # nose down onto the shanks before tightening
+        # (mg_magnifying_bracket_arm_check).
+        "ROTATE MHA-MG-01 NOSE DOWN UNTIL BOTH SCREWS BEAR, THEN TIGHTEN.",
     ),
     "lever-wire-fitted": ("LEVER WIRE: FIT IT PER MHA-MG-00 SHEET 5.",),
     "pen-hung": (
