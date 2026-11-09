@@ -111,7 +111,7 @@ def test_counter_upper_loop_rides_on_the_shoulder_and_clears_the_tube() -> None:
 
 def test_counter_shoulder_screw_head_points_outboard() -> None:
     """The screw frame's head (+Z) points outboard (machine +X), so its thread
-    runs into the end piece.  Imports the summing build, so it waits on the
+    runs into the MHA-SM-05 end plug.  Imports the summing build, so it waits on the
     re-recorded counter calibration (settled_spring_seats)."""
     import build_sm_summing_assembly as summing
 

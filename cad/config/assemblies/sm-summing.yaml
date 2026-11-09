@@ -28,10 +28,12 @@ allowed_free_stems:
 # its jam nut must read under-constrained WITH it (a grounded/fixed
 # regression would freeze the counter-spring anchor while the lever still
 # swings, codex #201).
-# The purchased MHA-SM-VN-56 shoulder screw is locked to the fixed gooseneck;
-# the upper eye rides free on the shoulder under its head (owner ruling
-# 2026-11-08 (Pedro), #2144 item 11.4: bare slotted McMaster 91829A566, washer
-# dropped) and adds no operational freedom.
+# The MHA-SM-05 end plug is locked to the fixed gooseneck (bonded with
+# LOCTITE 638, owner rulings 2026-11-08 (Pedro), #2315), and the purchased
+# MHA-SM-VN-56 shoulder screw is locked to the plug it threads into; the upper
+# eye rides free on the shoulder under its head (owner ruling 2026-11-08
+# (Pedro), #2144 item 11.4: bare slotted McMaster 91829A566, washer dropped)
+# and adds no operational freedom.
 required_free_stems:
   - sm-summing-lever
   - sm-vn-boss-hook
@@ -47,6 +49,6 @@ drawing_unit: in
 machinist_exceptions:
   - id: "SM-01"
     kind: "accept"
-    where: "sheet 3 step 8 and check 3: MHA-SM-VN-56 seated on the MHA-SM-01 end-piece face, the upper loop of MHA-SM-VN-51 free on its shoulder under its head, no threadlocker"
+    where: "sheet 4 step 8B and check 3: MHA-SM-VN-56 seated on the MHA-SM-05 end-plug face, the upper loop of MHA-SM-VN-51 free on its shoulder under its head, no threadlocker"
     finding: "threaded joint under operating load without a lock (rule 23)"
-    reason: "Owner ruling 2026-11-08 (Pedro), #2144 item 11.4, supersedes #1951's clamped eye and the 2026-09-21 static-clamp ruling this row recorded (drafted by the fan-out, PENDING the owner's confirmation that the seated shoulder needs no lock): the shoulder screw is tightened until its shoulder seats on the end-piece face, so screw and end piece never move relative to each other; the eye turns and slides only on the ground shoulder, whose drag is the eye load times friction at the shoulder radius, far below the seated shoulder's breakaway friction, and nothing clamps the eye to turn the screw (joint_retention.py sm-summing/gooseneck-shoulder-screw, STATIC_CLAMP). Check 3 is the acceptance."
+    reason: "Owner ruling 2026-11-08 (Pedro), #2144 item 11.4, supersedes #1951's clamped eye and the 2026-09-21 static-clamp ruling this row recorded (drafted by the fan-out, PENDING the owner's confirmation that the seated shoulder needs no lock): the shoulder screw is tightened until its shoulder seats on the end-plug face, so screw and end plug never move relative to each other; the eye turns and slides only on the ground shoulder, whose drag is the eye load times friction at the shoulder radius, far below the seated shoulder's breakaway friction, and nothing clamps the eye to turn the screw (joint_retention.py sm-summing/gooseneck-shoulder-screw, STATIC_CLAMP). Check 3 is the acceptance. Owner rulings 2026-11-08 (Pedro), #2315 move the tap and end face to the MHA-SM-05 end plug, bonded into MHA-SM-01 at step 8 and cured before this step."

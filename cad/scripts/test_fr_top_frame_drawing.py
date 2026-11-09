@@ -1956,10 +1956,29 @@ def test_hub_set_screw_keeps_one_and_a_half_diameters_of_full_thread() -> None:
     ]
     assert terms["spot face from bore axis at its minimum"] == pytest.approx(20.828)
     assert all(v < 0.0 for k, v in terms.items() if k != "spot face from bore axis at its minimum")
-    assert spec.SET_SCREW_FULL_THREAD_MIN == pytest.approx(10.317, abs=1e-3)
-    assert spec.SET_SCREW_FULL_THREAD_NOMINAL == pytest.approx(10.688, abs=1e-3)
+    assert spec.SET_SCREW_FULL_THREAD_MIN == pytest.approx(12.031, abs=1e-3)
+    assert spec.SET_SCREW_FULL_THREAD_NOMINAL == pytest.approx(12.395, abs=1e-3)
     assert spec.SET_SCREW_MAJOR_DIA == pytest.approx(6.35)
+    assert spec.SET_SCREW_ENGAGEMENT_D == pytest.approx(1.895, abs=1e-3)
     assert spec.SET_SCREW_ENGAGEMENT_D >= spec.SET_SCREW_MIN_ENGAGEMENT_D == 1.5
+
+
+def test_gooseneck_bore_slides_on_the_bare_leg_and_the_set_screw_reaches_it() -> None:
+    """Owner ruling 2026-11-08 (Pedro), #2315: the hub bore takes the
+    gooseneck's bare 1/2 in leg at .520, .008-.032 diametral slip over the
+    tube's mill OD; the 3/4 in MHA-FR-VN-52 still reaches the leg (15.42 of
+    19.05) and tightens snug, 9 in-lb (1 N·m) max."""
+    assert spec.GOOSENECK_BORE_DIA == pytest.approx(0.520 * 25.4)
+    assert spec.DRAWING_PRECISION["GooseneckProfile"] == {"GnDia": 3}
+    assert spec.GOOSENECK_SLIP_MIN / 25.4 == pytest.approx(0.008, abs=1e-6)
+    assert spec.GOOSENECK_SLIP_MAX / 25.4 == pytest.approx(0.032, abs=1e-6)
+    assert spec.SET_SCREW_REACH_MAX == pytest.approx(15.418, abs=1e-3)
+    assert spec.SET_SCREW_REACH_MAX < spec.SET_SCREW_LENGTH - spec.SET_SCREW_PITCH
+    assert spec.SET_SCREW_LENGTH == pytest.approx(19.05)
+    assert (spec.SET_SCREW_TORQUE_MAX_IN_LB, spec.SET_SCREW_TORQUE_MAX_NM) == (9.0, 1.0)
+    assert spec.SET_SCREW_TORQUE_MAX_NM == pytest.approx(
+        spec.SET_SCREW_TORQUE_MAX_IN_LB * 0.112984829, abs=0.02
+    )
 
 
 def test_set_screw_boss_carries_the_spot_face_proud_of_the_rail() -> None:

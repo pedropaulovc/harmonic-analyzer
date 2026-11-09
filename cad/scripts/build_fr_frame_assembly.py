@@ -201,6 +201,7 @@ from fr_vn_lag_screw_spec import (
     TIP_CHAMFER as LAG_TIP_CHAMFER,
 )
 from build_fr_top_frame import (
+    GOOSENECK_X as TOP_GOOSENECK_X,
     SET_SPOT_FACE_X as TOP_SET_SPOT_FACE_X,
     SIDE_TAP_SPEC as TOP_CROSS_TAP_SPEC,
 )
@@ -227,6 +228,7 @@ from fr_vn_tube_frame_cap_spec import (
     TOTAL_HEIGHT as CAP_TOTAL_HEIGHT,
 )
 from fr_tube_frame_spec import COLUMN_LENGTH, OUTER_DIA as COLUMN_OUTER_DIA
+from sm_gooseneck_geom import TUBE_DIA as GOOSENECK_TUBE_DIA
 import fr_frame_explode_spec as explode
 from fr_frame_setting_bands import TOP_AXIS_HEIGHT_BAND_MM
 
@@ -338,16 +340,18 @@ if not math.isclose(CAP_MOUTH_Y + CAP_TOTAL_HEIGHT, CAP_TOP_Y, abs_tol=1e-9):
     raise AssertionError("cap placement does not preserve the finished frame top")
 #
 # gooseneck-set-screw: 1x McMaster 91410A540 1/4-20 x 3/4 square-head cup-point
-# set screw gripping the gooseneck post through the casting's east-hub boss,
+# set screw gripping the gooseneck's bare leg through the casting's east-hub boss,
 # axis along X at (y TOP_SCREW_Y, z 3.088 -- the hub/post centreline).
-# Entered through the boss's spot face x -218.0 (21.0 from the bore axis):
+# Entered through the boss's spot face x -218.08 (21.08 from the bore axis):
 # local +Y -> -X (rot_z_rows(90), euler [0,0,90]) points the exact stock shank
-# inboard while retaining its cup tip at x -205.15, 0.21 clear (outboard) of
-# the gooseneck's Ø15.875 sleeve surface at x -204.94. The under-head face is the tip less the
-# shank, x -224.20: the head stands 6.2 proud of the spot face, so the cup
-# point reaches the post before the head could bottom.
+# inboard while retaining its cup tip at x -203.56, 0.21 clear (outboard) of
+# the gooseneck's Ø12.70 tube surface at x -203.35 (owner ruling 2026-11-08
+# (Pedro), #2315: the Ø.520 hub bore takes the bare leg). The under-head face
+# is the tip less the shank, x -222.61: the head stands 4.5 proud of the spot
+# face, so the cup point reaches the leg before the head could bottom.
 GOOSENECK_HUB_Z = 3.088  # gooseneck bore centreline (unchanged position)
-SET_SCREW_TIP_X = -205.15  # 0.21 clear (outboard) of the Ø15.875 sleeve, -204.94
+SET_SCREW_TUBE_GAP = 0.21  # cup tip outboard of the nominal tube surface
+SET_SCREW_TIP_X = TOP_GOOSENECK_X - GOOSENECK_TUBE_DIA / 2.0 - SET_SCREW_TUBE_GAP
 SET_SCREW_UNDER_HEAD_X = SET_SCREW_TIP_X - GOOSENECK_SHANK_LEN
 if not SET_SCREW_UNDER_HEAD_X < TOP_SET_SPOT_FACE_X < SET_SCREW_TIP_X:
     raise AssertionError(
@@ -1007,7 +1011,7 @@ async def build(adapter) -> dict[str, str]:
             assert_component_placed(adapter, cross_screw, cross_target, s_rows)
 
     # Gooseneck set screw: 1/4-20 x 3/4 square head through the hub boss's tap
-    # hole along +X at the hub centreline; tip 0.21 clear of the Ø15.875 sleeve
+    # hole along +X at the hub centreline; tip 0.21 clear of the Ø12.70 tube
     # (see SET_SCREW_* constants). Same fix-all treatment.
     set_target = [SET_SCREW_UNDER_HEAD_X, TOP_SCREW_Y, GOOSENECK_HUB_Z]
     set_rows = rot_z_rows(90.0)

@@ -306,7 +306,20 @@ def test_retention_rows_cite_the_package_steps() -> None:
     assert hanger.exposure is joint_retention.Exposure.STATIC_CLAMP
     assert hanger.lock is joint_retention.Lock.NONE
     assert rows["sm-summing/boss-hook-in-lever"].installed_at == "MHA-SM-00 STEP 2"
-    assert rows["sm-summing/gooseneck-shoulder-screw"].installed_at == "MHA-SM-00 STEP 8"
+    # Owner rulings 2026-11-08 (Pedro), #2315: step 8 bonds the end plug per
+    # sheet 1 note 5, so the shoulder screw goes in at 8A-8B.
+    assert rows["sm-summing/gooseneck-shoulder-screw"].installed_at == "MHA-SM-00 STEP 8B"
+    steps = {step.split(". ", 1)[0]: step for step in notes.ASSEMBLY_STEPS}
+    assert steps["8"].startswith("8. BOND MHA-SM-05 INTO MHA-SM-01 PER SHEET 1 NOTE 5")
+    assert steps["8A"].startswith("8A. PASS MHA-SM-VN-56")
+    assert steps["8B"].startswith("8B. TURN MHA-SM-VN-56 INTO MHA-SM-05")
+    assert steps["10A"].startswith("10A. TIGHTEN THE HUB SET SCREW MHA-FR-VN-52")
+    assert "SNUG, 9 IN-LB MAX" in steps["10A"]
+    (bond_note,) = [n for n in notes.ASSEMBLED_NOTES if n.startswith("5. LOCTITE 638")]
+    assert "CURE 24 H BEFORE STEP 8A" in bond_note
+    # Bench acceptance, as note 4's dowel bond (machinist review, run
+    # 20261109T142156827Z, rule 23).
+    assert bond_note.endswith("ACCEPT: IT DOES NOT TURN OR PULL OUT BY HAND.")
     hook = rows["sm-summing/boss-hook-in-lever"]
     assert hook.lock is joint_retention.Lock.JAM_NUT
     assert hook.lock_part == "sm_vn_boss_hook_jam_nut"

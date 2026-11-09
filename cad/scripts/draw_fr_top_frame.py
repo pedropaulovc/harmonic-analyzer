@@ -628,14 +628,14 @@ HUB_SECTION_SCALE = (1, 1)
 HUB_SECTION_CAPTION_XY = (0.330, 0.178)
 # K-K prints 1:1, the bore axis pinned at x 332.0 mm (HUB_SECTION_PROFILE_X),
 # so the boss face stands at 310.0, the spot face at 311.0 and the bore wall
-# at 323.5; the rail top prints at y 230.1 and the tap axis at 211.8 (the
+# at 325.4; the rail top prints at y 230.1 and the tap axis at 211.8 (the
 # 40d9d030e render).  The thread length nests inside the 21.0 and shares its
 # spot-face extension line: it stands nearer the rail top with its text out
 # LEFT, the 21.0 over it with its text out RIGHT, so neither leader leaves
 # its line across the other's extension lines.  The boss face's 22.0 hangs
 # under the view, its line 3.5 over the caption (178.0), its text out left
 # (test_hub_boss_section_layout_replays_historical_ink).
-HUB_SET_THREAD_LINE_XY = (0.3172, 0.2365)
+HUB_SET_THREAD_LINE_XY = (0.3181, 0.2365)
 HUB_SET_THREAD_OFFSET_XY = (0.2840, 0.2380)
 HUB_SET_SPOT_LINE_XY = (0.3215, 0.2435)
 HUB_SET_SPOT_OFFSET_XY = (0.3640, 0.2460)

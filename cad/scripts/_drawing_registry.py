@@ -555,6 +555,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="sm_gooseneck_end_plug",
+        part="sm_gooseneck_end_plug",
+        artifact_stem="sm-gooseneck-end-plug",
+        script_name="draw_sm_gooseneck_end_plug.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="sm_vn_gooseneck_shoulder_screw",
         part="sm_vn_gooseneck_shoulder_screw",
         artifact_stem="sm-vn-gooseneck-shoulder-screw",

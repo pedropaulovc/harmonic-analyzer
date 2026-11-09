@@ -219,6 +219,7 @@ PART_ROWS = {
     "sm-vn-boss-hook-jam-nut": _config.parts("sm-vn-boss-hook-jam-nut"),
     "sm-vn-counter-spring": _config.parts("sm-vn-counter-spring"),
     "sm-gooseneck": _config.parts("sm-gooseneck"),
+    "sm-gooseneck-end-plug": _config.parts("sm-gooseneck-end-plug"),
     "sm-vn-gooseneck-shoulder-screw": _config.parts("sm-vn-gooseneck-shoulder-screw"),
 }
 if set(PART_ROWS) != set(BOM_COMPONENTS):

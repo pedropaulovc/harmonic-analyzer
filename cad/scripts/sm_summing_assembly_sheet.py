@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import _config
 import ha_harmonic_analyzer_assembly_steps as ha_steps
+import fr_top_frame_spec as top_frame
 import sm_vn_knife_mount_dowel_spec as knife_dowel
 from _assembly_contract import assembly_contract
 from _inch_fraction import inch_fraction
@@ -24,6 +25,7 @@ from sm_summing_assembly_spec import (
     COUNTER_FEATURE,
     COUNTER_SPRING,
     DOWEL,
+    END_PLUG,
     GOOSENECK,
     HANGER_BOLT,
     HANGER_FIT_REACH,
@@ -77,7 +79,8 @@ BOM_DESCRIPTIONS = {
     BOSS_HOOK: "#10-24 OPEN EYEBOLT, TRIMMED",
     BOSS_JAM_NUT: "#10-24 THIN HEX JAM NUT",
     COUNTER_SPRING: "COUNTER SPRING",
-    GOOSENECK: "COUNTER-SPRING GOOSENECK",
+    GOOSENECK: "COUNTER-SPRING GOOSENECK, BENT TUBE",
+    END_PLUG: "GOOSENECK END PLUG",
     SPRING_SCREW: "GOOSENECK SHOULDER SCREW",
 }
 if set(BOM_DESCRIPTIONS) != set(QUANTITIES):
@@ -89,6 +92,11 @@ LEVEL_CRITERION = f"LEVEL WITHIN ±{LEVEL_TOLERANCE_DEG:g}°"
 # the MHA-MG-08 clamp precedent: a converted band goes to the title block).
 HANGER_FIT_CUT = _length(HANGER_FIT_REACH, HANGER_FIT_REACH_PLACES)
 ROCK_TRAVEL_MIN = f"{_length(BOSS_ROCK_TRAVEL, ROCK_PRECISION)} MIN"
+# The hub set screw bears on the bare .065 wall (owner rulings 2026-11-08
+# (Pedro), #2315): snug, to fr_top_frame_spec's torque limit.
+HUB_SET_SCREW_TORQUE = (
+    f"SNUG, {top_frame.SET_SCREW_TORQUE_MAX_IN_LB:g} IN-LB MAX"
+)
 # The knife-mount gauge bar (Owner ruling 2026-11-08 (Pedro), #2144 item
 # 11.3): a tool named in the steps, not a BOM part.
 KNIFE_GAUGE_BAR = f"Ø{_length(KNIFE_GAUGE_BAR_DIA, 4)} CLASS ZZ MINUS GAUGE PIN"
@@ -119,12 +127,16 @@ ASSEMBLED_NOTES = (
     f"4. {BOND_GRADE} BOND (STEP 1B): DEGREASE DOWEL AND HOLE; COAT THE "
     "DOWEL, NEVER THE BLIND HOLE; PRESS IT TO THE HOLE FLOOR; CURE 24 H "
     "BEFORE STEP 1C. ACCEPT: IT DOES NOT TURN OR SLIDE BY HAND.",
+    "5. LOCTITE 638 BOND (STEP 8): DEGREASE THE MHA-SM-05 SPIGOT AND THE "
+    "MHA-SM-01 BORE; COAT THE SPIGOT; PUSH IT IN UNTIL THE HEAD SEATS SQUARE "
+    "AND FLUSH ON THE TUBE'S FACED END; CURE 24 H BEFORE STEP 8A. ACCEPT: IT "
+    "DOES NOT TURN OR PULL OUT BY HAND.",
 )
 # The fitter's order; sm_summing_explode_spec.EXPLODE_STEPS runs it backwards.
 # A step does one thing (rule 22): a numbered step's own sub-steps carry a
 # letter (1A, 1B, ...; no I or O), so the numbers other sheets and
 # joint_retention cite (cut at 4 on MHA-SM-VN-52, hanger joint complete at 6,
-# shoulder screw at 8, level at 10) stay put. Steps 1-8 are done on the top
+# shoulder screw at 8B, level at 10) stay put. Steps 1-8 are done on the top
 # frame, steps 9-10 at final assembly (MHA-HA-00). Owner ruling 2026-10-24
 # (T+H3): the dowels press into the crossbar before the mounts go on. Steps
 # 1C-1G (sm Q3) and 1H-1K (sm Q7) transfer the knife-mount and bracket taps
@@ -137,7 +149,11 @@ ASSEMBLED_NOTES = (
 # re-hung and swung until the rock gauge passes (step 6;
 # build_sm_summing_assembly's rock and rear-yaw budgets). Owner ruling
 # 2026-11-08 (Pedro), #2144 item 11.4: the upper eye rides free on the
-# shoulder screw (step 8, check 3), superseding #1951's clamped eye.
+# shoulder screw (step 8B, check 3), superseding #1951's clamped eye.
+# Owner rulings 2026-11-08 (Pedro), #2315: step 8 bonds the MHA-SM-05 end
+# plug into MHA-SM-01 with LOCTITE 638 (note 5; it may be done before step
+# 1 and cures before the shoulder screw goes in at 8A-8B); step 10A
+# tightens the hub set screw on the bare leg, to its limit, on its own.
 ASSEMBLY_STEPS = (
     "1. ON THE TOP FRAME MHA-FR-02, AT EACH HANGER HOLE PRESS ONE MHA-SM-VN-53 "
     "DOWEL (TWO IN ALL), CHAMFER END FIRST, UP INTO THE BLIND HOLE BESIDE IT "
@@ -195,9 +211,11 @@ ASSEMBLY_STEPS = (
     "THE CROSSBAR UNDERSIDE.",
     f"7. CHECK THE FREE ROCK AGAIN (CHECK 2, DETAIL {DETAIL_LETTER}) BEFORE THE "
     "COUNTER SPRING GOES ON.",
-    "8. PASS MHA-SM-VN-56 THROUGH THE UPPER LOOP OF MHA-SM-VN-51, THEN TURN "
-    "IT INTO THE END PIECE OF MHA-SM-01 AND TIGHTEN UNTIL ITS SHOULDER SEATS "
-    "ON THE END FACE; NO THREADLOCKER.",
+    # One printed line: sheet 4 is full (note 5 names the compound).
+    "8. BOND MHA-SM-05 INTO MHA-SM-01 PER SHEET 1 NOTE 5 (MAY BE DONE BEFORE STEP 1).",
+    "8A. PASS MHA-SM-VN-56 THROUGH THE UPPER LOOP OF MHA-SM-VN-51.",
+    "8B. TURN MHA-SM-VN-56 INTO MHA-SM-05 UNTIL ITS SHOULDER SEATS ON THE END "
+    "FACE; NO THREADLOCKER.",
     "9. AT FINAL ASSEMBLY (MHA-HA-00): DROP THE MHA-SM-01 POST INTO THE "
     "FRAME'S GOOSENECK HUB WITH THE HUB SET SCREW MHA-FR-VN-52 (FITTED PER "
     "MHA-FR-00) BACKED CLEAR.",
@@ -207,8 +225,10 @@ ASSEMBLY_STEPS = (
     f"{ha_steps.step_number('channel-anchors-set')}) AND EVERY CHANNEL "
     "AMPLITUDE AT ZERO: SLIDE THE GOOSENECK POST IN ITS HUB UNTIL THE "
     f"LEVER PLATE TOP IS {LEVEL_CRITERION} (DIGITAL ANGLE GAUGE ACROSS THE "
-    "PLATE), THEN TIGHTEN THE HUB SET SCREW MHA-FR-VN-52 ON THE POST. THE "
-    "GOOSENECK HEIGHT REFERENCE DIMENSION ON SHEET 1 IS THE NOMINAL START.",
+    "PLATE). THE GOOSENECK HEIGHT REFERENCE DIMENSION ON SHEET 1 IS THE "
+    "NOMINAL START.",
+    "10A. TIGHTEN THE HUB SET SCREW MHA-FR-VN-52 ON THE POST, "
+    f"{HUB_SET_SCREW_TORQUE}.",
 )
 ASSEMBLY_CHECKS = (
     "CHECKS:",
@@ -220,7 +240,7 @@ ASSEMBLY_CHECKS = (
     "TOUCHES A BORE.",
     "3. THE UPPER LOOP OF MHA-SM-VN-51 TURNS AND SLIDES FREELY ON THE SHOULDER "
     "OF MHA-SM-VN-56, UNDER ITS HEAD.",
-    f"4. AFTER STEP 10 THE LEVER PLATE TOP READS {LEVEL_CRITERION} AND THE "
+    f"4. AFTER STEP 10A THE LEVER PLATE TOP READS {LEVEL_CRITERION} AND THE "
     "GOOSENECK POST DOES NOT TURN OR SLIDE IN ITS HUB.",
     "5. THE EYE OF MHA-SM-VN-50 CANNOT BE TURNED BY HAND: MHA-SM-VN-55 IS TIGHT ON "
     "THE BOSS TOP FACE.",

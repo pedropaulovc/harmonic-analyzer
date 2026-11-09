@@ -17,6 +17,7 @@ import pd_transgear_removable_spec as removable
 import _sprocket_seat_geometry as seat_geometry
 import ch_anchor_jam_nut_spec
 import ch_vn_spring_hook_spec
+import fr_top_frame_spec
 from ha_harmonic_analyzer_assembly_spec import (
     BAR_HEIGHT_DIMENSION,
     BOM_ORDER,
@@ -213,7 +214,10 @@ _STEP_TEXT: dict[str, tuple[str, ...]] = {
         "STICK'S SCALE.",
         "SLIDE THE POST IN ITS HUB UNTIL A DIGITAL ANGLE GAUGE ACROSS THE "
         f"MHA-SM-03 PLATE TOP READS {LEVEL_ACCEPTANCE}.",
-        "TIGHTEN THE MHA-FR-VN-52 SET SCREW ON THE POST.",
+        # One printed line (the columns are full): the bare leg's set-screw
+        # limit (owner rulings 2026-11-08 (Pedro), #2315).
+        "TIGHTEN MHA-FR-VN-52 SNUG ON THE POST, "
+        f"{fr_top_frame_spec.SET_SCREW_TORQUE_MAX_IN_LB:g} IN-LB MAX.",
         "CHECK: UNDER FIRM HAND PRESSURE THE POST DOES NOT TURN OR SLIDE IN "
         "ITS HUB.",
         "IF THE POST MOVES, SLACKEN THE SET SCREW AND REPEAT "

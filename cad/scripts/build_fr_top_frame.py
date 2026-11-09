@@ -63,7 +63,7 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   Datum D on the native crossbar width establishes BOTH-face median plane;
   the hanger axes' linear position zone centres them within +/-.002 of it.
 * Gooseneck hub on the east rail (-X) at z +3.088: full-height rib 1.10 wide,
-  O.67 clearance bore for the O16 counter-spring post, underside boss
+  O.520 slip bore for the gooseneck's bare 1/2 in leg, underside boss
   O1.18 x .31 with twin V-gussets (ch30 p004), a square-sided cast boss under
   the top flange on the rib's outer face (ch19 img04; user ruling
   2026-10-12), spot-faced .83 from the bore axis, and a 1/4-20 tap from
@@ -192,6 +192,7 @@ from fr_top_frame_spec import (
     GOOSENECK_BORE_DIA,
     GOOSENECK_X,
     HALF_H,
+    HUB_BOSS_DROP,
     HUB_SET_BOSS_FROM_AXIS,
     HUB_SET_BOSS_W,
     HUB_SET_SPOT_DIA,
@@ -404,7 +405,6 @@ if not swept_contours_disjoint(HANGER_PIN_CONTOURS):
 GOOSENECK_Z = SUMMING_Z
 HUB_RIB_W = 27.94  # 1.10 full-height rib band across the east rail
 HUB_BOSS_DIA = 29.972  # 1.18 underside boss around the bore exit
-HUB_BOSS_DROP = 7.874  # .31 boss bottom local -26.1239
 HUB_GUSSET_T = 7.112  # .28 V-gusset thickness along X, centred on the bore
 HUB_GUSSET_HALF_IN = 8.0  # full-depth span |z - 3.088| <= 8 (ramp start, not printed)
 HUB_GUSSET_HALF_OUT = 29.972  # feathers to the underside at |z - 3.088| = 29.972 (span 2.36)

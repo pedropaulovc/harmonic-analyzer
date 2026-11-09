@@ -421,10 +421,10 @@ def test_cross_numbered_fit_pairs_use_fixed_runtime_oracles() -> None:
             frozenset(("sm-vn-boss-hook-1", "sm-summing-lever-1")): _annulus_limit(
                 4.826, 3.797, 19.05
             ),
-            # MHA-SM-VN-56 10-24 major in the #25 drill of the blind end-piece
-            # tap: the shoulder seats on the end face, so the whole 3/8
-            # thread stands in the tap (#2144 item 11.4).
-            frozenset(("sm-vn-gooseneck-shoulder-screw-1", "sm-gooseneck-1")): _annulus_limit(
+            # MHA-SM-VN-56 10-24 major in the #25 drill of the MHA-SM-05 end
+            # plug's blind tap: the shoulder seats on the end face, so the
+            # whole 3/8 thread stands in the tap (#2144 item 11.4, #2315).
+            frozenset(("sm-vn-gooseneck-shoulder-screw-1", "sm-gooseneck-end-plug-1")): _annulus_limit(
                 4.826, 3.797, 9.525
             ),
         }
@@ -543,10 +543,11 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 4.0386,
                 19.409206750583962,
             ),
-            # MHA-FR-VN-52 / 91410A540: spot face 21.0 from the bore axis to the
-            # cup tip 8.15 from it (12.5 to the O17 bore wall + 0.35).
+            # MHA-FR-VN-52 / 91410A540: spot face 21.08 from the bore axis to the
+            # cup tip 6.56 from it (14.48 to the O13.208 bore wall, 14.80 averaged
+            # over the annulus as the wall curves away).
             frozenset(("fr-vn-gooseneck-set-screw-1", "fr-top-frame-1")): _annulus_limit(
-                6.35, 5.105, 12.85
+                6.35, 5.105, 14.83
             ),
             **_expected_numbered_pairs(
                 "sh-vn-brass-fillister-screw",
@@ -606,8 +607,9 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(("sm-vn-boss-hook-1", "sm-summing-lever-1")): _annulus_limit(
                 4.826, 3.797, 19.05
             ),
-            # MHA-SM-VN-56 10-24 major, #25 drill, 3/8 thread seated (#2144 item 11.4).
-            frozenset(("sm-vn-gooseneck-shoulder-screw-1", "sm-gooseneck-1")): _annulus_limit(
+            # MHA-SM-VN-56 10-24 major, #25 drill, 3/8 thread seated in the
+            # MHA-SM-05 end plug (#2144 item 11.4, #2315).
+            frozenset(("sm-vn-gooseneck-shoulder-screw-1", "sm-gooseneck-end-plug-1")): _annulus_limit(
                 4.826, 3.797, 9.525
             ),
         },

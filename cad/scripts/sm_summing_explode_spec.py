@@ -1,8 +1,9 @@
 """Pure contract for the summing assembly's builder-owned named explode
 (SM_EXPLODED), shared by ``_sm_summing_explode`` and the package drawing.
 
-The sheet's ASSEMBLY_STEPS read back to front: the gooseneck and its screw
-lift off the spring, the screw backs out of the plug, the spring lifts off
+The sheet's ASSEMBLY_STEPS read back to front: the gooseneck, its bonded
+MHA-SM-05 end plug (step 8 bonds it, so it never leaves the tube) and the
+screw lift off the spring, the screw backs out of the plug, the spring lifts off
 the boss hook and the hook unscrews from the lever boss, its jam nut still
 threaded on the shank between the cut end and the boss (step 2 spins the
 nut on from the cut end before the hook enters the boss); then the dowels,
@@ -21,6 +22,7 @@ from sm_summing_assembly_spec import (
     BOSS_JAM_NUT,
     COUNTER_SPRING,
     DOWEL,
+    END_PLUG,
     GOOSENECK,
     HANGER_BOLT,
     HANGER_WASHER,
@@ -48,7 +50,7 @@ DOWEL_LIFT = 20.0
 BOSS_HOOK_LIFT = 35.0
 BOSS_JAM_NUT_LIFT = 23.0
 EXPLODE_STEPS: tuple[tuple[str, tuple[str, ...], str | None, str, float], ...] = (
-    ("gooseneck lifts", (GOOSENECK, SPRING_SCREW), None, "y", 80.0),
+    ("gooseneck lifts", (GOOSENECK, END_PLUG, SPRING_SCREW), None, "y", 80.0),
     ("shoulder screw backs out", (SPRING_SCREW,), None, "x", 35.0),
     ("counter spring lifts off hook", (COUNTER_SPRING,), None, "y", 55.0),
     ("boss hook unscrews", (BOSS_HOOK,), None, "y", BOSS_HOOK_LIFT),

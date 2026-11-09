@@ -23,6 +23,7 @@ Twenty springs pull on one end, one big spring on the other, and the whole thing
 | `sm-vn-counter-spring` | TODO | TODO | TODO |
 | `ch-fulcrum-keeper` | TODO | TODO | TODO |
 | `sm-gooseneck` | TODO | TODO | TODO |
+| `sm-gooseneck-end-plug` | TODO | TODO | TODO |
 
 : {tbl-colwidths="[40,10,25,25]"}
 

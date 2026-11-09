@@ -2,8 +2,9 @@
 
 Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: option A, a purchased
 shoulder screw, the counter spring's upper eye riding free on its shoulder
-under its head, the shoulder end seated on the MHA-SM-01
-end face and the thread in that end piece's plain blind tap.  This supersedes
+under its head, the shoulder end seated on the gooseneck's end face and the
+thread in a plain blind tap (since owner rulings 2026-11-08 (Pedro), #2315,
+both on the MHA-SM-05 end plug bonded into MHA-SM-01).  This supersedes
 #1951's clamped eye and retires the made MHA-SM-04.  The ruling named
 91259A576 (5/16 shoulder); its Ø7.94 shoulder drops the arm 0.79 mm against
 the plumb spring and the leading half-turn then meets the tube, so the 1/4

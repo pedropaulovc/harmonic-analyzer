@@ -179,8 +179,11 @@ def counter_upper_support_geometry() -> dict[str, str | float]:
     measure this support: owner ruling 2026-11-08 (Pedro), #2144 item 11.4
     (superseding #1951's clamped eye) seats the purchased MHA-SM-VN-56
     slotted shoulder screw (McMaster 91829A566) on the flush end face of the
-    Ø12.70 tube arm's end piece, its plain #10-24 tap without a counterbore,
-    and the loop rides free on the Ø6.35 shoulder, resting on that end face.
+    Ø12.70 tube arm, and the loop rides free on the Ø6.35 shoulder, resting
+    on that end face.  Owner rulings 2026-11-08 (Pedro), #2315: the end face
+    and the plain #10-24 tap (no counterbore) belong to MHA-SM-05, the end
+    plug bonded into MHA-SM-01's arm end, so the plug terms below are that
+    part's head and overall length.
     Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: bare slotted McMaster
     91829A566, washer dropped; the head retains the loaded eye
     (``eye_retainer``), so a certificate gated on the former washer cannot
@@ -222,9 +225,10 @@ def counter_seat() -> tuple[SettledSpring, float]:
         raise ValueError(
             "Stale counter native calibration: upper support must be the "
             "purchased MHA-SM-VN-56 shoulder screw (McMaster 91829A566, Ø6.35 "
-            "shoulder, 10-24 thread) seated on the end face, the eye free on "
-            "its shoulder (#2144 item 11.4). Rebuild sm-vn-gooseneck-shoulder-"
-            "screw and sm-gooseneck, then run diagnostics/calibrate_spring_seats.py "
+            "shoulder, 10-24 thread) seated on the MHA-SM-05 end plug's face, "
+            "the eye free on its shoulder (#2144 item 11.4, #2315). Rebuild "
+            "sm-vn-gooseneck-shoulder-screw, sm-gooseneck-end-plug and "
+            "sm-gooseneck, then run diagnostics/calibrate_spring_seats.py "
             "--presets neutral square --counter-only --write on a licensed "
             "farm/native seat; older support measurements cannot certify this "
             "joint."

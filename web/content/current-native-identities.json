@@ -1065,7 +1065,7 @@
       "status": "archive-only"
     }
   ],
-  "currentRegistryMapSha256": "2e8cd865827512f031625ef29f050431cd197dd313758c0cb03a7e23e6c8ac6d",
+  "currentRegistryMapSha256": "e2513148469638445d1e23b9de312350f7164fcdc56d72a1824e8b846a1ec75c",
   "nativeIdentities": [
     {
       "sourceStem": "ch-rocker-arm-tl-oblique-feed-lever",
@@ -2234,6 +2234,16 @@
         {
           "stem": "ch-rocker-arm-tl-oblique-hub-washer",
           "number": "MHA-CH-06-TL-52"
+        }
+      ]
+    },
+    {
+      "sourceStem": "sm-gooseneck-end-plug",
+      "sourceNumber": null,
+      "identities": [
+        {
+          "stem": "sm-gooseneck-end-plug",
+          "number": "MHA-SM-05"
         }
       ]
     },
