@@ -90,7 +90,8 @@ def test_every_toleranced_nominal_is_the_cad_constant(budget, nom):
         if feat["nominal"] is None:
             assert key in (
                 "cam_phase", "mesh_lag_spread", "cone_flat_clock",
-                "cone_land_clock", "cone_flat_play", "station_setting",
+                "cone_land_clock", "cone_flat_play", "cone_key_play",
+                "station_setting",
             ), key
             continue
         assert key in NOMINAL_FIELD, f"{key}: no Nominal field mapped"
@@ -1574,12 +1575,16 @@ def test_reference_inputs_stay_on_the_lifting_side():
 
 
 def test_cone_flat_phase_follows_gear_ratio_and_print_worst_lever(budget):
-    """The index removes only the Ø9.525-land lag, not differences between
-    flats or the clearance variation between individual gears. The lever is
-    the shortest flat the print accepts: the land at its least diameter and
-    greatest AF, less the title block's edge break on the torque corner
-    (Codex, #1128), unless the least bore flat is shorter still. The residual
-    is booked against the longest unbroken Ø9.525 flat."""
+    """The index removes only the keyed Ø9.525 land's lag, not differences
+    between lands or the clearance variation between individual gears. A
+    flat's lever is the shortest flat the print accepts: the land at its least
+    diameter and greatest AF, less the title block's edge break on the torque
+    corner (Codex, #1128), unless the least bore flat is shorter still. The
+    keyed land (owner decision C1 keyed, 2026-11-09, PR #1992) turns a gear by
+    half its keyway clearance over the key's lowest top less the edge break;
+    the flatted lands' residual is booked against the keyed land's mean lag
+    on its longest unbroken levers."""
+    import cone_land_key
     import dt_cone_gear_spec
     import cone_shaft_land_bands
     import gear_seat_fit
@@ -1593,9 +1598,13 @@ def test_cone_flat_phase_follows_gear_ratio_and_print_worst_lever(budget):
     mean = (clearance_lo + clearance_hi) / 2.0
     clock = budget["critical_features"]["cone_flat_clock"]["tolerance"]
     play = budget["critical_features"]["cone_flat_play"]["tolerance"]
+    key_play = budget["critical_features"]["cone_key_play"]["tolerance"]
     assert clock == dt_cone_gear_spec.FLAT_CLOCK_TOLERANCE_DEG
     assert play == pytest.approx((clearance_hi - clearance_lo) / 2.0)
     assert gear_seat_fit.FLAT_AF_CLEARANCE == (0.01016, 0.03048)
+    way_lo, way_hi = cone_land_key.KEYWAY_SIDE_CLEARANCE_MM
+    seat_lo, seat_hi = cone_land_key.KEYSEAT_SIDE_CLEARANCE_MM
+    assert key_play == pytest.approx((way_hi - way_lo) / 2.0)
     edge_break = _config.title_block("edge_break")
     lever_loss = max(edge_break["radius_mm"], edge_break["chamfer_max_mm"])
     af_upper, af_lower = cone_shaft_land_bands.FLAT_AF_BAND
@@ -1603,11 +1612,26 @@ def test_cone_flat_phase_follows_gear_ratio_and_print_worst_lever(budget):
         cone_shaft_land_bands.FLAT_AF_BAND
     )
 
-    reference_upper, _ = cone_shaft_land_bands.SECTION_DIA_BANDS[1]
-    reference_chord = chord(
-        dt_cone_gear_spec.bore_dia_mm(120) + reference_upper,
-        cone_shaft_land_bands.SECTION_FLAT_AF[1] + af_lower,
-    )
+    land_band = cone_shaft_land_bands.SECTION_DIA_BANDS[1]
+    land_upper, land_lower = land_band
+    radius_hi = (cone_land_key.LAND_DIA_MM + land_upper) / 2.0
+    radius_lo = (cone_land_key.LAND_DIA_MM + land_lower) / 2.0
+    s_nominal, size = cone_land_key.KEYSEAT_S_MM, cone_land_key.KEY_SIZE_MM
+    s_upper, s_lower = cone_land_key.KEYSEAT_S_BAND
+    key_upper, key_lower = cone_land_key.KEY_STOCK_BAND
+    key_lever = (s_nominal + s_lower - radius_hi) + (size + key_lower) - lever_loss
+    _, bore_upper = gear_seat_fit.seat_bore_band(land_band)
+    assert key_lever > (cone_land_key.LAND_DIA_MM + bore_upper) / 2.0
+    way_long = (s_nominal + s_upper - radius_lo) + (size + key_upper)
+    seat_band = cone_land_key.KEYSEAT_WIDTH_BAND
+    seat_width_lo = cone_land_key.KEYSEAT_WIDTH_MM + min(seat_band)
+    seat_long = math.sqrt(radius_hi**2 - (seat_width_lo / 2.0) ** 2)
+    seat_lag = (seat_lo + seat_hi) / 4.0 / seat_long
+    reference_lag = seat_lag + (way_lo + way_hi) / 4.0 / way_long
+    way_mean = (way_lo + way_hi) / 2.0
+    flat_play, flat_residual = profiles["cone_flat_play"]
+    key_per_unit, key_residual = profiles["cone_key_play"]
+    assert not np.any(key_residual)
     for section, (band, af, carried) in enumerate(
         zip(
             cone_shaft_land_bands.SECTION_DIA_BANDS,
@@ -1619,14 +1643,16 @@ def test_cone_flat_phase_follows_gear_ratio_and_print_worst_lever(budget):
         if not carried:
             assert section == 0 and af is None
             continue
-        assert af is not None
+        keyed = section == 1
+        assert (af is None) == keyed
         diameter = dt_cone_gear_spec.bore_dia_mm(carried[0])
-        _, lower = band
-        _, bore_lower = gear_seat_fit.seat_bore_band(band)
-        lever = min(
-            chord(diameter + lower, af + af_upper) - lever_loss,
-            chord(diameter + bore_lower, af + bore_af_upper),
-        )
+        if not keyed:
+            _, lower = band
+            _, bore_lower = gear_seat_fit.seat_bore_band(band)
+            lever = min(
+                chord(diameter + lower, af + af_upper) - lever_loss,
+                chord(diameter + bore_lower, af + bore_af_upper),
+            )
         for teeth in carried:
             index = teeth // 6 - 1
             ratio = teeth / 120.0
@@ -1634,18 +1660,19 @@ def test_cone_flat_phase_follows_gear_ratio_and_print_worst_lever(budget):
             assert profiles["cone_flat_clock"][0][index] * clock == pytest.approx(
                 math.radians(clock) * ratio
             )
-            per_unit, residual = profiles["cone_flat_play"]
+            if keyed:
+                assert flat_play[index] == 0.0 and flat_residual[index] == 0.0
+                for clearance in (way_lo, way_hi):
+                    phase = (clearance - way_mean) * key_per_unit[index]
+                    expected = (clearance - way_mean) / (2.0 * key_lever) * ratio
+                    assert phase == pytest.approx(expected, abs=1e-12)
+                continue
+            assert key_per_unit[index] == 0.0
             for clearance in (clearance_lo, mean, clearance_hi):
-                phase = (clearance - mean) * per_unit[index] + residual[index]
-                if section == 1:
-                    expected = (clearance - mean) / lever * ratio
-                else:
-                    expected = (clearance / lever - mean / reference_chord) * ratio
+                phase = (clearance - mean) * flat_play[index] + flat_residual[index]
+                expected = (clearance / lever - reference_lag) * ratio
                 assert phase == pytest.approx(expected, abs=1e-12)
-            if section == 1:
-                assert residual[index] == pytest.approx(0.0, abs=1e-12)
-            else:
-                assert residual[index] > 0.0
+            assert flat_residual[index] > 0.0
 
 
 def test_shaft_flat_clock_is_printed_and_booked_per_land(budget):

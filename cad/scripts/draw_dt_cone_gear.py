@@ -2,30 +2,33 @@ r"""Create the complete cone-gear batch drawing package (MHA-DT-03).
 
 Every configured family member T006..T120 by six receives a standalone sheet.
 Each sheet selects its own part configuration, imports the native model-owned
-blank diameter, D-bore (diameter, across-flat and flat clock), face width,
-driving circular-tooth-thickness requirement and functional root-envelope
-limits, plus the actual finite cutter recipe and bounded carrying-contact data.
+blank diameter, bore (T006..T024 a D: diameter, across-flat and flat clock;
+T030..T120 round with a hub keyway: diameter, keyway width, T and clock), face
+width, driving circular-tooth-thickness requirement and functional
+root-envelope limits, plus the actual finite cutter recipe and bounded
+carrying-contact data.
 The native imported bands remain model-owned. A last sheet defines the T006
 tooth space point by point beside its outline (the custom DT6-FORM1 tool is
 ground to it); the exact equations stay in the model's "Cutter Profile"
 property.
 
 There are no datums, feature-control frames or finish symbols: the bore is a
-fixed D-fit that does not run (drawing-guidelines.md rule 6).  Hidden lines
+D or keyed fit that does not run (drawing-guidelines.md rule 6).  Hidden lines
 communicate no additional manufacturing fact on these through-bored spur
 gears, so every view remains hidden-lines-removed.  The side view stays in
 projection with the front view's bore axis; its
 face width hangs below it, clear of the Gear Data block. The circular pitch
 thickness uses a construction inspection witness of the actual arc size, not
 an ideal chord oracle; root MIN/MAX use the actual radial-envelope witness.
-The D-bore prints in an enlarged bore view, DETAIL A, a cropped *Front model
+The bore prints in an enlarged bore view, DETAIL A, a cropped *Front model
 view at a scale that renders every bore at least ``BORE_VIEW_BORE_MIN``
 across (its flat is 0.13 deep on T006 and T012); its lettered boundary rings
 the bore on the front view, and both views centre-mark the bore. Sheet 21's
 plot is DETAIL B, lettered on the T006 front view. Numbered notes name each
-mate once: note 1 the bore's sliding fit on MHA-DT-04, note 2 the mesh with
-MHA-DT-12. The part saves both construction sketches hidden; only the front
-view, which dimensions them, shows them.
+mate once: note 1 the bore's sliding fit on MHA-DT-04 (and the MHA-DT-VN-71
+key, T030..T120), note 2 the mesh with MHA-DT-12. The part saves both
+construction sketches hidden; only the front view, which dimensions them,
+shows them.
 """
 
 from __future__ import annotations
@@ -90,6 +93,7 @@ from _paths import CAD_ROOT
 from _pdf_ink import PageInk, read_pdf_ink
 from _session import run_build
 import _telemetry
+import cone_land_key
 from cone_shaft_land_bands import FLAT_AF_BAND, SECTION_DIA_BANDS
 from dt_cone_gear_notes import (
     CUTTER_DETAIL_SHEET,
@@ -102,21 +106,25 @@ from dt_cone_gear_spec import (
     BORE_AF_PLACES,
     BORE_BAND_PLACES,
     BORE_DIA_BAND,
+    BORE_SKETCH,
     CUSTOM_SIX_FORM_TOLERANCE_NOTE,
     CONFIGURATION_TEETH,
     DRAWING_PRECISION_BY_NAME,
     FACE_WIDTH,
     FORM_PLACES,
+    KEYED_BORE_SKETCH,
     WEB_REFERENCE_ANGLE_DEG,
     WEB_REFERENCE_TEETH,
+    bore_clock_offset_mm,
     bore_dia_mm,
+    bore_reach_mm,
     blank_dia_band,
     inch_text,
     tooth_thickness_band,
     bore_flat_af_mm,
-    bore_flat_offset_mm,
     floor_limits_mm,
     gap_floor_deviations_mm,
+    keyed,
     outside_dia_mm,
     land_section,
     tooth_thickness_mm,
@@ -124,6 +132,7 @@ from dt_cone_gear_spec import (
     custom_six_gap_half_angle_rad,
     stock_form_profile,
 )
+import dt_cone_gear_spec
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
@@ -213,6 +222,10 @@ BORE_VIEW_CROP_MARGIN = 0.0015
 # half a row less than the 5 mm it stood at and the bottom stays put.
 BORE_VIEW_AF_DROP = 0.0025
 BORE_VIEW_LABEL_DROP = 0.016
+# A keyway's T text stands right of the title, so the title rises under T's
+# dimension line instead of under its text: the larger crop circle (the
+# keyway's corners) would otherwise push it into the sheet's zone band.
+KEYED_BORE_VIEW_LABEL_DROP = 0.0135
 # The diameter's text stands this far above the crop circle (6 mm with the
 # value alone): the block is centred there, and the lines under the value
 # (two with the mate, one with the note flag) would lower the leader
@@ -699,13 +712,17 @@ def _insert_form_table(adapter: Any) -> Any:
 # several dimensions is named once, in one numbered note those dimensions
 # flag (rule 4; screen of f21dfcdd2ba7: SLIDES ON MHA-DT-04 printed on both
 # the bore's diameter and its across-flat, MHA-DT-12 on the tip, thickness
-# and root): note 1 holds the D-bore's fit on MHA-DT-04, note 2 the teeth's
-# mesh with MHA-DT-12 (``sheet_notes``).
+# and root): note 1 holds the bore's fit on MHA-DT-04 (and, on the keyed
+# T030..T120, the MHA-DT-VN-71 key's), note 2 the teeth's mesh with
+# MHA-DT-12 (``sheet_notes``).
 SHAFT_MATE = "MHA-DT-04"
 # A matched pair names its mate by name and number (rule 4; round-1 review
 # of the fan-out: note 1 named MHA-DT-04 by number only, and no land).
 SHAFT_NAME = str(_config.parts("dt-cone-gear-shaft")["title"]).upper()
 CYLINDER_MATE = "MHA-DT-12"
+# Land 1's key (owner decision 2026-11-09, C1 keyed, PR #1992), named by
+# number like the shaft.
+KEY_MATE = "MHA-DT-VN-71"
 BORE_NOTE_NUMBER = 1
 TEETH_NOTE_NUMBER = 2
 BORE_NOTE_FLAG = f"SEE NOTE {BORE_NOTE_NUMBER}"
@@ -724,6 +741,13 @@ DIMENSION_CALLOUTS = {
     # the bore view crops the teeth off, so the callout names the reference
     # its centre-mark line stands for.
     "BoreFlatClock": "TO TOOTH CENTERLINE",
+    # The keyed bore (T030..T120) is round, so it takes the fit bore's REAM
+    # (rule 7); its keyway's width band is the requirement, with no process
+    # word.  T names what it reaches, the D's BoreAF form.
+    "KeyedBoreDia": f"REAM THRU\n{BORE_NOTE_FLAG}",
+    "KeywayWidth": BORE_NOTE_FLAG,
+    "KeywayT": f"KEYWAY TO FAR SIDE\n{BORE_NOTE_FLAG}",
+    "KeywayClock": "TO TOOTH CENTERLINE",
     # The text is the same on every sheet: offset (OffsetText), the imported
     # model dimension printed the LAST sheet's below-text on all of them (T006
     # printed T120's "ON PITCH CIRCLE Ø63.500", farm runs of 746809f62 and
@@ -751,6 +775,7 @@ CALLOUTS_ABOVE = {
     "ToothThickness": "CIRCULAR TOOTH THICKNESS",
     "BlankDia": TEETH_NOTE_FLAG,
     "BoreFlatClock": BORE_NOTE_FLAG,
+    "KeywayClock": BORE_NOTE_FLAG,
 }
 if any("\n" in text for text in CALLOUTS_ABOVE.values()):
     raise AssertionError("an above-callout with a line break does not print")
@@ -761,46 +786,70 @@ def _inch_limits(lower_mm: float, upper_mm: float) -> str:
 
 
 def bore_clearances_mm(teeth: int) -> tuple[tuple[float, float], tuple[float, float]]:
-    """((min, max) round, (min, max) across-flat) diametral clearance of the
-    sheet's D-bore on its MHA-DT-04 land, from both parts' printed limits.
+    """((min, max) round, (min, max) across-flat or keyway-to-key) clearance
+    of the sheet's bore on its MHA-DT-04 land, from the parts' printed limits.
 
-    Bore and land share their nominals (gear_seat_fit), so each clearance is
-    the bore's deviation less the land's.
+    Bore and land share their nominals (gear_seat_fit), so each round or
+    across-flat clearance is the bore's deviation less the land's; a keyway's
+    is its width's against the key's (cone_land_key).
     """
     land_upper, land_lower = SECTION_DIA_BANDS[land_section(teeth)]
-    flat_upper, flat_lower = FLAT_AF_BAND
     bore_upper, bore_lower = BORE_DIA_BAND
+    round_fit = (bore_lower - land_upper, bore_upper - land_lower)
+    if keyed(teeth):
+        return round_fit, cone_land_key.KEYWAY_SIDE_CLEARANCE_MM
+    flat_upper, flat_lower = FLAT_AF_BAND
     af_upper, af_lower = BORE_AF_BAND
-    return (
-        (bore_lower - land_upper, bore_upper - land_lower),
-        (af_lower - flat_upper, af_upper - flat_lower),
-    )
+    return round_fit, (af_lower - flat_upper, af_upper - flat_lower)
 
 
 def sheet_notes(teeth: int) -> str:
     """The sheet's numbered notes, flagged from the bore and teeth callouts.
 
-    Note 1 is the D-bore's matched fit (rule 4): its bands are narrower than
+    Note 1 is the bore's matched fit (rule 4): its bands are narrower than
     the shop's turned and milled rows, so the bore is made to the measured
-    land, with the clearance both parts' limits give as REF. Note 2 names
-    the mesh and the fit route of the tip, thickness and root bands: the
-    over-pins and assembly backlash acceptances in GEAR DATA; it carries the
-    teeth's do-not-cut, flagged to them rather than in a general block.
+    land, with the clearance the parts' limits give as REF; a keyed bore
+    names the key its keyway slides on. Note 2 names the mesh and the fit
+    route of the tip, thickness and root bands: the over-pins and assembly
+    backlash acceptances in GEAR DATA; it carries the teeth's do-not-cut,
+    flagged to them rather than in a general block.
     """
-    (round_min, round_max), (flat_min, flat_max) = bore_clearances_mm(teeth)
-    land = (
-        f"\u00d8{inch_text(bore_dia_mm(teeth), BORE_BAND_PLACES)} LAND, "
-        f"{inch_text(bore_flat_af_mm(teeth), BORE_AF_PLACES)} ACROSS FLAT"
-    )
+    (round_min, round_max), (second_min, second_max) = bore_clearances_mm(teeth)
+    land = f"\u00d8{inch_text(bore_dia_mm(teeth), BORE_BAND_PLACES)} LAND"
+    if keyed(teeth):
+        fit = (
+            f"{BORE_NOTE_NUMBER}. SLIDING FIT ON {SHAFT_NAME} {SHAFT_MATE}, {land}, "
+            f"AND KEY {KEY_MATE}:",
+            "   BORE MADE TO THE MEASURED LAND "
+            f"(CLEARANCE {_inch_limits(round_min, round_max)} ON \u00d8, "
+            f"{_inch_limits(second_min, second_max)} KEYWAY TO KEY).",
+        )
+    else:
+        land += f", {inch_text(bore_flat_af_mm(teeth), BORE_AF_PLACES)} ACROSS FLAT"
+        fit = (
+            f"{BORE_NOTE_NUMBER}. SLIDING FIT ON {SHAFT_NAME} {SHAFT_MATE}, {land}:",
+            "   BORE AND FLAT MADE TO THE MEASURED LAND "
+            f"(CLEARANCE {_inch_limits(round_min, round_max)} ON \u00d8, "
+            f"{_inch_limits(second_min, second_max)} ACROSS FLAT).",
+        )
     return "\n".join((
-        f"{BORE_NOTE_NUMBER}. SLIDING FIT ON {SHAFT_NAME} {SHAFT_MATE}, {land}:",
-        "   BORE AND FLAT MADE TO THE MEASURED LAND "
-        f"(CLEARANCE {_inch_limits(round_min, round_max)} ON \u00d8, "
-        f"{_inch_limits(flat_min, flat_max)} ACROSS FLAT).",
+        *fit,
         f"{TEETH_NOTE_NUMBER}. TEETH MESH WITH {CYLINDER_MATE}: ACCEPT OVER PINS, "
         "THEN BY BACKLASH AT ASSEMBLY,",
         f"   PER GEAR DATA. {TOOTH_EDGE_NOTE}",
     ))
+
+
+def sheet_dimension_names(teeth: int) -> set[str]:
+    """The model dimensions the sheet prints: every marked one but the other
+    bore's, and RV-03's web on the T012 sheet only."""
+    other = dt_cone_gear_spec.DRAWING_DIMENSIONS[
+        BORE_SKETCH if keyed(teeth) else KEYED_BORE_SKETCH
+    ]
+    names = set().union(*DRAWING_DIMENSIONS.values()) - other
+    if teeth != WEB_REFERENCE_TEETH:
+        names.discard("WebMin")
+    return names
 
 
 def rendered_half_od(teeth: int) -> float:
@@ -966,45 +1015,81 @@ def _bore_view_ratio(teeth: int) -> float:
 
 
 def bore_view_crop_radius(teeth: int) -> float:
-    """Sheet radius of the bore view's crop circle round the bore axis."""
-    return bore_dia_mm(teeth) * _bore_view_ratio(teeth) / 2000.0 + BORE_VIEW_CROP_MARGIN
+    """Sheet radius of the bore view's crop circle round the bore axis: the
+    bore's reach (a keyway's top corners) plus the margin."""
+    return bore_reach_mm(teeth) * _bore_view_ratio(teeth) / 1000.0 + BORE_VIEW_CROP_MARGIN
 
 
-def bore_flat_vertex(teeth: int) -> tuple[float, float]:
-    """Sheet point where the flat crosses the bore's horizontal centreline:
-    the clock dimension's vertex."""
-    flat = bore_flat_offset_mm(teeth) * _bore_view_ratio(teeth) / 1000.0
+def clock_dimension_name(teeth: int) -> str:
+    """The sheet's clock: the D's flat or the keyway's top to the centreline."""
+    return "KeywayClock" if keyed(teeth) else "BoreFlatClock"
+
+
+def bore_clock_vertex(teeth: int) -> tuple[float, float]:
+    """Sheet point where the flat (keyway top) crosses the bore's horizontal
+    centreline: the clock dimension's vertex."""
+    flat = bore_clock_offset_mm(teeth) * _bore_view_ratio(teeth) / 1000.0
     return BORE_VIEW_CENTER[0] + flat, BORE_VIEW_CENTER[1]
 
 
-def bore_view_keep(teeth: int) -> dict[str, tuple[float, float]]:
-    """Text positions of the three bore dimensions round the bore view.
+# The keyway's width (T030..T120) prints right of the crop circle under the
+# axis, the clock's mirror: its dimension line stands at the text, its
+# witnesses run right from the keyway top's corners. Its block (value and
+# band over the note flag, two rows) is sized like the clock's lines; T's
+# text then stands right of it, so T's dimension line runs on under it.
+KEYWAY_WIDTH_TEXT_HALF_WIDTH = 0.014
+KEYWAY_WIDTH_TEXT_HALF_HEIGHT = 0.006
 
-    The diameter's leader runs in from upper left; the across-flat's
+
+def bore_view_keep(teeth: int) -> dict[str, tuple[float, float]]:
+    """Text positions of the bore dimensions round the bore view.
+
+    The diameter's leader runs in from upper left; the across-flat's (T's)
     dimension line hangs under the crop circle between its witnesses (the
-    arc's -X point and the flat) and runs on right to its text, which stands
-    outside the flat's witness; the clock's arc sweeps the quadrant between
-    the flat's upper half and the +X centre-mark line
+    arc's -X point and the flat or keyway top) and runs on right to its
+    text, which stands outside that witness (and, keyed, right of the
+    keyway width's block); the clock's arc sweeps the quadrant between the
+    flat's (keyway top's) upper half and the +X centre-mark line
     (``_sweep_clock_right_of_flat``), its text right of the circle and
     raised clear of the axis line and the arc's arrowhead on it
-    (BORE_CLOCK_TEXT_*).
+    (BORE_CLOCK_TEXT_*). The keyway width's text mirrors the clock's under
+    the axis.
     """
     ratio = _bore_view_ratio(teeth)
-    flat = bore_flat_offset_mm(teeth) * ratio / 1000.0
+    flat = bore_clock_offset_mm(teeth) * ratio / 1000.0
     crop = bore_view_crop_radius(teeth)
     x, y = BORE_VIEW_CENTER
+    # 3 mm right of x - 0.022: the inch seat band (+0.04572/+0.0254)
+    # ran the text 1.6 mm past the left inner border (#290 batch 0).
+    diameter = (x - 0.019, y + crop + BORE_VIEW_DIA_LIFT)
+    clock = (
+        x + crop + BORE_CLOCK_TEXT_GAP + BORE_CLOCK_TEXT_HALF_WIDTH,
+        y + BORE_CLOCK_ARROW_LENGTH + ARROW_TEXT_CLEARANCE + BORE_CLOCK_TEXT_HALF_HEIGHT,
+    )
+    if not keyed(teeth):
+        return {
+            "BoreCutDia": diameter,
+            "BoreAF": (
+                x + flat + BORE_VIEW_AF_GAP + BORE_VIEW_AF_HALF_WIDTH,
+                y - crop - BORE_VIEW_AF_DROP,
+            ),
+            "BoreFlatClock": clock,
+        }
+    width_right = x + crop + BORE_CLOCK_TEXT_GAP + 2.0 * KEYWAY_WIDTH_TEXT_HALF_WIDTH
+    half_width = dt_cone_gear_spec.KEYWAY_HALF_WIDTH_MM * ratio / 1000.0
     return {
-        # 3 mm right of x - 0.022: the inch seat band (+0.04572/+0.0254)
-        # ran the text 1.6 mm past the left inner border (#290 batch 0).
-        "BoreCutDia": (x - 0.019, y + crop + BORE_VIEW_DIA_LIFT),
-        "BoreAF": (
-            x + flat + BORE_VIEW_AF_GAP + BORE_VIEW_AF_HALF_WIDTH,
+        "KeyedBoreDia": diameter,
+        # Under the lower witness and the arrow that ends on it.
+        "KeywayWidth": (
+            width_right - KEYWAY_WIDTH_TEXT_HALF_WIDTH,
+            y - half_width - BORE_CLOCK_ARROW_LENGTH - ARROW_TEXT_CLEARANCE
+            - KEYWAY_WIDTH_TEXT_HALF_HEIGHT,
+        ),
+        "KeywayT": (
+            max(x + flat, width_right) + BORE_VIEW_AF_GAP + BORE_VIEW_AF_HALF_WIDTH,
             y - crop - BORE_VIEW_AF_DROP,
         ),
-        "BoreFlatClock": (
-            x + crop + BORE_CLOCK_TEXT_GAP + BORE_CLOCK_TEXT_HALF_WIDTH,
-            y + BORE_CLOCK_ARROW_LENGTH + ARROW_TEXT_CLEARANCE + BORE_CLOCK_TEXT_HALF_HEIGHT,
-        ),
+        "KeywayClock": clock,
     }
 
 
@@ -1025,7 +1110,8 @@ def bore_view_label(teeth: int) -> str:
 
 
 def bore_view_label_top(teeth: int) -> float:
-    return BORE_VIEW_CENTER[1] - bore_view_crop_radius(teeth) - BORE_VIEW_LABEL_DROP
+    drop = KEYED_BORE_VIEW_LABEL_DROP if keyed(teeth) else BORE_VIEW_LABEL_DROP
+    return BORE_VIEW_CENTER[1] - bore_view_crop_radius(teeth) - drop
 
 
 def form_plot_label() -> str:
@@ -1053,8 +1139,11 @@ class FrontDetail:
     letter_reach: float
 
 
-# A's boundary stands this far outside the bore on paper, inside the web.
+# A's boundary stands this far outside the bore on paper, inside the web. A
+# keyed bore's ring clears the keyway's corners by less: at .8 mm T030's
+# letter (3:1) would not fit the web between that ring and the root envelope.
 BORE_DETAIL_MARGIN = 0.0008
+KEYED_BORE_DETAIL_MARGIN = 0.0006
 # The letters print at the notes' height: at the default 3.5 mm, A's would
 # not fit the T006 web between its boundary and the root envelope.
 DETAIL_LETTER_HEIGHT = 0.0025
@@ -1086,7 +1175,8 @@ def _front_ratio(teeth: int) -> float:
 def front_details(teeth: int) -> tuple[FrontDetail, ...]:
     """The detail boundaries the sheet's front view carries."""
     ratio = _front_ratio(teeth)
-    bore_radius_mm = bore_dia_mm(teeth) / 2.0 + BORE_DETAIL_MARGIN * 1000.0 / ratio
+    margin = KEYED_BORE_DETAIL_MARGIN if keyed(teeth) else BORE_DETAIL_MARGIN
+    bore_radius_mm = bore_reach_mm(teeth) + margin * 1000.0 / ratio
     web_mm = floor_limits_mm(teeth)[0] / 2.0 - bore_radius_mm
     details = [
         FrontDetail(
@@ -1495,7 +1585,7 @@ def _assert_settled_clocks(adapter: Any, clocks: list[tuple[str, Any, int]]) -> 
     for configuration, display, teeth in clocks:
         if not ddoc.ActivateSheet(configuration):
             raise RuntimeError(f"failed to activate {configuration} for its settled clock")
-        found = clock_arc_faults(_clock_arcs(display), bore_flat_vertex(teeth))
+        found = clock_arc_faults(_clock_arcs(display), bore_clock_vertex(teeth))
         if found:
             faults.append(f"{configuration}: {'; '.join(found)}")
     if faults:
@@ -1528,13 +1618,14 @@ def _sweep_clock_right_of_flat(
     view. Every flip is read back from the drawn arcs and the measured value;
     a clock that ends anywhere else raises with the stray points.
     """
+    clock_name = clock_dimension_name(teeth)
     clocks = [
         _early_bound(annotation, "IAnnotation")
         for annotation in annotations
-        if dimension_name(adapter, _early_bound(annotation, "IAnnotation")) == "BoreFlatClock"
+        if dimension_name(adapter, _early_bound(annotation, "IAnnotation")) == clock_name
     ]
     if len(clocks) != 1:
-        raise RuntimeError(f"{label}: expected one BoreFlatClock, found {len(clocks)}")
+        raise RuntimeError(f"{label}: expected one {clock_name}, found {len(clocks)}")
     annotation = clocks[0]
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
     dimension = _early_bound(display.GetDimension2(0), "IDimension")
@@ -1546,8 +1637,8 @@ def _sweep_clock_right_of_flat(
         raise RuntimeError(f"{label}: the flat clock has no selection name")
     model = adapter.currentModel
     drawing = _early_bound(model, "IDrawingDoc")
-    vertex = bore_flat_vertex(teeth)
-    text_xy = bore_view_keep(teeth)["BoreFlatClock"]
+    vertex = bore_clock_vertex(teeth)
+    text_xy = bore_view_keep(teeth)[clock_name]
     imported = float(_read_member(dimension, "SystemValue"))
     flips: list[str] = []
     stray: list[tuple[float, float]] = []
@@ -2107,8 +2198,9 @@ async def build(adapter: Any) -> dict[str, str]:
 
         # The bore view imports FIRST, while it is uncropped: a model
         # dimension already on the sheet is not imported again, and no other
-        # view keeps BoreProfile's three.  BoreProfile is consumed by BoreCut,
-        # so it imports without being shown (_drawing_hidden_sketches r21).
+        # view keeps the bore sketch's dimensions.  The sketch (BoreProfile,
+        # or KeyedBoreProfile on T030..T120) is consumed by its cut, so it
+        # imports without being shown (_drawing_hidden_sketches r21).
         bore_keep = bore_view_keep(teeth)
         bore_annotations = hidden_sketches.curate_view_dimensions(
             adapter,
@@ -2169,16 +2261,18 @@ async def build(adapter: Any) -> dict[str, str]:
             adapter, [*front_annotations, *right_annotations], configuration, teeth
         )
         annotations = [*bore_annotations, *front_annotations, *right_annotations]
-        # RV-03's web dimension shows on the T012 sheet only (front_keep).
+        # The sheet's own bore, and RV-03's web on T012 only (front_keep).
+        printed = sheet_dimension_names(teeth)
         callouts = {
-            name: text for name, text in DIMENSION_CALLOUTS.items()
-            if name != "WebMin" or teeth == WEB_REFERENCE_TEETH
+            name: text for name, text in DIMENSION_CALLOUTS.items() if name in printed
         }
         set_dimension_callouts(adapter, annotations, callouts)
-        set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
+        set_dimension_callouts(adapter, annotations, {
+            name: text for name, text in CALLOUTS_ABOVE.items() if name in printed
+        }, location="above")
         assert_imported_precision(adapter, annotations, {
             name: places for name, places in DRAWING_PRECISION_BY_NAME.items()
-            if name != "WebMin" or teeth == WEB_REFERENCE_TEETH
+            if name in printed
         })
         _center_mark_bore(adapter, front, teeth, label=f"{configuration} front")
         _center_mark_bore(adapter, bore_view, teeth, label=f"{configuration} bore view")

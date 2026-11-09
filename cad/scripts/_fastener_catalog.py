@@ -109,6 +109,13 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "98381A417",
         material="Alloy Steel",
     ),
+    # MHA-DT-VN-71 (owner decision C1 keyed, 2026-11-09, PR #1992): the 1/16
+    # square key in MHA-DT-04's land-1 keyseat, cut from 12 in key stock.
+    "dt-vn-cone-shaft-key": _stock(
+        "dt-vn-cone-shaft-key",
+        "1008-1045 Carbon Steel Machine Key Stock",
+        "98830A511",
+    ),
     "sh-vn-brass-fillister-screw": _stock(
         "sh-vn-brass-fillister-screw",
         "Brass Fillister Head Slotted Screw",

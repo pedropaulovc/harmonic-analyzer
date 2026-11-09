@@ -50,9 +50,10 @@ SECTION_DIA_BANDS: tuple[tuple[float, float], ...] = (
 # Shared displayed precision: native drawing and physical-limit consumers
 # read the same per-section table; no unrounded-nominal acceptance mapping.
 # Inch places: four on every land and across-flat, the places their
-# .0008/.0020/.0004 in bands need (.4825, .3750, .3450, .0310, .0170).
+# .0008/.0020/.0004 in bands need (.4825, .3750, .2300, .0310, .0170).
 LAND_DIA_PLACES = (4, 4, 4, 4, 4)
-LAND_AF_PLACES = (None, 4, 4, 4, 4)
+# Land 1 is round with a keyseat (cone_land_key owns its places).
+LAND_AF_PLACES = (None, None, 4, 4, 4)
 
 
 def _printed_mm(native_mm: float, places: int) -> float:
@@ -149,16 +150,18 @@ SECTION_CONE_GEAR_TEETH: tuple[tuple[int, ...], ...] = (
     (6, 12),
 )
 
-# D-flats (user ruling 2026-09-28): every gear land carries one flat, milled
-# full length at the same clock (the shaft's local +X), and every gear on it
-# has a matching D-bore, so the flats carry the one angular datum all twenty
-# channels and the 64T share. Intermediate flats are about 8% of the land
-# diameter deep. The terminal flat is the deep D above, held by round
-# guidance. Across-flat is the flat-to-opposite-round size a
-# micrometer reads. Index-aligned with SECTION_DIA_BANDS; Sec0 has no flat.
+# D-flats (user ruling 2026-09-28): lands 2-4 each carry one flat, milled
+# full length at the same clock (the shaft's local +X), and every gear on them
+# has a matching D-bore.  Land 1 carries the 1/16 key instead, its keyseat on
+# the same clock (owner decision 2026-11-09, C1 keyed, PR #1992; cone_land_key),
+# so the flats and the key carry the one angular datum all twenty channels and
+# the 64T share. Intermediate flats are about 8% of the land diameter deep.
+# The terminal flat is the deep D above, held by round guidance. Across-flat
+# is the flat-to-opposite-round size a micrometer reads. Index-aligned with
+# SECTION_DIA_BANDS; Sec0 and the keyed Sec1 have no flat.
 SECTION_FLAT_AF: tuple[float | None, ...] = (
     None,  # Sec0: pivot journal
-    8.763,  # Sec1: .345 on the 3/8 land, .030 deep
+    None,  # Sec1: round, keyed (cone_land_key)
     5.842,  # Sec2: .230 on the 1/4 land, .020 deep
     2.921,  # Sec3: .115 on the 1/8 land, .010 deep
     TERMINAL_FLAT_AF_MM,  # Sec4: deep D held by round guidance, same named AF band
@@ -166,11 +169,11 @@ SECTION_FLAT_AF: tuple[float | None, ...] = (
 
 
 def land_finished_af_limits_mm(section: int) -> tuple[float, float]:
-    """Absolute PRINTED (MIN,MAX) of a real D-flat; journal has no AF."""
+    """Absolute PRINTED (MIN,MAX) of a real D-flat; journal and keyed land have no AF."""
     native = SECTION_FLAT_AF[section]
     places = LAND_AF_PLACES[section]
     if native is None or places is None:
-        raise ValueError("round pivot journal has no finished across-flat limits")
+        raise ValueError(f"Sec{section} is round: no finished across-flat limits")
     nominal = _printed_mm(native, places)
     return nominal+FLAT_AF_BAND[1], nominal+FLAT_AF_BAND[0]
 

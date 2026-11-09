@@ -8,12 +8,13 @@ view, each dimension line inside the land it measures (the 3.2 mm collar
 instead takes one near-side arrow on its rim).  The two short lands
 ahead of the tip are 6.9 mm long, so the three tip-end diameter texts climb
 in steps: the tip's line rises highest and each text hangs to the RIGHT of
-its line above every line it spans.  Each gear land's D-flat is shown in its
-own enlarged cut-only section, A-A to D-D, carrying its across-flat; B-B to
+its line above every line it spans.  Each gear land's anti-spin cut (land
+1's keyseat, lands 2-4's D-flats) is shown in its own enlarged cut-only
+section, A-A to D-D, carrying its sizes; B-B to
 D-D are cut on DETAIL E, the stepped tip at 4:1, where their arrows and
 letters have room.  A standard isometric supplies pictorial clarity.  Every
 tight band names its mate at its own callout or in the numbered land note
-linked from each land's diameter and across-flat, and the notes give the
+linked from each land's diameter, keyseat and across-flat, and the notes give the
 collar's tight limits and the tailstock support the tip land needs (U40).
 Source geometry and native model fits stay authoritative.  The front-to-tip
 overall is a reference and takes its display precision from the spec.
@@ -104,6 +105,7 @@ from dt_cone_gear_shaft_spec import (
     DRAWING_REFERENCE_PRECISION,
     FILLET_CALLOUT,
     FLAT_LANDS,
+    KEYED_LAND,
     FLAT_MATE_SUFFIXES,
     JOURNAL_DIA,
     SEAT_MATE_CALLOUTS,
@@ -351,8 +353,9 @@ CUT_PARENT_SCALE = {CutParent.SIDE: SIDE_SCALE, CutParent.TIP_DETAIL: TIP_DETAIL
 # its land on both sides, so the partial cut is the whole D.
 PARTIAL_CUT_PARENTS = frozenset({CutParent.TIP_DETAIL})
 
-# The D sections (user ruling 2026-09-28: every gear land carries one flat on
-# the shaft's +X).  The side view looks straight at the flats, so their size
+# The D sections (user ruling 2026-09-28: lands 2-4 each carry one flat on
+# the shaft's +X; land 1 its keyseat there instead, owner decision
+# 2026-11-09, C1 keyed, PR #1992).  The side view looks straight at the cuts, so their size
 # is only readable end-on: each land is cut across and shown cut-only
 # (nothing beyond the plane prints), each enlarged to about 16..19 mm across
 # so the reader-owned smallest AF reads with its band. A-A cuts land
@@ -391,7 +394,12 @@ PARTIAL_CUT_PARENTS = frozenset({CutParent.TIP_DETAIL})
 # B's at 0.3715; B-B already stands at the frame, so A-A moves 2.9 mm left
 # and Ø12.2555 (SIDE_DIAMETERS) 4.5 mm left to keep A's box clear of it.
 # The across-flat is the part's own dimension (Sec{i}AF, sketched on the
-# land's end plane, parallel to the cut), so it prints its model band.
+# land's end plane, parallel to the cut), so it prints its model band.  A-A
+# prints land 1's keyseat the same way: its S (Sec1KeyseatS, horizontal like
+# the AF it replaces, with no suffix, so its line is shorter than the old
+# AF's) where the AF stood, and its width (Sec1KeyseatWidth, vertical, the
+# land-note flag after it) above that on the keyseat's own side, placed at
+# build time once the section reports which side +X lands on.
 D_SECTIONS = (
     DSection(
         1, "A", SECTION_ENDS[1] - 25.0, CutParent.SIDE, 0.0150, (0.3371, 0.165), (2, 1)
@@ -424,11 +432,18 @@ D_SECTIONS = (
         (20, 1),
     ),
 )
-# Each across-flat's text, centred over its section.
+# The dimensions each section prints; the first is centred over its section.
+SECTION_DIMENSION_NAMES = {
+    KEYED_LAND: ("Sec1KeyseatS", "Sec1KeyseatWidth"),
+    **{land: (f"Sec{land}AF",) for land in FLAT_LANDS},
+}
 D_SECTION_KEEP = {
-    f"Sec{section.land}AF": (section.centre[0], section.centre[1] + 0.017)
+    SECTION_DIMENSION_NAMES[section.land][0]: (section.centre[0], section.centre[1] + 0.017)
     for section in D_SECTIONS
 }
+# The keyseat width's text: KEYSEAT_WIDTH_RISE above the section centre,
+# over the S line, at the keyseat side's sheet x.
+KEYSEAT_WIDTH_RISE = 0.027
 # The terminal flat's torque corners ride above its across-flat; the flats'
 # shared clock is in the land note (spec LAND_NOTE) with their fit.
 SECTION_ABOVE_CALLOUTS = {
@@ -505,8 +520,8 @@ CAPTION_SETTLE_M = 0.0006
 _CENTER_MARK_ANNOTATION = 13
 # An arrowhead's half-width across its shaft (the audit's 12.1 x 3.4 mm head).
 SECTION_ARROW_HALF_WIDTH = 0.0017
-if tuple(section.land for section in D_SECTIONS) != FLAT_LANDS:
-    raise AssertionError("every flatted land takes exactly one D section")
+if tuple(section.land for section in D_SECTIONS) != (KEYED_LAND, *FLAT_LANDS):
+    raise AssertionError("every gear land takes exactly one section")
 
 
 @_telemetry.traced("drawing.cylindrical_face_scan")
@@ -846,7 +861,7 @@ class PlacedSection(NamedTuple):
     section: DSection
     view: Any
     face: Box
-    across_flat: Any
+    dimensions: tuple[Any, ...]
     caption: Box
 
 
@@ -1139,11 +1154,11 @@ def _cut_endpoints(
 def _add_d_sections(
     adapter: Any, parents: Mapping[CutParent, Any], sign: int
 ) -> list[PlacedSection]:
-    """Cut each flatted land across and print its across-flat in the section,
-    its centre mark deleted and its caption hung under it.
+    """Cut each gear land across and print its keyseat or across-flat in the
+    section, its centre mark deleted and its caption hung under it.
 
-    ``curate_view_dimensions`` fails the build if a section's across-flat
-    does not arrive, so every D on the sheet carries its size."""
+    ``curate_view_dimensions`` fails the build if a section's dimensions
+    do not arrive, so every cut on the sheet carries its size."""
     placed = []
     for section in D_SECTIONS:
         start, end = _cut_endpoints(adapter, parents[section.parent], section, sign)
@@ -1159,8 +1174,10 @@ def _add_d_sections(
             label=f"land {section.land} D section",
         )
         _prepare_d_section(adapter, view, section)
-        name = f"Sec{section.land}AF"
-        keep = {name: D_SECTION_KEEP[name]}
+        names = SECTION_DIMENSION_NAMES[section.land]
+        keep = {names[0]: D_SECTION_KEEP[names[0]]}
+        if section.land == KEYED_LAND:
+            keep[names[1]] = _keyseat_width_text_position(adapter, view, section, sign)
         dimensions = curate_view_dimensions(
             adapter,
             view,
@@ -1169,7 +1186,7 @@ def _add_d_sections(
             dimensions_by_feature=DRAWING_DIMENSIONS,
         )
         by_name = {dimension_name(adapter, dimension): dimension for dimension in dimensions}
-        across_flat = by_name[name]
+        kept = tuple(by_name[name] for name in names)
         _delete_centre_mark(adapter, view, section)
         face = _section_face(adapter, view, section, sign)
         caption = _place_view_caption(
@@ -1179,21 +1196,34 @@ def _add_d_sections(
             CaptionAnchor.TOP_CENTRE,
             label=f"section {section.label} caption",
         )
-        if name in SECTION_ABOVE_CALLOUTS:
-            # The terminal flat's torque corners stay sharp in the model, so
-            # their break limit rides above that flat's own across-flat.
-            set_dimension_callouts(
-                adapter,
-                [across_flat],
-                _printable_above_callouts({name: SECTION_ABOVE_CALLOUTS[name]}),
-                location="above",
-            )
-        if name in FLAT_MATE_SUFFIXES:
-            _set_dimension_suffixes(
-                adapter, [across_flat], {name: FLAT_MATE_SUFFIXES[name]}
-            )
-        placed.append(PlacedSection(section, view, face, across_flat, caption))
+        for name, dimension in zip(names, kept, strict=True):
+            if name in SECTION_ABOVE_CALLOUTS:
+                # The terminal flat's torque corners stay sharp in the model, so
+                # their break limit rides above that flat's own across-flat.
+                set_dimension_callouts(
+                    adapter,
+                    [dimension],
+                    _printable_above_callouts({name: SECTION_ABOVE_CALLOUTS[name]}),
+                    location="above",
+                )
+            if name in FLAT_MATE_SUFFIXES:
+                _set_dimension_suffixes(adapter, [dimension], {name: FLAT_MATE_SUFFIXES[name]})
+        placed.append(PlacedSection(section, view, face, kept, caption))
     return placed
+
+
+def _keyseat_width_text_position(
+    adapter: Any, view: Any, section: DSection, sign: int
+) -> tuple[float, float]:
+    """Sheet position of the keyseat width's text: above the S line, over the
+    land's +X edge, where the keyseat is (the section states which side)."""
+    (keyseat,) = model_points_in_view(
+        adapter,
+        view,
+        ((SECTION_DIAS[section.land] / 2000.0, 0.0, sign * section.station_mm / 1000.0),),
+        label=f"section {section.label} keyseat side",
+    )
+    return keyseat[0], section.centre[1] + KEYSEAT_WIDTH_RISE
 
 
 def _section_face(adapter: Any, view: Any, section: DSection, sign: int) -> Box:
@@ -1271,11 +1301,11 @@ def _view_outline(view: Any) -> Box:
 
 
 def _land_boxes(adapter: Any, view: Any, sign: int, *, label: str) -> dict[str, Box]:
-    """Each flatted land's silhouette on ``view``, clipped to its outline."""
+    """Each gear land's silhouette on ``view``, clipped to its outline."""
     outline = _view_outline(view)
     starts = (COLLAR_END_STATION, *SECTION_ENDS[1:-1])
     boxes = {}
-    for land, start in zip(FLAT_LANDS, starts):
+    for land, start in zip((KEYED_LAND, *FLAT_LANDS), starts, strict=True):
         radius = SECTION_DIAS[land] / 2000.0
         corners = model_points_in_view(
             adapter,
@@ -1370,9 +1400,12 @@ def _prove_section_layout(
             )
         cell = {
             f"{label} face": placed.face,
-            f"{label} across-flat": _dimension_text_box(
-                placed.across_flat, f"{label} across-flat"
-            ),
+            **{
+                f"{label} dimension {index}": _dimension_text_box(
+                    dimension, f"{label} dimension {index}"
+                )
+                for index, dimension in enumerate(placed.dimensions, start=1)
+            },
             f"{label} caption": placed.caption,
         }
         require_clear(

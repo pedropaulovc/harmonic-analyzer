@@ -20,10 +20,13 @@ from _fit_deviations import deviations
 from dt_cone_gear_notes import BLANK_DIA_REFERENCE_SKETCH
 from dt_cone_gear_spec import (
     BORE_DIA_BAND,
+    BORE_SKETCH,
     CONFIGS,
     CONFIGURATION_TEETH,
+    D_BORE_TEETH,
     FACE_WIDTH,
     GAP_FLOOR_SKETCH,
+    KEYED_BORE_SKETCH,
     MACHINED_WEB_TARGET_MM,
     MM_PER_IN,
     TOOTH_REFERENCE_SKETCH,
@@ -34,13 +37,32 @@ from dt_cone_gear_spec import (
     floor_radius_max_mm,
     floor_radius_min_mm,
     gap_floor_deviations_mm,
+    keyed,
+    keyway_web_required_mm,
     stock_form_profile,
     tooth_features,
     tooth_thickness_band,
 )
+import cone_land_key
 
 _TOL_BILAT = 2  # swTolType_e.swTolBILAT
 _TOL_LIMIT = 3  # swTolType_e.swTolLIMIT
+
+# The bore features each configuration carries, cut before sketch
+# (dependents before parents): the D on T006..T024, the keyed bore on
+# T030..T120 and on the unplaced Default, which keeps T120's globals.
+BORE_CUT = "BoreCut"
+KEYED_BORE_CUT = "KeyedBoreCut"
+D_BORE_FEATURES = (BORE_CUT, BORE_SKETCH)
+KEYED_BORE_FEATURES = (KEYED_BORE_CUT, KEYED_BORE_SKETCH)
+D_BORE_CONFIGURATIONS = frozenset(f"T{teeth:03d}" for teeth in D_BORE_TEETH)
+
+
+def foreign_bore_features(configuration: str) -> tuple[str, ...]:
+    """The bore features ``configuration`` suppresses."""
+    if configuration in D_BORE_CONFIGURATIONS:
+        return KEYED_BORE_FEATURES
+    return D_BORE_FEATURES
 
 
 # The two bilateral bands T006 overrides (pending exception ruling #971); every other
@@ -335,6 +357,27 @@ async def _configuration_topology(
                     feature_issues.append(
                         f"{feature_name}: native error {error[0]}, warning={bool(error[1])}"
                     )
+    # The configuration carries one bore (_restrict_bores), error-free.
+    foreign_bores = foreign_bore_features(configuration)
+    for feature_name in (*D_BORE_FEATURES, *KEYED_BORE_FEATURES):
+        raw_feature = part.FeatureByName(feature_name)
+        if raw_feature is None:
+            feature_issues.append(f"missing native feature {feature_name}")
+            continue
+        feature = _early_bound(raw_feature, "IFeature")
+        answer = feature.IsSuppressed2(1, null_variant())
+        answer = answer if isinstance(answer, (list, tuple)) else (answer,)
+        foreign = feature_name in foreign_bores
+        if len(answer) != 1 or bool(answer[0]) != foreign:
+            feature_issues.append(f"{feature_name}: wrong suppression in {configuration}")
+        if not foreign:
+            error = feature.GetErrorCode2()
+            if not isinstance(error, (list, tuple)) or len(error) < 2:
+                feature_issues.append(f"{feature_name}: unreadable native error state")
+            elif int(error[0] or 0):
+                feature_issues.append(
+                    f"{feature_name}: native error {error[0]}, warning={bool(error[1])}"
+                )
     raw_sketch = part.FeatureByName(tooth_features(teeth)[0])
     if raw_sketch is not None:
         raw_specific = _early_bound(raw_sketch, "IFeature").GetSpecificFeature2()
@@ -354,7 +397,15 @@ async def _configuration_topology(
     if measure_roots and len(bodies) == 1:
         native_min, native_max, root_edges = _native_root_envelope_mm(bodies[0], teeth=teeth)
         expected_min, expected_max = floor_radius_min_mm(teeth), floor_radius_max_mm(teeth)
-        maximum_bore_radius = (bore_dia_mm(teeth) + BORE_DIA_BAND[0]) / 2.0
+        if keyed(teeth):
+            # The keyway's top corner at the print limits (cone_land_key).
+            maximum_bore_radius = cone_land_key.hub_keyway_corner_radius_max_mm(
+                bore_dia_mm(teeth) + BORE_DIA_BAND[1]
+            )
+            required_web = keyway_web_required_mm(teeth)
+        else:
+            maximum_bore_radius = (bore_dia_mm(teeth) + BORE_DIA_BAND[0]) / 2.0
+            required_web = WEB_EXCEPTIONS_MM.get(teeth, MACHINED_WEB_TARGET_MM)
         minimum_web = native_min - maximum_bore_radius
         root_observation = (
             f", native_root_min={native_min:.6f}, native_root_max={native_max:.6f}, "
@@ -363,7 +414,6 @@ async def _configuration_topology(
         )
         if max(abs(native_min - expected_min), abs(native_max - expected_max)) > 0.002:
             root_issues.append("native radial root envelope differs from the finite cutter arc")
-        required_web = WEB_EXCEPTIONS_MM.get(teeth, MACHINED_WEB_TARGET_MM)
         if minimum_web < required_web - 1e-9:
             root_issues.append(
                 f"native bore web {minimum_web:.6f} < retained {required_web:.6f} mm"

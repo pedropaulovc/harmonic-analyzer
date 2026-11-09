@@ -603,6 +603,17 @@
       ]
     },
     {
+      "sourceStem": "dt-vn-cone-shaft-key",
+      "sourceNumber": null,
+      "identities": [
+        {
+          "parent": "dt-drive-train",
+          "stem": "dt-vn-cone-shaft-key",
+          "number": "MHA-DT-VN-71"
+        }
+      ]
+    },
+    {
       "sourceStem": "sm-vn-gooseneck-shoulder-screw",
       "sourceNumber": null,
       "identities": [
@@ -1065,7 +1076,7 @@
       "status": "archive-only"
     }
   ],
-  "currentRegistryMapSha256": "e2513148469638445d1e23b9de312350f7164fcdc56d72a1824e8b846a1ec75c",
+  "currentRegistryMapSha256": "959bf45b0cee1049e23ccdeedfe38c1c9d28cd9aafb81f4dee22579c150ce534",
   "nativeIdentities": [
     {
       "sourceStem": "ch-rocker-arm-tl-oblique-feed-lever",

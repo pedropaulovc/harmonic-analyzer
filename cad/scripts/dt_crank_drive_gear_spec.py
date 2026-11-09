@@ -4,9 +4,9 @@ The dark steel 64T gear at the cone set's large end; it carries the crossed-axis
 helical accommodation for its straight 16T crank pinion mate (4:1 crank-to-cone
 reduction).
 
-Recreated under ``cad/docs/drawing-guidelines.md``. The five blank,
-bore and entry sizes -- outside diameter, face width, round bore, D-bore
-across-flat and south bore chamfer -- are NATIVE model dimensions carrying
+Recreated under ``cad/docs/drawing-guidelines.md``. The six blank,
+bore and entry sizes -- outside diameter, face width, round bore, keyway
+width and T, and south bore chamfer -- are NATIVE model dimensions carrying
 their own decimal places and, where a mate needs one, their own bands; the
 tooth system a cut-gear print cannot express as dimensions stays in the
 gear-data block drawing-guidelines.md rule 7 (notes: few, flagged, never a
@@ -23,6 +23,7 @@ from __future__ import annotations
 import math
 
 import _config
+import cone_land_key
 import cone_line
 from gear_face_band import GEAR_FACE_WIDTH_BAND
 import cone_shaft_land_bands
@@ -283,14 +284,16 @@ STOCK_PROFILE_CORNERS = tuple(
     )
 )
 
-# The Ø9.525 round portion of MHA-DT-04's Sec1 gear seat. This shared spec
-# owns its nominal, round slide-fit clearance and D-flat AF band without
-# pulling the part builder into drawing recipes.
+# The Ø9.525 MHA-DT-04 land-1 gear seat. This shared spec owns its nominal,
+# round slide-fit clearance and the 1/16 keyway's numbers without pulling the
+# part builder into drawing recipes.
 BORE_DIA = 0.375 * MM_PER_IN  # 9.525
+if abs(BORE_DIA - cone_land_key.LAND_DIA_MM) > 1e-9:
+    raise AssertionError("the 64T bore no longer matches the keyed land 1")
 
-# A printable slide fit on the Sec1 gear-seat land. The round and flat
-# clearances are independent: BoreDia sets radial runout; BoreAF limits
-# angular play on the local +X flat. No joining compound is involved.
+# A printable slide fit on the land-1 gear seat. BoreDia sets radial runout;
+# the key in the +X keyway (owner decision C1 keyed, 2026-11-09, PR #1992)
+# carries the drive. No joining compound is involved.
 _LAND_UPPER, _LAND_LOWER = cone_shaft_land_bands.SECTION_DIA_BANDS[1]
 if (_LAND_UPPER, _LAND_LOWER) != cone_shaft_land_bands.GEAR_SEAT_BAND:
     raise AssertionError("the 64T no longer rides a gear-seat land")
@@ -302,28 +305,41 @@ BORE_DIAMETRAL_CLEARANCE = (
 if BORE_DIAMETRAL_CLEARANCE != GEAR_SEAT_CLEARANCE:
     raise AssertionError("64T bore lost its round slide-fit clearance")
 
-# One D-flat on local +X, paired with MHA-DT-04 Sec1. Across-flat is measured
-# from this plane to the opposite circular wall, not from the gear centre.
-BORE_AF = cone_shaft_land_bands.SECTION_FLAT_AF[1]
-BORE_AF_BAND = gear_seat_fit.flat_bore_af_band(cone_shaft_land_bands.FLAT_AF_BAND)
-if BORE_AF is None:
-    raise AssertionError("the 64T needs the flatted Sec1 gear seat")
+# One broached 1/16 keyway on local +X, the clock the retired D-flat held,
+# for the MHA-DT-VN-71 key in MHA-DT-04's land-1 keyseat. Width and T (top to
+# the bore's far side, ANSI B17.1) come from cone_land_key; the 64T forks none.
+KEYWAY_WIDTH = cone_land_key.KEYWAY_WIDTH_MM
+KEYWAY_WIDTH_BAND = cone_land_key.KEYWAY_WIDTH_BAND
+KEYWAY_T = cone_land_key.KEYWAY_T_MM
+KEYWAY_T_BAND = cone_land_key.KEYWAY_T_BAND
+KEYWAY_PLACES = cone_land_key.KEYWAY_PLACES
+# The keyway top's nominal distance from the bore axis, on +X.
+KEYWAY_TOP_OFFSET = cone_land_key.keyway_top_offset_mm(BORE_DIA)
 
-# The MHA-DT-04 Sec1 flat stops square against its collar. A flat milled with
-# an end mill of at least Ø8 leaves an axial crescent at the chord corners.
-# At offset y from the flat midpoint its horn height above the flat is
-# sqrt(Rshaft²-y²)-flat_offset, and the cutter's axial runout is
-# Rcutter-sqrt(Rcutter²-y²). Their SUM must fit inside the 45° bore-entry
-# chamfer, not merely the cutter runout alone. With Rcutter < Rshaft that
-# sum increases monotonically from the flat midpoint to a chord corner;
-# using the upper shaft diameter and lower shaft AF is print-worst.
-MIN_FLAT_CUTTER_RADIUS = 4.0  # ≥Ø8 end mill
-# The south entry is functional, but it needs no band of its own: the nominal
-# is chosen so the title block's .XX band alone keeps the chamfer's minimum
-# outside the print-worst cutter crescent (machinist review r1 of #1641: a
+# Web under the keyway: the keyway's top corner at its print limits against
+# the minimum root circle. Rule 17 books .080 in as the web target.
+WEB_TARGET_MM = 0.080 * MM_PER_IN
+KEYWAY_CORNER_RADIUS_MAX = cone_land_key.hub_keyway_corner_radius_max_mm(
+    BORE_DIA + BORE_DIA_BAND[1]
+)
+KEYWAY_WEB_MIN = ROOT_DIA_MIN / 2.0 - KEYWAY_CORNER_RADIUS_MAX
+if KEYWAY_WEB_MIN < WEB_TARGET_MM:
+    raise AssertionError(
+        f"64T web over the keyway {KEYWAY_WEB_MIN:.4f} mm is under the "
+        f"{WEB_TARGET_MM:.4f} mm rule-17 target"
+    )
+
+# MHA-DT-04's land-1 root into its thrust collar, mirrored here because
+# dt_cone_gear_shaft_spec imports this gear (an import here would cycle); the
+# offline drawing test cross-checks it against COLLAR_ROOT_RADIUS_MAX.
+_SHAFT_COLLAR_ROOT_RADIUS_MAX = 0.0508  # .002
+# The south bore entry clears that root so the south face seats flat on the
+# collar. It needs no band of its own: the title block's .XX band alone keeps
+# the chamfer's minimum clear of the root (machinist review r1 of #1641: a
 # 1.00 +0.10/0 leg read as a tight band with no named mate; rule 4 (tighten
 # only for function, and name the mate) and the owner's standing preference
-# to move the nominal rather than print a tight band).
+# to move the nominal rather than print a tight band). The keyway breaks
+# through the chamfer on +X; the key ends KEY_END_SET short of the collar.
 BORE_SOUTH_CHAMFER = 1.524  # .06
 BORE_SOUTH_CHAMFER_PLACES = 2
 # The limits a part accepted against the printed leg may show: the general
@@ -332,22 +348,8 @@ BORE_SOUTH_CHAMFER_PLACES = 2
 _CHAMFER_ROW = printed_band_mm(BORE_SOUTH_CHAMFER_PLACES, unit=UNIT)
 BORE_SOUTH_CHAMFER_MIN = BORE_SOUTH_CHAMFER - _CHAMFER_ROW
 BORE_SOUTH_CHAMFER_MAX = BORE_SOUTH_CHAMFER + _CHAMFER_ROW
-# The shaft's nominal Sec1 Ø is BORE_DIA; the drawing contract tests it
-# against dt_cone_gear_shaft_spec.SECTION_DIAS[1] without a circular import.
-_SHAFT_MAX_R = (BORE_DIA + cone_shaft_land_bands.SECTION_DIA_BANDS[1][0]) / 2.0
-_SHAFT_MIN_AF = BORE_AF + cone_shaft_land_bands.FLAT_AF_BAND[1]
-_FLAT_OFFSET = _SHAFT_MIN_AF - _SHAFT_MAX_R
-_HALF_CHORD = math.sqrt(_SHAFT_MAX_R**2 - _FLAT_OFFSET**2)
-_MAX_HORN = _SHAFT_MAX_R - _FLAT_OFFSET
-_MAX_CUTTER_RUNOUT = MIN_FLAT_CUTTER_RADIUS - math.sqrt(
-    MIN_FLAT_CUTTER_RADIUS**2 - _HALF_CHORD**2
-)
-MAX_FLAT_CRESCENT = max(_MAX_HORN, _MAX_CUTTER_RUNOUT)
-if MAX_FLAT_CRESCENT >= BORE_SOUTH_CHAMFER_MIN:
-    raise AssertionError(
-        f"Sec1 end-mill horn + runout {MAX_FLAT_CRESCENT:.4f} reaches "
-        f"the south bore chamfer {BORE_SOUTH_CHAMFER_MIN:.4f}"
-    )
+if BORE_SOUTH_CHAMFER_MIN <= _SHAFT_COLLAR_ROOT_RADIUS_MAX:
+    raise AssertionError("the south bore chamfer no longer clears the collar root")
 
 # Even at the collar's supplied 5/8-in stock lower bound and the bore/chamfer
 # upper bounds, the mouth ends before the collar's outer bearing annulus.
@@ -361,12 +363,12 @@ _BORE_MAX_R = (
 COLLAR_BEARING_ANNULUS = _COLLAR_MIN_R - (_BORE_MAX_R + BORE_SOUTH_CHAMFER_MAX)
 if COLLAR_BEARING_ANNULUS <= 0:
     raise AssertionError("the chamfer reaches the collar's bearing outer rim")
-FLAT_ENGAGEMENT_MIN = FACE_WIDTH + FACE_WIDTH_BAND[1] - BORE_SOUTH_CHAMFER_MAX
+BORE_ENGAGEMENT_MIN = FACE_WIDTH + FACE_WIDTH_BAND[1] - BORE_SOUTH_CHAMFER_MAX
 
-# No roughness symbol: the D-bore is a gear seat that drives through its flat
+# No roughness symbol: the bore is a gear seat that drives through its key
 # and does not run, and drawing-guidelines.md rule 6 (roughness symbols only
-# where a surface runs, slides or locates) puts no symbol on a gear's D-bore or
-# seat bore (machinist review r1 of #1641, all three runs). The teeth and end
+# where a surface runs, slides or locates) puts no symbol on a gear's seat
+# bore (machinist review r1 of #1641, all three runs). The teeth and end
 # faces carry none either; the title block's process row covers them.
 SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 
@@ -382,7 +384,7 @@ SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "OutsideDiaReference": {"OutsideDia"},
     "GearBlank": {"FaceWidth"},
-    "BoreProfile": {"BoreDia", "BoreAF"},
+    "BoreProfile": {"BoreDia", "KeywayWidth", "KeywayT"},
     "BoreSouthChamfer": {"BoreSouthChamferSize"},
 }
 
@@ -394,8 +396,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # marks, so ``draw_dt_crank_drive_gear`` imports each dimension verbatim and only
 # reads ``GetPrimaryPrecision2()`` back off the sheet.
 #
-# Inch places: the round and D-flat bore sizes carry their own fit bands at
-# four (+.0018/+.0010, +.0008/+.0004). The outside diameter prints three with
+# Inch places: the round bore carries its fit band at four (+.0018/+.0010)
+# and the keyway its width and T bands at four. The outside diameter prints three with
 # +/-.004. The face width is the four-place +/-.001 member of the solid gear
 # stack; its south face seats on the collar and the tolerance only shifts the
 # north face. The south chamfer leg prints two places under the title block's
@@ -403,7 +405,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "OutsideDiaReference": {"OutsideDia": OUTSIDE_DIA_PLACES},
     "GearBlank": {"FaceWidth": FACE_WIDTH_PLACES},
-    "BoreProfile": {"BoreDia": 4, "BoreAF": 4},
+    "BoreProfile": {"BoreDia": 4, "KeywayWidth": KEYWAY_PLACES, "KeywayT": KEYWAY_PLACES},
     "BoreSouthChamfer": {"BoreSouthChamferSize": BORE_SOUTH_CHAMFER_PLACES},
 }
 

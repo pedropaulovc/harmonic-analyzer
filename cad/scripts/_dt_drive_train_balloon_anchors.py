@@ -77,6 +77,7 @@ DRIVE_TRAIN_BALLOON_ANCHORS: dict[str, dict[str, BalloonAnchor]] = {
         "sh-vn-fillister-screw-90280a108": BalloonAnchor(instance="@SwingStopScrew:1"),
         "dt-cone-gear-shaft": BalloonAnchor(),
         "dt-crank-drive-gear": BalloonAnchor(),
+        "dt-vn-cone-shaft-key": BalloonAnchor(),
         "dt-cone-gear": BalloonAnchor(instance="dt-cone-gear-10"),
     },
     "crank": {

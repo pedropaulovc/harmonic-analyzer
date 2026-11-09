@@ -300,6 +300,11 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "McMaster 91829A560 supplied shoulder length +0.0508/0 mm; "
         "upper/lower deviations used by the platform's stock axial stack"
     ),
+    ("dt_vn_cone_shaft_key_spec", "SIZE_BAND"): (
+        "McMaster 98830A511 supplied undersized key-stock section +0/-0.0508 mm, "
+        "printed as supplier REF; cone_land_key's keyseat/keyway clearance proofs "
+        "read the same band as KEY_STOCK_BAND"
+    ),
     ("dt_crankshaft_spec", "SEAT_COLLAR_BAND"): (
         "the seat face's station deviations, indexed for the hub-to-sprocket air"
     ),

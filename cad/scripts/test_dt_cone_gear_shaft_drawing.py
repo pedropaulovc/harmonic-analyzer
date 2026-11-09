@@ -18,7 +18,9 @@ import dt_cone_gear_stack
 import cone_line
 import _cone_axis_constants
 import dt_cone_pivot_post_spec
+import cone_land_key
 import cone_shaft_land_bands
+import gear_seat_fit
 import cone_stack_end_play
 import dt_cone_tip_block_spec
 import dt_vn_cone_tip_collar_spec
@@ -80,6 +82,7 @@ def test_section_fits_are_toleranced_on_the_model() -> None:
     assert model_toleranced_dimensions(part) == {
         ("f'Sec{section}Profile'", "f'Sec{section}Dia'"): "*deviations(band)",
         ("f'Sec{land}FlatProfile'", "f'Sec{land}AF'"): "*deviations(FLAT_AF_BAND)",
+        ("Sec1KeyseatProfile", "name"): "*deviations(band)",
         ("ShoulderFillets", "ShoulderR"): "*deviations(FILLET_R_BAND)",
     }
 
@@ -205,6 +208,7 @@ def test_the_d_sections_print_the_corner_limit_clock_and_mates(monkeypatch):
     monkeypatch.setattr(drawing, "_cut_endpoints", lambda *_a: ((0.0, 0.0), (1.0, 0.0)))
     monkeypatch.setattr(drawing, "create_section_view", lambda *_a, label, **_k: label)
     monkeypatch.setattr(drawing, "_prepare_d_section", lambda *_a: None)
+    monkeypatch.setattr(drawing, "_keyseat_width_text_position", lambda *_a: (0.0, 0.0))
     monkeypatch.setattr(
         drawing, "curate_view_dimensions", lambda _a, _view, *, keep, **_k: list(keep)
     )
@@ -228,7 +232,7 @@ def test_the_d_sections_print_the_corner_limit_clock_and_mates(monkeypatch):
         ([terminal], {terminal: drawing.TORQUE_CORNER_CALLOUT}, "above"),
     ]
     assert [names for names, _texts in suffixes] == [
-        [f"Sec{land}AF"] for land in (1, 2, 3, 4)
+        ["Sec1KeyseatWidth"], *([f"Sec{land}AF"] for land in (2, 3, 4))
     ]
     assert len({texts[names[0]] for names, texts in suffixes}) == 1
 
@@ -261,14 +265,17 @@ def test_every_tight_band_names_its_mate_and_fit_route():
     }
     assert str(spec.STACK_NOTE) in drawing.STACK_FLAG_SUFFIX
     notes = spec.DRAWING_NOTES.splitlines()
-    land_note = " ".join(notes[:2])
+    land_note = " ".join(notes[:3])
     assert notes[0].startswith("1. ") and notes[1].startswith("   ")
+    assert notes[2].startswith("   ")
     for mate in ("dt-cone-gear", "dt-crank-drive-gear", "dt-vn-cone-tip-collar"):
         assert _config.parts(mate)["number"] in land_note
+    # Land 1's key (owner decision 2026-11-09, PR #1992) by its number.
+    assert "MHA-DT-VN-71" in notes[0]
     assert "CLEARANCE" in land_note
     # The three-place lengths name the stack they set once (rule 4).
     for mate in ("dt-cone-gear", "dt-crank-drive-gear"):
-        assert _config.parts(mate)["number"] in notes[2]
+        assert _config.parts(mate)["number"] in notes[3]
     # Every suffix is one line; every below callout carries at most two lines
     # of words (rule 7), a parenthesized REF clearance row beside them.
     assert not any("\n" in text for text in drawing.DIMENSION_SUFFIXES.values())
@@ -307,7 +314,8 @@ def test_display_precision_is_owned_by_the_part() -> None:
         "Sec2End": 3,
         "Sec3End": 3,
         "Sec4End": 2,
-        "Sec1AF": 4,
+        "Sec1KeyseatWidth": cone_land_key.KEYSEAT_PLACES,
+        "Sec1KeyseatS": cone_land_key.KEYSEAT_PLACES,
         "Sec2AF": 4,
         "Sec3AF": 4,
         "Sec4AF": 4,
@@ -423,8 +431,12 @@ def test_required_drawing_paths() -> None:
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert part.DRAWING_DIMENSIONS is dt_cone_gear_shaft_spec.DRAWING_DIMENSIONS
     marked = set().union(*dt_cone_gear_shaft_spec.DRAWING_DIMENSIONS.values())
+    # The sections print SECTION_DIMENSION_NAMES; the keyseat width's text is
+    # placed at build time on the keyseat's side, the rest at D_SECTION_KEEP.
+    sections = set().union(*drawing.SECTION_DIMENSION_NAMES.values())
+    assert set(drawing.D_SECTION_KEEP) <= sections
     assert (
-        set(drawing.SIDE_KEEP) | set(drawing.SIDE_DIAMETERS) | set(drawing.D_SECTION_KEEP)
+        set(drawing.SIDE_KEEP) | set(drawing.SIDE_DIAMETERS) | sections
         == marked
     )
     # Nothing is imported twice, and the donor hands over exactly the six
@@ -844,7 +856,7 @@ def test_each_d_section_cuts_its_own_land_clear_of_its_neighbours() -> None:
     big_end = drawing.SIDE_CENTER[0] + spec.SHAFT_LENGTH / 2000.0
     starts = (spec.COLLAR_END_STATION, *spec.SECTION_ENDS[1:-1])
     sections = drawing.D_SECTIONS
-    assert tuple(section.land for section in sections) == spec.FLAT_LANDS
+    assert tuple(section.land for section in sections) == (spec.KEYED_LAND, *spec.FLAT_LANDS)
     caption_w, caption_h = drawing.SECTION_CAPTION_SIZE
     cells = []
     for section, start in zip(sections, starts):
@@ -867,15 +879,15 @@ def test_each_d_section_cuts_its_own_land_clear_of_its_neighbours() -> None:
         assert across >= 15.0, section
         half = across / 2000.0
         x, y = section.centre
-        text_x, text_y = drawing.D_SECTION_KEEP[f"Sec{section.land}AF"]
+        name = drawing.SECTION_DIMENSION_NAMES[section.land][0]
+        text_x, text_y = drawing.D_SECTION_KEEP[name]
         assert text_x == x and text_y > y + half, section
-        # A's and the terminal land's across-flats carry one-line callouts,
-        # centred on their texts (20261010T071427837Z: the torque run reached
-        # 6.9 mm past the right border, and over C-C's outline); every one
-        # carries its gears after the value, the whole line centred.
-        name = f"Sec{section.land}AF"
+        # The terminal land's across-flat carries a one-line callout,
+        # centred on its text (20261010T071427837Z: the torque run reached
+        # 6.9 mm past the right border, and over C-C's outline); every
+        # across-flat carries its gears after the value, the whole line centred.
         callout_x, callout_y = drawing.SECTION_CALLOUT_REACH.get(name, (0.0, 0.005))
-        line = "8.763 -0.01" + spec.FLAT_MATE_SUFFIXES[name]
+        line = "8.763 -0.01" + spec.FLAT_MATE_SUFFIXES.get(name, "")
         text_half = len(line) * drawing.AF_CHAR_WIDTH / 2.0
         reach_x, reach_y = max(callout_x, text_half), callout_y
         cell = (
@@ -1266,11 +1278,12 @@ def test_custom_tip_collar_stays_wholly_on_the_terminal_land_at_printed_limits()
     assert collar_north_max <= shaft_tip_min
 
 
-def test_every_gear_land_carries_one_d_flat() -> None:
-    """User ruling 2026-09-28: each gear land is a D whose across-flat is its
-    section's; the flat's plane is the AF less the round half-diameter."""
+def test_lands_two_to_four_carry_one_d_flat() -> None:
+    """User ruling 2026-09-28: lands 2-4 are Ds whose across-flat is their
+    section's; the flat's plane is the AF less the round half-diameter.
+    Land 1 is round and keyed (owner decision 2026-11-09, PR #1992)."""
     spec = dt_cone_gear_shaft_spec
-    assert spec.FLAT_LANDS == (1, 2, 3, 4)
+    assert spec.FLAT_LANDS == (2, 3, 4)
     assert spec.SECTION_FLAT_AF is cone_shaft_land_bands.SECTION_FLAT_AF
     assert spec.FLAT_OFFSETS == pytest.approx(tuple(
         None if af is None else af - dia / 2.0
@@ -1285,26 +1298,62 @@ def test_every_gear_land_carries_one_d_flat() -> None:
     assert max(spec.FLAT_LANDS) == len(spec.SECTIONS) - 1
 
 
-def test_each_flat_is_cut_over_exactly_its_land(monkeypatch) -> None:
-    """Each flat is sketched on its land's end plane and cut blind back over
-    the land (the tip's from the end face): land 1 stops at the collar face,
-    every other at the step behind it."""
+def test_land_one_keyseat_runs_off_over_land_two_with_the_key_bands() -> None:
+    """The keyseat floor and the 64T/T030 keyway top stand outside land 2's
+    round at every print limit, so the keyseat runs out into air and the
+    keyed bores pass land 2; its two dimensions carry cone_land_key's bands
+    and places; the removed area is the exact circular strip."""
+    spec = dt_cone_gear_shaft_spec
+    key = cone_land_key
+    assert spec.SECTION_DIAS[spec.KEYED_LAND] == key.LAND_DIA_MM
+    assert spec.FLAT_OFFSETS[spec.KEYED_LAND] is None
+    land2_max = (spec.SECTION_DIAS[2] + spec.SECTION_DIA_BANDS[2][0]) / 2.0
+    land1_max = spec.SECTION_DIAS[1] + spec.SECTION_DIA_BANDS[1][0]
+    floor_min = key.limits(key.KEYSEAT_S_MM, key.KEYSEAT_S_BAND)[0] - land1_max / 2.0
+    assert floor_min > land2_max
+    bore_max = spec.SECTION_DIAS[1] + gear_seat_fit.seat_bore_band(spec.SECTION_DIA_BANDS[1])[0]
+    keyway_min = key.limits(key.KEYWAY_T_MM, key.KEYWAY_T_BAND)[0] - bore_max / 2.0
+    assert keyway_min > land2_max
+    assert spec.DRAWING_PRECISION["Sec1KeyseatProfile"] == {
+        "Sec1KeyseatWidth": key.KEYSEAT_PLACES,
+        "Sec1KeyseatS": key.KEYSEAT_PLACES,
+    }
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert '("Sec1KeyseatWidth", cone_land_key.KEYSEAT_WIDTH_BAND)' in source
+    assert '("Sec1KeyseatS", cone_land_key.KEYSEAT_S_BAND)' in source
+    # Exact strip area against a fine numerical integration.
+    radius = key.LAND_DIA_MM / 2.0
+    half = key.KEYSEAT_WIDTH_MM / 2.0
+    steps = 20000
+    dy = 2.0 * half / steps
+    numeric = sum(
+        (math.sqrt(radius**2 - (-half + (k + 0.5) * dy) ** 2) - key.KEYSEAT_FLOOR_OFFSET_MM) * dy
+        for k in range(steps)
+    )
+    assert part.keyseat_area() == pytest.approx(numeric, rel=1e-6)
+
+
+def test_each_cut_is_made_over_exactly_its_land(monkeypatch) -> None:
+    """Land 1's keyseat and each flat are sketched on their land's end plane
+    and cut blind back over the land (the tip's from the end face): land 1's
+    stops at the collar face, every other at the step behind it."""
     adapter, stubs, _sketch_dims, _gated = _stubbed_build(monkeypatch)
     spec = dt_cone_gear_shaft_spec
+    lands = (spec.KEYED_LAND, *spec.FLAT_LANDS)
     sketched = [c.args[0] for c in adapter.create_sketch.call_args_list]
-    for land in spec.FLAT_LANDS:
+    for land in lands:
         assert f"Sec{land}EndPlane" in sketched, land
     cuts = [c.args[0] for c in adapter.create_cut_extrude.call_args_list]
-    assert len(cuts) == len(spec.FLAT_LANDS)
+    assert len(cuts) == len(lands)
     starts = (spec.COLLAR_END_STATION, *spec.SECTION_ENDS[1:-1])
-    for params, land, start in zip(cuts, spec.FLAT_LANDS, starts):
+    for params, land, start in zip(cuts, lands, starts, strict=True):
         assert params.depth == pytest.approx(spec.SECTION_ENDS[land] - start), land
         assert not params.reverse_direction, land
     # The tip flat's cut starts at the end face: it runs out through the tip.
     assert spec.SECTION_ENDS[-1] == pytest.approx(spec.SHAFT_LENGTH)
     named = [c.args[1] for c in stubs["name_last_feature"].call_args_list]
-    assert [f"Sec{land}Flat" for land in spec.FLAT_LANDS] == [
-        name for name in named if name.endswith("Flat")
+    assert ["Sec1Keyseat", *(f"Sec{land}Flat" for land in spec.FLAT_LANDS)] == [
+        name for name in named if name.endswith(("Flat", "Keyseat"))
     ]
 
 
@@ -1344,8 +1393,9 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
     )
     numbered = [line.split(".")[0] for line in notes.splitlines() if not line.startswith(" ")]
     assert numbered == ["1", "2", "3"]
-    # Rule 7: at most four short lines, the RV-02 tailstock line included.
-    assert len(notes.splitlines()) <= 4
+    # Rule 7: few short lines, the RV-02 tailstock line included (the land
+    # note's third line names land 1's key, PR #1992).
+    assert len(notes.splitlines()) <= 5
     tailstock = [line for line in notes.splitlines() if "TAILSTOCK" in line.upper()]
     assert len(tailstock) == 1
     for forbidden in (
@@ -1496,6 +1546,10 @@ def test_every_station_knob_owns_its_plane_and_depth(monkeypatch) -> None:
         )
         assert records[f"Sec{land}AF"] == f'"SecAF{land}"'
         assert records[f"Sec{land}FarSide"] == f'"SecDia{land}" / 2'
+    assert owners["Sec1KeyseatLength@Sec1Keyseat"] == part.flat_length_expression(1)
+    assert records["Sec1KeyseatWidth"] == '"Sec1KeyseatW"'
+    assert records["Sec1KeyseatS"] == '"Sec1KeyseatS"'
+    assert records["Sec1FarSide"] == '"SecDia1" / 2'
 
 
 def test_station_owners_cover_every_knob_once() -> None:
@@ -1811,6 +1865,8 @@ def test_every_land_is_placed_from_its_chucking_origin(monkeypatch) -> None:
         assert knobs[f"SecEnd{i}"] == f"{knob}mm"
     for land in spec.FLAT_LANDS:
         assert knobs[f"SecAF{land}"] == f"{spec.SECTION_FLAT_AF[land]}mm"
+    assert knobs["Sec1KeyseatW"] == f"{cone_land_key.KEYSEAT_WIDTH_MM}mm"
+    assert knobs["Sec1KeyseatS"] == f"{cone_land_key.KEYSEAT_S_MM}mm"
     assert "CollarEnd" not in knobs
 
 

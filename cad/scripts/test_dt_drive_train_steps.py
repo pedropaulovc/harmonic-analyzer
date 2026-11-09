@@ -67,7 +67,13 @@ def test_the_cone_stack_step_prints_measured_limits() -> None:
     stack = _step_body("cone-gears-stacked")
     assert "MHA-DT-07" in stack and "MHA-DT-03" in stack
     assert "T120 FIRST THROUGH T006" in stack
-    assert "EACH FLAT TO FLAT AND AGAINST THE LAST" in stack
+    # Owner decision C1 keyed (2026-11-09, PR #1992): the land-1 key goes in
+    # before any gear slides over it.
+    key = _config.parts("dt-vn-cone-shaft-key")["number"]
+    assert stack.index(f"SEAT {key} IN THE MHA-DT-04 KEYSEAT") < stack.index(
+        "SLIDE MHA-DT-07"
+    )
+    assert f"SLIDE MHA-DT-07 ON {key}" in stack
     # The decimal-inch window rounds inward, a thousandth inside each limit.
     printed = re.search(r"T006 BACK FACE: ACCEPT (\d*\.\d{3})-(\d*\.\d{3})\.", stack)
     assert printed is not None

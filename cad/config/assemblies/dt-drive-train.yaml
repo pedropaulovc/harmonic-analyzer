@@ -24,6 +24,11 @@ flip_invert:
   - cam follower back seat depth
   - cam follower front seat depth
   - cone gear axial seat
+  # MHA-DT-VN-71 (owner decision C1 keyed, 2026-11-09, PR #1992): its Front
+  # and Right planes sit on the + side of the shaft's same-sense planes, as
+  # the cone gears' Front planes do; seeded by that precedent, not yet read.
+  - cone key axial seat
+  - cone key on the keyseat floor
   - cone platform height
   - crankshaft axial (on the plate)
   - lever axial seat
@@ -48,6 +53,9 @@ allowed_free_stems:
   # MHA-DT-VN-69 is pressed in the MHA-DT-21 foot and rides the swing (rule-23
   # retention, owner ruling 2026-11-07, PR #2248).
   - dt-vn-locating-pin
+  # MHA-DT-VN-71 sits in the MHA-DT-04 keyseat and rides the shaft's spin
+  # and swing (owner decision C1 keyed, 2026-11-09, PR #1992).
+  - dt-vn-cone-shaft-key
   - dt-vn-cone-tip-collar
   - dt-vn-cone-tip-pinch-screw
   - dt-crank-arm

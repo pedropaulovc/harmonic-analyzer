@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 
 import _config
+import cone_land_key
 import cone_line
 import build_dt_crank_drive_gear as part
 import dt_cone_gear_shaft_spec
@@ -54,7 +55,8 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     kept = set(drawing.FRONT_KEEP) | set(drawing.SECTION_KEEP)
     assert kept == marked == {
-        "OutsideDia", "FaceWidth", "BoreDia", "BoreAF", "BoreSouthChamferSize"
+        "OutsideDia", "FaceWidth", "BoreDia", "KeywayWidth", "KeywayT",
+        "BoreSouthChamferSize",
     }
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
 
@@ -106,7 +108,7 @@ def test_precision_is_authored_on_the_part_and_only_read_by_the_sheet() -> None:
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in _build_source()
 
 
-def test_bore_bands_fit_both_sec1_land_dimensions_at_every_limit() -> None:
+def test_bore_band_fits_the_keyed_land_at_every_limit() -> None:
     land_upper, land_lower = cone_shaft_land_bands.SECTION_DIA_BANDS[1]
     bore_upper, bore_lower = spec.BORE_DIA_BAND
     assert (
@@ -114,66 +116,74 @@ def test_bore_bands_fit_both_sec1_land_dimensions_at_every_limit() -> None:
         bore_upper - land_lower,
     ) == pytest.approx(gear_seat_fit.GEAR_SEAT_CLEARANCE)
     assert spec.BORE_DIA == pytest.approx(dt_cone_gear_shaft_spec.SECTION_DIAS[1])
-    assert spec.BORE_AF == cone_shaft_land_bands.SECTION_FLAT_AF[1] == 8.763
-    bore_upper, bore_lower = spec.BORE_AF_BAND
-    land_upper, land_lower = cone_shaft_land_bands.FLAT_AF_BAND
-    assert (
-        bore_lower - land_upper,
-        bore_upper - land_lower,
-    ) == pytest.approx(gear_seat_fit.FLAT_AF_CLEARANCE)
-    assert spec.BORE_AF_BAND == pytest.approx((0.02032, 0.01016))
-    assert set(spec.DRAWING_DIMENSIONS["BoreProfile"]) == {"BoreDia", "BoreAF"}
-    assert set(spec.DRAWING_PRECISION["BoreProfile"]) == {"BoreDia", "BoreAF"}
+    assert spec.BORE_DIA == pytest.approx(cone_land_key.LAND_DIA_MM)
+    assert spec.DRAWING_DIMENSIONS["BoreProfile"] == {"BoreDia", "KeywayWidth", "KeywayT"}
+    assert spec.DRAWING_PRECISION["BoreProfile"] == {
+        "BoreDia": 4,
+        "KeywayWidth": cone_land_key.KEYWAY_PLACES,
+        "KeywayT": cone_land_key.KEYWAY_PLACES,
+    }
 
 
-def test_D_bore_cut_area_is_smaller_than_a_round_bore() -> None:
-    r = spec.BORE_DIA / 2.0
-    flat_x = spec.BORE_AF - r
-    assert 0 < flat_x < r
-    # The closing chord is to the +X side of centre; the remaining arc goes
-    # through -X (not the short discarded cap on +X).
-    assert 360.0 - 2.0 * math.degrees(math.acos(flat_x / r)) > 180.0
-    segment = r * r * math.acos(flat_x / r) - flat_x * math.sqrt(r * r - flat_x * flat_x)
-    assert segment > 0
-    assert math.pi * r * r - segment > 0
-
-
-def test_south_chamfer_covers_print_worst_end_mill_crescent() -> None:
-    shaft_r = (
-        dt_cone_gear_shaft_spec.SECTION_DIAS[1]
-        + cone_shaft_land_bands.SECTION_DIA_BANDS[1][0]
-    ) / 2
-    flat_offset = (
-        cone_shaft_land_bands.SECTION_FLAT_AF[1]
-        + cone_shaft_land_bands.FLAT_AF_BAND[1]
-        - shaft_r
+def test_keyway_takes_the_key_and_leaves_the_web_target() -> None:
+    # The keyway's numbers are cone_land_key's, not a fork.
+    assert (spec.KEYWAY_WIDTH, spec.KEYWAY_WIDTH_BAND) == (
+        cone_land_key.KEYWAY_WIDTH_MM, cone_land_key.KEYWAY_WIDTH_BAND
     )
-    half_chord = math.sqrt(shaft_r**2 - flat_offset**2)
-    cutter_r = spec.MIN_FLAT_CUTTER_RADIUS
-    assert cutter_r == 4.0  # minimum Ø8 cutter: anything larger leaves less runout
+    assert (spec.KEYWAY_T, spec.KEYWAY_T_BAND) == (
+        cone_land_key.KEYWAY_T_MM, cone_land_key.KEYWAY_T_BAND
+    )
+    # The key slides in the keyway and clears its top at every limit.
+    width_min = spec.KEYWAY_WIDTH + spec.KEYWAY_WIDTH_BAND[1]
+    key_max = cone_land_key.KEY_SIZE_MM + cone_land_key.KEY_STOCK_BAND[0]
+    assert width_min >= key_max
+    t_min = spec.KEYWAY_T + spec.KEYWAY_T_BAND[1]
+    s_max = cone_land_key.KEYSEAT_S_MM + cone_land_key.KEYSEAT_S_BAND[0]
+    assert t_min - s_max - key_max > 0.0
+    # The keyway top sits outside the bore, on +X.
+    assert spec.BORE_DIA / 2 < spec.KEYWAY_TOP_OFFSET < spec.ROOT_DIA_MIN / 2
+    # Rule 17: the web from the keyway's widest, deepest corner (T max, bore
+    # min) to the minimum root circle meets the .080 target.
+    corner = math.hypot(
+        t_min + (spec.KEYWAY_T_BAND[0] - spec.KEYWAY_T_BAND[1])
+        - (spec.BORE_DIA + spec.BORE_DIA_BAND[1]) / 2,
+        (spec.KEYWAY_WIDTH + spec.KEYWAY_WIDTH_BAND[0]) / 2,
+    )
+    assert spec.KEYWAY_CORNER_RADIUS_MAX == pytest.approx(corner)
+    assert spec.KEYWAY_WEB_MIN == pytest.approx(spec.ROOT_DIA_MIN / 2 - corner)
+    assert spec.KEYWAY_WEB_MIN >= 0.080 * 25.4
 
-    def horn_plus_runout(y: float) -> float:
-        return (
-            math.sqrt(shaft_r**2 - y**2) - flat_offset
-            + cutter_r - math.sqrt(cutter_r**2 - y**2)
-        )
 
-    # The derivative is y(1/sqrt(Rc²-y²)-1/sqrt(Rshaft²-y²))>0
-    # throughout the half-chord because Rc<Rshaft: the corner is the max.
-    samples = [horn_plus_runout(half_chord * i / 128) for i in range(129)]
-    assert samples == sorted(samples)
-    assert spec.MAX_FLAT_CRESCENT == pytest.approx(samples[-1])
-    # The leg prints at .XX under the title block's band alone, and that band's
-    # minimum still clears the crescent; the part authors no band of its own.
+def test_keyed_bore_area_matches_a_sampled_profile() -> None:
+    radius = spec.BORE_DIA / 2
+    half = spec.KEYWAY_WIDTH / 2
+    top_x = spec.KEYWAY_TOP_OFFSET
+    # Independent midpoint integration across y of the keyhole's chord.
+    slices = 4000
+    dy = 2 * radius / slices
+    reference = 0.0
+    for i in range(slices):
+        y = -radius + (i + 0.5) * dy
+        chord = math.sqrt(radius * radius - y * y)
+        right = max(chord, top_x) if abs(y) <= half else chord
+        reference += (chord + right) * dy
+    assert part._keyed_bore_area(radius, half, top_x) == pytest.approx(reference, abs=0.005)
+
+
+def test_south_chamfer_clears_the_collar_root_and_prints_title_block_band() -> None:
     grade = printed_band_mm(2, unit=spec.UNIT)
     assert spec.BORE_SOUTH_CHAMFER_MIN == pytest.approx(spec.BORE_SOUTH_CHAMFER - grade)
     assert spec.BORE_SOUTH_CHAMFER_MAX == pytest.approx(spec.BORE_SOUTH_CHAMFER + grade)
     assert spec.DRAWING_PRECISION["BoreSouthChamfer"]["BoreSouthChamferSize"] == 2
-    assert spec.MAX_FLAT_CRESCENT < spec.BORE_SOUTH_CHAMFER_MIN
+    # The mirrored collar root is the shaft spec's.
+    assert spec._SHAFT_COLLAR_ROOT_RADIUS_MAX == pytest.approx(
+        dt_cone_gear_shaft_spec.COLLAR_ROOT_RADIUS_MAX
+    )
+    assert spec.BORE_SOUTH_CHAMFER_MIN > dt_cone_gear_shaft_spec.COLLAR_ROOT_RADIUS_MAX
     assert '"BoreSouthChamfer", "BoreSouthChamferSize"' not in _build_source()
 
 
-def test_chamfer_leaves_a_collar_bearing_annulus_and_flat_engagement() -> None:
+def test_chamfer_leaves_a_collar_bearing_annulus_and_bore_engagement() -> None:
     collar_min_r = (
         dt_cone_gear_shaft_spec.COLLAR_DIA
         + dt_cone_gear_shaft_spec.STOCK_DIA_BAND[1]
@@ -183,34 +193,43 @@ def test_chamfer_leaves_a_collar_bearing_annulus_and_flat_engagement() -> None:
     annulus = collar_min_r - bore_max_r - chamfer_max
     assert spec.COLLAR_BEARING_ANNULUS == pytest.approx(annulus)
     assert annulus > 0.0
-    assert spec.FACE_WIDTH - spec.BORE_SOUTH_CHAMFER > spec.FLAT_ENGAGEMENT_MIN
-    assert spec.FLAT_ENGAGEMENT_MIN == pytest.approx(
+    assert spec.FACE_WIDTH - spec.BORE_SOUTH_CHAMFER > spec.BORE_ENGAGEMENT_MIN
+    assert spec.BORE_ENGAGEMENT_MIN == pytest.approx(
         spec.FACE_WIDTH + spec.FACE_WIDTH_BAND[1] - chamfer_max
     )
-    assert spec.FLAT_ENGAGEMENT_MIN > 0
+    assert spec.BORE_ENGAGEMENT_MIN > 0
 
 
-def test_chamfer_volume_tracks_both_D_bore_walls() -> None:
+def test_chamfer_volume_excludes_the_keyway() -> None:
     radius = spec.BORE_DIA / 2
-    flat_x = spec.BORE_AF - radius
+    half = spec.KEYWAY_WIDTH / 2
+    top_x = spec.KEYWAY_TOP_OFFSET
     leg = spec.BORE_SOUTH_CHAMFER
-    # Independent axial integration of the D-shaped section: the circular
-    # arc and the straight flat both advance by the 45° leg at the mouth.
-    def area(offset: float) -> float:
-        r, chord = radius + offset, flat_x + offset
-        return math.pi * r * r - (
-            r * r * math.acos(chord / r)
-            - chord * math.sqrt(r * r - chord * chord)
-        )
 
-    baseline = area(0)
-    slices = 1024
+    # Independent: at each depth, the grown annulus less the keyway slot,
+    # integrated across y by midpoints.
+    def added(offset: float) -> float:
+        grown = radius + offset
+        slices = 800
+        dy = 2 * grown / slices
+        total = 0.0
+        for i in range(slices):
+            y = -grown + (i + 0.5) * dy
+            outer = math.sqrt(grown * grown - y * y)
+            inner = math.sqrt(max(radius * radius - y * y, 0.0))
+            ring = 2 * (outer - inner)
+            if abs(y) <= half:
+                # The slot covers x in [inner, top_x] on +X.
+                ring -= max(0.0, min(outer, top_x) - inner)
+            total += ring * dy
+        return total
+
+    slices = 64
     reference = sum(
-        (area(leg * i / slices) - baseline) * (0.5 if i in (0, slices) else 1)
-        for i in range(slices + 1)
+        added(leg * (i + 0.5) / slices) for i in range(slices)
     ) * leg / slices
-    removed = part._bore_south_chamfer_volume(radius, flat_x, leg)
-    assert removed == pytest.approx(reference, abs=0.001)
+    removed = part._bore_south_chamfer_volume(radius, half, top_x, leg)
+    assert removed == pytest.approx(reference, rel=0.01)
     assert 0 < removed < math.pi * leg**2 * (radius + leg / 3)
 
 
@@ -242,7 +261,7 @@ def test_print_carries_no_gdt_basic_dimensions_or_roughness() -> None:
     # drawing-guidelines.md rule 5 (avoid excessive GD&T): a gear on a shaft
     # land is not on the GD&T allowlist, so the end-face perpendicularity
     # frame, the tooth-tip runout frame and the bore datum are gone. Rule 6
-    # puts no roughness on a gear's D-bore or seat bore: it does not run.
+    # puts no roughness on a gear's seat bore: it does not run.
     source = _source()
     for helper in (
         "add_datum_feature(",
@@ -481,38 +500,35 @@ def test_notes_do_not_substitute_for_native_fit_dimensions() -> None:
         for line in notes.GEAR_DATA.splitlines()
     )
     assert notes.SHAFT_MATE_NUMBER == _config.parts("dt-cone-gear-shaft")["number"]
+    assert notes.KEY_MATE_NUMBER == _config.parts("dt-vn-cone-shaft-key")["number"]
     assert drawing.SHAFT_MATE_NAME == _config.parts("dt-cone-gear-shaft")["title"].upper()
     assert not hasattr(notes, "ATTACHMENT_PROCESS")
     assert not hasattr(notes, "ATTACHMENT_ALTERNATIVE")
 
 
-def test_both_d_bore_dimensions_link_one_matched_fit_note() -> None:
-    # Screen of the novice rubric (#2223): the round and across-flat bands
-    # (.0008 and .0004 wide) are narrower than the turned-diameter and
-    # milled-width rows, so the fit route is a matched fit to the measured
-    # MHA-DT-04 land with an acceptance (rule 4). One feature, two tight
-    # dimensions: the mate and standard fit name print once, in note 1, and
-    # both dimensions link it. The limits stay (fleet gear_seat_fit); the
-    # clearances print as reference. No process word (RV-01).
+def test_bore_and_keyway_dimensions_link_one_matched_fit_note() -> None:
+    # The round band (.0008 wide) is narrower than the turned-diameter row, so
+    # the fit route is a matched fit to the measured MHA-DT-04 land 1 with an
+    # acceptance (rule 4). One feature, several tight dimensions: the mates
+    # print once, in note 1, and every bore and keyway dimension links it.
+    # The round bore takes rule 12's REAM now no flat is left to cut away.
     link = f"SEE NOTE {drawing.BORE_FIT_NOTE_NUMBER}"
-    assert drawing.DIMENSION_CALLOUTS["BoreDia"] == f"THRU\n{link}"
-    assert drawing.DIMENSION_CALLOUTS["BoreAF"] == f"BORE ACROSS FLAT\n{link}"
-    for name in ("BoreDia", "BoreAF"):
+    assert drawing.DIMENSION_CALLOUTS["BoreDia"] == f"REAM THRU\n{link}"
+    for name in ("KeywayWidth", "KeywayT"):
+        callout = drawing.DIMENSION_CALLOUTS[name]
+        assert callout.startswith("KEYWAY") and callout.endswith(link), name
+    for name in ("BoreDia", "KeywayWidth", "KeywayT"):
         callout = drawing.DIMENSION_CALLOUTS[name]
         assert notes.SHAFT_MATE_NUMBER not in callout, name
-        assert "CLEARANCE" not in callout and "REAM" not in callout, name
+        assert notes.KEY_MATE_NUMBER not in callout, name
+        assert "CLEARANCE" not in callout, name
     note = " ".join(line.strip() for line in drawing.BORE_FIT_NOTE.splitlines())
-    round_low, round_high = gear_seat_fit.GEAR_SEAT_CLEARANCE
-    flat_low, flat_high = gear_seat_fit.FLAT_AF_CLEARANCE
-    assert note == (
-        "1. SLIDING FIT ON CONE GEAR SHAFT MHA-DT-04, MADE TO ITS MEASURED LAND "
-        f"(CLEARANCE {spec.inch_text(round_low, 4)}-{spec.inch_text(round_high, 4)}, "
-        f"ACROSS FLAT {spec.inch_text(flat_low, 4)}-{spec.inch_text(flat_high, 4)}); "
-        "SLIDES ON, NO ROCK."
-    )
     assert note.startswith(f"{drawing.BORE_FIT_NOTE_NUMBER}. ")
-    for private in ("DIAMETRAL", "AF CLEARANCE", "REAM"):
-        assert private not in drawing.SHEET_NOTES, private
+    assert f"{notes.SHAFT_MATE_NUMBER} LAND 1" in note
+    assert notes.KEY_MATE_NUMBER in note
+    # Rule 7: the note carries no dimension and no flat.
+    assert "." not in note.split(". ", 1)[1].rstrip(".")
+    assert "FLAT" not in drawing.SHEET_NOTES
     assert len(drawing.SHEET_NOTES.splitlines()) <= 4
     assert "add_note(adapter, SHEET_NOTES, *NOTES_XY)" in _source()
 
@@ -542,7 +558,7 @@ def test_sheet_runs_at_3_to_2_with_every_view_at_sheet_scale() -> None:
 
 
 def test_hidden_lines_are_off_and_helical_tangent_edges_are_dropped() -> None:
-    # The face view shows the arc and flat in solid lines, and the centre
+    # The face view shows the bore and keyway in solid lines, and the centre
     # section cuts the bore open, so hidden edges add no requirement; the
     # helical flanks project dense tangent curves, removed from orthographic
     # views only.
@@ -619,11 +635,16 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
     assert sx + face_half < drawing.ISO_CENTER[0] - half_od
     # The gear-data column stays left of every dimension the face view places.
     assert drawing.GEAR_DATA_POS[0] < min(x for x, _ in drawing.FRONT_KEEP.values())
-    # The AF callout and the chamfer stand in the lane between the tooth tips
-    # and the section's south face, the chamfer under the AF block. The leg's
-    # text sits left of its dimension line, which stands at the keep x (r1 of
-    # #1641 read the text's right edge back at the keep).
-    af = _text_box(drawing.FRONT_KEEP["BoreAF"], drawing.AF_CALLOUT, "8.763 +0.020")
+    # The keyway T and width callouts and the chamfer stand in the lane between
+    # the tooth tips and the section's south face, the chamfer between them.
+    # The leg's text sits left of its dimension line, which stands at the keep
+    # x (r1 of #1641 read the text's right edge back at the keep).
+    keyway_t = _text_box(
+        drawing.FRONT_KEEP["KeywayT"], drawing.KEYWAY_T_CALLOUT, "0.4055 \N{PLUS-MINUS SIGN}0.0010"
+    )
+    keyway_width = _text_box(
+        drawing.FRONT_KEEP["KeywayWidth"], drawing.KEYWAY_WIDTH_CALLOUT, "0.0625 +0.0010"
+    )
     chamfer_keep = drawing.SECTION_KEEP["BoreSouthChamferSize"]
     centred = _text_box(
         chamfer_keep, drawing.DIMENSION_CALLOUTS["BoreSouthChamferSize"], "1.50"
@@ -631,10 +652,11 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
     shift = chamfer_keep[0] - centred[2]
     chamfer = (centred[0] + shift, centred[1], centred[2] + shift, centred[3])
     section_left = sx - face_half - _VIEW_OUTLINE_PAD
-    for box in (af, chamfer):
+    for box in (keyway_t, keyway_width, chamfer):
         assert _box_distance(box, drawing.FRONT_CENTER) > half_od + _VIEW_OUTLINE_PAD + 0.003
         assert box[2] < section_left - 0.003
-    assert chamfer[3] < af[1] - 0.003
+    assert chamfer[3] < keyway_t[1] - 0.003
+    assert keyway_width[3] < chamfer[1] - 0.003
     # The chamfer's leg dimension runs off the south face at bore height.
     assert sy - half_od < drawing.SECTION_KEEP["BoreSouthChamferSize"][1] < sy
     # The caption hangs under the section and over the title block, the
@@ -746,9 +768,9 @@ def test_outside_dia_reference_is_saved_hidden_and_imported_per_view() -> None:
 
 
 def test_face_view_leaders_have_separate_landings() -> None:
-    # The round diameter and AF need room around the D-bore; the
+    # The round diameter and keyway dimensions need room around the bore; the
     # tip-diameter arrow belongs on the near tooth silhouette, and only the
-    # AF dimension (it spans the axis) may meet the A-A cutting line.
+    # keyway T dimension (it spans the axis) may meet the A-A cutting line.
     import _drawing_leaders as leaders
 
     cx, cy = drawing.FRONT_CENTER
@@ -756,16 +778,19 @@ def test_face_view_leaders_have_separate_landings() -> None:
     assert r == pytest.approx(spec.BORE_DIA * 1.5 / 2000.0)
     tip_text = drawing.FRONT_KEEP["OutsideDia"]
     bore_text = drawing.FRONT_KEEP["BoreDia"]
-    af_text = drawing.FRONT_KEEP["BoreAF"]
+    t_text = drawing.FRONT_KEEP["KeywayT"]
+    width_text = drawing.FRONT_KEEP["KeywayWidth"]
     assert bore_text[0] < cx and bore_text[1] < cy
-    assert af_text[0] > cx and af_text[1] > cy
+    assert t_text[0] > cx and t_text[1] > cy
+    assert width_text[0] > cx and width_text[1] < cy
     assert tip_text[0] > cx and tip_text[1] > cy + drawing.HALF_OD
     angle = math.atan2(bore_text[1] - cy, bore_text[0] - cx)
     bore = [(bore_text, (cx + r * math.cos(angle), cy + r * math.sin(angle)))]
-    flat_x = (spec.BORE_AF - spec.BORE_DIA / 2) * drawing.VIEW_SCALE[0] / (
-        1000 * drawing.VIEW_SCALE[1]
-    )
-    af = [(af_text, (cx + flat_x, cy))]
+    sheet = drawing.VIEW_SCALE[0] / (1000 * drawing.VIEW_SCALE[1])
+    top_x = spec.KEYWAY_TOP_OFFSET * sheet
+    half_width = spec.KEYWAY_WIDTH / 2 * sheet
+    keyway_t = [(t_text, (cx + top_x, cy))]
+    keyway_width = [(width_text, (cx + top_x, cy - half_width))]
     # The broken leader leaves the shelf under the callout's last line at
     # its end nearer the gear, aimed at the centre.
     tip_box = _text_box(tip_text, drawing.TIP_DIA_CALLOUT, _TIP_DIA_TEXT)
@@ -778,13 +803,15 @@ def test_face_view_leaders_have_separate_landings() -> None:
     cutting_line = [((cx - reach, cy), (cx + reach, cy))]
     assert leaders.distance_to_point(old_tip[0], (cx, cy)) < drawing.TIP_DIA_KEEP_OUT
     leaders.assert_leaders_clear(
-        {"OutsideDia": new_tip, "BoreDia": bore, "BoreAF": af},
+        {"OutsideDia": new_tip, "BoreDia": bore, "KeywayT": keyway_t,
+         "KeywayWidth": keyway_width},
         centre=(cx, cy),
         keep_out={"OutsideDia": drawing.TIP_DIA_KEEP_OUT},
         lands_within={
             "OutsideDia": drawing.TIP_DIA_LANDING,
             "BoreDia": drawing.BORE_LANDING,
-            "BoreAF": drawing.BORE_LANDING,
+            "KeywayT": drawing.BORE_LANDING,
+            "KeywayWidth": drawing.BORE_LANDING,
         },
         label="gear bore layout",
     )
@@ -792,6 +819,7 @@ def test_face_view_leaders_have_separate_landings() -> None:
         {
             "OutsideDia": new_tip,
             "BoreDia": bore,
+            "KeywayWidth": keyway_width,
             "SectionLine": cutting_line,
         },
         centre=(cx, cy),
@@ -799,11 +827,12 @@ def test_face_view_leaders_have_separate_landings() -> None:
         lands_within={
             "OutsideDia": drawing.TIP_DIA_LANDING,
             "BoreDia": drawing.BORE_LANDING,
+            "KeywayWidth": drawing.BORE_LANDING,
             "SectionLine": drawing.SECTION_LINE_LANDING,
         },
         label="gear leaders vs A-A",
     )
-    # The cut runs along the bore axis through the flat: the tip leader stays
+    # The cut runs along the bore axis through the keyway: the tip leader stays
     # above it, the bore leader below it.
     assert min(new_tip[0][0][1], new_tip[0][1][1]) > cy + 0.005
     assert max(bore[0][0][1], bore[0][1][1]) < cy

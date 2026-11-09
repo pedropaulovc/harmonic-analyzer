@@ -106,11 +106,14 @@ GEAR_DATA = gear_data_note(
     ]
 )
 
-# The local +X flat and the paired shaft seat are defined by the native
-# BoreAF and BoreDia dimensions; the assembly's stack locates this gear.
+# The +X keyway, its key and the paired shaft seat are defined by the native
+# BoreDia, KeywayWidth and KeywayT dimensions; the assembly's stack locates
+# this gear.
 # The seat's owner, quoted only to identify the mate (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)). Hard-coded
 # rather than read from ``_config.parts``: this module is in the part's
 # rebuild closure, and a cross-part config read would make cone-gear-shaft.yaml
 # a rebuild dependency of this gear. ``test_crank_drive_gear_drawing`` checks
 # it against the registry offline, where a cross-check costs nothing.
 SHAFT_MATE_NUMBER = "MHA-DT-04"
+# The key the keyway takes, quoted the same way and cross-checked the same way.
+KEY_MATE_NUMBER = "MHA-DT-VN-71"

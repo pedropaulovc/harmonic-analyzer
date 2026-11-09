@@ -28,7 +28,7 @@ Components of a built-up part are the detail parts a finished part may be made f
 |---|---|---:|---:|
 | `ha` / `HA` | Harmonic analyzer | 0 | 0 |
 | `ch` / `CH` | Channel | 13 | 7 |
-| `dt` / `DT` | Drive train | 34 | 15 |
+| `dt` / `DT` | Drive train | 34 | 16 |
 | `fr` / `FR` | Frame | 5 | 4 |
 | `mg` / `MG` | Magnifier | 10 | 4 |
 | `pd` / `PD` | Paper drive | 23 | 13 |
@@ -457,6 +457,7 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | part | — | — | — | — | `pd-vn-transgear-cluster-shim` | MHA-PD-VN-68 |
 | part | — | — | — | — | `dt-vn-keeper-chain-screw` | MHA-DT-VN-70 |
 | part | — | — | — | — | `dt-vn-locating-pin` | MHA-DT-VN-69 |
+| part | — | — | — | — | `dt-vn-cone-shaft-key` | MHA-DT-VN-71 |
 | part | `column-clamp-front` | MHA-105 | `sh-column-clamp-front` | MHA-SH-001 | `sh-column-clamp-front` | MHA-SH-01 |
 | part | `column-clamp-back` | MHA-106 | `sh-column-clamp-back` | MHA-SH-002 | `sh-column-clamp-back` | MHA-SH-02 |
 | retired tooling part | — | — | `ch-rocker-arm-tl-vise-stop` | MHA-CH-006-TL-01 | — | MHA-CH-06-TL-01 (retired; never reissued) |
@@ -763,3 +764,4 @@ A retired Number is never reused. A family added after a cutover takes the next 
 | retired | `sm-gooseneck-spring-screw` | MHA-SM-04 | Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: the shop-turned 1/4-28 cheese-head screw that clamped the counter spring's upper eye gives way to the purchased MHA-SM-VN-56 shoulder screw, the eye riding free on its shoulder (superseding #1951's clamped eye); no registry, builder or drawing; stem and Number never reissued |
 | added | `sm-vn-gooseneck-shoulder-screw` | MHA-SM-VN-56 | Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: McMaster-Carr 91829A566 slotted 18-8 stainless precision shoulder screw, 1/4 x 3/8 in shoulder, 10-24 thread (owner ruling 2026-11-08 (Pedro), #2144 item 11.4: bare slotted McMaster 91829A566, washer dropped); its shoulder seats on the gooseneck's end face in a plain blind tap (the MHA-SM-01 end piece's at the time; the MHA-SM-05 end plug's since owner rulings 2026-11-08 (Pedro), #2315), and the MHA-SM-VN-51 upper eye rides free on it |
 | added | `sm-gooseneck-end-plug` | MHA-SM-05 | Owner rulings 2026-11-08 (Pedro), #2315: turned AISI 1018 end plug, its own part with its own drawing and MHA-SM-00 BOM row and step (not `component_of`): Ø.500 head x .60, flush with MHA-SM-01's tube, and a Ø.363 spigot x .42 turned to the measured tube bore (.0040-.0098 clearance), bonded into MHA-SM-01's faced arm end with LOCTITE 638 at MHA-SM-00 and cured 24 h before the screw goes in; tapped #10-24 UNC-2B blind before bonding for the MHA-SM-VN-56 shoulder screw (owner minor RV-01: ENGAGEMENT .220 MIN (1.16D)); bare, no plating. It replaces MHA-SM-01's brazed end piece; no sleeve and no MHA-SM-06 |
+| added | `dt-vn-cone-shaft-key` | MHA-DT-VN-71 | Owner decision C1 keyed, 2026-11-09 ([PR #1992](https://github.com/pedropaulovc/harmonic-analyzer/pull/1992)): 1008-1045 carbon steel machine key stock, 1/16 x 1/16, undersized, McMaster-Carr 98830A511, cut to length, x1; sits in the MHA-DT-04 land-1 keyseat and drives the 64T (MHA-DT-07) and T030–T120 (MHA-DT-03) through their broached keyways, superseding the land-1 D-flat of the 2026-09-28 ruling |

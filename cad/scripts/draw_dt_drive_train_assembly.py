@@ -691,6 +691,7 @@ BOM_PART_NUMBERS = {
     "dt-vn-cone-tip-pinch-screw": "MHA-DT-VN-56",
     "dt-vn-cone-tip-block-screw": "MHA-DT-VN-60",
     "dt-vn-locating-pin": "MHA-DT-VN-69",
+    "dt-vn-cone-shaft-key": "MHA-DT-VN-71",
     "dt-vn-post-mount-screw": str(_config.parts("dt-vn-post-mount-screw")["number"]),
     "dt-vn-cone-lock-knob": "MHA-DT-VN-51",
     "dt-vn-cone-pivot-screw": "MHA-DT-VN-52",
@@ -745,6 +746,7 @@ BOM_DESCRIPTIONS = {
     "dt-vn-cone-tip-pinch-screw": "#4-40 FILLISTER SCREW, MCMASTER 91794A112",
     "dt-vn-cone-tip-block-screw": "#4-40 X 3/8 SHCS, MCMASTER 91251A108",
     "dt-vn-locating-pin": "1/16 X 3/8 DOWEL PIN, MCMASTER 98381A417",
+    "dt-vn-cone-shaft-key": "1/16 SQ KEY STOCK, MCMASTER 98830A511",
     "dt-vn-post-mount-screw": (
         f"{post_screw.THREAD} X {post_screw.STOCK_LENGTH_MM / 25.4:g} FILLISTER STOCK, "
         f"MSC {post_screw.SKU}"
@@ -1244,16 +1246,22 @@ def inch_envelope(limits_mm: tuple[float, float], places: int) -> str:
 CONE_CRANK_STEPS = _note_text(
     (
         f"ASSEMBLY SEQUENCE - CONE SET AND CRANK {CODE_KEY_POINTER}",
-        # Slide the one flat of every gear onto the shaft and close the
-        # accepted stack against its collar before setting tip end play.
-        "1. SLIDE MHA-DT-07 ONTO THE MHA-DT-04 D-FLAT AGAINST ITS COLLAR.",
-        "1A. SLIDE {cone_gears}X MHA-DT-03 ON, T120 FIRST THROUGH T006, EACH FLAT TO",
-        "   FLAT AND AGAINST THE LAST.",
-        f"1B. MEASURE THE {CONE_GEAR_COUNT}-GEAR STACK, T120 FRONT FACE TO T006 BACK FACE:",
+        # Seat the land-1 key, slide every gear on and close the accepted
+        # stack against its collar before setting tip end play.  Owner
+        # decision C1 keyed (2026-11-09, PR #1992): the 64T and T120..T030
+        # drive through MHA-DT-VN-71 in the land-1 keyseat, whose collar end
+        # stops the key; T024..T006 keep their D-flats.  A keyway or D-bore
+        # goes on its key or flat only one way and 1C measures the stack its
+        # gears close, so 1B names neither: sheet 7's left field holds step 1
+        # in eight lines, and the wrap counts 1B's placeholder at its width.
+        "1. SEAT MHA-DT-VN-71 IN THE MHA-DT-04 KEYSEAT, TO ITS COLLAR END.",
+        "1A. SLIDE MHA-DT-07 ON MHA-DT-VN-71 AGAINST THE MHA-DT-04 COLLAR.",
+        "1B. SLIDE {cone_gears}X MHA-DT-03 ON, T120 FIRST THROUGH T006.",
+        f"1C. MEASURE THE {CONE_GEAR_COUNT}-GEAR STACK, T120 FRONT FACE TO T006 BACK FACE:",
         f"   ACCEPT {inch_window(STACK_L20_ACCEPT, 3)}.",
-        "1C. IF THE STACK IS LONG, RE-FACE ITS THICKEST GEAR.",
-        "1D. IF IT IS SHORT, REMAKE ITS THINNEST GEAR.",
-        "1E. REPEAT 1B UNTIL THE STACK READS IN ITS WINDOW.",
+        "1D. IF THE STACK IS LONG, RE-FACE ITS THICKEST GEAR.",
+        "1E. IF IT IS SHORT, REMAKE ITS THINNEST GEAR.",
+        "1F. REPEAT 1C UNTIL THE STACK READS IN ITS WINDOW.",
         # U37c cut-to-fit acceptance survives the taller post and longer stock:
         # MHA-DT-VN-61's registry/spec own the selected screw and reference length.
         # Each screw is cut against its own matched post/platform hole, never

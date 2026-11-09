@@ -1,0 +1,16 @@
+dt-vn-cone-shaft-key:
+  title: Cone Shaft Key
+  number: MHA-DT-VN-71
+  stock_name: 1008-1045 Carbon Steel Machine Key Stock
+  supplier: McMaster-Carr
+  supplier_skus: [98830A511]
+  material: Plain Carbon Steel
+  material_specification: "1008-1045 carbon steel machine key stock, 1/16 x 1/16 x 12 in, undersized (height and width -.002/+.000), Rockwell B50 min; McMaster-Carr 98830A511"
+  finish: plain; as supplied
+  quantity: 1
+  tolerance_class: machined_block
+  process: purchased
+  drawing_unit: in
+  # Modified purchased part (owner decision C1 keyed, 2026-11-09, PR #1992):
+  # 12 in key stock cut to cone_land_key.KEY_LENGTH_MM; the section is as
+  # supplied. SKU read live 2026-11-09 (https://www.mcmaster.com/98830A511/).

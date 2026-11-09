@@ -2306,6 +2306,18 @@
           "number": "MHA-SM-05"
         }
       ]
+    },
+    {
+      "old_stem": "dt-vn-cone-shaft-key",
+      "old_number": null,
+      "introduced": "2026-11-09",
+      "new_identities": [
+        {
+          "parent": "dt-drive-train",
+          "stem": "dt-vn-cone-shaft-key",
+          "number": "MHA-DT-VN-71"
+        }
+      ]
     }
   ],
   "retired_identities": [

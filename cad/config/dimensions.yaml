@@ -364,13 +364,13 @@ sections:
         - derived from current spec
         - med
       - - Cone shaft diameter
-        - 'Stepped from the front end: Ø12.2308 journal shaft-local 0–43.18 (1.70 in); Ø15.875 integral thrust collar shaft-local 43.18–46.361218417631, supporting the 64T south face and defining the drawing length origin. Gear lands Ø9.525 / 6.35 / 3.175 / 0.7874 (terminal .031 in), with co-clocked +X flats, nominal AF 8.763 / 5.842 / 2.921 / 0.432, each +0/−0.010. Seat steps remain 1.0 mm south of the T030/T024/T018 north faces, at cone stations 100.519532647896 / 107.395144329776 / 114.270756011656. T012, T006 and the custom collar share the terminal land; its end follows SHAFT_LENGTH. Printed in decimal inch (#290).'
+        - 'Stepped from the front end: Ø12.2308 journal shaft-local 0–43.18 (1.70 in); Ø15.875 integral thrust collar shaft-local 43.18–46.361218417631, supporting the 64T south face and defining the drawing length origin. Gear lands Ø9.525 / 6.35 / 3.175 / 0.7874 (terminal .031 in). Land 1 carries a 1/16 in square key (MHA-DT-VN-71) in a +X keyseat over its length (owner decision C1 keyed, 2026-11-09, PR #1992): width 1.5875 +0.0254/−0, S 8.664 (.3411 in) +0/−0.051 floor to far side, 0.861 (.034 in) deep at its centreline (cone_land_key). Lands 2–4 carry co-clocked +X flats, nominal AF 5.842 / 2.921 / 0.432, each +0/−0.010. Seat steps remain 1.0 mm south of the T030/T024/T018 north faces, at cone stations 100.519532647896 / 107.395144329776 / 114.270756011656. T012, T006 and the custom collar share the terminal land; its end follows SHAFT_LENGTH. Printed in decimal inch (#290).'
         - 12.2308/9.525/6.35/3.175/0.7874
         - 'dt_cone_gear_shaft_spec derives axial stations from cone_line and the post; cone_shaft_land_bands owns diameters, flats and retention bands. The Ø12.2308 journal runs in the Ø12.2808 bore with 0.05 mm nominal diametral clearance over the 42.011 mm boss plus 1.169 mm proud; actual support clearance/span remain reader-owned. The 3.181218417631 mm integral thrust collar supports the stack. Terminal AF 0.432 (.017 in) stops the flat short of the axis at every printed limit, so the round still guides the collar, and leaves the stock flat point its landing on the flat, with terminal-flat edge break 0.025 MAX (.001 in). Former Ø1.5875 / AF 1.460 terminal geometry, the 1/32 in land with AF 0.420, later AF 0.730 / 0.480 / 0.430 selections and the McMaster 9414T1 collar are historical, not current machining or procurement inputs.'
         - legacy diameters + derived current stations and retention
         - med
       - - Gear bores (configured `BoreDia`, with matching D-flat)
-        - 'D-bores on stepped shaft: round seat nominal Ø9.525 T030–T120 and 64T; Ø6.350 T024; Ø3.175 T018; Ø0.7874 (.031 in) T006–T012. One +X flat per bore; shaft AF 8.763 / 5.842 / 2.921 / 0.432 (.017 in), +0/−0.010; bore AF +0.010/+0.020 over the corresponding shaft nominal. Flat clearance 0.01–0.03; round-bore bands come from gear_seat_fit and the shared land bands, not the custom collar''s wider fit. Printed in decimal inch (#290).'
+        - 'Round seat nominal Ø9.525 T030–T120 and 64T, broached for the land-1 key: 1/16 A broach keyway width 1.5875 +0.0254/−0, T 10.300 (.4055 in) ±0.025 keyway top to far side of the bore, on +X (cone_land_key; owner decision C1 keyed, 2026-11-09, PR #1992). D-bores Ø6.350 T024; Ø3.175 T018; Ø0.7874 (.031 in) T006–T012, one +X flat per bore; shaft AF 5.842 / 2.921 / 0.432 (.017 in), +0/−0.010; bore AF +0.010/+0.020 over the corresponding shaft nominal. Flat clearance 0.01–0.03; round-bore bands come from gear_seat_fit and the shared land bands, not the custom collar''s wider fit. Printed in decimal inch (#290).'
         - —
         - 'The 2026-09-28 D-bore ruling replaces the p.21 solder-joint interpretation with adhesive-free alignment, an explicit fidelity departure. Current cutter-owned physical floors/root domains and bore envelopes must retain the T006 web floor 0.62 mm and the T012 web 2.024 mm (.0797 in MIN, owner-accepted RV-03 under the 2.032 target) with the .031 in terminal seat. DT6-FORM1 option (a) (root R1.10) prints the T006 floor Ø.0840..0867 in (2.134..2.202 mm), a .0256 in (0.650 mm) worst web over the .031 in bore. Earlier DT6-FORM1 root MIN Ø2.346 (R1.491 tool), modified ideal-profile Ø2.346 / worst web 0.35425 on the former 1/16 in terminal, historical U40 Ø2.880 / 0.621 web acceptance, the 1/32 in terminal and the former 0.025–0.105 round-clearance summary are not current.'
         - derived from current readers
@@ -383,7 +383,8 @@ sections:
         - med
   - prose: |2
 
-      Notes: all 20 gears rotate together on one D-flat shaft. Their 6.8756 ±0.025
+      Notes: all 20 gears rotate together on one shaft, keyed on land 1 and on
+      D-flats on lands 2–4. Their 6.8756 ±0.025
       faces touch from the collar-supported 64T to T006; accept the twenty-gear
       stack at 137.512 ±0.20. The MHA-DT-VN-54 set-screw collar is pushed onto a
       0.45 mm feeler against T006 and locked on the D-flat, for 0.35–0.55 mm
@@ -397,7 +398,8 @@ sections:
       The p.21 macro shows solder blobs on the small gears, but the
       2026-09-28 user ruling chooses co-clocked D-flats and matching D-bores
       to align the gears without adhesive: a deliberate departure from that
-      photographed detail. The cone set pivots out of engagement for sine/cosine
+      photographed detail. Owner decision C1 keyed (2026-11-09, PR #1992)
+      supersedes it on land 1: a 1/16 square key drives T030–T120 and the 64T. The cone set pivots out of engagement for sine/cosine
       alignment (ch. 25). Current tooth authority is the finite stock/custom
       tool form and its off-centre root arcs; no ideal-N upper continuation is
       permitted. The earlier ideal 6T involute was severely undercut at standard
@@ -2289,7 +2291,8 @@ sections:
          ch. 12 "7 mm" face callout applies to the CONE gears; the 2026-09-28
          touching-stack model uses 6.8887 ±0.025 per gear instead (ch. 12 face row).
       7. **Small cone gears cannot carry the 9.525 mm shaft bore** (ch. 12) —
-         **RESOLVED: configured D-bore + stepped D-flat shaft.** The smallest
+         **RESOLVED: configured bore + stepped shaft; land 1 keyed (owner
+         decision C1 keyed, 2026-11-09, PR #1992), lands 2–4 D-flats.** The smallest
          gears need Ø1.5875 seats; T018 uses Ø3.175, T024 Ø6.35, and T030–T120
          Ø9.525. The shaft has one common-clock +X flat per gear land, with AF
          1.460/2.921/5.842/8.763 for increasing land diameter and +0/−0.010

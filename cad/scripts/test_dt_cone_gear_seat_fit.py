@@ -1,4 +1,4 @@
-"""Every cone gear D-bore against the D-flat land it slides onto.
+"""Every cone gear bore against the land it slides onto: a D-flat or the key.
 
 Cross-part contract between the cone gear family (MHA-DT-03) and the cone gear
 shaft (MHA-DT-04), closing two Codex findings:
@@ -8,6 +8,8 @@ shaft (MHA-DT-04), closing two Codex findings:
 * #811: a slide-on fit needs a stated, positive clearance.  The solid-stack
   ruling (2026-09-28) makes it the shared gear seat fit (gear_seat_fit):
   0.0254-0.09652 diametral on the round, 0.01016-0.03048 across the flat.
+  On the keyed land 1 (owner decision C1 keyed, 2026-11-09, PR #1992) the
+  keyway's clearances to the key are cone_land_key's.
 """
 
 from __future__ import annotations
@@ -20,6 +22,7 @@ import pytest
 import _config
 import _fit_shaft_h
 import build_dt_cone_gear_shaft
+import cone_land_key
 import dt_cone_gear_shaft_spec as shaft
 import dt_cone_gear_spec as spec
 import cone_shaft_land_bands as lands
@@ -44,15 +47,24 @@ def test_the_shaft_reads_the_land_bands_from_their_own_module() -> None:
     assert len(lands.SECTION_FLAT_AF) == len(shaft.SECTIONS)
 
 
-def test_every_gear_bore_is_the_d_flat_land_under_it() -> None:
+def test_every_gear_bore_is_the_land_under_it() -> None:
     carried = sorted(t for teeth in lands.SECTION_CONE_GEAR_TEETH for t in teeth)
     assert carried == sorted(spec.CONFIGURATION_TEETH)
+    assert spec.KEYED_LAND == shaft.KEYED_LAND
+    assert set(spec.KEYED_TEETH) == set(lands.SECTION_CONE_GEAR_TEETH[spec.KEYED_LAND])
     for teeth in spec.CONFIGURATION_TEETH:
         section = spec.land_section(teeth)
         assert teeth in lands.SECTION_CONE_GEAR_TEETH[section]
         assert spec.bore_dia_mm(teeth) == pytest.approx(shaft.SECTION_DIAS[section])
-        # Every gear land carries a flat (ruling 1: the Sec4 flat runs out
-        # through the tip, so T006 and T012 slide onto it too).
+        if spec.keyed(teeth):
+            # Land 1 is round and keyed; its gears have no flat to match.
+            assert lands.SECTION_FLAT_AF[section] is None, teeth
+            assert spec.bore_dia_mm(teeth) == cone_land_key.LAND_DIA_MM
+            with pytest.raises(AssertionError):
+                spec.bore_flat_af_mm(teeth)
+            continue
+        # Every other gear land carries a flat (ruling 1: the Sec4 flat runs
+        # out through the tip, so T006 and T012 slide onto it too).
         assert lands.SECTION_FLAT_AF[section] is not None, teeth
         assert spec.bore_flat_af_mm(teeth) == pytest.approx(
             lands.SECTION_FLAT_AF[section]
@@ -100,6 +112,8 @@ def test_every_seat_keeps_both_clearance_windows_at_the_print_extremes() -> None
         land_upper, land_lower = lands.SECTION_DIA_BANDS[section]
         assert bore_lower - land_upper >= round_min - 1e-9, teeth
         assert bore_upper - land_lower <= round_max + 1e-9, teeth
+        if spec.keyed(teeth):
+            continue
         # Nominals match, so the AF clearance is the band difference alone.
         assert spec.bore_flat_af_mm(teeth) == pytest.approx(
             lands.SECTION_FLAT_AF[section]
@@ -108,15 +122,80 @@ def test_every_seat_keeps_both_clearance_windows_at_the_print_extremes() -> None
         assert af_upper - land_af_lower <= flat_max + 1e-9, teeth
 
 
+def _limits(nominal: float, band: tuple[float, float]) -> tuple[float, float]:
+    return nominal + band[1], nominal + band[0]
+
+
+def test_every_keyed_gear_slides_over_the_key_at_the_print_extremes() -> None:
+    # Radial: the keyway's top (T at its least, from the far side of the
+    # bore) clears the key's top (S at its most plus the key at its most),
+    # with the hub's far side on the land's far side; sides: the broach's
+    # least width against the key at its most.
+    key_max = _limits(cone_land_key.KEY_SIZE_MM, cone_land_key.KEY_STOCK_BAND)[1]
+    t_min = _limits(cone_land_key.KEYWAY_T_MM, cone_land_key.KEYWAY_T_BAND)[0]
+    s_max = _limits(cone_land_key.KEYSEAT_S_MM, cone_land_key.KEYSEAT_S_BAND)[1]
+    width_min = _limits(cone_land_key.KEYWAY_WIDTH_MM, cone_land_key.KEYWAY_WIDTH_BAND)[0]
+    assert t_min - s_max - key_max > 0.0
+    assert width_min - key_max >= 0.0
+    for teeth in spec.KEYED_TEETH:
+        # The keyway breaks out of the round bore and stays centred on +X.
+        radius = spec.bore_dia_mm(teeth) / 2.0
+        assert spec.keyway_top_offset_mm(teeth) == pytest.approx(
+            cone_land_key.KEYWAY_T_MM - radius
+        )
+        assert spec.keyway_top_offset_mm(teeth) > radius > spec.KEYWAY_HALF_WIDTH_MM
+
+
+def test_every_keyed_web_is_proved_at_the_keyway_corner() -> None:
+    # Rule 17 at the keyway's top corner (T at its most, bore at its least,
+    # broach at its widest), under the printed root envelope MIN: T030 is
+    # the recorded minor (RV-07, .0622 in), above the .060 floor; every
+    # other keyed gear keeps the .080 target.
+    t_max = _limits(cone_land_key.KEYWAY_T_MM, cone_land_key.KEYWAY_T_BAND)[1]
+    width_max = _limits(cone_land_key.KEYWAY_WIDTH_MM, cone_land_key.KEYWAY_WIDTH_BAND)[1]
+    for teeth in spec.KEYED_TEETH:
+        bore_min = spec.bore_dia_mm(teeth) + spec.BORE_DIA_BAND[1]
+        corner = math.hypot(t_max - bore_min / 2.0, width_max / 2.0)
+        web = spec.floor_limits_mm(teeth)[0] / 2.0 - corner
+        assert spec.keyway_web_min_mm(teeth) == pytest.approx(web)
+        # The corner, not the centreline, governs.
+        assert web < spec.floor_limits_mm(teeth)[0] / 2.0 - (t_max - bore_min / 2.0)
+        assert web >= spec.MACHINED_WEB_FLOOR_MM - 1e-9, teeth
+        assert web >= spec.keyway_web_required_mm(teeth) - 1e-9, teeth
+        if teeth not in spec.KEYWAY_WEB_EXCEPTIONS_MM:
+            assert web >= spec.MACHINED_WEB_TARGET_MM - 1e-9, teeth
+    assert set(spec.KEYWAY_WEB_EXCEPTIONS_MM) == {30}
+    assert spec.inch_grid_mm(spec.keyway_web_min_mm(30), 4, math.floor) == pytest.approx(
+        spec.KEYWAY_WEB_EXCEPTIONS_MM[30]
+    )
+    assert spec.MACHINED_WEB_FLOOR_MM < spec.KEYWAY_WEB_EXCEPTIONS_MM[30] < spec.MACHINED_WEB_TARGET_MM
+
+
+def test_keyed_bore_area_is_the_round_bore_plus_the_keyway_outside_it() -> None:
+    # Midpoint-rule integral of the keyway strip outside the round bore.
+    for teeth in spec.KEYED_TEETH[:1]:
+        radius = spec.bore_dia_mm(teeth) / 2.0
+        half, top = spec.KEYWAY_HALF_WIDTH_MM, spec.keyway_top_offset_mm(teeth)
+        steps = 20000
+        dy = 2.0 * half / steps
+        outside = sum(
+            (top - math.sqrt(radius**2 - (-half + (i + 0.5) * dy) ** 2)) * dy
+            for i in range(steps)
+        )
+        assert spec.keyway_area_outside_bore_mm2(teeth) == pytest.approx(outside, rel=1e-7)
+
+
 def test_the_flat_is_a_true_chord_clocked_to_one_place() -> None:
-    # The printed clock (tooth centreline to flat normal) takes one place and
-    # carries the error budget's cone_flat_clock term.
+    # The printed clock (tooth centreline to flat normal, or keyway top) takes
+    # one place and carries the error budget's cone_flat_clock term.
     assert spec.FLAT_CLOCK_TOLERANCE_DEG == 0.25
     assert spec.DRAWING_PRECISION_BY_NAME["BoreFlatClock"] == 1
+    assert spec.DRAWING_PRECISION_BY_NAME["KeywayClock"] == 1
     assert "BoreFlatClock" in spec.DRAWING_DIMENSIONS["BoreProfile"]
+    assert "KeywayClock" in spec.DRAWING_DIMENSIONS[spec.KEYED_BORE_SKETCH]
     # Terminal deep-D keeps over half the cylindrical guidance at print corners;
     # intermediate lands retain their original shallow-flat condition.
-    for teeth in spec.CONFIGURATION_TEETH:
+    for teeth in spec.D_BORE_TEETH:
         radius = spec.bore_dia_mm(teeth) / 2.0
         offset = spec.bore_flat_offset_mm(teeth)
         if teeth in spec.TERMINAL_WEB_REQUIREMENTS_MM:
@@ -197,8 +276,8 @@ def _actual_clock_fit(teeth):
     return dia,shaft_af,bore_af,edge_break
 
 
-def test_connected_home_clock_uses_actual_all_twenty_coupled_fit_bands() -> None:
-    for teeth in spec.CONFIGURATION_TEETH:
+def test_connected_home_clock_uses_actual_all_d_bore_coupled_fit_bands() -> None:
+    for teeth in spec.D_BORE_TEETH:
         dia,shaft_af,bore_af,edge_break = _actual_clock_fit(teeth)
         bound = connected_home_clock_angle_bound_rad(
             dia,shaft_af,bore_af,edge_break_mm=edge_break,
