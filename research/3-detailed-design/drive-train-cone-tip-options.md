@@ -92,21 +92,23 @@ cone, as on the original (engineerguy video 4, 6:41–6:47).
 ## Axial retention of the gears
 
 Main has two floats: the gear stack between DT-04's thrust collar and the VN-54 set-screw collar,
-and the shaft between the MHA-DT-05 boss and the VN-55 cup (`cone_stack_end_play.py`). With VN-54
-gone, C1 keyed has one captured chain instead:
+and the shaft between the MHA-DT-05 boss and the VN-55 cup (`cone_stack_end_play.py`). C1 keyed
+keeps two floats but needs no collar:
 
 ```
 DT-05 boss | DT-04 collar | 64T | T120 … T030 | T024 = DT-04 | T018 = T012 = spigot = DT-04 | bushing | end screw | DT-21
 ```
 
-(`|` is a contact face, `=` a LOCTITE 638 bonded slip fit.) The end screw sets one end play for
-the shaft and the stack together.
+(`|` is a contact face, `=` a LOCTITE 638 bonded slip fit.) T024, bonded to DT-04 at a set
+station, takes VN-54's place: the stack float between DT-04's collar and T024 is set when T024
+is bonded, with a feeler as VN-54 is set today. The end screw sets the shaft's end play between
+the DT-05 boss and the bushing.
 
 - **T024** is centred by the round Ø.250 land and bonded to it, so DT-04 turns it and holds it
   axially.
 - **T018** and **T012** are centred by T006's spigot and bonded to it; the spigot is bonded in
   DT-04's socket, so DT-04 turns all three and holds them axially.
-- T030–T120 ride the key and stay free to slide; the bonded tip and the end screw capture them.
+- T030–T120 and the 64T ride the key and slide between DT-04's collar and the bonded T024.
 - Bond the tip on DT-04 itself: phase T018 and T012 to T024 through lined-up tooth spaces with a
   pin, and hold the phase inside 638's fixture time. Cure before first load. About 250 °C
   releases the bonds, so the shaft and its tip come off as one unit.
