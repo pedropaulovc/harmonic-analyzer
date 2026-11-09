@@ -2176,7 +2176,7 @@ async def build(adapter: Any) -> dict[str, str]:
     counter_dimension = _early_bound(
         add_edge_dimension(
             adapter, front, p0=web_xy, p1=flank_xy,
-            text_xy=(0.275, 0.245), label=counter_angle_label,
+            text_xy=(0.216, 0.2378), label=counter_angle_label,
             orientation="angular", entity_types=("EDGE", "EDGE"),
             entities=(web_edge.edge, flank_edge.edge),
         ),
@@ -2197,6 +2197,12 @@ async def build(adapter: Any) -> dict[str, str]:
     if counter_dimension.GetPrimaryPrecision2() != 1:
         raise RuntimeError(f"{counter_angle_label}: angle precision did not take")
     set_reference_dimension(adapter, counter_annotation, label=counter_angle_label)
+    # Keep the acute arc on the counter arm, with its text above the
+    # boss-side flank rather than over the coefficient arm.
+    offset_dimension_text(
+        adapter, [counter_annotation],
+        {dimension_name(adapter, counter_annotation): (0.206, 0.249)},
+    )
 
     # Anchor-tap pattern control: datum B on the plate end the seed hole is
     # located from, BASIC row-X / start-Z / pitch coordinates off A|B, datum C
@@ -2255,10 +2261,16 @@ async def build(adapter: Any) -> dict[str, str]:
         label="anchor boss Z location",
         entities=(end_edge.edge, anchor_rim.edge),
     )
-    # The mid rib shares the boss's station (machinist review r6: its 5.08
-    # thickness had no location along the plate); the plan draws the rib
-    # through the boss, so this one 3.00 locates both and carries no words
-    # (rule 7).
+    # Extend the boss's plan axis through the middle rib: the existing 3.00
+    # now visibly locates their shared Z0 station without another dimension.
+    _owned_centerline(
+        adapter, top,
+        (
+            (TIP_X - ANCHOR_R - RECEIVER_AXIS_OVERRUN_MM, 0.0, 0.0),
+            (RIB_REACH + RECEIVER_AXIS_OVERRUN_MM, 0.0, 0.0),
+        ),
+        label="boss and middle rib centreline",
+    )
     # The row X, start Z and pitch are the part's own BASIC locators
     # (SpringRowCoordinates: X off datum A's -Z ridge axis, start Z off datum
     # B's end, each to a hole centre), imported with the plan's dimensions.
