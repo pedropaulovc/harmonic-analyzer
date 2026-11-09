@@ -272,6 +272,7 @@ def test_boss_face_location_reads_document_precision_when_inherited(monkeypatch,
     case.state.document_precision = places
     if places == 2:
         case.capture()()
+        assert case.state.value * 1000.0 == pytest.approx(6.025)
     else:
         with pytest.raises(RuntimeError):
             case.capture()
@@ -370,7 +371,7 @@ def test_knife_height_is_a_native_point_to_actual_plate_top_dimension(monkeypatc
     check()
     assert case.state.picks == ["height.end", "plate top"]
     assert case.state.placements == [(*drawing.KNIFE_HEIGHT_LOCATION_XY, 0.0)]
-    assert case.state.value * 1000.0 == pytest.approx(2.594)
+    assert case.state.value * 1000.0 == pytest.approx(1.634)
     case.state.precision = -2
     check()  # ordinary precision may follow the existing document
     case.state.document_precision = 3
@@ -682,15 +683,15 @@ def test_view_f_centerline_projects_only_the_actual_relocated_receiver_row(
     segment = drawing._receiver_axis_centerline(adapter, back)
     assert activated == ["VIEW F"]
     assert projected_points == [
-        pytest.approx((0.0316926, -0.0007112, -0.0762)),
-        pytest.approx((0.014002, -0.0007112, -0.0762)),
+        pytest.approx((0.0316926, 0.0002488, -0.0762)),
+        pytest.approx((0.014002, 0.0002488, -0.0762)),
     ]
     assert created_lines == [pytest.approx((
         origin[0] - scale * 0.0316926 + 0.03,
-        origin[1] - scale * 0.0007112 - 0.02,
+        origin[1] + scale * 0.0002488 - 0.02,
         0.0,
         origin[0] - scale * 0.014002 + 0.03,
-        origin[1] - scale * 0.0007112 - 0.02,
+        origin[1] + scale * 0.0002488 - 0.02,
         0.0,
     ))]
     assert manager.AddToDB is False
@@ -758,9 +759,9 @@ def test_marked_dimensions_are_all_placed_and_their_callouts_land() -> None:
 def test_one_three_rib_size_leaves_the_distinct_counter_web_top_flush() -> None:
     spec = sm_summing_lever_spec
     assert lever_build.RIB_T == spec.RIB_T == 5.08
-    assert spec.COUNTER_WEB_T == 5.08
-    assert spec.COUNTER_WEB_T / 2.0 == spec.COEFFICIENT_TOP_Y == 2.54
-    assert spec.COEFFICIENT_T == 7.0
+    assert spec.COUNTER_WEB_T == spec.COEFFICIENT_T == 7.0
+    assert spec.COUNTER_WEB_T / 2.0 == spec.COEFFICIENT_TOP_Y == 3.5
+    assert -spec.COUNTER_WEB_T / 2.0 == spec.COEFFICIENT_BOTTOM_Y == -3.5
     assert notes.DRAWING_DIMENSIONS["EdgeRibFront"] == {"EdgeRibThickness"}
     assert notes.DIMENSION_PREFIXES[("EdgeRibFront", "EdgeRibThickness")] == "3X "
     rib_dimensions = {
@@ -2266,7 +2267,7 @@ def _native_plate_thickness(monkeypatch, offset=(0.0, 0.0), band=(0, 0.0, 0.0)):
 
 
 def _recorded_plate_thickness(monkeypatch):
-    """Replay r6's dimension-display rows and projected free-end coordinates."""
+    """Translate r6's recorded layout to the current plate faces; not native proof."""
     case = _native_plate_thickness(monkeypatch)
     state = case.state
     state.name = "PlateThickness@PlateProfile@sm-summing-lever.Part"
@@ -2315,6 +2316,21 @@ def _recorded_plate_thickness(monkeypatch):
     state.text_position = (
         0.21636249951273206, 0.08022187482984736, -9.999999999949722e-05,
     )
+    # Keep the historical witness/leader shapes, translated with the plate.
+    rise = drawing.COEFFICIENT_TOP_Y / 1000.0 - 0.00254
+    state.lines = [
+        (*row[:5], row[5] + rise, *row[6:8], row[8] + rise, *row[9:])
+        for row in state.lines
+    ]
+    for row in state.arrows:
+        row[1] += rise
+    state.projected = {
+        (x, (drawing.COEFFICIENT_TOP_Y if y > 0.0 else drawing.COEFFICIENT_BOTTOM_Y) / 1000.0, z): (px, py + rise)
+        for (x, y, z), (px, py) in state.projected.items()
+    }
+    for member in ("annotation_position", "text_position"):
+        x, y, z = getattr(state, member)
+        setattr(state, member, (x, y + rise, z))
     monkeypatch.setattr(state.data, "GetLineAtIndex2", lambda index: state.lines[index])
     monkeypatch.setattr(
         state.data, "GetTextPositionAtIndex",

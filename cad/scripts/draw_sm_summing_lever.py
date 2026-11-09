@@ -1695,12 +1695,12 @@ FRONT_KEEP = {
     "EdgeRibFrontArcR": (0.1948, 0.2120),
     "RibReach": (0.2443, 0.254),
 }
-# The native 6.985 mm face span uses the ordinary document .XX precision:
-# its text is above the profile and right of RibReach's complete callout.
+# The native boss-top span is ANCHOR_H/2 - COEFFICIENT_TOP_Y (6.025 mm).
+# Its ordinary .XX text is above the profile and right of RibReach's callout.
 BOSS_FACE_LOCATION_XY = (0.284, 0.250)
 # VIEW F's right-hand column is outside the boss's actual X400.0875 mm end.
-# The short 2.594 span hangs its ordinary 2.59 below the view: predicted native
-# text X403.5..415.1375 / Y125.2219..128.7219 mm, clear of the tap callout.
+# The native knife-vertex span is HEX_H/2 - COEFFICIENT_TOP_Y (1.634 mm).
+# Its ordinary .XX text stays in the right/below lane; native ink needs review.
 KNIFE_HEIGHT_LOCATION_XY = (0.4035, 0.128)
 # Detail D at 10:1: the complete envelope fills a 120 mm crop on sheet 2.
 # The ridge pair shares one line above the crop, with each whole callout

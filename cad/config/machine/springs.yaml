@@ -23,6 +23,13 @@
 # (calibrate_spring_seats.py --presets neutral square, farm run
 # 20261109T094053155Z-2d9c88ebdf204a3483878254be081432); the counter seats it
 # re-measured matched the committed ones exactly.
+# #2129 centres the coefficient plate at local Y±3.50: its lower channel
+# supports move +0.96 mm while the upper supports stay fixed. The records below
+# predate that change and are stale, not rigidly translatable certificates.
+# Channel lengths/axes and both presets' counter balance lengths must be
+# re-measured with diagnostics/calibrate_spring_seats.py --presets neutral square
+# --write on a coordinated farm/native seat; the unchanged counter boss does
+# not preserve the counter load when the channel springs shorten.
 # channels.yaml must exactly match a preset vector below. Custom stations require
 # new native calibration; builds never interpolate or search for a replacement.
 springs:

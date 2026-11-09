@@ -94,7 +94,7 @@ def test_shortest_part_backed_out_keeps_two_full_threads_past_the_nut():
 def test_the_anchor_is_sized_at_the_coefficient_plate_thickness_extremes():
     """The uniform 7.00 coefficient plate prints .28 ±.01 in on the lever, and
     the printed nominal governs (rule 3), so the jam nut seats anywhere from
-    6.858 to 7.366 below its fixed top. The trim is 17.78 shank / 1.20 in
+    6.858 to 7.366 below its top face. The trim is 17.78 shank / 1.20 in
     overall: the worst-case 1.5875 full-thread floor, one .01 step of margin,
     and the round-up to the grid."""
     thin, thick = _printed_plate_limits_mm()

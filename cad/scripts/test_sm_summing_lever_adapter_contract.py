@@ -195,7 +195,7 @@ def _extracted_sketch(section: profile.RibProfile, *, mutation: str | None = Non
     elif mutation == "wrong_thickness":
         for node in ast.walk(helper):
             if isinstance(node, ast.Name) and node.id == "COEFFICIENT_T":
-                node.id = "COUNTER_WEB_T"
+                node.id = "RIB_T"
     elif mutation is not None:
         raise AssertionError(mutation)
     recorder = _SketchRecorder()
@@ -230,6 +230,7 @@ def _extracted_sketch(section: profile.RibProfile, *, mutation: str | None = Non
         "ARC_R": section.wrap_radius, "TIP_X": spec.TIP_X,
         "COEFFICIENT_T": section.top_y - section.bottom_y,
         "COUNTER_WEB_T": spec.COUNTER_WEB_T, "RIB_BLEND_R": section.blend_radius,
+        "RIB_T": spec.RIB_T,
     }
     module = ast.Module(body=[
         ast.ImportFrom(module="__future__", names=[ast.alias(name="annotations")], level=0), helper,
@@ -491,10 +492,11 @@ def _native_boss_face_graph():
     return namespace["_assert_boss_face_graph"], adapter, features
 
 
-def test_extracted_boss_face_graph_uses_real_asymmetric_plate_and_flush_web_faces() -> None:
+def test_extracted_boss_face_graph_uses_real_centred_plate_and_flush_web_faces() -> None:
     check, adapter, _features = _native_boss_face_graph()
     assert spec.COUNTER_WEB_T / 2.0 == spec.COEFFICIENT_TOP_Y
-    assert spec.ANCHOR_H / 2.0 - spec.COEFFICIENT_TOP_Y == pytest.approx(6.985)
+    assert -spec.COUNTER_WEB_T / 2.0 == spec.COEFFICIENT_BOTTOM_Y
+    assert spec.ANCHOR_H / 2.0 - spec.COEFFICIENT_TOP_Y == pytest.approx(6.025)
     check(adapter)
 
 
@@ -534,16 +536,15 @@ def _native_slab_fixture():
     return adapter, features
 
 
-def test_extracted_front_slab_preserves_real_seats_and_owner_specific_native_dimensions() -> None:
+@pytest.mark.parametrize("obsolete_faces", [(2.54, -2.54), (2.54, -4.46)])
+def test_extracted_front_slab_preserves_real_seats_and_owner_specific_native_dimensions(obsolete_faces) -> None:
     namespace = _source_helpers(("_assert_coefficient_slab",))
     adapter, features = _native_slab_fixture()
     namespace["_assert_coefficient_slab"](adapter)
     features["CoefficientsPlate"].faces.reverse()
     namespace["_assert_coefficient_slab"](adapter)
-    # The old 5.08 bottom must fail even if every named parameter still agrees.
-    features["CoefficientsPlate"].faces = [
-        _plane_face(spec.COEFFICIENT_TOP_Y), _plane_face(-2.54),
-    ]
+    # Reject both old fixed-top slabs even when named parameters still agree.
+    features["CoefficientsPlate"].faces = [_plane_face(y) for y in obsolete_faces]
     with pytest.raises(RuntimeError, match="missing seat"):
         namespace["_assert_coefficient_slab"](adapter)
     # A correct value on the wrong feature is not persistent native ownership.

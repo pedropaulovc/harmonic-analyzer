@@ -36,8 +36,8 @@ KNIFE_CONTACT_Y = KNIFE[1] + sm_summing_lever_spec.HEX_H / 2.0
 # anchor's plumb line and need both counter seats recalibrated natively.
 COLUMN_X = -197.0
 MIN_CLEARANCE_MM = 0.25
-# The uniform coefficient slab grows downward from its fixed spring top.
-# Use its authored faces, never +/- half its thickness about the knife.
+# The coefficient slab is centred on the knife/trunnion axis (#2129).
+# Both spring-anchor and jam-nut seats follow its authored faces.
 PLATE_TOP_Y = KNIFE[1] + sm_summing_lever_spec.COEFFICIENT_TOP_Y
 PLATE_BOTTOM_Y = KNIFE[1] + sm_summing_lever_spec.COEFFICIENT_BOTTOM_Y
 CHANNEL_ANCHOR_XY = (

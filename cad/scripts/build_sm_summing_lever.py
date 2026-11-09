@@ -4,10 +4,10 @@ The cast-iron lever that sums the pull of the 20 channel springs and balances
 them against the master (counter) spring -- a FIRST-CLASS LEVER hung in
 suspension on a knife edge.
 
-PROVENANCE / REVERT NOTICE: this restores the legacy ``cad/SummingLever.cs``
-shape (commit 9eb1710, itself translated from ``summing-lever.kcl``) at the
-user's explicit direction (2026-06-16), superseding the M6.4 "knife-edge tube +
-Ø14 bore" model. Two corrections the user made over the raw .cs:
+PROVENANCE: the 2026-06-16 reconstruction superseded the M6.4 "knife-edge
+tube + Ø14 bore" model. Historical .cs/KCL geometry records that reconstruction,
+not the current design authority: the shared spec and owner decisions govern.
+Two corrections established the solid pivot and knife-edge trunnions:
 
 * The real lever has **NO bore** -- the M6.4 bored tube was wrong. The .cs
   solid pivot cylinder is correct.
@@ -17,11 +17,11 @@ user's explicit direction (2026-06-16), superseding the M6.4 "knife-edge tube +
   references/.../ch18_images/page001_img0{1,3}, photogrammetry 194637152 /
   194651412) and is tuned against the knife-mount fit + ch30 parity.
 
-Seven features (the six .cs features + the hex knife edge):
+Seven principal features:
 
-1. Coefficients plate  -- uniform 7 mm positive-X slab with its top held at
-   local Y+2.54; the downward addition leaves spring and knife registration
-   unchanged. The negative-X counter web stays 5.08 mm centered on Y0.
+1. Coefficients plate  -- uniform 7 mm positive-X slab centred at local Y0,
+   with faces Y±3.50, matching the centred 7 mm negative-X counter web
+   (owner decision #2129). The knife-edge trunnions remain unchanged.
 2. Pivot cylinder      -- Front-plane solid circle at the origin, symmetric
    extrude along the long edge (the pivot/rock axis = local Z).
 3. Hex knife edges     -- ONE vertex-up hexagonal prism through the pivot,
@@ -42,10 +42,9 @@ Part-local frame: origin = the knife-edge line, placed IDENTITY at machine
 (-15, 979.6932, 0), so local axes ARE machine axes: +X = the channel-spring
 (coefficients-plate) arm (machine west), -X = the counter-spring
 (summation-anchor) arm (machine east), +Y up, +Z along the knife edge
-(channel direction). The spring holes sit at their registered local
-positions (so the 20 channel springs need no change) and the summation
-anchor lands where the counter-spring boss-hook attaches (local x -76 ->
-machine -91 ~ the M6.4 hook at -90.5).
+(channel direction). The spring-hole X/Z stations remain registered; their
+entry face follows the centred coefficient top. The summation anchor lands
+where the counter-spring boss-hook attaches (local x -76 -> machine -91).
 
 Sketches follow the repo fully-defined convention (cad/scripts/_sketch.py).
 The common rib profile has native tangent constraints, defining dimensions,
@@ -183,15 +182,14 @@ from sm_summing_lever_profile import receiver_pilot_wall_budget, receiver_wall_m
 PART_NAME = "sm-summing-lever"
 MATERIAL = "Gray Cast Iron"  # see _appearance.apply_material docstring
 
-# The .cs is authored with the coefficients plate on -X; the machine wants it on
-# the +X arm (to match the M6.4 frame the rest of the assembly registers to), so
-# every .cs-derived X is multiplied by SX.
+# The historical reconstruction's X direction is opposite the installed
+# coefficient arm. SX preserves that registration, not a .cs design authority.
 SX = -1.0
 
-# --- SummingLever.cs constants (inches -> mm) ------------------------------
+# --- retained reconstruction dimensions (inches -> mm) ---------------------
 PLATE_W = 1.75 * IN  # coefficients plate width (along the arm, X)   44.45
 PLATE_L = 6.0 * IN  # coefficients/pivot length (along Z)           152.40
-# Coefficient thickness and fixed top are imported separately from counter web.
+# The shared spec owns both centred 7 mm sections and their real face levels.
 CYL_R = 0.5 * IN  # pivot cylinder radius                          12.70
 RIB_PAD = 0.1 * IN  # rib arc padding over the cylinder              2.54
 SUM_H = 3.0 * IN  # summation plate height (tip reach)             76.20
@@ -242,7 +240,7 @@ if RIB_REACH > HOLE_X - blind_cut_dia_mm(HOLE_SPEC) / 2.0 - 2.0:
 
 # Receiver-coordinate marks (``_receiver_coordinate_dimensions``): short
 # construction lines whose ends carry the bracket-tap coordinates.  The edge
-# mark lies on the free edge below its fixed top corner; each tap mark lies
+# mark lies on the free edge below its actual top corner; each tap mark lies
 # on its row inside the tap drill.
 RECEIVER_EDGE_MARK = 1.0
 RECEIVER_TAP_MARK = 0.5
@@ -321,7 +319,7 @@ async def _three_point_arc(
 
 
 def _assert_coefficient_slab(adapter) -> None:
-    """Fixed real seats and persistent extrusion dimensions after rebuild."""
+    """Centred real seats and persistent extrusion dimensions after rebuild."""
     model = _early_bound(adapter.currentModel, "IPartDoc")
     feature = _early_bound(model.FeatureByName("CoefficientsPlate"), "IFeature")
     heights = []
@@ -354,16 +352,15 @@ def _assert_coefficient_slab(adapter) -> None:
 
 
 def _assert_boss_face_graph(adapter) -> None:
-    """Real Y faces tie the boss and counterweb to the coefficient top.
+    """Prove both centred plate/web faces and the unchanged boss envelope.
 
-    The plate is not symmetric about Y0. Its actual top is the common web
-    top; the boss top stands ANCHOR_H/2 above Y0, not above the plate centre.
-    This proves the flush caption without inventing a midplane datum.
+    Both 7 mm sections meet at Y±3.50. The boss remains centred at Y0 with
+    its own ANCHOR_H span; neither the boss nor knife trunnions follow a face.
     """
     model = _early_bound(adapter.currentModel, "IPartDoc")
     for owner, expected in (
         ("SummationAnchor", (-ANCHOR_H / 2.0, ANCHOR_H / 2.0)),
-        ("SummationPlate", (-COUNTER_WEB_T / 2.0, COEFFICIENT_TOP_Y)),
+        ("SummationPlate", (-COUNTER_WEB_T / 2.0, COUNTER_WEB_T / 2.0)),
         ("CoefficientsPlate", (COEFFICIENT_BOTTOM_Y, COEFFICIENT_TOP_Y)),
     ):
         raw_feature = model.FeatureByName(owner)
@@ -383,15 +380,15 @@ def _assert_boss_face_graph(adapter) -> None:
             raise RuntimeError(f"{owner}: native Y faces {heights} do not contain {expected}")
     _telemetry.success(
         "boss face graph: boss top above coefficient top by "
-        f"{ANCHOR_H / 2.0 - COEFFICIENT_TOP_Y:.6f} mm; counterweb top flush"
+        f"{ANCHOR_H / 2.0 - COEFFICIENT_TOP_Y:.6f} mm; both counterweb faces flush"
     )
 
 
 async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
-    """Feature 1: uniform coefficient slab from Y-4.46 to fixed Y+2.54.
+    """Feature 1: uniform coefficient slab centred on Y0, with faces Y±3.50.
 
-    The HOLE_COUNT spring holes are ONE seed cut at station j=0 + a native
-    FeatureLinearPattern5 marching the remaining stations at CHANNEL_PITCH.
+    The HOLE_COUNT spring holes are ONE seed cut at station j=HOLE_COUNT-1
+    plus a native FeatureLinearPattern5 marching at CHANNEL_PITCH down -Z.
     (An early pattern attempt marched along an AUTO-selected plate edge whose
     natural sense silently reversed the field off the -Z plate edge -- only
     j=0 stayed cut -- and was replaced by cutting all 20 stations outright in
@@ -401,9 +398,8 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     the plate, and an analytic volume gate that resolves a single missing
     hole.)
 
-    Machine-y registration (the M6.4 plate-top-at-998 convention) is set at
-    PLACEMENT, not baked here -- see spring_mount_geom.PLATE_TOP_Y and the
-    Phase 2/3 plan."""
+    Assembly placement retains the knife registration; the spring entry Y
+    follows COEFFICIENT_TOP_Y, not a historical fixed-top convention."""
     from solidworks_mcp.adapters.base import (
         ExtrusionParameters,
         LinearPatternParameters,
@@ -2001,15 +1997,7 @@ def _drawing_dimension_contract(adapter) -> None:
 
 
 async def _receiver_coordinate_dimensions(adapter) -> None:
-    """Native coordinates from the real free edge and fixed plate top.
-
-    Each dimension runs from the free edge's top corner, a model vertex, to
-    a tap centre.  Both are ends of short construction marks that lie on ink
-    the view prints anyway: the corner's runs down the free edge, each tap's
-    along its row inside the drill, on the centre mark.  The old L-chain
-    through the plate-top corner over each tap drew a line across the end
-    rib's face at the plate top, read as a face 2.54 over the taps
-    (machinist review r11); the rib's slants wall the taps there."""
+    """Native coordinates from the real free edge and actual plate top."""
     from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
     check("receiver coordinate sketch", await adapter.create_sketch("Front"))
