@@ -462,6 +462,10 @@ tangent propagation:
   faces. With the 7.00 web the flank stays inside the web wherever it meets
   the boss (1.94 mm above Y0 at the boss rim), so no flank-to-boss junction
   exists.
+- **CounterWebSideRootFillets**: where each web side arc leaves the pivot
+  cylinder (|Z|≈56.8 mm), across the web's 7.00 mm. The blend between the
+  crossed cylinders need not be analytic; its feature radius carries the
+  R.040 MAX band and an exact envelope bounds its faces.
 - **KnifeShoulderFillets**: each stub's six lateral faces and ridge round
   into the body end face, under the same title-block **R.040 MAX**; the two
   lower flanks' roots meet mitred at the sharp bottom vertex. They occupy

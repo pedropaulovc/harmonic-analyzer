@@ -134,7 +134,7 @@ BRACKET_TAP_CALLOUT_PROCESS = f"SPOT THRU {BRACKET_NUMBER} AT ASSEMBLY\n"
 # (1.5689 / .5022 / .2778): four places hold them to under .00005 in.  They
 # are native model dimensions of the part's hidden SpringRowCoordinates
 # sketch, which owns their BASIC type, places and 19X count.  The drawing's
-# own boss-top (.28) and knife-ridge (.10) locations of the coefficient top
+# own boss-top (.24) and knife-ridge (.06) locations of the coefficient top
 # follow the document's .XX, as do the 3.00 anchor X/Z: their printed limits
 # stay inside every check (sm_summing_lever_profile.PLATE_TOP_Y_ALLOWANCE).
 BASIC_PLACES = 4

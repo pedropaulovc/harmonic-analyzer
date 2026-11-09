@@ -785,6 +785,12 @@ def test_boss_and_flank_crease_picks_lie_on_their_web_junctions() -> None:
     assert families["CounterWebJunctionFillets"] == boss + creases + flank
     # The web side arc ends on the boss's Z extreme.
     assert namespace["summation_side_half_width"](spec.TIP_X) == pytest.approx(spec.ANCHOR_R)
+    # Each side arc leaves the pivot cylinder at the web's mid-plane.
+    side_z = namespace["summation_side_half_width"](-spec.CYL_R)
+    assert 50.0 < side_z < spec.PLATE_L / 2.0 - spec.RIB_T
+    assert families["CounterWebSideRootFillets"] == [
+        [-spec.CYL_R, 0.0, side_z], [-spec.CYL_R, 0.0, -side_z],
+    ]
 
 
 def test_knife_shoulder_picks_lie_on_both_stub_roots() -> None:
@@ -954,6 +960,23 @@ def test_native_web_junction_and_knife_shoulder_envelopes_refuse_escaped_faces()
     ):
         with pytest.raises(RuntimeError, match="escapes"):
             audit(_feature_adapter(_NativeFeature(faces=[_root_face(escaped)])), "CounterWebJunctionFillets", 1)
+    # Side-arc exits: nonanalytic faces suffice, but only inside their band.
+    side_z = namespace["summation_side_half_width"](-spec.CYL_R)
+    exit_box = (-spec.CYL_R - 0.4, -0.5, side_z - 0.4, -spec.CYL_R + 0.3, 0.5, side_z + 0.4)
+    mirrored_exit = (*exit_box[:2], -exit_box[5], *exit_box[3:5], -exit_box[2])
+    audit(_feature_adapter(_NativeFeature(
+        faces=[_root_face(exit_box, unknown=True), _root_face(mirrored_exit, unknown=True)],
+    )), "CounterWebSideRootFillets", 2)
+    for escaped in (
+        (*exit_box[:2], side_z - 5.0, *exit_box[3:]),  # down the side arc
+        (*exit_box[:5], side_z + 5.0),  # up the pivot
+        (-spec.CYL_R - 3.0, *exit_box[1:]),
+        (exit_box[0], -web - 2.0 * r, *exit_box[2:]),
+    ):
+        with pytest.raises(RuntimeError, match="escapes"):
+            audit(_feature_adapter(_NativeFeature(faces=[_root_face(escaped, unknown=True)])), "CounterWebSideRootFillets", 1)
+    with pytest.raises(RuntimeError, match=r"\(1 faces\)"):
+        audit(_feature_adapter(_NativeFeature(faces=[_root_face(exit_box, unknown=True)])), "CounterWebSideRootFillets", 2)
     s = spec.RIB_BLEND_R
     side = (spec.HEX_W / 2.0, -spec.HEX_H / 4.0, spec.HEX_Z_INNER, spec.HEX_W / 2.0 + s, spec.HEX_H / 4.0, spec.HEX_Z_INNER + s)
     roots = [_root_face(side, radius=s), _root_face((-side[3], *side[1:3], -side[0], *side[4:]), radius=s)]
@@ -1055,7 +1078,7 @@ def test_extracted_root_operations_disable_propagation_and_gate_actual_added_vol
 @pytest.mark.parametrize("new_name", [
     "CoefficientUndersideRootFillets", "CoefficientTopRootFillets",
     "CounterWebTopRootFillets", "CounterWebUndersideRootFillets", "CounterWebJunctionFillets",
-    "KnifeShoulderFillets",
+    "CounterWebSideRootFillets", "KnifeShoulderFillets",
 ])
 @pytest.mark.parametrize("increment", ["within", "zero", "negative", "excess"])
 def test_each_junction_family_has_its_own_increment_bound_without_relaxing_old_roots(

@@ -1489,6 +1489,13 @@ def rib_root_edge_families() -> tuple[tuple[str, list[list[float]], float], ...]
         web_picks,
         math.tau * ANCHOR_R + 2.0 * COUNTER_WEB_T + 2.0 * RIB_T + 12.0 * RIB_BLEND_R,
     ))
+    # Each web side arc leaving the pivot cylinder, across the web.
+    side_z = summation_side_half_width(-CYL_R)
+    families.append((
+        "CounterWebSideRootFillets",
+        [[-CYL_R, 0.0, sign * side_z] for sign in (1.0, -1.0)],
+        2.0 * COUNTER_WEB_T + 8.0 * RIB_BLEND_R,
+    ))
     # Both stub roots at the body end faces: two hexagon perimeters plus
     # one-radius corner neighbourhoods.
     families.append((
@@ -1516,7 +1523,7 @@ def _assert_root_feature_bounds(adapter, name: str, minimum_faces: int) -> None:
     """Read only new fillet surfaces: bounded reach, entry and radius."""
     raw = _early_bound(adapter.currentModel, "IPartDoc").FeatureByName(name)
     feature = _early_bound(raw, "IFeature")
-    count = 0
+    count = seen = 0
     knife = name == "KnifeShoulderFillets"
     expected_radius = RIB_BLEND_R
     reach = [0.0, 0.0, 0.0]  # knife roots: max |x|, |y| and |z| measured
@@ -1562,6 +1569,21 @@ def _assert_root_feature_bounds(adapter, name: str, minimum_faces: int) -> None:
             (-COUNTER_WEB_T / 2.0 - RIB_BLEND_R, COUNTER_WEB_T / 2.0 + RIB_BLEND_R),
             (-ANCHOR_R - RIB_BLEND_R, ANCHOR_R + RIB_BLEND_R),
         )
+    elif name == "CounterWebSideRootFillets":
+        # Where each side arc leaves the pivot: across the web, within one
+        # radius of the cylinder and of the arc (|Z| below).
+        envelope = (
+            (
+                -CYL_R - 2.0 * RIB_BLEND_R,
+                -math.sqrt(CYL_R**2 - (COUNTER_WEB_T / 2.0) ** 2) + RIB_BLEND_R,
+            ),
+            (-COUNTER_WEB_T / 2.0 - RIB_BLEND_R, COUNTER_WEB_T / 2.0 + RIB_BLEND_R),
+            None,
+        )
+        side_band = (
+            summation_side_half_width(-CYL_R - 2.0 * RIB_BLEND_R),
+            summation_side_half_width(envelope[0][1] - RIB_BLEND_R) + 2.0 * RIB_BLEND_R,
+        )
     elif knife:
         # Around each hexagon, inside one radius of the body end face. The
         # roots meet mitred at the sharp bottom vertex, R/sin(half angle) out.
@@ -1572,6 +1594,7 @@ def _assert_root_feature_bounds(adapter, name: str, minimum_faces: int) -> None:
             None,
         )
     for raw_face in feature.GetFaces() or ():
+        seen += 1
         face = _early_bound(raw_face, "IFace2")
         surface = _early_bound(face.GetSurface(), "ISurface")
         radius = None
@@ -1615,6 +1638,10 @@ def _assert_root_feature_bounds(adapter, name: str, minimum_faces: int) -> None:
                 max(reach[0], abs(x_min), abs(x_max)), max(reach[1], abs(y_min), abs(y_max)),
                 max(reach[2], far),
             ]
+        elif name == "CounterWebSideRootFillets":
+            near, far = sorted((abs(z_min), abs(z_max)))
+            if z_min * z_max <= 0.0 or near < side_band[0] - 1e-5 or far > side_band[1] + 1e-5:
+                raise RuntimeError(f"{name}: native face escapes the junction envelope: {extrema}")
         elif z_min <= -PLATE_L / 2.0 + 1e-5 or z_max >= PLATE_L / 2.0 - 1e-5:
             raise RuntimeError(f"{name}: root blend reaches an outside entry/knife cap: {extrema}")
         if any(
@@ -1652,10 +1679,13 @@ def _assert_root_feature_bounds(adapter, name: str, minimum_faces: int) -> None:
                     f"{name}: native root radius {radius} is not R{expected_radius}"
                 )
             count += 1
-    if count < minimum_faces:
+    # The blend between the crossed pivot and side-arc cylinders need not be
+    # analytic: the envelope bounds its faces, the feature radius its size.
+    analytic_minimum = 0 if name == "CounterWebSideRootFillets" else minimum_faces
+    if count < analytic_minimum or seen < minimum_faces:
         raise RuntimeError(
             f"{name}: only {count} native R{expected_radius} root surfaces "
-            f"for {minimum_faces} selected reentrant roots"
+            f"({seen} faces) for {minimum_faces} selected reentrant roots"
         )
     if longitudinal is not None and covered_runs != set(range(len(runs))):
         raise RuntimeError(f"{name}: missing native longitudinal blend run: {sorted(covered_runs)}")
