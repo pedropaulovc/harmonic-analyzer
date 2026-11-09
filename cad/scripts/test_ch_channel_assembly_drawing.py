@@ -284,6 +284,18 @@ def test_the_spring_set_and_its_preload_check_are_printed_from_the_layout() -> N
     assert f"{bank.STACK_L20_ACCEPT[0]:.2f}" not in _step_body("rocker-stack-measured")
 
 
+def test_the_stack_measuring_step_names_the_view_whose_dimension_carries_the_band() -> None:
+    """r5 Opus C2 (rule 19): the fitter package prints the stack acceptance
+    band on view D's native stack dimension (drawing policy: no limits in
+    note text), so the measuring step names that view and the dimension
+    carries STACK_L20_ACCEPT."""
+    assert drawing.ROCKER_BANK.title in drawing.FITUP_TEXT["rocker-stack-measured"]
+    asm = drawing.asm
+    lower, upper = asm.DIMENSION_TOLERANCES[asm.STACK_LENGTH_DIMENSION]
+    nominal = asm.PIVOT_CHAIN_Z[3] - asm.PIVOT_CHAIN_Z[2]
+    assert (nominal + lower, nominal + upper) == pytest.approx(bank.STACK_L20_ACCEPT)
+
+
 def test_each_stake_step_names_the_view_that_points_at_its_tap_mouth() -> None:
     """Rule 23 (round 2 reviews): every stake is in a view. Each staking step
     names the bank view whose pointer lands on a tap mouth and says where its
@@ -1098,9 +1110,9 @@ def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
     axis only if they are made in one setup at their installed spacing, feet
     on one flat; the shaft gauges that line. The pair is then set on the top
     frame by DRO, screwed down, and each set screw's tap mouth staked over it
-    (drawing-guidelines.md rule 23). The keeper print points at these steps."""
+    (drawing-guidelines.md rule 23). The keeper print says AT ASSEMBLY,
+    citing no step."""
     import ch_fulcrum_keeper_spec as keeper
-    import draw_ch_fulcrum_keeper as keeper_drawing
     from channel_frame_geom import LEVER_FULCRUM_XY
     from frame_column_stations import COLUMN_X
 
@@ -1189,14 +1201,7 @@ def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
     assert south_margin + band - title_block_band > 0.0
     assert north_margin > 10 * band
     assert top.KEEPER_TAP_DRILL_WALL_MARGIN >= top.WALL_FLOOR_MM
-    # The keeper print cites these steps by key.
-    assert keeper_drawing.DIMENSION_CALLOUTS["BoreDia"].endswith(
-        f"PER {steps.step_ref(steps.KEEPERS_PAIR_REAMED_KEY)}"
-    )
-    assert keeper_drawing.DIMENSION_CALLOUTS["CrownRadius"].endswith(
-        f"PER {steps.step_ref(steps.KEEPERS_PAIR_REAMED_KEY)}"
-    )
-    assert steps.step_ref(steps.SET_SCREWS_STAKED_KEY) in keeper_drawing.SET_SCREW_QUALIFIER
+
 
 
 def test_each_rod_fork_is_pinned_to_its_arm_at_the_bench_first() -> None:

@@ -1,7 +1,7 @@
 r"""The rocker arm's surface-profile check (plan ch_rocker_arm S7 op 97).
 
-Both printed profile zones (MHA-CH-06: the top edge's 0.5 Ⓤ0.5 and the lower
-outline's 0.5 Ⓤ0 between J and K, each to A|B|C) are read against the arm
+Both printed profile zones (MHA-CH-06: the top edge's 0.5 and the lower
+outline's 0.5 between J and K, each equal-bilateral to A|B|C) are read against the arm
 outline template (inventory gauges.arm-outline-template), pinned on the arm in
 datums A and C. A DTI (gauges.dti) on the height gauge's scriber
 (gauges.height-gauge) is zeroed on the template's edge and read on the arm's
@@ -59,51 +59,53 @@ _GAUGES = tomllib.loads(
 DTI_RESOLUTION_MM = _GAUGES["dti"]["resolution_in"]["value"] * INCH  # 0.0127
 DTI_TRAVEL_IN = _GAUGES["dti"]["range_in"]
 ZONE_MM = float(drawing.ARC_PROFILE_ZONE_MM)
-OUTSIDE_MM = {
-    frame: float(value) for frame, value in drawing.ARC_PROFILE_OUTSIDE_MM.items()
-}
 _CENTRE = (0.0, rocker_interface.CENTER_Y - rocker_interface.PIVOT_MID_Y)
 _XY = tuple[float, float]
 
 # ---------------------------------------------------------------------------
 # The arm outline template (gauges.arm-outline-template): an O1 plate carrying
-# the rocker's finished outline (the R800 top and R816 bottom arcs about the
-# pivot, the radial tip lands and the tapered ends), a reamed hole for a pin
+# the rocker's finished outline (its top and bottom arcs about the pivot, the
+# radial tip lands and the tapered ends), a reamed hole for a pin
 # gauge in the arm's pivot bore and a radial slot for a second pin gauge in
 # its rod-pin hole, which clocks it. Frame: origin on the pivot-hole axis in
 # the face laid on the arm, +Y toward the arcs' common centre (the mirror line
 # is the Y axis), +X toward the rocker's connecting-rod end, plate Z0..THICK.
 #
 # Every edge derives from the rocker's own CAD source and aims at the middle
-# of its 0.5 surface-profile zone (rocker.TOP_EDGE_BAND): outside on the top
-# arc, inside on the lower outline, leaving the zone's whole width to the
-# filing that follows. The arcs sit half the zone higher, on the trammel's own
-# radii; the tip lands and tapered ends are offset half the zone along their
-# own normals, since a rigid +Y shift put each tip land 0.0453 OUTSIDE the
-# lower zone (#1544).
-R_TOP = rocker.R_TOP
-R_BOTTOM = rocker_interface.R_BOTTOM
+# of its surface-profile zone (rocker.TOP_EDGE_BAND, rocker.BOTTOM_EDGE_BAND),
+# leaving the zone's whole width to the filing that follows. Since the owner
+# ruling of 2026-11-08 (#2144 item 10.3) the rocker's nominal IS that middle,
+# so the aim offsets below are nil and the template is the one made before
+# it. Its arcs stay on the trammel's book radii (inventory tools.rocker-
+# trammel) about a centre raised by the arcs' mid-zone shift: each meets its
+# mid-zone arc on the mirror line and falls short by shift x (1 - cos phi)
+# off it. The tip lands and tapered ends are offset along their own normals,
+# never by a rigid +Y shift, which put each tip land 0.0453 OUTSIDE the lower
+# zone (#1544).
+R_TOP = rocker_interface.BOOK_TOP_RADIUS
+R_BOTTOM = rocker_interface.BOOK_BOTTOM_RADIUS
 _ROCKER_ZONE = rocker.TOP_EDGE_BAND[0] - rocker.TOP_EDGE_BAND[1]
-_MID_ZONE = _ROCKER_ZONE / 2.0  # 0.254 into the material on the lower outline
-# The aim: the middle of the rocker's one-sided top-edge band.
+# Into the material on the lower outline: its band's middle, off the nominal.
+_MID_ZONE = -sum(rocker.BOTTOM_EDGE_BAND) / 2.0
+# The aim: the middle of the rocker's top-edge band.
 _ROCKER_TOP_LOW = rocker.TOP_EDGE_ABOVE_PIVOT + rocker.TOP_EDGE_BAND[1]
 _ROCKER_TOP_HIGH = rocker.TOP_EDGE_ABOVE_PIVOT + rocker.TOP_EDGE_BAND[0]
 TOP_ABOVE_PIVOT = round((_ROCKER_TOP_LOW + _ROCKER_TOP_HIGH) / 2.0, 3)  # 8.254
 CENTER_Y = TOP_ABOVE_PIVOT + R_TOP  # 808.254
 BOTTOM_BELOW_PIVOT = round(R_BOTTOM - CENTER_Y, 3)  # 7.746
 if abs(R_BOTTOM - R_TOP - rocker_interface.ARM_DEPTH) > 1e-9:
-    raise AssertionError("rocker arcs are no longer ARM_DEPTH apart")
+    raise AssertionError("template arcs are no longer the rocker's ARM_DEPTH apart")
 if abs(TOP_ABOVE_PIVOT + BOTTOM_BELOW_PIVOT - rocker_interface.ARM_DEPTH) > 1e-9:
     raise AssertionError(
         "template arcs are no longer ARM_DEPTH apart on the mirror line"
     )
-if abs(_CENTRE[1] + (TOP_ABOVE_PIVOT - rocker.TOP_EDGE_ABOVE_PIVOT) - CENTER_Y) > 1e-9:
+if abs((CENTER_Y - R_BOTTOM) - (_CENTRE[1] - rocker_interface.R_BOTTOM) - _MID_ZONE) > 1e-9:
     raise AssertionError(
-        "template arc centre is not the rocker's, raised by the aim offset"
+        "template bottom arc misses the lower band's middle on the mirror line"
     )
 # The outline's stations are made to three places.
 END_PLACES = 3
-_ROCKER_MIDDLE = (0.0, _CENTRE[1] - (R_TOP + R_BOTTOM) / 2.0)
+_ROCKER_MIDDLE = (0.0, _CENTRE[1] - (rocker.R_TOP + rocker_interface.R_BOTTOM) / 2.0)
 
 
 def _inward(start: _XY, end: _XY) -> _XY:
@@ -129,8 +131,8 @@ def _crossing(p: _XY, d: _XY, q: _XY, e: _XY) -> _XY:
 
 # The rocker's BASIC +X land (radial from its top-arc end) and taper, pivot frame.
 _ROCKER_TOP_END = (
-    R_TOP * math.sin(rocker._ALPHA_TOP),
-    _CENTRE[1] - R_TOP * math.cos(rocker._ALPHA_TOP),
+    rocker.R_TOP * math.sin(rocker._ALPHA_TOP),
+    _CENTRE[1] - rocker.R_TOP * math.cos(rocker._ALPHA_TOP),
 )
 _ROCKER_TIP = (
     _ROCKER_TOP_END[0] + rocker.TIP_FACE * math.sin(rocker._ALPHA_TOP),
@@ -138,7 +140,7 @@ _ROCKER_TIP = (
 )
 _ROCKER_BOT_END = (
     rocker.BOT_END_X,
-    _CENTRE[1] - math.sqrt(R_BOTTOM**2 - rocker.BOT_END_X**2),
+    _CENTRE[1] - math.sqrt(rocker_interface.R_BOTTOM**2 - rocker.BOT_END_X**2),
 )
 ROCKER_LAND = (_ROCKER_TOP_END, _ROCKER_TIP)
 ROCKER_TAPER = (_ROCKER_TIP, _ROCKER_BOT_END)
@@ -265,11 +267,15 @@ if ROD_SLOT_WIDTH_MIN - ROD_PIN_MAX <= 0.0:
 ROD_HOLE_RADIAL = float(rocker.GEOMETRIC_TOLERANCES_MM["rod-pin hole position"]) / 2.0
 ROD_HOLE_PLAY = (_ROD_HOLE_HIGH - ROD_PIN_MIN) / 2.0  # 0.0597
 ROD_SLOT_PLAY = (ROD_SLOT_WIDTH_MAX - ROD_PIN_MIN) / 2.0  # 0.0076
-# The slot's 0.75 run (inventory gauges.arm-outline-template; formerly
+# The slot's 1.00 run (inventory gauges.arm-outline-template; formerly
 # ROD_SLOT_FLAT, three places) must admit the pin at the rocker's worst
 # radial position error and play, so the radial slot absorbs that error and
-# only its width sets the clocking below.
-ROD_SLOT_FLAT = 0.75
+# only its width sets the clocking below. It grew from 0.75 when the rod-pin
+# hole's zone widened to the drilled-hole row's Ø.014 (delegated ruling
+# 2026-11-07, Q3-A; owner review #2144); the template is not yet made
+# (inventory verify = false), and its inventory note restates the run at
+# the next inventory edit.
+ROD_SLOT_FLAT = 1.00
 if (ROD_SLOT_FLAT - printed_band_mm(_ROD_SLOT_PLACES)) / 2.0 < (
     ROD_HOLE_RADIAL + ROD_HOLE_PLAY + printed_band_mm(_ROD_SLOT_PLACES)
 ):
@@ -360,15 +366,14 @@ def _radial(point: _XY) -> float:
     return math.hypot(point[0] - _CENTRE[0], point[1] - _CENTRE[1])
 
 
-# Each segment: the drawing feature, its printed frame, the template's edge
-# end to end along the +X half, and tau. The -X half is the mirror image.
+# Each segment: the drawing feature, the template's edge end to end along the
+# +X half, and tau. The -X half is the mirror image.
 _TOP_END = (TOP_END_X, TOP_END_Y)
 _TIP = (TIP_X, TIP_Y)
 _BOT_END = (BOT_END_X, BOT_END_Y)
 SEGMENTS: dict[str, dict] = {
     "top arc": {
         "features": ("top_edge",),
-        "frame": "TopRadius",
         "label": f"the R{rocker.R_TOP:g} top arc",
         "edge": lambda s: _arc(R_TOP, s * TOP_END_X),
         "length": R_TOP * ALPHA_TOP,
@@ -378,7 +383,6 @@ SEGMENTS: dict[str, dict] = {
     },
     "tip land": {
         "features": ("tip_land_pos_x", "tip_land_neg_x"),
-        "frame": "BottomRadius",
         "label": "each tip land",
         "edge": lambda s: (
             _TOP_END[0] + s * (_TIP[0] - _TOP_END[0]),
@@ -389,7 +393,6 @@ SEGMENTS: dict[str, dict] = {
     },
     "taper": {
         "features": ("profile_outer",),
-        "frame": "BottomRadius",
         "label": "each tapered end",
         "edge": lambda s: (
             _TIP[0] + s * (_BOT_END[0] - _TIP[0]),
@@ -400,7 +403,6 @@ SEGMENTS: dict[str, dict] = {
     },
     "bottom arc": {
         "features": ("profile_outer",),
-        "frame": "BottomRadius",
         "label": f"the R{rocker_interface.R_BOTTOM:g} bottom arc",
         "edge": lambda s: _arc(R_BOTTOM, s * BOT_END_X),
         "length": R_BOTTOM * ALPHA_BOT,
@@ -433,11 +435,9 @@ def guard(point: _XY, normal: _XY) -> float:
 
 
 def zone_readings(name: str, point: _XY) -> tuple[float, float]:
-    """The readings o that keep the arm's edge in its zone at ``point``."""
-    segment = SEGMENTS[name]
-    u = OUTSIDE_MM[segment["frame"]]
-    tau = segment["tau"]((abs(point[0]), point[1]))
-    return tau - (ZONE_MM - u), tau + u
+    """The readings o that keep the arm's edge in its equal-bilateral zone at ``point``."""
+    tau = SEGMENTS[name]["tau"]((abs(point[0]), point[1]))
+    return tau - ZONE_MM / 2.0, tau + ZONE_MM / 2.0
 
 
 def window(name: str) -> dict[str, tuple[float, float]]:
@@ -489,8 +489,8 @@ def method_steps() -> list[str]:
     half_travel = DTI_TRAVEL_IN / 2.0
     return [
         f"Both printed profile zones, read against the arm outline template (gauges.arm-outline-template) "
-        f"pinned in datums A and C: the top edge ({ZONE_MM:g}, all outside the R{rocker.R_TOP:g} BASIC arc) and "
-        f"the lower outline J to K ({ZONE_MM:g}, all inside the BASIC outline: the R{rocker_interface.R_BOTTOM:g} arc, both "
+        f"pinned in datums A and C: the top edge ({ZONE_MM:g}, equal-bilateral about the R{rocker.R_TOP:g} BASIC arc) and "
+        f"the lower outline J to K ({ZONE_MM:g}, equal-bilateral about the BASIC outline: the R{rocker_interface.R_BOTTOM:g} arc, both "
         f"tapers and both tip lands, so the tip_land_pos_x and tip_land_neg_x zones are read here too). Done on "
         f"the granite surface plate (gauges.granite-surface-plate), off the rest plate.",
         "Clean the arm, the template and both pins and leave them on the granite for 30 min to reach its temperature.",

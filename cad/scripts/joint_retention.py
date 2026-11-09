@@ -1432,7 +1432,7 @@ JOINTS: tuple[Joint, ...] = (
         evidence=(
             "build_ch_channel_assembly.py keeper loop (frame-side-screw at FULCRUM_KEEPER_CENTRE_Z +- KEEPER_SCREW_Z_OFF) + header; "
             "ch_fulcrum_keeper_spec.py docstring/SCREW_X/SCREW_HOLE_SPEC/KEEPER_TAP_SPEC (#2-56 blind, 11.5 drill, "
-            "ThreadDepth 7.6; FOOT_SCREW_ENGAGEMENT_D) + DRAWING_NOTES 2; build_fr_top_frame.py step 'KeeperTaps' "
+            "ThreadDepth 7.6; FOOT_SCREW_ENGAGEMENT_D) + ch_fulcrum_keeper_notes.FOOT_HOLE_MATE; build_fr_top_frame.py step 'KeeperTaps' "
             "consumes KEEPER_TAP_SPEC; config parts/ch-vn-frame-side-screw.yaml (91794A080); draw_ch_channel_assembly.py "
             "step fulcrum-keepers-screwed ('SCREW EACH ITEM 8 DOWN WITH ONE ITEM 9'), after keeper-feet-tapped taps the rail"
         ),
@@ -1458,8 +1458,8 @@ JOINTS: tuple[Joint, ...] = (
         lock_step=ch_channel_assembly_steps.SET_SCREWS_STAKED_KEY,
         evidence=(
             "build_ch_channel_assembly.py keeper loop (ch-vn-fulcrum-set-screw on each keeper's crown tap axis); "
-            "ch_fulcrum_keeper_spec.SET_SCREW_HOLE_SPEC (#1-72 tapped, through_next) + DRAWING_NOTES 2; "
-            "draw_ch_fulcrum_keeper.SET_SCREW_QUALIFIER (stake at MHA-CH-00 assembly); "
+            "ch_fulcrum_keeper_spec.SET_SCREW_HOLE_SPEC (#1-72 tapped, through_next); "
+            "ch_fulcrum_keeper_notes.SET_SCREW_QUALIFIER ('FOR MHA-CH-VN-55 SET SCREW, AT ASSEMBLY'); "
             "draw_ch_channel_assembly.py steps fulcrum-set-screws-driven ('TIGHTEN ONE ITEM 10 SET SCREW ONTO EACH "
             "FLAT.') and fulcrum-set-screws-staked ('STAKE THE MOUTH OF EACH ITEM 10 TAP AT 2 POINTS, "
             "ONE EACH SIDE ALONG ITEM 2 (VIEW E).'); "

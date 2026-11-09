@@ -14,9 +14,10 @@ side, the hub hole PIVOT_MID_Y up), extruded mid-plane in Z. ONE sketch,
 ``StrapProfile``, holds the outline and the hole, so every printed location
 runs from the hole's centre: a construction line on the mirror axis, from the
 bottom edge through the hole's centre to the top edge, carries both edges'
-heights from the hole and puts the arcs' centre on that axis (the bottom radius is
-then derived, never printed); the tip lands' outer corners and the taper feet
-are dimensioned across from the hole's centre.
+heights from the hole and puts both arcs' centres on that axis; each arc then
+prints its own radius (the bottom one an equation of the top radius and the
+two heights, so the arcs stay concentric); the tip lands' outer corners and
+the taper feet are dimensioned across from the hole's centre.
 
 Run (SolidWorks already open)::
 
@@ -31,8 +32,10 @@ import sys
 from _appearance import apply_material
 from _bore_axis import name_bore_axis
 from _check import check
+from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
 from _document_units import apply_package_model_units
+from _drawing_dimension_insert import add_angular_reference_dimension
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -59,10 +62,10 @@ from _sketch import (
     set_sketch_direct_db,
 )
 from _sketch_circle import define_circle
+from ch_rocker_arm_spec import _ALPHA_TOP
 from ch_rocker_hub_fit import STRAP_HOLE_BAND
 from ch_rocker_strap_notes import (
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     DRAWING_PRECISION,
     DRAWING_PRECISION_BY_NAME,
     ISOMETRIC_VIEW_NOTE,
@@ -80,6 +83,7 @@ from ch_rocker_strap_spec import (
     CURVE_RADIUS,
     HOLE_DIA,
     PIVOT_MID_Y,
+    R_BOTTOM,
     R_TOP,
     ROD_TIP_X,
     ROD_TIP_Y,
@@ -99,11 +103,68 @@ _SAVED_DRAWING_PROPERTIES = (
     "Material Specification",
     "Finish",
     "Quantity",
-    "Manufacturing Notes",
     "Isometric View Note",
 )
 
 V_STRAP = (strap_area() - math.pi * (HOLE_DIA / 2.0) ** 2) * ARM_THICKNESS
+
+
+def _as_construction(adapter, entity_id: str) -> None:
+    """Flag a registered sketch line as construction geometry (the setter is
+    on ISketchSegment, not the ISketchLine the registry binds)."""
+    segment = _early_bound(adapter._sketch_entities[entity_id], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError(f"{entity_id} did not take the construction flag")
+
+
+async def _tip_land_angle_reference(adapter, rod_tip_line: str, dims: SketchDims) -> None:
+    """Measure the real +X radial land from vertical (build_ch_rocker_arm's
+    construction): "RADIAL" alone named a centre the sheet does not show (r4
+    machinist review), so the end faces print their angle from the hole's
+    vertical centreline. A construction ray rooted at the land's top end,
+    vertical with its length driven, and a DRIVEN angle: the outline gains no
+    driving constraint."""
+    set_sketch_direct_db(adapter, True)
+    vertical = check(
+        "tip land vertical reference",
+        await adapter.add_line(TOP_END_X, TOP_END_Y, TOP_END_X, TOP_END_Y - TIP_FACE),
+    )
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, vertical)
+    check(
+        "tip land vertical reference root",
+        await adapter.add_sketch_constraint(
+            f"{vertical}.start", f"{rod_tip_line}.start", "coincident"
+        ),
+    )
+    check(
+        "tip land vertical reference direction",
+        await adapter.add_sketch_constraint(vertical, None, "vertical"),
+    )
+    await dimension_between(
+        adapter,
+        f"{vertical}.start",
+        f"{vertical}.end",
+        "vertical_distance",
+        TIP_FACE,
+        "tip land vertical reference length",
+    )
+    dims.record("TipLandVerticalLength", '"TipFaceLen"')
+    # Text in the acute downward wedge: the measured land and ray, never a
+    # numeric text override.
+    await add_angular_reference_dimension(
+        adapter,
+        vertical,
+        rod_tip_line,
+        (
+            TOP_END_X + 2.0 * TIP_FACE * math.sin(_ALPHA_TOP / 2.0),
+            TOP_END_Y - 2.0 * TIP_FACE * math.cos(_ALPHA_TOP / 2.0),
+        ),
+        "tip land from vertical",
+        expected_degrees=math.degrees(_ALPHA_TOP),
+    )
+    dims.record("TipLandAngle")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -140,9 +201,15 @@ async def build(adapter) -> dict[str, str]:
     check("create_sketch strap", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     entities = [
+        # Seeded with its centre 2 mm below the top arc's: two centres drawn
+        # on one point merge into a single sketch point (as the lines' ends
+        # merge with the arcs' here), which made the arcs concentric by
+        # construction and BottomRadius a driven dimension (r1 farm: the
+        # Equations feature refused it). The bottom-edge depth and the
+        # radius then solve it back onto the shared centre.
         check(
             "strap bottom arc",
-            await adapter.add_arc(0.0, CENTER_Y, *tail_b, *rod_b),
+            await adapter.add_arc(0.0, CENTER_Y - 2.0, *tail_b, *rod_b),
         ),
         check(
             "strap top arc",
@@ -159,7 +226,7 @@ async def build(adapter) -> dict[str, str]:
         check(
             "edge reference centerline",
             await adapter.add_centerline(
-                0.0, 0.0, 0.0, PIVOT_MID_Y + TOP_EDGE_ABOVE_PIVOT
+                0.0, PIVOT_MID_Y - BOTTOM_EDGE_BELOW_PIVOT, 0.0, PIVOT_MID_Y + TOP_EDGE_ABOVE_PIVOT
             ),
         ),
     ]
@@ -199,16 +266,11 @@ async def build(adapter) -> dict[str, str]:
         "mirror axis head on the top edge",
         await adapter.add_sketch_constraint(f"{axis}.end", top_arc, "coincident"),
     )
-    check(
-        "arc centre on the mirror axis",
-        await adapter.add_sketch_constraint(f"{top_arc}.center", axis, "coincident"),
-    )
-    check(
-        "concentric arcs",
-        await adapter.add_sketch_constraint(
-            f"{top_arc}.center", f"{bottom_arc}.center", "coincident"
-        ),
-    )
+    for arc, label in ((top_arc, "top"), (bottom_arc, "bottom")):
+        check(
+            f"{label} arc centre on the mirror axis",
+            await adapter.add_sketch_constraint(f"{arc}.center", axis, "coincident"),
+        )
     await dimension_between(
         adapter,
         hole_centre,
@@ -232,6 +294,14 @@ async def build(adapter) -> dict[str, str]:
         await adapter.add_sketch_dimension(top_arc, None, "radial", R_TOP),
     )
     strap.record("TopRadius", '"RTop"')
+    # The bottom arc's own radius, so the sheet prints it instead of a
+    # "concentric" sentence (rule 26): the top radius and both heights put
+    # its centre on the top arc's.
+    check(
+        "bottom radius",
+        await adapter.add_sketch_dimension(bottom_arc, None, "radial", R_BOTTOM),
+    )
+    strap.record("BottomRadius", '"RTop" + "TopAbovePivot" + "BottomBelowPivot"')
     # Offsets across from the hole's centre: horizontal_distance shows the
     # magnitude, so each drives POSITIVE against its shared global.
     for ref, name, value, expr in (
@@ -258,6 +328,7 @@ async def build(adapter) -> dict[str, str]:
             await adapter.add_sketch_dimension(line, None, "linear", TIP_FACE),
         )
         strap.record(name, '"TipFaceLen"')
+    await _tip_land_angle_reference(adapter, rod_tip_line, strap)
     await ensure_fully_defined(adapter, "strap sketch")
     check("exit_sketch strap", await adapter.exit_sketch())
     name_last_feature(adapter, "StrapProfile")
@@ -292,8 +363,8 @@ async def build(adapter) -> dict[str, str]:
     await report_mass_properties(adapter)
 
     # Native bands: the thickness (the finished part's, the faces are not cut
-    # again), the hub hole's press band, the top edge's one-sided plus over the
-    # hole and the bottom edge's one-sided minus under it.
+    # again), the hub hole's press band, and the arc-system zone's bilateral
+    # band on the top edge's height over the hole and the bottom edge's under it.
     strap_lower, strap_upper = deviations(ARM_THICKNESS_BAND)
     if strap_lower != -strap_upper:
         raise AssertionError("ch_rocker_arm_spec.ARM_THICKNESS_BAND must be symmetric")
@@ -312,7 +383,7 @@ async def build(adapter) -> dict[str, str]:
         "StrapProfile",
         "TopAbovePivot",
         *deviations(TOP_EDGE_BAND),
-        # Y14.5 inch: the tolerance carries the nominal's places (.315 +.020/.000).
+        # Y14.5 inch: the tolerance carries the nominal's places (.325 +/-.010).
         places=DRAWING_PRECISION_BY_NAME["TopAbovePivot"],
         display_unit=UNIT,
     )
@@ -321,7 +392,7 @@ async def build(adapter) -> dict[str, str]:
         "StrapProfile",
         "BottomBelowPivot",
         *deviations(BOTTOM_EDGE_BAND),
-        # Y14.5 inch: the tolerance carries the nominal's places (.315 +.020/.000).
+        # Y14.5 inch: the tolerance carries the nominal's places (.305 +/-.010).
         places=DRAWING_PRECISION_BY_NAME["BottomBelowPivot"],
         display_unit=UNIT,
     )
@@ -331,12 +402,7 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_properties(
-        adapter,
-        PART_NAME,
-        {
-            "Manufacturing Notes": DRAWING_NOTES,
-            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
-        },
+        adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
     )
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)

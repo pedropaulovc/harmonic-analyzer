@@ -270,7 +270,7 @@ from _rocker_interface import PIVOT_MID_Y as ARM_PIVOT_LOCAL_Y  # 8.0: strap mid
 # already cost 20 x 20.27 mm^3 of cylinder-gear interference at the top level).
 from _rocker_interface import CENTER_Y as ARM_ARC_CENTER_LOCAL_Y  # 816: arm-local arc
 
-# centre above the bottom edge (= CURVE_RADIUS + ARM_DEPTH), shared with the
+# centre above the frame origin (the book bottom edge, BOOK_TOP_RADIUS + BOOK_DEPTH), shared with the
 # offline error budget so the slide-arc height is never copied.
 from channel_frame_geom import (  # machine-frame shaft axes + cam lock, shared with error_budget
     CAM_SHAFT_XY,

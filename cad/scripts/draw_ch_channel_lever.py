@@ -150,28 +150,41 @@ def _inch(value_mm: float) -> str:
 
 
 # The bar-to-hub roots are inside corners: the title block's INSIDE CORNERS
-# row controls them, so no callout repeats it (rule 2; review r1-r3).
+# row controls them, so no callout repeats it (rule 2; review r1-r3). A hole
+# location carries its value and band only (rule 7): each drilled hole's mate
+# rides its own hole callout. The fulcrum bore names its standard fit and the
+# clearance range as REF (rule 4).
 FRONT_CALLOUTS = {
     "FulcrumDia": (
-        f"REAM THRU; RUNS ON\nSHAFT {SHAFT_NUMBER},"
-        f" {_inch(_CLEARANCE_LEAST)}-{_inch(_CLEARANCE_MOST)}\nDIAMETRAL CLEARANCE"
+        f"REAM THRU\nRUNNING FIT ON {SHAFT_NUMBER}\n"
+        f"(CLEARANCE {_inch(_CLEARANCE_LEAST)}-{_inch(_CLEARANCE_MOST)} REF)"
     ),
     "BarHeight": "FULL R AT TIP",
-    "BarPinCx": "SETS LEVER RATIO",
-    "SpringCx": "SETS LEVER RATIO",
 }
 # What engages each drilled hole rides its own hole callout (machinist r5:
 # on the arm's location it did not say the hole is a running bore).
 HOLE_MATES = {
     "bar-pin hole": f"RUNS ON PIN\n{PIN_NUMBER}",
-    "spring-eye hole": f"HOOKS SPRING\n{SPRING_NUMBER}",
+    # The two arms' ratio is the channel's lever ratio (error_budget gain).
+    "spring-eye hole": f"HOOKS {SPRING_NUMBER};\nSETS LEVER RATIO",
 }
-# Each drilled hole's native size prints .XXX.
-HOLE_PRECISION = {"hw-diam": 3}
+# Each drilled hole's native size prints the exact decimal of its named drill
+# (rule 3: #47 is .0785, #21 is .159).
+HOLE_PRECISION = {"bar-pin hole": {"hw-diam": 4}, "spring-eye hole": {"hw-diam": 3}}
+# The hub length's +.001/.000 is narrower than the shop's turned-length row
+# (+/-.001); it names the stack it sets (rule 4) and nothing more. The 20-hub
+# stack's length and end play between the MHA-CH-07 keepers are the channel
+# assembly's acceptance (MHA-CH-00), not this part's (machinist r1: a second
+# line here was assembly narration), and the band is accepted on RV-03.
+# The plate's .080 +/-.002 offset in the hub is a tight band, so it names
+# what it serves at the dimension (rule 4; ch-fab-2 r2: 3/3 runs asked for
+# it there, and a second reason on the .118 read as narration): each bar
+# rides its lever's plate, so the offset spaces neighbouring bars in the
+# stack (ch_bar_pivot_pin_spec).
 TOP_CALLOUTS = {
     "LeverThick": f"SLIDING FIT IN NOTCH\nOF {BAR_NUMBER}",
-    "PlateOffset": f"LOCATES {BAR_NUMBER} NOTCH;\nSETS GAP TO NEXT BAR",
-    "HubLength": f"{STATIONS} HUBS STACK;\nSETS STATION PITCH",
+    "PlateOffset": f"SPACES {BAR_NUMBER} BARS",
+    "HubLength": f"SETS PITCH OF {STATIONS}X\nSTACK ON {SHAFT_NUMBER}",
 }
 
 FRONT_KEEP = {
@@ -193,6 +206,9 @@ TOP_KEEP = {
     # (r2 render), so the outer (right) line carries the lower text and
     # neither line runs through the other's text.
     "HubLength": (0.075, TOP_CENTER[1] + 0.032),
+    # Its value row sits under the hub length's shelf (ch-fab-2 r3: at +0.018
+    # that shelf struck the .080); its one row of words and its shelf still
+    # stand ~4 mm above its own arrows over the plate.
     "PlateOffset": (0.095, TOP_CENTER[1] + 0.014),
 }
 OVERALL_TEXT_XY = (FRONT_CENTER[0], 0.082)
@@ -352,7 +368,9 @@ async def build(adapter: Any) -> dict[str, str]:
         process=drill_process(BAR_PIN_HOLE_SPEC) + "\n",
     )
     _name_hole_mate(bar_pin_callout, label="bar-pin hole")
-    set_hole_callout_precision(bar_pin_callout, HOLE_PRECISION, label="bar-pin hole")
+    set_hole_callout_precision(
+        bar_pin_callout, HOLE_PRECISION["bar-pin hole"], label="bar-pin hole"
+    )
     spring_callout = add_native_hole_callout(
         adapter,
         front,
@@ -362,7 +380,9 @@ async def build(adapter: Any) -> dict[str, str]:
         process=drill_process(SPRING_EYE_HOLE_SPEC) + "\n",
     )
     _name_hole_mate(spring_callout, label="spring-eye hole")
-    set_hole_callout_precision(spring_callout, HOLE_PRECISION, label="spring-eye hole")
+    set_hole_callout_precision(
+        spring_callout, HOLE_PRECISION["spring-eye hole"], label="spring-eye hole"
+    )
     rebuild_drawing(adapter, label="hole callout mates")
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):

@@ -142,19 +142,19 @@ critical_features:
     class: channel
     holds: "offset-turn the cam in a 4-jaw, indicate the throw to 0.01"
   rocker_rod_pin_radius:
-    tolerance: 0.1016  # +/-.004 in, half the inch print's .008 position zone
+    tolerance: 0.1778  # +/-.007 in, half the inch print's .014 position zone (delegated ruling 2026-11-07, owner review #2144)
     nominal: _rocker_interface.ROD_HOLE_X
     quantity: gain
     class: channel
     holds: "rod-pin hole position from the pivot bore, DRO/CNC"
   lever_bar_pin_arm:
-    tolerance: 0.1016  # +/-.004 in, the inch print's band
+    tolerance: 0.127  # +/-.005 in, the title block's .XXX row (delegated ruling 2026-11-07, owner review #2144)
     nominal: ch_channel_lever_spec.BAR_PIN_X
     quantity: gain
     class: channel
     holds: "bar-pin hole from the fulcrum bore, DRO/CNC"
   lever_spring_hook_arm:
-    tolerance: 0.1016  # +/-.004 in, the inch print's band
+    tolerance: 0.127  # +/-.005 in, the title block's .XXX row (delegated ruling 2026-11-07, owner review #2144)
     nominal: ch_channel_lever_spec.LEVER_SPRING_X
     quantity: gain
     class: channel

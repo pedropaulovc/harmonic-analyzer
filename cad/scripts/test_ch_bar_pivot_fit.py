@@ -119,8 +119,11 @@ def test_neighbour_stack_closes_the_inter_bar_gap_exactly() -> None:
 
 def _lever_bar_swing_deg() -> float:
     """|lever tilt - bar tilt| over one cam turn at bar stations 0..80 mm,
-    the rocker's solved swing applied to its R800 arc in either sense."""
+    the rocker's solved swing applied to its top-edge arc in either sense,
+    with that edge at either limit of its profile zone (the low one swings
+    farthest)."""
     import ch_connecting_rod_spec as rod
+    import ch_rocker_arm_spec as rocker
     import channel_frame_geom as frame
     import channel_kinematics as ck
     import dt_cylinder_gear_spec as gear
@@ -141,14 +144,15 @@ def _lever_bar_swing_deg() -> float:
     acx0, acy0 = ck.ARC["acx"], ck.ARC["acy"]
     worst = 0.0
     try:
-        for delta in {min(tilts), max(tilts), -min(tilts), -max(tilts), 0.0}:
-            t = math.radians(delta)
-            rx, ry = acx0 - ox, acy0 - oy
-            ck.ARC["acx"] = ox + rx * math.cos(t) - ry * math.sin(t)
-            ck.ARC["acy"] = oy + rx * math.sin(t) + ry * math.cos(t)
-            for station in range(0, 81, 10):
-                state = ck.solve_state(float(station))
-                worst = max(worst, abs(state["lever_tilt"] - state["bar_tilt"]))
+        for edge in rocker.TOP_EDGE_BAND:
+            for delta in {min(tilts), max(tilts), -min(tilts), -max(tilts), 0.0}:
+                t = math.radians(delta)
+                rx, ry = acx0 - ox, acy0 + edge - oy
+                ck.ARC["acx"] = ox + rx * math.cos(t) - ry * math.sin(t)
+                ck.ARC["acy"] = oy + rx * math.sin(t) + ry * math.cos(t)
+                for station in range(0, 81, 10):
+                    state = ck.solve_state(float(station))
+                    worst = max(worst, abs(state["lever_tilt"] - state["bar_tilt"]))
     finally:
         ck.ARC["acx"], ck.ARC["acy"] = acx0, acy0
     return worst

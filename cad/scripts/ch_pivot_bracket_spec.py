@@ -151,10 +151,15 @@ SET_SCREW_MAJOR_DIA = THREAD_MAJOR_MM[SET_SCREW_THREAD]
 # The cup end the flat must take: the vendor's 45 deg x one-pitch point
 # chamfer off the major (sh_vn_arbor_set_screw_spec.POINT_LENGTH).
 SET_SCREW_POINT_DIA = SET_SCREW_MAJOR_DIA - 2.0 * SET_SCREW_PITCH  # 1.575
-# The tap sits on the ear's mid-plane, held +/-.004 from the inboard face;
-# that face's mid-plane is itself half the thickness band off, so the tap
-# may stand this far off nominal along the shaft.
-SET_SCREW_STATION_BAND = 0.1016  # +/-.004
+# The tap sits on the ear's mid-plane, its drilled station printed plain .16
+# from the inboard face at the title block's .XX (+/-.01): the review read a
+# bare .XXX on it as over-specification (ch-fab-2 r2), and the walls and the
+# rocker bank's cup-on-flat reach still pass at .XX. That face's mid-plane is
+# itself half the thickness band off, so the tap may stand this far off
+# nominal along the shaft. Delegated ruling 2026-11-07 (Main, Q2-A, then L2
+# to the row), no precedent; owner review #2144 -- pending owner
+# confirmation.
+SET_SCREW_STATION_BAND = printed_band_mm(2, unit=UNIT)  # +/-.01
 SET_SCREW_OFF_MID_MAX = SET_SCREW_STATION_BAND + EAR_T_BAND / 2.0
 # The thread's wall to each ear face at the worst case (target .080): the
 # inboard face at the tap's far limit, the outboard face also losing the
@@ -165,7 +170,7 @@ SET_SCREW_WALLS_MIN = {
     - EAR_T_BAND
     - SET_SCREW_OFF_MID_MAX
     - SET_SCREW_MAJOR_DIA / 2.0,
-}  # 2.49, 2.39
+}  # 2.34, 2.24
 if min(SET_SCREW_WALLS_MIN.values()) < LIGAMENT_TARGET:
     raise AssertionError(
         f"the apex tap leaves {SET_SCREW_WALLS_MIN} to the ear faces at worst"

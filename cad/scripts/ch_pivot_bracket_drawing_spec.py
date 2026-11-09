@@ -96,8 +96,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 #   radius, the overall height and the bore height the bands the set screw's
 #   full thread is counted at (ARCH_R_BAND, HEIGHT_BAND);
 # - the foot length and the hold-down station ride the title block's .XX
-#   (ch_pivot_bracket_sides proves the foot for them); the ear thickness and
-#   tap station carry their own +/-.004, so print .XXX;
+#   (ch_pivot_bracket_sides proves the foot for them); the ear thickness
+#   carries its own +/-.004, so prints .XXX; the apex tap's station rides
+#   the title block's .XX like every other location here (ch-fab-2 r2);
 # - the foot height sits at .XX in the support's seat-screw reach
 #   (rocker_bracket_seat_layout.FOOT_H_RANGE);
 # - the bore lateral is a routine location of a fitted bore; the cross-bore
@@ -113,7 +114,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "HoleProfile": {"HoleStation": 2, "HoleDia": 3},
     "BoreLateralReference": {"BoreLateral": 2},
     "HoleLateralReference": {"HoleLateral": 2},
-    "SetScrewReference": {"SetScrewLocation": 3},
+    "SetScrewReference": {"SetScrewLocation": 2},
     "HeightReference": {"OverallHeight": 2},
     "CornerFillet": {"CornerRadius": CORNER_R_PLACES},
 }

@@ -12,8 +12,10 @@ ch-rocker-strap:
   # nominals; no thickness or width tolerance stated.
   # Black oxide once, on the joined MHA-CH-06, after its bore and length are
   # finished; note 2 names the joint ("on joined MHA-CH-06" read as an
-  # unexplained second joint to the r1 machinist review).
-  finish: black oxide after joining
+  # unexplained second joint to the r1 machinist review). The field names the
+  # mate it follows (fab-2 r5, 2 of 3 runs: "after joining" named none);
+  # the title-block cell takes 36 characters.
+  finish: black oxide after joining MHA-CH-12
   quantity: 20
   tolerance_class: machined_block
   drawing_unit: in
