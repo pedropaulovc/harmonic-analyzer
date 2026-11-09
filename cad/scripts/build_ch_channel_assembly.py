@@ -360,10 +360,14 @@ from ch_amplitude_bar_spec import (  # noqa: E402
     BAR_WIDTH,  # 6.35 square section
     TOP_PIN_Y as BAR_TOP_PIN_Y,  # 801.9432
 )
-from ch_bar_pivot_pin_spec import PIN_INSTALLED_LENGTH as BAR_PIN_LENGTH  # noqa: E402
+from ch_bar_pivot_pin_spec import (  # noqa: E402
+    INSTALLED_CONFIG as BAR_PIN_INSTALLED_CONFIG,
+    PIN_INSTALLED_LENGTH as BAR_PIN_LENGTH,
+)
 
-# The bar pivot pin is modelled installed: flush with both bar faces, centred
-# on the bar's top pin bore at mid-width, lock-mated to the bar.
+# The bar pivot pin is placed in its INSTALLED configuration: flush with both
+# bar faces, centred on the bar's top pin bore at mid-width, lock-mated to the
+# bar (its default is the longer cut pin its drawing prints).
 if abs(BAR_PIN_LENGTH - BAR_WIDTH) > 1e-9:
     raise AssertionError(
         f"bar pivot pin length {BAR_PIN_LENGTH:g} != bar width {BAR_WIDTH:g}"
@@ -2354,8 +2358,8 @@ async def build(adapter) -> dict[str, str]:
 
     # Bar pivot pins (MHA-CH-11): one per channel, OUTSIDE the CopyWithMates
     # slice, so the pinned slice contract (SLICE_MATES / SLICE_EXTERNAL / the
-    # per-part mate counts above) never sees them. Each pin is modelled
-    # installed -- pressed through the bar's top-notch cheeks and dressed
+    # per-part mate counts above) never sees them. Each pin is placed in its
+    # INSTALLED configuration -- pressed through the bar's top-notch cheeks and dressed
     # flush with both bar faces, its axis the bar's top pin bore (Axis1@bar,
     # which J3 holds coaxial with the lever's bar-pin hole) -- so it is
     # inserted at the bar's SOLVED pose (pin X = bar X, the bore axis; pin
@@ -2393,6 +2397,7 @@ async def build(adapter) -> dict[str, str]:
             euler_from_rows(pin_rows),
             pin_rows,
             ground=False,
+            configuration=BAR_PIN_INSTALLED_CONFIG,
             label=f"bar-pivot-pin ch{j:02d} pressed",
         )
         if pin != f"ch-bar-pivot-pin-{j + 1}":
