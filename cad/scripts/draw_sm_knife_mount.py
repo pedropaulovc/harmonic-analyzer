@@ -478,30 +478,26 @@ _DRILL_ANGLE_VARIABLE = 16  # swCalloutVariable_e.swCalloutVariable_Drill_Angle
 # lower-left rim, nearer its block.
 TAP_CALLOUT_RIM_SIDE = -1.0
 # The bore's frames (Owner ruling 2026-11-08 (Pedro), #2144 item 11.3):
-# ⌖Ø.008|A|B and, directly under it, ∥.002|A -- two frames, each with its
-# own leader to the bore's crown, because a stacked lower frame takes its
-# upper's Ø (_drawing_gdt.add_feature_control_frame) and an axis held
-# parallel to a datum plane takes a two-plane zone, not a Ø.  They stand
-# above the block's upper-right corner, right of the datum-A tag, where the
-# former two-row composite frame stood.  The former top row, measured on
-# farm run 20261027T154115830Z, ran x 150.0..191.6 mm, y 166.6..173.6, its
-# leader off the left end at y 170.1; the ∥ row stands one 7.0 mm row under
-# it, so its bottom, y 159.6, stands 5.0 mm over the block's top edge (y
-# 154.6) and the 20.616 BASIC's top extension line.  Lower, its leader to the
-# crown ran flatter: at the ⌖ frame's x it entered the top edge at x 137.2
-# and ran 36.7 mm over the part, 11.5 mm past the crown's 25.2 mm approach
-# (integration farm run 20261109T062834910Z, leader-over-part, limit 10).
-# The ∥ frame therefore stands 9.0 mm left of the ⌖ frame, so its leader
-# enters about 7 mm further left (about 33 mm over the part, a 7.7 mm
-# detour); nothing else stands within x 141..192 between y 159.6 and the ⌖
-# frame (datum A's tag ends at x 126.5, the right view's Ra 3.2 starts at x
-# 214.0).  Neither row is wider than the former A|B|C rows.
+# ⌖Ø.008|A|B and ∥.002|A -- two frames, each with its own leader to the
+# bore's crown, because a stacked lower frame takes its upper's Ø
+# (_drawing_gdt.add_feature_control_frame) and an axis held parallel to a
+# datum plane takes a two-plane zone, not a Ø.  The ⌖ frame stands above
+# the block's upper-right corner, right of the datum-A tag, where the former
+# two-row composite frame stood (farm run 20261027T154115830Z: x
+# 150.0..191.6 mm, y 166.6..173.6, its leader off the left end at y 170.1).
+# The ∥ frame cannot share that side: one row under it at the same x its
+# leader ran flatter, 36.7 mm over the part, 11.5 mm past the crown's 25.2
+# mm approach (integration farm run 20261109T062834910Z, leader-over-part,
+# limit 10); 9 mm left, its 6.4 mm leader shoulder crossed the ⌖ leader
+# (farm run 20261109T082115744Z, leader-crosses-leader).  So it stands
+# mirrored, left of the datum-A tag (x 118..126.5), one row under the ⌖ frame:
+# its left edge at x 78, its right end (about x 106..109) and shoulder stop
+# short of the tag's stem, and its leader drops almost plumb to the crown
+# (about 29 mm over the part, a 4 mm detour).  Its bottom, y 159.6, stands
+# 9.6 mm over the ream note (top y 150, right end x 84) and its top, y
+# 166.6, 5 mm under the tap callout's last row (bottom about y 172).
 BORE_FRAME_XY = (FRONT_CENTER[0] + 0.035, _front_y(BLK_TOP) + 0.019)
-BORE_PARALLELISM_FRAME_SHIFT_X = -0.009
-BORE_PARALLELISM_FRAME_XY = (
-    BORE_FRAME_XY[0] + BORE_PARALLELISM_FRAME_SHIFT_X,
-    BORE_FRAME_XY[1] - 0.007,
-)
+BORE_PARALLELISM_FRAME_XY = (FRONT_CENTER[0] - 0.037, BORE_FRAME_XY[1] - 0.007)
 BORE_BASIC_TEXT_XY = (
     _sheet_x(BLK_HALF_X) + 0.012,
     _front_y(BLK_TOP - BORE_CENTRE_DEPTH / 2.0),
