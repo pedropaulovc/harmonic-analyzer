@@ -24,7 +24,7 @@ off the plate top, it no longer trades engagement for eye lift.
 
 The fitter holds the eye at its clocking while the nut is tightened, so the
 trim survives the lock; re-trimming means slackening the nut first.  The
-step text the top-level assembly prints is ``ANCHOR_INSTALL_STEP``.
+top-level assembly (MHA-HA-00) prints the install steps.
 
 Issue #290: the sheet prints decimal inch (``drawing_unit: in``).  The two
 shop controls (the finished overall and the restored deburr) are authored as
@@ -228,20 +228,3 @@ SUPPLIER_THREAD_START_MM = (
 # Saved hidden; reference views explicitly reveal only the owner they dimension.
 REFERENCE_SKETCHES = (SUPPLIER_STOCK_FEATURE, SUPPLIER_THREAD_FEATURE)
 
-_ANCHOR_NUMBER = _config.parts("ch-vn-spring-hook")["number"]
-_LEVER_NUMBER = _config.parts("sm-summing-lever")["number"]
-# The top-level (MHA-HA-00) step that installs and locks the 20 anchors,
-# without its step number; ANCHOR_INSTALL_CHECK is its acceptance.
-ANCHOR_INSTALL_STEP = (
-    f"THREAD EACH {_ANCHOR_NUMBER} DOWN INTO ITS {_LEVER_NUMBER} PLATE TAP UNTIL "
-    f"THE NECK SEATS ON THE PLATE TOP. TO SET THE CHANNEL PRELOAD, BACK IT OUT "
-    f"NO MORE THAN {ADJUSTMENT_TURNS} TURN, FINISHING WITH THE EYE OPENING IN "
-    f"THE SPRING PULL PLANE. HOLDING THE EYE THERE, RUN ONE {_NUT_NUMBER} UP "
-    "THE SHANK WITH A SHOP-MADE FORKED DRIVER AND JAM IT AGAINST THE PLATE "
-    "UNDERSIDE."
-)
-ANCHOR_INSTALL_CHECK = (
-    f"EVERY {_ANCHOR_NUMBER} EYE STANDS IN ITS SPRING PULL PLANE AND CANNOT BE "
-    f"TURNED BY HAND; ITS {_NUT_NUMBER} IS TIGHT ON THE PLATE UNDERSIDE WITH "
-    "FULL THREAD SHOWING BELOW IT."
-)

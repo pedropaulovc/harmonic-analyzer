@@ -1832,7 +1832,8 @@ JOINTS: tuple[Joint, ...] = (
             "build_ha_harmonic_analyzer_assembly.py module docstring (channel spring anchors thread DOWN into "
             "the 20 #6-32 taps); build_ch_channel_assembly.py _assert_spring_mount and "
             "CHANNEL_ANCHOR_NUT_XY/CHANNEL_ANCHOR_NUT_ROWS; ch_vn_spring_hook_spec.py SHANK_LENGTH_MM/"
-            "PROTRUSION_MAX_MM/full_threads_past_nut_mm/ADJUSTMENT_TURNS/ANCHOR_INSTALL_STEP; "
+            "PROTRUSION_MAX_MM/full_threads_past_nut_mm/ADJUSTMENT_TURNS; "
+            "ha_harmonic_analyzer_assembly_sheet.py channel-anchors-set steps; "
             "sm_summing_lever_spec.HOLE_SPEC; stock_anchor_geom.ANCHOR_9489T111; ch_anchor_jam_nut_spec.py; "
             "cad/config/parts/ch-vn-spring-hook.yaml installation_notes"
         ),

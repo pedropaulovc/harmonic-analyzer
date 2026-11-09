@@ -140,10 +140,23 @@ END_FLOAT_MIN = round(0.0080 * 25.4, 6)  # 0.2032
 
 # --- shim fit-up (owner ruling 2026-11-01, #2124) ----------------------------------
 # Shims go on under the rear bushing while the ring gap less the next shim
-# still clears END_FLOAT_MIN, so the gap ends inside one shim of the floor:
-# RING_FLOAT_RANGE.  The count runs from none (the shortest unshimmed gap)
-# to the most the longest takes in the thinnest shims.
-RING_FLOAT_RANGE = (END_FLOAT_MIN, round(END_FLOAT_MIN + SHIM.THICKNESS_MAX, 6))
+# still clears END_FLOAT_MIN, so the gap ends inside one shim of the floor.
+# RING_FLOAT_RANGE is that, its top rounded up to the next .001 inch step
+# (.0135 -> .014) so MHA-PD-00 VIEW E prints a plain inch band, .008 +.006/0,
+# not the shim's converted .0055 (rule 4; delegated ruling 2026-11-07 (Main),
+# no precedent; owner review #2144; pending owner confirmation).  Every stack
+# that reads the range is judged at the wider top.  The count runs from none
+# (the shortest unshimmed gap) to the most the longest takes in the thinnest
+# shims.
+_RING_FLOAT_STEP_MM = 0.0254  # .001
+RING_FLOAT_RANGE = (
+    END_FLOAT_MIN,
+    round(
+        math.ceil((END_FLOAT_MIN + SHIM.THICKNESS_MAX) / _RING_FLOAT_STEP_MM - 1e-9)
+        * _RING_FLOAT_STEP_MM,
+        6,
+    ),
+)
 SHIM_COUNT_RANGE = (
     max(
         0,

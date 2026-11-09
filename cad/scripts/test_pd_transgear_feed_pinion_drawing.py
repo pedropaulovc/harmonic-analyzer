@@ -934,12 +934,13 @@ def test_finite_gear_data_and_model_consume_one_tooth_system() -> None:
     assert steps.RACK_DATUM_BACKLASH_TEXT in value
     assert drawing.MESH_SET_STEP == steps.step_ref("hanger-meshed")
     assert value.endswith(drawing.MESH_SET_STEP)
-    # That step is where MHA-PD-00 sets the shake that sets the mesh depth.
+    # That step is where MHA-PD-00 sets the shake that sets the mesh depth:
+    # its sub-step sets the arm on the datum backlash window.
     assembly_draw = Path(drawing.__file__).parent / "draw_pd_paper_drive_assembly.py"
     assembly_source = assembly_draw.read_text(encoding="utf-8")
     meshed = assembly_source.split('"hanger-meshed": (', 1)[1].split("),", 1)[0]
-    assert "RACK_DATUM_BACKLASH_TEXT} PLATEN SHAKE" in meshed
-    assert "SETS THE FEED MESH DEPTH" in meshed
+    assert "shake = steps.RACK_DATUM_BACKLASH_TEXT" in assembly_source
+    assert "SET THE ARM SO THE PLATEN SHAKES {shake} ALONG THE RACK" in meshed
     assert "PROFILE SHIFT" not in drawing.GEAR_DATA_NOTE
     # A form-cut tooth is a translated involute: its pitch thickness does
     # not follow the generated-involute span relation, so only the span

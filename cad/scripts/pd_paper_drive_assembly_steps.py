@@ -25,7 +25,6 @@ import dt_drive_train_steps
 import pd_transgear_drive_collar_spec as collar
 import paper_drive_mesh_check as mesh_check
 import paper_drive_rack_setup as rack_setup
-import pd_transgear_removable_spec as removable
 import _sprocket_seat_geometry as seat_geometry
 import paper_drive_geom as paper_geometry
 import _paper_drive_placement as paper_placement
@@ -176,11 +175,6 @@ PAPER_FEED_REFERENCE_PLACES = 4
 PAPER_TRAVEL_PER_CRANK_TEXT = inch_text(
     paper_geometry.NET_RACK_TRAVEL_PER_CRANK_REV, PAPER_FEED_REFERENCE_PLACES
 )
-PAPER_FEED_REFERENCE_TEXT = (
-    f"FEED SETUP: {removable.CRANK_CONFIG} CRANK / "
-    f"{removable.KNOB_CONFIG} KNOB.\n"
-    f"PLATEN TRAVEL {PAPER_TRAVEL_PER_CRANK_TEXT} PER CRANK REV (REF)."
-)
 
 # The bar's top above the base deck: the builder's BAR_TOP_Y less the deck's
 # BASE_DECK_Y. Its height affects the chain's centre distance, not the feed
@@ -242,10 +236,6 @@ COLLAR_DISC_AIR_MIN = collar.COLLAR_DISC_AIR_MIN
 OFFSET_ACCEPT_TEXT = (
     f"{inch_text(collar.FIT_UP_OFFSET_TARGET, 3)} \u00b1{inch_text(OFFSET_ACCEPT_TOL, 3)}"
 )
-# The knob wheel floats collar.KNOB_FLOAT_RANGE forward of its seat (the collar's
-# front face) under the thumbnut; the setting and its acceptance read it
-# held back on that seat, the pose ACCEPTED_CHAIN_OFFSET_IN_SERVICE assumes.
-KNOB_HELD_BACK_TEXT = f"{removable.KNOB_CONFIG} HELD BACK ON ITS SEAT"
 COLLAR_DISC_AIR_TEXT = inch_min_text(COLLAR_DISC_AIR_MIN, 3)
 RACK_CREST_TEXT = f"{inch_text(RACK_CREST_DROP, 3)} \u00b1{inch_text(RACK_CREST_TOL, 3)}"
 RACK_DATUM_BACKLASH_TEXT = inch_window(rack_setup.RACK_DATUM_BACKLASH_RANGE, 4, " TO ")

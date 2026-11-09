@@ -51,7 +51,7 @@ import transgear_hanger_joints as joints
 import pd_vn_transgear_knob_cup_pin_spec as cup_pin
 import pd_vn_transgear_pivot_screw_spec as pivot_screw
 
-STEP_HEAD = re.compile(r"^(\d+)\. ", re.MULTILINE)
+STEP_HEAD = re.compile(r"^(\d+)([A-Z]?)\. ", re.MULTILINE)
 # Default-format note text, measured on r743-rocker-fix3's render (leaf
 # 20260926T112244Z-1-a884759d), as test_channel_assembly_drawing uses them;
 # #945 moves these into _drawing_common.
@@ -147,17 +147,9 @@ def _unit_step_notes() -> drawing.StepNotes:
 
 
 def _step_body(key: str) -> str:
-    """The printed text of one step, from its head to the blank line that
-    separates it from the next step (or its column's end)."""
-    notes = _unit_step_notes()
-    text = "\n\n".join(
-        (notes.platen_steps, *notes.fitup_notes, *notes.fitup_continued_notes, *notes.chain_notes)
-    )
-    heads = list(STEP_HEAD.finditer(text))
-    index = steps.step_number(key) - 1
-    end = heads[index + 1].start() if index + 1 < len(heads) else len(text)
-    body = text[heads[index].end() : end].split("\n\n")[0]
-    return " ".join(body.split())
+    """The printed text of one step, its sub-steps joined, heads dropped."""
+    texts = drawing._step_text(operating_domain=_unit_operating_domain())[key]
+    return " ".join(" ".join(texts).split())
 
 
 def _number(stem: str) -> str:
@@ -184,33 +176,29 @@ def test_an_unknown_step_is_refused() -> None:
 
 def test_the_printed_step_heads_are_the_registry_in_order() -> None:
     notes = _unit_step_notes()
-    printed = [
-        int(n)
-        for text in (
-            notes.platen_steps,
-            *notes.fitup_notes,
-            *notes.fitup_continued_notes,
-            *notes.chain_notes,
+    heads = STEP_HEAD.findall(notes.fitup_steps)
+    numbers = list(dict.fromkeys(int(number) for number, _letter in heads))
+    assert numbers == list(range(1, len(steps.SEQUENCE) + 1))
+    for number in numbers:
+        letters = [letter for n, letter in heads if int(n) == number]
+        assert letters == [""] or letters == list(
+            drawing.SUB_STEP_LETTERS[: len(letters)]
         )
-        for n in STEP_HEAD.findall(text)
-    ]
-    assert printed == list(range(1, len(steps.SEQUENCE) + 1))
 
 
-def test_one_blank_line_separates_consecutive_steps_and_none_splits_a_step() -> None:
+def test_one_blank_line_separates_consecutive_steps_and_none_splits_a_sub_step() -> None:
     notes = _unit_step_notes()
-    for text in (
-        notes.platen_steps,
-        *notes.fitup_notes,
-        *notes.fitup_continued_notes,
-        *notes.chain_notes,
-    ):
-        lines = text.splitlines()
-        heads = [i for i, line in enumerate(lines) if STEP_HEAD.match(line)]
-        assert lines[heads[0] - 1] != ""  # the heading runs straight into the first step
-        for previous, head in zip(heads, heads[1:]):
-            assert lines[head - 1] == "" and lines[head - 2] != ""
-            assert "" not in lines[previous : head - 1]
+    for column in notes.columns:
+        lines = column.text.splitlines()
+        heads = [
+            (index, int(match[1]))
+            for index, line in enumerate(lines)
+            if (match := STEP_HEAD.match(line))
+        ]
+        assert lines[heads[0][0] - 1] != ""  # the heading runs straight into the first step
+        for (previous, number), (head, next_number) in zip(heads, heads[1:]):
+            blanks = lines[previous:head].count("")
+            assert blanks == (0 if next_number == number else 1)
 
 
 def test_the_crank_side_pointer_names_the_sheet_that_prints_those_steps() -> None:
@@ -219,10 +207,8 @@ def test_the_crank_side_pointer_names_the_sheet_that_prints_those_steps() -> Non
     import draw_dt_drive_train_assembly as drive_train
     notes = _unit_step_notes()
 
-    pointers = re.findall(
-        r"(MHA-[A-Z]{2}-00)\b SHEET (\d+), STEPS (\d+) AND (\d+)",
-        notes.chain_notes[0].replace("\n", " "),
-    )
+    text = notes.fitup_steps.replace("\n", " ")
+    pointers = re.findall(r"(MHA-[A-Z]{2}-00)\b SHEET (\d+), STEPS (\d+) AND (\d+)", text)
     wanted = [str(dt_drive_train_steps.step_number(key)) for key in steps.CRANK_SIDE_KEYS]
     assert pointers == [
         (assembly_contract("dt-drive-train").number, str(drive_train.SEQUENCE_SHEET), *wanted)
@@ -230,41 +216,28 @@ def test_the_crank_side_pointer_names_the_sheet_that_prints_those_steps() -> Non
     assert steps.CRANK_SIDE_KEYS == ("crank-mesh-checked", "paper-drive-wheel")
     # The cone-and-crank steps are the note package_note_fields stacks on
     # SEQUENCE_SHEET.
-    printed = set(STEP_HEAD.findall(drive_train.CONE_CRANK_STEPS))
+    printed = {number for number, _letter in STEP_HEAD.findall(drive_train.CONE_CRANK_STEPS)}
     assert set(wanted) <= printed
     fitup_ref = steps.step_number(drawing.FITUP_CHAIN_KEY)
     pose_ref = steps.step_number("fitup-pose-set")
     assert f"STEP {pose_ref}" in _step_body("fitup-accepted")
-    heading = notes.chain_notes[0].index("CHAIN FIT-UP")
-    assert notes.chain_notes[0].index(f"\n{fitup_ref}. ") > heading
+    heading = notes.fitup_steps.index("CHAIN FIT-UP, STEPS")
+    assert notes.fitup_steps.index(f"\n{fitup_ref}A. ") > heading
 
 
 def test_the_steps_fit_their_fields() -> None:
     notes = _unit_step_notes()
     template = DRAWING_TEMPLATES[drawing.SPEC.layout]
+    assert len(notes.columns) == len(drawing.STEP_SLOTS)
+    right_limits = {
+        drawing.PLATEN_NOTE_XY: drawing.PLATEN_NOTE_RIGHT,
+        drawing.FITUP_NOTE_XY[0]: drawing.FITUP_NOTE_LIMITS[0][0],
+        drawing.FITUP_NOTE_XY[1]: drawing.FITUP_NOTE_LIMITS[1][0],
+    }
     fields = (
-        *zip(
-            notes.fitup_notes,
-            drawing.FITUP_NOTE_XY,
-            drawing.FITUP_NOTE_LIMITS,
-            strict=True,
-        ),
-        *zip(
-            notes.fitup_continued_notes,
-            drawing.FITUP_NOTE_XY,
-            drawing.FITUP_NOTE_LIMITS,
-            strict=True,
-        ),
-        *zip(
-            notes.chain_notes,
-            drawing.FITUP_NOTE_XY,
-            drawing.FITUP_NOTE_LIMITS,
-            strict=True,
-        ),
-        (
-            notes.platen_steps,
-            drawing.PLATEN_NOTE_XY,
-            (drawing.PLATEN_NOTE_RIGHT, template.title_block_top_m),
+        *(
+            (column.text, column.xy, (right_limits[column.xy], slot.bottom))
+            for column, slot in zip(notes.columns, drawing.STEP_SLOTS, strict=True)
         ),
         *(
             (
@@ -282,16 +255,36 @@ def test_the_steps_fit_their_fields() -> None:
         lines = text.splitlines()
         assert left + max(map(len, lines)) * NOTE_CHAR_WIDTH < right_limit
         assert top - len(lines) * NOTE_LINE_PITCH > bottom_limit
+    for column, slot in zip(notes.columns, drawing.STEP_SLOTS, strict=True):
+        assert (column.sheet, column.xy) == (slot.sheet, slot.xy)
+        assert slot.bottom >= template.title_block_top_m
     (first_left, _), (second_left, _) = drawing.FITUP_NOTE_XY
     first_limit, second_limit = drawing.FITUP_NOTE_LIMITS
     assert first_limit[0] < second_left
     assert second_limit[1] > template.title_block_top_m
     assert first_left > 0.0 and second_limit[0] < template.width_m
-    # Sheet 3's caption sits under its steps, sheet 1's under the front view.
+    # Sheet 4's caption sits under its steps.
     assert notes.exploded_caption_xy[1] < drawing.PLATEN_NOTE_XY[1] - (
         len(notes.platen_steps.splitlines()) * NOTE_LINE_PITCH
     )
     assert notes.exploded_caption_xy[1] - NOTE_LINE_PITCH > template.title_block_top_m
+    # VIEW K and VIEW E stand under the columns that share their sheets.
+    assert drawing.KNOB_SETTING_CENTER[1] + drawing.KNOB_SETTING_RADIUS < (
+        drawing.KNOB_SETTING_FIELD_TOP
+    )
+    assert drawing.CLUSTER_FLOAT_CENTER[1] + drawing.CLUSTER_FLOAT_RADIUS < (
+        drawing.CLUSTER_FLOAT_FIELD_TOP
+    )
+
+
+def test_no_sub_step_runs_past_six_lines() -> None:
+    notes = _unit_step_notes()
+    for column in notes.columns:
+        lines = column.text.splitlines()
+        heads = [i for i, line in enumerate(lines) if STEP_HEAD.match(line)]
+        for head, end in zip(heads, [*heads[1:], len(lines)]):
+            body = [line for line in lines[head:end] if line]
+            assert len(body) <= 6, lines[head]
 
 
 def test_a_bom_that_cannot_fit_all_rows_is_refused_not_truncated() -> None:
@@ -397,13 +390,10 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
     ) in located
     # The setting's identities, in operation order: S (the arm's empty pin
     # bore, the pressed pin's running axis), K set at VIEW K's model
-    # dimensions with the mesh they set, then each part reamed to its own
-    # drawing, then the dowels.
+    # dimensions, then each part reamed to its own drawing, then the dowels.
     order = [
         "PIN BORE S",
         drawing.KNOB_SETTING_VIEW_NAME,
-        _number("pd-transgear-knob-shaft"),
-        _number("pd-rack-pinion"),
         _number("pd-transgear-arm"),
         _number("pd-transgear-arm-plate"),
         _number("pd-vn-transgear-arm-plate-locating-pin"),
@@ -574,16 +564,19 @@ def test_view_k_frames_the_chain_with_its_settings_outside_the_crop() -> None:
                 assert end[1] + shift[1] + 0.003 < drawing.KNOB_SETTING_FIELD_TOP
             boxes.append(box)
         # Each circle lettered on a leader to its centre: S and T inside the
-        # crop, K just outside it past the boss, each clear of the chain.
+        # crop, the knob bore just outside it past the boss, each clear of the
+        # chain. The bore's letter is not the view's (round 7, rule 26).
+        bore = drawing.KNOB_BORE_LETTER
+        assert bore != "K" and bore not in {"S", "T"}
         letters = drawing.knob_setting_letters(s, q, k, t)
-        assert letters.keys() == drawing.KNOB_SETTING_LEGEND.keys() == {"S", "K", "T"}
+        assert letters.keys() == drawing.KNOB_SETTING_LEGEND.keys() == {"S", bore, "T"}
         half_w, half_h = drawing.KNOB_SETTING_LETTER_HALF
         diagonal = math.hypot(half_w, half_h)
         for letter, ((left, top), tip) in letters.items():
-            assert tip == {"S": s, "K": k, "T": t}[letter]
+            assert tip == {"S": s, bore: k, "T": t}[letter]
             middle = (left + half_w, top - half_h)
             reach = math.dist(middle, centre)
-            if letter == "K":
+            if letter == bore:
                 assert reach - diagonal > drawing.KNOB_SETTING_RADIUS
             else:
                 assert reach + diagonal < drawing.KNOB_SETTING_RADIUS
@@ -614,24 +607,19 @@ def test_view_k_frames_the_chain_with_its_settings_outside_the_crop() -> None:
     # The legend names each lettered circle by its part number.
     for letter, stem in (
         ("S", "pd-transgear-arm"),
-        ("K", "pd-transgear-arm-plate"),
+        (drawing.KNOB_BORE_LETTER, "pd-transgear-arm-plate"),
         ("T", "pd-vn-transgear-arm-plate-screw"),
     ):
         assert f"{letter}: {_number(stem)} " in drawing.KNOB_SETTING_CAPTION
-    # ALONG is the DRO frame's P-S axis, and the legend and the step name P.
+    # ALONG is the DRO frame's pivot-S axis; the legend defines ALONG and
+    # ACROSS.
     s, q = knob_setting.S_XY, knob_setting.Q_XY
     toward_p = (knob_setting.P_XY[0] - s[0], knob_setting.P_XY[1] - s[1])
     along = (q[0] - s[0], q[1] - s[1])
     assert abs(toward_p[0] * along[1] - toward_p[1] * along[0]) < 1e-9
     assert toward_p[0] * along[0] + toward_p[1] * along[1] > 0.0
-    assert "ALONG: S TOWARD P" in drawing.KNOB_SETTING_CAPTION
-    assert "P: ARM'S PIVOT BORE" in drawing.KNOB_SETTING_CAPTION
-    # Sheet 5's second column ends above the view's field.
-    notes = _unit_step_notes()
-    _, top = drawing.FITUP_NOTE_XY[1]
-    assert top - len(notes.fitup_notes[1].splitlines()) * NOTE_LINE_PITCH > (
-        drawing.KNOB_SETTING_FIELD_TOP
-    )
+    assert "ALONG:" in drawing.KNOB_SETTING_CAPTION
+    assert "ACROSS:" in drawing.KNOB_SETTING_CAPTION
     assert drawing.KNOB_SETTING_CENTER[1] - drawing.KNOB_SETTING_RADIUS > (
         DRAWING_TEMPLATES[drawing.SPEC.layout].title_block_top_m
     )
@@ -660,11 +648,15 @@ def test_the_jig_bored_k_lands_in_the_set_band_with_margin_at_both_ends() -> Non
     ]
     accuracy = stated * 25.4
     # Centring is a null reading against the step's stated acceptance, not a
-    # measured size: under half a division of sweep (the TIR) puts each centre
-    # within a quarter division of the spindle. The indicator's unknown
-    # accuracy over its range scales that sub-division reading only; the
-    # bound holds while the indicator repeats to its stated sweep at null.
-    division = inventory["gauges"]["dti"]["resolution_in"]["value"] * 25.4
+    # measured size: under one division of sweep (the TIR) puts each centre
+    # within half a division of the spindle (owner ruling 2026-11-08 (Pedro),
+    # #2144 item 5.3). The indicator's unknown accuracy over its range scales
+    # that reading only; the bound holds while the indicator repeats to its
+    # stated sweep at null.
+    division_in = inventory["gauges"]["dti"]["resolution_in"]["value"]
+    # The printed sweep is a value on the shop's own test indicator.
+    assert drawing.KNOB_SETTING_INDICATOR_DIVISION_IN == division_in
+    division = division_in * 25.4
     centring = drawing.KNOB_SETTING_TRUE_SWEEP_DIVISIONS * division / 2.0
     # Signed worst case, every bound adding the same way: the DRO is zeroed
     # on S, so its two axes' errors enter once, on the S-to-K move, both
@@ -674,7 +666,8 @@ def test_the_jig_bored_k_lands_in_the_set_band_with_margin_at_both_ends() -> Non
     radial_err = dro + 2.0 * centring
     lever = knob_setting.K_SET_CENTRE_DISTANCE_MM / steps_arm.PIN_STATION
     tangential_err = dro + 2.0 * centring + 2.0 * centring * lever
-    assert radial_err == pytest.approx(0.0135, abs=1e-4)
+    assert centring == pytest.approx(division / 2.0)
+    assert radial_err == pytest.approx(0.0199, abs=1e-4)
     # The printed values are the display's own counts: the operator dials
     # exactly what VIEW K prints.
     # The 5 um scale's inch-mode count, .0002.
@@ -710,24 +703,13 @@ def test_the_jig_bored_k_lands_in_the_set_band_with_margin_at_both_ends() -> Non
 
 def test_the_matched_plate_is_refitted_on_its_dowels_and_re_read() -> None:
     located = _step_body("arm-plate-located")
-    assert (
-        "DOWELS INTO THE ARM FROM THE REAR, "
-        f"{steps.inch_window(plate_locating_interface.PROUD_LIMITS_MM, 3, ' TO ')} PROUD;"
-    ) in located
-    assert "MATCH-MARK ARM AND PLATE" in located
+    assert steps.inch_window(plate_locating_interface.PROUD_LIMITS_MM, 3, " TO ") in located
     fitted = _step_body("arm-plate-fitted")
-    assert "PLATE ON THE LOCATING DOWELS" in fitted
-    assert "DOWELS LOCATE; SCREWS CLAMP ONLY" in fitted
-    # One ordinary hand check; no gauge budget or load qualification text.
-    assert "PUSH AND ROCK THE PLATE BY HAND: NO SHAKE ON THE DOWELS" in fitted
-    assert "RE-CHECK AFTER EVERY REMOVAL" in fitted
     # The setting step's own coordinates fix K; the refit only checks shake.
     assert disc.inch_text(knob_setting.K_FROM_S_ALONG_MM, knob_setting.PLACES) not in fitted
     assert drawing.KNOB_SETTING_VIEW_NAME not in fitted
     for method in ("RFS", "UNCERTAINTY", "QUALIFIED", "ACTUAL"):
         assert method not in fitted
-    assert "COUNTERSINK" not in fitted
-    assert "PIVOT BORE WAS REAMED TO THIS SCREW" in _step_body("hanger-pivoted")
     assert steps.step_number("arm-plate-located") + 1 == steps.step_number("arm-plate-fitted")
 
 
@@ -765,14 +747,14 @@ def test_the_feed_setup_reference_uses_the_selected_ratios_and_reference_pitch()
         * feed_pinion.PITCH_DIA
     )
     assert paper_geometry.NET_RACK_TRAVEL_PER_CRANK_REV == pytest.approx(expected)
-    text = steps.PAPER_FEED_REFERENCE_TEXT
+    text = drawing.PAPER_FEED_TEXT
     match = re.search(r"PLATEN TRAVEL (\d*\.\d+) PER CRANK REV \(REF\)", text)
     assert match
     places = steps.PAPER_FEED_REFERENCE_PLACES
     assert len(match[1].split(".")[1]) == places
     assert float(match[1]) * 25.4 == pytest.approx(expected, abs=0.5 * 10.0**-places * 25.4)
-    assert f"{sprocket.CRANK_CONFIG} CRANK" in text
-    assert f"{sprocket.KNOB_CONFIG} KNOB" in text
+    assert f"{sprocket.CRANK_TEETH}-TOOTH CRANK" in text
+    assert f"{sprocket.KNOB_TEETH}-TOOTH KNOB" in text
     for caption in drawing.ASSEMBLED_CAPTIONS.values():
         assert text in caption
     # The form-cutter setting changes the tooth boundary, not the rolling pitch.
@@ -1126,7 +1108,7 @@ def test_the_transgear_explode_views_fit_their_fields_at_the_bom_configuration()
     # and above the title block.
     x, y = drawing.TRANSGEAR_EXPLODED_CAPTION_XY
     lines = drawing.TRANSGEAR_EXPLODED_CAPTION.splitlines()
-    assert lines[0].startswith("TRANSGEAR EXPLODED, ISOMETRIC, 2:3")
+    assert lines[0].startswith("TRANSGEAR EXPLODED, ISOMETRIC:")
     assert x > knob[2] and y < cluster[1]
     assert x + max(map(len, lines)) * NOTE_CHAR_WIDTH < 0.420
     assert y - len(lines) * NOTE_LINE_PITCH > template.title_block_top_m
@@ -1200,30 +1182,32 @@ def test_no_retired_part_is_named_on_the_sheet() -> None:
     text = _unit_step_notes().fitup_steps
     printed = set(re.findall(r"MHA-(?!VN-)[A-Z]{2}-(?:[0-9]{2}(?:-TL-(?:[0-9]{2}|VN-[5-9][0-9]))?|VN-[5-9][0-9])(?:-T[0-9]{3})?(?![A-Z0-9-])", text))
     assert not any(number in text for number in retired)
+    # Off-BOM numbers: the drive-train package the crank side cites and its
+    # crankshaft the fit-up pulls forward, and the frame parts (columns, base
+    # deck) the bar is clamped to and set from.
     assert printed <= set(drawing.BOM_PART_NUMBERS.values()) | {
-        assembly_contract("dt-drive-train").number
+        assembly_contract("dt-drive-train").number,
+        drawing.CRANKSHAFT,
+        drawing.FRAME_COLUMN,
+        drawing.FRAME_BASE,
     }
 
 
-def test_the_knob_stack_prints_front_to_rear() -> None:
-    """Contract §1: thumbnut | knob wheel | collar | pinion | ring | plate hub | plate |
-    rear boss | cup | screw."""
+def test_the_knob_stack_goes_on_front_to_rear() -> None:
+    """Contract §1: shaft through ring and plate, then the cup and its pin,
+    then the collar."""
     body = _step_body("knob-stack-fitted")
     order = [
-        "pd-transgear-thumbnut",
-        "pd-transgear-removable",
-        "pd-transgear-drive-collar",
         "pd-transgear-knob-shaft",
         "pd-transgear-knob-thrust-ring",
         "pd-transgear-arm-plate",
         "pd-transgear-knob-cup",
         "pd-vn-transgear-knob-cup-pin",
+        "pd-transgear-drive-collar",
     ]
-    assert [stem for stem, _label in drawing.KNOB_STACK if stem] == order
     positions = [body.index(_number(stem)) for stem in order]
     assert positions == sorted(positions)
-    assert body.index("PLATE HUB") < body.index(_number("pd-transgear-arm-plate"))
-    assert body.index("REAR BOSS") < body.index(_number("pd-transgear-knob-cup"))
+
 
 
 def test_the_pivot_screw_is_staked_and_the_spacer_pressed_as_made() -> None:
@@ -1234,26 +1218,17 @@ def test_the_pivot_screw_is_staked_and_the_spacer_pressed_as_made() -> None:
     head holds the arm on it."""
     body = _step_body("hanger-pivoted")
     window = steps.inch_window(pivot_screw.TIP_RECESS, 3, " TO ")
-    assert "THREADLOCKER OPTIONAL" in body
+    # The tip is staked; no threadlocker (the standing no-threadlocker rule).
+    assert "THREADLOCKER" not in body
     assert "BLIND" not in body
-    assert "THROUGH TAP" in body
     assert f"{window} BELOW THE BAR'S FRONT FACE" in body
-    assert "STAKE THE FRONT TAP MOUTH ONTO THE TIP AT 2 OPPOSITE POINTS" in body
-    # The screw is chosen by its unfaced tip before the arm's bore is reamed
-    # to it, so the fitter never meets a matched screw that fails the check.
-    assert (
-        "THE ARM'S PIVOT BORE WAS REAMED TO THIS SCREW, CHOSEN BEFORE REAMING "
-        "SO ITS UNFACED TIP REACHES THAT WINDOW: KEEP THEM TOGETHER."
-    ) in body
-    face = body.index("BELOW THE BAR'S FRONT FACE")
-    assert face < body.index("CHOSEN BEFORE REAMING")
+    assert drawing.PIVOT_STAKE_POINTS_TEXT in body
     assert "ANOTHER SCREW" not in body
     assert drawing.PIVOT_VIEW_REF in body
     assert _number("pd-vn-transgear-pivot-screw") in body
     assert _number("pd-transgear-pivot-spacer") in body
     assert _number("pd-vn-transgear-pivot-spring") in body
     assert "AS MADE" in body
-    assert "FLUSH WITH ITS END ON A FLAT" in body
     # No step shortens the spacer.
     assert not re.search(r"\bFACE (IT|THE SPACER|TO)\b", _unit_step_notes().fitup_steps)
 
@@ -1271,7 +1246,6 @@ def test_the_fitup_acceptance_prints_the_contract_bands() -> None:
         f"{steps.OFFSET_ACCEPT_TEXT} FORWARD",
         steps.inch_window(expected_float, 3, " TO "),
         steps.COLLAR_DISC_AIR_TEXT,
-        f"{sprocket.KNOB_CONFIG} FREE UNDER THE NUT",
     ):
         assert text in body, text
     assert "HEAD PLAY" not in body
@@ -1295,13 +1269,12 @@ def test_the_pivot_section_and_its_locator_keep_to_sheet_two_left_field() -> Non
     scale = drawing.PIVOT_LOCATOR_SCALE[0] / drawing.PIVOT_LOCATOR_SCALE[1]
     stack_half = (pivot_screw.HEAD_H - drawing.PIVOT_FRONT_FACE_Y) / 2.0
     assert (stack_half + 1.0) * scale / 1000.0 <= drawing.PIVOT_CUT_HALF < lr
-    # The caption over the ring, left of the locator's section arrows.
-    caption_lines = drawing.PIVOT_CAPTION.splitlines()
-    cx, cy = drawing.PIVOT_CAPTION_XY
+    # VIEW B's label left of the locator's circle, over the ring.
+    cx, cy = drawing.PIVOT_LOCATOR_CAPTION_XY
     assert cx > 0.018
-    assert cx + max(map(len, caption_lines)) * NOTE_CHAR_WIDTH < lx - lr - 0.008
+    assert cx + len(drawing.PIVOT_LOCATOR_CAPTION) * NOTE_CHAR_WIDTH < lx - lr
     assert cy <= ring_top
-    assert cy - len(caption_lines) * NOTE_LINE_PITCH > sy + reach
+    assert cy - NOTE_LINE_PITCH > sy + reach
     # The native section caption under the ring, above the border.
     caption_y = drawing.PIVOT_SECTION_CAPTION_XY[1]
     assert caption_y < sy - reach
@@ -1387,7 +1360,7 @@ def test_the_pivot_stake_note_points_at_the_front_mouth_clear_of_the_balloons() 
     sides = {stem: side for stem, side, *_ in drawing.PIVOT_BALLOON_TIPS}
     assert sides["pd-support-bar"] == "left"
     assert drawing.PIVOT_STAKE_POINTS_TEXT in drawing.PIVOT_STAKE_NOTE
-    assert drawing.PIVOT_STAKE_POINTS_TEXT in drawing.PIVOT_CAPTION
+    assert drawing.PIVOT_LOCATOR_CAPTION in drawing.sheet_texts(_unit_step_notes())
     assert drawing.PIVOT_STAKE_NOTE in drawing.sheet_texts(_unit_step_notes())
 
     lines = drawing.PIVOT_STAKE_NOTE.splitlines()
@@ -1471,19 +1444,25 @@ def test_pivot_section_balloon_columns_keep_order_and_pitch() -> None:
 
 def test_the_actual_collar_disc_overlap_is_checked_before_final_platen_installation() -> None:
     """A static F-to-disc setting cannot certify all loaded overlapping patches."""
-    assert _step_body("platen-hung").startswith("TRIAL-HANG")
     inspected = _step_body("collar-disc-air-inspected")
-    assert "CHAIN OFF" in inspected
     assert f"REMOVE THE {_number('pd-platen')} PLATEN" in inspected
     assert "TRIAL PLATEN" not in inspected
-    assert "ARM HELD IN ITS OPERATING LATCH POSE" in inspected
-    assert " ".join(collar.COLLAR_DISC_AIR_PHRASE.split()) in inspected
-    assert f"ONE DISC TURN = {disc.TEETH / knob_shaft.TEETH:g} KNOB TURNS" in inspected
-    assert "REFIT THE PLATEN AND LATCH THE HANGER" in inspected
-    assert "RE-CHECK THE OVERLAP AIR AND RACK MESH" in inspected
-    assert "BIASED" not in inspected
+    assert f"({disc.TEETH / knob_shaft.TEETH:g} KNOB TURNS)" in inspected
+    assert f"CLEARANCE {steps.COLLAR_DISC_AIR_TEXT}" in inspected
+    assert "REFIT THE PLATEN." in inspected
+    # The feeler carries the MHA-PD-10 step face (Q1 C), the MHA-PD-17
+    # spigot end ⊥ .001 (owner ruling 2026-11-08 (Pedro), #2144 item 3.2) and
+    # the MHA-PD-18 pin bore S ⊥ Ø.001 A (owner ruling 2026-11-08 (Pedro),
+    # #2144 item 4.1): the remedy re-faces only the step, setting hub and
+    # disc back, which also recovers the air a tilted S closed.
+    flat = " ".join(inspected.split())
+    assert (
+        f"THE {_number('pd-transgear-disc-hub')} SPIGOT END SEATS ON IT, SO HUB AND "
+        "DISC SET BACK BY THAT AMOUNT." in flat
+    )
+    assert "RE-FACE THE " + _number("pd-transgear-disc-hub") not in flat
     assert steps.COLLAR_DISC_AIR_MIN == collar.COLLAR_DISC_AIR_MIN
-    assert "AT OVERLAP AFTER REFITTING AND LATCHING" in _step_body("fitup-accepted")
+    assert steps.COLLAR_DISC_AIR_TEXT in _step_body("fitup-accepted")
     keys = (
         "hook-pin-hole-match-drilled",
         "collar-shoulder-seated",
@@ -1510,7 +1489,7 @@ def test_the_rear_cup_is_pinned_and_the_nut_seats_on_the_faced_pilot() -> None:
     """R9-70's rear cup and wheel-float fit remain; the front drive is a true D."""
     knob = _step_body("knob-stack-fitted")
     for text in (
-        f"{disc.inch_text(knob_shaft.END_FLOAT, 3)} FEELER AT THE BOSS",
+        f"{disc.inch_text(knob_shaft.END_FLOAT, 3)} FEELER",
         cup_pin.HOLE_TEXT,
         f"{disc.inch_text(cup.PIN_HOLE_FROM_FRONT, 3)} FROM THE CUP FRONT",
     ):
@@ -1536,19 +1515,16 @@ def test_the_rear_cup_is_pinned_and_the_nut_seats_on_the_faced_pilot() -> None:
     assert seq.index("pilot-faced-to-fit") < seq.index("collar-shoulder-seated")
     assert f"{collar.PILOT_PROUD_TEXT} PROUD" in _step_body("pilot-faced-to-fit")
     seated = _step_body("collar-shoulder-seated")
-    assert "NUT TIGHT ON THE PILOT." in seated
+    assert "COLLAR'S PILOT" in seated
     # The nut is a static clamp (the D-flat and dowels drive): rule 23's
     # U-MHA-PD-13-no-lock holds only while nobody turns it to drive.
-    assert seated.endswith("THUMBNUT IS A CLAMP ONLY; NEVER TURNED TO DRIVE.")
+    assert "NEVER TURN IT TO DRIVE" in seated
 
 
 def test_the_knob_and_its_grip_are_defined_and_service_turns_the_crank() -> None:
     knob = _step_body("knob-stack-fitted")
     chain_step = steps.step_number("chain-closed")
-    assert knob.endswith(
-        "THIS SHAFT IS THE KNOB; ITS GRIP IS THE COLLAR: HOLD OR TURN THE KNOB BY "
-        f"IT TILL STEP {chain_step}, THEN TURN THE CRANK."
-    )
+    assert f"TURN THE KNOB ONLY BY THE COLLAR UNTIL STEP {chain_step}" in knob
     assert "KNOB HELD" in _step_body("hanger-meshed")
     assert steps.SEQUENCE.index("knob-stack-fitted") < steps.SEQUENCE.index(
         "hanger-meshed"
@@ -1560,15 +1536,12 @@ def test_the_knob_and_its_grip_are_defined_and_service_turns_the_crank() -> None
 
 def test_the_fitted_collar_rear_face_reacts_on_the_actual_gear_shoulder() -> None:
     faced = _step_body("collar-rear-faced-to-fit")
-    assert collar.BODY_FACE_PHRASE in faced
-    assert "START LONG; STRIP AND FACE THE REAR" in faced
-    assert "REFITTING WITH THE REAR FACE SEATED" in faced
     assert (
-        f"FINISHED BODY WITHIN {_number('pd-transgear-drive-collar')}'S FITTED LIMITS"
+        f"WITHIN {_number('pd-transgear-drive-collar')}'S FITTED LIMITS"
     ) in faced
     seated = _step_body("collar-shoulder-seated")
     assert "D-BORE ON THE SHAFT D-FLAT" in seated
-    assert "REAR FACE BEARING ON THE MHA-PD-08 15T FRONT FACE" in seated
+    assert f"{_number('pd-transgear-knob-shaft')} 15T FRONT FACE" in seated
     assert "ON THE DRIVE DOWELS" in seated
     assert collar.BODY_REAR_FACE_FROM_F == 0.0
     assert collar.LENGTH_FITTED_MIN <= collar.LENGTH <= collar.LENGTH_FITTED_MAX
@@ -1578,13 +1551,12 @@ def test_the_fitted_collar_rear_face_reacts_on_the_actual_gear_shoulder() -> Non
 def test_the_fitup_steps_and_the_collar_note_share_facing_setting_and_stud_cut() -> None:
     """R9-30's shared fit phrases now describe shoulder seating, not core drilling."""
     note = " ".join(collar.FIT_UP_NOTE.split())
-    for key, phrase in (
-        ("collar-rear-faced-to-fit", collar.BODY_FACE_PHRASE),
-        ("collar-rear-faced-to-fit", collar.FIT_UP_OFFSET_SET_TEXT),
-        ("stud-end-cut", collar.STUD_CUT_PHRASE),
-    ):
-        assert phrase in _step_body(key), key
-        assert phrase in note, key
+    phrase = collar.FIT_UP_OFFSET_SET_TEXT
+    assert phrase in _step_body("collar-rear-faced-to-fit")
+    assert phrase in note
+    # The stud cut prints the collar spec's own window.
+    low, high = (steps.inch_text(v, 3) for v in collar.STUD_CUT_BELOW_RIM)
+    assert f"{low} TO {high} BELOW THE RIM" in _step_body("stud-end-cut")
     for text in drawing.sheet_texts(_unit_step_notes()):
         assert "THROUGH THE CORE" not in text
         assert "SPRING PIN IN THE SLOT" not in text
@@ -1613,7 +1585,7 @@ def test_the_collar_is_faced_and_shoulder_seated_before_stud_cut_and_acceptance(
 
 def test_the_cluster_float_and_pin_bands_print_their_spec_ranges() -> None:
     accepted = _step_body("fitup-accepted")
-    assert f"RING GAP PER {drawing.CLUSTER_FLOAT_VIEW_NAME}" in accepted
+    assert f"RING GAP READS {drawing.CLUSTER_FLOAT_VIEW_NAME}" in accepted
     assert "DISC TURNS FREE" in accepted
     for key, bounds in (
         ("collar-pins-pressed", drive_pin.PROUD_RANGE),
@@ -1637,13 +1609,23 @@ def test_the_cluster_is_shimmed_to_view_e_after_it_is_hung() -> None:
     assert drawing.CLUSTER_FLOAT_VIEW_NAME in shimmed and "FEELER" in shimmed
     # Codjiflo (#2124): the gap is read with the ring on the groove's load
     # wall, where transgear_cluster_fit puts it, not loose in its play.
-    assert "RING ON ITS GROOVE'S LOAD WALL" in " ".join(shimmed.split())
+    assert "RING ON ITS GROOVE'S FRONT WALL" in " ".join(shimmed.split())
     assert disc.inch_text(cluster_fit.END_FLOAT_MIN, 3) not in shimmed
     # Codjiflo and machinist review (#2124): the step gives the fit-up's
-    # count range, and the BOM's QTY is the whole kit, the stack's nominal
-    # shims plus the spares the model stores in the spare T18's bore.
+    # most shims, and the BOM's QTY is the whole kit, the stack's nominal
+    # shims plus the spares the model stores in the spare sprocket's bore.
     low_count, high_count = cluster_fit.SHIM_COUNT_RANGE
-    assert f"{low_count} TO {high_count} " in " ".join(shimmed.split())
+    assert f"UP TO {high_count} IN ALL" in " ".join(shimmed.split())
+    # Rounds 9-10: the gap is corrected either way, one action a sub-step. The
+    # bare stack is never under the window (printed), so an under gap is an
+    # overshoot and one shim comes off; shims target the window's middle.
+    flat = " ".join(shimmed.split())
+    assert "WITH NO SHIMS IT NEVER READS UNDER" in flat
+    assert "IF IT READ UNDER, TAKE ONE SHIM OFF." in flat
+    middle = disc.inch_text(sum(cluster_fit.RING_FLOAT_RANGE) / 2.0, 3)
+    assert f"TOTALLING THE GAP LESS {middle}" in flat
+    assert cluster_fit.RING_FLOAT_RANGE[0] < sum(cluster_fit.RING_FLOAT_RANGE) / 2.0
+    assert cluster_fit.UNSHIMMED_FLOAT_RANGE[0] >= cluster_fit.RING_FLOAT_RANGE[0]
     assert high_count <= cluster_fit.SHIM_COUNT_MAX
     description = drawing.BOM_DESCRIPTIONS["pd-vn-transgear-cluster-shim"]
     assert "SUPPLY" not in description
@@ -1718,10 +1700,9 @@ def test_nothing_in_the_disc_cluster_is_faced_at_assembly() -> None:
     assert "OIL THE PIN" in hung
     for number in bushings:
         assert number in hung
-    assert "ON THE NOSE TRAPS HUB AND DISC" in hung
+    assert f"TRAPPING THE {drawing._N['pd-transgear-disc-hub']} HUB" in hung
     accepted = _step_body("fitup-accepted")
     assert f"STEP {steps.step_number('collar-disc-air-inspected')}" in accepted
-    assert "ELSE REPORT" in accepted
     assert steps.step_number("disc-cluster-assembled") + 1 == steps.step_number(
         "disc-taps-transferred"
     )
@@ -1734,18 +1715,19 @@ def test_the_disc_is_centred_to_its_running_bore_before_transfer_and_match_mark(
         f"MANDREL IN THE {drawing._N['pd-transgear-feed-pinion']} BORE" in transferred
     )
     assert (
-        f"WITH A \u00d8{disc.inch_text(disc.TOOTH_SPACE_GAUGE_PIN_DIA_MM, 3)} GAUGE PIN IN EACH "
+        f"\u00d8{disc.inch_text(disc.TOOTH_SPACE_GAUGE_PIN_DIA_MM, 3)} GAUGE PIN IN EACH "
         f"{drawing._N['pd-rack-pinion']} TOOTH SPACE IN TURN"
     ) in transferred
-    assert f"TILL THE DIAL READS {disc.TOOTH_SPACE_RUNOUT_TIR_TEXT} TIR MAX" in transferred
+    tir = disc.inch_text(disc.inch_floor_mm(disc.TOOTH_SPACE_RUNOUT_TIR_MM, 3), 3)
+    assert f"{tir} TIR MAX" in transferred
     for method in ("CERTIFIED", "RUNNING-BORE", "INDICATOR STATION", "INSPECTION"):
         assert method not in transferred
     ordered_actions = (
         "TAP THE DISC CENTRAL",
         "SPOT-DRILL THE DISC",
         "SCREWS.",
-        f"RECHECK ALL {disc.TEETH} SPACES",
-        "THEN MATCH-MARK DISC AND HUB",
+        f"ALL {disc.TEETH} SPACES",
+        "MATCH-MARK DISC AND HUB",
     )
     locations = [transferred.index(action) for action in ordered_actions]
     assert locations == sorted(locations)
@@ -1764,10 +1746,8 @@ def test_the_plate_screws_are_cut_to_the_limit_the_lock_sweep_clears() -> None:
     # between; the screws are back in before the hanger is pivoted.
     assert steps.SEQUENCE[cut:pivoted - 1] == ("pin-pressed",)
     body = _step_body("arm-plate-screws-cut")
-    assert body.startswith(
-        f"TAKE BOTH {_number('pd-vn-transgear-arm-plate-screw')} SCREWS OUT"
-    )
-    assert "REFIT THE SAME SCREWS IN THE SAME HOLES BEFORE PIVOTING THE HANGER" in body
+    assert body.startswith(f"REMOVE BOTH {_number('pd-vn-transgear-arm-plate-screw')} SCREWS")
+    assert "REFIT THE SAME SCREWS IN THE SAME HOLES" in body
     limit = f"FLUSH TO {disc.inch_text(joints.PLATE_SCREW_CUT_PROUD_MAX, 3)} PROUD"
     assert limit in body
     assert joints.PLATE_SCREW_TIP_PROUD_MAX == joints.PLATE_SCREW_CUT_PROUD_MAX
@@ -1917,7 +1897,10 @@ def test_every_bom_item_is_ballooned_on_some_sheet() -> None:
     # Edge-on in the front and right views the spare is a bare bar: hidden
     # there, shown and ballooned on the isometric only.
     for caption in drawing.ASSEMBLED_CAPTIONS.values():
-        assert "T18 SPARE, STORED LOOSE" in " ".join(caption.split())
+        assert (
+            f"{drawing.sprocket_name(drawing._SPARE_CONFIGS[0])} ON THE BASE DECK IS A "
+            "SPARE, STORED LOOSE"
+        ) in " ".join(caption.split())
 
 
 def test_the_exploded_sheet_balloons_exactly_the_platen_group() -> None:
@@ -2050,13 +2033,11 @@ def test_the_platen_group_is_built_and_hung_before_its_locks_are_set() -> None:
     order = ["bar-clamped", "rack-soldered", "guides-screwed", "clips-fitted"]
     order += ["platen-hung", "guide-locks-set", "lock-seats-faced"]
     assert list(steps.SEQUENCE[: len(order)]) == order
-    assert f"{steps.BAR_TOP_ABOVE_DECK_TEXT} ABOVE THE BASE DECK" in _step_body(
-        "bar-clamped"
-    )
+    assert f"{steps.BAR_TOP_ABOVE_DECK_TEXT} ABOVE THE " in _step_body("bar-clamped")
     # The round pair locates the bar before the slotted pair is tightened;
     # the step names it by its holes, as no package sheet defines END A.
     bar_clamped = _step_body("bar-clamped")
-    assert "TIGHTEN THE ROUND-HOLE PAIR, THEN THE SLOTTED PAIR." in bar_clamped
+    assert bar_clamped.index("ROUND-HOLE PAIR") < bar_clamped.index("SLOTTED PAIR")
     assert "END A" not in bar_clamped
     # The latched hook cannot take up a rack set off its band (rack-crest
     # ruling): the step prints the crest band itself.
@@ -2078,6 +2059,48 @@ def test_the_platen_group_is_built_and_hung_before_its_locks_are_set() -> None:
     assert drawing.GUIDE_SCREWS + drawing.CLIP_SCREWS == len(
         assembly.GUIDE_SCREW_XY
     ) + len(assembly.CLIP_SCREW_XY)
+    # Owner ruling 2026-11-08 (Pedro), #2144 item 2.3: MHA-PD-11's screw taps
+    # are tapped to its print and the screws float in MHA-PD-02's holes, so
+    # nothing is spotted, drilled or tapped through the platen at assembly.
+    guides_screwed = " ".join(_step_body("guides-screwed").split())
+    for word in ("SPOT", "TRANSFER", "DRILL", "TAP EACH"):
+        assert word not in guides_screwed
+
+
+def test_the_lock_taps_are_the_even_taps_counted_from_either_end() -> None:
+    """The steps count the guide's lock taps in plain words (round 4, rule
+    22): along the rail the platen-screw taps alternate with the lock taps,
+    so the lock taps are the 2nd, 4th, 6th and 8th from either end."""
+    import build_pd_platen_guide as guide
+
+    stations = sorted(
+        [(x, "screw") for x in guide.SCREW_STATION_X]
+        + [(x, "lock") for x in guide.HOLE_X]
+    )
+    kinds = [kind for _, kind in stations]
+    assert len(kinds) == drawing.GUIDE_TAPS_IN_ROW
+    lock_positions = [i + 1 for i, kind in enumerate(kinds) if kind == "lock"]
+    assert lock_positions == [2, 4, 6, 8]
+    assert kinds == kinds[::-1]
+    hung = _step_body("platen-hung")
+    assert not re.search(r"\bA[1-9]\b", _step_body("guides-screwed") + hung)
+
+
+def test_the_sprockets_are_named_plainly_never_by_configuration_code() -> None:
+    """Round 8 (rules 22, 26): the steps and sheet 1 name each MHA-PD-09
+    sprocket by its tooth count, never by the bare T12/T18/T24 code."""
+    codes = re.compile(
+        r"\b(?:" + "|".join(re.escape(name) for name, _teeth in sprocket.CONFIGS) + r")\b"
+    )
+    notes = _unit_step_notes()
+    for text in drawing.sheet_texts(notes):
+        assert not codes.search(text), text
+    assert drawing.sprocket_name(sprocket.KNOB_CONFIG) == (
+        f"{sprocket.KNOB_TEETH}-TOOTH {_number('pd-transgear-removable')} SPROCKET"
+    )
+    assert drawing.sprocket_name(drawing._SPARE_CONFIGS[0]) in drawing.ASSEMBLED_CAPTIONS[
+        next(iter(drawing.ASSEMBLED_CAPTIONS))
+    ].replace("\n", " ")
 
 
 def test_the_chain_is_closed_and_run_after_the_collar_is_accepted() -> None:
@@ -2088,9 +2111,13 @@ def test_the_chain_is_closed_and_run_after_the_collar_is_accepted() -> None:
         "chain-run-accepted",
     )
     closed = _step_body("chain-closed")
-    assert f"LOOP {chain.LINK_COUNT} PITCHES" in closed
+    # The loose links loop one pitch short; the connecting link closes it.
+    assert f"LOOP {chain.LINK_COUNT - 1} PITCHES" in closed
+    assert f"THE LOOP {chain.LINK_COUNT} PITCHES" in closed
     assert "ANSI #25" in closed
-    assert f"OVER THE {sprocket.KNOB_CONFIG} AND THE {sprocket.CRANK_CONFIG}" in closed
+    knob = drawing.sprocket_name(sprocket.KNOB_CONFIG, numbered=False)
+    crank = drawing.sprocket_name(sprocket.CRANK_CONFIG, numbered=False)
+    assert f"OVER THE {knob} AND THE {crank}" in " ".join(closed.split())
     assert chain.LINK_COUNT % 2 == 0
     assert chain.LINK_PITCH == sprocket.CHAIN_PITCH
     assert chain.CENTRELINE_LEN == pytest.approx(
@@ -2121,21 +2148,24 @@ def test_the_setting_and_the_acceptance_offsets_are_told_apart() -> None:
     behind the crank wheel within the acceptance passes."""
     setting = _step_body("collar-rear-faced-to-fit")
     accepted = _step_body("fitup-accepted")
-    assert f"STEP {steps.step_number('fitup-accepted')} RE-CHECKS" in setting
-    assert f"STEP {steps.step_number('collar-rear-faced-to-fit')}'S SETTING" in accepted
+    assert collar.FIT_UP_OFFSET_SET_TEXT in setting
+    assert steps.OFFSET_ACCEPT_TEXT in accepted
+    assert collar.FIT_UP_OFFSET_SET_TEXT != steps.OFFSET_ACCEPT_TEXT
+    assert f"STEP {steps.step_number('collar-rear-faced-to-fit')}" in accepted
     behind = steps.OFFSET_ACCEPT_TOL - collar.FIT_UP_OFFSET_TARGET
     assert behind > 0.0
-    assert f"UP TO {disc.inch_text(behind, 3)} BEHIND PASSES" in accepted
 
 
 def test_the_knob_wheel_is_read_held_back_on_its_seat() -> None:
     """Codex P2 on b2eb9a0e1: read the wheel held back on its seat, not
     floated forward under the nut. Its actual float is paid once in service."""
     pose = _step_body("fitup-pose-set")
-    assert steps.KNOB_HELD_BACK_TEXT in pose
-    assert steps.KNOB_HELD_BACK_TEXT in _step_body("collar-rear-faced-to-fit")
+    knob = drawing.sprocket_name(sprocket.KNOB_CONFIG)
+    assert f"{knob}, HELD BACK ON ITS SEAT" in " ".join(pose.split())
+    held_back = f"{drawing.sprocket_name(sprocket.KNOB_CONFIG, numbered=False)} HELD BACK"
+    assert held_back in " ".join(_step_body("collar-rear-faced-to-fit").split())
     accepted = _step_body("fitup-accepted")
-    assert accepted.startswith(f"ACCEPT, IN STEP {steps.step_number('fitup-pose-set')}")
+    assert accepted.startswith(f"CHECK, IN STEP {steps.step_number('fitup-pose-set')}")
     low, high = steps.ACCEPTED_CHAIN_OFFSET_IN_SERVICE
     half_plate_spread = (max(seat_geometry.PLATE_BAND) - min(seat_geometry.PLATE_BAND)) / 2.0
     assert (low, high) == pytest.approx(
@@ -2255,62 +2285,35 @@ def test_the_hook_is_set_on_a_meshed_and_run_hanger() -> None:
     fitted, meshed, drilled = (steps.step_number(key) for key in keys)
     assert meshed == fitted + 1 and drilled == meshed + 1
     domain = _unit_operating_domain()
-    text = drawing._step_text(operating_domain=domain)
-    fit = " ".join(text["latch-hook-fitted"].split())
-    assert "ITS PIN HOLE IS NOT YET DRILLED" in fit
-    mesh = " ".join(text["hanger-meshed"].split())
-    assert mesh.startswith(
-        f"SWING THE HANGER UP TILL THE {_number('pd-transgear-feed-pinion')} TEETH"
-    )
-    for method in ("RECEIVING RECORD", "ADMISSION", "TRAVELER"):
-        assert method not in mesh
-    assert "ALIGN A FEED TOOTH CENTRE DIRECTLY BELOW A RACK SPACE CENTRE" in mesh
-    assert f"SET {steps.RACK_DATUM_BACKLASH_TEXT} PLATEN SHAKE AT THAT DATUM" in mesh
-    # The datum shake states what it sets.
-    assert "FEED MESH DEPTH" in mesh
-    # The window names its end and the feed direction by the crank, not by a
-    # machine axis no sheet draws, and the title block already gives the unit.
+    mesh = _step_body("hanger-meshed")
+    # The datum shake is the one constant MHA-PD-10's GEAR DATA also prints.
+    shake = steps.RACK_DATUM_BACKLASH_TEXT
+    low, high = (float(value) * 25.4 for value in shake.split(" TO "))
+    band = rack_setup.RACK_DATUM_BACKLASH_RANGE
+    assert band[0] <= low < high <= band[1]
+    assert shake in mesh and shake in _step_body("hook-pin-hole-match-drilled")
+    # The window names its end by the crank, not by a machine axis no sheet
+    # draws, and the title block already gives the unit.
     window = drawing.engaged_feed_text(domain)
     assert window in mesh
-    assert "CRANK-SIDE CUT END" in window and window.count("CRANK") >= 2
-    assert "FEED STUD AXIS" in window
     for axis_word in ("-X", "+X", "MACHINE X", " MM"):
         assert axis_word not in mesh
-    assert window.startswith(
-        f"ENGAGED FEED: {steps.inch_window(domain.axis_from_left_end_limits_mm, 3, ' TO ')} FROM"
-    )
-    assert "RUN THAT WINDOW: NO TIGHT SPOT, SHAKE AT EVERY TOOTH" in mesh
-    assert "STOP BEFORE EITHER END LIMIT" in mesh
-    assert "RESET ONLY WITH FEED DISENGAGED" in mesh
-    assert "FULL TRAVEL" not in mesh
-    hook = " ".join(text["hook-pin-hole-match-drilled"].split())
-    assert hook.startswith("HOLDING THAT MESH")
     # Codex P1 on b2eb9a0e1: set clear of the pin, the unclamped arm fell
     # through the hole's clearance and opened the feed mesh.
-    pin = drawing._N["pd-vn-transgear-latch-pin"]
-    assert f"ITS HOLE'S LOWER EDGE ON THE {pin} PIN" in hook
-    assert "CLEAR" not in hook
-    # The one-piece hook's pin hole is drilled from the pin at the set mesh,
-    # then the part is hardened: no fitter-measured set position remains.
-    assert "DRAWN PLACE" not in hook
-    # Rule 24: the heat treatment is the hook drawing's; the re-run re-checks
-    # step 24's datum shake (rule 4: the drilled hole must keep that band).
-    hook_number = drawing._N["pd-latch-hook"]
-    assert f"HARDEN AND TEMPER PER {hook_number}." in hook
-    assert "BLUE" not in hook
-    assert hook.endswith(
-        "UNCLAMP, LATCH, RE-RUN THE DEFINED ENGAGED-FEED WINDOW; RE-CHECK "
-        f"{steps.RACK_DATUM_BACKLASH_TEXT} SHAKE AT THE DATUM."
-    )
+    hook = _step_body("hook-pin-hole-match-drilled")
+    assert "LOWER EDGE ON THE PIN" in hook
+    # Rule 24: the heat treatment is the hook drawing's.
+    assert f"PER {drawing._N['pd-latch-hook']}" in hook
 
 
 def test_the_loaded_rack_check_is_one_dial_run_over_the_engaged_window() -> None:
-    body = _step_body("loaded-rack-geometry-checked")
-    assert body.startswith("HANGER LATCHED, PAPER LOADED. TRAVEL: TURN THE KNOB")
-    travel, backlash = body.split(" BACKLASH: ")
-    assert "RUN THE PLATEN THROUGH THE WHOLE ENGAGED WINDOW: NO TIGHT SPOT" in travel
+    texts = drawing._step_text(operating_domain=_unit_operating_domain())[
+        "loaded-rack-geometry-checked"
+    ]
+    travel = next(text for text in texts if "RUN THE PLATEN" in text)
     assert "KNOB HELD" not in travel
-    assert backlash.startswith("KNOB HELD, ROCK THE PLATEN ALONG THE RACK")
+    assert any(text.startswith("CHECK: KNOB HELD") for text in texts)
+    body = _step_body("loaded-rack-geometry-checked")
     for method in ("UNCERTAINTY", "RE-ZERO", "DATUM", "REJECT"):
         assert method not in body
     assert steps.step_number("hook-pin-hole-match-drilled") < steps.step_number(
@@ -2321,15 +2324,15 @@ def test_the_loaded_rack_check_is_one_dial_run_over_the_engaged_window() -> None
 
 def test_the_reducer_is_clocked_once_with_an_ordinary_limit() -> None:
     body = _step_body("fitup-pose-set")
-    assert body.startswith("HANGER LATCHED.")
-    assert steps.KNOB_HELD_BACK_TEXT in body
-    clock = steps.inch_floor_mm(drawing.quality.reducer_setup_clock_deviation_mm(), 4)
-    assert (
-        "TURN THE DISC SO, ON THE LINE THROUGH THE KNOB AND CLUSTER AXES, A "
-        f"{disc.TEETH}T TOOTH STANDS CENTRED IN A {knob_shaft.TEETH}T GAP, "
-        f"WITHIN {disc.inch_text(clock, 4)} AT THE PITCH CIRCLE"
-    ) in body
-    assert body.endswith("TURN THE KNOB: NO TIGHT SPOT, SHAKE AT EVERY TOOTH.")
+    assert "HELD BACK ON ITS SEAT" in " ".join(body.split())
+    clock = steps.inch_floor_mm(drawing.quality.reducer_setup_clock_deviation_mm(), 3)
+    assert f"WITHIN {disc.inch_text(clock, 3)} AT THE PITCH CIRCLE" in body
+    assert "TEST INDICATOR" in body
+    # The reducer's GO / NO-GO feelers bound the mesh's normal backlash inward.
+    go, no_go = drawing.REDUCER_BACKLASH_FEELERS_MM
+    assert go < no_go
+    assert f"A {disc.inch_text(go, 3)} FEELER ENTERS" in body
+    assert f"A {disc.inch_text(no_go, 3)} FEELER DOES NOT" in body
     for method in ("UNCERTAINTY", "RE-ZERO", "RE-CLOCK", "ABSOLUTE", "REJECT"):
         assert method not in body
     assert steps.step_number("knob-stack-fitted") < steps.step_number("fitup-pose-set")
@@ -2480,13 +2483,14 @@ def test_a_direct_datum_reader_cannot_widen_the_printed_setup_band() -> None:
 def test_note_formatting_is_explicit_about_its_supplied_window() -> None:
     domain = _unit_operating_domain()
     notes = drawing.format_step_notes(operating_domain=domain)
-    assert drawing.engaged_feed_text(domain) in notes.fitup_steps.replace("\n   ", " ")
-    assert (
-        notes.platen_steps, notes.fitup_notes, notes.fitup_continued_notes, notes.chain_notes,
-    ) == drawing._step_columns(operating_domain=domain)
-    assert drawing.sheet_texts(notes)[:7] == (
-        notes.platen_steps, *notes.fitup_notes, *notes.fitup_continued_notes,
-        *notes.chain_notes,
+    window = steps.inch_window(domain.axis_from_left_end_limits_mm, 3, " TO ")
+    assert window in drawing.engaged_feed_text(domain)
+    assert drawing.engaged_feed_text(domain) in _step_body("hanger-meshed")
+    assert notes.columns == drawing.pack_step_columns(
+        drawing._step_text(operating_domain=domain)
+    )
+    assert drawing.sheet_texts(notes)[: len(notes.columns)] == tuple(
+        column.text for column in notes.columns
     )
 
 

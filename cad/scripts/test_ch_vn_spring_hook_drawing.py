@@ -126,23 +126,6 @@ def test_the_anchor_is_sized_at_the_coefficient_plate_thickness_extremes():
     assert spec.PROTRUSION_MM == pytest.approx(7.605)
 
 
-def test_install_step_locks_the_anchor_with_its_jam_nut():
-    nut = _config.parts("ch-anchor-jam-nut")["number"]
-    step = " ".join(spec.ANCHOR_INSTALL_STEP.split())
-    assert f"RUN ONE {nut} UP" in step
-    assert "FORKED DRIVER" in step
-    assert "JAM IT AGAINST THE PLATE UNDERSIDE" in step
-    assert f"NO MORE THAN {spec.ADJUSTMENT_TURNS} TURN" in step
-    assert nut in spec.ANCHOR_INSTALL_CHECK
-    assert "NO NUT IS INSTALLED" not in spec.DRAWING_NOTES
-    for text in (
-        spec.ANCHOR_INSTALL_STEP,
-        spec.ANCHOR_INSTALL_CHECK,
-        spec.DRAWING_NOTES,
-    ):
-        for banned in ("THREADLOCK", "LOCTITE", "NYLON", "NYLOC", "PATCH"):
-            assert banned not in text.upper()
-
 
 def test_printed_back_out_limit_matches_the_computed_budget():
     # The registry note is what the fitter reads; a band or plate change that

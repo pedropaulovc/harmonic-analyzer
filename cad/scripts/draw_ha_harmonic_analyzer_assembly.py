@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import math
+import re
 import sys
 import textwrap
 from pathlib import Path
@@ -23,6 +24,7 @@ from typing import Any, Callable
 import _telemetry
 import ha_harmonic_analyzer_assembly_sheet as notes
 import ha_harmonic_analyzer_assembly_spec as spec
+import ha_harmonic_analyzer_assembly_steps as steps
 from _assembly_contract import assembly_contract
 from _check import check
 from _com import _early_bound
@@ -98,7 +100,7 @@ SHEET_NAMES = (
     "FINISHED MACHINE",
     "EXPLODED VIEW + BOM",
     "INTEGRATION STEPS",
-    "CHECKS BEFORE RUNNING",
+    "STEPS AND CHECKS",
 )
 if SPEC.layout is not DrawingLayout.PORTRAIT:
     raise AssertionError("the complete-machine primary sheet must stay portrait")
@@ -235,16 +237,20 @@ PAPER_DRIVE_EXPLODE_M = tuple(
 
 # Sheets 4 and 5 (landscape): text columns over the title block's height,
 # the finished-machine thumbnail at the right. A blank line separates the
-# numbered steps, so the sequence fills both sheet-4 columns and the checks
-# move to sheet 5, level with its thumbnail rather than bunched in the top
-# corner (machinist review rule 15 on 29a080cd4).
+# printed steps (rule 15 on 29a080cd4). Rule 22's one-action steps and their
+# lettered sub-steps outgrow sheet 4's two columns, so the sequence runs on
+# into sheet 5's two columns, a keyed step never split across columns, and
+# the checks before running follow the last step there.
 NOTE_LINE_PITCH = 0.00455  # measured default-format note line pitch
 STEPS_LINE_WIDTH = 60  # characters; ~2.7 mm each
 STEPS_TOP_Y = 0.262
 STEPS_LEFT_X = 0.018
 STEPS_RIGHT_X = 0.195
-STEPS_SPLIT = 7  # steps 1..7 in the left column
 STEPS_VIEW_CENTER = (0.390, 0.170)
+# One text line's clearance kept above the title block.
+STEPS_COLUMN_LINES = int(
+    (STEPS_TOP_Y - _LANDSCAPE.title_block_top_m) / NOTE_LINE_PITCH
+) - 1
 
 BOM_COMPONENTS = spec.BOM_ORDER
 BOM_PART_NUMBERS = {stem: assembly_contract(stem).number for stem in BOM_COMPONENTS}
@@ -265,25 +271,33 @@ if spec.SOURCE_CONFIGURATION != ASSEMBLY_VIEW_CONFIGURATION:
     raise AssertionError("the complete-machine explode is authored in Default")
 
 
+_STEP_HEAD = re.compile(r"(\d+)([A-Z]?)")
+
+
 def _wrapped(lines: tuple[str, ...], *, width: int, heading: str | None = None) -> str:
-    """Wrap each numbered line under its own number, a blank line between
-    numbered lines; one note per block."""
+    """Wrap each numbered line (``7.`` or a lettered sub-step ``7B.``) under its
+    own head; a blank line between numbered steps, none between the lettered
+    sub-steps of one step; one note per block."""
     out = [heading] if heading else []
-    numbered = False
+    previous: str | None = None
     for line in lines:
-        number, sep, rest = line.partition(". ")
-        if sep and number.isdigit():
-            if numbered:
+        head, sep, rest = line.partition(". ")
+        match = _STEP_HEAD.fullmatch(head) if sep else None
+        if match:
+            if previous is not None and match.group(1) != previous:
                 out.append("")
-            numbered = True
+            previous = match.group(1)
             out += textwrap.wrap(
                 rest,
                 width=width,
-                initial_indent=f"{number}. ",
-                subsequent_indent=" " * (len(number) + 2),
+                initial_indent=f"{head}. ",
+                subsequent_indent=" " * (len(head) + 2),
+                break_on_hyphens=False,
             )
         else:
-            out += textwrap.wrap(line, width=width, subsequent_indent="   ")
+            out += textwrap.wrap(
+                line, width=width, subsequent_indent="   ", break_on_hyphens=False
+            )
     return "\n".join(out)
 
 
@@ -291,28 +305,74 @@ ASSEMBLED_NOTE = _wrapped(
     (
         notes.ORIENTATION_NOTE,
         notes.NIB_PARKED_NOTE,
-        f"INTEGRATION STEPS ON SHEET {SHEET_NAMES.index('INTEGRATION STEPS') + 1}.",
+        "INTEGRATION STEPS ON SHEETS "
+        f"{SHEET_NAMES.index('INTEGRATION STEPS') + 1} AND "
+        f"{SHEET_NAMES.index('STEPS AND CHECKS') + 1}.",
     ),
     width=ASSEMBLED_NOTE_WIDTH,
 )
-STEPS_LEFT = _wrapped(
-    notes.ASSEMBLY_STEPS[:STEPS_SPLIT],
-    width=STEPS_LINE_WIDTH,
-    heading="INTEGRATION SEQUENCE",
-)
-STEPS_RIGHT = _wrapped(notes.ASSEMBLY_STEPS[STEPS_SPLIT:], width=STEPS_LINE_WIDTH)
+STEPS_HEADING = "INTEGRATION SEQUENCE"
+STEPS_CONTINUED_HEADING = "INTEGRATION SEQUENCE, CONTINUED"
 ASSEMBLY_CHECKS = _wrapped(
     notes.ASSEMBLY_CHECKS, width=STEPS_LINE_WIDTH, heading="CHECKS BEFORE RUNNING"
 )
-_CHECKS_HEIGHT = (ASSEMBLY_CHECKS.count("\n") + 1) * NOTE_LINE_PITCH
-CHECKS_XY = (STEPS_LEFT_X, STEPS_VIEW_CENTER[1] + _CHECKS_HEIGHT / 2.0)
-STEPS_COLUMN_BOTTOM_Y = min(
-    STEPS_TOP_Y
-    - NOTE_LINE_PITCH
-    * max(block.count("\n") + 1 for block in (STEPS_LEFT, STEPS_RIGHT)),
-    CHECKS_XY[1] - _CHECKS_HEIGHT,
+
+
+def _lines(block: str) -> int:
+    return block.count("\n") + 1
+
+
+def pack_step_columns(
+    groups: tuple[tuple[str, ...], ...], *, columns: int, capacity: int, reserve: int
+) -> tuple[tuple[str, ...], ...]:
+    """Fill ``columns`` columns in order with whole step groups (a keyed step
+    and its sub-steps), each at most ``capacity`` printed lines with its
+    heading; the last also keeps ``reserve`` lines for the checks."""
+    packed: list[list[str]] = [[]]
+    for group in groups:
+        trial = (*packed[-1], *group)
+        heading = STEPS_HEADING if len(packed) == 1 else STEPS_CONTINUED_HEADING
+        limit = capacity - (reserve if len(packed) == columns else 0)
+        if packed[-1] and _lines(_wrapped(trial, width=STEPS_LINE_WIDTH, heading=heading)) > limit:
+            packed.append([])
+            if len(packed) > columns:
+                raise AssertionError("the integration steps outgrow sheets 4 and 5")
+            trial = group
+            heading = STEPS_CONTINUED_HEADING
+            limit = capacity - (reserve if len(packed) == columns else 0)
+            if _lines(_wrapped(trial, width=STEPS_LINE_WIDTH, heading=heading)) > limit:
+                raise AssertionError("one integration step outgrows a column")
+        packed[-1] = list(trial)
+    return tuple(tuple(column) for column in packed)
+
+
+_STEP_GROUPS = tuple(notes.step_lines(key) for key in steps.SEQUENCE)
+STEP_COLUMNS: tuple[str, ...] = tuple(
+    _wrapped(
+        column,
+        width=STEPS_LINE_WIDTH,
+        heading=STEPS_HEADING if index == 0 else STEPS_CONTINUED_HEADING,
+    )
+    for index, column in enumerate(
+        pack_step_columns(_STEP_GROUPS, columns=3, capacity=STEPS_COLUMN_LINES, reserve=0)
+    )
 )
-if STEPS_COLUMN_BOTTOM_Y <= _LANDSCAPE.title_block_top_m or CHECKS_XY[1] > STEPS_TOP_Y:
+# Sheet 4 holds the first two columns; sheet 5 the third, with the checks
+# before running in its right-hand column.
+STEP_COLUMN_SHEETS = tuple(
+    SHEET_NAMES[3] if index < 2 else SHEET_NAMES[4] for index in range(len(STEP_COLUMNS))
+)
+STEP_COLUMN_XY = tuple(
+    (STEPS_LEFT_X if index % 2 == 0 else STEPS_RIGHT_X, STEPS_TOP_Y)
+    for index in range(len(STEP_COLUMNS))
+)
+if len(STEP_COLUMNS) != 3:
+    raise AssertionError("the sequence runs on into sheet 5's left column")
+CHECKS_XY = (STEPS_RIGHT_X, STEPS_TOP_Y)
+STEPS_COLUMN_BOTTOM_Y = min(
+    STEPS_TOP_Y - NOTE_LINE_PITCH * _lines(block) for block in (*STEP_COLUMNS, ASSEMBLY_CHECKS)
+)
+if STEPS_COLUMN_BOTTOM_Y <= _LANDSCAPE.title_block_top_m:
     raise AssertionError("the steps sheets' text leaves its field")
 
 
@@ -1065,26 +1125,26 @@ def _place_thumbnail(adapter: Any, name: str) -> None:
 
 
 def _place_steps_sheet(adapter: Any) -> None:
-    """The integration sequence in two columns and a thumbnail."""
-    name = SHEET_NAMES[3]
-    _place_thumbnail(adapter, name)
-    _add_note_block(
-        adapter,
-        name,
-        STEPS_LEFT,
-        (STEPS_LEFT_X, STEPS_TOP_Y),
-        label=f"steps 1-{STEPS_SPLIT}",
-    )
-    _add_note_block(
-        adapter, name, STEPS_RIGHT, (STEPS_RIGHT_X, STEPS_TOP_Y), label="later steps"
-    )
+    """Sheet 4: the integration sequence's first two columns and a thumbnail."""
+    _place_thumbnail(adapter, SHEET_NAMES[3])
+    _place_step_columns(adapter, SHEET_NAMES[3])
 
 
 def _place_checks_sheet(adapter: Any) -> None:
-    """The checks before running and a thumbnail."""
+    """Sheet 5: the sequence continued, the checks before running and a
+    thumbnail."""
     name = SHEET_NAMES[4]
     _place_thumbnail(adapter, name)
+    _place_step_columns(adapter, name)
     _add_note_block(adapter, name, ASSEMBLY_CHECKS, CHECKS_XY, label="checks")
+
+
+def _place_step_columns(adapter: Any, name: str) -> None:
+    for index, (block, sheet, xy) in enumerate(
+        zip(STEP_COLUMNS, STEP_COLUMN_SHEETS, STEP_COLUMN_XY)
+    ):
+        if sheet == name:
+            _add_note_block(adapter, name, block, xy, label=f"steps column {index + 1}")
 
 
 def _activate_package(adapter: Any, target: Any) -> None:
