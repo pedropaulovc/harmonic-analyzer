@@ -249,14 +249,18 @@ EYEBOLT_BALLOON_POINT_MM = (
 )
 # The jam nut's walked anchor landed at its underside, so leader 7 read as
 # ending on the eyebolt shank below the nut (machinist review on 6d7f35476).
-# It is pinned to the hex instead: the vertical corner edge at half height
-# between the two flats facing the +X+Y+Z isometric viewer. The builder
-# places the nut with ROT_X_NEG90, part (x, y, z) -> machine (x, z, -y), so
-# the part corner at 120 deg from +Y, (r sin 120, r cos 120), lands at
-# machine (+X, +Z).
+# It is pinned to a vertical corner edge of the hex at half height. The
+# corner facing the +X+Y+Z viewer still read as the shank (integration
+# review at 8fb7fb46f7): leader 7 rises from below and to the right, and its
+# arrowhead closed over the nut's lower outline where the cut end shows. So
+# the anchor is the corner on the hex's right-hand silhouette, which the
+# leader meets from the open side. The builder places the nut with
+# ROT_X_NEG90, part (x, y, z) -> machine (x, z, -y), so the part corner at
+# 60 deg from +Y, (r sin 60, r cos 60), lands at machine (+X, -Z), the
+# corner farthest right on the isometric sheet.
 JAM_NUT_BALLOON_POINT_MM = (
-    jam_nut.ACROSS_CORNERS / 2.0 * math.sin(math.radians(120.0)),
-    jam_nut.ACROSS_CORNERS / 2.0 * math.cos(math.radians(120.0)),
+    jam_nut.ACROSS_CORNERS / 2.0 * math.sin(math.radians(60.0)),
+    jam_nut.ACROSS_CORNERS / 2.0 * math.cos(math.radians(60.0)),
     jam_nut.THICKNESS / 2.0,
 )
 BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS} | {

@@ -174,7 +174,7 @@ def test_eyebolt_balloon_lands_on_the_eye_facing_the_viewer() -> None:
     assert drawing.BALLOON_ANCHORS[spec.BOSS_HOOK].point_mm == point
 
 
-def test_jam_nut_balloon_lands_on_the_hex_corner_facing_the_viewer() -> None:
+def test_jam_nut_balloon_lands_on_the_hex_corner_on_the_right_silhouette() -> None:
     x, y, z = drawing.JAM_NUT_BALLOON_POINT_MM
     # A hex corner (corners at 0, 60, ... deg from part +Y), at half height.
     assert math.hypot(x, y) == pytest.approx(jam_nut.ACROSS_CORNERS / 2.0)
@@ -182,12 +182,19 @@ def test_jam_nut_balloon_lands_on_the_hex_corner_facing_the_viewer() -> None:
     assert sixths == pytest.approx(round(sixths), abs=1e-9)
     assert z == pytest.approx(jam_nut.THICKNESS / 2.0)
 
-    def toward_viewer(px: float, py: float) -> float:
-        # Row-vector placement (the builder's JAM_NUT_ROWS), dotted with the
-        # +X+Y+Z isometric view direction in the horizontal plane.
+    def machine(px: float, py: float) -> list[float]:
+        # Row-vector placement (the builder's JAM_NUT_ROWS).
         rows = builder.JAM_NUT_ROWS
-        machine = [px * rows[0][i] + py * rows[1][i] for i in range(3)]
-        return machine[0] + machine[2]
+        return [px * rows[0][i] + py * rows[1][i] for i in range(3)]
+
+    def sheet_right(px: float, py: float) -> float:
+        # The +X+Y+Z isometric's sheet right is machine (+X - Z) / sqrt 2.
+        mx, _my, mz = machine(px, py)
+        return mx - mz
+
+    def toward_viewer(px: float, py: float) -> float:
+        mx, _my, mz = machine(px, py)
+        return mx + mz
 
     corners = [
         (
@@ -196,9 +203,10 @@ def test_jam_nut_balloon_lands_on_the_hex_corner_facing_the_viewer() -> None:
         )
         for k in range(6)
     ]
-    assert toward_viewer(x, y) == pytest.approx(
-        max(toward_viewer(*corner) for corner in corners)
-    )
+    # Leader 7 rises from below right: it lands on the corner farthest right,
+    # a drawn silhouette edge (one of its two flats faces the viewer).
+    assert sheet_right(x, y) == pytest.approx(max(sheet_right(*c) for c in corners))
+    assert toward_viewer(x, y) > 0.0
     assert drawing.BALLOON_ANCHORS[spec.BOSS_JAM_NUT].point_mm == (x, y, z)
     assert drawing.BALLOON_ANCHORS[spec.BOSS_JAM_NUT].instance is None
 
