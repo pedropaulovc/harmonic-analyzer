@@ -327,8 +327,10 @@ def _wrapped(lines: tuple[str, ...], *, width: int, spaced: bool = False) -> str
 ASSEMBLED_NOTES = _wrapped(notes.ASSEMBLED_NOTES, width=NOTES_WIDTH)
 # A blank line separates step groups (and checks). The steps run down sheet 3
 # beside the finished view and continue on sheet 4 from STEPS_CONTINUED_FROM,
-# above the checks; each block must end above the inner border.
-STEPS_CONTINUED_FROM = "5"
+# above the checks; each block must end above the inner border. Steps 5 and 6
+# print one action a sub-step (rule 22), so step 5 moves to sheet 3 to keep
+# sheet 4 inside its border.
+STEPS_CONTINUED_FROM = "6"
 _SPLIT = next(
     index
     for index, line in enumerate(notes.ASSEMBLY_STEPS)
