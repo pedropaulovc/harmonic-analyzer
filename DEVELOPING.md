@@ -1509,9 +1509,9 @@ and save and must preserve native bytes. Save/open warning and error bits,
 failed dimension writes, failed rebuilds, and failed readbacks are fatal.
 Feature checks retain raw/effective native type and name events. Only `ICE`
 uses the SDK-prescribed legacy `GetTypeName` underlying-kind query. The
-semantic boss contract accepts only documented `Boss`/`Extrusion` kinds and
-requires native `IExtrudeFeatureData2` confirmation of boss, non-thin,
-single-direction, non-reversed, blind extrusion with finite positive depth;
+semantic extrusion contract accepts only documented `Boss`/`Extrusion` kinds,
+requires `IFeature.IsBase2` (the first solid is a base, not an added boss), and
+checks native non-thin, single-direction, non-reversed, blind extrusion with finite positive depth;
 a matching type label alone is not proof.
 
 These are raw **warm-seat operation** timings, including validation and save/

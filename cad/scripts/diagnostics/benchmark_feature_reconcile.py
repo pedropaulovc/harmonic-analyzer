@@ -78,10 +78,8 @@ class Benchmark:
         _telemetry.event(f"{PREFIX}.feature_type", **observed)
         mismatch = observed["actual_name"] != item["name"]
         if item["key"] == "body":
-            # Manifest "Boss" is the closed recipe's semantic boss contract,
-            # not a requirement that every seat returns that native string.
-            # Boss/Extrusion are documented extrusion classes, never thin/cut
-            # classes. A matching string alone is insufficient.
+            # The first solid extrusion is a base feature, not an added boss.
+            # Native Boss/Extrusion labels alone cannot establish that contract.
             mismatch |= observed["effective_type"] not in {"Boss", "Extrusion"}
             if not mismatch:
                 definition = feature.GetDefinition()
@@ -90,6 +88,7 @@ class Benchmark:
                 definition = _early_bound(definition, "IExtrudeFeatureData2")
                 observed.update({
                     "is_boss": bool(definition.IsBossFeature()),
+                    "is_base": bool(feature.IsBase2()),
                     "is_thin": bool(definition.IsThinFeature()),
                     "both_directions": bool(definition.BothDirections),
                     "reverse_direction": bool(definition.ReverseDirection),
@@ -99,7 +98,7 @@ class Benchmark:
                 definition = None  # Never retain feature-data objects across reopen.
                 _telemetry.event(f"{PREFIX}.extrusion_definition", **observed)
                 mismatch |= (
-                    not observed["is_boss"] or observed["is_thin"]
+                    not observed["is_base"] or observed["is_thin"]
                     or observed["both_directions"] or observed["reverse_direction"]
                     or observed["forward_end_condition"] != 0  # swEndCondBlind
                     or not math.isfinite(observed["forward_depth_m"])
