@@ -88,7 +88,8 @@ Error sensitivity (printed next to the bands that carry it):
   height and width tolerances do not apply: one carriage runs on each rail,
   the selected shims set the carrier height, and the strap HUB is reamed
   in place. Z0 preload and C accuracy are not required for a passing kit
-  carriage; if none meets 0.02, fit a preloaded (Z0/ZA) HGH15CA carriage.
+  carriage; if none on a rail meets 0.02, the rail kit is replaced (owner
+  ruling 2026-11-08: no fallback carriage).
 
 Sweep (Main, 2026-10-16). The brief swept the cutter over the whole 350
 blank, +/-13 degrees about C. Here each pass covers the part only. The
