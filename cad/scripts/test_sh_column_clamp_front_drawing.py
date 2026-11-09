@@ -160,9 +160,9 @@ def test_bore_prints_the_grip_budget_on_the_column() -> None:
     # match are named once, under the hole callout.
     assert not {"EarHole1Z", "EarHoleHeight"} & set(drawing.DIMENSION_CALLOUTS)
     assert "MHA-SH-02" in drawing.HOLE_CALLOUT_BELOW
-    # The three-place overall depth prints bare: no reason on it (rule 7).
+    # The three-place depth says what it sets.
     assert spec.DRAWING_PRECISION["BlockProfile"]["Depth"] == 3
-    assert "Depth" not in drawing.DIMENSION_CALLOUTS
+    assert "MHA-SH-02" in drawing.DIMENSION_CALLOUTS["Depth"]
 
 
 def test_ear_hole_callout_reads_size_then_drill_thru() -> None:
