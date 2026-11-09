@@ -1411,6 +1411,10 @@ PACKAGE_NATIVE_PY = (SCRIPTS_DIR / "package_native.py").resolve()
 # verify:/check: task names (reused by build + release so a new gate is wired in
 # one place).
 _VERIFY_NAMES = ("soundness", "kinematics")  # need SW (spine); subsystems retired
+# EXPERIMENT BRANCH ONLY: the pool exports build/release closures, not arbitrary
+# selected roots. This leaf is explicitly on build below for canonical admission.
+# Never merge this experiment wiring into the production build graph.
+_EXPERIMENT_VERIFY_NAMES = ("feature_reconcile",)
 # Offline checks REQUIRED on every build/release (fast, high-value):
 _CHECK_NAMES = (
     "math",
@@ -3272,6 +3276,27 @@ def _verify_task(name: str) -> dict[str, Any]:
             "clean": True,
             "verbosity": 2,
         }
+    if name == "feature_reconcile":
+        script = (SCRIPTS_DIR / "diagnostics" / "benchmark_feature_reconcile.py").resolve()
+        cmd = [sys.executable, str(script), "benchmark", "--trials", "3"]
+        deps = sorted({
+            *_executed_closure(cmd),
+            str((script.parent / "_feature_reconcile.py").resolve()),
+            str(PART_TEMPLATE),
+            _submodule_assembly_dep(),
+        })
+        return {
+            "name": name,
+            "file_dep": deps,
+            "targets": _canonical_targets(f"verify:{name}"),
+            "uptodate": [not _cache.forced_refresh(f"verify:{name}")],
+            "actions": [(_cached_com_action, [
+                f"verify:{name}", cmd, deps,
+                [REPORTS / "feature-reconcile"], "verify-feature-reconcile",
+            ])],
+            "clean": True,
+            "verbosity": 2,
+        }
     if name == "kinematics":
 
         # Pass the graph's assemblies EXPLICITLY (dashed names) rather than letting
@@ -3314,7 +3339,7 @@ def task_verify():
     output. The ``verify:`` prefix marks them SolidWorks-dependent (vs the
     SolidWorks-free ``check:`` tasks).
     """
-    for name in _VERIFY_NAMES:
+    for name in (*_VERIFY_NAMES, *_EXPERIMENT_VERIFY_NAMES):
         yield _verify_task(name)
 
 
@@ -4992,6 +5017,9 @@ def task_build():
             + [f"drawing:{s}" for s in _drawing_order()]
             + [f"check:machinist_review:{s}" for s, _mode in _reviewed_drawings()]
             + [f"verify:{s}" for s in _VERIFY_NAMES]
+            # EXPERIMENT ONLY: required in the pool's exported build closure.
+            # Submit only this leaf, never build/release, for the benchmark.
+            + [f"verify:{s}" for s in _EXPERIMENT_VERIFY_NAMES]
             + [f"prechips:{stem}" for stem in _process_plans.TRAVELER_STEMS]
         ),
     }
@@ -5024,7 +5052,7 @@ def _canonical_subtask_names(family: str) -> list[str]:
     if family == "drawing":
         return _drawing_order()
     if family == "verify":
-        return list(_VERIFY_NAMES)
+        return [*_VERIFY_NAMES, *_EXPERIMENT_VERIFY_NAMES]
     if family == "check":
         return [
             *_check_task_names(),
@@ -5056,6 +5084,13 @@ def _canonical_targets(name: str) -> list[str]:
     if family == "verify_soundness":
         return [str(REPORTS / f"verify-soundness-{subname.replace('_', '-')}.ok")]
     if family == "verify":
+        if subname == "feature_reconcile":
+            directory = REPORTS / "feature-reconcile"
+            return [str(directory / filename) for filename in (
+                "report.json", "spans.jsonl", "baseline-manifest.json", "target-recipe.json", "baseline.SLDPRT",
+                *(f"trial-{trial}-{mode}.SLDPRT"
+                  for trial in range(1, 4) for mode in ("clean", "incremental", "noop")),
+            )]
         return [str(REPORTS / f"verify-{subname}.ok")]
     if family == "check":
         if subname.startswith("machinist_review:"):
@@ -5269,7 +5304,7 @@ def canonical_target_owners(paths: Iterable[str] | None = None) -> dict[str, str
         include(f"verify_soundness:{stem}")
     for stem in DRAWINGS_BY_NAME:
         include(f"drawing:{stem}")
-    for name in _VERIFY_NAMES:
+    for name in (*_VERIFY_NAMES, *_EXPERIMENT_VERIFY_NAMES):
         include(f"verify:{name}")
     for name in _check_task_names():
         include(f"check:{name}")

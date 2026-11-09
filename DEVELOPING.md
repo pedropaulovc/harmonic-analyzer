@@ -1462,6 +1462,70 @@ than in their names.
 workflow identity. An unchanged Git commit does not by itself mean an unchanged
 key; compare these before reusing or resuming a run.
 
+### Experimental keyed-feature reconciliation (draft branch only)
+
+**This experiment is not a merge candidate. Do not run `build` or `release`
+on this branch.** The pool currently exports only the `build`/`release`
+dependency closures (`agent/worker.py:REQUESTED_TARGETS`). Merely registering
+an opt-in `verify:` leaf does not admit it into that graph. This draft
+therefore explicitly adds `verify:feature_reconcile` to the branch's `build`
+dependencies, without changing pool admission, seat settings, or any production
+part recipe. That intentional default-graph change must never reach main.
+Submit **only** the diagnostic leaf from a clean, pushed experiment checkout,
+using the persistent launcher supervision described above:
+
+```powershell
+./scripts/farm-run.ps1 -Worktree C:/src/ha-feature-reconcile-20261109 `
+  -PoolHome C:/src/solidworks-pool -Targets verify:feature_reconcile `
+  -LeafTimeout 30 -DisplayName 'Experimental keyed-feature benchmark' `
+  -Tag feature-reconcile-native `
+  -ForceCacheRefresh verify:feature_reconcile `
+  -ForceCacheRefreshReason 'Measure three fresh native trials, not cached timings'
+```
+
+The canonical task uses the ordinary cache-keyed COM action, seat lock, graph
+admission, and archive publication. It creates an origin-centred, dimensioned
+Front-plane circle and positive-Z blind extrusion, saves a baseline native
+part plus semantic-key manifest, then copies/reopens those exact baseline bytes
+for each parameter edit. Three trials alternate clean/incremental ordering;
+each also measures a no-op from the saved incremental result. Structural
+key/type/order/dependency/operation changes return `full_build` with **no**
+partial edit instructions; they are not an arbitrary-topology edit engine.
+
+Declared outputs under `cad/out/reports/feature-reconcile/` include
+`report.json`, `spans.jsonl`, `baseline-manifest.json`, `target-recipe.json`,
+the baseline and all nine trial native parts. The directory is archived by the
+ordinary leaf cache, so raw benchmark OTel spans survive worker cleanup.
+The report carries trace/span IDs, per-phase wall timings, individual results
+and medians; it reports initial baseline creation separately. Native validation
+is identical before save and after close/reopen: named driving dimensions,
+exact `IBody2.GetExtremePoint` bounds, direct native volume, and baseline
+feature references resolved using `GetObjectByPersistReference3` plus native
+`ISldWorks.IsSame` (not reference-byte equality). No-op skips edits, rebuild
+and save and must preserve native bytes. Save/open warning and error bits,
+failed dimension writes, failed rebuilds, and failed readbacks are fatal.
+
+These are raw **warm-seat operation** timings, including validation and save/
+reopen, not whole-build speedups. Incremental timings also include baseline
+contract validation before the first mutation. The report excludes process
+startup, connection, farm scheduling, source acquisition, and cache publication;
+use the surrounding farm spans to study those separately. No measurements
+are claimed until a native run succeeds and its declared evidence is retained.
+
+Safe offline commands (no COM connection):
+
+```powershell
+uv run --frozen python cad/scripts/diagnostics/benchmark_feature_reconcile.py --help
+uv run --frozen python -m pytest cad/scripts/test_feature_reconcile.py -q
+uv run --frozen python cad/scripts/diagnostics/benchmark_feature_reconcile.py plan `
+  <retained-output>/reports/feature-reconcile/baseline-manifest.json `
+  <retained-output>/reports/feature-reconcile/target-recipe.json
+```
+
+The `plan` command reads the manifest's saved recipe and emits `incremental`,
+`noop`, or `full_build` without loading native bindings. Standalone benchmark
+execution is rejected unless the canonical COM seat lock is held.
+
 ### Readiness is not proof of a build
 
 `farm-launch started` means the wrapper initialized its log and startup record.
