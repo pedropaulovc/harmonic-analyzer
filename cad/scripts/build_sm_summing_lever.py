@@ -1028,14 +1028,23 @@ def _assert_native_rib_profile(adapter, stem: str) -> None:
         if raw_dimension is None:
             raise RuntimeError(f"{stem}: missing native driving counter angle")
         dimension = _early_bound(raw_dimension, "IDimension")
+        driven_state = int(dimension.DrivenState)
+        actual_radians = float(dimension.SystemValue)
+        expected_radians = math.radians(COUNTER_FLANK_ANGLE_DEG)
         if (
-            int(dimension.DrivenState) != 2
+            driven_state != 2
             or not math.isclose(
-                float(dimension.SystemValue), math.radians(COUNTER_FLANK_ANGLE_DEG),
+                actual_radians, expected_radians,
                 rel_tol=0.0, abs_tol=1e-10,
             )
         ):
-            raise RuntimeError(f"{stem}: counter angle is not the nominal native driver")
+            raise RuntimeError(
+                f"{stem}: counter angle {dimension.FullName!r} is not the nominal native driver: "
+                f"DrivenState={driven_state!r}, expected=2; "
+                f"SystemValue={actual_radians!r} rad, expected={expected_radians!r} rad; "
+                f"delta={actual_radians - expected_radians!r} rad; "
+                f"actual_degrees={math.degrees(actual_radians)!r}"
+            )
     _telemetry.success(f"{stem}: both native tangent flanks and R.040 profile blends")
 
 

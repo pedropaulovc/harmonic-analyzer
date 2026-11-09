@@ -378,6 +378,7 @@ def test_native_counter_profile_requires_both_nominal_planes_and_driver(damage) 
         normal = (-math.sin(angle), sign * math.cos(angle), 0.0)
         plane(normal, tuple(spec.RIB_WRAP_R * value / 1000.0 for value in normal))
     dimension = SimpleNamespace(
+        FullName="MiddleRibCounterAngle@MiddleRibProfile@sm-summing-lever.Part",
         DrivenState=1 if damage == "reference" else 2,
         SystemValue=math.radians(11.537 if damage == "wrong_angle" else spec.COUNTER_FLANK_ANGLE_DEG),
     )
@@ -403,8 +404,14 @@ def test_native_counter_profile_requires_both_nominal_planes_and_driver(damage) 
     if damage is None:
         check(adapter, "MiddleRib")
     else:
-        with pytest.raises(RuntimeError):
+        with pytest.raises(RuntimeError) as error:
             check(adapter, "MiddleRib")
+        if damage in {"reference", "wrong_angle", "nan_angle"}:
+            message = str(error.value)
+            assert dimension.FullName in message
+            assert f"DrivenState={dimension.DrivenState!r}, expected=2" in message
+            assert f"SystemValue={dimension.SystemValue!r} rad" in message
+            assert "delta=" in message
 
 
 def _source_helpers(names: tuple[str, ...], **bindings):
