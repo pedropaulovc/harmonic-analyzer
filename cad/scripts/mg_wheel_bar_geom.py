@@ -69,9 +69,8 @@ AXLE_BORE_DIA = 4.7371  # .1865
 AXLE_BORE_BAND = (0.0127, 0.0)  # (upper, lower) deviations: +.0005/0, reamed
 AXLE_BORE_PLACES = 4
 # Printed depth: .374 (the 9.5 mm stock) at the title block's .XXX, no band
-# of its own, loosened from a converted-mm +/-.004 (delegated ruling
-# 2026-11-07, Main, no precedent, PROVISIONAL pending owner confirmation;
-# owner review #2144). Its three places carry a function: with the axle's
+# of its own, loosened from a converted-mm +/-.004.
+# Owner ruling 2026-11-08 (Pedro), #2144 item 11.2. Its three places carry a function: with the axle's
 # press gauge and shank it places the axle's back end in the bore
 # (mg_wheel_axle_spec.BACK_END_SUNK_MIN / BACK_END_SUNK_MAX), and the sheet
 # names that stack on it.

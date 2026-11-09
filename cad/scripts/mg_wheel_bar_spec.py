@@ -72,8 +72,8 @@ BORE_ROW_PLACES = 3
 # zone of 2*sqrt(2)*band; with the taps' 0.283 it must stay inside the 0.812.
 # The clamp row and both clamp stations print .XXX with no band of their own:
 # the title block's +/-.005 (0.359 + 0.283 = 0.642), tightened from a
-# converted-mm +/-.007 (delegated ruling 2026-11-07, Main, no precedent;
-# owner review #2144). test_mg_wheel_bar_drawing derives the stack from the
+# converted-mm +/-.007 (Owner ruling 2026-11-08 (Pedro), #2144 item 11.2).
+# test_mg_wheel_bar_drawing derives the stack from the
 # clamp's own modules, so the clamp's geometry stays out of this part's
 # recipe. Drill wander is not charged, as on the support bar (#1988).
 CLAMP_POSITION_PLACES = 3
