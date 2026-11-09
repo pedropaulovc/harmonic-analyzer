@@ -762,8 +762,9 @@ def _assert_counter_flank_angle(adapter: Any, annotations: list[Any]) -> None:
         or annotation.IsDangling()
     ):
         raise RuntimeError(f"{name}: lost native model association")
-    if int(display.Type2) != 3 or int(dimension.DrivenState) != 2:
-        raise RuntimeError(f"{name}: expected the native driving angular dimension")
+    # The model driver reports driven (1) after its equation is bound.
+    if int(display.Type2) != 3 or int(dimension.DrivenState) != 1:
+        raise RuntimeError(f"{name}: expected the equation-controlled angular dimension")
     if not math.isclose(
         float(dimension.SystemValue), math.radians(COUNTER_FLANK_ANGLE_DEG),
         rel_tol=0.0, abs_tol=1e-8,

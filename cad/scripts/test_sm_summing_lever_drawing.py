@@ -918,7 +918,7 @@ def test_counter_flank_import_contract() -> None:
 
 
 @pytest.mark.parametrize("case", [
-    "native", "missing", "duplicate", "wrong_feature", "dangling", "reference",
+    "native", "missing", "duplicate", "wrong_feature", "dangling", "unbound",
     "linear", "wrong_angle", "rounded_angle", "supplement", "nonfinite",
     "tighter_band", "parentheses", "wrong_count", "precision",
 ])
@@ -936,7 +936,7 @@ def test_counter_flank_import_reads_native_driving_control(monkeypatch, case) ->
     native = SimpleNamespace(
         FullName=f"{name}@{'OtherProfile' if case == 'wrong_feature' else 'MiddleRibProfile'}@sm-summing-lever",
         SystemValue=value,
-        DrivenState=1 if case == "reference" else 2,
+        DrivenState=2 if case == "unbound" else 1,
         GetToleranceType=lambda: 2 if case == "tighter_band" else 0,
     )
     display = SimpleNamespace(

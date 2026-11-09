@@ -347,10 +347,11 @@ def test_counter_angle_global_uses_native_expression_after_its_lengths() -> None
         assert -radius / math.sin(math.radians(degrees)) == pytest.approx(-reach, abs=1e-6)
 
 
+@pytest.mark.parametrize("equation_bound", [False, True])
 @pytest.mark.parametrize("damage", [
-    None, "rounded_upper", "rounded_lower", "missing_lower", "reference", "wrong_angle", "missing_angle", "nan_angle",
+    None, "rounded_upper", "rounded_lower", "missing_lower", "wrong_state", "wrong_angle", "missing_angle", "nan_angle",
 ])
-def test_native_counter_profile_requires_both_nominal_planes_and_driver(damage) -> None:
+def test_native_counter_profile_requires_both_nominal_planes_and_driver(damage, equation_bound) -> None:
     faces = []
 
     def plane(normal, point):
@@ -377,20 +378,16 @@ def test_native_counter_profile_requires_both_nominal_planes_and_driver(damage) 
         angle = math.radians(11.537 if damage == f"rounded_{side}" else spec.COUNTER_FLANK_ANGLE_DEG)
         normal = (-math.sin(angle), sign * math.cos(angle), 0.0)
         plane(normal, tuple(spec.RIB_WRAP_R * value / 1000.0 for value in normal))
+    expected_state = 1 if equation_bound else 2
     dimension = SimpleNamespace(
         FullName="MiddleRibCounterAngle@MiddleRibProfile@sm-summing-lever.Part",
-        DrivenState=1 if damage == "reference" else 2,
+        DrivenState=3 - expected_state if damage == "wrong_state" else expected_state,
         SystemValue=math.radians(11.537 if damage == "wrong_angle" else spec.COUNTER_FLANK_ANGLE_DEG),
     )
     if damage == "nan_angle":
         dimension.SystemValue = math.nan
 
     def parameter(name):
-        if name == "PlateWidth@PlateProfile":
-            return SimpleNamespace(
-                FullName="PlateWidth@PlateProfile@sm-summing-lever.Part",
-                DrivenState=1, SystemValue=spec.PLATE_W / 1000.0,
-            )
         assert name == "MiddleRibCounterAngle@MiddleRibProfile"
         return None if damage == "missing_angle" else dimension
 
@@ -407,14 +404,14 @@ def test_native_counter_profile_requires_both_nominal_planes_and_driver(damage) 
     check = namespace["_assert_native_rib_profile"]
     adapter = SimpleNamespace(currentModel=model)
     if damage is None:
-        check(adapter, "MiddleRib")
+        check(adapter, "MiddleRib", equation_bound=equation_bound)
     else:
         with pytest.raises(RuntimeError) as error:
-            check(adapter, "MiddleRib")
-        if damage in {"reference", "wrong_angle", "nan_angle"}:
+            check(adapter, "MiddleRib", equation_bound=equation_bound)
+        if damage in {"wrong_state", "wrong_angle", "nan_angle"}:
             message = str(error.value)
             assert dimension.FullName in message
-            assert f"DrivenState={dimension.DrivenState!r}, expected=2" in message
+            assert f"DrivenState={dimension.DrivenState!r}, expected={expected_state}" in message
             assert f"SystemValue={dimension.SystemValue!r} rad" in message
             assert "delta=" in message
 

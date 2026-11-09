@@ -973,8 +973,8 @@ async def _rib_profile_sketch(
     drive_jobs += rib.apply(adapter, f"{stem}Profile")
 
 
-def _assert_native_rib_profile(adapter, stem: str) -> None:
-    """Prove both real flanks and both R.040 blend surfaces, not only the sketch."""
+def _assert_native_rib_profile(adapter, stem: str, *, equation_bound: bool = False) -> None:
+    """Prove native flanks/blends and the counter angle's stage-specific state."""
     model = _early_bound(adapter.currentModel, "IPartDoc")
     raw = model.FeatureByName(stem)
     if raw is None:
@@ -1028,28 +1028,25 @@ def _assert_native_rib_profile(adapter, stem: str) -> None:
         if raw_dimension is None:
             raise RuntimeError(f"{stem}: missing native driving counter angle")
         dimension = _early_bound(raw_dimension, "IDimension")
+        # Equation-controlled dimensions report driven (1), not their
+        # creation-time driving state (2), as the PlateWidth control confirms.
+        expected_state = 1 if equation_bound else 2
         driven_state = int(dimension.DrivenState)
         actual_radians = float(dimension.SystemValue)
         expected_radians = math.radians(COUNTER_FLANK_ANGLE_DEG)
         if (
-            driven_state != 2
+            driven_state != expected_state
             or not math.isclose(
                 actual_radians, expected_radians,
                 rel_tol=0.0, abs_tol=1e-10,
             )
         ):
-            raw_control = adapter.currentModel.Parameter("PlateWidth@PlateProfile")
-            control = None if raw_control is None else _early_bound(raw_control, "IDimension")
-            control_readback = None if control is None else (
-                str(control.FullName), int(control.DrivenState), float(control.SystemValue)
-            )
             raise RuntimeError(
                 f"{stem}: counter angle {dimension.FullName!r} is not the nominal native driver: "
-                f"DrivenState={driven_state!r}, expected=2; "
+                f"DrivenState={driven_state!r}, expected={expected_state}; "
                 f"SystemValue={actual_radians!r} rad, expected={expected_radians!r} rad; "
                 f"delta={actual_radians - expected_radians!r} rad; "
-                f"actual_degrees={math.degrees(actual_radians)!r}; "
-                f"equation_bound_plate_width={control_readback!r}"
+                f"actual_degrees={math.degrees(actual_radians)!r}"
             )
     _telemetry.success(f"{stem}: both native tangent flanks and R.040 profile blends")
 
@@ -2524,7 +2521,7 @@ async def build(adapter) -> dict[str, str]:
     _assert_coefficient_slab(adapter)
     _assert_boss_face_graph(adapter)
     for stem in ("EdgeRibFront", "EdgeRibBack", "MiddleRib"):
-        _assert_native_rib_profile(adapter, stem)
+        _assert_native_rib_profile(adapter, stem, equation_bound=True)
 
     # pivot axis (Axis1) = cylinder centreline along Z -- the static mate
     # reference to the knife-mount (keeps the lever at the knife line with no

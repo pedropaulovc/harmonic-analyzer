@@ -434,7 +434,9 @@ One upper-flank angle to an on-axis construction ray controls
 both tangents through their shared apex and coradial wrap arcs; no second
 angle or mirror relation is added. Native readback requires both counter
 planes, their derived apex at **X=−76.20, Y=0 mm** within **0.000001 mm**,
-and the driving angle. The drawing imports one decimal under the ordinary
+and the exact angle value. Its native state is driving (2) at creation and
+equation-controlled/driven (1) after binding, matching the same part's
+equation-bound plate-width dimension. The drawing imports one decimal under the ordinary
 title-block angular band, without a tighter local tolerance or reference
 parentheses. **SumH** remains the web/boss authority, not a second rib-apex
 dimension.
