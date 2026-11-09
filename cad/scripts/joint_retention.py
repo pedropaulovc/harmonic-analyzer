@@ -273,19 +273,17 @@ RULINGS: dict[str, Ruling] = {
     "U-MHA-CH-VN-51-no-lock": Ruling(
         joint="ha-harmonic-analyzer/channel-anchor-in-summing-plate",
         granted=(
-            "user, 2026-11-09, issue #2326: 'The real machine has no jam nuts on the spring hooks. "
-            "The 20 channel spring hooks (ch-vn-spring-hook, McMaster 9489T111) ... just thread into "
-            "the summing lever. Nothing torques the hooks, so a nut has nothing to resist.' The "
+            "owner (Pedro), 2026-11-09, #2326: 'these jam nuts dont actually exist in real device and "
+            "must be removed ; there is no torque load on hooks so theres no need for nuts'. The "
             "MHA-CH-14 jam nut is retired; each anchor stays bare in its coefficient-plate tap"
         ),
     ),
     "U-MHA-SM-VN-50-no-lock": Ruling(
         joint="sm-summing/boss-hook-in-lever",
         granted=(
-            "user, 2026-11-09, issue #2326: 'The real machine has no jam nuts on the spring hooks. "
-            "The 20 channel spring hooks ... and the counter-spring boss hook (sm-vn-boss-hook, McMaster "
-            "9490T1) just thread into the summing lever. Nothing torques the hooks, so a nut has nothing "
-            "to resist.' The MHA-SM-VN-55 jam nut is retired; the anchor stays bare in the boss tap"
+            "owner (Pedro), 2026-11-09, #2326: 'these jam nuts dont actually exist in real device and "
+            "must be removed ; there is no torque load on hooks so theres no need for nuts'. The "
+            "MHA-SM-VN-55 jam nut is retired; the anchor stays bare in the boss tap"
         ),
     ),
 }

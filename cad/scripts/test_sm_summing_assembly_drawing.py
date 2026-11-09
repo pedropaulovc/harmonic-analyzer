@@ -330,7 +330,7 @@ def test_rear_mount_is_rehung_on_the_lever_and_swung_to_the_rock_gauge() -> None
     )
     # The cut stays at step 4 and the hanger joint completes at step 6, the
     # steps the purchased-part sheets and joint_retention cite.
-    cut = next(s for s in notes.ASSEMBLY_STEPS if s.startswith("4. "))
+    cut = " ".join(_step_group("4"))
     assert "CUT AN" in cut
     assert builder.KNIFE_REAR_YAW_RANGE_DEG > builder.KNIFE_BAR_YAW_DEG
 

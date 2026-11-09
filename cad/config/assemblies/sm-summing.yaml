@@ -48,3 +48,8 @@ machinist_exceptions:
     where: "sheet 3 step 8 and check 3: MHA-SM-VN-56 seated on the MHA-SM-01 end-piece face, the upper loop of MHA-SM-VN-51 free on its shoulder under its head, no threadlocker"
     finding: "threaded joint under operating load without a lock (rule 23)"
     reason: "Owner ruling 2026-11-08 (Pedro), #2144 item 11.4, supersedes #1951's clamped eye and the 2026-09-21 static-clamp ruling this row recorded (drafted by the fan-out, PENDING the owner's confirmation that the seated shoulder needs no lock): the shoulder screw is tightened until its shoulder seats on the end-piece face, so screw and end piece never move relative to each other; the eye turns and slides only on the ground shoulder, whose drag is the eye load times friction at the shoulder radius, far below the seated shoulder's breakaway friction, and nothing clamps the eye to turn the screw (joint_retention.py sm-summing/gooseneck-shoulder-screw, STATIC_CLAMP). Check 3 is the acceptance."
+  - id: "SM-02"
+    kind: "accept"
+    where: "sheet 3 step 2 and sheet 1 DETAIL A: MHA-SM-VN-50 threaded bare into the MHA-SM-03 tapped boss, cut end within half a turn of flush with the boss underside, eye clocked, no lock part"
+    finding: "threaded adjuster under the counter-spring pull held by a plain thread, no lock (rule 23)"
+    reason: "Owner ruling 2026-11-09 (Pedro), #2326: \"these jam nuts dont actually exist in real device and must be removed ; there is no torque load on hooks so theres no need for nuts\". The spring pulls along the shank axis, which the full 19.05 boss thread carries (joint_retention.py sm-summing/boss-hook-in-lever, ruling U-MHA-SM-VN-50-no-lock). This accepts only this joint's missing lock."
