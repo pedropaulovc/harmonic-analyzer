@@ -115,6 +115,14 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
     raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
 
 
+# The top relief's round end prints as a drawing-side radial on its arc in
+# detail B (draw_dt_cone_swing_platform._add_relief_end_radius), at the
+# places of the relief width it halves.
+DRAWING_REFERENCE_PRECISION: dict[str, int] = {
+    "top relief end": DRAWING_PRECISION_BY_NAME["PivotBearingReliefDia"],
+}
+
+
 # View scales differ from the sheet scale and therefore remain property-linked
 # labels.  The split plans are named so each dimension set has an unambiguous
 # owner; these are view captions, not manufacturing notes.

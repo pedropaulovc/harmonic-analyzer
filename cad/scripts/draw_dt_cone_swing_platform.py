@@ -60,7 +60,8 @@ from _drawing_dimensions import (
     set_dimension_callouts,
     set_reference_dimension,
 )
-from _drawing_edges import visible_view_entities
+from _drawing_edge_dimensions import assert_dimension_measures
+from _drawing_edges import scan_view_edges, visible_view_entities
 from _drawing_finish import add_surface_finish
 from _drawing_hole_callout import (
     add_native_hole_callout,
@@ -74,6 +75,7 @@ from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_scan import _zoomed_on
 from _drawing_sections import create_section_view
+from _drawing_selection import _select_view_entity
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_callout_thread_class import omit_title_block_thread_class
@@ -95,6 +97,7 @@ from diagnostics.drawing_layout_audit import (
 from dt_cone_swing_platform_drawing_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    DRAWING_REFERENCE_PRECISION,
     HOLDDOWN_CALLOUT_BELOW,
     HOLDDOWN_PROCESS,
     PIVOT_BORE_CALLOUT_BELOW,
@@ -561,18 +564,24 @@ RELIEF_FLAG = f"SEE NOTE {RELIEF_NOTE_NUMBER}"
 NOTE_CHAR_HEIGHT = 0.0025
 NOTE_ROW_HEIGHT = 0.0044
 NOTE_WIDTH = 58
-# The relief's closed end is a full R concentric with the pivot bore: the .42
-# width alone left its centre and radius unstated (proof run
-# 20261109T134133430Z, blocker, 2 of 3 runs).  The note, flagged from the
-# relief depth in section A-A, states it before the fit; three rows.
 RELIEF_NOTE = textwrap.fill(
-    "TOP RELIEF: FULL R END, CONCENTRIC WITH THE PIVOT BORE. "
-    "FIT ITS DEPTH TO MHA-DT-VN-52 SHOULDER: SWINGS FREE, NO AXIAL SHAKE.",
+    "FIT TOP RELIEF DEPTH TO MHA-DT-VN-52 SHOULDER: "
+    "SWINGS FREE, NO AXIAL SHAKE.",
     width=NOTE_WIDTH,
     initial_indent=f"{RELIEF_NOTE_NUMBER}. ",
     subsequent_indent="   ",
     break_on_hyphens=False,
 )
+# The relief's round end, dimensioned in detail B on its arc (the .42 width
+# alone left its radius and centre unstated, and a sentence in note 1 that
+# located them read as a location in words: proof runs 20261109T134133430Z
+# and 20261109T143813883Z, rules 1, 7, 12 and 26).  The arc stands about the
+# pivot bore's centre mark; the value is half the width, at the width's
+# places (DRAWING_REFERENCE_PRECISION).  Its text stands right of the
+# plate's edge under HoldDownX's .04 (bottom about 0.046), the leader rising
+# about 10 degrees from the pivot onto the arc's east shoulder.
+RELIEF_END_RADIUS_MM = _part.PIVOT_BEARING_RELIEF_DIAMETER / 2.0
+RELIEF_END_TEXT_XY = (DETAIL_KEEP["HoldDownX"][0], DETAIL_PIVOT_Y + 0.0055)
 ENGAGEMENT_NOTE = f"{ENGAGEMENT_NOTE_NUMBER}. {POST_MOUNT_ENGAGEMENT_NOTE}"
 # Sheet 1's only note, where the integration proof (run
 # 20261109T062834910Z) printed it: ink 0.0756..0.0835, under section A-A's
@@ -1710,6 +1719,50 @@ def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any]:
     return pivot_edges[0], min(mount_edges, key=lambda item: item[0])[1]
 
 
+def _add_relief_end_radius(adapter: Any, detail: Any) -> None:
+    """Dimension the top relief's round end on its arc in detail B.
+
+    The arc is picked as a native entity from the detail's edge scan (the
+    rim at the plate top, or the floor's rim under it: both project onto the
+    same curve), so a moved relief fails loud in ``circle_at``; the radial
+    must attach to that arc and measure half the relief width.  Its centre
+    is the pivot bore's, whose centre mark the arc surrounds in the view.
+    """
+    label = "top relief end"
+    edges = scan_view_edges(detail, label="hold-down station detail edges")
+    arc = None
+    misses: list[str] = []
+    for rim_y in (PLATE_THICKNESS, PLATE_THICKNESS - _part.PIVOT_BEARING_RELIEF_DEPTH):
+        try:
+            arc = edges.circle_at(
+                (0.0, rim_y, 0.0), RELIEF_END_RADIUS_MM, axis=(0.0, 1.0, 0.0), label=label
+            ).edge
+            break
+        except RuntimeError as error:
+            misses.append(str(error))
+    if arc is None:
+        raise RuntimeError("; ".join(misses))
+    draw = adapter.currentModel
+    _select_view_entity(adapter, detail, "EDGE", None, label=label, entity=arc)
+    display = draw.AddRadialDimension2(*RELIEF_END_TEXT_XY, 0.0)
+    draw.ClearSelection2(True)
+    if display is None:
+        raise RuntimeError(f"failed to dimension the {label}")
+    display = _early_bound(display, "IDisplayDimension")
+    assert_dimension_measures(
+        adapter,
+        display,
+        expected_mm=RELIEF_END_RADIUS_MM,
+        label=label,
+        entities=(arc,),
+        entity_types=("EDGE",),
+    )
+    places = DRAWING_REFERENCE_PRECISION[label]
+    display.SetPrecision3(DRAWING_REFERENCE_PRECISION[label], -1, -1, -1)
+    if int(display.GetPrimaryPrecision2()) != places:
+        raise RuntimeError(f"{label}: {places} decimal places did not persist")
+
+
 # swSFSymType_e.swSFBasic: the any-process symbol (open vee, no bar).
 SF_ANY_PROCESS = 0
 
@@ -2335,6 +2388,7 @@ def _place_holes_sheet(adapter: Any) -> list[Any]:
     # banded size and the flag to note 3 (rule-23 retention, owner ruling
     # 2026-11-07 (MHA-DT-00 rubric sample, PR #2248); round 6, #7).
     set_dimension_callouts(adapter, detail_annotations, {"TipDowelDia": TIP_DOWEL_CALLOUT})
+    _add_relief_end_radius(adapter, detail)
     # Its station from the pivot-bore axis is a reference (round 6, #6); the
     # chained TipDowelX controls (dt_cone_swing_platform_spec.
     # TIP_DOWEL_STATION_TOL_MM says why).

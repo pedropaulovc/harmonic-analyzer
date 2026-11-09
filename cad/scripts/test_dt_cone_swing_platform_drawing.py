@@ -1625,6 +1625,30 @@ def test_tip_dowel_texts_stand_off_detail_b_circle() -> None:
     assert start[0] < pivot_text[0]
 
 
+def test_relief_end_radius_stands_right_of_detail_b_under_holddown_x() -> None:
+    """The top relief's round end prints its radius in detail B (proof runs
+    20261109T134133430Z and 20261109T143813883Z: the .42 width alone, then a
+    sentence in note 1, left it unlocated).  Half the width at its places;
+    the text (four glyphs) stands outside the detail circle under HoldDownX,
+    and the leader rises from the pivot onto the arc's crown side."""
+    assert drawing.RELIEF_END_RADIUS_MM == pytest.approx(
+        part.PIVOT_BEARING_RELIEF_DIAMETER / 2.0
+    )
+    assert drawing.DRAWING_REFERENCE_PRECISION["top relief end"] == 2
+    assert "TOP RELIEF:" not in drawing.RELIEF_NOTE
+    x, y = drawing.RELIEF_END_TEXT_XY
+    w, h = 4 * 0.00287, 0.0035
+    box = (x - w / 2.0, y - h, x + w / 2.0, y + h)
+    cx, cy = drawing.DETAIL_CENTER
+    for corner_x in (box[0], box[2]):
+        for corner_y in (box[1], box[3]):
+            assert math.dist((corner_x, corner_y), (cx, cy)) > drawing.DETAIL_SHEET_RADIUS
+    assert box[3] < _holddown_x_text_box()[1]
+    assert y > drawing.DETAIL_PIVOT_Y
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "_add_relief_end_radius(adapter, detail)" in source
+
+
 def test_relief_width_text_sits_between_its_neighbours() -> None:
     """The 10.50 relief text clears the 195.09 line and the plate's west edge.
 
