@@ -344,8 +344,14 @@ def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None
     assert re.search(r"\d\.\d", note.split("1:48", 1)[1]) is None
     assert "PinProudReference" not in dt_crank_hub_spec.DRAWING_DIMENSIONS
     assert "PinProud" not in drawing.END_KEEP
-    # The bore band governs; the clearance is a reference restatement.
-    assert dt_crank_hub_notes.BORE_CALLOUT.splitlines()[1].startswith("(")
+    # The bore band governs; the callout names the standard fit, the one
+    # MHA-DT-11's sheet gives the joint, and the clearance follows as REF.
+    import dt_crankshaft_notes
+
+    bore = dt_crank_hub_notes.BORE_CALLOUT.splitlines()
+    assert bore[1] == f"{dt_crankshaft_notes.SLIDING_FIT} ON MHA-DT-11"
+    assert bore[2].startswith("(CLEARANCE ") and "DIAMETRAL" not in dt_crank_hub_notes.BORE_CALLOUT
+    assert drawing.ISO_NOTE == "ISOMETRIC VIEW" and drawing.SHEET_SCALE == (2.0, 1.0)
 
 
 def _flat(text: str) -> str:
