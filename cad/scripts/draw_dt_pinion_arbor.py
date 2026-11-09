@@ -384,17 +384,21 @@ DIAMETER_BLOCK_SIZE = (0.027, 0.014)
 # right of the 19.0's head-end witness; the underline still starts right of
 # detail A's view box (x 0.1928).
 # Two rows preserve the measured underline height between the crown-sag and
-# cross-hole text.  The hole names the pin it takes by number and kind: the
-# round-7 local repeat read "PRESS FIT" on a hole at or above the pin's
-# nominal as a fit with no interference, while a slotted spring pin grips by
-# compressing into that B18.8.2 hole band.  A third row would run into the
-# MHA-DT-15 bore callout above, and a 24+ character row puts the underline
-# over detail A's view box, so "SPRING PIN" carries the fit.
-PIN_HOLE_CALLOUT = f"{_PIN_DRILL_THRU_CALLOUT}\n{_PIN_NUMBER} SPRING PIN"
+# cross-hole text.  The band is ASME B18.8.2's recommended hole for the 1/16
+# slotted spring pin (.062-.065; the title block's DRILLED HOLES row would
+# open it to .0665), which the pin grips by compressing into: the press fit
+# the MHA-DT-33 collar and MHA-DT-19 sheets name for the same pin.  The
+# second row names that fit and the mate (rule 4; integration proof
+# 20261109T105251629Z, 3 of 3 runs: the pin's number alone named no fit).
+# A third row would run into the MHA-DT-15 bore callout above, so the row
+# drops "SPRING PIN" (the number names the pin) and, 25 characters wide,
+# moves the bend half a millimetre nearer the hole to keep the underline
+# right of detail A's view box.
+PIN_HOLE_CALLOUT = f"{_PIN_DRILL_THRU_CALLOUT}\nPRESS FIT ON {_PIN_NUMBER}"
 PIN_HOLE_CALLOUT_ADVANCE = 0.00267
 PIN_HOLE_CALLOUT_CENTRE_DX = 0.00075
 PIN_HOLE_LEADER_ARROW_DX = -0.0004
-PIN_HOLE_LEADER_RUN = 0.009
+PIN_HOLE_LEADER_RUN = 0.0085
 PIN_HOLE_CALLOUT_WIDTH = PIN_HOLE_CALLOUT_ADVANCE * max(
     len(line) for line in PIN_HOLE_CALLOUT.split("\n")
 )
