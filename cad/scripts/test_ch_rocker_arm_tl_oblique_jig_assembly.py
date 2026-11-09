@@ -1185,10 +1185,11 @@ def test_bom_follows_the_part_registry() -> None:
         )
         if stem in SHARED_VENDOR_FAMILIES:
             # The machine's registry row is untouched: its own number and
-            # quantity (the knife mounts' four); the jig consumes the riser's
-            # two stop holes' worth, bought as the same stock pin.
+            # quantity (the knife mounts' two, one per mount since owner
+            # ruling 2026-11-08 (Pedro), #2144 item 11.3); the jig consumes
+            # the riser's two stop holes' worth, bought as the same stock pin.
             assert configuration is None and row["process"] == "purchased", stem
-            assert number == "MHA-SM-VN-53" and quantity == spec.stop_pin.QUANTITY == 4
+            assert number == "MHA-SM-VN-53" and quantity == spec.stop_pin.QUANTITY == 2
             assert spec.QUANTITIES[stem] == len(riser.STOP_PIN_HOLES) == 2
             continue
         assert quantity == spec.QUANTITIES[stem], stem

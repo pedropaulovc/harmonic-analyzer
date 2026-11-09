@@ -26,7 +26,8 @@ _STOCK_REQUIREMENTS = {
     "pn-vn-hanger-screw": (("93075A199",), "MHA-PN-VN-50", 1),
     "sm-vn-knife-hanger-stud": (("92314A253",), "MHA-SM-VN-52", 2),
     "sm-vn-knife-hanger-washer": (("96659A104",), "MHA-SM-VN-54", 2),
-    "sm-vn-knife-mount-dowel": (("98381A473",), "MHA-SM-VN-53", 4),
+    # One per knife mount: owner ruling 2026-11-08 (Pedro), #2144 item 11.3.
+    "sm-vn-knife-mount-dowel": (("98381A473",), "MHA-SM-VN-53", 2),
     "mg-vn-magnifying-bracket-screw": (("91794A078",), "MHA-MG-VN-53", 2),
     "ms-vn-stop-plate-screw": (("90114A124",), "MHA-MS-VN-51", 2),
     "fr-vn-lag-screw": (("92240A540",), "MHA-FR-VN-51", 4),
