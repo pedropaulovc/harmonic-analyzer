@@ -238,7 +238,7 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
     ),
     # Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: the counter spring's
     # upper eye rides free on this shoulder screw's 1/4 shoulder, seated on
-    # the MHA-SM-01 end face, retained by its head.  Owner ruling 2026-11-08
+    # the MHA-SM-05 end plug's face, retained by its head.  Owner ruling 2026-11-08
     # (Pedro), #2144 item 11.4: bare slotted McMaster 91829A566, washer
     # dropped.
     "sm-vn-gooseneck-shoulder-screw": _stock(

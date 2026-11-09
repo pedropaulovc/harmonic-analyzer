@@ -236,8 +236,8 @@ def counter_upper_support_offset(axis: tuple[float, float]) -> float:
     Owner ruling 2026-11-08 (Pedro), #2144 item 11.4, superseding #1951's
     clamped eye: the loop rides free on the purchased shoulder screw's ground
     shoulder, never on its 10-24 thread (the shoulder is seated on the end
-    face, so the thread is inside the end piece), so the bearing surface is
-    the shoulder diameter.
+    face, so the thread is inside the MHA-SM-05 end plug), so the bearing
+    surface is the shoulder diameter.
     """
     ux, uy = axis
     radius = counter_stock.COIL_MEAN_RADIUS_MM
@@ -405,8 +405,9 @@ def counter_half_turn_clearances(
 ) -> tuple[float, float]:
     """Lower bounds on raised half-turn clearance to the arm and the head.
 
-    The arm is the Ø12.70 tube and its end piece, turned flush with it (no
-    step), so it is one cylinder of radius TUBE_DIA/2 up to the end face.  The
+    The arm is the Ø12.70 tube and its MHA-SM-05 end plug, whose head is
+    turned flush with the tube (no step), so it is one cylinder of radius
+    TUBE_DIA/2 up to the end face.  The
     retainer is MHA-SM-VN-56's head (Ø HEAD_DIA x HEAD_HEIGHT), the shoulder
     seated on the end face (owner ruling 2026-11-08 (Pedro), #2144 item 11.4:
     bare slotted McMaster 91829A566, washer dropped).  ``pose`` is the native-seat placement, the loop on the end

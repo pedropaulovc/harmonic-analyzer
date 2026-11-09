@@ -301,8 +301,8 @@ springs:
           arm_end_x_mm: -103.359695
           spring_eye_x_mm: -105.8
           tube_dia_mm: 12.7
-          plug_head_length_mm: 21.5
-          plug_length_mm: 26.0
+          plug_head_length_mm: 15.239999999999998
+          plug_length_mm: 25.907999999999998
           plug_edge_break_mm: 0.25
         final_distance_mm:
           lower: 3.786502649535992e-06
@@ -365,8 +365,8 @@ springs:
           arm_end_x_mm: -103.359695
           spring_eye_x_mm: -105.8
           tube_dia_mm: 12.7
-          plug_head_length_mm: 21.5
-          plug_length_mm: 26.0
+          plug_head_length_mm: 15.239999999999998
+          plug_length_mm: 25.907999999999998
           plug_edge_break_mm: 0.25
         final_distance_mm:
           lower: 3.786498099335672e-06

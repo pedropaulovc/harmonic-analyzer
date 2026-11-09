@@ -37,6 +37,7 @@ from _hole_spec import (
     blind_cut_dia_mm,
     drill_process,
 )
+from _mcmaster_91410a540 import SHANK_LEN as SET_SCREW_LENGTH
 from _surface_finish import SEAT_UM, SurfaceFinishControl, ra
 from _cone_axis_constants import (
     FRAME_FRONT_COLUMN_Z,
@@ -54,6 +55,7 @@ from fr_frame_attachment_spec import (
 )
 from fr_frame_cross_screw import far_wall_start_max_mm
 from frame_column_stations import COLUMN_X
+from sm_gooseneck_geom import TUBE_DIA_MAX, TUBE_DIA_MIN
 
 UNIT = drawing_unit("parts/fr-top-frame", _config.parts("fr-top-frame"))
 IN = 25.4
@@ -95,12 +97,20 @@ CAP_RECESS_FLOOR_Y = HALF_H + BOSS_ABOVE - CAP_RECESS_DEPTH  # 6.5151
 SCREW_AXIS_Y = TOP_SCREW_Y - TOP_FRAME_MID_Y  # -0.0381
 SCREW_AXIS_BELOW_RAIL_TOP = HALF_H - SCREW_AXIS_Y  # 18.288, .72
 GOOSENECK_X = -COLUMN_X  # east rail, -X crank side (summing's post station)
-GOOSENECK_BORE_DIA = 17.018  # .67 the gooseneck's O15.875 sleeve slides through
+# Owner ruling 2026-11-08 (Pedro), #2315: the bore takes the gooseneck's
+# bare 1/2 x .065 4130-N leg (MHA-SM-01) directly and prints .520
+# at .XXX: drill 13 mm, then finish 33/64 or bore.  It leaves .008-.032
+# diametral slip over the tube's mill OD band (sm_gooseneck_geom.TUBE_DIA_MIN
+# ..MAX) so the gooseneck still slides for height setting (checked below).
+GOOSENECK_BORE_DIA = 13.208  # .520
+# The hub's underside boss drops below the rail band around the bore exit, so
+# the bore runs RING_HEIGHT + HUB_BOSS_DROP (build_fr_top_frame's HubBoss).
+HUB_BOSS_DROP = 7.874  # .31 boss bottom local -26.1239
 
 # --- Gooseneck set-screw boss (east-rail hub) ---------------------------------
 #
 # User ruling 2026-10-12 (option (a), no jam nut): the MHA-FR-VN-52 square-head
-# cup-point set screw that pinches the gooseneck's O15.875 sleeve enters the hub through a cast
+# cup-point set screw that pinches the gooseneck's bare leg enters the hub through a cast
 # boss on the hub pad's outer face -- square-sided and blended into the rail
 # under the top flange, as the ch19 img04 hub shows it -- spot-faced square
 # to the tap. The spot face starts the thread square on a machined face (the
@@ -357,8 +367,8 @@ HANGER_KNOCKOUT_CALLOUT_BELOW = "FROM REAM FLOOR;\nMHA-SM-VN-53 KNOCKOUT"
 # terms): the thread is full only where its major circle lies wholly in metal,
 # so the bore's sag across the hole is lost, and so is the one-pitch entry
 # chamfer; the flat spot face loses none. The spot face sits at the near end
-# of its .XX band, the bore at the larger of its printed .XX band and the title
-# block's drilled row.
+# of its .XX band, the bore at the larger of a .XX band (wider than its
+# printed .XXX) and the title block's drilled row.
 _GOOSENECK_BORE_RADIUS_MAX = (GOOSENECK_BORE_DIA + max(_XX, DRILL_OVERSIZE)) / 2.0
 SET_SCREW_THREAD_TERMS = {
     "spot face from bore axis at its minimum": HUB_SET_SPOT_FROM_AXIS
@@ -367,19 +377,50 @@ SET_SCREW_THREAD_TERMS = {
     "bore sag across the thread": -_sag(_GOOSENECK_BORE_RADIUS_MAX),
     "one-pitch entry chamfer": -SET_SCREW_PITCH,
 }
-SET_SCREW_FULL_THREAD_MIN = sum(SET_SCREW_THREAD_TERMS.values())  # 10.32
+SET_SCREW_FULL_THREAD_MIN = sum(SET_SCREW_THREAD_TERMS.values())  # 12.03
 SET_SCREW_FULL_THREAD_NOMINAL = (
     HUB_SET_SPOT_FROM_AXIS
     - GOOSENECK_BORE_DIA / 2.0
     - _sag(GOOSENECK_BORE_DIA / 2.0)
     - SET_SCREW_PITCH
-)  # 10.69
-SET_SCREW_ENGAGEMENT_D = SET_SCREW_FULL_THREAD_MIN / SET_SCREW_MAJOR_DIA  # 1.62D
+)  # 12.39
+SET_SCREW_ENGAGEMENT_D = SET_SCREW_FULL_THREAD_MIN / SET_SCREW_MAJOR_DIA  # 1.89D
 if SET_SCREW_ENGAGEMENT_D < SET_SCREW_MIN_ENGAGEMENT_D:
     raise AssertionError(
         f"hub set screw keeps {SET_SCREW_ENGAGEMENT_D:.2f}D of full thread "
         f"at the printed worst case (< {SET_SCREW_MIN_ENGAGEMENT_D}D)"
     )
+# The bare leg slides through the bore for height setting: the bore's least
+# printed size (.515) clears the tube's largest mill OD (.507), and its
+# largest (.530, as above) leaves .032.
+GOOSENECK_SLIP_MIN = GOOSENECK_BORE_DIA - _XXX - TUBE_DIA_MAX  # 0.203, .008
+GOOSENECK_SLIP_MAX = 2.0 * _GOOSENECK_BORE_RADIUS_MAX - TUBE_DIA_MIN  # 0.813, .032
+if GOOSENECK_SLIP_MIN <= 0.0:
+    raise AssertionError(
+        f"the gooseneck bore's least printed size leaves {GOOSENECK_SLIP_MIN:.3f} mm "
+        "over the tube's largest mill OD; the leg would not slide"
+    )
+# The 3/4 in MHA-FR-VN-52 still reaches the leg at the worst case: the spot
+# face at the far end of its .XX band, the leg at its smallest OD pushed
+# against the bore's far wall at its largest.  One pitch of thread-start
+# margin keeps the head off the spot face when the cup point bites.
+SET_SCREW_REACH_MAX = (
+    HUB_SET_SPOT_FROM_AXIS
+    + printed_band_mm(HUB_SET_SPOT_PLACES, unit=UNIT)
+    - (TUBE_DIA_MIN - _GOOSENECK_BORE_RADIUS_MAX)
+)  # 15.42
+if SET_SCREW_REACH_MAX >= SET_SCREW_LENGTH - SET_SCREW_PITCH:
+    raise AssertionError(
+        f"MHA-FR-VN-52 needs {SET_SCREW_REACH_MAX:.2f} mm from the spot face to "
+        f"the leg, against its {SET_SCREW_LENGTH:.2f} mm less one pitch"
+    )
+# Owner ruling 2026-11-08 (Pedro), #2315: tighten snug, 9 in-lb (1 N·m) max.
+# Slip at SF 3 on the 69.3 N pull at mu 0.15 needs ~693 N of clamp (0.88
+# N·m); the bare .065 wall yields locally near 1.14 kN (1.45 N·m).  The full
+# Unbrako 87 in-lb would push ~7.7 kN.  The leg itself at the hub carries
+# 7.33 N·m on Z 124 mm^3: 59 MPa against 4130-N's 434 MPa.
+SET_SCREW_TORQUE_MAX_IN_LB = 9.0
+SET_SCREW_TORQUE_MAX_NM = 1.0
 
 
 # --- Machining-required surfaces ---------------------------------------------
@@ -397,7 +438,7 @@ if SET_SCREW_ENGAGEMENT_D < SET_SCREW_MIN_ENGAGEMENT_D:
 # * The four cap-recess floors carry no finish: each MHA-FR-VN-54 cap seats on
 #   its tube end (build_fr_frame_assembly asserts it), 1.5 mm above the floor,
 #   so the recess only clears the cap skirt.
-# * The gooseneck bore (a drilled hole the set screw clamps the post in) and
+# * The gooseneck bore (a drilled hole the set screw clamps the bare leg in) and
 #   the set-screw spot face (a clamp face) neither run nor locate, so they
 #   carry no symbol (machinist review r1, 2026-10-18; drawing-guidelines.md
 #   rule 6).
@@ -487,7 +528,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # fit-up-located keeper feet, not independently located to the general band.
 # The cap recess depth carries the bilateral band the build applies, its
 # diameter the title block's .XXX (owner ruling 2026-11-06), the
-# gooseneck bore prints the clearance a purchased post is set into, the
+# gooseneck bore prints the slip clearance the gooseneck's bare leg slides in, the
 # finished grip prints .XXX (the rail height, that same thickness, prints its
 # reference at the grip's places), and the dowel press ream holds its own
 # +.0005/0 band at four places.
@@ -503,7 +544,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "RibProfile": {"RibWidth": 2},
     "SetBossProfile": {"SetBossWidth": 2},
     "SetSpotProfile": {"SetSpotDia": 2},
-    "GooseneckProfile": {"GnDia": 3},  # a drill diameter: .670
+    "GooseneckProfile": {"GnDia": 3},  # a drill diameter: .520
     "CapRecessProfile": {"CapRecessDia": 3},
     "CapRecesses": {"CapRecessDepth": 3},
     "HangerPinProfile": {"HangerPinHoleDia": HANGER_PIN_HOLE_DIA_PLACES},

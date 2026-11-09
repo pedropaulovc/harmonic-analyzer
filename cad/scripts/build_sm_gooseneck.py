@@ -1,44 +1,32 @@
-r"""Build MHA-SM-01, the gooseneck: a bent 1/2 in tube with a brazed end piece.
+r"""Build MHA-SM-01, the gooseneck: a bent 1/2 in tube.
 
-Owner rulings 2026-10-27 (#1951): the whole gooseneck is 1/2 in x 0.065 in
-4130-N seamless tube, bent R3.0 (the 1/2 in x 3 in CLR die).  Its arm ends
-flush, with no step, in a SOLID Ø.500 end piece silver-brazed on a shank
-inside the tube bore.  Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: the
-end piece is tapped plain #10-24 UNC-2B BLIND for the purchased MHA-SM-VN-56
-shoulder screw, with no counterbore (``sm_gooseneck_spring_joint``).  A 5/8 in
-x 0.058 in 4130-N sleeve, select-fitted from stock and brazed, covers the leg
-from its foot: the post the east top-frame hub's Ø17 bore and set screw take.
-The screw is a separate component, not part of this weldment.  Decimal-inch
-document and sheet (#290, the registry row's drawing_unit).
+Owner rulings 2026-10-27 (#1951): the gooseneck is 1/2 in x 0.065 in 4130-N
+seamless tube, bent R3.0 (the 1/2 in x 3 in CLR die).  Owner rulings
+2026-11-08 (Pedro), #2315: MHA-SM-01 is the bent tube ALONE.  It is bent with
+a tail, then its arm end is sawn and faced to TUBE_END_X; it is polished bare,
+oiled or waxed, with no torch work.  The end plug that carries the shoulder
+screw's tap is its own part, MHA-SM-05 ``sm-gooseneck-end-plug``, bonded into
+the arm end at MHA-SM-00; the reference machine has no leg sleeve, so the
+bare leg is the post MHA-FR-02's hub bore takes.  Decimal-inch document and
+sheet (#290, the registry row's drawing_unit).
 
-One weldment part of two solid bodies, the tube (its sleeve merged on) and
-the end piece, so a section hatches each as its own part and every view
-draws their joint (machinist review of 3c0b5d87c), built in this order:
+One part of one solid body, built in this order:
 
 1. ``Leg``: the tube from its foot LEG_BOTTOM up to the bend tangent LEG_TOP.
 2. ``BendArmSweep``: the 90-degree bend R BEND_R and the TUBE_STRAIGHT arm to
-   TUBE_END_X along ``BendPath``, hollow, merged onto the leg.
-3. ``EndPiece``: the solid head Ø PLUG_DIA from the end face ARM_END_X to the
-   tube end TUBE_END_X, then the braze shank Ø PLUG_SHANK_DIA x
-   PLUG_SHANK_LENGTH into the tube bore -- one revolve on ``ArmAxisPlane``
-   (the horizontal plane through the arm axis, so section A-A on the print
-   carries its dimensions), NOT merged: its head bears on the tube end and
-   its shank stands in the bore at the joint's nominal braze clearance.
-4. ``ThreadBore``: the native blind bottoming tap from ``TAP_SPEC``, started
-   on the end face, both depths from it.  ``SpringScrewAxis`` is its hidden,
-   equation-driven assembly reference.
-5. ``Sleeve``: Ø SLEEVE_DIA from LEG_BOTTOM to SLEEVE_TOP, its bore the tube
-   OD, revolved onto the leg.
-6. ``StationReference``: a hidden construction sketch on the Front plane
+   the faced end TUBE_END_X along ``BendPath``, hollow, merged onto the leg.
+3. ``StationReference``: a hidden construction sketch on the Front plane
    whose two lines lie on the leg and arm axes; its dimensions are the
    elevation's leg length and arm straight.
-7. ``OverallReference``: a hidden construction sketch on the Front plane
-   whose lines lie on the foot face, the bare leg's outer silhouette and the
-   arm's top silhouette; its dimensions are the elevation's reference overall
-   height and reach.
+4. ``TubeOdReference``: a hidden Front-plane sketch carrying the tube's stock
+   Ø across the bare leg.
+5. ``OverallReference``: a hidden construction sketch on the Front plane
+   whose lines lie on the foot face, the leg's outer silhouette and the arm's
+   top silhouette; its dimensions are the elevation's overall height and
+   reach.
 
 Layout (mm): origin at the leg's reference mid-height; leg y -329.46..87.1,
-bend centre (-76.2, 87.1), arm axis y 163.3, end face x ARM_END_X.
+bend centre (-76.2, 87.1), arm axis y 163.3, faced arm end x TUBE_END_X.
 
 Run on a SolidWorks worker::
 
@@ -52,10 +40,9 @@ import sys
 
 import _telemetry
 from _appearance import apply_material
-from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound
-from _dimensions import drive_dimension, name_dimensions, set_global
+from _dimensions import drive_dimension, set_global
 from _document_units import apply_package_model_units
 from _drawing_dimension_insert import add_diametric_linear_dimension
 from _drawing_marks import (
@@ -69,7 +56,6 @@ from _drawing_precision import (
 )
 from _extrude import extrude_at_offset
 from _feature_tree import name_last_feature
-from _holes import blind_hole_volume_mm3, wizard_holes
 from _part_checks import report_mass_properties, volume_check
 from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
@@ -77,7 +63,6 @@ from _rebuild import force_rebuild
 from _session import run_build
 from _sketch import (
     SketchDims,
-    add_line_chain,
     anchor_point_to_origin,
     blank_sketch,
     dimension_between,
@@ -101,64 +86,36 @@ from sm_gooseneck_spec import (
 # summing assembly imports for its hang proof -- so this build and that proof
 # can never drift apart.
 from sm_gooseneck_geom import (
-    ARM_END_X,
-    ARM_STRAIGHT,
     ARM_Y,
     BEND_R,
     LEG_BOTTOM,
     LEG_TOP,
-    PLUG_DIA,
-    PLUG_HEAD_LENGTH,
-    PLUG_SHANK_LENGTH,
-    SLEEVE_DIA,
-    SLEEVE_LENGTH,
-    SLEEVE_TOP,
     TUBE_BORE_DIA,
     TUBE_DIA,
     TUBE_END_X,
     TUBE_STRAIGHT,
     WALL_T,
 )
-from sm_gooseneck_spring_joint import (
-    PLUG_SHANK_DIA,
-    TAP_DRILL_DEPTH,
-    TAP_DRILL_DIA,
-    TAP_SPEC,
-)
 
 PART_NAME = "sm-gooseneck"
-# The registry row names 4130-N tube and an AISI 1018 end piece; SolidWorks'
-# plain carbon steel stands in for their density.
+# The registry row names 4130-N tube; SolidWorks' plain carbon steel stands in
+# for its density.  The title block's material and finish come from the row
+# (apply_drawing_properties).
 MATERIAL = "Plain Carbon Steel"
 
 TUBE_R = TUBE_DIA / 2.0
 TUBE_IR = TUBE_BORE_DIA / 2.0
 RING_AREA = math.pi * (TUBE_R**2 - TUBE_IR**2)  # the tube wall's cross-section
-PLUG_R = PLUG_DIA / 2.0
-SHANK_R = PLUG_SHANK_DIA / 2.0
-# The shank's inner end, inside the straight tube short of the bend.
-SHANK_END_X = TUBE_END_X + PLUG_SHANK_LENGTH
-TAP_DRILL_R = TAP_DRILL_DIA / 2.0
-SLEEVE_R = SLEEVE_DIA / 2.0
 
-if not math.isclose(PLUG_DIA, TUBE_DIA, abs_tol=1e-9):
-    raise AssertionError("gooseneck end piece is not flush with the tube OD")
-if not TAP_DRILL_R < SHANK_R < TUBE_IR:
-    raise AssertionError("gooseneck braze shank does not sit clear in the tube bore")
-if SHANK_END_X >= -BEND_R:
-    raise AssertionError("gooseneck braze shank reaches past the bend tangent")
-if not math.isclose(TUBE_END_X - ARM_END_X, PLUG_HEAD_LENGTH, abs_tol=1e-9):
-    raise AssertionError("gooseneck tube does not end on the end piece's head")
+if not math.isclose(TUBE_STRAIGHT, -TUBE_END_X - BEND_R, abs_tol=1e-9):
+    raise AssertionError("gooseneck arm straight does not end on the faced arm end")
 
 # Analytic volumes, mm^3.
-V_END_PIECE = math.pi * (PLUG_R**2 * PLUG_HEAD_LENGTH + SHANK_R**2 * PLUG_SHANK_LENGTH)
-V_TAP = blind_hole_volume_mm3(TAP_DRILL_DIA, TAP_DRILL_DEPTH)
 V_LEG = RING_AREA * (LEG_TOP - LEG_BOTTOM)
 # Quarter torus with an annular cross-section (Pappus): (pi/2) * BendR * ring.
 V_BEND = math.pi / 2.0 * BEND_R * RING_AREA
 V_ARM = RING_AREA * TUBE_STRAIGHT
-V_SLEEVE = math.pi * (SLEEVE_R**2 - TUBE_R**2) * SLEEVE_LENGTH
-V_FINAL = V_END_PIECE - V_TAP + V_LEG + V_BEND + V_ARM + V_SLEEVE
+V_FINAL = V_LEG + V_BEND + V_ARM
 
 
 def _finite(label: str, volume: float) -> float:
@@ -205,11 +162,11 @@ def _author_dimension_callouts(adapter) -> None:
 
 @_telemetry.traced("part.reference_dimensions")
 def _author_reference_dimensions(adapter) -> None:
-    """Parenthesize the stock Ø on their source dimensions: as supplied, they
-    print as reference, untoleranced (the drawing imports them as they are).
+    """Parenthesize the reference dimensions on their sources: they print as
+    reference, untoleranced (the drawing imports them as they are).
 
     ``ShowParenthesis`` brackets the whole text block, so a reference that
-    carries a callout below (the sleeve's fit) would read its requirement as
+    carries a callout below (the tube's stock wall) would read its callout as
     reference too (machinist review of 6b67c9516).  That one brackets only its
     value with a "(" prefix and ")" suffix, carrying SolidWorks' own
     "<MOD-DIAM>" token since a custom prefix replaces the Ø glyph."""
@@ -238,10 +195,9 @@ def _author_reference_dimensions(adapter) -> None:
 
 async def _tube_od_reference(adapter) -> list[tuple[str, str]]:
     """The tube's stock Ø on the elevation, as a reference: a hidden Front-plane
-    sketch whose line runs along the bare leg's right silhouette,
-    TUBE_OD_REF_SPAN about mid-way between the sleeve's top and the bend's entry
-    tangent, Ø-dimensioned from a centreline on the leg axis.  Returns the
-    deferred drive jobs."""
+    sketch whose line runs along the leg's right silhouette, TUBE_OD_REF_SPAN
+    about TUBE_OD_REF_Y, Ø-dimensioned from a centreline on the leg axis.
+    Returns the deferred drive jobs."""
     y0 = TUBE_OD_REF_Y - TUBE_OD_REF_SPAN / 2.0
     y1 = TUBE_OD_REF_Y + TUBE_OD_REF_SPAN / 2.0
     dims = SketchDims()
@@ -298,22 +254,22 @@ async def _tube_od_reference(adapter) -> list[tuple[str, str]]:
 
 # OverallReference's witness stubs: this long (1 mm on the 1:3 sheet), each on
 # a drawn edge and ending at the witness point, so the edge's own ink covers
-# the phantom.  A full-length arm line over the end piece's top outline read
-# as a stray dashed line (machinist review r8, farm run 20261101T035809796Z).
+# the phantom.  A full-length arm line over the arm's top outline read as a
+# stray dashed line (machinist review r8, farm run 20261101T035809796Z).
 _OVERALL_STUB = 3.0
 
 
 async def _overall_reference(adapter) -> list[tuple[str, str]]:
-    """The bent form's overall height and reach, as references: 417.1 and
-    27.16 stop at the bend's tangents, so the finished part had no size to
-    check from its faces (machinist review r5 of farm run
+    """The bent form's overall height and reach, to real faces: the leg
+    length and arm straight stop at the bend's tangents, so the finished part
+    had no size to check from its faces (machinist review r5 of farm run
     20261101T004958072Z).  A hidden Front-plane sketch of four construction
-    lines, each on a drawn edge: the foot face from the axis to the sleeve's
-    outer corner, a stub of the bare leg's outer silhouette ending at the
-    bend's entry tangent, and two stubs of the arm's top silhouette, one from
-    the end face, one ending at the bend's exit tangent.  OverallHeight runs
-    from the foot face to the arm's top, OverallReach from the end face to the
-    leg's outer side.  Returns the deferred drive jobs."""
+    lines, each on a drawn edge: the foot face from the axis to the leg's
+    outer corner, a stub of the leg's outer silhouette ending at the bend's
+    entry tangent, and two stubs of the arm's top silhouette, one from the
+    faced arm end, one ending at the bend's exit tangent.  OverallHeight runs
+    from the foot face to the arm's top, OverallReach from the faced arm end
+    to the leg's outer side.  Returns the deferred drive jobs."""
     top = ARM_Y + TUBE_DIA / 2.0
     leg_x = TUBE_DIA / 2.0
     dims = SketchDims()
@@ -324,15 +280,15 @@ async def _overall_reference(adapter) -> list[tuple[str, str]]:
     try:
         foot = check(
             "overall reference foot line",
-            await adapter.add_line(0.0, LEG_BOTTOM, SLEEVE_DIA / 2.0, LEG_BOTTOM),
+            await adapter.add_line(0.0, LEG_BOTTOM, leg_x, LEG_BOTTOM),
         )
         leg = check(
             "overall reference leg stub",
             await adapter.add_line(leg_x, LEG_TOP - _OVERALL_STUB, leg_x, LEG_TOP),
         )
         arm_end = check(
-            "overall reference end-face stub",
-            await adapter.add_line(ARM_END_X, top, ARM_END_X + _OVERALL_STUB, top),
+            "overall reference arm-end stub",
+            await adapter.add_line(TUBE_END_X, top, TUBE_END_X + _OVERALL_STUB, top),
         )
         arm_tangent = check(
             "overall reference arm tangent stub",
@@ -360,10 +316,10 @@ async def _overall_reference(adapter) -> list[tuple[str, str]]:
         f"{foot}.start",
         f"{foot}.end",
         "horizontal_distance",
-        SLEEVE_DIA / 2.0,
+        leg_x,
         "overall reference foot line",
     )
-    dims.record("OverallFootRadius", '"SleeveDia" / 2')
+    dims.record("OverallFootRadius", '"TubeDia" / 2')
     await anchor_point_to_origin(
         adapter, f"{leg}.end", leg_x, LEG_TOP, "overall reference leg top"
     )
@@ -401,7 +357,7 @@ async def _overall_reference(adapter) -> list[tuple[str, str]]:
         )
         dims.record(name)
     # Both arm stubs lie on the arm's top; the two printed dimensions fix
-    # that height and the end face's station.
+    # that height and the faced arm end's station.
     check(
         "overall reference arm stubs level",
         await adapter.add_sketch_constraint(
@@ -422,10 +378,10 @@ async def _overall_reference(adapter) -> list[tuple[str, str]]:
         f"{arm_end}.start",
         f"{leg}.end",
         "horizontal_distance",
-        leg_x - ARM_END_X,
+        leg_x - TUBE_END_X,
         "overall reach",
     )
-    dims.record("OverallReach", '"TubeDia" / 2 - "ArmEndX"')
+    dims.record("OverallReach", '"TubeDia" / 2 - "TubeEndX"')
     await ensure_fully_defined(adapter, "overall reference sketch")
     check("exit_sketch overall reference", await adapter.exit_sketch())
     name_last_feature(adapter, "OverallReference")
@@ -435,7 +391,6 @@ async def _overall_reference(adapter) -> list[tuple[str, str]]:
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CreatePlaneParameters,
-        RevolveParameters,
         SweepParameters,
     )
 
@@ -443,8 +398,7 @@ async def build(adapter) -> dict[str, str]:
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
-    # Editable form and end-piece globals drive the sketches below; the
-    # native tap's thread identity comes from TAP_SPEC. The ``mm`` suffix is
+    # Editable form globals drive the sketches below. The ``mm`` suffix is
     # load-bearing -- this is an INCH document and the equation manager reads
     # BARE numbers in document units. Signed coordinates keep their sign in
     # the global; the UNSIGNED distance dims they drive negate them so the
@@ -456,18 +410,11 @@ async def build(adapter) -> dict[str, str]:
         ("LegTop", LEG_TOP),
         ("LegBottom", LEG_BOTTOM),
         ("BendR", BEND_R),
-        ("ArmEndX", ARM_END_X),
-        ("PlugHeadLength", PLUG_HEAD_LENGTH),
-        ("PlugShankLength", PLUG_SHANK_LENGTH),
-        ("PlugShankDia", PLUG_SHANK_DIA),
-        ("SleeveDia", SLEEVE_DIA),
-        ("SleeveTop", SLEEVE_TOP),
+        ("TubeEndX", TUBE_END_X),
     ):
         await set_global(adapter, name, f"{value}mm")
     await set_global(adapter, "ArmY", '"LegTop" + "BendR"')
-    await set_global(adapter, "ArmStraight", '-"ArmEndX" - "BendR"')
-    # Flush, no step: the head is the tube's own diameter.
-    await set_global(adapter, "PlugDia", '"TubeDia"')
+    await set_global(adapter, "ArmStraight", '-"TubeEndX" - "BendR"')
 
     # Per-sketch dim names + drive equations are declared inline at each
     # record call; their drive jobs collect here and apply in one deferred
@@ -513,10 +460,10 @@ async def build(adapter) -> dict[str, str]:
     if abs(vol - expected) > 0.005 * expected:
         raise RuntimeError(f"leg volume {vol:.1f} != {expected:.1f}")
 
-    # 2. Quarter bend + straight arm to the tube end: ONE sweep along an arc +
-    # line chain. Direct DB keeps inference relations off; exact-coordinate
-    # joints still merge. add_arc draws CCW: bend entry (angle 0 from the
-    # centre) to bend exit (angle 90).
+    # 2. Quarter bend + straight arm to the faced arm end: ONE sweep along an
+    # arc + line chain. Direct DB keeps inference relations off;
+    # exact-coordinate joints still merge. add_arc draws CCW: bend entry
+    # (angle 0 from the centre) to bend exit (angle 90).
     bend_path = SketchDims()
     check("create_sketch bend path", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
@@ -577,7 +524,7 @@ async def build(adapter) -> dict[str, str]:
         TUBE_STRAIGHT,
         "tube straight",
     )
-    bend_path.record("TubeStraight", '"ArmStraight" - "PlugHeadLength"')
+    bend_path.record("TubeStraight", '"ArmStraight"')
     await ensure_fully_defined(adapter, "bend path")
     check("exit_sketch bend path", await adapter.exit_sketch())
     # The sweep selects this sketch by name below; rename it BEFORE the sweep
@@ -678,232 +625,19 @@ async def build(adapter) -> dict[str, str]:
     check("sweep bend + arm", res)
     name_last_feature(adapter, "BendArmSweep")
     blank_reference_geometry(adapter, tuple((name, "PLANE") for name in profile_planes))
-    # The sweep merges onto the leg; the end piece comes after, as its own
-    # body.
-    expected = expected + V_BEND + V_ARM
-    vol = await _volume(adapter)
-    _telemetry.info(
-        f"volume after bend + arm: {vol:.1f} mm^3 (analytic {expected:.1f})"
-    )
+    # The sweep merges onto the leg: the whole tube.
     # 0.02: the annular wall is a small share of the swept section, so the same
     # absolute B-rep slack is larger relative to the expectation.
-    if abs(vol - expected) > 0.02 * expected:
-        raise RuntimeError(f"bend volume {vol:.1f} != {expected:.1f}")
-
-    # 3. The end piece, on the horizontal plane through the arm axis, as its
-    # own body (see the module docstring).
-    # Sketch (u, v) is model (x, -z) about the arm axis at v = 0.
-    check(
-        "create_plane ArmAxisPlane",
-        await adapter.create_plane(
-            CreatePlaneParameters(mode="offset", base_plane="Top Plane", offset=ARM_Y)
-        ),
-    )
-    name_last_feature(adapter, "ArmAxisPlane")
-    drive_jobs.append(
-        (name_dimensions(adapter, "ArmAxisPlane", ["ArmAxisStation"])[0], '"ArmY"')
-    )
-    end_piece = SketchDims()
-    end_piece_points = [
-        (SHANK_END_X, 0.0),
-        (SHANK_END_X, SHANK_R),
-        (TUBE_END_X, SHANK_R),
-        (TUBE_END_X, PLUG_R),
-        (ARM_END_X, PLUG_R),
-        (ARM_END_X, 0.0),
-    ]
-    check("create_sketch end piece", await adapter.create_sketch("ArmAxisPlane"))
-    set_sketch_direct_db(adapter, True)
-    try:
-        end_piece_axis = check(
-            "end piece axis centerline",
-            await adapter.add_centerline(ARM_END_X, 0.0, SHANK_END_X, 0.0),
-        )
-        end_piece_lines = await add_line_chain(adapter, end_piece_points)
-    finally:
-        # Session state on the seat: a failed segment must not leave sketch
-        # inference off for the next leaf.
-        set_sketch_direct_db(adapter, False)
-    shank_end, shank_side, head_step, head_side, end_face, end_piece_floor = (
-        end_piece_lines
-    )
-    for line, relation in (
-        (shank_end, "vertical"),
-        (shank_side, "horizontal"),
-        (head_step, "vertical"),
-        (head_side, "horizontal"),
-        (end_face, "vertical"),
-        (end_piece_floor, "horizontal"),
-    ):
-        check(
-            f"end piece {relation} {line}",
-            await adapter.add_sketch_constraint(line, None, relation),
-        )
-    await anchor_point_to_origin(
-        adapter, f"{end_face}.end", ARM_END_X, 0.0, "end face centre"
-    )
-    end_piece.record("EndFaceStation", '-"ArmEndX"')
-    for name, line, length in (
-        ("PlugHeadLength", head_side, PLUG_HEAD_LENGTH),
-        ("PlugShankLength", shank_side, PLUG_SHANK_LENGTH),
-    ):
-        await dimension_between(
-            adapter,
-            f"{line}.start",
-            f"{line}.end",
-            "horizontal_distance",
-            length,
-            f"end piece {name}",
-        )
-        end_piece.record(name, f'"{name}"')
-    for name, line, u_mid, radius in (
-        ("PlugDia", head_side, ARM_END_X + PLUG_HEAD_LENGTH / 2.0, PLUG_R),
-        ("PlugShankDia", shank_side, TUBE_END_X + PLUG_SHANK_LENGTH / 2.0, SHANK_R),
-    ):
-        await add_diametric_linear_dimension(
-            adapter, end_piece_axis, line, (u_mid, radius + 4.0), name
-        )
-        end_piece.record(name, f'"{name}"')
-    await ensure_fully_defined(adapter, "end piece sketch")
-    check("exit_sketch end piece", await adapter.exit_sketch())
-    name_last_feature(adapter, "EndPieceProfile")
-    drive_jobs += end_piece.apply(adapter, "EndPieceProfile")
-    check(
-        "revolve end piece",
-        await adapter.create_revolve(
-            RevolveParameters(angle=360.0, merge_result=False)
-        ),
-    )
-    name_last_feature(adapter, "EndPiece")
-    vol = await _volume_check(
-        adapter, "solid end piece", vol + V_END_PIECE, 0.005 * V_END_PIECE
-    )
-
-    # 4. The native blind bottoming tap, started on the end face (west-facing),
-    # both depths from it (sm_gooseneck_spring_joint; owner ruling 2026-11-08
-    # (Pedro), #2144 item 11.4: plain tap, no counterbore).  If the wizard's
-    # table drill differs from TAP_DRILL_DIA, wizard_holes fails loud (the
-    # joint's walls are budgeted on that drill).
-    tap = wizard_holes(
-        adapter,
-        TAP_SPEC,
-        [[ARM_END_X, ARM_Y, 0.0]],
-        (-1.0, 0.0, 0.0),
-        f"gooseneck end piece ({TAP_SPEC.size} blind)",
-        name="ThreadBore",
-        expect_dia_mm=TAP_DRILL_DIA,
-        placement_dims=[((None, None), ("TapAxisY", '"ArmY"'))],
-    )
-    if abs(tap.depth_mm - TAP_DRILL_DEPTH) > 0.005:
-        raise RuntimeError(
-            f"gooseneck tap drill depth {tap.depth_mm:.3f} != {TAP_DRILL_DEPTH:.3f} mm"
-        )
-    drive_jobs += tap.placement_drive_jobs
-    vol = await _volume_check(adapter, "end piece blind tap", vol - V_TAP, 0.02 * V_TAP)
-    blank_reference_geometry(adapter, (("ArmAxisPlane", "PLANE"),))
-
-    await name_bore_axis(
-        adapter,
-        "Front Plane",
-        0.0,
-        "Top Plane",
-        ARM_Y,
-        "spring screw",
-        drive_b='"ArmY"',
-        drive_jobs=drive_jobs,
-    )
-    name_last_feature(adapter, "SpringScrewAxis")
-
-    # 5. The sleeve over the leg from its foot, revolved about the leg axis
-    # on the Front plane; its bore is the tube OD, so it merges onto the leg.
-    sleeve = SketchDims()
-    sleeve_points = [
-        (TUBE_R, LEG_BOTTOM),
-        (SLEEVE_R, LEG_BOTTOM),
-        (SLEEVE_R, SLEEVE_TOP),
-        (TUBE_R, SLEEVE_TOP),
-    ]
-    check("create_sketch sleeve", await adapter.create_sketch("Front"))
-    set_sketch_direct_db(adapter, True)
-    try:
-        sleeve_axis = check(
-            "sleeve axis centerline",
-            await adapter.add_centerline(0.0, LEG_BOTTOM, 0.0, 0.0),
-        )
-        sleeve_lines = await add_line_chain(adapter, sleeve_points)
-    finally:
-        # Session state on the seat (as the end piece above).
-        set_sketch_direct_db(adapter, False)
-    sleeve_foot, sleeve_side, sleeve_top, sleeve_bore = sleeve_lines
-    for line, relation in (
-        (sleeve_axis, "vertical"),
-        (sleeve_foot, "horizontal"),
-        (sleeve_side, "vertical"),
-        (sleeve_top, "horizontal"),
-        (sleeve_bore, "vertical"),
-    ):
-        check(
-            f"sleeve {relation} {line}",
-            await adapter.add_sketch_constraint(line, None, relation),
-        )
-    await anchor_point_to_origin(adapter, f"{sleeve_axis}.end", 0.0, 0.0, "leg axis")
-    check(
-        "sleeve axis from the foot",
-        await adapter.add_sketch_constraint(
-            f"{sleeve_axis}.start", f"{sleeve_foot}.start", "horizontal_points"
-        ),
-    )
-    await dimension_between(
-        adapter,
-        f"{sleeve_foot}.start",
-        "origin",
-        "vertical_distance",
-        -LEG_BOTTOM,
-        "sleeve foot station",
-    )
-    sleeve.record("SleeveFootStation", '-"LegBottom"')
-    await dimension_between(
-        adapter,
-        f"{sleeve_side}.start",
-        f"{sleeve_side}.end",
-        "vertical_distance",
-        SLEEVE_LENGTH,
-        "sleeve length",
-    )
-    sleeve.record("SleeveLength", '"SleeveTop" - "LegBottom"')
-    for name, line, radius, drive in (
-        ("SleeveDia", sleeve_side, SLEEVE_R, '"SleeveDia"'),
-        ("SleeveBoreDia", sleeve_bore, TUBE_R, '"TubeDia"'),
-    ):
-        await add_diametric_linear_dimension(
-            adapter,
-            sleeve_axis,
-            line,
-            (radius + 4.0, (LEG_BOTTOM + SLEEVE_TOP) / 2.0),
-            name,
-        )
-        sleeve.record(name, drive)
-    await ensure_fully_defined(adapter, "sleeve sketch")
-    check("exit_sketch sleeve", await adapter.exit_sketch())
-    name_last_feature(adapter, "SleeveProfile")
-    drive_jobs += sleeve.apply(adapter, "SleeveProfile")
-    check(
-        "revolve sleeve", await adapter.create_revolve(RevolveParameters(angle=360.0))
-    )
-    name_last_feature(adapter, "Sleeve")
-    # The sleeve adds only its own annulus: its bore is the leg's OD.
     final_vol = await _volume_check(
-        adapter, "leg sleeve", vol + V_SLEEVE, 0.01 * V_SLEEVE
+        adapter, "bend + arm", V_FINAL, 0.02 * V_FINAL
     )
     _telemetry.info(f"gooseneck volume {final_vol:.1f} mm^3 (analytic {V_FINAL:.1f})")
-    if abs(final_vol - V_FINAL) > 0.02 * V_FINAL:
-        raise RuntimeError(f"gooseneck volume {final_vol:.1f} != {V_FINAL:.1f}")
 
-    # 6. Drawing-only station reference on the Front plane: two construction
+    # 3. Drawing-only station reference on the Front plane: two construction
     # lines on the leg and arm axes whose length dimensions ARE the printed
     # leg length (foot to the bend's entry tangent) and arm straight (the
-    # bend's exit tangent to the end face), driven by the same globals so no
-    # geometry moves.  Hidden at the end; the drawing shows it per view.
+    # bend's exit tangent to the faced arm end), driven by the same globals so
+    # no geometry moves.  Hidden at the end; the drawing shows it per view.
     stations = SketchDims()
     check("create_sketch station reference", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
@@ -914,10 +648,10 @@ async def build(adapter) -> dict[str, str]:
         )
         arm_axis = check(
             "arm axis reference line",
-            await adapter.add_line(-BEND_R, ARM_Y, ARM_END_X, ARM_Y),
+            await adapter.add_line(-BEND_R, ARM_Y, TUBE_END_X, ARM_Y),
         )
     finally:
-        # Session state on the seat (as the end piece above).
+        # Session state on the seat (as the bend path above).
         set_sketch_direct_db(adapter, False)
     for line, relation in ((leg_axis, "vertical"), (arm_axis, "horizontal")):
         _construction(adapter, line, "station reference")
@@ -948,7 +682,7 @@ async def build(adapter) -> dict[str, str]:
         f"{arm_axis}.start",
         f"{arm_axis}.end",
         "horizontal_distance",
-        ARM_STRAIGHT,
+        TUBE_STRAIGHT,
         "arm straight",
     )
     stations.record("ArmStraight", '"ArmStraight"')
@@ -970,13 +704,12 @@ async def build(adapter) -> dict[str, str]:
     await _volume_check(
         adapter, "driven gooseneck (equations neutral)", final_vol, 0.001 * final_vol
     )
-    # Two bodies (module docstring): the tube with its sleeve merged on the
-    # leg's OD, and the end piece, its head on the tube end's annulus.
+    # One body: the bent tube (the end plug is MHA-SM-05, its own part).
     bodies = tuple(
         _early_bound(adapter.currentModel, "IPartDoc").GetBodies2(0, False) or ()
     )
-    if len(bodies) != 2:
-        raise RuntimeError(f"gooseneck: expected two solid bodies, found {len(bodies)}")
+    if len(bodies) != 1:
+        raise RuntimeError(f"gooseneck: expected one solid body, found {len(bodies)}")
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
@@ -985,11 +718,11 @@ async def build(adapter) -> dict[str, str]:
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     _author_dimension_callouts(adapter)
-    _author_reference_dimensions(adapter)
     # The tube's stock Ø, a sketch-only diametric dimension, prints no Ø of
     # its own (farm run 20261031T233549214Z printed "(12.70)"); it carries
     # its wall callout, so _author_reference_dimensions writes its
-    # "(<MOD-DIAM>" prefix with the sleeve's.
+    # "(<MOD-DIAM>" prefix.
+    _author_reference_dimensions(adapter)
     # The reference sketches own printed dimensions and only reference lines:
     # hide them so no assembly instance renders them (#880).  The drawing shows
     # them per view through _drawing_hidden_sketches to import those dimensions.

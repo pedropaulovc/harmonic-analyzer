@@ -30,12 +30,16 @@ _COUNTER_ANCHOR_THREAD_LIMIT = smooth_annulus_limit_mm3(
 # recipe cache keys.
 _KNIFE_HANGER_REACH = 8.9173
 # MHA-SM-VN-56's 10-24 thread (McMaster 91829A566, 3/8 long) in the #25
-# drill of the blind #10-24 tap in MHA-SM-01's solid end piece: the shoulder
-# seats on the end face, so the whole thread length stands in the tap (owner
-# ruling 2026-11-08 (Pedro), #2144 item 11.4: plain tap, no counterbore). A
-# literal, test-pinned to sm_vn_gooseneck_shoulder_screw_spec.THREAD_LENGTH
-# like _KNIFE_HANGER_REACH, so a screw or gooseneck edit does not re-key this
-# table or the summing soundness gate.
+# drill of the blind #10-24 tap in the MHA-SM-05 end plug: the shoulder
+# seats on the plug's end face, so the whole thread length stands in the tap
+# (owner ruling 2026-11-08 (Pedro), #2144 item 11.4: plain tap, no
+# counterbore; owner rulings 2026-11-08 (Pedro), #2315: the tap is the
+# plug's).  A literal, test-pinned to
+# sm_vn_gooseneck_shoulder_screw_spec.THREAD_LENGTH like _KNIFE_HANGER_REACH,
+# so a screw or plug edit does not re-key this table or the summing
+# soundness gate.  The plug's spigot sits in MHA-SM-01's bore at the bond's
+# diametral clearance (sm_gooseneck_spring_joint.BOND_CLEARANCE_MIN/MAX), so
+# plug and tube have no pair: any overlap between them fails the gate.
 _GOOSENECK_THREAD_LENGTH = 9.525
 # Bearing seats are exact face contacts, NOT interference fits. Zero volume
 # permits a reported coincidence but no unmeasured kernel sliver allowance.
@@ -61,7 +65,7 @@ ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
         ("sm-vn-boss-hook-1", "sm-summing-lever-1")
     ): _COUNTER_ANCHOR_THREAD_LIMIT,
     # Spring/support contact has no allowance and remains independently gated.
-    frozenset(("sm-vn-gooseneck-shoulder-screw-1", "sm-gooseneck-1")): (
+    frozenset(("sm-vn-gooseneck-shoulder-screw-1", "sm-gooseneck-end-plug-1")): (
         smooth_annulus_limit_mm3(
             THREAD_MAJOR_MM["#10-24"], TAP_DRILL_MM["#10-24"], _GOOSENECK_THREAD_LENGTH
         )

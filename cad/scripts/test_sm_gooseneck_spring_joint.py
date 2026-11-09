@@ -1,13 +1,15 @@
-"""Offline tap, wall and free-eye contracts for the gooseneck's shoulder screw.
+"""Offline tap, wall, bond and free-eye contracts for the gooseneck's shoulder screw.
 
 Owner ruling 2026-11-08 (Pedro), #2144 item 11.4, supersedes #1951's clamped
-eye: the purchased MHA-SM-VN-56 shoulder screw seats on the flush end face of
-MHA-SM-01's solid Ø.500 end piece, its thread in a plain blind tap (no
-counterbore, frames or datums), and the MHA-SM-VN-51 upper eye rides free on
-its shoulder under its head (bare slotted McMaster 91829A566, washer
-dropped).  One owner minor stands against rule 18: the catalogue thread's
-engagement (sm-gooseneck RV-04, accepted).  The sheet prints decimal inch
-(#290): every term is charged at the limits it prints.
+eye: the purchased MHA-SM-VN-56 shoulder screw seats on the flush end face,
+its thread in a plain blind tap (no counterbore, frames or datums), and the
+MHA-SM-VN-51 upper eye rides free on its shoulder under its head (bare
+slotted McMaster 91829A566, washer dropped).  Owner rulings 2026-11-08
+(Pedro), #2315: the end face and the tap belong to the MHA-SM-05 end plug,
+tapped before it is bonded into MHA-SM-01 with LOCTITE 638 at MHA-SM-00.
+One owner minor stands against rule 18: the catalogue thread's engagement
+(sm-gooseneck-end-plug RV-01, accepted).  The plug's sheet prints decimal
+inch (#290): every term is charged at the limits it prints.
 """
 
 from __future__ import annotations
@@ -21,6 +23,7 @@ import pytest
 import _config
 import machinist_exceptions
 import sm_gooseneck_geom as gooseneck
+import sm_gooseneck_end_plug_spec as plug_spec
 import sm_gooseneck_spec as gooseneck_spec
 import sm_gooseneck_spring_joint as joint
 import sm_vn_counter_spring_stock_geom as spring
@@ -184,45 +187,90 @@ def _declared(package: str):
 
 
 def test_engagement_minor_is_declared_and_required(monkeypatch) -> None:
-    declared = _declared("sm_gooseneck")
-    assert declared["RV-04"] == "minor"
-    # The counterbore wall and the run-out note retired with the counterbore.
-    assert "RV-01" not in declared and "RV-03" not in declared
-    joint.owner_minor(_config.parts("sm-gooseneck"), "RV-04", "sm_gooseneck")
+    # Owner rulings 2026-11-08 (Pedro), #2315: the tap moved to the end plug,
+    # so its shortfall stands as the plug's RV-01, and the bent tube carries
+    # no exception at all.
+    declared = _declared("sm_gooseneck_end_plug")
+    assert declared == {"RV-01": "minor"}
+    assert _declared("sm_gooseneck") == {}
+    joint.owner_minor(
+        _config.parts("sm-gooseneck-end-plug"), "RV-01", "sm_gooseneck_end_plug"
+    )
     real = _config.parts
 
     def without(accept: bool):
         def parts(stem=None):
             row = real(stem)
-            if stem != "sm-gooseneck":
+            if stem != "sm-gooseneck-end-plug":
                 return row
             entries = [dict(entry) for entry in row["machinist_exceptions"]]
             if accept:
                 for entry in entries:
                     entry["kind"] = "accept"
             else:
-                entries = [entry for entry in entries if entry["id"] != "RV-04"]
+                entries = [entry for entry in entries if entry["id"] != "RV-01"]
             return {**row, "machinist_exceptions": entries}
 
         return parts
 
+    missing = "sm_gooseneck_end_plug: no owner minor RV-01"
     for accept in (False, True):
-        with pytest.raises(AssertionError, match="sm_gooseneck: no owner minor RV-04"):
-            joint.owner_minor(without(accept)("sm-gooseneck"), "RV-04", "sm_gooseneck")
+        with pytest.raises(AssertionError, match=missing):
+            joint.owner_minor(
+                without(accept)("sm-gooseneck-end-plug"), "RV-01", "sm_gooseneck_end_plug"
+            )
     monkeypatch.setattr(_config, "parts", without(False))
-    with pytest.raises(AssertionError, match="sm_gooseneck: no owner minor RV-04"):
-        runpy.run_path(gooseneck_spec.__file__)
+    with pytest.raises(AssertionError, match=missing):
+        runpy.run_path(plug_spec.__file__)
+
+
+def test_bond_holds_the_screw_removal_torque() -> None:
+    # Owner pick 2026-11-08 (Pedro), #2315 option 2: LOCTITE 638 on the .42
+    # spigot at the .0040-.0098 window, inside the TDS's 0.25 mm gap fill;
+    # silver braze retired with the torch work.
+    assert (joint.BOND_CLEARANCE_MIN, joint.BOND_CLEARANCE_MAX) == pytest.approx(
+        (0.0040 * IN, 0.0098 * IN)
+    )
+    assert joint.BOND_CLEARANCE_MAX <= joint.LOCTITE_638_GAP_MAX
+    clearance = gooseneck.TUBE_BORE_DIA - joint.PLUG_SHANK_DIA
+    assert joint.BOND_CLEARANCE_MIN <= clearance <= joint.BOND_CLEARANCE_MAX
+    assert joint.PLUG_SHANK_DIA == pytest.approx(0.363 * IN)
+    assert gooseneck.PLUG_SHANK_LENGTH == pytest.approx(0.42 * IN)
+    capacity = (
+        joint.LOCTITE_638_SHEAR_MPA
+        * joint.BOND_FACTOR
+        * math.pi
+        * joint.PLUG_SHANK_DIA**2
+        * gooseneck.PLUG_SHANK_LENGTH
+        / 2.0
+        / 1000.0
+    )
+    assert joint.BOND_TORQUE_CAPACITY == pytest.approx(capacity)
+    assert joint.SCREW_REMOVAL_TORQUE == pytest.approx(1.3 * 22.8 * 0.1129848)
+    assert joint.BOND_TORQUE_MARGIN_MIN == 2.0
+    assert joint.BOND_TORQUE_CAPACITY >= 2.0 * joint.SCREW_REMOVAL_TORQUE
+    # The shortest printed spigot (.XX overall less .XX head) still holds it.
+    assert plug_spec.BOND_TORQUE_CAPACITY_MIN >= 2.0 * joint.SCREW_REMOVAL_TORQUE
+    assert not any(name.startswith("BRAZE") for name in vars(joint))
 
 
 def test_registry_reads_stay_scoped() -> None:
     # The joint and the vendor spec read no registry row, so the channel
     # seats importing the joint through settled_spring_seats never re-key on
-    # a part's row; the gooseneck spec reads its own row and the screw's.
+    # a part's row; the end plug spec reads its own row only, and the tube's
+    # spec reads no tap or screw row.
     for module in (joint, screw):
         tokens = config_files_of(Path(module.__file__))
         assert "**" not in tokens
         assert not {token for token in tokens if token.startswith("parts/")}
-    tokens = config_files_of(Path(gooseneck_spec.__file__))
+    tokens = config_files_of(Path(plug_spec.__file__))
     assert "**" not in tokens
-    assert {"parts/sm-gooseneck.yaml", "parts/sm-vn-gooseneck-shoulder-screw.yaml"} <= set(tokens)
-    assert gooseneck_spec.UNIT == gooseneck.SHEET_UNIT == joint.UNIT == "in"
+    # Its own row (and the registry's shared defaults, merged into every row).
+    assert {token for token in tokens if token.startswith("parts/")} == {
+        "parts/_defaults.yaml",
+        "parts/sm-gooseneck-end-plug.yaml",
+    }
+    tokens = config_files_of(Path(gooseneck_spec.__file__))
+    assert "parts/sm-vn-gooseneck-shoulder-screw.yaml" not in tokens
+    assert "parts/sm-gooseneck-end-plug.yaml" not in tokens
+    assert plug_spec.UNIT == gooseneck_spec.UNIT == gooseneck.SHEET_UNIT == joint.UNIT == "in"

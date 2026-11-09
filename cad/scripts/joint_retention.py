@@ -620,8 +620,8 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "ch_vn_frame_side_screw",  # #2-56 fillister (McMaster 91794A080, MHA-CH-VN-52); member, x2 into top_frame KeeperTaps (top-level row)
         "ch_fulcrum_keeper",  # #1-72 UNF crown tap through to the shaft bore (receiver of MHA-CH-VN-55); its #2 foot hole is clearance only
         "ch_vn_fulcrum_set_screw",  # #1-72 UNF x 5/32 cup-point set screw (McMaster 91375A942, MHA-CH-VN-55), member: x2, one into each fulcrum_keeper crown tap
-        "sm_gooseneck",  # receiver: plain blind-tapped solid end piece brazed into the 1/2 in tube arm (#2144 item 11.4); its sleeve is the post gripped by the frame's set screw
-        "sm_vn_gooseneck_shoulder_screw",  # purchased MHA-SM-VN-56 shoulder screw, member: seated on the gooseneck end face; the counter-spring upper eye rides free on its shoulder
+        "sm_gooseneck_end_plug",  # MHA-SM-05, receiver: plain blind #10-24 UNC-2B tap, tapped before it is bonded (LOCTITE 638) into the gooseneck's arm end (#2315)
+        "sm_vn_gooseneck_shoulder_screw",  # purchased MHA-SM-VN-56 shoulder screw, member: seated on the end plug's face; the counter-spring upper eye rides free on its shoulder
         "fr_vn_gooseneck_set_screw",  # 1/4-20 UNC x 3/4 square-head cup point (91410A540), member: into top_frame hub boss tap, grips summing gooseneck
         "pd_vn_guide_lock_screw",  # #4-40 slotted pan head (McMaster 91792A108, MHA-PD-VN-60, R9-31), member: 8 into the platen_guide rear through taps
         "pn_vn_hanger_screw",  # #8-32 UNC x 1 hex head (McMaster 93075A199), member through the pen-hanger strap's clearance hole into the hanger nut and jam nut
@@ -688,6 +688,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "dt_cone_pivot_post",  # clamped part: counterbored clearance for MHA-DT-VN-61; journals only
         "ch_connecting_rod",  # strap bore on cam + reamed pin hole (pressed MHA-CH-10 pin)
         "sm_vn_counter_spring",  # 1330K524 extension spring: upper eye free on the MHA-SM-VN-56 shoulder, lower eye hooks the boss-hook eye, no thread
+        "sm_gooseneck",  # MHA-SM-01 bent 1/2 in tube (#2315): its bore takes the bonded MHA-SM-05 spigot, its bare leg is the post the frame's set screw grips; no thread
         "dt_crank_drive_gear",  # slides on the MHA-DT-04 D-flat against its collar, no thread
         "dt_crank_handle",  # oak handle, runs on the MHA-DT-32 shoulder
         "dt_crank_handle_butt_cup",  # bonded in the handle butt; pocket bored for the MHA-DT-32 head, no thread
@@ -870,9 +871,9 @@ JOINTS: tuple[Joint, ...] = (
         ),
         exposure=Exposure.OSCILLATING,
         exposure_reason="cup point is the ONLY retention of the summing gooseneck post (MHA-SM-01) in the top_frame rail-hub bore, both its slid-to-level height and its rotation; the post's arm carries the counter-spring hung from the rocking summing lever, so the load it reacts cycles every stroke",
-        axial_capture="threads into the through-to-bore 1/4-20 GooseneckTap through the east-rail hub boss's Ø10 spot face; square head standing proud outboard; cup point bears radially on the gooseneck's Ø15.875 sleeve (as modelled it stands 0.21 clear)",
+        axial_capture="threads into the through-to-bore 1/4-20 GooseneckTap through the east-rail hub boss's Ø10 spot face (1.89D full thread at the printed worst case); square head standing proud outboard; cup point bears radially on the gooseneck's bare Ø12.70 4130-N leg in the Ø.520 hub bore, no sleeve (owner rulings 2026-11-08 (Pedro), #2315; as modelled it stands 0.21 clear), tightened snug to 9 in-lb (1 N·m) MAX so the .065 wall is not crushed",
         lock=Lock.NONE,
-        evidence="build_fr_frame_assembly.py:build (gooseneck-set-screw, SET_SCREW_TIP_X, McMaster 91410A540 SHANK_LEN) + module comment; build_fr_top_frame.py:SET_TAP_SPEC, step 8 SetBoss/SetSpotFace, step 14 GooseneckTap; build_sm_summing_assembly.py docstring + gooseneck placement; spring_mount_geom.py docstring ('setup slides the gooseneck until level'); draw_fr_frame_assembly.py STEP_TEXT gooseneck-set-screw-started ('CUP POINT CLEAR OF THE BORE; MHA-HA-00 STEP n TIGHTENS IT ON THE POST'), post-bore-checked; ha_harmonic_analyzer_assembly_sheet.py summing-levelled ('TIGHTEN MHA-FR-VN-52 ON THE POST')",
+        evidence="build_fr_frame_assembly.py:build (gooseneck-set-screw, SET_SCREW_TIP_X, McMaster 91410A540 SHANK_LEN) + module comment; build_fr_top_frame.py:SET_TAP_SPEC, step 8 SetBoss/SetSpotFace, step 14 GooseneckTap; fr_top_frame_spec.py GOOSENECK_BORE_DIA, SET_SCREW_ENGAGEMENT_D, SET_SCREW_REACH_MAX, SET_SCREW_TORQUE_MAX_IN_LB/NM; build_sm_summing_assembly.py docstring, gooseneck placement and _assert_gooseneck_leg_spans_hub_bore; spring_mount_geom.py docstring ('setup slides the gooseneck until level'); draw_fr_frame_assembly.py STEP_TEXT gooseneck-set-screw-started ('CUP POINT CLEAR OF THE BORE; MHA-HA-00 STEP n TIGHTENS IT ON THE POST'), post-bore-checked; ha_harmonic_analyzer_assembly_sheet.py summing-levelled ('TIGHTEN THE MHA-FR-VN-52 SET SCREW ON THE POST, SNUG, ... MAX')",
         exception="U-MHA-FR-VN-52-no-lock",
     ),
     # --- drive_train (MHA-DT-00): cone set and crank, and their screws into the frame's base ---
@@ -1586,15 +1587,15 @@ JOINTS: tuple[Joint, ...] = (
         id="sm-summing/gooseneck-shoulder-screw",
         assembly="sm_summing",
         member="sm_vn_gooseneck_shoulder_screw",
-        receiver="sm_gooseneck",
+        receiver="sm_gooseneck_end_plug",
         thread=f"{gooseneck_screw.THREAD} UNC",
         quantity=1,
-        installed_at="MHA-SM-00 STEP 8",
+        installed_at="MHA-SM-00 STEP 8B",
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
             "owner ruling 2026-11-08 (Pedro), #2144 item 11.4, superseding #1951's "
             "clamped eye: the shoulder screw is tightened until its shoulder seats on "
-            "the end piece's face, so screw and end piece never move relative to each "
+            "the end plug's face, so screw and end plug never move relative to each "
             "other. The supplier upper eye rides free on the ground shoulder under the "
             "head; nothing clamps it, so its swing turns the eye on the shoulder, "
             "whose drag is the eye load times friction at the shoulder radius, far "
@@ -1602,28 +1603,33 @@ JOINTS: tuple[Joint, ...] = (
             "reaches the screw axis."
         ),
         axial_capture=(
-            "purchased MHA-SM-VN-56 shoulder seated on the face of MHA-SM-01's solid "
-            "Ø12.70 end piece, its thread in the end piece's plain blind tap (no "
+            "purchased MHA-SM-VN-56 shoulder seated on the face of the solid Ø12.70 "
+            "MHA-SM-05 end plug, its thread in the plug's plain blind tap (no "
             "counterbore); the head retains the loaded eye (plumb pull, owner ruling "
             "2026-11-08 (Pedro), #2144 item 11.4: bare slotted McMaster 91829A566, "
             "washer dropped). "
             "The deepest screw tip stays inside the tap's full thread, and the "
-            "bottoming tap's lead inside its drill."
+            "bottoming tap's lead inside its drill. The plug is bonded into "
+            "MHA-SM-01's arm end with LOCTITE 638 and cured 24 h before the screw "
+            "goes in (owner rulings 2026-11-08 (Pedro), #2315), so the bond, not a "
+            "thread, carries the seating and removal torque into the tube."
         ),
         lock=Lock.NONE,
         evidence=(
             "owner ruling 2026-11-08 (Pedro), #2144 item 11.4: bare slotted "
-            "purchased shoulder screw, washer dropped, plain tap in the end piece, "
-            "the eye free on the shoulder; sm-summing.yaml SM-01 (pending owner "
-            "confirmation) and sm-gooseneck.yaml RV-04 (engagement under 1.5D); "
-            "sm_gooseneck_spring_joint.py ENGAGEMENT_MIN/PLUG_WALL_MIN/"
-            "DRILL_POINT_SHANK_WALL_MIN/LOADED_RETENTION_MIN/EYE_AXIAL_PLAY_MIN/"
-            "EYE_AXIAL_PLAY_MAX/TIP_THREAD_MARGIN_MIN/TAP_LEAD_DRILL_MARGIN_MIN; "
-            "build_sm_summing_assembly.py shoulder screw lock_mate "
+            "purchased shoulder screw, washer dropped, plain tap, the eye free on "
+            "the shoulder; owner rulings 2026-11-08 (Pedro), #2315: the tap moves to "
+            "the MHA-SM-05 end plug, bonded at MHA-SM-00 step 8; sm-summing.yaml "
+            "SM-01 (pending owner confirmation) and sm-gooseneck-end-plug.yaml RV-01 "
+            "(engagement under 1.5D); sm_gooseneck_spring_joint.py ENGAGEMENT_MIN/"
+            "PLUG_WALL_MIN/DRILL_POINT_SHANK_WALL_MIN/LOADED_RETENTION_MIN/"
+            "EYE_AXIAL_PLAY_MIN/EYE_AXIAL_PLAY_MAX/TIP_THREAD_MARGIN_MIN/"
+            "TAP_LEAD_DRILL_MARGIN_MIN/BOND_TORQUE_CAPACITY/SCREW_REMOVAL_TORQUE; "
+            "build_sm_summing_assembly.py end plug and shoulder screw lock_mates "
             "(CAD restraint, not mechanical locking hardware); the installation "
-            "step is in the summing assembly's Manufacturing Notes property "
-            "(UPPER_EYE_NOTES) and printed as MHA-SM-00 step 8 "
-            "(sm_summing_assembly_sheet.ASSEMBLY_STEPS 8, ASSEMBLY_CHECKS 3); "
+            "steps are in the summing assembly's Manufacturing Notes property "
+            "(UPPER_EYE_NOTES) and printed as MHA-SM-00 steps 8 and 9 "
+            "(sm_summing_assembly_sheet.ASSEMBLY_STEPS 8-9, ASSEMBLY_CHECKS 3); "
             "_counter_spring_hang.assert_counter_spring_top_hang"
         ),
     ),
@@ -2485,7 +2491,7 @@ REQUIRED_JOINTS: dict[str, Occurrence] = {
         "sm_summing", "build_sm_summing_assembly.py", "JAM_NUT_POS"
     ),
     "sm-summing/gooseneck-shoulder-screw": Occurrence(
-        "sm_summing", "build_sm_summing_assembly.py", "shoulder screw seated on end piece"
+        "sm_summing", "build_sm_summing_assembly.py", "shoulder screw seated on end plug"
     ),
     "pn-pen/hanger-screw-in-nut": Occurrence(
         "pn_pen", "build_pn_pen_assembly.py", "HANGER_NUT_POS"

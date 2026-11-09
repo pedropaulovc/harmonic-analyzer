@@ -32,22 +32,27 @@ boss-hook / counter-spring / gooseneck chain.
   saved model rocks on the knife edge.
 * boss-hook (keyed to the lever's anchor eye) + its MHA-SM-VN-55 jam nut on the
   boss top face + counter-spring + gooseneck -- the counter-balance hung from
-  the east column; the gooseneck's brazed O15.875 sleeve is the post the
-  top-frame rail hub's set screw grips (no separate clamp part).
+  the east column; the gooseneck's bare Ø12.70 leg is the post the top-frame
+  rail hub's set screw grips (no sleeve and no separate clamp part: owner
+  rulings 2026-11-08 (Pedro), #2315, MHA-FR-02's hub bored to the tube).
+* sm-gooseneck-end-plug -- MHA-SM-05, bonded flush into the gooseneck's arm
+  end with LOCTITE 638 (owner rulings 2026-11-08 (Pedro), #2315); its outer
+  face is the end face and it carries the plain blind #10-24 tap.  Locked to
+  the fixed gooseneck, as the bond holds it.
 * sm-vn-gooseneck-shoulder-screw -- purchased MHA-SM-VN-56 slotted shoulder
-  screw, head outboard, its shoulder seated on the face of the gooseneck's
-  flush end piece and its 10-24 thread in the end piece's plain blind tap.
-  Owner ruling 2026-11-08 (Pedro), #2144 item 11.4, superseding #1951's
-  clamped eye: the supplier upper loop rides free on the shoulder between the
-  end face and the head (bare slotted McMaster 91829A566, washer dropped).
-  Locked to the fixed gooseneck with no additional operational DOF.
+  screw, head outboard, its shoulder seated on the end plug's face and its
+  10-24 thread in the plug's plain blind tap.  Owner ruling 2026-11-08
+  (Pedro), #2144 item 11.4, superseding #1951's clamped eye: the supplier
+  upper loop rides free on the shoulder between the end face and the head
+  (bare slotted McMaster 91829A566, washer dropped).  Locked to the end plug
+  it threads into, with no additional operational DOF.
 
 Cross-subassembly fits (checked at the top level): the channel springs
 (ch-channel.SLDASM) thread the summing-lever plate's O4.5 holes -- gated
 analytically by build_ch_channel_assembly._assert_plate_threading; the knife-
 hanger bolts pass the top-frame crossbar's O6.147 clearance holes and clamp
 through their washers on its faced top; the knife-mount dowels press into
-its blind reams (fr-frame.SLDASM); the gooseneck's sleeve drops
+its blind reams (fr-frame.SLDASM); the gooseneck's bare leg drops
 through the casting's rail-hub bore, gripped by its 1/4-20 set screw.
 
 Fix-all strategy (M6.2): every structural component inserted at its exact
@@ -573,36 +578,43 @@ JAM_NUT_ROWS = ROT_X_NEG90
 # ``counter_seat`` before assembly creation.
 
 UPPER_EYE_NOTES = (
-    "MHA-SM-VN-56: SEAT SHOULDER ON END PIECE FACE.\n"
+    "MHA-SM-05: BOND INTO MHA-SM-01 WITH LOCTITE 638; CURE 24 H.\n"
+    "MHA-SM-VN-56: SEAT SHOULDER ON MHA-SM-05 END FACE.\n"
     "UPPER EYE RIDES FREE ON SHOULDER UNDER THE HEAD.\n"
     "NO THREADLOCKER."
 )
+# The top-frame hub bore runs the full rail band and on through the underside
+# boss (fr_top_frame_spec.HUB_BOSS_DROP below the rail underside).
+HUB_BORE_BOTTOM_Y = CASTING_UNDERSIDE_Y - top_frame.HUB_BOSS_DROP
+HUB_BORE_TOP_Y = CROSSBAR_TOP_Y
 
 
-def _assert_gooseneck_sleeve_covers_hub_bore(
+def _assert_gooseneck_leg_spans_hub_bore(
     gooseneck_origin_y: float, label: str
 ) -> None:
-    """Require the brazed sleeve over the top-frame rail's whole bore span.
+    """Require the bare straight leg through the top-frame hub bore's length.
 
-    The Ø12.70 tube alone would rattle in the unchanged Ø17 rail-hub bore;
-    the 5/8 in sleeve (sm_gooseneck_geom.SLEEVE_*) is the post the hub's set
-    screw grips, so at this setting it must run from below the rail underside
-    (CASTING_UNDERSIDE_Y) to above its faced top (CROSSBAR_TOP_Y).
+    Owner rulings 2026-11-08 (Pedro), #2315: the reference machine has no
+    sleeve; MHA-FR-02's hub is bored to slide on the bare Ø12.70 tube
+    (fr_top_frame_spec.GOOSENECK_BORE_DIA), so at this setting the straight
+    leg (LEG_BOTTOM up to the bend's entry tangent LEG_TOP) must run from
+    below the hub boss's bottom (HUB_BORE_BOTTOM_Y) to above the rail's faced
+    top (HUB_BORE_TOP_Y): the set screw then bears on the leg, and neither
+    the leg's foot nor the bend enters the bore.
     """
-    sleeve_bottom = gooseneck_origin_y + sm_gooseneck_geom.LEG_BOTTOM
-    sleeve_top = gooseneck_origin_y + sm_gooseneck_geom.SLEEVE_TOP
-    if not (sleeve_bottom <= CASTING_UNDERSIDE_Y and CROSSBAR_TOP_Y <= sleeve_top):
+    leg_bottom = gooseneck_origin_y + sm_gooseneck_geom.LEG_BOTTOM
+    leg_top = gooseneck_origin_y + sm_gooseneck_geom.LEG_TOP
+    if not (leg_bottom <= HUB_BORE_BOTTOM_Y and HUB_BORE_TOP_Y <= leg_top):
         raise RuntimeError(
-            f"gooseneck sleeve y {sleeve_bottom:.3f}..{sleeve_top:.3f} at the "
-            f"{label} setting does not cover the top-frame hub bore's rail span "
-            f"{CASTING_UNDERSIDE_Y:.3f}..{CROSSBAR_TOP_Y:.3f}"
+            f"gooseneck leg y {leg_bottom:.3f}..{leg_top:.3f} at the {label} "
+            f"setting does not span the top-frame hub bore "
+            f"{HUB_BORE_BOTTOM_Y:.3f}..{HUB_BORE_TOP_Y:.3f}"
         )
     log(
-        f"gooseneck sleeve ({label}): y {sleeve_bottom:.3f}..{sleeve_top:.3f} "
-        f"covers the hub bore rail span {CASTING_UNDERSIDE_Y:.3f}.."
-        f"{CROSSBAR_TOP_Y:.3f} "
-        f"({CASTING_UNDERSIDE_Y - sleeve_bottom:.3f} "
-        f"below, {sleeve_top - CROSSBAR_TOP_Y:.3f} above)"
+        f"gooseneck leg ({label}): y {leg_bottom:.3f}..{leg_top:.3f} spans the "
+        f"hub bore {HUB_BORE_BOTTOM_Y:.3f}..{HUB_BORE_TOP_Y:.3f} "
+        f"({HUB_BORE_BOTTOM_Y - leg_bottom:.3f} below, "
+        f"{leg_top - HUB_BORE_TOP_Y:.3f} above)"
     )
 
 
@@ -741,10 +753,10 @@ async def build(adapter) -> dict[str, str]:
     counter_pose = counter_seat.pose
     _assert_counter_spring_hang(counter_pose)
     assert_counter_spring_top_hang(counter_pose, gooseneck_origin_y)
-    _assert_gooseneck_sleeve_covers_hub_bore(
+    _assert_gooseneck_leg_spans_hub_bore(
         spring_mounts.GOOSENECK_ORIGIN_Y, "reference"
     )
-    _assert_gooseneck_sleeve_covers_hub_bore(gooseneck_origin_y, "settled")
+    _assert_gooseneck_leg_spans_hub_bore(gooseneck_origin_y, "settled")
     _assert_knife_hanger_stack()
 
     # Reset the free-DOF manifest buffer before any *_driver(free_dof_key=...)
@@ -979,7 +991,7 @@ async def build(adapter) -> dict[str, str]:
     )
     # Ry(180): the gooseneck's overhang arm reaches from the east column toward
     # the machine centre. Its measured origin Y is inserted directly; its
-    # sleeve is held in the top-frame rail-hub bore by its 1/4-20 set screw.
+    # bare leg is held in the top-frame rail-hub bore by its 1/4-20 set screw.
     gooseneck = await place_component(
         adapter,
         "sm-gooseneck",
@@ -987,16 +999,38 @@ async def build(adapter) -> dict[str, str]:
         [0.0, 180.0, 0.0],
         ROT_Y_180,
     )
-    # The shoulder screw's origin is its shoulder end face, local +Z to the
-    # head; ROT_Y_POS90 maps +Z to machine +X, so the shoulder seats on the
-    # end face and the thread runs into the blind tap.  The mate records the
-    # seated pose, not a mechanical screw lock; the eye rides free on the
-    # shoulder (#2144 item 11.4) and adds no operational DOF.
-    screw_rows = ROT_Y_POS90
-    screw_y = gooseneck_origin_y + sm_gooseneck_geom.ARM_Y
-    screw_position = [spring_mounts.GOOSENECK_END_X, screw_y, SUMMING_Z]
+    # MHA-SM-05, bonded in the arm end (owner rulings 2026-11-08 (Pedro),
+    # #2315): its origin is the end face's centre with the spigot along local
+    # +X, so the gooseneck's own Ry(180) runs the spigot to machine -X, into
+    # the tube's faced end.  Locked to the gooseneck, as the bond holds it;
+    # no operational DOF.
+    end_axis_y = gooseneck_origin_y + sm_gooseneck_geom.ARM_Y
+    plug_position = [spring_mounts.GOOSENECK_END_X, end_axis_y, SUMMING_Z]
     # Literal stems, one call each: _buildgraph's source-expression contract
     # and the hanger-stack recipe count read them.
+    plug = await place_component(
+        adapter,
+        "sm-gooseneck-end-plug",
+        plug_position,
+        [0.0, 180.0, 0.0],
+        ROT_Y_180,
+        ground=False,
+    )
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{plug}", "PLANE"),
+        named_ref(f"Front Plane@{gooseneck}", "PLANE"),
+        label="end plug bonded in gooseneck arm",
+    )
+    assert_component_placed(adapter, plug, plug_position, ROT_Y_180)
+    # The shoulder screw's origin is its shoulder end face, local +Z to the
+    # head; ROT_Y_POS90 maps +Z to machine +X, so the shoulder seats on the
+    # plug's end face and the thread runs into its blind tap.  Locked to the
+    # plug it threads into; the mate records the seated pose, not a
+    # mechanical screw lock; the eye rides free on the shoulder (#2144 item
+    # 11.4) and adds no operational DOF.
+    screw_rows = ROT_Y_POS90
+    screw_position = [spring_mounts.GOOSENECK_END_X, end_axis_y, SUMMING_Z]
     screw_component = await place_component(
         adapter,
         "sm-vn-gooseneck-shoulder-screw",
@@ -1008,8 +1042,8 @@ async def build(adapter) -> dict[str, str]:
     await lock_mate(
         adapter,
         named_ref(f"Front Plane@{screw_component}", "PLANE"),
-        named_ref(f"Front Plane@{gooseneck}", "PLANE"),
-        label="shoulder screw seated on end piece",
+        named_ref(f"Front Plane@{plug}", "PLANE"),
+        label="shoulder screw seated on end plug",
     )
     assert_component_placed(adapter, screw_component, screw_position, screw_rows)
 

@@ -3,7 +3,8 @@
 Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: the counter spring's upper
 eye rides free on the shoulder of the slotted McMaster 91829A566 (read live
 2026-11-08; owner ruling 2026-11-08 (Pedro), #2144 item 11.4: bare slotted
-McMaster 91829A566, washer dropped), seated on the MHA-SM-01 end face.
+McMaster 91829A566, washer dropped), seated on the end face of the MHA-SM-05
+end plug bonded into MHA-SM-01 (owner rulings 2026-11-08 (Pedro), #2315).
 """
 from __future__ import annotations
 
@@ -215,12 +216,10 @@ def test_sheet_notes_state_supplier_data_and_where_used_only():
     assert spec.SUPPLIER_DATA[-1] == "10-24 UNC-2A, 3/8 THREAD; 70 KSI."
     for line in spec.SUPPLIER_DATA:
         assert "STAINLESS" not in line and "PASSIVATED" not in line, line
-    assert row["installation_notes"] == "INSTALLATION - MHA-SM-01 END PIECE"
-    assert any(
-        "MHA-SM-VN-56 THROUGH THE UPPER LOOP OF MHA-SM-VN-51" in step
-        and "SHOULDER SEATS" in step
-        for step in assembly.ASSEMBLY_STEPS
-    )
+    assert row["installation_notes"] == "INSTALLATION - MHA-SM-05 END PLUG"
+    steps = {step.split(". ", 1)[0]: step for step in assembly.ASSEMBLY_STEPS}
+    assert "MHA-SM-VN-56 THROUGH THE UPPER LOOP OF MHA-SM-VN-51" in steps["8A"]
+    assert "SHOULDER SEATS" in steps["8B"]
 
 
 def test_shoulder_length_and_thread_note_keep_their_own_lanes():

@@ -235,7 +235,9 @@ def test_isolated_counter_provenance_identifies_the_whole_support(
 ):
     # Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: the purchased
     # MHA-SM-VN-56 shoulder screw seated on the plain-tapped end face; the
-    # eye rides free on its shoulder.
+    # eye rides free on its shoulder.  Owner rulings 2026-11-08 (Pedro),
+    # #2315: that face and tap are MHA-SM-05's, the end plug (.60 head, .42
+    # spigot) bonded into MHA-SM-01's arm end.
     _, record = isolated_calibration
     support = record["upper_support"]
     assert support["component"] == "sm-vn-gooseneck-shoulder-screw"
@@ -261,8 +263,8 @@ def test_isolated_counter_provenance_identifies_the_whole_support(
         key.startswith(("plug_counterbore", "clamp_", "body_", "slot_")) for key in support
     )
     assert support["tube_dia_mm"] == pytest.approx(12.70)
-    assert support["plug_head_length_mm"] == 21.50
-    assert support["plug_length_mm"] == 26.00
+    assert support["plug_head_length_mm"] == pytest.approx(0.60 * 25.4)
+    assert support["plug_length_mm"] == pytest.approx((0.60 + 0.42) * 25.4)
     assert support["plug_edge_break_mm"] == 0.25
     counter_seat()
 

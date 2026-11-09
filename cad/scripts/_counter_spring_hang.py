@@ -6,10 +6,12 @@ fresh measurement while the counter record it replaces is still stale, and
 build_sm_summing_assembly gates the settled placement with the same check.
 
 Owner ruling 2026-11-08 (Pedro), #2144 item 11.4, superseding #1951's clamped
-eye: the upper eye rides free on MHA-SM-VN-56's shoulder, seated on the
-MHA-SM-01 end face, retained by the screw's head on the LOADED basis (owner
-ruling 2026-11-08 (Pedro), #2144 item 11.4: bare slotted McMaster 91829A566,
-washer dropped).
+eye: the upper eye rides free on MHA-SM-VN-56's shoulder, seated on the end
+face, retained by the screw's head on the LOADED basis (owner ruling
+2026-11-08 (Pedro), #2144 item 11.4: bare slotted McMaster 91829A566, washer
+dropped).  Owner rulings 2026-11-08 (Pedro), #2315: that end face is the
+MHA-SM-05 end plug's, bonded flush into MHA-SM-01's arm end, so the arm stays
+one Ø TUBE_DIA cylinder up to it.
 """
 
 from __future__ import annotations

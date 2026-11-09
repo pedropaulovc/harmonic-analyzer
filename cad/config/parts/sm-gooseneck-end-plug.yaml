@@ -1,0 +1,20 @@
+sm-gooseneck-end-plug:
+  title: Gooseneck End Plug
+  number: MHA-SM-05
+  # Owner rulings 2026-11-08 (Pedro), #2315: an independent part with its own
+  # drawing and MHA-SM-00 BOM row (not component_of), bonded into MHA-SM-01's
+  # arm end with LOCTITE 638 at MHA-SM-00 and carrying the #10-24 tap for the
+  # MHA-SM-VN-56 shoulder screw.
+  material: Plain Carbon Steel
+  material_specification: AISI 1018 cold-drawn round, 5/8 in
+  finish: bare, oiled (no plating)
+  quantity: 1
+  tolerance_class: machined_block
+  drawing_unit: in
+  process: "turned from 1018 round: head turned to the tube OD, spigot turned to the measured MHA-SM-01 bore, faced to length; tapped #10-24 UNC-2B blind before bonding"
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "minor"
+      where: "end view, the #10-24 blind tap: ENGAGEMENT .220 MIN (1.16D)"
+      finding: "full-thread engagement .220 in (1.16D), below rule 18's 1.5D"
+      reason: "Owner ruling 2026-11-08 (Pedro), #2144 item 11.4 (option A, a shoulder screw seated on the end face); owner ruling 2026-11-08 (Pedro), #2144 item 11.4: bare slotted McMaster 91829A566, washer dropped, and this shortfall accepted with that choice (carried from MHA-SM-01 RV-04 when the end plug became its own part, owner rulings 2026-11-08 (Pedro), #2315): the catalogue screw's 3/8 thread, less its undercut (2.3368, the family's vendor model) and a 1.5-pitch tip lead, leaves .220 of full thread whatever the tap depth (sm_gooseneck_spring_joint.ENGAGEMENT_MIN, floored); the 18-8 screw runs in the 1018 plug and the eye rides free on the shoulder, so the thread carries only the seated shoulder's preload."

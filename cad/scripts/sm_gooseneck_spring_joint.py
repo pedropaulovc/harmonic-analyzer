@@ -1,24 +1,27 @@
 """Tap, wall and free-eye budgets for the gooseneck's counter-spring screw.
 
 Owner ruling 2026-11-08 (Pedro), #2144 item 11.4, supersedes #1951's clamped
-eye: the whole gooseneck is still 1/2 in tube ending flush in the solid
-Ø.500 end piece (sm_gooseneck_geom), but the counter spring's upper eye now
-rides FREE on the 1/4 shoulder of a purchased shoulder screw (MHA-SM-VN-56),
-between the end face and the head.  Owner ruling 2026-11-08 (Pedro), #2144
-item 11.4: bare slotted McMaster 91829A566, washer dropped (the ruling's
-first 91259A576 5/16 shoulder dropped the arm 0.79 mm and its leading
-half-turn met the tube).
+eye: the counter spring's upper eye rides FREE on the 1/4 shoulder of a
+purchased shoulder screw (MHA-SM-VN-56), between the end face and the head.
+Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: bare slotted McMaster
+91829A566, washer dropped (the ruling's first 91259A576 5/16 shoulder dropped
+the arm 0.79 mm and its leading half-turn met the tube).
 The shoulder end seats on the end face and the 10-24 thread runs into a plain
 #10-24 UNC blind tap: no counterbore, no position frames, no datums.  The
 tap's axis carries the implied-zero coaxial offset of the title block's .XXX
 row.
 
-One owner minor (cad/config/parts/sm-gooseneck.yaml RV-04, accepted with the
-bare slotted screw) stands against rule 18: the catalogue screw's 3/8
+Owner rulings 2026-11-08 (Pedro), #2315: the end face, the tap and its walls
+belong to the end plug, MHA-SM-05 ``sm-gooseneck-end-plug``, its own part on
+its own inch sheet, tapped BEFORE it is bonded into MHA-SM-01's tube with
+LOCTITE 638 at MHA-SM-00 (sm_gooseneck_geom).
+
+One owner minor (cad/config/parts/sm-gooseneck-end-plug.yaml RV-01, accepted
+with the bare slotted screw) stands against rule 18: the catalogue screw's 3/8
 thread, less its undercut and tip lead, engages ENGAGEMENT_MIN (1.16D) of
 full thread, under 1.5D.  The check raises unless that declaration is
-present (sm_gooseneck_spec).  MHA-SM-01 prints decimal inch (#290): every term
-below charges the limits its sheet prints.
+present (sm_gooseneck_end_plug_spec).  Every term below charges the limits the
+plug's inch sheet prints.
 """
 
 from __future__ import annotations
@@ -48,13 +51,13 @@ UNIT = gooseneck.SHEET_UNIT
 # (#290 ruling), so the record keeps that value.
 EDGE_BREAK = edge_break_chamfer_mm(unit=UNIT)
 CALIBRATED_EDGE_BREAK = 0.25
-# The end piece's head Ø (.50) and length (.85) print at the title block's
-# .XX; the shank Ø (.363, below) at .XXX.  (lower, upper) mm about the model.
+# The plug's head Ø (.50) and length (.60) print at the title block's .XX;
+# the spigot Ø (.363, below) at .XXX.  (lower, upper) mm about the model.
 PLUG_DIA_DEVIATIONS = printed_deviations(gooseneck.PLUG_DIA, 2, unit=UNIT)
 PLUG_HEAD_LENGTH_DEVIATIONS = printed_deviations(
     gooseneck.PLUG_HEAD_LENGTH, 2, unit=UNIT
 )
-# The tap's axis to the end piece's OD: no frame and no datum (owner ruling
+# The tap's axis to the plug's OD: no frame and no datum (owner ruling
 # 2026-11-08, #2144 item 11.4), so the implied-zero coaxial offset is the
 # title block's .XXX row, a radial offset of its band.
 THREAD_AXIS_OFFSET_MAX = printed_band_mm(3, unit=UNIT)
@@ -64,47 +67,62 @@ THREAD_AXIS_OFFSET_MAX = printed_band_mm(3, unit=UNIT)
 # A print row for it read as method and could not be inspected after tapping
 # (machinist review of e487a1bb4; codjiflo P2 on #1997).
 DRILL_WANDER_MAX = 0.10
-# The end piece's shank is turned to the measured tube bore (the stock bore
-# spans 9.02-9.91, sm_gooseneck_geom), and the diametral clearance is the
-# mating requirement.  The retained Ø band still limits the shank, and the
-# wall budget below uses its lower limit.  Owner ruling 2026-10-27 (#1997):
-# the end piece is joined BEFORE the bend, cooled or fully cured first, so the
-# solid shank, .046 short of the bend's exit tangent, supports the tube through
-# the bend.  Three joints were weighed (#1997 joint-options note):
+# The plug's spigot is turned to the measured tube bore (the stock bore spans
+# 9.02-9.91, sm_gooseneck_geom), and the diametral clearance is the mating
+# requirement.  The retained Ø band still limits the spigot, and the wall
+# budget below uses its lower limit.  Owner pick 2026-11-08 (Pedro), #2315
+# option 2: LOCTITE 638 retaining compound on a .42 spigot, cured 24 h before
+# the shoulder screw goes in.  The joint is made at MHA-SM-00 after MHA-SM-01
+# is bent, so nothing in it sees the bend or a torch.  Earlier weighings
+# (#1997 joint-options note; #2315 options sketch):
 # - Press fit: rejected.  Shigley 10e eq. 3-57/3-58 (same steel, solid shaft)
 #   caps the diametral interference at about 0.021 before the thinnest
 #   tube's bore yields (0.014 at SF 1.5): a window too narrow on a stock bore
 #   measured in the shop.
-# - Silver braze, BAg-7: the filler maker's flux-brazed window, 0.002-0.005 in
-#   (0.051-0.127 mm) PER SIDE (Lucas-Milhaupt, "The Effect of Joint
-#   Clearance on Braze Joint Strength", Table 1; per side as in its
-#   "Designing Braze Joints at Temperature"), so .004-.010 in diametral;
-#   the window takes .0040-.0098 in (0.1016-0.24892) so it stays inside the
-#   LOCTITE 638 gap below, and prints rounded inward at four places.
-# - LOCTITE 638 retaining compound, the alternative: the same window, inside
-#   the TDS's 0.25 mm gap fill (TDS, August 2016).  ISO 10123 shear 25
-#   N/mm^2 minimum at 24 h, derated by the Henkel Retaining Compound Design
-#   Guide's factors (alloy steel 0.9, clearance 0.3 at the window's wide
-#   end, L/D 0.5 on a 9 mm shaft 0.6) holds about 2.2 N m, over the
-#   shoulder screw's seating torque reacting through the head.
-# The leg sleeve's stock select-fit takes the same window (sm_gooseneck_spec).
-BRAZE_CLEARANCE_MIN = 0.1016  # .0040 in
-BRAZE_CLEARANCE_MAX = 0.24892  # .0098 in
+# - Silver braze: dropped with the plating and torch work (#2315).
+# The window is .0040-.0098 in (0.1016-0.24892) diametral, inside the TDS's
+# 0.25 mm gap fill (TDS, August 2016), printed rounded inward at four places.
+BOND_CLEARANCE_MIN = 0.1016  # .0040 in
+BOND_CLEARANCE_MAX = 0.24892  # .0098 in
 # LOCTITE 638 TDS (August 2016): bond gaps up to 0.25 mm.
 LOCTITE_638_GAP_MAX = 0.25
-if BRAZE_CLEARANCE_MAX > LOCTITE_638_GAP_MAX:
-    raise AssertionError("the end piece's joint window passes LOCTITE 638's gap fill")
-# The shank's Ø at .XXX, on the inch grid: the tube's nominal bore less the
+if BOND_CLEARANCE_MAX > LOCTITE_638_GAP_MAX:
+    raise AssertionError("the end plug's joint window passes LOCTITE 638's gap fill")
+# The spigot's Ø at .XXX, on the inch grid: the tube's nominal bore less the
 # window's middle, .370 - .0069 = .363.
 PLUG_SHANK_DIA = (
     round(
-        (gooseneck.TUBE_BORE_DIA - (BRAZE_CLEARANCE_MIN + BRAZE_CLEARANCE_MAX) / 2.0)
+        (gooseneck.TUBE_BORE_DIA - (BOND_CLEARANCE_MIN + BOND_CLEARANCE_MAX) / 2.0)
         / MM_PER_IN,
         3,
     )
     * MM_PER_IN
 )
 PLUG_SHANK_DIA_DEVIATIONS = printed_deviations(PLUG_SHANK_DIA, 3, unit=UNIT)
+# The bond's torque capacity: ISO 10123 shear 25 N/mm^2 minimum at 24 h
+# (TDS), derated by the Henkel Retaining Compound Design Guide's factors:
+# alloy steel 0.9, clearance 0.3 at the window's wide end, and L/D 1.0 (the
+# .42 spigot on its .363 Ø is L/D 1.16).  It must hold the shoulder screw's
+# removal torque: its 18-8 #10-24 dry seating torque, 22.8 in-lb (Federal
+# Screw Works torque chart), times 1.3 breakaway, reacted through the joint
+# when the screw is backed out.
+LOCTITE_638_SHEAR_MPA = 25.0
+BOND_FACTOR = 0.9 * 0.3 * 1.0
+BOND_TORQUE_CAPACITY = (
+    LOCTITE_638_SHEAR_MPA
+    * BOND_FACTOR
+    * math.pi
+    * PLUG_SHANK_DIA
+    * gooseneck.PLUG_SHANK_LENGTH
+    * PLUG_SHANK_DIA
+    / 2.0
+    / 1000.0
+)  # N m, 9.6
+SCREW_SEATING_TORQUE = 22.8 * 0.1129848  # N m
+SCREW_REMOVAL_TORQUE = 1.3 * SCREW_SEATING_TORQUE  # 3.35
+BOND_TORQUE_MARGIN_MIN = 2.0
+if BOND_TORQUE_CAPACITY < BOND_TORQUE_MARGIN_MIN * SCREW_REMOVAL_TORQUE:
+    raise AssertionError("the end plug's LOCTITE 638 bond does not hold the screw's removal torque")
 
 
 def owner_minor(row: dict, exception_id: str, part: str) -> None:
@@ -188,7 +206,7 @@ WIRE_R = spring.WIRE_RADIUS_MM
 # rated).  The eye's pull bends it as a cantilever off the end face: at worst
 # the whole pull rides the loop's head-side wire, its centre one wire radius
 # off the head face at the longest eye space, and the least section there is
-# the thread's undercut land (Ø3.3528), which the end piece's tap mouth
+# the thread's undercut land (Ø3.3528), which the end plug's tap mouth
 # actually supports, so the root stress below is a bound.  Callers pass the
 # spring's catalogue maximum load (spring_mount_geom reads it from the
 # registry; this module reads no row).
@@ -203,7 +221,7 @@ def root_stress_mpa(load_n: float) -> tuple[float, float]:
     return load_n * LOAD_LEVER_MAX / _ROOT_SECTION_MODULUS, load_n / _ROOT_AREA
 
 
-# --- The end piece's blind tap (drawing-guidelines.md rule 18) -----------------
+# --- The end plug's blind tap (drawing-guidelines.md rule 18) -----------------
 # The shoulder seats on the end face, so the screw's tip stands its catalogue
 # thread length (3/8) into the tap.  The full thread runs past that tip at the
 # printed band; a bottoming tap's 1.5-pitch
@@ -253,14 +271,14 @@ ENGAGEMENT_CALLOUT_MIN = (
 ENGAGEMENT_CALLOUT_D = math.floor(round(ENGAGEMENT_MIN / screw.MAJOR_DIA * 100.0, 6)) / 100.0
 
 # drawing-guidelines.md rule 17 walls, FULL worst case, every term cited:
-#  * the end piece's head OD at its lower printed limit (PLUG_DIA_DEVIATIONS,
+#  * the plug's head OD at its lower printed limit (PLUG_DIA_DEVIATIONS,
 #    title-block .XX);
 #  * the tap at its basic major plus 0.025 root oversize (TAP_ROOT_OVERSIZE);
 #  * the tap's implied-zero offset from the OD (THREAD_AXIS_OFFSET_MAX) and
 #    its drill's wander (DRILL_WANDER_MAX);
 #  * 0.3 degrees of drill run-off over the deepest thread and its lead: the
-#    head OD is turned before brazing and the hole is drilled after, in a
-#    DIFFERENT setup located on the tube, so the run-off term applies;
+#    print does not tie the tap to the setup that turns the head, so the
+#    run-off term applies;
 #  * the title-block .010 edge break on the tap's mouth and on the head's OD
 #    edge at the end face (both counted together).
 TAP_ROOT_OVERSIZE = 0.025
@@ -315,14 +333,15 @@ if SHOULDER_NECK_STEP_MAX >= WIRE_R:
 if ENGAGEMENT_MIN <= 0.0:
     raise AssertionError("gooseneck shoulder screw engages no full thread")
 if TIP_THREAD_MARGIN_MIN <= 0.0:
-    raise AssertionError("gooseneck screw tip reaches past the end piece's full thread")
+    raise AssertionError("gooseneck screw tip reaches past the end plug's full thread")
 if TAP_LEAD_DRILL_MARGIN_MIN < 0.0:
-    raise AssertionError("gooseneck end piece's tap lead runs past its drill")
+    raise AssertionError("gooseneck end plug's tap lead runs past its drill")
 if TAP_DRILL_DEPTH_MAX > PLUG_HEAD_LENGTH_MIN:
-    raise AssertionError("gooseneck end piece's full-Ø drill runs into its shank")
+    raise AssertionError("gooseneck end plug's full-Ø drill runs into its shank")
 if min(PLUG_WALL_MIN, DRILL_POINT_SHANK_WALL_MIN) < PLUG_WALL_TARGET:
     raise AssertionError(
-        "gooseneck end piece loses a drawing-guidelines.md rule 17 (walls and webs) wall"
+        "gooseneck end plug loses a drawing-guidelines.md rule 17 (walls and webs) wall"
     )
 # ENGAGEMENT_MIN < ENGAGEMENT_MIN_D * MAJOR_DIA stands only on owner minor
-# sm-gooseneck RV-04; the part spec (sm_gooseneck_spec) checks the declaration.
+# sm-gooseneck-end-plug RV-01; the part spec (sm_gooseneck_end_plug_spec)
+# checks the declaration.

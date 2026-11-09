@@ -38,6 +38,9 @@ BOSS_HOOK = "sm-vn-boss-hook"
 BOSS_JAM_NUT = "sm-vn-boss-hook-jam-nut"
 COUNTER_SPRING = "sm-vn-counter-spring"
 GOOSENECK = "sm-gooseneck"
+# MHA-SM-05, bonded into the gooseneck's arm end at this assembly (owner
+# rulings 2026-11-08 (Pedro), #2315).
+END_PLUG = "sm-gooseneck-end-plug"
 SPRING_SCREW = "sm-vn-gooseneck-shoulder-screw"
 
 # Every component family and its count, in the builder's insertion order: the
@@ -52,6 +55,7 @@ QUANTITIES = {
     BOSS_JAM_NUT: 1,
     COUNTER_SPRING: 1,
     GOOSENECK: 1,
+    END_PLUG: 1,
     SPRING_SCREW: 1,
 }
 
@@ -90,8 +94,8 @@ KNIFE_GAUGE_BAR_DIA_MIN = (KNIFE_GAUGE_BAR_DIA_IN + min(KNIFE_GAUGE_BAR_BAND_IN)
 #
 # CounterSetting: the MHA-SM-VN-56 axis over the counter spring, measured up the
 # spring's own axis from the knife-edge contact level. Sliding the gooseneck's
-# sleeve in the frame hub sets it until the lever is level, so it prints as a
-# reference nominal.
+# bare leg in the frame hub sets it until the lever is level, so it prints as
+# a reference nominal.
 #
 # KnifeRockGauge: how far the boss-hook face rises when the lever rocks the
 # free-rock floor about the knife edge -- the free-rock acceptance in a

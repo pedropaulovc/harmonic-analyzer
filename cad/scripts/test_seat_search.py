@@ -470,7 +470,11 @@ def test_counter_support_certificate_refuses_stale_or_unproven_parts(
 
     ledger.write_text("{}")
     driver._require_current_support_parts()
-    assert seen[-1] == ["part:sm_gooseneck", "part:sm_vn_gooseneck_shoulder_screw"]
+    assert seen[-1] == [
+        "part:sm_gooseneck",
+        "part:sm_gooseneck_end_plug",
+        "part:sm_vn_gooseneck_shoulder_screw",
+    ]
 
 
 def test_driver_imports_against_the_stale_counter_record_it_replaces() -> None:

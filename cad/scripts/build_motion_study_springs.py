@@ -82,8 +82,9 @@ SUM_LEVER_EYE = (
     _SL.HOLE_Z_FIRST + ANCHOR_9489T111.eye_centre_mm[2],
 )
 # The stock double-loop spring's upper eye rides free on the MHA-SM-VN-56
-# shoulder, resting on the gooseneck end face (#2144 item 11.4), as in
-# spring_mount_geom.COUNTER_UPPER_EYE_X (assembly frame).
+# shoulder, resting on the MHA-SM-05 end plug's face (#2144 item 11.4,
+# #2315), as in spring_mount_geom.COUNTER_UPPER_EYE_X (assembly frame); the
+# datum stays on the structural gooseneck, which the plug is bonded into.
 GOOSENECK_EYE = (
     _GN.SPRING_EYE_X,
     _GN.ARM_Y,

@@ -479,6 +479,20 @@ def test_the_gooseneck_set_screw_is_waived_only_by_its_ruling() -> None:
     assert joint_id in unlocked(without)
 
 
+def test_the_gooseneck_shoulder_screw_threads_into_the_bonded_end_plug() -> None:
+    """Owner rulings 2026-11-08 (Pedro), #2315: the #10-24 tap belongs to the
+    MHA-SM-05 end plug, bonded into the bare MHA-SM-01 tube at MHA-SM-00 step
+    8; the shoulder screw goes in at step 8B, after the cure.  The tube itself
+    carries no thread."""
+    (row,) = [j for j in jr.JOINTS if j.id == "sm-summing/gooseneck-shoulder-screw"]
+    assert row.receiver == "sm_gooseneck_end_plug"
+    assert row.installed_at == "MHA-SM-00 STEP 8B"
+    assert "sm_gooseneck_end_plug" in jr.THREADED_PARTS
+    assert "sm_gooseneck" in jr.UNTHREADED_PARTS
+    assert "sm_gooseneck" not in jr.THREADED_PARTS
+    assert not any("sm_gooseneck" in (j.member, j.receiver) for j in jr.JOINTS)
+
+
 def test_the_pen_rod_set_screw_is_waived_only_by_its_ruling() -> None:
     """PR #1436: the rod set screw's cup point is the v-block's only retention on
     the rod, an oscillating joint with no room for a jam screw. The user

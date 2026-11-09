@@ -2295,6 +2295,17 @@
           "number": "MHA-DT-VN-70"
         }
       ]
+    },
+    {
+      "old_stem": "sm-gooseneck-end-plug",
+      "old_number": null,
+      "introduced": "2026-11-08",
+      "new_identities": [
+        {
+          "stem": "sm-gooseneck-end-plug",
+          "number": "MHA-SM-05"
+        }
+      ]
     }
   ],
   "retired_identities": [

@@ -1,4 +1,4 @@
-"""Offline flush end piece, blind tap, counterbore and weldment-note contracts."""
+"""Offline contracts for MHA-SM-01, the bent gooseneck tube, and its sheet."""
 
 from __future__ import annotations
 
@@ -11,19 +11,24 @@ from types import SimpleNamespace
 
 import pytest
 
-from _hole_spec import DRILL_POINT_H
+import _config
+from _machinist_review_mode import MachinistReviewMode
 import build_sm_gooseneck as part
 import draw_sm_gooseneck as drawing
 import sm_gooseneck_geom as geom
 import sm_gooseneck_spec as spec
-import sm_gooseneck_spring_joint as joint
+
+_SOURCES = (part, spec, drawing)
+
+
+def _tree(module) -> ast.Module:
+    return ast.parse(Path(module.__file__).read_text(encoding="utf-8"))
 
 
 def _calls(module, *, name: str | None = None, attr: str | None = None) -> list:
-    tree = ast.parse(Path(module.__file__).read_text(encoding="utf-8"))
     return [
         node
-        for node in ast.walk(tree)
+        for node in ast.walk(_tree(module))
         if isinstance(node, ast.Call)
         and (
             (name is not None and getattr(node.func, "id", None) == name)
@@ -32,63 +37,112 @@ def _calls(module, *, name: str | None = None, attr: str | None = None) -> list:
     ]
 
 
-def test_end_piece_is_flush_and_the_tube_ends_on_its_head() -> None:
-    # Owner ruling (#1951): flush with the tube OD, no step.
-    assert geom.PLUG_DIA == geom.TUBE_DIA == 12.70
-    assert part.PLUG_R == part.TUBE_R
+def _recorded_equations(module) -> dict[str, str]:
+    return {
+        call.args[0].value: call.args[1].value
+        for call in _calls(module, attr="record")
+        if len(call.args) == 2 and isinstance(call.args[0], ast.Constant)
+    }
+
+
+def _global_equations(module) -> dict[str, str]:
+    return {
+        call.args[1].value: call.args[2].value
+        for call in _calls(module, name="set_global")
+        if all(isinstance(arg, ast.Constant) for arg in call.args[1:3])
+    }
+
+
+def _globals_mm() -> dict[str, float]:
+    """The part's globals in model mm: the numeric ones as the build sets
+    them, the equations evaluated on those."""
+    values = {
+        "TubeDia": geom.TUBE_DIA,
+        "WallT": geom.WALL_T,
+        "LegTop": geom.LEG_TOP,
+        "LegBottom": geom.LEG_BOTTOM,
+        "BendR": geom.BEND_R,
+        "TubeEndX": geom.TUBE_END_X,
+    }
+    for name, expression in _global_equations(part).items():
+        values[name] = _evaluate(expression, values)
+    return values
+
+
+def _evaluate(expression: str, values: dict[str, float]) -> float:
+    literal = re.sub(r'"(\w+)"', lambda m: repr(values[m.group(1)]), expression)
+    return eval(literal)  # noqa: S307 -- the builder's own literal
+
+
+def test_gooseneck_is_one_bent_tube_ending_at_its_faced_arm_end() -> None:
+    # Owner rulings 2026-11-08 (Pedro), #2315: the bent tube alone; its arm
+    # end is the end plug's (MHA-SM-05) head length short of the end face.
     assert geom.TUBE_END_X - geom.ARM_END_X == pytest.approx(geom.PLUG_HEAD_LENGTH)
-    assert geom.ARM_STRAIGHT == pytest.approx(
-        geom.TUBE_STRAIGHT + geom.PLUG_HEAD_LENGTH
-    )
-    # The braze shank sits in the tube bore at its diametral clearance and
-    # inside the straight, short of the bend tangent.
-    clearance = geom.TUBE_BORE_DIA - joint.PLUG_SHANK_DIA
-    assert joint.BRAZE_CLEARANCE_MIN <= clearance <= joint.BRAZE_CLEARANCE_MAX
-    assert part.SHANK_R < part.TUBE_IR
-    assert part.SHANK_END_X == pytest.approx(geom.TUBE_END_X + geom.PLUG_SHANK_LENGTH)
-    assert part.SHANK_END_X < -geom.BEND_R
-    assert geom.PLUG_LENGTH == geom.PLUG_HEAD_LENGTH + geom.PLUG_SHANK_LENGTH
-
-
-def test_blind_tap_stays_inside_the_solid_end_piece() -> None:
-    assert joint.TAP_SPEC.kind.startswith("tapped")
-    assert joint.TAP_SPEC.size == "#10-24"
-    assert joint.TAP_SPEC.end == "blind"
-    assert joint.TAP_SPEC.thread_class == "2B"
-    assert part.TAP_DRILL_DIA == joint.TAP_DRILL_DIA
-    assert joint.TAP_THREAD_DEPTH < joint.TAP_DRILL_DEPTH
-    # The full drill Ø stays in the shortest head; the point stays in the end
-    # piece, so the tube's bore never sees the drill.
-    assert joint.TAP_DRILL_DEPTH_MAX <= joint.PLUG_HEAD_LENGTH_MIN
-    tip = joint.TAP_DRILL_DEPTH_MAX + DRILL_POINT_H * joint.TAP_DRILL_DIA_MAX / 2.0
-    assert tip < geom.PLUG_LENGTH
-    taps = _calls(part, name="wizard_holes")
-    assert len(taps) == 1
-    # The tube is swept first; the end piece and its tap follow as their own
-    # body, so the tap never reaches the tube's.
-    sweeps = _calls(part, attr="create_sweep")
-    assert sweeps
-    assert taps[0].lineno > max(node.lineno for node in sweeps)
-
-
-def test_tap_starts_on_the_end_face_of_the_unmerged_end_piece() -> None:
-    # Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: a plain tap, no
-    # counterbore, both depths from the end face.
+    assert geom.TUBE_STRAIGHT == pytest.approx(-geom.TUBE_END_X - geom.BEND_R)
+    assert geom.TUBE_STRAIGHT > 0.0
+    assert part.V_FINAL == pytest.approx(part.V_LEG + part.V_BEND + part.V_ARM)
+    assert part.V_ARM == pytest.approx(part.RING_AREA * geom.TUBE_STRAIGHT)
     source = Path(part.__file__).read_text(encoding="utf-8")
-    sweep = source.index("create_sweep")
-    end_piece = source.index('name_last_feature(adapter, "EndPiece")')
-    tap = source.index('name="ThreadBore"')
-    assert sweep < end_piece < tap
-    assert "Counterbore" not in source
-    # The end piece is its own body, so section A-A hatches it apart from the
-    # tube (machinist review of 3c0b5d87c).
-    revolve = source.rindex("create_revolve", 0, end_piece)
-    assert "merge_result=False" in source[revolve:end_piece]
-    assert "len(bodies) != 2" in source
-    assert "[[ARM_END_X, ARM_Y, 0.0]]" in source
-    assert joint.TAP_SPEC.depth_mm == joint.TAP_DRILL_DEPTH
-    assert joint.TAP_SPEC.overrides_mm == {"ThreadDepth": joint.TAP_THREAD_DEPTH}
-    assert part.V_TAP > 0.0
+    assert "len(bodies) != 1" in source
+    # No end piece, tap, screw axis or sleeve: nothing is revolved, drilled or
+    # given an assembly axis on the tube.
+    for name in ("create_revolve", "wizard_holes", "name_bore_axis", "add_line_chain"):
+        assert not _calls(part, name=name) and not _calls(part, attr=name), name
+    features = {
+        call.args[1].value
+        for call in _calls(part, name="name_last_feature")
+        if isinstance(call.args[1], ast.Constant)
+    }
+    assert features == {
+        "LegProfile",
+        "Leg",
+        "BendPath",
+        "BendProfile",
+        "BendProfileFlipped",
+        "BendArmSweep",
+        "StationReference",
+        "TubeOdReference",
+        "OverallReference",
+    }
+
+
+def test_no_plug_tap_sleeve_or_braze_terms_remain() -> None:
+    banned = re.compile(r"\b(?:SLEEVE|BRAZE|PLUG|TAP)_")
+    for module in _SOURCES:
+        text = Path(module.__file__).read_text(encoding="utf-8")
+        assert not banned.findall(text), module.__name__
+    for module in (part, spec):
+        names = {node.id for node in ast.walk(_tree(module)) if isinstance(node, ast.Name)}
+        assert not {name for name in names if banned.match(name)}
+    printed = " ".join(
+        (spec.DRAWING_NOTES, *spec.DIMENSION_CALLOUTS_BY_NAME.values())
+    ).upper()
+    for word in ("BRAZE", "BAG-7", "LOCTITE", "PLATE", "MASK", "SLEEVE", "TAP", "PLUG"):
+        assert word not in printed, word
+
+
+def test_globals_drive_the_built_arm_and_overall_sizes() -> None:
+    values = _globals_mm()
+    assert values["ArmY"] == pytest.approx(geom.ARM_Y)
+    assert values["ArmStraight"] == pytest.approx(geom.TUBE_STRAIGHT)
+    equations = _recorded_equations(part)
+    # The swept arm and the printed arm straight run to the faced arm end.
+    assert equations["TubeStraight"] == equations["ArmStraight"] == '"ArmStraight"'
+    height = geom.ARM_Y + geom.TUBE_DIA / 2.0 - geom.LEG_BOTTOM
+    reach = geom.TUBE_DIA / 2.0 - geom.TUBE_END_X
+    assert _evaluate(equations["OverallHeight"], values) == pytest.approx(height)
+    assert _evaluate(equations["OverallReach"], values) == pytest.approx(reach)
+    assert _evaluate(equations["LegLength"], values) == pytest.approx(geom.LEG_LENGTH)
+    assert _evaluate(equations["OverallFootRadius"], values) == pytest.approx(
+        geom.TUBE_DIA / 2.0
+    )
+    assert height / 25.4 == pytest.approx(19.65)
+    assert reach / 25.4 == pytest.approx(3.719, abs=0.0005)
+    assert geom.TUBE_STRAIGHT / 25.4 == pytest.approx(0.469, abs=0.0005)
+    # The reference sketches are hidden in the part and shown only by the
+    # elevation.
+    blanked = {call.args[1].value for call in _calls(part, name="blank_sketch")}
+    assert blanked == {"StationReference", "TubeOdReference", "OverallReference"}
 
 
 def test_every_direct_db_block_restores_inference_in_finally() -> None:
@@ -96,7 +150,7 @@ def test_every_direct_db_block_restores_inference_in_finally() -> None:
     # that turns it off must restore it even when a native segment is
     # rejected, so every True is followed at once by a try whose finally
     # restores it, and nothing restores it outside a finally.
-    tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
+    tree = _tree(part)
 
     def toggle(node: ast.AST) -> str | None:
         if (
@@ -131,93 +185,58 @@ def test_every_direct_db_block_restores_inference_in_finally() -> None:
     assert on == restored == len(offs) >= 1
 
 
-def test_end_piece_carries_no_counterbore_frames_or_datums() -> None:
-    # Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: plain #10-24 tap; no
-    # counterbore, frames, datums or RV-01.
+def test_sheet_places_every_marked_dimension_at_its_places() -> None:
     marked = {name for names in spec.DRAWING_DIMENSIONS.values() for name in names}
-    assert not any("Counterbore" in name for name in marked)
-    assert "CounterboreProfile" not in spec.DRAWING_DIMENSIONS
-    for name in ("GEOMETRIC_TOLERANCES_IN", "DIMENSION_CALLOUTS_ABOVE", "COUNTERBORE_NOTE"):
-        assert not hasattr(spec, name)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    for token in ("add_feature_control_frame", "add_datum_feature", "CreateDetailViewAt"):
-        assert token not in source
-    assert spec.PLUG_DIA_CALLOUT == "FLUSH WITH TUBE OD"
-    callouts = spec.DIMENSION_CALLOUTS_BY_NAME
-    assert set(callouts) <= marked
+    assert marked == {
+        "LegLength",
+        "ArmStraight",
+        "TubeOdRef",
+        "OverallHeight",
+        "OverallReach",
+        "BendRadius",
+    }
+    assert set(drawing.FRONT_KEEP) == marked
+    assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
+    assert spec.DRAWING_PRECISION_BY_NAME == {
+        "LegLength": 1,
+        "BendRadius": 1,
+        "ArmStraight": 2,
+        "OverallHeight": 2,
+        "OverallReach": 2,
+        "TubeOdRef": 3,
+    }
     for feature, by_name in spec.DIMENSION_CALLOUTS.items():
-        assert set(by_name) <= set(spec.DRAWING_DIMENSIONS[feature])
+        assert set(by_name) <= spec.DRAWING_DIMENSIONS[feature]
+    assert spec.DIMENSION_CALLOUTS_BY_NAME == {
+        "BendRadius": "TUBE CENTERLINE",
+        "TubeOdRef": ".065 WALL STOCK",
+    }
 
 
-def test_notes_state_stock_process_and_intent_without_sizes() -> None:
-    lines = spec.DRAWING_NOTES.splitlines()
-    # Rule 7: four lines at most, each ending left of the title block
-    # (x 0.216) from NOTES_XY at the sheet's ~2.42 mm a character (farm run
-    # 20261028T005208028Z: the 80-character line ended at x 0.210).
-    assert len(lines) <= 4
-    assert all(re.match(r"\d\. ", line) for line in lines)
-    assert drawing.NOTES_XY[0] + 0.00242 * max(map(len, lines)) < 0.214
-    notes = " ".join(spec.DRAWING_NOTES.split())
-    # Each window prints in plain inch steps, rounded inward at three places
-    # (integration review at 8fb7fb46f7: .0040-.0098 read as converted mm).
-    # The shank's stays inside BAg-7's window and LOCTITE 638's 0.25 mm gap
-    # fill; the brazed-only sleeve takes BAg-7's .004-.010 diametral.
-    assert spec.SHANK_CLEARANCE_WINDOW == ".004-.009"
-    assert spec.SLEEVE_CLEARANCE_WINDOW == ".004-.010"
-    assert 0.009 * 25.4 <= joint.BRAZE_CLEARANCE_MAX <= joint.LOCTITE_638_GAP_MAX
-    assert joint.BRAZE_CLEARANCE_MIN <= 0.004 * 25.4
-    assert spec.SLEEVE_CLEARANCE_MAX == pytest.approx(0.010 * 25.4)
-    # Every SEE NOTE n a callout prints names a note on the sheet.
-    numbers = {line.split(".", 1)[0] for line in lines}
-    printed = " ".join(spec.DIMENSION_CALLOUTS_BY_NAME.values())
-    assert set(re.findall(r"SEE NOTE (\d)", printed)) <= numbers
-    # A callout carries at most two lines of words (rule 7).
-    for name, text in spec.DIMENSION_CALLOUTS_BY_NAME.items():
-        assert len(text.splitlines()) <= 2, name
-    # Both fit windows print as the acceptance of a matched fit (fan-out
-    # policy 1): the shank turned to suit the tube, the sleeve selected.
-    assert notes.count(f"TUBE ID, CLEARANCE {spec.SHANK_CLEARANCE_WINDOW};") == 1
-    assert notes.count(f"ON TUBE, CLEARANCE {spec.SLEEVE_CLEARANCE_WINDOW};") == 1
-    assert "REF" not in notes
-    assert "DIAMETRAL" not in notes
-    # Both blocks sit beside the narrow end view: the shank's leader shoulder
-    # ends left of it and the sleeve fits between it and the elevation's leg
-    # (Opus reviews at 7fe9d97bd and 85e75a2b5).
-    for text in (spec.SHANK_FIT_CALLOUT, spec.SLEEVE_FIT_CALLOUT):
-        assert max(map(len, text.splitlines())) < 19
-    # A note names no tool (rule 7): R3.0 is the native bend radius.
-    assert "DIE" not in notes
-    # Sizes and tolerances are native model dimensions, never note text.
-    assert re.search(r"\b\d+\.\d{1,2}\b", notes) is None, notes
-    assert "<MOD-DIAM>" not in notes and "Ø" not in notes
-    assert "THRU" not in notes.upper()
-
-
-def test_stock_diameters_print_as_untoleranced_references() -> None:
-    # Machinist review of main 31cea0b73 (owner ruling 2026-10-31): the as-
-    # supplied tube and sleeve Ø print as native reference dimensions, no
-    # band; the supplier's tolerance governs and the walls stay designations.
+def test_references_and_the_governing_arm_size() -> None:
+    # The tube's stock Ø and the overall height are references; the arm end
+    # is sawn and faced after the bend (#2315), so the overall reach to real
+    # faces governs and the arm straight to the bend's tangent is reference.
     assert spec.REFERENCE_DIMENSIONS == {
         "TubeOdReference": frozenset({"TubeOdRef"}),
-        "SleeveProfile": frozenset({"SleeveDia"}),
-        "OverallReference": frozenset({"OverallHeight", "OverallReach"}),
-        # Turned to the measured tube ID (note 2): the fit governs.
-        "EndPieceProfile": frozenset({"PlugShankDia"}),
+        "StationReference": frozenset({"ArmStraight"}),
+        "OverallReference": frozenset({"OverallHeight"}),
     }
     for feature, names in spec.REFERENCE_DIMENSIONS.items():
         assert names <= spec.DRAWING_DIMENSIONS[feature]
-        assert set(names) <= set(drawing.FRONT_KEEP) | set(drawing.SECTION_KEEP)
-    # The reference line runs on the bare leg, between the sleeve and the bend.
+    referenced = set().union(*spec.REFERENCE_DIMENSIONS.values())
+    assert {"LegLength", "BendRadius", "OverallReach"}.isdisjoint(referenced)
+    # The tube Ø's reference line runs on the leg, below the bend tangent.
     low = spec.TUBE_OD_REF_Y - spec.TUBE_OD_REF_SPAN / 2.0
     high = spec.TUBE_OD_REF_Y + spec.TUBE_OD_REF_SPAN / 2.0
-    assert geom.SLEEVE_TOP < low < high < geom.LEG_TOP
+    assert geom.LEG_BOTTOM < low < high < geom.LEG_TOP
 
 
 def test_only_the_reference_value_is_bracketed_when_a_callout_rides_it(
     monkeypatch,
 ) -> None:
-    # Machinist review of 6b67c9516: ShowParenthesis bracketed the sleeve's
-    # whole block, so its fit requirement read as reference.
+    # Machinist review of 6b67c9516: ShowParenthesis bracketed a whole block,
+    # so its callout read as reference.
     class Display:
         def __init__(self) -> None:
             self.ShowParenthesis = False
@@ -236,200 +255,107 @@ def test_only_the_reference_value_is_bracketed_when_a_callout_rides_it(
 
     monkeypatch.setattr(part, "_named_dimensions", named)
     part._author_reference_dimensions(None)
-    for name in ("SleeveDia", "TubeOdRef", "PlugShankDia"):
-        display = displays[name]
-        assert (display.GetText(1), display.GetText(2)) == ("(<MOD-DIAM>", ")")
-        assert not display.ShowParenthesis
-    for name in ("OverallHeight", "OverallReach"):
+    assert set(displays) == {"TubeOdRef", "ArmStraight", "OverallHeight"}
+    tube = displays["TubeOdRef"]
+    assert (tube.GetText(1), tube.GetText(2)) == ("(<MOD-DIAM>", ")")
+    assert not tube.ShowParenthesis
+    for name in ("ArmStraight", "OverallHeight"):
         assert displays[name].ShowParenthesis
         assert displays[name].text == {}
 
 
-def _recorded_equations(module) -> dict[str, str]:
-    return {
-        call.args[0].value: call.args[1].value
-        for call in _calls(module, attr="record")
-        if len(call.args) == 2 and isinstance(call.args[0], ast.Constant)
-    }
+def test_note_states_the_bend_acceptance_without_method_or_sizes() -> None:
+    lines = spec.DRAWING_NOTES.splitlines()
+    # Rule 7: four lines at most, each ending left of the title block
+    # (x 0.216) from NOTES_XY at the sheet's ~2.42 mm a character (farm run
+    # 20261028T005208028Z: the 80-character line ended at x 0.210).
+    assert 1 <= len(lines) <= 4
+    assert all(re.match(r"\d\. ", line) for line in lines)
+    assert drawing.NOTES_XY[0] + 0.00242 * max(map(len, lines)) < 0.214
+    notes = " ".join(spec.DRAWING_NOTES.split())
+    assert "OVALITY 5% MAX" in notes and "NO KINKS" in notes
+    # Geometry, not method (rule 7): no tool, no bend order, no tail.
+    for word in ("DIE", "SAW", "TAIL", "FACE", "THEN", "JOIN", "CURE"):
+        assert word not in notes, word
+    # The title block owns material and finish (rule 2).
+    for word in ("4130", "POLISH", "OIL", "WAX"):
+        assert word not in notes, word
+    # Sizes and tolerances are native model dimensions, never note text.
+    assert re.search(r"\b\d+\.\d{1,2}\b", notes) is None, notes
+    assert "<MOD-DIAM>" not in notes and "Ø" not in notes
+    # A callout carries at most two lines of words (rule 7).
+    for name, text in spec.DIMENSION_CALLOUTS_BY_NAME.items():
+        assert len(text.splitlines()) <= 2, name
 
 
-def test_overall_height_and_reach_print_as_two_place_references() -> None:
-    # Machinist review r5 of farm run 20261101T004958072Z: the leg length and
-    # arm straight stop at the bend's tangents, so the bent part needs overall
-    # sizes to real faces, printed as references beside the governing tangent
-    # ones.  Two places: the snapped leg puts the height at 19.650 in, a
-    # one-place tie.
-    names = {"OverallHeight", "OverallReach"}
-    assert spec.DRAWING_DIMENSIONS["OverallReference"] == names
-    assert spec.REFERENCE_DIMENSIONS["OverallReference"] == names
-    assert spec.DRAWING_PRECISION["OverallReference"] == dict.fromkeys(names, 2)
-    assert names <= set(drawing.FRONT_KEEP)
-    # The equations, evaluated on the part's globals, are the faces' spans.
-    globals_mm = {
-        "ArmY": geom.LEG_TOP + geom.BEND_R,
-        "TubeDia": geom.TUBE_DIA,
-        "LegBottom": geom.LEG_BOTTOM,
-        "ArmEndX": geom.ARM_END_X,
-    }
-    equations = _recorded_equations(part)
-
-    def evaluate(name: str) -> float:
-        expression = re.sub(
-            r'"(\w+)"', lambda m: repr(globals_mm[m.group(1)]), equations[name]
+def test_title_block_material_and_finish_come_from_the_registry_row() -> None:
+    row = _config.parts("sm-gooseneck")
+    assert row["number"] == "MHA-SM-01"
+    assert row["drawing_unit"] == spec.UNIT == geom.SHEET_UNIT == "in"
+    assert "OnlineMetals 7322" in row["material_specification"]
+    finish = str(row["finish"]).lower()
+    assert "polished bare" in finish and "oil or wax" in finish
+    assert "machinist_exceptions" not in row
+    # apply_drawing_properties stamps the row's fields; the build passes only
+    # the sheet's own notes.
+    properties = _calls(part, name="apply_drawing_properties")
+    assert len(properties) == 1
+    extra = ast.literal_eval(
+        ast.unparse(properties[0].args[2]).replace("DRAWING_NOTES", "'n'").replace(
+            "ISOMETRIC_VIEW_NOTE", "'i'"
         )
-        return eval(expression)  # noqa: S307 -- the builder's own literal
-
-    height = geom.ARM_Y + geom.TUBE_DIA / 2.0 - geom.LEG_BOTTOM
-    reach = geom.TUBE_DIA / 2.0 - geom.ARM_END_X
-    assert evaluate("OverallHeight") == pytest.approx(height)
-    assert evaluate("OverallReach") == pytest.approx(reach)
-    assert height / 25.4 == pytest.approx(19.65)
-    assert reach / 25.4 == pytest.approx(4.319, abs=0.0005)
-    # The sketch is hidden in the part and shown only by the elevation.
-    blanked = {call.args[1].value for call in _calls(part, name="blank_sketch")}
-    assert "OverallReference" in blanked
+    )
+    assert set(extra) == {"Manufacturing Notes", "Isometric View Note"}
 
 
-def test_overall_references_stand_clear_of_the_elevation_dimensions() -> None:
+def test_sheet_is_the_elevation_and_isometric_only() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    for token in (
+        "create_section_view",
+        "CreateDetailViewAt",
+        "add_native_hole_callout",
+        '"*Left"',
+        "Crop2",
+        "FaceHatch",
+    ):
+        assert token not in source, token
+    views = [
+        call.args[2].value
+        for call in _calls(drawing, name="place_view")
+        if isinstance(call.args[2], ast.Constant)
+    ]
+    assert views == ["*Front", "*Isometric"]
+    assert drawing.MACHINIST_REVIEW is MachinistReviewMode.ENFORCE
+    assert spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:4"
+    assert drawing.ISO_SCALE == (1, 4)
+
+
+def test_elevation_dimensions_stand_clear_of_each_other_and_the_title_block() -> None:
     keep = drawing.FRONT_KEEP
     height_x, height_y = keep["OverallHeight"]
     reach_x, reach_y = keep["OverallReach"]
-    # Outermost on the leg's right, short of the isometric's left edge (x
-    # 0.358 in farm run 20261101T004958072Z), its text away from the leg's.
-    assert keep["LegLength"][0] + 0.015 <= height_x <= drawing.ISO_CENTER[0] - 0.030
+    # Outermost on the leg's right, short of the title block's left edge
+    # (x 0.216) and the isometric, its text away from the leg length's.
+    assert keep["LegLength"][0] + 0.015 <= height_x <= 0.216 - 0.010
+    assert height_x <= drawing.ISO_CENTER[0] - 0.030
     assert abs(height_y - keep["LegLength"][1]) >= 0.015
     assert drawing.FOOT_Y < height_y < drawing._front_y(geom.ARM_Y + geom.TUBE_DIA / 2)
-    # Over the arm straight, under the view label (bottom y 0.258).
-    assert keep["ArmStraight"][1] + 0.005 <= reach_y <= 0.258 - 0.0045
-    assert drawing.END_FACE_X < reach_x < drawing._front_x(geom.TUBE_DIA / 2)
-    # The arm straight's text (11.3 mm wide at 27.16, farm run
-    # 20261101T022045634Z; 1.07 is narrower) ends one
-    # text clearance (1.78 mm) left of the end face's shared extension line.
-    assert keep["ArmStraight"][0] + 0.0113 / 2 + 0.00178 <= drawing.END_FACE_X
-
-
-def test_tap_callout_states_geometry_and_its_mate_within_four_rows() -> None:
-    # The native callout's two rows plus these two stay within the layout
-    # audit's four-row limit; each row is finished geometry, not method.
-    rows = spec.TAP_CALLOUT_BELOW.splitlines()
-    assert rows == [
-        f"FOR {spec.SCREW_NUMBER}",
-        f"ENGAGEMENT {f'{joint.ENGAGEMENT_CALLOUT_MIN:.3f}'.lstrip('0')} MIN "
-        f"({joint.ENGAGEMENT_CALLOUT_D:.2f}D)",
-    ]
-    assert rows[1] == "ENGAGEMENT .220 MIN (1.16D)"
-    assert spec.SCREW_NUMBER == "MHA-SM-VN-56"
-    # No row longer than r7's 39-character row, which stood left of the arm
-    # straight's text.
-    assert max(map(len, rows)) <= 39
-    assert "AXIS" not in spec.TAP_CALLOUT_BELOW
-    assert "C'BORE" not in spec.TAP_CALLOUT_BELOW
-    assert "WANDER" not in spec.TAP_CALLOUT_BELOW
-    assert "BRAZE" not in spec.TAP_CALLOUT_BELOW
-    printed = " ".join((spec.DRAWING_NOTES, spec.TAP_CALLOUT_BELOW)).upper()
-    assert "PURCHASED" not in printed and "INTEGRAL" not in printed
-    assert "THREADLOCKER" not in printed  # the spring eye belongs to the assembly
-
-
-def test_sheet_places_every_marked_dimension_at_its_places() -> None:
-    marked = {name for names in spec.DRAWING_DIMENSIONS.values() for name in names}
-    assert set(drawing.FRONT_KEEP) | set(drawing.SECTION_KEEP) == marked
-    assert not set(drawing.FRONT_KEEP) & set(drawing.SECTION_KEEP)
-    assert set(spec.DRAWING_DIMENSIONS["EndPieceProfile"]) == set(drawing.SECTION_KEEP)
-    assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
-    assert {
-        name for name, places in spec.DRAWING_PRECISION_BY_NAME.items() if places == 1
-    } == spec.ONE_PLACE_DIMENSIONS
-    # Section A-A keeps only the end piece: its crop runs past the shank,
-    # short of the bend; its full cut's line runs past where the plane leaves
-    # the bend's outer wall, short of the leg, so the cut imports.  The line
-    # it prints is then the short partial one (rule 9): across the end piece
-    # and its joint, on past the crop to the bend tangent.  The long line is
-    # centred on the short one, so shortening it does not move the view.
-    start, end = drawing.SECTION_CROP_X_MM
-    assert start < geom.ARM_END_X < part.SHANK_END_X < end < -geom.BEND_R
-    bend_cut_end = -geom.BEND_R + math.sqrt(
-        (geom.BEND_R + geom.TUBE_DIA / 2.0) ** 2 - geom.BEND_R**2
+    # Over the arm straight, inside the sheet's top border.
+    assert keep["ArmStraight"][1] + 0.005 <= reach_y <= 0.258
+    assert drawing.ARM_END_X < reach_x < drawing._front_x(geom.TUBE_DIA / 2)
+    # The arm straight's text (~12 mm wide at (.47)) ends one text clearance
+    # (1.78 mm) left of the faced arm end's shared extension line.
+    assert keep["ArmStraight"][0] + 0.012 / 2 + 0.00178 <= drawing.ARM_END_X
+    # The tube Ø crosses the leg on its left, level with the leg length.
+    assert keep["TubeOdRef"][0] < drawing.LEG_AXIS_X < keep["LegLength"][0]
+    assert keep["TubeOdRef"][1] == keep["LegLength"][1]
+    # The elevation's foot stands above the title block's top (y 0.066) and
+    # the note, which ends left of the elevation's arm end.
+    assert drawing.FOOT_Y > 0.066 > drawing.NOTES_XY[1]
+    note_end = drawing.NOTES_XY[0] + 0.00242 * max(
+        map(len, spec.DRAWING_NOTES.splitlines())
     )
-    line_start, line_end = drawing.SECTION_LINE_X_MM
-    assert line_start < start and bend_cut_end < line_end < 0.0
-    short_start, short_end = drawing.SECTION_SHORT_X_MM
-    assert short_start == start and end < short_end == -geom.BEND_R
-    assert line_start + line_end == pytest.approx(short_start + short_end)
-    assert drawing.TUBE_BREAK_X < end < short_end
-
-
-@pytest.fixture
-def saved_tap(monkeypatch):
-    """Read-only saved feature with independently specified native tap metadata."""
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
-    definition = SimpleNamespace(
-        FastenerSize="#10-24",
-        ThreadClass="2B",
-        ThreadEndCondition=0,  # blind
-        EndCondition=0,
-        TapDrillDiameter=0.003797,  # native model length units are metres
-        TapDrillDepth=0.014224,  # .56 in
-        ThreadDepth=0.011176,  # .44 in
-    )
-    feature = SimpleNamespace(
-        GetTypeName2=lambda: "HoleWzd",
-        GetDefinition=lambda: definition,
-    )
-    model = SimpleNamespace(
-        FeatureByName=lambda name: feature if name == "ThreadBore" else None,
-    )
-    return model, feature, definition
-
-
-@pytest.mark.parametrize("offset_mm", [-0.004, 0.0, 0.004])
-@pytest.mark.parametrize("field", ["TapDrillDiameter", "TapDrillDepth", "ThreadDepth"])
-def test_saved_native_receiver_accepts_the_blind_tap(saved_tap, field, offset_mm):
-    model, _feature, definition = saved_tap
-    setattr(definition, field, getattr(definition, field) + offset_mm / 1000.0)
-    drawing._require_saved_tap(model)
-
-
-@pytest.mark.parametrize(
-    ("field", "value", "diagnostic"),
-    [
-        ("FastenerSize", "1/4-20", "thread size"),
-        ("ThreadClass", "", "ThreadClass"),
-        ("ThreadClass", "3B", "ThreadClass"),
-        ("ThreadEndCondition", 1, "ThreadEndCondition"),
-        ("ThreadEndCondition", 2, "ThreadEndCondition"),
-        ("EndCondition", 1, "EndCondition"),
-        ("EndCondition", 2, "EndCondition"),
-        ("TapDrillDiameter", 0.0, "tap drill"),
-        ("TapDrillDiameter", 0.003791, "tap drill"),
-        ("TapDrillDiameter", 0.003803, "tap drill"),
-        ("TapDrillDiameter", math.nan, "tap drill"),
-        ("TapDrillDepth", 0.0141, "tap drill depth"),
-        ("TapDrillDepth", 0.0200, "tap drill depth"),
-        ("ThreadDepth", 0.0113, "thread depth"),
-        ("ThreadDepth", 0.0105, "thread depth"),
-    ],
-)
-def test_saved_native_receiver_rejects_lost_thread_metadata(
-    saved_tap, field, value, diagnostic
-):
-    model, _feature, definition = saved_tap
-    setattr(definition, field, value)
-    with pytest.raises(RuntimeError, match=diagnostic):
-        drawing._require_saved_tap(model)
-
-
-@pytest.mark.parametrize("fault", ["missing", "plain_cut", "no_definition"])
-def test_saved_receiver_requires_a_native_hole_feature(saved_tap, fault):
-    model, feature, _definition = saved_tap
-    if fault == "missing":
-        model.FeatureByName = lambda _name: None
-    elif fault == "plain_cut":
-        feature.GetTypeName2 = lambda: "Cut"
-    else:
-        feature.GetDefinition = lambda: None
-    with pytest.raises(RuntimeError):
-        drawing._require_saved_tap(model)
+    assert note_end < drawing.ARM_END_X
 
 
 def _mass_adapter(volume: float):
@@ -450,5 +376,5 @@ def test_build_stops_on_a_non_finite_volume_read(volume):
         asyncio.run(part._volume(adapter))
     # The shared check already rejects an infinite read; NaN needs the guard.
     with pytest.raises(RuntimeError, match="non-finite volume|volume -?inf"):
-        asyncio.run(part._volume_check(adapter, "end piece", 100.0, 1.0))
+        asyncio.run(part._volume_check(adapter, "bend + arm", 100.0, 1.0))
     assert asyncio.run(part._volume(_mass_adapter(100.0))) == 100.0
