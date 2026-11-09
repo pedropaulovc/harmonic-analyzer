@@ -1494,7 +1494,10 @@ partial edit instructions; they are not an arbitrary-topology edit engine.
 
 Declared outputs under `cad/out/reports/feature-reconcile/` include
 `report.json`, `spans.jsonl`, `baseline-manifest.json`, `target-recipe.json`,
-the baseline and all nine trial native parts. The directory is archived by the
+the baseline and all nine trial native parts, plus `visual-clean.png` and
+`visual-incremental.png`. The two native isometric viewport captures are produced
+after all timed trials, without saving the source parts; image validation and
+native byte-identity checks are mandatory. The directory is archived by the
 ordinary leaf cache, so raw benchmark OTel spans survive worker cleanup.
 The report carries trace/span IDs, per-phase wall timings, individual results
 and medians; it reports initial baseline creation separately. Native validation
@@ -1507,7 +1510,11 @@ failed dimension writes, failed rebuilds, and failed readbacks are fatal.
 
 These are raw **warm-seat operation** timings, including validation and save/
 reopen, not whole-build speedups. Incremental timings also include baseline
-contract validation before the first mutation. The report excludes process
+contract validation before the first mutation, reported as its own phase rather
+than edit time. Verification, save, reopen, and each close have separate phase
+spans; trial row totals still include them all. Dedicated raw span serialization
+happens when the root benchmark span ends, outside measured trial rows. The
+post-trial visual captures are also excluded. The report excludes process
 startup, connection, farm scheduling, source acquisition, and cache publication;
 use the surrounding farm spans to study those separately. No measurements
 are claimed until a native run succeeds and its declared evidence is retained.

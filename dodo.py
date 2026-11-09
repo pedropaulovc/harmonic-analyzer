@@ -5088,6 +5088,7 @@ def _canonical_targets(name: str) -> list[str]:
             directory = REPORTS / "feature-reconcile"
             return [str(directory / filename) for filename in (
                 "report.json", "spans.jsonl", "baseline-manifest.json", "target-recipe.json", "baseline.SLDPRT",
+                "visual-clean.png", "visual-incremental.png",
                 *(f"trial-{trial}-{mode}.SLDPRT"
                   for trial in range(1, 4) for mode in ("clean", "incremental", "noop")),
             )]

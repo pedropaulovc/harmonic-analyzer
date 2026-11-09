@@ -87,6 +87,8 @@ class Benchmark:
     def validate(self, spec, refs):
         """Identical native gates for baseline, clean, incremental and no-op."""
         from _com import _early_bound
+        import pythoncom
+        from win32com.client import VARIANT
         model = self.model()
         params = spec["parameters_mm"]
         values = {}
@@ -102,7 +104,11 @@ class Benchmark:
         ext = _early_bound(model.Extension, "IModelDocExtension")
         for item in FEATURES:
             native = self.feature(item)
-            answer = ext.GetObjectByPersistReference3(list(base64.b64decode(refs[item["key"]], validate=True)))
+            reference = VARIANT(
+                pythoncom.VT_ARRAY | pythoncom.VT_UI1,
+                base64.b64decode(refs[item["key"]], validate=True),
+            )
+            answer = ext.GetObjectByPersistReference3(reference)
             if not isinstance(answer, (tuple, list)) or len(answer) != 2:
                 raise RuntimeError(f"Unexpected reference resolution: {answer!r}")
             resolved, state = answer
@@ -211,13 +217,17 @@ class Benchmark:
             decision = plan(manifest["recipe"], spec) if manifest else None
             if decision and decision.decision == "full_build":
                 raise RuntimeError("Structural plan must be handled before native mutation")
-        with self.phase("edit", case, skipped=mode == "noop"):
+        dimensions = []
+        with self.phase("baseline_validation", case, skipped=mode != "incremental"):
+            if mode == "incremental":
+                # Validate *all* input contracts and resolve all dimensions
+                # before timing the first mutation.
+                self.validate(manifest["recipe"], manifest["feature_references"])
+                dimensions = [(self.dimension(key), value) for key, value in decision.edits]
+        with self.phase("edit", case, skipped=mode == "noop", mode=mode):
             if mode == "clean":
                 await self.create(spec)
             elif mode == "incremental":
-                # Validate *all* input contracts before applying the first edit.
-                self.validate(manifest["recipe"], manifest["feature_references"])
-                dimensions = [(self.dimension(key), value) for key, value in decision.edits]
                 for dimension, value in dimensions:
                     status = dimension.SetSystemValue3(value / 1000, 1, None)
                     if int(status) != 0:  # swSetValue_Successful
@@ -230,16 +240,22 @@ class Benchmark:
         with self.phase("rebuild", case, skipped=mode == "noop"):
             if mode != "noop" and not self.model().EditRebuild3():
                 raise RuntimeError("EditRebuild3 failed")
-        with self.phase("validation_save", case, save_skipped=mode == "noop"):
+        with self.phase("validation_before_save", case):
             refs = self.refs() if mode == "clean" else manifest["feature_references"]
             before = self.validate(spec, refs)
+        with self.phase("save", case, skipped=mode == "noop"):
             if mode != "noop":
                 self.save(path)
             saved_hash = digest(path)
+        with self.phase("close_before_reopen", case):
             self.close()
+        with self.phase("reopen", case):
             await self.open(path)
+        with self.phase("validation_after_reopen", case):
             after = self.validate(spec, refs)
+        with self.phase("close_after_reopen", case):
             self.close()
+        with self.phase("readback_integrity", case):
             if digest(path) != saved_hash:
                 raise RuntimeError("Readback changed saved native bytes")
             if mode == "noop" and saved_hash != manifest["native_sha256"]:
@@ -248,6 +264,42 @@ class Benchmark:
                 "decision": asdict(decision) if decision else {"decision": "clean"},
                 "before_save": before, "after_reopen": after, "path": path.name,
                 "native_sha256": saved_hash, "feature_references": refs}
+
+    async def render(self, row):
+        """Capture a saved trial outside all timed operation rows; never save it."""
+        import _telemetry
+        from _check import check
+        from PIL import Image
+
+        native = self.out / row["path"]
+        image_path = self.out / f"visual-{row['mode']}.png"
+        original_hash = digest(native)
+        with _telemetry.span(f"{PREFIX}.render", mode=row["mode"], timed_trial=False):
+            await self.open(native)
+            try:
+                # export_image may fall back to an existence-based SaveAs capture.
+                # Remove our prior image so stale bytes cannot masquerade as proof.
+                image_path.unlink(missing_ok=True)
+                check(f"render {row['mode']}", await self.adapter.export_image({
+                    "file_path": str(image_path),
+                    "format_type": "png",
+                    "width": 1600,
+                    "height": 1000,
+                    "view_orientation": "isometric",
+                }))
+                with Image.open(image_path) as image:
+                    dimensions = list(image.size)
+                    if image.format != "PNG" or min(dimensions) <= 0:
+                        raise RuntimeError(f"Invalid PNG proof: {image_path}")
+                    image.verify()
+            finally:
+                self.close()
+            if digest(native) != original_hash:
+                raise RuntimeError(f"Rendering changed native bytes: {native}")
+        return {"mode": row["mode"], "native_file": native.name,
+                "native_sha256": original_hash, "image_file": image_path.name,
+                "image_sha256": digest(image_path), "image_dimensions": dimensions,
+                "orientation": "isometric", "included_in_trial_timings": False}
 
 
 async def benchmark(adapter, out, trials):
@@ -263,13 +315,21 @@ async def benchmark(adapter, out, trials):
         def __init__(self):
             self.count = 0
             self.error = None
+            self.completed = []
 
         def on_end(self, span):
-            if span.name.startswith(PREFIX):
+            if not span.name.startswith(PREFIX):
+                return
+            self.completed.append(span)
+            self.count += 1
+            # Retain real completed SDK spans, but serialize/write only when
+            # the enclosing benchmark ends (also on exceptions). Dedicated
+            # evidence IO must not inflate the operation timing rows.
+            if span.name == PREFIX:
                 try:
-                    with raw.open("a", encoding="utf-8") as stream:
-                        stream.write(span.to_json(indent=None) + "\n")
-                    self.count += 1
+                    with raw.open("w", encoding="utf-8") as stream:
+                        for completed in self.completed:
+                            stream.write(completed.to_json(indent=None) + "\n")
                 except Exception as exc:
                     self.error = exc
                     raise
@@ -331,6 +391,8 @@ async def benchmark(adapter, out, trials):
                 out / edited["path"], noop_manifest))
         if digest(out / manifest["native_file"]) != original_hash:
             raise RuntimeError("Trials mutated exact baseline")
+        # Rendering is visual evidence, not part of any measured trial.
+        visual_proof = [await harness.render(pair[mode]) for mode in ("clean", "incremental")]
     if retained.error or retained.count < len(harness.phases) + 1:
         raise RuntimeError(f"Incomplete retained OTel evidence: {retained.count}, {retained.error}")
     report = {"schema": 1, "experimental_limits": "Only an origin-centred Front-plane circle and positive-Z blind extrusion; no arbitrary topology reconciliation.",
@@ -338,9 +400,10 @@ async def benchmark(adapter, out, trials):
               "initial_baseline": initial, "structural_decision": asdict(structural),
               "results": results, "phases": harness.phases, "raw_spans": raw.name,
               "retained_span_count": retained.count,
+              "visual_proof": visual_proof,
               "median_seconds": {mode: statistics.median(row["seconds"] for row in results if row["mode"] == mode)
                                  for mode in ("clean", "incremental", "noop")},
-              "timing_note": "Warm-seat native operation wall times, including validation/save/readback; baseline cost separate. Excludes process/connect/farm/cache overhead. No-op skips mutation/rebuild/save, not validation."}
+              "timing_note": "Warm-seat native operation wall times, including baseline prevalidation and validation/save/readback; baseline cost separate. Phase spans separate prevalidation, edit, rebuild, validations, save, reopen and closes. Excludes process/connect/farm/cache overhead and post-trial visual renders. No-op skips mutation/rebuild/save, not validation."}
     write_json(out / "report.json", report)
     return {"report": str(out / "report.json"), "spans": str(raw)}
 
