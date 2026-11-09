@@ -1409,14 +1409,17 @@ CONE_CRANK_STEPS = _note_text(
         # prints on MHA-DT-VN-65's own sheet.
         "6J. SCREW THE END LINK OF MHA-DT-VN-65 FLAT TO MHA-DT-06 WITH MHA-DT-VN-70",
         "   THROUGH ITS EYE.",
-        "6K. THREAD MHA-DT-27 THROUGH THE MHA-DT-09 CROSS-HOLE AND THE FAR LINK'S EYE.",
-        "6L. CLOSE MHA-DT-27 WITH PLIERS: BUTT GAP 0-"
+        # Rule 23 (integration proof run 20261109T062834910Z): the anchor
+        # screw's bench acceptance.
+        "6K. CHECK THAT MHA-DT-VN-70 IS SEATED AND DOES NOT TURN BY HAND.",
+        "6L. THREAD MHA-DT-27 THROUGH THE MHA-DT-09 CROSS-HOLE AND THE FAR LINK'S EYE.",
+        "6M. CLOSE MHA-DT-27 WITH PLIERS: BUTT GAP 0-"
         + f"{RING_BUTT_GAP_BAND[1] / 25.4:.3f}".removeprefix("0")
         + ".",
-        "6M. HANG MHA-DT-27 FROM THE MHA-DT-09 HEAD: CLEAR OF THE HUB.",
+        "6N. HANG MHA-DT-27 FROM THE MHA-DT-09 HEAD: CLEAR OF THE HUB.",
         # Rule 23 (rubric sample round 12, #1): the taper-pinned crank arm's
         # bench acceptance.
-        "6N. CHECK THAT MHA-DT-06 DOES NOT TURN OR SLIDE ON MHA-DT-11 BY HAND.",
+        "6P. CHECK THAT MHA-DT-06 DOES NOT TURN OR SLIDE ON MHA-DT-11 BY HAND.",
         # Local review of 747487c71 and owner ruling 2026-10-24 (#1900): the
         # ferrule cures centred on the pivot bore.  Rule 23: the handle spins
         # on the MHA-DT-32 shoulder, so the screw is staked in the arm's
