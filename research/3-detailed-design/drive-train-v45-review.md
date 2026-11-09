@@ -425,8 +425,9 @@ Severity: **BLOCKER** (can't be made or will not work as drawn), **MAJOR**, **MI
 ## 7. Cone-tip options (period-accurate)
 
 > **Superseded.** [Cone tip options and drive-train DFM](drive-train-cone-tip-options.md)
-> re-judges these options under rules 17 and 23: T006 cannot carry any bore, and solder does not
-> hold a drive-torque joint, so option C is rejected and option A changes. Kept for provenance.
+> re-judges these options against main and the current rubric, with the owner's 2026-11-09
+> direction (T006 web best effort; solder allowed on the tip's light drive torque). Option C,
+> revised, is now the recommendation. Kept for provenance.
 
 ![Cone tip: v45 vs three period-accurate options, why a one-piece tip can't be milled, and
 c.1898 fixing methods](drive-train-v45-review/cone-tip-options.png)

@@ -1,9 +1,9 @@
-"""Cone-tip options against the 2026-11-08 machinist-review rubric (main a8441605f, v47 geometry).
+"""Cone-tip options for MHA-DT-03/-04 (main a8441605f geometry), labelled in inches.
 
-Side views to scale (mm); x = 0 at the T018 big-end (south) face, tip to the right.
-Geometry is read from cad/scripts on main (dt_cone_gear_spec, dt_cone_gear_shaft_spec,
-dt_vn_cone_tip_collar_spec, dt_cone_tip_block_spec); see the review's "Reproducing" section.
-Usage: uv run --no-project --with matplotlib python cone_tip_options.py geometry.json out.png
+Side views to scale; x = 0 at the T018 big-end (south) face, tip to the right. Geometry is
+read from cad/scripts on main through dump_geometry.py; block_air.py supplies the block and
+bushing air to the drum bank. Usage, from the repo root:
+uv run --no-project --with matplotlib python cone_tip_options.py geometry.json air.json out.png
 """
 
 import json
@@ -19,19 +19,22 @@ from matplotlib.patches import Circle, Polygon, Rectangle
 
 with open(sys.argv[1], encoding="utf-8") as f:
     GEO = json.load(f)
-OUT = sys.argv[2]
+with open(sys.argv[2], encoding="utf-8") as f:
+    AIR = json.load(f)
+OUT = sys.argv[3]
 
 IN = 25.4
 FLOOR, TARGET = 0.060 * IN, 0.080 * IN  # rule 17, inch sheets
-BORE_PLUS = 0.0018 * IN  # MHA-DT-03 bore band upper (+.0018)
+BORE_PLUS = 0.0018 * IN  # MHA-DT-03 D-bore band upper (+.0018)
 REAM_PLUS = 0.0005 * IN  # shop table: reamed hole +.0005/0
 
 SURFACE, INK, INK2, MUTED = "#fcfcfb", "#0b0b0b", "#52514e", "#b8b7b0"
 STEEL, STEEL_E = "#e4e3de", "#6b6a65"
 BRASS, BRASS_E = "#f2d27a", "#9a6a00"  # C36000: T030-T120, tip bushing
-BRONZE, BRONZE_E = "#d9a24a", "#7a5212"  # C67500 manganese bronze: T006-T024, arbors
+BRONZE, BRONZE_E = "#d9a24a", "#7a5212"  # C67500 manganese bronze: T006-T024, tip parts
 BLOCK, BLOCK_E = "#77766f", "#2f2e2b"
 INTEGRAL_E = "#1d5aa3"  # blue outline = part with integral teeth
+SOLDER = "#2b2a28"
 CONTACT = "#1baf7a"
 BAD, GOOD, WARN = "#d03b3b", "#0c8a0c", "#b8860b"
 
@@ -40,41 +43,59 @@ G = {int(k): v for k, v in GEO["gears"].items()}
 SOUTH_T018 = GEO["T006_NORTH_FACE_STATION"] - 3 * W  # x origin, cone station
 ENDS = [
     e - GEO["front_stub"] - SOUTH_T018 for e in GEO["section_ends"]
-]  # DT-04 land ends, sketch x
+]  # DT-04 land ends
 DIAS = GEO["section_dias"]
 AF = GEO["section_flat_af"]
 X = {30: -2 * W, 24: -W, 18: 0.0, 12: W, 6: 2 * W}
 T006_N = 3 * W
 COLLAR0 = GEO["TIP_COLLAR_START_STATION"] - SOUTH_T018
 COLLAR1 = GEO["TIP_COLLAR_END_STATION"] - SOUTH_T018
-BLOCK_S = GEO["TIP_BLOCK_SOUTH_FACE_STATION"] - SOUTH_T018
-BLOCK_N = GEO["TIP_BLOCK_NORTH_FACE_STATION"] - SOUTH_T018
+BLOCK_S0 = GEO["TIP_BLOCK_SOUTH_FACE_STATION"] - SOUTH_T018
+BLOCK_N0 = GEO["TIP_BLOCK_NORTH_FACE_STATION"] - SOUTH_T018
 CUP_RIM = GEO["ADJUSTER_CUP_RIM_STATION"] - SOUTH_T018
 TIP = GEO["T006_TIP_STATION"] - SOUTH_T018
 CONTACT_ZONE = (2.2, 5.3)  # from each band's big-end face; v45 GLB measurement
 
-# ---- numbers the figure and the review quote --------------------------------------------
-STEM = 1 / 16 * IN  # proposed T012 seat and pivot on the arbor
-SPIGOT = 1 / 8 * IN
+# ---- proposed tip end (options A, B, C) ---------------------------------------------------
+STEM = 1 / 16 * IN  # T006 spigot / T012 seat and the pivot
+SPIGOT = 1 / 8 * IN  # option A arbor into DT-04
+BUSH_D, BUSH_L = (
+    0.225 * IN,
+    0.160 * IN,
+)  # brass bushing, pressed on the pivot against T006
+END_PLAY = 0.010 * IN
+BLOCK_GAP = 0.200 * IN  # T006 north face to the moved block's south face
+BLOCK_DEPTH = 0.430 * IN  # 1.5D of 1/4-28 past both mouth countersinks
+BLOCK_S = T006_N + BLOCK_GAP
+BLOCK_N = BLOCK_S + BLOCK_DEPTH
+END_FACE = T006_N + BUSH_L + END_PLAY
+PIVOT_END = END_FACE + 0.120 * IN
+SCREW_MINOR = (0.250 - 1.22687 / 28) * IN  # 1/4-28 external basic minor
+
 web = lambda t, bore: (G[t]["root_min"] - bore) / 2.0
 N = {
-    "t006_web_now": web(6, G[6]["bore"] + BORE_PLUS),
-    "t012_web_now": web(12, G[12]["bore"] + BORE_PLUS),
-    "t006_max_bore": G[6]["root_min"] - 2 * FLOOR,
-    "t012_max_bore": G[12]["root_min"] - 2 * FLOOR,
-    "t012_web_stem": web(12, STEM + BORE_PLUS),
+    "t006_web_main": web(6, G[6]["bore"] + BORE_PLUS),
+    "t012_web_main": web(12, G[12]["bore"] + BORE_PLUS),
     "t006_web_116": web(6, STEM + BORE_PLUS),
+    "t012_web_reamed_116": web(12, STEM + REAM_PLUS),
+    "t012_web_d_116": web(12, STEM + BORE_PLUS),
     "stem_under_t006_root": (G[6]["root_min"] - STEM) / 2.0,
     "spigot_wall_to_flat": (AF[1] - DIAS[1] / 2.0) - (SPIGOT + REAM_PLUS) / 2.0,
-    "drill_rod_wall": (DIAS[3] - (GEO["section_dias"][4] + REAM_PLUS)) / 2.0,
-    "bushing_wall": (5.0 - STEM) / 2.0,
+    "drill_rod_wall": (DIAS[3] - (DIAS[4] + REAM_PLUS)) / 2.0,
+    "bushing_wall": (BUSH_D - STEM - REAM_PLUS) / 2.0,
+    "end_screw_wall": (SCREW_MINOR - STEM - REAM_PLUS) / 2.0,
+    "block_move": BLOCK_S0 - BLOCK_S,
+    "block_air_now": AIR["block_air_now"],
+    "block_air_moved": AIR["block_air_at_gap"],
+    "bushing_air": AIR["bushing_air"],
+    "collar_body_air_nominal": AIR["collar_nominal_air_by_tier"]["body"],
+    "collar_body_air_worst": AIR["collar_worst_air_by_tier"]["body"],
+    "collar_nose_air_nominal": AIR["collar_nominal_air_by_tier"]["nose"],
+    "collar_nose_air_worst": AIR["collar_worst_air_by_tier"]["nose"],
 }
-for t, nb in ((24, 18), (18, 12), (12, 6)):
-    h = (
-        G[t]["od"] - G[nb]["root_min"]
-    ) / 2.0  # neighbour shoulder above this band's root
-    N[f"shoulder_{nb}"] = h
-    N[f"runout_{nb}_r3175"] = math.sqrt(h * (2 * 3.175 - h)) if h < 3.175 else 3.175
+h = (G[12]["od"] - G[6]["root_min"]) / 2.0
+N["t012_shoulder_over_t006_root"] = h
+N["runout_quarter_cutter"] = math.sqrt(h * (2 * 3.175 - h))
 with open(OUT.replace(".png", ".numbers.json"), "w", encoding="utf-8") as f:
     json.dump(N, f, indent=1)
 
@@ -90,28 +111,42 @@ plt.rcParams.update(
 
 def inch(mm, places=3):
     s = f"{mm / IN:.{places}f}"
-    return s[1:] if s.startswith("0.") else s
+    return s[1:] if s.startswith("0.") else s.replace("-0.", "-.")
 
 
-def rect(ax, x0, x1, dia, fc, ec, lw=0.9, ls="-", z=2, hatch=None, y0=None):
-    y = -dia / 2 if y0 is None else y0
+def rect(ax, x0, x1, dia, fc, ec, lw=0.9, ls="-", z=2, hatch=None):
     ax.add_patch(
         Rectangle(
-            (x0, y), x1 - x0, dia, fc=fc, ec=ec, lw=lw, ls=ls, zorder=z, hatch=hatch
+            (x0, -dia / 2),
+            x1 - x0,
+            dia,
+            fc=fc,
+            ec=ec,
+            lw=lw,
+            ls=ls,
+            zorder=z,
+            hatch=hatch,
         )
     )
 
 
-def gear(ax, t, fc, ec, bore=None, integral=False, z=3, label=True, x0=None, flat=None):
-    x0 = X[t] if x0 is None else x0
+def gear(ax, t, fc, ec, bore=None, integral=False, z=3, flat=None):
+    x0 = X[t]
     od, root = G[t]["od"], G[t]["root_min"]
-    edge = INTEGRAL_E if integral else ec
-    lw = 1.6 if integral else 0.9
-    rect(ax, x0, x0 + W, od, fc, edge, lw=lw, z=z)
-    for s in (1, -1):  # tooth band, hatched
+    rect(
+        ax,
+        x0,
+        x0 + W,
+        od,
+        fc,
+        INTEGRAL_E if integral else ec,
+        lw=1.6 if integral else 0.9,
+        z=z,
+    )
+    for y0 in (root / 2, -od / 2):  # tooth band, hatched
         ax.add_patch(
             Rectangle(
-                (x0, s * root / 2 if s > 0 else -od / 2),
+                (x0, y0),
                 W,
                 (od - root) / 2,
                 fc="none",
@@ -121,10 +156,9 @@ def gear(ax, t, fc, ec, bore=None, integral=False, z=3, label=True, x0=None, fla
                 zorder=z + 0.1,
             )
         )
-    ax.plot([x0, x0 + W], [root / 2, root / 2], color=ec, lw=0.5, zorder=z + 0.2)
-    ax.plot([x0, x0 + W], [-root / 2, -root / 2], color=ec, lw=0.5, zorder=z + 0.2)
-    if bore:
-        for s in (1, -1):
+    for s in (1, -1):
+        ax.plot([x0, x0 + W], [s * root / 2] * 2, color=ec, lw=0.5, zorder=z + 0.2)
+        if bore:
             ax.plot(
                 [x0, x0 + W],
                 [s * bore / 2] * 2,
@@ -151,17 +185,27 @@ def gear(ax, t, fc, ec, bore=None, integral=False, z=3, label=True, x0=None, fla
         solid_capstyle="butt",
         zorder=z + 1,
     )
-    if label:
-        ax.text(
-            x0 + W / 2,
-            od / 2 + 1.1,
-            f"T{t:03d}",
-            ha="center",
-            va="bottom",
-            fontsize=8.2,
-            fontweight="bold",
-            zorder=9,
-        )
+    ax.text(
+        x0 + W / 2,
+        od / 2 + 1.1,
+        f"T{t:03d}",
+        ha="center",
+        va="bottom",
+        fontsize=8.2,
+        fontweight="bold",
+        zorder=9,
+    )
+
+
+def solder_face(ax, x, dia):
+    ax.plot(
+        [x, x],
+        [-dia / 2, dia / 2],
+        color=SOLDER,
+        lw=2.4,
+        zorder=6,
+        solid_capstyle="butt",
+    )
 
 
 def centreline(ax, x0, x1):
@@ -195,6 +239,7 @@ def dim(ax, x0, x1, y, text, fs=7.0):
         "",
         xy=(x0, y),
         xytext=(x1, y),
+        zorder=9,
         arrowprops={
             "arrowstyle": "<->",
             "color": INK2,
@@ -202,7 +247,6 @@ def dim(ax, x0, x1, y, text, fs=7.0):
             "shrinkA": 0,
             "shrinkB": 0,
         },
-        zorder=9,
     )
     ax.text(
         (x0 + x1) / 2,
@@ -216,13 +260,12 @@ def dim(ax, x0, x1, y, text, fs=7.0):
     )
 
 
-def frame(ax, title, verdict, mark, xlim=(-17, 52), ylim=(-19.0, 15.5)):
+def frame(ax, title, verdict, mark, xlim=(-17, 46), ylim=(-19.0, 15.5)):
     ax.set_xlim(*xlim)
     ax.set_ylim(*ylim)
     ax.set_aspect("equal")
     ax.axis("off")
     ax.set_title(title, loc="left", fontsize=11.5, fontweight="bold", pad=22)
-    col = {"bad": BAD, "good": GOOD, "warn": WARN}[mark]
     ax.text(
         0.0,
         1.015,
@@ -231,17 +274,22 @@ def frame(ax, title, verdict, mark, xlim=(-17, 52), ylim=(-19.0, 15.5)):
         fontsize=8.0,
         va="bottom",
         ha="left",
-        bbox={"boxstyle": "round,pad=0.3", "fc": SURFACE, "ec": col, "lw": 1.2},
+        bbox={
+            "boxstyle": "round,pad=0.3",
+            "fc": SURFACE,
+            "ec": {"bad": BAD, "good": GOOD, "warn": WARN}[mark],
+            "lw": 1.2,
+        },
     )
 
 
-def tip_block(ax, adjuster):
-    """MHA-DT-21 side view, truncated below; slit from the top; pinch screw seen end-on."""
+def tip_block(ax, south, north, adjuster):
+    """MHA-DT-21 side view, truncated below; pinch screw seen end-on above the axis."""
     top = 52.578 - 38.1
     ax.add_patch(
         Rectangle(
-            (BLOCK_S, -15.0),
-            BLOCK_N - BLOCK_S,
+            (south, -15.0),
+            north - south,
             top + 15.0,
             fc=BLOCK,
             ec=BLOCK_E,
@@ -250,34 +298,21 @@ def tip_block(ax, adjuster):
         )
     )
     ax.plot(
-        [BLOCK_S, BLOCK_N],
+        [south, north],
         [-15.0, -15.0],
         color=SURFACE,
         lw=2.5,
         ls=(0, (3, 2)),
         zorder=2.45,
     )
-    mid = (BLOCK_S + BLOCK_N) / 2
+    mid = (south + north) / 2
     ax.add_patch(
         Circle((mid, 8.89), 1.42, fc="#d6d5cf", ec=BLOCK_E, lw=0.8, zorder=2.7)
-    )  # #4-40 pinch
+    )
     ax.plot([mid - 1.0, mid + 1.0], [8.89, 8.89], color=BLOCK_E, lw=0.8, zorder=2.8)
-    if adjuster == "cup":  # VN-55 #10-32 x 3/8
+    if adjuster == "cup":  # VN-55 #10-32 x 3/8 cup set screw
         a0, a1, d = CUP_RIM, CUP_RIM + 9.525, 4.826
-    else:  # long 1/4-28 end screw
-        a0, a1, d = END_FACE, BLOCK_N, 6.35
-    rect(ax, a0, min(a1, BLOCK_N), d, "#cfcec8", BLOCK_E, lw=0.7, z=2.55)
-    for s in (1, -1):
-        ax.plot(
-            [max(a0, BLOCK_S), min(a1, BLOCK_N)],
-            [s * d / 2] * 2,
-            color="#efeee9",
-            lw=0.6,
-            ls=(0, (2, 1.4)),
-            zorder=2.6,
-        )
-    if adjuster == "cup":
-        rect(ax, BLOCK_N, a1, d, "#cfcec8", BLOCK_E, lw=0.7, z=2.55)
+        rect(ax, a0, a1, d, "#cfcec8", BLOCK_E, lw=0.7, z=2.55)
         ax.add_patch(
             Polygon(
                 [[a0, 1.3], [a0 + 1.21, 0.55], [a0 + 1.21, -0.55], [a0, -1.3]],
@@ -287,66 +322,119 @@ def tip_block(ax, adjuster):
                 lw=0.6,
                 zorder=2.65,
             )
-        )  # cup
-    else:
-        ax.add_patch(
-            Polygon(
-                [
-                    [BLOCK_N, -4.6],
-                    [BLOCK_N + 1.3, -4.6],
-                    [BLOCK_N + 2.8, -2.6],
-                    [BLOCK_N + 3.2, 0],
-                    [BLOCK_N + 2.8, 2.6],
-                    [BLOCK_N + 1.3, 4.6],
-                    [BLOCK_N, 4.6],
-                ],
-                closed=True,
-                fc=BLOCK,
-                ec=BLOCK_E,
-                lw=0.9,
-                zorder=2.6,
-            )
         )
-        ax.plot(
-            [BLOCK_N + 1.6, BLOCK_N + 3.2], [0, 0], color="#efeee9", lw=1.0, zorder=2.7
-        )  # slot
+        return
+    rect(
+        ax, END_FACE, north, 6.35, "#cfcec8", BLOCK_E, lw=0.7, z=2.55
+    )  # 1/4-28 end screw
+    rect(
+        ax,
+        END_FACE,
+        PIVOT_END + 0.3,
+        STEM + 0.3,
+        "none",
+        INK2,
+        lw=0.6,
+        ls=(0, (2, 1.2)),
+        z=2.7,
+    )
+    ax.add_patch(
+        Polygon(
+            [
+                [north, -4.6],
+                [north + 1.3, -4.6],
+                [north + 2.8, -2.6],
+                [north + 3.2, 0],
+                [north + 2.8, 2.6],
+                [north + 1.3, 4.6],
+                [north, 4.6],
+            ],
+            closed=True,
+            fc=BLOCK,
+            ec=BLOCK_E,
+            lw=0.9,
+            zorder=2.6,
+        )
+    )  # domed slotted head, outboard
+    ax.plot([north + 1.6, north + 3.2], [0, 0], color="#efeee9", lw=1.0, zorder=2.7)
 
 
-END_FACE = T006_N + 4.4  # option A/B: end-screw inner face (bushing 4 mm + .4 end play)
-PIVOT_END = END_FACE + 4.0
+def tip_end(ax):
+    """Pivot, pressed brass bushing, moved block and end screw (options A, B, C)."""
+    rect(ax, T006_N, PIVOT_END, STEM, BRONZE, INTEGRAL_E, lw=1.6, z=3.2)
+    rect(ax, T006_N, T006_N + BUSH_L, BUSH_D, BRASS, BRASS_E, z=3.4)
+    tip_block(ax, BLOCK_S, BLOCK_N, "end")
+    ax.add_patch(
+        Rectangle(
+            (BLOCK_S0, -15.0),
+            BLOCK_N0 - BLOCK_S0,
+            52.578 - 38.1 + 15.0,
+            fc="none",
+            ec=MUTED,
+            lw=0.8,
+            ls=(0, (3, 2)),
+            zorder=2.3,
+        )
+    )  # today's block, ghosted
+    ax.annotate(
+        "",
+        xy=(BLOCK_S, -17.6),
+        xytext=(BLOCK_S0, -17.6),
+        zorder=9,
+        arrowprops={"arrowstyle": "->", "color": INK2, "lw": 0.8},
+    )
+    ax.text(
+        BLOCK_S0 + 0.5,
+        -17.6,
+        f"DT-21 moves\n{inch(N['block_move'], 2)} south",
+        ha="left",
+        va="center",
+        fontsize=7.0,
+        color=INK2,
+    )
 
-fig = plt.figure(figsize=(17, 23.0), dpi=150, facecolor=SURFACE)
+
+def dt04(ax, end):
+    rect(ax, -17, ENDS[1], DIAS[1], STEEL, STEEL_E)
+    if end > ENDS[1]:
+        rect(ax, ENDS[1], ENDS[2], DIAS[2], STEEL, STEEL_E)
+        rect(ax, ENDS[2], min(end, ENDS[3]), DIAS[3], STEEL, STEEL_E)
+
+
+fig = plt.figure(figsize=(17, 27.5), dpi=150, facecolor=SURFACE)
 gs = GridSpec(
     4,
     2,
     figure=fig,
-    height_ratios=[1, 1, 1, 0.62],
+    height_ratios=[1, 1, 1, 1.3],
     hspace=0.30,
     wspace=0.06,
     left=0.025,
     right=0.985,
-    top=0.885,
+    top=0.89,
     bottom=0.03,
 )
 fig.text(
     0.025,
-    0.983,
-    "Cone tip (T006–T024): main as of 2026-11-09 vs options, judged by the 2026-11-08 machinist-review rubric",
+    0.985,
+    "Cone tip (T006–T024): main today vs options, with the exceptions each one still needs",
     fontsize=15,
     fontweight="bold",
     va="top",
 )
 fig.text(
     0.025,
-    0.968,
-    "Side views to scale (mm), x = 0 at the T018 big-end face, tip to the right. Geometry from main a8441605f (MHA-DT-03/-04/-21, VN-54/-55); "
-    "the inch sheets print the same model.\nGreen bars: where the 120T cylinder gear touches each band (2.2–5.3 mm from its big-end face, v45 GLB). "
-    "Fill = material: manganese bronze C67500 for T006–T024 and new tip parts (main's material_tip_specification),\n"
-    "brass C36000 from T030, steel for DT-04 and the screws. Blue outline = part with integral teeth. Dashed = bores and hidden seats.\n"
-    f"Rule 17 (inch sheets): every machined wall or web ≥ .060 in ({FLOOR:.2f} mm) floor, .080 in target, at the printed worst case. "
-    "\nRule 23: a joint carrying drive torque is held by a key or flat with axial capture, a cross or taper pin, or a press or bonded fit; solder and a plain set screw never count.\n"
-    "Real tip (book pp.17–21, engineerguy video 4 at 6:36–6:39): a small brass bushing fixed on the pivot turns with the cone and bears on a long end screw "
-    "through a black split block, locked by a side pinch screw. Nothing like VN-54.",
+    0.972,
+    "Side views to scale; every value in inches. x = 0 at the T018 big-end face, tip to the right. Geometry from main a8441605f "
+    "(MHA-DT-03/-04/-20/-21, VN-54/-55).\n"
+    f"Green bars: where the 120T cylinder gear touches each band ({inch(CONTACT_ZONE[0])}–{inch(CONTACT_ZONE[1])} from its big-end face, v45 GLB). "
+    "Fill = material: manganese bronze C67500 for T006–T024 and new tip parts (main's tip specification),\n"
+    "brass C36000 from T030 and for the bushing, steel for DT-04 and the screws. Blue outline = part with integral teeth. "
+    "Black strokes = soft-solder joints. Dashed = bores, seats and today's block position.\n"
+    "Owner direction (2026-11-09): T006's web is best effort (rule 17), and soft solder may carry the tip's drive torque, which is minimal "
+    "(rule 23 otherwise excludes solder). Both are recorded as owner exceptions below.\n"
+    "Real tip (book pp.17–21, engineerguy video 4 at 6:36–6:39): a small brass bushing fixed on the pivot turns with the cone and bears on a "
+    "long end screw through a black split block, locked by a side pinch screw.",
     fontsize=8.6,
     color=INK2,
     va="top",
@@ -357,30 +445,17 @@ fig.text(
 ax = fig.add_subplot(gs[0, 0])
 frame(
     ax,
-    "1 · Main today (v47 inch sheets)",
-    "Ships only under owner exceptions RV-01/RV-04 (DT-03) and RV-01/RV-02 (DT-04), all pending #1649",
+    "1 · Main today (v47)",
+    "Nine tip exceptions, four of them waiting on #1649",
     "bad",
 )
-rect(ax, -17, ENDS[1], DIAS[1], STEEL, STEEL_E)
-rect(ax, ENDS[1], ENDS[2], DIAS[2], STEEL, STEEL_E)
-rect(ax, ENDS[2], ENDS[3], DIAS[3], STEEL, STEEL_E)
+dt04(ax, ENDS[3])
 rect(ax, ENDS[3], TIP, DIAS[4], STEEL, STEEL_E, z=3.6)
 gear(ax, 30, BRASS, BRASS_E, bore=DIAS[1])
 for t in (24, 18, 12, 6):
     gear(ax, t, BRONZE, BRONZE_E, bore=G[t]["bore"])
 rect(ax, COLLAR0, COLLAR0 + 3.5, 6.35, STEEL, STEEL_E, z=3.4)
 rect(ax, COLLAR0 + 3.5, COLLAR1, 16.764, STEEL, STEEL_E, z=3.4)
-ax.add_patch(
-    Rectangle(
-        (COLLAR0 + 7.5 - 1.09, 0.3),
-        2.18,
-        8.08,
-        fc="#c9c8c2",
-        ec=STEEL_E,
-        lw=0.6,
-        zorder=3.5,
-    )
-)
 ax.text(
     (COLLAR0 + 3.5 + COLLAR1) / 2,
     -4.6,
@@ -391,46 +466,44 @@ ax.text(
     color=INK2,
     zorder=4,
 )
-tip_block(ax, "cup")
-centreline(ax, -17, 50)
+tip_block(ax, BLOCK_S0, BLOCK_N0, "cup")
+centreline(ax, -17, 44)
 note(
     ax,
     (16.5, 1.0),
     (-16.5, -12.4),
-    f"T006 bore Ø.031 D: web {inch(N['t006_web_now'], 4)} MIN, under the .060 floor (RV-04)",
+    f"T006 Ø.031 D-bore: web {inch(N['t006_web_main'], 4)} (RV-01, RV-04)",
     "bad",
 )
 note(
     ax,
     (10.0, 2.0),
     (-3, 12.8),
-    f"T012 web {inch(N['t012_web_now'], 4)} MIN, just under the .080 target (RV-03)",
+    f"T012 web {inch(N['t012_web_main'], 4)} (RV-03)",
     "warn",
 )
 note(
     ax,
     (30.0, 0.4),
-    (26, -14.4),
-    "Ø.031 land, L/D 43, flat AF .017 (RV-01, RV-02)",
+    (16, -16.4),
+    "Ø.031 land, L/D 43, flat .017 (DT-04 RV-01, RV-02)",
     "bad",
 )
-note(
-    ax, (28.5, 8.4), (27, 12.8), "VN-54: made part with a VN number; review OFF", "bad"
-)
+note(ax, (28.5, 8.4), (20, 12.8), "VN-54: made part on a VN number", "bad")
 note(
     ax,
     (CUP_RIM + 0.6, 0.0),
-    (49.5, -6.5),
-    "tip runs in VN-55's\ncup point",
+    (43.5, -7.5),
+    "tip in VN-55's cup;\n1.0D thread (DT-00 DT-03)",
     None,
     ha="right",
 )
-dim(ax, ENDS[3], TIP, -8.6, f"terminal land {inch(TIP - ENDS[3], 2)} long")
+dim(ax, ENDS[3], TIP, -8.6, f"terminal land {inch(TIP - ENDS[3], 2)}")
 
-# ---------------- Panel 2: rule 17 chart
+# ---------------- Panel 2: webs per option
 ax = fig.add_subplot(gs[0, 1])
 ax.set_title(
-    "2 · Why no option may bore T006 (rule 17)",
+    "2 · Webs under T006 and T012, by option (rule 17, best effort)",
     loc="left",
     fontsize=11.5,
     fontweight="bold",
@@ -439,77 +512,115 @@ ax.set_title(
 ax.text(
     0.0,
     1.015,
-    "A bore needs root − 2 × .060 in of web. T006's root leaves less than nothing, so T006 must be solid with its shaft.",
+    "Only a T006 with no bore has a web worth the name. A, B and C all cut T006 solid with its own spigot or arbor.",
     transform=ax.transAxes,
     fontsize=8.0,
     va="bottom",
     ha="left",
-    bbox={"boxstyle": "round,pad=0.3", "fc": SURFACE, "ec": BAD, "lw": 1.2},
+    bbox={"boxstyle": "round,pad=0.3", "fc": SURFACE, "ec": GOOD, "lw": 1.2},
 )
-rows = [6, 12, 18, 24]
-for i, t in enumerate(rows):
-    y = 3 - i
-    root = G[t]["root_min"]
-    mx = root - 2 * FLOOR
-    ax.barh(y + 0.18, root, height=0.32, color=BRONZE, ec=BRONZE_E, lw=0.6)
-    ax.barh(
-        y - 0.18, max(mx, 0), height=0.32, color=CONTACT if mx > 0 else BAD, alpha=0.75
-    )
-    ax.text(
-        -0.25, y, f"T{t:03d}", ha="right", va="center", fontsize=9, fontweight="bold"
-    )
-    ax.text(
-        root + 0.12,
-        y + 0.18,
-        f"root Ø{inch(root, 4)} MIN",
-        va="center",
-        fontsize=7.6,
-        color=INK2,
-    )
-    ax.text(
-        max(mx, 0) + 0.12,
-        y - 0.18,
-        (
-            f"largest bore {inch(mx, 4)}"
-            if mx > 0
-            else "largest bore negative: none possible"
-        ),
-        va="center",
-        fontsize=7.6,
-        color=INK2 if mx > 0 else BAD,
-    )
-    bore_now = G[t]["bore"] + BORE_PLUS
-    ax.plot([bore_now, bore_now], [y - 0.4, y + 0.4], color=INK, lw=1.4)
-    ax.text(
-        bore_now, y + 0.42, "main", ha="center", va="bottom", fontsize=6.6, color=INK
-    )
-for x, lab in ((STEM + BORE_PLUS, "Ø1/16 (A)"),):
-    ax.plot([x, x], [2 - 0.4, 2 + 0.4], color=INTEGRAL_E, lw=1.4)
-    ax.text(x, 2 - 0.45, lab, ha="center", va="top", fontsize=6.6, color=INTEGRAL_E)
-ax.set_xlim(-1.4, 14.5)
-ax.set_ylim(-2.4, 3.9)
+bars = [
+    ("Main / #1649 A, D, F", N["t006_web_main"], N["t012_web_main"]),
+    ("#1649 E (1/16 land)", N["t006_web_116"], N["t012_web_d_116"]),
+    ("C sweated cluster", None, N["t012_web_reamed_116"]),
+    ("A tip arbor", None, N["t012_web_reamed_116"]),
+    ("B planed arbor", None, None),
+]
+for i, (lab, w6, w12) in enumerate(bars):
+    y = len(bars) - 1 - i
+    for dy, w, col, name in ((0.18, w6, BRONZE, "T006"), (-0.18, w12, BRASS, "T012")):
+        if w is None:
+            ax.text(
+                0.002,
+                y + dy,
+                f"{name}: solid, no bore",
+                va="center",
+                fontsize=7.4,
+                color=GOOD,
+            )
+            continue
+        ax.barh(y + dy, w / IN, height=0.32, color=col, ec=BRONZE_E, lw=0.6)
+        ax.text(
+            w / IN + 0.002,
+            y + dy,
+            f"{name} web {inch(w, 4)}",
+            va="center",
+            fontsize=7.4,
+            color=BAD if w < FLOOR else (WARN if w < TARGET else INK2),
+        )
+    ax.text(-0.004, y, lab, ha="right", va="center", fontsize=8.6, fontweight="bold")
+for x, lab, col in ((0.060, "floor .060", BAD), (0.080, "target .080", WARN)):
+    ax.axvline(x, color=col, lw=0.9, ls=(0, (4, 2)))
+    ax.text(x, len(bars) - 0.35, lab, color=col, fontsize=7.4, ha="center", va="bottom")
+ax.set_xlim(-0.075, 0.13)
+ax.set_ylim(-0.7, len(bars) + 0.1)
 ax.set_yticks([])
-ax.set_xlabel("diameter, mm (bore at its printed maximum)", fontsize=8)
+ax.set_xlabel("web at the printed worst case, in", fontsize=8)
+ax.set_xticks([0, 0.02, 0.04, 0.06, 0.08, 0.10, 0.12])
+ax.set_xticklabels(["0", ".02", ".04", ".06", ".08", ".10", ".12"])
 for s in ("top", "right", "left"):
     ax.spines[s].set_visible(False)
-ax.text(
-    0.99,
-    0.02,
-    f"#1649 (A) drill-rod tip, (D) broach, (E) 1/16 land, (F) round pinned bore all keep a bore in T006.\n"
-    f"At 1/16 in the T006 web would be {inch(N['t006_web_116'], 4)}; at today's .031 it is {inch(N['t006_web_now'], 4)}.\n"
-    f"(A) also leaves {inch(N['drill_rod_wall'], 3)} wall round the rod in DT-04's Ø.125 land.",
-    transform=ax.transAxes,
-    ha="right",
-    va="bottom",
-    fontsize=7.6,
-    color=INK2,
-    bbox={"boxstyle": "round,pad=0.35", "fc": SURFACE, "ec": MUTED, "lw": 0.8},
+
+# ---------------- Panel 3: Option C
+ax = fig.add_subplot(gs[1, 0])
+frame(
+    ax,
+    "3 · Option C (recommended): gears cut alone, sweated into a tip cluster",
+    "DT-04 only loses its Ø.031 land. Every gear is cut alone on a mandrel; soft solder joins T006, T012 and T018",
+    "good",
+)
+dt04(ax, ENDS[3])
+gear(ax, 30, BRASS, BRASS_E, bore=DIAS[1])
+gear(ax, 24, BRONZE, BRONZE_E, bore=DIAS[2], flat=AF[2] - DIAS[2] / 2)
+gear(ax, 18, BRONZE, BRONZE_E, bore=DIAS[3], flat=AF[3] - DIAS[3] / 2)
+gear(ax, 12, BRONZE, BRONZE_E, bore=STEM)
+rect(ax, X[12], X[6], STEM, BRONZE, INTEGRAL_E, lw=1.2, z=3.25)  # T006 spigot in T012
+gear(ax, 6, BRONZE, BRONZE_E, integral=True)
+solder_face(ax, X[12], G[12]["od"] - 0.6)
+solder_face(ax, X[6], G[6]["od"] - 0.4)
+tip_end(ax)
+centreline(ax, -17, 44)
+note(
+    ax,
+    (17.2, -1.6),
+    (-16.5, -17.6),
+    f"T006 part: spigot, 6 leaves, pivot; spigot and pivot Ø.0625 sit\n{inch(N['stem_under_t006_root'], 4)} under the root, so its fly cutter runs off both sides",
+    "good",
+)
+note(
+    ax,
+    (10.0, 0.4),
+    (-16.5, 13.4),
+    f"T012 reamed Ø.0625: web {inch(N['t012_web_reamed_116'], 4)}\n(over the floor, under the target: RV-03 stays, new value)",
+    "warn",
+)
+note(
+    ax,
+    (X[12], 3.2),
+    (-16.5, -12.6),
+    "T018 | T012 | T006 sweated face to face,\njoints in the untouched big-end zone; T018 keeps its flat",
+    "warn",
+)
+note(
+    ax,
+    (T006_N + 2.0, BUSH_D / 2),
+    (12.5, 10.6),
+    f"bushing Ø{inch(BUSH_D)} × {inch(BUSH_L)} pressed on the pivot,\nturns with the cone (wall {inch(N['bushing_wall'])})",
+    "good",
+)
+note(
+    ax,
+    (BLOCK_S + 1.0, 3.2),
+    (26.0, -13.0),
+    f"1/4-28 end screw, Ø.063 pivot hole, wall {inch(N['end_screw_wall'])};\nblock {inch(BLOCK_DEPTH, 2)} deep for 1.5D; pinch slit locks it",
+    "warn",
 )
 
+# ---------------- Panel 4: Option A
 
-def arbor_common(ax, one_piece):
-    """DT-04 shortened to its Ø.375 land; the bronze tip arbor plugs into it."""
-    rect(ax, -17, ENDS[1], DIAS[1], STEEL, STEEL_E)
+
+def arbor(ax, one_piece):
+    dt04(ax, ENDS[1])
     rect(
         ax,
         ENDS[1] - 8.0,
@@ -525,7 +636,6 @@ def arbor_common(ax, one_piece):
     rect(ax, ENDS[1], ENDS[2], DIAS[2], BRONZE, INTEGRAL_E, lw=1.6, z=2.2)
     rect(ax, ENDS[2], ENDS[3], DIAS[3], BRONZE, INTEGRAL_E, lw=1.6, z=2.2)
     rect(ax, ENDS[3], X[6], STEM, BRONZE, INTEGRAL_E, lw=1.6, z=2.2)
-    rect(ax, T006_N, PIVOT_END, STEM, BRONZE, INTEGRAL_E, lw=1.6, z=3.2)
     gear(ax, 24, BRONZE, BRONZE_E, bore=DIAS[2], flat=AF[2] - DIAS[2] / 2)
     if one_piece:
         for t in (18, 12, 6):
@@ -533,11 +643,11 @@ def arbor_common(ax, one_piece):
         for t in (
             12,
             6,
-        ):  # planing relief at the big-end face, inside the untouched 2.2
-            for s in (1, -1):
+        ):  # planing relief at each big-end face, inside the untouched zone
+            for y0 in (G[t]["root_min"] / 2 - 0.55, -G[t]["root_min"] / 2):
                 ax.add_patch(
                     Rectangle(
-                        (X[t], s * G[t]["root_min"] / 2 - (0.55 if s > 0 else 0)),
+                        (X[t], y0),
                         1.5,
                         0.55,
                         fc=SURFACE,
@@ -550,122 +660,82 @@ def arbor_common(ax, one_piece):
         gear(ax, 18, BRONZE, BRONZE_E, bore=DIAS[3], flat=AF[3] - DIAS[3] / 2)
         gear(ax, 12, BRONZE, BRONZE_E, bore=STEM)
         gear(ax, 6, BRONZE, BRONZE_E, integral=True)
-    rect(
-        ax, T006_N, T006_N + 4.0, 5.0, BRASS, BRASS_E, z=3.4
-    )  # bushing, fixed on the pivot
-    rect(
-        ax,
-        END_FACE,
-        PIVOT_END + 0.4,
-        STEM + 0.25,
-        "none",
-        INK2,
-        lw=0.6,
-        ls=(0, (2, 1.2)),
-        z=2.7,
-    )
-    tip_block(ax, "end")
-    rect(
-        ax, END_FACE, BLOCK_S, 6.35, "#cfcec8", BLOCK_E, lw=0.7, z=2.5, hatch="////"
-    )  # exposed thread
-    centreline(ax, -17, 50)
+        solder_face(ax, X[6], G[6]["od"] - 0.4)
+    tip_end(ax)
+    centreline(ax, -17, 44)
     dim(ax, ENDS[1] - 8.0, ENDS[1], -9.4, "Ø.125 spigot,\n.31 deep")
 
 
-# ---------------- Panel 3: Option A
-ax = fig.add_subplot(gs[1, 0])
-frame(
-    ax,
-    "3 · Option A (recommended): T006 cut on a bronze tip arbor",
-    "No bored T006, no Ø.031 land, no VN-54. Lathe + mill + dividing head; uses the custom T006 fly cutter main already specifies",
-    "good",
-)
-arbor_common(ax, one_piece=False)
-note(
-    ax,
-    (17.2, -1.6),
-    (2.0, -18.4),
-    f"T006 integral: no bore, no web; stem and pivot Ø.0625 sit {inch(N['stem_under_t006_root'], 4)}\n"
-    "under its root, so the fly cutter runs off both sides. Cut T006 before T012 goes on",
-    "good",
-)
-note(
-    ax,
-    (10.5, 0.6),
-    (-16.5, 13.4),
-    f"T012 on a Ø.0625 seat: web {inch(N['t012_web_stem'], 4)} MIN\n(floor .060, under the .080 target: state it on the sheet)",
-    "warn",
-)
-note(
-    ax,
-    (-11.0, 0.8),
-    (-16.5, -15.2),
-    f"spigot bonded LOCTITE 638 in a reamed Ø.125 hole;\nwall to DT-04's flat {inch(N['spigot_wall_to_flat'], 3)}",
-    "good",
-)
-note(
-    ax,
-    (T006_N + 2.0, 2.4),
-    (21.0, 12.6),
-    "brass bushing pressed on the pivot,\nturns with the cone, thrusts on the end screw",
-    "good",
-)
-note(
-    ax,
-    (31.5, 3.2),
-    (26.0, -12.4),
-    "long 1/4-28 end screw, Ø.063 pivot hole; pinch slit\nlocks it. DT-21 grows south to about .43 for 1.5D",
-    "warn",
-)
-note(
-    ax, (3.4, 2.9), (14.5, 9.2), "T018, T024 keep their flats,\nnow on the arbor", None
-)
-
-# ---------------- Panel 4: Option B
 ax = fig.add_subplot(gs[1, 1])
 frame(
     ax,
-    "4 · Option B: one-piece T006–T018 arbor, T012 and T006 planed",
-    "Period, no joints in the tip. Needs a shaper or the lathe used as one; rule 16 route is arguable for a first-timer",
+    "4 · Option A: T006 cut on a bronze tip arbor",
+    "Fewer soldered joints, one more part: the arbor replaces DT-04's lands 2–4 and is bonded into its Ø.375 land",
+    "good",
+)
+arbor(ax, one_piece=False)
+note(
+    ax,
+    (-11.0, 0.8),
+    (-16.5, -15.6),
+    f"spigot bonded LOCTITE 638 in a reamed Ø.125 hole;\nwall to DT-04's flat {inch(N['spigot_wall_to_flat'])}",
+    "good",
+)
+note(
+    ax,
+    (10.0, 0.4),
+    (-16.5, 13.4),
+    f"T012 reamed Ø.0625 on the arbor, sweated to T006:\nweb {inch(N['t012_web_reamed_116'], 4)} (RV-03, new value)",
     "warn",
 )
-arbor_common(ax, one_piece=True)
+note(
+    ax, (3.4, 2.9), (11.0, 10.6), "T018, T024 keep their flats,\nnow on the arbor", None
+)
+note(
+    ax,
+    (BLOCK_S + 1.0, 3.2),
+    (26.0, -13.0),
+    "same bushing, moved block\nand end screw as C",
+    None,
+)
+
+# ---------------- Panel 5: Option B
+ax = fig.add_subplot(gs[2, 0])
+frame(
+    ax,
+    "5 · Option B: one-piece T006–T018 arbor, T012 and T006 planed",
+    "No joints in the tip; needs a shaper or the lathe used as one, which a reviewer may refuse under rule 16",
+    "warn",
+)
+arbor(ax, one_piece=True)
 note(
     ax,
     (3.4, 4.4),
     (-16.5, 13.4),
-    f"T018 can still be milled: its neighbours stand\nbelow its root (T012 OD {inch(G[12]['od'], 3)} < root {inch(G[18]['root_min'], 3)})",
+    f"T018 milled: T012's OD {inch(G[12]['od'])} is under T018's root {inch(G[18]['root_min'])}",
     "good",
 )
 note(
     ax,
     (8.0, 2.6),
-    (8.0, 12.6),
-    "T012 and T006 planed with form tools; 1.5 mm relief\ngroove at each big-end face, inside the untouched 2.2 mm",
+    (8.0, 10.6),
+    "T012, T006 planed with form tools; .06 relief groove\nat each big-end face, inside the untouched .087",
     "warn",
 )
 note(
     ax,
     (12.0, -3.4),
-    (-5.0, -15.4),
-    "18 tooth spaces planed (not 36):\nindex 6 and 12 from one 72-hole plate",
-    None,
-)
-note(
-    ax,
-    (31.5, 3.2),
-    (30.0, -15.4),
-    "same tip end, bushing and\nspigot joint as option A",
+    (-6.0, -15.6),
+    "18 tooth spaces planed;\nindex 6 and 12 from one 72-hole plate",
     None,
 )
 
-# ---------------- Panel 5: cutter run-out
-ax = fig.add_subplot(gs[2, 0])
-R = 3.175  # a 1/4 in cutter; a fly cutter's swing is larger and worse
-h = N["shoulder_6"]
-reach = math.sqrt(h * (2 * R - h)) if h < R else R
+# ---------------- Panel 6: cutter run-out
+ax = fig.add_subplot(gs[2, 1])
+R = 3.175
+reach = N["runout_quarter_cutter"]
 ax.set_title(
-    "5 · Why T012 must be off the arbor while T006 is cut (option A)",
+    "6 · Why T006 is cut before T012 joins it (A and C)",
     loc="left",
     fontsize=11.5,
     fontweight="bold",
@@ -674,8 +744,8 @@ ax.set_title(
 ax.text(
     0.0,
     1.015,
-    f"T012 stands {inch(h, 3)} in above T006's root. A Ø1/4 cutter reaches full depth only {reach:.1f} mm from that shoulder; "
-    "contact starts 2.2 mm from it.",
+    f"T012 stands {inch(h)} above T006's root. A Ø1/4 cutter reaches full depth only {inch(reach)} from that shoulder; "
+    f"contact starts {inch(CONTACT_ZONE[0])} from it.",
     transform=ax.transAxes,
     fontsize=8.0,
     va="bottom",
@@ -686,15 +756,14 @@ ax.set_xlim(-1.5, 40)
 ax.set_ylim(-3.5, 12.5)
 ax.set_aspect("equal")
 ax.axis("off")
-x12, x6 = 0.0, W
 ax.add_patch(
-    Rectangle((x12, 0), W, G[12]["od"] / 2, fc=BRONZE, ec=BRONZE_E, lw=0.9, zorder=2)
+    Rectangle((0, 0), W, G[12]["od"] / 2, fc=BRONZE, ec=BRONZE_E, lw=0.9, zorder=2)
 )
 ax.add_patch(
-    Rectangle((x6, 0), W, G[6]["od"] / 2, fc=BRONZE, ec=INTEGRAL_E, lw=1.4, zorder=2)
+    Rectangle((W, 0), W, G[6]["od"] / 2, fc=BRONZE, ec=INTEGRAL_E, lw=1.4, zorder=2)
 )
 ax.plot(
-    [x6, x6 + W],
+    [W, 2 * W],
     [G[6]["root_min"] / 2] * 2,
     color=INK2,
     lw=0.7,
@@ -702,11 +771,11 @@ ax.plot(
     zorder=3,
 )
 ax.text(
-    x6 + W + 0.2, G[6]["root_min"] / 2, "T006 root", fontsize=7, va="center", color=INK2
+    2 * W + 0.2, G[6]["root_min"] / 2, "T006 root", fontsize=7, va="center", color=INK2
 )
 ax.add_patch(
     Circle(
-        (x6 + reach, G[6]["root_min"] / 2 + R),
+        (W + reach, G[6]["root_min"] / 2 + R),
         R,
         fc=BAD,
         alpha=0.13,
@@ -717,28 +786,23 @@ ax.add_patch(
     )
 )
 ax.plot(
-    [x6 + 2.2, x6 + 5.3],
+    [W + CONTACT_ZONE[0], W + CONTACT_ZONE[1]],
     [G[6]["od"] / 2 + 0.35] * 2,
     color=CONTACT,
     lw=2.6,
     solid_capstyle="butt",
     zorder=5,
 )
-centreline(ax, -1.5, x6 + W + 1)
-dim(ax, x6, x6 + reach, -0.9, f"{reach:.1f} > 2.2")
+centreline(ax, -1.5, 2 * W + 1)
+dim(ax, W, W + reach, -0.9, f"{inch(reach)} > {inch(CONTACT_ZONE[0])}")
 ax.text(
-    x12 + W / 2,
-    G[12]["od"] / 2 + 0.5,
-    "T012",
-    ha="center",
-    fontsize=8,
-    fontweight="bold",
+    W / 2, G[12]["od"] / 2 + 0.5, "T012", ha="center", fontsize=8, fontweight="bold"
 )
 ax.text(
-    x6 + W / 2, G[6]["od"] / 2 + 1.0, "T006", ha="center", fontsize=8, fontweight="bold"
+    1.5 * W, G[6]["od"] / 2 + 1.0, "T006", ha="center", fontsize=8, fontweight="bold"
 )
 ax.text(
-    x6 + reach,
+    W + reach,
     G[6]["root_min"] / 2 + 2 * R + 0.3,
     "Ø1/4 cutter at full depth,\nclosest it can come",
     ha="center",
@@ -748,19 +812,17 @@ ax.text(
 ax.text(
     17.0,
     12.0,
-    "Order of work for option A\n"
-    "1  Turn the arbor between centres: spigot, Ø.250 and\n"
-    "    Ø.125 seats, Ø.0625 seat, T006 blank, Ø.0625 pivot.\n"
-    "2  Cut T006 with the DT6-FORM1 fly cutter. It runs off\n"
-    "    over the Ø.0625 seat and pivot: nothing larger is on\n"
-    "    the arbor yet.\n"
-    "3  Mill the T018 and T024 flats.\n"
-    "4  Cut T012 on its own mandrel, then slide T012, T018,\n"
-    "    T024 on. T006 sits inside T012's root\n"
-    f"    ({inch(G[6]['od'], 3)} < {inch(G[12]['root_min'], 3)}), so T012 never blocks T006 again.\n"
-    "Option B leaves T012 on the arbor, so T012 and T006 are\n"
-    "planed. T018 is still milled: the T024 that would block it\n"
-    "is a separate gear.",
+    "Order of work for option C\n"
+    "1  Turn the T006 blank with its Ø.0625 spigot and pivot.\n"
+    "2  Cut T006 with the DT6-FORM1 fly cutter; it runs off over\n"
+    "    the spigot and pivot. Press the bushing on the pivot.\n"
+    "3  Cut T012 (reamed Ø.0625) and T018 (D-bore) alone.\n"
+    "4  Pin-jig the three through lined-up tooth spaces, tin,\n"
+    "    assemble hot, let cool. Reheat to take them apart.\n"
+    "5  Slide the cluster onto DT-04's Ø.125 land, flat to flat.\n"
+    "6  Set end play at the end screw; tighten the pinch screw.\n"
+    f"T006 sits inside T012's root ({inch(G[6]['od'])} < {inch(G[12]['root_min'])}),\n"
+    "so T012 never blocks T006's cutter once T006 is done.",
     fontsize=7.9,
     va="top",
     color=INK,
@@ -768,109 +830,66 @@ ax.text(
     bbox={"boxstyle": "round,pad=0.4", "fc": SURFACE, "ec": MUTED, "lw": 0.8},
 )
 
-# ---------------- Panel 6: rejected
-ax = fig.add_subplot(gs[2, 1])
+# ---------------- Table: exceptions per option
+ax = fig.add_subplot(gs[3, :])
 ax.axis("off")
 ax.set_title(
-    "6 · Rejected under the current rubric",
+    "7 · Owner exceptions after each option (tip-related only; IDs as on main)",
     loc="left",
     fontsize=11.5,
     fontweight="bold",
-    pad=22,
+    pad=10,
 )
-rej = [
-    (
-        "Keep main (#1649 C)",
-        f"T006 web {inch(N['t006_web_now'], 4)} < .060 floor; Ø.031 × 1.32 land and .017 flat; VN-54 has no historical counterpart. Ships only by exception.",
-    ),
-    (
-        "#1649 A: drill-rod tip in DT-04",
-        f"T006 stays bored (web {inch(N['t006_web_now'], 4)}); {inch(N['drill_rod_wall'], 3)} wall round the rod in the Ø.125 land; still needs VN-54 to hold T006/T012.",
-    ),
-    (
-        "#1649 D, E, F: broach, 1/16 land, round pinned bore",
-        f"Every one keeps a bore in T006 (no legal bore exists). E gives a {inch(N['t006_web_116'], 4)} web; F cannot pin a .031 shaft.",
-    ),
-    (
-        "#1649 B: 6-leaf pinion wire",
-        "Clock pinion wire is a cycloidal leaf form, not DT6-FORM1's 20° profile against the 120T drum; no 48DP stock found. Unverified, not pursued.",
-    ),
-    (
-        "v45 review option C: separate gears sweated into a cluster",
-        "Rule 23: solder never counts on a drive-torque joint. T006 also still needs a spigot bore or a spigot; a spigot is option A.",
-    ),
-    (
-        "Bond T012–T018 to the stem instead of flats",
-        "Rule 23 allows it, but the 2026-09-28 ruling phases every gear by one flat and keeps the cone stack unbonded. Owner call (see review).",
-    ),
-]
-y = 0.97
-for head, body in rej:
-    ax.text(
-        0.0,
-        y,
-        "✗ " + head,
-        transform=ax.transAxes,
-        fontsize=9.0,
-        fontweight="bold",
-        color=BAD,
-        va="top",
-    )
-    ax.text(
-        0.03,
-        y - 0.045,
-        body,
-        transform=ax.transAxes,
-        fontsize=8.1,
-        color=INK2,
-        va="top",
-        wrap=True,
-    )
-    y -= 0.165
-
-# ---------------- Table
-ax = fig.add_subplot(gs[3, :])
-ax.axis("off")
-cols = [
-    "",
-    "T006 (rule 17)",
-    "Cutting route (rule 16)",
-    "Tip retention (rule 23)",
-    "Owner rulings it touches",
-    "Parts that change",
-]
+cols = ["", "Retired", "Still needed", "New or changed", "Parts that change"]
 rows = [
     [
         "Main today",
-        f"bored, web {inch(N['t006_web_now'], 4)}",
-        "Ø.031 land with tailstock;\nmicro D-flat and D-bores",
-        "D-flats; VN-54 set screw\non the .017 flat",
-        "keeps U40 and 09-28\nthrough RV-01..04",
+        "—",
+        "DT-03 RV-01 (D-bore), RV-02 (no process word), RV-03 (T012 .0797),\nRV-04 (T006 .0256); DT-04 RV-01 (land), RV-02 (tailstock);\nVN-54 RV-01; DT-21 RV-01; DT-00 DT-03 (VN-55 1.0D)",
+        "—",
         "—",
     ],
     [
-        "A (recommended)",
-        "integral, no web",
-        "lathe, mill, dividing head,\nDT6-FORM1 fly cutter",
-        "T006 integral; T012-T024 on\nflats; spigot bonded LOCTITE 638",
-        "retires U40; keeps 09-28\n(T012 flat on Ø.0625)",
-        "new tip arbor; DT-04 ends at Ø.375 land;\nVN-54, VN-55 out; end screw + bushing in;\nDT-21 1/4-28 and deeper",
+        "C (recommended)",
+        "DT-03 RV-01, RV-04; DT-04 RV-01, RV-02;\nVN-54 RV-01; DT-00 DT-03",
+        "DT-03 RV-02 (T018–T120 D-bores);\nDT-21 RV-01 and DT-20 RV-03 (callout places,\nre-scoped to the moved holes)",
+        f"DT-03 RV-03 → T012 web {inch(N['t012_web_reamed_116'], 4)};\nnew DT-00: solder on the T018-T012-T006 drive joints (rule 23);\nnew end screw: pivot-hole wall {inch(N['end_screw_wall'])} (rule 17 minor)",
+        "DT-04 loses its tip land; T006 becomes a part;\nT012 round bore; VN-54, VN-55 out; end screw\nand bushing in; DT-21 deeper and moved; DT-20 hole",
+    ],
+    [
+        "A",
+        "DT-03 RV-01, RV-04; DT-04 RV-01, RV-02;\nVN-54 RV-01; DT-00 DT-03",
+        "DT-03 RV-02; DT-21 RV-01; DT-20 RV-03",
+        f"DT-03 RV-03 → T012 web {inch(N['t012_web_reamed_116'], 4)};\nnew DT-00: solder on the T012-T006 joint;\nnew end screw wall {inch(N['end_screw_wall'])}",
+        "as C, plus the arbor; DT-04 ends at its Ø.375 land",
     ],
     [
         "B",
-        "integral, no web",
-        "as A, plus a shaper or the\nlathe planing T012 and T006",
-        "T006-T018 integral; T024 flat;\nspigot bonded LOCTITE 638",
-        "retires U40; T012 and T018\nlose their flats",
-        "as A; T012 and T018 configurations\nretire into the arbor",
+        "DT-03 RV-01, RV-03, RV-04; DT-04 RV-01, RV-02;\nVN-54 RV-01; DT-00 DT-03",
+        "DT-03 RV-02; DT-21 RV-01; DT-20 RV-03",
+        f"new end screw wall {inch(N['end_screw_wall'])};\npossible rule 16 acceptance for planing",
+        "as A; T012, T018 configurations retire into the arbor",
     ],
     [
-        "#1649 A/D/E/F",
-        "bored, < .060",
-        "as listed in #1649",
-        "unchanged (VN-54)",
-        "U40 or 09-28",
-        "DT-04 and/or DT-03",
+        "#1649 A (drill-rod tip)",
+        "DT-04 RV-02",
+        "DT-03 RV-01, RV-02, RV-03, RV-04; VN-54 RV-01;\nDT-21 RV-01; DT-00 DT-03",
+        f"DT-04 RV-01 → rod socket wall {inch(N['drill_rod_wall'])} (below the floor)",
+        "DT-04, new drill-rod tip",
+    ],
+    [
+        "#1649 E (1/16 land)",
+        "DT-04 RV-02 (if L/D 21 turns unsupported)",
+        "DT-03 RV-01, RV-02; DT-04 RV-01; VN-54 RV-01;\nDT-21 RV-01; DT-00 DT-03",
+        f"RV-04 → T006 web {inch(N['t006_web_116'], 4)} (worse than today);\nRV-03 → {inch(N['t012_web_d_116'], 4)}",
+        "DT-03, DT-04",
+    ],
+    [
+        "#1649 F, soldered",
+        "DT-03 RV-01 (no D on T006, T012)",
+        "DT-03 RV-02, RV-03, RV-04; DT-04 RV-01, RV-02;\nVN-54 RV-01; DT-21 RV-01; DT-00 DT-03",
+        "new DT-00: solder on T006, T012 to the land",
+        "DT-03, DT-04",
     ],
 ]
 tb = ax.table(
@@ -879,11 +898,11 @@ tb = ax.table(
     loc="upper center",
     cellLoc="left",
     colLoc="left",
-    colWidths=[0.09, 0.09, 0.17, 0.2, 0.16, 0.29],
+    colWidths=[0.11, 0.19, 0.25, 0.23, 0.22],
 )
 tb.auto_set_font_size(False)
-tb.set_fontsize(8.0)
-tb.scale(1, 3.2)
+tb.set_fontsize(7.8)
+tb.scale(1, 3.9)
 for (r, c), cell in tb.get_celld().items():
     cell.set_edgecolor(MUTED)
     cell.set_linewidth(0.6)
@@ -892,14 +911,15 @@ for (r, c), cell in tb.get_celld().items():
         cell.set_facecolor("#efeee9")
     if c == 0 and r > 0:
         cell.set_text_props(fontweight="bold")
+    if r == 2:
+        cell.set_facecolor("#eef6ee")
 fig.text(
     0.025,
-    0.012,
-    "Sources: cad/scripts and cad/config on main a8441605f; issue #1649; drawing-guidelines.md rules 4, 16, 17, 21, 23; book pp.17–21; engineerguy video 4 (6:36–6:39); "
-    "contact zone measured on v45 gltf/dt-drive-train.glb (cone stations unchanged since). Proposal only, not in CAD.",
+    0.01,
+    "Sources: cad/scripts and cad/config on main a8441605f; issue #1649; drawing-guidelines.md rules 4, 16, 17, 18, 20, 21, 23; book pp.17–21; "
+    "engineerguy video 4 (6:36–6:39); contact zone measured on v45 gltf/dt-drive-train.glb (cone stations unchanged since). Proposal only, not in CAD.",
     fontsize=7.6,
     color=INK2,
 )
 fig.savefig(OUT, dpi=150, facecolor=SURFACE)
 print("wrote", OUT)
-print(json.dumps(N, indent=1))
