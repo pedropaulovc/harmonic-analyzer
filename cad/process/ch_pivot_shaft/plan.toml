@@ -28,7 +28,7 @@ quantity = 1                 # harmonic-analyzer/cad/config/parts/ch-pivot-shaft
 
 [drawing]
 number = "MHA-CH-05"        # parts/ch-pivot-shaft.yaml:ch-pivot-shaft.number
-revision = "v48"             # authored HA next-revision plan, held pending matching native export and commissioning
+revision = "v49"             # authored HA next-revision plan, held pending matching native export and commissioning
 # Prechips preserves the exact delivered v47 feature/STEP pair and its v47 provenance.
 # This authored revision does not qualify the historical pair as a current v48 export.
 
