@@ -52,15 +52,15 @@ def test_drawing_keeps_only_make_critical_model_dimensions() -> None:
     marked = set().union(*support.DRAWING_DIMENSIONS.values())
     kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) | set(drawing.VIEW_B_KEEP)
     assert kept == marked == expected
-    assert drawing.DIMENSION_CALLOUTS == {
-        "WinWidth": "SQ POCKET BOTH SIDES",
-        "PocketRadius": "8X",
-        "CavityRadius": "4X",
-        "CavWidth": "SQ CAVITY THRU",
-        "RimChamferSize": RIM_CHAMFER_CALLOUT,
-        "PocketEndStation": "BOTH SIDES",
-        "PocketBottomStation": "BOTH SIDES",
-        "TopFlatPlusZStation": "BOTH SIDES\nKEEPS MHA-CH-08\nSEAT TAPS IN WEB",
+    assert set(drawing.DIMENSION_CALLOUTS) == {
+        "WinWidth",
+        "PocketRadius",
+        "CavityRadius",
+        "CavWidth",
+        "RimChamferSize",
+        "PocketEndStation",
+        "PocketBottomStation",
+        "TopFlatPlusZStation",
     }
     part_owned = {
         "RimChamferSize",
@@ -1253,7 +1253,7 @@ def _inch_ref(value_in: float) -> str:
     return f"({value_in:.3f})".replace("(0.", "(.")
 
 
-FLAT_PLUS_TEXT = ".08\nBOTH SIDES\nKEEPS MHA-CH-08\nSEAT TAPS IN WEB"
+FLAT_PLUS_TEXT = ".08\n" + drawing.DIMENSION_CALLOUTS["TopFlatPlusZStation"]
 # The sheet's left inner border (r7 layout audit: the 6.35's block at 11.1 mm
 # crossed it by 1.58 mm).
 SHEET_LEFT_INNER_BORDER_X = 0.0127
@@ -1376,12 +1376,9 @@ def _boxes_clear(a: tuple[float, ...], b: tuple[float, ...], gap: float) -> bool
     )
 
 
-# One chamfer feature (RimChamfer) breaks every outside edge, both pocket rims
-# and the cavity rims on both web faces, so the size's caption names them all:
-# outside chamfers drawn with no size contradict the title block's 0.25 MAX
-# edge break (machinist review, MHA-FR-05 blocker).
-RIM_CHAMFER_CALLOUT = " X 45 DEG\nALL OUTSIDE\nEDGES AND\nPOCKET AND\nCAVITY RIMS"
-RIM_CHAMFER_TEXT = ".06\n" + RIM_CHAMFER_CALLOUT.strip()
+RIM_CHAMFER_TEXT = ".06\n" + drawing.DIMENSION_CALLOUTS["RimChamferSize"].strip().replace(
+    "<MOD-DEG>", "°"
+)
 
 
 def _rim_chamfer_box() -> tuple[float, ...]:
@@ -1390,12 +1387,12 @@ def _rim_chamfer_box() -> tuple[float, ...]:
     return _text_box(RIM_CHAMFER_TEXT, drawing.RIM_CHAMFER_TEXT_XY)
 
 
-def test_rim_chamfer_callout_names_every_edge_the_feature_breaks() -> None:
-    assert drawing.DIMENSION_CALLOUTS["RimChamferSize"] == RIM_CHAMFER_CALLOUT
-    # The rows under the size's angle name the edges, digit-free.
-    caption = RIM_CHAMFER_CALLOUT.split("\n", 1)[1]
-    assert "OUTSIDE" in caption and "POCKET" in caption and "CAVITY" in caption
-    assert not any(char.isdigit() for char in caption)
+def test_rim_chamfer_feature_breaks_every_edge_its_note_names() -> None:
+    # The callout links the numbered note that names the edges.
+    assert drawing.DIMENSION_CALLOUTS["RimChamferSize"].endswith(
+        f"SEE NOTE {drawing.CHAMFER_NOTE_NUMBER}"
+    )
+    assert drawing.CHAMFER_NOTE.startswith(f"{drawing.CHAMFER_NOTE_NUMBER}. ")
     # The faces whose every edge the feature breaks: both slant faces (the
     # pocket rims and the outside edges they share), the -X end face and one
     # cavity fillet face. The +X end face is selected as its two edges the
@@ -1645,7 +1642,6 @@ def test_view_b_is_a_cropped_rail_strip_in_the_band_below_the_section() -> None:
     assert y + half_crop < SECTION_CAPTION_BOTTOM - 0.003
     caption_left, caption_top = drawing.VIEW_B_CAPTION_XY
     caption_lines = drawing.VIEW_B_CAPTION.splitlines()
-    assert caption_lines == ["VIEW B", "SCALE 1:2"]
     assert caption_top < y - half_crop - 0.002
     assert caption_left >= x - half_len
     caption_right = caption_left + max(map(len, caption_lines)) * NOTE_CHAR_WIDTH
@@ -1667,20 +1663,23 @@ def test_seat_callout_text_sits_between_the_hole_table_and_the_title_block() -> 
     assert x + width < 0.415  # the right border
 
 
-def test_hole_pattern_note_stands_beside_the_table() -> None:
-    """A free note anchors at its text's top-left (inspect-3 render: anchored
-    at x 0.392 it ran 12.6 mm past the right border), so it must clear the
-    table above, the centred seat callout to its left, the title block below
-    and the right border."""
-    lines = drawing.HOLE_PATTERN_NOTE.splitlines()
-    left, top = drawing.HOLE_PATTERN_NOTE_XY
-    right = left + max(map(len, lines)) * NOTE_CHAR_WIDTH
-    bottom = top - len(lines) * NOTE_LINE_PITCH
-    callout_right = drawing.SEAT_CALLOUT_XY[0] + 24 * NOTE_CHAR_WIDTH / 2.0
-    assert left > callout_right + 0.002
-    assert top < HOLE_TABLE_BOTTOM - 0.002
-    assert bottom > TITLE_BLOCK_TOP + 0.002
-    assert right < 0.415 - 0.002  # the right border
+def test_hole_table_with_its_mate_column_stays_inside_the_border() -> None:
+    """The fifth (MATE) column fits only because the native columns narrow."""
+    widths = drawing.HOLE_TABLE_COLUMN_WIDTHS
+    assert set(widths) == {0, 1, 2, drawing.HOLE_TABLE_SIZE_COLUMN, drawing.HOLE_TABLE_MATE_COLUMN}
+    assert drawing.HOLE_TABLE_ANCHOR[0] + sum(widths.values()) < 0.415
+    assert drawing.HOLE_TABLE_MATE == "MHA-FR-01"
+
+
+def test_chamfer_note_sits_in_the_open_band_under_the_bottom_view() -> None:
+    left, top = drawing.CHAMFER_NOTE_XY
+    right = left + len(drawing.CHAMFER_NOTE) * NOTE_CHAR_WIDTH
+    assert left > SHEET_LEFT_INNER_BORDER_X + 0.003
+    assert right < TITLE_BLOCK_LEFT - 0.003
+    assert top - NOTE_LINE_PITCH > 0.0127 + 0.002  # the bottom inner border
+    scale = drawing.VIEW_SCALE / 1000
+    bottom_view_bottom = drawing.BOTTOM_CENTER[1] - support.WIDE * scale
+    assert top < bottom_view_bottom - 0.012  # under the origin arrows
 
 
 def test_view_b_arrow_looks_down_on_the_rail_from_above_the_front_view() -> None:

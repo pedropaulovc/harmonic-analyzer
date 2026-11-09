@@ -31,9 +31,10 @@ MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 
 SPEC = DRAWINGS_BY_NAME["fr_vn_lag_screw"]
-# The footer's ITEM row: the catalogue designation in plain text. The stem's
-# "lag" is historical: this is a machine screw, so the row says so outright.
-ITEM = "1/4-20 x 3/4 HEX HEAD MACHINE SCREW, FULLY THREADED (NOT A LAG)"
+# The footer's ITEM row: the catalogue designation in plain text, as
+# McMaster-Carr names it. The stem's "lag" is historical; the row describes
+# the screw without arguing with the PART cell's slug.
+ITEM = "1/4-20 x 3/4 HEX HEAD SCREW, FULLY THREADED"
 # Each of these spans is shorter than its text, so the witnesses ran through
 # it: shelve the text past its outer witness (farm proof 20261031T195237722Z
 # cleared the thread shelf; the head height and width text still collided).
