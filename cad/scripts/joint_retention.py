@@ -705,7 +705,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "pd_guide_lock",  # 1/8 drill holes (R9-49) only; clamped by guide_lock_screw
         "dt_vn_keeper_chain",  # bead chain
         "dt_vn_keeper_chain_link",  # snap loop link
-        "sm_vn_knife_mount_dowel",  # MHA-SM-VN-53 1/8 dowels, two pressed into the crossbar's blind underside reams per knife mount, slip in the knife mount's round hole and slot
+        "sm_vn_knife_mount_dowel",  # MHA-SM-VN-53 1/8 dowels, one pressed into the crossbar's blind underside ream per knife mount, slipping into the knife mount's round hole B (#2144 item 11.3)
         "sm_vn_knife_hanger_washer",  # new 18-8 SAE washer (McMaster 96659A104), hex-head bearing on the faced crossbar top; no thread
         "pd_latch_hook",  # MHA-PD-14 formed spring-steel hook: screw holes drilled thru, latch-pin hole match-drilled at assembly; no thread
         "sh_vn_music_wire",  # LeverWire and PenWire members, wrapped/tied, no thread
@@ -1468,9 +1468,9 @@ JOINTS: tuple[Joint, ...] = (
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
             "clamps the knife-edge bearing block's top seat to the stationary crossbar underside (MOUNT_GAP 0); "
-            "block and casting never move relative to each other. The two pressed MHA-SM-VN-53 dowels, held in "
-            "the crossbar's underside reams and slipped into the block's round hole and slot (owner ruling "
-            "2026-10-24, T+H3), react any torque about the screw axis, and the lever rock (freed lever_rock DOF) "
+            "block and casting never move relative to each other. The one pressed MHA-SM-VN-53 dowel, held in "
+            "the crossbar's underside ream 7.62 off the screw axis and slipped into the block's round hole B "
+            "(owner rulings 2026-10-24, T+H3, and 2026-11-08, #2144 item 11.3), reacts any torque about the screw axis, and the lever rock (freed lever_rock DOF) "
             "acts about machine Z, perpendicular to the vertical (Y) screw, so it reaches the thread only as "
             "cyclic tension and shear, never as torque about its own axis"
         ),
@@ -1478,11 +1478,11 @@ JOINTS: tuple[Joint, ...] = (
             "plain hex head (92314A253) seated on a new 18-8 SAE washer (96659A104), whose lower "
             "bearing face seats on the crossbar's faced top; MHA-SM-00 step 4 cuts each bolt under "
             "the head to the crossbar-underside-to-washer-top height measured at its own hole plus "
-            ".351 +/-.006 in, so the bolt passes the O6.045 clearance hole and reaches 8.9173 nominal "
-            "(8.763..9.0678 worst case) into the 9.65 +/-0.13 full thread of the #10-24 bottoming tap, "
+            ".351 +/-.005 in, so the bolt passes the O6.147 (C drill) clearance hole and reaches 8.9173 nominal "
+            "(8.7884..9.0424 worst case) into the .375 +/-.005 (9.525 +/-0.127) full thread of the #10-24 bottoming tap, "
             "drawing the block up against the casting. The independently inspected full-form cut "
-            "tail covers the longest reach with 0.4910667 spare; one incomplete tip pitch leaves "
-            "7.7046667 full engagement, with 0.4522 minimum tip air"
+            "tail covers the longest reach with 0.5164667 spare; one incomplete tip pitch leaves "
+            "7.7300667 full engagement, with 0.3556 minimum tip air"
         ),
         lock=Lock.NONE,
         lock_part="",
