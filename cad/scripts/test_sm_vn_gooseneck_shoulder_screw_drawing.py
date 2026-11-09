@@ -202,3 +202,32 @@ def test_purchased_sheet_documents_built_part():
     assert sheet.source.stem == part.PART_NAME == sheet.artifact_stem
     assert sheet.layout in DRAWING_TEMPLATES
     assert set(drawing.SHELVES) <= {name for name, _, _ in spec.REFERENCE_DIMENSIONS}
+
+
+def test_sheet_notes_state_supplier_data_and_where_used_only():
+    """Integration review (run 20261109T062834910Z): the material and finish
+    print in the title block only (rule 2), and the installation block names
+    where the screw goes; its eye-on-shoulder and seating steps are the
+    MHA-SM-00 assembly's (rule 7)."""
+    import sm_summing_assembly_sheet as assembly
+
+    row = _config.parts(STEM)
+    assert spec.SUPPLIER_DATA[-1] == "10-24 UNC-2A, 3/8 THREAD; 70 KSI."
+    for line in spec.SUPPLIER_DATA:
+        assert "STAINLESS" not in line and "PASSIVATED" not in line, line
+    assert row["installation_notes"] == "INSTALLATION - MHA-SM-01 END PIECE"
+    assert any(
+        "MHA-SM-VN-56 THROUGH THE UPPER LOOP OF MHA-SM-VN-51" in step
+        and "SHOULDER SEATS" in step
+        for step in assembly.ASSEMBLY_STEPS
+    )
+
+
+def test_thread_note_clears_the_shoulder_length_dimension():
+    """Integration review (run 20261109T062834910Z, rule 14): the thread note
+    stands right of the (.375) shoulder length's outside arrow and tail, so its
+    leader reaches the thread's middle without crossing that dimension line."""
+    import draw_sm_vn_gooseneck_shoulder_screw as drawing
+
+    assert drawing.THREAD_NOTE_RIGHT >= 0.010
+    assert 0.5 <= drawing.THREAD_LANDING < 1.0

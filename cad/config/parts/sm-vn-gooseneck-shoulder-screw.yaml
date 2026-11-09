@@ -9,10 +9,10 @@ sm-vn-gooseneck-shoulder-screw:
   # 91829A566, washer dropped.
   material_specification: "Slotted 18-8 stainless steel precision shoulder screw, passivated, 70,000 psi tensile, Rockwell B55; McMaster-Carr 91829A566"
   finish: passivated
+  # Where used only; the eye-on-shoulder and seating steps are the
+  # MHA-SM-00 assembly's (sm_summing_assembly_sheet step 8, check 3).
   installation_notes: |-
     INSTALLATION - MHA-SM-01 END PIECE
-    UPPER EYE OF MHA-SM-VN-51 ON THE SHOULDER UNDER THE HEAD.
-    SEAT THE SHOULDER ON THE END FACE.
   quantity: 1
   tolerance_class: machined_block
   process: purchased
