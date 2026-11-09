@@ -59,6 +59,9 @@ CONTACT_ZONE = (2.2, 5.3)  # from each band's big-end face; v45 GLB measurement
 # ---- proposed tip end (options A, B, C) ---------------------------------------------------
 STEM = 1 / 16 * IN  # T006 spigot / T012 seat and the pivot
 SPIGOT = 1 / 8 * IN  # option A arbor into DT-04
+SOCKET = (
+    0.190 * IN
+)  # option C1: depth of the T006 spigot's socket in DT-04's Ø.250 land
 BUSH_D, BUSH_L = (
     0.225 * IN,
     0.160 * IN,
@@ -81,6 +84,9 @@ N = {
     "t012_web_d_116": web(12, STEM + BORE_PLUS),
     "stem_under_t006_root": (G[6]["root_min"] - STEM) / 2.0,
     "spigot_wall_to_flat": (AF[1] - DIAS[1] / 2.0) - (SPIGOT + REAM_PLUS) / 2.0,
+    "socket_wall_to_flat": (AF[2] - DIAS[2] / 2.0) - (STEM + REAM_PLUS) / 2.0,
+    "t018_web_reamed_116": web(18, STEM + REAM_PLUS),
+    "c1_spigot_len": SOCKET + 2 * W,
     "drill_rod_wall": (DIAS[3] - (DIAS[4] + REAM_PLUS)) / 2.0,
     "bushing_wall": (BUSH_D - STEM - REAM_PLUS) / 2.0,
     "end_screw_wall": (SCREW_MINOR - STEM - REAM_PLUS) / 2.0,
@@ -401,22 +407,22 @@ def dt04(ax, end):
         rect(ax, ENDS[2], min(end, ENDS[3]), DIAS[3], STEEL, STEEL_E)
 
 
-fig = plt.figure(figsize=(17, 27.5), dpi=150, facecolor=SURFACE)
+fig = plt.figure(figsize=(17, 33.5), dpi=150, facecolor=SURFACE)
 gs = GridSpec(
-    4,
+    5,
     2,
     figure=fig,
-    height_ratios=[1, 1, 1, 1.3],
+    height_ratios=[1, 1, 1, 0.62, 1.45],
     hspace=0.30,
     wspace=0.06,
     left=0.025,
     right=0.985,
-    top=0.89,
-    bottom=0.03,
+    top=0.905,
+    bottom=0.025,
 )
 fig.text(
     0.025,
-    0.985,
+    0.988,
     "Cone tip (T006–T024): main today vs options, with the exceptions each one still needs",
     fontsize=15,
     fontweight="bold",
@@ -424,7 +430,7 @@ fig.text(
 )
 fig.text(
     0.025,
-    0.972,
+    0.978,
     "Side views to scale; every value in inches. x = 0 at the T018 big-end face, tip to the right. Geometry from main a8441605f "
     "(MHA-DT-03/-04/-20/-21, VN-54/-55).\n"
     f"Green bars: where the 120T cylinder gear touches each band ({inch(CONTACT_ZONE[0])}–{inch(CONTACT_ZONE[1])} from its big-end face, v45 GLB). "
@@ -512,7 +518,7 @@ ax.set_title(
 ax.text(
     0.0,
     1.015,
-    "Only a T006 with no bore has a web worth the name. A, B and C all cut T006 solid with its own spigot or arbor.",
+    "Only a T006 with no bore has a web worth the name. A, B, C1 and C2 all cut T006 solid with its own spigot or arbor.",
     transform=ax.transAxes,
     fontsize=8.0,
     va="bottom",
@@ -522,7 +528,8 @@ ax.text(
 bars = [
     ("Main / #1649 A, D, F", N["t006_web_main"], N["t012_web_main"]),
     ("#1649 E (1/16 land)", N["t006_web_116"], N["t012_web_d_116"]),
-    ("C sweated cluster", None, N["t012_web_reamed_116"]),
+    ("C1 long spigot", None, N["t012_web_reamed_116"]),
+    ("C2 soldering jig", None, N["t012_web_reamed_116"]),
     ("A tip arbor", None, N["t012_web_reamed_116"]),
     ("B planed arbor", None, None),
 ]
@@ -561,13 +568,75 @@ ax.set_xticklabels(["0", ".02", ".04", ".06", ".08", ".10", ".12"])
 for s in ("top", "right", "left"):
     ax.spines[s].set_visible(False)
 
-# ---------------- Panel 3: Option C
+# ---------------- Panel 3: Option C1 (long spigot)
 ax = fig.add_subplot(gs[1, 0])
 frame(
     ax,
-    "3 · Option C (recommended): gears cut alone, sweated into a tip cluster",
-    "DT-04 only loses its Ø.031 land. Every gear is cut alone on a mandrel; soft solder joins T006, T012 and T018",
+    "3 · Option C1 (recommended): gears cut alone, cluster on T006's long spigot",
+    "A fit centres the cluster: T006's Ø.0625 spigot runs through T012 and T018 into a socket in DT-04; solder only drives",
     "good",
+)
+dt04(ax, ENDS[2])
+rect(ax, ENDS[2], X[18], DIAS[2], STEEL, STEEL_E)  # Ø.250 land to T024's north face
+rect(
+    ax, X[18] - SOCKET, X[18], STEM + 0.3, "none", INK2, lw=0.6, ls=(0, (2, 1.2)), z=2.5
+)  # reamed socket in DT-04's Ø.250 land
+gear(ax, 30, BRASS, BRASS_E, bore=DIAS[1])
+gear(ax, 24, BRONZE, BRONZE_E, bore=DIAS[2], flat=AF[2] - DIAS[2] / 2)
+gear(ax, 18, BRONZE, BRONZE_E, bore=STEM)
+gear(ax, 12, BRONZE, BRONZE_E, bore=STEM)
+rect(ax, X[18] - SOCKET, X[6], STEM, BRONZE, INTEGRAL_E, lw=1.2, z=3.25)  # T006 spigot
+gear(ax, 6, BRONZE, BRONZE_E, integral=True)
+for t in (18, 12, 6):
+    solder_face(ax, X[t], G[t]["od"] - 0.4 if t == 6 else G[t]["od"] - 0.6)
+tip_end(ax)
+centreline(ax, -17, 44)
+note(
+    ax,
+    (X[18] - SOCKET / 2, 0.5),
+    (-16.5, -15.4),
+    f"socket Ø.0625 × {inch(SOCKET, 2)} reamed in DT-04's Ø.250 land:\n"
+    f"wall to the T024 flat {inch(N['socket_wall_to_flat'], 4)} (rule 17 minor)",
+    "warn",
+)
+note(
+    ax,
+    (17.2, -1.6),
+    (-16.5, -18.6),
+    f"T006 part: spigot {inch(N['c1_spigot_len'], 2)} long, 6 leaves, pivot; Ø.0625 sits "
+    f"{inch(N['stem_under_t006_root'], 4)} under the root",
+    "warn",
+)
+note(
+    ax,
+    (10.0, 0.4),
+    (-16.5, 13.4),
+    f"T012, T018 reamed Ø.0625: T012 web {inch(N['t012_web_reamed_116'], 4)} (RV-03, new value),"
+    f" T018 web {inch(N['t018_web_reamed_116'], 3)}",
+    "warn",
+)
+note(
+    ax,
+    (X[18], 4.6),
+    (-3.0, 10.4),
+    "T024 | T018 | T012 | T006 sweated face to face;\nT024 keeps its flat and drives",
+    "warn",
+)
+note(
+    ax,
+    (BLOCK_S + 1.0, 3.2),
+    (26.0, -13.0),
+    f"bushing, 1/4-28 end screw (wall {inch(N['end_screw_wall'])}),\nblock {inch(BLOCK_DEPTH, 2)} deep: as A",
+    None,
+)
+
+# ---------------- Panel 4: Option C2 (soldering jig)
+ax = fig.add_subplot(gs[1, 1])
+frame(
+    ax,
+    "4 · Option C2: gears cut alone, cluster trued by a soldering jig",
+    "DT-04 only loses its Ø.031 land; T006's short spigot centres T012, and a jig holds the pair true to T018 while solder sets",
+    "warn",
 )
 dt04(ax, ENDS[3])
 gear(ax, 30, BRASS, BRASS_E, bore=DIAS[1])
@@ -578,42 +647,47 @@ rect(ax, X[12], X[6], STEM, BRONZE, INTEGRAL_E, lw=1.2, z=3.25)  # T006 spigot i
 gear(ax, 6, BRONZE, BRONZE_E, integral=True)
 solder_face(ax, X[12], G[12]["od"] - 0.6)
 solder_face(ax, X[6], G[6]["od"] - 0.4)
+for t in (18, 12, 6):  # jig bore steps on the tooth tips
+    rect(
+        ax,
+        X[t],
+        X[t] + W,
+        G[t]["od"] + 1.2,
+        "none",
+        WARN,
+        lw=0.9,
+        ls=(0, (3, 1.6)),
+        z=7,
+    )
 tip_end(ax)
 centreline(ax, -17, 44)
 note(
     ax,
-    (17.2, -1.6),
-    (-16.5, -17.6),
-    f"T006 part: spigot, 6 leaves, pivot; spigot and pivot Ø.0625 sit\n{inch(N['stem_under_t006_root'], 4)} under the root, so its fly cutter runs off both sides",
-    "good",
-)
-note(
-    ax,
-    (10.0, 0.4),
+    (X[12] + 2.0, G[12]["od"] / 2 + 0.6),
     (-16.5, 13.4),
-    f"T012 reamed Ø.0625: web {inch(N['t012_web_reamed_116'], 4)}\n(over the floor, under the target: RV-03 stays, new value)",
+    "soldering jig: stepped bore on the T018, T012, T006 tooth tips,\nphasing pin through lined-up tooth spaces (needs its own drawing)",
     "warn",
 )
 note(
     ax,
     (X[12], 3.2),
-    (-16.5, -12.6),
-    "T018 | T012 | T006 sweated face to face,\njoints in the untouched big-end zone; T018 keeps its flat",
+    (-16.5, -15.4),
+    "nothing fits T012 or T006 to DT-04: their run-out\nis whatever the jig holds while the solder sets",
     "warn",
 )
 note(
     ax,
-    (T006_N + 2.0, BUSH_D / 2),
-    (12.5, 10.6),
-    f"bushing Ø{inch(BUSH_D)} × {inch(BUSH_L)} pressed on the pivot,\nturns with the cone (wall {inch(N['bushing_wall'])})",
-    "good",
+    (17.2, -1.6),
+    (-16.5, -18.6),
+    f"T006 part: spigot .27, 6 leaves, pivot; T012 web {inch(N['t012_web_reamed_116'], 4)}; T018 keeps its flat",
+    None,
 )
 note(
     ax,
     (BLOCK_S + 1.0, 3.2),
     (26.0, -13.0),
-    f"1/4-28 end screw, Ø.063 pivot hole, wall {inch(N['end_screw_wall'])};\nblock {inch(BLOCK_DEPTH, 2)} deep for 1.5D; pinch slit locks it",
-    "warn",
+    "same bushing, moved block\nand end screw as C1",
+    None,
 )
 
 # ---------------- Panel 4: Option A
@@ -666,10 +740,10 @@ def arbor(ax, one_piece):
     dim(ax, ENDS[1] - 8.0, ENDS[1], -9.4, "Ø.125 spigot,\n.31 deep")
 
 
-ax = fig.add_subplot(gs[1, 1])
+ax = fig.add_subplot(gs[2, 0])
 frame(
     ax,
-    "4 · Option A: T006 cut on a bronze tip arbor",
+    "5 · Option A: T006 cut on a bronze tip arbor",
     "Fewer soldered joints, one more part: the arbor replaces DT-04's lands 2–4 and is bonded into its Ø.375 land",
     "good",
 )
@@ -695,15 +769,15 @@ note(
     ax,
     (BLOCK_S + 1.0, 3.2),
     (26.0, -13.0),
-    "same bushing, moved block\nand end screw as C",
+    "same bushing, moved block\nand end screw as C1",
     None,
 )
 
 # ---------------- Panel 5: Option B
-ax = fig.add_subplot(gs[2, 0])
+ax = fig.add_subplot(gs[2, 1])
 frame(
     ax,
-    "5 · Option B: one-piece T006–T018 arbor, T012 and T006 planed",
+    "6 · Option B: one-piece T006–T018 arbor, T012 and T006 planed",
     "No joints in the tip; needs a shaper or the lathe used as one, which a reviewer may refuse under rule 16",
     "warn",
 )
@@ -731,11 +805,11 @@ note(
 )
 
 # ---------------- Panel 6: cutter run-out
-ax = fig.add_subplot(gs[2, 1])
+ax = fig.add_subplot(gs[3, :])
 R = 3.175
 reach = N["runout_quarter_cutter"]
 ax.set_title(
-    "6 · Why T006 is cut before T012 joins it (A and C)",
+    "7 · Why T006 is cut before T012 joins it (A, C1 and C2)",
     loc="left",
     fontsize=11.5,
     fontweight="bold",
@@ -752,9 +826,10 @@ ax.text(
     ha="left",
     bbox={"boxstyle": "round,pad=0.3", "fc": SURFACE, "ec": BAD, "lw": 1.2},
 )
-ax.set_xlim(-1.5, 40)
+ax.set_xlim(-1.5, 66)
 ax.set_ylim(-3.5, 12.5)
 ax.set_aspect("equal")
+ax.set_anchor("W")
 ax.axis("off")
 ax.add_patch(
     Rectangle((0, 0), W, G[12]["od"] / 2, fc=BRONZE, ec=BRONZE_E, lw=0.9, zorder=2)
@@ -810,19 +885,19 @@ ax.text(
     color=BAD,
 )
 ax.text(
-    17.0,
+    19.0,
     12.0,
-    "Order of work for option C\n"
-    "1  Turn the T006 blank with its Ø.0625 spigot and pivot.\n"
-    "2  Cut T006 with the DT6-FORM1 fly cutter; it runs off over\n"
-    "    the spigot and pivot. Press the bushing on the pivot.\n"
-    "3  Cut T012 (reamed Ø.0625) and T018 (D-bore) alone.\n"
-    "4  Pin-jig the three through lined-up tooth spaces, tin,\n"
-    "    assemble hot, let cool. Reheat to take them apart.\n"
-    "5  Slide the cluster onto DT-04's Ø.125 land, flat to flat.\n"
+    "Order of work for option C1\n"
+    f"1  Turn the T006 blank between centres: {inch(N['c1_spigot_len'], 2)} of Ø.0625 spigot (L/D {N['c1_spigot_len'] / STEM:.0f}, steady or\n"
+    "    tailstock support), the leaf blank, and the Ø.0625 pivot.\n"
+    "2  Cut T006 with the DT6-FORM1 fly cutter; it runs off over the spigot and pivot. Press the bushing on.\n"
+    "3  Ream T018 and T012 Ø.0625, then cut each alone on a Ø.0625 mandrel. Ream DT-04's socket Ø.0625 × .19.\n"
+    "4  Thread T018 and T012 onto T006's spigot; pin-phase them through lined-up tooth spaces; sweat.\n"
+    "5  Put T024 on DT-04's flat, push the spigot home in the socket, phase T018 to T024, sweat that face.\n"
+    "    Reheat to take it apart.\n"
     "6  Set end play at the end screw; tighten the pinch screw.\n"
-    f"T006 sits inside T012's root ({inch(G[6]['od'])} < {inch(G[12]['root_min'])}),\n"
-    "so T012 never blocks T006's cutter once T006 is done.",
+    f"T006 sits inside T012's root ({inch(G[6]['od'])} < {inch(G[12]['root_min'])}), so T012 never blocks T006's cutter once T006 is done.\n"
+    "C2 differs at 3–5: T018 keeps its D-bore on DT-04's Ø.125 land, and the jig, not the shaft, trues T012 and T006.",
     fontsize=7.9,
     va="top",
     color=INK,
@@ -831,10 +906,10 @@ ax.text(
 )
 
 # ---------------- Table: exceptions per option
-ax = fig.add_subplot(gs[3, :])
+ax = fig.add_subplot(gs[4, :])
 ax.axis("off")
 ax.set_title(
-    "7 · Owner exceptions after each option (tip-related only; IDs as on main)",
+    "8 · Owner exceptions after each option (tip-related only; IDs as on main)",
     loc="left",
     fontsize=11.5,
     fontweight="bold",
@@ -850,18 +925,25 @@ rows = [
         "—",
     ],
     [
-        "C (recommended)",
+        "C1 (recommended)",
         "DT-03 RV-01, RV-04; DT-04 RV-01, RV-02;\nVN-54 RV-01; DT-00 DT-03",
-        "DT-03 RV-02 (T018–T120 D-bores);\nDT-21 RV-01 and DT-20 RV-03 (callout places,\nre-scoped to the moved holes)",
-        f"DT-03 RV-03 → T012 web {inch(N['t012_web_reamed_116'], 4)};\nnew DT-00: solder on the T018-T012-T006 drive joints (rule 23);\nnew end screw: pivot-hole wall {inch(N['end_screw_wall'])} (rule 17 minor)",
-        "DT-04 loses its tip land; T006 becomes a part;\nT012 round bore; VN-54, VN-55 out; end screw\nand bushing in; DT-21 deeper and moved; DT-20 hole",
+        "DT-03 RV-02 (T024–T120 D-bores);\nDT-21 RV-01 and DT-20 RV-03 (callout places,\nre-scoped to the moved holes)",
+        f"DT-03 RV-03 → T012 web {inch(N['t012_web_reamed_116'], 4)}; new DT-00: solder on\nthe T024-T018-T012-T006 drive joints (rule 23);\nnew DT-04 socket wall {inch(N['socket_wall_to_flat'], 4)} and end-screw\nwall {inch(N['end_screw_wall'])} (both rule 17 minor)",
+        "DT-04 ends at its Ø.250 land, socket added;\nT006 a part; T012, T018 round bores; VN-54, VN-55\nout; end screw, bushing in; DT-21 moved; DT-20 hole",
+    ],
+    [
+        "C2",
+        "DT-03 RV-01, RV-04; DT-04 RV-01, RV-02;\nVN-54 RV-01; DT-00 DT-03",
+        "DT-03 RV-02 (T018–T120 D-bores);\nDT-21 RV-01; DT-20 RV-03",
+        f"DT-03 RV-03 → T012 web {inch(N['t012_web_reamed_116'], 4)}; new DT-00: solder on\nthe T018-T012-T006 drive joints (rule 23);\nnew end screw: wall {inch(N['end_screw_wall'])} (rule 17 minor); jig drawing",
+        "DT-04 loses its tip land; T006 a part; T012 round\nbore; VN-54, VN-55 out; end screw, bushing in;\nDT-21 moved; DT-20 hole; new soldering jig",
     ],
     [
         "A",
         "DT-03 RV-01, RV-04; DT-04 RV-01, RV-02;\nVN-54 RV-01; DT-00 DT-03",
         "DT-03 RV-02; DT-21 RV-01; DT-20 RV-03",
         f"DT-03 RV-03 → T012 web {inch(N['t012_web_reamed_116'], 4)};\nnew DT-00: solder on the T012-T006 joint;\nnew end screw wall {inch(N['end_screw_wall'])}",
-        "as C, plus the arbor; DT-04 ends at its Ø.375 land",
+        "as C2, plus the arbor; DT-04 ends at its Ø.375 land",
     ],
     [
         "B",

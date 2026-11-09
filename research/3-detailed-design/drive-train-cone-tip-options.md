@@ -18,8 +18,8 @@
 > are inches and are read from `cad/scripts` and `cad/config` on that commit (see
 > [Reproducing](#reproducing)).
 
-![Cone tip: main today, webs by option, options C, A and B, cutter run-out, and the exceptions
-each option still needs](drive-train-cone-tip-options/cone-tip-options-2026-11-09.png)
+![Cone tip: main today, webs by option, options C1, C2, A and B, cutter run-out, and the exceptions
+each option still needs](drive-train-cone-tip-options/cone-tip-options-2026-11-09-r2.png)
 
 ## Where main stands
 
@@ -61,7 +61,7 @@ which matches the book's "more yellow ... harder metal". This review keeps it.
 
 ## Moving the tip block
 
-Options A, B and C end the shaft about .29 past T006's north face, not 1.32 past it. MHA-DT-21
+Options A, B, C1 and C2 end the shaft about .29 past T006's north face, not 1.32 past it. MHA-DT-21
 therefore moves .42 south, so its adjuster still reaches the pivot. The moved block's south face
 sits .200 from T006's north face.
 
@@ -83,21 +83,41 @@ sits .200 from T006's north face.
 
 ## Options
 
-### C · Gears cut alone, sweated into a tip cluster (recommended)
+### C · Gears cut alone, sweated into a tip cluster
 
-- **DT-04** loses only its Ø.031 land and ends where it does today under T012. T030, T024 and
-  T018 stay on their flats.
+Common to both variants:
+
 - **T006** becomes its own small C67500 part: a Ø.0625 spigot, the six leaves, and a Ø.0625
   pivot. Spigot and pivot sit .0108 under T006's root, so the DT6-FORM1 fly cutter runs off on
   both sides.
-- **T012** is cut alone with a reamed round Ø.0625 bore, giving a .0646 web.
-- **Joints.** T018, T012 and T006 are sweated face to face, phased by a pin jig through lined-up
-  tooth spaces. The joints sit at the big-end faces, in the untouched .087. The cluster slides
-  onto DT-04's Ø.125 land, flat to flat; T018's D-bore carries the torque into DT-04. Reheating
-  takes it apart.
+- **T012** is reamed round Ø.0625 and cut alone on a mandrel, giving a .0646 web.
+- **Joints** are sweated face to face at the big-end faces, in the untouched .087, phased by a pin
+  through lined-up tooth spaces. Reheating takes them apart.
 - **Tip end.** The pressed brass bushing, the moved DT-21 and the 1/4-28 end screw, as above.
-- **Why it wins now.** Every gear is cut alone on an ordinary mandrel. DT-04 changes least. Only
-  one new part is turned, and it is short (about .83). Soft solder is a period method.
+
+The variants differ in what centres T012 and T006 on the shaft.
+
+#### C1 · Long spigot into DT-04 (recommended)
+
+- T006's spigot is .73 long. It runs through T012 and T018 into a reamed Ø.0625 × .19 socket in
+  the end of DT-04's Ø.250 land. DT-04 ends at T024's north face and loses lands 3 and 4.
+- T018 is reamed round Ø.0625 (web .127). T024 keeps its flat, and T024, T018, T012 and T006 are
+  sweated face to face. The socket fit locates the cluster; the solder carries the torque.
+- The socket's wall to the T024 flat is .0735, a minor rule 17 shortfall.
+- The cost is the spigot: .73 of Ø.0625 (L/D 12), turned between centres with a steady or
+  tailstock support.
+
+#### C2 · Soldering jig
+
+- DT-04 loses only its Ø.031 land and ends where it does today under T012. T018 keeps its D-bore
+  and flat on DT-04's Ø.125 land.
+- T006's short spigot (.27) centres T012, but nothing fits the T012/T006 pair to DT-04. A
+  stepped-bore jig on the T018, T012 and T006 tooth tips holds them true while the solder sets,
+  so their run-out is whatever the jig holds. The jig needs its own drawing.
+
+**Why C1 wins.** Every gear is cut alone on an ordinary mandrel, a fit rather than a jig sets the
+tip's concentricity, and soft solder is a period method. C2 leaves DT-04 nearly untouched but
+moves concentricity onto a jig.
 
 ### A · T006 cut on a bronze tip arbor
 
@@ -105,7 +125,7 @@ sits .200 from T006's north face.
   flats, a Ø.0625 T012 seat, the integral T006 and the pivot.
 - Its Ø.125 spigot is bonded with LOCTITE 638 into a reamed hole in DT-04's Ø.375 land; the wall
   to that land's flat is .095. T012 is sweated to T006 (web .0646).
-- It has one fewer soldered face than C, at the cost of a longer slender part turned between
+- It has one fewer soldered face than C1, at the cost of a longer slender part turned between
   centres.
 
 ### B · One-piece T006–T018 arbor, T012 and T006 planed
@@ -125,7 +145,8 @@ keep drawing-side Hole Wizard places; they are re-scoped to the moved holes.
 | option | retired | still needed | new or changed |
 |---|---|---|---|
 | Main today | — | all nine above | — |
-| **C (recommended)** | DT-03 RV-01, RV-04; DT-04 RV-01, RV-02; VN-54 RV-01; DT-00 DT-03 | DT-03 RV-02 (T018–T120 D-bores); DT-21 RV-01; DT-20 RV-03 | DT-03 RV-03 becomes T012 web .0646; new DT-00: soft solder on the T018–T012–T006 drive joints (rule 23); new end-screw sheet: pivot-hole wall .072 (rule 17 minor; none with 5/16-24) |
+| **C1 (recommended)** | DT-03 RV-01, RV-04; DT-04 RV-01, RV-02; VN-54 RV-01; DT-00 DT-03 | DT-03 RV-02 (T024–T120 D-bores); DT-21 RV-01; DT-20 RV-03 | DT-03 RV-03 becomes T012 web .0646; new DT-00: soft solder on the T024–T018–T012–T006 drive joints (rule 23); new DT-04: socket wall .0735 to the T024 flat (rule 17 minor); new end-screw sheet: pivot-hole wall .072 (rule 17 minor; none with 5/16-24) |
+| C2 | DT-03 RV-01, RV-04; DT-04 RV-01, RV-02; VN-54 RV-01; DT-00 DT-03 | DT-03 RV-02 (T018–T120 D-bores); DT-21 RV-01; DT-20 RV-03 | DT-03 RV-03 becomes T012 web .0646; new DT-00: soft solder on the T018–T012–T006 drive joints; end-screw wall .072; plus a drawing for the soldering jig |
 | A | DT-03 RV-01, RV-04; DT-04 RV-01, RV-02; VN-54 RV-01; DT-00 DT-03 | DT-03 RV-02; DT-21 RV-01; DT-20 RV-03 | DT-03 RV-03 becomes .0646; new DT-00: solder on the T012–T006 joint; end-screw wall .072 |
 | B | DT-03 RV-01, RV-03, RV-04; DT-04 RV-01, RV-02; VN-54 RV-01; DT-00 DT-03 | DT-03 RV-02; DT-21 RV-01; DT-20 RV-03 | end-screw wall .072; possibly a rule 16 acceptance for planing |
 | #1649 A, drill-rod tip | DT-04 RV-02 | DT-03 RV-01, RV-02, RV-03, RV-04; VN-54 RV-01; DT-21 RV-01; DT-00 DT-03 | DT-04 RV-01 becomes a rod-socket wall of .047, under the floor |
@@ -137,14 +158,14 @@ wire) is not pursued: clock pinion wire is a cycloidal leaf, not DT6-FORM1's 20�
 the 120T drum, and no 48DP stock turned up.
 
 Two owner rulings also need amending, not excepting:
-- **2026-09-28** (one flat per gear land; no gear bonded). C and A drop T012's flat and solder
-  T012/T006. B drops the T012 and T018 flats.
-- **U40** (integral Ø.031 land). It retires in A, B and C.
+- **2026-09-28** (one flat per gear land; no gear bonded). C2 and A drop T012's flat and solder
+  T012/T006; C1 also drops T018's flat and solders T018 to T024. B drops the T012 and T018 flats.
+- **U40** (integral Ø.031 land). It retires in A, B, C1 and C2.
 
 ## Owner decisions
 
-1. C, A or B. C is recommended: least new machining, every gear cut alone, and period solder.
-   B retires one more exception (RV-03) but needs planing.
+1. C1, C2, A or B. C1 is recommended: a fit centres the tip, every gear is cut alone, and the
+   solder is period. B retires one more exception (RV-03) but needs planing.
 2. Move DT-21 .42 south and deepen it to .430 for a 1/4-28 end screw (or .52 for 5/16-24),
    replacing VN-54 and VN-55 with the brass bushing and end screw.
 3. Record the solder exception and the T012 .0646 web.
@@ -153,7 +174,7 @@ Two owner rulings also need amending, not excepting:
 
 "Verified" means read on main `a8441605f`; the rest need a look at the current sheet first.
 
-1. **Cone tip: option C** (above).
+1. **Cone tip: option C1** (above).
 2. **Stop MHA-DT-21 turning on its single screw**
    ([#1178](https://github.com/pedropaulovc/harmonic-analyzer/issues/1178), open). Rule 23
    (static clamp): a one-screw part whose turning changes a setting needs a dowel, tongue, step or
@@ -177,8 +198,8 @@ Two owner rulings also need amending, not excepting:
    ([#1134](https://github.com/pedropaulovc/harmonic-analyzer/issues/1134), open), with the deep
    2X Ø.281 holes; rule 17 counts drill wander.
 7. **Compass words ENFORCE review missed** (rule 26, verified): DT-04's
-   `COLLAR NORTH FACE / 64T SEAT`, and VN-68's `NORTH FACE … NORTH MHA-DT-02 STRAP`. Option C
-   removes the first. The second belongs in an MHA-DT-00 step (#930).
+   `COLLAR NORTH FACE / 64T SEAT`, and VN-68's `NORTH FACE … NORTH MHA-DT-02 STRAP`. Options C1 and C2
+   remove the first. The second belongs in an MHA-DT-00 step (#930).
 
 Dropped from the v45 list because the rubric now says otherwise: a datum and frame scheme
 (rule 5), operation plans and named tools on the prints (rule 7: route them in the book or a
@@ -195,10 +216,10 @@ D=research/3-detailed-design/drive-train-cone-tip-options
 uv run --frozen python $D/dump_geometry.py > geometry.json
 uv run --frozen python $D/block_air.py > air.json
 uv run --no-project --with matplotlib python $D/cone_tip_options.py geometry.json air.json \
-  cone-tip-options-2026-11-09.png
+  cone-tip-options-2026-11-09-r2.png
 ```
 
-The last command also writes `cone-tip-options-2026-11-09.numbers.json` with every web, wall, air and
+The last command also writes `cone-tip-options-2026-11-09-r2.numbers.json` with every web, wall, air and
 run-out quoted above. The air figures are nominal, through `dt_tip_collar_air`'s own pose and
 support functions. The contact zone is the v45 surface-sampled measurement; the cone stations
 have not changed since.
