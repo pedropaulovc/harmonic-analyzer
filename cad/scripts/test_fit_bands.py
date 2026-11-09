@@ -377,7 +377,7 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ),
     ("pd_rack_pinion_spec", "CENTRE_DISTANCE_SET_BAND"): (
         "the reducer's S-K set band at assembly (+x/-0 fine-pitch centre "
-        "allowance), on MHA-PD-00 VIEW K's S-K setting (the arm and plate "
+        "allowance), on MHA-PD-00 DETAIL K's S-K setting (the arm and plate "
         "sheets point at that view and print no value), read by "
         "paper_drive_arm_registration; no fit"
     ),
