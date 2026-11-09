@@ -289,6 +289,7 @@ springs:
           head_height_mm: 4.762499999999999
           drive_slot_width_mm: 1.524
           drive_slot_depth_mm: 1.905
+          eye_retainer: head
           eye_gap_mm: 4.88061
           arm_end_x_mm: -103.359695
           spring_eye_x_mm: -105.8
@@ -352,6 +353,7 @@ springs:
           head_height_mm: 4.762499999999999
           drive_slot_width_mm: 1.524
           drive_slot_depth_mm: 1.905
+          eye_retainer: head
           eye_gap_mm: 4.88061
           arm_end_x_mm: -103.359695
           spring_eye_x_mm: -105.8
