@@ -825,13 +825,13 @@ def test_the_knife_edge_prints_its_ridge_and_flanks_to_the_sides() -> None:
     assert set(knife) <= set(drawing.DETAIL_KEEP)
     assert "KnifeRidgeRadius" in drawing.DETAIL_KEEP
     prefixes = notes.DIMENSION_PREFIXES
-    assert prefixes[("KnifeEnvelopeReference", "HexWidth")] == "2X (1 PER STUB)\n("
+    assert prefixes[("KnifeEnvelopeReference", "HexWidth")] == "EACH STUB ("
     for name in ("HexHeight", "RidgeFromLeft", "RidgeFromRight"):
-        assert prefixes[("KnifeEnvelopeReference", name)] == "2X (1 PER STUB)\n"
-    assert prefixes[("KnifeEnvelopeReference", "FlankToSide")] == "4X (2 PER STUB)\n"
-    assert prefixes[("KnifeRidgeFillet", "KnifeRidgeRadius")] == "2X (1 PER STUB)\nR"
+        assert prefixes[("KnifeEnvelopeReference", name)] == "EACH STUB "
+    assert prefixes[("KnifeEnvelopeReference", "FlankToSide")] == "2X PER STUB "
+    assert prefixes[("KnifeRidgeFillet", "KnifeRidgeRadius")] == "EACH STUB R"
     # The knife envelope's bands link one note naming their seat once (rule
-    # 4); the 2X counts say both stubs.
+    # 4); EACH STUB states the multiplicity without a multiline prefix.
     seat_bands = ("RidgeFromLeft", "RidgeFromRight", "FlankToSide", "HexHeight")
     for name in seat_bands:
         assert notes.DIMENSION_CALLOUTS_BELOW[name] == notes.KNIFE_SEAT_NOTE_LINK, name
@@ -1071,10 +1071,9 @@ def test_flank_shelf_clears_recorded_angular_route_and_complete_neighbors() -> N
     old_connector = Segment(0.0583221, 0.1667272, 0.0696861, 0.0754438)
     assert segment_box_overlap_length(old_connector, printed_rows[1]) > 0.003
     x, y = drawing.FLANK_TEXT_XY
-    assert x == 0.051, "retain the measured horizontal shelf/neighbor relationship"
-    dy = y - 0.081
-    native = tuple(Box(row.xmin, row.ymin + dy, row.xmax, row.ymax + dy) for row in native_rows)
-    printed = tuple(Box(row.xmin, row.ymin + dy, row.xmax, row.ymax + dy) for row in printed_rows)
+    dx, dy = x - 0.051, y - 0.081
+    native = tuple(Box(row.xmin + dx, row.ymin + dy, row.xmax + dx, row.ymax + dy) for row in native_rows)
+    printed = tuple(Box(row.xmin + dx, row.ymin + dy, row.xmax + dx, row.ymax + dy) for row in printed_rows)
     clearance = 0.00357  # one complete recorded printed cap height
     neighbors = (
         # Combined complete native/PDF blocks, not just the closest numbers.
@@ -1312,8 +1311,8 @@ def test_the_between_stub_ridge_bound_holds_only_with_the_sides_in_one_plane() -
     assert spec.KNIFE_STUB_RIDGE_OFFSET_MAX == 2.0 * spec.RIDGE_FROM_SIDE_TOL
     assert spec.KNIFE_RIDGE_CONTACT_SPAN == pytest.approx(spec.HEX_Z_INNER + spec.HEX_Z_OUTER)
     assert spec.KNIFE_HOOK_ARM_SPREAD_MAX == pytest.approx(0.078, abs=5e-4)
-    assert notes.DIMENSION_PREFIXES[("KnifeEnvelopeReference", "RidgeFromLeft")] == "2X (1 PER STUB)\n"
-    assert notes.DIMENSION_PREFIXES[("KnifeEnvelopeReference", "RidgeFromRight")] == "2X (1 PER STUB)\n"
+    assert notes.DIMENSION_PREFIXES[("KnifeEnvelopeReference", "RidgeFromLeft")] == "EACH STUB "
+    assert notes.DIMENSION_PREFIXES[("KnifeEnvelopeReference", "RidgeFromRight")] == "EACH STUB "
     assert lever_build.KNIFE_SIDE_PLANE_TOL == 1e-6
     assert "_assert_knife_sides_coplanar" in [
         _call_name(call) for call in _calls_in_order(_builder_function("build"))
@@ -1415,17 +1414,28 @@ def test_back_projected_knife_detail_uses_model_owned_spans_and_exterior_angle()
     vertex, shoulder, side_end = map(project, (model_vertex, model_shoulder, model_side_end))
     assert shoulder[0] < vertex[0]  # the model's +X flank, not its opposite
     assert spec.HEX_H / 2.0 < drawing.DETAIL_RADIUS_MM - 0.5
+    # Budget the actual inch text, not the pre-migration metric values.
+    def inch(value, places=spec.KNIFE_ENVELOPE_PLACES):
+        return f"{value / 25.4:.{places}f}".removeprefix("0")
+
+    ridge_value = f"EACH STUB {inch(spec.RIDGE_FROM_SIDE)} ±{inch(spec.RIDGE_FROM_SIDE_TOL)}"
+    flank_band = f"{spec.KNIFE_FLANK_TO_SIDE_TOL_DEG:.1f}".removeprefix("0")
     blocks = {
-        "HexWidth": _detail_block("HexWidth", "2X (1 PER STUB)\n(8.080)"),
-        "HexHeight": _detail_block("HexHeight", "2X (1 PER STUB)\n10.268"),
-        "RidgeFromLeft": _detail_block("RidgeFromLeft", "2X (1 PER STUB)\n4.040 ±0.05"),
-        "RidgeFromRight": _detail_block("RidgeFromRight", "2X (1 PER STUB)\n4.040 ±0.05"),
-        "FlankToSide": _detail_block("FlankToSide", "4X (2 PER STUB)\n122.4° ±0.5°"),
-        "KnifeRidgeRadius": _detail_block("KnifeRidgeRadius", "2X (1 PER STUB)\nR0.1 MAX"),
+        "HexWidth": _detail_block("HexWidth", f"EACH STUB ({inch(spec.HEX_W)})"),
+        "HexHeight": _detail_block("HexHeight", f"EACH STUB {inch(spec.HEX_H)}"),
+        "RidgeFromLeft": _detail_block("RidgeFromLeft", ridge_value),
+        "RidgeFromRight": _detail_block("RidgeFromRight", ridge_value),
+        "FlankToSide": _detail_block(
+            "FlankToSide", f"2X PER STUB {spec.KNIFE_FLANK_TO_SIDE_DEG:.1f}° ±{flank_band}°",
+        ),
+        "KnifeRidgeRadius": _detail_block(
+            "KnifeRidgeRadius", f"EACH STUB R{inch(spec.KNIFE_RIDGE_R, spec.KNIFE_RIDGE_R_PLACES)} MAX",
+        ),
     }
     for name, (left, _right, _bottom, top, _lines) in blocks.items():
         assert top < _BORDER_TOP_M - 0.004, name
         assert left > _BORDER_LEFT_M + 0.002, name
+    assert blocks["FlankToSide"][1] < shoulder[0] - 0.002
     pair_lines = {
         name: _dimension_line_y(name, blocks[name][4]) for name in spans
     }

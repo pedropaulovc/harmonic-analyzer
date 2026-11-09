@@ -1757,13 +1757,13 @@ DETAIL_KEEP = {
     # (machinist review 41bbeec): seeded nearer the upper end, it lands on
     # the arc's upper part, below and right of the shelf, outside the arc.
     "FlankToSide": (0.0653, 0.1918),
-    "KnifeRidgeRadius": (0.181, 0.219),
+    "KnifeRidgeRadius": (0.182, 0.219),
 }
 # Keep the native arc radius. R3's low shelf routed through the final SEAT T.
-# Above the height's Y201.3401 witness, the whole two-row block clears it by
-# 4.1036 mm and the X74.5999 ridge witness by 4.9138 mm. Any connector from
-# the unchanged arc stays below the text; verify regenerated native/PDF ink.
-FLANK_TEXT_XY = (0.051, 0.211)
+# Above the height's Y201.3401 witness, the two-row block stays left of the
+# X74.5999 ridge witness. Keep the per-stub count and value on one line;
+# verify the unchanged arc's connector and the complete text in the PDF.
+FLANK_TEXT_XY = (0.04365, 0.211)
 RIDGE_WITNESS_GAP = 0.010
 TOP_KEEP = {
     # The model width is authored at the plan's middle Z. Its native

@@ -53,6 +53,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # upper flanks each make the one flank-to-side angle.  A radial prefix
 # replaces the native R, so a radius prefix carries its own; the width's
 # opening parenthesis marks it a reference (its suffix closes it).
+# Keep per-stub prefixes on one line: multiline values disappear when the
+# existing SEE NOTE callout is added. EACH STUB is one feature on each;
+# 2X PER STUB is the two upper flank angles on each hexagon.
 DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
     ("EdgeRibFront", "EdgeRibThickness"): "3X ",
     ("EdgeRibFrontProfile", "RibReach"): "3X ",
@@ -60,12 +63,12 @@ DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
     ("MiddleRibProfile", "MiddleRibCounterAngle"): "2X ",
     ("SummationPlateProfile", "SummationArcRadius"): "2X R",
     ("KnifeStubReference", "KnifeStubLength"): "2X ",
-    ("KnifeRidgeFillet", "KnifeRidgeRadius"): "2X (1 PER STUB)\nR",
-    ("KnifeEnvelopeReference", "HexWidth"): "2X (1 PER STUB)\n(",
-    ("KnifeEnvelopeReference", "HexHeight"): "2X (1 PER STUB)\n",
-    ("KnifeEnvelopeReference", "RidgeFromLeft"): "2X (1 PER STUB)\n",
-    ("KnifeEnvelopeReference", "RidgeFromRight"): "2X (1 PER STUB)\n",
-    ("KnifeEnvelopeReference", "FlankToSide"): "4X (2 PER STUB)\n",
+    ("KnifeRidgeFillet", "KnifeRidgeRadius"): "EACH STUB R",
+    ("KnifeEnvelopeReference", "HexWidth"): "EACH STUB (",
+    ("KnifeEnvelopeReference", "HexHeight"): "EACH STUB ",
+    ("KnifeEnvelopeReference", "RidgeFromLeft"): "EACH STUB ",
+    ("KnifeEnvelopeReference", "RidgeFromRight"): "EACH STUB ",
+    ("KnifeEnvelopeReference", "FlankToSide"): "2X PER STUB ",
     # A linear dimension across the plan's cylinder band prints no Ø itself.
     ("CylinderReference", "CylinderDia"): "<MOD-DIAM>",
 }
