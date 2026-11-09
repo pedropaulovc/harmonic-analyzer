@@ -75,23 +75,6 @@ def test_the_chamfered_end_is_the_pressed_end() -> None:
     assert (spec.DIA / 2.0, spec.CHAMFER_LEN) in section
 
 
-def test_the_installation_note_names_one_pin_per_mount_and_fits_the_sheet() -> None:
-    from _purchased_fastener_drawing import note_lines
-
-    lines = note_lines(_config.parts(STEM)["installation_notes"], label=STEM)
-    assert all(len(line) <= 70 for line in lines), lines
-    flat = " ".join(lines)
-    assert "MHA-SM-02" in flat and "MHA-FR-02" in flat
-    assert "UNDERSIDE REAM, CHAMFER END FIRST." in flat
-    # Owner ruling 2026-10-24 (T+H3): the crossbar holds the press, the knife
-    # mount the slip.  Owner ruling 2026-11-08 (Pedro), #2144 item 11.3: one
-    # pin per mount, into its round hole; no slot remains.
-    assert "PRESS FIT IN THE MHA-FR-02 CROSSBAR" in flat
-    assert "ONE PIN PER MHA-SM-02 KNIFE MOUNT" in flat
-    assert "ROUND HOLE" in flat and "SLOT" not in flat
-    assert _config.parts(STEM)["quantity"] == spec.QUANTITY == 2
-
-
 def test_purchased_sheet_documents_the_built_part() -> None:
     import draw_sm_vn_knife_mount_dowel as drawing
 

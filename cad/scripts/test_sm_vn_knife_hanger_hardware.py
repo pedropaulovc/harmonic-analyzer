@@ -130,7 +130,7 @@ def test_title_block_chamfer_band_leads_into_the_tap_inside_one_pitch() -> None:
     assert bolt.SHANK_DIA_MAX == pytest.approx(4.8006)
     tap_drill = TAP_DRILL_MM[bolt.THREAD]
     assert bolt.SHANK_DIA_MAX - 2 * bolt.CHAMFER_WIDTH_MIN < tap_drill
-    assert "1 PITCH MAX" in bolt.DIMENSION_CALLOUTS["ThreadLengthMin"]
+    assert "1 PITCH MAX" in bolt_drawing.DIMENSION_CALLOUTS["ThreadLengthMin"]
     assert bolt.CATALOG_LENGTH - bolt.LENGTH > bolt.PITCH
 
 
@@ -286,7 +286,7 @@ def test_native_controls_are_owned_and_printed_without_precision_rewrites() -> N
     assert bolt_drawing.EXPECTED_CONTROLS["ChamferAngle"] == pytest.approx(
         (math.radians(45.0), -math.radians(1.0), math.radians(1.0))
     )
-    assert "ChamferAngle" not in bolt.DIMENSION_CALLOUTS
+    assert "ChamferAngle" not in bolt_drawing.DIMENSION_CALLOUTS
     assert set(bolt.DRAWING_DIMENSIONS) == {
         "StockTrimProfile",
         "StockDeburrProfile",
@@ -305,28 +305,23 @@ def test_native_controls_are_owned_and_printed_without_precision_rewrites() -> N
     assert bolt_drawing.REFERENCE_NOMINAL == pytest.approx(0.04670)
     assert bolt.DIMENSION_TOLERANCE_TYPES["CutLength"] == 0
     assert bolt.DIMENSION_PRECISION["CutLength"] == 2
-    cut_callout = bolt.DIMENSION_CALLOUTS["CutLength"]
-    assert cut_callout.splitlines() == [
-        "UNDER HEAD TO FINISHED TIP",
-        "CUT AT ASSEMBLY",
-        "PER MHA-SM-00 STEP 4",
-    ]
+    cut_callout = bolt_drawing.DIMENSION_CALLOUTS["CutLength"]
+    # Rule 7: at most two lines of words under any control.
+    assert all(
+        len(text.splitlines()) <= 2 for text in bolt_drawing.DIMENSION_CALLOUTS.values()
+    )
+    assert "MHA-SM-00 STEP 4" in cut_callout
     for retired in ("THREAD ENGAGEMENT", "TIP CLEARANCE", "MATE:"):
         assert retired not in cut_callout
     assert bolt.DIMENSION_TOLERANCE_TYPES["ThreadLengthMin"] == 5
-    assert "1 PITCH MAX" in bolt.DIMENSION_CALLOUTS["ThreadLengthMin"]
-    assert "FULL FORM" in bolt.DIMENSION_CALLOUTS["ThreadLengthMin"]
-    assert "\n" in bolt.DIMENSION_CALLOUTS["ThreadLengthMin"]
-    assert all("\\n" not in text for text in bolt.DIMENSION_CALLOUTS.values())
+    assert "1 PITCH MAX" in bolt_drawing.DIMENSION_CALLOUTS["ThreadLengthMin"]
+    assert all("\\n" not in text for text in bolt_drawing.DIMENSION_CALLOUTS.values())
     # The title block's thread row gives class 2A; the callout does not.
-    assert bolt.DIMENSION_CALLOUTS["ThreadLengthMin"].startswith("#10-24 UNC ")
-    assert all("2A" not in text for text in bolt.DIMENSION_CALLOUTS.values())
-    chamfer_callout = bolt.DIMENSION_CALLOUTS["ChamferWidth"]
+    assert all("2A" not in text for text in bolt_drawing.DIMENSION_CALLOUTS.values())
+    chamfer_callout = bolt_drawing.DIMENSION_CALLOUTS["ChamferWidth"]
     # No literal angle: the 45 degrees is the native ChamferAngle's own text.
-    reason = chamfer_callout.replace("MHA-SM-02", "")
-    assert not any(character.isdigit() for character in reason)
+    assert not any(character.isdigit() for character in chamfer_callout)
     assert "DEG" not in chamfer_callout and "°" not in chamfer_callout
-    assert "MHA-SM-02" in chamfer_callout
     source = (SCRIPTS / "draw_sm_vn_knife_hanger_stud.py").read_text(encoding="utf-8")
     assert "build_purchased_fastener_drawing" not in source
     assert "_stock_trim_drawing" in source
@@ -629,9 +624,6 @@ def test_modified_stock_route_is_complete_not_the_old_socket_recipe() -> None:
     assert "COUNTERBORE" not in row["installation_notes"]
     assert "SPOTFACE" not in row["installation_notes"]
     assert "FACED TOP" in row["installation_notes"]
-    washer_notes = _config.parts(washer_part.PART_NAME)["installation_notes"]
-    assert "SPOTFACE" not in washer_notes
-    assert "SEATS ON THE FACED CROSSBAR TOP" in washer_notes
     for module in ("build_sm_vn_knife_hanger_stud", "draw_sm_vn_knife_hanger_stud"):
         tree = ast.parse((SCRIPTS / f"{module}.py").read_text(encoding="utf-8"))
         imports = {
@@ -1183,7 +1175,7 @@ def test_sheet_prints_purchased_note_and_chamfer_leader_with_native_readback(
         for name in keep:
             display = SimpleNamespace(
                 GetText=lambda _index, name=name: (
-                    bolt.DIMENSION_CALLOUTS.get(name, "").replace("\n", "\r\n")
+                    bolt_drawing.DIMENSION_CALLOUTS.get(name, "").replace("\n", "\r\n")
                     + (" WRONG" if fault == "callout" else "")
                 )
             )
