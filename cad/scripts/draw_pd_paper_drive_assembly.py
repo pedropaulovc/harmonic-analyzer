@@ -1795,6 +1795,15 @@ def _step_text(
         return sub_step(key, index)
 
     shim_target = steps.inch_text(sum(cluster_fit.RING_FLOAT_RANGE) / 2.0, 3)
+    shim_thickness = steps.inch_text(cluster_fit.SHIM.THICKNESS, 3)
+    # The bare stack's ring gap, widened outward to the .001 grid: its floor
+    # still holds the window's floor (never under) and the most shims, at
+    # their thinnest, still bring its top into the window.
+    _bare_in = (
+        math.floor(cluster_fit.UNSHIMMED_FLOAT_RANGE[0] / 25.4 * 1000.0 + 1e-9) / 1000.0,
+        math.ceil(cluster_fit.UNSHIMMED_FLOAT_RANGE[1] / 25.4 * 1000.0 - 1e-9) / 1000.0,
+    )
+    bare_gap = " TO ".join(steps.inch_text(limit * 25.4, 3) for limit in _bare_in)
     # Remedies that run back through joints made permanent by then (13J
     # stake, 22D/22E cross-pin, 15C-15F tapped disc) release and renew named
     # parts. Owner ruling 2026-11-08 (auto-selected after timeout), pending
@@ -2077,7 +2086,8 @@ def _step_text(
             f"{n['pd-vn-transgear-retaining-ring']} "
             "RING ON ITS GROOVE'S FRONT WALL.",
             f"READ THE GAP BETWEEN THE {n['pd-transgear-front-bushing']} BUSHING AND "
-            f"THE {n['pd-vn-transgear-retaining-ring']} RING WITH FEELERS.",
+            f"THE {n['pd-vn-transgear-retaining-ring']} RING WITH FEELERS "
+            f"(WITH NO SHIMS IT READS {bare_gap}).",
             # Machinist review rounds 8-10: the shims sit under the rear
             # bushing, so the stack comes off to change them, either way, and
             # goes back on to re-read. The bare stack is never under the
@@ -2086,14 +2096,19 @@ def _step_text(
             # sized to bring the gap to the window's middle. The check is the
             # reading alone and the next sub-step names what it passes on
             # (machinist review of fanout/integration 8fb7fb46f7: a bare-stack
-            # remark between them left "IF IT DOES" pointing at either).
+            # remark between them left "IF IT DOES" pointing at either). The
+            # bare gap's range and the shim's thickness print with the reading
+            # and the remedy, so the sheet shows that none to the most shims
+            # cover every stack and an under reading always has a shim to take
+            # off (review of the DETAIL E rename: the loop could stall).
             f"CHECK: THE GAP READS {CLUSTER_FLOAT_VIEW_NAME} (SHEET {float_sheet}).",
             f"IF THE GAP READS {CLUSTER_FLOAT_VIEW_NAME}, GO TO STEP "
             f"{steps.step_number('disc-cluster-shimmed') + 1}.",
             "IF NOT, REMOVE THE RING, THE "
             f"{n['pd-transgear-front-bushing']} BUSHING, THE SLEEVE WITH HUB AND DISC, "
             f"AND THE {n['pd-transgear-rear-bushing']} BUSHING.",
-            f"IF IT READ OVER, ADD {n['pd-vn-transgear-cluster-shim']} SHIMS AT THE "
+            f"IF IT READ OVER, ADD {n['pd-vn-transgear-cluster-shim']} SHIMS, "
+            f"{shim_thickness} THICK, AT THE "
             f"ARM FACE TOTALLING THE GAP LESS {shim_target}, UP TO "
             f"{cluster_fit.SHIM_COUNT_RANGE[1]} IN ALL.",
             "IF IT READ UNDER, TAKE ONE SHIM OFF.",
