@@ -21,10 +21,11 @@ from pathlib import Path
 from typing import Any, NoReturn
 
 from solidworks_mcp.adapters.solidworks.drawing import (
-    dimension_name, place_view, set_view_position, view_name,
+    add_note, dimension_name, place_view, set_view_position, view_name,
 )
 
 from _machinist_review_mode import MachinistReviewMode
+import _config
 import _telemetry
 from _check import check
 from _com import _early_bound
@@ -74,7 +75,6 @@ from pd_vn_transgear_pivot_screw_spec import (
     CHAMFER_ANGLE,
     CHAMFER_ANGLE_TOLERANCE,
     CHAMFER_WIDTH,
-    DIMENSION_CALLOUTS,
     DIMENSION_PRECISION,
     DIMENSION_TOLERANCE_TYPES,
     DRAWING_DIMENSIONS,
@@ -82,6 +82,7 @@ from pd_vn_transgear_pivot_screw_spec import (
     HEAD_CHAMFER,
     HEAD_DIA,
     HEAD_H,
+    PRINTED_THREAD,
     SHOULDER_END_Y,
     SHOULDER_DIA,
     SHOULDER_LEN,
@@ -94,6 +95,7 @@ from pd_vn_transgear_pivot_screw_spec import (
     THREAD_LEN,
     THREAD_LENGTH_MIN,
     THREAD_MAJOR,
+    TIP_RECESS,
     TIP_Y,
 )
 
@@ -152,9 +154,35 @@ FRONT_KEEP = {
 # The chamfer callout stands below-right of the tip, under the tail's lower
 # extension line and right of the leg's own extension lines.
 CHAMFER_TEXT_XY = (0.185, TIP_SHEET_Y - 0.018)
-# The reference length's four lines stand wholly left of its dimension line
-# (73 mm wide), so neither its arrows nor its extension lines strike them.
+# The reference length's (.360) and SEE NOTE 1 stand wholly left of its
+# dimension line (73 mm wide), so neither its arrows nor its extension lines
+# strike them.
 CUT_LENGTH_TEXT_XY = (0.062, (TIP_SHEET_Y + SHOULDER_END_SHEET_Y) / 2)
+# Machinist review (rubric v2, clarity, r1-r3): the reference length carried
+# three lines of words and the thread tail three; rule 7 allows a callout two.
+# The fit-up requirement (rule 19, matched to the bar) moves to numbered
+# note 1, linked by SEE NOTE 1 on the length it sets; the tail's full form is
+# the thread designation's own, so only its one-pitch exception stays.
+FIT_UP_NOTE = 1
+_RECESS_TEXT = f"{TIP_RECESS[0] / 25.4:.3f}-{TIP_RECESS[1] / 25.4:.3f}".replace("0.", ".")
+FIT_UP_NOTE_TEXT = (
+    f"{FIT_UP_NOTE}. TIP FACED AT ASSEMBLY {_RECESS_TEXT} BELOW\n"
+    f"    FRONT FACE OF SUPPORT BAR {_config.parts('pd-support-bar')['number']}."
+)
+DIMENSION_CALLOUTS = {
+    "CutLength": f"SEE NOTE {FIT_UP_NOTE}",
+    # The native ChamferAngle prints its own 45 degrees.
+    "ChamferWidth": "CUT-END CHAMFER\nPAST THE THREAD ROOT",
+    "ThreadLengthMin": (
+        f"{PRINTED_THREAD} FROM FACED TIP\n"
+        "INCOMPLETE THREAD AT TIP 1 PITCH MAX"
+    ),
+}
+# Sheet-owned, in the open field under the reference length's leader and left
+# of the title block (x >= 0.216 below y = 0.065); the insertion point is the
+# note's top-left.
+FIT_UP_NOTE_XY = (0.025, 0.058)
+_TITLE_BLOCK_XMIN = 0.216
 # The native straight leader departs down-left from the actual sheet-left
 # upper trimmed rim. Native automatic wrapping fits the measured left field.
 _HEAD_TOP_R = HEAD_DIA / 2 - HEAD_CHAMFER
@@ -2015,6 +2043,53 @@ def _assert_paper_layout(
             )
 
 
+def _add_fit_up_note(adapter: Any, front: Any, top: Any, iso: Any) -> Any:
+    """Insert numbered note 1 on the finished sheet; return its settled proof."""
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    # ActivateView("") returns False for sheet context; require native context
+    # so the note belongs to the sheet, not the last view the leader used.
+    drawing.ActivateView("")
+    if drawing.ActiveDrawingView is not None:
+        raise RuntimeError("fit-up note 1: cannot leave view context for the sheet")
+    note = add_note(adapter, FIT_UP_NOTE_TEXT, *FIT_UP_NOTE_XY)
+    if note is None:
+        raise RuntimeError("fit-up note 1: InsertNote failed")
+    note = _early_bound(note, "INote")
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+
+    def settled() -> None:
+        if (
+            str(note.GetText() or "").replace("\r", "") != FIT_UP_NOTE_TEXT
+            or int(annotation.OwnerType) != 1  # swAnnotationOwner_e: sheet
+        ):
+            raise RuntimeError("fit-up note 1: sheet-owned text did not persist")
+        border = _finished_border(adapter)
+        text = display_box(
+            {"texts": _paper_annotation(adapter, annotation, label="fit-up note 1")["display"]["texts"]}
+        )
+        if text is None or (
+            text.xmin < border.xmin or text.ymin < border.ymin
+            or text.xmax + _PAPER_GAP_M > _TITLE_BLOCK_XMIN or text.ymax > border.ymax
+        ):
+            raise RuntimeError("fit-up note 1: complete native text leaves its open field")
+        for view in (front, top, iso):
+            outline = Box(*(float(value) for value in _early_bound(view, "IView").GetOutline()))
+            if text.gap(outline) < _PAPER_GAP_M:
+                raise RuntimeError("fit-up note 1: complete native text crowds a finished view")
+        for raw in _early_bound(front, "IView").GetAnnotations() or ():
+            other = _paper_annotation(adapter, _early_bound(raw, "IAnnotation"), label="Front annotation")
+            other_text = display_box({"texts": other["display"].get("texts") or ()})
+            geometry = annotation_geometry(other, owner="Front annotation", advance=calibrate_sheet_advance((other,)))
+            if (
+                other_text is not None and text.gap(other_text) < _PAPER_GAP_M
+            ) or any(segment_box_distance(run, text) < _PAPER_GAP_M for run in geometry.segments):
+                raise RuntimeError("fit-up note 1: complete native text crowds Front text/line")
+
+    rebuild_drawing(adapter, label="place fit-up note 1")
+    settled()
+    return settled
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -2116,6 +2191,7 @@ async def build(adapter: Any) -> dict[str, str]:
         "Purchased Screw Note"
     ) or printed != properties["Purchased Screw Note"].replace("\r", ""):
         raise RuntimeError("Purchased Screw Note: linked head note did not persist")
+    fit_note_check = _add_fit_up_note(adapter, front, top, iso)
     stock, stock_iso, stock_annotation = _add_stock_reference(adapter)
     supplier_refs["SupplierStockThreadLength"] = stock_annotation
     identities = _supplier_reference_identities(adapter, supplier_refs)
@@ -2156,6 +2232,7 @@ async def build(adapter: Any) -> dict[str, str]:
             adapter, front, top, iso, note, fresh,
             purchased_text=properties["Purchased Screw Note"],
         )
+        fit_note_check()
 
     physical_labels = ("SupplierHeadHeight", "SupplierStockThreadLength")
     serialized_full_names: dict[str, str] = {}
