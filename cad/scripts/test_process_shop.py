@@ -14,7 +14,6 @@ from prechips.model import CuttingData, Inventory, Policy
 
 import _process_plans as plans
 import ch_rocker_arm_spec as rocker
-from _printed_limits import limits
 
 MODELS = {
     "inventory.toml": Inventory,
