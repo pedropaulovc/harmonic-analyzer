@@ -4,16 +4,23 @@ A Ø100 cast-iron spider: six tapered spokes, a grooved rim, a Ø30 boss with
 the Ø.499 drum spigot, a reamed axle bore and two wire-tie holes.  Decimal-inch
 sheet (#290); the hub stations and rim keep their millimetre nominals.  The wheel
 axis is local +Z, so the FRONT view is the face (rim, spokes, fillets, bore,
-ties) and SECTION A-A, cut on the axis through the model's Right plane, is
-the hub profile, the rim's Ø, the groove and the axial widths in solid lines
-(drawing-guidelines.md rule 9 (show internal shape in solid lines)).  Every size rides the part's marked dimensions; only the rim's axial
-width and the rim-bore round's R (on its cut arc) are added on the sheet.
-The rim's Ø come from a hidden reference sketch in A-A's plane, shown in
-the part while A-A is cut (_drawing_hidden_sketches).  TIE 2, radial inside
-the rim, shows in a broken-out window on the face (TIE2_WINDOW).
-The bore's and the spigot's mates print on
-their own diameter callouts (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)), and the running bore carries the
-part-owned roughness its fit needs (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)).
+ties) and SECTION A-A, cut along the face's horizontal centreline through the
+0 and 180 deg spokes (the model's Top plane) and turned a quarter turn to lie
+like the lathe holds it, is the hub profile, the rim's Ø, the groove and the
+axial widths in solid lines (drawing-guidelines.md rule 9 (show internal
+shape in solid lines; a spoked part is cut through a spoke)).  Every size
+rides the part's marked dimensions; only the rim's axial width and the
+rim-bore round's R (on its cut arc) are added on the sheet.  The rim's Ø and
+the spokes' back-face offset come from a hidden reference sketch in A-A's plane,
+shown in the part while A-A is cut (_drawing_hidden_sketches).  TIE 2,
+radial inside the rim, shows in a broken-out window on the face
+(TIE2_WINDOW).  The bore's and the spigot's matched fits are numbered notes
+their own callouts link by "SEE NOTE n" (drawing-guidelines.md rule 7
+(notes: few, flagged, never a method)), and the running bore carries the
+part-owned roughness its fit needs (drawing-guidelines.md rule 6 (roughness
+symbols only where a surface runs, slides or locates)).  A-A's cutting plane
+carries the spokes' clocking on the face, and a drawn centreline the groove,
+web and rim's shared plane on A-A (drawing-guidelines.md rule 26).
 
 Run with SolidWorks open::
 
@@ -71,11 +78,15 @@ from _machinist_review_mode import MachinistReviewMode
 from _section_axis import position_section_caption
 from _session import run_build
 from _surface_finish import surface_finish_by_key
-from _title_block_units import MM_PER_INCH, render_number
-from _transgear_zone_line import sheet_to_sketch
+from _transgear_zone_line import (
+    CENTER_LINE_STYLE,
+    CENTER_LINE_WEIGHT,
+    require_placed,
+    sheet_to_sketch,
+    sketch_lines,
+)
 from _mg_wheel_rim_geometry import RIM_AXIAL, RIM_INNER_DIA, RIM_OUTER_DIA
 from mg_magnifying_wheel_geom import (
-    DRUM_PRESS,
     HUB_BACK_Z,
     HUB_FRONT_Z,
     SPOKE_ROOT_WIDTH,
@@ -84,11 +95,13 @@ from mg_magnifying_wheel_geom import (
 )
 from mg_magnifying_wheel_spec import (
     BORE_DIA,
+    BORE_FIT_NOTE,
     CAST_ROUND_R,
     DIAMETER_REFERENCE,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     DRAWING_REFERENCE_PRECISION,
+    GROOVE_SEAT_NOTE,
     HUB_DIA,
     HUB_FILLET_PRINTED,
     HUB_FILLET_R,
@@ -97,19 +110,21 @@ from mg_magnifying_wheel_spec import (
     RIM_FILLET_R,
     ROUND_TEXT_SUFFIX,
     SPIGOT_DIA,
-    SPOKE_PITCH_CALLOUT,
+    SPIGOT_FIT_NOTE,
+    SPOKE_AXIAL,
     SPOKE_PITCH_DEG,
     SURFACE_FINISHES,
     TIE1_CLOCK_DEG,
     TIE1_R,
     TIE2_CLOCK_DEG,
+    TIE2_FROM_SPOKE_DEG,
     TIE_HOLE_DIA,
     clock_to_local_deg,
     fillet,
 )
-from mg_wheel_group import HUB_RUNNING
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     dimension_name,
     place_view,
     view_name,
@@ -145,16 +160,21 @@ SECTION_CENTER = (0.255, 0.165)
 # ISO_CLEAR off them, and above the spigot length's row, whose one-line
 # callout names the drum by number and runs right past the section.
 ISO_CENTER = (0.372, 0.200)
-ISO_NOTE_XY = (ISO_CENTER[0] - 0.030, 0.150)
 ISO_CLEAR = 0.005
 
 _RIM_R = RIM_OUTER_DIA * SHEET_SCALE[0] / 2000.0
-# The cutting line runs the face view's full height on the axis, this far
-# past the OD at each end; the A-A caption's top centre stands under the
-# section's axial rows, above the title block.
-SECTION_LINE_OVERRUN = 0.006
+# The cutting line runs the face view's full width along the horizontal
+# centreline, through the bore and the 0 and 180 deg spokes, this far past
+# the OD at each end, clear of the tip width's extension lines; the A-A
+# caption's top centre stands under the section's axial rows, above the
+# title block.
+SECTION_LINE_OVERRUN = 0.008
 SECTION_LINE_LANDING = (0.0, _RIM_R + SECTION_LINE_OVERRUN + 0.005)
 SECTION_CAPTION_XY = (SECTION_CENTER[0], 0.088)
+# The turn's label stands centred under the caption (top-left anchored,
+# capitals about 2.6 mm a character), above the title block.
+ROTATION_NOTE_TOP = SECTION_CAPTION_XY[1] - 0.009
+ROTATION_NOTE_CHAR = 0.0026
 _SECTION_PLACEMENT_TOL = 1e-5
 
 DRAWING_PRECISION_BY_NAME = {
@@ -171,9 +191,10 @@ DRAWING_PRECISION_BY_NAME = {
 # through the centre, under the shoulders.  The bore's Ø takes one arrow on
 # its near rim (set_near_side_diameter), so only the bore's leader, its
 # finish's and the spoke root's offset-text leader cross the face; the rim's
-# two Ø print on A-A (rule 11).  The A-A cutting line stands on the axis
-# (x = 0): its arrows point left (the section looks along -X) with their
-# letters beyond the tips, so every leader leaves its feature away from it.
+# two Ø print on A-A (rule 11).  The A-A cutting line runs along the
+# horizontal centreline (y = 0): its arrows point up (the section looks along
+# +Y) with their letters beyond the tips, so every face leader leaves its
+# feature above or below it and none crosses it.
 #
 # A dimension's position is its text block's mid-height above the point its
 # leader or shoulder meets (a one-line shoulder runs 2.8 mm under its point,
@@ -239,24 +260,24 @@ _RIM_FILLET = _printed_fillet(
     RIM_INNER_DIA / 2.0, RIM_FILLET_R, False, RIM_FILLET_PRINTED
 )
 _TIE1 = _polar((0.0, 0.0), clock_to_local_deg(TIE1_CLOCK_DEG), TIE1_R)
-# TIE 2's angle is driven between its radial axis (outward at 223 deg) and the
-# horizontal inner end, where the axis enters the rim bore: the sketch's own
-# sector runs from that point's outward horizontal (180 deg) to the axis, so
-# a text in it draws one arc and no extension arcs.  Its text stands 35 mm
-# out on the sector's bisector, past the OD, so its arc meets the axis 79 mm
-# out: beyond the end of TIE 2's Ø extension lines.
+# TIE 2's clock is the spoke reference's driven angle from the 180 deg
+# spoke's centreline (on A-A's cutting line) to the hole's radial
+# axis (outward at 223 deg), its vertex on the bore axis (drawing-guidelines.md
+# rule 10: dimension from a real feature).  Its text stands
+# _TIE2_CLOCK_TEXT_R out on the sector's bisector, past the OD: its arc
+# crosses TIE 1's lower Y extension line well inside that line's end
+# (78 mm out), and its text stands clear of the rim and of the Y's text.
 _TIE2_OUTWARD = clock_to_local_deg(TIE2_CLOCK_DEG) % 360.0
-_TIE2_INNER = _polar((0.0, 0.0), _TIE2_OUTWARD, RIM_INNER_DIA / 2.0)
-_TIE2_ANGLE_SECTOR = (180.0, _TIE2_OUTWARD)
+_TIE2_CLOCK_SECTOR = (_TIE2_OUTWARD - TIE2_FROM_SPOKE_DEG, _TIE2_OUTWARD)
+_TIE2_CLOCK_TEXT_R = 64.0
 # TIE 2 runs inside the rim, so the hidden-lines-removed face view draws
 # none of it.  A broken-out window on its axis cuts the rim at the wheel's
 # mid-plane, the plane of TIE 2's axis and of the sketch its Ø and angle
 # dimension, so both stand on the hole's cut walls (drawing-guidelines.md
 # rule 9 (never dimension to a hidden line)).  The window is (s, t) mm about
 # the hole: s out along its axis, t across it along _TIE2_ACROSS (sheet
-# down-right).  It runs from the rim bore's air past the OD; on the -t side
-# it stays inside the angle's horizontal leg, which leaves the axis's inner
-# end, so the leg crosses no hatch.
+# down-right).  It runs from the rim bore's air past the OD and stays narrow
+# across the axis, so the clock's legs cross no hatch.
 _TIE2_ALONG = (
     math.cos(math.radians(_TIE2_OUTWARD)),
     math.sin(math.radians(_TIE2_OUTWARD)),
@@ -292,62 +313,98 @@ def tie2_window_point(s: float, t: float) -> tuple[float, float]:
 # lands its arrow where the ray meets the arc: each shoulder stands on a ray
 # through its own fillet's arc.  The shoulder runs on under the whole text.
 _RADIUS_SHOULDER_LEFT = 11.3
-# The hub fillet R's arc faces the hub-spoke corner, so its leader reaches it from
-# the material side: up from the seed spoke's -Y fillet through the spoke
-# (crossing only the spoke widths' extension lines and TIE 1's, which
-# drawing-guidelines.md rule 14 allows), left of the root width's line and
-# its text leader, to a shoulder above the A-A line's top end and arrow,
-# its text left of the shoulder, under the spoke pitch's arc and between
-# its 60 and 120 deg extension lines.
-_HUB_FILLET_SHOULDER = _polar(_HUB_FILLET[0], 93.8, 67.4)
-# The rim fillet R leaves the 180 deg spoke's sheet-+Y rim fillet out through the rim
-# to a shoulder left of the OD, its text left of the shoulder, above TIE 1's
-# Y extension line and right of its dimension line.
-_RIM_FILLET_SHOULDER = _polar(_RIM_FILLET[0], 190.0, 11.2)
-# The mates the matched fits and the tight bands name (drawing-guidelines.md
+
+
+def _out_to(
+    centre: tuple[float, float], bearing_deg: float, radius: float
+) -> tuple[float, float]:
+    """Where the ray from ``centre`` along ``bearing_deg`` reaches ``radius``
+    from the wheel's axis (model mm)."""
+    bearing = math.radians(bearing_deg)
+    along = centre[0] * math.cos(bearing) + centre[1] * math.sin(bearing)
+    reach = -along + math.sqrt(along**2 - centre[0] ** 2 - centre[1] ** 2 + radius**2)
+    return _polar(centre, bearing_deg, reach)
+
+
+# Both fillet R's print above A-A's cutting line, each arrow outside its
+# arc on the ray from the arc's centre through its shoulder, the leader
+# reaching it from the material side.  The hub fillet R's arc (the 120 deg
+# spoke's, facing the 120-180 window) opens toward the hub, so its leader
+# runs right at 10 deg over the 120 deg spoke's root, the hub's top and the
+# 60 deg spoke's root, through the 0-60 window above the spoke widths'
+# lines and the rim, to a shoulder right of the wheel above the A-A arrow's
+# letter, its text right of the shoulder.  (An arrow from inside on the
+# opposite side, which would let the leader come from the window, stays on
+# the circle's undrawn near side: runs 20261107T101438062Z and
+# 20261107T103514893Z, tip at 20 deg with the solid leader on or off.)  The
+# rim fillet R's leader leaves the 60 deg spoke's 60-120 rim fillet through
+# the rim on a ray parallel to the spoke pitch's 60 deg extension line,
+# 6.7 mm left of it, to a shoulder above the wheel, its text left of the
+# shoulder under the pitch's arc.
+_HUB_FILLET_LEADER = 10.0
+_HUB_FILLET_SHOULDER = _out_to(
+    _HUB_FILLET[0], _HUB_FILLET_LEADER, RIM_OUTER_DIA / 2.0 + 6.0
+)
+_RIM_FILLET_LEADER = 60.0
+_RIM_FILLET_SHOULDER = _out_to(
+    _RIM_FILLET[0], _RIM_FILLET_LEADER, RIM_OUTER_DIA / 2.0 + 8.0
+)
+# The mates the tight bands and the tie holes name (drawing-guidelines.md
 # rule 4 (tighten only for function, and name the mate)), by drawing number.
 AXLE_NUMBER = str(_config.parts("mg-wheel-axle")["number"])
 DRUM_NUMBER = str(_config.parts("mg-wheel-drum")["number"])
-PEN_WIRE_NUMBER = str(_config.parts("sh-vn-music-wire")["number"])
-
-
-def _inch(value_mm: float) -> str:
-    """A stated fit limit (mm) as the inch sheet prints it, to .0001."""
-    return render_number(value_mm / MM_PER_INCH, "in", 4)
-
-
-# The bore's matched fit, one item a line as the spigot's, so the block is
-# no wider than "MG-WHEEL-AXLE": it stands left of the wheel with the face
-# moved toward the border.
-BORE_CALLOUT = (
-    f"REAM THRU\n{_inch(HUB_RUNNING[0])}-{_inch(HUB_RUNNING[1])}\nDIAMETRAL\n"
-    f"CLEARANCE ON\nMG-WHEEL-AXLE\n{AXLE_NUMBER}"
+WIRE_NUMBER = str(_config.parts("sh-vn-music-wire")["number"])
+# The tie holes are named plainly at their callouts (drawing-guidelines.md
+# rule 26: WIRE TIE HOLE, no coined labels).  TIE 2's says where it runs:
+# radial, from the groove's bottom (the groove sits on A-A's drawn
+# centreline) through to the rim bore, clocked by its 43° from the
+# horizontal.  Each takes at most two lines of words under its process
+# (rule 7).
+TIE1_CALLOUT = "DRILL THRU\nWIRE TIE HOLE"
+TIE2_CALLOUT = "DRILL THRU\nRADIAL WIRE TIE HOLE\nFROM GROOVE BOTTOM"
+# Each side of a centred tie block past the DRILL THRU line's half-width
+# (capitals about 2.6 mm a character), mm.
+_TIE_BLOCK_WIDEN = (
+    (max(len(line) for line in TIE1_CALLOUT.splitlines()) - len("DRILL THRU"))
+    * 2.6
+    / 2.0
 )
+
+
+# The bore's matched fit is note BORE_FIT_NOTE (mg_magnifying_wheel_spec):
+# its callout keeps the process and the link, so the block stays narrow left
+# of the wheel.
+BORE_CALLOUT = f"REAM THRU\nSEE NOTE {BORE_FIT_NOTE}"
 # The bore's block: its widest line sets its width (2.45 mm a character);
-# the block stands left of the wheel on a shoulder 30 mm above the axis,
-# its right end 7 mm off the OD.
-_BORE_SHOULDER_Y = 30.0
+# the block stands left of the wheel on a shoulder 38 mm above the axis,
+# over the bore finish's symbol, its right end where a 145 deg ray from the
+# axis meets that height, so the bore's leader runs out through the 120-180
+# window.
+_BORE_SHOULDER_Y = 38.0
+_BORE_LEADER_BEARING = 145.0
 _BORE_BLOCK_HALF = max(len(line) for line in BORE_CALLOUT.splitlines()) * 2.45 / 2.0
 _BORE_BLOCK_X = (
-    -math.sqrt((RIM_OUTER_DIA / 2.0) ** 2 - _BORE_SHOULDER_Y**2)
-    - 7.0
-    - _BORE_BLOCK_HALF
+    _BORE_SHOULDER_Y / math.tan(math.radians(_BORE_LEADER_BEARING)) - _BORE_BLOCK_HALF
 )
 FRONT_KEEP = {
     # Near-side, one arrow: the bore up-left through the 120-180 window to
-    # its block's shoulder (stacked Ø plus six callout lines).
-    "BoreDiaDim": _over((_BORE_BLOCK_X, _BORE_SHOULDER_Y), 8),
-    # Each fillet R on its own fillet (_HUB_FILLET_SHOULDER,
-    # _RIM_FILLET_SHOULDER), each text left of its shoulder.
+    # its block's shoulder (stacked Ø plus its callout lines).
+    "BoreDiaDim": _over(
+        (_BORE_BLOCK_X, _BORE_SHOULDER_Y), 2 + len(BORE_CALLOUT.splitlines())
+    ),
+    # Each fillet R on its own fillet (_HUB_FILLET_SHOULDER right of the
+    # wheel, its text right of the shoulder; _RIM_FILLET_SHOULDER above it,
+    # its text left of the shoulder).
     "HubFilletR": _over(
-        (_HUB_FILLET_SHOULDER[0] - _RADIUS_SHOULDER_LEFT, _HUB_FILLET_SHOULDER[1]), 2
+        (_HUB_FILLET_SHOULDER[0] + _RADIUS_SHOULDER_LEFT, _HUB_FILLET_SHOULDER[1]), 2
     ),
     "RimFilletR": _over(
         (_RIM_FILLET_SHOULDER[0] - _RADIUS_SHOULDER_LEFT, _RIM_FILLET_SHOULDER[1]), 2
     ),
     # The spoke pattern's 6X 60° between the 60 and 120 deg spokes'
-    # centrelines, above the wheel, its clocking callout over it.
-    "SpokePitch": _face(0.0, RIM_OUTER_DIA / 2.0 + 30.0),
+    # centrelines, above the wheel: the one-line value centres half a text
+    # line under 30 mm past the OD.
+    "SpokePitch": _face(0.0, RIM_OUTER_DIA / 2.0 + 30.0 - _TEXT_LINE * 500.0),
     # Each spoke width's line beside its own end: the root's inside the hub
     # fillets' feet, its text off on a leader (SPOKE_ROOT_TEXT_XY); the
     # tip's outside the rim, its text below the line beside the OD, so
@@ -356,34 +413,40 @@ FRONT_KEEP = {
     "SpokeTipWidth": _over((RIM_OUTER_DIA / 2.0 + 3.0, -22.0), 2),
     # TIE 1's two coordinates from the bore centre.  The Y between its own
     # extension lines, which run left from the bore's and the hole's centres
-    # past the OD, its text off the lower one, 26 mm outside the rim, clear
-    # of the rim fillet R's shoulder (the lines stand only 5.6 apart); the X
-    # below the wheel, its extension lines down from the bore's centre (the
-    # A-A line) and the hole's, its text left of the A-A line under the lower
-    # "A" and right of TIE 2's block.
+    # past the OD, its text off the lower one, 26 mm outside the rim, below
+    # the A-A arrow (the lines stand only 5.6 apart); the X below the wheel,
+    # its extension lines down from the bore's centre and the hole's, its
+    # text left of the bore's under the wheel and right of TIE 2's block.
     "Tie1Y": _face(-(RIM_OUTER_DIA / 2.0 + 26.0), _TIE1[1] - 5.4),
     "Tie1X": _face(-9.0, -RIM_OUTER_DIA / 2.0 - 16.0),
     # The two tie Ø callouts hang off the face, the block's leader from its
-    # shoulder's near end (the shoulder runs 7.3 mm under the point).  TIE
-    # 1's block stands below the wheel, its top (DRILL THRU over the stacked
-    # Ø) 3.2 mm under the OD, its shoulder 20 mm right of the A-A line, so
-    # the leader runs down-right from the hole, away from the line and from
-    # the X's extension line, and the block stays left of the section's
-    # overall row.
+    # shoulder's near end (the shoulder runs 7.3 mm under the point).  Each
+    # reads size, then process, then its plain name (rule 26), centred on
+    # the point.  TIE 1's block stands below the wheel, its top 3.2 mm under
+    # the OD, its shoulder's near end 20 mm right of the bore's centre (the
+    # name line widens the block _TIE_BLOCK_WIDEN each side past the DRILL
+    # THRU width the 15.3 mm shoulder offset was set for), so the leader runs
+    # down-right from the hole, away from the X's extension line, and the
+    # block stays left of the section's overall row.
     "Tie1HoleDia": _face(
-        20.0 + _CALLOUT_SHOULDER_LEFT,
-        -RIM_OUTER_DIA / 2.0 - 3.2 - _CALLOUT_ABOVE - _TEXT_LINE * 1000.0,
+        20.0 + _CALLOUT_SHOULDER_LEFT + _TIE_BLOCK_WIDEN,
+        -RIM_OUTER_DIA / 2.0
+        - 3.2
+        - _CALLOUT_ABOVE
+        - _TEXT_LINE * 1000.0 * len(TIE1_CALLOUT.splitlines()) / 2.0,
     ),
-    "Tie2Angle": _face(*_polar(_TIE2_INNER, sum(_TIE2_ANGLE_SECTOR) / 2.0, 35.0)),
+    "Tie2Clock": _face(
+        *_polar((0.0, 0.0), sum(_TIE2_CLOCK_SECTOR) / 2.0, _TIE2_CLOCK_TEXT_R)
+    ),
     # TIE 2's Ø is a linear width across the radial hole: its extension lines
     # run out along the hole's axis to the dimension line's foot, ~1 mm past
     # the text's projection onto the axis, so a block on that foot would sit
-    # on both lines: the block stands 25 mm off the axis on the side away
-    # from the angle, its projection 75 mm out (the extension lines stop ~76,
-    # short of the angle's arc at 79), "TIE 2" and "RADIAL" under it; it stays
-    # outside the OD and left of the A-A line's lower "A".
+    # on both lines: the block stands 23.6 mm off the axis on the side away
+    # from the clock, its projection 81.5 mm out (past the clock's arc,
+    # which ends on the hole's axis between the lines); its wide name line
+    # keeps it left of TIE 1's X and above the notes.
     "Tie2HoleDia": _face(
-        *_polar(_polar((0.0, 0.0), _TIE2_OUTWARD, 75.0), _TIE2_OUTWARD + 90.0, 25.0)
+        *_polar(_polar((0.0, 0.0), _TIE2_OUTWARD, 81.5), _TIE2_OUTWARD + 90.0, 23.6)
     ),
 }
 # The spoke root's text hangs off its dimension line on an OffsetText leader
@@ -404,9 +467,8 @@ NEAR_SIDE_DIAMETERS = {
     "BoreDiaDim": BORE_DIA,
 }
 # TIE 1's Ø takes one arrow on the rim nearest its block, down-right of the
-# hole, and no line through the centre (the default leader, with the hole on
-# the A-A line, runs down it).  Every face leader near the line is
-# proven off it, each landing on its own feature's radius from the axis.
+# hole, and no line through the centre.  Every face leader near A-A's line
+# is proven off it, each landing on its own feature's radius from the axis.
 TIE1_NEAR_SIDE = "Tie1HoleDia"
 _BORE_LANDING = (0.8 * BORE_DIA / 2000.0, 1.2 * BORE_DIA / 2000.0)
 FACE_LEADER_LANDINGS = {
@@ -426,11 +488,11 @@ FACE_LEADER_LANDINGS = {
 CENTRE_MARK_ARM = 0.0025
 _CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
 _MARK_ON_HOLE = 0.0005
-# Section A-A: sheet right = model -Z (the pen side, where the spigot
-# stands), model +Y up, as the Right view drew it; _orient_section proves
-# both and puts the hub's back face on the axis at _section_x(HUB_BACK_Z), so
-# the section centres on the part's axial extent and each hub face's sheet x
-# follows from its z.
+# Section A-A looks along +Y; _orient_section turns it so sheet right =
+# model -Z (the pen side, where the spigot stands) and model +X (the seed
+# spoke) up, proves both, and puts the hub's back face on the axis at
+# _section_x(HUB_BACK_Z), so the section centres on the part's axial extent
+# and each hub face's sheet x follows from its z.
 _SIDE_MID_Z = (HUB_BACK_Z + HUB_FRONT_Z) / 2.0
 
 
@@ -480,11 +542,24 @@ _HUB_DIA_X = _section_x(HUB_BACK_Z) - _TEXT_OFF_LINE - _HUB_DIA_TEXT_HALF
 _RIM_BORE_DIA_X = _HUB_DIA_X - _HUB_DIA_TEXT_HALF - _TEXT_OFF_LINE
 _GROOVE_DIA_X = _RIM_BORE_DIA_X - _TEXT_OFF_LINE - _GROOVE_BLOCK_HALF
 _RIM_OD_DIA_X = _GROOVE_DIA_X - _GROOVE_BLOCK_HALF - _TEXT_OFF_LINE
-# Above the hub, two rows left of the back face, the spokes' thickness under
-# the rim's width (added below): both lines run from the part leftward to
-# their text, above the hub's extension lines and under the rim bore.
-_SPOKE_ROW = SECTION_CENTER[1] + HUB_DIA / 2000.0 + 0.0055
-_RIM_WIDTH_ROW = _SPOKE_ROW + 0.010
+# A-A cuts the 0 and 180 deg spokes, so the hatch runs from the hub to the
+# rim on both; no dimension line runs over it (owner review 2026-11-07:
+# solid from dimension lines at a glance).  Above the rim, three rows left
+# of the rim's back face, the smallest span nearest the part: the spokes'
+# back face from the rim's (".08", SpokeFaceOffset, imported from the
+# hidden DIAMETER_REFERENCE sketch), then the spokes' thickness (".16"),
+# whose extension lines start where the spoke meets the rim bore
+# (_set_section_witnesses), as the ".08"'s spoke-side line does, then the
+# rim's width (".31", added below).  Every line runs from the part leftward
+# to its text.
+_SPOKE_FACE_ROW = SECTION_CENTER[1] + _RIM_R + 0.006
+_SPOKE_ROW = _SPOKE_FACE_ROW + 0.0055
+_RIM_WIDTH_ROW = _SPOKE_ROW + 0.0055
+SPOKE_FACE_TEXT_XY = _beside(
+    _section_x(RIM_AXIAL / 2.0), -1, 8, _SPOKE_FACE_ROW + _ONE_LINE_UP
+)
+# The spigot Ø's dimension line, 7.2 mm past the spigot end.
+_SPIGOT_DIM_X = _section_x(HUB_FRONT_Z) + 0.0072
 # The hub's three axial sizes below the rim, one row each, all from the
 # spigot's faced front end (drawing-guidelines.md rule 11 (turned parts read like the lathe)) and all texts right of it except
 # the overall's; each text OUTSIDE its span so no extension line runs
@@ -492,40 +567,41 @@ _RIM_WIDTH_ROW = _SPOKE_ROW + 0.010
 # Nearest the part the spigot length (".354 +.004/.000"), whose band keeps the
 # drum from standing proud (DRUM_RECESS); then the web's centre plane
 # (".61"), which the rim and its groove share, its extension line rising
-# toward the groove (_clear_section_witnesses) left of the spigot step's, so
-# the row above stops short of it; last the overall (".772 ±.004"), which
-# holds the axle's nut stack, left of the back face above the A-A caption.
-# Each band's need, and the
-# plane the .61 locates, stands over its value (CALLOUTS_ABOVE), its text
-# centred clear of the face it leaves.  The two right-hand sizes keep their
-# arrows inside their spans, so no tail reaches a neighbouring extension
-# line.
+# toward the groove (_set_section_witnesses) on the drawn centreline that
+# plane is (WEB_CENTRELINES), left of the spigot step's, so the row above
+# stops short of it; last the overall (".772 ±.004"), which holds the
+# axle's nut stack, left of the back face above the A-A caption.  Each
+# band's need stands over its value (CALLOUTS_ABOVE); the .61, a location,
+# prints its value and band alone (drawing-guidelines.md rule 7).  Each
+# text is centred clear of the face it leaves.  The two right-hand sizes
+# keep their arrows inside their spans, so no tail reaches a neighbouring
+# extension line.
 #
 # _HUB_ROWS are the dimension lines.  A text block centres on its point, so
 # a callout over the value lifts the point half a line more than
 # _ONE_LINE_UP / _STACK_UP.  The overall's row stands over the caption; the
 # plane's runs 5.4 mm above it; the spigot length's stands 11.9 mm over the
-# plane's, so its block clears the plane's two-line block by the layout
-# audit's text separation (3.57 mm).
+# plane's, so its block clears the plane's one-line value by more than the
+# layout audit's text separation (3.57 mm).
 _ABOVE_UP = _TEXT_LINE / 2.0
 _HUB_ROWS = tuple(
     SECTION_CENTER[1] - _RIM_R - drop for drop in (0.0050, 0.0184, 0.0238)
 )
 # The spigot length's +.004/.000 band keeps the drum under the spigot face
 # (mg_magnifying_wheel_geom.DRUM_RECESS): its callout names the drum.
-SPIGOT_LENGTH_CALLOUT = f"MG-WHEEL-DRUM {DRUM_NUMBER} NOT PROUD"
-# The groove's centre sits on that plane (build_mg_magnifying_wheel: "groove
-# centre on the mid-plane"), so the callout names it: the .61 locates the
-# groove, and TIE 2 drilled from its bottom, axially.
-WEB_CENTER_CALLOUT = "GROOVE, WEB & RIM CENTER"
+SPIGOT_LENGTH_CALLOUT = f"DRUM {DRUM_NUMBER} NOT PROUD"
 # The overall sets the axle's locknut stack (mg_wheel_group): the callout
 # names the stack and the axle by number on one short line, so its dimension
-# line stops short of TIE 1's DRILL THRU block.
+# line stops short of TIE 1's block.
 HUB_LENGTH_CALLOUT = f"{AXLE_NUMBER} LOCKNUT STACK"
 # The groove's two bands seat the pen wire (mg_magnifying_wheel_spec
-# GROOVE_WIDTH_MIN, GROOVE_DEPTH_MIN): each callout names it.
-GROOVE_CALLOUT = f"PEN-WIRE SEAT\n{PEN_WIRE_NUMBER}"
-GROOVE_R_CALLOUT = f"PEN-WIRE SEAT {PEN_WIRE_NUMBER}"
+# GROOVE_WIDTH_MIN, GROOVE_DEPTH_MIN): both link the one numbered note that
+# names it (drawing-guidelines.md rule 4: a mate serving several features
+# is named once, in one flagged note linked to the features).
+GROOVE_CALLOUT = f"SEE NOTE {GROOVE_SEAT_NOTE}"
+# The web plane's value is ".61 ±.03": its text is centred this many
+# characters (with the margin) right of the spigot face.
+_PLANE_VALUE_CHARS = 8
 # Capitals print wider than _TEXT_CHAR (about 2.6 mm a character), so a
 # callout's span is estimated two characters wide.
 _CALLOUT_MARGIN_CHARS = 2
@@ -542,17 +618,13 @@ SECTION_KEEP = {
     "HubDia": (_HUB_DIA_X, SECTION_CENTER[1]),
     "GrooveBottomDia": (_GROOVE_DIA_X, SECTION_CENTER[1] + 0.030),
     # Right of the view only the spigot's Ø, its line 7.2 mm past the spigot
-    # end and its text under the spigot, so the matched-fit callout lines
-    # stack down toward the spigot length's row: ISO_CLEAR off the
-    # isometric, proven at build (_assert_text_off_iso), so no line is wider
-    # than "INTERFERENCE IN".
+    # end; its text hangs off that line on a leader (SPIGOT_TEXT_XY).
     "SpigotDia": (
-        _section_x(HUB_FRONT_Z) + 0.0072,
+        _SPIGOT_DIM_X,
         SECTION_CENTER[1] - SPIGOT_DIA / 2000.0 - 0.012 + _TEXT_LINE / 2.0,
     ),
-    # Its ".16 ±.03" centred eight characters off the back face, so the web's
-    # outline clears its last digit.
-    "SpokeAxial": _beside(_section_x(HUB_BACK_Z), -1, 8, _SPOKE_ROW + _ONE_LINE_UP),
+    # Its ".16 ±.03" centred eight characters off the rim's back face.
+    "SpokeAxial": _beside(_section_x(RIM_AXIAL / 2.0), -1, 8, _SPOKE_ROW + _ONE_LINE_UP),
     "SpigotLength": _beside(
         _section_x(HUB_FRONT_Z),
         1,
@@ -563,8 +635,8 @@ SECTION_KEEP = {
     "HubFrontZ": _beside(
         _section_x(HUB_FRONT_Z),
         1,
-        len(WEB_CENTER_CALLOUT) + _CALLOUT_MARGIN_CHARS,
-        _HUB_ROWS[1] + _ONE_LINE_UP + _ABOVE_UP,
+        _PLANE_VALUE_CHARS + _CALLOUT_MARGIN_CHARS,
+        _HUB_ROWS[1] + _ONE_LINE_UP,
     ),
     "HubLength": _beside(
         _section_x(HUB_BACK_Z),
@@ -573,120 +645,127 @@ SECTION_KEEP = {
         _HUB_ROWS[2] + _ONE_LINE_UP + _ABOVE_UP,
     ),
     # The groove's R up right, its leader down-left onto the groove at 35
-    # deg, so the stub it draws past the arc leaves the rim's back face above
-    # the rim width's extension line; its shoulder over the top of the
-    # rim-bore round's R block (ROUND_TEXT_XY).  Its one-line ± band leaves
-    # the shoulder where the stacked band's block put it.
+    # deg, right of the axial rows' line ends; its shoulder over the top of
+    # the rim-bore round's R block (ROUND_TEXT_XY), under its note link.
+    # Its one-line ± band leaves the shoulder where the stacked band's block
+    # put it.
     "GrooveR": (
         SECTION_CENTER[0] + 0.0344,
         SECTION_CENTER[1] + 0.0701 - (_STACK_UP - _ONE_LINE_UP),
     ),
 }
-# The rim's two Ø, imported from the hidden DIAMETER_REFERENCE sketch in
-# A-A's plane (mg_magnifying_wheel_spec): the rim bore's between its extension
-# lines under the hub; the rim OD's between its own at the hub's height, its
-# block (value and callout, no row wider than _RIM_OD_BLOCK_HALF) clear of
-# the groove bottom's line to its right and the front view to its left.
-# The OD's .XX floor keeps the groove deeper than the pen wire
-# (mg_magnifying_wheel_spec.GROOVE_DEPTH_MIN); short rows keep the centred
-# block narrow.
-RIM_OD_CALLOUT = "HOLDS PEN\nWIRE IN\nGROOVE"
-_RIM_OD_BLOCK_HALF = (
-    max(len(row) for row in RIM_OD_CALLOUT.splitlines()) * _TEXT_CHAR / 2.0
+# The spigot's two-line block ("(Ø.499)" over its note link) hangs on an
+# OffsetText leader (SpokeRootWidth's) right of its dimension line, level
+# with the axis, so neither the spigot's outline nor the dimension line
+# crosses it (drawing-guidelines.md rule 14): ISO_CLEAR off the isometric,
+# proven at build (_assert_text_off_iso).
+SPIGOT_TEXT_XY = (
+    _SPIGOT_DIM_X + 0.008 + len(f"SEE NOTE {SPIGOT_FIT_NOTE}") * 0.0026 / 2.0,
+    SECTION_CENTER[1],
 )
-if _RIM_OD_DIA_X + _RIM_OD_BLOCK_HALF > _GROOVE_DIA_X - _TEXT_OFF_LINE:
-    raise AssertionError("the rim OD block reaches the groove bottom's dimension line")
+# The rim's two Ø and the spokes' back face, imported from the hidden
+# DIAMETER_REFERENCE sketch in A-A's plane (mg_magnifying_wheel_spec): the
+# rim bore's Ø between its extension lines under the hub; the rim OD's, an
+# overall size printed bare (drawing-guidelines.md rule 7: no reason on an
+# overall size), between its own at the hub's height, clear of the groove
+# bottom's line to its right and the front view to its left; the back
+# face's on its row above the rim (SPOKE_FACE_TEXT_XY).
 SECTION_DIAMETER_KEEP = {
     "RimInnerDiaDim": (_RIM_BORE_DIA_X, SECTION_CENTER[1] - 0.030),
     "RimOuterDiaDim": (_RIM_OD_DIA_X, SECTION_CENTER[1]),
+    "SpokeFaceOffset": SPOKE_FACE_TEXT_XY,
 }
 # The rim-bore round's R is a sheet radial on its cut arc: A-A cannot import
 # a fillet radius whose arc IS the cut (neither the targeted import nor
 # DragModelDimension lands CastRoundR there).  It takes the arc at the rim's
-# front (sheet-right, model -Z) top corner, the circle's centre one R in
-# from the bore and the side face.  A cut-face arc lies in the cut plane, so
-# its axis is the cut's normal (model X); the round's tangent circles beyond
-# the cut keep the wheel's Z, and the axis keeps the pick off them.
-# Its callout stands right, between the spigot's Ø block and the groove's R:
-# the value on its point and the two callout lines under it, the shoulder
-# under the last (5.6 mm a line), its top about 4.75 mm under the groove R's
-# shoulder.  The shoulder runs 4.3 mm under the arc's centre and 8 mm right,
-# so the radial leader lands on the arc about 28 deg below the side face's
-# tangent and crosses the rim's front face above the top of the rim width's
-# extension line (a landing past about 40 deg below crosses that line).  The
-# groove bottom's Ø holds the left.
+# front (sheet-right, model -Z) inner corner over the seed spoke, the
+# circle's centre one R in from the bore and the side face.  A cut-face arc
+# lies in the cut plane, so its axis is the cut's normal (model Y); the
+# round's tangent circles beyond the cut keep the wheel's Z, and the axis
+# keeps the pick off them.  Its callout stands right, between the spigot's
+# Ø block and the groove's R: the value over its one callout line, the
+# shoulder under it (5.6 mm a line), the block centred on its point.  The
+# shoulder runs 4.3 mm under the arc's centre and 8 mm right, so the radial
+# leader lands on the arc about 28 deg below the side face's tangent and
+# crosses the rim's front face under the rim width's extension line, which
+# rises from the OD.  The groove bottom's Ø holds the left.
 _ROUND_ARC_CENTER = (
-    0.0,
     RIM_INNER_DIA / 2.0 + CAST_ROUND_R,
+    0.0,
     -(RIM_AXIAL / 2.0 - CAST_ROUND_R),
 )
-_CUT_NORMAL = (1.0, 0.0, 0.0)
-ROUND_TEXT_XY = (SECTION_CENTER[0] + 0.0322, SECTION_CENTER[1] + 0.0517)
-# The R's single limit holds TIE 2's wall to the rim's side faces
-# (mg_magnifying_wheel_spec.TIE2_FACE_WALL), so the callout says so.
-ROUND_CALLOUT = "2X RIM BORE EDGES\nHOLDS TIE 2 WALL"
+_CUT_NORMAL = (0.0, 1.0, 0.0)
+ROUND_TEXT_XY = (
+    SECTION_CENTER[0] + 0.0322,
+    SECTION_CENTER[1] + 0.0517 - _TEXT_LINE / 2.0,
+)
+ROUND_CALLOUT = "2X RIM BORE EDGES"
 
 
-# The two fits print on their own diameters (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)) as matched fits
-# (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)): each Ø is a reference nominal (REFERENCE_DIMENSIONS), and
-# its callout names the mate and states the diametral fit the finished pair
-# must make (mg_wheel_group.HUB_RUNNING, mg_magnifying_wheel_geom.DRUM_PRESS):
-# the bore is reamed to run on the finished axle, and the spigot turned to
-# press into the drum's finished reamed bore.
+# The two matched fits (drawing-guidelines.md rule 4 (tighten only for
+# function, and name the mate)): each Ø is a reference nominal
+# (REFERENCE_DIMENSIONS), and its callout links the numbered note that names
+# the standard fit and the mate, the clearance or interference the finished
+# pair makes as REF (mg_magnifying_wheel_spec.DRAWING_NOTES): the bore is
+# reamed to run on the finished axle, and the spigot turned to press into
+# the drum's finished reamed bore.  The groove's two bands link their one
+# note; the tie holes read size, then process, then their plain name
+# (drawing-guidelines.md rule 26).
 DIMENSION_CALLOUTS = {
     "BoreDiaDim": BORE_CALLOUT,
-    "SpigotDia": (
-        f"{_inch(DRUM_PRESS[0])}-{_inch(DRUM_PRESS[1])}\nDIAMETRAL\n"
-        f"INTERFERENCE IN\nMG-WHEEL-DRUM\n{DRUM_NUMBER}"
-    ),
+    "SpigotDia": f"SEE NOTE {SPIGOT_FIT_NOTE}",
     "GrooveBottomDia": GROOVE_CALLOUT,
-    "RimOuterDiaDim": RIM_OD_CALLOUT,
+    "GrooveR": GROOVE_CALLOUT,
     "SpokeRootWidth": _ROOT_CALLOUT,
     "SpokeTipWidth": "6X TIP",
     "HubFilletR": "12X",
     "RimFilletR": "12X",
-    "Tie1HoleDia": "TIE 1",
-    "Tie2HoleDia": "TIE 2\nRADIAL",
+    "Tie1HoleDia": TIE1_CALLOUT,
+    "Tie2HoleDia": TIE2_CALLOUT,
 }
-# The tie holes' operation stands over their Ø, keeping each block as narrow
-# as its stacked Ø; each axial band's need, the plane the .61 locates and
-# the groove R's seat stand over their values; the spokes' clocking over
-# their pitch.
+# Each axial band's need stands over its value.
 CALLOUTS_ABOVE = {
-    "Tie1HoleDia": "DRILL THRU",
-    "Tie2HoleDia": "DRILL THRU",
     "SpigotLength": SPIGOT_LENGTH_CALLOUT,
-    "HubFrontZ": WEB_CENTER_CALLOUT,
     "HubLength": HUB_LENGTH_CALLOUT,
-    "GrooveR": GROOVE_R_CALLOUT,
-    "SpokePitch": SPOKE_PITCH_CALLOUT,
 }
 # SOLIDWORKS drops a multi-line callout above a value from the print
 # (draw_dt_cone_gear).
 if any("\n" in text for text in CALLOUTS_ABOVE.values()):
     raise AssertionError("an above-callout with a line break does not print")
-# The two tie notes, top-left anchored, under the two tie blocks and left of
-# the title block.
+# The notes, top-left anchored, under the two tie blocks and left of the
+# title block.
 NOTES_XY = (0.020, 0.062)
+# drawing-guidelines.md rule 26: the spokes' clocking and the plane the .61
+# locates are drawn lines, not sentences.  On the face, A-A's cutting line
+# runs through the bore's axis and the two spokes on it (the seed spoke on
+# local +X).  On A-A, the groove, web and rim's shared mid-plane (model
+# z = 0, the plane HubFrontZ dimensions) along each cut spoke from the hub,
+# CENTRELINE_OVERRUN past the OD.  Model mm.
+CENTRELINE_OVERRUN = 2.0
+_CENTRELINE_REACH = RIM_OUTER_DIA / 2.0 + CENTRELINE_OVERRUN
+WEB_CENTRELINES = {
+    side: ((sign * HUB_DIA / 2.0, 0.0, 0.0), (sign * _CENTRELINE_REACH, 0.0, 0.0))
+    for side, sign in (("upper", 1.0), ("lower", -1.0))
+}
 
-# The rim's axial width spans its two side faces where A-A cuts them: at the
-# rim's top each is a straight cut-face line at z = +/-RIM_AXIAL/2, running
-# from the rim-bore round's tangent (r = RIM_INNER_DIA/2 + CAST_ROUND_R) to
-# the OD, picked through its midpoint as a native entity.  The section's scan
-# holds no OD corner circle (r = 50, z = +/-4): edge-on, each lies under the
-# cut face's boundary and the round's tangent circle, which A-A draws
-# instead.  The OD is no single line to measure either: the groove splits it
-# into two lands.
+# The rim's axial width spans its two side faces where A-A cuts them over
+# the seed spoke: at the rim's top each is a straight cut-face line at
+# z = +/-RIM_AXIAL/2, running from the rim-bore round's tangent
+# (r = RIM_INNER_DIA/2 + CAST_ROUND_R) to the OD, picked through its
+# midpoint as a native entity.  The section's scan holds no OD corner circle
+# (r = 50, z = +/-4): edge-on, each lies under the cut face's boundary and
+# the round's tangent circle, which A-A draws instead.  The OD is no single
+# line to measure either: the groove splits it into two lands.
 _RIM_SIDE_Y = (RIM_INNER_DIA / 2.0 + CAST_ROUND_R + RIM_OUTER_DIA / 2.0) / 2.0
 _RIM_SIDE_POINTS = tuple(
-    (0.0, _RIM_SIDE_Y, z) for z in (RIM_AXIAL / 2.0, -RIM_AXIAL / 2.0)
+    (_RIM_SIDE_Y, 0.0, z) for z in (RIM_AXIAL / 2.0, -RIM_AXIAL / 2.0)
 )
 # A failed section pick names every scanned edge passing this near its point.
 _PICK_INVENTORY_MM = 6.0
-# The bore's finish symbol stands outside the OD left of the wheel, between
-# the bore's block and the rim fillet R's text; its leader lands on the bore
-# on that bearing, clear below the bore's Ø leader and above that R's text.
-_BORE_FINISH_BEARING = 161.6
+# The bore's finish symbol stands outside the OD left of the wheel, under
+# the bore's block; its leader lands on the bore on that bearing, clear
+# below the bore's Ø leader and above the A-A arrow's letter.
+_BORE_FINISH_BEARING = 158.0
 BORE_FINISH_SYMBOL = _face(
     *_polar((0.0, 0.0), _BORE_FINISH_BEARING, RIM_OUTER_DIA / 2.0 + 21.2)
 )
@@ -822,16 +901,31 @@ def _assert_text_off_iso(adapter: Any, annotations: list[Any], iso: Any) -> None
     )
 
 
-def _orient_section(adapter: Any, section: Any) -> None:
-    """Stand section A-A as SECTION_KEEP draws it: the hub's back face left of
-    the spigot, +Y up, the back face on the axis at
-    (_section_x(HUB_BACK_Z), SECTION_CENTER[1]).
+def _handedness(
+    back: tuple[float, float], front: tuple[float, float], top: tuple[float, float]
+) -> float:
+    """Positive when back -> spigot end -> rim top turn counter-clockwise on
+    the sheet: a turn keeps the sign, a reversed cut (a mirror) flips it."""
+    return (front[0] - back[0]) * (top[1] - back[1]) - (front[1] - back[1]) * (
+        top[0] - back[0]
+    )
 
-    A half turn swaps both ways; reversing the cut (looking from the other
-    side of the plane) mirrors left-right only, so the two fix every
-    orientation, as draw_pd_transgear_thumbnut's _stand_section_rim_up.  The
-    view is then moved by its projection, not its outline: the hub stands
-    off the rim's mid-plane, so the outline's centre is not a hub face.
+
+def _orient_section(adapter: Any, section: Any) -> str:
+    """Lay section A-A as SECTION_KEEP draws it and return its rotation label.
+
+    The section stands as projected off the face's horizontal cutting line,
+    the wheel's axis upright; it must lie across, the hub's back face left of
+    the spigot and the seed spoke (+X) up, the back face on the axis at
+    (_section_x(HUB_BACK_Z), SECTION_CENTER[1]).  A turn keeps the
+    handedness of (back face, spigot end, rim top) and reversing the cut
+    (looking from the other side of the plane) mirrors it, so the cut is
+    reversed when the handedness is wrong and the view is then turned until
+    +X stands up.  The label names the turn as read back on the sheet
+    (drawing-guidelines.md rule 9: a rotated view says so), never from
+    IView.Angle's sign.  The view is then moved by its projection, not its
+    outline: the hub stands off the rim's mid-plane, so the outline's centre
+    is not a hub face.
     """
     native = _early_bound(section, "IView")
 
@@ -842,30 +936,53 @@ def _orient_section(adapter: Any, section: Any) -> None:
             (
                 (0.0, 0.0, HUB_BACK_Z / 1000.0),
                 (0.0, 0.0, HUB_FRONT_Z / 1000.0),
-                (0.0, RIM_OUTER_DIA / 2000.0, HUB_BACK_Z / 1000.0),
+                (RIM_OUTER_DIA / 2000.0, 0.0, HUB_BACK_Z / 1000.0),
             ),
             label="wheel section orientation",
             names=("hub back face", "spigot end", "rim top"),
         )
 
-    back, front, top = read()
-    if top[1] < back[1]:
-        native.Angle = float(native.Angle) + math.pi
-        rebuild_drawing(adapter, label="wheel section turned")
-        back, front, top = read()
-    if back[0] > front[0]:
+    def laid(points: list[tuple[float, float]]) -> bool:
+        back, front, top = points
+        return (
+            back[0] < front[0]
+            and top[1] > back[1]
+            and abs(top[0] - back[0]) <= _SECTION_PLACEMENT_TOL
+        )
+
+    points = read()
+    if _handedness(*points) < 0.0:
         cut = _early_bound(native.GetSection(), "IDrSection")
         reversed_cut = not bool(cut.GetReversedCutDirection())
         cut.SetReversedCutDirection(reversed_cut)
         rebuild_drawing(adapter, label="wheel section reversed")
         if bool(cut.GetReversedCutDirection()) != reversed_cut:
             raise RuntimeError("wheel section cut direction did not persist")
-        back, front, top = read()
-    if not (back[0] < front[0] and top[1] > back[1]):
+        points = read()
+        if _handedness(*points) < 0.0:
+            raise RuntimeError(f"wheel section A-A stayed mirrored: {points}")
+    back, _front, top = points
+    projected = math.atan2(top[1] - back[1], top[0] - back[0])
+    turn = math.remainder(math.pi / 2.0 - projected, 2.0 * math.pi)
+    if abs(abs(turn) - math.pi / 2.0) > 1e-6:
         raise RuntimeError(
-            f"wheel section A-A is not back face left, +Y up: back={back}, "
-            f"spigot end={front}, rim top={top}"
+            f"wheel section A-A projects +X at {math.degrees(projected):.3f} deg, "
+            "not across the sheet"
         )
+    start = float(native.Angle)
+    for sign in (1.0, -1.0):
+        native.Angle = start + sign * turn
+        rebuild_drawing(adapter, label=f"wheel section turned ({sign:+g})")
+        points = read()
+        if laid(points):
+            break
+    else:
+        raise RuntimeError(
+            f"wheel section A-A is not back face left, +X up after turning "
+            f"{math.degrees(turn):+.1f} deg either way: {points}"
+        )
+    label = f"ROTATED 90 DEG {'CCW' if turn > 0.0 else 'CW'}"
+    back, front, top = points
     target = (_section_x(HUB_BACK_Z), SECTION_CENTER[1])
     for attempt in range(4):
         if math.dist(back, target) <= _SECTION_PLACEMENT_TOL:
@@ -881,9 +998,10 @@ def _orient_section(adapter: Any, section: Any) -> None:
             f"wheel section A-A back face stayed at {back}, requested {target}"
         )
     _telemetry.info(
-        f"wheel section: angle={float(native.Angle):.6f} rad, back={back}, "
-        f"spigot end={front}, rim top={top}"
+        f"wheel section: {label}, angle={float(native.Angle):.6f} rad, "
+        f"back={back}, spigot end={front}, rim top={top}"
     )
+    return label
 
 
 def _set_arrows_inside(adapter: Any, annotations: list[Any]) -> None:
@@ -902,6 +1020,38 @@ def _set_arrows_inside(adapter: Any, annotations: list[Any]) -> None:
             raise RuntimeError(f"{name} did not keep its arrows inside")
     if remaining:
         raise RuntimeError(f"no dimension to set arrows inside: {sorted(remaining)}")
+
+
+def _fillet_tip(
+    display: Any,
+    name: str,
+    centre: tuple[float, float],
+    ends: tuple[float, float],
+    radius: float,
+) -> tuple[tuple[float, float], float, bool]:
+    """``name``'s rebuilt arrow tip, its bearing (deg) from the fillet's sheet
+    ``centre``, and whether it lies on the fillet's arc (FILLET_TIP_TOL,
+    FILLET_SPAN_TOL)."""
+    raw = display.GetDisplayData()
+    if raw is None:
+        raise RuntimeError(f"{name} has no rebuilt display data")
+    data = _early_bound(raw, "IDisplayData")
+    if int(data.GetArrowHeadCount()) != 1:
+        raise RuntimeError(f"{name} must draw exactly one radial arrow")
+    arrow = tuple(float(v) for v in data.GetArrowHeadAtIndex2(0))
+    if len(arrow) != 12 or not all(math.isfinite(v) for v in arrow):
+        raise RuntimeError(f"{name} has incomplete arrow-head coordinates")
+    tip = (arrow[0], arrow[1])
+    off = (tip[0] - centre[0], tip[1] - centre[1])
+    bearing = math.degrees(math.atan2(off[1], off[0]))
+    span = (ends[1] - ends[0] + 180.0) % 360.0 - 180.0
+    mid = ends[0] + span / 2.0
+    swing = abs((bearing - mid + 180.0) % 360.0 - 180.0)
+    on_arc = (
+        abs(math.hypot(*off) - radius / 1000.0) <= FILLET_TIP_TOL
+        and swing <= abs(span) / 2.0 + FILLET_SPAN_TOL
+    )
+    return tip, bearing, on_arc
 
 
 def _dress_fillet_radii(adapter: Any, annotations: list[Any]) -> None:
@@ -931,15 +1081,60 @@ def _dress_fillet_radii(adapter: Any, annotations: list[Any]) -> None:
 
 # Section A-A shows only hatch on its cut faces (drawing-guidelines.md rule
 # 9).  Two model dimensions' extension lines rise from inside the hub: the
-# spokes' thickness from the seed spoke's root corner, whose arrows land on
-# the spoke beyond the cut at its own row, so it shows none; and the web's
-# centre plane from the origin, whose line starts the document gap past the
-# rim's OD instead, under the groove the plane locates.
-_WITNESS_NONE = 3  # swWitnessLineVisibility_e.swWitnessLineNone
+# spokes' thickness from the seed spoke's root corner, whose lines start
+# instead where the cut spoke meets the rim bore and rise through the rim
+# to their row above it; and the web's centre plane from the origin, whose
+# line starts the document gap past the rim's OD instead, under the groove
+# the plane locates.
+_SPOKE_WITNESS_START = SECTION_CENTER[1] + RIM_INNER_DIA * SHEET_SCALE[0] / 2000.0
 
 
-@_telemetry.traced("wheel.clear_section_witnesses")
-def _clear_section_witnesses(adapter: Any, annotations: list[Any]) -> None:
+def _rising_witness_start(annotation: Any, x: float, label: str) -> float:
+    """The lowest sheet y of ``annotation``'s vertical extension line at
+    sheet ``x``: where a line rising to its dimension line starts."""
+    starts = [
+        min(a[1], b[1])
+        for a, b in dimension_segments(annotation)
+        if abs(a[0] - x) < 1e-4 and abs(b[0] - x) < 1e-4 and abs(a[1] - b[1]) > 1e-6
+    ]
+    if not starts:
+        raise RuntimeError(f"{label}: no extension line at x={x:.4f} m")
+    return min(starts)
+
+
+def _start_spoke_witnesses(adapter: Any, spoke: Any) -> None:
+    """Start SpokeAxial's two extension lines at the spoke's junction with the
+    rim bore (_SPOKE_WITNESS_START) by their witness gaps, read back."""
+    display = _early_bound(spoke.GetSpecificAnnotation(), "IDisplayDimension")
+    xs = tuple(_section_x(z) for z in (SPOKE_AXIAL / 2.0, -SPOKE_AXIAL / 2.0))
+    before = [_rising_witness_start(spoke, x, "SpokeAxial") for x in xs]
+    if abs(before[0] - before[1]) > 1e-5:
+        raise RuntimeError(f"SpokeAxial's extension lines start apart: {before}")
+    rise = _SPOKE_WITNESS_START - before[0]
+    if rise <= 0.0:
+        _telemetry.info(f"SpokeAxial: extension lines already start at y={before[0]:.5f} m")
+        return
+    for index in (0, 1):
+        ok, _use_doc, old_gap = display.GetWitnessLineGap(index, False, 0.0)
+        if ok is not True:
+            raise RuntimeError(f"SpokeAxial witness {index} gap could not be read")
+        if display.SetWitnessLineGap(index, False, float(old_gap) + rise) is not True:
+            raise RuntimeError(f"SpokeAxial witness {index} gap was refused")
+    rebuild_drawing(adapter, label="spoke thickness witness gaps")
+    after = [_rising_witness_start(spoke, x, "SpokeAxial") for x in xs]
+    if any(abs(start - _SPOKE_WITNESS_START) > 1e-5 for start in after):
+        raise RuntimeError(
+            f"SpokeAxial's extension lines start at {after}, not at the rim bore "
+            f"y={_SPOKE_WITNESS_START:.5f} m"
+        )
+    _telemetry.info(
+        f"SpokeAxial: extension lines start at the rim bore y={after[0]:.5f} m "
+        f"(were {before[0]:.5f})"
+    )
+
+
+@_telemetry.traced("wheel.section_witnesses")
+def _set_section_witnesses(adapter: Any, annotations: list[Any]) -> None:
     """Keep SpokeAxial's and HubFrontZ's extension lines off A-A's cut faces,
     read back."""
     named = {
@@ -948,13 +1143,8 @@ def _clear_section_witnesses(adapter: Any, annotations: list[Any]) -> None:
     }
     missing = {"SpokeAxial", "HubFrontZ"} - set(named)
     if missing:
-        raise RuntimeError(f"no section dimension to clear: {sorted(missing)}")
-    spoke = _early_bound(
-        named["SpokeAxial"].GetSpecificAnnotation(), "IDisplayDimension"
-    )
-    spoke.WitnessVisibility = _WITNESS_NONE
-    if int(spoke.WitnessVisibility) != _WITNESS_NONE:
-        raise RuntimeError("SpokeAxial kept its extension lines")
+        raise RuntimeError(f"no section dimension to set: {sorted(missing)}")
+    _start_spoke_witnesses(adapter, named["SpokeAxial"])
     plane = named["HubFrontZ"]
     display = _early_bound(plane.GetSpecificAnnotation(), "IDisplayDimension")
     plane_x = _section_x(0.0)
@@ -1045,6 +1235,51 @@ def _break_out_tie2(adapter: Any, front: Any) -> None:
     )
 
 
+@_telemetry.traced("wheel.centrelines", label_param="label")
+def _add_centrelines(
+    adapter: Any,
+    view: Any,
+    ends_mm: dict[str, tuple[tuple[float, float, float], tuple[float, float, float]]],
+    *,
+    label: str,
+) -> None:
+    """Draw each of ``ends_mm`` (model mm) as a thin black centreline in
+    ``view``'s sketch (_transgear_zone_line's direct-to-database lines), its
+    font and ends read back after the rebuild."""
+    keys = tuple(ends_mm)
+    sheet = model_points_in_view(
+        adapter,
+        view,
+        tuple(
+            tuple(value / 1000.0 for value in end)
+            for key in keys
+            for end in ends_mm[key]
+        ),
+        label=label,
+        names=tuple(f"{key} {end}" for key in keys for end in ("start", "end")),
+    )
+    lines = sketch_lines(
+        adapter,
+        view,
+        {
+            key: (sheet[2 * index], sheet[2 * index + 1])
+            for index, key in enumerate(keys)
+        },
+        style=CENTER_LINE_STYLE,
+        width=CENTER_LINE_WEIGHT,
+        label=label,
+    )
+    rebuild_drawing(adapter, label=label)
+    require_placed(
+        adapter,
+        lines,
+        style=CENTER_LINE_STYLE,
+        width=CENTER_LINE_WEIGHT,
+        label=label,
+        stage="rebuilt",
+    )
+
+
 def _width_dimension_lines(
     annotation: Any, axis_y: float, half_widths: tuple[float, ...]
 ) -> list[Any]:
@@ -1093,25 +1328,8 @@ def _assert_fillet_radii(
             _early_bound(named[name], "IAnnotation").GetSpecificAnnotation(),
             "IDisplayDimension",
         )
-        raw = display.GetDisplayData()
-        if raw is None:
-            raise RuntimeError(f"{name} has no rebuilt display data")
-        data = _early_bound(raw, "IDisplayData")
-        if int(data.GetArrowHeadCount()) != 1:
-            raise RuntimeError(f"{name} must draw exactly one radial arrow")
-        arrow = tuple(float(v) for v in data.GetArrowHeadAtIndex2(0))
-        if len(arrow) != 12 or not all(math.isfinite(v) for v in arrow):
-            raise RuntimeError(f"{name} has incomplete arrow-head coordinates")
-        tip = (arrow[0], arrow[1])
-        off = (tip[0] - centre[0], tip[1] - centre[1])
-        bearing = math.degrees(math.atan2(off[1], off[0]))
-        half = abs((ends[1] - ends[0] + 180.0) % 360.0 - 180.0) / 2.0
-        mid = ends[0] + ((ends[1] - ends[0] + 180.0) % 360.0 - 180.0) / 2.0
-        swing = abs((bearing - mid + 180.0) % 360.0 - 180.0)
-        if (
-            abs(math.hypot(*off) - radius / 1000.0) > FILLET_TIP_TOL
-            or swing > half + FILLET_SPAN_TOL
-        ):
+        tip, bearing, on_arc = _fillet_tip(display, name, centre, ends, radius)
+        if not on_arc:
             raise RuntimeError(
                 f"{name}'s arrow tip {tip} is not on its fillet's arc (centre "
                 f"{centre}, R {radius}, arc {ends[0]:.1f}..{ends[1]:.1f} deg, tip "
@@ -1288,7 +1506,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
-            "Isometric View Note",
         ),
         required=(
             "Number",
@@ -1296,7 +1513,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
-            "Isometric View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -1330,23 +1546,24 @@ async def build(adapter: Any) -> dict[str, str]:
         label="section A-A diameter reference",
         base_view=front,
     ):
+        # Drawn left to right, the line's arrows point up: A-A looks along +Y.
         section = create_section_view(
             adapter,
             front,
             line_start=(
-                FRONT_CENTER[0],
-                FRONT_CENTER[1] - _RIM_R - SECTION_LINE_OVERRUN,
+                FRONT_CENTER[0] - _RIM_R - SECTION_LINE_OVERRUN,
+                FRONT_CENTER[1],
             ),
             line_end=(
-                FRONT_CENTER[0],
-                FRONT_CENTER[1] + _RIM_R + SECTION_LINE_OVERRUN,
+                FRONT_CENTER[0] + _RIM_R + SECTION_LINE_OVERRUN,
+                FRONT_CENTER[1],
             ),
             view_xy=SECTION_CENTER,
             section_label="A",
             scale=(1, 1),
             label="wheel section A-A",
         )
-        _orient_section(adapter, section)
+        rotation = _orient_section(adapter, section)
         # drawing-guidelines.md rule 9 (show internal shape in solid lines):
         # a section shows no hidden lines.
         set_hidden_lines_removed(adapter, section)
@@ -1358,6 +1575,19 @@ async def build(adapter: Any) -> dict[str, str]:
             dimensions_by_feature=DRAWING_DIMENSIONS,
         )
     position_section_caption(adapter, section, SECTION_CAPTION_XY, label="wheel")
+    # The turn prints under the caption (drawing-guidelines.md rule 9: a
+    # rotated view says so), centred on it; the caption prints no scale, the
+    # section being drawn at the sheet's.
+    if (
+        add_note(
+            adapter,
+            rotation,
+            SECTION_CAPTION_XY[0] - len(rotation) * ROTATION_NOTE_CHAR / 2.0,
+            ROTATION_NOTE_TOP,
+        )
+        is None
+    ):
+        raise RuntimeError(f"failed to label section A-A {rotation}")
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
     # The face view needs no hidden lines once the section carries the hub.
     for view in (front, iso):
@@ -1380,10 +1610,14 @@ async def build(adapter: Any) -> dict[str, str]:
     # The matched fits' Ø are reference nominals: "(Ø.499)", "(Ø.1885)".
     set_reference_dimensions(adapter, annotations, REFERENCE_DIMENSIONS)
     set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
-    offset_dimension_text(adapter, annotations, {"SpokeRootWidth": SPOKE_ROOT_TEXT_XY})
+    offset_dimension_text(
+        adapter,
+        annotations,
+        {"SpokeRootWidth": SPOKE_ROOT_TEXT_XY, "SpigotDia": SPIGOT_TEXT_XY},
+    )
     _set_arrows_inside(adapter, annotations)
     _dress_fillet_radii(adapter, annotations)
-    _clear_section_witnesses(adapter, annotations)
+    _set_section_witnesses(adapter, annotations)
     axis, tie1, bore_landing = model_points_in_view(
         adapter,
         front,
@@ -1456,6 +1690,7 @@ async def build(adapter: Any) -> dict[str, str]:
         _early_bound(rim_width, "IDisplayDimension"), "rim axial width"
     )
     round_radius = _add_round_radius(adapter, section, section_edges)
+    _add_centrelines(adapter, section, WEB_CENTRELINES, label="wheel web centreline")
     rebuild_drawing(adapter, label="wheel dimension layout")
     _assert_text_off_iso(
         adapter,
@@ -1468,7 +1703,6 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
-    add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(
         adapter,

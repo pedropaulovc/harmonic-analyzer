@@ -10,7 +10,8 @@ radial hole from the groove bottom to the rim bore.
 
 Layout: wheel axis = local Z through the origin, the origin on the spokes' and
 rim's mid-plane (``mg_magnifying_wheel_geom``). The hub profile and the groove
-are revolved on the Right plane (sketch x -> model -Z).
+are revolved on the Top plane, the plane through the seed spoke on +X and the
+180 deg spoke that section A-A cuts (``_profile_mapper``).
 
 Run (SolidWorks already open)::
 
@@ -37,6 +38,7 @@ from _rebuild import force_rebuild
 from _session import run_build
 from _sketch import (
     SketchDims,
+    _record_origin_anchor,
     add_line_chain,
     anchor_point_to_origin,
     blank_reference_sketches,
@@ -116,7 +118,7 @@ from mg_magnifying_wheel_spec import (
     DRAWING_NOTES,
     DRAWING_PRECISION,
     HUB_FILLET_PRINTED,
-    ISOMETRIC_VIEW_NOTE,
+    REFERENCE_DIAMETERS,
     REFERENCE_SKETCHES,
     REFERENCE_WITNESS_LEN,
     RIM_FILLET_PRINTED,
@@ -125,8 +127,11 @@ from mg_magnifying_wheel_spec import (
     SPOKE_PITCH_PREFIX,
     SPOKE_PITCH_SPOKES,
     SPOKE_REFERENCE,
+    SPOKE_FACE_OFFSET,
     SPOKE_STUB_R,
     SURFACE_FINISHES,
+    TIE2_CLOCK_SPOKE,
+    TIE2_FROM_SPOKE_DEG,
 )
 from mg_wheel_bar_geom import WHEEL_BAR_Y as _YOKE_WHEEL_Y
 
@@ -239,27 +244,14 @@ V_TIE2 = _tie2_volume()
 
 # --- TIE 2 profile: a half rectangle beside its radial axis, revolve-cut -------
 # The axis runs radially at TIE2_CLOCK_DEG from inside the rim bore out past the
-# groove floor. Its inner end runs HORIZONTAL (in the air inside the rim bore)
-# so the hole's angle reads off it on the face view.
+# groove floor. Its inner end runs HORIZONTAL, in the air inside the rim bore.
 _TIE2_LOCAL = math.radians(clock_to_local_deg(TIE2_CLOCK_DEG))
 _TIE2_U = (math.cos(_TIE2_LOCAL), math.sin(_TIE2_LOCAL))
 _TIE2_W = (-_TIE2_U[1], _TIE2_U[0])
 _TIE2_IN_R = _RIM_IN_R - 1.5  # the full bore starts inside the rim bore
 _TIE2_OUT_R = _GROOVE_CENTRE_R + 0.1  # ends in the groove's air
-_TIE2_ANGLE = math.degrees(math.atan2(abs(_TIE2_U[1]), abs(_TIE2_U[0])))
 if abs(_TIE2_U[1]) < 1e-6 or abs(_TIE2_U[0]) < 1e-6:
     raise AssertionError("TIE 2 must run oblique to the sketch axes")
-# The driven angle's text sits inside the ACUTE sector at P_in, between the
-# axis (outward, along U) and the horizontal ray on the same x side as U --
-# SolidWorks picks which of the four angles to report from the text point.
-_TIE2_ANGLE_TEXT_R = 2.5
-_TIE2_BISECTOR = (_TIE2_U[0] + math.copysign(1.0, _TIE2_U[0]), _TIE2_U[1])
-_TIE2_ANGLE_TEXT = (
-    _TIE2_IN_R * _TIE2_U[0]
-    + _TIE2_ANGLE_TEXT_R * _TIE2_BISECTOR[0] / math.hypot(*_TIE2_BISECTOR),
-    _TIE2_IN_R * _TIE2_U[1]
-    + _TIE2_ANGLE_TEXT_R * _TIE2_BISECTOR[1] / math.hypot(*_TIE2_BISECTOR),
-)
 
 
 def _tie2_profile() -> list[tuple[float, float]]:
@@ -313,20 +305,20 @@ def _spoke_edge_picks(circle_r: float, printed: tuple[int, int]) -> list[list[fl
 
 
 def _section_plane(adapter) -> None:
-    """Section A-A's cutting plane, named and hidden: coincident with the Right
-    plane (model X = 0, through the wheel axis), the plane A-A cuts.  A hidden
-    sketch on a bare standard plane imports nothing into a section, and an
-    offset plane cannot sit at zero offset, so it is InsertRefPlane's
-    Coincident constraint on the selected Right plane
+    """Section A-A's cutting plane, named and hidden: coincident with the Top
+    plane (model Y = 0, through the wheel axis and the 0 and 180 deg spokes),
+    the plane A-A cuts.  A hidden sketch on a bare standard plane imports
+    nothing into a section, and an offset plane cannot sit at zero offset, so
+    it is InsertRefPlane's Coincident constraint on the selected Top plane
     (build_ch_rocker_arm_tl_oblique_carrier's section plane)."""
     from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     model.ClearSelection2(True)
     if not model.Extension.SelectByID2(
-        "Right Plane", "PLANE", 0, 0, 0, False, 0, null_callout(), 0
+        "Top Plane", "PLANE", 0, 0, 0, False, 0, null_callout(), 0
     ):
-        raise RuntimeError(f"plane {SECTION_PLANE}: cannot select the Right plane")
+        raise RuntimeError(f"plane {SECTION_PLANE}: cannot select the Top plane")
     feature_manager = _early_bound(model.FeatureManager, "IFeatureManager")
     # swRefPlaneReferenceConstraint_Coincident = 4
     if feature_manager.InsertRefPlane(4, 0.0, 0, 0.0, 0, 0.0) is None:
@@ -354,7 +346,7 @@ def _sketch_mapper(
     """Map model points (mm) into the ACTIVE sketch, requiring model axis
     ``u_axis`` along the sketch's u and ``v_axis`` along its v (either sign)
     (build_ch_rocker_arm_tl_oblique_carrier's mapper): a plane coincident with
-    the Right plane need not keep its sketch axes' senses."""
+    the Top plane need not keep its sketch axes' senses."""
     import pythoncom
     from win32com.client import VARIANT
 
@@ -397,26 +389,63 @@ def _sketch_mapper(
     return to_sketch
 
 
+# The turned profiles lie in A-A's plane (the Top plane): the axis runs along
+# the sketch's v (model Z) and every radius along its u (model X), so an
+# axial line is vertical in the sketch and a radial one horizontal.
+_AXIAL = "vertical"
+_RADIAL = "horizontal"
+_AXIAL_DISTANCE = "vertical_distance"
+_RADIAL_DISTANCE = "horizontal_distance"
+# Two points at one axial station / on one radius.
+_SAME_STATION = "horizontal_points"
+_SAME_RADIUS = "vertical_points"
+
+
+def _profile_mapper(
+    adapter, *, label: str
+) -> tuple[Callable[[float, float], tuple[float, float]], bool]:
+    """Map a turned profile point (a, r) into the ACTIVE Top-plane sketch:
+    ``a`` the axial coordinate -z (the half-profile's own frame, front face
+    to the right), ``r`` the radius out along model +X, the seed spoke's
+    side, which A-A stands upward.  Returns the map and whether it mirrors
+    the (a, r) frame: SketchManager.CreateArc always runs counter-clockwise,
+    so a mirrored frame draws each arc from its far end."""
+    to_sketch = _sketch_mapper(adapter, u_axis=0, v_axis=2, label=label)
+
+    def to_profile(a: float, r: float) -> tuple[float, float]:
+        return to_sketch((r, 0.0, -a))
+
+    origin = to_profile(0.0, 0.0)
+    along_a = [p - o for p, o in zip(to_profile(1.0, 0.0), origin, strict=True)]
+    along_r = [p - o for p, o in zip(to_profile(0.0, 1.0), origin, strict=True)]
+    mirrored = along_a[0] * along_r[1] - along_a[1] * along_r[0] < 0.0
+    return to_profile, mirrored
+
+
 # The reference sketch's axis is the bore's centreline in A-A: it runs the
 # hub's length and this far past each end face, clear of the Ø30's text.
 _CENTRELINE_OVERRUN = 2.0
 
 
 async def _diameter_reference(adapter) -> list[tuple[str, str]]:
-    """Section A-A's rim diameters (mg_magnifying_wheel_spec.DIAMETER_REFERENCE).
+    """Section A-A's rim diameters and the spokes' back face
+    (mg_magnifying_wheel_spec.DIAMETER_REFERENCE).
 
     A hidden sketch on SECTION_PLANE: the wheel axis as a centreline, and on
     each rim surface a construction witness REFERENCE_WITNESS_LEN long, the
     OD's from the rim's back face, the rim bore's from the back rim-bore
     round's tangent.  Each Ø is a diametric dimension from the axis to its
     witness's start, driven from the global its Front-plane circle is driven
-    from, so the sketch restates the geometry and moves with it.  It adds no
-    volume.
+    from, so the sketch restates the geometry and moves with it.  A third
+    witness starts where the spokes' back face meets the rim bore, and
+    SpokeFaceOffset locates it from the OD witness's start along the axis
+    (SPOKE_FACE_OFFSET): the part owns that size and its casting band, so A-A
+    imports it like the spokes' thickness.  It adds no volume.
     """
     feature = DIAMETER_REFERENCE
     _section_plane(adapter)
     check(f"create_sketch {feature}", await adapter.create_sketch(SECTION_PLANE))
-    to_sketch = _sketch_mapper(adapter, u_axis=2, v_axis=1, label=feature)
+    to_sketch = _sketch_mapper(adapter, u_axis=0, v_axis=2, label=feature)
     axis_start = to_sketch((0.0, 0.0, HUB_BACK_Z + _CENTRELINE_OVERRUN))
     axis_end = to_sketch((0.0, 0.0, HUB_FRONT_Z - _CENTRELINE_OVERRUN))
     back = RIM_AXIAL / 2.0
@@ -431,21 +460,28 @@ async def _diameter_reference(adapter) -> list[tuple[str, str]]:
     )
     lines = []
     for name, _drive, radius, z in witnesses:
-        start = to_sketch((0.0, radius, z))
-        end = to_sketch((0.0, radius, z - REFERENCE_WITNESS_LEN))
+        start = to_sketch((radius, 0.0, z))
+        end = to_sketch((radius, 0.0, z - REFERENCE_WITNESS_LEN))
         lines.append(
             check(f"{feature} {name} witness", await adapter.add_line(*start, *end))
         )
+    face_z = SPOKE_AXIAL / 2.0
+    face_start = to_sketch((_RIM_IN_R, 0.0, face_z))
+    face_end = to_sketch((_RIM_IN_R, 0.0, face_z - REFERENCE_WITNESS_LEN))
+    face = check(
+        f"{feature} SpokeFaceOffset witness",
+        await adapter.add_line(*face_start, *face_end),
+    )
     set_sketch_direct_db(adapter, False)
-    for line in lines:
+    for line in (*lines, face):
         segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
         segment.ConstructionGeometry = True
         if not bool(segment.ConstructionGeometry):
             raise RuntimeError(f"{feature} {line}: construction flag rejected")
-    for line in (axis, *lines):
+    for line in (axis, *lines, face):
         check(
-            f"{feature} {line} horizontal",
-            await adapter.add_sketch_constraint(line, None, "horizontal"),
+            f"{feature} {line} axial",
+            await adapter.add_sketch_constraint(line, None, _AXIAL),
         )
     dims = SketchDims()
     await anchor_point_to_origin(
@@ -464,7 +500,7 @@ async def _diameter_reference(adapter) -> list[tuple[str, str]]:
             adapter,
             f"{line}.start",
             "origin",
-            "horizontal_distance",
+            _AXIAL_DISTANCE,
             abs(z),
             f"{feature} {name} witness station",
         )
@@ -477,11 +513,41 @@ async def _diameter_reference(adapter) -> list[tuple[str, str]]:
         )
         dims.record(None)
     for line, (name, drive, radius, _z) in zip(lines, witnesses, strict=True):
-        start = to_sketch((0.0, radius, back))
         await add_diametric_linear_dimension(
-            adapter, axis, f"{line}.start", (start[0], start[1] + 4.0), name
+            adapter,
+            axis,
+            f"{line}.start",
+            to_sketch((radius + 4.0, 0.0, back)),
+            name,
         )
         dims.record(name, drive)
+    # The spokes' back-face witness: on the rim bore's radius, its length,
+    # and located from the OD witness's start (the rim's back face).
+    await dimension_between(
+        adapter,
+        f"{face}.start",
+        "origin",
+        _RADIAL_DISTANCE,
+        _RIM_IN_R,
+        f"{feature} SpokeFaceOffset witness radius",
+    )
+    dims.record(None)
+    check(
+        f"{feature} SpokeFaceOffset witness length",
+        await adapter.add_sketch_dimension(
+            face, None, "linear", REFERENCE_WITNESS_LEN
+        ),
+    )
+    dims.record(None)
+    await dimension_between(
+        adapter,
+        f"{lines[0]}.start",
+        f"{face}.start",
+        _AXIAL_DISTANCE,
+        SPOKE_FACE_OFFSET,
+        "SpokeFaceOffset",
+    )
+    dims.record("SpokeFaceOffset")
     await ensure_fully_defined(adapter, feature)
     check(f"exit_sketch {feature}", await adapter.exit_sketch())
     name_last_feature(adapter, feature)
@@ -490,26 +556,43 @@ async def _diameter_reference(adapter) -> list[tuple[str, str]]:
 
 
 async def _spoke_reference(adapter) -> list[tuple[str, str]]:
-    """The spoke pattern's pitch (mg_magnifying_wheel_spec.SPOKE_REFERENCE).
+    """The spoke pattern's pitch and TIE 2's clock
+    (mg_magnifying_wheel_spec.SPOKE_REFERENCE).
 
-    A hidden Front-plane sketch: the centrelines of SPOKE_PITCH_SPOKES as
-    construction stubs through the rim, each end anchored on its spoke's
-    radial, and the DRIVEN angle between them (the Tie2Angle precedent), so
-    it restates the pattern without driving it.  It adds no volume.
+    A hidden Front-plane sketch of construction stubs through the rim, each
+    end anchored on its radial, in pairs: the centrelines of
+    SPOKE_PITCH_SPOKES, and the TIE2_CLOCK_SPOKE spoke's with TIE 2's axis.
+    Each pair's DRIVEN angle (vertex on the bore axis) restates the pattern
+    and the hole's clock without driving either.  It adds no volume.
     """
     feature = SPOKE_REFERENCE
     check(f"create_sketch {feature}", await adapter.create_sketch("Front"))
-    bearings = [k * SPOKE_PITCH_DEG for k in SPOKE_PITCH_SPOKES]
+    clock_spoke = TIE2_CLOCK_SPOKE * SPOKE_PITCH_DEG
+    pairs = (
+        (
+            "SpokePitch",
+            "spoke pitch",
+            [k * SPOKE_PITCH_DEG for k in SPOKE_PITCH_SPOKES],
+            SPOKE_PITCH_DEG,
+        ),
+        (
+            "Tie2Clock",
+            "tie 2 clock",
+            [clock_spoke, clock_spoke + TIE2_FROM_SPOKE_DEG],
+            TIE2_FROM_SPOKE_DEG,
+        ),
+    )
     stubs = []
     set_sketch_direct_db(adapter, True)
-    for bearing in bearings:
-        a = math.radians(bearing)
-        ends = [(r * math.cos(a), r * math.sin(a)) for r in SPOKE_STUB_R]
-        line = check(
-            f"{feature} {bearing:g} deg centreline",
-            await adapter.add_centerline(*ends[0], *ends[1]),
-        )
-        stubs.append((line, ends))
+    for _name, label, bearings, _degrees in pairs:
+        for bearing in bearings:
+            a = math.radians(bearing)
+            ends = [(r * math.cos(a), r * math.sin(a)) for r in SPOKE_STUB_R]
+            line = check(
+                f"{feature} {label} {bearing:g} deg centreline",
+                await adapter.add_centerline(*ends[0], *ends[1]),
+            )
+            stubs.append((line, ends))
     set_sketch_direct_db(adapter, False)
     dims = SketchDims()
     for line, ends in stubs:
@@ -517,18 +600,18 @@ async def _spoke_reference(adapter) -> list[tuple[str, str]]:
             await anchor_point_to_origin(
                 adapter, end_ref, *point, f"{feature} {end_ref}"
             )
-            dims.record(None)
-            dims.record(None)
-    between = math.radians(sum(bearings) / 2.0)
-    await add_angular_reference_dimension(
-        adapter,
-        stubs[0][0],
-        stubs[1][0],
-        (SPOKE_STUB_R[0] * math.cos(between), SPOKE_STUB_R[0] * math.sin(between)),
-        "spoke pitch",
-        expected_degrees=SPOKE_PITCH_DEG,
-    )
-    dims.record("SpokePitch")
+            _record_origin_anchor(dims, *point, None, None, None, None)
+    for index, (name, label, bearings, degrees) in enumerate(pairs):
+        between = math.radians(sum(bearings) / 2.0)
+        await add_angular_reference_dimension(
+            adapter,
+            stubs[2 * index][0],
+            stubs[2 * index + 1][0],
+            (SPOKE_STUB_R[0] * math.cos(between), SPOKE_STUB_R[0] * math.sin(between)),
+            label,
+            expected_degrees=degrees,
+        )
+        dims.record(name)
     await ensure_fully_defined(adapter, feature)
     check(f"exit_sketch {feature}", await adapter.exit_sketch())
     name_last_feature(adapter, feature)
@@ -688,35 +771,37 @@ async def build(adapter) -> dict[str, str]:
         0.002 * (volume + SPOKE_COUNT * V_SPOKE_FREE),
     )
 
-    # Hub: ONE stepped half-profile on the Right plane (sketch x -> model -Z):
-    # the Ø30 boss from its back face to the step, then the Ø.499 spigot to its
-    # front face, revolved about the axis line.
+    # Hub: ONE stepped half-profile in A-A's plane (_profile_mapper: axial
+    # a = -z, radius on +X): the Ø30 boss from its back face to the step, then
+    # the Ø.499 spigot to its front face, revolved about the axis line.
     hub_sd = SketchDims()
     back_x, step_x, front_x = -HUB_BACK_Z, -HUB_STEP_Z, -HUB_FRONT_Z
-    check("create_sketch hub", await adapter.create_sketch("Right"))
+    check("create_sketch hub", await adapter.create_sketch("Top"))
+    hub_point, _ = _profile_mapper(adapter, label="hub sketch")
     set_sketch_direct_db(adapter, True)
     hub_axis = check(
-        "hub axis centerline", await adapter.add_centerline(back_x, 0.0, front_x, 0.0)
+        "hub axis centerline",
+        await adapter.add_centerline(*hub_point(back_x, 0.0), *hub_point(front_x, 0.0)),
     )
     back, boss, step, spigot, front, axis_line = await add_line_chain(
         adapter,
         [
-            (back_x, 0.0),
-            (back_x, _HUB_R),
-            (step_x, _HUB_R),
-            (step_x, _SPIGOT_R),
-            (front_x, _SPIGOT_R),
-            (front_x, 0.0),
+            hub_point(back_x, 0.0),
+            hub_point(back_x, _HUB_R),
+            hub_point(step_x, _HUB_R),
+            hub_point(step_x, _SPIGOT_R),
+            hub_point(front_x, _SPIGOT_R),
+            hub_point(front_x, 0.0),
         ],
     )
     set_sketch_direct_db(adapter, False)
     for line, direction in (
-        (back, "vertical"),
-        (boss, "horizontal"),
-        (step, "vertical"),
-        (spigot, "horizontal"),
-        (front, "vertical"),
-        (axis_line, "horizontal"),
+        (back, _RADIAL),
+        (boss, _AXIAL),
+        (step, _RADIAL),
+        (spigot, _AXIAL),
+        (front, _RADIAL),
+        (axis_line, _AXIAL),
     ):
         check(
             f"hub {direction} {line}",
@@ -726,14 +811,14 @@ async def build(adapter) -> dict[str, str]:
     # (the origin): every axial size reads from that one faced end
     # (drawing-guidelines.md rule 11 (turned parts read like the lathe)), the spigot length the drum's recess needs among them.
     await anchor_point_to_origin(
-        adapter, f"{front}.end", front_x, 0.0, "hub spigot front face"
+        adapter, f"{front}.end", *hub_point(front_x, 0.0), "hub spigot front face"
     )
     hub_sd.record("HubFrontZ", '"HubFrontZ"')
     await dimension_between(
         adapter,
         f"{back}.start",
         f"{front}.end",
-        "horizontal_distance",
+        _AXIAL_DISTANCE,
         HUB_LEN,
         "HubLength",
     )
@@ -742,17 +827,21 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         f"{step}.start",
         f"{front}.end",
-        "horizontal_distance",
+        _AXIAL_DISTANCE,
         SPIGOT_LEN,
         "SpigotLength",
     )
     hub_sd.record("SpigotLength", '"SpigotLength"')
     await add_diametric_linear_dimension(
-        adapter, hub_axis, boss, (back_x + 3.0, _HUB_R + 4.0), "HubDia"
+        adapter, hub_axis, boss, hub_point(back_x + 3.0, _HUB_R + 4.0), "HubDia"
     )
     hub_sd.record("HubDia", '"HubDia"')
     await add_diametric_linear_dimension(
-        adapter, hub_axis, spigot, (front_x - 3.0, _SPIGOT_R + 4.0), "SpigotDia"
+        adapter,
+        hub_axis,
+        spigot,
+        hub_point(front_x - 3.0, _SPIGOT_R + 4.0),
+        "SpigotDia",
     )
     hub_sd.record("SpigotDia", '"SpigotDia"')
     await ensure_fully_defined(adapter, "hub sketch")
@@ -834,41 +923,51 @@ async def build(adapter) -> dict[str, str]:
         adapter, "rim rounds", volume - V_ROUNDS, 0.02 * V_ROUNDS
     )
 
-    # Pen-wire U-groove, revolve-cut on the Right plane: two quarter arcs meet
-    # at the groove bottom (a vertex the bottom diameter dimensions to), then
-    # straight walls run out past the OD. The revolve axis is a short unit
-    # centerline from the origin along the sketch's horizontal.
+    # Pen-wire U-groove, revolve-cut in A-A's plane (_profile_mapper): two
+    # quarter arcs meet at the groove bottom (a vertex the bottom diameter
+    # dimensions to), then straight walls run out past the OD. The revolve axis
+    # is a short unit centerline from the origin.  Each arc is named by its
+    # ends: a mirrored sketch frame draws it from its far end, so "start" and
+    # "end" swap.
     groove_sd = SketchDims()
-    check("create_sketch groove", await adapter.create_sketch("Right"))
+    check("create_sketch groove", await adapter.create_sketch("Top"))
+    groove_point, mirrored = _profile_mapper(adapter, label="groove sketch")
     set_sketch_direct_db(adapter, True)
-    groove_axis = check("groove axis", await adapter.add_centerline(0.0, 0.0, 1.0, 0.0))
+    groove_axis = check(
+        "groove axis",
+        await adapter.add_centerline(*groove_point(0.0, 0.0), *groove_point(1.0, 0.0)),
+    )
     bottom_r = GROOVE_BOTTOM_DIA / 2.0
+    centre = groove_point(0.0, _GROOVE_CENTRE_R)
+    bottom = groove_point(0.0, bottom_r)
+    left_foot = groove_point(-GROOVE_R, _GROOVE_CENTRE_R)
+    right_foot = groove_point(GROOVE_R, _GROOVE_CENTRE_R)
+    first, last = ("end", "start") if mirrored else ("start", "end")
+    left_ends = (bottom, left_foot) if mirrored else (left_foot, bottom)
+    right_ends = (right_foot, bottom) if mirrored else (bottom, right_foot)
     left_arc = check(
         "groove left arc",
-        await adapter.add_arc(
-            0.0, _GROOVE_CENTRE_R, -GROOVE_R, _GROOVE_CENTRE_R, 0.0, bottom_r
-        ),
+        await adapter.add_arc(*centre, *left_ends[0], *left_ends[1]),
     )
     right_arc = check(
         "groove right arc",
-        await adapter.add_arc(
-            0.0, _GROOVE_CENTRE_R, 0.0, bottom_r, GROOVE_R, _GROOVE_CENTRE_R
-        ),
+        await adapter.add_arc(*centre, *right_ends[0], *right_ends[1]),
     )
+    groove_bottom = f"{right_arc}.{first}"
     set_sketch_direct_db(adapter, False)
     _right_wall, groove_top, _left_wall = await add_line_chain(
         adapter,
         [
-            (GROOVE_R, _GROOVE_CENTRE_R),
-            (GROOVE_R, _GROOVE_TOP_R),
-            (-GROOVE_R, _GROOVE_TOP_R),
-            (-GROOVE_R, _GROOVE_CENTRE_R),
+            right_foot,
+            groove_point(GROOVE_R, _GROOVE_TOP_R),
+            groove_point(-GROOVE_R, _GROOVE_TOP_R),
+            left_foot,
         ],
         close=False,
     )
     check(
-        "groove axis horizontal",
-        await adapter.add_sketch_constraint(groove_axis, None, "horizontal"),
+        "groove axis along the wheel axis",
+        await adapter.add_sketch_constraint(groove_axis, None, _AXIAL),
     )
     await anchor_point_to_origin(
         adapter, f"{groove_axis}.start", 0.0, 0.0, "groove axis"
@@ -891,29 +990,29 @@ async def build(adapter) -> dict[str, str]:
                 "groove centre on the mid-plane",
                 f"{right_arc}.center",
                 "origin",
-                "vertical_points",
+                _SAME_STATION,
             ),
             (
                 "groove bottom under the centre",
-                f"{right_arc}.start",
+                groove_bottom,
                 f"{right_arc}.center",
-                "vertical_points",
+                _SAME_STATION,
             ),
             (
                 "groove right wall foot",
-                f"{right_arc}.end",
+                f"{right_arc}.{last}",
                 f"{right_arc}.center",
-                "horizontal_points",
+                _SAME_RADIUS,
             ),
             (
                 "groove left wall foot",
-                f"{left_arc}.start",
+                f"{left_arc}.{first}",
                 f"{right_arc}.center",
-                "horizontal_points",
+                _SAME_RADIUS,
             ),
-            ("groove right wall vertical", _right_wall, None, "vertical"),
-            ("groove left wall vertical", _left_wall, None, "vertical"),
-            ("groove top horizontal", groove_top, None, "horizontal"),
+            ("groove right wall radial", _right_wall, None, _RADIAL),
+            ("groove left wall radial", _left_wall, None, _RADIAL),
+            ("groove top axial", groove_top, None, _AXIAL),
         ),
     )
     check(
@@ -924,8 +1023,8 @@ async def build(adapter) -> dict[str, str]:
     await add_diametric_linear_dimension(
         adapter,
         groove_axis,
-        f"{right_arc}.start",
-        (4.0, bottom_r - 4.0),
+        groove_bottom,
+        groove_point(4.0, bottom_r - 4.0),
         "GrooveBottomDia",
     )
     groove_sd.record("GrooveBottomDia", '"GrooveBottomDia"')
@@ -933,7 +1032,7 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         f"{groove_top}.start",
         "origin",
-        "vertical_distance",
+        _RADIAL_DISTANCE,
         _GROOVE_TOP_R,
         "groove overrun",
     )
@@ -989,9 +1088,9 @@ async def build(adapter) -> dict[str, str]:
     # The farm's first native run (1b6b007ff) left this sketch under-defined
     # with the axis pinned instead by an origin-on-line coincidence, an
     # outer-reach distance and an adapter "angular" dimension; none of those has
-    # a native precedent in the repo. The angle is therefore a DRIVEN
-    # reference here (the NotchPhase / BoreFlatClock precedent); the anchors
-    # are computed on the radial, so the axis still passes the origin.
+    # a native precedent in the repo. The anchors are computed on the radial,
+    # so the axis passes the origin; its clock prints from the spoke
+    # reference (_spoke_reference's Tie2Clock), vertex on the bore axis.
     # DOF: axis 4 + profile 4 lines 8 = 12 = 4 anchor dims + 2x2 end
     # coincidences + square + parallel + inner end horizontal + diameter.
     tie2_sd = SketchDims()
@@ -1036,15 +1135,6 @@ async def build(adapter) -> dict[str, str]:
     )
     await add_diametric_linear_dimension(adapter, tie2_axis, wall, text, "Tie2HoleDia")
     tie2_sd.record("Tie2HoleDia", '"TieHoleDia"')
-    await add_angular_reference_dimension(
-        adapter,
-        inner_end,
-        on_axis,
-        _TIE2_ANGLE_TEXT,
-        "tie 2 angle",
-        expected_degrees=_TIE2_ANGLE,
-    )
-    tie2_sd.record("Tie2Angle")
     await ensure_fully_defined(adapter, "tie 2 sketch")
     check("exit_sketch tie 2", await adapter.exit_sketch())
     name_last_feature(adapter, "Tie2Profile")
@@ -1157,7 +1247,7 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     # A diametric linear dimension prints no Ø of its own: the native symbol
     # token supplies it (build_dt_pinion_arbor's journal references).
-    for name in sorted(DRAWING_DIMENSIONS[DIAMETER_REFERENCE]):
+    for name in REFERENCE_DIAMETERS:
         set_dimension_prefix(adapter, DIAMETER_REFERENCE, name, "<MOD-DIAM>")
     set_dimension_prefix(adapter, SPOKE_REFERENCE, "SpokePitch", SPOKE_PITCH_PREFIX)
     clear_dimensions_for_drawing(adapter)
@@ -1167,10 +1257,7 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_properties(
         adapter,
         PART_NAME,
-        {
-            "Manufacturing Notes": DRAWING_NOTES,
-            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
-        },
+        {"Manufacturing Notes": DRAWING_NOTES},
     )
     # The reference sketches stay in the part for the drawing's views to
     # import, hidden so they print in no assembly (_drawing_hidden_sketches
