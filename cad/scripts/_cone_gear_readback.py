@@ -48,21 +48,30 @@ import cone_land_key
 _TOL_BILAT = 2  # swTolType_e.swTolBILAT
 _TOL_LIMIT = 3  # swTolType_e.swTolLIMIT
 
-# The bore features each configuration carries, cut before sketch
-# (dependents before parents): the D on T006..T024, the keyed bore on
-# T030..T120 and on the unplaced Default, which keeps T120's globals.
+# The bore features, cut before sketch (dependents before parents). The D
+# (BoreProfile/BoreCut) stays live in EVERY configuration, as on main: its
+# marked dimensions are written, and the part saved, with T120 active, and
+# drawing:dt_cone_gear (7f1dedc) imported none of them on T006 once the D was
+# suppressed in T120 and marked with T024 active. On T030..T120 and the
+# unplaced Default (T120's globals) its Ø.375 with the placeholder flat lies
+# inside the round part of the keyed bore cut over it, so the bore is the
+# keyed one. The keyed bore is suppressed on T006..T024, whose small bores
+# it cannot solve on, and is live in T120 when it is marked and saved.
 BORE_CUT = "BoreCut"
 KEYED_BORE_CUT = "KeyedBoreCut"
 D_BORE_FEATURES = (BORE_CUT, BORE_SKETCH)
 KEYED_BORE_FEATURES = (KEYED_BORE_CUT, KEYED_BORE_SKETCH)
 D_BORE_CONFIGURATIONS = frozenset(f"T{teeth:03d}" for teeth in D_BORE_TEETH)
+# The configuration every marked dimension's owner is live in: marks, bands
+# and places are written, and the part is saved, with it active.
+MARKING_CONFIGURATION = "T120"
 
 
 def foreign_bore_features(configuration: str) -> tuple[str, ...]:
     """The bore features ``configuration`` suppresses."""
     if configuration in D_BORE_CONFIGURATIONS:
         return KEYED_BORE_FEATURES
-    return D_BORE_FEATURES
+    return ()
 
 
 # The two bilateral bands T006 overrides (pending exception ruling #971); every other
@@ -357,7 +366,7 @@ async def _configuration_topology(
                     feature_issues.append(
                         f"{feature_name}: native error {error[0]}, warning={bool(error[1])}"
                     )
-    # The configuration carries one bore (_restrict_bores), error-free.
+    # The configuration carries its bore (_restrict_bores), error-free.
     foreign_bores = foreign_bore_features(configuration)
     for feature_name in (*D_BORE_FEATURES, *KEYED_BORE_FEATURES):
         raw_feature = part.FeatureByName(feature_name)

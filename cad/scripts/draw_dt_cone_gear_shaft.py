@@ -441,9 +441,16 @@ D_SECTION_KEEP = {
     SECTION_DIMENSION_NAMES[section.land][0]: (section.centre[0], section.centre[1] + 0.017)
     for section in D_SECTIONS
 }
-# The keyseat width's text: KEYSEAT_WIDTH_RISE above the section centre,
-# over the S line, at the keyseat side's sheet x.
-KEYSEAT_WIDTH_RISE = 0.027
+# The keyseat width's text: KEYSEAT_WIDTH_RISE above the section centre, at
+# the keyseat side's sheet x.  A vertical dimension's line stands at its
+# text's left edge, so the text runs right from the keyseat: the PR #2331
+# proof (head 7f1dedc) measured A-A's cell to 0.3927 with it, 2.2 mm into
+# B-B's (from 0.3711), the 46 mm text standing over B's column.  Nothing
+# leaves room to move A-A that far (the Ø.4825 text holds its left side), so
+# the text rides one row above B's cell instead: its own box in the layout
+# proof, not inside A's cell, its foot ~5 mm over B's 0.1855 top and well
+# under the pictorial.
+KEYSEAT_WIDTH_RISE = 0.030
 # The terminal flat's torque corners ride above its across-flat; the flats'
 # shared clock is in the land note (spec LAND_NOTE) with their fit.
 SECTION_ABOVE_CALLOUTS = {
@@ -1398,22 +1405,32 @@ def _prove_section_layout(
             raise RuntimeError(
                 f"{label} carries a centre mark again after its deletion"
             )
+        texts_in_section = {
+            f"{label} dimension {index}": _dimension_text_box(
+                dimension, f"{label} dimension {index}"
+            )
+            for index, dimension in enumerate(placed.dimensions, start=1)
+        }
         cell = {
             f"{label} face": placed.face,
-            **{
-                f"{label} dimension {index}": _dimension_text_box(
-                    dimension, f"{label} dimension {index}"
-                )
-                for index, dimension in enumerate(placed.dimensions, start=1)
-            },
+            f"{label} dimension 1": texts_in_section[f"{label} dimension 1"],
             f"{label} caption": placed.caption,
+        }
+        # A-A's keyseat width rides above B's cell (KEYSEAT_WIDTH_RISE): its
+        # own box, clear of every other group, not part of A's cell.
+        riders = {
+            name: box for name, box in texts_in_section.items() if name not in cell
         }
         require_clear(
             f"{label} caption",
             placed.caption,
-            {name: box for name, box in cell.items() if name != f"{label} caption"},
+            {
+                name: box
+                for name, box in (*cell.items(), *riders.items())
+                if name != f"{label} caption"
+            },
         )
-        groups[label] = {label: _union(cell.values())}
+        groups[label] = {label: _union(cell.values()), **riders}
     lands = {
         **_land_boxes(adapter, side, sign, label="side view"),
         **_land_boxes(adapter, detail, sign, label="tip detail"),

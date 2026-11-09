@@ -635,16 +635,19 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
     assert sx + face_half < drawing.ISO_CENTER[0] - half_od
     # The gear-data column stays left of every dimension the face view places.
     assert drawing.GEAR_DATA_POS[0] < min(x for x, _ in drawing.FRONT_KEEP.values())
-    # The keyway T and width callouts and the chamfer stand in the lane between
-    # the tooth tips and the section's south face, the chamfer between them.
-    # The leg's text sits left of its dimension line, which stands at the keep
-    # x (r1 of #1641 read the text's right edge back at the keep).
+    # The keyway T callout and the chamfer stand in the lane between the tooth
+    # tips and the section's south face, the chamfer under T. The leg's text
+    # sits left of its dimension line, which stands at the keep x (r1 of #1641
+    # read the text's right edge back at the keep); the keyway width's text
+    # sits right of its dimension line, on the shelf the line turns into
+    # (farm proof of #2331 at 7f1dedc: line at the keep x, shelf to the right).
     keyway_t = _text_box(
         drawing.FRONT_KEEP["KeywayT"], drawing.KEYWAY_T_CALLOUT, "0.4055 \N{PLUS-MINUS SIGN}0.0010"
     )
-    keyway_width = _text_box(
-        drawing.FRONT_KEEP["KeywayWidth"], drawing.KEYWAY_WIDTH_CALLOUT, "0.0625 +0.0010"
-    )
+    width_keep = drawing.FRONT_KEEP["KeywayWidth"]
+    centred = _text_box(width_keep, drawing.KEYWAY_WIDTH_CALLOUT, "0.0625 +0.0010")
+    shift = width_keep[0] - centred[0]
+    keyway_width = (centred[0] + shift, centred[1], centred[2] + shift, centred[3])
     chamfer_keep = drawing.SECTION_KEEP["BoreSouthChamferSize"]
     centred = _text_box(
         chamfer_keep, drawing.DIMENSION_CALLOUTS["BoreSouthChamferSize"], "1.50"
@@ -657,6 +660,9 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
         assert box[2] < section_left - 0.003
     assert chamfer[3] < keyway_t[1] - 0.003
     assert keyway_width[3] < chamfer[1] - 0.003
+    # Under the teeth the width's text stands over the numbered notes.
+    assert keyway_width[1] > drawing.NOTES_XY[1] + 0.002
+    assert keyway_width[2] < 0.216 - 0.003  # left of the title block
     # The chamfer's leg dimension runs off the south face at bore height.
     assert sy - half_od < drawing.SECTION_KEEP["BoreSouthChamferSize"][1] < sy
     # The caption hangs under the section and over the title block, the
@@ -782,15 +788,34 @@ def test_face_view_leaders_have_separate_landings() -> None:
     width_text = drawing.FRONT_KEEP["KeywayWidth"]
     assert bore_text[0] < cx and bore_text[1] < cy
     assert t_text[0] > cx and t_text[1] > cy
-    assert width_text[0] > cx and width_text[1] < cy
+    assert width_text[0] > cx and width_text[1] < cy - drawing.HALF_OD
     assert tip_text[0] > cx and tip_text[1] > cy + drawing.HALF_OD
     angle = math.atan2(bore_text[1] - cy, bore_text[0] - cx)
     bore = [(bore_text, (cx + r * math.cos(angle), cy + r * math.sin(angle)))]
     sheet = drawing.VIEW_SCALE[0] / (1000 * drawing.VIEW_SCALE[1])
     top_x = spec.KEYWAY_TOP_OFFSET * sheet
     half_width = spec.KEYWAY_WIDTH / 2 * sheet
-    keyway_t = [(t_text, (cx + top_x, cy))]
-    keyway_width = [(width_text, (cx + top_x, cy - half_width))]
+    # T: extension lines up from 1 mm off the far wall and the keyway top on
+    # the axis to 1 mm past its dimension line, which runs out to the text.
+    tx, ty = t_text
+    keyway_t = [
+        ((cx - r, cy + 0.001), (cx - r, ty + 0.001)),
+        ((cx + top_x, cy + 0.001), (cx + top_x, ty + 0.001)),
+        ((cx - r, ty), (tx, ty)),
+    ]
+    # The keyway width's ink as the farm read it: extension lines from 1 mm
+    # off the keyway's top corners to 1 mm past the vertical dimension line at
+    # the keep x, two outside arrows' lines, the lower one running down to a
+    # shelf 10 mm under the keep, and no ink between the arrows.
+    wx, wy = width_text
+    ext_gap = 0.001
+    keyway_width = [
+        ((cx + top_x + ext_gap, cy - half_width), (wx + ext_gap, cy - half_width)),
+        ((cx + top_x + ext_gap, cy + half_width), (wx + ext_gap, cy + half_width)),
+        ((wx + 0.025, wy - 0.010), (wx, wy - 0.010)),
+        ((wx, wy - 0.010), (wx, cy - half_width)),
+        ((wx, cy + half_width), (wx, cy + half_width + 0.0064)),
+    ]
     # The broken leader leaves the shelf under the callout's last line at
     # its end nearer the gear, aimed at the centre.
     tip_box = _text_box(tip_text, drawing.TIP_DIA_CALLOUT, _TIP_DIA_TEXT)
@@ -800,7 +825,15 @@ def test_face_view_leaders_have_separate_landings() -> None:
     old_tip = [(near_end, (cx - rim[0], cy - rim[1]))]
     new_tip = [(near_end, (cx + rim[0], cy + rim[1]))]
     reach = drawing.HALF_OD + drawing.SECTION_LINE_OVERRUN
-    cutting_line = [((cx - reach, cy), (cx + reach, cy))]
+    # The chain and, 2 mm in from each end, the A-A arrows' 12 mm stems on
+    # the keyway side (farm proof of #2331): the stem the width's extension
+    # line struck when the width stood past the teeth.
+    stem_x = reach - 0.002
+    cutting_line = [
+        ((cx - reach, cy), (cx + reach, cy)),
+        ((cx - stem_x, cy + 0.012), (cx - stem_x, cy)),
+        ((cx + stem_x, cy + 0.012), (cx + stem_x, cy)),
+    ]
     assert leaders.distance_to_point(old_tip[0], (cx, cy)) < drawing.TIP_DIA_KEEP_OUT
     leaders.assert_leaders_clear(
         {"OutsideDia": new_tip, "BoreDia": bore, "KeywayT": keyway_t,

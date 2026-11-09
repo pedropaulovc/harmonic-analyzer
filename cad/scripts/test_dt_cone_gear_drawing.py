@@ -200,18 +200,41 @@ def test_bore_bands_are_the_current_derived_seat_fit_bands() -> None:
     assert spec.KEYWAY_HALF_WIDTH_MM == cone_land_key.KEYWAY_WIDTH_MM / 2.0
 
 
-def test_each_configuration_carries_exactly_one_bore_feature() -> None:
-    # The D-bore on T006..T024, the keyed bore on T030..T120 (and the
-    # unplaced Default, which keeps T120's globals): each configuration
-    # suppresses the other with itself active (_restrict_bores, re-proved by
-    # the row sweep and read back by the topology audit).
+def test_every_marked_owner_is_live_in_the_marking_configuration() -> None:
+    # drawing:dt_cone_gear at 7f1dedc: BoreProfile, suppressed in T120 (the
+    # configuration the part is marked and saved in) and marked with T024
+    # active, imported none of its three dimensions on the T006 sheet. So the
+    # D-bore stays live in every configuration, as on main, and only the keyed
+    # bore is suppressed, on the D-bore configurations whose small bores it
+    # cannot solve on; every marked owner is live in T120.
     d_features = {readback.BORE_CUT, spec.BORE_SKETCH}
     keyed_features = {readback.KEYED_BORE_CUT, spec.KEYED_BORE_SKETCH}
+    marking = readback.MARKING_CONFIGURATION
+    assert marking == f"T{max(spec.CONFIGURATION_TEETH):03d}"
+    assert not set(readback.foreign_bore_features(marking)) & set(notes.DRAWING_DIMENSIONS)
     for name, teeth in spec.CONFIGS:
         foreign = set(readback.foreign_bore_features(name))
-        assert foreign == (d_features if spec.keyed(teeth) else keyed_features), name
+        assert foreign == (set() if spec.keyed(teeth) else keyed_features), name
+        assert not foreign & d_features
         assert spec.bore_sketch(teeth) not in foreign
-    assert set(readback.foreign_bore_features("Default")) == d_features
+    assert readback.foreign_bore_features("Default") == ()
+    # On the keyed configurations the live D (Ø.375, its flat on the
+    # placeholder across-flat) lies inside the keyed bore's round part, which
+    # both sketches take from "BoreDia": the union cut is the keyed bore.
+    for teeth in spec.KEYED_TEETH:
+        radius = spec.bore_dia_mm(teeth) / 2.0
+        assert part.bore_af_in(teeth) * 25.4 == pytest.approx(cone_land_key.KEYSEAT_S_MM)
+        assert 0.0 < cone_land_key.KEYSEAT_S_MM - radius < radius
+    assert geometry.bore_area_mm2(30) == pytest.approx(
+        math.pi * (spec.bore_dia_mm(30) / 2.0) ** 2 + spec.keyway_area_outside_bore_mm2(30)
+    )
+    # Marks, bands and places are written once, with the marking
+    # configuration active and checked, never with a D-bore one.
+    build = inspect.getsource(part.build)
+    marks = build.index("mark_dimensions_for_drawing(")
+    assert build.index("active_configuration_name(adapter) != MARKING_CONFIGURATION") < marks
+    assert build.count("mark_dimensions_for_drawing(") == 1
+    assert "_activate_configuration(model" not in build[marks:]
     # Dependents before parents: each cut is suppressed before its sketch.
     for features in (readback.D_BORE_FEATURES, readback.KEYED_BORE_FEATURES):
         assert features[0].endswith("Cut") and features[1].endswith("Profile")

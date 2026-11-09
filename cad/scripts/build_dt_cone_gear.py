@@ -8,7 +8,8 @@ six. No zero-length connector, ideal-N flank or upper continuation is used.
 
 The common extruded blank and the configured bore retain configuration-owned
 native dimensions: a D-bore on T006..T024, a round bore with one hub keyway on
-T030..T120 (cone_land_key), each a configuration-restricted feature. Gap
+T030..T120 (cone_land_key), cut over the D, which lies inside it and stays
+live in every configuration; the keyed bore is suppressed on T006..T024. Gap
 bisectors rotate by pi/N so tooth zero and the bore flat's (keyway's) outward
 normal remain +X. Native inspection sketches carry the actual pitch
 thickness and functional root-envelope limits; neither sketch claims to drive
@@ -49,6 +50,7 @@ from _cone_gear_geometry import R_CLEAR_MM, bore_area_mm2
 from _cone_gear_readback import (
     BORE_CUT,
     KEYED_BORE_CUT,
+    MARKING_CONFIGURATION,
     _BANDED_DIMENSIONS,
     _TOL_LIMIT,
     foreign_bore_features,
@@ -75,7 +77,6 @@ from dt_cone_gear_spec import (
     FACE_WIDTH_BAND,
     BORE_DIA_BAND,
     CONFIGS,
-    D_BORE_TEETH,
     DEFAULT_TEETH,
     DIAMETRAL_PITCH,
     FACE_WIDTH,
@@ -116,7 +117,11 @@ from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _paths import OUT_PNG, OUT_SLDPRT
-from _rebuild import assert_saved_configurations_regenerate, force_rebuild
+from _rebuild import (
+    active_configuration_name,
+    assert_saved_configurations_regenerate,
+    force_rebuild,
+)
 from _session import run_build
 from _sketch import (
     SketchDims,
@@ -169,9 +174,10 @@ def bore_dia_in(teeth: int) -> float:
 
 def bore_af_in(teeth: int) -> float:
     """The BoreAF global in inches: a D-bore's land across-flat.  A keyed
-    configuration suppresses the D-bore, whose sketch still takes a value
-    that solves on its Ø.375: the land's keyseat S (cone_land_key), where the
-    flat stood.  T120 authors the D sketch with it."""
+    configuration keeps the D live (its marks, ``MARKING_CONFIGURATION``) on
+    a value that solves on its Ø.375 and lies inside the keyed bore cut over
+    it: the land's keyseat S (cone_land_key), where the flat stood.  T120
+    authors the D sketch with it."""
     if keyed(teeth):
         return cone_land_key.KEYSEAT_S_MM / MM_PER_IN
     return bore_flat_af_mm(teeth) / MM_PER_IN
@@ -687,19 +693,21 @@ def _suppress_in_active_configuration(
 
 
 def _restrict_bores(adapter: Any) -> None:
-    """With each configuration active, suppress the bore it does not carry
+    """With each D-bore configuration active, suppress the keyed bore
     (``foreign_bore_features``), before any per-configuration global moves:
     every configuration still holds T120's Ø.375, on which both bores solve.
     The D-bore's Ø.031 configurations would fail the keyed sketch, and the
-    tooth rows are authored with each configuration active."""
+    tooth rows are authored with each configuration active. The D stays live
+    in every configuration: on the keyed ones it lies inside the keyed bore."""
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     part = _early_bound(model, "IPartDoc")
     for configuration in [str(name) for name in model.GetConfigurationNames()]:
+        foreign = foreign_bore_features(configuration)
+        if not foreign:
+            continue
         _activate_configuration(model, configuration)
-        _suppress_in_active_configuration(
-            part, configuration, foreign_bore_features(configuration)
-        )
-    _telemetry.success("each configuration carries one bore: D on T006-T024, keyed on the rest")
+        _suppress_in_active_configuration(part, configuration, foreign)
+    _telemetry.success("the keyed bore suppressed on T006-T024; the D-bore live everywhere")
 
 
 def _suppress_rows_and_hide_references(adapter: Any, pattern_axis: str) -> None:
@@ -887,8 +895,8 @@ async def build(adapter) -> dict[str, str]:
     _telemetry.debug(f"{od_dim} reads {before:g} (unit factor {dim_unit:g})")
 
     # ------------------------------------------------------------------
-    # Configured D-bore (user ruling 2026-09-28; T006..T024 only, its sketch
-    # authored in T120 on the placeholder ``bore_af_in``): one sketch, one
+    # Configured D-bore (user ruling 2026-09-28; the bore of T006..T024, its
+    # sketch authored in T120 on the placeholder ``bore_af_in``): one sketch, one
     # cut.  The round part is an origin-centred arc with a DRIVING diameter linked to
     # "BoreDia"; the flat is a vertical line joining the arc's ends on local
     # +X (the phase-0 tooth's side), so its outward normal is +X.  A
@@ -1009,8 +1017,9 @@ async def build(adapter) -> dict[str, str]:
             f"{bore_af_dim} reads {bore_af_before!r}, not the bore across-flat"
         )
     # The keyed bore, cut over the D, which lies inside its round part: T120
-    # (and Default) carry both until ``_restrict_bores``, and their union is
-    # the keyed bore.
+    # and every keyed configuration (and Default) carry both, and their union
+    # is the keyed bore. ``_restrict_bores`` suppresses the keyed bore on
+    # T006..T024; the D stays live everywhere (``foreign_bore_features``).
     keyed_bore = await _author_keyed_bore(adapter)
     keyed_sketch = name_last_feature(adapter, KEYED_BORE_SKETCH)
     drive_jobs += keyed_bore.apply(adapter, keyed_sketch)
@@ -1345,12 +1354,15 @@ async def build(adapter) -> dict[str, str]:
     # sweep); their decimal places live on the model and each configuration
     # sheet only imports and arranges them.
     clear_dimensions_for_drawing(adapter)
-    # Each bore is marked, banded and given its places with a configuration
-    # that carries it active: the D-bore in T024 (below), every other feature,
-    # the keyed bore included, in T120, active here.
+    # Every marked owner is live in T120, active here: the D-bore everywhere
+    # and the keyed bore on T030..T120 (``foreign_bore_features``). Marks,
+    # bands and places written on an owner suppressed in the active, saved
+    # configuration did not reach the drawing (7f1dedc: T006 imported none of
+    # BoreProfile's three, marked with T024 active and suppressed in T120).
+    if active_configuration_name(adapter) != MARKING_CONFIGURATION:
+        raise RuntimeError(f"drawing marks need {MARKING_CONFIGURATION} active")
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
-        if feature_name != BORE_SKETCH:
-            mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     # The bands are physical millimetres; UNIT prints them in decimal inch, at
     # the nominal's places so a T006 band's fourth place is never dropped.
     places = {
@@ -1368,6 +1380,14 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "Blank", "FaceWidth", *deviations(FACE_WIDTH_BAND),
         places=places["FaceWidth"], display_unit=UNIT,
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, BORE_SKETCH, "BoreCutDia", *deviations(BORE_DIA_BAND),
+        places=places["BoreCutDia"], display_unit=UNIT,
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, BORE_SKETCH, "BoreAF", *deviations(BORE_AF_BAND),
+        places=places["BoreAF"], display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
         adapter, KEYED_BORE_SKETCH, "KeyedBoreDia", *deviations(BORE_DIA_BAND),
@@ -1395,6 +1415,13 @@ async def build(adapter) -> dict[str, str]:
     )
     set_dimension_symmetric_angular_tolerance(
         adapter,
+        BORE_SKETCH,
+        "BoreFlatClock",
+        FLAT_CLOCK_TOLERANCE_DEG,
+        require_driven=True,
+    )
+    set_dimension_symmetric_angular_tolerance(
+        adapter,
         KEYED_BORE_SKETCH,
         "KeywayClock",
         FLAT_CLOCK_TOLERANCE_DEG,
@@ -1410,30 +1437,7 @@ async def build(adapter) -> dict[str, str]:
         tol_type=WEB_MIN_TOL_TYPE,
     )
     _set_configuration_bands(adapter)
-    apply_drawing_precision(adapter, {
-        feature: decimals for feature, decimals in DRAWING_PRECISION.items()
-        if feature != BORE_SKETCH
-    })
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-    _activate_configuration(model, f"T{D_BORE_TEETH[-1]:03d}")
-    mark_dimensions_for_drawing(adapter, BORE_SKETCH, DRAWING_DIMENSIONS[BORE_SKETCH])
-    set_dimension_bilateral_tolerance(
-        adapter, BORE_SKETCH, "BoreCutDia", *deviations(BORE_DIA_BAND),
-        places=places["BoreCutDia"], display_unit=UNIT,
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, BORE_SKETCH, "BoreAF", *deviations(BORE_AF_BAND),
-        places=places["BoreAF"], display_unit=UNIT,
-    )
-    set_dimension_symmetric_angular_tolerance(
-        adapter,
-        BORE_SKETCH,
-        "BoreFlatClock",
-        FLAT_CLOCK_TOLERANCE_DEG,
-        require_driven=True,
-    )
-    apply_drawing_precision(adapter, {BORE_SKETCH: DRAWING_PRECISION[BORE_SKETCH]})
-    _activate_configuration(model, "T120")
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
     apply_drawing_properties(
         adapter,
         PART_NAME,

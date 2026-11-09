@@ -70,10 +70,19 @@ ISO_CENTER = (0.200, 0.125)
 HALF_SIZE = SIZE * VIEW_SCALE[0] / 2000.0
 HALF_LENGTH = LENGTH * VIEW_SCALE[0] / 2000.0
 # The end view's height (model X, horizontal) above it, its width (model Y,
-# vertical) left of it; the side view's length under it.
+# vertical) left of it; the side view's length under it.  The square's 3.2 mm
+# at 2:1 is shorter than the stacked (1/16") is tall, so the width's text
+# stands BELOW the square, outside its extension lines, and its dimension
+# line stops at the value: centred between them, both extension lines and
+# the dimension line struck the fraction (machinist review of PR #2331 head
+# 7f1dedc, r1-r3; draw_dt_pinion_lift_rod's PinHoleZ precedent).
+WIDTH_TEXT_DROP = 0.012
 FRONT_KEEP = {
     "KeyHeight": (FRONT_CENTER[0], FRONT_CENTER[1] + HALF_SIZE + 0.012),
-    "KeyWidth": (FRONT_CENTER[0] - HALF_SIZE - 0.014, FRONT_CENTER[1]),
+    "KeyWidth": (
+        FRONT_CENTER[0] - HALF_SIZE - 0.014,
+        FRONT_CENTER[1] - HALF_SIZE - WIDTH_TEXT_DROP,
+    ),
 }
 RIGHT_KEEP = {
     "CutLength": (RIGHT_CENTER[0], RIGHT_CENTER[1] - HALF_SIZE - 0.012),

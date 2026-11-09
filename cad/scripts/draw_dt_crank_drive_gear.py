@@ -113,11 +113,18 @@ HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / (VIEW_SCALE[1] * 2000.0)
 FACE_WIDTH_HALF = FACE_WIDTH * VIEW_SCALE[0] / (VIEW_SCALE[1] * 2000.0)
 
 # End view: round diameter on the lower left, keyway T in the lane right of
-# the tooth tips with the keyway width under it, and tip diameter above.
+# the tooth tips, keyway width under the teeth, and tip diameter above.
 # Dimension text centres on its keep point. The A-A cutting line crosses the
 # face on the bore axis, below the tip leader and above the bore leader; only
-# T's witness lines, which start on the axis, meet it. The keyway width's
-# dimension line stands right of the cutting line's end, so it never meets it.
+# T's witness lines, which start on the axis, meet it. The keyway width is a
+# vertical dimension whose extension lines run along the cutting line, one
+# either side of it: carried out past the teeth they struck the A-A arrow's
+# stem (farm proof of #2331 at 7f1dedc). So its dimension line stands just
+# off the keyway top, its extension lines end well inside the arrow, and the
+# dimension line runs down across the face to the value under the teeth,
+# its shelf and text to the right of the line and right of the numbered
+# notes. Between its two outside arrows the line has no ink, so the cutting
+# line passes through that gap untouched.
 # The keyway itself appears on local +X in the face view.
 #
 # The tip text sits up and right of the teeth, right of every gear-data row
@@ -128,13 +135,12 @@ TIP_DIA_CALLOUT = "FIXED-CENTRE MESH\nWITH MHA-DT-10"
 # The T block's widest line is its value; it stands in the lane right of
 # the tooth tips, over 3 mm beyond the padded front-view clearance guard and
 # over 14 mm to the padded section, without moving its model anchors or the
-# chamfer below it. The width block takes the same lane below the cutting
-# line.
+# chamfer below it.
 FRONT_KEEP = {
     "OutsideDia": (FRONT_CENTER[0] + 0.055, FRONT_CENTER[1] + 0.067),
     "BoreDia": (FRONT_CENTER[0] - 0.078, FRONT_CENTER[1] - 0.062),
     "KeywayT": (FRONT_CENTER[0] + 0.099, FRONT_CENTER[1] + 0.028),
-    "KeywayWidth": (FRONT_CENTER[0] + 0.099, FRONT_CENTER[1] - 0.035),
+    "KeywayWidth": (FRONT_CENTER[0] + 0.013, FRONT_CENTER[1] - 0.072),
 }
 # Longitudinal centre section A-A instead of a plain side view: the south
 # bore chamfer is internal, and a targeted import delivers the chamfer's

@@ -102,3 +102,17 @@ def test_purchased_sheet_has_the_actual_source_marks_and_cli_stem(
     assert set(spec.STOCK_FRACTION_DIMENSIONS) == spec.DRAWING_DIMENSIONS["KeyProfile"]
     monkeypatch.setattr("sys.argv", [str(sheet.script), _STEM])
     assert drawing._parse_args().part == _STEM
+
+
+def test_end_view_width_text_stands_outside_its_extension_lines() -> None:
+    """PR #2331 head 7f1dedc machinist review (r1-r3, clarity): centred on the
+    3.2 mm square, the stacked (1/16") width was struck by its dimension line
+    and both extension lines.  Its text centre stands below the square by more
+    than half the stacked fraction's ~9 mm render height, above the note, and
+    left of the square inside the border."""
+    cx, cy = drawing.FRONT_CENTER
+    x, y = drawing.FRONT_KEEP["KeyWidth"]
+    half_text = 0.0045
+    assert y < cy - drawing.HALF_SIZE - half_text - 0.003
+    assert y - half_text > drawing.NOTES_XY[1] + 0.005
+    assert 0.0127 + 0.007 < x < cx - drawing.HALF_SIZE
