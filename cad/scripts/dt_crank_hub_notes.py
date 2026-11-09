@@ -80,12 +80,16 @@ def seam_callout(mate: str, depth: str = "", pin: str = "SEAM PIN MHA-DT-VN-59")
     )
 
 
-# The printed band governs the bore; the shaft clearance it yields is a
-# reference restatement.
+# The printed band governs the bore; the callout names the standard fit
+# MHA-DT-11's sheet gives the same joint (its SLIDING_FIT on the hub shank),
+# and the clearance it yields follows as REF (rule 4: DIAMETRAL
+# CLEARANCE beside printed limits repeats them in private words; integration
+# proof 20261109T105251629Z, 3 of 3 runs).  The hub slides on and is
+# taper-pinned at assembly, so no ANSI RC/LC class fits the .0010-.0023 band.
 BORE_CALLOUT = (
     "REAM THRU\n"
-    f"({inch_text(SHAFT_CLEARANCE_MIN, 4)}-{inch_text(SHAFT_CLEARANCE_MAX, 4)} DIAMETRAL\n"
-    "CLEARANCE ON MHA-DT-11)"
+    "SLIDING FIT ON MHA-DT-11\n"
+    f"(CLEARANCE {inch_text(SHAFT_CLEARANCE_MIN, 4)}-{inch_text(SHAFT_CLEARANCE_MAX, 4)})"
 )
 # The arm bore is made first and carries the band; this seat is turned to fit
 # it, so its nominal prints as a reference under the match-fit callout.

@@ -35,7 +35,6 @@ from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measur
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leader_notes import add_attached_note
-from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm, drill_process
@@ -226,6 +225,12 @@ SIDE_KEEP = {
 }
 HOLE_CALLOUT_XY = (0.150, 0.222)
 ISO_NOTE_XY = (0.345, 0.195)
+# The isometric is drawn at the sheet's 2:1, so its label states no scale
+# (rule 9: a view prints its scale only where it differs; integration proof
+# 20261109T105251629Z, 3 of 3 runs).  The part's "Isometric View Note"
+# property still reads SCALE 2:1: dt_crank_hub_spec is in every crank part's
+# closure, so the sheet prints its own label rather than re-key them.
+ISO_NOTE = "ISOMETRIC VIEW"
 # The numbered notes' top-left corner: under the overall's row (y 0.090) and
 # left of the title block (x 0.216).
 NOTES_XY = (0.020, 0.062)
@@ -289,22 +294,8 @@ async def build(adapter: Any) -> dict[str, str]:
     check("open crank-hub source", await adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
-        (
-            "Number",
-            "Revision",
-            "Title",
-            "Material Specification",
-            "Finish",
-            "Quantity",
-            "Isometric View Note",
-        ),
-        required=(
-            "Number",
-            "Material Specification",
-            "Finish",
-            "Quantity",
-            "Isometric View Note",
-        ),
+        ("Number", "Revision", "Title", "Material Specification", "Finish", "Quantity"),
+        required=("Number", "Material Specification", "Finish", "Quantity"),
     )
     drawing_model, _sheet = new_project_drawing(
         adapter,
@@ -398,7 +389,8 @@ async def build(adapter: Any) -> dict[str, str]:
     _add_seam_station(adapter, front)
     if add_note(adapter, SHEET_NOTES, *NOTES_XY) is None:
         raise RuntimeError("failed to add the crank hub's numbered notes")
-    add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
+    if add_note(adapter, ISO_NOTE, *ISO_NOTE_XY) is None:
+        raise RuntimeError("failed to add the crank hub's isometric label")
 
     return await finalize_drawing(
         adapter,
