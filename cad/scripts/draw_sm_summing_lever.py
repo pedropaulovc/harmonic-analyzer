@@ -2329,6 +2329,14 @@ async def build(adapter: Any) -> dict[str, str]:
     ):
         detail = _knife_detail(adapter, back)
         _hidden_lines_removed_without_greyed_pass(detail)
+        # End-on, the stub-root blends' seams radiate from the apex and struck
+        # datum A's box (machinist review, run 20261109T194558640Z). They
+        # are tangent edges; Detail D needs none of them.
+        detail_view = _early_bound(detail, "IView")
+        detail_view.SetDisplayTangentEdges2(0)  # swTangentEdgesHidden
+        if int(detail_view.GetDisplayTangentEdges2()) != 0:
+            raise RuntimeError("failed to hide Detail D's tangent edges")
+        detail_view.UpdateViewDisplayGeometry()
         detail_annotations = curate_hidden_dimensions(
             adapter,
             detail,
