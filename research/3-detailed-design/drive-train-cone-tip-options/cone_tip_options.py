@@ -137,18 +137,22 @@ def rect(ax, x0, x1, dia, fc, ec, lw=0.9, ls="-", z=2, hatch=None):
 
 
 def gear(ax, t, fc, ec, bore=None, integral=False, z=3, flat=None):
+    """Gear cut on the axial plane: the bore is open, so the shaft or spigot inside shows.
+
+    `flat` is the axis-to-flat distance of a D-bore; the section plane is drawn through the
+    flat on the lower half.
+    """
     x0 = X[t]
     od, root = G[t]["od"], G[t]["root_min"]
-    rect(
-        ax,
-        x0,
-        x0 + W,
-        od,
-        fc,
-        INTEGRAL_E if integral else ec,
-        lw=1.6 if integral else 0.9,
-        z=z,
-    )
+    edge = INTEGRAL_E if integral else ec
+    lw = 1.6 if integral else 0.9
+    if bore:
+        lower = flat if flat is not None else bore / 2
+        bands = ((bore / 2, od / 2), (-od / 2, -lower))
+    else:
+        bands = ((-od / 2, od / 2),)
+    for y0, y1 in bands:
+        ax.add_patch(Rectangle((x0, y0), W, y1 - y0, fc=fc, ec=edge, lw=lw, zorder=z))
     for y0 in (root / 2, -od / 2):  # tooth band, hatched
         ax.add_patch(
             Rectangle(
@@ -164,24 +168,6 @@ def gear(ax, t, fc, ec, bore=None, integral=False, z=3, flat=None):
         )
     for s in (1, -1):
         ax.plot([x0, x0 + W], [s * root / 2] * 2, color=ec, lw=0.5, zorder=z + 0.2)
-        if bore:
-            ax.plot(
-                [x0, x0 + W],
-                [s * bore / 2] * 2,
-                color=INK2,
-                lw=0.6,
-                ls=(0, (2, 1.4)),
-                zorder=z + 0.3,
-            )
-    if flat is not None:
-        ax.plot(
-            [x0, x0 + W],
-            [flat, flat],
-            color=INK2,
-            lw=0.5,
-            ls=(0, (1, 1.2)),
-            zorder=z + 0.3,
-        )
     c0, c1 = CONTACT_ZONE
     ax.plot(
         [x0 + c0, x0 + c1],
@@ -203,15 +189,16 @@ def gear(ax, t, fc, ec, bore=None, integral=False, z=3, flat=None):
     )
 
 
-def solder_face(ax, x, dia):
-    ax.plot(
-        [x, x],
-        [-dia / 2, dia / 2],
-        color=SOLDER,
-        lw=2.4,
-        zorder=6,
-        solid_capstyle="butt",
-    )
+def solder_face(ax, x, dia, inner=0.0):
+    for s in (1, -1):
+        ax.plot(
+            [x, x],
+            [s * inner, s * dia / 2],
+            color=SOLDER,
+            lw=2.4,
+            zorder=6,
+            solid_capstyle="butt",
+        )
 
 
 def centreline(ax, x0, x1):
@@ -407,22 +394,60 @@ def dt04(ax, end):
         rect(ax, ENDS[2], min(end, ENDS[3]), DIAS[3], STEEL, STEEL_E)
 
 
-fig = plt.figure(figsize=(17, 33.5), dpi=150, facecolor=SURFACE)
+FL = {
+    i: AF[i] - DIAS[i] / 2 for i in (1, 2, 3, 4)
+}  # axis to the flat of each DT-04 land
+
+
+def draw_c1(ax):
+    """C1 in section: DT-04 ends at T024's north face; T006's spigot runs into its socket."""
+    dt04(ax, ENDS[1])
+    rect(ax, ENDS[1], X[18], DIAS[2], STEEL, STEEL_E)  # Ø.250 land to T024's north face
+    rect(
+        ax, X[18] - SOCKET, X[18], STEM + REAM_PLUS + 0.25, SURFACE, INK2, lw=0.6, z=2.5
+    )  # reamed socket in DT-04's Ø.250 land
+    gear(ax, 30, BRASS, BRASS_E, bore=DIAS[1], flat=FL[1])
+    gear(ax, 24, BRONZE, BRONZE_E, bore=DIAS[2], flat=FL[2])
+    gear(ax, 18, BRONZE, BRONZE_E, bore=STEM)
+    gear(ax, 12, BRONZE, BRONZE_E, bore=STEM)
+    rect(ax, X[18] - SOCKET, X[6], STEM, BRONZE, INTEGRAL_E, lw=1.2, z=3.25)  # spigot
+    gear(ax, 6, BRONZE, BRONZE_E, integral=True)
+    solder_face(ax, X[18], G[18]["od"] - 0.6, DIAS[2] / 2)
+    solder_face(ax, X[12], G[12]["od"] - 0.6, STEM / 2)
+    solder_face(ax, X[6], G[6]["od"] - 0.4, STEM / 2)
+
+
+def draw_c2(ax):
+    """C2 in section: DT-04 ends inside T018; T006's short spigot stops at T012's south face."""
+    dt04(ax, ENDS[3])
+    gear(ax, 30, BRASS, BRASS_E, bore=DIAS[1], flat=FL[1])
+    gear(ax, 24, BRONZE, BRONZE_E, bore=DIAS[2], flat=FL[2])
+    gear(ax, 18, BRONZE, BRONZE_E, bore=DIAS[3], flat=FL[3])
+    gear(ax, 12, BRONZE, BRONZE_E, bore=STEM)
+    rect(
+        ax, X[12], X[6], STEM, BRONZE, INTEGRAL_E, lw=1.2, z=3.25
+    )  # T006 spigot in T012
+    gear(ax, 6, BRONZE, BRONZE_E, integral=True)
+    solder_face(ax, X[12], G[12]["od"] - 0.6, DIAS[3] / 2)
+    solder_face(ax, X[6], G[6]["od"] - 0.4, STEM / 2)
+
+
+fig = plt.figure(figsize=(17, 43.5), dpi=150, facecolor=SURFACE)
 gs = GridSpec(
-    5,
+    6,
     2,
     figure=fig,
-    height_ratios=[1, 1, 1, 0.62, 1.45],
+    height_ratios=[1, 1, 1, 1.55, 0.62, 1.45],
     hspace=0.30,
     wspace=0.06,
     left=0.025,
     right=0.985,
-    top=0.905,
-    bottom=0.025,
+    top=0.92,
+    bottom=0.02,
 )
 fig.text(
     0.025,
-    0.988,
+    0.99,
     "Cone tip (T006–T024): main today vs options, with the exceptions each one still needs",
     fontsize=15,
     fontweight="bold",
@@ -430,8 +455,8 @@ fig.text(
 )
 fig.text(
     0.025,
-    0.978,
-    "Side views to scale; every value in inches. x = 0 at the T018 big-end face, tip to the right. Geometry from main a8441605f "
+    0.982,
+    "Side views to scale, cut on the axial plane so DT-04 and the spigot show inside the gears; every value in inches. x = 0 at the T018 big-end face, tip to the right; the lower half is cut through each D flat. Geometry from main a8441605f "
     "(MHA-DT-03/-04/-20/-21, VN-54/-55).\n"
     f"Green bars: where the 120T cylinder gear touches each band ({inch(CONTACT_ZONE[0])}–{inch(CONTACT_ZONE[1])} from its big-end face, v45 GLB). "
     "Fill = material: manganese bronze C67500 for T006–T024 and new tip parts (main's tip specification),\n"
@@ -457,9 +482,9 @@ frame(
 )
 dt04(ax, ENDS[3])
 rect(ax, ENDS[3], TIP, DIAS[4], STEEL, STEEL_E, z=3.6)
-gear(ax, 30, BRASS, BRASS_E, bore=DIAS[1])
-for t in (24, 18, 12, 6):
-    gear(ax, t, BRONZE, BRONZE_E, bore=G[t]["bore"])
+gear(ax, 30, BRASS, BRASS_E, bore=DIAS[1], flat=FL[1])
+for t, land in ((24, 2), (18, 3), (12, 4), (6, 4)):
+    gear(ax, t, BRONZE, BRONZE_E, bore=G[t]["bore"], flat=FL[land])
 rect(ax, COLLAR0, COLLAR0 + 3.5, 6.35, STEEL, STEEL_E, z=3.4)
 rect(ax, COLLAR0 + 3.5, COLLAR1, 16.764, STEEL, STEEL_E, z=3.4)
 ax.text(
@@ -576,19 +601,7 @@ frame(
     "A fit centres the cluster: T006's Ø.0625 spigot runs through T012 and T018 into a socket in DT-04; solder only drives",
     "good",
 )
-dt04(ax, ENDS[2])
-rect(ax, ENDS[2], X[18], DIAS[2], STEEL, STEEL_E)  # Ø.250 land to T024's north face
-rect(
-    ax, X[18] - SOCKET, X[18], STEM + 0.3, "none", INK2, lw=0.6, ls=(0, (2, 1.2)), z=2.5
-)  # reamed socket in DT-04's Ø.250 land
-gear(ax, 30, BRASS, BRASS_E, bore=DIAS[1])
-gear(ax, 24, BRONZE, BRONZE_E, bore=DIAS[2], flat=AF[2] - DIAS[2] / 2)
-gear(ax, 18, BRONZE, BRONZE_E, bore=STEM)
-gear(ax, 12, BRONZE, BRONZE_E, bore=STEM)
-rect(ax, X[18] - SOCKET, X[6], STEM, BRONZE, INTEGRAL_E, lw=1.2, z=3.25)  # T006 spigot
-gear(ax, 6, BRONZE, BRONZE_E, integral=True)
-for t in (18, 12, 6):
-    solder_face(ax, X[t], G[t]["od"] - 0.4 if t == 6 else G[t]["od"] - 0.6)
+draw_c1(ax)
 tip_end(ax)
 centreline(ax, -17, 44)
 note(
@@ -638,15 +651,7 @@ frame(
     "DT-04 only loses its Ø.031 land; T006's short spigot centres T012, and a jig holds the pair true to T018 while solder sets",
     "warn",
 )
-dt04(ax, ENDS[3])
-gear(ax, 30, BRASS, BRASS_E, bore=DIAS[1])
-gear(ax, 24, BRONZE, BRONZE_E, bore=DIAS[2], flat=AF[2] - DIAS[2] / 2)
-gear(ax, 18, BRONZE, BRONZE_E, bore=DIAS[3], flat=AF[3] - DIAS[3] / 2)
-gear(ax, 12, BRONZE, BRONZE_E, bore=STEM)
-rect(ax, X[12], X[6], STEM, BRONZE, INTEGRAL_E, lw=1.2, z=3.25)  # T006 spigot in T012
-gear(ax, 6, BRONZE, BRONZE_E, integral=True)
-solder_face(ax, X[12], G[12]["od"] - 0.6)
-solder_face(ax, X[6], G[6]["od"] - 0.4)
+draw_c2(ax)
 for t in (18, 12, 6):  # jig bore steps on the tooth tips
     rect(
         ax,
@@ -706,11 +711,11 @@ def arbor(ax, one_piece):
         ls=(0, (2, 1.2)),
         z=2.3,
     )
-    gear(ax, 30, BRASS, BRASS_E, bore=DIAS[1])
+    gear(ax, 30, BRASS, BRASS_E, bore=DIAS[1], flat=FL[1])
     rect(ax, ENDS[1], ENDS[2], DIAS[2], BRONZE, INTEGRAL_E, lw=1.6, z=2.2)
     rect(ax, ENDS[2], ENDS[3], DIAS[3], BRONZE, INTEGRAL_E, lw=1.6, z=2.2)
     rect(ax, ENDS[3], X[6], STEM, BRONZE, INTEGRAL_E, lw=1.6, z=2.2)
-    gear(ax, 24, BRONZE, BRONZE_E, bore=DIAS[2], flat=AF[2] - DIAS[2] / 2)
+    gear(ax, 24, BRONZE, BRONZE_E, bore=DIAS[2], flat=FL[2])
     if one_piece:
         for t in (18, 12, 6):
             gear(ax, t, BRONZE, BRONZE_E, integral=True)
@@ -731,10 +736,10 @@ def arbor(ax, one_piece):
                     )
                 )
     else:
-        gear(ax, 18, BRONZE, BRONZE_E, bore=DIAS[3], flat=AF[3] - DIAS[3] / 2)
+        gear(ax, 18, BRONZE, BRONZE_E, bore=DIAS[3], flat=FL[3])
         gear(ax, 12, BRONZE, BRONZE_E, bore=STEM)
         gear(ax, 6, BRONZE, BRONZE_E, integral=True)
-        solder_face(ax, X[6], G[6]["od"] - 0.4)
+        solder_face(ax, X[6], G[6]["od"] - 0.4, STEM / 2)
     tip_end(ax)
     centreline(ax, -17, 44)
     dim(ax, ENDS[1] - 8.0, ENDS[1], -9.4, "Ø.125 spigot,\n.31 deep")
@@ -804,12 +809,116 @@ note(
     None,
 )
 
-# ---------------- Panel 6: cutter run-out
-ax = fig.add_subplot(gs[3, :])
+
+# ---------------- Panels 7, 8: where DT-04 and T006's spigot meet (C1, C2)
+def junction(ax, title, verdict, mark, draw):
+    frame(ax, title, verdict, mark, xlim=(-7.6, 15.6), ylim=(-9.6, 9.6))
+    draw(ax)
+    centreline(ax, -7.6, 15.6)
+    for t in ax.texts:  # gear labels off the zoomed window; keep the verdict box
+        if t.get_transform() is not ax.transAxes:
+            t.set_clip_on(True)
+
+
+def vdim(ax, x, y0, y1):
+    ax.annotate(
+        "",
+        xy=(x, y0),
+        xytext=(x, y1),
+        zorder=9,
+        arrowprops={
+            "arrowstyle": "<->",
+            "color": INK,
+            "lw": 0.7,
+            "shrinkA": 0,
+            "shrinkB": 0,
+        },
+    )
+
+
+ax = fig.add_subplot(gs[3, 0])
+junction(
+    ax,
+    "7 · C1 detail: T006's spigot in DT-04's socket",
+    "The spigot ends .19 inside DT-04's Ø.250 land, under T024: a reamed fit, not the solder, centres the cluster",
+    "good",
+    draw_c1,
+)
+vdim(ax, X[18] - SOCKET / 2, -(STEM + REAM_PLUS) / 2, -FL[2])
+dim(ax, X[18] - SOCKET, X[18], 2.5, f"socket {inch(SOCKET, 2)}", fs=6.8)
+note(
+    ax,
+    (X[18] - SOCKET / 2, -1.7),
+    (-7.3, -8.3),
+    f"socket Ø.0625 reamed in DT-04's Ø.250 land;\nspigot slip fit, locates only;\nwall to the flat {inch(N['socket_wall_to_flat'], 4)} (rule 17 minor)",
+    "warn",
+    fs=7.2,
+)
+note(
+    ax,
+    (-1.2, 2.2),
+    (5.6, 8.6),
+    "DT-04 ends at T024's north face;\nT024 rides the Ø.250 land on its flat",
+    None,
+    fs=7.2,
+)
+note(
+    ax,
+    (4.6, 0.25),
+    (5.6, 6.6),
+    f"T018, T012 reamed Ø.0625 on the spigot;\nwebs {inch(N['t018_web_reamed_116'], 3)} and {inch(N['t012_web_reamed_116'], 4)}",
+    None,
+    fs=7.2,
+)
+note(
+    ax,
+    (X[18], -4.2),
+    (4.2, -7.8),
+    "T024 | T018 face sweated:\nthis joint carries the torque",
+    "warn",
+    fs=7.2,
+)
+
+ax = fig.add_subplot(gs[3, 1])
+junction(
+    ax,
+    "8 · C2 detail: the spigot never reaches DT-04",
+    f"DT-04's Ø.125 land stops {inch(X[12] - ENDS[3])} short of the spigot; only the T018 | T012 solder face links them",
+    "warn",
+    draw_c2,
+)
+dim(ax, ENDS[3], X[12], -1.4, f"gap {inch(X[12] - ENDS[3])}", fs=6.8)
+note(
+    ax,
+    (ENDS[3] - 0.6, 1.0),
+    (5.6, 8.6),
+    "DT-04's Ø.125 land, T018 on its flat\n(as main, less the Ø.031 tip land)",
+    None,
+    fs=7.2,
+)
+note(
+    ax,
+    (X[12] + 1.2, 0.3),
+    (8.4, 6.6),
+    "T006's .27 spigot fills\nT012's bore only",
+    None,
+    fs=7.2,
+)
+note(
+    ax,
+    (X[12], -2.6),
+    (-7.3, -8.3),
+    "nothing fits T012 or T006 to DT-04: the jig sets their\nrun-out, and the T018 | T012 solder face holds it",
+    "warn",
+    fs=7.2,
+)
+
+# ---------------- Panel 9: cutter run-out
+ax = fig.add_subplot(gs[4, 0])
 R = 3.175
 reach = N["runout_quarter_cutter"]
 ax.set_title(
-    "7 · Why T006 is cut before T012 joins it (A, C1 and C2)",
+    "9 · Why T006 is cut before T012 joins it (A, C1 and C2)",
     loc="left",
     fontsize=11.5,
     fontweight="bold",
@@ -826,7 +935,7 @@ ax.text(
     ha="left",
     bbox={"boxstyle": "round,pad=0.3", "fc": SURFACE, "ec": BAD, "lw": 1.2},
 )
-ax.set_xlim(-1.5, 66)
+ax.set_xlim(-1.5, 24)
 ax.set_ylim(-3.5, 12.5)
 ax.set_aspect("equal")
 ax.set_anchor("W")
@@ -884,9 +993,11 @@ ax.text(
     fontsize=7,
     color=BAD,
 )
+ax = fig.add_subplot(gs[4, 1])
+ax.axis("off")
 ax.text(
-    19.0,
-    12.0,
+    0.0,
+    1.0,
     "Order of work for option C1\n"
     f"1  Turn the T006 blank between centres: {inch(N['c1_spigot_len'], 2)} of Ø.0625 spigot (L/D {N['c1_spigot_len'] / STEM:.0f}, steady or\n"
     "    tailstock support), the leaf blank, and the Ø.0625 pivot.\n"
@@ -898,7 +1009,8 @@ ax.text(
     "6  Set end play at the end screw; tighten the pinch screw.\n"
     f"T006 sits inside T012's root ({inch(G[6]['od'])} < {inch(G[12]['root_min'])}), so T012 never blocks T006's cutter once T006 is done.\n"
     "C2 differs at 3–5: T018 keeps its D-bore on DT-04's Ø.125 land, and the jig, not the shaft, trues T012 and T006.",
-    fontsize=7.9,
+    transform=ax.transAxes,
+    fontsize=7.4,
     va="top",
     color=INK,
     linespacing=1.4,
@@ -906,10 +1018,10 @@ ax.text(
 )
 
 # ---------------- Table: exceptions per option
-ax = fig.add_subplot(gs[4, :])
+ax = fig.add_subplot(gs[5, :])
 ax.axis("off")
 ax.set_title(
-    "8 · Owner exceptions after each option (tip-related only; IDs as on main)",
+    "10 · Owner exceptions after each option (tip-related only; IDs as on main)",
     loc="left",
     fontsize=11.5,
     fontweight="bold",

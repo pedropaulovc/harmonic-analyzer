@@ -18,8 +18,9 @@
 > are inches and are read from `cad/scripts` and `cad/config` on that commit (see
 > [Reproducing](#reproducing)).
 
-![Cone tip: main today, webs by option, options C1, C2, A and B, cutter run-out, and the exceptions
-each option still needs](drive-train-cone-tip-options/cone-tip-options-2026-11-09-r2.png)
+![Cone tip in axial section (DT-04 and the T006 spigot visible inside the gears): main today, webs by
+option, options C1, C2, A and B, details of where the spigot meets DT-04 in C1 and C2, cutter
+run-out, and the exceptions each option still needs](drive-train-cone-tip-options/cone-tip-options-2026-11-09-r3.png)
 
 ## Where main stands
 
@@ -216,10 +217,10 @@ D=research/3-detailed-design/drive-train-cone-tip-options
 uv run --frozen python $D/dump_geometry.py > geometry.json
 uv run --frozen python $D/block_air.py > air.json
 uv run --no-project --with matplotlib python $D/cone_tip_options.py geometry.json air.json \
-  cone-tip-options-2026-11-09-r2.png
+  cone-tip-options-2026-11-09-r3.png
 ```
 
-The last command also writes `cone-tip-options-2026-11-09-r2.numbers.json` with every web, wall, air and
+The last command also writes `cone-tip-options-2026-11-09-r3.numbers.json` with every web, wall, air and
 run-out quoted above. The air figures are nominal, through `dt_tip_collar_air`'s own pose and
 support functions. The contact zone is the v45 surface-sampled measurement; the cone stations
 have not changed since.
