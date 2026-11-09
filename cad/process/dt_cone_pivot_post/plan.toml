@@ -20,7 +20,7 @@ quantity_cite = ["harmonic-analyzer/cad/config/parts/dt-cone-pivot-post.yaml:dt-
 
 [drawing]
 number = "MHA-DT-05" # parts/dt-cone-pivot-post.yaml:dt-cone-pivot-post.number
-revision = "v48" # authored next-revision candidate; not an assertion of machining approval
+revision = "v49" # authored next-revision candidate; not an assertion of machining approval
 
 [stock]
 form = "rectangular_bar"

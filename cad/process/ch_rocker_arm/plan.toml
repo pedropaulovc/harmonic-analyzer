@@ -15,7 +15,7 @@ quantity_cite = "AUTHOR'S CHOICE: one built-up arm; strap MHA-CH-13 plus hub MHA
 
 [drawing]
 number = "MHA-CH-06"
-revision = "v48"
+revision = "v49"
 cite = ["cad/config/parts/ch-rocker-arm.yaml", "cad/config/parts/ch-rocker-strap.yaml", "cad/config/parts/ch-rocker-hub.yaml"]
 
 [stock]
