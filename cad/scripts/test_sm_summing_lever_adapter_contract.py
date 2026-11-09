@@ -386,6 +386,11 @@ def test_native_counter_profile_requires_both_nominal_planes_and_driver(damage) 
         dimension.SystemValue = math.nan
 
     def parameter(name):
+        if name == "PlateWidth@PlateProfile":
+            return SimpleNamespace(
+                FullName="PlateWidth@PlateProfile@sm-summing-lever.Part",
+                DrivenState=1, SystemValue=spec.PLATE_W / 1000.0,
+            )
         assert name == "MiddleRibCounterAngle@MiddleRibProfile"
         return None if damage == "missing_angle" else dimension
 

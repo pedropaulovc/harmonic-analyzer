@@ -1038,12 +1038,18 @@ def _assert_native_rib_profile(adapter, stem: str) -> None:
                 rel_tol=0.0, abs_tol=1e-10,
             )
         ):
+            raw_control = adapter.currentModel.Parameter("PlateWidth@PlateProfile")
+            control = None if raw_control is None else _early_bound(raw_control, "IDimension")
+            control_readback = None if control is None else (
+                str(control.FullName), int(control.DrivenState), float(control.SystemValue)
+            )
             raise RuntimeError(
                 f"{stem}: counter angle {dimension.FullName!r} is not the nominal native driver: "
                 f"DrivenState={driven_state!r}, expected=2; "
                 f"SystemValue={actual_radians!r} rad, expected={expected_radians!r} rad; "
                 f"delta={actual_radians - expected_radians!r} rad; "
-                f"actual_degrees={math.degrees(actual_radians)!r}"
+                f"actual_degrees={math.degrees(actual_radians)!r}; "
+                f"equation_bound_plate_width={control_readback!r}"
             )
     _telemetry.success(f"{stem}: both native tangent flanks and R.040 profile blends")
 
