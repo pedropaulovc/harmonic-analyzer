@@ -448,7 +448,7 @@ BOSS_ABOVE_RAIL_LINE_XY = (
 )
 # Above the dimension's own upper arrow, not 51 mm below it -- see the
 # boss-height comment in the A-A recipe for what the long leader crossed.
-# Its 36.5 mm row ends 2.2 mm short of the recess depth's "+.012" (farm
+# Its 36.5 mm row ends 2.2 mm short of the recess depth's "+.010" (farm
 # inspect-3: 1.43 at +0.0135).
 BOSS_ABOVE_RAIL_TEXT_XY = (BOSS_ABOVE_RAIL_LINE_XY[0] + 0.0127, 0.176)
 # The A-A witnesses off the boss top, the recess floor and the rail top
