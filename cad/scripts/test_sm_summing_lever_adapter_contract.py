@@ -422,7 +422,7 @@ def _source_helpers(names: tuple[str, ...], **bindings):
     functions = []
     dependencies = (
         "_circumcenter", "summation_side_half_width", "longitudinal_root_families",
-        "longitudinal_root_geometry", "counter_flank_crease_x",
+        "longitudinal_root_geometry", "counter_flank_crease_x", "knife_shoulder_picks",
     )
     if "_assert_receiver_profile_walls" in names:
         dependencies += ("_assert_receiver_plate_backing",)
@@ -458,7 +458,6 @@ def _source_helpers(names: tuple[str, ...], **bindings):
         "SUMMATION_SIDE_POINTS": lever_build.SUMMATION_SIDE_POINTS,
         "HEX_W": spec.HEX_W, "HEX_H": spec.HEX_H, "HEX_Z_INNER": spec.HEX_Z_INNER,
         "KNIFE_RIDGE_R": spec.KNIFE_RIDGE_R, "RIDGE_ANGLE_DEG": spec.RIDGE_ANGLE_DEG,
-        "KNIFE_SHOULDER_R": spec.KNIFE_SHOULDER_R,
         "ExtrusionParameters": SimpleNamespace,
     }
     # The coefficient slab, counter web and all ribs retain separate authorities.
@@ -696,10 +695,13 @@ def test_extracted_root_picks_stay_inside_reach_and_off_entry_and_knife_caps() -
     namespace = _source_helpers(("rib_root_edge_families",))
     families = namespace["rib_root_edge_families"]()
     assert families
-    for _, picks, length in families:
+    for name, picks, length in families:
         assert picks
         assert length > 0.0
-        assert all(-spec.PLATE_L / 2.0 < z < spec.PLATE_L / 2.0 for _, _, z in picks)
+        if name == "KnifeShoulderFillets":  # stub roots on the body end faces
+            assert all(abs(z) == spec.HEX_Z_INNER == spec.PLATE_L / 2.0 for _, _, z in picks)
+        else:
+            assert all(-spec.PLATE_L / 2.0 < z < spec.PLATE_L / 2.0 for _, _, z in picks)
         assert all(x < spec.RIB_REACH for x, _, _ in picks)
 
 
@@ -786,7 +788,7 @@ def test_boss_and_flank_crease_picks_lie_on_their_web_junctions() -> None:
 
 
 def test_knife_shoulder_picks_lie_on_both_stub_roots() -> None:
-    namespace = _source_helpers(("knife_shoulder_picks",))
+    namespace = _source_helpers(())
     picks = namespace["knife_shoulder_picks"]()
     assert len(picks) == 14
     w2, h2, h4 = spec.HEX_W / 2.0, spec.HEX_H / 2.0, spec.HEX_H / 4.0
@@ -952,7 +954,7 @@ def test_native_web_junction_and_knife_shoulder_envelopes_refuse_escaped_faces()
     ):
         with pytest.raises(RuntimeError, match="escapes"):
             audit(_feature_adapter(_NativeFeature(faces=[_root_face(escaped)])), "CounterWebJunctionFillets", 1)
-    s = spec.KNIFE_SHOULDER_R
+    s = spec.RIB_BLEND_R
     side = (spec.HEX_W / 2.0, -spec.HEX_H / 4.0, spec.HEX_Z_INNER, spec.HEX_W / 2.0 + s, spec.HEX_H / 4.0, spec.HEX_Z_INNER + s)
     roots = [_root_face(side, radius=s), _root_face((-side[3], *side[1:3], -side[0], *side[4:]), radius=s)]
     audit(_feature_adapter(_NativeFeature(faces=roots)), "KnifeShoulderFillets", 2)
@@ -963,8 +965,16 @@ def test_native_web_junction_and_knife_shoulder_envelopes_refuse_escaped_faces()
     ):
         with pytest.raises(RuntimeError, match=match):
             audit(_feature_adapter(_NativeFeature(faces=[_root_face(escaped, radius=s)])), "KnifeShoulderFillets", 1)
+    # The roots meet mitred at the sharp bottom vertex, R/sin(half angle) below.
+    mitre = s / math.sin(math.radians(spec.RIDGE_ANGLE_DEG) / 2.0)
+    bottom = (0.0, -spec.HEX_H / 2.0 - mitre, spec.HEX_Z_INNER, side[3], -spec.HEX_H / 4.0, side[5])
+    audit(_feature_adapter(_NativeFeature(faces=[_root_face(bottom, radius=s)])), "KnifeShoulderFillets", 1)
+    with pytest.raises(RuntimeError, match="escapes"):
+        audit(_feature_adapter(_NativeFeature(
+            faces=[_root_face((bottom[0], bottom[1] - 0.01, *bottom[2:]), radius=s)],
+        )), "KnifeShoulderFillets", 1)
     with pytest.raises(RuntimeError, match="native root radius"):
-        audit(_feature_adapter(_NativeFeature(faces=[_root_face(side, radius=r)])), "KnifeShoulderFillets", 1)
+        audit(_feature_adapter(_NativeFeature(faces=[_root_face(side, radius=0.508)])), "KnifeShoulderFillets", 1)
 
 
 @pytest.mark.parametrize("mutation", [
@@ -1045,6 +1055,7 @@ def test_extracted_root_operations_disable_propagation_and_gate_actual_added_vol
 @pytest.mark.parametrize("new_name", [
     "CoefficientUndersideRootFillets", "CoefficientTopRootFillets",
     "CounterWebTopRootFillets", "CounterWebUndersideRootFillets", "CounterWebJunctionFillets",
+    "KnifeShoulderFillets",
 ])
 @pytest.mark.parametrize("increment", ["within", "zero", "negative", "excess"])
 def test_each_junction_family_has_its_own_increment_bound_without_relaxing_old_roots(
@@ -1087,37 +1098,6 @@ def test_each_junction_family_has_its_own_increment_bound_without_relaxing_old_r
             asyncio.run(namespace["_rib_root_fillets"](adapter, []))
         applied = families[:index + 1]  # No later operation after a refused one.
     assert operations == [(spec.RIB_BLEND_R, picks, False) for _, picks, _ in applied]
-
-
-@pytest.mark.parametrize("addition", [1.0, 0.0, -1.0, 1e8])
-def test_knife_shoulder_roots_are_r020_without_propagation_and_volume_gated(addition: float) -> None:
-    operations, proofs, jobs = [], [], []
-
-    async def fillet(radius, picks, *, propagate):
-        operations.append((radius, picks, propagate))
-        return SimpleNamespace(is_success=True)
-
-    async def volume(adapter, label):
-        return 1000.0 + (addition if label.startswith("after ") else 0.0)
-
-    namespace = _source_helpers(
-        ("knife_shoulder_picks", "_knife_shoulder_fillets"),
-        _measured_volume=volume, check=lambda label, result: None,
-        name_last_feature=lambda adapter, name: None,
-        name_dimensions=lambda adapter, name, names: [f"{item}@{name}" for item in names],
-        _assert_root_feature_bounds=lambda adapter, name, count: proofs.append((name, count)),
-    )
-    helper = namespace["_knife_shoulder_fillets"]
-    adapter = SimpleNamespace(add_fillet=fillet)
-    if addition <= 0.0 or addition > 1e6:
-        with pytest.raises(RuntimeError, match="outside"):
-            asyncio.run(helper(adapter, jobs))
-        assert not proofs
-    else:
-        asyncio.run(helper(adapter, jobs))
-        assert proofs == [("KnifeShoulderFillets", 12)]
-        assert jobs == [("KnifeShoulderRadius@KnifeShoulderFillets", '"KnifeShoulderR"')]
-    assert operations == [(spec.KNIFE_SHOULDER_R, namespace["knife_shoulder_picks"](), False)]
 
 
 def test_every_modeled_root_including_lower_longitudinal_family_gets_native_max_band() -> None:

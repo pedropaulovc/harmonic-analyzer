@@ -164,10 +164,6 @@ from sm_summing_lever_spec import (
     KNIFE_RIDGE_R_BAND,
     KNIFE_RIDGE_R_PLACES,
     KNIFE_RIDGE_R_TOL_TYPE,
-    KNIFE_SHOULDER_R,
-    KNIFE_SHOULDER_R_BAND,
-    KNIFE_SHOULDER_R_PLACES,
-    KNIFE_SHOULDER_R_TOL_TYPE,
     PLATE_W_DEVIATIONS,
     RIDGE_ANGLE_DEG,
     RIDGE_FROM_SIDE_TOL,
@@ -734,26 +730,24 @@ async def _measured_volume(adapter, label: str) -> float:
     return float(mass.data.volume)
 
 
-def _knife_radius_max_limit(
-    adapter, feature: str, name: str, nominal: float, band, tol_type: int, places: int,
-) -> None:
-    """A knife radius as the single limit "R... MAX" carrying the band's
+def _knife_ridge_max_limit(adapter) -> None:
+    """KnifeRidgeRadius as the single limit "R.004 MAX" carrying the band's
     deviations (build_ch_pivot_bracket._corner_radius_max_limit's recipe)."""
-    lower, upper = deviations(band)
-    _, dimension = _named_dimension(adapter, feature, name)
-    label = f"{name}@{feature}"
+    lower, upper = deviations(KNIFE_RIDGE_R_BAND)
+    _, dimension = _named_dimension(adapter, "KnifeRidgeFillet", "KnifeRidgeRadius")
+    label = "KnifeRidgeRadius@KnifeRidgeFillet"
     value = float(dimension.SystemValue)
-    if not math.isclose(value, nominal / 1000.0, abs_tol=1e-9):
+    if not math.isclose(value, KNIFE_RIDGE_R / 1000.0, abs_tol=1e-9):
         raise RuntimeError(
             f"{label}: nominal {value * 1000.0:.7f} is not the band's max "
-            f"{nominal}"
+            f"{KNIFE_RIDGE_R}"
         )
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    tolerance.Type = tol_type
+    tolerance.Type = KNIFE_RIDGE_R_TOL_TYPE
     if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
         raise RuntimeError(f"{label}: SetValues rejected {lower:+g}/{upper:+g} mm")
     if (
-        int(tolerance.Type) != tol_type
+        int(tolerance.Type) != KNIFE_RIDGE_R_TOL_TYPE
         or not math.isclose(
             float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
         )
@@ -762,8 +756,10 @@ def _knife_radius_max_limit(
         )
     ):
         raise RuntimeError(f"{label}: MAX-limit tolerance readback changed")
-    set_dimension_display_precision(adapter, feature, name, places)
-    _telemetry.success(f"{label}: single limit {nominal:g} MAX")
+    set_dimension_display_precision(
+        adapter, "KnifeRidgeFillet", "KnifeRidgeRadius", KNIFE_RIDGE_R_PLACES
+    )
+    _telemetry.success(f"{label}: single limit {KNIFE_RIDGE_R:g} MAX")
 
 
 def _assert_edge_rib_end_planes(adapter) -> None:
@@ -1493,6 +1489,13 @@ def rib_root_edge_families() -> tuple[tuple[str, list[list[float]], float], ...]
         web_picks,
         math.tau * ANCHOR_R + 2.0 * COUNTER_WEB_T + 2.0 * RIB_T + 12.0 * RIB_BLEND_R,
     ))
+    # Both stub roots at the body end faces: two hexagon perimeters plus
+    # one-radius corner neighbourhoods.
+    families.append((
+        "KnifeShoulderFillets",
+        knife_shoulder_picks(),
+        2.0 * (HEX_H + 4.0 * math.hypot(HEX_W / 2.0, HEX_H / 4.0)) + 14.0 * RIB_BLEND_R,
+    ))
     return tuple(families)
 
 
@@ -1515,7 +1518,8 @@ def _assert_root_feature_bounds(adapter, name: str, minimum_faces: int) -> None:
     feature = _early_bound(raw, "IFeature")
     count = 0
     knife = name == "KnifeShoulderFillets"
-    expected_radius = KNIFE_SHOULDER_R if knife else RIB_BLEND_R
+    expected_radius = RIB_BLEND_R
+    reach = [0.0, 0.0, 0.0]  # knife roots: max |x|, |y| and |z| measured
     longitudinal = {
         family: (x_sign, face_y) for family, x_sign, face_y in longitudinal_root_families()
     }.get(name)
@@ -1559,10 +1563,12 @@ def _assert_root_feature_bounds(adapter, name: str, minimum_faces: int) -> None:
             (-ANCHOR_R - RIB_BLEND_R, ANCHOR_R + RIB_BLEND_R),
         )
     elif knife:
-        # Around each hexagon, inside one radius of the body end face.
+        # Around each hexagon, inside one radius of the body end face. The
+        # roots meet mitred at the sharp bottom vertex, R/sin(half angle) out.
+        mitre = RIB_BLEND_R / math.sin(math.radians(RIDGE_ANGLE_DEG) / 2.0)
         envelope = (
-            (-HEX_W / 2.0 - KNIFE_SHOULDER_R, HEX_W / 2.0 + KNIFE_SHOULDER_R),
-            (-HEX_H / 2.0 - KNIFE_SHOULDER_R, HEX_H / 2.0 + KNIFE_SHOULDER_R),
+            (-HEX_W / 2.0 - RIB_BLEND_R, HEX_W / 2.0 + RIB_BLEND_R),
+            (-HEX_H / 2.0 - mitre, HEX_H / 2.0 + mitre),
             None,
         )
     for raw_face in feature.GetFaces() or ():
@@ -1602,9 +1608,13 @@ def _assert_root_feature_bounds(adapter, name: str, minimum_faces: int) -> None:
             near, far = sorted((abs(z_min), abs(z_max)))
             if (
                 z_min * z_max <= 0.0 or near < HEX_Z_INNER - 1e-5
-                or far > HEX_Z_INNER + KNIFE_SHOULDER_R + 1e-5
+                or far > HEX_Z_INNER + RIB_BLEND_R + 1e-5
             ):
                 raise RuntimeError(f"{name}: shoulder blend leaves the stub root: {extrema}")
+            reach = [
+                max(reach[0], abs(x_min), abs(x_max)), max(reach[1], abs(y_min), abs(y_max)),
+                max(reach[2], far),
+            ]
         elif z_min <= -PLATE_L / 2.0 + 1e-5 or z_max >= PLATE_L / 2.0 - 1e-5:
             raise RuntimeError(f"{name}: root blend reaches an outside entry/knife cap: {extrema}")
         if any(
@@ -1649,6 +1659,10 @@ def _assert_root_feature_bounds(adapter, name: str, minimum_faces: int) -> None:
         )
     if longitudinal is not None and covered_runs != set(range(len(runs))):
         raise RuntimeError(f"{name}: missing native longitudinal blend run: {sorted(covered_runs)}")
+    if knife:
+        _telemetry.info(
+            f"{name}: native roots reach |X| {reach[0]:.4f}, |Y| {reach[1]:.4f}, |Z| {reach[2]:.4f} mm"
+        )
 
 
 async def _rib_root_fillets(adapter, drive_jobs: list[tuple[str, str]]) -> None:
@@ -1675,32 +1689,6 @@ async def _rib_root_fillets(adapter, drive_jobs: list[tuple[str, str]]) -> None:
         _telemetry.success(
             f"{name}: bounded native R.040 roots added {addition:.6f} mm^3"
         )
-
-
-async def _knife_shoulder_fillets(adapter, drive_jobs: list[tuple[str, str]]) -> None:
-    """Bounded R.020 stub roots at the body end faces, without propagation."""
-    name, picks = "KnifeShoulderFillets", knife_shoulder_picks()
-    before = await _measured_volume(adapter, f"before {name}")
-    check(
-        f"{name}: selected stub roots R{KNIFE_SHOULDER_R}",
-        await adapter.add_fillet(KNIFE_SHOULDER_R, picks, propagate=False),
-    )
-    name_last_feature(adapter, name)
-    [radius] = name_dimensions(adapter, name, ["KnifeShoulderRadius"])
-    drive_jobs.append((radius, '"KnifeShoulderR"'))
-    after = await _measured_volume(adapter, f"after {name}")
-    addition = after - before
-    # Both hexagon perimeters plus one-radius corner neighbourhoods.
-    perimeter = 2.0 * (HEX_H + 4.0 * math.hypot(HEX_W / 2.0, HEX_H / 4.0))
-    upper_bound = 2.0 * KNIFE_SHOULDER_R**2 * (perimeter + 14.0 * KNIFE_SHOULDER_R)
-    if not 0.0 < addition <= upper_bound:
-        raise RuntimeError(
-            f"{name}: native stub roots added {addition:.6f} mm^3, "
-            f"outside (0, {upper_bound:.6f}]; no redesign/fallback allowed"
-        )
-    # Twelve lateral roots; the ridge-round patch may be nonanalytic.
-    _assert_root_feature_bounds(adapter, name, 12)
-    _telemetry.success(f"{name}: bounded native R.020 stub roots added {addition:.6f} mm^3")
 
 
 def _rib_radius_max_limits(adapter) -> None:
@@ -2571,7 +2559,6 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "HexH", f"{HEX_H}mm")
     await set_global(adapter, "HexDepth", f"{HEX_DEPTH}mm")
     await set_global(adapter, "KnifeRidgeR", f"{KNIFE_RIDGE_R}mm")
-    await set_global(adapter, "KnifeShoulderR", f"{KNIFE_SHOULDER_R}mm")
     await set_global(adapter, "ArcR", '"CylR" + "RibPad"')
     # Keep the derivation native: a degree literal was rounded to angular places.
     await set_global(
@@ -2610,7 +2597,6 @@ async def build(adapter) -> dict[str, str]:
     await _summation_anchor(adapter, drive_jobs)
     await _middle_rib(adapter, drive_jobs)
     await _rib_root_fillets(adapter, drive_jobs)
-    await _knife_shoulder_fillets(adapter, drive_jobs)
     await _counter_anchor_tap(adapter, drive_jobs)
     await _bracket_mounting_taps(adapter)
     await _knife_envelope_reference(adapter, drive_jobs)
@@ -2663,14 +2649,7 @@ async def build(adapter) -> dict[str, str]:
     # stamp the make-critical title-block properties.
     clear_dimensions_for_drawing(adapter)
     _drawing_dimension_contract(adapter)
-    _knife_radius_max_limit(
-        adapter, "KnifeRidgeFillet", "KnifeRidgeRadius", KNIFE_RIDGE_R,
-        KNIFE_RIDGE_R_BAND, KNIFE_RIDGE_R_TOL_TYPE, KNIFE_RIDGE_R_PLACES,
-    )
-    _knife_radius_max_limit(
-        adapter, "KnifeShoulderFillets", "KnifeShoulderRadius", KNIFE_SHOULDER_R,
-        KNIFE_SHOULDER_R_BAND, KNIFE_SHOULDER_R_TOL_TYPE, KNIFE_SHOULDER_R_PLACES,
-    )
+    _knife_ridge_max_limit(adapter)
     _rib_radius_max_limits(adapter)
     _receiver_model_bands(adapter)
     await _receiver_coordinate_dimensions(adapter)
@@ -2695,7 +2674,6 @@ async def build(adapter) -> dict[str, str]:
     _assert_edge_rib_end_planes(adapter)
     for name, picks, _ in rib_root_edge_families():
         _assert_root_feature_bounds(adapter, name, len(picks))
-    _assert_root_feature_bounds(adapter, "KnifeShoulderFillets", 12)
     name_octant_views(
         adapter,
         octants={"REAR-BOTTOM-RIGHT": RECEIVER_ISOMETRIC_OCTANT},

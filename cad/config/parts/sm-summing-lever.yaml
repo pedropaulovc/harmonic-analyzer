@@ -12,7 +12,7 @@ sm-summing-lever:
   # blends into both coefficient faces at X1.41. The title block owns the
   # R.040 MAX ceiling; bounded native profile-blend and rib inner-cap-root guards
   # against plate, cylinder and counter web remain. Four longitudinal plate/web
-  # cylinder families, one boss/crease web family and R.020 MAX knife-stub roots
+  # cylinder families, one boss/crease web family and the knife-stub roots
   # join every remaining inside corner without tangent propagation.
   # No R.040 blend reaches the receiver entry caps; the knife seat clears the stub roots.
   # Spring/nut seats, Ø.006 pattern and #1769 footprint stay put.
