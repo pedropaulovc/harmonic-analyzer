@@ -10,6 +10,7 @@ place, no GD&T, no roughness symbol, and at most four note lines.
 from __future__ import annotations
 
 import math
+import re
 from pathlib import Path
 
 import pytest
@@ -156,10 +157,12 @@ def test_notes_are_few_and_carry_no_values() -> None:
         f"{2.0 * spec.MEAN_R:g}",
     ):
         assert value not in text, value
-    assert "SILVER-SOLDERED" in text
     assert "MHA-DT-09" in text and "CROSS-HOLE" in text
     for callout in notes.DIMENSION_CALLOUTS.values():
-        assert not any(ch.isdigit() for ch in callout), callout
+        # A flag to a numbered note is the only number a callout carries.
+        words = re.sub(r"SEE NOTE \d+", "", callout)
+        assert not any(ch.isdigit() for ch in words), callout
+    assert "SEE NOTE 1" in notes.DIMENSION_CALLOUTS["JointDia"]
     assert '"Manufacturing Notes": DRAWING_NOTES' in _build_source()
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in _source()
 

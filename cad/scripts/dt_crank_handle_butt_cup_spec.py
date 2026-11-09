@@ -68,8 +68,7 @@ POCKET_DIA = 6.2992  # .248
 POCKET_CLEARANCE = (0.2032, 0.4064)  # .008-.016
 POCKET_DIA_MAX = 6.5278  # .257
 # Owner ruling B on #1375: the cup grows around the unchanged head and pocket,
-# rather than retaining a sub-floor wall or tightening the body band. Owner
-# ruling 2026-11-08 (Pedro), #2144 item 7.1 grows it again so that the
+# rather than retaining a sub-floor wall or tightening the body band.  Owner ruling 2026-11-08 (Pedro), #2144 item 7.1 (#2170, option B) grows it again so that the
 # floor holds at the outer face, where both of the wall's edges are broken.
 POCKET_WALL_FLOOR_MM = WALL_FLOOR_MM
 BODY_DIA = 10.7188  # .422: the largest pocket, two .060 face walls, their breaks and the band

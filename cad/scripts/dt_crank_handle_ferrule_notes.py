@@ -7,12 +7,12 @@ both on every wording edit.  Only the ferrule's drawing script imports this
 module, so a callout edit re-keys neither the part nor its mates; it reads
 the stated walls from the MHA-DT-08 spec, which owns their stack.
 
-No general note remains (MHA-DT-34 machinist ENFORCE, r1-r3).  Every
-requirement that has a feature sits on that feature's callout (rule 7: flag it
-where it applies), naming the mate that sets it (rule 4): the bore's matched
-fit, and the OD's skim with the handle and the walls that skim leaves.  The
-section already shows the bore running through, so THRU rides on its callout;
-bonding the ring on is the assembly's business, not this part's.
+One numbered flag note remains (rule 7: a callout is its size and process
+plus at most two lines of words).  The bore's matched fit sits on its own
+callout, naming the mate that sets it (rule 4); the OD's skim with the
+handle, and the walls that skim leaves, are note 1, flagged from the OD.
+The section already shows the bore running through, so THRU rides on its
+callout; bonding the ring on is the assembly's business, not this part's.
 """
 
 from __future__ import annotations
@@ -48,31 +48,31 @@ def _floor_3pl(value_mm: float) -> float:
 SEAT_FACE_WALL_MIN = _floor_3pl(FERRULE_MOUTH_WALL_MIN)
 ARM_FACE_WALL_MIN = _floor_3pl(FERRULE_ARM_FACE_WALL_MIN)
 
-# The bore's .XXX band is a matched fit: the oak tenon is turned to suit
-# this bore for an epoxy line (r1-r3 finding 1: name the mate and the
-# clearance at the callout, not in a general note).  BORE names the process,
-# so the .XXX row, not DRILLED HOLES, sets its limits (#290 review of
-# eb22a22f1).  Short rows keep the block between the bore's extension lines.
+# The bore keeps its .XXX row; the oak tenon is turned to the measured bore
+# for an epoxy line, so the callout names the fit, the mate and its route,
+# with the clearance as the acceptance (rule 4; fan-out policy 1).  BORE
+# names the process, so the .XXX row, not DRILLED HOLES, sets its limits
+# (#290 review of eb22a22f1).
 BORE_FIT_CALLOUT = "\n".join(
     (
-        f"BORE THRU; {HANDLE_NUMBER} TENON",
-        f"TURNED TO SUIT, {inch_text(TENON_GLUE_LINE[0], 3)}-"
-        f"{inch_text(TENON_GLUE_LINE[1], 3)}",
-        "DIAMETRAL CLEARANCE",
+        "BORE THRU",
+        f"BONDED FIT ON {HANDLE_NUMBER} TENON TURNED",
+        f"TO MEASURED BORE (CLEARANCE {inch_text(TENON_GLUE_LINE[0], 3)}-"
+        f"{inch_text(TENON_GLUE_LINE[1], 3)})",
     )
 )
 # The OD is the 9/16-in rod as supplied: an untoleranced reference whose
 # supplier tolerance governs (owner rule; #290 reviews asked for a printed
 # band), skimmed to the grip contour with the handle after the epoxy cures
-# (user ruling 2026-10-01); the finished size sits on the OD itself (r1-r3
-# finding 2), with the walls the skim leaves.
-OUTER_DIA_CALLOUT = "\n".join(
+# (user ruling 2026-10-01).  The skim and the walls it leaves are note 1,
+# flagged from the OD.
+SKIM_NOTE = 1
+OUTER_DIA_CALLOUT = f"ROD AS SUPPLIED\nSEE NOTE {SKIM_NOTE}"
+SHEET_NOTES = "\n".join(
     (
-        "9/16 ROD AS SUPPLIED;",
-        f"SKIM TO <MOD-DIAM>{inch_text(INSTALLED_OUTER_DIA, 2)}",
-        f"WITH {HANDLE_NUMBER}",
-        "AFTER CURE;",
-        f"WALL {inch_text(SEAT_FACE_WALL_MIN, 3)} MIN AT SEAT FACE;",
-        f"WALL {inch_text(ARM_FACE_WALL_MIN, 3)} MIN AT ARM FACE",
+        f"{SKIM_NOTE}. SKIM OD TO <MOD-DIAM>{inch_text(INSTALLED_OUTER_DIA, 2)}"
+        f" WITH {HANDLE_NUMBER} AFTER CURE;",
+        f"   WALL {inch_text(SEAT_FACE_WALL_MIN, 3)} MIN AT SEAT FACE,"
+        f" {inch_text(ARM_FACE_WALL_MIN, 3)} MIN AT ARM FACE.",
     )
 )

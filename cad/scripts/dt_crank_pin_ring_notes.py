@@ -54,9 +54,11 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 REFERENCE_DIMENSIONS = frozenset({"WireDia", "JointDia"})
 # The wire is bought stock: an untoleranced reference whose supplier tolerance
 # governs (owner rule; #290 reviews asked for a printed band).
+# The joint is closed through the MHA-DT-09 cross-hole: note 1, flagged from
+# the joint it governs (rule 7).
 DIMENSION_CALLOUTS: dict[str, str] = {
     "WireDia": "WIRE AS SUPPLIED;\nSUPPLIER TOLERANCE",
-    "JointDia": "SILVER-SOLDER JOINT",
+    "JointDia": "SILVER-SOLDER BUTT JOINT\nSEE NOTE 1",
 }
 if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
     DRAWING_PRECISION_BY_NAME
@@ -65,9 +67,4 @@ if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
 if not REFERENCE_DIMENSIONS <= set(DRAWING_PRECISION_BY_NAME):
     raise AssertionError("every reference ring dimension must be marked")
 
-DRAWING_NOTES = "\n".join(
-    (
-        "1. ENDS BUTTED AND SILVER-SOLDERED AT THE JOINT BEAD.",
-        "2. CLOSED WITH THE WIRE THROUGH THE MHA-DT-09 TAPER-PIN CROSS-HOLE.",
-    )
-)
+DRAWING_NOTES = "1. CLOSED WITH THE WIRE THROUGH THE MHA-DT-09 TAPER-PIN CROSS-HOLE."

@@ -155,7 +155,6 @@ def test_blind_seat_dimensions_are_assigned_to_readable_views() -> None:
         "PinSeatCy",
         "Depth",
         "CrossHoleDia",
-        "CrossHoleCz",
         "PinSeatCz",
     }
 
@@ -186,8 +185,7 @@ def test_follower_seat_station_is_printed_from_face_a_with_a_rule_12_web() -> No
     face_a = drawing.LEFT_CENTER[0] - (
         dt_pinion_bracket_geometry.THICKNESS * drawing.SHEET_SCALE[0] / 2000.0
     )
-    for name in ("PinSeatCz", "CrossHoleCz"):
-        assert drawing.LEFT_KEEP[name][0] < face_a, name
+    assert drawing.LEFT_KEEP["PinSeatCz"][0] < face_a
 
 
 def _segment_distance(
@@ -323,10 +321,12 @@ def test_set_pin_cross_hole_is_located_by_model_dimensions() -> None:
         "SPRING PIN, PRESS FIT",
     ]
     dims = dt_pinion_bracket_spec.DRAWING_DIMENSIONS
-    assert dims["CrossHoleProfile"] == {"CrossHoleDia", "CrossHoleCz"}
+    # Through the thickness the hole shares the seat's centreline, which
+    # PinSeatCz locates: the sheet prints that line once.
+    assert dims["CrossHoleProfile"] == {"CrossHoleDia"}
     by_name = dt_pinion_bracket_spec.DRAWING_PRECISION_BY_NAME
     assert by_name["CrossHoleDia"] == 4
-    assert by_name["CrossHoleCz"] == 2
+    assert "CrossHoleCz" not in by_name
     # The station is the model's relation to its globals, not a typed number,
     # and no hidden sketch is left for a hidden-owner import.
     build_source = inspect.getsource(bracket)
@@ -341,9 +341,9 @@ def test_set_pin_cross_hole_is_located_by_model_dimensions() -> None:
 
 def test_fitted_bores_name_their_mates_and_fits() -> None:
     # Rule 4 (r1 machinist review, #1007): every REAM band names the mate and
-    # the fit it needs at its own callout, by the parts registry's number; the
-    # two held locations say what they serve.  The pinned pivot bore runs on
-    # nothing, so it carries no roughness symbol (rule 6).
+    # the fit it needs at its own callout, by the parts registry's number.
+    # Location dimensions carry their value alone (rule 7).  The pinned pivot
+    # bore runs on nothing, so it carries no roughness symbol (rule 6).
     import _config
     from machinist_exceptions import load_exceptions
 
@@ -352,24 +352,27 @@ def test_fitted_bores_name_their_mates_and_fits() -> None:
 
     callouts = drawing.DIMENSION_CALLOUTS
     expected = {
-        "PivotBoreDia": ("SLIDE FIT", number("dt-pinion-pivot-shaft"), "PINNED"),
-        "ArborBoreDia": ("RUNNING FIT", number("dt-pinion-arbor")),
-        "PinSeatDia": ("SLIP FIT", number("dt-pinion-cam-pin")),
-        "PinSeatCy": (number("dt-pinion-cam"),),
-        "PinSeatCz": (number("dt-pinion-cam-pin"),),
+        "PivotBoreDia": (number("dt-pinion-pivot-shaft"),),
+        "ArborBoreDia": (number("dt-pinion-arbor"),),
+        "PinSeatDia": (number("dt-pinion-cam-pin"), "<HOLE-DEPTH>"),
     }
     for name, words in expected.items():
         text = " ".join(callouts[name].splitlines())
         for word in words:
             assert word in text, (name, word)
+    # Both seat stations are locations: value and band only (rule 7); their
+    # .XXX bands ride the part's exception accepts.
+    assert not {"PinSeatCy", "PinSeatCz"} & set(callouts)
     assert {c.key for c in dt_pinion_bracket_spec.SURFACE_FINISHES} == {"arbor_bore"}
     # #290: on the .36 strap the far-face wall clears the .080 target, so the
-    # sheet prints no WALL minimum and the former RV-01 exception is retired.
+    # sheet prints no WALL minimum and the former WALL exception is retired;
+    # the two accepts left are the seat stations' .XXX bands (rule 7 bare).
     from _inch_wall_limits import WALL_TARGET_MM
 
-    assert "WALL" not in callouts["PinSeatCz"]
     assert dt_pinion_bracket_spec.PIN_SEAT_WEB_WORST >= WALL_TARGET_MM
-    assert not load_exceptions(_config.CONFIG_DIR, "dt_pinion_bracket", "part")
+    exceptions = load_exceptions(_config.CONFIG_DIR, "dt_pinion_bracket", "part")
+    assert [(e.id, e.kind) for e in exceptions] == [("RV-01", "accept"), ("RV-02", "accept")]
+    assert all("WALL" not in e.finding.upper() for e in exceptions)
     # The (43.0) stands left of the flank, so no leader to the follower seat
     # (callouts right of the view) crosses its dimension line.
     face_a = drawing.LEFT_CENTER[0] - (
@@ -462,7 +465,6 @@ def test_every_web_and_ligament_clears_the_floor_at_the_printed_bands() -> None:
     # sheet's own, stated once in pinion_bracket_geometry.
     for name, places in (
         ("Depth", geometry.THICKNESS_PLACES),
-        ("CrossHoleCz", geometry.CROSS_HOLE_CZ_PLACES),
         ("BottomCapRadius", geometry.END_RADIUS_PLACES),
         ("TopCapRadius", geometry.END_RADIUS_PLACES),
     ):

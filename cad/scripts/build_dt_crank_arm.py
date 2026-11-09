@@ -67,6 +67,7 @@ from dt_crank_arm_spec import (
     FIDUCIAL_X,
     FIDUCIAL_Y,
     HALF_WIDTH,
+    AXIS_FROM_EDGE_STATION_X,
     HANDLE_PIVOT_HOLE_SPEC,
     HUB_SEAT_DIA,
     ISOMETRIC_VIEW_NOTE,
@@ -469,6 +470,35 @@ async def build(adapter) -> dict[str, str]:
     )
     stations.record("WidthX", '"ArmC2C"')
     stations.record("WidthY", '"ArmWidth" / 2')
+    # The bore/pivot axis from the top long edge (dt_crank_arm_spec
+    # AXIS_FROM_EDGE_*): a vertical construction line from the axis up to the
+    # edge's height, its foot on the axis at its station.
+    set_sketch_direct_db(adapter, True)
+    edge_ref = check(
+        "axis-from-edge reference line",
+        await adapter.add_line(
+            AXIS_FROM_EDGE_STATION_X, 0.0, AXIS_FROM_EDGE_STATION_X, HALF_WIDTH
+        ),
+    )
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, edge_ref)
+    check(
+        "axis-from-edge reference vertical",
+        await adapter.add_sketch_constraint(edge_ref, None, "vertical"),
+    )
+    await anchor_point_to_origin(
+        adapter, f"{edge_ref}.start", AXIS_FROM_EDGE_STATION_X, 0.0, "axis-from-edge foot"
+    )
+    stations.record("AxisFromEdgeX")
+    await dimension_between(
+        adapter,
+        f"{edge_ref}.start",
+        f"{edge_ref}.end",
+        "vertical_distance",
+        HALF_WIDTH,
+        "axis-from-edge reference",
+    )
+    stations.record("AxisFromEdge", '"ArmWidth" / 2')
     await ensure_fully_defined(adapter, "station reference sketch")
     check("exit_sketch station reference", await adapter.exit_sketch())
     name_last_feature(adapter, "StationReference")

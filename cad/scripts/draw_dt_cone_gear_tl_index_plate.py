@@ -31,6 +31,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
 )
 from _drawing_dimensions import (
@@ -39,17 +40,27 @@ from _drawing_dimensions import (
     set_dimension_callouts,
 )
 from _drawing_gdt import add_feature_control_frame
+from _drawing_leaders import set_near_side_diameter
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
+from _machinist_review_mode import MachinistReviewMode
 from _native_axis_datum import add_native_axis_datum
 from _paths import CAD_ROOT
 from _session import run_build
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
-from solidworks_mcp.adapters.solidworks.drawing import place_view, view_name
+from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
+    dimension_name,
+    place_view,
+    view_name,
+)
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["dt_cone_gear_tl_index_plate"]
 PART_STEM = SPEC.artifact_stem
@@ -69,6 +80,9 @@ FACE_CENTER = (0.130, 0.150)
 EDGE_CENTER = (0.300, FACE_CENTER[1])
 ISO_CENTER = (0.380, 0.195)
 ISO_NOTE_XY = (0.345, 0.150)
+# The head's one full naming (RV-03): right of the edge view, above the title
+# block (top y ~0.065), its two rows short of the right border.
+HEAD_NOTE_XY = (0.315, 0.090)
 
 # Dimension text positions (sheet metres, the text's centre). The plate's
 # rim stands 75 mm (sheet) from the centre: the outer index circles' sizes
@@ -77,14 +91,35 @@ ISO_NOTE_XY = (0.345, 0.150)
 _FX, _FY = FACE_CENTER
 FACE_KEEP = {
     "PlateDia": (_FX - 0.080, _FY + 0.093),
-    part.PRINTED_HOLE: (_FX + 0.115, _FY + 0.098),
+    part.PRINTED_HOLE: (_FX + 0.110, _FY + 0.098),
     "Ring57Pcd": (_FX + 0.115, _FY + 0.050),
     "Ring51Pcd": (_FX + 0.115, _FY + 0.008),
-    "Ring24Pcd": (_FX + 0.110, _FY - 0.040),
+    # Its near-side leader lands on the circle's right at -12.8 degrees,
+    # below the 51X's and clear of the 3X countersink callout (round 2,
+    # rule 14).
+    "Ring24Pcd": (_FX + 0.110, _FY - 0.025),
     "MountHoleDia": (_FX - 0.095, _FY + 0.030),
-    "BoreDia": (_FX - 0.087, _FY - 0.050),
+    # Above the plate, right of the Ø3.94's leader and left of the vertical
+    # centreline, so its leader drops steeply onto the bore's upper left:
+    # from the lower left it crossed datum A's leader, which SolidWorks
+    # places on the bore's lower left (round 1, rule 14).  At +0.108 its
+    # stacked +.003 met the top border (round 2 render).
+    "BoreDia": (_FX - 0.030, _FY + 0.100),
     "MountPcd": (_FX - 0.020, _FY - 0.100),
 }
+# Every diameter about the bore axis takes one arrow on its near rim
+# (set_near_side_diameter): native, the plate, the three index circles, the
+# bolt circle and the bore each drew a diametral line through the centre, a
+# star of crossings with each other and with the bore's and bolt circle's
+# leaders (fan-out round 3 repeat review, rule 14).
+NEAR_SIDE_DIAMETERS = (
+    "PlateDia",
+    "Ring57Pcd",
+    "Ring51Pcd",
+    "Ring24Pcd",
+    "BoreDia",
+    "MountPcd",
+)
 # Above the edge view's top, clear of its witness lines.
 EDGE_KEEP = {"PlateThick": (EDGE_CENTER[0], _FY + 0.090)}
 
@@ -242,11 +277,18 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, part.CALLOUTS_BELOW)
     assert_imported_precision(adapter, annotations, part.DRAWING_PRECISION_BY_NAME)
     set_basic_dimensions(adapter, annotations, part.BASIC_DIMENSIONS)
+    for name in NEAR_SIDE_DIAMETERS:
+        matches = [a for a in annotations if dimension_name(adapter, a) == name]
+        if len(matches) != 1:
+            raise RuntimeError(f"expected one {name} dimension, found {len(matches)}")
+        set_near_side_diameter(matches[0], f"index plate {name}")
+    rebuild_drawing(adapter, label="index plate near-side diameters")
     _centre_mark_bore(adapter, face)
     _position_index_holes(adapter, face)
     for view in (face, edge, iso):
         set_hidden_lines_removed(adapter, view)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
+    add_note(adapter, part.HEAD_NOTE, *HEAD_NOTE_XY)
     return await finalize_drawing(
         adapter,
         OUTPUTS,
