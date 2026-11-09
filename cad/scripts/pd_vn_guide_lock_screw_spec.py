@@ -96,8 +96,8 @@ LOCK_HOLE_DIA_MAX = LOCK_HOLE_DIA_MIN + drilled_oversize_mm(unit=lock.UNIT)
 # Radial position error of one screw axis relative to its lock hole: the
 # transfer's reach (pd_guide_lock_spec.HOLE_TRANSFER_BAND per axis). Each
 # hole is struck and drilled from its own tap, so it follows the tap
-# wherever the guide's Ø.008 put it: that zone no longer parts hole from
-# screw.
+# wherever the guide's printed coordinates put it: they no longer part hole
+# from screw.
 POSITION_RADIAL = math.hypot(lock.HOLE_TRANSFER_BAND, lock.HOLE_TRANSFER_BAND)
 CLEARANCE_RADIAL_MIN = (LOCK_HOLE_DIA_MIN - SCREW_MAJOR_MAX) / 2.0
 CLEARANCE_RADIAL_MAX = (LOCK_HOLE_DIA_MAX - SCREW_MAJOR_MIN) / 2.0
@@ -120,15 +120,12 @@ if LOCK_SET_OFFSET[0] < 0.0:
 
 # --- The set plate at each hole station ---------------------------------------
 # Beyond its hole's set gain, the plate stands off its model at each hole
-# station in y by the tap's own position (half the guide's Ø.008: the screw
-# rides the actual tap) and by the hole's place from the plate's edges
-# (pd_guide_lock_spec.HOLE_PLACEMENT_BAND: the plate is placed by hand when
-# struck). Both act per hole, so a plate the print accepts can also stand
-# turned against its tap row.
-LOCK_STATION_STANDOFF = (
-    float(guide.GEOMETRIC_TOLERANCES_MM["guide hole-pattern position"]) / 2.0
-    + lock.HOLE_PLACEMENT_BAND
-)
+# station in y by the tap's own position (the guide's printed tap row,
+# pd_platen_guide_spec.TAP_Y_BAND: the screw rides the actual tap) and by the
+# hole's place from the plate's edges (pd_guide_lock_spec.HOLE_PLACEMENT_BAND:
+# the plate is placed by hand when struck). Both act per hole, so a plate the
+# print accepts can also stand turned against its tap row.
+LOCK_STATION_STANDOFF = guide.TAP_Y_BAND + lock.HOLE_PLACEMENT_BAND
 # (min, max) as set, away from the bar from the model, at each hole station.
 LOCK_STATION_SET = (
     LOCK_SET_OFFSET[0] - LOCK_STATION_STANDOFF,
@@ -141,8 +138,8 @@ LOCK_STATION_SET = (
 # fattest screw, its tap, transfer and placement errors toward the bar)
 # while the other stands at the most (the largest drill on the thinnest
 # screw, its errors away from it). The rigid plate then turns through the
-# difference over the shortest hole pitch (the actual tap pitch, held to the
-# guide's Ø.008 at each end, less the transfer at each hole), and its corner
+# difference over the shortest hole pitch (the actual tap pitch, each tap
+# within the guide's printed station band, less the transfer at each hole), and its corner
 # outboard of the nearer-set station swings toward the bar by that skew
 # times the longest overhang the outline and placement bands allow. This
 # bounds the plate pushed at its middle, as the "guide-locks-set" step does:
@@ -152,7 +149,7 @@ _HOLE_X = sorted(x for x, _ in lock.HOLE_XY)
 _HOLE_PITCH_MIN = (
     _HOLE_X[-1]
     - _HOLE_X[0]
-    - float(guide.GEOMETRIC_TOLERANCES_MM["guide hole-pattern position"])
+    - 2.0 * guide.TAP_STATION_BAND
     - 2.0 * lock.HOLE_TRANSFER_BAND
 )
 _WIDTH_DEV = printed_deviations(

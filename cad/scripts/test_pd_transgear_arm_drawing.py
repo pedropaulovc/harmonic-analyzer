@@ -179,14 +179,16 @@ def _printed_proud_range(pin_length: float, hole_depth: float) -> tuple[float, f
 
 
 # The worst far-face margin this test's restatement finds at the printed
-# reaches, and the retired 3/4 pin's: it barely clears in a 6.20 hole; 0.05
-# deeper it stops short of the face.  #290: the tip station and the hole
+# reaches, and the retired 3/4 pin's: it stops short of the face in a 6.20
+# hole and further short 0.05 deeper.  #290: the tip station and the hole
 # depth print rounded to .XX inch (reach 0.376 / 0.372), the hook its formed
-# .XX ±.02 (FORMED_BAND .024 with the rounding, MHA-PD-14).
-# MHA-PD-20 faces at ⊥ .001 (delegated ruling 2026-11-07) open the pivot fit.
-_PINNED_FAR_FACE_MARGIN = 0.880
-_PINNED_OLD_PIN_MARGIN = 0.005
-_PINNED_DEEPER_OLD_PIN_MARGIN = -0.045
+# .XX ±.02 (FORMED_BAND .024 with the rounding, MHA-PD-14).  The hook's
+# screw holes take the title block's ±.005 (delegated ruling 2026-11-07, the
+# bar's taps spotted through them), so the hook's screw drift grew; MHA-PD-20
+# faces at ⊥ .001 (delegated ruling 2026-11-07) open the pivot fit.
+_PINNED_FAR_FACE_MARGIN = 0.646
+_PINNED_OLD_PIN_MARGIN = -0.229
+_PINNED_DEEPER_OLD_PIN_MARGIN = -0.279
 
 
 def _worst_far_face_margin(
@@ -285,8 +287,8 @@ def test_the_latch_pin_full_diameter_passes_the_hook_at_the_printed_tip_band() -
     # The screws' float turns the hook about the pin as well as sliding it,
     # so the drift along U at the hole exceeds the pure slide.
     assert joints.HOOK_DRIFT_ALONG_U > joints.HOOK_SCREW_SHIFT
-    # Negative control: the 3/4 pin barely clears in a 6.20 hole and stops
-    # short 0.05 deeper with the bends and the grade; without them it cleared.
+    # Negative control: the 3/4 pin stops short in a 6.20 hole, and further
+    # short 0.05 deeper, with the bends and the grade; without them it cleared.
     old = _printed_proud_range(0.75 * 25.4, 6.20)
     assert _worst_far_face_margin(printed, old) == pytest.approx(
         _PINNED_OLD_PIN_MARGIN, abs=1e-3

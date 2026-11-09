@@ -1,7 +1,7 @@
 r"""Create the curated machinist drawing for the platen guide.
 
 The SLDPRT remains authoritative.  This recipe supplies only the platen-guide
-views, dimensions, hole groups, GD&T and surface symbol;
+views, dimensions, hole table, tap-row note and surface symbol;
 sheet/template and export behavior lives in ``_drawing_common``.
 Leader behavior lives in ``_drawing_attachment``.
 
@@ -38,7 +38,6 @@ from _drawing_dimension_import import curate_view_dimensions, import_cosmetic_th
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_edges import visible_view_entities
 from _drawing_finish import add_surface_finish
-from _drawing_gdt import add_datum_feature, add_feature_control_frame
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -61,12 +60,12 @@ from build_pd_platen_guide import (
 from pd_platen_guide_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
-    GEOMETRIC_TOLERANCES_IN,
     GUIDE_DEPTH_CALLOUT,
     GUIDE_HEIGHT,
     SURFACE_FINISHES,
     TAPPED_HOLE_SPEC,
     TAP_Y,
+    TAP_Y_BAND_TEXT,
 )
 
 
@@ -86,12 +85,12 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 # The 1:1 front view is centred at sheet X=0.190 m. Derive its left edge from
-# the resized guide so hole-table and datum anchors follow the part geometry.
+# the resized guide so the hole-table anchors follow the part geometry.
 FRONT_VIEW_X_M = 0.190
 FRONT_LEFT_X_M = FRONT_VIEW_X_M - GUIDE_LENGTH / 2000.0
 FRONT_VIEW_Y_M = 0.110
-# The view centres on the rail's outline: its bottom edge (datum B) and the
-# tap row stand from that centre by the model's height and TAP_Y.
+# The view centres on the rail's outline: its bottom edge and the tap row
+# stand from that centre by the model's height and TAP_Y.
 FRONT_BOTTOM_Y_M = FRONT_VIEW_Y_M - GUIDE_HEIGHT / 2000.0
 FRONT_HOLE_Y_M = FRONT_BOTTOM_Y_M + TAP_Y / 1000.0
 # Every tap runs through the rail, so the front view shows all nine and one
@@ -119,8 +118,6 @@ def _tags_above(stations: tuple[float, ...]) -> frozenset[float]:
 
 
 HOLE_TAGS_ABOVE = _tags_above(HOLE_STATIONS_MM)
-# Put datum B's symbol midway between the A3/A4 hole axes, clear of both.
-DATUM_B_SYMBOL_X_M = FRONT_LEFT_X_M + (FRONT_X[2] + FRONT_X[3]) / 2000.0
 # The bar-slide finish lands on the bottom edge (model y 0, front face z 0)
 # midway between the A1 and A2 axes, clear of both centre marks. The landing
 # is projected from the model at draw time. The symbol is anchored at its
@@ -135,21 +132,40 @@ DATUM_B_SYMBOL_X_M = FRONT_LEFT_X_M + (FRONT_X[2] + FRONT_X[3]) / 2000.0
 BAR_SLIDE_STATION_MM = (FRONT_X[0] + REAR_X[0]) / 2.0
 BAR_SLIDE_FINISH_XY = (FRONT_LEFT_X_M + BAR_SLIDE_STATION_MM / 1000.0 + 0.003, 0.075)
 FINISH_CHAR_HEIGHT = 0.0025
-# The position frame names the parts whose holes the 9X taps must match
-# (machinist review round 3: a frame and basic table with no mating pattern
-# named read as over-specification). The note stands right of the frame, under
-# the overall length's line and above the tags over the bar. It also states
-# the taps' finished wall to the edges, at the floor (rule 20; Owner ruling
-# 2026-11-08 (Pedro), #2144 item 2.1 in pd-platen-guide.yaml).
-FCF_MATE_NOTE = (
-    f"MATCHES {_config.parts('pd-platen')['number']} AND "
-    f"{_config.parts('pd-guide-lock')['number']} HOLES; {TAP_EDGE_WALL_TEXT}"
+# Owner ruling 2026-11-08 (Pedro, #2144 item 2.3): the taps are noncritical,
+# so they print plain hole-table coordinates with no position frame. The
+# stations take the title block's .XXX; this note gives the tap row its
+# ±.004 and the reason for it, the taps' finished wall to the edges at the
+# floor (rule 20; owner ruling RV-01 in pd-platen-guide.yaml). The block's
+# top-left stands where round 5/6 shipped it: right of the A3 tag (text ends
+# ~0.1435), 2.1 mm under the 10.62 line (~0.1321); its two lines (5.5 mm
+# pitch, ~0.121 bottom) end left of the 10.62's right extension line
+# (x 0.325) and, for the second, of the A7 tag (x ~0.246).
+HOLE_TAGS = tuple(f"A{index}" for index in range(1, len(HOLE_STATIONS_MM) + 1))
+PLATEN_NUMBER = _config.parts("pd-platen")["number"]
+LOCK_NUMBER = _config.parts("pd-guide-lock")["number"]
+TAP_ROW_NOTE = (
+    f"{HOLE_TAGS[0]}-{HOLE_TAGS[-1]}: Y LOC {TAP_Y_BAND_TEXT}\n{TAP_EDGE_WALL_TEXT}"
 )
-FCF_MATE_NOTE_XY = (0.141, 0.1285)
+TAP_ROW_NOTE_XY = (0.146, 0.1300)
+# Rule 10 / rule 4: the tagged table names each tap's mate in its own column,
+# the platen's holes for the platen-screw taps and the guide lock's for the
+# lock taps (round 2). The column follows the fr_harmonic_base NOTE column:
+# inserted after SIZE, its cells written per row bound to its station; the
+# table may widen right (it ends ~0.165, the isometric starts ~0.305).
+HOLE_TABLE_MATE_COLUMN = "MATE"
+HOLE_TABLE_MATE_COLUMN_WIDTH = 0.030  # "MHA-PD-02" prints ~22 mm
+HOLE_TABLE_MATES: dict[float, str] = {
+    station: PLATEN_NUMBER if station in FRONT_X else LOCK_NUMBER
+    for station in HOLE_STATIONS_MM
+}
+_INSERT_COLUMN_AFTER = 3  # swTableItemInsertPosition_After
+_INSERT_COLUMN_DEFAULT_WIDTH = 0  # swInsertColumn_DefaultWidth
+_TABLE_SIZE_CAN_CHANGE = 0  # swTableRowColChange_TableSizeCanChange
 # The right view's depth: its text stack (keep = its centre) left of the
 # extension lines (x 0.365 and 0.375), its underline on its own dimension
-# line (~0.075), under the height's ".29" (bottom ~0.108) and datum A's tag
-# (bottom 0.1065). The four rows span ~0.075..0.095 (round 6, shipped; a
+# line (~0.075), under the height's ".29" (bottom ~0.108). The four rows
+# span ~0.075..0.095 (round 6, shipped; a
 # six-row stack raised to 0.088 read as the .29's limits, round 7).
 DEPTH_TEXT_XY = (0.341, 0.085)
 # The table fits above the front view; 0.020 also clears the 12.7 mm zone
@@ -170,7 +186,7 @@ THREAD_TAP_DRILL_MM = blind_cut_dia_mm(TAPPED_HOLE_SPEC)
 
 
 def _bottom_surface_edge(view: Any) -> Any:
-    """Return the guide's full-length model edge on the bottom datum surface."""
+    """Return the guide's full-length model edge on the bottom surface."""
     candidates: list[tuple[float, Any]] = []
     for raw_edge in visible_view_entities(view, 1, label="platen-guide bottom edge"):
         edge = _early_bound(raw_edge, "IEdge")
@@ -226,18 +242,144 @@ def _hole_rim_entities(
     return tuple(rims)
 
 
-def _place_hole_tags(view: Any, table: Any) -> None:
-    """Move each native hole tag beside its own hole, on a leader to its rim."""
-    stations_by_tag: dict[str, float] = {}
+def _table_cells(table: Any, columns: int) -> tuple[tuple[str, ...], ...]:
+    return tuple(
+        tuple(
+            str(table.DisplayedText2(row, column, False) or "").strip()
+            for column in range(columns)
+        )
+        for row in range(int(table.RowCount))
+    )
+
+
+def _hole_table_rows(table: Any) -> dict[float, tuple[int, str]]:
+    """Bind every native row to exactly one model station: station -> (row, tag)."""
+    if int(table.RowCount) != len(HOLE_STATIONS_MM) + 1:
+        raise RuntimeError(
+            f"platen-guide hole table has {int(table.RowCount)} rows; "
+            f"expected {len(HOLE_STATIONS_MM) + 1}"
+        )
+    rows: dict[float, tuple[int, str]] = {}
+    tags: set[str] = set()
     for row in range(1, int(table.RowCount)):
         tag = str(table.DisplayedText2(row, 0, False) or "").strip()
         x_mm = float(str(table.DisplayedText2(row, 1, False))) * 25.4
         station = min(HOLE_STATIONS_MM, key=lambda s: abs(s - x_mm))
-        if abs(station - x_mm) > 0.02 or station in stations_by_tag.values():
+        if not tag or tag in tags or abs(station - x_mm) > 0.02 or station in rows:
             raise RuntimeError(
-                f"hole-table row {tag!r} has no unique station: {x_mm:g}"
+                f"hole-table row {row} {tag!r} has no unique station: {x_mm:g}"
             )
-        stations_by_tag[tag] = station
+        tags.add(tag)
+        rows[station] = (row, tag)
+    return rows
+
+
+def _add_mate_column(table: Any) -> tuple[tuple[tuple[str, ...], ...], bool | None]:
+    """Write HOLE_TABLE_MATES into a custom MATE column after SIZE.
+
+    Returns the generated TAG/X LOC/Y LOC/SIZE cells, which the column must
+    leave in place through the rebuild (``_check_mate_column``), and whether
+    the SIZE cells were merged before it went in.
+    """
+    if int(table.ColumnCount) != 4:
+        raise RuntimeError("the MATE column expects the native four-column hole table")
+    rows = _hole_table_rows(table)
+    generated = _table_cells(table, 4)
+    size_merged = _size_cells_merged(table)
+    inserted = table.InsertColumn2(
+        _INSERT_COLUMN_AFTER, 3, HOLE_TABLE_MATE_COLUMN, _INSERT_COLUMN_DEFAULT_WIDTH
+    )
+    if inserted is not True:
+        raise RuntimeError("native hole table refused the MATE column")
+    if table.SetColumnTitle2(4, HOLE_TABLE_MATE_COLUMN, False) is not True:
+        raise RuntimeError("native hole-table MATE column title did not set")
+    for station, (row, tag) in rows.items():
+        if table.IsCellTextEditable(row, 4) is not True:
+            raise RuntimeError(f"native hole-table MATE cell of {tag} is not editable")
+        table.SetText2(row, 4, False, HOLE_TABLE_MATES[station])
+    actual = float(
+        table.SetColumnWidth(4, HOLE_TABLE_MATE_COLUMN_WIDTH, _TABLE_SIZE_CAN_CHANGE)
+    )
+    if abs(actual - HOLE_TABLE_MATE_COLUMN_WIDTH) > 1e-6:
+        raise RuntimeError(f"hole-table MATE column width did not persist: {actual!r}")
+    return generated, size_merged
+
+
+def _normalised(cells: tuple[tuple[str, ...], ...]) -> tuple[tuple[str, ...], ...]:
+    """Cells with their whitespace (SolidWorks' CRLF and wraps) collapsed."""
+    return tuple(tuple(" ".join(value.split()) for value in row) for row in cells)
+
+
+def _size_cells_merged(table: Any) -> bool | None:
+    """Whether every hole row's SIZE cell (column 3) is one merged cell;
+    None when SolidWorks will not report it (the probe is telemetry only)."""
+    last = int(table.RowCount) - 1
+    try:
+        for row in range(2, last + 1):
+            state = table.IsCellMerged(row, 3)
+            merged = state[0] if isinstance(state, tuple) else state
+            if not merged:
+                return False
+    except Exception as error:  # noqa: BLE001 - a probe, logged and not relied on
+        _telemetry.info(f"hole-table SIZE merge state unreadable: {error!r}")
+        return None
+    return True
+
+
+def _row_key(row: tuple[str, ...]) -> tuple[str, float, float]:
+    """A hole row's tag and X/Y LOC, the locations compared as numbers
+    (SolidWorks may print .140 or 0.140 for the same cell)."""
+    return row[0], round(float(row[1]), 4), round(float(row[2]), 4)
+
+
+def _check_mate_column(
+    table: Any, generated: tuple[tuple[str, ...], ...], size_merged: bool | None
+) -> None:
+    """Only the MATE column changed: each row keeps its tag, location and
+    size, and names its tap's mate.  The native table's one SIZE for the
+    tag group (rule 10) is merged again if the inserted column split it."""
+    if int(table.ColumnCount) != 5:
+        raise RuntimeError("hole table lost or duplicated the MATE column")
+    cells = _table_cells(table, 5)
+    before = _normalised(generated)
+    after = _normalised(tuple(row[:4] for row in cells))
+    _telemetry.info(f"hole-table cells before MATE: {before!r}; after: {after!r}")
+    if tuple(map(_row_key, after[1:])) != tuple(map(_row_key, before[1:])):
+        raise RuntimeError(f"MATE column changed hole-table tags or locations: {cells!r}")
+    # The nine taps keep one size, still the #4-40 tap (its native text may
+    # re-render, so the compare is on the one size, not its exact string).
+    sizes_after = {row[3] for row in after[1:]} - {""}
+    if len(sizes_after) != 1 or "4-40" not in next(iter(sizes_after)):
+        raise RuntimeError(f"MATE column changed the hole-table size: {cells!r}")
+    rows = _hole_table_rows(table)
+    mates = {row: HOLE_TABLE_MATES[station] for station, (row, _tag) in rows.items()}
+    expected = tuple(
+        HOLE_TABLE_MATE_COLUMN if index == 0 else mates[index]
+        for index in range(len(cells))
+    )
+    if tuple(row[4] for row in cells) != expected:
+        raise RuntimeError(f"hole-table MATE cells differ: {cells!r}")
+    merged_after = _size_cells_merged(table)
+    if size_merged and merged_after is False:
+        try:
+            restored = table.MergeCells(1, 3, int(table.RowCount) - 1, 3)
+        except Exception as error:  # noqa: BLE001 - logged; the table stays valid
+            restored = repr(error)
+        merged_after = _size_cells_merged(table)
+        _telemetry.info(
+            f"hole-table SIZE merge restored after the MATE column: "
+            f"MergeCells={restored!r}, merged={merged_after!r}"
+        )
+    _telemetry.info(
+        "hole-table mates: "
+        f"{ {tag: HOLE_TABLE_MATES[station] for station, (_row, tag) in rows.items()}!r}; "
+        f"SIZE merged before={size_merged!r} after={merged_after!r}"
+    )
+
+
+def _place_hole_tags(view: Any, table: Any) -> None:
+    """Move each native hole tag beside its own hole, on a leader to its rim."""
+    stations_by_tag = {tag: station for station, (_row, tag) in _hole_table_rows(table).items()}
     moved: set[str] = set()
     for raw in _early_bound(view, "IView").GetAnnotations() or ():
         annotation = _early_bound(raw, "IAnnotation")
@@ -343,8 +485,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # The bar's height sits off the front view's east end (the dimension
     # measures the x=Length edge's endpoints, sheet x 0.3248), not beside the
     # right view, where its extension lines would fence the section. At
-    # x 0.338 the text clears the front view's box (0.3304) and datum A's tag
-    # (0.3485). y 0.110 centres the 3.5 mm text in the 7.4 mm gap between the
+    # x 0.338 the text clears the front view's box (0.3304). y 0.110 centres
+    # the 3.5 mm text in the 7.4 mm gap between the
     # extension lines (the rail's edges) so neither runs through it. Both
     # dimensions live in the
     # GuideProfile sketch (Front plane). Their places, and the depth's, are the
@@ -352,7 +494,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # kept them. The depth's value, limits and two-line reason stack above its
     # dimension line; between its extension lines (10 mm apart) both lines
     # struck the 44 mm stack (machinist review round 3), so the stack stands
-    # left of them, below datum A's tag and the height's text.
+    # left of them, below the height's text.
     annotations = [
         *curate_view_dimensions(
             adapter,
@@ -386,105 +528,41 @@ async def build(adapter: Any) -> dict[str, str]:
         hole_entities=_hole_rim_entities(
             front, HOLE_STATIONS_MM, label="platen-guide front"
         ),
-        # X LOC = the station from the left face (datum C); Y LOC = the bar's
-        # hole-line height above the bottom face, both at .XXX.
+        # X LOC = the station from the left face at .XXX (the title block's
+        # ±.005); Y LOC = the tap row above the bottom face, its ±.004 on the
+        # sheet's tap-row note (owner ruling 2026-11-08).
         expected_locations_mm=tuple((station, TAP_Y) for station in HOLE_STATIONS_MM),
         anchor_xy=(HOLE_TABLE_X_M, HOLE_TABLE_Y_M),
         label="platen-guide taps",
         unit="in",
         location_places=3,
     )
+    # The nine taps are one size: the table prints that size once, the SIZE
+    # cells of tag group A merged natively (rule 10: the size callout once per
+    # tag group), each hole keeping its own tag and X/Y LOC row.  The shared
+    # helper inserts the table uncombined; draw_fr_harmonic_base combines it
+    # the same way.
+    hole_feature = _early_bound(
+        _early_bound(hole_table, "IHoleTableAnnotation").HoleTable, "IHoleTable"
+    )
+    hole_feature.CombineSameSize = True
+    if not hole_feature.CombineSameSize or hole_feature.CombineTags:
+        raise RuntimeError("platen-guide hole table did not keep one tag per hole")
+    drawing_model.EditRebuild3()
+    if int(hole_table.RowCount) != len(HOLE_STATIONS_MM) + 1:
+        raise RuntimeError("combining the platen-guide tap sizes changed the table rows")
+    # Each tap's mate in its own column (rule 10), checked after a rebuild as
+    # draw_fr_harmonic_base checks its NOTE column.
+    generated, size_merged = _add_mate_column(hole_table)
+    drawing_model.EditRebuild3()
+    _check_mate_column(hole_table, generated, size_merged)
     _place_hole_tags(front, hole_table)
 
-    # Datums A (platen-mating face), B (bottom edge) and C (left end) frame the
-    # tap pattern's position; the right view shows A as its left edge.
-    datum_a_edge = (0.365, 0.110)
-    datum_b_entity = _bottom_surface_edge(front)
-    datum_c_edge = (FRONT_LEFT_X_M, FRONT_HOLE_Y_M)
-    add_datum_feature(
-        adapter,
-        right,
-        edge_xy=datum_a_edge,
-        # Level with the face it names, in the 25 mm gap between the front view's
-        # end (x=0.340) and the right view (x=0.365), so the leader is short and
-        # horizontal and its arrow lands ON the face. Below the view instead, the
-        # arrow ran onto the 10.00 dimension's extension line ~22 mm down, where
-        # a datum tag reads as the center plane rather than the surface. The box
-        # top (y=0.118) still clears the isometric's outline at y=0.131.
-        symbol_xy=(0.352, 0.110),
-        datum="A",
-        label="platen-mating face",
-    )
-    add_datum_feature(
-        adapter,
-        front,
-        entity=datum_b_entity,
-        symbol_xy=(DATUM_B_SYMBOL_X_M, 0.098),
-        datum="B",
-        label="guide bottom edge",
-        # The tag hangs only 10.6 mm below the bottom edge, so a snap-back onto
-        # the attachment would pass the default bound; the live readback is
-        # 0.0507 mm above the request.
-        position_tolerance_m=0.005,
-    )
-    # Dropped to y=0.098 from FRONT_HOLE_Y_M (0.1111): level with the edge, the
-    # box is UNAVOIDABLY struck through. `insert_hole_table` gives no control over
-    # where SolidWorks auto-places the hole table's origin indicator, and it does
-    # NOT land on datum_xy -- measured, it sits ~13.5 mm left of the bar's end, as
-    # a vertical Y-axis shaft at x=0.0265 spanning y 0.107..0.122, an origin circle
-    # at (0.0266, 0.1076), and a "0" glyph at x 0.0250..0.0279 / y 0.1036..0.1059.
-    # At y=0.1111 the tag's box (x 0.0210..0.0281) swallowed that shaft: it ran the
-    # box's full height, 0.4 mm from the "C" glyph. So the indicator cannot move
-    # and datum C must.
-    #
-    # LEFT is not available: the 7.1 mm box would now fit the ~12.3 mm corridor
-    # between the frame bound (~0.0127) and the shaft, but any box left of the
-    # shaft puts its horizontal leader ACROSS the shaft instead -- trading a
-    # strikethrough for a crossing. UP hits the "Y" label and the 300.00
-    # extension line.
-    #
-    # y=0.098 is the HIGHEST that clears: box y 0.0945..0.1015 leaves 2.1 mm under
-    # the "0" glyph, ~8.3 mm off the re-centred frame rule, and 8 mm left of the
-    # "0 -> X" row (x>=0.036, y 0.091..0.0955); the band x 0.017..0.039 is
-    # otherwise empty (probed y=0.096/0.100/0.102 -- only the rule and the
-    # x=0.0399 extension line).
-    #
-    # TRADEOFF, deliberate: a datum tag re-attaches at the point on its entity
-    # NEAREST the symbol (draw_fulcrum_shaft.py; wheel-axle's datum A proves it for
-    # straight edges too -- pick x=0.13125, symbol x=0.13725, triangle rendered at
-    # 0.1376). The end edge spans only y 0.1086..0.1136, so a symbol below it slides
-    # the triangle to the bottom corner (0.040, 0.1086) rather than mid-edge. The
-    # triangle stays ON the end face and the symbol stays outboard of it
-    # (dot((-0.012, -0.0106), (-1,0)) = +0.012 > 0), so it still reads as the end
-    # datum -- but there is no placement that keeps it mid-edge, because the edge's
-    # whole 5 mm lies inside the shaft's span.
-    add_datum_feature(
-        adapter,
-        front,
-        edge_xy=datum_c_edge,
-        symbol_xy=(0.028, 0.098),
-        datum="C",
-        label="guide end edge",
-    )
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=(FRONT_LEFT_X_M + FRONT_X[0] / 1000.0, FRONT_HOLE_Y_M),
-        # Was (0.105, 0.155), above the 269.64 dimension line, which its leader
-        # to A1 crossed (leader-crosses-line). Now between the bar and that line,
-        # right of the A1 tag: frame y 0.122..0.129 and "9X" down to 0.1174,
-        # 3.2 mm under the dimension line and 3.6 mm clear of the A1 tag.
-        frame_xy=(0.097, 0.129),
-        characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_IN["guide hole-pattern position"],
-        datums=("A", "B", "C"),
-        diameter=True,
-        quantity="9X",
-        label="guide hole-pattern position",
-    )
-    if add_note(adapter, FCF_MATE_NOTE, *FCF_MATE_NOTE_XY) is None:
-        raise RuntimeError("hole-pattern mate note was not inserted")
-    # The platen hangs by the top rail's bottom face (datum B) on the bar's top
+    # Owner ruling 2026-11-08: plain coordinates, no datums or position
+    # frame. The note stands where round 5/6 shipped it, under the 10.62 line.
+    if add_note(adapter, TAP_ROW_NOTE, *TAP_ROW_NOTE_XY) is None:
+        raise RuntimeError("tap-row band and wall note was not inserted")
+    # The platen hangs by the top rail's bottom face on the bar's top
     # edge and slides along it: the one running surface takes the part-owned
     # Ra symbol, landed on that face's edge in the front view.
     add_surface_finish(
@@ -493,7 +571,7 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=BAR_SLIDE_FINISH_XY,
         control=surface_finish_by_key(SURFACE_FINISHES, "bar_slide"),
         label="bar-slide face finish",
-        entity=datum_b_entity,
+        entity=_bottom_surface_edge(front),
         char_height=FINISH_CHAR_HEIGHT,
         leader_attach_xy=model_point_in_view(
             adapter,

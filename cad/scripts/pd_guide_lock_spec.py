@@ -44,7 +44,7 @@ UNIT = drawing_unit("parts/pd-guide-lock", _config.parts("pd-guide-lock"))
 # on each lock station.
 LOCK_WIDTH = 22.606  # .89, along +X
 # R9-59: the plate laps past the rail's outer edge. Its screw holes sit on the
-# rail's tap row, .140 above the rail's datum B (pd_platen_guide_spec.TAP_Y):
+# rail's tap row, .140 above the rail's bottom face (pd_platen_guide_spec.TAP_Y):
 # that is the bottom rail's outer edge and .150 below the top rail's, so at
 # .155 from the guide-side edge the plate laps .015 past the bottom rail and
 # .005 past the top one, and the holes keep the .080 wall target at the

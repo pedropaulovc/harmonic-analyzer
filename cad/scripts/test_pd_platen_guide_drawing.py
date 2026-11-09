@@ -216,7 +216,8 @@ def test_lock_receivers_are_through_taps_that_hold_the_screw_tip() -> None:
 
 def test_lock_through_tap_exits_clear_the_front_taps() -> None:
     # Each through tap exits the platen-mating face .276 from a front tap:
-    # both majors at the 9X Ø.008 position, both mouths broken .010.
+    # both stations at the title block's .XXX ±.005 (owner ruling
+    # 2026-11-08), both mouths broken .010.
     from _inch_wall_limits import WALL_FLOOR_MM
 
     c2c = min(
@@ -225,30 +226,147 @@ def test_lock_through_tap_exits_clear_the_front_taps() -> None:
         for front in guide.SCREW_STATION_X
     )
     assert c2c == pytest.approx(0.276 * 25.4)
-    wall = c2c - 0.008 * 25.4 - THREAD_MAJOR_MM["#4-40"] - 2.0 * 0.010 * 25.4
-    assert wall == pytest.approx(3.454, abs=1e-3)
+    wall = c2c - 2.0 * 0.005 * 25.4 - THREAD_MAJOR_MM["#4-40"] - 2.0 * 0.010 * 25.4
+    assert wall == pytest.approx(3.403, abs=1e-3)
     assert wall >= WALL_FLOOR_MM
     assert guide.LOCK_TAP_EXIT_WALL_MIN == pytest.approx(wall)
 
 
 def test_tap_walls_to_the_edges_pay_both_breaks_and_print_at_the_floor() -> None:
-    # Codjiflo (#2124): .080 unbroken from each tap's major at its Ø.008 zone
-    # to datum B and to the .29 top face at its minimum, less the title
-    # block's .010 outside edge break and the tap's .010 mouth break.
+    # Codjiflo (#2124): .080 unbroken from each tap's major at the row's
+    # .140 ±.004 (owner ruling 2026-11-08) to the bottom face and to the .29
+    # top face at its minimum, less the title block's .010 outside edge break
+    # and the tap's .010 mouth break.
     from _inch_wall_limits import WALL_FLOOR_MM
 
     unbroken = guide.TAP_Y - THREAD_MAJOR_MM["#4-40"] / 2.0 - 0.004 * 25.4
     assert unbroken == pytest.approx(0.080 * 25.4, abs=1e-3)
     assert guide.TAP_EDGE_WALL_MIN == pytest.approx(unbroken - 2.0 * 0.010 * 25.4)
     assert guide.TAP_EDGE_WALL_MIN >= WALL_FLOOR_MM - 0.0005
-    # Rule 20: the sheet states the shortfall at the tap pattern's note, and
-    # the package declares it (Owner ruling 2026-11-08 (Pedro), #2144 item 2.1).
+    # Rule 20: the sheet states the shortfall at the tap row's note, and the
+    # package declares it (owner ruling RV-01).
     assert guide.TAP_EDGE_WALL_TEXT == "WALL .060 MIN, TAPS TO EDGES"
-    assert drawing.FCF_MATE_NOTE.endswith(guide.TAP_EDGE_WALL_TEXT)
+    assert drawing.TAP_ROW_NOTE.split("\n")[1:] == [guide.TAP_EDGE_WALL_TEXT]
     exceptions = _config.parts("pd-platen-guide")["machinist_exceptions"]
-    assert any(
-        entry["kind"] == "minor" and ".060" in entry["where"] for entry in exceptions
+    (entry,) = [entry for entry in exceptions if entry["id"] == "RV-01"]
+    assert entry["kind"] == "minor" and ".060" in entry["where"]
+    assert entry["reason"].startswith("Owner ruling 2026-11-08 (Pedro)")
+
+
+def test_the_taps_print_plain_coordinates_without_gdt() -> None:
+    """Owner ruling 2026-11-08 (#2144 item 2.3): noncritical holes, no
+    position frame or datums, no spot-through route. The stations take the
+    title block's .XXX ±.005; the tap row's ±.004 is on the note at the
+    table, with its reason."""
+    from pd_platen_guide_spec import (
+        TAP_STATION_BAND,
+        TAP_STATION_PLACES,
+        TAP_Y_BAND,
+        TAP_Y_BAND_TEXT,
     )
+
+    assert not hasattr(guide, "GEOMETRIC_TOLERANCES_MM")
+    assert TAP_STATION_PLACES == 3
+    assert TAP_STATION_BAND == pytest.approx(0.005 * 25.4)
+    assert TAP_Y_BAND == pytest.approx(0.004 * 25.4)
+    assert TAP_Y_BAND_TEXT == ".140 ±.004"
+    assert drawing.TAP_ROW_NOTE.split("\n")[0] == "A1-A9: Y LOC .140 ±.004"
+    assert len(drawing.HOLE_TAGS) == len(drawing.HOLE_STATIONS_MM) == 9
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    for gone in ("add_feature_control_frame", "add_datum_feature", "SPOT THRU"):
+        assert gone not in source
+    exceptions = _config.parts("pd-platen-guide")["machinist_exceptions"]
+    assert [entry["id"] for entry in exceptions] == ["RV-01"]
+
+
+class _FakeHoleTable:
+    """Native hole table stand-in: TAG / X LOC / Y LOC / SIZE, rows unordered,
+    the SIZE cells merged.  Like the farm's SolidWorks (round 3), inserting a
+    column re-renders the generated cells (.140 for 0.140, the size's CRLF)
+    and splits the SIZE merge."""
+
+    def __init__(self) -> None:
+        stations = list(reversed(drawing.HOLE_STATIONS_MM))
+        self.cells = [["TAG", "X LOC", "Y LOC", "SIZE"]] + [
+            [f"A{i}", f"{station / 25.4:.3f}", "0.140", "4-40 UNC - 2B THRU ALL"]
+            for i, station in enumerate(stations, start=1)
+        ]
+        self.widths = [0.02, 0.03, 0.03, 0.06]
+        self.size_merged = True
+        self.merge_calls: list[tuple[int, int, int, int]] = []
+
+    @property
+    def RowCount(self) -> int:
+        return len(self.cells)
+
+    @property
+    def ColumnCount(self) -> int:
+        return len(self.cells[0])
+
+    def DisplayedText2(self, row: int, column: int, _hidden: bool) -> str:
+        return self.cells[row][column]
+
+    def InsertColumn2(self, where: int, index: int, title: str, _width: int) -> bool:
+        assert (where, index) == (3, 3)
+        for row in self.cells[1:]:
+            row[2] = ".140"
+            row[3] = "4-40 UNC - 2B\r\nTHRU ALL"
+        for row in self.cells:
+            row.append("")
+        self.widths.append(0.01)
+        self.size_merged = False
+        return True
+
+    def IsCellMerged(self, row: int, column: int) -> tuple[bool, int, int]:
+        return (column == 3 and row > 0 and self.size_merged, 1, 3)
+
+    def MergeCells(self, *cells: int) -> bool:
+        self.merge_calls.append(cells)
+        self.size_merged = True
+        return True
+
+    def SetColumnTitle2(self, column: int, title: str, _flag: bool) -> bool:
+        self.cells[0][column] = title
+        return True
+
+    def IsCellTextEditable(self, row: int, column: int) -> bool:
+        return row > 0 and column == 4
+
+    def SetText2(self, row: int, column: int, _flag: bool, text: str) -> None:
+        self.cells[row][column] = text
+
+    def SetColumnWidth(self, column: int, width: float, _change: int) -> float:
+        self.widths[column] = width
+        return width
+
+
+def test_the_hole_table_names_each_taps_mate() -> None:
+    """Round 2 (rules 4 and 10): a MATE column names MHA-PD-02 for the platen
+    taps and MHA-PD-12 for the lock taps, each row bound by its station, not
+    by its tag's order; the generated cells stay as they were."""
+    platen = _config.parts("pd-platen")["number"]
+    lock = _config.parts("pd-guide-lock")["number"]
+    assert {drawing.HOLE_TABLE_MATES[s] for s in drawing.FRONT_X} == {platen}
+    assert {drawing.HOLE_TABLE_MATES[s] for s in drawing.REAR_X} == {lock}
+    table = _FakeHoleTable()
+    generated, size_merged = drawing._add_mate_column(table)
+    assert size_merged is True
+    drawing._check_mate_column(table, generated, size_merged)
+    assert table.merge_calls == [(1, 3, table.RowCount - 1, 3)]
+    assert table.size_merged
+    assert table.cells[0][4] == drawing.HOLE_TABLE_MATE_COLUMN
+    for row in table.cells[1:]:
+        x_mm = float(row[1]) * 25.4
+        station = min(drawing.HOLE_STATIONS_MM, key=lambda s: abs(s - x_mm))
+        assert row[4] == (platen if station in drawing.FRONT_X else lock)
+    assert table.widths[4] == drawing.HOLE_TABLE_MATE_COLUMN_WIDTH
+    table.cells[3][4] = platen if table.cells[3][4] == lock else lock
+    with pytest.raises(RuntimeError, match="MATE cells differ"):
+        drawing._check_mate_column(table, generated, size_merged)
+    table.cells[3][4] = platen if table.cells[3][4] == lock else lock
+    table.cells[3][1] = "9.999"
+    with pytest.raises(RuntimeError, match="tags or locations"):
+        drawing._check_mate_column(table, generated, size_merged)
 
 
 def test_drawing_contract_imports_without_pywin32() -> None:
@@ -277,9 +395,9 @@ def test_required_drawing_paths() -> None:
     assert drawing.PNG.as_posix().endswith("/png/pd-platen-guide_drawing.png")
 
 
-def test_sheet_carries_no_notes_block_restating_the_position_frame() -> None:
-    # The 9X position frame already says it; "HOLE POSITION PER FCF." only
-    # repeated it (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)), and nothing else needs a note.
+def test_sheet_carries_no_notes_block() -> None:
+    # The tap-row note at the hole table carries the only words the taps
+    # need (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).
     assert not hasattr(guide, "DRAWING_NOTES")
     for module in (guide, drawing):
         assert "Manufacturing Notes" not in Path(module.__file__).read_text(
@@ -373,27 +491,12 @@ def test_part_authors_the_printed_dimensions_and_places() -> None:
     assert source.count("dimensions_by_feature=DRAWING_DIMENSIONS") == 2
 
 
-def test_datum_b_surface_symbol_is_clear_of_every_hole_axis() -> None:
-    hole_axis_x = {
-        drawing.FRONT_LEFT_X_M + station / 1000.0
-        for station in (*drawing.REAR_X, *drawing.FRONT_X)
-    }
-    assert drawing.DATUM_B_SYMBOL_X_M == pytest.approx(
-        drawing.FRONT_LEFT_X_M + guide.GUIDE_LENGTH * 0.6 / 1000.0, abs=1.3e-5
-    )
-    # The stations sit on the platen's .001 grid, within half a step.
-    assert min(
-        abs(drawing.DATUM_B_SYMBOL_X_M - x) for x in hole_axis_x
-    ) == pytest.approx(
-        (guide.GUIDE_LENGTH * 0.1 - guide.LOCK_SCREW_DX) / 1000.0, abs=1.3e-5
-    )
+def test_bar_slide_finish_lands_on_the_bottom_surface_edge() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "def _bottom_surface_edge(" in source
     assert 'visible_view_entities(view, 1, label="platen-guide bottom edge")' in source
     assert "if span_mm < GUIDE_LENGTH - 0.1:" in source
-    assert "datum_b_entity = _bottom_surface_edge(front)" in source
-    assert "entity=datum_b_entity" in source
-    assert "symbol_xy=(DATUM_B_SYMBOL_X_M, 0.098)" in source
+    assert "entity=_bottom_surface_edge(front)" in source
 
 
 def test_gdt_xml_and_note_links_use_native_drawing_contracts() -> None:

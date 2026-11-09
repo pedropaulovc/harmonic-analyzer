@@ -2,7 +2,7 @@ r"""Reproduction script: transgear disc hub (MHA-PD-17; ch. 23; 1 used).
 
 The turned brass hub and flange whose bore slides on the pinion sleeve's
 (MHA-PD-10) boss and drives through its D-flat. Its rear spigot passes the
-reducer disc's (MHA-PD-06) bore, which pilots on it, and seats on the sleeve's
+reducer disc's (MHA-PD-06) bore, which it clears, and seats on the sleeve's
 step; the flange's rear face clamps the disc's front face and three #0-80
 fillister screws (MHA-PD-VN-55) hold them.  Nothing fastens the hub to the
 sleeve: the spigot bears on the step and the MHA-PD-25 front bushing traps hub
@@ -567,7 +567,7 @@ async def build(adapter) -> dict[str, str]:
     await report_mass_properties(adapter)
     # The bore carries both its bands on the model: the round's and the
     # flat's, which together set the fit on the sleeve's boss and flat; the
-    # spigot carries its SHAFT_H, the disc's pilot.  The overall and spigot
+    # spigot carries its turned-row band, clear of the disc's bore.  The overall and spigot
     # lengths carry the disc cluster stack's printed band.  Every other size
     # is governed by its places, the holes by the title block's DRILLED HOLES
     # row (the spec's DRAWING_PRECISION).  All print in inches.

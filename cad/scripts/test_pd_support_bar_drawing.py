@@ -12,6 +12,7 @@ import pytest
 import _config
 from _column_clamp_interface import BAR_DEPTH
 from _inch_wall_limits import WALL_TARGET_MM
+from _surface_finish import surface_finish_by_key
 import build_pd_support_bar as part
 import draw_pd_support_bar as drawing
 import pd_support_bar_drawing_spec as sheet_spec
@@ -21,16 +22,19 @@ import pd_support_bar_spec as spec
 def test_printed_mating_numbers_resolve_to_the_registered_parts() -> None:
     registered = {row["number"] for row in _config.parts().values()}
     references = (
-        (
-            drawing.DIMENSION_CALLOUTS["ClampSlotCboreWidth"],
-            "sh-vn-clamp-screw",
-        ),
-        (
-            drawing.DIMENSION_CALLOUTS["ClampSlotCboreDepth"],
-            "sh-vn-clamp-screw",
-        ),
+        (drawing.DIMENSION_CALLOUTS["ClampSlotWidth"], "sh-vn-clamp-screw"),
+        (drawing.DIMENSION_CALLOUTS["Depth"], "pd-vn-transgear-pivot-screw"),
         (drawing.CLAMP_CBORE_CALLOUT, "sh-vn-clamp-screw"),
-        (drawing.DIMENSION_CALLOUTS["Depth"], "sh-vn-fillister-screw-90280a108"),
+        (drawing.DIMENSION_CALLOUTS["PivotCskDia"], "pd-vn-transgear-pivot-screw"),
+        (drawing.DIMENSION_CALLOUTS["BracketCskDia"], "pd-latch-hook"),
+        (
+            surface_finish_by_key(sheet_spec.SURFACE_FINISHES, "top_slide").production_method,
+            "pd-platen-guide",
+        ),
+        (
+            surface_finish_by_key(sheet_spec.SURFACE_FINISHES, "front_slide").production_method,
+            "pd-platen",
+        ),
     )
     for text, mate in references:
         printed = set(re.findall(r"\bMHA-[A-Z0-9]+(?:-[A-Z0-9]+)+\b", text))
@@ -55,16 +59,74 @@ def test_printed_bands_match_the_bar_and_drilled_slot_limits() -> None:
     assert part.CLAMP_SLOT_WIDTH_LIMITS == (0.0, drilled_oversize_mm(unit="in"))
 
 
+def test_hook_tap_stations_are_reference_and_only_the_pivot_row_is_banded() -> None:
+    """Round 3 machinist review (over-specification): SPOT THRU MHA-PD-14 AT
+    ASSEMBLY sets the hook taps' stations, so they print REF with no band;
+    the row height and the pivot's station keep ±.002 (RV-01)."""
+    import inspect
+
+    banded = set(sheet_spec.BANDED_HANGER_NAMES)
+    reference = set(sheet_spec.HOOK_TAP_REFERENCE_NAMES)
+    assert banded == {"HangerRowHeight", "PivotTapStation"}
+    assert reference == {"BracketTapStation1", "BracketTapStation2"}
+    assert banded | reference == {"HangerRowHeight", *sheet_spec.HANGER_STATION_NAMES}
+    source = inspect.getsource(part.build)
+    assert "for name in BANDED_HANGER_NAMES:" in source
+    assert "HANGER_STATION_NAMES" not in source
+    assert "SPOT THRU MHA-PD-14" in sheet_spec.DIMENSION_CALLOUTS["BracketCskDia"]
+
+
+def _station_annotations(tolerance_type: int = 0, names=None):
+    names = sheet_spec.HOOK_TAP_REFERENCE_NAMES if names is None else names
+    tolerance = SimpleNamespace(Type=tolerance_type)
+    display = SimpleNamespace(GetDimension2=lambda _i: SimpleNamespace(Tolerance=tolerance))
+    return [
+        SimpleNamespace(name=name, GetSpecificAnnotation=lambda: display)
+        for name in ("PivotTapStation", *names)
+    ]
+
+
+@pytest.fixture
+def reference_calls(monkeypatch):
+    calls = []
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, annotation: annotation.name)
+    monkeypatch.setattr(
+        drawing,
+        "set_reference_dimension",
+        lambda _adapter, annotation, *, label: calls.append((annotation.name, label)),
+    )
+    return calls
+
+
+def test_hook_tap_stations_go_reference_once_each(reference_calls) -> None:
+    drawing._reference_hook_tap_stations(None, _station_annotations())
+    assert [name for name, _label in reference_calls] == list(
+        sheet_spec.HOOK_TAP_REFERENCE_NAMES
+    )
+
+
+def test_hook_tap_reference_refuses_a_band_or_a_missing_station(reference_calls) -> None:
+    with pytest.raises(RuntimeError, match="carries a band"):
+        drawing._reference_hook_tap_stations(None, _station_annotations(tolerance_type=1))
+    with pytest.raises(RuntimeError, match="BracketTapStation2 dimensions, not 1"):
+        drawing._reference_hook_tap_stations(
+            None, _station_annotations(names=("BracketTapStation1",))
+        )
+    assert all(name != "PivotTapStation" for name, _label in reference_calls)
+
+
 def test_clamp_holes_find_the_back_arc_taps_at_the_printed_worst_case() -> None:
     """Review of PR #1471: the clamp row printed .X (±0.8), whose 2.263
     position zone over-runs the 0.812 the #8 clearance holes float on the
     #8-32 shanks. Fixed fastener: each screw threads into an MHA-SH-02
     back-arc tap held ±.004 along the bar and in height (sh_column_clamp_fit),
     so the bar's zone (2·√2·band, plus the print's rounding) plus the tap's
-    must stay inside the least hole's float; the band is the widest .XXX
-    that does. A drift in the band, the hole, the shank or the taps' bands
-    breaks one of these."""
+    must stay inside the least hole's float; the title block's .XXX ±.005
+    does (delegated ruling 2026-11-07). A drift in the band, the hole, the
+    shank or the taps' bands breaks one of these."""
     from _hole_spec import HoleSpec, blind_cut_dia_mm
+    from _printed_tolerance import printed_band_mm
     from sh_column_clamp_back_geom import HOLE_SPEC as BACK_ARC_TAP
     from sh_column_clamp_fit import EAR_HEIGHT_BAND, EAR_STATION_BAND
     from sh_vn_clamp_screw_spec import SHANK_DIA
@@ -87,11 +149,10 @@ def test_clamp_holes_find_the_back_arc_taps_at_the_printed_worst_case() -> None:
     # The .XXX print rounds the mm stations, so the zone carries that
     # rounding on top of the band's.
     band = part.CLAMP_POSITION_BAND
-    assert band == pytest.approx(0.1778)  # ±.007
+    assert band == pytest.approx(printed_band_mm(3, unit="in")) == pytest.approx(0.127)
     assert part.clamp_position_zone(band) >= zone(band)
     assert part.BACK_ARC_TAP_ZONE == pytest.approx(tap_zone)
-    assert part.clamp_position_zone(band) + tap_zone <= hole_float  # .800 <= .812
-    assert part.clamp_position_zone(band + 0.0254) + tap_zone > hole_float
+    assert part.clamp_position_zone(band) + tap_zone <= hole_float  # .653 <= .812
 
 
 def test_row_nominals_are_the_built_holes() -> None:
@@ -216,8 +277,33 @@ def test_reference_rows_follow_the_bar_globals_onto_the_holes(
             f"{row.prefix}RiseY": height / 2.0,
             row.height_name: height / 2.0 - row_y,
             f"{row.prefix}StartX": length / 2.0,
-            # Each station runs from the moved left end to its unmoved hole.
+            # A row whose run starts off END A drops to it down END A's edge.
+            f"{row.prefix}StartY": height / 2.0,
+            f"{row.prefix}StartDrop": height / 2.0 - row_y,
+            # A height read off a run's end in the bar: a stub on the top
+            # face over it, at the run end's fixed offset from the centre.
+            f"{row.prefix}StubX": abs(row.runs[-1][1]),
+            f"{row.prefix}StubY": height / 2.0,
+            f"{row.prefix}StubLength": part.HEIGHT_STUB_LENGTH,
+            # Each station runs from the moved left end to its unmoved hole,
+            # and so does each run's end.
             **{name: x + length / 2.0 for name, (x, _y) in zip(names, holes)},
+            **{
+                f"{row.prefix}Run{index}{side}X": x + length / 2.0
+                for index, run in enumerate(row.runs)
+                for side, x in zip(("Start", "End"), run)
+            },
+            # Every other run reads its own height off a stub over its end.
+            **{
+                key: value
+                for index, name in enumerate(row.run_heights)
+                for key, value in (
+                    (f"{row.prefix}Run{index}StubX", abs(row.runs[index][1])),
+                    (f"{row.prefix}Run{index}StubY", height / 2.0),
+                    (f"{row.prefix}Run{index}StubLength", part.HEIGHT_STUB_LENGTH),
+                    (name, height / 2.0 - row_y),
+                )
+            },
         }
         authored = _authored_row(monkeypatch, row)
         for name, value, drive in authored:
@@ -225,6 +311,118 @@ def test_reference_rows_follow_the_bar_globals_onto_the_holes(
             # Neutral at the built size, tracking the holes at any other.
             assert _evaluate(drive, built) == pytest.approx(value), name
             assert _evaluate(drive, globals_mm) == pytest.approx(expected[name]), name
+        # Every run carrying holes has a height dimension.
+        heights = {row.height_name, *row.run_heights}
+        assert heights <= {name for name, _value, _drive in authored}
+        assert len(heights) == len(row.runs)
+
+
+def test_each_row_draws_its_own_centreline() -> None:
+    """Round 4 machinist review (rule 26): one drawn line ran through the
+    .571 taps and the .551 clamp holes, .020 apart. Each row's sketch draws
+    runs through its own holes only, no stretch of the bar under both rows'
+    runs, every run clearing the other row's widest rings; the .551 reads off
+    the clamp run at the +X end, the .571 off the tap run's end."""
+    taps, clamps = part.HANGER_ROW, part.CLAMP_ROW
+    assert part.ROW_CENTRELINES == (taps, clamps)
+    for row in (taps, clamps):
+        on_runs = [name for run in row.runs for name, _ in part._run_holes(row, run)]
+        assert sorted(on_runs) == sorted(name for name, _ in row.holes)
+    # The other row's rings: the slot counterbores reach 5.75 off their
+    # centres, the round ones 4.25, the countersinks 2.15.
+    slot_reach = part.CLAMP_SLOT_RUN / 2.0 + part.CLAMP_CBORE_DIA / 2.0
+    csk_reach = spec.PIVOT_TAP_CSK_DIA / 2.0
+    for start, end in taps.runs:
+        for x in part.CLAMP_ROW_X:
+            assert x + slot_reach < start or end < x - slot_reach, x
+    for start, end in clamps.runs:
+        for _, x in taps.holes:
+            assert x + csk_reach < start or end < x - csk_reach, x
+    assert clamps.runs[-1][1] == part.BAR_LENGTH / 2.0
+    assert taps.runs[-1][1] == sheet_spec.HANGER_HEIGHT_X
+    line_x = drawing.FRONT_KEEP["HangerRowHeight"][0]
+    assert line_x == pytest.approx(
+        drawing._face_x(sheet_spec.HANGER_HEIGHT_X) + drawing.HANGER_ROW_LINE_SIDE
+    )
+    # The run's end stands clear past the hook taps' countersinks and short
+    # of the west slots' counterbores, the text's lane over the top face.
+    assert sheet_spec.HANGER_HEIGHT_X > spec.BRACKET_TAP_X[1] + 0.020 / drawing._S
+    assert sheet_spec.HANGER_HEIGHT_X < min(part.CLAMP_SLOT_X) - slot_reach
+
+
+def test_round_pair_run_reads_its_own_height_in_the_principal_view() -> None:
+    """Round 7 review blocker: the round pair's east run carried no height,
+    the .551 reading only off the west (slots') run. The east run reads its
+    own .551 off its end in the principal view, the back face, which imports
+    it (VIEW D's import deletes it as unrequested, as the principal view's
+    deletes the bar height). Round 7's native layout: the .571 text sat on
+    its line's shelf, 6.4 mm tall, 2.45 mm a character; the top slide
+    symbol's leader drops at 0.0807 from its shelf at 0.2424."""
+    name = sheet_spec.CLAMP_EAST_HEIGHT_NAME
+    clamps = part.CLAMP_ROW
+    assert clamps.run_heights == (name,)
+    assert name in sheet_spec.DRAWING_DIMENSIONS["ClampRowReference"]
+    assert name in drawing.FRONT_KEEP and name not in drawing.BACK_KEEP
+    assert sheet_spec.SHEET_PRECISION["ClampRowReference"][name] == 3
+    # It is a location: no band of its own, no words (title block ±.005).
+    assert name not in drawing.DIMENSION_CALLOUTS
+    line_x, text_y = drawing.FRONT_KEEP[name]
+    assert line_x == pytest.approx(
+        drawing._face_x(clamps.runs[0][1]) + drawing.HANGER_ROW_LINE_SIDE
+    )
+    assert text_y == drawing.FRONT_KEEP["HangerRowHeight"][1]
+    text = f"{part.CLAMP_ROW_HEIGHT / 25.4:.3f}".lstrip("0")
+    box = (line_x, text_y - 0.0032, line_x + len(text) * 0.00245, text_y + 0.0032)
+    leader_x, shelf_y = 0.0807, 0.2424
+    assert drawing._face_x(drawing.TOP_FINISH_MODEL_X) == pytest.approx(leader_x, abs=5e-4)
+    assert box[0] - leader_x >= 0.005
+    assert shelf_y - box[3] >= 0.003
+    assert box[1] - drawing.FACE_TOP >= 0.002
+    # Right of the run's end, past the inner round hole's ring.
+    assert line_x - drawing._face_x(max(part.CLAMP_ROUND_X)) > 0.005
+    # Well left of section A-A's letters (0.1208).
+    assert 0.1208 - box[2] >= 0.015
+
+
+def test_tap_row_height_text_clears_the_hook_leader_and_both_shoulders() -> None:
+    """The .571 reads off the tap run's end with its one-row text over the top
+    face. Round 2's native layout: each countersink callout's bottom shoulder
+    stands 11.1 mm under its keep and runs from 41.9 mm left of it to 40.4
+    right; the hook pair's leader runs from its right hole to that left end.
+    Both callouts rise together, so the hook leader still passes under the
+    pivot block's last row; the text (2.76 mm a character, 6.4 mm tall,
+    starting 1.5 mm right of its line) stands right of that leader, under the
+    shoulders and over the top face."""
+    shoulder_drop, shoulder_left = 0.0111, 0.0419
+    hook_x, hook_y = drawing.FRONT_KEEP["BracketCskDia"]
+    pivot_x, pivot_y = drawing.FRONT_KEEP["PivotCskDia"]
+    assert hook_y == pivot_y == drawing.FACE_TOP + drawing.CSK_CALLOUT_RISE
+    shoulder_y = hook_y - shoulder_drop
+    hole = (
+        drawing._face_x(spec.BRACKET_TAP_X[1]),
+        drawing.FACE_TOP - part.HANGER_ROW_HEIGHT * drawing._S,
+    )
+    knee = (hook_x - shoulder_left, shoulder_y)
+
+    def leader_x(y: float) -> float:
+        return hole[0] + (y - hole[1]) * (knee[0] - hole[0]) / (knee[1] - hole[1])
+
+    line_x, text_y = drawing.FRONT_KEEP["HangerRowHeight"]
+    text = f"{part.HANGER_ROW_HEIGHT / 25.4:.3f} \u00b1.002".lstrip("0")
+    box = (line_x + 0.0015, text_y - 0.0032, line_x + 0.0015 + len(text) * 0.00276, text_y + 0.0032)
+    assert box[1] - drawing.FACE_TOP >= 0.002
+    assert shoulder_y - box[3] >= 0.002
+    assert box[0] - leader_x(box[3]) >= 0.003
+    # Its line, from the row up to the text, stays right of the leader too.
+    assert line_x - leader_x(text_y) >= 0.003
+    # The hook leader passes under the pivot block's bottom row's right end.
+    pivot_row_right = pivot_x + len("LOCATES MHA-PD-VN-57") * 0.00264 / 2.0
+    assert knee[0] > pivot_row_right
+    assert (pivot_y - shoulder_drop) - (
+        hole[1] + (pivot_row_right - hole[0]) * (knee[1] - hole[1]) / (knee[0] - hole[0])
+    ) >= 0.0015
+    # Under the border.
+    assert hook_y + 0.0116 < 0.2667 - 0.002
 
 
 def test_rows_stack_shortest_nearest_the_bar() -> None:
@@ -249,25 +447,24 @@ def test_rows_stack_shortest_nearest_the_bar() -> None:
         x = drawing.FRONT_KEEP[name][0]
         assert drawing.LEFT_END < x < drawing.LEFT_END + span * drawing._S
     # In the front-face view that end is on the sheet's right: the long clamp
-    # rows' texts stand between it and their holes. The first two rows'
-    # banded texts are wider than their spans, so they stand right of the
-    # end's extension line and left of the isometric view (its r6 outline's
-    # left edge), at a conservative 2.76 mm a character (2.3 measured).
+    # rows' texts stand between it and their holes; the first two rows' stand
+    # right of the end's extension line (the first's text is wider than its
+    # span) and left of the isometric view (its r6 outline's left edge), at a
+    # conservative 2.76 mm a character (2.3 measured).
     iso_left = 0.3216
     for name, station, hole_x in zip(
         sheet_spec.CLAMP_STATION_NAMES, part.CLAMP_STATIONS, part.CLAMP_ROW_X
     ):
         x = drawing.BACK_KEEP[name][0]
-        value, band = (
-            f"{v / 25.4:.3f}".lstrip("0")
-            for v in (station, part.CLAMP_POSITION_BAND)
-        )
-        text = f"{value} \u00b1{band}"
+        text = f"{station / 25.4:.3f}".lstrip("0")
         half = len(text) * 0.00276 / 2.0
-        if (drawing.RIGHT_END - drawing._back_x(hole_x)) > 2.0 * half:
+        if x < drawing.RIGHT_END:
             assert drawing._back_x(hole_x) < x - half < x + half < drawing.RIGHT_END
         else:
             assert drawing.RIGHT_END < x - half < x + half < iso_left, name
+    first = drawing.RIGHT_END - drawing._back_x(part.CLAMP_ROW_X[0])
+    assert drawing.BACK_KEEP["ClampStation1"][0] > drawing.RIGHT_END
+    assert first < len(f"{part.CLAMP_STATIONS[0] / 25.4:.3f}".lstrip("0")) * 0.00276
 
 
 def test_clamp_callout_stands_between_the_bar_and_the_length_line() -> None:
@@ -400,10 +597,10 @@ def test_west_slots_take_up_the_column_pitch() -> None:
     # the printed .196) at the worst height misalignment.
     radial = (4.978 - SHANK_DIA) / 2.0
     station = part.CLAMP_POSITION_BAND
-    assert station == pytest.approx(0.1778)  # ±.007
+    assert station == pytest.approx(0.127)  # the title block's ±.005
     height = station + EAR_HEIGHT_BAND
     slack = math.sqrt(radial**2 - height**2)
-    assert slack == pytest.approx(0.2948, abs=1e-4)
+    assert slack == pytest.approx(0.3358, abs=1e-4)
     # Each slot's least travel each way: its .118 run at .XXX.
     assert part.CLAMP_SLOT_RUN == 2.0 * part.CLAMP_SLOT_TRAVEL == 2.9972
     assert part.CLAMP_SLOT_WIDTH == part.CLAMP_HOLE_DIA == pytest.approx(4.978)
@@ -411,8 +608,8 @@ def test_west_slots_take_up_the_column_pitch() -> None:
     # Between an east and a west screw: both bar stations, both clamps' tap
     # stations and both clamps' shift on their columns.
     between = 2.0 * (station + EAR_STATION_BAND + BORE_DIAMETRAL_CLEARANCE[1] / 2.0)
-    assert between == pytest.approx(0.8636)
-    for pitch, margin in ((top, 0.6512), (base, 0.1412)):
+    assert between == pytest.approx(0.762)
+    for pitch, margin in ((top, 0.8346), (base, 0.3246)):
         left = travel + 2.0 * slack - (pitch + between)
         assert left == pytest.approx(margin, abs=5e-4)
         assert part.clamp_slot_closure_margin(pitch) == pytest.approx(left)
@@ -420,7 +617,7 @@ def test_west_slots_take_up_the_column_pitch() -> None:
     assert 2.0 * slack - (top + between) < 0.0
     # The east pair share one clamp: only their stations and taps open it.
     east = 2.0 * slack - 2.0 * (station + EAR_STATION_BAND)
-    assert east == pytest.approx(0.0309, abs=1e-4)
+    assert east == pytest.approx(0.2143, abs=1e-4)
     assert part.clamp_east_pair_margin() == pytest.approx(east)
 
 
@@ -469,9 +666,9 @@ def test_slot_counterbores_leave_rule_17_walls() -> None:
     inner, outer = sorted(part.CLAMP_STATIONS)[2:]
     shortest = part.BAR_LENGTH - printed_band_mm(1, unit="in")
     end_wall = shortest - (outer + station) - cbore_reach
-    assert end_wall == pytest.approx(2.899, abs=5e-3)
+    assert end_wall == pytest.approx(2.946, abs=5e-3)
     web = (outer - inner) - 2.0 * station - 2.0 * cbore_reach
-    assert web == pytest.approx(22.757, abs=5e-3)
+    assert web == pytest.approx(22.860, abs=5e-3)
     # The clamp line stands CLAMP_ROW_HEIGHT under the top face, so the
     # bottom face (the height's printed minimum) is the nearer one.
     side = (
@@ -481,7 +678,7 @@ def test_slot_counterbores_leave_rule_17_walls() -> None:
         - station
         - cbore_max / 2.0
     )
-    assert side == pytest.approx(6.968, abs=5e-3)
+    assert side == pytest.approx(7.019, abs=5e-3)
     for wall in (end_wall, web, side):
         assert wall >= WALL_TARGET_MM
     # Nominally 5.806 to the end, 23.495 between.
@@ -617,6 +814,13 @@ def slot_depth_native(monkeypatch):
     position = [0.07575, 0.0592, 0.41865]
     state = {"ignore_seed": False, "activations": [], "seeds": []}
 
+    def baseline() -> float:
+        return next(
+            start[1]
+            for start, end in lines["ClampSlotCboreDepth"]
+            if start[1] == end[1] and {start[0], end[0]} == {_FRONT_X, _FLOOR_X}
+        )
+
     class Display:
         _offset = False
 
@@ -631,7 +835,7 @@ def slot_depth_native(monkeypatch):
                 # Model the documented native creation-point re-dress. An
                 # omitted/ignored baseline seed must fail the witness guard.
                 state["activations"].append(position[1])
-                dy = position[1] - 0.0480875
+                dy = position[1] - baseline()
                 lines["ClampSlotCboreDepth"] = [
                     (start, (end[0], end[1] + dy))
                     if start[0] == end[0]
@@ -664,20 +868,33 @@ def slot_depth_native(monkeypatch):
         GetNotes=lambda: [caption],
     )
     moves = []
+    seats = []
 
     def move(_adapter, annotation, dx, dy, *, label):
-        assert display.OffsetText is True
         box = boxes[annotation.name]
         boxes[annotation.name] = (
             box[0] + dx, box[1] + dy, box[2] + dx, box[3] + dy,
         )
+        if not display.OffsetText:
+            # Before OffsetText the line follows its text: the baseline and
+            # the witnesses' far ends move with it, the witnesses' feet stay.
+            position[1] += dy
+            lines[annotation.name] = [
+                (start, (end[0], end[1] + dy))
+                if start[0] == end[0]
+                else ((start[0], start[1] + dy), (end[0], end[1] + dy))
+                for start, end in lines[annotation.name]
+            ]
+            seats.append((dx, dy))
+            return
         # A positive-control native route leaves the mouth horizontally,
         # then turns outside the actual bar. Unlike the previous fixture,
         # this includes an OffsetText leader that the material guard sees.
         left, bottom = boxes[annotation.name][:2]
+        line_y = baseline()
         lines[annotation.name].extend([
-            ((_FRONT_X, 0.0480875), (left, 0.0480875)),
-            ((left, 0.0480875), (left, bottom)),
+            ((_FRONT_X, line_y), (left, line_y)),
+            ((left, line_y), (left, bottom)),
         ])
         moves.append((dx, dy))
 
@@ -692,10 +909,12 @@ def slot_depth_native(monkeypatch):
         lambda _adapter, annotation, *, label: boxes[annotation.name],
     )
     monkeypatch.setattr(drawing, "dimension_segments", lambda annotation: lines[annotation.name])
+    # Sheet y 0.048 is the clamp line, as in the material proof below.
     monkeypatch.setattr(
         drawing, "_sheet",
         lambda _adapter, _view, point, _label: (
-            0.053 - point[2] / 1000.0, 0.048 + point[1] / 1000.0,
+            0.053 - point[2] / 1000.0,
+            0.048 + (point[1] - spec.CLAMP_TAP_Y) / 1000.0,
         ),
     )
     monkeypatch.setattr(drawing, "move_annotation", move)
@@ -706,7 +925,7 @@ def slot_depth_native(monkeypatch):
     )
     return SimpleNamespace(
         section=section, boxes=boxes, lines=lines, witnesses=witnesses,
-        display=display, moves=moves, state=state,
+        display=display, moves=moves, seats=seats, state=state, position=position,
         details=[annotations["ClampSlotCboreWidth"]],
         depth=[annotations["ClampSlotCboreDepth"]],
         back=[annotations["ClampStation4"], annotations["ClampRowHeight"]],
@@ -741,6 +960,53 @@ def test_slot_depth_ignored_baseline_seed_refuses_native_redress(slot_depth_nati
         )
     assert native.state["activations"] == [0.0592]
     assert native.moves == []
+
+
+def test_slot_depth_seats_a_drifted_baseline_on_the_clamp_line(slot_depth_native):
+    """Round 1 of the fan-out: with the callout lines gone the bare .19's line
+    stood ~8.4 mm over the clamp line, its floor witness into the upper bar.
+    The baseline is measured and moved onto the clamp line before OffsetText,
+    so the witnesses the guards keep are the seated ones."""
+    native = slot_depth_native
+    drift = 0.0083
+    native.lines["ClampSlotCboreDepth"] = [
+        (start, (end[0], end[1] + drift))
+        if start[0] == end[0]
+        else ((start[0], start[1] + drift), (end[0], end[1] + drift))
+        for start, end in native.lines["ClampSlotCboreDepth"]
+    ]
+    native.position[1] += drift
+    # Positive control: the drifted native ink crosses the upper bar.
+    drifted = drawing._slot_depth_native_lines(native.depth[0])[0]
+    material = drawing._slot_section_material_boxes(None, native.section, drifted)
+    with pytest.raises(RuntimeError, match="upper bar"):
+        drawing._require_slot_depth_ink_outside_material(
+            native.lines["ClampSlotCboreDepth"], material
+        )
+    witnesses = drawing._place_slot_depth_callout(
+        None, native.section, native.details, native.depth, native.back
+    )
+    assert native.seats == [(0.0, pytest.approx(0.048 - (0.0480875 + drift)))]
+    for got, expected in zip(witnesses, native.witnesses):
+        assert got[0] == expected[0]
+        assert got[1] == pytest.approx(
+            (expected[1][0], expected[1][1] + 0.048 - 0.0480875)
+        )
+    assert native.state["seeds"][0][1] == pytest.approx(0.048)
+
+
+def test_slot_depth_refuses_a_baseline_that_does_not_seat(slot_depth_native, monkeypatch):
+    native = slot_depth_native
+    monkeypatch.setattr(drawing, "move_annotation", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        drawing, "_sheet",
+        lambda _adapter, _view, point, _label: (0.053 - point[2] / 1000.0, 0.040),
+    )
+    with pytest.raises(RuntimeError, match="did not settle on the clamp line"):
+        drawing._place_slot_depth_callout(
+            None, native.section, native.details, native.depth, native.back
+        )
+    assert native.state["seeds"] == []
 
 
 @pytest.mark.parametrize("flip", [-1.0, 1.0])
@@ -1095,6 +1361,31 @@ def test_section_a_a_caption_stands_directly_under_the_cut_bar() -> None:
     assert drawing.SECTION_CAPTION_TOP_Y > drawing.ISO_CENTER[1] + 0.040
 
 
+def test_section_a_a_thickness_text_clears_both_extension_lines() -> None:
+    """Round 7 of the fan-out: the 28-character 'SETS MHA-PD-VN-57
+    ENGAGEMENT' row ran 11 mm across the left extension line, which ended
+    inside its 'M'. Round 7's native layout: the keep is the block's centre,
+    5.6 mm a row, 2.78 mm a character, the dimension line 0.4 mm over the
+    block's foot and the extension lines 1 mm past it. The block stands left
+    of the left extension line by 1.5 mm or more, right of the hook taps'
+    callout shoulder (round 2's 0.3124 end, 0.2393), its foot (so its line)
+    where round 7's was, and under the border."""
+    scale = drawing.SECTION_SCALE[0] / drawing.SECTION_SCALE[1]
+    left_face = drawing.SECTION_CENTER[0] - BAR_DEPTH * scale / 2000.0
+    top = drawing.SECTION_CENTER[1] + spec.BAR_HEIGHT * scale / 2000.0
+    x = left_face - drawing.SECTION_DEPTH_SIDE
+    y = top + drawing.SECTION_DEPTH_RISE
+    rows = [".374", *drawing.DIMENSION_CALLOUTS["Depth"].splitlines()]
+    assert len(rows) - 1 <= 2
+    half_width = max(map(len, rows)) * 0.00278 / 2.0
+    half_height = len(rows) * 0.0056 / 2.0 + 0.0003
+    box = (x - half_width, y - half_height, x + half_width, y + half_height)
+    assert left_face - box[2] >= 0.0015 + 0.0025
+    assert box[0] - 0.3124 >= 0.005
+    assert box[1] == pytest.approx(0.2297, abs=5e-4)
+    assert box[3] < 0.2667 - 0.005
+
+
 class _DetailView:
     """A placed model view: its Position moves by SetViewPosition, and a model
     point projects ``offset`` from it."""
@@ -1297,3 +1588,101 @@ def test_slot_profiles_run_along_the_bar_in_any_sketch_frame(
         ]
         assert ends[index][1] == pytest.approx(spec.CLAMP_TAP_Y)
         assert abs(ends[index][0] - slot_x) == pytest.approx(run / 2.0)
+
+
+def test_locations_and_overall_sizes_carry_no_words() -> None:
+    """Rule 7 (screen 20261107T081227004Z): a location dimension carries its
+    value and band alone, and an overall size with no band of its own no
+    reason; the mates stand on the holes' size callouts. The .XXX height and
+    thickness each name the stack they set (rule 4; round 4 machinist
+    review)."""
+    words = set(drawing.DIMENSION_CALLOUTS) | set(drawing.DIMENSION_CALLOUTS_ABOVE)
+    locations = {
+        "HangerRowHeight",
+        "ClampRowHeight",
+        *sheet_spec.HANGER_STATION_NAMES,
+        *sheet_spec.CLAMP_STATION_NAMES,
+    }
+    assert not words & (locations | {"Length"})
+    assert _config.parts("pd-guide-lock")["number"] in drawing.DIMENSION_CALLOUTS["Height"]
+    assert (
+        _config.parts("pd-vn-transgear-pivot-screw")["number"]
+        in drawing.DIMENSION_CALLOUTS["Depth"]
+    )
+    # The counterbored slot names its mate once, on its width, in the
+    # standard clearance form; the counterbore says only whose centres it
+    # shares; the round holes name theirs once.
+    callouts = [*drawing.DIMENSION_CALLOUTS.values(), sheet_spec.CLAMP_CBORE_CALLOUT]
+    assert "ClampSlotCboreDepth" not in words
+    assert "MHA-SH-VN-53" not in drawing.DIMENSION_CALLOUTS["ClampSlotCboreWidth"]
+    assert sum("CLEARANCE FOR MHA-SH-VN-53" in " ".join(text.split()) for text in callouts) == 2
+    for text in callouts:
+        assert not re.search(r"\b(LOCATE TO|SEATS|HEADS|SLIDING|TO SUIT)\b", text), text
+    # At most two lines of words under each callout.
+    assert all(
+        len(text.splitlines()) <= 2 for text in drawing.DIMENSION_CALLOUTS.values()
+    )
+    assert len(sheet_spec.CLAMP_CBORE_CALLOUT.splitlines()) <= 2
+
+
+_CBORE_NATIVE = {
+    5: "<HOLE-SPOT><MOD-DIAM><hw-cbdia> <HOLE-DEPTH><hw-cbdepth>",
+    6: "",
+    7: "<NUM_INST>X <MOD-DIAM><hw-thruholedia> <hw-thru>",
+    8: "",
+}
+
+
+@pytest.mark.parametrize("extent", ["<hw-thru>", "THRU ALL"])
+def test_clamp_callout_reads_size_then_drill_then_thru(extent) -> None:
+    native = {**_CBORE_NATIVE, 7: _CBORE_NATIVE[7].replace("<hw-thru>", extent)}
+    updated = drawing.clamp_callout_definitions(native)
+    row = updated[7]
+    size = row.index("<hw-thruholedia>")
+    process = row.index(f" {sheet_spec.CLAMP_HOLE_PROCESS} ")
+    assert size < process < row.index(extent)
+    assert row.replace(f" {sheet_spec.CLAMP_HOLE_PROCESS}", "", 1) == native[7]
+    # The counterbore row keeps its symbol and variables; the mates go below.
+    assert updated[5] == native[5]
+    assert updated[8] == sheet_spec.CLAMP_CBORE_CALLOUT
+
+
+@pytest.mark.parametrize(
+    "native",
+    [
+        {**_CBORE_NATIVE, 8: "ALREADY BELOW"},
+        {**_CBORE_NATIVE, 7: "<NUM_INST>X <MOD-DIAM><hw-thruholedia>"},
+        {**_CBORE_NATIVE, 5: _CBORE_NATIVE[5] + " THRU"},
+        {k: v for k, v in _CBORE_NATIVE.items() if k != 6},
+    ],
+)
+def test_clamp_callout_refuses_an_unexpected_native_layout(native) -> None:
+    with pytest.raises(RuntimeError, match="clamp callout"):
+        drawing.clamp_callout_definitions(native)
+
+
+def test_countersinks_print_their_angle_after_the_max_limit() -> None:
+    assert drawing.COUNTERSINK_SUFFIX.startswith(part.MAX_SUFFIX)
+    assert drawing.COUNTERSINK_SUFFIX.endswith(f"{spec.TAP_CSK_ANGLE_DEG:.0f}\u00b0")
+    for name in drawing.COUNTERSINK_NAMES:
+        prefix = sheet_spec.DIMENSION_PREFIXES[("CountersinkReference", name)]
+        assert prefix.index("<HOLE-SINK>") < prefix.index("<MOD-DIAM>")
+
+
+def test_front_face_view_is_lettered_without_the_sheet_scale() -> None:
+    """Rules 9 and 26: the front face's removed rear view carries the letter
+    of its viewing arrow and, at the sheet's scale, no scale."""
+    assert drawing.FACE_SCALE == drawing.SHEET_SCALE
+    assert drawing.BACK_VIEW_CAPTION == f"VIEW {drawing.FRONT_FACE_VIEW_LETTER}"
+    taken = {"A", "B", drawing.DETAIL_LETTER}
+    assert drawing.FRONT_FACE_VIEW_LETTER not in taken | {"I", "O", "Q"}
+
+
+@pytest.mark.parametrize("side", [-1.0, 1.0])
+def test_view_arrow_points_level_at_the_front_face_from_outside(side) -> None:
+    front, back = (0.390 + side * 0.0095, 0.213), (0.390 - side * 0.0095, 0.213)
+    (letter_x, letter_top), (tip_x, tip_y) = drawing._view_arrow_points(front, back)
+    assert tip_y == front[1]
+    assert letter_top - drawing.VIEW_LETTER_HEIGHT / 2.0 == pytest.approx(tip_y)
+    assert side * (tip_x - front[0]) == pytest.approx(drawing.VIEW_ARROW_TIP_GAP)
+    assert side * (letter_x - tip_x) == pytest.approx(drawing.VIEW_ARROW_LENGTH)

@@ -282,16 +282,13 @@ def test_the_far_face_gate_refuses_the_three_quarter_pin(monkeypatch) -> None:
     """R9-50: the 3/4 dowel stops short of the one-piece hook's far face with
     the ear's 1 deg bend, the screws' drift, the formed band and the length
     grade; the gate refuses it and accepts the 7/8 pin in the 8.50 hole.
-    At the printed bands the 3/4 dowel in a 6.20 hole barely clears, so the
-    refusal is shown 0.05 deeper."""
+    With the hook's screw holes at the title block's ±.005 (delegated ruling
+    2026-11-07, pending owner confirmation) the 3/4 dowel falls short even
+    in the 6.20 hole that once barely cleared."""
     assert joints.LATCH_PIN_FAR_FACE_MARGIN_WORST > 0.6
     monkeypatch.setattr(latch_pin, "LENGTH", 0.75 * 25.4)
     monkeypatch.setattr(latch_pin, "PROUD", 0.75 * 25.4 - 6.20)
     monkeypatch.setattr(arm, "PIN_HOLE_DEPTH", 6.20)
-    clearing = _reload_joints()
-    assert 0.0 < clearing.LATCH_PIN_FAR_FACE_MARGIN_WORST < 0.05
-    monkeypatch.setattr(latch_pin, "PROUD", 0.75 * 25.4 - 6.25)
-    monkeypatch.setattr(arm, "PIN_HOLE_DEPTH", 6.25)
     with pytest.raises(
         AssertionError,
         match=r"MHA-PD-VN-58 pin / MHA-PD-14 strip far face.* 0\.\d+ short",

@@ -47,10 +47,12 @@ SHEET_MAX = (1.0 / 16.0 + 0.005) * IN
 # The transfer premise: the transfer screw's point and the drill on its mark
 # put each hole's axis within .001 per axis of its actual tap. The holes print
 # plain at the title block's .XXX ±.005 from the plate's edges. The guide
-# taps' Ø.008 position zone.
+# taps print plain coordinates (owner ruling 2026-11-08, #2144 item 2.3):
+# stations at the title block's .XXX ±.005, the row ±.004.
 TRANSFER = 0.001 * IN
 PLACEMENT = printed_band_mm(3, unit="in")
-GUIDE_ZONE = 0.008 * IN
+TAP_X_BAND = 0.005 * IN
+TAP_Y_BAND = 0.004 * IN
 
 
 def _reload_screw_spec() -> None:
@@ -87,15 +89,15 @@ def test_the_quarter_inch_screw_is_refused(monkeypatch) -> None:
 def test_transferred_holes_fit_the_fixed_fastener_stack() -> None:
     """R9-49: the hole-over-screw radial clearance covers the transfer's
     radial reach, with the 1/8 drill at its smallest and the screw major at
-    its largest. Each hole follows its own tap, so the guide's Ø.008 no
-    longer parts hole from screw."""
+    its largest. Each hole follows its own tap, so the guide's printed tap
+    coordinates no longer part hole from screw."""
     hole_min = 0.125 * IN
     radial = math.hypot(TRANSFER, TRANSFER)
     # The printed bands, untightened, and the transfer premise.
     assert PLACEMENT == pytest.approx(0.005 * IN)
     assert lock.HOLE_PLACEMENT_BAND == pytest.approx(PLACEMENT)
     assert lock.HOLE_TRANSFER_BAND == pytest.approx(TRANSFER)
-    assert guide.GEOMETRIC_TOLERANCES_IN["guide hole-pattern position"] == ".008"
+    assert (guide.TAP_STATION_BAND, guide.TAP_Y_BAND) == pytest.approx((TAP_X_BAND, TAP_Y_BAND))
     assert blind_cut_dia_mm(lock.HOLE_SPEC) == pytest.approx(hole_min)
     assert screw.POSITION_RADIAL == pytest.approx(radial)
     assert (hole_min - MAJOR_MAX) / 2.0 >= radial
@@ -141,15 +143,15 @@ _CLEARANCE_MAX = (_HOLE_MIN + DRILLED_PLUS - MAJOR_MIN) / 2.0
 _POSITION = math.hypot(TRANSFER, TRANSFER)
 _SET_MIN = _CLEARANCE_MIN - _POSITION
 _SET_MAX = _CLEARANCE_MAX + _POSITION
-_TAP_R = GUIDE_ZONE / 2.0
+_TAP_DY = TAP_Y_BAND
 # The plate at each hole station also stands off its model by its tap's
 # position and its hole's placement from the plate's edges.
-_STATION_MIN = _SET_MIN - _TAP_R - PLACEMENT
-_STATION_MAX = _SET_MAX + _TAP_R + PLACEMENT
+_STATION_MIN = _SET_MIN - _TAP_DY - PLACEMENT
+_STATION_MAX = _SET_MAX + _TAP_DY + PLACEMENT
 # Holes at x .157 and .709 (.XXX) from the left edge of the .89 (.XX ±.01)
 # plate, y .155 from its guide-side edge, on the .29 rail's tap row .140 above
-# its datum B (owner ruling 2026-11-01, B2): the plate laps .015 past the
-# bottom rail's datum B and .005 past the top rail's top face; the .45 height
+# its bottom face (owner ruling 2026-11-01, B2): the plate laps .015 past the
+# bottom rail's bottom face and .005 past the top rail's top face; the .45 height
 # at .XX. PR #1897 grew the plate so every hole wall reaches the wall target.
 _HOLE_X = (0.157 * IN, 0.709 * IN)
 _HOLE_Y = 0.155 * IN
@@ -161,9 +163,9 @@ _WIDTH = 0.89 * IN
 _HEIGHT = 0.45 * IN
 _HEIGHT_BAND = _WIDTH_BAND = printed_band_mm(2, unit="in")
 # The spec's closed form: the station window over the shortest hole pitch
-# (the taps' pitch at the Ø.008, less the transfer at each hole), times the
-# longest overhang (the outline's band and the hole's placement).
-_PITCH_MIN = _HOLE_X[1] - _HOLE_X[0] - GUIDE_ZONE - 2.0 * TRANSFER
+# (the taps' pitch at their printed station bands, less the transfer at each
+# hole), times the longest overhang (the outline's band and the hole's placement).
+_PITCH_MIN = _HOLE_X[1] - _HOLE_X[0] - 2.0 * TAP_X_BAND - 2.0 * TRANSFER
 _OVERHANG = _WIDTH + _WIDTH_BAND - _HOLE_X[1] + PLACEMENT
 _SKEW = (_STATION_MAX - _STATION_MIN) / _PITCH_MIN
 _FAR_REACH = _OVERHANG * _SKEW - _STATION_MIN
@@ -229,7 +231,7 @@ def test_a_set_plate_skews_at_opposite_tap_and_placement_errors() -> None:
     corner comes toward the spacer (the skew's cosine draws a nearer far
     edge in less) further than the plate translated would carry it."""
     reach = _set_plate_reach(
-        (0.0, PLACEMENT), (0.0, -PLACEMENT), (0.0, -0.999 * _TAP_R), (0.0, 0.999 * _TAP_R),
+        (0.0, PLACEMENT), (0.0, -PLACEMENT), (0.0, -0.999 * _TAP_DY), (0.0, 0.999 * _TAP_DY),
         0.0, 0.0, _CLEARANCE_MIN, _CLEARANCE_MIN, _WIDTH,
     )  # fmt: skip
     assert reach[0] == pytest.approx(0.2092, abs=3e-4)
@@ -244,7 +246,7 @@ def test_a_set_plate_skews_further_on_unequal_hole_clearances() -> None:
     spacer than tap and placement errors alone do."""
     longest = _WIDTH + _WIDTH_BAND
     reach = _set_plate_reach(
-        (PLACEMENT, PLACEMENT), (-PLACEMENT, -PLACEMENT), (0.0, -_TAP_R), (0.0, _TAP_R),
+        (PLACEMENT, PLACEMENT), (-PLACEMENT, -PLACEMENT), (0.0, -_TAP_DY), (0.0, _TAP_DY),
         TRANSFER, -TRANSFER, _CLEARANCE_MAX, _CLEARANCE_MIN, longest,
     )  # fmt: skip
     assert reach[0] == pytest.approx(0.2617, abs=5e-4)
@@ -256,12 +258,14 @@ def test_a_set_plate_skews_further_on_unequal_hole_clearances() -> None:
 
 
 def test_the_set_plate_envelope_bounds_every_corner_of_the_bands() -> None:
-    """Every combination of hole placement extremes, tap errors on the
-    Ø.008 circle, transfer extremes, clearance extremes and plate width
-    stays inside the envelope the sweep reads, on both long edges."""
+    """Every combination of hole placement extremes, tap errors at the
+    corners and mid-sides of the guide's printed station and row bands,
+    transfer extremes, clearance extremes and plate width stays inside the
+    envelope the sweep reads, on both long edges."""
     taps = [
-        (_TAP_R * math.cos(k * math.pi / 4.0), _TAP_R * math.sin(k * math.pi / 4.0))
-        for k in range(8)
+        (dx, dy)
+        for dx in (-TAP_X_BAND, 0.0, TAP_X_BAND)
+        for dy in (-TAP_Y_BAND, 0.0, TAP_Y_BAND)
     ]
     clearances = (_CLEARANCE_MIN, _CLEARANCE_MAX)
     far = guide_side = -math.inf

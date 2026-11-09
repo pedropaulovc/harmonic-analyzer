@@ -20,6 +20,7 @@ import _config
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 import _drawing_edges
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DRAWING_TEMPLATES
 import _gtol_face
 from _layout_geometry import Box, estimate_text_box
 import _part_properties
@@ -131,10 +132,10 @@ def test_the_overall_and_the_spigot_are_terms_of_the_disc_cluster_stack() -> Non
     )
     assert "HubLength" not in spec.REFERENCE_DIMENSIONS
     callouts = drawing.DIMENSION_CALLOUTS_BELOW
-    assert callouts["HubLength"] == spec.HUB_LENGTH_CALLOUT
-    assert callouts["SpigotLength"] == spec.SPIGOT_LENGTH_CALLOUT
-    assert STACK_NAME in callouts["HubLength"]
-    assert STACK_NAME in callouts["SpigotLength"]
+    assert callouts["HubLength"] == callouts["SpigotLength"] == (
+        f"SEE NOTE {spec.STACK_NOTE}"
+    )
+    assert STACK_NAME in spec.STACK_TEXT
 
 
 def test_the_bore_the_spigot_and_the_stack_lengths_carry_model_bands() -> None:
@@ -192,14 +193,16 @@ def test_the_d_bore_slides_on_the_sleeve_boss_and_flat_at_every_printed_limit() 
     assert round_fit == pytest.approx(spec.BOSS_CLEARANCE_LIMITS, abs=1e-6)
     assert spec.BOSS_CLEARANCE == spec.BOSS_CLEARANCE_LIMITS[1]
     assert flat_fit == pytest.approx(spec.FLAT_CLEARANCE, abs=1e-6)
-    bore_callout = " ".join(drawing.DIMENSION_CALLOUTS_BELOW["BoreDia"].split())
-    printed = re.search(r"\(DIA CLR (\d*\.\d+-\d*\.\d+) ON", bore_callout)
-    assert printed is not None
-    assert _clr(printed.group(1)) == pytest.approx(round_fit, abs=0.00005 * IN)
-    flat_callout = " ".join(drawing.DIMENSION_CALLOUTS_BELOW["FlatToAxis"].split())
-    printed = re.search(r"\(CLR (\d*\.\d+-\d*\.\d+) ON", flat_callout)
-    assert printed is not None
-    assert _clr(printed.group(1)) == pytest.approx(flat_fit, abs=0.00005 * IN)
+    link = f"SEE NOTE {spec.BORE_FIT_NOTE}"
+    assert link in drawing.DIMENSION_CALLOUTS_BELOW["BoreDia"].splitlines()
+    # The flat's callout is the link alone: where the flat ends is drawn on
+    # SECTION A-A, never worded on its location dimension.
+    assert drawing.DIMENSION_CALLOUTS_BELOW["FlatToAxis"] == link
+    note = " ".join(spec.BORE_FIT_TEXT.split())
+    printed = re.findall(r"(\d*\.\d+-\d*\.\d+) ON THE (ROUND|FLAT)", note)
+    assert [kind for _, kind in printed] == ["ROUND", "FLAT"]
+    assert _clr(printed[0][0]) == pytest.approx(round_fit, abs=0.00005 * IN)
+    assert _clr(printed[1][0]) == pytest.approx(flat_fit, abs=0.00005 * IN)
 
 
 def test_boss_round_engagement_and_available_flat_face_follow_the_live_sleeve() -> None:
@@ -258,14 +261,14 @@ def test_boss_round_engagement_and_available_flat_face_follow_the_live_sleeve() 
 
 
 def test_the_spigot_seats_on_the_step_square_and_clear_of_the_disc() -> None:
-    """R9-68: the spigot pilots the disc's bore and seats on the 12T's step.
+    """R9-68: the spigot clears the disc's bore and seats on the 12T's step.
     Its end and the flange's rear face are square to the bore (datum A) on
     the sheet; the disc's tilt reads both, the step's and the hub's rock on
     the boss, and its rear face stays in air ahead of the step."""
     import pd_rack_pinion_spec as disc
     import pd_transgear_feed_pinion_spec as sleeve
 
-    # The spigot pilots the disc: the two printed bands never bind.
+    # The spigot clears the disc's bore: the two printed bands never bind.
     spigot = (
         spec.SPIGOT_DIA + spec.SPIGOT_DIA_BAND[1],
         spec.SPIGOT_DIA + spec.SPIGOT_DIA_BAND[0],
@@ -274,10 +277,7 @@ def test_the_spigot_seats_on_the_step_square_and_clear_of_the_disc() -> None:
     fit = (disc_bore[0] - spigot[1], disc_bore[1] - spigot[0])
     assert fit == pytest.approx(disc.SPIGOT_DIAMETRAL_CLEARANCE)
     assert fit[0] >= 0.0
-    callout = " ".join(drawing.DIMENSION_CALLOUTS_BELOW["SpigotDia"].split())
-    printed = re.search(r"\(DIA CLR (\d*\.\d+-\d*\.\d+) IN", callout)
-    assert printed is not None
-    assert _clr(printed.group(1)) == pytest.approx(fit, abs=0.00005 * IN)
+    assert spec.DISC_NUMBER in drawing.DIMENSION_CALLOUTS_BELOW["SpigotDia"].splitlines()[0]
     # The common seat annulus at the actual partial-depth cutter end, with
     # every printed radial/tip/step/full-depth corner bounded by its owner.
     assert spec.SEAT_CONTACT_R == pytest.approx(
@@ -298,7 +298,7 @@ def test_the_spigot_seats_on_the_step_square_and_clear_of_the_disc() -> None:
     assert spec.BORE_DATUM == sleeve.BORE_DATUM == "A"
     assert spec.GEOMETRIC_TOLERANCES_IN == {
         "flange rear face perpendicularity to bore": ".001",
-        "spigot end perpendicularity to bore": ".0002",
+        "spigot end perpendicularity to bore": ".001",
     }
     tilt = (
         sleeve.STEP_FACE_PERPENDICULARITY / sleeve.STEP_FACE_PERPENDICULARITY_ZONE_DIA
@@ -555,25 +555,28 @@ def _sheet_text() -> str:
         (
             *drawing.DIMENSION_CALLOUTS_BELOW.values(),
             *drawing.DIMENSION_CALLOUTS_ABOVE.values(),
+            drawing.NOTES_TEXT,
         )
     )
 
 
 def test_every_mate_the_sheet_cites_is_named_with_its_own_number() -> None:
-    """drawing-guidelines.md rule 3 (decimal places carry the tolerance): every part number the sheet cites is a mate's, printed
-    after that mate's name, and is the number the mate's own sheet carries."""
-    name_by_number: dict[str, str] = {}
-    for stem, name in (
-        ("pd-transgear-feed-pinion", spec.SLEEVE_NAME),
-        ("pd-vn-transgear-disc-screw", spec.SCREW_NAME),
-        ("pd-rack-pinion", spec.DISC_NAME),
-    ):
-        name_by_number[_config.parts(stem)["number"]] = name
+    """drawing-guidelines.md rule 4 (tighten only for function, and name the
+    mate): every part number the sheet cites is a mate's own number, and each
+    matched fit names its mate by name and number."""
+    cited_mates = {
+        _config.parts(stem)["number"]
+        for stem in (
+            "pd-transgear-feed-pinion",
+            "pd-vn-transgear-disc-screw",
+            "pd-rack-pinion",
+            "pd-transgear-drive-collar",
+        )
+    }
     printed = " ".join(_sheet_text().split())
     cited = re.findall(r"MHA-(?!VN-)[A-Z]{2}-(?:[0-9]{2}(?:-TL-(?:[0-9]{2}|VN-[5-9][0-9]))?|VN-[5-9][0-9])(?:-T[0-9]{3})?(?![A-Z0-9-])", printed)
-    assert set(cited) == set(name_by_number)
-    for number, name in name_by_number.items():
-        assert printed.count(f"{name} {number}") == printed.count(number), number
+    assert set(cited) == cited_mates
+    assert f"{spec.SLEEVE_NAME} {spec.SLEEVE_NUMBER}" in spec.BORE_FIT_TEXT
 
 
 def test_walls_hold_at_the_worst_case_the_sheet_prints() -> None:
@@ -667,7 +670,7 @@ def test_the_package_declares_the_bore_wall_the_callout_prints() -> None:
     (entry,) = [entry for entry in exceptions if entry["id"] == "RV-02"]
     assert entry["kind"] == "minor"
     assert spec.BORE_WALL_TEXT in entry["where"]
-    assert "delegated ruling 2026-11-04" in entry["reason"]
+    assert entry["reason"].startswith("Owner ruling 2026-11-08 (Pedro)")
     assert "#2144" in entry["reason"]
     assert drawing.DIMENSION_CALLOUTS_BELOW["BoreDia"].split("\n")[-1] == (
         spec.BORE_WALL_TEXT
@@ -922,6 +925,211 @@ def test_turned_diameters_print_inline_beside_their_own_step_on_the_edge_view() 
         if boxes[a].overlaps(boxes[b], tol=0.0)
     ]
     assert clashes == []
+
+
+def test_section_a_a_cuts_the_flat_square_through_the_bore_axis() -> None:
+    """drawing-guidelines.md rule 9: the flat's blind end on the flange's
+    rear face is internal shape, so SECTION A-A draws it in solid lines.  Its
+    cutting plane is the model's x = 0: through the bore's axis and along the
+    flat's normal (local -Y), square to the flat through its middle; it
+    misses every screw hole and runs past the flange's rim each side, so the
+    whole cut closes and each letter stands off the rim."""
+    (x0, y0, z0), (x1, y1, z1) = drawing.SECTION_LINE_MODEL
+    assert x0 == x1 == 0.0
+    assert z0 == z1
+    # From the flat's side (-Y) across the axis to the oil hole's (+Y).
+    flange_r = spec.FLANGE_DIA / 2.0
+    assert y0 < -flange_r < -spec.FLAT_TO_AXIS < 0.0 < flange_r < y1
+    for index in range(spec.SCREW_COUNT):
+        angle = 2.0 * math.pi * index / spec.SCREW_COUNT  # 0 deg on local +X
+        hole_x = joint.BOLT_CIRCLE_DIA / 2.0 * math.cos(angle)
+        assert abs(hole_x) - spec.SCREW_HOLE_DIA / 2.0 > 1.0, index
+
+    # The face view lays model +Y right and +X up, so the plane is the
+    # horizontal through the bore's centre, the flat's end on the left.
+    assert drawing.END_VIEW_ANGLE == pytest.approx(-math.pi / 2.0)
+    (sx0, sy0), (sx1, sy1) = drawing.SECTION_LINE
+    assert sy0 == sy1 == pytest.approx(drawing.AXIS_Y)
+    assert (sx0 + sx1) / 2.0 == pytest.approx(drawing.END_CENTER[0])
+    assert drawing._face_view_xy((0.0, -spec.FLAT_TO_AXIS, 0.0))[0] < (
+        drawing.END_CENTER[0]
+    )
+    # Drawn left to right, its arrows point down, away from datum A's tag.
+    assert sx0 < sx1
+    assert drawing.DATUM_A_SYMBOL[1] > drawing.AXIS_Y
+    overshoot = min(
+        drawing.END_CENTER[0] - flange_r * drawing._S - sx0,
+        sx1 - drawing.END_CENTER[0] - flange_r * drawing._S,
+    )
+    assert overshoot >= 0.005
+    assert sx0 > 0.0127 + 0.005  # inside the sheet's inner border
+
+
+def test_the_flat_reference_length_is_the_overall_less_the_spigot() -> None:
+    """The section dimensions the flat's end from the hub front face as a
+    REFERENCE: the overall less the spigot length, the two printed stack
+    terms that already locate the flange's rear face, so no band enters any
+    stack, and it prints at their places."""
+    assert spec.FLAT_LENGTH_REF == pytest.approx(spec.HUB_LENGTH - spec.SPIGOT_LENGTH)
+    assert spec.FLAT_LENGTH_REF == pytest.approx(0.395 * IN)
+    assert spec.DRAWING_REFERENCE_PRECISION == _places("HubLength")
+    assert spec.DRAWING_REFERENCE_PRECISION == _places("SpigotLength")
+    assert spec.REFERENCE_DIMENSIONS == frozenset()
+    # The picks lie on the cut's boundary lines on the flat's side: the hub
+    # front face between the flat and the body's O.D., the flange's rear
+    # face (the flat's end, z = 0) between the spigot's O.D. and the rim.
+    front, rear = drawing.FLAT_REF_PICKS_MM
+    assert front[0] == rear[0] == 0.0
+    assert front[2] == spec.HUB_FRONT_Z and rear[2] == 0.0
+    assert rear[2] - front[2] == pytest.approx(spec.FLAT_LENGTH_REF)
+    assert -spec.HUB_DIA / 2.0 < front[1] < -spec.FLAT_TO_AXIS
+    assert -spec.FLANGE_DIA / 2.0 < rear[1] < -spec.SPIGOT_DIA / 2.0
+
+
+# Ink outside the recipe's own constants, measured on the r4 render (run
+# 20261107T180459203Z): the isometric's shaded ink and the end of the
+# Ø1.05's lower extension line.
+_ISO_INK = Box(0.335, 0.147, 0.408, 0.224)
+_FLANGE_DIA_EXTENSION_END = (0.3355, 0.1248)
+_INNER_BORDER = Box(0.0127, 0.0127, 0.4191, 0.2667)
+# The native section caption's "SECTION" caps, 5.1 mm on the feed pinion's
+# B-B (run 20261107T121559938Z), its 11 characters 44 mm wide.
+_CAPTION_CAP_M = 0.0055
+
+
+def test_section_a_a_stands_in_the_free_field_clear_of_every_other_ink() -> None:
+    """The removed section, its REF and its caption stand right of the edge
+    view's Ø1.05, under the isometric and over the title block, inside the
+    border; the REF's text stands off the part, inline beside the hub body
+    under the flange."""
+    s = drawing._S
+    xy = drawing._section_xy
+    flange_top = xy(0.0, 0.0)[1]
+    flange_bottom = xy(0.0, -spec.FLANGE_THICK)[1]
+    front = xy(0.0, spec.HUB_FRONT_Z)[1]
+    spigot_end = xy(0.0, spec.SPIGOT_LENGTH)[1]
+    flange = Box(
+        xy(-spec.FLANGE_DIA / 2.0, 0.0)[0], flange_bottom,
+        xy(spec.FLANGE_DIA / 2.0, 0.0)[0], flange_top,
+    )
+    body = Box(
+        xy(-spec.HUB_DIA / 2.0, 0.0)[0], front,
+        xy(spec.HUB_DIA / 2.0, 0.0)[0], flange_bottom,
+    )
+    spigot = Box(
+        xy(-spec.SPIGOT_DIA / 2.0, 0.0)[0], flange_top,
+        xy(spec.SPIGOT_DIA / 2.0, 0.0)[0], spigot_end,
+    )
+    overrun = drawing.SECTION_AXIS_OVERRUN_MM * s
+    axis = Box(
+        drawing.SECTION_CENTER[0], front - overrun,
+        drawing.SECTION_CENTER[0], spigot_end + overrun,
+    )
+    ref_value = f"({spec.FLAT_LENGTH_REF / IN:.{spec.DRAWING_REFERENCE_PRECISION}f})"
+    ref_text = estimate_text_box(
+        ref_value.replace("(0.", "(.", 1),
+        anchor=drawing.FLAT_REF_TEXT_XY,
+        height=_CAP_M,
+        reference=2,
+        advance_ratio=_ADVANCE,
+    )
+    caption = estimate_text_box(
+        "SECTION A-A",
+        anchor=drawing.SECTION_CAPTION_XY,
+        height=_CAPTION_CAP_M,
+        reference=5,
+        advance_ratio=_ADVANCE,
+    )
+    assert ref_text is not None and caption is not None
+    # The dimension line through the text, its extension lines out from the
+    # body's and the flange's left ends past it.
+    ref_ink = ref_text.union(
+        Box(drawing.FLAT_REF_TEXT_XY[0] - 0.002, front, flange.xmin, flange_top)
+    )
+    section_ink = [flange, body, spigot, axis, ref_ink, caption]
+
+    # The section's centre is the axis's mid-length.
+    assert (flange.xmin + flange.xmax) / 2.0 == pytest.approx(drawing.SECTION_CENTER[0])
+    assert (front + spigot_end) / 2.0 == pytest.approx(drawing.SECTION_CENTER[1])
+    title_top = DRAWING_TEMPLATES[drawing.SPEC.layout].title_block_top_m
+    for box in section_ink:
+        assert box.xmin >= _INNER_BORDER.xmin + 0.003, box
+        assert box.xmax <= _INNER_BORDER.xmax - 0.003, box
+        assert box.ymin >= title_top + 0.003, box
+        assert box.gap(_ISO_INK) >= 0.010, box
+        if box.xmin < _FLANGE_DIA_EXTENSION_END[0]:
+            assert box.ymax <= _FLANGE_DIA_EXTENSION_END[1] - 0.005, box
+    kept = {
+        name: _printed_box(name, anchor)
+        for keep in (drawing.END_KEEP, drawing.SIDE_KEEP)
+        for name, anchor in keep.items()
+    }
+    for name, box in kept.items():
+        for ink in section_ink:
+            assert box.gap(ink) >= 0.005, (name, ink)
+    # Text off the part: the REF beside the hub body, under the flange,
+    # left of the rim; the caption under the axis line's end.
+    for part_box in (flange, body, spigot):
+        assert ref_text.gap(part_box) >= 0.002
+        assert caption.gap(part_box) >= 0.003
+    assert ref_text.xmax < flange.xmin
+    assert flange_bottom > ref_text.ymax and ref_text.ymin > front
+    assert caption.ymax < axis.ymin
+
+
+@pytest.mark.parametrize(
+    ("linked", "label_line"),
+    [
+        ("<VLNAME> <VLLABEL>\r\nSCALE <VLSCALE>", "<VLNAME> <VLLABEL>"),
+        (
+            "<VLNAME> <FONT size=3.5><VLLABEL>\r\n"
+            "<VLSCALE><FONT size=6.35> <FONT size=3.5><VLSCALEV><FONT size=6.35>",
+            "<VLNAME> <FONT size=3.5><VLLABEL>",
+        ),
+        ("<VLNAME> <VLLABEL>\r\nSCALE <VLSCALEV>\r\n", "<VLNAME> <VLLABEL>"),
+    ],
+)
+def test_section_caption_drops_only_its_scale_line(linked, label_line) -> None:
+    """Round 5 (rule 9): SECTION A-A is at the sheet's 3:1, so its caption
+    keeps its label line and loses the scale line SolidWorks links."""
+    assert drawing.VIEW_SCALE == tuple(int(v) for v in drawing.SHEET_SCALE)
+    assert drawing.caption_without_scale(linked) == label_line
+
+
+@pytest.mark.parametrize(
+    "linked",
+    ["<VLNAME> <VLLABEL> SCALE <VLSCALEV>", "<VLLABEL>\r\nSCALE <VLSCALEV>"],
+)
+def test_section_caption_of_unforeseen_form_is_left_alone(linked) -> None:
+    assert drawing.caption_without_scale(linked) is None
+
+
+class _CaptionNote:
+    def __init__(self, linked: str) -> None:
+        self.PropertyLinkedText = linked
+
+
+class _SectionView:
+    def __init__(self, notes, ratio=(3.0, 1.0)) -> None:
+        self._notes = notes
+        self.ScaleRatio = ratio
+
+    def GetNotes(self):
+        return self._notes
+
+
+def test_section_caption_scale_is_removed_natively(monkeypatch) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _iface: value)
+    rebuilds: list[str] = []
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda _a, *, label: rebuilds.append(label))
+    caption = _CaptionNote("<VLNAME> <VLLABEL>\r\nSCALE <VLSCALEV>")
+    other = _CaptionNote("")
+    drawing._drop_sheet_scale_from_caption(None, _SectionView([other, caption]))
+    assert caption.PropertyLinkedText == "<VLNAME> <VLLABEL>"
+    assert other.PropertyLinkedText == ""
+    assert len(rebuilds) == 1
+    with pytest.raises(RuntimeError, match="not at the sheet scale"):
+        drawing._drop_sheet_scale_from_caption(None, _SectionView([caption], (2.0, 1.0)))
 
 
 class _FakeSketchManager:

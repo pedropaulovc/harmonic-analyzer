@@ -88,6 +88,29 @@ def test_hub_never_stands_proud_of_the_nose():
     assert least >= -1e-9
 
 
+def test_mha_pd_00_feels_the_air_the_seat_faces_squareness_closes():
+    """Owner ruling 2026-11-08 (#2144 item 3.2) and the MHA-PD-10 step face
+    route: the hub spigot end and the sleeve step face print ⊥ .001, and
+    their collar-air terms are accepted by MHA-PD-00's .004 feeler (re-face
+    the step if short), so the stack gate drops them; with them the air is
+    under the floor, which is why the feeler check carries it."""
+    import pd_transgear_disc_hub_spec as hub
+
+    assert hub.GEOMETRIC_TOLERANCES_IN["spigot end perpendicularity to bore"] == ".001"
+    assert AIR.ASSEMBLY_ACCEPTED_COLLAR_SOURCES == {
+        "sleeve step face perpendicularity",
+        "hub spigot end perpendicularity",
+    }
+    every = AIR.COLLAR_AIR_UNACCEPTED
+    assert set(every.terms) - set(AIR.COLLAR_AIR.terms) == AIR.ASSEMBLY_ACCEPTED_COLLAR_SOURCES
+    assert every.terms["hub spigot end perpendicularity"] == pytest.approx(
+        AIR.SPIGOT_SLOPE * AIR.Q_FROM_DISC_AXIS
+    )
+    assert every.statistical_mm < AIR.COLLAR_AIR_MIN
+    assert AIR.COLLAR_AIR.statistical_mm >= AIR.COLLAR_AIR_MIN
+    assert AIR.COLLAR_AIR_MIN == pytest.approx(0.004 * 25.4)
+
+
 def test_collar_air_is_the_statistical_stack():
     stack = AIR.COLLAR_AIR
     clearances = sum(

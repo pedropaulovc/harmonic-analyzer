@@ -7,3 +7,14 @@ pd-support-bar:
   tolerance_class: machined_block
   process: "machined (steel); back face drilled and tapped for the transgear pivot (flat-bottomed blind tap) and the latch hook's base screws (through taps)"
   drawing_unit: in
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "accept"
+      where: "principal view: the #8-32 pivot tap's station 6.617 \u00b1.002 from END A, and the hanger row height .571 \u00b1.002 from the top face"
+      finding: "hole location band narrower than the \u00b1.005 drilled-hole row, with no fit route named at the feature (rule 4, shop table)"
+      reason: "Owner ruling 2026-11-08 (Pedro), #2144 item 4.2. The MHA-PD-VN-57 pivot screw threads into this tap through the MHA-PD-18 arm and MHA-PD-20 spacer, so there is no mate to transfer it from; its position feeds the transgear hanger's latch, spacer-sweep and pen-inset stacks. The hook taps on the same row are spotted through MHA-PD-14 at assembly."
+    - id: "RV-02"
+      kind: "accept"
+      where: "SECTION A-A thickness .374 (SETS MHA-PD-VN-57 ENGAGEMENT) and VIEW D height 1.010 (SETS MHA-PD-12 RETENTION), each at the title block's .XXX row with no explicit band"
+      finding: "a reason on an overall size with no band of its own (rule 7 narration), or a three-place size with no stated function (rule 3)"
+      reason: "Owner ruling 2026-11-08 (Pedro), #2144 item 4.3. Both sizes are spent by stacks at the .XXX row: the thickness by the MHA-PD-VN-57 pivot screw's thread engagement (under rule 18's 1.5D at .XX) and the height by the MHA-PD-12 lock's retention on the bar. Rule 3 makes such a size a rule 4 matter that names its stack; printed bare, the reviews read it as over-specification (round 4, 3/3), and with its stack named, as narration (round 5 local repeat, 3/3)."
