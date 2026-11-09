@@ -74,8 +74,9 @@ HANGER_FIT_REACH_PLACES = 3
 # (+.0000/-.0002 in) slides through BOTH mounts' bores; the bolts are
 # tightened and the bar must slide back out.  It sets the front mount's yaw
 # about its dowel (and proves both mounts' pitch); the rear mount is then
-# re-hung on the lever's stub and swung until the rock gauge passes
-# (``build_sm_summing_assembly`` budgets both).  Its nominal is the bore's
+# re-hung on the lever's stub and swung until the rock gauge passes (this
+# fit-up order owner-confirmed 2026-11-08 (Pedro), #2144 item 11.3;
+# ``build_sm_summing_assembly`` budgets both).  Its nominal is the bore's
 # smallest printed Ø, so it enters every conforming bore.
 KNIFE_GAUGE_BAR_DIA_IN = 0.4720
 KNIFE_GAUGE_BAR_BAND_IN = (0.0, -0.0002)  # (upper, lower), class ZZ minus
