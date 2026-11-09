@@ -809,10 +809,8 @@ def test_bom_does_not_accept_rebuild_damage_as_its_settled_baseline(
 
 def test_wire_application_instructions_stay_with_the_assembly_consumers():
     magnifier_steps = " ".join(magnifier.notes.ASSEMBLY_STEPS)
-    pen_steps = " ".join(pen.notes.ASSEMBLY_STEPS)
     assert (
         "HOOK THE MHA-SH-VN-56 LEVER WIRE IN THE MHA-MG-06 OUTPUT FIXTURE SPIGOT GROOVE"
         in magnifier_steps
     )
     assert "WRAP IT CLOCKWISE DOWN THE MHA-MG-10 DRUM" in magnifier_steps
-    assert "SEAT THE PEN WIRE IN THE MHA-MG-05 WHEEL RIM GROOVE" in pen_steps

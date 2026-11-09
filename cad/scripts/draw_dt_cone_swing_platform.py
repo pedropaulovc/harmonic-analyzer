@@ -1246,8 +1246,8 @@ def _print_pivot_band_exactly(display: Any) -> None:
     band's four places.
 
     This render-time precision write is the declared exception RV-01 in
-    ``cad/config/parts/dt-cone-swing-platform.yaml`` (delegated ruling
-    2026-11-02, owner review #2144): a hole callout does not inherit the
+    ``cad/config/parts/dt-cone-swing-platform.yaml`` (Owner ruling
+    2026-11-08 (Pedro), #2144 item 1.2): a hole callout does not inherit the
     part's places.  With the Hole Wizard diameter's tolerance precision
     authored as 4 on the part (read back 4), the callout's ``<hw-diam>``
     still reported -1, the document default (farm run 20261102T230110877Z).

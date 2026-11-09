@@ -139,8 +139,8 @@ FINISH_CHAR_HEIGHT = 0.0025
 # (machinist review round 3: a frame and basic table with no mating pattern
 # named read as over-specification). The note stands right of the frame, under
 # the overall length's line and above the tags over the bar. It also states
-# the taps' finished wall to the edges, at the floor (rule 20; delegated
-# ruling RV-01 in pd-platen-guide.yaml).
+# the taps' finished wall to the edges, at the floor (rule 20; Owner ruling
+# 2026-11-08 (Pedro), #2144 item 2.1 in pd-platen-guide.yaml).
 FCF_MATE_NOTE = (
     f"MATCHES {_config.parts('pd-platen')['number']} AND "
     f"{_config.parts('pd-guide-lock')['number']} HOLES; {TAP_EDGE_WALL_TEXT}"

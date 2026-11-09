@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import math
+import re
 import sys
 import textwrap
 from pathlib import Path
@@ -165,6 +166,14 @@ DETAIL_LABEL_GAP = 0.005
 DETAIL_LABEL_INSET = 0.040
 CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 DETAIL_POSITION_TOL_M = 1e-4
+# DETAIL A's boundary on the 1:5 front view: black like the outlines, its
+# letter centred under the circle in the open sheet below the lever, so no
+# line (the circle, the knife-mount bolt) strikes it (farm r1: lettered at
+# the upper right, the circle and the bolt ran through it). A note's
+# position is its text's upper-left corner.
+DETAIL_BOUNDARY_COLOR = 0  # COLORREF black
+DETAIL_LETTER_GAP = 0.002
+DETAIL_LETTER_HALF_WIDTH = 0.0013
 
 # --- Sheet 2 ------------------------------------------------------------------
 EXPLODED_ISO_CENTER = (0.112, 0.150)
@@ -272,17 +281,30 @@ PRECISION = {
 }
 
 
+_STEP_LABEL = re.compile(r"(\d+)[A-HJ-NP-Z]?")
+
+
+def _step_group(line: str) -> str | None:
+    """The step number a numbered line belongs to ("1" for "1" and "1A"), or
+    None for a heading or a plain line."""
+    number, sep, _rest = line.partition(". ")
+    match = _STEP_LABEL.fullmatch(number) if sep else None
+    return match.group(1) if match else None
+
+
 def _wrapped(lines: tuple[str, ...], *, width: int, spaced: bool = False) -> str:
-    """Wrap each numbered line under its own number; one note per block.
-    ``spaced`` puts one blank line between consecutive numbered steps."""
+    """Wrap each numbered line under its own number or lettered sub-step
+    label; one note per block. ``spaced`` puts one blank line between steps
+    of different numbers (a step's lettered sub-steps follow it unspaced)."""
     out: list[str] = []
-    numbered = False
+    group: str | None = None
     for line in lines:
-        number, sep, rest = line.partition(". ")
-        if sep and number.isdigit():
-            if spaced and numbered:
+        number, _sep, rest = line.partition(". ")
+        current = _step_group(line)
+        if current is not None:
+            if spaced and group is not None and current != group:
                 out.append("")
-            numbered = True
+            group = current
             out += textwrap.wrap(
                 rest,
                 width=width,
@@ -303,19 +325,25 @@ def _wrapped(lines: tuple[str, ...], *, width: int, spaced: bool = False) -> str
 
 
 ASSEMBLED_NOTES = _wrapped(notes.ASSEMBLED_NOTES, width=NOTES_WIDTH)
-# A blank line separates consecutive steps (and checks). Spaced, steps and
-# checks together need 57 lines (262 mm) of a 249 mm field above the inner
-# border, so the whole checks list continues on sheet 4. The steps alone (41
-# lines) end 61 mm above the border; the checks (17 lines) 171 mm above it.
+# A blank line separates step groups (and checks). The steps run down sheet 3
+# beside the finished view and continue on sheet 4 from STEPS_CONTINUED_FROM,
+# above the checks; each block must end above the inner border.
+STEPS_CONTINUED_FROM = "5"
+_SPLIT = next(
+    index
+    for index, line in enumerate(notes.ASSEMBLY_STEPS)
+    if line.startswith(f"{STEPS_CONTINUED_FROM}. ")
+)
 STEPS_NOTE = "\n".join(
     (
         "ASSEMBLY SEQUENCE",
-        _wrapped(notes.ASSEMBLY_STEPS, width=STEPS_LINE_WIDTH, spaced=True),
+        _wrapped(notes.ASSEMBLY_STEPS[:_SPLIT], width=STEPS_LINE_WIDTH, spaced=True),
     )
 )
 CHECKS_NOTE = "\n".join(
     (
         "ASSEMBLY SEQUENCE (CONT.)",
+        _wrapped(notes.ASSEMBLY_STEPS[_SPLIT:], width=STEPS_LINE_WIDTH, spaced=True),
         "",
         _wrapped(notes.ASSEMBLY_CHECKS, width=STEPS_LINE_WIDTH, spaced=True),
     )
@@ -325,6 +353,7 @@ for _note in (STEPS_NOTE, CHECKS_NOTE):
         raise AssertionError(
             "the summing assembly sequence or checks overrun the sheet"
         )
+# The detail's scale differs from the sheet's 1:5, so its label prints it.
 DETAIL_LABEL = f"{notes.DETAIL_TITLE}\nSCALE {DETAIL_SCALE[0]} : {DETAIL_SCALE[1]}"
 
 
@@ -571,20 +600,24 @@ def _placed_detail(adapter: Any) -> Any:
     return view
 
 
-def _crop_detail(adapter: Any, view: Any) -> None:
-    """Crop ``view`` to the circle round ``DETAIL_CENTRE``: sketch the circle
-    in the active view's own sketch and Crop2 while it is still selected."""
-    label = notes.DETAIL_TITLE
+def _view_sketch_circle(
+    adapter: Any,
+    view: Any,
+    centre: tuple[float, float],
+    radius: float,
+    *,
+    label: str,
+    exact: bool,
+) -> Any:
+    """A circle (sheet metres) in ``view``'s own sketch, the view active;
+    ``exact`` adds it to the database without sketch inference."""
     view = _early_bound(view, "IView")
     _activate_view(adapter, view, label=label)
     sketch = _early_bound(view.GetSketch(), "ISketch")
     transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
     utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
     points = []
-    for x, y in (
-        DETAIL_CENTRE,
-        (DETAIL_CENTRE[0] + DETAIL_CROP_RADIUS, DETAIL_CENTRE[1]),
-    ):
+    for x, y in (centre, (centre[0] + radius, centre[1])):
         point = _early_bound(
             utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
         )
@@ -592,13 +625,24 @@ def _crop_detail(adapter: Any, view: Any) -> None:
         points.append(tuple(float(value) for value in projected.ArrayData))
     manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
     previous = bool(manager.AddToDB)
-    manager.AddToDB = False
+    manager.AddToDB = exact
     try:
         circle = manager.CreateCircle(*points[0], *points[1])
     finally:
         manager.AddToDB = previous
     if circle is None:
-        raise RuntimeError(f"failed to sketch the {label} crop circle")
+        raise RuntimeError(f"failed to sketch the {label} circle")
+    return circle
+
+
+def _crop_detail(adapter: Any, view: Any) -> None:
+    """Crop ``view`` to the circle round ``DETAIL_CENTRE``: sketch the circle
+    in the active view's own sketch and Crop2 while it is still selected."""
+    label = notes.DETAIL_TITLE
+    view = _early_bound(view, "IView")
+    _view_sketch_circle(
+        adapter, view, DETAIL_CENTRE, DETAIL_CROP_RADIUS, label=label, exact=False
+    )
     status = int(view.Crop2(False, False, 1))
     adapter.currentModel.ClearSelection2(True)
     adapter.currentModel.EditRebuild3()
@@ -613,6 +657,39 @@ def _crop_detail(adapter: Any, view: Any) -> None:
         raise RuntimeError(
             f"{label} is not cropped: Crop2 status {status}, IsCropped {cropped}"
         )
+
+
+def _mark_detail_boundary(adapter: Any, front: Any) -> None:
+    """DETAIL A's boundary on the 1:5 front view: a black circle round the
+    region the 1:1 detail shows, lettered beneath it (rule 9: an
+    enlarged view has a lettered boundary on its parent)."""
+    label = f"{notes.DETAIL_TITLE} boundary"
+    centre = model_point_in_view(
+        adapter,
+        front,
+        (DETAIL_MODEL_CENTRE_MM[0] / 1000.0, DETAIL_MODEL_CENTRE_MM[1] / 1000.0, 0.0),
+        label=label,
+    )
+    radius = DETAIL_RADIUS_MM * ASSEMBLED_SCALE[0] / ASSEMBLED_SCALE[1] / 1000.0
+    circle = _early_bound(
+        _view_sketch_circle(adapter, front, centre, radius, label=label, exact=True),
+        "ISketchSegment",
+    )
+    # A view-sketch circle prints in the sketch's grey; colour it as the
+    # outline (draw_pn_pen_assembly's detail boundaries).
+    circle.Color = DETAIL_BOUNDARY_COLOR
+    adapter.currentModel.ClearSelection2(True)
+    adapter.currentModel.EditRebuild3()
+    if int(circle.Color) != DETAIL_BOUNDARY_COLOR:
+        raise RuntimeError(f"{label}: circle reads colour {int(circle.Color)}")
+    _activate_view(adapter, front, label=label)
+    letter_xy = (
+        centre[0] - DETAIL_LETTER_HALF_WIDTH,
+        centre[1] - radius - DETAIL_LETTER_GAP,
+    )
+    if add_note(adapter, notes.DETAIL_LETTER, *letter_xy) is None:
+        raise RuntimeError(f"failed to letter the {label}")
+    _telemetry.info(f"summing: {label} centre {centre!r} radius {radius!r}")
 
 
 def _knife_detail(adapter: Any) -> Callable[[], None]:
@@ -688,6 +765,7 @@ def _place_assembled_sheet(adapter: Any) -> Callable[[], None]:
         _assert_view_on_sheet(view, label=label)
         views[name] = view
     counter_settled = _counter_setting(adapter, views["*Front"])
+    _mark_detail_boundary(adapter, views["*Front"])
     detail_settled = _knife_detail(adapter)
     _add_note_block(
         adapter, SHEET_NAMES[0], ASSEMBLED_NOTES, NOTES_XY, label="assembled notes"

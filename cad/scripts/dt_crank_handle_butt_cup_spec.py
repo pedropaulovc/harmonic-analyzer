@@ -13,8 +13,8 @@ cup, whose face stays flat (local review of fbf82ad96).  Formerly: turned across
 the cup together, so wood and steel read as one rounded butt.  The smaller
 MHA-DT-32 head sets the pocket's matched fit.  Owner ruling B on #1375
 enlarges the body to retain the rule-17 floor as the pocket wall at the
-smallest body and largest pocket; Main's delegated ruling 2026-11-04 (#2170,
-option B) holds it at the outer face, after both of that face's edge breaks.
+smallest body and largest pocket; Owner ruling 2026-11-08 (Pedro), #2144
+item 7.1 holds it at the outer face, after both of that face's edge breaks.
 
 The pocket is bored to suit the MHA-DT-32 head; the handle's end play is fitted
 on the screw shoulder at assembly, so no length here is a stack term.  The

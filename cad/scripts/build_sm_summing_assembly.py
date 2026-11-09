@@ -150,13 +150,13 @@ HANGER_REACH = KNIFE_MOUNT_TOP_Y - HANGER_STUD_Y  # 8.9173, the modelled nominal
 # cuts each bolt to the crossbar-underside-to-washer-top height measured at
 # its own hole plus the fit-up reach, so the printed grip band and the
 # washer's catalogue thickness spread are measured out and only the cut's
-# own band reaches the tap: .345-.357 in, 8.763..9.0678.
+# own band reaches the tap: .346-.356 in, 8.7884..9.0424.
 HANGER_REACH_MIN = spec.HANGER_FIT_REACH - spec.HANGER_FIT_REACH_TOL
 HANGER_REACH_MAX = spec.HANGER_FIT_REACH + spec.HANGER_FIT_REACH_TOL
 # The cut must come out of the 2 in stock and remove its factory end: the
 # longest cut is the thickest printed grip plus the thickest washer plus
-# the longest reach, 37.01 + 1.651 + 9.0678 = 47.7288; the shortest is
-# 35.99 + 0.9144 + 8.763 = 45.6674.
+# the longest reach, 47.3202; the shortest is the thinnest of each plus the
+# shortest reach, 46.0756.
 HANGER_CUT_LENGTH_MIN = (
     top_frame.HANGER_GRIP
     - top_frame.HANGER_GRIP_TOL
@@ -170,14 +170,14 @@ HANGER_CUT_LENGTH_MAX = (
     + HANGER_REACH_MAX
 )
 # Charge the cut end's maximum incomplete lead, one pitch:
-# 7.7046667 >= 1.5D = 7.239.
+# 7.7300667 >= 1.5D = 7.239.
 HANGER_ENGAGEMENT_MIN = HANGER_REACH_MIN - hanger_screw.INCOMPLETE_TIP_LEN_MAX
 HANGER_ENGAGEMENT_FLOOR = hanger_screw.ENGAGEMENT_MIN_D * hanger_screw.SHANK_DIA
-# Longest reach under the shallowest full tap: 9.52 - 9.0678 = 0.4522 air.
+# Longest reach under the shallowest full tap: 9.52 - 9.0424 = 0.4776 air.
 HANGER_TIP_CLEARANCE = knife_mount.STUD_TAP_THREAD_DEPTH_MIN - HANGER_REACH_MAX
 # Modified-part inspection acceptance, not a vendor thread-to-head claim:
 # the useful full-form tail (.418 MIN, 10.6172, less one incomplete pitch)
-# spans 9.0678.
+# spans 9.0424.
 HANGER_THREAD_SPARE = (
     hanger_screw.THREAD_LENGTH_MIN - hanger_screw.INCOMPLETE_TIP_LEN_MAX
 ) - HANGER_REACH_MAX
