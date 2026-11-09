@@ -152,8 +152,8 @@ def test_unseated_lever_exception_reaches_only_its_actual_review_packages(monkey
 
 
 def test_pinion_cam_inch_set_screws_remain_staked_at_fitup() -> None:
+    import dt_drive_train_steps as steps
     import dt_pinion_cam_geometry as geometry
-    import dt_pinion_cam_spec as spec
 
     row = next(
         joint
@@ -166,7 +166,9 @@ def test_pinion_cam_inch_set_screws_remain_staked_at_fitup() -> None:
     assert row.quantity == 2
     assert row.exposure is Exposure.OSCILLATING
     assert row.lock is Lock.STAKED
-    assert row.lock_step == spec.SET_SCREW_STAKE_STEP_KEY
+    # The stake is MHA-DT-00's step; the cam sheet gives only the tap.
+    assert row.lock_step == "cam-collars-set"
+    assert steps.step_number(row.lock_step)
     assert row.lock_binds == (row.member, row.receiver)
     assert jr.REQUIRED_JOINTS[row.id].anchor == row.lock_step
 

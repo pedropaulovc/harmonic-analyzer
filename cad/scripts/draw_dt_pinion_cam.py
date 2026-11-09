@@ -16,6 +16,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -32,11 +33,13 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
 )
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_finish import add_surface_finish
+from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
@@ -50,17 +53,14 @@ import _telemetry
 from dt_pinion_cam_spec import (
     BORE_CALLOUT,
     CAM_OD,
-    COLLAR_OD_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     ECC,
-    ECCENTRICITY_CALLOUT,
-    SET_SCREW_STAKE_STEP_KEY,
+    LIFT_NOTE_CALLOUT,
     SURFACE_FINISHES,
     TAP_DRILL_CALLOUT,
     THIN_WALL_CALLOUT,
 )
-from dt_drive_train_steps import step_ref
 
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -111,15 +111,19 @@ _SQRT_HALF = 0.5**0.5
 # reference up the wall over the bore, its text above the OD's top between
 # the bore and eccentricity callouts.
 FRONT_KEEP = {
-    "BoreDia": (0.055, 0.180),
+    # Centred right of 0.055 so the bore callout's widest line, the fit
+    # name, stays 3 mm inside the left border.
+    "BoreDia": (0.058, 0.180),
     "CollarCy": (0.150, 0.200),
-    "ThinWallMin": (FRONT_CENTER[0], 0.195),
+    # Farm r5 36077d60b3 (3 of 3 runs): at y 0.195 "THIN-SIDE WALL" printed
+    # on the bore callout's stacked "+.0005"; 9 mm higher both rows clear it.
+    "ThinWallMin": (FRONT_CENTER[0], 0.204),
 }
 SIDE_KEEP = {
     "Depth": (SIDE_CENTER[0], SIDE_CENTER[1] + 0.055),
     # ENFORCE r2: at +0.035 the follower-pin line ran back over the right
-    # face; +0.051 centres the 53-wide callout between the profile and the
-    # isometric view boxes (~5.5 clear each side).
+    # face; +0.051 centres the callout between the profile and the
+    # isometric view boxes.
     "CollarOd": (SIDE_CENTER[0] + 0.051, SIDE_CENTER[1]),
 }
 # The tap-drill callout sits LEFT of the end view, under the profile view:
@@ -134,13 +138,32 @@ BOTTOM_KEEP = {
     "TapDrillDia": (0.215, 0.100),
     "TapCz": (BOTTOM_CENTER[0] + 0.036, BOTTOM_CENTER[1] + 0.007),
 }
+# The eccentricity is a location: value and band, plus the flag to the note
+# naming the lift it sets with the OD (rules 4 and 7; fan-out r1).
 DIMENSION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
-    "CollarOd": COLLAR_OD_CALLOUT,
-    "CollarCy": ECCENTRICITY_CALLOUT,
-    "TapDrillDia": f"{TAP_DRILL_CALLOUT}\n{step_ref(SET_SCREW_STAKE_STEP_KEY)}",
+    "CollarOd": LIFT_NOTE_CALLOUT,
+    "CollarCy": LIFT_NOTE_CALLOUT,
+    "TapDrillDia": TAP_DRILL_CALLOUT,
     "ThinWallMin": THIN_WALL_CALLOUT,
 }
+# The view along the set-screw axis is a removed view: lettered, with its
+# viewing arrow on the front view square onto the tap's mouth at the bottom
+# of the OD, looking up the tap (rule 9; fan-out screen 20261107T081227004Z:
+# the prose-named view had no letter and no arrow).  It is drawn as seen
+# along that arrow, so it is not rotated.
+SET_SCREW_VIEW_LETTER = "A"
+SET_SCREW_VIEW_LABEL = f"VIEW {SET_SCREW_VIEW_LETTER}"
+SET_SCREW_VIEW_LABEL_XY = (BOTTOM_CENTER[0] - 0.009, 0.082)
+VIEW_LETTER_HEIGHT = 0.005
+VIEW_ARROW_SQUARE_TOL = 0.0003
+_TAP_MOUTH = (_front_x(0.0), _front_y(-ECC - CAM_OD / 2.0))
+# (letter's upper-left, leader tip): the letter hangs below the mouth and
+# its leader rises from the letter's left side, squared on readback.
+SET_SCREW_VIEW_ARROW = (
+    (_TAP_MOUTH[0] - 0.0004, _TAP_MOUTH[1] - 0.010),
+    _TAP_MOUTH,
+)
 # Decimal places are the part's (dt_pinion_cam_spec.DRAWING_PRECISION, applied
 # by build_dt_pinion_cam).  The sheet only reads them back.
 
@@ -167,6 +190,51 @@ def _limit_witness_lines(
             f"missing dimensions for witness-line limits: {sorted(remaining)!r}"
         )
     adapter.currentModel.GraphicsRedraw2()
+
+
+def _add_view_arrow(adapter: Any, front: Any) -> None:
+    """The letter arrow on the front view naming the removed set-screw view:
+    square up onto the tap's mouth (draw_sm_summing_lever's view G arrow)."""
+    text_xy, tip_xy = SET_SCREW_VIEW_ARROW
+    label = f"view {SET_SCREW_VIEW_LETTER} viewing arrow"
+    note = add_leader_note(
+        adapter,
+        SET_SCREW_VIEW_LETTER,
+        text_xy=text_xy,
+        attach_xy=tip_xy,
+        view=front,
+        label=label,
+    )
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    text_format = annotation.GetTextFormat(0)
+    if text_format is None:
+        raise RuntimeError(f"{label} note has no text format")
+    text_format.CharHeight = VIEW_LETTER_HEIGHT
+    if not annotation.SetTextFormat(0, False, text_format):
+        raise RuntimeError(f"failed to size the {label} letter")
+    rebuild_drawing(adapter, label=f"{label} letter")
+    points = list(annotation.GetLeaderPointsAtIndex(0) or ())
+    if len(points) < 6 or math.dist((points[-3], points[-2]), tip_xy) > 0.001:
+        raise RuntimeError(f"{label} tip moved when its letter was sized")
+    # The leader leaves the letter's side: slide the letter by any miss so
+    # the arrow stands square onto the mouth.
+    miss = tip_xy[0] - points[0]
+    if abs(miss) > VIEW_ARROW_SQUARE_TOL:
+        x, y, z = (float(value) for value in annotation.GetPosition())
+        if not annotation.SetPosition2(x + miss, y, z):
+            raise RuntimeError(f"failed to square the {label}")
+        rebuild_drawing(adapter, label=f"square {label}")
+        points = list(annotation.GetLeaderPointsAtIndex(0) or ())
+        if (
+            len(points) < 6
+            or math.dist((points[-3], points[-2]), tip_xy) > 0.001
+            or abs(tip_xy[0] - points[0]) > VIEW_ARROW_SQUARE_TOL
+        ):
+            raise RuntimeError(f"{label} did not square: leader {points}")
+    _telemetry.info(
+        f"{label}: leader {points[0]:.5f},{points[1]:.5f} -> "
+        f"{points[-3]:.5f},{points[-2]:.5f} (square when the x agree)"
+    )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -287,10 +355,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
-    if add_note(
-        adapter, "VIEW ALONG SET-SCREW AXIS - ROTATED 90 DEG", 0.255, 0.075
-    ) is None:
-        raise RuntimeError("failed to label rotated cam set-screw end view")
+    _add_view_arrow(adapter, front)
+    if add_note(adapter, SET_SCREW_VIEW_LABEL, *SET_SCREW_VIEW_LABEL_XY) is None:
+        raise RuntimeError("failed to label the cam's set-screw view")
     add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.205)
 
     return await finalize_drawing(

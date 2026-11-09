@@ -204,26 +204,35 @@ SET_SCREW_SUBFLUSH_MIN_MM = (
 if SET_SCREW_SUBFLUSH_MIN_MM <= 0.0:
     raise AssertionError("the longest supplied screw can stand proud of the cam OD")
 
-BORE_CALLOUT = f"REAM THRU\nSLIP FIT ON LIFT ROD {LIFT_ROD_NUMBER}"
-# ENFORCE r8 (gating): the tap breaks out on the heavy side of this OD, and a
-# blind reader could not tell whether the pin's track crosses it.  It does
-# not: the follower contact stays 45 deg or more off the tap mouth over the
-# whole stroke (test_cam_set_screw_hole_stays_clear_of_the_follower), so the
-# callout says so, without a number (notes carry no dimensions).
-COLLAR_OD_CALLOUT = (
-    f"{FOLLOWER_PIN_NUMBER} FOLLOWER\nPIN RIDES THIS OD\nON AN ARC CLEAR\nOF THE TAP"
+# The reamed bore's fit, by its standard name, with the clearance its printed
+# limits give on the rod's (rule 4; fan-out screen 20261107T081227004Z:
+# SLIP FIT is not a standard fit name).
+_SLIP_CLEARANCE_IN = tuple(
+    f"{value / 25.4:.4f}".removeprefix("0")
+    for value in (SLIP_CLEARANCE_MIN, SLIP_CLEARANCE_MAX)
 )
-ECCENTRICITY_CALLOUT = (
-    f"ECCENTRICITY\nBORE AXIS TO OD AXIS\nSETS {FOLLOWER_PIN_NUMBER} PIN LIFT"
+BORE_CALLOUT = "\n".join(
+    (
+        "REAM THRU",
+        f"SLIDING FIT ON LIFT ROD {LIFT_ROD_NUMBER}",
+        f"(CLEARANCE {_SLIP_CLEARANCE_IN[0]}-{_SLIP_CLEARANCE_IN[1]})",
+    )
 )
-# drawing-guidelines.md rule 23 (lock threaded joints exposed to operating
-# loads), #1176: MHA-DT-00's cam-collars-set step stakes the tap mouth over
-# the set screw; the drawing resolves this key through dt_drive_train_steps
-# so the number follows the assembly sequence.  The spec holds only the key:
-# importing the steps module here would re-key the part on every step edit
-# (as MHA-DT-16 / MHA-DT-17 hold LEVER_PIN_SET_STEP_KEY).
-SET_SCREW_STAKE_STEP_KEY = "cam-collars-set"
-TAP_DRILL_CALLOUT = "TAP DRILL THRU TO BORE\n#2-56 UNC\nSTAKE AT ASSEMBLY PER"
+# The OD and its .079 offset from the bore together set the follower pin's
+# lift, so the one reason sits once, in numbered note 1, and both dimensions
+# flag it (rules 4 and 7; fan-out r1 57234c1d71: the reason on the OD's
+# callout alone left the tight .079 with no mate at its callout).  The tap
+# mouth stays 45 deg or more off the pin's track
+# (test_cam_set_screw_hole_stays_clear_of_the_follower); saying so on the
+# sheet was design rationale (fan-out screen 20261107T081227004Z).
+LIFT_NOTE_NUMBER = 1
+SCREW_NOTE_NUMBER = 2
+LIFT_NOTE_CALLOUT = f"SEE NOTE {LIFT_NOTE_NUMBER}"
+_OD_TEXT = f"{CAM_OD / 25.4:.{COLLAR_OD_PLACES}f}".removeprefix("0")
+_ECC_TEXT = f"{ECC / 25.4:.{ECC_PLACES}f}".removeprefix("0")
+# The stake over the set screw is MHA-DT-00's cam-collars-set step (rule 23:
+# the assembly step gives the method); the part sheet gives only the tap.
+TAP_DRILL_CALLOUT = "TAP DRILL THRU TO BORE\n#2-56 UNC"
 
 # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the roughness goes on the surface that runs.  The follower pin rides
 # the cam OD; the set-screwed bore never moves on the rod, so it carries none.
@@ -278,8 +287,17 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
     raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
 
-# The tapped-hole requirement is attached to its tap-drill dimension. The
-# linked note carries only loose hardware; the ASME source and stack above
-# account for the supplier's overall-length limits, not an invented SKU.
-DRAWING_NOTES = "SUPPLY ASME B18.3 #2-56 UNC X 3/16\nFLAT-POINT SOCKET SET SCREW LOOSE."
+# The tapped-hole requirement is attached to its tap-drill dimension.  Note 2
+# carries only loose hardware; the ASME source and stack above account for
+# the supplier's overall-length limits, not an invented SKU.  The thick-side
+# wall is deeper than the longest screw (SET_SCREW_SUBFLUSH_MIN_MM); saying
+# the tightened screw sits below the OD read as assembly narration (fan-out
+# r2, rule 7), so the sheet does not.
+DRAWING_NOTES = "\n".join(
+    (
+        f"{LIFT_NOTE_NUMBER}. \N{LATIN CAPITAL LETTER O WITH STROKE}{_OD_TEXT} AND "
+        f"{_ECC_TEXT} SET THE LIFT OF FOLLOWER PIN {FOLLOWER_PIN_NUMBER}.",
+        f"{SCREW_NOTE_NUMBER}. SUPPLY ASME B18.3 #2-56 UNC X 3/16 FLAT-POINT SOCKET SET SCREW LOOSE.",
+    )
+)
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"

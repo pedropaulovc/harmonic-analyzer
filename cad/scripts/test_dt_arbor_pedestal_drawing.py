@@ -537,6 +537,21 @@ def test_tap_callout_rewrite_refuses_an_unexpected_native_format() -> None:
         drawing.set_screw_callout_definitions(no_class)
 
 
+def test_hold_down_callout_reads_size_then_drill_then_extent() -> None:
+    """Fan-out screen 20261107T081227004Z: "DRILL Ø .180 THRU ALL" put the
+    process ahead of the size (rule 26: size, process, depth)."""
+    import pytest
+
+    native = {5: "<MOD-DIAM><hw-diam> <hw-thru>", 6: "", 7: "", 8: ""}
+    updated = drawing.hold_down_callout_definitions(dict(native))
+    assert updated == {5: "<MOD-DIAM><hw-diam> DRILL <hw-thru>", 6: "", 7: "", 8: ""}
+    with pytest.raises(RuntimeError, match="one bare diameter"):
+        drawing.hold_down_callout_definitions(updated)
+    source = _drawing_source()
+    assert 'process="DRILL"' not in source
+    assert "_set_hold_down_callout_text(hold_down_callout)" in source
+
+
 def test_part_stamps_make_flexible_material_and_protective_finish() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_properties" in source
@@ -580,16 +595,34 @@ def test_lateral_locations_start_on_a_feature_not_the_symmetry_axis() -> None:
     assert drawing.BORE_LATERAL_XY[1] < drawing._front_y(0.0)
 
 
-def test_crown_callout_says_where_the_tapered_flanks_start() -> None:
-    """Round-2 review: the flanks run from the foot corners (the strap root is
-    the full foot width) up to tangency with the crown."""
+def test_crown_callout_and_flank_angle_define_the_tapered_flanks() -> None:
+    """Round-2 review: the flanks run from the foot top (the strap root is the
+    full foot width) up to tangency with the crown.  Fan-out local repeat of
+    e308920ca9: the coined "FOOT CORNERS" left the taper unprinted, so the
+    flank's angle off the seat prints as a reference."""
+    import math
+
     import build_dt_arbor_pedestal
 
+    spec = dt_arbor_pedestal_spec
     source = Path(build_dt_arbor_pedestal.__file__).read_text(encoding="utf-8")
     assert "half_root = FOOT_WIDTH / 2.0" in source
-    assert "FOOT CORNERS" in drawing.CROWN_CALLOUT
-    assert "TANGENT" in drawing.CROWN_CALLOUT
+    assert drawing.CROWN_CALLOUT == "SIDES TANGENT"
     assert not re.search(r"\d", drawing.CROWN_CALLOUT)
+    lean = math.degrees(
+        math.atan(
+            (spec.FOOT_WIDTH / 2.0 - spec.TAPER_TANGENT_X)
+            / (spec.TAPER_TANGENT_Y - spec.FOOT_HEIGHT)
+        )
+    )
+    assert 1.0 < lean < 2.0
+    assert drawing.FLANK_ANGLE_DEG == pytest.approx(90.0 + lean)
+    # The text stands east of the elevation, between the foot-height lane and
+    # the bore axis.
+    east_flank = drawing.FRONT_CENTER[0] + spec.FOOT_WIDTH * drawing._S / 2.0
+    assert drawing.FLANK_ANGLE_XY[0] > east_flank
+    assert drawing._front_y(spec.FOOT_HEIGHT) < drawing.FLANK_ANGLE_XY[1]
+    assert drawing.FLANK_ANGLE_XY[1] < drawing._front_y(spec.BORE_HEIGHT)
 
 
 def test_apex_set_screw_tap_keeps_1_5d_only_at_r11() -> None:

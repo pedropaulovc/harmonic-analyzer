@@ -5,7 +5,8 @@ face view, a longitudinal centre section through the D-flat and an isometric
 of a helical toothed disc with a local +X D-bore, and five native model
 dimensions -- outside diameter, four-place face width, round bore diameter,
 across-flat and south-entry chamfer -- plus the gear-data block drawing-guidelines.md rule 7 (notes: few, flagged, never a method) keeps
-for the crossed-axis tooth system.
+for the crossed-axis tooth system and one numbered note, the D-bore's matched
+fit, that both bore dimensions link.
 
 No datums, no feature control frames: a gear slipped onto a shaft land is not
 on the GD&T allowlist (drawing-guidelines.md rule 5 (avoid excessive GD&T)), and the retired end-face perpendicularity
@@ -30,6 +31,7 @@ from typing import Any
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     dimension_name,
     place_view,
     view_name,
@@ -100,8 +102,9 @@ GEAR_DATA_POS = (0.016, 0.262)
 # The property-linked block hangs down from GEAR_DATA_POS one 2.5 mm note line
 # per row: on farm run 20261001T110844152Z the 15 rows' cap tops ran 261.7 to
 # 212.8 mm (3.50 mm pitch) and the last row's descenders reached 208.9 mm.
-# The tooth-edge requirement is one of its rows, so the sheet has no other
-# note (machinist review r1 of #1641: a free-floating note).
+# The tooth-edge requirement is one of its rows, not a free-floating note
+# (machinist review r1 of #1641); the only other note is the D-bore's
+# numbered fit note (NOTES_XY).
 GEAR_DATA_LINE_PITCH = 0.0035
 GEAR_DATA_BOTTOM = GEAR_DATA_POS[1] - len(GEAR_DATA.splitlines()) * GEAR_DATA_LINE_PITCH
 
@@ -124,10 +127,10 @@ FACE_WIDTH_HALF = FACE_WIDTH * VIEW_SCALE[0] / (VIEW_SCALE[1] * 2000.0)
 # name the mesh its band serves (machinist review r1 of #1641: the mate was
 # named only in GEAR DATA).
 TIP_DIA_CALLOUT = "FIXED-CENTRE MESH\nWITH MHA-DT-10"
-# The full mate Number makes the AF block 70.8 mm wide at the calibrated
-# dimension font. This lane leaves over 3 mm beyond the padded front-view
-# clearance guard and over 14 mm to the padded section, without moving its
-# model anchors or the chamfer below it.
+# The AF block's widest line is its value; it stands in the lane right of
+# the tooth tips, over 3 mm beyond the padded front-view clearance guard and
+# over 14 mm to the padded section, without moving its model anchors or the
+# chamfer below it.
 FRONT_KEEP = {
     "OutsideDia": (FRONT_CENTER[0] + 0.055, FRONT_CENTER[1] + 0.067),
     "BoreDia": (FRONT_CENTER[0] - 0.078, FRONT_CENTER[1] - 0.062),
@@ -148,13 +151,26 @@ FRONT_KEEP = {
 SECTION_LINE_OVERRUN = 0.005
 # The native caption's top centre, under the section and above the title block.
 SECTION_CAPTION_XY = (SECTION_CENTER[0], 0.085)
+# The native caption's fields: name and letter only, no scale compartment.
+SECTION_CAPTION_TEXT = "<VLNAME> <VLLABEL>"
 # The cut runs along the face view's horizontal centre line, so A-A projects
 # with the flat to the right; ``_turn_section_axis_across`` turns it 90° CCW
-# so the gear axis reads across the sheet. The native label says so in its
-# one writable compartment, the custom scale text (as draw_fr_harmonic_base
-# labels its turned sections), and the turn proves the direction (machinist
-# review r3 of #1641: a turned section with no rotation label, rule 15).
-SECTION_LABEL_SCALE_TEXT = "ROTATED 90 DEG CCW  SCALE"
+# so the gear axis reads across the sheet. The native caption reads SECTION
+# A-A only: the section is drawn at the sheet's 3:2, so it prints no scale
+# (drawing-guidelines.md rule 9: a scale equal to the sheet's restates the
+# title block). The turn prints in a note centred under the caption, as
+# draw_mg_magnifying_wheel labels its turned section, and the turn proves the
+# direction (machinist review r3 of #1641: a turned section with no rotation
+# label).
+ROTATION_NOTE = "ROTATED 90\N{DEGREE SIGN} CCW"
+# Top-left anchored, capitals about 2.6 mm a character, its top 9 mm under
+# the caption's (a one-line caption's 6.35 mm SECTION letters above it).
+ROTATION_NOTE_TOP = SECTION_CAPTION_XY[1] - 0.009
+ROTATION_NOTE_CHAR = 0.0026
+ROTATION_NOTE_XY = (
+    SECTION_CAPTION_XY[0] - len(ROTATION_NOTE) * ROTATION_NOTE_CHAR / 2.0,
+    ROTATION_NOTE_TOP,
+)
 # Face width up and left of the section, its dimension line run out past the
 # south witness line so neither witness line strikes the text (machinist
 # review r1 of #1641); the chamfer's leg dimension runs left off the south
@@ -170,37 +186,52 @@ SECTION_KEEP = {
 # text-unmatched), while the native below lane prints on every sheet.
 FACE_WIDTH_CALLOUT = "SETS CONE GEAR STACK\nON MHA-DT-04"
 
-# Native bands on both bore dimensions set the fitted clearance. The callout
-# adds extent and the mating part by name and number; it does not repeat
-# those dimensions. No process word: a reamer would cut away the flat, and
-# the dimensions define the D-profile (user ruling 2026-09-29, machinist
-# review of the #1128 full build). The mate's name lives here, not beside
+# Native bands on both bore dimensions set the fitted clearance: the fleet
+# gear-seat fit (gear_seat_fit) on the MHA-DT-04 land, .0008 wide on the
+# round and .0004 across the flat, narrower than the shop table's turned
+# diameter and milled width rows. Their fit route is a matched fit to the
+# finished land with its acceptance (drawing-guidelines.md rule 4), named
+# once in numbered note 1 that both bore dimensions link (rule 4: one
+# feature with several tight dimensions names its mate once); the limits
+# still apply and the clearances print as reference. No process word: a
+# reamer would cut away the flat, and the dimensions define the D-profile
+# (user ruling 2026-09-29, machinist review of the #1128 full build;
+# dt-crank-drive-gear.yaml RV-01). The mate's name lives here, not beside
 # its number in crank_drive_gear_notes, which is in the part's rebuild
 # closure; test_crank_drive_gear_drawing checks it against the registry.
 SHAFT_MATE_NAME = "CONE GEAR SHAFT"
-BORE_CALLOUT = (
-    "THRU\n"
-    f"({inch_text(BORE_DIAMETRAL_CLEARANCE[0], 4)}-{inch_text(BORE_DIAMETRAL_CLEARANCE[1], 4)} DIAMETRAL\n"
-    f"CLEARANCE ON\n{SHAFT_MATE_NAME} {SHAFT_MATE_NUMBER})"
+BORE_FIT_NOTE_NUMBER = 1
+BORE_FIT_NOTE = "\n".join(
+    (
+        f"{BORE_FIT_NOTE_NUMBER}. SLIDING FIT ON {SHAFT_MATE_NAME} {SHAFT_MATE_NUMBER}, "
+        "MADE TO ITS MEASURED LAND",
+        f"   (CLEARANCE {inch_text(BORE_DIAMETRAL_CLEARANCE[0], 4)}-"
+        f"{inch_text(BORE_DIAMETRAL_CLEARANCE[1], 4)}, ACROSS FLAT "
+        f"{inch_text(FLAT_AF_CLEARANCE[0], 4)}-{inch_text(FLAT_AF_CLEARANCE[1], 4)}); "
+        "SLIDES ON, NO ROCK.",
+    )
 )
-AF_CALLOUT = (
-    "BORE ACROSS FLAT\n"
-    f"({inch_text(FLAT_AF_CLEARANCE[0], 4)}-{inch_text(FLAT_AF_CLEARANCE[1], 4)} AF CLEARANCE\n"
-    f"ON {SHAFT_MATE_NAME} {SHAFT_MATE_NUMBER})"
-)
+# The sheet's numbered notes, in one block (rule 7: at most four short
+# lines), top-left anchored at the lower left: under the round bore's
+# callout, left of the title block (x 0.216), inside the border.
+SHEET_NOTES = BORE_FIT_NOTE
+NOTES_XY = (0.016, 0.060)
+BORE_CALLOUT = f"THRU\nSEE NOTE {BORE_FIT_NOTE_NUMBER}"
+AF_CALLOUT = f"BORE ACROSS FLAT\nSEE NOTE {BORE_FIT_NOTE_NUMBER}"
 DIMENSION_CALLOUTS = {
     "OutsideDia": TIP_DIA_CALLOUT,
     "BoreDia": BORE_CALLOUT,
     "BoreAF": AF_CALLOUT,
     "FaceWidth": FACE_WIDTH_CALLOUT,
     # The leg is native and prints under the title block's .XX band; the
-    # chamfer feature is 45° on the model. The callout says the chamfer is on
-    # one end only and why (the leader shows which end). SolidWorks sets the
-    # block's widest line against the leg's own dimension line, whose
-    # extension lines overrun it by 1 mm: two trailing spaces on every line
-    # keep that ink clear (r3 of #1641 printed RUNOUT's T on the line).
+    # chamfer feature is 45° on the model. The callout says why the chamfer
+    # is there; the leader shows which end (fan-out r1: "THIS END" made a
+    # third row of words, rule 7). SolidWorks sets the block's widest line
+    # against the leg's own dimension line, whose extension lines overrun it
+    # by 1 mm: two trailing spaces on every line keep that ink clear (r3 of
+    # #1641 printed RUNOUT's T on the line).
     "BoreSouthChamferSize": (
-        " X 45 DEG, THIS END  \nCLEARS FLAT RUNOUT  \nOF MHA-DT-04  "
+        " X 45\N{DEGREE SIGN}  \nCLEARS FLAT RUNOUT  \nOF MHA-DT-04  "
     ),
 }
 
@@ -235,16 +266,23 @@ def _hide_tangent_edges(view: Any, label: str) -> None:
 
 
 def _position_section_caption(adapter: Any, view: Any) -> None:
-    """Move the native linked A-A caption under the section, fields intact."""
+    """Drop the A-A caption's scale, move it under the section and label the
+    turn under it.
+
+    The caption keeps its native name and letter fields; the section is at
+    the sheet's scale, so its scale fields go (as draw_dt_cone_pivot_post
+    captions its A-A). The turn is a plain note centred under it.
+    """
     candidates = []
     for raw_note in _early_bound(view, "IView").GetNotes() or ():
         note = _early_bound(raw_note, "INote")
         linked_text = str(note.PropertyLinkedText or "")
         if all(token in linked_text for token in ("<VLNAME>", "<VLLABEL>")):
-            candidates.append((note, linked_text))
+            candidates.append(note)
     if len(candidates) != 1:
         raise RuntimeError(f"expected one native linked section caption, found {len(candidates)}")
-    note, linked_text = candidates[0]
+    note = candidates[0]
+    note.PropertyLinkedText = SECTION_CAPTION_TEXT
     annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
     if not annotation.SetPosition2(*SECTION_CAPTION_XY, 0.0):
         raise RuntimeError("failed to position the 64T section caption")
@@ -252,8 +290,10 @@ def _position_section_caption(adapter: Any, view: Any) -> None:
     position = tuple(float(value) for value in annotation.GetPosition())
     if math.dist(position[:2], SECTION_CAPTION_XY) > 1e-6:
         raise RuntimeError("64T section caption position did not persist")
-    if str(note.PropertyLinkedText or "") != linked_text:
-        raise RuntimeError("64T section caption lost its native fields")
+    if str(note.PropertyLinkedText or "") != SECTION_CAPTION_TEXT:
+        raise RuntimeError("64T section caption did not keep name-and-letter fields only")
+    if add_note(adapter, ROTATION_NOTE, *ROTATION_NOTE_XY) is None:
+        raise RuntimeError(f"failed to label section A-A {ROTATION_NOTE}")
 
 
 def _section_axes(adapter: Any, view: Any) -> tuple[tuple[float, float], tuple[float, float]]:
@@ -286,12 +326,12 @@ def _turn_section_axis_across(adapter: Any, view: Any) -> None:
         axis, flat = _section_axes(adapter, native)
     # SolidWorks lays the aligned section in projection, the flat along the
     # cutting line as in the face view: rightward. Turning that flat up is
-    # 90° counter-clockwise, which SECTION_LABEL_SCALE_TEXT prints; any other
-    # start would make the label false, so it fails the build instead.
+    # 90° counter-clockwise, which ROTATION_NOTE prints; any other start
+    # would make the label false, so it fails the build instead.
     if flat[0] <= 0.0 or abs(flat[1]) > 1e-8:
         raise RuntimeError(
             f"64T section does not lay the flat rightward before its turn ({flat=}), "
-            f"so {SECTION_LABEL_SCALE_TEXT!r} would be false"
+            f"so {ROTATION_NOTE!r} would be false"
         )
     native.Angle = float(native.Angle) - math.atan2(axis[1], axis[0])
     rebuild_drawing(adapter, label="turn 64T section")
@@ -302,29 +342,6 @@ def _turn_section_axis_across(adapter: Any, view: Any) -> None:
         f"64T section turned: angle={float(native.Angle):.6f} rad, "
         f"reversed={bool(section.GetReversedCutDirection())}"
     )
-
-
-def _label_section_rotation(drawing_model: Any) -> None:
-    """Write the rotation into the native section label's scale compartment.
-
-    swDetailingSectionViewLabels_{PerStandard,Scale,CustomScale} = 242/247/84
-    and swDetailingViewLabelsScale_SCALEcustom = 3, as draw_fr_harmonic_base
-    reads them off this install's swconst.tlb (R2026x). The label then reads
-    "SECTION A-A" over "ROTATED 90 DEG CCW  SCALE 3 : 2".
-    """
-    extension = _early_bound(drawing_model.Extension, "IModelDocExtension")
-    if not extension.SetUserPreferenceToggle(242, 0, False):
-        raise RuntimeError("failed to release the standard section-label defaults")
-    if not extension.SetUserPreferenceInteger(247, 0, 3):
-        raise RuntimeError("failed to select custom section-label scale text")
-    if not extension.SetUserPreferenceString(84, 0, SECTION_LABEL_SCALE_TEXT):
-        raise RuntimeError("failed to write the section-label scale text")
-    if (
-        extension.GetUserPreferenceToggle(242, 0)
-        or int(extension.GetUserPreferenceInteger(247, 0)) != 3
-        or str(extension.GetUserPreferenceString(84, 0)) != SECTION_LABEL_SCALE_TEXT
-    ):
-        raise RuntimeError("native section-label scale text did not persist")
 
 
 def _named(adapter: Any, annotations: list[Any], name: str) -> Any:
@@ -443,8 +460,6 @@ async def build(adapter: Any) -> dict[str, str]:
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
-    _label_section_rotation(drawing_model)
-
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE)
     section = create_section_view(
         adapter,
@@ -498,6 +513,8 @@ async def build(adapter: Any) -> dict[str, str]:
     _bore_leaders_clear(adapter, front, front_annotations)
 
     add_property_linked_note(adapter, "Gear Data", *GEAR_DATA_POS, char_height=0.0025)
+    if add_note(adapter, SHEET_NOTES, *NOTES_XY) is None:
+        raise RuntimeError("failed to add the 64T's numbered notes")
     return await finalize_drawing(
         adapter,
         OUTPUTS,

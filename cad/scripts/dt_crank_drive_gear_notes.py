@@ -50,12 +50,18 @@ GEAR_DATA = gear_data_note(
             "PRESSURE ANGLE, NORMAL (CUTTER)",
             f"{spec.CUTTER_PRESSURE_ANGLE_DEG:.1f} DEG",
         ),
+        # The cutter by number and range, and the helical gear's virtual tooth
+        # count that picks it, in handbook words on one labelled row.  The
+        # cutter template's 55-tooth design count read as a private
+        # "REFERENCE TEETH" (fan-out local repeat of 36077d60b3, 2 of 3 runs).
+        # One row, not two: the block's last rows already stand just above
+        # the gear's rim.
         (
-            "FORM CUTTER / REFERENCE TEETH / VIRTUAL TEETH (REF)",
+            "FORM CUTTER",
             f"#{spec.CUTTER_NUMBER}, {spec.CUTTER_TEETH_RANGE[0]}-"
-            f"{spec.CUTTER_TEETH_RANGE[1]}T / "
-            f"{spec.CUTTER_TEMPLATE.reference_teeth} / "
-            f"{spec.VIRTUAL_TEETH:.{spec.GEAR_DATA_REFERENCE_PLACES}f}",
+            f"{spec.CUTTER_TEETH_RANGE[1]}T, FOR "
+            f"{spec.VIRTUAL_TEETH:.{spec.GEAR_DATA_REFERENCE_PLACES}f} "
+            "VIRTUAL TEETH (REF)",
         ),
         ("DIAMETRAL PITCH, TRANSVERSE (REF)", f"{spec.DIAMETRAL_PITCH:.2f}"),
         ("PRESSURE ANGLE, TRANSVERSE (REF)", f"{spec.PRESSURE_ANGLE_DEG:.2f} DEG"),

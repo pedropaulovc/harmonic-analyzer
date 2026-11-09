@@ -823,19 +823,17 @@ def test_journal_rims_print_the_thrust_ring_break() -> None:
     import dt_cone_gear_shaft_spec as shaft
 
     break_max = shaft.THRUST_EDGE_BREAK_MAX
-    assert (
-        f"RIMS BREAK {shaft.inch_text(break_max, 3)} MAX"
-        == shaft.POST_JOURNAL_RIM_BREAK
+    assert f"RIMS BREAK {shaft.inch_text(break_max, 3)} MAX" == shaft.POST_JOURNAL_RIM_BREAK
+    # r16 (rules 4 and 7) gave the tighter break its reason at the callout;
+    # the novice rubric's two-line callout moved the collar's part into
+    # numbered note 2, which the bore's callout flags, and fan-out r1 put the
+    # short break back at the bore's leader (rule 7).
+    assert drawing.DIMENSION_CALLOUTS["JournalBoreDia"] == (
+        f"REAM THRU, SEE NOTE 2\n{shaft.POST_JOURNAL_RIM_BREAK}"
     )
-    bore_callout = drawing.DIMENSION_CALLOUTS["JournalBoreDia"]
-    # r16 (rules 4 and 7): the tighter break carries its reason under it.
-    assert bore_callout.splitlines()[-2:] == [
-        shaft.POST_JOURNAL_RIM_BREAK,
-        "FOR COLLAR SEAT",
-    ]
-    assert (
-        f"EDGE BREAK {shaft.inch_text(break_max, 3)} MAX" in shaft.COLLAR_STOCK_CALLOUT
-    )
+    assert shaft.POST_JOURNAL_RIM_BREAK not in drawing.SHEET_NOTES
+    assert "CONE SHAFT MHA-DT-04" in _note(2) and "ITS COLLAR" in _note(2)
+    assert f"EDGE BREAK {shaft.inch_text(break_max, 3)} MAX" in shaft.COLLAR_STOCK_CALLOUT
     ring = shaft.THRUST_RING_MIN
     assert ring - 2.0 * break_max >= shaft.THRUST_RING_FLOOR
     # the title block's general break on the rim would not hold the floor
@@ -892,7 +890,8 @@ def test_north_cone_boss_end_carries_the_running_finish() -> None:
 def test_foot_seat_mate_rides_its_ra_symbol_not_a_loose_note() -> None:
     """PR #2107 machinist review (clarity, gating): the foot's mate stood in a
     loose general note, not on the callout it explains; it prints over the
-    foot seat's Ra, and the sheet carries no general note."""
+    foot seat's Ra.  The part carries no general note; the sheet's only notes
+    are the numbered fit notes its bore callouts flag."""
     foot = surface_finish_by_key(spec.SURFACE_FINISHES, "foot_seat")
     assert (
         foot.production_method == spec.FOOT_SEAT_FINISH_TARGET == "SEATS ON MHA-DT-20"
@@ -1012,10 +1011,20 @@ def test_plan_names_the_ray_its_basic_angle_runs_to() -> None:
     assert "CONE_AXIS_LABEL,\n        text_xy=CONE_AXIS_LABEL_XY," in source
 
 
-def test_crank_bore_thru_rides_the_size_line_so_the_mate_line_stays_narrow() -> None:
-    """r4 view-crowding: "THRU, RUNS ON ..." below the size reached the 38.10."""
-    assert drawing.DIMENSION_SUFFIXES["CrankBoreDia"] == " THRU"
-    assert drawing.DIMENSION_CALLOUTS["CrankBoreDia"] == "RUNS ON MHA-DT-11"
+def test_both_bores_read_size_then_ream_thru_and_flag_their_fit_note() -> None:
+    """Novice-rubric screen (rules 12, 26 and 4): neither banded bore named a
+    process, and RUNS ON named a mate but no fit.  Both are reamed with owned
+    reamers (.4500 and .4835, cone_pivot_post_spec), so each callout reads
+    size, REAM, THRU and flags the numbered note that states its standard
+    running fit.  The crank bore's process and flag share its one row under
+    the size: a third row dropped onto the head's top edge, and the 13° arc
+    caps the block above (FRONT_KEEP)."""
+    for name, note in (("CrankBoreDia", 1), ("JournalBoreDia", 2)):
+        assert name not in drawing.DIMENSION_SUFFIXES
+        rows = drawing.DIMENSION_CALLOUTS[name].splitlines()
+        assert rows[0] == f"REAM THRU, SEE NOTE {note}"
+    assert _note(1).startswith("1. RUNNING FIT ON CRANKSHAFT MHA-DT-11 (CLEARANCE ")
+    assert _note(2).startswith("2. RUNNING FIT ON CONE SHAFT MHA-DT-04 (CLEARANCE ")
 
 
 def test_crank_bore_mate_line_stands_clear_of_the_head_height_extension() -> None:
@@ -1023,13 +1032,21 @@ def test_crank_bore_mate_line_stands_clear_of_the_head_height_extension() -> Non
     MHA-DT-11 underline sat 0.8 mm over HeadHt's upper extension line (the
     head's top edge), parallel to it.  That render put the underline 7.31 mm
     under the requested y and the box 2.6 mm past its 156.3 mm right end, at
-    x 0.1330; View C's nearest text (the 1.697 block) starts at 180.6 mm and
-    the crowding check asks one 15 mm text height of air."""
+    x 0.1330; View C's nearest text (the 1.697 block) starts at 180.6 mm.
+    The block keeps two rows.  Its second row, "REAM THRU, SEE NOTE 1", is
+    four glyphs (~2.7 mm each, centred) wider than RUNS ON MHA-DT-11, and the
+    1.697 block lost its two word rows (5.5 mm each of its 19 mm), so the
+    crowding check asks that smaller block's height of air."""
     x, y = drawing.FRONT_KEEP["CrankBoreDia"]
     underline_y = y - 0.00731
     assert underline_y - drawing._front_y(spec.BLOCK_HEIGHT) >= 0.0025
-    box_right = 0.1563 + (x - 0.1330) + 0.0026
-    assert 0.1806 - box_right >= 0.015
+    row = drawing.DIMENSION_CALLOUTS["CrankBoreDia"]
+    assert "\n" not in row
+    grown = (len(row) - len("RUNS ON MHA-DT-11")) * 0.0027 / 2.0
+    box_right = 0.1563 + (x - 0.1330) + 0.0026 + grown
+    assert "CrankAboveCone" not in drawing.DIMENSION_CALLOUTS
+    spacing_block_height = 0.0190 - 2 * 0.0055
+    assert 0.1806 - box_right >= spacing_block_height
 
 
 def test_mounting_hole_callout_says_drill_above_its_through_row() -> None:
@@ -1050,11 +1067,19 @@ def test_mounting_hole_callout_says_drill_above_its_through_row() -> None:
     assert "_set_mount_hole_process(mount_callout)" in source
 
 
-def test_thrust_face_station_names_the_collar_it_bears() -> None:
-    """r5 (rule 4): the ±0.25 station must say which part's collar it sets."""
-    callout = drawing.DIMENSION_CALLOUTS["ConeBossNorthZ"]
-    assert "MHA-DT-04" in callout
-    assert "COLLAR" in callout
+def test_thrust_face_station_flags_note_2_which_names_the_collar() -> None:
+    """r5 (rule 4) asked the ±.002 station to say whose collar it sets.  The
+    novice rubric (rule 7) keeps a location to its value and band, so the
+    cone bore's note 2 names the MHA-DT-04 collar on the face at that station
+    and the station flags it (fan-out r1).  The face's Ra symbol keeps no
+    text: the spec is shared by other slices' parts, so the sheet does not
+    re-key it."""
+    assert drawing.DIMENSION_CALLOUTS["ConeBossNorthZ"] == "SEE NOTE 2"
+    face = surface_finish_by_key(spec.SURFACE_FINISHES, "cone_boss_north_face")
+    assert face.production_method == ""
+    assert drawing._NORTH_BOSS_FINISH_OFFSET == (-0.006, 0.008)
+    assert "MHA-DT-04" in _note(2)
+    assert "ITS COLLAR RUNS ON THE .827 FACE." in _note(2)
     # Above the upper extension line, below the sheet border.
     assert drawing.SECTION_KEEP["ConeBossNorthZ"][1] > 0.250
 
@@ -1343,3 +1368,132 @@ def test_drawing_side_callout_precision_is_the_declared_exception() -> None:
     assert (spec.MOUNT_HOLE_CALLOUT_PLACES, spec.MOUNT_CBORE_DEPTH_PLACES) == (3, 2)
     assert "written as 3" in entry.where and "written as 2" in entry.where
     assert all(name in entry.where for name in drawing.MOUNT_HOLE_PRECISION)
+
+
+def _note(number: int) -> str:
+    """Numbered note ``number`` of the sheet's block, its lines joined."""
+    lines = drawing.SHEET_NOTES.splitlines()
+    start = next(i for i, line in enumerate(lines) if line.startswith(f"{number}. "))
+    body = [lines[start]]
+    for line in lines[start + 1 :]:
+        if not line.startswith("   "):
+            break
+        body.append(line.strip())
+    return " ".join(body)
+
+
+def test_numbered_notes_state_each_bores_fit_and_its_locations_mates() -> None:
+    """Novice-rubric screen (rules 4, 7 and 26): the four location dimensions
+    carried their mates in words, the 1.697 named its mesh only by tooth
+    count, and the bores said RUNS ON with no fit.  Each bore's numbered note
+    states the standard running fit on its shaft by drawing number with the
+    clearance its printed limits give as REF, and the mates its locations
+    serve: the bore spacing and the crank boss's north-face station set the
+    16T crank pinion against the 64T crank drive gear (rule 4: a gear centre
+    distance names the mesh), and the MHA-DT-04 collar runs on the cone
+    boss's north face.  The cone-axis height takes the title block's .XX band,
+    so rule 4 asks no mate of it.  Four lines in all (rule 7)."""
+    import dt_cone_gear_shaft_spec as shaft
+    import dt_crank_drive_gear_spec as gear64
+    import dt_crank_pinion_spec as pinion
+    import dt_crankshaft_spec as crankshaft
+
+    assert drawing.SHEET_NOTES == "\n".join(
+        (
+            "1. RUNNING FIT ON CRANKSHAFT MHA-DT-11 (CLEARANCE .0010-.0023).",
+            "2. RUNNING FIT ON CONE SHAFT MHA-DT-04 (CLEARANCE .0010-.0023);",
+            "   ITS COLLAR RUNS ON THE .827 FACE.",
+            "3. 1.697 AND .842 SET MESH OF PINION MHA-DT-10 WITH GEAR MHA-DT-07.",
+        )
+    )
+    assert len(drawing.SHEET_NOTES.splitlines()) <= 4
+    # Each REF range is the bore's printed limits against its shaft's.
+    for note, bore, (upper, lower), shaft_dia, (shaft_upper, shaft_lower) in (
+        (1, spec.CRANK_BORE_DIA, spec.RUNNING_BORE_BAND, crankshaft.JOURNAL_DIA, crankshaft.JOURNAL_DIA_BAND),
+        (2, spec.BORE_DIA, spec.JOURNAL_BORE_BAND, shaft.JOURNAL_DIA, shaft.SECTION_DIA_BANDS[0]),
+    ):
+        clearance = (
+            bore + lower - (shaft_dia + shaft_upper),
+            bore + upper - (shaft_dia + shaft_lower),
+        )
+        assert f"(CLEARANCE {drawing.fit_clearance_text(clearance)})" in _note(note)
+    # The cited values are the ones the locations print.
+    for value, name in (
+        (spec.CRANK_ABOVE_CONE, "CrankAboveCone"),
+        (spec.CRANK_BOSS_NORTH_FACE, "CrankBossStartZ"),
+        (spec.CONE_BOSS_NORTH_STATION, "ConeBossNorthZ"),
+    ):
+        text = f"{value / 25.4:.{spec.DRAWING_PRECISION_BY_NAME[name]}f}".removeprefix("0")
+        assert text in drawing.SHEET_NOTES
+    # Every mate by its registered drawing number; the 16T and 64T are the
+    # crank pinion and the crank drive gear.
+    for stem, number in (
+        ("dt-crankshaft", "MHA-DT-11"),
+        ("dt-crank-pinion", "MHA-DT-10"),
+        ("dt-crank-drive-gear", "MHA-DT-07"),
+        ("dt-cone-gear-shaft", "MHA-DT-04"),
+    ):
+        assert _config.parts(stem)["number"] == number
+        assert number in drawing.SHEET_NOTES
+    assert "MHA-DT-21" not in drawing.SHEET_NOTES
+    assert (pinion.TEETH, gear64.TEETH) == (16, 64)
+    for private in ("DIAMETRAL", "RUNS ON MHA", "16T", "64T", "T120", "MATCHES"):
+        assert private not in drawing.SHEET_NOTES
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "add_note(adapter, SHEET_NOTES, *NOTES_XY)" in source
+
+
+def test_locations_print_their_value_band_and_note_flag_only() -> None:
+    """Novice-rubric screen (rule 7): a location carries its value and band
+    and nothing else; fan-out r1 (rules 4, 7): a tight location whose mate
+    sits in a numbered note flags that note, so the reader reaches it."""
+    flagged = {
+        "ConeBossNorthZ": "SEE NOTE 2",
+        "CrankBossStartZ": "SEE NOTE 3",
+        "CrankAboveCone": "SEE NOTE 3",
+    }
+    callouts = {**drawing.DIMENSION_CALLOUTS, **drawing.DIMENSION_CALLOUTS_ABOVE}
+    for name, flag in flagged.items():
+        assert callouts[name] == flag
+    assert set(drawing.DIMENSION_CALLOUTS_ABOVE) == {"CrankAboveCone"}
+    assert _note(2).endswith("ITS COLLAR RUNS ON THE .827 FACE.")
+    assert _note(3).startswith("3. 1.697 AND .842 SET MESH")
+    for name in ("JournalAxisY", "CrankAxisY", "MountWestX", "MountEastX"):
+        assert name not in callouts
+    for name in (*flagged, "JournalAxisY", "CrankAxisY", "MountWestX", "MountEastX"):
+        assert name not in drawing.DIMENSION_SUFFIXES
+        assert name not in drawing.DIMENSION_PREFIXES
+
+
+def test_every_callout_keeps_at_most_two_lines_of_words() -> None:
+    """Rule 7: size and process lines plus at most two lines of words; the
+    crank boss length keeps one reason, the mate its south face seats."""
+    for text in drawing.DIMENSION_CALLOUTS.values():
+        assert len(text.splitlines()) <= 2
+    assert drawing.DIMENSION_CALLOUTS["CrankBossLen"] == "SEATS\nMHA-DT-11 COLLAR"
+
+
+def test_numbered_notes_stand_in_free_sheet_space() -> None:
+    """Bottom left: under the elevation's datum B frame (it hangs 7 mm under
+    its tag point), inside the border and left of the title block, at the
+    sheet's ~2.7 mm glyph advance and 5.5 mm row pitch."""
+    region, keep_outs = _landscape_sheet()
+    title_block = dict(keep_outs)["title-block"]
+    x, top = drawing.NOTES_XY
+    lines = drawing.SHEET_NOTES.splitlines()
+    assert top <= drawing.DATUM_B_TAG_XY[1] - 0.007 - 0.005
+    assert top - len(lines) * 0.0055 >= region.ymin + 0.005
+    assert x >= region.xmin + 0.005
+    assert x + max(len(line) for line in lines) * 0.0027 <= title_block.xmin - 0.005
+
+
+def test_view_c_is_labelled_by_its_letter_alone() -> None:
+    """Novice-rubric screen (rule 26): 'VIEW C - CONE JOURNAL / LOOK ALONG
+    CONE AXIS' followed the standard label with prose; arrow C on SECTION A-A
+    already says what it looks along."""
+    assert drawing.JOURNAL_VIEW_LABEL == "VIEW C"
+    head_left = drawing.JOURNAL_CENTER[0] - spec.HEAD_DIA / 2000.0
+    assert head_left < drawing.JOURNAL_VIEW_LABEL_XY[0] < drawing.JOURNAL_CENTER[0]
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "add_note(adapter, JOURNAL_VIEW_LABEL, *JOURNAL_VIEW_LABEL_XY)" in source
+    assert "LOOK ALONG" not in source
