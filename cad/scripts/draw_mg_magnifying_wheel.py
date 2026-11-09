@@ -101,6 +101,7 @@ from mg_magnifying_wheel_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     DRAWING_REFERENCE_PRECISION,
+    GROOVE_BOTTOM_DIA,
     GROOVE_SEAT_NOTE,
     HUB_DIA,
     HUB_FILLET_PRINTED,
@@ -163,6 +164,12 @@ ISO_CENTER = (0.372, 0.200)
 ISO_CLEAR = 0.005
 
 _RIM_R = RIM_OUTER_DIA * SHEET_SCALE[0] / 2000.0
+# HubFrontZ's centre-plane extension line ends on the lower groove's bottom,
+# inside the notch, so the .61 visibly lands on the groove it locates: with
+# the line stopping a gap short of the OD, integration proof
+# 20261109T105251629Z (r1) read every axial dimension as ending at a rim
+# face and the groove as unlocated.
+_GROOVE_BOTTOM_R = GROOVE_BOTTOM_DIA * SHEET_SCALE[0] / 2000.0
 # The cutting line runs the face view's full width along the horizontal
 # centreline, through the bore and the 0 and 180 deg spokes, this far past
 # the OD at each end, clear of the tip width's extension lines; the A-A
@@ -1135,7 +1142,8 @@ def _start_spoke_witnesses(adapter: Any, spoke: Any) -> None:
 
 @_telemetry.traced("wheel.section_witnesses")
 def _set_section_witnesses(adapter: Any, annotations: list[Any]) -> None:
-    """Keep SpokeAxial's and HubFrontZ's extension lines off A-A's cut faces,
+    """Keep SpokeAxial's extension lines off A-A's cut faces and run
+    HubFrontZ's centre-plane line up into the lower groove to its bottom,
     read back."""
     named = {
         dimension_name(adapter, annotation): _early_bound(annotation, "IAnnotation")
@@ -1168,7 +1176,7 @@ def _set_section_witnesses(adapter: Any, annotations: list[Any]) -> None:
         ok, use_doc, old_gap = display.GetWitnessLineGap(index, False, 0.0)
         if ok is not True:
             raise RuntimeError(f"HubFrontZ witness {index} gap could not be read")
-        target = SECTION_CENTER[1] - _RIM_R - float(old_gap)
+        target = SECTION_CENTER[1] - _GROOVE_BOTTOM_R
         gap = float(old_gap) + before - target
         if display.SetWitnessLineGap(index, False, gap) is not True:
             raise RuntimeError(f"HubFrontZ witness {index} gap was refused")

@@ -311,6 +311,15 @@ def test_linked_notes_specify_the_fits_the_ties_and_the_angle_the_spokes() -> No
         assert a[1] == b[1] == a[2] == b[2] == 0.0
         assert abs(a[0]) == geom.HUB_DIA / 2.0
         assert abs(b[0]) > rim.RIM_OUTER_DIA / 2.0
+    # Its centre-plane extension line runs up into the lower groove to the
+    # groove's bottom, so the .61 visibly lands on the groove (integration
+    # proof 20261109T105251629Z, r1).
+    assert drawing._GROOVE_BOTTOM_R == pytest.approx(
+        rim.GROOVE_BOTTOM_DIA * drawing.SHEET_SCALE[0] / 2000.0
+    )
+    assert drawing._GROOVE_BOTTOM_R < drawing._RIM_R
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "target = SECTION_CENTER[1] - _GROOVE_BOTTOM_R" in source
     # Each tie hole is named plainly at its own callout (rule 26: WIRE TIE
     # HOLE, no coined label), size before process, at most two lines of
     # words (rule 7): no project label, so no key.
