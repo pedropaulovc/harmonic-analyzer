@@ -383,7 +383,7 @@ def test_tenon_wall_charges_both_breaks_at_its_free_end() -> None:
     # Codjiflo on #2102 (#2171): at the tenon's free end the outside edge and
     # the pivot bore's mouth each take the title block's break, as the glue
     # length charges the end break; the governing wall is the straight one
-    # less both. Owner ruling 2026-11-08 (Pedro), #2144 item 7.2 accepts
+    # less both.  Owner ruling 2026-11-08 (Pedro), #2144 item 7.2 (#2171, option C) accepts
     # .040 there as RV-02; the straight .060 stays RV-01.  The fit note states
     # each, matching its declaration.
     spec = dt_crank_handle_spec

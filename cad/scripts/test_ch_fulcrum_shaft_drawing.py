@@ -7,6 +7,7 @@ from pathlib import Path
 
 import build_ch_fulcrum_shaft as part
 import ch_fulcrum_keeper_spec
+import ch_fulcrum_shaft_notes as notes
 import ch_fulcrum_shaft_spec
 import draw_ch_fulcrum_shaft as drawing
 
@@ -158,7 +159,7 @@ def test_side_view_texts_stand_clear_of_extension_lines() -> None:
     # final "55" and shelf touching the border.
     across_x, across_y = keep["AcrossFlat"]
     widest = max(
-        len(line) for line in ch_fulcrum_shaft_spec.ACROSS_FLAT_CALLOUT.splitlines()
+        len(line) for line in notes.ACROSS_FLAT_CALLOUT.splitlines()
     )
     assert across_y + 0.004 <= drawing._SHAFT_BOTTOM_Y - 0.010
     assert across_x > right_tip + 0.005
@@ -182,47 +183,43 @@ def test_side_view_texts_stand_clear_of_extension_lines() -> None:
     assert math.isclose(drawing.FINISH_EDGE[1], drawing._SHAFT_TOP_Y)
     # Machinist review r2: a row's last glyph meets the dimension's vertical
     # leader, and a trailing ';' touched it.
-    for callout in (
-        ch_fulcrum_shaft_spec.SHAFT_DIA_CALLOUT,
-        ch_fulcrum_shaft_spec.ACROSS_FLAT_CALLOUT,
-    ):
+    for callout in (notes.SHAFT_DIA_CALLOUT, notes.ACROSS_FLAT_CALLOUT):
         assert all(line[-1].isalnum() for line in callout.splitlines())
     # Post-v46 review: the final E of the widest Ø row still met that line;
     # every printed row carries two trailing spaces of ink air.
     assert drawing.SHAFT_DIA_CALLOUT_ROWS.splitlines() == [
-        f"{line}  " for line in ch_fulcrum_shaft_spec.SHAFT_DIA_CALLOUT.splitlines()
+        f"{line}  " for line in notes.SHAFT_DIA_CALLOUT.splitlines()
     ]
     # #2108 review: the S of SETS met the across-flat block's vertical line
     # on its left; every row there leads with one space of ink air.
     assert drawing.ACROSS_FLAT_CALLOUT_ROWS.splitlines() == [
-        f" {line}" for line in ch_fulcrum_shaft_spec.ACROSS_FLAT_CALLOUT.splitlines()
+        f" {line}" for line in notes.ACROSS_FLAT_CALLOUT.splitlines()
     ]
 
 
 def test_three_place_sizes_name_their_mates() -> None:
     # Rule 4: the shaft is the first-made part of the keeper fit, so its band
-    # stays here and the callout names the bores and their clearance; the
-    # across-flat size sets the set screw's engagement.
-    spec = ch_fulcrum_shaft_spec
-    keeper = ch_fulcrum_keeper_spec
-    assert spec.SHAFT_FIT_CLEARANCE_MM == (
-        keeper.BORE_DIA_BAND[1] - spec.SHAFT_DIA_BAND[0],
-        keeper.BORE_DIA_BAND[0] - spec.SHAFT_DIA_BAND[1],
-    )
-    assert ".0015-.0028 DIAMETRAL CLEARANCE" in spec.SHAFT_DIA_CALLOUT
-    assert "MHA-CH-07" in spec.SHAFT_DIA_CALLOUT
-    assert "MHA-CH-02" in spec.SHAFT_DIA_CALLOUT
-    assert "MHA-CH-VN-55" in spec.ACROSS_FLAT_CALLOUT
+    # stays here and the callout names the bores by the standard fit and,
+    # the SHAFT_H band being narrower than the turned-diameter row, its route
+    # (fan-out F1: bought ground stock); the across-flat size sets the set
+    # screw's engagement. Rule 7: one fit statement, two lines of words.
+    assert notes.SHAFT_DIA_CALLOUT.splitlines() == [
+        "SLIDING FIT IN MHA-CH-07 BORES",
+        "1/4 GROUND STOCK OK",
+    ]
+    assert "MHA-CH-VN-55" in notes.ACROSS_FLAT_CALLOUT
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert '"ShaftDia": SHAFT_DIA_CALLOUT_ROWS' in source
     assert '"AcrossFlat": ACROSS_FLAT_CALLOUT_ROWS' in source
-    assert "1/4 IN GROUND STOCK OK." in spec.DRAWING_NOTES
+    # The sheet's drawing text lives off the spec the assembly imports.
+    for name in ("SHAFT_DIA_CALLOUT", "ACROSS_FLAT_CALLOUT", "DRAWING_NOTES", "ISO_VIEW_NOTE"):
+        assert not hasattr(ch_fulcrum_shaft_spec, name)
 
 
 def test_dome_prints_as_a_spherical_reference() -> None:
     # Rule 7: the hemisphere is drawn and dimensioned, not a note.
     spec = ch_fulcrum_shaft_spec
-    assert "HEMISPHERE" not in spec.DRAWING_NOTES
+    assert "HEMISPHERE" not in notes.DRAWING_NOTES
     assert "DomeRadius" in spec.DRAWING_DIMENSIONS["FlatProfile"]
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert 'dims.record("DomeRadius", \'"ShaftDia" / 2\')' in source
@@ -232,7 +229,7 @@ def test_dome_prints_as_a_spherical_reference() -> None:
 def test_every_orthographic_view_is_at_sheet_scale() -> None:
     assert drawing.SHEET_SCALE == (2.0, 1.0)
     assert not hasattr(ch_fulcrum_shaft_spec, "END_VIEW_NOTE")
-    assert ch_fulcrum_shaft_spec.ISO_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:1"
+    assert notes.ISO_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:1"
     assert drawing.ISO_SCALE == (1, 1)
 
 
@@ -319,7 +316,7 @@ def test_precision_matches_the_marked_dimensions() -> None:
     spec = ch_fulcrum_shaft_spec
     assert spec.DRAWING_PRECISION["ShaftProfile"]["ShaftDia"] == 4
     assert spec.DRAWING_PRECISION["FlatProfile"]["AcrossFlat"] == 3
-    assert len(spec.DRAWING_NOTES.splitlines()) <= 4
+    assert len(notes.DRAWING_NOTES.splitlines()) <= 4
 
 
 def test_interference_literals_track_the_set_screw_and_keeper() -> None:

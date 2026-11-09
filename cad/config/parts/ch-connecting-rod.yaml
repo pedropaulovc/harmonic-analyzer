@@ -2,7 +2,7 @@ ch-connecting-rod:
   number: MHA-CH-03
   material: Plain Carbon Steel
   material_specification: AISI 1018 low-carbon steel plate
-  finish: BLACK ENAMEL; MASK BORE, PLATE FACES, PIN HOLE AND FORK SLOT; OIL BARE MACHINED SURFACES
+  finish: BLACK ENAMEL; MASK BORE, RING AND SHANK FACES, PIN HOLE, FORK SLOT; OIL BARE SURFACES
   quantity: 20
   tolerance_class: machined_block
   fit_class: cam_follower_contact
@@ -24,3 +24,8 @@ ch-connecting-rod:
       where: "front view, boxed .16 BASIC from datum A (the bore axis) to datum B (the shank's left flank)"
       finding: "basic A-to-B tie without a geometric control or acceptance tolerance on datum feature B (rules 5, 10)"
       reason: "owner ruling 2026-10-24 (#1980): the basic tie is the frame's origin across the shank; B's offset is bounded in practice by the .32 width and the title block, so no further control is added (RV-01 stands) (owner-accepted)"
+    - id: "RV-04"
+      kind: "accept"
+      where: "front view, the Ø.0770 +.0009/+.0005 REAM THRU pin hole, PRESS FIT ON MHA-CH-10, with note 1's matched press fit"
+      finding: "the +.0009 upper deviation is not a plain inch step: it reads as a converted millimetre value (rule 4)"
+      reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144 (fan-out Q1, pending owner confirmation; F5 applied by analogy). The limits .0775-.0779 are the ones the pin budget holds against the 5/64 drill-rod pin MHA-CH-10 (ANSI FN2, .00085 MAX interference; owner press-fit ruling 2026-10-09, #1292 F1): a .0775 reamer cuts inside them. Restating them as Ø.0775 +.0004/.0000 moves the model's nominal and re-keys the channel assembly for print text alone, and no plain step on .0770 holds both the least interference and the FN2 cap. The hole is reamed to the measured pin (note 1). Accepts the printed step only, no other band or fit departure."

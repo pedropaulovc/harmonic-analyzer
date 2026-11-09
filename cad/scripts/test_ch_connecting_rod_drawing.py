@@ -160,8 +160,8 @@ def test_pin_hole_is_the_reamed_press_hole_for_the_rod_pivot_pin() -> None:
     assert "drives=(None,'\"CenterDistance\"','\"PinHoleDia\"')" in build
     assert 'name_last_feature(adapter,"PinHoleProfile")' in build
     assert 'name_last_feature(adapter,"PinHole")' in build
-    assert drawing.PIN_NUMBER == _config.parts("ch-rod-pivot-pin")["number"]
-    assert drawing.ARM_NUMBER == _config.parts("ch-rocker-arm")["number"]
+    assert ch_connecting_rod_notes.PIN_NUMBER == _config.parts("ch-rod-pivot-pin")["number"]
+    assert ch_connecting_rod_notes.ARM_NUMBER == _config.parts("ch-rocker-arm")["number"]
     assert drawing.CAM_NUMBER == _config.parts("dt-cylinder-gear")["number"]
 
 
@@ -200,7 +200,16 @@ def test_sheet_runs_at_1_to_1_with_1_to_2_isometric() -> None:
     # carries the fork detail's circle; every side-view dimension prints in
     # the detail.
     assert drawing.LEFT_CENTER == (0.080, drawing.FRONT_CENTER[1])
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' not in source
+    # Fan-out screen 2026-11-07: the reamed hole's matched press fit is the
+    # sheet's one numbered note, top left over the views.
+    assert 'add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)' in source
+    assert ch_connecting_rod_notes.DRAWING_NOTES.splitlines() == [
+        "1. MATCHED PRESS FIT ON ROD PIVOT PIN MHA-CH-10:",
+        "    REAM .0002-.0008 UNDER THE MEASURED PIN.",
+        "2. FORK SLOT: RUNNING FIT ON ARM MHA-CH-06.",
+        "3. RING AND SHANK: SLIDING FIT IN MHA-DT-12 CAM SLOT.",
+    ]
+    assert ch_connecting_rod_notes.CAM_NUMBER == drawing.CAM_NUMBER
     assert max(y for _, y in drawing.DETAIL_KEEP.values()) < 0.260
     assert ch_connecting_rod_notes.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:2"
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
@@ -224,17 +233,22 @@ def test_every_tight_band_names_its_mate() -> None:
     bore = drawing.FRONT_CALLOUTS["StrapBoreDia"]
     assert bore.startswith("BORE")
     assert drawing.CAM_NUMBER in bore
-    ream = drawing.FRONT_CALLOUTS["PinHoleDia"]
-    assert ream.startswith("THRU - REAM")
-    assert drawing.PIN_NUMBER in ream
-    assert drawing.ARM_NUMBER in drawing.DETAIL_CALLOUTS["SlotWidth"]
-    # The tine's band locates the slot from the datum face and holds the gap
-    # to the next channel's rod, the same part (#982 review r2).
-    assert drawing.ROD_NUMBER == "MHA-CH-03"
-    assert drawing.ROD_NUMBER in drawing.DETAIL_CALLOUTS["TineNear"]
-    assert drawing.CAM_NUMBER in drawing.DETAIL_CALLOUTS["RingFaceNear"]
-    assert drawing.CAM_NUMBER in drawing.LEFT_CALLOUTS["RingThick"]
-    assert drawing.LEFT_CALLOUTS["RingThick"].startswith("RING AND SHANK")
+    # Fan-out screen 2026-11-07: size, then process (rule 26), and the band
+    # narrower than the reamer row links its matched press fit (note 1;
+    # pending owner confirmation, fan-out Q1).
+    assert drawing.FRONT_CALLOUTS["PinHoleDia"] == (
+        "REAM THRU\nSEE NOTE 1"
+    )
+    # Fan-out rounds 1-2 (rule 4): two tight bands serving one mate link one
+    # note naming it, so the mate prints once and each band reaches it: the
+    # slot and the tine walls that locate it (note 2, the arm), the ring and
+    # shank's thickness and its centring offset (note 3, the cam's slot).
+    assert drawing.DETAIL_CALLOUTS == {
+        "TineNear": "2X TINE WALL\nSEE NOTE 2",
+        "SlotWidth": "SEE NOTE 2",
+        "RingFaceNear": "SEE NOTE 3",
+    }
+    assert drawing.LEFT_CALLOUTS["RingThick"] == "RING AND SHANK\nSEE NOTE 3"
     assert set(drawing.DETAIL_CALLOUTS) <= set(drawing.DETAIL_KEEP)
     assert set(drawing.LEFT_CALLOUTS) <= set(drawing.LEFT_KEEP)
     assert set(drawing.FRONT_CALLOUTS) <= set(drawing.FRONT_KEEP)
@@ -517,7 +531,7 @@ def test_reamed_pin_hole_is_a_native_four_place_dimension() -> None:
         "*deviations(PIN_HOLE_BAND)"
     )
     assert "PinHoleDia" in drawing.FRONT_KEEP
-    assert drawing.FRONT_CALLOUTS["PinHoleDia"].startswith("THRU - REAM")
+    assert drawing.FRONT_CALLOUTS["PinHoleDia"].startswith("REAM THRU\n")
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert (
         "set_dimension_callouts(adapter, front_annotations, FRONT_CALLOUTS)" in source
@@ -638,7 +652,7 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     assert spec["material"] == rod.MATERIAL == "Plain Carbon Steel"
     assert spec["material_specification"] == "AISI 1018 low-carbon steel plate"
     assert spec["finish"] == (
-        "BLACK ENAMEL; MASK BORE, PLATE FACES, PIN HOLE AND FORK SLOT; "
-        "OIL BARE MACHINED SURFACES"
+        "BLACK ENAMEL; MASK BORE, RING AND SHANK FACES, PIN HOLE, FORK SLOT; "
+        "OIL BARE SURFACES"
     )
     assert int(spec["quantity"]) == 20

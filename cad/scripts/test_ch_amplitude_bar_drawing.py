@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+import ch_bar_pivot_pin_spec as pin_spec
 import ch_amplitude_bar_notes
 import ch_amplitude_bar_spec
 import draw_ch_amplitude_bar as drawing
@@ -76,7 +77,7 @@ def test_top_pin_hole_is_the_reamed_press_hole_for_the_bar_pivot_pin() -> None:
     cheeks (ch_bar_pivot_pin_spec holds the fit), so the hole is reamed to a
     band of its own, native on TopPinDia. Machinist round 1 (#1293): the hole
     was only words in a note; it now prints in the top end's right side view,
-    its THRU / REAM / PRESS FIT callout at the diameter."""
+    its REAM THRU callout at the diameter, flagged to note 1."""
     from _drawing_contract import model_toleranced_dimensions
 
     notes = ch_amplitude_bar_notes
@@ -93,7 +94,20 @@ def test_top_pin_hole_is_the_reamed_press_hole_for_the_bar_pivot_pin() -> None:
         "TopPinDia",
     }
     assert set(drawing.TOP_SIDE_KEEP) == notes.DRAWING_DIMENSIONS["TopPinProfile"]
-    assert notes.DIMENSION_CALLOUTS["TopPinDia"] == "THRU, REAM\nPRESS FIT MHA-CH-11"
+    # Fan-out screen 2026-11-07: size, then process (rule 26); the band is
+    # narrower than the reamer row, so the callout links the matched press fit
+    # in note 1, which names the pin by name and number with its acceptance
+    # (rules 4 and 7; pending owner confirmation, fan-out Q1).
+    assert notes.DIMENSION_CALLOUTS["TopPinDia"] == (
+        "REAM THRU\nSEE NOTE 1"
+    )
+    assert notes.DRAWING_NOTES.splitlines() == [
+        "1. MATCHED PRESS FIT ON BAR PIVOT PIN MHA-CH-11:",
+        "    REAM .0002-.0008 UNDER THE MEASURED PIN.",
+    ]
+    assert notes.TOP_PIN_NAME == "BAR PIVOT PIN"
+    # The acceptance stays inside the FN2 window the pin budget is held to.
+    assert float(notes.PIN_FIT_INTERFERENCE[1]) * 25.4 <= pin_spec.PRESS_INTERFERENCE_MAX
     precision = notes.DRAWING_PRECISION["TopPinProfile"]
     assert precision == {"BarSection": 2, "TopPinX": 3, "TopPinDrop": 2, "TopPinDia": 4}
     # Machinist round 1: the three-place location states its function, the
@@ -183,17 +197,21 @@ def test_callouts_name_each_mate_at_its_dimension() -> None:
     assert notes.LEVER_NUMBER == parts("ch-channel-lever")["number"]
     assert notes.ROCKER_ARM_NUMBER == parts("ch-rocker-arm")["number"]
     callouts = notes.DIMENSION_CALLOUTS
-    assert callouts["TopNotchWidth"].startswith("STRADDLES MHA-CH-02\n")
-    assert callouts["BottomNotchWidth"].startswith("RIDES MHA-CH-06\n")
-    assert callouts["TopRightLedge"] == "CENTRES ON LEVER"
-    assert callouts["BottomLeftLedge"] == "CENTRES ON ROCKER"
+    # Fan-out round 1 (rule 4): each width names its standard fit, the
+    # running floor its minimum holds over the plate.
+    assert callouts["TopNotchWidth"].startswith("RUNNING FIT MHA-CH-02\n")
+    assert callouts["BottomNotchWidth"].startswith("RUNNING FIT MHA-CH-06\n")
+    # Fan-out screen 2026-11-07 (rule 7): a location carries its value and
+    # band only, and each notch names its mate once, on its width; each
+    # notch's ROOTS limit rides its depth.
+    assert "TopRightLedge" not in callouts
+    assert "BottomLeftLedge" not in callouts
     assert callouts["TopNotchHeight"] == "ROOTS R.015 MAX"
-    # Machinist r5: the foot depth's shallow-only band names its mate.
-    assert callouts["BottomNotchHeight"] == "SITS ON MHA-CH-06"
-    assert callouts["BottomNotchWidth"].endswith("\nROOTS R.015 MAX")
+    assert callouts["BottomNotchHeight"] == "ROOTS R.015 MAX"
+    assert len(callouts["BottomNotchWidth"].splitlines()) == 2
     assert drawing.CALLOUTS_ABOVE <= set(callouts)
     for text in callouts.values():
-        assert all(len(line) <= 20 for line in text.splitlines()), text
+        assert all(len(line) <= 21 for line in text.splitlines()), text
     # r1 (64ebba372): SOLIDWORKS printed nothing of the two-line callout set
     # above TopNotchWidth; a callout over its value is one line.
     for name in drawing.CALLOUTS_ABOVE:
@@ -281,7 +299,7 @@ def test_bottom_notch_depth_band_is_native_on_its_dimension() -> None:
         "*deviations(BOTTOM_NOTCH_DEPTH_BAND)"
     )
     assert "BottomNotchHeight" in drawing.DETAIL_A_KEEP
-    assert not hasattr(ch_amplitude_bar_notes, "DRAWING_NOTES")
+    assert "NOTCH" not in ch_amplitude_bar_notes.DRAWING_NOTES
 
 
 # Each printed dimension's two sketch references, in the part (x, y, z) mm: a
@@ -365,7 +383,10 @@ def test_cropped_views_frame_their_ends_and_place_text_outside_the_bar() -> None
     bar_left = a.sheet_xy(0.0, 0.0)[0]
     front_bar_right = drawing.FRONT_CENTER[0] + spec.BAR_WIDTH / 4000.0
     for name, (x, _y) in drawing.DETAIL_A_KEEP.items():
-        width = max(map(len, callouts[name].splitlines())) * _CHAR
+        width = max(
+            [len(line) for line in callouts.get(name, "").splitlines()]
+            + [drawing.LEDGE_TEXT_CHARS]
+        ) * _CHAR
         if name == "BottomNotchHeight":
             assert x + 0.002 < bar_left, name
             assert x - width > front_bar_right + 0.004, name
@@ -387,8 +408,8 @@ def test_cropped_views_frame_their_ends_and_place_text_outside_the_bar() -> None
     assert row_y > b.sheet_xy(0.0, spec.BAR_LENGTH)[1]
     half = max(map(len, callouts["TopNotchWidth"].splitlines())) * _CHAR / 2
     assert drawing.DETAIL_B_KEEP["TopNotchWidth"][0] + half + 0.002 < b.sheet_xy(0.0, 0.0)[0]
-    # r6: the ledge's value and callout clear the bar's right-face witness.
-    ledge_half = len(callouts["TopRightLedge"]) * _CHAR / 2
+    # r6: the ledge's value clears the bar's right-face witness.
+    ledge_half = drawing.LEDGE_TEXT_CHARS * _CHAR / 2
     assert (
         drawing.DETAIL_B_KEEP["TopRightLedge"][0] - ledge_half
         > b.sheet_xy(spec.BAR_WIDTH, 0.0)[0] + 0.0015
@@ -517,18 +538,50 @@ def test_notch_centring_bands_ride_each_details_ledge_not_a_note() -> None:
         assert ch_amplitude_bar_notes.DRAWING_PRECISION["BarProfile"][name] == 3
 
 
-def test_sheet_carries_no_general_note() -> None:
+def test_the_one_note_is_the_pin_holes_matched_fit() -> None:
     """Machinist round 1 (#1293): the section, the hole, the roots and the
-    plating left the notes for their dimensions and the FINISH field. Round 2:
-    the last line (both notches through, in one plane) repeated what the
-    front view and the isometrics show, so the sheet has no note block."""
-    assert not hasattr(ch_amplitude_bar_notes, "DRAWING_NOTES")
+    plating left the notes for their dimensions and the FINISH field; round 2:
+    the last line repeated what the views show. Fan-out screen 2026-11-07:
+    the reamed hole's band is narrower than the reamer row, so its matched
+    press fit is the sheet's one numbered note, property-linked from the part
+    and linked from the hole's callout; it stands under DETAIL A's label, right
+    of the front view and left of the title block."""
     draw_source = Path(drawing.__file__).read_text(encoding="utf-8")
     part_source = Path(bar.__file__).read_text(encoding="utf-8")
-    assert "add_property_linked_note" not in draw_source
-    assert "Manufacturing Notes" not in draw_source
-    assert "Manufacturing Notes" not in part_source
-    assert "apply_drawing_properties(adapter, PART_NAME)" in part_source
+    assert 'add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)' in draw_source
+    assert '{"Manufacturing Notes": DRAWING_NOTES}' in part_source
+    notes = ch_amplitude_bar_notes
+    assert notes.DRAWING_NOTES.startswith(f"{notes.PIN_FIT_NOTE_NUMBER}. ")
+    assert f"SEE NOTE {notes.PIN_FIT_NOTE_NUMBER}" in notes.DIMENSION_CALLOUTS["TopPinDia"]
+    x, y = drawing.NOTES_XY
+    width = max(len(line) for line in notes.DRAWING_NOTES.splitlines()) * _CHAR
+    a = drawing.DETAIL_A
+    assert drawing.FRONT_CENTER[0] + 0.005 < x and x + width < 0.216
+    assert y < a.label_xy[1] - 2 * _LINE - 0.002
+    assert y - 2 * _LINE > 0.0127
+
+
+def test_view_c_is_named_by_its_arrow_on_detail_b() -> None:
+    """Fan-out screen 2026-11-07 (rule 9): the prose-named right side of
+    DETAIL B is VIEW C, with a level viewing arrow on DETAIL B looking -X
+    onto the bar's right face, between the notch floor's witness and the
+    depth's text, its letter short of the depth's dimension line."""
+    spec = ch_amplitude_bar_spec
+    b = drawing.DETAIL_B
+    assert drawing.TOP_SIDE.title == "VIEW C" and drawing.TOP_SIDE.letter is None
+    assert not any("RIGHT SIDE" in view.title for view in drawing.CROPPED_VIEWS)
+    (text_x, text_y), (tip_x, tip_y) = drawing.VIEW_C_ARROW
+    face_x = b.sheet_xy(spec.BAR_WIDTH, 0.0)[0]
+    assert face_x < tip_x < face_x + 0.005
+    assert text_x > tip_x
+    assert math.isclose(text_y - drawing.VIEW_LETTER_HEIGHT / 2.0, tip_y)
+    floor_y = b.sheet_xy(0.0, spec.BAR_LENGTH - spec.TOP_NOTCH_HEIGHT)[1]
+    depth_x, depth_y = drawing.DETAIL_B_KEEP["TopNotchHeight"]
+    assert floor_y + 0.004 < tip_y - drawing.VIEW_LETTER_HEIGHT / 2.0
+    assert tip_y + drawing.VIEW_LETTER_HEIGHT / 2.0 < depth_y - _LINE - 0.002
+    assert text_x + _CHAR + 0.002 < depth_x
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "_add_view_arrow(adapter, views[DETAIL_B.name])" in source
 
 
 def test_functional_notch_finish_is_a_native_symbol_on_the_floor() -> None:
@@ -617,8 +670,9 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     spec = _config.parts("ch-amplitude-bar")
     assert spec["material_specification"] == "low-carbon cold-finished steel, 1/4 in sq"
     # One line in the FINISH field (r1 wrapped at 50 characters). Round 2:
-    # the unplated press bore states its protection.
-    assert spec["finish"] == "bright chrome, dims plated; pin hole bare, oiled"
+    # the unplated press bore states its protection. Fan-out round 1 (rule
+    # 26): 'dims plated' was private shorthand; the sizes apply after plating.
+    assert spec["finish"] == "chrome, sizes after plating; pin hole bare, oiled"
     assert len(spec["finish"]) < 50
     assert int(spec["quantity"]) == 20
 

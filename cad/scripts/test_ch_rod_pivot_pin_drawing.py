@@ -70,29 +70,42 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert part.DRAWING_DIMENSIONS is notes.DRAWING_DIMENSIONS
     marked = set().union(*notes.DRAWING_DIMENSIONS.values())
     assert set(drawing.RIGHT_KEEP) == marked == {"PinDia", "PinLen", "BlankLen"}
-    assert notes.REFERENCE_DIMENSIONS == {"PinLen"}
     # Drawing-only data stays out of the spec the channel assembly imports.
-    for name in ("DRAWING_DIMENSIONS", "DRAWING_PRECISION", "REFERENCE_DIMENSIONS"):
+    for name in ("DRAWING_DIMENSIONS", "DRAWING_PRECISION", "PIN_LENGTH_CALLOUT"):
         assert not hasattr(spec, name), name
     assert not hasattr(drawing, "FRONT_KEEP")
 
 
 def test_precision_and_band_are_authored_on_the_part() -> None:
     # The journal is the as-bought drill rod: no model band (its stock
-    # fraction prints as a REFERENCE; the supplier's grind governs).
+    # fraction prints as a REFERENCE; the supplier's grind governs). The
+    # installed length is set at assembly flush with the fork's outer faces
+    # (fan-out round 1, rule 19: a set-at-assembly size has limits and its
+    # acceptance): at two places the title block's .XX band, a plain inch
+    # step (round 2), holds the fork thickness's worst case.
     assert "draw_ch_rod_pivot_pin.py" in PRECISION_MIGRATED_DRAWINGS
     source = _source()
     assert "set_dimension_precision" not in source
     assert "SetPrecision3" not in source
     assert "assert_imported_precision(" in source
-    # A LINEAR reference: the plural helper forces a diameter glyph.
-    assert "set_reference_dimensions(" not in source
-    assert "set_reference_dimension(adapter, matches[0]" in source
+    assert "set_reference_dimension" not in source
     assert "hidden_sketches.curate_view_dimensions(" in source
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in _build_source()
     assert "require_saved_drawing_properties(" in _build_source()
     assert model_toleranced_dimensions(part) == {}
-
+    assert notes.DRAWING_PRECISION["PinProfile"]["PinLen"] == 2
+    title_block_2pl = 0.01 * 25.4
+    assert max(abs(d) for d in rod.FORK_THICKNESS_BAND) <= title_block_2pl
+    # How it is set (dressed flush with the fork) is MHA-CH-00's step, not
+    # this sheet's (rule 7; local repeat after round 3).
+    assert notes.PIN_LENGTH_CALLOUT == "SET AT ASSEMBLY"
+    assert '"PinLen": PIN_LENGTH_CALLOUT' in source
+    # The blank's MIN still leaves stock over the longest set length.
+    assert spec.PIN_BLANK_LENGTH > spec.PIN_INSTALLED_LENGTH + title_block_2pl
+    # Each setting line stays narrower than the 10:1 pin between its
+    # extension lines (round 2, rule 14).
+    for line in notes.PIN_LENGTH_CALLOUT.splitlines():
+        assert len(line) * 0.0026 < 2.0 * drawing.HALF_LEN - 0.004, line
 
 def test_blank_length_is_a_model_dimension_with_its_min_limit() -> None:
     """PR #1292 review N1 and machinist review #1522 (rule 4 (tighten only
@@ -153,29 +166,21 @@ def test_journal_fits_hold_at_the_drill_rod_grind() -> None:
     assert spec.BUDGET["running_clearance_min"] > 0.0
 
 
-def test_note_states_installed_state_and_flush_ends() -> None:
-    lines = notes.DRAWING_NOTES.splitlines()
-    assert len(lines) <= 4  # drawing-guidelines.md rule 7 (notes: few, flagged, never a method)
-    assert lines == [
-        "1. INSTALLED STATE SHOWN: BOTH ENDS DRESSED FLUSH WITH THE MHA-CH-03"
-        " FORK FACES AT ASSEMBLY, NEVER PROUD.",
+def test_sheet_carries_no_note_and_the_callout_names_both_fits() -> None:
+    """Fan-out screen 2026-11-07 (rule 7): dressing the ends flush is an
+    assembly step (CH-00 'rod-forks-pinned' states it), not part of making
+    the pin, so the sheet carries no note. The Ø callout names each fit by
+    its standard name and its mate (#1522), with no band and no material
+    (#2136 review: the title-block MATERIAL owns the stock)."""
+    assert not hasattr(notes, "DRAWING_NOTES")
+    assert "Manufacturing Notes" not in _build_source()
+    assert "Manufacturing Notes" not in _source()
+    assert notes.PIN_DIA_CALLOUT.splitlines() == [
+        "PRESS FIT IN MHA-CH-03 FORK HOLE",
+        "RUNNING FIT IN MHA-CH-06 #47 HOLE",
     ]
-    text = notes.DRAWING_NOTES
-    # drawing-simplicity-policy.md `How the repository implements the guidelines` and drawing-guidelines.md rule 7 (notes: few, flagged, never a method) (PR #1292 review N1): the blank's size and limit are the
-    # BlankLen model dimension's, so no limit may ride the note text.
-    for limit in (f"{spec.PIN_BLANK_LENGTH:g}", "MIN", "\u00b1", "+/-"):
-        assert limit not in text, limit
-    # The fits ride the Ø callout (#1522), so the note restates neither.
-    for fit in ("PRESS IN", "PRESSED", "RUNS", "#47", "BLANK"):
-        assert fit not in text, fit
-    assert "PEEN" not in text and "#746" not in text
-    assert "DRILL ROD" not in text  # the title-block MATERIAL owns the stock
-    # #2136 review: the bought rod's REF prints no band and no material.
     for row in notes.PIN_DIA_CALLOUT.splitlines():
         assert "\u00b1" not in row and "DRILL ROD" not in row
-    assert notes.PIN_DIA_CALLOUT.splitlines()[0] == "AS SUPPLIED"
-    assert '"Manufacturing Notes": DRAWING_NOTES' in _build_source()
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in _source()
 
 
 def test_mating_part_numbers_on_the_sheet_are_live() -> None:
@@ -195,7 +200,7 @@ def test_sheet_runs_at_10_to_1_and_lands_clear_of_the_title_block() -> None:
     assert dia_x < drawing.RIGHT_CENTER[0] - 0.015  # off the centerline pick
     assert drawing.RIGHT_KEEP["PinLen"][1] < drawing.RIGHT_CENTER[1] - drawing.HALF_DIA
     assert drawing.RIGHT_KEEP["BlankLen"][1] < drawing.RIGHT_KEEP["PinLen"][1] - 0.010
-    for x, y in (*drawing.RIGHT_KEEP.values(), drawing.NOTES_XY):
+    for x, y in drawing.RIGHT_KEEP.values():
         assert 0.012 < x < 0.420
         assert 0.012 < y < 0.267
         assert not (x > 0.216 and y < 0.070), (x, y)

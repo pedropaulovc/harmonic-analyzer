@@ -55,7 +55,7 @@ BODY_DIA_TOL = printed_band_mm(3, unit=UNIT)
 # re-review): overall and pocket depth.  The floor is what remains, so the
 # overall carries enough that its .XX worst case, over the deepest banded
 # pocket, still leaves the rule-17 target at the floor hole's lip, both of the
-# hole's mouths broken (Owner ruling 2026-11-08 (Pedro), #2144 item 7.3: .32 -> .34).
+# hole's mouths broken (Owner ruling 2026-11-08 (Pedro), #2144 item 7.3, #2196: .32 -> .34).
 OVERALL_LENGTH = 8.636  # .34
 # Deep enough that the longest banded MHA-DT-32 head, at the widest fitted end
 # play, still sits below the face (Codex P2 on #1139).  User ruling 2026-09-30.
