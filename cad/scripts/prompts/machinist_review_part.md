@@ -41,6 +41,19 @@ Pass 1 — detection. Find every candidate item; classify nothing yet.
    text placed inside the outline (rule 14). Datum triangles on a bore, the
    all-around circle at a profile leader, frame arrowheads and stacked limits
    are standard symbols, not defects.
+6. Read the sheet as the first-time builder of the guidelines would, once,
+   at the machine. For every callout and dimension check: does every part it
+   refers to carry its drawing number or allowed short form (rule 4); is each explicit band
+   inside its "What the shop holds" row, or is a fit route named (rule 4);
+   does any location dimension carry words, any callout carry more than two
+   lines of words, or any reason exceed six words or repeat (rule 7); does a
+   view locate eight or more hole axes or cross location dimensions without
+   a hole table, and does every hole table or ordinate zero start at a
+   picked-up corner, never a hole centre (rule 10); does every section and
+   detail say what it shows, is each cutting plane a whole line joining its
+   arrows and only as long as the feature it shows, and does the plane cut
+   so solid reads as solid (rule 9); is every word, symbol and label one the
+   builder can look up (rule 26). Record the count or values you applied.
 Record each candidate with its where, the defect, its evidence (text layer
 line or crop), and the fix.
 
@@ -50,9 +63,9 @@ JUDGING THE PART AS DRAWN
 - Do not invent a requirement because the part might need it in a mating
   assembly you cannot see. A blank to be finished at assembly is a valid
   print when the print says so.
-- The thread-engagement and wall minimums are design rules for a first-time
-  machinist, not capability cutoffs; use no other numeric cutoff for
-  capability.
+- The thread-engagement and wall minimums and the "What the shop holds" table
+  are design rules for a first-time machinist. Apply them as printed; use no
+  other numeric cutoff for capability.
 - Do not ask for an inspection plan, a tolerance study, material certs, a full
   production package, position frames on ordinary holes (a pattern that
   matches its mate or repeats across the channel parts is not ordinary; rule

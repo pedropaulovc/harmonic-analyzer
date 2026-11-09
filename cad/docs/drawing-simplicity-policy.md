@@ -212,12 +212,18 @@ reviews that read it. This policy file is not a review input.
   first-time hobby machinist:
   they are design margins for the shop class the guidelines describe, not
   capability limits.
-- **Retention (rule 23).** Mechanical locks are the default, in preference
-  order: dowels, set screws, jam nuts, cross-pins, keys or flats with axial
-  capture, pinch clamps — then a brazed joint — then peening. Threadlocker is
-  an option, never the default; on its own it locks nothing (rule 23).
-  `cad/scripts/joint_retention.py` lists every threaded joint and audits the
-  rule (`check:joint_retention`).
+- **Retention (rule 23).** Owner priority (2026-11-06): physical retention,
+  then visual fidelity to the 1898 machine, then simplicity for a hobby
+  builder, then sturdiness under handling. Every fixed joint, threaded or
+  not, is held by a printed, bench-checkable means suited to its load; a CAD
+  mate holds nothing. No device order is imposed. A specified anaerobic bond
+  (grade, clearance, prep, cure, acceptance) equals a press fit, including
+  for axial-only pins and rods (supersedes the 2026-10-15 thread-or-press
+  ruling). Red threadlocker (262/263) is a lock on seated threads #10 and
+  larger, never on adjusters or joints that must open; 222/243 are optional
+  consumables. `cad/scripts/joint_retention.py` lists every threaded joint
+  and audits it (`check:joint_retention`); smooth fixed joints are not yet
+  in its inventory.
 - **Legacy assembly sheets.** Three-view sheets from
   `drawing_recipe_assembly.md` are orientation placeholders and are expected
   to fail review until they are built out to rule 22.
@@ -405,12 +411,15 @@ remain opaque; repository templates must be composed before use as overrides.
 Historical benchmark composition pins the reviewer rubric, resolving its
 severity contract from the same Git ref rather than the working tree. The
 benchmark judge and its kind-specific contract still come from the working
-tree for both configurations, as before this change. A confirmed
-finding gates only when at least two runs raised it independently (owner ruling
-2026-10-18; `GATING_MIN_RUNS`, reduced to the number of valid runs when fewer
-than two are valid). A confirmed finding from one run stays in the report as
-non-gating evidence: across repeated rounds, lone confirmations moved from
-round to round while the sheet itself converged.
+tree for both configurations, as before this change. A confirmed blocker
+gates when one run raised it; a confirmed over-specification or clarity
+finding gates only when at least two runs raised it independently
+(`GATING_MIN_RUNS`, each reduced to the number of valid runs when fewer are
+valid). The two-run rule is the owner ruling of 2026-10-18: across repeated
+rounds, lone confirmations moved from round to round while the sheet itself
+converged. The owner ruling of 2026-11-06 exempted blockers after v47 shipped
+two judge-confirmed blockers that only one run had raised. A lone
+non-blocker confirmation stays in the report as non-gating evidence.
 
 The gate covers every sheet whose rendered output a PR changes, including a
 sheet that changes only because CAD geometry, config or a helper it reads

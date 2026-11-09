@@ -2718,7 +2718,7 @@
           "rule": 10,
           "polarity": "positive",
           "confidence": "high",
-          "evidence": "v40 fr-top-frame sheet 3: origin is the upper-left socket bore axis, a physical feature that can be indicated; dimensions run baseline from it. Rule 10 permits origins on a real feature such as a bore axis."
+          "evidence": "v40 fr-top-frame sheet 3: origin is the upper-left socket bore axis, a physical feature that can be indicated, so it is not a blocker. Since 2026-11-07 rule 10 wants a hole-table or ordinate zero on a picked-up corner, which is a presentation (clarity) finding at most."
         },
         {
           "text": "Does not raise a blocker against '2X Ø3.45 ↧16.0 KEEPER TAP 8-32 UNC-2B ↧10.0' or 'HANGER DRILL 2X Ø13.49 THRU ALL'.",
@@ -4837,6 +4837,221 @@
           "polarity": "positive",
           "confidence": "high",
           "evidence": "As above."
+        }
+      ]
+    },
+    {
+      "id": 81,
+      "name": "tl-oblique-carrier-novice-v47",
+      "package": "ch_rocker_arm_tl_oblique_carrier",
+      "kind": "part",
+      "release": "v47",
+      "prompt": "Blind machinist review of the ch-rocker-arm-tl-oblique-carrier part package (1 sheet).",
+      "expected_output": "FIX (#2151). The unsupported ±.0008 hole-location bands are unbuildable blockers under the shop table; the missing hole table and unidentified broken section are clarity defects; same-parent short forms such as TL-24 are allowed; the design narration is over_specification.",
+      "expectations": [
+        {
+          "text": "Verdict is FIX",
+          "check": {
+            "verdict": "FIX"
+          },
+          "rule": 1,
+          "polarity": "negative",
+          "confidence": "high",
+          "evidence": "MHA-CH-06-TL-21 sheet 1 prints '.2844 ±.0008', '.9638 ±.0008' and '17.7219 ±.0008', with 'SETS R816 ON MHA-CH-13' or 'SETS R800 ON MHA-CH-13', but no matched-fit acceptance, transfer or assembly-setting route at those locations."
+        },
+        {
+          "text": "Blockers identify the .2844 ±.0008 and .9638 ±.0008 locations and the 17.7219 ±.0008 hole spacing as unbuildable cut-to-number bands: ±.0008 is narrower than the shop-table reamed/bored-hole or milled-step location rows (±.002 up to 6 in, ±.004 beyond 6 in), and naming the R816/R800 function and MHA-CH-13 does not supply a fit route",
+          "check": {
+            "category": "blockers"
+          },
+          "rule": 4,
+          "polarity": "negative",
+          "confidence": "high",
+          "evidence": "Sheet 1: '.2844 ±.0008 / SETS R816 ON / MHA-CH-13' and '.9638 ±.0008 / SETS R816 ON / MHA-CH-13' appear at both ends; the long location reads '17.7219 ±.0008 / SETS R800 ON / MHA-CH-13'. These location callouts state no fit route. The separate bore-size callout's '.0010-.0025 DIAMETRAL CLEARANCE ON MHA-CH-06-TL-VN-77 SHOULDER SCREW' controls bore clearance, not these locations."
+        },
+        {
+          "text": "A clarity finding requires a tagged hole table (or another rule-10-sanctioned form) instead of individual location dimensions for the main view's 12 hole axes and multiple mate/reason-qualified hole locations",
+          "check": {
+            "category": "clarity"
+          },
+          "rule": 10,
+          "polarity": "negative",
+          "confidence": "high",
+          "evidence": "Sheet 1 main view locates 12 hole axes: four '.3750' reamed holes, four '.089' 4-40 holes, two '.257' 5/16-18 holes, one '.201' 1/4-20 hole and one '.12 X 90°' spot. Individual locations include '4.154 / LOCATES TL-24', '7.287 / LOCATES TL-24', '10.435 / LOCATES TL-24' and '13.568 / LOCATES TL-24'; there are no hole tags or hole table."
+        },
+        {
+          "text": "A clarity finding identifies SECTION A-A as a section broken down to one of the two identical Ø.3750 reamed holes crossed by the A-A plane without identifying which hole the section shows; the letter A-A alone does not identify that feature",
+          "check": {
+            "category": "clarity"
+          },
+          "rule": 9,
+          "polarity": "negative",
+          "confidence": "high",
+          "evidence": "Sheet 1: the A-A cutting plane runs through the lower left and lower right holes of the 'Ø.3750 +.0015/+.0010 / 4X REAM THRU' group. The short, broken section below shows one bore and is labelled only 'SECTION A-A / SCALE 3 : 1', with '.47' thickness and '.012 min. / X 45°, 4X UNDERSIDE / SEATS ON TL-VN-78 SPACER'; no hole tag or left/right identity is supplied."
+        },
+        {
+          "text": "No clarity or blocker finding objects to the short forms 'TL-24' and 'TL-VN-78': on this MHA-CH-06-TL-21 sheet they complete to MHA-CH-06-TL-24 and MHA-CH-06-TL-VN-78, mates in the same parent assembly (owner ruling 2026-11-06)",
+          "check": {
+            "absent_from": "clarity"
+          },
+          "rule": 4,
+          "polarity": "positive",
+          "confidence": "high",
+          "evidence": "Sheet 1 repeatedly prints 'LOCATES TL-24'; the underside chamfer prints 'SEATS ON TL-VN-78 SPACER'. The sheet's own number is MHA-CH-06-TL-21, so both complete from its MHA-CH-06- prefix."
+        },
+        {
+          "text": "An over_specification finding flags 'HOLDS MHA-CH-06-TL-24 SCREWS CLEAR OF ITS CUT EDGES' and 'MIRRORS CL STATION' as design narration, and the repeated 'LOCATES TL-24' reasons on individual location dimensions as repeated narration rather than needed dimensions",
+          "check": {
+            "category": "over_specification"
+          },
+          "rule": 7,
+          "polarity": "negative",
+          "confidence": "high",
+          "evidence": "Sheet 1 4-40 callout: 'HOLDS MHA-CH-06-TL-24 SCREWS / CLEAR OF ITS CUT EDGES' (nine reason words excluding the mate number). The 1/4-20 callout adds 'CLAMPS MHA-CH-13 / MIRRORS CL STATION'. 'LOCATES TL-24' is repeated at 4.154, 7.287, 2X 1.432, 2X 1.744, 10.435 and 13.568."
+        }
+      ]
+    },
+    {
+      "id": 82,
+      "name": "tl-oblique-end-bracket-novice-v47",
+      "package": "ch_rocker_arm_tl_oblique_end_bracket",
+      "kind": "part",
+      "release": "v47",
+      "prompt": "Blind machinist review of the ch-rocker-arm-tl-oblique-end-bracket part package (1 sheet).",
+      "expected_output": "FIX (#2046). KP08 is a catalogue code rather than its assigned MHA drawing number; the repeated per-hole callouts and millimetre locations in the inch view are clarity defects.",
+      "expectations": [
+        {
+          "text": "Verdict is FIX",
+          "check": {
+            "verdict": "FIX"
+          },
+          "rule": 1,
+          "polarity": "negative",
+          "confidence": "high",
+          "evidence": "MHA-CH-06-TL-28 sheet 1 prints 'MATCHES KP08 BLOCK HOLES', repeats the same 8-32 and 6-32 hole callouts per hole, and prints '13.925 ±.13 mm' and '55.925 ±.13 mm' in the view on a 'UNIT: IN' sheet."
+        },
+        {
+          "text": "A clarity finding requires the full MHA-CH-06-TL-VN-56 drawing number for the KP08 pillow block instead of the KP08 catalogue-code mate references; the catalogue code may follow the full number",
+          "check": {
+            "category": "clarity"
+          },
+          "rule": 4,
+          "polarity": "negative",
+          "confidence": "high",
+          "evidence": "Sheet 1: '.250 / KP08 + MHA-CH-06-TL-20', '13.925 ±.13 mm / MATCHES KP08 BLOCK HOLES' and '55.925 ±.13 mm / MATCHES KP08 BLOCK HOLES'. No full MHA drawing number for the KP08 block appears on this sheet."
+        },
+        {
+          "text": "A clarity finding groups the four identical 8-32 holes under one 4X callout and the two identical 6-32 holes under one 2X callout instead of repeating the same callout at every hole",
+          "check": {
+            "category": "clarity"
+          },
+          "rule": 10,
+          "polarity": "negative",
+          "confidence": "high",
+          "evidence": "Sheet 1: four separate leaders each repeat 'Ø.136 THRU ALL / 8-32 UNC ↧ .450 MIN FAR SIDE'; two separate leaders each repeat 'Ø.107 THRU ALL / 6-32 UNC ↧ .450 MIN'. None is grouped as 4X or 2X."
+        },
+        {
+          "text": "A clarity finding flags the explicitly printed millimetre locations 13.925 ±.13 mm and 55.925 ±.13 mm within the inch manufacturing view, rather than claiming that these are inch-valued dimensions or only catalogue reference sizes",
+          "check": {
+            "category": "clarity"
+          },
+          "rule": 2,
+          "polarity": "negative",
+          "confidence": "high",
+          "evidence": "Sheet 1 title block: 'UNIT: IN'. The main view nevertheless prints '13.925 ±.13 mm / MATCHES KP08 BLOCK HOLES' and '55.925 ±.13 mm / MATCHES KP08 BLOCK HOLES' as controlling baseline locations alongside inch locations '.285', '.942', '1.808' and '2.465'; neither mm location is marked REF."
+        }
+      ]
+    },
+    {
+      "id": 83,
+      "name": "magnifier-enlarged-view-identity-v47",
+      "package": "mg_magnifier_assembly",
+      "kind": "assembly",
+      "release": "v47",
+      "prompt": "Blind machinist review of the mg-magnifier assembly package (5 sheets).",
+      "expected_output": "FIX. The three enlarged views on sheet 1 are named only in prose, with no identifying letters or linked boundaries or viewing arrows on their parent views; report these as clarity defects under rule 9.",
+      "expectations": [
+        {
+          "text": "Verdict is FIX",
+          "check": {
+            "verdict": "FIX"
+          },
+          "rule": 9,
+          "polarity": "negative",
+          "confidence": "high",
+          "evidence": "MHA-MG-00 sheet 1 labels the enlarged views 'LEVER TIP DETAIL', 'WHEEL ENDSHAKE' and 'AXLE AS PRESSED', with scales but no view letters or matching parent-view boundaries/arrows."
+        },
+        {
+          "text": "A clarity finding identifies LEVER TIP DETAIL as an unlabelled enlarged view: prose and a scale do not replace a detail letter and a matching lettered boundary on its parent view",
+          "check": {
+            "category": "clarity"
+          },
+          "rule": 9,
+          "polarity": "negative",
+          "confidence": "high",
+          "evidence": "Sheet 1 lower-left enlargement: 'LEVER TIP DETAIL / VIEW FROM THE FRONT / SCALE 4 : 1', with '.05 / FLAT LEVER TIP / PROUD OF FAR / BRACKET FACE'. The enlargement has a circular crop but no identifying letter; neither assembled orthographic parent has a matching lettered detail boundary."
+        },
+        {
+          "text": "A clarity finding identifies WHEEL ENDSHAKE as an unlabelled enlarged view with no view letter and no corresponding boundary or viewing arrow on its parent",
+          "check": {
+            "category": "clarity"
+          },
+          "rule": 9,
+          "polarity": "negative",
+          "confidence": "high",
+          "evidence": "Sheet 1 right-hand enlargement: 'WHEEL ENDSHAKE / SCALE 4 : 1', with '.004 ±.002 / WHEEL FREE, NO RATTLE; / SET BY THE FIRST NUT, / LOCKED BY THE SECOND'. No letter identifies it or links it to a parent boundary/viewing arrow."
+        },
+        {
+          "text": "A clarity finding identifies AXLE AS PRESSED as an unlabelled enlarged view: the prose naming its parts and scale does not supply a view letter or a matching parent-view boundary or arrow",
+          "check": {
+            "category": "clarity"
+          },
+          "rule": 9,
+          "polarity": "negative",
+          "confidence": "high",
+          "evidence": "Sheet 1 upper-right enlargement: 'AXLE AS PRESSED / MHA-MG-07 WHEEL AXLE PRESSED / INTO MHA-MG-08 WHEEL BAR / SCALE 2 : 1', with '(1.500)' and 'ACCEPT: LOCKNUT ON FULL THREAD, THREAD END .114 MAX PAST IT'. The view has no identifying letter and no linked lettered boundary or arrow on a parent."
+        }
+      ]
+    },
+    {
+      "id": 84,
+      "name": "crank-hub-reamed-fit-control-v47",
+      "package": "dt_crank_hub",
+      "kind": "part",
+      "release": "v47",
+      "prompt": "Blind machinist review of the dt-crank-hub part package (1 sheet).",
+      "expected_output": "Positive control for rule 4 only: no blocker calls the Ø.3760 +.0005/.0000 reamed through bore unsupported or unbuildable. Its band meets the reamed-hole shop row and its callout states diametral clearance to MHA-DT-11. Other features remain reviewable.",
+      "expectations": [
+        {
+          "text": "No blocker says the Ø.3760 +.0005/.0000 REAM THRU bore is unbuildable under the shop table, lacks an identifiable mate, or lacks fit acceptance: its +.0005/0 size band meets the reamed-hole row and the callout states .0010-.0023 diametral clearance on MHA-DT-11",
+          "check": {
+            "absent_from": "blockers"
+          },
+          "rule": 4,
+          "polarity": "positive",
+          "confidence": "high",
+          "evidence": "MHA-DT-31 sheet 1 bore callout: 'Ø.3760 +.0005/.0000 / REAM THRU / (.0010-.0023 DIAMETRAL / CLEARANCE ON MHA-DT-11)'. This expectation covers that bore only, not the part's other fits, notes or locations."
+        }
+      ]
+    },
+    {
+      "id": 85,
+      "name": "platen-guide-hole-table-control-v47",
+      "package": "pd_platen_guide",
+      "kind": "part",
+      "release": "v47",
+      "prompt": "Blind machinist review of the pd-platen-guide part package (1 sheet).",
+      "expected_output": "Positive control for rule 10's hole-table trigger: no clarity finding claims that the nine hole axes lack a tagged hole table or X/Y locations. The sheet already supplies the table and tags; unrelated table-form or other drawing defects remain reviewable.",
+      "expectations": [
+        {
+          "text": "No clarity finding says the nine hole axes require a missing hole table, lack hole tags, or lack X/Y locations: the view already tags A1-A9 and the printed hole table supplies each tag's X and Y location and size",
+          "check": {
+            "absent_from": "clarity"
+          },
+          "rule": 10,
+          "polarity": "positive",
+          "confidence": "high",
+          "evidence": "MHA-PD-11 sheet 1 table headings: 'TAG', 'X LOC (BASIC)', 'Y LOC (BASIC)', 'SIZE'. Rows A1-A9 give X values '1.062', '2.909', '3.185', '3.461', '5.308', '7.155', '7.431', '7.707', '9.554', each at Y '0.140', with 'Ø.089 THRU ALL / 4-40 UNC - 2B THRU ALL'. The view carries matching A1-A9 tags, X/Y zero marks and the linked pattern note 'MATCHES MHA-PD-02 AND MHA-PD-12 HOLES; WALL .060 MIN, TAPS TO EDGES'."
         }
       ]
     }
