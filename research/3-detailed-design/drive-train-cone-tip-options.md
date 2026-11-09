@@ -19,7 +19,7 @@
 > [Reproducing](#reproducing)).
 
 ![Cone tip: main today, webs by option, options C, A and B, cutter run-out, and the exceptions
-each option still needs](drive-train-cone-tip-options/cone-tip-options-v47.png)
+each option still needs](drive-train-cone-tip-options/cone-tip-options-2026-11-09.png)
 
 ## Where main stands
 
@@ -195,10 +195,10 @@ D=research/3-detailed-design/drive-train-cone-tip-options
 uv run --frozen python $D/dump_geometry.py > geometry.json
 uv run --frozen python $D/block_air.py > air.json
 uv run --no-project --with matplotlib python $D/cone_tip_options.py geometry.json air.json \
-  cone-tip-options-v47.png
+  cone-tip-options-2026-11-09.png
 ```
 
-The last command also writes `cone-tip-options-v47.numbers.json` with every web, wall, air and
+The last command also writes `cone-tip-options-2026-11-09.numbers.json` with every web, wall, air and
 run-out quoted above. The air figures are nominal, through `dt_tip_collar_air`'s own pose and
 support functions. The contact zone is the v45 surface-sampled measurement; the cone stations
 have not changed since.
