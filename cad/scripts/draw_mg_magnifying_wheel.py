@@ -571,8 +571,10 @@ _SPIGOT_DIM_X = _section_x(HUB_FRONT_Z) + 0.0072
 # plane is (WEB_CENTRELINES), left of the spigot step's, so the row above
 # stops short of it; last the overall (".772 ±.004"), which holds the
 # axle's nut stack, left of the back face above the A-A caption.  Each
-# band's need stands over its value (CALLOUTS_ABOVE); the .61, a location,
-# prints its value and band alone (drawing-guidelines.md rule 7).  Each
+# band's need stands over its value (CALLOUTS_ABOVE), and so does what the
+# .61 locates: GROOVE CENTER.  Without that label the extension line read as
+# ending on no feature, and the groove as located only by symmetry (integration
+# proof 20261109T105251629Z, blocker, rule 10).  Each
 # text is centred clear of the face it leaves.  The two right-hand sizes
 # keep their arrows inside their spans, so no tail reaches a neighbouring
 # extension line.
@@ -599,9 +601,13 @@ HUB_LENGTH_CALLOUT = f"{AXLE_NUMBER} LOCKNUT STACK"
 # names it (drawing-guidelines.md rule 4: a mate serving several features
 # is named once, in one flagged note linked to the features).
 GROOVE_CALLOUT = f"SEE NOTE {GROOVE_SEAT_NOTE}"
-# The web plane's value is ".61 ±.03": its text is centred this many
-# characters (with the margin) right of the spigot face.
-_PLANE_VALUE_CHARS = 8
+# The .61 locates the groove's centre (the shared mid-plane it is cut on), so
+# the label names the groove, the feature the TIE 2 hole is drilled from.
+GROOVE_CENTER_CALLOUT = "GROOVE CENTER"
+# The web plane's value is ".61 ±.03", 8 characters: its block, the label
+# over the value, is centred this many characters (with the margin) right of
+# the spigot face.
+_PLANE_VALUE_CHARS = max(8, len(GROOVE_CENTER_CALLOUT))
 # Capitals print wider than _TEXT_CHAR (about 2.6 mm a character), so a
 # callout's span is estimated two characters wide.
 _CALLOUT_MARGIN_CHARS = 2
@@ -636,7 +642,7 @@ SECTION_KEEP = {
         _section_x(HUB_FRONT_Z),
         1,
         _PLANE_VALUE_CHARS + _CALLOUT_MARGIN_CHARS,
-        _HUB_ROWS[1] + _ONE_LINE_UP,
+        _HUB_ROWS[1] + _ONE_LINE_UP + _ABOVE_UP,
     ),
     "HubLength": _beside(
         _section_x(HUB_BACK_Z),
@@ -726,6 +732,7 @@ DIMENSION_CALLOUTS = {
 # Each axial band's need stands over its value.
 CALLOUTS_ABOVE = {
     "SpigotLength": SPIGOT_LENGTH_CALLOUT,
+    "HubFrontZ": GROOVE_CENTER_CALLOUT,
     "HubLength": HUB_LENGTH_CALLOUT,
 }
 # SOLIDWORKS drops a multi-line callout above a value from the print

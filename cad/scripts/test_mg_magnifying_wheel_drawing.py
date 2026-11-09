@@ -304,8 +304,9 @@ def test_linked_notes_specify_the_fits_the_ties_and_the_angle_the_spokes() -> No
     assert not hasattr(drawing, "SPOKE_CENTRELINE")
     assert spec.SPOKE_REFERENCE in spec.REFERENCE_SKETCHES
     # The .61 locates the groove, web and rim's shared mid-plane, drawn on
-    # A-A; the location carries its value and band alone (rule 7).
-    assert "HubFrontZ" not in drawing.CALLOUTS_ABOVE
+    # A-A; its label names the groove it locates (integration proof
+    # 20261109T105251629Z: unlabelled, it read as ending on no feature).
+    assert drawing.CALLOUTS_ABOVE["HubFrontZ"] == "GROOVE CENTER"
     assert "HubFrontZ" not in drawing.DIMENSION_CALLOUTS
     for a, b in drawing.WEB_CENTRELINES.values():
         assert a[1] == b[1] == a[2] == b[2] == 0.0
