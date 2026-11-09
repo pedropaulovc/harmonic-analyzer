@@ -194,18 +194,20 @@ ENGAGEMENT_STATEMENT = (
 )
 TAP_CALLOUT_BELOW = f"FOR {SCREW_NUMBER}\n{ENGAGEMENT_STATEMENT}"
 
-# Two lines (drawing-guidelines.md rule 7), each ending left of the title
-# block: the spigot's matched fit in the tube (linked from the spigot Ø), and
-# the joint it makes, named once.  The sheet shows the plug alone, so it
-# leaves the bench tapped and needs no order note; the bond itself is
-# MHA-SM-00 STEP 8 (GoosePlug, relaying owner rulings 2026-11-08 (Pedro),
-# #2315: no sequence note, no RV-02).  Material and finish are the title
-# block's (registry row: AISI 1018 cold-drawn round; bare, no plating).
+# One flag note (drawing-guidelines.md rule 7), linked from the spigot Ø, in
+# two lines that each end left of the title block: the spigot's matched fit
+# in the tube and the joint it makes, named once (machinist review, proof run
+# 20261109T171155303Z: a separate bond note sat unflagged).  The sheet shows
+# the plug alone, so it leaves the bench tapped and needs no order note; the
+# bond itself is MHA-SM-00 STEP 8 (GoosePlug, relaying owner rulings
+# 2026-11-08 (Pedro), #2315: no sequence note, no RV-02).  Material and finish
+# are the title block's (registry row: AISI 1018 cold-drawn round; bare, no
+# plating).
 DRAWING_NOTES = "\n".join(
     (
         f"{FIT_NOTE}. TURN SPIGOT TO MEASURED {TUBE_NUMBER} BORE, "
-        f"CLEARANCE {BOND_WINDOW}",
-        f"2. BONDED INTO {TUBE_NUMBER} WITH LOCTITE 638 AT {ASSEMBLY_NUMBER}",
+        f"CLEARANCE {BOND_WINDOW},",
+        f"   FOR ITS LOCTITE 638 BOND INTO {TUBE_NUMBER} AT {ASSEMBLY_NUMBER}",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"

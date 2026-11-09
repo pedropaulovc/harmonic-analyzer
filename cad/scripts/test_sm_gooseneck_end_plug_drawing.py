@@ -228,11 +228,11 @@ def test_only_the_reference_value_is_bracketed_under_its_callout(monkeypatch) ->
     assert not display.ShowParenthesis
 
 
-def test_notes_state_the_fit_and_the_joint() -> None:
+def test_one_flag_note_states_the_fit_and_the_joint() -> None:
     lines = spec.DRAWING_NOTES.splitlines()
     assert lines == [
-        "1. TURN SPIGOT TO MEASURED MHA-SM-01 BORE, CLEARANCE .004-.009",
-        "2. BONDED INTO MHA-SM-01 WITH LOCTITE 638 AT MHA-SM-00",
+        "1. TURN SPIGOT TO MEASURED MHA-SM-01 BORE, CLEARANCE .004-.009,",
+        "   FOR ITS LOCTITE 638 BOND INTO MHA-SM-01 AT MHA-SM-00",
     ]
     # No sequence note: the sheet shows the plug alone, so it leaves the
     # bench tapped; the bond is MHA-SM-00 STEP 8 (#2315, no RV-02).
@@ -251,7 +251,8 @@ def test_notes_state_the_fit_and_the_joint() -> None:
         )
     )
     assert spec.BOND_WINDOW == window == ".004-.009"
-    numbers = {line.split(".", 1)[0] for line in lines}
+    numbers = {line.split(".", 1)[0] for line in lines if not line.startswith(" ")}
+    assert numbers == {"1"}
     printed = " ".join(spec.DIMENSION_CALLOUTS_BY_NAME.values())
     assert set(re.findall(r"SEE NOTE (\d)", printed)) <= numbers
     notes = " ".join(spec.DRAWING_NOTES.split()).upper()
