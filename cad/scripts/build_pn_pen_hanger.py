@@ -67,7 +67,6 @@ from pn_pen_hanger_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
-    FRONT_VIEW_NOTE,
     GUIDE_PLATE_DROPS,
     GUIDE_PLATE_T,
     GUIDE_PLATE_WIDTH,
@@ -343,7 +342,6 @@ async def build(adapter) -> dict[str, str]:
         PART_NAME,
         {
             "Manufacturing Notes": DRAWING_NOTES,
-            "Front View Note": FRONT_VIEW_NOTE,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )

@@ -210,6 +210,7 @@ if TAP_WALL_START_Z + TAP_WALL_MIN_MM >= FRAME_DEPTH:
     raise AssertionError("the tap wall reference runs out of the frame")
 
 DRAWING_NOTES = ""
-FRONT_VIEW_NOTE = "FRONT VIEW SCALE 2:1"
-BOTTOM_VIEW_NOTE = "BOTTOM VIEW SCALE 2:1"
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
+# Every view is at the sheet's 2:1, which the title block states (rule 9);
+# the front and bottom views are projected and need no label, the one
+# pictorial is named in words.
+ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW"

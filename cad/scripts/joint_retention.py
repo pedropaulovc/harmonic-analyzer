@@ -1640,8 +1640,8 @@ JOINTS: tuple[Joint, ...] = (
         lock_binds=("pn_vn_hanger_screw", "pn_vn_pen_hanger_nut"),
         lock_step=(
             "nut held on the strap front while the screw is tightened from behind the bar, then the thin "
-            "90760A009 nut jammed against it (pn-vn-pen-hanger-nut.yaml / pn-vn-pen-hanger-jam-nut.yaml "
-            "installation_notes; drawing-guidelines.md rule 23 (lock threaded joints exposed to operating loads))"
+            "90760A009 nut jammed against it (pn_pen_assembly_sheet.ASSEMBLY_STEPS 7, MHA-PN-00 step 7; "
+            "drawing-guidelines.md rule 23 (lock threaded joints exposed to operating loads))"
         ),
         evidence=(
             "build_pn_pen_assembly.py: M6.10 fastener block (HANGER_SCREW_POS, HANGER_NUT_POS, "

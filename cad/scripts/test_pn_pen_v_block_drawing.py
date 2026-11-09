@@ -524,7 +524,8 @@ def test_bottom_view_prints_the_neck_step_where_it_is_an_outline_change() -> Non
     assert pivot_x + 0.018 < 0.2158 - 0.003
     assert bottom > 0.0127 + 0.01
     assert pivot_y + 0.016 < y2 - 0.0019 - 0.004
-    assert spec.DIMENSION_CALLOUTS["PivotDia"].count("\n") == 3
+    # REAM THRU and two lines of words (rule 7).
+    assert spec.DIMENSION_CALLOUTS["PivotDia"].count("\n") == 2
     # Its leader, from the bore's near rim to the block's lower left, passes
     # the paper end's extension line between the neck's back corner and the
     # depth's extension line, and under the depth line's end: it crosses no
@@ -618,7 +619,8 @@ def test_holes_are_native_wizard_features_with_native_callouts() -> None:
         ("PivotBoreProfile", "PivotDia"): spec.PIVOT_BORE_BAND
     }
     assert _DRAWING_SOURCE.count("add_native_hole_callout(") == 1
-    assert 'process="TAP"' in _DRAWING_SOURCE
+    # Size first (rule 26): no process prefix leads the thread row.
+    assert "process=" not in _DRAWING_SOURCE
     # The title block owns the thread class (rule 2); the reamed bore's
     # leader stops on the near rim (rule 14).
     assert (
@@ -641,55 +643,66 @@ def test_pivot_callout_names_its_mate_and_says_ream() -> None:
     assert callout.startswith("REAM THRU")
     assert rod_number in callout
     assert not re.search(r"\d\.\d", callout)
+    # The standard fit name (rule 26), the words in at most two lines (rule 7).
+    assert "SLIDING FIT" in callout
+    assert len(callout.splitlines()[1:]) <= 2
 
 
-def test_tap_callout_says_drill_and_ends_in_the_pivot_bore() -> None:
+def test_tap_callout_reads_size_first_and_ends_in_the_pivot_bore() -> None:
     # Review r11 (rule 12): "TAP 4-40 UNC THRU" read as drilled through the
     # block, so both native rows end INTO PIVOT BORE; r13: "Ø 2.26 ..." had no
-    # process word, so the drill row opens DRILL.  Only text around the
-    # variables changes, so size and thread stay associative.
+    # process word, so the drill row says DRILL; the fan-out screen (rule 26):
+    # size first, then process, then depth.  Only text around the variables
+    # changes, so size and thread stay associative.
     original = {
-        5: "TAP <hw-threaddesc> <hw-thru>",
+        5: "<hw-threaddesc> <hw-thru>",
         6: "",
         7: "<MOD-DIAM><hw-tapdrldia> <hw-thru>",
         8: "",
     }
     rewritten = drawing._tap_callout_definitions(original)
     assert rewritten == {
-        5: "TAP <hw-threaddesc> INTO PIVOT BORE",
+        5: "<hw-threaddesc> INTO PIVOT BORE",
         6: "",
-        7: "DRILL <MOD-DIAM><hw-tapdrldia> INTO PIVOT BORE",
+        7: "<MOD-DIAM><hw-tapdrldia> DRILL INTO PIVOT BORE",
         8: "",
     }
     # Both rows in one part: the drill row alone takes the word.
     joined = drawing._tap_callout_definitions(
         {
-            5: "TAP <hw-threaddesc> <hw-thru>",
+            5: "<hw-threaddesc> <hw-thru>",
             6: "",
             7: "",
             8: "<MOD-DIAM><hw-thrutapdrldia> <hw-thru>\nCOAXIAL",
         }
     )
-    assert joined[8] == "DRILL <MOD-DIAM><hw-thrutapdrldia> INTO PIVOT BORE\nCOAXIAL"
+    assert joined[8] == "<MOD-DIAM><hw-thrutapdrldia> DRILL INTO PIVOT BORE\nCOAXIAL"
     # Precision goes to whichever drill-size variable the callout carries.
     assert drawing._tap_drill_variable(rewritten) == "hw-tapdrldia"
     assert drawing._tap_drill_variable(joined) == "hw-thrutapdrldia"
     with pytest.raises(RuntimeError):
-        drawing._tap_drill_variable({5: "TAP <hw-threaddesc>", 7: "DRILL"})
+        drawing._tap_drill_variable({5: "<hw-threaddesc>", 7: "DRILL"})
     for bad in (
-        {5: "TAP <hw-threaddesc> <hw-thru>", 6: "", 7: "", 8: ""},
+        {5: "<hw-threaddesc> <hw-thru>", 6: "", 7: "", 8: ""},
         {5: "<hw-thru>", 6: "", 7: "<hw-thru>", 8: ""},
-        {5: "TAP <hw-threaddesc> <hw-thru>", 7: "<hw-thru>"},
-        # No drill row, or one already worded, or sharing the thread's row.
-        {5: "TAP <hw-threaddesc> <hw-thru>", 6: "", 7: "<hw-thru>", 8: ""},
+        {5: "<hw-threaddesc> <hw-thru>", 7: "<hw-thru>"},
+        # No drill row, a process prefix, one already worded, or a drill row
+        # sharing the thread's row.
+        {5: "<hw-threaddesc> <hw-thru>", 6: "", 7: "<hw-thru>", 8: ""},
         {
             5: "TAP <hw-threaddesc> <hw-thru>",
             6: "",
-            7: "DRILL <MOD-DIAM><hw-tapdrldia> <hw-thru>",
+            7: "<MOD-DIAM><hw-tapdrldia> <hw-thru>",
             8: "",
         },
         {
-            5: "TAP <hw-tapdrldia> <hw-threaddesc> <hw-thru> <hw-thru>",
+            5: "<hw-threaddesc> <hw-thru>",
+            6: "",
+            7: "<MOD-DIAM><hw-tapdrldia> DRILL <hw-thru>",
+            8: "",
+        },
+        {
+            5: "<hw-tapdrldia> <hw-threaddesc> <hw-thru> <hw-thru>",
             6: "",
             7: "",
             8: "",
@@ -700,12 +713,13 @@ def test_tap_callout_says_drill_and_ends_in_the_pivot_bore() -> None:
     assert not re.search(r"\d", drawing._TAP_END + drawing._DRILL_WORD)
     # The readback, on resolved text as the sheet prints it.
     assert drawing._tap_callout_resolved(
-        "TAP 4-40 UNC INTO PIVOT BORE\n\nDRILL Ø2.26 INTO PIVOT BORE\n"
+        "4-40 UNC INTO PIVOT BORE\n\nØ2.26 DRILL INTO PIVOT BORE\n"
     )
     for printed in (
-        "TAP 4-40 UNC INTO PIVOT BORE\n\nØ2.26 INTO PIVOT BORE\n",
-        "DRILL TAP 4-40 UNC INTO PIVOT BORE\n\nØ2.26 INTO PIVOT BORE\n",
-        "TAP 4-40 UNC THRU\n\nDRILL Ø2.26 INTO PIVOT BORE\n",
+        "4-40 UNC INTO PIVOT BORE\n\nØ2.26 INTO PIVOT BORE\n",
+        "TAP 4-40 UNC INTO PIVOT BORE\n\nØ2.26 DRILL INTO PIVOT BORE\n",
+        "4-40 UNC INTO PIVOT BORE\n\nDRILL Ø2.26 INTO PIVOT BORE\n",
+        "4-40 UNC THRU\n\nØ2.26 DRILL INTO PIVOT BORE\n",
     ):
         assert not drawing._tap_callout_resolved(printed), printed
     # After the thread class leaves, on the tap's callout only.

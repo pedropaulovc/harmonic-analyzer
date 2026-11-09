@@ -292,10 +292,12 @@ def test_views_and_scales_are_explicit() -> None:
     assert "scale=ISO_SCALE" in source
     assert drawing.ISO_SCALE == (2, 1)
     assert '"*Right"' not in source
-    assert spec.FRONT_VIEW_NOTE == "FRONT VIEW SCALE 2:1"
-    assert spec.BOTTOM_VIEW_NOTE == "BOTTOM VIEW SCALE 2:1"
-    assert spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 2:1"
-    assert not hasattr(spec, "RIGHT_VIEW_NOTE")
+    # Rule 9: every view is at the sheet scale, so no caption states one, and
+    # the projected front and bottom views carry no label.
+    assert "SCALE" not in spec.ISOMETRIC_VIEW_NOTE
+    for retired in ("FRONT_VIEW_NOTE", "BOTTOM_VIEW_NOTE", "RIGHT_VIEW_NOTE"):
+        assert not hasattr(spec, retired)
+    assert "Front View Note" not in source and "Bottom View Note" not in source
     # finalize_drawing owns the pictorial's Shaded With Edges; an early call
     # read cosmetic-thread quality False on the farm (run 20261014T002650255Z).
     assert "set_high_quality_shaded_with_edges" not in source
@@ -307,10 +309,8 @@ def test_isometric_stays_clear_of_the_front_view_border_and_title_block() -> Non
     hx, hy = drawing.ISO_HALF_EXTENT
     assert hx == pytest.approx(0.0235, abs=0.001)
     assert hy == pytest.approx(0.0473, abs=0.001)
-    # Right of the 40.0 dimension line and the front view's note.
+    # Right of the 40.0 dimension line.
     assert cx - hx > drawing.FRONT_KEEP["OuterHeightDim"][0] + 0.05
-    front_note_end = drawing.FRONT_VIEW_NOTE_XY[0] + len(spec.FRONT_VIEW_NOTE) * 0.0025
-    assert cx - hx > front_note_end + 0.03
     assert cy + hy < 0.267 - 0.02  # under the top border
     # Its note sits below the view, centred under it, well above the title block.
     nx, ny = drawing.ISO_VIEW_NOTE_XY
@@ -379,7 +379,7 @@ def test_hole_callout_clears_the_views_and_their_dimensions() -> None:
     assert x > drawing.BOTTOM_RIGHT_X + 0.015
     assert drawing.BOTTOM_HIGH_Y < y < drawing.FRONT_BOTTOM_Y - 0.010
     # Its two lines stand right of the window width's right extension line.
-    callout_left = x - _half_width("TAP 4-40 UNC THRU")
+    callout_left = x - _half_width("4-40 UNC THRU")
     assert (
         callout_left
         > drawing._front_xy(spec.OUTER_WIDTH - spec.RAIL_SIDE, 0)[0] + 0.005
@@ -390,7 +390,8 @@ def test_hole_callout_clears_the_views_and_their_dimensions() -> None:
     hx, hy = drawing.HOLE_SHEET_XY
     leader_y = hy + (y - hy) * (depth_x - hx) / (x - hx)
     assert leader_y > drawing.BOTTOM_HIGH_Y + 0.008
-    assert drawing.HOLE_CALLOUT_PROCESS == "TAP"
+    # Rule 26: size first, so no process word leads the thread row.
+    assert "process=" not in inspect.getsource(drawing.build)
 
 
 def test_tap_wall_text_stands_on_a_shelf_clear_of_every_line() -> None:
