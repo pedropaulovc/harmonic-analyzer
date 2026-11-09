@@ -104,15 +104,51 @@ def test_purchased_sheet_has_the_actual_source_marks_and_cli_stem(
     assert drawing._parse_args().part == _STEM
 
 
-def test_end_view_width_text_stands_outside_its_extension_lines() -> None:
-    """PR #2331 head 7f1dedc machinist review (r1-r3, clarity): centred on the
-    3.2 mm square, the stacked (1/16") width was struck by its dimension line
-    and both extension lines.  Its text centre stands below the square by more
-    than half the stacked fraction's ~9 mm render height, above the note, and
-    left of the square inside the border."""
+# The stacked (1/16") as the farm rendered it (B sheet, 5100 px = 431.8 mm):
+# 11.8 mm wide, about 9 mm tall; a bent-leader value hangs its shelf on
+# either side of its dimension line, and an outside arrow reaches ~5 mm past
+# its extension line.
+_INNER_BORDER = (0.0127, 0.0127, 0.4191, 0.2667)
+_TEXT_W, _TEXT_H, _ARROW, _CLEAR = 0.0125, 0.009, 0.006, 0.003
+
+
+def _inside(box: tuple[float, float, float, float]) -> bool:
+    x0, y0, x1, y1 = _INNER_BORDER
+    return (
+        box[0] >= x0 + _CLEAR
+        and box[1] >= y0 + _CLEAR
+        and box[2] <= x1 - _CLEAR
+        and box[3] <= y1 - _CLEAR
+    )
+
+
+def test_end_view_ref_dimensions_stand_clear_inside_the_border() -> None:
+    """Machinist reviews of PR #2331: centred on the 3.2 mm square, the
+    vertical (1/16") was struck by its own dimension and extension lines
+    (7f1dedc, r1-r3); set left of the square, its shelf ran out through the
+    inner border (5994f29, r1-r3, rule 13).  Both REF values' text and lines
+    lie inside the border with air; the width's text stands below the square,
+    outside its extension lines, on either shelf side clear of the side view
+    and above the note."""
     cx, cy = drawing.FRONT_CENTER
-    x, y = drawing.FRONT_KEEP["KeyWidth"]
-    half_text = 0.0045
-    assert y < cy - drawing.HALF_SIZE - half_text - 0.003
-    assert y - half_text > drawing.NOTES_XY[1] + 0.005
-    assert 0.0127 + 0.007 < x < cx - drawing.HALF_SIZE
+    half = drawing.HALF_SIZE
+    # Height: horizontal, its value over the square, arrows outside.
+    hx, hy = drawing.FRONT_KEEP["KeyHeight"]
+    assert hy - _TEXT_H / 2.0 > cy + half + _CLEAR
+    height_text = (
+        hx - _TEXT_W / 2,
+        hy - _TEXT_H / 2,
+        hx + _TEXT_W / 2,
+        hy + _TEXT_H / 2,
+    )
+    height_line = (cx - half - _ARROW, cy + half, cx + half + _ARROW, hy)
+    # Width: vertical line right of the square, value below it on a shelf.
+    wx, wy = drawing.FRONT_KEEP["KeyWidth"]
+    assert wx > cx + half + _CLEAR
+    assert wy + _TEXT_H / 2.0 < cy - half - _CLEAR
+    width_text = (wx - _TEXT_W, wy - _TEXT_H / 2, wx + _TEXT_W, wy + _TEXT_H / 2)
+    width_line = (cx - half, wy, wx, cy + half + _ARROW)
+    for box in (height_text, height_line, width_text, width_line):
+        assert _inside(box), box
+    assert width_text[2] + _CLEAR < drawing.RIGHT_CENTER[0] - drawing.HALF_LENGTH
+    assert width_text[1] > drawing.NOTES_XY[1] + 0.005

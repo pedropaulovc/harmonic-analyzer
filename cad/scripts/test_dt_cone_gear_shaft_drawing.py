@@ -907,15 +907,20 @@ def test_each_d_section_cuts_its_own_land_clear_of_its_neighbours() -> None:
         for b in cells[index + 1 :]:
             assert a[2] < b[0] or b[2] < a[0] or a[3] < b[1] or b[3] < a[1], (a, b)
     # A-A's keyseat width text rides above B's cell: its line stands at the
-    # text's left edge on the keyseat's side (either side of A), the text
-    # 46.1 mm wide and 3.5 mm over its position (PR #2331 proof at 7f1dedc
-    # measured 0.3466..0.3927 with its top 0.1955 at a 0.192 position).
+    # text's left edge on the keyseat's side, the text 46.1 mm wide, 4.5 mm
+    # under and 3.5 mm over its position (PR #2331 farm proofs: 7f1dedc
+    # measured 0.3466..0.3927; 5994f29 r2 0.1905..0.1985 at 0.195).  The row
+    # it rides is bounded by B's measured cell top and the pictorial's
+    # measured outline bottom (5994f29 r2), each kept CLEAR_GAP_M plus 1 mm off.
+    b_cell_top, iso_bottom = 0.1855, 0.2001
     keyed = next(s for s in sections if s.land == spec.KEYED_LAND)
     keyed_half = spec.SECTION_DIAS[spec.KEYED_LAND] / 2000.0 * keyed.scale[0] / keyed.scale[1]
     rise_y = keyed.centre[1] + drawing.KEYSEAT_WIDTH_RISE
+    assert rise_y - 0.0045 >= b_cell_top + CLEAR_GAP_M + 0.001
+    assert rise_y + 0.0035 <= iso_bottom - CLEAR_GAP_M - 0.001
     for side in (-1.0, 1.0):
         left = keyed.centre[0] + side * keyed_half
-        rider = (left, rise_y - 0.0035 - CLEAR_GAP_M, left + 0.0461, rise_y + 0.0035)
+        rider = (left, rise_y - 0.0045, left + 0.0461, rise_y + 0.0035)
         assert rider[2] <= template.width_m - margin - CLEAR_GAP_M
         for index, cell in enumerate(cells):
             if sections[index] is keyed:

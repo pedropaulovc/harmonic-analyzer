@@ -292,8 +292,8 @@ Monte Carlo of [`error_budget.yaml`](../config/error_budget.yaml) (4000 draws,
 zero-centred features uniform within ± tolerance per channel; `cone_flat_play`
 instead draws the physical .0004–.0012 in (0.01016–0.03048 mm) across-flat
 clearance around its 0.02032 mm mean on the T006–T024 D-flats, and `cone_key_play`
-the T030–T120 keyway side clearance on the MHA-DT-VN-71 key (0–.003 in,
-`cone_land_key.KEYWAY_SIDE_CLEARANCE_MM`) about its 0.0381 mm mean — `class: channel` drawn once per draw and shared by every trial,
+the T030–T120 keyway side clearance on the MHA-DT-VN-71 key (0–.004 in,
+`cone_land_key.KEYWAY_SIDE_CLEARANCE_MM`) about its 0.0508 mm mean — `class: channel` drawn once per draw and shared by every trial,
 `class: setup` (station setting) redrawn per trial as the operator resets the bars — applied to each bar's **physical hook waveform** at its
 station — so a gain error scales the channel's second harmonic, a phase error rotates it, and a
 kinematic deviation (eccentricity, the rod pin, the lever's bar pin and spring eye: `feature_axes`) **reshapes** it

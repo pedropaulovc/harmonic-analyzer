@@ -193,9 +193,9 @@ def test_bore_bands_are_the_current_derived_seat_fit_bands() -> None:
         assert spec.bore_dia_mm(teeth) == pytest.approx(
             dt_cone_gear_shaft_spec.SECTION_DIAS[spec.land_section(teeth)]
         )
-    # The keyway takes cone_land_key's bands: the broach's +.0010/-.0000
-    # width and T's +/-.0010, plain inch steps.
-    assert cone_land_key.KEYWAY_WIDTH_BAND == (0.0254, 0.0)
+    # The keyway takes cone_land_key's bands: the milled-width row's
+    # +.0020/-.0000 width and T's +/-.0010, plain inch steps.
+    assert cone_land_key.KEYWAY_WIDTH_BAND == (0.0508, 0.0)
     assert cone_land_key.KEYWAY_T_BAND == (0.0254, -0.0254)
     assert spec.KEYWAY_HALF_WIDTH_MM == cone_land_key.KEYWAY_WIDTH_MM / 2.0
 

@@ -44,12 +44,14 @@ LAND_DIA_MM = 9.525  # 3/8
 KEY_SIZE_MM = 1.5875  # 1/16
 KEY_STOCK_BAND = (0.0, -0.0508)  # +.000/-.002
 
-# Shaft keyseat: milled with a 1/16 end mill, width +.0010/-.0000, floor at
-# S = .3411 (+.0000/-.0020), .034 deep at the keyseat's centreline (the
+# Shaft keyseat: milled with a 1/16 end mill, width +.0020/-.0000 (the shop
+# table's milled-width row, .002 wide: the key slides in any keyseat a 1/16
+# end mill cuts, so the width needs no tighter band and no fit route), floor
+# at S = .3411 (+.0000/-.0020), .034 deep at the keyseat's centreline (the
 # research's square-key seat: half the key height below the land's surface at
 # the keyseat's edge).
 KEYSEAT_WIDTH_MM = KEY_SIZE_MM
-KEYSEAT_WIDTH_BAND = (0.0254, 0.0)  # +.0010/-.0000
+KEYSEAT_WIDTH_BAND = (0.0508, 0.0)  # +.0020/-.0000
 KEYSEAT_S_MM = 8.66394  # .3411
 KEYSEAT_S_BAND = (0.0, -0.0508)  # +.0000/-.0020
 KEYSEAT_PLACES = 4
@@ -57,11 +59,13 @@ KEYSEAT_PLACES = 4
 KEYSEAT_FLOOR_OFFSET_MM = KEYSEAT_S_MM - LAND_DIA_MM / 2.0
 KEYSEAT_DEPTH_MM = LAND_DIA_MM - KEYSEAT_S_MM  # .034 at the centreline
 
-# Hub keyway: one pass of a 1/16 A broach (width .0625-.0635), its top at
-# T = .4055 +/-.0010 from the bore's far side: .002 over the key at the
-# nominal bore (the research's KEY_CLEAR), never under zero at the limits.
+# Hub keyway: one pass of a 1/16 A broach, width +.0020/-.0000 (the shop
+# table's milled-width row, .002 wide; machinist review of PR #2331 at
+# 5994f29: a .001 band named no fit route), its top at T = .4055 +/-.0010
+# from the bore's far side: .002 over the key at the nominal bore (the
+# research's KEY_CLEAR), never under zero at the limits.
 KEYWAY_WIDTH_MM = KEY_SIZE_MM
-KEYWAY_WIDTH_BAND = (0.0254, 0.0)  # +.0010/-.0000
+KEYWAY_WIDTH_BAND = (0.0508, 0.0)  # +.0020/-.0000
 KEYWAY_T_MM = 10.2997  # .4055
 KEYWAY_T_BAND = (0.0254, -0.0254)  # +/-.0010
 KEYWAY_PLACES = 4
@@ -116,9 +120,11 @@ if min(KEYSEAT_SIDE_CLEARANCE_MM[0], KEYWAY_SIDE_CLEARANCE_MM[0]) < 0.0:
         "the key does not slide in its keyseat or keyways at the limits"
     )
 # The key stays in the keyseat: its bottom on the floor, at least half its
-# height below the land's surface at the keyseat's edge at every limit.
+# height below the land's surface at the keyseat's edge at every limit (the
+# widest keyseat on the smallest land, floor at its shallowest).
 _KEYSEAT_EDGE_DEPTH_MIN_MM = math.sqrt(
-    (LAND_DIA_MM / 2.0 - 0.0508 / 2.0) ** 2 - (KEYSEAT_WIDTH_MM / 2.0) ** 2
+    (LAND_DIA_MM / 2.0 - 0.0508 / 2.0) ** 2
+    - (limits(KEYSEAT_WIDTH_MM, KEYSEAT_WIDTH_BAND)[1] / 2.0) ** 2
 ) - (limits(KEYSEAT_S_MM, KEYSEAT_S_BAND)[1] - LAND_DIA_MM / 2.0)
 if _KEYSEAT_EDGE_DEPTH_MIN_MM < 0.45 * KEY_SIZE_MM:
     raise AssertionError(

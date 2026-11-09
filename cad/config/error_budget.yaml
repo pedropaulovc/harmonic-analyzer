@@ -127,7 +127,7 @@ reserved:
 monte_carlo:
   draws: 4000
   seed: 20260912
-  distribution: uniform          # deviations uniform within +/- tolerance; cone_flat_play is drawn about the fit's 0.02032 mm mean, cone_key_play about the keyway's 0.0381 mm mean
+  distribution: uniform          # deviations uniform within +/- tolerance; cone_flat_play is drawn about the fit's 0.02032 mm mean, cone_key_play about the keyway's 0.0508 mm mean
 
 # Channel-specific features. `tolerance` is the +/- half-width of the drawing
 # (or matching/setup) limit; `unit` is mm unless stated. `class`:
@@ -208,12 +208,12 @@ critical_features:
     class: channel
     holds: "D-bore across-flat fit on T006-T024: .0004-.0012 in (0.01016-0.03048 mm) clearance on every gear (gear_seat_fit.FLAT_AF_CLEARANCE), acting on the shortest flat half-chord MHA-DT-04 accepts (land at its least diameter and greatest AF) less the title block's 0.25 edge break on its torque corner (error_budget.phase_profiles); subtract the keyed Ø9.525 land's mean lag as a crank-index time shift, retain per-land residual and per-gear scatter"
   cone_key_play:
-    tolerance: 0.0381
+    tolerance: 0.0508
     unit: mm
     nominal: null
     quantity: phase
     class: channel
-    holds: "keyway side clearance on the MHA-DT-VN-71 key, T030-T120 (owner decision C1 keyed, 2026-11-09, PR #1992): 0-.003 in (0-0.0762 mm), keyway width less key width (cone_land_key.KEYWAY_SIDE_CLEARANCE_MM), drawn whole per gear though the one key's width is common to every gear and only the keyway width (+.001/-0) scatters; split about the key, so cranking one way turns a gear by half its clearance over the key's top, at the key's least height in the shallowest keyseat less the title block's 0.25 edge break (error_budget._key_levers); the keyed land's mean lag is the crank-index reference, so no residual"
+    holds: "keyway side clearance on the MHA-DT-VN-71 key, T030-T120 (owner decision C1 keyed, 2026-11-09, PR #1992): 0-.004 in (0-0.1016 mm), keyway width less key width (cone_land_key.KEYWAY_SIDE_CLEARANCE_MM), drawn whole per gear though the one key's width is common to every gear and only the keyway width (+.002/-0, the milled-width row) scatters; split about the key, so cranking one way turns a gear by half its clearance over the key's top, at the key's least height in the shallowest keyseat less the title block's 0.25 edge break (error_budget._key_levers); the keyed land's mean lag is the crank-index reference, so no residual"
   cone_land_clock:
     tolerance: 1.0
     unit: deg

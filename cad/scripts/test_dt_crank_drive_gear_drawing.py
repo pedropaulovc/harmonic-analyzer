@@ -645,7 +645,7 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
         drawing.FRONT_KEEP["KeywayT"], drawing.KEYWAY_T_CALLOUT, "0.4055 \N{PLUS-MINUS SIGN}0.0010"
     )
     width_keep = drawing.FRONT_KEEP["KeywayWidth"]
-    centred = _text_box(width_keep, drawing.KEYWAY_WIDTH_CALLOUT, "0.0625 +0.0010")
+    centred = _text_box(width_keep, drawing.KEYWAY_WIDTH_CALLOUT, "0.0625 +0.0020")
     shift = width_keep[0] - centred[0]
     keyway_width = (centred[0] + shift, centred[1], centred[2] + shift, centred[3])
     chamfer_keep = drawing.SECTION_KEEP["BoreSouthChamferSize"]

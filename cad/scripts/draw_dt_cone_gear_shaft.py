@@ -448,9 +448,12 @@ D_SECTION_KEEP = {
 # B-B's (from 0.3711), the 46 mm text standing over B's column.  Nothing
 # leaves room to move A-A that far (the Ø.4825 text holds its left side), so
 # the text rides one row above B's cell instead: its own box in the layout
-# proof, not inside A's cell, its foot ~5 mm over B's 0.1855 top and well
-# under the pictorial.
-KEYSEAT_WIDTH_RISE = 0.030
+# proof, not inside A's cell.  That row is measured (5994f29 r2): B's cell
+# top 0.1855, the pictorial's outline bottom 0.2001, and the text's box 4.5
+# mm under and 3.5 mm over its position (0.1905..0.1985 at 0.195, where it
+# crowded the pictorial).  The rise centres it in that 14.6 mm row: 3.3 mm
+# clear of each, 1.3 mm over CLEAR_GAP_M.
+KEYSEAT_WIDTH_RISE = 0.0283
 # The terminal flat's torque corners ride above its across-flat; the flats'
 # shared clock is in the land note (spec LAND_NOTE) with their fit.
 SECTION_ABOVE_CALLOUTS = {
