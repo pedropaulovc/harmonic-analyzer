@@ -315,6 +315,21 @@ def test_retention_rows_cite_the_package_steps() -> None:
     assert nut.installed_at == "MHA-SM-00 STEP 2"
 
 
+def _step_group(number: str) -> list[str]:
+    """The numbered step and its lettered sub-steps, in order."""
+    return [s for s in notes.ASSEMBLY_STEPS if drawing._step_group(s) == number]
+
+
+def test_steps_five_and_six_do_one_thing_a_sub_step() -> None:
+    # Rule 22 (integration review at 8fb7fb46f7): each sub-step of the
+    # hanger fit-up does one thing; its label is its only ". ".
+    for number in ("5", "6"):
+        group = _step_group(number)
+        assert len(group) > 1
+        for line in group:
+            assert line.count(". ") == 1, line
+
+
 def test_step_five_runs_each_hanger_bolt_home_by_hand_then_sets_the_gauge_pin() -> None:
     # Owner ruling 2026-10-27 (#2018 option C): accepted as is.  Each cut
     # bolt is run in by hand to its washer before it draws the mount's top
@@ -322,11 +337,13 @@ def test_step_five_runs_each_hanger_bolt_home_by_hand_then_sets_the_gauge_pin() 
     # #2144 item 11.3: with both bolts finger-tight the gauge pin through
     # both bores sets the mounts' yaw before they are tightened, and it must
     # slide back out (check 6).
-    step = next(s for s in notes.ASSEMBLY_STEPS if s.startswith("5. "))
+    step = " ".join(_step_group("5"))
+    assert step.startswith("5. ")
     assert "MHA-SM-VN-52" in step
     assert "WASHER" in step
     assert "WITHOUT THE LEVER" in step
     assert step.index("BY HAND") < step.index(notes.KNIFE_GAUGE_BAR) < step.index("TIGHTEN")
+    assert step.index("TIGHTEN") < step.index("WITHDRAW THE PIN")
     assert notes.KNIFE_GAUGE_BAR == "Ø.4720 CLASS ZZ MINUS GAUGE PIN"
     assert spec.KNIFE_GAUGE_BAR_DIA == pytest.approx(2.0 * builder.knife_mount.BORE_R_MIN)
     assert notes.KNIFE_GAUGE_BAR not in " ".join(notes.BOM_DESCRIPTIONS.values())
@@ -340,10 +357,10 @@ def test_rear_mount_is_rehung_on_the_lever_and_swung_to_the_rock_gauge() -> None
     # Coordinator ruling on the SM-00 order for #2144 item 11.3: the lever's
     # rigid stubs cannot enter two fixed bores, so the rear mount comes off,
     # takes its stub, is re-hung finger-tight and swung until check 2 passes.
-    step = next(s for s in notes.ASSEMBLY_STEPS if s.startswith("6. "))
+    step = " ".join(_step_group("6"))
     assert step.startswith("6. ") and "REAR MOUNT" in step
     assert (
-        step.index("LIFT THE MOUNT OFF")
+        step.index("LIFT THE REAR MOUNT OFF")
         < step.index("RE-HANG")
         < step.index("BY HAND")
         < step.index("SWING THE REAR MOUNT ABOUT ITS DOWEL")
@@ -376,7 +393,11 @@ def test_steps_and_checks_stay_above_the_inner_border() -> None:
     assert drawing.STEPS_XY[1] < drawing.SHEET_INNER_BORDER[3]
     assert drawing.STEPS_RIGHT < drawing.TITLE_BLOCK[0]
     split = notes.ASSEMBLY_STEPS.index(
-        next(s for s in notes.ASSEMBLY_STEPS if s.startswith("5. "))
+        next(
+            s
+            for s in notes.ASSEMBLY_STEPS
+            if s.startswith(f"{drawing.STEPS_CONTINUED_FROM}. ")
+        )
     )
     assert (
         drawing.STEPS_NOTE.split()
