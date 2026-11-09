@@ -746,15 +746,13 @@ def _holddown_x_text_box() -> tuple[float, float, float, float]:
 
 
 def _tip_dowel_x_text_box() -> tuple[float, float, float, float]:
-    """TipDowelX's text block, as HoldDownX's frame standing on its dimension
-    line, with its MATCHES MHA-DT-21 row one pitch above (rule-23 retention,
-    owner ruling 2026-11-07): centred on the keep x, the keep half a row over
-    the value's own point."""
+    """TipDowelX's text frame, as HoldDownX's: centred on the keep x and
+    standing on its dimension line (rule-23 retention, owner ruling
+    2026-11-07)."""
     x, y = drawing.DETAIL_KEEP["TipDowelX"]
-    w = max(drawing.TIP_DOWEL_X_TEXT_SIZE[0], drawing.TIP_DOWEL_X_CALLOUT_SIZE[0])
-    h = drawing.TIP_DOWEL_X_TEXT_SIZE[1]
-    line_y = y - drawing.TIP_DOWEL_X_ROW_PITCH / 2.0 - drawing.HOLDDOWN_X_LINE_DROP
-    return (x - w / 2.0, line_y, x + w / 2.0, line_y + drawing.TIP_DOWEL_X_ROW_PITCH + h)
+    w, h = drawing.TIP_DOWEL_X_TEXT_SIZE
+    line_y = y - drawing.HOLDDOWN_X_LINE_DROP
+    return (x - w / 2.0, line_y, x + w / 2.0, line_y + h)
 
 
 def _tip_dowel_callout_box() -> tuple[float, float, float, float]:
@@ -1556,12 +1554,15 @@ def test_tip_dowel_stays_chained_for_the_stack() -> None:
     face web both fall under the wall target; the chained station holds
     both, so it controls and the pivot-axis station is a reference.  One
     locating scheme per hole (rule 10; integration proof 20261109T105251629Z
-    read a controlling .188 beside it as a second one), and the band names
-    the mate whose tap-to-dowel spacing it matches (rule 4)."""
-    assert drawing.TIP_DOWEL_X_CALLOUT == "MATCHES MHA-DT-21"
+    read a controlling .188 beside it as a second one).  The spacing matches
+    MHA-DT-21's tap-to-dowel spacing, which note 3 names (rule 4); the .228
+    itself carries only its value and band (rule 7)."""
     assert spec.TIP_DOWEL_FROM_HOLDDOWN == block.DOWEL_FROM_TAP
+    flat = " ".join(row.strip() for row in drawing.TIP_DOWEL_NOTE.split("\n"))
+    assert f"SPACED TO MATCH {drawing.TIP_BLOCK_NUMBER}." in flat
+    assert drawing.TIP_BLOCK_NUMBER == "MHA-DT-21"
     drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert '{"TipDowelX": TIP_DOWEL_X_CALLOUT}, location="above"' in drawing_source
+    assert '{"TipDowelX":' not in drawing_source
     web = checks.TIP_DOWEL_WEBS["hold-down counterbore (underside)"]
     assert web >= WALL_TARGET_MM
     assert web - spec.HOLDDOWN_STATION_TOL_MM < WALL_TARGET_MM

@@ -387,10 +387,10 @@ HOLDDOWN_X_LINE_DROP = 0.00278
 # line under it, so neither witness crosses a dimension line.  The
 # controlling station stays TipDowelX from the hold-down hole (the stack
 # reason is at dt_cone_swing_platform_spec.TIP_DOWEL_STATION_TOL_MM): one
-# locating scheme per hole (rule 10).  Integration proof 20261109T062834910Z
-# read that as a chain, and 20261109T105251629Z read the .188 printed beside
-# it as a second controlling location; the latter's fix is this one when the
-# hole-to-hole spacing must be held, so TipDowelX names the mate it matches.
+# locating scheme per hole (rule 10).  Integration proof 20261109T105251629Z
+# read a controlling .188 beside it as a second location, the judge's fix
+# for a spacing the owner needs held is this one, and note 3 names the mate
+# the spacing matches (TIP_DOWEL_NOTE).
 TIP_DOWEL_PIVOT_X_TEXT_SIZE = (0.0160, 0.0035)
 TIP_DOWEL_PIVOT_X_LINE_Y = (
     DETAIL_HOLDDOWN_Y - HOLDDOWN_CLEARANCE_DIA / 2.0 * _DETAIL_S - 0.0011
@@ -429,16 +429,6 @@ _HOLDDOWN_X_TEXT_X = (
 # TipDowelX's dowel witness.
 DETAIL_TIP_DOWEL_X = DETAIL_CENTER[0] + TIP_DOWEL_LOCAL_X * _DETAIL_S
 TIP_DOWEL_X_TEXT_SIZE = (0.0240, 0.0035)
-# The banded spacing holds the plate's hold-down and dowel holes to the tip
-# block's own tap-to-dowel spacing, MHA-DT-21's DOWEL_FROM_TAP (rule 4: the
-# mate and the reason for a band tighter than a drilled hole's).  It stands
-# over the value, one row (5.45 mm pitch, 2.87 mm a glyph, as the ream's
-# rows) above it: the keep lifts half a row so the value stays on its line,
-# and moves left so the wider row's right end keeps the value's 1 mm off the
-# circle.
-TIP_DOWEL_X_CALLOUT = "MATCHES MHA-DT-21"
-TIP_DOWEL_X_CALLOUT_SIZE = (len(TIP_DOWEL_X_CALLOUT) * 0.00287, 0.0035)
-TIP_DOWEL_X_ROW_PITCH = 0.00545
 TIP_DOWEL_X_LINE_Y = (
     DETAIL_HOLDDOWN_Y + HOLDDOWN_CLEARANCE_DIA / 2.0 * _DETAIL_S + 0.0067
 )
@@ -447,7 +437,7 @@ _TIP_DOWEL_X_TEXT_X = (
     - math.sqrt(
         (DETAIL_SHEET_RADIUS + 0.001) ** 2 - (TIP_DOWEL_X_LINE_Y - DETAIL_CENTER[1]) ** 2
     )
-    - max(TIP_DOWEL_X_TEXT_SIZE[0], TIP_DOWEL_X_CALLOUT_SIZE[0]) / 2.0
+    - TIP_DOWEL_X_TEXT_SIZE[0] / 2.0
 )
 # Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
 # #2248).  The tip-block locating dowel's slip ream, under its
@@ -469,17 +459,22 @@ TIP_DOWEL_CALLOUT = "\n".join(
 # dt_pinion_lift_rod_spec.PIN_HOLE_CALLOUT): the hole slips over the dowel
 # MHA-DT-21 holds pressed, and is reamed to size through with the block on,
 # after MHA-DT-21's press ream has been drilled and reamed up through this
-# plate.  Two rows of at most TIP_DOWEL_NOTE_WIDTH characters under a hanging
-# indent; the step reference never breaks across rows.  Round 7's layout
-# audit measured 62 characters at 107.7 mm (x 221.6..329.3 mm), 7.6 mm into
-# the box of the section A-A label above it (from x 321.7 mm).  The callout's
-# SEE NOTE 3 names the hole, so the note opens on the fit; its longest row
-# is 50 characters, about 97 mm.
+# plate.  Its banded spacing from the hold-down hole matches the block's own
+# tap-to-dowel spacing (dt_cone_tip_block_spec.DOWEL_FROM_TAP), so the note
+# names that mate (rule 4); words on the .228 itself read as a location
+# carrying words (rule 7; proof run 20261109T134133430Z, 3 of 3 runs).  Two
+# rows of at most TIP_DOWEL_NOTE_WIDTH characters under a hanging indent; the
+# step reference never breaks across rows.  Round 7's layout audit measured
+# 62 characters at 107.7 mm (x 221.6..329.3 mm), 7.6 mm into the box of the
+# section A-A label above it (from x 321.7 mm).  The callout's SEE NOTE 3
+# names the hole, so the note opens on the fit; its longest row is 50
+# characters, about 97 mm.
 TIP_DOWEL_NOTE_WIDTH = 55
+TIP_BLOCK_NUMBER = _config.parts("dt-cone-tip-block")["number"]
 _NBSP = "\u00a0"
 TIP_DOWEL_NOTE = textwrap.fill(
-    f"SLIDING FIT ON {TIP_DOWEL_PIN_NUMBER}. MATCH-REAM THRU AT "
-    f"{step_ref('post-and-tip-block').replace(' ', _NBSP)}.",
+    f"SLIDING FIT ON {TIP_DOWEL_PIN_NUMBER}, SPACED TO MATCH {TIP_BLOCK_NUMBER}. "
+    f"MATCH-REAM THRU AT {step_ref('post-and-tip-block').replace(' ', _NBSP)}.",
     width=TIP_DOWEL_NOTE_WIDTH,
     initial_indent=f"{TIP_DOWEL_NOTE_NUMBER}. ",
     subsequent_indent="   ",
@@ -509,10 +504,7 @@ TIP_DOWEL_CALLOUT_LOWER_LEFT = (
 DETAIL_KEEP = {
     "HoldDownZ": (0.044, DETAIL_HOLDDOWN_Y + 0.0045),
     "HoldDownX": (_HOLDDOWN_X_TEXT_X, HOLDDOWN_X_LINE_Y + HOLDDOWN_X_LINE_DROP),
-    "TipDowelX": (
-        _TIP_DOWEL_X_TEXT_X,
-        TIP_DOWEL_X_LINE_Y + HOLDDOWN_X_LINE_DROP + TIP_DOWEL_X_ROW_PITCH / 2.0,
-    ),
+    "TipDowelX": (_TIP_DOWEL_X_TEXT_X, TIP_DOWEL_X_LINE_Y + HOLDDOWN_X_LINE_DROP),
     "TipDowelPivotX": (
         _TIP_DOWEL_PIVOT_X_TEXT_X,
         TIP_DOWEL_PIVOT_X_LINE_Y + HOLDDOWN_X_LINE_DROP,
@@ -569,9 +561,13 @@ RELIEF_FLAG = f"SEE NOTE {RELIEF_NOTE_NUMBER}"
 NOTE_CHAR_HEIGHT = 0.0025
 NOTE_ROW_HEIGHT = 0.0044
 NOTE_WIDTH = 58
+# The relief's closed end is a full R concentric with the pivot bore: the .42
+# width alone left its centre and radius unstated (proof run
+# 20261109T134133430Z, blocker, 2 of 3 runs).  The note, flagged from the
+# relief depth in section A-A, states it before the fit; three rows.
 RELIEF_NOTE = textwrap.fill(
-    "FIT TOP RELIEF DEPTH TO MHA-DT-VN-52 SHOULDER: "
-    "SWINGS FREE, NO AXIAL SHAKE.",
+    "TOP RELIEF: FULL R END, CONCENTRIC WITH THE PIVOT BORE. "
+    "FIT ITS DEPTH TO MHA-DT-VN-52 SHOULDER: SWINGS FREE, NO AXIAL SHAKE.",
     width=NOTE_WIDTH,
     initial_indent=f"{RELIEF_NOTE_NUMBER}. ",
     subsequent_indent="   ",
@@ -2339,9 +2335,6 @@ def _place_holes_sheet(adapter: Any) -> list[Any]:
     # banded size and the flag to note 3 (rule-23 retention, owner ruling
     # 2026-11-07 (MHA-DT-00 rubric sample, PR #2248); round 6, #7).
     set_dimension_callouts(adapter, detail_annotations, {"TipDowelDia": TIP_DOWEL_CALLOUT})
-    set_dimension_callouts(
-        adapter, detail_annotations, {"TipDowelX": TIP_DOWEL_X_CALLOUT}, location="above"
-    )
     # Its station from the pivot-bore axis is a reference (round 6, #6); the
     # chained TipDowelX controls (dt_cone_swing_platform_spec.
     # TIP_DOWEL_STATION_TOL_MM says why).
