@@ -821,7 +821,9 @@ def test_the_knife_edge_prints_its_ridge_and_flanks_to_the_sides() -> None:
     to its side face, on both stubs; the width is a reference."""
     spec = sm_summing_lever_spec
     knife = notes.DRAWING_DIMENSIONS["KnifeEnvelopeReference"]
-    assert knife == {"HexWidth", "HexHeight", "RidgeFromLeft", "RidgeFromRight", "FlankToSide"}
+    assert knife == {
+        "HexWidth", "HexHeight", "RidgeFromLeft", "RidgeFromRight", "FlankToSide", "LowerFlankToSide",
+    }
     assert set(knife) <= set(drawing.DETAIL_KEEP)
     assert "KnifeRidgeRadius" in drawing.DETAIL_KEEP
     prefixes = notes.DIMENSION_PREFIXES
@@ -829,6 +831,9 @@ def test_the_knife_edge_prints_its_ridge_and_flanks_to_the_sides() -> None:
     for name in ("HexHeight", "RidgeFromLeft", "RidgeFromRight"):
         assert prefixes[("KnifeEnvelopeReference", name)] == "EACH STUB "
     assert prefixes[("KnifeEnvelopeReference", "FlankToSide")] == "2X PER STUB "
+    # The lower corners close the hexagon at the title block's angular row.
+    assert prefixes[("KnifeEnvelopeReference", "LowerFlankToSide")] == "2X PER STUB "
+    assert "LowerFlankToSide" not in notes.DIMENSION_CALLOUTS_BELOW
     assert prefixes[("KnifeRidgeFillet", "KnifeRidgeRadius")] == "EACH STUB R"
     # The knife envelope's bands link one note naming their seat once (rule
     # 4); EACH STUB states the multiplicity without a multiline prefix.
@@ -1336,7 +1341,9 @@ def _detail_block(name: str, value: str) -> tuple[float, float, float, float, in
     lines = [*value.split("\n"), *notes.DIMENSION_CALLOUTS_BELOW.get(name, "").split("\n")]
     lines = [line for line in lines if line]
     # The angular arc keeps its native exterior seed; only its text is offset.
-    x, y = drawing.FLANK_TEXT_XY if name == "FlankToSide" else drawing.DETAIL_KEEP[name]
+    x, y = {
+        "FlankToSide": drawing.FLANK_TEXT_XY, "LowerFlankToSide": drawing.LOWER_FLANK_TEXT_XY,
+    }.get(name, drawing.DETAIL_KEEP.get(name))
     half_w = _CHAR_M * max(map(len, lines)) / 2.0
     half_h = _LINE_M * len(lines) / 2.0
     return x - half_w, x + half_w, y - half_h, y + half_h, len(lines)
@@ -1348,7 +1355,7 @@ def _dimension_line_y(name: str, lines: int) -> float:
 
 def _knife_envelope_model_owners():
     """Read the native reference's endpoint owners, not left/right name guesses."""
-    lines, spans, angle_lines = {}, {}, None
+    lines, spans, angle_lines = {}, {}, []
     pending_span = None
 
     def endpoint(reference):
@@ -1387,9 +1394,9 @@ def _knife_envelope_model_owners():
                     assert pending_span is not None
                     spans[mark] = pending_span
             elif name == "add_angular_reference_dimension":
-                angle_lines = tuple(lines[argument.id] for argument in call.args[1:3])
+                angle_lines.append(tuple(lines[argument.id] for argument in call.args[1:3]))
     assert set(spans) == {"RidgeFromLeft", "RidgeFromRight"}
-    assert angle_lines is not None
+    assert len(angle_lines) == 2  # upper, then lower corner
     return spans, angle_lines
 
 
@@ -1401,7 +1408,7 @@ def test_back_projected_knife_detail_uses_model_owned_spans_and_exterior_angle()
     cx, cy = drawing.DETAIL_CENTER
     fence = drawing.DETAIL_RADIUS_MM * scale
     hw = spec.HEX_W / 2.0 * scale
-    spans, angle_lines = _knife_envelope_model_owners()
+    spans, (angle_lines, lower_lines) = _knife_envelope_model_owners()
     [model_vertex] = set(spans["RidgeFromLeft"]) & set(spans["RidgeFromRight"])
     [model_shoulder] = set(angle_lines[0]) & set(angle_lines[1])
     assert model_vertex in angle_lines[0]
@@ -1430,6 +1437,9 @@ def test_back_projected_knife_detail_uses_model_owned_spans_and_exterior_angle()
         ),
         "KnifeRidgeRadius": _detail_block(
             "KnifeRidgeRadius", f"EACH STUB R{inch(spec.KNIFE_RIDGE_R, spec.KNIFE_RIDGE_R_PLACES)} max.",
+        ),
+        "LowerFlankToSide": _detail_block(
+            "LowerFlankToSide", f"2X PER STUB {spec.KNIFE_FLANK_TO_SIDE_DEG:.1f}°",
         ),
     }
     for name, (left, _right, _bottom, top, _lines) in blocks.items():
@@ -1479,6 +1489,26 @@ def test_back_projected_knife_detail_uses_model_owned_spans_and_exterior_angle()
     assert drawing.DETAIL_KEEP["KnifeRidgeRadius"][0] - 0.0278 > 0.1554 + 0.002
     assert blocks["KnifeRidgeRadius"][2] > datum_foot + 0.007 + 0.004
     assert blocks["KnifeRidgeRadius"][3] < pair_line - 0.004
+    # The lower corner: the same +X side's shoulder, its arc in the exterior
+    # wedge, its one-row text below the height's bottom witness and left of
+    # the width's witness, the arc clear of the height text and width line.
+    [model_lower] = set(lower_lines[0]) & set(lower_lines[1])
+    [model_bottom] = set(lower_lines[0]) - {model_lower}
+    [model_side_top] = set(lower_lines[1]) - {model_lower}
+    lower, bottom, side_top = map(project, (model_lower, model_bottom, model_side_top))
+    assert lower[0] == pytest.approx(shoulder[0]) and bottom[0] == pytest.approx(vertex[0])
+    lower_x, lower_y = drawing.DETAIL_KEEP["LowerFlankToSide"]
+    direction = math.degrees(math.atan2(lower_y - lower[1], lower_x - lower[0])) % 360.0
+    from_flank = math.degrees(math.atan2(lower[1] - bottom[1], lower[0] - bottom[0])) % 360.0
+    from_side = math.degrees(math.atan2(lower[1] - side_top[1], lower[0] - side_top[0])) % 360.0
+    assert from_flank < direction < from_side
+    lower_radius = math.dist((lower_x, lower_y), lower)
+    assert lower[0] - lower_radius > blocks["HexHeight"][1] + 0.002
+    assert lower[1] - lower_radius > width_line + 0.002
+    left, right, _bottom, top, _ = blocks["LowerFlankToSide"]
+    assert top < bottom[1] - 0.002 and right < lower[0] - 0.002
+    assert left > _BORDER_LEFT_M + 0.002
+    assert _bottom > drawing.DETAIL_LABEL_XY[1]
 
 
 def test_knife_detail_is_cut_from_the_existing_receiver_view(monkeypatch) -> None:

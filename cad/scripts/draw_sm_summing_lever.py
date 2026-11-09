@@ -1107,34 +1107,37 @@ def _clear_ridge_witnesses(
             )
 
 
-def _place_flank_text(adapter: Any, annotations: list[Any]) -> None:
+def _place_flank_text(
+    adapter: Any, annotations: list[Any], name: str = "FlankToSide",
+    text_xy: tuple[float, float] | None = None,
+) -> None:
     """Keep the model-owned exterior angle arc; move its whole block off it.
 
     Use the trammel-point recipe's native angular shelf pattern. Merely
     translating the two-row text on the arc leaves its qualifier struck.
     """
-    name = "FlankToSide"
+    text_xy = FLANK_TEXT_XY if text_xy is None else text_xy
     matches = [raw for raw in annotations if dimension_name(adapter, raw) == name]
     if len(matches) != 1:
-        raise RuntimeError("knife detail needs one native FlankToSide")
+        raise RuntimeError(f"knife detail needs one native {name}")
     annotation = _early_bound(matches[0], "IAnnotation")
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
     display.OffsetText = False
     if display.OffsetText is not False:
-        raise RuntimeError("FlankToSide: inherited text offset could not be reset")
+        raise RuntimeError(f"{name}: inherited text offset could not be reset")
     arc_xy = DETAIL_KEEP[name]
     if annotation.SetPosition2(*arc_xy, 0.0) is not True:
-        raise RuntimeError("FlankToSide: native exterior arc placement was refused")
+        raise RuntimeError(f"{name}: native exterior arc placement was refused")
     position = annotation.GetPosition()
     if not position or math.dist(tuple(position[:2]), arc_xy) > 1e-5:
-        raise RuntimeError("FlankToSide: native exterior arc placement did not persist")
-    offset_dimension_text(adapter, [annotation], {name: FLANK_TEXT_XY})
+        raise RuntimeError(f"{name}: native exterior arc placement did not persist")
+    offset_dimension_text(adapter, [annotation], {name: text_xy})
     position = annotation.GetPosition()
     if (
         display.OffsetText is not True or not position
-        or math.dist(tuple(position[:2]), FLANK_TEXT_XY) > 1e-5
+        or math.dist(tuple(position[:2]), text_xy) > 1e-5
     ):
-        raise RuntimeError("FlankToSide: complete angular text did not stay on its shelf")
+        raise RuntimeError(f"{name}: complete angular text did not stay on its shelf")
 
 
 def _plate_thickness_check(
@@ -1757,6 +1760,10 @@ DETAIL_KEEP = {
     # (machinist review 41bbeec): seeded nearer the upper end, it lands on
     # the arc's upper part, below and right of the shelf, outside the arc.
     "FlankToSide": (0.0653, 0.1918),
+    # The lower corner's arc and shelf mirror the upper pair's about the
+    # side faces' midpoint (Y150 mm): its one-row text below the height's
+    # Y98.66 witness.
+    "LowerFlankToSide": (0.0653, 0.1082),
     "KnifeRidgeRadius": (0.186, 0.219),
 }
 # Keep the native arc radius. R3's low shelf routed through the final SEAT T.
@@ -1764,6 +1771,7 @@ DETAIL_KEEP = {
 # X74.5999 ridge witness. Keep the per-stub count and value on one line;
 # verify the unchanged arc's connector and the complete text in the PDF.
 FLANK_TEXT_XY = (0.04365, 0.211)
+LOWER_FLANK_TEXT_XY = (0.04365, 0.089)
 RIDGE_WITNESS_GAP = 0.010
 TOP_KEEP = {
     # The model width is authored at the plan's middle Z. Its native
@@ -2352,6 +2360,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _apply_callouts(adapter, detail_annotations, label="knife detail")
     _clear_ridge_witnesses(adapter, detail, detail_annotations)
     _place_flank_text(adapter, detail_annotations)
+    _place_flank_text(adapter, detail_annotations, "LowerFlankToSide", LOWER_FLANK_TEXT_XY)
     back_edges = scan_view_edges(back, label="bracket receiver face")
     mounting_rims = _mounting_rims(back_edges)
     # Below VIEW F, clear of the receiver stations and the detail's width.

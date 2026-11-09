@@ -1933,8 +1933,9 @@ async def _knife_envelope_reference(adapter, drive_jobs: list[tuple[str, str]]) 
     seat needs.  Construction lines carry them off the same globals: the
     vertex line (HexHeight), the shoulder line between the upper shoulders
     (the ridge sharp from each end, RidgeFromLeft/Right; HexWidth a driven
-    reference), and the +X upper flank and side face (FlankToSide, driven).
-    The part saves the sketch hidden and the drawing shows it only in
+    reference), the +X upper flank and side face (FlankToSide, driven), and
+    the +X lower flank and side face (LowerFlankToSide, driven, at the title
+    block's angular tolerance).  The part saves the sketch hidden and the drawing shows it only in
     Detail D (code review C09, owner ruling T1)."""
     from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
@@ -1957,13 +1958,24 @@ async def _knife_envelope_reference(adapter, drive_jobs: list[tuple[str, str]]) 
         "knife-envelope +X side face",
         await adapter.add_line(HEX_W / 2.0, HEX_H / 4.0, HEX_W / 2.0, 0.0),
     )
+    # The lower half: the side face's other half and the +X lower flank to
+    # the bottom vertex, so the lower corner's angle can print.
+    lower_side = check(
+        "knife-envelope +X lower side face",
+        await adapter.add_line(HEX_W / 2.0, 0.0, HEX_W / 2.0, -HEX_H / 4.0),
+    )
+    lower_flank = check(
+        "knife-envelope +X lower flank",
+        await adapter.add_line(HEX_W / 2.0, -HEX_H / 4.0, 0.0, -HEX_H / 2.0),
+    )
     set_sketch_direct_db(adapter, False)
-    for entity in (width, height, flank, side):
+    for entity in (width, height, flank, side, lower_side, lower_flank):
         _as_construction(adapter, entity)
     for entity, relation in (
         (width, "horizontal"),
         (height, "vertical"),
         (side, "vertical"),
+        (lower_side, "vertical"),
     ):
         check(
             f"knife-envelope {entity} {relation}",
@@ -1973,11 +1985,18 @@ async def _knife_envelope_reference(adapter, drive_jobs: list[tuple[str, str]]) 
         (f"{flank}.start", f"{height}.end"),
         (f"{flank}.end", f"{width}.end"),
         (f"{side}.start", f"{width}.end"),
+        (f"{lower_side}.start", f"{side}.end"),
+        (f"{lower_flank}.start", f"{lower_side}.end"),
+        (f"{lower_flank}.end", f"{height}.start"),
     ):
         check(
             f"knife-envelope {first} on {second}",
             await adapter.add_sketch_constraint(first, second, "coincident"),
         )
+    check(
+        "knife-envelope side halves equal",
+        await adapter.add_sketch_constraint(lower_side, side, "equal"),
+    )
     check(
         "knife-envelope side foot level with the origin",
         await adapter.add_sketch_constraint(
@@ -2037,6 +2056,17 @@ async def _knife_envelope_reference(adapter, drive_jobs: list[tuple[str, str]]) 
         expected_degrees=180.0 - RIDGE_ANGLE_DEG / 2.0,
     )
     knife.record("FlankToSide")
+    # The lower corner at the title block's angular tolerance; its text in
+    # the exterior wedge below the +X lower shoulder.
+    await add_angular_reference_dimension(
+        adapter,
+        lower_flank,
+        lower_side,
+        (HEX_W / 2.0 + 2.0, -HEX_H / 4.0 - 0.6),
+        "knife lower flank to side face",
+        expected_degrees=180.0 - RIDGE_ANGLE_DEG / 2.0,
+    )
+    knife.record("LowerFlankToSide")
     await ensure_fully_defined(adapter, "knife-envelope reference sketch")
     check("exit knife-envelope reference", await adapter.exit_sketch())
     name_last_feature(adapter, "KnifeEnvelopeReference")
@@ -2169,6 +2199,7 @@ def _drawing_dimension_contract(adapter) -> None:
     # own tolerances; the vertex height the title block's .XXX (the envelope's
     # places are DRAWING_PRECISION's).
     set_dimension_display_precision(adapter, "KnifeEnvelopeReference", "FlankToSide", 1)
+    set_dimension_display_precision(adapter, "KnifeEnvelopeReference", "LowerFlankToSide", 1)
     for name in ("RidgeFromLeft", "RidgeFromRight"):
         set_dimension_symmetric_tolerance(
             adapter, "KnifeEnvelopeReference", name, RIDGE_FROM_SIDE_TOL,

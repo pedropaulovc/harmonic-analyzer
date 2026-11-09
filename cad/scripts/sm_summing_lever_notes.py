@@ -44,6 +44,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "RidgeFromLeft",
         "RidgeFromRight",
         "FlankToSide",
+        "LowerFlankToSide",
     },
 }
 
@@ -69,6 +70,7 @@ DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
     ("KnifeEnvelopeReference", "RidgeFromLeft"): "EACH STUB ",
     ("KnifeEnvelopeReference", "RidgeFromRight"): "EACH STUB ",
     ("KnifeEnvelopeReference", "FlankToSide"): "2X PER STUB ",
+    ("KnifeEnvelopeReference", "LowerFlankToSide"): "2X PER STUB ",
     # A linear dimension across the plan's cylinder band prints no Ø itself.
     ("CylinderReference", "CylinderDia"): "<MOD-DIAM>",
 }
