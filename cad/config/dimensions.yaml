@@ -1182,9 +1182,9 @@ sections:
         - 'ch. 15 notes + assembly solve (level rest pose); ch30 px measurement anchored on column pitch + GT rescale + ch19 closeups (2026-08-02 rederive)'
         - measured/med
       - - Springs (default)
-        - 'McMaster 9432K31, catalogue inside-hook length (not coil-body length): neutral analytic length 64.319119 mm and force 4.378157 N from spring_mount_geom.channel_pose(0), with lower/upper eye centres approximately (24.850028,998.407800)/(24.850317,1057.697719) mm. Owner issue #2129 centres the 7.00 mm coefficient plate at local Y±3.50: lower anchor and underside jam nut rise 0.96 mm while the channel lever stays fixed. This shortens the spring and changes counter balance; the old native seats require full neutral/square recalibration before assembled acceptance.'
+        - 'McMaster 9432K31, catalogue inside-hook length (not coil-body length): neutral analytic length 64.319119 mm and force 4.378157 N from spring_mount_geom.channel_pose(0), with lower/upper eye centres approximately (24.850028,998.407800)/(24.850317,1057.697719) mm. Owner issue #2129 centres the 7.00 mm coefficient plate at local Y±3.50: lower anchor and underside jam nut rise 0.96 mm while the channel lever stays fixed. Native fixture recalibration on 2026-11-09 measured the neutral channel inside length at 64.320894940 mm and re-measured all neutral/square channel and counter seats; saved-assembly contact and clearance gates remain required.'
         - 'cad/scripts/spring_mount_geom.py, ch_vn_channel_spring_stock_geom.py and cad/config/machine/springs.yaml; owner centring decision #2129'
-        - derived analytic geometry; native recalibration required
+        - derived analytic geometry + native fixture calibration
       - - Default mechanism state
         - 'gear notches near +Y with the drive-train''s preserved +1.5° local-Y tooth phase → cam centres at (−60.167, 99.155) = drum (−60.394, 90.518) + 8.64·(sin 1.5°, cos 1.5°). The asymmetric cylinder bodies are Ry180 end-for-end, putting each cam plane at z_j −3.25; 163.101 rods reach the level-arm pins. 0 cranks = cos mode reading +1 on every channel.'
         - ch. 13/14 end views + ch. 25 + assembly solve (ch14 ROM re-derive 2026-07-02)
