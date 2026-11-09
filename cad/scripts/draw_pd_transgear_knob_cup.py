@@ -123,11 +123,19 @@ BORE_CALLOUT = (
     f"SLIDING FIT ON {SHAFT_NUMBER}\n"
     f"(CLEARANCE {BORE_CLEARANCE_TEXT})"
 )
-DIMENSION_CALLOUTS = {"BoreDia": BORE_CALLOUT}
+# The block hangs right of its own vertical dimension line, which drops to
+# the shelf under the block's last row: the line struck the S of SLIDING and
+# the shelf both parentheses' tails (machinist review r1-r3, text on lines).
+# A leading space on every row holds the ink off the line
+# (draw_ch_fulcrum_shaft's across-flat block), and a closing no-break-space
+# row drops the shelf a row below the parentheses.
+BORE_CALLOUT_ROWS = "\n".join(f" {row}" for row in BORE_CALLOUT.splitlines()) + "\n\u00a0"
+DIMENSION_CALLOUTS = {"BoreDia": BORE_CALLOUT_ROWS}
 
 # Half the height of the bore's value-and-callout block: 31 mm on the
-# eecbf88 render for the stacked band over four callout rows; three rows now.
-BORE_BLOCK_HALF_HEIGHT = 0.0130
+# eecbf88 render for the stacked band over four callout rows; three rows and
+# the shelf row now.
+BORE_BLOCK_HALF_HEIGHT = 0.0153
 # The O.D. on the rear-face side, between the face view and the section.
 # The bore right of the front face: its block (taller than the 24 mm between
 # the bore's extension lines) stands below the lower one, clear of the
