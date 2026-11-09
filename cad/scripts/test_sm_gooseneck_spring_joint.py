@@ -34,15 +34,15 @@ EDGE_BREAK = 0.010 * IN
 
 
 def test_catalogue_screw_and_washer_are_the_ruled_parts() -> None:
-    # Owner ruling 2026-11-08, #2144 item 11.4; both SKUs auto-selected after
-    # the owner's ask timed out, pending owner confirmation.  McMaster
-    # 91259A535, read live 2026-11-08 (1/4 x 3/8 shoulder, 10-24 x 3/8
-    # thread, B18.3); the washer McMaster 93475A250 (DIN 125 M6), read live
-    # the same day.
-    assert screw.SKU == "91259A535"
+    # Owner ruling 2026-11-08 (Pedro, #2144 item 11.4): keep the slotted
+    # design; slotted McMaster 91829A566 found by vendor search, pending owner
+    # confirmation, read live 2026-11-08 (1/4 -.001/0 x 3/8 +.002/0 precision
+    # shoulder, 10-24 x 3/8 thread); the washer McMaster 93475A250 (DIN 125
+    # M6), read live the same day.
+    assert screw.SKU == "91829A566"
     assert screw.SHOULDER_DIA == pytest.approx(0.250 * IN)
     assert screw.SHOULDER_LENGTH == pytest.approx(0.375 * IN)
-    assert screw.THREAD == "#10-24" and screw.THREAD_CLASS == "3A"
+    assert screw.THREAD == "#10-24" and screw.THREAD_CLASS == "2A"
     assert screw.THREAD_LENGTH == pytest.approx(0.375 * IN)
     assert washer.SKU == "93475A250"
     assert (washer.ID, washer.OD, washer.THICKNESS) == pytest.approx((6.4, 12.0, 1.6))
@@ -69,6 +69,22 @@ def test_washer_slides_on_the_shoulder_and_the_head_bears_on_it() -> None:
     overlap = screw.HEAD_DIA_MIN / 2.0 - washer.ID_MAX / 2.0 - float_max
     assert joint.HEAD_WASHER_OVERLAP_MIN == pytest.approx(overlap)
     assert joint.HEAD_WASHER_OVERLAP_MIN > 0.0
+    # The precision shoulder (6.35 MAX) in the DIN 125 M6 bore (6.40 MIN).
+    assert joint.WASHER_SHOULDER_CLEARANCE_MIN == pytest.approx(0.05)
+
+
+def test_the_slotted_screw_carries_the_counter_spring() -> None:
+    # 18-8 at the page's 70,000 psi: the spring's catalogue maximum load hung
+    # at the washer's face bends the undercut land (Ø3.3528) to about a third
+    # of the tensile rating; direct shear is negligible.
+    import spring_mount_geom
+
+    assert screw.TENSILE_STRENGTH_MPA == pytest.approx(482.633, abs=1e-3)
+    assert joint.LOAD_LEVER_MAX == joint.EYE_SPACE_MAX
+    bending, shear = joint.root_stress_mpa(spring_mount_geom.COUNTER_MAXIMUM_LOAD_N)
+    assert bending == pytest.approx(153.1, abs=0.1)
+    assert screw.TENSILE_STRENGTH_MPA / bending >= 3.0
+    assert shear < 10.0
 
 
 def test_the_eye_rides_free_between_end_face_and_washer() -> None:
@@ -86,8 +102,8 @@ def test_the_eye_rides_free_between_end_face_and_washer() -> None:
     assert joint.EYE_AXIAL_PLAY_MIN == pytest.approx(space_min - gooseneck.SPRING_EYE_GAP)
     assert joint.EYE_AXIAL_PLAY_MAX == pytest.approx(space_max - gooseneck.SPRING_EYE_GAP)
     assert 0.0 < joint.EYE_AXIAL_PLAY_MIN < joint.EYE_AXIAL_PLAY_MAX
-    assert joint.EYE_AXIAL_PLAY_MIN == pytest.approx(2.587, abs=0.001)
-    assert joint.EYE_AXIAL_PLAY_MAX == pytest.approx(3.371, abs=0.001)
+    assert joint.EYE_AXIAL_PLAY_MIN == pytest.approx(2.741, abs=0.001)
+    assert joint.EYE_AXIAL_PLAY_MAX == pytest.approx(3.295, abs=0.001)
     # B18.3's head fillet (Ø.276 MAX transition from the Ø.227 MIN neck) can
     # stand the washer's inner edge off the head face, never by more than the
     # fillet's radius.
@@ -133,10 +149,10 @@ def test_engagement_is_the_catalogue_thread_and_its_minor() -> None:
     full_end = screw.THREAD_LENGTH - 1.5 * screw.PITCH
     start = max(screw.THREAD_NECK_WIDTH_MAX, EDGE_BREAK)
     assert joint.ENGAGEMENT_MIN == pytest.approx(min(full_end, 0.43 * IN) - start)
-    assert joint.ENGAGEMENT_MIN == pytest.approx(0.2295 * IN)
+    assert joint.ENGAGEMENT_MIN == pytest.approx(5.6007, abs=1e-4)
     assert joint.ENGAGEMENT_MIN < 1.5 * screw.MAJOR_DIA
-    assert joint.ENGAGEMENT_CALLOUT_MIN == 0.229
-    assert joint.ENGAGEMENT_CALLOUT_D == 1.20
+    assert joint.ENGAGEMENT_CALLOUT_MIN == 0.220
+    assert joint.ENGAGEMENT_CALLOUT_D == 1.16
     assert joint.ENGAGEMENT_CALLOUT_MIN * IN <= joint.ENGAGEMENT_MIN
     assert joint.ENGAGEMENT_CALLOUT_D * screw.MAJOR_DIA <= joint.ENGAGEMENT_MIN
 

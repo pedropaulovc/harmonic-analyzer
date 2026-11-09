@@ -2,9 +2,10 @@
 
 Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: a thin washer under the
 shoulder screw's head, on its 1/4 shoulder, keeps the counter spring's upper
-eye (Ø.374 ID) from passing the Ø3/8 head.  SKU auto-selected after the
-owner's ask timed out, pending owner confirmation (with the screw's
-91259A535).
+eye (Ø.374 ID) from passing the Ø3/8 head.  Owner ruling 2026-11-08 (Pedro,
+#2144 item 11.4): keep the slotted design; slotted McMaster 91829A566 found
+by vendor search, pending owner confirmation, and this washer found for its
+shoulder.
 
 Source: https://www.mcmaster.com/93475A250/, read live 2026-11-08; page-stated
 fields only: 18-8 stainless steel general purpose washer for M6, DIN 125; ID

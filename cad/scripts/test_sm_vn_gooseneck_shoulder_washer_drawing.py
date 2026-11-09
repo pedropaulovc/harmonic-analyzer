@@ -2,8 +2,8 @@
 
 Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: a thin washer under the
 MHA-SM-VN-56 shoulder screw's head retains the counter spring's free upper
-eye (McMaster 93475A250, DIN 125 M6, read live 2026-11-08; auto-selected
-after the owner's ask timed out, pending owner confirmation).
+eye (McMaster 93475A250, DIN 125 M6, read live 2026-11-08; found by vendor
+search for the slotted 91829A566 shoulder, pending owner confirmation).
 """
 from __future__ import annotations
 

@@ -29,7 +29,7 @@ _COUNTER_ANCHOR_THREAD_LIMIT = smooth_annulus_limit_mm3(
 # this literal, test-pinned to build_sm_summing_assembly, to avoid broad
 # recipe cache keys.
 _KNIFE_HANGER_REACH = 8.9173
-# MHA-SM-VN-56's 10-24 thread (McMaster 91259A535, 3/8 long) in the #25
+# MHA-SM-VN-56's 10-24 thread (McMaster 91829A566, 3/8 long) in the #25
 # drill of the blind #10-24 tap in MHA-SM-01's solid end piece: the shoulder
 # seats on the end face, so the whole thread length stands in the tap (owner
 # ruling 2026-11-08 (Pedro), #2144 item 11.4: plain tap, no counterbore). A

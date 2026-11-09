@@ -251,7 +251,7 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "catalogue OD band, upper limit indexed for the carrier's thrust-seat "
         "chamfer-mouth check; the sheet prints it as untoleranced REF"
     ),
-    # #2144 item 11.4: McMaster 91259A535 / 93475A250 catalogue bands, indexed
+    # #2144 item 11.4: McMaster 91829A566 / 93475A250 catalogue bands, indexed
     # into MIN/MAX limits that sm_gooseneck_spring_joint charges; the sheets
     # print them as untoleranced REF.
     ("sm_vn_gooseneck_shoulder_screw_spec", "SHOULDER_DIA_BAND"): (

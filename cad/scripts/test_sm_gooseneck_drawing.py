@@ -316,7 +316,7 @@ def test_tap_callout_states_geometry_and_its_mate_within_four_rows() -> None:
         f"ENGAGEMENT {f'{joint.ENGAGEMENT_CALLOUT_MIN:.3f}'.lstrip('0')} MIN "
         f"({joint.ENGAGEMENT_CALLOUT_D:.2f}D)",
     ]
-    assert rows[1] == "ENGAGEMENT .229 MIN (1.20D)"
+    assert rows[1] == "ENGAGEMENT .220 MIN (1.16D)"
     assert spec.SCREW_NUMBER == "MHA-SM-VN-56"
     # No row longer than r7's 39-character row, which stood left of the arm
     # straight's text.

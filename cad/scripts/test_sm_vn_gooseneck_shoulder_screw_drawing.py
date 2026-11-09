@@ -1,9 +1,10 @@
 """SolidWorks-free physical and registry contracts for MHA-SM-VN-56.
 
 Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: the counter spring's upper
-eye rides free on the shoulder of McMaster 91259A535 (read live 2026-11-08;
-auto-selected after the owner's ask timed out, pending owner confirmation),
-seated on the MHA-SM-01 end face.
+eye rides free on the shoulder of the slotted McMaster 91829A566 (read live
+2026-11-08; owner ruling 2026-11-08 (Pedro, #2144 item 11.4): keep the
+slotted design; found by vendor search, pending owner confirmation), seated
+on the MHA-SM-01 end face.
 """
 from __future__ import annotations
 
@@ -23,14 +24,43 @@ from _fastener_catalog import FASTENERS
 STEM = "sm-vn-gooseneck-shoulder-screw"
 
 
-def test_envelope_volume_has_all_three_supplied_sections():
+def test_envelope_volume_has_all_three_supplied_sections_less_the_slot():
+    radius, half = spec.HEAD_DIA / 2.0, spec.SLOT_WIDTH / 2.0
+    # The slot removes the head's chord strip |y| <= SLOT_WIDTH / 2.
+    strip = 2.0 * (half * math.sqrt(radius**2 - half**2) + radius**2 * math.asin(half / radius))
+    assert part.SLOT_VOLUME == pytest.approx(strip * spec.SLOT_DEPTH)
+    assert strip == pytest.approx(spec.SLOT_WIDTH * spec.HEAD_DIA, rel=0.01)
     assert part.MODEL_VOLUME == pytest.approx(
         math.pi / 4.0 * (
             spec.SHOULDER_DIA**2 * spec.SHOULDER_LENGTH
             + spec.HEAD_DIA**2 * spec.HEAD_HEIGHT
             + spec.MAJOR_DIA**2 * spec.THREAD_LENGTH
         )
+        - part.SLOT_VOLUME
     )
+
+
+def test_driver_slot_is_cut_down_from_the_head_face(monkeypatch):
+    rectangles = AsyncMock()
+    monkeypatch.setattr(part, "define_centered_rectangle", rectangles)
+    monkeypatch.setattr(part, "ensure_fully_defined", AsyncMock())
+    monkeypatch.setattr(part, "check", lambda label, value: value)
+    names = []
+    monkeypatch.setattr(part, "name_last_feature", lambda _adapter, name: names.append(name))
+    monkeypatch.setattr(part, "blank_reference_geometry", lambda *args: None)
+    adapter = SimpleNamespace(
+        create_plane=AsyncMock(), create_sketch=AsyncMock(), exit_sketch=AsyncMock(),
+        create_cut_extrude=AsyncMock(),
+    )
+    asyncio.run(part._driver_slot(adapter))
+    plane = adapter.create_plane.call_args.args[0]
+    assert (plane.base_plane, plane.offset) == ("Front Plane", spec.LENGTH)
+    adapter.create_sketch.assert_awaited_once_with("SlotPlane")
+    assert rectangles.call_args.args[1:3] == (part.SLOT_SPAN / 2.0, spec.SLOT_WIDTH / 2.0)
+    assert part.SLOT_SPAN > spec.HEAD_DIA
+    cut = adapter.create_cut_extrude.call_args.args[0]
+    assert cut.depth == spec.SLOT_DEPTH and not cut.reverse_direction
+    assert names[-1] == part.SLOT_FEATURE == "DriverSlot"
 
 
 @pytest.mark.parametrize("offset,reverse", [(0.0, False), (9.525, False), (0.0, True)])
@@ -88,20 +118,28 @@ def test_counter_seat_certificate_names_this_screw():
 
 def test_supplier_dimensions_and_physical_contract():
     inch = 25.4
-    assert spec.SKU == "91259A535"
+    assert spec.SKU == "91829A566"
     assert spec.SHOULDER_DIA == pytest.approx(0.250 * inch)
-    assert spec.SHOULDER_DIA_BAND == pytest.approx((-0.002 * inch, -0.004 * inch))
+    assert spec.SHOULDER_DIA_BAND == pytest.approx((0.0, -0.001 * inch))
     assert spec.SHOULDER_LENGTH == pytest.approx(0.375 * inch)
-    assert spec.SHOULDER_LENGTH_BAND == pytest.approx((0.005 * inch, -0.005 * inch))
-    assert (spec.THREAD, spec.THREAD_CLASS) == ("#10-24", "3A")
+    assert spec.SHOULDER_LENGTH_BAND == pytest.approx((0.002 * inch, 0.0))
+    assert (spec.THREAD, spec.THREAD_CLASS) == ("#10-24", "2A")
     assert spec.MAJOR_DIA == pytest.approx(0.190 * inch)
     assert spec.PITCH == pytest.approx(inch / 24.0)
     assert spec.THREAD_LENGTH == pytest.approx(3 / 8 * inch)
     assert (spec.HEAD_DIA, spec.HEAD_HEIGHT) == pytest.approx((3 / 8 * inch, 3 / 16 * inch))
     assert spec.LENGTH == pytest.approx(spec.SHOULDER_LENGTH + spec.HEAD_HEIGHT)
-    # ASME B18.3's 1/4 row: the head's least Ø and the necks the joint charges.
+    assert spec.TENSILE_STRENGTH_MPA == pytest.approx(70_000 * 0.00689476)
+    # The slot and undercut: the same family's harvested vendor model.
+    import _mcmaster_91829a560 as family
+
+    assert (spec.SLOT_WIDTH, spec.SLOT_DEPTH) == (family.SLOT_W, family.SLOT_D)
+    assert (family.HEAD_DIA, family.HEAD_T) == pytest.approx((spec.HEAD_DIA, spec.HEAD_HEIGHT))
+    assert spec.THREAD_NECK_WIDTH_MAX == pytest.approx(family.UC_SPAN)
+    assert spec.THREAD_NECK_DIA_MIN == family.UC_LAND_DIA
+    assert spec.SLOT_DEPTH < spec.HEAD_HEIGHT
+    # ASME B18.3's 1/4 row as the conservative allowance the drawing omits.
     assert spec.HEAD_DIA_MIN == pytest.approx(0.357 * inch)
-    assert spec.THREAD_NECK_WIDTH_MAX == pytest.approx(0.083 * inch)
     assert spec.SHOULDER_NECK_DIA_MIN == pytest.approx(0.227 * inch)
     assert spec.HEAD_FILLET_TRANSITION_DIA_MAX == pytest.approx(0.276 * inch)
     assert spec.SHOULDER_NECK_DIA_MIN < spec.SHOULDER_DIA + min(spec.SHOULDER_DIA_BAND)
@@ -120,7 +158,7 @@ def test_native_supplier_witness_inventory():
         "SupplierShoulderLength": (-spec.SHOULDER_LENGTH, spec.SHOULDER_DIA / 2.0),
         "SupplierHeadDiameter": (-spec.LENGTH, -spec.HEAD_DIA / 2.0),
     }
-    assert spec.THREAD_NOTE == "10-24 UNC-3A\n(AS SUPPLIED)"
+    assert spec.THREAD_NOTE == "10-24 UNC-2A\n(AS SUPPLIED)"
 
 
 def test_build_uses_contract_dimensions_and_publishes_z_axis(monkeypatch):
@@ -136,7 +174,7 @@ def test_build_uses_contract_dimensions_and_publishes_z_axis(monkeypatch):
     monkeypatch.setattr(part, "apply_package_model_units", lambda *args, **kwargs: None)
     monkeypatch.setattr(part, "apply_custom_properties", lambda *args: None)
     for name in ("volume_check", "bbox_extent_check", "apply_material", "apply_color",
-                 "_supplier_references", "report_mass_properties"):
+                 "_supplier_references", "report_mass_properties", "_driver_slot"):
         monkeypatch.setattr(part, name, AsyncMock())
     saved = AsyncMock(return_value={"part": STEM})
     monkeypatch.setattr(part, "save_part_and_images", saved)
@@ -150,6 +188,7 @@ def test_build_uses_contract_dimensions_and_publishes_z_axis(monkeypatch):
     axis = adapter.create_axis.call_args.args[0]
     assert axis.mode == "two_planes"
     assert set(axis.planes) == {"Top Plane", "Right Plane"}
+    part._driver_slot.assert_awaited_once_with(adapter)
     part.volume_check.assert_awaited_once()
     saved.assert_awaited_once_with(adapter, STEM)
 

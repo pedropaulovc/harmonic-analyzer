@@ -1,11 +1,13 @@
-"""Build purchased MHA-SM-VN-56, the gooseneck shoulder screw (McMaster 91259A535).
+"""Build purchased MHA-SM-VN-56, the gooseneck shoulder screw (McMaster 91829A566).
 
 Datasheet-built nominal envelope, as the oblique trammel's pivot screw
 (build_ch_rocker_arm_tl_vn_oblique_pivot_screw): no vendor CAD, and no
-unreported edge, neck or socket form is inferred.  Axis +Z, origin on the
-shoulder end face; the nominal 10-24 thread envelope extends -Z.  Supplier
-sizes are model-owned construction references in a Right-plane sketch, in
-the final part frame, not claims of helical attachment.
+unreported edge, neck or undercut form is inferred.  Axis +Z, origin on the
+shoulder end face; the nominal 10-24 thread envelope extends -Z, and the
+straight driver slot (the spec's SLOT_WIDTH x SLOT_DEPTH) is cut across the
+head's end face, as build_dt_crank_handle_pivot_screw's.  Supplier sizes are
+model-owned construction references in a Right-plane sketch, in the final
+part frame, not claims of helical attachment.
 """
 from __future__ import annotations
 
@@ -14,7 +16,7 @@ import sys
 
 import _config
 import sm_vn_gooseneck_shoulder_screw_spec as part
-from _appearance import BAR_STEEL, apply_color, apply_material
+from _appearance import POLISHED_STEEL, apply_color, apply_material
 from _bought_revolve import stock_properties
 from _check import check
 from _com import _early_bound
@@ -30,6 +32,7 @@ from _part_save import save_part_and_images
 from _session import run_build
 from _sketch import SketchDims, blank_reference_sketches, ensure_fully_defined
 from _sketch_circle import define_circle
+from _sketch_rectangle import define_centered_rectangle
 from _supplier_screw_reference import _linear
 from _visibility import blank_reference_geometry
 
@@ -38,11 +41,21 @@ SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material
 AXIS_NAME = part.AXIS_NAME
 THREAD_FEATURE = "ThreadEnvelope"
+SLOT_FEATURE = "DriverSlot"
+# The slot runs along model X past the head on both sides.
+SLOT_SPAN = part.HEAD_DIA + 2.0
+_HEAD_R = part.HEAD_DIA / 2.0
+_SLOT_HALF = part.SLOT_WIDTH / 2.0
+# The head's chord strip under the slot, |y| <= SLOT_WIDTH / 2.
+SLOT_VOLUME = part.SLOT_DEPTH * 2.0 * (
+    _SLOT_HALF * math.sqrt(_HEAD_R**2 - _SLOT_HALF**2)
+    + _HEAD_R**2 * math.asin(_SLOT_HALF / _HEAD_R)
+)
 MODEL_VOLUME = math.pi / 4.0 * (
     part.SHOULDER_DIA**2 * part.SHOULDER_LENGTH
     + part.HEAD_DIA**2 * part.HEAD_HEIGHT
     + part.MAJOR_DIA**2 * part.THREAD_LENGTH
-)
+) - SLOT_VOLUME
 
 
 async def _ring(adapter, name, od, bore, length, *, offset=0.0, reverse=False):
@@ -67,6 +80,28 @@ async def _ring(adapter, name, od, bore, length, *, offset=0.0, reverse=False):
         ExtrusionParameters(depth=length, reverse_direction=reverse)
     ))
     name_last_feature(adapter, name)
+
+
+async def _driver_slot(adapter):
+    """Cut the straight slot down from the head's end face (z = LENGTH)."""
+    from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
+
+    check("slot plane", await adapter.create_plane(
+        CreatePlaneParameters(mode="offset", base_plane="Front Plane", offset=part.LENGTH)
+    ))
+    name_last_feature(adapter, "SlotPlane")
+    blank_reference_geometry(adapter, (("SlotPlane", "PLANE"),))
+    check("slot sketch", await adapter.create_sketch("SlotPlane"))
+    await define_centered_rectangle(adapter, SLOT_SPAN / 2.0, _SLOT_HALF, "driver slot")
+    await ensure_fully_defined(adapter, "driver slot")
+    check("slot exit", await adapter.exit_sketch())
+    name_last_feature(adapter, "SlotProfile")
+    # From the head's end face down into the head (-Z); a cut into air
+    # removes nothing, and the volume check after it refuses that.
+    check(SLOT_FEATURE, await adapter.create_cut_extrude(
+        ExtrusionParameters(depth=part.SLOT_DEPTH, reverse_direction=False)
+    ))
+    name_last_feature(adapter, SLOT_FEATURE)
 
 
 async def _supplier_references(adapter):
@@ -102,6 +137,7 @@ async def build(adapter) -> dict[str, str]:
     await _ring(adapter, "Shoulder", part.SHOULDER_DIA, 0.0, part.SHOULDER_LENGTH)
     await _ring(adapter, "Head", part.HEAD_DIA, 0.0, part.HEAD_HEIGHT, offset=part.SHOULDER_LENGTH)
     await _ring(adapter, THREAD_FEATURE, part.MAJOR_DIA, 0.0, part.THREAD_LENGTH, reverse=True)
+    await _driver_slot(adapter)
     check("publish axis", await adapter.create_axis(CreateAxisParameters(
         mode="two_planes", planes=["Top Plane", "Right Plane"]
     )))
@@ -110,9 +146,8 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, PART_NAME, MODEL_VOLUME, max(0.01, MODEL_VOLUME * 1e-5))
     await bbox_extent_check(adapter, PART_NAME, "z", part.LENGTH + part.THREAD_LENGTH)
     await apply_material(adapter, MATERIAL)
-    # Black oxide renders in the darkest named steel tone that keeps black
-    # edges readable (build_pn_pen_hanger).
-    await apply_color(adapter, BAR_STEEL)
+    # Passivated 18-8 stainless renders as the polished steel tone.
+    await apply_color(adapter, POLISHED_STEEL)
     apply_custom_properties(adapter, stock_properties(_config.parts(PART_NAME)))
     await _supplier_references(adapter)
     await report_mass_properties(adapter)

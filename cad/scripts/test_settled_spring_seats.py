@@ -241,7 +241,10 @@ def test_isolated_counter_provenance_identifies_the_whole_support(
     assert support["component"] == "sm-vn-gooseneck-shoulder-screw"
     assert support["number"] == "MHA-SM-VN-56"
     assert support["number"] == _config.parts(support["component"])["number"]
-    assert support["supplier_sku"] == "91259A535"
+    assert support["supplier_sku"] == "91829A566"
+    # The slotted head's driver slot (#2144 item 11.4), not the retired
+    # clamped eye's slot.
+    assert (support["drive_slot_width_mm"], support["drive_slot_depth_mm"]) == (1.524, 1.905)
     assert support["thread"] == "#10-24"
     assert support["pitch_mm"] == pytest.approx(25.4 / 24.0)
     assert support["major_dia_mm"] == pytest.approx(4.826)
@@ -271,6 +274,8 @@ def test_isolated_counter_provenance_identifies_the_whole_support(
         "shoulder_length_mm",
         "head_dia_mm",
         "head_height_mm",
+        "drive_slot_width_mm",
+        "drive_slot_depth_mm",
         "eye_gap_mm",
         "arm_end_x_mm",
         "spring_eye_x_mm",

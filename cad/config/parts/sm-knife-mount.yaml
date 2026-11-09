@@ -16,7 +16,7 @@ sm-knife-mount:
       kind: "accept"
       where: "the knife-bore position frame ⌖ Ø.008 | A | B"
       finding: "position frame over-specified (rule 5)"
-      reason: "Owner ruling 2026-11-08 (Pedro), #2144 item 11.3 (scheme S1): one dowel (datum B) and the screw hang the block, the slot and datum C are deleted, and the bore is located to A|B only; its yaw about B is left free on the part because the MHA-SM-00 gauge bar through both mounts' bores sets it at assembly and the rock gauge proves the 5.0 deg free rock (build_sm_summing_assembly). The Ø.008 bounds the bore's offset off its station, which the hanger-bolt float and rear-mount yaw budgets charge (owner-accepted knife-edge-system control). The #10-24 tap carries no frame, it is spotted through MHA-FR-02's #10 hole (delegated ruling 2026-11-07 (Main), owner review #2144, sm Q3)"
+      reason: "Owner ruling 2026-11-08 (Pedro), #2144 item 11.3 (scheme S1): one dowel (datum B) and the screw hang the block, the slot and datum C are deleted, and the bore is located to A|B only; its yaw about B is left free on the part because the MHA-SM-00 gauge bar through both mounts' bores sets it at assembly and the rock gauge proves the 5.0 deg free rock (build_sm_summing_assembly). The Ø.008 bounds the bore's offset off its station, which the hanger-bolt float and rear-mount yaw budgets charge (owner-accepted knife-edge-system control). The #10-24 tap carries no frame, it is spotted through MHA-FR-02's #10 hole (delegated ruling 2026-11-07 (Main), sm Q3; the SM-00 fit-up order OWNER CONFIRMED 2026-11-08 (Pedro), #2144 item 11.3)"
     - id: "RV-02"
       kind: "accept"
       where: "the knife-bore parallelism refinement ∥ .002 | A under the Ø.008 position frame"

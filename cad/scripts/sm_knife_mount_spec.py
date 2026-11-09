@@ -151,8 +151,9 @@ KNIFE_BORE_POSITION_TOL = GEOMETRIC_TOLERANCES_MM["knife-bore position"]
 KNIFE_BORE_PARALLELISM_TOL = GEOMETRIC_TOLERANCES_MM["knife-bore parallelism"]
 # The #10-24 tap is spotted through MHA-FR-02's #10 clearance hole with the
 # annealed block hung on its dowel, then drilled and tapped before
-# hardening (delegated ruling sm Q3, 2026-11-07 (Main), no precedent; owner
-# review #2144; pending owner confirmation): no position frame prints.  The
+# hardening (delegated ruling sm Q3, 2026-11-07 (Main); the SM-00 fit-up
+# order OWNER CONFIRMED 2026-11-08 (Pedro), #2144 item 11.3): no position
+# frame prints.  The
 # stacks keep charging the former Ø.005 zone as the transfer's residual
 # about the tap's nominal station (on the bore's vertical centre plane,
 # PIN_HOLE_X from B), and ``build_sm_summing_assembly``'s HANGER_SCREW_MISMATCH
