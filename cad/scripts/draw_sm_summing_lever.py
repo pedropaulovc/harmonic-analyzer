@@ -12,6 +12,8 @@ reaching to the tapped counter-spring anchor boss on the -X arm.  Both spring
 anchors are purchased eyebolts that thread straight into those taps, so the
 print controls thread identity and position, never a seat bore. Sheet 1
 shows the 1:2 end profile and top plan and a 1:4 shaded isometric.
+The plan's reference reach locates the visible middle-rib/web intersection,
+not the theoretical taper apex buried inside the counter web.
 Sheet 2 shows VIEW F at 1:1, a complete 10:1 knife detail D cut from that
 view, and a shaded underside isometric. VIEW F carries the blind bracket
 receivers, the uniform coefficient plate's visible free-end thickness and
@@ -55,6 +57,7 @@ from _drawing_dimensions import (
     assert_imported_precision,
     offset_dimension_text,
     set_dimension_callouts,
+    set_reference_dimension,
 )
 from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_edges import ViewEdge, ViewEdges, scan_view_edges
@@ -130,6 +133,8 @@ from sm_summing_lever_spec import (
     PLATE_L,
     PLATE_W,
     RIB_REACH,
+    RIB_T,
+    RIB_WRAP_R,
     RIDGE_ANGLE_DEG,
     SURFACE_FINISHES,
     TIP_X,
@@ -2141,6 +2146,38 @@ async def build(adapter: Any) -> dict[str, str]:
         label="anchor tap X location",
         entities=(ridge_axis, anchor_rim.edge),
         entity_types=ridge_entity_types,
+    )
+
+    # The negative flank is tangent to the pivot wrap and meets the web top
+    # before its theoretical apex reaches the boss axis. Dimension that real
+    # visible vertex, using the existing pivot reference rather than a sketch
+    # of the buried apex. Parentheses retain the sheet's inch units/precision
+    # without imposing another tolerance on this derived intersection.
+    counter_tip_label = "middle rib at counter web top"
+    counter_tip_x = TIP_X + COUNTER_WEB_T / 2.0 * math.sqrt(
+        TIP_X**2 - RIB_WRAP_R**2
+    ) / RIB_WRAP_R
+    counter_tip_point = (counter_tip_x, COUNTER_WEB_T / 2.0, RIB_T / 2.0)
+    counter_tip_vertex = top_edges.exact_vertex_at(
+        counter_tip_point, label=counter_tip_label,
+    )
+    counter_tip_xy = model_point_in_view(
+        adapter, top, _metres(counter_tip_point), label=counter_tip_label,
+    )
+    counter_tip_dimension = add_edge_dimension(
+        adapter, top, p0=ridge_dim_edge, p1=counter_tip_xy,
+        text_xy=(0.216, 0.0883), label=counter_tip_label,
+        orientation="horizontal", entity_types=("SKETCHSEGMENT", "VERTEX"),
+        entities=(ridge_axis, counter_tip_vertex),
+    )
+    assert_dimension_measures(
+        adapter, counter_tip_dimension, expected_mm=-counter_tip_x,
+        label=counter_tip_label, entities=(ridge_axis, counter_tip_vertex),
+        entity_types=("SKETCHSEGMENT", "VERTEX"),
+    )
+    set_reference_dimension(
+        adapter, _early_bound(counter_tip_dimension, "IDisplayDimension").GetAnnotation(),
+        label=counter_tip_label,
     )
 
     # Anchor-tap pattern control: datum B on the plate end the seed hole is

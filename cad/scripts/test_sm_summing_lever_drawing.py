@@ -898,6 +898,86 @@ def _drawing_function(name: str) -> ast.FunctionDef | ast.AsyncFunctionDef:
     )
 
 
+@pytest.mark.parametrize("endpoint", ["visible", "buried", "underside", "wrong_attachment"])
+def test_counter_taper_reference_uses_visible_web_top_vertex(identity, endpoint) -> None:
+    """The derived reference reaches the web intersection, never the buried apex."""
+    spec = sm_summing_lever_spec
+    tangent_x = spec.RIB_WRAP_R**2 / spec.TIP_X
+    tangent_y = spec.RIB_WRAP_R * math.sqrt(
+        1.0 - spec.RIB_WRAP_R**2 / spec.TIP_X**2
+    )
+    x = spec.TIP_X + (tangent_x - spec.TIP_X) * (
+        spec.COUNTER_WEB_T / 2.0 / tangent_y
+    )
+    assert f"{-x / 25.4:.2f}" == "2.32"
+    y = spec.COUNTER_WEB_T / 2.0
+    if endpoint == "buried":
+        x, y = spec.TIP_X, 0.0
+    elif endpoint == "underside":
+        y = -y
+    vertex, other_vertex, axis = object(), object(), object()
+    edge = ViewEdge(
+        object(), ((x, y, spec.RIB_T / 2.0), (x, y, -spec.RIB_T / 2.0)),
+        None, (vertex, other_vertex),
+    )
+    attached = other_vertex if endpoint == "wrong_attachment" else vertex
+    display = _dimension(-x, (axis, attached))
+    picks, references = [], []
+
+    def add(adapter, view, **kwargs):
+        assert adapter is identity and view is top
+        picks.append(kwargs)
+        return display
+
+    def reference(adapter, annotation, **kwargs):
+        assert adapter is identity and annotation is display.GetAnnotation()
+        references.append(kwargs)
+
+    body = _drawing_function("build").body
+    start = next(
+        index for index, node in enumerate(body)
+        if isinstance(node, ast.Assign)
+        and any(isinstance(target, ast.Name) and target.id == "counter_tip_label"
+                for target in node.targets)
+    )
+    stop = next(
+        index for index in range(start, len(body))
+        if isinstance(body[index], ast.Expr)
+        and isinstance(body[index].value, ast.Call)
+        and _call_name(body[index].value) == "set_reference_dimension"
+    )
+    block = ast.Module(body=body[start:stop + 1], type_ignores=[])
+    top = object()
+    scope = {
+        **vars(drawing), "adapter": identity, "top": top,
+        "top_edges": ViewEdges(label="top", edges=(edge,)),
+        "ridge_axis": axis, "ridge_dim_edge": (0.235, 0.175),
+        "model_point_in_view": lambda _adapter, _view, point, **_kw: point[:2],
+        "add_edge_dimension": add, "set_reference_dimension": reference,
+        "_early_bound": lambda value, _kind: value,
+    }
+    code = compile(block, "<counter taper reference>", "exec")
+    if endpoint != "visible":
+        match = "unmatched picks" if endpoint == "wrong_attachment" else "no exact visible vertex"
+        with pytest.raises(RuntimeError, match=match):
+            exec(code, scope)
+        assert not references
+        return
+    exec(code, scope)
+    assert len(picks) == len(references) == 1
+    assert picks[0]["entities"] == (axis, vertex)
+    assert picks[0]["entity_types"] == ("SKETCHSEGMENT", "VERTEX")
+    assert picks[0]["orientation"] == "horizontal"
+    assert picks[0]["p1"] == pytest.approx((x / 1000.0, y / 1000.0))
+    # Only the existing parenthesis formatter may change the presentation:
+    # no unit, precision, tolerance or numeric-text override in this block.
+    assert {_call_name(call) for call in _calls_in_order(block)} == {
+        "sqrt", "exact_vertex_at", "model_point_in_view", "_metres",
+        "add_edge_dimension", "assert_dimension_measures",
+        "set_reference_dimension", "_early_bound", "GetAnnotation",
+    }
+
+
 def test_layout_retains_six_views_on_two_sheets_without_a_section() -> None:
     """Pin the approved topology, not helper spelling or projection wiring."""
     calls = _calls_in_order(_drawing_function("build"))
