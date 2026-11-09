@@ -58,13 +58,57 @@ class Benchmark:
         return _early_bound(self.adapter.currentModel, "IModelDoc2")
 
     def feature(self, item):
+        import _telemetry
         from _com import _early_bound
         raw = _early_bound(self.model(), "IPartDoc").FeatureByName(item["name"])
         if raw is None:
-            raise RuntimeError(f"Missing keyed feature {item['key']}")
+            raise RuntimeError(f"Missing keyed feature {item['key']}: expected name={item['name']!r}")
         feature = _early_bound(raw, "IFeature")
-        if feature.Name != item["name"] or feature.GetTypeName2() != item["type"]:
-            raise RuntimeError(f"Native feature contract mismatch: {item}")
+        observed = {
+            "key": item["key"], "actual_name": str(feature.Name),
+            "raw_type": str(feature.GetTypeName2()),
+        }
+        # SDK GetTypeName2 explicitly requires GetTypeName only for ICE.
+        # Retain the raw answer even if querying the underlying kind fails.
+        _telemetry.event(f"{PREFIX}.feature_type_raw", **observed)
+        observed["effective_type"] = (
+            str(feature.GetTypeName()) if observed["raw_type"] == "ICE"
+            else observed["raw_type"]
+        )
+        _telemetry.event(f"{PREFIX}.feature_type", **observed)
+        mismatch = observed["actual_name"] != item["name"]
+        if item["key"] == "body":
+            # Manifest "Boss" is the closed recipe's semantic boss contract,
+            # not a requirement that every seat returns that native string.
+            # Boss/Extrusion are documented extrusion classes, never thin/cut
+            # classes. A matching string alone is insufficient.
+            mismatch |= observed["effective_type"] not in {"Boss", "Extrusion"}
+            if not mismatch:
+                definition = feature.GetDefinition()
+                if definition is None:
+                    raise RuntimeError(f"Missing extrusion definition: expected={item!r}, observed={observed!r}")
+                definition = _early_bound(definition, "IExtrudeFeatureData2")
+                observed.update({
+                    "is_boss": bool(definition.IsBossFeature()),
+                    "is_thin": bool(definition.IsThinFeature()),
+                    "both_directions": bool(definition.BothDirections),
+                    "reverse_direction": bool(definition.ReverseDirection),
+                    "forward_end_condition": int(definition.GetEndCondition(True)),
+                    "forward_depth_m": float(definition.GetDepth(True)),
+                })
+                definition = None  # Never retain feature-data objects across reopen.
+                _telemetry.event(f"{PREFIX}.extrusion_definition", **observed)
+                mismatch |= (
+                    not observed["is_boss"] or observed["is_thin"]
+                    or observed["both_directions"] or observed["reverse_direction"]
+                    or observed["forward_end_condition"] != 0  # swEndCondBlind
+                    or not math.isfinite(observed["forward_depth_m"])
+                    or observed["forward_depth_m"] <= 0
+                )
+        else:
+            mismatch |= observed["effective_type"] != item["type"]
+        if mismatch:
+            raise RuntimeError(f"Native feature contract mismatch: expected={item!r}, observed={observed!r}")
         return feature
 
     def dimension(self, key):
