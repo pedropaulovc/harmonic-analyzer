@@ -706,7 +706,8 @@ def test_post_screw_engagement_note_states_the_computed_exception() -> None:
         f"SEE NOTE {drawing.ENGAGEMENT_NOTE_NUMBER}" in drawing.POST_MOUNT_CALLOUT_BELOW
     )
     # The notes sit in the empty band above the title block (2.5 mm text,
-    # ~1.93 mm a character, 4.4 mm a line), note 1 over note 2.
+    # ~1.93 mm a character, 4.4 mm a line): note 1 alone on sheet 1, note 2
+    # over note 3 on sheet 2.
     def box(text: str, upper_left: tuple[float, float]) -> tuple[float, ...]:
         rows = text.split("\n")
         x, y = upper_left
@@ -714,14 +715,15 @@ def test_post_screw_engagement_note_states_the_computed_exception() -> None:
 
     engagement = box(drawing.ENGAGEMENT_NOTE, drawing.ENGAGEMENT_NOTE_XY)
     relief = box(drawing.RELIEF_NOTE, drawing.RELIEF_NOTE_XY_UPPER_LEFT)
+    dowel = box(drawing.TIP_DOWEL_NOTE, drawing.TIP_DOWEL_NOTE_XY)
     for note in (engagement, relief):
         assert note[0] > 0.2185 + 0.002  # plan caption row
         assert note[2] <= 0.342 - 0.002  # A-A label
         assert note[1] >= 0.066 + 0.004  # title block top
-    assert relief[1] >= engagement[3] - 1e-9
-    # Under the pivot bore callout's bottom row (r11 0.0926, shifted).
+    assert engagement[1] >= dowel[3] - 1e-9
+    # Under sheet 2's pivot bore callout's bottom row (r11 0.0926, shifted).
     shift = drawing.PIVOT_BORE_CALLOUT_XY[1] - 0.099
-    assert (0.0926 + shift) - relief[3] > 0.00357
+    assert (0.0926 + shift) - engagement[3] > 0.00357
 
 
 # Detail B's "10.45" (12 x 5 mm, 81788ce9's "11.00") hangs outward from its
@@ -1425,7 +1427,7 @@ def test_tip_dowel_ream_callout_flags_its_fit_note() -> None:
     """Machinist review of round 6, #7: the slip ream states its fit and the
     part it takes, by drawing number, and when it is match-reamed.  Under the
     banded size the callout keeps two rows, the process and the flag to
-    note 1; the note carries the fit, MHA-DT-VN-69, and the match-ream at
+    note 3; the note carries the fit, MHA-DT-VN-69, and the match-ream at
     the assembly step after MHA-DT-21's ream (the step's own "PER THEIR
     CALLOUTS" points here)."""
     import dt_drive_train_steps
@@ -1472,24 +1474,51 @@ def test_tip_dowel_ream_callout_flags_its_fit_note() -> None:
     assert rows_height <= drawing.TIP_DOWEL_CALLOUT_SIZE[1] + 1e-9
 
 
+def test_each_sheet_prints_the_notes_its_flags_name() -> None:
+    """Rule 7, integration proof run 20261109T062834910Z: the dowel note
+    printed on sheet 1 as a second note 1 while its SEE NOTE 1 flag stood in
+    detail B on sheet 2.  The notes number once across the drawing; sheet 1
+    (section A-A's relief flag) carries note 1, sheet 2 (the post-mount tap
+    callout and detail B's ream) notes 2 and 3."""
+    import inspect
+
+    numbers = (
+        drawing.RELIEF_NOTE_NUMBER,
+        drawing.ENGAGEMENT_NOTE_NUMBER,
+        drawing.TIP_DOWEL_NOTE_NUMBER,
+    )
+    assert numbers == (1, 2, 3)
+    assert drawing.RELIEF_NOTE.startswith("1. ")
+    assert drawing.ENGAGEMENT_NOTE.startswith("2. ")
+    assert drawing.TIP_DOWEL_NOTE.startswith("3. ")
+    assert drawing.RELIEF_FLAG == "SEE NOTE 1"
+    assert "SEE NOTE 2" in drawing.POST_MOUNT_CALLOUT_BELOW
+    assert drawing.TIP_DOWEL_CALLOUT.split("\n")[-1] == "SEE NOTE 3"
+    sheet_two = inspect.getsource(drawing._place_holes_sheet)
+    sheet_one = inspect.getsource(drawing.build).split("_place_holes_sheet(adapter)")[0]
+    for name in ("ENGAGEMENT_NOTE,", "TIP_DOWEL_NOTE,", "TIP_DOWEL_CALLOUT"):
+        assert name in sheet_two and name not in sheet_one, name
+    assert "RELIEF_NOTE," in sheet_one and "RELIEF_NOTE," not in sheet_two
+
+
 def test_tip_dowel_note_stands_in_the_band_over_the_title_block() -> None:
-    """Measured on the r6 render: the title block's top line at 0.0648, the
-    engagement note's ink from 0.0760 up, and A-A's SCALE 2:1 from x 0.332.
-    The note's first row inks 3.47 mm (the engagement note's), each further
-    row 4.4 mm."""
+    """Sheet 2, under note 2 (ink 0.0760..0.0795, the r6 render's): the
+    title block's top line at 0.0648 (r6).  The note's first row inks 3.47
+    mm (the engagement note's), each further row 4.4 mm."""
     x, y = drawing.TIP_DOWEL_NOTE_XY
     rows = drawing.TIP_DOWEL_NOTE.split("\n")
     bottom = y - 0.00347 - (len(rows) - 1) * drawing.TIP_DOWEL_NOTE_ROW_HEIGHT
     right = x + max(map(len, rows)) * drawing.TIP_DOWEL_NOTE_GLYPH_WIDTH
     assert x == drawing.ENGAGEMENT_NOTE_XY[0]
-    assert y <= 0.0760 - 0.0015
+    engagement_ink_bottom = drawing.ENGAGEMENT_NOTE_XY[1] - 0.0035
+    assert engagement_ink_bottom == pytest.approx(0.0760)
+    assert y <= engagement_ink_bottom - 0.0015
     assert bottom >= 0.0648 + 0.0015
     assert x > 0.2185 + 0.002  # plan caption row
     assert right < 0.4191 - 0.002  # the sheet's inner border
-    # Round 7's layout audit: the section A-A label's box starts at x 0.3217
-    # and reaches down to y 0.0744, inside the note's first row.
-    assert right < 0.3217 - 0.002
-    # Under A-A's SCALE 2:1 (ink 0.0760..0.0795 from x 0.332) by the same air.
+    # Clear of the pivot bore callout's left end (x ~0.1666) above, and of
+    # detail B's callout block (right end ~0.152) to the left.
+    assert x > 0.152 + 0.002
     assert drawing.TIP_DOWEL_NOTE_CHAR_HEIGHT == 0.0025
 
 
