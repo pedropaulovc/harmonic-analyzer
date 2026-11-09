@@ -370,7 +370,7 @@ DETAIL_HOLDDOWN_X = DETAIL_CENTER[0] + HOLDDOWN_LOCAL_X * _DETAIL_S
 # (" 1.00 ±0.1 ", spaces included) 21.96 x 3.5 mm, centred on the keep x
 # and standing on the dimension line, 2.78 mm under the keep y.  Its line
 # passed 1.1 mm under the hole's rim until round 7: that band now carries
-# the tip dowel's station from the pivot (TipDowelPivotX, below), so
+# the tip dowel's REF station from the pivot (TipDowelPivotX, below), so
 # HoldDownX's line runs a text height plus 1.1 mm lower, 1.3 mm over the top
 # relief's crown, and its outside arrow tails keep 1.5 mm over the relief's
 # arc.  Its frame's lower-left corner stands 1 mm off the circle and its
@@ -378,20 +378,20 @@ DETAIL_HOLDDOWN_X = DETAIL_CENTER[0] + HOLDDOWN_LOCAL_X * _DETAIL_S
 HOLDDOWN_X_TEXT_SIZE = (0.02196, 0.0035)
 HOLDDOWN_X_LINE_DROP = 0.00278
 # Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
-# #2248); machinist review of round 6, #6.  The tip dowel's controlling
-# station from the pivot-bore axis, the origin that locates every hole on
-# this plate (rule 10), at the title block's .XXX (" .188 ", 6 glyphs at
-# HoldDownX's measured 2.0 mm), on HoldDownX's former line 1.1 mm under the
-# hold-down's rim.  Its 9.6 mm span cannot hold its text, which hangs right,
-# outside the circle, where HoldDownX's stood.  Its pivot witness rises on
-# HoldDownX's, and its dowel witness drops from the ream only to this line,
-# short of HoldDownX's line under it, so neither witness crosses a dimension
-# line.  Until the integration proof (run 20261109T062834910Z) it printed as
-# a REF, which left the ream located only by a chain through the hold-down
-# hole.  TipDowelX stays as the banded hole-to-hole relation rule 10 allows
-# beside the origin's station (the stack reason is at
-# dt_cone_swing_platform_spec.TIP_DOWEL_STATION_TOL_MM).
-TIP_DOWEL_PIVOT_X_TEXT_SIZE = (0.0120, 0.0035)
+# #2248); machinist review of round 6, #6.  The tip dowel's REF station
+# from the pivot-bore axis (" (.188) ", 8 glyphs at HoldDownX's measured
+# 2.0 mm), on HoldDownX's former line 1.1 mm under the hold-down's rim.  Its
+# 9.6 mm span cannot hold its text, which hangs right, outside the circle,
+# where HoldDownX's stood.  Its pivot witness rises on HoldDownX's, and its
+# dowel witness drops from the ream only to this line, short of HoldDownX's
+# line under it, so neither witness crosses a dimension line.  The
+# controlling station stays TipDowelX from the hold-down hole (the stack
+# reason is at dt_cone_swing_platform_spec.TIP_DOWEL_STATION_TOL_MM): one
+# locating scheme per hole (rule 10).  Integration proof 20261109T062834910Z
+# read that as a chain, and 20261109T105251629Z read the .188 printed beside
+# it as a second controlling location; the latter's fix is this one when the
+# hole-to-hole spacing must be held, so TipDowelX names the mate it matches.
+TIP_DOWEL_PIVOT_X_TEXT_SIZE = (0.0160, 0.0035)
 TIP_DOWEL_PIVOT_X_LINE_Y = (
     DETAIL_HOLDDOWN_Y - HOLDDOWN_CLEARANCE_DIA / 2.0 * _DETAIL_S - 0.0011
 )
@@ -429,6 +429,16 @@ _HOLDDOWN_X_TEXT_X = (
 # TipDowelX's dowel witness.
 DETAIL_TIP_DOWEL_X = DETAIL_CENTER[0] + TIP_DOWEL_LOCAL_X * _DETAIL_S
 TIP_DOWEL_X_TEXT_SIZE = (0.0240, 0.0035)
+# The banded spacing holds the plate's hold-down and dowel holes to the tip
+# block's own tap-to-dowel spacing, MHA-DT-21's DOWEL_FROM_TAP (rule 4: the
+# mate and the reason for a band tighter than a drilled hole's).  It stands
+# over the value, one row (5.45 mm pitch, 2.87 mm a glyph, as the ream's
+# rows) above it: the keep lifts half a row so the value stays on its line,
+# and moves left so the wider row's right end keeps the value's 1 mm off the
+# circle.
+TIP_DOWEL_X_CALLOUT = "MATCHES MHA-DT-21"
+TIP_DOWEL_X_CALLOUT_SIZE = (len(TIP_DOWEL_X_CALLOUT) * 0.00287, 0.0035)
+TIP_DOWEL_X_ROW_PITCH = 0.00545
 TIP_DOWEL_X_LINE_Y = (
     DETAIL_HOLDDOWN_Y + HOLDDOWN_CLEARANCE_DIA / 2.0 * _DETAIL_S + 0.0067
 )
@@ -437,7 +447,7 @@ _TIP_DOWEL_X_TEXT_X = (
     - math.sqrt(
         (DETAIL_SHEET_RADIUS + 0.001) ** 2 - (TIP_DOWEL_X_LINE_Y - DETAIL_CENTER[1]) ** 2
     )
-    - TIP_DOWEL_X_TEXT_SIZE[0] / 2.0
+    - max(TIP_DOWEL_X_TEXT_SIZE[0], TIP_DOWEL_X_CALLOUT_SIZE[0]) / 2.0
 )
 # Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
 # #2248).  The tip-block locating dowel's slip ream, under its
@@ -499,7 +509,10 @@ TIP_DOWEL_CALLOUT_LOWER_LEFT = (
 DETAIL_KEEP = {
     "HoldDownZ": (0.044, DETAIL_HOLDDOWN_Y + 0.0045),
     "HoldDownX": (_HOLDDOWN_X_TEXT_X, HOLDDOWN_X_LINE_Y + HOLDDOWN_X_LINE_DROP),
-    "TipDowelX": (_TIP_DOWEL_X_TEXT_X, TIP_DOWEL_X_LINE_Y + HOLDDOWN_X_LINE_DROP),
+    "TipDowelX": (
+        _TIP_DOWEL_X_TEXT_X,
+        TIP_DOWEL_X_LINE_Y + HOLDDOWN_X_LINE_DROP + TIP_DOWEL_X_ROW_PITCH / 2.0,
+    ),
     "TipDowelPivotX": (
         _TIP_DOWEL_PIVOT_X_TEXT_X,
         TIP_DOWEL_PIVOT_X_LINE_Y + HOLDDOWN_X_LINE_DROP,
@@ -608,7 +621,7 @@ HOLDDOWN_CROP_MARGIN_MM = 0.25
 # The strip's lower-left (east underside) corner on the sheet, where the
 # view is moved once cropped.  Detail B's texts right of its circle clear
 # C-C's padded box (inset left 0.1306, inset top 0.0496): TipDowelPivotX's
-# (x ..0.1201, y 0.0496..0.0531) and HoldDownX's (x ..0.1305, y
+# (x ..0.1241, y 0.0496..0.0531) and HoldDownX's (x ..0.1305, y
 # 0.0450..0.0485) both end left of the inset.  The padded box's foot
 # (0.0283) stands 0.7 mm over the native label's top (0.0291), inside the
 # blocking audit's 1.5 mm.
@@ -2326,10 +2339,21 @@ def _place_holes_sheet(adapter: Any) -> list[Any]:
     # banded size and the flag to note 3 (rule-23 retention, owner ruling
     # 2026-11-07 (MHA-DT-00 rubric sample, PR #2248); round 6, #7).
     set_dimension_callouts(adapter, detail_annotations, {"TipDowelDia": TIP_DOWEL_CALLOUT})
-    # Its station from the pivot-bore axis (TipDowelPivotX) prints as a
-    # controlling .XXX dimension, not a REF: the origin locates the ream, and
-    # TipDowelX is the banded relation to the hold-down hole
-    # (dt_cone_swing_platform_spec.TIP_DOWEL_STATION_TOL_MM says why).
+    set_dimension_callouts(
+        adapter, detail_annotations, {"TipDowelX": TIP_DOWEL_X_CALLOUT}, location="above"
+    )
+    # Its station from the pivot-bore axis is a reference (round 6, #6); the
+    # chained TipDowelX controls (dt_cone_swing_platform_spec.
+    # TIP_DOWEL_STATION_TOL_MM says why).
+    tip_dowel_pivot = [
+        item for item in detail_annotations
+        if dimension_name(adapter, item) == "TipDowelPivotX"
+    ]
+    if len(tip_dowel_pivot) != 1:
+        raise RuntimeError("expected one tip dowel pivot-axis station in detail B")
+    set_reference_dimension(
+        adapter, tip_dowel_pivot[0], label="tip dowel pivot-axis reference station"
+    )
     north_edge = [a for a in plan_annotations if dimension_name(adapter, a) == "NorthEdgeZ"]
     if len(north_edge) != 1:
         raise RuntimeError("expected one NorthEdgeZ on the hole-pattern plan")
