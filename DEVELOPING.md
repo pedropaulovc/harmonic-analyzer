@@ -1468,9 +1468,10 @@ key; compare these before reusing or resuming a run.
 on this branch.** The pool currently exports only the `build`/`release`
 dependency closures (`agent/worker.py:REQUESTED_TARGETS`). Merely registering
 an opt-in `verify:` leaf does not admit it into that graph. This draft
-therefore explicitly adds `verify:feature_reconcile` to the branch's `build`
-dependencies, without changing pool admission, seat settings, or any production
-part recipe. That intentional default-graph change must never reach main.
+therefore explicitly adds `verify:feature_reconcile` and
+`verify:assembly_reconcile` to the branch's `build` dependencies, without
+changing pool admission, seat settings, or any production part or assembly
+recipe. That intentional default-graph change must never reach main.
 Submit **only** the diagnostic leaf from a clean, pushed experiment checkout,
 using the persistent launcher supervision described above:
 
@@ -1573,6 +1574,83 @@ the enclosing farm span was 488.6 s, including 107.7 s of source acquisition and
 whole farm span and must not be summed as an exhaustive breakdown.
 Source, native evidence and earlier attempts are recorded in
 [PR #2322](https://github.com/pedropaulovc/harmonic-analyzer/pull/2322).
+
+#### Assembly mate reconciliation benchmark (draft)
+
+`verify:assembly_reconcile` (`cad/scripts/diagnostics/benchmark_assembly_reconcile.py`,
+planner `_assembly_reconcile.py`) reuses the qualified cylinder above as a
+scratch child, inserted twice with explicit `Default` assembly and child
+configurations. `base` is fixed at the origin; `mover` is fully constrained by
+`ReconcileTop`/`ReconcileRight` coincident planes and the `ReconcileDistance`
+Front-plane distance mate (aligned, unflipped, mover on +Z). The incremental
+edit changes only `D1@ReconcileDistance` from 30 mm to 40 mm with
+`SetSystemValue3`; it never reinserts components or re-mates. Any other recipe
+change returns `full_build` with no edits; malformed recipes raise.
+
+Submit only this leaf, with the same launcher supervision:
+
+```powershell
+./scripts/farm-run.ps1 -Worktree C:/src/ha-feature-reconcile-20261109 `
+  -PoolHome C:/src/solidworks-pool -Targets verify:assembly_reconcile `
+  -LeafTimeout 30 -DisplayName 'Experimental assembly mate benchmark' `
+  -Tag assembly-reconcile-native `
+  -ForceCacheRefresh verify:assembly_reconcile `
+  -ForceCacheRefreshReason 'Measure three fresh native assembly trials, not cached timings'
+```
+
+There is no repository assembly template. The run reads the seat's
+`swDefaultTemplateAssembly` path without changing it, requires an existing
+`.ASMDOT`, records path, size and SHA-256, creates every assembly with
+`NewDocument` on that exact path, and fails if the preference or bytes change.
+That template is seat-local and not in the recipe cache key, so only fresh
+forced native runs count as benchmark evidence. Before any document work,
+every native enum literal the benchmark uses is checked against the seat's
+installed `swconst.tlb`.
+
+Copy isolation: incremental and no-op trials byte-copy the source assembly and
+its child under unique per-trial names, then retarget the **closed** copy with
+`ISldWorks.ReplaceReferencedDocument`. `GetDocumentDependencies2` must report
+exactly the source child before and exactly the trial child after. After every
+open, each occurrence's `GetPathName`, its loaded model path and
+`GetSuppression2` must name the trial child, and the source child must not be
+loaded. Baseline assembly, baseline child and fixture child hashes are
+re-checked after every trial. Child hashes are recorded before and after each
+trial, but geometry is validated separately by the qualified part validator.
+
+Validation before save and after close/reopen is identical in every mode:
+one fixed and one floating resolved occurrence, mover fully constrained
+(`GetConstrainedStatus() == 3`), identity rotation plus exact signed
+translations `(0,0,0)` and `(0,0,+d)`, exactly the three named mates,
+unsuppressed with zero `GetErrorCode2` (warnings are fatal), expected
+`IMate2` type, alignment, flip, and datum-plane entities on both occurrences.
+The distance dimension's `GetFeatureOwner` must be the keyed mate. Persistent
+references resolve both components and all three mates through
+`GetObjectByPersistReference3` plus `IsSame` (falling back to the documented
+`GetSpecificFeature2` only when the result is an `IFeature`). Incremental and
+no-op identities come from the copied baseline manifest. Clean identities come
+only from the same clean build.
+
+Phase spans (`experiment.assembly_reconcile.*`) cover copy, retarget, open,
+diff, prevalidation, edit, rebuild, both validations, save, both closes,
+reopen and readback integrity. Clean creation spans include `CreateMate`
+solves and the adapter's `EditRebuild3` after each mate, so the separate
+rebuild phase is not all solver time. Fixture and baseline creation, renders
+and span serialization are outside trial rows. Outputs under
+`cad/out/reports/assembly-reconcile/` include `report.json`, `spans.jsonl`,
+manifests, the fixture, baseline and all nine trial assemblies and children,
+and untimed `visual-clean.png`/`visual-incremental.png`. Compare image hashes
+and content evidence, not tool previews. Offline commands:
+
+```powershell
+uv run --frozen python cad/scripts/diagnostics/benchmark_assembly_reconcile.py --help
+uv run --frozen python -m pytest cad/scripts/test_assembly_reconcile.py -q
+uv run --frozen python cad/scripts/diagnostics/benchmark_assembly_reconcile.py plan `
+  <retained-output>/reports/assembly-reconcile/baseline-manifest.json `
+  <retained-output>/reports/assembly-reconcile/target-recipe.json
+```
+
+No assembly measurements are claimed until a native run succeeds and its
+evidence is retained.
 
 ### Readiness is not proof of a build
 

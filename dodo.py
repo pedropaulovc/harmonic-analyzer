@@ -1412,9 +1412,9 @@ PACKAGE_NATIVE_PY = (SCRIPTS_DIR / "package_native.py").resolve()
 # one place).
 _VERIFY_NAMES = ("soundness", "kinematics")  # need SW (spine); subsystems retired
 # EXPERIMENT BRANCH ONLY: the pool exports build/release closures, not arbitrary
-# selected roots. This leaf is explicitly on build below for canonical admission.
-# Never merge this experiment wiring into the production build graph.
-_EXPERIMENT_VERIFY_NAMES = ("feature_reconcile",)
+# selected roots. These leaves are explicitly on build below for canonical
+# admission. Never merge this experiment wiring into the production build graph.
+_EXPERIMENT_VERIFY_NAMES = ("feature_reconcile", "assembly_reconcile")
 # Offline checks REQUIRED on every build/release (fast, high-value):
 _CHECK_NAMES = (
     "math",
@@ -3297,6 +3297,30 @@ def _verify_task(name: str) -> dict[str, Any]:
             "clean": True,
             "verbosity": 2,
         }
+    if name == "assembly_reconcile":
+        # Seat-local assembly template is pinned by path+hash at runtime and is
+        # NOT a file_dep: only forced-refresh native runs are benchmark evidence.
+        script = (SCRIPTS_DIR / "diagnostics" / "benchmark_assembly_reconcile.py").resolve()
+        cmd = [sys.executable, str(script), "benchmark", "--trials", "3"]
+        deps = sorted({
+            *_executed_closure(cmd),
+            *(str((script.parent / module).resolve()) for module in (
+                "_assembly_reconcile.py", "_feature_reconcile.py", "benchmark_feature_reconcile.py")),
+            str(PART_TEMPLATE),
+            _submodule_assembly_dep(),
+        })
+        return {
+            "name": name,
+            "file_dep": deps,
+            "targets": _canonical_targets(f"verify:{name}"),
+            "uptodate": [not _cache.forced_refresh(f"verify:{name}")],
+            "actions": [(_cached_com_action, [
+                f"verify:{name}", cmd, deps,
+                [REPORTS / "assembly-reconcile"], "verify-assembly-reconcile",
+            ])],
+            "clean": True,
+            "verbosity": 2,
+        }
     if name == "kinematics":
 
         # Pass the graph's assemblies EXPLICITLY (dashed names) rather than letting
@@ -5018,7 +5042,7 @@ def task_build():
             + [f"check:machinist_review:{s}" for s, _mode in _reviewed_drawings()]
             + [f"verify:{s}" for s in _VERIFY_NAMES]
             # EXPERIMENT ONLY: required in the pool's exported build closure.
-            # Submit only this leaf, never build/release, for the benchmark.
+            # Submit only the selected experiment leaf, never build/release.
             + [f"verify:{s}" for s in _EXPERIMENT_VERIFY_NAMES]
             + [f"prechips:{stem}" for stem in _process_plans.TRAVELER_STEMS]
         ),
@@ -5091,6 +5115,16 @@ def _canonical_targets(name: str) -> list[str]:
                 "visual-clean.png", "visual-incremental.png",
                 *(f"trial-{trial}-{mode}.SLDPRT"
                   for trial in range(1, 4) for mode in ("clean", "incremental", "noop")),
+            )]
+        if subname == "assembly_reconcile":
+            directory = REPORTS / "assembly-reconcile"
+            return [str(directory / filename) for filename in (
+                "report.json", "spans.jsonl", "baseline-manifest.json", "target-recipe.json",
+                "fixture-child.SLDPRT", "baseline.SLDASM", "baseline-child.SLDPRT",
+                "visual-clean.png", "visual-incremental.png",
+                *(f"trial-{trial}-{mode}{suffix}"
+                  for trial in range(1, 4) for mode in ("clean", "incremental", "noop")
+                  for suffix in (".SLDASM", "-child.SLDPRT")),
             )]
         return [str(REPORTS / f"verify-{subname}.ok")]
     if family == "check":
