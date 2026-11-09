@@ -280,14 +280,15 @@ BORE_VIEW_POSITION_TOL_M = 1e-4
 NOTE_CENTRING_TOL_M = 0.001
 CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 CENTER_MARK_SINGLE = 2  # swCenterMarkStyle_e.swCenterMark_Single
-# Imported, the flat clock keeps its sketch's quadrant (between the flat's
-# upper half and the -X centreline) wherever its text goes. Its arc then
-# swept the diameter's upper-left leader lane, and on the 4:1 sheets it
-# crossed that leader's shoulder (T030-T120, run 20260929T064504232Z).
+# Imported, a clock keeps its sketch's quadrant wherever its text goes. Left
+# between the flat's upper half and the -X centreline, its arc swept the
+# diameter's upper-left leader lane, and on the 4:1 sheets it crossed that
+# leader's shoulder (T030-T120, run 20260929T064504232Z).
 # ``_sweep_clock_right_of_flat`` flips it into the quadrant right of the
-# flat and above the axis. Its arc may overrun the flat or the axis by
-# CLOCK_ARC_OVERRUN and must centre on the flat/axis crossing within
-# CLOCK_ARC_CENTRE_TOL (sheet metres).
+# flat (keyway top) and above the axis; the D's BoreFlatClock is authored
+# there (build_dt_cone_gear), so its sheets import it with no flip. Its arc
+# may overrun the flat or the axis by CLOCK_ARC_OVERRUN and must centre on
+# the flat/axis crossing within CLOCK_ARC_CENTRE_TOL (sheet metres).
 CLOCK_ARC_OVERRUN = 0.0003
 CLOCK_ARC_CENTRE_TOL = 0.0005
 CLOCK_FLIPS = ("SupplementaryAngle", "VerticallyOppositeAngle", "SupplementaryAngle")

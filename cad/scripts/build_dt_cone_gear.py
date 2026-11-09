@@ -980,9 +980,16 @@ async def build(adapter) -> dict[str, str]:
         "bore across-flat",
     )
     bore.record("BoreAF", '"BoreAF"')
-    # Text inside the right angle the flat makes above the centreline; the
-    # sheet repositions it.  Either reading is 90 deg.
-    await add_angular_reference_dimension(
+    # Created inside the right angle the flat makes above the -X centreline,
+    # then turned to its supplement: the angle between the flat's upper half
+    # and the centreline's +X extension, the quadrant every D sheet prints
+    # (draw_dt_cone_gear._sweep_clock_right_of_flat, whose first flip from the
+    # created quadrant lands there).  A sheet-side flip of this model
+    # dimension did not survive the drawing's settling rebuild once the D was
+    # live, and never flipped, in the keyed configurations and T120
+    # (drawing:dt_cone_gear at 5994f29, T006-T024), so the model carries the
+    # printed quadrant and the sheets import it as is.  Either reading is 90 deg.
+    flat_clock = await add_angular_reference_dimension(
         adapter,
         bore_flat,
         clock_line,
@@ -990,6 +997,16 @@ async def build(adapter) -> dict[str, str]:
         "bore flat clock",
         expected_degrees=90.0,
     )
+    if not flat_clock.SupplementaryAngle():
+        raise RuntimeError("bore flat clock: SupplementaryAngle refused")
+    flat_clock_value = abs(float(_read_member(
+        _early_bound(flat_clock.GetDimension2(0), "IDimension"), "SystemValue"
+    )))
+    if abs(flat_clock_value - math.pi / 2.0) > 1e-8:
+        raise RuntimeError(
+            f"bore flat clock reads {math.degrees(flat_clock_value):.6f} deg after "
+            "its supplement, not 90"
+        )
     bore.record("BoreFlatClock")
     await ensure_fully_defined(adapter, "bore D sketch")
     check("exit_sketch bore", await adapter.exit_sketch())

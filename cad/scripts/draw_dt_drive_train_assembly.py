@@ -1214,9 +1214,10 @@ ROCKER_ARM = str(_config.parts("ch-rocker-arm")["number"])
 # The step that sets the channel's rods and rocker arms on the cams (the
 # interface notes cite it).
 CHANNEL_RODS_SET_AT = _step_ref("cylinder-stack-accepted", "B")
-# Step 5's T12 is the paper drive's removable chain sprocket in its T12
-# configuration (pd_transgear_removable_spec: T12 on the crank); the machinist
-# review of 8e6a0dbd8 asked for its own number.
+# Step 5's chain wheel is the paper drive's removable sprocket (its T12
+# configuration, pd_transgear_removable_spec); the machinist review of
+# 8e6a0dbd8 asked for its own number.  The sheet prints no "T12": the code
+# key defines TNNN for MHA-DT-03 only (review of 5994f29c83, rule 4).
 CRANK_CHAIN_WHEEL = str(_config.parts("pd-transgear-removable")["number"])
 PLATEN_NUMBER = str(_config.parts("pd-platen")["number"])
 
@@ -1380,7 +1381,7 @@ CONE_CRANK_STEPS = _note_text(
         f"{inch_envelope((max(CRANK_END_PROUD_RANGE[0], 0.0), CRANK_END_PROUD_RANGE[1]), 3)}"
         " PROUD OF MHA-DT-10.",
         "4V. DO NOT FACE THAT END.",
-        f"5. SLIDE {CRANK_CHAIN_WHEEL} T12 ON MHA-DT-11, HOLES OVER THE 2X MHA-DT-VN-67.",
+        f"5. SLIDE {CRANK_CHAIN_WHEEL} ON MHA-DT-11, HOLES OVER THE 2X MHA-DT-VN-67.",
         # U33 (user, 2026-09-23): crank hub MHA-DT-31 pressed into the arm and
         # seam-pinned by MHA-DT-VN-59; the MHA-DT-09 cross-hole runs behind
         # the arm through the hub barrel. The seam's size and depth print
@@ -1955,7 +1956,7 @@ INTERFACE_NOTES = _note_text(
         "BASE MHA-FR-01 (FRAME ASSEMBLY MHA-FR-00) RECEIVES MHA-DT-VN-52, MHA-DT-VN-51,",
         "MHA-SH-VN-52 ({stop} SWING STOP + {foot} SPRING FOOT), {slotted}X MHA-DT-VN-57 AND",
         "{hold_down}X MHA-DT-VN-62.",
-        f"PAPER DRIVE MHA-PD-00: {CRANK_CHAIN_WHEEL} T12 CHAIN WHEEL ON MHA-DT-11,",
+        f"PAPER DRIVE MHA-PD-00: {CRANK_CHAIN_WHEEL} CHAIN WHEEL ON MHA-DT-11,",
         # Rubric sample round 14 (rule 23): its retention and acceptance.
         "   PINNED BY 2X MHA-DT-VN-67, HELD ENDWISE BY MHA-DT-31 (STEP "
         f"{steps.step_number('crank-hub-fitted')}F).",

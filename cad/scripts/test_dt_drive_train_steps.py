@@ -265,14 +265,14 @@ def test_a_cite_to_the_wrong_step_is_caught() -> None:
 
 def _defined_codes() -> list[str]:
     """The short codes MHA-DT-00 defines: each cone gear's configuration
-    (the BOM's "T006-T120 BY 6") and the chain wheel the interface notes name."""
+    (the BOM's "T006-T120 BY 6").  The chain wheel goes by its number only:
+    a "T12" read as a cone-gear code (machinist review of 5994f29c83)."""
     cone = re.search(r"\bT(\d+)-T(\d+) BY (\d+)\b", drawing.BOM_DESCRIPTIONS["dt-cone-gear"])
     assert cone, drawing.BOM_DESCRIPTIONS["dt-cone-gear"]
     first, last, step = (int(value) for value in cone.groups())
     gears = {f"T{teeth:03d}" for teeth in range(first, last + 1, step)}
-    named = set(re.findall(r"\bT\d+\b", drawing.INTERFACE_NOTES))
-    assert named, "the interface notes name the T12 chain wheel"
-    return [re.escape(code) for code in sorted(gears | named)]
+    assert not re.findall(r"\bT\d+\b", drawing.INTERFACE_NOTES), "the interface notes print no tooth code"
+    return [re.escape(code) for code in sorted(gears)]
 
 
 def _direction_key() -> str:

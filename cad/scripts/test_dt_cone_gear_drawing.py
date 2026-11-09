@@ -1387,6 +1387,22 @@ def test_enlarged_views_are_lettered_with_boundaries_on_the_front_view() -> None
     assert 'set_near_side_diameter(found[0], f"{configuration} FloorDia")' in source
 
 
+def test_the_d_clock_is_authored_in_the_quadrant_its_sheets_print() -> None:
+    """drawing:dt_cone_gear at 5994f29: each D sheet's sheet-side flip of
+    BoreFlatClock read right at the sweep, then the settling rebuild drew all
+    four (T006-T024) back in the sketch's quadrant (arcs 22.6..180 deg),
+    while the keyed sheets, whose owner is suppressed wherever no sheet flips
+    it, held. The model now carries the printed quadrant: the D's clock is
+    turned to its supplement (90 deg either way) before the sketch closes."""
+    build = inspect.getsource(part.build)
+    created = build.index('"bore flat clock"')
+    turned = build.index("flat_clock.SupplementaryAngle()", created)
+    assert turned < build.index('bore.record("BoreFlatClock")') < build.index(
+        'ensure_fully_defined(adapter, "bore D sketch")'
+    )
+    assert drawing.clock_dimension_name(6) == "BoreFlatClock"
+
+
 def test_settled_clock_check_refuses_outside_arrow_stubs() -> None:
     """Run 20261010T073917031Z's arc readbacks (sheet mm): T006's clock drew
     one arc between its legs, broken by its text; T120's, its arrows left
