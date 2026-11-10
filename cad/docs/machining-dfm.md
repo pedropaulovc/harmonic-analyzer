@@ -5,8 +5,11 @@
 > Tier-1 parts — *can the machinist actually cut this, in what stock, in how many setups, and where
 > will it fight back.* Generic DFM checklists ("radius internal corners", "minimize setups") are
 > useless as bare bullets; every row below is attached to a **named feature with a real number** from
-> the build script. Audience + toolchain per §1/§11: period **brass + steel**, **manual mill + lathe
-> primary (fidelity)**, **PM-30MV CNC for the repeat parts**, Fusion 360 CAM off the STEP export.
+> the build script. Audience + toolchain per §1/§11: period **brass + steel**, on a **manual** shop
+> (`cad/process/shop/inventory.toml`): the **PM-30MV mill, handwheels on all three axes read on a DRO**
+> (`operation_mode = "manual_with_digital_positioning"`), the **PM-1127VF-LB lathe** and the **BS-0
+> dividing head**. There is no CNC: the repeat parts get their repeatability from fixtures, stops and
+> indexing.
 
 All numbers are from the `cad/scripts/build_*.py` sources (mm). Where a part is modeled as a
 **casting** but you intend to cut it from bar, that is a *substitution* — flagged, because the
@@ -24,8 +27,10 @@ its first-root position; no second general note restates that location.
 - **Three parts carry the whole risk. Everything else is generous.**
   1. **`dt-cone-tip-gear` (T006, MHA-DT-37)** — six leaves on a **Ø4.31 mm OD** solid, with an integral
      Ø.0625 in spigot (.71 in long, L/D about 12) to the south and an integral Ø.0625 in pivot (.25 in) to the north
-     (owner decision C1 keyed, 2026-11-09, PR #1992). The single hardest part in the machine. Turn the
-     spigot and pivot between centres with steady support, then cut the leaves; the teeth are involute
+     (owner decision C1 keyed, 2026-11-09, PR #1992). The single hardest part in the machine. Its
+     turning route is **not selected**: the part's process text and sheet note 3 (`CENTRES OK.`) name
+     centres and a steady, but no listed centre or steady rest fits a Ø.0625 stem
+     ([#2468](https://github.com/pedropaulovc/harmonic-analyzer/issues/2468)). The teeth are involute
      flanks closed by a gap floor with printed diameter limits, and the floor, cut by DT6-FORM1, is
      Ø2.136 MIN / Ø2.201 MAX, the cutter running off over both stems (.011 in radial). T006 has no bore, so
      the former 0.62 mm web floor exception is gone. The thinnest cone web is now T012's 1.641 mm
@@ -68,14 +73,14 @@ its first-root position; no second general note restates that location.
      chain the two ends; the front-to-tip overall is a reference. The
      presentation does not prescribe a workholding arrangement.
 
-- **The CNC repeat families (make N identical on the PM-30MV — this is where CNC earns its keep):**
-  | family | qty | why CNC |
+- **The repeat families (make N identical by hand: the shop is manual, so fixtures, stops and indexing carry the repeatability):**
+  | family | qty | repeat risk and route |
   |---|---|---|
-  | `dt-cylinder-gear` (+ integral cam) | 20 | 120 teeth + eccentric cam + 0.4 mm index notch, all co-phased +Y — hand-repeating 20× scatters the phase |
-  | `dt-cone-gear` | 19 | involute teeth cut with stock 48DP PA20 range cutters indexed on a dividing head; T006 (`dt-cone-tip-gear`) alone needs a special cutter (see [Cutter plan](#cutter-plan)); wire-EDM = outsource alt |
-  | `pivot-bushing` / `lever-bushing` | 19 each | turned spacers whose **length** sets channel pitch — length consistency across the set is the point |
-  | `ch-rocker-arm` | 20 | flat R800 profile, one setup — ideal CNC profile part |
-  | `ch-connecting-rod` | 20 | flat 2D outline from 1018 plate, stepped both faces, slotted fork → 2.5D |
+  | `dt-cylinder-gear` (+ integral cam) | 20 | 120 teeth + eccentric cam + 0.4 mm index notch, all co-phased +Y — hand-repeating 20× scatters the phase. Teeth with the stock #2 cutter on the BS-0; the cam's throw and phase need an eccentric fixture that is not drawn, so the cam route is **not selected** ([#2361](https://github.com/pedropaulovc/harmonic-analyzer/issues/2361)); no saw as thin as the notch is owned ([#2364](https://github.com/pedropaulovc/harmonic-analyzer/issues/2364)) |
+  | `dt-cone-gear` | 19 | involute teeth cut with stock 48DP PA20 range cutters indexed on the BS-0 dividing head; T006 (`dt-cone-tip-gear`) alone needs a special cutter (see [Cutter plan](#cutter-plan)); wire-EDM = outsource alt; the cutters and arbors are not yet in the inventory ([#2356](https://github.com/pedropaulovc/harmonic-analyzer/issues/2356)) |
+  | `ch-rocker-arm` / `ch-channel-lever` hubs | 20 each | the integral hubs stack face to face and set the 7.0565 channel pitch; the 19 `pivot-bushing` and 19 `lever-bushing` spacers are retired. Hub width consistency across each set is the point ([#2344](https://github.com/pedropaulovc/harmonic-analyzer/issues/2344)) |
+  | `ch-rocker-arm` | 20 | strap with a pressed hub; the R800/R816 arcs are cut on the oblique jig MHA-CH-06-TL-00, by a held reference route that is not yet qualified (`cad/process/ch_rocker_arm/plan.toml`) |
+  | `ch-connecting-rod` | 20 | flat outline from 1018 plate, stepped both faces, slotted fork; the outline on the manual mill is **route not selected** ([#2340](https://github.com/pedropaulovc/harmonic-analyzer/issues/2340)) |
   | `sm-knife-mount` | 2 | trivial prismatic block, 2 identical |
 
 - **Casting-vs-bar substitution:** `fr-rocker-arm-support` is a benign stock
@@ -856,34 +861,37 @@ run. No COM, farm, or generated-traveler certification is claimed here.
 
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
-| **`dt-cylinder-gear`** ×20 | round brass bar ~65; toothed disc OD64.44×3 + integral eccentric cam OD30.6×4.0565 (offset +Y 8.64); total H 7.0565 | Ø9.575 through bore on the Ø9.525 (3/8") arbor — **rides free on arbor, no keyway**; 120T involute 48DP PA20 (2.5D through-cut, patterned → **DXF/2.5D-machinable**); cam = plain eccentric circle (2.5D); **0.4 mm alignment notch** = the +Y co-phased timing datum | cam thin-side wall **1.90 mm**; notch kerf **0.4 mm** (slitting-saw, fragile crests); 3 mm slender disc; **double-sided** (teeth+notch front / cam boss far face) | **≥2** (flip for cam boss) | **CNC-REPEAT** — lathe bore+OD, teeth with a stock 48DP PA20 #2 cutter indexed (see [Cutter plan](#cutter-plan); wire-EDM = outsource), cam offset, notch by slitting saw; **hold the +Y phasing identical on all 20** |
-| **`ch-connecting-rod`** ×20 | AISI 1018 plate, 1/4" faced to .240; 2D outline ~7.4×1.61; ring and shank .086, both faces at .077 / .163 ±.002 from the fork's datum face, fork .240 REF, all on one mid-plane; black finish | Ø1.213 +.003/0 strap bore (rides the Ø30.6 mm MHA-DT-12 cam); fork .390 wide, full R.195 crown on the pin, .710 long from the crown; tine .067 ±.002 from the datum face, slot .106 ±.002, .580 deep from the crown (#982); Ø.077 +.0009/+.0005 pin hole reamed through both tines (pin MHA-CH-10 pressed in at assembly, ends dressed flush; user ruling 2026-10-09, PR #1292) | tines **.067** (.065 MIN, owner-accepted RV-02) beside a .106 slot — slitting saw or a 3/32 end mill in two passes, hold the 3-place band; both faces stepped (thin .086 shank ~6 long faced from 1/4 plate — chatter/curl); the ream must hold its .0004 band for the press | **2** (flip to face the second side; slot, drill and ream in the second) | **DXF/2.5D profile** the outline, face both sides to the two levels, slit the fork, drill + ream |
+| **`dt-cylinder-gear`** ×20 | round brass bar ~65; toothed disc OD64.41×3 + integral eccentric cam OD30.6×4.0565 (offset +Y 8.64); total H 7.0565 | Ø9.550 (.3760 +.0005/0) reamed through bore on the Ø9.525 (3/8") arbor — **rides free on arbor, no keyway**; 120T involute 48DP PA20 (2.5D through-cut, patterned → **DXF/2.5D-machinable**); cam = plain eccentric circle (2.5D); **0.4 mm alignment notch** = the +Y co-phased timing datum | cam thin-side wall **1.80 mm** (.071 MIN, RV-01); notch kerf **0.4 mm** (slitting-saw, fragile crests; no saw that thin is owned, [#2364](https://github.com/pedropaulovc/harmonic-analyzer/issues/2364)); 3 mm slender disc; **double-sided** (teeth+notch front / cam boss far face) | **≥2** (flip for cam boss) | **manual** — lathe bore+OD, teeth with a stock 48DP PA20 #2 cutter indexed on the BS-0 (see [Cutter plan](#cutter-plan); wire-EDM = outsource); the cam turned about its offset axis and clocked to the teeth is **route not selected**: its eccentric fixture is not drawn ([#2361](https://github.com/pedropaulovc/harmonic-analyzer/issues/2361)); **hold the +Y phasing identical on all 20** |
+| **`ch-connecting-rod`** ×20 | AISI 1018 plate, 1/4" faced to .240; 2D outline ~7.4×1.61; ring and shank .086, both faces at .077 / .163 ±.002 from the fork's datum face, fork .240 REF, all on one mid-plane; black finish | Ø1.213 +.003/0 strap bore (rides the Ø30.6 mm MHA-DT-12 cam); fork .390 wide, full R.195 crown on the pin, .710 long from the crown; tine .067 ±.002 from the datum face, slot .106 ±.002, .580 deep from the crown (#982); Ø.077 +.0009/+.0005 pin hole reamed through both tines (pin MHA-CH-10 pressed in at assembly, ends dressed flush; user ruling 2026-10-09, PR #1292) | tines **.067** (.065 MIN, owner-accepted RV-02) beside a .106 slot — slitting saw or a 3/32 end mill in two passes, hold the 3-place band; both faces stepped (thin .086 shank ~6 long faced from 1/4 plate — chatter/curl); the ream must hold its .0004 band for the press | **2** (flip to face the second side; slot, drill and ream in the second) | **manual**; the outline (ring, shank, fork) on the manual mill is **route not selected** ([#2340](https://github.com/pedropaulovc/harmonic-analyzer/issues/2340)); face both sides to the two levels, slit the fork, drill + ream |
 
 ### Cone gears + shaft (T1 — the 48DP PA20 train, tip gears fragile)
 
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
-| **`dt-cone-gear`** ×19 (T012→T120) | round brass bar, extruded disc, face **6.8756 ±0.025** each, OD printed per gear at the AGMA (N + 2)/DP blank, +0/−0.05, capped by the cutter's form (`dt_cone_gear_spec.py`); tip gears T012–T024 harder yellow metal | T030+ round Ø9.525 bore broached for the land-1 1/16 key (1/16 A broach, 3/8 A bushing; keyway on +X, clocked to the phase-0 tooth); T024 reamed round Ø6.350 (+.0018/+.0010 in) and T012/T018 reamed Ø1.5875 (+.0005/−0 in), bonded slip fits (owner decision C1 keyed, 2026-11-09, PR #1992); 12–120 involute teeth PA20, tooth thickness ±0.075, 2.5D through-cut | **T012 web 1.641 mm (.0646 in) minimum** over its reamed bore (RV-03); T030 keyway-corner web .0621 in (RV-07); whole gear tiny → difficult workholding | ≥2 (turn/bore, indexed teeth) | stock 48DP PA20 range cutter per gear, **indexed**, set up within 0.05 TIR of the finished bore (see [Cutter plan](#cutter-plan)). Measure the keyed faces 64T–T030 as one stack and T024–T006 as the bonded tip | 
-| **`dt-cone-tip-gear`** ×1 (T006, MHA-DT-37) | C67500 bar; six leaves Ø4.31 +0/−0.02 OD, face 6.8756 ±0.025, integral Ø.0625 in spigot × .71 south and Ø.0625 in pivot × .25 north | DT6-FORM1 leaves, tooth thickness +0/−0.04; spigot bonded in MHA-DT-04's socket and through T012/T018; pivot carries the pressed MHA-DT-38 bushing (made to its measured bore) and runs in MHA-DT-39 | spigot L/D about 12 whips; ~4 mm gear hard to grip; the cutter must run off over both stems | ≥2 (turn between centres, indexed leaves) | manual lathe between centres **+ steady**, then the named custom ground tool DT6-FORM1, indexed | 
+| **`dt-cone-gear`** ×19 (T012→T120) | round brass bar, extruded disc, face **6.8756 ±0.025** each, OD printed per gear at the AGMA (N + 2)/DP blank, +0/−0.05, capped by the cutter's form (`dt_cone_gear_spec.py`); tip gears T012–T024 harder yellow metal (`material_tip_specification`; the title block still prints `Brass`, [#1080](https://github.com/pedropaulovc/harmonic-analyzer/issues/1080)) | T030+ round Ø9.525 bore broached for the land-1 1/16 key (1/16 A broach, 3/8 A bushing; keyway on +X, clocked to the phase-0 tooth); T024 reamed round Ø6.350 (+.0018/+.0010 in) and T012/T018 reamed Ø1.5875 (+.0005/−0 in), bonded slip fits (owner decision C1 keyed, 2026-11-09, PR #1992); 12–120 involute teeth PA20, tooth thickness ±0.075, 2.5D through-cut | **T012 web 1.641 mm (.0646 in) minimum** over its reamed bore (RV-03); T030 keyway-corner web .0621 in (RV-07); whole gear tiny → difficult workholding | ≥2 (turn/bore, indexed teeth) | stock 48DP PA20 range cutter per gear, **indexed**, set up within 0.05 TIR of the finished bore (see [Cutter plan](#cutter-plan)). Measure the keyed faces 64T–T030 as one stack and T024–T006 as the bonded tip | 
+| **`dt-cone-tip-gear`** ×1 (T006, MHA-DT-37) | C67500 bar; six leaves Ø4.31 +0/−0.02 OD, face 6.8756 ±0.025, integral Ø.0625 in spigot × .71 south and Ø.0625 in pivot × .25 north | DT6-FORM1 leaves, tooth thickness +0/−0.04; spigot bonded in MHA-DT-04's socket and through T012/T018; pivot carries the pressed MHA-DT-38 bushing (made to its measured bore) and runs in MHA-DT-39 | spigot L/D about 12 whips; ~4 mm gear hard to grip; the cutter must run off over both stems | ≥2 (turn, indexed leaves) | turning **route not selected**: no listed centre or steady fits the Ø.0625 stems ([#2468](https://github.com/pedropaulovc/harmonic-analyzer/issues/2468)); leaves with the custom ground tool DT6-FORM1, indexed ([#2358](https://github.com/pedropaulovc/harmonic-analyzer/issues/2358)) | 
 | **`dt-cone-gear-shaft`** ×1 | stepped steel bar; integral Ø12.2555 post journal, thrust collar then Ø9.525 keyed land 1 and Ø6.35 round land 2 | turned steps plus **a 1/16 square keyseat milled along the Ø9.525 land on +X** (S .3385 +0/−.0040 in, width .0625 +.0020/−0 in; carries the MHA-DT-VN-71 key); land 2 ends .025 in inside the bonded T024's bore with a reamed Ø.0625 × .20 in socket for the MHA-DT-37 spigot. Finish the post journal for its printed running clearance | none severe: the slender terminal land, its D-flats and the tailstock note are gone (C1 keyed) | lathe + 1 milling setup (keyseat) | manual lathe, drill and ream the end socket, then mill the keyseat | 
 | **`dt-cone-tip-bushing`** ×1 (MHA-DT-38) | C36000 brass bar; Ø.228 × .160 in | Ø.0615 in reamed bore, press fit on the MHA-DT-37 pivot; north face bears on MHA-DT-39 | wall .0805 in minimum | 1 (turn, ream, part) | manual lathe | 
 | **`dt-cone-tip-end-screw`** ×1 (MHA-DT-39) | McMaster-Carr 91794A558 18-8 slotted fillister 1/4-28 × 5/8 | drilled and reamed Ø.0630 × .12 in pivot hole concentric in the threaded end (running fit on the MHA-DT-37 pivot) | wall to the 2A thread root **.067 in MIN** (RV-01, rule 17 minor) | 1 (hold on the thread in a threaded collet or split nut) | manual lathe, centre drill, drill, ream | 
 
-### Pivots, bushings, shafts (T1 — the 19-channel stacks)
+### Pivot and fulcrum shafts (T1 — the 20-channel stacks)
 
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
-| **`ch-pivot-shaft`** ×1 | plain steel bar Ø6.35×203.2 | solid, no bore/step/thread; 2 end faces | **L/D 32:1** → whip; steady-rest / between-centers | 1 | manual lathe + steady |
-| **`ch-fulcrum-shaft`** ×1 | plain steel bar Ø6.35×166.4 | domed R3.175 ends; two 0.3-deep set-screw flats on one side at ±75.0 | **L/D 26:1** → whip; **same stock as pivot-shaft — don't mix** | 2 (turn domes; mill both flats in one setup) | manual lathe + steady, mill |
-| **`pivot-bushing`** ×19 | brass, OD Ø10.0×**4.5565** | Ø6.5 through bore (rides Ø6.35, **0.15 mm** clr); stubby L/D 0.46 | **length 4.5565 sets the 7.0565 channel pitch** → parting-length repeatability across all 19 is *the* critical dim | 1 (turn + bore + part) | **CNC-REPEAT** / collet stop for length consistency |
-| **`lever-bushing`** ×19 | brass, OD Ø12.0×**4.0565** | Ø6.5 through bore (rides Ø6.35, 0.15 mm clr); twin of pivot-bushing | same drill/ream as pivot-bushing; differs only OD (12 vs 10) + length (4.0565 vs 4.5565) — **don't mix the two sets** | 1 | **CNC-REPEAT** / collet stop |
+| **`ch-pivot-shaft`** ×1 | 1018 CF bar per its registry, or 1/4 ground stock as the print allows (stock allocation: [#2346](https://github.com/pedropaulovc/harmonic-analyzer/issues/2346)); Ø.2500 +0/−.0008 × 6.40 tip to tip | domed both ends; two set-screw flats in line, one side, one at each end | **L/D about 25:1** → whip; follow rest | 2 (turn, face and dome both ends; mill both flats in one setup) | manual lathe, chuck and tailstock centre with a follow rest, then mill |
+| **`ch-fulcrum-shaft`** ×1 | plain steel bar Ø6.35×166.6 | domed R3.175 ends; two 0.3-deep set-screw flats on one side at ±75.06 | **L/D 26:1** → whip; **same stock as pivot-shaft — don't mix** | 2 (turn domes; mill both flats in one setup) | manual lathe + steady, mill |
 
-### Rocker arms + support (T1 — flat profile + cast bracket)
+The 19 `pivot-bushing` and 19 `lever-bushing` spacers are retired. The 20 rocker arms ride the
+pivot shaft and the 20 channel levers the fulcrum shaft on their own integral hubs, which stack face
+to face and set the 7.0565 channel pitch (`ch_rocker_arm_spec.HUB_LENGTH`,
+`ch_channel_lever_spec.HUB_LENGTH`).
+
+### Rocker arms + support (T1 — built-up profile arm + cast bracket)
 
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
-| **`ch-rocker-arm`** ×20 | flat steel plate **2.5 mm** thick, ~270×21 | **top edge = R800 concave arc** (the amplitude-bar rides ON it) — it is the **2D OUTLINE of the plate, NOT a concave pocket/face**; bottom edge R816 concentric; Ø6.5 pivot bore + Ø2.0 rod-pin bore, both through the plate | none severe — pivot bore is **inherently square** (drilled through flat stock, one setup); no slot, no internal corner | **1** (all features one plane) | **CNC 2.5D profile** (×20 identical) or bandsaw+template; the R800 is profiled, not form-cut |
-| **`fr-rocker-arm-support`** | modeled Gray Cast Iron; drawing permits gray iron casting or low-carbon steel stock; trapezoidal wedge, 6.35 mm shell/web | opposed 165.1 mm pockets with **R6.35** internal corners; through cavity with **R12.7** corners; **4× 5/16 through clearance drills** in the 6.35 mm foot for top-down 1/4-20 hex-head screws; RimChamfer 1.27 | 6.35 mm web/shell; from solid stock, each pocket reaches about 28.6 mm at the wide foot. R6.35 is ordinary contour geometry on a PM-25MV and does not need square-corner EDM; a 1/8″ end mill can finish the radius, but its long reach in 1018 favors roughing with a stiffer cutter first | casting route: foot holes/rim; solid-stock route: **2 opposed pocket setups** + foot drilling | cast body, or rough both pockets from 1018 with a larger cutter and finish the R6.35 corners with a 1/8″ end mill; drill the clearance pattern from the seat face |
+| **`ch-rocker-arm`** ×20 | one piece from solid per its registry, or (sheet note 2, RV-06, owner route v3 2026-10-16) built up: strap MHA-CH-13 from 1018 CF 1/8 × 1-1/2 flat faced to .098 ±.001, about 292 long (11.494 REF), with hub MHA-CH-12 turned from 1018 round and pressed into the strap's reamed hole | **top edge = R800 concave arc** (BASIC R31.486 under a .020 profile, RV-02; the amplitude-bar rides ON it) — it is the **2D OUTLINE of the strap, NOT a concave pocket/face**; bottom edge R816 concentric; integral hub sets the 7.0565 channel pitch; reamed pivot bore through the hub, #47 rod-pin hole through the strap | thin strap faced from 1/8 bar ([#2340](https://github.com/pedropaulovc/harmonic-analyzer/issues/2340)); hub wall .064 MIN (RV-03); a manual mill moves one axis at a time, so the arcs need the jig | strap faced, sawn to a preform, then hub hole drilled and reamed and both arcs cut on the jig in one clamping; hub turned; bore and length finished on the joined arm | **manual**: arcs cut on the oblique jig MHA-CH-06-TL-00 (`ch-rocker-arm-tl-oblique-jig`) by the held reference route `cad/process/ch_rocker_arm/plan.toml`, not yet qualified (jig open items include [#2336](https://github.com/pedropaulovc/harmonic-analyzer/issues/2336) and [#2443](https://github.com/pedropaulovc/harmonic-analyzer/issues/2443)) |
+| **`fr-rocker-arm-support`** | modeled Gray Cast Iron; drawing permits gray iron casting or low-carbon steel stock; trapezoidal wedge, 6.35 mm shell/web | opposed 165.1 mm pockets with **R6.35** internal corners; through cavity with **R12.7** corners; **4× 5/16 through clearance drills** in the 6.35 mm foot for top-down 1/4-20 hex-head screws; .06 × 45° rim chamfer; 2× #8-32 bottoming-tapped seats in the top face, transferred from the MHA-CH-08 brackets at assembly | 6.35 mm web/shell; from solid stock, each pocket reaches about 28.6 mm at the wide foot. R6.35 is ordinary contour geometry on the PM-30MV and does not need square-corner EDM; a 1/8″ end mill can finish the radius, but its long reach in 1018 favors roughing with a stiffer cutter first | casting route: foot holes/rim; solid-stock route: **2 opposed pocket setups** + foot drilling | cast body, or rough both pockets from 1018 with a larger cutter and finish the R6.35 corners with a 1/8″ end mill; drill the clearance pattern from the seat face |
 
 ---
 
@@ -903,8 +911,9 @@ run. No COM, farm, or generated-traveler certification is claimed here.
 3. ~~**Model the `sm-knife-mount` mounting holes**~~ — RESOLVED (top-frame rederive, 2026-08-02; #10-24 hex-head cutover, 2026-10-13): the
    block is clamped to the top-frame casting's integral crossbar by the cut-to-length 18-8 hex-head Bolt
    and new #10 SAE washer on the whole faced top, into a #10-24 bottoming tap and located by one dowel pressed into the crossbar's blind underside ream and slipped into the block's round hole (owner ruling 2026-10-24, T+H3; one dowel per mount and a gauge pin through both bores setting their yaw at MHA-SM-00, owner ruling 2026-11-08 (Pedro), #2144 item 11.3); the current route is documented above. Its revised native wizard and dimension import require the scoped farm proof; offline tests alone are not native evidence.
-4. **Reconcile the `ch-rocker-arm` R800 vs book 812.8 mm** (already a §4 Finding) before it becomes a
-   drawing callout — but note the good news from this pass: it's a *profile* dimension, cheap to change.
+4. ~~**Reconcile the `ch-rocker-arm` R800 vs book 812.8 mm**~~ — RESOLVED: the arm keeps the book's
+   R800 arc (`_rocker_interface.BOOK_TOP_RADIUS`), set to the middle of its profile zone (owner ruling
+   2026-11-08 (Pedro), #2144 item 10.3); the sheet prints it BASIC R31.486 under a .020 profile (RV-02).
 5. **Consider enlarging the tip cone gears** (T006 `dt-cone-tip-gear` and T012) — the model already flags them marginal and a
    period build used harder metal. **DP caveat:** enlarging OD at a *fixed tooth count* changes the
    DP/module and **breaks the shared 48DP mesh** — tooth *counts* preserve the ratio, but DP/pitch
@@ -940,7 +949,8 @@ steps instead of one big engagement.
   cannot cut, plus the thin T006 **root-to-bore web** (0.621 mm in the model they checked). Their rule sets are tuned for
   moulding / sheet / generic 3-axis and don't flag manual-machining hazards. **A green from these
   means little — trust it for nothing on the corners or walls.**
-- **Fusion 360 CAM verify/simulate — the one worth banking on, with a known edge.** Because it
+- **Fusion 360 CAM verify/simulate — a desk check only, with a known edge.** The shop has no CNC, so
+  no program runs on the manual PM-30MV; but because it
   simulates the *actual tool against the actual solid*, it **surfaces the class DFMPro missed**: an
   internal corner smaller than the smallest endmill shows up as **un-cut stock** (you can't program a
   sharp internal corner), and tool-reach / gouge / holder-collision are caught. Banking on Fusion for
@@ -948,14 +958,14 @@ steps instead of one big engagement.
   rule-of-thumb checker.
   - **But its blind spot is exactly where the worst risk lives.** Fusion treats geometry as **rigid**
   and stock as **held**, so it will *not* warn that the **T012 web (1.64 mm minimum)** breaks in
-  workholding, the **Ø1.5875 mm T006 spigot** whips, the **1.90 mm cam wall** is fragile, or that
+  workholding, the **Ø1.5875 mm T006 spigot** whips, the **1.80 mm cam wall** is fragile, or that
   a ~4 mm gear can't be gripped. Thin-wall / fragile-feature / fixturing failures are not modelled
   by CAM sim. **A clean Fusion sim is not a substitute for a first cut on the fragile parts.**
 
 **Order that actually de-risks the build:**
-1. **Fusion CAM verify** — cheap; catches the tool-access/gouge/reach majority, incl. the sharp corners
+1. **Fusion CAM verify** (desk check, no CNC behind it) — cheap; catches the tool-access/gouge/reach majority, incl. the sharp corners
    (as uncut stock).
-2. **First-article cut** — cut **one** of each fragile/hard part (a T006 gear, a cam-gear, a bushing,
+2. **First-article cut** — cut **one** of each fragile/hard part (a T006 gear, a cam-gear, a rocker arm,
    the thin shaft) and inspect **before** committing to 20×. The only check that catches
    thin-wall/workholding — precisely Fusion's blind spot.
 3. Narrow paid consults / outsource-quotes only for whatever 1–2 leave open.
@@ -1013,16 +1023,20 @@ plates have not been checked against this list; check yours before cutting.
 | `dt-cone-gear` T078 | 78 | #2 | 20 on 39 |
 | `dt-cone-gear` T084 | 84 | #2 | 10 on 21 |
 | `dt-cone-gear` T090 | 90 | #2 | 8 on 18 |
-| `dt-cone-gear` T096 | 96 | #2 | 5/12 turn: no standard circle |
-| `dt-cone-gear` T102 | 102 | #2 | 20/51 turn: no standard circle |
+| `dt-cone-gear` T096 | 96 | #2 | 10 on 24 (MHA-DT-03-TL-01) |
+| `dt-cone-gear` T102 | 102 | #2 | 20 on 51 (MHA-DT-03-TL-01) |
 | `dt-cone-gear` T108 | 108 | #2 | 10 on 27 |
-| `dt-cone-gear` T114 | 114 | #2 | 20/57 turn: no standard circle |
+| `dt-cone-gear` T114 | 114 | #2 | 20 on 57 (MHA-DT-03-TL-01) |
 | `dt-cone-gear` T120 | 120 | #2 | 5 on 15 |
 | `dt-cylinder-gear` ×20 | 120 | #2 | 5 on 15 |
 | `dt-alignment-pinion` | 32 | #4 | 1 turn + 4 on 16 |
 
-T096, T102 and T114 need differential indexing, which takes a universal head with change
-gears, or a plate drilled with 12, 51 or 57 holes. Those tooth counts did not change with the
+T096, T102 and T114 need 5/12, 20/51 and 20/57 of a crank turn, which no stock plate gives. The
+shop-made index plate MHA-DT-03-TL-01 (`dt-cone-gear-tl-index-plate`, fitted by
+`dt-cone-gear-tl-indexing-assembly`) carries 24-, 51- and 57-hole circles for them; its sizes are
+best guesses until the BS-0 plate is measured
+([#2157](https://github.com/pedropaulovc/harmonic-analyzer/issues/2157)). Differential indexing on a
+universal head with change gears is the alternative. Those tooth counts did not change with the
 pitch, so this was already true of the old train.
 
 Each gear is modelled as the gap its stock cutter makes: the tooth of the lowest count in the
@@ -1041,8 +1055,10 @@ teeth is possible in principle, but the part is not designed around it.
 ### T006 special cutter
 
 No range cutter reaches 6 teeth, so T006 needs a tool made in the shop: DT6-FORM1, a custom
-ground form tool whose full grind, including the relief that clears the drum tips, is
-drawn on its own detail sheet in the MHA-DT-37 package. T006 has no bore since owner
+ground form tool. Sheet 2 of the MHA-DT-37 package defines the T006 tooth space it is ground to,
+point by point with its form tolerance; the tool itself (blank, rake, relief, holder) is not drawn,
+and the form band has no gauge the shop owns
+([#2358](https://github.com/pedropaulovc/harmonic-analyzer/issues/2358)). T006 has no bore since owner
 decision C1 keyed (2026-11-09, PR #1992), so the cutter leaves no root-to-bore web; it runs off over
 the integral spigot and pivot (.011 in radial).
 
