@@ -109,10 +109,11 @@ def test_hole_callout_states_process_fit_mate_and_wall() -> None:
     assert spec.END_HOLE_CALLOUT.splitlines() == [
         "REAM",
         "RUNNING FIT ON MHA-DT-37 PIVOT",
-        "(CLEARANCE .0005-.0013 REF)",
         "WALL TO THREAD ROOT .067 MIN",
     ]
     assert "91794A558" in spec.STOCK_NOTE
+    # Rule 2: the material lives in the title block only.
+    assert "STAINLESS" not in spec.STOCK_NOTE
 
 
 def test_builder_cuts_one_reamed_hole() -> None:

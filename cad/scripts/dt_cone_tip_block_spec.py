@@ -116,8 +116,13 @@ BLOCK_HEIGHT_PLACES = 2
 AXIS_HEIGHT_PLACES = 2
 PINCH_HEIGHT_PLACES = 2
 PASSAGE_CENTER_PLACES = 3
-# .XXX: the pinch hole stands at the block's half depth, .215 (BLOCK_Z).
-PINCH_DEPTH_PLACES = 3
+# The pinch hole stands .22 from the north face, on the .01 grid at .XX
+# (machinist review of PR 2's farm proof, rule 3: no function needs the
+# .XXX its old half-depth station .215 printed), .005 south of the block's
+# half depth; PINCH_Z is its centre off the half depth (model +Z north).
+PINCH_DEPTH_CENTER = 5.588  # .22
+PINCH_DEPTH_PLACES = 2
+PINCH_Z = BLOCK_Z / 2.0 - PINCH_DEPTH_CENTER
 SLIT_W_PLACES = 2
 # The slit depth does not print: its modelled floor stands wholly inside the
 # adjuster tap drill (checked below), so the print says SLOT INTO BORE on the
@@ -284,11 +289,14 @@ WORST_ADJUSTER_SIDE_LIGAMENT_MM = (
     - _printed_limits(BLOCK_X / 2.0, PASSAGE_CENTER_PLACES)[1]
     - _root_r
 )
+# The thinner (south) side of the pinch hole: it stands south of half depth.
 WORST_PINCH_DEPTH_LIGAMENT_MM = (
     _depth_limits[0]
-    - _printed_limits(BLOCK_Z / 2.0, PINCH_DEPTH_PLACES)[1]
+    - _printed_limits(PINCH_DEPTH_CENTER, PINCH_DEPTH_PLACES)[1]
     - _worst_clearance_radius
 )
+if PINCH_Z > 0.0:
+    raise AssertionError("the pinch hole's thinner side is no longer its south side")
 for _name, _web in (
     ("slit-mouth web", WORST_SLIT_MOUTH_WEB_MM),
     ("top ligament", WORST_TOP_LIGAMENT_MM),

@@ -22,6 +22,7 @@ from typing import Any
 from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
 
 from _check import check
+from _com import _early_bound
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -68,10 +69,9 @@ OUTPUTS = DrawingOutputs(
     png=SPEC.outputs["png"],
 )
 
-# Ø5.8 x 4.1 at 5:1 reads 29 x 20 on the sheet.  Machinist review of farm run
-# 20261110T001845485Z: on the 8:1 sheet the section caption printed a
-# "SCALE 8 : 1" equal to the sheet's; 5:1 sections on 5:1 sheets print none
-# (MHA-DT-35).  The isometric stays 8:1, so its label states a real scale.
+# Ø5.8 x 4.1 at 5:1 reads 29 x 20 on the sheet.  The isometric stays 8:1, so
+# its label states a real scale; the section, at the sheet's, prints none
+# (``_drop_sheet_scale_from_caption``).
 SHEET_SCALE = (5.0, 1.0)
 VIEW_SCALE = (5, 1)
 if tuple(ISOMETRIC_VIEW_SCALE) == VIEW_SCALE:
@@ -97,25 +97,83 @@ NORTH_FACE_X = SECTION_CENTER[0] + HALF_LENGTH
 _ROW = 0.0056
 _BORE_BLOCK_BELOW_KEEP = 0.0038 - 3.0 * _ROW  # last row's baseline
 # The OD's two-row block (value, wall) sits between its extension lines left
-# of the section.  The length's stack rows go ABOVE its value, beyond the
-# ends of its extension lines.  The bore's block stands above and right of
-# the north face, wholly above its upper extension line (the bore edge at
-# 5:1 leaves 7.8 mm between them, under the block's ~25 mm), clear of the
-# length's rows and short of the isometric.
+# of the section.  The bore's block stands above and right of the north face,
+# wholly above its upper extension line (the bore edge at 5:1 leaves 7.8 mm
+# between them, under the block's ~25 mm), short of the isometric.  The
+# length's three-row block is wider than the 20 mm between its extension
+# lines, so it stands off to the right under the section, where no extension
+# line runs through it (draw_pd_transgear_front_bushing's RingLength).  Round
+# 2 (farm run 20261110T035403233Z): the "above" callout lane stored the
+# length's stack rows but never printed them, so every callout rides the
+# "below" lane that prints.
 SECTION_KEEP = {
     "OuterDia": (SECTION_CENTER[0] - HALF_LENGTH - 0.030, SECTION_CENTER[1]),
     "BoreDia": (
         NORTH_FACE_X + 0.015,
         SECTION_CENTER[1] + BORE_R + 0.004 - _BORE_BLOCK_BELOW_KEEP,
     ),
-    "Length": (SECTION_CENTER[0], SECTION_CENTER[1] + OUTER_R + 0.016),
+    "Length": (NORTH_FACE_X + 0.045, SECTION_CENTER[1] - OUTER_R - 0.022),
 }
-CALLOUTS_BELOW = {"BoreDia": BORE_CALLOUT, "OuterDia": OUTER_DIA_CALLOUT}
-CALLOUTS_ABOVE = {"Length": LENGTH_CALLOUT}
+DIMENSION_CALLOUTS = {
+    "BoreDia": BORE_CALLOUT,
+    "OuterDia": OUTER_DIA_CALLOUT,
+    "Length": LENGTH_CALLOUT,
+}
 CUT_START = (END_CENTER[0], END_CENTER[1] - OUTER_R - 0.006)
 CUT_END = (END_CENTER[0], END_CENTER[1] + OUTER_R + 0.006)
 if BORE_DIA >= OUTER_DIA:
     raise AssertionError("MHA-DT-38 bore is not inside its OD")
+
+
+def _drop_sheet_scale_from_caption(adapter: Any, section: Any) -> None:
+    """SECTION A-A is drawn at the sheet's scale, so its caption prints no
+    scale (rule 9).  SolidWorks links a scale line into the native caption of
+    a section given its own ratio (``create_section_view`` sets one) whether
+    or not it equals the sheet's: farm runs 20261110T001845485Z (8:1) and
+    20261110T035403233Z (5:1) both printed it.  The line is removed from the
+    caption's linked fields (draw_pd_transgear_disc_hub's recipe)."""
+    native = _early_bound(section, "IView")
+    ratio = tuple(float(value) for value in native.ScaleRatio)
+    if abs(ratio[0] / ratio[1] - SHEET_SCALE[0] / SHEET_SCALE[1]) > 1e-9:
+        raise RuntimeError(
+            f"MHA-DT-38 section A-A is not at the sheet scale: {ratio!r}"
+        )
+    captions = []
+    for raw_note in native.GetNotes() or ():
+        note = _early_bound(raw_note, "INote")
+        linked_text = str(note.PropertyLinkedText or "")
+        if "<VLLABEL>" in linked_text:
+            captions.append((note, linked_text))
+    if len(captions) != 1:
+        raise RuntimeError(
+            f"expected one MHA-DT-38 section caption, found {len(captions)}"
+        )
+    note, linked_text = captions[0]
+    _telemetry.info(f"MHA-DT-38 section A-A caption fields {linked_text!r}")
+    if "<VLSCALE" not in linked_text:
+        return
+    wanted = caption_without_scale(linked_text)
+    note.PropertyLinkedText = wanted
+    rebuild_drawing(adapter, label="MHA-DT-38 section caption without scale")
+    if str(note.PropertyLinkedText or "") != wanted:
+        raise RuntimeError("MHA-DT-38 section caption fields did not persist")
+
+
+def caption_without_scale(linked_text: str) -> str:
+    """The caption's label line (``<VLNAME>`` and ``<VLLABEL>``) alone; any
+    other field layout fails loud rather than print the scale."""
+    lines = [
+        line for line in linked_text.replace("\r\n", "\n").split("\n") if line.strip()
+    ]
+    kept = [line for line in lines if "<VLSCALE" not in line]
+    if (
+        len(lines) - len(kept) != 1
+        or len(kept) != 1
+        or "<VLNAME>" not in kept[0]
+        or "<VLLABEL>" not in kept[0]
+    ):
+        raise RuntimeError(f"caption scale line is not separable: {linked_text!r}")
+    return kept[0]
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -173,6 +231,7 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=VIEW_SCALE,
         label="bushing longitudinal section",
     )
+    _drop_sheet_scale_from_caption(adapter, section)
     position_section_caption(adapter, section, CAPTION_XY, label="bushing")
     iso = place_view(
         adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISOMETRIC_VIEW_SCALE
@@ -190,8 +249,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # Places and the bore's band are authored on the part; the sheet only
     # proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW, location="below")
-    set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS, location="below")
     rebuild_drawing(adapter, label="MHA-DT-38 dimensions")
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the bushing end view")

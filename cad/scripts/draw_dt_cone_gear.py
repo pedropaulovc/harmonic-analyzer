@@ -16,11 +16,12 @@ spur gears, so every view remains hidden-lines-removed.  The side view stays
 in projection with the front view's bore axis; its face width hangs below it,
 clear of the Gear Data block. The circular pitch thickness uses a
 construction inspection witness of the actual arc size, not an ideal chord
-oracle; root MIN/MAX use the actual radial-envelope witness.  The bore prints
-in an enlarged bore view, DETAIL A, a cropped *Front model view at a scale
-that renders every bore at least ``BORE_VIEW_BORE_MIN`` across; its lettered
-boundary rings the bore on the front view, and both views centre-mark the
-bore. Numbered notes name each mate once: note 1 the bore's fit (bonded on
+oracle; root MIN/MAX use the actual radial-envelope witness.  A plain round
+bore (T012..T024) prints its diameter on the front view; a keyed bore
+(T030..T120) prints in an enlarged bore view, DETAIL A, a cropped *Front model
+view at a scale that renders the bore at least ``BORE_VIEW_BORE_MIN`` across;
+its lettered boundary rings the bore on the front view, and both views
+centre-mark the bore. Numbered notes name each mate once: note 1 the bore's fit (bonded on
 MHA-DT-37's spigot, T012/T018; bonded on MHA-DT-04's land 2, T024; sliding
 on MHA-DT-04 and the MHA-DT-VN-71 key, T030..T120), note 2 the mesh with
 MHA-DT-12. The part saves both construction sketches hidden; only the front
@@ -166,13 +167,15 @@ FRONT_CENTER = (0.105, 0.150)
 # 0.140 offset that cleared FaceWidth from Gear Data broke the alignment).
 RIGHT_CENTER = (0.245, FRONT_CENTER[1])
 ISO_CENTER = (0.355, 0.150)
-# The D-bore prints in its own enlarged view: a *Front model view of the
-# sheet's configuration, cropped by a circle round the bore (the MHA-DT-VN-61
-# pattern of draw_amplitude_bar and draw_pinion_arbor; their native detail
-# views would not take moved or imported dimensions).  At sheet scale the
-# flat is 0.76-2.3 mm deep, 1.02 mm on T006's 8:1; enlarged, 2.5-3.1 mm.
-# The view sits lower left, under the front view and left of the thickness
-# callout, and carries every bore dimension: diameter, across-flat (keyway).
+# The keyed bore (T030..T120) prints in its own enlarged view: a *Front model
+# view of the sheet's configuration, cropped by a circle round the bore (the
+# MHA-DT-VN-61 pattern of draw_amplitude_bar and draw_pinion_arbor; their
+# native detail views would not take moved or imported dimensions).  The view
+# sits lower left, under the front view and left of the thickness callout,
+# and carries every keyed-bore dimension: diameter, keyway width, T, clock.
+# A plain round bore (T012..T024) has no shape to enlarge: its diameter reads
+# on the front view (``front_bore_dia_xy``; round 2 machinist review of the
+# C1-keyed sheets, rule 1).
 # The layout audit compares view OUTLINES, not circles: GetOutline pads the
 # front view ~5.5 mm and a cropped view 10.1-10.75 mm past its crop circle
 # (farm run 20260929T061328212Z at 70d2e52: T084's front box [54.8, 99.8, 155.2,
@@ -199,10 +202,10 @@ BORE_VIEW_CROP_MARGIN = 0.0015
 # BORE ACROSS FLAT adds one, so the point drops half a row less than the
 # 5 mm it stood at and the bottom stays put.
 BORE_VIEW_AF_DROP = 0.0025
-BORE_VIEW_LABEL_DROP = 0.016
-# A keyway's T text stands right of the title, so the title rises under T's
-# dimension line instead of under its text: the larger crop circle (the
-# keyway's corners) would otherwise push it into the sheet's zone band.
+# The view's title stands this far under the crop circle: a keyway's T text
+# stands right of it, so the title rises under T's dimension line instead of
+# under its text, the larger crop circle (the keyway's corners) would
+# otherwise push it into the sheet's zone band.
 KEYED_BORE_VIEW_LABEL_DROP = 0.0135
 # The diameter's text stands this far above the crop circle (6 mm with the
 # value alone): the block is centred there, and the lines under the value
@@ -535,7 +538,35 @@ def front_keep(teeth: int) -> dict[str, tuple[float, float]]:
     # Only the T012 sheet states RV-03's web; no other sheet shows its sketch.
     if teeth == WEB_REFERENCE_TEETH:
         keep["WebMin"] = web_min_text_xy()
+    # A plain round bore reads on the front view; a keyed one in DETAIL A.
+    if not keyed(teeth):
+        keep["BoreCutDia"] = front_bore_dia_xy(teeth)
     return keep
+
+
+# The round bore's callout block (Ø, value and band over REAM THRU and the
+# flag) round its SetPosition point, measured on T012..T024 in the round-2
+# farm run 20261110T035403233Z: x -16.3..+16.3 mm, y -10.1..+9.0 mm, its
+# leader shoulder along the bottom edge. The block's lower-right corner stands
+# FRONT_BORE_DIA_REACH outside the tip circle at FRONT_BORE_DIA_ANGLE_DEG,
+# the one front-view diagonal no line takes (the centre mark runs square, the
+# root envelope's leader comes in from the upper right, T012's web runs down
+# left and the thickness witnesses run right): the radial leader crosses the
+# teeth to the bore's rim and nothing else.
+FRONT_BORE_DIA_TEXT_HALF_WIDTH = 0.0165
+FRONT_BORE_DIA_TEXT_DROP = 0.0101
+FRONT_BORE_DIA_REACH = 0.005
+FRONT_BORE_DIA_ANGLE_DEG = 135.0
+
+
+def front_bore_dia_xy(teeth: int) -> tuple[float, float]:
+    """Sheet point of a round bore's diameter text, upper left of the gear."""
+    reach = rendered_half_od(teeth) + FRONT_BORE_DIA_REACH
+    angle = math.radians(FRONT_BORE_DIA_ANGLE_DEG)
+    return (
+        FRONT_CENTER[0] + reach * math.cos(angle) - FRONT_BORE_DIA_TEXT_HALF_WIDTH,
+        FRONT_CENTER[1] + reach * math.sin(angle) + FRONT_BORE_DIA_TEXT_DROP,
+    )
 
 
 def tooth_thickness_shelf(teeth: int) -> tuple[float, float]:
@@ -599,25 +630,25 @@ KEYWAY_WIDTH_TEXT_DROP = 0.0036
 
 
 def bore_view_keep(teeth: int) -> dict[str, tuple[float, float]]:
-    """Text positions of the bore dimensions round the bore view.
+    """Text positions of the keyed bore's dimensions round the bore view; a
+    round bore has no bore view (``front_keep``).
 
-    The diameter's leader runs in from upper left.  On a keyed sheet T's
-    dimension line hangs under the crop circle between its witnesses (the
-    arc's -X point and the keyway top) and runs on right to its text, which
-    stands outside that witness and right of the keyway width's block; the
-    clock's arc sweeps the quadrant between the keyway top's upper half and
-    the +X centre-mark line (``_sweep_clock_right_of_flat``), its text right
-    of the circle and raised clear of the axis line and the arc's arrowhead
-    on it (BORE_CLOCK_TEXT_*). The keyway width's text mirrors the clock's
-    under the axis.  A round bonded bore prints its diameter alone.
+    The diameter's leader runs in from upper left.  T's dimension line hangs
+    under the crop circle between its witnesses (the arc's -X point and the
+    keyway top) and runs on right to its text, which stands outside that
+    witness and right of the keyway width's block; the clock's arc sweeps the
+    quadrant between the keyway top's upper half and the +X centre-mark line
+    (``_sweep_clock_right_of_flat``), its text right of the circle and raised
+    clear of the axis line and the arc's arrowhead on it (BORE_CLOCK_TEXT_*).
+    The keyway width's text mirrors the clock's under the axis.
     """
+    if not keyed(teeth):
+        return {}
     x, y = BORE_VIEW_CENTER
     crop = bore_view_crop_radius(teeth)
     # 3 mm right of x - 0.022: the inch seat band (+0.04572/+0.0254)
     # ran the text 1.6 mm past the left inner border (#290 batch 0).
     diameter = (x - 0.019, y + crop + BORE_VIEW_DIA_LIFT)
-    if not keyed(teeth):
-        return {"BoreCutDia": diameter}
     ratio = _bore_view_ratio(teeth)
     top = keyway_top_offset_mm(teeth) * ratio / 1000.0
     clock = (
@@ -654,8 +685,7 @@ def bore_view_label(teeth: int) -> str:
 
 
 def bore_view_label_top(teeth: int) -> float:
-    drop = KEYED_BORE_VIEW_LABEL_DROP if keyed(teeth) else BORE_VIEW_LABEL_DROP
-    return BORE_VIEW_CENTER[1] - bore_view_crop_radius(teeth) - drop
+    return BORE_VIEW_CENTER[1] - bore_view_crop_radius(teeth) - KEYED_BORE_VIEW_LABEL_DROP
 
 
 @dataclass(frozen=True)
@@ -675,10 +705,9 @@ class FrontDetail:
     letter_reach: float
 
 
-# A's boundary stands this far outside the bore on paper, inside the web. A
-# keyed bore's ring clears the keyway's corners by less: at .8 mm T030's
-# letter (3:1) would not fit the web between that ring and the root envelope.
-BORE_DETAIL_MARGIN = 0.0008
+# A's boundary stands this far outside the keyway's corners on paper, inside
+# the web: at .8 mm T030's letter (3:1) would not fit the web between that
+# ring and the root envelope.
 KEYED_BORE_DETAIL_MARGIN = 0.0006
 # The letters print at the notes' height: at the default 3.5 mm, A's would
 # not fit the narrowest web between its boundary and the root envelope.
@@ -701,10 +730,12 @@ def _front_ratio(teeth: int) -> float:
 
 
 def front_details(teeth: int) -> tuple[FrontDetail, ...]:
-    """The detail boundaries the sheet's front view carries: DETAIL A."""
+    """The detail boundaries the sheet's front view carries: DETAIL A on a
+    keyed sheet, none on a round-bore one."""
+    if not keyed(teeth):
+        return ()
     ratio = _front_ratio(teeth)
-    margin = KEYED_BORE_DETAIL_MARGIN if keyed(teeth) else BORE_DETAIL_MARGIN
-    bore_radius_mm = bore_reach_mm(teeth) + margin * 1000.0 / ratio
+    bore_radius_mm = bore_reach_mm(teeth) + KEYED_BORE_DETAIL_MARGIN * 1000.0 / ratio
     web_mm = floor_limits_mm(teeth)[0] / 2.0 - bore_radius_mm
     return (
         FrontDetail(
@@ -1758,41 +1789,48 @@ async def build(adapter: Any) -> dict[str, str]:
         iso = place_view(
             adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=view_scale
         )
-        bore_view = place_view(
-            adapter,
-            str(SOURCE),
-            "*Front",
-            *BORE_VIEW_CENTER,
-            scale=bore_view_scale(teeth),
+        # Only a keyed bore takes its enlarged view (BORE_VIEW_CENTER).
+        bore_view = (
+            place_view(
+                adapter,
+                str(SOURCE),
+                "*Front",
+                *BORE_VIEW_CENTER,
+                scale=bore_view_scale(teeth),
+            )
+            if keyed(teeth)
+            else None
         )
-        views = (front, right, iso, bore_view)
+        views = tuple(view for view in (front, right, iso, bore_view) if view is not None)
         _configure_views(adapter, configuration, views)
         for view in views:
             set_hidden_lines_removed(adapter, view)
         _hide_tangent_edges(front, configuration)
         _assert_tooth_geometry(front, configuration, teeth)
-        _center_bore_view(adapter, bore_view, configuration)
 
         # The bore view imports FIRST, while it is uncropped: a model
         # dimension already on the sheet is not imported again, and no other
         # view keeps the bore sketch's dimensions.  The sketch (BoreProfile,
         # or KeyedBoreProfile on T030..T120) is consumed by its cut, so it
-        # imports without being shown (_drawing_hidden_sketches r21).
-        bore_keep = bore_view_keep(teeth)
-        bore_annotations = hidden_sketches.curate_view_dimensions(
-            adapter,
-            bore_view,
-            keep=bore_keep,
-            view_label=f"{configuration} bore",
-            dimensions_by_feature=DRAWING_DIMENSIONS,
-        )
-        if keyed(teeth):
+        # imports without being shown (_drawing_hidden_sketches r21); a round
+        # bore's imports with the front view's.
+        bore_annotations: list[Any] = []
+        if bore_view is not None:
+            _center_bore_view(adapter, bore_view, configuration)
+            bore_keep = bore_view_keep(teeth)
+            bore_annotations = hidden_sketches.curate_view_dimensions(
+                adapter,
+                bore_view,
+                keep=bore_keep,
+                view_label=f"{configuration} bore",
+                dimensions_by_feature=DRAWING_DIMENSIONS,
+            )
             clock = _sweep_clock_right_of_flat(
                 adapter, bore_view, bore_annotations, teeth,
                 label=f"{configuration} bore view",
             )
             clocks.append((configuration, clock, teeth))
-        _crop_bore_view(adapter, bore_view, configuration, teeth, set(bore_keep))
+            _crop_bore_view(adapter, bore_view, configuration, teeth, set(bore_keep))
         # The part saves its authoring sketches hidden; the front view shows
         # the tooth and floor ones again for their dimensions, the side view
         # the tip-diameter witness (the iso view shows the part as saved).
@@ -1808,17 +1846,21 @@ async def build(adapter: Any) -> dict[str, str]:
         # ENFORCE round 4 of #971: the root envelope's dimension line crossed
         # the centre and the bore; its leader stops on its near rim. Through
         # the centre it also crossed T012's web dimension line (screen of
-        # f21dfcdd2ba7, rule 14) and ran through DETAIL A's boundary.
-        found = [
-            item for item in front_annotations
-            if dimension_name(adapter, item) == "FloorDia"
-        ]
-        if len(found) != 1:
-            raise RuntimeError(
-                f"{configuration}: expected one FloorDia dimension, found {len(found)}"
-            )
-        set_near_side_diameter(found[0], f"{configuration} FloorDia")
-        rebuild_drawing(adapter, label=f"{configuration} near-side diameter leader")
+        # f21dfcdd2ba7, rule 14) and ran through DETAIL A's boundary. A round
+        # bore's diameter on the front view stops on its near rim likewise,
+        # clear of the centre mark and the web.
+        near_side = ("FloorDia",) if keyed(teeth) else ("FloorDia", "BoreCutDia")
+        for name in near_side:
+            found = [
+                item for item in front_annotations
+                if dimension_name(adapter, item) == name
+            ]
+            if len(found) != 1:
+                raise RuntimeError(
+                    f"{configuration}: expected one {name} dimension, found {len(found)}"
+                )
+            set_near_side_diameter(found[0], f"{configuration} {name}")
+        rebuild_drawing(adapter, label=f"{configuration} near-side diameter leaders")
         # The face width first: the whole-model import deletes whatever it
         # does not keep, the witness's BlankDia included, which the targeted
         # import then brings in with its sketch shown in this view.
@@ -1857,7 +1899,8 @@ async def build(adapter: Any) -> dict[str, str]:
             adapter, front, teeth, label=f"{configuration} front",
             arms_mm=front_centre_mark_arms_mm(teeth),
         )
-        _center_mark_bore(adapter, bore_view, teeth, label=f"{configuration} bore view")
+        if bore_view is not None:
+            _center_mark_bore(adapter, bore_view, teeth, label=f"{configuration} bore view")
         sheet = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
         if not sheet.SetScale(*view_scale, False, False):
             raise RuntimeError(f"failed to pin the {configuration} sheet scale")
@@ -1866,8 +1909,11 @@ async def build(adapter: Any) -> dict[str, str]:
         )
         _mark_front_details(adapter, front, teeth, label=configuration)
         # Last, as before: the sheet's notes below land while the bore view
-        # is active.
-        _label_bore_view(adapter, bore_view, teeth, label=f"{configuration} bore view")
+        # (the front view on a round-bore sheet) is active.
+        if bore_view is not None:
+            _label_bore_view(adapter, bore_view, teeth, label=f"{configuration} bore view")
+        else:
+            _activate_view(adapter, front, label=f"{configuration} notes")
 
         add_property_linked_note(
             adapter, "Gear Data", *GEAR_DATA_POS, char_height=0.0025

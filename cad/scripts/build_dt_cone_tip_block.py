@@ -92,8 +92,10 @@ from dt_cone_tip_block_spec import (
     PINCH_BORE_SPEC,
     PINCH_BORE_DIA,
     PINCH_CLEARANCE_SPEC,
+    PINCH_DEPTH_CENTER,
     PINCH_HEIGHT,
     PINCH_RISE,
+    PINCH_Z,
     SLIT_DEPTH,
     SLIT_W,
     SURFACE_FINISHES,
@@ -285,7 +287,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "SlitDepth", f"{SLIT_DEPTH}mm")
     await set_global(adapter, "PinchRise", f"{PINCH_RISE}mm")
     await set_global(adapter, "PassageCenter", '"BlockX" / 2')
-    await set_global(adapter, "PinchDepthCenter", '"BlockZ" / 2')
+    await set_global(adapter, "PinchDepthCenter", f"{PINCH_DEPTH_CENTER}mm")
     await set_global(adapter, "FootTapOffsetX", f"{FOOT_TAP_OFFSET_X}mm")
     await set_global(adapter, "FootTapX", '"BlockX" / 2 + "FootTapOffsetX"')
     await set_global(adapter, "FootTapZ", '"BlockZ" / 2')
@@ -391,16 +393,21 @@ async def build(adapter) -> dict[str, str]:
     # Pinch screw cross-bore: native #4-40 tap through both jaws, followed by a
     # normal-fit #4 clearance through the +X near jaw only. The screw slips
     # through the head-side jaw and pulls against threads in the far jaw.
-    # Both features run along local X at (y = PINCH_BORE_Y, z = 0) from the +X
-    # block face. The slit splits the cylinder into two solid halves, so the
-    # through cut removes tap-drill area over (BLOCK_X - SLIT_W) of material.
+    # Both features run along local X at (y = PINCH_BORE_Y, z = PINCH_Z, .22
+    # from the north face) from the +X block face; the placement's z
+    # dimension holds PINCH_Z's magnitude, driven from PinchDepthCenter.  The
+    # slit splits the cylinder into two solid halves, so the through cut
+    # removes tap-drill area over (BLOCK_X - SLIT_W) of material.
+    pinch_placement = [
+        (("PinchCz", '"PinchDepthCenter" - "BlockZ" / 2'), ("PinchZ", '"PinchBoreY"'))
+    ]
     pinch_cut = wizard_holes(
         adapter, PINCH_BORE_SPEC,
-        [[BLOCK_X / 2.0, PINCH_BORE_Y, 0.0]],
+        [[BLOCK_X / 2.0, PINCH_BORE_Y, PINCH_Z]],
         (1.0, 0.0, 0.0),
         f"pinch tapped hole ({PINCH_BORE_SPEC.size})",
         name="PinchBore",
-        placement_dims=[((None, None), ("PinchZ", '"PinchBoreY"'))],
+        placement_dims=pinch_placement,
     )
     drive_jobs += pinch_cut.placement_drive_jobs
     v_pinch = math.pi * (PINCH_BORE_DIA / 2.0) ** 2 * (BLOCK_X - SLIT_W)
@@ -408,12 +415,12 @@ async def build(adapter) -> dict[str, str]:
 
     pinch_clearance = wizard_holes(
         adapter, PINCH_CLEARANCE_SPEC,
-        [[BLOCK_X / 2.0, PINCH_BORE_Y, 0.0]],
+        [[BLOCK_X / 2.0, PINCH_BORE_Y, PINCH_Z]],
         (1.0, 0.0, 0.0),
         f"pinch near-jaw clearance ({PINCH_CLEARANCE_SPEC.size} normal)",
         name="PinchClearance",
         expect_dia_mm=PINCH_CLEARANCE_DIA,
-        placement_dims=[((None, None), ("PinchZ", '"PinchBoreY"'))],
+        placement_dims=pinch_placement,
     )
     drive_jobs += pinch_clearance.placement_drive_jobs
     near_jaw = (BLOCK_X - SLIT_W) / 2.0
@@ -488,8 +495,9 @@ async def build(adapter) -> dict[str, str]:
     # Second named axis (Axis2): the pinch-screw cross-bore, along local X at
     # the slit -- the assembly locates the pinch screw on it.
     await name_bore_axis(
-        adapter, "Top Plane", PINCH_BORE_Y, "Front Plane", 0.0, "pinch axis",
-        drive_a='"PinchBoreY"', drive_jobs=drive_jobs,
+        adapter, "Top Plane", PINCH_BORE_Y, "Front Plane", PINCH_Z, "pinch axis",
+        drive_a='"PinchBoreY"', drive_b='"PinchDepthCenter" - "BlockZ" / 2',
+        drive_jobs=drive_jobs,
     )
     # Third axis, NAMED "dowel axis" (the platform's post-mount axes'
     # pattern): the locating dowel's ream, vertical (Front Plane at the tap's
@@ -544,10 +552,10 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         plane="Right",
         start=(-BLOCK_Z / 2.0, PINCH_BORE_Y),
-        end=(0.0, PINCH_BORE_Y),
+        end=(-PINCH_Z, PINCH_BORE_Y),
         orientation="horizontal",
         dimension_type="horizontal_distance",
-        value_mm=BLOCK_Z / 2.0,
+        value_mm=PINCH_DEPTH_CENTER,
         feature_name="PinchDepthReference",
         dimension_name="PinchDepthCenter",
         drive_expression='"PinchDepthCenter"',

@@ -83,7 +83,9 @@ from dt_cone_tip_block_spec import (
     HOLDDOWN_THREAD,
     PINCH_BORE_DIA,
     PINCH_CLEARANCE_DIA,
+    PINCH_DEPTH_CENTER,
     PINCH_HEIGHT,
+    PINCH_Z,
     SLIT_DEPTH,
     SLIT_W,
     SURFACE_FINISHES,
@@ -263,9 +265,9 @@ ROUND_OUT = 0.0001
 # I31's 27.8, and stopped 0.3 mm short of the right view's north face.
 ADJUSTER_CALLOUT_EXTENT = (0.0295, 0.0086, 0.0290, 0.0078)
 # The flag's ink from its upper-left corner: run 20261110T001845485Z printed
-# "CARRIES MHA-DT-39" 44.6 x 3.4 mm, 2.62 mm a glyph; its 23 glyphs at that
-# pitch, rounded out, centred over the 59.8 mm callout under it.
-ADJUSTER_ENTRY_EXTENT = (0.0, 0.0036, 0.0605, 0.0)
+# "CARRIES MHA-DT-39" 44.6 x 3.4 mm, 2.62 mm a glyph; BORE_FLAG_TEXT has the
+# same 17 glyphs.
+ADJUSTER_ENTRY_EXTENT = (0.0, 0.0036, 0.0450, 0.0)
 ADJUSTER_LEADER_ANGLE = math.radians(37.0)
 ADJUSTER_FLOOR_GAP = _drawing_leaders.ARROW_TEXT_CLEARANCE + ARROW_HALF_WIDTH + ROUND_OUT
 ADJUSTER_ENTRY_Y = _elevation_y(BLOCK_HEIGHT - SLIT_DEPTH, FRONT_CENTER) - ADJUSTER_FLOOR_GAP
@@ -440,7 +442,7 @@ TOP_TEXT_OFFSETS = {
 PINCH_HEIGHT_LINE_X = _right_x(Z_SOUTH) + 0.010
 RIGHT_KEEP = {
     "PinchDepthCenter": (
-        _right_x(BLOCK_Z / 4.0),
+        _right_x((Z_NORTH + PINCH_Z) / 2.0),
         _elevation_y(BLOCK_HEIGHT, RIGHT_CENTER) + 0.007,
     ),
     "PinchHeight": (
@@ -533,7 +535,7 @@ BOTTOM_KEEP = {
 _LEFT_NORTH_X = LEFT_CENTER[0] + Z_NORTH * _S
 VIEW_B_DIMENSIONS = {
     "ViewBPinchDepth": (
-        LEFT_CENTER[0] + BLOCK_Z * _S / 4.0,
+        LEFT_CENTER[0] + (Z_NORTH + PINCH_Z) / 2.0 * _S,
         _elevation_y(BLOCK_HEIGHT, LEFT_CENTER) + 0.007,
     ),
     "ViewBPinchHeight": (
@@ -548,12 +550,14 @@ CAPTION_Y = _elevation_y(0.0, FRONT_CENTER) - 0.004
 # out.  An estimate until a render measures it.
 VIEW_CAPTION_EXTENT = (0.0, 0.0036, 0.0160, 0.0)
 # The bore's function, named at its callout (screen review dt-fab-4: the
-# location carries its value only, rule 4): through the end screw it carries,
-# it locates T006's pivot on the shaft line, which is what holds its
-# location .XXX (the post's turn takes up the tip's lateral error only with
-# PassageCenter at .XXX: build_dt_drive_train_assembly.TIP_LATERAL_ERROR_MM;
-# machinist review of PR 2's farm proof found no function on the .335).
-BORE_FLAG_TEXT = f"LOCATES {TIP_GEAR_NUMBER} PIVOT"
+# location carries its value only, rule 4).  Its .XXX location holds the end
+# screw, and with it T006's pivot, on the line MHA-DT-05's journal points the
+# shaft along: the post's turn on its screws takes up the tip's lateral
+# error only with PassageCenter at .XXX (build_dt_drive_train_assembly
+# TIP_LATERAL_ERROR_MM 6.20 against 6.25; at .XX 6.33).  Its height is made
+# to the same axis (note 2).  Machinist review of PR 2's farm proof (rounds 1
+# and 2) read "LOCATES MHA-DT-37 PIVOT" as a mate with no function.
+BORE_FLAG_TEXT = f"ON {POST_NUMBER} AXIS"
 # Review C1: the left view sits right of the right view, out of third-angle
 # order, so it is a removed view named by a letter arrow on the view that
 # shows the face it looks at.  VIEW B looks at the -X (pinch-thread) face:
@@ -613,7 +617,7 @@ _PINCH_CLEARANCE_SHOULDER_DX = (
     _PINCH_CLEARANCE_SHOULDER_Y - _elevation_y(PINCH_HEIGHT, RIGHT_CENTER)
 ) * math.tan(PINCH_CLEARANCE_LEADER_ANGLE)
 PINCH_CLEARANCE_CALLOUT_XY = (
-    RIGHT_CENTER[0] + _PINCH_CLEARANCE_SHOULDER_DX - PINCH_CLEARANCE_CALLOUT_EXTENT[2],
+    _right_x(PINCH_Z) + _PINCH_CLEARANCE_SHOULDER_DX - PINCH_CLEARANCE_CALLOUT_EXTENT[2],
     PINCH_CLEARANCE_CALLOUT_Y,
 )
 # The pinch thread callout stands above VIEW B, its shoulder's left end left
@@ -744,8 +748,8 @@ def _value_and_rows_extent(
 
 
 _VALUE_EXTENTS = {
-    # The pinch hole's .215 depth station.
-    "PinchDepthCenter": _value_extent("PinchDepthCenter", BLOCK_Z / 2.0),
+    # The pinch hole's .22 depth station.
+    "PinchDepthCenter": _value_extent("PinchDepthCenter", PINCH_DEPTH_CENTER),
     # The locating dowel's station and its ream's banded size with rows.
     "DowelX": DOWEL_X_EXTENT,
     "DowelHoleDia": DOWEL_HOLE_EXTENT,
@@ -775,11 +779,16 @@ _VALUE_EXTENTS = {
 # (I31); "Ø 2.26 TO SLOT" on the same sheet 33.7 mm; "DRILL " added 19.6 mm,
 # the 0.0196 in the pinch clearance callout's growth.
 # The hold-down tap's lines (the tap drill and its depth, the thread and its
-# full-thread depth, then the mate its stations locate on) plus the
-# shoulder, measured on the c4c0e848a render: SolidWorks centres the block
-# on the point, 7.8 mm over it to the shoulder 8.35 under it, and the mate
-# line prints 57.6 mm wide.
-FOOT_TAP_QUALIFIER = "LOCATES ON MHA-DT-20"
+# full-thread depth, then the stack its stations set) plus the shoulder,
+# measured on the c4c0e848a render: SolidWorks centres the block on the
+# point, 7.8 mm over it to the shoulder 8.35 under it, and the last line's
+# twenty glyphs print 57.6 mm wide.  The tap's .215 from the north face sets
+# where that face, and so the end screw's head, stands over MHA-DT-20's
+# hold-down hole: at .XX the end screw's embed (build_dt_drive_train_assembly
+# END_SCREW_EMBED_WORST_MM) passes its reach and its engagement falls under
+# the owner's 1.39 D, so the station stays .XXX and names that stack (rule 4;
+# machinist review of PR 2's farm proof, round 2, found no function on it).
+FOOT_TAP_QUALIFIER = "SETS MHA-DT-39 REACH"
 FOOT_TAP_CALLOUT_EXTENT = (0.0293, 0.0086, 0.0293, 0.0080)
 # The locating dowel's ream callout (rule-23 retention, owner ruling
 # 2026-11-07 (MHA-DT-00 rubric sample, PR #2248)).  Right of the bottom view
@@ -1107,7 +1116,7 @@ def sheet_dimension_ink() -> dict[str, DimensionInk]:
         # (af13c8ff8 print: from 1.0 mm above it), not at the block's top.
         "PinchDepthCenter": (
             h,
-            (north, _right_x(0.0)),
+            (north, _right_x(PINCH_Z)),
             (_elevation_y(PINCH_HEIGHT, RIGHT_CENTER), top - 0.002),
             drop("PinchDepthCenter"),
             out,
@@ -1126,7 +1135,7 @@ def sheet_dimension_ink() -> dict[str, DimensionInk]:
         # corner and the hole's centre.
         "ViewBPinchDepth": (
             h,
-            (LEFT_CENTER[0], _LEFT_NORTH_X),
+            (LEFT_CENTER[0] + PINCH_Z * _S, _LEFT_NORTH_X),
             (pinch_y, top),
             drop("ViewBPinchDepth"),
             inside,
@@ -1134,7 +1143,7 @@ def sheet_dimension_ink() -> dict[str, DimensionInk]:
         "ViewBPinchHeight": (
             v,
             (foot, pinch_y),
-            (_LEFT_NORTH_X, LEFT_CENTER[0]),
+            (_LEFT_NORTH_X, LEFT_CENTER[0] + PINCH_Z * _S),
             keeps["ViewBPinchHeight"][0],
             inside,
         ),
@@ -1228,13 +1237,13 @@ def sheet_leaders() -> dict[str, Leader]:
         "pinch clearance callout": _callout_leader(
             PINCH_CLEARANCE_CALLOUT_XY,
             PINCH_CLEARANCE_CALLOUT_EXTENT,
-            (_right_x(0.0), pinch_y),
+            (_right_x(PINCH_Z), pinch_y),
             PINCH_CLEARANCE_DIA * _S / 2.0,
         ),
         "pinch thread callout": _callout_leader(
             PINCH_THREAD_CALLOUT_XY,
             PINCH_THREAD_CALLOUT_EXTENT,
-            (LEFT_CENTER[0], pinch_y),
+            (LEFT_CENTER[0] + PINCH_Z * _S, pinch_y),
             PINCH_BORE_DIA * _S / 2.0,
         ),
         "foot tap callout": _callout_leader(
@@ -1554,7 +1563,7 @@ def _add_view_b_pinch_dimensions(adapter: Any, view: Any, thread_edge: Any) -> N
             north,
             (_LEFT_NORTH_X, _elevation_y(BLOCK_HEIGHT / 2.0, LEFT_CENTER)),
             "horizontal",
-            BLOCK_Z / 2.0,
+            PINCH_DEPTH_CENTER,
         ),
         (
             "ViewBPinchHeight",

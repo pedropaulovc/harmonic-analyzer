@@ -923,6 +923,38 @@ def test_each_side_view_cutting_line_letter_clears_its_land() -> None:
         assert gap >= CLEAR_GAP_M + 0.0015, (section.label, gap)
 
 
+def test_section_a_cutting_line_clears_the_root_radius_and_the_step_length() -> None:
+    """PR 2 r2 (967cedb) measured, with A cut 25 mm north of land 1's step
+    (line at sheet x 0.1150): the upper arrow 0.1133..0.1287 x 0.1633..0.1667
+    (the proof's 1.7 mm pad included), the letters 0.1285..0.1349, the lower
+    one 0.1334..0.1397 high, and the R.004 text 0.0862..0.1122 x
+    0.1612..0.1647 about its (0.0996, 0.1640) position; the arrow crowded the
+    text by 1.1 mm.  Every box translated with its anchor, the arrow keeps
+    CLEAR_GAP_M plus 1 mm off the radius text and the lower letter stays left
+    of Sec1End's text (its value and flag, centred)."""
+    spec = dt_cone_gear_shaft_spec
+    big_end = drawing.SIDE_CENTER[0] + spec.SHAFT_LENGTH / 2000.0
+    (section,) = drawing.D_SECTIONS
+    line_x = big_end - section.station_mm / 1000.0
+    arrow = (line_x - 0.0017, line_x + 0.0137)
+    letter = (line_x + 0.0135, line_x + 0.0199)
+    r_x, r_y = drawing.SIDE_KEEP["ShoulderR"]
+    radius_text = (r_x - 0.0134, r_y - 0.0028, r_x + 0.0126, r_y + 0.0007)
+    upper_arrow_y = (
+        drawing.SIDE_CENTER[1] + section.reach - 0.0017,
+        drawing.SIDE_CENTER[1] + section.reach + 0.0017,
+    )
+    assert radius_text[1] < upper_arrow_y[1] and upper_arrow_y[0] < radius_text[3]
+    assert arrow[0] - radius_text[2] >= CLEAR_GAP_M + 0.001
+    # Sec1End's text keeps at least r2's offset from the lower letter, a pair
+    # the r2 proof passed (text at 0.1560, A cut 25 mm from the step).
+    s_x, _s_y = drawing.SIDE_KEEP["Sec1End"]
+    r2_letter_right = big_end - (spec.SECTION_ENDS[1] - 25.0) / 1000.0 + 0.0199
+    assert s_x - letter[1] >= 0.1560 - r2_letter_right - 1e-6
+    # The cut stays on land 1, clear of its diameter line.
+    assert abs(line_x - drawing.SIDE_DIAMETERS["Sec1Dia"][0]) >= 0.002
+
+
 def test_the_tip_end_view_carries_the_socket_callout_in_the_frame() -> None:
     """Rules 9 and 12: the socket is a standard blind ream, so its callout on
     the end view facing it defines it.  The view is projected left of the
@@ -1125,83 +1157,76 @@ def test_land_one_keyseat_runs_off_over_land_two_with_the_key_bands() -> None:
 
 def test_each_cut_is_made_over_exactly_its_feature(monkeypatch) -> None:
     """Land 1's keyseat is sketched on its end plane and cut blind back over
-    the land to the collar face; the socket is sketched on land 2's end plane
-    (the shaft's end) and cut blind its depth back into land 2."""
+    the land to one end-mill radius short of the collar face, where the end
+    mill's semicircle closes it (Codjiflo P2 on #2331, rule 16); the socket
+    is sketched on land 2's end plane (the shaft's end) and cut blind its
+    depth back into land 2."""
     adapter, stubs, _sketch_dims, _gated = _stubbed_build(monkeypatch)
     spec = dt_cone_gear_shaft_spec
+    key = cone_land_key
     sketched = [c.args[0] for c in adapter.create_sketch.call_args_list]
     assert sketched.count("Sec1EndPlane") == 2  # the land's profile and the keyseat
     assert sketched.count("Sec2EndPlane") == 2  # the land's profile and the socket
+    assert "Sec1KeyseatEndPlane" in sketched
     cuts = [c.args[0] for c in adapter.create_cut_extrude.call_args_list]
+    reach = spec.SECTION_DIAS[1] / 2.0 + 1.0
     assert [params.depth for params in cuts] == pytest.approx(
-        [spec.SECTION_ENDS[1] - spec.COLLAR_END_STATION, spec.SOCKET_DEPTH]
+        [
+            spec.SECTION_ENDS[1] - spec.COLLAR_END_STATION - key.KEY_END_SET_MM,
+            2.0 * (reach - key.KEYSEAT_FLOOR_OFFSET_MM),
+            spec.SOCKET_DEPTH,
+        ]
     )
     assert not any(params.reverse_direction for params in cuts)
+    # The end: a Ø W plunge, mid-plane from a plane 1 mm outside land 1 on
+    # +X, reaching the floor; centred one radius north of the collar face.
+    assert cuts[1].both_directions
+    assert ("Right Plane", reach) in _planes(adapter)
+    circle = next(
+        c for c in stubs["define_circle"].call_args_list if c.args[4] == "Sec1 keyseat end"
+    )
+    assert abs(circle.args[1]) + abs(circle.args[2]) == pytest.approx(
+        spec.COLLAR_END_STATION + key.KEY_END_SET_MM
+    )
+    assert circle.args[3] == pytest.approx(key.KEYSEAT_WIDTH_MM / 2.0)
+    assert circle.kwargs["drives"][2] == '"Sec1KeyseatW"'
+    assert part.KEYSEAT_END_STATION_EXPRESSION in circle.kwargs["drives"]
     named = [c.args[1] for c in stubs["name_last_feature"].call_args_list]
-    assert [name for name in named if name in {"Sec1Keyseat", "SocketProfile", "Socket"}] == [
-        "Sec1Keyseat", "SocketProfile", "Socket"
+    order = {"Sec1Keyseat", "Sec1KeyseatEnd", "SocketProfile", "Socket"}
+    assert [name for name in named if name in order] == [
+        "Sec1Keyseat", "Sec1KeyseatEnd", "SocketProfile", "Socket"
     ]
     assert not [name for name in named if "Flat" in name or name.startswith(("Sec3", "Sec4"))]
 
 
-def test_the_keyseat_end_is_located_from_the_collar_face_on_the_sheet() -> None:
-    """Machinist review of 06460fb: the sheet gave no keyseat length or end
-    location, so no mill stop.  The end radius's centre prints from the
-    collar face at the title block's .XX in the side view, and at its printed
-    limits, with the key's .XX length, the key's north end stays short of
-    T024 (the key comes to rest against the end, so the band moves the key,
-    never into the radius)."""
-    spec = dt_cone_gear_shaft_spec
+def test_the_keyseat_end_is_the_end_mill_radius_and_clears_the_key() -> None:
+    """The end's radius is half the keyseat (KEY_END_SET), tangent to the
+    collar face; the key's square south end sits on the radius's centre line,
+    where the keyseat is full width, so the key's corners clear the end at
+    every limit; and the end's volume is the exact half-disc integral."""
     key = cone_land_key
-    assert spec.DRAWING_DIMENSIONS["Sec1KeyseatEndProfile"] == {"Sec1KeyseatEndSet"}
-    assert spec.DRAWING_PRECISION_BY_NAME["Sec1KeyseatEndSet"] == 2
-    assert "Sec1KeyseatEndSet" in drawing.SIDE_KEEP
-    assert f"{key.KEY_END_SET_MM / 25.4:.2f}" == "0.05"
-    # Codjiflo #2331 4521933063: at the printed low limit the widest end mill
-    # keeps the collar's tip-side face (the 64T's seat) uncut, with margin.
-    lower = spec.printed_length_deviations("Sec1KeyseatEndSet")[0]
-    widest = key.limits(key.KEYSEAT_WIDTH_MM, key.KEYSEAT_WIDTH_BAND)[1]
-    assert spec.KEYSEAT_END_COLLAR_CLEARANCE_MIN_MM == pytest.approx(
-        key.KEY_END_SET_MM + lower - widest / 2.0
+    spec = dt_cone_gear_shaft_spec
+    assert key.KEY_END_SET_MM == pytest.approx(key.KEYSEAT_WIDTH_MM / 2.0)
+    assert part.KEYSEAT_END_STATION == pytest.approx(
+        spec.COLLAR_END_STATION + key.KEY_END_SET_MM
     )
-    assert key.KEY_END_SET_MM + lower >= (
-        key.KEYSEAT_WIDTH_MM / 2.0 + spec.KEYSEAT_END_COLLAR_MARGIN_MM
+    # The key's widest half-width fits the end's least radius on its south line.
+    key_half_max = key.limits(key.KEY_SIZE_MM, key.KEY_STOCK_BAND)[1] / 2.0
+    end_radius_min = key.limits(key.KEYSEAT_WIDTH_MM, key.KEYSEAT_WIDTH_BAND)[0] / 2.0
+    assert key_half_max <= end_radius_min
+    # Volume: converged, and between the half disc times the floor-to-round
+    # height at the keyseat's edge and at its centre.
+    assert part.keyseat_end_volume() == pytest.approx(
+        part.keyseat_end_volume(steps=40000), rel=1e-5
     )
-    assert spec.KEYSEAT_END_COLLAR_CLEARANCE_MIN_MM >= spec.KEYSEAT_END_COLLAR_MARGIN_MM
-    # Positive control: .03 (the model tangent) cut into the face.
-    assert 0.03 * 25.4 + printed_deviations(0.03 * 25.4, 2, unit="in")[0] < widest / 2.0
-    upper = spec.printed_length_deviations("Sec1KeyseatEndSet")[1]
-    key_band = printed_band_mm(key.KEY_LENGTH_PLACES, unit="in")
-    north = (
-        spec.COLLAR_END_STATION
-        + key.KEY_END_SET_MM
-        + upper
-        + key.KEY_LENGTH_MM
-        + key_band
+    radius = spec.SECTION_DIAS[1] / 2.0
+    half = key.KEYSEAT_WIDTH_MM / 2.0
+    floor = key.KEYSEAT_FLOOR_OFFSET_MM
+    assert (
+        math.pi / 2.0 * half**2 * (math.sqrt(radius**2 - half**2) - floor)
+        < part.keyseat_end_volume()
+        < math.pi / 2.0 * half**2 * (radius - floor)
     )
-    t024_south = spec.FRONT_STUB + spec.gear_faces(16)[0]
-    assert spec.KEY_NORTH_MARGIN_MM == pytest.approx(t024_south - north)
-    assert spec.KEY_NORTH_MARGIN_MM > 0.0
-    # Its text sits right of the web's and left of its own left arrow, its
-    # line below the web's witnesses and the collar diameter's lower line.
-    x, y = drawing.SIDE_KEEP["Sec1KeyseatEndSet"]
-    seat_x = drawing.BIG_END_X - spec.COLLAR_END_STATION / 1000.0
-    # PR 1 r8 (1b3d39ffbd16) boxes about their positions: the ".05" text
-    # 2.8 mm left, 3.0 right, 1.8 under, 1.7 over; its line 2.8 mm under its
-    # position, as the web's and Sec1End's are; the web's outside left arrow
-    # 6.3 mm long and 0.76 mm wide on its line from the collar face.
-    text = (x - 0.0028, y - 0.0018, x + 0.0030, y + 0.0017)
-    web_line = drawing.SIDE_KEEP["CollarWidth"][1] - 0.0028
-    web_arrow = (seat_x - 0.0063, web_line - 0.00038, seat_x, web_line + 0.00038)
-    dx = max(web_arrow[0] - text[2], text[0] - web_arrow[2], 0.0)
-    dy = max(web_arrow[1] - text[3], text[1] - web_arrow[3], 0.0)
-    assert math.hypot(dx, dy) >= CLEAR_GAP_M  # r8: 0.41 mm, layout audit gating
-    # Its own left arrow, from the radius centre's extension line, ends right
-    # of the text; its line stays above Sec1End's.
-    left_arrow = seat_x - key.KEY_END_SET_MM / 1000.0 - 0.0036
-    assert text[2] < left_arrow
-    sec1_line = drawing.SIDE_KEEP["Sec1End"][1] - 0.0028
-    assert y - 0.0028 - sec1_line >= 0.0015 and text[1] - sec1_line >= CLEAR_GAP_M
 
 
 def test_shoulder_roots_are_modelled_not_noted() -> None:
@@ -1379,7 +1404,7 @@ def test_every_station_knob_owns_its_plane_and_depth(monkeypatch) -> None:
     # The keyseat's length follows land 1's knob; its sketch is sized by the
     # land's diameter and the key globals.  The socket's diameter is its
     # global's.
-    assert owners["Sec1KeyseatLength@Sec1Keyseat"] == '"SecEnd1"'
+    assert owners["Sec1KeyseatLength@Sec1Keyseat"] == part.KEYSEAT_LENGTH_EXPRESSION
     (socket,) = [
         c
         for c in stubs["define_circle"].call_args_list
@@ -1641,6 +1666,10 @@ def _stubbed_build(monkeypatch):
     stubs["add_line_chain"].side_effect = lambda _a, points, close=True: [
         f"L{k}" for k in range(len(points) if close else len(points) - 1)
     ]
+    # The keyseat end's plane maps the shaft axis onto its sketch's -x.
+    monkeypatch.setattr(
+        part, "_sketch_xy_mm", lambda _a, point: (-point[2], point[1])
+    )
     monkeypatch.setattr(part, "_shoulder_root_max_limit", lambda _a: None)
     gated_after: list[int] = []
     monkeypatch.setattr(

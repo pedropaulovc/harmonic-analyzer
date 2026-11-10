@@ -1109,7 +1109,12 @@ def test_cone_station_rows_run_front_to_back() -> None:
     table = drawing.code_key_text(rows, 3).splitlines()
     assert table[1] == "TNNN = MHA-DT-03 WITH NNN TEETH, BY STATION, FRONT TO BACK:"
     assert table[2].startswith("STN  1  T120")
-    assert table[-1] == "GEAR 0-2 = MHA-DT-12 FROM THE FRONT, GEAR 0 ON MHA-DT-26."
+    assert table[-2] == "GEAR 0-2 = MHA-DT-12 FROM THE FRONT, GEAR 0 ON MHA-DT-26."
+    # Step 1P's comb is a shop tool with no BOM row: the key names it and
+    # defines the BLADE the step cites (machinist review of bd81283964).
+    assert table[-1] == "MHA-DT-03-TL-02 = PHASING COMB, ONE BLADE IN A TOOTH SPACE PER GEAR."
+    step = drawing.CONE_CRANK_STEPS[drawing.CONE_CRANK_STEPS.index("1P. ") :]
+    assert step.startswith("1P. ENGAGE MHA-DT-03-TL-02 AT ONCE, T030'S BLADE")
 
 
 def test_bom_split_keeps_the_first_column_no_taller() -> None:

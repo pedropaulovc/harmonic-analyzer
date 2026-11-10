@@ -136,10 +136,13 @@ COMB_CENTER_MM = (
     + (min(y for _, y in _COMB_POINTS) + max(y for _, y in _COMB_POINTS)) / 2.0,
     comb.KIT_POSITION_MM[2],
 )
-# Item 2 has no fitting here: the drive train's bonding step engages it.
+# Item 2 has no fitting here: the drive train's bonding step engages it. Its
+# view is a removed view at its own scale, so it carries a letter (rule 9).
+COMB_VIEW_LETTER = "A"
 COMB_VIEW_LABEL = "\n".join(
     (
-        f"ITEM 2, LOOSE KIT ITEM, SCALE {COMB_VIEW_SCALE[0]:g}:{COMB_VIEW_SCALE[1]:g}",
+        f"VIEW {COMB_VIEW_LETTER}, ITEM 2, SCALE "
+        f"{COMB_VIEW_SCALE[0]:g}:{COMB_VIEW_SCALE[1]:g}",
         "FITTED BY MHA-DT-00 STEP 1, NOT ON THE HEAD",
     )
 )

@@ -110,8 +110,23 @@ def test_bore_block_stands_clear_of_its_extension_lines() -> None:
     )
     assert drawing.SHEET_SCALE == (5.0, 1.0)
     assert tuple(spec.ISOMETRIC_VIEW_SCALE) != drawing.VIEW_SCALE
-    assert drawing.CALLOUTS_BELOW == {
+    # Round 2 (farm run 20261110T035403233Z): the "above" lane never printed
+    # the length's stack rows; every callout rides the "below" lane, and the
+    # length's block stands right of the north face, under the section.
+    assert drawing.DIMENSION_CALLOUTS == {
         "BoreDia": spec.BORE_CALLOUT,
         "OuterDia": spec.OUTER_DIA_CALLOUT,
+        "Length": spec.LENGTH_CALLOUT,
     }
-    assert drawing.CALLOUTS_ABOVE == {"Length": spec.LENGTH_CALLOUT}
+    length_x, length_y = drawing.SECTION_KEEP["Length"]
+    assert length_x > drawing.NORTH_FACE_X + 0.03
+    assert length_y < drawing.SECTION_CENTER[1] - drawing.OUTER_R
+
+
+def test_section_caption_drops_only_its_scale_line() -> None:
+    import draw_dt_cone_tip_bushing as drawing
+
+    linked = "<VLNAME> <VLLABEL>\r\n<VLSCALE> <VLSCALEV>"
+    assert drawing.caption_without_scale(linked) == "<VLNAME> <VLLABEL>"
+    with pytest.raises(RuntimeError):
+        drawing.caption_without_scale("<VLNAME>\n<VLLABEL>\n<VLSCALEV>")

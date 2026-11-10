@@ -118,7 +118,7 @@ def test_callouts_and_notes_name_every_mate_once() -> None:
     pivot = callouts["PivotDia"]
     assert pivot == f"PRESS AND RUNNING FIT\n{notes.PIVOT_NOTE_FLAG}"
     sheet = notes.sheet_notes().splitlines()
-    assert len(sheet) <= 5
+    assert len(sheet) <= 6
     # One pivot diameter: pressed in the bushing, its end running in the end
     # screw's hole; both mates by number and name, both acceptances.
     pivot_note = " ".join(sheet[:2])
@@ -129,8 +129,11 @@ def test_callouts_and_notes_name_every_mate_once() -> None:
     assert spec.inch_range(spec.PIVOT_PRESS_INTERFERENCE_MM) in pivot_note
     assert spec.inch_range(spec.PIVOT_RUNNING_CLEARANCE_MM) in pivot_note
     assert sheet[2].startswith(f"{notes.TEETH_NOTE_NUMBER}. TEETH MESH WITH MHA-DT-12")
-    assert sheet[-1] == "3. CENTRES OK."
-    assert callouts["FaceWidth"] == "SETS CONE GEAR STACK\nON MHA-DT-04"
+    assert sheet[-2] == "3. CENTRES OK."
+    # The width's mate in a flagged note: its callout block fits between the
+    # extension lines the two stem lengths share.
+    assert callouts["FaceWidth"] == notes.FACE_NOTE_FLAG == "SEE NOTE 4"
+    assert sheet[-1] == "4. GEAR WIDTH: SETS THE CONE GEAR STACK ON MHA-DT-04."
     text = "\n".join((*sheet, *callouts.values()))
     # No retired part, no solder, no D-flat, no stale tip collar.
     for retired in ("MHA-DT-VN-54", "MHA-DT-VN-55", "SOLDER", "FLAT", "COLLAR"):

@@ -206,21 +206,40 @@ def test_the_shop_row_bands_live_on_the_model_dimensions() -> None:
         assert name in spec.GLOBALS, name
 
 
-def test_every_banded_dimension_points_at_note_one() -> None:
-    banded = {name for _, name in spec.MODEL_BANDS_MM}
-    for name in banded:
-        assert spec.BLADE_NOTE_FLAG in spec.CALLOUTS_BELOW[name], name
+def test_every_banded_dimension_names_its_gear_or_points_at_note_one() -> None:
+    """Each blade's thickness and location name its gear; its tip depth
+    points at note 1, which ties it to the gear named at that blade."""
     for teeth in spec.GEARS:
-        callout = spec.CALLOUTS_BELOW[spec.blade_width_name(teeth)]
-        assert callout.splitlines() == [
-            f"{spec.gear_number(teeth)} SPACE",
+        assert spec.CALLOUTS_BELOW[spec.blade_width_name(teeth)].splitlines() == [
+            spec.gear_number(teeth),
             spec.BLADE_NOTE_FLAG,
         ]
+        assert spec.CALLOUTS_BELOW[spec.blade_face_name(teeth)] == spec.gear_number(
+            teeth
+        )
+        assert spec.CALLOUTS_BELOW[spec.blade_tip_name(teeth)] == spec.BLADE_NOTE_FLAG
     notes = spec.SHEET_NOTES.splitlines()
     assert len(notes) <= 4
     assert notes[0].startswith("1. EACH BLADE: CLEARANCE FIT IN ONE TOOTH SPACE")
-    # Words only: no dimension, no method (rule 7).
+    assert "NAMED AT IT" in notes[1]
+    # Words only: no dimension, no method, no narration (rule 7).
     assert not any(char.isdigit() for line in notes for char in line[2:])
+    assert "PHASE" not in spec.SHEET_NOTES
+
+
+def test_sizes_no_fit_depends_on_print_at_two_places() -> None:
+    """Rule 3: the lengths, starts, steps, height and thickness are .XX; the
+    blades still sit inside their gears' faces at the .XX band."""
+    for name in (
+        "PlateLength",
+        "PlateHeight",
+        "PlateThick",
+        "BladeLength",
+        *(f"Start{spec.gear_tag(t)}" for t in spec.BONDED_TEETH),
+        *(f"Step{spec.gear_tag(t)}" for t in spec.BONDED_TEETH[:-1]),
+    ):
+        assert spec.DRAWING_PRECISION_BY_NAME[name] == 2, name
+    assert spec.AXIAL_PLACEMENT_WINDOW_MM >= 0.1
 
 
 def test_no_fork_wording_survives() -> None:
@@ -246,36 +265,27 @@ def test_builder_drives_every_global_and_names_the_blades() -> None:
     assert spec.PLATE_VOLUME - spec.FINISHED_VOLUME == pytest.approx(expected)
 
 
-CHAR = 0.0026  # measured: a capital of the 3.5 mm dimension font
-
-
-def _block(text_lines: list[str], right: float, y: float) -> tuple[float, ...]:
-    width = max(len(line) for line in text_lines) * CHAR
-    return (right - width, y - 0.010, right, y + 0.010)
-
-
 def _apart(a: tuple[float, ...], b: tuple[float, ...]) -> bool:
     return a[2] <= b[0] or b[2] <= a[0] or a[3] <= b[1] or b[3] <= a[1]
 
 
 def test_sheet_text_stands_apart_inside_the_border_and_off_the_title_block() -> None:
+    """On the measured text sides (round 2 farm layout audit)."""
     left, bottom, right, top = 0.0127, 0.0127, 0.4191, 0.2667
-    title = (0.216, 0.0127, right, 0.069)
-    # Front: the depth texts in one row, banded ones 25 mm wide, centred.
+    title = (0.216, 0.0, right, 0.066 + 0.003)
+    # Front: each depth's text runs right of its line, the next line clear.
     row = sorted(
-        (x, drawing._half_width(name))
+        (x, drawing.depth_text_width(name))
         for name, (x, y) in drawing.FRONT_KEEP.items()
-        if y == drawing.DEPTH_TEXT_Y or name == "PlateHeight"
+        if y == drawing.DEPTH_TEXT_Y
     )
-    for (x0, h0), (x1, h1) in zip(row, row[1:], strict=False):
-        assert x1 - h1 - (x0 + h0) >= drawing.TEXT_GAP - 1e-9
+    assert len(row) == len(spec.GEARS) + len(spec.BONDED_TEETH) - 1
+    for (x0, w0), (x1, _w1) in zip(row, row[1:], strict=False):
+        assert x1 - (x0 + w0) >= drawing.TEXT_GAP - 1e-9
     assert row[-1][0] + row[-1][1] < right
-    assert drawing.DEPTH_TEXT_Y + 0.010 < drawing.PLATE_BOX[1]
-    # Bottom: each block ends at its dimension line and runs left.
-    blocks = {}
-    for name, (x, y) in drawing.BOTTOM_KEEP.items():
-        lines = [".000 +.000", *spec.CALLOUTS_BELOW.get(name, "").splitlines()]
-        blocks[name] = _block(lines, x, y)
+    assert drawing.DEPTH_TEXT_Y + 0.008 < drawing.PLATE_BOX[1]
+    # Bottom: no block on another, the border, or the title block.
+    blocks = drawing.bottom_blocks()
     names = list(blocks)
     for i, a in enumerate(names):
         box = blocks[a]
@@ -283,24 +293,27 @@ def test_sheet_text_stands_apart_inside_the_border_and_off_the_title_block() -> 
         assert _apart(box, title), a
         for b in names[i + 1 :]:
             assert _apart(box, blocks[b]), (a, b)
-    # No outer-row leader runs through an inner-row block.
+    # No line from the edge view to an outer-row block runs through an
+    # inner-row block (rule 14).
     for name, (x, y) in drawing.BOTTOM_KEEP.items():
         if y not in (drawing.OVER_Y[1], drawing.UNDER_Y[1]):
             continue
         inner = drawing.OVER_Y[0] if y == drawing.OVER_Y[1] else drawing.UNDER_Y[0]
         for other, box in blocks.items():
             if drawing.BOTTOM_KEEP[other][1] == inner:
-                assert not box[0] <= x <= box[2], (name, other)
+                assert not box[0] - 0.002 <= x <= box[2] + 0.002, (name, other)
+    # T006's thickness stands over the edge view, off the title block.
+    assert drawing.width_over(6)
     # The bottom view's rows stand clear of the front view's start rows.
     lowest_start = min(
         y for name, (_x, y) in drawing.FRONT_KEEP.items() if name.startswith("Start")
     )
-    assert drawing.OVER_Y[1] + 0.010 < lowest_start - 0.003
+    assert max(box[3] for box in blocks.values()) < lowest_start - 0.004
     # The notes sit left of the title block, under the bottom view's blocks.
-    width = max(len(line) for line in spec.SHEET_NOTES.splitlines()) * CHAR
+    width = max(len(line) for line in spec.SHEET_NOTES.splitlines()) * 0.0026
     assert drawing.NOTES_XY[0] + width < title[0]
     lines = len(spec.SHEET_NOTES.splitlines())
-    assert drawing.NOTES_XY[1] < drawing.UNDER_Y[1] - 0.010
+    assert drawing.NOTES_XY[1] < min(box[1] for box in blocks.values()) - 0.002
     assert drawing.NOTES_XY[1] - lines * 0.0046 > bottom
 
 
@@ -316,6 +329,6 @@ def test_the_shop_kit_holds_the_comb() -> None:
     assert kit.BOM_COMPONENTS == (kit.PLATE, spec.PART_NAME)
     assert kit.BOM_ITEMS[spec.PART_NAME] == "2"
     assert "KIT_POSITION_MM" in inspect.getsource(kit_build)
-    # A loose kit item: its own view, never drawn in the assembled views.
+    # A loose kit item in its own removed view, lettered with its scale.
     assert kit.BOM_DESCRIPTIONS[spec.PART_NAME] == "CONE TIP GEAR PHASING COMB"
-    assert "LOOSE KIT ITEM" in kit.COMB_VIEW_LABEL
+    assert kit.COMB_VIEW_LABEL.splitlines()[0] == "VIEW A, ITEM 2, SCALE 2:1"

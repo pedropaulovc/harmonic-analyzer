@@ -102,10 +102,14 @@ def test_part_and_drawing_share_the_complete_native_dimension_contract() -> None
         assert expected == marked - (round_bore if spec.keyed(teeth) else keyed_bore) - (
             set() if teeth == spec.WEB_REFERENCE_TEETH else {"WebMin"}
         )
-        # The whole bore prints in the bore view, and only there.
-        assert set(drawing.bore_view_keep(teeth)) == spec.DRAWING_DIMENSIONS[
-            spec.bore_sketch(teeth)
-        ]
+        # A keyed bore prints whole in the bore view, and only there; a plain
+        # round bore has no bore view and prints on the front view.
+        bore = spec.DRAWING_DIMENSIONS[spec.bore_sketch(teeth)]
+        if spec.keyed(teeth):
+            assert set(drawing.bore_view_keep(teeth)) == bore
+        else:
+            assert drawing.bore_view_keep(teeth) == {}
+            assert bore <= set(drawing.front_keep(teeth))
         # Diameters on the side view beside the face width (rule 11).
         assert set(drawing.right_keep(teeth)) == {"FaceWidth", "BlankDia"}
 
@@ -879,12 +883,50 @@ _CROPPED_OUTLINE_PAD = 0.0113
 _ZONE_MARGIN = 0.0127
 
 
-def test_bore_view_enlarges_every_bore_clear_of_its_neighbours() -> None:
+def test_front_view_carries_a_round_bore_callout_clear_of_its_neighbours() -> None:
+    """Round 2 machinist review of the C1-keyed sheets (rule 1): DETAIL A only
+    enlarged T012..T024's plain round bore, so the diameter reads on the
+    front view, its block (measured extents) upper left of the gear: outside
+    the tip circle, inside the border, under the numbered notes, left of the
+    root envelope's stack and above T012's web text."""
+    for teeth in spec.CONFIGURATION_TEETH:
+        if spec.keyed(teeth):
+            assert "BoreCutDia" not in drawing.front_keep(teeth)
+            continue
+        x, y = drawing.front_keep(teeth)["BoreCutDia"]
+        assert (x, y) == drawing.front_bore_dia_xy(teeth)
+        half_width = drawing.FRONT_BORE_DIA_TEXT_HALF_WIDTH
+        box = Box(x - half_width, y - drawing.FRONT_BORE_DIA_TEXT_DROP, x + half_width, y + 0.009)
+        cx, cy = drawing.FRONT_CENTER
+        nearest = (min(max(cx, box.xmin), box.xmax), min(max(cy, box.ymin), box.ymax))
+        half_od = drawing.rendered_half_od(teeth)
+        assert math.dist(nearest, drawing.FRONT_CENTER) >= half_od + 0.004, teeth
+        # The leader runs up left, the one diagonal no other front-view line takes.
+        corner_angle = math.degrees(math.atan2(box.ymin - cy, box.xmax - cx))
+        assert corner_angle == pytest.approx(drawing.FRONT_BORE_DIA_ANGLE_DEG, abs=5.0)
+        assert abs(math.remainder(corner_angle - spec.WEB_REFERENCE_ANGLE_DEG, 360.0)) >= 90.0
+        assert box.xmin > _ZONE_MARGIN
+        notes_bottom = drawing.NUMBERED_NOTES_POS[1] - len(
+            drawing.sheet_notes(teeth).splitlines()
+        ) * 0.00351
+        assert box.ymax < notes_bottom - 0.005, teeth
+        floor_x = drawing.front_keep(teeth)["FloorDia"][0]
+        assert box.xmax < floor_x - 0.019 - 0.005, teeth
+        if teeth == spec.WEB_REFERENCE_TEETH:
+            assert box.ymin > drawing.web_min_text_xy()[1] + 0.010
+        with pytest.raises(ValueError):
+            drawing.clock_dimension_name(teeth)
+    source = inspect.getsource(drawing.build)
+    assert 'near_side = ("FloorDia",) if keyed(teeth) else ("FloorDia", "BoreCutDia")' in source
+
+
+def test_bore_view_enlarges_every_keyed_bore_clear_of_its_neighbours() -> None:
     ladder = [n / d for n, d in drawing.BORE_VIEW_SCALE_LADDER]
     cx, cy = drawing.BORE_VIEW_CENTER
     for teeth in spec.CONFIGURATION_TEETH:
-        keyed = spec.keyed(teeth)
-        dia_name = "KeyedBoreDia" if keyed else "BoreCutDia"
+        if not spec.keyed(teeth):
+            continue
+        dia_name = "KeyedBoreDia"
         numerator, denominator = drawing._SCALE_BY_TEETH[teeth]
         sheet_ratio = numerator / denominator
         view_numerator, view_denominator = drawing.bore_view_scale(teeth)
@@ -924,12 +966,6 @@ def test_bore_view_enlarges_every_bore_clear_of_its_neighbours() -> None:
             "DETAIL A",
             f"SCALE {view_numerator:g} : {view_denominator:g}",
         ]
-        if not keyed:
-            # A reamed round bore prints its diameter alone: no clock.
-            assert set(keep) == {"BoreCutDia"}
-            with pytest.raises(ValueError):
-                drawing.clock_dimension_name(teeth)
-            continue
         clock_name = drawing.clock_dimension_name(teeth)
         assert clock_name == "KeywayClock"
         # The keyway is at least 2.5 mm deep on paper.
@@ -1076,11 +1112,15 @@ def _corner_radii(box: Box, centre: tuple[float, float]) -> tuple[float, float]:
 
 
 def test_enlarged_views_are_lettered_with_boundaries_on_the_front_view() -> None:
-    """Rule 9 (screen of f21dfcdd2ba7): the bore view is DETAIL A, its
-    boundary ringing the bore on every front view. The letter stands outside
-    its boundary, clear of the lines round it."""
+    """Rule 9 (screen of f21dfcdd2ba7): the keyed bore view is DETAIL A, its
+    boundary ringing the bore on every keyed front view; a round-bore sheet
+    has no enlarged view and no boundary. The letter stands outside its
+    boundary, clear of the lines round it."""
     for teeth in spec.CONFIGURATION_TEETH:
         details = drawing.front_details(teeth)
+        if not spec.keyed(teeth):
+            assert details == ()
+            continue
         assert [detail.letter for detail in details] == ["A"]
         bore = details[0]
         centre, radius = drawing.front_detail_on_sheet(teeth, bore)
@@ -1102,7 +1142,8 @@ def test_enlarged_views_are_lettered_with_boundaries_on_the_front_view() -> None
     assert "_mark_front_details(adapter, front, teeth" in source
     # The root envelope's leader stops on its near rim (the tip diameter
     # left the front view for the side view).
-    assert 'set_near_side_diameter(found[0], f"{configuration} FloorDia")' in source
+    assert 'set_near_side_diameter(found[0], f"{configuration} {name}")' in source
+    assert "if bore_view is not None:" in source
 
 
 def test_settled_clock_check_refuses_outside_arrow_stubs() -> None:

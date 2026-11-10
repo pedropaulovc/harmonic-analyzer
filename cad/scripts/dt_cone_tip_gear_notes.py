@@ -48,6 +48,8 @@ PIVOT_NOTE_NUMBER = 1
 TEETH_NOTE_NUMBER = 2
 PIVOT_NOTE_FLAG = f"SEE NOTE {PIVOT_NOTE_NUMBER}"
 TEETH_NOTE_FLAG = f"SEE NOTE {TEETH_NOTE_NUMBER}"
+FACE_NOTE_NUMBER = 4
+FACE_NOTE_FLAG = f"SEE NOTE {FACE_NOTE_NUMBER}"
 
 
 def sheet_notes() -> str:
@@ -60,7 +62,8 @@ def sheet_notes() -> str:
     end screw's hole then runs on it with the clearance its limits give. Note
     2 names the mesh and the fit route of the tip, thickness and root bands,
     with the teeth's do-not-cut. Note 3: the stems are turned between centres,
-    and a centre hole in either end harms nothing (rule 11).
+    and a centre hole in either end harms nothing (rule 11). Note 4 names the
+    gear width's mate: the leaves set the cone gear stack on the shaft.
     """
     interference = spec.inch_range(spec.PIVOT_PRESS_INTERFERENCE_MM)
     clearance = spec.inch_range(spec.PIVOT_RUNNING_CLEARANCE_MM)
@@ -74,6 +77,7 @@ def sheet_notes() -> str:
             "THEN BY BACKLASH AT ASSEMBLY,",
             f"   PER GEAR DATA. {TOOTH_EDGE_NOTE}",
             "3. CENTRES OK.",
+            f"{FACE_NOTE_NUMBER}. GEAR WIDTH: SETS THE CONE GEAR STACK ON {SHAFT_MATE_NUMBER}.",
         )
     )
 
@@ -94,8 +98,10 @@ DIMENSION_CALLOUTS = {
     # The origin circle is an inspection witness, not the off-centre root arc.
     "FloorDia": f"ROOT ENVELOPE\n{TEETH_NOTE_FLAG}",
     # The leaves are one face of the twenty-gear cone stack (dt_cone_gear_stack)
-    # on the cone shaft, the crank drive gear's wording (draw_dt_crank_drive_gear).
-    "FaceWidth": f"SETS CONE GEAR STACK\nON {SHAFT_MATE_NUMBER}",
+    # on the cone shaft: named in flagged note 4, so the callout block stays
+    # inside the width's own extension lines, which the pivot's and spigot's
+    # lengths share (farm review round 2, rule 14).
+    "FaceWidth": FACE_NOTE_FLAG,
 }
 # Text over the value, one line each (a multi-line callout above a value
 # drops from the print, draw_dt_cone_gear).

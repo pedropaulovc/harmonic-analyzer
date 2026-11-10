@@ -86,7 +86,6 @@ def gear_tag(teeth: int) -> str:
 
 # --- The title block's bands (inch sheet) -------------------------------------
 _XX = printed_band_mm(2, unit=UNIT)
-_XXX = printed_band_mm(3, unit=UNIT)
 
 
 def inch_grid_mm(value_mm: float, places: int, rounding=round) -> float:
@@ -131,9 +130,11 @@ def _south_face_mm(teeth: int) -> float:
 # MHA-DT-38 bushing); a blade's north end over the smaller gear beyond it
 # clears that gear's tips (its tip stands over them, below).  The blades stop
 # BLADE_INSET short of both faces; T030..T012 blades are BLADE_LENGTH long,
-# and the T006 blade runs to the plate's north end.
-BLADE_INSET = 0.020 * INCH
-BLADE_LENGTH_PLACES = 3
+# and the T006 blade runs to the plate's north end. Every length is .XX at
+# the title block's band (rule 3): the inset keeps each blade inside its
+# face at that band (AXIAL_PLACEMENT_WINDOW).
+BLADE_INSET = 0.030 * INCH
+BLADE_LENGTH_PLACES = 2
 BLADE_LENGTH = inch_grid_mm(
     FACE_WIDTH - 2.0 * BLADE_INSET, BLADE_LENGTH_PLACES, math.floor
 )
@@ -169,14 +170,15 @@ def _placement_window_mm(
 
 
 def _placement_window_min_mm() -> float:
-    face, feeler, printed = abs(family.FACE_WIDTH_BAND[1]), STACK_FEELER_BAND, _XXX
+    face, feeler, printed = abs(family.FACE_WIDTH_BAND[1]), STACK_FEELER_BAND, _XX
     widths = []
-    for signs in itertools.product((-1.0, 1.0), repeat=len(GEARS) + 1):
+    for signs in itertools.product((-1.0, 1.0), repeat=len(GEARS) + 3):
         faces = tuple(sign * face for sign in signs[: len(GEARS)])
-        stack_feeler = signs[-1] * feeler
-        # The print's worst: blade starts early (south ends nearer the larger
-        # gear), the plate long (T006's north end nearer the bushing).
-        ends = (0.0, *(-printed for _ in GEARS[1:]), printed)
+        stack_feeler = signs[len(GEARS)] * feeler
+        # Every print: the blade starts at either end of their .XX band
+        # (together), the plate's length at either end of its own.
+        start, length = signs[-2] * printed, signs[-1] * printed
+        ends = (0.0, *(start for _ in GEARS[1:]), length)
         widths.append(_placement_window_mm(stack_feeler, faces, ends))
     return min(widths)
 
@@ -782,8 +784,16 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     PLATE_FEATURE: {"PlateThick"},
     **{blade_sketch(t): {blade_width_name(t), blade_face_name(t)} for t in GEARS},
 }
+# Every length and height no fit depends on is .XX (rule 3).
 _TWO_PLACE = frozenset(
-    {"PlateHeight", "PlateThick", *(f"Step{gear_tag(t)}" for t in BONDED_TEETH[:-1])}
+    {
+        "PlateLength",
+        "PlateHeight",
+        "PlateThick",
+        "BladeLength",
+        *(f"Start{gear_tag(t)}" for t in BONDED_TEETH),
+        *(f"Step{gear_tag(t)}" for t in BONDED_TEETH[:-1]),
+    }
 )
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     feature: {name: 2 if name in _TWO_PLACE else 3 for name in names}
@@ -811,27 +821,25 @@ MODEL_BANDS_MM: dict[tuple[str, str], tuple[float, float]] = {
 }
 
 # --- Sheet words ----------------------------------------------------------------
-# Every banded dimension serves the five gears' tooth spaces; note 1 names the
-# fit, each blade's thickness names its gear (rule 4). Words only (rule 7).
+# Every banded dimension serves one gear's tooth space. Each blade's
+# thickness and location name its gear; its tip depth points at note 1,
+# which ties it to the gear named at that blade (rule 4). Words only, no
+# narration (rule 7).
 BLADE_NOTE_NUMBER = 1
 BLADE_NOTE_FLAG = f"SEE NOTE {BLADE_NOTE_NUMBER}"
 SHEET_NOTES = "\n".join(
     (
         f"{BLADE_NOTE_NUMBER}. EACH BLADE: CLEARANCE FIT IN ONE TOOTH SPACE OF THE GEAR",
-        "   NAMED AT IT, ITS TIP BETWEEN THAT GEAR'S ROOT AND PITCH",
-        "   CIRCLES. THE BLADES SET THE FIVE GEARS' PHASE TOGETHER.",
+        "   NAMED AT IT, ITS TIP BETWEEN THAT GEAR'S ROOT AND PITCH CIRCLES.",
     )
 )
 if len(SHEET_NOTES.splitlines()) > 4:
     raise AssertionError("at most four note lines")
-# Each blade names the gear whose space it fits; every tight band points at
-# note 1; the thin blades print as a plain fact (rule 20).
+# The thin blades print as a plain fact (rule 20).
 BLADE_WALL_TEXT = f"BLADE WALL {inch_text(BLADE_MIN_IN * INCH, 3)} MIN"
 CALLOUTS_BELOW: dict[str, str] = {
-    **{
-        blade_width_name(t): f"{gear_number(t)} SPACE\n{BLADE_NOTE_FLAG}" for t in GEARS
-    },
-    **{blade_face_name(t): BLADE_NOTE_FLAG for t in GEARS},
+    **{blade_width_name(t): f"{gear_number(t)}\n{BLADE_NOTE_FLAG}" for t in GEARS},
+    **{blade_face_name(t): gear_number(t) for t in GEARS},
     **{blade_tip_name(t): BLADE_NOTE_FLAG for t in GEARS},
     "PlateThick": BLADE_WALL_TEXT,
 }

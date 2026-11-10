@@ -152,28 +152,16 @@ def inch_text(value_mm: float, places: int) -> str:
     return text[1:] if text.startswith("0.") else text
 
 
-def _floor_text(value_mm: float, places: int) -> str:
-    scaled = math.floor(round(value_mm / MM_PER_IN * 10**places, 6))
-    return inch_text(scaled / 10**places * MM_PER_IN, places)
-
-
-def _ceil_text(value_mm: float, places: int) -> str:
-    scaled = math.ceil(round(value_mm / MM_PER_IN * 10**places, 6))
-    return inch_text(scaled / 10**places * MM_PER_IN, places)
-
-
-# Rule 12: the process; rule 4: the fit and its mate by drawing number, the
-# clearance REF; rule 20: the wall shortfall as a plain fact (RV-01).  The
-# reamed depth is its own model dimension in the section (a blind hole's
-# depth is its full-diameter depth, so it needs no words).
+# Rule 12: the process; rule 4: the fit and its mate by drawing number (the
+# printed limits set the clearance, so no REF range repeats them); rule 20:
+# the wall shortfall as a plain fact (RV-01).  Rule 7: two lines of words.
+# The reamed depth is its own model dimension in the section (a blind
+# hole's depth is its full-diameter depth, so it needs no words).
 END_HOLE_CALLOUT = "\n".join(
     (
         "REAM",
         f"RUNNING FIT ON {PIVOT_NUMBER} PIVOT",
-        f"(CLEARANCE {_floor_text(PIVOT_CLEARANCE[0], 4)}-"
-        f"{_ceil_text(PIVOT_CLEARANCE[1], 4)} REF)",
-        f"WALL TO THREAD ROOT {END_HOLE_WALL_PRINTED_IN:.3f}".replace("0.", ".", 1)
-        + " MIN",
+        f"WALL TO THREAD ROOT {inch_text(END_HOLE_WALL_PRINTED_IN * MM_PER_IN, 3)} MIN",
     )
 )
 
@@ -181,7 +169,7 @@ END_HOLE_CALLOUT = "\n".join(
 STOCK_NOTE = "\n".join(
     (
         f"1. MAKE FROM McMASTER-CARR {SKU}, {THREAD} X 5/8 SLOTTED FILLISTER",
-        "   HEAD SCREW, 18-8 STAINLESS STEEL; ADD THE REAMED HOLE ONLY.",
+        "   HEAD SCREW; ADD THE REAMED HOLE ONLY.",
         "2. UNDIMENSIONED PURCHASED GEOMETRY IS REFERENCE.",
     )
 )

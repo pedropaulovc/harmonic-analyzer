@@ -610,9 +610,12 @@ SEQUENCE_LEFT_FIELD = (
 # recheck table (round 1 measured those at x 147.6 mm and y 178.1 mm) and
 # clear left of the reference view (x 361 mm up).
 # Owner ruling 2026-11-08 (Pedro): the field holds the code key, two lines
-# more than the station table it carries (bottom 117 -> 110 mm, still over
-# the interface notes' 101 mm top and the title block's 65.5 mm).
-STATION_TABLE_FIELD = (0.158, 0.172, 0.350, 0.110)
+# more than the station table it carries (bottom 117 -> 110 mm), and the
+# phasing comb's line (machinist review of bd81283964: bottom 110 -> 105.5 mm,
+# still 4.5 mm over the interface notes' 101 mm top; run
+# 20261110T035403233Z measured the key's bottom at 112.5 mm with 0.6 line
+# spare in the 110 mm field).
+STATION_TABLE_FIELD = (0.158, 0.172, 0.350, 0.1055)
 # The external interfaces print on sheet 14 under the feeler stack table,
 # left of the title block (x 216 mm): sheet 12's right field holds the checks
 # continuation and saved pose (rubric sample round 4: the one-thing check
@@ -1221,6 +1224,10 @@ CHANNEL_RODS_SET_AT = _step_ref("cylinder-stack-accepted", "B")
 # key defines TNNN for MHA-DT-03 only (review of 5994f29c83, rule 4).
 CRANK_CHAIN_WHEEL = str(_config.parts("pd-transgear-removable")["number"])
 PLATEN_NUMBER = str(_config.parts("pd-platen")["number"])
+# Step 1P's phasing comb is a shop tool in the cone-gear indexing kit, never
+# a BOM row (owner rulings 2026-11-09 and 2026-11-10); the code key names it
+# and its blade (machinist review of bd81283964: an undefined tool and word).
+PHASING_COMB = str(_config.parts("dt-cone-gear-tl-phasing-comb")["number"])
 
 
 ASSEMBLED_HEADING = (
@@ -1287,10 +1294,11 @@ CONE_CRANK_STEPS = _note_text(
         # 180/30 deg off the key; the comb goes on only one way round, so the
         # step names the key and the other blades take the bonded gears'
         # spaces at the same time (dt_cone_gear_tl_phasing_comb_spec).  Sheet
-        # 7's left field has no line to spare, so the step stays one line.
-        "1P. ENGAGE MHA-DT-03-TL-02 AT ONCE, T030'S BLADE BESIDE THE KEY.",
+        # 7's left field has no line to spare, so the step stays one line; the
+        # sheet 14 code key names the comb and its blades (code_key_text).
+        f"1P. ENGAGE {PHASING_COMB} AT ONCE, T030'S BLADE BESIDE THE KEY.",
         # The sheet 1 note's cure and hand acceptance close the bonds.
-        "1Q. REMOVE MHA-DT-03-TL-02 AND THE FEELER ONCE THE BONDS GRAB.",
+        f"1Q. REMOVE {PHASING_COMB} AND THE FEELER ONCE THE BONDS GRAB.",
         # U37c cut-to-fit acceptance survives the taller post and longer stock:
         # MHA-DT-VN-61's registry/spec own the selected screw and reference length.
         # Each screw is cut against its own matched post/platform hole, never
@@ -2596,8 +2604,9 @@ def cone_station_rows(
 def code_key_text(rows: Sequence[tuple[int, str]], cylinder_gears: int) -> str:
     """The package's labelled code key (owner ruling 2026-11-08, Pedro): the
     MHA-DT-03 codes as the model configures them, by station front to back
-    (``rows``, from the placed cone gears), two columns, and GEAR 0 to the
-    last of the ``cylinder_gears`` MHA-DT-12, counted from the front."""
+    (``rows``, from the placed cone gears), two columns, GEAR 0 to the last of
+    the ``cylinder_gears`` MHA-DT-12, counted from the front, and step 1P's
+    phasing comb and its blades (a shop tool on its own print, no BOM row)."""
     code = rows[0][1]
     digits = "N" * (len(code) - 1)
     half = (len(rows) + 1) // 2
@@ -2613,6 +2622,7 @@ def code_key_text(rows: Sequence[tuple[int, str]], cylinder_gears: int) -> str:
     lines.append(
         f"GEAR 0-{cylinder_gears - 1} = MHA-DT-12 FROM THE FRONT, GEAR 0 ON MHA-DT-26."
     )
+    lines.append(f"{PHASING_COMB} = PHASING COMB, ONE BLADE IN A TOOTH SPACE PER GEAR.")
     return "\n".join(lines)
 
 

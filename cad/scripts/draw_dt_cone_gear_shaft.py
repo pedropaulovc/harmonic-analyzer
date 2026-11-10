@@ -170,16 +170,17 @@ DONOR_CENTER = (0.360, 0.090)
 # above the 3/8-to-1/4 in step it attaches to (the fillet's first edge),
 # right of the Ø.2500 line.  With its stacked +.000/-.002 band its text is
 # 23.4 mm wide and its shoulder 25.4 mm, so it stands 0.4 mm nearer that line
-# than the bare MAX text did: the text ends 2.2 mm short of section A-A's upper
-# arrow (the layout proof's 2 mm gap; final3 read 1.8 at +0.010) and the
-# shoulder starts 0.7 mm right of the Ø.2500 line (r16 crossed it at +0.0085).
+# than the bare MAX text did.  PR 2 r2 (967cedb) measured it 0.0862..0.1122
+# x 0.1612..0.1647: 4.1 mm short of section A-A's upper arrow with A cut
+# A_CUT_FROM_STEP_MM from the step (1.1 mm at 25, under the proof's 2 mm),
+# and its shoulder 1.3 mm right of the Ø.2500 line (r16 crossed it at +0.0085).
 SIDE_KEEP = {
     "CollarWidth": (0.1740, 0.1355),
     "Sec0End": (0.2311, 0.1355),
-    # Its " SEE NOTE 2" flag (round 4) widens the text to ~37 mm; 6 mm right
+    # Its " SEE NOTE 2" flag (round 4) widens the text to ~37 mm; 9 mm right
     # of the bare value's centre it starts right of section A's lower letter
-    # (x <= 0.1353), one tier above it.
-    "Sec1End": (0.1560, 0.1275),
+    # (x <= 0.1379 with A cut 28 mm from the step), one tier above it.
+    "Sec1End": (0.1590, 0.1275),
     "Sec2End": (0.1464, 0.1195),
     "ShoulderR": (BIG_END_X - SECTION_ENDS[1] / 1000.0 + 0.0096, 0.1640),
     # The keyseat end's centre from the collar face (machinist review of
@@ -339,9 +340,15 @@ class DSection(NamedTuple):
 # side +X lands on.  A's line is wider than its section: r3
 # (20261018T065854075Z) and #290 batch 0 placed it 2.9 mm left of the
 # frame-bound column, with Ø12.2555 (SIDE_DIAMETERS) 4.5 mm left to keep
-# A's box clear of it.
+# A's box clear of it.  The cutting line stands A_CUT_FROM_STEP_MM north of
+# land 1's step: at 25 mm its upper arrow, 0.1133..0.1287 with the proof's
+# 1.7 mm pad, stood 1.1 mm right of the R.004 text's 0.1122 (PR 2 r2,
+# 967cedb).  At 28 mm the arrows start 0.1163, 4.1 mm clear; its letters
+# (0.1285..0.1349 at 25 mm) move to 0.1315..0.1379, and Sec1End's text
+# (SIDE_KEEP) moves 3 mm right with them.
+A_CUT_FROM_STEP_MM = 28.0
 D_SECTIONS = (
-    DSection(1, "A", SECTION_ENDS[1] - 25.0, 0.0150, (0.3371, 0.165), (2, 1)),
+    DSection(1, "A", SECTION_ENDS[1] - A_CUT_FROM_STEP_MM, 0.0150, (0.3371, 0.165), (2, 1)),
 )
 # The dimensions each section prints; the first is centred over its section
 # (A-A's S shifted at build time, below).

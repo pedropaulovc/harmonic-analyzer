@@ -61,18 +61,14 @@ OUTPUTS = DrawingOutputs(
 )
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
-# A 1.33 x .51 plate whose thinnest blade is .022: 5:1 keeps the blades and
-# the .022 T030 blade tip legible. Measured on the farm sheet (layout audit):
-# dimension text is 3.5 mm high, about 2.6 mm a capital, a banded value with
-# its stacked limits 25 mm wide centred on its dimension line.
+# A 1.31 x .51 plate whose thinnest blade is .022: 5:1 keeps the blades and
+# the .022 T030 blade tip legible.
 SHEET_SCALE = (5.0, 1.0)
 VIEW_SCALE = (5, 1)
 RATIO = VIEW_SCALE[0] / VIEW_SCALE[1]
 ISO_SCALE = (1, 1)
 # The model origin (the T030 blade's north end on the seat line) on the
-# sheet; the bottom view projects straight below. The T030 blade's callout
-# block ends at the origin and runs 52 mm left: it stays 5 mm inside the
-# border.
+# sheet; the bottom view projects straight below.
 FRONT_ORIGIN = (0.072, 0.215)
 BOTTOM_CENTER_Y = 0.0903
 # The isometric and its label in the free upper right, over the seat line's
@@ -80,7 +76,7 @@ BOTTOM_CENTER_Y = 0.0903
 # title block.
 ISO_CENTER = (0.372, 0.246)
 ISO_NOTE_XY = (0.325, 0.227)
-NOTES_XY = (0.020, 0.034)
+NOTES_XY = (0.020, 0.036)
 
 
 def front_xy(x_mm: float, y_mm: float) -> tuple[float, float]:
@@ -96,16 +92,33 @@ _TOP_Y = part.PLATE_HEIGHT
 _LOW_Y = min(y for _, y in _POINTS)
 PLATE_BOX = (*front_xy(_SOUTH_X, _LOW_Y), *front_xy(_NORTH_X, _TOP_Y))
 
+# --- Measured text (round 2 farm sheet, layout audit) --------------------------
+# A dimension whose text stands outside its extension lines prints the text
+# on one side of its dimension line, with the line at the text's edge: the
+# blade tip depths, the steps, the blade thicknesses and the plate thickness
+# to the right of the line, a blade's location from the back face to its
+# left. Widths (sheet m): a banded value with its limits, or SEE NOTE 1,
+# 24 mm; a two-place value 7.6 mm; a capital 2.7 mm. A line of dimension
+# text stands 5 mm in a block, which is centred on its keep point.
+TEXT_GAP = 0.004
+TIP_TEXT_WIDTH = 0.024
+STEP_TEXT_WIDTH = 0.0076
+CHAR_WIDTH = 0.0027
+LINE_HEIGHT = 0.005
+
+
+def text_width(lines: list[str]) -> float:
+    """A dimension block's width: its banded value or its longest line."""
+    return max(TIP_TEXT_WIDTH, *(len(line) * CHAR_WIDTH for line in lines))
+
+
 # --- Front view dimension text (sheet m) ---------------------------------------
 # The plate's length over it; the blade starts below it, one row each, from
 # the south end. The heights stand in one baseline row right of the north
-# end, shallowest first; the plate's height has its text in its span, every
+# end, shallowest first: the plate's height has its text in its span, every
 # depth below the seat has its text in one row under the plate's lowest
-# blade, so no extension line runs through a text. Neighbouring texts stand
-# their half-widths plus TEXT_GAP apart.
-TEXT_GAP = 0.003
-BANDED_HALF_WIDTH = 0.0125  # value and stacked limits, or SEE NOTE 1 under it
-PLAIN_HALF_WIDTH = 0.0046  # a two-place value
+# blade, each line TEXT_GAP right of the text before it, so no line runs
+# through a text.
 BASELINE_X0 = PLATE_BOX[2] + 0.008
 DEPTH_TEXT_Y = PLATE_BOX[1] - 0.014
 START_ROW_Y0 = PLATE_BOX[1] - 0.010
@@ -123,8 +136,8 @@ def _heights() -> list[tuple[str, float]]:
     return [("PlateHeight", -part.PLATE_HEIGHT), *sorted(rows, key=lambda row: row[1])]
 
 
-def _half_width(name: str) -> float:
-    return BANDED_HALF_WIDTH if name.startswith("BladeTip") else PLAIN_HALF_WIDTH
+def depth_text_width(name: str) -> float:
+    return TIP_TEXT_WIDTH if name.startswith("BladeTip") else STEP_TEXT_WIDTH
 
 
 def front_keep() -> dict[str, tuple[float, float]]:
@@ -141,62 +154,82 @@ def front_keep() -> dict[str, tuple[float, float]]:
             front_xy((_SOUTH_X + south) / 2.0, 0.0)[0],
             START_ROW_Y0 - row * START_ROW_PITCH,
         )
-    x, previous = BASELINE_X0, None
-    for name, depth in _heights():
-        if previous is not None:
-            x += _half_width(previous) + TEXT_GAP + _half_width(name)
-        y = front_xy(0.0, -depth / 2.0)[1] if depth < 0.0 else DEPTH_TEXT_Y
-        keep[name] = (x, y)
-        previous = name
+    (height, depth), *depths = _heights()
+    keep[height] = (BASELINE_X0, front_xy(0.0, -depth / 2.0)[1])
+    x = BASELINE_X0 + TEXT_GAP
+    for name, _depth in depths:
+        keep[name] = (x, DEPTH_TEXT_Y)
+        x += depth_text_width(name) + TEXT_GAP
     return keep
 
 
 FRONT_KEEP = front_keep()
 
 # --- Bottom view ---------------------------------------------------------------
-# A narrow vertical dimension prints its text left of its dimension line,
-# ending there, on a leader shelf (farm layout audit). Each blade's thickness
-# has its line just inside its blade's north end, its block in the inner row
-# on one side of the plate's edge view (alternating, so blocks in a row stand
-# a blade apart); its location from the back face has its line just inside
-# the blade's south end, its block in the outer row on the other side, so no
-# leader crosses another block. The thickness over the edge view right of
-# the plate.
-LINE_INSET = 0.002
-FACE_LINE_INSET = 0.005
-ROW_CLEAR = 0.014  # edge view to the inner row's text, half a block plus air
-ROW_PITCH = 0.022
+# Each blade's thickness and location from the back face print as one group
+# on its blade, each naming the gear: the thickness in the inner row on one
+# side of the plate's edge view, its line just inside the blade's south end;
+# the location in the outer row on the other side, its line clear of the
+# inner row's blocks. The sides alternate blade by blade, so blocks in a row
+# stand two blades apart; T006's thickness stands over the edge view, off the
+# title block. The plate's thickness in the outer row over the edge view,
+# right of the plate.
+WIDTH_LINE_INSET = 0.002
+FACE_LINE_INSET = 0.012
+ROW_AIR = 0.004
 _HALF_THICK = part.THICKNESS * RATIO / 2000.0
+_WIDTH_HALF = 2.0 * LINE_HEIGHT  # four lines: limits, value, gear, flag
+_FACE_HALF = 1.5 * LINE_HEIGHT  # three lines: limits, value, gear
 OVER_Y = (
-    BOTTOM_CENTER_Y + _HALF_THICK + ROW_CLEAR,
-    BOTTOM_CENTER_Y + _HALF_THICK + ROW_CLEAR + ROW_PITCH,
+    BOTTOM_CENTER_Y + _HALF_THICK + ROW_AIR + _WIDTH_HALF,
+    BOTTOM_CENTER_Y + _HALF_THICK + 2.0 * ROW_AIR + 2.0 * _WIDTH_HALF + _FACE_HALF,
 )
 UNDER_Y = (
-    BOTTOM_CENTER_Y - _HALF_THICK - ROW_CLEAR,
-    BOTTOM_CENTER_Y - _HALF_THICK - ROW_CLEAR - ROW_PITCH,
+    BOTTOM_CENTER_Y - _HALF_THICK - ROW_AIR - _WIDTH_HALF,
+    BOTTOM_CENTER_Y - _HALF_THICK - 2.0 * ROW_AIR - 2.0 * _WIDTH_HALF - _FACE_HALF,
 )
-PLATE_THICK_X = PLATE_BOX[2] + 0.055
+PLATE_THICK_X = PLATE_BOX[2] + 0.020
+
+
+def width_over(teeth: int) -> bool:
+    """T030, T018 and T006 print their thickness over the edge view."""
+    return part.GEARS.index(teeth) % 2 == 0
 
 
 def bottom_keep() -> dict[str, tuple[float, float]]:
-    keep = {"PlateThick": (PLATE_THICK_X, OVER_Y[0])}
-    for index, teeth in enumerate(part.GEARS):
-        south, north = part.blade_x_mm(teeth)
-        width_rows, face_rows = (
-            (UNDER_Y, OVER_Y) if index % 2 == 0 else (OVER_Y, UNDER_Y)
-        )
+    keep = {"PlateThick": (PLATE_THICK_X, OVER_Y[1])}
+    for teeth in part.GEARS:
+        south, _north = part.blade_x_mm(teeth)
+        line = front_xy(south, 0.0)[0]
+        over = width_over(teeth)
         keep[part.blade_width_name(teeth)] = (
-            front_xy(north, 0.0)[0] - LINE_INSET,
-            width_rows[0],
+            line + WIDTH_LINE_INSET,
+            OVER_Y[0] if over else UNDER_Y[0],
         )
         keep[part.blade_face_name(teeth)] = (
-            front_xy(south, 0.0)[0] + FACE_LINE_INSET,
-            face_rows[1],
+            line + FACE_LINE_INSET,
+            UNDER_Y[1] if over else OVER_Y[1],
         )
     return keep
 
 
 BOTTOM_KEEP = bottom_keep()
+_BANDED = frozenset(name for _feature, name in part.MODEL_BANDS_MM)
+
+
+def bottom_blocks() -> dict[str, tuple[float, float, float, float]]:
+    """(left, bottom, right, top) of each bottom-view dimension's text: a
+    banded value is two lines (limits stacked), a plain one is one, then its
+    callout's lines; a location's text runs left of its line, the rest right."""
+    blocks = {}
+    for name, (x, y) in BOTTOM_KEEP.items():
+        callout = part.CALLOUTS_BELOW.get(name, "").splitlines()
+        lines = (2 if name in _BANDED else 1) + len(callout)
+        width = text_width(callout)
+        left = x - width if name.startswith("BladeFace") else x
+        half = lines * LINE_HEIGHT / 2.0
+        blocks[name] = (left, y - half, left + width, y + half)
+    return blocks
 
 
 def sheet_dimension_names() -> set[str]:

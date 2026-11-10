@@ -554,7 +554,7 @@ def test_pinch_clearance_leader_stands_off_the_hole_centreline() -> None:
     shoulder's right end (the literals in PINCH_CLEARANCE_CALLOUT_XY are the
     callout's extent)."""
     leader = drawing.sheet_leaders()["pinch clearance callout"]
-    centre = (drawing.RIGHT_CENTER[0], drawing._elevation_y(drawing.PINCH_HEIGHT, drawing.RIGHT_CENTER))
+    centre = (drawing._right_x(drawing.PINCH_Z), drawing._elevation_y(drawing.PINCH_HEIGHT, drawing.RIGHT_CENTER))
     _left, down, right, _up = drawing.PINCH_CLEARANCE_CALLOUT_EXTENT
     x, y = drawing.PINCH_CLEARANCE_CALLOUT_XY
     assert leader.start == pytest.approx((x + right, y - down), abs=1e-12)
@@ -783,9 +783,13 @@ def test_r3_prints_no_two_place_dimension_it_does_not_need() -> None:
         "Depth",
         "BlockHt",
         "PinchHeight",
+        "PinchDepthCenter",
         "SlitW",
         "AxisHeight",
     }
+    # The pinch hole's station sits on the .01 grid (round-2 review of PR 2:
+    # .215 printed a third place no function needed).
+    assert dt_cone_tip_block_spec.PINCH_DEPTH_CENTER / 25.4 == pytest.approx(0.22)
 
 
 def test_every_three_place_size_names_its_mate_at_its_dimension() -> None:
@@ -808,13 +812,8 @@ def test_every_three_place_size_names_its_mate_at_its_dimension() -> None:
         "FootTapX",
         "FootTapZ",
         "DowelX",
-        "PinchDepthCenter",
     }
     three_place.discard("DowelX")
-    # The pinch hole's station is half the .43 depth, .215: off the .01
-    # grid, so it prints .XXX for its value, not for a fit, and names nothing.
-    assert dt_cone_tip_block_spec.BLOCK_Z / 2.0 / 25.4 == pytest.approx(0.215)
-    three_place.discard("PinchDepthCenter")
     assert "DowelX" not in texts
     # The width's band is its own, one-sided; its reason still names the edge.
     assert "MHA-DT-20" in texts["Width"]
