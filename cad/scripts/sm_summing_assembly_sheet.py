@@ -17,6 +17,11 @@ import sm_vn_knife_mount_dowel_spec as knife_dowel
 from _assembly_contract import assembly_contract
 from _inch_fraction import inch_fraction
 from _title_block_units import LENGTH_UNITS, render_number
+from sm_knife_mount_spec import (
+    KNIFE_GAUGE_BAR_CLEARANCE_IN,
+    KNIFE_GAUGE_BAR_DIA,
+    KNIFE_GAUGE_BAR_LENGTH_IN,
+)
 from sm_summing_assembly_spec import (
     BOSS_HOOK,
     BOSS_JAM_NUT,
@@ -32,9 +37,6 @@ from sm_summing_assembly_spec import (
     HANGER_FIT_REACH_PLACES,
     HANGER_WASHER,
     KNIFE_FREE_ROCK_FLOOR_DEG,
-    KNIFE_GAUGE_BAR_CLEARANCE_IN,
-    KNIFE_GAUGE_BAR_DIA,
-    KNIFE_GAUGE_BAR_LENGTH_IN,
     KNIFE_MOUNT,
     LEVER,
     QUANTITIES,

@@ -365,11 +365,11 @@ def test_step_five_runs_each_hanger_bolt_home_by_hand_then_sets_the_gauge_bar() 
         ".0002-.0017 DIAMETRAL CLEARANCE IN EACH MHA-SM-02 BORE"
     )
     assert "PIN" not in notes.KNIFE_GAUGE_BAR and "ZZ" not in notes.KNIFE_GAUGE_BAR
-    assert spec.KNIFE_GAUGE_BAR_DIA == pytest.approx(2.0 * builder.knife_mount.BORE_R_MIN)
-    assert max(spec.KNIFE_GAUGE_BAR_CLEARANCE_IN) * 25.4 == pytest.approx(
+    assert builder.knife_mount.KNIFE_GAUGE_BAR_DIA == pytest.approx(2.0 * builder.knife_mount.BORE_R_MIN)
+    assert max(builder.knife_mount.KNIFE_GAUGE_BAR_CLEARANCE_IN) * 25.4 == pytest.approx(
         builder.KNIFE_BAR_CLEARANCE
     )
-    assert min(spec.KNIFE_GAUGE_BAR_CLEARANCE_IN) > 0.0
+    assert min(builder.knife_mount.KNIFE_GAUGE_BAR_CLEARANCE_IN) > 0.0
     assert builder.KNIFE_GAUGE_BAR_LENGTH > builder.KNIFE_MOUNT_OUTER_SPAN_MAX
     assert builder.KNIFE_MOUNT_OUTER_SPAN_MAX / 25.4 == pytest.approx(7.415, abs=1e-3)
     assert notes.KNIFE_GAUGE_BAR not in " ".join(notes.BOM_DESCRIPTIONS.values())

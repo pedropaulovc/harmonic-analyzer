@@ -117,6 +117,32 @@ BORE_DIA_BAND = (0.0381, 0.0)  # +.0015/.0000 in
 BORE_DIA_PLACES = 4
 BORE_R_MIN = R_BORE + min(BORE_DIA_BAND) / 2.0  # 5.9944
 BORE_R_MAX = R_BORE + max(BORE_DIA_BAND) / 2.0  # 6.01345
+
+# --- Knife-mount gauge bar (Owner ruling 2026-11-08 (Pedro), #2144 item 11.3) --
+# A tool, not a BOM part: with each MHA-SM-02 hung on its one MHA-SM-VN-53
+# dowel and its bolt finger-tight, a gauge bar slides through BOTH mounts'
+# bores; the bolts are tightened and the bar must slide back out.  It sets
+# the front mount's yaw about its dowel (and proves both mounts' pitch); the
+# rear mount is then re-hung on the lever's stub and swung until the rock
+# gauge passes (this fit-up order owner-confirmed 2026-11-08 (Pedro), #2144
+# item 11.3; ``build_sm_summing_assembly`` budgets both).  Owner ruling
+# 2026-11-10 (Pedro), #2334, S2: a 2 in class ZZ pin cannot reach both
+# mounts, whose outer faces stand 7.41 apart, so the tool is an 8.0 in bar.
+# A bar that long has no gauge class, so it is made to the measured bores
+# (machinist review of farm build 20261110T204245.238203Z: a bare band
+# names no fit route): reference Ø.4720, the bore's smallest printed size,
+# at .0002-.0017 diametral clearance in each bore, so the rock budget keeps
+# the old class ZZ pin's .0017 maximum (inventory gauges.gauge-bar-0472x8).
+# The fit lives here, beside the bore it is cut to, so MHA-FR-02's hanger
+# mirror can charge the bar's play without importing the summing spec's
+# config closure (test_dodo_recipe's fine-grained config deps).
+KNIFE_GAUGE_BAR_DIA_IN = 0.4720
+KNIFE_GAUGE_BAR_CLEARANCE_IN = (0.0002, 0.0017)  # (min, max) diametral, each bore
+KNIFE_GAUGE_BAR_DIA = KNIFE_GAUGE_BAR_DIA_IN * 25.4  # 11.9888
+# The bar in the smallest conforming bores.
+KNIFE_GAUGE_BAR_DIA_MIN = (KNIFE_GAUGE_BAR_DIA_IN - KNIFE_GAUGE_BAR_CLEARANCE_IN[0]) * 25.4
+KNIFE_GAUGE_BAR_LENGTH_IN = 8.0
+
 # The block's overall sizes print two places (.XX): every stack below reads
 # them, so none takes the .X row.
 BLOCK_SIZE_PLACES = 2
@@ -132,7 +158,7 @@ GEOMETRIC_TOLERANCES_IN: dict[str, str] = {
     "knife-bore position": ".008",
     "knife-bore parallelism": ".002",
     "dowel hole perpendicularity": ".001",
-    "knife-hanger tap position": ".008",
+    "knife-hanger tap position": ".005",
 }
 GEOMETRIC_TOLERANCES_MM: dict[str, float] = {
     key: float(value) * DOWEL.MM_PER_IN
@@ -155,7 +181,7 @@ KNIFE_BORE_POSITION_TOL = GEOMETRIC_TOLERANCES_MM["knife-bore position"]
 KNIFE_BORE_PARALLELISM_TOL = GEOMETRIC_TOLERANCES_MM["knife-bore parallelism"]
 # The #10-24 tap is drilled and tapped on the part, located from datum B
 # (Owner ruling 2026-11-10 (Pedro), #2334 option B1, S1, superseding
-# delegated ruling sm Q3's spot through MHA-FR-02): ⌖Ø.008|A|B|C▷, its axis
+# delegated ruling sm Q3's spot through MHA-FR-02): ⌖Ø.005|A|B|C▷, its axis
 # BASIC PIN_HOLE_X from B's on the bore's vertical centre plane (the
 # section A-A BASIC the bore's frame shares).  A|B alone would leave the
 # tap's turn about B free relative to the bore, whose yaw inside its own
@@ -164,8 +190,10 @@ KNIFE_BORE_PARALLELISM_TOL = GEOMETRIC_TOLERANCES_MM["knife-bore parallelism"]
 # datum C, clocks the tap, and C's translation modifier lets C's simulator
 # centre in the bore while it only fixes that turn.  Then
 # ``build_sm_summing_assembly``'s HANGER_SCREW_MISMATCH charges the zone's
-# radius alone, and Ø.008 closes inside MHA-FR-02's C-drill hole (machinist
-# exception RV-06: under the drilled-hole row, by that ruling).
+# radius alone.  Owner ruling 2026-11-10 (Pedro), #2334 margin option 1a,
+# superseding that ruling's Ø.008: with the gauge bar's play charged, Ø.008
+# left 0.018 of bolt spare in MHA-FR-02's C-drill hole; Ø.005 leaves 0.072
+# and FR-02 unchanged (machinist exception RV-06: under the drilled-hole row).
 STUD_TAP_POSITION_TOL = GEOMETRIC_TOLERANCES_MM["knife-hanger tap position"]
 # Datum B's round slip hole stands square to the datum-A top seat, so the
 # MHA-SM-VN-53 dowel, pressed square into the crossbar, enters it without

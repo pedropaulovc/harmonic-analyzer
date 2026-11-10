@@ -426,7 +426,7 @@ def test_tap_callout_parks_between_the_top_view_and_the_front_view() -> None:
 
 
 def test_tap_frame_stands_between_the_top_view_and_the_callout() -> None:
-    # Owner ruling 2026-11-10 (Pedro), #2334, S1: the tap's ⌖Ø.008|A|B|C▷
+    # Owner ruling 2026-11-10 (Pedro), #2334, S1: the tap's ⌖Ø.005|A|B|C▷
     # frame stands under the top view and over the callout, left of the
     # callout's leader; the two leaders take the tap's two lower rims, the
     # frame's the left, so they do not cross.
@@ -807,14 +807,14 @@ def test_native_gdt_and_bore_geometry() -> None:
         "knife-bore position": ".008",
         "knife-bore parallelism": ".002",
         "dowel hole perpendicularity": ".001",
-        "knife-hanger tap position": ".008",
+        "knife-hanger tap position": ".005",
     }
     # Owner ruling 2026-10-27 (#2016): the name a sibling's assembly check
     # imports.
     assert sm_knife_mount_spec.DOWEL_HOLE_PERPENDICULARITY_TOL == pytest.approx(0.0254)
     assert sm_knife_mount_spec.KNIFE_BORE_POSITION_TOL == pytest.approx(0.2032)
     assert sm_knife_mount_spec.KNIFE_BORE_PARALLELISM_TOL == pytest.approx(0.0508)
-    assert sm_knife_mount_spec.STUD_TAP_POSITION_TOL == pytest.approx(0.2032)
+    assert sm_knife_mount_spec.STUD_TAP_POSITION_TOL == pytest.approx(0.127)
     for gone in (
         "DOWEL_SLOT_PERPENDICULARITY_TOL",
         "KNIFE_BORE_ORIENTATION_TOL",

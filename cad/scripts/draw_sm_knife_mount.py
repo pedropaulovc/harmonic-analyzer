@@ -20,7 +20,7 @@ dimensioned where the cut shows it); the tap axis, run on through the
 bore's centre, stands BASIC .300 from B's axis there.  The reamed bore
 carries ⌖Ø.008|A|B, which carries datum C, and a separate ∥.002|A, its
 centre a BASIC height under A (its yaw is set at MHA-SM-00 by a gauge bar);
-the #10-24 tap, cut on the part to ⌖Ø.008|A|B|C▷ (owner ruling 2026-11-10
+the #10-24 tap, cut on the part to ⌖Ø.005|A|B|C▷ (owner ruling 2026-11-10
 (Pedro), #2334, S1), its #25 pilot at three places under the title block's
 DRILLED HOLES row, its full thread at two with its own native +/-0.13, its
 class the title block's thread row, its drill depth banded, its drill point
@@ -472,7 +472,7 @@ TAP_POINT_ANGLE_VARIABLE = "hw-drlang"
 TAP_POINT_ANGLE_TOKEN = f"<{TAP_POINT_ANGLE_VARIABLE}>"
 _CALLOUT_ANGLE_VARIABLE = 2  # swCalloutVariableType_e.swCalloutVariableType_Angle
 _DRILL_ANGLE_VARIABLE = 16  # swCalloutVariable_e.swCalloutVariable_Drill_Angle
-# The tap's position frame, ⌖Ø.008|A|B|C▷ (Owner ruling 2026-11-10 (Pedro),
+# The tap's position frame, ⌖Ø.005|A|B|C▷ (Owner ruling 2026-11-10 (Pedro),
 # #2334, S1: cut on the part, clocked by the bore, datum C), stands in the
 # open band between the top view's bottom edge (y ~221 mm) and the
 # callout's top row (y ~194 mm), left of the callout's leader: its top
@@ -1337,7 +1337,7 @@ async def build(adapter: Any) -> dict[str, str]:
         datums=("A",),
         label="knife-bore parallelism",
     )
-    # The #10-24 tap: ⌖Ø.008|A|B|C▷, the bolt axis the crossbar's C-drill
+    # The #10-24 tap: ⌖Ø.005|A|B|C▷, the bolt axis the crossbar's C-drill
     # hole floats round (build_sm_summing_assembly's knife-hanger stack),
     # its turn about B clocked by the bore, C's simulator free to centre.
     add_feature_control_frame(

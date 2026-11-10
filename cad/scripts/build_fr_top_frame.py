@@ -868,8 +868,8 @@ _FR_RAIL_HALF_WIDTH_MIN = (
 # Match the assembly's tap/dowel mismatch without importing a COM recipe
 # (build_sm_summing_assembly.HANGER_SCREW_MISMATCH; Owner ruling 2026-11-08
 # (Pedro), #2144 item 11.3, scheme S1).  Along the dowel line: the ream's
-# .XXX station, the spotted tap's residual (the former Ø.005 zone's
-# radius), B's slip on its pin and B's datum simulator t/2 (codjiflo round
+# .XXX station, the tap's position-zone radius (KNIFE_MOUNT.STUD_TAP_POSITION_TOL
+# / 2, ⌖|A|B|C▷: owner ruling 2026-11-10 (Pedro), #2334), B's slip on its pin and B's datum simulator t/2 (codjiflo round
 # 5).  Across it: the ream's implied-zero .XXX "SAME Z", the same three
 # block terms, and the turn the gauge bar gives the block about its dowel,
 # which moves the tap across by PIN_HOLE_X times the bar line's yaw
@@ -892,9 +892,17 @@ _HANGER_BORE_LINE_OFFSET = (
     + _KNIFE_DOWEL_HOLE_PERP / 2.0
     + KNIFE_MOUNT.KNIFE_BORE_POSITION_TOL / 2.0
 )  # 0.4140, each station
-HANGER_BAR_YAW_SHIFT = (
-    HANGER_PIN_X * 2.0 * _HANGER_BORE_LINE_OFFSET / (STUD_Z_REAR - STUD_Z_FRONT)
-)  # 0.0362
+# The bar's own diametral clearance in each bore turns each block on it a
+# further atan(clearance / shortest bore) (build_sm_summing_assembly
+# KNIFE_BAR_PLAY_YAW_DEG, owner review of #2334); the tap turns with it.
+_HANGER_BAR_PLAY_YAW = math.atan(
+    (2.0 * KNIFE_MOUNT.BORE_R_MAX - KNIFE_MOUNT.KNIFE_GAUGE_BAR_DIA_MIN)
+    / (KNIFE_MOUNT.SUPPORT_Z_THICK - KNIFE_MOUNT.BLOCK_SIZE_TOL)
+)
+HANGER_BAR_YAW_SHIFT = HANGER_PIN_X * math.tan(
+    math.atan(2.0 * _HANGER_BORE_LINE_OFFSET / (STUD_Z_REAR - STUD_Z_FRONT))
+    + _HANGER_BAR_PLAY_YAW
+)  # 0.0602
 HANGER_SEAT_BOLT_MISMATCH = math.hypot(
     _HANGER_BLOCK_SHIFT, _HANGER_BLOCK_SHIFT + HANGER_BAR_YAW_SHIFT
 )
@@ -1048,7 +1056,7 @@ for _label, _value in BAR_POCKET_HOLE_WALLS.items():
 # hole, its widest .X width, the worse .X row-to-face reach either side;
 # the whole turned through the title-block angle about the round dowel,
 # which also covers the yaw the MHA-SM-00 gauge bar sets
-# (HANGER_BAR_YAW_SHIFT's turn, under 0.3 deg).  Owner ruling 2026-11-08
+# (HANGER_BAR_YAW_SHIFT's turn with the bar's play, under 0.5 deg).  Owner ruling 2026-11-08
 # (Pedro), #2144 item 11.3: one dowel, so the block fits one way round
 # only, its round hole (datum B) on the ream's pin.
 # _external_edge_breaks keeps every finished edge-break band 0.5 off both hulls.

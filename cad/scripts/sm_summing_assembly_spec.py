@@ -72,28 +72,6 @@ HANGER_FIT_REACH = 8.9154  # .351
 HANGER_FIT_REACH_TOL = 0.127  # .005, the title block's three-place band
 HANGER_FIT_REACH_PLACES = 3
 
-# --- Knife-mount gauge bar (Owner ruling 2026-11-08 (Pedro), #2144 item 11.3) --
-# A tool, not a BOM part: with each MHA-SM-02 hung on its one MHA-SM-VN-53
-# dowel and its bolt finger-tight, a gauge bar slides through BOTH mounts'
-# bores; the bolts are tightened and the bar must slide back out.  It sets
-# the front mount's yaw about its dowel (and proves both mounts' pitch); the
-# rear mount is then re-hung on the lever's stub and swung until the rock
-# gauge passes (this fit-up order owner-confirmed 2026-11-08 (Pedro), #2144
-# item 11.3; ``build_sm_summing_assembly`` budgets both).  Owner ruling
-# 2026-11-10 (Pedro), #2334, S2: a 2 in class ZZ pin cannot reach both
-# mounts, whose outer faces stand 7.41 apart, so the tool is an 8.0 in bar.
-# A bar that long has no gauge class, so it is made to the measured bores
-# (machinist review of farm build 20261110T204245.238203Z: a bare band
-# names no fit route): reference Ø.4720, the bore's smallest printed size,
-# at .0002-.0017 diametral clearance in each bore, so the rock budget keeps
-# the old class ZZ pin's .0017 maximum (inventory gauges.gauge-bar-0472x8).
-KNIFE_GAUGE_BAR_DIA_IN = 0.4720
-KNIFE_GAUGE_BAR_CLEARANCE_IN = (0.0002, 0.0017)  # (min, max) diametral, each bore
-KNIFE_GAUGE_BAR_DIA = KNIFE_GAUGE_BAR_DIA_IN * 25.4  # 11.9888
-# The bar in the smallest conforming bores.
-KNIFE_GAUGE_BAR_DIA_MIN = (KNIFE_GAUGE_BAR_DIA_IN - KNIFE_GAUGE_BAR_CLEARANCE_IN[0]) * 25.4
-KNIFE_GAUGE_BAR_LENGTH_IN = 8.0
-
 # --- Assembly settings, as model dimensions -------------------------------------
 # Two blanked Front-plane construction sketches in the assembly (sketch x =
 # machine X, sketch y = machine Y), each driven from globals and marked for the
