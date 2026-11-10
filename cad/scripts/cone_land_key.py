@@ -143,13 +143,20 @@ if KEYSEAT_EDGE_DEPTH_MIN_MM < limits(KEY_SIZE_MM, KEY_STOCK_BAND)[1] / 2.0:
         "under half the key"
     )
 
-# The key's length.  The keyseat runs from the 64T seat (the collar's
+# The key's length.  The keyseat runs from near the 64T seat (the collar's
 # tip-side face, CollarEndPlane) to land 1's end, where it runs out into air
-# over the Ø.250 land as the flat did.  The 1/16 end mill leaves its radius at
-# the collar end, so the key's square south end sits one KEY_END_SET (half the
-# keyseat) north of the collar face; its .XX length keeps its north end on
-# land 1 within the title block's band, and T024's south face, one
-# SEAT_STEP_SETBACK past land 1's end, captures it north.
-KEY_END_SET_MM = KEYSEAT_WIDTH_MM / 2.0
-KEY_LENGTH_MM = 115.316  # 4.54
+# over the Ø.250 land as the flat did.  The 1/16 end mill closes it at the
+# collar end with its own radius, centred KEY_END_SET north of the collar
+# face (printed .XX, KEY_END_SET_PLACES): far enough that at the printed low
+# limit the cutter still stands clear of that face, the 64T's seat and the
+# cone stack's origin (Codjiflo #2331 4521933063: at .03, tangent in the
+# model, the low limit sank the cutter .011 into it; the spec proves the
+# clearance).  The key's square south end comes to rest on that centre line,
+# where the keyseat first runs full width, so it shares the station.  Its .XX
+# length keeps its north end on land 1 at nominal, and T024's south face, one
+# SEAT_STEP_SETBACK past land 1's end, captures it north at the print-worst
+# of both .XX lengths (the shaft spec's KEY_NORTH_MARGIN_MM).
+KEY_END_SET_MM = 1.27  # .05
+KEY_END_SET_PLACES = 2
+KEY_LENGTH_MM = 114.808  # 4.52
 KEY_LENGTH_PLACES = 2

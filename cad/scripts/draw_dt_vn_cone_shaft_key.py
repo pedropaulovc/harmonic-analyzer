@@ -59,7 +59,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# Every view at the sheet's 2:1: the side view's 4.54 key spans 231 mm of the
+# Every view at the sheet's 2:1: the side view's 4.52 key spans 230 mm of the
 # B sheet's field, the end view sits left of it in line, the isometric under
 # it, clear of the title block (x >= 216 mm, y <= 66 mm).
 SHEET_SCALE = (2.0, 1.0)

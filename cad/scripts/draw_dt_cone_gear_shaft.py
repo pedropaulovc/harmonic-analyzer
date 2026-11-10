@@ -198,15 +198,16 @@ SIDE_KEEP = {
     "Sec4End": (0.1314, 0.1035),
     "ShoulderR": (BIG_END_X - SECTION_ENDS[1] / 1000.0 + 0.0096, 0.1640),
     # The keyseat end's centre from the collar face (machinist review of
-    # 06460fb).  Its 0.8 mm span puts both arrows outside; it hangs below the
-    # shaft from land 1's lower corner, where the collar diameter's line
-    # (x 0.2088, down to y 0.1357) and the collar web's witnesses (down to
-    # 0.1323) end above its line (y 0.1280): its right arrow (to x ~0.210)
-    # crosses neither.  Its ".03" text (~7 mm, on its line like the web's
-    # 0.1327) stands left of the left arrow (from ~0.2018), 1.2 mm under the
-    # web's text box and right of it (ends ~0.1927), and right of Sec1End's
-    # text (ends ~0.175) one tier up from Sec1End's line (0.1247).
-    "Sec1KeyseatEndSet": (0.1975, 0.1308),
+    # 06460fb; .05 since Codjiflo #2331 4521933063).  Its 1.3 mm span puts both
+    # arrows outside; it hangs below the shaft from land 1's lower corner,
+    # where the collar diameter's line (x 0.2088, down to y 0.1357) and the
+    # collar web's witnesses (down to 0.1323) end above its line (y 0.1280):
+    # its right arrow (to x ~0.210) crosses neither.  Its ".05" text (~7 mm,
+    # on its line like the web's 0.1327) stands left of the left arrow (from
+    # ~0.2013), 1.2 mm under the web's text box and just right of it (ends
+    # ~0.1927), and right of Sec1End's text (ends ~0.175) one tier up from
+    # Sec1End's line (0.1247).
+    "Sec1KeyseatEndSet": (0.1965, 0.1308),
 }
 OVERALL_REFERENCE_TEXT_XY = (0.1515, 0.0795)
 # Sheet width of one length digit or point at the dimension font (the 916a

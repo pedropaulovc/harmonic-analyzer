@@ -554,9 +554,13 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 #
 # Keyseat end (machinist review of 06460fb: the mill stop): the end radius's
 # centre from the collar's tip-side face, two places, the title block's .XX
-# grade.  The key's square south end comes to rest on that centre line, so
-# the band moves the key, never into the end; KEY_NORTH_MARGIN_MM below keeps
-# its north end short of T024 at the printed limits of both lengths.
+# grade, at .05 (cone_land_key.KEY_END_SET_MM).  At its printed low limit the
+# widest end mill still stands clear of that face, the 64T's seat
+# (KEYSEAT_END_COLLAR_CLEARANCE_MIN_MM below; Codjiflo #2331 4521933063:
+# .03, tangent in the model, let it sink .011 in).  The key's square south
+# end comes to rest on that centre line, so the band moves the key, never
+# into the end; KEY_NORTH_MARGIN_MM below keeps its north end short of T024
+# at the printed limits of both lengths.
 #
 # Collar (#914): the diameter is the bar's as supplied (STOCK_DIA), so it
 # prints as the 5/8 fraction reference, the bar's own size; the web prints
@@ -577,7 +581,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "Sec1KeyseatWidth": cone_land_key.KEYSEAT_PLACES,
         "Sec1KeyseatS": cone_land_key.KEYSEAT_PLACES,
     },
-    "Sec1KeyseatEndProfile": {"Sec1KeyseatEndSet": 2},
+    "Sec1KeyseatEndProfile": {"Sec1KeyseatEndSet": cone_land_key.KEY_END_SET_PLACES},
     "Sec2FlatProfile": {"Sec2AF": LAND_AF_PLACES[2]},
     "Sec3FlatProfile": {"Sec3AF": LAND_AF_PLACES[3]},
     "Sec4FlatProfile": {"Sec4AF": LAND_AF_PLACES[4]},
@@ -697,4 +701,22 @@ KEY_NORTH_MARGIN_MM = (
 if KEY_NORTH_MARGIN_MM <= 0.0:
     raise AssertionError(
         f"the key reaches T024 at print-worst ({KEY_NORTH_MARGIN_MM} mm)"
+    )
+
+# The keyseat's end at its printed low limit, cut by the widest end mill
+# (the keyseat's upper width), keeps KEYSEAT_END_COLLAR_MARGIN_MM of the
+# collar's tip-side face, the 64T's seat and the stack's origin, uncut.
+KEYSEAT_END_COLLAR_MARGIN_MM = 0.1
+KEYSEAT_END_COLLAR_CLEARANCE_MIN_MM = (
+    cone_land_key.KEY_END_SET_MM
+    + printed_length_deviations("Sec1KeyseatEndSet")[0]
+    - cone_land_key.limits(
+        cone_land_key.KEYSEAT_WIDTH_MM, cone_land_key.KEYSEAT_WIDTH_BAND
+    )[1]
+    / 2.0
+)
+if KEYSEAT_END_COLLAR_CLEARANCE_MIN_MM < KEYSEAT_END_COLLAR_MARGIN_MM:
+    raise AssertionError(
+        "the keyseat's end mill reaches the collar's 64T seat at print-worst "
+        f"({KEYSEAT_END_COLLAR_CLEARANCE_MIN_MM:.4f} mm clear)"
     )

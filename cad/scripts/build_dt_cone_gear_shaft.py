@@ -186,6 +186,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "CollarWidth", f"{COLLAR_THICKNESS}mm")
     await set_global(adapter, "Sec1KeyseatW", f"{cone_land_key.KEYSEAT_WIDTH_MM}mm")
     await set_global(adapter, "Sec1KeyseatS", f"{cone_land_key.KEYSEAT_S_MM}mm")
+    await set_global(adapter, "Sec1KeyseatEndSet", f"{cone_land_key.KEY_END_SET_MM}mm")
     for i in FLAT_LANDS:
         await set_global(adapter, f"SecAF{i}", f"{SECTION_FLAT_AF[i]}mm")
 
@@ -455,23 +456,27 @@ def flat_length_expression(land: int) -> str:
 
 
 # Land 1's keyseat is milled with a 1/16 end mill that runs out over land 2
-# and stops at the collar's tip-side face, leaving its own radius there
-# (rule 16; Codjiflo P2 on #2331): the straight keyseat stops one end-mill
-# radius (cone_land_key.KEY_END_SET_MM, half the keyseat) north of the collar
-# face and a semicircular end, tangent to that face, closes it.  The key's
-# square south end sits on that line.  The straight cut's length is the land
-# less that radius, from the knobs that bound it.
-KEYSEAT_LENGTH_EXPRESSION = '"SecEnd1" - "Sec1KeyseatW" / 2'
+# and stops short of the collar's tip-side face, leaving its own radius
+# (rule 16; Codjiflo P2 on #2331): the straight keyseat stops at the radius's
+# centre, cone_land_key.KEY_END_SET_MM (.05) north of the collar face (the
+# Sec1KeyseatEndSet knob), and a semicircular end closes it, clear of that face
+# (the 64T's seat) at every printed limit (Codjiflo #2331 4521933063; the
+# shaft spec's KEYSEAT_END_COLLAR_CLEARANCE_MIN_MM).  The key's square south
+# end sits on that line.  The straight cut's length is the land less that
+# set, from the knobs that bound it.
+KEYSEAT_LENGTH_EXPRESSION = '"SecEnd1" - "Sec1KeyseatEndSet"'
 # The end's sketch locates the radius centre FROM THE COLLAR FACE, where the
 # machinist sets the mill stop (machinist review of 06460fb: the sheet gave
 # no length or end location): a construction line on the collar's tip-side
 # face (its station from the front face, the journal and the web) and the
-# centre one radius (Sec1KeyseatEndSet, the sheet's .XX dimension) north of it.
+# centre KEY_END_SET (Sec1KeyseatEndSet, the sheet's .XX dimension) north of it.
 KEYSEAT_COLLAR_FACE_EXPRESSION = '"SecEnd0" + "CollarWidth"'
-KEYSEAT_END_SET_EXPRESSION = '"Sec1KeyseatW" / 2'
+KEYSEAT_END_SET_EXPRESSION = '"Sec1KeyseatEndSet"'
 KEYSEAT_END_STATION = COLLAR_END_STATION + cone_land_key.KEY_END_SET_MM
-if abs(cone_land_key.KEY_END_SET_MM - cone_land_key.KEYSEAT_WIDTH_MM / 2.0) > 1e-12:
-    raise AssertionError("the keyseat's end radius is the end mill's, half the keyseat")
+if cone_land_key.KEY_END_SET_MM <= cone_land_key.KEYSEAT_WIDTH_MM / 2.0:
+    raise AssertionError(
+        "the keyseat's end radius reaches the collar face in the model"
+    )
 
 
 async def _add_collar(
@@ -567,8 +572,8 @@ async def _cut_keyseat(adapter: Any, drive_jobs: list[tuple[str, str]]) -> float
     ``SecDia1``/2 from the axis) to the floor's midpoint, whose length IS
     ``Sec1KeyseatS`` (ANSI B17.1 S, the across-flat's measurement form).  The
     cut runs back toward the collar's tip-side face by the land's length less
-    the end mill's radius (KEYSEAT_LENGTH_EXPRESSION); _cut_keyseat_end
-    closes it with the end mill's semicircle.
+    the end radius's set from that face (KEYSEAT_LENGTH_EXPRESSION);
+    _cut_keyseat_end closes it with the end mill's semicircle.
     """
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
@@ -677,7 +682,8 @@ async def _cut_keyseat_end(adapter: Any, drive_jobs: list[tuple[str, str]]) -> f
     to land 1's round on -Y (``Sec1KeyseatCollarFace`` from the origin,
     driven by the journal and web knobs; ``Sec1KeyseatCollarRise`` =
     ``SecDia1``/2), the centre on the axis line and ``Sec1KeyseatEndSet``
-    (= W/2, the drawing dimension) along the shaft from the line's outer end,
+    (= KEY_END_SET, the drawing dimension, driven by the ``Sec1KeyseatEndSet``
+    knob) along the shaft from the line's outer end,
     so its extension lines start at the collar's lower corner in the side
     view (*Right, model +Y up) and at the centre, and run down to the
     sheet's length tiers.  Model points map to

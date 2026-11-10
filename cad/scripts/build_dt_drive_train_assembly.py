@@ -1643,7 +1643,7 @@ if abs(SHAFT_FRONT_STATION + SHAFT_COLLAR_END - _GEAR64_SOUTH_STATION) > 1e-9:
 # collar's OD on some seats (#916).
 # MHA-DT-VN-71 (owner decision C1 keyed, 2026-11-09, PR #1992): the key lies
 # in land 1's keyseat, its square south end one KEY_END_SET north of the
-# collar's tip-side face (CollarEndPlane; the keyseat's end-mill radius) and
+# collar's tip-side face (CollarEndPlane; the keyseat end radius's centre) and
 # its bottom on the keyseat floor.  The keyseat runs out over the Ø.250 land,
 # so T024's south face, one SEAT_STEP_SETBACK past land 1's end, captures the
 # key north: at the .XX length's print maximum its north end keeps air to T024.

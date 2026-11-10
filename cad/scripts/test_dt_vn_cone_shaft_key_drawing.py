@@ -69,22 +69,27 @@ def test_section_is_the_undersized_stock_and_the_length_one_cut() -> None:
 
 
 def test_key_lies_on_land_1_driving_the_64t_through_t030_short_of_t024() -> None:
-    """The square south end stands half a keyseat width (the end mill's
-    radius) north of the collar; across the .XX length band the north end
-    stays short of T024, which rides land 2's flat, and keeps more than half
-    of T030's face on the key."""
-    assert spec.END_SET_MM == pytest.approx(cone_land_key.KEYSEAT_WIDTH_MM / 2.0)
+    """The square south end rests on the keyseat end radius's centre line,
+    .05 (.XX on MHA-DT-04) north of the collar, the radius then clear of the
+    collar's 64T seat (Codjiflo #2331 4521933063); across that band and the
+    .XX length band the south end stays under the 64T, the north end stays
+    short of T024, which rides land 2's flat, and keeps more than half of
+    T030's face on the key."""
+    assert spec.END_SET_MM == cone_land_key.KEY_END_SET_MM
+    assert spec.END_SET_MM > cone_land_key.KEYSEAT_WIDTH_MM / 2.0
     assert spec.FLOOR_OFFSET_MM == cone_land_key.KEYSEAT_FLOOR_OFFSET_MM
     band = printed_band_mm(spec.LENGTH_PLACES, unit=spec.UNIT)
+    set_band = printed_band_mm(cone_land_key.KEY_END_SET_PLACES, unit=spec.UNIT)
     south = shaft.COLLAR_END_STATION + spec.END_SET_MM
     north = south + spec.LENGTH
     t030_south, _ = (shaft.FRONT_STUB + face for face in shaft.gear_faces(15))
     t024_south, _ = (shaft.FRONT_STUB + face for face in shaft.gear_faces(16))
     assert shaft.KEYED_LAND == 1
-    assert south < shaft.FRONT_STUB + shaft.gear_faces(0)[0]  # inside the 64T
+    # Inside the 64T.
+    assert south + set_band < shaft.FRONT_STUB + shaft.gear_faces(0)[0]
     assert north <= shaft.SECTION_ENDS[shaft.KEYED_LAND]
-    assert north + band < t024_south
-    assert north - band > t030_south + FACE_WIDTH / 2.0
+    assert north + set_band + band < t024_south
+    assert north - set_band - band > t030_south + FACE_WIDTH / 2.0
 
 
 def test_the_cut_clears_the_bar_by_a_key_size_off_its_cut_face() -> None:

@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 
 import _config
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import printed_band_mm, printed_deviations
 import _drawing_detail_projection
 import _fit_shaft_h
 import build_dt_cone_gear_shaft as part
@@ -1454,7 +1454,7 @@ def test_each_cut_is_made_over_exactly_its_land(monkeypatch) -> None:
     }
     assert records["Sec1KeyseatCollarFace"] == '"SecEnd0" + "CollarWidth"'
     assert records["Sec1KeyseatCollarRise"] == '"SecDia1" / 2'
-    assert records["Sec1KeyseatEndSet"] == '"Sec1KeyseatW" / 2'
+    assert records["Sec1KeyseatEndSet"] == '"Sec1KeyseatEndSet"'
     assert records["Sec1KeyseatEndDia"] == '"Sec1KeyseatW"'
     # The tip flat's cut starts at the end face: it runs out through the tip.
     assert spec.SECTION_ENDS[-1] == pytest.approx(spec.SHAFT_LENGTH)
@@ -1467,13 +1467,15 @@ def test_each_cut_is_made_over_exactly_its_land(monkeypatch) -> None:
 
 
 def test_the_keyseat_end_is_the_end_mill_radius_and_clears_the_key() -> None:
-    """The end's radius is half the keyseat (KEY_END_SET), tangent to the
-    collar face; the key's square south end sits on the radius's centre line,
-    where the keyseat is full width, so the key's corners clear the end at
-    every limit; and the end's volume is the exact half-disc integral."""
+    """The end's radius is half the keyseat, its centre KEY_END_SET (.05) from
+    the collar face, so in the model the radius stands clear of that face;
+    the key's square south end sits on the radius's centre line, where the
+    keyseat is full width, so the key's corners clear the end at every
+    limit; and the end's volume is the exact half-disc integral."""
     key = cone_land_key
     spec = dt_cone_gear_shaft_spec
-    assert key.KEY_END_SET_MM == pytest.approx(key.KEYSEAT_WIDTH_MM / 2.0)
+    assert key.KEY_END_SET_MM == pytest.approx(0.05 * 25.4)
+    assert key.KEY_END_SET_MM > key.KEYSEAT_WIDTH_MM / 2.0
     assert part.KEYSEAT_END_STATION == pytest.approx(
         spec.COLLAR_END_STATION + key.KEY_END_SET_MM
     )
@@ -1508,7 +1510,20 @@ def test_the_keyseat_end_is_located_from_the_collar_face_on_the_sheet() -> None:
     assert spec.DRAWING_DIMENSIONS["Sec1KeyseatEndProfile"] == {"Sec1KeyseatEndSet"}
     assert spec.DRAWING_PRECISION_BY_NAME["Sec1KeyseatEndSet"] == 2
     assert "Sec1KeyseatEndSet" in drawing.SIDE_KEEP
-    assert f"{key.KEY_END_SET_MM / 25.4:.2f}" == "0.03"
+    assert f"{key.KEY_END_SET_MM / 25.4:.2f}" == "0.05"
+    # Codjiflo #2331 4521933063: at the printed low limit the widest end mill
+    # keeps the collar's tip-side face (the 64T's seat) uncut, with margin.
+    lower = spec.printed_length_deviations("Sec1KeyseatEndSet")[0]
+    widest = key.limits(key.KEYSEAT_WIDTH_MM, key.KEYSEAT_WIDTH_BAND)[1]
+    assert spec.KEYSEAT_END_COLLAR_CLEARANCE_MIN_MM == pytest.approx(
+        key.KEY_END_SET_MM + lower - widest / 2.0
+    )
+    assert key.KEY_END_SET_MM + lower >= (
+        key.KEYSEAT_WIDTH_MM / 2.0 + spec.KEYSEAT_END_COLLAR_MARGIN_MM
+    )
+    assert spec.KEYSEAT_END_COLLAR_CLEARANCE_MIN_MM >= spec.KEYSEAT_END_COLLAR_MARGIN_MM
+    # Positive control: .03 (the model tangent) cut into the face.
+    assert 0.03 * 25.4 + printed_deviations(0.03 * 25.4, 2, unit="in")[0] < widest / 2.0
     upper = spec.printed_length_deviations("Sec1KeyseatEndSet")[1]
     key_band = printed_band_mm(key.KEY_LENGTH_PLACES, unit="in")
     north = (
@@ -1526,7 +1541,8 @@ def test_the_keyseat_end_is_located_from_the_collar_face_on_the_sheet() -> None:
     x, y = drawing.SIDE_KEEP["Sec1KeyseatEndSet"]
     seat_x = drawing.BIG_END_X - spec.COLLAR_END_STATION / 1000.0
     web_text_right = drawing.SIDE_KEEP["CollarWidth"][0] + 0.0374 / 2.0
-    assert web_text_right < x - 0.0035 and x + 0.0035 < seat_x - 0.0008 - 0.0036
+    left_arrow = seat_x - key.KEY_END_SET_MM / 1000.0 - 0.0036
+    assert web_text_right < x - 0.0035 and x + 0.0035 < left_arrow - 0.001
     assert y - 0.0028 < drawing.SIDE_KEEP["CollarWidth"][1] - 0.0028 - 0.0035
     assert y - 0.0028 > drawing.SIDE_KEEP["Sec1End"][1]
 
@@ -2043,6 +2059,7 @@ def test_every_land_is_placed_from_its_chucking_origin(monkeypatch) -> None:
         assert knobs[f"SecAF{land}"] == f"{spec.SECTION_FLAT_AF[land]}mm"
     assert knobs["Sec1KeyseatW"] == f"{cone_land_key.KEYSEAT_WIDTH_MM}mm"
     assert knobs["Sec1KeyseatS"] == f"{cone_land_key.KEYSEAT_S_MM}mm"
+    assert knobs["Sec1KeyseatEndSet"] == f"{cone_land_key.KEY_END_SET_MM}mm"
     assert "CollarEnd" not in knobs
 
 
