@@ -145,8 +145,8 @@ CUTTER_TEMPLATE = template_for_teeth(
 CUTTER_NUMBER = CUTTER_TEMPLATE.cutter_number
 CUTTER_TEETH_RANGE = CUTTER_TEMPLATE.teeth_range
 VIRTUAL_TEETH = TEETH / _COS_INCLINE**3
-# The inclination prints as a native angle (ToothLineReference) at one place
-# under the title block's +/-1 deg. A setting error d(beta) shifts the 64T
+# The inclination prints in the gear data at one place under the title
+# block's +/-1 deg, as the helix angle did. A setting error d(beta) shifts the 64T
 # normal pitch by p_t sin(beta) d(beta), 0.013 mm at 1 deg, inside the
 # crossed mesh's mid-face worst-corner backlash (crank_mesh_stack.
 # standard_check). Across the face it also turns the tooth line against the
@@ -275,7 +275,7 @@ TOOL_PLUNGE_MM = STOCK_PROFILE.plunge_mm
 # mid-face to the south face keeps that edge within the helix's mesh; the
 # station is the middle of that range, a quarter face north of the collar
 # face (equally, a quarter face toward it from mid-face), on the .XX grid the
-# sheet prints, whose title-block band keeps it inside the range.
+# gear data prints, whose title-block band keeps it inside the range.
 TOOTH_SPACE_CROSSING_PLACES = 2
 TOOTH_SPACE_CROSSING = (
     round(FACE_WIDTH / 4.0 / MM_PER_IN, TOOTH_SPACE_CROSSING_PLACES) * MM_PER_IN
@@ -431,17 +431,15 @@ SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 # dimension IS the tip circle the turner sets: it carries the band and callout
 # independently of whichever recipe cuts the teeth, and
 # drawing-simplicity-policy.md `How the repository implements the guidelines` says model it rather than type it into the data block.
-# ``ToothLineReference`` is the same for the tooth line: two Top-plane rays
-# from the point where the tooth spaces' centre planes cross the axis, one
-# along the axis and one along a near-side (+Y) tooth's line as it projects
-# onto that plane, carry the inclination and the crossing's station from the
-# south face into section A-A, whose plane is the Top plane.
+# The tooth line has no native dimension: no view shows a tooth's line on a
+# drawn edge (machinist review of farm proof r3 on #2482 refused a 13 deg
+# measured between construction rays in the bore), so its inclination, hand
+# and crossing station print in the gear data, as the helix angle did.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "OutsideDiaReference": {"OutsideDia"},
     "GearBlank": {"FaceWidth"},
     "BoreProfile": {"BoreDia", "KeywayWidth", "KeywayT"},
     "BoreSouthChamfer": {"BoreSouthChamferSize"},
-    "ToothLineReference": {"ToothInclination", "ToothSpaceCrossing"},
 }
 
 # --- Decimal places, authored ON THE PART ------------------------------------
@@ -457,17 +455,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # +/-.004. The face width is the four-place +/-.001 member of the solid gear
 # stack; its south face seats on the collar and the tolerance only shifts the
 # north face. The south chamfer leg prints two places under the title block's
-# .XX band, with no band of its own; so does the tooth-space crossing. The
-# tooth inclination prints one place under the title block's angle row.
+# .XX band, with no band of its own.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "OutsideDiaReference": {"OutsideDia": OUTSIDE_DIA_PLACES},
     "GearBlank": {"FaceWidth": FACE_WIDTH_PLACES},
     "BoreProfile": {"BoreDia": 4, "KeywayWidth": KEYWAY_PLACES, "KeywayT": KEYWAY_PLACES},
     "BoreSouthChamfer": {"BoreSouthChamferSize": BORE_SOUTH_CHAMFER_PLACES},
-    "ToothLineReference": {
-        "ToothInclination": TOOTH_INCLINATION_PLACES,
-        "ToothSpaceCrossing": TOOTH_SPACE_CROSSING_PLACES,
-    },
 }
 
 # The drawing reads this flat view back off the sheet: a dimension name is

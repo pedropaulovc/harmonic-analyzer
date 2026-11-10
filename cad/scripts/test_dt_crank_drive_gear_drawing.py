@@ -57,7 +57,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     kept = set(drawing.FRONT_KEEP) | set(drawing.SECTION_KEEP)
     assert kept == marked == {
         "OutsideDia", "FaceWidth", "BoreDia", "KeywayWidth", "KeywayT",
-        "BoreSouthChamferSize", "ToothInclination", "ToothSpaceCrossing",
+        "BoreSouthChamferSize",
     }
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
 
@@ -303,7 +303,8 @@ def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
         "PITCH DIAMETER (REF)",
         "ROOT DIAMETER (REF)",
         "FORM CUTTER:  #2, 55-134T, FOR 69.185 VIRTUAL TEETH (REF)",
-        "TOOTH LINE:  STRAIGHT, RIGHT HAND, AS SECTION A-A",
+        "TOOTH LINE:  STRAIGHT, 13.0 DEG RIGHT HAND FROM AXIS",
+        "TOOTH SPACES CENTRED ON AXIS AT:  .07 FROM CHAMFERED BORE FACE",
         f"BASE TANGENT SPAN OVER {spec.BASE_TANGENT_SPAN_TEETH} TEETH, NORMAL, ACCEPT ON THIS PART",
         "TRANSVERSE BACKLASH WITH MHA-DT-10, ACCEPT AT ASSEMBLY",
         "TOOTH FORM",
@@ -422,31 +423,28 @@ def test_exact_stock_span_limits_book_printed_corners_on_the_inch_grid(part_spec
     assert not hasattr(notes, "NORMAL_TOOTH_THICKNESS_DEVIATIONS")
 
 
-def test_tooth_line_is_native_and_the_data_block_states_its_hand() -> None:
+def test_the_data_block_states_the_tooth_line_as_it_stated_the_helix() -> None:
     # Owner ruling 2026-11-10 on #2332 (option A): straight teeth inclined
-    # to the axis. The inclination and the crossing station print once, as
-    # native dimensions in section A-A; the hand, which no view can settle,
-    # and the crossed axes read in the data block.
+    # to the axis. No view shows a tooth's line on a drawn edge, so the
+    # inclination, hand and crossing station print in the data block, as
+    # the helix angle did (machinist review of farm proof r3 on #2482
+    # refused a native 13 deg between reference rays in section A-A).
     data = notes.GEAR_DATA
     assert (
-        "TOOTH LINE:  STRAIGHT, RIGHT HAND, AS SECTION A-A; AXES CROSSED WITH MHA-DT-10"
+        f"TOOTH LINE:  STRAIGHT, {spec.TOOTH_INCLINATION_DEG:.1f} DEG RIGHT HAND FROM AXIS; "
+        "AXES CROSSED WITH MHA-DT-10"
     ) in data
-    for retired in ("HELIX", "LEAD", "SCREW SWEEP"):
+    assert (
+        f"TOOTH SPACES CENTRED ON AXIS AT:  "
+        f"{spec.inch_text(spec.TOOTH_SPACE_CROSSING, 2)} FROM CHAMFERED BORE FACE"
+    ) in data
+    for retired in ("HELIX", "LEAD", "SCREW SWEEP", "SECTION A-A"):
         assert retired not in data, retired
-    assert f"{spec.TOOTH_INCLINATION_DEG:.1f}" not in data
     lines = data.splitlines()
-    assert len(lines) == 18
+    assert len(lines) == 19
     assert lines[-1] == "MATES WITH:  CRANK PINION MHA-DT-10, 16T SPUR"
-    assert spec.DRAWING_DIMENSIONS["ToothLineReference"] == {
-        "ToothInclination", "ToothSpaceCrossing",
-    }
-    assert spec.DRAWING_PRECISION_BY_NAME["ToothInclination"] == 1
-    assert spec.DRAWING_PRECISION_BY_NAME["ToothSpaceCrossing"] == 2
-    assert set(drawing.SECTION_KEEP) >= {"ToothInclination", "ToothSpaceCrossing"}
-    build = _build_source()
-    assert 'name_last_feature(adapter, "ToothLineReference")' in build
-    assert 'blank_sketch(adapter, "ToothLineReference")' in build
-    assert "_add_driving_tooth_inclination(adapter, axis_ray, tooth_ray)" in build
+    assert "ToothLineReference" not in spec.DRAWING_DIMENSIONS
+    assert "ToothLineReference" not in _build_source()
     # The ordinary +/-1 deg keeps the mid-face worst-corner crossed-mesh
     # backlash positive: the 64T normal pitch moves p_t sin(beta) per radian.
     import crank_mesh_stack
@@ -948,8 +946,8 @@ def test_both_shop_gears_state_the_source_owned_tooth_runout_not_a_form_class() 
     assert spec.TOOTH_RUNOUT_TIR_MM < 0.001 * spec.OUTSIDE_DIA
     assert "MHA-DT-10" in runout_row
     assert any(line.startswith("TRANSVERSE BACKLASH WITH MHA-DT-10") for line in lines)
-    # The 64T's block keeps its 18 lines (one fewer since the straight tooth
-    # line replaced the helix and lead rows) and its widest row: an extra line
-    # or a wider row runs its last rows into the tooth tips.
-    assert len(lines) == 18
+    # The 64T's block keeps main's 19 lines (the tooth line and its crossing
+    # station replaced the helix and lead rows) and its widest row: an extra
+    # line or a wider row runs its last rows into the tooth tips.
+    assert len(lines) == 19
     assert len(runout_row) <= max(len(line) for line in lines if line is not runout_row)

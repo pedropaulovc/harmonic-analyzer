@@ -3,10 +3,9 @@ r"""Create the curated manufacturing drawing for the crank-drive gear (64T).
 Recreated under ``cad/docs/drawing-guidelines.md``. The sheet is a
 face view, a longitudinal centre section through the keyway and an isometric
 of a toothed disc with straight teeth inclined to its axis and a round bore
-keyed on local +X, and eight native model dimensions -- outside diameter,
-four-place face width, round bore diameter, keyway width and T, south-entry
-chamfer, and the tooth inclination with the station where the tooth spaces
-cross the axis -- plus the gear-data block drawing-guidelines.md rule 7 (notes: few, flagged, never a method) keeps
+keyed on local +X, and six native model dimensions -- outside diameter,
+four-place face width, round bore diameter, keyway width and T, and
+south-entry chamfer -- plus the gear-data block drawing-guidelines.md rule 7 (notes: few, flagged, never a method) keeps
 for the crossed-axis tooth system and one numbered note, the keyed bore's
 matched fit, that the bore and keyway dimensions link.
 
@@ -76,8 +75,6 @@ from dt_crank_drive_gear_spec import (
     DRAWING_PRECISION_BY_NAME,
     FACE_WIDTH,
     OUTSIDE_DIA,
-    TOOTH_INCLINATION_DEG,
-    TOOTH_SPACE_CROSSING,
     inch_text,
 )
 
@@ -189,33 +186,9 @@ ROTATION_NOTE_XY = (
 # south witness line so neither witness line strikes the text (machinist
 # review r1 of #1641); the chamfer's leg dimension runs left off the south
 # face into the lane under the T callout, as RimChamferSize does.
-# The tooth line (ToothLineReference, owner ruling 2026-11-10 on #2332): its
-# two rays run from the crossing, TOOTH_SPACE_CROSSING right of the south
-# face on the axis, back to the south face, the tooth ray rising toward the
-# keyway. Both print as plain dimensions with no words (rule 7) and their
-# text clear of the section (rule 14; farm proof r2 of #2482 put a callout
-# block over the section and the machinist review gated it). The station's
-# text stands left of the south face, between the T leader above and the
-# 13 deg's extension lines below. The 13 deg opens left, toward the open
-# sheet: its text sits on the acute wedge's bisector 40 mm out, where the
-# wedge is wider than the text, so neither the arc's extension lines nor
-# the section strike it and the native angle stays the acute one. The
-# chamfer's block drops below the axis line those extensions carry.
-_SHEET_PER_MM = VIEW_SCALE[0] / (VIEW_SCALE[1] * 1000.0)
-TOOTH_CROSSING_XY = (
-    SECTION_CENTER[0] - FACE_WIDTH_HALF + TOOTH_SPACE_CROSSING * _SHEET_PER_MM,
-    SECTION_CENTER[1],
-)
-TOOTH_ANGLE_TEXT_RADIUS = 0.040
-_HALF_INCLINATION = math.radians(TOOTH_INCLINATION_DEG / 2.0)
 SECTION_KEEP = {
     "FaceWidth": (SECTION_CENTER[0] - 0.040, SECTION_CENTER[1] + HALF_OD + 0.016),
-    "BoreSouthChamferSize": (SECTION_CENTER[0] - 0.028, SECTION_CENTER[1] - 0.017),
-    "ToothSpaceCrossing": (SECTION_CENTER[0] - 0.014, SECTION_CENTER[1] + 0.013),
-    "ToothInclination": (
-        TOOTH_CROSSING_XY[0] - TOOTH_ANGLE_TEXT_RADIUS * math.cos(_HALF_INCLINATION),
-        TOOTH_CROSSING_XY[1] + TOOTH_ANGLE_TEXT_RADIUS * math.sin(_HALF_INCLINATION),
-    ),
+    "BoreSouthChamferSize": (SECTION_CENTER[0] - 0.028, SECTION_CENTER[1] - 0.005),
 }
 # The face width's +/-.001 is the gear's term in the solid cone-gear stack
 # on the cone gear shaft (dt_cone_gear_stack); rule 4 asks that the stack be
@@ -307,10 +280,9 @@ def _hide_tangent_edges(view: Any, label: str) -> None:
 
     On 64 inclined teeth every flank-to-tip and flank-to-root transition
     projects as its own line, so an edge-on view of the rim arrives as a
-    stripe field of 128 lines -- ink that carries no fact the section's tooth
-    line and the gear data do not state, and that no dimension can be placed
-    on top of. The isometric keeps its tangent edges: there the teeth are the
-    thing being shown.
+    stripe field of 128 lines -- ink that carries no fact the gear data does
+    not state, and that no dimension can be placed on top of. The isometric
+    keeps its tangent edges: there the teeth are the thing being shown.
     """
     view.SetDisplayTangentEdges2(0)
     if int(view.GetDisplayTangentEdges2()) != 0:
@@ -560,7 +532,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_dimension_callouts(
         adapter, section_annotations,
-        {name: DIMENSION_CALLOUTS[name] for name in SECTION_KEEP if name in DIMENSION_CALLOUTS},
+        {name: DIMENSION_CALLOUTS[name] for name in SECTION_KEEP},
     )
     assert_imported_precision(
         adapter, front_annotations + section_annotations, DRAWING_PRECISION_BY_NAME

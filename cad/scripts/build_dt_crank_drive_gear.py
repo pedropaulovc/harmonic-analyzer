@@ -83,9 +83,7 @@ from dt_crank_drive_gear_spec import (
     OUTSIDE_DIA_TOLERANCE_MM,
     SURFACE_FINISHES,
     TEETH,
-    TOOTH_INCLINATION_DEG,
     TOOTH_SPACE,
-    TOOTH_SPACE_CROSSING,
     TOOTH_SPACE_FORM,
     UNIT,
 )
@@ -167,50 +165,6 @@ def _verify_named_dimension(adapter, full_name: str, expected_mm: float) -> None
         raise RuntimeError(
             f"{full_name} measures {actual_mm:g} mm, expected {expected_mm:g} mm"
         )
-
-
-def _add_driving_tooth_inclination(adapter, axis_ray: str, tooth_ray: str) -> None:
-    """Author the acute angle between the two crossing-rooted rays as DRIVING.
-
-    build_dt_cone_pivot_post's ``_add_driving_plan_incline`` recipe: both rays
-    selected as segments, the text point on their bisector inside the acute
-    wedge, passed with sketch y in BOTH the y and the -z slots so it lands in
-    that wedge whether SOLIDWORKS reads it in sketch or model space, and the
-    value proven acute before the dimension is made driving.
-    """
-    from solidworks_mcp.adapters import sw_type_info as _sw_type_info
-    from solidworks_mcp.adapters.solidworks.sketch import _select_sketch_entities
-
-    # The rays run south (sketch +y) from the crossing; the bisector point
-    # sits 1 mm along it, inside both rays' 1.78 mm reach.
-    half = math.radians(TOOTH_INCLINATION_DEG / 2.0)
-    text_radius_m = 0.001
-    text_x = text_radius_m * math.sin(half)
-    text_y = -TOOTH_SPACE_CROSSING / 1000.0 + text_radius_m * math.cos(half)
-    model = adapter.currentModel
-    model.ClearSelection2(True)
-    _select_sketch_entities(adapter, [axis_ray, tooth_ray], 0)
-    extension = _sw_type_info.early_bound_or_flag(
-        model.Extension, "IModelDocExtension", "AddSpecificDimension"
-    )
-    display, status = extension.AddSpecificDimension(
-        text_x, text_y, -text_y, 3, 0  # swDimensionType_e.swAngularDimension
-    )
-    model.ClearSelection2(True)
-    if display is None:
-        raise RuntimeError(f"tooth inclination: AddSpecificDimension(angular) failed ({status})")
-    dimension = _early_bound(
-        _early_bound(display, "IDisplayDimension").GetDimension2(0), "IDimension"
-    )
-    actual = math.degrees(abs(float(dimension.SystemValue)))
-    if abs(actual - TOOTH_INCLINATION_DEG) > 1e-6:
-        raise RuntimeError(
-            f"tooth inclination measured {actual:.6f} deg, expected {TOOTH_INCLINATION_DEG:.6f} deg"
-        )
-    dimension.DrivenState = 2  # swDimensionDrivenState_e.swDimensionDriving
-    if int(dimension.DrivenState) != 2:
-        raise RuntimeError("tooth inclination did not become driving")
-    _telemetry.success(f"driving tooth inclination: {TOOTH_INCLINATION_DEG:.4f} deg")
 
 
 PART_NAME = "dt-crank-drive-gear"
@@ -437,62 +391,6 @@ async def build(adapter) -> dict[str, str]:
         display_unit=UNIT,
     )
 
-    # The tooth line, as a REFERENCE sketch on the Top plane, the plane
-    # section A-A cuts. Two construction rays share the crossing point, as
-    # the plan-angle rays of build_dt_cone_pivot_post do (two rays from one
-    # vertex enclose one acute wedge an angular dimension reads
-    # unambiguously). Both run SOUTH to the collar face, so the wedge opens
-    # toward the open sheet left of the section, where the 13 deg has room
-    # (farm proof r2 of #2482: opened north, its text fell on the section).
-    # The axis ray ends on the origin, the axis on the south face; its
-    # length IS the crossing's station. Top-plane sketch x is model +X and
-    # sketch y model -Z. The tooth ray is a near-side (+Y, t = -X) tooth's
-    # line d = cos(beta) z - sin(beta) x projected onto the plane: it runs
-    # toward +X as z falls, as a right-hand gear's near teeth do seen with
-    # the axis left to right. The values are the spec's, which the tooth cut
-    # above was gated against.
-    tooth_line = SketchDims()
-    check("create_sketch tooth line reference", await adapter.create_sketch("Top"))
-    set_sketch_direct_db(adapter, True)
-    beta = math.radians(TOOTH_INCLINATION_DEG)
-    ray_length = TOOTH_SPACE_CROSSING / math.cos(beta)
-    axis_ray = check(
-        "tooth line axis ray",
-        await adapter.add_centerline(0.0, -TOOTH_SPACE_CROSSING, 0.0, 0.0),
-    )
-    tooth_ray = check(
-        "tooth line ray",
-        await adapter.add_centerline(
-            0.0, -TOOTH_SPACE_CROSSING, TOOTH_SPACE_CROSSING * math.tan(beta), 0.0
-        ),
-    )
-    set_sketch_direct_db(adapter, False)
-    for label, first, second, relation in (
-        ("tooth line axis ray vertical", axis_ray, None, "vertical"),
-        ("axis ray ends on the south face's axis", f"{axis_ray}.end", "origin", "coincident"),
-        ("tooth ray from the crossing", f"{tooth_ray}.start", f"{axis_ray}.start", "coincident"),
-    ):
-        check(label, await adapter.add_sketch_constraint(first, second, relation))
-    check(
-        "tooth-space crossing station",
-        await adapter.add_sketch_dimension(
-            f"{axis_ray}.start", "origin", "vertical_distance", TOOTH_SPACE_CROSSING
-        ),
-    )
-    tooth_line.record("ToothSpaceCrossing")
-    check(
-        "tooth ray length",
-        await adapter.add_sketch_dimension(tooth_ray, None, "linear", ray_length),
-    )
-    tooth_line.record("ToothLineRayLength")
-    _add_driving_tooth_inclination(adapter, axis_ray, tooth_ray)
-    tooth_line.record("ToothInclination")
-    await ensure_fully_defined(adapter, "tooth line reference sketch")
-    check("exit_sketch tooth line reference", await adapter.exit_sketch())
-    name_last_feature(adapter, "ToothLineReference")
-    tooth_line.apply(adapter, "ToothLineReference")
-    _verify_named_dimension(adapter, "ToothSpaceCrossing@ToothLineReference", TOOTH_SPACE_CROSSING)
-
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
 
@@ -508,7 +406,6 @@ async def build(adapter) -> dict[str, str]:
     # no assembly instance renders it (#880).  The drawing shows it per view
     # through _drawing_hidden_sketches to import those dimensions.
     blank_sketch(adapter, "OutsideDiaReference")
-    blank_sketch(adapter, "ToothLineReference")
     return await save_simplified_part(adapter, PART_NAME, disc.tooth_features)
 
 

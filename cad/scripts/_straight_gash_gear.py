@@ -181,6 +181,7 @@ def _affine_expression(offset: float, along_x: float, along_y: float, x: str, y:
     return "+".join(f"({term})" if index == 0 else term for index, term in enumerate(terms))
 
 
+@_telemetry.traced("gear.straight_gash")
 async def build_straight_gash_gear(
     adapter: Any,
     section: StockFormProfile,
@@ -304,6 +305,7 @@ def _flank_samples(section: Any) -> tuple[tuple[int, float, tuple[float, float]]
     )
 
 
+@_telemetry.traced("gear.straight_gash_flanks")
 def assert_straight_gash_flanks(
     adapter: Any,
     section: Any,

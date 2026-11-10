@@ -71,17 +71,26 @@ GEAR_DATA = gear_data_note(
         # plunge row below carries the cut depth.
         ("ROOT DIAMETER (REF)", inch_text(spec.ROOT_DIA_MIN, 3)),
         # Straight teeth inclined to the axis (owner ruling 2026-11-10, #2332
-        # option A). The inclination and the station where each tooth space's
-        # centre plane crosses the axis are NATIVE dimensions in section A-A
-        # (ToothLineReference), under the title block's rows, so this row
-        # restates neither number; it gives what no view can settle, the
-        # hand, and why a straight 16T meshes inclined teeth: the axes cross
-        # (machinist review of PR 2 round 4 read the 64T as a spur). High in
-        # the block: on MATES WITH, the last row, it ran into the tooth tips
-        # (layout audit of PR 2 round 5, struck at x 120.8 mm).
+        # option A), stated as the helix angle was: no view shows a tooth's
+        # line on a drawn edge, so a native 13 deg measured between reference
+        # rays in section A-A floated off real geometry (machinist review of
+        # farm proof r3 on #2482). The title block's +/-1 deg and .XX rows
+        # govern both numbers. The hand is the one fact a mirrored part would
+        # get wrong, and the crossed axes are why a straight 16T meshes
+        # inclined teeth (machinist review of PR 2 round 4 read the 64T as a
+        # spur). The station is where each tooth space is centred on the
+        # axis, from the face the bore chamfer marks. High in the block: on
+        # MATES WITH, the last row, it ran into the tooth tips (layout audit
+        # of PR 2 round 5, struck at x 120.8 mm).
         (
             "TOOTH LINE",
-            f"STRAIGHT, {spec.TOOTH_HAND}, AS SECTION A-A; AXES CROSSED WITH MHA-DT-10",
+            f"STRAIGHT, {spec.TOOTH_INCLINATION_DEG:.{spec.TOOTH_INCLINATION_PLACES}f} DEG "
+            f"{spec.TOOTH_HAND} FROM AXIS; AXES CROSSED WITH MHA-DT-10",
+        ),
+        (
+            "TOOTH SPACES CENTRED ON AXIS AT",
+            f"{inch_text(spec.TOOTH_SPACE_CROSSING, spec.TOOTH_SPACE_CROSSING_PLACES)} "
+            "FROM CHAMFERED BORE FACE",
         ),
         (
             f"BASE TANGENT SPAN OVER {spec.BASE_TANGENT_SPAN_TEETH} TEETH, NORMAL, ACCEPT ON THIS PART",
