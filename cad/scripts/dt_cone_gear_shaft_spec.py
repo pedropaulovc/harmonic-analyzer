@@ -405,8 +405,10 @@ SURFACE_FINISHES = (
 # title block's angle (error_budget.yaml books it as cone_flat_clock).  Note
 # BOND_NOTE names the bonded mates of land 2 and the socket.  Note STACK_NOTE
 # names, once, the stack the three-place lengths set (rule 4): the step
-# stands SEAT_STEP_SETBACK behind T024's south face (the proof below) and the
-# collar web is the MHA-DT-07 station and the stack's origin.  The
+# stands SEAT_STEP_SETBACK behind T024's south face (the proof below), the
+# tip station keeps the end inside T024's bore so T018 butts T024 (the
+# recess proof below), and the collar web is the MHA-DT-07 station and the
+# stack's origin.  The
 # 2026-09-28 flats' matched-fit line and U40's tailstock line went with the
 # flats and the tip land (C1 keyed supersedes both).
 STACK_NOTE = 3

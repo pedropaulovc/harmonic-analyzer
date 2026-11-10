@@ -1093,6 +1093,10 @@ def test_the_shaft_end_stays_inside_t024_at_every_limit() -> None:
     assert spec.T024_BOND_LENGTH_MIN_MM > 0.5 * spec.CONE_GEAR_FACE_WIDTH
     # Positive control: at .XX the end could stand proud of T024.
     assert recess + spec.T024_NORTH_FACE_DEVIATION_MM[0] - _band(2) < 0.0
+    # So the .XXX is functional, and the sheet says so: Sec2End carries the
+    # stack note's flag (PR 2 r4 review: an unflagged three-place length).
+    assert "Sec2End" in drawing.STACK_LENGTHS
+    assert drawing.DIMENSION_SUFFIXES["Sec2End"] == drawing.STACK_FLAG_SUFFIX
 
 
 def test_the_spigot_keeps_floor_air_and_engagement_in_the_socket() -> None:

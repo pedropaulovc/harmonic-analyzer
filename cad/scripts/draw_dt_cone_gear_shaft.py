@@ -257,9 +257,14 @@ DIAMETER_TEXT_WIDTH = 0.032
 # One-line suffixes after a dimension's value: land 2's flag to the bond
 # note, and the stack's three-place lengths' flag to the stack note (round 4
 # review: a note naming the mates must be linked at each callout it serves,
-# rule 7).  Other lengths carry their value and band only.
+# rule 7).  The tip station Sec2End is one of them: its .XXX band is what
+# keeps the shaft's end inside T024's bore, so T018 butts T024 and not the
+# shaft (the recess proof in dt_cone_gear_shaft_spec; at .XX the end could
+# stand 0.10 mm proud of T024's north face).  PR 2 r4 review (7522757):
+# unflagged, it read as a three-place length with no function.  Other
+# lengths carry their value and band only.
 STACK_FLAG_SUFFIX = f" SEE NOTE {STACK_NOTE}"
-STACK_LENGTHS = ("Sec1End", "CollarWidth")
+STACK_LENGTHS = ("Sec1End", "Sec2End", "CollarWidth")
 DIMENSION_SUFFIXES = {
     **SEAT_MATE_SUFFIXES,
     **{name: STACK_FLAG_SUFFIX for name in STACK_LENGTHS},
