@@ -16,6 +16,13 @@ Issue #290: the sheet prints decimal inch (``drawing_unit: in``).  Lengths
 stay physical millimetres, each owned nominal the exact decimal of its
 printed inch value; stations other subsystems own (the knife line, the
 summing axis, the keeper fit-up) flow through unsnapped.
+
+Owner ruling 2026-11-10 (#2333, option a): the frame is a one-off gray-iron
+sand casting poured from a 3D-printed pattern and machined on its seats only:
+the faced top and underside planes, the tube sockets, cap recesses and
+gooseneck bore, and the drilled, tapped and reamed holes.  Every other face
+stays as cast.  The registry row (``cad/config/parts/fr-top-frame.yaml``)
+carries the material and process.
 """
 
 from __future__ import annotations
