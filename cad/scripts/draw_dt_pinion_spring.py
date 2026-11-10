@@ -748,8 +748,7 @@ def kink_arc_faults(
 ) -> list[str]:
     """Why the kink angle's drawn arcs do not read as the included wedge
     between the free form's drawn legs, the blade running down and the flat
-    running up from their crossing (draw_dt_cone_gear.clock_arc_faults'
-    reading): centred on the crossing, every point within
+    running up from their crossing: centred on the crossing, every point within
     KINK_ARC_HALF_SPREAD_DEG of the wedge's bisector, spanning it, at a
     radius that ends the arc on the drawn flat (KINK_ARC_RADIUS_RANGE), so
     no extension line runs off the legs.  Empty when they do."""
