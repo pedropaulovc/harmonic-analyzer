@@ -256,7 +256,8 @@ def test_the_d_sections_print_the_corner_limit_clock_and_mates(monkeypatch):
         a_section.centre[0] + 0.0095, a_section.centre[1] + drawing.KEYSEAT_WIDTH_RISE
     )
     assert keeps[0]["Sec1KeyseatS"] == (
-        a_section.centre[0] - drawing.KEYSEAT_S_SHIFT, a_section.centre[1] + 0.017
+        a_section.centre[0] - drawing.KEYSEAT_S_SHIFT,
+        a_section.centre[1] + 0.017 + drawing.KEYSEAT_S_FLAG_LIFT,
     )
     assert inside == ["Sec1KeyseatS"]
 
@@ -966,6 +967,19 @@ def test_each_d_section_cuts_its_own_land_clear_of_its_neighbours() -> None:
     s_x = keyed.centre[0] - drawing.KEYSEAT_S_SHIFT
     assert s_x + 0.0130 <= keyseat_x - CLEAR_GAP_M - 0.001
     assert s_x - 0.0144 >= 0.3111 + CLEAR_GAP_M
+    # With its NOTE flag above, S's block is centred on its position, the
+    # value pushed down by the flag's row: PR 1 r9 (9b8efb7876) measured
+    # 0.3170..0.3424 x 0.1747..0.1872 about (0.3301, 0.182), its foot 0.2 mm
+    # off the face (the proof refused it).  Lifted, the block clears the
+    # face, the Ø.4825 text (to 0.3144) and the width's line by CLEAR_GAP_M
+    # and stays under the pictorial's outline (0.2001).
+    s_y = keyed.centre[1] + 0.017 + drawing.KEYSEAT_S_FLAG_LIFT
+    block = (s_x - 0.0131, s_y - 0.0073, s_x + 0.0123, s_y + 0.0052)
+    face_top = keyed.centre[1] + keyed_half
+    assert block[1] - face_top >= CLEAR_GAP_M + 0.001
+    assert block[0] >= 0.3144 + CLEAR_GAP_M
+    assert block[2] <= keyseat_x - CLEAR_GAP_M
+    assert block[3] <= 0.2001 - CLEAR_GAP_M
     floor_x = keyed.centre[0] + (
         cone_land_key.KEYSEAT_FLOOR_OFFSET_MM / 1000.0 * keyed.scale[0] / keyed.scale[1]
     )

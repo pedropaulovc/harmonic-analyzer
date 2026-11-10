@@ -308,6 +308,7 @@ def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
         "TRANSVERSE BACKLASH WITH MHA-DT-10, ACCEPT AT ASSEMBLY",
         "TOOTH FORM",
         "TOOTH EDGES",
+        "TOOTH RUNOUT TO BORE",
         "MATES WITH",
     ):
         assert field in data, field
@@ -320,7 +321,7 @@ def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
         "C2C",
         "NONCONJUGATE",
         "X.XX",
-        "RUNOUT",
+        "FIXTURE RUNOUT",
         "NONSTANDARD",
         "SAME CUTTER",
         "LONG ADDENDUM",
@@ -331,11 +332,10 @@ def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
     accepting = [
         line
         for line in data.splitlines()
-        if any(owner in line for owner in (
-            "ACCEPT ON THIS PART", "ACCEPT AT ASSEMBLY", "ACCEPT AT SETUP"
-        ))
+        if any(owner in line for owner in ("ACCEPT ON THIS PART", "ACCEPT AT ASSEMBLY"))
     ]
-    assert len(accepting) == 3
+    assert len(accepting) == 2
+    assert "ACCEPT AT SETUP" not in data
     for line in accepting:
         assert "REF" not in line
     # ... and no OTHER row claims an acceptance band. A tooth count, the
@@ -905,40 +905,33 @@ def test_face_view_leaders_have_separate_landings() -> None:
     assert max(bore[0][0][1], bore[0][1][1]) < cy
 
 
-def test_both_shop_gears_state_the_source_owned_tooth_cutting_setup_not_a_form_class() -> None:
+def test_both_shop_gears_state_the_source_owned_tooth_runout_not_a_form_class() -> None:
     import dt_crank_pinion_notes as pinion_notes
 
     setup_tir = _config.fit("crank_mesh", "tooth_cutting_runout_tir_mm")
     for part_spec, part_notes in ((spec, notes), (pinion_spec, pinion_notes)):
         assert part_spec.TOOTH_RUNOUT_TIR_MM == setup_tir
-        rows = dict(
-            (label.strip(), value.strip())
-            for label, separator, value in (
-                line.partition(":") for line in part_notes.GEAR_DATA.splitlines()[1:]
-            )
-            if separator
-        )
-        tir = spec.inch_text(part_spec.TOOTH_RUNOUT_TIR_MM, 3)
-        # The shop's runout row: .001 per inch of the feature (mm per mm).
-        runout_row = 0.001 * part_spec.OUTSIDE_DIA
-        if part_spec.TOOTH_RUNOUT_TIR_MM < runout_row:
-            # Under its row (the 64T's Ø2.8 blank), the row names its route
-            # and the surface indicated: an arbor fitted to the bore.
-            assert rows["TOOTH CUTTING SETUP, ACCEPT AT SETUP"] == (
-                f"ARBOR FITTED TO BORE, {tir} TIR MAX"
-            )
-        else:
-            assert rows["TOOTH CUTTING SETUP, ACCEPT AT SETUP"] == (
-                f"{tir} TIR MAX TO FINISHED BORE"
-            )
         assert "AGMA" not in part_notes.GEAR_DATA
         assert not hasattr(part_spec, "GEOMETRIC_CONTROLS")
         assert not hasattr(part_spec, "GEOMETRIC_TOLERANCES_MM")
-    # Each finished-bore eccentricity is half its own stated setup TIR.
+    # Each finished-bore eccentricity is half its own stated TIR.
     assert (spec.TOOTH_RUNOUT_TIR_MM + pinion_spec.TOOTH_RUNOUT_TIR_MM) / 2.0 == setup_tir
+    # The 64T: one GEAR DATA row accepts the finished part's tooth runout to
+    # its bore at crank_mesh's value, with no setup or workholding words;
+    # under the shop's runout row (.001 per inch of the Ø2.8 blank) it names
+    # its mate, whose backlash row is the mesh's acceptance.
+    tir = spec.inch_text(spec.TOOTH_RUNOUT_TIR_MM, 3)
+    lines = notes.GEAR_DATA.splitlines()
+    runout_rows = [line for line in lines if "TIR" in line]
+    assert len(runout_rows) == 1
+    runout_row = runout_rows[0]
+    assert "RUNOUT TO BORE" in runout_row and f"{tir} TIR MAX" in runout_row
+    for method in ("SETUP", "ARBOR", "FIXTURE", "INDICATE"):
+        assert method not in runout_row, method
+    assert spec.TOOTH_RUNOUT_TIR_MM < 0.001 * spec.OUTSIDE_DIA
+    assert "MHA-DT-10" in runout_row
+    assert any(line.startswith("TRANSVERSE BACKLASH WITH MHA-DT-10") for line in lines)
     # The 64T's block keeps its 19 lines and its widest row: an extra line or
     # a wider row runs its last rows into the tooth tips.
-    lines = notes.GEAR_DATA.splitlines()
     assert len(lines) == 19
-    setup_row = next(line for line in lines if line.startswith("TOOTH CUTTING SETUP"))
-    assert len(setup_row) <= max(len(line) for line in lines if line is not setup_row)
+    assert len(runout_row) <= max(len(line) for line in lines if line is not runout_row)
