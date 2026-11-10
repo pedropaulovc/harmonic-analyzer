@@ -127,7 +127,6 @@ from ch_pivot_shaft_spec import (
     FLAT_DEPTH as PIVOT_FLAT_DEPTH,
     SHAFT_DIA as PIVOT_SHAFT_DIA,
 )
-from ch_rocker_arm_spec import HUB_LENGTH, HUB_LENGTH_BAND
 from channel_frame_geom import LEVER_FULCRUM_XY, ROCKER_PIVOT_XY
 from frame_column_stations import COLUMN_X
 from rocker_bank_layout import (
@@ -137,7 +136,6 @@ from rocker_bank_layout import (
     ROCKER_SPRING_SET,
     ROCKER_SPRING_SET_BAND,
     SHAFT_TIP_SET_BAND,
-    STACK_L20,
     STACK_MID_Z,
 )
 
@@ -1082,25 +1080,12 @@ def _fitup_text() -> dict[str, str]:
 
     # Every hub comes at or over its print length (its band is upper-only),
     # so the shortest stack the printed hub band allows still meets the
-    # printed stack's low limit (#2330: compared as printed, each at its own
-    # places): the stack can only be long, and the re-face step covers that.
-    # It faces the longest hubs on the end away from datum G, the face each
-    # arm registers on in the stack (draw_ch_rocker_arm), keeping each at or
-    # over its print.
-    hub_places = asm.HUB_LENGTH_PLACES
-    stack_places = asm.TOLERANCE_PRECISION[asm.STACK_LENGTH_DIMENSION]
-    stack_lower, _upper = asm.DIMENSION_TOLERANCES[asm.STACK_LENGTH_DIMENSION]
-    hub_low = asm.printed(HUB_LENGTH, hub_places) + asm.printed(
-        HUB_LENGTH_BAND[1], hub_places
-    )
-    stack_low = asm.printed(STACK_L20, stack_places) + asm.printed(
-        stack_lower, stack_places
-    )
-    if COUNT * hub_low < stack_low - 1e-9:
-        raise AssertionError(
-            "the re-face step covers only a long stack, but the printed hub "
-            "band allows a stack under the printed stack's low limit"
-        )
+    # printed stack's low limit: ch_channel_assembly_spec checks that as
+    # printed, each at its own places (#2330), when this module imports it.
+    # The stack can only be long, and the re-face step covers that. It faces
+    # the longest hubs on the end away from datum G, the face each arm
+    # registers on in the stack (draw_ch_rocker_arm), keeping each at or over
+    # its print.
     # The pivot shaft comes finished, domed both ends to its overall length
     # (ch_pivot_shaft_spec): its left tip set DOME_HEIGHT proud of the left
     # ear, within SHAFT_TIP_SET_BAND, puts both flats under their screws
