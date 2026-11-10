@@ -1,5 +1,6 @@
-# CAD-owned shop-equipment records: facts the CAD specs and their tests read
-# that the prechips shop schema cannot express. Each fact lives in exactly one
+# CAD-owned shop-equipment records: facts the CAD specs and their tests read,
+# and workholding a process plan names, that the prechips shop schema cannot
+# express. Each fact lives in exactly one
 # file: anything prechips can hold (machines, chucks, measuring ranges and
 # resolutions, tools' sizing data, cutting settings) is in cad/process/shop.toml,
 # and no field here repeats one there. An object may appear in both files with
@@ -138,6 +139,27 @@ source = "https://www.precisionmatthews.com/products/vise-6in-highprec"
 # L1 = 150 mm; the bare jaw-to-jaw caliper reading was 6.135 in (2026-10-05), but
 # the owner reports (2026-10-30) only 5 3/4 in pieces fit with the stock hard jaws.
 opening_in = { value = 5.75, measured = { status = "measured", by = "Pedro Paulo Vezza Campos", date = "2026-10-30", instrument = "owner-reported fit with stock hard jaws" } }
+
+# Base-bar (MHA-CH-06-TL-20) vise workholding the base-bar plan's face and hole
+# setups name (plan text and diagrams; prechips has no parallel or jack record).
+# Source and status: Pedro's 2026-11-05 hand traveler
+# ch-rocker-arm-tl-oblique-base-bar-traveler-2026-11-05.html, tool list (open
+# PR #2218, branch process/basebar-traveler-logbook-advice). Status is as that
+# sheet states it on 2026-11-05; no dimension beyond the sheet's is recorded.
+[fixtures.parallels-1-3-8in]
+name = "1-3/8 in parallels, matched pair"
+present = false
+status = "not owned: your set stops at 1 in"
+use = "Op 30 and Setup A: lift the bar above the jaw tops"
+
+[fixtures.jack-hhip-3901-0079]
+name = "HHIP 3901-0079 screw jack"
+make = "HHIP"
+sku = "3901-0079"
+range = "about 3.9–5.5 in"
+present = false
+status = "not owned"
+use = "Op 30 and A4: under the overhanging end"
 
 # --- stock ------------------------------------------------------------------
 

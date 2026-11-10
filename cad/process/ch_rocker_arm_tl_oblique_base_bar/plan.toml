@@ -1,5 +1,8 @@
-# Source: cad/process/hand-travelers/
-# ch-rocker-arm-tl-oblique-base-bar-traveler-2026-10-30.html.
+# Source: Pedro's 2026-11-05 hand traveler
+# ch-rocker-arm-tl-oblique-base-bar-traveler-2026-11-05.html (open PR #2218,
+# branch process/basebar-traveler-logbook-advice; drawing v47), including its
+# vise workholding: 1-3/8 in parallels and the HHIP 3901-0079 jack, recorded in
+# cad/config/shop-equipment.toml with that sheet's ownership status.
 # Table-clamped squaring sequence: 2026-11-07 session
 # 2026-11-07T00-02-29-727Z_01a1b350-58df-72b7-a9e3-7735a77b13fc.
 # v48 drawing: bar 1 alone carries the four #12 bracket holes; rail stations

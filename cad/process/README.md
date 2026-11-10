@@ -46,9 +46,10 @@ traveler passes again.
 
 ## Shop records
 
-`shop.toml` is the prechips shop file: machines, workholding, gauges, limits,
-tools and cutting settings, in prechips' schema and units. Any fact that schema
-can express lives here. Its records include the rocker DTI's range and
+`shop.toml` is the prechips shop file: machines, gauges, limits, tools and
+cutting settings, in prechips' schema and units. It holds only records an HA
+plan or an HA spec/test reads (no example tooling from other projects); a fact
+that schema can express lives here. Its records include the rocker DTI's range and
 resolution (`gauges.dti`), read by `ch_rocker_arm_profile_check.py`; the
 PM-30MV X DRO scale (`gauges.mill-x-dro`), whose resolution the paper-drive
 tests read; and the rocker profile cutter (`tools.rocker-profile-cutter`) with
@@ -64,6 +65,9 @@ Facts prechips has no field for, but which CAD specs and tests read, live in
 - the LMS 6784 end-mill set and its sizes, the 8-32 plug hand tap's flute
   length, and the shop-made rocker trammel's R800/R816 lengths;
 - the PM 6-in vise's make, SKU, source and opening;
+- the base-bar plan's vise workholding (1-3/8 in parallels, HHIP 3901-0079
+  screw jack), with the ownership status Pedro's 2026-11-05 hand sheet gives
+  (PR #2218): neither owned on that date;
 - three `[[stock]]` rows: OnlineMetals 4807 strap and 1173 bar, and McMaster
   8663K55 acetal.
 

@@ -1,10 +1,11 @@
 # Harmonic-analyzer shop file for prechips travelers: tooling, cutting settings,
-# machines, workholding, gauges and limits, in the prechips shop schema. Checks
-# use these values as written, with no measured/placeholder provenance (owner
-# ruling 2026-11-10, cad/process/README.md). Part-specific tool keys do not
-# assert tool equivalence. Material identities preserve each source's stated
-# stock condition; they are not inferred from the printed material text or
-# treated as interchangeable. Facts the prechips schema cannot hold that CAD
+# machines, gauges and limits, in the prechips shop schema. It holds only
+# records an HA plan (cad/process/<stem>/plan.toml) or an HA spec/test reads.
+# Checks use these values as written, with no measured/placeholder provenance
+# (owner ruling 2026-11-10, cad/process/README.md). Part-specific tool keys do
+# not assert tool equivalence. Material identities preserve each source's
+# stated stock condition; they are not inferred from the printed material text
+# or treated as interchangeable. Facts the prechips schema cannot hold that CAD
 # specs read live in cad/config/shop-equipment.toml; no field is in both files.
 
 # Source: prechips v0.9.0 examples/shop.toml (archive/pre-v0.10-2026-11-08
@@ -19,45 +20,9 @@ travel_mm = { x = 584.2, y = 222.25, z = 355.6 }
 # HA: envelope spindle_to_table_min_in 2.46 (62.484 mm), max 17 in (431.8 mm).
 spindle_to_table_mm = [62.484, 431.8]
 
-[machines.pm-1127vf-lb]
-kind = "lathe"
-rpm_ranges = [[70, 380], [380, 2000]]
-swing_over_bed_mm = 279.4
-# HA: envelope swing_over_cross_slide_in 6.66 (169.164 mm).
-swing_over_cross_slide_mm = 169.164
-between_centres_mm = 699.77
-
-[machines.bs-0]
-kind = "dividing_head"
-worm_ratio = 40
-direct_index_positions = 24
-plate_holes = { A = [15, 16, 17, 18, 19, 20], B = [21, 23, 27, 29, 31, 33], C = [37, 39, 41, 43, 47, 49] }
-
-[workholding.chuck-3jaw-6]
-kind = "chuck"
-grip_range_mm = [3.0, 140.0]
-body_diameter_mm = 158.0
-body_length_mm = 72.0
-
-[workholding.chuck-4jaw-6]
-kind = "chuck"
-grip_range_mm = [6.0, 150.0]
-body_diameter_mm = 158.0
-body_length_mm = 70.0
-
-[workholding.chuck-4jaw-5-bs0]
-kind = "chuck"
-grip_range_mm = [4.0, 110.0]
-body_diameter_mm = 127.0
-body_length_mm = 62.0
-
 [gauges.calipers]
 range_mm = [0.0, 152.4]
 resolution_mm = 0.0127
-
-[gauges.micrometers]
-range_mm = [0.0, 76.2]
-resolution_mm = 0.00254
 
 # Pin-gauge set range, 0.011-0.500 in by 0.001 in; its grade note is
 # cad/config/shop-equipment.toml gauges.pin-gauges. 0.011 in = 0.2794 mm exactly.
@@ -75,16 +40,6 @@ resolution_mm = 0.0254
 [gauges.dti]
 range_mm = [0.0, 0.762]
 resolution_mm = 0.0127
-
-# 10x measuring loupe with a 0.1 mm reticle (edge breaks, relief corners).
-[gauges.measuring-loupe]
-range_mm = [0.0, 10.0]
-resolution_mm = 0.1
-
-# PM-1127VF-LB carriage Z DRO scale read as a length gauge (fit-scribe hold).
-[gauges.lathe-z-dro]
-range_mm = [0.0, 699.77]
-resolution_mm = 0.005
 
 # PM-30MV X DRO scale read as a length gauge (feed-lever length, hand sheet
 # TL-26 Setup B). Range: machines.pm-30mv X travel; resolution: archive
@@ -151,135 +106,6 @@ sfm = 165
 chip_load_mm_per_tooth = 0.0508
 flutes = 2
 feed_unit = "in/min"
-
-# Source: comparison/pivot-shaft.toml; archived pivot-shaft plan rev 7,
-# inventory/pedro-shop.toml and cutting-data.toml pivot-shaft/DataShaft4 rows.
-# These are authored choices, not drawing requirements (MHA-065 v40).
-[tools.shaft-ar]
-description = "AR carbide turning/facing tool"
-[tools.shaft-centre]
-description = "#2 M42 centre drill, Ø1.98 pilot / 60° seat"
-# Angles, nose radius, blade width and corner radius remain local parameters.
-[tools.shaft-hss]
-description = "3/8 in M42 RH bit"
-[tools.shaft-blade]
-description = "M2 square blade"
-
-# LMS 2569: supplied pre-ground HSS bit; 3/8 in shank; convex Ø0–19.05 mm.
-# https://littlemachineshop.com/products/ball-and-radius-turning-tool-small
-# https://littlemachineshop.com/cdn/shop/files/SmallRadiustoolinstructions.pdf?v=15026407504268274368
-[tools.lms-2569]
-description = "LMS 2569 ball-turning attachment, 3/8 in shank, HSS cutter"
-
-# Calculated settings: archived cutting-data.toml rows (Machinery's Handbook
-# 27th ed. starting values as cited there); operations supply the diameter.
-# AR carbide face row; at Ø10 the 300 ft/min speed clamps to the lathe top speed.
-[settings.shaft-face-carbide-1018]
-tool = "shaft-ar"
-material = "shaft-1018-cold-finished"
-sfm = 300
-feed_mm_rev = 0.08
-# ShaftPrep centre-drill row, taken at the pilot; the quill is fed by hand.
-[settings.shaft-centre-drill-1018]
-tool = "shaft-centre"
-material = "shaft-1018-cold-finished"
-sfm = 110
-feed = "Hand quill, 0.038 mm/rev"
-# DataShaft4 M42 HSS bit rows.
-[settings.shaft-face-hss-1018]
-tool = "shaft-hss"
-material = "shaft-1018-cold-finished"
-sfm = 90
-feed_mm_rev = 0.08
-[settings.shaft-rough-turn-hss-1018]
-tool = "shaft-hss"
-material = "shaft-1018-cold-finished"
-sfm = 90
-feed_mm_rev = 0.10
-[settings.shaft-finish-turn-hss-1018]
-tool = "shaft-hss"
-material = "shaft-1018-cold-finished"
-sfm = 110
-feed_mm_rev = 0.05
-# M2 blade form_relief and cut_to_fit rows; parting is hand-fed.
-[settings.shaft-relief-1018]
-tool = "shaft-blade"
-material = "shaft-1018-cold-finished"
-sfm = 70
-feed_mm_rev = 0.02
-[settings.shaft-parting-1018]
-tool = "shaft-blade"
-material = "shaft-1018-cold-finished"
-sfm = 70
-feed = "Hand plunge, 0.025 mm/rev"
-# Retained authored 1400 rpm HSS starting speed, not an LMS recommendation.
-# Manual pp. 6–7: light manual cross-slide increments and handle sweeps.
-[settings.shaft-dome-1018]
-tool = "lms-2569"
-material = "shaft-1018-cold-finished"
-rpm = 1400
-feed = "Manual light cross-slide infeed / handle sweep"
-
-# Source: comparison/pivot-bracket.toml; archived pivot-bracket plan,
-# inventory/pedro-shop.toml, cutting-data.toml and expected/traveler.html.
-# The source says plain carbon steel, not a specific grade or stock condition.
-[tools.bracket-face]
-description = "Ø3/4 in HSS 4-flute end mill"
-[tools.bracket-end]
-description = "Ø3/8 in HSS 4-flute end mill"
-[tools.bracket-long]
-description = "Ø3/8 in centre-cutting HSS 4-flute; 31.75 flutes, 37 projection"
-[tools.bracket-spot-long]
-description = "Ø1/4 in M42 120° spot drill; 50 projection clears ear"
-[tools.bracket-drill15]
-description = "Ø4.572 HSS #15 drill"
-[tools.bracket-spot]
-description = "Ø3/8 in M42 120° spot drill"
-[tools.bracket-drillD]
-description = "Ø6.248 HSS letter D drill"
-[tools.bracket-ream]
-description = "Ø6.512 HSS chucking reamer"
-
-[settings.bracket-end-plain-carbon-steel]
-tool = "bracket-end"
-material = "bracket-plain-carbon-steel"
-rpm = 900
-feed = "90 mm/min"
-[settings.bracket-long-plain-carbon-steel]
-tool = "bracket-long"
-material = "bracket-plain-carbon-steel"
-rpm = 900
-feed = "90 mm/min; any in-stock plunge 45 mm/min"
-
-# Source: comparison/blondihacks-t-nuts.toml; archive/pre-v0.10-2026-11-08
-# (6603afbc), blondihacks-t-nuts inventory/cutting-data and expected traveler.
-# HB120 annealed stock and these numeric settings are source-author selections.
-# Matching rpm/feed does not equate the shoulder rougher and flat-end finisher.
-[tools.tnuts-face]
-description = "3/4-in HSS TiCN square-end mill, 4 flutes"
-[tools.tnuts-rough]
-description = "1/2-in HSS shoulder rougher, 4 flutes"
-[tools.tnuts-finish]
-description = "1/2-in HSS flat-end finisher, 4 flutes"
-[tools.tnuts-saw]
-description = "2-in HSS, 36T; .125 kerf / .120 body; 1/2-in bore"
-[tools.tnuts-spot]
-description = "#3 HSS centre drill"
-[tools.tnuts-drill]
-description = "5/16-in HSS jobber drill, 118° point"
-[tools.tnuts-tap]
-description = "3/8-16 RH HSS taper tap; spring follower"
-
-[settings.tnuts-rough-1018]
-tool = "tnuts-rough"
-material = "tnuts-1018-annealed-hb120"
-rpm = 750
-feed = "3 in/min"
-[settings.tnuts-finish-1018]
-tool = "tnuts-finish"
-material = "tnuts-1018-annealed-hb120"
-rpm = 750
-feed = "3 in/min"
 
 # Source: end-bracket.toml and feed-lever.toml; hand travelers dated
 # 2026-11-02 (MHA-CH-06-TL-28/TL-26 v47), the v48 manifest notes (#29 tap
