@@ -6609,7 +6609,7 @@ cite = ["OnlineMetals part 7506 https://www.onlinemetals.com/en/buy/x/pid/7506 o
 [[stock]]
 form = "flat_bar"
 material = "1018 cold-finish carbon steel"
-note = "Ordered 2026-11-03: 1/4 x 2-1/2 in 1018 CF flat, 36 in (standard length). Allocation: dt-cone-swing-platform (MHA-DT-20), pd-platen-guide (MHA-PD-11)."
+note = "Ordered 2026-11-03: 1/4 x 2-1/2 in 1018 CF flat, 36 in (standard length). Allocation: dt-cone-swing-platform (MHA-DT-20). Not pd-platen-guide (MHA-PD-11), first allocated here: its .29 x .40 rail section (owner ruling B2, 2026-11-01) exceeds the bar's .250 thickness both ways, so no orientation yields it (#2408); it takes the 3/8 x 1/2 bar at the end of this list."
 section_mm = [63.5, 6.35]
 length_mm = 914.4
 on_hand = false
@@ -7014,3 +7014,14 @@ section_mm = [152.4, 1.6002]
 length_mm = 152.4
 on_hand = false
 cite = ["McMaster-Carr 8956K455 https://www.mcmaster.com/8956K455/ ordered 2026-11-03"]
+
+# Not ordered: stock still to buy.
+
+[[stock]]
+form = "flat_bar"
+material = "1018 cold-finish carbon steel"
+note = "To order: 3/8 x 1/2 in 1018 CF flat, 2 pieces x 12 in (standard length). Allocation: pd-platen-guide (MHA-PD-11), one rail per piece (10.62 long, both rails of the platen). The rail is .29 ±.01 tall (3/8 stock) by .40/.39 deep (1/2 stock): skim .042 off each of the top and bottom faces and .052 off each of the front and back faces, so opposite faces lose equal metal and the long thin rail does not bow from one-sided stress relief. The bottom face (the 1.6 slide on MHA-PD-07) is cut in that skim. The nearer 5/16 x 1/2 section is not in OnlineMetals' 1018 CF rectangle-bar range (listing read 2026-11-10); the 1/4 x 2-1/2 bar cannot yield the section (#2408). Not owned."
+section_mm = [12.7, 9.525]
+length_mm = 304.8
+on_hand = false
+cite = ["OnlineMetals part 7482 https://www.onlinemetals.com/en/buy/carbon-steel/0-375-x-0-5-carbon-steel-rectangle-bar-1018-cold-finish/pid/7482 read live 2026-11-10: 3/8 x 1/2 1018 cold finish, ASTM A108, 12 in $4.80", "MHA-PD-11 sheet and pd_platen_guide_spec: GUIDE_HEIGHT .29 at .XX, GUIDE_DEPTH .40 +.00/-.01, length 10.62, quantity 2"]
