@@ -1,0 +1,159 @@
+# Source: cad/process/hand-travelers/
+# ch-rocker-arm-tl-oblique-feed-lever-traveler-2026-11-02.html (drawing v47):
+# route, cut list, tools, speeds, workholding, datums and the filed grip-end
+# corners. Dimensions and limits follow the feature manifest, which agrees
+# with the hand sheet except that it prints the as-bought section bands and
+# carries no corner-radius record.
+title = "Oblique trammel feed lever"
+part = "{{cad.drawing_number}}"
+revision = "{{cad.revision}}"
+material = "6061-T6511 aluminium"
+stock = "{{process.blank_thickness_in:fraction}} × {{process.blank_width_in:fraction}} × 24 in bar (OnlineMetals 1165, shared with TL-28); {{process.quantity:d}} × {{process.blank_length_in:.2f}} in blank."
+note = "Inches. Only the ends, two holes and two grip-end corners are machined; 1/2 and 1 in faces as bought."
+shop = "../shop.toml"
+material_key = "6061-t6511"
+
+[cad]
+file = "../../out/features/ch_rocker_arm_tl_oblique_feed_lever/features.toml"
+adapter = "harmonic_feed_lever"
+
+[parameters]
+blank_length_in = 11.9
+blank_min_length_in = 11.85
+bracket_blank_in = 2.85          # TL-28 blanks from the same bar (hand cut list).
+blank_thickness_in = 0.5
+blank_width_in = 1.0
+quantity = 1
+corner_radius_in = 0.2           # Hand sheet (v47 drawing 2X R.2); no v48 record.
+corner_layout_in = 0.2           # Hand sheet: scribed lines .20 from end and sides.
+# Machine-capacity inputs (mm). Heights are above the mill table; tool lengths
+# run from spindle nose to tip (holder gauge + projection). Archive values are
+# archive/pre-v0.10-2026-11-08 examples/inventory/pedro-shop.toml.
+vise_bed_height_mm = 73.3044     # Archive fixtures.vise-pm-6.bed_height_in 2.886.
+parallel_height_mm = 25.4        # 1 in parallels (archive parallels-lms-6745 1in).
+end_cut_tip_z_mm = -1.016        # Hand sheet: cutter .04 below the bar.
+drill_tip_z_mm = -2.54           # Hand sheet: drill about .1 past breakthrough.
+cutter_dia_mm = 12.7             # 1/2 in end mill.
+r8_collet_gauge_mm = 6.0         # Archive holders.r8-collets-lms-4860.gauge_len_mm.
+half_mill_projection_min_mm = 41.0  # Archive LMS 6784 neighbours bound 1/2 in.
+half_mill_projection_max_mm = 50.0
+drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
+# Archive drill-index-115 13/32 in member, 112.8 out of drill-chuck-r8: the
+# next recorded jobber above 11/32 in, so it bounds that drill.
+drill_projection_max_mm = 112.8
+
+[[tools]]
+id = "saw"
+name = "Saw"
+ref = "jig-saw"
+[[tools]]
+id = "em-half"
+name = "1/2 in end mill"
+ref = "jig-em-half"
+[[tools]]
+id = "spot"
+name = "#2 centre drill"
+ref = "jig-spot"
+[[tools]]
+id = "drill"
+name = "11/32 drill"
+ref = "jig-drill-11-32"
+[[tools]]
+id = "files"
+name = "Files"
+ref = "jig-files"
+
+[[setups]]
+machine_kind = "other"
+title = "Saw blank"
+machine = "Saw / bench"
+indexing = "none"
+envelope = "other"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "saw"
+sizing = "other"
+instruction = "Cut list from the 1165 bar, ~1/8 kerf each: this lever {{process.blank_length_in:.2f}}, then 2 × {{process.bracket_blank_in:.2f}} for TL-28; keep the rest. Waste side of the line; lever blank ≥{{process.blank_min_length_in:.2f}}."
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+title = "Zero end and both holes"
+machine = "PM-30MV / 6 in vise"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "Flat, 1 in face up, on 1 in parallels against both jaws; ZERO EDGE at fixed jaw; ~.4 out past the left jaw side, the rest out right. Keep off the ~5 in overhang."
+datum = "X0 ZERO END (milled here); Y0 ZERO EDGE, touched past the jaws (~X 8); +Y toward you."
+# The cutter centre and edge finder stay within the lever length plus one
+# cutter diameter; across the 1 in width plus one diameter.
+envelope = { x_span_mm = ["{{cad.length_mm}}", "{{process.cutter_dia_mm}}"], y_span_mm = ["{{cad.blank_width_mm}}", "{{process.cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{cad.blank_thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.drill_tip_z_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+sizing = "other"
+instruction = "Cutter .04 below bar. Clean up left end feeding toward you, .02 X steps, ≤ half the allowance. Mark ZERO END and ZERO EDGE."
+settings = "jig-em-half-6061-t6511"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "spot"
+sizing = "other"
+instruction = "Spot H1–H{{cad.hole_count:d}}, cone ~3/16 across. X ±{{cad.station_tol_in:.2f}}; Y {{cad.row_min_in:.2f}}–{{cad.row_max_in:.2f}}."
+rpm = 3000
+feed = "hand"
+
+[setups.operations.table]
+columns = ["Hole", "X", "Y"]
+rows = "{{cad.hole_rows}}"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "drill"
+sizing = { kind = "band", band_mm = "{{cad.hole_dia_band_mm}}" }
+instruction = "H1–H{{cad.hole_count:d}} through between the parallels, tip ~.1 past breakthrough; peck .1. H1 leaves a ~.11 web to the end."
+rpm = 2000
+feed = "hand"
+inspection = "Stations {{cad.hole_stations_in}} ±{{cad.station_tol_in:.2f}} from ZERO END; row {{cad.row_min_in:.2f}}–{{cad.row_max_in:.2f}} from ZERO EDGE."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.hole_1_station_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.hole_2_station_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.row_band_mm}}" }]
+
+[[setups]]
+machine_kind = "other"
+title = "Grip end to length"
+machine = "PM-30MV / 6 in vise"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "Same vise, ZERO EDGE at fixed jaw, slid left: grip end ~.4 past the right jaw side; ZERO END ~5 in out left."
+datum = "Re-find X0 on ZERO END; keep Y."
+envelope = { x_span_mm = ["{{cad.length_mm}}", "{{process.cutter_dia_mm}}"], y_span_mm = ["{{cad.blank_width_mm}}", "{{process.cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{cad.blank_thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.end_cut_tip_z_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+sizing = "other"
+instruction = "Measure cutter D; cut grip end feeding away, .02 passes, final X = {{cad.length_in:.3f}} + D/2."
+settings = "jig-em-half-6061-t6511"
+inspection = "Length {{cad.length_min_in:.1f}}–{{cad.length_max_in:.1f}} on the DRO from ZERO END."
+gauge_checks = [{ gauge = "mill-x-dro", band_mm = "{{cad.length_band_mm}}" }]
+
+[[setups]]
+machine_kind = "other"
+title = "Grip corners / deburr / inspect"
+machine = "Bench vise, soft jaws"
+indexing = "none"
+envelope = "other"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "files"
+sizing = "other"
+instruction = "Scribe lines {{process.corner_layout_in:.2f}} from the grip end and from each side on the top face. Lever upright, grip end just above the jaws: file both vertical grip-end corners to R{{process.corner_radius_in:.1f}}, inside the lines, blended."
+feed = "hand"
+inspection = "2X R{{process.corner_radius_in:.1f}} ±{{cad.linear_1pl_in:.1f}}, visual against the scribed lines."
+gauge_checks = "other"
+
+[[setups.operations]]
+instruction = "Edges and both ends of both holes R{{cad.edge_break_in:.3f}} or chamfer {{cad.chamfer_max_in:.3f}} max."
+inspection = "Section {{cad.thickness_min_in:.3f}}–{{cad.thickness_max_in:.3f}} × {{cad.width_min_in:.3f}}–{{cad.width_max_in:.3f}} as bought, no saw or vise damage; two 5/16-18 socket screws pass through both holes at once without binding."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.thickness_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.width_band_mm}}" }]

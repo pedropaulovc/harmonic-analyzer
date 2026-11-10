@@ -671,7 +671,7 @@ def test_the_jig_bored_k_lands_in_the_set_band_with_margin_at_both_ends() -> Non
     # The printed values are the display's own counts: the operator dials
     # exactly what DETAIL K prints.
     # The 5 um scale's inch-mode count, .0002.
-    count = round(dro_record["resolution_mm"]["value"] / 25.4, 4) * 25.4
+    count = round(shop["gauges"]["mill-x-dro"]["resolution_mm"] / 25.4, 4) * 25.4
     assert knob_setting.DRO_COUNT_MM == pytest.approx(count)
     x, y = knob_setting.K_FROM_S_ALONG_MM, knob_setting.K_FROM_S_ACROSS_MM
     for value in (x, y):

@@ -253,9 +253,9 @@ disjoint fields; no field is duplicated. See
 ## Travelers
 
 `_process_plans.TRAVELER_STEMS` lists the parts with a `prechips:<stem>` task:
-`ch_rocker_arm_tl_oblique_base_bar`, `ch_rocker_arm_tl_oblique_end_bracket`
-and `ch_rocker_arm_tl_oblique_feed_lever`. `build` and `release` require every
-one.
+`ch_rocker_arm_tl_oblique_base_bar` and `ch_rocker_arm_tl_oblique_end_bracket`.
+`build` and `release` require every one. The feed lever's plan is held,
+unenrolled (see [`cad/process/README.md`](../../process/README.md)).
 
 ```text
 uv run --frozen python -m doit prechips:<stem>
@@ -295,12 +295,12 @@ The `_run_stamped` → `_exec` path injects `TRACEPARENT` and service
 `pipeline.prechips_traveler` span and a `prechips.traveler` span around the CLI.
 A missing plan or nonzero exit marks the pipeline span as failed.
 
-Current state: only the base-bar plan exists, ported from the prechips
-`examples/base-bar.toml`. Under prechips 0.8.0 its `harmonic_base_bar` adapter
-cannot read the v48 manifest (`rail_hole_1.station: missing drawing
-requirement`), so it refuses; the fix is upstream in prechips 0.9. The end
-bracket and feed lever have no plan yet. Until both are resolved the traveler
-tasks fail `build` and `release`.
+Current state: prechips 0.9 or later is required. The base bar and end bracket
+pass on the v48 manifests. The feed lever's plan refuses on `tool_sizing` (its
+11/32 drill is below the drawing's hole band) and is held out of
+`TRAVELER_STEMS` until that is resolved. prechips adapters are tied to the
+manifest's contents: a drawing change that alters a part's manifest
+requirements needs a prechips adapter release before its traveler passes again.
 
 ## Release travelers
 

@@ -179,11 +179,11 @@ glTF exports plus the drawing PDFs.
 Drawing-bound requirement manifests are exported with named STEP face sets.
 `prechips:<stem>` tasks render a standalone HTML
 [prechips](https://github.com/pedropaulovc/prechips) traveler for each part
-in `_process_plans.TRAVELER_STEMS` (the oblique-trammel base bar, end bracket
-and feed lever) from its `cad/process/<stem>/plan.toml`, which reads that
-part's exported manifest. Only exit 0 passes the build and release gates, and
-releases include the generated travelers. Only the base-bar plan exists so far,
-and it does not pass yet. See the
+in `_process_plans.TRAVELER_STEMS` (the oblique-trammel base bar and end
+bracket) from its `cad/process/<stem>/plan.toml`, which reads that part's
+exported manifest. Only exit 0 passes the build and release gates, and releases
+include the generated travelers. The feed lever's plan is held until prechips'
+drill-size refusal is resolved. See the
 [export/traveler contract](cad/docs/pipeline/features-travelers.md).
 
 ## References

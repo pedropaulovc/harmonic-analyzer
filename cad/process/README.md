@@ -11,7 +11,7 @@ cad/process/
 ```
 
 [prechips](https://github.com/pedropaulovc/prechips) is a stdlib-only PyPI
-dependency, declared as `prechips>=0.8,<10`. The lock resolves the latest
+dependency, declared as `prechips>=0.9,<10`. The lock resolves the latest
 release; bump it with `uv lock --upgrade-package prechips`. It reads the plan,
 the shop file and the part's exported `features.toml`, and writes one standalone
 HTML traveler. It needs no FreeCAD or geometry kernel and checks no hashes. HA
@@ -38,20 +38,21 @@ dimensions, limits and the drawing revision from `{{cad.…}}` rather than typin
 them, so a CAD change reaches the traveler through the exported manifest. Every
 file in the plan directory is an input to the traveler task.
 
-Only `ch_rocker_arm_tl_oblique_base_bar/plan.toml` exists today. It is ported
-from the prechips `examples/base-bar.toml`, and its header names its sources.
-Under prechips 0.8.0 it refuses: the `harmonic_base_bar` adapter cannot read
-the v48 manifest (`rail_hole_1.station: missing drawing requirement`). The fix
-is upstream in prechips 0.9. The end bracket and feed lever still need plans.
+The base bar, end bracket and feed lever have plans, ported from the prechips
+0.9 examples; each header names its sources. Each plan's `adapter` is a prechips
+adapter written against that part's manifest contents, so a drawing change that
+alters the manifest's requirements needs a prechips adapter release before the
+traveler passes again.
 
 ## Shop records
 
 `shop.toml` is the prechips shop file: machines, workholding, gauges, limits,
 tools and cutting settings, in prechips' schema and units. Any fact that schema
 can express lives here. Its records include the rocker DTI's range and
-resolution (`gauges.dti`), read by `ch_rocker_arm_profile_check.py`, and the
-rocker profile cutter (`tools.rocker-profile-cutter`) with its HSS cutting
-setting (`settings.rocker-profile-hss-low-carbon-steel`).
+resolution (`gauges.dti`), read by `ch_rocker_arm_profile_check.py`; the
+PM-30MV X DRO scale (`gauges.mill-x-dro`), whose resolution the paper-drive
+tests read; and the rocker profile cutter (`tools.rocker-profile-cutter`) with
+its HSS cutting setting (`settings.rocker-profile-hss-low-carbon-steel`).
 
 Facts prechips has no field for, but which CAD specs and tests read, live in
 [`cad/config/shop-equipment.toml`](../config/shop-equipment.toml):
@@ -59,8 +60,7 @@ Facts prechips has no field for, but which CAD specs and tests read, live in
 - gauges: the DTI's kind and make, the pin-gauge note, the Mitutoyo gauge-block
   set (read by `ch_rocker_arm_tl_oblique_jig_assembly_spec.py`), the arm-outline
   template and the Vermont class X 2558-minus pin;
-- the PM-30MV DRO's make, scale resolution and cited accuracy (read by the
-  paper-drive tests);
+- the PM-30MV DRO's make and cited accuracy (read by the paper-drive tests);
 - the LMS 6784 end-mill set and its sizes, the 8-32 plug hand tap's flute
   length, and the shop-made rocker trammel's R800/R816 lengths;
 - the PM 6-in vise's make, SKU, source and opening;
@@ -84,8 +84,15 @@ values as written; do not change a value merely to make a check pass.
 ## Travelers
 
 `cad/scripts/_process_plans.py:TRAVELER_STEMS` lists the parts with a
-`prechips:<stem>` task: the oblique-trammel base bar, end bracket and feed
-lever. `build` and `release` require every one.
+`prechips:<stem>` task: the oblique-trammel base bar and end bracket. `build`
+and `release` require every one; under prechips 0.9 both pass on the v48
+manifests.
+
+The feed lever's plan (`ch_rocker_arm_tl_oblique_feed_lever/plan.toml`) is held
+in the repository but not enrolled. prechips refuses it on `tool_sizing`: the
+plan's 11/32 drill (8.73125 mm) is below the drawing's hole band
+(8.7376–8.8392 mm). That is a finding for the owner (a different drill, or a
+drawing change), not a check to opt out of; enroll the part once its plan passes.
 
 ```text
 uv run --frozen python -m doit prechips:<stem>

@@ -12,10 +12,12 @@ from pathlib import Path
 
 from export_features import OUT as CAD_OUT
 
+# The feed lever's plan (cad/process/ch_rocker_arm_tl_oblique_feed_lever/) is
+# held unenrolled: prechips refuses its 11/32 drill below the drawing's hole
+# band (cad/process/README.md).
 TRAVELER_STEMS: tuple[str, ...] = (
     "ch_rocker_arm_tl_oblique_base_bar",
     "ch_rocker_arm_tl_oblique_end_bracket",
-    "ch_rocker_arm_tl_oblique_feed_lever",
 )
 PROCESS_ROOT = Path(__file__).resolve().parents[1] / "process"
 SHOP_PATH = PROCESS_ROOT / "shop.toml"

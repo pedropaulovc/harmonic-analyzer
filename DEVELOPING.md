@@ -306,7 +306,7 @@ completed
 
 `prechips:<stem>` tasks run on the submitter, including when SolidWorks leaves
 run on the farm. They need nothing beyond the locked Python environment:
-prechips is a stdlib-only PyPI dependency (`prechips>=0.8,<10`), with no
+prechips is a stdlib-only PyPI dependency (`prechips>=0.9,<10`), with no
 FreeCAD, geometry kernel or network access. The lock resolves the latest
 release; bump it with `uv lock --upgrade-package prechips`. To render one
 traveler outside doit, after its scoped feature bundle exists:

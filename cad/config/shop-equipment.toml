@@ -85,14 +85,9 @@ length_in = { value = 2, measured = { status = "measured", by = "placeholder (re
 # --- measuring equipment on the mill -------------------------------------
 
 # The PM-30MV's installed DRO; the mill's own capacity is cad/process/shop.toml
-# machines.pm-30mv.
+# machines.pm-30mv, and its scale resolution is shop.toml gauges.mill-x-dro.
 [dro.pm-30mv]
 make = "MagXact MX-100M"
-# Basis: the installed MagXact MX-100M (owner-confirmed 2026-10-27). Its manual (V1
-# 9-1-2021) states "The standard MagXact package for the mill has 5 micron (0.005 mm
-# = 0.0002") resolution scales" with display resolution DP defaulting to the same 5
-# microns. The vendor's accuracy statement is in cite below.
-resolution_mm = { value = 0.005, measured = { status = "measured", by = "Pedro Paulo Vezza Campos", date = "2026-10-27", instrument = "installed MagXact MX-100M identified by the owner; vendor-stated 5 um scale and display resolution" } }
 cite = [
   "DRO accuracy, vendor-stated: MagXact MX-100M product page (https://www.precisionmatthews.com/products/dro-mag-m-3ax-18x36x20), read 2026-10-27: \"Magnetic Scales and encoders, .0002” Accuracy\"; the X, Y and Z scales are each listed at .0002 in. Installed DRO and 0.0002 in precision confirmed by the owner 2026-10-27.",
 ]

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" data-cad-template="inspect" data-rail-length-mm="450" data-rail-width-mm="15" data-rail-height-mm="15" data-screw-dia-mm="4.17" data-screw-length-mm="15.875" data-screw-head-dia-mm="6.86" data-screw-head-height-mm="4.17" viewBox="0 0 720 280" width="720" height="280" font-family="Arial, Helvetica, sans-serif" font-size="15">
-  <!-- Authored hardware on the root: 450 mm HGR15 rail; #8-32 × 5/8 socket screw. -->
+<svg xmlns="http://www.w3.org/2000/svg" data-cad-template="inspect" data-rail-width-mm="15" data-rail-height-mm="15" data-screw-dia-mm="4.17" data-screw-length-mm="15.875" data-screw-head-dia-mm="6.86" data-screw-head-height-mm="4.17" viewBox="0 0 720 280" width="720" height="280" font-family="Arial, Helvetica, sans-serif" font-size="15">
+  <!-- Authored hardware on the root: HGR15 rail section; #8-32 × 5/8 socket screw. -->
   <defs>
     <pattern id="sec" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
       <rect width="6" height="6" fill="#dfe6ee"/>
@@ -11,9 +11,8 @@
 
   <!-- Plan: CAD finished bar seen from C'BORE SIDE -->
   <rect id="bar" x="{{view.x0}}" y="{{view.top}}" width="{{view.plan_w}}" height="{{view.plan_h}}" fill="#dfe6ee" stroke="#111" stroke-width="1.5"/>
-  <!-- rail on the opposite face: hidden under bar, flush at ZERO END, overhang at right -->
+  <!-- rail on the opposite face: hidden under bar, trimmed flush with both ends -->
   <g id="rail-hidden" data-cad-group="rail-hidden" fill="none" stroke="#333" stroke-width="1.2" stroke-dasharray="5 3"/>
-  <g id="rail-overhang" data-cad-group="rail-overhang" fill="#b5b9bf" stroke="#111" stroke-width="1.2"/>
 
   <g id="rail-holes" data-cad-group="rail-holes" fill="#fff" stroke="#111" stroke-width="1.1"/>
   <g id="bracket-holes" data-cad-group="bracket-holes" fill="#fff" stroke="#111" stroke-width="1.1"/>
@@ -28,7 +27,7 @@
   <line x1="205" y1="50" x2="210" y2="60" stroke="#111" stroke-width="1"/>
   <text x="130" y="{{view.cbore_label_y}}">C'BORE SIDE up</text>
   <text x="120" y="{{view.rail_label_y}}">{{cad.rail_range}} 8-32 (rail screws)</text>
-  <text x="30" y="{{view.rail_note_y}}">HGR15 rail (under): flush left, overhangs right</text>
+  <text x="30" y="{{view.rail_note_y}}">HGR15 rail (under): trimmed flush both ends</text>
   <line x1="{{view.rail_leader_x1}}" y1="{{view.rail_leader_y1}}" x2="{{view.rail_leader_x2}}" y2="{{view.rail_leader_y2}}" stroke="#111" stroke-width="1"/>
 
   <!-- Section A-A across CAD width and thickness, ZERO EDGE right -->

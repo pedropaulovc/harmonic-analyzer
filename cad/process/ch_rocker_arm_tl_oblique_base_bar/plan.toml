@@ -1,16 +1,15 @@
-# MHA-CH-06-TL-20 traveler plan for restarted prechips (pro profile).
-# Ported from prechips v0.8.0 examples/base-bar.toml, whose sources are the
-# hand-written 2026-11-05 base-bar traveler (ha-basebar-traveler worktree) and
-# the 2026-11-07 table-clamped squaring session
+# Source: cad/process/hand-travelers/
+# ch-rocker-arm-tl-oblique-base-bar-traveler-2026-10-30.html.
+# Table-clamped squaring sequence: 2026-11-07 session
 # 2026-11-07T00-02-29-727Z_01a1b350-58df-72b7-a9e3-7735a77b13fc.
-# CAD values bind from the exported feature manifest; diagrams/ holds the
-# setup sketches the plan names.
-title = "Oblique trammel base bar — {{process.quantity:d}} identical"
+# v48 drawing: bar 1 alone carries the four #12 bracket holes; rail stations
+# are REF, transferred from each bar's own trimmed rail (flush both ends).
+title = "Oblique trammel base bar — bar 1 and bar 2"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "6061-T6511 aluminium"
 stock = "{{process.blank_thickness_in:fraction}} × {{process.blank_width_in:fraction}} in bar; {{process.quantity:d}} × {{process.blank_length_in:fraction}} in blanks."
-note = "Inches unless mm. Finished {{cad.size_summary}}. Not mirrored; flip bar 2 in assembly."
+note = "Inches unless mm. Finished {{cad.size_summary}}. Bar 2: no bracket holes; turned over in assembly."
 shop = "../shop.toml"
 material_key = "6061-t6511"
 
@@ -74,7 +73,7 @@ name = "#29 drill"
 ref = "basebar-rail-drill"
 [[tools]]
 id = "bracket-drill"
-name = "#9 drill"
+name = "#12 drill"
 ref = "basebar-bracket-drill"
 [[tools]]
 id = "slot-drill"
@@ -187,19 +186,19 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "ZERO EDGE at back jaw, ZERO END left, C'BORE SIDE up; 1-3/8 in parallels. Support both overhangs with jacks clear of hole/slot paths."
 datum = "Drawing lower edge = ZERO EDGE; left end = ZERO END; far face = C'BORE SIDE. Back-left X0/Y0; +X right, drawing Y dimensions become −Y."
-diagram = { file = "diagrams/holes.svg", alt = "Finished {{cad.length_in:.2f}} in bar in vise: C'BORE SIDE up, ZERO EDGE at back fixed jaw, ZERO END left, X0 Y0 back-left; rail holes {{cad.rail_range}}, counterbored {{cad.bracket_range}}, slots {{cad.slot_range}} and jacks under both overhangs." }
+diagram = { file = "diagrams/holes.svg", alt = "Finished {{cad.length_in:.2f}} in bar in vise: C'BORE SIDE up, ZERO EDGE at back fixed jaw, ZERO END left, X0 Y0 back-left; rail holes {{cad.rail_range}}, counterbored {{cad.bracket_range}} (bar 1 only), slots {{cad.slot_range}} and jacks under both overhangs." }
 # Hole and slot centres lie inside the finished bar. Longest: a drill in the
 # drill chuck; shortest: the 5/16 in counterbore cutter in an R8 collet.
 envelope = { x_span_mm = "{{cad.length_mm}}", y_span_mm = "{{cad.width_mm}}", work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{cad.thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.drill_tip_z_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.small_mill_projection_min_mm}}"] }
 
 [[setups.operations]]
-instruction = "Before drilling: from the rail end that goes at ZERO END, check the {{cad.rail_count:d}} hole centres at {{cad.rail_stations_mm}} mm, each ±{{cad.rail_position_tol_mm:.2f}} mm. Stop if different."
+instruction = "Before drilling: on this bar's own trimmed rail, flush at ZERO END, measure the {{cad.rail_count:d}} hole centres (REF {{cad.rail_first_mm:.3f}} mm, {{cad.rail_pitch_mm:.3f}} mm pitch). Drill {{cad.rail_range}} at measured X."
 
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "spot"
 sizing = "other"
-instruction = "Spot {{cad.spot_count:d}} holes to Ø.125. All drills: .125 pecks, drill tip .125 past underside. Inches; IDs follow coordinate order. Rail X ±{{cad.rail_position_tol_in:.3f}}; bracket X/Y ±{{cad.bracket_position_tol_in:.3f}}; rail row ±{{cad.rail_row_tol_in:.2f}}; slot positions ±{{cad.slot_position_tol_in:.2f}}."
+instruction = "Spot to Ø.125 ({{cad.bracket_range}} bar 1 only). All drills: .125 pecks, drill tip .125 past underside. Inches; IDs follow coordinate order. Rail X as measured; bracket X/Y ±{{cad.bracket_position_tol_in:.3f}}; rail row ±{{cad.rail_row_tol_in:.2f}}; slot positions ±{{cad.slot_position_tol_in:.2f}}."
 rpm = 3000
 feed = "hand"
 
@@ -219,7 +218,7 @@ feed = "hand"
 speed_kind = "spindle"
 tool = "bracket-drill"
 sizing = { kind = "band", band_mm = "{{cad.bracket_dia_band_mm}}" }
-instruction = "{{cad.bracket_range}} through."
+instruction = "Bar 1 only: {{cad.bracket_range}} through."
 rpm = 3000
 feed = "hand"
 
@@ -242,7 +241,7 @@ feed = "hand"
 speed_kind = "spindle"
 tool = "counterbore"
 sizing = { kind = "band", band_mm = "{{cad.counterbore_dia_band_mm}}" }
-instruction = "Counterbore {{cad.bracket_range}}, {{cad.counterbore_depth_in:.3f}} deep from top."
+instruction = "Bar 1 only: counterbore {{cad.bracket_range}}, {{cad.counterbore_depth_in:.3f}} deep from top."
 rpm = 2000
 feed = "slow hand plunge"
 
@@ -267,7 +266,7 @@ title = "Deburr / inspect both"
 machine = "Bench / clean mill table"
 indexing = "none"
 datum = "Marked end/edge; rail on face opposite C'BORE SIDE."
-diagram = { file = "diagrams/inspect.svg", alt = "Finished bar from C'BORE SIDE with section through bracket holes {{cad.bracket_range}}: socket heads recessed in counterbores; HGR15 rail on the opposite face, flush at ZERO END and overhanging the right end; slot stud fit." }
+diagram = { file = "diagrams/inspect.svg", alt = "Finished bar 1 from C'BORE SIDE with section through bracket holes {{cad.bracket_range}}: socket heads recessed in counterbores; HGR15 rail on the opposite face, trimmed flush with both ends; slot stud fit." }
 envelope = "other"
 
 [[setups.operations]]
@@ -279,7 +278,7 @@ columns = ["Inspect", "Requirement"]
 rows = [
   ["Overall size", "{{cad.size_summary}}; length both edges;\nwidth ends/mid; thickness corners/mid; ends square to ZERO EDGE"],
   ["Seats", "No rock on mill table; no chatter marks; Ra {{cad.finish_ra_um:.1f}} µm both faces"],
-  ["Bracket holes / counterbores", "Holes Ø{{cad.bracket_dia_min_in:.3f}}–{{cad.bracket_dia_max_in:.3f}}; counterbores Ø{{cad.counterbore_dia_min_in:.3f}}–{{cad.counterbore_dia_max_in:.3f}} × {{cad.counterbore_depth_min_in:.3f}}–{{cad.counterbore_depth_max_in:.3f}} deep;\ncheck #8-32 × 5/8 socket screw head sits recessed"],
-  ["Rail fit", "450 mm HGR15 rail; {{cad.rail_count:d}}× #8-32 × 3/4 socket screws;\nall hand-start, no side force; flush ZERO END, overhang opposite"],
+  ["Bracket holes / counterbores", "Bar 1: holes Ø{{cad.bracket_dia_min_in:.3f}}–{{cad.bracket_dia_max_in:.3f}}; counterbores Ø{{cad.counterbore_dia_min_in:.3f}}–{{cad.counterbore_dia_max_in:.3f}} × {{cad.counterbore_depth_min_in:.3f}}–{{cad.counterbore_depth_max_in:.3f}} deep;\ncheck #8-32 × 5/8 socket screw head sits recessed"],
+  ["Rail fit", "Own HGR15 rail trimmed flush both ends; {{cad.rail_count:d}}× #8-32 × 3/4 socket screws\nenter free, no forcing"],
   ["Slots", "Width {{cad.slot_width_min_in:.2f}}–{{cad.slot_width_max_in:.2f}}; overall length minus width {{cad.slot_spacing_min_in:.2f}}–{{cad.slot_spacing_max_in:.2f}};\n1/2-13 slot-fit stud slides end-to-end"],
 ]

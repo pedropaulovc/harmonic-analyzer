@@ -6,7 +6,7 @@
 # interchangeable. Facts the prechips schema cannot hold that CAD specs read
 # live in cad/config/shop-equipment.toml; no field is in both files.
 
-# Source: prechips v0.8.0 examples/shop.toml (archive/pre-v0.10-2026-11-08
+# Source: prechips v0.9.0 examples/shop.toml (archive/pre-v0.10-2026-11-08
 # examples/inventory/pedro-shop.toml and examples/shop-policy.toml, converted to
 # millimetres), plus the HA records marked below.
 [machines.pm-30mv]
@@ -81,6 +81,13 @@ resolution_mm = 0.1
 range_mm = [0.0, 699.77]
 resolution_mm = 0.005
 
+# PM-30MV X DRO scale read as a length gauge (feed-lever length, hand sheet
+# TL-26 Setup B). Range: machines.pm-30mv X travel; resolution: archive
+# machines PM-30MV EL400-class DRO resolution_mm.
+[gauges.mill-x-dro]
+range_mm = [0.0, 584.2]
+resolution_mm = 0.005
+
 [limits]
 stickout_ld_max = 4.0
 tool_change_clearance_mm = 25.0
@@ -88,7 +95,8 @@ tool_change_clearance_mm = 25.0
 # Source: base-bar.toml; source hand traveler dated 2026-11-05 and
 # table-clamped squaring sequence dated 2026-11-07 (see plan provenance).
 # diameter_mm: standard nominal size stated in each description, × 25.4.
-# The 8-32 tap records the plan's authored #29 (.136 in) tap drill.
+# The 8-32 tap records the plan's authored #29 (.136 in) tap drill. The v48
+# drawing calls the #12 bracket drill (notes.process).
 [tools.basebar-saw]
 description = "Aluminium saw"
 [tools.basebar-em-half]
@@ -103,8 +111,8 @@ description = "#2 centre drill"
 description = "#29 (.136 in) drill"
 diameter_mm = 3.4544
 [tools.basebar-bracket-drill]
-description = "#9 (.196 in) drill"
-diameter_mm = 4.9784
+description = "#12 (.189 in) drill"
+diameter_mm = 4.8006
 [tools.basebar-slot-drill]
 description = "3/8 in drill"
 diameter_mm = 9.525
@@ -264,6 +272,39 @@ feed = "3 in/min"
 tool = "tnuts-finish"
 material = "tnuts-1018-annealed-hb120"
 rpm = 750
+feed = "3 in/min"
+
+# Source: end-bracket.toml and feed-lever.toml; hand travelers dated
+# 2026-11-02 (MHA-CH-06-TL-28/TL-26 v47), the v48 manifest notes (#29 tap
+# drill, plug-start then bottoming-finish taps) and the archived
+# taps-unc-hand 8-32 plug/bottoming records. Speeds are the hand sheets'
+# LittleMachineShop 6061-T6 row: 165 ft/min milling -> 1250 rpm.
+[tools.jig-saw]
+description = "Miter saw or bandsaw"
+[tools.jig-em-half]
+description = "1/2 in centre-cutting 2-flute end mill"
+diameter_mm = 12.7
+[tools.jig-spot]
+description = "#2 centre drill"
+[tools.jig-drill-29]
+description = "#29 (.136 in) drill"
+diameter_mm = 3.4544
+[tools.jig-tap-8-32-plug]
+description = "8-32 UNC plug tap; T-handle wrench"
+tap_drill_mm = 3.4544
+[tools.jig-tap-8-32-bottoming]
+description = "8-32 UNC bottoming tap (1–2 chamfered threads); T-handle wrench"
+tap_drill_mm = 3.4544
+[tools.jig-drill-11-32]
+description = "11/32 (.3438 in) drill, 115-piece index"
+diameter_mm = 8.73125
+[tools.jig-files]
+description = "10 in mill second-cut and 8 in smooth files; bench vise with soft jaws"
+
+[settings.jig-em-half-6061-t6511]
+tool = "jig-em-half"
+material = "6061-t6511"
+rpm = 1250
 feed = "3 in/min"
 
 # HA: the rocker arm's strap profile cutter on its low-carbon steel (the oblique
