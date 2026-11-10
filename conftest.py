@@ -348,6 +348,17 @@ def _cache_refresh_isolated(monkeypatch):
     monkeypatch.delenv("HARMONIC_CACHE_REFRESH", raising=False)
 
 
+@pytest.fixture(autouse=True)
+def _com_replay_off(monkeypatch):
+    """Part builds under test run unrecorded unless a test opts in.
+
+    ``HARMONIC_COM_REPLAY`` defaults to ``shadow``, which would swap the build
+    command a test asserts for the recording driver's and record under the
+    real ``cad/out/replay``. Tests of the recording set the mode themselves.
+    """
+    monkeypatch.setenv("HARMONIC_COM_REPLAY", "off")
+
+
 @pytest.fixture
 def saved_native_bytes():
     """Build the observed native DisplayLists envelope for parser-backed tests."""

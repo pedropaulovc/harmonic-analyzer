@@ -88,7 +88,11 @@ Design notes / invariants:
 Backend: an **Azure Blob container** reached over HTTPS (443). Speaks plain object
 storage, so it works from anywhere -- including networks (e.g. residential ISPs)
 that block SMB/445, with no VPN, private endpoint, or mounted drive. A cache entry
-is one ``<key>.tar.gz`` blob under a 2-hex virtual prefix. Configure with:
+is one ``<key>.tar.gz`` blob under a 2-hex virtual prefix. *Sidecars*
+(:func:`publish_sidecar`) are small create-only blobs published BESIDE the
+archives under their own registered prefixes (``com-replay/``: the shadow COM
+recordings, ``_replay_shadow``); they are never part of an archive or a key.
+Configure with:
 
 * ``HARMONIC_CACHE_ACCOUNT``   -- storage account name (e.g. ``stswbuildcache07aba2``)
 * ``HARMONIC_CACHE_CONTAINER`` -- container name (default ``buildcache``)
@@ -113,6 +117,7 @@ import concurrent.futures
 import contextlib
 import errno
 import hashlib
+import io
 import json
 import os
 import re
@@ -539,6 +544,11 @@ _TRANSFER_CONCURRENCY = 8
 # ``_BlobBackend.put`` stages _BLOCK_SIZE blocks under writer-unique IDs.
 _SINGLE_PUT_MAX = 64 * 1024 * 1024
 _BLOCK_SIZE = 4 * 1024 * 1024
+# Sidecar blobs (publish_sidecar): the registered name prefixes -- never the
+# archives' 2-hex shards -- a size bound (one request each) and a listing bound.
+_SIDECAR_PREFIXES = ("com-replay/",)
+_SIDECAR_MAX = _SINGLE_PUT_MAX
+_SIDECAR_LIST_MAX = 1000
 
 # Small gate stamps need one GET, not HEAD+GET. The SDK's first GET is bounded
 # by this size; larger local hits discard that prefix and reuse verified disk
@@ -1034,6 +1044,56 @@ class _BlobBackend:
             [BlobBlock(block_id=block_id) for block_id in ids],
             metadata=metadata, **condition,
         )
+
+    def put_sidecar(self, name: str, data: bytes) -> None:
+        """Create-only upload of one small named blob; raises when it exists.
+        Hash, size and epoch commit with the content, as for an archive."""
+        metadata = {
+            "sidecar_sha256": hashlib.sha256(data).hexdigest(),
+            "sidecar_size": str(len(data)),
+            "epoch": _CACHE_EPOCH,
+        }
+        self._cc.get_blob_client(name).upload_blob(
+            io.BytesIO(data),
+            length=len(data),
+            overwrite=False,
+            metadata=metadata,
+        )
+
+    def sidecar_exists(self, name: str) -> bool:
+        return self._cc.get_blob_client(name).exists()
+
+    def get_sidecar(self, name: str) -> bytes | None:
+        """A sidecar's bytes, verified against the metadata committed with
+        them; None when absent."""
+        from azure.core.exceptions import ResourceNotFoundError
+
+        try:
+            download = self._cc.get_blob_client(name).download_blob(
+                max_concurrency=_TRANSFER_CONCURRENCY
+            )
+        except ResourceNotFoundError:
+            return None
+        metadata = download.properties.metadata
+        body = io.BytesIO()
+        download.readinto(body)
+        data = body.getvalue()
+        if (
+            metadata.get("epoch") != _CACHE_EPOCH
+            or metadata.get("sidecar_size") != str(len(data))
+            or metadata.get("sidecar_sha256") != hashlib.sha256(data).hexdigest()
+        ):
+            raise RuntimeError(f"cache sidecar integrity mismatch for {name}")
+        return data
+
+    def list_sidecars(self, prefix: str) -> list[tuple[str, float]]:
+        """``(name, last-modified epoch seconds)`` under ``prefix``."""
+        found: list[tuple[str, float]] = []
+        for blob in self._cc.list_blobs(name_starts_with=prefix):
+            found.append((blob.name, blob.last_modified.timestamp()))
+            if len(found) >= _SIDECAR_LIST_MAX:
+                break
+        return found
 
 
 # --------------------------------------------------------------------------- #
@@ -1956,3 +2016,88 @@ def _store(
     finally:
         if blob is not None:
             blob.close()
+
+
+# --------------------------------------------------------------------------- #
+# Sidecars -- small create-only blobs BESIDE the archives (module docstring).
+# Never an archive member, never a key input, never fatal: every function
+# below returns a benign outcome instead of raising.
+# --------------------------------------------------------------------------- #
+def _sidecar_name(name: str, *, prefix: bool = False) -> str:
+    parts = name.split("/")
+    if prefix and len(parts) > 1 and parts[-1] == "":
+        parts.pop()  # a listing prefix may end at a "directory"
+    if (
+        not name.startswith(_SIDECAR_PREFIXES)
+        or "\\" in name
+        or any(part in ("", ".", "..") for part in parts)
+    ):
+        raise ValueError(f"not a sidecar blob name: {name!r}")
+    return name
+
+
+def publish_sidecar(name: str, data: bytes) -> str:
+    """Create-only upload of ``data`` as sidecar ``name``. Published only in
+    ``rw``, like an archive. RETURNS ``stored``, ``exists`` (another writer was
+    first: its bytes stand), ``skip`` (``ro``), ``off`` or ``error``."""
+    if not writable():
+        return "skip" if enabled() else "off"
+    try:
+        name = _sidecar_name(name)
+        if len(data) > _SIDECAR_MAX:
+            raise ValueError(f"{len(data)} bytes exceeds the sidecar bound")
+        backend = _backend()
+        if backend is None:
+            return "off"
+        with _phase("cache.upload", bytes=len(data), sidecar=True):
+            try:
+                backend.put_sidecar(name, data)
+            except Exception:
+                if not backend.sidecar_exists(name):
+                    raise
+                return "exists"
+        return "stored"
+    except Exception as exc:  # noqa: BLE001 -- a sidecar never costs a build
+        _warn(f"sidecar {name} not published: {exc!r}")
+        return "error"
+
+
+def fetch_sidecar(name: str) -> bytes | None:
+    """Sidecar ``name``'s verified bytes; None when it is absent, the cache is
+    off, or the download or its verification fails."""
+    if not enabled():
+        return None
+    try:
+        name = _sidecar_name(name)
+        backend = _backend()
+        if backend is None:
+            return None
+        with _phase("cache.download", phase="sidecar"):
+            return backend.get_sidecar(name)
+    except Exception as exc:  # noqa: BLE001 -- a sidecar never costs a build
+        _warn(f"sidecar {name} not fetched: {exc!r}")
+        return None
+
+
+def list_sidecars(prefix: str) -> list[tuple[str, float]]:
+    """``(name, last-modified epoch seconds)`` of the sidecars under
+    ``prefix``, newest first; empty when the cache is off or listing fails."""
+    if not enabled():
+        return []
+    try:
+        backend = _backend()
+        if backend is None:
+            return []
+        with _phase("cache.list", prefix=prefix):
+            found = backend.list_sidecars(_sidecar_name(prefix, prefix=True))
+    except Exception as exc:  # noqa: BLE001 -- a sidecar never costs a build
+        _warn(f"sidecars under {prefix} not listed: {exc!r}")
+        return []
+    return sorted(found, key=lambda item: item[1], reverse=True)
+
+
+def record_event(event: str, label: str, key: str, **extra) -> None:
+    """Append an outcome about ``label``'s cache key that is not a cache
+    operation (e.g. ``replay_shadow``) to cache.jsonl, with the same base record
+    and key provenance as the cache's own events. Best-effort."""
+    _record(event, label, key, **extra)

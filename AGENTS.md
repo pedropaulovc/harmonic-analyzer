@@ -980,6 +980,15 @@ unconditional writers: **every leaf key changes once, with no epoch-3 fallback**
 Use fresh build snapshots for cutover; do not mix persistent old native outputs
 with epoch-4 identities. A cold full build requires separate authorization.
 
+**COM conversation recording (shadow).** Every part build that runs is recorded
+through `cad/scripts/com_replay.py` and published beside its archive as
+`com-replay/...` sidecars. Off the seat, it is then replayed against the nearest
+earlier recording, purely as telemetry: nothing is reused, and no output, exit
+code or cache key changes. `HARMONIC_COM_REPLAY=off` is the kill switch; the
+other values are `record` and `shadow` (the default). The recorder's own fault
+exits 92, and the build is then re-run once unrecorded. See DEVELOPING.md
+"COM conversation recording (shadow)".
+
 **Per-seat part order — two cold builders split the work, not duplicate it.**
 Parts have no inter-part deps, so the order in which their tasks are offered to the
 scheduler is free. Two seats cold-building in the *same* order march in lock-step,
