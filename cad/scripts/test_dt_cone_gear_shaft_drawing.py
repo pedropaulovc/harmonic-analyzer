@@ -2163,6 +2163,7 @@ def test_the_64t_straight_tooth_space_keeps_its_material_and_flank_gates(monkeyp
     volumes = {}
     planes = []
     curves = []
+    expressions = []
 
     async def record_volume(_adapter, label, expected, tolerance):
         volumes[label] = (expected, tolerance)
@@ -2177,6 +2178,7 @@ def test_the_64t_straight_tooth_space_keeps_its_material_and_flank_gates(monkeyp
 
     async def record_curve(_adapter, name, x, y):
         curves.append(name)
+        expressions.append((x, y))
         return name
 
     def record_flanks(_adapter, section, actual, *, tolerance_mm):
@@ -2198,8 +2200,15 @@ def test_the_64t_straight_tooth_space_keeps_its_material_and_flank_gates(monkeyp
     monkeypatch.setattr(_gear, "volume_check", record_volume)
     monkeypatch.setattr(_gear, "_plane_through", record_plane)
     monkeypatch.setattr(_gear, "_crossing_plane", record_crossing)
+    # The frame the farm read back (run 20261110T210742240Z): an off-origin
+    # sketch with a 3.4e-18 residue, which ``.12g`` spelled as an exponent
+    # the equation parser rejected.
     monkeypatch.setattr(
-        _gear, "_sketch_mapper", lambda *_args: ((0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 1.0, 0.0))
+        _gear, "_sketch_mapper", lambda *_args: (
+            (3.3881317890172014e-18, 0.39999645716715093, -2.1684043449710089e-16),
+            (-0.9999999999999998, 0.0, 0.0),
+            (0.0, -1.0000000000000002, 0.0),
+        )
     )
     monkeypatch.setattr(_gear, "equation_curve", record_curve)
     monkeypatch.setattr(_gear, "assert_straight_gash_flanks", record_flanks)
@@ -2238,6 +2247,11 @@ def test_the_64t_straight_tooth_space_keeps_its_material_and_flank_gates(monkeyp
             clearance_radius_mm=max(_gear.R_CLEAR_IN * _gear.IN, form.blank_radius_mm + 1.0),
         )
     ]
+    for x, y in expressions:
+        assert not re.search(r"\d[eE][-+]?\d", x + y), (x, y)
+    first_x, first_y = expressions[0]
+    assert first_x.startswith("(0.000000000000)+(-1.000000000000)*(")
+    assert first_y.startswith(f"({0.39999645716715093 / _gear.IN:.12f})+(-1.000000000000)*(")
     blank = math.pi * gash.blank_radius_mm**2 * face
     removed = gash.removed_volume_mm3(form)
     assert volumes["seeded tooth space"] == (pytest.approx(blank - removed), 1.0)

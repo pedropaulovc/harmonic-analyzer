@@ -21,7 +21,7 @@ import _telemetry
 from _check import check
 from _com import _early_bound, _read_member
 from _feature_tree import _feature_by_name, name_last_feature
-from _gear import R_CLEAR_IN, ToothedDisc, equation_curve, fmt, pattern_about_z
+from _gear import R_CLEAR_IN, ToothedDisc, equation_curve, pattern_about_z
 from _part_checks import volume_check
 from _paths import IN
 from _sketch import ensure_fully_defined
@@ -163,6 +163,24 @@ def _sketch_mapper(adapter: Any, gash: StraightGash) -> tuple[Vector, Vector, Ve
     return origin, r_axis, n_axis
 
 
+def _literal(value: float) -> str:
+    """Fixed-point curve literal: the equation parser takes no exponents
+    (farm run 20261110T210742240Z: a 3.4e-18 sketch-origin residue from
+    ``.12g`` failed the first flank)."""
+    return f"{round(value, 12) + 0.0:.12f}"
+
+
+def _affine_expression(offset: float, along_x: float, along_y: float, x: str, y: str) -> str:
+    """``offset + along_x * x + along_y * y``, dropping terms below 1e-12."""
+    terms = [_literal(offset)]
+    terms += [
+        f"({_literal(coefficient)})*({expression})"
+        for coefficient, expression in ((along_x, x), (along_y, y))
+        if abs(coefficient) >= 1e-12
+    ]
+    return "+".join(f"({term})" if index == 0 else term for index, term in enumerate(terms))
+
+
 async def build_straight_gash_gear(
     adapter: Any,
     section: StockFormProfile,
@@ -247,7 +265,7 @@ async def build_straight_gash_gear(
         unit_scale=1.0 / IN, clearance_radius_mm=clearance
     ):
         x_expr, y_expr = (
-            f"({fmt(o / IN)})+({fmt(a[k])})*({segment.x})+({fmt(b[k])})*({segment.y})"
+            _affine_expression(o / IN, a[k], b[k], segment.x, segment.y)
             for k, o, a, b in ((0, origin[0], r_axis, n_axis), (1, origin[1], r_axis, n_axis))
         )
         curves.append(await equation_curve(adapter, segment.name, x_expr, y_expr))
