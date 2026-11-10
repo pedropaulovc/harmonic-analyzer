@@ -143,7 +143,7 @@ rows = "{{cad.hole_rows}}"
 speed_kind = "spindle"
 tool = "drill"
 sizing = { kind = "band", band_mm = "{{cad.tap_drill_band_mm}}" }
-instruction = "H1–H{{cad.hole_count:d}} through; peck .1."
+instruction = "H1–H{{cad.hole_count:d}} through, tip just through; peck .1."
 rpm = 3000
 feed = "hand"
 inspection = "Stations {{cad.hole_stations_mm}} mm ±{{cad.station_tol_mm:.2f}} from INNER END; row {{cad.row_min_in:.3f}}–{{cad.row_max_in:.3f}} from ROW EDGE."
