@@ -14,3 +14,9 @@ dt-cone-gear-tl-phasing-comb:
   tolerance_class: machined_block
   drawing_unit: in
   process: "mill 3/32 in flat to thickness, then saw and mill the plate's stepped edge; mill each fork's slot; break edges, not the slot edges"
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "minor"
+      where: "bottom view, the .070 plate-thickness callout: TINE WALL .013 MIN"
+      finding: "each fork's two tines (the plate either side of its slot) below the .060 wall floor (rules 17, 20)"
+      reason: "Delegated ruling 2026-11-09 (ImplementC1KeyedOpus), pending owner confirmation, under owner ruling 2026-11-09 (b1, PR #1992 https://github.com/pedropaulovc/harmonic-analyzer/pull/1992) choosing a flat phasing comb whose forks straddle each tip gear's phase-0 tooth with a tine in each neighbouring tooth space. A 48 DP tooth space is about .035 wide where a fork enters it, so no tine can reach the .060 floor; the plate is held to .070 +/-.001 so both tines clear T030's spaces, and they stand .013 at the print's worst. Shop tooling, never in a machine; a broken tine is remade."

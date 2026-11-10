@@ -47,11 +47,14 @@ UNIT = drawing_unit("parts/dt-cone-tip-block", _config.parts("dt-cone-tip-block"
 # lower limit keeps the 5/8 pinch screw (McMaster 91794A112)
 # PINCH_SCREW_RECESS_MM short of the -X face (asserted with the screw below).
 BLOCK_X = 17.018  # .67 plan width across the shaft
-# Plan depth along the shaft, printed .XXX: cone_tip_cluster's BLOCK_DEPTH_MM,
-# deep enough for 1.5 D of the 1/4-28 end screw's full thread past both mouth
+# Plan depth along the shaft: cone_tip_cluster's BLOCK_DEPTH_MM, deep enough
+# for 1.5 D of the 1/4-28 end screw's full thread past both mouth
 # countersinks at the printed limits (END_SCREW_EMBED_WINDOW below; owner
-# decision C1 keyed, 2026-11-09, PR #1992).  Its half, the pinch hole's and the
-# foot tap's station, is .215, so both print .XXX.
+# decision C1 keyed, 2026-11-09, PR #1992).  It prints .XX: the window holds
+# at the title block's +/-.01 (machinist review of PR 2's farm proof, rule 3:
+# engagement is no clearance, wall or floor, and rule 19: no band tightened
+# to rescue a thread).  Its half, the pinch hole's and the foot tap's
+# station, is .215, off the .01 grid, so both print .XXX.
 BLOCK_Z = cone_tip_cluster.BLOCK_DEPTH_MM  # .430
 
 # Owner decision C1 keyed (2026-11-09, PR #1992): MHA-DT-04 now ends inside
@@ -106,7 +109,7 @@ PINCH_RISE = PINCH_HEIGHT - ADJUSTER_AXIS_HEIGHT
 # pinch screw's tip recess hold at its lower limit.
 BLOCK_WIDTH_BAND = (0.0, -0.508)  # +.000/-.020
 BLOCK_WIDTH_PLACES = 2
-BLOCK_DEPTH_PLACES = 3
+BLOCK_DEPTH_PLACES = 2
 BLOCK_HEIGHT_PLACES = 2
 # .XX: the tip's vertical alignment with the post journal
 # (build_dt_drive_train_assembly's vertical take-up) reads this band.
@@ -429,28 +432,28 @@ END_SCREW_EMBED = TIP_BLOCK_NORTH_FACE - END_SCREW_END_STATION
 # drawing-guidelines.md rule 18: 1.5 D of full thread past both mouth
 # countersinks (the deepest the callout's .XXX diameter allows).  The block's
 # full thread is its depth less both; the screw's runs from 1P under its
-# head to 2P short of its end.  In embed (from the north face, south
-# positive) the window is: shallow, the screw's full thread ends 1.5 D past
-# the north countersink; deep, the shortest screw's head runout leaves 1.5 D
-# above the south countersink of the shallowest block, and its head stands
-# END_SCREW_HEAD_AIR_MM off the north face.  The screw's full thread
-# (L - 3P) is longer than 1.5 D, so inside the window the engagement is never
-# under it.  build_dt_drive_train_assembly sums the tip's axial stack (post,
-# shaft collar, gear stack and feeler, bushing, hold-down, this block's tap
-# station) about END_SCREW_EMBED and asserts it stays inside this window.
+# head to 2P short of its end.  The depth prints .XX (rule 19: no band is
+# tightened to rescue a thread), so at its shallowest the block holds
+# END_SCREW_ENGAGEMENT_MIN_MM, 1.48 D: the engagement floor is that or 1.5 D,
+# whichever is less.  The tip's engagement at the printed limits is
+# build_dt_drive_train_assembly's END_SCREW_ENGAGEMENT_WORST_D (1.39 D at the
+# stack's shallow end, owner ruling 2026-11-09 via PR #1992), stated there.
+# In embed (from the north face, south positive) the window is: shallow, the
+# screw's full thread ends the floor past the north countersink; deep, the
+# shortest screw's head runout leaves the floor above the south countersink
+# of the shallowest block, and its head stands END_SCREW_HEAD_AIR_MM off the
+# north face.  The screw's full thread (L - 3P) is longer than 1.5 D, so
+# inside the window the engagement is never under the floor.
 END_SCREW_MIN_ENGAGEMENT_D = 1.5
 END_SCREW_HEAD_AIR_MM = 0.25
-_ENGAGEMENT_FLOOR_MM = END_SCREW_MIN_ENGAGEMENT_D * _ADJ_MAJOR_MM
 _csk_dia_max = _printed_limits(ADJUSTER_CSK_DIA, 3)[1]
 ADJUSTER_CSK_MAX = (_csk_dia_max - ADJUSTER_BORE_DIA) / 2.0
 END_SCREW_ENGAGEMENT_MIN_MM = _depth_limits[0] - 2.0 * ADJUSTER_CSK_MAX
-if END_SCREW_ENGAGEMENT_MIN_MM < _ENGAGEMENT_FLOOR_MM - 1e-9:
-    raise AssertionError(
-        f"the block's full thread {END_SCREW_ENGAGEMENT_MIN_MM:.3f} at its shallowest "
-        f"is under 1.5 D ({_ENGAGEMENT_FLOOR_MM:.3f})"
-    )
+_ENGAGEMENT_FLOOR_MM = min(
+    END_SCREW_MIN_ENGAGEMENT_D * _ADJ_MAJOR_MM, END_SCREW_ENGAGEMENT_MIN_MM
+)
 if END_SCREW_LENGTH_MIN - END_SCREW_POINT_MAX_MM - END_SCREW_HEAD_RUNOUT_MM < (
-    _ENGAGEMENT_FLOOR_MM
+    END_SCREW_MIN_ENGAGEMENT_D * _ADJ_MAJOR_MM
 ):
     raise AssertionError("the end screw's own full thread is under 1.5 D")
 # The deepest the shortest screw can reach before its head comes within
@@ -488,7 +491,7 @@ END_SCREW_EMBED_WINDOW = (
 )
 for _edge in END_SCREW_EMBED_WINDOW:
     if end_screw_full_thread_mm(_edge) < _ENGAGEMENT_FLOOR_MM - 1e-9:
-        raise AssertionError("the end screw's window edge leaves under 1.5 D")
+        raise AssertionError("the end screw's window edge leaves under its floor")
 # At the block's printed limits the screw must reach the bushing over the
 # whole set end play: the model's end play less the least lies at the deep
 # end, the most at the shallow end.
@@ -502,7 +505,7 @@ if not (
 ):
     raise AssertionError(
         f"end screw embed {END_SCREW_EMBED_RANGE_MM[0]:.3f}..{END_SCREW_EMBED_RANGE_MM[1]:.3f} "
-        f"over the set end play leaves its 1.5D window {END_SCREW_EMBED_WINDOW[0]:.3f}.."
+        f"over the set end play leaves its engagement window {END_SCREW_EMBED_WINDOW[0]:.3f}.."
         f"{END_SCREW_EMBED_WINDOW[1]:.3f}"
     )
 # The nominal screw end proud of the south face, and head off the north face.

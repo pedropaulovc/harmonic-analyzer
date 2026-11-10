@@ -53,7 +53,6 @@ from dt_cone_tip_end_screw_spec import (
     DRAWING_PRECISION_BY_NAME,
     END_HOLE_CALLOUT,
     END_HOLE_DEPTH,
-    END_HOLE_DEPTH_CALLOUT,
     HEAD_RADIUS,
     ISOMETRIC_VIEW_SCALE,
     OVERALL_LENGTH,
@@ -82,7 +81,9 @@ END_CENTER = (0.075, 0.165)
 SECTION_CENTER = (0.215, 0.165)
 ISO_CENTER = (0.365, 0.215)
 CAPTION_XY = (0.200, 0.110)
-ISO_NOTE_POS = (0.335, 0.160)
+# The isometric's label directly under the pictorial (machinist review of farm
+# run 20261110T001845485Z: the hole callout had pushed between them).
+ISO_NOTE_POS = (0.340, 0.176)
 NOTES_XY = (0.030, 0.085)
 
 _S = VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0  # model mm -> sheet m
@@ -96,19 +97,26 @@ HOLE_FLOOR_X = TIP_X - END_HOLE_DEPTH * _S
 if not SECTION_CENTER[0] < HOLE_FLOOR_X < TIP_X:
     raise AssertionError("MHA-DT-39 hole lies outside its section's right half")
 
-# The reamed diameter's four-row block stands right of the threaded end,
-# above the axis; the depth under the thread, between its extension lines.
+# Measured on the farm sheet (layout audit, run 20261110T001845485Z): a
+# diameter whose text stands outside its extension lines hangs its block on a
+# shelf starting at the keep x; the rows run down from the value at 5.6 mm
+# pitch, the value's stacked limits 11.7 mm above the keep point.  The reamed
+# diameter's block (value, REAM, three rows) therefore stands below and right
+# of the threaded end, wholly under the hole's lower extension line, inside
+# the frame and under the isometric's label.  The depth's bare value sits
+# between its extension lines under the thread.
+_DIA_BLOCK_ABOVE_KEEP = 0.0117
 SECTION_KEEP = {
-    "EndHoleDia": (TIP_X + 0.060, SECTION_CENTER[1] + 0.018),
+    "EndHoleDia": (
+        TIP_X + 0.012,
+        SECTION_CENTER[1] - THREAD_R - 0.004 - _DIA_BLOCK_ABOVE_KEEP,
+    ),
     "EndHoleDepth": (
         (TIP_X + HOLE_FLOOR_X) / 2.0,
         SECTION_CENTER[1] - THREAD_R - 0.012,
     ),
 }
-DIMENSION_CALLOUTS = {
-    "EndHoleDia": END_HOLE_CALLOUT,
-    "EndHoleDepth": END_HOLE_DEPTH_CALLOUT,
-}
+DIMENSION_CALLOUTS = {"EndHoleDia": END_HOLE_CALLOUT}
 # The end view looks at the threaded end along model +Y: its vertical runs
 # along model Z, so a vertical cut through the centre is the Right plane.
 CUT_START = (END_CENTER[0], END_CENTER[1] - HEAD_R - 0.006)

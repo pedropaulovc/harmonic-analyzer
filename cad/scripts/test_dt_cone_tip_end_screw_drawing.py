@@ -108,7 +108,8 @@ def test_pivot_never_bottoms_and_always_runs_in_the_hole() -> None:
 def test_hole_callout_states_process_fit_mate_and_wall() -> None:
     assert spec.END_HOLE_CALLOUT.splitlines() == [
         "REAM",
-        "RUNNING FIT ON MHA-DT-37 PIVOT (CLEARANCE .0005-.0013 REF)",
+        "RUNNING FIT ON MHA-DT-37 PIVOT",
+        "(CLEARANCE .0005-.0013 REF)",
         "WALL TO THREAD ROOT .067 MIN",
     ]
     assert "91794A558" in spec.STOCK_NOTE
@@ -136,3 +137,19 @@ def test_sheet_is_registered_and_enforced() -> None:
     assert sheet.artifact_stem == spec.PART_NAME
     assert drawing.MACHINIST_REVIEW is MachinistReviewMode.ENFORCE
     assert set(drawing.SECTION_KEEP) == set(spec.DRAWING_PRECISION_BY_NAME)
+
+
+def test_hole_callout_stands_clear_of_its_lines_and_inside_the_frame() -> None:
+    import draw_dt_cone_tip_end_screw as drawing
+
+    # Farm run 20261110T001845485Z: the block ran past the right frame and
+    # sat between the isometric and its label.  Its top now stands under the
+    # thread (so under both of the hole's extension lines), right of the
+    # threaded end, and its widest row (~74 mm) ends inside the frame.
+    x, y = drawing.SECTION_KEEP["EndHoleDia"]
+    block_top = y + drawing._DIA_BLOCK_ABOVE_KEEP
+    assert block_top < drawing.SECTION_CENTER[1] - drawing.THREAD_R
+    assert x > drawing.TIP_X
+    assert x + 0.075 < 0.419
+    assert block_top < drawing.ISO_NOTE_POS[1]
+    assert drawing.DIMENSION_CALLOUTS == {"EndHoleDia": spec.END_HOLE_CALLOUT}

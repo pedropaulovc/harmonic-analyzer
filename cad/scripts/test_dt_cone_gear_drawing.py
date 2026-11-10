@@ -141,12 +141,10 @@ def test_tip_diameter_carries_its_own_mesh_depth_band() -> None:
         'set_dimension_prefix(adapter, BLANK_DIA_REFERENCE_SKETCH, "BlankDia", "<MOD-DIAM>")'
         in source
     )
-    assert readback._BANDED_DIMENSIONS[0] == (
-        notes.BLANK_DIA_REFERENCE_SKETCH, "BlankDia", spec.blank_dia_band,
-        spec.CONFIGURATION_TEETH,
-    )
-    assert readback._BANDED_DIMENSIONS[2] == (
-        spec.BORE_SKETCH, "BoreCutDia", spec.bore_dia_band, spec.ROUND_BORE_TEETH,
+    assert readback._BANDED_DIMENSIONS == (
+        (notes.BLANK_DIA_REFERENCE_SKETCH, "BlankDia", spec.blank_dia_band),
+        (spec.TOOTH_REFERENCE_SKETCH, "ToothThickness", spec.tooth_thickness_band),
+        (spec.BORE_SKETCH, "BoreCutDia", spec.bore_dia_band),
     )
     assert "_set_configuration_bands(adapter)" in source
 
@@ -1162,10 +1160,10 @@ def _callout_dimension(name: str, texts: dict[int, str]) -> object:
 
 
 def test_settled_callouts_refuse_a_bare_dimension(monkeypatch: pytest.MonkeyPatch) -> None:
-    # Farm run 20261110T005033414Z: the D sheets printed BoreCutDia and
-    # BoreAF bare, their shared callouts reset by the keyed sheets'
-    # whole-model side-view import. The thickness stands for a callout
-    # written over its value.
+    # Farm proof 6fda5a4: T012..T024 printed the reamed bore's Ø and band
+    # without REAM THRU / SEE NOTE 1, and T012 the web without its words,
+    # their shared callouts reset by the keyed sheets' whole-model side-view
+    # import (machinist review FIX, rules 4, 7, 12).
     from types import SimpleNamespace
 
     sheets: list[str] = []
@@ -1173,24 +1171,24 @@ def test_settled_callouts_refuse_a_bare_dimension(monkeypatch: pytest.MonkeyPatc
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
     monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, item: item.name)
     adapter = SimpleNamespace(currentModel=ddoc)
-    below = {name: drawing.DIMENSION_CALLOUTS[name] for name in ("BoreCutDia", "BoreAF", "ToothThickness")}
-    above = {"ToothThickness": drawing.CALLOUTS_ABOVE["ToothThickness"]}
-    printed = {
-        "BoreCutDia": _callout_dimension("BoreCutDia", {4: below["BoreCutDia"].replace("\n", "\r\n")}),
-        "BoreAF": _callout_dimension("BoreAF", {4: " "}),
-        "ToothThickness": _callout_dimension("ToothThickness", {}),
-    }
-    sheet = [("T006", list(printed.values()), below, above)]
+    assert drawing.DIMENSION_CALLOUTS["BoreCutDia"].splitlines() == [
+        "REAM THRU", drawing.BORE_NOTE_FLAG,
+    ]
+    below = {name: drawing.DIMENSION_CALLOUTS[name] for name in ("BoreCutDia", "WebMin")}
+    printed = [
+        _callout_dimension("BoreCutDia", {4: " "}),
+        _callout_dimension("WebMin", {4: below["WebMin"].replace("\n", "\r\n")}),
+    ]
+    sheet = [("T012", printed, below, {})]
     with pytest.raises(RuntimeError, match="settling rebuild") as failure:
         drawing._assert_settled_callouts(adapter, sheet)
     message = str(failure.value)
-    assert "T006 BoreCutDia" not in message
-    for fault in ("T006 BoreAF: ' '", "T006 ToothThickness: ''"):
-        assert fault in message
+    assert "T012 BoreCutDia: ' '" in message
+    assert "T012 WebMin" not in message
     # A dimension the sheet does not hold is a fault, not a pass.
-    with pytest.raises(RuntimeError, match="T012 KeyedBoreDia: not on the sheet"):
+    with pytest.raises(RuntimeError, match="T030 KeyedBoreDia: not on the sheet"):
         drawing._assert_settled_callouts(
-            adapter, [("T012", [], {"KeyedBoreDia": drawing.DIMENSION_CALLOUTS["KeyedBoreDia"]}, {})]
+            adapter, [("T030", [], {"KeyedBoreDia": drawing.DIMENSION_CALLOUTS["KeyedBoreDia"]}, {})]
         )
     # Written again after the last sheet's import, the same sheet passes.
     monkeypatch.setattr(
@@ -1540,9 +1538,9 @@ def test_every_configuration_stores_its_own_blank_and_thickness_band(
 ) -> None:
     """part:dt_cone_gear at 039e557da: a one-configuration write's immediate
     readback returned that configuration's band. The FloorDia form instead:
-    every carrying configuration written, then each read back in the
-    reopened audit with itself active. The reamed bore's band is written
-    into T012..T024 alone, each its own."""
+    every configuration written, then each read back in the reopened audit
+    with itself active. The round bore, live in every configuration, takes
+    its band in every one too (reamer on T012/T018, seat class elsewhere)."""
     tolerances = {
         "BlankDia": _FakeTolerance(),
         "ToothThickness": _FakeTolerance(),
@@ -1554,13 +1552,13 @@ def test_every_configuration_stores_its_own_blank_and_thickness_band(
 
     monkeypatch.setattr(part, "_named_dimension", named)
     part._set_configuration_bands(object())
-    for name, band_for, carried in (
-        ("BlankDia", spec.blank_dia_band, spec.CONFIGURATION_TEETH),
-        ("ToothThickness", spec.tooth_thickness_band, spec.CONFIGURATION_TEETH),
-        ("BoreCutDia", spec.bore_dia_band, spec.ROUND_BORE_TEETH),
+    for name, band_for in (
+        ("BlankDia", spec.blank_dia_band),
+        ("ToothThickness", spec.tooth_thickness_band),
+        ("BoreCutDia", spec.bore_dia_band),
     ):
         calls = tolerances[name].calls
-        configs = [(c, t) for c, t in spec.CONFIGS if t in carried]
+        configs = list(spec.CONFIGS)
         assert [call[3] for call in calls] == [[c] for c, _ in configs]
         for (lower, upper, which, _names), (_c, teeth) in zip(calls, configs, strict=True):
             assert which == 3

@@ -49,7 +49,9 @@ from dt_cone_tip_bushing_spec import (
     DRAWING_PRECISION_BY_NAME,
     ISOMETRIC_VIEW_SCALE,
     LENGTH,
+    LENGTH_CALLOUT,
     OUTER_DIA,
+    OUTER_DIA_CALLOUT,
     UNIT,
 )
 
@@ -66,9 +68,14 @@ OUTPUTS = DrawingOutputs(
     png=SPEC.outputs["png"],
 )
 
-# Ø5.8 x 4.1 at 8:1 reads 46 x 33 on the sheet.
-SHEET_SCALE = (8.0, 1.0)
-VIEW_SCALE = (8, 1)
+# Ø5.8 x 4.1 at 5:1 reads 29 x 20 on the sheet.  Machinist review of farm run
+# 20261110T001845485Z: on the 8:1 sheet the section caption printed a
+# "SCALE 8 : 1" equal to the sheet's; 5:1 sections on 5:1 sheets print none
+# (MHA-DT-35).  The isometric stays 8:1, so its label states a real scale.
+SHEET_SCALE = (5.0, 1.0)
+VIEW_SCALE = (5, 1)
+if tuple(ISOMETRIC_VIEW_SCALE) == VIEW_SCALE:
+    raise AssertionError("MHA-DT-38 isometric label would repeat the sheet scale")
 END_CENTER = (0.070, 0.165)
 SECTION_CENTER = (0.200, 0.165)
 ISO_CENTER = (0.355, 0.205)
@@ -77,19 +84,34 @@ ISO_NOTE_POS = (0.335, 0.160)
 
 _S = VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0  # model mm -> sheet m
 OUTER_R = OUTER_DIA * _S / 2.0
+BORE_R = BORE_DIA * _S / 2.0
 HALF_LENGTH = LENGTH * _S / 2.0
 # A-A's arrows point right, so the section looks along model -Z: local +X runs
 # right and the north face (x = LENGTH) is the section's right edge.
 NORTH_FACE_X = SECTION_CENTER[0] + HALF_LENGTH
 
-# The OD stands left of the section, the bore's three-row block right of it
-# between its extension lines, the length above.  The cutting line runs
-# vertically through the end view's centre.
+# Measured on the farm sheet (layout audit, run 20261110T001845485Z): a block
+# placed inside its extension lines centres on the keep point; one placed
+# outside them hangs on a shelf that starts at the keep x, and its rows run
+# about 30 mm down from the value (three callout rows, 3.5 mm text).
+_ROW = 0.0056
+_BORE_BLOCK_BELOW_KEEP = 0.0038 - 3.0 * _ROW  # last row's baseline
+# The OD's two-row block (value, wall) sits between its extension lines left
+# of the section.  The length's stack rows go ABOVE its value, beyond the
+# ends of its extension lines.  The bore's block stands above and right of
+# the north face, wholly above its upper extension line (the bore edge at
+# 5:1 leaves 7.8 mm between them, under the block's ~25 mm), clear of the
+# length's rows and short of the isometric.
 SECTION_KEEP = {
     "OuterDia": (SECTION_CENTER[0] - HALF_LENGTH - 0.030, SECTION_CENTER[1]),
-    "BoreDia": (NORTH_FACE_X + 0.060, SECTION_CENTER[1]),
-    "Length": (SECTION_CENTER[0], SECTION_CENTER[1] + OUTER_R + 0.012),
+    "BoreDia": (
+        NORTH_FACE_X + 0.015,
+        SECTION_CENTER[1] + BORE_R + 0.004 - _BORE_BLOCK_BELOW_KEEP,
+    ),
+    "Length": (SECTION_CENTER[0], SECTION_CENTER[1] + OUTER_R + 0.016),
 }
+CALLOUTS_BELOW = {"BoreDia": BORE_CALLOUT, "OuterDia": OUTER_DIA_CALLOUT}
+CALLOUTS_ABOVE = {"Length": LENGTH_CALLOUT}
 CUT_START = (END_CENTER[0], END_CENTER[1] - OUTER_R - 0.006)
 CUT_END = (END_CENTER[0], END_CENTER[1] + OUTER_R + 0.006)
 if BORE_DIA >= OUTER_DIA:
@@ -168,9 +190,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # Places and the bore's band are authored on the part; the sheet only
     # proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    set_dimension_callouts(
-        adapter, annotations, {"BoreDia": BORE_CALLOUT}, location="below"
-    )
+    set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW, location="below")
+    set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
     rebuild_drawing(adapter, label="MHA-DT-38 dimensions")
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the bushing end view")

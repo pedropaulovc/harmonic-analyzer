@@ -345,9 +345,10 @@ DETAIL_MODEL_Z = -12.9  # detail circle centre, between the pivot and the hole
 DETAIL_RADIUS_MM = 16.0
 DETAIL_SCALE = (3, 2)
 # The former B letter stood 0.28 mm off the relief-width arrow and 0.62 mm
-# over the pivot station witness. Its native anchor now puts the printed
-# box at about [189.2,138.4]..[192.8,144.6] mm, clear of both and the circle.
-DETAIL_PARENT_LETTER_XY = (0.188, 0.145)
+# over the pivot station witness.  Run 20261110T001845485Z printed it at
+# [185.5,141.6]..[189.2,147.8] mm, 1.2 mm over the relief-width arrow (y
+# 140.4; layout audit arrow-near-text, clearance 2.0), so it rises 1.5 mm.
+DETAIL_PARENT_LETTER_XY = (0.188, 0.1465)
 _DETAIL_S = DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
 # The layout audit boxes a detail view by its native outline, which run
 # eaafbc73 measured at the circle plus 10.4 mm a side ([53.6, 9.6]..
@@ -412,7 +413,11 @@ _TIP_DOWEL_PIVOT_X_TEXT_X = (
     )
     + TIP_DOWEL_PIVOT_X_TEXT_SIZE[0] / 2.0
 )
-HOLDDOWN_X_LINE_Y = TIP_DOWEL_PIVOT_X_LINE_Y - HOLDDOWN_X_TEXT_SIZE[1] - 0.0011
+# Run 20261110T001845485Z printed HoldDownX's text 0.15 mm under
+# TipDowelPivotX's (layout audit text-clearance, 1.78 mm needed); C1 keyed's
+# detail centre leaves the relief's crown 10 mm under this line, so it drops
+# a further 1.9 mm.
+HOLDDOWN_X_LINE_Y = TIP_DOWEL_PIVOT_X_LINE_Y - HOLDDOWN_X_TEXT_SIZE[1] - 0.0030
 _HOLDDOWN_X_TEXT_X = (
     DETAIL_CENTER[0]
     + math.sqrt(
@@ -510,8 +515,14 @@ TIP_DOWEL_CALLOUT_LOWER_LEFT = (
     ),
     _TIP_DOWEL_CALLOUT_BOTTOM,
 )
+# HoldDownZ's line stands right of the native label's printed box (run
+# 20261110T001845485Z measured "DETAIL B" at x 16.8..47.3, y 24.5..30.7):
+# with C1 keyed's station (owner decision 2026-11-09, PR #1992) the pivot's
+# extension line runs at the label's height (y 25.6), and at x 0.044 it ran
+# through the B (machinist review, clarity, gating).  Its end, 1 mm past
+# this line, now stands 2.2 mm right of the label.
 DETAIL_KEEP = {
-    "HoldDownZ": (0.044, DETAIL_HOLDDOWN_Y + 0.0045),
+    "HoldDownZ": (0.0505, DETAIL_HOLDDOWN_Y + 0.0045),
     "HoldDownX": (_HOLDDOWN_X_TEXT_X, HOLDDOWN_X_LINE_Y + HOLDDOWN_X_LINE_DROP),
     "TipDowelX": (_TIP_DOWEL_X_TEXT_X, TIP_DOWEL_X_LINE_Y + HOLDDOWN_X_LINE_DROP),
     "TipDowelPivotX": (

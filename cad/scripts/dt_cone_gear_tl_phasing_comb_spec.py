@@ -186,8 +186,8 @@ BOND_FLOAT_MM = max(
     *(family.bond_clearance_mm(teeth)[1] / 2.0 for teeth in (24, 18, 12)),
     cluster.SPIGOT_BOND_CLEARANCE_MM[1] / 2.0,
 )
-# Every other slot bottom (and the step north of its fork) stands this far
-# over its gear's largest tip.
+# Each step (the plate's edge north of a fork) stands this far over the
+# largest tip it passes over, after the seat's drop, its band and the float.
 TIP_AIR = 0.010 * INCH
 # A fork tip stands this far over its gear's pitch circle (nominal).
 FORK_TIP_RISE = 0.007 * INCH
@@ -196,32 +196,42 @@ FORK_TIP_RISE = 0.007 * INCH
 ENGAGEMENT_MIN = 0.10
 
 
-def _below_seat(radius_mm: float, rounding=round) -> float:
-    return inch_grid_mm(SEAT_RADIUS_MM - radius_mm, RADIAL_PLACES, rounding)
+def _below_seat(radius_mm: float, places: int, rounding=round) -> float:
+    return inch_grid_mm(SEAT_RADIUS_MM - radius_mm, places, rounding)
 
 
-# Printed, seat line down (positive): each fork tip, each slot bottom/step.
+# Printed, seat line down (positive): each fork tip.
 FORK_TIP_DEPTH_MM: dict[int, float] = {
-    teeth: _below_seat(pitch_radius_mm(teeth) + FORK_TIP_RISE) for teeth in GEARS
+    teeth: _below_seat(pitch_radius_mm(teeth) + FORK_TIP_RISE, RADIAL_PLACES)
+    for teeth in GEARS
 }
-# T030's slot bottom IS the seat; the others' stand TIP_AIR over their tips
-# (rounded toward the seat: never less air).
-SLOT_BOTTOM_DEPTH_MM: dict[int, float] = {
+# The step north of each of T030..T012's forks passes over that gear's tip
+# (and the next, smaller one's): .XX, rounded toward the seat (never less
+# air). T030's step is the seat line itself. Every slot runs from under its
+# fork tip up to the seat line, so no slot has a bottom of its own to print.
+STEP_PLACES = 2
+_STEP_BAND = printed_band_mm(STEP_PLACES, unit=UNIT)
+STEP_DEPTH_MM: dict[int, float] = {
     teeth: (
         0.0
         if teeth == REFERENCE_TEETH
-        else _below_seat(tip_radius_limits_mm(teeth)[1] + TIP_AIR, math.floor)
+        else _below_seat(
+            tip_radius_limits_mm(teeth)[1]
+            + SEAT_DROP_MM
+            + _STEP_BAND
+            + BOND_FLOAT_MM
+            + TIP_AIR,
+            STEP_PLACES,
+            math.floor,
+        )
     )
-    for teeth in GEARS
+    for teeth in GEARS[:-1]
 }
-# The steps between forks are the slot bottoms of the fork south of each:
-# T030..T012's slots end flush with the step north of their fork.
-STEP_DEPTH_MM = {teeth: SLOT_BOTTOM_DEPTH_MM[teeth] for teeth in GEARS[:-1]}
 # The plate stands this high over the seat (.XX).
 PLATE_HEIGHT = 0.25 * INCH
 
 
-def _radius_limits(depth_mm: float, band_mm: float = _XXX) -> tuple[float, float]:
+def _radius_limits(depth_mm: float, band_mm: float) -> tuple[float, float]:
     """(lowest, highest) radius a printed depth below the seat reaches."""
     return (
         SEAT_RADIUS_MM - SEAT_DROP_MM - depth_mm - band_mm,
@@ -248,15 +258,19 @@ for _teeth in GEARS:
         raise AssertionError(
             f"T{_teeth:03d} fork catches under {ENGAGEMENT_MIN} mm of tooth"
         )
-    if _teeth != REFERENCE_TEETH:
-        _bottom = _radius_limits(SLOT_BOTTOM_DEPTH_MM[_teeth])[0]
-        if _bottom - BOND_FLOAT_MM <= tip_radius_limits_mm(_teeth)[1]:
-            raise AssertionError(f"T{_teeth:03d} slot bottom reaches its tooth tip")
-# The step north of each fork clears the next, smaller gear's tip too.
+    # A bonded gear's slot runs up to the seat line, far over its tip.
+    if _teeth != REFERENCE_TEETH and (
+        SEAT_RADIUS_MM - SEAT_DROP_MM - BOND_FLOAT_MM <= tip_radius_limits_mm(_teeth)[1]
+    ):
+        raise AssertionError(f"T{_teeth:03d} slot top reaches its tooth tip")
+# Each step clears the tips of the gear south of it and the next, smaller one.
 for _south, _north in zip(GEARS, GEARS[1:]):
-    _step = _radius_limits(STEP_DEPTH_MM[_south])[0]
-    if _step - BOND_FLOAT_MM <= tip_radius_limits_mm(_north)[1]:
-        raise AssertionError(f"step over T{_north:03d} reaches its tips")
+    if _south == REFERENCE_TEETH:
+        continue
+    _step = _radius_limits(STEP_DEPTH_MM[_south], _STEP_BAND)[0]
+    for _teeth in (_south, _north):
+        if _step - BOND_FLOAT_MM <= tip_radius_limits_mm(_teeth)[1]:
+            raise AssertionError(f"step north of T{_south:03d} reaches T{_teeth:03d}")
 
 
 # --- Tooth geometry at a radius (the family's corner profiles) ---------------
@@ -319,18 +333,14 @@ SLOT_WIDTH_MAX_MM = {
 for _teeth, _width in SLOT_WIDTH_MM.items():
     if _width - SLOT_BAND_MM < thickest_tooth_mm(_teeth) + SLOT_MIN_CLEARANCE_MM - 1e-9:
         raise AssertionError(f"T{_teeth:03d} slot binds on its thickest tooth")
-# The four bonded slots' centre planes stand within this zone about T030's
-# (datum A, the reference slot's centre plane; the slots are drawn on one
-# centre plane, so the true position is that plane). The zone is the shop's
-# milled-step location row, +/-.002, never tighter.
-SLOT_POSITION_MM = 0.004 * INCH
-GEOMETRIC_TOLERANCES_IN: dict[str, str] = {"slot position": ".004"}
-if (
-    abs(float(GEOMETRIC_TOLERANCES_IN["slot position"]) * INCH - SLOT_POSITION_MM)
-    > 1e-12
-):
-    raise AssertionError("the printed slot position zone is not the proved one")
-SLOT_DATUM = "A"
+# Every slot's near wall is located from the plate's back face (the model's
+# Z0, the Front plane) by one common distance, SLOT_FACE, held to the shop's
+# milled-step location row (+/-.002): the slots stand in line, so the gears
+# phase together. A slot's centre plane then lies within SLOT_CENTRE_BAND of
+# its nominal.
+SLOT_FACE_BAND_MM = 0.002 * INCH
+SLOT_FACE_DEVIATIONS_MM = (-SLOT_FACE_BAND_MM, SLOT_FACE_BAND_MM)
+SLOT_CENTRE_BAND_MM = SLOT_FACE_BAND_MM + SLOT_BAND_MM / 2.0
 
 
 def _turn_in_slot_rad(profile, radius_mm: float, width_mm: float) -> float:
@@ -366,13 +376,16 @@ BOND_CLOCK_TOLERANCE_MM = float(
 
 def phase_error_mm(teeth: int) -> float:
     """A bonded gear's worst phase against T030, pitch arc: its own fork's
-    play, T030's fork's (the comb turns with it), and the slots' centre
-    planes standing apart by the position zone."""
+    play, T030's fork's (the comb turns with it), and the two slots' centre
+    planes standing apart: each by its centre band, and by half the two
+    nominal widths' difference (the near walls are in line)."""
     pitch = pitch_radius_mm(teeth)
     fork_low = FORK_TIP_RADIUS_LIMITS_MM[teeth][0]
     reference_low = FORK_TIP_RADIUS_LIMITS_MM[REFERENCE_TEETH][0]
     play = (FORK_PLAY_RAD[teeth] + FORK_PLAY_RAD[REFERENCE_TEETH]) * pitch
-    offset = SLOT_POSITION_MM / 2.0 * (pitch / fork_low + pitch / reference_low)
+    stagger = abs(SLOT_WIDTH_MM[teeth] - SLOT_WIDTH_MM[REFERENCE_TEETH]) / 2.0
+    offset = (SLOT_CENTRE_BAND_MM + stagger) * pitch / fork_low
+    offset += SLOT_CENTRE_BAND_MM * pitch / reference_low
     return play + offset
 
 
@@ -416,26 +429,59 @@ def _neighbour_reach_mm(teeth: int) -> float:
 
 
 NEIGHBOUR_REACH_MM = {teeth: _neighbour_reach_mm(teeth) for teeth in GEARS}
-# A slot's centre plane stands off the plate's by up to half its position zone.
+# The plate's faces stand off each slot's centre plane by its centre's place
+# (SLOT_FACE plus half the width) and the rest of the thickness; the farther
+# face must stay inside the neighbouring tooth space. With SLOT_FACE half the
+# rest of the thickness, the farther face's worst is half the thickness plus
+# the thickness band and the centre band.
 THICKNESS = inch_grid_mm(
-    2.0 * (min(NEIGHBOUR_REACH_MM.values()) - TINE_AIR)
-    - THICKNESS_BAND_MM
-    - SLOT_POSITION_MM,
+    2.0 * (min(NEIGHBOUR_REACH_MM.values()) - TINE_AIR - SLOT_CENTRE_BAND_MM)
+    - 2.0 * THICKNESS_BAND_MM,
     2,
     math.floor,
 )
-# The thinnest tine: the thinnest plate, the widest slot, off centre by half
-# the position zone.
-TINE_MIN_MM = min(
-    (THICKNESS - THICKNESS_BAND_MM - SLOT_WIDTH_MAX_MM[t] - SLOT_POSITION_MM) / 2.0
-    for t in GEARS
+SLOT_FACE_PLACES = 3
+SLOT_FACE_MM = inch_grid_mm(
+    (THICKNESS - max(SLOT_WIDTH_MM.values())) / 2.0, SLOT_FACE_PLACES, math.floor
 )
+
+
+def face_reach_mm(teeth: int) -> float:
+    """The farther plate face's worst distance from ``teeth``'s slot centre
+    plane (thickest plate, centre farthest from that face)."""
+    width = SLOT_WIDTH_MM[teeth]
+    centre = SLOT_FACE_MM + width / 2.0
+    near = centre + SLOT_CENTRE_BAND_MM
+    far = THICKNESS + THICKNESS_BAND_MM - (centre - SLOT_CENTRE_BAND_MM)
+    return max(near, far)
+
+
+def tine_min_mm(teeth: int) -> float:
+    """The thinner of ``teeth``'s two tines at the print's worst."""
+    near = SLOT_FACE_MM - SLOT_FACE_BAND_MM
+    far = (
+        THICKNESS
+        - THICKNESS_BAND_MM
+        - (SLOT_FACE_MM + SLOT_FACE_BAND_MM)
+        - SLOT_WIDTH_MAX_MM[teeth]
+    )
+    return min(near, far)
+
+
+# The thinnest tine anywhere: printed on the sheet as a plain fact.
+TINE_MIN_MM = min(tine_min_mm(t) for t in GEARS)
+TINE_MIN_IN = math.floor(TINE_MIN_MM / INCH * 1000.0 + 1e-9) / 1000.0
 if TINE_MIN_MM <= 0.25:
     raise AssertionError(f"tine {TINE_MIN_MM:.3f} mm thin")
 for _teeth in GEARS:
-    _outer = (THICKNESS + THICKNESS_BAND_MM + SLOT_POSITION_MM) / 2.0
-    if _outer + TINE_AIR > NEIGHBOUR_REACH_MM[_teeth]:
+    if face_reach_mm(_teeth) + TINE_AIR > NEIGHBOUR_REACH_MM[_teeth]:
         raise AssertionError(f"T{_teeth:03d} tine strikes the neighbouring tooth")
+
+# --- Pose in the shop kit (MHA-DT-03-TL-00) -----------------------------------
+# The comb's model origin (mm) in the kit frame, in the index plate's front
+# plane under its rim; the kit's build places it here and its sheet finds it
+# here.
+KIT_POSITION_MM = (-11.0, -62.0, 0.0)
 
 # --- Model --------------------------------------------------------------------
 # The slot cuts run out this far below their fork tips.
@@ -446,6 +492,10 @@ def slot_width_name(teeth: int) -> str:
     return f"SlotWidth{gear_tag(teeth)}"
 
 
+def slot_face_name(teeth: int) -> str:
+    return f"SlotFace{gear_tag(teeth)}"
+
+
 # Model globals: name -> value (mm); the build sets each and drives from it.
 GLOBALS: dict[str, float] = {
     "PlateLength": PLATE_LENGTH,
@@ -453,10 +503,10 @@ GLOBALS: dict[str, float] = {
     "PlateThick": THICKNESS,
     "FingerLength": FINGER_LENGTH,
     "SlotRunout": SLOT_RUNOUT,
+    "SlotFace": SLOT_FACE_MM,
     **{f"Start{gear_tag(t)}": FINGER_START_MM[t] for t in BONDED_TEETH},
     **{f"Fork{gear_tag(t)}": FORK_TIP_DEPTH_MM[t] for t in GEARS},
     **{f"Step{gear_tag(t)}": STEP_DEPTH_MM[t] for t in BONDED_TEETH[:-1]},
-    "SlotBottomT006": SLOT_BOTTOM_DEPTH_MM[6],
     **{slot_width_name(t): SLOT_WIDTH_MM[t] for t in GEARS},
 }
 
@@ -485,7 +535,7 @@ def profile_points_mm() -> list[tuple[float, float]]:
         points.append((south, fork))
         points.append((north, fork))
         if teeth != GEARS[-1]:
-            points.append((north, -SLOT_BOTTOM_DEPTH_MM[teeth]))
+            points.append((north, -STEP_DEPTH_MM[teeth]))
     points.append((_SOUTH_X + PLATE_LENGTH, PLATE_HEIGHT))
     return points
 
@@ -495,15 +545,11 @@ if profile_points_mm()[3] != (0.0, 0.0):
 
 
 def slot_rectangle_mm(teeth: int) -> tuple[float, float, float, float]:
-    """(x0, y0, x1, y1) of ``teeth``'s slot on the Front plane: the fork's
-    length, from SLOT_RUNOUT under its tip up to its slot bottom."""
+    """(x0, z0, x1, z1) of ``teeth``'s slot in the model: the fork's length,
+    its near wall SLOT_FACE off the plate's back face (Z0). It is cut on the
+    Top plane (the seat line) down through its fork, SLOT_RUNOUT past the tip."""
     south, north = finger_x_mm(teeth)
-    return (
-        south,
-        -FORK_TIP_DEPTH_MM[teeth] - SLOT_RUNOUT,
-        north,
-        -SLOT_BOTTOM_DEPTH_MM[teeth],
-    )
+    return south, SLOT_FACE_MM, north, SLOT_FACE_MM + SLOT_WIDTH_MM[teeth]
 
 
 def _area(points: list[tuple[float, float]]) -> float:
@@ -516,10 +562,11 @@ def _area(points: list[tuple[float, float]]) -> float:
 
 
 PLATE_VOLUME = _area(profile_points_mm()) * THICKNESS
+# Each slot removes its fork's length and width from the tip up to the seat.
 SLOT_VOLUME_MM3 = {
     teeth: (
         (slot_rectangle_mm(teeth)[2] - slot_rectangle_mm(teeth)[0])
-        * (FORK_TIP_DEPTH_MM[teeth] - SLOT_BOTTOM_DEPTH_MM[teeth])
+        * FORK_TIP_DEPTH_MM[teeth]
         * SLOT_WIDTH_MM[teeth]
     )
     for teeth in GEARS
@@ -549,13 +596,18 @@ PROFILE_DIMENSIONS = frozenset(
         *(f"Step{gear_tag(t)}" for t in BONDED_TEETH[:-1]),
     }
 )
+# The slots stand in line: one location prints, on T006's slot at the plate's
+# north end, as 5X.
+SLOT_FACE_PRINTED = slot_face_name(GEARS[-1])
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     PROFILE_SKETCH: set(PROFILE_DIMENSIONS),
     PLATE_FEATURE: {"PlateThick"},
-    slot_sketch(6): {"SlotBottomT006"},
-    **{slot_feature(t): {slot_width_name(t)} for t in GEARS},
+    **{slot_sketch(t): {slot_width_name(t)} for t in GEARS[:-1]},
+    slot_sketch(GEARS[-1]): {slot_width_name(GEARS[-1]), SLOT_FACE_PRINTED},
 }
-_TWO_PLACE = frozenset({"PlateHeight"})
+_TWO_PLACE = frozenset(
+    {"PlateHeight", *(f"Step{gear_tag(t)}" for t in BONDED_TEETH[:-1])}
+)
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     feature: {name: 2 if name in _TWO_PLACE else 3 for name in names}
     for feature, names in DRAWING_DIMENSIONS.items()
@@ -564,7 +616,8 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places for dims in DRAWING_PRECISION.values() for name, places in dims.items()
 }
 DRAWING_VALUES_BY_NAME: dict[str, float] = {
-    name: GLOBALS[name] for name in DRAWING_PRECISION_BY_NAME
+    name: (SLOT_FACE_MM if name == SLOT_FACE_PRINTED else GLOBALS[name])
+    for name in DRAWING_PRECISION_BY_NAME
 }
 # Fabricated nominals sit on their printed inch grid (rule 3).
 for _name, _value in DRAWING_VALUES_BY_NAME.items():
@@ -573,30 +626,47 @@ for _name, _value in DRAWING_VALUES_BY_NAME.items():
         raise AssertionError(f"{_name} {_value} mm is off its .{'X' * _places} grid")
 # The bands tighter than the title block, each at its shop row and set on the
 # model's own dimension: (feature, dimension) -> (lower, upper) deviation, mm.
+# Every slot's location carries the band; T006's prints for all five.
 MODEL_BANDS_MM: dict[tuple[str, str], tuple[float, float]] = {
     (PLATE_FEATURE, "PlateThick"): THICKNESS_DEVIATIONS_MM,
     **{(PROFILE_SKETCH, f"Fork{gear_tag(t)}"): FORK_DEPTH_DEVIATIONS_MM for t in GEARS},
-    **{(slot_feature(t), slot_width_name(t)): SLOT_DEVIATIONS_MM for t in GEARS},
+    **{(slot_sketch(t), slot_width_name(t)): SLOT_DEVIATIONS_MM for t in GEARS},
+    **{(slot_sketch(t), slot_face_name(t)): SLOT_FACE_DEVIATIONS_MM for t in GEARS},
+}
+# Each band's stamped places: its printed precision; the four unprinted slot
+# locations take the printed one's.
+MODEL_BAND_PLACES: dict[tuple[str, str], int] = {
+    (feature, name): DRAWING_PRECISION_BY_NAME.get(name, SLOT_FACE_PLACES)
+    for feature, name in MODEL_BANDS_MM
 }
 
 # --- Sheet words ----------------------------------------------------------------
-# The banded dimensions' mate is the gear named at each slot (rule 4).
+# Every banded dimension serves the five gears' teeth; note 1 names the fit
+# of each, the slot callouts name the gears (rule 4). Words only (rule 7).
 SLOT_NOTE_NUMBER = 1
 SLOT_NOTE_FLAG = f"SEE NOTE {SLOT_NOTE_NUMBER}"
 SHEET_NOTES = "\n".join(
     (
-        f"{SLOT_NOTE_NUMBER}. EACH SLOT, ITS FORK TIP AND THE PLATE THICKNESS FIT THE GEAR",
-        "   NAMED AT THE SLOT: THE SLOT ON ONE TOOTH, THE TINES IN THE SPACES",
-        "   BESIDE IT.",
+        f"{SLOT_NOTE_NUMBER}. EACH SLOT: CLEARANCE FIT ON ONE TOOTH OF THE GEAR NAMED",
+        "   AT IT. ALL FIVE SLOTS IN LINE, SO THE FIVE GEARS PHASE TOGETHER.",
+        "   EACH FORK TIP: BETWEEN ITS GEAR'S PITCH AND TIP CIRCLES. THE TINES:",
+        "   CLEARANCE FIT IN THE TOOTH SPACES EACH SIDE OF THAT TOOTH.",
     )
 )
 if len(SHEET_NOTES.splitlines()) > 4:
     raise AssertionError("at most four note lines")
-# Each slot names the gear whose tooth it fits; the four equal fork lengths
-# print once.
+# Each slot names the gear whose tooth it fits; every tight band points at
+# note 1; the thin tines print as a plain fact (rule 20).
+TINE_WALL_TEXT = f"TINE WALL {inch_text(TINE_MIN_IN * INCH, 3)} MIN"
 CALLOUTS_BELOW: dict[str, str] = {
     **{slot_width_name(t): f"{gear_number(t)} TOOTH\n{SLOT_NOTE_FLAG}" for t in GEARS},
-    "PlateThick": SLOT_NOTE_FLAG,
+    **{f"Fork{gear_tag(t)}": SLOT_NOTE_FLAG for t in GEARS},
+    SLOT_FACE_PRINTED: SLOT_NOTE_FLAG,
+    "PlateThick": f"{SLOT_NOTE_FLAG}\n{TINE_WALL_TEXT}",
 }
-CALLOUTS_ABOVE: dict[str, str] = {"FingerLength": f"{len(GEARS) - 1}X"}
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
+# The four equal fork lengths and the five in-line slot locations print once.
+CALLOUTS_ABOVE: dict[str, str] = {
+    "FingerLength": f"{len(GEARS) - 1}X",
+    SLOT_FACE_PRINTED: f"{len(GEARS)}X",
+}
+ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"

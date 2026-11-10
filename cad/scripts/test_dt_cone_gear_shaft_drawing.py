@@ -167,10 +167,18 @@ def test_the_keyseat_section_flags_the_land_note(monkeypatch):
     monkeypatch.setattr(drawing, "_cut_endpoints", lambda *_a: ((0.0, 0.0), (1.0, 0.0)))
     monkeypatch.setattr(drawing, "create_section_view", lambda *_a, label, **_k: label)
     monkeypatch.setattr(drawing, "_prepare_d_section", lambda *_a: None)
-    monkeypatch.setattr(drawing, "_keyseat_width_text_position", lambda *_a: (0.0, 0.0))
     monkeypatch.setattr(
-        drawing, "curate_view_dimensions", lambda _a, _view, *, keep, **_k: list(keep)
+        drawing, "_keyseat_side_x", lambda _a, _view, section, _sign: section.centre[0] + 0.0095
     )
+    keeps = []
+    monkeypatch.setattr(
+        drawing,
+        "curate_view_dimensions",
+        lambda _a, _view, *, keep, **_k: keeps.append(dict(keep)) or list(keep),
+    )
+    inside = []
+    monkeypatch.setattr(drawing, "_set_arrows_inside", lambda dimension, _label: inside.append(dimension))
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
     monkeypatch.setattr(drawing, "dimension_name", lambda _a, dimension: dimension)
     monkeypatch.setattr(drawing, "_delete_centre_mark", lambda *_a: None)
     monkeypatch.setattr(drawing, "_section_face", lambda *_a: (0.0, 0.0, 1.0, 1.0))
@@ -194,6 +202,22 @@ def test_the_keyseat_section_flags_the_land_note(monkeypatch):
             {"Sec1KeyseatWidth": f" NOTE {dt_cone_gear_shaft_spec.LAND_NOTE}"},
         )
     ]
+    # A-A (machinist review of PR 1 5a4e41cb5f, clarity): the width's line
+    # rises at the keyseat's edge, the S text steps away from it and the S
+    # arrows stand inside, so neither crosses the other.
+    (a_section,) = drawing.D_SECTIONS
+    assert keeps == [
+        {
+            "Sec1KeyseatS": (
+                a_section.centre[0] - drawing.KEYSEAT_S_SHIFT, a_section.centre[1] + 0.017
+            ),
+            "Sec1KeyseatWidth": (
+                a_section.centre[0] + 0.0095,
+                a_section.centre[1] + drawing.KEYSEAT_WIDTH_RISE,
+            ),
+        }
+    ]
+    assert inside == ["Sec1KeyseatS"]
 
 
 def test_every_tight_band_names_its_mate_and_fit_route():
@@ -863,6 +887,20 @@ def test_the_keyseat_section_cuts_land_one_clear_of_its_neighbours() -> None:
         assert rider[3] <= template.height_m - margin
         assert rider[1] > cell[3], (rider, cell)
         assert rider[0] > socket_x + drawing.DIAMETER_TEXT_WIDTH + 0.1
+    # The width's line rises at the keyseat's edge.  The S text (PR 1
+    # 5a4e41cb5f r3 layout audit: 0.3227..0.3501 about its 0.3371 position,
+    # 14.4 mm left and 13.0 mm right) steps away from it, ending CLEAR_GAP_M
+    # plus 1 mm short of that line, its left end clear of the Ø.4825 block
+    # (<= 0.3111, test_every_tight_band_names_its_mate_and_fit_route); with
+    # its arrows inside, its dimension line ends at the floor's extension line,
+    # inside the land's edge.
+    keyseat_x = x + half
+    s_x = x - drawing.KEYSEAT_S_SHIFT
+    assert s_x + 0.0130 <= keyseat_x - CLEAR_GAP_M - 0.001
+    assert s_x - 0.0144 >= 0.3111 + CLEAR_GAP_M
+    floor_x = x + cone_land_key.KEYSEAT_FLOOR_OFFSET_MM / 1000.0 * section.scale[0] / section.scale[1]
+    assert floor_x < keyseat_x
+    assert drawing.ARROWS_INSIDE == 0
 
 
 # How far above a side-view cutting line's lower end its letter's top stands:
@@ -903,15 +941,13 @@ def test_the_tip_end_view_carries_the_socket_callout_in_the_frame() -> None:
     assert '"*Front", *TIP_END_VIEW_CENTER, scale=SIDE_SCALE' in source
     assert set(drawing.TIP_END_VIEW_KEEP) == {"SocketDia"}
     text_x, text_y = drawing.TIP_END_VIEW_KEEP["SocketDia"]
-    lines = 1 + len(spec.SOCKET_CALLOUT.split("\n"))
-    width = max(
-        drawing.DIAMETER_TEXT_WIDTH,
-        *(len(line) * drawing.CALLOUT_CHAR_WIDTH for line in spec.SOCKET_CALLOUT.split("\n")),
-    )
-    assert margin <= text_x and text_y <= template.height_m - margin
-    assert text_y - lines * 0.005 > y + half + CLEAR_GAP_M
-    assert text_x + width < drawing.SIDE_DIAMETERS["Sec2Dia"][0] + 0.010
-    assert text_y - lines * 0.005 > drawing.NOTES_XY[1]
+    # Its box as measured on the PR 2 farm proof (6fda5a4): 16.3 mm left and
+    # 26.8 mm right of its position, 10.1 mm under and 9.1 mm over.
+    box = (text_x - 0.0163, text_y - 0.0101, text_x + 0.0268, text_y + 0.0091)
+    assert box[0] >= margin + CLEAR_GAP_M and box[3] <= template.height_m - margin
+    assert box[1] > y + half + CLEAR_GAP_M
+    assert box[2] + CLEAR_GAP_M < drawing.SIDE_DIAMETERS["Sec2Dia"][0]
+    assert box[1] > drawing.NOTES_XY[1]
 
 
 def test_stacked_tip_diameters_never_run_a_line_through_a_text() -> None:

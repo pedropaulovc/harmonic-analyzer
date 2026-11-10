@@ -87,3 +87,31 @@ def test_sheet_is_registered_and_enforced() -> None:
     assert sheet.artifact_stem == spec.PART_NAME
     assert drawing.MACHINIST_REVIEW is MachinistReviewMode.ENFORCE
     assert set(drawing.SECTION_KEEP) == set(spec.DRAWING_PRECISION_BY_NAME)
+
+
+def test_three_place_od_and_length_state_their_function() -> None:
+    # Rule 3: a three-place size states the wall it holds or the stack it
+    # sets; both specs refuse the .XX band they replace.
+    assert spec.OUTER_DIA_CALLOUT == "HOLDS WALL .080 MIN"
+    assert spec.LENGTH_CALLOUT.splitlines() == [
+        "MHA-DT-37 PIVOT CLEARS",
+        "MHA-DT-39 HOLE FLOOR",
+    ]
+
+
+def test_bore_block_stands_clear_of_its_extension_lines() -> None:
+    import draw_dt_cone_tip_bushing as drawing
+
+    # Farm run 20261110T001845485Z: the bore's extension lines ran through
+    # its callout rows, and the 8:1 section caption repeated the sheet scale.
+    _x, y = drawing.SECTION_KEEP["BoreDia"]
+    assert (
+        y + drawing._BORE_BLOCK_BELOW_KEEP > drawing.SECTION_CENTER[1] + drawing.BORE_R
+    )
+    assert drawing.SHEET_SCALE == (5.0, 1.0)
+    assert tuple(spec.ISOMETRIC_VIEW_SCALE) != drawing.VIEW_SCALE
+    assert drawing.CALLOUTS_BELOW == {
+        "BoreDia": spec.BORE_CALLOUT,
+        "OuterDia": spec.OUTER_DIA_CALLOUT,
+    }
+    assert drawing.CALLOUTS_ABOVE == {"Length": spec.LENGTH_CALLOUT}

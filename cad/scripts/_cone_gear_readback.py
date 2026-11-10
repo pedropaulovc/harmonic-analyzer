@@ -74,14 +74,15 @@ def foreign_bore_features(configuration: str) -> tuple[str, ...]:
 
 
 # The configuration-specific bilateral bands, each written into (and read
-# back from) the configurations that carry its dimension: the round bore's
-# reamer band on T012/T018 and seat band on T024 (bore_dia_band), and the
-# shared blank and tooth-thickness bands.  The tip diameter's band rides the
-# side view's witness, the printed dimension (dt_cone_gear_notes).
+# back from) every configuration: the round bore's reamer band on T012/T018
+# and seat band on T024..T120 (bore_dia_band; the bore is live in every
+# configuration since the T120 marking fix), and the shared blank and
+# tooth-thickness bands. The tip diameter's band rides the side view's
+# witness, the printed dimension (dt_cone_gear_notes).
 _BANDED_DIMENSIONS = (
-    (BLANK_DIA_REFERENCE_SKETCH, "BlankDia", blank_dia_band, CONFIGURATION_TEETH),
-    (TOOTH_REFERENCE_SKETCH, "ToothThickness", tooth_thickness_band, CONFIGURATION_TEETH),
-    (BORE_SKETCH, "BoreCutDia", bore_dia_band, ROUND_BORE_TEETH),
+    (BLANK_DIA_REFERENCE_SKETCH, "BlankDia", blank_dia_band),
+    (TOOTH_REFERENCE_SKETCH, "ToothThickness", tooth_thickness_band),
+    (BORE_SKETCH, "BoreCutDia", bore_dia_band),
 )
 
 
@@ -114,9 +115,7 @@ def _assert_configuration_bands(adapter: Any, configuration: str, teeth: int) ->
     """Read FloorDia and the configuration's banded dimensions back in the
     active configuration."""
     _assert_gap_floor_limits(adapter, configuration, teeth)
-    for feature, name, band_for, carried in _BANDED_DIMENSIONS:
-        if teeth not in carried:
-            continue
+    for feature, name, band_for in _BANDED_DIMENSIONS:
         _display, dimension = _named_dimension(adapter, feature, name)
         tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
         kind = int(tolerance.Type)

@@ -64,6 +64,13 @@ if WALL_WORST < WALL_TARGET_MM:
     raise AssertionError(
         f"MHA-DT-38 wall {WALL_WORST / MM_PER_IN:.4f} in under the .080 target"
     )
+# Rule 3: the OD keeps its third place because at .XX the same wall falls
+# under the target; the OD states the wall it holds, once.
+_WALL_AT_XX = (
+    OUTER_DIA - printed_band_mm(2, unit=UNIT) - (BORE_DIA + max(BORE_DIA_BAND))
+) / 2.0
+if _WALL_AT_XX >= WALL_TARGET_MM:
+    raise AssertionError("MHA-DT-38 OD holds the wall at .XX: print it at .XX")
 
 
 def inch_text(value_mm: float, places: int) -> str:
@@ -94,6 +101,12 @@ BORE_CALLOUT = "\n".join(
         f"{_ceil_text(PRESS_INTERFERENCE[1], 4)} REF)",
     )
 )
+OUTER_DIA_CALLOUT = f"HOLDS WALL {_floor_text(WALL_WORST, 3)} MIN"
+# Rule 3 / rule 4: the length keeps its third place because it sets the
+# stack of the MHA-DT-37 pivot's end against the floor of MHA-DT-39's reamed
+# hole (dt_cone_tip_end_screw_spec.PIVOT_FLOOR_AIR_MIN, which refuses the
+# .XX band); the length names that stack, once.
+LENGTH_CALLOUT = f"{PIVOT_NUMBER} PIVOT CLEARS\n{END_SCREW_NUMBER} HOLE FLOOR"
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BushingProfile": {"OuterDia", "BoreDia", "Length"},

@@ -122,6 +122,15 @@ if PIVOT_FLOOR_AIR_MIN <= 0.0:
     raise AssertionError(
         f"MHA-DT-37 pivot bottoms in the MHA-DT-39 hole ({PIVOT_FLOOR_AIR_MIN:.3f} mm)"
     )
+# The MHA-DT-38 length is the stack term that needs its third place: at the
+# title block's .XX band the pivot could bottom (MHA-DT-38's length callout
+# names this stack).
+_PIVOT_FLOOR_AIR_AT_XX = (END_HOLE_DEPTH - END_HOLE_DEPTH_BAND) - (
+    (tip.PIVOT_LENGTH_MM + PIVOT_LENGTH_BAND)
+    - (tip.BUSHING_LENGTH_MM - printed_band_mm(2, unit="in"))
+)
+if _PIVOT_FLOOR_AIR_AT_XX > 1e-9:  # zero air: the pivot touches the floor
+    raise AssertionError("MHA-DT-38 length holds the pivot air at .XX: print .XX")
 # Backed off to the largest end play, with the hole mouth's general edge
 # break, the shortest pivot still runs in the reamed hole.
 HOLE_MOUTH_BREAK_MAX = edge_break_chamfer_mm(unit=UNIT)
@@ -155,18 +164,18 @@ def _ceil_text(value_mm: float, places: int) -> str:
 
 # Rule 12: the process; rule 4: the fit and its mate by drawing number, the
 # clearance REF; rule 20: the wall shortfall as a plain fact (RV-01).  The
-# reamed depth is its own model dimension in the section.
+# reamed depth is its own model dimension in the section (a blind hole's
+# depth is its full-diameter depth, so it needs no words).
 END_HOLE_CALLOUT = "\n".join(
     (
         "REAM",
-        f"RUNNING FIT ON {PIVOT_NUMBER} PIVOT"
-        f" (CLEARANCE {_floor_text(PIVOT_CLEARANCE[0], 4)}-"
+        f"RUNNING FIT ON {PIVOT_NUMBER} PIVOT",
+        f"(CLEARANCE {_floor_text(PIVOT_CLEARANCE[0], 4)}-"
         f"{_ceil_text(PIVOT_CLEARANCE[1], 4)} REF)",
         f"WALL TO THREAD ROOT {END_HOLE_WALL_PRINTED_IN:.3f}".replace("0.", ".", 1)
         + " MIN",
     )
 )
-END_HOLE_DEPTH_CALLOUT = "FULL DIA"
 
 # The stock, named once (rule 7: a flagged note, no method).
 STOCK_NOTE = "\n".join(

@@ -723,14 +723,15 @@ def test_post_screw_engagement_note_states_the_computed_exception() -> None:
     assert (0.0926 + shift) - engagement[3] > 0.00357
 
 
-# Detail B's "10.45" (12 x 5 mm, 81788ce9's "11.00") hangs outward from its
-# dimension line, centred on the keep y.  The hold-down callout's box follows
+# Detail B's ".738 ±.005" hangs outward (left) from its dimension line,
+# centred on the keep y: run 20261110T001845485Z printed it 24.5 mm wide
+# under a shelf from x 19.5 to its 44.0 line.  The hold-down callout's box follows
 # RD1's render (text centred on the requested x, baseline 2.7 mm under the
 # requested y, 3.5 mm text): 50 mm wide for "DRILL <MOD-DIAM>3.05 THRU ALL"
 # over its counterbore line, 10 mm under to 4 mm over the requested point.
 def _holddown_z_text_box() -> tuple[float, float, float, float]:
     x, y = drawing.DETAIL_KEEP["HoldDownZ"]
-    return (x - 0.013, y - 0.0025, x, y + 0.0025)
+    return (x - 0.0245, y - 0.0025, x, y + 0.0025)
 
 
 def _holddown_x_text_box() -> tuple[float, float, float, float]:
@@ -919,7 +920,7 @@ def test_holddown_band_clears_border_title_block_and_captions() -> None:
     ours = {
         "detail label": (label_x, label_y, label_x + 0.0315, label_y + 0.0162),
         "detail outline": outline,
-        "10.45": _holddown_z_text_box(),
+        ".738 ±.005": _holddown_z_text_box(),
         "1.00 ±0.1": _holddown_x_text_box(),
         ".228 ±.004": _tip_dowel_x_text_box(),
         "(.188)": _tip_dowel_pivot_x_text_box(),
@@ -938,10 +939,12 @@ def test_holddown_band_clears_border_title_block_and_captions() -> None:
         for caption in captions:
             assert not _boxes_overlap(box, caption), (name, caption)
     names = list(ours)
-    # HoldDownX is detail B's own dimension, so its text may stand in the
-    # detail's padded outline (the test below keeps it off the circle); C-C's
-    # face labels are its own notes, standing in its padding beside the ink.
+    # HoldDownX and HoldDownZ are detail B's own dimensions, so their text
+    # may stand in the detail's padded outline (HoldDownZ's stays off the
+    # circle, below; the test below keeps HoldDownX off it); C-C's face labels
+    # are its own notes, standing in its padding beside the ink.
     own = {
+        ("detail outline", ".738 ±.005"),
         ("detail outline", "1.00 ±0.1"),
         ("detail outline", ".228 ±.004"),
         ("detail outline", "(.188)"),
@@ -953,10 +956,17 @@ def test_holddown_band_clears_border_title_block_and_captions() -> None:
             if (first, second) in own:
                 continue
             assert not _boxes_overlap(ours[first], ours[second]), (first, second)
-    # The 10.45 text sits outside its own extension-line span (pivot to hole),
+    # The .738 text sits outside its own extension-line span (pivot to hole),
     # so SolidWorks hangs it off the line instead of centring the line through
     # it (81788ce9: "11.|00").
-    assert ours["10.45"][1] >= drawing.DETAIL_HOLDDOWN_Y > drawing.DETAIL_PIVOT_Y
+    assert ours[".738 ±.005"][1] >= drawing.DETAIL_HOLDDOWN_Y > drawing.DETAIL_PIVOT_Y
+    assert ours[".738 ±.005"][2] < cx - r
+    # The pivot's extension line ends 1 mm past HoldDownZ's line; at C1 keyed's
+    # station it runs at the label's height, so that end stands clear of the
+    # label (run 20261110T001845485Z: through its B at x 0.044).
+    label_box = ours["detail label"]
+    assert label_box[1] < drawing.DETAIL_PIVOT_Y < label_box[3]
+    assert drawing.DETAIL_KEEP["HoldDownZ"][0] - 0.001 >= label_box[2] + 0.002
     # The label lies under its own strip (8783776d printed it 50 mm off).
     label = ours["C-C label"]
     strip = drawing.holddown_strip_box()
@@ -971,7 +981,7 @@ def test_holddown_band_clears_border_title_block_and_captions() -> None:
     padded = _holddown_padded_outline()
     inner = (padded[0] + inset, padded[1] + inset, padded[2] - inset, padded[3] - inset)
     for name in (
-        "10.45",
+        ".738 ±.005",
         "1.00 ±0.1",
         ".228 ±.004",
         "(.188)",
@@ -1601,6 +1611,11 @@ def test_tip_dowel_texts_stand_off_detail_b_circle() -> None:
     pivot_text = _tip_dowel_pivot_x_text_box()
     assert _tip_dowel_callout_box()[1] >= pivot_text[3] + 0.0015 - 1e-9
     assert pivot_text[1] >= _holddown_x_text_box()[3] + 0.0011 - 1e-9
+    # Run 20261110T001845485Z measured HoldDownX's printed text 4.5 mm over
+    # its line top and TipDowelPivotX's from its own line up; the layout
+    # audit wants 1.78 mm of air between them (it read 0.15 at a 1.1 mm drop).
+    holddown_x_top = drawing.HOLDDOWN_X_LINE_Y + 0.0045
+    assert drawing.TIP_DOWEL_PIVOT_X_LINE_Y - holddown_x_top >= 0.00178
     s = drawing._DETAIL_S
     dowel = (drawing.DETAIL_TIP_DOWEL_X, drawing.DETAIL_HOLDDOWN_Y)
     assert dowel[0] - cx == pytest.approx(spec.TIP_DOWEL_LOCAL_X * s)

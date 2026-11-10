@@ -38,6 +38,13 @@ flip_invert:
   - cone key on the keyseat floor
   - cone platform height
   - crankshaft axial (on the plate)
+  # MHA-DT-39's TipFace and MHA-DT-38's NorthFace normals both point up the
+  # shaft, so the plain sign rule seats the screw end 0.15 INSIDE the bushing:
+  # PR 2 farm proof 6fda5a4 (assembly:dt_drive_train) read a 2.906 mm^3
+  # end-screw/bushing overlap, the 0.15 mm-deep chamfered annulus that side
+  # predicts (2.92 mm^3).  The 0.30 mm wrong-side move is inside the mate
+  # guard's 0.5 mm origin tolerance, so only the interference gate saw it.
+  - end screw end play gap
   - lever axial seat
   - lift rod axial
   - pinch head seat @ppn
@@ -153,6 +160,6 @@ machinist_exceptions:
     reason: "Owner ruling 2026-11-08 (Pedro), #2144 item 6.1; the dowel option is #2277. 10D clamps the ear at Y, 10F screws it down, 10G rechecks Y and 10H checks by hand that it does not turn. The wave-spring preload acts along the shaft axis in the screw's plane, so it puts no torque about the screw, and once MHA-CH-00 sets the pivot shaft in both ears the two brackets turn only together"
   - id: "DT-07"
     kind: "minor"
-    where: "sheet 7 step 3: MHA-DT-39 1/4-28 end screw in the .430 MHA-DT-21 tap, run in until MHA-DT-04 stops shuttling and backed off 1/8 turn"
+    where: "sheet 7 step 3: MHA-DT-39 1/4-28 end screw in the .43 MHA-DT-21 tap, run in until MHA-DT-04 stops shuttling and backed off 1/8 turn"
     finding: "thread engagement below 1.5D (rule 18)"
     reason: "Owner ruling 2026-11-09 via PR #1992 (https://github.com/pedropaulovc/harmonic-analyzer/pull/1992): MHA-DT-39 (McMaster 91794A558, 1/4-28 x 5/8) stays at the current MHA-DT-21 station with 1.39D of full thread at the print-worst shallow end, against rule 18's 1.5D. The end screw is set against MHA-DT-38, so its embed follows the tip's axial stack (post boss, MHA-DT-04 collar web, the cone gear stack and its feeler, MHA-DT-38's length, the MHA-DT-21 hold-down) plus the set end play; MHA-DT-21 is placed so the head never bottoms at the deep end (build_dt_drive_train_assembly.END_SCREW_ENGAGEMENT_WORST_D, asserted >= 1.0D). MHA-DT-VN-56 pinches the screw in the slit block once the end play is set"

@@ -353,9 +353,9 @@ def _set_gap_floor_limits(adapter: Any) -> None:
 
 
 def _set_configuration_bands(adapter: Any) -> None:
-    """Store each configuration's bilateral bands (``_BANDED_DIMENSIONS``):
-    the blank and tooth-thickness bands in every configuration, the round
-    bore's own band in each configuration that carries it.
+    """Store each configuration's bilateral bands (``_BANDED_DIMENSIONS``)
+    in every configuration: the blank and tooth-thickness bands, and the
+    round bore's (the reamer's on T012/T018, the seat class elsewhere).
 
     The FloorDia form (``_set_gap_floor_limits``): one ``SetValues2`` with
     swSetValue_InSpecificConfigurations per configuration. No readback here:
@@ -368,12 +368,10 @@ def _set_configuration_bands(adapter: Any) -> None:
     import pythoncom
     from win32com.client import VARIANT
 
-    for feature, name, band_for, carried in _BANDED_DIMENSIONS:
+    for feature, name, band_for in _BANDED_DIMENSIONS:
         _display, dimension = _named_dimension(adapter, feature, name)
         tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
         for configuration, teeth in CONFIGS:
-            if teeth not in carried:
-                continue
             band = band_for(teeth)
             lower, upper = deviations(band)
             names = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BSTR, [configuration])
@@ -384,8 +382,10 @@ def _set_configuration_bands(adapter: Any) -> None:
                     f"{name}@{configuration}: SetValues2 rejected the band {band} mm"
                 )
     _telemetry.success(
-        f"BlankDia, ToothThickness and BoreCutDia bands set per configuration "
-        f"(BoreCutDia: {', '.join(f'T{t:03d} {bore_dia_band(t)}' for t in ROUND_BORE_TEETH)} mm)"
+        f"BlankDia, ToothThickness and BoreCutDia bands set in {len(CONFIGS)} "
+        f"configurations (BoreCutDia: "
+        f"{', '.join(f'T{t:03d} {bore_dia_band(t)}' for t in ROUND_BORE_TEETH)} mm, "
+        f"seat class {BORE_DIA_BAND} mm on the rest)"
     )
 
 

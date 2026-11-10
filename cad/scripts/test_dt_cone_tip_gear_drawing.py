@@ -116,21 +116,30 @@ def test_callouts_and_notes_name_every_mate_once() -> None:
         assert mate in spigot
     assert spigot.startswith("BONDED FIT IN")
     pivot = callouts["PivotDia"]
-    assert "RUNNING FIT IN MHA-DT-39" in pivot
-    assert notes.PIVOT_NOTE_FLAG in pivot
+    assert pivot == f"PRESS AND RUNNING FIT\n{notes.PIVOT_NOTE_FLAG}"
     sheet = notes.sheet_notes().splitlines()
-    assert len(sheet) <= 4
-    assert sheet[0].startswith(f"{notes.PIVOT_NOTE_NUMBER}. PRESS FIT IN MHA-DT-38")
-    assert spec.inch_range(spec.PIVOT_PRESS_INTERFERENCE_MM) in sheet[0]
-    assert sheet[1].startswith(f"{notes.TEETH_NOTE_NUMBER}. TEETH MESH WITH MHA-DT-12")
+    assert len(sheet) <= 5
+    # One pivot diameter: pressed in the bushing, its end running in the end
+    # screw's hole; both mates by number and name, both acceptances.
+    pivot_note = " ".join(sheet[:2])
+    assert sheet[0].startswith(
+        f"{notes.PIVOT_NOTE_NUMBER}. PIVOT: PRESS FIT IN MHA-DT-38"
+    )
+    assert "MHA-DT-39 CONE TIP END SCREW" in pivot_note
+    assert spec.inch_range(spec.PIVOT_PRESS_INTERFERENCE_MM) in pivot_note
+    assert spec.inch_range(spec.PIVOT_RUNNING_CLEARANCE_MM) in pivot_note
+    assert sheet[2].startswith(f"{notes.TEETH_NOTE_NUMBER}. TEETH MESH WITH MHA-DT-12")
     assert sheet[-1] == "3. CENTRES OK."
+    assert callouts["FaceWidth"] == "SETS CONE GEAR STACK\nON MHA-DT-04"
     text = "\n".join((*sheet, *callouts.values()))
     # No retired part, no solder, no D-flat, no stale tip collar.
     for retired in ("MHA-DT-VN-54", "MHA-DT-VN-55", "SOLDER", "FLAT", "COLLAR"):
         assert retired not in text, retired
     gear_data = notes.gear_data()
     assert "MATE:  MHA-DT-12, 120T" in gear_data
-    assert "TO SPIGOT AND PIVOT" in gear_data
+    # The setup names the features the sheet draws, not private labels.
+    assert "TIR MAX TO BOTH \u00d8.0625 ENDS" in gear_data
+    assert "SPIGOT" not in gear_data and "PIVOT" not in gear_data
     minimum, maximum = family.over_pins_limits_mm(6)
     assert f"{spec.inch_text(minimum, 4)} TO {spec.inch_text(maximum, 4)}" in gear_data
 

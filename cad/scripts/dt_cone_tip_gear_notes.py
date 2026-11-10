@@ -30,6 +30,8 @@ STEM_BORE_MATES = tuple(
 )
 BUSHING_MATE_NUMBER = "MHA-DT-38"
 END_SCREW_MATE_NUMBER = "MHA-DT-39"
+BUSHING_MATE_TITLE = str(_config.parts("dt-cone-tip-bushing")["title"]).upper()
+END_SCREW_MATE_TITLE = str(_config.parts("dt-cone-tip-end-screw")["title"]).upper()
 
 # Sheet 2 is the T006 tooth space the DT6-FORM1 tool is ground to.
 SHEET_NAMES = ("T006", "DT6-FORM1")
@@ -51,18 +53,23 @@ TEETH_NOTE_FLAG = f"SEE NOTE {TEETH_NOTE_NUMBER}"
 def sheet_notes() -> str:
     """The sheet's numbered notes.
 
-    Note 1 is the pivot's matched fit (rule 4): its .0003 band is under the
-    turned-diameter row, so the pivot is made to the measured MHA-DT-38 bore,
-    the interference the parts' limits give as REF. Note 2 names the mesh and
-    the fit route of the tip, thickness and root bands, with the teeth's
-    do-not-cut. Note 3: the stems are turned between centres, and a centre
-    hole in either end harms nothing (rule 11).
+    Note 1 is the pivot's two fits (rule 4): the bushing presses over its root
+    and the end screw's reamed hole runs on its end, one diameter for both.
+    Its .0003 band is under the turned-diameter row, so the pivot is made to
+    the measured MHA-DT-38 bore, the interference the parts' limits give; the
+    end screw's hole then runs on it with the clearance its limits give. Note
+    2 names the mesh and the fit route of the tip, thickness and root bands,
+    with the teeth's do-not-cut. Note 3: the stems are turned between centres,
+    and a centre hole in either end harms nothing (rule 11).
     """
     interference = spec.inch_range(spec.PIVOT_PRESS_INTERFERENCE_MM)
+    clearance = spec.inch_range(spec.PIVOT_RUNNING_CLEARANCE_MM)
     return "\n".join(
         (
-            f"{PIVOT_NOTE_NUMBER}. PRESS FIT IN {BUSHING_MATE_NUMBER}: PIVOT MADE TO ITS MEASURED BORE "
-            f"(INTERFERENCE {interference}).",
+            f"{PIVOT_NOTE_NUMBER}. PIVOT: PRESS FIT IN {BUSHING_MATE_NUMBER} {BUSHING_MATE_TITLE}, "
+            f"MADE TO ITS MEASURED BORE (INTERFERENCE {interference});",
+            f"   ITS END RUNS IN {END_SCREW_MATE_NUMBER} {END_SCREW_MATE_TITLE} "
+            f"(DIAMETRAL CLEARANCE {clearance}).",
             f"{TEETH_NOTE_NUMBER}. TEETH MESH WITH {CYLINDER_MATE_NUMBER}: ACCEPT OVER PINS, "
             "THEN BY BACKLASH AT ASSEMBLY,",
             f"   PER GEAR DATA. {TOOTH_EDGE_NOTE}",
@@ -81,12 +88,14 @@ DIMENSION_CALLOUTS = {
         f"BONDED FIT IN {SHAFT_MATE_NUMBER} SOCKET\n"
         f"AND {STEM_BORE_MATES[0]}, {STEM_BORE_MATES[1]}"
     ),
-    "PivotDia": f"RUNNING FIT IN {END_SCREW_MATE_NUMBER}\n{PIVOT_NOTE_FLAG}",
+    # One diameter carries both of note 1's fits.
+    "PivotDia": f"PRESS AND RUNNING FIT\n{PIVOT_NOTE_FLAG}",
     "ToothThickness": TEETH_NOTE_FLAG,
     # The origin circle is an inspection witness, not the off-centre root arc.
     "FloorDia": f"ROOT ENVELOPE\n{TEETH_NOTE_FLAG}",
-    # The leaves are one face of the twenty-gear cone stack (dt_cone_gear_stack).
-    "FaceWidth": "20-GEAR STACK",
+    # The leaves are one face of the twenty-gear cone stack (dt_cone_gear_stack)
+    # on the cone shaft, the crank drive gear's wording (draw_dt_crank_drive_gear).
+    "FaceWidth": f"SETS CONE GEAR STACK\nON {SHAFT_MATE_NUMBER}",
 }
 # Text over the value, one line each (a multi-line callout above a value
 # drops from the print, draw_dt_cone_gear).
@@ -161,7 +170,8 @@ def gear_data() -> str:
         # gear's seat is its own stems, between whose centres it is cut.
         (
             "TOOTH CUTTING SETUP, ACCEPT AT SETUP",
-            f"{inch(cone_set_stack.TOOTH_RUNOUT_TIR_MM, 3)} TIR MAX TO SPIGOT AND PIVOT",
+            f"{inch(cone_set_stack.TOOTH_RUNOUT_TIR_MM, 3)} TIR MAX TO BOTH "
+            f"\u00d8{inch(spec.STEM_DIA_MM, 4)} ENDS",
         ),
         (
             f"OVER 2 PINS \u00d8{inch(pin, 3)}, OPPOSITE GAPS",

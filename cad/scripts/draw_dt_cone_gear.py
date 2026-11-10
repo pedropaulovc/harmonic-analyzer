@@ -1052,10 +1052,10 @@ def _rewrite_callouts(adapter: Any, sheets: list[SheetCallouts]) -> None:
     prints it (OffsetText, DIMENSION_CALLOUTS["ToothThickness"]). Each sheet's
     side view imports the whole marked set (``_curate_repeated_dimensions``),
     which brings in, and deletes, every marked dimension live in its
-    configuration: since the T120 marking fix that includes the D-bore's on
-    T030..T120 and the web's on every sheet, so the keyed sheets reset the
-    callouts T006..T024 had written (farm run 20261110T005033414Z: the D-bore
-    Ø, across-flat and clock printed bare, the T012 web without its words).
+    configuration: since the T120 marking fix that includes the round bore's
+    on T030..T120 and the web's on every sheet, so the keyed sheets reset the
+    callouts T012..T024 had written (farm proof 6fda5a4: the reamed bore's Ø
+    printed bare, the T012 web without its words).
     """
     for _sheet, printed, below, above in sheets:
         set_dimension_callouts(adapter, printed, below)
@@ -1095,6 +1095,124 @@ def _assert_settled_callouts(adapter: Any, sheets: list[SheetCallouts]) -> None:
         raise RuntimeError(
             "dimension callouts after the settling rebuild:\n" + "\n".join(faults)
         )
+
+
+
+def _clock_arcs(display: Any) -> list[tuple[tuple[float, float], list[tuple[float, float]]]]:
+    """The clock dimension's drawn arcs as (centre, tessellated points), in
+    sheet metres, read the way the layout audit reads them."""
+    data = _early_bound(display.GetDisplayData(), "IDisplayData")
+    arcs = []
+    for index in range(int(data.GetArcCount())):
+        raw = tuple(float(value) for value in (data.GetArcAtIndex2(index) or ()))
+        segments = arc_segments(raw)
+        if not segments:
+            continue
+        points = [(segments[0].x0, segments[0].y0), *((s.x1, s.y1) for s in segments)]
+        arcs.append(((raw[10], raw[11]), points))
+    return arcs
+
+
+def _sweep_clock_right_of_flat(
+    adapter: Any, view: Any, annotations: list[Any], teeth: int, *, label: str
+) -> Any:
+    """Flip the imported flat clock until its arc sweeps only the quadrant
+    right of the flat and above the axis, then re-seat its text there.
+
+    The flips act on the selected dimension (the API's own example selects
+    it first), so each one runs with the clock alone selected in its active
+    view. Every flip is read back from the drawn arcs and the measured value;
+    a clock that ends anywhere else raises with the stray points.
+    """
+    clock_name = clock_dimension_name(teeth)
+    clocks = [
+        _early_bound(annotation, "IAnnotation")
+        for annotation in annotations
+        if dimension_name(adapter, _early_bound(annotation, "IAnnotation")) == clock_name
+    ]
+    if len(clocks) != 1:
+        raise RuntimeError(f"{label}: expected one {clock_name}, found {len(clocks)}")
+    annotation = clocks[0]
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    display.ArrowSide = ARROWS_INSIDE
+    if int(display.ArrowSide) != ARROWS_INSIDE:
+        raise RuntimeError(f"{label}: the flat clock did not keep its arrows inside")
+    selection_name = str(display.GetNameForSelection() or "")
+    if not selection_name:
+        raise RuntimeError(f"{label}: the flat clock has no selection name")
+    model = adapter.currentModel
+    drawing = _early_bound(model, "IDrawingDoc")
+    vertex = bore_clock_vertex(teeth)
+    text_xy = bore_view_keep(teeth)[clock_name]
+    imported = float(_read_member(dimension, "SystemValue"))
+    flips: list[str] = []
+    stray: list[tuple[float, float]] = []
+    for flip in ("", *CLOCK_FLIPS):
+        if flip:
+            if not drawing.ActivateView(view.GetName2()):
+                raise RuntimeError(f"{label}: failed to activate the bore view")
+            model.ClearSelection2(True)
+            if not model.Extension.SelectByID2(
+                selection_name, "DIMENSION", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
+            ):
+                raise RuntimeError(f"{label}: failed to select the flat clock {selection_name!r}")
+            flipped = getattr(display, flip)()
+            model.ClearSelection2(True)
+            if not flipped:
+                raise RuntimeError(f"{label}: {flip} refused on the flat clock")
+            flips.append(flip)
+            if not annotation.SetPosition2(*text_xy, 0.0):
+                raise RuntimeError(f"{label}: failed to re-seat the flat clock text")
+            rebuild_drawing(adapter, label=f"{label} clock {flip}")
+        arcs = _clock_arcs(display)
+        if not arcs:
+            raise RuntimeError(f"{label}: the flat clock draws no arc")
+        for centre, points in arcs:
+            if math.dist(centre, vertex) > CLOCK_ARC_CENTRE_TOL:
+                raise RuntimeError(
+                    f"{label}: flat clock arc centred at "
+                    f"{tuple(round(v * 1000, 2) for v in centre)} mm, not the "
+                    f"flat/axis crossing {tuple(round(v * 1000, 2) for v in vertex)} mm"
+                )
+        stray = [
+            point
+            for _centre, points in arcs
+            for point in points
+            if point[0] < vertex[0] - CLOCK_ARC_OVERRUN or point[1] < vertex[1] - CLOCK_ARC_OVERRUN
+        ]
+        radii = sorted({round(math.dist(centre, points[0]) * 1000, 2) for centre, points in arcs})
+        spans = [
+            tuple(
+                round(math.degrees(math.atan2(y - vertex[1], x - vertex[0])), 1)
+                for x, y in (points[0], points[-1])
+            )
+            for _centre, points in arcs
+        ]
+        measured = float(_read_member(dimension, "SystemValue"))
+        _telemetry.info(
+            f"{label}: flat clock after {flips or ['import']}: reads "
+            f"{math.degrees(measured):.4f} deg, {len(arcs)} arc(s) spanning {spans} "
+            f"deg about the flat/axis crossing, radius {radii} mm, {len(stray)} "
+            "point(s) outside the quadrant right of the flat and above the axis",
+            clock_flips=len(flips),
+            clock_stray_points=len(stray),
+            clock_measured_deg=math.degrees(measured),
+        )
+        if abs(measured - imported) > 1e-9:
+            raise RuntimeError(
+                f"{label}: {flips[-1]} changed the clock from "
+                f"{math.degrees(imported):.4f} to {math.degrees(measured):.4f} deg"
+            )
+        if not stray:
+            if int(display.ArrowSide) != ARROWS_INSIDE:
+                raise RuntimeError(f"{label}: {flips} put the clock's arrows outside")
+            return display
+    raise RuntimeError(
+        f"{label}: flat clock arc still leaves the quadrant right of the flat and "
+        f"above the axis after {flips}; first stray points "
+        f"{[tuple(round(v * 1000, 1) for v in p) for p in stray[:3]]} mm"
+    )
 
 
 def _shelve_tooth_thickness(
@@ -1762,6 +1880,8 @@ async def build(adapter: Any) -> dict[str, str]:
         check_drawing_layout(
             adapter, layout=SPEC.layout, stem=f"cone-gear {configuration}"
         )
+
+    _rewrite_callouts(adapter, sheet_callouts)
 
     return await finalize_drawing(
         adapter,

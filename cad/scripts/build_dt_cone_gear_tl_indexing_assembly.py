@@ -34,10 +34,9 @@ from _document_units import apply_package_model_units
 from _drawing_marks import DRAWN_BY
 from _session import run_build
 from _transforms import IDENTITY, euler_from_rows
+from dt_cone_gear_tl_phasing_comb_spec import KIT_POSITION_MM
 
 ASM_NAME = "dt-cone-gear-tl-indexing"
-# The comb's model origin (mm) in the kit frame: under the plate's rim.
-COMB_POSITION_MM = (-11.0, -62.0, 0.0)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -64,7 +63,7 @@ async def build(adapter) -> dict[str, str]:
     await place_component(
         adapter,
         "dt-cone-gear-tl-phasing-comb",
-        list(COMB_POSITION_MM),
+        list(KIT_POSITION_MM),
         euler_from_rows(rows),
         rows,
     )

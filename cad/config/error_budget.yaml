@@ -201,12 +201,12 @@ critical_features:
     class: channel
     holds: "index each keyed cone gear's teeth off its keyway (KeywayClock, T030-T120) on one setup (+/-0.25 deg); the bonded T006-T024 have no bore feature and book cone_tip_bond_clock instead"
   cone_tip_bond_clock:
-    tolerance: 0.411
+    tolerance: 0.446
     unit: mm
     nominal: null
     quantity: phase
     class: channel
-    holds: "owner decision C1 keyed (2026-11-09, PR #1992): T024 bonded (LOCTITE 638) on MHA-DT-04's round land 2, T018 and T012 on MHA-DT-37's spigot and the spigot in MHA-DT-04, all clocked to the keyed T030 by the forks of the phasing comb MHA-DT-03-TL-02 (owner ruling 2026-11-09) engaged in their tooth spaces until the compound grabs (MHA-DT-00 step 1); the comb's slot widths (+/-.001 in), fork-tip depths (+/-.002 in) and slot positions to the T030-slot datum (.004 in) are at their shop rows, and dt_cone_gear_tl_phasing_comb_spec.PHASE_ERROR_MM asserts every bonded gear's worst phase against T030 inside this tolerance (T024 worst, 0.411 mm pitch arc), drawn per gear; at the 120T cam that is 1/(60 m) rad per mm on every bonded gear (error_budget.phase_profiles)"
+    holds: "owner decision C1 keyed (2026-11-09, PR #1992): T024 bonded (LOCTITE 638) on MHA-DT-04's round land 2, T018 and T012 on MHA-DT-37's spigot and the spigot in MHA-DT-04, all clocked to the keyed T030 by the forks of the phasing comb MHA-DT-03-TL-02 (owner ruling 2026-11-09) engaged in their tooth spaces until the compound grabs (MHA-DT-00 step 1); the comb's slot widths (+/-.001 in), fork-tip depths (+/-.002 in) and common slot location (+/-.002 in from its back face) are at their shop rows, and dt_cone_gear_tl_phasing_comb_spec.PHASE_ERROR_MM asserts every bonded gear's worst phase against T030 inside this tolerance (T024 worst, 0.446 mm pitch arc), drawn per gear; at the 120T cam that is 1/(60 m) rad per mm on every bonded gear (error_budget.phase_profiles)"
   cone_key_play:
     tolerance: 0.0508
     unit: mm

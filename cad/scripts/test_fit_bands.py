@@ -89,8 +89,8 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
     ),
     # for configuration, teeth in CONFIGS: band = band_for(teeth); deviations(band)
     ("build_dt_cone_gear", "band"): (
-        "tuple(band_for(teeth) for _feature, _name, band_for, carried"
-        " in _BANDED_DIMENSIONS for teeth in carried)",
+        "tuple(band_for(teeth) for _feature, _name, band_for in _BANDED_DIMENSIONS"
+        " for teeth in __import__('dt_cone_gear_spec').CONFIGURATION_TEETH)",
         "each",
     ),
     # for name, band in (("BlankDia", blank_dia_band(teeth)), ...): deviations(band)
@@ -111,10 +111,10 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
         " CORE_FLAT_TOOL_END_RADIUS_BAND)",
         "each",
     ),
-    # for feature, name, band_for in _BANDED_DIMENSIONS: band = band_for(teeth)
+    # for feature, name, band_for in _BANDED_DIMENSIONS: band = band_for(teeth), every configuration
     ("_cone_gear_readback", "band"): (
-        "tuple(band_for(teeth) for _feature, _name, band_for, carried"
-        " in _BANDED_DIMENSIONS for teeth in carried)",
+        "tuple(band_for(teeth) for _feature, _name, band_for in _BANDED_DIMENSIONS"
+        " for teeth in __import__('dt_cone_gear_spec').CONFIGURATION_TEETH)",
         "each",
     ),
 }

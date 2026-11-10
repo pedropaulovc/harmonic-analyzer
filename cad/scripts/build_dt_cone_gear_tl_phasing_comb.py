@@ -10,10 +10,11 @@ on the seat line.
 Features:
 
 * ``PlateProfile`` on the Front plane: the closed rectilinear outline, every
-  length driven from the spec's globals; ``Plate`` extrudes it mid-plane.
-* ``SlotProfileTnnn`` / ``SlotTnnn`` per fork: a Front-plane rectangle over
-  the fork's length, from under its tip up to its slot bottom, cut mid-plane
-  to the slot's width.
+  length driven from the spec's globals; ``Plate`` extrudes it +Z by the
+  thickness, so the Front plane is the plate's back face.
+* ``SlotProfileTnnn`` / ``SlotTnnn`` per fork: a Top-plane (seat line)
+  rectangle over the fork's length, its near wall ``SlotFace`` off the back
+  face, cut down through the fork.
 
 Run (SolidWorks already open)::
 
@@ -55,18 +56,20 @@ from dt_cone_gear_tl_phasing_comb_spec import (
     GEARS,
     GLOBALS,
     ISOMETRIC_VIEW_NOTE,
+    MODEL_BAND_PLACES,
     MODEL_BANDS_MM,
     PLATE_FEATURE,
     PLATE_VOLUME,
     PROFILE_SKETCH,
+    SLOT_RUNOUT,
     SLOT_VOLUME_MM3,
-    SLOT_WIDTH_MM,
     THICKNESS,
     UNIT,
     gear_tag,
     profile_points_mm,
     slot_feature,
     slot_rectangle_mm,
+    slot_face_name,
     slot_sketch,
     slot_width_name,
 )
@@ -200,41 +203,37 @@ async def _plate_profile(adapter: Any) -> list[tuple[str, str]]:
 
 def _slot_drives(teeth: int) -> tuple[list[str], list[str]]:
     """Names and drives of a slot rectangle's dims in define_rectilinear_chain's
-    emission order: its length, its depth, then its top-left corner's x (and
-    y below the seat, but for T030 whose slot bottom IS the seat)."""
+    emission order: its length, its width, then its near south corner's x and
+    its near wall's distance from the plate's back face (the origin's Z0)."""
     tag = gear_tag(teeth)
-    if teeth == GEARS[-1]:
-        span = f'"PlateLength" - "Start{tag}"'
-        bottom_name, bottom = "SlotBottomT006", '"SlotBottomT006"'
-    else:
-        span = '"FingerLength"'
-        bottom_name, bottom = f"SlotBottom{tag}", f'"Step{tag}"'
+    span = f'"PlateLength" - "Start{tag}"' if teeth == GEARS[-1] else '"FingerLength"'
     corner_x = (
         '"FingerLength"' if teeth == GEARS[0] else f'"Start{tag}" - "FingerLength"'
     )
-    if teeth == GEARS[0]:
-        depth = f'"Fork{tag}" + "SlotRunout"'
-        return (
-            [f"SlotSpan{tag}", f"SlotDepth{tag}", f"SlotX{tag}"],
-            [span, depth, corner_x],
-        )
-    depth = f'"Fork{tag}" + "SlotRunout" - {bottom}'
     return (
-        [f"SlotSpan{tag}", f"SlotDepth{tag}", f"SlotX{tag}", bottom_name],
-        [span, depth, corner_x, bottom],
+        [
+            f"SlotSpan{tag}",
+            slot_width_name(teeth),
+            f"SlotX{tag}",
+            slot_face_name(teeth),
+        ],
+        [span, f'"{slot_width_name(teeth)}"', corner_x, '"SlotFace"'],
     )
 
 
 async def _slot(
     adapter: Any, teeth: int, volume: float
 ) -> tuple[list[tuple[str, str]], float]:
+    """A Top-plane rectangle over the fork's length (sketch u = model X,
+    v = model -Z), its near wall SlotFace off the back face, cut from the seat
+    line down through the fork, SlotRunout past its tip."""
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     tag = gear_tag(teeth)
-    x0, y0, x1, y1 = slot_rectangle_mm(teeth)
-    # Top-left first: the chain's anchor is the slot bottom's south corner.
-    points = [(x0, y1), (x1, y1), (x1, y0), (x0, y0)]
-    check(f"create_sketch {tag} slot", await adapter.create_sketch("Front"))
+    x0, z0, x1, z1 = slot_rectangle_mm(teeth)
+    # Near south corner first: the chain's anchor.
+    points = [(x0, -z0), (x1, -z0), (x1, -z1), (x0, -z1)]
+    check(f"create_sketch {tag} slot", await adapter.create_sketch("Top"))
     lines = await add_line_chain(adapter, points)
     dims = SketchDims()
     names, drives = _slot_drives(teeth)
@@ -252,15 +251,17 @@ async def _slot(
     check(f"exit_sketch {tag} slot", await adapter.exit_sketch())
     name_last_feature(adapter, slot_sketch(teeth))
     jobs = dims.apply(adapter, slot_sketch(teeth))
+    # A cut from the Top plane runs -Y by default (build_dt_cone_tip_block's
+    # dowel reverses it to run +Y).
     check(
         f"cut {tag} slot",
         await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=SLOT_WIDTH_MM[teeth], both_directions=True)
+            ExtrusionParameters(depth=FORK_TIP_DEPTH_MM[teeth] + SLOT_RUNOUT)
         ),
     )
     name_last_feature(adapter, slot_feature(teeth))
-    width = name_dimensions(adapter, slot_feature(teeth), [slot_width_name(teeth)])[0]
-    jobs.append((width, f'"{slot_width_name(teeth)}"'))
+    depth = name_dimensions(adapter, slot_feature(teeth), [f"SlotDepth{tag}"])[0]
+    jobs.append((depth, f'"Fork{tag}" + "SlotRunout"'))
     removed = SLOT_VOLUME_MM3[teeth]
     volume = await volume_check(
         adapter, f"{tag} slot", volume - removed, 0.01 * removed + 0.01
@@ -279,11 +280,10 @@ async def build(adapter: Any) -> dict[str, str]:
         await set_global(adapter, name, f"{value}mm")
 
     drive_jobs = await _plate_profile(adapter)
+    # +Z from the Front plane: the plate's back face is Z0, the slots' datum.
     check(
         "extrude plate",
-        await adapter.create_extrusion(
-            ExtrusionParameters(depth=THICKNESS, both_directions=True)
-        ),
+        await adapter.create_extrusion(ExtrusionParameters(depth=THICKNESS)),
     )
     name_last_feature(adapter, PLATE_FEATURE)
     drive_jobs.append(
@@ -307,15 +307,15 @@ async def build(adapter: Any) -> dict[str, str]:
         0.002 * PLATE_VOLUME,
     )
     _require_one_solid_body(adapter, label="driven phasing comb")
-    # The slot widths, fork-tip depths and plate thickness carry their shop
-    # rows; the gear named at each slot is their mate (sheet note 1).
+    # The slot widths and locations, fork-tip depths and plate thickness carry
+    # their shop rows; the gear named at each slot is their mate (sheet note 1).
     for (feature_name, dimension_name), deviations in MODEL_BANDS_MM.items():
         set_dimension_bilateral_tolerance(
             adapter,
             feature_name,
             dimension_name,
             *deviations,
-            places=DRAWING_PRECISION[feature_name][dimension_name],
+            places=MODEL_BAND_PLACES[feature_name, dimension_name],
             display_unit=UNIT,
         )
 

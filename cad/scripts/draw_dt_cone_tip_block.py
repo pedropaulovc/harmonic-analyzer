@@ -119,7 +119,7 @@ PNG = OUTPUTS.png
 # already states (#1).
 DOWEL_PIN_NUMBER = _config.parts("dt-vn-locating-pin")["number"]
 PLATFORM_NUMBER = _config.parts("dt-cone-swing-platform")["number"]
-END_SCREW_NUMBER = _config.parts("dt-cone-tip-end-screw")["number"]
+TIP_GEAR_NUMBER = _config.parts("dt-cone-tip-gear")["number"]
 POST_NUMBER = _config.parts("dt-cone-pivot-post")["number"]
 if POST_NUMBER != AXIS_HEIGHT_MATCH_MATE:
     raise AssertionError("the axis height's matched mate is not the pivot post")
@@ -160,9 +160,10 @@ DOWEL_NOTE = textwrap.fill(
 # MHA-DT-20 within the match residual (dt_cone_tip_block_spec).  The
 # AxisHeight value keeps its general band (the absolute range the matched
 # value takes) and flags this note, worded like the cone gear's MADE TO THE
-# MEASURED LAND.
+# MEASURED LAND.  The location carries only the flag (rule 7; machinist
+# review of PR 2's farm proof read "MATCHED," on it as words on a location).
 AXIS_MATCH_NOTE_NUMBER = 2
-AXIS_HEIGHT_CALLOUT = f"MATCHED,\nSEE NOTE {AXIS_MATCH_NOTE_NUMBER}"
+AXIS_HEIGHT_CALLOUT = f"SEE NOTE {AXIS_MATCH_NOTE_NUMBER}"
 AXIS_MATCH_NOTE = textwrap.fill(
     AXIS_HEIGHT_MATCH_REQUIREMENT,
     width=DOWEL_NOTE_WIDTH,
@@ -261,10 +262,10 @@ ROUND_OUT = 0.0001
 # render the shoulder ran 29.0 mm right of the callout's point, 1.2 mm past
 # I31's 27.8, and stopped 0.3 mm short of the right view's north face.
 ADJUSTER_CALLOUT_EXTENT = (0.0295, 0.0086, 0.0290, 0.0078)
-# The flag's ink from its upper-left corner: ADJUSTER ENTRY's fourteen
-# glyphs measured 36.3 x 3.4 mm (287c); its 21 glyphs at that pitch, rounded
-# out.  An estimate until a render measures it.
-ADJUSTER_ENTRY_EXTENT = (0.0, 0.0036, 0.0560, 0.0)
+# The flag's ink from its upper-left corner: run 20261110T001845485Z printed
+# "CARRIES MHA-DT-39" 44.6 x 3.4 mm, 2.62 mm a glyph; its 23 glyphs at that
+# pitch, rounded out, centred over the 59.8 mm callout under it.
+ADJUSTER_ENTRY_EXTENT = (0.0, 0.0036, 0.0605, 0.0)
 ADJUSTER_LEADER_ANGLE = math.radians(37.0)
 ADJUSTER_FLOOR_GAP = _drawing_leaders.ARROW_TEXT_CLEARANCE + ARROW_HALF_WIDTH + ROUND_OUT
 ADJUSTER_ENTRY_Y = _elevation_y(BLOCK_HEIGHT - SLIT_DEPTH, FRONT_CENTER) - ADJUSTER_FLOOR_GAP
@@ -320,11 +321,10 @@ SLIT_ROW_LEFT = SLIT_W * _S / 2.0 + 0.0064 + TEXT_CLEARANCE + ROUND_OUT
 # value the text keeps to one line (SolidWorks drops multi-line text placed
 # above a dimension); below it, the full mate number gets its own row.
 DIMENSION_CALLOUTS = {
-    # The adjuster thread runs through the block's depth: its length is the
-    # end screw's engagement window (build_dt_drive_train_assembly's embed
-    # stack).  Two rows of words (round-1 farm review, dt-fab-4); the whole
-    # value/mate block sits on a native offset shelf right of the plan.
-    "Depth": f"SETS {END_SCREW_NUMBER}\nENGAGEMENT",
+    # The depth prints .43 at the title block's .XX (machinist review of PR
+    # 2's farm proof, rules 3 and 19): a general size with no band of its own
+    # carries no reason (rule 7); its value stands on a native offset shelf
+    # right of the plan.
     # The matched axis height (AXIS_MATCH_NOTE).
     "AxisHeight": AXIS_HEIGHT_CALLOUT,
     # Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
@@ -423,7 +423,9 @@ TOP_KEEP = {
 }
 TOP_TEXT_OFFSETS = {
     "Depth": (
-        PLAN_DEPTH_LINE_X + 0.010 + _callout_half_width(DIMENSION_CALLOUTS["Depth"]),
+        PLAN_DEPTH_LINE_X
+        + 0.010
+        + len(printed_value_text("Depth", BLOCK_Z)) * _VALUE_GLYPH_WIDTH / 2.0,
         _plan_y(0.0),
     ),
 }
@@ -545,9 +547,13 @@ CAPTION_Y = _elevation_y(0.0, FRONT_CENTER) - 0.004
 # A one-line "VIEW B": six glyphs at the 287c captions' 2.6 mm pitch, rounded
 # out.  An estimate until a render measures it.
 VIEW_CAPTION_EXTENT = (0.0, 0.0036, 0.0160, 0.0)
-# The end screw the through thread carries, named at the bore's callout
-# (screen review dt-fab-4: the location carries its value only, rule 4).
-BORE_FLAG_TEXT = f"CARRIES {END_SCREW_NUMBER}"
+# The bore's function, named at its callout (screen review dt-fab-4: the
+# location carries its value only, rule 4): through the end screw it carries,
+# it locates T006's pivot on the shaft line, which is what holds its
+# location .XXX (the post's turn takes up the tip's lateral error only with
+# PassageCenter at .XXX: build_dt_drive_train_assembly.TIP_LATERAL_ERROR_MM;
+# machinist review of PR 2's farm proof found no function on the .335).
+BORE_FLAG_TEXT = f"LOCATES {TIP_GEAR_NUMBER} PIVOT"
 # Review C1: the left view sits right of the right view, out of third-angle
 # order, so it is a removed view named by a letter arrow on the view that
 # shows the face it looks at.  VIEW B looks at the -X (pinch-thread) face:
@@ -748,6 +754,7 @@ _VALUE_EXTENTS = {
         for name, nominal in (
             ("PinchHeight", PINCH_HEIGHT),
             ("PassageCenter", BLOCK_X / 2.0),
+            ("Depth", BLOCK_Z),
             ("FootTapX", FOOT_TAP_X),
             ("FootTapZ", FOOT_TAP_Z),
         )
@@ -755,7 +762,6 @@ _VALUE_EXTENTS = {
     **{
         name: _value_and_rows_extent(name, nominal, text)
         for name, nominal, text in (
-            ("Depth", BLOCK_Z, DIMENSION_CALLOUTS["Depth"]),
             ("AxisHeight", ADJUSTER_AXIS_HEIGHT, DIMENSION_CALLOUTS["AxisHeight"]),
             ("Width", BLOCK_X, DIMENSION_CALLOUTS_ABOVE["Width"]),
             # "1.20" under its SLOT INTO BORE row.

@@ -290,7 +290,7 @@ flowchart LR
 
 Monte Carlo of [`error_budget.yaml`](../config/error_budget.yaml) (4000 draws,
 zero-centred features uniform within ± tolerance per channel; `cone_tip_bond_clock`
-draws the bonded T006–T024's phasing-comb play, ±0.411 mm of pitch arc per gear
+draws the bonded T006–T024's phasing-comb play, ±0.446 mm of pitch arc per gear
 (the MHA-DT-03-TL-02 comb at its shop-row limits, T024 worst:
 `dt_cone_gear_tl_phasing_comb_spec.PHASE_ERROR_MM`; owner rulings C1 keyed and b1,
 2026-11-09, PR #1992), and `cone_key_play`
@@ -355,7 +355,7 @@ current report does not discharge the operating assumptions or waivers below.
   is clocked to T030 by a fork of the MHA-DT-03-TL-02 phasing comb on its +X
   tooth (owner ruling 2026-11-09) while its LOCTITE 638
   bond grabs, so it sits within its fork's and T030's fork's play plus the
-  slot position zone (±0.411 mm of pitch arc at T024, the worst), drawn per
+  slot position zone (±0.446 mm of pitch arc at T024, the worst), drawn per
   gear (`cone_tip_bond_clock`). The former D-flat
   play on lands 2–4 and its per-land mean residual retired with the flats.
   Crank in one direction only; a

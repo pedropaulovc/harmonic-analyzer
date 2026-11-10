@@ -42,16 +42,23 @@ def test_adjuster_thread_is_tapped_through_with_no_floor() -> None:
 
 
 def test_end_screw_embed_range_stays_inside_its_engagement_window() -> None:
-    """The window gives the 91794A558 end screw 1.5 D of shared full thread
-    past the deepest countersinks of the shallowest block, its head clear of
-    the north face, and the set end play's whole range stays inside it."""
+    """The window gives the 91794A558 end screw the most full thread the
+    shallowest block holds (1.5 D, or the block's own thread past its deepest
+    countersinks if that is less), its head clear of the north face, and the
+    set end play's whole range stays inside it.  The depth prints .XX (rule
+    19: no band tightened to rescue a thread), which leaves the shallowest
+    block 1.48 D: above the assembly's stated 1.39 D end-screw engagement
+    (owner ruling 2026-11-09), and short of 1.5 D only by its countersinks."""
     spec = dt_cone_tip_block_spec
     major = spec.end_screw_stock.SHANK_DIA
     assert spec.ADJUSTER_CSK_DIA > major
     assert spec.END_SCREW_MIN_ENGAGEMENT_D == 1.5
+    assert spec.DRAWING_PRECISION_BY_NAME["Depth"] == 2
+    floor = min(1.5 * major, spec.END_SCREW_ENGAGEMENT_MIN_MM)
+    assert spec.END_SCREW_ENGAGEMENT_MIN_MM / major == pytest.approx(1.484, abs=1e-3)
     low, high = spec.END_SCREW_EMBED_WINDOW
     for edge in (low, high):
-        assert spec.end_screw_full_thread_mm(edge) >= 1.5 * major - 1e-9
+        assert spec.end_screw_full_thread_mm(edge) >= floor - 1e-9
     assert high <= spec.END_SCREW_REACH_MAX_EMBED_MM
     lo, hi = spec.END_SCREW_EMBED_RANGE_MM
     assert low <= lo < spec.END_SCREW_EMBED < hi <= high
@@ -766,13 +773,14 @@ def test_r3_prints_no_two_place_dimension_it_does_not_need() -> None:
     is the block's own fit; it prints .XX, and C1 keyed (owner decision
     2026-11-09, PR #1992) makes it to the measured post (AXIS_MATCH_NOTE)."""
     grades = dt_cone_tip_block_spec.DRAWING_PRECISION_BY_NAME
-    assert grades["Depth"] == 3
+    assert grades["Depth"] == 2
     assert grades["BlockHt"] == 2
     assert grades["AxisHeight"] == 2
     assert "PinchRise" not in grades
     # Nothing prints .X: on the inch sheet its +/-.1 fails every web.
     assert {name for name, places in grades.items() if places == 2} == {
         "Width",
+        "Depth",
         "BlockHt",
         "PinchHeight",
         "SlitW",
@@ -796,7 +804,6 @@ def test_every_three_place_size_names_its_mate_at_its_dimension() -> None:
     texts["PassageCenter"] = drawing.BORE_FLAG_TEXT
     three_place = {name for name, places in grades.items() if places == 3}
     assert three_place == {
-        "Depth",
         "PassageCenter",
         "FootTapX",
         "FootTapZ",
@@ -804,7 +811,7 @@ def test_every_three_place_size_names_its_mate_at_its_dimension() -> None:
         "PinchDepthCenter",
     }
     three_place.discard("DowelX")
-    # The pinch hole's station is half the .430 depth, .215: off the .01
+    # The pinch hole's station is half the .43 depth, .215: off the .01
     # grid, so it prints .XXX for its value, not for a fit, and names nothing.
     assert dt_cone_tip_block_spec.BLOCK_Z / 2.0 / 25.4 == pytest.approx(0.215)
     three_place.discard("PinchDepthCenter")
