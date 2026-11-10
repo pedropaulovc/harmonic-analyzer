@@ -87,9 +87,8 @@ values as written; do not change a value merely to make a check pass.
 `prechips:<stem>` task: the oblique-trammel base bar and end bracket. `build`
 and `release` require every one. Each part ships two travelers from the same
 plan: `traveler.html` (`pro`, concise) and `traveler-hobby.html` (`hobby`, with
-the setup pictures in `<stem>/diagrams/`). Under prechips 0.9 the base bar
-passes both on the v48 manifest; the end bracket passes `pro` and refuses
-`hobby` until its setup diagrams land in its `diagrams/`.
+the setup pictures in `<stem>/diagrams/`). Under prechips 0.9 the base bar and
+end bracket pass both on the v48 manifests.
 
 The feed lever's plan (`ch_rocker_arm_tl_oblique_feed_lever/plan.toml`) is held
 in the repository but not enrolled. prechips refuses it on `tool_sizing`: the

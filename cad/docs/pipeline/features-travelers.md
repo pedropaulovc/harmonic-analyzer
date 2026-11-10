@@ -303,9 +303,8 @@ The `_run_stamped` → `_exec` path injects `TRACEPARENT` and service
 around the CLI.
 A missing plan or nonzero exit marks the pipeline span as failed.
 
-Current state: prechips 0.9 or later is required. The base bar passes both
-profiles on the v48 manifest. The end bracket passes `pro` and refuses `hobby`
-until its setup diagrams land in its plan's `diagrams/`. The feed lever's plan
+Current state: prechips 0.9 or later is required. The base bar and end bracket
+pass both profiles on the v48 manifests. The feed lever's plan
 refuses on `tool_sizing` (its
 11/32 drill is below the drawing's hole band) and is held out of
 `TRAVELER_STEMS` until that is resolved. prechips adapters are tied to the

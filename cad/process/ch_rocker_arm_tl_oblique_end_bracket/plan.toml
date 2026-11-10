@@ -24,6 +24,11 @@ blank_min_length_in = 2.75
 blank_thickness_in = 0.5
 blank_width_in = 1.0
 quantity = 2
+# Cut list on the shared 1165 bar (hand sheet): the TL-26 lever blank first.
+lever_blank_in = 11.9
+bar_length_in = 24.0            # OnlineMetals 1165 nominal; measure it first.
+kerf_in = 0.125                 # Hand sheet: about 1/8 in per cut.
+y_touch_x_in = 3.5              # Hand sheet: Y0 touched on the fixed jaw past the part.
 # Machine-capacity inputs (mm). Heights are above the mill table; tool lengths
 # run from spindle nose to tip (holder gauge + projection). Archive values are
 # archive/pre-v0.10-2026-11-08 examples/inventory/pedro-shop.toml.
@@ -31,6 +36,8 @@ vise_jaw_width_mm = 158.6738     # Archive fixtures.vise-pm-6.jaw_width_in 6.247
 overhang_mm = 5.08               # Hand sheet: ~.2 in past the jaw side.
 vise_bed_height_mm = 73.3044     # Archive fixtures.vise-pm-6.bed_height_in 2.886.
 parallel_height_mm = 25.4        # 1 in parallels (archive parallels-lms-6745 1in).
+parallel_thickness_mm = 3.175    # Archive parallels-lms-6745 thickness_in 0.125.
+vise_jaw_height_mm = 44.9453     # Archive fixtures.vise-pm-6.jaw_height_in 1.7695.
 end_cut_tip_z_mm = -1.016        # Hand sheet: cutter .04 below the part.
 cutter_dia_mm = 12.7             # 1/2 in end mill.
 r8_collet_gauge_mm = 6.0         # Archive holders.r8-collets-lms-4860.gauge_len_mm.
@@ -76,6 +83,7 @@ title = "Saw blanks"
 machine = "Saw / bench"
 indexing = "none"
 envelope = "other"
+diagram = { file = "diagrams/end-bracket/saw.svg", alt = "Cut list on the shared bar with both bracket blanks after the lever blank" }
 
 [[setups.operations]]
 speed_kind = "other"
@@ -91,6 +99,7 @@ machine = "PM-30MV / 6 in vise"
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "Flat, 1 in face up, on 1 in parallels against both jaws; left end ~.2 past the left jaw side, then slid right ~.2 past the right jaw side."
+diagram = { file = "diagrams/end-bracket/ends.svg", alt = "Flat in the vise: left end cleaned to INNER END, then slid right and cut to length" }
 datum = "First squared end = INNER END = X0."
 # The part moves between two holds: cutter centre spans the jaw width, both
 # overhangs and one cutter diameter; across the 1 in face plus one diameter.
@@ -123,6 +132,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "On edge, BAR SIDE up, ROW EDGE at fixed jaw, INNER END ~.2 out left; 1 in parallels pushed against both jaws leave a 1/4 in gap under the hole row."
 datum = "X0 INNER END; Y0 ROW EDGE (fixed jaw face); +Y toward you."
+diagram = { file = "diagrams/end-bracket/bar-side.svg", alt = "On edge with BAR SIDE up and ROW EDGE at the fixed jaw; section through H1" }
 # Hole centres lie inside the finished part. Longest: a tap (overall length
 # bounds its projection) in the drill chuck; shortest: the centre drill.
 envelope = { x_span_mm = "{{cad.length_mm}}", y_span_mm = "{{cad.thickness_mm}}", work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{cad.width_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.drill_tip_z_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.tap_oal_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.spot_projection_mm}}"] }
@@ -132,6 +142,7 @@ speed_kind = "spindle"
 tool = "spot"
 sizing = "other"
 instruction = "Spot H1–H{{cad.hole_count:d}}, cone ~5/32 across. X ±{{cad.station_tol_in:.3f}} ({{cad.station_tol_mm:.2f}} mm); Y {{cad.row_min_in:.3f}}–{{cad.row_max_in:.3f}}."
+instruction_detailed = "Y0: ROW EDGE is on the fixed jaw, so touch the jaw face from your side at ~X {{process.y_touch_x_in:.1f}}, past the part, and zero Y there. Spot H1–H{{cad.hole_count:d}}, cone ~5/32 across. X ±{{cad.station_tol_in:.3f}} ({{cad.station_tol_mm:.2f}} mm); Y {{cad.row_min_in:.3f}}–{{cad.row_max_in:.3f}}."
 rpm = 3000
 feed = "hand"
 
@@ -154,6 +165,7 @@ speed_kind = "other"
 tool = "plug"
 sizing = "other"
 instruction = "Start H1–H{{cad.hole_count:d}}. Plug tip not past {{cad.bar_tip_max_in:.3f}} below BAR SIDE."
+instruction_detailed = "Tape a flag on the plug tap {{cad.bar_tip_max_in:.3f}} from its tip. Start H1–H{{cad.hole_count:d}} square from the drill chuck, spindle off, about 3 turns; finish with the T-handle, stopping before the flag reaches BAR SIDE."
 feed = "hand"
 
 [[setups.operations]]
@@ -161,6 +173,7 @@ speed_kind = "other"
 tool = "bottoming"
 sizing = "other"
 instruction = "Finish H1–H{{cad.hole_count:d}} to tip mark {{cad.bar_tip_min_in:.3f}}–{{cad.bar_tip_max_in:.3f}} below BAR SIDE, measured from the physical tip."
+instruction_detailed = "Tape a flag on the bottoming tap {{cad.bar_tip_min_in:.3f}}–{{cad.bar_tip_max_in:.3f}} from its physical tip. Finish H1–H{{cad.hole_count:d}} until the flag reaches BAR SIDE."
 feed = "hand"
 inspection = "{{cad.thread}} full thread {{cad.bar_thread_min_in:.3f}}–{{cad.bar_thread_max_in:.3f}} from BAR SIDE."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.bar_thread_band_mm}}" }]
@@ -172,6 +185,7 @@ machine = "PM-30MV / 6 in vise"
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "Rolled over on the same parallels: KP08 SIDE up, INNER END left, ROW EDGE at moving jaw."
+diagram = { file = "diagrams/end-bracket/kp08-side.svg", alt = "Rolled over with KP08 SIDE up and ROW EDGE at the moving jaw; section through H1" }
 datum = "X0 INNER END; Y0 fixed jaw; hole row at Y = W − {{cad.row_in:.3f}}."
 # Taps only, over the drilled holes. Tap projection has no record, so the
 # shortest tool is bounded by the chuck alone and the deepest point by the
@@ -183,6 +197,7 @@ speed_kind = "other"
 tool = "plug"
 sizing = "other"
 instruction = "Start H1–H{{cad.hole_count:d}}. Plug tip not past {{cad.kp08_tip_max_in:.3f}} below KP08 SIDE."
+instruction_detailed = "Flag the plug tap {{cad.kp08_tip_max_in:.3f}} from its tip. Start H1–H{{cad.hole_count:d}} as in Op 70, stopping before the flag reaches KP08 SIDE."
 feed = "hand"
 
 [[setups.operations]]
@@ -190,6 +205,7 @@ speed_kind = "other"
 tool = "bottoming"
 sizing = "other"
 instruction = "Finish H1–H{{cad.hole_count:d}} to tip mark {{cad.kp08_tip_min_in:.3f}}–{{cad.kp08_tip_max_in:.3f}} below KP08 SIDE, from the physical tip."
+instruction_detailed = "Flag the bottoming tap {{cad.kp08_tip_min_in:.3f}}–{{cad.kp08_tip_max_in:.3f}} from its physical tip. Finish H1–H{{cad.hole_count:d}} until the flag reaches KP08 SIDE."
 feed = "hand"
 inspection = "Full thread {{cad.kp08_thread_min_in:.3f}}–{{cad.kp08_thread_max_in:.3f}} from KP08 SIDE."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.kp08_thread_band_mm}}" }]
@@ -199,6 +215,7 @@ machine_kind = "other"
 title = "Deburr / inspect"
 machine = "Bench"
 indexing = "none"
+diagram = { file = "diagrams/end-bracket/inspect.svg", alt = "Finished bracket: hole stations from INNER END, row from ROW EDGE and both thread zones" }
 envelope = "other"
 
 [[setups.operations]]

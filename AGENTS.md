@@ -505,9 +505,8 @@ either is a refusal (bad input or a failed enforced check) and leaves neither
 file nor a stamp. Each task depends only on its own
 `package:features:<stem>` leaf, is not cache-keyed, and `build` and `release`
 require every enrolled stem. A stem without a plan fails only its own task.
-Under prechips 0.9 the base bar passes both profiles on the v48 manifest. The
-end bracket passes `pro` and refuses `hobby` until its setup diagrams land in
-`cad/process/ch_rocker_arm_tl_oblique_end_bracket/diagrams/`. The feed lever's
+Under prechips 0.9 the base bar and end bracket pass both profiles on the v48
+manifests. The feed lever's
 plan is held, unenrolled: prechips refuses it on `tool_sizing` (see
 `cad/process/README.md`). prechips adapters are tied to the manifest's
 contents, so a drawing change that alters a part's manifest requirements needs
