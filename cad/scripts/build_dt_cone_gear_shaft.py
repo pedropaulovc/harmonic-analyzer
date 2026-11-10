@@ -648,9 +648,10 @@ async def _cut_keyseat_end(adapter: Any, drive_jobs: list[tuple[str, str]]) -> f
     check(f"create_sketch {label}", await adapter.create_sketch("Sec1KeyseatEndPlane"))
     x_mm, y_mm = _sketch_xy_mm(adapter, (reach, 0.0, KEYSEAT_END_STATION))
     along_x = abs(x_mm) > abs(y_mm)
-    if min(abs(x_mm), abs(y_mm)) > 1e-6 or abs(
-        max(abs(x_mm), abs(y_mm)) - KEYSEAT_END_STATION
-    ) > 1e-6:
+    if (
+        min(abs(x_mm), abs(y_mm)) > 1e-6
+        or abs(max(abs(x_mm), abs(y_mm)) - KEYSEAT_END_STATION) > 1e-6
+    ):
         raise RuntimeError(
             f"{label}: the end's centre maps to sketch ({x_mm}, {y_mm}), not onto "
             f"one axis at {KEYSEAT_END_STATION}"
@@ -676,7 +677,9 @@ async def _cut_keyseat_end(adapter: Any, drive_jobs: list[tuple[str, str]]) -> f
     check(
         f"cut {label}",
         await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=2.0 * (reach - floor_offset), both_directions=True)
+            ExtrusionParameters(
+                depth=2.0 * (reach - floor_offset), both_directions=True
+            )
         ),
     )
     name_last_feature(adapter, "Sec1KeyseatEnd")
@@ -684,7 +687,9 @@ async def _cut_keyseat_end(adapter: Any, drive_jobs: list[tuple[str, str]]) -> f
     return keyseat_end_volume()
 
 
-def _sketch_xy_mm(adapter: Any, point_mm: tuple[float, float, float]) -> tuple[float, float]:
+def _sketch_xy_mm(
+    adapter: Any, point_mm: tuple[float, float, float]
+) -> tuple[float, float]:
     """The active sketch's (x, y), mm, of a model point given in mm."""
     sketch = _early_bound(adapter.currentModel.SketchManager.ActiveSketch, "ISketch")
     transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")

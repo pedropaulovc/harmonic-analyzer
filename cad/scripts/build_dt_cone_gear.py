@@ -35,7 +35,6 @@ from _document_units import apply_package_model_units
 from _part_properties import part_drawing_unit
 from _single_limit_tolerance import set_single_limit
 from _drawing_precision import _named_dimension, apply_drawing_precision
-from _drawing_dimension_insert import add_angular_reference_dimension
 from _drawing_prefix import set_dimension_prefix
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _drawing_tolerances import (
@@ -242,8 +241,9 @@ async def _author_keyed_bore(adapter: Any) -> SketchDims:
     keyway on +X: its horizontal length is KeywayT, ANSI B17.1's keyway top
     to the bore's far side.  The top's length is KeywayWidth.  Both are
     literals, one value in every keyed configuration (the FaceWidth form).
-    The DRIVEN angular KeywayClock between the top and the centreline
-    carries FLAT_CLOCK_TOLERANCE_DEG.  No fix anywhere.
+    The keyway's clock is the drawn +X centreline it shares with the
+    phase-0 tooth, at the title block's angle (error_budget.yaml
+    cone_flat_clock), so it takes no dimension.  No fix anywhere.
 
     DOF: arc 5 + sides 8 + top 4 + centreline 4 = 21 = centre on origin 2 +
     four corner joins 8 + sides horizontal 2 + top vertical 1 + centreline
@@ -1127,13 +1127,7 @@ async def build(adapter) -> dict[str, str]:
         places=places["ToothThickness"],
         display_unit=UNIT,
     )
-    set_dimension_symmetric_angular_tolerance(
-        adapter,
-        KEYED_BORE_SKETCH,
-        "KeywayClock",
-        FLAT_CLOCK_TOLERANCE_DEG,
-        require_driven=True,
-    )
+
     _start, web_min, web_band = web_reference_mm()
     set_single_limit(
         adapter,

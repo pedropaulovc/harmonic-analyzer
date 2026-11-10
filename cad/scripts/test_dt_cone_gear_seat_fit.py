@@ -181,10 +181,11 @@ def test_keyed_bore_area_is_the_round_bore_plus_the_keyway_outside_it() -> None:
         )
 
 
-def test_only_the_keyway_is_clocked() -> None:
-    # The printed keyway clock takes one place and carries the error
-    # budget's cone_flat_clock term; the bonded round bores carry none.
-    assert spec.FLAT_CLOCK_TOLERANCE_DEG == 0.25
-    assert spec.DRAWING_PRECISION_BY_NAME["KeywayClock"] == 1
+def test_no_bore_is_clock_dimensioned() -> None:
+    # The keyway shares the front view's drawn centreline with the phase-0
+    # tooth: its clock is the title block's angle, undimensioned
+    # (test_error_budget pins error_budget.yaml's cone_flat_clock to it); the
+    # bonded round bores carry no clock.
     assert spec.DRAWING_DIMENSIONS[spec.BORE_SKETCH] == {"BoreCutDia"}
-    assert "KeywayClock" in spec.DRAWING_DIMENSIONS[spec.KEYED_BORE_SKETCH]
+    assert "KeywayClock" not in spec.DRAWING_DIMENSIONS[spec.KEYED_BORE_SKETCH]
+    assert not any("Clock" in name for name in spec.DRAWING_PRECISION_BY_NAME)

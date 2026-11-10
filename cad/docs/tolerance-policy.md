@@ -348,7 +348,9 @@ current report does not discharge the operating assumptions or waivers below.
   knife line). Drill the 20 holes from one fixture; the along-knife pitch can be loose.
 - **Phase is cheap if clocks share their datums.** ±0.25° cam-lobe/notch phase
   is 0.13 mm at the notch. Each keyed cone gear's teeth are indexed from its
-  +X keyway on one setup: T030–T120 and the 64T on the land-1 key (owner
+  +X keyway on one setup, the keyway and the phase-0 tooth sharing the front
+  view's drawn centreline at the title block's ±1° (`cone_flat_clock`):
+  T030–T120 and the 64T on the land-1 key (owner
   decision C1 keyed, 2026-11-09, PR #1992). The keyed gears share one key, so
   its play is a common crank-index time shift and only each keyway's side
   clearance scatters. The four tip gears T006–T024 have no bore feature: each

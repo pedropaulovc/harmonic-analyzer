@@ -75,8 +75,10 @@ def test_part_and_drawing_share_the_complete_native_dimension_contract() -> None
     assert notes.DRAWING_PRECISION[witness] == spec.DRAWING_PRECISION["BlankProfile"]
     assert notes.REFERENCE_SKETCHES == (*spec.REFERENCE_SKETCHES, witness)
     marked = set().union(*notes.DRAWING_DIMENSIONS.values())
+    # No clock: the keyway shares the front view's drawn +X centreline with
+    # the phase-0 tooth, at the title block's angle.
     round_bore = {"BoreCutDia"}
-    keyed_bore = {"KeyedBoreDia", "KeywayWidth", "KeywayT", "KeywayClock"}
+    keyed_bore = {"KeyedBoreDia", "KeywayWidth", "KeywayT"}
     assert marked == {
         "BlankDia",
         "FaceWidth",
@@ -116,11 +118,12 @@ def test_part_and_drawing_share_the_complete_native_dimension_contract() -> None
 
 def test_model_owns_precision_for_every_printed_dimension() -> None:
     # Decimal inch (#290): four places carry every band and narrow floor
-    # window exactly on the .0001 grid; the keyway clock one degree place.
+    # window exactly on the .0001 grid.
     assert spec.DRAWING_PRECISION_BY_NAME == {
         "BlankDia": 4,
         "FaceWidth": 4,
         "BoreCutDia": 4,
+
         "KeyedBoreDia": 4,
         "KeywayWidth": cone_land_key.KEYWAY_PLACES,
         "KeywayT": cone_land_key.KEYWAY_PLACES,
@@ -376,24 +379,22 @@ def test_tight_bands_name_their_mates_once_in_flagged_notes() -> None:
     bore_flag, teeth_flag = drawing.BORE_NOTE_FLAG, drawing.TEETH_NOTE_FLAG
     for name in ("BoreCutDia", "KeyedBoreDia", "KeywayWidth", "KeywayT"):
         assert bore_flag in callouts[name].splitlines(), name
-    # The keyed clock's ±.25° says why once, over the value (rules 4 and 7):
-    # note 1 states the bore's fit only, so a flag to it explained nothing.
-    assert above["KeywayClock"] == drawing.CLOCK_REASON
-    assert len(drawing.CLOCK_REASON.split()) <= 6
-    assert len(drawing.CLOCK_REASON) <= len(callouts["KeywayClock"])
+
     # A size reads from its witnesses: the keyway's T carries its flag only.
     assert callouts["KeywayT"] == bore_flag
     assert above["BlankDia"] == teeth_flag
     assert callouts["FloorDia"].splitlines() == ["ROOT ENVELOPE", teeth_flag]
     assert "MHA-DT-04" in callouts["FaceWidth"]
-    assert set(above) == {"ToothThickness", "BlankDia", "KeywayClock"}
+    assert set(above) == {"ToothThickness", "BlankDia"}
+    # No clock is dimensioned, so no clock callout carries words (rule 7).
+    assert not any("Clock" in name for name in (*callouts, *above))
     assert all("\n" not in text for text in above.values())
     # The mates appear once each, in the notes; no dimension repeats them.
     for text in (*callouts.values(), *above.values()):
         assert notes.CYLINDER_MATE_NUMBER not in text, text
         assert drawing.KEY_MATE not in text, text
     for name in (
-        "BoreCutDia", "KeyedBoreDia", "KeywayWidth", "KeywayT", "KeywayClock",
+        "BoreCutDia", "KeyedBoreDia", "KeywayWidth", "KeywayT",
     ):
         assert "MHA-DT-04" not in callouts[name] + above.get(name, "")
     # Both round bores are fit bores: REAM is their one process word
@@ -914,8 +915,6 @@ def test_front_view_carries_a_round_bore_callout_clear_of_its_neighbours() -> No
         assert box.xmax < floor_x - 0.019 - 0.005, teeth
         if teeth == spec.WEB_REFERENCE_TEETH:
             assert box.ymin > drawing.web_min_text_xy()[1] + 0.010
-        with pytest.raises(ValueError):
-            drawing.clock_dimension_name(teeth)
     source = inspect.getsource(drawing.build)
     assert 'near_side = ("FloorDia",) if keyed(teeth) else ("FloorDia", "BoreCutDia")' in source
 
@@ -966,30 +965,17 @@ def test_bore_view_enlarges_every_keyed_bore_clear_of_its_neighbours() -> None:
             "DETAIL A",
             f"SCALE {view_numerator:g} : {view_denominator:g}",
         ]
-        clock_name = drawing.clock_dimension_name(teeth)
-        assert clock_name == "KeywayClock"
         # The keyway is at least 2.5 mm deep on paper.
         flat = spec.keyway_top_offset_mm(teeth) * ratio / 1000.0
         assert abs(bore * ratio / 2000.0 - flat) >= 0.0025, teeth
         # The T text stands wholly right of the keyway top's witness, left of
-        # the title block, above the title, which stays inside the border,
-        # and under the clock's text.
+        # the title block, above the title, which stays inside the border.
         af_x, af_y = keep["KeywayT"]
         assert af_x - drawing.BORE_VIEW_AF_HALF_WIDTH > cx + flat + 0.002
         assert af_x + drawing.BORE_VIEW_AF_HALF_WIDTH < 0.216
         assert af_y < cy - crop
         assert af_y - 2.0 * _BORE_TEXT_HALF_HEIGHT > title_top
-        assert af_y + 2.0 * _BORE_TEXT_HALF_HEIGHT < keep[clock_name][1] - 0.010
-        # The clock text stands wholly right of the circle and clear of the
-        # thickness callout's shelved block.
-        clock_x, clock_y = keep[clock_name]
-        # Its two-line block (measured half-extents) stands an arrow length
-        # plus clearance above the axis line, where the arc's arrowhead ends
-        # under the text, and clear of the crop circle.
-        assert clock_y - drawing.BORE_CLOCK_TEXT_HALF_HEIGHT >= (
-            cy + drawing.BORE_CLOCK_ARROW_LENGTH + _drawing_leaders.ARROW_TEXT_CLEARANCE - 1e-12
-        ), teeth
-        assert clock_x - drawing.BORE_CLOCK_TEXT_HALF_WIDTH >= cx + crop + 0.002 - 1e-12, teeth
+
         ctt_x, ctt_y = drawing.tooth_thickness_shelf(teeth)
         ctt_box = (
             ctt_x,
@@ -997,17 +983,7 @@ def test_bore_view_enlarges_every_keyed_bore_clear_of_its_neighbours() -> None:
             ctt_x + _THICKNESS_SHELF_LENGTH,
             ctt_y + _THICKNESS_INK_HEIGHT,
         )
-        assert _drawing_annotation_extent.boxes_clear(clock_box, ctt_box), teeth
-        # The clock's arc centres where the keyway top crosses the axis and
-        # swings through its text, in the quadrant right of it and above the
-        # axis: clear of the diameter's upper-left lane and under the front
-        # view.
-        vx, vy = drawing.bore_clock_vertex(teeth)
-        assert (vx, vy) == pytest.approx((cx + flat, cy))
-        assert clock_x > vx and clock_y > vy
-        reach = math.dist((vx, vy), (clock_x, clock_y))
-        assert dia_x + _BORE_DIA_TEXT_RIGHT_REACH < clock_box[0] - 0.005
-        assert vy + reach + 0.003 < front_bottom, teeth
+
         # The keyway width's block stands right of the crop circle, under its
         # lower witness and arrow, clear of T's block and the thickness text.
         width_x, width_y = keep["KeywayWidth"]
@@ -1144,50 +1120,6 @@ def test_enlarged_views_are_lettered_with_boundaries_on_the_front_view() -> None
     # left the front view for the side view).
     assert 'set_near_side_diameter(found[0], f"{configuration} {name}")' in source
     assert "if bore_view is not None:" in source
-
-
-def test_settled_clock_check_refuses_outside_arrow_stubs() -> None:
-    """Run 20261010T073917031Z's arc readbacks (sheet mm): T006's clock drew
-    one arc between its legs, broken by its text; T120's, its arrows left
-    smart, drew two 10 deg stubs outside them and no arc. The clock is forced
-    arrows-inside, and finalize re-reads every sheet's arcs after settling."""
-
-    def arc(vertex, radius, start, end):
-        steps = 12
-        return (
-            vertex,
-            [
-                (
-                    vertex[0] + radius * math.cos(math.radians(start + (end - start) * i / steps)),
-                    vertex[1] + radius * math.sin(math.radians(start + (end - start) * i / steps)),
-                )
-                for i in range(steps + 1)
-            ],
-        )
-
-    good_vertex = (0.05292, 0.060)
-    good = [arc(good_vertex, 0.04642, 0.0, 11.0), arc(good_vertex, 0.04642, 18.0, 90.0)]
-    assert drawing.clock_arc_faults(good, good_vertex) == []
-    bad_vertex = (0.068, 0.060)
-    bad = [arc(bad_vertex, 0.03503, -10.2, 0.0), arc(bad_vertex, 0.03503, 90.0, 100.2)]
-    faults = drawing.clock_arc_faults(bad, bad_vertex)
-    assert any("outside the quadrant" in fault for fault in faults)
-    assert any("sweep" in fault for fault in faults)
-    assert drawing.clock_arc_faults([], bad_vertex) == ["no arc"]
-    assert drawing.ARROWS_INSIDE == 0  # swDimensionArrowsSide_e.swDimArrowsInside
-
-
-def test_settled_clocks_refuse_stub_arcs_on_any_sheet(monkeypatch: pytest.MonkeyPatch) -> None:
-    from types import SimpleNamespace
-
-    sheets: list[str] = []
-    ddoc = SimpleNamespace(ActivateSheet=lambda name: sheets.append(name) or True)
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
-    monkeypatch.setattr(drawing, "_clock_arcs", lambda display: display)
-    clocks = [("T030", [], 30), ("T036", [], 36)]
-    with pytest.raises(RuntimeError, match=r"settling rebuild:\nT030: no arc\nT036: no arc"):
-        drawing._assert_settled_clocks(SimpleNamespace(currentModel=ddoc), clocks)
-    assert sheets == ["T030", "T036"]
 
 
 def _callout_dimension(name: str, texts: dict[int, str]) -> object:

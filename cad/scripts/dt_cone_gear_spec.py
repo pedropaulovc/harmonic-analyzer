@@ -370,13 +370,15 @@ FACE_WIDTH_BAND = GEAR_FACE_WIDTH_BAND
 # Keyway clock: on the keyed land 1 (owner decision 2026-11-09, C1 keyed, PR
 # #1992) the hub keyway is the gear's angular datum on MHA-DT-04, and its
 # centreline passes through the centre of the phase-0 tooth on local +X, so
-# every keyed gear keeps the clock it is placed at.  Index the teeth off the
-# keyway on one setup; the native KeywayClock angular dimension carries this
-# band (error_budget.yaml cone_flat_clock), the cylinder gear's
-# CAM_PHASE_TOLERANCE_DEG precedent.  The round bonded tip gears T012..T024
-# carry no clock on their bores: MHA-DT-00's bonding step phases them (T018
-# and T012 to T024 through lined-up tooth spaces).
-FLAT_CLOCK_TOLERANCE_DEG = 0.25
+# every keyed gear keeps the clock it is placed at.  The keyway and the
+# phase-0 tooth share the front view's drawn +X centreline (drawing-guidelines
+# rule 26: features in line share a drawn centreline), so the clock is the
+# title block's angle and takes no dimension: the error budget's
+# cone_flat_clock closes at it (machinist review of the C1-keyed sheets, PR 2
+# round 2: a ±.25° clock in DETAIL A named a tooth the detail does not draw,
+# and no mate).  The round bonded tip gears T012..T024 carry no clock on
+# their bores: MHA-DT-00's bonding step phases them (T018 and T012 to T024
+# through lined-up tooth spaces).
 
 
 def floor_radius_min_mm(teeth: int) -> float:
@@ -664,7 +666,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BlankProfile": {"BlankDia"},
     "Blank": {"FaceWidth"},
     BORE_SKETCH: {"BoreCutDia"},
-    KEYED_BORE_SKETCH: {"KeyedBoreDia", "KeywayWidth", "KeywayT", "KeywayClock"},
+    KEYED_BORE_SKETCH: {"KeyedBoreDia", "KeywayWidth", "KeywayT"},
     TOOTH_REFERENCE_SKETCH: {"ToothThickness"},
     GAP_FLOOR_SKETCH: {"FloorDia"},
     WEB_REFERENCE_SKETCH: {"WebMin"},
@@ -820,10 +822,9 @@ def configuration_number(part_number: str, teeth: int) -> str:
 # tip diameter prints four too, and every blank is floored to that grid, so
 # the printed size is the modelled one.  The face width prints four, like the
 # cylinder gear's OverallThickness under the same rule: three would round its
-# nominal by a third of the +/-.001 band.  The keyway clock prints one place
-# of degrees, the cylinder gear's NotchPhase precedent: +/-0.25 needs no
-# more.  The keyway's width and T print at cone_land_key's places.  RV-03's
-# T012 web prints its ruled .0646 MIN at four.
+# nominal by a third of the +/-.001 band.  The keyway's width and T print at
+# cone_land_key's places.  RV-03's T012 web prints its ruled .0646 MIN at
+# four.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BlankProfile": {"BlankDia": 4},
     "Blank": {"FaceWidth": 4},

@@ -199,7 +199,7 @@ critical_features:
     nominal: null
     quantity: phase
     class: channel
-    holds: "index each keyed cone gear's teeth off its keyway (KeywayClock, T030-T120) on one setup (+/-0.25 deg); the bonded T006-T024 have no bore feature and book cone_tip_bond_clock instead"
+    holds: "each keyed cone gear's keyway (T030-T120) on its phase-0 tooth's centreline, the two sharing the sheet's drawn centreline at the title-block +/-1 deg angle (no clock dimension); the bonded T006-T024 have no bore feature and book cone_tip_bond_clock instead"
   cone_tip_bond_clock:
     tolerance: 0.479
     unit: mm

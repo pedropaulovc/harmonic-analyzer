@@ -1661,8 +1661,6 @@ def _stubbed_build(monkeypatch):
     sketch_dims.return_value.apply.return_value = []
     monkeypatch.setattr(part, "SketchDims", sketch_dims)
     monkeypatch.setattr(part, "_sketch_x_per_model_x", lambda _a: -1.0)
-    # The keyseat end's plane maps the shaft axis onto its sketch's -x.
-    monkeypatch.setattr(part, "_sketch_xy_mm", lambda _a, point: (-point[2], point[1]))
     stubs["add_line_chain"].side_effect = lambda _a, points, close=True: [
         f"L{k}" for k in range(len(points) if close else len(points) - 1)
     ]
