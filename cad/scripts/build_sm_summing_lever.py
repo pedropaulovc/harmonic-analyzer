@@ -1585,6 +1585,7 @@ def _assert_root_feature_bounds(adapter, name: str, minimum_faces: int) -> None:
             summation_side_half_width(-CYL_R - 2.0 * RIB_BLEND_R),
             summation_side_half_width(envelope[0][1] - RIB_BLEND_R) + 2.0 * RIB_BLEND_R,
         )
+        covered_sides = set()
     elif knife:
         # Around each hexagon, inside one radius of the body end face. The
         # roots meet mitred at the sharp bottom vertex, R/sin(half angle) out.
@@ -1643,6 +1644,7 @@ def _assert_root_feature_bounds(adapter, name: str, minimum_faces: int) -> None:
             near, far = sorted((abs(z_min), abs(z_max)))
             if z_min * z_max <= 0.0 or near < side_band[0] - 1e-5 or far > side_band[1] + 1e-5:
                 raise RuntimeError(f"{name}: native face escapes the junction envelope: {extrema}")
+            covered_sides.add(math.copysign(1.0, z_min))
         elif z_min <= -PLATE_L / 2.0 + 1e-5 or z_max >= PLATE_L / 2.0 - 1e-5:
             raise RuntimeError(f"{name}: root blend reaches an outside entry/knife cap: {extrema}")
         if any(
@@ -1690,6 +1692,8 @@ def _assert_root_feature_bounds(adapter, name: str, minimum_faces: int) -> None:
         )
     if longitudinal is not None and covered_runs != set(range(len(runs))):
         raise RuntimeError(f"{name}: missing native longitudinal blend run: {sorted(covered_runs)}")
+    if name == "CounterWebSideRootFillets" and covered_sides != {1.0, -1.0}:
+        raise RuntimeError(f"{name}: missing native side-arc blend at Z side: {sorted(covered_sides)}")
     if knife:
         _telemetry.info(
             f"{name}: native roots reach |X| {reach[0]:.4f}, |Y| {reach[1]:.4f}, |Z| {reach[2]:.4f} mm"
