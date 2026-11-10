@@ -740,14 +740,17 @@ DIMENSION_CALLOUTS = {
     "BoreAF": f"BORE ACROSS FLAT\n{BORE_NOTE_FLAG}",
     # The flat's normal runs through the bore axis and the +X tooth's centre;
     # the bore view crops the teeth off, so the callout names the reference
-    # its centre-mark line stands for.
+    # its centre-mark line stands for, the line the front view's mark draws
+    # through that tooth (front_centre_mark_arms_mm).
     "BoreFlatClock": "TO TOOTH CENTERLINE",
     # The keyed bore (T030..T120) is round, so it takes the fit bore's REAM
     # (rule 7); its keyway's width band is the requirement, with no process
-    # word.  T names what it reaches, the D's BoreAF form.
+    # word.  T reads from its witnesses (keyway top, far side of the bore):
+    # a size carries its value, band and flag (machinist review of the
+    # C1-keyed sheets dropped KEYWAY TO FAR SIDE).
     "KeyedBoreDia": f"REAM THRU\n{BORE_NOTE_FLAG}",
     "KeywayWidth": BORE_NOTE_FLAG,
-    "KeywayT": f"KEYWAY TO FAR SIDE\n{BORE_NOTE_FLAG}",
+    "KeywayT": BORE_NOTE_FLAG,
     "KeywayClock": "TO TOOTH CENTERLINE",
     # The text is the same on every sheet: offset (OffsetText), the imported
     # model dimension printed the LAST sheet's below-text on all of them (T006
@@ -772,11 +775,16 @@ DIMENSION_CALLOUTS = {
 # Text over the value. One line each: SOLIDWORKS drops a multi-line callout
 # above a value from the print (ENFORCE round 2 of #971: every two-line one
 # went unmatched in the PDF; draw_ch_amplitude_bar r1).
+# The clocks' ±.25° is tighter than the title block's ±1°, and note 1 states
+# only the bore's fit: each clock says why in its own words (rules 4 and 7;
+# machinist review of the C1-keyed sheets), the tooth's phase on the shaft
+# (error_budget.yaml cone_flat_clock).
+CLOCK_REASON = "SETS TOOTH PHASE"
 CALLOUTS_ABOVE = {
     "ToothThickness": "CIRCULAR TOOTH THICKNESS",
     "BlankDia": TEETH_NOTE_FLAG,
-    "BoreFlatClock": BORE_NOTE_FLAG,
-    "KeywayClock": BORE_NOTE_FLAG,
+    "BoreFlatClock": CLOCK_REASON,
+    "KeywayClock": CLOCK_REASON,
 }
 if any("\n" in text for text in CALLOUTS_ABOVE.values()):
     raise AssertionError("an above-callout with a line break does not print")
@@ -1040,6 +1048,9 @@ def bore_clock_vertex(teeth: int) -> tuple[float, float]:
 # text then stands right of it, so T's dimension line runs on under it.
 KEYWAY_WIDTH_TEXT_HALF_WIDTH = 0.014
 KEYWAY_WIDTH_TEXT_HALF_HEIGHT = 0.006
+# Air between the end of the width's upper dimension line and the keyed
+# clock's block above it (bore_view_keep).
+KEYWAY_WIDTH_LINE_CLEARANCE = 0.001
 
 
 def bore_view_keep(teeth: int) -> dict[str, tuple[float, float]]:
@@ -1078,6 +1089,17 @@ def bore_view_keep(teeth: int) -> dict[str, tuple[float, float]]:
         }
     width_right = x + crop + BORE_CLOCK_TEXT_GAP + 2.0 * KEYWAY_WIDTH_TEXT_HALF_WIDTH
     half_width = dt_cone_gear_spec.KEYWAY_HALF_WIDTH_MM * ratio / 1000.0
+    # The width's arrows stand outside its witnesses, so its dimension line
+    # runs a document arrow length past the upper witness, straight up under
+    # the clock's block: it struck the O of TOOTH on every keyed sheet
+    # (layout audit of the C1-keyed farm run, line (91.9, 63.2)-(91.9, 69.5)
+    # mm against the block's bottom row at 67.2 mm). The block stands
+    # KEYWAY_WIDTH_LINE_CLEARANCE over that line's end.
+    clock = (
+        clock[0],
+        y + half_width + DIMENSION_ARROW_LENGTH + KEYWAY_WIDTH_LINE_CLEARANCE
+        + BORE_CLOCK_TEXT_HALF_HEIGHT,
+    )
     return {
         "KeyedBoreDia": diameter,
         # Under the lower witness and the arrow that ends on it.
@@ -1901,10 +1923,41 @@ def _check_exported_pdf(phase: str) -> None:
         assert_tooth_thickness_text_air(PDF)
 
 
-def _center_mark_bore(adapter: Any, view: Any, teeth: int, *, label: str) -> None:
-    """Centre-mark the D-bore on its arc.  ``IView.AutoInsertCenterMarks2``
-    looks for round holes; the D is an arc and a flat, so the arc's -X point
-    is picked and marked directly (the draw_channel_lever R3 recipe)."""
+# The front view's bore centre mark draws its lines (machinist review of the
+# C1-keyed sheets, rule 10: the clock's reference, the tooth centreline, was
+# drawn nowhere). Its +X arm runs from the bore's rim through the phase-0
+# tooth, which the flat (keyway) is clocked to, to CENTRE_LINE_OVERRUN past
+# the tip; the other three stop CENTRE_LINE_OVERRUN past the rim. Sheet
+# metres; swCenterMarkHandle_e Up 0, Left 1, Down 2, Right 3, each arm a model
+# length from the rim (draw_dt_pinion_bracket's cross-hole mark).
+CENTRE_LINE_OVERRUN = 0.0015
+_CENTER_MARK_HANDLE_RIGHT = 3
+_CENTER_MARK_HANDLES = (0, 1, 2, _CENTER_MARK_HANDLE_RIGHT)
+
+
+def front_centre_mark_arms_mm(teeth: int) -> dict[int, float]:
+    """Model length of each front-view centre-mark arm past the bore's rim."""
+    overrun = CENTRE_LINE_OVERRUN * 1000.0 / _front_ratio(teeth)
+    arms = dict.fromkeys(_CENTER_MARK_HANDLES, overrun)
+    arms[_CENTER_MARK_HANDLE_RIGHT] = (
+        outside_dia_mm(teeth) - bore_dia_mm(teeth)
+    ) / 2.0 + overrun
+    return arms
+
+
+def _center_mark_bore(
+    adapter: Any,
+    view: Any,
+    teeth: int,
+    *,
+    label: str,
+    arms_mm: dict[int, float] | None = None,
+) -> None:
+    """Centre-mark the bore on its arc.  ``IView.AutoInsertCenterMarks2``
+    looks for round holes; the D is an arc and a flat (the keyed bore an arc
+    and a keyway), so the arc's -X point is picked and marked directly (the
+    draw_channel_lever R3 recipe). ``arms_mm`` draws the mark's lines, each
+    that model length past the rim."""
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
     _activate_view(adapter, view, label=label)
@@ -1923,6 +1976,23 @@ def _center_mark_bore(adapter: Any, view: Any, teeth: int, *, label: str) -> Non
     draw.ClearSelection2(True)
     if mark is None:
         raise RuntimeError(f"failed to centre-mark the {label} bore")
+    if arms_mm is None:
+        return
+    mark = _early_bound(mark, "ICenterMark")
+    mark.UseDocDisplaySettings = False
+    mark.ShowLines = True
+    for handle, arm_mm in arms_mm.items():
+        if not mark.SetExtendedLength(0, handle, arm_mm / 1000.0):
+            raise RuntimeError(f"{label} centre mark arm {handle} did not extend")
+    if bool(mark.UseDocDisplaySettings) or not bool(mark.ShowLines):
+        raise RuntimeError(f"{label} centre mark lost its extended lines")
+    _telemetry.info(
+        f"{label} centre mark arms past the rim (model mm): "
+        + ", ".join(
+            f"{handle}={float(mark.GetExtendedLength(0, handle)) * 1000.0:.3f}"
+            for handle in arms_mm
+        )
+    )
 
 
 def _note_box(note: Any, *, label: str) -> tuple[float, float, float, float]:
@@ -2275,7 +2345,10 @@ async def build(adapter: Any) -> dict[str, str]:
             name: places for name, places in DRAWING_PRECISION_BY_NAME.items()
             if name in printed
         })
-        _center_mark_bore(adapter, front, teeth, label=f"{configuration} front")
+        _center_mark_bore(
+            adapter, front, teeth, label=f"{configuration} front",
+            arms_mm=front_centre_mark_arms_mm(teeth),
+        )
         _center_mark_bore(adapter, bore_view, teeth, label=f"{configuration} bore view")
         sheet = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
         if not sheet.SetScale(*view_scale, False, False):

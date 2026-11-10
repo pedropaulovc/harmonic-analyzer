@@ -194,9 +194,10 @@ def test_bore_bands_are_the_current_derived_seat_fit_bands() -> None:
             dt_cone_gear_shaft_spec.SECTION_DIAS[spec.land_section(teeth)]
         )
     # The keyway takes cone_land_key's bands: the milled-width row's
-    # +.0020/-.0000 width and T's +/-.0010, plain inch steps.
+    # +.0020/-.0000 width and the milled-step row's +/-.0020 on T, plain
+    # inch steps.
     assert cone_land_key.KEYWAY_WIDTH_BAND == (0.0508, 0.0)
-    assert cone_land_key.KEYWAY_T_BAND == (0.0254, -0.0254)
+    assert cone_land_key.KEYWAY_T_BAND == (0.0508, -0.0508)
     assert spec.KEYWAY_HALF_WIDTH_MM == cone_land_key.KEYWAY_WIDTH_MM / 2.0
 
 
@@ -375,7 +376,13 @@ def test_tight_bands_name_their_mates_once_in_flagged_notes() -> None:
     bore_flag, teeth_flag = drawing.BORE_NOTE_FLAG, drawing.TEETH_NOTE_FLAG
     for name in ("BoreCutDia", "BoreAF", "KeyedBoreDia", "KeywayWidth", "KeywayT"):
         assert bore_flag in callouts[name].splitlines(), name
-    assert above["BoreFlatClock"] == above["KeywayClock"] == bore_flag
+    # The clocks' ±.25° says why once, over the value (rules 4 and 7): note 1
+    # states the bore's fit only, so a flag to it explained nothing.
+    assert above["BoreFlatClock"] == above["KeywayClock"] == drawing.CLOCK_REASON
+    assert len(drawing.CLOCK_REASON.split()) <= 6
+    assert len(drawing.CLOCK_REASON) <= len(callouts["KeywayClock"])
+    # A size reads from its witnesses: the keyway's T carries its flag only.
+    assert callouts["KeywayT"] == bore_flag
     assert above["BlankDia"] == teeth_flag
     assert callouts["FloorDia"].splitlines() == ["ROOT ENVELOPE", teeth_flag]
     assert "MHA-DT-04" in callouts["FaceWidth"]
@@ -1308,6 +1315,37 @@ def test_bore_view_enlarges_every_bore_clear_of_its_neighbours() -> None:
         for other in (clock_box, t_box, ctt_box):
             assert _drawing_annotation_extent.boxes_clear(width_box, other), teeth
         assert math.dist((vx, vy), (width_x, vy + half_width)) < reach
+        # The width's arrows stand outside its witnesses: its dimension line
+        # runs a document arrow length up past the upper witness at the
+        # text's x, under the clock's block. The block stands clear above
+        # that line's end (it struck the O of TOOTH on every keyed sheet of
+        # the C1-keyed farm review: line top 69.5 mm, block row 67.2 mm).
+        line_top = cy + half_width + drawing.DIMENSION_ARROW_LENGTH
+        assert clock_box[0] < width_x < clock_box[2]
+        assert clock_box[1] >= line_top + drawing.KEYWAY_WIDTH_LINE_CLEARANCE - 1e-12, teeth
+
+
+def test_front_view_draws_the_tooth_centreline_the_clock_refers_to() -> None:
+    """Machinist review of the C1-keyed sheets (rule 10): the clock's '90°
+    ±.25° TO TOOTH CENTERLINE' named a line drawn nowhere. The front view's
+    bore centre mark draws its lines; its +X arm runs from the bore's rim
+    through the phase-0 tooth (gap bisectors rotate by pi/N, so a tooth
+    centres on +X, the flat's or keyway's normal) to just past the tip,
+    short of the 3 o'clock tooth's thickness dimension line."""
+    for teeth in spec.CONFIGURATION_TEETH:
+        arms = drawing.front_centre_mark_arms_mm(teeth)
+        ratio = drawing._front_ratio(teeth)
+        assert set(arms) == {0, 1, 2, 3}
+        overrun = drawing.CENTRE_LINE_OVERRUN * 1000.0 / ratio
+        assert arms[0] == arms[1] == arms[2] == pytest.approx(overrun)
+        rim_x = drawing.FRONT_CENTER[0] + spec.bore_dia_mm(teeth) * ratio / 2000.0
+        end_x = rim_x + arms[3] * ratio / 1000.0
+        tip_x = drawing.FRONT_CENTER[0] + drawing.rendered_half_od(teeth)
+        assert end_x == pytest.approx(tip_x + drawing.CENTRE_LINE_OVERRUN)
+        assert end_x < drawing.front_keep(teeth)["ToothThickness"][0] - 0.005, teeth
+        assert end_x < drawing.tooth_thickness_shelf(teeth)[0] - 0.005, teeth
+    source = inspect.getsource(drawing.build)
+    assert "arms_mm=front_centre_mark_arms_mm(teeth)" in source
 
 
 # The detail letter's ink at DETAIL_LETTER_HEIGHT, half its width and height

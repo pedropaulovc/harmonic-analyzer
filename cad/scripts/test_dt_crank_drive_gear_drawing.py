@@ -524,7 +524,9 @@ def test_bore_and_keyway_dimensions_link_one_matched_fit_note() -> None:
         assert "CLEARANCE" not in callout, name
     note = " ".join(line.strip() for line in drawing.BORE_FIT_NOTE.splitlines())
     assert note.startswith(f"{drawing.BORE_FIT_NOTE_NUMBER}. ")
-    assert f"{notes.SHAFT_MATE_NUMBER} LAND 1" in note
+    # The land is named by what it is (its key), not by an undefined label.
+    assert f"THE KEYED LAND OF CONE GEAR SHAFT {notes.SHAFT_MATE_NUMBER}" in note
+    assert "LAND 1" not in note
     assert notes.KEY_MATE_NUMBER in note
     # Rule 7: the note carries no dimension and no flat.
     assert "." not in note.split(". ", 1)[1].rstrip(".")
@@ -642,7 +644,7 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
     # sits right of its dimension line, on the shelf the line turns into
     # (farm proof of #2331 at 7f1dedc: line at the keep x, shelf to the right).
     keyway_t = _text_box(
-        drawing.FRONT_KEEP["KeywayT"], drawing.KEYWAY_T_CALLOUT, "0.4055 \N{PLUS-MINUS SIGN}0.0010"
+        drawing.FRONT_KEEP["KeywayT"], drawing.KEYWAY_T_CALLOUT, "0.4045 \N{PLUS-MINUS SIGN}0.0020"
     )
     width_keep = drawing.FRONT_KEEP["KeywayWidth"]
     centred = _text_box(width_keep, drawing.KEYWAY_WIDTH_CALLOUT, "0.0625 +0.0020")

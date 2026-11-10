@@ -207,11 +207,15 @@ FACE_WIDTH_CALLOUT = "SETS CONE GEAR STACK\nON MHA-DT-04"
 SHAFT_MATE_NAME = "CONE GEAR SHAFT"
 KEY_MATE_NAME = "KEY"
 BORE_FIT_NOTE_NUMBER = 1
+# The land is named by what it is, its key, not by a project label the sheet
+# never defines (machinist review, run 20261110T001845485Z: "LAND 1"; rule
+# 26). MHA-DT-04 keys one land only. Each line stays no longer than 51
+# characters, left of the keyway width's text above it.
 BORE_FIT_NOTE = "\n".join(
     (
-        f"{BORE_FIT_NOTE_NUMBER}. SLIDING FIT ON {SHAFT_MATE_NAME} {SHAFT_MATE_NUMBER} LAND 1,",
-        f"   MADE TO ITS MEASURED LAND; DRIVEN BY {KEY_MATE_NAME}",
-        f"   {KEY_MATE_NUMBER}; SLIDES ON, NO ROCK.",
+        f"{BORE_FIT_NOTE_NUMBER}. SLIDING FIT ON THE KEYED LAND OF {SHAFT_MATE_NAME}",
+        f"   {SHAFT_MATE_NUMBER}, MADE TO ITS MEASURED LAND; DRIVEN BY",
+        f"   {KEY_MATE_NAME} {KEY_MATE_NUMBER}; SLIDES ON, NO ROCK.",
     )
 )
 # The sheet's numbered notes, in one block (rule 7: at most four short
