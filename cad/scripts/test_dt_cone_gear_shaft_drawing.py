@@ -161,9 +161,10 @@ def test_the_section_loses_its_centre_mark(monkeypatch):
 
 def test_the_keyseat_section_flags_the_land_note(monkeypatch):
     """Run the real section loop with its native steps recorded: A-A prints
-    the keyseat's S and width, the width flagged to the land note; nothing
-    rides above them."""
+    the keyseat's S and width, both flagged to the land note: the width after
+    its value, the S above it (PR 2 r5 machinist review, clarity)."""
     suffixes = []
+    callouts = []
     monkeypatch.setattr(drawing, "_cut_endpoints", lambda *_a: ((0.0, 0.0), (1.0, 0.0)))
     monkeypatch.setattr(drawing, "create_section_view", lambda *_a, label, **_k: label)
     monkeypatch.setattr(drawing, "_prepare_d_section", lambda *_a: None)
@@ -186,7 +187,9 @@ def test_the_keyseat_section_flags_the_land_note(monkeypatch):
     monkeypatch.setattr(
         drawing,
         "set_dimension_callouts",
-        lambda *_a, **_k: pytest.fail("no callout rides a section dimension"),
+        lambda _a, dimensions, texts, *, location: callouts.append(
+            (tuple(dimensions), texts, location)
+        ),
     )
     monkeypatch.setattr(
         drawing,
@@ -196,12 +199,14 @@ def test_the_keyseat_section_flags_the_land_note(monkeypatch):
     placed = drawing._add_d_sections(object(), object(), 1)
     assert len(placed) == len(drawing.D_SECTIONS) == 1
     assert placed[0].dimensions == ("Sec1KeyseatS", "Sec1KeyseatWidth")
+    flag = f"NOTE {dt_cone_gear_shaft_spec.LAND_NOTE}"
     assert suffixes == [
         (
             ("Sec1KeyseatS", "Sec1KeyseatWidth"),
-            {"Sec1KeyseatWidth": f" NOTE {dt_cone_gear_shaft_spec.LAND_NOTE}"},
+            {"Sec1KeyseatWidth": f" {flag}"},
         )
     ]
+    assert callouts == [(("Sec1KeyseatS",), {"Sec1KeyseatS": flag}, "above")]
     # A-A (machinist review of PR 1 5a4e41cb5f, clarity): the width's line
     # rises at the keyseat's edge, the S text steps away from it and the S
     # arrows stand inside, so neither crosses the other.
@@ -903,6 +908,14 @@ def test_the_keyseat_section_cuts_land_one_clear_of_its_neighbours() -> None:
     floor_x = x + cone_land_key.KEYSEAT_FLOOR_OFFSET_MM / 1000.0 * section.scale[0] / section.scale[1]
     assert floor_x < keyseat_x
     assert drawing.ARROWS_INSIDE == 0
+    # S's land-note flag rides above it, centred on its text: clear of the
+    # width's line at the keyseat's edge, of the Ø.4825 block (ends 0.3144,
+    # PR 2 r5 layout audit) and of the pictorial's outline bottom.
+    flag = drawing.SECTION_ABOVE_CALLOUTS["Sec1KeyseatS"]
+    flag_half = len(flag) * drawing.ABOVE_CALLOUT_CHAR_WIDTH / 2.0
+    assert s_x + flag_half <= keyseat_x - CLEAR_GAP_M - 0.001
+    assert s_x - flag_half >= 0.3144 + CLEAR_GAP_M
+    assert text_y + drawing.ABOVE_CALLOUT_RISE <= iso_bottom - CLEAR_GAP_M - 0.001
 
 
 # How far above a side-view cutting line's lower end its letter's top stands:
@@ -1312,11 +1325,22 @@ def test_the_keyseat_end_is_located_from_the_collar_face_on_the_sheet() -> None:
     # line below the web's witnesses and the collar diameter's lower line.
     x, y = drawing.SIDE_KEEP["Sec1KeyseatEndSet"]
     seat_x = drawing.BIG_END_X - spec.COLLAR_END_STATION / 1000.0
-    web_text_right = drawing.SIDE_KEEP["CollarWidth"][0] + 0.0374 / 2.0
+    # PR 1 r8 (1b3d39ffbd16) boxes about their positions: the ".05" text
+    # 2.8 mm left, 3.0 right, 1.8 under, 1.7 over; its line 2.8 mm under its
+    # position, as the web's and Sec1End's are; the web's outside left arrow
+    # 6.3 mm long and 0.76 mm wide on its line from the collar face.
+    text = (x - 0.0028, y - 0.0018, x + 0.0030, y + 0.0017)
+    web_line = drawing.SIDE_KEEP["CollarWidth"][1] - 0.0028
+    web_arrow = (seat_x - 0.0063, web_line - 0.00038, seat_x, web_line + 0.00038)
+    dx = max(web_arrow[0] - text[2], text[0] - web_arrow[2], 0.0)
+    dy = max(web_arrow[1] - text[3], text[1] - web_arrow[3], 0.0)
+    assert math.hypot(dx, dy) >= CLEAR_GAP_M  # r8: 0.41 mm, layout audit gating
+    # Its own left arrow, from the radius centre's extension line, ends right
+    # of the text; its line stays above Sec1End's.
     left_arrow = seat_x - key.KEY_END_SET_MM / 1000.0 - 0.0036
-    assert web_text_right < x - 0.0035 and x + 0.0035 < left_arrow - 0.001
-    assert y - 0.0028 < drawing.SIDE_KEEP["CollarWidth"][1] - 0.0028 - 0.0035
-    assert y - 0.0028 > drawing.SIDE_KEEP["Sec1End"][1]
+    assert text[2] < left_arrow
+    sec1_line = drawing.SIDE_KEEP["Sec1End"][1] - 0.0028
+    assert y - 0.0028 - sec1_line >= 0.0015 and text[1] - sec1_line >= CLEAR_GAP_M
 
 
 def test_shoulder_roots_are_modelled_not_noted() -> None:

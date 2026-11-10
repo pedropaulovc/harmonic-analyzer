@@ -97,6 +97,7 @@ from dt_cone_gear_shaft_spec import (
     DRAWING_REFERENCE_PRECISION,
     KEYED_LAND,
     KEYSEAT_MATE_SUFFIXES,
+    LAND_NOTE,
     JOURNAL_DIA,
     SEAT_MATE_CALLOUTS,
     SEAT_MATE_SUFFIXES,
@@ -395,6 +396,20 @@ ARROWS_INSIDE = 0  # swDimensionArrowsSide_e.swDimArrowsInside
 # (0.1905..0.1985 at 0.195, where it crowded the pictorial).  The rise centres
 # it in that 14.6 mm row: 3.3 mm clear of each, 1.3 mm over CLEAR_GAP_M.
 KEYSEAT_WIDTH_RISE = 0.0283
+# A-A's S flags the land note like its width (PR 2 r5 machinist review,
+# clarity: the depth lacked the width's flag).  Above, not after: an
+# after-suffix would run the S line ~18 mm right, through the width's
+# dimension line at the keyseat's edge (0.3466), and the Ø.4825 block (to
+# 0.3144) holds its left (PR 2 r5, 20261110T081142602Z, as PR 1 r8).  An
+# above callout is centred on its dimension's text, set as one run (a
+# 40-character run read 110.6 mm wide in COM, 20261010T071427837Z) 8.7 mm
+# above the text position (f68549253): centred on the S text (0.3301), the
+# 6-character run spans ~0.322..0.338, 8 mm left of the width's line and
+# shelf (from 0.3466 at y 0.1888), ~6 mm under the pictorial (0.2001 from x
+# 0.3275).  One line: a line break in the above compartment never prints.
+SECTION_ABOVE_CALLOUTS = {"Sec1KeyseatS": f"NOTE {LAND_NOTE}"}
+ABOVE_CALLOUT_CHAR_WIDTH = 0.1106243 / 40
+ABOVE_CALLOUT_RISE = 0.0087
 
 
 def _set_dimension_suffixes(
@@ -960,6 +975,12 @@ def _add_d_sections(adapter: Any, side: Any, sign: int) -> list[PlacedSection]:
             },
         )
         if section.land == KEYED_LAND:
+            set_dimension_callouts(
+                adapter,
+                [kept[0]],
+                {names[0]: SECTION_ABOVE_CALLOUTS[names[0]]},
+                location="above",
+            )
             _set_arrows_inside(kept[0], f"section {section.label} {names[0]}")
             rebuild_drawing(adapter, label=f"section {section.label} arrows inside")
         placed.append(PlacedSection(section, view, face, kept, caption))
@@ -1157,6 +1178,11 @@ def _prove_section_layout(
             f"{label} dimension 1": texts_in_section[f"{label} dimension 1"],
             f"{label} caption": placed.caption,
         }
+        if placed.section.land == KEYED_LAND:
+            # A-A's S and its NOTE flag above it stand over the face; as one
+            # box with the face they would reach up beside the width's row.
+            # So S rides on its own, clear of the face and of the width.
+            del cell[f"{label} dimension 1"]
         # A-A's keyseat width rides above the section (KEYSEAT_WIDTH_RISE):
         # its own box, clear of every other group, not part of A's cell.
         riders = {
