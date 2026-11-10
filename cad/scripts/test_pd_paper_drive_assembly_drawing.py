@@ -387,12 +387,15 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
         f"PRESS {plate_locating_pin.ASSEMBLY_QUANTITY} "
         f"{_number('pd-vn-transgear-arm-plate-locating-pin')} DOWELS"
     ) in located
-    # The setting's identities, in operation order: S (the arm's empty pin
-    # bore, the pressed pin's running axis), K set at DETAIL K's model
-    # dimensions, then each part reamed to its own drawing, then the dowels.
+    # The setting's identities, in operation order: S (the pressed pin's
+    # shank in its bore, the cluster's running axis), K set at DETAIL K's
+    # model dimensions, the trial mesh, then each part reamed to its own
+    # drawing, then the dowels.
     order = [
         "PIN BORE S",
         drawing.KNOB_SETTING_VIEW_NAME,
+        "TRIAL MESH",
+        drawing.PLATE_DOWEL_PILOT_TEXT,
         _number("pd-transgear-arm"),
         _number("pd-transgear-arm-plate"),
         _number("pd-vn-transgear-arm-plate-locating-pin"),
@@ -404,11 +407,13 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
     # The step cites the view's model dimensions and types no value of its own.
     for value in (knob_setting.K_FROM_S_ALONG_MM, knob_setting.K_FROM_S_ACROSS_MM):
         assert disc.inch_text(value, knob_setting.PLACES) not in located
-    # S is the arm's reamed bore, not the pin's head (no drawing control
-    # holds the head to the shank): the pin goes in after the plate is set.
-    assert "NO PIN YET" in located
-    assert steps.step_number("arm-plate-fitted") < steps.step_number("pin-pressed")
-    assert steps.step_number("pin-pressed") < steps.step_number("hanger-pivoted")
+    # S is the pressed pin's shank, indicated from the front, not its head
+    # (no drawing control holds the head to the shank): the pin goes in
+    # before the plate is set, so the trial mesh can run the cluster on it.
+    assert f"{_number('pd-transgear-pin')} PIN'S SHANK IN ITS PIN BORE S" in located
+    assert "FRONT UP" in located
+    assert steps.step_number("pin-pressed") < steps.step_number("arm-plate-located")
+    assert steps.step_number("arm-plate-fitted") < steps.step_number("hanger-pivoted")
     # "True" is a stated null-reading acceptance, the budget's centring bound.
     assert drawing.KNOB_SETTING_TRUE in located
 
@@ -1807,9 +1812,9 @@ def test_the_plate_screws_are_cut_to_the_limit_the_lock_sweep_clears() -> None:
     order = ["arm-plate-fitted", "arm-plate-screws-cut", "hanger-pivoted"]
     fitted, cut, pivoted = (steps.step_number(key) for key in order)
     assert cut == fitted + 1 and cut < pivoted
-    # Only the pin, pressed once the plate is set from its bore, goes in
-    # between; the screws are back in before the hanger is pivoted.
-    assert steps.SEQUENCE[cut:pivoted - 1] == ("pin-pressed",)
+    # The pin is pressed before the plate is set (#2417), so nothing goes in
+    # between: the screws are back in before the hanger is pivoted.
+    assert cut + 1 == pivoted
     body = _step_body("arm-plate-screws-cut")
     assert body.startswith(f"REMOVE BOTH {_number('pd-vn-transgear-arm-plate-screw')} SCREWS")
     assert "REFIT THE SAME SCREWS IN THE SAME HOLES" in body
@@ -2389,15 +2394,66 @@ def test_the_reducer_is_clocked_once_with_an_ordinary_limit() -> None:
     clock = steps.inch_floor_mm(drawing.quality.reducer_setup_clock_deviation_mm(), 3)
     assert f"WITHIN {disc.inch_text(clock, 3)} AT THE PITCH CIRCLE" in body
     assert "TEST INDICATOR" in body
-    # The reducer's GO / NO-GO feelers bound the mesh's normal backlash inward.
-    go, no_go = drawing.REDUCER_BACKLASH_FEELERS_MM
-    assert go < no_go
-    assert f"A {disc.inch_text(go, 3)} FEELER ENTERS" in body
-    assert f"A {disc.inch_text(no_go, 3)} FEELER DOES NOT" in body
+    # The reducer is accepted on an indicator, not on feelers in the mesh.
+    assert drawing.REDUCER_DIAL_CHECK in body
+    assert "FEELER ENTERS" not in body
     for method in ("UNCERTAINTY", "RE-ZERO", "RE-CLOCK", "ABSOLUTE", "REJECT"):
         assert method not in body
     assert steps.step_number("knob-stack-fitted") < steps.step_number("fitup-pose-set")
     assert steps.step_number("fitup-pose-set") < steps.step_number("chain-closed")
+
+
+def test_the_reducer_dial_window_stays_inside_the_mesh_budget() -> None:
+    meshes = drawing.mesh_check.reducer_band_meshes()
+    circular = (
+        min(mesh.backlash_mm[0] for mesh in meshes),
+        max(mesh.backlash_mm[1] for mesh in meshes),
+    )
+    tips = [profile.blank_radius_mm for profile in disc.manufactured_profiles()]
+    pitch = disc.PITCH_DIA / 2.0
+    low, high = drawing.REDUCER_BACKLASH_DIAL_MM
+    # Read at the tip, the tightest mesh never reads above the floor and the
+    # loosest never below the ceiling, on any printed tip.
+    assert circular[0] * max(tips) / pitch <= low < high
+    assert high <= circular[1] * min(tips) / pitch
+    division = drawing.KNOB_SETTING_INDICATOR_DIVISION_IN * 25.4
+    for bound in (low, high):
+        assert bound / division == pytest.approx(round(bound / division))
+    assert drawing.REDUCER_BACKLASH_DIAL_TEXT == (
+        f"{disc.inch_text(low, 4)} TO {disc.inch_text(high, 4)}"
+    )
+
+
+def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
+    """#2417: the mesh is read on its real seats while the plate is clamped,
+    again once it is doweled, and only confirmed at the chain fit-up."""
+    located = _step_body("arm-plate-located")
+    trial = located.index("TRIAL MESH")
+    assert located.index(drawing.REDUCER_DIAL_CHECK) > trial
+    assert located.index(drawing.PLATE_DOWEL_PILOT_TEXT) > located.index(
+        drawing.REDUCER_DIAL_CHECK
+    )
+    # The cluster and the pin it runs on exist before the plate is set.
+    for key in ("disc-cluster-assembled", "disc-taps-transferred", "pin-pressed"):
+        assert steps.step_number(key) < steps.step_number("arm-plate-located")
+    # A cluster or pin remedy that repeats from the latch pin never repeats
+    # the disc's one-time tap transfer.
+    assert steps.step_number("disc-taps-transferred") < steps.step_number(
+        "latch-pin-pressed"
+    )
+    # The plate moves only inside K's setting circle.
+    assert drawing.KNOB_SETTING_CIRCLE_TEXT in located
+    fitted = _step_body("arm-plate-fitted")
+    assert "AS 12M AND 12N" in fitted
+    assert f"NEW {_number('pd-transgear-arm')} ARM" in fitted
+    # The doweled re-read comes before anything irreversible on the arm.
+    for key in ("hanger-pivoted", "knob-stack-fitted", "hook-pin-hole-match-drilled"):
+        assert steps.step_number("arm-plate-fitted") < steps.step_number(key)
+    # The final confirmation reads the same way and rebuilds no arm or plate.
+    pose = _step_body("fitup-pose-set")
+    assert drawing.REDUCER_DIAL_CHECK in pose
+    for part in ("pd-transgear-arm", "pd-transgear-arm-plate", "pd-latch-hook"):
+        assert f"NEW {_number(part)}" not in pose
 
 
 def test_the_feed_mesh_stays_on_the_hook_run_and_passes_its_closed_form_gates() -> None:

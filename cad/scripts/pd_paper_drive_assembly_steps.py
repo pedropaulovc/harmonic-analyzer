@@ -56,30 +56,38 @@ SEQUENCE: tuple[str, ...] = (
     # seats faced to the platen's float, pd_platen_guide_spec.LOCK_GAP_FIT).
     "guide-locks-set",
     "lock-seats-faced",
-    # Hanger, on the bench, then hung (R9-6: the spacer is fitted as made).
-    "latch-pin-pressed",
-    # The plate's knob bore K is set on the mill DRO from the arm's empty
-    # reamed pin bore S, the pin's running axis once pressed (one turned
-    # shank Ø, pd_transgear_pin_spec), at MHA-PD-00 DETAIL K's model
-    # dimensions, before the two locating holes receive their separate final
-    # press/slip reams. The arm lies flat on parallels, plate up, with no
-    # pin yet: its head is not concentric to the shank by any drawing
-    # control, so it is no reference (codjiflo P2 on 8e8d5d5).
-    "arm-plate-located",
-    "arm-plate-fitted",
-    "arm-plate-screws-cut",
-    # R9-68: the plain pin pressed into the arm's reamed hole, head on the
-    # arm's rear face (pd_transgear_pin_spec).
-    "pin-pressed",
-    "hanger-pivoted",
-    # Disc cluster, on the bench (R9-68: the disc on the sleeve's seat
+    # Disc cluster, on the bench, before anything is fixed on the arm, so the
+    # reducer's trial mesh can run on it (R9-68: the disc on the sleeve's seat
     # shoulder, the hub's D-bore on its D-flat; R9-8, R9-9). Hub and bushings
     # are printed lengths (transgear_cluster_fit); nothing is faced: the float
     # is shimmed at assembly (owner ruling 2026-11-01, #2124).
     # Centre and seat the disc to the sleeve's actual running-bore datum
     # before transfer-spotting; lock, re-indicate every space, then match-mark.
+    # Ahead of the arm's steps, so an arm remedy that repeats from
+    # "latch-pin-pressed" never repeats the cluster's one-time transfer.
     "disc-cluster-assembled",
     "disc-taps-transferred",
+    # Hanger, on the bench, then hung (R9-6: the spacer is fitted as made).
+    "latch-pin-pressed",
+    # R9-68: the plain pin pressed into the arm's reamed hole, head on the
+    # arm's rear face (pd_transgear_pin_spec), before the plate is set: the
+    # pressed shank is the cluster's running axis, so the setting indicates
+    # it (not the head, which no drawing control holds to the shank: codjiflo
+    # P2 on 8e8d5d5) and the trial mesh runs the cluster on it (#2417).
+    "pin-pressed",
+    # The plate's knob bore K is set on the mill DRO from the pressed pin's
+    # shank S at MHA-PD-00 DETAIL K's model dimensions, the arm front up, and
+    # held by clamps while the reducer is trial-meshed on its real seats (the
+    # cluster on the pin, the knob shaft in the plate bore) and read with the
+    # indicator; the plate is moved until the mesh reads in its window, and
+    # only then are the two locating holes drilled and given their separate
+    # final press/slip reams (#2417: doweled before any trial, a bad mesh was
+    # found only at the chain fit-up and rebuilt twelve parts). The doweled
+    # plate is read again before anything irreversible is done on the arm.
+    "arm-plate-located",
+    "arm-plate-fitted",
+    "arm-plate-screws-cut",
+    "hanger-pivoted",
     # R9-47: tips flush to 0.20 below the disc's rear face, cut ends broken
     # (pd_vn_transgear_disc_screw_spec.TIP_BELOW_REAR_FACE, CUT_END_BREAK_MAX).
     "disc-screws-cut",

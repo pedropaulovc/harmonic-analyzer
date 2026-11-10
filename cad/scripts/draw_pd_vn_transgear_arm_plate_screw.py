@@ -40,7 +40,7 @@ PRINTED_REFERENCES = ("SupplierHeadDiameter",)
 # proud limit and the cut-end break): the part sheet only points to it. The
 # step number is a literal so a renumbered MHA-PD-00 does not re-key this
 # sheet; test_pd_vn_transgear_arm_plate_screw_drawing pins it to the key.
-CUT_STEP = 11
+CUT_STEP = 14
 GENERAL_TEXT = f"PURCHASED PART, CUT AT ASSEMBLY PER MHA-PD-00 STEP {CUT_STEP}. VIEWS SHOW IT CUT."
 
 
