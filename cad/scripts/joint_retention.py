@@ -684,12 +684,14 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "ch_channel_lever",  # Ø6.5 fulcrum bore, #47 bar-pin hole, #21 spring-eye hole; no taps
         "ch_vn_channel_spring_installed",  # 9432K31 extension spring, hook ends in lever hole / eyebolt eye
         "sh_column_clamp_front",  # #8 CLEARANCE ear holes only; clamped in the screw stack
-        "dt_cone_gear",  # slides on the MHA-DT-04 D-flat, no thread
+        # T120..T030 keyways on the MHA-DT-VN-71 key in land 1 (owner decision C1
+        # keyed, 2026-11-09, PR #1992); T024..T006 D-bores on the land 2-4 D-flats; no thread
+        "dt_cone_gear",
         "dt_cone_pivot_post",  # clamped part: counterbored clearance for MHA-DT-VN-61; journals only
         "ch_connecting_rod",  # strap bore on cam + reamed pin hole (pressed MHA-CH-10 pin)
         "sm_vn_counter_spring",  # 1330K524 extension spring: upper eye free on the MHA-SM-VN-56 shoulder, lower eye hooks the boss-hook eye, no thread
         "sm_gooseneck",  # MHA-SM-01 bent 1/2 in tube (#2315): its bore takes the bonded MHA-SM-05 spigot, its bare leg is the post the frame's set screw grips; no thread
-        "dt_crank_drive_gear",  # slides on the MHA-DT-04 D-flat against its collar, no thread
+        "dt_crank_drive_gear",  # keyway on the MHA-DT-VN-71 key against the MHA-DT-04 collar, no thread
         "dt_crank_handle",  # oak handle, runs on the MHA-DT-32 shoulder
         "dt_crank_handle_butt_cup",  # bonded in the handle butt; pocket bored for the MHA-DT-32 head, no thread
         "dt_crank_handle_ferrule",  # bonded (epoxy) to the handle tenon
@@ -700,6 +702,9 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         # MHA-DT-VN-69 dowel (rule-23 retention, owner ruling 2026-11-07; MHA-DT-00
         # rubric sample, PR #2248): pressed into a ream made at assembly, no thread
         "dt_vn_locating_pin",
+        # MHA-DT-VN-71 key in the MHA-DT-04 land-1 keyseat, trapped by the collar end
+        # and T024 (owner decision C1 keyed, 2026-11-09, PR #1992), no thread
+        "dt_vn_cone_shaft_key",
         "dt_crank_pin_ring",  # brass wire keeper ring
         "dt_crank_pinion",  # pinned by crank_pinion_pin
         "dt_crank_pinion_pin",  # plain 1/8 drill-rod drive pin
@@ -778,6 +783,7 @@ UNTHREADED_STOCK: dict[str, str] = {
     "dt_vn_keeper_chain": "jack chain; its end link is clamped under a screw head and its far link threads a ring, carrying no thread",
     "dt_vn_crank_seat_drive_pin": "dowel pin pressed into a plain hole",
     "dt_vn_locating_pin": "dowel pin pressed into a plain reamed hole",
+    "dt_vn_cone_shaft_key": "square key stock in the shaft keyseat and the gear keyways; no thread",
     "sm_vn_knife_mount_dowel": "dowel pin pressed into a blind reamed hole",
     "sm_vn_knife_hanger_washer": "plain SAE washer under the knife-hanger hex head; no thread",
     "dt_vn_pinion_strap_pin": "slotted spring pin pressed into a plain hole",
@@ -1015,7 +1021,7 @@ JOINTS: tuple[Joint, ...] = (
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
             "MHA-DT-VN-54 turns as one with MHA-DT-04 (its set screw on the Sec4 D-flat) and rubs nothing "
-            "that moves relative to it: the D-flat-keyed stack floats a feeler gap south of it "
+            "that moves relative to it: the keyed and D-flat-keyed stack floats a feeler gap south of it "
             "and the tip block stands clear north (collar-to-block air), so no friction torque "
             "acts about the radial set-screw axis; stack float thrust and start/stop inertia "
             "load the screw across its axis"

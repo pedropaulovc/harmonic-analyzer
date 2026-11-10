@@ -127,7 +127,7 @@ reserved:
 monte_carlo:
   draws: 4000
   seed: 20260912
-  distribution: uniform          # deviations uniform within +/- tolerance; cone_flat_play is drawn about the fit's 0.02032 mm mean
+  distribution: uniform          # deviations uniform within +/- tolerance; cone_flat_play is drawn about the fit's 0.02032 mm mean, cone_key_play about the keyway's 0.0508 mm mean
 
 # Channel-specific features. `tolerance` is the +/- half-width of the drawing
 # (or matching/setup) limit; `unit` is mm unless stated. `class`:
@@ -194,26 +194,33 @@ critical_features:
     class: channel
     holds: "derived: half the cone<->cylinder gear_mesh backlash band (tolerances/gear_mesh.yaml 0.05..0.20 mm) at the 120T pitch radius, one-directional cranking"
   cone_flat_clock:
-    tolerance: 0.25
+    tolerance: 1.0
     unit: deg
     nominal: null
     quantity: phase
     class: channel
-    holds: "index each cone gear's teeth off its D-bore flat on one setup (BoreFlatClock +/-0.25 deg); the shaft flats' own clock is cone_land_clock"
+    holds: "each cone gear's keyway (T030-T120) or D-bore flat (T006-T024) on the phase-0 tooth's centreline, the two sharing the sheet's drawn centreline at the title-block +/-1 deg angle (no clock dimension); the shaft flats' own clock is cone_land_clock. Allowable check (error_budget.py, 2026-11-10, PR #2331): alone at 1.0 deg MAE 0.066 / pair p99 0.103 against an equal-share allowable of 0.754 deg (0.05 MAE), so it takes more than its equal share, as cam_eccentricity, spring_rate, station_setting and cone_flat_play do; the combined budget closes: scatter MAE 0.185 <= 0.3, p99 max 0.934 <= 1.5, pair_1_20 expected worst 1.578 <= 2.0 (11.8 % of machines over 2.0)"
   cone_flat_play:
     tolerance: 0.01016
     unit: mm
     nominal: null
     quantity: phase
     class: channel
-    holds: "D-bore across-flat fit: .0004-.0012 in (0.01016-0.03048 mm) clearance on every gear (gear_seat_fit.FLAT_AF_CLEARANCE), acting on the shortest flat half-chord MHA-DT-04 accepts (land at its least diameter and greatest AF) less the title block's 0.25 edge break on its torque corner (error_budget.phase_profiles); subtract the common Ø9.525-land mean lag as a crank-index time shift, retain per-land residual and per-gear scatter"
+    holds: "D-bore across-flat fit on T006-T024: .0004-.0012 in (0.01016-0.03048 mm) clearance on every gear (gear_seat_fit.FLAT_AF_CLEARANCE), acting on the shortest flat half-chord MHA-DT-04 accepts (land at its least diameter and greatest AF) less the title block's 0.25 edge break on its torque corner (error_budget.phase_profiles); subtract the keyed Ø9.525 land's mean lag as a crank-index time shift, retain per-land residual and per-gear scatter"
+  cone_key_play:
+    tolerance: 0.0508
+    unit: mm
+    nominal: null
+    quantity: phase
+    class: channel
+    holds: "keyway side clearance on the MHA-DT-VN-71 key, T030-T120 (owner decision C1 keyed, 2026-11-09, PR #1992): 0-.004 in (0-0.1016 mm), keyway width less key width (cone_land_key.KEYWAY_SIDE_CLEARANCE_MM), drawn whole per gear though the one key's width is common to every gear and only the keyway width (+.002/-0, the milled-width row) scatters; split about the key, so cranking one way turns a gear by half its clearance over the key's top, at the key's least height in the shallowest keyseat less the title block's 0.25 edge break (error_budget._key_levers); the keyed land's mean lag is the crank-index reference, so no residual"
   cone_land_clock:
     tolerance: 1.0
     unit: deg
     nominal: null
     quantity: phase
     class: channel
-    holds: "MHA-DT-04 section A-A callout 4 FLATS IN LINE at the title-block +/-1 deg angle: the Ø6.350, Ø3.175 and Ø0.794 land flats each within 1 deg of the Ø9.525 land's, which carries T030-T120 and the 64T (its own clock is a crank-index shift); one draw per land, shared by its gears (error_budget.draw_groups)"
+    holds: "MHA-DT-04 land flats in line with the land-1 keyseat at the title-block +/-1 deg angle: the Ø6.350, Ø3.175 and Ø0.794 land flats each within 1 deg of the Ø9.525 land's keyseat, which carries T030-T120 and the 64T on the MHA-DT-VN-71 key (its own clock is a crank-index shift); one draw per land, shared by its gears (error_budget.draw_groups)"
   station_setting:
     tolerance: 0.25
     nominal: null

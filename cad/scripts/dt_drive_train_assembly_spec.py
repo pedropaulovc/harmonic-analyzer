@@ -59,6 +59,7 @@ CLUSTERS: dict[Cluster, tuple[str, ...]] = {
         "dt-cone-gear-shaft",
         "dt-cone-gear",
         "dt-crank-drive-gear",
+        "dt-vn-cone-shaft-key",
         "dt-cone-swing-platform",
         "dt-cone-pivot-post",
         "dt-cone-tip-block",
@@ -188,7 +189,13 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     ExplodeStep("swing stop lifts", (SWING_STOP_SCREW_SELECTOR,), "y", 75.0),
     ExplodeStep(
         "cone rotor withdraws",
-        ("dt-cone-gear-shaft", "dt-cone-gear", "dt-crank-drive-gear", "dt-vn-cone-tip-collar"),
+        (
+            "dt-cone-gear-shaft",
+            "dt-cone-gear",
+            "dt-crank-drive-gear",
+            "dt-vn-cone-shaft-key",
+            "dt-vn-cone-tip-collar",
+        ),
         "cone",
         50.0,
     ),
@@ -227,6 +234,13 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
         "cone",
         12.0,
     ),
+    # MHA-DT-VN-71 (owner decision C1 keyed, 2026-11-09, PR #1992) then rises
+    # parallel to the shaft (+Y is square to the level, inclined cone axis) to
+    # stand above the T120 tip radius (about 32.3), so its length reads beside
+    # the gears it drives.  Its keyseat opens on the shaft's +X, toward the
+    # meshing drum gears, so it does not leave that way.  Not yet proven on a
+    # sheet.
+    ExplodeStep("cone key lifts out", ("dt-vn-cone-shaft-key",), "y", 45.0),
     ExplodeStep("tip pinch screw lifts", ("dt-vn-cone-tip-pinch-screw",), "y", 25.0),
     # MHA-DT-VN-60 comes down out of the dropped plate's counterbore: 50 carries
     # its tip ~7 below the plate's underside after the plate's 30.

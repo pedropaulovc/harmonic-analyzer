@@ -1003,6 +1003,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="dt_vn_cone_shaft_key",
+        part="dt_vn_cone_shaft_key",
+        artifact_stem="dt-vn-cone-shaft-key",
+        script_name="draw_dt_vn_cone_shaft_key.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="pd_transgear_knob_shaft",
         part="pd_transgear_knob_shaft",
         artifact_stem="pd-transgear-knob-shaft",

@@ -55,7 +55,10 @@ REFERENCE_SKETCHES = (*spec.REFERENCE_SKETCHES, BLANK_DIA_REFERENCE_SKETCH)
 
 
 def root_to_bore_web_min_mm(teeth: int) -> float:
-    """Print-worst radial ligament; the fitted D-flat only leaves more metal."""
+    """Print-worst radial ligament: to the keyway's top corner on a keyed
+    gear; on a D the fitted flat only leaves more metal than the round bore."""
+    if spec.keyed(teeth):
+        return spec.keyway_web_min_mm(teeth)
     minimum, _maximum = spec.floor_limits_mm(teeth)
     bore_maximum = spec.inch_grid_mm(
         spec.bore_dia_mm(teeth) + spec.BORE_DIA_BAND[0], spec.BORE_BAND_PLACES, math.ceil

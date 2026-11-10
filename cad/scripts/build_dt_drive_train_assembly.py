@@ -1641,6 +1641,31 @@ if abs(SHAFT_FRONT_STATION + SHAFT_COLLAR_END - _GEAR64_SOUTH_STATION) > 1e-9:
 # pick there is view-dependent (IModelDocExtension::SelectByID2 picks FACEs
 # through the graphics ray), and one 0.33 mm outside the collar selected the
 # collar's OD on some seats (#916).
+# MHA-DT-VN-71 (owner decision C1 keyed, 2026-11-09, PR #1992): the key lies
+# in land 1's keyseat, its square south end one KEY_END_SET north of the
+# collar's tip-side face (CollarEndPlane; the keyseat end radius's centre) and
+# its bottom on the keyseat floor.  The keyseat runs out over the Ø.250 land,
+# so T024's south face, one SEAT_STEP_SETBACK past land 1's end, captures the
+# key north: at the .XX length's print maximum its north end keeps air to T024.
+import dt_vn_cone_shaft_key_spec as cone_key  # noqa: E402
+from _printed_tolerance import printed_band_mm as _printed_band_mm  # noqa: E402
+from dt_cone_gear_shaft_spec import gear_faces as _shaft_gear_faces  # noqa: E402
+
+CONE_KEY_SOUTH_LOCAL_Z = SHAFT_COLLAR_END + cone_key.END_SET_MM
+_CONE_KEY_NORTH_MAX_LOCAL_Z = (
+    CONE_KEY_SOUTH_LOCAL_Z
+    + cone_key.LENGTH
+    + _printed_band_mm(cone_key.LENGTH_PLACES, unit=cone_key.UNIT)
+)
+_T024_SOUTH_LOCAL_Z = SHAFT_FRONT_STUB + _shaft_gear_faces(16)[0]
+if (
+    _config.cone_teeth(16) != 24
+    or not _CONE_KEY_NORTH_MAX_LOCAL_Z < _T024_SOUTH_LOCAL_Z
+):
+    raise AssertionError(
+        f"MHA-DT-VN-71's north end reaches {_CONE_KEY_NORTH_MAX_LOCAL_Z:.3f} at its print "
+        f"maximum, not short of T024's south face {_T024_SOUTH_LOCAL_Z:.3f}"
+    )
 # --- tip end-play stack (item 5, v4_t00471 / 7:49) ---------------------------
 # Along the axis, south to north: T006 gear | feeler gap | MHA-DT-VN-54 stack
 # collar, locked on the Sec4 D-flat | air | block | shaft tip | the 94025A164
@@ -4412,6 +4437,18 @@ ROT_Y_INCLINE = [
     [0.0, 1.0, 0.0],
     [SIN_I, 0.0, COS_I],
 ]  # Ry(+INCLINE), row-vector convention (matches the frame script's Ry rows)
+# MHA-DT-VN-71 shares the shaft's orientation (its own frame: bottom face on
+# its Right Plane, width centred on its Top Plane, length along +Z), so its
+# origin is the shaft-frame point (keyseat floor on +X, 0, south end) carried
+# through these rows: the shaft's local +X is row 0, its axis row 2.
+CONE_KEY_ORIGIN = [
+    a + cone_key.FLOOR_OFFSET_MM * x
+    for a, x in zip(
+        cone_station(SHAFT_FRONT_STATION + CONE_KEY_SOUTH_LOCAL_Z),
+        ROT_Y_INCLINE[0],
+        strict=True,
+    )
+]
 # The tip-stack riders are authored along +Y (Top-plane extrusions); these lay
 # that +Y axis along the inclined plate frame (same row-vector convention).
 ROT_SHAFT_NORTH = [  # +Y -> the increasing-station shaft direction (tip collar)
@@ -4561,14 +4598,19 @@ async def _key_to_shaft(
     and shaft share the inclined orientation (ROT_Y_INCLINE), so their Right
     planes are parallel at the keyed phase -- the parallel pins the spin with
     no tuned angle (the lag-screw idiom). Removes the same 6 DOF the lock did;
-    no fix/lock.  On the cone shaft the parallel IS the D-flat (user ruling
-    2026-09-28): every gear land's flat and every cone-gear/64T D-bore flat
-    face outward on their part's local +X, the Right-plane normal, so the
-    mate states the physical joint; a gear flipped 180 deg would put its flat
+    no fix/lock.  On the cone shaft the parallel states the physical joint,
+    since every drive feature faces outward on its part's local +X, the
+    Right-plane normal.  On land 1 the parallel IS the MHA-DT-VN-71 key (owner
+    decision C1 keyed, 2026-11-09, PR #1992): the keyseat, the key and every
+    T030..T120 and 64T keyway sit on +X.  On lands 2-4 it is still the D-flat
+    (user ruling 2026-09-28): each land's flat and each T024..T006 D-bore flat.
+    A gear flipped 180 deg would put its keyway away from the key or its flat
     into the land, which the interference gate catches.  The seat is a
     Front-plane distance along the shaft axis (read live) unless
     ``seat_plane`` names the shaft plane the gear's south face sits ON (see
-    :func:`_axial_seat`)."""
+    :func:`_axial_seat`).  The mates are authored in that order, [coaxial,
+    axial seat, anti-spin]: the cone-gear CopyWithMates2 ladder's slot
+    contract."""
     p_o = _org(adapter, part)
     await coincident_mate(
         adapter,
@@ -5313,6 +5355,18 @@ async def build(adapter) -> dict[str, str]:
         [0.0, INCLINE_DEG, 0.0],
         ROT_Y_INCLINE,
         ground=False,
+    )
+    # MHA-DT-VN-71 in land 1's keyseat (owner decision C1 keyed, 2026-11-09,
+    # PR #1992): inserted in the shaft's orientation at CONE_KEY_ORIGIN and
+    # mated to the shaft's planes below, before the gears slide over it.
+    cone_key_part = await place_component(
+        adapter,
+        "dt-vn-cone-shaft-key",
+        CONE_KEY_ORIGIN,
+        [0.0, INCLINE_DEG, 0.0],
+        ROT_Y_INCLINE,
+        ground=False,
+        label="cone-shaft-key (MHA-DT-VN-71 in the land 1 keyseat)",
     )
     gear64 = await _place_on_shaft(
         adapter,
@@ -6119,6 +6173,45 @@ async def build(adapter) -> dict[str, str]:
         raise AssertionError(
             f"pinch screw head face sits at block x {_pin_x:.4f}, not on the +X "
             f"clearance face (x {TIP_BLOCK_X / 2.0:.4f})"
+        )
+    # MHA-DT-VN-71 in land 1's keyseat (owner decision C1 keyed, 2026-11-09,
+    # PR #1992): three plane mates to the shaft, no lock.  Its Top Plane on
+    # the shaft's centres its width on the keyseat; its Right Plane (the
+    # bottom face) parallel to the shaft's at the keyseat floor's offset on
+    # +X; its Front Plane (the square south end) KEY_END_SET north of
+    # CollarEndPlane, a Front-plane distance as the cone gears' seats are.
+    key_o = _org(adapter, cone_key_part)
+    key_s = component_transform(adapter, cone_shaft)
+    key_x_dir = [key_s[0], key_s[1], key_s[2]]  # image of the shaft's local +X
+    await coincident_mate(
+        adapter,
+        named_ref(f"Top Plane@{cone_key_part}", "PLANE"),
+        named_ref(f"Top Plane@{cone_shaft}", "PLANE"),
+        label="cone key centred on the keyseat",
+        verify=(cone_key_part, key_o),
+    )
+    d_floor = sum((key_o[k] - cone_o[k]) * key_x_dir[k] for k in range(3))
+    await distance_driver(
+        adapter,
+        named_ref(f"Right Plane@{cone_key_part}", "PLANE"),
+        named_ref(f"Right Plane@{cone_shaft}", "PLANE"),
+        d_floor,
+        label=f"cone key on the keyseat floor d={d_floor:.4f}",
+        verify=(cone_key_part, key_o),
+    )
+    await _axial_seat(
+        adapter, cone_key_part, cone_shaft, cone_o, cone_axis_dir, key_o, "cone key", ""
+    )
+    _key_live = _org(adapter, cone_key_part)
+    _key_local = [
+        sum((_key_live[k] - cone_o[k]) * row[k] for k in range(3))
+        for row in (key_x_dir, key_s[3:6], cone_axis_dir)
+    ]
+    _key_want = (cone_key.FLOOR_OFFSET_MM, 0.0, CONE_KEY_SOUTH_LOCAL_Z)
+    if any(abs(a - b) > 1e-4 for a, b in zip(_key_local, _key_want, strict=True)):
+        raise AssertionError(
+            f"cone key origin at shaft (x, y, z) {_key_local}, not on the keyseat "
+            f"floor at its collar end {_key_want}"
         )
     # The 64T crank-drive gear and the 20 cone gears are one rigid stepped
     # cluster KEYED to the cone shaft -- each via coaxial + axial seat + parallel

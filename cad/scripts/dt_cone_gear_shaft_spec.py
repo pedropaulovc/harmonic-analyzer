@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 
+import cone_land_key
 import cone_line
 import dt_cone_pivot_post_spec
 import dt_cone_tip_block_spec
@@ -41,7 +42,7 @@ from dt_crank_drive_gear_spec import FACE_WIDTH as GEAR64_FACE_WIDTH
 from dt_crank_drive_gear_spec import LAYOUT_FACE_WIDTH as GEAR64_LAYOUT_FACE_WIDTH
 from dt_crank_drive_gear_spec import SOUTH_FACE_SHIFT_NORTH as GEAR64_SOUTH_FACE_SHIFT_NORTH
 from dt_crank_drive_gear_spec import LAYOUT_CENTRE_STATION as GEAR64_LAYOUT_CENTRE_STATION
-from gear_seat_fit import FLAT_AF_CLEARANCE, flat_bore_af_band, seat_bore_band
+from gear_seat_fit import flat_bore_af_band, seat_bore_band
 
 
 MM_PER_IN = 25.4
@@ -205,11 +206,11 @@ def _gear(teeth: int) -> str:
 # (JOURNAL_DIAMETRAL_CLEARANCE_MM) as a REF row of its own: two lines of
 # words (rule 7) narrow enough to stand between the faced end and section
 # A-A (round 3's 33-character line crowded section A's letter).  Every gear
-# land and its flat slide in the bores of the gears it carries; those mates
-# (MHA-DT-03, MHA-DT-07 on land 1, MHA-DT-VN-54 on the terminal land) and
-# the flats' matched fit are flag note LAND_NOTE, linked from each land's
-# diameter and across-flat: the stepped tip's texts climb over each other
-# and have no room for the names.
+# land slides in the bores of the gears it carries; those mates (MHA-DT-03,
+# MHA-DT-07 and the MHA-DT-VN-71 key on land 1, MHA-DT-VN-54 on the terminal
+# land) and the flats' matched fit are flag note LAND_NOTE, linked from each
+# land's diameter, the keyseat and each across-flat: the stepped tip's texts
+# climb over each other and have no room for the names.
 LAND_NOTE = 1
 LAND_FLAG = f"SEE NOTE {LAND_NOTE}"
 JOURNAL_FIT_CALLOUT = (
@@ -228,13 +229,13 @@ SEAT_MATE_CALLOUTS = {
 TERMINAL_LAND = 4
 SEAT_MATE_SUFFIXES = {f"Sec{land}Dia": f" {LAND_FLAG}" for land in (2, 3, TERMINAL_LAND)}
 # An across-flat line is centred on its section; with "SEE" B-B's would
-# overrun the sheet border by 0.6 mm, so the flats carry the bare flag.
-FLAT_MATE_SUFFIXES = {f"Sec{land}AF": f" NOTE {LAND_NOTE}" for land in (1, 2, 3, 4)}
-# Every D-bore's across-flat band is gear_seat_fit.flat_bore_af_band of the
-# land's (the 64T's too), so one clearance serves all four flats.
-FLAT_AF_CLEARANCE_TEXT = (
-    f"{inch_text(FLAT_AF_CLEARANCE[0], 4)}-{inch_text(FLAT_AF_CLEARANCE[1], 4)}"
-)
+# overrun the sheet border by 0.6 mm, so the flats carry the bare flag.  Land 1
+# is keyed (owner decision 2026-11-09, C1 keyed, PR #1992): its keyseat width
+# carries the same bare flag.
+FLAT_MATE_SUFFIXES = {
+    "Sec1KeyseatWidth": f" NOTE {LAND_NOTE}",
+    **{f"Sec{land}AF": f" NOTE {LAND_NOTE}" for land in (2, 3, 4)},
+}
 
 # Station layout.  Every cone gear station was laid out on a 6.5 reference
 # face one exact-tracking seat pitch (dt_cone_gear_spec.SEAT_PITCH) from the next;
@@ -323,7 +324,7 @@ TIP_STUB_LENGTH = T006_TIP_STATION - TIP_STUB_START_STATION
 # length, snapped above.
 SECTION_DIAS: tuple[float, ...] = (
     JOURNAL_DIA,  # integral v2-post bearing journal, .4825
-    9.525,  # 3/8: 64T + T120..T030 seats
+    cone_land_key.LAND_DIA_MM,  # 3/8: 64T + T120..T030 seats, keyed
     6.35,  # 1/4: T024 seat
     3.175,  # 1/8: T018 seat
     TERMINAL_DIA_MM,  # .031: T012/T006, collar, tip
@@ -352,38 +353,57 @@ def validate_gear_loading_clearances() -> None:
                 f"T{teeth:03d} tip diameter does not exceed the next inboard bore"
             )
 
-# D-flats (user ruling 2026-09-28): every gear land carries one flat with its
+# D-flats (user ruling 2026-09-28): lands 2-4 each carry one flat with its
 # outward normal on the shaft's local +X (the Right plane's normal), across
 # flat SECTION_FLAT_AF (flat to the opposite side of the land, the size a
 # micrometer reads) with FLAT_AF_BAND.  Each flat runs its whole land, from
-# the collar's (or the larger land's) face to the land's end, and the gears'
-# D-bores (MHA-DT-03, MHA-DT-07) slide straight on.  The terminal land's flat runs
+# the larger land's face to the land's end, and the gears' D-bores (MHA-DT-03)
+# slide straight on.  The terminal land's flat runs
 # out THROUGH THE TIP (user ruling 2026-09-28): T012 and T006 slide on over
 # it and MHA-DT-VN-54 is a thrust spacer riding the D, so the end face is a D too.
+# Land 1 is round and keyed instead (owner decision 2026-11-09, C1 keyed,
+# PR #1992; superseding the 2026-09-28 ruling's "no keys" for land 1 only):
+# the 1/16 keyseat (cone_land_key) sits on the same +X clock and runs the
+# same extent the flat did, from the collar's tip-side face to the land's end.
 # FLAT_OFFSETS[i] is the flat's distance from the axis.
 FLAT_OFFSETS: tuple[float | None, ...] = tuple(
     None if af is None else af - dia / 2.0
     for af, dia in zip(SECTION_FLAT_AF, SECTION_DIAS)
 )
 FLAT_LANDS = tuple(i for i, af in enumerate(SECTION_FLAT_AF) if af is not None)
-if FLAT_LANDS != (1, 2, 3, 4):
-    raise AssertionError(f"every gear land and only those carries a flat: {FLAT_LANDS}")
-# Each flat runs off its land's end into air: the next land lies wholly inside
-# the flat plane, so milling one flat never touches a smaller land.  And every
-# gear, bore at its largest and flat at its shallowest, passes over every land
-# north of its own on the way to its seat.
-for _land in FLAT_LANDS[:-1]:
+if FLAT_LANDS != (2, 3, 4):
+    raise AssertionError(f"lands 2-4 and only those carry a flat: {FLAT_LANDS}")
+KEYED_LAND = 1
+if SECTION_DIAS[KEYED_LAND] != cone_land_key.LAND_DIA_MM or KEYED_LAND in FLAT_LANDS:
+    raise AssertionError("land 1 is the keyed Ø.375 land, without a flat")
+# Each flat (and land 1's keyseat) runs off its land's end into air: the next
+# land lies wholly inside the flat plane (keyseat floor), so milling one never
+# touches a smaller land.  And every gear, bore at its largest and flat (keyway
+# top) at its shallowest, passes over every land north of its own on the way
+# to its seat.
+for _land in (KEYED_LAND, *FLAT_LANDS[:-1]):
     _next_radius_max = (SECTION_DIAS[_land + 1] + SECTION_DIA_BANDS[_land + 1][0]) / 2.0
-    _bore_flat_min = (
-        SECTION_FLAT_AF[_land]
-        + flat_bore_af_band(FLAT_AF_BAND)[1]
-        - (SECTION_DIAS[_land] + seat_bore_band(SECTION_DIA_BANDS[_land])[0]) / 2.0
-    )
-    if FLAT_OFFSETS[_land] < _next_radius_max or _bore_flat_min < _next_radius_max:
+    _bore_dia_max = SECTION_DIAS[_land] + seat_bore_band(SECTION_DIA_BANDS[_land])[0]
+    if _land == KEYED_LAND:
+        # Floor at its lowest (S at its minimum, land at its largest); keyway
+        # top at its lowest (T at its minimum, bore at its largest).
+        _cut_offset_min = (
+            cone_land_key.limits(cone_land_key.KEYSEAT_S_MM, cone_land_key.KEYSEAT_S_BAND)[0]
+            - (SECTION_DIAS[_land] + SECTION_DIA_BANDS[_land][0]) / 2.0
+        )
+        _bore_cut_min = (
+            cone_land_key.limits(cone_land_key.KEYWAY_T_MM, cone_land_key.KEYWAY_T_BAND)[0]
+            - _bore_dia_max / 2.0
+        )
+    else:
+        _cut_offset_min = FLAT_OFFSETS[_land]
+        _bore_cut_min = (
+            SECTION_FLAT_AF[_land] + flat_bore_af_band(FLAT_AF_BAND)[1] - _bore_dia_max / 2.0
+        )
+    if _cut_offset_min < _next_radius_max or _bore_cut_min < _next_radius_max:
         raise AssertionError(
-            f"land {_land}'s flat {FLAT_OFFSETS[_land]:.4f} (bore flat "
-            f"{_bore_flat_min:.4f}) reaches into land {_land + 1} "
-            f"(radius {_next_radius_max:.4f})"
+            f"land {_land}'s cut {_cut_offset_min:.4f} (bore's {_bore_cut_min:.4f}) "
+            f"reaches into land {_land + 1} (radius {_next_radius_max:.4f})"
         )
 
 # Two length origins, one per chucking (drawing-guidelines.md rule 11; Main's
@@ -439,8 +459,8 @@ FILLET_CALLOUT = "3X"
 
 # Surface texture, on the one land that runs: the .4825 journal turns in
 # the pivot post bore.  Every other land only carries parts locked to the
-# shaft -- the gears slide on and are driven by the flats, the MHA-DT-VN-54
-# collar is screwed to the terminal flat -- and the tip bears on the
+# shaft -- the gears slide on and are driven by the key (land 1) and the
+# flats, the MHA-DT-VN-54 collar is screwed to the terminal flat -- and the tip bears on the
 # adjuster's cup with its end, not its round, so they are left to the
 # title-block process row (drawing-guidelines.md rule 6; machinist review
 # r5, 20261018T080102803Z, which found the tip land's Ra 1.6 unexplained).
@@ -452,13 +472,16 @@ SURFACE_FINISHES = (
 
 # The sheet's numbered flag notes, four lines (drawing-guidelines.md rule 7:
 # few, flagged, never a method).  Note LAND_NOTE is linked from every land's
-# diameter and across-flat: it names each land's mates once by drawing number
-# (rule 4; sections A-A to D-D cut lands 1 to 4), and gives the flats' .0004
-# bands, under the milled-width row, their fit route: each flat is milled
-# matched to its gears' measured D-bores, with the acceptance and the
-# printed limits' across-flat clearance as REF.  The flats' common clock is
-# the aligned sections' and the title block's angle (error_budget.yaml books
-# it per land as cone_land_clock).  Note STACK_NOTE names, once, the stack the
+# diameter, land 1's keyseat and each across-flat: it names each land's mates
+# once by drawing number (rule 4; sections A-A to D-D cut lands 1 to 4: A-A
+# the keyed land with its MHA-DT-VN-71 key, owner decision 2026-11-09, PR
+# #1992), and gives the flats' .0004 bands (B-B to D-D), under the
+# milled-width row, their fit route: each flat is milled matched to its gears'
+# measured D-bores with an unambiguous acceptance (rule 4's matched pair: a
+# clearance range OR an acceptance; Codjiflo P2 on #2331 held the block to
+# rule 7's four lines, so the REF clearance went).  The keyseat and the flats' common clock is the aligned
+# sections' and the title block's angle (error_budget.yaml books it per land
+# as cone_land_clock).  Note STACK_NOTE names, once, the stack the
 # three-place lengths set (rule 4): each step stands SEAT_STEP_SETBACK behind
 # the smaller gear's south face (the proof below) and the collar web is the
 # MHA-DT-07 station and the stack's origin.  The tailstock line is the one
@@ -475,9 +498,8 @@ STACK_LENGTHS_TEXT = ", ".join(
 ) + f" AND {inch_text(COLLAR_THICKNESS, 3)}"
 DRAWING_NOTES = "\n".join(
     (
-        f"{LAND_NOTE}. SLIDING FIT IN MHA-DT-03, A-A ALSO MHA-DT-07, D-D ALSO MHA-DT-VN-54;",
-        "   MILL FLATS TO MEASURED D-BORES: NO ROCK "
-        f"(CLEARANCE {FLAT_AF_CLEARANCE_TEXT} REF).",
+        f"{LAND_NOTE}. SLIDING FIT IN MHA-DT-03; A-A ALSO MHA-DT-07 AND KEY MHA-DT-VN-71;",
+        "   D-D ALSO MHA-DT-VN-54; MILL FLATS TO MEASURED D-BORES: NO ROCK.",
         f"{STACK_NOTE}. {STACK_LENGTHS_TEXT} SET THE MHA-DT-07 AND MHA-DT-03 STACK.",
         f"{TAILSTOCK_NOTE}. TURN THE TIP LAND WITH TAILSTOCK SUPPORT.",
     )
@@ -494,7 +516,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Sec2": {"Sec2End"},
     "Sec3": {"Sec3End"},
     "Sec4": {"Sec4End"},
-    "Sec1FlatProfile": {"Sec1AF"},
+    "Sec1KeyseatProfile": {"Sec1KeyseatWidth", "Sec1KeyseatS"},
+    "Sec1KeyseatEndProfile": {"Sec1KeyseatEndSet"},
     "Sec2FlatProfile": {"Sec2AF"},
     "Sec3FlatProfile": {"Sec3AF"},
     "Sec4FlatProfile": {"Sec4AF"},
@@ -509,7 +532,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 #
 # Diameters and across-flats: four places.  Each carries its named band
 # (SECTION_DIA_BANDS, FLAT_AF_BAND), so their places are only the number's
-# spelling.
+# spelling.  Land 1's keyseat width and S print at cone_land_key's places
+# with its bands.
 #
 # Land steps Sec1End..Sec3End (from the collar's tip-side face): three
 # places, which is the title-block .XXX general grade (+-.005) and no
@@ -528,6 +552,16 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # grade, since the journal's guaranteed bearing span below reads it (never .X).
 # Step radius: three places; nothing depends on it beyond the setback proof.
 #
+# Keyseat end (machinist review of 06460fb: the mill stop): the end radius's
+# centre from the collar's tip-side face, two places, the title block's .XX
+# grade, at .05 (cone_land_key.KEY_END_SET_MM).  At its printed low limit the
+# widest end mill still stands clear of that face, the 64T's seat
+# (KEYSEAT_END_COLLAR_CLEARANCE_MIN_MM below; Codjiflo #2331 4521933063:
+# .03, tangent in the model, let it sink .011 in).  The key's square south
+# end comes to rest on that centre line, so the band moves the key, never
+# into the end; KEY_NORTH_MARGIN_MM below keeps its north end short of T024
+# at the printed limits of both lengths.
+#
 # Collar (#914): the diameter is the bar's as supplied (STOCK_DIA), so it
 # prints as the 5/8 fraction reference, the bar's own size; the web prints
 # three places because it is the 64T's station toward MHA-DT-05
@@ -543,7 +577,11 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Sec2": {"Sec2End": 3},
     "Sec3": {"Sec3End": 3},
     "Sec4": {"Sec4End": 2},
-    "Sec1FlatProfile": {"Sec1AF": LAND_AF_PLACES[1]},
+    "Sec1KeyseatProfile": {
+        "Sec1KeyseatWidth": cone_land_key.KEYSEAT_PLACES,
+        "Sec1KeyseatS": cone_land_key.KEYSEAT_PLACES,
+    },
+    "Sec1KeyseatEndProfile": {"Sec1KeyseatEndSet": cone_land_key.KEY_END_SET_PLACES},
     "Sec2FlatProfile": {"Sec2AF": LAND_AF_PLACES[2]},
     "Sec3FlatProfile": {"Sec3AF": LAND_AF_PLACES[3]},
     "Sec4FlatProfile": {"Sec4AF": LAND_AF_PLACES[4]},
@@ -577,6 +615,7 @@ _LENGTH_NOMINALS = {
     **{f"Sec{i}End": knob for i, knob in enumerate(SECTION_KNOBS)},
     "CollarWidth": COLLAR_THICKNESS,
     "ShoulderR": FILLET_RADIUS,
+    "Sec1KeyseatEndSet": cone_land_key.KEY_END_SET_MM,
 }
 
 
@@ -644,3 +683,40 @@ for _name, _j, _end in zip(("Sec1End", "Sec2End", "Sec3End"), SEAT_STEP_GEARS, S
         raise AssertionError(
             f"{_name}: the step and its root reach the smaller gear at print-worst {_terms}"
         )
+
+# The key's north end at the far printed limits of the keyseat end's .XX
+# location and the key's .XX length stays south of T024 (gear 16), which
+# rides land 2's flat: the key sits between the keyseat's end and T024.
+KEY_NORTH_MARGIN_MM = (
+    FRONT_STUB
+    + gear_faces(16)[0]
+    - (
+        COLLAR_END_STATION
+        + cone_land_key.KEY_END_SET_MM
+        + printed_length_deviations("Sec1KeyseatEndSet")[1]
+        + cone_land_key.KEY_LENGTH_MM
+        + printed_band_mm(cone_land_key.KEY_LENGTH_PLACES, unit=UNIT)
+    )
+)
+if KEY_NORTH_MARGIN_MM <= 0.0:
+    raise AssertionError(
+        f"the key reaches T024 at print-worst ({KEY_NORTH_MARGIN_MM} mm)"
+    )
+
+# The keyseat's end at its printed low limit, cut by the widest end mill
+# (the keyseat's upper width), keeps KEYSEAT_END_COLLAR_MARGIN_MM of the
+# collar's tip-side face, the 64T's seat and the stack's origin, uncut.
+KEYSEAT_END_COLLAR_MARGIN_MM = 0.1
+KEYSEAT_END_COLLAR_CLEARANCE_MIN_MM = (
+    cone_land_key.KEY_END_SET_MM
+    + printed_length_deviations("Sec1KeyseatEndSet")[0]
+    - cone_land_key.limits(
+        cone_land_key.KEYSEAT_WIDTH_MM, cone_land_key.KEYSEAT_WIDTH_BAND
+    )[1]
+    / 2.0
+)
+if KEYSEAT_END_COLLAR_CLEARANCE_MIN_MM < KEYSEAT_END_COLLAR_MARGIN_MM:
+    raise AssertionError(
+        "the keyseat's end mill reaches the collar's 64T seat at print-worst "
+        f"({KEYSEAT_END_COLLAR_CLEARANCE_MIN_MM:.4f} mm clear)"
+    )

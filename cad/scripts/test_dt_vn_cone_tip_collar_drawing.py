@@ -754,7 +754,7 @@ def test_all_land_physical_limit_readers_share_native_print_precision(section, n
     upper, lower = lands.SECTION_DIA_BANDS[section]
     nominal = round(native / 25.4, lands.LAND_DIA_PLACES[section]) * 25.4
     assert lands.land_finished_dia_limits_mm(native, section) == pytest.approx((nominal+lower, nominal+upper))
-    if section:
+    if section in shaft.FLAT_LANDS:
         assert shaft.DRAWING_PRECISION[f"Sec{section}FlatProfile"][f"Sec{section}AF"] == lands.LAND_AF_PLACES[section]
         af = round(lands.SECTION_FLAT_AF[section], lands.LAND_AF_PLACES[section])
         assert lands.land_finished_af_limits_mm(section) == pytest.approx((af+lands.FLAT_AF_BAND[1], af+lands.FLAT_AF_BAND[0]))

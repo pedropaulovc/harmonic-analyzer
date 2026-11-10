@@ -1,11 +1,14 @@
-"""The fit class for a gear slid onto its D-flat land on MHA-DT-04.
+"""The fit class for a gear slid onto its land on MHA-DT-04.
 
 Every gear on the cone gear shaft -- the twenty cone gears and the 64T
-crank-drive gear -- slides onto a D-flat land and bears on its neighbour.
-None is bonded (user ruling 2026-09-28: D-flat shaft and D-bores, no keys,
-no solder, no retaining compound).  Two clearances bound each seat, and both
-bore bands derive from the land's published limits, so moving a land moves
-its bores:
+crank-drive gear -- slides onto its land and bears on its neighbour.  Land 1
+(the 64T and T030..T120) is keyed: a 1/16 square key in a keyseat drives
+keyway-broached bores (cone_land_key; owner decision C1 keyed, 2026-11-09,
+PR #1992, superseding there the user ruling 2026-09-28 "D-flat shaft and
+D-bores, no keys, no solder, no retaining compound").  Lands 2-4 keep that
+ruling's D-flats and D-bores; none of their gears is bonded.  Two clearances
+bound each seat, and both bore bands derive from the land's published
+limits, so moving a land moves its bores:
 
 * Round, .0010-.0038 in diametral.  The .0010 floor lets a novice's gear
   slide down its land to the stack.  The .0038 ceiling bounds the gear's
@@ -13,10 +16,12 @@ its bores:
   crank_mesh_stack book that runout against the meshes.  On the land's
   0/-.0020 band the bore prints +.0018/+.0010, which the owned over reamer
   (.1260, .2510, .3760) cuts.
-* Across the flat, .0004-.0012 in (user ruling 2026-09-28, "interchangeable
-  tight"). The flat carries clock; the exact connected-home width barrier
-  below bounds its play. Clearance divided by half-chord is only a linear
-  approximation, not an angular bound. A channel's cam sees T/120 of the turn.
+* Across a D-flat (lands 2-4), .0004-.0012 in (user ruling 2026-09-28,
+  "interchangeable tight"). The flat carries clock; the exact connected-home
+  width barrier below bounds its play. Clearance divided by half-chord is only
+  a linear approximation, not an angular bound. A channel's cam sees T/120 of
+  the turn.  On land 1 the key carries clock (cone_land_key's side
+  clearances).
 
 Its own small module so only its importers re-key.
 """

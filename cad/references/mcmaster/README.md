@@ -114,6 +114,7 @@ recipes:
 | 98381A435 | `pd-vn-transgear-arm-plate-locating-pin` (MHA-PD-VN-64; catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
 | 98381A473 | `sm-vn-knife-mount-dowel` | Alloy Steel Dowel Pin |
 | 98381A474 | `pd-vn-transgear-latch-pin` (catalogue-only; no vendor model; SKU not yet read live) | Alloy Steel Dowel Pin |
+| 98830A511 | `dt-vn-cone-shaft-key` (MHA-DT-VN-71; catalogue-only; no vendor model) | 1008-1045 Carbon Steel Machine Key Stock |
 | 99607A213 | `pn-vn-pen-set-screw` | Stainless Steel Flared-Collar Knurled-Head Thumb Screw |
 
 The cone-lock selection follows `cad/scripts/build_dt_vn_cone_lock_knob.py`; the
@@ -1224,6 +1225,20 @@ Catalog specifications checked on September 10, 2026:
   pressed to the floor of the MHA-DT-21 foot's blind .0620 ream, a slip fit
   in the MHA-DT-20 plate's .0630 thru ream, match-drilled at MHA-DT-00
   step 2. `diag_build_98381A417.py` models the plain nominal cylinder;
+  catalogue-only, no vendor model, no replica gate.
+- [98830A511](https://www.mcmaster.com/98830A511/) (`dt-vn-cone-shaft-key`,
+  MHA-DT-VN-71, quantity one; owner decision C1 keyed, 2026-11-09, PR #1992)
+  was read live on November 9, 2026 from the product page and the family
+  table https://www.mcmaster.com/products/keys/width~1-16-1/: 1008-1045
+  carbon steel machine key stock, straight, 12 in long, 1/16 in high x
+  1/16 in wide, Tolerance Rating Undersized: height and width -0.002 to
+  0.000 in, length -0.125 to 0.000 in, Rockwell B50 minimum, $0.47 each. The
+  page states no edge form. The same table lists the oversized 98830A005,
+  the 36 in oversized 98830A701 and the zinc-plated oversized 98491A097; the
+  undersized bar is the one whose section `cone_land_key` fits in the
+  MHA-DT-04 land-1 keyseat and the MHA-DT-03/MHA-DT-07 keyways.
+  `diag_build_98830A511.py` models the plain nominal square bar and
+  `build_dt_vn_cone_shaft_key.py` cuts it to `cone_land_key.KEY_LENGTH_MM`;
   catalogue-only, no vendor model, no replica gate.
 - [98381A434](https://www.mcmaster.com/98381A434/) (`dt-vn-crank-seat-drive-pin`,
   MHA-DT-VN-67, crank only) was read live on September 30, 2026: alloy steel dowel pin,

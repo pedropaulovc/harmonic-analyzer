@@ -1,12 +1,12 @@
 r"""Create the curated manufacturing drawing for the crank-drive gear (64T).
 
 Recreated under ``cad/docs/drawing-guidelines.md``. The sheet is a
-face view, a longitudinal centre section through the D-flat and an isometric
-of a helical toothed disc with a local +X D-bore, and five native model
-dimensions -- outside diameter, four-place face width, round bore diameter,
-across-flat and south-entry chamfer -- plus the gear-data block drawing-guidelines.md rule 7 (notes: few, flagged, never a method) keeps
-for the crossed-axis tooth system and one numbered note, the D-bore's matched
-fit, that both bore dimensions link.
+face view, a longitudinal centre section through the keyway and an isometric
+of a helical toothed disc with a round bore keyed on local +X, and six native
+model dimensions -- outside diameter, four-place face width, round bore
+diameter, keyway width and T, and south-entry chamfer -- plus the gear-data block drawing-guidelines.md rule 7 (notes: few, flagged, never a method) keeps
+for the crossed-axis tooth system and one numbered note, the keyed bore's
+matched fit, that the bore and keyway dimensions link.
 
 No datums, no feature control frames: a gear slipped onto a shaft land is not
 on the GD&T allowlist (drawing-guidelines.md rule 5 (avoid excessive GD&T)), and the retired end-face perpendicularity
@@ -65,7 +65,8 @@ from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
-from dt_crank_drive_gear_notes import GEAR_DATA, SHAFT_MATE_NUMBER
+import cone_land_key
+from dt_crank_drive_gear_notes import GEAR_DATA, KEY_MATE_NUMBER, SHAFT_MATE_NUMBER
 from dt_crank_drive_gear_spec import (
     BORE_DIA,
     BORE_DIAMETRAL_CLEARANCE,
@@ -75,7 +76,6 @@ from dt_crank_drive_gear_spec import (
     OUTSIDE_DIA,
     inch_text,
 )
-from gear_seat_fit import FLAT_AF_CLEARANCE
 
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -103,7 +103,7 @@ GEAR_DATA_POS = (0.016, 0.262)
 # per row: on farm run 20261001T110844152Z the 15 rows' cap tops ran 261.7 to
 # 212.8 mm (3.50 mm pitch) and the last row's descenders reached 208.9 mm.
 # The tooth-edge requirement is one of its rows, not a free-floating note
-# (machinist review r1 of #1641); the only other note is the D-bore's
+# (machinist review r1 of #1641); the only other note is the keyed bore's
 # numbered fit note (NOTES_XY).
 GEAR_DATA_LINE_PITCH = 0.0035
 GEAR_DATA_BOTTOM = GEAR_DATA_POS[1] - len(GEAR_DATA.splitlines()) * GEAR_DATA_LINE_PITCH
@@ -116,29 +116,39 @@ HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / (VIEW_SCALE[1] * 2000.0)
 # can be proven not to overlap offline.
 FACE_WIDTH_HALF = FACE_WIDTH * VIEW_SCALE[0] / (VIEW_SCALE[1] * 2000.0)
 
-# End view: round diameter on the lower left, AF in the lane right of the
-# tooth tips and tip diameter above it. Dimension text centres on its keep
-# point. The A-A cutting line crosses the face on the bore axis, below the
-# tip leader and above the bore leader; only AF's witness lines, which start
-# on the axis, meet it. The flat itself appears on local +X in the face view.
+# End view: round diameter on the lower left, keyway T in the lane right of
+# the tooth tips, keyway width under the teeth, and tip diameter above.
+# Dimension text centres on its keep point. The A-A cutting line crosses the
+# face on the bore axis, below the tip leader and above the bore leader; only
+# T's witness lines, which start on the axis, meet it. The keyway width is a
+# vertical dimension whose extension lines run along the cutting line, one
+# either side of it: carried out past the teeth they struck the A-A arrow's
+# stem (farm proof of #2331 at 7f1dedc). So its dimension line stands just
+# off the keyway top, its extension lines end well inside the arrow, and the
+# dimension line runs down across the face to the value under the teeth,
+# its shelf and text to the right of the line and right of the numbered
+# notes. Between its two outside arrows the line has no ink, so the cutting
+# line passes through that gap untouched.
+# The keyway itself appears on local +X in the face view.
 #
 # The tip text sits up and right of the teeth, right of every gear-data row
 # that reaches its height and under the face-width block, so its callout can
 # name the mesh its band serves (machinist review r1 of #1641: the mate was
 # named only in GEAR DATA).
 TIP_DIA_CALLOUT = "FIXED-CENTRE MESH\nWITH MHA-DT-10"
-# The AF block's widest line is its value; it stands in the lane right of
+# The T block's widest line is its value; it stands in the lane right of
 # the tooth tips, over 3 mm beyond the padded front-view clearance guard and
 # over 14 mm to the padded section, without moving its model anchors or the
 # chamfer below it.
 FRONT_KEEP = {
     "OutsideDia": (FRONT_CENTER[0] + 0.055, FRONT_CENTER[1] + 0.067),
     "BoreDia": (FRONT_CENTER[0] - 0.078, FRONT_CENTER[1] - 0.062),
-    "BoreAF": (FRONT_CENTER[0] + 0.099, FRONT_CENTER[1] + 0.028),
+    "KeywayT": (FRONT_CENTER[0] + 0.099, FRONT_CENTER[1] + 0.028),
+    "KeywayWidth": (FRONT_CENTER[0] + 0.013, FRONT_CENTER[1] - 0.072),
 }
 # Longitudinal centre section A-A instead of a plain side view: the south
 # bore chamfer is internal, and a targeted import delivers the chamfer's
-# size only into a section whose plane holds the flat. Probe run
+# size only into a section whose plane holds the keyway. Probe run
 # 20260929T113615557Z-0f9264a5 (223e44d) imported BoreSouthChamfer into each
 # candidate view before any other view held it: the cut along +X gave
 # BoreSouthChamferSize, while the cut along +Y, *Right and *Back gave
@@ -154,7 +164,7 @@ SECTION_CAPTION_XY = (SECTION_CENTER[0], 0.085)
 # The native caption's fields: name and letter only, no scale compartment.
 SECTION_CAPTION_TEXT = "<VLNAME> <VLLABEL>"
 # The cut runs along the face view's horizontal centre line, so A-A projects
-# with the flat to the right; ``_turn_section_axis_across`` turns it 90° CCW
+# with the keyway to the right; ``_turn_section_axis_across`` turns it 90° CCW
 # so the gear axis reads across the sheet. The native caption reads SECTION
 # A-A only: the section is drawn at the sheet's 3:2, so it prints no scale
 # (drawing-guidelines.md rule 9: a scale equal to the sheet's restates the
@@ -174,7 +184,7 @@ ROTATION_NOTE_XY = (
 # Face width up and left of the section, its dimension line run out past the
 # south witness line so neither witness line strikes the text (machinist
 # review r1 of #1641); the chamfer's leg dimension runs left off the south
-# face into the lane under the AF callout, as RimChamferSize does.
+# face into the lane under the T callout, as RimChamferSize does.
 SECTION_KEEP = {
     "FaceWidth": (SECTION_CENTER[0] - 0.040, SECTION_CENTER[1] + HALF_OD + 0.016),
     "BoreSouthChamferSize": (SECTION_CENTER[0] - 0.028, SECTION_CENTER[1] - 0.005),
@@ -186,29 +196,38 @@ SECTION_KEEP = {
 # text-unmatched), while the native below lane prints on every sheet.
 FACE_WIDTH_CALLOUT = "SETS CONE GEAR STACK\nON MHA-DT-04"
 
-# Native bands on both bore dimensions set the fitted clearance: the fleet
-# gear-seat fit (gear_seat_fit) on the MHA-DT-04 land, .0008 wide on the
-# round and .0004 across the flat, narrower than the shop table's turned
-# diameter and milled width rows. Their fit route is a matched fit to the
-# finished land with its acceptance (drawing-guidelines.md rule 4), named
-# once in numbered note 1 that both bore dimensions link (rule 4: one
-# feature with several tight dimensions names its mate once); the limits
-# still apply and the clearances print as reference. No process word: a
-# reamer would cut away the flat, and the dimensions define the D-profile
-# (user ruling 2026-09-29, machinist review of the #1128 full build;
-# dt-crank-drive-gear.yaml RV-01). The mate's name lives here, not beside
-# its number in crank_drive_gear_notes, which is in the part's rebuild
-# closure; test_crank_drive_gear_drawing checks it against the registry.
+# Native bands on the bore and keyway dimensions set the fitted clearances:
+# the fleet gear-seat fit (gear_seat_fit) on MHA-DT-04's land 1, .0008 wide
+# on the round, and cone_land_key's width and T for the MHA-DT-VN-71 key.
+# The round's fit route is a matched fit to the finished land with its
+# acceptance (drawing-guidelines.md rule 4), named once in numbered note 1
+# that the bore and keyway dimensions link (rule 4: one feature with several
+# tight dimensions names its mate once). The round bore's callout carries
+# REAM, rule 12's process for a fit bore (no flat left for a reamer to cut
+# away, so dt-crank-drive-gear.yaml RV-01 is retired); the keyway's bands
+# are its requirement and print no process. The mate's name lives here, not beside its number in
+# crank_drive_gear_notes, which is in the part's rebuild closure;
+# test_crank_drive_gear_drawing checks it against the registry.
 SHAFT_MATE_NAME = "CONE GEAR SHAFT"
+KEY_MATE_NAME = "KEY"
 BORE_FIT_NOTE_NUMBER = 1
+# The land is named by what it is, its key, not by a project label the sheet
+# never defines (machinist review, run 20261110T001845485Z: "LAND 1"; rule
+# 26). MHA-DT-04 keys one land only. The clearances print as REF in the form
+# draw_dt_cone_gear.sheet_notes prints for the keyed cone gears on the same
+# land, read from the same limits (the round fit, cone_land_key's keyway side
+# clearance). Each line stays no longer than 51 characters, left of the
+# keyway width's text above it.
+_ROUND_FIT = "-".join(inch_text(value, 4) for value in BORE_DIAMETRAL_CLEARANCE)
+_KEYWAY_FIT = "-".join(
+    inch_text(value, 4) for value in cone_land_key.KEYWAY_SIDE_CLEARANCE_MM
+)
 BORE_FIT_NOTE = "\n".join(
     (
-        f"{BORE_FIT_NOTE_NUMBER}. SLIDING FIT ON {SHAFT_MATE_NAME} {SHAFT_MATE_NUMBER}, "
-        "MADE TO ITS MEASURED LAND",
-        f"   (CLEARANCE {inch_text(BORE_DIAMETRAL_CLEARANCE[0], 4)}-"
-        f"{inch_text(BORE_DIAMETRAL_CLEARANCE[1], 4)}, ACROSS FLAT "
-        f"{inch_text(FLAT_AF_CLEARANCE[0], 4)}-{inch_text(FLAT_AF_CLEARANCE[1], 4)}); "
-        "SLIDES ON, NO ROCK.",
+        f"{BORE_FIT_NOTE_NUMBER}. SLIDING FIT ON THE KEYED LAND OF {SHAFT_MATE_NAME}",
+        f"   {SHAFT_MATE_NUMBER} AND {KEY_MATE_NAME} {KEY_MATE_NUMBER}: BORE MADE TO THE",
+        f"   MEASURED LAND (CLEARANCE {_ROUND_FIT} ON \u00d8,",
+        f"   {_KEYWAY_FIT} KEYWAY TO KEY); SLIDES ON, NO ROCK.",
     )
 )
 # The sheet's numbered notes, in one block (rule 7: at most four short
@@ -216,12 +235,18 @@ BORE_FIT_NOTE = "\n".join(
 # callout, left of the title block (x 0.216), inside the border.
 SHEET_NOTES = BORE_FIT_NOTE
 NOTES_XY = (0.016, 0.060)
-BORE_CALLOUT = f"THRU\nSEE NOTE {BORE_FIT_NOTE_NUMBER}"
-AF_CALLOUT = f"BORE ACROSS FLAT\nSEE NOTE {BORE_FIT_NOTE_NUMBER}"
+BORE_CALLOUT = f"REAM THRU\nSEE NOTE {BORE_FIT_NOTE_NUMBER}"
+# The keyway's width and T print their value, band and flag only, as the
+# keyed cone gears' do (draw_dt_cone_gear: the machinist review of the
+# C1-keyed sheets dropped KEYWAY TO FAR SIDE; rule 25, sheets agree). T
+# reads from its witnesses: the keyway top and the far side of the bore.
+KEYWAY_WIDTH_CALLOUT = f"SEE NOTE {BORE_FIT_NOTE_NUMBER}"
+KEYWAY_T_CALLOUT = f"SEE NOTE {BORE_FIT_NOTE_NUMBER}"
 DIMENSION_CALLOUTS = {
     "OutsideDia": TIP_DIA_CALLOUT,
     "BoreDia": BORE_CALLOUT,
-    "BoreAF": AF_CALLOUT,
+    "KeywayWidth": KEYWAY_WIDTH_CALLOUT,
+    "KeywayT": KEYWAY_T_CALLOUT,
     "FaceWidth": FACE_WIDTH_CALLOUT,
     # The leg is native and prints under the title block's .XX band; the
     # chamfer feature is 45° on the model. The callout says why the chamfer
@@ -231,12 +256,12 @@ DIMENSION_CALLOUTS = {
     # by 1 mm: two trailing spaces on every line keep that ink clear (r3 of
     # #1641 printed RUNOUT's T on the line).
     "BoreSouthChamferSize": (
-        " X 45\N{DEGREE SIGN}  \nCLEARS FLAT RUNOUT  \nOF MHA-DT-04  "
+        " X 45\N{DEGREE SIGN}  \nCLEARS COLLAR ROOT  \nOF MHA-DT-04  "
     ),
 }
 
 # The tip diameter lands on its near (upper right) rim and the round
-# clearance on the lower left of the surviving circular bore wall.
+# diameter on the lower left of the circular bore wall.
 BORE_SHEET_RADIUS = BORE_DIA * VIEW_SCALE[0] / (VIEW_SCALE[1] * 2000.0)
 # Past the bore's own radius, only the leaders that land on it arrive.
 TIP_DIA_KEEP_OUT = 2.0 * BORE_SHEET_RADIUS
@@ -297,47 +322,47 @@ def _position_section_caption(adapter: Any, view: Any) -> None:
 
 
 def _section_axes(adapter: Any, view: Any) -> tuple[tuple[float, float], tuple[float, float]]:
-    """Sheet directions of the gear axis (+Z) and the flat's normal (+X)."""
+    """Sheet directions of the gear axis (+Z) and the keyway's direction (+X)."""
     origin = model_point_in_view(adapter, view, (0.0, 0.0, 0.0), label="64T section origin")
     axes = []
-    for xyz, name in (((0.0, 0.0, 0.001), "gear axis"), ((0.001, 0.0, 0.0), "flat normal")):
+    for xyz, name in (((0.0, 0.0, 0.001), "gear axis"), ((0.001, 0.0, 0.0), "keyway direction")):
         point = model_point_in_view(adapter, view, xyz, label=f"64T section {name}")
         axes.append((point[0] - origin[0], point[1] - origin[1]))
     return axes[0], axes[1]
 
 
 def _turn_section_axis_across(adapter: Any, view: Any) -> None:
-    """Turn A-A so the gear axis reads left to right, flat side up.
+    """Turn A-A so the gear axis reads left to right, keyway side up.
 
     Cut along +X, the section lands with the axis vertical. A left-to-right
     axis puts the south face, the chamfered one, toward the face view. With
-    the flat up the sight runs along -Y, so the A-A arrows point down, away
-    from the AF dimension line above the cutting line.
+    the keyway up the sight runs along -Y, so the A-A arrows point down, away
+    from the T dimension line above the cutting line.
     """
     native = _early_bound(view, "IView")
     section = _early_bound(native.GetSection(), "IDrSection")
-    axis, flat = _section_axes(adapter, native)
-    if axis[0] * flat[1] - axis[1] * flat[0] < 0.0:
+    axis, keyway = _section_axes(adapter, native)
+    if axis[0] * keyway[1] - axis[1] * keyway[0] < 0.0:
         reversed_cut = not bool(section.GetReversedCutDirection())
         section.SetReversedCutDirection(reversed_cut)
         rebuild_drawing(adapter, label="reverse 64T section")
         if bool(section.GetReversedCutDirection()) != reversed_cut:
             raise RuntimeError("64T section cutting direction did not persist")
-        axis, flat = _section_axes(adapter, native)
-    # SolidWorks lays the aligned section in projection, the flat along the
-    # cutting line as in the face view: rightward. Turning that flat up is
+        axis, keyway = _section_axes(adapter, native)
+    # SolidWorks lays the aligned section in projection, the keyway along the
+    # cutting line as in the face view: rightward. Turning it up is
     # 90° counter-clockwise, which ROTATION_NOTE prints; any other start
     # would make the label false, so it fails the build instead.
-    if flat[0] <= 0.0 or abs(flat[1]) > 1e-8:
+    if keyway[0] <= 0.0 or abs(keyway[1]) > 1e-8:
         raise RuntimeError(
-            f"64T section does not lay the flat rightward before its turn ({flat=}), "
+            f"64T section does not lay the keyway rightward before its turn ({keyway=}), "
             f"so {ROTATION_NOTE!r} would be false"
         )
     native.Angle = float(native.Angle) - math.atan2(axis[1], axis[0])
     rebuild_drawing(adapter, label="turn 64T section")
-    axis, flat = _section_axes(adapter, native)
-    if axis[0] <= 0.0 or abs(axis[1]) > 1e-8 or flat[1] <= 0.0 or abs(flat[0]) > 1e-8:
-        raise RuntimeError(f"64T section did not turn axis-across: {axis=}, {flat=}")
+    axis, keyway = _section_axes(adapter, native)
+    if axis[0] <= 0.0 or abs(axis[1]) > 1e-8 or keyway[1] <= 0.0 or abs(keyway[0]) > 1e-8:
+        raise RuntimeError(f"64T section did not turn axis-across: {axis=}, {keyway=}")
     _telemetry.info(
         f"64T section turned: angle={float(native.Angle):.6f} rad, "
         f"reversed={bool(section.GetReversedCutDirection())}"
@@ -352,7 +377,7 @@ def _named(adapter: Any, annotations: list[Any], name: str) -> Any:
 
 
 def _add_bore_arc_center_mark(adapter: Any, view: Any) -> None:
-    """Mark the D-bore axis on its far (-X) circular arc, not the flat."""
+    """Mark the bore axis on its far (-X) circular arc, away from the keyway."""
     draw = adapter.currentModel
     drawing_doc = _sw_type_info.early_bound_or_flag(
         draw, "IDrawingDoc", "ActivateView", "InsertCenterMark3"
@@ -364,15 +389,15 @@ def _add_bore_arc_center_mark(adapter: Any, view: Any) -> None:
         "", "EDGE", FRONT_CENTER[0] - BORE_SHEET_RADIUS, FRONT_CENTER[1], 0.0,
         False, 0, null_callout(), 0,
     ):
-        raise RuntimeError("failed to select the round side of the D-bore")
+        raise RuntimeError("failed to select the round side of the keyed bore")
     center_mark = drawing_doc.InsertCenterMark3(2, False, False)
     draw.ClearSelection2(True)
     if center_mark is None:
-        raise RuntimeError("failed to mark the D-bore axis")
+        raise RuntimeError("failed to mark the keyed bore axis")
 
 
 def _bore_leaders_clear(adapter: Any, front: Any, annotations: list[Any]) -> None:
-    """Fail unless no two face-view leaders cross and none but the AF
+    """Fail unless no two face-view leaders cross and none but the keyway T
     dimension touches the A-A cutting line."""
     tip = _named(adapter, annotations, "OutsideDia")
     set_near_side_diameter(tip, "tip diameter")
@@ -384,27 +409,31 @@ def _bore_leaders_clear(adapter: Any, front: Any, annotations: list[Any]) -> Non
     rebuild_drawing(adapter, label="tip and bore diameter near-side leaders")
     tip_segments = dimension_segments(tip)
     bore_segments = dimension_segments(bore)
+    width_segments = dimension_segments(_named(adapter, annotations, "KeywayWidth"))
     assert_leaders_clear(
         {
             "OutsideDia": tip_segments,
             "BoreDia": bore_segments,
-            "BoreAF": dimension_segments(_named(adapter, annotations, "BoreAF")),
+            "KeywayT": dimension_segments(_named(adapter, annotations, "KeywayT")),
+            "KeywayWidth": width_segments,
         },
         centre=FRONT_CENTER,
         keep_out={"OutsideDia": TIP_DIA_KEEP_OUT},
         lands_within={
             "OutsideDia": TIP_DIA_LANDING,
             "BoreDia": BORE_LANDING,
-            "BoreAF": BORE_LANDING,
+            "KeywayT": BORE_LANDING,
+            "KeywayWidth": BORE_LANDING,
         },
         label="crank drive gear bore",
     )
-    # AF runs from the round wall across the axis to the flat, so it spans
-    # any centre cut; every leader that lands on one rim stays off the line.
+    # T runs from the round wall across the axis to the keyway top, so it
+    # spans any centre cut; every leader that lands on one rim stays off the line.
     assert_leaders_clear(
         {
             "OutsideDia": tip_segments,
             "BoreDia": bore_segments,
+            "KeywayWidth": width_segments,
             "SectionLine": section_line_segments(adapter, front),
         },
         centre=FRONT_CENTER,
@@ -412,6 +441,7 @@ def _bore_leaders_clear(adapter: Any, front: Any, annotations: list[Any]) -> Non
         lands_within={
             "OutsideDia": TIP_DIA_LANDING,
             "BoreDia": BORE_LANDING,
+            "KeywayWidth": BORE_LANDING,
             "SectionLine": SECTION_LINE_LANDING,
         },
         label="crank drive gear leaders vs A-A",
@@ -474,8 +504,8 @@ async def build(adapter: Any) -> dict[str, str]:
     _turn_section_axis_across(adapter, section)
     _position_section_caption(adapter, section)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
-    # The bore profile is a circular arc closed by a flat; the D-shape is
-    # explicit in the face view and the section needs no hidden edges.
+    # The bore profile is a circular arc closed by the keyway; the keyed
+    # shape is explicit in the face view and the section needs no hidden edges.
     for view in (front, section, iso):
         set_hidden_lines_removed(adapter, view)
     _hide_tangent_edges(front, "front")
@@ -508,7 +538,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, front_annotations + section_annotations, DRAWING_PRECISION_BY_NAME
     )
     _add_bore_arc_center_mark(adapter, front)
-    # No roughness symbol: the D-bore is a gear seat, not a running surface
+    # No roughness symbol: the keyed bore is a gear seat, not a running surface
     # (drawing-guidelines.md rule 6; dt_crank_drive_gear_spec.SURFACE_FINISHES).
     _bore_leaders_clear(adapter, front, front_annotations)
 

@@ -19,6 +19,7 @@ from functools import lru_cache
 from typing import Any
 
 import _config
+import cone_land_key
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _package_units import drawing_unit
 from cone_pitch import SEAT_PITCH
@@ -237,6 +238,10 @@ def _member(teeth: int) -> _Member:
     web_required = WEB_EXCEPTIONS_MM.get(teeth, MACHINED_WEB_TARGET_MM)
     if (minimum - maximum_bore) / 2.0 < web_required - 1e-9:
         raise ValueError(f"T{teeth:03d}: printed root misses the retained web")
+    # A keyed gear's ligament is shortest at its keyway's top corner
+    # (cone_land_key): at least the .080 target, or its recorded minor.
+    if keyed(teeth) and _keyway_web_mm(teeth, minimum) < keyway_web_required_mm(teeth) - 1e-9:
+        raise ValueError(f"T{teeth:03d}: printed root misses the keyway corner's web")
     # T006 root (re-derived for option (a), replacing the D2.346 MIN of the
     # retired R1.491 tool): the standard-depth thick corner sits the tool root
     # R1.10 on the gear's own axis offset 0, so the root MAX is D2.20; the thin
@@ -336,7 +341,7 @@ def over_pins_limits_mm(teeth: int) -> tuple[float, float]:
     )
 
 
-BORE_DIA = 9.525  # 3/8 (.3750) at T120; smaller on the tip gears
+BORE_DIA = cone_land_key.LAND_DIA_MM  # 3/8 (.3750) at T120; smaller on the tip gears
 # Face width (user ruling 2026-09-28): the cone set is a solid stack.  Every
 # gear is one seat pitch thick, so each bears on its neighbour and the stack
 # on MHA-DT-07 sets every station (dt_cone_gear_stack); no gear is bonded.  The
@@ -353,10 +358,14 @@ FACE_WIDTH_BAND = GEAR_FACE_WIDTH_BAND
 # Flat clock (user ruling 2026-09-28): the bore's D-flat is the gear's
 # angular datum on MHA-DT-04, and its outward normal passes through the centre
 # of the phase-0 tooth on local +X, so every gear keeps the clock it is
-# placed at.  Index the teeth off the flat on one setup; the native
-# BoreFlatClock angular dimension carries this band (error_budget.yaml
-# cone_flat_clock), the cylinder gear's CAM_PHASE_TOLERANCE_DEG precedent.
-FLAT_CLOCK_TOLERANCE_DEG = 0.25
+# placed at.  On the keyed land 1 (owner decision 2026-11-09, C1 keyed, PR
+# #1992) the hub keyway takes the flat's place on the same +X clock.  The
+# flat (keyway) and the phase-0 tooth share the front view's drawn +X
+# centreline (drawing-guidelines rule 26: features in line share a drawn
+# centreline), so the clock is the title block's angle and takes no
+# dimension: the error budget's cone_flat_clock closes at it (machinist
+# review of the C1-keyed sheets, PR 2 round 2: a ±.25° clock in DETAIL A
+# named a tooth the detail does not draw, and no mate).
 
 
 def floor_radius_min_mm(teeth: int) -> float:
@@ -426,9 +435,10 @@ TERMINAL_WEB_REQUIREMENTS_MM = {
 BORE_BAND_PLACES = 4
 
 
-# The band is UNIFORM: BoreCutDia is one model dimension across all twenty
-# configurations. Keep the retained seat class independent of selected cutter
-# settings so numerical qualification does not require its own output first.
+# The band is UNIFORM: BoreCutDia (the D-bores) and KeyedBoreDia (the keyed
+# bores) carry it in every configuration. Keep the retained seat class
+# independent of selected cutter settings so numerical qualification does
+# not require its own output first.
 def _seat_fit_band() -> tuple[float, float]:
     """(upper, lower): the round seat fit that holds on every gear land."""
     carried = [
@@ -473,16 +483,25 @@ def terminal_web_mm(teeth: int) -> float:
 
 
 
-# --- D-bore (user ruling 2026-09-28) -----------------------------------------
+# --- D-bores (user ruling 2026-09-28) and keyed bores (C1 keyed) -------------
 #
-# Every bore is a D: the round bore above plus one flat, parallel to the
-# land's flat, whose outward normal is local +X (through the phase-0 tooth,
-# FLAT_CLOCK_TOLERANCE_DEG).  Across-flat (AF) is measured from the flat to
-# the far side of the round bore, the land's own AF nominal; the band keeps
-# .0004-.0012 in AF clearance on the land's FLAT_AF_BAND.  One band for all twenty,
-# so one BoreAF tolerance serves every configuration.
+# T006..T024 ride lands 2-4: each bore is a D, the round bore above plus one
+# flat, parallel to the land's flat, whose outward normal is local +X
+# (through the phase-0 tooth, error_budget.yaml cone_flat_clock).  Across-flat (AF) is
+# measured from the flat to the far side of the round bore, the land's own AF
+# nominal; the band keeps .0004-.0012 in AF clearance on the land's
+# FLAT_AF_BAND.  One band for every D, so one BoreAF tolerance serves them all.
+#
+# T030..T120 ride land 1, which is round and keyed (owner decision
+# 2026-11-09, C1 keyed, PR #1992; it supersedes there the 2026-09-28 ruling's
+# "no keys"): the round bore above, its band unchanged, and one hub keyway for
+# the MHA-DT-VN-71 1/16 key, centred on +X where the flat stood.  Its width
+# and T (keyway top to the bore's far side, ANSI B17.1) are cone_land_key's.
 BORE_AF_BAND = flat_bore_af_band(FLAT_AF_BAND)  # +.0008/+.0004 in
 BORE_AF_PLACES = 4
+KEYED_LAND = 1
+if SECTION_FLAT_AF[KEYED_LAND] is not None:
+    raise AssertionError("land 1 carries the key, not a flat")
 
 
 def land_section(teeth: int) -> int:
@@ -494,8 +513,17 @@ def land_section(teeth: int) -> int:
     raise AssertionError(f"no MHA-DT-04 land carries the T{teeth:03d} cone gear")
 
 
+def keyed(teeth: int) -> bool:
+    """Whether the gear rides the keyed land 1: a round bore and keyway, no D."""
+    return land_section(teeth) == KEYED_LAND
+
+
+KEYED_TEETH = tuple(teeth for teeth in CONFIGURATION_TEETH if keyed(teeth))
+D_BORE_TEETH = tuple(teeth for teeth in CONFIGURATION_TEETH if not keyed(teeth))
+
+
 def bore_flat_af_mm(teeth: int) -> float:
-    """Return the configuration's nominal bore across-flat."""
+    """Return the configuration's nominal bore across-flat (D-bores only)."""
     across_flat = SECTION_FLAT_AF[land_section(teeth)]
     if across_flat is None:
         raise AssertionError(f"the T{teeth:03d} land has no flat")
@@ -517,12 +545,78 @@ def bore_flat_segment_area_mm2(teeth: int) -> float:
     )
 
 
-for _teeth in CONFIGURATION_TEETH:
+for _teeth in D_BORE_TEETH:
     if not 0.0 < bore_flat_offset_mm(_teeth) < bore_dia_mm(_teeth) / 2.0:
         raise AssertionError(
             f"T{_teeth:03d} bore AF {bore_flat_af_mm(_teeth)} does not cut a "
             f"flat into its Ø{bore_dia_mm(_teeth)} bore"
         )
+
+
+def _require_keyed(teeth: int) -> None:
+    if not keyed(teeth):
+        raise ValueError(f"T{teeth:03d} has a D-bore, not a keyway")
+
+
+KEYWAY_HALF_WIDTH_MM = cone_land_key.KEYWAY_WIDTH_MM / 2.0
+
+
+def keyway_top_offset_mm(teeth: int) -> float:
+    """Nominal distance of the keyway's top from the bore axis, on +X."""
+    _require_keyed(teeth)
+    return cone_land_key.keyway_top_offset_mm(bore_dia_mm(teeth))
+
+
+def keyway_corner_radius_mm(teeth: int) -> float:
+    """Nominal distance of the keyway's top corners from the bore axis: the
+    bore's farthest reach."""
+    return math.hypot(keyway_top_offset_mm(teeth), KEYWAY_HALF_WIDTH_MM)
+
+
+def keyway_area_outside_bore_mm2(teeth: int) -> float:
+    """Area the keyway adds to the round bore, per unit face (exact): the
+    strip |y| <= w/2 out to the top, less the round bore's share of it."""
+    radius = bore_dia_mm(teeth) / 2.0
+    half, top = KEYWAY_HALF_WIDTH_MM, keyway_top_offset_mm(teeth)
+    # Integral over |y| <= half of (top - sqrt(radius^2 - y^2)).
+    return 2.0 * half * top - (
+        half * math.sqrt(radius * radius - half * half)
+        + radius * radius * math.asin(half / radius)
+    )
+
+
+for _teeth in KEYED_TEETH:
+    if not KEYWAY_HALF_WIDTH_MM < bore_dia_mm(_teeth) / 2.0 < keyway_top_offset_mm(_teeth):
+        raise AssertionError(f"T{_teeth:03d} keyway does not break out of its bore")
+
+
+def _keyway_web_mm(teeth: int, root_min_dia_mm: float) -> float:
+    """Print-worst ligament from the root envelope to the keyway's top corner
+    (cone_land_key: T at its maximum, the bore at its minimum)."""
+    corner = cone_land_key.hub_keyway_corner_radius_max_mm(bore_dia_mm(teeth) + BORE_DIA_BAND[1])
+    return root_min_dia_mm / 2.0 - corner
+
+
+def keyway_web_min_mm(teeth: int) -> float:
+    """Print-worst ligament of a keyed gear, at its keyway's top corner."""
+    _require_keyed(teeth)
+    return _keyway_web_mm(teeth, floor_limits_mm(teeth)[0])
+
+
+# The keyed webs under rule 17's .080 target: T030's .06218 in (printed
+# .0621, floored like every GEAR DATA web; the keyway width at the milled-
+# width row's +.0020) is recorded as a minor
+# (cad/config/parts/dt-cone-gear.yaml, owner ruling 2026-11-09 via PR #1992),
+# above the .060 floor; every other keyed gear keeps the target.
+KEYWAY_WEB_EXCEPTIONS_MM: dict[int, float] = {30: 1.57734}  # T030: .0621
+if min(KEYWAY_WEB_EXCEPTIONS_MM.values()) < MACHINED_WEB_FLOOR_MM:
+    raise AssertionError("a keyed web exception falls under rule 17's .060 floor")
+
+
+def keyway_web_required_mm(teeth: int) -> float:
+    """The keyway-corner web a keyed gear must keep."""
+    _require_keyed(teeth)
+    return KEYWAY_WEB_EXCEPTIONS_MM.get(teeth, MACHINED_WEB_TARGET_MM)
 
 
 # The part's construction-only authoring sketches.  The part saves them
@@ -568,14 +662,38 @@ def web_reference_mm() -> tuple[float, float, tuple[float, float]]:
 # The finite translated root is an off-centre arc, not a bowed ideal chord.
 # Native tolerances remain meaningful: the pitch thickness has its retained
 # bilateral band; the root envelope has the qualified per-count LIMIT pair.
+# The D-bore (BoreProfile, T006..T024) and the keyed bore (KEYED_BORE_SKETCH,
+# T030..T120) are separate configuration-restricted features; a sheet prints
+# the one its configuration carries.
+BORE_SKETCH = "BoreProfile"
+KEYED_BORE_SKETCH = "KeyedBoreProfile"
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BlankProfile": {"BlankDia"},
     "Blank": {"FaceWidth"},
-    "BoreProfile": {"BoreCutDia", "BoreAF", "BoreFlatClock"},
+    BORE_SKETCH: {"BoreCutDia", "BoreAF"},
+    KEYED_BORE_SKETCH: {"KeyedBoreDia", "KeywayWidth", "KeywayT"},
     TOOTH_REFERENCE_SKETCH: {"ToothThickness"},
     GAP_FLOOR_SKETCH: {"FloorDia"},
     WEB_REFERENCE_SKETCH: {"WebMin"},
 }
+
+
+def bore_sketch(teeth: int) -> str:
+    """The bore sketch the configuration carries (and its sheet prints)."""
+    return KEYED_BORE_SKETCH if keyed(teeth) else BORE_SKETCH
+
+
+def bore_clock_offset_mm(teeth: int) -> float:
+    """Distance from the bore axis to the clock's vertex on +X: the D's flat,
+    or the keyway's top."""
+    return keyway_top_offset_mm(teeth) if keyed(teeth) else bore_flat_offset_mm(teeth)
+
+
+def bore_reach_mm(teeth: int) -> float:
+    """Nominal farthest point of the bore from its axis: the round bore, or
+    the keyway's top corners."""
+    return keyway_corner_radius_mm(teeth) if keyed(teeth) else bore_dia_mm(teeth) / 2.0
+
 
 # Blank band below the printed outside diameter, undersize only, so the
 # closing corner keeps root clearance (user ruling 2026-10-10: ordinary
@@ -716,14 +834,19 @@ def configuration_number(part_number: str, teeth: int) -> str:
 # T006, and every blank is floored to that grid, so the printed size is the
 # modelled one.  The face width prints four, like the cylinder gear's
 # OverallThickness under the same rule: three would round its nominal by a
-# third of the +/-.001 band.  The flat clock prints one place of degrees,
-# the cylinder gear's NotchPhase precedent: +/-0.25 needs no more.  RV-03's
-# T012 web prints its ruled .0797 MIN at four.
+# third of the +/-.001 band.  The keyway's width and T print at
+# cone_land_key's places.  RV-03's T012
+# web prints its ruled .0797 MIN at four.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BlankProfile": {"BlankDia": 4},
     "Blank": {"FaceWidth": 4},
-    "BoreProfile": {
-        "BoreCutDia": BORE_BAND_PLACES, "BoreAF": BORE_AF_PLACES, "BoreFlatClock": 1,
+    BORE_SKETCH: {
+        "BoreCutDia": BORE_BAND_PLACES, "BoreAF": BORE_AF_PLACES,
+    },
+    KEYED_BORE_SKETCH: {
+        "KeyedBoreDia": BORE_BAND_PLACES,
+        "KeywayWidth": cone_land_key.KEYWAY_PLACES,
+        "KeywayT": cone_land_key.KEYWAY_PLACES,
     },
     TOOTH_REFERENCE_SKETCH: {"ToothThickness": 4},
     GAP_FLOOR_SKETCH: {"FloorDia": 4},

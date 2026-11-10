@@ -67,7 +67,13 @@ def test_the_cone_stack_step_prints_measured_limits() -> None:
     stack = _step_body("cone-gears-stacked")
     assert "MHA-DT-07" in stack and "MHA-DT-03" in stack
     assert "T120 FIRST THROUGH T006" in stack
-    assert "EACH FLAT TO FLAT AND AGAINST THE LAST" in stack
+    # Owner decision C1 keyed (2026-11-09, PR #1992): the land-1 key goes in
+    # before any gear slides over it.
+    key = _config.parts("dt-vn-cone-shaft-key")["number"]
+    assert stack.index(f"SEAT {key} IN THE MHA-DT-04 KEYSEAT") < stack.index(
+        "SLIDE MHA-DT-07"
+    )
+    assert f"SLIDE MHA-DT-07 ON {key}" in stack
     # The decimal-inch window rounds inward, a thousandth inside each limit.
     printed = re.search(r"T006 BACK FACE: ACCEPT (\d*\.\d{3})-(\d*\.\d{3})\.", stack)
     assert printed is not None
@@ -259,14 +265,14 @@ def test_a_cite_to_the_wrong_step_is_caught() -> None:
 
 def _defined_codes() -> list[str]:
     """The short codes MHA-DT-00 defines: each cone gear's configuration
-    (the BOM's "T006-T120 BY 6") and the chain wheel the interface notes name."""
+    (the BOM's "T006-T120 BY 6").  The chain wheel goes by its number only:
+    a "T12" read as a cone-gear code (machinist review of 5994f29c83)."""
     cone = re.search(r"\bT(\d+)-T(\d+) BY (\d+)\b", drawing.BOM_DESCRIPTIONS["dt-cone-gear"])
     assert cone, drawing.BOM_DESCRIPTIONS["dt-cone-gear"]
     first, last, step = (int(value) for value in cone.groups())
     gears = {f"T{teeth:03d}" for teeth in range(first, last + 1, step)}
-    named = set(re.findall(r"\bT\d+\b", drawing.INTERFACE_NOTES))
-    assert named, "the interface notes name the T12 chain wheel"
-    return [re.escape(code) for code in sorted(gears | named)]
+    assert not re.findall(r"\bT\d+\b", drawing.INTERFACE_NOTES), "the interface notes print no tooth code"
+    return [re.escape(code) for code in sorted(gears)]
 
 
 def _direction_key() -> str:

@@ -66,7 +66,7 @@ def clearance_budget(
         + setup.PIVOT_THREAD_CENTRING_MM
         + setup.ARBOR_RUNNING_FLOAT_MM
     )
-    gear_cock = math.atan(GEAR_SEAT_CLEARANCE[1] / drive.FLAT_ENGAGEMENT_MIN)
+    gear_cock = math.atan(GEAR_SEAT_CLEARANCE[1] / drive.BORE_ENGAGEMENT_MIN)
     # The south entry chamfer shortens the supporting cylindrical bore and
     # lengthens the far-tip lever; a full-face-width cock estimate understates it.
     cock_lever = (

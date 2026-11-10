@@ -691,6 +691,7 @@ BOM_PART_NUMBERS = {
     "dt-vn-cone-tip-pinch-screw": "MHA-DT-VN-56",
     "dt-vn-cone-tip-block-screw": "MHA-DT-VN-60",
     "dt-vn-locating-pin": "MHA-DT-VN-69",
+    "dt-vn-cone-shaft-key": "MHA-DT-VN-71",
     "dt-vn-post-mount-screw": str(_config.parts("dt-vn-post-mount-screw")["number"]),
     "dt-vn-cone-lock-knob": "MHA-DT-VN-51",
     "dt-vn-cone-pivot-screw": "MHA-DT-VN-52",
@@ -745,6 +746,7 @@ BOM_DESCRIPTIONS = {
     "dt-vn-cone-tip-pinch-screw": "#4-40 FILLISTER SCREW, MCMASTER 91794A112",
     "dt-vn-cone-tip-block-screw": "#4-40 X 3/8 SHCS, MCMASTER 91251A108",
     "dt-vn-locating-pin": "1/16 X 3/8 DOWEL PIN, MCMASTER 98381A417",
+    "dt-vn-cone-shaft-key": "1/16 SQ KEY STOCK, MCMASTER 98830A511",
     "dt-vn-post-mount-screw": (
         f"{post_screw.THREAD} X {post_screw.STOCK_LENGTH_MM / 25.4:g} FILLISTER STOCK, "
         f"MSC {post_screw.SKU}"
@@ -1212,9 +1214,10 @@ ROCKER_ARM = str(_config.parts("ch-rocker-arm")["number"])
 # The step that sets the channel's rods and rocker arms on the cams (the
 # interface notes cite it).
 CHANNEL_RODS_SET_AT = _step_ref("cylinder-stack-accepted", "B")
-# Step 5's T12 is the paper drive's removable chain sprocket in its T12
-# configuration (pd_transgear_removable_spec: T12 on the crank); the machinist
-# review of 8e6a0dbd8 asked for its own number.
+# Step 5's chain wheel is the paper drive's removable sprocket (its T12
+# configuration, pd_transgear_removable_spec); the machinist review of
+# 8e6a0dbd8 asked for its own number.  The sheet prints no "T12": the code
+# key defines TNNN for MHA-DT-03 only (review of 5994f29c83, rule 4).
 CRANK_CHAIN_WHEEL = str(_config.parts("pd-transgear-removable")["number"])
 PLATEN_NUMBER = str(_config.parts("pd-platen")["number"])
 
@@ -1244,16 +1247,22 @@ def inch_envelope(limits_mm: tuple[float, float], places: int) -> str:
 CONE_CRANK_STEPS = _note_text(
     (
         f"ASSEMBLY SEQUENCE - CONE SET AND CRANK {CODE_KEY_POINTER}",
-        # Slide the one flat of every gear onto the shaft and close the
-        # accepted stack against its collar before setting tip end play.
-        "1. SLIDE MHA-DT-07 ONTO THE MHA-DT-04 D-FLAT AGAINST ITS COLLAR.",
-        "1A. SLIDE {cone_gears}X MHA-DT-03 ON, T120 FIRST THROUGH T006, EACH FLAT TO",
-        "   FLAT AND AGAINST THE LAST.",
-        f"1B. MEASURE THE {CONE_GEAR_COUNT}-GEAR STACK, T120 FRONT FACE TO T006 BACK FACE:",
+        # Seat the land-1 key, slide every gear on and close the accepted
+        # stack against its collar before setting tip end play.  Owner
+        # decision C1 keyed (2026-11-09, PR #1992): the 64T and T120..T030
+        # drive through MHA-DT-VN-71 in the land-1 keyseat, whose collar end
+        # stops the key; T024..T006 keep their D-flats.  A keyway or D-bore
+        # goes on its key or flat only one way and 1C measures the stack its
+        # gears close, so 1B names neither: sheet 7's left field holds step 1
+        # in eight lines, and the wrap counts 1B's placeholder at its width.
+        "1. SEAT MHA-DT-VN-71 IN THE MHA-DT-04 KEYSEAT, TO ITS COLLAR END.",
+        "1A. SLIDE MHA-DT-07 ON MHA-DT-VN-71 AGAINST THE MHA-DT-04 COLLAR.",
+        "1B. SLIDE {cone_gears}X MHA-DT-03 ON, T120 FIRST THROUGH T006.",
+        f"1C. MEASURE THE {CONE_GEAR_COUNT}-GEAR STACK, T120 FRONT FACE TO T006 BACK FACE:",
         f"   ACCEPT {inch_window(STACK_L20_ACCEPT, 3)}.",
-        "1C. IF THE STACK IS LONG, RE-FACE ITS THICKEST GEAR.",
-        "1D. IF IT IS SHORT, REMAKE ITS THINNEST GEAR.",
-        "1E. REPEAT 1B UNTIL THE STACK READS IN ITS WINDOW.",
+        "1D. IF THE STACK IS LONG, RE-FACE ITS THICKEST GEAR.",
+        "1E. IF IT IS SHORT, REMAKE ITS THINNEST GEAR.",
+        "1F. REPEAT 1C UNTIL THE STACK READS IN ITS WINDOW.",
         # U37c cut-to-fit acceptance survives the taller post and longer stock:
         # MHA-DT-VN-61's registry/spec own the selected screw and reference length.
         # Each screw is cut against its own matched post/platform hole, never
@@ -1372,7 +1381,7 @@ CONE_CRANK_STEPS = _note_text(
         f"{inch_envelope((max(CRANK_END_PROUD_RANGE[0], 0.0), CRANK_END_PROUD_RANGE[1]), 3)}"
         " PROUD OF MHA-DT-10.",
         "4V. DO NOT FACE THAT END.",
-        f"5. SLIDE {CRANK_CHAIN_WHEEL} T12 ON MHA-DT-11, HOLES OVER THE 2X MHA-DT-VN-67.",
+        f"5. SLIDE {CRANK_CHAIN_WHEEL} ON MHA-DT-11, HOLES OVER THE 2X MHA-DT-VN-67.",
         # U33 (user, 2026-09-23): crank hub MHA-DT-31 pressed into the arm and
         # seam-pinned by MHA-DT-VN-59; the MHA-DT-09 cross-hole runs behind
         # the arm through the hub barrel. The seam's size and depth print
@@ -1778,10 +1787,14 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
         # Owner ruling 2026-11-08 (Pedro): step 23 trusts the transfer
         # through the MHA-DT-20 reamed pivot bore, with the cone set at its
         # working position (the check 4D leaves): punch, lift off, spot-drill,
-        # drill and tap.  The swing check (23H) is the only acceptance, and
+        # drill and tap.  The swing check (23J) is the only acceptance, and
         # DT-00 prints no offset from the pedestal seats (FoFr #2261 owns D1
         # as a transfer).  The stop and lock seats are MHA-FR-01 print holes.
-        # Check 4 then sets the swing and clamps it.
+        # Check 4 then sets the swing and clamps it.  PR 2 machinist review
+        # round 6 (clarity): a seated screw's engagement cannot be read, so
+        # each blind seat's full-thread depth and its screw's thread length
+        # are recorded before the screw goes in; checks 4U and 4W take the
+        # lesser of the two.
         (
             "other-base-mounting",
             "CONE SET ON THE BASE: SET MHA-DT-20 ON THE CHECK 4D FEELER LEAVES.\n"
@@ -1790,9 +1803,12 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
             "LIFT MHA-DT-20 AND THE LEAVES OFF.\n"
             "SPOT-DRILL THE PUNCH MARK.\n"
             f"DRILL AND TAP {pivot_screw.THREAD} THERE PER MHA-FR-01.\n"
-            "RUN THE OILED MHA-DT-VN-52 DOWN THRU THE MHA-DT-20 PIVOT BORE UNTIL ITS "
-            "SHOULDER SEATS HARD ON THE BASE.\n"
+            "RECORD THE TAPPED HOLE'S FULL-THREAD DEPTH WITH A DEPTH GAUGE.\n"
+            "RECORD MHA-DT-VN-52'S THREAD LENGTH WITH CALIPERS.\n"
+            "RUN OILED MHA-DT-VN-52 THRU MHA-DT-20 UNTIL ITS SHOULDER SEATS.\n"
             "CHECK THAT MHA-DT-20 SWINGS FREELY UNDER THE HEAD.\n"
+            "RECORD THE STOP SEAT'S FULL-THREAD DEPTH WITH A DEPTH GAUGE.\n"
+            "RECORD MHA-SH-VN-52'S THREAD LENGTH WITH CALIPERS.\n"
             "RUN THE MHA-SH-VN-52 SWING STOP INTO MHA-FR-01 UNTIL IT SEATS.\n"
             "SWING THE CONE SET IN.\n"
             "RUN MHA-DT-VN-51 IN FINGER-LOOSE THRU THE MHA-DT-20 NOTCH.",
@@ -1885,10 +1901,12 @@ CHECKS = _note_text(
         "MHA-DT-12.",
         "4T. IF IT BINDS, STONE THE MHA-DT-12 TIP WHERE IT MARKS.",
         "4U. VERIFY MHA-DT-VN-52 FULL-FORM THREAD ENGAGEMENT "
-        f"{pivot_screw.MIN_USEFUL_ENGAGEMENT_TEXT}.",
+        f"{pivot_screw.MIN_USEFUL_ENGAGEMENT_TEXT}: THE LESSER READING OF STEPS "
+        f"{_step_ref('other-base-mounting', 'F')}-{_step_ref('other-base-mounting', 'G')}.",
         "4V. CHECK THAT MHA-DT-20 AND THE MHA-DT-VN-52 SHOULDER STAY SEATED.",
         "4W. VERIFY THE MHA-SH-VN-52 SWING STOP FULL-FORM THREAD ENGAGEMENT "
-        f"{stop_screw.MIN_USEFUL_ENGAGEMENT_TEXT}.",
+        f"{stop_screw.MIN_USEFUL_ENGAGEMENT_TEXT}: THE LESSER READING OF STEPS "
+        f"{_step_ref('other-base-mounting', 'K')}-{_step_ref('other-base-mounting', 'L')}.",
         "4X. CHECK THAT ITS HEAD IS FULLY SEATED.",
         # Rubric sample round 2: the notch's reference, the running direction
         # and the sine sense must be readable.  Notches up = cosine mode,
@@ -1947,7 +1965,7 @@ INTERFACE_NOTES = _note_text(
         "BASE MHA-FR-01 (FRAME ASSEMBLY MHA-FR-00) RECEIVES MHA-DT-VN-52, MHA-DT-VN-51,",
         "MHA-SH-VN-52 ({stop} SWING STOP + {foot} SPRING FOOT), {slotted}X MHA-DT-VN-57 AND",
         "{hold_down}X MHA-DT-VN-62.",
-        f"PAPER DRIVE MHA-PD-00: {CRANK_CHAIN_WHEEL} T12 CHAIN WHEEL ON MHA-DT-11,",
+        f"PAPER DRIVE MHA-PD-00: {CRANK_CHAIN_WHEEL} CHAIN WHEEL ON MHA-DT-11,",
         # Rubric sample round 14 (rule 23): its retention and acceptance.
         "   PINNED BY 2X MHA-DT-VN-67, HELD ENDWISE BY MHA-DT-31 (STEP "
         f"{steps.step_number('crank-hub-fitted')}F).",

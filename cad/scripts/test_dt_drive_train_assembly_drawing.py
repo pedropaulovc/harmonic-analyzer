@@ -545,16 +545,18 @@ def test_t120_fitup_envelope_matches_the_actual_model() -> None:
 
 def test_step_one_sets_the_64t_against_the_shaft_collar() -> None:
     """#916: the shaft's thrust collar is the 64T's axial stop (the drive
-    train seats the gear's south face on the collar end), so step 1 names it;
-    crank_boss_rim books the gear's station from that collar."""
+    train seats the gear's south face on the collar end), so the step-1 line
+    that slides it on names it; crank_boss_rim books the gear's station from
+    that collar.  Owner decision C1 keyed (2026-11-09, PR #1992): the land-1
+    key is seated first."""
     import dt_cone_gear_shaft_spec as shaft
 
     assert shaft.COLLAR_THICKNESS > 0.0
     gear = drawing.BOM_PART_NUMBERS["dt-crank-drive-gear"]
     shaft_number = drawing.BOM_PART_NUMBERS["dt-cone-gear-shaft"]
     step_one = drawing.CONE_CRANK_STEPS.split("\n2. ")[0]
-    first_line = step_one.split("\n1. ")[1].split("\n")[0]
-    assert gear in first_line and shaft_number in first_line and "COLLAR" in first_line
+    (line,) = (row for row in step_one.split("\n") if f"SLIDE {gear}" in row)
+    assert shaft_number in line and "COLLAR" in line
 
 
 def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
@@ -603,6 +605,33 @@ def test_cone_swing_check_requires_installed_stop_inspection_and_seating() -> No
     assert minimum <= stop_screw.MIN_USEFUL_ENGAGEMENT_MM + 1e-9
     assert "CHECK THAT ITS HEAD IS FULLY SEATED" in check
     assert "CHECK THAT MHA-DT-20 AND THE MHA-DT-VN-52 SHOULDER STAY SEATED" in check
+    _assert_engagement_cites_its_records(
+        check, "SWING STOP FULL-FORM", "THE STOP SEAT'S", "MHA-SH-VN-52'S THREAD LENGTH"
+    )
+
+
+def _assert_engagement_cites_its_records(
+    check: str, joint: str, seat: str, screw: str
+) -> None:
+    """PR 2 machinist review round 6: a seated screw's engagement cannot be
+    read, so the check takes the lesser of the seat's full-thread depth and
+    the screw's thread length, both recorded in step 23 before it goes in."""
+    import dt_drive_train_steps as steps
+
+    cited = re.search(
+        rf"{joint} THREAD ENGAGEMENT \.\d{{3}} MIN: THE LESSER READING OF STEPS (\d+\w)-(\d+\w)\.",
+        check,
+    )
+    assert cited is not None
+    number = steps.step_number("other-base-mounting")
+    assert all(ref.startswith(str(number)) for ref in cited.groups())
+    body = _rig_step_body("other-base-mounting")
+    seat_line, screw_line = (
+        re.search(rf"\b{ref}\. (.*?)(?= {number}[A-HJ-NP-Z]\. |$)", body).group(1)
+        for ref in cited.groups()
+    )
+    assert seat_line == f"RECORD {seat} FULL-THREAD DEPTH WITH A DEPTH GAUGE."
+    assert screw_line == f"RECORD {screw} WITH CALIPERS."
 
 
 def test_cone_swing_check_requires_pivot_thread_engagement() -> None:
@@ -617,6 +646,12 @@ def test_cone_swing_check_requires_pivot_thread_engagement() -> None:
     assert pivot_screw.THREAD_SOLID_DIA - 1e-9 <= minimum
     assert minimum <= pivot_screw.MIN_USEFUL_ENGAGEMENT_MM + 1e-9
     assert "MHA-DT-VN-52 SHOULDER STAY SEATED" in check
+    _assert_engagement_cites_its_records(
+        check,
+        "MHA-DT-VN-52 FULL-FORM",
+        "THE TAPPED HOLE'S",
+        "MHA-DT-VN-52'S THREAD LENGTH",
+    )
 
 
 def _flat(text: str) -> str:
@@ -962,6 +997,17 @@ def test_explode_plan_resolves_every_step_on_the_built_census() -> None:
     assert moved["tip dowel drops"] == ("dt-vn-locating-pin-1",)
     drop = {step.label: step for step in spec.EXPLODE_STEPS}["tip dowel drops"]
     assert drop.axis == "y" and -drop.distance_mm > tip_block.DOWEL_HOLE_DEPTH + 10.0
+    # MHA-DT-VN-71 (owner decision C1 keyed, 2026-11-09, PR #1992) leaves with
+    # the rotor, stays as the gears slide off it, then rises square to the
+    # level cone axis to stand above the largest gear's tips.
+    assert "dt-vn-cone-shaft-key-1" in moved["cone rotor withdraws"]
+    assert "dt-vn-cone-shaft-key-1" not in moved["cone gears slide toward the tip"]
+    assert moved["cone key lifts out"] == ("dt-vn-cone-shaft-key-1",)
+    lift = {step.label: step for step in spec.EXPLODE_STEPS}["cone key lifts out"]
+    assert (
+        lift.axis == "y"
+        and lift.distance_mm > cone_spec.outside_dia_mm(120) / 2.0 + 10.0
+    )
     assert moved["block screws lift"] == tuple(f"dt-vn-slotted-screw-{i}" for i in range(1, 5))
     # The rig sheet's MHA-DT-VN-57 balloon is pinned to the front block's west screw.
     rig_anchors = drawing.DRIVE_TRAIN_BALLOON_ANCHORS["pinion-rig"]
