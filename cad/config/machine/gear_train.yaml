@@ -9,12 +9,21 @@ gear_train:
                                    # crest) sits 1.5 deg off vertical: a common cam phase the error budget scores as-built
   drive_axis_y_mm: 95.25          # base top + platform stock + common cone-axis height
   crank_drive_ratio: [16, 64]      # 16T pinion on crankshaft : 64T on cone shaft
-  crank_drive_normal_module_mm: 1.0583333333333333 # standard normal 24DP; transverse pitch and helix follow the cone incline
+  crank_drive_normal_module_mm: 1.0583333333333333 # standard normal 24DP; transverse pitch and tooth inclination follow the cone incline
   crank_drive_pressure_angle_deg: 20.0            # standard normal-plane cutter pressure angle
   crank_axis_height_mm: 81.19564350289599          # common Y raise; crossed-mesh bore spacing unchanged
   crank_mesh_phase_offset_deg: 0.0               # offset from the standard tooth-in-gap seed at the contact azimuth
   source: "48DP PA20 cone train and normal-24DP PA20 crossed-crank design; DIMENSIONS.md ch13/ch29/ch8 for historical counts and gear law"
   confidence: high                 # selected tooth systems; historical scale measurements remain low confidence
+  # WITHDRAWN by owner ruling 2026-11-10 (#2332, option A), superseding the
+  # true right-hand helix: the 64T's teeth are STRAIGHT, inclined 13.001107 deg
+  # right hand, each space plain-indexed on the dividing head tilted 13 deg
+  # with its cutter centre plane crossing the axis 1.778 mm (.07 in) north of
+  # the south face; no lead gearing. The notes' "64T helix", "helix conversion"
+  # and "Helical lead is 945.862339 mm/revolution, not a tilted straight slot"
+  # sentences below are void. They stay verbatim only because notes is a
+  # parsed value of this shared file (37 part recipes key on it) while
+  # comments are not; reword them with the next real gear_train edit.
   notes: >-
     Cone, cylinder and alignment teeth use the 48DP PA20 tooth system.
     Shop-made profiles use the actual specified finite stock/custom cutter
