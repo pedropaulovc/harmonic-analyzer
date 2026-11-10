@@ -1456,22 +1456,26 @@ PLAN_TAGS: tuple[PlanTag, ...] = (
 
 # --- Fitter package text -------------------------------------------------------------
 # Rail setting is an assembly control, independent of the carrier's .XXX
-# hole-table locations. Owner ruling 2026-11-08 (Pedro), A3 option C: the
-# hub X 0, Y .5125 ±.0005 stays; each table move (origin to each station
-# along each rail, and the hub's Y from the origin) is made with an inch
-# gauge-block stack between a stop clamped on the table and a dial
-# indicator fixed to the machine, the shop table's "assembly gap, alignment
+# hole-table locations. Owner ruling 2026-11-08 (Pedro), A3 option C, as
+# ruled: "the stack's stations S 4.00, 8.00, 12.00 and 15.00 and its hub X 0,
+# Y .5125 ±.0005 stay; each table move (origin to S 4.00 to 8.00 to 12.00 to
+# 15.00 along each rail, and the hub's Y from the origin) is made with an
+# inch gauge-block stack between a stop clamped on the table and a dial
+# indicator fixed to the machine", the shop table's "assembly gap, alignment
 # (test indicator)" row, ±.0005 (TL-00 round 1 review: the ±.001 stations
 # were DRO distances up to 14.85 in with no fit route). Every stack is built
 # from the shop's set (shop-equipment gauges.gauge-blocks-mitutoyo, 81-piece inch).
 # The station error this chain leaves in the cut, relative to the hub, is
 # computed and charged below (CHAIN_STATION_RADIUS).
 #
-# #2336 (DFM review of v48, F1): A3's stations S 12.00 and 15.00 sat at X
-# 11.877 and 14.846 from step 6's origin, past the table's X reach
-# (TABLE_REACH_X), so step 6 could not bring them under the spindle. Each
-# rail is now set at two stations, S 4.00 and S 11.00 (X 3.959 and 10.887),
-# one stack per link; the S 4.00 to 11.00 link's 6.9281 X is a 5-block stack.
+# Amended by delegated ruling (Main, 2026-11-10, #2336; precedent A3 option
+# C, #2144), not an owner ruling: the owner's #2336 note confirms only that
+# S 4.00 and 8.00 are in travel. A3's S 12.00 and 15.00 sat at X 11.877 and
+# 14.846 from step 6's origin, past the table's X reach (TABLE_REACH_X), so
+# step 6 could not bring them under the spindle. Each rail is now set at two
+# stations, S 4.00 and S 11.00 (X 3.959 and 10.887), one stack per link; the
+# S 4.00 to 11.00 link's 6.9281 X is a 5-block stack, which retires A3's
+# 4 in-per-link stacks (an implementation choice; the ruling set no length).
 # The baseline answers the rail-angle sensitivity: with the hub reamed in
 # place, 0.01 degree of one rail's angle moves the strap edges 0.014 mm
 # against the hub (both rails alike 0.018), not the 0.47 mm the absolute
@@ -1618,11 +1622,11 @@ RAIL_SETTING_CHECK = "6H"  # the step that rechecks every row as set
 # The moves use a setting stop and indicator of their own; step 6A's origin
 # stops and indicators stay put through step 14's recheck (local repeat on
 # cc83acaa8a: the title's 'A STOP' could be read as an origin stop).
+# Three lines: the far limit table's procedure needs the setting sheet's room.
 RAIL_SETTING_TITLE = (
-    "RAIL SETTING TABLE (STEP 6): EACH MOVE TO STATION S FROM THE "
-    "POSITION IN FROM, X THEN Y, BY A GAUGE-BLOCK STACK: WRING IT ON A "
-    "SETTING STOP CLAMPED TO THE TABLE, ZERO A SETTING INDICATOR FIXED "
-    "TO THE MACHINE ON IT, REMOVE IT, MOVE THE TABLE TO 0 ON THE STOP."
+    "RAIL SETTING TABLE (STEP 6): EACH MOVE FROM FROM TO S, X THEN Y: WRING "
+    "ITS GAUGE-BLOCK STACK ON A SETTING STOP ON THE TABLE, ZERO A "
+    "MACHINE-MOUNTED SETTING INDICATOR ON IT, REMOVE IT, MOVE TO 0."
 )
 _CHAIN_TEXT = tuple(_length(s, SWEEP_LIMIT_PLACES) for s in CHAIN_STATIONS)
 RAIL_SETTING_HEADER = ("S", "FROM", "RAIL 1 X", "RAIL 1 Y", "RAIL 2 X", "RAIL 2 Y", "RANGE", "CHECK")
@@ -1684,9 +1688,13 @@ PASS_TABLE_ROWS: tuple[tuple[str, ...], ...] = tuple(
     )
     for row, s in PASS_DRO_STATIONS
 )
+# The pin is put at FROM through the rail-setting rows and centred as in 6D
+# by sliding the carriage only (after 6K the bar is never tapped): the
+# _FAR_LIMIT_ERROR links. Step 6Q removes the bar stop after marking.
 FAR_LIMIT_TITLE = (
-    "FAR LIMIT TABLE (STEP 6N): PIN AT FROM, CLAMP A STOP TO THE BAR AT THE "
-    "CARRIAGE'S SPINDLE-END FACE; SET S BY THE STACK FROM IT."
+    "FAR LIMIT TABLE (STEP 6P), EACH RAIL: TABLE AT RAIL SETTING ROW FROM, "
+    "HEAD CENTRED AS IN 6D, CARRIAGE ONLY; BAR STOP CLAMPED AT THE "
+    "CARRIAGE'S SPINDLE-END FACE; S BY GAUGE-BLOCK STACK OFF IT."
 )
 FAR_LIMIT_HEADER = ("ROW", "S", "FROM", "STACK", "RANGE")
 FAR_LIMIT_ROWS: tuple[tuple[str, ...], ...] = tuple(
@@ -2339,10 +2347,10 @@ ASSEMBLY_STEPS = (
     f"6K. TIGHTEN THE 4 HOLD-DOWN NUTS {_item(FLANGE_NUT)}.",
     f"6L. CHECK EVERY HEAD AGAIN AS IN STEP {RAIL_SETTING_CHECK}.",
     "6M. IF A HEAD FAILS, REDO STEPS 6C-6L WITH THE NUTS LOOSENED.",
-    "6N. SET EACH PASS-TABLE LIMIT ROW BY DRO AS IN STEP 6D, IN X ONLY, AND EACH "
-    "FAR LIMIT TABLE ROW AS ITS TITLE STATES.",
-    "6P. WITNESS-MARK THE BAR AT THE CARRIAGE'S SPINDLE-END FACE AT EACH LIMIT "
-    "ROW, WITH THE PASS NAME, INNER OR OUTER.",
+    "6N. SET EACH PASS-TABLE LIMIT ROW BY DRO AS IN STEP 6D, IN X ONLY.",
+    "6P. SET EACH RAIL'S FAR LIMIT ROWS AS THEIR TABLE'S TITLE STATES.",
+    "6Q. WITNESS-MARK THE BAR AT THE CARRIAGE'S SPINDLE-END FACE AT EACH LIMIT "
+    "ROW, WITH THE PASS NAME, THEN REMOVE THE BAR STOPS.",
     # The foot (UNVERIFIED, #2184) between TL-28's two bounds: no thinner,
     # so the 5/8's tip stays clear of the bar screw's in the shared THRU
     # thread; no thicker, so its full thread holds 1.5 D

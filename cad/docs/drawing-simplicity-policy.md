@@ -301,9 +301,10 @@ limits on both source-model Y dimensions without moving their nominal
 geometry, and saves the property-linked note; the drawing only reads the
 limits. This is not a general exception to rules 3 or 7. Section A-A identifies
 the cropped feature as A1. The rail-setting `STATION_BAND` belongs to the
-assembly: ±.0005 on each gauge-block link, origin to S 4.00 to S 11.00,
-every station inside the PM-30MV's X travel (#2336), independent of the
-carrier table.
+assembly: ±.0005 on each gauge-block link, independent of the carrier table.
+The owner's A3 option C ruling (2026-11-08) stationed it at S 4.00, 8.00, 12.00
+and 15.00; a delegated ruling (#2336, precedent A3 option C, #2144) moved it to
+origin to S 4.00 to S 11.00 so every station is inside the PM-30MV's X travel.
 
 [`correlated_pin_budget`](../scripts/ch_rocker_arm_tl_oblique_carrier_spec.py)
 bounds the whole tolerance box and continuous strap arc analytically. For a

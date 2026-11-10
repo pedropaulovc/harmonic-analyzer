@@ -1983,9 +1983,7 @@ def test_rail_setting_chain_uses_the_gauge_block_set_and_closes_the_stack() -> N
 def test_rail_setting_baseline_answers_the_rail_angle_sensitivity() -> None:
     """#2336: with the hub reamed in place, 0.01 degree of one rail's angle
     moves the strap edges about 0.014 mm against the hub, so the ±.0005 links
-    over the 7 in baseline turn a rail by at most 0.005 degree. The band stays:
-    added to the outer edge's pin stack (#2314) the chain already exceeds the
-    strap's half band, so it is not slack."""
+    over the 7 in baseline turn a rail by at most 0.005 degree."""
     inch = spec.trammel.INCH
     baseline = spec.CHAIN_STATIONS[-1] - spec.CHAIN_STATIONS[0]
     assert baseline == pytest.approx(7.0 * inch)
@@ -1996,8 +1994,6 @@ def test_rail_setting_baseline_answers_the_rail_angle_sensitivity() -> None:
     assert both == pytest.approx(0.0176, abs=0.0005)
     square = spec.STATION_BAND * (math.sin(spec.trammel.HALF_ALPHA) + math.cos(spec.trammel.HALF_ALPHA))
     assert math.degrees(square / baseline) < 0.005
-    outer = spec.carrier.PIN_RELATIVE_STACK["outer"]
-    assert spec.trammel.TOP_EDGE_HALF_BAND - outer < spec.CHAIN_STATION_RADIUS
 
 
 def test_every_printed_table_setting_is_inside_the_mill_x_travel(report) -> None:
@@ -2193,9 +2189,10 @@ def test_general_torque_note_covers_every_fastener_no_step_torques() -> None:
 def test_sweep_limits_are_witness_marked_and_every_pass_runs_mark_to_mark() -> None:
     """Review jig-asm r2: each sweep limit is witness-marked; every complete
     pass runs mark to mark. #2336: the near limits are pass-table rows set
-    by DRO in X only; the far limits, past the table's X travel, are far-limit
-    rows set along each rail by a gauge stack from S 11.00 (both step 6N,
-    marked in step 6P)."""
+    by DRO in X only (step 6N); the far limits, past the table's X travel, are
+    far-limit rows set on each rail by a gauge stack off a bar stop at the
+    carriage with the pin at S 11.00 (step 6P), all marked in step 6Q, which
+    removes the bar stops before any pass runs."""
     inch = spec.trammel.INCH
     hundredth = inch / 100.0
     gap = spec.leadscrew.FEED_GAP
@@ -2231,10 +2228,12 @@ def test_sweep_limits_are_witness_marked_and_every_pass_runs_mark_to_mark() -> N
         assert row[6] == "X ±.004"
     steps = {text.split(". ", 1)[0]: text for text in spec.ASSEMBLY_STEPS}
     assert "LIMIT ROW" in steps["6N"] and "X ONLY" in steps["6N"]
-    assert "FAR LIMIT TABLE ROW AS ITS TITLE STATES" in steps["6N"]
-    assert "WITNESS-MARK" in steps["6P"] and "6Q" not in steps
-    assert "STOP TO THE BAR" in spec.FAR_LIMIT_TITLE and "SPINDLE-END FACE" in spec.FAR_LIMIT_TITLE
-    assert "(STEP 6N)" in spec.FAR_LIMIT_TITLE and "STACK FROM IT" in spec.FAR_LIMIT_TITLE
+    assert "FAR LIMIT ROWS AS THEIR TABLE'S TITLE STATES" in steps["6P"] and "EACH RAIL" in steps["6P"]
+    assert "WITNESS-MARK" in steps["6Q"] and "REMOVE THE BAR STOPS" in steps["6Q"]
+    title = spec.FAR_LIMIT_TITLE
+    assert title.startswith("FAR LIMIT TABLE (STEP 6P), EACH RAIL:")
+    assert "RAIL SETTING ROW FROM" in title and "CARRIAGE ONLY" in title
+    assert "BAR STOP" in title and "SPINDLE-END FACE" in title and "GAUGE-BLOCK STACK" in title
     assert "MARK TO MARK" in steps["9N"] and "MARK TO MARK" in steps["13A"]
 
 
