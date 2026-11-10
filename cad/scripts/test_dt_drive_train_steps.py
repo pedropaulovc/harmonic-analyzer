@@ -136,6 +136,10 @@ def test_the_end_screw_sets_the_end_play_after_the_pivot_runs_free() -> None:
         "THREAD MHA-DT-39 IN UNTIL MHA-DT-04 JUST STOPS SHUTTLING",
         "BACK MHA-DT-39 OFF 1/8 TURN",
         "TIGHTEN MHA-DT-VN-56",
+        "REPEAT 3-3C UNTIL THE END PLAY READS IN ITS WINDOW",
+        # Rule 23 (PR 2 machinist review round 10): the pinch lock's bench
+        # acceptance comes once the end play is final.
+        "CHECK THAT MHA-DT-39 DOES NOT TURN IN MHA-DT-21 BY HAND",
     )
     positions = [fitup.find(phrase) for phrase in order]
     assert -1 not in positions, positions

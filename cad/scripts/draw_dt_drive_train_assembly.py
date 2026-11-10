@@ -600,12 +600,15 @@ ISO_RIGHT_FIELD = (
     NOTE_FIELD_RIGHT[2],
     REFERENCE_ISO_CENTER[1] + REFERENCE_ISO_HALF_OUTLINE + REFERENCE_ISO_GAP,
 )
-# Sheet 7's reference view sits under the left column's steps 1-3 (they end
-# near y=81 mm), so the right field runs to NOTE_FIELD_RIGHT's foot; its
-# caption prints ~9 mm under the outline (~19 mm up), clear of the zone border.
-# The rule-23 tip dowel steps (owner ruling 2026-11-07, PR #2248)
-# lowered it 3 mm and closed its gap to the other sheets' REFERENCE_ISO_GAP.
-SEQUENCE_ISO_CENTER = (0.115, 0.053)
+# Sheet 7's reference view sits under the left column's steps 1-2 (they end
+# near y=78 mm), so the right field runs to NOTE_FIELD_RIGHT's foot; its
+# caption prints ~9 mm under the outline (~15 mm up), clear of the 12.7 mm
+# zone border.  The rule-23 tip dowel steps (owner ruling 2026-11-07, PR
+# #2248) lowered it 3 mm and closed its gap to the other sheets'
+# REFERENCE_ISO_GAP; PR 2 machinist review round 10's end-screw lock check
+# (3F) lowered it one NOTE_LINE_PITCH more (run 20261110T140136846Z: caption
+# ink 20.2-23.8 mm up, outline 27.8-78.2 mm).
+SEQUENCE_ISO_CENTER = (0.115, 0.0485)
 SEQUENCE_ISO_GAP = REFERENCE_ISO_GAP
 REFERENCE_ISO_CAPTION_XY = (0.330, 0.082)
 SEQUENCE_LEFT_FIELD = (
@@ -1384,6 +1387,9 @@ CONE_CRANK_STEPS = _note_text(
         f"{inch_window(SHAFT_END_PLAY, 3)}.",
         "3D. IF THE END PLAY IS OUT, LOOSEN MHA-DT-VN-56.",
         "3E. REPEAT 3-3C UNTIL THE END PLAY READS IN ITS WINDOW.",
+        # Rule 23 (PR 2 machinist review round 10): the pinch lock's bench
+        # acceptance, worded as 2Q's, once the end play is final.
+        "3F. CHECK THAT MHA-DT-39 DOES NOT TURN IN MHA-DT-21 BY HAND.",
         # User ruling 2026-09-28: the crank journal runs directly in the post;
         # the centres are fixed, and the only mesh requirement is no binding.
         # CONTRACT-crank: MHA-DT-VN-67 press to the blind-hole floor.  Owner
@@ -2085,7 +2091,7 @@ def _split_sequence_chain(
 # splits keep every field full once the one-thing lines grew the sequence
 # (rubric sample rounds 2 and 4); test_every_note_field_holds_its_stacked_blocks
 # proves each fits.
-CONE_CONTINUED_FROM = f"{steps.step_number('post-and-tip-block')}L"
+CONE_CONTINUED_FROM = f"{steps.step_number('post-and-tip-block')}M"
 CRANK_CONTINUED_FROM = str(steps.step_number("crank-hub-fitted"))
 _CRANK_CONTINUED_HEADING = f"ASSEMBLY SEQUENCE CONT. - CRANK {CODE_KEY_POINTER}"
 CONE_CRANK_PRIMARY, CONE_CRANK_CONTINUED, CRANK_CONTINUED = _split_sequence_chain(
