@@ -10,9 +10,9 @@ Two facts set the finished length.  The anchor's Ø3.175 unthreaded neck
 cannot enter a #6-32 tap, so the neck shoulders on the plate's TOP face --
 the hard down-stop, where the installed thread starts.  Per-channel
 calibration then backs the anchor out up to ``ADJUSTMENT_TURNS`` counted
-turns (``ADJUSTMENT_TRAVEL_MM``) to trim the spring preload -- one turn is
-worth 0.139 N of the 2.71 N installed load, 5% of preload -- which lifts the
-cut end.  So the shank must cross the plate, carry the nut, and still show
+turns (``ADJUSTMENT_TRAVEL_MM``) to trim the spring preload -- one turn
+changes the load by the spring rate times the thread pitch -- which lifts
+the cut end. So the shank must cross the plate, carry the nut, and still show
 ``FULL_THREADS_PAST_NUT`` full turns below the nut at the worst case: the
 shortest in-band anchor (title-block 1-place band) under the thickest in-band
 nut, its deburr at the adverse corner of its band, backed out the whole

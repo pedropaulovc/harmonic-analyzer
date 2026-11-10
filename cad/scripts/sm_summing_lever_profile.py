@@ -1,7 +1,7 @@
 """Pure sections for the uniform-7 mm summing lever; lengths are millimetres.
 
-The installed top face and spring row stay fixed. The matched bracket/receiver
-row is located from that actual top by the joint contract. Each positive-X rib
+Both 7 mm plate sections are centred on Y0. The matched bracket/receiver
+row is located from the actual coefficient top by the joint contract. Each positive-X rib
 flank is the common tangent of the origin-centred wrap and a concave R.040
 runout into its coefficient-plate face. No tangent coordinate is a design knob.
 Line/circle boundary integrals give exact areas and first moments: these are
@@ -21,11 +21,11 @@ import sm_summing_lever_spec as spec
 
 Point = tuple[float, float]
 
-# PlateProfile.PlateTopY independently drives CoefficientTopY: unlike the old
-# centred slab, it takes a whole band of its own, not half the thickness band.
-# The sheet locates the top .10 (.XX) below the knife ridge, which stands half
-# the .404 (.XXX) vertex height above the axis; the boss top's .28 only
-# narrows it. The allowance is that chain's larger printed excursion.
+# PlateProfile.PlateTopY independently drives CoefficientTopY. Nominal centring
+# does not halve the shop's face-location allowance: the printed ridge-to-top
+# dimension and knife vertex height still locate the actual face.
+# The sheet locates the top .06 (.XX) below the knife ridge, which stands half
+# the .404 (.XXX) vertex height above the axis. Charge that chain's excursion.
 _RIDGE = tuple(
     d / 2.0
     for d in printed_deviations(spec.HEX_H, spec.KNIFE_ENVELOPE_PLACES, unit=spec.UNIT)

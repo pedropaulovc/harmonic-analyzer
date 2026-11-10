@@ -41,13 +41,13 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 MM_PER_IN = 25.4
 UNIT = drawing_unit("parts/sm-summing-lever", _config.parts("sm-summing-lever"))
 
-# --- Nominal geometry (SummingLever.cs, inches -> mm; DIMENSIONS.md ch. 18). ---
+# --- Nominal geometry (mm); plate/web centring per owner issue #2129. ---
 PLATE_W = 1.75 * MM_PER_IN  # 44.45 coefficients-plate width (X)
 PLATE_L = 6.0 * MM_PER_IN  # 152.40 plate / pivot length (Z)
-COUNTER_WEB_T = 0.2 * MM_PER_IN  # 5.08 negative-X web, centered on Y0
-COEFFICIENT_T = 7.0  # uniform positive-X plate; thickened downward only (.276)
-COEFFICIENT_TOP_Y = 0.1 * MM_PER_IN  # fixed +2.54 seat, independent of web depth
-COEFFICIENT_BOTTOM_Y = COEFFICIENT_TOP_Y - COEFFICIENT_T  # -4.46 nut seats
+COEFFICIENT_T = 7.0  # uniform plate centred on the pivot/trunnion axis
+COUNTER_WEB_T = COEFFICIENT_T  # negative-X web shares the plate's two faces
+COEFFICIENT_TOP_Y = COEFFICIENT_T / 2.0  # +3.50 spring-anchor seats
+COEFFICIENT_BOTTOM_Y = -COEFFICIENT_T / 2.0  # -3.50 jam-nut seats
 CYL_R = 0.5 * MM_PER_IN  # 12.70 pivot-cylinder radius
 SUM_H = 3.0 * MM_PER_IN  # 76.20 summation reach (-X)
 ANCHOR_R = 0.375 * MM_PER_IN  # 9.525 summation-anchor outer radius
@@ -203,6 +203,8 @@ COUNTER_HOLE_SPEC = HoleSpec("tapped", ANCHOR_9490T1.thread_size)
 # --- Derived. ---
 CYL_DIA = 2.0 * CYL_R  # 25.4
 TIP_X = -SUM_H  # -76.20 summation tip / anchor X
+# Preserve the nominal tangent apex exactly; rounding is drawing-only.
+COUNTER_FLANK_ANGLE_DEG = math.degrees(math.asin(RIB_WRAP_R / abs(TIP_X)))
 HOLE_Z_FIRST = CHANNEL_Z0 + HOLE_Z_OFFSET
 HOLE_Z_LAST = CHANNEL_Z0 + CHANNEL_PITCH * (HOLE_COUNT - 1) + HOLE_Z_OFFSET
 HOLE_EDGE_OFFSET = PLATE_W - HOLE_X  # 4.60 from the free +X plate edge
@@ -232,6 +234,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "SummationPlate": {"WebThickness": 2},
     "EdgeRibFrontProfile": {"EdgeRibFrontArcR": 2, "RibReach": 2},
     "EdgeRibFront": {"EdgeRibThickness": 2},
+    "MiddleRibProfile": {"MiddleRibCounterAngle": 1},
     "KnifeStubReference": {"KnifeStubLength": 2},
     "KnifeRidgeFillet": {"KnifeRidgeRadius": KNIFE_RIDGE_R_PLACES},
     "KnifeEnvelopeReference": {
