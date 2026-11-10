@@ -32,12 +32,11 @@ from _document_units import apply_package_model_units
 from _part_properties import part_drawing_unit
 from _single_limit_tolerance import set_single_limit
 from _drawing_precision import _named_dimension, apply_drawing_precision
-from _drawing_dimension_insert import add_angular_reference_dimension, add_diametric_linear_dimension
+from _drawing_dimension_insert import add_diametric_linear_dimension
 from _drawing_prefix import set_dimension_prefix
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _drawing_tolerances import (
     set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_angular_tolerance,
     set_dimension_symmetric_tolerance,
 )
 from _simplified_part import (
@@ -80,7 +79,6 @@ from dt_cone_gear_spec import (
     DEFAULT_TEETH,
     DIAMETRAL_PITCH,
     FACE_WIDTH,
-    FLAT_CLOCK_TOLERANCE_DEG,
     GAP_FLOOR_SKETCH,
     KEYED_BORE_SKETCH,
     KEYWAY_HALF_WIDTH_MM,
@@ -350,9 +348,10 @@ async def _author_keyed_bore(adapter: Any) -> SketchDims:
     keyway on +X: its horizontal length is KeywayT, ANSI B17.1's keyway top
     to the bore's far side, the measurement form BoreAF uses.  The top's
     length is KeywayWidth.  Both are literals, one value in every keyed
-    configuration (the FaceWidth form).  The DRIVEN angular KeywayClock
-    between the top and the centreline carries FLAT_CLOCK_TOLERANCE_DEG, the
-    D's BoreFlatClock.  No fix anywhere.
+    configuration (the FaceWidth form).  The keyway's clock is the drawn
+    +X centreline it shares with the phase-0 tooth, at the title block's
+    angle (error_budget.yaml cone_flat_clock), so it takes no dimension.  No fix
+    anywhere.
 
     DOF: arc 5 + sides 8 + top 4 + centreline 4 = 21 = centre on origin 2 +
     four corner joins 8 + sides horizontal 2 + top vertical 1 + centreline
@@ -426,17 +425,6 @@ async def _author_keyed_bore(adapter: Any) -> SketchDims:
         "keyway width",
     )
     keyed_bore.record("KeywayWidth")
-    # Text inside the right angle the top makes above the centreline, as the
-    # D's clock; the sheet repositions it.  Either reading is 90 deg.
-    await add_angular_reference_dimension(
-        adapter,
-        top,
-        clock_line,
-        (top_x - 0.3 * radius, 0.4 * half),
-        "keyway clock",
-        expected_degrees=90.0,
-    )
-    keyed_bore.record("KeywayClock")
     await ensure_fully_defined(adapter, "keyed bore sketch")
     check("exit_sketch keyed bore", await adapter.exit_sketch())
     return keyed_bore
@@ -904,17 +892,15 @@ async def build(adapter) -> dict[str, str]:
     # X axis to the flat: its horizontal length is the across-flat, the
     # DRIVING "BoreAF" dimension linked to the configured "BoreAF" global.
     # The flat's squareness to that centreline (the phase-0 tooth's) comes
-    # from the vertical relation; the DRIVEN angular BoreFlatClock between
-    # the flat and a construction ray continuing the centreline past the
-    # flat (+X) carries FLAT_CLOCK_TOLERANCE_DEG (the cylinder gear's
-    # NotchPhase precedent).  No fix anywhere: a fix drives the dimensions
-    # and kills their configuration links.
+    # from the vertical relation; its clock is the drawn +X centreline it
+    # shares with that tooth, at the title block's angle
+    # (error_budget.yaml cone_flat_clock), so it takes no dimension.  No fix anywhere:
+    # a fix drives the dimensions and kills their configuration links.
     #
-    # DOF: arc 5 + flat 4 + centreline 4 + ray 4 = 17 = centre on origin 2 +
+    # DOF: arc 5 + flat 4 + centreline 4 = 13 = centre on origin 2 +
     # diameter 1 + flat vertical 1 + two end joins 4 + centreline horizontal
     # 1 + its start on the arc 1 + its start level with the origin 1 + its
-    # end on the flat 1 + BoreAF 1 + ray start on the centreline's end 2 +
-    # ray horizontal 1 + ray equal to the centreline 1.
+    # end on the flat 1 + BoreAF 1.
     #
     # Both bores MUST precede the circular pattern: cut AFTER the pattern,
     # the same recipe solves to nothing in every configuration whose
@@ -982,37 +968,6 @@ async def build(adapter) -> dict[str, str]:
         "bore across-flat",
     )
     bore.record("BoreAF", '"BoreAF"')
-    # The clock is authored in the quadrant every D sheet prints: between the
-    # flat's upper half and a construction ray from the flat/axis crossing
-    # along +X, text right of the flat and above the axis.  Against the -X
-    # centreline (main's form) it imported between the flat and that
-    # centreline and each sheet flipped it (SupplementaryAngle); drawing:
-    # dt_cone_gear at 5994f29 and 5a4e41cb5 drew all four D sheets' flips
-    # back after the settling rebuild, and a model-side SupplementaryAngle did
-    # not change the imported quadrant.  The ray starts on the centreline's
-    # end, runs horizontal and is as long as the centreline (no dimension).
-    # Either reading is 90 deg.
-    set_sketch_direct_db(adapter, True)
-    clock_ray = check(
-        "bore clock ray",
-        await adapter.add_centerline(flat_x, 0.0, flat_x + bore_af_default_in * MM_PER_IN, 0.0),
-    )
-    set_sketch_direct_db(adapter, False)
-    for label, first, second, relation in (
-        ("clock ray starts at the flat/axis crossing", f"{clock_ray}.start", f"{clock_line}.end", "coincident"),
-        ("clock ray horizontal", clock_ray, None, "horizontal"),
-        ("clock ray as long as the centreline", clock_ray, clock_line, "equal"),
-    ):
-        check(label, await adapter.add_sketch_constraint(first, second, relation))
-    await add_angular_reference_dimension(
-        adapter,
-        bore_flat,
-        clock_ray,
-        (flat_x + 0.3 * bore_radius, 0.4 * flat_half),
-        "bore flat clock",
-        expected_degrees=90.0,
-    )
-    bore.record("BoreFlatClock")
     await ensure_fully_defined(adapter, "bore D sketch")
     check("exit_sketch bore", await adapter.exit_sketch())
     bore_sketch = name_last_feature(adapter, BORE_SKETCH)
@@ -1434,20 +1389,6 @@ async def build(adapter) -> dict[str, str]:
         *deviations(TOOTH_THICKNESS_BAND),
         places=places["ToothThickness"],
         display_unit=UNIT,
-    )
-    set_dimension_symmetric_angular_tolerance(
-        adapter,
-        BORE_SKETCH,
-        "BoreFlatClock",
-        FLAT_CLOCK_TOLERANCE_DEG,
-        require_driven=True,
-    )
-    set_dimension_symmetric_angular_tolerance(
-        adapter,
-        KEYED_BORE_SKETCH,
-        "KeywayClock",
-        FLAT_CLOCK_TOLERANCE_DEG,
-        require_driven=True,
     )
     _start, web_min, web_band = web_reference_mm()
     set_single_limit(

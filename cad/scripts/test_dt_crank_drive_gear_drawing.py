@@ -140,6 +140,18 @@ def test_keyway_takes_the_key_and_leaves_the_web_target() -> None:
     t_min = spec.KEYWAY_T + spec.KEYWAY_T_BAND[1]
     s_max = cone_land_key.KEYSEAT_S_MM + cone_land_key.KEYSEAT_S_BAND[0]
     assert t_min - s_max - key_max > 0.0
+    # The key keeps half its largest height in the keyseat at the keyseat's
+    # edge: the smallest land, the widest keyseat, and S at its largest from
+    # that land's far side (Codjiflo review of #2331).
+    land_r_min = (
+        cone_land_key.LAND_DIA_MM + cone_shaft_land_bands.GEAR_SEAT_BAND[1]
+    ) / 2
+    seat_half_max = (
+        cone_land_key.KEYSEAT_WIDTH_MM + cone_land_key.KEYSEAT_WIDTH_BAND[0]
+    ) / 2
+    edge_depth = math.sqrt(land_r_min**2 - seat_half_max**2) - (s_max - land_r_min)
+    assert cone_land_key.KEYSEAT_EDGE_DEPTH_MIN_MM == pytest.approx(edge_depth)
+    assert edge_depth >= key_max / 2
     # The keyway top sits outside the bore, on +X.
     assert spec.BORE_DIA / 2 < spec.KEYWAY_TOP_OFFSET < spec.ROOT_DIA_MIN / 2
     # Rule 17: the web from the keyway's widest, deepest corner (T max, bore
@@ -508,10 +520,10 @@ def test_notes_do_not_substitute_for_native_fit_dimensions() -> None:
 
 def test_bore_and_keyway_dimensions_link_one_matched_fit_note() -> None:
     # The round band (.0008 wide) is narrower than the turned-diameter row, so
-    # the fit route is a matched fit to the measured MHA-DT-04 land 1 with an
-    # acceptance (rule 4). One feature, several tight dimensions: the mates
-    # print once, in note 1, and every bore and keyway dimension links it.
-    # The round bore takes rule 12's REAM now no flat is left to cut away.
+    # the fit route is a matched fit to the measured keyed land of MHA-DT-04
+    # with an acceptance (rule 4). One feature, several tight dimensions: the
+    # mates print once, in note 1, and every bore and keyway dimension links
+    # it. The round bore takes rule 12's REAM now no flat is left to cut away.
     link = f"SEE NOTE {drawing.BORE_FIT_NOTE_NUMBER}"
     assert drawing.DIMENSION_CALLOUTS["BoreDia"] == f"REAM THRU\n{link}"
     for name in ("KeywayWidth", "KeywayT"):
@@ -528,8 +540,22 @@ def test_bore_and_keyway_dimensions_link_one_matched_fit_note() -> None:
     assert f"THE KEYED LAND OF CONE GEAR SHAFT {notes.SHAFT_MATE_NUMBER}" in note
     assert "LAND 1" not in note
     assert notes.KEY_MATE_NUMBER in note
-    # Rule 7: the note carries no dimension and no flat.
-    assert "." not in note.split(". ", 1)[1].rstrip(".")
+    # The clearances print as REF in the keyed cone gears' form, off the
+    # same limits (draw_dt_cone_gear.sheet_notes on the same land).
+    import draw_dt_cone_gear as cone_drawing
+
+    (round_lo, round_hi), (key_lo, key_hi) = cone_drawing.bore_clearances_mm(30)
+    reference = (
+        f"(CLEARANCE {spec.inch_text(round_lo, 4)}-{spec.inch_text(round_hi, 4)} "
+        f"ON \u00d8, {spec.inch_text(key_lo, 4)}-{spec.inch_text(key_hi, 4)} KEYWAY TO KEY)"
+    )
+    assert reference in " ".join(
+        line.strip() for line in cone_drawing.sheet_notes(30).splitlines()
+    )
+    assert reference in note
+    assert note.endswith("SLIDES ON, NO ROCK.")
+    # Every line ends left of the keyway width's text above the block.
+    assert max(len(line) for line in drawing.SHEET_NOTES.splitlines()) <= 51
     assert "FLAT" not in drawing.SHEET_NOTES
     assert len(drawing.SHEET_NOTES.splitlines()) <= 4
     assert "add_note(adapter, SHEET_NOTES, *NOTES_XY)" in _source()

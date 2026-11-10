@@ -315,6 +315,11 @@ async def build(adapter) -> dict[str, str]:
     removed = await _cut_keyseat(adapter, drive_jobs)
     volume -= removed
     await volume_check(adapter, "Sec1 keyseat", volume, 0.1 * removed)
+    removed = await _cut_keyseat_end(adapter, drive_jobs)
+    volume -= removed
+    # The end's own volume, under 1 mm^3, sets its gate: a plunge on the
+    # wrong side of the axis removes a whole fresh disc, twice as much.
+    await volume_check(adapter, "Sec1 keyseat end", volume, 0.25 * removed)
     for i in FLAT_LANDS:
         removed = await _cut_flat(adapter, i, drive_jobs)
         volume -= removed
@@ -444,12 +449,25 @@ def _flat_start_station(land: int) -> float:
 
 
 def flat_length_expression(land: int) -> str:
-    """The cut length's equation: the land's own length, from the knobs that
-    bound it (the gear-seat knobs are measured from the collar's tip-side
-    face, where land 1's keyseat starts)."""
-    if land == 1:
-        return '"SecEnd1"'
+    """A flat's length equation: its land's own length, from the knobs that
+    bound it."""
     return f'"SecEnd{land}" - "SecEnd{land - 1}"'
+
+
+# Land 1's keyseat is milled with a 1/16 end mill that runs out over land 2
+# and stops at the collar's tip-side face, leaving its own radius there
+# (rule 16; Codjiflo P2 on #2331): the straight keyseat stops one end-mill
+# radius (cone_land_key.KEY_END_SET_MM, half the keyseat) north of the collar
+# face and a semicircular end, tangent to that face, closes it.  The key's
+# square south end sits on that line.  The straight cut's length is the land
+# less that radius, from the knobs that bound it.
+KEYSEAT_LENGTH_EXPRESSION = '"SecEnd1" - "Sec1KeyseatW" / 2'
+# The end's centre station from the front face: the collar's tip-side face
+# (journal and web) plus the radius.
+KEYSEAT_END_STATION_EXPRESSION = '"SecEnd0" + "CollarWidth" + "Sec1KeyseatW" / 2'
+KEYSEAT_END_STATION = COLLAR_END_STATION + cone_land_key.KEY_END_SET_MM
+if abs(cone_land_key.KEY_END_SET_MM - cone_land_key.KEYSEAT_WIDTH_MM / 2.0) > 1e-12:
+    raise AssertionError("the keyseat's end radius is the end mill's, half the keyseat")
 
 
 async def _add_collar(
@@ -519,6 +537,22 @@ def keyseat_area() -> float:
     return strip - 2.0 * half * floor
 
 
+def keyseat_end_volume(steps: int = 4000) -> float:
+    """Volume (mm^3) the end-mill plunge removes beyond the straight cut: the
+    half disc of radius W/2 on the collar side of its centre, from the floor
+    out to the land's round (midpoint rule over y; the integrand is smooth
+    and the floor lies inside the land at the keyseat's edges)."""
+    radius = SECTION_DIAS[1] / 2.0
+    half = cone_land_key.KEYSEAT_WIDTH_MM / 2.0
+    floor = cone_land_key.KEYSEAT_FLOOR_OFFSET_MM
+    dy = 2.0 * half / steps
+    total = 0.0
+    for k in range(steps):
+        y = -half + (k + 0.5) * dy
+        total += math.sqrt(half**2 - y**2) * (math.sqrt(radius**2 - y**2) - floor) * dy
+    return total
+
+
 async def _cut_keyseat(adapter: Any, drive_jobs: list[tuple[str, str]]) -> float:
     """Cut land 1's keyseat and return the volume removed.
 
@@ -528,8 +562,9 @@ async def _cut_keyseat(adapter: Any, drive_jobs: list[tuple[str, str]]) -> float
     construction line along the x axis from the land's far side (anchored by
     ``SecDia1``/2 from the axis) to the floor's midpoint, whose length IS
     ``Sec1KeyseatS`` (ANSI B17.1 S, the across-flat's measurement form).  The
-    cut runs back to the collar's tip-side face by the land's length, square
-    at the collar like the flat it replaces.
+    cut runs back toward the collar's tip-side face by the land's length less
+    the end mill's radius (KEYSEAT_LENGTH_EXPRESSION); _cut_keyseat_end
+    closes it with the end mill's semicircle.
     """
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
@@ -539,7 +574,9 @@ async def _cut_keyseat(adapter: Any, drive_jobs: list[tuple[str, str]]) -> float
     floor_offset = cone_land_key.KEYSEAT_FLOOR_OFFSET_MM
     half = cone_land_key.KEYSEAT_WIDTH_MM / 2.0
     reach = radius + 1.0
-    length = SECTION_ENDS[land] - _flat_start_station(land)
+    length = (
+        SECTION_ENDS[land] - _flat_start_station(land) - cone_land_key.KEY_END_SET_MM
+    )
     profile = "Sec1KeyseatProfile"
     dims = SketchDims()
     check(f"create_sketch {label}", await adapter.create_sketch("Sec1EndPlane"))
@@ -616,8 +653,96 @@ async def _cut_keyseat(adapter: Any, drive_jobs: list[tuple[str, str]]) -> float
     )
     name_last_feature(adapter, "Sec1Keyseat")
     length_dim = name_dimensions(adapter, "Sec1Keyseat", ["Sec1KeyseatLength"])
-    drive_jobs += [(length_dim[0], flat_length_expression(land))]
+    drive_jobs += [(length_dim[0], KEYSEAT_LENGTH_EXPRESSION)]
     return keyseat_area() * length
+
+
+async def _cut_keyseat_end(adapter: Any, drive_jobs: list[tuple[str, str]]) -> float:
+    """Close the keyseat's collar end with the end mill's semicircle and
+    return the volume removed.
+
+    A Ø``Sec1KeyseatW`` circle centred on the keyseat's centreline at
+    KEYSEAT_END_STATION, sketched on a plane parallel to the Right Plane one
+    millimetre outside land 1 (on the keyseat's +X side), cut mid-plane deep
+    enough to reach the floor: the mid-plane cut needs no direction off the
+    plane, its far half meets only air, and its centre lies where the
+    straight cut stops, so only the collar-side half disc is new.  Its centre
+    station is driven from the knobs (KEYSEAT_END_STATION_EXPRESSION) and its
+    size by the keyseat width, so the end follows both; the sketch states
+    which of its axes runs along the shaft (ModelToSketchTransform).
+    """
+    from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
+
+    label = "Sec1 keyseat end"
+    radius = SECTION_DIAS[1] / 2.0
+    reach = radius + 1.0
+    floor_offset = cone_land_key.KEYSEAT_FLOOR_OFFSET_MM
+    half = cone_land_key.KEYSEAT_WIDTH_MM / 2.0
+    check(
+        "create_plane Sec1KeyseatEndPlane",
+        await adapter.create_plane(
+            CreatePlaneParameters(mode="offset", base_plane="Right Plane", offset=reach)
+        ),
+    )
+    name_last_feature(adapter, "Sec1KeyseatEndPlane")
+    profile = "Sec1KeyseatEndProfile"
+    dims = SketchDims()
+    check(f"create_sketch {label}", await adapter.create_sketch("Sec1KeyseatEndPlane"))
+    x_mm, y_mm = _sketch_xy_mm(adapter, (reach, 0.0, KEYSEAT_END_STATION))
+    along_x = abs(x_mm) > abs(y_mm)
+    if (
+        min(abs(x_mm), abs(y_mm)) > 1e-6
+        or abs(max(abs(x_mm), abs(y_mm)) - KEYSEAT_END_STATION) > 1e-6
+    ):
+        raise RuntimeError(
+            f"{label}: the end's centre maps to sketch ({x_mm}, {y_mm}), not onto "
+            f"one axis at {KEYSEAT_END_STATION}"
+        )
+    await define_circle(
+        adapter,
+        x_mm if along_x else 0.0,
+        0.0 if along_x else y_mm,
+        half,
+        label,
+        dims=dims,
+        names=("Sec1KeyseatEndStation", "Sec1KeyseatEndStation", "Sec1KeyseatEndDia"),
+        drives=(
+            KEYSEAT_END_STATION_EXPRESSION if along_x else None,
+            None if along_x else KEYSEAT_END_STATION_EXPRESSION,
+            '"Sec1KeyseatW"',
+        ),
+    )
+    await ensure_fully_defined(adapter, f"{label} sketch")
+    check(f"exit_sketch {label}", await adapter.exit_sketch())
+    name_last_feature(adapter, profile)
+    drive_jobs += dims.apply(adapter, profile)
+    check(
+        f"cut {label}",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(
+                depth=2.0 * (reach - floor_offset), both_directions=True
+            )
+        ),
+    )
+    name_last_feature(adapter, "Sec1KeyseatEnd")
+    blank_reference_geometry(adapter, (("Sec1KeyseatEndPlane", "PLANE"),))
+    return keyseat_end_volume()
+
+
+def _sketch_xy_mm(
+    adapter: Any, point_mm: tuple[float, float, float]
+) -> tuple[float, float]:
+    """The active sketch's (x, y), mm, of a model point given in mm."""
+    sketch = _early_bound(adapter.currentModel.SketchManager.ActiveSketch, "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    point = _early_bound(
+        utility.CreatePoint(double_array([value / 1000.0 for value in point_mm])),
+        "IMathPoint",
+    )
+    moved = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+    data = [float(value) for value in moved.ArrayData]
+    return data[0] * 1000.0, data[1] * 1000.0
 
 
 async def _cut_flat(adapter: Any, land: int, drive_jobs: list[tuple[str, str]]) -> float:

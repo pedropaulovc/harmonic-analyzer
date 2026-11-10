@@ -348,7 +348,9 @@ current report does not discharge the operating assumptions or waivers below.
 - **Phase is cheap if clocks share their datums.** ±0.25° cam-lobe/notch phase
   is 0.13 mm at the notch. The land-1 keyseat and the shaft flats are milled
   at one clock and each cone gear's teeth are indexed from its bore's +X
-  feature on one setup: the land-1 keyway on T030–T120 and the 64T (owner
+  feature on one setup, the feature and the phase-0 tooth sharing the front
+  view's drawn centreline at the title block's ±1° (`cone_flat_clock`): the
+  land-1 keyway on T030–T120 and the 64T (owner
   decision C1 keyed, 2026-11-09, PR #1992), the D-bore flat on T006–T024.
   The keyed gears share one key, so its play is a common crank-index time
   shift and only each keyway's side clearance scatters. The D-flat

@@ -359,11 +359,13 @@ FACE_WIDTH_BAND = GEAR_FACE_WIDTH_BAND
 # angular datum on MHA-DT-04, and its outward normal passes through the centre
 # of the phase-0 tooth on local +X, so every gear keeps the clock it is
 # placed at.  On the keyed land 1 (owner decision 2026-11-09, C1 keyed, PR
-# #1992) the hub keyway takes the flat's place on the same +X clock.  Index
-# the teeth off the flat (keyway) on one setup; the native BoreFlatClock
-# (KeywayClock) angular dimension carries this band (error_budget.yaml
-# cone_flat_clock), the cylinder gear's CAM_PHASE_TOLERANCE_DEG precedent.
-FLAT_CLOCK_TOLERANCE_DEG = 0.25
+# #1992) the hub keyway takes the flat's place on the same +X clock.  The
+# flat (keyway) and the phase-0 tooth share the front view's drawn +X
+# centreline (drawing-guidelines rule 26: features in line share a drawn
+# centreline), so the clock is the title block's angle and takes no
+# dimension: the error budget's cone_flat_clock closes at it (machinist
+# review of the C1-keyed sheets, PR 2 round 2: a ±.25° clock in DETAIL A
+# named a tooth the detail does not draw, and no mate).
 
 
 def floor_radius_min_mm(teeth: int) -> float:
@@ -485,7 +487,7 @@ def terminal_web_mm(teeth: int) -> float:
 #
 # T006..T024 ride lands 2-4: each bore is a D, the round bore above plus one
 # flat, parallel to the land's flat, whose outward normal is local +X
-# (through the phase-0 tooth, FLAT_CLOCK_TOLERANCE_DEG).  Across-flat (AF) is
+# (through the phase-0 tooth, error_budget.yaml cone_flat_clock).  Across-flat (AF) is
 # measured from the flat to the far side of the round bore, the land's own AF
 # nominal; the band keeps .0004-.0012 in AF clearance on the land's
 # FLAT_AF_BAND.  One band for every D, so one BoreAF tolerance serves them all.
@@ -668,8 +670,8 @@ KEYED_BORE_SKETCH = "KeyedBoreProfile"
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BlankProfile": {"BlankDia"},
     "Blank": {"FaceWidth"},
-    BORE_SKETCH: {"BoreCutDia", "BoreAF", "BoreFlatClock"},
-    KEYED_BORE_SKETCH: {"KeyedBoreDia", "KeywayWidth", "KeywayT", "KeywayClock"},
+    BORE_SKETCH: {"BoreCutDia", "BoreAF"},
+    KEYED_BORE_SKETCH: {"KeyedBoreDia", "KeywayWidth", "KeywayT"},
     TOOTH_REFERENCE_SKETCH: {"ToothThickness"},
     GAP_FLOOR_SKETCH: {"FloorDia"},
     WEB_REFERENCE_SKETCH: {"WebMin"},
@@ -832,21 +834,19 @@ def configuration_number(part_number: str, teeth: int) -> str:
 # T006, and every blank is floored to that grid, so the printed size is the
 # modelled one.  The face width prints four, like the cylinder gear's
 # OverallThickness under the same rule: three would round its nominal by a
-# third of the +/-.001 band.  The flat (keyway) clock prints one place of
-# degrees, the cylinder gear's NotchPhase precedent: +/-0.25 needs no more.
-# The keyway's width and T print at cone_land_key's places.  RV-03's T012
+# third of the +/-.001 band.  The keyway's width and T print at
+# cone_land_key's places.  RV-03's T012
 # web prints its ruled .0797 MIN at four.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BlankProfile": {"BlankDia": 4},
     "Blank": {"FaceWidth": 4},
     BORE_SKETCH: {
-        "BoreCutDia": BORE_BAND_PLACES, "BoreAF": BORE_AF_PLACES, "BoreFlatClock": 1,
+        "BoreCutDia": BORE_BAND_PLACES, "BoreAF": BORE_AF_PLACES,
     },
     KEYED_BORE_SKETCH: {
         "KeyedBoreDia": BORE_BAND_PLACES,
         "KeywayWidth": cone_land_key.KEYWAY_PLACES,
         "KeywayT": cone_land_key.KEYWAY_PLACES,
-        "KeywayClock": 1,
     },
     TOOTH_REFERENCE_SKETCH: {"ToothThickness": 4},
     GAP_FLOOR_SKETCH: {"FloorDia": 4},

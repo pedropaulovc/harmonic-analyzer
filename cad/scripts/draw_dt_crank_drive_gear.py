@@ -65,13 +65,16 @@ from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
+import cone_land_key
 from dt_crank_drive_gear_notes import GEAR_DATA, KEY_MATE_NUMBER, SHAFT_MATE_NUMBER
 from dt_crank_drive_gear_spec import (
     BORE_DIA,
+    BORE_DIAMETRAL_CLEARANCE,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FACE_WIDTH,
     OUTSIDE_DIA,
+    inch_text,
 )
 
 
@@ -99,6 +102,7 @@ GEAR_DATA_POS = (0.016, 0.262)
 # The property-linked block hangs down from GEAR_DATA_POS one 2.5 mm note line
 # per row: on farm run 20261001T110844152Z the 15 rows' cap tops ran 261.7 to
 # 212.8 mm (3.50 mm pitch) and the last row's descenders reached 208.9 mm.
+# The tooth-edge requirement is one of its rows, not a free-floating note
 # (machinist review r1 of #1641); the only other note is the keyed bore's
 # numbered fit note (NOTES_XY).
 GEAR_DATA_LINE_PITCH = 0.0035
@@ -209,13 +213,21 @@ KEY_MATE_NAME = "KEY"
 BORE_FIT_NOTE_NUMBER = 1
 # The land is named by what it is, its key, not by a project label the sheet
 # never defines (machinist review, run 20261110T001845485Z: "LAND 1"; rule
-# 26). MHA-DT-04 keys one land only. Each line stays no longer than 51
-# characters, left of the keyway width's text above it.
+# 26). MHA-DT-04 keys one land only. The clearances print as REF in the form
+# draw_dt_cone_gear.sheet_notes prints for the keyed cone gears on the same
+# land, read from the same limits (the round fit, cone_land_key's keyway side
+# clearance). Each line stays no longer than 51 characters, left of the
+# keyway width's text above it.
+_ROUND_FIT = "-".join(inch_text(value, 4) for value in BORE_DIAMETRAL_CLEARANCE)
+_KEYWAY_FIT = "-".join(
+    inch_text(value, 4) for value in cone_land_key.KEYWAY_SIDE_CLEARANCE_MM
+)
 BORE_FIT_NOTE = "\n".join(
     (
         f"{BORE_FIT_NOTE_NUMBER}. SLIDING FIT ON THE KEYED LAND OF {SHAFT_MATE_NAME}",
-        f"   {SHAFT_MATE_NUMBER}, MADE TO ITS MEASURED LAND; DRIVEN BY",
-        f"   {KEY_MATE_NAME} {KEY_MATE_NUMBER}; SLIDES ON, NO ROCK.",
+        f"   {SHAFT_MATE_NUMBER} AND {KEY_MATE_NAME} {KEY_MATE_NUMBER}: BORE MADE TO THE",
+        f"   MEASURED LAND (CLEARANCE {_ROUND_FIT} ON \u00d8,",
+        f"   {_KEYWAY_FIT} KEYWAY TO KEY); SLIDES ON, NO ROCK.",
     )
 )
 # The sheet's numbered notes, in one block (rule 7: at most four short

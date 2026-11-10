@@ -1599,7 +1599,9 @@ def test_cone_flat_phase_follows_gear_ratio_and_print_worst_lever(budget):
     clock = budget["critical_features"]["cone_flat_clock"]["tolerance"]
     play = budget["critical_features"]["cone_flat_play"]["tolerance"]
     key_play = budget["critical_features"]["cone_key_play"]["tolerance"]
-    assert clock == dt_cone_gear_spec.FLAT_CLOCK_TOLERANCE_DEG
+    # The flat (keyway) and the phase-0 tooth share the front view's drawn
+    # centreline: the clock is the title block's angle, undimensioned.
+    assert clock == float(_config.title_block("angular")["value_deg"])
     assert play == pytest.approx((clearance_hi - clearance_lo) / 2.0)
     assert gear_seat_fit.FLAT_AF_CLEARANCE == (0.01016, 0.03048)
     way_lo, way_hi = cone_land_key.KEYWAY_SIDE_CLEARANCE_MM

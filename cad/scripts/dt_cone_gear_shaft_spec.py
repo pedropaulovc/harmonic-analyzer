@@ -42,7 +42,7 @@ from dt_crank_drive_gear_spec import FACE_WIDTH as GEAR64_FACE_WIDTH
 from dt_crank_drive_gear_spec import LAYOUT_FACE_WIDTH as GEAR64_LAYOUT_FACE_WIDTH
 from dt_crank_drive_gear_spec import SOUTH_FACE_SHIFT_NORTH as GEAR64_SOUTH_FACE_SHIFT_NORTH
 from dt_crank_drive_gear_spec import LAYOUT_CENTRE_STATION as GEAR64_LAYOUT_CENTRE_STATION
-from gear_seat_fit import FLAT_AF_CLEARANCE, flat_bore_af_band, seat_bore_band
+from gear_seat_fit import flat_bore_af_band, seat_bore_band
 
 
 MM_PER_IN = 25.4
@@ -203,6 +203,7 @@ def _gear(teeth: int) -> str:
 # 4).  The journal's .0008 band is under the turned-diameter row, so it is a
 # matched running fit to the MHA-DT-05 bore, the form the reviewer accepted
 # on MHA-DT-19's pivot shaft, its clearance the printed limits'
+# (JOURNAL_DIAMETRAL_CLEARANCE_MM) as a REF row of its own: two lines of
 # words (rule 7) narrow enough to stand between the faced end and section
 # A-A (round 3's 33-character line crowded section A's letter).  Every gear
 # land slides in the bores of the gears it carries; those mates (MHA-DT-03,
@@ -235,11 +236,6 @@ FLAT_MATE_SUFFIXES = {
     "Sec1KeyseatWidth": f" NOTE {LAND_NOTE}",
     **{f"Sec{land}AF": f" NOTE {LAND_NOTE}" for land in (2, 3, 4)},
 }
-# Every D-bore's across-flat band is gear_seat_fit.flat_bore_af_band of the
-# land's, so one clearance serves all three flats.
-FLAT_AF_CLEARANCE_TEXT = (
-    f"{inch_text(FLAT_AF_CLEARANCE[0], 4)}-{inch_text(FLAT_AF_CLEARANCE[1], 4)}"
-)
 
 # Station layout.  Every cone gear station was laid out on a 6.5 reference
 # face one exact-tracking seat pitch (dt_cone_gear_spec.SEAT_PITCH) from the next;
@@ -474,15 +470,16 @@ SURFACE_FINISHES = (
     ),
 )
 
-# The sheet's numbered flag notes, five lines (drawing-guidelines.md rule 7:
+# The sheet's numbered flag notes, four lines (drawing-guidelines.md rule 7:
 # few, flagged, never a method).  Note LAND_NOTE is linked from every land's
 # diameter, land 1's keyseat and each across-flat: it names each land's mates
 # once by drawing number (rule 4; sections A-A to D-D cut lands 1 to 4: A-A
 # the keyed land with its MHA-DT-VN-71 key, owner decision 2026-11-09, PR
 # #1992), and gives the flats' .0004 bands (B-B to D-D), under the
 # milled-width row, their fit route: each flat is milled matched to its gears'
-# measured D-bores, with the acceptance and the printed limits' across-flat
-# clearance as REF.  The keyseat and the flats' common clock is the aligned
+# measured D-bores with an unambiguous acceptance (rule 4's matched pair: a
+# clearance range OR an acceptance; Codjiflo P2 on #2331 held the block to
+# rule 7's four lines, so the REF clearance went).  The keyseat and the flats' common clock is the aligned
 # sections' and the title block's angle (error_budget.yaml books it per land
 # as cone_land_clock).  Note STACK_NOTE names, once, the stack the
 # three-place lengths set (rule 4): each step stands SEAT_STEP_SETBACK behind
@@ -501,9 +498,8 @@ STACK_LENGTHS_TEXT = ", ".join(
 ) + f" AND {inch_text(COLLAR_THICKNESS, 3)}"
 DRAWING_NOTES = "\n".join(
     (
-        f"{LAND_NOTE}. SLIDING FIT: A-A MHA-DT-03 30T-120T GEARS AND MHA-DT-07,",
-        "   KEY MHA-DT-VN-71; B-B TO D-D MHA-DT-03, D-D ALSO MHA-DT-VN-54; MILL",
-        f"   FLATS TO MEASURED D-BORES: NO ROCK (CLEARANCE {FLAT_AF_CLEARANCE_TEXT} REF).",
+        f"{LAND_NOTE}. SLIDING FIT IN MHA-DT-03; A-A ALSO MHA-DT-07 AND KEY MHA-DT-VN-71;",
+        "   D-D ALSO MHA-DT-VN-54; MILL FLATS TO MEASURED D-BORES: NO ROCK.",
         f"{STACK_NOTE}. {STACK_LENGTHS_TEXT} SET THE MHA-DT-07 AND MHA-DT-03 STACK.",
         f"{TAILSTOCK_NOTE}. TURN THE TIP LAND WITH TAILSTOCK SUPPORT.",
     )

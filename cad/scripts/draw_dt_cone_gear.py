@@ -2,8 +2,8 @@ r"""Create the complete cone-gear batch drawing package (MHA-DT-03).
 
 Every configured family member T006..T120 by six receives a standalone sheet.
 Each sheet selects its own part configuration, imports the native model-owned
-blank diameter, bore (T006..T024 a D: diameter, across-flat and flat clock;
-T030..T120 round with a hub keyway: diameter, keyway width, T and clock), face
+blank diameter, bore (T006..T024 a D: diameter and across-flat; T030..T120
+round with a hub keyway: diameter, keyway width and T), face
 width, driving circular-tooth-thickness requirement and functional
 root-envelope limits, plus the actual finite cutter recipe and bounded
 carrying-contact data.
@@ -53,7 +53,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 
 import _config
 from _check import check
-from _com import _early_bound, _read_member
+from _com import _early_bound
 from _cone_gear_readback import assert_saved_configuration_topology
 from _drawing_common import (
     DrawingOutputs,
@@ -85,7 +85,6 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _fit_deviations import deviations
-from _layout_audit import arc_segments
 from _layout_geometry import Box, Segment, segment_box_distance
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
@@ -192,7 +191,7 @@ ISO_CENTER = (0.355, 0.150)
 # views would not take moved or imported dimensions).  At sheet scale the
 # flat is 0.76-2.3 mm deep, 1.02 mm on T006's 8:1; enlarged, 2.5-3.1 mm.
 # The view sits lower left, under the front view and left of the thickness
-# callout, and carries every bore dimension: diameter, across-flat, clock.
+# callout, and carries every bore dimension: diameter, across-flat (keyway).
 # The layout audit compares view OUTLINES, not circles: GetOutline pads the
 # front view ~5.5 mm and a cropped view 10.1-10.75 mm past its crop circle
 # (farm run 20260929T061328212Z at 70d2e52: T084's front box [54.8, 99.8, 155.2,
@@ -211,15 +210,13 @@ BORE_VIEW_SCALE_LADDER = (
 # crop prints no outline (``_crop_bore_view``): drawn, its circle stood 3 mm
 # outside the bore and the diameter's outside arrow spanned exactly that
 # ring, so the Ø read as landing on the unlabelled circle (ENFORCE round 1
-# of #971). Unprinted, the ring only spaces the bore from the clock text:
-# 1.5 mm keeps the clock's three-line block's arc (its radius grows with the
-# crop) clear of the front view on T114.
+# of #971). Unprinted, the ring only spaces the bore from its callouts.
 BORE_VIEW_CROP_MARGIN = 0.0015
 # The view's title stands this far under the crop circle, below the
 # across-flat callout's dimension line, the block's bottom edge. The block is
-# centred on its SetPosition point (as the clock's is, below), ~5.3 mm a
-# row; the flag's line under BORE ACROSS FLAT adds one, so the point drops
-# half a row less than the 5 mm it stood at and the bottom stays put.
+# centred on its SetPosition point, ~5.3 mm a row; the flag's line under
+# BORE ACROSS FLAT adds one, so the point drops half a row less than the
+# 5 mm it stood at and the bottom stays put.
 BORE_VIEW_AF_DROP = 0.0025
 BORE_VIEW_LABEL_DROP = 0.016
 # A keyway's T text stands right of the title, so the title rises under T's
@@ -242,56 +239,12 @@ BORE_VIEW_DIA_LIFT = 0.0115
 # witness by BORE_VIEW_AF_GAP.
 BORE_VIEW_AF_GAP = 0.004
 BORE_VIEW_AF_HALF_WIDTH = 0.027
-# The flat clock's text, measured with two lines ("90° ±0.25°" over TO TOOTH
-# CENTERLINE) in the run-20261010T051729717Z T006 PDF: x 69.8-119.9 mm, y
-# 60.0-72.0 mm round its SetPosition point (94.9, 66.0) mm, so the point is
-# the block's centre. Its arc ends on the bore's +X axis line with an
-# arrowhead at radius |text - vertex|, i.e. under the text: there the axis
-# line and arrow ran through the C of CENTERLINE (eye pass of that run). The
-# arrowhead (3.6 mm long on that PDF; the document's 6.35 mm arrow-length
-# preference is not what this arc end draws) now ends ARROW_TEXT_CLEARANCE
-# under the block, and the block's left edge stands CLEAR_GAP_M right of the
-# bore view's crop circle. The flag's line over the value makes the block
-# three lines, ~18 mm tall; the flag is shorter than TO TOOTH CENTERLINE, so
-# the measured width still bounds the block. A
-# wider half-width would swing the arc into the front view's box on T114
-# (test_bore_view_enlarges_every_d_bore_clear_of_its_neighbours). The native
-# readback still refuses an arc sweep under CLOCK_MIN_SWEEP_DEG.
-BORE_CLOCK_TEXT_HALF_WIDTH = 0.025
-BORE_CLOCK_TEXT_HALF_HEIGHT = 0.009
-BORE_CLOCK_TEXT_GAP = 0.002
-BORE_CLOCK_ARROW_LENGTH = 0.0036
-# swDimensionArrowsSide_e.swDimArrowsInside, set rather than left to the
-# document's smart arrows (main's draw_dt_cone_tip_block form). Left smart,
-# the clock read whole at the sweep (0-14.6 and 24.2-90 deg about the
-# vertex at 35.0 mm) but the settling rebuild drew it with its arrows
-# outside on every sheet whose arc is that short (T018-T120, run
-# 20261010T073917031Z): two 10 deg stubs beyond the legs, no arc between
-# them. At 46.4 mm (T006/T012) smart arrows stayed inside.
-ARROWS_INSIDE = 0
-# A settled clock's arcs reach both legs within this, and sweep at least
-# CLOCK_MIN_SWEEP_DEG between them (the text gap is the rest; T006 swept
-# 0-11 and 18-90 deg in that run, 83 deg).
-CLOCK_LEG_TOL_DEG = 1.0
-CLOCK_MIN_SWEEP_DEG = 45.0
 # The bore axis must land within 0.1 mm of BORE_VIEW_CENTER after the move
 # (draw_amplitude_bar's detail tolerance), and the title within 1 mm.
 BORE_VIEW_POSITION_TOL_M = 1e-4
 NOTE_CENTRING_TOL_M = 0.001
 CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 CENTER_MARK_SINGLE = 2  # swCenterMarkStyle_e.swCenterMark_Single
-# Imported, a clock keeps its sketch's quadrant wherever its text goes. Left
-# between the flat's upper half and the -X centreline, its arc swept the
-# diameter's upper-left leader lane, and on the 4:1 sheets it crossed that
-# leader's shoulder (T030-T120, run 20260929T064504232Z).
-# ``_sweep_clock_right_of_flat`` flips it into the quadrant right of the
-# flat (keyway top) and above the axis; the D's BoreFlatClock is authored
-# against a +X ray there (build_dt_cone_gear), so it imports with no flip.
-# A clock's arc may overrun the flat or the axis by CLOCK_ARC_OVERRUN and must
-# centre on the flat/axis crossing within CLOCK_ARC_CENTRE_TOL (sheet metres).
-CLOCK_ARC_OVERRUN = 0.0003
-CLOCK_ARC_CENTRE_TOL = 0.0005
-CLOCK_FLIPS = ("SupplementaryAngle", "VerticallyOppositeAngle", "SupplementaryAngle")
 # Top-aligned with the numbered notes: the 14-line block (header + 13
 # rows) measured 49.1 mm tall natively (e91d2581 layout audit), 3.51 mm a
 # line; the 15-line block ends ~52.6 mm down, still above the largest side
@@ -732,17 +685,11 @@ DIMENSION_CALLOUTS = {
     # No process word: a reamer would cut away the flat, and the dimensions
     # define the D-profile (user ruling 2026-09-29, machinist review of the
     # #1128 full build). The flag hangs under the value in rows as narrow as
-    # the value: on T006/T012 the flat's witness for the clock rises ~3 mm
-    # right of it, and a wider block's shoulder crosses that witness.
+    # the value.
     "BoreCutDia": f"THRU\n{BORE_NOTE_FLAG}",
     # The value is the gear bore's own; naming the bore, not the shaft it
     # slides on, keeps it from reading as MHA-DT-04's across-flat.
     "BoreAF": f"BORE ACROSS FLAT\n{BORE_NOTE_FLAG}",
-    # The flat's normal runs through the bore axis and the +X tooth's centre;
-    # the bore view crops the teeth off, so the callout names the reference
-    # its centre-mark line stands for, the line the front view's mark draws
-    # through that tooth (front_centre_mark_arms_mm).
-    "BoreFlatClock": "TO TOOTH CENTERLINE",
     # The keyed bore (T030..T120) is round, so it takes the fit bore's REAM
     # (rule 7); its keyway's width band is the requirement, with no process
     # word.  T reads from its witnesses (keyway top, far side of the bore):
@@ -751,7 +698,6 @@ DIMENSION_CALLOUTS = {
     "KeyedBoreDia": f"REAM THRU\n{BORE_NOTE_FLAG}",
     "KeywayWidth": BORE_NOTE_FLAG,
     "KeywayT": BORE_NOTE_FLAG,
-    "KeywayClock": "TO TOOTH CENTERLINE",
     # The text is the same on every sheet: offset (OffsetText), the imported
     # model dimension printed the LAST sheet's below-text on all of them (T006
     # printed T120's "ON PITCH CIRCLE Ø63.500", farm runs of 746809f62 and
@@ -775,16 +721,9 @@ DIMENSION_CALLOUTS = {
 # Text over the value. One line each: SOLIDWORKS drops a multi-line callout
 # above a value from the print (ENFORCE round 2 of #971: every two-line one
 # went unmatched in the PDF; draw_ch_amplitude_bar r1).
-# The clocks' ±.25° is tighter than the title block's ±1°, and note 1 states
-# only the bore's fit: each clock says why in its own words (rules 4 and 7;
-# machinist review of the C1-keyed sheets), the tooth's phase on the shaft
-# (error_budget.yaml cone_flat_clock).
-CLOCK_REASON = "SETS TOOTH PHASE"
 CALLOUTS_ABOVE = {
     "ToothThickness": "CIRCULAR TOOTH THICKNESS",
     "BlankDia": TEETH_NOTE_FLAG,
-    "BoreFlatClock": CLOCK_REASON,
-    "KeywayClock": CLOCK_REASON,
 }
 if any("\n" in text for text in CALLOUTS_ABOVE.values()):
     raise AssertionError("an above-callout with a line break does not print")
@@ -1029,28 +968,17 @@ def bore_view_crop_radius(teeth: int) -> float:
     return bore_reach_mm(teeth) * _bore_view_ratio(teeth) / 1000.0 + BORE_VIEW_CROP_MARGIN
 
 
-def clock_dimension_name(teeth: int) -> str:
-    """The sheet's clock: the D's flat or the keyway's top to the centreline."""
-    return "KeywayClock" if keyed(teeth) else "BoreFlatClock"
-
-
-def bore_clock_vertex(teeth: int) -> tuple[float, float]:
-    """Sheet point where the flat (keyway top) crosses the bore's horizontal
-    centreline: the clock dimension's vertex."""
-    flat = bore_clock_offset_mm(teeth) * _bore_view_ratio(teeth) / 1000.0
-    return BORE_VIEW_CENTER[0] + flat, BORE_VIEW_CENTER[1]
-
-
 # The keyway's width (T030..T120) prints right of the crop circle under the
-# axis, the clock's mirror: its dimension line stands at the text, its
-# witnesses run right from the keyway top's corners. Its block (value and
-# band over the note flag, two rows) is sized like the clock's lines; T's
-# text then stands right of it, so T's dimension line runs on under it.
+# axis: its dimension line stands at the text, its witnesses run right from
+# the keyway top's corners. Its block (value and band over the note flag,
+# two rows) stands KEYWAY_WIDTH_TEXT_GAP right of the crop circle and its
+# top KEYWAY_WIDTH_TEXT_DROP + ARROW_TEXT_CLEARANCE under the lower witness,
+# where every keyed sheet has printed it; T's text then stands right of it,
+# so T's dimension line runs on under it.
 KEYWAY_WIDTH_TEXT_HALF_WIDTH = 0.014
 KEYWAY_WIDTH_TEXT_HALF_HEIGHT = 0.006
-# Air between the end of the width's upper dimension line and the keyed
-# clock's block above it (bore_view_keep).
-KEYWAY_WIDTH_LINE_CLEARANCE = 0.001
+KEYWAY_WIDTH_TEXT_GAP = 0.002
+KEYWAY_WIDTH_TEXT_DROP = 0.0036
 
 
 def bore_view_keep(teeth: int) -> dict[str, tuple[float, float]]:
@@ -1060,12 +988,8 @@ def bore_view_keep(teeth: int) -> dict[str, tuple[float, float]]:
     dimension line hangs under the crop circle between its witnesses (the
     arc's -X point and the flat or keyway top) and runs on right to its
     text, which stands outside that witness (and, keyed, right of the
-    keyway width's block); the clock's arc sweeps the quadrant between the
-    flat's (keyway top's) upper half and the +X centre-mark line
-    (``_sweep_clock_right_of_flat``), its text right of the circle and
-    raised clear of the axis line and the arc's arrowhead on it
-    (BORE_CLOCK_TEXT_*). The keyway width's text mirrors the clock's under
-    the axis.
+    keyway width's block). The keyway width's text stands right of the
+    circle under the axis.
     """
     ratio = _bore_view_ratio(teeth)
     flat = bore_clock_offset_mm(teeth) * ratio / 1000.0
@@ -1074,10 +998,6 @@ def bore_view_keep(teeth: int) -> dict[str, tuple[float, float]]:
     # 3 mm right of x - 0.022: the inch seat band (+0.04572/+0.0254)
     # ran the text 1.6 mm past the left inner border (#290 batch 0).
     diameter = (x - 0.019, y + crop + BORE_VIEW_DIA_LIFT)
-    clock = (
-        x + crop + BORE_CLOCK_TEXT_GAP + BORE_CLOCK_TEXT_HALF_WIDTH,
-        y + BORE_CLOCK_ARROW_LENGTH + ARROW_TEXT_CLEARANCE + BORE_CLOCK_TEXT_HALF_HEIGHT,
-    )
     if not keyed(teeth):
         return {
             "BoreCutDia": diameter,
@@ -1085,34 +1005,21 @@ def bore_view_keep(teeth: int) -> dict[str, tuple[float, float]]:
                 x + flat + BORE_VIEW_AF_GAP + BORE_VIEW_AF_HALF_WIDTH,
                 y - crop - BORE_VIEW_AF_DROP,
             ),
-            "BoreFlatClock": clock,
         }
-    width_right = x + crop + BORE_CLOCK_TEXT_GAP + 2.0 * KEYWAY_WIDTH_TEXT_HALF_WIDTH
+    width_right = x + crop + KEYWAY_WIDTH_TEXT_GAP + 2.0 * KEYWAY_WIDTH_TEXT_HALF_WIDTH
     half_width = dt_cone_gear_spec.KEYWAY_HALF_WIDTH_MM * ratio / 1000.0
-    # The width's arrows stand outside its witnesses, so its dimension line
-    # runs a document arrow length past the upper witness, straight up under
-    # the clock's block: it struck the O of TOOTH on every keyed sheet
-    # (layout audit of the C1-keyed farm run, line (91.9, 63.2)-(91.9, 69.5)
-    # mm against the block's bottom row at 67.2 mm). The block stands
-    # KEYWAY_WIDTH_LINE_CLEARANCE over that line's end.
-    clock = (
-        clock[0],
-        y + half_width + DIMENSION_ARROW_LENGTH + KEYWAY_WIDTH_LINE_CLEARANCE
-        + BORE_CLOCK_TEXT_HALF_HEIGHT,
-    )
     return {
         "KeyedBoreDia": diameter,
         # Under the lower witness and the arrow that ends on it.
         "KeywayWidth": (
             width_right - KEYWAY_WIDTH_TEXT_HALF_WIDTH,
-            y - half_width - BORE_CLOCK_ARROW_LENGTH - ARROW_TEXT_CLEARANCE
+            y - half_width - KEYWAY_WIDTH_TEXT_DROP - ARROW_TEXT_CLEARANCE
             - KEYWAY_WIDTH_TEXT_HALF_HEIGHT,
         ),
         "KeywayT": (
             max(x + flat, width_right) + BORE_VIEW_AF_GAP + BORE_VIEW_AF_HALF_WIDTH,
             y - crop - BORE_VIEW_AF_DROP,
         ),
-        "KeywayClock": clock,
     }
 
 
@@ -1561,60 +1468,6 @@ def _crop_bore_view(
         raise RuntimeError(f"{label} lost {lost} to its crop; it holds {sorted(after)}")
 
 
-def clock_arc_faults(
-    arcs: list[tuple[tuple[float, float], list[tuple[float, float]]]],
-    vertex: tuple[float, float],
-) -> list[str]:
-    """Why a flat clock's drawn arcs do not read as one 90 deg arc between
-    its legs: centred on the flat/axis crossing, inside the quadrant right of
-    the flat and above the axis, reaching both legs and sweeping most of the
-    way between them. Empty when they do."""
-    if not arcs:
-        return ["no arc"]
-    faults = []
-    angles = []
-    for centre, points in arcs:
-        if math.dist(centre, vertex) > CLOCK_ARC_CENTRE_TOL:
-            faults.append(f"arc centred {math.dist(centre, vertex) * 1000:.2f} mm off the vertex")
-        ends = [
-            math.degrees(math.atan2(py - vertex[1], px - vertex[0]))
-            for px, py in (points[0], points[-1])
-        ]
-        angles.append((min(ends), max(ends)))
-    stray = [
-        point
-        for _centre, points in arcs
-        for point in points
-        if point[0] < vertex[0] - CLOCK_ARC_OVERRUN or point[1] < vertex[1] - CLOCK_ARC_OVERRUN
-    ]
-    if stray:
-        faults.append(f"{len(stray)} point(s) outside the quadrant")
-    low = min(a for a, _b in angles)
-    high = max(b for _a, b in angles)
-    if abs(low) > CLOCK_LEG_TOL_DEG or abs(high - 90.0) > CLOCK_LEG_TOL_DEG:
-        faults.append(f"arcs end at {low:.1f}..{high:.1f} deg, not on the legs")
-    swept = sum(b - a for a, b in angles)
-    if swept < CLOCK_MIN_SWEEP_DEG:
-        faults.append(f"arcs sweep {swept:.1f} deg")
-    return faults
-
-
-def _assert_settled_clocks(adapter: Any, clocks: list[tuple[str, Any, int]]) -> None:
-    """After finalize's settling rebuild, every sheet's flat clock still draws
-    one arc between its legs (run 20261010T073917031Z: read whole at the
-    sweep, drawn as two outside stubs in the PDF on T018-T120)."""
-    ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
-    faults = []
-    for configuration, display, teeth in clocks:
-        if not ddoc.ActivateSheet(configuration):
-            raise RuntimeError(f"failed to activate {configuration} for its settled clock")
-        found = clock_arc_faults(_clock_arcs(display), bore_clock_vertex(teeth))
-        if found:
-            faults.append(f"{configuration}: {'; '.join(found)}")
-    if faults:
-        raise RuntimeError("flat clock arcs after the settling rebuild:\n" + "\n".join(faults))
-
-
 # swDimensionTextParts_e: the callout lanes set_dimension_callouts writes.
 _CALLOUT_ABOVE = 3
 _CALLOUT_BELOW = 4
@@ -1674,123 +1527,6 @@ def _assert_settled_callouts(adapter: Any, sheets: list[SheetCallouts]) -> None:
         raise RuntimeError(
             "dimension callouts after the settling rebuild:\n" + "\n".join(faults)
         )
-
-
-def _clock_arcs(display: Any) -> list[tuple[tuple[float, float], list[tuple[float, float]]]]:
-    """The clock dimension's drawn arcs as (centre, tessellated points), in
-    sheet metres, read the way the layout audit reads them."""
-    data = _early_bound(display.GetDisplayData(), "IDisplayData")
-    arcs = []
-    for index in range(int(data.GetArcCount())):
-        raw = tuple(float(value) for value in (data.GetArcAtIndex2(index) or ()))
-        segments = arc_segments(raw)
-        if not segments:
-            continue
-        points = [(segments[0].x0, segments[0].y0), *((s.x1, s.y1) for s in segments)]
-        arcs.append(((raw[10], raw[11]), points))
-    return arcs
-
-
-def _sweep_clock_right_of_flat(
-    adapter: Any, view: Any, annotations: list[Any], teeth: int, *, label: str
-) -> Any:
-    """Flip the imported flat clock until its arc sweeps only the quadrant
-    right of the flat and above the axis, then re-seat its text there.
-
-    The flips act on the selected dimension (the API's own example selects
-    it first), so each one runs with the clock alone selected in its active
-    view. Every flip is read back from the drawn arcs and the measured value;
-    a clock that ends anywhere else raises with the stray points.
-    """
-    clock_name = clock_dimension_name(teeth)
-    clocks = [
-        _early_bound(annotation, "IAnnotation")
-        for annotation in annotations
-        if dimension_name(adapter, _early_bound(annotation, "IAnnotation")) == clock_name
-    ]
-    if len(clocks) != 1:
-        raise RuntimeError(f"{label}: expected one {clock_name}, found {len(clocks)}")
-    annotation = clocks[0]
-    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-    dimension = _early_bound(display.GetDimension2(0), "IDimension")
-    display.ArrowSide = ARROWS_INSIDE
-    if int(display.ArrowSide) != ARROWS_INSIDE:
-        raise RuntimeError(f"{label}: the flat clock did not keep its arrows inside")
-    selection_name = str(display.GetNameForSelection() or "")
-    if not selection_name:
-        raise RuntimeError(f"{label}: the flat clock has no selection name")
-    model = adapter.currentModel
-    drawing = _early_bound(model, "IDrawingDoc")
-    vertex = bore_clock_vertex(teeth)
-    text_xy = bore_view_keep(teeth)[clock_name]
-    imported = float(_read_member(dimension, "SystemValue"))
-    flips: list[str] = []
-    stray: list[tuple[float, float]] = []
-    for flip in ("", *CLOCK_FLIPS):
-        if flip:
-            if not drawing.ActivateView(view.GetName2()):
-                raise RuntimeError(f"{label}: failed to activate the bore view")
-            model.ClearSelection2(True)
-            if not model.Extension.SelectByID2(
-                selection_name, "DIMENSION", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
-            ):
-                raise RuntimeError(f"{label}: failed to select the flat clock {selection_name!r}")
-            flipped = getattr(display, flip)()
-            model.ClearSelection2(True)
-            if not flipped:
-                raise RuntimeError(f"{label}: {flip} refused on the flat clock")
-            flips.append(flip)
-            if not annotation.SetPosition2(*text_xy, 0.0):
-                raise RuntimeError(f"{label}: failed to re-seat the flat clock text")
-            rebuild_drawing(adapter, label=f"{label} clock {flip}")
-        arcs = _clock_arcs(display)
-        if not arcs:
-            raise RuntimeError(f"{label}: the flat clock draws no arc")
-        for centre, points in arcs:
-            if math.dist(centre, vertex) > CLOCK_ARC_CENTRE_TOL:
-                raise RuntimeError(
-                    f"{label}: flat clock arc centred at "
-                    f"{tuple(round(v * 1000, 2) for v in centre)} mm, not the "
-                    f"flat/axis crossing {tuple(round(v * 1000, 2) for v in vertex)} mm"
-                )
-        stray = [
-            point
-            for _centre, points in arcs
-            for point in points
-            if point[0] < vertex[0] - CLOCK_ARC_OVERRUN or point[1] < vertex[1] - CLOCK_ARC_OVERRUN
-        ]
-        radii = sorted({round(math.dist(centre, points[0]) * 1000, 2) for centre, points in arcs})
-        spans = [
-            tuple(
-                round(math.degrees(math.atan2(y - vertex[1], x - vertex[0])), 1)
-                for x, y in (points[0], points[-1])
-            )
-            for _centre, points in arcs
-        ]
-        measured = float(_read_member(dimension, "SystemValue"))
-        _telemetry.info(
-            f"{label}: flat clock after {flips or ['import']}: reads "
-            f"{math.degrees(measured):.4f} deg, {len(arcs)} arc(s) spanning {spans} "
-            f"deg about the flat/axis crossing, radius {radii} mm, {len(stray)} "
-            "point(s) outside the quadrant right of the flat and above the axis",
-            clock_flips=len(flips),
-            clock_stray_points=len(stray),
-            clock_measured_deg=math.degrees(measured),
-        )
-        if abs(measured - imported) > 1e-9:
-            raise RuntimeError(
-                f"{label}: {flips[-1]} changed the clock from "
-                f"{math.degrees(imported):.4f} to {math.degrees(measured):.4f} deg"
-            )
-        if not stray:
-            if int(display.ArrowSide) != ARROWS_INSIDE:
-                raise RuntimeError(f"{label}: {flips} put the clock's arrows outside")
-            return display
-    raise RuntimeError(
-        f"{label}: flat clock arc still leaves the quadrant right of the flat and "
-        f"above the axis after {flips}; first stray points "
-        f"{[tuple(round(v * 1000, 1) for v in p) for p in stray[:3]]} mm"
-    )
 
 
 def _shelve_tooth_thickness(
@@ -1984,10 +1720,13 @@ def _check_exported_pdf(phase: str) -> None:
         assert_tooth_thickness_text_air(PDF)
 
 
-# The front view's bore centre mark draws its lines (machinist review of the
-# C1-keyed sheets, rule 10: the clock's reference, the tooth centreline, was
-# drawn nowhere). Its +X line runs from the bore's rim through the phase-0
-# tooth, which the flat (keyway) is clocked to, to CENTRE_LINE_OVERRUN past
+# The front view's bore centre mark draws the clock: its +X line is the
+# centreline the flat (keyway) and the phase-0 tooth share, so their 0 deg
+# holds to the title block's angle (rule 26: features in line share a drawn
+# centreline; error_budget.yaml cone_flat_clock) and no sheet
+# dimensions it (machinist review of the C1-keyed sheets, PR 2 round 2: a
+# ±.25° clock in DETAIL A named a tooth that view does not draw). The line
+# runs from the bore's rim through that tooth to CENTRE_LINE_OVERRUN past
 # the tip, stopping CENTRE_LINE_DIMENSION_AIR short of the thickness
 # dimension's line: that line's midpoint, on the bore axis, starts the leader
 # to the thickness text's shelf, whose block straddles the axis 6.5 mm on.
@@ -2320,7 +2059,6 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     ddoc = _early_bound(drawing_model, "IDrawingDoc")
 
-    clocks: list[tuple[str, Any, int]] = []
     sheet_callouts: list[SheetCallouts] = []
     for teeth in CONFIGURATION_TEETH:
         configuration = f"T{teeth:03d}"
@@ -2365,10 +2103,6 @@ async def build(adapter: Any) -> dict[str, str]:
             view_label=f"{configuration} bore",
             dimensions_by_feature=DRAWING_DIMENSIONS,
         )
-        clock = _sweep_clock_right_of_flat(
-            adapter, bore_view, bore_annotations, teeth, label=f"{configuration} bore view"
-        )
-        clocks.append((configuration, clock, teeth))
         _crop_bore_view(adapter, bore_view, configuration, teeth, set(bore_keep))
         # The part saves its authoring sketches hidden; the front view shows
         # the tooth and floor ones again for their dimensions, the side view
@@ -2504,10 +2238,7 @@ async def build(adapter: Any) -> dict[str, str]:
         expected_sheet_names=SHEET_NAMES,
         sheet_layouts={name: SPEC.layout for name in SHEET_NAMES},
         sheet_scales=SHEET_SCALES,
-        settled_checks=(
-            lambda: _assert_settled_clocks(adapter, clocks),
-            lambda: _assert_settled_callouts(adapter, sheet_callouts),
-        ),
+        settled_checks=(lambda: _assert_settled_callouts(adapter, sheet_callouts),),
         checkpoint=_check_exported_pdf,
     )
 

@@ -47,29 +47,30 @@ KEY_STOCK_BAND = (0.0, -0.0508)  # +.000/-.002
 # Shaft keyseat: milled with a 1/16 end mill, width +.0020/-.0000 (the shop
 # table's milled-width row, .002 wide: the key slides in any keyseat a 1/16
 # end mill cuts, so the width needs no tighter band and no fit route), floor
-# at S = .3391 +.0000/-.0040, the row for a milled step located from its
+# at S = .3385 +.0000/-.0040, the row for a milled step located from its
 # datum (.004 wide).  S and T are both printed at their rows, so their
 # nominals are set from the limits that matter: T's largest keeps the gears'
-# webs where the owner ruled them, and S's largest then keeps the key's top
-# under T's smallest.  .036 deep at the keyseat's centreline (the research's
-# square-key seat: at least half the key height below the land's surface at
-# the keyseat's edge).
+# webs where the owner ruled them, and S's largest keeps half the key below
+# the land's surface at the keyseat's edge on the smallest land (the guard
+# below; .3391 left .7898 against the key's .7938 half, Codjiflo review of
+# PR #2331) and the key's top under T's smallest.  .0365 deep at the
+# keyseat's centreline (the research's square-key seat).
 KEYSEAT_WIDTH_MM = KEY_SIZE_MM
 KEYSEAT_WIDTH_BAND = (0.0508, 0.0)  # +.0020/-.0000
-KEYSEAT_S_MM = 8.61314  # .3391
+KEYSEAT_S_MM = 8.5979  # .3385
 KEYSEAT_S_BAND = (0.0, -0.1016)  # +.0000/-.0040
 KEYSEAT_PLACES = 4
 # Distance of the keyseat floor from the land's axis, on +X.
 KEYSEAT_FLOOR_OFFSET_MM = KEYSEAT_S_MM - LAND_DIA_MM / 2.0
-KEYSEAT_DEPTH_MM = LAND_DIA_MM - KEYSEAT_S_MM  # .036 at the centreline
+KEYSEAT_DEPTH_MM = LAND_DIA_MM - KEYSEAT_S_MM  # .0365 at the centreline
 
 # Hub keyway: one pass of a 1/16 A broach, width +.0020/-.0000 (the shop
 # table's milled-width row, .002 wide; machinist review of PR #2331 at
 # 5994f29: a .001 band named no fit route), its top at T = .4045 +/-.0020
 # from the bore's far side, the milled-step row (machinist review of PR
 # #2331's follow-on run 20261110T001845485Z: +/-.0010 named no fit route):
-# T's largest, .4065, is the one the keyed webs were ruled at; .003 over the
-# key at the nominals, never under zero at the limits.
+# T's largest, .4065, is the one the keyed webs were ruled at; .0035 over
+# the key at the nominals, never under zero at the limits.
 KEYWAY_WIDTH_MM = KEY_SIZE_MM
 KEYWAY_WIDTH_BAND = (0.0508, 0.0)  # +.0020/-.0000
 KEYWAY_T_MM = 10.2743  # .4045
@@ -126,15 +127,19 @@ if min(KEYSEAT_SIDE_CLEARANCE_MM[0], KEYWAY_SIDE_CLEARANCE_MM[0]) < 0.0:
         "the key does not slide in its keyseat or keyways at the limits"
     )
 # The key stays in the keyseat: its bottom on the floor, at least half its
-# height below the land's surface at the keyseat's edge at every limit (the
-# widest keyseat on the smallest land, floor at its shallowest).
-_KEYSEAT_EDGE_DEPTH_MIN_MM = math.sqrt(
-    (LAND_DIA_MM / 2.0 - 0.0508 / 2.0) ** 2
+# largest height below the land's surface at the keyseat's edge at every
+# limit.  Worst case: the smallest land (cone_shaft_land_bands.GEAR_SEAT_BAND,
+# 0/-.0020, mirrored here: that module reads this one), the widest keyseat,
+# and S at its largest measured from the far side of that same smallest land,
+# so the floor stands S_max - R_min from the axis.
+_LAND_RADIUS_MIN_MM = (LAND_DIA_MM - 0.0508) / 2.0
+KEYSEAT_EDGE_DEPTH_MIN_MM = math.sqrt(
+    _LAND_RADIUS_MIN_MM**2
     - (limits(KEYSEAT_WIDTH_MM, KEYSEAT_WIDTH_BAND)[1] / 2.0) ** 2
-) - (limits(KEYSEAT_S_MM, KEYSEAT_S_BAND)[1] - LAND_DIA_MM / 2.0)
-if _KEYSEAT_EDGE_DEPTH_MIN_MM < 0.45 * KEY_SIZE_MM:
+) - (limits(KEYSEAT_S_MM, KEYSEAT_S_BAND)[1] - _LAND_RADIUS_MIN_MM)
+if KEYSEAT_EDGE_DEPTH_MIN_MM < limits(KEY_SIZE_MM, KEY_STOCK_BAND)[1] / 2.0:
     raise AssertionError(
-        f"the key's seat is {_KEYSEAT_EDGE_DEPTH_MIN_MM:.4f} deep at its edge, "
+        f"the key's seat is {KEYSEAT_EDGE_DEPTH_MIN_MM:.4f} deep at its edge, "
         "under half the key"
     )
 

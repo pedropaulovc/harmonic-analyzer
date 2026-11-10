@@ -284,19 +284,19 @@ def test_every_tight_band_names_its_mate_and_fit_route():
     }
     assert str(spec.STACK_NOTE) in drawing.STACK_FLAG_SUFFIX
     notes = spec.DRAWING_NOTES.splitlines()
-    land_note = " ".join(notes[:3])
+    land_note = " ".join(notes[:2])
     assert notes[0].startswith("1. ") and notes[1].startswith("   ")
-    assert notes[2].startswith("   ")
     for mate in ("dt-cone-gear", "dt-crank-drive-gear", "dt-vn-cone-tip-collar"):
         assert _config.parts(mate)["number"] in land_note
-    # Land 1's members named plainly (machinist review of 5a4e41cb5f: no
-    # undefined T030-T120 code) and its key by its number (PR #1992).
-    assert "30T-120T GEARS" in notes[0] and "T030" not in land_note
-    assert "KEY MHA-DT-VN-71" in land_note
-    assert "CLEARANCE" in land_note
+    # Land 1's members by drawing number, no undefined gear code (machinist
+    # review of 5a4e41cb5f: T030-T120), and its key by its number (PR #1992).
+    assert not re.search(r"T\d{3}", land_note)
+    assert "A-A ALSO MHA-DT-07 AND KEY MHA-DT-VN-71" in land_note
+    # The flats' matched fit (rule 4): measured D-bores and its acceptance.
+    assert "MEASURED D-BORES: NO ROCK" in land_note
     # The three-place lengths name the stack they set once (rule 4).
     for mate in ("dt-cone-gear", "dt-crank-drive-gear"):
-        assert _config.parts(mate)["number"] in notes[3]
+        assert _config.parts(mate)["number"] in notes[2]
     # Every suffix is one line; every below callout carries at most two lines
     # of words (rule 7), a parenthesized REF clearance row beside them.
     assert not any("\n" in text for text in drawing.DIMENSION_SUFFIXES.values())
@@ -1393,26 +1393,83 @@ def test_land_one_keyseat_runs_off_over_land_two_with_the_key_bands() -> None:
 
 def test_each_cut_is_made_over_exactly_its_land(monkeypatch) -> None:
     """Land 1's keyseat and each flat are sketched on their land's end plane
-    and cut blind back over the land (the tip's from the end face): land 1's
-    stops at the collar face, every other at the step behind it."""
+    and cut blind back over the land (the tip's from the end face): every
+    flat stops at the step behind it; the keyseat stops one end-mill radius
+    short of the collar face, where the end mill's semicircle closes it
+    (Codjiflo P2 on #2331, rule 16)."""
     adapter, stubs, _sketch_dims, _gated = _stubbed_build(monkeypatch)
     spec = dt_cone_gear_shaft_spec
+    key = cone_land_key
     lands = (spec.KEYED_LAND, *spec.FLAT_LANDS)
     sketched = [c.args[0] for c in adapter.create_sketch.call_args_list]
     for land in lands:
         assert f"Sec{land}EndPlane" in sketched, land
     cuts = [c.args[0] for c in adapter.create_cut_extrude.call_args_list]
-    assert len(cuts) == len(lands)
-    starts = (spec.COLLAR_END_STATION, *spec.SECTION_ENDS[1:-1])
-    for params, land, start in zip(cuts, lands, starts, strict=True):
+    assert len(cuts) == len(lands) + 1
+    keyseat, end, *flats = cuts
+    assert keyseat.depth == pytest.approx(
+        spec.SECTION_ENDS[1] - spec.COLLAR_END_STATION - key.KEY_END_SET_MM
+    )
+    assert not keyseat.reverse_direction
+    for params, land, start in zip(flats, spec.FLAT_LANDS, spec.SECTION_ENDS[1:-1], strict=True):
         assert params.depth == pytest.approx(spec.SECTION_ENDS[land] - start), land
         assert not params.reverse_direction, land
+    # The end: a Ø W plunge, mid-plane from a plane 1 mm outside land 1 on
+    # +X, reaching the floor; centred one radius north of the collar face.
+    reach = spec.SECTION_DIAS[1] / 2.0 + 1.0
+    assert ("Right Plane", reach) in _planes(adapter)
+    assert "Sec1KeyseatEndPlane" in sketched
+    assert end.both_directions
+    assert end.depth == pytest.approx(2.0 * (reach - key.KEYSEAT_FLOOR_OFFSET_MM))
+    circle = next(
+        c
+        for c in stubs["define_circle"].call_args_list
+        if c.args[4] == "Sec1 keyseat end"
+    )
+    assert abs(circle.args[1]) + abs(circle.args[2]) == pytest.approx(
+        spec.COLLAR_END_STATION + key.KEY_END_SET_MM
+    )
+    assert circle.args[3] == pytest.approx(key.KEYSEAT_WIDTH_MM / 2.0)
+    assert circle.kwargs["drives"][2] == '"Sec1KeyseatW"'
+    assert part.KEYSEAT_END_STATION_EXPRESSION in circle.kwargs["drives"]
     # The tip flat's cut starts at the end face: it runs out through the tip.
     assert spec.SECTION_ENDS[-1] == pytest.approx(spec.SHAFT_LENGTH)
     named = [c.args[1] for c in stubs["name_last_feature"].call_args_list]
-    assert ["Sec1Keyseat", *(f"Sec{land}Flat" for land in spec.FLAT_LANDS)] == [
-        name for name in named if name.endswith(("Flat", "Keyseat"))
-    ]
+    assert [
+        "Sec1Keyseat",
+        "Sec1KeyseatEnd",
+        *(f"Sec{land}Flat" for land in spec.FLAT_LANDS),
+    ] == [name for name in named if name.endswith(("Flat", "Keyseat", "KeyseatEnd"))]
+
+
+def test_the_keyseat_end_is_the_end_mill_radius_and_clears_the_key() -> None:
+    """The end's radius is half the keyseat (KEY_END_SET), tangent to the
+    collar face; the key's square south end sits on the radius's centre line,
+    where the keyseat is full width, so the key's corners clear the end at
+    every limit; and the end's volume is the exact half-disc integral."""
+    key = cone_land_key
+    spec = dt_cone_gear_shaft_spec
+    assert key.KEY_END_SET_MM == pytest.approx(key.KEYSEAT_WIDTH_MM / 2.0)
+    assert part.KEYSEAT_END_STATION == pytest.approx(
+        spec.COLLAR_END_STATION + key.KEY_END_SET_MM
+    )
+    # The key's widest half-width fits the end's least radius on its south line.
+    key_half_max = key.limits(key.KEY_SIZE_MM, key.KEY_STOCK_BAND)[1] / 2.0
+    end_radius_min = key.limits(key.KEYSEAT_WIDTH_MM, key.KEYSEAT_WIDTH_BAND)[0] / 2.0
+    assert key_half_max <= end_radius_min
+    # Volume: closed form of the half disc times the floor-to-round height,
+    # checked against a finer midpoint sum.
+    assert part.keyseat_end_volume() == pytest.approx(
+        part.keyseat_end_volume(steps=40000), rel=1e-5
+    )
+    radius = spec.SECTION_DIAS[1] / 2.0
+    half = key.KEYSEAT_WIDTH_MM / 2.0
+    floor = key.KEYSEAT_FLOOR_OFFSET_MM
+    assert (
+        math.pi / 2.0 * half**2 * (math.sqrt(radius**2 - half**2) - floor)
+        < part.keyseat_end_volume()
+        < math.pi / 2.0 * half**2 * (radius - floor)
+    )
 
 
 def test_shoulder_roots_are_modelled_not_noted() -> None:
@@ -1451,9 +1508,9 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
     )
     numbered = [line.split(".")[0] for line in notes.splitlines() if not line.startswith(" ")]
     assert numbered == ["1", "2", "3"]
-    # Rule 7: few short lines, the RV-02 tailstock line included (the land
-    # note's third line names land 1's key, PR #1992).
-    assert len(notes.splitlines()) <= 5
+    # Rule 7: at most four short lines, the RV-02 tailstock line included
+    # (Codjiflo P2 on #2331).
+    assert len(notes.splitlines()) <= 4
     tailstock = [line for line in notes.splitlines() if "TAILSTOCK" in line.upper()]
     assert len(tailstock) == 1
     for forbidden in (
@@ -1604,7 +1661,7 @@ def test_every_station_knob_owns_its_plane_and_depth(monkeypatch) -> None:
         )
         assert records[f"Sec{land}AF"] == f'"SecAF{land}"'
         assert records[f"Sec{land}FarSide"] == f'"SecDia{land}" / 2'
-    assert owners["Sec1KeyseatLength@Sec1Keyseat"] == part.flat_length_expression(1)
+    assert owners["Sec1KeyseatLength@Sec1Keyseat"] == part.KEYSEAT_LENGTH_EXPRESSION
     assert records["Sec1KeyseatWidth"] == '"Sec1KeyseatW"'
     assert records["Sec1KeyseatS"] == '"Sec1KeyseatS"'
     assert records["Sec1FarSide"] == '"SecDia1" / 2'
@@ -1849,6 +1906,8 @@ def _stubbed_build(monkeypatch):
     sketch_dims.return_value.apply.return_value = []
     monkeypatch.setattr(part, "SketchDims", sketch_dims)
     monkeypatch.setattr(part, "_sketch_x_per_model_x", lambda _a: -1.0)
+    # The keyseat end's plane maps the shaft axis onto its sketch's -x.
+    monkeypatch.setattr(part, "_sketch_xy_mm", lambda _a, point: (-point[2], point[1]))
     stubs["add_line_chain"].side_effect = lambda _a, points, close=True: [
         f"L{k}" for k in range(len(points) if close else len(points) - 1)
     ]

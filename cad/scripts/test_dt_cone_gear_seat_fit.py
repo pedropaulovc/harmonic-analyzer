@@ -185,14 +185,12 @@ def test_keyed_bore_area_is_the_round_bore_plus_the_keyway_outside_it() -> None:
         assert spec.keyway_area_outside_bore_mm2(teeth) == pytest.approx(outside, rel=1e-7)
 
 
-def test_the_flat_is_a_true_chord_clocked_to_one_place() -> None:
-    # The printed clock (tooth centreline to flat normal, or keyway top) takes
-    # one place and carries the error budget's cone_flat_clock term.
-    assert spec.FLAT_CLOCK_TOLERANCE_DEG == 0.25
-    assert spec.DRAWING_PRECISION_BY_NAME["BoreFlatClock"] == 1
-    assert spec.DRAWING_PRECISION_BY_NAME["KeywayClock"] == 1
-    assert "BoreFlatClock" in spec.DRAWING_DIMENSIONS["BoreProfile"]
-    assert "KeywayClock" in spec.DRAWING_DIMENSIONS[spec.KEYED_BORE_SKETCH]
+def test_the_flat_is_a_true_chord_clocked_to_the_title_block() -> None:
+    # The flat (keyway) shares the front view's drawn centreline with the
+    # phase-0 tooth: the clock is the title block's angle, undimensioned
+    # (test_error_budget pins error_budget.yaml's cone_flat_clock to it).
+    assert "BoreFlatClock" not in spec.DRAWING_DIMENSIONS[spec.BORE_SKETCH]
+    assert "KeywayClock" not in spec.DRAWING_DIMENSIONS[spec.KEYED_BORE_SKETCH]
     # Terminal deep-D keeps over half the cylindrical guidance at print corners;
     # intermediate lands retain their original shallow-flat condition.
     for teeth in spec.D_BORE_TEETH:
