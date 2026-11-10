@@ -12,10 +12,12 @@ every native step as its own ``run_build`` subprocess:
 4. geometry digests D1/D2 of the two recorded artefacts; K3; K4;
 5. rollback walk over a copy of A1 against L1's mass-property read points; K5.
 
-``report.json`` is rewritten after every phase. Only infrastructure or
-soundness faults exit non-zero (phase-0 build failure, a watchdog exit, a
-negative control answering NOOP, a seat-safety violation, an unwritable
-report); every other K failure is a recorded result.
+``report.json`` is rewritten after every phase, and every K verdict's evidence
+is also logged (bounded, at WARN) because a failed leaf publishes only its task
+log. Only infrastructure or soundness faults exit non-zero (phase-0 build
+failure, a watchdog exit, a negative control answering NOOP, documents still
+open after a native step's own discard, an unwritable report); every other K
+failure is a recorded result.
 
 ``native digest`` / ``native walk`` are the child entry points (they connect).
 ``--help`` imports neither pywin32 nor ``_session``.
@@ -73,6 +75,11 @@ _TOLERANCE = {
 }
 _READ_POINT_RTOL = 1e-9
 _MASS_MEMBERS = ("Volume", "Mass", "SurfaceArea", "CenterOfMass")
+_OBJECT_SAME = 1  # swObjectEquality_e.swObjectSame, ISldWorks.IsSame's answer
+# Evidence logged per verdict: bounded so a task log stays readable.
+_EVIDENCE_LINES = 45
+_EVIDENCE_TOP = 12
+_CLIP = 200
 # Child timeouts (s): a hung child fails the leaf before the farm leaf timeout.
 _RECORD_TIMEOUT = 900
 _REPLAY_TIMEOUT = 600
@@ -101,6 +108,71 @@ class Fatal(Exception):
         self.reason = reason
         self.code = code
         self.scope = scope
+
+
+class Shape(StrEnum):
+    """How the generated wrapper exposes a member (call it, or read/write it)."""
+
+    METHOD = "method"
+    GET = "get"
+    PUT = "put"
+
+
+# Every COM member the native children call, with the shape the generated
+# wrapper (sldworks_2026) gives it on the interface each object is bound to;
+# test_com_conversation checks this table against the wrapper.
+NATIVE_MEMBERS: tuple[tuple[str, str, Shape], ...] = (
+    ("ISldWorks", "OpenDoc6", Shape.METHOD),
+    ("ISldWorks", "CloseDoc", Shape.METHOD),
+    ("ISldWorks", "GetOpenDocumentByName", Shape.METHOD),
+    ("ISldWorks", "IsSame", Shape.METHOD),
+    ("ISldWorks", "IActiveDoc2", Shape.GET),
+    ("ISldWorks", "CloseAllDocuments", Shape.METHOD),
+    ("ISldWorks", "GetFirstDocument", Shape.METHOD),
+    ("IModelDoc2", "GetPathName", Shape.METHOD),
+    ("IModelDoc2", "GetTitle", Shape.METHOD),
+    ("IModelDoc2", "GetNext", Shape.METHOD),
+    ("IModelDoc2", "Extension", Shape.GET),
+    ("IModelDoc2", "FeatureManager", Shape.GET),
+    ("IModelDoc2", "GetEquationMgr", Shape.METHOD),
+    ("IModelDoc2", "ForceRebuild3", Shape.METHOD),
+    ("IModelDoc2", "FirstFeature", Shape.METHOD),
+    ("IModelDocExtension", "CreateMassProperty", Shape.METHOD),
+    ("IModelDocExtension", "CreateMassProperty2", Shape.METHOD),
+    ("IModelDocExtension", "CustomPropertyManager", Shape.METHOD),
+    ("IMassProperty2", "AccuracyLevel", Shape.GET),
+    ("IMassProperty2", "AccuracyLevel", Shape.PUT),
+    ("IMassProperty2", "Mass", Shape.GET),
+    ("IMassProperty2", "Volume", Shape.GET),
+    ("IMassProperty2", "SurfaceArea", Shape.GET),
+    ("IMassProperty2", "CenterOfMass", Shape.GET),
+    ("IMassProperty2", "GetMomentOfInertia", Shape.METHOD),
+    ("IMassProperty", "Mass", Shape.GET),
+    ("IMassProperty", "Volume", Shape.GET),
+    ("IMassProperty", "SurfaceArea", Shape.GET),
+    ("IMassProperty", "CenterOfMass", Shape.GET),
+    ("IPartDoc", "GetBodies2", Shape.METHOD),
+    ("IBody2", "GetMassProperties", Shape.METHOD),
+    ("IBody2", "GetExtremePoint", Shape.METHOD),
+    ("IBody2", "GetFaceCount", Shape.METHOD),
+    ("IBody2", "GetEdgeCount", Shape.METHOD),
+    ("IBody2", "GetVertexCount", Shape.METHOD),
+    ("IFeature", "Name", Shape.GET),
+    ("IFeature", "GetTypeName2", Shape.METHOD),
+    ("IFeature", "IsSuppressed", Shape.METHOD),
+    ("IFeature", "IsRolledBack", Shape.METHOD),
+    ("IFeature", "GetNextFeature", Shape.METHOD),
+    ("IFeature", "GetFirstDisplayDimension", Shape.METHOD),
+    ("IFeature", "GetNextDisplayDimension", Shape.METHOD),
+    ("IDisplayDimension", "GetDimension2", Shape.METHOD),
+    ("IDimension", "FullName", Shape.GET),
+    ("IDimension", "SystemValue", Shape.GET),
+    ("ICustomPropertyManager", "GetNames", Shape.METHOD),
+    ("ICustomPropertyManager", "Get6", Shape.METHOD),
+    ("IEquationMgr", "GetCount", Shape.METHOD),
+    ("IEquationMgr", "Equation", Shape.METHOD),
+    ("IFeatureManager", "EditRollback", Shape.METHOD),
+)
 
 
 def sha256(path: Path) -> str:
@@ -193,6 +265,7 @@ class Leaf:
             "verdicts": {},
             "assumptions": {},
             "seat_safety": {"violations": []},
+            "evidence": {},
             "exit": None,
         }
 
@@ -231,6 +304,15 @@ class Leaf:
             "reason": reason,
         }
         self.save()
+
+    def evidence(self, key: str, lines: list[str]) -> None:
+        """Bounded verdict evidence, logged at WARN because a failed leaf
+        publishes only its task log (warnings and errors)."""
+        bounded = lines[:_EVIDENCE_LINES]
+        if len(lines) > _EVIDENCE_LINES:
+            bounded.append(f"  ... {len(lines) - _EVIDENCE_LINES} more in report.json")
+        self.report["evidence"][key] = bounded
+        self.telemetry.warn("\n".join([f"evidence {key}:", *bounded]))
 
     def seat_stopped(self) -> bool:
         """Whether a fault makes any further native (seat) step unsafe or moot."""
@@ -317,19 +399,37 @@ class Leaf:
         if child.rc != 0:
             raise RuntimeError(f"{run} build exited {child.rc}")
         if log is not None:
-            self.report["logs"][log.name] = self.log_summary(log)
+            summary = self.log_summary(log)
+            self.report["logs"][log.name] = summary
+            self.evidence(f"counts {log.name}", render_counts(log.name, summary))
 
     def log_summary(self, log: Path) -> dict[str, Any]:
-        loaded = self.conversation.load(log)
+        conversation = self.conversation
+        loaded = conversation.load(log)
         trailer = dict(loaded.trailer)
         capture = log.parent / trailer.get("capture_dir", "")
         kinds: dict[str, int] = {}
+        interfaces: dict[str, int] = {}
+        inert_members: dict[str, int] = {}
+        on_inert_handles = 0
         for call in loaded.calls:
             kinds[call.kind.value] = kinds.get(call.kind.value, 0) + 1
+            if call.origin is conversation.Origin.INERT:
+                inert_members[call.site] = inert_members.get(call.site, 0) + 1
+                continue
+            interface = call.site.rpartition(".")[0] or call.site
+            interfaces[interface] = interfaces.get(interface, 0) + 1
+            on_inert_handles += _names_inert_handle([call.handle, call.args])
+        recipe = sum(interfaces.values())
         return {
             "bytes": log.stat().st_size,
             "calls": len(loaded.calls),
+            "recipe_calls": recipe,
+            "inert_calls": len(loaded.calls) - recipe,
             "kinds": kinds,
+            "calls_by_interface": _top(interfaces),
+            "inert_by_member": _top(inert_members),
+            "recipe_requests_on_inert_handles": on_inert_handles,
             "with_write_back": sum(1 for c in loaded.calls if c.outs),
             "raised": sum(1 for c in loaded.calls if c.raised is not None),
             "identity_comparisons": kinds.get("eq", 0),
@@ -351,36 +451,16 @@ class Leaf:
 
     def phase2(self) -> None:
         self.build("W2", "run2", self.logs / "L2.jsonl.gz")
-        conversation = self.conversation
-        l1, l2 = (
-            conversation.load(self.logs / "L1.jsonl.gz"),
-            conversation.load(self.logs / "L2.jsonl.gz"),
+        comparison = self.conversation.compare_conversations(
+            self.logs / "L1.jsonl.gz", self.logs / "L2.jsonl.gz"
         )
-        divergence = conversation.first_divergence(l1, l2)
-        captured = {
-            "L1": self._captured(l1.trailer),
-            "L2": self._captured(l2.trailer),
-        }
         self.report["verdicts"]["K1"] = {
-            "pass": divergence is None,
-            "criterion": "first_divergence(L1, L2) is None after the Generator mask",
-            "divergence": divergence.to_json() if divergence else None,
-            "calls": [len(l1.calls), len(l2.calls)],
-            "header_differences": conversation.compare_headers(l1.header, l2.header),
-            "solidworks_written_files_differ": sorted(
-                rel
-                for rel in set(captured["L1"]) | set(captured["L2"])
-                if captured["L1"].get(rel) != captured["L2"].get(rel)
-            ),
+            "pass": comparison["request_divergence"] is None,
+            "criterion": "no recipe REQUEST divergence between L1 and L2 (Generator "
+            "mask only); response differences are counted by member, never masked",
+            **comparison,
         }
-
-    @staticmethod
-    def _captured(trailer: dict[str, Any]) -> dict[str, str]:
-        return {
-            f"{seq}/{rel}": digest
-            for seq, files in trailer.get("captured", {}).items()
-            for rel, digest in files.items()
-        }
+        self.evidence("K1", render_k1(self.report["verdicts"]["K1"]))
 
     def replay(
         self, name: str, script: Path, log: Path, scratch: str
@@ -423,15 +503,18 @@ class Leaf:
             "pass": result["verdict"] == "noop"
             and result["served"] == result["recorded"]
             and not result.get("py_output_mismatches"),
-            "criterion": "NOOP, served == recorded, Python outputs byte-equal to run1",
+            "criterion": "NOOP, every recorded recipe request served, Python "
+            "outputs byte-equal to run1 (recipe-inert calls served best-effort)",
             "verdict": result["verdict"],
             "served": result["served"],
             "recorded": result["recorded"],
             "reason": result.get("reason"),
             "divergence": result.get("divergence"),
+            "inert": result.get("inert"),
             "py_output_mismatches": result.get("py_output_mismatches"),
             "script_error": result.get("script_error"),
         }
+        self.evidence("K2", render_k2(self.report["verdicts"]["K2"], result))
 
     def phase3b(self) -> None:
         l1 = self.logs / "L1.jsonl.gz"
@@ -464,6 +547,7 @@ class Leaf:
             "ulp_expected_seq": seq,
             "ulp_divergence_seq": ulp_seq,
         }
+        self.evidence("K2b", render_k2b(self.report["verdicts"]["K2b"], controls))
         vacuous = [name for name, verdict in verdicts.items() if verdict == "noop"]
         if vacuous:
             raise Fatal(
@@ -517,6 +601,9 @@ class Leaf:
             "differences": differences[:200],
             "difference_count": len(differences),
         }
+        self.evidence(
+            "K3", render_k3(self.report["verdicts"]["K3"], (native or {}).get("u11"))
+        )
         self.check_a1("after_digest")
 
     def k4(self) -> None:
@@ -560,6 +647,7 @@ class Leaf:
             "size_with_capture_pass": l1["bytes"] + l1["capture_bytes_on_disk"]
             <= archive,
         }
+        self.evidence("K4", render_k4(self.report["verdicts"]["K4"]))
 
     def phase5(self) -> None:
         if not self.a1.is_file():
@@ -613,6 +701,7 @@ class Leaf:
             },
             **summary,
         }
+        self.evidence("K5", render_k5(self.report["verdicts"]["K5"]))
 
     # -- assumptions ----------------------------------------------------------------
 
@@ -631,6 +720,9 @@ class Leaf:
                 ),
                 "adopted_outside_calls": trailer.get("adopted_outside_calls"),
                 "foreign_thread_calls": trailer.get("foreign_thread_calls"),
+                "recipe_requests_on_inert_handles": l1.get(
+                    "recipe_requests_on_inert_handles"
+                ),
                 "K2": (verdicts.get("K2") or {}).get("pass"),
             },
             "R2": {
@@ -680,6 +772,10 @@ class Leaf:
             "R11": {
                 "claim": "connect-time adapter state suffices",
                 "restoration": replay.get("r11"),
+                "connect_time_module_state": "recipe-inert module caches (e.g. the "
+                "seat identity) are outside the claim: their requests are served "
+                "best-effort, see inert",
+                "inert": replay.get("inert"),
             },
             "R12": {
                 "claim": "replay telemetry is separable",
@@ -742,9 +838,11 @@ def _replay_summary(result: dict[str, Any] | None) -> dict[str, Any]:
         "reason",
         "served",
         "recorded",
+        "recorded_total",
         "seconds",
         "window_seconds",
         "divergence",
+        "inert",
         "rc",
         "script_error",
         "com_outputs",
@@ -792,6 +890,207 @@ def _walk_summary(walk: dict[str, Any] | None) -> dict[str, Any]:
     }
 
 
+# ---------------------------------------------------------------------------
+# Evidence rendering (bounded lines for the task log)
+# ---------------------------------------------------------------------------
+
+
+def _clip(value: Any) -> str:
+    text = value if isinstance(value, str) else json.dumps(value, default=str)
+    return text if len(text) <= _CLIP else f"{text[: _CLIP - 3]}..."
+
+
+def _top(counts: dict[str, int], limit: int = 20) -> dict[str, int]:
+    return dict(sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:limit])
+
+
+def _names_inert_handle(value: Any) -> bool:
+    """Whether a recipe request names an object a recipe-inert call created
+    (negative handles): inert results must never reach the build."""
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, int):
+        return value < 0
+    if isinstance(value, dict):
+        return ("h" in value and _names_inert_handle(value["h"])) or any(
+            _names_inert_handle(v) for k, v in value.items() if k != "h"
+        )
+    if isinstance(value, list):
+        return any(_names_inert_handle(v) for v in value)
+    return False
+
+
+def _verdict_word(verdict: dict[str, Any]) -> str:
+    return "PASS" if verdict.get("pass") else "FAIL"
+
+
+def render_divergence(divergence: dict[str, Any] | None) -> list[str]:
+    """A divergence with its caller frames and the five calls before it."""
+    if not divergence:
+        return []
+    seq_new = divergence.get("seq_new")
+    lines = [
+        f"  at recipe #{divergence.get('index')} (seq {divergence.get('seq')}"
+        + (f", new seq {seq_new}" if seq_new is not None else "")
+        + f"): {divergence.get('side')}/{divergence.get('field')} differs, "
+        f"kind {divergence.get('kind')}, phase {divergence.get('phase')}, "
+        f"feature {divergence.get('feature')}",
+    ]
+    for side in ("expected", "actual"):
+        call = divergence.get(side) or {}
+        lines.append(
+            f"    {side}: {call.get('site')} h={call.get('h')} from {call.get('caller')}"
+        )
+        if call:
+            lines.append(f"      args {_clip(call.get('args'))}")
+    preceding = divergence.get("preceding_response_difference")
+    if preceding:
+        lines.append(
+            f"    nearest earlier response difference: #{preceding['index']} "
+            f"{preceding['member']} {preceding['field']} {preceding['a']} vs "
+            f"{preceding['b']} (from {preceding['caller']})"
+        )
+    for row in divergence.get("context") or []:
+        lines.append(
+            f"    before: seq {row['seq']} {row['site']} [{row['kind']}] h={row['h']} "
+            f"from {row['caller']}: {_clip(row['args'])} -> {_clip(row['response'])}"
+        )
+    return lines
+
+
+def render_counts(name: str, summary: dict[str, Any]) -> list[str]:
+    trailer = summary.get("trailer") or {}
+    lines = [
+        f"{name}: {summary['calls']} calls (recipe {summary['recipe_calls']}, inert "
+        f"{summary['inert_calls']}), {summary['bytes']} log bytes, captured "
+        f"{len(trailer.get('captured') or {})} calls / "
+        f"{trailer.get('capture_bytes')} bytes; write-back calls "
+        f"{summary['with_write_back']}, identity ops "
+        f"{summary['identity_comparisons']}, raised {summary['raised']}, recipe "
+        f"requests on inert handles {summary['recipe_requests_on_inert_handles']}",
+        f"  kinds {_clip(summary['kinds'])}",
+        f"  by interface {_clip(_top(summary['calls_by_interface'], _EVIDENCE_TOP))}",
+    ]
+    if summary["inert_by_member"]:
+        lines.append(
+            f"  inert by member {_clip(_top(summary['inert_by_member'], _EVIDENCE_TOP))}"
+        )
+    return lines
+
+
+def render_k1(k1: dict[str, Any]) -> list[str]:
+    differences = k1.get("response_differences") or {}
+    lines = [
+        f"K1 {_verdict_word(k1)}: recipe calls L1/L2 {k1.get('recipe_calls')}, inert "
+        f"{k1.get('inert_calls')}; {k1.get('response_difference_count')} response "
+        f"differences over {len(differences)} members before any request divergence",
+    ]
+    divergence = k1.get("request_divergence")
+    if divergence:
+        lines += ["  REQUEST divergence:", *render_divergence(divergence)]
+    examples = {e["member"]: e for e in k1.get("response_examples") or []}
+    for member, count in list(differences.items())[:_EVIDENCE_TOP]:
+        first = examples.get(member)
+        detail = (
+            f", first #{first['index']} {first['field']} {first['a']} vs {first['b']} "
+            f"(from {first['caller']})"
+            if first
+            else ""
+        )
+        lines.append(f"  response {member}: {count}x{detail}")
+    inert = k1.get("inert_differences") or {}
+    if inert:
+        lines.append(f"  inert count differences {_clip(inert)}")
+    captures = k1.get("capture_differences") or []
+    if captures:
+        lines.append(
+            f"  SolidWorks-written files differing: {len(captures)} "
+            f"{_clip([(c['index'], c['member'], c['file']) for c in captures])}"
+        )
+    headers = k1.get("header_differences") or {}
+    if headers:
+        lines.append(f"  header differences {sorted(headers)}")
+    return lines
+
+
+def render_k2(k2: dict[str, Any], result: dict[str, Any]) -> list[str]:
+    inert = result.get("inert") or {}
+    lines = [
+        f"K2 {_verdict_word(k2)}: {k2.get('verdict')}, {k2.get('served')}/"
+        f"{k2.get('recorded')} recipe requests served; {k2.get('reason')}",
+        f"  inert: recorded {inert.get('recorded')}, served {inert.get('served')}, "
+        f"unrecorded {inert.get('unserved')}, unconsumed {inert.get('unconsumed')}",
+    ]
+    for row in (inert.get("unserved_members") or [])[:5]:
+        lines.append(
+            f"    unrecorded inert {row['member']} x{row['count']} from {row['caller']}"
+        )
+    lines += render_divergence(k2.get("divergence"))
+    error = k2.get("script_error")
+    if error:
+        lines.append(
+            f"  script error {error.get('type')}: {_clip(error.get('message'))}"
+        )
+        tail = (error.get("traceback") or "").strip().splitlines()[-6:]
+        lines += [f"    {_clip(line)}" for line in tail]
+    for rel, digests in list((k2.get("py_output_mismatches") or {}).items())[:5]:
+        lines.append(f"  Python output differs: {rel} {_clip(digests)}")
+    for key in ("sandbox_violations", "read_mismatches", "materialise_missing"):
+        rows = result.get(key) or []
+        if rows:
+            lines.append(f"  {key} ({len(rows)}): {_clip(rows[:3])}")
+    r11 = result.get("r11") or {}
+    if r11.get("mismatched"):
+        lines.append(f"  R11 mismatched adapter state {_clip(r11['mismatched'])}")
+    return lines
+
+
+def render_k2b(k2b: dict[str, Any], controls: dict[str, Any]) -> list[str]:
+    lines = [
+        f"K2b {_verdict_word(k2b)}: verdicts {k2b.get('verdicts')}, ulp perturbed seq "
+        f"{k2b.get('ulp_expected_seq')} diverged at {k2b.get('ulp_divergence_seq')}",
+    ]
+    for name, control in controls.items():
+        lines.append(f"  {name}: {_clip(control.get('reason'))}")
+    return lines
+
+
+def render_k3(k3: dict[str, Any], u11: dict[str, Any] | None) -> list[str]:
+    lines = [
+        f"K3 {_verdict_word(k3)}: {k3.get('difference_count')} digest differences",
+        *(f"  {_clip(d)}" for d in (k3.get("differences") or [])[:10]),
+    ]
+    if u11 is not None:
+        lines.append(f"  U11 same-name open {_clip(u11)}")
+    return lines
+
+
+def render_k4(k4: dict[str, Any]) -> list[str]:
+    return [
+        f"K4 {_verdict_word(k4)}: W0 {k4['W0']:.2f}s W1 {k4['W1']:.2f}s WR "
+        f"{k4['WR']:.2f}s; WR/W1 {k4['WR_over_W1']:.3f}; record overhead "
+        f"{k4['record_overhead_over_W0']:+.4f} (unadjusted "
+        f"{k4['record_overhead_unadjusted_over_W0']:+.4f}); L1 {k4['L1_bytes']} B, "
+        f"captures {k4['capture_bytes_on_disk']} B, run1 archive "
+        f"{k4['run1_archive_bytes']} B",
+        f"  windows {_clip(k4.get('window_basis'))}",
+    ]
+
+
+def render_k5(k5: dict[str, Any]) -> list[str]:
+    return [
+        f"K5 {_verdict_word(k5)} (report only): features {k5.get('features')}, "
+        f"unreachable {_clip(k5.get('unreachable_features'))}, read points "
+        f"{k5.get('read_point_count')} within {k5.get('read_points_within_tolerance')}, "
+        f"final digest == D1 {k5.get('final_digest_equals_D1')}, walk "
+        f"{k5.get('walk_seconds')}s",
+        f"  outside {_clip(k5.get('read_points_outside'))}",
+        f"  final digest differences {_clip(k5.get('final_digest_differences'))}",
+        f"  U1 {_clip(k5.get('u1'))}",
+        f"  U16 {_clip((k5.get('u16') or {}).get('bar_kept_by_ForceRebuild3'))}",
+    ]
+
+
 def _perturb_first_float(conversation: Any, source: Path, target: Path) -> int:
     """Copy ``source`` with the first float request argument moved 1 ulp;
     return the seq of the perturbed request."""
@@ -814,7 +1113,7 @@ def _perturb_first_float(conversation: Any, source: Path, target: Path) -> int:
     writer.header(loaded.header)
     perturbed: int | None = None
     for call in loaded.calls:
-        if perturbed is None:
+        if perturbed is None and call.origin is conversation.Origin.RECIPE:
             args, done = _nudge_list(call.args, nudge)
             if done:
                 call = dataclasses.replace(call, args=args)
@@ -1012,7 +1311,20 @@ def _log_summary(leaf: Leaf, code: int, reason: str) -> None:
         phases=json.dumps(phases),
         walls=json.dumps(walls),
     )
-    (_telemetry.success if code == 0 else _telemetry.error)(message)
+    # One line per verdict, so the end of the task log reads on its own.
+    headlines = [
+        f"  {key}: {lines[0]}"
+        for key, lines in leaf.report["evidence"].items()
+        if lines and key.startswith("K")
+    ]
+    errors = [
+        f"  {key}: {row.get('error')}"
+        for key, row in leaf.report["phases"].items()
+        if row.get("status") == Status.ERROR.value
+    ]
+    (_telemetry.success if code == 0 else _telemetry.error)(
+        "\n".join([message, *headlines, *errors])
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1021,12 +1333,17 @@ def _log_summary(leaf: Leaf, code: int, reason: str) -> None:
 
 
 def _open(adapter: Any, path: Path) -> Any:
+    """``OpenDoc6`` (silent), bound to the generated ``IModelDoc2`` so every
+    member called on it has the shape :data:`NATIVE_MEMBERS` lists."""
+    from _com import _early_bound
+
     answer = adapter.swApp.OpenDoc6(str(path), _DOC_PART, _OPEN_SILENT, "", 0, 0)
     if not isinstance(answer, (tuple, list)) or len(answer) != 3:
         raise RuntimeError(f"unexpected OpenDoc6 readback: {answer!r}")
     document, errors, warnings = answer
     if document is None or errors or warnings:
         raise RuntimeError(f"OpenDoc6 {path}: errors={errors} warnings={warnings}")
+    document = _early_bound(document, "IModelDoc2")
     actual = Path(str(document.GetPathName()))
     if os.path.normcase(str(actual.resolve())) != os.path.normcase(str(path.resolve())):
         raise RuntimeError(f"opened {actual}, not {path}")
@@ -1034,9 +1351,33 @@ def _open(adapter: Any, path: Path) -> Any:
 
 
 def _close(adapter: Any, document: Any, path: Path) -> None:
+    """Close ``document`` (an :func:`_open` result) without saving."""
     adapter.swApp.CloseDoc(str(document.GetTitle()))
     if adapter.swApp.GetOpenDocumentByName(str(path)) is not None:
         raise RuntimeError(f"document did not close: {path}")
+
+
+def _leave_seat_empty(adapter: Any) -> dict[str, Any]:
+    """Close every open document WITHOUT saving (``_session``'s discard), so a
+    probe bug becomes a recorded error, not a seat holding a cad/out file;
+    the resident check that follows decides whether anything is left."""
+    import _session
+
+    try:
+        _session.discard_open_documents(adapter)
+    except Exception as exc:  # noqa: BLE001 - recorded; the resident check decides
+        return {"discarded": False, "error": f"{type(exc).__name__}: {exc}"}
+    return {"discarded": True}
+
+
+def _residents(adapter: Any) -> list[str]:
+    """``cad/out`` documents still open; unreadable counts as open."""
+    import _session
+
+    try:
+        return _session._resident_output_documents(adapter)
+    except Exception as exc:  # noqa: BLE001 - an unknown seat is not an empty one
+        return [f"<resident check failed: {type(exc).__name__}: {exc}>"]
 
 
 def _floats(value: Any, scale: float = 1.0) -> list[float] | None:
@@ -1159,13 +1500,20 @@ def geometry_digest(document: Any) -> dict[str, Any]:
 
 
 async def native_digest(adapter: Any, a1: Path, a2: Path, out: Path) -> dict[str, str]:
-    import _session
-
     out.mkdir(parents=True, exist_ok=True)
     report: dict[str, Any] = {"a1": str(a1), "a2": str(a2)}
     try:
         report["sha256_before"] = [sha256(a1), sha256(a2)]
-        report["u11"] = _probe_same_name_open(adapter, a1, a2)
+        try:
+            report["u11"] = _probe_same_name_open(adapter, a1, a2)
+        except Exception as exc:  # noqa: BLE001 - U11 is report-only; D1/D2 still run
+            report["u11"] = {
+                "error": f"{type(exc).__name__}: {exc}",
+                "traceback": traceback.format_exc(),
+            }
+        residents = _residents(adapter)
+        if residents:
+            raise RuntimeError(f"documents open after the U11 probe: {residents}")
         for label, path in (("D1", a1), ("D2", a2)):
             started = time.perf_counter()
             document = _open(adapter, path)
@@ -1177,51 +1525,43 @@ async def native_digest(adapter: Any, a1: Path, a2: Path, out: Path) -> dict[str
             write_json(out / f"{label}.json", digest)
         report["sha256_after"] = [sha256(a1), sha256(a2)]
     finally:
-        report["residents_after"] = _session._resident_output_documents(adapter)
+        report["cleanup"] = _leave_seat_empty(adapter)
+        report["residents_after"] = _residents(adapter)
         write_json(out / "native.json", report)
     return {"digest": str(out)}
 
 
 def _probe_same_name_open(adapter: Any, a1: Path, a2: Path) -> dict[str, Any]:
-    """U11: open A2 while A1 (same file name, other folder) is open; then
-    close whatever is open under either path (titles collide, so by path)."""
-    first = _open(adapter, a1)
+    """U11: open A2 while A1 (same file name, other folder) is open. Leaves
+    the seat empty either way: the titles collide, so it discards everything."""
+    from _com import _early_bound
+
     probe: dict[str, Any] = {}
     try:
+        first = _open(adapter, a1)
         answer = adapter.swApp.OpenDoc6(str(a2), _DOC_PART, _OPEN_SILENT, "", 0, 0)
         document, errors, warnings = (
             answer if isinstance(answer, (tuple, list)) else (answer, None, None)
         )
-        probe = {
-            "returned_document": document is not None,
-            "errors": errors,
-            "warnings": warnings,
-            "returned_path": str(document.GetPathName())
-            if document is not None
-            else None,
-            "returned_a1": (
-                bool(adapter.swApp.IsSame(document, first) == 1)
-                if document is not None
+        returned = _early_bound(document, "IModelDoc2")
+        probe.update(
+            returned_document=returned is not None,
+            errors=errors,
+            warnings=warnings,
+            returned_path=str(returned.GetPathName()) if returned is not None else None,
+            returned_a1=(
+                adapter.swApp.IsSame(returned, first) == _OBJECT_SAME
+                if returned is not None
                 else None
             ),
-        }
+        )
     finally:
-        for _ in range(4):
-            open_documents = [
-                doc
-                for doc in (
-                    adapter.swApp.GetOpenDocumentByName(str(p)) for p in (a1, a2)
-                )
-                if doc is not None
-            ]
-            if not open_documents:
-                break
-            adapter.swApp.CloseDoc(str(open_documents[0].GetTitle()))
-    probe["open_after_cleanup"] = [
-        str(p)
-        for p in (a1, a2)
-        if adapter.swApp.GetOpenDocumentByName(str(p)) is not None
-    ]
+        probe["cleanup"] = _leave_seat_empty(adapter)
+        probe["open_after_cleanup"] = [
+            str(p)
+            for p in (a1, a2)
+            if adapter.swApp.GetOpenDocumentByName(str(p)) is not None
+        ]
     if probe["open_after_cleanup"]:
         raise RuntimeError(
             f"U11 probe left documents open: {probe['open_after_cleanup']}"
@@ -1311,7 +1651,6 @@ def _within(recorded: Any, live: Any) -> bool:
 async def native_walk(
     adapter: Any, a1: Path, copy: Path, log: Path, reference: Path, out: Path
 ) -> dict[str, str]:
-    import _session
     from _com import _com_invoke, _early_bound
 
     report: dict[str, Any] = {"a1": str(a1), "copy": str(copy)}
@@ -1434,7 +1773,8 @@ async def native_walk(
         if report["a1_sha256_after"] != report["a1_sha256_before"]:
             raise RuntimeError("A1 changed during the walk")
     finally:
-        report["residents_after"] = _session._resident_output_documents(adapter)
+        report["cleanup"] = _leave_seat_empty(adapter)
+        report["residents_after"] = _residents(adapter)
         write_json(out, report)
     return {"walk": str(out)}
 

@@ -11,11 +11,21 @@ interposes one proxy per interface object at that boundary and either
   ``QueryInterface``, ``GetIDsOfNames``, ``GetTypeInfo``, identity
   comparison, and any method of a non-dispatch interface such as
   ``ITypeInfo``) as one :class:`Call` with canonical arguments and response, or
-* REPLAYS a recorded log with SolidWorks absent: request ``k`` must equal the
-  recorded request ``k`` exactly (after the declared provenance mask) and is
-  then answered with the recorded response. The first mismatch is sticky and
-  raised as :class:`ReplayStop`, a ``BaseException`` so the adapter's
-  ``except Exception`` fallbacks cannot swallow it.
+* REPLAYS a recorded log with SolidWorks absent: the ``k``-th recipe request
+  must equal the recorded ``k``-th recipe request exactly (after the declared
+  provenance mask) and is then answered with the recorded response. The first
+  mismatch is sticky and raised as :class:`ReplayStop`, a ``BaseException`` so
+  the adapter's ``except Exception`` fallbacks cannot swallow it.
+
+Every call carries its :class:`Origin` and its Python caller (the nearest
+frames outside this module, pywin32 and the makepy wrappers). A call made while
+a recipe-inert module (``_buildgraph.RECIPE_INERT_MODULES``) is on the stack is
+INERT: ``check:inert`` proves such code only observes (no COM mutator before a
+save, pinned call sites whose results the build discards), so its requests are
+not part of the no-op claim. Replay serves them best-effort from the recorded
+inert calls by exact request, in any order, and answers an unrecorded one with
+``E_FAIL``; their handles come from a separate (negative) range, so inert
+activity cannot renumber the objects recipe requests name.
 
 pywin32 recognises its own interface objects by ``isinstance(...,
 PyIDispatchType)``; that C type cannot be subclassed, so :func:`funnel`
@@ -45,9 +55,11 @@ from __future__ import annotations
 import base64
 import contextlib
 import datetime
+import functools
 import gc
 import gzip
 import hashlib
+import itertools
 import json
 import os
 import re
@@ -113,6 +125,27 @@ class Side(StrEnum):
     LENGTH = "length"
 
 
+class Field(StrEnum):
+    """Which part of a call differs."""
+
+    OP = "op"
+    MEMBER = "member"
+    HANDLE = "handle"
+    ARGS = "args"
+    RESULT = "result"
+    RAISED = "raised"
+    OUTS = "outs"
+    LENGTH = "length"
+
+
+class Origin(StrEnum):
+    """Who issued a call: build code, or a recipe-inert module (observation
+    only, enforced by ``check:inert``)."""
+
+    RECIPE = "recipe"
+    INERT = "inert"
+
+
 class GuardMode(StrEnum):
     WARN = "warn"
     RAISE = "raise"
@@ -136,13 +169,22 @@ class Call:
     raised: Any = None
     outs: list[Any] | None = None
     foreign_thread: bool = False
+    origin: Origin = Origin.RECIPE
+    caller: str = ""
 
     @property
     def kind(self) -> Kind:
         return kind_of(self.op, self.args)
 
     def request(self) -> dict[str, Any]:
-        return {"h": self.handle, "op": self.op, "args": self.args, "site": self.site}
+        return {
+            "h": self.handle,
+            "op": self.op,
+            "args": self.args,
+            "site": self.site,
+            "caller": self.caller,
+            "origin": self.origin.value,
+        }
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -179,27 +221,41 @@ class Header:
 
 @dataclass(frozen=True, slots=True)
 class Divergence:
-    seq: int
+    """Where a request stream stops matching: ``index`` in the recipe stream,
+    ``seq`` the recorded call's log position (``None`` past its end)."""
+
+    index: int
+    seq: int | None
     side: Side
+    field: Field
     expected: dict[str, Any] | None
     actual: dict[str, Any] | None
     phase: Phase | None
     last_tree_seq_base: int | None
     feature: str | None
+    context: list[dict[str, Any]]
 
     def to_json(self) -> dict[str, Any]:
+        expected = self.expected or {}
+        actual = self.actual or {}
         return {
+            "index": self.index,
             "seq": self.seq,
             "side": self.side.value,
-            "member_expected": (self.expected or {}).get("site"),
-            "member_actual": (self.actual or {}).get("site"),
+            "field": self.field.value,
+            "member_expected": expected.get("site"),
+            "member_actual": actual.get("site"),
+            "kind": expected.get("kind") or actual.get("kind"),
+            "caller_expected": expected.get("caller"),
+            "caller_actual": actual.get("caller"),
             "phase": self.phase.value if self.phase else None,
             "phase_basis": "heuristic member-verb classifier",
             "last_tree_seq_base": self.last_tree_seq_base,
             "feature": self.feature,
-            "feature_basis": "last IFeature.Name put at or before seq in the base",
+            "feature_basis": "last IFeature.Name put at or before index in the base",
             "expected": self.expected,
             "actual": self.actual,
+            "context": self.context,
         }
 
 
@@ -913,6 +969,76 @@ def _site() -> str:
     return "?"
 
 
+class _Role(StrEnum):
+    PLUMBING = "plumbing"  # this module, pywin32, makepy-generated wrappers
+    INERT = "inert"  # a module in _buildgraph.RECIPE_INERT_MODULES
+    BUILD = "build"  # the repository's build code (cad/scripts)
+    LIBRARY = "library"  # the adapter, asyncio, the standard library
+
+
+# Directory names whose frames are COM plumbing rather than callers: pywin32's
+# package and the makepy output (gen_py, the adapter's checked-in _generated).
+_PLUMBING_DIRS = frozenset({"win32com", "gen_py", "_generated"})
+_CALLER_FRAMES = 3
+_ENGINE_PATH = os.path.normcase(__file__)
+_BUILD_PREFIX = os.path.normcase(os.path.dirname(__file__)) + os.sep
+_ROLES: dict[Any, tuple[_Role, str]] = {}
+
+
+@functools.cache
+def _inert_files() -> frozenset[str]:
+    """The recipe-inert modules' files (``os.path.normcase``), from the one
+    registry ``check:inert`` enforces."""
+    import _buildgraph
+
+    return frozenset(
+        os.path.normcase(str(_buildgraph.SCRIPTS_DIR / name))
+        for name in _buildgraph.RECIPE_INERT_MODULES
+    )
+
+
+def _role_of(code: Any) -> tuple[_Role, str]:
+    path = os.path.normcase(code.co_filename)
+    label = f"{Path(code.co_filename).stem}:{code.co_name}"
+    if path == _ENGINE_PATH or _PLUMBING_DIRS.intersection(Path(path).parts):
+        return _Role.PLUMBING, label
+    if path in _inert_files():
+        return _Role.INERT, label
+    if path.startswith(_BUILD_PREFIX):
+        return _Role.BUILD, label
+    return _Role.LIBRARY, label
+
+
+def _origin_and_caller() -> tuple[Origin, str]:
+    """INERT when a recipe-inert module is anywhere on the stack (its
+    callees act for it), and the caller: the nearest non-plumbing frames as
+    ``module:function:line``, innermost first, plus the two nearest
+    build-code frames when those three are all adapter or library frames (a
+    decorator's wrapper is often the first)."""
+    origin = Origin.RECIPE
+    callers: list[str] = []
+    build_seen = False
+    build_frames: list[str] = []
+    frame = sys._getframe(1)
+    while frame is not None:
+        code = frame.f_code
+        role = _ROLES.get(code)
+        if role is None:
+            role = _ROLES[code] = _role_of(code)
+        kind = role[0]
+        if kind is _Role.INERT:
+            origin = Origin.INERT
+        if kind is not _Role.PLUMBING and len(callers) < _CALLER_FRAMES:
+            callers.append(f"{role[1]}:{frame.f_lineno}")
+            build_seen = build_seen or kind is not _Role.LIBRARY
+        elif kind is _Role.BUILD and not build_seen and len(build_frames) < 2:
+            build_frames.append(f"{role[1]}:{frame.f_lineno}")
+        frame = frame.f_back
+    if build_frames:
+        callers.append("... " + " < ".join(build_frames))
+    return origin, " < ".join(callers)
+
+
 # ---------------------------------------------------------------------------
 # Log I/O
 # ---------------------------------------------------------------------------
@@ -973,6 +1099,10 @@ class LogWriter:
             line["u"] = call.outs
         if call.foreign_thread:
             line["t"] = 1
+        if call.origin is Origin.INERT:
+            line["g"] = "i"
+        if call.caller:
+            line["c"] = call.caller
         self._line(line)
         self.calls += 1
 
@@ -1008,6 +1138,8 @@ def load(log: Path) -> Conversation:
                         raised=line.get("e"),
                         outs=line.get("u"),
                         foreign_thread=bool(line.get("t")),
+                        origin=Origin.INERT if line.get("g") == "i" else Origin.RECIPE,
+                        caller=line.get("c", ""),
                     )
                 )
             elif "H" in line:
@@ -1031,8 +1163,38 @@ def _conversation(value: Path | Conversation) -> Conversation:
 # ---------------------------------------------------------------------------
 
 
-def _feature_before(calls: Sequence[Call], seq: int) -> str | None:
-    for call in reversed(calls[: seq + 1]):
+_CONTEXT_CALLS = 5
+_CLIP = 240
+_EXAMPLES = 25
+
+
+def recipe_calls(calls: Sequence[Call]) -> list[Call]:
+    """The calls the no-op claim is about: all but recipe-inert ones."""
+    return [call for call in calls if call.origin is Origin.RECIPE]
+
+
+def clip(value: Any, width: int = _CLIP) -> str:
+    """A bounded one-line JSON rendering of a canonical value."""
+    text = json.dumps(value, separators=(",", ":"), default=str)
+    return text if len(text) <= width else f"{text[: width - 3]}..."
+
+
+def brief(call: Call) -> dict[str, Any]:
+    """One call, bounded: what a reader needs to place it."""
+    width = _HEADER_WIDTH.get(call.op, 0)
+    return {
+        "seq": call.seq,
+        "site": call.site,
+        "kind": call.kind.value,
+        "h": call.handle,
+        "caller": call.caller,
+        "args": clip(call.args[width:]),
+        "response": clip(call.raised if call.raised is not None else call.result),
+    }
+
+
+def _feature_before(calls: Sequence[Call], index: int) -> str | None:
+    for call in reversed(calls[: index + 1]):
         if call.kind is Kind.PUT and call.site.endswith("IFeature.Name"):
             names = [a for a in call.args if isinstance(a, str)]
             if names:
@@ -1051,9 +1213,10 @@ def _last_tree_seq(calls: Sequence[Call]) -> int | None:
 
 
 def _divergence(
-    calls: Sequence[Call],
-    seq: int,
+    stream: Sequence[Call],
+    index: int,
     side: Side,
+    field: Field,
     expected: Call | None,
     actual: dict[str, Any] | None,
 ) -> Divergence:
@@ -1064,44 +1227,173 @@ def _divergence(
         else kind_of((actual or {}).get("op", ""), (actual or {}).get("args", []))
     )
     return Divergence(
-        seq=seq,
+        index=index,
+        seq=expected.seq if expected else None,
         side=side,
+        field=field,
         expected=expected.to_json() if expected else None,
         actual=actual,
         phase=classify(site, kind),
-        last_tree_seq_base=_last_tree_seq(calls),
-        feature=_feature_before(calls, min(seq, len(calls) - 1)) if calls else None,
+        last_tree_seq_base=_last_tree_seq(stream),
+        feature=_feature_before(stream, min(index, len(stream) - 1))
+        if stream
+        else None,
+        context=[brief(c) for c in stream[max(0, index - _CONTEXT_CALLS) : index]],
     )
 
 
-def first_divergence(
+def request_field(
+    expected: Call,
+    handle: int,
+    op: str,
+    args: list[Any],
+    mask: Sequence[MaskRule] = PROVENANCE_MASK,
+) -> Field | None:
+    """The first part of a request that differs from ``expected`` (args after
+    ``mask``), or ``None`` when it is the same request."""
+    if expected.op != op:
+        return Field.OP
+    width = _HEADER_WIDTH.get(op, 0)
+    if not same(expected.args[:width], args[:width]):
+        return Field.MEMBER
+    if expected.handle != handle:
+        return Field.HANDLE
+    if not same(_masked(expected.args, mask), _masked(args, mask)):
+        return Field.ARGS
+    return None
+
+
+def _response_field(a: Call, b: Call) -> Field | None:
+    if not same(a.raised, b.raised):
+        return Field.RAISED
+    if not same(a.result, b.result):
+        return Field.RESULT
+    if not same(a.outs, b.outs):
+        return Field.OUTS
+    return None
+
+
+def _response_of(call: Call, field: Field) -> Any:
+    if field is Field.RAISED:
+        return call.raised
+    if field is Field.OUTS:
+        return call.outs
+    return call.result
+
+
+def _request_divergence(
+    a: Sequence[Call],
+    b: Sequence[Call],
+    index: int,
+    field: Field,
+    preceding: dict[str, Any] | None,
+) -> dict[str, Any]:
+    x = a[index] if index < len(a) else None
+    y = b[index] if index < len(b) else None
+    side = Side.LENGTH if field is Field.LENGTH else Side.REQUEST
+    found = _divergence(a, index, side, field, x, y.to_json() if y else None).to_json()
+    found["seq_new"] = y.seq if y else None
+    found["preceding_response_difference"] = preceding
+    return found
+
+
+def _capture_differences(
+    base: Conversation, new: Conversation, a: Sequence[Call], b: Sequence[Call]
+) -> list[dict[str, Any]]:
+    """SolidWorks-written files whose bytes differ, keyed by recipe index."""
+
+    def by_index(
+        conversation: Conversation, stream: Sequence[Call]
+    ) -> dict[tuple[int | None, str], str]:
+        index_of = {call.seq: i for i, call in enumerate(stream)}
+        return {
+            (index_of.get(int(seq)), rel): digest
+            for seq, files in conversation.trailer.get("captured", {}).items()
+            for rel, digest in files.items()
+        }
+
+    left, right = by_index(base, a), by_index(new, b)
+    differences = []
+    for key in sorted(set(left) | set(right), key=str):
+        if left.get(key) == right.get(key):
+            continue
+        index, rel = key
+        member = a[index].site if index is not None and index < len(a) else None
+        differences.append(
+            {
+                "index": index,
+                "member": member,
+                "file": rel,
+                "a": left.get(key),
+                "b": right.get(key),
+            }
+        )
+    return differences[:_EXAMPLES]
+
+
+def compare_conversations(
     base_log: Path | Conversation,
     new_log: Path | Conversation,
     mask: Sequence[MaskRule] = PROVENANCE_MASK,
-) -> Divergence | None:
-    """The first call at which two logs differ in request or response
-    (requests compared after ``mask``), or ``None`` if they are identical."""
-    base = _conversation(base_log).calls
-    new = _conversation(new_log).calls
-    for index, (a, b) in enumerate(zip(base, new, strict=False)):
-        if (
-            a.handle != b.handle
-            or a.op != b.op
-            or not same(_masked(a.args, mask), _masked(b.args, mask))
-        ):
-            return _divergence(base, index, Side.REQUEST, a, b.to_json())
-        if not (
-            same(a.result, b.result)
-            and same(a.raised, b.raised)
-            and same(a.outs, b.outs)
-        ):
-            return _divergence(base, index, Side.RESPONSE, a, b.to_json())
-    if len(base) != len(new):
-        index = min(len(base), len(new))
-        expected = base[index] if index < len(base) else None
-        actual = new[index].to_json() if index < len(new) else None
-        return _divergence(base, index, Side.LENGTH, expected, actual)
-    return None
+) -> dict[str, Any]:
+    """K1: do two recordings of one script issue the same requests?
+
+    Recipe calls are aligned by position. The first request that differs
+    (operation, member, handle or masked arguments) ends the alignment and is
+    THE request divergence, reported with its context and the nearest earlier
+    response difference (a response that may have steered it). Responses may
+    differ legitimately between two live sessions (process ids, window
+    handles, times, temporary paths, persistent ids): every one before the
+    request divergence is counted by member with its first example, and none
+    is masked. Recipe-inert calls are compared only as per-member counts, and
+    SolidWorks-written files by digest per recipe call."""
+    base, new = _conversation(base_log), _conversation(new_log)
+    a, b = recipe_calls(base.calls), recipe_calls(new.calls)
+    counts: Counter[str] = Counter()
+    examples: dict[str, dict[str, Any]] = {}
+    preceding: dict[str, Any] | None = None
+    divergence: dict[str, Any] | None = None
+    for index, (x, y) in enumerate(zip(a, b, strict=False)):
+        changed = request_field(x, y.handle, y.op, y.args, mask)
+        if changed is not None:
+            divergence = _request_divergence(a, b, index, changed, preceding)
+            break
+        changed = _response_field(x, y)
+        if changed is None:
+            continue
+        counts[x.site] += 1
+        preceding = {
+            "index": index,
+            "seq": [x.seq, y.seq],
+            "member": x.site,
+            "field": changed.value,
+            "caller": x.caller,
+            "a": clip(_response_of(x, changed)),
+            "b": clip(_response_of(y, changed)),
+        }
+        if x.site not in examples and len(examples) < _EXAMPLES:
+            examples[x.site] = preceding
+    else:
+        if len(a) != len(b):
+            index = min(len(a), len(b))
+            divergence = _request_divergence(a, b, index, Field.LENGTH, preceding)
+    inert_a = Counter(c.site for c in base.calls if c.origin is Origin.INERT)
+    inert_b = Counter(c.site for c in new.calls if c.origin is Origin.INERT)
+    return {
+        "recipe_calls": [len(a), len(b)],
+        "inert_calls": [sum(inert_a.values()), sum(inert_b.values())],
+        "request_divergence": divergence,
+        "response_difference_count": sum(counts.values()),
+        "response_differences": dict(counts.most_common()),
+        "response_examples": list(examples.values()),
+        "inert_differences": {
+            site: [inert_a[site], inert_b[site]]
+            for site in sorted(set(inert_a) | set(inert_b))
+            if inert_a[site] != inert_b[site]
+        },
+        "capture_differences": _capture_differences(base, new, a, b),
+        "header_differences": compare_headers(base.header, new.header),
+    }
 
 
 def compare_headers(a: Header, b: Header) -> dict[str, Any]:
@@ -1429,10 +1721,15 @@ class Recorder:
         self.capture_dir = capture_dir
         self.closed = False
         self.seq = 0
-        self.next_handle = 1
+        self._handles = {
+            Origin.RECIPE: itertools.count(1),
+            Origin.INERT: itertools.count(-1, -1),
+        }
+        self.allocated: Counter[Origin] = Counter()
+        self.origins: Counter[Origin] = Counter()
         self.depth = 0
         self.types: dict[str, dict[str, Any]] = {}
-        self._identities: dict[int, int] = {}
+        self._identities: dict[Origin, dict[int, int]] = {o: {} for o in Origin}
         self.adopted_inside = 0
         self.adopted_outside = 0
         self.foreign_thread_calls = 0
@@ -1445,21 +1742,22 @@ class Recorder:
 
     # -- handles ---------------------------------------------------------------
 
-    def _new_proxy(self, real: Any) -> RecordingProxy:
+    def _new_proxy(self, real: Any, origin: Origin) -> RecordingProxy:
         ptype = type(real).__name__
         facts = self.types.get(ptype)
         if facts is None:
             facts = self.types[ptype] = _type_facts(real)
-        proxy = RecordingProxy(self, self.next_handle, real, facts)
-        self.next_handle += 1
+        proxy = RecordingProxy(self, next(self._handles[origin]), real, facts)
+        self.allocated[origin] += 1
         return proxy
 
     def root(self, real: Any) -> RecordingProxy:
         """A pre-window object the build inherits through the adapter."""
-        return self._new_proxy(real)
+        return self._new_proxy(real, Origin.RECIPE)
 
     def adopt(self, real: Any) -> RecordingProxy:
-        proxy = self._new_proxy(real)
+        origin, caller = _origin_and_caller()
+        proxy = self._new_proxy(real, origin)
         if self.closed:
             return proxy
         if self.depth > 0:  # a byref write-back of the call in progress
@@ -1467,7 +1765,7 @@ class Recorder:
             return proxy
         self.adopted_outside += 1
         seq = self._next_seq()
-        self.writer.emit(
+        self._emit(
             Call(
                 seq,
                 proxy._h,
@@ -1475,24 +1773,30 @@ class Recorder:
                 [],
                 _site(),
                 self.codec.encode(proxy, result=True),
+                origin=origin,
+                caller=caller,
             )
         )
         return proxy
 
-    def wrap(self, value: Any) -> Any:
+    def wrap(self, value: Any, origin: Origin) -> Any:
         cls = type(value)
         if cls is tuple:
-            items = [self.wrap(v) for v in value]
+            items = [self.wrap(v, origin) for v in value]
             return (
                 value
                 if all(a is b for a, b in zip(items, value, strict=True))
                 else tuple(items)
             )
         if cls is list:
-            return [self.wrap(v) for v in value]
+            return [self.wrap(v, origin) for v in value]
         if is_interface(value):
-            return self._new_proxy(value)
+            return self._new_proxy(value, origin)
         return value
+
+    def _emit(self, call: Call) -> None:
+        self.origins[call.origin] += 1
+        self.writer.emit(call)
 
     def _next_seq(self) -> int:
         seq = self.seq
@@ -1559,6 +1863,7 @@ class Recorder:
             return method(*_unproxied(list(args)))
         seq = self._next_seq()
         site = _site()
+        origin, caller = _origin_and_caller()
         foreign = threading.get_ident() != self._thread
         self.foreign_thread_calls += foreign
         canonical = [self.codec.encode(a) for a in args]
@@ -1571,10 +1876,10 @@ class Recorder:
                 raw = method(*real_args)
         except BaseException as exc:
             self.depth -= 1
-            outs = self._outs(variants)
+            outs = self._outs(variants, origin)
             if watch:
                 self._capture(seq, watch)
-            self.writer.emit(
+            self._emit(
                 Call(
                     seq,
                     proxy._h,
@@ -1585,15 +1890,17 @@ class Recorder:
                     _encode_exception(self.codec, exc),
                     outs,
                     foreign,
+                    origin,
+                    caller,
                 )
             )
             raise
         self.depth -= 1
-        result = self.wrap(raw)
-        outs = self._outs(variants)
+        result = self.wrap(raw, origin)
+        outs = self._outs(variants, origin)
         if watch:
             self._capture(seq, watch)
-        self.writer.emit(
+        self._emit(
             Call(
                 seq,
                 proxy._h,
@@ -1604,6 +1911,8 @@ class Recorder:
                 None,
                 outs,
                 foreign,
+                origin,
+                caller,
             )
         )
         return result
@@ -1625,7 +1934,7 @@ class Recorder:
 
         return [convert(a) for a in args], tracked
 
-    def _outs(self, tracked: list[_WriteBack]) -> list[Any] | None:
+    def _outs(self, tracked: list[_WriteBack], origin: Origin) -> list[Any] | None:
         """Encode each write-back as ``[attribute, raw value]`` and apply it
         to the caller's VARIANT the way pywin32 would have (``value`` wraps
         interfaces through ``_get_good_object_``; those wrapping calls are
@@ -1638,7 +1947,7 @@ class Recorder:
             if after is entry.before and not entry.via_property:
                 outs.append(None)
                 continue
-            after = self.wrap(after)
+            after = self.wrap(after, origin)
             via = "value" if entry.via_property else "_value"
             outs.append([via, self.codec.encode(after, result=True)])
             setattr(entry.original, via, after)
@@ -1653,9 +1962,19 @@ class Recorder:
         )
         if self.closed:
             return outcome
+        origin, caller = _origin_and_caller()
         seq = self._next_seq()
-        self.writer.emit(
-            Call(seq, proxy._h, op, [{"h": other._h}], _site(), bool(outcome))
+        self._emit(
+            Call(
+                seq,
+                proxy._h,
+                op,
+                [{"h": other._h}],
+                _site(),
+                bool(outcome),
+                origin=origin,
+                caller=caller,
+            )
         )
         return outcome
 
@@ -1666,10 +1985,11 @@ class Recorder:
             return hash(proxy._real)
         seq = self._next_seq()
         site = _site()
+        origin, caller = _origin_and_caller()
         try:
             real_hash = hash(proxy._real)
         except Exception as exc:
-            self.writer.emit(
+            self._emit(
                 Call(
                     seq,
                     proxy._h,
@@ -1678,11 +1998,18 @@ class Recorder:
                     site,
                     None,
                     _encode_exception(self.codec, exc),
+                    origin=origin,
+                    caller=caller,
                 )
             )
             raise
-        index = self._identities.setdefault(real_hash, len(self._identities))
-        self.writer.emit(Call(seq, proxy._h, "__hash__", [], site, index))
+        identities = self._identities[origin]
+        index = identities.setdefault(real_hash, len(identities))
+        self._emit(
+            Call(
+                seq, proxy._h, "__hash__", [], site, index, origin=origin, caller=caller
+            )
+        )
         return index
 
 
@@ -1729,8 +2056,21 @@ def capture_dir_of(log: Path) -> Path:
     return log.with_name(log.name + ".files")
 
 
+# The answer to a recipe-inert request the recording never saw: E_FAIL. Inert
+# code guards every probe ("provenance is never fatal"), so it records an
+# unreadable value and carries on, exactly as with a seat that refuses.
+_UNRECORDED_INERT = {
+    "com_error": [
+        -2147467259,
+        "replay: this recipe-inert request was not recorded",
+        None,
+        None,
+    ]
+}
+
+
 class Replayer:
-    """Serves a recorded conversation; the first mismatch is sticky."""
+    """Serves a recorded conversation; the first recipe mismatch is sticky."""
 
     def __init__(
         self,
@@ -1740,7 +2080,8 @@ class Replayer:
         materialise: Callable[[int], None] | None = None,
     ):
         self.header = conversation.header
-        self.calls = conversation.calls
+        self.strict = recipe_calls(conversation.calls)
+        self.inert = [c for c in conversation.calls if c.origin is Origin.INERT]
         self.types: dict[str, dict[str, Any]] = conversation.trailer.get("types", {})
         self.roots = roots
         self.mask = mask
@@ -1750,6 +2091,11 @@ class Replayer:
         self.served = 0
         self.stop: ReplayStop | None = None
         self.proxies: dict[int, ReplayProxy] = {}
+        self._inert_used = [False] * len(self.inert)
+        self._inert_first = 0
+        self.inert_served = 0
+        self.inert_unserved: Counter[str] = Counter()
+        self._unserved_callers: dict[str, str] = {}
 
     def proxy(self, handle: int, ptype: str | None) -> ReplayProxy:
         existing = self.proxies.get(handle)
@@ -1773,29 +2119,77 @@ class Replayer:
     def _expect(self, handle: int, op: str, canonical: list[Any], site: str) -> Call:
         if self.stop is not None:
             raise self.stop
-        actual = {"h": handle, "op": op, "args": canonical, "site": site}
-        if self.pos >= len(self.calls):
+        origin, caller = _origin_and_caller()
+        if origin is Origin.INERT:
+            return self._serve_inert(handle, op, canonical, site, caller)
+        actual = {
+            "h": handle,
+            "op": op,
+            "args": canonical,
+            "site": site,
+            "caller": caller,
+            "kind": kind_of(op, canonical).value,
+        }
+        if self.pos >= len(self.strict):
             self._halt(
                 Verdict.EXHAUSTED,
-                _divergence(self.calls, self.pos, Side.LENGTH, None, actual),
-                f"request {self.pos} ({site}) beyond the {len(self.calls)} recorded",
+                _divergence(
+                    self.strict, self.pos, Side.LENGTH, Field.LENGTH, None, actual
+                ),
+                f"recipe request #{self.pos} ({site} from {caller or '?'}) beyond "
+                f"the {len(self.strict)} recorded",
             )
-        expected = self.calls[self.pos]
-        if (
-            expected.handle != handle
-            or expected.op != op
-            or not same(
-                _masked(expected.args, self.mask), _masked(canonical, self.mask)
-            )
-        ):
+        expected = self.strict[self.pos]
+        changed = request_field(expected, handle, op, canonical, self.mask)
+        if changed is not None:
             self._halt(
                 Verdict.DIVERGED,
-                _divergence(self.calls, self.pos, Side.REQUEST, expected, actual),
-                f"request {self.pos}: expected {expected.site} got {site}",
+                _divergence(
+                    self.strict, self.pos, Side.REQUEST, changed, expected, actual
+                ),
+                f"request {expected.seq}: expected {expected.site} got {site} "
+                f"({changed.value} differs; recorded from {expected.caller or '?'}, "
+                f"now from {caller or '?'})",
             )
         self.pos += 1
         self.served += 1
         return expected
+
+    def _serve_inert(
+        self, handle: int, op: str, canonical: list[Any], site: str, caller: str
+    ) -> Call:
+        """Best effort: the first unused recorded inert call with exactly this
+        request, wherever it was recorded; else ``E_FAIL``."""
+        masked = _masked(canonical, self.mask)
+        for index in range(self._inert_first, len(self.inert)):
+            candidate = self.inert[index]
+            if self._inert_used[index] or candidate.handle != handle:
+                continue
+            if candidate.op != op or not same(
+                _masked(candidate.args, self.mask), masked
+            ):
+                continue
+            self._inert_used[index] = True
+            while (
+                self._inert_first < len(self.inert)
+                and self._inert_used[self._inert_first]
+            ):
+                self._inert_first += 1
+            self.inert_served += 1
+            return candidate
+        self.inert_unserved[site] += 1
+        self._unserved_callers.setdefault(site, caller)
+        return Call(
+            -1,
+            handle,
+            op,
+            canonical,
+            site,
+            None,
+            _UNRECORDED_INERT,
+            origin=Origin.INERT,
+            caller=caller,
+        )
 
     def call(self, proxy: ComProxy, op: str, args: tuple[Any, ...]) -> Any:
         canonical = [self.codec.encode(a) for a in args]
@@ -1825,18 +2219,40 @@ class Replayer:
     def finish(self) -> tuple[Verdict, Divergence | None, str]:
         if self.stop is not None:
             return self.stop.verdict, self.stop.divergence, self.stop.reason
-        if self.pos < len(self.calls):
-            expected = self.calls[self.pos]
+        if self.pos < len(self.strict):
+            expected = self.strict[self.pos]
             return (
                 Verdict.UNCONSUMED,
-                _divergence(self.calls, self.pos, Side.LENGTH, expected, None),
-                f"script returned with {len(self.calls) - self.pos} recorded requests unserved",
+                _divergence(
+                    self.strict, self.pos, Side.LENGTH, Field.LENGTH, expected, None
+                ),
+                f"script returned with {len(self.strict) - self.pos} recorded "
+                "recipe requests unserved",
             )
         return (
             Verdict.NOOP,
             None,
-            "every request matched and the log was fully consumed",
+            "every recipe request matched and the recipe stream was fully consumed",
         )
+
+    def inert_report(self) -> dict[str, Any]:
+        """How the recipe-inert calls were served (none of it is the verdict)."""
+        unconsumed = Counter(
+            call.site
+            for call, used in zip(self.inert, self._inert_used, strict=True)
+            if not used
+        )
+        return {
+            "recorded": len(self.inert),
+            "served": self.inert_served,
+            "unserved": sum(self.inert_unserved.values()),
+            "unserved_members": [
+                {"member": site, "count": count, "caller": self._unserved_callers[site]}
+                for site, count in self.inert_unserved.most_common(_EXAMPLES)
+            ],
+            "unconsumed": sum(unconsumed.values()),
+            "unconsumed_members": dict(unconsumed.most_common(_EXAMPLES)),
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -2132,7 +2548,9 @@ def recording(
                     "status": "complete",
                     "outcome": outcome,
                     "calls": recorder.seq,
-                    "handles": recorder.next_handle - 1,
+                    "handles": recorder.allocated[Origin.RECIPE],
+                    "inert_handles": recorder.allocated[Origin.INERT],
+                    "inert_calls": recorder.origins[Origin.INERT],
                     "types": recorder.types,
                     "external": recorder.external,
                     "internal_paths": sorted(recorder.internal_paths),
@@ -2410,7 +2828,7 @@ def replay_build(
             Verdict.INPUT_MISMATCH,
             None,
             0,
-            len(conversation.calls),
+            len(recipe_calls(conversation.calls)),
             time.perf_counter() - started,
             {},
             {},
@@ -2514,12 +2932,14 @@ def replay_build(
         sandbox_violations=sandbox.violations + observer.violations,
         proxies_served=len(replayer.proxies),
         live_interface_objects_at_end=count() if count else None,
+        inert=replayer.inert_report(),
+        recorded_total=len(conversation.calls),
     )
     return ReplayResult(
         verdict,
         divergence,
         replayer.served,
-        len(conversation.calls),
+        len(replayer.strict),
         time.perf_counter() - started,
         com_outputs,
         py_outputs,

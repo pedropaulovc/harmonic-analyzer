@@ -1494,6 +1494,23 @@ violation) fail the leaf. The engine (`_com_conversation.py`) and the CLI stay
 out of every recipe closure; `test_com_conversation.py` (enrolled in
 `check:recipe`) checks that and the offline record/replay contract.
 
+K1 is a **request** verdict: the two recorded builds issue the same requests
+(only the generator-provenance argument is masked). Response differences
+(results, raised errors, byref outputs) are counted per member and never
+masked or folded into K1. Calls issued while a recipe-inert module
+(`_buildgraph.RECIPE_INERT_MODULES`, the set `check:inert` enforces) is on the
+Python stack are logged as `"g":"i"` with their own negative handle range and
+are excluded from strict ordering: replay serves them by exact request match
+and answers an unrecorded one with `E_FAIL`, which those modules already
+tolerate. This is what lets a replay process, which never connected, re-ask
+the seat identity that the recording's process cached at connect time. The
+same reordering from any other module still diverges. Every logged call
+carries its Python caller frames. After each K verdict and at the end of the
+run the leaf logs bounded evidence (first divergence with field, both sides,
+the five preceding calls, counts) at WARN, so `task.log` keeps it even when a
+later phase fails. Each native phase closes every document without saving in a
+`finally` and fails only if a document is still open after that cleanup.
+
 ### Readiness is not proof of a build
 
 `farm-launch started` means the wrapper initialized its log and startup record.

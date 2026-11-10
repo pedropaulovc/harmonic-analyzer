@@ -15,7 +15,8 @@ Branch ``experiment/com-replay-20261110``: never merge. Engine and design notes:
     no-op verdict, 91 for any other verdict, 1 for an infrastructure failure.
 
 ``diff <a> <b> [--result P]``
-    First divergence between two logs (JSON on stdout), exit 0 when identical.
+    Request divergence and per-member response differences between two logs
+    (JSON on stdout); exit 0 when the recipe requests are identical.
 
 Nothing here is imported by a recipe; ``--help`` imports neither pywin32 nor
 the build modules.
@@ -55,7 +56,7 @@ def _parser() -> argparse.ArgumentParser:
         help="SolidWorks-written files of the log (default: beside the log)",
     )
 
-    diff = sub.add_parser("diff", help="first divergence between two logs")
+    diff = sub.add_parser("diff", help="request/response comparison of two logs")
     diff.add_argument("base", type=Path)
     diff.add_argument("new", type=Path)
     diff.add_argument("--result", type=Path)
@@ -78,14 +79,13 @@ def main(argv: list[str] | None = None) -> int:
     import _telemetry
 
     if args.command == "diff":
-        divergence = conversation.first_divergence(args.base, args.new)
-        payload = {"identical": divergence is None}
-        if divergence is not None:
-            payload["divergence"] = divergence.to_json()
+        payload = conversation.compare_conversations(args.base, args.new)
         if args.result is not None:
             _write_json(args.result, payload)
         sys.stdout.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
-        return 0 if divergence is None else conversation.EXIT_REPLAY_NOT_NOOP
+        if payload["request_divergence"] is None:
+            return 0
+        return conversation.EXIT_REPLAY_NOT_NOOP
 
     script = args.script.resolve()
     if args.command == "record":
@@ -108,9 +108,12 @@ def main(argv: list[str] | None = None) -> int:
         capture_dir=args.capture_dir.resolve() if args.capture_dir else None,
     )
     _write_json(args.result, result.to_json())
+    inert = result.details.get("inert") or {}
     summary = (
         f"replay {script.name}: {result.verdict.value} "
-        f"({result.served}/{result.recorded} served, {result.seconds:.2f}s)"
+        f"({result.served}/{result.recorded} recipe requests served, inert "
+        f"{inert.get('served', 0)}/{inert.get('recorded', 0)} served "
+        f"{inert.get('unserved', 0)} unrecorded, {result.seconds:.2f}s)"
     )
     if result.verdict is conversation.Verdict.NOOP:
         _telemetry.success(summary)

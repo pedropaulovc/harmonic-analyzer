@@ -13,6 +13,7 @@ the CLI end to end with the sandbox armed.
 from __future__ import annotations
 
 import asyncio
+import importlib.util
 import json
 import math
 import os
@@ -31,6 +32,7 @@ from win32com.client import VARIANT, Dispatch, DispatchBaseClass
 import _com
 import _com_conversation as conv
 import _paths
+import _seat_forensics
 from diagnostics import benchmark_replay_noop as leaf
 
 SCRIPTS = Path(__file__).resolve().parent
@@ -58,12 +60,13 @@ class FakeServer:
     """One in-memory application: parts by name, properties, byref outputs."""
 
     NAMES = {"Add": 1, "GetPart": 2, "Volume": 10, "Name": 6}
-    METHODS = frozenset({1, 2, 3, 4, 5, 7, 8, 9, 11})
+    METHODS = frozenset({1, 2, 3, 4, 5, 7, 8, 9, 11, 12, 13, 14})
 
-    def __init__(self) -> None:
+    def __init__(self, volume_scale: float = 1.0) -> None:
         self.calls = 0
         self.names: dict[str, str] = {}
         self.properties: list[tuple[Any, ...]] = []
+        self.volume_scale = volume_scale
 
     def root(self) -> FakeDispatch:
         return FakeDispatch(self, "app")
@@ -102,7 +105,14 @@ class FakeServer:
             self.properties.append(args)
             return 0
         if dispid == 10:
-            return {"part:plate": 1.25, "part:arm": 2.5}.get(ident, 0.5)
+            volume = {"part:plate": 1.25, "part:arm": 2.5}.get(ident, 0.5)
+            return self.volume_scale * volume
+        if dispid == 12:
+            return 4242
+        if dispid == 13:
+            return "34.3.0"
+        if dispid == 14:
+            return "C:\\seat\\working"
         return f"answer-{dispid}"
 
 
@@ -187,6 +197,15 @@ class IApp(DispatchBaseClass):
             option,
         )
 
+    def GetProcessID(self):  # noqa: N802
+        return self._oleobj_.InvokeTypes(12, LCID, 1, (3, 0), ())
+
+    def RevisionNumber(self):  # noqa: N802
+        return self._oleobj_.InvokeTypes(13, LCID, 1, (8, 0), ())
+
+    def GetCurrentWorkingDirectory(self):  # noqa: N802
+        return self._oleobj_.InvokeTypes(14, LCID, 1, (8, 0), ())
+
     _prop_map_get_ = {"Name": (6, 2, (8, 0), (), "Name", None)}
     _prop_map_put_ = {"Name": ((6, LCID, 4, 0), ())}
 
@@ -213,16 +232,46 @@ class FakeAdapter:
     """What a build sees: COM state on attributes, like PyWin32Adapter."""
 
     def __init__(self, server: FakeServer | None = None) -> None:
-        self.app = IApp(server.root()) if server else None
+        self.swApp = IApp(server.root()) if server else None
         self.raw = server.root() if server else None
         self.calls_made = 0
 
+    def _attempt(self, operation: Any, default: Any = None) -> Any:
+        try:
+            return operation()
+        except Exception:  # noqa: BLE001 - PyWin32Adapter._attempt's contract
+            return default
 
-async def scenario(adapter: Any, *, variant: str = "") -> dict[str, Any]:
+
+def _seat_calls(adapter: Any, variant: str) -> None:
+    """The native run's seat-provenance shapes: the same reads issued by the
+    recipe-inert module, or straight from build code."""
+    app = adapter.swApp
+    if variant == "provenance":
+        _seat_forensics.seat_provenance(adapter)
+    elif variant == "inert-ab":
+        _seat_forensics._seat_identity_of(adapter)
+        _seat_forensics._seat_working_directory(adapter)
+    elif variant == "inert-ba":
+        _seat_forensics._seat_working_directory(adapter)
+        _seat_forensics._seat_identity_of(adapter)
+    elif variant == "direct-ab":
+        app.GetProcessID()
+        app.GetCurrentWorkingDirectory()
+    elif variant == "direct-ba":
+        app.GetCurrentWorkingDirectory()
+        app.GetProcessID()
+
+
+async def scenario(
+    adapter: Any, *, variant: str = "", probe: Any = None
+) -> dict[str, Any]:
     """Every path a build drives: early-bound methods and properties, typed
     returns, identity, byref outputs (values and an interface), a COM error,
     late binding, ``_com._com_invoke`` and a SolidWorks-written file."""
-    app = adapter.app
+    app = adapter.swApp
+    if probe is not None:
+        probe(app)
     second = math.nextafter(2.25, 3.0) if variant == "ulp" else 2.25
     total = app.Add(1.5, second)
     plate = app.GetPart("plate")
@@ -264,6 +313,7 @@ async def scenario(adapter: Any, *, variant: str = "") -> dict[str, Any]:
         app.Add(0.0, 0.0)
     if variant != "short":
         app.Add3("Generator", 30, "harmonic-analyzer @ 0123abc", 2)
+    _seat_calls(adapter, variant)
     report = _paths.OUT_SLDPRT.parent / "py-output.json"
     report.write_text(json.dumps(result, sort_keys=True), encoding="utf-8")
     escape = os.environ.get("COM_REPLAY_TEST_ESCAPE")
@@ -277,7 +327,7 @@ async def scenario(adapter: Any, *, variant: str = "") -> dict[str, Any]:
 def _record(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, **kwargs: Any):
     out_root = tmp_path / "run1"
     monkeypatch.setattr(_paths, "OUT_SLDPRT", out_root / "sldprt")
-    server = FakeServer()
+    server = kwargs.pop("server", None) or FakeServer()
     adapter = FakeAdapter(server)
     log = tmp_path / "logs" / "L1.jsonl.gz"
     with conv.recording(
@@ -323,7 +373,7 @@ def test_unchanged_build_replays_as_noop_without_the_server(tmp_path, monkeypatc
 
 def test_recording_restores_the_adapters_real_objects(tmp_path, monkeypatch):
     _, _, _, adapter = _record(tmp_path, monkeypatch)
-    assert type(adapter.app._oleobj_) is FakeDispatch
+    assert type(adapter.swApp._oleobj_) is FakeDispatch
     assert type(adapter.raw) is FakeDispatch
 
 
@@ -353,6 +403,9 @@ def test_kinds_identity_and_write_back_are_recorded(tmp_path, monkeypatch):
     calls = conv.load(log).calls
     kinds = {(c.site, c.kind) for c in calls}
     assert ("IApp.Add", conv.Kind.CALL) in kinds
+    add = next(c for c in calls if c.site == "IApp.Add")
+    assert "test_com_conversation:scenario" in add.caller
+    assert all(c.origin is conv.Origin.RECIPE for c in calls)
     assert ("IPart.Name", conv.Kind.PUT) in kinds
     assert ("IPart.Name", conv.Kind.GET) in kinds
     assert any(c.kind is conv.Kind.QI for c in calls)
@@ -419,19 +472,22 @@ def test_paths_are_root_relative():
     assert other.decode("<OUT>\\sldprt\\A.SLDPRT") == "D:\\Scratch\\sldprt\\A.SLDPRT"
 
 
-def test_provenance_mask_covers_only_the_generator(tmp_path):
-    def conversation(*args: Any) -> conv.Conversation:
-        call = conv.Call(0, 1, "InvokeTypes", [9, 0, 1, [3, 0], [], *args], "IApp.Add3")
-        header = conv.Header(1, "x", "x", "", "", None, {}, [], {}, {}, "")
-        return conv.Conversation(header, [call], {})
+def test_provenance_mask_covers_only_the_generator():
+    def call(*args: Any) -> conv.Call:
+        return conv.Call(0, 1, "InvokeTypes", [9, 0, 1, [3, 0], [], *args], "IApp.Add3")
 
-    generator = conversation("Generator", 30, "harmonic-analyzer @ abc123", 2)
-    rebuilt = conversation("Generator", 30, "harmonic-analyzer @ def456-dirty", 2)
-    other = conversation("Material", 30, "harmonic-analyzer @ def456", 2)
-    other_base = conversation("Material", 30, "harmonic-analyzer @ abc123", 2)
-    assert conv.first_divergence(generator, rebuilt) is None
-    assert conv.first_divergence(other_base, other) is not None
-    assert conv.first_divergence(generator, rebuilt, mask=()) is not None
+    def differs(
+        a: conv.Call, b: conv.Call, mask: tuple = conv.PROVENANCE_MASK
+    ) -> conv.Field | None:
+        return conv.request_field(a, b.handle, b.op, b.args, mask)
+
+    generator = call("Generator", 30, "harmonic-analyzer @ abc123", 2)
+    rebuilt = call("Generator", 30, "harmonic-analyzer @ def456-dirty", 2)
+    other = call("Material", 30, "harmonic-analyzer @ def456", 2)
+    other_base = call("Material", 30, "harmonic-analyzer @ abc123", 2)
+    assert differs(generator, rebuilt) is None
+    assert differs(other_base, other) is conv.Field.ARGS
+    assert differs(generator, rebuilt, mask=()) is conv.Field.ARGS
 
 
 def test_changed_external_input_is_an_input_mismatch(tmp_path, monkeypatch):
@@ -444,7 +500,7 @@ def test_changed_external_input_is_an_input_mismatch(tmp_path, monkeypatch):
     with conv.recording(
         adapter, script=Path(__file__), log=log, roots=conv.Roots(out_root), audit=False
     ):
-        adapter.app.Open(str(template))
+        adapter.swApp.Open(str(template))
     assert conv.check_inputs(conv.load(log)) == []
     template.write_bytes(b"template v2")
     monkeypatch.setenv("HARMONIC_FIT_GROUPS", "changed")
@@ -528,6 +584,135 @@ def test_cli_replays_a_recorded_build_in_a_sandboxed_subprocess(tmp_path, monkey
         )
         assert outcome["sandbox_violations"]
     assert not _SANDBOX_PROBE.exists()
+
+
+def _stub_seat_probes(monkeypatch: pytest.MonkeyPatch, identity: dict) -> None:
+    """The seat probes that read the process table rather than COM, stubbed;
+    ``identity`` is the module's connect-time cache."""
+    monkeypatch.setattr(_seat_forensics, "_seat_identity", dict(identity))
+    monkeypatch.setattr(_seat_forensics, "_process_started_at", lambda pid: None)
+    monkeypatch.setattr(_seat_forensics, "_process_session_id", lambda pid: None)
+    monkeypatch.setattr(_seat_forensics, "_process_memory", lambda pid: (None, None))
+    monkeypatch.setattr(_seat_forensics, "_sldworks_pids", set)
+
+
+def test_inert_requests_replay_in_any_order(tmp_path, monkeypatch):
+    _stub_seat_probes(monkeypatch, {})
+    log, _, _, _ = _record(tmp_path, monkeypatch, variant="inert-ab")
+    inert = [c.site for c in conv.load(log).calls if c.origin is conv.Origin.INERT]
+    assert inert == [
+        "IApp.GetProcessID",
+        "IApp.RevisionNumber",
+        "IApp.GetCurrentWorkingDirectory",
+    ]
+    replayer, _, stop = _replay(log, tmp_path, monkeypatch, variant="inert-ba")
+    assert stop is None and replayer.finish()[0] is conv.Verdict.NOOP
+    report = replayer.inert_report()
+    assert (report["served"], report["unserved"], report["unconsumed"]) == (3, 0, 0)
+
+
+def test_the_same_reorder_in_build_code_diverges(tmp_path, monkeypatch):
+    log, _, _, _ = _record(tmp_path, monkeypatch, variant="direct-ab")
+    assert all(c.origin is conv.Origin.RECIPE for c in conv.load(log).calls)
+    replayer, _, stop = _replay(log, tmp_path, monkeypatch, variant="direct-ba")
+    assert stop is not None and stop.verdict is conv.Verdict.DIVERGED
+    divergence = stop.divergence.to_json()
+    assert divergence["field"] == "member"
+    assert (divergence["member_expected"], divergence["member_actual"]) == (
+        "IApp.GetProcessID",
+        "IApp.GetCurrentWorkingDirectory",
+    )
+    assert "test_com_conversation:_seat_calls" in divergence["caller_actual"]
+    assert "test_com_conversation:_seat_calls" in divergence["caller_expected"]
+    assert len(divergence["context"]) == 5
+    lines = leaf.render_k2(
+        {"pass": False, "verdict": "diverged", "divergence": divergence},
+        {"inert": replayer.inert_report()},
+    )
+    assert sum(line.startswith("    before: seq") for line in lines) == 5
+
+
+def test_a_connect_time_seat_cache_does_not_steer_the_replay(tmp_path, monkeypatch):
+    # Natively the seat identity is cached at connect, before the recording
+    # window opens; a replay process never connected, so it asks again.
+    _stub_seat_probes(
+        monkeypatch, {"seat_pid": 4242, "seat_pid_source": "GetProcessID"}
+    )
+    log, _, _, _ = _record(tmp_path, monkeypatch, variant="provenance")
+    inert = [c.site for c in conv.load(log).calls if c.origin is conv.Origin.INERT]
+    assert inert == ["IApp.GetCurrentWorkingDirectory"]
+    _stub_seat_probes(monkeypatch, {})
+    replayer, _, stop = _replay(log, tmp_path, monkeypatch, variant="provenance")
+    assert stop is None and replayer.finish()[0] is conv.Verdict.NOOP
+    report = replayer.inert_report()
+    assert [row["member"] for row in report["unserved_members"]] == [
+        "IApp.GetProcessID"
+    ]
+    assert (report["served"], report["unconsumed"]) == (1, 0)
+
+
+def test_inert_objects_have_their_own_handles(tmp_path, monkeypatch):
+    helper = tmp_path / "inert_probe.py"
+    helper.write_text(
+        "def probe(app):\n    return app.GetPart('probe').Volume\n", encoding="utf-8"
+    )
+    spec = importlib.util.spec_from_file_location("inert_probe", helper)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    inert_files = frozenset({os.path.normcase(str(helper))})
+    monkeypatch.setattr(conv, "_inert_files", lambda: inert_files)
+    monkeypatch.setattr(conv, "_ROLES", {})
+    plain, _, _, _ = _record(tmp_path / "plain", monkeypatch)
+    probed, _, _, _ = _record(tmp_path / "probed", monkeypatch, probe=module.probe)
+    inert = [c for c in conv.load(probed).calls if c.origin is conv.Origin.INERT]
+    assert inert and any(
+        c.result.get("h", 0) < 0 for c in inert if c.op == "InvokeTypes"
+    )
+    comparison = conv.compare_conversations(plain, probed)
+    assert comparison["request_divergence"] is None
+    assert comparison["inert_calls"] == [0, len(inert)]
+
+
+def test_k1_separates_request_divergence_from_response_differences(
+    tmp_path, monkeypatch
+):
+    base, _, _, _ = _record(tmp_path / "a", monkeypatch)
+    scaled, _, _, _ = _record(
+        tmp_path / "b", monkeypatch, server=FakeServer(volume_scale=2.0)
+    )
+    responses = conv.compare_conversations(base, scaled)
+    assert responses["request_divergence"] is None
+    assert responses["response_differences"] == {
+        "IPart.Volume": 1,
+        "CDispatch.Volume": 1,  # the byref child is wrapped late-bound
+    }
+    example = responses["response_examples"][0]
+    assert example["field"] == "result"
+    assert "test_com_conversation:scenario" in example["caller"]
+    extra, _, _, _ = _record(tmp_path / "c", monkeypatch, variant="extra")
+    requests = conv.compare_conversations(base, extra)
+    divergence = requests["request_divergence"]
+    assert divergence["field"] == "member" and divergence["member_actual"] == "IApp.Add"
+    assert len(divergence["context"]) == 5 and divergence["seq_new"] is not None
+    lines = leaf.render_k1({"pass": False, **requests})
+    assert lines[1] == "  REQUEST divergence:" and len(lines) < leaf._EVIDENCE_LINES
+
+
+def test_native_members_match_the_generated_wrapper():
+    from solidworks_mcp.adapters._generated import sldworks_2026 as wrapper
+
+    wrong = []
+    for interface, member, shape in leaf.NATIVE_MEMBERS:
+        cls = getattr(wrapper, interface)
+        method = callable(cls.__dict__.get(member))
+        actual = {
+            leaf.Shape.METHOD: method and member not in cls._prop_map_get_,
+            leaf.Shape.GET: member in cls._prop_map_get_ and not method,
+            leaf.Shape.PUT: member in cls._prop_map_put_,
+        }
+        if not actual[shape]:
+            wrong.append(f"{interface}.{member} is not a {shape.value}")
+    assert not wrong, wrong
 
 
 def test_ulp_control_log_diverges_at_the_perturbed_request(tmp_path, monkeypatch):
