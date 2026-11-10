@@ -905,14 +905,16 @@ async def build(adapter) -> dict[str, str]:
     # DRIVING "BoreAF" dimension linked to the configured "BoreAF" global.
     # The flat's squareness to that centreline (the phase-0 tooth's) comes
     # from the vertical relation; the DRIVEN angular BoreFlatClock between
-    # the flat and the centreline carries FLAT_CLOCK_TOLERANCE_DEG (the
-    # cylinder gear's NotchPhase precedent).  No fix anywhere: a fix drives
-    # the dimensions and kills their configuration links.
+    # the flat and a construction ray continuing the centreline past the
+    # flat (+X) carries FLAT_CLOCK_TOLERANCE_DEG (the cylinder gear's
+    # NotchPhase precedent).  No fix anywhere: a fix drives the dimensions
+    # and kills their configuration links.
     #
-    # DOF: arc 5 + flat 4 + centreline 4 = 13 = centre on origin 2 +
+    # DOF: arc 5 + flat 4 + centreline 4 + ray 4 = 17 = centre on origin 2 +
     # diameter 1 + flat vertical 1 + two end joins 4 + centreline horizontal
     # 1 + its start on the arc 1 + its start level with the origin 1 + its
-    # end on the flat 1 + BoreAF 1.
+    # end on the flat 1 + BoreAF 1 + ray start on the centreline's end 2 +
+    # ray horizontal 1 + ray equal to the centreline 1.
     #
     # Both bores MUST precede the circular pattern: cut AFTER the pattern,
     # the same recipe solves to nothing in every configuration whose
@@ -980,33 +982,36 @@ async def build(adapter) -> dict[str, str]:
         "bore across-flat",
     )
     bore.record("BoreAF", '"BoreAF"')
-    # Created inside the right angle the flat makes above the -X centreline,
-    # then turned to its supplement: the angle between the flat's upper half
-    # and the centreline's +X extension, the quadrant every D sheet prints
-    # (draw_dt_cone_gear._sweep_clock_right_of_flat, whose first flip from the
-    # created quadrant lands there).  A sheet-side flip of this model
-    # dimension did not survive the drawing's settling rebuild once the D was
-    # live, and never flipped, in the keyed configurations and T120
-    # (drawing:dt_cone_gear at 5994f29, T006-T024), so the model carries the
-    # printed quadrant and the sheets import it as is.  Either reading is 90 deg.
-    flat_clock = await add_angular_reference_dimension(
+    # The clock is authored in the quadrant every D sheet prints: between the
+    # flat's upper half and a construction ray from the flat/axis crossing
+    # along +X, text right of the flat and above the axis.  Against the -X
+    # centreline (main's form) it imported between the flat and that
+    # centreline and each sheet flipped it (SupplementaryAngle); drawing:
+    # dt_cone_gear at 5994f29 and 5a4e41cb5 drew all four D sheets' flips
+    # back after the settling rebuild, and a model-side SupplementaryAngle did
+    # not change the imported quadrant.  The ray starts on the centreline's
+    # end, runs horizontal and is as long as the centreline (no dimension).
+    # Either reading is 90 deg.
+    set_sketch_direct_db(adapter, True)
+    clock_ray = check(
+        "bore clock ray",
+        await adapter.add_centerline(flat_x, 0.0, flat_x + bore_af_default_in * MM_PER_IN, 0.0),
+    )
+    set_sketch_direct_db(adapter, False)
+    for label, first, second, relation in (
+        ("clock ray starts at the flat/axis crossing", f"{clock_ray}.start", f"{clock_line}.end", "coincident"),
+        ("clock ray horizontal", clock_ray, None, "horizontal"),
+        ("clock ray as long as the centreline", clock_ray, clock_line, "equal"),
+    ):
+        check(label, await adapter.add_sketch_constraint(first, second, relation))
+    await add_angular_reference_dimension(
         adapter,
         bore_flat,
-        clock_line,
-        (flat_x - 0.3 * bore_radius, 0.4 * flat_half),
+        clock_ray,
+        (flat_x + 0.3 * bore_radius, 0.4 * flat_half),
         "bore flat clock",
         expected_degrees=90.0,
     )
-    if not flat_clock.SupplementaryAngle():
-        raise RuntimeError("bore flat clock: SupplementaryAngle refused")
-    flat_clock_value = abs(float(_read_member(
-        _early_bound(flat_clock.GetDimension2(0), "IDimension"), "SystemValue"
-    )))
-    if abs(flat_clock_value - math.pi / 2.0) > 1e-8:
-        raise RuntimeError(
-            f"bore flat clock reads {math.degrees(flat_clock_value):.6f} deg after "
-            "its supplement, not 90"
-        )
     bore.record("BoreFlatClock")
     await ensure_fully_defined(adapter, "bore D sketch")
     check("exit_sketch bore", await adapter.exit_sketch())

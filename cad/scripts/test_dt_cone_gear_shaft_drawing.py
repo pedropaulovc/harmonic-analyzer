@@ -208,10 +208,18 @@ def test_the_d_sections_print_the_corner_limit_clock_and_mates(monkeypatch):
     monkeypatch.setattr(drawing, "_cut_endpoints", lambda *_a: ((0.0, 0.0), (1.0, 0.0)))
     monkeypatch.setattr(drawing, "create_section_view", lambda *_a, label, **_k: label)
     monkeypatch.setattr(drawing, "_prepare_d_section", lambda *_a: None)
-    monkeypatch.setattr(drawing, "_keyseat_width_text_position", lambda *_a: (0.0, 0.0))
     monkeypatch.setattr(
-        drawing, "curate_view_dimensions", lambda _a, _view, *, keep, **_k: list(keep)
+        drawing, "_keyseat_side_x", lambda _a, _view, section, _sign: section.centre[0] + 0.0095
     )
+    keeps = []
+    monkeypatch.setattr(
+        drawing,
+        "curate_view_dimensions",
+        lambda _a, _view, *, keep, **_k: keeps.append(dict(keep)) or list(keep),
+    )
+    inside = []
+    monkeypatch.setattr(drawing, "_set_arrows_inside", lambda dimension, _label: inside.append(dimension))
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
     monkeypatch.setattr(drawing, "dimension_name", lambda _a, dimension: dimension)
     monkeypatch.setattr(drawing, "_delete_centre_mark", lambda *_a: None)
     monkeypatch.setattr(drawing, "_section_face", lambda *_a: (0.0, 0.0, 1.0, 1.0))
@@ -235,6 +243,17 @@ def test_the_d_sections_print_the_corner_limit_clock_and_mates(monkeypatch):
         ["Sec1KeyseatWidth"], *([f"Sec{land}AF"] for land in (2, 3, 4))
     ]
     assert len({texts[names[0]] for names, texts in suffixes}) == 1
+    # A-A (machinist review of 5a4e41cb5f, clarity): the width's line rises at
+    # the keyseat's edge, the S text steps away from it and the S arrows
+    # stand inside, so neither crosses the other.
+    a_section = drawing.D_SECTIONS[0]
+    assert keeps[0]["Sec1KeyseatWidth"] == (
+        a_section.centre[0] + 0.0095, a_section.centre[1] + drawing.KEYSEAT_WIDTH_RISE
+    )
+    assert keeps[0]["Sec1KeyseatS"] == (
+        a_section.centre[0] - drawing.KEYSEAT_S_SHIFT, a_section.centre[1] + 0.017
+    )
+    assert inside == ["Sec1KeyseatS"]
 
 
 def test_every_tight_band_names_its_mate_and_fit_route():
@@ -270,8 +289,10 @@ def test_every_tight_band_names_its_mate_and_fit_route():
     assert notes[2].startswith("   ")
     for mate in ("dt-cone-gear", "dt-crank-drive-gear", "dt-vn-cone-tip-collar"):
         assert _config.parts(mate)["number"] in land_note
-    # Land 1's key (owner decision 2026-11-09, PR #1992) by its number.
-    assert "MHA-DT-VN-71" in notes[0]
+    # Land 1's members named plainly (machinist review of 5a4e41cb5f: no
+    # undefined T030-T120 code) and its key by its number (PR #1992).
+    assert "30T-120T GEARS" in notes[0] and "T030" not in land_note
+    assert "KEY MHA-DT-VN-71" in land_note
     assert "CLEARANCE" in land_note
     # The three-place lengths name the stack they set once (rule 4).
     for mate in ("dt-cone-gear", "dt-crank-drive-gear"):
@@ -928,6 +949,21 @@ def test_each_d_section_cuts_its_own_land_clear_of_its_neighbours() -> None:
             assert rider[2] < cell[0] or cell[2] < rider[0] or rider[3] < cell[1] or (
                 cell[3] < rider[1]
             ), (rider, cell)
+    # The width's line rises at the keyseat's edge.  The S text (5a4e41cb5f
+    # r3 layout audit: 0.3227..0.3501 about its 0.3371 position, 14.4 mm left
+    # and 13.0 mm right) steps away from it, ending CLEAR_GAP_M plus 1 mm short
+    # of that line, its left end clear of the Ø.4825 block (<= 0.3111, above);
+    # with its arrows inside, its dimension line ends at the floor's
+    # extension line, inside the land's edge.
+    keyseat_x = keyed.centre[0] + keyed_half
+    s_x = keyed.centre[0] - drawing.KEYSEAT_S_SHIFT
+    assert s_x + 0.0130 <= keyseat_x - CLEAR_GAP_M - 0.001
+    assert s_x - 0.0144 >= 0.3111 + CLEAR_GAP_M
+    floor_x = keyed.centre[0] + (
+        cone_land_key.KEYSEAT_FLOOR_OFFSET_MM / 1000.0 * keyed.scale[0] / keyed.scale[1]
+    )
+    assert floor_x < keyseat_x
+    assert drawing.ARROWS_INSIDE == 0
 
 
 # How far past its line a detail cutting line's letter reaches toward the big

@@ -432,7 +432,8 @@ D_SECTIONS = (
         (20, 1),
     ),
 )
-# The dimensions each section prints; the first is centred over its section.
+# The dimensions each section prints; the first is centred over its section
+# (A-A's S shifted at build time, below).
 SECTION_DIMENSION_NAMES = {
     KEYED_LAND: ("Sec1KeyseatS", "Sec1KeyseatWidth"),
     **{land: (f"Sec{land}AF",) for land in FLAT_LANDS},
@@ -441,6 +442,18 @@ D_SECTION_KEEP = {
     SECTION_DIMENSION_NAMES[section.land][0]: (section.centre[0], section.centre[1] + 0.017)
     for section in D_SECTIONS
 }
+# A-A's S text steps KEYSEAT_S_SHIFT away from the keyseat, and its arrows
+# stand inside its extension lines (swDimensionArrowsSide_e.swDimArrowsInside),
+# so the keyseat width's dimension line, rising at the keyseat's edge, crosses
+# neither the S text nor its dimension line.  Machinist review of 5a4e41cb5f
+# r3 (clarity, gating) and its layout audit measured the collision: the width
+# line at x 0.3466 ran through the S band text (0.3227..0.3501, centred 1.4
+# mm off its 0.3371 position) and its outside arrow's line out to 0.3513.  At
+# 7.0 mm off, the S text ends 0.3431, 3.5 mm short of the width line; inside
+# arrows end its dimension line at the floor's extension line, 0.3449.  Its
+# left end, 0.3157, stays 8 mm right of the Ø.4825 block (~0.307).
+KEYSEAT_S_SHIFT = 0.0070
+ARROWS_INSIDE = 0  # swDimensionArrowsSide_e.swDimArrowsInside
 # The keyseat width's text: KEYSEAT_WIDTH_RISE above the section centre, at
 # the keyseat side's sheet x.  A vertical dimension's line stands at its
 # text's left edge, so the text runs right from the keyseat: the PR #2331
@@ -1187,7 +1200,11 @@ def _add_d_sections(
         names = SECTION_DIMENSION_NAMES[section.land]
         keep = {names[0]: D_SECTION_KEEP[names[0]]}
         if section.land == KEYED_LAND:
-            keep[names[1]] = _keyseat_width_text_position(adapter, view, section, sign)
+            keyseat_x = _keyseat_side_x(adapter, view, section, sign)
+            s_x, s_y = keep[names[0]]
+            away = -math.copysign(KEYSEAT_S_SHIFT, keyseat_x - section.centre[0])
+            keep[names[0]] = (s_x + away, s_y)
+            keep[names[1]] = (keyseat_x, section.centre[1] + KEYSEAT_WIDTH_RISE)
         dimensions = curate_view_dimensions(
             adapter,
             view,
@@ -1218,22 +1235,32 @@ def _add_d_sections(
                 )
             if name in FLAT_MATE_SUFFIXES:
                 _set_dimension_suffixes(adapter, [dimension], {name: FLAT_MATE_SUFFIXES[name]})
+        if section.land == KEYED_LAND:
+            _set_arrows_inside(kept[0], f"section {section.label} {names[0]}")
+            rebuild_drawing(adapter, label=f"section {section.label} arrows inside")
         placed.append(PlacedSection(section, view, face, kept, caption))
     return placed
 
 
-def _keyseat_width_text_position(
-    adapter: Any, view: Any, section: DSection, sign: int
-) -> tuple[float, float]:
-    """Sheet position of the keyseat width's text: above the S line, over the
-    land's +X edge, where the keyseat is (the section states which side)."""
+def _set_arrows_inside(raw: Any, label: str) -> None:
+    """Put a dimension's arrows inside its extension lines and read it back."""
+    annotation = _early_bound(raw, "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    display.ArrowSide = ARROWS_INSIDE
+    if int(display.ArrowSide) != ARROWS_INSIDE:
+        raise RuntimeError(f"{label}: arrows did not move inside")
+
+
+def _keyseat_side_x(adapter: Any, view: Any, section: DSection, sign: int) -> float:
+    """Sheet x of the land's +X edge on its section, where the keyseat is
+    (the section states which side)."""
     (keyseat,) = model_points_in_view(
         adapter,
         view,
         ((SECTION_DIAS[section.land] / 2000.0, 0.0, sign * section.station_mm / 1000.0),),
         label=f"section {section.label} keyseat side",
     )
-    return keyseat[0], section.centre[1] + KEYSEAT_WIDTH_RISE
+    return keyseat[0]
 
 
 def _section_face(adapter: Any, view: Any, section: DSection, sign: int) -> Box:

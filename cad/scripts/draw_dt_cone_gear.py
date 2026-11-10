@@ -286,9 +286,9 @@ CENTER_MARK_SINGLE = 2  # swCenterMarkStyle_e.swCenterMark_Single
 # leader's shoulder (T030-T120, run 20260929T064504232Z).
 # ``_sweep_clock_right_of_flat`` flips it into the quadrant right of the
 # flat (keyway top) and above the axis; the D's BoreFlatClock is authored
-# there (build_dt_cone_gear), so its sheets import it with no flip. Its arc
-# may overrun the flat or the axis by CLOCK_ARC_OVERRUN and must centre on
-# the flat/axis crossing within CLOCK_ARC_CENTRE_TOL (sheet metres).
+# against a +X ray there (build_dt_cone_gear), so it imports with no flip.
+# A clock's arc may overrun the flat or the axis by CLOCK_ARC_OVERRUN and must
+# centre on the flat/axis crossing within CLOCK_ARC_CENTRE_TOL (sheet metres).
 CLOCK_ARC_OVERRUN = 0.0003
 CLOCK_ARC_CENTRE_TOL = 0.0005
 CLOCK_FLIPS = ("SupplementaryAngle", "VerticallyOppositeAngle", "SupplementaryAngle")

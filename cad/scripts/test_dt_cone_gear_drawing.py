@@ -1388,18 +1388,55 @@ def test_enlarged_views_are_lettered_with_boundaries_on_the_front_view() -> None
 
 
 def test_the_d_clock_is_authored_in_the_quadrant_its_sheets_print() -> None:
-    """drawing:dt_cone_gear at 5994f29: each D sheet's sheet-side flip of
-    BoreFlatClock read right at the sweep, then the settling rebuild drew all
-    four (T006-T024) back in the sketch's quadrant (arcs 22.6..180 deg),
-    while the keyed sheets, whose owner is suppressed wherever no sheet flips
-    it, held. The model now carries the printed quadrant: the D's clock is
-    turned to its supplement (90 deg either way) before the sketch closes."""
-    build = inspect.getsource(part.build)
-    created = build.index('"bore flat clock"')
-    turned = build.index("flat_clock.SupplementaryAngle()", created)
-    assert turned < build.index('bore.record("BoreFlatClock")') < build.index(
-        'ensure_fully_defined(adapter, "bore D sketch")'
+    """drawing:dt_cone_gear at 5994f29 and 5a4e41cb5: each D sheet imported
+    BoreFlatClock between the flat and the -X centreline (arcs 90..180 deg),
+    flipped it right of the flat (0..90 deg), and the settling rebuild drew
+    all four (T006-T024) back; a model-side SupplementaryAngle left the
+    import unchanged. The clock is now dimensioned against a construction
+    ray from the flat/axis crossing along +X, its text right of the flat and
+    above the axis, so the sketch's own quadrant is the printed one."""
+    import ast
+
+    tree = ast.parse(inspect.getsource(part.build).lstrip())
+    calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)]
+
+    def call_named(name: str, label: str) -> ast.Call:
+        found = [
+            call for call in calls
+            if ast.unparse(call.func).endswith(name)
+            and any(isinstance(a, ast.Constant) and a.value == label for a in ast.walk(call))
+        ]
+        assert len(found) == 1, (name, label)
+        return found[0]
+
+    ray = next(
+        call.args[1] for call in calls
+        if ast.unparse(call.func) == "check"
+        and isinstance(call.args[0], ast.Constant) and call.args[0].value == "bore clock ray"
     )
+    ray_call = ray.value if isinstance(ray, ast.Await) else ray
+    assert ast.unparse(ray_call.func).endswith("add_centerline")
+    x0, y0, x1, y1 = (ast.unparse(arg) for arg in ray_call.args)
+    # From the flat/axis crossing, along +X, on the axis.
+    assert (x0, y0, y1) == ("flat_x", "0.0", "0.0")
+    assert x1.startswith("flat_x + ")
+    relations = {
+        tuple(ast.unparse(item) for item in row.elts[1:])
+        for row in ast.walk(tree)
+        if isinstance(row, ast.Tuple) and len(row.elts) == 4
+        and isinstance(row.elts[0], ast.Constant) and "clock ray" in str(row.elts[0].value)
+    }
+    assert relations == {
+        ("f'{clock_ray}.start'", "f'{clock_line}.end'", "'coincident'"),
+        ("clock_ray", "None", "'horizontal'"),
+        ("clock_ray", "clock_line", "'equal'"),
+    }
+    clock = call_named("add_angular_reference_dimension", "bore flat clock")
+    first, second, text = (ast.unparse(arg) for arg in clock.args[1:4])
+    assert (first, second) == ("bore_flat", "clock_ray")
+    # Text right of the flat and above the axis: that quadrant is the clock.
+    assert text == "(flat_x + 0.3 * bore_radius, 0.4 * flat_half)"
+    assert not any(ast.unparse(call.func).endswith("SupplementaryAngle") for call in calls)
     assert drawing.clock_dimension_name(6) == "BoreFlatClock"
 
 
