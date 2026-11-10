@@ -260,6 +260,8 @@ def inputs(dodo, tmp_path, monkeypatch):
         "machinist_review_judge_schema.json",
         "machinist_review_precheck.md",
         "machinist_review_precheck_schema.json",
+        "machinist_review_change_gate.md",
+        "machinist_review_change_gate_schema.json",
     ):
         (prompts / name).write_text("{}", encoding="utf-8")
     guidelines = root / "cad" / "docs" / "drawing-guidelines.md"
@@ -357,6 +359,9 @@ def test_dependency_manifest_edits_rekey_review(inputs, manifest):
         "cad/config/identity-migration-map.json",
         "cad/scripts/prompts/machinist_review_precheck.md",
         "cad/scripts/prompts/machinist_review_precheck_schema.json",
+        # The shadow drawing-change gate never keys the review either.
+        "cad/scripts/prompts/machinist_review_change_gate.md",
+        "cad/scripts/prompts/machinist_review_change_gate_schema.json",
     ],
 )
 def test_bypassed_precheck_inputs_do_not_invalidate_forced_review_cache(
