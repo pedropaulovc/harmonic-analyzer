@@ -178,6 +178,21 @@ def test_fit_up_adjustments_are_complete_and_ordered_before_installation() -> No
         0.001 * IN,
     )
     assert f"REPEAT FROM STEP {steps.step_number('guides-screwed')}" in lock_step
+    # #2335: the gap is the rail's depth less the bar's, so facing the rail's
+    # back closes it. The loop faces an over gap by its reading less a target
+    # inside the window and replaces the rail only when a gap ends under it
+    # (over-faced); the old text faced under gaps and replaced over ones.
+    low, high = (f"{float(v):.3f}".lstrip("0") for v in float_window.groups())
+    face = re.search(
+        rf"\bIF A GAP IS OVER {high}, REMOVE THE LOCKS\b.*"
+        rf"\bBACK FACE UNDER EACH LOCK THAT READ OVER {high} BY ITS GAP LESS (\.\d+)\.",
+        lock_step,
+    )
+    assert face is not None
+    assert guide.LOCK_GAP_FIT[0] < float(face.group(1)) * IN < guide.LOCK_GAP_FIT[1]
+    assert f"IF A GAP IS STILL OVER {high}, REPEAT " in lock_step
+    assert re.search(rf"\bIF A GAP IS UNDER {low}, REPLACE THAT GUIDE\b", lock_step)
+    assert "OVER THE WINDOW, REPLACE" not in lock_step
 
     cut_step = printed_step("disc-screws-cut")
     assert drawing.BOM_PART_NUMBERS["pd-vn-transgear-disc-screw"] in cut_step
