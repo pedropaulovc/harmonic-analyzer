@@ -83,7 +83,7 @@ resolution_mm = 0.005
 
 # PM-30MV X DRO scale read as a length gauge (feed-lever length, hand sheet
 # TL-26 Setup B). Range: machines.pm-30mv X travel; resolution: archive
-# machines PM-30MV EL400-class DRO resolution_mm.
+# installed MagXact MX-100M DRO, 5 um scales (owner-confirmed 2026-10-27).
 [gauges.mill-x-dro]
 range_mm = [0.0, 584.2]
 resolution_mm = 0.005
