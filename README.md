@@ -177,8 +177,9 @@ Without a seat you can still run the offline gates
 glTF exports plus the drawing PDFs.
 
 Drawing-bound requirement manifests are exported with named STEP face sets.
-`prechips:<stem>` tasks render a standalone HTML
-[prechips](https://github.com/pedropaulovc/prechips) traveler for each part
+`prechips:<stem>` tasks render two standalone HTML
+[prechips](https://github.com/pedropaulovc/prechips) travelers (a concise `pro`
+sheet and a `hobby` sheet with setup pictures) for each part
 in `_process_plans.TRAVELER_STEMS` (the oblique-trammel base bar and end
 bracket) from its `cad/process/<stem>/plan.toml`, which reads that part's
 exported manifest. Only exit 0 passes the build and release gates, and releases

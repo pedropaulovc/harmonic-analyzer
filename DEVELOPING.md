@@ -306,18 +306,20 @@ completed
 
 `prechips:<stem>` tasks run on the submitter, including when SolidWorks leaves
 run on the farm. They need nothing beyond the locked Python environment:
-prechips is a stdlib-only PyPI dependency (`prechips>=0.9,<10`), with no
+prechips is a stdlib-only PyPI dependency (`prechips>=0.9`), with no
 FreeCAD, geometry kernel or network access. The lock resolves the latest
-release; bump it with `uv lock --upgrade-package prechips`. To render one
-traveler outside doit, after its scoped feature bundle exists:
+release; bump it with `uv lock --upgrade-package prechips`. To render a part's
+two travelers (`traveler.html` under `--profile pro`, `traveler-hobby.html`
+under `--profile hobby` with setup pictures) outside doit, after its scoped
+feature bundle exists:
 
 ```text
 uv run --frozen python cad/scripts/prechips_traveler.py <stem>
 ```
 
-Only exit 0 is success. Exit 2 is a refusal (bad input or a failed enforced
-check) and leaves no `traveler.html`. Plan authoring and the shop files are
-described in [`cad/process/README.md`](cad/process/README.md).
+Only exit 0 from both profiles is success. Exit 2 from either is a refusal (bad
+input or a failed enforced check) and leaves neither file. Plan authoring and
+the shop files are described in [`cad/process/README.md`](cad/process/README.md).
 
 ## Local pytest timing
 

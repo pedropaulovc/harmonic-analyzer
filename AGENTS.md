@@ -491,24 +491,30 @@ table and each feature's face set against that STEP; neither it nor
 
 Each part in `_process_plans.TRAVELER_STEMS` (the oblique-trammel base bar and
 end bracket) has a `prechips:<stem>` task. It runs
-`cad/scripts/prechips_traveler.py <stem>`, which calls
-`python -m prechips traveler cad/process/<stem>/plan.toml --profile pro` and
-writes one standalone `cad/out/travelers/<stem>/traveler.html`. prechips is a
-stdlib-only PyPI dependency (`prechips>=0.9,<10`; the lock resolves the latest
+`cad/scripts/prechips_traveler.py <stem>`, which runs
+`python -m prechips traveler cad/process/<stem>/plan.toml` twice from the same
+plan: `--profile pro` writes `cad/out/travelers/<stem>/traveler.html` and
+`--profile hobby` writes `traveler-hobby.html` with the plan's setup pictures
+(`cad/process/<stem>/diagrams/*.svg`, which are task inputs). prechips is a
+stdlib-only PyPI dependency (`prechips>=0.9`; the lock resolves the latest
 release, bump it with `uv lock --upgrade-package prechips`): no FreeCAD, no
 geometry kernel, no report or hash certificate. The plan reads its CAD values
 from the part's `features.toml` and its machines, tools, settings and gauges
-from `cad/process/shop.toml`. Only exit 0 passes; exit 2 is a refusal (bad input
-or a failed enforced check) and writes nothing. Each task depends only on its own
+from `cad/process/shop.toml`. Only exit 0 from both profiles passes; exit 2 from
+either is a refusal (bad input or a failed enforced check) and leaves neither
+file nor a stamp. Each task depends only on its own
 `package:features:<stem>` leaf, is not cache-keyed, and `build` and `release`
 require every enrolled stem. A stem without a plan fails only its own task.
-Under prechips 0.9 the base bar and end bracket pass on the v48 manifests. The
-feed lever's plan is held, unenrolled: prechips refuses it on `tool_sizing`
-(see `cad/process/README.md`). prechips adapters are tied to the manifest's
+Under prechips 0.9 the base bar passes both profiles on the v48 manifest. The
+end bracket passes `pro` and refuses `hobby` until its setup diagrams land in
+`cad/process/ch_rocker_arm_tl_oblique_end_bracket/diagrams/`. The feed lever's
+plan is held, unenrolled: prechips refuses it on `tool_sizing` (see
+`cad/process/README.md`). prechips adapters are tied to the manifest's
 contents, so a drawing change that alters a part's manifest requirements needs
 a prechips adapter release before that part's traveler passes again.
 A generated traveler is not machining approval.
-Releases ship each `travelers/<stem>/traveler.html` and list them in the notes.
+Releases ship each part's `travelers/<stem>/traveler.html` and
+`traveler-hobby.html` and list them in the notes.
 See [feature exports and travelers](cad/docs/pipeline/features-travelers.md).
 
 - `build` is the **one** fully-safe entry: every part + assembly + every gate.

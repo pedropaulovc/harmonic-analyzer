@@ -4614,7 +4614,12 @@ def test_prechips_task_shape_and_complete_dependency_closure(synthetic_prechips_
     assert str(unrelated.resolve()) not in deps
     assert str(step.resolve()) not in deps
     stamp = str(dodo.REPORTS / f"prechips-{stem}.ok")
-    assert task["targets"] == [stamp, str(plans.traveler_html(stem, dodo.CAD_OUT))]
+    assert task["targets"] == [
+        stamp, *(str(path) for path in plans.traveler_paths(stem, dodo.CAD_OUT)),
+    ]
+    assert [Path(target).name for target in task["targets"][1:]] == [
+        "traveler.html", "traveler-hobby.html",
+    ]
     assert task["targets"] == dodo._canonical_targets(f"prechips:{stem}")
     assert "uptodate" not in task
     clear, (action, args) = task["actions"]

@@ -22,7 +22,7 @@ Task groups (the prefix says whether SolidWorks is required):
   verify:<suite>     soundness/subsystems/kinematics gates (COM)
   check:<name>       math/config/graph/nameplate/recipe gates (NO SolidWorks)
   check:machinist_review:<stem> cached blind reviews + judge (NO SolidWorks)
-  prechips:<stem>    standalone HTML manufacturing traveler (NO SolidWorks)
+  prechips:<stem>    pro + hobby HTML manufacturing travelers (NO SolidWorks)
   export             neutral STEP/STL/glTF/scene export (COM)
   release            cut a tagged GitHub release (COM + gh; opt-in)
   build              EVERY part + assembly + EVERY gate -- the one safe entry
@@ -4616,7 +4616,8 @@ def _prechips_task(stem: str) -> dict[str, Any]:
     return {
         "name": stem,
         "file_dep": sorted({
-            # The plan directory also holds the setup diagrams the plan embeds.
+            # The plan directory also holds the diagrams/*.svg setup pictures
+            # the hobby traveler embeds.
             *(str(path.resolve()) for path in plan.parent.rglob("*") if path.is_file()),
             str(_process_plans.SHOP_PATH.resolve()),
             str(manifest.resolve()),
@@ -4626,7 +4627,8 @@ def _prechips_task(stem: str) -> dict[str, Any]:
         }),
         "task_dep": [f"package:features:{stem}"],
         "targets": targets,
-        # A refusal must not leave a previous success's stamp beside no HTML.
+        # A refusal must not leave a previous success's stamp beside no HTML;
+        # the wrapper removes both HTML files itself.
         "actions": [
             (Path.unlink, [Path(targets[0])], {"missing_ok": True}),
             (_run_stamped, [cmd, label, targets[0], label]),
@@ -4637,7 +4639,7 @@ def _prechips_task(stem: str) -> dict[str, Any]:
 
 
 def task_prechips():
-    """SolidWorks-free prechips travelers for enrolled parts (one HTML each)."""
+    """SolidWorks-free prechips travelers for enrolled parts (pro and hobby HTML each)."""
     import _process_plans
 
     for stem in _process_plans.TRAVELER_STEMS:
@@ -5027,7 +5029,7 @@ def _canonical_targets(name: str) -> list[str]:
 
         return [
             str(REPORTS / f"prechips-{subname}.ok"),
-            str(_process_plans.traveler_html(subname, CAD_OUT)),
+            *(str(path) for path in _process_plans.traveler_paths(subname, CAD_OUT)),
         ]
     if family == "package":
         if subname.startswith("features:"):
@@ -5250,8 +5252,9 @@ def canonical_target_owners(paths: Iterable[str] | None = None) -> dict[str, str
     if (
         queried_namespace(traveler_root)
         or traveler_stamp
+        # Every traveler target is an .html file directly under its stem.
         or _ownership_namespace_has_aliases(
-            traveler_root, filenames=frozenset({"traveler.html"}),
+            traveler_root, filenames=frozenset(), suffixes=frozenset({".html"}),
         )
         or any(path.is_symlink() for path in REPORTS.glob("prechips-*.ok"))
     ):

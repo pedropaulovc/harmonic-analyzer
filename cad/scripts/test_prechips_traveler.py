@@ -1,12 +1,14 @@
 """Wrapper contracts against the installed prechips CLI, without SolidWorks.
 
-The plans here are literal-only (no ``[cad]`` table) under a custom profile
-with ``enforce = []``, so a real prechips run needs no feature export.
+The plans here are literal-only (no ``[cad]`` table). Real prechips runs map
+both traveler files to a custom profile with ``enforce = []``, so they need no
+feature export; the build's own pro/hobby mapping is checked by command shape.
 """
 
 from __future__ import annotations
 
 import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -47,30 +49,57 @@ def process(tmp_path, monkeypatch):
         plans.plan_path(stem).parent.mkdir(parents=True)
         plans.plan_path(stem).write_text(text, encoding="utf-8")
 
-    return tmp_path / "out", str(profile), author
+    def smoke_profiles() -> None:
+        monkeypatch.setattr(
+            plans, "TRAVELER_PROFILES", {name: str(profile) for name in plans.TRAVELER_PROFILES},
+        )
+
+    return tmp_path / "out", smoke_profiles, author
 
 
-def test_literal_plan_writes_one_standalone_html(process):
-    out, profile, author = process
+def test_literal_plan_writes_both_standalone_travelers(process):
+    out, smoke_profiles, author = process
     author("smoke_part", _LITERAL_PLAN)
-    assert wrapper.main(["smoke_part", "--out", str(out), "--profile", profile]) == 0
-    html = plans.traveler_html("smoke_part", out)
-    assert "Smoke plate" in html.read_text(encoding="utf-8")
-    assert sorted(path.name for path in html.parent.iterdir()) == ["traveler.html"]
+    smoke_profiles()
+    assert wrapper.main(["smoke_part", "--out", str(out)]) == 0
+    paths = plans.traveler_paths("smoke_part", out)
+    for path in paths:
+        assert "Smoke plate" in path.read_text(encoding="utf-8")
+    assert sorted(path.name for path in paths[0].parent.iterdir()) == [
+        "traveler-hobby.html", "traveler.html",
+    ]
+    assert plans.traveler_complete("smoke_part", out)
 
 
-def test_refusal_propagates_and_removes_previous_html(process):
-    out, profile, author = process
+def test_refusal_propagates_and_removes_previous_travelers(process):
+    out, smoke_profiles, author = process
     author("refused_part", '[cad]\nfile = "missing.toml"\nadapter = "unsupported"\n')
-    html = plans.traveler_html("refused_part", out)
-    html.parent.mkdir(parents=True)
-    html.write_text("previous success", encoding="utf-8")
-    assert wrapper.main(["refused_part", "--out", str(out), "--profile", profile]) == 2
-    assert not html.exists()
+    smoke_profiles()
+    paths = plans.traveler_paths("refused_part", out)
+    paths[0].parent.mkdir(parents=True)
+    for path in paths:
+        path.write_text("previous success", encoding="utf-8")
+    assert wrapper.main(["refused_part", "--out", str(out)]) == 2
+    assert not any(path.exists() for path in paths)
+
+
+def test_hobby_refusal_removes_the_pro_traveler(process, monkeypatch):
+    out, _smoke_profiles, author = process
+    author("smoke_part", _LITERAL_PLAN)
+
+    def run(cmd, **kwargs):
+        if cmd[cmd.index("--profile") + 1] == "pro":
+            Path(cmd[cmd.index("--out") + 1]).write_text("pro", encoding="utf-8")
+            return subprocess.CompletedProcess(cmd, 0)
+        return subprocess.CompletedProcess(cmd, 2)
+
+    monkeypatch.setattr(wrapper.subprocess, "run", run)
+    assert wrapper.main(["smoke_part", "--out", str(out)]) == 2
+    assert not any(path.exists() for path in plans.traveler_paths("smoke_part", out))
 
 
 def test_missing_plan_fails_without_running_prechips(process, monkeypatch):
-    out, _profile, _author = process
+    out, _smoke_profiles, _author = process
     monkeypatch.setattr(
         wrapper.subprocess, "run",
         lambda *args, **kwargs: pytest.fail("prechips ran without a plan"),
@@ -79,8 +108,8 @@ def test_missing_plan_fails_without_running_prechips(process, monkeypatch):
     assert not plans.traveler_complete("unplanned_part", out)
 
 
-def test_build_runs_the_strict_pro_profile(process, monkeypatch):
-    out, _profile, author = process
+def test_build_runs_pro_then_hobby_from_the_same_plan(process, monkeypatch):
+    out, _smoke_profiles, author = process
     author("smoke_part", _LITERAL_PLAN)
     calls = []
 
@@ -90,8 +119,9 @@ def test_build_runs_the_strict_pro_profile(process, monkeypatch):
 
     monkeypatch.setattr(wrapper.subprocess, "run", run)
     assert wrapper.main(["smoke_part", "--out", str(out)]) == 0
-    (cmd,) = calls
-    assert cmd[1:5] == ["-m", "prechips", "traveler", str(plans.plan_path("smoke_part"))]
-    assert cmd[5:] == [
-        "--profile", "pro", "--out", str(plans.traveler_html("smoke_part", out)),
+    pro, hobby = plans.traveler_paths("smoke_part", out)
+    head = ["-m", "prechips", "traveler", str(plans.plan_path("smoke_part"))]
+    assert [cmd[1:] for cmd in calls] == [
+        [*head, "--profile", "pro", "--out", str(pro)],
+        [*head, "--profile", "hobby", "--out", str(hobby)],
     ]

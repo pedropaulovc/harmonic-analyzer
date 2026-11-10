@@ -256,9 +256,10 @@ def test_prechips_traveler_nonrecording_span_preserves_exit_code(
     plan = tmp_path / "plan.toml"
     plan.write_text("", encoding="utf-8")
     html = tmp_path / "traveler" / "traveler.html"
+    hobby = tmp_path / "traveler" / "traveler-hobby.html"
     monkeypatch.setattr(wrapper._telemetry, "set_service", lambda *args: None)
     monkeypatch.setattr(wrapper._process_plans, "plan_path", lambda *args: plan)
-    monkeypatch.setattr(wrapper._process_plans, "traveler_html", lambda *args: html)
+    monkeypatch.setattr(wrapper._process_plans, "traveler_paths", lambda *args: (html, hobby))
     calls = []
 
     def run(cmd, **kwargs):
@@ -273,7 +274,7 @@ def test_prechips_traveler_nonrecording_span_preserves_exit_code(
         raise SystemExit(wrapper.main(["ch_rocker_arm", "--out", str(tmp_path)]))
     assert caught.value.code == code
     assert calls[0][1:4] == ["-m", "prechips", "traveler"]
-    assert not html.exists()
+    assert not html.exists() and not hobby.exists()
 
 
 def _log_from_a_named_caller(message: str) -> None:

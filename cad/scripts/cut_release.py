@@ -33,7 +33,9 @@ What it does, in order:
      The independently produced feature bundles are checked for the same face
      labels and patch counts as the full STEPs, then copied intact under
      ``features/<stem>/`` with their own digest-bound adjacent STEP, and verified
-     strict travelers for every enrolled plan under ``travelers/<stem>/``.
+     travelers for every enrolled plan under ``travelers/<stem>/`` (the strict
+     ``pro`` ``traveler.html`` and the ``hobby`` ``traveler-hobby.html`` with
+     setup pictures).
      Every DXF a drawing note names by bundle path (``_release_artwork``, e.g.
      ``pdf/fr-nameplate-outline.dxf``) is copied from its tracked source to that
      path, beside the PDFs; an unresolved or ambiguous name fails the cut.
@@ -1247,7 +1249,9 @@ def release_notes(version: str, facts: dict[str, Any]) -> str:
         f"- `png/` -- isometric preview renders "
         f"({facts['pngs']} images)\n"
         + (
-            "- `travelers/` -- standalone HTML prechips travelers: "
+            "- `travelers/` -- standalone HTML prechips travelers, each part's "
+            "`traveler.html` (pro) and `traveler-hobby.html` (hobby, with setup "
+            "pictures): "
             + ", ".join(f"`{path}`" for path in facts["travelers"])
             + "\n"
             if facts.get("travelers")

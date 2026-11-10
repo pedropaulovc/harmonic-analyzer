@@ -2,7 +2,8 @@
 
 Each enrolled part has an authored ``cad/process/<stem>/plan.toml`` that the
 installed prechips CLI renders, with the shared ``cad/process/shop.toml``, into
-one standalone ``traveler.html`` under ``cad/out/travelers/<stem>/``.
+two standalone HTML travelers under ``cad/out/travelers/<stem>/``: the concise
+``pro`` sheet and the ``hobby`` sheet with its setup pictures.
 """
 
 from __future__ import annotations
@@ -21,7 +22,12 @@ TRAVELER_STEMS: tuple[str, ...] = (
 )
 PROCESS_ROOT = Path(__file__).resolve().parents[1] / "process"
 SHOP_PATH = PROCESS_ROOT / "shop.toml"
-TRAVELER_NAME = "traveler.html"
+# Each traveler file and the built-in prechips profile it is rendered with,
+# from the same plan; ``pro`` first.
+TRAVELER_PROFILES: dict[str, str] = {
+    "traveler.html": "pro",
+    "traveler-hobby.html": "hobby",
+}
 
 
 def plan_path(stem: str) -> Path:
@@ -32,23 +38,25 @@ def traveler_dir(stem: str, out: Path = CAD_OUT) -> Path:
     return Path(out) / "travelers" / stem
 
 
-def traveler_html(stem: str, out: Path = CAD_OUT) -> Path:
-    return traveler_dir(stem, out) / TRAVELER_NAME
+def traveler_paths(stem: str, out: Path = CAD_OUT) -> tuple[Path, ...]:
+    """The part's traveler files, in ``TRAVELER_PROFILES`` order."""
+    return tuple(traveler_dir(stem, out) / name for name in TRAVELER_PROFILES)
 
 
 def traveler_complete(stem: str, out: Path = CAD_OUT) -> bool:
-    return traveler_html(stem, out).is_file()
+    return all(path.is_file() for path in traveler_paths(stem, out))
 
 
 def stage_travelers(out: Path, stage: Path) -> list[Path]:
-    """Copy every enrolled traveler into the release stage, failing on a missing one."""
+    """Copy every enrolled part's travelers into the release stage, failing on a missing one."""
     import _telemetry
 
     with _telemetry.span("release.travelers_stage", stems=len(TRAVELER_STEMS)):
         missing = [
-            str(traveler_html(stem, out))
+            str(path)
             for stem in TRAVELER_STEMS
-            if not traveler_complete(stem, out)
+            for path in traveler_paths(stem, out)
+            if not path.is_file()
         ]
         if missing:
             raise FileNotFoundError(
@@ -57,8 +65,9 @@ def stage_travelers(out: Path, stage: Path) -> list[Path]:
             )
         staged = []
         for stem in TRAVELER_STEMS:
-            target = traveler_html(stem, stage)
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(traveler_html(stem, out), target)
-            staged.append(target.parent)
+            target = traveler_dir(stem, stage)
+            target.mkdir(parents=True, exist_ok=True)
+            for path in traveler_paths(stem, out):
+                shutil.copyfile(path, target / path.name)
+            staged.append(target)
         return staged

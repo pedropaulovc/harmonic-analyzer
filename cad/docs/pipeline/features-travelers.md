@@ -262,41 +262,51 @@ uv run --frozen python -m doit prechips:<stem>
 ```
 
 The task runs `cad/scripts/prechips_traveler.py <stem>`, which removes any
-previous `cad/out/travelers/<stem>/traveler.html` and then runs:
+previous `traveler.html` and `traveler-hobby.html` under
+`cad/out/travelers/<stem>/` and then renders both from the same plan:
 
 ```text
 python -m prechips traveler cad/process/<stem>/plan.toml --profile pro --out cad/out/travelers/<stem>/traveler.html
+python -m prechips traveler cad/process/<stem>/plan.toml --profile hobby --out cad/out/travelers/<stem>/traveler-hobby.html
 ```
 
-It returns prechips' exit code unchanged. The task is SolidWorks-free,
-submitter-only (including under the farm executor) and not remote-cache-keyed.
-Its only task dependency is its own `package:features:<stem>` leaf. Its file
-dependencies are every file in the plan directory, `cad/process/shop.toml`, the
-scoped `features.toml`, `pyproject.toml`, `uv.lock` and the wrapper's script
-closure. Its targets are the stamp `cad/out/reports/prechips-<stem>.ok` and
-`traveler.html`; the stamp is removed before each run so a refusal never leaves
-an old stamp. If `cad/process/<stem>/plan.toml` is missing, the graph still
-loads and only that task fails, naming the missing plan.
+If either run exits nonzero, the wrapper removes both files and returns that
+exit code; the hobby run starts only after the pro run passes. The task is
+SolidWorks-free, submitter-only (including under the farm executor) and not
+remote-cache-keyed. Its only task dependency is its own
+`package:features:<stem>` leaf. Its file dependencies are every file in the
+plan directory (including the `diagrams/*.svg` setup pictures the hobby sheet
+embeds), `cad/process/shop.toml`, the scoped `features.toml`, `pyproject.toml`,
+`uv.lock` and the wrapper's script closure. Its targets are the stamp
+`cad/out/reports/prechips-<stem>.ok`, `traveler.html` and
+`traveler-hobby.html`; the stamp is removed before each run so a refusal never
+leaves an old stamp. If `cad/process/<stem>/plan.toml` is missing, the graph
+still loads and only that task fails, naming the missing plan.
 
-| prechips exit | build/release gate | meaning |
+| prechips exit (either profile) | build/release gate | meaning |
 |---|---|---|
-| 0 | pass | `traveler.html` written |
-| 2 | fail, no stamp | refusal: bad input, or a failed enforced check (`stock_fit`, `turning_deflection`, `cutting_speeds`, `tool_sizing`, `indexing`, `gauge_capability`, `lathe_holding`, `machine_capacity`); nothing written |
-| other nonzero | fail, no stamp | consumer failure |
+| 0 from both | pass | `traveler.html` and `traveler-hobby.html` written |
+| 2 | fail, no stamp | refusal: bad input, or a failed enforced check (`stock_fit`, `turning_deflection`, `cutting_speeds`, `tool_sizing`, `indexing`, `gauge_capability`, `lathe_holding`, `machine_capacity`); neither file kept |
+| other nonzero | fail, no stamp | consumer failure; neither file kept |
 
-The `pro` profile enforces every check listed above. A refusal names the check;
-a pass prints no checker text on the sheet. The traveler is one standalone HTML
-file. It carries no report, hash or certificate, and a pass is not permission to
-machine: shop measurements, physical setup verification and machining approval
-remain human responsibilities.
+The `pro` profile enforces every check listed above and prints a concise sheet.
+The `hobby` profile prints the plan's setup pictures and requires one for every
+setup. A refusal names the check; a pass prints no checker text on the sheet.
+Each traveler is one standalone HTML file. It carries no report, hash or
+certificate, and a pass is not permission to machine: shop measurements,
+physical setup verification and machining approval remain human
+responsibilities.
 
 The `_run_stamped` → `_exec` path injects `TRACEPARENT` and service
 `prechips-traveler`; the wrapper continues the task trace with a
-`pipeline.prechips_traveler` span and a `prechips.traveler` span around the CLI.
+`pipeline.prechips_traveler` span and one `prechips.traveler` span per profile
+around the CLI.
 A missing plan or nonzero exit marks the pipeline span as failed.
 
-Current state: prechips 0.9 or later is required. The base bar and end bracket
-pass on the v48 manifests. The feed lever's plan refuses on `tool_sizing` (its
+Current state: prechips 0.9 or later is required. The base bar passes both
+profiles on the v48 manifest. The end bracket passes `pro` and refuses `hobby`
+until its setup diagrams land in its plan's `diagrams/`. The feed lever's plan
+refuses on `tool_sizing` (its
 11/32 drill is below the drawing's hole band) and is held out of
 `TRAVELER_STEMS` until that is resolved. prechips adapters are tied to the
 manifest's contents: a drawing change that alters a part's manifest
@@ -306,10 +316,10 @@ requirements needs a prechips adapter release before its traveler passes again.
 
 After staging the verified `features/` bundles, `cut_release.py` calls
 `_process_plans.stage_travelers(out, stage)` under `release.travelers_stage`.
-It copies each enrolled `cad/out/travelers/<stem>/traveler.html` to
-`travelers/<stem>/traveler.html` in the release ZIP, and fails naming every
-traveler that was not generated. `facts["travelers"]` records the staged
-paths and the release notes list them.
+It copies each enrolled part's `traveler.html` and `traveler-hobby.html` from
+`cad/out/travelers/<stem>/` to `travelers/<stem>/` in the release ZIP, and
+fails naming every traveler file that was not generated. `facts["travelers"]`
+records the staged directories and the release notes list them.
 
 The publisher's only tracked-source update is `cad/config/release.yaml`
 `next_revision`; it does not edit process plans. The generated-only follow-up

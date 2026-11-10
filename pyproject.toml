@@ -68,9 +68,10 @@ dependencies = [
     # drawing leaves as Temporal workflows to the SolidWorks build farm.
     "temporalio>=1.32",
     # Drawing-bound manufacturing travelers (SolidWorks-free prechips:<stem> tasks).
-    # Loose range: the lock resolves the latest release; bump it deliberately
-    # with `uv lock --upgrade-package prechips`.
-    "prechips>=0.8,<10",
+    # 0.9 adds the adapters for the enrolled parts' current manifests; no upper
+    # bound. The lock resolves the latest release; bump it deliberately with
+    # `uv lock --upgrade-package prechips`.
+    "prechips>=0.9",
 ]
 
 [dependency-groups]

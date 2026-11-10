@@ -766,22 +766,37 @@ def test_release_stages_baseline_but_never_seals_divergent_feature_producers(
 def test_release_stages_enrolled_travelers_after_feature_binding(
     feature_release: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    plans = cut_release._process_plans
+    monkeypatch.setattr(plans, "TRAVELER_STEMS", ("ch_rocker_arm",))
+    generated = plans.traveler_paths("ch_rocker_arm", feature_release)
+    generated[0].parent.mkdir(parents=True)
+    for path in generated:
+        path.write_bytes(f"verified {path.name}".encode())
+    real_stage = plans.stage_travelers
+
     def stage_travelers(out: Path, stage: Path) -> list[Path]:
         assert out == feature_release
         assert (stage / "features" / "ch_rocker_arm" / "features.toml").is_file()
-        traveler = stage / "travelers" / "ch_rocker_arm"
-        traveler.mkdir(parents=True)
-        (traveler / "traveler.html").write_bytes(b"verified strict traveler")
-        return [traveler]
+        return real_stage(out, stage)
 
-    monkeypatch.setattr(cut_release._process_plans, "stage_travelers", stage_travelers)
+    monkeypatch.setattr(plans, "stage_travelers", stage_travelers)
     zip_path, facts = cut_release.bundle("v38")
 
     assert facts["travelers"] == ["travelers/ch_rocker_arm"]
     with zipfile.ZipFile(zip_path) as archive:
-        assert archive.read("travelers/ch_rocker_arm/traveler.html") == (
-            b"verified strict traveler"
-        )
+        for name in ("traveler.html", "traveler-hobby.html"):
+            assert archive.read(f"travelers/ch_rocker_arm/{name}") == f"verified {name}".encode()
+
+
+def test_staging_refuses_a_part_missing_its_hobby_traveler(tmp_path: Path, monkeypatch) -> None:
+    plans = cut_release._process_plans
+    monkeypatch.setattr(plans, "TRAVELER_STEMS", ("ch_rocker_arm",))
+    pro, hobby = plans.traveler_paths("ch_rocker_arm", tmp_path / "out")
+    pro.parent.mkdir(parents=True)
+    pro.write_text("pro only", encoding="utf-8")
+    with pytest.raises(FileNotFoundError, match="traveler-hobby.html"):
+        plans.stage_travelers(tmp_path / "out", tmp_path / "stage")
+    assert not (tmp_path / "stage" / "travelers").exists()
 
 
 def test_release_never_seals_a_failed_traveler_verification(

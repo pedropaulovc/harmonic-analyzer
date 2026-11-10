@@ -548,6 +548,9 @@ def _case_enrolled_traveler_keeps_normal_loader_conversion(dodo, monkeypatch, tm
     source = tmp_path / stem / "plan.toml"
     source.parent.mkdir()
     source.write_text('features = "fixture"\n', encoding="utf-8")
+    diagram = source.parent / "diagrams" / "setup.svg"
+    diagram.parent.mkdir()
+    diagram.write_text("<svg/>", encoding="utf-8")
     shop = tmp_path / "shop.toml"
     shop.write_text("version = 1\n", encoding="utf-8")
     monkeypatch.setattr(_process_plans, "TRAVELER_STEMS", (stem,))
@@ -561,6 +564,10 @@ def _case_enrolled_traveler_keeps_normal_loader_conversion(dodo, monkeypatch, tm
         assert _record(selected[name]) == _record(normal[name])
     assert selected[f"prechips:{stem}"].task_dep == [f"package:features:{stem}"]
     assert str(source.resolve()) in selected[f"prechips:{stem}"].file_dep
+    assert str(diagram.resolve()) in selected[f"prechips:{stem}"].file_dep
+    assert [Path(target).name for target in selected[f"prechips:{stem}"].targets] == [
+        f"prechips-{stem}.ok", "traveler.html", "traveler-hobby.html",
+    ]
     owners = dodo.canonical_target_owners()
     for target in selected[f"prechips:{stem}"].targets:
         assert owners[_path_identity(_workspace_path(REPO_ROOT, target))] == f"prechips:{stem}"
@@ -827,7 +834,8 @@ def _case_alias_scan_covers_exact_declared_target_depth(dodo, ordinary, monkeypa
         ("features.toml", frozenset({"features.toml"}), frozenset({".step"})),
         ("ownership-probe.STEP", frozenset({"features.toml"}), frozenset({".step"})),
         ("ownership-probe-Installed.STEP", frozenset({"features.toml"}), frozenset({".step"})),
-        ("traveler.html", frozenset({"traveler.html"}), frozenset()),
+        ("traveler.html", frozenset(), frozenset({".html"})),
+        ("traveler-hobby.html", frozenset(), frozenset({".html"})),
     ):
         scanned.clear()
         children[:] = [entry(stem / filename, alias=True)]
