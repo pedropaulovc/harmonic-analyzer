@@ -141,7 +141,6 @@ from dt_cone_swing_platform_spec import (
     PIVOT_RELIEF_FIT_REQUIREMENT,
     POST_MOUNT_ENGAGEMENT_NOTE,
     POST_MOUNT_SPEC,
-    POST_MOUNT_STATION_TOL_MM,
     POST_MOUNT_TAP_DIA,
     SURFACE_FINISHES,
     TIP_DOWEL_FROM_HOLDDOWN,
@@ -921,29 +920,16 @@ async def build(adapter) -> dict[str, str]:
     # Hole Wizard owns the pivot-hole precision and native size callout.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     # The tip-block stacks run through the hold-down stations and the post
-    # taps, so those placement dimensions carry explicit bands instead of the
-    # general grade.
-    for dimension_name in ("HoldDownX", "HoldDownZ"):
-        set_dimension_symmetric_tolerance(
-            adapter,
-            "HoldDownHole",
-            dimension_name,
-            HOLDDOWN_STATION_TOL_MM,
-            display_unit=UNIT,
-        )
-    for dimension_name in (
-        "PostMountWestX",
-        "PostMountWestZ",
-        "PostMountEastX",
-        "PostMountEastZ",
-    ):
-        set_dimension_symmetric_tolerance(
-            adapter,
-            "PostMountHoles",
-            dimension_name,
-            POST_MOUNT_STATION_TOL_MM,
-            display_unit=UNIT,
-        )
+    # taps at +/-.005.  HoldDownZ and the post-tap stations print .XXX, whose
+    # title-block grade is that band (DRAWING_PRECISION); HoldDownX prints
+    # .XX, so it alone carries the band explicitly.
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "HoldDownHole",
+        "HoldDownX",
+        HOLDDOWN_STATION_TOL_MM,
+        display_unit=UNIT,
+    )
     # The tip-block locating dowel's station carries the hold-down's band
     # (the webs to its counterbore here and to MHA-DT-21's +X face close on
     # it); the slip ream its REAM_H7, at the nominal's four places.

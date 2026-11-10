@@ -723,9 +723,10 @@ def test_post_screw_engagement_note_states_the_computed_exception() -> None:
     assert (0.0926 + shift) - engagement[3] > 0.00357
 
 
-# Detail B's ".738 ±.005" hangs outward (left) from its dimension line,
-# centred on the keep y: run 20261110T001845485Z printed it 24.5 mm wide
-# under a shelf from x 19.5 to its 44.0 line.  The hold-down callout's box follows
+# Detail B's ".738" hangs outward (left) from its dimension line,
+# centred on the keep y: run 20261110T001845485Z printed it, then with a
+# +/-.005 band, 24.5 mm wide under a shelf from x 19.5 to its 44.0 line; the
+# bare .XXX (C1 keyed r9) is shorter, so that width bounds it.  The hold-down callout's box follows
 # RD1's render (text centred on the requested x, baseline 2.7 mm under the
 # requested y, 3.5 mm text): 50 mm wide for "DRILL <MOD-DIAM>3.05 THRU ALL"
 # over its counterbore line, 10 mm under to 4 mm over the requested point.
@@ -920,7 +921,7 @@ def test_holddown_band_clears_border_title_block_and_captions() -> None:
     ours = {
         "detail label": (label_x, label_y, label_x + 0.0315, label_y + 0.0162),
         "detail outline": outline,
-        ".738 ±.005": _holddown_z_text_box(),
+        ".738": _holddown_z_text_box(),
         "1.00 ±0.1": _holddown_x_text_box(),
         ".228 ±.004": _tip_dowel_x_text_box(),
         "(.188)": _tip_dowel_pivot_x_text_box(),
@@ -944,7 +945,7 @@ def test_holddown_band_clears_border_title_block_and_captions() -> None:
     # circle, below; the test below keeps HoldDownX off it); C-C's face labels
     # are its own notes, standing in its padding beside the ink.
     own = {
-        ("detail outline", ".738 ±.005"),
+        ("detail outline", ".738"),
         ("detail outline", "1.00 ±0.1"),
         ("detail outline", ".228 ±.004"),
         ("detail outline", "(.188)"),
@@ -959,8 +960,8 @@ def test_holddown_band_clears_border_title_block_and_captions() -> None:
     # The .738 text sits outside its own extension-line span (pivot to hole),
     # so SolidWorks hangs it off the line instead of centring the line through
     # it (81788ce9: "11.|00").
-    assert ours[".738 ±.005"][1] >= drawing.DETAIL_HOLDDOWN_Y > drawing.DETAIL_PIVOT_Y
-    assert ours[".738 ±.005"][2] < cx - r
+    assert ours[".738"][1] >= drawing.DETAIL_HOLDDOWN_Y > drawing.DETAIL_PIVOT_Y
+    assert ours[".738"][2] < cx - r
     # The pivot's extension line ends 1 mm past HoldDownZ's line; at C1 keyed's
     # station it runs at the label's height, so that end stands clear of the
     # label (run 20261110T001845485Z: through its B at x 0.044).
@@ -981,7 +982,7 @@ def test_holddown_band_clears_border_title_block_and_captions() -> None:
     padded = _holddown_padded_outline()
     inner = (padded[0] + inset, padded[1] + inset, padded[2] - inset, padded[3] - inset)
     for name in (
-        ".738 ±.005",
+        ".738",
         "1.00 ±0.1",
         ".228 ±.004",
         "(.188)",
@@ -1278,6 +1279,17 @@ def test_holddown_x_is_a_banded_dimension_hanging_right_of_detail_b() -> None:
         "HoldDownZ": 3,
     }
     assert spec.HOLDDOWN_STATION_TOL_MM == 0.127  # the +/-.005 drilled-hole row
+    # HoldDownX's .XX carries the band; HoldDownZ and the post-tap stations
+    # print .XXX, whose title-block grade is the band (rule 2, C1 keyed r9).
+    banded = model_toleranced_dimensions(part)
+    assert banded[("HoldDownHole", "HoldDownX")] == "HOLDDOWN_STATION_TOL_MM"
+    assert ("HoldDownHole", "HoldDownZ") not in banded
+    assert not any(feature == "PostMountHoles" for feature, _ in banded)
+    assert (
+        spec.HOLDDOWN_STATION_TOL_MM
+        == spec.POST_MOUNT_STATION_TOL_MM
+        == printed_band_mm(3, unit=spec.UNIT)
+    )
     text = _holddown_x_text_box()
     cx, cy = drawing.DETAIL_CENTER
     for corner_x in (text[0], text[2]):
