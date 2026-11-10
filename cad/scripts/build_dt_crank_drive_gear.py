@@ -181,10 +181,12 @@ def _add_driving_tooth_inclination(adapter, axis_ray: str, tooth_ray: str) -> No
     from solidworks_mcp.adapters import sw_type_info as _sw_type_info
     from solidworks_mcp.adapters.solidworks.sketch import _select_sketch_entities
 
+    # The rays run south (sketch +y) from the crossing; the bisector point
+    # sits 1 mm along it, inside both rays' 1.78 mm reach.
     half = math.radians(TOOTH_INCLINATION_DEG / 2.0)
-    text_radius_m = 0.004
-    text_x = -text_radius_m * math.sin(half)
-    text_y = -TOOTH_SPACE_CROSSING / 1000.0 - text_radius_m * math.cos(half)
+    text_radius_m = 0.001
+    text_x = text_radius_m * math.sin(half)
+    text_y = -TOOTH_SPACE_CROSSING / 1000.0 + text_radius_m * math.cos(half)
     model = adapter.currentModel
     model.ClearSelection2(True)
     _select_sketch_entities(adapter, [axis_ray, tooth_ray], 0)
@@ -213,6 +215,8 @@ def _add_driving_tooth_inclination(adapter, axis_ray: str, tooth_ray: str) -> No
 
 PART_NAME = "dt-crank-drive-gear"
 MATERIAL = "Plain Carbon Steel"  # p.20: dark gear, distinct from the brass train
+# The assembly's coaxial and gear mates select the bore axis by this name.
+BORE_AXIS = "BoreAxis"
 
 # The 64T seats on MHA-DT-04's keyed land 1.
 BORE_DIAMETER = 0.375 * IN
@@ -361,8 +365,15 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "south bore chamfer", expected, 0.03 * v_chamfer + 0.15)
 
     # Named bore/central axis for view-independent assembly mate
-    # selection (M6 mated-DOF drive train).
-    await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "bore axis")
+    # selection (M6 mated-DOF drive train). Renamed BoreAxis: the tooth cut
+    # creates its own reference axes first, so the default AxisN ordinal the
+    # assembly used to quote (Axis2) now names the tooth space's pivot (farm
+    # run 20261110T211638308Z: '64T coaxial' landed 36.75 mm off).
+    bore_axis = await name_bore_axis(
+        adapter, "Top Plane", 0.0, "Right Plane", 0.0, "bore axis"
+    )
+    _feature_by_name(adapter, bore_axis).Name = BORE_AXIS
+    _telemetry.success(f"feature {bore_axis!r} -> {BORE_AXIS!r}")
 
     # Apply the deferred drive equations after the whole model + a rebuild exist,
     # then re-check: each equation evaluates to the as-built value, so the
@@ -430,36 +441,35 @@ async def build(adapter) -> dict[str, str]:
     # section A-A cuts. Two construction rays share the crossing point, as
     # the plan-angle rays of build_dt_cone_pivot_post do (two rays from one
     # vertex enclose one acute wedge an angular dimension reads
-    # unambiguously): one north along the axis to the north face, one north
-    # along the tooth line. The crossing's station is dimensioned from the
-    # origin, the axis on the SOUTH face. Top-plane sketch x is model +X and
+    # unambiguously). Both run SOUTH to the collar face, so the wedge opens
+    # toward the open sheet left of the section, where the 13 deg has room
+    # (farm proof r2 of #2482: opened north, its text fell on the section).
+    # The axis ray ends on the origin, the axis on the south face; its
+    # length IS the crossing's station. Top-plane sketch x is model +X and
     # sketch y model -Z. The tooth ray is a near-side (+Y, t = -X) tooth's
     # line d = cos(beta) z - sin(beta) x projected onto the plane: it runs
-    # toward -X as z grows, as a right-hand gear's near teeth do seen with
+    # toward +X as z falls, as a right-hand gear's near teeth do seen with
     # the axis left to right. The values are the spec's, which the tooth cut
     # above was gated against.
     tooth_line = SketchDims()
     check("create_sketch tooth line reference", await adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
     beta = math.radians(TOOTH_INCLINATION_DEG)
-    ray_length = (FACE_WIDTH - TOOTH_SPACE_CROSSING) / math.cos(beta)
+    ray_length = TOOTH_SPACE_CROSSING / math.cos(beta)
     axis_ray = check(
         "tooth line axis ray",
-        await adapter.add_centerline(0.0, -TOOTH_SPACE_CROSSING, 0.0, -FACE_WIDTH),
+        await adapter.add_centerline(0.0, -TOOTH_SPACE_CROSSING, 0.0, 0.0),
     )
     tooth_ray = check(
         "tooth line ray",
         await adapter.add_centerline(
-            0.0,
-            -TOOTH_SPACE_CROSSING,
-            -ray_length * math.sin(beta),
-            -TOOTH_SPACE_CROSSING - ray_length * math.cos(beta),
+            0.0, -TOOTH_SPACE_CROSSING, TOOTH_SPACE_CROSSING * math.tan(beta), 0.0
         ),
     )
     set_sketch_direct_db(adapter, False)
     for label, first, second, relation in (
         ("tooth line axis ray vertical", axis_ray, None, "vertical"),
-        ("crossing on the axis", f"{axis_ray}.start", "origin", "vertical_points"),
+        ("axis ray ends on the south face's axis", f"{axis_ray}.end", "origin", "coincident"),
         ("tooth ray from the crossing", f"{tooth_ray}.start", f"{axis_ray}.start", "coincident"),
     ):
         check(label, await adapter.add_sketch_constraint(first, second, relation))
@@ -470,13 +480,6 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     tooth_line.record("ToothSpaceCrossing")
-    check(
-        "tooth line axis ray to the north face",
-        await adapter.add_sketch_dimension(
-            f"{axis_ray}.end", "origin", "vertical_distance", FACE_WIDTH
-        ),
-    )
-    tooth_line.record("ToothLineAxisEnd")
     check(
         "tooth ray length",
         await adapter.add_sketch_dimension(tooth_ray, None, "linear", ray_length),

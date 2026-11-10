@@ -6199,7 +6199,8 @@ async def build(adapter) -> dict[str, str]:
     # The 64T crank-drive gear and the 20 cone gears are one rigid stepped
     # cluster KEYED to the cone shaft -- each via coaxial + axial seat + parallel
     # anti-spin (see _key_to_shaft), replacing its lock with no fix/lock/tuned
-    # angle. The 64T uses its Axis2 central axis, the cone gears their Axis1.
+    # angle. The 64T uses its named BoreAxis (build_dt_crank_drive_gear: its
+    # tooth cut makes reference axes first), the cone gears their Axis1.
     # The 64T seat is a contact: its Front plane IS its south face (the blank
     # is sketched on Front and extruded +z by the face width, and
     # _place_on_shaft puts that origin face/2 south of the gear's centre), so
@@ -6208,7 +6209,7 @@ async def build(adapter) -> dict[str, str]:
     await _key_to_shaft(
         adapter,
         gear64,
-        "Axis2",
+        "BoreAxis",
         cone_axis,
         cone_shaft,
         cone_o,
@@ -6593,7 +6594,7 @@ async def build(adapter) -> dict[str, str]:
     await gear_mate(
         adapter,
         named_ref(f"Axis2@{pinion}", "AXIS"),
-        named_ref(f"Axis2@{gear64}", "AXIS"),
+        named_ref(f"BoreAxis@{gear64}", "AXIS"),
         _config.machine("gear_train", "crank_drive_ratio"),
         label="16T:64T crank drive",
     )

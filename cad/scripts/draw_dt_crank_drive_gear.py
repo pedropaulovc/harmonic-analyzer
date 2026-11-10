@@ -76,6 +76,8 @@ from dt_crank_drive_gear_spec import (
     DRAWING_PRECISION_BY_NAME,
     FACE_WIDTH,
     OUTSIDE_DIA,
+    TOOTH_INCLINATION_DEG,
+    TOOTH_SPACE_CROSSING,
     inch_text,
 )
 
@@ -188,17 +190,32 @@ ROTATION_NOTE_XY = (
 # review r1 of #1641); the chamfer's leg dimension runs left off the south
 # face into the lane under the T callout, as RimChamferSize does.
 # The tooth line (ToothLineReference, owner ruling 2026-11-10 on #2332): its
-# two rays start on the axis TOOTH_SPACE_CROSSING right of the south face and
-# run right, the tooth ray falling toward the bore's far wall. The station
-# stands in the bore's open band above the axis with its text out left of
-# the south face, above the chamfer's block; the inclination's text sits on
-# the acute wedge's bisector just right of the north face, so the native
-# angle stays the acute one.
+# two rays run from the crossing, TOOTH_SPACE_CROSSING right of the south
+# face on the axis, back to the south face, the tooth ray rising toward the
+# keyway. Both print as plain dimensions with no words (rule 7) and their
+# text clear of the section (rule 14; farm proof r2 of #2482 put a callout
+# block over the section and the machinist review gated it). The station's
+# text stands left of the south face, between the T leader above and the
+# 13 deg's extension lines below. The 13 deg opens left, toward the open
+# sheet: its text sits on the acute wedge's bisector 40 mm out, where the
+# wedge is wider than the text, so neither the arc's extension lines nor
+# the section strike it and the native angle stays the acute one. The
+# chamfer's block drops below the axis line those extensions carry.
+_SHEET_PER_MM = VIEW_SCALE[0] / (VIEW_SCALE[1] * 1000.0)
+TOOTH_CROSSING_XY = (
+    SECTION_CENTER[0] - FACE_WIDTH_HALF + TOOTH_SPACE_CROSSING * _SHEET_PER_MM,
+    SECTION_CENTER[1],
+)
+TOOTH_ANGLE_TEXT_RADIUS = 0.040
+_HALF_INCLINATION = math.radians(TOOTH_INCLINATION_DEG / 2.0)
 SECTION_KEEP = {
     "FaceWidth": (SECTION_CENTER[0] - 0.040, SECTION_CENTER[1] + HALF_OD + 0.016),
-    "BoreSouthChamferSize": (SECTION_CENTER[0] - 0.028, SECTION_CENTER[1] - 0.005),
-    "ToothSpaceCrossing": (SECTION_CENTER[0] - 0.014, SECTION_CENTER[1] + 0.0065),
-    "ToothInclination": (SECTION_CENTER[0] + 0.013, SECTION_CENTER[1] - 0.002),
+    "BoreSouthChamferSize": (SECTION_CENTER[0] - 0.028, SECTION_CENTER[1] - 0.017),
+    "ToothSpaceCrossing": (SECTION_CENTER[0] - 0.014, SECTION_CENTER[1] + 0.013),
+    "ToothInclination": (
+        TOOTH_CROSSING_XY[0] - TOOTH_ANGLE_TEXT_RADIUS * math.cos(_HALF_INCLINATION),
+        TOOTH_CROSSING_XY[1] + TOOTH_ANGLE_TEXT_RADIUS * math.sin(_HALF_INCLINATION),
+    ),
 }
 # The face width's +/-.001 is the gear's term in the solid cone-gear stack
 # on the cone gear shaft (dt_cone_gear_stack); rule 4 asks that the stack be
@@ -269,9 +286,6 @@ DIMENSION_CALLOUTS = {
     "BoreSouthChamferSize": (
         " X 45\N{DEGREE SIGN}  \nCLEARS COLLAR ROOT  \nOF MHA-DT-04  "
     ),
-    # The crossing is a point on the axis, not an edge: the callout names it.
-    "ToothSpaceCrossing": "TOOTH-SPACE CENTRE\nPLANES CROSS AXIS",
-    "ToothInclination": "TOOTH LINE",
 }
 
 # The tip diameter lands on its near (upper right) rim and the round
@@ -546,7 +560,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_dimension_callouts(
         adapter, section_annotations,
-        {name: DIMENSION_CALLOUTS[name] for name in SECTION_KEEP},
+        {name: DIMENSION_CALLOUTS[name] for name in SECTION_KEEP if name in DIMENSION_CALLOUTS},
     )
     assert_imported_precision(
         adapter, front_annotations + section_annotations, DRAWING_PRECISION_BY_NAME
