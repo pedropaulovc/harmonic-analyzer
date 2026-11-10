@@ -90,8 +90,9 @@ retiredTooling.push(...[
 // way to the shared MHA-SH-VN-54 1/4 cup point (#2119, rule 18 engagement),
 // the MHA-PD-VN-67 pivot shim to the arm's spot face (#290), the made
 // gooseneck spring screw to the purchased MHA-SM-VN-56 shoulder screw (owner
-// ruling 2026-11-08 (Pedro), #2144 item 11.4), and the MHA-DT-28 anchor eye
-// and MHA-DT-VN-66 loop link to the screwed jack chain (#2144 9.2).
+// ruling 2026-11-08 (Pedro), #2144 item 11.4), the MHA-DT-28 anchor eye
+// and MHA-DT-VN-66 loop link to the screwed jack chain (#2144 9.2), and the
+// MHA-CH-14 and MHA-SM-VN-55 spring-hook jam nuts to bare hooks (#2326).
 const retiredMachine = [{
   old_stem: 'vn-pen-rod-set-screw',
   old_number: 'MHA-VN-061',
@@ -116,6 +117,16 @@ const retiredMachine = [{
   old_stem: 'dt-crank-pin-eye',
   old_number: 'MHA-DT-028',
   new_identities: [{ stem: 'dt-crank-pin-eye', number: 'MHA-DT-28' }],
+  status: 'retired',
+}, {
+  old_stem: 'ch-anchor-jam-nut',
+  old_number: 'MHA-CH-014',
+  new_identities: [{ stem: 'ch-anchor-jam-nut', number: 'MHA-CH-14' }],
+  status: 'retired',
+}, {
+  old_stem: 'vn-boss-hook-jam-nut',
+  old_number: 'MHA-VN-072',
+  new_identities: [{ parent: 'sm-summing', stem: 'sm-vn-boss-hook-jam-nut', number: 'MHA-SM-VN-55' }],
   status: 'retired',
 }]
 

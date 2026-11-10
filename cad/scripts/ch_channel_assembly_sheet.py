@@ -25,7 +25,6 @@ from ch_channel_assembly_spec import (
     STACK_LENGTH_DIMENSION,
 )
 from ch_channel_explode_spec import (
-    ANCHOR_NUT,
     BANK_SPRING,
     BAR,
     BAR_PIN,
@@ -99,5 +98,4 @@ BOM_DESCRIPTIONS = {
     BAR_PIN: "BAR PIVOT PIN",
     CHANNEL_SPRING: "EXTENSION SPRING",
     HOOK: "#6-32 EYEBOLT SPRING ANCHOR",
-    ANCHOR_NUT: "#6-32 ROUND ANCHOR JAM NUT",
 }

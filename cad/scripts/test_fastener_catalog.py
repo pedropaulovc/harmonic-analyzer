@@ -38,7 +38,6 @@ _STOCK_REQUIREMENTS = {
     "pn-vn-pen-adjust-nut": (("92671A115",), "MHA-PN-VN-53", 1),
     "pn-vn-pen-hanger-nut": (("90480A009",), "MHA-PN-VN-54", 1),
     "pn-vn-pen-hanger-jam-nut": (("90760A009",), "MHA-PN-VN-55", 1),
-    "sm-vn-boss-hook-jam-nut": (("90760A140",), "MHA-SM-VN-55", 1),
     "pd-vn-platen-clip-screw": (("92446A077",), "MHA-PD-VN-65", 4),
     "dt-vn-pinion-strap-pin": (("98296A027",), "MHA-DT-VN-63", 3),
     "dt-vn-post-mount-screw": (("40923906",), "MHA-DT-VN-61", 2),

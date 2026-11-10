@@ -15,7 +15,6 @@ import ha_harmonic_analyzer_assembly_steps as steps
 import pd_paper_drive_assembly_steps as pd_steps
 import pd_transgear_removable_spec as removable
 import _sprocket_seat_geometry as seat_geometry
-import ch_anchor_jam_nut_spec
 import ch_vn_spring_hook_spec
 from ha_harmonic_analyzer_assembly_spec import (
     BAR_HEIGHT_DIMENSION,
@@ -132,28 +131,7 @@ LEVEL_TOLERANCE_DEG = angular_band_deg()
 LEVEL_ACCEPTANCE = f"LEVEL WITHIN \u00b1{LEVEL_TOLERANCE_DEG:g}\u00b0"
 _AMPLITUDE_BAR = str(_config.parts("ch-amplitude-bar")["number"])
 _ANCHOR = str(_config.parts("ch-vn-spring-hook")["number"])
-_ANCHOR_NUT = str(_config.parts("ch-anchor-jam-nut")["number"])
 _SUMMING_PLATE = str(_config.parts("sm-summing-lever")["number"])
-
-# The forked driver that runs each round, slotted MHA-CH-14 jam nut up its
-# anchor (ch_anchor_jam_nut_spec: one straight slot across the lower face, the
-# anchor's shank through the nut's centre). A screwdriver blade, its tines in
-# the nut's slot either side of the shank: thinner than the slot, no wider
-# than the nut, its centre slot clearing the shank's major diameter and
-# deeper than the shank stands below the plate. Sizes in the sheet's inch,
-# at the .XX/.XXX grades a tool sketch needs.
-DRIVER_BLADE_WIDTH = 0.25
-DRIVER_BLADE_THICK_MAX = 0.045
-DRIVER_SLOT_WIDTH = 0.16
-DRIVER_SLOT_DEPTH = 0.40
-if not (
-    DRIVER_BLADE_THICK_MAX < ch_anchor_jam_nut_spec.SLOT_WIDTH / 25.4
-    and DRIVER_BLADE_WIDTH <= ch_anchor_jam_nut_spec.OD_MIN / 25.4
-    and ch_anchor_jam_nut_spec.THREAD_MAJOR / 25.4 + 0.01 < DRIVER_SLOT_WIDTH
-    and DRIVER_SLOT_DEPTH > ch_vn_spring_hook_spec.PROTRUSION_MAX_MM / 25.4
-    and (DRIVER_BLADE_WIDTH - DRIVER_SLOT_WIDTH) / 2.0 >= 0.04
-):
-    raise AssertionError("the forked driver must fit the jam nut's slot round the shank")
 
 
 def _n(key: str) -> int:
@@ -185,11 +163,6 @@ _STEP_TEXT: dict[str, tuple[str, ...]] = {
         "MHA-CH-VN-50 SPRING HANGING FROM ITS LEVER WITH ITS BOTTOM LOOP FREE.",
     ),
     "channel-anchors-set": (
-        f"MAKE A FORKED DRIVER FOR THE {_ANCHOR_NUT} NUTS: GRIND A FLAT "
-        f"SCREWDRIVER BLADE TO {render_number(DRIVER_BLADE_WIDTH, 'in', 2)} WIDE AND "
-        f"{render_number(DRIVER_BLADE_THICK_MAX, 'in', 3)} THICK MAX.",
-        f"SLOT THE BLADE'S MIDDLE {render_number(DRIVER_SLOT_WIDTH, 'in', 2)} WIDE X "
-        f"{render_number(DRIVER_SLOT_DEPTH, 'in', 2)} DEEP.",
         f"DISCARD THE HEX NUT SUPPLIED WITH EACH OF THE {CHANNEL_ANCHORS} {_ANCHOR} "
         "ANCHORS.",
         f"THREAD EACH {_ANCHOR} DOWN INTO ITS {_SUMMING_PLATE} PLATE TAP UNTIL ITS "
@@ -197,13 +170,6 @@ _STEP_TEXT: dict[str, tuple[str, ...]] = {
         f"TURN EACH {_ANCHOR} BACK, NO MORE THAN "
         f"{ch_vn_spring_hook_spec.ADJUSTMENT_TURNS} TURN, TO BRING ITS EYE OPENING "
         "IN LINE WITH ITS SPRING.",
-        f"HOLDING THE EYE THERE, RUN ONE {_ANCHOR_NUT} UP THE SHANK WITH THE "
-        "FORKED DRIVER, TINES IN THE NUT'S SLOT, TIGHT AGAINST THE PLATE "
-        "UNDERSIDE.",
-        f"CHECK EACH {_ANCHOR}: ITS EYE CANNOT BE TURNED BY HAND.",
-        f"CHECK EACH {_ANCHOR_NUT}: FULL THREAD SHOWS BELOW IT.",
-        "IF AN EYE TURNS OR NO THREAD SHOWS, SLACKEN THAT NUT AND REPEAT "
-        f"{_n('channel-anchors-set')}E-{_n('channel-anchors-set')}F.",
         "HOOK EACH SPRING'S BOTTOM LOOP INTO ITS ANCHOR EYE.",
     ),
     "summing-levelled": (

@@ -1182,7 +1182,7 @@ sections:
         - 'ch. 15 notes + assembly solve (level rest pose); ch30 px measurement anchored on column pitch + GT rescale + ch19 closeups (2026-08-02 rederive)'
         - measured/med
       - - Springs (default)
-        - 'McMaster 9432K31, catalogue inside-hook length (not coil-body length): neutral analytic length 64.319119 mm and force 4.378157 N from spring_mount_geom.channel_pose(0), with lower/upper eye centres approximately (24.850028,998.407800)/(24.850317,1057.697719) mm. Owner issue #2129 centres the 7.00 mm coefficient plate at local Y±3.50: lower anchor and underside jam nut rise 0.96 mm while the channel lever stays fixed. Native fixture recalibration on 2026-11-09 measured the neutral channel inside length at 64.320894940 mm and re-measured all neutral/square channel and counter seats; saved-assembly contact and clearance gates remain required.'
+        - 'McMaster 9432K31, catalogue inside-hook length (not coil-body length): neutral analytic length 64.319119 mm and force 4.378157 N from spring_mount_geom.channel_pose(0), with lower/upper eye centres approximately (24.850028,998.407800)/(24.850317,1057.697719) mm. Owner issue #2129 centres the 7.00 mm coefficient plate at local Y±3.50: the lower anchor rises 0.96 mm while the channel lever stays fixed. Native fixture recalibration on 2026-11-09 measured the neutral channel inside length at 64.320894940 mm and re-measured all neutral/square channel and counter seats; saved-assembly contact and clearance gates remain required.'
         - 'cad/scripts/spring_mount_geom.py, ch_vn_channel_spring_stock_geom.py and cad/config/machine/springs.yaml; owner centring decision #2129'
         - derived analytic geometry + native fixture calibration
       - - Default mechanism state
@@ -1237,9 +1237,9 @@ sections:
         - source geometry + authorized joint relocation
         - med
       - - Spring holes
-        - '20×#6-32through taps at leverlocalX39.85, Z=−70.62825+j×7.0565 (j0..19), Ø.006RFS pattern. Purchased9489T111 anchors seat at coefficienttopY+3.50 and lock withMHA-CH-14 jamnuts atY−3.50. Both seats rise0.96mm; 7.00mm nominal engagement and the cut-anchor/full-thread-past-nut budgets are unchanged.'
+        - '20×#6-32through taps at leverlocalX39.85, Z=−70.62825+j×7.0565 (j0..19), Ø.010RFS pattern (#2326). Purchased9489T111 anchors seat at coefficienttopY+3.50 and thread straight in with no jamnut (#2326); 7.00mm nominal engagement.'
         - —
-        - 'cad/scripts/sm_summing_lever_spec.py and ch_anchor_jam_nut_spec.py'
+        - 'cad/scripts/sm_summing_lever_spec.py and ch_vn_spring_hook_spec.py'
         - source geometry + centred spring interface (#2129)
         - med
       - - Web + boss
@@ -1249,7 +1249,7 @@ sections:
         - source geometry
         - low
       - - Hook hole
-        - 'Vertical#10-24through tap in the counter-anchor boss at leverlocalX−76.20, Z0; purchased9490T1anchor and its top jamnut retain their installed pose.'
+        - 'Vertical#10-24through tap in the counter-anchor boss at leverlocalX−76.20, Z0; purchased9490T1anchor retains its installed pose, with no jamnut (#2326).'
         - —
         - 'cad/scripts/sm_summing_lever_spec.py COUNTER_HOLE_SPEC'
         - source geometry + retained counter-spring interface

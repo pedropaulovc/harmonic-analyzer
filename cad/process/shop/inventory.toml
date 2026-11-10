@@ -6888,7 +6888,7 @@ cite = ["OnlineMetals part 1257 https://www.onlinemetals.com/en/buy/x/pid/1257 o
 [[stock]]
 form = "round_bar"
 material = "C360 free-machining brass, H02"
-note = "Ordered 2026-11-03: 5/16 in C360 round, 12 in (standard length). Allocation: ch-anchor-jam-nut (MHA-CH-14)."
+note = "Ordered 2026-11-03: 5/16 in C360 round, 12 in (standard length). Originally allocated to the made channel-anchor jam nuts, retired 2026-11-09 (owner ruling, #2326). Retain this order as unallocated stock."
 dia_mm = 7.9375
 length_mm = 304.8
 on_hand = false

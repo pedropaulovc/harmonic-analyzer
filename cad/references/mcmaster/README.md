@@ -38,7 +38,7 @@ recipes:
 | 90280A837 | `fr-vn-frame-cross-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90480A009 | `pn-vn-pen-hanger-nut` (catalogue-only; no vendor model) | Low-Strength Zinc-Plated Steel Hex Nut |
 | 90760A009 | `pn-vn-pen-hanger-jam-nut` (catalogue-only; no vendor model) | Zinc-Plated Steel Narrow-Profile Hex Nut |
-| 90760A140 | `sm-vn-boss-hook-jam-nut` (MHA-SM-VN-55; catalogue-only, no vendor model) | Zinc-Plated Steel Narrow-Profile Hex Nut |
+| 90760A140 | — (`sm-vn-boss-hook-jam-nut` MHA-SM-VN-55 until 2026-11-09; retired) | Zinc-Plated Steel Narrow-Profile Hex Nut |
 | 91247A720 | — (diagnostic recipe; a former `sm-vn-knife-hanger-stud`) | Medium-Strength Grade 5 Steel Hex Head Screw |
 | 91251A108 | `dt-vn-cone-tip-block-screw` (catalogue-only; no vendor model) | Black-Oxide Alloy Steel Socket Head Screw |
 | 91251A157 | — (catalogue-only diagnostic recipe; former `sm-vn-knife-hanger-stud`) | Black-Oxide Alloy Steel Socket Head Screw |
@@ -1606,20 +1606,10 @@ Catalog specifications checked on September 10, 2026:
   committed. Neither nut has a solid used here: `diag_build_90480A009.py`
   and `diag_build_90760A009.py` extrude the hexagon with a plain bore at the
   #8-32 basic major, so both are catalogue-only.
-- [90760A140](https://www.mcmaster.com/90760A140/) (`sm-vn-boss-hook-jam-nut`,
-  MHA-SM-VN-55, one) locks the MHA-SM-VN-50 counter anchor (9490T1, trimmed) in
-  the MHA-SM-03 summing-lever boss. It was read live on October 16, 2026
-  from the McMaster 10-24 narrow-profile hex-nut listing, whose product page
-  needs a login: zinc-plated steel narrow-profile hex nut, 10-24 UNC
-  right-hand Class 2B, 5/16 in across flats, 7/64 in high, with a material
-  certificate. It runs down the eyebolt shank and is jammed against the boss
-  top face with the eye held clocked, the joint's rule 23 lock. Of its
-  listing siblings, 90760A120 (zinc-plated, 1/4 in across flats, 3/32 in
-  high) leaves thin walls on a #10 thread and less wrench purchase,
-  90760A190 is black-oxide where the zinc-plated 9490T1 wants a matching
-  finish, and 90730A011 is 18-8 stainless. No solid is used here:
-  `diag_build_90760A140.py` extrudes the hexagon with a plain bore at the
-  #10-24 basic major, so it is catalogue-only.
+- [90760A140](https://www.mcmaster.com/90760A140/) narrow-profile #10-24 hex
+  nut was the counter anchor's jam nut on the summing-lever boss until the
+  2026-11-09 ruling (#2326) retired it: nothing torques the hook, so it
+  threads straight into the boss.
 - [9666K56](https://www.mcmaster.com/9666K56/) supplies both amplification
   wires, the `LeverWire` and `PenWire` configurations of `sh-vn-music-wire`
   (MHA-SH-VN-56; `mg-vn-lever-wire` MHA-MG-VN-56 and `pn-vn-pen-wire`
