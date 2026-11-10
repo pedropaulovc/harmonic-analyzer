@@ -1615,6 +1615,67 @@ def _assert_settled_clocks(adapter: Any, clocks: list[tuple[str, Any, int]]) -> 
         raise RuntimeError("flat clock arcs after the settling rebuild:\n" + "\n".join(faults))
 
 
+# swDimensionTextParts_e: the callout lanes set_dimension_callouts writes.
+_CALLOUT_ABOVE = 3
+_CALLOUT_BELOW = 4
+
+# One sheet's printed callouts: (sheet, its curated annotations, below-text
+# by dimension name, above-text by dimension name).
+SheetCallouts = tuple[str, list[Any], dict[str, str], dict[str, str]]
+
+
+def _rewrite_callouts(adapter: Any, sheets: list[SheetCallouts]) -> None:
+    """Write every sheet's callouts again once the last sheet is imported.
+
+    A model dimension's callout text is one value shared by every sheet that
+    prints it (OffsetText, DIMENSION_CALLOUTS["ToothThickness"]). Each sheet's
+    side view imports the whole marked set (``_curate_repeated_dimensions``),
+    which brings in, and deletes, every marked dimension live in its
+    configuration: since the T120 marking fix that includes the D-bore's on
+    T030..T120 and the web's on every sheet, so the keyed sheets reset the
+    callouts T006..T024 had written (farm run 20261110T005033414Z: the D-bore
+    Ø, across-flat and clock printed bare, the T012 web without its words).
+    """
+    for _sheet, printed, below, above in sheets:
+        set_dimension_callouts(adapter, printed, below)
+        set_dimension_callouts(adapter, printed, above, location="above")
+
+
+def _assert_settled_callouts(adapter: Any, sheets: list[SheetCallouts]) -> None:
+    """After finalize's settling rebuild, every sheet's printed dimensions
+    still carry their callouts (``_rewrite_callouts``)."""
+    ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
+    faults = []
+    for sheet, printed, below, above in sheets:
+        if not ddoc.ActivateSheet(sheet):
+            raise RuntimeError(f"failed to activate {sheet} for its settled callouts")
+        expected = {
+            (name, part): text
+            for part, texts in ((_CALLOUT_BELOW, below), (_CALLOUT_ABOVE, above))
+            for name, text in texts.items()
+        }
+        for annotation in printed:
+            annotation = _early_bound(annotation, "IAnnotation")
+            name = dimension_name(adapter, annotation)
+            display = None
+            for part in (_CALLOUT_BELOW, _CALLOUT_ABOVE):
+                text = expected.pop((name, part), None)
+                if text is None:
+                    continue
+                if display is None:
+                    display = _early_bound(
+                        annotation.GetSpecificAnnotation(), "IDisplayDimension"
+                    )
+                read = str(display.GetText(part) or "").replace("\r", "")
+                if read != text:
+                    faults.append(f"{sheet} {name}: {read!r}, expected {text!r}")
+        faults.extend(f"{sheet} {name}: not on the sheet" for name, _part in expected)
+    if faults:
+        raise RuntimeError(
+            "dimension callouts after the settling rebuild:\n" + "\n".join(faults)
+        )
+
+
 def _clock_arcs(display: Any) -> list[tuple[tuple[float, float], list[tuple[float, float]]]]:
     """The clock dimension's drawn arcs as (centre, tessellated points), in
     sheet metres, read the way the layout audit reads them."""
@@ -2237,6 +2298,7 @@ async def build(adapter: Any) -> dict[str, str]:
     ddoc = _early_bound(drawing_model, "IDrawingDoc")
 
     clocks: list[tuple[str, Any, int]] = []
+    sheet_callouts: list[SheetCallouts] = []
     for teeth in CONFIGURATION_TEETH:
         configuration = f"T{teeth:03d}"
         view_scale = SHEET_SCALES[configuration]
@@ -2337,10 +2399,10 @@ async def build(adapter: Any) -> dict[str, str]:
         callouts = {
             name: text for name, text in DIMENSION_CALLOUTS.items() if name in printed
         }
+        above = {name: text for name, text in CALLOUTS_ABOVE.items() if name in printed}
         set_dimension_callouts(adapter, annotations, callouts)
-        set_dimension_callouts(adapter, annotations, {
-            name: text for name, text in CALLOUTS_ABOVE.items() if name in printed
-        }, location="above")
+        set_dimension_callouts(adapter, annotations, above, location="above")
+        sheet_callouts.append((configuration, annotations, callouts, above))
         assert_imported_precision(adapter, annotations, {
             name: places for name, places in DRAWING_PRECISION_BY_NAME.items()
             if name in printed
@@ -2408,6 +2470,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to pin the DT6-FORM1 detail sheet scale")
     rebuild_drawing(adapter, label="DT6-FORM1 detail layout audit")
     check_drawing_layout(adapter, layout=SPEC.layout, stem="cone-gear DT6-FORM1")
+    _rewrite_callouts(adapter, sheet_callouts)
 
     return await finalize_drawing(
         adapter,
@@ -2418,7 +2481,10 @@ async def build(adapter: Any) -> dict[str, str]:
         expected_sheet_names=SHEET_NAMES,
         sheet_layouts={name: SPEC.layout for name in SHEET_NAMES},
         sheet_scales=SHEET_SCALES,
-        settled_checks=(lambda: _assert_settled_clocks(adapter, clocks),),
+        settled_checks=(
+            lambda: _assert_settled_clocks(adapter, clocks),
+            lambda: _assert_settled_callouts(adapter, sheet_callouts),
+        ),
         checkpoint=_check_exported_pdf,
     )
 

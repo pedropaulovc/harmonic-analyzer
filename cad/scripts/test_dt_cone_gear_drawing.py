@@ -1522,6 +1522,63 @@ def test_settled_clocks_refuse_stub_arcs_on_any_sheet(monkeypatch: pytest.Monkey
     assert sheets == ["T012", "T018"]
 
 
+def _callout_dimension(name: str, texts: dict[int, str]) -> object:
+    from types import SimpleNamespace
+
+    display = SimpleNamespace(
+        GetText=lambda part: texts.get(part, ""),
+        SetText=lambda part, text: texts.__setitem__(part, text),
+    )
+    return SimpleNamespace(name=name, GetSpecificAnnotation=lambda: display)
+
+
+def test_settled_callouts_refuse_a_bare_dimension(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Farm run 20261110T005033414Z: the D sheets printed BoreCutDia, BoreAF
+    # and BoreFlatClock bare, their shared callouts reset by the keyed sheets'
+    # whole-model side-view import.
+    from types import SimpleNamespace
+
+    sheets: list[str] = []
+    ddoc = SimpleNamespace(ActivateSheet=lambda name: sheets.append(name) or True)
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, item: item.name)
+    adapter = SimpleNamespace(currentModel=ddoc)
+    below = {name: drawing.DIMENSION_CALLOUTS[name] for name in ("BoreCutDia", "BoreAF", "BoreFlatClock")}
+    above = {"BoreFlatClock": drawing.CALLOUTS_ABOVE["BoreFlatClock"]}
+    printed = {
+        "BoreCutDia": _callout_dimension("BoreCutDia", {4: below["BoreCutDia"].replace("\n", "\r\n")}),
+        "BoreAF": _callout_dimension("BoreAF", {4: " "}),
+        "BoreFlatClock": _callout_dimension("BoreFlatClock", {}),
+    }
+    sheet = [("T006", list(printed.values()), below, above)]
+    with pytest.raises(RuntimeError, match="settling rebuild") as failure:
+        drawing._assert_settled_callouts(adapter, sheet)
+    message = str(failure.value)
+    assert "T006 BoreCutDia" not in message
+    for fault in ("T006 BoreAF: ' '", "T006 BoreFlatClock: ''"):
+        assert fault in message
+    # A dimension the sheet does not hold is a fault, not a pass.
+    with pytest.raises(RuntimeError, match="T012 KeyedBoreDia: not on the sheet"):
+        drawing._assert_settled_callouts(
+            adapter, [("T012", [], {"KeyedBoreDia": drawing.DIMENSION_CALLOUTS["KeyedBoreDia"]}, {})]
+        )
+    # Written again after the last sheet's import, the same sheet passes.
+    monkeypatch.setattr(
+        drawing, "set_dimension_callouts",
+        lambda _adapter, items, texts, location="below": [
+            item.GetSpecificAnnotation().SetText(4 if location == "below" else 3, texts[item.name])
+            for item in items if item.name in texts
+        ],
+    )
+    drawing._rewrite_callouts(adapter, sheet)
+    drawing._assert_settled_callouts(adapter, sheet)
+    source = inspect.getsource(drawing.build)
+    assert source.index("_rewrite_callouts(adapter, sheet_callouts)") < source.index(
+        "return await finalize_drawing("
+    )
+    assert "_assert_settled_callouts(adapter, sheet_callouts)" in source
+
+
 # The T012 thickness callout, each PDF text run's ink relative to its shelf's
 # start (sheet metres): run 20261024T091056564Z's print, its name row moved
 # over the value and its flag, recentred, under it. The root envelope's flag
