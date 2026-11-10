@@ -1,11 +1,17 @@
 fr-top-frame:
   number: MHA-FR-02
-  material_family: ferrous_noncritical
+  # Owner ruling 2026-11-10 (#2333, option a): a one-off gray-iron sand
+  # casting poured from a 3D-printed pattern and machined on its seats only.
+  # It supersedes the ferrous_noncritical family's low-carbon-steel
+  # alternative and the "solid stock or casting" process. The A48 class is
+  # the minimum tensile class, so a class 30 heat also conforms.
+  material: GRAY IRON, ASTM A48 CLASS 25
+  material_specification: GRAY IRON, ASTM A48 CLASS 25
   finish: ALKYD PRIME/GREEN ENAMEL;MASK SEATS/BORES/THREADS;LIGHT OIL BARE METAL
   quantity: 1
   tolerance_class: machined_block
   drawing_unit: in
-  process: "machined from solid stock or casting"
+  process: "gray iron casting from a 3D-printed pattern, machined on the seats: the faced top and underside planes, tube sockets, cap recesses, gooseneck bore and the drilled, tapped and reamed holes"
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"

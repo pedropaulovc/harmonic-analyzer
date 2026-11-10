@@ -36,6 +36,7 @@ SHOP_MADE_IDS = frozenset(
         "gauges.rocker-trammel-setting-bar",
         "tools.ring-laps",
         "tools.rocker-trammel",
+        "tools.top-frame-casting-pattern",
     }
 )
 

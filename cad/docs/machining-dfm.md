@@ -885,6 +885,18 @@ run. No COM, farm, or generated-traveler certification is claimed here.
 | **`ch-rocker-arm`** ×20 | flat steel plate **2.5 mm** thick, ~270×21 | **top edge = R800 concave arc** (the amplitude-bar rides ON it) — it is the **2D OUTLINE of the plate, NOT a concave pocket/face**; bottom edge R816 concentric; Ø6.5 pivot bore + Ø2.0 rod-pin bore, both through the plate | none severe — pivot bore is **inherently square** (drilled through flat stock, one setup); no slot, no internal corner | **1** (all features one plane) | **CNC 2.5D profile** (×20 identical) or bandsaw+template; the R800 is profiled, not form-cut |
 | **`fr-rocker-arm-support`** | modeled Gray Cast Iron; drawing permits gray iron casting or low-carbon steel stock; trapezoidal wedge, 6.35 mm shell/web | opposed 165.1 mm pockets with **R6.35** internal corners; through cavity with **R12.7** corners; **4× 5/16 through clearance drills** in the 6.35 mm foot for top-down 1/4-20 hex-head screws; RimChamfer 1.27 | 6.35 mm web/shell; from solid stock, each pocket reaches about 28.6 mm at the wide foot. R6.35 is ordinary contour geometry on a PM-25MV and does not need square-corner EDM; a 1/8″ end mill can finish the radius, but its long reach in 1018 favors roughing with a stiffer cutter first | casting route: foot holes/rim; solid-stock route: **2 opposed pocket setups** + foot drilling | cast body, or rough both pockets from 1018 with a larger cutter and finish the R6.35 corners with a 1/8″ end mill; drill the clearance pattern from the seat face |
 
+### Frame (T1 — cast top frame)
+
+Owner ruling 2026-11-10 (#2333, option a): `fr-top-frame` is a bought one-off
+gray-iron sand casting (ASTM A48 class 25 minimum) poured from a 3D-printed
+pattern and machined on its seats only. The casting questions the ruling left
+open (draft, as-cast bands, boss tops, the set-screw boss, datum D, cast datum
+targets) are on #2333; the row below changes no geometry.
+
+| part | stock / form | key features | machinability hazards | setups | route |
+|---|---|---|---|---|---|
+| **`fr-top-frame`** | gray-iron casting, about 23.8 lb as cast (17.7 lb finished; 17.28 × 10.59 × 1.93 in), `[[stock]]` casting row and `services.gray-iron-foundry`; shop-printed pattern `tools.top-frame-casting-pattern` | inverted-T rails (.32 flange, .51 web, 1.117 pocket, R.12 roots) and four Ø1.77 bosses .18 proud, all as cast; **machined:** the faced top (63.3 in²) and faced underside (23.7 in², datum A and both knife seats), 4 Ø1.004 sockets bored from solid bosses, 4 Ø1.083 cap recesses, the Ø.520 gooseneck bore, and the drilled, tapped and reamed holes | flat parting at the faced top plane leaves no undercut except the gooseneck set-screw boss top (0.16 in²); 144 in² of cast walls carry no draft; the title-block ±.01 cannot be held on as-cast faces, and at ±.03 the keeper 2-56 tap drill wall falls from .087 to .047 (floor .060); solid bosses are the heaviest sections (modulus .35 vs .18 for a rail), so feed them from the boss tops | facing: both knife seats lie inside one 3.5 in face-mill setup with the hole-table Y0 edge at the column (.07 to spare at the 7.5 in throat) and both keeper seats with .49; holes 8.60 (knife) and 9.705 (socket) from that edge need the part turned 180°, so each station and socket row is picked up from the first | stress-relieved casting from the foundry; face the top off three boss bottoms, turn over onto it and face the underside to the 1.437 grip, centre the socket pattern on the cast bosses and transfer-bore the base from it (#2386) |
+
 ---
 
 ## Recommended actions (gaps this pass surfaced)

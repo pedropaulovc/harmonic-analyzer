@@ -3050,6 +3050,29 @@ coating = "hot black oxide, matte"
 note = "illustrative example outside finisher: hot black oxide, matte, MIL-DTL-13924 class 1, with oil dip; adds about 1 µm or less. Example (plausible, not measured): confirm the vendor before quoting."
 verify = false
 
+# Owner ruling 2026-11-10 (#2333, option a): MHA-FR-02 is a bought one-off
+# gray-iron sand casting, poured by an outside foundry from a pattern the shop
+# prints, then machined on its seats in the shop. Nothing below is quoted,
+# ordered, printed or owned; the RFQ and foundry shortlist are on #2333.
+[services.gray-iron-foundry]
+name = "gray-iron jobbing foundry, one-off sand castings from a customer pattern"
+kind = "outside_process"
+present = false
+verify = false
+note = "Candidate outside service, not chosen or quoted: pours ASTM A48 gray iron (class 25 minimum) in green sand or no-bake from the shop's printed pattern, stress relieves before shipping, and returns the casting cleaned with risers and gates removed. The shop machines the seats."
+
+[tools.top-frame-casting-pattern]
+name = "MHA-FR-02 top-frame casting pattern, 3D-printed, shop-made"
+kind = "casting_pattern"
+shop_made = true
+present = false
+verify = false
+note = "Not yet made. Printed in sections from the finished-part model plus machining stock, draft and the foundry's shrink allowance (about 1/8 in per ft for gray iron), with the four boss tops as a separate cope-side half on a flat parting at the faced top plane. The inventory lists no 3D printer: print in the shop only once one is recorded here, otherwise send the files to a print service. The pattern geometry still needs the owner's #2333 answers on draft, as-cast tolerance and stock."
+
+[consumables.pattern-filament]
+name = "PLA 3D-printer filament for casting patterns"
+products = ["candidate purchase, not owned: 1.75 mm PLA, about 1 kg for the MHA-FR-02 pattern (estimate, not a slicer figure); the pattern is sealed and painted before it goes to the foundry"]
+
 [fixtures]
 
 [fixtures.vise-pm-6]
@@ -7014,3 +7037,10 @@ section_mm = [152.4, 1.6002]
 length_mm = 152.4
 on_hand = false
 cite = ["McMaster-Carr 8956K455 https://www.mcmaster.com/8956K455/ ordered 2026-11-03"]
+
+[[stock]]
+form = "casting"
+material = "gray iron, ASTM A48 class 25 (a class 30 heat also conforms)"
+note = "Owner ruling 2026-11-10 (#2333, option a): a one-off gray-iron sand casting poured by services.gray-iron-foundry from the shop's printed pattern, tools.top-frame-casting-pattern, and machined on its seats in the shop. Allocation: fr-top-frame (MHA-FR-02). About 23 lb as cast and 17.3 x 10.6 x 1.9 in finished envelope, estimated from the finished model plus machining stock and solid bosses, not a foundry figure. Not quoted or ordered."
+on_hand = false
+cite = ["https://github.com/pedropaulovc/harmonic-analyzer/issues/2333"]

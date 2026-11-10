@@ -6085,3 +6085,15 @@ def test_set_screw_boss_face_is_never_proud_of_the_left_boss_tangent() -> None:
     face_max = part.HUB_SET_BOSS_FROM_AXIS + spec.PRINTED_LINEAR_BAND_MM[2]
     assert part.SET_BOSS_FACE_TANGENT_MARGIN == pytest.approx(boss_r_min - face_max, abs=1e-3)
     assert part.SET_BOSS_FACE_TANGENT_MARGIN >= -1e-9
+
+
+def test_registry_row_records_the_casting_route():
+    # Owner ruling 2026-11-10 (#2333, option a): gray-iron casting from a
+    # printed pattern, machined on the seats; the steel alternative is gone.
+    row = _config.parts("fr-top-frame")
+    assert row["material"] == row["material_specification"] == (
+        "GRAY IRON, ASTM A48 CLASS 25"
+    )
+    assert "STEEL" not in row["material"]
+    assert row["process"].startswith("gray iron casting from a 3D-printed pattern")
+    assert part.MATERIAL == "Gray Cast Iron"
