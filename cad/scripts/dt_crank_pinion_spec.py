@@ -61,7 +61,7 @@ def prints_exactly(value_mm: float, places: int, unit: str = UNIT) -> bool:
 
 TEETH = 16
 # The straight pinion uses the pair's standard normal-pitch system with a
-# 14--16T form cutter, distinct from the helix's virtual-tooth cutter.
+# 14--16T form cutter, distinct from the inclined 64T's virtual-tooth cutter.
 DIAMETRAL_PITCH = dt_crank_drive_gear_spec.CUTTER_DIAMETRAL_PITCH
 PRESSURE_ANGLE_DEG = dt_crank_drive_gear_spec.CUTTER_PRESSURE_ANGLE_DEG
 DEDENDUM_FACTOR = dt_crank_drive_gear_spec.DEDENDUM_FACTOR
@@ -74,7 +74,7 @@ TOOTH_THICKNESS_UPPER_DEVIATION = 0.000
 TOOTH_THICKNESS_LOWER_DEVIATION = -0.020
 
 # A straight spur's normal and transverse sections coincide; its own stock
-# form cutter uses the physical tooth count, unlike the helical mate's.
+# form cutter uses the physical tooth count, unlike the inclined mate's.
 CUTTER_TEMPLATE = template_for_teeth(TEETH, DIAMETRAL_PITCH, PRESSURE_ANGLE_DEG)
 CUTTER_NUMBER = CUTTER_TEMPLATE.cutter_number
 CUTTER_TEETH_RANGE = CUTTER_TEMPLATE.teeth_range
@@ -498,7 +498,7 @@ def pitch_point_azimuths(
 def tooth_in_gap_seed_deg(alpha64_deg: float, alpha16_deg: float) -> float:
     """Pinion clocking (one 16T pitch) that puts its gap on the 64T tooth
     nearest the pitch point: the 64T is keyed at its authored phase (a tooth
-    centred at azimuth 0, mid-face for the helix), so its nearest tooth leads
+    centred at azimuth 0, mid-face for the inclined teeth), so its nearest tooth leads
     the pitch point by delta; the pinion's gap sits that same arc (64/16
     pinion degrees per 64T degree) past the pitch point on its side."""
     pitch64 = 360.0 / dt_crank_drive_gear_spec.TEETH

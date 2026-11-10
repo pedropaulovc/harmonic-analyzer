@@ -1,10 +1,11 @@
 """Offline contracts for the crank-drive-gear drawing.
 
 The print is recreated under ``cad/docs/drawing-guidelines.md``: a 64T
-helical gear slipped onto the cone shaft's land carries no datums and no frames,
-its blank, bore and south-entry sizes are native model dimensions whose places
-and bands the PART owns, and the tooth system it cannot dimension -- helix
-angle, hand and exact finite stock tangent-span limits -- lives in the gear-data block.
+gear with straight inclined teeth slipped onto the cone shaft's land carries
+no datums and no frames, its blank, bore, south-entry and tooth-line sizes are
+native model dimensions whose places and bands the PART owns, and the tooth
+system it cannot dimension -- hand and exact finite stock tangent-span limits
+-- lives in the gear-data block.
 """
 
 from __future__ import annotations
@@ -56,16 +57,16 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     kept = set(drawing.FRONT_KEEP) | set(drawing.SECTION_KEEP)
     assert kept == marked == {
         "OutsideDia", "FaceWidth", "BoreDia", "KeywayWidth", "KeywayT",
-        "BoreSouthChamferSize",
+        "BoreSouthChamferSize", "ToothInclination", "ToothSpaceCrossing",
     }
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
 
 
 def test_the_outside_diameter_is_a_native_reference_sketch_dimension() -> None:
-    # The helix recipe grows the teeth off a ROOT cylinder blank, so no solid
-    # feature owns the tip circle -- and the OD is the first size the turner
-    # sets. drawing-simplicity-policy.md `How the repository implements the guidelines`'s remedy is to MODEL it (a construction sketch whose one
-    # driving dimension IS the value), not to type it into the data block.
+    # The OD is the first size the turner sets; drawing-simplicity-policy.md
+    # `How the repository implements the guidelines`'s remedy is to MODEL it (a
+    # construction sketch whose one driving dimension IS the value), not to
+    # type it into the data block.
     build = _build_source()
     assert 'name_last_feature(adapter, "OutsideDiaReference")' in build
     assert 'name_dimensions(adapter, "OutsideDiaReference", ["OutsideDia"])' in build
@@ -302,8 +303,7 @@ def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
         "PITCH DIAMETER (REF)",
         "ROOT DIAMETER (REF)",
         "FORM CUTTER:  #2, 55-134T, FOR 69.185 VIRTUAL TEETH (REF)",
-        "HELIX AT PITCH DIA",
-        "LEAD (in/rev, REF)",
+        "TOOTH LINE:  STRAIGHT, RIGHT HAND, AS SECTION A-A",
         f"BASE TANGENT SPAN OVER {spec.BASE_TANGENT_SPAN_TEETH} TEETH, NORMAL, ACCEPT ON THIS PART",
         "TRANSVERSE BACKLASH WITH MHA-DT-10, ACCEPT AT ASSEMBLY",
         "TOOTH FORM",
@@ -401,7 +401,7 @@ def test_exact_stock_span_limits_book_printed_corners_on_the_inch_grid(part_spec
         assert corner.radial_translation_mm == pytest.approx(
             translation_for_pitch_tooth_thickness(
                 part_spec.TEETH, part_spec.CUTTER_TEMPLATE, corner.pitch_tooth_thickness_mm,
-                profile.helix_angle_deg,
+                corner.helix_angle_deg,
             )
         )
         assert corner.blank_radius_mm <= (
@@ -422,49 +422,60 @@ def test_exact_stock_span_limits_book_printed_corners_on_the_inch_grid(part_spec
     assert not hasattr(notes, "NORMAL_TOOTH_THICKNESS_DEVIATIONS")
 
 
-def test_gear_data_states_the_helix_and_its_hand() -> None:
-    # The two tooth-system facts no view of this gear can settle and a mirrored
-    # or straight-cut part would get wrong.
+def test_tooth_line_is_native_and_the_data_block_states_its_hand() -> None:
+    # Owner ruling 2026-11-10 on #2332 (option A): straight teeth inclined
+    # to the axis. The inclination and the crossing station print once, as
+    # native dimensions in section A-A; the hand, which no view can settle,
+    # and the crossed axes read in the data block.
     data = notes.GEAR_DATA
     assert (
-        f"HELIX AT PITCH DIA:  {spec.HELIX_ANGLE_DEG:.1f} DEG RIGHT HAND, "
-        "AXES CROSSED WITH MHA-DT-10"
+        "TOOTH LINE:  STRAIGHT, RIGHT HAND, AS SECTION A-A; AXES CROSSED WITH MHA-DT-10"
     ) in data
-    # The last row stands just above the rim (PR 2 round 5: a 65-character
-    # MATES WITH row was struck at x 120.8 mm); it keeps PR 1's length, and
-    # the block its 19 lines.
+    for retired in ("HELIX", "LEAD", "SCREW SWEEP"):
+        assert retired not in data, retired
+    assert f"{spec.TOOTH_INCLINATION_DEG:.1f}" not in data
     lines = data.splitlines()
-    assert len(lines) == 19
+    assert len(lines) == 18
     assert lines[-1] == "MATES WITH:  CRANK PINION MHA-DT-10, 16T SPUR"
-    assert f"LEAD (in/rev, REF):  {spec.inch_text(spec.HELIX_LEAD_MM, 3)}" in data
-    assert "SCREW SWEEP" not in data
-    # The ordinary +/-1 deg helix keeps the worst-corner crossed-mesh backlash
-    # positive: the 64T normal pitch moves p_t sin(beta) per radian.
+    assert spec.DRAWING_DIMENSIONS["ToothLineReference"] == {
+        "ToothInclination", "ToothSpaceCrossing",
+    }
+    assert spec.DRAWING_PRECISION_BY_NAME["ToothInclination"] == 1
+    assert spec.DRAWING_PRECISION_BY_NAME["ToothSpaceCrossing"] == 2
+    assert set(drawing.SECTION_KEEP) >= {"ToothInclination", "ToothSpaceCrossing"}
+    build = _build_source()
+    assert 'name_last_feature(adapter, "ToothLineReference")' in build
+    assert 'blank_sketch(adapter, "ToothLineReference")' in build
+    assert "_add_driving_tooth_inclination(adapter, axis_ray, tooth_ray)" in build
+    # The ordinary +/-1 deg keeps the mid-face worst-corner crossed-mesh
+    # backlash positive: the 64T normal pitch moves p_t sin(beta) per radian.
     import crank_mesh_stack
     transverse_pitch = math.pi * spec.PITCH_DIA / spec.TEETH
-    pitch_shift = transverse_pitch * math.sin(math.radians(spec.HELIX_ANGLE_DEG)) * math.radians(
-        spec.HELIX_ANGLE_TOLERANCE_DEG
-    )
+    pitch_shift = transverse_pitch * math.sin(
+        math.radians(spec.TOOTH_INCLINATION_DEG)
+    ) * math.radians(spec.TOOTH_INCLINATION_TOLERANCE_DEG)
     assert pitch_shift < crank_mesh_stack.standard_check().backlash_min_mm / 2.0
-    # The hand follows the recipe's twist sense: the tooth azimuth advances
-    # counter-clockwise about +z with increasing z (_gear._TWIST_CCW = +1).
-    assert spec.HELIX_HAND == "RIGHT HAND"
-    assert spec.HELIX_ANGLE_DEG == pytest.approx(part.STOCK_PROFILE.helix_angle_deg)
+    # The hand follows the tooth line: azimuth advances counter-clockwise
+    # about +z with increasing z (test_straight_gash).
+    assert spec.TOOTH_HAND == "RIGHT HAND"
+    assert spec.TOOTH_INCLINATION_DEG == pytest.approx(spec.STOCK_PROFILE.helix_angle_deg)
+    assert spec.TOOTH_INCLINATION_DEG == spec.TOOTH_SPACE.inclination_deg
 
 
 def test_gear_data_numbers_track_the_part_geometry() -> None:
-    assert spec.TEETH == part.STOCK_PROFILE.teeth
-    assert part.STOCK_PROFILE is spec.STOCK_PROFILE
+    assert spec.TEETH == part.TEETH == spec.STOCK_PROFILE.teeth
+    assert part.TOOTH_SPACE_FORM is spec.TOOTH_SPACE_FORM
     assert spec.CUTTER_TEMPLATE.diametral_pitch == spec.CUTTER_DIAMETRAL_PITCH
     assert spec.PITCH_DIA == pytest.approx(spec.TEETH * spec.MODULE_MM)
     # The pair shares normal pitch and pressure angle, but not cutter numbers.
-    # The helix's transverse quantities and full depth follow its normal system.
-    cos_helix = math.cos(math.radians(spec.HELIX_ANGLE_DEG))
-    assert spec.CUTTER_DIAMETRAL_PITCH == pytest.approx(spec.DIAMETRAL_PITCH / cos_helix)
+    # The inclined teeth's transverse quantities and full depth follow its
+    # normal system.
+    cos_incline = math.cos(math.radians(spec.TOOTH_INCLINATION_DEG))
+    assert spec.CUTTER_DIAMETRAL_PITCH == pytest.approx(spec.DIAMETRAL_PITCH / cos_incline)
     assert spec.CUTTER_DIAMETRAL_PITCH == pytest.approx(
         spec.MM_PER_IN / _config.machine("gear_train", "crank_drive_normal_module_mm")
     )
-    assert math.tan(math.radians(spec.PRESSURE_ANGLE_DEG)) * cos_helix == pytest.approx(
+    assert math.tan(math.radians(spec.PRESSURE_ANGLE_DEG)) * cos_incline == pytest.approx(
         math.tan(math.radians(spec.CUTTER_PRESSURE_ANGLE_DEG))
     )
     assert spec.CUTTER_DIAMETRAL_PITCH == pinion_spec.DIAMETRAL_PITCH
@@ -474,16 +485,13 @@ def test_gear_data_numbers_track_the_part_geometry() -> None:
     )
     assert spec.CUTTER_NUMBER == 2 != pinion_spec.CUTTER_NUMBER
     assert spec.CUTTER_TEETH_RANGE == (55, 134)
-    assert spec.VIRTUAL_TEETH == pytest.approx(spec.TEETH / cos_helix**3)
+    assert spec.VIRTUAL_TEETH == pytest.approx(spec.TEETH / cos_incline**3)
     assert (
         spec.CUTTER_TEETH_RANGE[0] <= spec.VIRTUAL_TEETH <= spec.CUTTER_TEETH_RANGE[1]
     )
-    assert spec.HELIX_LEAD_MM == pytest.approx(
-        math.pi * spec.PITCH_DIA / math.tan(math.radians(spec.HELIX_ANGLE_DEG))
-    )
+    assert not hasattr(spec, "HELIX_LEAD_MM")
     assert f"{spec.VIRTUAL_TEETH:.{spec.GEAR_DATA_REFERENCE_PLACES}f}" in notes.GEAR_DATA
-    assert spec.inch_text(spec.HELIX_LEAD_MM, spec.GEAR_DATA_REFERENCE_PLACES) in notes.GEAR_DATA
-    assert "screw_sweep_bound_mm=NATIVE_SWEEP_BOUND_MM" in _build_source()
+    assert "flank_bound_mm=NATIVE_FLANK_BOUND_MM" in _build_source()
     profile = spec.STOCK_PROFILE
     assert spec.DEDENDUM_FACTOR == 1.25
     # Standard depth puts the cutter's reference pitch line on the gear's pitch
@@ -940,7 +948,8 @@ def test_both_shop_gears_state_the_source_owned_tooth_runout_not_a_form_class() 
     assert spec.TOOTH_RUNOUT_TIR_MM < 0.001 * spec.OUTSIDE_DIA
     assert "MHA-DT-10" in runout_row
     assert any(line.startswith("TRANSVERSE BACKLASH WITH MHA-DT-10") for line in lines)
-    # The 64T's block keeps its 19 lines and its widest row: an extra line or
-    # a wider row runs its last rows into the tooth tips.
-    assert len(lines) == 19
+    # The 64T's block keeps its 18 lines (one fewer since the straight tooth
+    # line replaced the helix and lead rows) and its widest row: an extra line
+    # or a wider row runs its last rows into the tooth tips.
+    assert len(lines) == 18
     assert len(runout_row) <= max(len(line) for line in lines if line is not runout_row)

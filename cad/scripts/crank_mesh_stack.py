@@ -1,18 +1,24 @@
 """Fixed-centre 16T:64T crossed mesh: dimensional stack and standard check.
 
-The 64T is a right-hand helix on the inclined cone axis, cut with the same
-normal 24DP PA20 stock cutter as the straight 16T. It is checked as an
-ordinary crossed pair in the 64T's normal section: the 64T takes its virtual
-radius R/cos^2(helix) and its thickness scales by cos(helix), while the 16T is
-already in that plane (to within the 0.52 deg crossing). The centre range is
+The 64T's straight teeth are inclined to the cone axis by the cone incline,
+right hand, cut with the same normal 24DP PA20 stock cutter as the straight
+16T. It is checked as an ordinary crossed pair in the 64T's normal section:
+the 64T takes its virtual radius R/cos^2(beta) and its thickness scales by
+cos(beta), while the 16T is already in that plane (to within the 0.52 deg
+crossing). The centre range is
 the closed-form sum of the printed and fitted terms below, each booked at the
 end that closes or opens the mesh. Everything is read from part specs and
 config. The native assembly interference gate checks the real flanks.
+
+The standard check books the centre at mid-face. Because the axes cross in
+plan, the centre closes toward the 64T's south face and opens toward its
+north face; ``station_checks`` reports that per face station, closed form,
+NOT gated (the margin it shows awaits an owner ruling, #2481).
 """
 from __future__ import annotations
 
 import math
-from dataclasses import replace
+from dataclasses import dataclass, replace
 
 import _config
 import dt_cone_pivot_post_spec as post
@@ -24,7 +30,14 @@ from cone_line import COS_I, POST_STATION, SIN_I
 from cone_stack_end_play import CONE_FLOAT_NORTH
 from _cone_axis_constants import GEAR_AXIS_SHIFT
 from gear_seat_fit import GEAR_SEAT_CLEARANCE
-from standard_mesh_checks import MeshCheck, check_mesh, plane_gear
+from standard_mesh_checks import (
+    MeshCheck,
+    backlash,
+    check_mesh,
+    interference_margin,
+    plane_gear,
+    root_clearance,
+)
 
 R64 = gear64.PITCH_DIA / 2.0
 R16 = pinion.PITCH_DIA / 2.0
@@ -99,7 +112,7 @@ CENTRE_RANGE_MM = (
     FRAME_C2C + sum(max(v, 0.0) for v in OPENING_TERMS.values()),
 )
 
-_BETA = math.radians(gear64.HELIX_ANGLE_DEG)
+_BETA = math.radians(gear64.TOOTH_INCLINATION_DEG)
 EQUIVALENT_RADIUS_GROWTH_64 = R64 / math.cos(_BETA) ** 2 - R64
 
 
@@ -124,12 +137,70 @@ def standard_check() -> MeshCheck:
     )
 
 
+# Mid-face's distance from where the axes cross in plan, along the 64T axis:
+# the plan offset FRAME_DX closes at tan(i) per unit of axis.
+PLAN_CROSSING_TO_MIDFACE = FRAME_DX * COS_I / SIN_I
+# South face, south quarter, mid-face, north quarter, north face (+ = north).
+FACE_STATIONS_MM = tuple(gear64.FACE_WIDTH * k for k in (-0.5, -0.25, 0.0, 0.25, 0.5))
+
+
+def centre_at_station(station_mm: float) -> float:
+    """Nominal centre distance at a 64T face station (mm north of mid-face)."""
+    plan = (PLAN_CROSSING_TO_MIDFACE + station_mm) * SIN_I / COS_I
+    return math.hypot(FRAME_DY, plan)
+
+
+@dataclass(frozen=True)
+class StationCheck:
+    station_mm: float
+    centre_shift_mm: float
+    backlash_min_mm: float  # every printed corner pair, both centre-range ends
+    interference_margin_mm: float  # at the closed end
+    root_clearance_mm: float  # at the closed end
+
+    def text(self) -> str:
+        return (
+            f"station {self.station_mm:+.3f} mm: centre {self.centre_shift_mm:+.4f}, "
+            f"backlash min {self.backlash_min_mm:.4f}, interference margin "
+            f"{self.interference_margin_mm:.3f}, root clearance {self.root_clearance_mm:.3f}"
+        )
+
+
+def station_checks() -> tuple[StationCheck, ...]:
+    """The standard check's corners at each face station's centre (reported only)."""
+    grow = EQUIVALENT_RADIUS_GROWTH_64
+    alpha = math.radians(gear64.CUTTER_PRESSURE_ANGLE_DEG)
+    pins = [plane_gear(profile, pinion.MODULE_MM) for _, profile in pinion.STOCK_PROFILE_CORNERS]
+    gears = [_normal_section_64(profile) for _, profile in gear64.STOCK_PROFILE_CORNERS]
+    rows = []
+    for station in FACE_STATIONS_MM:
+        shift = centre_at_station(station) - FRAME_C2C
+        closed = CENTRE_RANGE_MM[0] + grow + shift
+        rows.append(StationCheck(
+            station,
+            shift,
+            min(backlash(a, b, c + grow + shift, alpha)
+                for a in pins for b in gears for c in CENTRE_RANGE_MM),
+            min(interference_margin(a, b, closed, alpha) for a in pins for b in gears),
+            min(root_clearance(a, b, closed) for a in pins for b in gears),
+        ))
+    return tuple(rows)
+
+
+def station_text() -> str:
+    return "\n".join(
+        ["crank mesh by 64T face station (REPORTED, not gated; #2481):"]
+        + [f"  {row.text()}" for row in station_checks()]
+    )
+
+
 def stack_text() -> str:
     lines = [f"fixed-centre crank mesh: nominal C {FRAME_C2C:.4f} mm, range "
              f"{CENTRE_RANGE_MM[0]:.4f}..{CENTRE_RANGE_MM[1]:.4f} mm"]
     lines += [f"  closing {name:42s} {value:.5f}" for name, value in CLOSING_TERMS.items()]
     lines += [f"  opening {name:42s} {value:.5f}" for name, value in OPENING_TERMS.items()]
     lines.append("  " + standard_check().text())
+    lines.append(station_text())
     return "\n".join(lines)
 
 

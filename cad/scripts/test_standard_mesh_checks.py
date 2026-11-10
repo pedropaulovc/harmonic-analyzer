@@ -71,3 +71,18 @@ def test_crossed_crank_mesh_passes_the_standard_checks() -> None:
     check = crank_mesh_stack.standard_check()
     _require_no_bind(check)
     assert check.contact_ratio_nominal >= 1.0, check.text()
+
+
+def test_crank_mesh_station_report_resolves_the_centre_across_the_face() -> None:
+    """Reported, not gated (#2481): the axes cross in plan, so the centre
+    closes toward the 64T's south face. Mid-face is standard_check's centre."""
+    rows = crank_mesh_stack.station_checks()
+    assert [row.station_mm for row in rows] == list(crank_mesh_stack.FACE_STATIONS_MM)
+    shifts = [row.centre_shift_mm for row in rows]
+    assert shifts == sorted(shifts) and shifts[0] < 0.0 < shifts[-1]
+    middle = rows[len(rows) // 2]
+    assert middle.centre_shift_mm == pytest.approx(0.0, abs=1e-12)
+    assert middle.backlash_min_mm == pytest.approx(
+        crank_mesh_stack.standard_check().backlash_min_mm
+    )
+    assert "REPORTED, not gated; #2481" in crank_mesh_stack.stack_text()

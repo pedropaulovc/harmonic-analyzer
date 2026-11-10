@@ -8,11 +8,13 @@ The crank bore's configured height closes the mesh at the physical 64T
 centre without moving the 48DP cone stack or its face/seat datums.
 
 CROSSED-MESH CUT: the 64T rides the cone shaft while the straight 16T
-spins about machine z. The finite normal-24DP PA20 stock #2/55T master
-owns the actual tooth form. The complete physical-pitch material sector
-is a nominal normal-section screw sweep with a right-hand constant lead,
-not an ideal transverse N64 involute or a physical disc-cutter envelope.
-Actual crossed-mesh engineering acceptance remains separate from this CAD gate.
+spins about machine z. Its teeth are STRAIGHT, inclined to its axis by the
+cone incline, right hand (owner ruling 2026-11-10 on #2332, option A,
+superseding the true helix): each tooth space is the finite normal-24DP PA20
+stock #2/55T form, cut as a straight prism along the tooth line, its centre
+plane crossing the axis TOOTH_SPACE_CROSSING north of the south face
+(straight_gash). Actual crossed-mesh engineering acceptance remains separate
+from this CAD gate (crank_mesh_stack).
 
 Dimensions: cad/config/dimensions.yaml ch12 crank-drive gear row +
 Appendix C #9.
@@ -27,9 +29,9 @@ annulus remains intact. Its south face butts against the MHA-DT-04 thrust
 collar; the north face touches T120 in the solid cone-gear stack. The 64T
 has no tooth-to-key clock requirement.
 
-Layout: gear axis = Z through the origin, disc z = 0..FACE_WIDTH; the helix
-twist is symmetric about the mid-face plane (the assembly's phase math
-references the mid-face azimuth).
+Layout: gear axis = Z through the origin, disc z = 0..FACE_WIDTH with the
+SOUTH (collar) face at z = 0; a tooth is centred on +X on the pitch circle at
+mid-face (the assembly's phase math references the mid-face azimuth).
 
 Run (SolidWorks already open)::
 
@@ -61,7 +63,8 @@ from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawin
 from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension_symmetric_tolerance
 from _fit_deviations import deviations
 from _simplified_part import save_simplified_part
-from _gear import build_stock_form_gear, volume_check
+from _gear import volume_check
+from _straight_gash_gear import build_straight_gash_gear
 from _part_pmi import author_part_pmi
 from gear_face_band import GEAR_FACE_WIDTH_BAND
 from dt_crank_drive_gear_notes import GEAR_DATA
@@ -75,11 +78,15 @@ from dt_crank_drive_gear_spec import (
     KEYWAY_T_BAND,
     KEYWAY_WIDTH,
     KEYWAY_WIDTH_BAND,
-    NATIVE_SWEEP_BOUND_MM,
+    NATIVE_FLANK_BOUND_MM,
     OUTSIDE_DIA,
     OUTSIDE_DIA_TOLERANCE_MM,
-    STOCK_PROFILE,
     SURFACE_FINISHES,
+    TEETH,
+    TOOTH_INCLINATION_DEG,
+    TOOTH_SPACE,
+    TOOTH_SPACE_CROSSING,
+    TOOTH_SPACE_FORM,
     UNIT,
 )
 
@@ -162,6 +169,48 @@ def _verify_named_dimension(adapter, full_name: str, expected_mm: float) -> None
         )
 
 
+def _add_driving_tooth_inclination(adapter, axis_ray: str, tooth_ray: str) -> None:
+    """Author the acute angle between the two crossing-rooted rays as DRIVING.
+
+    build_dt_cone_pivot_post's ``_add_driving_plan_incline`` recipe: both rays
+    selected as segments, the text point on their bisector inside the acute
+    wedge, passed with sketch y in BOTH the y and the -z slots so it lands in
+    that wedge whether SOLIDWORKS reads it in sketch or model space, and the
+    value proven acute before the dimension is made driving.
+    """
+    from solidworks_mcp.adapters import sw_type_info as _sw_type_info
+    from solidworks_mcp.adapters.solidworks.sketch import _select_sketch_entities
+
+    half = math.radians(TOOTH_INCLINATION_DEG / 2.0)
+    text_radius_m = 0.004
+    text_x = -text_radius_m * math.sin(half)
+    text_y = -TOOTH_SPACE_CROSSING / 1000.0 - text_radius_m * math.cos(half)
+    model = adapter.currentModel
+    model.ClearSelection2(True)
+    _select_sketch_entities(adapter, [axis_ray, tooth_ray], 0)
+    extension = _sw_type_info.early_bound_or_flag(
+        model.Extension, "IModelDocExtension", "AddSpecificDimension"
+    )
+    display, status = extension.AddSpecificDimension(
+        text_x, text_y, -text_y, 3, 0  # swDimensionType_e.swAngularDimension
+    )
+    model.ClearSelection2(True)
+    if display is None:
+        raise RuntimeError(f"tooth inclination: AddSpecificDimension(angular) failed ({status})")
+    dimension = _early_bound(
+        _early_bound(display, "IDisplayDimension").GetDimension2(0), "IDimension"
+    )
+    actual = math.degrees(abs(float(dimension.SystemValue)))
+    if abs(actual - TOOTH_INCLINATION_DEG) > 1e-6:
+        raise RuntimeError(
+            f"tooth inclination measured {actual:.6f} deg, expected {TOOTH_INCLINATION_DEG:.6f} deg"
+        )
+    dimension.DrivenState = 2  # swDimensionDrivenState_e.swDimensionDriving
+    if int(dimension.DrivenState) != 2:
+        raise RuntimeError("tooth inclination did not become driving")
+    _telemetry.success(f"driving tooth inclination: {TOOTH_INCLINATION_DEG:.4f} deg")
+
+
 PART_NAME = "dt-crank-drive-gear"
 MATERIAL = "Plain Carbon Steel"  # p.20: dark gear, distinct from the brass train
 
@@ -189,10 +238,10 @@ async def build(adapter) -> dict[str, str]:
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # The shared helper sweeps the complete finite stock-form sector, including
-    # offcentre root-floor lobes; its phase and Green-volume gates precede pattern.
-    disc = await build_stock_form_gear(
-        adapter, STOCK_PROFILE, FACE_WIDTH, screw_sweep_bound_mm=NATIVE_SWEEP_BOUND_MM
+    # The shared helper cuts one straight stock-form tooth space through the
+    # full-tip blank, gates its volume and native flanks, then patterns it.
+    disc = await build_straight_gash_gear(
+        adapter, TOOTH_SPACE_FORM, TOOTH_SPACE, TEETH, flank_bound_mm=NATIVE_FLANK_BOUND_MM
     )
     volume = disc.volume
 
@@ -210,7 +259,7 @@ async def build(adapter) -> dict[str, str]:
         (name_dimensions(adapter, "GearBlank", ["FaceWidth"])[0], '"FaceWidth"')
     ]
 
-    # Cut one keyed bore through the finished helix: the bore's major arc
+    # Cut one keyed bore through the finished teeth: the bore's major arc
     # through local -X, closed on +X by the keyway's two sides and top. A
     # construction witness from the far (-X) arc wall, on the axis, to the
     # keyway top's midpoint owns the native T measurement (KeywayT, ANSI
@@ -351,12 +400,11 @@ async def build(adapter) -> dict[str, str]:
         expected, 0.03 * v_chamfer + 0.15,
     )
 
-    # The actual blank circle, as a REFERENCE sketch. The helix grows a complete
-    # stock material sector off an embedded base cylinder, so no solid feature
-    # owns the outside diameter -- yet the OD is the first size the turner sets
-    # and the print must carry it as a model dimension, not as text in the data
-    # block (drawing-simplicity-policy.md `How the repository implements the guidelines`'s "model it, even if that takes a hidden reference
-    # sketch whose one driving dimension IS the value"). Construction geometry:
+    # The actual blank circle, as a REFERENCE sketch. The OD is the first size
+    # the turner sets and the print must carry it as a model dimension, not as
+    # text in the data block (drawing-simplicity-policy.md `How the repository implements the guidelines`'s "model it, even if that takes a hidden reference
+    # sketch whose one driving dimension IS the value"); this sketch owns its
+    # band and callout whatever recipe cuts the teeth. Construction geometry:
     # its dimension imports onto the sheet, the circle itself is never drawn.
     check("create_sketch tip reference", await adapter.create_sketch("Front"))
     tip_ref = await define_circle(
@@ -378,6 +426,70 @@ async def build(adapter) -> dict[str, str]:
         display_unit=UNIT,
     )
 
+    # The tooth line, as a REFERENCE sketch on the Top plane, the plane
+    # section A-A cuts. Two construction rays share the crossing point, as
+    # the plan-angle rays of build_dt_cone_pivot_post do (two rays from one
+    # vertex enclose one acute wedge an angular dimension reads
+    # unambiguously): one north along the axis to the north face, one north
+    # along the tooth line. The crossing's station is dimensioned from the
+    # origin, the axis on the SOUTH face. Top-plane sketch x is model +X and
+    # sketch y model -Z. The tooth ray is a near-side (+Y, t = -X) tooth's
+    # line d = cos(beta) z - sin(beta) x projected onto the plane: it runs
+    # toward -X as z grows, as a right-hand gear's near teeth do seen with
+    # the axis left to right. The values are the spec's, which the tooth cut
+    # above was gated against.
+    tooth_line = SketchDims()
+    check("create_sketch tooth line reference", await adapter.create_sketch("Top"))
+    set_sketch_direct_db(adapter, True)
+    beta = math.radians(TOOTH_INCLINATION_DEG)
+    ray_length = (FACE_WIDTH - TOOTH_SPACE_CROSSING) / math.cos(beta)
+    axis_ray = check(
+        "tooth line axis ray",
+        await adapter.add_centerline(0.0, -TOOTH_SPACE_CROSSING, 0.0, -FACE_WIDTH),
+    )
+    tooth_ray = check(
+        "tooth line ray",
+        await adapter.add_centerline(
+            0.0,
+            -TOOTH_SPACE_CROSSING,
+            -ray_length * math.sin(beta),
+            -TOOTH_SPACE_CROSSING - ray_length * math.cos(beta),
+        ),
+    )
+    set_sketch_direct_db(adapter, False)
+    for label, first, second, relation in (
+        ("tooth line axis ray vertical", axis_ray, None, "vertical"),
+        ("crossing on the axis", f"{axis_ray}.start", "origin", "vertical_points"),
+        ("tooth ray from the crossing", f"{tooth_ray}.start", f"{axis_ray}.start", "coincident"),
+    ):
+        check(label, await adapter.add_sketch_constraint(first, second, relation))
+    check(
+        "tooth-space crossing station",
+        await adapter.add_sketch_dimension(
+            f"{axis_ray}.start", "origin", "vertical_distance", TOOTH_SPACE_CROSSING
+        ),
+    )
+    tooth_line.record("ToothSpaceCrossing")
+    check(
+        "tooth line axis ray to the north face",
+        await adapter.add_sketch_dimension(
+            f"{axis_ray}.end", "origin", "vertical_distance", FACE_WIDTH
+        ),
+    )
+    tooth_line.record("ToothLineAxisEnd")
+    check(
+        "tooth ray length",
+        await adapter.add_sketch_dimension(tooth_ray, None, "linear", ray_length),
+    )
+    tooth_line.record("ToothLineRayLength")
+    _add_driving_tooth_inclination(adapter, axis_ray, tooth_ray)
+    tooth_line.record("ToothInclination")
+    await ensure_fully_defined(adapter, "tooth line reference sketch")
+    check("exit_sketch tooth line reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "ToothLineReference")
+    tooth_line.apply(adapter, "ToothLineReference")
+    _verify_named_dimension(adapter, "ToothSpaceCrossing@ToothLineReference", TOOTH_SPACE_CROSSING)
+
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
 
@@ -393,6 +505,7 @@ async def build(adapter) -> dict[str, str]:
     # no assembly instance renders it (#880).  The drawing shows it per view
     # through _drawing_hidden_sketches to import those dimensions.
     blank_sketch(adapter, "OutsideDiaReference")
+    blank_sketch(adapter, "ToothLineReference")
     return await save_simplified_part(adapter, PART_NAME, disc.tooth_features)
 
 

@@ -4,7 +4,7 @@ The pinion on the crankshaft that meshes the dark steel crank-drive gear
 at the cone set's large end (`build_dt_crank_drive_gear.py`), implementing
 the book-stated 4:1 crank-to-cone reduction (p. 16). The straight 16T uses
 the pair's normal 24DP PA20 system with the finite stock #7/14T master,
-including its actual translated root floor; the helix lives on the 64T.
+including its actual translated root floor; the 64T carries the inclined teeth.
 A plain hub boss at the tooth root (ch12 p.19 page002_img02 / img06)
 carries the 1/8 in retention pin that keys the pinion to the crankshaft
 through a match-drilled radial cross-hole (dt_crank_pinion_spec).

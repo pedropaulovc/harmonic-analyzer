@@ -2,9 +2,11 @@ r"""Create the curated manufacturing drawing for the crank-drive gear (64T).
 
 Recreated under ``cad/docs/drawing-guidelines.md``. The sheet is a
 face view, a longitudinal centre section through the keyway and an isometric
-of a helical toothed disc with a round bore keyed on local +X, and six native
-model dimensions -- outside diameter, four-place face width, round bore
-diameter, keyway width and T, and south-entry chamfer -- plus the gear-data block drawing-guidelines.md rule 7 (notes: few, flagged, never a method) keeps
+of a toothed disc with straight teeth inclined to its axis and a round bore
+keyed on local +X, and eight native model dimensions -- outside diameter,
+four-place face width, round bore diameter, keyway width and T, south-entry
+chamfer, and the tooth inclination with the station where the tooth spaces
+cross the axis -- plus the gear-data block drawing-guidelines.md rule 7 (notes: few, flagged, never a method) keeps
 for the crossed-axis tooth system and one numbered note, the keyed bore's
 matched fit, that the bore and keyway dimensions link.
 
@@ -185,9 +187,18 @@ ROTATION_NOTE_XY = (
 # south witness line so neither witness line strikes the text (machinist
 # review r1 of #1641); the chamfer's leg dimension runs left off the south
 # face into the lane under the T callout, as RimChamferSize does.
+# The tooth line (ToothLineReference, owner ruling 2026-11-10 on #2332): its
+# two rays start on the axis TOOTH_SPACE_CROSSING right of the south face and
+# run right, the tooth ray falling toward the bore's far wall. The station
+# stands in the bore's open band above the axis with its text out left of
+# the south face, above the chamfer's block; the inclination's text sits on
+# the acute wedge's bisector just right of the north face, so the native
+# angle stays the acute one.
 SECTION_KEEP = {
     "FaceWidth": (SECTION_CENTER[0] - 0.040, SECTION_CENTER[1] + HALF_OD + 0.016),
     "BoreSouthChamferSize": (SECTION_CENTER[0] - 0.028, SECTION_CENTER[1] - 0.005),
+    "ToothSpaceCrossing": (SECTION_CENTER[0] - 0.014, SECTION_CENTER[1] + 0.0065),
+    "ToothInclination": (SECTION_CENTER[0] + 0.013, SECTION_CENTER[1] - 0.002),
 }
 # The face width's +/-.001 is the gear's term in the solid cone-gear stack
 # on the cone gear shaft (dt_cone_gear_stack); rule 4 asks that the stack be
@@ -258,6 +269,9 @@ DIMENSION_CALLOUTS = {
     "BoreSouthChamferSize": (
         " X 45\N{DEGREE SIGN}  \nCLEARS COLLAR ROOT  \nOF MHA-DT-04  "
     ),
+    # The crossing is a point on the axis, not an edge: the callout names it.
+    "ToothSpaceCrossing": "TOOTH-SPACE CENTRE\nPLANES CROSS AXIS",
+    "ToothInclination": "TOOTH LINE",
 }
 
 # The tip diameter lands on its near (upper right) rim and the round
@@ -277,12 +291,12 @@ SECTION_LINE_LANDING = (0.0, HALF_OD + SECTION_LINE_OVERRUN + 0.005)
 def _hide_tangent_edges(view: Any, label: str) -> None:
     """Drop a view's tangent edges, and prove they went.
 
-    On a 64-tooth TRUE helix every flank-to-tip and flank-to-root transition
-    projects as its own curve, so an edge-on view of the rim arrives as a
-    stripe field of 128 helical lines -- ink that carries no fact the gear
-    data does not state, and that no dimension can be placed on top of. The
-    isometric keeps its tangent edges: there the helix is the thing being
-    shown.
+    On 64 inclined teeth every flank-to-tip and flank-to-root transition
+    projects as its own line, so an edge-on view of the rim arrives as a
+    stripe field of 128 lines -- ink that carries no fact the section's tooth
+    line and the gear data do not state, and that no dimension can be placed
+    on top of. The isometric keeps its tangent edges: there the teeth are the
+    thing being shown.
     """
     view.SetDisplayTangentEdges2(0)
     if int(view.GetDisplayTangentEdges2()) != 0:
@@ -486,7 +500,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Crank-Drive Gear Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "crank-drive gear; steel; 64T helical",
+            3: "crank-drive gear; steel; 64T straight, inclined",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
