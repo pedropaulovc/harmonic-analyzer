@@ -23,7 +23,7 @@ hours_actual: 0
 - `references/machining-for-hobbyists-getting-started/03_chapter-1-machine-shop-overview.pdf`
 - PM-1127VF-LB manufacturer manual: unresolved pending build-year/nameplate
   verification and a matching manufacturer manual. Use the
-  [shop inventory](../../cad/process/shop/inventory.toml) for installed equipment.
+  [shop file](../../cad/process/shop.toml) for installed equipment.
 - `references/jet-bd-920n-operators-manual.pdf`, historical reference for the former JET only
 - `cad/docs/machining-dfm.md` — the fragile-feature list is the hazard list
 

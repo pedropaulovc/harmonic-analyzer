@@ -110,7 +110,7 @@ Watch the 4 mm floor under the knife-mount's Ø25.4 bore when you get to boring
 it — breakout there scraps the part.
 
 Standing a base bar on its end is out: 443 mm is more than the 17 in maximum
-from spindle to table (`cad/process/shop/inventory.toml`).
+from spindle to table (`cad/process/shop.toml` machines.pm-30mv).
 
 ## Sessions
 

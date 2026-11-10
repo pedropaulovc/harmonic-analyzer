@@ -176,13 +176,14 @@ Without a seat you can still run the offline gates
 (`uv run python -m doit check:math`), and every release ships the STEP, STL and
 glTF exports plus the drawing PDFs.
 
-Drawing-bound requirement manifests for the rocker arm, pivot shaft and cone
-pivot post are exported with named STEP face sets. Enrolled `prechips:<stem>`
-tasks bind the committed process plans to those exact exports and generate strict
-[prechips](https://github.com/pedropaulovc/prechips) travelers; only exit 0 passes
-the build and release gates. Releases include the verified travelers alongside
-their feature bundles. No plans are enrolled yet: the legacy plans are retained
-but must be migrated and pass on real geometry before enrollment. See the
+Drawing-bound requirement manifests are exported with named STEP face sets.
+`prechips:<stem>` tasks render a standalone HTML
+[prechips](https://github.com/pedropaulovc/prechips) traveler for each part
+in `_process_plans.TRAVELER_STEMS` (the oblique-trammel base bar, end bracket
+and feed lever) from its `cad/process/<stem>/plan.toml`, which reads that
+part's exported manifest. Only exit 0 passes the build and release gates, and
+releases include the generated travelers. Only the base-bar plan exists so far,
+and it does not pass yet. See the
 [export/traveler contract](cad/docs/pipeline/features-travelers.md).
 
 ## References
