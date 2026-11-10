@@ -1787,10 +1787,14 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
         # Owner ruling 2026-11-08 (Pedro): step 23 trusts the transfer
         # through the MHA-DT-20 reamed pivot bore, with the cone set at its
         # working position (the check 4D leaves): punch, lift off, spot-drill,
-        # drill and tap.  The swing check (23H) is the only acceptance, and
+        # drill and tap.  The swing check (23J) is the only acceptance, and
         # DT-00 prints no offset from the pedestal seats (FoFr #2261 owns D1
         # as a transfer).  The stop and lock seats are MHA-FR-01 print holes.
-        # Check 4 then sets the swing and clamps it.
+        # Check 4 then sets the swing and clamps it.  PR 2 machinist review
+        # round 6 (clarity): a seated screw's engagement cannot be read, so
+        # each blind seat's full-thread depth and its screw's thread length
+        # are recorded before the screw goes in; checks 4U and 4W take the
+        # lesser of the two.
         (
             "other-base-mounting",
             "CONE SET ON THE BASE: SET MHA-DT-20 ON THE CHECK 4D FEELER LEAVES.\n"
@@ -1799,9 +1803,12 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
             "LIFT MHA-DT-20 AND THE LEAVES OFF.\n"
             "SPOT-DRILL THE PUNCH MARK.\n"
             f"DRILL AND TAP {pivot_screw.THREAD} THERE PER MHA-FR-01.\n"
-            "RUN THE OILED MHA-DT-VN-52 DOWN THRU THE MHA-DT-20 PIVOT BORE UNTIL ITS "
-            "SHOULDER SEATS HARD ON THE BASE.\n"
+            "RECORD THE TAPPED HOLE'S FULL-THREAD DEPTH WITH A DEPTH GAUGE.\n"
+            "RECORD MHA-DT-VN-52'S THREAD LENGTH WITH CALIPERS.\n"
+            "RUN OILED MHA-DT-VN-52 THRU MHA-DT-20 UNTIL ITS SHOULDER SEATS.\n"
             "CHECK THAT MHA-DT-20 SWINGS FREELY UNDER THE HEAD.\n"
+            "RECORD THE STOP SEAT'S FULL-THREAD DEPTH WITH A DEPTH GAUGE.\n"
+            "RECORD MHA-SH-VN-52'S THREAD LENGTH WITH CALIPERS.\n"
             "RUN THE MHA-SH-VN-52 SWING STOP INTO MHA-FR-01 UNTIL IT SEATS.\n"
             "SWING THE CONE SET IN.\n"
             "RUN MHA-DT-VN-51 IN FINGER-LOOSE THRU THE MHA-DT-20 NOTCH.",
@@ -1894,10 +1901,12 @@ CHECKS = _note_text(
         "MHA-DT-12.",
         "4T. IF IT BINDS, STONE THE MHA-DT-12 TIP WHERE IT MARKS.",
         "4U. VERIFY MHA-DT-VN-52 FULL-FORM THREAD ENGAGEMENT "
-        f"{pivot_screw.MIN_USEFUL_ENGAGEMENT_TEXT}.",
+        f"{pivot_screw.MIN_USEFUL_ENGAGEMENT_TEXT}: THE LESSER READING OF STEPS "
+        f"{_step_ref('other-base-mounting', 'F')}-{_step_ref('other-base-mounting', 'G')}.",
         "4V. CHECK THAT MHA-DT-20 AND THE MHA-DT-VN-52 SHOULDER STAY SEATED.",
         "4W. VERIFY THE MHA-SH-VN-52 SWING STOP FULL-FORM THREAD ENGAGEMENT "
-        f"{stop_screw.MIN_USEFUL_ENGAGEMENT_TEXT}.",
+        f"{stop_screw.MIN_USEFUL_ENGAGEMENT_TEXT}: THE LESSER READING OF STEPS "
+        f"{_step_ref('other-base-mounting', 'K')}-{_step_ref('other-base-mounting', 'L')}.",
         "4X. CHECK THAT ITS HEAD IS FULLY SEATED.",
         # Rubric sample round 2: the notch's reference, the running direction
         # and the sine sense must be readable.  Notches up = cosine mode,

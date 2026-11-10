@@ -605,6 +605,33 @@ def test_cone_swing_check_requires_installed_stop_inspection_and_seating() -> No
     assert minimum <= stop_screw.MIN_USEFUL_ENGAGEMENT_MM + 1e-9
     assert "CHECK THAT ITS HEAD IS FULLY SEATED" in check
     assert "CHECK THAT MHA-DT-20 AND THE MHA-DT-VN-52 SHOULDER STAY SEATED" in check
+    _assert_engagement_cites_its_records(
+        check, "SWING STOP FULL-FORM", "THE STOP SEAT'S", "MHA-SH-VN-52'S THREAD LENGTH"
+    )
+
+
+def _assert_engagement_cites_its_records(
+    check: str, joint: str, seat: str, screw: str
+) -> None:
+    """PR 2 machinist review round 6: a seated screw's engagement cannot be
+    read, so the check takes the lesser of the seat's full-thread depth and
+    the screw's thread length, both recorded in step 23 before it goes in."""
+    import dt_drive_train_steps as steps
+
+    cited = re.search(
+        rf"{joint} THREAD ENGAGEMENT \.\d{{3}} MIN: THE LESSER READING OF STEPS (\d+\w)-(\d+\w)\.",
+        check,
+    )
+    assert cited is not None
+    number = steps.step_number("other-base-mounting")
+    assert all(ref.startswith(str(number)) for ref in cited.groups())
+    body = _rig_step_body("other-base-mounting")
+    seat_line, screw_line = (
+        re.search(rf"\b{ref}\. (.*?)(?= {number}[A-HJ-NP-Z]\. |$)", body).group(1)
+        for ref in cited.groups()
+    )
+    assert seat_line == f"RECORD {seat} FULL-THREAD DEPTH WITH A DEPTH GAUGE."
+    assert screw_line == f"RECORD {screw} WITH CALIPERS."
 
 
 def test_cone_swing_check_requires_pivot_thread_engagement() -> None:
@@ -619,6 +646,12 @@ def test_cone_swing_check_requires_pivot_thread_engagement() -> None:
     assert pivot_screw.THREAD_SOLID_DIA - 1e-9 <= minimum
     assert minimum <= pivot_screw.MIN_USEFUL_ENGAGEMENT_MM + 1e-9
     assert "MHA-DT-VN-52 SHOULDER STAY SEATED" in check
+    _assert_engagement_cites_its_records(
+        check,
+        "MHA-DT-VN-52 FULL-FORM",
+        "THE TAPPED HOLE'S",
+        "MHA-DT-VN-52'S THREAD LENGTH",
+    )
 
 
 def _flat(text: str) -> str:
