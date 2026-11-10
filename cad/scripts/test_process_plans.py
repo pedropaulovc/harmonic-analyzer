@@ -1214,30 +1214,35 @@ def test_revision_validation_names_authored_revision_line(synthetic, configured)
 
 @pytest.mark.parametrize("stem", ["ch_pivot_shaft", "dt_cone_pivot_post"])
 @pytest.mark.parametrize("check", [False, True])
-def test_held_v48_plan_rejects_v47_export_before_consumer_or_kernel(
+def test_held_plan_rejects_previous_revision_export_before_consumer_or_kernel(
     tmp_path, monkeypatch, stem, check
 ):
     from contextlib import nullcontext
     from types import SimpleNamespace
 
+    import _config
     import prechips_traveler as wrapper
 
+    # Held plans track release.yaml next_revision, so the stale export is the
+    # previous release; deriving both keeps this test valid across bumps.
+    current = _config.release_revision()
+    stale = f"v{int(current.removeprefix('v')) - 1}"
     assert plans.TRAVELER_STEMS == ()
-    plans.check_authored_plan_revision(stem, "v48")
+    plans.check_authored_plan_revision(stem, current)
     out = tmp_path / "out"
     manifest, step = plans.bundle_paths(stem, out)
     manifest.parent.mkdir(parents=True)
-    step.write_bytes(b"preserved v47 STEP bytes")
+    step.write_bytes(f"preserved {stale} STEP bytes".encode())
     manifest.write_text(
         f'part = "{stem.replace("_", "-")}"\n'
         f'step = "{step.name}"\n'
         f'step_sha256 = "{hashlib.sha256(step.read_bytes()).hexdigest()}"\n'
-        '[drawing]\nrevision = "v47"\n',
+        f'[drawing]\nrevision = "{stale}"\n',
         encoding="utf-8",
     )
     before = (manifest.read_bytes(), step.read_bytes())
-    with pytest.raises(plans.PlanBindError, match="differs from manifest 'v47'"):
-        plans.check_plan_revision(stem, out, revision="v48")
+    with pytest.raises(plans.PlanBindError, match=f"differs from manifest '{stale}'"):
+        plans.check_plan_revision(stem, out, revision=current)
 
     def forbidden(*args, **kwargs):
         pytest.fail("revision mismatch reached the consumer or kernel")
@@ -1266,7 +1271,7 @@ def test_held_v48_plan_rejects_v47_export_before_consumer_or_kernel(
     assert wrapper.main(argv) == 3
     assert len(errors) == 1
     assert isinstance(errors[0], plans.PlanBindError)
-    assert "differs from manifest 'v47'" in str(errors[0])
+    assert f"differs from manifest '{stale}'" in str(errors[0])
     assert (manifest.read_bytes(), step.read_bytes()) == before
     assert not (out / "travelers" / stem / "plan.toml").exists()
     assert not (out / "travelers" / stem / ".check" / "plan.toml").exists()
