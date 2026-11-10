@@ -271,7 +271,7 @@ class Leaf:
         )
         self.telemetry.event(
             f"{PREFIX}.child",
-            **{k: v for k, v in run.to_json().items() if v is not None},
+            **{f"child.{k}": v for k, v in run.to_json().items() if v is not None},
         )
         if rc in self.watchdog_codes:
             raise Fatal(f"{name}: watchdog exit {rc} (seat state unknown)", code=rc)
