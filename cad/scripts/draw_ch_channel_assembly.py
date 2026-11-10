@@ -137,7 +137,7 @@ from rocker_bank_layout import (
     ROCKER_SPRING_SET,
     ROCKER_SPRING_SET_BAND,
     SHAFT_TIP_SET_BAND,
-    STACK_L20_ACCEPT,
+    STACK_L20,
     STACK_MID_Z,
 )
 
@@ -1081,15 +1081,25 @@ def _fitup_text() -> dict[str, str]:
         return steps.step_number(key)
 
     # Every hub comes at or over its print length (its band is upper-only),
-    # so the shortest stack the part band allows still meets the acceptance's
-    # low limit: the stack can only be long, and the re-face step covers that.
+    # so the shortest stack the printed hub band allows still meets the
+    # printed stack's low limit (#2330: compared as printed, each at its own
+    # places): the stack can only be long, and the re-face step covers that.
     # It faces the longest hubs on the end away from datum G, the face each
     # arm registers on in the stack (draw_ch_rocker_arm), keeping each at or
     # over its print.
-    if COUNT * (HUB_LENGTH + HUB_LENGTH_BAND[1]) < STACK_L20_ACCEPT[0] - 1e-9:
+    hub_places = asm.HUB_LENGTH_PLACES
+    stack_places = asm.TOLERANCE_PRECISION[asm.STACK_LENGTH_DIMENSION]
+    stack_lower, _upper = asm.DIMENSION_TOLERANCES[asm.STACK_LENGTH_DIMENSION]
+    hub_low = asm.printed(HUB_LENGTH, hub_places) + asm.printed(
+        HUB_LENGTH_BAND[1], hub_places
+    )
+    stack_low = asm.printed(STACK_L20, stack_places) + asm.printed(
+        stack_lower, stack_places
+    )
+    if COUNT * hub_low < stack_low - 1e-9:
         raise AssertionError(
-            "the re-face step covers only a long stack, but the hub band "
-            "allows a stack under the acceptance's low limit"
+            "the re-face step covers only a long stack, but the printed hub "
+            "band allows a stack under the printed stack's low limit"
         )
     # The pivot shaft comes finished, domed both ends to its overall length
     # (ch_pivot_shaft_spec): its left tip set DOME_HEIGHT proud of the left

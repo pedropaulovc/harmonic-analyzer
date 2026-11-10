@@ -304,12 +304,17 @@ def test_the_stack_measuring_step_names_the_view_whose_dimension_carries_the_ban
     """r5 Opus C2 (rule 19): the fitter package prints the stack acceptance
     band on view D's native stack dimension (drawing policy: no limits in
     note text), so the measuring step names that view and the dimension
-    carries STACK_L20_ACCEPT."""
+    carries STACK_L20_ACCEPT's upper limit, its lower one carried down to the
+    printed hubs (#2330)."""
     assert drawing.ROCKER_BANK.title in drawing.FITUP_TEXT["rocker-stack-measured"]
     asm = drawing.asm
     lower, upper = asm.DIMENSION_TOLERANCES[asm.STACK_LENGTH_DIMENSION]
     nominal = asm.PIVOT_CHAIN_Z[3] - asm.PIVOT_CHAIN_Z[2]
-    assert (nominal + lower, nominal + upper) == pytest.approx(bank.STACK_L20_ACCEPT)
+    assert nominal == pytest.approx(bank.STACK_L20)
+    assert nominal + upper == pytest.approx(bank.STACK_L20_ACCEPT[1])
+    assert nominal + lower <= bank.STACK_L20_ACCEPT[0]
+    # 5.5563 +.0040/-.0003: no wider than the four-place grid needs.
+    assert (lower / 25.4, upper / 25.4) == pytest.approx((-0.0003, 0.0040), abs=1e-12)
 
 
 def test_each_stake_step_names_the_view_that_points_at_its_tap_mouth() -> None:
@@ -354,10 +359,26 @@ def test_each_stake_step_names_the_view_that_points_at_its_tap_mouth() -> None:
 
 def test_the_stack_step_says_which_way_and_where_to_re_face() -> None:
     """Machinist review (PR #1605): the hub band is upper-only, so the
-    shortest stack meets the acceptance's low limit; the re-face loops back
-    to the measurement."""
+    shortest stack of hubs in print meets the stack's printed low limit; the
+    re-face loops back to the measurement. #2330: both are read as printed,
+    each at its own places (.2778 x 20 = 5.5560 against 5.5563 -.0003)."""
+    import ch_rocker_arm_notes as rocker_notes
+
+    asm = drawing.asm
     assert HUB_LENGTH_BAND[1] == 0.0
-    assert bank.COUNT * (HUB_LENGTH + HUB_LENGTH_BAND[1]) >= bank.STACK_L20_ACCEPT[0] - 1e-9
+    hub_places = rocker_notes.DRAWING_PRECISION["Hub"]["HubLength"]
+    assert asm.HUB_LENGTH_PLACES == hub_places
+    stack_places = asm.TOLERANCE_PRECISION[asm.STACK_LENGTH_DIMENSION]
+    lower, _upper = asm.DIMENSION_TOLERANCES[asm.STACK_LENGTH_DIMENSION]
+    hub_low = round(HUB_LENGTH / 25.4, hub_places) + round(
+        HUB_LENGTH_BAND[1] / 25.4, hub_places
+    )
+    stack_low = round(bank.STACK_L20 / 25.4, stack_places) + round(
+        lower / 25.4, stack_places
+    )
+    assert hub_low == pytest.approx(0.2778)
+    assert stack_low == pytest.approx(5.5560)
+    assert bank.COUNT * hub_low >= stack_low - 1e-9
     refaced = _step_body("rocker-stack-refaced")
     assert "DATUM G" in refaced
     assert f"{HUB_LENGTH:.2f}" not in refaced
