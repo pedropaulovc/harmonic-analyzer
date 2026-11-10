@@ -1462,6 +1462,38 @@ than in their names.
 workflow identity. An unchanged Git commit does not by itself mean an unchanged
 key; compare these before reusing or resuming a run.
 
+### Experimental COM-conversation no-op replay (draft branch only)
+
+**This experiment is not a merge candidate. Do not run `build` or `release`
+on this branch.** The pool exports only the `build`/`release` dependency
+closures, so the branch adds `verify:replay_noop` to its own `build`
+dependencies (`_EXPERIMENT_VERIFY_NAMES` in `dodo.py`) without changing pool
+admission, seat settings or any part, assembly or drawing recipe. That
+default-graph change must never reach main. Submit **only** the diagnostic
+leaf from a clean, pushed experiment checkout, under the persistent launcher
+supervision described above:
+
+```powershell
+./scripts/farm-run.ps1 -Worktree C:/src/ha-com-replay-20261110 `
+  -PoolHome C:/src/solidworks-pool -Targets verify:replay_noop `
+  -LeafTimeout 30 -DisplayName 'COM replay no-op benchmark' `
+  -Tag replay-noop -ForceCacheRefresh verify:replay_noop `
+  -ForceCacheRefreshReason 'Measure fresh native record/replay, not cached'
+```
+
+The leaf (`cad/scripts/diagnostics/benchmark_replay_noop.py`) holds the seat
+and runs each native step as its own `run_build` subprocess with outputs
+redirected under `cad/out/reports/replay-noop/`: an unrecorded clean build of
+`pd_transgear_arm_plate` (W0), two recorded clean builds (L1/L2, W1/W2), a
+SolidWorks-free replay of L1 (`com_replay.py replay`, WR) with two negative
+controls, geometry digests of both recorded artefacts, and a rollback walk over
+a copy of the first. `report.json` holds the K1-K5 verdicts with their evidence
+and the R/U assumption map; only infrastructure or soundness faults (phase-0
+failure, a watchdog exit, a negative control answering NOOP, a seat-safety
+violation) fail the leaf. The engine (`_com_conversation.py`) and the CLI stay
+out of every recipe closure; `test_com_conversation.py` (enrolled in
+`check:recipe`) checks that and the offline record/replay contract.
+
 ### Readiness is not proof of a build
 
 `farm-launch started` means the wrapper initialized its log and startup record.

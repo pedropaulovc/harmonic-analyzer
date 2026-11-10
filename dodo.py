@@ -1411,6 +1411,10 @@ PACKAGE_NATIVE_PY = (SCRIPTS_DIR / "package_native.py").resolve()
 # verify:/check: task names (reused by build + release so a new gate is wired in
 # one place).
 _VERIFY_NAMES = ("soundness", "kinematics")  # need SW (spine); subsystems retired
+# EXPERIMENT BRANCH ONLY (experiment/com-replay-20261110): the pool exports
+# build/release closures, not arbitrary selected roots, so this leaf is on build
+# below for canonical admission. Never merge this wiring into the production graph.
+_EXPERIMENT_VERIFY_NAMES = ("replay_noop",)
 # Offline checks REQUIRED on every build/release (fast, high-value):
 _CHECK_NAMES = (
     "math",
@@ -3303,6 +3307,32 @@ def _verify_task(name: str) -> dict[str, Any]:
             "clean": True,
             "verbosity": 2,
         }
+    if name == "replay_noop":
+        # EXPERIMENT ONLY: COM-conversation record/replay no-op benchmark. The
+        # leaf runs the stem's and the control stem's real part scripts, so their
+        # part recipes are inputs; only forced-refresh native runs are evidence.
+        script = (SCRIPTS_DIR / "diagnostics" / "benchmark_replay_noop.py").resolve()
+        stem, control_stem = "pd_transgear_arm_plate", "pd_transgear_arm"
+        cmd = [sys.executable, str(script), "benchmark", "--stem", stem,
+               "--control-stem", control_stem]
+        deps = sorted({
+            *_executed_closure([*cmd, str(SCRIPTS_DIR / "com_replay.py")]),
+            *_part_file_deps(SCRIPTS_DIR / f"build_{stem}.py", stem),
+            *_part_file_deps(SCRIPTS_DIR / f"build_{control_stem}.py", control_stem),
+            _submodule_assembly_dep(),
+        })
+        return {
+            "name": name,
+            "file_dep": deps,
+            "targets": _canonical_targets(f"verify:{name}"),
+            "uptodate": [not _cache.forced_refresh(f"verify:{name}")],
+            "actions": [(_cached_com_action, [
+                f"verify:{name}", cmd, deps,
+                [REPORTS / "replay-noop"], "verify-replay-noop",
+            ])],
+            "clean": True,
+            "verbosity": 2,
+        }
     raise ValueError(f"unknown canonical task: verify:{name}")
 
 
@@ -3314,7 +3344,7 @@ def task_verify():
     output. The ``verify:`` prefix marks them SolidWorks-dependent (vs the
     SolidWorks-free ``check:`` tasks).
     """
-    for name in _VERIFY_NAMES:
+    for name in (*_VERIFY_NAMES, *_EXPERIMENT_VERIFY_NAMES):
         yield _verify_task(name)
 
 
@@ -3967,6 +3997,8 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         # The threaded-joint retention audit's logic, and the joint table's
         # coverage of every threaded part the assemblies reference.
         SCRIPTS_DIR / "test_joint_retention.py",
+        # EXPERIMENT BRANCH ONLY: offline COM-conversation record/replay engine.
+        SCRIPTS_DIR / "test_com_conversation.py",
     ]
     # These are runtime-read rather than imported, so module_deps_of cannot
     # discover them. A prompt/schema edit must invalidate check:recipe and rerun
@@ -4993,6 +5025,9 @@ def task_build():
             + [f"drawing:{s}" for s in _drawing_order()]
             + [f"check:machinist_review:{s}" for s, _mode in _reviewed_drawings()]
             + [f"verify:{s}" for s in _VERIFY_NAMES]
+            # EXPERIMENT ONLY: required in the pool's exported build closure.
+            # Submit only the selected experiment leaf, never build/release.
+            + [f"verify:{s}" for s in _EXPERIMENT_VERIFY_NAMES]
             + [f"prechips:{stem}" for stem in _process_plans.TRAVELER_STEMS]
         ),
     }
@@ -5025,7 +5060,7 @@ def _canonical_subtask_names(family: str) -> list[str]:
     if family == "drawing":
         return _drawing_order()
     if family == "verify":
-        return list(_VERIFY_NAMES)
+        return [*_VERIFY_NAMES, *_EXPERIMENT_VERIFY_NAMES]
     if family == "check":
         return [
             *_check_task_names(),
@@ -5057,6 +5092,9 @@ def _canonical_targets(name: str) -> list[str]:
     if family == "verify_soundness":
         return [str(REPORTS / f"verify-soundness-{subname.replace('_', '-')}.ok")]
     if family == "verify":
+        if subname == "replay_noop":
+            directory = REPORTS / "replay-noop"
+            return [str(directory / "report.json"), str(directory / "spans.jsonl")]
         return [str(REPORTS / f"verify-{subname}.ok")]
     if family == "check":
         if subname.startswith("machinist_review:"):
@@ -5270,7 +5308,7 @@ def canonical_target_owners(paths: Iterable[str] | None = None) -> dict[str, str
         include(f"verify_soundness:{stem}")
     for stem in DRAWINGS_BY_NAME:
         include(f"drawing:{stem}")
-    for name in _VERIFY_NAMES:
+    for name in (*_VERIFY_NAMES, *_EXPERIMENT_VERIFY_NAMES):
         include(f"verify:{name}")
     for name in _check_task_names():
         include(f"check:{name}")
