@@ -19,19 +19,17 @@ from _drawing_precision import _named_dimension
 from _fit_deviations import deviations
 from dt_cone_gear_notes import BLANK_DIA_REFERENCE_SKETCH
 from dt_cone_gear_spec import (
-    BORE_DIA_BAND,
     BORE_SKETCH,
     CONFIGS,
     CONFIGURATION_TEETH,
-    D_BORE_TEETH,
     FACE_WIDTH,
     GAP_FLOOR_SKETCH,
     KEYED_BORE_SKETCH,
-    MACHINED_WEB_TARGET_MM,
     MM_PER_IN,
+    ROUND_BORE_TEETH,
     TOOTH_REFERENCE_SKETCH,
-    WEB_EXCEPTIONS_MM,
     blank_dia_band,
+    bore_dia_band,
     bore_dia_mm,
     floor_limits_mm,
     floor_radius_max_mm,
@@ -42,26 +40,27 @@ from dt_cone_gear_spec import (
     stock_form_profile,
     tooth_features,
     tooth_thickness_band,
+    web_required_mm,
 )
 import cone_land_key
 
 _TOL_BILAT = 2  # swTolType_e.swTolBILAT
 _TOL_LIMIT = 3  # swTolType_e.swTolLIMIT
 
-# The bore features, cut before sketch (dependents before parents). The D
-# (BoreProfile/BoreCut) stays live in EVERY configuration, as on main: its
-# marked dimensions are written, and the part saved, with T120 active, and
-# drawing:dt_cone_gear (7f1dedc) imported none of them on T006 once the D was
-# suppressed in T120 and marked with T024 active. On T030..T120 and the
-# unplaced Default (T120's globals) its Ø.375 with the placeholder flat lies
-# inside the round part of the keyed bore cut over it, so the bore is the
-# keyed one. The keyed bore is suppressed on T006..T024, whose small bores
-# it cannot solve on, and is live in T120 when it is marked and saved.
+# The bore features, cut before sketch (dependents before parents). The
+# round bore (BoreProfile/BoreCut) stays live in EVERY configuration: its
+# marked dimension is written, and the part saved, with T120 active, and
+# drawing:dt_cone_gear (7f1dedc) imported none of a bore's dimensions once
+# its owner was suppressed in T120 and marked with another configuration
+# active. On T030..T120 and the unplaced Default (T120's globals) its
+# diameter is "BoreDia", the keyed bore's own round part, so the union cut is
+# the keyed bore. The keyed bore is suppressed on T012..T024, whose small
+# bores it cannot solve on, and is live in T120 when it is marked and saved.
 BORE_CUT = "BoreCut"
 KEYED_BORE_CUT = "KeyedBoreCut"
-D_BORE_FEATURES = (BORE_CUT, BORE_SKETCH)
+ROUND_BORE_FEATURES = (BORE_CUT, BORE_SKETCH)
 KEYED_BORE_FEATURES = (KEYED_BORE_CUT, KEYED_BORE_SKETCH)
-D_BORE_CONFIGURATIONS = frozenset(f"T{teeth:03d}" for teeth in D_BORE_TEETH)
+ROUND_BORE_CONFIGURATIONS = frozenset(f"T{teeth:03d}" for teeth in ROUND_BORE_TEETH)
 # The configuration every marked dimension's owner is live in: marks, bands
 # and places are written, and the part is saved, with it active.
 MARKING_CONFIGURATION = "T120"
@@ -69,17 +68,21 @@ MARKING_CONFIGURATION = "T120"
 
 def foreign_bore_features(configuration: str) -> tuple[str, ...]:
     """The bore features ``configuration`` suppresses."""
-    if configuration in D_BORE_CONFIGURATIONS:
+    if configuration in ROUND_BORE_CONFIGURATIONS:
         return KEYED_BORE_FEATURES
     return ()
 
 
-# The two bilateral bands T006 overrides (pending exception ruling #971); every other
-# configuration carries the shared band. The tip diameter's band rides the
-# side view's witness, the printed dimension (dt_cone_gear_notes).
+# The configuration-specific bilateral bands, each written into (and read
+# back from) every configuration: the round bore's reamer band on T012/T018
+# and seat band on T024..T120 (bore_dia_band; the bore is live in every
+# configuration since the T120 marking fix), and the shared blank and
+# tooth-thickness bands. The tip diameter's band rides the side view's
+# witness, the printed dimension (dt_cone_gear_notes).
 _BANDED_DIMENSIONS = (
     (BLANK_DIA_REFERENCE_SKETCH, "BlankDia", blank_dia_band),
     (TOOTH_REFERENCE_SKETCH, "ToothThickness", tooth_thickness_band),
+    (BORE_SKETCH, "BoreCutDia", bore_dia_band),
 )
 
 
@@ -109,7 +112,8 @@ def _assert_gap_floor_limits(adapter: Any, configuration: str, teeth: int) -> No
 
 
 def _assert_configuration_bands(adapter: Any, configuration: str, teeth: int) -> None:
-    """Read FloorDia, BlankDia and ToothThickness back in the active configuration."""
+    """Read FloorDia and the configuration's banded dimensions back in the
+    active configuration."""
     _assert_gap_floor_limits(adapter, configuration, teeth)
     for feature, name, band_for in _BANDED_DIMENSIONS:
         _display, dimension = _named_dimension(adapter, feature, name)
@@ -127,8 +131,8 @@ def _assert_configuration_bands(adapter: Any, configuration: str, teeth: int) ->
                 f"expected bilateral {expected} mm"
             )
     _telemetry.success(
-        f"{configuration}: blank {blank_dia_band(teeth)} and tooth-thickness "
-        f"{tooth_thickness_band(teeth)} bands"
+        f"{configuration}: blank {blank_dia_band(teeth)}, tooth-thickness "
+        f"{tooth_thickness_band(teeth)} and bore {bore_dia_band(teeth)} bands"
     )
 
 
@@ -368,7 +372,7 @@ async def _configuration_topology(
                     )
     # The configuration carries its bore (_restrict_bores), error-free.
     foreign_bores = foreign_bore_features(configuration)
-    for feature_name in (*D_BORE_FEATURES, *KEYED_BORE_FEATURES):
+    for feature_name in (*ROUND_BORE_FEATURES, *KEYED_BORE_FEATURES):
         raw_feature = part.FeatureByName(feature_name)
         if raw_feature is None:
             feature_issues.append(f"missing native feature {feature_name}")
@@ -409,12 +413,12 @@ async def _configuration_topology(
         if keyed(teeth):
             # The keyway's top corner at the print limits (cone_land_key).
             maximum_bore_radius = cone_land_key.hub_keyway_corner_radius_max_mm(
-                bore_dia_mm(teeth) + BORE_DIA_BAND[1]
+                bore_dia_mm(teeth) + bore_dia_band(teeth)[1]
             )
             required_web = keyway_web_required_mm(teeth)
         else:
-            maximum_bore_radius = (bore_dia_mm(teeth) + BORE_DIA_BAND[0]) / 2.0
-            required_web = WEB_EXCEPTIONS_MM.get(teeth, MACHINED_WEB_TARGET_MM)
+            maximum_bore_radius = (bore_dia_mm(teeth) + bore_dia_band(teeth)[0]) / 2.0
+            required_web = web_required_mm(teeth)
         minimum_web = native_min - maximum_bore_radius
         root_observation = (
             f", native_root_min={native_min:.6f}, native_root_max={native_max:.6f}, "

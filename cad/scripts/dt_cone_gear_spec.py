@@ -1,13 +1,18 @@
 r"""Closed-form stock-cutter authority shared by the cone family and its drawing.
 
-Every count T006..T120 is cut by its standard 48DP PA20 rotary cutter (the
-approved DT6-FORM1 tool for T006) set at the standard depth: the cutter's
-reference pitch line lies on the gear's own pitch circle, so the nominal pitch
-thickness is the cutter's. The blank is the AGMA standard outside diameter
-(N + 2)/DP, capped where the cutter's finite form stops supporting a tip at
-either thickness limit. Nothing here reads measured or proof data; the mesh
-is checked in closed form by ``standard_mesh_checks`` and natively by the
-assembly interference gate.
+Every count T006..T120 on the cone line (CONE_TEETH) is cut by its standard
+48DP PA20 rotary cutter (the approved DT6-FORM1 tool for T006) set at the
+standard depth: the cutter's reference pitch line lies on the gear's own pitch
+circle, so the nominal pitch thickness is the cutter's. The blank is the AGMA
+standard outside diameter (N + 2)/DP, capped where the cutter's finite form
+stops supporting a tip at either thickness limit. Nothing here reads measured
+or proof data; the mesh is checked in closed form by ``standard_mesh_checks``
+and natively by the assembly interference gate.
+
+The tooth-form layer serves every cone on the line; the MHA-DT-03 family
+(CONFIGURATION_TEETH) is T012..T120.  T006 is its own part, MHA-DT-37
+(dt_cone_tip_gear_spec: six leaves with an integral spigot and pivot; owner
+decision 2026-11-09, C1 keyed, PR #1992), which reads its tooth form here.
 """
 
 from __future__ import annotations
@@ -20,18 +25,13 @@ from typing import Any
 
 import _config
 import cone_land_key
+import cone_tip_cluster
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _package_units import drawing_unit
 from cone_pitch import SEAT_PITCH
 from gear_face_band import GEAR_FACE_WIDTH_BAND
-from cone_shaft_land_bands import (
-    FLAT_AF_BAND,
-    SECTION_CONE_GEAR_TEETH,
-    SECTION_DIA_BANDS,
-    SECTION_FLAT_AF,
-    TERMINAL_DIA_MM,
-)
-from gear_seat_fit import flat_bore_af_band, seat_bore_band
+from cone_shaft_land_bands import GEAR_SEAT_BAND, SECTION_CONE_GEAR_TEETH
+from gear_seat_fit import seat_bore_band
 from stock_form_cutter import (
     CustomSixCutter,
     StockFormProfile,
@@ -67,21 +67,26 @@ def inch_text(value_mm: float, places: int) -> str:
 
 
 # Family alloy split (config-owned, cad/config/parts/dt-cone-gear.yaml): the
-# title-block material (C36000) covers T030-T120; the four tip gears are the
-# harder alloy below (dimensions.yaml ch.12 p.21).
+# title-block material (C36000) covers T030-T120; the three tip gears
+# T012-T024 are the harder alloy below (dimensions.yaml ch.12 p.21), as is
+# T006 (MHA-DT-37).
 _MFG = _config.parts("dt-cone-gear")
 BODY_MATERIAL_SPEC = str(_MFG["material_specification"])
 TIP_MATERIAL_SPEC = str(_MFG["material_tip_specification"])
 
 TEETH = int(_config.machine("gear_train", "fundamental_cone_teeth"))
-CONFIGURATION_TEETH = tuple(range(6, TEETH + 1, 6))
+# Every cone on the line, T006 included: its tooth form and its mesh.
+CONE_TEETH = tuple(range(6, TEETH + 1, 6))
+# The MHA-DT-03 family's configurations; T006 is MHA-DT-37.
+CONFIGURATION_TEETH = CONE_TEETH[1:]
 CONFIGS = tuple((f"T{n:03d}", n) for n in CONFIGURATION_TEETH)
 DEFAULT_TEETH = CONFIGURATION_TEETH[-1]
 
 
 def tooth_features(teeth: int) -> tuple[str, str, str]:
-    """Distinct real topology for one configured finite cutter profile."""
-    if teeth not in CONFIGURATION_TEETH:
+    """Distinct real topology for one finite cutter profile (sketch, cut,
+    pattern); MHA-DT-37 names its T006 row the same way."""
+    if teeth not in CONE_TEETH:
         raise ValueError(f"unsupported cone-gear tooth count {teeth}")
     suffix = f"T{teeth:03d}"
     return tuple(f"{stem}{suffix}" for stem in (
@@ -159,7 +164,7 @@ def _custom_six_relief(involute_only: CustomSixCutter) -> TrochoidRelief:
 
 def cutter_template(teeth: int) -> Any:
     """Canonical stock master or the explicitly approved finite N6 tool."""
-    _require_member(teeth)
+    _require_cone(teeth)
     if teeth == 6:
         args = (
             DIAMETRAL_PITCH, PRESSURE_ANGLE_DEG, CUSTOM_SIX_ROOT_RADIUS_MM,
@@ -171,9 +176,16 @@ def cutter_template(teeth: int) -> Any:
     return template_for_teeth(teeth, DIAMETRAL_PITCH, PRESSURE_ANGLE_DEG)
 
 
-def _require_member(teeth: int) -> None:
-    if type(teeth) is not int or teeth not in CONFIGURATION_TEETH:
+def _require_cone(teeth: int) -> None:
+    """Any cone on the line: the tooth-form layer (T006 included)."""
+    if type(teeth) is not int or teeth not in CONE_TEETH:
         raise ValueError(f"unsupported cone-gear tooth count {teeth}")
+
+
+def _require_member(teeth: int) -> None:
+    """A configuration of the MHA-DT-03 family: bores, alloys, sheets."""
+    if type(teeth) is not int or teeth not in CONFIGURATION_TEETH:
+        raise ValueError(f"T{teeth} is not an MHA-DT-03 configuration")
 
 
 def standard_translation_mm(teeth: int) -> float:
@@ -190,7 +202,7 @@ class _Member:
 
 @lru_cache(maxsize=None)
 def _member(teeth: int) -> _Member:
-    _require_member(teeth)
+    _require_cone(teeth)
     cutter = cutter_template(teeth)
     translation = standard_translation_mm(teeth)
     pitch_radius = teeth * MODULE_MM / 2.0
@@ -232,21 +244,20 @@ def _member(teeth: int) -> _Member:
     error = max(corner.geometry_error_bound_mm for corner in corners)
     minimum = inch_grid_mm(2.0 * (root_min - error), places, math.floor)
     maximum = inch_grid_mm(2.0 * (root_max + error), places, math.ceil)
-    maximum_bore = inch_grid_mm(
-        bore_dia_mm(teeth) + BORE_DIA_BAND[0], BORE_BAND_PLACES, math.ceil
-    )
-    web_required = WEB_EXCEPTIONS_MM.get(teeth, MACHINED_WEB_TARGET_MM)
-    if (minimum - maximum_bore) / 2.0 < web_required - 1e-9:
-        raise ValueError(f"T{teeth:03d}: printed root misses the retained web")
-    # A keyed gear's ligament is shortest at its keyway's top corner
-    # (cone_land_key): at least the .080 target, or its recorded minor.
-    if keyed(teeth) and _keyway_web_mm(teeth, minimum) < keyway_web_required_mm(teeth) - 1e-9:
-        raise ValueError(f"T{teeth:03d}: printed root misses the keyway corner's web")
+    # The family's bore webs (T006 has no bore: MHA-DT-37 proves its spigot
+    # and pivot under the root MIN).  A keyed gear's ligament is shortest at
+    # its keyway's top corner (cone_land_key): at least the .080 target, or
+    # its recorded minor.
+    if teeth in CONFIGURATION_TEETH:
+        if keyed(teeth):
+            if _keyway_web_mm(teeth, minimum) < keyway_web_required_mm(teeth) - 1e-9:
+                raise ValueError(f"T{teeth:03d}: printed root misses the keyway corner's web")
+        elif _round_bore_web_mm(teeth, minimum) < web_required_mm(teeth) - 1e-9:
+            raise ValueError(f"T{teeth:03d}: printed root misses the retained web")
     # T006 root (re-derived for option (a), replacing the D2.346 MIN of the
     # retired R1.491 tool): the standard-depth thick corner sits the tool root
     # R1.10 on the gear's own axis offset 0, so the root MAX is D2.20; the thin
-    # corner's -0.032 translation gives the MIN. The web above is the strength
-    # floor: D >= the MAX bore + 2 x 0.62.
+    # corner's -0.032 translation gives the MIN.
     if teeth == 6 and not math.isclose(
         root_max, CUSTOM_SIX_ROOT_RADIUS_MM + max(translations), abs_tol=error
     ):
@@ -291,7 +302,7 @@ _OVER_PINS_SAMPLES = 2000
 
 
 def over_pins_pin_dia_mm(teeth: int) -> float:
-    _require_member(teeth)
+    _require_cone(teeth)
     return CUSTOM_SIX_PIN_DIA_MM if teeth == 6 else OVER_PINS_PIN_DIA_MM
 
 
@@ -343,29 +354,33 @@ def over_pins_limits_mm(teeth: int) -> tuple[float, float]:
 
 BORE_DIA = cone_land_key.LAND_DIA_MM  # 3/8 (.3750) at T120; smaller on the tip gears
 # Face width (user ruling 2026-09-28): the cone set is a solid stack.  Every
-# gear is one seat pitch thick, so each bears on its neighbour and the stack
-# on MHA-DT-07 sets every station (dt_cone_gear_stack); no gear is bonded.  The
-# face is SEAT_PITCH floored to four millimetre places, so the modelled stack
-# closes without interference; it is a stack closure, so it is not snapped
-# to the inch grid and prints .2707 at four inch places, inside its band.
-# Every gear grew SOUTH: its north face
-# stays on the station layout (cone_line), so T006's north face -- the
-# datum the MHA-DT-VN-54 stack collar is feelered off -- does not move.  The band
-# is the cylinder bank's L20 d' rule (+/-.001 in per gear, the 20-gear stack
-# accepted at +/-0.20 mm), so it is faced to a micrometer on both sides.
+# gear is one seat pitch thick, so each bears on its neighbour
+# (dt_cone_gear_stack).  That ruling's "no gear is bonded" is superseded by
+# the owner decision 2026-11-09 (C1 keyed, PR #1992): T024 is bonded on land
+# 2 and T018/T012 on MHA-DT-37's spigot; T030..T120 still float on the key.
+# The face is SEAT_PITCH floored to four millimetre places, so the modelled
+# stack closes without interference; it is a stack closure, so it is not
+# snapped to the inch grid and prints .2707 at four inch places, inside its
+# band.  Every gear grew SOUTH: its north face stays on the station layout
+# (cone_line).  The band is the cylinder bank's L20 d' rule (+/-.001 in per
+# gear, the 20-gear stack accepted at +/-0.20 mm), so it is faced to a
+# micrometer on both sides.
 FACE_WIDTH = math.floor(SEAT_PITCH * 1e4) / 1e4
 FACE_WIDTH_BAND = GEAR_FACE_WIDTH_BAND
-# Flat clock (user ruling 2026-09-28): the bore's D-flat is the gear's
-# angular datum on MHA-DT-04, and its outward normal passes through the centre
-# of the phase-0 tooth on local +X, so every gear keeps the clock it is
-# placed at.  On the keyed land 1 (owner decision 2026-11-09, C1 keyed, PR
-# #1992) the hub keyway takes the flat's place on the same +X clock.  The
-# flat (keyway) and the phase-0 tooth share the front view's drawn +X
-# centreline (drawing-guidelines rule 26: features in line share a drawn
-# centreline), so the clock is the title block's angle and takes no
-# dimension: the error budget's cone_flat_clock closes at it (machinist
-# review of the C1-keyed sheets, PR 2 round 2: a ±.25° clock in DETAIL A
-# named a tooth the detail does not draw, and no mate).
+# Keyway clock: on the keyed land 1 (owner decision 2026-11-09, C1 keyed, PR
+# #1992) the hub keyway is the gear's angular datum on MHA-DT-04, and its
+# centreline passes through the centre of the phase-0 tooth on local +X, so
+# every keyed gear keeps the clock it is placed at.  The keyway and the
+# phase-0 tooth share the front view's drawn +X centreline (drawing-guidelines
+# rule 26: features in line share a drawn centreline), so the clock is the
+# title block's angle and takes no dimension: the error budget's
+# cone_flat_clock closes at it (machinist review of the C1-keyed sheets, PR 2
+# round 2: a ±.25° clock in DETAIL A named a tooth the detail does not draw,
+# and no mate).  The round bonded tip gears T012..T024 carry no clock on
+# their bores: MHA-DT-00 step 1S engages the MHA-DT-03-TL-02 comb while the
+# bond cures, its blades phasing T024, T018, T012 and T006 each to the keyed
+# T030 (owner ruling 2026-11-10 via PR #1992; dt_cone_gear_tl_phasing_comb_spec,
+# error_budget.yaml cone_tip_bond_clock).
 
 
 def floor_radius_min_mm(teeth: int) -> float:
@@ -395,17 +410,21 @@ def gap_floor_deviations_mm(teeth: int) -> tuple[float, float]:
 
 
 def bore_dia_mm(teeth: int) -> float:
-    """Return the configured bore that fits the matching stepped-shaft land."""
+    """Return the configured bore: T012/T018 reamed for MHA-DT-37's spigot,
+    T024 for land 2 of MHA-DT-04, T030..T120 for the keyed land 1."""
     _require_member(teeth)
-    # T006/T012 share the actual terminal reader. Their strength acceptance
-    # is rederived below from the current cutter-owned printed floor MINs.
-    if teeth <= 12:
-        return TERMINAL_DIA_MM
-    if teeth == 18:
-        return 3.175  # 1/8 (.1250)
+    if teeth <= 18:
+        return cone_tip_cluster.STEM_BORE_DIA_MM  # .0625
     if teeth == 24:
         return 6.35  # 1/4 (.2500)
     return BORE_DIA
+
+
+def bore_dia_band(teeth: int) -> tuple[float, float]:
+    """(upper, lower) band of the configuration's bore: the stem reamer's on
+    T012/T018, the gear-seat class (BORE_DIA_BAND) on every land."""
+    _require_member(teeth)
+    return cone_tip_cluster.STEM_BORE_BAND if teeth <= 18 else BORE_DIA_BAND
 
 
 def material_specification(teeth: int) -> str:
@@ -414,55 +433,30 @@ def material_specification(teeth: int) -> str:
     return TIP_MATERIAL_SPEC if teeth <= 24 else BODY_MATERIAL_SPEC
 
 
-FAMILY_BORES_MM = {teeth: bore_dia_mm(teeth) for teeth in CONFIGURATION_TEETH}
-
-# The special webs: the user's T006 >=0.62 ruling, and T012's .0797 in on the
-# .031 terminal land (#290; owner minor RV-03 in cad/config/parts/
-# dt-cone-gear.yaml: .0003 in under the .080 target, above the .060 floor).
-# Every other gear must achieve the ordinary .080 in target, not merely the
-# hard floor (rule 17 on an inch sheet, _inch_wall_limits).  These are
+# The bore webs under rule 17's .080 target (rule 17 on an inch sheet,
+# _inch_wall_limits): T012's .0646 in, its Ø.0625 reamed bore on MHA-DT-37's
+# spigot under the cutter-native T012 root (owner minor RV-03 in
+# cad/config/parts/dt-cone-gear.yaml, owner ruling 2026-11-09 via PR #1992:
+# .0154 in under the target, above the .060 floor).  Every other round bore
+# keeps the ordinary .080 in target, not merely the hard floor.  These are
 # acceptance inputs; the factory checks every actual cutter corner.
 MACHINED_WEB_FLOOR_MM = WALL_FLOOR_MM
 MACHINED_WEB_TARGET_MM = WALL_TARGET_MM
-WEB_EXCEPTIONS_MM: dict[int, float] = {6: 0.62, 12: 2.02438}  # T012: .0797
-TERMINAL_WEB_REQUIREMENTS_MM = {
-    6: WEB_EXCEPTIONS_MM[6],
-    12: WEB_EXCEPTIONS_MM[12],
-}
+WEB_EXCEPTIONS_MM: dict[int, float] = {12: 1.64084}  # T012: .0646
+if min(WEB_EXCEPTIONS_MM.values()) < MACHINED_WEB_FLOOR_MM:
+    raise AssertionError("a bore web exception falls under rule 17's .060 floor")
 
 # Printed inch places of the bore band (model-owned): four hold the
-# +.0018/+.0010 in class and the .0310/.3750 nominals exactly.
+# +.0018/+.0010 in seat class, the reamer's +.0005/-.0000 and the
+# .0625/.2500/.3750 nominals exactly.
 BORE_BAND_PLACES = 4
 
-
-# The band is UNIFORM: BoreCutDia (the D-bores) and KeyedBoreDia (the keyed
-# bores) carry it in every configuration. Keep the retained seat class
-# independent of selected cutter settings so numerical qualification does
-# not require its own output first.
-def _seat_fit_band() -> tuple[float, float]:
-    """(upper, lower): the round seat fit that holds on every gear land."""
-    carried = [
-        seat_bore_band(band)
-        for band, teeth in zip(SECTION_DIA_BANDS, SECTION_CONE_GEAR_TEETH)
-        if teeth
-    ]
-    return (min(band[0] for band in carried), max(band[1] for band in carried))
-
-
-def terminal_web_bore_upper_mm() -> float:
-    """Largest bore deviation admitted by the qualified terminal root limits."""
-    cap = min(
-        floor_limits_mm(teeth)[0] - 2.0 * minimum
-        - inch_grid_mm(bore_dia_mm(teeth), BORE_BAND_PLACES, math.ceil)
-        for teeth, minimum in TERMINAL_WEB_REQUIREMENTS_MM.items()
-    )
-    return inch_grid_mm(cap, BORE_BAND_PLACES, math.floor)
-
-
-# The inch class is authored as exact millimetre decimals (gear_seat_fit), so
-# it rides the model unrounded.
-BORE_BAND_FIT_UPPER, BORE_BAND_LOWER = _seat_fit_band()
-BORE_DIA_BAND = (BORE_BAND_FIT_UPPER, BORE_BAND_LOWER)
+# The land seat class (gear_seat_fit): T024's bore on the round land 2 and
+# the keyed bores on land 1 share GEAR_SEAT_BAND, so one band serves both
+# BoreCutDia (T024) and KeyedBoreDia.  The inch class is authored as exact
+# millimetre decimals, so it rides the model unrounded.
+BORE_DIA_BAND = seat_bore_band(GEAR_SEAT_BAND)
+BORE_BAND_FIT_UPPER, BORE_BAND_LOWER = BORE_DIA_BAND
 BORE_BAND_MIN_WIDTH_MM = 0.02032  # .0008
 if BORE_DIA_BAND[0] - BORE_DIA_BAND[1] < BORE_BAND_MIN_WIDTH_MM - 1e-9:
     raise AssertionError(
@@ -471,91 +465,86 @@ if BORE_DIA_BAND[0] - BORE_DIA_BAND[1] < BORE_BAND_MIN_WIDTH_MM - 1e-9:
     )
 
 
-def terminal_web_mm(teeth: int) -> float:
-    """Print-worst radial ligament, read from the actual cutter and fit."""
-    if teeth not in TERMINAL_WEB_REQUIREMENTS_MM:
-        raise ValueError(f"T{teeth:03d} is not carried by the terminal land")
-    maximum_bore = inch_grid_mm(
-        bore_dia_mm(teeth) + BORE_DIA_BAND[0], BORE_BAND_PLACES, math.ceil
-    )
-    return (floor_limits_mm(teeth)[0] - maximum_bore) / 2.0
-
-
-
-
-# --- D-bores (user ruling 2026-09-28) and keyed bores (C1 keyed) -------------
+# --- Round bonded bores and keyed bores (owner decision 2026-11-09) ----------
 #
-# T006..T024 ride lands 2-4: each bore is a D, the round bore above plus one
-# flat, parallel to the land's flat, whose outward normal is local +X
-# (through the phase-0 tooth, error_budget.yaml cone_flat_clock).  Across-flat (AF) is
-# measured from the flat to the far side of the round bore, the land's own AF
-# nominal; the band keeps .0004-.0012 in AF clearance on the land's
-# FLAT_AF_BAND.  One band for every D, so one BoreAF tolerance serves them all.
-#
-# T030..T120 ride land 1, which is round and keyed (owner decision
-# 2026-11-09, C1 keyed, PR #1992; it supersedes there the 2026-09-28 ruling's
-# "no keys"): the round bore above, its band unchanged, and one hub keyway for
-# the MHA-DT-VN-71 1/16 key, centred on +X where the flat stood.  Its width
-# and T (keyway top to the bore's far side, ANSI B17.1) are cone_land_key's.
-BORE_AF_BAND = flat_bore_af_band(FLAT_AF_BAND)  # +.0008/+.0004 in
-BORE_AF_PLACES = 4
+# C1 keyed (PR #1992) leaves no D-bore: the 2026-09-28 ruling's "one flat per
+# gear land; no keys, no solder, no retaining compound; no gear bonded" is
+# superseded.  T030..T120 ride land 1, round and keyed: the round bore, its
+# seat band, and one hub keyway for the MHA-DT-VN-71 1/16 key, centred on +X
+# (cone_land_key owns its width and T, keyway top to the bore's far side,
+# ANSI B17.1).  T024 is reamed round on the round land 2 and T018/T012 are
+# reamed round for MHA-DT-37's spigot; each is a LOCTITE 638 bonded slip fit
+# (cone_tip_cluster), so every bonded diametral clearance at the print limits
+# lies inside the compound's largest gap and is never interference.
 KEYED_LAND = 1
-if SECTION_FLAT_AF[KEYED_LAND] is not None:
-    raise AssertionError("land 1 carries the key, not a flat")
-
-
-def land_section(teeth: int) -> int:
-    """Index of the MHA-DT-04 land (cone_shaft_land_bands) carrying ``teeth``."""
-    _require_member(teeth)
-    for section, carried in enumerate(SECTION_CONE_GEAR_TEETH):
-        if teeth in carried:
-            return section
-    raise AssertionError(f"no MHA-DT-04 land carries the T{teeth:03d} cone gear")
+KEYED_TEETH = tuple(SECTION_CONE_GEAR_TEETH[KEYED_LAND])
+# MHA-DT-04's round land 2 carries T024 alone; T018 and T012 ride the spigot.
+LAND_2_TEETH = tuple(SECTION_CONE_GEAR_TEETH[2])
+SPIGOT_TEETH = (12, 18)
+ROUND_BORE_TEETH = tuple(t for t in CONFIGURATION_TEETH if t not in KEYED_TEETH)
+if sorted((*SPIGOT_TEETH, *LAND_2_TEETH)) != list(ROUND_BORE_TEETH):
+    raise AssertionError(
+        f"round bores {ROUND_BORE_TEETH} are not the spigot's {SPIGOT_TEETH} "
+        f"and land 2's {LAND_2_TEETH}"
+    )
 
 
 def keyed(teeth: int) -> bool:
-    """Whether the gear rides the keyed land 1: a round bore and keyway, no D."""
-    return land_section(teeth) == KEYED_LAND
+    """Whether the gear rides the keyed land 1: a round bore and keyway."""
+    _require_member(teeth)
+    return teeth in KEYED_TEETH
 
 
-KEYED_TEETH = tuple(teeth for teeth in CONFIGURATION_TEETH if keyed(teeth))
-D_BORE_TEETH = tuple(teeth for teeth in CONFIGURATION_TEETH if not keyed(teeth))
+def bonded_mate(teeth: int) -> tuple[float, tuple[float, float]]:
+    """(nominal, band) of the stem or land a round bore is bonded on."""
+    _require_member(teeth)
+    if teeth in SPIGOT_TEETH:
+        return cone_tip_cluster.SPIGOT
+    if teeth in LAND_2_TEETH:
+        return bore_dia_mm(teeth), GEAR_SEAT_BAND
+    raise ValueError(f"T{teeth:03d} rides the key, it is not bonded")
 
 
-def bore_flat_af_mm(teeth: int) -> float:
-    """Return the configuration's nominal bore across-flat (D-bores only)."""
-    across_flat = SECTION_FLAT_AF[land_section(teeth)]
-    if across_flat is None:
-        raise AssertionError(f"the T{teeth:03d} land has no flat")
-    return across_flat
-
-
-def bore_flat_offset_mm(teeth: int) -> float:
-    """Distance from the bore axis to the flat (AF minus the bore radius)."""
-    return bore_flat_af_mm(teeth) - bore_dia_mm(teeth) / 2.0
-
-
-def bore_flat_segment_area_mm2(teeth: int) -> float:
-    """Area the flat leaves standing inside the round bore (a circular
-    segment), per unit face: the solid gains this over a round bore."""
-    radius = bore_dia_mm(teeth) / 2.0
-    offset = bore_flat_offset_mm(teeth)
-    return radius * radius * math.acos(offset / radius) - offset * math.sqrt(
-        radius * radius - offset * offset
+def bond_clearance_mm(teeth: int) -> tuple[float, float]:
+    """(minimum, maximum) diametral clearance of a bonded bore at the limits."""
+    return cone_tip_cluster.diametral_clearance_mm(
+        (bore_dia_mm(teeth), bore_dia_band(teeth)), bonded_mate(teeth)
     )
 
 
-for _teeth in D_BORE_TEETH:
-    if not 0.0 < bore_flat_offset_mm(_teeth) < bore_dia_mm(_teeth) / 2.0:
+for _teeth in ROUND_BORE_TEETH:
+    _low, _high = bond_clearance_mm(_teeth)
+    if _low < 0.0 or _high > cone_tip_cluster.RETAINING_COMPOUND_MAX_GAP_MM:
         raise AssertionError(
-            f"T{_teeth:03d} bore AF {bore_flat_af_mm(_teeth)} does not cut a "
-            f"flat into its Ø{bore_dia_mm(_teeth)} bore"
+            f"T{_teeth:03d} bond clearance {(_low, _high)} mm leaves "
+            f"{cone_tip_cluster.RETAINING_COMPOUND}'s window"
         )
+
+
+def _round_bore_web_mm(teeth: int, root_min_dia_mm: float) -> float:
+    """Print-worst ligament from the root envelope to the largest printed
+    round bore."""
+    maximum_bore = inch_grid_mm(
+        bore_dia_mm(teeth) + bore_dia_band(teeth)[0], BORE_BAND_PLACES, math.ceil
+    )
+    return (root_min_dia_mm - maximum_bore) / 2.0
+
+
+def round_bore_web_min_mm(teeth: int) -> float:
+    """Print-worst ligament of a round-bored gear (T012..T024)."""
+    if keyed(teeth):
+        raise ValueError(f"T{teeth:03d} is keyed: its web is keyway_web_min_mm")
+    return _round_bore_web_mm(teeth, floor_limits_mm(teeth)[0])
+
+
+def web_required_mm(teeth: int) -> float:
+    """The round-bore web a gear must keep: the target, or its minor."""
+    return WEB_EXCEPTIONS_MM.get(teeth, MACHINED_WEB_TARGET_MM)
 
 
 def _require_keyed(teeth: int) -> None:
     if not keyed(teeth):
-        raise ValueError(f"T{teeth:03d} has a D-bore, not a keyway")
+        raise ValueError(f"T{teeth:03d} has a round bonded bore, not a keyway")
 
 
 KEYWAY_HALF_WIDTH_MM = cone_land_key.KEYWAY_WIDTH_MM / 2.0
@@ -619,6 +608,12 @@ def keyway_web_required_mm(teeth: int) -> float:
     return KEYWAY_WEB_EXCEPTIONS_MM.get(teeth, MACHINED_WEB_TARGET_MM)
 
 
+def web_min_mm(teeth: int) -> float:
+    """Print-worst root-to-bore ligament: to the keyway's top corner on a
+    keyed gear, to the round bore otherwise."""
+    return keyway_web_min_mm(teeth) if keyed(teeth) else round_bore_web_min_mm(teeth)
+
+
 # The part's construction-only authoring sketches.  The part saves them
 # hidden (they would otherwise render in every assembly that places a gear);
 # a sheet's front view shows one again only to import its dimensions.
@@ -631,7 +626,7 @@ REFERENCE_SKETCHES = (TOOTH_REFERENCE_SKETCH, GAP_FLOOR_SKETCH, WEB_REFERENCE_SK
 # text, the dt-pinion-cam RV-01 form): a hidden construction line from the
 # largest printed bore out to the smallest printed root envelope, along the
 # T012 gap bisector at WEB_REFERENCE_ANGLE_DEG (tooth zero on +X, gaps every
-# 30 deg from 15), printed as the single limit ".0797 MIN".  Only the T012
+# 30 deg from 15), printed as the single limit ".0646 MIN".  Only the T012
 # sheet imports it; the line's geometry is T012's, whichever configuration
 # is active.
 WEB_REFERENCE_TEETH = 12
@@ -646,13 +641,14 @@ def web_reference_mm() -> tuple[float, float, tuple[float, float]]:
     T012 web reference line: the largest printed bore's radius, the ruled
     web floored to the printed places, and that MIN's (upper, 0) band."""
     teeth = WEB_REFERENCE_TEETH
+    upper, lower = bore_dia_band(teeth)
     start = inch_grid_mm(
-        bore_dia_mm(teeth) + BORE_DIA_BAND[0], BORE_BAND_PLACES, math.ceil
+        bore_dia_mm(teeth) + upper, BORE_BAND_PLACES, math.ceil
     ) / 2.0
-    minimum = inch_grid_mm(terminal_web_mm(teeth), WEB_MIN_PLACES, math.floor)
+    minimum = inch_grid_mm(round_bore_web_min_mm(teeth), WEB_MIN_PLACES, math.floor)
     if minimum < WEB_EXCEPTIONS_MM[teeth] - 1e-9:
-        raise AssertionError("T012 web falls below RV-03's ruled .0797 in")
-    best = (floor_limits_mm(teeth)[1] - bore_dia_mm(teeth) - BORE_DIA_BAND[1]) / 2.0
+        raise AssertionError("T012 web falls below RV-03's ruled .0646 in")
+    best = (floor_limits_mm(teeth)[1] - bore_dia_mm(teeth) - lower) / 2.0
     return start, minimum, (round(best - minimum, 6), 0.0)
 
 
@@ -662,7 +658,8 @@ def web_reference_mm() -> tuple[float, float, tuple[float, float]]:
 # The finite translated root is an off-centre arc, not a bowed ideal chord.
 # Native tolerances remain meaningful: the pitch thickness has its retained
 # bilateral band; the root envelope has the qualified per-count LIMIT pair.
-# The D-bore (BoreProfile, T006..T024) and the keyed bore (KEYED_BORE_SKETCH,
+# The round bore (BORE_SKETCH, T012..T024: reamed, its band per
+# configuration, bore_dia_band) and the keyed bore (KEYED_BORE_SKETCH,
 # T030..T120) are separate configuration-restricted features; a sheet prints
 # the one its configuration carries.
 BORE_SKETCH = "BoreProfile"
@@ -670,7 +667,7 @@ KEYED_BORE_SKETCH = "KeyedBoreProfile"
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BlankProfile": {"BlankDia"},
     "Blank": {"FaceWidth"},
-    BORE_SKETCH: {"BoreCutDia", "BoreAF"},
+    BORE_SKETCH: {"BoreCutDia"},
     KEYED_BORE_SKETCH: {"KeyedBoreDia", "KeywayWidth", "KeywayT"},
     TOOTH_REFERENCE_SKETCH: {"ToothThickness"},
     GAP_FLOOR_SKETCH: {"FloorDia"},
@@ -681,12 +678,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 def bore_sketch(teeth: int) -> str:
     """The bore sketch the configuration carries (and its sheet prints)."""
     return KEYED_BORE_SKETCH if keyed(teeth) else BORE_SKETCH
-
-
-def bore_clock_offset_mm(teeth: int) -> float:
-    """Distance from the bore axis to the clock's vertex on +X: the D's flat,
-    or the keyway's top."""
-    return keyway_top_offset_mm(teeth) if keyed(teeth) else bore_flat_offset_mm(teeth)
 
 
 def bore_reach_mm(teeth: int) -> float:
@@ -702,19 +693,19 @@ def bore_reach_mm(teeth: int) -> float:
 BLANK_DIA_BAND = (0.0, -0.0508)
 # T006 keeps its own bands (pending exception ruling #971, user ruling 2026-10-10):
 # DT6-FORM1's relief leaves no flank for a tooth thicker than the tool, and a
-# thinner or smaller T006 loses the tip land. build_dt_cone_gear writes every
-# configuration's band into that configuration (IDimensionTolerance.SetValues2).
+# thinner or smaller T006 loses the tip land.  MHA-DT-37 prints them; every
+# MHA-DT-03 configuration takes the shared bands.
 CUSTOM_SIX_TOOTH_THICKNESS_BAND = (0.0, -0.04064)  # 0/-.0016 in
 CUSTOM_SIX_BLANK_DIA_BAND = (0.0, -0.02032)  # 0/-.0008 in
 
 
 def tooth_thickness_band(teeth: int) -> tuple[float, float]:
-    _require_member(teeth)
+    _require_cone(teeth)
     return CUSTOM_SIX_TOOTH_THICKNESS_BAND if teeth == 6 else TOOTH_THICKNESS_BAND
 
 
 def blank_dia_band(teeth: int) -> tuple[float, float]:
-    _require_member(teeth)
+    _require_cone(teeth)
     return CUSTOM_SIX_BLANK_DIA_BAND if teeth == 6 else BLANK_DIA_BAND
 
 
@@ -816,7 +807,7 @@ def custom_six_form_points_mm() -> tuple[tuple[float, float, float], ...]:
 
 
 def configuration_number(part_number: str, teeth: int) -> str:
-    """Return one configuration sheet's drawing number, e.g. ``MHA-DT-03-T006``."""
+    """Return one configuration sheet's drawing number, e.g. ``MHA-DT-03-T012``."""
     _require_member(teeth)
     number = part_number.strip().upper()
     if not number:
@@ -827,22 +818,19 @@ def configuration_number(part_number: str, teeth: int) -> str:
 # --- Decimal places, authored ON THE PART ------------------------------------
 #
 # drawing-simplicity-policy.md `How the repository implements the guidelines`: places and bands are model properties.  Decimal inch (#290):
-# four places on the fitted bore and across-flat (their +.0018/+.0010 and
-# +.0008/+.0004 bands), the tooth thickness and the gap-floor limits, so
+# four places on the fitted bores (the +.0018/+.0010 seat class and the
+# reamer's +.0005/-.0000), the tooth thickness and the gap-floor limits, so
 # both ends of each narrow floor window print without rounding inward.  The
-# tip diameter prints four too: its own BLANK_DIA_BAND (below) needs them on
-# T006, and every blank is floored to that grid, so the printed size is the
-# modelled one.  The face width prints four, like the cylinder gear's
-# OverallThickness under the same rule: three would round its nominal by a
-# third of the +/-.001 band.  The keyway's width and T print at
-# cone_land_key's places.  RV-03's T012
-# web prints its ruled .0797 MIN at four.
+# tip diameter prints four too, and every blank is floored to that grid, so
+# the printed size is the modelled one.  The face width prints four, like the
+# cylinder gear's OverallThickness under the same rule: three would round its
+# nominal by a third of the +/-.001 band.  The keyway's width and T print at
+# cone_land_key's places.  RV-03's T012 web prints its ruled .0646 MIN at
+# four.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BlankProfile": {"BlankDia": 4},
     "Blank": {"FaceWidth": 4},
-    BORE_SKETCH: {
-        "BoreCutDia": BORE_BAND_PLACES, "BoreAF": BORE_AF_PLACES,
-    },
+    BORE_SKETCH: {"BoreCutDia": BORE_BAND_PLACES},
     KEYED_BORE_SKETCH: {
         "KeyedBoreDia": BORE_BAND_PLACES,
         "KeywayWidth": cone_land_key.KEYWAY_PLACES,

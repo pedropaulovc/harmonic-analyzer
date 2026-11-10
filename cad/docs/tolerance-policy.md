@@ -289,9 +289,11 @@ flowchart LR
 ## Result: the budget for the critical features
 
 Monte Carlo of [`error_budget.yaml`](../config/error_budget.yaml) (4000 draws,
-zero-centred features uniform within ± tolerance per channel; `cone_flat_play`
-instead draws the physical .0004–.0012 in (0.01016–0.03048 mm) across-flat
-clearance around its 0.02032 mm mean on the T006–T024 D-flats, and `cone_key_play`
+zero-centred features uniform within ± tolerance per channel; `cone_tip_bond_clock`
+draws the bonded T006–T024's phasing-comb play, ±0.479 mm of pitch arc per gear
+(the MHA-DT-03-TL-02 comb's single blade per gear at its shop-row limits, T012 worst:
+`dt_cone_gear_tl_phasing_comb_spec.PHASE_ERROR_MM`; owner rulings C1 keyed and b1,
+2026-11-09, and single blade, 2026-11-10, PR #1992), and `cone_key_play`
 the T030–T120 keyway side clearance on the MHA-DT-VN-71 key (0–.004 in,
 `cone_land_key.KEYWAY_SIDE_CLEARANCE_MM`) about its 0.0508 mm mean — `class: channel` drawn once per draw and shared by every trial,
 `class: setup` (station setting) redrawn per trial as the operator resets the bars — applied to each bar's **physical hook waveform** at its
@@ -308,8 +310,7 @@ deviations too), % of the greatest term. "broad"
 pools the all-ones, half-rectangle, Gaussian and lifted-square (odd channels on) inputs; "pair" is channels 1 and
 20 alone, the consistency stress case. `allowable` is the tolerance at which a
 *zero-centred* feature alone would consume 0.05 % MAE or 0.5 % pair-p99, the
-equal-share allocation. The D-flat play's per-land mean residual survives even
-with no clearance scatter, so no linear allowable half-width exists for it.
+equal-share allocation.
 
 The configured limits and their holding methods remain in
 `error_budget.yaml.critical_features`; the model derives their error shares at
@@ -346,23 +347,20 @@ current report does not discharge the operating assumptions or waivers below.
 - **Summing-lever hole position is the relevant plate gain tolerance** (2.667 %/mm across the
   knife line). Drill the 20 holes from one fixture; the along-knife pitch can be loose.
 - **Phase is cheap if clocks share their datums.** ±0.25° cam-lobe/notch phase
-  is 0.13 mm at the notch. The land-1 keyseat and the shaft flats are milled
-  at one clock and each cone gear's teeth are indexed from its bore's +X
-  feature on one setup, the feature and the phase-0 tooth sharing the front
-  view's drawn centreline at the title block's ±1° (`cone_flat_clock`): the
-  land-1 keyway on T030–T120 and the 64T (owner
-  decision C1 keyed, 2026-11-09, PR #1992), the D-bore flat on T006–T024.
-  The keyed gears share one key, so its play is a common crank-index time
-  shift and only each keyway's side clearance scatters. The D-flat
-  angular play is larger on the smaller lands (half-chords ≈1.723,
-  0.861, 0.431 mm on Ø6.35, Ø3.175, Ø1.5875). A land accepted at its
-  least diameter and greatest AF has a shorter flat still (1.636,
-  0.772, 0.396), and the title block lets each flat's torque corner lose
-  0.25 of that to an edge break. The budget books both at their worst:
-  levers of 1.386, 0.522 and 0.146 mm, so the tip land's play is
-  about three times the sharp nominal's. The keyed land's mean lag is a
-  crank-index time shift, but neither the smaller lands' residual against it nor
-  independent .0004–.0012 in clearances are. Crank in one direction only; a
+  is 0.13 mm at the notch. Each keyed cone gear's teeth are indexed from its
+  +X keyway on one setup, the keyway and the phase-0 tooth sharing the front
+  view's drawn centreline at the title block's ±1° (`cone_flat_clock`):
+  T030–T120 and the 64T on the land-1 key (owner
+  decision C1 keyed, 2026-11-09, PR #1992). The keyed gears share one key, so
+  its play is a common crank-index time shift and only each keyway's side
+  clearance scatters. The four tip gears T006–T024 have no bore feature: each
+  is clocked to T030 by one blade of the MHA-DT-03-TL-02 phasing comb in the
+  tooth space beside its phase-0 tooth (owner rulings 2026-11-09 and
+  2026-11-10) while its LOCTITE 638 bond grabs, so it sits within its blade's
+  and T030's blade's play plus the blade location zone (±0.479 mm of pitch arc
+  at T012, the worst), drawn per gear (`cone_tip_bond_clock`). The former D-flat
+  play on lands 2–4 and its per-land mean residual retired with the flats.
+  Crank in one direction only; a
   reversal re-seats every mesh on the other flank (0.05–0.20 mm backlash).
 - **Every clearance in the position-driven chain is benign under one-sided load** — strap on
   cam, rod pin, rocker pivot, bar foot, top pin, spring hooks — because the channel spring

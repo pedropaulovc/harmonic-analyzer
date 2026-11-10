@@ -206,28 +206,6 @@
       ]
     },
     {
-      "sourceStem": "vn-cone-tip-collar",
-      "sourceNumber": "MHA-VN-016",
-      "identities": [
-        {
-          "parent": "dt-drive-train",
-          "stem": "dt-vn-cone-tip-collar",
-          "number": "MHA-DT-VN-54"
-        }
-      ]
-    },
-    {
-      "sourceStem": "vn-cone-tip-adjuster",
-      "sourceNumber": "MHA-VN-017",
-      "identities": [
-        {
-          "parent": "dt-drive-train",
-          "stem": "dt-vn-cone-tip-adjuster",
-          "number": "MHA-DT-VN-55"
-        }
-      ]
-    },
-    {
       "sourceStem": "vn-cone-tip-pinch-screw",
       "sourceNumber": "MHA-VN-018",
       "identities": [
@@ -1074,9 +1052,29 @@
       "registry": null,
       "builder": null,
       "status": "archive-only"
+    },
+    {
+      "sourceStem": "vn-cone-tip-collar",
+      "sourceNumber": "MHA-VN-016",
+      "parent": "dt-drive-train",
+      "stem": "dt-vn-cone-tip-collar",
+      "number": null,
+      "registry": null,
+      "builder": null,
+      "status": "archive-only"
+    },
+    {
+      "sourceStem": "vn-cone-tip-adjuster",
+      "sourceNumber": "MHA-VN-017",
+      "parent": "dt-drive-train",
+      "stem": "dt-vn-cone-tip-adjuster",
+      "number": null,
+      "registry": null,
+      "builder": null,
+      "status": "archive-only"
     }
   ],
-  "currentRegistryMapSha256": "959bf45b0cee1049e23ccdeedfe38c1c9d28cd9aafb81f4dee22579c150ce534",
+  "currentRegistryMapSha256": "a6d21f9b3d9fad5381cfca00fe085023f254d722ac03dfcabc94ef44bb6de3e3",
   "nativeIdentities": [
     {
       "sourceStem": "ch-rocker-arm-tl-oblique-feed-lever",
@@ -2269,6 +2267,16 @@
       ]
     },
     {
+      "sourceStem": "dt-cone-gear-tl-phasing-comb",
+      "sourceNumber": null,
+      "identities": [
+        {
+          "stem": "dt-cone-gear-tl-phasing-comb",
+          "number": "MHA-DT-03-TL-02"
+        }
+      ]
+    },
+    {
       "sourceStem": "dt-cone-gear-tl-indexing",
       "sourceNumber": null,
       "identities": [
@@ -2278,6 +2286,36 @@
         }
       ],
       "kind": "assembly"
+    },
+    {
+      "sourceStem": "dt-cone-tip-gear",
+      "sourceNumber": null,
+      "identities": [
+        {
+          "stem": "dt-cone-tip-gear",
+          "number": "MHA-DT-37"
+        }
+      ]
+    },
+    {
+      "sourceStem": "dt-cone-tip-bushing",
+      "sourceNumber": null,
+      "identities": [
+        {
+          "stem": "dt-cone-tip-bushing",
+          "number": "MHA-DT-38"
+        }
+      ]
+    },
+    {
+      "sourceStem": "dt-cone-tip-end-screw",
+      "sourceNumber": null,
+      "identities": [
+        {
+          "stem": "dt-cone-tip-end-screw",
+          "number": "MHA-DT-39"
+        }
+      ]
     }
   ],
   "archivedNumbers": [

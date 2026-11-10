@@ -9,19 +9,18 @@ dt-cone-gear-shaft:
   fit_class: shaft_in_bushing
   process: "turned stepped shaft with integral bearing journal and thrust collar (steel); 5/8 in cold-finished round bar, collar OD as supplied"
   drawing_unit: in
+  # Owner decision 2026-11-09, C1 keyed (PR #1992): lands 3 and 4 are gone,
+  # land 2 is round and ends inside T024's bore with a reamed socket for
+  # MHA-DT-37's spigot; no D-flat remains on the shaft. Retired with that
+  # decision: RV-01 (the slender .031 terminal land, its D-flat and its
+  # CORNERS .001 MAX) and RV-02 (the tailstock note). The rulings they rested
+  # on are superseded by C1 keyed: U40 2026-09-23 (integral .031 tip land
+  # turned with tailstock support) and 2026-09-28 ("one flat per gear land;
+  # no keys, no solder, no retaining compound; no gear bonded"). RV-03 keeps
+  # the journal only: no across-flat band remains.
   machinist_exceptions:
-    - id: "RV-01"
-      kind: "accept"
-      where: "sheet 1, the terminal (tip) land: Ø.0310 +.0000/-.0008 about 1.32 long (L/D about 43), its through-length D-flat AF .0170 +.0000/-.0004 in section D-D, and CORNERS .001 MAX above that across-flat"
-      finding: "slender tip land and its flat unbuildable or unreliable as one integral piece (rules 16, 21)"
-      reason: "owner rulings U40 2026-09-23 (the terminal land is turned integral with tailstock support) and 2026-09-28 (every gear land, terminal included, carries one flat; land 1 keyed instead by owner ruling 2026-11-09 via PR #1992 (https://github.com/pedropaulovc/harmonic-analyzer/pull/1992), lands 2-4 keep their flats); the .031 in land (1/32 snapped to .031 for the .0320 micro reamer, #290) is cutter-native for the 48DP T006/T012 webs (#1272); the .001 corner limit keeps the MHA-DT-VN-54 set screw landing on the flat; temporary: two-piece and pinion-wire alternatives await an owner ruling in #1649"
-    - id: "RV-02"
-      kind: "accept"
-      where: "sheet 1, note: TURN THE TIP LAND WITH TAILSTOCK SUPPORT."
-      finding: "process or method note (rule 7)"
-      reason: "owner ruling U40 2026-09-23: the slender terminal land cannot be turned unsupported, so the support is the requirement, not a method preference; goes away with the tip under #1649"
     - id: "RV-03"
       kind: "accept"
-      where: "sheet 1, the journal Ø.4825 +.0000/-.0008 (RUNNING FIT, MATCHED TO MHA-DT-05 BORE) and the tip land Ø.0310 +.0000/-.0008; the across-flats .2300, .1150 and .0170 +.0000/-.0004 in sections B-B to D-D (NOTE 1: MILL FLATS TO MEASURED D-BORES); land 1's keyed section A-A is out of scope (owner ruling 2026-11-09 via PR #1992 (https://github.com/pedropaulovc/harmonic-analyzer/pull/1992): plain inch-step keyseat bands)"
-      finding: "-.0008 and -.0004 are converted millimetre bands (0.02, 0.01 mm), not plain inch steps, and narrower than the turned-diameter and milled-width rows (rule 4)"
-      reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144 (F1, F2, F5): the bands come from the fleet-shared constants _fit_shaft_h.SHAFT_H and cone_shaft_land_bands.FLAT_AF_BAND, kept as is with the matched-fit route printed at each feature; the shared constants are restated at the next re-key of the cone shaft family"
+      where: "sheet 1, the journal Ø.4825 +.0000/-.0008 (RUNNING FIT, MATCHED TO MHA-DT-05 BORE); land 1's keyed section A-A and the socket's reamed Ø.0625 +.0005/-.0000 are out of scope (owner ruling 2026-11-09 via PR #1992 (https://github.com/pedropaulovc/harmonic-analyzer/pull/1992): plain inch-step bands)"
+      finding: "-.0008 is a converted millimetre band (0.02 mm), not a plain inch step, and narrower than the turned-diameter row (rule 4)"
+      reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144 (F1, F2, F5): the band comes from the fleet-shared constant _fit_shaft_h.SHAFT_H, kept as is with the matched-fit route printed at the feature; the shared constant is restated at the next re-key of the cone shaft family. Re-scoped by owner ruling 2026-11-09 via PR #1992 (https://github.com/pedropaulovc/harmonic-analyzer/pull/1992): the tip land and the across-flats it also covered are gone"

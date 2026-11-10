@@ -57,9 +57,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # spend the disengaged lock-knob head margin
 # (dt_cone_swing_platform_geometry.DISENGAGE_HEAD_MARGIN).  The tapped-hole
 # pattern and the hold-down's station along the cone axis are post- and
-# tip-block closures, off the grid, so they print .XXX; with HoldDownX they
-# carry the explicit bands the tip-block stacks need
-# (dt_cone_swing_platform_spec).  Relief depth is a reference nominal governed
+# tip-block closures, off the grid, so they print .XXX: the title block's
+# +/-.005 is the band the tip-block stacks need (dt_cone_swing_platform_spec).  Relief depth is a reference nominal governed
 # by the matched fit above. The Hole Wizard owns the pivot- and hold-down-hole
 # sizes/callouts.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
@@ -81,7 +80,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "PostMountEastZ": 3,
     },
     "LockNotchCapEProfile": {"CapECx": 2, "CapECz": 2, "CapEDia": 2},
-    # Banded on the part (HOLDDOWN_STATION_TOL_MM).
+    # HOLDDOWN_STATION_TOL_MM: HoldDownX's explicit band on the part, and
+    # HoldDownZ's .XXX title-block grade.
     "HoldDownHole": {"HoldDownX": 2, "HoldDownZ": 3},
     # Banded on the part: the station with the hold-down's +/-.004
     # (TIP_DOWEL_STATION_TOL_MM), the ream with its REAM_H7 at four places.

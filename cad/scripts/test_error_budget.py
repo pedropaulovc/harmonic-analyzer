@@ -90,7 +90,7 @@ def test_every_toleranced_nominal_is_the_cad_constant(budget, nom):
         if feat["nominal"] is None:
             assert key in (
                 "cam_phase", "mesh_lag_spread", "cone_flat_clock",
-                "cone_land_clock", "cone_flat_play", "cone_key_play",
+                "cone_tip_bond_clock", "cone_key_play",
                 "station_setting",
             ), key
             continue
@@ -1574,151 +1574,117 @@ def test_reference_inputs_stay_on_the_lifting_side():
         assert np.all(x >= 0.0), name
 
 
-def test_cone_flat_phase_follows_gear_ratio_and_print_worst_lever(budget):
-    """The index removes only the keyed Ø9.525 land's lag, not differences
-    between lands or the clearance variation between individual gears. A
-    flat's lever is the shortest flat the print accepts: the land at its least
-    diameter and greatest AF, less the title block's edge break on the torque
-    corner (Codex, #1128), unless the least bore flat is shorter still. The
-    keyed land (owner decision C1 keyed, 2026-11-09, PR #1992) turns a gear by
-    half its keyway clearance over the key's lowest top less the edge break;
-    the flatted lands' residual is booked against the keyed land's mean lag
-    on its longest unbroken levers."""
+def test_cone_phase_follows_gear_ratio_key_lever_and_bond_comb(budget):
+    """Owner decision C1 keyed (2026-11-09, PR #1992): the keyed gears turn by
+    half their keyway clearance over the key's lowest top less the edge break
+    and are indexed off the keyway; the bonded T006..T024 carry no key play,
+    only their tooth space's play about the phasing comb's blade, a pitch arc
+    over each gear's pitch radius, and T030's keyway clock, which the comb
+    seated on T030 carries into each as T030's cam phase.  No term carries a
+    residual."""
     import cone_land_key
     import dt_cone_gear_spec
+    import dt_cone_gear_tl_phasing_comb_spec as comb
     import cone_shaft_land_bands
     import gear_seat_fit
 
-    def chord(diameter, af):
-        radius = diameter / 2.0
-        return math.sqrt(radius**2 - (af - radius) ** 2)
-
     profiles = eb.phase_profiles()
-    clearance_lo, clearance_hi = gear_seat_fit.FLAT_AF_CLEARANCE
-    mean = (clearance_lo + clearance_hi) / 2.0
+    assert set(profiles) == {
+        "cam_phase", "mesh_lag_spread", "cone_flat_clock", "cone_key_play",
+        "cone_tip_bond_clock",
+    }
     clock = budget["critical_features"]["cone_flat_clock"]["tolerance"]
-    play = budget["critical_features"]["cone_flat_play"]["tolerance"]
     key_play = budget["critical_features"]["cone_key_play"]["tolerance"]
-    # The flat (keyway) and the phase-0 tooth share the front view's drawn
+    bond = budget["critical_features"]["cone_tip_bond_clock"]["tolerance"]
+    # The keyway and the phase-0 tooth share the front view's drawn
     # centreline: the clock is the title block's angle, undimensioned.
     assert clock == float(_config.title_block("angular")["value_deg"])
-    assert play == pytest.approx((clearance_hi - clearance_lo) / 2.0)
-    assert gear_seat_fit.FLAT_AF_CLEARANCE == (0.01016, 0.03048)
     way_lo, way_hi = cone_land_key.KEYWAY_SIDE_CLEARANCE_MM
-    seat_lo, seat_hi = cone_land_key.KEYSEAT_SIDE_CLEARANCE_MM
     assert key_play == pytest.approx((way_hi - way_lo) / 2.0)
+    # The booked bound is the phasing comb's proved worst phase, rounded up
+    # to the thousandth (owner ruling 2026-11-09: comb at shop rows).
+    worst = max(comb.PHASE_ERROR_MM.values())
+    assert worst <= bond < worst + 0.001
     edge_break = _config.title_block("edge_break")
     lever_loss = max(edge_break["radius_mm"], edge_break["chamfer_max_mm"])
-    af_upper, af_lower = cone_shaft_land_bands.FLAT_AF_BAND
-    bore_af_upper, _ = gear_seat_fit.flat_bore_af_band(
-        cone_shaft_land_bands.FLAT_AF_BAND
-    )
-
-    land_band = cone_shaft_land_bands.SECTION_DIA_BANDS[1]
-    land_upper, land_lower = land_band
+    land_band = cone_shaft_land_bands.SECTION_DIA_BANDS[dt_cone_gear_spec.KEYED_LAND]
+    land_upper, _ = land_band
     radius_hi = (cone_land_key.LAND_DIA_MM + land_upper) / 2.0
-    radius_lo = (cone_land_key.LAND_DIA_MM + land_lower) / 2.0
     s_nominal, size = cone_land_key.KEYSEAT_S_MM, cone_land_key.KEY_SIZE_MM
-    s_upper, s_lower = cone_land_key.KEYSEAT_S_BAND
-    key_upper, key_lower = cone_land_key.KEY_STOCK_BAND
+    _, s_lower = cone_land_key.KEYSEAT_S_BAND
+    _, key_lower = cone_land_key.KEY_STOCK_BAND
     key_lever = (s_nominal + s_lower - radius_hi) + (size + key_lower) - lever_loss
     _, bore_upper = gear_seat_fit.seat_bore_band(land_band)
     assert key_lever > (cone_land_key.LAND_DIA_MM + bore_upper) / 2.0
-    way_long = (s_nominal + s_upper - radius_lo) + (size + key_upper)
-    seat_band = cone_land_key.KEYSEAT_WIDTH_BAND
-    seat_width_lo = cone_land_key.KEYSEAT_WIDTH_MM + min(seat_band)
-    seat_long = math.sqrt(radius_hi**2 - (seat_width_lo / 2.0) ** 2)
-    seat_lag = (seat_lo + seat_hi) / 4.0 / seat_long
-    reference_lag = seat_lag + (way_lo + way_hi) / 4.0 / way_long
     way_mean = (way_lo + way_hi) / 2.0
-    flat_play, flat_residual = profiles["cone_flat_play"]
-    key_per_unit, key_residual = profiles["cone_key_play"]
-    assert not np.any(key_residual)
-    for section, (band, af, carried) in enumerate(
-        zip(
-            cone_shaft_land_bands.SECTION_DIA_BANDS,
-            cone_shaft_land_bands.SECTION_FLAT_AF,
-            cone_shaft_land_bands.SECTION_CONE_GEAR_TEETH,
-            strict=True,
-        )
-    ):
-        if not carried:
-            assert section == 0 and af is None
-            continue
-        keyed = section == 1
-        assert (af is None) == keyed
-        diameter = dt_cone_gear_spec.bore_dia_mm(carried[0])
-        if not keyed:
-            _, lower = band
-            _, bore_lower = gear_seat_fit.seat_bore_band(band)
-            lever = min(
-                chord(diameter + lower, af + af_upper) - lever_loss,
-                chord(diameter + bore_lower, af + bore_af_upper),
-            )
-        for teeth in carried:
-            index = teeth // 6 - 1
-            ratio = teeth / 120.0
-            assert dt_cone_gear_spec.bore_dia_mm(teeth) == pytest.approx(diameter)
+    key_per_unit, _ = profiles["cone_key_play"]
+    bond_per_unit, _ = profiles["cone_tip_bond_clock"]
+    for key, (_, residual) in profiles.items():
+        assert not np.any(residual), key
+    for index in range(eb.N_ELEMENTS):
+        teeth = 6 * (index + 1)
+        ratio = teeth / 120.0
+        if teeth in dt_cone_gear_spec.KEYED_TEETH:
             assert profiles["cone_flat_clock"][0][index] * clock == pytest.approx(
                 math.radians(clock) * ratio
             )
-            if keyed:
-                assert flat_play[index] == 0.0 and flat_residual[index] == 0.0
-                for clearance in (way_lo, way_hi):
-                    phase = (clearance - way_mean) * key_per_unit[index]
-                    expected = (clearance - way_mean) / (2.0 * key_lever) * ratio
-                    assert phase == pytest.approx(expected, abs=1e-12)
-                continue
-            assert key_per_unit[index] == 0.0
-            for clearance in (clearance_lo, mean, clearance_hi):
-                phase = (clearance - mean) * flat_play[index] + flat_residual[index]
-                expected = (clearance / lever - reference_lag) * ratio
+            assert bond_per_unit[index] == 0.0
+            for clearance in (way_lo, way_hi):
+                phase = (clearance - way_mean) * key_per_unit[index]
+                expected = (clearance - way_mean) / (2.0 * key_lever) * ratio
                 assert phase == pytest.approx(expected, abs=1e-12)
-            assert flat_residual[index] > 0.0
-
-
-def test_shaft_flat_clock_is_printed_and_booked_per_land(budget):
-    """MHA-DT-04's four flats share one clock by section A-A's callout, at the title block's
-    angle, and the budget draws that angle once per land: gears on one land
-    turn together, and the Ø9.525 land (the 64T and T030..T120) is the
-    reference its own clock cannot move."""
-    import cone_shaft_land_bands
-
-    angle = float(_config.title_block("angular")["value_deg"])
-    assert budget["critical_features"]["cone_land_clock"]["tolerance"] == angle
-
-    land = eb.draw_groups()["cone_land_clock"]
-    for carried in cone_shaft_land_bands.SECTION_CONE_GEAR_TEETH:
-        columns = {int(land[teeth // 6 - 1]) for teeth in carried}
-        if 120 in carried:
-            assert columns == {-1}
             continue
-        assert len(columns) <= 1
-    assert sorted(set(land.tolist()) - {-1}) == [0, 1, 2]
+        assert profiles["cone_flat_clock"][0][index] * clock == pytest.approx(
+            math.radians(clock) * comb.REFERENCE_TEETH / 120.0
+        )
+        assert eb.phase_draw_columns()["cone_flat_clock"][index] == (
+            comb.REFERENCE_TEETH // 6 - 1
+        )
+        assert key_per_unit[index] == 0.0
+        assert bond_per_unit[index] == pytest.approx(
+            1.0 / (60.0 * dt_cone_gear_spec.MODULE_MM)
+        )
 
-    dev = eb.draw_feature(np.random.default_rng(3), "cone_land_clock", angle, 500, 1)
-    assert dev.shape == (500, eb.N_ELEMENTS)
-    assert np.all(dev[:, 4:] == 0.0)  # T030..T120
-    assert np.array_equal(dev[:, 0], dev[:, 1])  # T006, T012: the tip flat
-    assert not np.array_equal(dev[:, 1], dev[:, 2])
-    assert not np.array_equal(dev[:, 2], dev[:, 3])
-    assert np.max(np.abs(dev)) <= angle
 
-
-def test_flat_phase_propagates_through_physical_readout(nom):
-    """A mixed-land pair retains both its clock error and smaller-land
-    systematic play after the common crank-index shift."""
-    import gear_seat_fit
-
+def test_bonded_gears_turn_with_t030s_clock_draw(nom):
+    """The phasing comb seats on T030's phase-0 tooth, so one T030 keyway
+    clock draw turns T006..T030 alike, by T030's cam phase, and the bonded
+    gears' own columns of that draw turn nothing (Codjiflo, PR #2459)."""
     x = np.zeros(eb.N_ELEMENTS)
-    x[[0, 19]] = 1.0  # T006 and T120, the two extremes of the flat size
-    clock = np.zeros((1, eb.N_ELEMENTS))
-    clock[0, 0] = 0.25
-    play = np.zeros((1, eb.N_ELEMENTS))
-    play[0, 0] = gear_seat_fit.FLAT_AF_CLEARANCE[1] - sum(
-        gear_seat_fit.FLAT_AF_CLEARANCE
-    ) / 2.0
-    dev = {"cone_flat_clock": clock, "cone_flat_play": play}
+    x[[0, 19]] = 1.0  # T006 (bonded) and T120 (keyed)
+    sens = eb.gain_sensitivities(nom)
+
+    def error(column: int) -> np.ndarray:
+        clock = np.zeros((1, eb.N_ELEMENTS))
+        clock[0, column] = 1.0
+        return eb._channel_model(x, nom, {"cone_flat_clock": clock}, sens)
+
+    assert np.max(np.abs(error(0))) < 1e-12
+    t030 = error(4)
+    t = eb.cycle_table(nom)
+    stations = x * nom.d_max
+    read = np.interp(stations, t.stations, t.read)
+    kappa = np.interp(stations, t.stations, t.kappa)
+    phi = np.zeros((1, eb.N_ELEMENTS))
+    phi[0, :5] = math.radians(1.0) * 30.0 / 120.0
+    gains = np.ones((1, eb.N_ELEMENTS))
+    measured = eb._read_draws(x, t, gains, phi, stations[None, :], read, kappa)
+    base = eb._read_draws(
+        x, t, gains, np.zeros_like(phi), stations[None, :], read, kappa
+    )
+    expected = 100.0 * (measured - base) / np.max(np.abs(eb.ideal_coefficients(x)))
+    assert np.max(np.abs(t030)) > 0.0
+    assert t030 == pytest.approx(expected, abs=1e-9)
+
+
+def test_bond_phase_propagates_through_physical_readout(nom):
+    """A pair holding a bonded and a keyed gear retains the bonded gear's
+    phasing-comb blade play through the physical readout."""
+    x = np.zeros(eb.N_ELEMENTS)
+    x[[0, 19]] = 1.0  # T006 (bonded) and T120 (keyed)
+    bond = np.zeros((1, eb.N_ELEMENTS))
+    bond[0, 0] = 0.0762
+    dev = {"cone_tip_bond_clock": bond}
     actual = eb._channel_model(x, nom, dev, eb.gain_sensitivities(nom))
     t = eb.cycle_table(nom)
     stations = x * nom.d_max
@@ -1738,7 +1704,7 @@ def test_flat_phase_propagates_through_physical_readout(nom):
     expected = 100.0 * (measured - base) / np.max(
         np.abs(eb.ideal_coefficients(x))
     )
-    assert np.max(np.abs(actual)) > 0.01
+    assert np.max(np.abs(actual)) > 0.0
     assert actual == pytest.approx(expected, abs=1e-9)
 
 

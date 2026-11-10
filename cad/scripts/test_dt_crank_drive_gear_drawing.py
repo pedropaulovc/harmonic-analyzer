@@ -426,7 +426,16 @@ def test_gear_data_states_the_helix_and_its_hand() -> None:
     # The two tooth-system facts no view of this gear can settle and a mirrored
     # or straight-cut part would get wrong.
     data = notes.GEAR_DATA
-    assert f"HELIX AT PITCH DIA:  {spec.HELIX_ANGLE_DEG:.1f} DEG RIGHT HAND" in data
+    assert (
+        f"HELIX AT PITCH DIA:  {spec.HELIX_ANGLE_DEG:.1f} DEG RIGHT HAND, "
+        "AXES CROSSED WITH MHA-DT-10"
+    ) in data
+    # The last row stands just above the rim (PR 2 round 5: a 65-character
+    # MATES WITH row was struck at x 120.8 mm); it keeps PR 1's length, and
+    # the block its 19 lines.
+    lines = data.splitlines()
+    assert len(lines) == 19
+    assert lines[-1] == "MATES WITH:  CRANK PINION MHA-DT-10, 16T SPUR"
     assert f"LEAD (in/rev, REF):  {spec.inch_text(spec.HELIX_LEAD_MM, 3)}" in data
     assert "SCREW SWEEP" not in data
     # The ordinary +/-1 deg helix keeps the worst-corner crossed-mesh backlash

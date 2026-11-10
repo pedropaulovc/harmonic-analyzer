@@ -1,0 +1,19 @@
+dt-cone-tip-end-screw:
+  title: Cone Tip End Screw
+  number: MHA-DT-39
+  stock_name: 18-8 Stainless Steel Fillister Head Slotted Screw
+  supplier: McMaster-Carr
+  supplier_skus: [91794A558]
+  material: 18-8 stainless steel
+  material_specification: 18-8 stainless steel, McMaster-Carr 91794A558 (1/4-28 x 5/8 in slotted fillister head screw)
+  finish: as supplied (passivated)
+  quantity: 1
+  tolerance_class: machined_block
+  process: "purchased McMaster-Carr 91794A558 screw; one added operation: drill and ream the pivot hole concentric in the threaded end"
+  drawing_unit: in
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "minor"
+      where: "sheet 1 end view, the reamed pivot hole's callout: WALL .067 MIN"
+      finding: "wall from the reamed pivot hole to the external thread's root under the .080 target (rule 17)"
+      reason: "Owner ruling 2026-11-09 via PR #1992 (https://github.com/pedropaulovc/harmonic-analyzer/pull/1992), C1 keyed: the end screw is McMaster 91794A558 (1/4-28 x 5/8 slotted fillister) with a Ø1/16 reamed pivot hole in its threaded end; the research quotes a .072 wall as a rule 17 minor. At the print worst case (dt_cone_tip_end_screw_spec.END_HOLE_WALL_WORST) the 1/4-28 UNF-2A minimum minor (0.1993 in, derived: pitch-diameter minimum 0.2225 less 0.649519 P) less the largest reamed hole (.0635), with the hole .0005 off the thread axis (the shop table's .001 runout), leaves .0674, printed .067 MIN: above the .060 floor, under the .080 target. This accepts no other wall, band or callout departure."

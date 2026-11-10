@@ -34,8 +34,6 @@ from dt_pinion_arbor_spec import SHAFT_LEN as ARBOR_LEN
 import dt_pinion_spring_geometry as spring
 import gen_dimensions
 import dt_vn_post_mount_screw_spec as post_screw
-import dt_vn_cone_tip_collar_spec as tip_collar
-import _mcmaster_94025a164 as tip_adjuster
 import dt_vn_cone_pivot_screw_spec as pivot_screw
 import dt_swing_stop_screw_spec as stop_screw
 
@@ -84,10 +82,6 @@ def test_real_configured_dimensions_tables_render_and_keep_dt_suffixes() -> None
     arbor = gen_dimensions.find_row(record, "Chapter 13", "Arbor ends and set screws")
     assert arbor is not None
     assert "#4-40" in arbor[1]
-    adjuster = gen_dimensions.find_row(record, "Chapter 13", "`dt-vn-cone-tip-adjuster`")
-    assert adjuster is not None
-    assert "#10-32" in adjuster[1]
-    assert "t00147:" in adjuster[3]
 
 
 def _mm(value: float, places: int = 3) -> str:
@@ -252,13 +246,16 @@ def test_current_drive_train_record_matches_the_selected_production_specs() -> N
 
     shaft_row = gen_dimensions.find_row(record, "Chapter 12", "Cone shaft diameter")
     assert shaft_row is not None
-    assert f"/ {cone_shaft.SECTION_FLAT_AF[-1]:.3f}," in shaft_row[1]
-    assert (
-        f"terminal-flat edge break {cone_shaft.TERMINAL_FLAT_EDGE_BREAK_MAX:.3f} MAX"
-        in shaft_row[3]
-    )
-    assert "cone_shaft_land_bands owns diameters, flats and retention bands" in shaft_row[3]
-    assert "its end follows SHAFT_LENGTH" in shaft_row[1]
+    # Owner decision C1 keyed (2026-11-09, PR #1992): three sections, no
+    # flat; the socket takes T006's spigot.
+    for fragment in (
+        f"Ø{cone_shaft.SECTION_DIAS[1]:g} keyed land 1",
+        f"Ø{cone_shaft.SECTION_DIAS[2]:g} round land 2",
+        f"reamed Ø{cone_shaft.SOCKET_DIA:g} x {cone_shaft.SOCKET_DEPTH:g} socket",
+        "its end follows SHAFT_LENGTH",
+    ):
+        assert fragment in shaft_row[1], fragment
+    assert "cone_shaft_land_bands owns the land diameters and bands" in shaft_row[3]
     shaft_length_row = gen_dimensions.find_row(record, "Chapter 12", "Cone shaft length")
     assert shaft_length_row is not None
     assert f"{cone_shaft.SHAFT_LENGTH:.12f} mm overall" in shaft_length_row[1]
@@ -310,41 +307,9 @@ def test_current_drive_train_record_matches_the_selected_production_specs() -> N
     for fragment in (
         f"current nominal centre ({_mm(tip_block_point[0], 9)}, +{tip_block_point[2]:.9f})",
         f"cone station {tip_block.TIP_BLOCK_STATION:.12f}",
-        f"north/south faces {cone_shaft.TIP_BLOCK_NORTH_FACE_STATION:.12f}"
-        f" / {cone_shaft.TIP_BLOCK_SOUTH_FACE_STATION:.12f}",
     ):
         assert fragment in tip_block_row[2], fragment
 
-    collar_row = gen_dimensions.find_row(record, "Chapter 13", "`dt-vn-cone-tip-collar`")
-    assert collar_row is not None
-    # #290: the collar's sheet prints inch; its shaft-owned axial stations stay
-    # in mm and print rounded at .XXX.
-    from _printed_tolerance import printed_band_mm
-
-    text = tip_collar.length_text
-    body_places = tip_collar.DRAWING_PRECISION_BY_NAME["CollarDia"]
-    axial = tip_collar.AXIAL_PLACES
-    for fragment in (
-        f"McMaster {tip_collar.SET_SCREW_SKU}",
-        f"body OD {text(tip_collar.OUTER_DIA, body_places)} "
-        f"±{text(tip_collar.ROUTINE_BAND_MM, 2)} in",
-        f"width {tip_collar.WIDTH:g}, south nose length {tip_collar.NOSE_LENGTH:g} "
-        f"and tap station {tip_collar.TAP_STATION:g} mm",
-        f"printed {text(tip_collar.WIDTH, axial)}/{text(tip_collar.NOSE_LENGTH, axial)}/"
-        f"{text(tip_collar.TAP_STATION, axial)} at the title-block "
-        f"±{text(printed_band_mm(axial, unit=tip_collar.UNIT), axial)}",
-        f"Ø{text(tip_collar.NOSE_DIA, tip_collar.DRAWING_PRECISION_BY_NAME['NoseDia'])} nose",
-        "fitted as supplied",
-        "SCREW_LANDING_MARGIN_MM",
-        "not a frozen purchased-collar diameter or native/full-P1 acceptance",
-    ):
-        assert fragment in collar_row[1], fragment
-    assert f"terminal AF {cone_shaft.SECTION_FLAT_AF[-1]:.3f} D-flat" in collar_row[2]
-    assert (
-        "dt_cone_gear_shaft_spec.TIP_COLLAR_START_STATION / TIP_COLLAR_END_STATION"
-        in collar_row[2]
-    )
-    assert "no physical-air or native realization qualification asserted" in collar_row[4]
     pivot_row = gen_dimensions.find_row(record, "Chapter 13", "`dt-vn-cone-pivot-screw`")
     assert pivot_row is not None
     for fragment in (
@@ -361,17 +326,6 @@ def test_current_drive_train_record_matches_the_selected_production_specs() -> N
         f"current nominal ({_mm(cone_line.PIVOT_XZ[0], 9)}, "
         f"+{cone_line.PIVOT_XZ[1]:.9f})" in pivot_row[2]
     )
-    adjuster_row = gen_dimensions.find_row(record, "Chapter 13", "`dt-vn-cone-tip-adjuster`")
-    assert adjuster_row is not None
-    for fragment in (
-        f"#10-32 UNF-{tip_adjuster.THREAD_CLASS}",
-        f"Ø{tip_adjuster.CUP_DIA:g} / depth {tip_adjuster.CUP_DEPTH:g}",
-        f"thread major MAX Ø{tip_adjuster.THREAD_MAJOR_MAX_MM:.5f}",
-        f"pitch diameter MIN Ø{tip_adjuster.EXTERNAL_PITCH_DIA_MIN_MM:.5f} mm",
-        "constrain threaded material, not supplied cup/body/length grades",
-    ):
-        assert fragment in adjuster_row[1], fragment
-    assert f"model apex/tip station is {cone_shaft.T006_TIP_STATION:.12f}" in adjuster_row[2]
     stop_row = gen_dimensions.find_row(record, "Chapter 13", "`sh-vn-fillister-screw-90280a108`")
     assert stop_row is not None
     for fragment in (

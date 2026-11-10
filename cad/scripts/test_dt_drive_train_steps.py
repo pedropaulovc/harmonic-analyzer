@@ -62,11 +62,14 @@ def test_each_typed_step_cite_names_the_step_that_does_it(
 
 
 def test_the_cone_stack_step_prints_measured_limits() -> None:
-    """The fitter accepts the touching gear stack before setting the tip."""
+    """The fitter accepts the touching gear stack before bonding the tip."""
     low, high = dt_cone_gear_stack.STACK_L20_ACCEPT
     stack = _step_body("cone-gears-stacked")
     assert "MHA-DT-07" in stack and "MHA-DT-03" in stack
-    assert "T120 FIRST THROUGH T006" in stack
+    # Machinist review round 4 of PR 2: the keyed range names its ends and
+    # count, and T024 is its own step.
+    assert "SLIDE T120 TO T030 (" in stack and "X MHA-DT-03) ON, T120 FIRST" in stack
+    assert "SLIDE T024 ON MHA-DT-04 AGAINST T030, DRY, NO FEELER" in stack
     # Owner decision C1 keyed (2026-11-09, PR #1992): the land-1 key goes in
     # before any gear slides over it.
     key = _config.parts("dt-vn-cone-shaft-key")["number"]
@@ -75,7 +78,7 @@ def test_the_cone_stack_step_prints_measured_limits() -> None:
     )
     assert f"SLIDE MHA-DT-07 ON {key}" in stack
     # The decimal-inch window rounds inward, a thousandth inside each limit.
-    printed = re.search(r"T006 BACK FACE: ACCEPT (\d*\.\d{3})-(\d*\.\d{3})\.", stack)
+    printed = re.search(r"MHA-DT-37 LEAVES' BACK: ACCEPT (\d*\.\d{3})-(\d*\.\d{3})\.", stack)
     assert printed is not None
     first, last = (float(value) * 25.4 for value in printed.groups())
     assert low <= first < low + 0.0254 and high - 0.0254 < last <= high
@@ -84,44 +87,93 @@ def test_the_cone_stack_step_prints_measured_limits() -> None:
     assert "IF IT IS SHORT, REMAKE ITS THINNEST GEAR" in stack
 
 
-def test_the_tip_step_sets_the_collar_before_the_end_play() -> None:
-    """User ruling 2026-09-29: the collar is set to T006 over the feeler and
-    locked first, so the stack's float is fixed on the shaft before the cup
-    screw sets MHA-DT-04's end play and the pinch screw locks it."""
-    fitup = _step_body("tip-adjuster-set")
-    # The tip's lateral error is taken up by turning MHA-DT-05 on its screws
-    # (build_drive_train_assembly.TIP_LATERAL_CAPACITY_MM), so the post stays
-    # turnable until the tip is centred in the cup, and is locked before the
-    # end play is set (Codex P1 on #1136).
+def test_the_tip_is_measured_dry_then_bonded_on_the_feeler() -> None:
+    """Owner decision C1 keyed (2026-11-09, PR #1992): the stack is measured
+    dry, MHA-DT-38 is pressed on the loose MHA-DT-37, and only then is T024
+    bonded one STACK_FEELER off T030 with the bonded gears phased to T030 by
+    the MHA-DT-03-TL-02 phasing comb, T030's blade beside the key (owner
+    rulings 2026-11-09 and 2026-11-10)."""
+    stack = _step_body("cone-gears-stacked")
     order = (
-        f"PUSH {_config.parts('dt-vn-cone-tip-collar')['number']} ONTO A "
-        f"{sheet.inch_text(cone_stack_end_play.COLLAR_FEELER, sheet.FEELER_PLACES)} FEELER ON T006",
-        "LOCK ITS SET SCREW",
-        "THREAD MHA-DT-VN-55 INTO MHA-DT-21",
-        "TURN MHA-DT-05 ON ITS SCREWS UNTIL THE TIP CENTRES IN THE CUP",
-        "TIGHTEN BOTH MHA-DT-VN-61",
-        "JUST STOPS SHUTTLING",
+        "SLIDE T024 ON MHA-DT-04 AGAINST T030, DRY, NO FEELER",
+        "SLIDE T012 AND T018 ON THE MHA-DT-37 SPIGOT, DRY",
+        "PUSH MHA-DT-37 INTO THE MHA-DT-04 SOCKET UNTIL T018 BEARS ON T024",
+        "ACCEPT",
+        "PRESS MHA-DT-38 ON THE MHA-DT-37 PIVOT",
+        f"BOND T024 ON MHA-DT-04, "
+        f"{sheet.inch_text(cone_stack_end_play.STACK_FEELER, sheet.FEELER_PLACES)} FEELER ON T030",
+        "BOND T012 AND T018 ON THE MHA-DT-37 SPIGOT",
+        "BOND MHA-DT-37 IN MHA-DT-04, T018 ON T024,",
+        "ENGAGE MHA-DT-03-TL-02 AT ONCE, T030'S BLADE BESIDE THE KEY",
+        "REMOVE MHA-DT-03-TL-02 AND THE FEELER",
+    )
+    positions = [stack.find(phrase) for phrase in order]
+    assert -1 not in positions, positions
+    assert positions == sorted(positions)
+
+
+def test_the_end_screw_sets_the_end_play_after_the_pivot_runs_free() -> None:
+    """The tip's lateral error is taken up by turning MHA-DT-05 on its screws
+    until T006's pivot runs free in MHA-DT-39
+    (build_dt_drive_train_assembly.TIP_LATERAL_CAPACITY_MM); the post and the
+    block are tightened and the block doweled before MHA-DT-39 sets the end
+    play and the pinch screw locks it."""
+    placed = _step_body("post-and-tip-block")
+    order = (
+        "RUN BOTH MHA-DT-VN-61 IN, LOOSE ENOUGH TO TURN MHA-DT-05",
+        "RUN MHA-DT-VN-60 UP THRU THE MHA-DT-20 COUNTERBORE",
+        "THREAD MHA-DT-39 INTO MHA-DT-21",
+        "TURN MHA-DT-05 ON ITS SCREWS UNTIL THE MHA-DT-37 PIVOT RUNS FREE",
+        "TIGHTEN BOTH MHA-DT-VN-61 AND MHA-DT-VN-60",
+        "DRILL AND REAM UP THRU MHA-DT-20 INTO MHA-DT-21",
+    )
+    positions = [placed.find(phrase) for phrase in order]
+    assert -1 not in positions, positions
+    assert positions == sorted(positions)
+    assert "FEELER" not in placed
+    fitup = _step_body("end-play-set")
+    order = (
+        "THREAD MHA-DT-39 IN UNTIL MHA-DT-04 JUST STOPS SHUTTLING",
+        "BACK MHA-DT-39 OFF 1/8 TURN",
         "TIGHTEN MHA-DT-VN-56",
+        "REPEAT 3-3C UNTIL THE END PLAY READS IN ITS WINDOW",
+        # Rule 23 (PR 2 machinist review round 10): the pinch lock's bench
+        # acceptance comes once the end play is final.
+        "CHECK THAT MHA-DT-39 DOES NOT TURN IN MHA-DT-21 BY HAND",
     )
     positions = [fitup.find(phrase) for phrase in order]
     assert -1 not in positions, positions
     assert positions == sorted(positions)
-    # The block is placed by its hold-down, squared and doweled (rule-23
-    # retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
-    # #2248)): nothing is set against it, and the post is left free to turn.
-    placed = _step_body("post-and-tip-block")
-    assert "RUN MHA-DT-VN-60 UP THRU THE MHA-DT-20 COUNTERBORE" in placed
-    assert "FEELER" not in placed
-    assert "RUN BOTH MHA-DT-VN-61 IN, LOOSE ENOUGH TO TURN MHA-DT-05" in placed
+    # Rule 20 (Codjiflo review of PR 2): the step that sets MHA-DT-39 prints
+    # DT-07's owner-accepted shortfall, and DT-07 quotes the same fact.
+    import build_dt_drive_train_assembly as assembly
+    import dt_drive_train_assembly_spec as assembly_spec
+
+    fact = assembly_spec.END_SCREW_ENGAGEMENT_ASSEMBLY_FACT
+    assert f"BACK MHA-DT-39 OFF 1/8 TURN: {fact}" in fitup
+    printed = re.fullmatch(r"ENGAGEMENT (\.\d{3}) MIN \((\d\.\d{2})D\)\.", fact)
+    assert printed is not None
+    printed_in, printed_d = (float(value) for value in printed.groups())
+    assert assembly.END_SCREW_ENGAGEMENT_WORST_MM - 0.0254 < printed_in * 25.4
+    assert printed_in * 25.4 <= assembly.END_SCREW_ENGAGEMENT_WORST_MM
+    assert printed_d <= assembly.END_SCREW_ENGAGEMENT_WORST_D < printed_d + 0.01
+    from machinist_exceptions import load_exceptions
+
+    declared = {
+        entry.id: entry
+        for entry in load_exceptions(_config.CONFIG_DIR, "dt_drive_train_assembly", "assembly")
+    }
+    assert declared["DT-07"].kind == "minor"
+    assert fact in declared["DT-07"].where
 
 
 def test_the_printed_shaft_end_play_is_the_band_the_stacks_book() -> None:
-    """The collar-to-block air and the adjuster's embed window book
+    """The end screw's embed and the bushing air book
     cone_stack_end_play.SHAFT_END_PLAY; the sheet prints that band, rounded
     inward to the thousandth."""
     match = re.search(
         r"DIAL-INDICATE THE MHA-DT-04 END PLAY AT THE SHAFT END: (\.\d{3})-(\.\d{3})",
-        _step_body("tip-adjuster-set"),
+        _step_body("end-play-set"),
     )
     assert match is not None
     low, high = (float(value) * 25.4 for value in match.groups())
@@ -148,7 +200,10 @@ def test_post_screws_keep_spec_owned_stock_and_cut_to_fit_acceptance() -> None:
     # The step prints the part sheet's exact maximum short, never a wider one.
     printed_short = float(re.search(r"FLUSH TO (\d*\.\d+) SHORT", fitup).group(1))
     assert printed_short * 25.4 == pytest.approx(screw.POST_SCREW_CUT_TO_FIT_SHORT, abs=1e-9)
-    assert "CUT EACH MHA-DT-VN-61 TO FIT" in fitup and "UNDERSIDE, NEVER PROUD" in fitup
+    assert (
+        "CUT EACH MHA-DT-VN-61 TO FIT" in fitup
+        and "SHORT OF THE MHA-DT-20 UNDERSIDE" in fitup
+    )
     assert "DEBURR THE CUT ENDS" in fitup
     assert screw.FIXED_CUT_LENGTH_EXISTS is False
     assert screw.STOCK_LENGTH_MM >= screw.FIXED_LENGTH_ENGAGEMENT_MIN_MM
@@ -265,14 +320,16 @@ def test_a_cite_to_the_wrong_step_is_caught() -> None:
 
 def _defined_codes() -> list[str]:
     """The short codes MHA-DT-00 defines: each cone gear's configuration
-    (the BOM's "T006-T120 BY 6").  The chain wheel goes by its number only:
-    a "T12" read as a cone-gear code (machinist review of 5994f29c83)."""
+    (the BOM's "T012-T120 BY 6") and any the interface notes name.  The chain
+    wheel goes by its number only: a "T12" read as a cone-gear code
+    (machinist review of 5994f29c83)."""
     cone = re.search(r"\bT(\d+)-T(\d+) BY (\d+)\b", drawing.BOM_DESCRIPTIONS["dt-cone-gear"])
     assert cone, drawing.BOM_DESCRIPTIONS["dt-cone-gear"]
     first, last, step = (int(value) for value in cone.groups())
     gears = {f"T{teeth:03d}" for teeth in range(first, last + 1, step)}
-    assert not re.findall(r"\bT\d+\b", drawing.INTERFACE_NOTES), "the interface notes print no tooth code"
-    return [re.escape(code) for code in sorted(gears)]
+    named = set(re.findall(r"\bT\d+\b", drawing.INTERFACE_NOTES))
+    assert "T12" not in named, "the interface notes print no chain-wheel tooth code"
+    return [re.escape(code) for code in sorted(gears | named)]
 
 
 def _direction_key() -> str:

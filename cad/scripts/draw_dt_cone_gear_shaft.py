@@ -5,19 +5,14 @@ one origin per chucking (rule 11): the journal and the collar web from the
 collar's thrust face, the gear lands and the tip from its tip-side face; every
 diameter is above it on that same side
 view, each dimension line inside the land it measures (the 3.2 mm collar
-instead takes one near-side arrow on its rim).  The two short lands
-ahead of the tip are 6.9 mm long, so the three tip-end diameter texts climb
-in steps: the tip's line rises highest and each text hangs to the RIGHT of
-its line above every line it spans.  Each gear land's anti-spin cut (land
-1's keyseat, lands 2-4's D-flats) is shown in its own enlarged cut-only
-section, A-A to D-D, carrying its sizes; B-B to
-D-D are cut on DETAIL E, the stepped tip at 4:1, where their arrows and
-letters have room.  A standard isometric supplies pictorial clarity.  Every
-tight band names its mate at its own callout or in the numbered land note
-linked from each land's diameter, keyseat and across-flat, and the notes give the
-collar's tight limits and the tailstock support the tip land needs (U40).
-Source geometry and native model fits stay authoritative.  The front-to-tip
-overall is a reference and takes its display precision from the spec.
+instead takes one near-side arrow on its rim).  Land 1's keyseat is shown in
+its own enlarged cut-only section A-A, carrying its sizes.  The tip end view,
+projected left of the side view, carries the reamed socket's callout (owner
+decision C1 keyed, 2026-11-09, PR #1992).  A standard isometric supplies
+pictorial clarity.  Every tight band names its mate at its own callout or in
+the numbered note linked from it.  Source geometry and native model fits stay
+authoritative.  The front-to-tip overall is a reference and takes its display
+precision from the spec.
 
 Run with SolidWorks open::
 
@@ -28,12 +23,10 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Iterable, Mapping, Sequence
-from enum import Enum
 import math
 import sys
 from typing import Any, NamedTuple
 
-from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -66,7 +59,6 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
-from _drawing_detail_projection import settle_detail_projection
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import set_dimension_callouts, set_reference_dimension
 from _drawing_edge_dimensions import add_edge_dimension
@@ -103,10 +95,8 @@ from dt_cone_gear_shaft_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
-    FILLET_CALLOUT,
-    FLAT_LANDS,
     KEYED_LAND,
-    FLAT_MATE_SUFFIXES,
+    KEYSEAT_MATE_SUFFIXES,
     LAND_NOTE,
     JOURNAL_DIA,
     SEAT_MATE_CALLOUTS,
@@ -115,8 +105,8 @@ from dt_cone_gear_shaft_spec import (
     SECTION_DIAS,
     SECTION_ENDS,
     SHAFT_LENGTH,
+    SOCKET_CALLOUT,
     SURFACE_FINISHES,
-    TORQUE_CORNER_CALLOUT,
 )
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -146,26 +136,23 @@ SHEET_NAMES = ("Shaft Controls",)
 
 # Landscape sheet, 0.4318 x 0.2794 m, title block bottom right (x > ~0.216,
 # y < ~0.066).  The spec-derived shaft at 1:1 ends at BIG_END_X, leaving the
-# right third for the pictorial (top) over the four D sections; the tip
-# detail fills the field above the side view (codex review, #1128: with the
-# sections in one row the drawing sat in the lower half, the upper field
-# empty, and the row's captions ran onto the title block).  The group sits
+# right third for the pictorial (top) over section A-A.  The group sits
 # just below mid-height so the baseline stack below and the diameters above
 # share the field with the note block in the lower left (review 2026-09-23:
 # at 0.170 rows A-B stood empty but for the note).  The view is placed by its
 # large end: every dimension below is laid out from that datum face, so a
-# change at the tip (the 2026-09-29 prism tip block lengthened it 2.31 mm)
-# moves only the tip.
+# change at the tip (C1 keyed ends the shaft inside T024's bore) moves only
+# the tip.
 BIG_END_X = 0.2526
 SIDE_CENTER = (BIG_END_X - SHAFT_LENGTH / 2000.0, 0.150)
 TIP_END_X = BIG_END_X - SHAFT_LENGTH / 1000.0
 # 10 mm right of round 2's (0.363): the collar's two-line callout, its limits
 # now at the feature, reaches x ~0.330 under the pictorial's low end.
 ISO_CENTER = (0.373, 0.232)
-# At the left frame, as the other part sheets' note blocks: the four note
-# lines run up to 72 characters before the title block.
+# At the left frame, as the other part sheets' note blocks: the note lines
+# run up to 72 characters before the title block.
 NOTES_XY = (0.020, 0.060)
-# Off-sheet-left donor: the five diameters are model dimensions of circular
+# Off-sheet-left donor: the land diameters are model dimensions of circular
 # profile sketches, so they can only be IMPORTED into a view that faces those
 # circles.  They are imported here, dragged onto the shoulder each one
 # belongs to, and this view is then deleted.
@@ -173,9 +160,9 @@ DONOR_CENTER = (0.360, 0.090)
 
 # Lengths, one origin per chucking (rule 11, round 6): the collar's thrust
 # face at sheet x 0.2096 for the journal (to the right) and the collar web,
-# both on the first tier; its tip-side face, one web left, for the three land
-# steps and the tip (#917 R5 (a)), baseline below the shaft, one tier each,
-# the shortest nearest the part.  Every tier is one line of text.  The
+# both on the first tier; its tip-side face, one web left, for the land step
+# and the tip (#917 R5 (a)), baseline below the shaft, one tier each, the
+# shorter nearer the part.  Every tier is one line of text.  The
 # front-to-tip overall, a reference, hangs lowest, above the title block.
 # A station's text is centred in its span when it fits there with
 # STATION_TEXT_CLEARANCE to spare; the web's 3.18 span is narrower than its
@@ -184,20 +171,24 @@ DONOR_CENTER = (0.360, 0.090)
 # above the 3/8-to-1/4 in step it attaches to (the fillet's first edge),
 # right of the Ø.2500 line.  With its stacked +.000/-.002 band its text is
 # 23.4 mm wide and its shoulder 25.4 mm, so it stands 0.4 mm nearer that line
-# than the bare MAX text did: the text ends 2.2 mm short of section A-A's upper
-# arrow (the layout proof's 2 mm gap; final3 read 1.8 at +0.010) and the
-# shoulder starts 0.7 mm right of the Ø.2500 line (r16 crossed it at +0.0085).
+# than the bare MAX text did.  PR 2 r2 (967cedb) measured it 0.0862..0.1122
+# x 0.1612..0.1647: 4.1 mm short of section A-A's upper arrow with A cut
+# A_CUT_FROM_STEP_MM from the step (1.1 mm at 25, under the proof's 2 mm),
+# and its shoulder 1.3 mm right of the Ø.2500 line (r16 crossed it at +0.0085).
+# PR 2 r3 (2aeedb78) measured the shoulder 0.0846..0.1130 at y 0.1612 about
+# its 0.0996 position, 2.4 mm wider than r2's, crossing the Ø.2500 line
+# (x 0.0849, 0.1532..0.1740).  Land 2 is too short to move that line left of
+# the shoulder, so the radius moves 2.8 mm right (shoulder from ~0.0874,
+# 2.5 mm right of the line) and A's cut 3 mm north to keep its arrow clear.
 SIDE_KEEP = {
     "CollarWidth": (0.1740, 0.1355),
     "Sec0End": (0.2311, 0.1355),
-    # Its " SEE NOTE 2" flag (round 4) widens the text to ~37 mm; 6 mm right
+    # Its " SEE NOTE 2" flag (round 4) widens the text to ~37 mm; 12 mm right
     # of the bare value's centre it starts right of section A's lower letter
-    # (x <= 0.1353), one tier above it.
-    "Sec1End": (0.1560, 0.1275),
+    # (x <= 0.1409 with A cut 31 mm from the step), one tier above it.
+    "Sec1End": (0.1620, 0.1275),
     "Sec2End": (0.1464, 0.1195),
-    "Sec3End": (0.1429, 0.1115),
-    "Sec4End": (0.1314, 0.1035),
-    "ShoulderR": (BIG_END_X - SECTION_ENDS[1] / 1000.0 + 0.0096, 0.1640),
+    "ShoulderR": (BIG_END_X - SECTION_ENDS[1] / 1000.0 + 0.0124, 0.1640),
     # The keyseat end's centre from the collar face (machinist review of
     # 06460fb; .05 since Codjiflo #2331 4521933063).  Its 1.3 mm span puts both
     # arrows outside; it hangs below the shaft from land 1's lower corner,
@@ -226,24 +217,16 @@ STATION_TEXT_CLEARANCE = 0.002
 # Diameters, imported on the donor and dragged onto the side view.  A vertical
 # linear dimension's line sits at its text x and the text hangs to the RIGHT
 # of that line (~32 mm wide with its stacked band, and its mate suffix
-# after it), so each x lies INSIDE the land it measures; the short lands'
-# lines follow their current end stations, one third of a land length back
-# from each small end.  Ø12.231 stands just off the faced end, its text and
+# after it), so each x lies INSIDE the land it measures; land 2's line
+# follows its end stations, one third of its length back from the tip.  Ø12.231 stands just off the faced end, its text and
 # two mate lines above the journal's extension lines, 4 mm nearer the end
-# than r2's so its widest mate line ends clear of section A-A's across-flat.
+# than r2's so its widest mate line ends clear of section A-A's dimensions.
 # Its text's lower-left corner is where the dimension line turns, so the
 # block stands 3.5 mm higher than r4b's: there the shelf sat on the
 # extension line and the 3 mm arrow rose into "MHA-DT-05" (machinist
-# review r4b, 20261018T072511131Z).  A tip-end text spans
-# its right-hand neighbours' lines: the tip's text sits highest and each
-# neighbour to the right steps down, so no line rises through a text (codex,
-# 18395f30).  Lands 2 and 3 carry their lines mid-land; the tip's line stays
-# 3.0 mm in from the tip face (r5's, clear of where the old tip finish leader
-# landed) and follows the
-# tip face when its station moves.  With its suffix the Ø6.350 text runs over
-# A-A's upper letter, so the three tip-end texts stand 2.5 mm higher than
-# r1's (the tip detail with them); Ø9.525 stands right of all three suffixes,
-# its two mate lines centred on it clear above A-A's letter.
+# review r4b, 20261018T072511131Z).  Land 2's text, with its suffix, ends
+# left of land 1's line; Ø9.525 stands right of it, its mate line centred on
+# it clear above A-A's letter.
 SIDE_DIAMETERS = {
     # The journal's text stands just off the faced end, where rounds 1 and 2
     # proved it hangs RIGHT of its line (r2 render 20261107T104940656Z: ink
@@ -259,8 +242,6 @@ SIDE_DIAMETERS = {
     "Sec0Dia": (0.2575, 0.1785),
     "Sec1Dia": (0.1600, 0.1800),
     "Sec2Dia": (BIG_END_X - (2.0 * SECTION_ENDS[2] + SECTION_ENDS[1]) / 3000.0, 0.1785),
-    "Sec3Dia": (BIG_END_X - (2.0 * SECTION_ENDS[3] + SECTION_ENDS[2]) / 3000.0, 0.1905),
-    "Sec4Dia": (TIP_END_X + 0.0030, 0.2025),
     # #914: the collar ring is 3.181 wide, too narrow for a dimension line
     # and two arrows inside it, so the collar alone takes the near-side
     # diametric style: one arrow on the top rim from outside, leader up to
@@ -274,12 +255,17 @@ NEAR_SIDE_DIAMETERS = ("CollarDia",)
 REFERENCE_DIAMETERS = ("CollarDia",)
 # Sheet width of one diameter text with its stacked band, for the layout test.
 DIAMETER_TEXT_WIDTH = 0.032
-# One-line suffixes after a dimension's value: the tip-end seats' flag to
-# the land note, and the stack's three-place lengths' flag to the stack note
-# (round 4 review: a note naming the mates must be linked at each callout it
-# serves, rule 7).  Other lengths carry their value and band only.
+# One-line suffixes after a dimension's value: land 2's flag to the bond
+# note, and the stack's three-place lengths' flag to the stack note (round 4
+# review: a note naming the mates must be linked at each callout it serves,
+# rule 7).  The tip station Sec2End is one of them: its .XXX band is what
+# keeps the shaft's end inside T024's bore, so T018 butts T024 and not the
+# shaft (the recess proof in dt_cone_gear_shaft_spec; at .XX the end could
+# stand 0.10 mm proud of T024's north face).  PR 2 r4 review (7522757):
+# unflagged, it read as a three-place length with no function.  Other
+# lengths carry their value and band only.
 STACK_FLAG_SUFFIX = f" SEE NOTE {STACK_NOTE}"
-STACK_LENGTHS = ("Sec1End", "Sec2End", "Sec3End", "CollarWidth")
+STACK_LENGTHS = ("Sec1End", "Sec2End", "CollarWidth")
 DIMENSION_SUFFIXES = {
     **SEAT_MATE_SUFFIXES,
     **{name: STACK_FLAG_SUFFIX for name in STACK_LENGTHS},
@@ -301,11 +287,10 @@ DONOR_KEEP = {
     name: (DONOR_CENTER[0], DONOR_CENTER[1] - 0.012 * index)
     for index, name in enumerate(SIDE_DIAMETERS)
 }
-# Three identical step roots, one modelled fillet, one radius dimension (the
-# collar's roots stay sharp, #914, their limit in the collar callout).  The
-# journal and land 1 name their mates below their diameters.
+# One step root, one radius dimension (the collar's roots stay sharp, #914,
+# their limit in the collar callout).  The journal and land 1 name their
+# mates below their diameters.
 DIMENSION_CALLOUTS = {
-    "ShoulderR": FILLET_CALLOUT,
     "CollarDia": COLLAR_STOCK_CALLOUT,
     **SEAT_MATE_CALLOUTS,
 }
@@ -317,142 +302,71 @@ PIVOT_FINISH_XY = (0.2400, 0.1800)
 PIVOT_FINISH_ATTACH_INSET = 0.020
 
 
-class CutParent(Enum):
-    """The view a D section's cutting-plane line is drawn on."""
-
-    SIDE = "side view"
-    TIP_DETAIL = "tip detail"
+# The tip end view (drawing-guidelines.md rules 9 and 12): the reamed socket
+# is a standard blind ream, fully defined by its callout, so it needs no
+# section.  The view looks at the tip end face (*Front looks along model -Z,
+# the shaft's tip end on its +Z), projected LEFT of the side view in third
+# angle at the sheet scale, on the side view's axis, so it needs no label.
+# Its outline is the collar's Ø5/8 circle; TIP_END_VIEW_GAP leaves the axis
+# overrun and the collar circle 12 mm apart.  SocketDia is imported there,
+# where its circle faces the viewer, its text up and left of the view
+# (the field the stepped-tip detail used to take), clear of land 2's
+# diameter text, which hangs right of its line inside land 2.  The text's box
+# was measured on the PR 2 farm proof (6fda5a4): its callout rows make it
+# 43.1 mm wide, 16.3 mm left and 26.8 mm right of its position, 10.1 mm
+# under and 9.1 mm over (0.0037..0.0468 x 0.1749..0.1941 at (0.020, 0.185),
+# 9 mm through the left frame).  At x 0.033 it spans 0.0167..0.0598: 4 mm
+# inside the frame, 25 mm left of land 2's line.
+TIP_END_VIEW_GAP = 0.020
+TIP_END_VIEW_CENTER = (TIP_END_X - TIP_END_VIEW_GAP, SIDE_CENTER[1])
+TIP_END_VIEW_KEEP = {"SocketDia": (0.033, 0.185)}
+SOCKET_CALLOUTS = {"SocketDia": SOCKET_CALLOUT}
 
 
 class DSection(NamedTuple):
-    """One gear land's D-flat section: the station its cutting line crosses,
-    the view carrying that line, how far the line reaches either side of the
-    axis on that view's sheet, where the removed section stands, and its own
-    scale."""
+    """The keyed land's section: the station its cutting line crosses on the
+    side view, how far the line reaches either side of the axis, where the
+    removed section stands, and its own scale."""
 
     land: int
     label: str
     station_mm: float
-    parent: CutParent
     reach: float
     centre: tuple[float, float]
     scale: tuple[int, int]
 
 
-# The stepped tip (lands 2..4) is too short at 1:1
-# for three cutting lines: an arrow is 12 mm long and its letter stands 14..21
-# mm past the line, so B, C and D piled onto each other, onto the tip's
-# diameter lines and onto R0.10 3X (codex review, #1128).  They are cut on
-# DETAIL E instead, the tip at 4:1 in the empty field above the side view,
-# where their lines stand 27 and 28 mm apart.  The detail carries no dimension:
-# DragModelDimension refuses to re-home a model dimension into a detail view,
-# so every diameter and station stays on the side view.  The circle on the
-# side view spans lands 2..4 only, clear of
-# the R0.10 leader at the Ø6.350 to Ø9.525 step; the detail draws no boundary
-# round its clipped geometry.  It stands 2.5 mm above r1's 0.236, with the
-# tip-end diameter texts under it.
-TIP_DETAIL_LABEL = "E"
-TIP_DETAIL_SCALE = (4, 1)
-TIP_DETAIL_STATION_MM = SECTION_ENDS[3] - 1.8
-TIP_DETAIL_RADIUS = 0.009
-TIP_DETAIL_CENTER = (0.100, 0.2385)
-# The circle's letter on the side view: up-left of the circle (x 0.069..0.087,
-# y 0.141..0.159), between the terminal and Ø3.175 dimension lines,
-# under their texts, 2 mm off the circle whichever corner of the
-# letter SolidWorks anchors.
-TIP_DETAIL_LETTER_XY = (0.064, 0.164)
-CUT_PARENT_SCALE = {CutParent.SIDE: SIDE_SCALE, CutParent.TIP_DETAIL: TIP_DETAIL_SCALE}
-# A cutting line on the detail spans its land, not the detail's whole view, so
-# SolidWorks leaves the full section open (leaf 20260929T212413Z-1-c1463903:
-# B-B "did not close"); it is made a partial section, as
-# draw_cone_swing_platform cut C-C from its detail.  The line still runs past
-# its land on both sides, so the partial cut is the whole D.
-PARTIAL_CUT_PARENTS = frozenset({CutParent.TIP_DETAIL})
-
-# The D sections (user ruling 2026-09-28: lands 2-4 each carry one flat on
-# the shaft's +X; land 1 its keyseat there instead, owner decision
-# 2026-11-09, C1 keyed, PR #1992).  The side view looks straight at the cuts, so their size
-# is only readable end-on: each land is cut across and shown cut-only
-# (nothing beyond the plane prints), each enlarged to about 16..19 mm across
-# so the reader-owned smallest AF reads with its band. A-A cuts land
-# 1 on the side view, left of the Ø9.525 line. Its lower letter's top stands
-# 4.8..6.3 mm above the line's end, by seat (6.3 on swmaker00000a in the
-# 19e33c6c2 build, where a 12.5 mm reach left it 1.4 mm under land 1); the
-# 15 mm reach leaves the worst 3.9 mm under the land.  B, C and D cut the
-# detail.  A line's arrows look toward the big end (sheet +x) and its
-# letter's right edge lands 19.9..21.3 mm past the line, a spread SolidWorks
-# sets per line and per seat (leaves 20260929T221513Z-1-22b951a7,
-# 20260929T235413Z-1-6ebc5952), so side by side
-# the lines must stand at least 23 mm (that run and the next arrow's 1.7 mm
-# half-width) plus the layout audit's 2 mm apart.  The three stations are
-# spread over their lands for that: B and C 0.6 and 0.8 mm short of the step
-# at their land's small end, D 8.0 mm past the detail's centre and inside its
-# circle, so the lines stand 26.8 and 28.0 mm apart at 4:1: C's letters clear
-# B's arrows by 3.8 mm and D's clear C's by 5.0 mm on the worst seat measured,
-# and B's letters clear land 1 by 3.7 mm.  At the old 24 mm (C on the
-# detail's centre) D's letter crowded C's arrow at 1.7 mm on swmaker00000f.
-# B's reach puts its lower letter 3.5 mm under land 2 and C's matches it; D's,
-# on the thinnest land, is shorter.  The four stand in two rows right of the
-# side view, under the pictorial, each over its caption, the bottom row's
-# captions above the title block (x > 0.216, y < 0.066).  D's across-flat
-# carries the torque-corner callout and A's the flats' shared clock, each
-# centred over its text and SECTION_CALLOUT_REACH either side of it, so D
-# stands between C-C's outline and the right border and A's stays left of
-# B's cell; C stands left of A's column, its cell clear of D's callout and
-# of the side view's big end.  Every across-flat flags the land note after
-# its value (FLAT_MATE_SUFFIXES), the whole line centred on the text position
-# (r2, 20261018T062935602Z: B's "5.842 -0.01 T024" read 376.0..410.5 mm
-# about its 393 mm centre), so A's 56 mm line pushes A-A 3 mm right of r2's
-# and B-B 1 mm right: r3 (20261018T065854075Z) measured A's box ending at
-# 0.3693 with A at 0.341, 2.0 mm short of B's at 0.3713, under the proof's
-# CLEAR_GAP_M plus margin.  The inch flat band's five places (-0.01016)
-# widened both lines: #290 batch 0 read A's box ending at 0.3722, 0.7 mm into
-# B's at 0.3715; B-B already stands at the frame, so A-A moves 2.9 mm left
-# and Ø12.2555 (SIDE_DIAMETERS) 4.5 mm left to keep A's box clear of it.
-# The across-flat is the part's own dimension (Sec{i}AF, sketched on the
-# land's end plane, parallel to the cut), so it prints its model band.  A-A
-# prints land 1's keyseat the same way: its S (Sec1KeyseatS, horizontal like
-# the AF it replaces, with no suffix, so its line is shorter than the old
-# AF's) where the AF stood, and its width (Sec1KeyseatWidth, vertical, the
-# land-note flag after it) above that on the keyseat's own side, placed at
-# build time once the section reports which side +X lands on.
+# Land 1's keyseat (owner decision 2026-11-09, C1 keyed, PR #1992), on the
+# shaft's +X.  The side view looks straight at it, so its size is only
+# readable end-on: the land is cut across and shown cut-only (nothing beyond
+# the plane prints), enlarged 2:1.  A-A cuts land 1 on the side view, left of
+# the Ø9.525 line.  Its lower letter's top stands 4.8..6.3 mm above the
+# line's end, by seat (6.3 on swmaker00000a in the 19e33c6c2 build, where a
+# 12.5 mm reach left it 1.4 mm under land 1); the 15 mm reach leaves the
+# worst 3.9 mm under the land.  The section stands right of the side view,
+# under the pictorial, over its caption.  It prints the keyseat's S
+# (Sec1KeyseatS, horizontal, centred over the section) and its width
+# (Sec1KeyseatWidth, vertical, the land-note flag after it) above that on the
+# keyseat's own side, placed at build time once the section reports which
+# side +X lands on.  A's line is wider than its section: r3
+# (20261018T065854075Z) and #290 batch 0 placed it 2.9 mm left of the
+# frame-bound column, with Ø12.2555 (SIDE_DIAMETERS) 4.5 mm left to keep
+# A's box clear of it.  The cutting line stands A_CUT_FROM_STEP_MM north of
+# land 1's step: at 25 mm its upper arrow, 0.1133..0.1287 with the proof's
+# 1.7 mm pad, stood 1.1 mm right of the R.004 text's 0.1122 (PR 2 r2,
+# 967cedb).  At 28 mm the arrows started 0.1163.  r3's wider radius text
+# moved 2.8 mm right (SIDE_KEEP), so at 31 mm the arrows start 0.1193, 3.5 mm
+# clear of its shoulder's right end (~0.1158); its letters (0.1285..0.1349 at
+# 25 mm) move to 0.1345..0.1409, and Sec1End's text (SIDE_KEEP) moves 6 mm
+# right with them.
+A_CUT_FROM_STEP_MM = 31.0
 D_SECTIONS = (
-    DSection(
-        1, "A", SECTION_ENDS[1] - 25.0, CutParent.SIDE, 0.0150, (0.3371, 0.165), (2, 1)
-    ),
-    DSection(
-        2,
-        "B",
-        SECTION_ENDS[2] - 0.6,
-        CutParent.TIP_DETAIL,
-        0.0210,
-        (0.394, 0.165),
-        (3, 1),
-    ),
-    DSection(
-        3,
-        "C",
-        SECTION_ENDS[3] - 0.8,
-        CutParent.TIP_DETAIL,
-        0.0210,
-        (0.305, 0.100),
-        (5, 1),
-    ),
-    DSection(
-        4,
-        "D",
-        TIP_DETAIL_STATION_MM + 8.0,
-        CutParent.TIP_DETAIL,
-        0.0155,
-        (0.3846, 0.100),
-        (20, 1),
-    ),
+    DSection(1, "A", SECTION_ENDS[1] - A_CUT_FROM_STEP_MM, 0.0150, (0.3371, 0.165), (2, 1)),
 )
 # The dimensions each section prints; the first is centred over its section
 # (A-A's S shifted at build time, below).
 SECTION_DIMENSION_NAMES = {
     KEYED_LAND: ("Sec1KeyseatS", "Sec1KeyseatWidth"),
-    **{land: (f"Sec{land}AF",) for land in FLAT_LANDS},
 }
 D_SECTION_KEEP = {
     SECTION_DIMENSION_NAMES[section.land][0]: (section.centre[0], section.centre[1] + 0.017)
@@ -461,13 +375,14 @@ D_SECTION_KEEP = {
 # A-A's S text steps KEYSEAT_S_SHIFT away from the keyseat, and its arrows
 # stand inside its extension lines (swDimensionArrowsSide_e.swDimArrowsInside),
 # so the keyseat width's dimension line, rising at the keyseat's edge, crosses
-# neither the S text nor its dimension line.  Machinist review of 5a4e41cb5f
-# r3 (clarity, gating) and its layout audit measured the collision: the width
-# line at x 0.3466 ran through the S band text (0.3227..0.3501, centred 1.4
-# mm off its 0.3371 position) and its outside arrow's line out to 0.3513.  At
-# 7.0 mm off, the S text ends 0.3431, 3.5 mm short of the width line; inside
-# arrows end its dimension line at the floor's extension line, 0.3449.  Its
-# left end, 0.3157, stays 8 mm right of the Ø.4825 block (~0.307).
+# neither the S text nor its dimension line.  Machinist review of PR 1
+# 5a4e41cb5f r3 (clarity, gating) and its layout audit measured the
+# collision: the width line at x 0.3466 ran through the S band text
+# (0.3227..0.3501, 14.4 mm left and 13.0 mm right of its 0.3371 position) and
+# its outside arrow's line out to 0.3513.  At 7.0 mm off, the S text ends
+# 0.3431, 3.5 mm short of the width line; inside arrows end its dimension line
+# at the floor's extension line, 0.3449.  Its left end, 0.3157, stays clear of
+# the Ø.4825 block (~0.307).
 KEYSEAT_S_SHIFT = 0.0070
 # S's text block (value, stacked band, and the NOTE flag above them) stands
 # centred on its position, so the flag's row pushed the value DOWN: PR 1 r9
@@ -482,58 +397,25 @@ KEYSEAT_S_FLAG_LIFT = 0.0030
 ARROWS_INSIDE = 0  # swDimensionArrowsSide_e.swDimArrowsInside
 # The keyseat width's text: KEYSEAT_WIDTH_RISE above the section centre, at
 # the keyseat side's sheet x.  A vertical dimension's line stands at its
-# text's left edge, so the text runs right from the keyseat: the PR #2331
-# proof (head 7f1dedc) measured A-A's cell to 0.3927 with it, 2.2 mm into
-# B-B's (from 0.3711), the 46 mm text standing over B's column.  Nothing
-# leaves room to move A-A that far (the Ø.4825 text holds its left side), so
-# the text rides one row above B's cell instead: its own box in the layout
-# proof, not inside A's cell.  That row is measured (5994f29 r2): B's cell
-# top 0.1855, the pictorial's outline bottom 0.2001, and the text's box 4.5
-# mm under and 3.5 mm over its position (0.1905..0.1985 at 0.195, where it
-# crowded the pictorial).  The rise centres it in that 14.6 mm row: 3.3 mm
-# clear of each, 1.3 mm over CLEAR_GAP_M.
+# text's left edge, so the text runs right from the keyseat, 46.1 mm wide:
+# the PR #2331 proof (head 7f1dedc) measured it to 0.3927 from ~0.3466, wider
+# than A-A's cell.  It rides one row above the section (PR #2331's farm fix,
+# 5994f29c83), its own box in the layout proof, not inside A's cell.  That row
+# is measured (5994f29 r2): A-A's S text top 0.1855, the pictorial's outline
+# bottom 0.2001, and the text's box 4.5 mm under and 3.5 mm over its position
+# (0.1905..0.1985 at 0.195, where it crowded the pictorial).  The rise centres
+# it in that 14.6 mm row: 3.3 mm clear of each, 1.3 mm over CLEAR_GAP_M.
 KEYSEAT_WIDTH_RISE = 0.0283
-# The terminal flat's torque corners ride above its across-flat; the flats'
-# shared clock is in the land note (spec LAND_NOTE) with their fit.
-SECTION_ABOVE_CALLOUTS = {
-    f"Sec{max(FLAT_LANDS)}AF": TORQUE_CORNER_CALLOUT,
-    # A-A's S flags the land note like its width (PR 2 r5 machinist review,
-    # clarity: the depth lacked the width's flag).  Above, not after: an
-    # after-suffix would run the S line ~18 mm right, through the width's
-    # dimension line at the keyseat's edge (0.3466), and the Ø.4825 block
-    # (to 0.3144) holds its left.  Centred on the S text, it joins S's block
-    # (KEYSEAT_S_FLAG_LIFT has the r9 measurement), 4.2 mm left of the
-    # width's line and shelf (from 0.3466 at y 0.1888).
-    "Sec1KeyseatS": f"NOTE {LAND_NOTE}",
-}
-# An above callout is centred on its dimension's text, set as one run: a
-# 40-character run read 110.6 mm wide in COM (Sec4AF's 0.3377..0.4483 at
-# 20261010T071427837Z) and 8.7 mm above the text position (f68549253).
-ABOVE_CALLOUT_CHAR_WIDTH = 0.1106243 / 40
-SECTION_CALLOUT_REACH = {
-    name: (len(text) * ABOVE_CALLOUT_CHAR_WIDTH / 2.0, 0.0087)
-    for name, text in SECTION_ABOVE_CALLOUTS.items()
-}
-# One character of an across-flat line, value, band and suffix together: B's
-# 16-character line read 34.5 mm on r2 (20261018T062935602Z).
-AF_CHAR_WIDTH = 0.0345 / 16
-# Section C-C's native outline, (0.2597..0.3503) x (0.0682..0.1318) at
-# 20261010T071427837Z, which the layout audit holds text off.
-SECTION_C_OUTLINE_RIGHT = 0.3503
-
-
-def _printable_above_callouts(callouts: dict[str, str]) -> dict[str, str]:
-    """Refuse an above-callout SolidWorks would keep but not print.
-
-    A line break in the above compartment is stored (``GetDisplayData`` reads
-    it back) yet nothing of the callout reaches the PDF (main's
-    draw_pd_transgear_thumbnut; this sheet's torque corners at
-    20261010T071427837Z), while one-line above callouts print.
-    """
-    broken = sorted(name for name, text in callouts.items() if "\n" in text)
-    if broken:
-        raise RuntimeError(f"above-callouts with a line break do not print: {broken}")
-    return callouts
+# A-A's S flags the land note like its width (PR 2 r5 machinist review,
+# clarity: the depth lacked the width's flag).  Above, not after: an
+# after-suffix would run the S line ~18 mm right, through the width's
+# dimension line at the keyseat's edge (0.3466), and the Ø.4825 block (to
+# 0.3144) holds its left (PR 2 r5, 20261110T081142602Z, as PR 1 r8).
+# Centred on the S text, it joins S's block (KEYSEAT_S_FLAG_LIFT has the
+# r9 measurement), 4.2 mm left of the width's line and shelf (from 0.3466
+# at y 0.1888).  One line: a line break in the above compartment never
+# prints.
+SECTION_ABOVE_CALLOUTS = {"Sec1KeyseatS": f"NOTE {LAND_NOTE}"}
 
 
 def _set_dimension_suffixes(
@@ -557,28 +439,25 @@ def _set_dimension_suffixes(
 
 
 # A native "SECTION A-A / SCALE 2 : 1" caption measured 45.4 x 17.0 mm (leaf
-# for c8b0aad); each is hung SECTION_CAPTION_GAP under its section's ink.
+# for c8b0aad); it is hung SECTION_CAPTION_GAP under its section's ink.
 SECTION_CAPTION_SIZE = (0.046, 0.017)
 SECTION_CAPTION_GAP = 0.003
-# The detail's caption stands this far right of its rightmost ink, B's letters.
-DETAIL_CAPTION_GAP = 0.004
 # A caption lands within this of its target (its anchor is not its box).  A
 # note's extent reads on a grid that differs by session: on two seats (leaves
-# 20260930T011635Z-1-c8539f7a, 20260930T011941Z-1-30339b73) C-C's caption top
-# settled 0.30 mm under the target and D-D's 0.31 mm over the same y, both to
-# the micron on both seats, so 0.3 mm was half a step and refused D-D.  At
-# 0.6 mm the caption still stands 2.4 mm or more under its face.
-# The layout proof measures the placed box, so the slack costs no clearance.
+# 20260930T011635Z-1-c8539f7a, 20260930T011941Z-1-30339b73) a caption top
+# settled 0.30 mm under the target and another 0.31 mm over the same y, both
+# to the micron on both seats, so 0.3 mm was half a step.  At 0.6 mm the
+# caption still stands 2.4 mm or more under its face.  The layout proof
+# measures the placed box, so the slack costs no clearance.
 CAPTION_SETTLE_M = 0.0006
-# The full A-A section is the one SolidWorks gives a centre mark; the partial
-# ones get none, so the mark is deleted and all four sections read alike
-# (machinist review r7, 20261018T084331898Z: "A-A has a centre mark but B-B,
-# C-C and D-D do not").  swAnnotationType_e.swCenterMarkSym:
+# A full section is given a centre mark, which is deleted so the section
+# reads as the cut face alone (machinist review r7, 20261018T084331898Z).
+# swAnnotationType_e.swCenterMarkSym:
 _CENTER_MARK_ANNOTATION = 13
 # An arrowhead's half-width across its shaft (the audit's 12.1 x 3.4 mm head).
 SECTION_ARROW_HALF_WIDTH = 0.0017
-if tuple(section.land for section in D_SECTIONS) != (KEYED_LAND, *FLAT_LANDS):
-    raise AssertionError("every gear land takes exactly one section")
+if tuple(section.land for section in D_SECTIONS) != (KEYED_LAND,):
+    raise AssertionError("the keyed land, and only it, takes a section")
 
 
 @_telemetry.traced("drawing.cylindrical_face_scan")
@@ -611,11 +490,9 @@ def _cylindrical_face(adapter: Any, view: Any, diameter_mm: float) -> Any:
 def _end_circle(view: Any, *, station_mm: float, diameter_mm: float, label: str) -> Any:
     """The one visible end-face circle (or arc) at ``station_mm`` of ``diameter_mm``.
 
-    The journal's circle also stands at the collar face and the tip land's at
-    its own start, so the pick is by station AND diameter.  The tip's end face
-    is a D (its flat runs out through the tip), so its edge is the D's arc,
-    still a circle curve of the land's radius.  The station is matched on
-    |z|: the shaft runs along model Z from the front face, and the sign of
+    The journal's circle also stands at the collar face and the socket's
+    mouth on the tip face, so the pick is by station AND diameter.  The
+    station is matched on |z|: the shaft runs along model Z from the front face, and the sign of
     that axis is the part's, not an assumption made here.
     """
     matches: list[Any] = []
@@ -897,23 +774,12 @@ def _prepare_d_section(adapter: Any, view: Any, section: DSection) -> None:
         raise RuntimeError(f"section {section.label} scale did not persist: {ratio}")
     if not bool(cut.GetDisplayOnlySurfaceCut()):
         raise RuntimeError(f"section {section.label} kept geometry beyond the cut")
-    partial = section.parent in PARTIAL_CUT_PARENTS
-    if bool(cut.GetPartialSection()) != partial:
-        raise RuntimeError(
-            f"section {section.label} is {'not ' if partial else ''}a partial "
-            f"section, cut from the {section.parent.value}"
-        )
-
-
-class CaptionAnchor(Enum):
-    """The point of a caption's box laid on its target."""
-
-    TOP_CENTRE = "top centre"
-    LEFT_MIDDLE = "left middle"
+    if bool(cut.GetPartialSection()):
+        raise RuntimeError(f"section {section.label} is a partial section")
 
 
 class PlacedSection(NamedTuple):
-    """A built D section and the ink its layout proof measures."""
+    """The built section and the ink its layout proof measures."""
 
     section: DSection
     view: Any
@@ -959,168 +825,24 @@ def _station_point(
     return (0.0, offset, sign * station_mm / 1000.0)
 
 
-def _sheet_segment_in_parent_sketch(
-    adapter: Any, parent: Any, sheet_points: Sequence[tuple[float, float]]
-) -> list[tuple[float, ...]]:
-    """Sheet points through the parent sketch's transform, as
-    ``create_section_view`` maps its cutting line."""
-    sketch = _early_bound(_early_bound(parent, "IView").GetSketch(), "ISketch")
-    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
-    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    points = []
-    for x, y in sheet_points:
-        point = _early_bound(
-            utility.CreatePoint(double_array([float(x), float(y), 0.0])), "IMathPoint"
-        )
-        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
-        points.append(tuple(float(value) for value in projected.ArrayData))
-    return points
-
-
-# With no outline printed, the detail's outline is the clipped shaft, not the
-# circle's box: the Ø6.35 end is clipped 2.3 mm short of the circle at 4:1, so
-# the axis point stands up to this far off the outline's centre along the axis.
-TIP_DETAIL_CLIP_SLACK = 0.003
-
-
-@_telemetry.traced("drawing.tip_detail")
-def _create_tip_detail(adapter: Any, side: Any, sign: int) -> Any:
-    """DETAIL E, the stepped tip at TIP_DETAIL_SCALE: the parent of B, C and D.
-
-    The circle is sketched on the side view; its rim point lies off the axis
-    in model Y, since the side view looks along model X.  A fresh detail's
-    Position and ModelToViewTransform lag its ink (draw_cone_swing_platform,
-    leaf 20260928T075849Z-1-882b4704), so the view is placed by its outline,
-    and its projection must catch up before any cut is projected through it.
-
-    The projection is read only behind UpdateViewDisplayGeometry, the view
-    barrier draw_dt_cylinder_gear takes (through
-    _drawing_detail_projection.settle_detail_projection): a rebuild leaves the
-    regenerated view pending until Windows repaints the sheet.  Rebuilds alone
-    caught the transform up within one settle on all 28 earlier leaves that
-    read it (26 of them stale at the first read), but on leaf
-    20261009T165136Z-1-acbeda8d (swmaker000004) three never did: the centre
-    projected to (-0.04756, 0.236), the ink centre moved by exactly
-    TIP_DETAIL_CENTER - Position, so the transform still stood where
-    CreateDetailViewAt4 first put the view, while Position (0.24756, 0.236)
-    and the outline (centred on (0.1, 0.236)) had moved on.
-    """
-    draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")
-    if not ddoc.ActivateView(view_name(adapter, side)):
-        raise RuntimeError("failed to activate the tip detail's parent view")
-    draw.ClearSelection2(True)
-    centre = _station_point(TIP_DETAIL_STATION_MM, 0.0, sign)
-    rim = _station_point(TIP_DETAIL_STATION_MM, TIP_DETAIL_RADIUS, sign)
-    sheet = model_points_in_view(
-        adapter, side, (centre, rim), label="tip detail circle", names=("centre", "rim")
-    )
-    points = _sheet_segment_in_parent_sketch(adapter, side, sheet)
-    manager = _early_bound(draw.SketchManager, "ISketchManager")
-    previous_add_to_db = bool(manager.AddToDB)
-    manager.AddToDB = True
-    try:
-        circle = manager.CreateCircle(*points[0], *points[1])
-    finally:
-        manager.AddToDB = previous_add_to_db
-    if circle is None:
-        raise RuntimeError("failed to sketch the tip detail circle")
-    selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
-    selection_data = selection_manager.CreateSelectData()
-    selection_data.View = side
-    selectable = _sw_type_info.early_bound_or_flag(circle, "ISketchSegment", "Select4")
-    if not selectable.Select4(False, selection_data):
-        raise RuntimeError("failed to select the tip detail circle")
-    detail = ddoc.CreateDetailViewAt4(
-        *TIP_DETAIL_CENTER,
-        0.0,
-        0,  # swDetViewSTANDARD
-        float(TIP_DETAIL_SCALE[0]),
-        float(TIP_DETAIL_SCALE[1]),
-        TIP_DETAIL_LABEL,
-        1,  # swDetCircleCIRCLE
-        False,  # FullOutline
-        False,  # JaggedOutline
-        True,  # NoOutline
-        5,
-    )
-    draw.ClearSelection2(True)
-    if detail is None:
-        raise RuntimeError("CreateDetailViewAt4 returned no tip detail")
-    detail = _sw_type_info.early_bound_or_flag(
-        detail, "IView", "SetViewPosition", "Position"
-    )
-    rebuild_drawing(adapter, label="create tip detail")
-    ratio = tuple(float(value) for value in detail.ScaleRatio)
-    if not math.isclose(ratio[0] / ratio[1], TIP_DETAIL_SCALE[0] / TIP_DETAIL_SCALE[1]):
-        raise RuntimeError(f"tip detail scale is {ratio}, not {TIP_DETAIL_SCALE}")
-    for attempt in range(4):
-        outline = tuple(float(value) for value in detail.GetOutline())
-        landed = ((outline[0] + outline[2]) / 2.0, (outline[1] + outline[3]) / 2.0)
-        anchor = tuple(float(value) for value in detail.Position)
-        _telemetry.info(f"tip detail pass {attempt}: anchor={anchor} outline={outline}")
-        if math.dist(landed, TIP_DETAIL_CENTER) < PLACE_SETTLE_M:
-            break
-        moved = [
-            anchor[axis] + TIP_DETAIL_CENTER[axis] - landed[axis] for axis in range(2)
-        ]
-        if not detail.SetViewPosition(double_array(moved), False):
-            raise RuntimeError("failed to position the tip detail")
-        rebuild_drawing(adapter, label="place tip detail")
-    else:
-        raise RuntimeError(
-            f"tip detail outline centre stayed at {landed}, requested {TIP_DETAIL_CENTER}"
-        )
-    projected = settle_detail_projection(
-        adapter,
-        detail,
-        centre,
-        ink_xy=landed,
-        tolerance_xy=(TIP_DETAIL_CLIP_SLACK, 0.0005),
-        label="tip detail",
-    )
-    _telemetry.info(
-        f"tip detail: parent circle centre {sheet[0]}, detail centre {projected}, "
-        f"outline {tuple(float(value) for value in detail.GetOutline())}"
-    )
-    return detail
-
-
-def _place_detail_letter(adapter: Any, side: Any) -> None:
-    """Stand the side view's circle letter where TIP_DETAIL_LETTER_XY says."""
-    circles = tuple(_read_member(_early_bound(side, "IView"), "GetDetailCircles") or ())
-    if len(circles) != 1:
-        raise RuntimeError(
-            f"expected one detail circle on the side view, found {len(circles)}"
-        )
-    circle = _early_bound(circles[0], "IDetailCircle")
-    circle.SetLabelPosition(*TIP_DETAIL_LETTER_XY)
-    rebuild_drawing(adapter, label="place tip detail letter")
-    actual = tuple(float(value) for value in circle.GetLabelPosition())
-    if len(actual) != 2 or math.dist(actual, TIP_DETAIL_LETTER_XY) > 1e-8:
-        raise RuntimeError(f"tip detail letter position did not persist: {actual}")
-
-
 def _note_box(note: Any) -> Box:
     extent = tuple(float(value) for value in note.GetExtent())
     return (extent[0], extent[1], extent[3], extent[4])
 
 
-def _caption_anchor(box: Box, anchor: CaptionAnchor) -> tuple[float, float]:
-    if anchor is CaptionAnchor.TOP_CENTRE:
-        return ((box[0] + box[2]) / 2.0, box[3])
-    return (box[0], (box[1] + box[3]) / 2.0)
+def _caption_anchor(box: Box) -> tuple[float, float]:
+    """A caption box's top centre."""
+    return ((box[0] + box[2]) / 2.0, box[3])
 
 
 def _place_view_caption(
     adapter: Any,
     view: Any,
     target: tuple[float, float],
-    anchor: CaptionAnchor,
     *,
     label: str,
 ) -> Box:
-    """Move a view's native caption so its box's ``anchor`` lands on
+    """Move a view's native caption so its box's top centre lands on
     ``target``, its linked fields intact, and return the measured box.
 
     The caption's position is not its box, so the move is measured
@@ -1141,7 +863,7 @@ def _place_view_caption(
     annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
     for _attempt in range(4):
         box = _note_box(note)
-        point = _caption_anchor(box, anchor)
+        point = _caption_anchor(box)
         error = (target[0] - point[0], target[1] - point[1])
         if max(abs(error[0]), abs(error[1])) < CAPTION_SETTLE_M:
             break
@@ -1151,21 +873,17 @@ def _place_view_caption(
         rebuild_drawing(adapter, label=f"place {label}")
     else:
         raise RuntimeError(
-            f"{label} stayed at {box}, its {anchor.value} requested at {target}"
+            f"{label} stayed at {box}, its top centre requested at {target}"
         )
     if str(note.PropertyLinkedText or "") != linked:
         raise RuntimeError(f"{label} lost its linked view fields")
-    _telemetry.info(f"{label}: {anchor.value} at {target}, box {box}")
+    _telemetry.info(f"{label}: top centre at {target}, box {box}")
     return box
 
 
 def _delete_centre_mark(adapter: Any, view: Any, section: DSection) -> None:
     """Delete the section's centre mark, if SolidWorks gave it one, and read
-    none back.
-
-    A full section gets a mark; a partial one (cut from the tip detail) gets
-    none (leaf 20260929T212711Z-1-75518df7).  Only A-A is full, so a kept
-    mark marked one section in four."""
+    none back (a full section gets one)."""
     label = f"section {section.label} centre mark"
     iview = _early_bound(view, "IView")
     marks = tuple(iview.GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ())
@@ -1190,10 +908,9 @@ def _delete_centre_mark(adapter: Any, view: Any, section: DSection) -> None:
 def _cut_endpoints(
     adapter: Any, parent: Any, section: DSection, sign: int
 ) -> tuple[tuple[float, float], tuple[float, float]]:
-    """The cutting line's sheet endpoints on its parent, bottom first: drawn
-    upward, the arrows look toward the big end, as every D section does."""
-    scale = CUT_PARENT_SCALE[section.parent]
-    offset = section.reach * scale[1] / scale[0]
+    """The cutting line's sheet endpoints on the side view, bottom first:
+    drawn upward, the arrows look toward the big end."""
+    offset = section.reach * SIDE_SCALE[1] / SIDE_SCALE[0]
     first, second = model_points_in_view(
         adapter,
         parent,
@@ -1208,27 +925,25 @@ def _cut_endpoints(
 
 
 @_telemetry.traced("drawing.d_sections")
-def _add_d_sections(
-    adapter: Any, parents: Mapping[CutParent, Any], sign: int
-) -> list[PlacedSection]:
-    """Cut each gear land across and print its keyseat or across-flat in the
-    section, its centre mark deleted and its caption hung under it.
+def _add_d_sections(adapter: Any, side: Any, sign: int) -> list[PlacedSection]:
+    """Cut the keyed land across and print its keyseat in the section, its
+    centre mark deleted and its caption hung under it.
 
     ``curate_view_dimensions`` fails the build if a section's dimensions
     do not arrive, so every cut on the sheet carries its size."""
     placed = []
     for section in D_SECTIONS:
-        start, end = _cut_endpoints(adapter, parents[section.parent], section, sign)
+        start, end = _cut_endpoints(adapter, side, section, sign)
         view = create_section_view(
             adapter,
-            parents[section.parent],
+            side,
             line_start=start,
             line_end=end,
             view_xy=section.centre,
             section_label=section.label,
             scale=section.scale,
-            partial=section.parent in PARTIAL_CUT_PARENTS,
-            label=f"land {section.land} D section",
+            partial=False,
+            label=f"land {section.land} section",
         )
         _prepare_d_section(adapter, view, section)
         names = SECTION_DIMENSION_NAMES[section.land]
@@ -1254,22 +969,24 @@ def _add_d_sections(
             adapter,
             view,
             (section.centre[0], face[1] - SECTION_CAPTION_GAP),
-            CaptionAnchor.TOP_CENTRE,
             label=f"section {section.label} caption",
         )
-        for name, dimension in zip(names, kept, strict=True):
-            if name in SECTION_ABOVE_CALLOUTS:
-                # The terminal flat's torque corners stay sharp in the model, so
-                # their break limit rides above that flat's own across-flat.
-                set_dimension_callouts(
-                    adapter,
-                    [dimension],
-                    _printable_above_callouts({name: SECTION_ABOVE_CALLOUTS[name]}),
-                    location="above",
-                )
-            if name in FLAT_MATE_SUFFIXES:
-                _set_dimension_suffixes(adapter, [dimension], {name: FLAT_MATE_SUFFIXES[name]})
+        _set_dimension_suffixes(
+            adapter,
+            kept,
+            {
+                name: text
+                for name, text in KEYSEAT_MATE_SUFFIXES.items()
+                if name in names
+            },
+        )
         if section.land == KEYED_LAND:
+            set_dimension_callouts(
+                adapter,
+                [kept[0]],
+                {names[0]: SECTION_ABOVE_CALLOUTS[names[0]]},
+                location="above",
+            )
             _set_arrows_inside(kept[0], f"section {section.label} {names[0]}")
             rebuild_drawing(adapter, label=f"section {section.label} arrows inside")
         placed.append(PlacedSection(section, view, face, kept, caption))
@@ -1298,12 +1015,12 @@ def _keyseat_side_x(adapter: Any, view: Any, section: DSection, sign: int) -> fl
 
 
 def _section_face(adapter: Any, view: Any, section: DSection, sign: int) -> Box:
-    """The D's cut face on its section, boxed round the land's full circle.
+    """The land's cut face on its section, boxed round the land's full circle.
 
     A section's outline is no measure of its ink: SolidWorks boxes the whole
     part's depth (the Ø15.9 collar) and the cutting line's length, plus 5.6
-    mm (leaf 20260929T212933Z-1-e35ef0ba: B-B's outline ran 29 mm either side
-    of its 9.5 mm face, past the right border).  The face is centred on the
+    mm (leaf 20260929T212933Z-1-e35ef0ba: a section's outline ran 29 mm either
+    side of its 9.5 mm face, past the right border).  The face is centred on the
     axis, which must stand where the layout put the section."""
     (centre,) = model_points_in_view(
         adapter,
@@ -1376,7 +1093,7 @@ def _land_boxes(adapter: Any, view: Any, sign: int, *, label: str) -> dict[str, 
     outline = _view_outline(view)
     starts = (COLLAR_END_STATION, *SECTION_ENDS[1:-1])
     boxes = {}
-    for land, start in zip((KEYED_LAND, *FLAT_LANDS), starts, strict=True):
+    for land, start in enumerate(starts, start=KEYED_LAND):
         radius = SECTION_DIAS[land] / 2000.0
         corners = model_points_in_view(
             adapter,
@@ -1416,18 +1133,17 @@ def _prove_section_layout(
     adapter: Any,
     *,
     side: Any,
-    detail: Any,
+    tip_end: Any,
     iso: Any,
     sections: Sequence[PlacedSection],
-    detail_caption: Box,
     dimensions: Mapping[str, Any],
     sign: int,
 ) -> None:
     """Prove from measured ink what the codex review of #1128 found broken:
-    every section, caption, cutting line, the detail and the pictorial inside
-    the frame and off the title block; the cutting lines' arrows and letters
-    clear of each other, of every dimension text and of the lands; and each
-    section's caption and across-flat clear of its neighbours."""
+    every section, caption, cutting line, the tip end view and the pictorial
+    inside the frame and off the title block; the cutting line's arrows and
+    letters clear of each other, of every dimension text and of the lands;
+    and each section's caption and dimensions clear of its neighbours."""
     region = sheet_region(adapter)
     template = DRAWING_TEMPLATES[SPEC.layout]
     keep_out = {
@@ -1443,22 +1159,10 @@ def _prove_section_layout(
         for name, annotation in dimensions.items()
     }
     side_lines = _section_line_ink(side)
-    detail_lines = _section_line_ink(detail)
-    expected = {
-        CutParent.SIDE: sorted(
-            s.label for s in D_SECTIONS if s.parent is CutParent.SIDE
-        ),
-        CutParent.TIP_DETAIL: sorted(
-            s.label for s in D_SECTIONS if s.parent is CutParent.TIP_DETAIL
-        ),
-    }
-    if (
-        sorted(side_lines) != expected[CutParent.SIDE]
-        or sorted(detail_lines) != expected[CutParent.TIP_DETAIL]
-    ):
+    expected = sorted(s.label for s in D_SECTIONS)
+    if sorted(side_lines) != expected:
         raise RuntimeError(
-            f"cutting lines: side view {sorted(side_lines)}, tip detail "
-            f"{sorted(detail_lines)}; expected {expected}"
+            f"cutting lines: side view {sorted(side_lines)}; expected {expected}"
         )
     groups: dict[str, dict[str, Box]] = {}
     for placed in sections:
@@ -1485,8 +1189,8 @@ def _prove_section_layout(
             # box with the face they would reach up beside the width's row.
             # So S rides on its own, clear of the face and of the width.
             del cell[f"{label} dimension 1"]
-        # A-A's keyseat width rides above B's cell (KEYSEAT_WIDTH_RISE): its
-        # own box, clear of every other group, not part of A's cell.
+        # A-A's keyseat width rides above the section (KEYSEAT_WIDTH_RISE):
+        # its own box, clear of every other group, not part of A's cell.
         riders = {
             name: box for name, box in texts_in_section.items() if name not in cell
         }
@@ -1510,42 +1214,23 @@ def _prove_section_layout(
             },
         )
         groups[label] = {label: _union(cell.values()), **riders}
-    lands = {
-        **_land_boxes(adapter, side, sign, label="side view"),
-        **_land_boxes(adapter, detail, sign, label="tip detail"),
-    }
-    for name, boxes in (*side_lines.items(), *detail_lines.items()):
+    lands = _land_boxes(adapter, side, sign, label="side view")
+    for name, boxes in side_lines.items():
         for box_name, box in boxes.items():
             if "letter" in box_name:
                 require_clear(box_name, box, lands)
         groups[f"cutting line {name}"] = boxes
-    groups["tip detail"] = {
-        "tip detail": _view_outline(detail),
-        "tip detail caption": detail_caption,
-    }
+    groups["tip end view"] = {"tip end view": _view_outline(tip_end)}
     groups["isometric"] = {"isometric": _view_outline(iso)}
-    groups["side view dimension texts"] = texts
+    groups["dimension texts"] = texts
     for group in groups.values():
         for name, box in group.items():
             require_inside(name, box, region)
             require_clear(name, box, keep_out)
-    # A cutting line crosses its own parent's outline by design; everything
-    # else keeps apart.
-    apart = {name: group for name, group in groups.items() if name != "tip detail"}
-    _require_apart(apart)
-    for name, group in groups.items():
-        if name.startswith("cutting line") or name == "tip detail":
-            continue
-        for box_name, box in group.items():
-            require_clear(box_name, box, groups["tip detail"])
-    require_clear(
-        "tip detail caption",
-        detail_caption,
-        {name: box for boxes in detail_lines.values() for name, box in boxes.items()},
-    )
+    _require_apart(groups)
     _telemetry.success(
         f"section layout proved: {len(sections)} sections, "
-        f"{len(side_lines) + len(detail_lines)} cutting lines, {len(texts)} dimension texts"
+        f"{len(side_lines)} cutting lines, {len(texts)} dimension texts"
     )
 
 
@@ -1627,10 +1312,13 @@ async def build(adapter: Any) -> dict[str, str]:
 
     side = place_view(adapter, str(SOURCE), "*Right", *SIDE_CENTER, scale=SIDE_SCALE)
     donor = place_view(adapter, str(SOURCE), "*Front", *DONOR_CENTER, scale=SIDE_SCALE)
+    tip_end = place_view(
+        adapter, str(SOURCE), "*Front", *TIP_END_VIEW_CENTER, scale=SIDE_SCALE
+    )
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
     # The isometric too (PR #1436 fleet invariant): finalization's shaded
     # pass is then a real mode change, so its cosmetic edges print at quality.
-    for view in (side, donor, iso):
+    for view in (side, donor, tip_end, iso):
         set_hidden_lines_removed(adapter, view)
 
     pivot_face = _cylindrical_face(adapter, side, JOURNAL_DIA)
@@ -1652,6 +1340,16 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="side",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    # The socket's diameter, native to the view that faces its circle, with
+    # its ream-and-depth callout and bond flag under it.
+    socket_annotations = curate_view_dimensions(
+        adapter,
+        tip_end,
+        keep=TIP_END_VIEW_KEEP,
+        view_label="tip end",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    set_dimension_callouts(adapter, socket_annotations, SOCKET_CALLOUTS)
     annotations = list(side_annotations)
     collar = None
     for annotation in donor_annotations:
@@ -1688,34 +1386,12 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     _set_dimension_suffixes(adapter, annotations, DIMENSION_SUFFIXES)
     sign = _axis_sign(adapter, side)
-    detail = _create_tip_detail(adapter, side, sign)
-    _place_detail_letter(adapter, side)
-    sections = _add_d_sections(
-        adapter, {CutParent.SIDE: side, CutParent.TIP_DETAIL: detail}, sign
-    )
-    # Precision hidden-lines-removed on every section, after its across-flat
-    # is attached: left on their parents' display, C-C (5:1) and D-D (20:1)
-    # printed their round as visible straight segments (machinist review r1,
-    # r2, r4b).
+    sections = _add_d_sections(adapter, side, sign)
+    # Precision hidden-lines-removed on every section, after its dimensions
+    # are attached: left on its parent's display, a section printed its round
+    # as visible straight segments (machinist review r1, r2, r4b).
     for placed in sections:
         set_hidden_lines_removed(adapter, placed.view)
-    # The caption stands right of the detail's ink: B's letters and the
-    # detail's own outline, whichever reaches further.
-    detail_ink_right = max(
-        _view_outline(detail)[2],
-        *(
-            box[2]
-            for boxes in _section_line_ink(detail).values()
-            for box in boxes.values()
-        ),
-    )
-    detail_caption = _place_view_caption(
-        adapter,
-        detail,
-        (detail_ink_right + DETAIL_CAPTION_GAP, TIP_DETAIL_CENTER[1]),
-        CaptionAnchor.LEFT_MIDDLE,
-        label="tip detail caption",
-    )
     overall = _add_overall_reference(adapter, side)
     # Every other dimension on the side view, which the collar callout's
     # proof measures it against.
@@ -1753,11 +1429,17 @@ async def build(adapter: Any) -> dict[str, str]:
     _prove_section_layout(
         adapter,
         side=side,
-        detail=detail,
+        tip_end=tip_end,
         iso=iso,
         sections=sections,
-        detail_caption=detail_caption,
-        dimensions={**collar_neighbours, "CollarDia": collar},
+        dimensions={
+            **collar_neighbours,
+            "CollarDia": collar,
+            **{
+                dimension_name(adapter, annotation): annotation
+                for annotation in socket_annotations
+            },
+        },
         sign=sign,
     )
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)

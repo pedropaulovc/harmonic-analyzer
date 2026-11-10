@@ -1,4 +1,4 @@
-"""Cross-sheet offline contracts for the six cone-cluster drawing packages."""
+"""Cross-sheet offline contracts for the seven cone-cluster drawing packages."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ import dt_cone_gear_notes
 import dt_cone_gear_shaft_spec
 import dt_cone_gear_spec
 import dt_cone_pivot_post_spec
+import dt_cone_tip_gear_notes
 import dt_cone_tip_block_spec
 import dt_cone_swing_platform_spec
 
@@ -16,6 +17,7 @@ SHEETS = (
     ("dt-arbor-pedestal", dt_arbor_pedestal_spec),
     ("dt-cone-gear", dt_cone_gear_notes),
     ("dt-cone-gear-shaft", dt_cone_gear_shaft_spec),
+    ("dt-cone-tip-gear", dt_cone_tip_gear_notes),
     ("dt-cone-pivot-post", dt_cone_pivot_post_spec),
     ("dt-cone-tip-block", dt_cone_tip_block_spec),
     ("dt-cone-swing-platform", dt_cone_swing_platform_spec),
@@ -55,15 +57,22 @@ def test_finish_field_does_not_repeat_generic_edge_break_instruction() -> None:
 
 
 def test_every_cone_sheet_names_the_actual_finite_cutting_system() -> None:
+    # Nineteen MHA-DT-03 sheets, T012..T120, and MHA-DT-37's T006 sheet.
     spec = dt_cone_gear_spec
     assert spec.DIAMETRAL_PITCH == _config.machine("gear_train", "diametral_pitch")
     assert spec.PRESSURE_ANGLE_DEG == _config.machine(
         "gear_train", "pressure_angle_deg"
     )
-    assert len(spec.CONFIGURATION_TEETH) == 20
-    for teeth in spec.CONFIGURATION_TEETH:
-        data = dt_cone_gear_notes.gear_data(teeth)
-        assert f"T{teeth:03d}" in data
+    assert len(spec.CONFIGURATION_TEETH) == 19
+    # Each family sheet names its configuration; MHA-DT-37 is one part and
+    # states its count.
+    sheets = [
+        (f"T{teeth:03d} / {teeth}", dt_cone_gear_notes.gear_data(teeth))
+        for teeth in spec.CONFIGURATION_TEETH
+    ]
+    sheets.append(("TEETH:  6\n", dt_cone_tip_gear_notes.gear_data()))
+    for teeth_row, data in sheets:
+        assert teeth_row in data
         assert (
             f"DIAMETRAL PITCH / PRESSURE ANGLE:  "
             f"{spec.DIAMETRAL_PITCH:.2f} / {spec.PRESSURE_ANGLE_DEG:.1f}\u00b0"

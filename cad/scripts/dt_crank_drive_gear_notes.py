@@ -71,10 +71,16 @@ GEAR_DATA = gear_data_note(
         # plunge row below carries the cut depth.
         ("ROOT DIAMETER (REF)", inch_text(spec.ROOT_DIA_MIN, 3)),
         # The title block's ±1° governs (HELIX_ANGLE_TOLERANCE_DEG); the row
-        # does not restate it (machinist review).
+        # does not restate it (machinist review). A helical 64T on a spur
+        # pinion reads as a contradiction unless the block says the axes cross
+        # at the helix angle (machinist review of PR 2 round 4 read the twist
+        # in the small isometric as a spur). The fact sits on this row, high
+        # in the block: on MATES WITH, the last row, it ran into the tooth
+        # tips (layout audit of PR 2 round 5, struck at x 120.8 mm).
         (
             "HELIX AT PITCH DIA",
-            f"{spec.HELIX_ANGLE_DEG:.{spec.GEAR_DATA_HELIX_PLACES}f} DEG {spec.HELIX_HAND}",
+            f"{spec.HELIX_ANGLE_DEG:.{spec.GEAR_DATA_HELIX_PLACES}f} DEG {spec.HELIX_HAND}, "
+            "AXES CROSSED WITH MHA-DT-10",
         ),
         (
             "LEAD (in/rev, REF)",
@@ -110,6 +116,7 @@ GEAR_DATA = gear_data_note(
         # fine teeth; the requirement is a tooth fact, so it reads with them
         # (machinist review r1 of #1641: a free-floating note).
         ("TOOTH EDGES", "DO NOT BREAK OR CHAMFER FLANKS, TIPS OR ROOTS"),
+        # The last row stands just above the rim: no longer than this.
         ("MATES WITH", "CRANK PINION MHA-DT-10, 16T SPUR"),
     ]
 )

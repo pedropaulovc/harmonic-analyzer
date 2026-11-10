@@ -1,10 +1,12 @@
 r"""Reproduction script: cone tip block (book ch. 12, p. 18; video 4/4 stills).
 
 The small adjuster-support block at the thin end of the cone shaft. It stands
-on the swing platform beside the pivot and carries the threaded, cup-ended
-end-play adjuster; the shaft tip enters the south face and seats in the
-adjuster's cup, which sets the shaft's end play. The block and whole cone set
-swing as one unit about the platform's pivot axis.
+on the swing platform beside the pivot and carries the end screw (MHA-DT-39,
+a 1/4-28 slotted fillister threaded through it from the north face); the
+screw's end stands proud of the south face, bears on the brass bushing on
+T006's pivot and carries that pivot in its reamed hole, which sets the shaft's
+end play (owner decision C1 keyed, 2026-11-09, PR #1992). The block and whole
+cone set swing as one unit about the platform's pivot axis.
 
 Dimensions estimated from the p.18 top-down and the v4_t00393 still
 (low). The adjuster axis above the block base is ADJUSTER_AXIS_HEIGHT, and
@@ -21,7 +23,7 @@ fit-up slide, fixes the block's station.
 Layout: block standing on the Top plane, plan centred on the origin,
 adjuster axis along Z at y = ADJUSTER_AXIS_HEIGHT (the assembly rotates the
 block about Y to align it with the cone axis). Named "adjuster axis" for the
-view-independent coaxial mate to the cup-ended screw, and "dowel axis"
+view-independent coaxial mate to the end screw, and "dowel axis"
 (vertical through the MHA-DT-VN-69 locating dowel's press ream; rule-23
 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR #2248)) for
 the dowel's mate.
@@ -90,8 +92,10 @@ from dt_cone_tip_block_spec import (
     PINCH_BORE_SPEC,
     PINCH_BORE_DIA,
     PINCH_CLEARANCE_SPEC,
+    PINCH_DEPTH_CENTER,
     PINCH_HEIGHT,
     PINCH_RISE,
+    PINCH_Z,
     SLIT_DEPTH,
     SLIT_W,
     SURFACE_FINISHES,
@@ -124,10 +128,10 @@ REFERENCE_SKETCHES = (
 # from the same values the print annotates (BLOCK_X/BLOCK_Z/BLOCK_HEIGHT,
 # threads, pinch height, slit width).
 # --- adjuster + pinch lock (item 5, v4_t00471 / 7:49) ------------------------
-# Native #10-32 adjuster thread tapped THROUGH the block (drawing-guidelines.md rule 18 (thread engagement) E11/W1). Its
-# tap-drill diameter is manufacturing geometry, distinct from the purchased
-# screw's true major-diameter solid.  The shaft tip enters through the same
-# thread from the south face.
+# Native 1/4-28 adjuster thread tapped THROUGH the block (drawing-guidelines.md
+# rule 18 (thread engagement) E11/W1). Its tap-drill diameter is manufacturing
+# geometry, distinct from the purchased screw's true major-diameter solid.  The
+# end screw threads through it from the north face.
 # McMaster 91794A112 is a #4-40 screw. The near jaw receives a normal-fit #4
 # clearance hole; the far jaw carries the coaxial #4-40 UNC-2B thread.
 PINCH_BORE_Y = PINCH_HEIGHT
@@ -283,7 +287,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "SlitDepth", f"{SLIT_DEPTH}mm")
     await set_global(adapter, "PinchRise", f"{PINCH_RISE}mm")
     await set_global(adapter, "PassageCenter", '"BlockX" / 2')
-    await set_global(adapter, "PinchDepthCenter", '"BlockZ" / 2')
+    await set_global(adapter, "PinchDepthCenter", f"{PINCH_DEPTH_CENTER}mm")
     await set_global(adapter, "FootTapOffsetX", f"{FOOT_TAP_OFFSET_X}mm")
     await set_global(adapter, "FootTapX", '"BlockX" / 2 + "FootTapOffsetX"')
     await set_global(adapter, "FootTapZ", '"BlockZ" / 2')
@@ -321,10 +325,10 @@ async def build(adapter) -> dict[str, str]:
     v_block = BLOCK_X * BLOCK_Z * BLOCK_HEIGHT
     volume = await volume_check(adapter, "block", v_block, 0.005 * v_block)
 
-    # Adjuster interface (v4_t00471 / 7:49; drawing-guidelines.md rule 18 (thread engagement) E11/W1): ONE native Hole
-    # Wizard #10-32 TAPPED hole THROUGH the block on the cone axis.  The
-    # slotted cup-point adjuster threads in from the north face and the shaft
-    # tip enters from the south face into its cup (axial end-play takeup).
+    # Adjuster interface (v4_t00471 / 7:49; drawing-guidelines.md rule 18 (thread
+    # engagement) E11/W1): ONE native Hole Wizard 1/4-28 TAPPED hole THROUGH the
+    # block on the cone axis.  The end screw threads in from the north face and
+    # stands proud of the south face, where it bears on the tip's bushing.
     # Drilled while the body is still simple (block only), so the removed
     # volume is the plain tap-drill cylinder.
     adjuster_cut = wizard_holes(
@@ -389,16 +393,21 @@ async def build(adapter) -> dict[str, str]:
     # Pinch screw cross-bore: native #4-40 tap through both jaws, followed by a
     # normal-fit #4 clearance through the +X near jaw only. The screw slips
     # through the head-side jaw and pulls against threads in the far jaw.
-    # Both features run along local X at (y = PINCH_BORE_Y, z = 0) from the +X
-    # block face. The slit splits the cylinder into two solid halves, so the
-    # through cut removes tap-drill area over (BLOCK_X - SLIT_W) of material.
+    # Both features run along local X at (y = PINCH_BORE_Y, z = PINCH_Z, .22
+    # from the north face) from the +X block face; the placement's z
+    # dimension holds PINCH_Z's magnitude, driven from PinchDepthCenter.  The
+    # slit splits the cylinder into two solid halves, so the through cut
+    # removes tap-drill area over (BLOCK_X - SLIT_W) of material.
+    pinch_placement = [
+        (("PinchCz", '"PinchDepthCenter" - "BlockZ" / 2'), ("PinchZ", '"PinchBoreY"'))
+    ]
     pinch_cut = wizard_holes(
         adapter, PINCH_BORE_SPEC,
-        [[BLOCK_X / 2.0, PINCH_BORE_Y, 0.0]],
+        [[BLOCK_X / 2.0, PINCH_BORE_Y, PINCH_Z]],
         (1.0, 0.0, 0.0),
         f"pinch tapped hole ({PINCH_BORE_SPEC.size})",
         name="PinchBore",
-        placement_dims=[((None, None), ("PinchZ", '"PinchBoreY"'))],
+        placement_dims=pinch_placement,
     )
     drive_jobs += pinch_cut.placement_drive_jobs
     v_pinch = math.pi * (PINCH_BORE_DIA / 2.0) ** 2 * (BLOCK_X - SLIT_W)
@@ -406,12 +415,12 @@ async def build(adapter) -> dict[str, str]:
 
     pinch_clearance = wizard_holes(
         adapter, PINCH_CLEARANCE_SPEC,
-        [[BLOCK_X / 2.0, PINCH_BORE_Y, 0.0]],
+        [[BLOCK_X / 2.0, PINCH_BORE_Y, PINCH_Z]],
         (1.0, 0.0, 0.0),
         f"pinch near-jaw clearance ({PINCH_CLEARANCE_SPEC.size} normal)",
         name="PinchClearance",
         expect_dia_mm=PINCH_CLEARANCE_DIA,
-        placement_dims=[((None, None), ("PinchZ", '"PinchBoreY"'))],
+        placement_dims=pinch_placement,
     )
     drive_jobs += pinch_clearance.placement_drive_jobs
     near_jaw = (BLOCK_X - SLIT_W) / 2.0
@@ -486,8 +495,9 @@ async def build(adapter) -> dict[str, str]:
     # Second named axis (Axis2): the pinch-screw cross-bore, along local X at
     # the slit -- the assembly locates the pinch screw on it.
     await name_bore_axis(
-        adapter, "Top Plane", PINCH_BORE_Y, "Front Plane", 0.0, "pinch axis",
-        drive_a='"PinchBoreY"', drive_jobs=drive_jobs,
+        adapter, "Top Plane", PINCH_BORE_Y, "Front Plane", PINCH_Z, "pinch axis",
+        drive_a='"PinchBoreY"', drive_b='"PinchDepthCenter" - "BlockZ" / 2',
+        drive_jobs=drive_jobs,
     )
     # Third axis, NAMED "dowel axis" (the platform's post-mount axes'
     # pattern): the locating dowel's ream, vertical (Front Plane at the tap's
@@ -542,10 +552,10 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         plane="Right",
         start=(-BLOCK_Z / 2.0, PINCH_BORE_Y),
-        end=(0.0, PINCH_BORE_Y),
+        end=(-PINCH_Z, PINCH_BORE_Y),
         orientation="horizontal",
         dimension_type="horizontal_distance",
-        value_mm=BLOCK_Z / 2.0,
+        value_mm=PINCH_DEPTH_CENTER,
         feature_name="PinchDepthReference",
         dimension_name="PinchDepthCenter",
         drive_expression='"PinchDepthCenter"',

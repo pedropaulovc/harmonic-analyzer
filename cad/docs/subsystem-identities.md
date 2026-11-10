@@ -6,7 +6,7 @@ Current part and assembly identities are frozen in [`cad/config/parts/`](../conf
 
 Use `<prefix>-<descriptive-name>` for native model and exported asset basenames, and `<prefix>_<descriptive_name>` for Python module and doit task stems. Assembly builders and drawing artefacts retain their `_assembly` or `-assembly` suffix. For example, `dt-drive-train.SLDASM` is built by `build_dt_drive_train_assembly.py`; its drawing artefact stem is `dt-drive-train-assembly`.
 
-Drawing Numbers use `MHA-<CATEGORY>-<NN>`, with two-digit sequences. `00` is the category's assembly drawing; fabricated parts start at `01`. HA, CH, DT, FR, MG, MS, PD, PN and SM have assemblies. SH contains fabricated parts and shared vendor parts; it has no assembly. Numbers are stored in the registries, not recalculated when the graph changes. Configuration variants retain their existing qualifiers on the family Number, such as `MHA-DT-03-T006` for a cone-gear configuration: `T006` is a tooth count, not an identity sequence, so it keeps its three digits. Installed channel spring stretch variants retain the unqualified base Number. Named member configurations of a shared vendor part (`InnerLink`, `LeverWire`, `TNut`) are selections within one Number, not qualifiers on it.
+Drawing Numbers use `MHA-<CATEGORY>-<NN>`, with two-digit sequences. `00` is the category's assembly drawing; fabricated parts start at `01`. HA, CH, DT, FR, MG, MS, PD, PN and SM have assemblies. SH contains fabricated parts and shared vendor parts; it has no assembly. Numbers are stored in the registries, not recalculated when the graph changes. Configuration variants retain their existing qualifiers on the family Number, such as `MHA-DT-03-T012` for a cone-gear configuration: `T012` is a tooth count, not an identity sequence, so it keeps its three digits. Installed channel spring stretch variants retain the unqualified base Number. Named member configurations of a shared vendor part (`InnerLink`, `LeverWire`, `TNut`) are selections within one Number, not qualifiers on it.
 
 Vendor parts are purchased finished parts. Supplier, SKU and commercial-process evidence decides that a part is a vendor part. A vendor part that one assembly uses directly belongs to that assembly. Its stem is the parent assembly's prefix, then `vn`, then the descriptive name, such as `dt-vn-cone-lock-knob`; a name that already began with the parent prefix drops the repeat, so the measuring stick's stop-plate screw is `ms-vn-stop-plate-screw`. Its Number puts `VN` after the parent's category and counts from `50` within that parent: `dt-vn-cone-lock-knob` is `MHA-DT-VN-51`. Containment through a sub-assembly or the top assembly is not direct use.
 
@@ -28,7 +28,7 @@ Components of a built-up part are the detail parts a finished part may be made f
 |---|---|---:|---:|
 | `ha` / `HA` | Harmonic analyzer | 0 | 0 |
 | `ch` / `CH` | Channel | 13 | 7 |
-| `dt` / `DT` | Drive train | 34 | 16 |
+| `dt` / `DT` | Drive train | 37 | 14 |
 | `fr` / `FR` | Frame | 5 | 4 |
 | `mg` / `MG` | Magnifier | 10 | 4 |
 | `pd` / `PD` | Paper drive | 23 | 13 |
@@ -329,6 +329,9 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | part | `crank-handle-ferrule` | MHA-152 | `dt-crank-handle-ferrule` | MHA-DT-034 | `dt-crank-handle-ferrule` | MHA-DT-34 |
 | part | `crank-handle-butt-cup` | MHA-153 | `dt-crank-handle-butt-cup` | MHA-DT-035 | `dt-crank-handle-butt-cup` | MHA-DT-35 |
 | retired part | `crank-seat-washer` | MHA-172 | `dt-crank-seat-washer` | MHA-DT-036 | — | MHA-DT-36 (retired; never reissued) |
+| part | — | — | — | — | `dt-cone-tip-gear` | MHA-DT-37 |
+| part | — | — | — | — | `dt-cone-tip-bushing` | MHA-DT-38 |
+| part | — | — | — | — | `dt-cone-tip-end-screw` | MHA-DT-39 |
 | part | `harmonic-base` | MHA-035 | `fr-harmonic-base` | MHA-FR-001 | `fr-harmonic-base` | MHA-FR-01 |
 | part | `top-frame` | MHA-077 | `fr-top-frame` | MHA-FR-002 | `fr-top-frame` | MHA-FR-02 |
 | part | `tube-frame` | MHA-083 | `fr-tube-frame` | MHA-FR-003 | `fr-tube-frame` | MHA-FR-03 |
@@ -397,8 +400,8 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | part | `cone-lock-knob` | MHA-093 | `vn-cone-lock-knob` | MHA-VN-013 | `dt-vn-cone-lock-knob` | MHA-DT-VN-51 |
 | part | `cone-pivot-screw` | MHA-094 | `vn-cone-pivot-screw` | MHA-VN-014 | `dt-vn-cone-pivot-screw` | MHA-DT-VN-52 |
 | part | `swing-stop-screw` | MHA-095 | `vn-swing-stop-screw` | MHA-VN-015 | `sh-vn-fillister-screw-90280a108` (`Default`) | MHA-SH-VN-52 |
-| part | `cone-tip-collar` | MHA-096 | `vn-cone-tip-collar` | MHA-VN-016 | `dt-vn-cone-tip-collar` | MHA-DT-VN-54 |
-| part | `cone-tip-adjuster` | MHA-097 | `vn-cone-tip-adjuster` | MHA-VN-017 | `dt-vn-cone-tip-adjuster` | MHA-DT-VN-55 |
+| retired part | `cone-tip-collar` | MHA-096 | `vn-cone-tip-collar` | MHA-VN-016 | — | MHA-DT-VN-54 (retired; never reissued) |
+| retired part | `cone-tip-adjuster` | MHA-097 | `vn-cone-tip-adjuster` | MHA-VN-017 | — | MHA-DT-VN-55 (retired; never reissued) |
 | part | `cone-tip-pinch-screw` | MHA-098 | `vn-cone-tip-pinch-screw` | MHA-VN-018 | `dt-vn-cone-tip-pinch-screw` | MHA-DT-VN-56 |
 | part | `slotted-screw` | MHA-101 | `vn-slotted-screw` | MHA-VN-019 | `dt-vn-slotted-screw` | MHA-DT-VN-57 |
 | part | `foot-screw` | MHA-103 | `vn-foot-screw` | MHA-VN-020 | `sh-vn-fillister-screw-90280a108` (`Default`) | MHA-SH-VN-52 |
@@ -534,6 +537,7 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | retired tooling part | — | — | `dt-cone-pivot-post-tl-cap-jaw-button` | MHA-DT-005-TL-03 | — | MHA-DT-05-TL-03 (retired 2026-10-21; never reissued) |
 | retired tooling part | — | — | `dt-cone-pivot-post-tl-soft-jaw` | MHA-DT-005-TL-04 | — | MHA-DT-05-TL-04 (retired 2026-10-21; never reissued) |
 | new tooling part (2026-11-02) | — | — | — | — | `dt-cone-gear-tl-index-plate` | MHA-DT-03-TL-01 |
+| new tooling part (2026-11-09) | — | — | — | — | `dt-cone-gear-tl-phasing-comb` | MHA-DT-03-TL-02 |
 | assembly | `frame` | MHA-A04 | `fr-frame` | MHA-FR-000 | `fr-frame` | MHA-FR-00 |
 | assembly | `drive-train` | MHA-A03 | `dt-drive-train` | MHA-DT-000 | `dt-drive-train` | MHA-DT-00 |
 | assembly | `channel` | MHA-A02 | `ch-channel` | MHA-CH-000 | `ch-channel` | MHA-CH-00 |
@@ -736,6 +740,7 @@ A retired Number is never reused. A family added after a cutover takes the next 
 | added | `ch-rocker-arm-tl-vn-oblique-hub-pin` | MHA-CH-06-TL-VN-80 | McMaster 23065A855-23065A4 Class Z NO-GO .4000 plug gauge x1, 2 in supply, abrasive-cut to .79 and bonded (was McMaster 2281A11-6410N695 Ø10.2000 until 2026-10-31) |
 | added | `dt-cone-gear-tl-index-plate` | MHA-DT-03-TL-01 | 2026-11-02 BS-0 dividing-head index plate with 57-, 51- and 24-hole circles for the 114T, 102T and 96T cone gears the stock plates cannot index; best-guess sizes pending measurement (#2157) |
 | added | `dt-cone-gear-tl-indexing` | MHA-DT-03-TL-00 | 2026-11-02 one-part tooling assembly holding the index plate on the BS-0 head, so the plate belongs to a registered fixture kit; never in a machine assembly or BOM |
+| added | `dt-cone-gear-tl-phasing-comb` | MHA-DT-03-TL-02 | Owner ruling 2026-11-09 (C1 keyed, [PR #1992](https://github.com/pedropaulovc/harmonic-analyzer/pull/1992), tip phasing option b1): flat steel comb with one blade per cone gear T030, T024, T018, T012 and T006 in the tooth space beside its phase-0 tooth at shop-row bands (single blade, owner ruling 2026-11-10), clocking the LOCTITE 638-bonded tip gears to the keyed T030 at MHA-DT-00 step 1; enrolled in the `dt-cone-gear-tl-indexing` kit (MHA-DT-03-TL-00 was already that kit's assembly Number); never in a machine assembly or BOM |
 | retired | `ch-rocker-arm-tl-vn-oblique-leadscrew-nut` | MHA-CH-06-TL-VN-55 | 2026-11-01 owner ruling (item 4): the shop-made TL-27 feed nut replaces the bought flange nut, so TL-32's lug needs no spigot recess; no registry, builder or drawing; Number never reissued |
 | added | `ch-rocker-arm-tl-oblique-feed-nut` | MHA-CH-06-TL-27 | 2026-11-01 shop-made Tr8x2 RH nut from brass 360-H02 3/4 × 1-1/4 in bar, faced to .40, on two TL-VN-66 screws into TL-32's lug |
 | added | `ch-rocker-arm-tl-vn-oblique-nut-dowel` | MHA-CH-06-TL-VN-81 | 2026-11-03 Main ruling on Codjiflo P1: McMaster 98381A438 3/32 x 1/2 alloy-steel dowel x1 (ASME B18.8.2, +.0001/+.0003), the TL-27 feed nut's positive anti-rotation key, slip in the nut and pressed into the TL-32 lug; bought fixture hardware modelled for the jig assembly |
@@ -765,3 +770,8 @@ A retired Number is never reused. A family added after a cutover takes the next 
 | added | `sm-vn-gooseneck-shoulder-screw` | MHA-SM-VN-56 | Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: McMaster-Carr 91829A566 slotted 18-8 stainless precision shoulder screw, 1/4 x 3/8 in shoulder, 10-24 thread (owner ruling 2026-11-08 (Pedro), #2144 item 11.4: bare slotted McMaster 91829A566, washer dropped); its shoulder seats on the gooseneck's end face in a plain blind tap (the MHA-SM-01 end piece's at the time; the MHA-SM-05 end plug's since owner rulings 2026-11-08 (Pedro), #2315), and the MHA-SM-VN-51 upper eye rides free on it |
 | added | `sm-gooseneck-end-plug` | MHA-SM-05 | Owner rulings 2026-11-08 (Pedro), #2315: turned AISI 1018 end plug, its own part with its own drawing and MHA-SM-00 BOM row and step (not `component_of`): Ø.500 head x .60, flush with MHA-SM-01's tube, and a Ø.363 spigot x .42 turned to the measured tube bore (.0040-.0098 clearance), bonded into MHA-SM-01's faced arm end with LOCTITE 638 at MHA-SM-00 and cured 24 h before the screw goes in; tapped #10-24 UNC-2B blind before bonding for the MHA-SM-VN-56 shoulder screw (owner minor RV-01: ENGAGEMENT .220 MIN (1.16D)); bare, no plating. It replaces MHA-SM-01's brazed end piece; no sleeve and no MHA-SM-06 |
 | added | `dt-vn-cone-shaft-key` | MHA-DT-VN-71 | Owner decision C1 keyed, 2026-11-09 ([PR #1992](https://github.com/pedropaulovc/harmonic-analyzer/pull/1992)): 1008-1045 carbon steel machine key stock, 1/16 x 1/16, undersized, McMaster-Carr 98830A511, cut to length, x1; sits in the MHA-DT-04 land-1 keyseat and drives the 64T (MHA-DT-07) and T030–T120 (MHA-DT-03) through their broached keyways, superseding the land-1 D-flat of the 2026-09-28 ruling |
+| added | `dt-cone-tip-gear` | MHA-DT-37 | Owner decision C1 keyed, 2026-11-09 ([PR #1992](https://github.com/pedropaulovc/harmonic-analyzer/pull/1992)): T006 cut solid in C67500 with its six DT6-FORM1 leaves, an integral Ø.0625 spigot bonded in the MHA-DT-04 socket and through MHA-DT-03-T012/-T018, and an integral Ø.0625 pivot carrying MHA-DT-38 and running in MHA-DT-39; replaces the T006 configuration of MHA-DT-03, whose `MHA-DT-03-T006` qualifier retires |
+| added | `dt-cone-tip-bushing` | MHA-DT-38 | Owner decision C1 keyed, 2026-11-09 ([PR #1992](https://github.com/pedropaulovc/harmonic-analyzer/pull/1992)): turned C36000 brass bushing pressed on the MHA-DT-37 pivot against the T006 leaves; its north face bears on the MHA-DT-39 end screw |
+| added | `dt-cone-tip-end-screw` | MHA-DT-39 | Owner decision C1 keyed, 2026-11-09 ([PR #1992](https://github.com/pedropaulovc/harmonic-analyzer/pull/1992)): McMaster-Carr 91794A558 18-8 slotted fillister 1/4-28 x 5/8 with a drilled and reamed pivot hole in its threaded end; real machining, so it carries the subsystem prefix, not a vendor Number; threads into MHA-DT-21 and sets the cone shaft's end play |
+| retired | `dt-vn-cone-tip-collar` | MHA-DT-VN-54 | Owner decision C1 keyed, 2026-11-09 ([PR #1992](https://github.com/pedropaulovc/harmonic-analyzer/pull/1992)): the bonded T024 and the end screw replace the set-screw collar on the terminal D-flat; no registry, builder or drawing; Number never reissued |
+| retired | `dt-vn-cone-tip-adjuster` | MHA-DT-VN-55 | Owner decision C1 keyed, 2026-11-09 ([PR #1992](https://github.com/pedropaulovc/harmonic-analyzer/pull/1992)): the MHA-DT-39 end screw replaces the #10-32 cup-point adjuster (McMaster-Carr 94025A164); no registry, builder or drawing; Number never reissued |

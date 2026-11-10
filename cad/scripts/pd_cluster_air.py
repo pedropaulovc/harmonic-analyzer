@@ -2,7 +2,7 @@
 
 The cluster's lengths print (``transgear_cluster_fit``; its end float is
 shimmed at assembly, owner ruling 2026-11-01, #2124) and its air stacks use
-the repository's air-stack method (machining-dfm.md, ``dt_tip_collar_air``
+the repository's air-stack method (machining-dfm.md, ``dt_cone_tip_air``
 precedent): worst-case arithmetic over every source if both stacks clear;
 otherwise, for both, the nominal air minus the arithmetic sum of the
 in-service clearances (the parts can take them all up together) minus the

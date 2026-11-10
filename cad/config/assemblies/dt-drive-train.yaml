@@ -24,6 +24,10 @@ flip_invert:
   - cam follower back seat depth
   - cam follower front seat depth
   - cone gear axial seat
+  # MHA-DT-37 (owner decision C1 keyed, 2026-11-09, PR #1992) is authored in
+  # the cone gears' frame (Front plane on its leaves' south face), so its seat
+  # takes their polarity; seeded by that precedent, not yet read.
+  - cone tip gear axial seat
   # MHA-DT-VN-71 (owner decision C1 keyed, 2026-11-09, PR #1992): its Front
   # and Right planes sit on the + side of the shaft's same-sense planes, as
   # the cone gears' Front planes do.  Both inverted seeds read correct on
@@ -34,6 +38,13 @@ flip_invert:
   - cone key on the keyseat floor
   - cone platform height
   - crankshaft axial (on the plate)
+  # MHA-DT-39's TipFace and MHA-DT-38's NorthFace normals both point up the
+  # shaft, so the plain sign rule seats the screw end 0.15 INSIDE the bushing:
+  # PR 2 farm proof 6fda5a4 (assembly:dt_drive_train) read a 2.906 mm^3
+  # end-screw/bushing overlap, the 0.15 mm-deep chamfered annulus that side
+  # predicts (2.92 mm^3).  The 0.30 mm wrong-side move is inside the mate
+  # guard's 0.5 mm origin tolerance, so only the interference gate saw it.
+  - end screw end play gap
   - lever axial seat
   - lift rod axial
   - pinch head seat @ppn
@@ -41,7 +52,6 @@ flip_invert:
   - pinion cam back set pin axial
   - pinion cam front set pin axial
   - tip block axial seat
-  - tip collar axial seat
   # Option E-a: the pinned torque shaft's axial station (pc-ea run).
   - torque shaft axial
 allowed_free_stems:
@@ -50,7 +60,6 @@ allowed_free_stems:
   - dt-cone-gear-shaft
   - dt-cone-pivot-post
   - dt-cone-swing-platform
-  - dt-vn-cone-tip-adjuster
   - dt-cone-tip-block
   - dt-vn-cone-tip-block-screw
   # MHA-DT-VN-69 is pressed in the MHA-DT-21 foot and rides the swing (rule-23
@@ -59,7 +68,13 @@ allowed_free_stems:
   # MHA-DT-VN-71 sits in the MHA-DT-04 keyseat and rides the shaft's spin
   # and swing (owner decision C1 keyed, 2026-11-09, PR #1992).
   - dt-vn-cone-shaft-key
-  - dt-vn-cone-tip-collar
+  # MHA-DT-37 is bonded in MHA-DT-04's socket and MHA-DT-38 is pressed on its
+  # pivot: both ride the shaft's spin and swing.  MHA-DT-39 threads through
+  # MHA-DT-21 and rides the swing (owner decision C1 keyed, 2026-11-09, PR
+  # #1992).
+  - dt-cone-tip-gear
+  - dt-cone-tip-bushing
+  - dt-cone-tip-end-screw
   - dt-vn-cone-tip-pinch-screw
   - dt-crank-arm
   - dt-crank-drive-gear
@@ -124,11 +139,10 @@ machinist_exceptions:
     where: "sheet 7 step 2: 2X MHA-DT-VN-61 1/4-20 screws cut to fit into the MHA-DT-20 taps, ENGAGEMENT .220 MIN (0.88D)."
     finding: "thread engagement below 1.5D (rule 18)"
     reason: "Owner ruling 2026-11-01: MHA-DT-VN-61 post-mount thread engagement 0.87D MIN (0.88D after #2107) accepted as a minor exception; #1019's 0.90D target not met. The same joint is MHA-DT-VN-61's RV-01"
-  - id: "DT-03"
-    kind: "minor"
-    where: "sheet 7 step 3: MHA-DT-VN-55 #10-32 cup set screw threaded into MHA-DT-21, ENGAGEMENT .190 MIN (1.0D)."
-    finding: "thread engagement below 1.5D (rule 18)"
-    reason: "Owner ruling 2026-11-01: thread engagement below 1.5D with no geometry escape accepted as a minor exception. MHA-DT-VN-55 tip adjuster, 1.0D (#975): the tip block's depth and the adjuster's working window fix it"
+  # DT-03 (MHA-DT-VN-55 #10-32 cup adjuster, 1.0D) retired with the adjuster:
+  # owner decision C1 keyed, 2026-11-09, PR #1992
+  # (https://github.com/pedropaulovc/harmonic-analyzer/pull/1992); its
+  # successor joint is DT-07 below.  Ids are not reused.
   - id: "DT-04"
     kind: "minor"
     where: "sheet 12 check 4: VERIFY MHA-DT-VN-52 FULL-FORM THREAD ENGAGEMENT .190 MIN; SHOULDER FULLY SEATED."
@@ -144,3 +158,8 @@ machinist_exceptions:
     where: "sheet 9 steps 10-10J: the back MHA-CH-08 set at DRO Y on the MHA-FR-05 rail and held by one MHA-CH-VN-57 #8-32 through its foot"
     finding: "one-screw part whose turning would change a setting, with no dowel, tongue, step or second screw (rule 23 static clamp)"
     reason: "Owner ruling 2026-11-08 (Pedro), #2144 item 6.1; the dowel option is #2277. 10D clamps the ear at Y, 10F screws it down, 10G rechecks Y and 10H checks by hand that it does not turn. The wave-spring preload acts along the shaft axis in the screw's plane, so it puts no torque about the screw, and once MHA-CH-00 sets the pivot shaft in both ears the two brackets turn only together"
+  - id: "DT-07"
+    kind: "minor"
+    where: "sheet 7 steps 3-3A: MHA-DT-39 1/4-28 end screw in the .43 MHA-DT-21 tap, run in until MHA-DT-04 stops shuttling, BACK MHA-DT-39 OFF 1/8 TURN: ENGAGEMENT .347 MIN (1.39D)."
+    finding: "thread engagement below 1.5D (rule 18)"
+    reason: "Owner ruling 2026-11-09 via PR #1992 (https://github.com/pedropaulovc/harmonic-analyzer/pull/1992): MHA-DT-39 (McMaster 91794A558, 1/4-28 x 5/8) stays at the current MHA-DT-21 station with 1.39D of full thread at the print-worst shallow end, against rule 18's 1.5D. The end screw is set against MHA-DT-38, so its embed follows the tip's axial stack (post boss, MHA-DT-04 collar web, the cone gear stack and its feeler, MHA-DT-38's length, the MHA-DT-21 hold-down) plus the set end play; MHA-DT-21 is placed so the head never bottoms at the deep end (build_dt_drive_train_assembly.END_SCREW_ENGAGEMENT_WORST_D, asserted >= 1.39D). MHA-DT-VN-56 pinches the screw in the slit block once the end play is set"

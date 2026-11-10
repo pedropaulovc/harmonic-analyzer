@@ -237,10 +237,12 @@ raw-map checks never normalize newlines or accept a platform-specific pin.
 The current-source executed-input closure also requires independent live-consumer
 seals for the current map and its Node authority helper at build and publication;
 these supplement rather than replace raw-map authentication.
-The table's four historical-only vendor occurrences remain separate, with no
-current Number, registry or builder path: the three pre-cutover retirements and
-the v39 `vn-keeper-chain-link` (MHA-DT-VN-66, retired 2026-11-08), whose row
-mirrors its `retired_identities` reservation exactly. They identify archived
+The table's six historical-only vendor occurrences remain separate, with no
+current Number, registry or builder path: the three pre-cutover retirements,
+the v39 `vn-keeper-chain-link` (MHA-DT-VN-66, retired 2026-11-08) and the v39
+`vn-cone-tip-collar` and `vn-cone-tip-adjuster` (MHA-DT-VN-54 and MHA-DT-VN-55,
+retired 2026-11-09, C1 keyed, PR #1992), whose rows mirror their
+`retired_identities` reservations exactly. They identify archived
 machine geometry, not invented CAD parts; retired standalone tooling is not
 added to them.
 Browser loading verifies the current table's semantic digest before projecting

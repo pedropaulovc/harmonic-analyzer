@@ -10,7 +10,6 @@ on the channel table that places the line.
 from __future__ import annotations
 
 from cone_pitch import SEAT_PITCH
-from cone_shaft_land_bands import TIP_COLLAR_BODY_NORTH_SHIFT_MM
 from _cone_axis_constants import GEAR_AXIS_SHIFT
 
 # Every station stays on the historical 6.5 cone reference face: the gears
@@ -23,12 +22,14 @@ CONE_FACE_STATION_REFERENCE = 6.5
 SHAFT_T120_STATION = 25.0 + CONE_FACE_STATION_REFERENCE / 2.0  # 28.25
 
 # T006 is the reference gear for the tip-end stack: its north face is the
-# fixed layout reference the MHA-DT-VN-54 stack collar is feeler-set off.
+# fixed layout reference the tip cluster's stations are laid out from
+# (cone_tip_cluster).
 T006_CENTER_STATION = SHAFT_T120_STATION + GEAR_AXIS_SHIFT + 19 * SEAT_PITCH
 T006_NORTH_FACE = T006_CENTER_STATION + CONE_FACE_STATION_REFERENCE / 2.0
-# Extend the tip, block and pivot by the SAME northward delta that moves only
-# the custom collar's large body and tap. Its small south end remains feeler-
-# set off T006; collar-to-block and block-to-pivot clearances are invariant.
-# The retained 7.5-mm extension and ordinary bands are not regraded.
-TIP_END_EXTENSION_MM = 7.5 + TIP_COLLAR_BODY_NORTH_SHIFT_MM
+# The pivot's station north of T006: 23.0 plus TIP_END_EXTENSION_MM.  The
+# extension was 7.5, then 7.5 + 0.50 when the retired MHA-DT-VN-54 collar's
+# body moved north; the C1 keyed tip (owner decision 2026-11-09, PR #1992)
+# keeps the swing-platform pivot where it is, so the 8.0 is a literal now
+# and PIVOT_STATION stays bit-identical.
+TIP_END_EXTENSION_MM = 8.0
 PIVOT_STATION = T006_NORTH_FACE + 23.0 + TIP_END_EXTENSION_MM

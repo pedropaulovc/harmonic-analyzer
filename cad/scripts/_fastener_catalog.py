@@ -73,16 +73,19 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "91251A108",
         material="Alloy Steel",
     ),
-    "dt-vn-cone-tip-adjuster": _stock(
-        "dt-vn-cone-tip-adjuster",
-        "18-8 Stainless Steel Slotted Cup-Tip Set Screw",
-        "94025A164",
-        material="AISI 304",
-    ),
     "dt-vn-cone-tip-pinch-screw": _stock(
         "dt-vn-cone-tip-pinch-screw",
         "18-8 Stainless Steel Fillister Head Slotted Screw",
         "91794A112",
+        material="AISI 304",
+    ),
+    # MHA-DT-39 (owner decision C1 keyed, 2026-11-09, PR #1992): the cone
+    # tip's end screw, 91794A558 stock with its threaded end drilled and
+    # reamed for MHA-DT-37's pivot (a made part on stock, so no VN Number).
+    "dt-cone-tip-end-screw": _stock(
+        "dt-cone-tip-end-screw",
+        "18-8 Stainless Steel Fillister Head Slotted Screw",
+        "91794A558",
         material="AISI 304",
     ),
     "dt-vn-crank-seat-drive-pin": _stock(

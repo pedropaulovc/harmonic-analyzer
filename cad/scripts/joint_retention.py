@@ -602,15 +602,13 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "sm_vn_boss_hook",  # #10-24 UNC (McMaster 9490T1 open-eye eyebolt), member into the summing-lever boss tap
         "sh_vn_clamp_screw",  # #8-32 UNC (90280A201), magnifier and paper-drive column clamps
         "sh_column_clamp_back",  # #8-32 UNC tapped ear holes, receiver of clamp_screw (magnifier and paper_drive)
-        "dt_cone_gear_shaft",  # receiver: Sec4 D-flat gripped by cone_tip_collar's #2-56 set screw
         "dt_vn_cone_lock_knob",  # 1/4-20 UNC knurled thumb screw (93585A190), member into harmonic_base (top level)
         "dt_vn_cone_pivot_screw",  # #10-24 UNC shoulder screw (91829A560), member into harmonic_base (top level)
         "dt_cone_swing_platform",  # 1/4-20 through-taps x2, receiver of post_mount_screw
-        "dt_vn_cone_tip_adjuster",  # #10-32 cup-tip set screw (94025A164), member into cone_tip_block
-        "dt_cone_tip_block",  # #4-40 blind foot tap + #10-32 through adjuster tap + #4-40 far-jaw pinch tap, receiver
+        "dt_cone_tip_end_screw",  # 1/4-28 fillister from 91794A558 (MHA-DT-39), member into cone_tip_block; reamed pivot hole in its end
+        "dt_cone_tip_block",  # #4-40 blind foot tap + 1/4-28 through end-screw tap + #4-40 far-jaw pinch tap, receiver
         "dt_vn_cone_tip_block_screw",  # #4-40 SHCS (91251A108), member into cone_tip_block foot
-        "dt_vn_cone_tip_collar",  # custom collar + stock #2-56 94355A213 flat-point screw on the shaft D-flat
-        "dt_vn_cone_tip_pinch_screw",  # #4-40 fillister (91794A112), member into cone_tip_block far jaw; lock of cone_tip_adjuster
+        "dt_vn_cone_tip_pinch_screw",  # #4-40 fillister (91794A112), member into cone_tip_block far jaw; lock of cone_tip_end_screw
         "dt_crank_arm",  # #4-40 and #2-56 through-taps, receiver of crank_handle_pivot_screw and MHA-DT-VN-70
         "dt_crank_handle_pivot_screw",  # #4-40 made shoulder screw (MHA-DT-32), member into crank_arm
         "sh_vn_brass_fillister_screw",  # #4-40 brass (90114A511), nameplate and paper guides
@@ -684,9 +682,15 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "ch_channel_lever",  # Ø6.5 fulcrum bore, #47 bar-pin hole, #21 spring-eye hole; no taps
         "ch_vn_channel_spring_installed",  # 9432K31 extension spring, hook ends in lever hole / eyebolt eye
         "sh_column_clamp_front",  # #8 CLEARANCE ear holes only; clamped in the screw stack
-        # T120..T030 keyways on the MHA-DT-VN-71 key in land 1 (owner decision C1
-        # keyed, 2026-11-09, PR #1992); T024..T006 D-bores on the land 2-4 D-flats; no thread
+        # T120..T030 keyways on the MHA-DT-VN-71 key in land 1; T024 bonded
+        # (LOCTITE 638) on round land 2, T018 and T012 on MHA-DT-37's spigot
+        # (owner decision C1 keyed, 2026-11-09, PR #1992); no thread
         "dt_cone_gear",
+        # MHA-DT-04: land-1 keyseat, round land 2, reamed socket for MHA-DT-37's
+        # spigot (C1 keyed); no thread
+        "dt_cone_gear_shaft",
+        "dt_cone_tip_gear",  # MHA-DT-37: spigot bonded in the MHA-DT-04 socket, plain pivot; no thread
+        "dt_cone_tip_bushing",  # MHA-DT-38 pressed on MHA-DT-37's pivot; no thread
         "dt_cone_pivot_post",  # clamped part: counterbored clearance for MHA-DT-VN-61; journals only
         "ch_connecting_rod",  # strap bore on cam + reamed pin hole (pressed MHA-CH-10 pin)
         "sm_vn_counter_spring",  # 1330K524 extension spring: upper eye free on the MHA-SM-VN-56 shoulder, lower eye hooks the boss-hook eye, no thread
@@ -903,15 +907,16 @@ JOINTS: tuple[Joint, ...] = (
         axial_capture=(
             "fillister head on the MHA-DT-05 counterbore floor; thread through the MHA-DT-20 1/4-20 "
             "through-tap, cut flush to 0.127 short of the underside (0.87D min, pending ruling "
-            "#1019 MHA-DT-VN-61, engagement only); left loose at post-and-tip-block, tightened at "
-            "tip-adjuster-set"
+            "#1019 MHA-DT-VN-61, engagement only); left loose at post-and-tip-block until "
+            "T006's pivot runs free in MHA-DT-39, then tightened"
         ),
         lock=Lock.NONE,
         evidence=(
             "build_dt_drive_train_assembly.py post_screws placement + lock_mate 'clamped in the post "
             "counterbore', cone-shaft revolute on 'journal axis@dt-cone-pivot-post'; "
-            "draw_dt_drive_train_assembly.py CONE_CRANK_STEPS 2 (post-and-tip-block) and 3 "
-            "(tip-adjuster-set 'TIGHTEN BOTH MHA-DT-VN-61'), 4 (crank-mesh-checked 'FIT MHA-DT-11 "
+            "draw_dt_drive_train_assembly.py CONE_CRANK_STEPS 2 (post-and-tip-block 'RUN BOTH "
+            "MHA-DT-VN-61 IN, LOOSE ENOUGH TO TURN MHA-DT-05' ... 'TIGHTEN BOTH MHA-DT-VN-61 AND "
+            "MHA-DT-VN-60'), 4 (crank-mesh-checked 'FIT MHA-DT-11 "
             "DIRECTLY IN THE MHA-DT-05 CRANK BORE'); dt_vn_post_mount_screw_spec.THREAD; "
             "dt_cone_swing_platform_spec.POST_MOUNT_SPEC; pending exception ruling #1019 MHA-DT-VN-61"
         ),
@@ -929,8 +934,8 @@ JOINTS: tuple[Joint, ...] = (
         # takes the turning moment, so the screw is a static clamp.
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
-            "MHA-DT-21 carries the running MHA-DT-04 tip in the MHA-DT-VN-55 cup: the shaft's "
-            "end-play thrust acts 1.0 off the screw axis (dt_cone_tip_block_spec.FOOT_TAP_OFFSET_X), "
+            "MHA-DT-21 carries MHA-DT-39, against whose end MHA-DT-38 on T006's pivot runs: the "
+            "shaft's end-play thrust acts 1.0 off the screw axis (dt_cone_tip_block_spec.FOOT_TAP_OFFSET_X), "
             "a moment about the vertical screw axis that varies every crank turn. The MHA-DT-VN-69 "
             "dowel pressed in the foot and slip-fitted in MHA-DT-20, .228 from the screw, takes "
             "that moment, so the block cannot turn about the screw and the screw only clamps "
@@ -938,8 +943,8 @@ JOINTS: tuple[Joint, ...] = (
         ),
         axial_capture=(
             "SHCS head on the MHA-DT-20 underside counterbore floor, thread up into the blind #4-40 "
-            "tap in the MHA-DT-21 foot; run in 'HELD SQUARE' (general note: snug); located against "
-            "turning by MHA-DT-VN-69"
+            "tap in the MHA-DT-21 foot; run in snug, tightened once T006's pivot runs free in "
+            "MHA-DT-39; located against turning by MHA-DT-VN-69"
         ),
         lock=Lock.NONE,
         evidence=(
@@ -948,39 +953,46 @@ JOINTS: tuple[Joint, ...] = (
             "assert; dt_cone_swing_platform_spec TIP_DOWEL_LOCAL_X/Z, dt_cone_tip_block_spec "
             "DOWEL_X; cone_tip_block_spec HOLDDOWN_THREAD / FOOT_TAP_OFFSET_X (user ruling "
             "2026-09-29: one #4-40 SHCS); draw_dt_drive_train_assembly.py CONE_CRANK_STEPS 2 "
-            "(post-and-tip-block: square, run in, match-drill and ream, press MHA-DT-VN-69 to the "
+            "(post-and-tip-block: square, run in snug, tighten with the pivot free, "
+            "match-drill and ream, press MHA-DT-VN-69 to the "
             "foot ream's floor; 'CHECK THAT MHA-DT-21 DOES NOT TURN ON MHA-DT-20 BY HAND')"
         ),
     ),
     Joint(
-        id="dt-drive-train/tip-adjuster",
+        id="dt-drive-train/tip-end-screw",
         assembly="dt_drive_train",
-        member="dt_vn_cone_tip_adjuster",
+        member="dt_cone_tip_end_screw",
         receiver="dt_cone_tip_block",
-        thread="#10-32",
+        thread="1/4-28",
         quantity=1,
-        installed_at="tip-adjuster-set",
+        installed_at="post-and-tip-block",
         exposure=Exposure.ADJUSTER,
         exposure_reason=(
             "Its turn sets MHA-DT-04's end play (run in until the shaft stops shuttling, back off "
-            "1/8 turn), and the shaft tip turns continuously against its cup, putting friction "
-            "drag about the screw's own axis"
+            "1/8 turn), and MHA-DT-38 on T006's pivot turns continuously against its end, putting "
+            "friction drag about the screw's own axis (owner decision C1 keyed, 2026-11-09, PR #1992)"
         ),
         axial_capture=(
-            "thread engagement only: headless cup-tip set screw in the block's #10-32 "
-            "through-tap, 1.0D min (pending ruling #975 MHA-DT-VN-55); cup bears on the shaft tip"
+            "fillister head clear of the block's north face; thread engagement only in the "
+            "block's 1/4-28 through-tap: 1.39D full thread at the printed limits, asserted "
+            ">= 1.39D and accepted by owner ruling 2026-11-09 (MHA-DT-00 DT-07); its reamed end "
+            "hole carries T006's pivot"
         ),
         lock=Lock.PINCH_CLAMP,
         lock_part="dt_vn_cone_tip_pinch_screw",
-        lock_binds=("dt_vn_cone_tip_adjuster", "dt_cone_tip_block"),
-        lock_step="tip-adjuster-set",
+        lock_binds=("dt_cone_tip_end_screw", "dt_cone_tip_block"),
+        lock_step="end-play-set",
         evidence=(
-            "draw_dt_drive_train_assembly.py CONE_CRANK_STEPS 3 (tip-adjuster-set 'THREAD MHA-DT-VN-55 ... "
-            "BACK OFF 1/8 TURN; TIGHTEN MHA-DT-VN-56 ACROSS THE SLIT'); cone_tip_block_spec "
-            "SLIT_FLOOR / WORST_SLIT_BREAKTHROUGH_MM (slit opens into the adjuster thread), "
-            "PINCH_THREAD; build_dt_drive_train_assembly.py parallel_mate 'adjuster anti-spin "
-            "(pinch-locked)'; pending exception ruling #975 MHA-DT-VN-55 ('the pinch screw across the slit "
-            "locks it'); cone_stack_end_play.SHAFT_END_PLAY"
+            "draw_dt_drive_train_assembly.py CONE_CRANK_STEPS 2 (post-and-tip-block 'THREAD "
+            "MHA-DT-39 INTO MHA-DT-21 OVER THE MHA-DT-37 PIVOT') and 3 "
+            "(end-play-set 'THREAD MHA-DT-39 IN UNTIL MHA-DT-04 JUST STOPS SHUTTLING', 'BACK "
+            "MHA-DT-39 OFF 1/8 TURN', 'TIGHTEN MHA-DT-VN-56 ACROSS THE SLIT', 'CHECK THAT "
+            "MHA-DT-39 DOES NOT TURN IN MHA-DT-21 BY HAND'); "
+            "build_dt_drive_train_assembly.END_SCREW_ENGAGEMENT_WORST_D / end_screw_embed_worst_mm; "
+            "dt_cone_tip_block_spec END_SCREW_EMBED / END_SCREW_REACH_MAX_EMBED_MM, SLIT_FLOOR / "
+            "WORST_SLIT_BREAKTHROUGH_MM (slit opens into the end-screw thread), PINCH_THREAD; "
+            "build_dt_drive_train_assembly.py parallel_mate 'end screw anti-spin (pinch-locked)'; "
+            "cone_stack_end_play.SHAFT_END_PLAY; dt-drive-train.yaml machinist_exceptions DT-07"
         ),
     ),
     Joint(
@@ -990,13 +1002,13 @@ JOINTS: tuple[Joint, ...] = (
         receiver="dt_cone_tip_block",
         thread="#4-40",
         quantity=1,
-        installed_at="tip-adjuster-set",
+        installed_at="end-play-set",
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
-            "Only closes the block's top slit: block, both jaws and the pinched adjuster ride the "
-            "platform as one and never move relative to each other, and the adjuster's cup drag "
-            "acts about the adjuster axis, perpendicular to this screw, reacted by jaw friction "
-            "on the adjuster thread, so no operating torque acts about the pinch axis"
+            "Only closes the block's top slit: block, both jaws and the pinched end screw ride the "
+            "platform as one and never move relative to each other, and the end screw's drag "
+            "acts about the end-screw axis, perpendicular to this screw, reacted by jaw friction "
+            "on the end-screw thread, so no operating torque acts about the pinch axis"
         ),
         axial_capture=(
             "fillister head on the block's +X face over the drilled-to-slot near-jaw clearance; "
@@ -1006,36 +1018,8 @@ JOINTS: tuple[Joint, ...] = (
         evidence=(
             "build_dt_drive_train_assembly.py pinch_screw placement and 'pinch screw in the "
             "cross-bore' mates, head-on-+X assert; cone_tip_block_spec PINCH_THREAD, "
-            "WORST_PINCH_ENGAGEMENT_MM; CONE_CRANK_STEPS 3 (tip-adjuster-set 'TIGHTEN "
+            "WORST_PINCH_ENGAGEMENT_MM; CONE_CRANK_STEPS 3 (end-play-set 'TIGHTEN "
             "MHA-DT-VN-56 ACROSS THE SLIT'); CONSUMABLES_NOTES '#4-40 ... SCREWS: SNUG'"
-        ),
-    ),
-    Joint(
-        id="dt-drive-train/tip-collar-set-screw",
-        assembly="dt_drive_train",
-        member="dt_vn_cone_tip_collar",
-        receiver="dt_cone_gear_shaft",
-        thread="#2-56",
-        quantity=1,
-        installed_at="tip-adjuster-set",
-        exposure=Exposure.STATIC_CLAMP,
-        exposure_reason=(
-            "MHA-DT-VN-54 turns as one with MHA-DT-04 (its set screw on the Sec4 D-flat) and rubs nothing "
-            "that moves relative to it: the keyed and D-flat-keyed stack floats a feeler gap south of it "
-            "and the tip block stands clear north (collar-to-block air), so no friction torque "
-            "acts about the radial set-screw axis; stack float thrust and start/stop inertia "
-            "load the screw across its axis"
-        ),
-        axial_capture=(
-            "94355A213 stock flat-point set screw, as supplied, landed on the shaft's Sec4 D-flat; "
-            "custom collar set one COLLAR_FEELER off T006; receiver carries >=1.5D full thread"
-        ),
-        lock=Lock.NONE,
-        evidence=(
-            "build_dt_drive_train_assembly.py tip_collar placement + 'tip collar set screw on the "
-            "D-flat' parallel mate; dt_vn_cone_tip_collar_spec SCREW_LANDING_MARGIN_MM, "
-            "WORST_FULL_ENGAGEMENT_MM and WORST_WALLS_MM; cone_stack_end_play "
-            "(collar and block never touch); CONE_CRANK_STEPS 'LOCK ITS SET SCREW ON THE FLAT'"
         ),
     ),
     Joint(
@@ -2413,16 +2397,11 @@ REQUIRED_JOINTS: dict[str, Occurrence] = {
         "build_dt_drive_train_assembly.py",
         "clamped in the platform hold-down counterbore",
     ),
-    "dt-drive-train/tip-adjuster": Occurrence(
-        "dt_drive_train", "build_dt_drive_train_assembly.py", '"dt-vn-cone-tip-adjuster"'
+    "dt-drive-train/tip-end-screw": Occurrence(
+        "dt_drive_train", "build_dt_drive_train_assembly.py", '"dt-cone-tip-end-screw"'
     ),
     "dt-drive-train/tip-pinch-screw": Occurrence(
         "dt_drive_train", "build_dt_drive_train_assembly.py", "pinch screw in the cross-bore"
-    ),
-    "dt-drive-train/tip-collar-set-screw": Occurrence(
-        "dt_drive_train",
-        "build_dt_drive_train_assembly.py",
-        "tip collar set screw on the D-flat",
     ),
     "dt-drive-train/handle-pivot-screw": Occurrence(
         "dt_drive_train", "build_dt_drive_train_assembly.py", '"dt-crank-handle-pivot-screw"'

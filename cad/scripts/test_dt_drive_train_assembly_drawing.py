@@ -47,6 +47,9 @@ EXTERNAL_NUMBERS = frozenset(
         drawing.ROCKER_ARM,
         # Check 5's feed sense, named on sheet 14's interface lines.
         drawing.PLATEN_NUMBER,
+        # Step 1P's phasing comb: a shop tool in the cone-gear indexing kit,
+        # never a drive-train BOM row (owner ruling 2026-11-09, PR #1992).
+        _config.parts("dt-cone-gear-tl-phasing-comb")["number"],
     }
 )
 # Named installation assemblies are external interfaces, not drive-train BOM rows.
@@ -812,7 +815,7 @@ def test_every_set_feeler_the_steps_and_checks_print_has_a_leaf_row() -> None:
     stays left of the cone station table."""
     rows = {row[0]: row[2] for row in drawing.FEELER_STACK_ROWS}
     assert "4H, 4J" in rows[".004"]
-    assert "CHECK 4D" in rows[".018"] and "3A" in rows[".018"]
+    assert "CHECK 4D" in rows[".018"] and "1P" in rows[".018"]
     assert rows[".020"] == "CHECK 4D, 4M"
     assert "4F" in rows[".010"]
     checks = " ".join(drawing.CHECKS.split())
@@ -1106,7 +1109,12 @@ def test_cone_station_rows_run_front_to_back() -> None:
     table = drawing.code_key_text(rows, 3).splitlines()
     assert table[1] == "TNNN = MHA-DT-03 WITH NNN TEETH, BY STATION, FRONT TO BACK:"
     assert table[2].startswith("STN  1  T120")
-    assert table[-1] == "GEAR 0-2 = MHA-DT-12 FROM THE FRONT, GEAR 0 ON MHA-DT-26."
+    assert table[-2] == "GEAR 0-2 = MHA-DT-12 FROM THE FRONT, GEAR 0 ON MHA-DT-26."
+    # Step 1P's comb is a shop tool with no BOM row: the key names it and
+    # defines the BLADE the step cites (machinist review of bd81283964).
+    assert table[-1] == "MHA-DT-03-TL-02 = PHASING COMB, ONE BLADE IN A TOOTH SPACE PER GEAR."
+    step = drawing.CONE_CRANK_STEPS[drawing.CONE_CRANK_STEPS.index("1S. ") :]
+    assert step.startswith("1S. ENGAGE MHA-DT-03-TL-02 AT ONCE, T030'S BLADE")
 
 
 def test_bom_split_keeps_the_first_column_no_taller() -> None:
@@ -1742,49 +1750,50 @@ def test_handle_pivot_screw_is_built_released_and_backs_out_of_the_handle() -> N
     assert -back_out.distance_mm > screw_spec.THREAD_LENGTH + handle_spec.HANDLE_LENGTH
 
 
+def _pivot_in_end_screw() -> float:
+    """How far T006's pivot runs into MHA-DT-39's reamed end hole, modelled."""
+    import cone_line
+    import cone_tip_cluster as cluster
+    import dt_cone_tip_block_spec as block
+
+    pivot_end = cone_line.T006_NORTH_FACE + cluster.TIP_SET_SHIFT_MM + cluster.PIVOT_LENGTH_MM
+    return pivot_end - block.END_SCREW_END_STATION
+
+
 def test_the_cone_rotor_withdraws_clear_of_the_post_and_the_tip_block() -> None:
     """With the cone gears touching, the collar on the post and the tip in
     its block, no MHA-DT-04 face showed in place and its balloon leader landed
-    on the tip block (run 7).  The rotor leaves along the cone axis until the
-    whole journal clears the post, and the tip hardware leads it by more than
-    the tip runs into the block."""
+    on the tip block (run 7).  The rotor leaves along the cone axis with its
+    bonded tip and pressed bushing (owner decision C1 keyed, 2026-11-09, PR
+    #1992) until the whole journal clears the post, and the tip hardware leads
+    it by more than T006's pivot runs into MHA-DT-39."""
     import dt_cone_gear_shaft_spec as shaft
 
     steps = {step.label: step for step in spec.EXPLODE_STEPS}
     rotor, tip = steps["cone rotor withdraws"], steps["tip block slides off"]
     assert rotor.axis == tip.axis == "cone"
-    assert "dt-cone-gear-shaft" in rotor.stems and "dt-cone-tip-block" in tip.stems
+    assert {"dt-cone-gear-shaft", "dt-cone-tip-gear", "dt-cone-tip-bushing"} <= set(rotor.stems)
+    assert "dt-cone-tip-block" in tip.stems
     # The collar bears on the post's north face, where the journal ends.
     assert rotor.distance_mm > shaft.JOURNAL_END
-    tip_in_block = shaft.T006_TIP_STATION - shaft.TIP_BLOCK_SOUTH_FACE_STATION
-    assert tip_in_block > 0.0
-    assert tip.distance_mm - rotor.distance_mm > tip_in_block
-    # The adjuster and pinch screw are threaded into the block: they go with it.
-    assert {"dt-vn-cone-tip-adjuster", "dt-vn-cone-tip-pinch-screw"} <= set(tip.stems)
+    pivot_in_screw = _pivot_in_end_screw()
+    assert pivot_in_screw > 0.0
+    assert tip.distance_mm - rotor.distance_mm > pivot_in_screw
+    # The end screw and pinch screw are threaded into the block: they go with it.
+    assert {"dt-cone-tip-end-screw", "dt-vn-cone-tip-pinch-screw"} <= set(tip.stems)
 
 
-def test_the_cone_gears_slide_off_the_64t_gear_and_stay_on_the_stub() -> None:
+def test_the_cone_gears_slide_off_the_64t_gear_short_of_the_end_screw() -> None:
     """Unexploded, MHA-DT-07 read as the stack's first disc and balloons 35
-    and 36 met there (r15).  The gears and MHA-DT-VN-54 slide on toward the tip
-    without it; the tip gear stays on the stub, the collar short of the block."""
-    import dt_cone_gear_shaft_spec as shaft
-
+    and 36 met there (r15).  The gears, MHA-DT-37 and MHA-DT-38 slide on
+    toward the tip without it, T006's pivot still short of MHA-DT-39."""
     steps = {step.label: step for step in spec.EXPLODE_STEPS}
     gears = steps["cone gears slide toward the tip"]
-    assert (gears.stems, gears.axis) == (("dt-cone-gear", "dt-vn-cone-tip-collar"), "cone")
-    stub = shaft.T006_TIP_STATION - shaft.T006_NORTH_FACE_STATION
-    assert 0.0 < gears.distance_mm < stub
-    collar_end = (
-        shaft.TIP_COLLAR_END_STATION
-        + steps["tip collar slips off"].distance_mm
-        + gears.distance_mm
-    )
-    block_face = (
-        shaft.TIP_BLOCK_SOUTH_FACE_STATION
-        + steps["tip block slides off"].distance_mm
-        - steps["cone rotor withdraws"].distance_mm
-    )
-    assert collar_end < block_face
+    assert gears.axis == "cone"
+    assert gears.stems == ("dt-cone-gear", "dt-cone-tip-gear", "dt-cone-tip-bushing")
+    assert gears.distance_mm > 0.0
+    lead = steps["tip block slides off"].distance_mm - steps["cone rotor withdraws"].distance_mm
+    assert gears.distance_mm + _pivot_in_end_screw() < lead
 
 
 

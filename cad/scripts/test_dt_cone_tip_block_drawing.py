@@ -28,32 +28,43 @@ def test_required_drawing_paths() -> None:
 
 
 def test_adjuster_thread_is_tapped_through_with_no_floor() -> None:
-    """E11/W1: no floor to break out and no tap lead to deduct (Main, 2026-09-24)."""
+    """E11/W1: no floor to break out and no tap lead to deduct (Main,
+    2026-09-24); C1 keyed (owner decision 2026-11-09, PR #1992) carries the
+    end screw's 1/4-28 thread through it."""
     spec = dt_cone_tip_block_spec
-    assert spec.ADJUSTER_THREAD == "#10-32"
+    assert spec.ADJUSTER_THREAD == spec.end_screw_stock.THREAD
     assert spec.ADJUSTER_BORE_SPEC.end == "through_all"
     assert spec.ADJUSTER_BORE_SPEC.depth_mm == 0.0
     assert "ThreadDepth" not in spec.ADJUSTER_BORE_SPEC.overrides_mm
     assert "PassageProfile" not in spec.DRAWING_DIMENSIONS
-    # The tip passes the thread's minimum minor diameter, not a separate hole.
-    assert spec.SHAFT_PASSAGE_DIA == pytest.approx(3.9624)
-    assert spec.SHAFT_PASSAGE_DIA < spec.ADJUSTER_BORE_DIA
+    # The tap drill is never under the thread's 2B minimum minor.
+    assert spec.ADJUSTER_MINOR_MIN_DIA <= spec.ADJUSTER_BORE_DIA
 
 
-def test_adjuster_embed_band_stays_inside_its_engagement_window() -> None:
-    """The window opens at 1.0D + countersink (the adjuster's user-ruled
-    engagement exception, 2026-09-29) and closes a countersink short of the
-    south face at the depth's .XXX-short limit: the cup sits on full thread.
-    A 1.5D floor would leave no room for the tip's print-worst stack."""
+def test_end_screw_embed_range_stays_inside_its_engagement_window() -> None:
+    """The window gives the 91794A558 end screw the most full thread the
+    shallowest block holds (1.5 D, or the block's own thread past its deepest
+    countersinks if that is less), its head clear of the north face, and the
+    set end play's whole range stays inside it.  The depth prints .XX (rule
+    19: no band tightened to rescue a thread), which leaves the shallowest
+    block 1.48 D: above the assembly's stated 1.39 D end-screw engagement
+    (owner ruling 2026-11-09), and short of 1.5 D only by its countersinks."""
     spec = dt_cone_tip_block_spec
-    assert spec.ADJUSTER_CSK_DIA > 4.826
-    assert spec.ADJUSTER_MIN_ENGAGEMENT_D == 1.0
-    assert spec.ADJUSTER_EMBED_WINDOW == pytest.approx((5.3086, 9.0424))
-    low, high = spec.ADJUSTER_EMBED_WINDOW
-    assert low == pytest.approx(1.0 * 4.826 + spec.ADJUSTER_CSK, abs=1e-3)
-    assert high == pytest.approx(spec.BLOCK_Z - 0.127 - spec.ADJUSTER_CSK)
-    assert low < spec.ADJUSTER_EMBED < high
-    assert drawing._CSK_DIA_TEXT == ".197"
+    major = spec.end_screw_stock.SHANK_DIA
+    assert spec.ADJUSTER_CSK_DIA > major
+    assert spec.END_SCREW_MIN_ENGAGEMENT_D == 1.5
+    assert spec.DRAWING_PRECISION_BY_NAME["Depth"] == 2
+    floor = min(1.5 * major, spec.END_SCREW_ENGAGEMENT_MIN_MM)
+    assert spec.END_SCREW_ENGAGEMENT_MIN_MM / major == pytest.approx(1.484, abs=1e-3)
+    low, high = spec.END_SCREW_EMBED_WINDOW
+    for edge in (low, high):
+        assert spec.end_screw_full_thread_mm(edge) >= floor - 1e-9
+    assert high <= spec.END_SCREW_REACH_MAX_EMBED_MM
+    lo, hi = spec.END_SCREW_EMBED_RANGE_MM
+    assert low <= lo < spec.END_SCREW_EMBED < hi <= high
+    # The screw's end stands proud of the south face toward the bushing.
+    assert spec.END_SCREW_END_STATION < spec.TIP_BLOCK_SOUTH_FACE
+    assert drawing._CSK_DIA_TEXT == ".257"
 
 
 def test_adjuster_callout_names_both_countersinks_under_the_thread() -> None:
@@ -138,10 +149,12 @@ def test_pinch_spacing_closes_every_print_tolerance_stack() -> None:
     assert spec.WORST_SCREW_ENVELOPE_GAP_MM > 0.0
     # U24b / U27: every web keeps the wall target at the printed limits after
     # edge breaks.  #290: the inch grades (.XX +/-.01, .XXX +/-.005) are
-    # tighter than the mm ones they replace, so every web grows.
-    assert spec.WORST_SLIT_MOUTH_WEB_MM == pytest.approx(3.723, abs=1e-3)
+    # tighter than the mm ones they replace, so every web grows.  C1 keyed's
+    # 1/4-28 end screw (owner decision 2026-11-09, PR #1992) opens the tap
+    # drill to 5.41, thinning the slit mouth and side webs.
+    assert spec.WORST_SLIT_MOUTH_WEB_MM == pytest.approx(2.934, abs=1e-3)
     assert spec.WORST_TOP_LIGAMENT_MM == pytest.approx(2.889, abs=1e-3)
-    assert spec.WORST_ADJUSTER_SIDE_LIGAMENT_MM == pytest.approx(5.354, abs=1e-3)
+    assert spec.WORST_ADJUSTER_SIDE_LIGAMENT_MM == pytest.approx(4.577, abs=1e-3)
     for web in (
         spec.WORST_SLIT_MOUTH_WEB_MM,
         spec.WORST_TOP_LIGAMENT_MM,
@@ -541,7 +554,7 @@ def test_pinch_clearance_leader_stands_off_the_hole_centreline() -> None:
     shoulder's right end (the literals in PINCH_CLEARANCE_CALLOUT_XY are the
     callout's extent)."""
     leader = drawing.sheet_leaders()["pinch clearance callout"]
-    centre = (drawing.RIGHT_CENTER[0], drawing._elevation_y(drawing.PINCH_HEIGHT, drawing.RIGHT_CENTER))
+    centre = (drawing._right_x(drawing.PINCH_Z), drawing._elevation_y(drawing.PINCH_HEIGHT, drawing.RIGHT_CENTER))
     _left, down, right, _up = drawing.PINCH_CLEARANCE_CALLOUT_EXTENT
     x, y = drawing.PINCH_CLEARANCE_CALLOUT_XY
     assert leader.start == pytest.approx((x + right, y - down), abs=1e-12)
@@ -757,22 +770,26 @@ def test_r3_prints_no_two_place_dimension_it_does_not_need() -> None:
     """Over-specification: no size prints a place no fit or asserted margin
     needs.  The rise leaves the print (the pinch hole locates from the foot).
     2026-09-29: the block's foot sits straight on the platform, so AxisHeight
-    is the block's own fit; the machinist review of d84a42ca7 printed it .XX,
-    the cup capture's grade, with no band of its own."""
+    is the block's own fit; it prints .XX, and C1 keyed (owner decision
+    2026-11-09, PR #1992) makes it to the measured post (AXIS_MATCH_NOTE)."""
     grades = dt_cone_tip_block_spec.DRAWING_PRECISION_BY_NAME
-    assert grades["Depth"] == 3
+    assert grades["Depth"] == 2
     assert grades["BlockHt"] == 2
     assert grades["AxisHeight"] == 2
     assert "PinchRise" not in grades
     # Nothing prints .X: on the inch sheet its +/-.1 fails every web.
     assert {name for name, places in grades.items() if places == 2} == {
         "Width",
+        "Depth",
         "BlockHt",
         "PinchHeight",
         "PinchDepthCenter",
         "SlitW",
         "AxisHeight",
     }
+    # The pinch hole's station sits on the .01 grid (round-2 review of PR 2:
+    # .215 printed a third place no function needed).
+    assert dt_cone_tip_block_spec.PINCH_DEPTH_CENTER / 25.4 == pytest.approx(0.22)
 
 
 def test_every_three_place_size_names_its_mate_at_its_dimension() -> None:
@@ -790,7 +807,12 @@ def test_every_three_place_size_names_its_mate_at_its_dimension() -> None:
         texts[name] = drawing.FOOT_TAP_QUALIFIER
     texts["PassageCenter"] = drawing.BORE_FLAG_TEXT
     three_place = {name for name, places in grades.items() if places == 3}
-    assert three_place == {"Depth", "PassageCenter", "FootTapX", "FootTapZ", "DowelX"}
+    assert three_place == {
+        "PassageCenter",
+        "FootTapX",
+        "FootTapZ",
+        "DowelX",
+    }
     three_place.discard("DowelX")
     assert "DowelX" not in texts
     # The width's band is its own, one-sided; its reason still names the edge.
@@ -976,7 +998,7 @@ def test_pinch_screw_is_the_5_8_stainless_fillister() -> None:
     the head.  The stainless-over-steel (galvanic) choice is design
     rationale, not a machinist instruction: the material rides the title
     block and the purchased-part ID.  The sheet carries no installation
-    note at all: the MHA-DT-00 tip-adjuster step tightens it across the slit
+    note at all: the MHA-DT-00 end-play step tightens it across the slit
     (delegated ruling F6, 2026-11-07)."""
     import _config
     from _fastener_catalog import fastener

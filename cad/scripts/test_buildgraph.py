@@ -105,7 +105,7 @@ _INSERTED_SOURCES = {
     "fr_vn_lag_screw fr_nameplate fr_rocker_arm_support fr_top_frame fr_tube_frame fr_vn_tube_frame_cap",
     "dt_drive_train": "dt_alignment_pinion dt_arbor_pedestal sh_vn_arbor_set_screw dt_cone_gear dt_cone_gear_shaft "
     "dt_vn_cone_lock_knob dt_cone_pivot_post dt_vn_cone_pivot_screw dt_cone_swing_platform "
-    "dt_vn_cone_tip_adjuster dt_cone_tip_block dt_vn_cone_tip_block_screw dt_vn_cone_tip_collar dt_vn_cone_tip_pinch_screw "
+    "dt_cone_tip_block dt_cone_tip_bushing dt_cone_tip_end_screw dt_cone_tip_gear dt_vn_cone_tip_block_screw dt_vn_cone_tip_pinch_screw "
     "dt_crank_arm dt_crank_drive_gear dt_crank_handle dt_crank_handle_butt_cup dt_crank_handle_ferrule "
     "dt_crank_handle_pivot_screw dt_crank_hub dt_vn_crank_hub_pin dt_crank_pin "
     "dt_crank_pin_ring dt_vn_crank_seat_drive_pin "
@@ -156,7 +156,7 @@ _INSERTED_SOURCES = {
     "ch_rocker_arm_tl_vn_oblique_pivot_screw ch_rocker_arm_tl_vn_oblique_pivot_spacer "
     "ch_rocker_arm_tl_vn_oblique_pivot_shim "
     "ch_rocker_arm_tl_oblique_hub_washer",
-    "dt_cone_gear_tl_indexing": "dt_cone_gear_tl_index_plate",
+    "dt_cone_gear_tl_indexing": "dt_cone_gear_tl_index_plate dt_cone_gear_tl_phasing_comb",
     "ha_harmonic_analyzer": "fr_frame dt_drive_train ch_channel sm_summing mg_magnifier pn_pen "
     "pd_paper_drive ms_measuring_stick",
 }
@@ -2011,7 +2011,7 @@ def test_module_deps_are_transitive():
     _part_properties' lazy import (registry-driven properties stay tracked)."""
     links = _helper_names("build_sh_vn_chain_link.py")
     assert {"_chain_link", "_chain", "_part_save", "_part_properties"} <= links, links
-    assert "_config" in _helper_names("build_dt_vn_cone_tip_collar.py"), (
+    assert "_config" in _helper_names("build_dt_crank_pin.py"), (
         "lazy _config edge lost"
     )
 

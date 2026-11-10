@@ -1592,17 +1592,6 @@
       ]
     },
     {
-      "old_stem": "vn-cone-tip-collar",
-      "old_number": "MHA-VN-016",
-      "new_identities": [
-        {
-          "parent": "dt-drive-train",
-          "stem": "dt-vn-cone-tip-collar",
-          "number": "MHA-DT-VN-54"
-        }
-      ]
-    },
-    {
       "old_stem": "vn-cone-tip-block-screw",
       "old_number": "MHA-VN-030",
       "new_identities": [
@@ -1662,17 +1651,6 @@
           "parent": "dt-drive-train",
           "stem": "dt-vn-cone-pivot-screw",
           "number": "MHA-DT-VN-52"
-        }
-      ]
-    },
-    {
-      "old_stem": "vn-cone-tip-adjuster",
-      "old_number": "MHA-VN-017",
-      "new_identities": [
-        {
-          "parent": "dt-drive-train",
-          "stem": "dt-vn-cone-tip-adjuster",
-          "number": "MHA-DT-VN-55"
         }
       ]
     },
@@ -2174,6 +2152,17 @@
       ]
     },
     {
+      "old_stem": "dt-cone-gear-tl-phasing-comb",
+      "old_number": null,
+      "introduced": "2026-11-09",
+      "new_identities": [
+        {
+          "stem": "dt-cone-gear-tl-phasing-comb",
+          "number": "MHA-DT-03-TL-02"
+        }
+      ]
+    },
+    {
       "old_stem": "dt-cone-gear-tl-indexing",
       "old_number": null,
       "introduced": "2026-11-02",
@@ -2316,6 +2305,39 @@
           "parent": "dt-drive-train",
           "stem": "dt-vn-cone-shaft-key",
           "number": "MHA-DT-VN-71"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-cone-tip-gear",
+      "old_number": null,
+      "introduced": "2026-11-09",
+      "new_identities": [
+        {
+          "stem": "dt-cone-tip-gear",
+          "number": "MHA-DT-37"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-cone-tip-bushing",
+      "old_number": null,
+      "introduced": "2026-11-09",
+      "new_identities": [
+        {
+          "stem": "dt-cone-tip-bushing",
+          "number": "MHA-DT-38"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-cone-tip-end-screw",
+      "old_number": null,
+      "introduced": "2026-11-09",
+      "new_identities": [
+        {
+          "stem": "dt-cone-tip-end-screw",
+          "number": "MHA-DT-39"
         }
       ]
     }
@@ -2816,6 +2838,30 @@
         {
           "stem": "dt-crank-pin-eye",
           "number": "MHA-DT-28"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "vn-cone-tip-collar",
+      "old_number": "MHA-VN-016",
+      "new_identities": [
+        {
+          "parent": "dt-drive-train",
+          "stem": "dt-vn-cone-tip-collar",
+          "number": "MHA-DT-VN-54"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "vn-cone-tip-adjuster",
+      "old_number": "MHA-VN-017",
+      "new_identities": [
+        {
+          "parent": "dt-drive-train",
+          "stem": "dt-vn-cone-tip-adjuster",
+          "number": "MHA-DT-VN-55"
         }
       ],
       "status": "retired"

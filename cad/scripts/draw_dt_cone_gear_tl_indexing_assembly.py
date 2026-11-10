@@ -1,12 +1,14 @@
-r"""Create the one-sheet cone-gear indexing-kit fitter sheet (MHA-DT-03-TL-00).
+r"""Create the cone-gear shop kit's fitter sheets (MHA-DT-03-TL-00).
 
 The kit is the custom index plate (item 1, MHA-DT-03-TL-01) on the owner's
-PM BS-0 dividing head, which is shop equipment and is not modelled. The sheet
-shows the plate face (countersunk side, the side that faces out on the head)
-with its balloon, the edge view and the shaded isometric, the one-row BOM, the
-fitting steps and checks, and the indexing table for the three cone gears the
-plate exists for. Hole-circle counts, tooth counts and the worm ratio come
-from ``dt_cone_gear_tl_index_plate_spec``; this recipe only lays the sheet out
+PM BS-0 dividing head, which is shop equipment and is not modelled, and the
+tip gears' phasing comb (item 2, MHA-DT-03-TL-02), which MHA-DT-00 step 1
+fits, not this sheet. The sheet shows the plate face (countersunk side, the
+side that faces out on the head) and the comb under it with their balloons,
+the edge view and the shaded isometric, the BOM, the plate's fitting steps
+and checks, and the indexing table for the three cone gears the plate exists
+for. Hole-circle counts, tooth counts and the worm ratio come from
+``dt_cone_gear_tl_index_plate_spec``; this recipe only lays the sheet out
 and never edits the source assembly.
 """
 
@@ -17,8 +19,10 @@ import math
 import sys
 from typing import Any, Callable
 
+import _config
 import _telemetry
 import dt_cone_gear_tl_index_plate_spec as plate
+import dt_cone_gear_tl_phasing_comb_spec as comb
 from _assembly_contract import assembly_contract
 from _check import check
 from _com import _early_bound
@@ -26,6 +30,7 @@ from _drawing_balloons import (
     BalloonAnchor,
     add_component_bom_balloons,
     assert_balloon_landings,
+    isolate_drawing_view_components,
 )
 from _drawing_common import (
     DrawingOutputs,
@@ -50,6 +55,7 @@ from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _session import run_build
 from _transgear_zone_line import require_placed, sketch_lines
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -82,32 +88,45 @@ SHEET_INNER_BORDER = (
     _TEMPLATE.height_m - 0.0127,
 )
 
-# Sheet metres. The plate face and edge sit top-left at full size; the
-# isometric sits below them, clear of the title block (x >= 0.216 m,
-# y <= 0.066 m); the BOM and the notes fill the right half above it.
+# Sheet metres. The plate face and edge sit top-left at full size, item 2
+# under item 1 at its kit pose; the isometric sits below them, clear of the
+# title block (x >= 0.216 m, y <= 0.066 m); the BOM and the notes fill the
+# right half above it.
 FRONT_CENTER = (0.085, 0.190)
 RIGHT_CENTER = (0.170, 0.190)
-ISO_CENTER = (0.085, 0.072)
+ISO_CENTER = (0.085, 0.080)
 ISO_NOTE_XY = (0.050, 0.046)
 # The BOM's template columns print 196.6 mm wide (farm r2 layout audit), so
 # its left edge sits close enough to the views to end inside the right border.
 BOM_ANCHOR = (0.219, 0.262)
-STEPS_XY = (0.219, 0.235)
-# The eleven-line steps note (4.5 mm a line) ends above the checks.
-CHECKS_XY = (0.219, 0.178)
-TABLE_XY = (0.219, 0.145)
+# The BOM's two item rows end above the steps; the steps' twelve lines (4.5
+# mm a line) above the checks, the checks above the indexing table.
+STEPS_XY = (0.219, 0.228)
+CHECKS_XY = (0.219, 0.1665)
+TABLE_XY = (0.219, 0.1335)
 BALLOON_MARGIN = 0.012
 
 PLATE = plate.PART_NAME
-BOM_COMPONENTS = (PLATE,)
-BOM_ITEM = "1"
+COMB = comb.PART_NAME
+BOM_COMPONENTS = (PLATE, COMB)
+BOM_ITEMS = {PLATE: "1", COMB: "2"}
 BOM_DESCRIPTIONS = {
     PLATE: "BS-0 INDEX PLATE, "
     + "/".join(str(count) for count in sorted(plate.RING_COUNTS))
-    + " HOLES"
+    + " HOLES",
+    COMB: str(_config.parts("dt-cone-gear-tl-phasing-comb")["title"]).upper(),
 }
-BOM_COMPONENT_IDENTITIES: dict[str, tuple[str, str | None]] = {PLATE: (PLATE, None)}
-BALLOON_ANCHORS = {PLATE: BalloonAnchor()}
+BOM_COMPONENT_IDENTITIES: dict[str, tuple[str, str | None]] = {
+    PLATE: (PLATE, None),
+    COMB: (COMB, None),
+}
+BALLOON_ANCHORS = {PLATE: BalloonAnchor(), COMB: BalloonAnchor()}
+# The kit-frame model point (mm) every view is placed by: the plate's centre.
+PLATE_CENTER_MM = (0.0, 0.0, plate.THICKNESS / 2.0)
+# Item 2 has no fitting here: the drive train's bonding step engages it. It
+# shows under item 1 in the plate's face and edge views at its kit pose,
+# ballooned there (rule 22); the steps say where it is fitted.
+COMB_FITTING_LINE = "ITEM 2 IS FITTED BY MHA-DT-00 STEP 1, NOT ON THE HEAD."
 
 # Steps 1 and 4 reuse the head's own plate screws without a lock: owner
 # ruling RV-01 (the kit's machinist_exceptions) accepts that joint. The head
@@ -127,6 +146,7 @@ ASSEMBLY_STEPS = "\n".join(
         "5. SET THE CRANK PIN ON THE CIRCLE THE INDEXING TABLE NAMES.",
         "6. SET THE SECTOR ARMS TO SPAN THE PIN'S HOLE PLUS THE TABLE'S",
         "   HOLE SPACES PER TOOTH (10 SPACES = 11 HOLES).",
+        COMB_FITTING_LINE,
     )
 )
 ASSEMBLY_CHECKS = "\n".join(
@@ -301,35 +321,93 @@ def _add_note(adapter: Any, text: str, xy: tuple[float, float], *, label: str) -
         raise RuntimeError(f"indexing-kit {label} printed as {printed!r}")
 
 
-def _bom_item(adapter: Any, table: Any) -> str:
-    """The plate's ITEM NO. as the BOM prints it; the steps cite item 1."""
+def _bom_items(adapter: Any, table: Any) -> dict[str, str]:
+    """Each part's ITEM NO. as the BOM prints it, read off its PART NUMBER
+    row; the steps cite item 1 and the comb's line item 2."""
     table = _early_bound(table, "ITableAnnotation")
-    header = [
-        str(adapter._attempt(lambda c=column: table.DisplayedText2(0, c, True)) or "")
-        .strip()
-        .upper()
-        for column in range(int(table.ColumnCount))
-    ]
-    items = [index for index, cell in enumerate(header) if cell.startswith("ITEM NO")]
-    if int(table.RowCount) != 2 or len(items) != 1:
-        raise RuntimeError(f"indexing-kit BOM is not one item row: {header!r}")
-    item = str(
-        adapter._attempt(lambda: table.DisplayedText2(1, items[0], True)) or ""
-    ).strip()
-    if item != BOM_ITEM:
+
+    def cell(row: int, column: int) -> str:
+        return str(
+            adapter._attempt(lambda: table.DisplayedText2(row, column, True)) or ""
+        ).strip()
+
+    header = [cell(0, column).upper() for column in range(int(table.ColumnCount))]
+    items = [index for index, text in enumerate(header) if text.startswith("ITEM NO")]
+    numbers = [index for index, text in enumerate(header) if text == "PART NUMBER"]
+    if (
+        int(table.RowCount) != 1 + len(BOM_COMPONENTS)
+        or len(items) != 1
+        or len(numbers) != 1
+    ):
         raise RuntimeError(
-            f"indexing-kit BOM numbers the plate {item!r}, not {BOM_ITEM}"
+            f"indexing-kit BOM is not {len(BOM_COMPONENTS)} item rows: {header!r}"
         )
-    return item
+    stems = {
+        str(_config.parts("dt-cone-gear-tl-index-plate")["number"]): PLATE,
+        comb.PART_NUMBER: COMB,
+    }
+    printed = {
+        stems.get(cell(row, numbers[0]), cell(row, numbers[0])): cell(row, items[0])
+        for row in range(1, int(table.RowCount))
+    }
+    if printed != BOM_ITEMS:
+        raise RuntimeError(
+            f"indexing-kit BOM numbers its parts {printed!r}, not {BOM_ITEMS!r}"
+        )
+    return printed
+
+
+def _move_model_point(
+    adapter: Any,
+    view: Any,
+    point_mm: tuple[float, float, float],
+    target: tuple[float, float],
+    *,
+    label: str,
+) -> None:
+    """Move ``view`` so the model point lands on ``target`` (sheet m): a view
+    is placed by the plate, not by the assembly's box, which also holds
+    item 2 (hidden or not)."""
+    view = _early_bound(view, "IView")
+    point = tuple(value / 1000.0 for value in point_mm)
+    here = model_points_in_view(adapter, view, [point], label=label)[0]
+    position = tuple(float(value) for value in view.Position)
+    moved = [position[i] + target[i] - here[i] for i in range(2)]
+    if not view.SetViewPosition(double_array(moved), False):
+        raise RuntimeError(f"failed to move the {label}")
+    rebuild_drawing(adapter, label=f"place {label}")
+    here = model_points_in_view(adapter, view, [point], label=label)[0]
+    if math.dist(here, target) > 1e-4:
+        raise RuntimeError(f"{label}: item sits at {here!r}, not {target!r}")
+
+
+def _kit_view(
+    adapter: Any,
+    name: str,
+    center: tuple[float, float],
+    scale: tuple[float, float],
+    stems: frozenset[str],
+) -> Any:
+    """One view of ``stems``, the plate's centre on ``center``."""
+    label = f"indexing kit {name}"
+    view = place_view(adapter, str(SOURCE), name, *center, scale=scale)
+    view = isolate_drawing_view_components(
+        adapter, view, visible_stems=stems, label=label
+    )
+    _move_model_point(adapter, view, PLATE_CENTER_MM, center, label=label)
+    return view
 
 
 def _place_sheet(adapter: Any) -> Any:
-    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=SHEET_SCALE)
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=SHEET_SCALE)
+    # The plate face and edge views show both items at their kit pose, item 2
+    # under item 1 with its own balloon; the shaded isometric shows item 1.
+    both = frozenset(BOM_COMPONENTS)
+    front = _kit_view(adapter, "*Front", FRONT_CENTER, SHEET_SCALE, both)
+    right = _kit_view(adapter, "*Right", RIGHT_CENTER, SHEET_SCALE, both)
     for view, name in ((front, "*Front"), (right, "*Right")):
         set_hidden_lines_removed(adapter, view)
         apply_view_configuration(adapter, view, label=f"indexing kit {name}")
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
+    iso = _kit_view(adapter, "*Isometric", ISO_CENTER, ISO_SCALE, frozenset({PLATE}))
     set_high_quality_shaded_with_edges(adapter, iso, label="indexing kit isometric")
     apply_view_configuration(
         adapter, iso, role=ViewRole.FULL_DETAIL, label="indexing kit *Isometric"
@@ -346,18 +424,20 @@ def _place_sheet(adapter: Any) -> Any:
         part_number_property="Number",
         label="indexing kit",
     )
-    item = _bom_item(adapter, table)
+    items = _bom_items(adapter, table)
     landings = add_component_bom_balloons(
         adapter,
         front,
-        items=((PLATE, item),),
+        items=tuple((stem, items[stem]) for stem in BOM_COMPONENTS),
         anchors=BALLOON_ANCHORS,
         label="indexing-kit BOM coverage",
         margin=BALLOON_MARGIN,
         explode_offsets={},
     )
-    if len(landings) != 1:
-        raise RuntimeError(f"indexing kit carries {len(landings)} balloons, expected 1")
+    if len(landings) != len(BOM_COMPONENTS):
+        raise RuntimeError(
+            f"indexing kit carries {len(landings)} balloons, expected {len(BOM_COMPONENTS)}"
+        )
     for text, xy, label in (
         (ASSEMBLY_STEPS, STEPS_XY, "fitting steps"),
         (ASSEMBLY_CHECKS, CHECKS_XY, "checks"),
@@ -431,7 +511,8 @@ def label_boxes(positions: dict[str, tuple[float, float]]) -> dict[str, Box]:
 
 def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
     """Sheet 2: item 1's edge view with the head, its hub and its screws
-    drawn in place, exploded, and labelled (rule 22)."""
+    drawn in place, exploded, and labelled (rule 22). Item 2 is not fitted
+    here, so the view shows item 1 alone."""
     label = "indexing-kit exploded view"
     _activate_sheet(adapter, SHEET_NAMES[1])
     view = place_view(
@@ -439,6 +520,9 @@ def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
     )
     set_hidden_lines_removed(adapter, view)
     apply_view_configuration(adapter, view, label=label)
+    view = isolate_drawing_view_components(
+        adapter, view, visible_stems=frozenset({PLATE}), label=label
+    )
     groups = exploded_lines()
     fonts = {
         "phantom": (PHANTOM_STYLE, PHANTOM_WIDTH),

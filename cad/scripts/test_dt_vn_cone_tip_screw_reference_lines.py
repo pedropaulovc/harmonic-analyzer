@@ -1,4 +1,4 @@
-"""The tip adjuster's and pinch screw's FRONT supplier lines print no stray ink.
+"""The pinch screw's FRONT supplier lines print no stray ink.
 
 SolidWorks draws the shown construction lines grey OVER the view's edges but
 UNDER the dimension extension lines of the same width (see
@@ -14,7 +14,6 @@ from types import ModuleType
 import pytest
 
 import _mcmaster_91794a112 as pinch
-import _mcmaster_94025a164 as adjuster
 from _supplier_screw_layout import supplier_screw_lane_plan
 
 FAR = 1000.0  # witnesses run on to their lanes, beyond the part
@@ -82,28 +81,16 @@ def _bare(line: Carrier, covers: list[Carrier]) -> list[tuple[float, float]]:
     return spans
 
 
-A_R = adjuster.SS_MAJOR_R
 P_SHANK_R, P_HEAD_R = pinch.SHANK_DIA / 2.0, pinch.HEAD_DIA / 2.0
 
 
 def test_sides_are_pinned_for_every_dimension() -> None:
-    for sku in (adjuster, pinch):
-        names = {name for name, _, _ in sku.SUPPLIER_REFERENCE_DIMENSIONS}
-        assert (
-            set(sku.SUPPLIER_REFERENCE_STARTS)
-            == set(sku.SUPPLIER_REFERENCE_SIDES)
-            == names
-        )
-
-
-def test_adjuster_lines_sit_on_the_slot_end_and_the_right_crest() -> None:
-    assert adjuster.SUPPLIER_REFERENCE_PLANES == {}
-    assert {name: _line(adjuster, name) for name in _rows(adjuster)} == {
-        # Slot face (y=0) to cup rim, under the diameter's right witness.
-        "SupplierLength": ((A_R, 0.0), (A_R, adjuster.SS_LEN)),
-        # Across the slot-end face, under the length's lower witness.
-        "SupplierThreadDiameter": ((-A_R, 0.0), (A_R, 0.0)),
-    }
+    names = {name for name, _, _ in pinch.SUPPLIER_REFERENCE_DIMENSIONS}
+    assert (
+        set(pinch.SUPPLIER_REFERENCE_STARTS)
+        == set(pinch.SUPPLIER_REFERENCE_SIDES)
+        == names
+    )
 
 
 def test_pinch_lines_sit_on_the_head_underside_and_the_right_crest() -> None:
@@ -113,20 +100,6 @@ def test_pinch_lines_sit_on_the_head_underside_and_the_right_crest() -> None:
         "SupplierHeadHeight": ((P_HEAD_R, 0.0), (P_HEAD_R, pinch.HEAD_H)),
         "SupplierThreadDiameter": ((-P_SHANK_R, 0.0), (P_SHANK_R, 0.0)),
     }
-
-
-# Measured ~0.76 sheet mm: 0.19 model mm at the adjuster's FRONT 4:1.
-@pytest.mark.parametrize("gap", (0.12, 0.19, 0.25))
-def test_adjuster_bares_only_the_chamfer_corner_gaps(gap: float) -> None:
-    covers = _witnesses(adjuster, gap)
-    assert {
-        name: _bare(_carrier(adjuster, name), covers) for name in _rows(adjuster)
-    } == {
-        "SupplierLength": [(0.0, pytest.approx(gap))],
-        "SupplierThreadDiameter": [(pytest.approx(A_R - gap), A_R)],
-    }
-    # The chord's stub lies beyond the end face's edge, in the chamfer corner.
-    assert A_R - gap >= adjuster.SS_CHAM_R
 
 
 # Measured ~0.76 mm at the pinch screw's FRONT 1:1.

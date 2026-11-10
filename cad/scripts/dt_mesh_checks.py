@@ -112,7 +112,7 @@ def cone_check(teeth: int) -> ConeMeshCheck:
 
 
 def cone_checks() -> tuple[ConeMeshCheck, ...]:
-    return tuple(cone_check(teeth) for teeth in cone.CONFIGURATION_TEETH)
+    return tuple(cone_check(teeth) for teeth in cone.CONE_TEETH)
 
 
 # Drum-tip path sampling for the T006 relief check. A 2.5e-5 rad step of the

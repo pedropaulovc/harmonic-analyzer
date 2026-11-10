@@ -99,12 +99,12 @@ from ch_channel_assembly_steps import (
 import ch_vn_rocker_thrust_washer_spec as rocker_washer
 import cone_line
 import cone_set_stack as set_stack
-from cone_stack_end_play import COLLAR_FEELER, SHAFT_END_PLAY
+from cone_stack_end_play import SHAFT_END_PLAY, STACK_FEELER
 import cylinder_bank_layout as bank
 import dt_cylinder_bank_setting_spec as bank_settings
-from dt_cone_gear_stack import COUNT as CONE_GEAR_COUNT, STACK_L20_ACCEPT
+from dt_cone_gear_spec import ROUND_BORE_TEETH
+from dt_cone_gear_stack import STACK_L20_ACCEPT
 from dt_cone_swing_platform_spec import POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT
-from dt_cone_tip_block_spec import ADJUSTER_ENGAGEMENT_ASSEMBLY_FACT, ADJUSTER_THREAD
 import dt_crank_drive_gear_spec as gear64
 import dt_crank_handle_pivot_screw_spec as handle_screw
 from dt_crank_hub_notes import FRONT_FACE_DATUM as HUB_FRONT_FACE_DATUM
@@ -140,6 +140,7 @@ from dt_drive_train_assembly_spec import (
     CLUSTERS,
     COMPONENT_IDENTITIES,
     EXPLODED_VIEW_NAME,
+    END_SCREW_ENGAGEMENT_ASSEMBLY_FACT,
     FOOT_SCREW_SELECTOR,
     PENDING_STEMS,
     SOURCE_CONFIGURATION,
@@ -166,7 +167,6 @@ import pinion_rig_tip_gap as TIP_GAP
 import rocker_bank_layout as rockers
 import dt_vn_cone_lock_knob_spec as lock_knob
 import dt_vn_cone_pivot_screw_spec as pivot_screw
-import dt_vn_cone_tip_collar_spec as tip_collar
 import dt_vn_post_mount_screw_spec as post_screw
 import dt_swing_stop_screw_spec as stop_screw
 
@@ -554,9 +554,18 @@ CLUSTER_BALLOON_CLEARANCE = {
 }
 
 # --- note fields (x0, top, x1, bottom), metres --------------------------------
-# Tops sit under the one-line sheet heading at HEADING_XY.
+# Tops sit under the one-line sheet heading at HEADING_XY.  Sheet 7's right
+# field (the only user of NOTE_FIELD_RIGHT's foot) runs down to the title
+# block's top plus the BOM's paper clearance: PR 2 round 4's one-joint cone
+# steps needed its last 3.5 mm (run 20261110T065454309Z printed its foot at
+# 75.4 mm with 0.67 line spare over the 65.5 mm title block).
 NOTE_FIELD_LEFT = (0.018, 0.252, 0.212, 0.035)
-NOTE_FIELD_RIGHT = (0.222, 0.252, 0.415, 0.072)
+NOTE_FIELD_RIGHT = (
+    0.222,
+    0.252,
+    0.415,
+    DRAWING_TEMPLATES[SPEC.layout].title_block_top_m + BOM_SHEET_CLEARANCE,
+)
 NOTE_FIELD_INSET = 0.0005
 NOTE_ANCHOR_PASSES = 3
 NOTE_ANCHOR_SETTLE = 0.00005
@@ -591,12 +600,15 @@ ISO_RIGHT_FIELD = (
     NOTE_FIELD_RIGHT[2],
     REFERENCE_ISO_CENTER[1] + REFERENCE_ISO_HALF_OUTLINE + REFERENCE_ISO_GAP,
 )
-# Sheet 7's reference view sits under the left column's steps 1-3 (they end
-# near y=81 mm), so the right field runs to NOTE_FIELD_RIGHT's foot; its
-# caption prints ~9 mm under the outline (~19 mm up), clear of the zone border.
-# The rule-23 tip dowel steps (owner ruling 2026-11-07, PR #2248)
-# lowered it 3 mm and closed its gap to the other sheets' REFERENCE_ISO_GAP.
-SEQUENCE_ISO_CENTER = (0.115, 0.053)
+# Sheet 7's reference view sits under the left column's steps 1-2 (they end
+# near y=78 mm), so the right field runs to NOTE_FIELD_RIGHT's foot; its
+# caption prints ~9 mm under the outline (~15 mm up), clear of the 12.7 mm
+# zone border.  The rule-23 tip dowel steps (owner ruling 2026-11-07, PR
+# #2248) lowered it 3 mm and closed its gap to the other sheets'
+# REFERENCE_ISO_GAP; PR 2 machinist review round 10's end-screw lock check
+# (3F) lowered it one NOTE_LINE_PITCH more (run 20261110T140136846Z: caption
+# ink 20.2-23.8 mm up, outline 27.8-78.2 mm).
+SEQUENCE_ISO_CENTER = (0.115, 0.0485)
 SEQUENCE_ISO_GAP = REFERENCE_ISO_GAP
 REFERENCE_ISO_CAPTION_XY = (0.330, 0.082)
 SEQUENCE_LEFT_FIELD = (
@@ -611,9 +623,12 @@ SEQUENCE_LEFT_FIELD = (
 # recheck table (round 1 measured those at x 147.6 mm and y 178.1 mm) and
 # clear left of the reference view (x 361 mm up).
 # Owner ruling 2026-11-08 (Pedro): the field holds the code key, two lines
-# more than the station table it carries (bottom 117 -> 110 mm, still over
-# the interface notes' 101 mm top and the title block's 65.5 mm).
-STATION_TABLE_FIELD = (0.158, 0.172, 0.350, 0.110)
+# more than the station table it carries (bottom 117 -> 110 mm), and the
+# phasing comb's line (machinist review of bd81283964: bottom 110 -> 105.5 mm,
+# still 4.5 mm over the interface notes' 101 mm top; run
+# 20261110T035403233Z measured the key's bottom at 112.5 mm with 0.6 line
+# spare in the 110 mm field).
+STATION_TABLE_FIELD = (0.158, 0.172, 0.350, 0.1055)
 # The external interfaces print on sheet 14 under the feeler stack table,
 # left of the title block (x 216 mm): sheet 12's right field holds the checks
 # continuation and saved pose (rubric sample round 4: the one-thing check
@@ -686,8 +701,9 @@ BOM_PART_NUMBERS = {
     "dt-cone-swing-platform": "MHA-DT-20",
     "dt-cone-pivot-post": "MHA-DT-05",
     "dt-cone-tip-block": "MHA-DT-21",
-    "dt-vn-cone-tip-collar": "MHA-DT-VN-54",
-    "dt-vn-cone-tip-adjuster": "MHA-DT-VN-55",
+    "dt-cone-tip-gear": "MHA-DT-37",
+    "dt-cone-tip-bushing": "MHA-DT-38",
+    "dt-cone-tip-end-screw": "MHA-DT-39",
     "dt-vn-cone-tip-pinch-screw": "MHA-DT-VN-56",
     "dt-vn-cone-tip-block-screw": "MHA-DT-VN-60",
     "dt-vn-locating-pin": "MHA-DT-VN-69",
@@ -736,13 +752,14 @@ BOM_DESCRIPTIONS = {
     "sh-vn-arbor-set-screw": "#4-40 X 1/4 SET SCREW, MCMASTER 91375A106",
     "sh-vn-fillister-screw-90280a108": "#4-40 FILLISTER SCREW, MCMASTER 90280A108",
     "dt-cone-gear-shaft": "CONE GEAR SHAFT",
-    "dt-cone-gear": "CONE GEAR, T006-T120 BY 6; 1 EACH",
+    "dt-cone-gear": "CONE GEAR, T012-T120 BY 6; 1 EACH",
     "dt-crank-drive-gear": f"CRANK DRIVE GEAR, {gear64.TEETH}T",
     "dt-cone-swing-platform": "CONE SWING PLATFORM",
     "dt-cone-pivot-post": "CONE PIVOT POST AND CRANK COLUMN",
     "dt-cone-tip-block": "CONE TIP BLOCK",
-    "dt-vn-cone-tip-collar": tip_collar.BOM_DESCRIPTION,
-    "dt-vn-cone-tip-adjuster": f"{ADJUSTER_THREAD} CUP SET SCREW, MCMASTER 94025A164",
+    "dt-cone-tip-gear": "CONE TIP GEAR, 6T WITH SPIGOT AND PIVOT",
+    "dt-cone-tip-bushing": "CONE TIP BUSHING",
+    "dt-cone-tip-end-screw": "END SCREW, MODIFIED MCMASTER 91794A558",
     "dt-vn-cone-tip-pinch-screw": "#4-40 FILLISTER SCREW, MCMASTER 91794A112",
     "dt-vn-cone-tip-block-screw": "#4-40 X 3/8 SHCS, MCMASTER 91251A108",
     "dt-vn-locating-pin": "1/16 X 3/8 DOWEL PIN, MCMASTER 98381A417",
@@ -1017,7 +1034,7 @@ def _nearest_leaf(setting: float) -> float:
 def _feeler_stack_rows() -> tuple[tuple[str, str, str], ...]:
     settings = (
         # Rubric sample round 13 (#4): the cone set's feelers are leaves too.
-        (COLLAR_FEELER, (COLLAR_FEELER,), _step_ref("tip-adjuster-set", "A")),
+        (STACK_FEELER, (STACK_FEELER,), _step_ref("cone-gears-stacked", "P")),
         (PINION_SEAT_FEELER, (PINION_SEAT_FEELER,), _step_ref("crank-mesh-checked", "F")),
         (
             FITUP.DRUM_END_SHIM,
@@ -1220,6 +1237,10 @@ CHANNEL_RODS_SET_AT = _step_ref("cylinder-stack-accepted", "B")
 # key defines TNNN for MHA-DT-03 only (review of 5994f29c83, rule 4).
 CRANK_CHAIN_WHEEL = str(_config.parts("pd-transgear-removable")["number"])
 PLATEN_NUMBER = str(_config.parts("pd-platen")["number"])
+# Step 1P's phasing comb is a shop tool in the cone-gear indexing kit, never
+# a BOM row (owner rulings 2026-11-09 and 2026-11-10); the code key names it
+# and its blade (machinist review of bd81283964: an undefined tool and word).
+PHASING_COMB = str(_config.parts("dt-cone-gear-tl-phasing-comb")["number"])
 
 
 ASSEMBLED_HEADING = (
@@ -1247,22 +1268,58 @@ def inch_envelope(limits_mm: tuple[float, float], places: int) -> str:
 CONE_CRANK_STEPS = _note_text(
     (
         f"ASSEMBLY SEQUENCE - CONE SET AND CRANK {CODE_KEY_POINTER}",
-        # Seat the land-1 key, slide every gear on and close the accepted
-        # stack against its collar before setting tip end play.  Owner
-        # decision C1 keyed (2026-11-09, PR #1992): the 64T and T120..T030
-        # drive through MHA-DT-VN-71 in the land-1 keyseat, whose collar end
-        # stops the key; T024..T006 keep their D-flats.  A keyway or D-bore
-        # goes on its key or flat only one way and 1C measures the stack its
-        # gears close, so 1B names neither: sheet 7's left field holds step 1
-        # in eight lines, and the wrap counts 1B's placeholder at its width.
+        # Owner decision C1 keyed (2026-11-09, PR #1992), superseding the
+        # 2026-09-28 ruling's "one flat per gear land; no keys, no solder, no
+        # retaining compound; no gear bonded": the 64T and T120..T030 drive
+        # through MHA-DT-VN-71 in the land-1 keyseat, whose collar end stops
+        # the key; T024 is bonded (LOCTITE 638) on the round land 2 one
+        # STACK_FEELER off T030, T012 and T018 on MHA-DT-37's spigot and the
+        # spigot in MHA-DT-04's socket, all four (T024..T006) phased to the
+        # keyed T030 by the MHA-DT-03-TL-02 phasing comb, one blade in a tooth
+        # space of each gear (owner rulings 2026-11-09 and 2026-11-10; a shop
+        # tool, never in this BOM) engaged inside the compound's fixture time
+        # (cone_tip_cluster, cone_stack_end_play;
+        # error_budget cone_tip_bond_clock).  The stack is first closed dry,
+        # T024 against T030 with no feeler, and measured; MHA-DT-38 is pressed
+        # on the loose MHA-DT-37 so the press never loads a bond.  Machinist
+        # review round 4 of PR 2 (rule 22): every slide and bond names its
+        # mate and makes one joint, and 1B names its range and count.  A
+        # keyway goes on its key only one way and 1F measures the stack its
+        # gears close; the wrap counts 1B's placeholder at its width.  Codjiflo
+        # review of PR 2: the tip's stations come only from closed faces (T018
+        # on T024, T012 on T018, MHA-DT-37's leaves on T012; the spigot never
+        # bottoms), so 1E and 1R push MHA-DT-37 through that chain to T024.
         "1. SEAT MHA-DT-VN-71 IN THE MHA-DT-04 KEYSEAT, TO ITS COLLAR END.",
         "1A. SLIDE MHA-DT-07 ON MHA-DT-VN-71 AGAINST THE MHA-DT-04 COLLAR.",
-        "1B. SLIDE {cone_gears}X MHA-DT-03 ON, T120 FIRST THROUGH T006.",
-        f"1C. MEASURE THE {CONE_GEAR_COUNT}-GEAR STACK, T120 FRONT FACE TO T006 BACK FACE:",
-        f"   ACCEPT {inch_window(STACK_L20_ACCEPT, 3)}.",
-        "1D. IF THE STACK IS LONG, RE-FACE ITS THICKEST GEAR.",
-        "1E. IF IT IS SHORT, REMAKE ITS THINNEST GEAR.",
-        "1F. REPEAT 1C UNTIL THE STACK READS IN ITS WINDOW.",
+        "1B. SLIDE T120 TO T030 ({keyed_gears}X MHA-DT-03) ON, T120 FIRST.",
+        "1C. SLIDE T024 ON MHA-DT-04 AGAINST T030, DRY, NO FEELER.",
+        "1D. SLIDE T012 AND T018 ON THE MHA-DT-37 SPIGOT, DRY.",
+        "1E. PUSH MHA-DT-37 INTO THE MHA-DT-04 SOCKET UNTIL T018 BEARS ON T024.",
+        f"1F. MEASURE T120 FRONT TO MHA-DT-37 LEAVES' BACK: ACCEPT {inch_window(STACK_L20_ACCEPT, 3)}.",
+        "1G. IF THE STACK IS LONG, RE-FACE ITS THICKEST GEAR.",
+        "1H. IF IT IS SHORT, REMAKE ITS THINNEST GEAR.",
+        "1J. REPEAT 1F UNTIL THE STACK READS IN ITS WINDOW.",
+        "1K. TAKE MHA-DT-37, T018, T012 AND T024 OFF.",
+        # Rule 23: the press fit's bench acceptance and its slip-fit remedy.
+        "1L. PRESS MHA-DT-38 ON THE MHA-DT-37 PIVOT, AGAINST ITS LEAVES.",
+        "1M. CHECK THAT MHA-DT-38 DOES NOT TURN OR SLIDE BY HAND.",
+        "1N. IF IT DOES, BOND IT ON WITH LOCTITE 638 PER THE SHEET 1 NOTE.",
+        # T024 pressed onto the feeler on T030 closes the keyed stack onto the
+        # collar, so the feeler sets the stack float (cone_stack_end_play).
+        f"1P. BOND T024 ON MHA-DT-04, {inch_text(STACK_FEELER, FEELER_PLACES)} FEELER ON T030, PER THE SHEET 1 NOTE.",
+        "1Q. BOND T012 AND T018 ON THE MHA-DT-37 SPIGOT PER THE SHEET 1 NOTE.",
+        "1R. BOND MHA-DT-37 IN MHA-DT-04, T018 ON T024, PER THE SHEET 1 NOTE.",
+        # Owner ruling 2026-11-10: one comb blade drops in one tooth space of
+        # each gear.  T030's keyway centreline runs through its phase-0 tooth
+        # (dt_cone_gear_spec), and its blade takes the space beside that tooth,
+        # 180/30 deg off the key; the comb goes on only one way round, so the
+        # step names the key and the other blades take the bonded gears'
+        # spaces at the same time (dt_cone_gear_tl_phasing_comb_spec).  Sheet
+        # 7's left field has no line to spare, so the step stays one line; the
+        # sheet 14 code key names the comb and its blades (code_key_text).
+        f"1S. ENGAGE {PHASING_COMB} AT ONCE, T030'S BLADE BESIDE THE KEY.",
+        # The sheet 1 note's cure and hand acceptance close the bonds.
+        f"1T. REMOVE {PHASING_COMB} AND THE FEELER ONCE THE BONDS GRAB.",
         # U37c cut-to-fit acceptance survives the taller post and longer stock:
         # MHA-DT-VN-61's registry/spec own the selected screw and reference length.
         # Each screw is cut against its own matched post/platform hole, never
@@ -1275,65 +1332,64 @@ CONE_CRANK_STEPS = _note_text(
         # The exact maximum short the part sheet allows (.005 in = 0.127): a
         # maximum never rounds outward, and the part's places print it whole.
         # Rule 22 (rubric sample round 10 lint): one sentence; the REF cut
-        # length and the stated engagement are the cut's own facts.
+        # length and the stated engagement are the cut's own facts.  FLUSH TO
+        # .005 SHORT is the never-proud limit (MHA-DT-VN-61's own sheet dropped
+        # NEVER PROUD as a restatement; PR 2 round 4 needed its line here).
         "2A. CUT EACH MHA-DT-VN-61 TO FIT, "
         f"({inch_text(post_screw.CUT_LENGTH_MM, post_screw.DRAWING_PRECISION_BY_NAME[post_screw.CUT_LENGTH_DIMENSION])}) "
         "REF LONG: FLUSH TO "
         f"{inch_max_text(post_screw.POST_SCREW_CUT_TO_FIT_SHORT, post_screw.CUT_TO_FIT_SHORT_PLACES)}"
-        " SHORT OF THE MHA-DT-20 UNDERSIDE, NEVER PROUD, " + POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT,
+        " SHORT OF THE MHA-DT-20 UNDERSIDE, " + POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT,
         "2B. DEBURR THE CUT ENDS.",
         "2C. RUN BOTH MHA-DT-VN-61 IN, LOOSE ENOUGH TO TURN MHA-DT-05.",
-        # #1074: the collar's bearing on the boss end reacts the tip
-        # adjuster's preload (#914), and the model mates it (#1058).
+        # #1074: the collar's bearing on the boss end reacts the end screw's
+        # load (#914), and the model mates it (#1058).
         "2D. JOURNAL MHA-DT-04 IN MHA-DT-05 UNTIL ITS COLLAR BEARS ON THE BOSS.",
-        "2E. SLIP MHA-DT-VN-54 ON THE MHA-DT-04 TIP STUB.",
         # User ruling 2026-09-29 (eight-views-4 photo): MHA-DT-21 is a prism
         # standing directly on MHA-DT-20, held by one #4-40 socket head cap
         # screw up from under the plate through its counterbored hole.
         # Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample,
         # PR #2248; owner question 2 option 0-A): one Ø1/16
         # MHA-DT-VN-69 dowel, match-drilled from under the plate with the block
-        # squared and snug, pressed in the foot's blind ream and a slip fit in
+        # squared and tight, pressed in the foot's blind ream and a slip fit in
         # the plate's opened ream, stops the block turning about its one screw.
         # The block never comes off: the dowel goes in from below.
-        "2F. STAND MHA-DT-21 ON MHA-DT-20 AT ITS HOLE, RIGHT FACE SQUARE TO THE",
-        "   MHA-DT-20 BACK EDGE.",
-        "2G. RUN MHA-DT-VN-60 UP THRU THE MHA-DT-20 COUNTERBORE, HELD SQUARE.",
-        "2H. DRILL AND REAM UP THRU MHA-DT-20 INTO MHA-DT-21 PER BOTH CALLOUTS.",
-        "2J. PRESS MHA-DT-VN-69 UP THRU MHA-DT-20 TO THE MHA-DT-21 HOLE FLOOR.",
+        "2E. STAND MHA-DT-21 ON MHA-DT-20, RIGHT FACE SQUARE TO ITS BACK EDGE.",
+        "2F. RUN MHA-DT-VN-60 UP THRU THE MHA-DT-20 COUNTERBORE, SNUG.",
+        # Owner decision C1 keyed (2026-11-09, PR #1992): T006's pivot runs in
+        # MHA-DT-39's reamed end hole.  Its lateral error is taken up by
+        # turning MHA-DT-05 on its screws' clearance (Codex P1 on #1136,
+        # 9e9982c5d); its vertical error by MHA-DT-21's AxisHeight, made to
+        # MHA-DT-05 (build_dt_drive_train_assembly TIP_LATERAL_CAPACITY_MM /
+        # TIP_VERTICAL_CAPACITY_MM).  User decision 2026-10-12: the post is
+        # held pushed toward the tip block while it is turned and its screws
+        # tightened (dt_cone_tip_air books that).
+        "2G. THREAD MHA-DT-39 INTO MHA-DT-21 OVER THE MHA-DT-37 PIVOT.",
+        "2H. HOLD MHA-DT-05 PUSHED TOWARD MHA-DT-21 ALONG THE SHAFT THROUGH 2K.",
+        "2J. TURN MHA-DT-05 ON ITS SCREWS UNTIL THE MHA-DT-37 PIVOT RUNS FREE.",
+        "2K. TIGHTEN BOTH MHA-DT-VN-61 AND MHA-DT-VN-60: THE PIVOT RUNS FREE.",
+        "2L. DRILL AND REAM UP THRU MHA-DT-20 INTO MHA-DT-21 PER BOTH CALLOUTS.",
+        "2M. PRESS MHA-DT-VN-69 UP THRU MHA-DT-20 TO THE MHA-DT-21 HOLE FLOOR.",
         # Rule 23 (rubric sample round 13, #3): a press that goes in by hand
         # is a slip fit, and the step says what to do then (as 4A-4B).
-        "2K. CHECK THAT MHA-DT-VN-69 DOES NOT SLIDE BY HAND.",
-        "2L. IF IT DOES, BOND IT IN WITH LOCTITE 638 PER THE SHEET 1 NOTE.",
-        "2M. CHECK THAT MHA-DT-21 DOES NOT TURN ON MHA-DT-20 BY HAND.",
-        # User ruling 2026-09-29: the stack's back float is held on the
-        # shaft by MHA-DT-VN-54, set off T006 by one feeler and locked on the
-        # D-flat; the cup screw alone then sets MHA-DT-04's end play
-        # (cone_stack_end_play).  U32 (user, 2026-09-23): option 1A turn-set.
-        # The tip's lateral error is taken up by turning MHA-DT-05 on its
-        # screws' clearance (Codex P1 on #1136, 9e9982c5d).  User decision
-        # 2026-10-12: the post is held pushed toward the tip block while it is
-        # turned and its screws tightened (dt_tip_collar_air).
-        "3. PUSH THE GEAR STACK TO THE FRONT, ONTO THE MHA-DT-04 COLLAR.",
-        f"3A. PUSH MHA-DT-VN-54 ONTO A {inch_text(COLLAR_FEELER, FEELER_PLACES)} FEELER ON T006.",
-        "3B. LOCK ITS SET SCREW ON THE FLAT.",
-        "3C. REMOVE THE FEELER.",
-        "3D. THREAD MHA-DT-VN-55 INTO MHA-DT-21 UNTIL IT TOUCHES THE MHA-DT-04 TIP,",
-        "   " + ADJUSTER_ENGAGEMENT_ASSEMBLY_FACT,
-        "3E. HOLD MHA-DT-05 PUSHED TOWARD MHA-DT-21 ALONG THE SHAFT THROUGH 3H.",
-        "3F. TURN MHA-DT-05 ON ITS SCREWS UNTIL THE TIP CENTRES IN THE CUP.",
-        "3G. TIGHTEN BOTH MHA-DT-VN-61.",
-        "3H. RECHECK THAT THE TIP IS CENTRED.",
-        "3J. THREAD MHA-DT-VN-55 IN UNTIL MHA-DT-04 JUST STOPS SHUTTLING.",
-        "3K. BACK MHA-DT-VN-55 OFF 1/8 TURN.",
-        "3L. TIGHTEN MHA-DT-VN-56 ACROSS THE SLIT.",
-        "3M. DIAL-INDICATE THE MHA-DT-04 END PLAY AT THE SHAFT END: "
+        "2N. CHECK THAT MHA-DT-VN-69 DOES NOT SLIDE BY HAND.",
+        "2P. IF IT DOES, BOND IT IN WITH LOCTITE 638 PER THE SHEET 1 NOTE.",
+        "2Q. CHECK THAT MHA-DT-21 DOES NOT TURN ON MHA-DT-20 BY HAND.",
+        # Owner decision C1 keyed (2026-11-09, PR #1992): the end screw sets
+        # MHA-DT-04's end play against MHA-DT-38 (cone_stack_end_play
+        # SHAFT_END_PLAY: 1/8 turn of 1/4-28 is 0.113) and the pinch screw
+        # locks it; 4N's full turn checks the shaft runs free after.  U32
+        # (user, 2026-09-23): option 1A turn-set.
+        "3. THREAD MHA-DT-39 IN UNTIL MHA-DT-04 JUST STOPS SHUTTLING.",
+        f"3A. BACK MHA-DT-39 OFF 1/8 TURN: {END_SCREW_ENGAGEMENT_ASSEMBLY_FACT}",
+        "3B. TIGHTEN MHA-DT-VN-56 ACROSS THE SLIT.",
+        "3C. DIAL-INDICATE THE MHA-DT-04 END PLAY AT THE SHAFT END: "
         f"{inch_window(SHAFT_END_PLAY, 3)}.",
-        "3N. IF THE END PLAY IS OUT, LOOSEN MHA-DT-VN-56.",
-        "3P. REPEAT 3J-3M UNTIL THE END PLAY READS IN ITS WINDOW.",
-        # Rule 23 (rubric sample round 7, #0): the set-screwed collar's
-        # bench acceptance.
-        "3Q. CHECK BY HAND: MHA-DT-VN-54 DOES NOT TURN OR SLIDE ON MHA-DT-04.",
+        "3D. IF THE END PLAY IS OUT, LOOSEN MHA-DT-VN-56.",
+        "3E. REPEAT 3-3C UNTIL THE END PLAY READS IN ITS WINDOW.",
+        # Rule 23 (PR 2 machinist review round 10): the pinch lock's bench
+        # acceptance, worded as 2Q's, once the end play is final.
+        "3F. CHECK THAT MHA-DT-39 DOES NOT TURN IN MHA-DT-21 BY HAND.",
         # User ruling 2026-09-28: the crank journal runs directly in the post;
         # the centres are fixed, and the only mesh requirement is no binding.
         # CONTRACT-crank: MHA-DT-VN-67 press to the blind-hole floor.  Owner
@@ -1993,7 +2049,7 @@ CONSUMABLES_NOTES = _note_text(
         "UNLESS ITS STEP GIVES ANOTHER SETTING.",
         # Rule 23 (rubric d9f8b0c): one package note may carry the bond's
         # degrease, apply and cure rules; the bonds are part-spec steps.
-        # Round 13: every bond cites the note (2L, 4B, 6B, 12-14), so the
+        # Round 13: every bond cites the note (1N-1R, 2P, 4B, 6B, 12-14), so the
         # note names no step range; the station it sets at once is 12A's.
         "LOCTITE 638 BONDS: DEGREASE BOTH PARTS; COAT THE "
         "INSERTED PART, NEVER A BLIND SEAT; KEEP IT OFF RUNNING LANDS; SET STEP "
@@ -2035,7 +2091,7 @@ def _split_sequence_chain(
 # splits keep every field full once the one-thing lines grew the sequence
 # (rubric sample rounds 2 and 4); test_every_note_field_holds_its_stacked_blocks
 # proves each fits.
-CONE_CONTINUED_FROM = f"{steps.step_number('tip-adjuster-set')}E"
+CONE_CONTINUED_FROM = f"{steps.step_number('post-and-tip-block')}M"
 CRANK_CONTINUED_FROM = str(steps.step_number("crank-hub-fitted"))
 _CRANK_CONTINUED_HEADING = f"ASSEMBLY SEQUENCE CONT. - CRANK {CODE_KEY_POINTER}"
 CONE_CRANK_PRIMARY, CONE_CRANK_CONTINUED, CRANK_CONTINUED = _split_sequence_chain(
@@ -2574,8 +2630,9 @@ def cone_station_rows(
 def code_key_text(rows: Sequence[tuple[int, str]], cylinder_gears: int) -> str:
     """The package's labelled code key (owner ruling 2026-11-08, Pedro): the
     MHA-DT-03 codes as the model configures them, by station front to back
-    (``rows``, from the placed cone gears), two columns, and GEAR 0 to the
-    last of the ``cylinder_gears`` MHA-DT-12, counted from the front."""
+    (``rows``, from the placed cone gears), two columns, GEAR 0 to the last of
+    the ``cylinder_gears`` MHA-DT-12, counted from the front, and step 1P's
+    phasing comb and its blades (a shop tool on its own print, no BOM row)."""
     code = rows[0][1]
     digits = "N" * (len(code) - 1)
     half = (len(rows) + 1) // 2
@@ -2591,6 +2648,7 @@ def code_key_text(rows: Sequence[tuple[int, str]], cylinder_gears: int) -> str:
     lines.append(
         f"GEAR 0-{cylinder_gears - 1} = MHA-DT-12 FROM THE FRONT, GEAR 0 ON MHA-DT-26."
     )
+    lines.append(f"{PHASING_COMB} = PHASING COMB, ONE BLADE IN A TOOTH SPACE PER GEAR.")
     return "\n".join(lines)
 
 
@@ -2631,7 +2689,8 @@ def package_note_fields(facts: SourceFacts) -> tuple[NoteField, ...]:
     placement re-derives them from the measured heading and isometric.
     """
     heading_lines = len(heading_text(1, ASSEMBLED_HEADING).splitlines())
-    cone_gears = facts.count("dt-cone-gear")
+    # Step 1B slides the keyed MHA-DT-03 gears; T024, T018 and T012 are bonded.
+    keyed_gears = facts.count("dt-cone-gear") - len(ROUND_BORE_TEETH)
     rig_first, rig_second, rig_third, rig_last = _split_sequence_chain(
         rig_steps(
             pivot_blocks=facts.count("dt-pinion-pivot-block"),
@@ -2668,7 +2727,7 @@ def package_note_fields(facts: SourceFacts) -> tuple[NoteField, ...]:
                 ("direction key", DIRECTION_NOTES),
                 (
                     "cone set sequence",
-                    CONE_CRANK_PRIMARY.format(cone_gears=cone_gears)
+                    CONE_CRANK_PRIMARY.format(keyed_gears=keyed_gears)
                     + cont(CONE_CONTINUED_FROM, right),
                 ),
             ),

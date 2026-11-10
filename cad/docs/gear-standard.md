@@ -9,7 +9,7 @@ involute cutter instead of making cutters for an odd pitch.
 
 | Meshing domain | Parts | Tooth system |
 |---|---|---|
-| Cone and cylinder train | `dt-cone-gear` T006–T120, `dt-cylinder-gear` ×20 (120T), `dt-alignment-pinion` (32T) | 48DP, PA20, spur |
+| Cone and cylinder train | `dt-cone-tip-gear` T006, `dt-cone-gear` T012–T120, `dt-cylinder-gear` ×20 (120T), `dt-alignment-pinion` (32T) | 48DP, PA20, spur |
 | Crossed crank pair | `dt-crank-pinion` (16T, straight), `dt-crank-drive-gear` (64T, right-hand helix 13.0011°) | normal 24DP, normal PA20 |
 | Paper-drive reducer | `pd-rack-pinion` (150T disc), `pd-transgear-knob-shaft` (integral 15T) | 48DP, PA20 (#1 and #7, added to the cone set) |
 | Paper feed | `pd-transgear-feed-pinion` (12T), `pd-platen-rack` | 32DP, PA20 |
@@ -288,10 +288,12 @@ The pitch change from 49.82 to 48 scales every standard diameter by +3.79%.
 
 - The 6T cone still needs a cutter you make. No ordinary cutter range reaches
   6 teeth. In the first 48DP study its root-to-bore web fell from 0.621 mm to
-  0.354 mm, because the PA20 gap floor sits lower. The terminal journal was
-  then cut to 1/32 in. With DT6-FORM1 the printed gap floor is Ø2.136 mm MIN,
-  which leaves a 0.64 mm web over the largest allowed bore, against a 0.62 mm
-  floor (the one named web exception).
+  0.354 mm, because the PA20 gap floor sits lower. Since owner decision C1 keyed
+  (2026-11-09, PR #1992) T006 is its own part, `dt-cone-tip-gear`, cut solid
+  with an integral Ø1.5875 mm spigot and pivot: with DT6-FORM1 the printed gap
+  floor is Ø2.136 mm MIN, so the cutter runs off over the stems and no web
+  remains to break. The thinnest cone web is now T012's 1.641 mm over its
+  reamed spigot bore.
 - The 64T crank gear is a true helix. Cutting it needs a spiral-capable
   universal dividing head geared to the table leadscrew (lead 945.86 mm per
   turn). A plain or semi-universal indexing head cannot do it; the shop's

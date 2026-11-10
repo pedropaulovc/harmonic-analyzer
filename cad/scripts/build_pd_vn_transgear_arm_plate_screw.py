@@ -23,7 +23,7 @@ line points to the MHA-PD-00 cut step), so that machinery buys nothing here and
 every one of its COM calls would be unexercised native risk; the profile
 route adds no COM call to the stock build and leaves the supplied-screw
 catalog run unchanged.  The parameters ride ``StockComponent.parameters``
-to the registered recipe, as ``build_dt_vn_cone_tip_collar`` passes its seated cup.
+to the registered recipe, as ``build_pd_vn_transgear_disc_screw`` passes its cut.
 
 Geometry source: the chosen live McMaster stock page, not a vendor model
 (``diagnostics/diag_mcmaster_oval.py``; no replica gate, no .SLDPRT committed).

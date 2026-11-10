@@ -27,7 +27,7 @@ import dt_cone_gear_spec as cone
 import dt_mesh_checks
 
 EXEMPT_CONE_TEETH = frozenset({6})
-CONE_TEETH = tuple(t for t in cone.CONFIGURATION_TEETH if t not in EXEMPT_CONE_TEETH)
+CONE_TEETH = tuple(t for t in cone.CONE_TEETH if t not in EXEMPT_CONE_TEETH)
 CONE_NOMINAL_CONTACT_RATIO_MIN = 1.0
 T006_CORNER_BACKLASH_MIN_MM = 0.02
 T006_RELIEF_CLEARANCE_MIN_MM = 0.010
