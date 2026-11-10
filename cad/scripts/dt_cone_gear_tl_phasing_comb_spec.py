@@ -844,6 +844,8 @@ CALLOUTS_BELOW: dict[str, str] = {
     **{blade_tip_name(t): BLADE_NOTE_FLAG for t in GEARS},
     "PlateThick": BLADE_WALL_TEXT,
 }
-# The four equal blade lengths print once.
-CALLOUTS_ABOVE: dict[str, str] = {"BladeLength": f"{len(GEARS) - 1}X"}
+# The five blade lengths are equal (T006's runs to the plate's north end,
+# PLATE_LENGTH = its start + BLADE_LENGTH) and print once, counted from the
+# blades drawn.
+CALLOUTS_ABOVE: dict[str, str] = {"BladeLength": f"{len(GEARS)}X"}
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

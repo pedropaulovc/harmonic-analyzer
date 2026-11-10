@@ -243,6 +243,25 @@ def test_sizes_no_fit_depends_on_print_at_two_places() -> None:
     assert spec.AXIAL_PLACEMENT_WINDOW_MM >= 0.1
 
 
+def test_the_blade_length_count_matches_the_blades_drawn() -> None:
+    """Every blade, T006's (to the plate's north end) included, is
+    BladeLength long, so the one length callout counts all of them; it is
+    the sheet's only count."""
+    lengths = [spec.blade_x_mm(t)[1] - spec.blade_x_mm(t)[0] for t in spec.GEARS]
+    assert lengths == pytest.approx([spec.BLADE_LENGTH] * len(spec.GEARS))
+    assert (
+        spec.CALLOUTS_ABOVE
+        == {"BladeLength": f"{len(spec.GEARS)}X"}
+        == {"BladeLength": "5X"}
+    )
+    counted = [
+        text
+        for text in (*spec.CALLOUTS_BELOW.values(), *spec.CALLOUTS_ABOVE.values())
+        if any(word[:-1].isdigit() and word.endswith("X") for word in text.split())
+    ]
+    assert counted == ["5X"]
+
+
 def test_no_fork_wording_survives() -> None:
     for module in (spec, part, drawing):
         source = inspect.getsource(module).lower()
