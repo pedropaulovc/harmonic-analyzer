@@ -1691,7 +1691,7 @@ experiment on a frozen baseline, not current-main qualification or proof for
 arbitrary component replacement, mate topology or nested assemblies.
 [Native assemblies, children, manifests, report and raw spans](https://github.com/user-attachments/files/34589963/native4-assembly-evidence.zip).
 
-#### Drawing reconciliation benchmark (draft, not yet run natively)
+#### Drawing reconciliation benchmark (draft)
 
 `verify:drawing_reconcile` (`cad/scripts/diagnostics/benchmark_drawing_reconcile.py`,
 planner `_drawing_reconcile.py`) draws the qualified cylinder above (diameter
@@ -1784,8 +1784,38 @@ uv run --frozen python cad/scripts/diagnostics/benchmark_drawing_reconcile.py pl
   <retained-output>/reports/drawing-reconcile/target-recipe.json
 ```
 
-No native measurement exists yet; do not cite timings until a forced native
-run passes and its evidence is retained.
+Native source `1668bba4c0b932eb9b0e50f350a7b6fa1580794b` passed on
+`swmaker00000f@15`, run `20261110T182442136Z-9b69422afae54d529795365fd3f7ee48`
+(attempt 1 failed only on a wrong attachment-count requirement). Three
+alternating clean/incremental pairs and no-op trials:
+
+| drawing operation | median seconds | observed range, seconds |
+|---|---:|---:|
+| clean part + clean drawing | 10.526 | 10.525 to 10.671 |
+| retained part edit + in-place drawing update | 9.783 | 9.603 to 9.859 |
+| no-op with isolation and validation | 6.065 | 6.055 to 6.125 |
+
+The in-place path used 7.1% less operation time (1.08x). The 172 retained
+spans show the saving is the part, not the drawing: clean spent 3.633 s
+creating and saving the part against 0.427 s for the retained edit. On the
+drawing side clean creation cost 1.672 s (views) + 0.250 s (annotations),
+while the in-place path paid 2.528 s to open the drawing with its part,
+0.698 s baseline validation, 0.535 s rebuild (clean 0.148 s) and 1.495 s
+save (clean 0.599 s). For this two-view sheet the drawing itself is at best
+break-even; a benefit on production sheets, where view creation and
+annotation dominate, is not demonstrated here.
+
+Both views stayed current, both imported dimensions stayed attached and read
+the 16 mm target after save/reopen, and the note and template annotations
+were unchanged. Clean and in-place PDFs had identical extracted text and page
+count but different bytes in every trial. View positions and sizes matched
+exactly; the depth dimension sat 2.0 mm apart in X because the in-place path
+kept its baseline position while the clean redraw placed it against the
+longer view. That is a real instance of placement drift between the two
+paths. `IAnnotation.GetAttachedEntityCount3` returned 0 for a healthy
+imported model dimension, so it is recorded but not required. The enclosing
+farm span took 209.0 s (source acquisition 103.2 s, execution 102.6 s).
+[Native drawings, parts, PDFs, report and raw spans](https://github.com/user-attachments/files/34644348/native2-drawing-evidence.zip).
 
 ### Readiness is not proof of a build
 
