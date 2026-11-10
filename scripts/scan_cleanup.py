@@ -7,7 +7,7 @@ Run with an existing Python 3.12+ interpreter (no project dependencies needed)::
 
 JSON goes to stdout. Name matches are leads, not proof of project ownership or
 permission to remove anything. Git registrations and primary checkout protection
-are reported separately. No process inspection, shutdown, pruning, or Git writes.
+are reported separately. Farm processes are listed read-only; nothing is stopped. No pruning or Git writes.
 """
 
 from __future__ import annotations
@@ -103,6 +103,33 @@ def registrations(repo: Path, warnings: list[str]) -> list[dict]:
     if current:
         rows.append(current)
     return rows
+
+
+def farm_processes(warnings: list[str]) -> list[dict]:
+    """Read-only inventory of farm.py processes; never stops them."""
+    query = (
+        "$self = $PID; "
+        "ConvertTo-Json -Compress -InputObject @(Get-CimInstance Win32_Process | "
+        "Where-Object { $_.ProcessId -ne $self -and $_.CommandLine -match 'farm\\.py' } | "
+        "Select-Object ProcessId, ParentProcessId, Name, ExecutablePath, CommandLine)"
+    )
+    try:
+        result = subprocess.run(
+            ["pwsh.exe", "-NoProfile", "-Command", query],
+            capture_output=True, text=True, timeout=60, check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        warnings.append(f"farm.py process scan failed: {exc}")
+        return []
+    if result.returncode != 0:
+        warnings.append(f"farm.py process scan failed: {result.stderr.strip()}")
+        return []
+    try:
+        rows = json.loads(result.stdout)
+    except ValueError as exc:
+        warnings.append(f"farm.py process scan returned unreadable output: {exc}")
+        return []
+    return [rows] if isinstance(rows, dict) else rows
 
 
 def measure(path: Path, args: argparse.Namespace, budget: dict) -> dict:
@@ -207,12 +234,14 @@ def main() -> int:
     roots = [*(checkout.parent for checkout in checkout_roots),
              Path("C:/"), Path("C:/tmp"), *args.root]
     exact = [(Path("C:/farm-build"), "requested exact farm-build path")]
+    exact.append((Path("C:/farm-runs"), "farm-run snapshot and run-record root; contents not inspected for ownership"))
     exact.extend((path, "known project-local generated output") for path in project_outputs)
     local = os.environ.get("LOCALAPPDATA")
     if local:
         local_path = Path(local)
         roots.extend((local_path, local_path / "Temp"))
         exact.append((local_path / "ha-farm", "farm-run.ps1 fallback log/snapshot home"))
+        exact.append((local_path / "ha-farm" / "runs", "farm-run run-record directory; contents not inspected for ownership"))
         exact.append((local_path / "harmonic-analyzer", "project buildgraph and archive caches"))
         exact.append((local_path / "harmonic-analyzer-agent-scratchpad", "project review evaluation scratchpad"))
         for checkout in checkout_roots:
@@ -388,6 +417,7 @@ def main() -> int:
             row["error"] = str(exc)
             row["protected"] = True
             row["review"] = "inspection failed; protected pending manual review"
+    farm_rows = farm_processes(warnings)
     report = {
         "read_only": True,
         "primary_checkout": str(primary),
@@ -398,6 +428,7 @@ def main() -> int:
         "warnings": warnings,
         "discovery": discovery,
         "worktrees": worktrees,
+        "farm_processes": farm_rows,
         "candidates": sorted(candidates.values(), key=lambda row: row["path"].casefold()),
     }
     print(json.dumps(report, indent=2, ensure_ascii=True))
