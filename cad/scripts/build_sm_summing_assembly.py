@@ -505,6 +505,12 @@ def _assert_knife_hanger_stack() -> None:
             f"the {KNIFE_GAUGE_BAR_LENGTH:.1f} gauge bar does not span both knife "
             f"mounts' outer faces ({KNIFE_MOUNT_OUTER_SPAN_MAX:.2f})"
         )
+    # The printed matched fit is the clearance the rock budget charges.
+    if abs(max(spec.KNIFE_GAUGE_BAR_CLEARANCE_IN) * 25.4 - KNIFE_BAR_CLEARANCE) > 1e-9:
+        raise RuntimeError(
+            f"the gauge bar's printed {max(spec.KNIFE_GAUGE_BAR_CLEARANCE_IN):.4f} max "
+            f"clearance is not the {KNIFE_BAR_CLEARANCE:.4f} the rock budget charges"
+        )
     if KNIFE_FREE_ROCK_WORST_DEG < KNIFE_FREE_ROCK_FLOOR_DEG:
         raise RuntimeError(
             f"knife edge rocks {KNIFE_FREE_ROCK_WORST_DEG:.3f} deg at the worst "
