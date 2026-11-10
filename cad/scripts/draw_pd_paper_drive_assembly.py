@@ -1771,6 +1771,13 @@ def _step_text(
     knob_window = steps.inch_window(KNOB_END_FLOAT_RANGE, 3, " TO ")
     shake = steps.RACK_DATUM_BACKLASH_TEXT
     lock_gap = steps.inch_window(platen_guide.LOCK_GAP_FIT, 3, " TO ")
+    lock_gap_min, lock_gap_max = lock_gap.split(" TO ")
+    # R9-47: the gap is the rail's depth less the bar's, so facing the rail's
+    # back under a lock closes it. As made it is always over the window
+    # (build_pd_platen_guide asserts it): each over lock is faced by its
+    # reading less the window's middle, and only an over-faced rail (under
+    # the window) is replaced.
+    lock_gap_target = steps.inch_text(sum(platen_guide.LOCK_GAP_FIT) / 2.0, 3)
     teeth = f"{KNOB_TEETH}T"
     knob = sprocket_name(sprocket.KNOB_CONFIG)
     crank = sprocket_name(sprocket.CRANK_CONFIG)
@@ -1912,14 +1919,15 @@ def _step_text(
         "lock-seats-faced": (
             "WITH THE LOCK SCREWS TIGHT, READ THE GAP BETWEEN EACH LOCK'S FRONT "
             "FACE AND THE BAR'S BACK FACE WITH FEELERS.",
-            f"WHERE IT IS UNDER {lock_gap.split(' TO ')[0]}, REMOVE THE LOCK.",
-            f"FACE THE {n['pd-platen-guide']} GUIDE'S BACK FACE UNDER EACH REMOVED "
-            f"LOCK BY THE AMOUNT ITS GAP READ UNDER {lock_gap.split(' TO ')[0]}.",
-            "REFIT EACH REMOVED LOCK WITH ITS SCREWS TIGHT.",
+            f"IF A GAP IS OVER {lock_gap_max}, REMOVE THE LOCKS AND LIFT THE "
+            "PLATEN OFF THE BAR.",
+            f"FACE THE {n['pd-platen-guide']} GUIDE'S BACK FACE UNDER EACH LOCK "
+            f"THAT READ OVER {lock_gap_max} BY ITS GAP LESS {lock_gap_target}.",
+            f"REFIT PER {s('platen-hung', 9)}-{s('guide-locks-set', 2)}.",
             f"CHECK: THE GAP IS {lock_gap} AT EVERY LOCK.",
-            f"IF A GAP IS STILL UNDER {lock_gap.split(' TO ')[0]}, REPEAT "
-            f"{s('lock-seats-faced', 1)}-{s('lock-seats-faced', 4)} FOR THAT LOCK.",
-            "IF A GAP IS OVER THE WINDOW, REPLACE THAT GUIDE AND REPEAT FROM "
+            f"IF A GAP IS STILL OVER {lock_gap_max}, REPEAT "
+            f"{s('lock-seats-faced', 1)}-{s('lock-seats-faced', 4)}.",
+            f"IF A GAP IS UNDER {lock_gap_min}, REPLACE THAT GUIDE AND REPEAT FROM "
             f"STEP {steps.step_number('guides-screwed')}.",
         ),
         "latch-pin-pressed": (
