@@ -1468,10 +1468,11 @@ key; compare these before reusing or resuming a run.
 on this branch.** The pool currently exports only the `build`/`release`
 dependency closures (`agent/worker.py:REQUESTED_TARGETS`). Merely registering
 an opt-in `verify:` leaf does not admit it into that graph. This draft
-therefore explicitly adds `verify:feature_reconcile` and
-`verify:assembly_reconcile` to the branch's `build` dependencies, without
-changing pool admission, seat settings, or any production part or assembly
-recipe. That intentional default-graph change must never reach main.
+therefore explicitly adds `verify:feature_reconcile`,
+`verify:assembly_reconcile` and `verify:drawing_reconcile` to the branch's
+`build` dependencies, without changing pool admission, seat settings, or any
+production part, assembly or drawing recipe. That intentional default-graph
+change must never reach main.
 Submit **only** the diagnostic leaf from a clean, pushed experiment checkout,
 using the persistent launcher supervision described above:
 
@@ -1689,6 +1690,102 @@ is not a farm-wall-time claim. This remains a two-occurrence, three-plane-mate
 experiment on a frozen baseline, not current-main qualification or proof for
 arbitrary component replacement, mate topology or nested assemblies.
 [Native assemblies, children, manifests, report and raw spans](https://github.com/user-attachments/files/34589963/native4-assembly-evidence.zip).
+
+#### Drawing reconciliation benchmark (draft, not yet run natively)
+
+`verify:drawing_reconcile` (`cad/scripts/diagnostics/benchmark_drawing_reconcile.py`,
+planner `_drawing_reconcile.py`) draws the qualified cylinder above (diameter
+20 mm, depth 12 mm) on the repository landscape template, resolved exactly as
+`_drawing_common.new_project_drawing` does (`DRAWING_TEMPLATES[layout]`, never
+the seat default; that template is a task `file_dep`). The sheet is 1:1 in
+millimetres with two decimals. It has two keyed model views, `ReconcileFront`
+(`*Front`) and `ReconcileSide` (`*Right`), named with `IView.SetName2`.
+`InsertModelAnnotations3` imports the model dimensions as native associative
+display dimensions: `Diameter@ReconcileProfile` in the front view and
+`Depth@ReconcileBody` in the side view. One free sheet note completes the
+drawing, which is saved as `.SLDDRW` and exported to PDF. The target changes
+depth from 12 mm to 16 mm. A planner change to any view, annotation, note,
+sheet, template or part structure returns `full_build` with no edits;
+malformed recipes raise. No isometric view is drawn, so the seat-global
+shaded-raster PDF preference that `finalize_drawing` raises is never touched.
+No seat (system) preference is written; units are document properties.
+
+Submit only this leaf, with the same launcher supervision:
+
+```powershell
+./scripts/farm-run.ps1 -Worktree C:/src/ha-feature-reconcile-20261109 `
+  -PoolHome C:/src/solidworks-pool -Targets verify:drawing_reconcile `
+  -LeafTimeout 30 -DisplayName 'Experimental drawing reconciliation benchmark' `
+  -Tag drawing-reconcile-native `
+  -ForceCacheRefresh verify:drawing_reconcile `
+  -ForceCacheRefreshReason 'Measure three fresh native drawing trials, not cached timings'
+```
+
+Modes, run as three alternating clean/incremental pairs plus a no-op from
+each saved incremental result:
+
+- **clean** builds, rebuilds and saves a fresh part at the target value, then
+  creates the drawing from scratch.
+- **incremental** copies the baseline part, then the drawing, so the drawing
+  is never older than its model. It retargets the closed drawing copy with
+  `ReplaceReferencedDocument`; `GetDocumentDependencies2` must report exactly
+  the source part before and the trial part after, with non-model
+  dependencies unchanged. It then opens the part and the drawing, validates
+  the copied baseline, edits `Depth@ReconcileBody` in place with
+  `SetSystemValue3`, and rebuilds the part and drawing. It saves the part
+  first, then the drawing.
+- **no-op** copies, retargets, opens and validates, but does not edit,
+  rebuild, save or export. The retargeted drawing and part bytes must stay
+  unchanged.
+
+Phase spans (`experiment.drawing_reconcile.*`) cover copy, retarget, open,
+diff, prevalidation, `part_edit` (clean creation, rebuild and save of the
+part), `view_create` and `annotate` (clean only), rebuild,
+`validation_before_save`, save, `pdf_export`, close, reopen,
+`validation_after_reopen`, `close_after_reopen` and readback integrity.
+
+Validation is identical in every mode, both before save and after reopen:
+
+- The drawing has one sheet with the declared scale and units.
+- Both keyed views exist with their declared orientation, referenced trial
+  part, configuration and scale. `IsModelOutOfDate` must be false. Positions
+  and outlines are recorded.
+- Exactly the two keyed display dimensions appear, each in its declared view.
+  Each must be visible, not dangling, attached to at least one entity, and read
+  the target model value through `GetSystemValue3`.
+- Exactly one visible, sheet-owned note carries the declared text.
+- The automatic and template annotation inventory, such as centre marks,
+  matches the baseline's observed inventory.
+- Part geometry, keyed persistent identities, bounds and volume pass the
+  part benchmark validator.
+
+Clean and incremental drawings must have equal view outline sizes,
+dimension values, note text and inventories. View, dimension and note
+position deltas are retained as evidence. Baseline drawing, part and PDF
+hashes are checked after every trial.
+
+For every clean and incremental PDF, the report records SHA-256, page count
+and extracted text. `report.json` `pdf_comparison` holds the per-trial
+clean-versus-incremental byte/page/text equality and a text diff. The
+repository has no PDF text helper, so text comes from pypdf's
+`PageObject.extract_text`; the report records that. The report keeps the
+assembly report's top-level `median_seconds`, `trial_seconds`,
+`phase_median_seconds` and `results`. Outputs under
+`cad/out/reports/drawing-reconcile/` are `report.json`, `spans.jsonl`,
+`baseline-manifest.json`, `target-recipe.json`, `baseline.SLDDRW`,
+`baseline-part.SLDPRT`, `baseline.pdf`, every trial drawing and part, and the
+clean and incremental trial PDFs. Offline commands:
+
+```powershell
+uv run --frozen python cad/scripts/diagnostics/benchmark_drawing_reconcile.py --help
+uv run --frozen python -m pytest cad/scripts/test_drawing_reconcile.py -q
+uv run --frozen python cad/scripts/diagnostics/benchmark_drawing_reconcile.py plan `
+  <retained-output>/reports/drawing-reconcile/baseline-manifest.json `
+  <retained-output>/reports/drawing-reconcile/target-recipe.json
+```
+
+No native measurement exists yet; do not cite timings until a forced native
+run passes and its evidence is retained.
 
 ### Readiness is not proof of a build
 

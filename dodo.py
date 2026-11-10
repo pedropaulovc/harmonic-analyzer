@@ -1414,7 +1414,7 @@ _VERIFY_NAMES = ("soundness", "kinematics")  # need SW (spine); subsystems retir
 # EXPERIMENT BRANCH ONLY: the pool exports build/release closures, not arbitrary
 # selected roots. These leaves are explicitly on build below for canonical
 # admission. Never merge this experiment wiring into the production build graph.
-_EXPERIMENT_VERIFY_NAMES = ("feature_reconcile", "assembly_reconcile")
+_EXPERIMENT_VERIFY_NAMES = ("feature_reconcile", "assembly_reconcile", "drawing_reconcile")
 # Offline checks REQUIRED on every build/release (fast, high-value):
 _CHECK_NAMES = (
     "math",
@@ -3321,6 +3321,33 @@ def _verify_task(name: str) -> dict[str, Any]:
             "clean": True,
             "verbosity": 2,
         }
+    if name == "drawing_reconcile":
+        # The repository landscape .DRWDOT is a real input (resolved exactly as
+        # new_project_drawing does); drawing.py is used, so the WHOLE-submodule tier.
+        from _drawing_types import DrawingLayout
+
+        script = (SCRIPTS_DIR / "diagnostics" / "benchmark_drawing_reconcile.py").resolve()
+        cmd = [sys.executable, str(script), "benchmark", "--trials", "3"]
+        deps = sorted({
+            *_executed_closure(cmd),
+            *(str((script.parent / module).resolve()) for module in (
+                "_drawing_reconcile.py", "_feature_reconcile.py", "benchmark_feature_reconcile.py")),
+            str(PART_TEMPLATE),
+            str(DRAWING_TEMPLATES[DrawingLayout.LANDSCAPE].path.resolve()),
+            _submodule_dep(),
+        })
+        return {
+            "name": name,
+            "file_dep": deps,
+            "targets": _canonical_targets(f"verify:{name}"),
+            "uptodate": [not _cache.forced_refresh(f"verify:{name}")],
+            "actions": [(_cached_com_action, [
+                f"verify:{name}", cmd, deps,
+                [REPORTS / "drawing-reconcile"], "verify-drawing-reconcile",
+            ])],
+            "clean": True,
+            "verbosity": 2,
+        }
     if name == "kinematics":
 
         # Pass the graph's assemblies EXPLICITLY (dashed names) rather than letting
@@ -5125,6 +5152,16 @@ def _canonical_targets(name: str) -> list[str]:
                 *(f"trial-{trial}-{mode}{suffix}"
                   for trial in range(1, 4) for mode in ("clean", "incremental", "noop")
                   for suffix in (".SLDASM", "-child.SLDPRT")),
+            )]
+        if subname == "drawing_reconcile":
+            directory = REPORTS / "drawing-reconcile"
+            return [str(directory / filename) for filename in (
+                "report.json", "spans.jsonl", "baseline-manifest.json", "target-recipe.json",
+                "baseline.SLDDRW", "baseline-part.SLDPRT", "baseline.pdf",
+                *(f"trial-{trial}-{mode}{suffix}"
+                  for trial in range(1, 4) for mode in ("clean", "incremental", "noop")
+                  for suffix in (".SLDDRW", "-part.SLDPRT")),
+                *(f"trial-{trial}-{mode}.pdf" for trial in range(1, 4) for mode in ("clean", "incremental")),
             )]
         return [str(REPORTS / f"verify-{subname}.ok")]
     if family == "check":
