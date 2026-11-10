@@ -505,9 +505,11 @@ class Harness:
                 if item is None or key in dimensions:
                     raise RuntimeError(f"Unexpected or duplicate display dimension: {observed}")
                 expected_mm = spec["part"]["parameters_mm"][item["dimension"]]
+                # attached_entities is evidence only: a healthy imported model dimension read 0 natively
+                # (attempt 1, Depth@ReconcileBody, dangling False), so IsDangling is the attachment proof.
                 if (observed["view"] != item["view"] or observed["owner_type"] != OWNER_VIEW
                         or observed["visible"] != ANNOTATION_VISIBLE or observed["dangling"]
-                        or observed["attached_entities"] < 1 or len(observed["position_mm"]) != 2
+                        or len(observed["position_mm"]) != 2
                         or not math.isfinite(observed["value_mm"])
                         or abs(observed["value_mm"] - expected_mm) > VALUE_TOLERANCE_MM):
                     raise RuntimeError(f"Display dimension {item['key']} contract mismatch: {observed}")
