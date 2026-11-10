@@ -15,6 +15,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal, Sequence
 
+from _title_block_units import render_number
+
 EXPLODED_VIEW_NAME = "DRIVE_TRAIN_EXPLODED"
 SOURCE_CONFIGURATION = "Default"
 
@@ -124,6 +126,20 @@ COLLAR_PIN_ROLE: Role = "arbor-collar-pin"
 # along the bore it turns in. The post is stationary, so the direction the
 # steps are authored along never moves under them.
 CONE_AXIS_SOURCE = ("dt-cone-pivot-post", "journal axis")
+
+
+# Rule 20 (Codjiflo review of PR 2): MHA-DT-00 step 3A states DT-07's
+# owner-accepted MHA-DT-39 shortfall as a fact, worded like
+# POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT.  A MIN never rounds up: the print-worst
+# full thread (build_dt_drive_train_assembly.END_SCREW_ENGAGEMENT_WORST_MM)
+# floors to three inch places and to two diameters.  The drawing may not
+# import the builder, so the builder refuses to run if these drift.
+END_SCREW_ENGAGEMENT_MIN_IN = 0.347
+END_SCREW_ENGAGEMENT_MIN_D = 1.39
+END_SCREW_ENGAGEMENT_ASSEMBLY_FACT = (
+    f"ENGAGEMENT {render_number(END_SCREW_ENGAGEMENT_MIN_IN, 'in', 3)} MIN "
+    f"({END_SCREW_ENGAGEMENT_MIN_D:.2f}D)."
+)
 
 
 @dataclass(frozen=True)

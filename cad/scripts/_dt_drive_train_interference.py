@@ -46,8 +46,6 @@ from dt_cone_tip_block_spec import DOWEL_HOLE_DEPTH as _TIP_DOWEL_PRESS_DEPTH
 from dt_vn_locating_pin_spec import DIA as _LOCATING_PIN_DIA
 from dt_vn_locating_pin_spec import PRESS_HOLE_DIA as _LOCATING_PIN_PRESS_HOLE_DIA
 from cone_tip_cluster import (
-    ADJUSTER_THREAD as _END_SCREW_THREAD,
-    BLOCK_DEPTH_MM as _BLOCK_DEPTH,
     BUSHING_BORE_DIA_MM as _BUSHING_BORE_DIA,
     BUSHING_LENGTH_MM as _BUSHING_LENGTH,
     STEM_DIA_MM as _PIVOT_DIA,
@@ -110,13 +108,12 @@ _TIP_HOLDDOWN_OBSERVED_MM3 = 5.6585
 _TIP_HOLDDOWN_GATE_LIMIT_MM3 = _TIP_HOLDDOWN_OBSERVED_MM3 * 1.10
 # MHA-DT-39, the 1/4-28 end screw (owner decision C1 keyed, 2026-11-09, PR
 # #1992), runs through MHA-DT-21's whole tapped depth with its threaded end
-# proud of the south face: the smooth annulus of its major in the 1/4-28 tap
-# drill over that depth bounds its helical overlap until the first drive-train
-# build observes it (the old #10-32 cup's observed 16.44 replaced a smooth
-# bound 3.5x high, so re-pin this one to the reading x 1.10 then).
-_END_SCREW_GATE_LIMIT_MM3 = smooth_annulus_limit_mm3(
-    THREAD_MAJOR_MM[_END_SCREW_THREAD], TAP_DRILL_MM[_END_SCREW_THREAD], _BLOCK_DEPTH
-)
+# proud of the south face, so its axial setting does not change the overlap:
+# 34.1729 mm3, read by the PR 2 drive-train leaf (6fda5a47590f, farm run
+# 20261110T001845485Z, assembly:dt_drive_train log line 601; the smooth
+# annulus bound was 104.31, 3.1x the reading).
+_END_SCREW_OBSERVED_MM3 = 34.1729
+_END_SCREW_GATE_LIMIT_MM3 = _END_SCREW_OBSERVED_MM3 * 1.10
 # MHA-DT-38 pressed on MHA-DT-37's pivot: the modelled press is the nominal
 # pivot in the nominal .0615 bore over the bushing's whole length.
 _BUSHING_PRESS_GATE_LIMIT_MM3 = smooth_annulus_limit_mm3(
@@ -139,7 +136,7 @@ ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
     frozenset(
         ("dt-crank-handle-pivot-screw-1", "dt-crank-arm-1")
     ): smooth_annulus_limit_mm3(THREAD_MAJOR_MM["#4-40"], TAP_DRILL_MM["#4-40"], 7.0),
-    # MHA-DT-39's 1/4-28 thread in the tapped block, bounded above.
+    # MHA-DT-39's 1/4-28 thread in the tapped block, observed above.
     frozenset(
         ("dt-cone-tip-end-screw-1", "dt-cone-tip-block-1")
     ): _END_SCREW_GATE_LIMIT_MM3,

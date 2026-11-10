@@ -163,6 +163,9 @@ def test_the_thin_blades_print_as_a_plain_fact_with_the_owner_ruling() -> None:
     assert spec.CALLOUTS_BELOW["PlateThick"] == spec.BLADE_WALL_TEXT
     rows = _config.parts(spec.PART_NAME)["machinist_exceptions"]
     assert [row["id"] for row in rows] == ["RV-01"]
+    # A rule 17 shortfall is filed at most as a minor finding, never
+    # suppressed (drawing-simplicity-policy.md).
+    assert rows[0]["kind"] == "minor"
     assert spec.BLADE_WALL_TEXT in rows[0]["where"]
     assert rows[0]["reason"].startswith(
         "owner ruling 2026-11-10 via PR #1992 "

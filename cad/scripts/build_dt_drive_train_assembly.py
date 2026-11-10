@@ -236,7 +236,11 @@ from _assembly_patterns import (
 )
 from _dt_drive_train_interference import ALLOWED_PAIRS
 from _dt_drive_train_explode import create_drive_train_explode
-from dt_drive_train_assembly_spec import COLLAR_PIN_ROLE
+from dt_drive_train_assembly_spec import (
+    COLLAR_PIN_ROLE,
+    END_SCREW_ENGAGEMENT_MIN_D,
+    END_SCREW_ENGAGEMENT_MIN_IN,
+)
 
 # CopyWithMates2 helpers for the cone-gear ladder (#228). NB importing _cwm
 # folds it into THIS assembly's recipe/cache key -- intended.
@@ -2675,9 +2679,10 @@ PIVOT_HEAD_WORST_GAP = tip_pivot_head_worst_gap_mm(TIP_NORTH_FACE_BAND_MM)
 # still stand off MHA-DT-21's north face, or the screw cannot be set.  Thread
 # engagement is rule 18: the block's 1.5D window cannot hold the whole stack
 # at the printed limits (the shallow end falls short), so the worst full
-# thread in D is booked against END_SCREW_ENGAGEMENT_FLOOR_D (1.0D) and the
-# 1.39D shortfall is the owner's rule-18 exception (ruling 2026-11-09 via PR
-# #1992: keep 91794A558 at this block station; dt-drive-train.yaml DT-07).
+# thread in D is held to END_SCREW_ENGAGEMENT_FLOOR_D, the 1.39D the owner's
+# rule-18 exception accepts (ruling 2026-11-09 via PR #1992: keep 91794A558
+# at this block station; dt-drive-train.yaml DT-07).  Any stack change that
+# cuts deeper fails here and needs a new ruling.
 END_SCREW_EMBED_BAND_MM = (
     POST_BOSS_FACE_AXIAL_BAND_MM
     + shaft_printed_band("CollarWidth")
@@ -2685,7 +2690,7 @@ END_SCREW_EMBED_BAND_MM = (
     + _printed_band_mm(tip_cluster.BUSHING_PLACES, unit=SHAFT_UNIT)
     + TIP_NORTH_FACE_BAND_MM
 )
-END_SCREW_ENGAGEMENT_FLOOR_D = 1.0
+END_SCREW_ENGAGEMENT_FLOOR_D = 1.39
 _END_SCREW_MAJOR_MM = THREAD_MAJOR_MM[tip_cluster.ADJUSTER_THREAD]
 
 
@@ -2713,10 +2718,24 @@ def end_screw_embed_worst_mm(band_mm: float) -> tuple[float, float]:
 
 
 END_SCREW_EMBED_WORST_MM = end_screw_embed_worst_mm(END_SCREW_EMBED_BAND_MM)
-END_SCREW_ENGAGEMENT_WORST_D = (
-    min(end_screw_full_thread_mm(embed) for embed in END_SCREW_EMBED_WORST_MM)
-    / _END_SCREW_MAJOR_MM
+END_SCREW_ENGAGEMENT_WORST_MM = min(
+    end_screw_full_thread_mm(embed) for embed in END_SCREW_EMBED_WORST_MM
 )
+END_SCREW_ENGAGEMENT_WORST_D = END_SCREW_ENGAGEMENT_WORST_MM / _END_SCREW_MAJOR_MM
+# MHA-DT-00 step 3A prints dt_drive_train_assembly_spec's floored values (rule
+# 20, DT-07); a MIN never rounds up.
+if (
+    math.floor(END_SCREW_ENGAGEMENT_WORST_MM / 25.4 * 1000.0 + 1e-9),
+    math.floor(END_SCREW_ENGAGEMENT_WORST_D * 100.0 + 1e-9),
+) != (
+    round(END_SCREW_ENGAGEMENT_MIN_IN * 1000.0),
+    round(END_SCREW_ENGAGEMENT_MIN_D * 100.0),
+):
+    raise AssertionError(
+        f"end screw print-worst full thread {END_SCREW_ENGAGEMENT_WORST_MM / 25.4:.4f} in "
+        f"({END_SCREW_ENGAGEMENT_WORST_D:.4f}D) no longer floors to the printed "
+        f"{END_SCREW_ENGAGEMENT_MIN_IN} MIN ({END_SCREW_ENGAGEMENT_MIN_D}D)"
+    )
 # Lateral: the end screw's axis (hold-down + PassageCenter, off the plate
 # centreline) against the line the journal points the shaft along.  The
 # journal's plan angle to the post's mount holes is BASIC with no frame

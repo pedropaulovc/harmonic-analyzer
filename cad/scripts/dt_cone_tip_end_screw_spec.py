@@ -29,6 +29,7 @@ import math
 import _config
 import cone_stack_end_play as end_play
 import cone_tip_cluster as tip
+import dt_cone_tip_gear_spec as tip_gear
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _mcmaster_91794a558 import (
     HEAD_DIA,
@@ -105,9 +106,11 @@ END_HOLE_WALL_PRINTED_IN = (
 # Running clearance, from the contract's printed limits.
 PIVOT_CLEARANCE = tip.PIVOT_RUNNING_CLEARANCE_MM
 # The pivot stands PIVOT_LENGTH north of T006's leaves; the bushing, pressed
-# against those leaves, covers BUSHING_LENGTH of it.  ASSUMPTION: MHA-DT-37
-# prints the pivot length at the title block's .XX (cone_tip_cluster: ".XX").
-PIVOT_LENGTH_BAND = printed_band_mm(2, unit="in")
+# against those leaves, covers BUSHING_LENGTH of it.  The pivot length's grade
+# is MHA-DT-37's authored precision, so a regrade there reruns this stack.
+PIVOT_LENGTH_BAND = printed_band_mm(
+    tip_gear.DRAWING_PRECISION["Pivot"]["PivotLength"], unit=tip_gear.UNIT
+)
 BUSHING_LENGTH_BAND = printed_band_mm(tip.BUSHING_PLACES, unit="in")
 PIVOT_PROUD_MAX = (tip.PIVOT_LENGTH_MM + PIVOT_LENGTH_BAND) - (
     tip.BUSHING_LENGTH_MM - BUSHING_LENGTH_BAND

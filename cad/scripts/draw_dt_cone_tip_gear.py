@@ -26,7 +26,6 @@ from __future__ import annotations
 import argparse
 import math
 import sys
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -37,14 +36,13 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     dimension_name,
     place_view,
-    view_name,
 )
 
+import _cone_gear_sheet as cone_sheet
 import _drawing_hidden_sketches as hidden_sketches
 import _telemetry
 from _check import check
 from _com import _early_bound
-from _drawing_annotation_extent import callout_ink, move_annotation
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -55,7 +53,6 @@ from _drawing_common import (
 )
 from _drawing_dimensions import (
     assert_imported_precision,
-    offset_dimension_text,
     set_dimension_callouts,
     set_reference_dimension,
 )
@@ -64,22 +61,17 @@ from _drawing_edges import visible_view_entities
 from _drawing_finish import add_surface_finish
 from _drawing_layout_collect import check_drawing_layout
 from _drawing_leader_notes import add_leader_note
-from _drawing_leaders import (
-    ARROW_TEXT_CLEARANCE,
-    dimension_segments,
-    set_near_side_diameter,
-)
+from _drawing_leaders import set_near_side_diameter
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _fit_deviations import deviations
-from _layout_geometry import Box, Segment, segment_box_distance
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
-from _pdf_ink import PageInk, read_pdf_ink
+from _pdf_ink import read_pdf_ink
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 from dt_cone_gear_spec import (
@@ -207,42 +199,23 @@ AXIS_OVERRUN = 0.003
 
 # --- Front view: the family's T006 inspection layout at this ratio --------------
 # The root-envelope stack stands right of the tip circle, above the thickness
-# witness and the thickness text's shelf; see draw_dt_cone_gear for each
-# measured offset.
-FLOOR_DIA_GAP_X = 0.0215
-FLOOR_DIA_RISE = 0.009
-_PREF_ARROW_LENGTH = 26  # swUserPreferenceDoubleValue_e.swDetailingArrowLength
-_PREF_OPT_NONE = 0
-DIMENSION_ARROW_LENGTH = 0.00635
-FLOOR_STACK_HALF_HEIGHT = 0.0115
-TOOTH_THICKNESS_TEXT_GAP = 0.0065
-TOOTH_THICKNESS_SHELF_DROP = 0.038
-TOOTH_THICKNESS_SEED = (0.0321, 0.0129)
-TOOTH_THICKNESS_PLACE_TOL = 0.0002
-TOOTH_THICKNESS_TEXT_AIR = ARROW_TEXT_CLEARANCE
+# witness and the thickness text's shelf (_cone_gear_sheet, the cone-gear
+# family's layout).
 CENTER_MARK_SINGLE = 2  # swCenterMarkStyle_e.swCenterMark_Single
-NOTE_CENTRING_TOL_M = 0.001
 _TOL_LIMIT = 3  # swTolType_e.swTolLIMIT
 
 
-def thickness_arrow_reach_y() -> float:
-    """Sheet y where the thickness dimension's upper arrow tail ends: half
-    the tooth thickness above the axis, then one outside arrow."""
-    return FRONT_CENTER[1] + sheet_mm(TOOTH_THICKNESS / 2.0) + DIMENSION_ARROW_LENGTH
-
-
 def floor_dia_y() -> float:
-    """Anchor y of the root-envelope stack, raised clear of the thickness
-    arrow's tail where its usual place would crowd it."""
-    usual = FRONT_CENTER[1] + 0.6 * HALF_OD + FLOOR_DIA_RISE
-    lowest = thickness_arrow_reach_y() + ARROW_TEXT_CLEARANCE + FLOOR_STACK_HALF_HEIGHT
-    return max(usual, lowest)
+    """Anchor y of the root-envelope stack (``cone_sheet.floor_dia_y``)."""
+    return cone_sheet.floor_dia_y(
+        FRONT_CENTER[1], HALF_OD, sheet_mm(TOOTH_THICKNESS / 2.0)
+    )
 
 
 FRONT_KEEP = {
-    "FloorDia": (FRONT_CENTER[0] + HALF_OD + FLOOR_DIA_GAP_X, floor_dia_y()),
+    "FloorDia": (FRONT_CENTER[0] + HALF_OD + cone_sheet.FLOOR_DIA_GAP_X, floor_dia_y()),
     # The vertical thickness dimension on the +X tooth; its text then leaves
-    # the line for its own shelf (``_shelve_tooth_thickness``).
+    # the line for its own shelf (``cone_sheet.shelve_tooth_thickness``).
     "ToothThickness": (
         FRONT_CENTER[0] + HALF_OD + 0.014,
         FRONT_CENTER[1] - HALF_OD - 0.0225,
@@ -251,11 +224,10 @@ FRONT_KEEP = {
 
 
 def tooth_thickness_shelf() -> tuple[float, float]:
-    """Where the thickness text's shelf starts: the text gap right of its
-    dimension line, the shelf drop under the root-envelope stack's anchor."""
-    return (
-        FRONT_KEEP["ToothThickness"][0] + TOOTH_THICKNESS_TEXT_GAP,
-        floor_dia_y() - TOOTH_THICKNESS_SHELF_DROP,
+    """Where the thickness text's shelf starts
+    (``cone_sheet.tooth_thickness_shelf``)."""
+    return cone_sheet.tooth_thickness_shelf(
+        FRONT_KEEP["ToothThickness"][0], floor_dia_y()
     )
 
 
@@ -266,48 +238,26 @@ FORM_DETAIL_LETTER = "B"
 FORM_DETAIL_CENTRE_MM = 1.80
 FORM_DETAIL_MARGIN_MM = 0.10
 FORM_LETTER_ANGLE_DEG = 45.0
-DETAIL_LETTER_HEIGHT = 0.0025
-DETAIL_LETTER_REACH = 0.0025
 
 
-@dataclass(frozen=True)
-class FrontDetail:
-    """A detail boundary on the front view and where its letter stands:
-    ``centre_mm``/``radius_mm`` in model mm (gear axis at the origin, tooth
-    zero on +X), the letter ``letter_reach`` (sheet m) outside the boundary
-    at ``letter_angle_deg``."""
-
-    letter: str
-    centre_mm: tuple[float, float]
-    radius_mm: float
-    letter_angle_deg: float
-    letter_reach: float
-
-
-def form_detail() -> FrontDetail:
+def form_detail() -> cone_sheet.FrontDetail:
     if not math.isclose((90.0 * TEETH / 360.0) % 1.0, 0.5):
         raise AssertionError("DETAIL B's 12 o'clock station is not a tooth space")
     root = PROFILE.template.root_radius_mm
     _radius, corner_x, corner_y = custom_six_form_points_mm()[-1]
     reach = math.hypot(corner_x, corner_y + root - FORM_DETAIL_CENTRE_MM)
-    return FrontDetail(
+    return cone_sheet.FrontDetail(
         FORM_DETAIL_LETTER,
         (0.0, FORM_DETAIL_CENTRE_MM),
         reach + FORM_DETAIL_MARGIN_MM,
         FORM_LETTER_ANGLE_DEG,
-        DETAIL_LETTER_REACH,
+        cone_sheet.DETAIL_LETTER_REACH,
     )
 
 
-def detail_letter_xy(
-    detail: FrontDetail, centre: tuple[float, float], radius: float
-) -> tuple[float, float]:
-    angle = math.radians(detail.letter_angle_deg)
-    reach = radius + detail.letter_reach
-    return centre[0] + reach * math.cos(angle), centre[1] + reach * math.sin(angle)
-
-
-def front_detail_on_sheet(detail: FrontDetail) -> tuple[tuple[float, float], float]:
+def front_detail_on_sheet(
+    detail: cone_sheet.FrontDetail,
+) -> tuple[tuple[float, float], float]:
     """Nominal sheet centre and radius of ``detail``'s boundary."""
     return (
         (
@@ -549,28 +499,6 @@ def form_notes_pos(table_height: float | None = None) -> tuple[float, float]:
 # --- Native helpers ---------------------------------------------------------------
 
 
-def _assert_dimension_arrow_length(drawing: Any) -> None:
-    """Refuse a template whose arrow length is not the one the layout assumes."""
-    extension = _early_bound(
-        _early_bound(drawing, "IModelDoc2").Extension, "IModelDocExtension"
-    )
-    live = float(extension.GetUserPreferenceDouble(_PREF_ARROW_LENGTH, _PREF_OPT_NONE))
-    if abs(live - DIMENSION_ARROW_LENGTH) > 1e-6:
-        raise RuntimeError(
-            f"drawing arrow length reads {live * 1000.0:.3f} mm; the root-envelope "
-            f"stack is placed for {DIMENSION_ARROW_LENGTH * 1000.0:.3f} mm"
-        )
-
-
-def _activate_view(adapter: Any, view: Any, *, label: str) -> str:
-    """Make ``view`` the active view (sketch entities and notes land in it)."""
-    name = view_name(adapter, view)
-    if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateView(name):
-        raise RuntimeError(f"failed to activate the {label} {name!r}")
-    adapter.currentModel.ClearSelection2(True)
-    return name
-
-
 def _place_origin(
     adapter: Any, view: Any, target: tuple[float, float], *, label: str
 ) -> None:
@@ -617,109 +545,12 @@ def _hide_title_block_source(adapter: Any, view: Any) -> None:
         raise RuntimeError("the tooth-space sheet's source view still reads visible")
 
 
-def _note_box(note: Any, *, label: str) -> tuple[float, float, float, float]:
-    """``INote.GetExtent``'s lower-left and upper-right corners, sheet metres."""
-    values = tuple(float(value) for value in (note.GetExtent() or ()))
-    if len(values) != 6 or not all(map(math.isfinite, values)):
-        raise RuntimeError(f"{label}: invalid note extent {values!r}")
-    box = (values[0], values[1], values[3], values[4])
-    if box[0] >= box[2] or box[1] >= box[3]:
-        raise RuntimeError(f"{label}: empty note extent {values!r}")
-    return box
-
-
-def _set_note_height(note: Any, height: float, *, label: str) -> None:
-    annotation = _early_bound(
-        _early_bound(note, "INote").GetAnnotation(), "IAnnotation"
-    )
-    text_format = annotation.GetTextFormat(0)
-    if text_format is None:
-        raise RuntimeError(f"{label}: note has no text format")
-    text_format.CharHeight = float(height)
-    if annotation.SetTextFormat(0, False, text_format) is not True:
-        raise RuntimeError(f"{label}: failed to set the note's text height")
-
-
-def _centred_view_note(
-    adapter: Any,
-    view: Any,
-    text: str,
-    *,
-    center_x: float,
-    center_y: float,
-    height: float,
-    label: str,
-) -> None:
-    """Insert a note ``view`` owns, centred on (``center_x``, ``center_y``)
-    by its extent; a note that does not centre, or lands elsewhere, raises."""
-    _activate_view(adapter, view, label=label)
-    raw = add_note(adapter, text, center_x, center_y)
-    if raw is None:
-        raise RuntimeError(f"failed to add the {label} note")
-    note = _early_bound(raw, "INote")
-    _set_note_height(note, height, label=label)
-    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
-
-    def error_of(box: tuple[float, float, float, float]) -> tuple[float, float]:
-        return (box[0] + box[2]) / 2.0 - center_x, (box[1] + box[3]) / 2.0 - center_y
-
-    for _ in range(2):
-        error = error_of(_note_box(note, label=label))
-        if max(map(abs, error)) <= NOTE_CENTRING_TOL_M / 10.0:
-            break
-        position = tuple(float(value) for value in annotation.GetPosition())
-        if not annotation.SetPosition2(
-            position[0] - error[0], position[1] - error[1], 0.0
-        ):
-            raise RuntimeError(f"failed to centre the {label} note")
-        rebuild_drawing(adapter, label=f"{label} note")
-    error = error_of(_note_box(note, label=label))
-    if max(map(abs, error)) > NOTE_CENTRING_TOL_M:
-        raise RuntimeError(
-            f"{label} note did not centre: off by ({error[0] * 1000:.2f}, "
-            f"{error[1] * 1000:.2f}) mm"
-        )
-    owned = [
-        str(_early_bound(found, "INote").GetText() or "").strip()
-        for found in (_early_bound(view, "IView").GetNotes() or ())
-    ]
-    if owned.count(text) != 1:
-        raise RuntimeError(f"{label} note did not land in its view: {owned!r}")
-
-
-def _sketch_view_circle(
-    adapter: Any, view: Any, center: tuple[float, float], radius: float, *, label: str
-) -> Any:
-    """Sketch a circle in the ACTIVE ``view``'s own sketch from sheet points,
-    through the view sketch's ModelToSketchTransform."""
-    sketch = _early_bound(_early_bound(view, "IView").GetSketch(), "ISketch")
-    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
-    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    points = []
-    for x, y in (center, (center[0] + radius, center[1])):
-        point = _early_bound(
-            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
-        )
-        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
-        points.append(tuple(float(value) for value in projected.ArrayData))
-    manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
-    previous_add_to_db = bool(manager.AddToDB)
-    manager.AddToDB = True
-    try:
-        circle = manager.CreateCircle(*points[0], *points[1])
-    finally:
-        manager.AddToDB = previous_add_to_db
-    if circle is None:
-        raise RuntimeError(f"failed to sketch the {label} circle")
-    return circle
-
-
 def _mark_form_detail(adapter: Any, front: Any) -> None:
     """Draw DETAIL B's boundary on the front view (a black view-sketch
     circle) and letter it outside, both owned by the view."""
     detail = form_detail()
     label = f"front detail {detail.letter}"
-    _activate_view(adapter, front, label=label)
+    cone_sheet.activate_view(adapter, front, label=label)
     x_mm, y_mm = detail.centre_mm
     centre, rim = (
         model_point_in_view(
@@ -728,8 +559,8 @@ def _mark_form_detail(adapter: Any, front: Any) -> None:
         for x, name in ((x_mm, "centre"), (x_mm + detail.radius_mm, "rim"))
     )
     radius = math.dist(centre, rim)
-    circle = _sketch_view_circle(
-        adapter, front, centre, radius, label=f"{label} boundary"
+    circle = cone_sheet.sketch_view_circle(
+        adapter, front, centre, radius, add_to_db=True, label=f"{label} boundary"
     )
     segment = _early_bound(circle, "ISketchSegment")
     segment.Color = 0  # COLORREF black, not the under-defined sketch blue.
@@ -737,14 +568,14 @@ def _mark_form_detail(adapter: Any, front: Any) -> None:
         raise RuntimeError(f"{label} boundary colour did not persist")
     adapter.currentModel.ClearSelection2(True)
     rebuild_drawing(adapter, label=f"{label} boundary")
-    letter_x, letter_y = detail_letter_xy(detail, centre, radius)
-    _centred_view_note(
+    letter_x, letter_y = cone_sheet.detail_letter_xy(detail, centre, radius)
+    cone_sheet.centred_view_note(
         adapter,
         front,
         detail.letter,
         center_x=letter_x,
         center_y=letter_y,
-        height=DETAIL_LETTER_HEIGHT,
+        height=cone_sheet.DETAIL_LETTER_HEIGHT,
         label=f"{label} letter",
     )
 
@@ -754,7 +585,7 @@ def _center_mark_pivot(adapter: Any, front: Any) -> None:
     picked as an edge and marked directly)."""
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
-    _activate_view(adapter, front, label="front pivot centre mark")
+    cone_sheet.activate_view(adapter, front, label="front pivot centre mark")
     pick = model_point_in_view(
         adapter,
         front,
@@ -811,152 +642,29 @@ def _assert_sheet_bands(adapter: Any, annotations: list[Any]) -> None:
     )
 
 
-def _shelve_tooth_thickness(adapter: Any, annotations: list[Any]) -> None:
-    """Offset the thickness text onto its own shelf and prove the shelf
-    landed there while the line stayed at the tooth (draw_dt_cone_gear)."""
-    matches = [
-        _early_bound(annotation, "IAnnotation")
-        for annotation in annotations
-        if dimension_name(adapter, annotation) == "ToothThickness"
-    ]
-    if len(matches) != 1:
-        raise RuntimeError(f"expected one ToothThickness, found {len(matches)}")
-    annotation = matches[0]
-    label = "T006 thickness text"
-    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-    line_x = FRONT_KEEP["ToothThickness"][0]
-    target = tooth_thickness_shelf()
-    seed = (target[0] + TOOTH_THICKNESS_SEED[0], target[1] + TOOTH_THICKNESS_SEED[1])
-    offset_dimension_text(adapter, [annotation], {"ToothThickness": seed})
-    ink = callout_ink(adapter, annotation, label=label)
-    dx, dy = target[0] - ink.text[0], target[1] - ink.text[1]
-    if max(abs(dx), abs(dy)) > TOOTH_THICKNESS_PLACE_TOL:
-        move_annotation(adapter, annotation, dx, dy, label=label)
-        ink = callout_ink(adapter, annotation, label=label)
-    error = (ink.text[0] - target[0], ink.text[1] - target[1])
-    stations = sorted(
-        round(start[0], 6)
-        for start, end in dimension_segments(annotation)
-        if abs(start[0] - end[0]) < 1e-7
-    )
-    if not bool(display.OffsetText):
-        raise RuntimeError(f"{label}: the thickness text did not stay offset")
-    if max(map(abs, error)) > TOOTH_THICKNESS_PLACE_TOL:
-        raise RuntimeError(
-            f"{label}: shelf starts {error[0] * 1000:.2f}, {error[1] * 1000:.2f} mm off its place"
-        )
-    strayed = [x for x in stations if abs(x - line_x) > TOOTH_THICKNESS_PLACE_TOL]
-    if not stations or strayed:
-        raise RuntimeError(
-            f"{label}: the thickness line left the tooth: vertical lines at "
-            f"{[round(x * 1000, 2) for x in stations]} mm, anchor {line_x * 1000:.2f}"
-        )
-
-
 # The thickness callout's printed rows other than the value, top down.
 TOOTH_THICKNESS_ROWS = (
     CALLOUTS_ABOVE["ToothThickness"],
     *DIMENSION_CALLOUTS["ToothThickness"].splitlines(),
 )
-_TEXT_AIR_WINDOW = 0.010
-
-
-def tooth_thickness_text_air(page: PageInk) -> tuple[float, str]:
-    """The smallest printed air between the thickness callout's glyphs and
-    any line on ``page`` other than the shelf the text stands on, with the
-    nearest line (draw_dt_cone_gear's audit of the printed ink)."""
-
-    def printed(row: str) -> list[Any]:
-        key = "".join(row.split())
-        return [span for span in page.spans if "".join(span.text.split()) == key]
-
-    name_row, *lower_rows = TOOTH_THICKNESS_ROWS
-    names = printed(name_row)
-    if len(names) != 1:
-        raise ValueError(f"thickness row {name_row!r} printed {len(names)} times")
-    name = names[0]
-    name_x = (name.xmin + name.xmax) / 2.0
-    runs = [name]
-    for row in lower_rows:
-        found = [span for span in printed(row) if span.ymax <= name.ymin]
-        if not found:
-            raise ValueError(
-                f"thickness row {row!r} printed 0 times under {name_row!r}"
-            )
-        runs.append(
-            min(
-                found,
-                key=lambda span: math.hypot(
-                    (span.xmin + span.xmax) / 2.0 - name_x, name.ymin - span.ymax
-                ),
-            )
-        )
-    block = Box(
-        min(span.xmin for span in runs),
-        min(span.ymin for span in runs),
-        max(span.xmax for span in runs),
-        max(span.ymax for span in runs),
-    )
-    hair = 0.0001
-    glyphs = [
-        Box(glyph.xmin, glyph.ymin, glyph.xmax, glyph.ymax)
-        for span in page.spans
-        if block.xmin - hair <= span.xmin
-        and span.xmax <= block.xmax + hair
-        and block.ymin - hair <= span.ymin
-        and span.ymax <= block.ymax + hair
-        for glyph in span.glyphs
-    ]
-    near = Box(
-        block.xmin - _TEXT_AIR_WINDOW,
-        block.ymin - _TEXT_AIR_WINDOW,
-        block.xmax + _TEXT_AIR_WINDOW,
-        block.ymax + _TEXT_AIR_WINDOW,
-    )
-    shelves = 0
-    air, nearest = _TEXT_AIR_WINDOW, "no line within reach"
-    for stroke in page.strokes:
-        if not (stroke.stroked or stroke.filled):
-            continue
-        segment = Segment(stroke.x0, stroke.y0, stroke.x1, stroke.y1)
-        if segment.length == 0.0 or segment_box_distance(segment, near) > 0.0:
-            continue
-        if (
-            abs(stroke.y0 - stroke.y1) < 1e-7
-            and block.ymin - 0.0025 <= stroke.y0 <= block.ymin
-            and min(stroke.x0, stroke.x1) <= block.xmin + 0.0005
-            and max(stroke.x0, stroke.x1) >= block.xmax - 0.0005
-        ):
-            shelves += 1
-            continue
-        pen = stroke.width / 2.0 if stroke.stroked else 0.0
-        for glyph in glyphs:
-            gap = segment_box_distance(segment, glyph) - pen
-            if gap < air:
-                air = gap
-                nearest = (
-                    f"{gap * 1000:.2f} mm from line {segment.format_mm()} to glyph "
-                    f"{glyph.format_mm()}"
-                )
-    if not shelves:
-        raise ValueError(f"no shelf under the thickness text {block.format_mm()}")
-    return air, nearest
 
 
 def assert_tooth_thickness_text_air(pdf: Path) -> None:
     """Refuse the export when a line comes nearer the thickness callout's
-    text than ``TOOTH_THICKNESS_TEXT_AIR`` on sheet 1's printed ink."""
+    text than ``cone_sheet.TOOTH_THICKNESS_TEXT_AIR`` on sheet 1's printed ink."""
     pages = read_pdf_ink(Path(pdf))
     if len(pages) != len(SHEET_NAMES):
         raise RuntimeError(
             f"{pdf} prints {len(pages)} pages, expected {len(SHEET_NAMES)}"
         )
-    air, nearest = tooth_thickness_text_air(pages[SHEET_NAMES.index(GEAR_SHEET)])
+    air, nearest = cone_sheet.tooth_thickness_text_air(
+        pages[SHEET_NAMES.index(GEAR_SHEET)], TOOTH_THICKNESS_ROWS, sheet=GEAR_SHEET
+    )
     _telemetry.info(f"thickness text air {air * 1000:.2f} mm")
-    if air < TOOTH_THICKNESS_TEXT_AIR:
+    if air < cone_sheet.TOOTH_THICKNESS_TEXT_AIR:
         raise RuntimeError(
             f"a line strikes the thickness text (under "
-            f"{TOOTH_THICKNESS_TEXT_AIR * 1000:.1f} mm of air): {nearest}"
+            f"{cone_sheet.TOOTH_THICKNESS_TEXT_AIR * 1000:.1f} mm of air): {nearest}"
         )
 
 
@@ -1206,7 +914,7 @@ def _draw_form_plot(adapter: Any) -> None:
         note = add_leader_note(
             adapter, text, text_xy=text_xy, attach_xy=tip, label=f"DETAIL B {text}"
         )
-        _set_note_height(note, FORM_TEXT_HEIGHT, label=f"DETAIL B {text}")
+        cone_sheet.set_note_height(note, FORM_TEXT_HEIGHT, label=f"DETAIL B {text}")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -1242,7 +950,7 @@ async def build(adapter: Any) -> dict[str, str]:
         layout=SPEC.layout,
         unit=part_drawing_unit(PART_STEM),
     )
-    _assert_dimension_arrow_length(drawing_model)
+    cone_sheet.assert_dimension_arrow_length(drawing_model)
     create_blank_drawing_sheets(adapter, SHEET_NAMES, label="cone tip gear")
     stamp_drawing_summary(
         adapter,
@@ -1305,7 +1013,13 @@ async def build(adapter: Any) -> dict[str, str]:
     sheet = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
     if not sheet.SetScale(*VIEW_SCALE, False, False):
         raise RuntimeError("failed to pin the T006 sheet scale")
-    _shelve_tooth_thickness(adapter, front_annotations)
+    cone_sheet.shelve_tooth_thickness(
+        adapter,
+        front_annotations,
+        line_x=FRONT_KEEP["ToothThickness"][0],
+        target=tooth_thickness_shelf(),
+        label="T006 thickness text",
+    )
     _center_mark_pivot(adapter, front)
     _mark_form_detail(adapter, front)
     _add_overall_reference(adapter, side)
@@ -1362,7 +1076,7 @@ async def build(adapter: Any) -> dict[str, str]:
         note = add_note(adapter, text, *position)
         if note is None:
             raise RuntimeError(f"failed to add the {label}")
-        _set_note_height(note, FORM_TEXT_HEIGHT, label=label)
+        cone_sheet.set_note_height(note, FORM_TEXT_HEIGHT, label=label)
     sheet = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
     if not sheet.SetScale(*SHEET_SCALES[CUTTER_DETAIL_SHEET], False, False):
         raise RuntimeError("failed to pin the DT6-FORM1 sheet scale")

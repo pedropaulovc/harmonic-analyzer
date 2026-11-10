@@ -140,6 +140,7 @@ from dt_drive_train_assembly_spec import (
     CLUSTERS,
     COMPONENT_IDENTITIES,
     EXPLODED_VIEW_NAME,
+    END_SCREW_ENGAGEMENT_ASSEMBLY_FACT,
     FOOT_SCREW_SELECTOR,
     PENDING_STEMS,
     SOURCE_CONFIGURATION,
@@ -1281,13 +1282,16 @@ CONE_CRANK_STEPS = _note_text(
         # review round 4 of PR 2 (rule 22): every slide and bond names its
         # mate and makes one joint, and 1B names its range and count.  A
         # keyway goes on its key only one way and 1F measures the stack its
-        # gears close; the wrap counts 1B's placeholder at its width.
+        # gears close; the wrap counts 1B's placeholder at its width.  Codjiflo
+        # review of PR 2: the tip's stations come only from closed faces (T018
+        # on T024, T012 on T018, MHA-DT-37's leaves on T012; the spigot never
+        # bottoms), so 1E and 1R push MHA-DT-37 through that chain to T024.
         "1. SEAT MHA-DT-VN-71 IN THE MHA-DT-04 KEYSEAT, TO ITS COLLAR END.",
         "1A. SLIDE MHA-DT-07 ON MHA-DT-VN-71 AGAINST THE MHA-DT-04 COLLAR.",
         "1B. SLIDE T120 TO T030 ({keyed_gears}X MHA-DT-03) ON, T120 FIRST.",
         "1C. SLIDE T024 ON MHA-DT-04 AGAINST T030, DRY, NO FEELER.",
         "1D. SLIDE T012 AND T018 ON THE MHA-DT-37 SPIGOT, DRY.",
-        "1E. PUSH THE MHA-DT-37 SPIGOT INTO THE MHA-DT-04 SOCKET, DRY.",
+        "1E. PUSH MHA-DT-37 INTO THE MHA-DT-04 SOCKET UNTIL T018 BEARS ON T024.",
         f"1F. MEASURE T120 FRONT TO MHA-DT-37 LEAVES' BACK: ACCEPT {inch_window(STACK_L20_ACCEPT, 3)}.",
         "1G. IF THE STACK IS LONG, RE-FACE ITS THICKEST GEAR.",
         "1H. IF IT IS SHORT, REMAKE ITS THINNEST GEAR.",
@@ -1301,7 +1305,7 @@ CONE_CRANK_STEPS = _note_text(
         # collar, so the feeler sets the stack float (cone_stack_end_play).
         f"1P. BOND T024 ON MHA-DT-04, {inch_text(STACK_FEELER, FEELER_PLACES)} FEELER ON T030, PER THE SHEET 1 NOTE.",
         "1Q. BOND T012 AND T018 ON THE MHA-DT-37 SPIGOT PER THE SHEET 1 NOTE.",
-        "1R. BOND THE SPIGOT IN THE MHA-DT-04 SOCKET PER THE SHEET 1 NOTE.",
+        "1R. BOND MHA-DT-37 IN MHA-DT-04, T018 ON T024, PER THE SHEET 1 NOTE.",
         # Owner ruling 2026-11-10: one comb blade drops in one tooth space of
         # each gear.  T030's keyway centreline runs through its phase-0 tooth
         # (dt_cone_gear_spec), and its blade takes the space beside that tooth,
@@ -1374,7 +1378,7 @@ CONE_CRANK_STEPS = _note_text(
         # locks it; 4N's full turn checks the shaft runs free after.  U32
         # (user, 2026-09-23): option 1A turn-set.
         "3. THREAD MHA-DT-39 IN UNTIL MHA-DT-04 JUST STOPS SHUTTLING.",
-        "3A. BACK MHA-DT-39 OFF 1/8 TURN.",
+        f"3A. BACK MHA-DT-39 OFF 1/8 TURN: {END_SCREW_ENGAGEMENT_ASSEMBLY_FACT}",
         "3B. TIGHTEN MHA-DT-VN-56 ACROSS THE SLIT.",
         "3C. DIAL-INDICATE THE MHA-DT-04 END PLAY AT THE SHAFT END: "
         f"{inch_window(SHAFT_END_PLAY, 3)}.",

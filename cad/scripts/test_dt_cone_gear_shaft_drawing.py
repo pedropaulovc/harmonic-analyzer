@@ -271,12 +271,9 @@ def test_every_tight_band_names_its_mate_and_fit_route():
     assert not re.search(r"\d?\.\d{2,}", spec.DRAWING_NOTES)
     for word in ("TAILSTOCK", "MILL", "TURN"):
         assert word not in spec.DRAWING_NOTES
-    # The socket's callout (rule 12): the process, its .XX depth, its flag.
-    assert spec.SOCKET_CALLOUT.split("\n") == [
-        f"REAM <HOLE-DEPTH> {spec.inch_text(spec.SOCKET_DEPTH, 2)}",
-        f"SEE NOTE {spec.BOND_NOTE}",
-    ]
-    assert drawing.SOCKET_CALLOUTS == {"SocketDia": spec.SOCKET_CALLOUT}
+    # The socket's native callout (rule 12) prints the model's size, band and
+    # depth; only its process and flag are words (test_the_socket_callout_*).
+    assert spec.SOCKET_PROCESS == "REAM"
     # Every suffix is one line; every below callout carries at most two lines
     # of words (rule 7), a parenthesized REF clearance row beside them.
     assert not any("\n" in text for text in drawing.DIMENSION_SUFFIXES.values())
@@ -313,6 +310,9 @@ def test_display_precision_is_owned_by_the_part() -> None:
         "Sec1KeyseatWidth": cone_land_key.KEYSEAT_PLACES,
         "Sec1KeyseatS": cone_land_key.KEYSEAT_PLACES,
         "SocketDia": cone_tip_cluster.STEM_PLACES,
+        # The socket depth, in its native callout: the title block's .XX,
+        # booked in the spigot proof.
+        "SocketDepth": 2,
         # The keyseat end's centre from the collar face: the title block's .XX.
         "Sec1KeyseatEndSet": 2,
         "ShoulderR": 3,
@@ -425,14 +425,14 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     marked = set().union(*dt_cone_gear_shaft_spec.DRAWING_DIMENSIONS.values())
     # The section prints SECTION_DIMENSION_NAMES; the keyseat width's text is
     # placed at build time on the keyseat's side, the rest at D_SECTION_KEEP.
-    # The tip end view prints the socket.
+    # The socket's native hole callout prints the Socket cut's own two.
     sections = set().union(*drawing.SECTION_DIMENSION_NAMES.values())
     assert set(drawing.D_SECTION_KEEP) <= sections
     assert (
         set(drawing.SIDE_KEEP)
         | set(drawing.SIDE_DIAMETERS)
         | sections
-        | set(drawing.TIP_END_VIEW_KEEP)
+        | drawing.SOCKET_CALLOUT_DIMENSIONS
         == marked
     )
     # Nothing is imported twice, and the donor hands over exactly the four
@@ -443,7 +443,7 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         set(drawing.SIDE_KEEP),
         set(drawing.DONOR_KEEP),
         set(drawing.D_SECTION_KEEP),
-        set(drawing.TIP_END_VIEW_KEEP),
+        drawing.SOCKET_CALLOUT_DIMENSIONS,
     )
     assert sum(map(len, keeps)) == len(set().union(*keeps))
     assert part.SECTIONS is dt_cone_gear_shaft_spec.SECTIONS
@@ -885,7 +885,7 @@ def test_the_keyseat_section_cuts_land_one_clear_of_its_neighbours() -> None:
     rise_y = y + drawing.KEYSEAT_WIDTH_RISE
     assert rise_y - 0.0045 >= s_text_top + CLEAR_GAP_M + 0.001
     assert rise_y + 0.0035 <= iso_bottom - CLEAR_GAP_M - 0.001
-    socket_x, _socket_y = drawing.TIP_END_VIEW_KEEP["SocketDia"]
+    socket_x, _socket_y = drawing.SOCKET_CALLOUT_XY
     for side in (-1.0, 1.0):
         left = x + side * half
         rider = (left, rise_y - 0.0045, left + 0.0461, rise_y + 0.0035)
@@ -975,11 +975,11 @@ def test_section_a_cutting_line_clears_the_root_radius_and_the_step_length() -> 
 
 
 def test_the_tip_end_view_carries_the_socket_callout_in_the_frame() -> None:
-    """Rules 9 and 12: the socket is a standard blind ream, so its callout on
-    the end view facing it defines it.  The view is projected left of the
-    side view on its axis at the sheet scale (third angle, no label), clear
-    of the tip; the callout's text stands inside the frame, above the view
-    and left of land 2's diameter line, off the note block."""
+    """Rules 9 and 12: the socket is a standard blind ream, so its native
+    callout on the end view facing it defines it.  The view is projected left
+    of the side view on its axis at the sheet scale (third angle, no label),
+    clear of the tip; the callout's text stands inside the frame, above the
+    view and left of land 2's diameter line, off the note block."""
     spec = dt_cone_gear_shaft_spec
     template = DRAWING_TEMPLATES[drawing.SPEC.layout]
     margin = 0.0127
@@ -990,15 +990,43 @@ def test_the_tip_end_view_carries_the_socket_callout_in_the_frame() -> None:
     assert x + half < drawing.TIP_END_X - drawing.AXIS_OVERRUN - CLEAR_GAP_M
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert '"*Front", *TIP_END_VIEW_CENTER, scale=SIDE_SCALE' in source
-    assert set(drawing.TIP_END_VIEW_KEEP) == {"SocketDia"}
-    text_x, text_y = drawing.TIP_END_VIEW_KEEP["SocketDia"]
-    # Its box as measured on the PR 2 farm proof (6fda5a4): 16.3 mm left and
-    # 26.8 mm right of its position, 10.1 mm under and 9.1 mm over.
-    box = (text_x - 0.0163, text_y - 0.0101, text_x + 0.0268, text_y + 0.0091)
+    text_x, text_y = drawing.SOCKET_CALLOUT_XY
+    # The PR 2 r5 rows (20261110T081142602Z) joined into one: the size row
+    # 33.9 mm and "REAM ↧ .20" 27.2 mm about the position, the band's top
+    # 9.1 mm over it and the flag row's foot 10.1 mm under.
+    box = (text_x - 0.0305, text_y - 0.0101, text_x + 0.0306, text_y + 0.0091)
     assert box[0] >= margin + CLEAR_GAP_M and box[3] <= template.height_m - margin
     assert box[1] > y + half + CLEAR_GAP_M
     assert box[2] + CLEAR_GAP_M < drawing.SIDE_DIAMETERS["Sec2Dia"][0]
     assert box[1] > drawing.NOTES_XY[1]
+
+
+def test_the_socket_callout_reams_to_its_native_depth_then_flags_the_bond() -> None:
+    """Rule 26 order (size, process, depth) on the native callout: the process
+    joins before the one native depth, wherever SolidWorks put it, and the
+    bond flag goes below; any other shape is refused (Codjiflo #2459
+    4523315375: the depth is the model's, never typed)."""
+    ream = drawing._ream_socket_definitions
+    flag = dt_cone_gear_shaft_spec.BOND_FLAG
+    native = {5: "<MOD-DIAM>", 6: " <HOLE-DEPTH><hw-depth>", 7: "", 8: ""}
+    assert ream(native) == {
+        5: "<MOD-DIAM>",
+        6: " REAM <HOLE-DEPTH><hw-depth>",
+        7: "",
+        8: flag,
+    }
+    below = {5: "<MOD-DIAM>", 6: "", 7: "", 8: "<HOLE-DEPTH> .20"}
+    assert ream(below)[8] == f" REAM <HOLE-DEPTH> .20\n{flag}"
+    for refused in (
+        {5: "<MOD-DIAM>", 6: "", 7: "", 8: ""},  # no depth
+        {5: "<HOLE-DEPTH>.1", 6: "<HOLE-DEPTH>.2", 7: "", 8: ""},  # two
+        {5: "", 6: "<HOLE-DEPTH>.20 DEEP", 7: "", 8: ""},  # text after it
+        {5: "", 6: "<HOLE-DEPTH>.20", 7: "", 8: "THRU"},  # below taken
+        {5: "REAM", 6: "<HOLE-DEPTH>.20", 7: "", 8: ""},  # process there
+        {5: "", 6: "<HOLE-DEPTH>.20", 7: ""},  # a part missing
+    ):
+        with pytest.raises(RuntimeError, match="socket callout"):
+            ream(refused)
 
 
 def test_stacked_tip_diameters_never_run_a_line_through_a_text() -> None:

@@ -274,17 +274,13 @@ SOCKET_DIA_BAND = cone_tip_cluster.STEM_BORE_BAND
 SOCKET_DEPTH = cone_tip_cluster.SOCKET_DEPTH_MM
 SOCKET_FLOOR_STATION = TIP_END_STATION - SOCKET_DEPTH
 # A standard blind ream is fully defined by its callout (drawing-guidelines.md
-# rules 9 and 12): the imported SocketDia over "REAM <depth> .20", the depth
-# at the title block's .XX, its flag after it -- dt_cone_tip_block's dowel
-# hole recipe.  The depth is not a marked dimension: it would dimension to a
-# hidden line on the side view.
-SOCKET_DEPTH_PLACES = 2
-SOCKET_CALLOUT = "\n".join(
-    (
-        f"REAM <HOLE-DEPTH> {inch_text(SOCKET_DEPTH, SOCKET_DEPTH_PLACES)}",
-        BOND_FLAG,
-    )
-)
+# rules 9 and 12): a native hole callout on the socket's rim prints the
+# Socket cut's own diameter (with its band) and depth, each at its model
+# places (DRAWING_PRECISION; the depth at the title block's .XX), the process
+# before the depth and the bond flag below (Codjiflo #2459 4523315375: a
+# depth typed from here would not follow the model).  The depth is never a
+# marked dimension on the side view: it would dimension to a hidden line.
+SOCKET_PROCESS = "REAM"
 
 # (diameter in inches, section end station in mm from the front stub end).
 # Diameters decrease toward the tip for tip-first assembly.  The land-1 end
@@ -429,6 +425,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Sec2": {"Sec2End"},
     "Sec1KeyseatProfile": {"Sec1KeyseatWidth", "Sec1KeyseatS"},
     "SocketProfile": {"SocketDia"},
+    "Socket": {"SocketDepth"},
     "Sec1KeyseatEndProfile": {"Sec1KeyseatEndSet"},
     "ShoulderFillets": {"ShoulderR"},
     "CollarProfile": {"CollarDia"},
@@ -455,9 +452,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # grade, booked in the recess proof below (the end stays inside T024's bore
 # at every limit).  Journal length Sec0End (collar thrust face back to the
 # front stub): two places, the .XX grade, since the journal's guaranteed
-# bearing span below reads it (never .X).  The socket's depth prints in its
-# callout at SOCKET_DEPTH_PLACES, the .XX grade, booked in the spigot proof
-# below.  Step radius: three places;
+# bearing span below reads it (never .X).  The socket's depth: two places,
+# the .XX grade, printed by its native hole callout and booked in the spigot
+# proof below.  Step radius: three places;
 # nothing depends on it beyond the setback proof.
 #
 # Keyseat end (machinist review of 06460fb: the mill stop): the end radius's
@@ -486,6 +483,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "Sec1KeyseatS": cone_land_key.KEYSEAT_PLACES,
     },
     "SocketProfile": {"SocketDia": cone_tip_cluster.STEM_PLACES},
+    "Socket": {"SocketDepth": 2},
     "Sec1KeyseatEndProfile": {"Sec1KeyseatEndSet": cone_land_key.KEY_END_SET_PLACES},
     "ShoulderFillets": {"ShoulderR": 3},
     "CollarProfile": {"CollarDia": 3},
@@ -518,19 +516,18 @@ _LENGTH_NOMINALS = {
     "CollarWidth": COLLAR_THICKNESS,
     "ShoulderR": FILLET_RADIUS,
     "Sec1KeyseatEndSet": cone_land_key.KEY_END_SET_MM,
+    "SocketDepth": SOCKET_DEPTH,
 }
 
 
 def printed_length_deviations(name: str) -> tuple[float, float]:
     """(lower, upper) mm about the model of a marked length's printed limits:
-    the inch value the sheet prints (the socket depth in its callout), with
-    its own band (the step root) or the title block's."""
+    the inch value the sheet prints, with its own band (the step root) or the
+    title block's."""
     if name == "ShoulderR":
         return printed_deviations(
             FILLET_RADIUS, DRAWING_PRECISION_BY_NAME[name], deviations(FILLET_R_BAND), unit=UNIT
         )
-    if name == "SocketDepth":
-        return printed_deviations(SOCKET_DEPTH, SOCKET_DEPTH_PLACES, unit=UNIT)
     return printed_deviations(
         _LENGTH_NOMINALS[name], DRAWING_PRECISION_BY_NAME[name], unit=UNIT
     )

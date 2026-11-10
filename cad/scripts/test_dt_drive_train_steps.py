@@ -97,13 +97,13 @@ def test_the_tip_is_measured_dry_then_bonded_on_the_feeler() -> None:
     order = (
         "SLIDE T024 ON MHA-DT-04 AGAINST T030, DRY, NO FEELER",
         "SLIDE T012 AND T018 ON THE MHA-DT-37 SPIGOT, DRY",
-        "PUSH THE MHA-DT-37 SPIGOT INTO THE MHA-DT-04 SOCKET, DRY",
+        "PUSH MHA-DT-37 INTO THE MHA-DT-04 SOCKET UNTIL T018 BEARS ON T024",
         "ACCEPT",
         "PRESS MHA-DT-38 ON THE MHA-DT-37 PIVOT",
         f"BOND T024 ON MHA-DT-04, "
         f"{sheet.inch_text(cone_stack_end_play.STACK_FEELER, sheet.FEELER_PLACES)} FEELER ON T030",
         "BOND T012 AND T018 ON THE MHA-DT-37 SPIGOT",
-        "BOND THE SPIGOT IN THE MHA-DT-04 SOCKET",
+        "BOND MHA-DT-37 IN MHA-DT-04, T018 ON T024,",
         "ENGAGE MHA-DT-03-TL-02 AT ONCE, T030'S BLADE BESIDE THE KEY",
         "REMOVE MHA-DT-03-TL-02 AND THE FEELER",
     )
@@ -140,6 +140,27 @@ def test_the_end_screw_sets_the_end_play_after_the_pivot_runs_free() -> None:
     positions = [fitup.find(phrase) for phrase in order]
     assert -1 not in positions, positions
     assert positions == sorted(positions)
+    # Rule 20 (Codjiflo review of PR 2): the step that sets MHA-DT-39 prints
+    # DT-07's owner-accepted shortfall, and DT-07 quotes the same fact.
+    import build_dt_drive_train_assembly as assembly
+    import dt_drive_train_assembly_spec as assembly_spec
+
+    fact = assembly_spec.END_SCREW_ENGAGEMENT_ASSEMBLY_FACT
+    assert f"BACK MHA-DT-39 OFF 1/8 TURN: {fact}" in fitup
+    printed = re.fullmatch(r"ENGAGEMENT (\.\d{3}) MIN \((\d\.\d{2})D\)\.", fact)
+    assert printed is not None
+    printed_in, printed_d = (float(value) for value in printed.groups())
+    assert assembly.END_SCREW_ENGAGEMENT_WORST_MM - 0.0254 < printed_in * 25.4
+    assert printed_in * 25.4 <= assembly.END_SCREW_ENGAGEMENT_WORST_MM
+    assert printed_d <= assembly.END_SCREW_ENGAGEMENT_WORST_D < printed_d + 0.01
+    from machinist_exceptions import load_exceptions
+
+    declared = {
+        entry.id: entry
+        for entry in load_exceptions(_config.CONFIG_DIR, "dt_drive_train_assembly", "assembly")
+    }
+    assert declared["DT-07"].kind == "minor"
+    assert fact in declared["DT-07"].where
 
 
 def test_the_printed_shaft_end_play_is_the_band_the_stacks_book() -> None:

@@ -51,6 +51,7 @@ import ch_connecting_rod_spec
 import sm_vn_counter_spring_spec
 import dt_cylinder_gear_spec
 import dt_cone_gear_spec
+import dt_cone_gear_tl_phasing_comb_spec as phasing_comb
 import cone_land_key
 import cone_shaft_land_bands
 import gear_seat_fit
@@ -1148,7 +1149,10 @@ def phase_profiles() -> dict[str, tuple[np.ndarray, np.ndarray]]:
     (``cone_tip_bond_clock``) is its tooth space about that blade at its pitch
     circle, a pitch-arc length: the turn at the cone gear is that arc over its
     pitch radius, and at the cam T_i/120 of it, i.e. 1/(60 m) per mm on every
-    bonded gear.
+    bonded gear.  The comb seats on T030's phase-0 tooth, so T030's own clock
+    carries into every bonded gear (``phase_draw_columns``): T030 turned by
+    delta slides the comb by its pitch arc, which turns each bonded gear by
+    the same arc, T030's delta * 30/120 at the cam on every one of them.
     """
     teeth = 6 * np.arange(1, N_ELEMENTS + 1)
     ratio = teeth / 120.0
@@ -1159,16 +1163,32 @@ def phase_profiles() -> dict[str, tuple[np.ndarray, np.ndarray]]:
     key_levers = np.where(keyed, 2.0 * short, np.inf)
     pitch_radius = teeth * dt_cone_gear_spec.MODULE_MM / 2.0
     deg = math.pi / 180.0
+    reference = phasing_comb.REFERENCE_TEETH / 120.0
     return {
         "cam_phase": (np.full(N_ELEMENTS, deg), np.zeros(N_ELEMENTS)),
         "mesh_lag_spread": (np.full(N_ELEMENTS, deg), np.zeros(N_ELEMENTS)),
-        "cone_flat_clock": (np.where(keyed, ratio * deg, 0.0), np.zeros(N_ELEMENTS)),
+        "cone_flat_clock": (
+            np.where(keyed, ratio, reference) * deg,
+            np.zeros(N_ELEMENTS),
+        ),
         "cone_key_play": (ratio / key_levers, np.zeros(N_ELEMENTS)),
         "cone_tip_bond_clock": (
             np.where(keyed, 0.0, ratio / pitch_radius),
             np.zeros(N_ELEMENTS),
         ),
     }
+
+
+def phase_draw_columns() -> dict[str, np.ndarray]:
+    """Per phase feature drawn once for several channels, the draw column
+    each channel reads: the bonded gears read T030's ``cone_flat_clock``, the
+    phasing comb's reference (``phase_profiles``)."""
+    teeth = 6 * np.arange(1, N_ELEMENTS + 1)
+    bonded = np.isin(teeth, phasing_comb.BONDED_TEETH)
+    if np.any(bonded == np.isin(teeth, dt_cone_gear_spec.KEYED_TEETH)):
+        raise ValueError("the comb phases every bonded cone gear and no keyed one")
+    reference = phasing_comb.REFERENCE_TEETH // 6 - 1
+    return {"cone_flat_clock": np.where(bonded, reference, np.arange(N_ELEMENTS))}
 
 
 def draw_feature(
@@ -1218,6 +1238,7 @@ def _channel_model(
     d = np.broadcast_to(scale * x * nom.d_max, (draws, N_ELEMENTS)).copy()
     bias = np.zeros(N_ELEMENTS)
     phases = phase_profiles()
+    columns = phase_draw_columns()
     for key, v in dev.items():
         if key in axes:
             # the linearised deviated cycle: its gain AND its shape, per axis
@@ -1229,6 +1250,8 @@ def _channel_model(
             log_g += np.log1p(sens[key] / 100.0 * v)
         elif key in phases:
             per_unit, residual = phases[key]
+            if key in columns:
+                v = v[..., columns[key]]
             phi += v * per_unit + residual
         elif key == "station_setting":
             # A bar can be set neither below the pivot (build_ch_channel_assembly

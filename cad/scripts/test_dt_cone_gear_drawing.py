@@ -15,6 +15,7 @@ import _drawing_leaders
 import _cone_gear_geometry as geometry
 import _cone_gear_native as native_gear
 import _cone_gear_readback as readback
+import _cone_gear_sheet as cone_sheet
 import build_dt_cone_gear as part
 import cone_land_key
 import dt_cone_gear_notes as notes
@@ -472,7 +473,8 @@ def test_numbered_notes_state_the_bore_fit_from_both_parts_limits() -> None:
         x, y = drawing.NUMBERED_NOTES_POS
         top = max(
             drawing.FRONT_CENTER[1] + drawing.rendered_half_od(teeth),
-            drawing.front_keep(teeth)["FloorDia"][1] + drawing.FLOOR_STACK_HALF_HEIGHT,
+            drawing.front_keep(teeth)["FloorDia"][1]
+            + cone_sheet.FLOOR_STACK_HALF_HEIGHT,
         )
         assert y - len(lines) * 0.00351 > top + 0.010
         assert x + max(map(len, lines)) * 0.00179 < drawing.GEAR_DATA_POS[0] - 0.005
@@ -809,18 +811,16 @@ def test_every_sheet_layout_keeps_views_dimensions_and_title_block_separate() ->
             drawing.FRONT_CENTER[1]
             + spec.tooth_thickness_mm(teeth) * numerator / (denominator * 2000.0)
         )
-        tail_y = witness_y + drawing.DIMENSION_ARROW_LENGTH
-        shelf_y = floor_y - drawing.FLOOR_STACK_HALF_HEIGHT
+        tail_y = witness_y + cone_sheet.DIMENSION_ARROW_LENGTH
+        shelf_y = floor_y - cone_sheet.FLOOR_STACK_HALF_HEIGHT
         assert shelf_y - tail_y >= _drawing_leaders.ARROW_TEXT_CLEARANCE - 1e-9, teeth
         assert (
-            floor_y + drawing.FLOOR_STACK_HALF_HEIGHT
+            floor_y + cone_sheet.FLOOR_STACK_HALF_HEIGHT
             < drawing.GEAR_DATA_POS[1] - drawing.GEAR_DATA_HEIGHT
         )
         # The shelf rises only where the tail needs it: every other sheet
         # keeps the stack's usual place.
-        usual = (
-            drawing.FRONT_CENTER[1] + 0.6 * half_od + drawing.FLOOR_DIA_RISE
-        )
+        usual = drawing.FRONT_CENTER[1] + 0.6 * half_od + cone_sheet.FLOOR_DIA_RISE
         assert floor_y >= usual - 1e-12
         if floor_y > usual:
             assert shelf_y - tail_y == pytest.approx(_drawing_leaders.ARROW_TEXT_CLEARANCE)
@@ -830,14 +830,16 @@ def test_every_sheet_layout_keeps_views_dimensions_and_title_block_separate() ->
         # and the bottom row, the block tops out under the root-envelope
         # stack's shelf and ends left of the side view.
         thickness_x, thickness_y = drawing.tooth_thickness_shelf(teeth)
-        assert thickness_x - line_x == pytest.approx(drawing.TOOTH_THICKNESS_TEXT_GAP)
+        assert thickness_x - line_x == pytest.approx(
+            cone_sheet.TOOTH_THICKNESS_TEXT_GAP
+        )
         leader = Segment(line_x, drawing.FRONT_CENTER[1], thickness_x, thickness_y)
         for x0, y0, x1, y1 in (_THICKNESS_C_GLYPH, _THICKNESS_BOTTOM_GLYPH):
             glyph = Box(
                 thickness_x + x0, thickness_y + y0, thickness_x + x1, thickness_y + y1
             )
             assert segment_box_distance(leader, glyph) >= (
-                drawing.TOOTH_THICKNESS_TEXT_AIR + _THICKNESS_AIR_MARGIN
+                cone_sheet.TOOTH_THICKNESS_TEXT_AIR + _THICKNESS_AIR_MARGIN
             ), teeth
         top = thickness_y + _THICKNESS_INK_HEIGHT
         assert top + 0.002 <= floor_y - _FLOOR_SHELF_DROP, teeth
@@ -1059,7 +1061,7 @@ def test_front_view_draws_the_centreline_the_flat_and_its_tooth_share() -> None:
         line_x = drawing.front_keep(teeth)["ToothThickness"][0]
         assert end_x <= line_x - drawing.CENTRE_LINE_DIMENSION_AIR + 1e-9, teeth
         assert _centre_line_text_air(teeth, end_x) >= (
-            drawing.TOOTH_THICKNESS_TEXT_AIR + _THICKNESS_AIR_MARGIN
+            cone_sheet.TOOTH_THICKNESS_TEXT_AIR + _THICKNESS_AIR_MARGIN
         ), teeth
     source = inspect.getsource(drawing.build)
     assert "arms_mm=front_centre_mark_arms_mm(teeth)" in source
@@ -1107,7 +1109,7 @@ def test_enlarged_views_are_lettered_with_boundaries_on_the_front_view() -> None
         assert spec.bore_dia_mm(teeth) * ratio / 2000.0 < radius < root
         # The letter sits in the web, clear of the boundary, the root
         # envelope and both centre-mark arms.
-        letter = _letter_box(drawing.detail_letter_xy(bore, centre, radius))
+        letter = _letter_box(cone_sheet.detail_letter_xy(bore, centre, radius))
         inner, outer = _corner_radii(letter, centre)
         assert inner >= radius + _LETTER_AIR, teeth
         assert outer <= root - _LETTER_AIR, teeth
@@ -1232,12 +1234,13 @@ def test_text_air_refuses_the_line_hung_text_and_passes_the_shelf() -> None:
     axis_y = drawing.FRONT_CENTER[1]
     lower = axis_y - _T012_HALF_WITNESS
     hung = _t012_thickness_page((line_x, 0.09286), [(line_x, 0.09286, line_x, lower)])
-    air, nearest = drawing.tooth_thickness_text_air(hung, 12)
+    rows = drawing.TOOTH_THICKNESS_ROWS
+    air, nearest = cone_sheet.tooth_thickness_text_air(hung, rows, sheet="T012")
     assert air == pytest.approx(0.00025 - _PEN / 2.0, abs=1e-7)
-    assert air < drawing.TOOTH_THICKNESS_TEXT_AIR
+    assert air < cone_sheet.TOOTH_THICKNESS_TEXT_AIR
     assert "glyph" in nearest
     shelf = drawing.tooth_thickness_shelf(12)
-    tail = drawing.DIMENSION_ARROW_LENGTH
+    tail = cone_sheet.DIMENSION_ARROW_LENGTH
     shelved = _t012_thickness_page(
         shelf,
         [
@@ -1251,13 +1254,15 @@ def test_text_air_refuses_the_line_hung_text_and_passes_the_shelf() -> None:
             ),
         ],
     )
-    air, _nearest = drawing.tooth_thickness_text_air(shelved, 12)
-    assert air >= drawing.TOOTH_THICKNESS_TEXT_AIR
-    with pytest.raises(ValueError, match="printed 0 times"):
-        drawing.tooth_thickness_text_air(replace(shelved, spans=shelved.spans[1:]), 12)
-    with pytest.raises(ValueError, match="no shelf"):
-        drawing.tooth_thickness_text_air(
-            replace(shelved, strokes=shelved.strokes[1:]), 12
+    air, _nearest = cone_sheet.tooth_thickness_text_air(shelved, rows, sheet="T012")
+    assert air >= cone_sheet.TOOTH_THICKNESS_TEXT_AIR
+    with pytest.raises(ValueError, match="T012: thickness row .* printed 0 times"):
+        cone_sheet.tooth_thickness_text_air(
+            replace(shelved, spans=shelved.spans[1:]), rows, sheet="T012"
+        )
+    with pytest.raises(ValueError, match="T012: no shelf"):
+        cone_sheet.tooth_thickness_text_air(
+            replace(shelved, strokes=shelved.strokes[1:]), rows, sheet="T012"
         )
 
 
@@ -1266,11 +1271,14 @@ def test_export_is_refused_on_the_sheet_whose_thickness_text_a_line_strikes(
 ) -> None:
     pages = [object()] * len(drawing.SHEET_NAMES)
     monkeypatch.setattr(drawing, "read_pdf_ink", lambda _path: pages)
-    struck = {18: 0.0015}
+    struck = {"T018"}
     monkeypatch.setattr(
-        drawing,
+        cone_sheet,
         "tooth_thickness_text_air",
-        lambda _page, teeth: (struck.get(teeth, 0.003), f"T{teeth:03d} nearest"),
+        lambda _page, _rows, *, sheet: (
+            0.0015 if sheet in struck else 0.003,
+            f"{sheet} nearest",
+        ),
     )
     with pytest.raises(
         RuntimeError, match=r"strikes the thickness text.*\nT018: T018 nearest$"
@@ -1287,7 +1295,9 @@ def test_export_is_refused_on_the_sheet_whose_thickness_text_a_line_strikes(
     assert checked == [drawing.PDF]
     build = inspect.getsource(drawing.build)
     assert "checkpoint=_check_exported_pdf" in build
-    assert build.index("_shelve_tooth_thickness(") > build.index("CALLOUTS_ABOVE")
+    assert build.index("cone_sheet.shelve_tooth_thickness(") > build.index(
+        "CALLOUTS_ABOVE"
+    )
 
 
 def test_shelving_moves_the_text_by_its_measured_shelf_and_keeps_the_line(
@@ -1320,21 +1330,27 @@ def test_shelving_moves_the_text_by_its_measured_shelf_and_keeps_the_line(
         calls.append(("move", dx, dy))
         state["shelf"] = (state["shelf"][0] + dx, state["shelf"][1] + dy)
 
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(cone_sheet, "_early_bound", lambda obj, _iface: obj)
     monkeypatch.setattr(
-        drawing, "dimension_name", lambda _adapter, _a: "ToothThickness"
+        cone_sheet, "dimension_name", lambda _adapter, _a: "ToothThickness"
     )
-    monkeypatch.setattr(drawing, "offset_dimension_text", offset)
-    monkeypatch.setattr(drawing, "callout_ink", ink)
-    monkeypatch.setattr(drawing, "move_annotation", move)
-    monkeypatch.setattr(drawing, "dimension_segments", lambda _a: state["lines"])
-    drawing._shelve_tooth_thickness(None, [annotation], teeth, label="T012")
+    monkeypatch.setattr(cone_sheet, "offset_dimension_text", offset)
+    monkeypatch.setattr(cone_sheet, "callout_ink", ink)
+    monkeypatch.setattr(cone_sheet, "move_annotation", move)
+    monkeypatch.setattr(cone_sheet, "dimension_segments", lambda _a: state["lines"])
+
+    def shelve() -> None:
+        cone_sheet.shelve_tooth_thickness(
+            None, [annotation], line_x=line_x, target=target, label="T012"
+        )
+
+    shelve()
     assert calls == [
         (
             "offset",
             (
-                target[0] + drawing.TOOTH_THICKNESS_SEED[0],
-                target[1] + drawing.TOOTH_THICKNESS_SEED[1],
+                target[0] + cone_sheet.TOOTH_THICKNESS_SEED[0],
+                target[1] + cone_sheet.TOOTH_THICKNESS_SEED[1],
             ),
         ),
         ("move", pytest.approx(-0.003), pytest.approx(0.002)),
@@ -1342,7 +1358,7 @@ def test_shelving_moves_the_text_by_its_measured_shelf_and_keeps_the_line(
     # A line that followed its text off the tooth is refused.
     state["lines"] = [((line_x + 0.03, 0.1), (line_x + 0.03, 0.12))]
     with pytest.raises(RuntimeError, match="left the tooth"):
-        drawing._shelve_tooth_thickness(None, [annotation], teeth, label="T012")
+        shelve()
 
 
 def test_dimension_arrow_length_is_read_from_the_drawing() -> None:
@@ -1361,12 +1377,12 @@ def test_dimension_arrow_length_is_read_from_the_drawing() -> None:
         def __init__(self, value: float) -> None:
             self.Extension = _Extension(value)
 
-    matching = _Drawing(drawing.DIMENSION_ARROW_LENGTH)
-    drawing._assert_dimension_arrow_length(matching)
+    matching = _Drawing(cone_sheet.DIMENSION_ARROW_LENGTH)
+    cone_sheet.assert_dimension_arrow_length(matching)
     # swDetailingArrowLength, swDetailingNoOptionSpecified
     assert matching.Extension.calls == [(26, 0)]
     with pytest.raises(RuntimeError, match="drawing arrow length reads 3.175 mm"):
-        drawing._assert_dimension_arrow_length(_Drawing(0.003175))
+        cone_sheet.assert_dimension_arrow_length(_Drawing(0.003175))
 
 
 # The functional root callout's widest row (the mate's, seventeen characters)

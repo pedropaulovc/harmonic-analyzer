@@ -1577,9 +1577,11 @@ def test_reference_inputs_stay_on_the_lifting_side():
 def test_cone_phase_follows_gear_ratio_key_lever_and_bond_comb(budget):
     """Owner decision C1 keyed (2026-11-09, PR #1992): the keyed gears turn by
     half their keyway clearance over the key's lowest top less the edge break
-    and are indexed off the keyway; the bonded T006..T024 carry no keyway
-    terms, only their tooth space's play about the phasing comb's blade, a pitch arc
-    over each gear's pitch radius.  No term carries a residual."""
+    and are indexed off the keyway; the bonded T006..T024 carry no key play,
+    only their tooth space's play about the phasing comb's blade, a pitch arc
+    over each gear's pitch radius, and T030's keyway clock, which the comb
+    seated on T030 carries into each as T030's cam phase.  No term carries a
+    residual."""
     import cone_land_key
     import dt_cone_gear_spec
     import dt_cone_gear_tl_phasing_comb_spec as comb
@@ -1632,11 +1634,47 @@ def test_cone_phase_follows_gear_ratio_key_lever_and_bond_comb(budget):
                 expected = (clearance - way_mean) / (2.0 * key_lever) * ratio
                 assert phase == pytest.approx(expected, abs=1e-12)
             continue
-        assert profiles["cone_flat_clock"][0][index] == 0.0
+        assert profiles["cone_flat_clock"][0][index] * clock == pytest.approx(
+            math.radians(clock) * comb.REFERENCE_TEETH / 120.0
+        )
+        assert eb.phase_draw_columns()["cone_flat_clock"][index] == (
+            comb.REFERENCE_TEETH // 6 - 1
+        )
         assert key_per_unit[index] == 0.0
         assert bond_per_unit[index] == pytest.approx(
             1.0 / (60.0 * dt_cone_gear_spec.MODULE_MM)
         )
+
+
+def test_bonded_gears_turn_with_t030s_clock_draw(nom):
+    """The phasing comb seats on T030's phase-0 tooth, so one T030 keyway
+    clock draw turns T006..T030 alike, by T030's cam phase, and the bonded
+    gears' own columns of that draw turn nothing (Codjiflo, PR #2459)."""
+    x = np.zeros(eb.N_ELEMENTS)
+    x[[0, 19]] = 1.0  # T006 (bonded) and T120 (keyed)
+    sens = eb.gain_sensitivities(nom)
+
+    def error(column: int) -> np.ndarray:
+        clock = np.zeros((1, eb.N_ELEMENTS))
+        clock[0, column] = 1.0
+        return eb._channel_model(x, nom, {"cone_flat_clock": clock}, sens)
+
+    assert np.max(np.abs(error(0))) < 1e-12
+    t030 = error(4)
+    t = eb.cycle_table(nom)
+    stations = x * nom.d_max
+    read = np.interp(stations, t.stations, t.read)
+    kappa = np.interp(stations, t.stations, t.kappa)
+    phi = np.zeros((1, eb.N_ELEMENTS))
+    phi[0, :5] = math.radians(1.0) * 30.0 / 120.0
+    gains = np.ones((1, eb.N_ELEMENTS))
+    measured = eb._read_draws(x, t, gains, phi, stations[None, :], read, kappa)
+    base = eb._read_draws(
+        x, t, gains, np.zeros_like(phi), stations[None, :], read, kappa
+    )
+    expected = 100.0 * (measured - base) / np.max(np.abs(eb.ideal_coefficients(x)))
+    assert np.max(np.abs(t030)) > 0.0
+    assert t030 == pytest.approx(expected, abs=1e-9)
 
 
 def test_bond_phase_propagates_through_physical_readout(nom):

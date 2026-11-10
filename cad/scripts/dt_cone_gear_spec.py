@@ -377,8 +377,10 @@ FACE_WIDTH_BAND = GEAR_FACE_WIDTH_BAND
 # cone_flat_clock closes at it (machinist review of the C1-keyed sheets, PR 2
 # round 2: a ±.25° clock in DETAIL A named a tooth the detail does not draw,
 # and no mate).  The round bonded tip gears T012..T024 carry no clock on
-# their bores: MHA-DT-00's bonding step phases them (T018 and T012 to T024
-# through lined-up tooth spaces).
+# their bores: MHA-DT-00 step 1S engages the MHA-DT-03-TL-02 comb while the
+# bond cures, its blades phasing T024, T018, T012 and T006 each to the keyed
+# T030 (owner ruling 2026-11-10 via PR #1992; dt_cone_gear_tl_phasing_comb_spec,
+# error_budget.yaml cone_tip_bond_clock).
 
 
 def floor_radius_min_mm(teeth: int) -> float:
