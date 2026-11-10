@@ -30,6 +30,8 @@ from __future__ import annotations
 import math
 
 from _assembly_contract import assembly_contract
+from _printed_tolerance import printed_deviations
+from _title_block_units import LENGTH_UNITS
 
 from ch_fulcrum_keeper_spec import (
     FOOT_TIP_X,
@@ -48,14 +50,16 @@ from _cone_axis_constants import FRAME_FRONT_COLUMN_Z
 from fr_top_frame_spec import BOSS_DIA as SOCKET_BOSS_DIA
 from fr_top_frame_spec import WEB_T as RAIL_WEB_T
 from frame_column_stations import COLUMN_X
+from ch_rocker_arm_spec import HUB_LENGTH, HUB_LENGTH_BAND, UNIT as HUB_UNIT
 from rocker_bank_layout import (
+    COUNT,
     HUB0_SOUTH_FACE_Z,
     HUB19_NORTH_FACE_Z,
     ROCKER_SPRING_SET,
     ROCKER_SPRING_SET_BAND,
     SOUTH_EAR_INNER_Z,
     SOUTH_WASHER_Z,
-    STACK_L20_ACCEPT,
+    STACK_L20,
     STACK_L20_ACCEPT_BAND,
 )
 
@@ -139,7 +143,7 @@ if not (
 
 if abs(PIVOT_CHAIN_Z[1] - PIVOT_CHAIN_Z[0] - ROCKER_SPRING_SET) > 1e-9:
     raise AssertionError("the spring-set leg is not ROCKER_SPRING_SET")
-if abs(PIVOT_CHAIN_Z[3] - PIVOT_CHAIN_Z[2] - STACK_L20_ACCEPT[0]) > 1e-9:
+if abs(PIVOT_CHAIN_Z[3] - PIVOT_CHAIN_Z[2] - STACK_L20) > 1e-9:
     raise AssertionError("the stack leg is not the closed-up stack length")
 if abs(LUG_INNER_FACE_Z[1] - LUG_INNER_FACE_Z[0] - KEEPER_INNER_FACE_SPAN_MM) > 1e-9:
     raise AssertionError("the lug leg is not the keeper inner-face span")
@@ -158,7 +162,7 @@ DRAWING_DIMENSIONS = {
 # snap (the channel pitch, the spring's installed height, the kinematic
 # fulcrum line), so each banded one prints to the places that state its exact
 # nominal within its band: four for the spring set (.0236), the closed-up
-# stack (5.5563, so the "never short" acceptance holds) and the lug inner
+# stack (5.5563, the hubs' four; see STACK_PRINTED_LOWER) and the lug inner
 # faces (1.5946, 7.1846); three for the lug centre (.114, band .004). The
 # reference lug span is on the .XX grid (5.59).
 DRAWING_PRECISION = {
@@ -179,14 +183,69 @@ TOLERANCE_PRECISION = {
     for places_by_name in DRAWING_PRECISION.values()
     for name, places in places_by_name.items()
 }
-# (lower, upper) deviations; the stack accepts only long (STACK_L20_ACCEPT).
+# The stack prints at the places of the MHA-CH-06 hub length it sums
+# (ch_rocker_arm_notes.DRAWING_PRECISION; test_ch_channel_assembly_drawing
+# pins the two). A sheet's limits are read at their printed places (rule 3),
+# so twenty hubs at the hub's printed low limit (.2778, 0.4 um under the
+# 7.0565 pitch) make 5.5560 while the stack's native nominal prints 5.5563
+# (#2330). The printed low limit is carried down onto that grid to the
+# twenty printed hubs, as dt_cylinder_bank_setting_spec floors its bands onto
+# theirs: 5.5563 +.0040/-.0003 (owner ruling 2026-11-09, #2330 option (a)).
+# No budget reads it: the bank is located from its north ear and no hub may
+# be short (rocker_bank_layout), so only a long stack is re-faced. This is the
+# one check that the hubs' printed band cannot make a short stack; the
+# MHA-CH-00 re-face step relies on it.
+HUB_LENGTH_PLACES = 4
+
+
+def _floored(mm: float, places: int) -> float:
+    """``mm`` floored onto the sheet's ``places`` grid, in mm."""
+    per_unit = LENGTH_UNITS[UNIT]
+    return math.floor(mm / per_unit * 10**places + 1e-9) / 10**places * per_unit
+
+
+_STACK_PLACES = TOLERANCE_PRECISION[STACK_LENGTH_DIMENSION]
+# One hub at the hub sheet's printed low limit, and the stack's printed
+# nominal, both in mm.
+HUB_PRINTED_LOW = (
+    HUB_LENGTH
+    + printed_deviations(
+        HUB_LENGTH,
+        HUB_LENGTH_PLACES,
+        (HUB_LENGTH_BAND[1], HUB_LENGTH_BAND[0]),
+        unit=HUB_UNIT,
+    )[0]
+)
+_STACK_PRINTED = (
+    STACK_L20 + printed_deviations(STACK_L20, _STACK_PLACES, (0.0, 0.0), unit=UNIT)[0]
+)
+STACK_PRINTED_LOWER = min(
+    STACK_L20_ACCEPT_BAND[1],
+    _floored(COUNT * HUB_PRINTED_LOW - _STACK_PRINTED, _STACK_PLACES),
+)
+_stack_low = (
+    STACK_L20
+    + printed_deviations(
+        STACK_L20,
+        _STACK_PLACES,
+        (STACK_PRINTED_LOWER, STACK_L20_ACCEPT_BAND[0]),
+        unit=UNIT,
+    )[0]
+)
+if _stack_low > COUNT * HUB_PRINTED_LOW + 1e-9:
+    raise AssertionError(
+        "the re-face step covers only a long stack, but twenty hubs at their "
+        "printed low limit print under the stack's printed low limit"
+    )
+# (lower, upper) deviations; the stack accepts only long (STACK_L20_ACCEPT),
+# down to its printed hubs (STACK_PRINTED_LOWER).
 # The keeper plan's three each carry their fit-up band on their own
 # dimension (owner ruling X1+B1, 2026-10-18): each inner face off the socket
 # line the location band, the lug centre off the web centre its own looser
 # band (owner ruling X-A, 2026-10-18).
 DIMENSION_TOLERANCES = {
     SPRING_SET_DIMENSION: (-ROCKER_SPRING_SET_BAND, ROCKER_SPRING_SET_BAND),
-    STACK_LENGTH_DIMENSION: (-STACK_L20_ACCEPT_BAND[1], STACK_L20_ACCEPT_BAND[0]),
+    STACK_LENGTH_DIMENSION: (STACK_PRINTED_LOWER, STACK_L20_ACCEPT_BAND[0]),
     KEEPER_X_DIMENSION: (-KEEPER_FITUP_X_BAND_MM, KEEPER_FITUP_X_BAND_MM),
     **{
         name: (-KEEPER_FITUP_LOCATION_BAND_MM, KEEPER_FITUP_LOCATION_BAND_MM)

@@ -127,7 +127,6 @@ from ch_pivot_shaft_spec import (
     FLAT_DEPTH as PIVOT_FLAT_DEPTH,
     SHAFT_DIA as PIVOT_SHAFT_DIA,
 )
-from ch_rocker_arm_spec import HUB_LENGTH, HUB_LENGTH_BAND
 from channel_frame_geom import LEVER_FULCRUM_XY, ROCKER_PIVOT_XY
 from frame_column_stations import COLUMN_X
 from rocker_bank_layout import (
@@ -137,7 +136,6 @@ from rocker_bank_layout import (
     ROCKER_SPRING_SET,
     ROCKER_SPRING_SET_BAND,
     SHAFT_TIP_SET_BAND,
-    STACK_L20_ACCEPT,
     STACK_MID_Z,
 )
 
@@ -1081,16 +1079,13 @@ def _fitup_text() -> dict[str, str]:
         return steps.step_number(key)
 
     # Every hub comes at or over its print length (its band is upper-only),
-    # so the shortest stack the part band allows still meets the acceptance's
-    # low limit: the stack can only be long, and the re-face step covers that.
-    # It faces the longest hubs on the end away from datum G, the face each
-    # arm registers on in the stack (draw_ch_rocker_arm), keeping each at or
-    # over its print.
-    if COUNT * (HUB_LENGTH + HUB_LENGTH_BAND[1]) < STACK_L20_ACCEPT[0] - 1e-9:
-        raise AssertionError(
-            "the re-face step covers only a long stack, but the hub band "
-            "allows a stack under the acceptance's low limit"
-        )
+    # so the shortest stack the printed hub band allows still meets the
+    # printed stack's low limit: ch_channel_assembly_spec checks that as
+    # printed, each at its own places (#2330), when this module imports it.
+    # The stack can only be long, and the re-face step covers that. It faces
+    # the longest hubs on the end away from datum G, the face each arm
+    # registers on in the stack (draw_ch_rocker_arm), keeping each at or over
+    # its print.
     # The pivot shaft comes finished, domed both ends to its overall length
     # (ch_pivot_shaft_spec): its left tip set DOME_HEIGHT proud of the left
     # ear, within SHAFT_TIP_SET_BAND, puts both flats under their screws
@@ -1168,9 +1163,13 @@ def _fitup_text() -> dict[str, str]:
             f"IF AN {pin} SLID IN BY HAND, PRESS IT OUT, REMAKE IT TO THE PRESS "
             f"SIZE ON ITS DRAWING AND RETURN TO STEP {n(steps.RODS_PINNED_KEY)}."
         ),
+        # The fitter leaves this list after the rod pins for the drive train's
+        # cylinder stack through its north-bracket set, then comes back here
+        # (#2330 machinist review, rule 22: the hand-off is printed).
         "north-bracket-held": (
-            f"CHECK THE LEFT {bracket} OF {rocker_view}, SET AT "
-            f"{steps.NORTH_BRACKET_SET_REF}, DOES NOT TURN BY HAND."
+            f"AFTER {steps.CYLINDER_STACK_REF} THROUGH {steps.NORTH_BRACKET_SET_REF}, "
+            f"CHECK THE LEFT {bracket} OF {rocker_view}, SET THERE, DOES NOT TURN "
+            "BY HAND."
         ),
         "arms-swung-up": f"SWING EACH {arm} UP ON ITS {rod}.",
         "north-ear-datum": (
