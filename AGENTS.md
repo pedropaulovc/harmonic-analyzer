@@ -500,7 +500,14 @@ stdlib-only PyPI dependency (`prechips>=0.9`; the lock resolves the latest
 release, bump it with `uv lock --upgrade-package prechips`): no FreeCAD, no
 geometry kernel, no report or hash certificate. The plan reads its CAD values
 from the part's `features.toml` and its machines, tools, settings and gauges
-from `cad/process/shop.toml`. Only exit 0 from both profiles passes; exit 2 from
+from `cad/process/shop.toml`. Owner rulings (Pedro): the prechips cutover is a
+clean cutover that deleted the legacy machinery, including the #1413
+placeholder release refusal and the PROVISIONAL sheet stamp; and for prechips
+shop data, "no pedantism of not measured value inferred; if it is in the
+inputs they will be considered" (2026-11-10). `shop.toml` values are used as
+written, with no measured/placeholder provenance, and they are HA's own
+recorded values (the deleted inventory's, where it had one; tool diameters stay
+nominal), not prechips example values. Only exit 0 from both profiles passes; exit 2 from
 either is a refusal (bad input or a failed enforced check) and leaves neither
 file nor a stamp. Each task depends only on its own
 `package:features:<stem>` leaf, is not cache-keyed, and `build` and `release`
@@ -511,7 +518,9 @@ plan is held, unenrolled: prechips refuses it on `tool_sizing` (see
 `cad/process/README.md`). prechips adapters are tied to the manifest's
 contents, so a drawing change that alters a part's manifest requirements needs
 a prechips adapter release before that part's traveler passes again.
-A generated traveler is not machining approval.
+A generated traveler is not machining approval. Release staging refuses a
+traveler whose sheet header does not print the drawing number and revision of
+the manifest staged beside it.
 Releases ship each part's `travelers/<stem>/traveler.html` and
 `traveler-hobby.html` and list them in the notes.
 See [feature exports and travelers](cad/docs/pipeline/features-travelers.md).

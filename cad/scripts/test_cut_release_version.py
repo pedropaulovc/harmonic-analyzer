@@ -770,13 +770,18 @@ def test_release_stages_enrolled_travelers_after_feature_binding(
     monkeypatch.setattr(plans, "TRAVELER_STEMS", ("ch_rocker_arm",))
     generated = plans.traveler_paths("ch_rocker_arm", feature_release)
     generated[0].parent.mkdir(parents=True)
-    for path in generated:
-        path.write_bytes(f"verified {path.name}".encode())
     real_stage = plans.stage_travelers
+    printed = {}
 
     def stage_travelers(out: Path, stage: Path) -> list[Path]:
         assert out == feature_release
         assert (stage / "features" / "ch_rocker_arm" / "features.toml").is_file()
+        # What prechips prints from the manifest bound into this release.
+        header = plans.traveler_header("ch_rocker_arm", stage)
+        assert header.endswith("; v38")
+        for path in generated:
+            printed[path.name] = f"<p>{header}</p> {path.name}".encode()
+            path.write_bytes(printed[path.name])
         return real_stage(out, stage)
 
     monkeypatch.setattr(plans, "stage_travelers", stage_travelers)
@@ -785,7 +790,37 @@ def test_release_stages_enrolled_travelers_after_feature_binding(
     assert facts["travelers"] == ["travelers/ch_rocker_arm"]
     with zipfile.ZipFile(zip_path) as archive:
         for name in ("traveler.html", "traveler-hobby.html"):
-            assert archive.read(f"travelers/ch_rocker_arm/{name}") == f"verified {name}".encode()
+            assert archive.read(f"travelers/ch_rocker_arm/{name}") == printed[name]
+
+
+def _staged_manifest(stage: Path, number: str, revision: str) -> None:
+    manifest = stage / "features" / "ch_rocker_arm" / "features.toml"
+    manifest.parent.mkdir(parents=True)
+    manifest.write_text(
+        f'part = "ch-rocker-arm"\n\n[drawing]\nnumber = "{number}"\nrevision = "{revision}"\n',
+        encoding="utf-8",
+    )
+
+
+def test_staging_refuses_a_traveler_rendered_from_another_revision(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    plans = cut_release._process_plans
+    monkeypatch.setattr(plans, "TRAVELER_STEMS", ("ch_rocker_arm",))
+    stage = tmp_path / "stage"
+    _staged_manifest(stage, "MHA-CH-06", "v39")
+    pro, hobby = plans.traveler_paths("ch_rocker_arm", tmp_path / "out")
+    pro.parent.mkdir(parents=True)
+    pro.write_text("<p>MHA-CH-06; v39</p>", encoding="utf-8")
+    hobby.write_text("<p>MHA-CH-06; v38</p>", encoding="utf-8")
+    with pytest.raises(ValueError, match="traveler-hobby.html") as refused:
+        plans.stage_travelers(tmp_path / "out", stage)
+    assert "traveler.html (" not in str(refused.value)
+    assert not (stage / "travelers").exists()
+    hobby.write_text("<p>MHA-CH-06; v39</p>", encoding="utf-8")
+    assert plans.stage_travelers(tmp_path / "out", stage) == [
+        plans.traveler_dir("ch_rocker_arm", stage),
+    ]
 
 
 def test_staging_refuses_a_part_missing_its_hobby_traveler(tmp_path: Path, monkeypatch) -> None:

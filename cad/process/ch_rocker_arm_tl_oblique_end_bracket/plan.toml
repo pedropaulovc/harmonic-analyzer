@@ -37,7 +37,7 @@ parallel_thickness_mm = 3.175    # Archive parallels-lms-6745 thickness_in 0.125
 vise_jaw_height_mm = 44.9453     # Archive fixtures.vise-pm-6.jaw_height_in 1.7695.
 end_cut_tip_z_mm = -1.016        # Hand sheet: cutter .04 below the part.
 cutter_dia_mm = 12.7             # 1/2 in end mill.
-r8_collet_gauge_mm = 6.0         # Archive holders.r8-collets-lms-4860.gauge_len_mm.
+r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
 # Archive LMS 6784 projections: 7/16 in 41, 11/16 in 50; the 1/2 in cutter has
 # no member record, so its neighbours bound it (as in base-bar.toml).
 half_mill_projection_min_mm = 41.0

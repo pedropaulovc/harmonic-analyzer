@@ -81,6 +81,26 @@ specification separate from an owner-selected cut length or layout decision,
 and distinguish purchased stock length from installed length. prechips uses
 values as written; do not change a value merely to make a check pass.
 
+Owner rulings (Pedro), recorded for the cutover:
+
+- The prechips cutover is a clean cutover. It deleted the legacy machinery,
+  including the #1413 placeholder release refusal and the PROVISIONAL sheet
+  stamp; no traveler or release gate distinguishes measured from placeholder
+  values.
+- For prechips shop data: "no pedantism of not measured value inferred; if it
+  is in the inputs they will be considered" (2026-11-10). `shop.toml` and plan
+  values are used as written, with no measured/placeholder provenance.
+- `shop.toml` and the plans carry HA's own recorded values, not the prechips
+  example ones: where the deleted inventory or shop policy (`45952b66bc`) held a
+  different value for the same machine, holder or limit, HA's value is used
+  and marked `HA:` in a comment beside it.
+- Cutter and drill diameters stay at their nominal sizes. Sizing compares the
+  named tool size with the drawing band; HA's per-tool readings in the deleted
+  inventory (for example #29 3.451 mm, #12 4.798 mm, the 3/4 in end mill
+  19.039 mm) were #1413 "realistic placeholder" values, not shop measurements,
+  and under the ruling above values are used as written in `shop.toml`, which
+  states the nominal size.
+
 ## Travelers
 
 `cad/scripts/_process_plans.py:TRAVELER_STEMS` lists the parts with a
@@ -115,7 +135,10 @@ fails only that part's task. A refusal is a finding about the plan or shop
 data; correct the source, not the check.
 
 Releases copy each part's `traveler.html` and `traveler-hobby.html` to
-`travelers/<stem>/` in the bundle and list
-them in the notes. A traveler that passes is not permission to machine: shop
+`travelers/<stem>/` in the bundle and list them in the notes. Staging refuses,
+before copying, any traveler whose sheet header does not print the drawing
+number and revision (`<number>; <revision>`) of the manifest staged under
+`features/<stem>/`, such as a traveler left from an older export. A traveler
+that passes is not permission to machine: shop
 measurements, physical setup verification and machining approval are still
 required. See the [feature/traveler contract](../docs/pipeline/features-travelers.md).

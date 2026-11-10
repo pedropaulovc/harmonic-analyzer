@@ -317,8 +317,12 @@ After staging the verified `features/` bundles, `cut_release.py` calls
 `_process_plans.stage_travelers(out, stage)` under `release.travelers_stage`.
 It copies each enrolled part's `traveler.html` and `traveler-hobby.html` from
 `cad/out/travelers/<stem>/` to `travelers/<stem>/` in the release ZIP, and
-fails naming every traveler file that was not generated. `facts["travelers"]`
-records the staged directories and the release notes list them.
+fails naming every traveler file that was not generated. Before copying, it
+also refuses every traveler whose text lacks the `<number>; <revision>` header
+line built from the `[drawing]` table of the manifest already staged under
+`features/<stem>/`, so a traveler rendered from an older export cannot ship
+beside a newer bundle. `facts["travelers"]` records the staged directories and
+the release notes list them.
 
 The publisher's only tracked-source update is `cad/config/release.yaml`
 `next_revision`; it does not edit process plans. The generated-only follow-up

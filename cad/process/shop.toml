@@ -1,25 +1,30 @@
 # Harmonic-analyzer shop file for prechips travelers: tooling, cutting settings,
 # machines, workholding, gauges and limits, in the prechips shop schema. Checks
-# use these values as written. Part-specific tool keys do not assert tool
-# equivalence. Material identities preserve each source's stated stock
-# condition; they are not inferred from the printed material text or treated as
-# interchangeable. Facts the prechips schema cannot hold that CAD specs read
-# live in cad/config/shop-equipment.toml; no field is in both files.
+# use these values as written, with no measured/placeholder provenance (owner
+# ruling 2026-11-10, cad/process/README.md). Part-specific tool keys do not
+# assert tool equivalence. Material identities preserve each source's stated
+# stock condition; they are not inferred from the printed material text or
+# treated as interchangeable. Facts the prechips schema cannot hold that CAD
+# specs read live in cad/config/shop-equipment.toml; no field is in both files.
 
 # Source: prechips v0.9.0 examples/shop.toml (archive/pre-v0.10-2026-11-08
 # examples/inventory/pedro-shop.toml and examples/shop-policy.toml, converted to
-# millimetres), plus the HA records marked below.
+# millimetres), plus the HA records marked below. Where HA's own records
+# (45952b66bc:cad/process/shop/{inventory,shop-policy}.toml) gave a different
+# value, HA's value is used and marked "HA:".
 [machines.pm-30mv]
 kind = "mill"
 rpm_ranges = [[50, 3000]]
 travel_mm = { x = 584.2, y = 222.25, z = 355.6 }
-spindle_to_table_mm = [60.96, 431.8]
+# HA: envelope spindle_to_table_min_in 2.46 (62.484 mm), max 17 in (431.8 mm).
+spindle_to_table_mm = [62.484, 431.8]
 
 [machines.pm-1127vf-lb]
 kind = "lathe"
 rpm_ranges = [[70, 380], [380, 2000]]
 swing_over_bed_mm = 279.4
-swing_over_cross_slide_mm = 169.926
+# HA: envelope swing_over_cross_slide_in 6.66 (169.164 mm).
+swing_over_cross_slide_mm = 169.164
 between_centres_mm = 699.77
 
 [machines.bs-0]
@@ -89,12 +94,14 @@ range_mm = [0.0, 584.2]
 resolution_mm = 0.005
 
 [limits]
-stickout_ld_max = 4.0
+# HA: shop-policy numbers.stickout_ld_max 3.0.
+stickout_ld_max = 3.0
 tool_change_clearance_mm = 25.0
 
 # Source: base-bar.toml; source hand traveler dated 2026-11-05 and
 # table-clamped squaring sequence dated 2026-11-07 (see plan provenance).
-# diameter_mm: standard nominal size stated in each description, × 25.4.
+# diameter_mm: standard nominal size stated in each description, × 25.4 (HA's
+# per-tool diameter readings are not used; cad/process/README.md).
 # The 8-32 tap records the plan's authored #29 (.136 in) tap drill. The v48
 # drawing calls the #12 bracket drill (notes.process).
 [tools.basebar-saw]

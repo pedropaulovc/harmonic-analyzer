@@ -38,7 +38,7 @@ end_cut_tip_z_mm = -1.016        # End cutter .04 in below the bar.
 drill_tip_z_mm = -3.175          # Drill tips .125 in past the underside.
 half_cutter_dia_mm = 12.7        # 1/2 in end mill.
 face_cutter_dia_mm = 19.05       # 3/4 in end mill.
-r8_collet_gauge_mm = 6.0         # Archive holders.r8-collets-lms-4860.gauge_len_mm.
+r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
 drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
 # Archive LMS 6784 set projections from the R8 collet grow with size: 3/16 and
 # 1/4 in 25, 3/8 in 38, 7/16 in 41, 11/16 in 50, 3/4 in 57. The 1/2 and 5/16 in
