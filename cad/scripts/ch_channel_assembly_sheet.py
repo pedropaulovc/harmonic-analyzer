@@ -54,7 +54,7 @@ def _screw(thread: str, length_mm: float, kind: str) -> str:
 
 
 DIMENSION_CALLOUTS = {
-    # Set by DRO off the right bracket's touch-off (the right-bracket
+    # Set by DRO off the right bracket's indicator zero (the right-bracket
     # spring-set step; #2337: no feeler leaf fits beside the spring).
     SPRING_SET_DIMENSION: "SPRING SET",
     # The accepted stack caps the hubs' summed excess, so each arm stays on

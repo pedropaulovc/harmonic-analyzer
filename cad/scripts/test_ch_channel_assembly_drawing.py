@@ -270,13 +270,15 @@ def test_each_lettered_view_has_a_viewing_arrow_letter() -> None:
     assert drawing.KEEPER_PLAN.label_text.endswith("SCALE 1 : 2")
 
 
-def test_the_spring_set_is_dro_set_off_a_touch_off_on_the_washer() -> None:
+def test_the_spring_set_is_dro_set_off_an_indicator_zero_on_the_washer() -> None:
     """#2337: the wave spring covers all but .004 of the right washer's face,
-    so no feeler leaf can set the right bracket beside it. The bracket is
-    zeroed by DRO with its ear on the washer before the spring goes on, comes
-    off for the spring, and goes back on at detail A's spring set from that
-    zero; the acceptance is the spring-back, checked while the bracket is only
-    clamped (machinist review, PR #1605)."""
+    so no feeler leaf can set the right bracket beside it. The bracket's foot
+    end is indicator- and DRO-zeroed with its ear on the washer before the
+    spring goes on; it comes off for the spring, goes back on under a light
+    clamp and is tapped to that zero with the DRO at detail A's spring set
+    (Codjiflo r1 on #2489: something must hold it there). The acceptance is
+    the spring-back, checked while the bracket is only clamped (machinist
+    review, PR #1605)."""
     import tomllib
 
     from _process_plans import PROCESS_ROOT
@@ -287,19 +289,23 @@ def test_the_spring_set_is_dro_set_off_a_touch_off_on_the_washer() -> None:
     assert f"EAR PUSHING {washer}" in on_washer
     assert steps.NORTH_BRACKET_SET_REF in on_washer
     assert spring not in on_washer
-    assert "ZERO THE DRO" in _step_body("south-bracket-zeroed")
+    zeroed = _step_body("south-bracket-zeroed")
+    assert "TEST INDICATOR" in zeroed and "ZERO THE DRO" in zeroed
     assert "OFF" in _step_body("south-bracket-slid-off")
+    assert "CLAMP IT LIGHTLY" in _step_body("south-bracket-refitted")
     setting = _step_body("south-bracket-spring-set")
     assert f"SPRING SET OF {drawing.SOUTH_END.title}, SHEET 4" in setting
     assert f"STEP {steps.step_number('south-bracket-zeroed')} ZERO" in setting
+    assert "INDICATOR READS ZERO" in setting
     assert drawing.SHEET_NAMES.index(drawing.DETAIL_SHEET) == 3
     callout = drawing.notes.DIMENSION_CALLOUTS[drawing.asm.SPRING_SET_DIMENSION]
     assert callout == "SPRING SET"
     # No step sets anything on a feeler leaf beside the spring.
     for key in steps.ROCKER_SEQUENCE:
         assert "FEELER" not in _step_body(key), key
-    # The set error (two touches on one face and the DRO over the move) is
-    # inside detail A's band; the DRO's is the shop's vendor-stated accuracy.
+    # The set error (two indicator nulls on one face, half a division each,
+    # and the DRO over the move) is inside detail A's band, on the shop's own
+    # indicator and the DRO's vendor-stated accuracy.
     inventory = tomllib.loads(
         (PROCESS_ROOT / "shop" / "inventory.toml").read_text(encoding="utf-8")
     )
@@ -311,6 +317,9 @@ def test_the_spring_set_is_dro_set_off_a_touch_off_on_the_washer() -> None:
         if match
     ]
     assert drawing.DRO_ACCURACY_MM == pytest.approx(stated * 25.4)
+    division = inventory["gauges"]["dti"]["resolution_in"]["value"] * 25.4
+    assert drawing.INDICATOR_DIVISION_MM == pytest.approx(division)
+    assert drawing.SPRING_SET_ERROR_MM == pytest.approx(division + stated * 25.4)
     assert drawing.SPRING_SET_ERROR_MM < bank.ROCKER_SPRING_SET_BAND
     order = [
         "south-washer-fitted",
@@ -319,6 +328,7 @@ def test_the_spring_set_is_dro_set_off_a_touch_off_on_the_washer() -> None:
         "south-bracket-slid-off",
         "bank-spring-checked",
         "bank-spring-fitted",
+        "south-bracket-refitted",
         "south-bracket-spring-set",
         "south-bracket-clamped",
         "spring-back-checked",
