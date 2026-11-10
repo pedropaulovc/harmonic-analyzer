@@ -24,9 +24,6 @@ blank_min_length_in = 2.75
 blank_thickness_in = 0.5
 blank_width_in = 1.0
 quantity = 2
-# Cut list on the shared 1165 bar (hand sheet): the TL-26 lever blank first.
-lever_blank_in = 11.9
-bar_length_in = 24.0            # OnlineMetals 1165 nominal; measure it first.
 kerf_in = 0.125                 # Hand sheet: about 1/8 in per cut.
 y_touch_x_in = 3.5              # Hand sheet: Y0 touched on the fixed jaw past the part.
 # Machine-capacity inputs (mm). Heights are above the mill table; tool lengths
@@ -83,13 +80,13 @@ title = "Saw blanks"
 machine = "Saw / bench"
 indexing = "none"
 envelope = "other"
-diagram = { file = "diagrams/end-bracket/saw.svg", alt = "Cut list on the shared bar with both bracket blanks after the lever blank" }
+diagram = { file = "diagrams/end-bracket/saw.svg", alt = "Both bracket blanks from the bar end left after the lever blank" }
 
 [[setups.operations]]
 speed_kind = "other"
 tool = "saw"
 sizing = "other"
-instruction = "From the 1165 bar after the TL-26 lever blank (cut list on TL-26): saw {{process.quantity:d}} × {{process.blank_length_in:.2f}} blanks, waste side of the line; each ≥{{process.blank_min_length_in:.2f}} long."
+instruction = "From the 1165 bar end left after the TL-26 lever blank: saw {{process.quantity:d}} × {{process.blank_length_in:.2f}} blanks, waste side of the line; each ≥{{process.blank_min_length_in:.2f}} long."
 feed = "hand"
 
 [[setups]]
@@ -142,7 +139,7 @@ speed_kind = "spindle"
 tool = "spot"
 sizing = "other"
 instruction = "Spot H1–H{{cad.hole_count:d}}, cone ~5/32 across. X ±{{cad.station_tol_in:.3f}} ({{cad.station_tol_mm:.2f}} mm); Y {{cad.row_min_in:.3f}}–{{cad.row_max_in:.3f}}."
-instruction_detailed = "Y0: ROW EDGE is on the fixed jaw, so touch the jaw face from your side at ~X {{process.y_touch_x_in:.1f}}, past the part, and zero Y there. Spot H1–H{{cad.hole_count:d}}, cone ~5/32 across. X ±{{cad.station_tol_in:.3f}} ({{cad.station_tol_mm:.2f}} mm); Y {{cad.row_min_in:.3f}}–{{cad.row_max_in:.3f}}."
+instruction_detailed = "Y0: ROW EDGE is on the fixed jaw, so touch the jaw face from your side at ~X {{process.y_touch_x_in:g}}, past the part, and zero Y there. Spot H1–H{{cad.hole_count:d}}, cone ~5/32 across. X ±{{cad.station_tol_in:.3f}} ({{cad.station_tol_mm:.2f}} mm); Y {{cad.row_min_in:.3f}}–{{cad.row_max_in:.3f}}."
 rpm = 3000
 feed = "hand"
 
@@ -197,7 +194,7 @@ speed_kind = "other"
 tool = "plug"
 sizing = "other"
 instruction = "Start H1–H{{cad.hole_count:d}}. Plug tip not past {{cad.kp08_tip_max_in:.3f}} below KP08 SIDE."
-instruction_detailed = "Flag the plug tap {{cad.kp08_tip_max_in:.3f}} from its tip. Start H1–H{{cad.hole_count:d}} as in Op 70, stopping before the flag reaches KP08 SIDE."
+instruction_detailed = "Tape a flag on the plug tap {{cad.kp08_tip_max_in:.3f}} from its tip. Start H1–H{{cad.hole_count:d}} square from the drill chuck, spindle off, about 3 turns; finish with the T-handle, stopping before the flag reaches KP08 SIDE."
 feed = "hand"
 
 [[setups.operations]]

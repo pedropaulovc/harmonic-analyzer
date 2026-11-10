@@ -8,7 +8,7 @@ title = "Oblique trammel feed lever"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "6061-T6511 aluminium"
-stock = "{{process.blank_thickness_in:fraction}} × {{process.blank_width_in:fraction}} × {{process.bar_length_in:.0f}} in bar (OnlineMetals 1165, shared with TL-28); {{process.quantity:d}} × {{process.blank_length_in:.2f}} in blank."
+stock = "{{process.blank_thickness_in:fraction}} × {{process.blank_width_in:fraction}} × 24 in bar (OnlineMetals 1165, shared with TL-28); {{process.quantity:d}} × {{process.blank_length_in:.2f}} in blank."
 note = "Inches. Only the ends, two holes and two grip-end corners are machined; 1/2 and 1 in faces as bought."
 shop = "../shop.toml"
 material_key = "6061-t6511"
@@ -20,9 +20,6 @@ adapter = "harmonic_feed_lever"
 [parameters]
 blank_length_in = 11.9
 blank_min_length_in = 11.85
-bracket_blank_in = 2.85          # TL-28 blanks from the same bar (hand cut list).
-bracket_quantity = 2
-bar_length_in = 24.0             # OnlineMetals 1165 nominal; measure it first.
 kerf_in = 0.125                  # Hand sheet: about 1/8 in per cut.
 blank_thickness_in = 0.5
 blank_width_in = 1.0
@@ -76,13 +73,13 @@ title = "Saw blank"
 machine = "Saw / bench"
 indexing = "none"
 envelope = "other"
-diagram = { file = "diagrams/feed-lever/saw.svg", alt = "Cut list on the shared bar with the lever blank first" }
+diagram = { file = "diagrams/feed-lever/saw.svg", alt = "The lever blank from the measured bar end" }
 
 [[setups.operations]]
 speed_kind = "other"
 tool = "saw"
 sizing = "other"
-instruction = "Cut list from the 1165 bar, ~{{process.kerf_in:fraction}} kerf each: this lever {{process.blank_length_in:.2f}}, then {{process.bracket_quantity:d}} × {{process.bracket_blank_in:.2f}} for TL-28; keep the rest. Waste side of the line; lever blank ≥{{process.blank_min_length_in:.2f}}."
+instruction = "Cut this lever {{process.blank_length_in:.2f}} first from the measured end of the 1165 bar, ~{{process.kerf_in:fraction}} kerf; the rest goes to TL-28. Waste side of the line; lever blank ≥{{process.blank_min_length_in:.2f}}."
 feed = "hand"
 
 [[setups]]
@@ -91,8 +88,8 @@ title = "Zero end and both holes"
 machine = "PM-30MV / 6 in vise"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Flat, 1 in face up, on 1 in parallels against both jaws; ZERO EDGE at fixed jaw; ~{{process.overhang_in:.1f}} out past the left jaw side, the rest out right. Keep off the ~5 in overhang."
-datum = "X0 ZERO END (milled here); Y0 ZERO EDGE, touched past the jaws (~X {{process.y_touch_x_in:.0f}}); +Y toward you."
+holding = "Flat, 1 in face up, on 1 in parallels against both jaws; ZERO EDGE at fixed jaw; ~{{process.overhang_in:.1dot}} out past the left jaw side, the rest out right. Keep off the ~5 in overhang."
+datum = "X0 ZERO END (milled here); Y0 ZERO EDGE, touched past the jaws (~X {{process.y_touch_x_in:g}}); +Y toward you."
 diagram = { file = "diagrams/feed-lever/zero-end.svg", alt = "ZERO END out left of the vise: end cleaned up and both holes drilled" }
 # The cutter centre and edge finder stay within the lever length plus one
 # cutter diameter; across the 1 in width plus one diameter.
@@ -133,7 +130,7 @@ title = "Grip end to length"
 machine = "PM-30MV / 6 in vise"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Same vise, ZERO EDGE at fixed jaw, slid left: grip end ~{{process.overhang_in:.1f}} past the right jaw side; ZERO END ~5 in out left."
+holding = "Same vise, ZERO EDGE at fixed jaw, slid left: grip end ~{{process.overhang_in:.1dot}} past the right jaw side; ZERO END ~5 in out left."
 datum = "Re-find X0 on ZERO END; keep Y."
 diagram = { file = "diagrams/feed-lever/grip-end.svg", alt = "Slid left: grip end out right of the vise and cut to length from ZERO END" }
 envelope = { x_span_mm = ["{{cad.length_mm}}", "{{process.cutter_dia_mm}}"], y_span_mm = ["{{cad.blank_width_mm}}", "{{process.cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{cad.blank_thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.end_cut_tip_z_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
