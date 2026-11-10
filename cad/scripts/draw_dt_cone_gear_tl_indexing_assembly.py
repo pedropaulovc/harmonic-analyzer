@@ -88,26 +88,22 @@ SHEET_INNER_BORDER = (
     _TEMPLATE.height_m - 0.0127,
 )
 
-# Sheet metres. The plate face and edge sit top-left at full size; the
-# isometric sits below them, clear of the title block (x >= 0.216 m,
-# y <= 0.066 m); the BOM and the notes fill the right half above it. Item 2,
-# a loose kit item, has its own view right of the isometric, under the edge
-# view, its label under it.
+# Sheet metres. The plate face and edge sit top-left at full size, item 2
+# under item 1 at its kit pose; the isometric sits below them, clear of the
+# title block (x >= 0.216 m, y <= 0.066 m); the BOM and the notes fill the
+# right half above it.
 FRONT_CENTER = (0.085, 0.190)
 RIGHT_CENTER = (0.170, 0.190)
 ISO_CENTER = (0.085, 0.080)
 ISO_NOTE_XY = (0.050, 0.046)
-COMB_VIEW_SCALE = (2.0, 1.0)
-COMB_VIEW_CENTER = (0.160, 0.112)
-COMB_LABEL_XY = (0.126, 0.090)
 # The BOM's template columns print 196.6 mm wide (farm r2 layout audit), so
 # its left edge sits close enough to the views to end inside the right border.
 BOM_ANCHOR = (0.219, 0.262)
-# The BOM's two item rows end above the steps; the steps' eleven lines (4.5
+# The BOM's two item rows end above the steps; the steps' twelve lines (4.5
 # mm a line) above the checks, the checks above the indexing table.
 STEPS_XY = (0.219, 0.228)
-CHECKS_XY = (0.219, 0.171)
-TABLE_XY = (0.219, 0.138)
+CHECKS_XY = (0.219, 0.1665)
+TABLE_XY = (0.219, 0.1335)
 BALLOON_MARGIN = 0.012
 
 PLATE = plate.PART_NAME
@@ -125,28 +121,12 @@ BOM_COMPONENT_IDENTITIES: dict[str, tuple[str, str | None]] = {
     COMB: (COMB, None),
 }
 BALLOON_ANCHORS = {PLATE: BalloonAnchor(), COMB: BalloonAnchor()}
-# Kit-frame model points (mm) each item's views are placed by: the plate's
-# centre, and the middle of the comb's box at its kit pose.
+# The kit-frame model point (mm) every view is placed by: the plate's centre.
 PLATE_CENTER_MM = (0.0, 0.0, plate.THICKNESS / 2.0)
-_COMB_POINTS = comb.profile_points_mm()
-COMB_CENTER_MM = (
-    comb.KIT_POSITION_MM[0]
-    + (min(x for x, _ in _COMB_POINTS) + max(x for x, _ in _COMB_POINTS)) / 2.0,
-    comb.KIT_POSITION_MM[1]
-    + (min(y for _, y in _COMB_POINTS) + max(y for _, y in _COMB_POINTS)) / 2.0,
-    comb.KIT_POSITION_MM[2],
-)
-# Item 2 has no fitting here: the drive train's bonding step engages it. Its
-# view stands alone at its own scale; no parent view shows item 2, so it
-# carries a title with its scale and no letter (rule 9: a letter needs its
-# viewing mark; the unlettered "EXPLODED VIEW ... / SCALE" title of
-# draw_pn_pen_assembly is the fleet's precedent).
-COMB_VIEW_LABEL = "\n".join(
-    (
-        f"ITEM 2 SHOWN ALONE, SCALE {COMB_VIEW_SCALE[0]:g}:{COMB_VIEW_SCALE[1]:g}",
-        "FITTED BY MHA-DT-00 STEP 1, NOT ON THE HEAD",
-    )
-)
+# Item 2 has no fitting here: the drive train's bonding step engages it. It
+# shows under item 1 in the plate's face and edge views at its kit pose,
+# ballooned there (rule 22); the steps say where it is fitted.
+COMB_FITTING_LINE = "ITEM 2 IS FITTED BY MHA-DT-00 STEP 1, NOT ON THE HEAD."
 
 # Steps 1 and 4 reuse the head's own plate screws without a lock: owner
 # ruling RV-01 (the kit's machinist_exceptions) accepts that joint. The head
@@ -166,6 +146,7 @@ ASSEMBLY_STEPS = "\n".join(
         "5. SET THE CRANK PIN ON THE CIRCLE THE INDEXING TABLE NAMES.",
         "6. SET THE SECTOR ARMS TO SPAN THE PIN'S HOLE PLUS THE TABLE'S",
         "   HOLE SPACES PER TOOTH (10 SPACES = 11 HOLES).",
+        COMB_FITTING_LINE,
     )
 )
 ASSEMBLY_CHECKS = "\n".join(
@@ -385,8 +366,8 @@ def _move_model_point(
     label: str,
 ) -> None:
     """Move ``view`` so the model point lands on ``target`` (sheet m): a view
-    showing one item of the kit is placed by that item, not by the
-    assembly's box, which still holds the hidden one."""
+    is placed by the plate, not by the assembly's box, which also holds
+    item 2 (hidden or not)."""
     view = _early_bound(view, "IView")
     point = tuple(value / 1000.0 for value in point_mm)
     here = model_points_in_view(adapter, view, [point], label=label)[0]
@@ -400,41 +381,33 @@ def _move_model_point(
         raise RuntimeError(f"{label}: item sits at {here!r}, not {target!r}")
 
 
-def _plate_view(
-    adapter: Any, name: str, center: tuple[float, float], scale: tuple[float, float]
+def _kit_view(
+    adapter: Any,
+    name: str,
+    center: tuple[float, float],
+    scale: tuple[float, float],
+    stems: frozenset[str],
 ) -> Any:
-    """One view of item 1 alone, its centre on ``center``."""
+    """One view of ``stems``, the plate's centre on ``center``."""
     label = f"indexing kit {name}"
     view = place_view(adapter, str(SOURCE), name, *center, scale=scale)
     view = isolate_drawing_view_components(
-        adapter, view, visible_stems=frozenset({PLATE}), label=label
+        adapter, view, visible_stems=stems, label=label
     )
     _move_model_point(adapter, view, PLATE_CENTER_MM, center, label=label)
     return view
 
 
 def _place_sheet(adapter: Any) -> Any:
-    # The assembled views show item 1 only; item 2 is a loose kit item in a
-    # view of its own (rule 22).
-    front = _plate_view(adapter, "*Front", FRONT_CENTER, SHEET_SCALE)
-    right = _plate_view(adapter, "*Right", RIGHT_CENTER, SHEET_SCALE)
-    comb_view = place_view(
-        adapter, str(SOURCE), "*Front", *COMB_VIEW_CENTER, scale=COMB_VIEW_SCALE
-    )
-    comb_view = isolate_drawing_view_components(
-        adapter, comb_view, visible_stems=frozenset({COMB}), label="indexing kit item 2"
-    )
-    _move_model_point(
-        adapter,
-        comb_view,
-        COMB_CENTER_MM,
-        COMB_VIEW_CENTER,
-        label="indexing kit item 2",
-    )
-    for view, name in ((front, "*Front"), (right, "*Right"), (comb_view, "item 2")):
+    # The plate face and edge views show both items at their kit pose, item 2
+    # under item 1 with its own balloon; the shaded isometric shows item 1.
+    both = frozenset(BOM_COMPONENTS)
+    front = _kit_view(adapter, "*Front", FRONT_CENTER, SHEET_SCALE, both)
+    right = _kit_view(adapter, "*Right", RIGHT_CENTER, SHEET_SCALE, both)
+    for view, name in ((front, "*Front"), (right, "*Right")):
         set_hidden_lines_removed(adapter, view)
         apply_view_configuration(adapter, view, label=f"indexing kit {name}")
-    iso = _plate_view(adapter, "*Isometric", ISO_CENTER, ISO_SCALE)
+    iso = _kit_view(adapter, "*Isometric", ISO_CENTER, ISO_SCALE, frozenset({PLATE}))
     set_high_quality_shaded_with_edges(adapter, iso, label="indexing kit isometric")
     apply_view_configuration(
         adapter, iso, role=ViewRole.FULL_DETAIL, label="indexing kit *Isometric"
@@ -452,17 +425,15 @@ def _place_sheet(adapter: Any) -> Any:
         label="indexing kit",
     )
     items = _bom_items(adapter, table)
-    landings = []
-    for view, stem in ((front, PLATE), (comb_view, COMB)):
-        landings += add_component_bom_balloons(
-            adapter,
-            view,
-            items=((stem, items[stem]),),
-            anchors=BALLOON_ANCHORS,
-            label=f"indexing-kit BOM coverage, item {items[stem]}",
-            margin=BALLOON_MARGIN,
-            explode_offsets={},
-        )
+    landings = add_component_bom_balloons(
+        adapter,
+        front,
+        items=tuple((stem, items[stem]) for stem in BOM_COMPONENTS),
+        anchors=BALLOON_ANCHORS,
+        label="indexing-kit BOM coverage",
+        margin=BALLOON_MARGIN,
+        explode_offsets={},
+    )
     if len(landings) != len(BOM_COMPONENTS):
         raise RuntimeError(
             f"indexing kit carries {len(landings)} balloons, expected {len(BOM_COMPONENTS)}"
@@ -471,7 +442,6 @@ def _place_sheet(adapter: Any) -> Any:
         (ASSEMBLY_STEPS, STEPS_XY, "fitting steps"),
         (ASSEMBLY_CHECKS, CHECKS_XY, "checks"),
         (INDEXING_TABLE, TABLE_XY, "indexing table"),
-        (COMB_VIEW_LABEL, COMB_LABEL_XY, "item 2 view label"),
         (ISO_NOTE, ISO_NOTE_XY, "isometric scale note"),
     ):
         _add_note(adapter, text, xy, label=label)

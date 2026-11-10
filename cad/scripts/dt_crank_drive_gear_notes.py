@@ -110,7 +110,14 @@ GEAR_DATA = gear_data_note(
         # fine teeth; the requirement is a tooth fact, so it reads with them
         # (machinist review r1 of #1641: a free-floating note).
         ("TOOTH EDGES", "DO NOT BREAK OR CHAMFER FLANKS, TIPS OR ROOTS"),
-        ("MATES WITH", "CRANK PINION MHA-DT-10, 16T SPUR"),
+        # A helical 64T on a spur pinion reads as a contradiction unless the
+        # row says the axes cross at the helix angle (machinist review of PR 2
+        # round 4 read the twist in the small isometric as a spur).
+        (
+            "MATES WITH",
+            "CRANK PINION MHA-DT-10, 16T SPUR, AXES CROSSED "
+            f"{spec.HELIX_ANGLE_DEG:.{spec.GEAR_DATA_HELIX_PLACES}f} DEG",
+        ),
     ]
 )
 

@@ -553,9 +553,18 @@ CLUSTER_BALLOON_CLEARANCE = {
 }
 
 # --- note fields (x0, top, x1, bottom), metres --------------------------------
-# Tops sit under the one-line sheet heading at HEADING_XY.
+# Tops sit under the one-line sheet heading at HEADING_XY.  Sheet 7's right
+# field (the only user of NOTE_FIELD_RIGHT's foot) runs down to the title
+# block's top plus the BOM's paper clearance: PR 2 round 4's one-joint cone
+# steps needed its last 3.5 mm (run 20261110T065454309Z printed its foot at
+# 75.4 mm with 0.67 line spare over the 65.5 mm title block).
 NOTE_FIELD_LEFT = (0.018, 0.252, 0.212, 0.035)
-NOTE_FIELD_RIGHT = (0.222, 0.252, 0.415, 0.072)
+NOTE_FIELD_RIGHT = (
+    0.222,
+    0.252,
+    0.415,
+    DRAWING_TEMPLATES[SPEC.layout].title_block_top_m + BOM_SHEET_CLEARANCE,
+)
 NOTE_FIELD_INSET = 0.0005
 NOTE_ANCHOR_PASSES = 3
 NOTE_ANCHOR_SETTLE = 0.00005
@@ -1021,7 +1030,7 @@ def _nearest_leaf(setting: float) -> float:
 def _feeler_stack_rows() -> tuple[tuple[str, str, str], ...]:
     settings = (
         # Rubric sample round 13 (#4): the cone set's feelers are leaves too.
-        (STACK_FEELER, (STACK_FEELER,), _step_ref("cone-gears-stacked", "M")),
+        (STACK_FEELER, (STACK_FEELER,), _step_ref("cone-gears-stacked", "P")),
         (PINION_SEAT_FEELER, (PINION_SEAT_FEELER,), _step_ref("crank-mesh-checked", "F")),
         (
             FITUP.DRUM_END_SHIM,
@@ -1266,28 +1275,33 @@ CONE_CRANK_STEPS = _note_text(
         # space of each gear (owner rulings 2026-11-09 and 2026-11-10; a shop
         # tool, never in this BOM) engaged inside the compound's fixture time
         # (cone_tip_cluster, cone_stack_end_play;
-        # error_budget cone_tip_bond_clock).  The stack is first closed dry
-        # and measured; MHA-DT-38 is pressed on the loose MHA-DT-37 so the
-        # press never loads a bond.  A keyway goes on its key only one way and
-        # 1D measures the stack its gears close, so 1B names neither; the wrap
-        # counts 1B's placeholder at its width.
+        # error_budget cone_tip_bond_clock).  The stack is first closed dry,
+        # T024 against T030 with no feeler, and measured; MHA-DT-38 is pressed
+        # on the loose MHA-DT-37 so the press never loads a bond.  Machinist
+        # review round 4 of PR 2 (rule 22): every slide and bond names its
+        # mate and makes one joint, and 1B names its range and count.  A
+        # keyway goes on its key only one way and 1F measures the stack its
+        # gears close; the wrap counts 1B's placeholder at its width.
         "1. SEAT MHA-DT-VN-71 IN THE MHA-DT-04 KEYSEAT, TO ITS COLLAR END.",
         "1A. SLIDE MHA-DT-07 ON MHA-DT-VN-71 AGAINST THE MHA-DT-04 COLLAR.",
-        "1B. SLIDE {keyed_gears}X MHA-DT-03 ON T120 FIRST, THEN T024, DRY.",
-        "1C. SLIDE T012 AND T018 ON THE MHA-DT-37 SPIGOT, THEN IT IN THE SOCKET.",
-        f"1D. MEASURE T120 FRONT TO MHA-DT-37 LEAVES' BACK: ACCEPT {inch_window(STACK_L20_ACCEPT, 3)}.",
-        "1E. IF THE STACK IS LONG, RE-FACE ITS THICKEST GEAR.",
-        "1F. IF IT IS SHORT, REMAKE ITS THINNEST GEAR.",
-        "1G. REPEAT 1D UNTIL THE STACK READS IN ITS WINDOW.",
-        "1H. TAKE MHA-DT-37, T018, T012 AND T024 OFF.",
+        "1B. SLIDE T120 TO T030 ({keyed_gears}X MHA-DT-03) ON, T120 FIRST.",
+        "1C. SLIDE T024 ON MHA-DT-04 AGAINST T030, DRY, NO FEELER.",
+        "1D. SLIDE T012 AND T018 ON THE MHA-DT-37 SPIGOT, DRY.",
+        "1E. PUSH THE MHA-DT-37 SPIGOT INTO THE MHA-DT-04 SOCKET, DRY.",
+        f"1F. MEASURE T120 FRONT TO MHA-DT-37 LEAVES' BACK: ACCEPT {inch_window(STACK_L20_ACCEPT, 3)}.",
+        "1G. IF THE STACK IS LONG, RE-FACE ITS THICKEST GEAR.",
+        "1H. IF IT IS SHORT, REMAKE ITS THINNEST GEAR.",
+        "1J. REPEAT 1F UNTIL THE STACK READS IN ITS WINDOW.",
+        "1K. TAKE MHA-DT-37, T018, T012 AND T024 OFF.",
         # Rule 23: the press fit's bench acceptance and its slip-fit remedy.
-        "1J. PRESS MHA-DT-38 ON THE MHA-DT-37 PIVOT, AGAINST ITS LEAVES.",
-        "1K. CHECK THAT MHA-DT-38 DOES NOT TURN OR SLIDE BY HAND.",
-        "1L. IF IT DOES, BOND IT ON WITH LOCTITE 638 PER THE SHEET 1 NOTE.",
+        "1L. PRESS MHA-DT-38 ON THE MHA-DT-37 PIVOT, AGAINST ITS LEAVES.",
+        "1M. CHECK THAT MHA-DT-38 DOES NOT TURN OR SLIDE BY HAND.",
+        "1N. IF IT DOES, BOND IT ON WITH LOCTITE 638 PER THE SHEET 1 NOTE.",
         # T024 pressed onto the feeler on T030 closes the keyed stack onto the
         # collar, so the feeler sets the stack float (cone_stack_end_play).
-        f"1M. BOND T024 ON A {inch_text(STACK_FEELER, FEELER_PLACES)} FEELER ON T030 PER THE SHEET 1 NOTE.",
-        "1N. BOND T012 AND T018 ON, THEN THE SPIGOT IN, PER THE SHEET 1 NOTE.",
+        f"1P. BOND T024 ON MHA-DT-04, {inch_text(STACK_FEELER, FEELER_PLACES)} FEELER ON T030, PER THE SHEET 1 NOTE.",
+        "1Q. BOND T012 AND T018 ON THE MHA-DT-37 SPIGOT PER THE SHEET 1 NOTE.",
+        "1R. BOND THE SPIGOT IN THE MHA-DT-04 SOCKET PER THE SHEET 1 NOTE.",
         # Owner ruling 2026-11-10: one comb blade drops in one tooth space of
         # each gear.  T030's keyway centreline runs through its phase-0 tooth
         # (dt_cone_gear_spec), and its blade takes the space beside that tooth,
@@ -1296,9 +1310,9 @@ CONE_CRANK_STEPS = _note_text(
         # spaces at the same time (dt_cone_gear_tl_phasing_comb_spec).  Sheet
         # 7's left field has no line to spare, so the step stays one line; the
         # sheet 14 code key names the comb and its blades (code_key_text).
-        f"1P. ENGAGE {PHASING_COMB} AT ONCE, T030'S BLADE BESIDE THE KEY.",
+        f"1S. ENGAGE {PHASING_COMB} AT ONCE, T030'S BLADE BESIDE THE KEY.",
         # The sheet 1 note's cure and hand acceptance close the bonds.
-        f"1Q. REMOVE {PHASING_COMB} AND THE FEELER ONCE THE BONDS GRAB.",
+        f"1T. REMOVE {PHASING_COMB} AND THE FEELER ONCE THE BONDS GRAB.",
         # U37c cut-to-fit acceptance survives the taller post and longer stock:
         # MHA-DT-VN-61's registry/spec own the selected screw and reference length.
         # Each screw is cut against its own matched post/platform hole, never
@@ -1311,12 +1325,14 @@ CONE_CRANK_STEPS = _note_text(
         # The exact maximum short the part sheet allows (.005 in = 0.127): a
         # maximum never rounds outward, and the part's places print it whole.
         # Rule 22 (rubric sample round 10 lint): one sentence; the REF cut
-        # length and the stated engagement are the cut's own facts.
+        # length and the stated engagement are the cut's own facts.  FLUSH TO
+        # .005 SHORT is the never-proud limit (MHA-DT-VN-61's own sheet dropped
+        # NEVER PROUD as a restatement; PR 2 round 4 needed its line here).
         "2A. CUT EACH MHA-DT-VN-61 TO FIT, "
         f"({inch_text(post_screw.CUT_LENGTH_MM, post_screw.DRAWING_PRECISION_BY_NAME[post_screw.CUT_LENGTH_DIMENSION])}) "
         "REF LONG: FLUSH TO "
         f"{inch_max_text(post_screw.POST_SCREW_CUT_TO_FIT_SHORT, post_screw.CUT_TO_FIT_SHORT_PLACES)}"
-        " SHORT OF THE MHA-DT-20 UNDERSIDE, NEVER PROUD, " + POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT,
+        " SHORT OF THE MHA-DT-20 UNDERSIDE, " + POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT,
         "2B. DEBURR THE CUT ENDS.",
         "2C. RUN BOTH MHA-DT-VN-61 IN, LOOSE ENOUGH TO TURN MHA-DT-05.",
         # #1074: the collar's bearing on the boss end reacts the end screw's
@@ -2023,7 +2039,7 @@ CONSUMABLES_NOTES = _note_text(
         "UNLESS ITS STEP GIVES ANOTHER SETTING.",
         # Rule 23 (rubric d9f8b0c): one package note may carry the bond's
         # degrease, apply and cure rules; the bonds are part-spec steps.
-        # Round 13: every bond cites the note (1L-1N, 2P, 4B, 6B, 12-14), so the
+        # Round 13: every bond cites the note (1N-1R, 2P, 4B, 6B, 12-14), so the
         # note names no step range; the station it sets at once is 12A's.
         "LOCTITE 638 BONDS: DEGREASE BOTH PARTS; COAT THE "
         "INSERTED PART, NEVER A BLIND SEAT; KEEP IT OFF RUNNING LANDS; SET STEP "
@@ -2065,7 +2081,7 @@ def _split_sequence_chain(
 # splits keep every field full once the one-thing lines grew the sequence
 # (rubric sample rounds 2 and 4); test_every_note_field_holds_its_stacked_blocks
 # proves each fits.
-CONE_CONTINUED_FROM = f"{steps.step_number('post-and-tip-block')}M"
+CONE_CONTINUED_FROM = f"{steps.step_number('post-and-tip-block')}L"
 CRANK_CONTINUED_FROM = str(steps.step_number("crank-hub-fitted"))
 _CRANK_CONTINUED_HEADING = f"ASSEMBLY SEQUENCE CONT. - CRANK {CODE_KEY_POINTER}"
 CONE_CRANK_PRIMARY, CONE_CRANK_CONTINUED, CRANK_CONTINUED = _split_sequence_chain(

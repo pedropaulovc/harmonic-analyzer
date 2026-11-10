@@ -630,9 +630,9 @@ BLADE_MIN_IN = math.floor(BLADE_MIN_MM / INCH * 1000.0 + 1e-9) / 1000.0
 
 # --- Pose in the shop kit (MHA-DT-03-TL-00) -----------------------------------
 # The comb's model origin (mm) in the kit frame, in the index plate's front
-# plane under its rim; the kit's build places it here and its sheet finds it
-# here.
-KIT_POSITION_MM = (-11.0, -62.0, 0.0)
+# plane under its rim, clear of it by about a balloon's diameter; the kit's
+# build places it here and its sheet shows it there under item 1.
+KIT_POSITION_MM = (-11.0, -70.0, 0.0)
 
 # --- Model --------------------------------------------------------------------
 # Each relief cut runs this far past the plate's faces, the blade's south end

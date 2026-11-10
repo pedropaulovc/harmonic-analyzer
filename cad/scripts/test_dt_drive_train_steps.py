@@ -66,7 +66,10 @@ def test_the_cone_stack_step_prints_measured_limits() -> None:
     low, high = dt_cone_gear_stack.STACK_L20_ACCEPT
     stack = _step_body("cone-gears-stacked")
     assert "MHA-DT-07" in stack and "MHA-DT-03" in stack
-    assert "MHA-DT-03 ON T120 FIRST, THEN T024" in stack
+    # Machinist review round 4 of PR 2: the keyed range names its ends and
+    # count, and T024 is its own step.
+    assert "SLIDE T120 TO T030 (" in stack and "X MHA-DT-03) ON, T120 FIRST" in stack
+    assert "SLIDE T024 ON MHA-DT-04 AGAINST T030, DRY, NO FEELER" in stack
     # Owner decision C1 keyed (2026-11-09, PR #1992): the land-1 key goes in
     # before any gear slides over it.
     key = _config.parts("dt-vn-cone-shaft-key")["number"]
@@ -92,12 +95,15 @@ def test_the_tip_is_measured_dry_then_bonded_on_the_feeler() -> None:
     rulings 2026-11-09 and 2026-11-10)."""
     stack = _step_body("cone-gears-stacked")
     order = (
-        "THEN T024, DRY",
+        "SLIDE T024 ON MHA-DT-04 AGAINST T030, DRY, NO FEELER",
+        "SLIDE T012 AND T018 ON THE MHA-DT-37 SPIGOT, DRY",
+        "PUSH THE MHA-DT-37 SPIGOT INTO THE MHA-DT-04 SOCKET, DRY",
         "ACCEPT",
         "PRESS MHA-DT-38 ON THE MHA-DT-37 PIVOT",
-        f"BOND T024 ON A "
+        f"BOND T024 ON MHA-DT-04, "
         f"{sheet.inch_text(cone_stack_end_play.STACK_FEELER, sheet.FEELER_PLACES)} FEELER ON T030",
-        "BOND T012 AND T018 ON, THEN THE SPIGOT IN",
+        "BOND T012 AND T018 ON THE MHA-DT-37 SPIGOT",
+        "BOND THE SPIGOT IN THE MHA-DT-04 SOCKET",
         "ENGAGE MHA-DT-03-TL-02 AT ONCE, T030'S BLADE BESIDE THE KEY",
         "REMOVE MHA-DT-03-TL-02 AND THE FEELER",
     )
@@ -169,7 +175,10 @@ def test_post_screws_keep_spec_owned_stock_and_cut_to_fit_acceptance() -> None:
     # The step prints the part sheet's exact maximum short, never a wider one.
     printed_short = float(re.search(r"FLUSH TO (\d*\.\d+) SHORT", fitup).group(1))
     assert printed_short * 25.4 == pytest.approx(screw.POST_SCREW_CUT_TO_FIT_SHORT, abs=1e-9)
-    assert "CUT EACH MHA-DT-VN-61 TO FIT" in fitup and "UNDERSIDE, NEVER PROUD" in fitup
+    assert (
+        "CUT EACH MHA-DT-VN-61 TO FIT" in fitup
+        and "SHORT OF THE MHA-DT-20 UNDERSIDE" in fitup
+    )
     assert "DEBURR THE CUT ENDS" in fitup
     assert screw.FIXED_CUT_LENGTH_EXISTS is False
     assert screw.STOCK_LENGTH_MM >= screw.FIXED_LENGTH_ENGAGEMENT_MIN_MM

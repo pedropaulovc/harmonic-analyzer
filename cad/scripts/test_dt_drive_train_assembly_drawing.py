@@ -815,7 +815,7 @@ def test_every_set_feeler_the_steps_and_checks_print_has_a_leaf_row() -> None:
     stays left of the cone station table."""
     rows = {row[0]: row[2] for row in drawing.FEELER_STACK_ROWS}
     assert "4H, 4J" in rows[".004"]
-    assert "CHECK 4D" in rows[".018"] and "1M" in rows[".018"]
+    assert "CHECK 4D" in rows[".018"] and "1P" in rows[".018"]
     assert rows[".020"] == "CHECK 4D, 4M"
     assert "4F" in rows[".010"]
     checks = " ".join(drawing.CHECKS.split())
@@ -1113,8 +1113,8 @@ def test_cone_station_rows_run_front_to_back() -> None:
     # Step 1P's comb is a shop tool with no BOM row: the key names it and
     # defines the BLADE the step cites (machinist review of bd81283964).
     assert table[-1] == "MHA-DT-03-TL-02 = PHASING COMB, ONE BLADE IN A TOOTH SPACE PER GEAR."
-    step = drawing.CONE_CRANK_STEPS[drawing.CONE_CRANK_STEPS.index("1P. ") :]
-    assert step.startswith("1P. ENGAGE MHA-DT-03-TL-02 AT ONCE, T030'S BLADE")
+    step = drawing.CONE_CRANK_STEPS[drawing.CONE_CRANK_STEPS.index("1S. ") :]
+    assert step.startswith("1S. ENGAGE MHA-DT-03-TL-02 AT ONCE, T030'S BLADE")
 
 
 def test_bom_split_keeps_the_first_column_no_taller() -> None:
