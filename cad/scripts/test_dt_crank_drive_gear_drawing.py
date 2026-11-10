@@ -918,11 +918,27 @@ def test_both_shop_gears_state_the_source_owned_tooth_cutting_setup_not_a_form_c
             )
             if separator
         )
-        assert rows["TOOTH CUTTING SETUP, ACCEPT AT SETUP"] == (
-            f"{spec.inch_text(part_spec.TOOTH_RUNOUT_TIR_MM, 3)} TIR MAX TO FINISHED BORE"
-        )
+        tir = spec.inch_text(part_spec.TOOTH_RUNOUT_TIR_MM, 3)
+        # The shop's runout row: .001 per inch of the feature (mm per mm).
+        runout_row = 0.001 * part_spec.OUTSIDE_DIA
+        if part_spec.TOOTH_RUNOUT_TIR_MM < runout_row:
+            # Under its row (the 64T's Ø2.8 blank), the row names its route
+            # and the surface indicated: an arbor fitted to the bore.
+            assert rows["TOOTH CUTTING SETUP, ACCEPT AT SETUP"] == (
+                f"ARBOR FITTED TO BORE, {tir} TIR MAX"
+            )
+        else:
+            assert rows["TOOTH CUTTING SETUP, ACCEPT AT SETUP"] == (
+                f"{tir} TIR MAX TO FINISHED BORE"
+            )
         assert "AGMA" not in part_notes.GEAR_DATA
         assert not hasattr(part_spec, "GEOMETRIC_CONTROLS")
         assert not hasattr(part_spec, "GEOMETRIC_TOLERANCES_MM")
     # Each finished-bore eccentricity is half its own stated setup TIR.
     assert (spec.TOOTH_RUNOUT_TIR_MM + pinion_spec.TOOTH_RUNOUT_TIR_MM) / 2.0 == setup_tir
+    # The 64T's block keeps its 19 lines and its widest row: an extra line or
+    # a wider row runs its last rows into the tooth tips.
+    lines = notes.GEAR_DATA.splitlines()
+    assert len(lines) == 19
+    setup_row = next(line for line in lines if line.startswith("TOOTH CUTTING SETUP"))
+    assert len(setup_row) <= max(len(line) for line in lines if line is not setup_row)

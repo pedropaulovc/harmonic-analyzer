@@ -107,6 +107,7 @@ from dt_cone_gear_shaft_spec import (
     FLAT_LANDS,
     KEYED_LAND,
     FLAT_MATE_SUFFIXES,
+    LAND_NOTE,
     JOURNAL_DIA,
     SEAT_MATE_CALLOUTS,
     SEAT_MATE_SUFFIXES,
@@ -201,13 +202,17 @@ SIDE_KEEP = {
     # 06460fb; .05 since Codjiflo #2331 4521933063).  Its 1.3 mm span puts both
     # arrows outside; it hangs below the shaft from land 1's lower corner,
     # where the collar diameter's line (x 0.2088, down to y 0.1357) and the
-    # collar web's witnesses (down to 0.1323) end above its line (y 0.1280):
-    # its right arrow (to x ~0.210) crosses neither.  Its ".05" text (~7 mm,
-    # on its line like the web's 0.1327) stands left of the left arrow (from
-    # ~0.2013), 1.2 mm under the web's text box and just right of it (ends
-    # ~0.1927), and right of Sec1End's text (ends ~0.175) one tier up from
-    # Sec1End's line (0.1247).
-    "Sec1KeyseatEndSet": (0.1965, 0.1308),
+    # collar web's witnesses (down to 0.1323) end above its line: its right
+    # arrow (to x ~0.213) crosses neither.  PR 1 r8 (1b3d39ffbd16) measured
+    # the ".05" text box 2.8 mm left, 3.0 mm right, 1.8 mm under and 1.7 mm
+    # over its (0.1965, 0.1308) position, its line 2.8 mm under it, and the
+    # web's outside left arrow (0.1999..0.2062 at y 0.1327, 0.76 mm wide)
+    # 0.41 mm from that box (layout audit arrow-near-text, gating; same on
+    # PR 2 r5).  Here the box (~0.1917..0.1975 x 0.1275..0.1310) keeps 2.7 mm
+    # of that arrow, its line (~0.1265) 1.8 mm over Sec1End's (0.1247) and
+    # its text 2.8 mm over it, and the web's text (ends 0.1913, from 0.1337
+    # up) 2.7 mm away.
+    "Sec1KeyseatEndSet": (0.1945, 0.1293),
 }
 OVERALL_REFERENCE_TEXT_XY = (0.1515, 0.0795)
 # Sheet width of one length digit or point at the dimension font (the 916a
@@ -482,6 +487,15 @@ KEYSEAT_WIDTH_RISE = 0.0283
 # shared clock is in the land note (spec LAND_NOTE) with their fit.
 SECTION_ABOVE_CALLOUTS = {
     f"Sec{max(FLAT_LANDS)}AF": TORQUE_CORNER_CALLOUT,
+    # A-A's S flags the land note like its width (PR 2 r5 machinist review,
+    # clarity: the depth lacked the width's flag).  Above, not after: an
+    # after-suffix would run the S line ~18 mm right, through the width's
+    # dimension line at the keyseat's edge (0.3466), and the Ø.4825 block
+    # (to 0.3144) holds its left.  Centred on the S text (0.3301 on PR 1 r8,
+    # 1b3d39ffbd16), the 6-character run spans ~0.322..0.338, 8.7 mm above
+    # the S position: 8 mm left of the width's line and shelf (from 0.3466 at
+    # y 0.1888), ~6 mm under the pictorial (0.2001 from x 0.3275).
+    "Sec1KeyseatS": f"NOTE {LAND_NOTE}",
 }
 # An above callout is centred on its dimension's text, set as one run: a
 # 40-character run read 110.6 mm wide in COM (Sec4AF's 0.3377..0.4483 at
@@ -1457,11 +1471,26 @@ def _prove_section_layout(
             f"{label} dimension 1": texts_in_section[f"{label} dimension 1"],
             f"{label} caption": placed.caption,
         }
+        if placed.section.land == KEYED_LAND:
+            # A-A's S and its NOTE flag above it stand over the face; as one
+            # box with the face they would reach up beside the width's row.
+            # So S rides on its own, clear of the face and of the width.
+            del cell[f"{label} dimension 1"]
         # A-A's keyseat width rides above B's cell (KEYSEAT_WIDTH_RISE): its
         # own box, clear of every other group, not part of A's cell.
         riders = {
             name: box for name, box in texts_in_section.items() if name not in cell
         }
+        if placed.section.land == KEYED_LAND:
+            s_name = f"{label} dimension 1"
+            require_clear(
+                s_name,
+                riders[s_name],
+                {
+                    f"{label} face": placed.face,
+                    **{name: box for name, box in riders.items() if name != s_name},
+                },
+            )
         require_clear(
             f"{label} caption",
             placed.caption,
