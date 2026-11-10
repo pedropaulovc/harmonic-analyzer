@@ -35,7 +35,7 @@ dt-cone-gear:
       reason: "Owner ruling 2026-11-09 via PR #1992 (https://github.com/pedropaulovc/harmonic-analyzer/pull/1992), C1 keyed: T012 is reamed round Ø.0625 and bonded on MHA-DT-37's Ø.0625 spigot, which must stand under T006's root so the DT6-FORM1 cutter runs off; the cutter-native T012 root fixes the web at .0646 (research: drive-train-cone-tip-options.md, option C). It replaces the 2026-11-01 ruling's .0797 on the retired .031 terminal land. Anything thinner must be ruled again"
     - id: "RV-06"
       kind: "accept"
-      where: "sheets T024-T120, DETAIL A: the bore Ø +.0018/+.0010 (REAM THRU; BoreCutDia on T024, KeyedBoreDia on T030-T120), flagged SEE NOTE 1"
+      where: "sheets T024-T120: the bore Ø +.0018/+.0010 (REAM THRU; BoreCutDia on T024's front view, KeyedBoreDia in DETAIL A on T030-T120), flagged SEE NOTE 1"
       finding: "+.0018/+.0010 is a converted millimetre band, not a plain inch step (rule 4)"
       reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144 (fan-out rulings F2 and F5). The limits come from the fleet-shared gear_seat_fit seat class on MHA-DT-04's GEAR_SEAT_BAND, restated in inch steps at that family's next re-key. Re-scoped by owner ruling 2026-11-09 via PR #1992 (https://github.com/pedropaulovc/harmonic-analyzer/pull/1992): no D-bore or across-flat band remains, and T012/T018 take the reamer's plain +.0005/-.0000. Accepts this notation only, no other band or callout departure."
     - id: "RV-07"

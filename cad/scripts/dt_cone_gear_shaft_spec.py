@@ -427,6 +427,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Sec2": {"Sec2End"},
     "Sec1KeyseatProfile": {"Sec1KeyseatWidth", "Sec1KeyseatS"},
     "SocketProfile": {"SocketDia"},
+    "Sec1KeyseatEndProfile": {"Sec1KeyseatEndSet"},
     "ShoulderFillets": {"ShoulderR"},
     "CollarProfile": {"CollarDia"},
     "Collar": {"CollarWidth"},
@@ -483,6 +484,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "Sec1KeyseatS": cone_land_key.KEYSEAT_PLACES,
     },
     "SocketProfile": {"SocketDia": cone_tip_cluster.STEM_PLACES},
+    "Sec1KeyseatEndProfile": {"Sec1KeyseatEndSet": 2},
     "ShoulderFillets": {"ShoulderR": 3},
     "CollarProfile": {"CollarDia": 3},
     "Collar": {"CollarWidth": 3},
@@ -657,20 +659,22 @@ if SOCKET_WALL_MIN_MM < WALL_TARGET_MM:
         f"socket wall {SOCKET_WALL_MIN_MM:.4f} mm under rule 17's .080"
     )
 
-# The keyseat's end at its printed low limit, cut by the widest end mill
-# (the keyseat's upper width), keeps KEYSEAT_END_COLLAR_MARGIN_MM of the
-# collar's tip-side face, the 64T's seat and the stack's origin, uncut.
-KEYSEAT_END_COLLAR_MARGIN_MM = 0.1
-KEYSEAT_END_COLLAR_CLEARANCE_MIN_MM = (
-    cone_land_key.KEY_END_SET_MM
-    + printed_length_deviations("Sec1KeyseatEndSet")[0]
-    - cone_land_key.limits(
-        cone_land_key.KEYSEAT_WIDTH_MM, cone_land_key.KEYSEAT_WIDTH_BAND
-    )[1]
-    / 2.0
+# The key's north end at the far printed limits of the keyseat end's .XX
+# location and the key's .XX length stays south of T024 (gear 16), bonded on
+# land 2 one feeler north of T030: the key sits between the keyseat's end and
+# T024.
+KEY_NORTH_MARGIN_MM = (
+    FRONT_STUB
+    + gear_faces(16)[0]
+    - (
+        COLLAR_END_STATION
+        + cone_land_key.KEY_END_SET_MM
+        + printed_length_deviations("Sec1KeyseatEndSet")[1]
+        + cone_land_key.KEY_LENGTH_MM
+        + printed_band_mm(cone_land_key.KEY_LENGTH_PLACES, unit=UNIT)
+    )
 )
-if KEYSEAT_END_COLLAR_CLEARANCE_MIN_MM < KEYSEAT_END_COLLAR_MARGIN_MM:
+if KEY_NORTH_MARGIN_MM <= 0.0:
     raise AssertionError(
-        "the keyseat's end mill reaches the collar's 64T seat at print-worst "
-        f"({KEYSEAT_END_COLLAR_CLEARANCE_MIN_MM:.4f} mm clear)"
+        f"the key reaches T024 at print-worst ({KEY_NORTH_MARGIN_MM} mm)"
     )

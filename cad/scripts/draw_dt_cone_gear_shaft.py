@@ -174,15 +174,20 @@ DONOR_CENTER = (0.360, 0.090)
 # x 0.1612..0.1647: 4.1 mm short of section A-A's upper arrow with A cut
 # A_CUT_FROM_STEP_MM from the step (1.1 mm at 25, under the proof's 2 mm),
 # and its shoulder 1.3 mm right of the Ø.2500 line (r16 crossed it at +0.0085).
+# PR 2 r3 (2aeedb78) measured the shoulder 0.0846..0.1130 at y 0.1612 about
+# its 0.0996 position, 2.4 mm wider than r2's, crossing the Ø.2500 line
+# (x 0.0849, 0.1532..0.1740).  Land 2 is too short to move that line left of
+# the shoulder, so the radius moves 2.8 mm right (shoulder from ~0.0874,
+# 2.5 mm right of the line) and A's cut 3 mm north to keep its arrow clear.
 SIDE_KEEP = {
     "CollarWidth": (0.1740, 0.1355),
     "Sec0End": (0.2311, 0.1355),
-    # Its " SEE NOTE 2" flag (round 4) widens the text to ~37 mm; 9 mm right
+    # Its " SEE NOTE 2" flag (round 4) widens the text to ~37 mm; 12 mm right
     # of the bare value's centre it starts right of section A's lower letter
-    # (x <= 0.1379 with A cut 28 mm from the step), one tier above it.
-    "Sec1End": (0.1590, 0.1275),
+    # (x <= 0.1409 with A cut 31 mm from the step), one tier above it.
+    "Sec1End": (0.1620, 0.1275),
     "Sec2End": (0.1464, 0.1195),
-    "ShoulderR": (BIG_END_X - SECTION_ENDS[1] / 1000.0 + 0.0096, 0.1640),
+    "ShoulderR": (BIG_END_X - SECTION_ENDS[1] / 1000.0 + 0.0124, 0.1640),
     # The keyseat end's centre from the collar face (machinist review of
     # 06460fb; .05 since Codjiflo #2331 4521933063).  Its 1.3 mm span puts both
     # arrows outside; it hangs below the shaft from land 1's lower corner,
@@ -343,10 +348,12 @@ class DSection(NamedTuple):
 # A's box clear of it.  The cutting line stands A_CUT_FROM_STEP_MM north of
 # land 1's step: at 25 mm its upper arrow, 0.1133..0.1287 with the proof's
 # 1.7 mm pad, stood 1.1 mm right of the R.004 text's 0.1122 (PR 2 r2,
-# 967cedb).  At 28 mm the arrows start 0.1163, 4.1 mm clear; its letters
-# (0.1285..0.1349 at 25 mm) move to 0.1315..0.1379, and Sec1End's text
-# (SIDE_KEEP) moves 3 mm right with them.
-A_CUT_FROM_STEP_MM = 28.0
+# 967cedb).  At 28 mm the arrows started 0.1163.  r3's wider radius text
+# moved 2.8 mm right (SIDE_KEEP), so at 31 mm the arrows start 0.1193, 3.5 mm
+# clear of its shoulder's right end (~0.1158); its letters (0.1285..0.1349 at
+# 25 mm) move to 0.1345..0.1409, and Sec1End's text (SIDE_KEEP) moves 6 mm
+# right with them.
+A_CUT_FROM_STEP_MM = 31.0
 D_SECTIONS = (
     DSection(1, "A", SECTION_ENDS[1] - A_CUT_FROM_STEP_MM, 0.0150, (0.3371, 0.165), (2, 1)),
 )
