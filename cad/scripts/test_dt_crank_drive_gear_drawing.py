@@ -526,9 +526,15 @@ def test_bore_and_keyway_dimensions_link_one_matched_fit_note() -> None:
     # it. The round bore takes rule 12's REAM now no flat is left to cut away.
     link = f"SEE NOTE {drawing.BORE_FIT_NOTE_NUMBER}"
     assert drawing.DIMENSION_CALLOUTS["BoreDia"] == f"REAM THRU\n{link}"
+    # The keyway's width and T print the bare flag, as the keyed cone gears'
+    # sheets do for the same keyway (rule 25: sheets agree).
+    import draw_dt_cone_gear as cone_drawing
+
     for name in ("KeywayWidth", "KeywayT"):
-        callout = drawing.DIMENSION_CALLOUTS[name]
-        assert callout.startswith("KEYWAY") and callout.endswith(link), name
+        assert drawing.DIMENSION_CALLOUTS[name] == link, name
+        assert (
+            drawing.DIMENSION_CALLOUTS[name] == cone_drawing.DIMENSION_CALLOUTS[name]
+        ), name
     for name in ("BoreDia", "KeywayWidth", "KeywayT"):
         callout = drawing.DIMENSION_CALLOUTS[name]
         assert notes.SHAFT_MATE_NUMBER not in callout, name

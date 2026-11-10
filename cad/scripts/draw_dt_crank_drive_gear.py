@@ -236,8 +236,12 @@ BORE_FIT_NOTE = "\n".join(
 SHEET_NOTES = BORE_FIT_NOTE
 NOTES_XY = (0.016, 0.060)
 BORE_CALLOUT = f"REAM THRU\nSEE NOTE {BORE_FIT_NOTE_NUMBER}"
-KEYWAY_WIDTH_CALLOUT = f"KEYWAY\nSEE NOTE {BORE_FIT_NOTE_NUMBER}"
-KEYWAY_T_CALLOUT = f"KEYWAY TO FAR SIDE\nSEE NOTE {BORE_FIT_NOTE_NUMBER}"
+# The keyway's width and T print their value, band and flag only, as the
+# keyed cone gears' do (draw_dt_cone_gear: the machinist review of the
+# C1-keyed sheets dropped KEYWAY TO FAR SIDE; rule 25, sheets agree). T
+# reads from its witnesses: the keyway top and the far side of the bore.
+KEYWAY_WIDTH_CALLOUT = f"SEE NOTE {BORE_FIT_NOTE_NUMBER}"
+KEYWAY_T_CALLOUT = f"SEE NOTE {BORE_FIT_NOTE_NUMBER}"
 DIMENSION_CALLOUTS = {
     "OutsideDia": TIP_DIA_CALLOUT,
     "BoreDia": BORE_CALLOUT,

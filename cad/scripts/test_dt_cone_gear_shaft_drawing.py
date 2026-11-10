@@ -337,6 +337,8 @@ def test_display_precision_is_owned_by_the_part() -> None:
         "Sec4End": 2,
         "Sec1KeyseatWidth": cone_land_key.KEYSEAT_PLACES,
         "Sec1KeyseatS": cone_land_key.KEYSEAT_PLACES,
+        # The keyseat end's centre from the collar face: the title block's .XX.
+        "Sec1KeyseatEndSet": 2,
         "Sec2AF": 4,
         "Sec3AF": 4,
         "Sec4AF": 4,
@@ -1421,17 +1423,39 @@ def test_each_cut_is_made_over_exactly_its_land(monkeypatch) -> None:
     assert "Sec1KeyseatEndPlane" in sketched
     assert end.both_directions
     assert end.depth == pytest.approx(2.0 * (reach - key.KEYSEAT_FLOOR_OFFSET_MM))
-    circle = next(
+    # Ø W, centred on the axis line one radius (the sheet's Sec1KeyseatEndSet)
+    # along the shaft from a construction line on the collar face.
+    (circle,) = adapter.add_circle.call_args_list
+    assert circle.args == pytest.approx(
+        (
+            -(spec.COLLAR_END_STATION + key.KEY_END_SET_MM),
+            0.0,
+            key.KEYSEAT_WIDTH_MM / 2.0,
+        )
+    )
+    (end_set,) = [
         c
-        for c in stubs["define_circle"].call_args_list
-        if c.args[4] == "Sec1 keyseat end"
+        for c in stubs["dimension_between"].call_args_list
+        if c.args[5] == "Sec1 keyseat end set"
+    ]
+    assert end_set.args[3] == "horizontal_distance"
+    assert end_set.args[4] == pytest.approx(key.KEY_END_SET_MM)
+    (collar_line,) = [
+        c.args[1]
+        for c in stubs["add_line_chain"].call_args_list
+        if c.args[1][0] == pytest.approx((-spec.COLLAR_END_STATION, 0.0))
+    ]
+    assert collar_line[1] == pytest.approx(
+        (-spec.COLLAR_END_STATION, -spec.SECTION_DIAS[1] / 2.0)
     )
-    assert abs(circle.args[1]) + abs(circle.args[2]) == pytest.approx(
-        spec.COLLAR_END_STATION + key.KEY_END_SET_MM
-    )
-    assert circle.args[3] == pytest.approx(key.KEYSEAT_WIDTH_MM / 2.0)
-    assert circle.kwargs["drives"][2] == '"Sec1KeyseatW"'
-    assert part.KEYSEAT_END_STATION_EXPRESSION in circle.kwargs["drives"]
+    records = {
+        c.args[0]: c.args[1] if len(c.args) > 1 else None
+        for c in _sketch_dims.return_value.record.call_args_list
+    }
+    assert records["Sec1KeyseatCollarFace"] == '"SecEnd0" + "CollarWidth"'
+    assert records["Sec1KeyseatCollarRise"] == '"SecDia1" / 2'
+    assert records["Sec1KeyseatEndSet"] == '"Sec1KeyseatW" / 2'
+    assert records["Sec1KeyseatEndDia"] == '"Sec1KeyseatW"'
     # The tip flat's cut starts at the end face: it runs out through the tip.
     assert spec.SECTION_ENDS[-1] == pytest.approx(spec.SHAFT_LENGTH)
     named = [c.args[1] for c in stubs["name_last_feature"].call_args_list]
@@ -1470,6 +1494,41 @@ def test_the_keyseat_end_is_the_end_mill_radius_and_clears_the_key() -> None:
         < part.keyseat_end_volume()
         < math.pi / 2.0 * half**2 * (radius - floor)
     )
+
+
+def test_the_keyseat_end_is_located_from_the_collar_face_on_the_sheet() -> None:
+    """Machinist review of 06460fb: the sheet gave no keyseat length or end
+    location, so no mill stop.  The end radius's centre prints from the
+    collar face at the title block's .XX in the side view, and at its printed
+    limits, with the key's .XX length, the key's north end stays short of
+    T024 (the key comes to rest against the end, so the band moves the key,
+    never into the radius)."""
+    spec = dt_cone_gear_shaft_spec
+    key = cone_land_key
+    assert spec.DRAWING_DIMENSIONS["Sec1KeyseatEndProfile"] == {"Sec1KeyseatEndSet"}
+    assert spec.DRAWING_PRECISION_BY_NAME["Sec1KeyseatEndSet"] == 2
+    assert "Sec1KeyseatEndSet" in drawing.SIDE_KEEP
+    assert f"{key.KEY_END_SET_MM / 25.4:.2f}" == "0.03"
+    upper = spec.printed_length_deviations("Sec1KeyseatEndSet")[1]
+    key_band = printed_band_mm(key.KEY_LENGTH_PLACES, unit="in")
+    north = (
+        spec.COLLAR_END_STATION
+        + key.KEY_END_SET_MM
+        + upper
+        + key.KEY_LENGTH_MM
+        + key_band
+    )
+    t024_south = spec.FRONT_STUB + spec.gear_faces(16)[0]
+    assert spec.KEY_NORTH_MARGIN_MM == pytest.approx(t024_south - north)
+    assert spec.KEY_NORTH_MARGIN_MM > 0.0
+    # Its text sits right of the web's and left of its own left arrow, its
+    # line below the web's witnesses and the collar diameter's lower line.
+    x, y = drawing.SIDE_KEEP["Sec1KeyseatEndSet"]
+    seat_x = drawing.BIG_END_X - spec.COLLAR_END_STATION / 1000.0
+    web_text_right = drawing.SIDE_KEEP["CollarWidth"][0] + 0.0374 / 2.0
+    assert web_text_right < x - 0.0035 and x + 0.0035 < seat_x - 0.0008 - 0.0036
+    assert y - 0.0028 < drawing.SIDE_KEEP["CollarWidth"][1] - 0.0028 - 0.0035
+    assert y - 0.0028 > drawing.SIDE_KEEP["Sec1End"][1]
 
 
 def test_shoulder_roots_are_modelled_not_noted() -> None:

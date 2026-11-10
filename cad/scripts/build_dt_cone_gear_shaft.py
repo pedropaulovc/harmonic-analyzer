@@ -462,9 +462,13 @@ def flat_length_expression(land: int) -> str:
 # square south end sits on that line.  The straight cut's length is the land
 # less that radius, from the knobs that bound it.
 KEYSEAT_LENGTH_EXPRESSION = '"SecEnd1" - "Sec1KeyseatW" / 2'
-# The end's centre station from the front face: the collar's tip-side face
-# (journal and web) plus the radius.
-KEYSEAT_END_STATION_EXPRESSION = '"SecEnd0" + "CollarWidth" + "Sec1KeyseatW" / 2'
+# The end's sketch locates the radius centre FROM THE COLLAR FACE, where the
+# machinist sets the mill stop (machinist review of 06460fb: the sheet gave
+# no length or end location): a construction line on the collar's tip-side
+# face (its station from the front face, the journal and the web) and the
+# centre one radius (Sec1KeyseatEndSet, the sheet's .XX dimension) north of it.
+KEYSEAT_COLLAR_FACE_EXPRESSION = '"SecEnd0" + "CollarWidth"'
+KEYSEAT_END_SET_EXPRESSION = '"Sec1KeyseatW" / 2'
 KEYSEAT_END_STATION = COLLAR_END_STATION + cone_land_key.KEY_END_SET_MM
 if abs(cone_land_key.KEY_END_SET_MM - cone_land_key.KEYSEAT_WIDTH_MM / 2.0) > 1e-12:
     raise AssertionError("the keyseat's end radius is the end mill's, half the keyseat")
@@ -666,10 +670,19 @@ async def _cut_keyseat_end(adapter: Any, drive_jobs: list[tuple[str, str]]) -> f
     millimetre outside land 1 (on the keyseat's +X side), cut mid-plane deep
     enough to reach the floor: the mid-plane cut needs no direction off the
     plane, its far half meets only air, and its centre lies where the
-    straight cut stops, so only the collar-side half disc is new.  Its centre
-    station is driven from the knobs (KEYSEAT_END_STATION_EXPRESSION) and its
-    size by the keyseat width, so the end follows both; the sketch states
-    which of its axes runs along the shaft (ModelToSketchTransform).
+    straight cut stops, so only the collar-side half disc is new.
+
+    The sketch locates the centre from the collar face, as the sheet does:
+    a construction line standing on the collar's tip-side face from the axis
+    to land 1's round on -Y (``Sec1KeyseatCollarFace`` from the origin,
+    driven by the journal and web knobs; ``Sec1KeyseatCollarRise`` =
+    ``SecDia1``/2), the centre on the axis line and ``Sec1KeyseatEndSet``
+    (= W/2, the drawing dimension) along the shaft from the line's outer end,
+    so its extension lines start at the collar's lower corner in the side
+    view (*Right, model +Y up) and at the centre, and run down to the
+    sheet's length tiers.  Model points map to
+    the sketch through ModelToSketchTransform, which also says which sketch
+    axis runs along the shaft.
     """
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
@@ -688,30 +701,77 @@ async def _cut_keyseat_end(adapter: Any, drive_jobs: list[tuple[str, str]]) -> f
     profile = "Sec1KeyseatEndProfile"
     dims = SketchDims()
     check(f"create_sketch {label}", await adapter.create_sketch("Sec1KeyseatEndPlane"))
-    x_mm, y_mm = _sketch_xy_mm(adapter, (reach, 0.0, KEYSEAT_END_STATION))
-    along_x = abs(x_mm) > abs(y_mm)
+    centre = _sketch_xy_mm(adapter, (reach, 0.0, KEYSEAT_END_STATION))
+    face = _sketch_xy_mm(adapter, (reach, 0.0, COLLAR_END_STATION))
+    corner = _sketch_xy_mm(adapter, (reach, -radius, COLLAR_END_STATION))
+    along_x = abs(centre[0]) > abs(centre[1])
+    along, across = (0, 1) if along_x else (1, 0)
+    for point, station in ((centre, KEYSEAT_END_STATION), (face, COLLAR_END_STATION)):
+        if abs(point[across]) > 1e-6 or abs(abs(point[along]) - station) > 1e-6:
+            raise RuntimeError(
+                f"{label}: station {station} maps to sketch {point}, not onto one axis"
+            )
     if (
-        min(abs(x_mm), abs(y_mm)) > 1e-6
-        or abs(max(abs(x_mm), abs(y_mm)) - KEYSEAT_END_STATION) > 1e-6
+        abs(corner[along] - face[along]) > 1e-6
+        or abs(abs(corner[across]) - radius) > 1e-6
     ):
-        raise RuntimeError(
-            f"{label}: the end's centre maps to sketch ({x_mm}, {y_mm}), not onto "
-            f"one axis at {KEYSEAT_END_STATION}"
-        )
-    await define_circle(
-        adapter,
-        x_mm if along_x else 0.0,
-        0.0 if along_x else y_mm,
-        half,
-        label,
-        dims=dims,
-        names=("Sec1KeyseatEndStation", "Sec1KeyseatEndStation", "Sec1KeyseatEndDia"),
-        drives=(
-            KEYSEAT_END_STATION_EXPRESSION if along_x else None,
-            None if along_x else KEYSEAT_END_STATION_EXPRESSION,
-            '"Sec1KeyseatW"',
+        raise RuntimeError(f"{label}: the collar corner maps to sketch {corner}")
+    along_distance, across_distance = (
+        ("horizontal_distance", "vertical_distance")
+        if along_x
+        else ("vertical_distance", "horizontal_distance")
+    )
+    (collar_line,) = await add_line_chain(adapter, [face, corner], close=False)
+    _as_construction(adapter, collar_line)
+    check(
+        f"{label} collar line square to the axis",
+        await adapter.add_sketch_constraint(
+            collar_line, None, "vertical" if along_x else "horizontal"
         ),
     )
+    await anchor_point_to_origin(
+        adapter, f"{collar_line}.start", face[0], face[1], f"{label} collar face"
+    )
+    dims.record("Sec1KeyseatCollarFace", KEYSEAT_COLLAR_FACE_EXPRESSION)
+    await dimension_between(
+        adapter,
+        f"{collar_line}.start",
+        f"{collar_line}.end",
+        across_distance,
+        radius,
+        f"{label} collar rise",
+    )
+    dims.record("Sec1KeyseatCollarRise", '"SecDia1" / 2')
+    sketch_mgr = adapter.currentSketchManager
+    prev_add_to_db = bool(sketch_mgr.AddToDB)
+    sketch_mgr.AddToDB = True
+    try:
+        circle = await adapter.add_circle(centre[0], centre[1], half)
+        check(f"add_circle {label}", circle)
+    finally:
+        sketch_mgr.AddToDB = prev_add_to_db
+    check(
+        f"{label} centre on the axis",
+        await adapter.add_sketch_constraint(
+            f"{circle.data}.center",
+            "origin",
+            "horizontal_points" if along_x else "vertical_points",
+        ),
+    )
+    await dimension_between(
+        adapter,
+        f"{collar_line}.end",
+        f"{circle.data}.center",
+        along_distance,
+        cone_land_key.KEY_END_SET_MM,
+        f"{label} set",
+    )
+    dims.record("Sec1KeyseatEndSet", KEYSEAT_END_SET_EXPRESSION)
+    check(
+        f"dimension {label} diameter",
+        await adapter.add_sketch_dimension(circle.data, None, "diameter", 2.0 * half),
+    )
+    dims.record("Sec1KeyseatEndDia", '"Sec1KeyseatW"')
     await ensure_fully_defined(adapter, f"{label} sketch")
     check(f"exit_sketch {label}", await adapter.exit_sketch())
     name_last_feature(adapter, profile)

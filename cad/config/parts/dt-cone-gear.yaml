@@ -56,7 +56,7 @@ dt-cone-gear:
       kind: "accept"
       where: "every gear sheet, DETAIL A: the bore Ø +.0018/+.0010 (THRU on the T006-T024 D-bores, BoreCutDia; REAM THRU on the keyed T030-T120 bores, KeyedBoreDia) and, on T006-T024, BORE ACROSS FLAT +.0008/+.0004, each flagged SEE NOTE 1 (made to the measured MHA-DT-04 land, clearance REF)"
       finding: "+.0018/+.0010 and +.0008/+.0004 are converted millimetre bands, not plain inch steps (rule 4)"
-      reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144 (fan-out rulings F2 and F5). The limits come from the fleet-shared gear_seat_fit and cone_shaft_land_bands.FLAT_AF_BAND, restated in inch steps at that family's next re-key; widening the flat to its row would let the D-flat clock each gear up to 11.6 degrees against its ±.25 degree phase. The matched-fit route to the measured land is printed in note 1. Accepts this notation only, no other band or callout departure."
+      reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144 (fan-out rulings F2 and F5). The limits come from the fleet-shared gear_seat_fit and cone_shaft_land_bands.FLAT_AF_BAND, restated in inch steps at that family's next re-key; widening the flat to its row would let the D-flat clock each gear up to 11.6 degrees against its title-block ±1 degree phase (error_budget cone_flat_clock). The matched-fit route to the measured land is printed in note 1. Accepts this notation only, no other band or callout departure."
     - id: "RV-07"
       kind: "minor"
       where: "sheet T030, GEAR DATA: WEB MIN (REF): .0621, root envelope to the hub keyway's top corner (KeyedBoreProfile: Ø.3750 +.0018/+.0010 bore, KeywayWidth .0625 +.0020/-.0000, KeywayT .4045 ±.0020)"

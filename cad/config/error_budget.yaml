@@ -199,7 +199,7 @@ critical_features:
     nominal: null
     quantity: phase
     class: channel
-    holds: "each cone gear's keyway (T030-T120) or D-bore flat (T006-T024) on the phase-0 tooth's centreline, the two sharing the sheet's drawn centreline at the title-block +/-1 deg angle (no clock dimension); the shaft flats' own clock is cone_land_clock"
+    holds: "each cone gear's keyway (T030-T120) or D-bore flat (T006-T024) on the phase-0 tooth's centreline, the two sharing the sheet's drawn centreline at the title-block +/-1 deg angle (no clock dimension); the shaft flats' own clock is cone_land_clock. Allowable check (error_budget.py, 2026-11-10, PR #2331): alone at 1.0 deg MAE 0.066 / pair p99 0.103 against an equal-share allowable of 0.754 deg (0.05 MAE), so it takes more than its equal share, as cam_eccentricity, spring_rate, station_setting and cone_flat_play do; the combined budget closes: scatter MAE 0.185 <= 0.3, p99 max 0.934 <= 1.5, pair_1_20 expected worst 1.578 <= 2.0 (11.8 % of machines over 2.0)"
   cone_flat_play:
     tolerance: 0.01016
     unit: mm

@@ -517,6 +517,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Sec3": {"Sec3End"},
     "Sec4": {"Sec4End"},
     "Sec1KeyseatProfile": {"Sec1KeyseatWidth", "Sec1KeyseatS"},
+    "Sec1KeyseatEndProfile": {"Sec1KeyseatEndSet"},
     "Sec2FlatProfile": {"Sec2AF"},
     "Sec3FlatProfile": {"Sec3AF"},
     "Sec4FlatProfile": {"Sec4AF"},
@@ -551,6 +552,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # grade, since the journal's guaranteed bearing span below reads it (never .X).
 # Step radius: three places; nothing depends on it beyond the setback proof.
 #
+# Keyseat end (machinist review of 06460fb: the mill stop): the end radius's
+# centre from the collar's tip-side face, two places, the title block's .XX
+# grade.  The key's square south end comes to rest on that centre line, so
+# the band moves the key, never into the end; KEY_NORTH_MARGIN_MM below keeps
+# its north end short of T024 at the printed limits of both lengths.
+#
 # Collar (#914): the diameter is the bar's as supplied (STOCK_DIA), so it
 # prints as the 5/8 fraction reference, the bar's own size; the web prints
 # three places because it is the 64T's station toward MHA-DT-05
@@ -570,6 +577,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "Sec1KeyseatWidth": cone_land_key.KEYSEAT_PLACES,
         "Sec1KeyseatS": cone_land_key.KEYSEAT_PLACES,
     },
+    "Sec1KeyseatEndProfile": {"Sec1KeyseatEndSet": 2},
     "Sec2FlatProfile": {"Sec2AF": LAND_AF_PLACES[2]},
     "Sec3FlatProfile": {"Sec3AF": LAND_AF_PLACES[3]},
     "Sec4FlatProfile": {"Sec4AF": LAND_AF_PLACES[4]},
@@ -603,6 +611,7 @@ _LENGTH_NOMINALS = {
     **{f"Sec{i}End": knob for i, knob in enumerate(SECTION_KNOBS)},
     "CollarWidth": COLLAR_THICKNESS,
     "ShoulderR": FILLET_RADIUS,
+    "Sec1KeyseatEndSet": cone_land_key.KEY_END_SET_MM,
 }
 
 
@@ -670,3 +679,22 @@ for _name, _j, _end in zip(("Sec1End", "Sec2End", "Sec3End"), SEAT_STEP_GEARS, S
         raise AssertionError(
             f"{_name}: the step and its root reach the smaller gear at print-worst {_terms}"
         )
+
+# The key's north end at the far printed limits of the keyseat end's .XX
+# location and the key's .XX length stays south of T024 (gear 16), which
+# rides land 2's flat: the key sits between the keyseat's end and T024.
+KEY_NORTH_MARGIN_MM = (
+    FRONT_STUB
+    + gear_faces(16)[0]
+    - (
+        COLLAR_END_STATION
+        + cone_land_key.KEY_END_SET_MM
+        + printed_length_deviations("Sec1KeyseatEndSet")[1]
+        + cone_land_key.KEY_LENGTH_MM
+        + printed_band_mm(cone_land_key.KEY_LENGTH_PLACES, unit=UNIT)
+    )
+)
+if KEY_NORTH_MARGIN_MM <= 0.0:
+    raise AssertionError(
+        f"the key reaches T024 at print-worst ({KEY_NORTH_MARGIN_MM} mm)"
+    )

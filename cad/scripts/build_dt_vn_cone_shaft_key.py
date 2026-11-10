@@ -61,13 +61,25 @@ SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material
 
 
+# The cutter stands one key size clear of the bar on every side but its cut
+# face.  Sketch y (model Y) spans the width's +/-SIZE/2 plus that clearance;
+# the cut is mid-plane about the Right Plane, the bottom face (model x = 0),
+# so its half depth reaches the clearance past the top face (x = SIZE) and
+# further still below the bottom (Codjiflo #2331 P3: at a 2 * SIZE depth its
+# far face lay on the top face).
+CUTTER_CLEARANCE = SIZE
+CUTTER_HALF_HEIGHT = SIZE / 2.0 + CUTTER_CLEARANCE
+CUT_DEPTH = 2.0 * (SIZE + CUTTER_CLEARANCE)
+
+
 async def _cut_stock(adapter) -> None:
     """Cut the bar at ``CutLength`` from its south end; the cutter's other
-    edges stand one key size clear of the bar."""
+    edges and faces stand ``CUTTER_CLEARANCE`` (one key size) clear of the
+    bar."""
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    margin = SIZE
-    far = STOCK_LENGTH + margin
+    margin = CUTTER_HALF_HEIGHT
+    far = STOCK_LENGTH + CUTTER_CLEARANCE
     dims = SketchDims()
     check("create_sketch key cut", await adapter.create_sketch("Right"))
     with no_sketch_inference(adapter):
@@ -114,7 +126,7 @@ async def _cut_stock(adapter) -> None:
     check(
         "cut key to length",
         await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=2.0 * margin, both_directions=True)
+            ExtrusionParameters(depth=CUT_DEPTH, both_directions=True)
         ),
     )
     name_last_feature(adapter, "KeyCut")

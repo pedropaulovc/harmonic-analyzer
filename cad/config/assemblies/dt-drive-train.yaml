@@ -26,7 +26,10 @@ flip_invert:
   - cone gear axial seat
   # MHA-DT-VN-71 (owner decision C1 keyed, 2026-11-09, PR #1992): its Front
   # and Right planes sit on the + side of the shaft's same-sense planes, as
-  # the cone gears' Front planes do; seeded by that precedent, not yet read.
+  # the cone gears' Front planes do.  Both inverted seeds read correct on
+  # assembly:dt_drive_train (06460fb6a8, farm run 20261110T053131196Z, leaf
+  # 20261110T054925Z-1 task.log lines 400-401 and 607): seated with no
+  # flip-seed MISS and queried inverted by the end-of-build audit.
   - cone key axial seat
   - cone key on the keyseat floor
   - cone platform height

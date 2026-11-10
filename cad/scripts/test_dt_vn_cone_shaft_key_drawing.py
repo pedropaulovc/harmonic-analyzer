@@ -87,6 +87,35 @@ def test_key_lies_on_land_1_driving_the_64t_through_t030_short_of_t024() -> None
     assert north - band > t030_south + FACE_WIDTH / 2.0
 
 
+def test_the_cut_clears_the_bar_by_a_key_size_off_its_cut_face() -> None:
+    """Codjiflo #2331 P3: a 2 * SIZE mid-plane cut about the Right Plane (the
+    bottom face) put its far face on the top face.  The cutter's faces now
+    stand one key size clear: the mid-plane half depth past the top face
+    (x = SIZE) and the bottom (x = 0), the sketch's y edges past the width's
+    +/-SIZE/2, and its far end past the supplied bar's end."""
+    import ast
+    import inspect
+
+    clear = part.CUTTER_CLEARANCE
+    assert clear == spec.SIZE
+    half_depth = part.CUT_DEPTH / 2.0
+    assert half_depth - spec.SIZE == pytest.approx(clear)
+    assert half_depth - 0.0 >= clear
+    assert part.CUTTER_HALF_HEIGHT - spec.SIZE / 2.0 == pytest.approx(clear)
+    tree = ast.parse(inspect.getsource(part._cut_stock))
+    (params,) = (
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and ast.unparse(node.func) == "ExtrusionParameters"
+    )
+    keywords = {k.arg: ast.unparse(k.value) for k in params.keywords}
+    assert keywords == {"depth": "CUT_DEPTH", "both_directions": "True"}
+    source = ast.unparse(tree)
+    assert "margin = CUTTER_HALF_HEIGHT" in source
+    assert "far = STOCK_LENGTH + CUTTER_CLEARANCE" in source
+
+
 def test_purchased_sheet_has_the_actual_source_marks_and_cli_stem(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
