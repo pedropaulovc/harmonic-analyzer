@@ -154,7 +154,7 @@ found three parts carrying essentially all of the risk:
 - The knife edge, which is the precision interface of the whole instrument and
   sits on a hex trunnion cantilevered 21.7 mm off an organic cast lever.
 - The bonded cone tip: three small gears held on that spigot and the shaft's
-  end with retaining compound, phased to the keyed stack by a pin.
+  end with retaining compound, each phased to the keyed T030 by the MHA-DT-03-TL-02 comb while the compound cures.
 
 There is also one settled finding that shapes the entire build: the replica cuts
 standard 48DP 20° inch teeth, so stock involute cutters make every gear except

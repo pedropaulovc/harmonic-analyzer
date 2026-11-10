@@ -456,11 +456,9 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             # First prism-block drive-train leaf: 5.6585 observed, plus ten
             # percent.
             frozenset(("dt-vn-cone-tip-block-screw-1", "dt-cone-tip-block-1")): 6.22435,
-            # MHA-DT-39 1/4-28 major 6.35 in the #3 tap drill 5.41 through
-            # MHA-DT-21's .430 (10.922) depth.
-            frozenset(("dt-cone-tip-end-screw-1", "dt-cone-tip-block-1")): _annulus_limit(
-                6.35, 5.41, 10.922
-            ),
+            # PR 2 drive-train leaf (6fda5a47590f): 34.1729 observed, plus
+            # ten percent.
+            frozenset(("dt-cone-tip-end-screw-1", "dt-cone-tip-block-1")): 37.59019,
             # MHA-DT-38's nominal .0615 (1.5621) bore pressed on MHA-DT-37's
             # nominal .0625 (1.5875) pivot over its .160 (4.064) length.
             frozenset(("dt-cone-tip-bushing-1", "dt-cone-tip-gear-1")): _annulus_limit(
