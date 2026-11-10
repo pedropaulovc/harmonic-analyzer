@@ -111,8 +111,6 @@ def gear_data(teeth: int) -> str:
         # so its backlash is accepted there, inside the mesh's RSS budget.
         ("BACKLASH WITH MATE, ACCEPT AT ASSEMBLY",
          f"{inch(minimum, 3)} TO {inch(maximum, 3)}"),
-        ("ROOT RADIAL MIN/MAX (REF)",
-         f"{inch(profile.root_radius_min_mm, 4)} / {inch(profile.root_radius_max_mm, 4)}"),
         # The bore's worst ligament (RV-03 on T012, RV-07 on T030).
         ("WEB MIN (REF)", inch(web, 4)),
         # cone_set_stack books each gear's tooth runout about its bore.

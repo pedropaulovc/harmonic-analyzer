@@ -155,16 +155,19 @@ def inch_text(value_mm: float, places: int) -> str:
     return text[1:] if text.startswith("0.") else text
 
 
-# Rule 12: the process; rule 4: the fit and its mate by drawing number (the
-# printed limits set the clearance, so no REF range repeats them); rule 20:
-# the wall shortfall as a plain fact (RV-01).  Rule 7: two lines of words.
-# The reamed depth is its own model dimension in the section (a blind
-# hole's depth is its full-diameter depth, so it needs no words).
-END_HOLE_CALLOUT = "\n".join(
+# The hole's native callout (rules 12 and 26: size, process, depth on one
+# line; PR 2 r7 machinist review): SolidWorks prints the cut's diameter with
+# its band and its depth, END_HOLE_PROCESS joins before the depth.  Below it,
+# rule 7's two lines of words, each no wider than the size line: the fit and
+# its mate by drawing number (rule 4; the printed limits set the clearance,
+# so no REF range repeats them) and the wall shortfall as a plain fact in
+# rule 20's own form (RV-01; the hole's one wall is to the thread root).
+END_HOLE_PROCESS = "REAM"
+END_HOLE_DEPTH_TEXT = inch_text(END_HOLE_DEPTH, END_HOLE_DEPTH_PLACES)
+END_HOLE_CALLOUT_BELOW = "\n".join(
     (
-        "REAM",
-        f"RUNNING FIT ON {PIVOT_NUMBER} PIVOT",
-        f"WALL TO THREAD ROOT {inch_text(END_HOLE_WALL_PRINTED_IN * MM_PER_IN, 3)} MIN",
+        f"RUNNING FIT ON {PIVOT_NUMBER}",
+        f"WALL {inch_text(END_HOLE_WALL_PRINTED_IN * MM_PER_IN, 3)} MIN",
     )
 )
 
@@ -177,16 +180,18 @@ STOCK_NOTE = "\n".join(
     )
 )
 
-# Model-owned drawing controls: one revolve-cut profile carries both sizes.
+# Model-owned drawing controls: a plain cut-extrude, its sketch circle the
+# reamed diameter and the cut's blind depth the full-diameter depth, so the
+# drawing's native hole callout reads both.
 HOLE_FEATURE = "EndHoleProfile"
+HOLE_CUT = "EndHole"
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    HOLE_FEATURE: {"EndHoleDia", "EndHoleDepth"},
+    HOLE_FEATURE: {"EndHoleDia"},
+    HOLE_CUT: {"EndHoleDepth"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    HOLE_FEATURE: {
-        "EndHoleDia": END_HOLE_DIA_PLACES,
-        "EndHoleDepth": END_HOLE_DEPTH_PLACES,
-    },
+    HOLE_FEATURE: {"EndHoleDia": END_HOLE_DIA_PLACES},
+    HOLE_CUT: {"EndHoleDepth": END_HOLE_DEPTH_PLACES},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places

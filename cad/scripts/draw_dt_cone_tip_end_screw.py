@@ -3,12 +3,12 @@ r"""Create the machinist drawing for MHA-DT-39, the cone tip end screw.
 A stock McMaster 91794A558 slotted fillister screw with one shop operation:
 the pivot hole reamed concentric in its threaded end (owner decision C1
 keyed, 2026-11-09).  The MHA-DT-34 ferrule's layout: the end view, looking at
-the threaded end, carries the hole's centre mark and the cutting plane; the
-longitudinal section A-A shows the hole on cut edges (drawing-guidelines.md
-rule 9) and takes its two model dimensions: the reamed diameter, whose
-callout names the process, the fit, the mate and the wall to the thread root
-(rules 4, 12, 20), and the full-diameter depth.  Note 1 names the stock;
-everything else is the supplier's (reference).
+the threaded end, carries the hole's centre mark, the cutting plane and the
+hole's native callout on its rim (size and band, REAM, depth from the cut;
+drawing-guidelines.md rules 12 and 26), with the fit and its mate and the wall
+to the thread root below it (rules 4, 7, 20); the longitudinal section A-A
+shows the hole on cut edges (rule 9).  Note 1 names the stock; everything
+else is the supplier's (reference).
 
 Run with SolidWorks open::
 
@@ -28,6 +28,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 )
 
 from _check import check
+from _drawing_blind_ream_callout import add_blind_ream_callout
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -36,27 +37,28 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
-from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_layout_collect import check_drawing_layout
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
+from _fit_deviations import deviations
+from _gear_drawing_entities import visible_circle_edge
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _section_axis import create_section_axis_centerline, position_section_caption
 from _session import run_build
 import _telemetry
 from dt_cone_tip_end_screw_spec import (
-    DRAWING_DIMENSIONS,
-    DRAWING_PRECISION_BY_NAME,
-    END_HOLE_CALLOUT,
+    END_HOLE_BAND,
+    END_HOLE_CALLOUT_BELOW,
     END_HOLE_DEPTH,
+    END_HOLE_DEPTH_TEXT,
+    END_HOLE_DIA,
+    END_HOLE_PROCESS,
     HEAD_RADIUS,
     ISOMETRIC_VIEW_SCALE,
     OVERALL_LENGTH,
-    SHANK_DIA,
     STOCK_NOTE,
     UNIT,
 )
@@ -77,7 +79,9 @@ OUTPUTS = DrawingOutputs(
 # 21.9 long over a Ø10.5 head at 4:1 reads 88 x 42 on the sheet.
 SHEET_SCALE = (4.0, 1.0)
 VIEW_SCALE = (4, 1)
-END_CENTER = (0.075, 0.165)
+# The end view stands far enough right that the hole's callout fits on its
+# left, at mid height (below).
+END_CENTER = (0.110, 0.165)
 SECTION_CENTER = (0.215, 0.165)
 ISO_CENTER = (0.365, 0.215)
 CAPTION_XY = (0.200, 0.110)
@@ -88,7 +92,6 @@ NOTES_XY = (0.030, 0.085)
 
 _S = VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0  # model mm -> sheet m
 HEAD_R = HEAD_RADIUS * _S
-THREAD_R = SHANK_DIA / 2.0 * _S
 # The section lays the axis horizontal, centred on the screw's length: as for
 # the ferrule's A-A (its arrows point right), the end toward the end view's
 # viewer, the threaded end, is the section's right edge.
@@ -97,26 +100,21 @@ HOLE_FLOOR_X = TIP_X - END_HOLE_DEPTH * _S
 if not SECTION_CENTER[0] < HOLE_FLOOR_X < TIP_X:
     raise AssertionError("MHA-DT-39 hole lies outside its section's right half")
 
-# Measured on the farm sheet (layout audit, run 20261110T001845485Z): a
-# diameter whose text stands outside its extension lines hangs its block on a
-# shelf starting at the keep x; the rows run down from the value at 5.6 mm
-# pitch, the value's stacked limits 11.7 mm above the keep point.  The reamed
-# diameter's block (value, REAM, three rows) therefore stands below and right
-# of the threaded end, wholly under the hole's lower extension line, inside
-# the frame and under the isometric's label.  The depth's bare value sits
-# between its extension lines under the thread.
-_DIA_BLOCK_ABOVE_KEEP = 0.0117
-SECTION_KEEP = {
-    "EndHoleDia": (
-        TIP_X + 0.012,
-        SECTION_CENTER[1] - THREAD_R - 0.004 - _DIA_BLOCK_ABOVE_KEEP,
-    ),
-    "EndHoleDepth": (
-        (TIP_X + HOLE_FLOOR_X) / 2.0,
-        SECTION_CENTER[1] - THREAD_R - 0.012,
-    ),
-}
-DIMENSION_CALLOUTS = {"EndHoleDia": END_HOLE_CALLOUT}
+# The hole's callout (PR 2 r7 machinist review, clarity: the depth belongs in
+# the callout, rule 26) stands left of the end view at mid height, its leader
+# running right to the rim's upper left: the cutting line's arrows and
+# letters stand above and below the view, right of the line, so the leader
+# crosses neither, and it lands above the hole's horizontal centre mark.
+# Its text centres on CALLOUT_XY (_drawing_blind_ream_callout).  The size
+# row is the widest, ~61 mm (the shaft socket's twin "Ø.0625 +.0005/.0000
+# REAM ↧ .20", PR 2 r5: 33.9 mm size plus 27.2 mm process and depth); the
+# word rows run ~2.48 mm a character (r7's 30-character fit row, 74.4 mm),
+# so 24 characters stay under it.  The block spans about 0.0165..0.0775, 4 mm
+# inside the frame (0.0124) and 11 mm short of the head's outline
+# (END_CENTER - HEAD_R, 0.089).  The section carries no dimension: both the
+# hole's are the callout's.
+CALLOUT_XY = (0.047, 0.172)
+CALLOUT_HALF_WIDTH = 0.0305
 # The end view looks at the threaded end along model +Y: its vertical runs
 # along model Z, so a vertical cut through the centre is the Right plane.
 CUT_START = (END_CENTER[0], END_CENTER[1] - HEAD_R - 0.006)
@@ -183,18 +181,7 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (end, section, iso):
         set_hidden_lines_removed(adapter, view)
 
-    annotations = curate_view_dimensions(
-        adapter,
-        section,
-        keep=SECTION_KEEP,
-        view_label="longitudinal section",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
-    # Places and the reamed band are authored on the part; the sheet only
-    # proves the import kept them.
-    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS, location="below")
-    rebuild_drawing(adapter, label="MHA-DT-39 dimensions")
+    _add_hole_callout(adapter, end)
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the end screw end view")
     create_section_axis_centerline(
@@ -212,6 +199,25 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Cone Tip End Screw Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+    )
+
+
+def _add_hole_callout(adapter: Any, end: Any) -> Any:
+    """The reamed hole's native callout on its rim in the end view
+    (_drawing_blind_ream_callout): the cut's diameter, band and depth stay
+    SolidWorks' own; REAM joins before the depth and the fit and wall rows go
+    below."""
+    return add_blind_ream_callout(
+        adapter,
+        end,
+        edge=visible_circle_edge(adapter, end, END_HOLE_DIA),
+        callout_xy=CALLOUT_XY,
+        label="end screw pivot hole",
+        dia_mm=END_HOLE_DIA,
+        deviations_mm=deviations(END_HOLE_BAND),
+        depth_text=END_HOLE_DEPTH_TEXT,
+        process=END_HOLE_PROCESS,
+        below=END_HOLE_CALLOUT_BELOW,
     )
 
 

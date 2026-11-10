@@ -291,10 +291,14 @@ def test_each_sheet_gets_its_own_actual_cutting_recipe() -> None:
         assert f"{spec.DIAMETRAL_PITCH:.2f} / {spec.PRESSURE_ANGLE_DEG:.1f}\u00b0" in data
         for physical_recipe in (
             "CUTTER", "CUTTER PLUNGE FROM BLANK OD", "WHOLE DEPTH",
-            "TOOTH FORM", "BACKLASH WITH MATE", "ROOT RADIAL MIN/MAX", "WEB",
+            "TOOTH FORM", "BACKLASH WITH MATE", "WEB",
             "OVER 2 PINS",
         ):
             assert physical_recipe in data, (teeth, physical_recipe)
+        # The Ø ROOT ENVELOPE limits alone control the root: a REF radial
+        # MIN/MAX restated them (T012's equalled CUTTER ROOT ARC R) under a
+        # non-standard name (machinist review of the C1-keyed round 7).
+        assert "ROOT RADIAL" not in data
         # ENFORCE round 1 of #971: "TOOL T" told the shop how to set the
         # cutter (rule 7); the plunge stays, a reference depth.
         assert "TOOL T" not in data

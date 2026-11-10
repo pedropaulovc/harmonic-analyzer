@@ -94,7 +94,9 @@ def test_hole_wall_to_the_thread_root_is_the_declared_minor() -> None:
     assert spec.END_HOLE_WALL_PRINTED_IN == 0.067
     (row,) = _config.parts(spec.PART_NAME)["machinist_exceptions"]
     assert row["id"] == "RV-01" and row["kind"] == "minor"
-    assert "WALL TO THREAD ROOT .067 MIN" in row["where"]
+    # The exception quotes the wall row the callout prints.
+    assert spec.END_HOLE_CALLOUT_BELOW.splitlines()[-1] == "WALL .067 MIN"
+    assert row["where"].endswith(": WALL .067 MIN")
     assert row["reason"].startswith("Owner ruling 2026-11-09 via PR #1992")
     assert "pull/1992" in row["reason"]
 
@@ -105,11 +107,30 @@ def test_pivot_never_bottoms_and_always_runs_in_the_hole() -> None:
     assert spec.PIVOT_PROUD_MIN < spec.PIVOT_PROUD_MAX
 
 
-def test_hole_callout_states_process_fit_mate_and_wall() -> None:
-    assert spec.END_HOLE_CALLOUT.splitlines() == [
-        "REAM",
-        "RUNNING FIT ON MHA-DT-37 PIVOT",
-        "WALL TO THREAD ROOT .067 MIN",
+def test_hole_callout_is_size_process_depth_then_two_lines_of_words() -> None:
+    from _drawing_blind_ream_callout import printed_depth, ream_definitions
+
+    # Rules 12 and 26 (PR 2 r7 machinist review): size, process, depth on the
+    # native callout's one line, the depth SolidWorks' own (its format
+    # definitions as r7 read them on the shaft socket's plain cut); rule 7:
+    # two lines of words below.
+    native = {
+        5: "<MOD-DIAM>",
+        6: f"<HOLE-DEPTH>{spec.END_HOLE_DEPTH_TEXT}",
+        7: "",
+        8: "",
+    }
+    callout = ream_definitions(
+        native,
+        process=spec.END_HOLE_PROCESS,
+        below=spec.END_HOLE_CALLOUT_BELOW,
+        label="end screw",
+    )
+    assert callout[6].strip() == "REAM <HOLE-DEPTH>.12"
+    assert printed_depth(callout, label="end screw") == ".12"
+    assert callout[8].splitlines() == [
+        "RUNNING FIT ON MHA-DT-37",
+        "WALL .067 MIN",
     ]
     assert "91794A558" in spec.STOCK_NOTE
     # Rule 2: the material lives in the title block only.
@@ -125,6 +146,11 @@ def test_builder_cuts_one_reamed_hole() -> None:
     assert build.V_HOLE == pytest.approx(
         math.pi / 4.0 * spec.END_HOLE_DIA**2 * spec.END_HOLE_DEPTH
     )
+    # A plain cut: the sketch owns the diameter, the cut its blind depth.
+    assert spec.DRAWING_DIMENSIONS == {
+        spec.HOLE_FEATURE: {"EndHoleDia"},
+        spec.HOLE_CUT: {"EndHoleDepth"},
+    }
     assert spec.DRAWING_PRECISION_BY_NAME == {"EndHoleDia": 4, "EndHoleDepth": 2}
 
 
@@ -137,20 +163,19 @@ def test_sheet_is_registered_and_enforced() -> None:
     assert sheet.source_kind == "part"
     assert sheet.artifact_stem == spec.PART_NAME
     assert drawing.MACHINIST_REVIEW is MachinistReviewMode.ENFORCE
-    assert set(drawing.SECTION_KEEP) == set(spec.DRAWING_PRECISION_BY_NAME)
 
 
-def test_hole_callout_stands_clear_of_its_lines_and_inside_the_frame() -> None:
+def test_hole_callout_stands_clear_of_the_end_view_and_inside_the_frame() -> None:
     import draw_dt_cone_tip_end_screw as drawing
 
-    # Farm run 20261110T001845485Z: the block ran past the right frame and
-    # sat between the isometric and its label.  Its top now stands under the
-    # thread (so under both of the hole's extension lines), right of the
-    # threaded end, and its widest row (~74 mm) ends inside the frame.
-    x, y = drawing.SECTION_KEEP["EndHoleDia"]
-    block_top = y + drawing._DIA_BLOCK_ABOVE_KEEP
-    assert block_top < drawing.SECTION_CENTER[1] - drawing.THREAD_R
-    assert x > drawing.TIP_X
-    assert x + 0.075 < 0.419
-    assert block_top < drawing.ISO_NOTE_POS[1]
-    assert drawing.DIMENSION_CALLOUTS == {"EndHoleDia": spec.END_HOLE_CALLOUT}
+    # The text centres on CALLOUT_XY, left of the end view at mid height: its
+    # widest row, the size line, stays inside the frame (0.0124) and short of
+    # the head's outline; no word row is wider than the size line (24
+    # characters at ~2.48 mm, r7).
+    x, _y = drawing.CALLOUT_XY
+    assert x - drawing.CALLOUT_HALF_WIDTH > 0.0124
+    assert (
+        x + drawing.CALLOUT_HALF_WIDTH < drawing.END_CENTER[0] - drawing.HEAD_R - 0.005
+    )
+    rows = spec.END_HOLE_CALLOUT_BELOW.splitlines()
+    assert max(len(row) for row in rows) * 0.00248 <= 2 * drawing.CALLOUT_HALF_WIDTH

@@ -24,7 +24,6 @@ from __future__ import annotations
 import argparse
 from collections.abc import Iterable, Mapping, Sequence
 import math
-import re
 import sys
 from typing import Any, NamedTuple
 
@@ -62,7 +61,7 @@ from _drawing_common import (
 )
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import set_dimension_callouts, set_reference_dimension
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_blind_ream_callout import add_blind_ream_callout
 from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_edges import visible_view_entities
 from _drawing_finish import add_surface_finish
@@ -110,10 +109,12 @@ from dt_cone_gear_shaft_spec import (
     SECTION_DIAS,
     SECTION_ENDS,
     SHAFT_LENGTH,
+    SOCKET_DEPTH,
     SOCKET_DIA,
     SOCKET_DIA_BAND,
     SOCKET_PROCESS,
     SURFACE_FINISHES,
+    inch_text,
 )
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -335,11 +336,12 @@ SOCKET_CALLOUT_XY = (0.047, 0.185)
 # The Socket cut's dimensions the callout prints (marked, with their model
 # places): no view imports them.
 SOCKET_CALLOUT_DIMENSIONS = frozenset({"SocketDia", "SocketDepth"})
-# Format definitions of a display dimension (swDimensionTextParts_e 5..8:
-# prefix, suffix, callout above, callout below), each written through its
-# part 1..4 (draw_dt_crankshaft._DEFINITION_TO_WRITABLE).
-_CALLOUT_BELOW_DEFINITION = 8
-_DEFINITION_TO_WRITABLE = {5: 1, 6: 2, 7: 3, 8: 4}
+# What the callout must print, read back: the Socket cut's diameter with
+# its band, and its depth at the model's drawing places (SolidWorks resolves
+# the depth from the cut at insertion; this only checks it).
+SOCKET_DEPTH_READBACK = inch_text(
+    SOCKET_DEPTH, DRAWING_PRECISION_BY_NAME["SocketDepth"]
+)
 
 
 class DSection(NamedTuple):
@@ -457,106 +459,24 @@ def _set_dimension_suffixes(
         raise RuntimeError(f"dimension suffixes not applied: {sorted(remaining)}")
 
 
-def _ream_socket_definitions(definitions: Mapping[int, str]) -> dict[int, str]:
-    """The socket callout's format definitions with SOCKET_PROCESS joined
-    before its depth and BOND_FLAG below (rule 26: size, process, depth).
-
-    Exactly one definition may carry ``<HOLE-DEPTH>``, once, followed by the
-    depth alone (draw_dt_crankshaft._depth_banded_definition's contract); the
-    callout-below definition must be empty unless it is that one.  Anything
-    else (no depth, two, text after it, the process or flag already there)
-    fails loud, naming the definitions.
-    """
-    current = dict(definitions)
-    if set(current) != set(_DEFINITION_TO_WRITABLE):
-        raise RuntimeError(f"socket callout: unexpected format parts {current!r}")
-    holders = [part for part, text in current.items() if "<HOLE-DEPTH>" in text]
-    joined = "\n".join(current.values())
-    if (
-        len(holders) != 1
-        or re.search(rf"\b{re.escape(SOCKET_PROCESS)}\b", joined)
-        or BOND_FLAG in joined
-    ):
-        raise RuntimeError(f"socket callout has no single native depth: {current!r}")
-    part = holders[0]
-    head, _marker, tail = current[part].rpartition("<HOLE-DEPTH>")
-    if "<HOLE-DEPTH>" in head or len(tail.split()) != 1:
-        raise RuntimeError(f"socket callout has no single native depth: {current!r}")
-    updated = dict(current)
-    updated[part] = f"{head.rstrip()} {SOCKET_PROCESS} <HOLE-DEPTH>{tail.rstrip()}"
-    below = _CALLOUT_BELOW_DEFINITION
-    if part == below:
-        updated[below] = f"{updated[below]}\n{BOND_FLAG}"
-    elif current[below].strip():
-        raise RuntimeError(f"socket callout's below compartment is taken: {current!r}")
-    else:
-        updated[below] = BOND_FLAG
-    return updated
-
-
-def _require_socket_band(
-    adapter: Any, display: Any, definitions: Mapping[int, str]
-) -> None:
-    """The callout's diameter is the Socket cut's SocketDia with its model
-    band (rule 4), read back on the callout's own dimension; a callout that
-    reads another dimension, or none, fails loud with its definitions."""
-    lower, upper = (value / 1000.0 for value in deviations(SOCKET_DIA_BAND))
-    raw = display.GetDimension2(0)
-    if raw is None:
-        raise RuntimeError(
-            f"socket callout carries no dimension: {dict(definitions)!r}"
-        )
-    dimension = _early_bound(raw, "IDimension")
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    name = dimension_name(adapter, display.GetAnnotation())
-    kind = int(tolerance.Type)
-    minimum = float(tolerance.GetMinValue())
-    maximum = float(tolerance.GetMaxValue())
-    if (
-        name != "SocketDia"
-        or kind != 2  # swTolType_e.swTolBILAT, as the part build sets it
-        or abs(minimum - lower) > 1e-9
-        or abs(maximum - upper) > 1e-9
-    ):
-        raise RuntimeError(
-            f"socket callout does not print SocketDia's band: dimension {name!r}, "
-            f"tolerance type {kind} {minimum:g}/{maximum:g} m (wanted bilateral "
-            f"{lower:g}/{upper:g} m); definitions {dict(definitions)!r}"
-        )
-
-
 @_telemetry.traced("drawing.socket_callout")
 def _add_socket_callout(adapter: Any, tip_end: Any) -> Any:
-    """Call out the socket natively on its rim in the tip end view: the Socket
-    cut's diameter, band and depth stay SolidWorks' own, the process and the
-    flag are written into the format definitions and read back.  Returns the
-    callout's annotation."""
-    display = add_native_hole_callout(
+    """Call out the socket natively on its rim in the tip end view
+    (_drawing_blind_ream_callout): the Socket cut's diameter, band and depth
+    stay SolidWorks' own; REAM joins before the depth and the bond flag goes
+    below.  Returns the callout's annotation."""
+    return add_blind_ream_callout(
         adapter,
         tip_end,
+        edge=visible_circle_edge(adapter, tip_end, SOCKET_DIA),
         callout_xy=SOCKET_CALLOUT_XY,
         label="socket",
-        edge=visible_circle_edge(adapter, tip_end, SOCKET_DIA),
+        dia_mm=SOCKET_DIA,
+        deviations_mm=deviations(SOCKET_DIA_BAND),
+        depth_text=SOCKET_DEPTH_READBACK,
+        process=SOCKET_PROCESS,
+        below=BOND_FLAG,
     )
-    display = _early_bound(display, "IDisplayDimension")
-    definitions = {
-        part: str(display.GetText(part) or "") for part in _DEFINITION_TO_WRITABLE
-    }
-    _telemetry.info(f"socket callout definitions: {definitions!r}")
-    updated = _ream_socket_definitions(definitions)
-    for part, text in updated.items():
-        if text == definitions[part]:
-            continue
-        display.SetText(_DEFINITION_TO_WRITABLE[part], text)
-        applied = str(display.GetText(part) or "")
-        if applied.replace("\r", "") != text.replace("\r", ""):
-            raise RuntimeError(
-                f"socket callout part {part} did not persist: {applied!r}, "
-                f"wanted {text!r}; definitions {definitions!r}"
-            )
-    _require_socket_band(adapter, display, updated)
-    rebuild_drawing(adapter, label="socket callout")
-    return display.GetAnnotation()
 
 
 # A native "SECTION A-A / SCALE 2 : 1" caption measured 45.4 x 17.0 mm (leaf

@@ -1011,15 +1011,22 @@ def test_the_socket_callout_reams_to_its_native_depth_then_flags_the_bond() -> N
     joins before the one native depth, wherever SolidWorks put it, and the
     bond flag goes below; any other shape is refused (Codjiflo #2459
     4523315375: the depth is the model's, never typed)."""
-    ream = drawing._ream_socket_definitions
+    import _drawing_blind_ream_callout as ream_callout
+
     flag = dt_cone_gear_shaft_spec.BOND_FLAG
-    native = {5: "<MOD-DIAM>", 6: " <HOLE-DEPTH><hw-depth>", 7: "", 8: ""}
-    assert ream(native) == {
-        5: "<MOD-DIAM>",
-        6: " REAM <HOLE-DEPTH><hw-depth>",
-        7: "",
-        8: flag,
-    }
+
+    def ream(definitions):
+        return ream_callout.ream_definitions(
+            definitions, process="REAM", below=flag, label="socket"
+        )
+
+    # The PR 2 r7 cut-extrude callout's own definitions, and what it printed.
+    native = {5: "<MOD-DIAM>", 6: "<HOLE-DEPTH>.20", 7: "", 8: ""}
+    reamed = ream(native)
+    assert reamed == {5: "<MOD-DIAM>", 6: " REAM <HOLE-DEPTH>.20", 7: "", 8: flag}
+    # The depth prints once, the model's at its drawing places.
+    assert ream_callout.printed_depth(reamed, label="socket") == ".20"
+    assert drawing.SOCKET_DEPTH_READBACK == ".20"
     below = {5: "<MOD-DIAM>", 6: "", 7: "", 8: "<HOLE-DEPTH> .20"}
     assert ream(below)[8] == f" REAM <HOLE-DEPTH> .20\n{flag}"
     for refused in (
@@ -1032,6 +1039,50 @@ def test_the_socket_callout_reams_to_its_native_depth_then_flags_the_bond() -> N
     ):
         with pytest.raises(RuntimeError, match="socket callout"):
             ream(refused)
+
+
+def test_the_socket_callout_reads_back_its_size_and_band(monkeypatch) -> None:
+    """The callout's own dimension reads an empty name (PR 2 r7), so the
+    readback knows the hole by its value: the socket's diameter with its
+    model band (swTolType_e.swTolBILAT = 2), or the build fails."""
+    from types import SimpleNamespace
+
+    import _drawing_blind_ream_callout as ream_callout
+
+    monkeypatch.setattr(ream_callout, "_early_bound", lambda obj, _interface: obj)
+    spec = dt_cone_gear_shaft_spec
+    lower, upper = drawing.deviations(spec.SOCKET_DIA_BAND)
+
+    def display(value_mm, kind, low_mm, high_mm):
+        tolerance = SimpleNamespace(
+            Type=kind,
+            GetMinValue=lambda: low_mm / 1000.0,
+            GetMaxValue=lambda: high_mm / 1000.0,
+        )
+        dimension = SimpleNamespace(SystemValue=value_mm / 1000.0, Tolerance=tolerance)
+        return SimpleNamespace(GetDimension2=lambda _index: dimension)
+
+    def check(callout):
+        ream_callout.require_printed_size(
+            callout,
+            dia_mm=spec.SOCKET_DIA,
+            deviations_mm=(lower, upper),
+            definitions={},
+            label="socket",
+        )
+
+    # r7: type 2, 0/1.27e-05 m, on the socket's own diameter.
+    check(display(spec.SOCKET_DIA, 2, lower, upper))
+    for wrong in (
+        display(spec.SOCKET_DIA + 0.01, 2, lower, upper),  # another hole
+        display(spec.SOCKET_DIA, 0, 0.0, 0.0),  # no band
+        display(spec.SOCKET_DIA, 3, lower, upper),  # limits, not bilateral
+        display(spec.SOCKET_DIA, 2, lower, upper + 0.001),  # another band
+    ):
+        with pytest.raises(
+            RuntimeError, match="socket callout does not print its size"
+        ):
+            check(wrong)
 
 
 def test_stacked_tip_diameters_never_run_a_line_through_a_text() -> None:

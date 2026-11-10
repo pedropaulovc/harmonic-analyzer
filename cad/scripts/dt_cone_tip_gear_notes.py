@@ -168,10 +168,6 @@ def gear_data() -> str:
             "BACKLASH WITH MATE, ACCEPT AT ASSEMBLY",
             f"{inch(minimum, 3)} TO {inch(maximum, 3)}",
         ),
-        (
-            "ROOT RADIAL MIN/MAX (REF)",
-            f"{inch(profile.root_radius_min_mm, 4)} / {inch(profile.root_radius_max_mm, 4)}",
-        ),
         # cone_set_stack books each gear's tooth runout about its seat; this
         # gear's seat is its own stems, between whose centres it is cut.
         (
