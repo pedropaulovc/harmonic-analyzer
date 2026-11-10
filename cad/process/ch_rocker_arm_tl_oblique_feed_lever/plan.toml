@@ -24,8 +24,9 @@ kerf_in = 0.125                  # Hand sheet: about 1/8 in per cut.
 blank_thickness_in = 0.5
 blank_width_in = 1.0
 quantity = 1
-corner_radius_in = 0.2           # Hand sheet (v47 drawing 2X R.2); no v48 record.
-corner_layout_in = 0.2           # Hand sheet: scribed lines .20 from end and sides.
+# Hand sheet (v47 drawing 2X R.2, lines scribed .20 from end and sides); no
+# v48 record. The scribed lines sit one corner radius back.
+corner_radius_in = 0.2
 overhang_in = 0.4                # Hand sheet: ZERO END, then grip end, ~.4 past the jaw side.
 y_touch_x_in = 8.0               # Hand sheet: Y0 touched past the right jaw side.
 # Machine-capacity inputs (mm). Heights are above the mill table; tool lengths
@@ -156,10 +157,10 @@ diagram = { file = "diagrams/feed-lever/corners.svg", alt = "Finished lever and 
 speed_kind = "other"
 tool = "files"
 sizing = "other"
-instruction = "Scribe lines {{process.corner_layout_in:.2f}} from the grip end and from each side on the top face. Lever upright, grip end just above the jaws: file both vertical grip-end corners to R{{process.corner_radius_in:.1f}}, inside the lines, blended."
-instruction_detailed = "Dykem the grip end; scribe lines {{process.corner_layout_in:.2f}} from the grip end and from each side on the top face, ~1/2 in back. Lever upright, grip end just above the jaws: file each vertical grip-end corner flat at 45° until the flat just reaches both lines, then roll the file round until it blends into an arc touching both lines (R{{process.corner_radius_in:.1f}})."
+instruction = "Scribe lines {{process.corner_radius_in:.2dot}} from the grip end and from each side on the top face. Lever upright, grip end just above the jaws: file both vertical grip-end corners to R{{process.corner_radius_in:.1dot}}, inside the lines, blended."
+instruction_detailed = "Dykem the grip end; scribe lines {{process.corner_radius_in:.2dot}} from the grip end and from each side on the top face, ~1/2 in back. Lever upright, grip end just above the jaws: file each vertical grip-end corner flat at 45° until the flat just reaches both lines, then roll the file round until it blends into an arc touching both lines (R{{process.corner_radius_in:.1dot}})."
 feed = "hand"
-inspection = "2X R{{process.corner_radius_in:.1f}} ±{{cad.linear_1pl_in:.1f}}, visual against the scribed lines."
+inspection = "2X R{{process.corner_radius_in:.1dot}} ±{{cad.linear_1pl_in:.1dot}}, visual against the scribed lines."
 gauge_checks = "other"
 
 [[setups.operations]]
