@@ -1863,20 +1863,14 @@ def test_bracket_slip_stop_and_lost_motion_follow_ruling_b() -> None:
         <= leadscrew.BRACKET_REVERSAL_LOST_MOTION_ACCEPTED
     )
     assert leadscrew.KP08_SCREW_FLOAT_MAX == pytest.approx(0.487, abs=1e-3)
-    # Cross-check the chip load against the shop's cutting data.
+    # Cross-check the chip load against the shop's cutting setting for the cutter.
     import tomllib
     from _paths import CAD_ROOT
 
-    rows = tomllib.loads(
-        (CAD_ROOT / "process" / "shop" / "cutting-data.toml").read_text(encoding="utf-8")
-    )["cut"]
-    [row] = [
-        r for r in rows
-        if r["material_class"] == "low_carbon_steel" and r["tool_material"] == "HSS"
-        and r["operation"] == "profile"
-        and r["diameter_range"][0] <= trammel.PART_CUTTER_DIA <= r["diameter_range"][1]
-    ]
-    assert row["chip_load_mm_per_tooth"] == spec.NORMAL_FEED_CHIP_LOAD_MM
+    shop = tomllib.loads((CAD_ROOT / "process" / "shop.toml").read_text(encoding="utf-8"))
+    setting = shop["settings"]["rocker-profile-hss-low-carbon-steel"]
+    assert setting["tool"] == "rocker-profile-cutter"
+    assert setting["chip_load_mm_per_tooth"] == spec.NORMAL_FEED_CHIP_LOAD_MM
 
 
 @pytest.mark.parametrize(

@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-import _process_plans as plans
+from _paths import CAD_ROOT
 import ch_rocker_arm_spec as rocker
 import _rocker_interface as rocker_interface
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
@@ -83,7 +83,7 @@ def test_inputs_come_from_the_rocker_spec() -> None:
 
 def test_both_cutters_are_on_hand_as_four_flute_end_mills() -> None:
     inventory = tomllib.loads(
-        (plans.PROCESS_ROOT / "shop" / "inventory.toml").read_bytes().decode()
+        (CAD_ROOT / "config" / "shop-equipment.toml").read_bytes().decode()
     )
     sizes = inventory["tools"]["endmills-lms-6784"]["sizes_in"]["2_and_4_flute"]
     assert 4 in inventory["tools"]["endmills-lms-6784"]["flutes"]
@@ -94,7 +94,7 @@ def test_both_cutters_are_on_hand_as_four_flute_end_mills() -> None:
 
 def test_carrier_stock_and_new_riser_blank_requirements() -> None:
     inventory = tomllib.loads(
-        (plans.PROCESS_ROOT / "shop" / "inventory.toml").read_bytes().decode()
+        (CAD_ROOT / "config" / "shop-equipment.toml").read_bytes().decode()
     )
     (carrier,) = [
         row for row in inventory["stock"]
@@ -128,7 +128,7 @@ def test_strap_blank_is_the_bought_one_and_a_half_inch_strap_stock() -> None:
     from _mcmaster_91251a197 import DIMS as common_screw
 
     inventory = tomllib.loads(
-        (plans.PROCESS_ROOT / "shop" / "inventory.toml").read_bytes().decode()
+        (CAD_ROOT / "config" / "shop-equipment.toml").read_bytes().decode()
     )
     (strap,) = [
         row
@@ -351,7 +351,7 @@ def test_base_bar_stock_fits_the_vise_with_its_column_edge_three_and_a_half_out(
     edge stays at lateral +88.9 (2026-10-17 ruling a) so the TL-28 brackets
     stand on bar 1; both hold-down studs stay on the bar."""
     inventory = tomllib.loads(
-        (plans.PROCESS_ROOT / "shop" / "inventory.toml").read_bytes().decode()
+        (CAD_ROOT / "config" / "shop-equipment.toml").read_bytes().decode()
     )
     vise_opening = inventory["fixtures"]["vise-pm-6"]["opening_in"]["value"] * 25.4
     assert trammel.BASE_BAR_WIDTH <= vise_opening

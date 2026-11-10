@@ -1463,7 +1463,7 @@ PLAN_TAGS: tuple[PlanTag, ...] = (
 # indicator fixed to the machine, the shop table's "assembly gap, alignment
 # (test indicator)" row, ±.0005 (TL-00 round 1 review: the ±.001 stations
 # were DRO distances up to 14.85 in with no fit route). Every stack is built
-# from the shop's set (inventory gauges.gauge-blocks-mitutoyo, 81-piece inch,
+# from the shop's set (shop-equipment gauges.gauge-blocks-mitutoyo, 81-piece inch,
 # largest block 4 in), so no stack exceeds 4 in. The station error this
 # chain leaves in the cut, relative to the hub, is computed and charged below
 # (CHAIN_STATION_RADIUS).
@@ -1472,7 +1472,7 @@ CHAIN_STATIONS = trammel.ALIGNMENT_STATIONS
 _CHAIN_LINKS = tuple(zip((0.0, *CHAIN_STATIONS[:-1]), CHAIN_STATIONS))
 _GAUGE_SET_KEY = "gauge-blocks-mitutoyo"
 _GAUGE_SET = tomllib.loads(
-    (CAD_ROOT / "process" / "shop" / "inventory.toml").read_text(encoding="utf-8")
+    (CAD_ROOT / "config" / "shop-equipment.toml").read_text(encoding="utf-8")
 )["gauges"][_GAUGE_SET_KEY]
 if not (
     _GAUGE_SET["present"]
@@ -1480,7 +1480,7 @@ if not (
     and "largest block 4 in" in _GAUGE_SET["note"]
 ):
     raise AssertionError("the shop's gauge-block set moved; recheck the rail-setting stacks")
-# The set's composition (its inventory comment), in ten-thousandths: .1001-
+# The set's composition (its shop-equipment comment), in ten-thousandths: .1001-
 # .1009 by .0001, .101-.149 by .001, .050-.950 by .050, and 1, 2, 3, 4 in.
 GAUGE_BLOCKS_TENTHS = (
     *range(1001, 1010),
@@ -1682,7 +1682,7 @@ FEED_THRUST_N = (
 #
 # The normal finish feed's thrust, from the cut itself: the 3/8 four-flute
 # HSS cutter (trammel.PART_CUTTER_DIA) on the rocker arm's low-carbon steel at
-# cutting-data.toml's profile chip load for that cutter (0.0254 mm/tooth).
+# cad/process/shop.toml's profile chip load for that cutter (0.0254 mm/tooth).
 # Specific cutting force kc = kc1 h^-mc with kc1 1500 N/mm², mc 0.22
 # (SOURCED: Machining Doctor, Specific Cutting Force, material group 02,
 # low-carbon steel), h the chip load (its maximum, a full-slot entry). Each
@@ -1693,7 +1693,7 @@ FEED_THRUST_N = (
 _CUT_KC1_MPA = 1500.0
 _CUT_MC = 0.22
 _CUT_TEETH_ENGAGED = 2
-NORMAL_FEED_CHIP_LOAD_MM = 0.0254  # cutting-data.toml: low-carbon steel, HSS profile, 3-12.7
+NORMAL_FEED_CHIP_LOAD_MM = 0.0254  # shop.toml settings.rocker-profile-hss-low-carbon-steel
 _CUT_KC_MPA = _CUT_KC1_MPA * NORMAL_FEED_CHIP_LOAD_MM ** (-_CUT_MC)  # 3364
 _CUT_TOOTH_FORCE_N = _CUT_KC_MPA * trammel.STRAP_THICK * NORMAL_FEED_CHIP_LOAD_MM  # 213
 NORMAL_CUT_FORCE_N = _CUT_TEETH_ENGAGED * math.sqrt(2.0) * _CUT_TOOTH_FORCE_N  # 602
@@ -1959,10 +1959,11 @@ def _item(stem: str) -> str:
     return f"(ITEM {ITEM_NUMBERS[stem]})"
 
 
-# The rocker-arm process plan (cad/process/ch_rocker_arm/plan.toml, the held
-# route for MHA-CH-06 and its MHA-CH-13 strap) owns the blank, its chords, its
-# loose CL/CR holes and the strap hub's drill/ream with its tool envelope;
-# TL-00 cites its operations and repeats none of its numbers.
+# The rocker-arm process plan (the held MHA-CH-06 route for the arm and its
+# MHA-CH-13 strap; its 0.3-format plan.toml was retired in the prechips cutover,
+# last at 45952b66bc:cad/process/ch_rocker_arm/plan.toml) owns the blank, its
+# chords, its loose CL/CR holes and the strap hub's drill/ream with its tool
+# envelope; TL-00 cites its operations and repeats none of its numbers.
 PROCESS_PLAN = "MHA-CH-06 PLAN"
 # The in-situ HUB position (owner ruling 3, 2026-11-07): step 10 taps the
 # carrier's HUB there and every strap's hub hole is drilled and reamed at the
