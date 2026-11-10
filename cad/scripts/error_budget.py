@@ -1142,12 +1142,13 @@ def phase_profiles() -> dict[str, tuple[np.ndarray, np.ndarray]]:
     the keyed gears carry no residual and only their keyways' scatter
     (``cone_key_play``); their teeth are indexed off the keyway
     (``cone_flat_clock``).  A bonded gear has no bore feature to index from:
-    MHA-DT-00 sets its clock with a fork of the MHA-DT-03-TL-02 phasing comb
-    in a tooth space, engaged with T030's before the compound grabs, and it
-    cures there with no play.  Its scatter (``cone_tip_bond_clock``) is its
-    tooth space about that fork at its pitch circle, a pitch-arc length: the
-    turn at the cone gear is that arc over its pitch radius, and at the cam
-    T_i/120 of it, i.e. 1/(60 m) per mm on every bonded gear.
+    MHA-DT-00 sets its clock with a blade of the MHA-DT-03-TL-02 phasing comb
+    in one of its tooth spaces (owner ruling 2026-11-10), T030's in its own,
+    before the compound grabs, and it cures there with no play.  Its scatter
+    (``cone_tip_bond_clock``) is its tooth space about that blade at its pitch
+    circle, a pitch-arc length: the turn at the cone gear is that arc over its
+    pitch radius, and at the cam T_i/120 of it, i.e. 1/(60 m) per mm on every
+    bonded gear.
     """
     teeth = 6 * np.arange(1, N_ELEMENTS + 1)
     ratio = teeth / 120.0

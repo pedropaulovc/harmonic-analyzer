@@ -1,20 +1,23 @@
 r"""Build the cone tip gears' phasing comb (MHA-DT-03-TL-02; shop tooling).
 
 One flat steel plate (dt_cone_gear_tl_phasing_comb_spec): its stepped edge
-carries a fork per gear, T030, T024, T018, T012 and T006, each split by a slot
-that straddles that gear's phase-0 tooth while LOCTITE 638 grabs (MHA-DT-00
-step 1). Model frame (spec docstring): X north along the plate, Y radially
-outward, Z through the thickness; the origin is the north end of the T030 fork
-on the seat line.
+carries one blade per gear, T030, T024, T018, T012 and T006, each dropping
+into one tooth space of that gear while LOCTITE 638 grabs (MHA-DT-00 step 1).
+Model frame (spec docstring): X north along the plate, Y radially outward, Z
+through the thickness; the origin is the north end of the T030 blade on the
+seat line.
 
 Features:
 
-* ``PlateProfile`` on the Front plane: the closed rectilinear outline, every
-  length driven from the spec's globals; ``Plate`` extrudes it +Z by the
-  thickness, so the Front plane is the plate's back face.
-* ``SlotProfileTnnn`` / ``SlotTnnn`` per fork: a Top-plane (seat line)
-  rectangle over the fork's length, its near wall ``SlotFace`` off the back
-  face, cut down through the fork.
+* ``PlateProfile`` on the Front plane: the closed rectilinear outline (each
+  blade's stock full thickness down to its tip), every length driven from
+  the spec's globals; ``Plate`` extrudes it +Z by the thickness, so the
+  Front plane is the plate's back face.
+* ``BladeRootTnnn``: a plane at the step south of T018's, T012's and T006's
+  blades (T030's and T024's leave the plate at the seat, the Top plane).
+* ``BladeProfileTnnn`` / ``BladeReliefTnnn`` per blade: one outline round
+  the blade, its thickness and its near face's ``BladeFace`` from the back
+  face, cut from the blade's root down past its tip.
 
 Run (SolidWorks already open)::
 
@@ -47,31 +50,34 @@ from _saved_part_guard import require_saved_drawing_properties
 from _session import run_build
 from _sketch import SketchDims, add_line_chain, dimension_between, ensure_fully_defined
 from _sketch_chains import define_rectilinear_chain
+from _visibility import blank_reference_geometry
 from dt_cone_gear_tl_phasing_comb_spec import (
+    BLADE_TIP_DEPTH_MM,
     BONDED_TEETH,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     FINISHED_VOLUME,
-    FORK_TIP_DEPTH_MM,
     GEARS,
     GLOBALS,
     ISOMETRIC_VIEW_NOTE,
-    MODEL_BAND_PLACES,
     MODEL_BANDS_MM,
     PLATE_FEATURE,
     PLATE_VOLUME,
     PROFILE_SKETCH,
-    SLOT_RUNOUT,
-    SLOT_VOLUME_MM3,
+    RELIEF_RUNOUT,
+    RELIEF_VOLUME_MM3,
     THICKNESS,
     UNIT,
+    blade_face_name,
+    blade_root_depth_mm,
+    blade_sketch,
+    blade_tip_name,
+    blade_width_name,
     gear_tag,
     profile_points_mm,
-    slot_feature,
-    slot_rectangle_mm,
-    slot_face_name,
-    slot_sketch,
-    slot_width_name,
+    relief_feature,
+    relief_outline_mm,
+    root_plane,
 )
 
 PART_NAME = "dt-cone-gear-tl-phasing-comb"
@@ -97,7 +103,7 @@ def _require_one_solid_body(adapter: Any, *, label: str) -> None:
 
 async def _plate_profile(adapter: Any) -> list[tuple[str, str]]:
     """The closed outline (``profile_points_mm``): every segment horizontal or
-    vertical, the T030 fork's north end on the origin, the lengths from the
+    vertical, the T030 blade's north end on the origin, the lengths from the
     plate's south end and the heights from the seat line (the origin's)."""
     points = profile_points_mm()
     check("create_sketch plate profile", await adapter.create_sketch("Front"))
@@ -122,16 +128,16 @@ async def _plate_profile(adapter: Any) -> list[tuple[str, str]]:
         return f"{lines[index]}.start"
 
     dims = SketchDims()
-    south_tip = start(1)  # the south end's lower corner (T030 fork tip)
+    south_tip = start(1)  # the south end's lower corner (T030 blade tip)
     await dimension_between(
         adapter,
         start(1),
         start(2),
         "horizontal_distance",
         -points[1][0],
-        "T030 fork length",
+        "T030 blade length",
     )
-    dims.record("FingerLength", '"FingerLength"')
+    dims.record("BladeLength", '"BladeLength"')
     top = len(points) - 1
     await dimension_between(
         adapter,
@@ -142,50 +148,50 @@ async def _plate_profile(adapter: Any) -> list[tuple[str, str]]:
         "plate length",
     )
     dims.record("PlateLength", '"PlateLength"')
-    # Each fork's lower south corner: the chain runs four vertices a fork
+    # Each blade's lower south corner: the chain runs four vertices a blade
     # (step, south corner, north corner, step), T030's south corner is P1.
-    forks = {teeth: 1 + 4 * index for index, teeth in enumerate(GEARS)}
-    if any(points[forks[t]][1] != -FORK_TIP_DEPTH_MM[t] for t in GEARS):
-        raise AssertionError("plate profile fork corners out of order")
+    blades = {teeth: 1 + 4 * index for index, teeth in enumerate(GEARS)}
+    if any(points[blades[t]][1] != -BLADE_TIP_DEPTH_MM[t] for t in GEARS):
+        raise AssertionError("plate profile blade corners out of order")
     for teeth in BONDED_TEETH:
-        south = forks[teeth]
+        south = blades[teeth]
         await dimension_between(
             adapter,
             south_tip,
             start(south),
             "horizontal_distance",
             points[south][0] - points[1][0],
-            f"{gear_tag(teeth)} fork start",
+            f"{gear_tag(teeth)} blade start",
         )
         dims.record(f"Start{gear_tag(teeth)}", f'"Start{gear_tag(teeth)}"')
     for teeth in BONDED_TEETH[:-1]:
-        south = forks[teeth]
+        south = blades[teeth]
         await dimension_between(
             adapter,
             start(south),
             start(south + 1),
             "horizontal_distance",
             points[south + 1][0] - points[south][0],
-            f"{gear_tag(teeth)} fork length",
+            f"{gear_tag(teeth)} blade length",
         )
-        dims.record(f"FingerLength{gear_tag(teeth)}", '"FingerLength"')
+        dims.record(f"BladeLength{gear_tag(teeth)}", '"BladeLength"')
     await dimension_between(
         adapter, "origin", start(0), "vertical_distance", points[0][1], "plate height"
     )
     dims.record("PlateHeight", '"PlateHeight"')
     for teeth in GEARS:
-        fork = forks[teeth]
+        corner = blades[teeth]
         await dimension_between(
             adapter,
             "origin",
-            start(fork),
+            start(corner),
             "vertical_distance",
-            -points[fork][1],
-            f"{gear_tag(teeth)} fork tip",
+            -points[corner][1],
+            f"{gear_tag(teeth)} blade tip",
         )
-        dims.record(f"Fork{gear_tag(teeth)}", f'"Fork{gear_tag(teeth)}"')
+        dims.record(blade_tip_name(teeth), f'"{blade_tip_name(teeth)}"')
     for teeth in BONDED_TEETH[:-1]:
-        step = forks[teeth] + 2
+        step = blades[teeth] + 2
         await dimension_between(
             adapter,
             "origin",
@@ -201,70 +207,110 @@ async def _plate_profile(adapter: Any) -> list[tuple[str, str]]:
     return dims.apply(adapter, PROFILE_SKETCH)
 
 
-def _slot_drives(teeth: int) -> tuple[list[str], list[str]]:
-    """Names and drives of a slot rectangle's dims in define_rectilinear_chain's
-    emission order: its length, its width, then its near south corner's x and
-    its near wall's distance from the plate's back face (the origin's Z0)."""
+def _relief_drives(teeth: int) -> tuple[list[str | None], list[str | None]]:
+    """Names and drives of a relief outline's dims in define_rectilinear_chain's
+    emission order (``relief_outline_mm``): the blade's span past its south
+    end, its width, its far face's span, the plate past the far face, the
+    outline's span, its depth through the plate; then the anchor (the blade's
+    near face at its north end): its x (none for T030's, on the origin) and
+    BladeFace from the back face."""
     tag = gear_tag(teeth)
-    span = f'"PlateLength" - "Start{tag}"' if teeth == GEARS[-1] else '"FingerLength"'
-    corner_x = (
-        '"FingerLength"' if teeth == GEARS[0] else f'"Start{tag}" - "FingerLength"'
-    )
-    return (
-        [
-            f"SlotSpan{tag}",
-            slot_width_name(teeth),
-            f"SlotX{tag}",
-            slot_face_name(teeth),
-        ],
-        [span, f'"{slot_width_name(teeth)}"', corner_x, '"SlotFace"'],
-    )
+    blade_span = '"BladeLength" + "ReliefRunout"'
+    names: list[str | None] = [
+        f"BladeSpan{tag}",
+        blade_width_name(teeth),
+        f"BladeFarSpan{tag}",
+        f"ReliefFar{tag}",
+        f"ReliefSpan{tag}",
+        f"ReliefWidth{tag}",
+    ]
+    drives: list[str | None] = [
+        blade_span,
+        f'"{blade_width_name(teeth)}"',
+        blade_span,
+        f'"PlateThick" + "ReliefRunout" - "{blade_face_name(teeth)}"'
+        f' - "{blade_width_name(teeth)}"',
+        '"BladeLength" + 2 * "ReliefRunout"',
+        '"PlateThick" + 2 * "ReliefRunout"',
+    ]
+    if teeth != GEARS[0]:
+        names.append(f"BladeEnd{tag}")
+        drives.append(
+            '"PlateLength" - "BladeLength"' if teeth == GEARS[-1] else f'"Start{tag}"'
+        )
+    names.append(blade_face_name(teeth))
+    drives.append(f'"{blade_face_name(teeth)}"')
+    return names, drives
 
 
-async def _slot(
+async def _relief(
     adapter: Any, teeth: int, volume: float
 ) -> tuple[list[tuple[str, str]], float]:
-    """A Top-plane rectangle over the fork's length (sketch u = model X,
-    v = model -Z), its near wall SlotFace off the back face, cut from the seat
-    line down through the fork, SlotRunout past its tip."""
-    from solidworks_mcp.adapters.base import ExtrusionParameters
+    """The plate cut away beside ``teeth``'s blade, from the blade's root
+    (the Top plane, the seat, for T030 and T024; a ``BladeRootTnnn`` plane at
+    the step south of it otherwise) down past its tip: one closed outline
+    round the blade (sketch u = model X, v = model -Z)."""
+    from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
     tag = gear_tag(teeth)
-    x0, z0, x1, z1 = slot_rectangle_mm(teeth)
-    # Near south corner first: the chain's anchor.
-    points = [(x0, -z0), (x1, -z0), (x1, -z1), (x0, -z1)]
-    check(f"create_sketch {tag} slot", await adapter.create_sketch("Top"))
+    jobs: list[tuple[str, str]] = []
+    root = blade_root_depth_mm(teeth)
+    plane = root_plane(teeth)
+    root_drive = ""
+    if plane is None:
+        plane = "Top"
+    else:
+        south = GEARS[GEARS.index(teeth) - 1]
+        root_drive = f' - "Step{gear_tag(south)}"'
+        check(
+            f"create_plane {plane}",
+            await adapter.create_plane(
+                CreatePlaneParameters(
+                    mode="offset", base_plane="Top Plane", offset=-root
+                )
+            ),
+        )
+        name_last_feature(adapter, plane)
+        jobs.append(
+            (
+                name_dimensions(adapter, plane, [f"RootOffset{tag}"])[0],
+                f'"Step{gear_tag(south)}"',
+            )
+        )
+        blank_reference_geometry(adapter, ((plane, "PLANE"),))
+    points = [(x, -z) for x, z in relief_outline_mm(teeth)]
+    check(f"create_sketch {tag} relief", await adapter.create_sketch(plane))
     lines = await add_line_chain(adapter, points)
     dims = SketchDims()
-    names, drives = _slot_drives(teeth)
+    names, drives = _relief_drives(teeth)
     await define_rectilinear_chain(
         adapter,
         lines,
         points,
         anchor=0,
-        label=f"{tag} slot",
+        label=f"{tag} relief",
         dims=dims,
         names=names,
         drives=drives,
     )
-    await ensure_fully_defined(adapter, f"{tag} slot sketch")
-    check(f"exit_sketch {tag} slot", await adapter.exit_sketch())
-    name_last_feature(adapter, slot_sketch(teeth))
-    jobs = dims.apply(adapter, slot_sketch(teeth))
-    # A cut from the Top plane runs -Y by default (build_dt_cone_tip_block's
-    # dowel reverses it to run +Y).
+    await ensure_fully_defined(adapter, f"{tag} relief sketch")
+    check(f"exit_sketch {tag} relief", await adapter.exit_sketch())
+    name_last_feature(adapter, blade_sketch(teeth))
+    jobs += dims.apply(adapter, blade_sketch(teeth))
+    # A cut from a plane parallel to Top runs -Y by default
+    # (build_dt_cone_tip_block's dowel reverses it to run +Y).
     check(
-        f"cut {tag} slot",
+        f"cut {tag} relief",
         await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=FORK_TIP_DEPTH_MM[teeth] + SLOT_RUNOUT)
+            ExtrusionParameters(depth=BLADE_TIP_DEPTH_MM[teeth] - root + RELIEF_RUNOUT)
         ),
     )
-    name_last_feature(adapter, slot_feature(teeth))
-    depth = name_dimensions(adapter, slot_feature(teeth), [f"SlotDepth{tag}"])[0]
-    jobs.append((depth, f'"Fork{tag}" + "SlotRunout"'))
-    removed = SLOT_VOLUME_MM3[teeth]
+    name_last_feature(adapter, relief_feature(teeth))
+    depth = name_dimensions(adapter, relief_feature(teeth), [f"ReliefDepth{tag}"])[0]
+    jobs.append((depth, f'"{blade_tip_name(teeth)}"{root_drive} + "ReliefRunout"'))
+    removed = RELIEF_VOLUME_MM3[teeth]
     volume = await volume_check(
-        adapter, f"{tag} slot", volume - removed, 0.01 * removed + 0.01
+        adapter, f"{tag} relief", volume - removed, 0.01 * removed + 0.01
     )
     return jobs, volume
 
@@ -280,7 +326,7 @@ async def build(adapter: Any) -> dict[str, str]:
         await set_global(adapter, name, f"{value}mm")
 
     drive_jobs = await _plate_profile(adapter)
-    # +Z from the Front plane: the plate's back face is Z0, the slots' datum.
+    # +Z from the Front plane: the plate's back face is Z0, the blades' datum.
     check(
         "extrude plate",
         await adapter.create_extrusion(ExtrusionParameters(depth=THICKNESS)),
@@ -292,7 +338,7 @@ async def build(adapter: Any) -> dict[str, str]:
     volume = await volume_check(adapter, "plate", PLATE_VOLUME, 0.002 * PLATE_VOLUME)
 
     for teeth in GEARS:
-        jobs, volume = await _slot(adapter, teeth, volume)
+        jobs, volume = await _relief(adapter, teeth, volume)
         drive_jobs += jobs
     _require_one_solid_body(adapter, label="phasing comb")
 
@@ -307,15 +353,15 @@ async def build(adapter: Any) -> dict[str, str]:
         0.002 * PLATE_VOLUME,
     )
     _require_one_solid_body(adapter, label="driven phasing comb")
-    # The slot widths and locations, fork-tip depths and plate thickness carry
-    # their shop rows; the gear named at each slot is their mate (sheet note 1).
+    # The blade thicknesses, locations and tip depths carry their shop rows;
+    # the gear named at each blade is their mate (sheet note 1).
     for (feature_name, dimension_name), deviations in MODEL_BANDS_MM.items():
         set_dimension_bilateral_tolerance(
             adapter,
             feature_name,
             dimension_name,
             *deviations,
-            places=MODEL_BAND_PLACES[feature_name, dimension_name],
+            places=DRAWING_PRECISION[feature_name][dimension_name],
             display_unit=UNIT,
         )
 

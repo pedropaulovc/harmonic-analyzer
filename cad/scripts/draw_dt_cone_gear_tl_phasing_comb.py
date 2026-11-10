@@ -1,13 +1,13 @@
 r"""Manufacturing drawing of the cone tip gears' phasing comb (MHA-DT-03-TL-02).
 
-One sheet. The front view draws the plate's stepped edge as it lies in the
-cone's radial plane, south (T030) left, the gears' axis below: every length
-from the plate's south end, every height from the seat line, the T030 fork's
-slot bottom (hidden lines show each slot running up to the seat line). The
-bottom view shows each fork's slot, its width banded at the shop's slot row
-with the gear it fits named at it (note 1), and the five slots' common
-location from the plate's back face at the shop's milled-step row (5X). A
-shaded isometric gives the picture.
+One sheet. The front view draws the plate's stepped edge as it lies parallel
+to the cone's radial plane, south (T030) left, the gears' axis below: every
+length from the plate's south end, every height from the seat line, each
+blade's tip (hidden lines show each blade's relief). The bottom view shows
+each blade: its thickness banded at the shop's milled-width row with the
+gear whose tooth space it fits named at it (note 1), and its near face from
+the plate's back face at the shop's milled-step row. A shaded isometric
+gives the picture.
 
 Run with SolidWorks open::
 
@@ -61,26 +61,26 @@ OUTPUTS = DrawingOutputs(
 )
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
-# A 1.33 x .51 plate whose smallest slot is .034: 5:1 keeps the slots and
-# the .010 T030 fork tip legible. Measured on the farm sheet (layout audit):
+# A 1.33 x .51 plate whose thinnest blade is .022: 5:1 keeps the blades and
+# the .022 T030 blade tip legible. Measured on the farm sheet (layout audit):
 # dimension text is 3.5 mm high, about 2.6 mm a capital, a banded value with
 # its stacked limits 25 mm wide centred on its dimension line.
 SHEET_SCALE = (5.0, 1.0)
 VIEW_SCALE = (5, 1)
 RATIO = VIEW_SCALE[0] / VIEW_SCALE[1]
-ISO_SCALE = (2, 1)
-# The model origin (the T030 fork's north end on the seat line) on the
-# sheet; the bottom view projects straight below. The T030 slot's callout
-# block ends at the origin and runs 53 mm left: it stays 5 mm inside the
+ISO_SCALE = (1, 1)
+# The model origin (the T030 blade's north end on the seat line) on the
+# sheet; the bottom view projects straight below. The T030 blade's callout
+# block ends at the origin and runs 52 mm left: it stays 5 mm inside the
 # border.
 FRONT_ORIGIN = (0.072, 0.215)
-BOTTOM_CENTER_Y = 0.105
-# The isometric and its label in the free lower right, between the height
-# texts and the title block; the notes under the bottom view's callouts, left
-# of the title block.
-ISO_CENTER = (0.345, 0.122)
-ISO_NOTE_XY = (0.305, 0.096)
-NOTES_XY = (0.020, 0.070)
+BOTTOM_CENTER_Y = 0.0903
+# The isometric and its label in the free upper right, over the seat line's
+# extension lines; the notes under the bottom view's callouts, left of the
+# title block.
+ISO_CENTER = (0.372, 0.246)
+ISO_NOTE_XY = (0.325, 0.227)
+NOTES_XY = (0.020, 0.034)
 
 
 def front_xy(x_mm: float, y_mm: float) -> tuple[float, float]:
@@ -97,11 +97,11 @@ _LOW_Y = min(y for _, y in _POINTS)
 PLATE_BOX = (*front_xy(_SOUTH_X, _LOW_Y), *front_xy(_NORTH_X, _TOP_Y))
 
 # --- Front view dimension text (sheet m) ---------------------------------------
-# The plate's length over it; the fork starts below it, one row each, from
+# The plate's length over it; the blade starts below it, one row each, from
 # the south end. The heights stand in one baseline row right of the north
 # end, shallowest first; the plate's height has its text in its span, every
 # depth below the seat has its text in one row under the plate's lowest
-# fork, so no extension line runs through a text. Neighbouring texts stand
+# blade, so no extension line runs through a text. Neighbouring texts stand
 # their half-widths plus TEXT_GAP apart.
 TEXT_GAP = 0.003
 BANDED_HALF_WIDTH = 0.0125  # value and stacked limits, or SEE NOTE 1 under it
@@ -115,7 +115,7 @@ START_ROW_PITCH = 0.008
 def _heights() -> list[tuple[str, float]]:
     """(dimension, depth below the seat, mm; negative above) right of the
     plate: the plate's height first, then the depths shallowest first."""
-    rows = [(f"Fork{part.gear_tag(t)}", part.FORK_TIP_DEPTH_MM[t]) for t in part.GEARS]
+    rows = [(part.blade_tip_name(t), part.BLADE_TIP_DEPTH_MM[t]) for t in part.GEARS]
     rows += [
         (f"Step{part.gear_tag(t)}", part.STEP_DEPTH_MM[t])
         for t in part.BONDED_TEETH[:-1]
@@ -124,19 +124,19 @@ def _heights() -> list[tuple[str, float]]:
 
 
 def _half_width(name: str) -> float:
-    return BANDED_HALF_WIDTH if name.startswith("Fork") else PLAIN_HALF_WIDTH
+    return BANDED_HALF_WIDTH if name.startswith("BladeTip") else PLAIN_HALF_WIDTH
 
 
 def front_keep() -> dict[str, tuple[float, float]]:
     keep: dict[str, tuple[float, float]] = {
         "PlateLength": ((PLATE_BOX[0] + PLATE_BOX[2]) / 2.0, PLATE_BOX[3] + 0.010),
-        "FingerLength": (
+        "BladeLength": (
             front_xy(_SOUTH_X / 2.0, 0.0)[0],
-            front_xy(0.0, -part.FORK_TIP_DEPTH_MM[part.GEARS[0]])[1] - 0.008,
+            front_xy(0.0, -part.BLADE_TIP_DEPTH_MM[part.GEARS[0]])[1] - 0.008,
         ),
     }
     for row, teeth in enumerate(part.BONDED_TEETH):
-        south, _north = part.finger_x_mm(teeth)
+        south, _north = part.blade_x_mm(teeth)
         keep[f"Start{part.gear_tag(teeth)}"] = (
             front_xy((_SOUTH_X + south) / 2.0, 0.0)[0],
             START_ROW_Y0 - row * START_ROW_PITCH,
@@ -155,29 +155,43 @@ FRONT_KEEP = front_keep()
 
 # --- Bottom view ---------------------------------------------------------------
 # A narrow vertical dimension prints its text left of its dimension line,
-# ending there, on a leader shelf (farm layout audit). Each slot's width has
-# its line just inside its fork's north end, its block in one of two rows,
-# over and under the plate's edge view, so blocks in a row stand a fork apart
-# and no leader crosses another block. The slots' common location (5X) prints
-# over the edge view right of the plate, the thickness under it farther right.
-SLOT_LINE_INSET = 0.002
-ROW_OFFSET = 0.0185
-OVER_Y = BOTTOM_CENTER_Y + ROW_OFFSET
-UNDER_Y = BOTTOM_CENTER_Y - ROW_OFFSET
-SLOT_FACE_X = PLATE_BOX[2] + 0.018
-PLATE_THICK_X = PLATE_BOX[2] + 0.053
+# ending there, on a leader shelf (farm layout audit). Each blade's thickness
+# has its line just inside its blade's north end, its block in the inner row
+# on one side of the plate's edge view (alternating, so blocks in a row stand
+# a blade apart); its location from the back face has its line just inside
+# the blade's south end, its block in the outer row on the other side, so no
+# leader crosses another block. The thickness over the edge view right of
+# the plate.
+LINE_INSET = 0.002
+FACE_LINE_INSET = 0.005
+ROW_CLEAR = 0.014  # edge view to the inner row's text, half a block plus air
+ROW_PITCH = 0.022
+_HALF_THICK = part.THICKNESS * RATIO / 2000.0
+OVER_Y = (
+    BOTTOM_CENTER_Y + _HALF_THICK + ROW_CLEAR,
+    BOTTOM_CENTER_Y + _HALF_THICK + ROW_CLEAR + ROW_PITCH,
+)
+UNDER_Y = (
+    BOTTOM_CENTER_Y - _HALF_THICK - ROW_CLEAR,
+    BOTTOM_CENTER_Y - _HALF_THICK - ROW_CLEAR - ROW_PITCH,
+)
+PLATE_THICK_X = PLATE_BOX[2] + 0.055
 
 
 def bottom_keep() -> dict[str, tuple[float, float]]:
-    keep = {
-        part.SLOT_FACE_PRINTED: (SLOT_FACE_X, OVER_Y),
-        "PlateThick": (PLATE_THICK_X, UNDER_Y),
-    }
+    keep = {"PlateThick": (PLATE_THICK_X, OVER_Y[0])}
     for index, teeth in enumerate(part.GEARS):
-        _south, north = part.finger_x_mm(teeth)
-        keep[part.slot_width_name(teeth)] = (
-            front_xy(north, 0.0)[0] - SLOT_LINE_INSET,
-            UNDER_Y if index % 2 == 0 else OVER_Y,
+        south, north = part.blade_x_mm(teeth)
+        width_rows, face_rows = (
+            (UNDER_Y, OVER_Y) if index % 2 == 0 else (OVER_Y, UNDER_Y)
+        )
+        keep[part.blade_width_name(teeth)] = (
+            front_xy(north, 0.0)[0] - LINE_INSET,
+            width_rows[0],
+        )
+        keep[part.blade_face_name(teeth)] = (
+            front_xy(south, 0.0)[0] + FACE_LINE_INSET,
+            face_rows[1],
         )
     return keep
 
@@ -239,7 +253,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Cone Tip Gear Phasing Comb Drawing",
             1: "Harmonic Analyzer shop tooling drawing",
             2: "Harmonic Analyzer Project",
-            3: "cone tip gear phasing comb; T030-T006 forks; MHA-DT-03-TL-02",
+            3: "cone tip gear phasing comb; one blade each, T030-T006; MHA-DT-03-TL-02",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -264,7 +278,7 @@ async def build(adapter: Any) -> dict[str, str]:
         (FRONT_ORIGIN[0], BOTTOM_CENTER_Y),
         label="bottom view",
     )
-    # The slots' bottoms are hidden in the front view; it shows them dashed.
+    # The blades' reliefs are hidden in the front view; it shows them dashed.
     set_hidden_lines_visible(adapter, front)
     for view in (bottom, iso):
         set_hidden_lines_removed(adapter, view)

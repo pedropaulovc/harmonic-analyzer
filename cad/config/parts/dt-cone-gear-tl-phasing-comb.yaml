@@ -3,9 +3,10 @@ dt-cone-gear-tl-phasing-comb:
   # Shop tooling: the parent MHA-DT-03 Number plus -TL-nn (subsystem-identities.md).
   # Owner ruling 2026-11-09 (b1) via PR #1992
   # (https://github.com/pedropaulovc/harmonic-analyzer/pull/1992): one flat
-  # plate in the cone's +X radial plane whose forks straddle the phase-0 tooth
-  # of T030 (keyed, over the key) and of the bonded T024, T018, T012 and T006
-  # while LOCTITE 638 grabs (MHA-DT-00 step 1). Never in the drive-train BOM.
+  # plate that phases T030 (keyed) and the bonded T024, T018, T012 and T006
+  # together while LOCTITE 638 grabs (MHA-DT-00 step 1); owner ruling
+  # 2026-11-10 via PR #1992: a single blade per gear, dropped in one tooth
+  # space of it. Never in the drive-train BOM.
   number: MHA-DT-03-TL-02
   material: LOW-CARBON STEEL, E.G. 1018 CF
   material_specification: low-carbon cold-finished steel flat, 3/32 in, ASTM A108 (1018)
@@ -13,10 +14,10 @@ dt-cone-gear-tl-phasing-comb:
   quantity: 1
   tolerance_class: machined_block
   drawing_unit: in
-  process: "mill 3/32 in flat to thickness, then saw and mill the plate's stepped edge; mill each fork's slot; break edges, not the slot edges"
+  process: "mill 3/32 in flat to thickness, then saw and mill the plate's stepped edge; mill each blade from both faces; break edges, not the blade edges"
   machinist_exceptions:
     - id: "RV-01"
-      kind: "minor"
-      where: "bottom view, the .070 plate-thickness callout: TINE WALL .013 MIN"
-      finding: "each fork's two tines (the plate either side of its slot) below the .060 wall floor (rules 17, 20)"
-      reason: "Delegated ruling 2026-11-09 (ImplementC1KeyedOpus), pending owner confirmation, under owner ruling 2026-11-09 (b1, PR #1992 https://github.com/pedropaulovc/harmonic-analyzer/pull/1992) choosing a flat phasing comb whose forks straddle each tip gear's phase-0 tooth with a tine in each neighbouring tooth space. A 48 DP tooth space is about .035 wide where a fork enters it, so no tine can reach the .060 floor; the plate is held to .070 +/-.001 so both tines clear T030's spaces, and they stand .013 at the print's worst. Shop tooling, never in a machine; a broken tine is remade."
+      kind: "accept"
+      where: "bottom view, each blade's thickness; the plate-thickness callout: BLADE WALL .022 MIN"
+      finding: "each blade, a wall .022 to .025 thick, below the .060 wall floor (rules 17, 20)"
+      reason: "owner ruling 2026-11-10 via PR #1992 (https://github.com/pedropaulovc/harmonic-analyzer/pull/1992): single blade per gear. Each blade drops into one tooth space of its 48 DP gear, as thick as that space allows where it enters (about .025 at the blade tip) less a clearance, so no blade can reach the .060 floor; the sheet states the thinnest blade as a plain fact. Shop tooling, never in a machine; a damaged blade is remade."

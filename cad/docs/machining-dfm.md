@@ -40,8 +40,9 @@ its first-root position; no second general note restates that location.
      on round land 2 one 0.45 ±0.10 feeler off T030 (0.35–0.55 mm stack float); T018 and T012 bonded on the
      MHA-DT-37 spigot, whose end is bonded in the reamed Ø.0625 × .20 in socket in MHA-DT-04's end; land 2
      ends .025 in inside T024's bore so T018 always butts T024. Degrease, phase each bonded gear to the keyed
-     stack within the compound's fixture time with the MHA-DT-03-TL-02 phasing comb (owner ruling
-     2026-11-09: one fork per gear on its +X tooth, T030 to T006), and let it cure before load; a bonded
+     stack within the compound's fixture time with the MHA-DT-03-TL-02 phasing comb (owner rulings
+     2026-11-09 and 2026-11-10: one blade per gear in the tooth space beside its phase-0 tooth, T030 to
+     T006), and let it cure before load; a bonded
      slip fit has nothing to adjust afterwards.
      The MHA-DT-38 brass bushing is pressed on the pivot against the leaves, made to its measured bore.
      The MHA-DT-39 end screw (stock 91794A558 with a reamed Ø.0630 × .12 in pivot hole, wall to the 2A

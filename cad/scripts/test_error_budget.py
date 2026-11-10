@@ -1578,7 +1578,7 @@ def test_cone_phase_follows_gear_ratio_key_lever_and_bond_comb(budget):
     """Owner decision C1 keyed (2026-11-09, PR #1992): the keyed gears turn by
     half their keyway clearance over the key's lowest top less the edge break
     and are indexed off the keyway; the bonded T006..T024 carry no keyway
-    terms, only their tooth space's play about the phasing comb's fork, a pitch arc
+    terms, only their tooth space's play about the phasing comb's blade, a pitch arc
     over each gear's pitch radius.  No term carries a residual."""
     import cone_land_key
     import dt_cone_gear_spec
@@ -1639,7 +1639,7 @@ def test_cone_phase_follows_gear_ratio_key_lever_and_bond_comb(budget):
 
 def test_bond_phase_propagates_through_physical_readout(nom):
     """A pair holding a bonded and a keyed gear retains the bonded gear's
-    phasing-comb fork play through the physical readout."""
+    phasing-comb blade play through the physical readout."""
     x = np.zeros(eb.N_ELEMENTS)
     x[[0, 19]] = 1.0  # T006 (bonded) and T120 (keyed)
     bond = np.zeros((1, eb.N_ELEMENTS))
