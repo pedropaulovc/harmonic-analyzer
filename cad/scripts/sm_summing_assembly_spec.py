@@ -74,18 +74,22 @@ HANGER_FIT_REACH_PLACES = 3
 
 # --- Knife-mount gauge bar (Owner ruling 2026-11-08 (Pedro), #2144 item 11.3) --
 # A tool, not a BOM part: with each MHA-SM-02 hung on its one MHA-SM-VN-53
-# dowel and its bolt finger-tight, a Ø.4720 class ZZ MINUS gauge pin
-# (+.0000/-.0002 in) slides through BOTH mounts' bores; the bolts are
-# tightened and the bar must slide back out.  It sets the front mount's yaw
-# about its dowel (and proves both mounts' pitch); the rear mount is then
-# re-hung on the lever's stub and swung until the rock gauge passes (this
-# fit-up order owner-confirmed 2026-11-08 (Pedro), #2144 item 11.3;
-# ``build_sm_summing_assembly`` budgets both).  Its nominal is the bore's
-# smallest printed Ø, so it enters every conforming bore.
+# dowel and its bolt finger-tight, a Ø.4720 +.0000/-.0002 in gauge bar slides
+# through BOTH mounts' bores; the bolts are tightened and the bar must slide
+# back out.  It sets the front mount's yaw about its dowel (and proves both
+# mounts' pitch); the rear mount is then re-hung on the lever's stub and
+# swung until the rock gauge passes (this fit-up order owner-confirmed
+# 2026-11-08 (Pedro), #2144 item 11.3; ``build_sm_summing_assembly`` budgets
+# both).  Its nominal is the bore's smallest printed Ø, so it enters every
+# conforming bore.  Owner ruling 2026-11-10 (Pedro), #2334, S2: a 2 in class
+# ZZ pin cannot reach both mounts, whose outer faces stand 7.40 apart, so
+# the tool is a named 8.0 in bar (a 12 mm g6 ground shaft miked to the band
+# serves; inventory gauges.gauge-bar-0472x8).
 KNIFE_GAUGE_BAR_DIA_IN = 0.4720
-KNIFE_GAUGE_BAR_BAND_IN = (0.0, -0.0002)  # (upper, lower), class ZZ minus
+KNIFE_GAUGE_BAR_BAND_IN = (0.0, -0.0002)  # (upper, lower)
 KNIFE_GAUGE_BAR_DIA = KNIFE_GAUGE_BAR_DIA_IN * 25.4  # 11.9888
 KNIFE_GAUGE_BAR_DIA_MIN = (KNIFE_GAUGE_BAR_DIA_IN + min(KNIFE_GAUGE_BAR_BAND_IN)) * 25.4
+KNIFE_GAUGE_BAR_LENGTH_IN = 8.0
 
 # --- Assembly settings, as model dimensions -------------------------------------
 # Two blanked Front-plane construction sketches in the assembly (sketch x =

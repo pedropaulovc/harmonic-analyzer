@@ -81,7 +81,7 @@ its first-root position; no second general note restates that location.
   | `ch-rocker-arm` / `ch-channel-lever` hubs | 20 each | the integral hubs stack face to face and set the 7.0565 channel pitch; the 19 `pivot-bushing` and 19 `lever-bushing` spacers are retired. Hub width consistency across each set is the point ([#2344](https://github.com/pedropaulovc/harmonic-analyzer/issues/2344)) |
   | `ch-rocker-arm` | 20 | strap with a pressed hub; the R800/R816 arcs are cut on the oblique jig MHA-CH-06-TL-00, by a held reference route that is not yet qualified (`cad/process/ch_rocker_arm/plan.toml`) |
   | `ch-connecting-rod` | 20 | flat outline from 1018 plate, stepped both faces, slotted fork; the outline on the manual mill is **route not selected** ([#2340](https://github.com/pedropaulovc/harmonic-analyzer/issues/2340)) |
-  | `sm-knife-mount` | 2 | trivial prismatic block, 2 identical |
+  | `sm-knife-mount` | 2 | trivial prismatic block, 2 identical; 4140/4142 HT pre-hardened bar (28-32 HRC), no heat treatment |
 
 - **Casting-vs-bar substitution:** `fr-rocker-arm-support` is a benign stock
   substitution; the **`sm-summing-lever` now explicitly uses a machined-from-solid
@@ -90,11 +90,9 @@ its first-root position; no second general note restates that location.
   cylinder, counter web and delicate knife trunnions into a simple plate part.
   Plan the multi-setup workholding and cutter access for the actual solid; the
   setup count and machining clearance still need native/CAM qualification.
-  - **`sm-knife-mount` is a material *conflict*, not a settled casting:** its registry
-    (`parts/sm-knife-mount.yaml`) and assessment §6 say **Brass**, but `build_sm_knife_mount.py` hardcodes
-    `MATERIAL = "Gray Cast Iron"`. The registry value is what stamps the BOM/drawing custom property, so
-    the intended stock is a **brass bar block** (trivial) — the script constant looks stale. Reconcile
-    before it reaches a drawing (gap below).
+  - **`sm-knife-mount` material is settled:** bar stock, 4140/4142 HT pre-hardened to 28-32 HRC
+    as supplied (`parts/sm-knife-mount.yaml`, owner ruling 2026-11-10 (Pedro), #2334 option B1); the
+    builder keeps the generic `Plain Carbon Steel` library material for density only.
 
 - `fr-rocker-arm-support` carries four **5/16 through clearance drills**. Four
   McMaster 92240A540 1/4-20 UNC-2A × 3/4 in hex-head screws install from the
@@ -599,7 +597,7 @@ probe, not evidence that it has been run for option A.
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
 | **`sm-summing-lever`** | machined-from-solid organic first-class lever; uniform 7.00 coefficient slab, retained centered 5.08 counter web | solid pivot cylinder Ø25.4×152.4 (**no bore**); 2× unchanged hex knife trunnions protruding 21.717 each end; 20× #6-32 through-taps in the 7.00 slab @ 7.0565 pitch (Ø2.705 tap drill), anchors locked by underside MHA-CH-14 jam nuts; one #10-24 tap through the Ø19.05×19.05 summation-anchor boss with its retained top jam nut; shared R15.24 tangent positive ribs, bounded R.040 MAX side roots/profile blends and a separately bounded lower longitudinal plate/cylinder blend, not general body fillets | delicate knife ridge; slender trunnions and cantilevered faces complicate workholding; small through-taps require controlled tapping; independent pilot wall guards retain the .080 in (2.032 mm) pilot floor; unchanged top-plate/cylinder, counter-web/cylinder, boss/counter-web, boss/middle-rib-flank, middle-rib-flank/counter-web and knife-stub shoulder junctions retain baseline RV-02 only; separate knife-root/tool-access debt remains | multiple setups; native/CAM route not yet qualified | **machined from solid**, per registry; preserve all spring/bracket/mount seats; evaluate hardened knife insert separately (§6) |
-| **`sm-knife-mount`** | rectangular block 25.4 ±0.8 wide ×29.6×14.0 (bar/plate), O1 hardened and drawn back to 40-45 HRC, the bore and B cut to their printed bands after heat treatment (owner ruling 2026-11-08, SM-02 harden less; supersedes H3's sizes-after-hardening); **2 identical** | unchanged Ø12.00 +0.03/0 reamed through bore and pose, centre 20.616 BASIC below the top face (`BORE_CY` −5.75 from the knife-edge origin, block top +14.866, clamped to the casting underside); #10-24 UNC-2B bottoming tap on the bore axis: #25 Ø3.7973 under the title-block DRILLED HOLES +0.10/0 row, cylindrical drill depth .438 ±.002 (11.1252 ±0.0508), full thread .375 ±.005 (9.525 ±0.127); fully charged drill-point crown web 2.1060 (≥2.032), no break-in (conservative proof envelope Ø3.924, above accepted MAX Ø3.8989; point MIN 117°); one MHA-SM-VN-53 slip hole cut from the top seat to a flat floor 9.398 deep (owner ruling 2026-10-24, T+H3): datum B, a Ø.1280 ±.0007 blind flat-bottom reamed round hole 7.62 (.300) +X of the tap axis, ⊥Ø.001 to A. Owner ruling 2026-11-08 (Pedro), #2144 item 11.3 (scheme S1) deletes the −X slot (datum C) and its notch: the tap is spotted through MHA-FR-02's #10 hole, and the bore carries ⌖Ø.008 to A and B plus a separate ∥.002 to A, its yaw about B set at MHA-SM-00 by a Ø.4720 class ZZ minus gauge pin through both mounts' bores: knife rock 7.76° worst against the 5.0° floor, the far-end offset 0.0470 being the pin's .0017 diametral clearance in the largest bore plus the lever ridge's yaw from that clearance over its 159.90 minimum mouth span; bore floor and pose unchanged | hold the explicit tap/drill depth bands and accepted pilot diameter/point-angle bounds to preserve ≥2.0 crown web; all joint webs ≥2.0 at printed worst cases | 1–2 (square block, bore one axis) | **CNC-REPEAT** (×2) or manual. Modified #10-24 hex-head Bolt MHA-SM-VN-52 (92314A253, cut under head at MHA-SM-00 step 4 to its hole's measured crossbar-underside-to-washer-top stack plus .351 ±.005 in (8.9154 ±0.127); 46.70 nominal, printed (1.84) as a reference) and new 18-8 SAE washer MHA-SM-VN-54 (96659A104) clamp the block to the top-frame's integral crossbar through a letter C drill Ø6.147 (.242) #10 clearance on D within ⌖ .010 | D (owner ruling 2026-11-06). Crossbar width 25.0 ±0.8, symmetric about X=−15; washer seat on the whole faced top (no SPOTFACE), 36.50 (title-block .XXX ±0.13) above faced underside. Nominal reach 8.9173, range 8.7884–9.0424; full-form engagement MIN 7.730067 ≥7.239, tip air MIN 0.3556. The bolt goes in plain, without threadlocker (coordinator ruling 2026-10-16: a doweled static clamp needs no lock). One MHA-SM-VN-53 dowel per mount (98381A473, 1/8 ×3/4) presses 11.94 to the floor of a Ø3.150 +0.013/0 blind ream in the crossbar's faced underside (0.015–0.033 interference), .300 ±.005 (7.62 ±0.127) +X of its bolt axis at the same Z and ⊥Ø0.025 (.001) to A (owner ruling 2026-11-06), pierced by a #51 (Ø1.70) knockout drilled up from its floor on the ream's axis; its proud end slips .0020–.0036 into the block's B, so the block fits one way round only (owner ruling 2026-11-08 (Pedro), #2144 item 11.3: the −X reams and their ⌖ frames are deleted). The #10 holes' ⌖ .010 | D to the bar's two-face width median datum D limits their X shift to ±0.127, retaining the Z socket station and ≥2.0 webs. The former #6 socket-head counterbore route is obsolete |
+| **`sm-knife-mount`** | rectangular block 25.4 ±0.8 wide ×29.6×14.0 (bar/plate), 4140/4142 HT pre-hardened bar, 28-32 HRC as supplied and not heat treated, the bore and B reamed once to their printed bands (owner ruling 2026-11-10 (Pedro), #2334 option B1; supersedes the 2026-11-08 harden-less O1 ruling); **2 identical** | unchanged Ø12.00 +0.03/0 reamed through bore and pose, centre 20.616 BASIC below the top face (`BORE_CY` −5.75 from the knife-edge origin, block top +14.866, clamped to the casting underside); #10-24 UNC-2B bottoming tap on the bore axis: #25 Ø3.7973 under the title-block DRILLED HOLES +0.10/0 row, cylindrical drill depth .438 ±.002 (11.1252 ±0.0508), full thread .375 ±.005 (9.525 ±0.127); fully charged drill-point crown web 2.1060 (≥2.032), no break-in (conservative proof envelope Ø3.924, above accepted MAX Ø3.8989; point MIN 117°); one MHA-SM-VN-53 slip hole cut from the top seat to a flat floor 9.398 deep (owner ruling 2026-10-24, T+H3): datum B, a Ø.1280 ±.0007 blind flat-bottom reamed round hole 7.62 (.300) +X of the tap axis, ⊥Ø.001 to A. Owner ruling 2026-11-08 (Pedro), #2144 item 11.3 (scheme S1) deletes the −X slot (datum C) and its notch: the bore carries ⌖Ø.008 to A and B (datum C) plus a separate ∥.002 to A, and the tap is cut on the part at ⌖Ø.008 | A | B | C▷ (owner ruling 2026-11-10 (Pedro), #2334, S1; formerly spotted through MHA-FR-02's #10 hole); the bore's yaw about B is set at MHA-SM-00 by a Ø.4720 +.0000/-.0002 × 8.0 in gauge bar through both mounts' bores (#2334, S2): knife rock 7.76° worst against the 5.0° floor, the far-end offset 0.0470 being the bar's .0017 diametral clearance in the largest bore plus the lever ridge's yaw from that clearance over its 159.90 minimum mouth span; bore floor and pose unchanged | hold the explicit tap/drill depth bands and accepted pilot diameter/point-angle bounds to preserve ≥2.0 crown web; all joint webs ≥2.0 at printed worst cases | 1–2 (square block, bore one axis) | **CNC-REPEAT** (×2) or manual. Modified #10-24 hex-head Bolt MHA-SM-VN-52 (92314A253, cut under head at MHA-SM-00 step 4 to its hole's measured crossbar-underside-to-washer-top stack plus .351 ±.005 in (8.9154 ±0.127); 46.70 nominal, printed (1.84) as a reference) and new 18-8 SAE washer MHA-SM-VN-54 (96659A104) clamp the block to the top-frame's integral crossbar through a letter C drill Ø6.147 (.242) #10 clearance on D within ⌖ .010 | D (owner ruling 2026-11-06). Crossbar width 25.0 ±0.8, symmetric about X=−15; washer seat on the whole faced top (no SPOTFACE), 36.50 (title-block .XXX ±0.13) above faced underside. Nominal reach 8.9173, range 8.7884–9.0424; full-form engagement MIN 7.730067 ≥7.239, tip air MIN 0.3556. The bolt goes in plain, without threadlocker (coordinator ruling 2026-10-16: a doweled static clamp needs no lock). One MHA-SM-VN-53 dowel per mount (98381A473, 1/8 ×3/4) presses 11.94 to the floor of a Ø3.150 +0.013/0 blind ream in the crossbar's faced underside (0.015–0.033 interference), .300 ±.005 (7.62 ±0.127) +X of its bolt axis at the same Z and ⊥Ø0.025 (.001) to A (owner ruling 2026-11-06), pierced by a #51 (Ø1.70) knockout drilled up from its floor on the ream's axis; its proud end slips .0020–.0036 into the block's B, so the block fits one way round only (owner ruling 2026-11-08 (Pedro), #2144 item 11.3: the −X reams and their ⌖ frames are deleted). The #10 holes' ⌖ .010 | D to the bar's two-face width median datum D limits their X shift to ±0.127, retaining the Z socket station and ≥2.0 webs. The former #6 socket-head counterbore route is obsolete |
 
 The Ø6.045 hanger clearance hole carries a **native explicit +0.13/0
 diameter band** (MIN 6.045, MAX 6.175), not the symmetric general ±0.13
@@ -687,7 +685,7 @@ former −X ream, its BASIC span and its ⌖ frame (owner ruling 2026-11-06's
 BASIC 7.620 either side of D under 2X ⌖Ø0.10 | A | D, SEP REQT) are
 deleted, so the block fits one way round only, and the MHA-SM-02 slot
 (datum C) is gone too. The block may turn about its one dowel; a Ø.4720
-gauge pin through both mounts' bores sets that turn at MHA-SM-00 step 5.
+gauge bar through both mounts' bores sets that turn at MHA-SM-00 step 5.
 The F-F and underside-locator annotations belong to `draw_fr_top_frame`
 and need native inspection (the knockout callout's leader now lands on the
 front ream); the historical slot-text placements and glyph clearances do
@@ -732,26 +730,30 @@ The D locator from the left bosses' tangent (the hole table's boss-corner
 origin, owner ruling 2026-11-07) retains its ordinary location band; the front and
 rear Z station dimensions likewise remain ordinary toleranced dimensions.
 
-The mount's tap is spotted through MHA-FR-02's #10 hole and charged its
-former Ø.005 zone's radius as residual. Owner ruling 2026-11-08 (Pedro),
-#2144 item 11.3 (scheme S1) hangs each block on one dowel, pressed into the
-crossbar and slipped into B, and the bolt. The X leg is the ream's .XXX
-station (0.127), that tap residual (0.0635), B's loosest slip and B's datum
-simulator, which within ⊥Ø.001 to A may sit t/2 off the pin root:
-**0.2489 mm**. The Z leg is the ream's implied-zero SAME Z (0.127), the
-same three block terms, and the turn the gauge pin gives the block about
-its dowel: the pin line runs through both bores, each off its station by
-the #10 hole's ⌖ .010 | D centring (0.127, owner ruling 2026-11-06), the
+The mount's tap is cut on the part at **⌖Ø.008 | A | B | C▷**, datum C the
+reamed bore, which only clocks it about B (owner ruling 2026-11-10 (Pedro),
+#2334 option B1, S1, superseding the spot-through of sm Q3; machinist
+exception RV-06), and is charged its zone's radius (0.1016). Owner ruling
+2026-11-08 (Pedro), #2144 item 11.3 (scheme S1) hangs each block on one
+dowel, pressed into the crossbar and slipped into B, and the bolt. The X
+leg is the ream's .XXX station (0.127), that tap radius, B's loosest slip
+and B's datum simulator, which within ⊥Ø.001 to A may sit t/2 off the pin
+root: **0.2870 mm**. The Z leg is the ream's implied-zero SAME Z (0.127),
+the same three block terms, and the turn the gauge bar gives the block
+about its dowel: the bar line runs through both bores, each off its station
+by the #10 hole's ⌖ .010 | D centring (0.127, owner ruling 2026-11-06), the
 ream's station, B's slip and simulator and the bore's ⌖Ø.008 radius (0.414
 in all), at opposite limits over the 174.12 station spacing, a **0.272°**
-turn that moves the tap 7.62 from B across by 0.0362:
-**hypot(0.2489, 0.2852) = 0.3785 mm**. Full-crossbar drill drift over the
-printed grip's thickest **36.63 mm** (36.50 + 0.13) is **0.1918 mm**;
-together they consume 0.5703 of the **0.6604 mm** radial float (the C
-drill's Ø6.147 minimum less the bolt's 4.826 major, halved), leaving
-**0.0901 mm**. The rear mount, re-hung on the lever's stub at MHA-SM-00
+turn that moves the tap 7.62 from B across by 0.0362; the tap, clocked to
+the bore, turns with it: **hypot(0.2870, 0.3233) = 0.4323 mm**. Full-crossbar
+drill drift over the printed grip's thickest **36.63 mm** (36.50 + 0.13) is
+**0.1918 mm**; together they consume 0.6241 of the **0.6604 mm** radial
+float (the C drill's Ø6.147 minimum less the bolt's 4.826 major, halved),
+leaving **0.0363 mm**. The gauge bar's own clearance in the bores (0.0432,
+a further 0.18° and 0.024 mm at the tap) is not charged; with it the spare
+is about 0.018 mm. The rear mount, re-hung on the lever's stub at MHA-SM-00
 step 6 and swung about its dowel until the rock gauge passes, may turn
-**1.114°** inside its bolt float, above the 0.272° the pin line can ask of
+**0.627°** inside its bolt float, above the 0.272° the bar line can ask of
 it (`build_sm_summing_assembly.KNIFE_REAR_YAW_RANGE_DEG`). The block
 carries no dowel-pattern frame: datum B is its round hole.
 
@@ -909,7 +911,7 @@ to face and set the 7.0565 channel pitch (`ch_rocker_arm_spec.HUB_LENGTH`,
    clearance, mass/CG, swept fit and measured installed balance remain open.
 3. ~~**Model the `sm-knife-mount` mounting holes**~~ — RESOLVED (top-frame rederive, 2026-08-02; #10-24 hex-head cutover, 2026-10-13): the
    block is clamped to the top-frame casting's integral crossbar by the cut-to-length 18-8 hex-head Bolt
-   and new #10 SAE washer on the whole faced top, into a #10-24 bottoming tap and located by one dowel pressed into the crossbar's blind underside ream and slipped into the block's round hole (owner ruling 2026-10-24, T+H3; one dowel per mount and a gauge pin through both bores setting their yaw at MHA-SM-00, owner ruling 2026-11-08 (Pedro), #2144 item 11.3); the current route is documented above. Its revised native wizard and dimension import require the scoped farm proof; offline tests alone are not native evidence.
+   and new #10 SAE washer on the whole faced top, into a #10-24 bottoming tap and located by one dowel pressed into the crossbar's blind underside ream and slipped into the block's round hole (owner ruling 2026-10-24, T+H3; one dowel per mount and a gauge bar through both bores setting their yaw at MHA-SM-00, owner ruling 2026-11-08 (Pedro), #2144 item 11.3; #10-24 tap cut on the part, 4140 HT as supplied, owner ruling 2026-11-10 (Pedro), #2334); the current route is documented above. Its revised native wizard and dimension import require the scoped farm proof; offline tests alone are not native evidence.
 4. ~~**Reconcile the `ch-rocker-arm` R800 vs book 812.8 mm**~~ — RESOLVED: the arm keeps the book's
    R800 arc (`_rocker_interface.BOOK_TOP_RADIUS`), set to the middle of its profile zone (owner ruling
    2026-11-08 (Pedro), #2144 item 10.3); the sheet prints it BASIC R31.486 under a .020 profile (RV-02).
@@ -921,9 +923,8 @@ to face and set the 7.0565 channel pitch (`ch_rocker_arm_spec.HUB_LENGTH`,
    the mating **cylinder gear + centre distance** to the same new DP for that pair, or keep DP and accept
    the small size. Not the free change it first looks — the cheaper de-risk is the **harder tip metal**
    the original used.
-6. **Reconcile the `sm-knife-mount` material** — `build_sm_knife_mount.py` (`Gray Cast Iron`) contradicts
-   `parts/sm-knife-mount.yaml` + §6 (`Brass`); the registry drives the BOM/drawing, so fix the script
-   constant to Brass (or decide the part is cast) before a drawing ships a wrong material.
+6. ~~**Reconcile the `sm-knife-mount` material**~~ — RESOLVED: 4140/4142 HT as supplied (owner ruling
+   2026-11-10 (Pedro), #2334); the registry stamps the BOM/drawing, the builder's library material is density only.
 
 > These are machinability flags, not tolerance rules — the fits/finish/GD&T for the same parts live in
 > [`tolerance-gdt-assessment.md`](./tolerance-gdt-assessment.md) §6, and the drawing/CAM outputs that

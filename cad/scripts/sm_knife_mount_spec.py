@@ -9,7 +9,7 @@ assembly layout; the fixed values are mirrored here for the drawing's view math,
 and the offline lockstep test asserts the part marks and the drawing keeps
 EXACTLY ``DRAWING_DIMENSIONS``.
 
-NOTE on the "knife edge": this hardened-steel BEARING BLOCK (ch18 p.42,
+NOTE on the "knife edge": this heat-treated steel BEARING BLOCK (ch18 p.42,
 2026-09-02 user re-read: unpainted heat-treated steel, not brass) carries a
 circular bore CLOSE around the mating hex trunnion (Ø.472 over the 8.080 x
 10.268 hex), so only the trunnion's TOP VERTEX LINE nears the bore's upper
@@ -34,13 +34,15 @@ and slips into this block's round hole (datum B).  Owner ruling 2026-11-08
 block; datum C, its slot open to the -X face and every slot control are
 deleted, and the block's yaw about the dowel is set at MHA-SM-00 by a
 Ø.4720 gauge bar slid through both mounts' bores while the screws are
-tightened.  Owner ruling 2026-11-08 (Pedro), SM-02 harden less: the O1
-block is hardened and drawn back to 40-45 HRC (tempered about 1000 F;
-Cincinnati Tool Steel Co.'s AISI O1 data sheet), which the shop can still
-ream, and the bore and datum B are cut to their printed bands after heat
-treatment (no allowance, no lap); the finish says so.  No check here or in
-the summing assembly charges the seat's hardness (no contact-stress or wear
-model reads it).
+tightened.  Owner ruling 2026-11-10 (Pedro), #2334 option B1 with S1 and
+S2, superseding the 2026-11-08 SM-02 harden-less ruling (O1 drawn back to
+40-45 HRC, fit sizes cut after hardening): the block is cut complete from
+AISI 4140/4142 HT bar as supplied, 28-32 HRC, with no heat treatment in the
+shop, so every printed band is cut once, in its final condition, with HSS;
+the finish says so.  No check here or in the summing assembly charges the
+seat's hardness (no contact-stress or wear model reads it): the seat need
+only out-rank the lever's soft parent-metal knife (#1611), and the error
+budget's knife rolling resistance stays an assumption to measure.
 """
 
 from __future__ import annotations
@@ -103,9 +105,9 @@ SURFACE_FINISHES = (
 # General tolerances the printed places claim (title block, drawing-guidelines.md rule 3 (decimal places carry the tolerance)).
 _XX = printed_band_mm(2, unit=UNIT)
 _XXX = printed_band_mm(3, unit=UNIT)
-# The Ø.472 bore is REAMED through after heat treatment (Owner ruling
-# 2026-11-08 (Pedro), SM-02 harden less; formerly bored, as no .472 reamer is
-# owned): a 12 mm H7 reamer, carbide at 40-45 HRC, cuts .4724-.4731 inside
+# The Ø.472 bore is REAMED through in the supplied 28-32 HRC condition
+# (Owner ruling 2026-11-10 (Pedro), #2334 option B1; formerly bored, as no
+# .472 reamer is owned): a 12 mm H7 HSS reamer cuts .4724-.4731 inside
 # the explicit .4720 +.0015/.0000 band, Ra 63 µin on its knife seat: the rock
 # budget takes the smallest bore, the webs the largest.  A plain inch step
 # (rule 4; machinist review round 4, farm run 20261107T161739921Z: the
@@ -130,6 +132,7 @@ GEOMETRIC_TOLERANCES_IN: dict[str, str] = {
     "knife-bore position": ".008",
     "knife-bore parallelism": ".002",
     "dowel hole perpendicularity": ".001",
+    "knife-hanger tap position": ".008",
 }
 GEOMETRIC_TOLERANCES_MM: dict[str, float] = {
     key: float(value) * DOWEL.MM_PER_IN
@@ -145,20 +148,25 @@ GEOMETRIC_TOLERANCES_MM: dict[str, float] = {
 # screws finger-tight sets the yaw before they are tightened, and must slide
 # out after (``build_sm_summing_assembly``'s rock budget charges the bar's
 # clearance, not this frame; pitch does not enter the lateral rock model).
-# The former composite ⌖ to A|B|C (owner ruling 2026-10-27, #2016) is gone
-# with datum C.
+# The former composite ⌖ to A|B|C (owner ruling 2026-10-27, #2016) went
+# with the slot; the bore is now itself datum C, the tap's clocking datum
+# (below).
 KNIFE_BORE_POSITION_TOL = GEOMETRIC_TOLERANCES_MM["knife-bore position"]
 KNIFE_BORE_PARALLELISM_TOL = GEOMETRIC_TOLERANCES_MM["knife-bore parallelism"]
-# The #10-24 tap is spotted through MHA-FR-02's #10 clearance hole with the
-# annealed block hung on its dowel, then drilled and tapped before
-# hardening (delegated ruling sm Q3, 2026-11-07 (Main), no precedent; owner
-# review #2144; pending owner confirmation): no position frame prints.  The
-# stacks keep charging the former Ø.005 zone as the transfer's residual
-# about the tap's nominal station (on the bore's vertical centre plane,
-# PIN_HOLE_X from B), and ``build_sm_summing_assembly``'s HANGER_SCREW_MISMATCH
-# adds the turn the gauge bar gives the block about its dowel; the webs to
-# B and the faces below keep millimetres of margin.
-STUD_TAP_POSITION_TOL = 0.005 * DOWEL.MM_PER_IN
+# The #10-24 tap is drilled and tapped on the part, located from datum B
+# (Owner ruling 2026-11-10 (Pedro), #2334 option B1, S1, superseding
+# delegated ruling sm Q3's spot through MHA-FR-02): ⌖Ø.008|A|B|C▷, its axis
+# BASIC PIN_HOLE_X from B's on the bore's vertical centre plane (the
+# section A-A BASIC the bore's frame shares).  A|B alone would leave the
+# tap's turn about B free relative to the bore, whose yaw inside its own
+# Ø.008 zone (0.85 deg over the shortest bore) the gauge bar turns the block
+# by at MHA-SM-00, swinging the tap 0.11 across its bolt hole; so the bore,
+# datum C, clocks the tap, and C's translation modifier lets C's simulator
+# centre in the bore while it only fixes that turn.  Then
+# ``build_sm_summing_assembly``'s HANGER_SCREW_MISMATCH charges the zone's
+# radius alone, and Ø.008 closes inside MHA-FR-02's C-drill hole (machinist
+# exception RV-06: under the drilled-hole row, by that ruling).
+STUD_TAP_POSITION_TOL = GEOMETRIC_TOLERANCES_MM["knife-hanger tap position"]
 # Datum B's round slip hole stands square to the datum-A top seat, so the
 # MHA-SM-VN-53 dowel, pressed square into the crossbar, enters it without
 # binding (owner ruling 2026-10-27, #2016, option A): ⊥Ø.001|A, a
@@ -399,23 +407,21 @@ if STUD_TAP_THREAD_DEPTH_MIN < STUD_TAP_ENGAGEMENT_MIN_D * STUD_THREAD_MAJOR:
 # The full thread holds the bolt, so the tap's callout says why its explicit
 # +/-.005 is there and names the mate (drawing-guidelines.md rule 4 (tighten
 # only for function, and name the mate)) on one reason row under the native
-# thread row: the bolt's tip clearance.  Under it the route row: the tap is
-# spotted through the crossbar's #10 hole (STUD_TAP_POSITION_TOL above).  The
+# thread row: the bolt's tip clearance.  The tap's location is its own
+# position frame (STUD_TAP_POSITION_TOL above), not a callout row.  The
 # callout names no tap tool (rule 7: the thread row's depth is its full
 # thread, ASME Y14.6, and the shop picks the tap that reaches it).  The drill
-# row names the #25 drill in the native size token's place.  Four rows --
-# drill, thread, reason, route -- stay inside the layout audit's four-row
-# limit (tall-block, farm build 20261013T225639.450330Z: five rows failed it).
+# row names the #25 drill in the native size token's place.  Three rows --
+# drill, thread, reason -- stay inside the layout audit's four-row limit
+# (tall-block, farm build 20261013T225639.450330Z: five rows failed it).
 BOLT_NUMBER = "MHA-SM-VN-52"
-FRAME_NUMBER = str(_config.parts("fr-top-frame")["number"])
 TAP_DRILL_CALLOUT = f"{STUD_TAP_DRILL} DRILL"
 TAP_CALLOUT_REASON = f"SETS {BOLT_NUMBER} TIP CLEARANCE"
-TAP_CALLOUT_ROUTE = f"SPOT THRU {FRAME_NUMBER} #10 HOLE"
 
 # MHA-SM-VN-53 dowel (owner ruling 2026-10-24, T+H3; machinist ENFORCE
 # review of this sheet, rules 16 and 4): the pin presses into the MHA-FR-02
-# crossbar, which carries its knockout, and SLIPS into this hardened block,
-# which so carries no press band to hold through heat treatment: a blind
+# crossbar, which carries its knockout, and SLIPS into this block, which so
+# carries no press band of its own: a blind
 # round slip hole, datum B, cut from the top seat to a flat floor.  Owner
 # ruling 2026-11-08 (Pedro), #2144 item 11.3 (scheme S1): one dowel per
 # mount; the -X pin's slot (datum C) is deleted.
@@ -460,12 +466,12 @@ _ROW_Z_MIN = min(
 PIN_HOLE_SIDE_WEB = PIN_HOLE_SIDE_DISTANCE - PIN_HOLE_SIDE_TOL - _PIN_R_MAX
 # B to the front/back face: 6.477 - 1.634 = 4.84.
 PIN_HOLE_Z_WEB = _ROW_Z_MIN - _PIN_R_MAX
-# The tap axis stands PIN_HOLE_X from B, within the transfer's residual.
+# The tap axis stands PIN_HOLE_X from B, within its position zone's radius.
 _TAP_FROM_B_MIN = PIN_HOLE_X - STUD_TAP_POSITION_TOL / 2.0
-# B to the tap's thread major: 7.557 - 1.634 - 2.413 = 3.51.
+# B to the tap's thread major: 7.518 - 1.634 - 2.413 = 3.47.
 PIN_HOLE_TAP_WEB = _TAP_FROM_B_MIN - _PIN_R_MAX - STUD_THREAD_MAJOR / 2.0
 # The tap's thread to the front/back face: its zone radius and the line's
-# skew over its BASIC station from B, 6.477 - 0.064 - 0.133 - 2.413 = 3.87.
+# skew over its BASIC station from B, 6.477 - 0.102 - 0.133 - 2.413 = 3.83.
 STUD_TAP_Z_WALL = (
     _ROW_Z_MIN
     - STUD_TAP_POSITION_TOL / 2.0

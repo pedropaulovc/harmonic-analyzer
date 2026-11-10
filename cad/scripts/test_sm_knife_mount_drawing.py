@@ -322,15 +322,16 @@ def test_tap_callout_moves_clear_of_the_row_dimension_tail() -> None:
     assert top <= tail_end - ARROW_TEXT_CLEARANCE_M - 0.001
 
 
-def test_tap_callout_prints_four_rows_with_its_bands_and_drill_point() -> None:
+def test_tap_callout_prints_three_rows_with_its_bands_and_drill_point() -> None:
     # Tall-block (the 4-row limit): the c673e62ee seat's definitions, the
     # pilot's stacked upper deviation a row of its own, printed five rows with
     # the mate below the thread.  Now the pilot is named by its drill (no Ø,
     # no band, no stacked row), the thread prints no class (the title block's
-    # thread row), and the reason naming the mate and the route spotting the
-    # tap through MHA-FR-02 are the rows under the thread, no process row
-    # above it: four.  The symmetric bands, the drill point and the thread's
-    # native depth stay.
+    # thread row), and the reason naming the mate is the row under the
+    # thread, no process row above it and no route row (owner ruling
+    # 2026-11-10 (Pedro), #2334, S1: the tap is cut on the part, located by
+    # its own frame): three.  The symmetric bands, the drill point and the
+    # thread's native depth stay.
     from _layout_audit import TEXT_ROW_LIMIT
 
     drill_row = "<MOD-DIAM> <hw-tapdrldia> <HOLE-DEPTH> <hw-tapdrldepth>"
@@ -362,12 +363,12 @@ def test_tap_callout_prints_four_rows_with_its_bands_and_drill_point() -> None:
     assert printed_rows(run, 1) == TEXT_ROW_LIMIT + 1
     assert stacked_band_rows == 0
     wanted = drawing.tap_callout_definitions(seat)
-    assert printed_rows(wanted, stacked_band_rows) == 4 <= TEXT_ROW_LIMIT
+    assert printed_rows(wanted, stacked_band_rows) == 3 <= TEXT_ROW_LIMIT
     assert wanted[7] == (
         f"{drawing.TAP_DRILL_CALLOUT} <HOLE-DEPTH> <hw-tapdrldepth> X <hw-drlang>"
     )
     assert wanted[5] == "<hw-threaddesc> <HOLE-DEPTH> <hw-threaddepth>"
-    assert wanted[8] == f"{drawing.TAP_CALLOUT_REASON}\n{drawing.TAP_CALLOUT_ROUTE}"
+    assert wanted[8] == drawing.TAP_CALLOUT_REASON
     joined = "".join(wanted.values())
     assert "threadclass" not in joined
     assert "<MOD-DIAM>" not in joined and "<hw-tapdrldia>" not in joined
@@ -422,6 +423,26 @@ def test_tap_callout_parks_between_the_top_view_and_the_front_view() -> None:
     reason_width = len(drawing.TAP_CALLOUT_REASON) * run_mm_per_char
     assert 2.0 * drawing.TAP_CALLOUT_HALF_WIDTH >= reason_width + 0.005
     assert len(drawing.TAP_CALLOUT_REASON) >= len(drawing.TAP_DRILL_CALLOUT)
+
+
+def test_tap_frame_stands_between_the_top_view_and_the_callout() -> None:
+    # Owner ruling 2026-11-10 (Pedro), #2334, S1: the tap's ⌖Ø.008|A|B|C▷
+    # frame stands under the top view and over the callout, left of the
+    # callout's leader; the two leaders take the tap's two lower rims, the
+    # frame's the left, so they do not cross.
+    from _layout_audit import TEXT_SEPARATION_HEIGHTS
+
+    x, y = drawing.TAP_FRAME_XY
+    top_view_bottom = drawing.TOP_CENTER[1] - drawing.TOP_HALF_Z
+    callout_top = drawing.TAP_CALLOUT_XY[1] + drawing.TAP_CALLOUT_TOP_REACH
+    frame_bottom = y - 0.007
+    assert top_view_bottom - y >= TEXT_SEPARATION_HEIGHTS * 0.0035
+    assert frame_bottom - callout_top >= TEXT_SEPARATION_HEIGHTS * 0.0035
+    assert x > SHEET_INNER_BORDER_LEFT + 0.001
+    # About 50 mm wide with its shoulder, it ends left of the tap axis.
+    tap_left = drawing.TOP_CENTER[0] - sm_knife_mount_spec.STUD_TAP_DIA / 1000.0
+    assert x + 0.056 < tap_left
+    assert drawing.TAP_FRAME_RIM_SIDE == -drawing.TAP_CALLOUT_RIM_SIDE == -1.0
 
 
 # Farm run 20261027T133857303Z's printed ink near datum B (sheet metres): the
@@ -668,19 +689,32 @@ def test_native_gdt_and_bore_geometry() -> None:
     # (owner ruling 2026-10-24, T+H3: one hole, no 2X pattern), its symbol
     # on its ⊥ frame (owner ruling 2026-10-27, #2016; a frame's datum
     # identifier read "B" back but printed nothing, 20261009T171439353Z).
-    # Owner ruling 2026-11-08 (Pedro), #2144 item 11.3: datum C, the slot
-    # and its frames are deleted.
+    # Owner ruling 2026-11-08 (Pedro), #2144 item 11.3: the slot datum C and
+    # its frames are deleted.  Owner ruling 2026-11-10 (Pedro), #2334, S1:
+    # the bore is datum C, its symbol on its ⌖ frame, and clocks the tap.
     assert source.count("add_datum_feature(") == 1
     assert "add_dimension_datum_feature" not in source
     assert "datum_identifier" not in source
-    assert source.count("add_frame_datum_feature(") == 1
+    assert source.count("add_frame_datum_feature(") == 2
     assert 'datum="A"' in source
     assert source.count('datum="B"') == 1
-    assert 'datum="C"' not in source
-    assert '"C"' not in source
-    assert source.index('datum="A"') < source.index('datum="B"')
+    assert source.count('datum="C"') == 1
+    assert (
+        source.index('datum="A"')
+        < source.index('datum="B"')
+        < source.index('datum="C"')
+    )
     for gone in ("SLOT_FRAME_XY", "SLOT_FRAME_SIZE", "SLOT_DATUM_C_XY", "SLOT_FRAME_WALL_X"):
         assert not hasattr(drawing, gone), gone
+    # Datum C hangs under the bore's ⌖ frame's middle as B under its ⊥.
+    b_drop = drawing.PIN_FRAME_XY[1] - drawing.PIN_DATUM_B_XY[1]
+    assert drawing.BORE_DATUM_C_XY == pytest.approx(
+        (
+            drawing.BORE_FRAME_XY[0] + drawing.BORE_FRAME_SIZE[0] / 2.0,
+            drawing.BORE_FRAME_XY[1] - b_drop,
+        )
+    )
+    assert drawing.BORE_DATUM_C_XY[1] > drawing._front_y(sm_knife_mount_spec.BLK_TOP)
     # The sheet fails unless every frame's datum is printed, over every view
     # a frame or tag stands in.
     assert (
@@ -720,6 +754,7 @@ def test_native_gdt_and_bore_geometry() -> None:
             "characteristic",
             "tolerance",
             "datums",
+            "translated",
             "diameter",
             "label",
         }
@@ -739,8 +774,15 @@ def test_native_gdt_and_bore_geometry() -> None:
         ),
         "knife-bore position": ("position", "knife-bore position", ("A", "B"), True),
         "knife-bore parallelism": ("parallelism", "knife-bore parallelism", ("A",), False),
+        "knife-hanger tap position": (
+            "position",
+            "knife-hanger tap position",
+            ("A", "B", "C"),
+            True,
+        ),
     }
-    assert source.count('datums=("A", "B", "C")') == 0
+    assert source.count('datums=("A", "B", "C")') == 1
+    assert source.count('translated=("C",)') == 1
     assert source.count('datums=("A", "B")') == 1
     assert source.count('datums=("A",)') == 2
     assert "lower_frame=" not in source
@@ -765,13 +807,14 @@ def test_native_gdt_and_bore_geometry() -> None:
         "knife-bore position": ".008",
         "knife-bore parallelism": ".002",
         "dowel hole perpendicularity": ".001",
+        "knife-hanger tap position": ".008",
     }
     # Owner ruling 2026-10-27 (#2016): the name a sibling's assembly check
     # imports.
     assert sm_knife_mount_spec.DOWEL_HOLE_PERPENDICULARITY_TOL == pytest.approx(0.0254)
     assert sm_knife_mount_spec.KNIFE_BORE_POSITION_TOL == pytest.approx(0.2032)
     assert sm_knife_mount_spec.KNIFE_BORE_PARALLELISM_TOL == pytest.approx(0.0508)
-    assert sm_knife_mount_spec.STUD_TAP_POSITION_TOL == pytest.approx(0.127)
+    assert sm_knife_mount_spec.STUD_TAP_POSITION_TOL == pytest.approx(0.2032)
     for gone in (
         "DOWEL_SLOT_PERPENDICULARITY_TOL",
         "KNIFE_BORE_ORIENTATION_TOL",
@@ -841,19 +884,19 @@ def test_part_stamps_make_critical_properties() -> None:
     config = _config.parts("sm-knife-mount")
     # ch18 p.42 (2026-09-02): unpainted heat-treated steel, not brass.  The
     # SolidWorks library material stays the generic steel (density); the
-    # title block's MATERIAL cell names the hardenable grade the finish
-    # needs (ENFORCE review, 2026-10-24, rule 2).
+    # title block's MATERIAL cell names the pre-hardened grade (owner ruling
+    # 2026-11-10 (Pedro), #2334 option B1).
     assert part.MATERIAL == "Plain Carbon Steel"
-    assert config["material"] == "AISI O1 tool steel"
-    assert config["material_specification"] == "AISI O1 tool steel"
-    # drawing-guidelines.md rule 2 (the title block is the general specification): the heat treatment and the bare surface are the Finish field's,
-    # stated once there (the sheet has no notes block), with when the fit
-    # sizes are cut: after the block is drawn back to a reamable hardness
-    # (owner ruling 2026-11-08, SM-02 harden less).
+    assert config["material"] == "AISI 4140/4142 HT steel"
+    assert "4140/4142 HT" in config["material_specification"]
+    # drawing-guidelines.md rule 2 (the title block is the general
+    # specification): the as-supplied hardness and the bare surface are the
+    # Finish field's, stated once there (the sheet has no notes block); the
+    # fits are cut once in that condition, so no heat-treat sequence.
     finish = config["finish"]
-    assert "40-45 HRC" in finish
+    assert "28-32 HRC" in finish
     assert "unpainted" in finish
-    assert "after hardening" in finish
+    assert "hardening" not in finish
     assert "Brass" not in config["material_specification"]
     assert int(config["quantity"]) == 2
     source = Path(part.__file__).read_text(encoding="utf-8")
@@ -1013,7 +1056,7 @@ def test_tap_point_rides_the_native_definitions_and_the_reason_names_the_mate() 
             f"{drawing.TAP_DRILL_CALLOUT} <HOLE-DEPTH> <hw-tapdrldepth> X <hw-drlang>\n"
             "<hw-threaddesc> <HOLE-DEPTH> <hw-threaddepth>"
         ),
-        8: f"{drawing.TAP_CALLOUT_REASON}\n{drawing.TAP_CALLOUT_ROUTE}",
+        8: drawing.TAP_CALLOUT_REASON,
     }
     assert drawing.tap_callout_definitions(
         {**before, 5: before[5].replace(" <hw-threadclass>", "-<hw-threadclass>")}

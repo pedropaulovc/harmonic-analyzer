@@ -343,22 +343,27 @@ def test_steps_five_and_six_do_one_thing_a_sub_step() -> None:
             assert line.count(". ") == 1, line
 
 
-def test_step_five_runs_each_hanger_bolt_home_by_hand_then_sets_the_gauge_pin() -> None:
+def test_step_five_runs_each_hanger_bolt_home_by_hand_then_sets_the_gauge_bar() -> None:
     # Owner ruling 2026-10-27 (#2018 option C): accepted as is.  Each cut
     # bolt is run in by hand to its washer before it draws the mount's top
     # seat flat to the crossbar underside.  Owner ruling 2026-11-08 (Pedro),
-    # #2144 item 11.3: with both bolts finger-tight the gauge pin through
+    # #2144 item 11.3: with both bolts finger-tight the gauge bar through
     # both bores sets the mounts' yaw before they are tightened, and it must
-    # slide back out (check 6).
+    # slide back out (check 6).  Owner ruling 2026-11-10 (Pedro), #2334, S2:
+    # the tool is a named 8.0 in bar that spans both mounts, not a class ZZ
+    # pin.
     step = " ".join(_step_group("5"))
     assert step.startswith("5. ")
     assert "MHA-SM-VN-52" in step
     assert "WASHER" in step
     assert "WITHOUT THE LEVER" in step
     assert step.index("BY HAND") < step.index(notes.KNIFE_GAUGE_BAR) < step.index("TIGHTEN")
-    assert step.index("TIGHTEN") < step.index("WITHDRAW THE PIN")
-    assert notes.KNIFE_GAUGE_BAR == "Ø.4720 CLASS ZZ MINUS GAUGE PIN"
+    assert step.index("TIGHTEN") < step.index("WITHDRAW THE BAR")
+    assert notes.KNIFE_GAUGE_BAR == "Ø.4720 +.0000/-.0002 X 8.0 LONG GAUGE BAR"
+    assert "PIN" not in notes.KNIFE_GAUGE_BAR and "ZZ" not in notes.KNIFE_GAUGE_BAR
     assert spec.KNIFE_GAUGE_BAR_DIA == pytest.approx(2.0 * builder.knife_mount.BORE_R_MIN)
+    assert builder.KNIFE_GAUGE_BAR_LENGTH > builder.KNIFE_MOUNT_OUTER_SPAN_MAX
+    assert builder.KNIFE_MOUNT_OUTER_SPAN_MAX / 25.4 == pytest.approx(7.415, abs=1e-3)
     assert notes.KNIFE_GAUGE_BAR not in " ".join(notes.BOM_DESCRIPTIONS.values())
     assert any(
         check.startswith("6. AFTER STEP 5") and notes.KNIFE_GAUGE_BAR in check

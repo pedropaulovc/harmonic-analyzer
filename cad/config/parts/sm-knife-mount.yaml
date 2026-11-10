@@ -1,22 +1,21 @@
 sm-knife-mount:
   number: MHA-SM-02
-  material: AISI O1 tool steel
-  material_specification: AISI O1 tool steel
-  # Owner ruling 2026-11-08 (Pedro), SM-02 harden less: harden the O1, then draw it back to a hardness the shop can still ream, and cut the fit sizes to their printed bands after heat treatment (no allowance, no lap).
-  # 40-45 HRC: Cincinnati Tool Steel Co., AISI O1 data sheet (https://cintool.com/documents/Oil_Hardening/01.pdf), 1 in rounds oil-quenched from 1475 F and tempered 2 h: 900 F 47, 1000 F 44, 1100 F 39 HRC.
-  finish: "40-45 HRC, unpainted; fit sizes cut after hardening"
+  material: AISI 4140/4142 HT steel
+  material_specification: AISI 4140/4142 HT, pre-hardened, as supplied
+  # Owner ruling 2026-11-10 (Pedro), #2334, option B1 with S1 and S2: the block is cut from 4140/4142 HT bar as supplied (28-32 HRC) with no heat treatment in the shop; both fits and the tap are cut once, in that condition, with HSS. It supersedes the 2026-11-08 owner ruling (SM-02 harden less: O1 drawn back to 40-45 HRC, fit sizes cut after hardening), whose own intent (a hardness the shop can still ream, no allowance, no lap) it keeps.
+  # 28-32 HRC is the mill's pre-hardened (quenched and tempered) condition: Wingate Alloys 4140 HT (https://wingatealloys.com/products/alloy-steel/4140-ht-4140-prehard/), Ameralloy 4140 (https://ameralloy.com/product/alloy-steel-4140/). The seat need only out-rank the lever's soft parent-metal knife (#1611); no check reads a harder seat.
+  finish: "28-32 HRC as supplied; unpainted, oiled"
   quantity: 2
   tolerance_class: machined_block
-  # Pedro's owner ruling, 2026-11-05 (coordinator session): tap annealed, inspect hardened.
-  # Delegated ruling sm Q5 (2026-11-07, Main) is superseded for the fit sizes by the 2026-11-08 owner ruling above.
-  process: "machined in the annealed condition with the fit sizes left under size; one blind #10-24 thread per mount (two mounts total), spotted through MHA-FR-02's #10 hole and cut with a bottoming tap before hardening; hardened, then tempered about 1000 F to 40-45 HRC; after heat treatment the MHA-SM-03 trunnion bore and the datum-B MHA-SM-VN-53 dowel hole are reamed to their printed bands, and the thread is gauge-checked"
+  # S1 of the same ruling supersedes delegated ruling sm Q3 (2026-11-07, Main): the #10-24 tap is located on the part from datum B, not spotted through MHA-FR-02. The owner rulings of 2026-11-05 (tap annealed, inspect hardened) and the delegated sm Q5 have no hardening left to govern.
+  process: "machined complete from 4140/4142 HT bar as supplied (28-32 HRC), no heat treatment; the MHA-SM-03 trunnion bore (12 mm H7 HSS reamer) and the datum-B MHA-SM-VN-53 dowel hole (.1280 HSS reamer) are reamed to their printed bands; one blind #10-24 thread per mount (two mounts total), drilled and tapped at its position from datum B with a bottoming tap and checked with an MHA-SM-VN-52 bolt"
   drawing_unit: in
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"
-      where: "the knife-bore position frame ⌖ Ø.008 | A | B"
+      where: "the knife-bore position frame ⌖ Ø.008 | A | B, which carries datum C"
       finding: "position frame over-specified (rule 5)"
-      reason: "Owner ruling 2026-11-08 (Pedro), #2144 item 11.3 (scheme S1): one dowel (datum B) and the screw hang the block, the slot and datum C are deleted, and the bore is located to A|B only; its yaw about B is left free on the part because the MHA-SM-00 gauge bar through both mounts' bores sets it at assembly (fit-up order owner-confirmed 2026-11-08 (Pedro), #2144 item 11.3) and the rock gauge proves the 5.0 deg free rock (build_sm_summing_assembly). The Ø.008 bounds the bore's offset off its station, which the hanger-bolt float and rear-mount yaw budgets charge (owner-accepted knife-edge-system control). The #10-24 tap carries no frame, it is spotted through MHA-FR-02's #10 hole (delegated ruling 2026-11-07 (Main), owner review #2144, sm Q3, pending owner confirmation)"
+      reason: "Owner ruling 2026-11-08 (Pedro), #2144 item 11.3 (scheme S1): one dowel (datum B) and the screw hang the block, the former slot datum C is deleted, and the bore is located to A|B only; its yaw about B is left free on the part because the MHA-SM-00 gauge bar through both mounts' bores sets it at assembly (fit-up order owner-confirmed 2026-11-08 (Pedro), #2144 item 11.3) and the rock gauge proves the 5.0 deg free rock (build_sm_summing_assembly). The Ø.008 bounds the bore's offset off its station, which the hanger-bolt float and rear-mount yaw budgets charge (owner-accepted knife-edge-system control). Owner ruling 2026-11-10 (Pedro), #2334 option B1, S1: the #10-24 tap is cut on the part from datum B instead of spotted through MHA-FR-02, and the bore, now datum C, clocks the tap's frame (RV-06)"
     - id: "RV-02"
       kind: "accept"
       where: "the knife-bore parallelism refinement ∥ .002 | A under the Ø.008 position frame"
@@ -37,3 +36,8 @@ sm-knife-mount:
       where: "the datum-B slip hole Ø.1280 ±.0007, MHA-SM-VN-53 SLIDING FIT, CLEARANCE .0020-.0036"
       finding: "converted-millimetre band, not a plain inch step (rule 4)"
       reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144 (sm Q4): the band is the MHA-SM-VN-53 dowel's slip budget, whose .0020 minimum clearance sets the slip-tilt allowance the ⊥ Ø.001 refinement needs (at ±.001 the allowance drops to 0.343 deg, under the 0.364 deg charged with the ⊥ Ø.001 crossbar reams of #2244); the callout names the dowel and its sliding fit with the clearance as its acceptance"
+    - id: "RV-06"
+      kind: "accept"
+      where: "the #10-24 tap's position frame ⌖ Ø.008 | A | B | C▷"
+      finding: "drilled-and-tapped hole positioned tighter than the drilled-hole location row with no fit route (rule 4); tertiary datum with translation modifier (rule 5)"
+      reason: "Owner ruling 2026-11-10 (Pedro), #2334 option B1 with S1: the tap is drilled and tapped on the part at the DRO from datum B, in the Ø.008 zone the knife-hanger bolt-float stack closes with inside MHA-FR-02's C-drill hole (build_sm_summing_assembly HANGER_SCREW_FLOAT_SPARE); the transfer through the frame it replaces needed an assembly step before the part was finished. The bore (datum C, translated) only clocks the tap about B: the gauge bar aligns each block to its bore at MHA-SM-00, so the tap must stand on the bore's square through B, or the bore's yaw inside its own zone would swing the tap 0.11 mm across its bolt hole"

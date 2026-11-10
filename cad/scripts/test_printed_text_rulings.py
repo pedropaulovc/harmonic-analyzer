@@ -159,11 +159,13 @@ def test_post_mount_screw_prints_no_installation_notes() -> None:
 def test_knife_mount_prints_its_heat_treatment_in_finish_only() -> None:
     row = yaml.safe_load((PARTS / "sm-knife-mount.yaml").read_text(encoding="utf-8"))
     row = row["sm-knife-mount"]
-    # The ruling's contract, not its wording: MATERIAL names the O1 steel,
-    # FINISH carries the hardness and the unpainted state, no sheet text does.
-    assert re.search(r"\bO1\b", row["material_specification"])
+    # The ruling's contract, not its wording: MATERIAL names the 4140/4142 HT
+    # steel (owner ruling 2026-11-10 (Pedro), #2334 option B1), FINISH
+    # carries the as-supplied hardness and the unpainted state, no sheet
+    # text does.
+    assert re.search(r"\b4140/4142 HT\b", row["material_specification"])
     assert "HRC" not in row["material_specification"].upper()
-    assert re.search(r"40-45\s*HRC", row["finish"], re.IGNORECASE)
+    assert re.search(r"28-32\s*HRC", row["finish"], re.IGNORECASE)
     assert "UNPAINTED" in row["finish"].upper()
     texts = {
         name: text.upper()

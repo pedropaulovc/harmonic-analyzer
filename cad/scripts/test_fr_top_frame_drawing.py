@@ -3776,7 +3776,7 @@ def test_knockouts_leave_a_floor_land_and_their_walls() -> None:
         washer.ID_MAX / 2.0, clearance_r + offset
     )
     assert part.HANGER_WASHER_KNOCKOUT_RING_MIN == pytest.approx(ring)
-    assert part.HANGER_WASHER_KNOCKOUT_RING_MIN == pytest.approx(0.19658624496875365)
+    assert part.HANGER_WASHER_KNOCKOUT_RING_MIN == pytest.approx(0.08903959583464616)
     assert ring > 0.0
 
 
@@ -3857,8 +3857,9 @@ def test_washer_support_on_the_faced_top_charges_all_printed_limits() -> None:
     )
     assert part.HANGER_DRIFT_AT_TOP == pytest.approx(0.19177922892285743)
     # Owner ruling 2026-11-08 (Pedro), #2144 item 11.3 (scheme S1): one
-    # dowel hangs each knife mount.  X .005 (the ream's .XXX) + .0025 (the
-    # spotted tap's residual) + slip/2 + t/2 (B's datum simulator off its
+    # dowel hangs each knife mount.  X .005 (the ream's .XXX) + .004 (the
+    # tap's ⌖Ø.008|A|B|C▷ radius, owner ruling 2026-11-10 (Pedro), #2334)
+    # + slip/2 + t/2 (B's datum simulator off its
     # hole's centre at the pin root, ⊥Ø.001|A; codjiflo round 5); Z the same
     # plus the tap's shift as the gauge bar turns the block about its dowel:
     # the bar line runs through both bores, each off its station across the
@@ -3872,7 +3873,7 @@ def test_washer_support_on_the_faced_top_charges_all_printed_limits() -> None:
         knife_mount.STUD_TAP_POSITION_TOL,
         knife_mount.DOWEL_HOLE_PERPENDICULARITY_TOL,
         knife_mount.KNIFE_BORE_POSITION_TOL,
-    ) == pytest.approx((0.127, 0.0254, 0.2032))
+    ) == pytest.approx((0.2032, 0.0254, 0.2032))
     slip = dowel.SLIP_CLEARANCE_MAX
     assert slip == pytest.approx(0.09144)  # .0036
     off = spec.HANGER_PIN_X_TOL
@@ -3892,7 +3893,7 @@ def test_washer_support_on_the_faced_top_charges_all_printed_limits() -> None:
     assert part.HANGER_SEAT_BOLT_MISMATCH == pytest.approx(
         math.hypot(block, block + yaw_shift)
     )
-    assert part.HANGER_SEAT_BOLT_MISMATCH == pytest.approx(0.3785180810874891)
+    assert part.HANGER_SEAT_BOLT_MISMATCH == pytest.approx(0.4322914056545431)
     assert spec.HANGER_WASHER_FLOAT_MAX == pytest.approx(
         (spec.HANGER_WASHER.ID_MAX-spec.HANGER_SCREW.SHANK_DIA_MIN)/2,
     )
@@ -3906,7 +3907,7 @@ def test_washer_support_on_the_faced_top_charges_all_printed_limits() -> None:
         + part.HANGER_DRIFT_AT_TOP
         + spec.HANGER_WASHER.OD_ID_RUNOUT_MAX
     )
-    assert part.HANGER_WASHER_OFFSET_MAX == pytest.approx(1.4745373100103467)
+    assert part.HANGER_WASHER_OFFSET_MAX == pytest.approx(1.5283106345774007)
     reach = spec.HANGER_WASHER.OD_MAX / 2.0 + part.HANGER_WASHER_OFFSET_MAX
     # Inside the top break's printed worst leg at the narrowest printed bar
     # half width, centred on D.
@@ -3917,7 +3918,7 @@ def test_washer_support_on_the_faced_top_charges_all_printed_limits() -> None:
         - part.EDGE_BREAK_PRINTED_MAX
         - reach
     )
-    assert part.HANGER_WASHER_BAR_TOP_MARGIN == pytest.approx(2.525962689989653)
+    assert part.HANGER_WASHER_BAR_TOP_MARGIN == pytest.approx(2.472189365422599)
     # Clear of the outer front/rear rail ends: each washer's Z reach is its
     # station band plus the print-worst reach; the rail's outer face is the
     # narrowest printed half flange past its socket axis. The rear end binds,
@@ -3933,12 +3934,12 @@ def test_washer_support_on_the_faced_top_charges_all_printed_limits() -> None:
     assert rear_end_wall < front_end_wall
     assert part.HANGER_WASHER_OUTER_END_WALL == pytest.approx(rear_end_wall)
     assert part.HANGER_WASHER_OUTER_END_WALL == pytest.approx(
-        32.37937490956312 + abs(part.FRONT_COLUMN_Z) - 112.0
+        32.325601584996065 + abs(part.FRONT_COLUMN_Z) - 112.0
     )
     assert part.HANGER_WASHER_BEARING_MIN == pytest.approx(
         spec.HANGER_WASHER_CONCENTRIC_ANNULUS_MIN - part.HANGER_WASHER_OFFSET_MAX
     )
-    assert part.HANGER_WASHER_BEARING_MIN == pytest.approx(1.6877626899896534)
+    assert part.HANGER_WASHER_BEARING_MIN == pytest.approx(1.6339893654225994)
     assert part.HANGER_WASHER_BAR_TOP_MARGIN > 0.0 and part.HANGER_WASHER_BEARING_MIN > 0.0
     assert part.HANGER_WASHER_OUTER_END_WALL >= 2.032
     # The spotface guards are gone, not aliased.

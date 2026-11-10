@@ -117,7 +117,9 @@ reserved:
     allowance_pct: 0.30
   knife:                           # fixed reversal displacement, evaluated at each input's
                                    # actual ordinate scale and available magnifier range
-    rolling_resistance_mm: 0.005   # hardened edge on a hardened seat; MEASURE as trace width on reversal
+    rolling_resistance_mm: 0.005   # soft parent-metal edge (#1611) on a 28-32 HRC 4140 HT seat
+                                   # (owner ruling 2026-11-10, #2334 B1); value unchanged until
+                                   # measured (#1611 pendulum coupon); MEASURE as trace width on reversal
     allowance_pct: 0.45
     # Both spring banks pull upward on opposite sides of the knife.
     # Stock rates/initial tensions and loaded perpendicular arms govern the

@@ -3,7 +3,8 @@ r"""Create the curated machinist drawing for the knife-mount bearing block.
 A machined, heat-treated steel block (25.4 wide x ~29.6 tall x 14 deep) with a
 single Ø12 bore.  The bore is the knife-edge bearing: the summing-lever
 trunnion's top vertex rides its upper inner wall in line contact (ch18 p.42:
-unpainted hardened steel, close bore -- 2026-09-02 user re-read).  Every face
+unpainted heat-treated steel, close bore -- 2026-09-02 user re-read; 4140/4142
+HT as supplied, owner ruling 2026-11-10 (Pedro), #2334).  Every face
 and the bore are real edges, so
 the block dimensions ride the auto-imported profile marks (block + bore) with the
 depth added across the right-view section.  The MHA-SM-VN-53 dowel presses
@@ -17,9 +18,10 @@ through the tap and dowel axes (drawing-guidelines.md rule 9 (show internal
 shape in solid lines): the floor is hidden in the front view, so it is
 dimensioned where the cut shows it); the tap axis, run on through the
 bore's centre, stands BASIC .300 from B's axis there.  The reamed bore
-carries ⌖Ø.008|A|B and a separate ∥.002|A, its centre a BASIC height under
-A (its yaw is set at MHA-SM-00 by a gauge bar); the #10-24 tap, spotted
-through MHA-FR-02, its #25 pilot at three places under the title block's
+carries ⌖Ø.008|A|B, which carries datum C, and a separate ∥.002|A, its
+centre a BASIC height under A (its yaw is set at MHA-SM-00 by a gauge bar);
+the #10-24 tap, cut on the part to ⌖Ø.008|A|B|C▷ (owner ruling 2026-11-10
+(Pedro), #2334, S1), its #25 pilot at three places under the title block's
 DRILLED HOLES row, its full thread at two with its own native +/-0.13, its
 class the title block's thread row, its drill depth banded, its drill point
 dimensioned (under the general angular band) and its mating bolt named on
@@ -118,7 +120,6 @@ from sm_knife_mount_spec import (
     SURFACE_FINISHES,
     UNIT,
     TAP_CALLOUT_REASON,
-    TAP_CALLOUT_ROUTE,
     TAP_DRILL_CALLOUT,
 )
 import sm_vn_knife_mount_dowel_spec as DOWEL
@@ -335,9 +336,9 @@ TOP_KEEP = {
 # 26: a depth is never deferred to a view).  These rows are drawing text,
 # so the frame's import closure keeps its key.
 LEVER_NUMBER = str(_config.parts("sm-summing-lever")["number"])
-# The bore is reamed to size after heat treatment, like datum B (Owner
-# ruling 2026-11-08 (Pedro), SM-02 harden less): a 12 mm H7 reamer (.4724-
-# .4731) cuts inside the +.0015/0 band.
+# The bore is reamed to size in the supplied 28-32 HRC condition, like
+# datum B (Owner ruling 2026-11-10 (Pedro), #2334 option B1): a 12 mm H7
+# HSS reamer (.4724-.4731) cuts inside the +.0015/0 band.
 BORE_CALLOUT = "\n".join(("REAM THRU", "RUNNING FIT ON", f"{LEVER_NUMBER} TRUNNION"))
 _SLIP_FIT = f"{DOWEL_NUMBER} SLIDING FIT"
 _SLIP_CLEARANCE = "CLEARANCE {:.4f}-{:.4f}".format(*PIN_SLIP_PRINTED).replace("0.", ".")
@@ -391,10 +392,10 @@ PIN_DATUM_B_XY = (
 # dimensions the drill's point -- SolidWorks' drill-angle variable after the
 # drill depth, ``X 118°`` -- so the title block's angular band governs the
 # point the crown web charges (sm_knife_mount_spec.STUD_TAP_POINT_ANGLE_MIN_DEG).
-# Four printed rows: the drill row, the thread, under it the reason the
-# thread's band is there, naming the bolt, and the route that places the tap
-# (sm_knife_mount_spec.TAP_CALLOUT_REASON and TAP_CALLOUT_ROUTE, in the below
-# definition; no tap tool is named, rule 7); both bands are symmetric,
+# Three printed rows: the drill row, the thread, and under it the reason the
+# thread's band is there, naming the bolt
+# (sm_knife_mount_spec.TAP_CALLOUT_REASON, in the below definition; no tap
+# tool is named, rule 7); both bands are symmetric,
 # printed inline, so none stacks a row of its own.  Farm build
 # 20261013T225639.450330Z (c673e62ee) printed five, the pilot's stacked
 # +0.10 and the mate each a row of its own (tall-block), at anchor (58.6,
@@ -471,10 +472,18 @@ TAP_POINT_ANGLE_VARIABLE = "hw-drlang"
 TAP_POINT_ANGLE_TOKEN = f"<{TAP_POINT_ANGLE_VARIABLE}>"
 _CALLOUT_ANGLE_VARIABLE = 2  # swCalloutVariableType_e.swCalloutVariableType_Angle
 _DRILL_ANGLE_VARIABLE = 16  # swCalloutVariable_e.swCalloutVariable_Drill_Angle
-# The tap carries no position frame (delegated ruling sm Q3: it is spotted
-# through MHA-FR-02's #10 hole); the callout's leader lands on the tap's
-# lower-left rim, nearer its block.
-TAP_CALLOUT_RIM_SIDE = -1.0
+# The tap's position frame, ⌖Ø.008|A|B|C▷ (Owner ruling 2026-11-10 (Pedro),
+# #2334, S1: cut on the part, clocked by the bore, datum C), stands in the
+# open band between the top view's bottom edge (y ~221 mm) and the
+# callout's top row (y ~194 mm), left of the callout's leader: its top
+# 7 mm under the view, its left end 38 mm in.  The two leaders land on the
+# tap's two lower rims: the frame's, leaving its right end, on the
+# lower-left, the callout's on the lower-right, so the frame's leader stays
+# left of the callout's all the way up (crossed rims would cross them, the
+# leader-crosses-leader of farm run 20261009T164113078Z).
+TAP_FRAME_XY = (0.038, 0.214)
+TAP_FRAME_RIM_SIDE = -1.0
+TAP_CALLOUT_RIM_SIDE = 1.0
 # The bore's frames (Owner ruling 2026-11-08 (Pedro), #2144 item 11.3):
 # ⌖Ø.008|A|B and ∥.002|A -- two frames, each with its own leader to the
 # bore's crown, because a stacked lower frame takes its upper's Ø
@@ -495,6 +504,16 @@ TAP_CALLOUT_RIM_SIDE = -1.0
 # 9.6 mm over the ream note (top y 150, right end x 84) and its top, y
 # 166.6, 5 mm under the tap callout's last row (bottom about y 172).
 BORE_FRAME_XY = (FRONT_CENTER[0] + 0.035, _front_y(BLK_TOP) + 0.019)
+# The ⌖ frame measured x 150.0..191.6 mm (farm run 20261027T154115830Z).
+# Datum C (Owner ruling 2026-11-10 (Pedro), #2334: the bore clocks the
+# tap's frame) hangs under its middle on datum B's shortened stem, its box
+# (about y 157..164 mm) over the block's corner-to-.811 witness (y 155) and
+# right of the .811 BASIC's witness end (x ~155).
+BORE_FRAME_SIZE = (0.0416, _GTOL_ROW)
+BORE_DATUM_C_XY = (
+    BORE_FRAME_XY[0] + BORE_FRAME_SIZE[0] / 2.0,
+    BORE_FRAME_XY[1] - BORE_FRAME_SIZE[1] - PIN_DATUM_B_STEM - DATUM_TAG_BOX,
+)
 BORE_PARALLELISM_FRAME_XY = (FRONT_CENTER[0] - 0.037, BORE_FRAME_XY[1] - 0.007)
 BORE_BASIC_TEXT_XY = (
     _sheet_x(BLK_HALF_X) + 0.012,
@@ -649,15 +668,15 @@ def tap_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
     native size run ``<MOD-DIAM> <hw-tapdrldia>`` become ``#25 DRILL``; the
     drill's point dimensioned right after the drill depth,
     ``<hw-tapdrldepth> X <hw-drlang>``; the thread's class variable dropped
-    with its separator; and the reason row (``TAP_CALLOUT_REASON``) and the
-    route row (``TAP_CALLOUT_ROUTE``) written into the empty below
-    definition, under the thread.  Every other character is as it was.
+    with its separator; and the reason row (``TAP_CALLOUT_REASON``) written
+    into the empty below definition, under the thread.  Every other
+    character is as it was.
 
     The drill's size run, the drill depth and the thread class must each be
-    defined exactly once, the drill angle, the drill's name, the reason and
-    the route not yet, and the below definition empty, so the block prints
-    four rows.  The depth and angle variables stay in the definition, so the
-    printed depths and angle are the Hole Wizard feature's own.
+    defined exactly once, the drill angle, the drill's name and the reason
+    not yet, and the below definition empty, so the block prints three rows.
+    The depth and angle variables stay in the definition, so the printed
+    depths and angle are the Hole Wizard feature's own.
     """
     joined = "\n".join(definitions.values())
     if (
@@ -667,7 +686,6 @@ def tap_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
         or TAP_POINT_ANGLE_TOKEN in joined
         or TAP_DRILL_CALLOUT in joined
         or TAP_CALLOUT_REASON in joined
-        or TAP_CALLOUT_ROUTE in joined
         or definitions[_CALLOUT_BELOW_DEFINITION].strip()
     ):
         raise RuntimeError(
@@ -685,7 +703,7 @@ def tap_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
         )
         for part, text in definitions.items()
     }
-    wanted[_CALLOUT_BELOW_DEFINITION] = f"{TAP_CALLOUT_REASON}\n{TAP_CALLOUT_ROUTE}"
+    wanted[_CALLOUT_BELOW_DEFINITION] = TAP_CALLOUT_REASON
     return wanted
 
 
@@ -963,7 +981,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Knife-Mount Bearing Block Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "knife mount; hardened steel bearing block; knife-edge bore",
+            3: "knife mount; heat-treated steel bearing block; knife-edge bore",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -1285,9 +1303,10 @@ async def build(adapter: Any) -> dict[str, str]:
     # locates it and a separate ∥.002|A under it holds its axis parallel to
     # the top seat; its yaw about B is set at MHA-SM-00 by the gauge bar, not
     # by this part.  Its centre is BASIC under A; across, BASIC .300 from
-    # B's axis.
+    # B's axis.  Its frame carries datum C, which clocks the tap's frame
+    # (Owner ruling 2026-11-10 (Pedro), #2334, S1).
     bore_crown = (FRONT_CENTER[0], _front_y(BORE_CY) + R_BORE * SHEET_SCALE[0] / 1000.0)
-    add_feature_control_frame(
+    bore_frame = add_feature_control_frame(
         adapter,
         front,
         edge_xy=bore_crown,
@@ -1298,6 +1317,14 @@ async def build(adapter: Any) -> dict[str, str]:
         diameter=True,
         label="knife-bore position",
     )
+    add_frame_datum_feature(
+        adapter,
+        front,
+        bore_frame,
+        datum="C",
+        symbol_xy=BORE_DATUM_C_XY,
+        label="datum C knife bore",
+    )
     add_feature_control_frame(
         adapter,
         front,
@@ -1307,6 +1334,21 @@ async def build(adapter: Any) -> dict[str, str]:
         tolerance=GEOMETRIC_TOLERANCES_IN["knife-bore parallelism"],
         datums=("A",),
         label="knife-bore parallelism",
+    )
+    # The #10-24 tap: ⌖Ø.008|A|B|C▷, the bolt axis the crossbar's C-drill
+    # hole floats round (build_sm_summing_assembly's knife-hanger stack),
+    # its turn about B clocked by the bore, C's simulator free to centre.
+    add_feature_control_frame(
+        adapter,
+        top,
+        edge_xy=_tap_lower_rim(adapter, top, TAP_FRAME_RIM_SIDE),
+        frame_xy=TAP_FRAME_XY,
+        characteristic="position",
+        tolerance=GEOMETRIC_TOLERANCES_IN["knife-hanger tap position"],
+        datums=("A", "B", "C"),
+        translated=("C",),
+        diameter=True,
+        label="knife-hanger tap position",
     )
     bore_basic = add_edge_dimension(
         adapter,
