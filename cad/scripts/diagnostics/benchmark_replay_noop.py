@@ -1,23 +1,32 @@
 """COM-conversation no-op replay benchmark (EXPERIMENT BRANCH ONLY; never merge).
 
 Branch ``experiment/com-replay-20261110``. Design: reconcile-adapter-design.md
-section 1. One farm leaf (``verify:replay_noop``) that holds the seat and runs
-every native step as its own ``run_build`` subprocess:
+section 1. One farm leaf (``verify:replay_noop``) that holds the seat and, for
+each ``--stem STEM:CONTROL_STEM[:PROFILE]`` in turn, runs every native step as
+its own ``run_build`` subprocess under ``replay-noop/<stem>/``:
 
-0. clean build, unrecorded, outputs under ``replay-noop/run0`` (W0);
-1. clean build recorded -> ``run1`` + ``logs/L1.jsonl.gz`` (W1);
-2. clean build recorded -> ``run2`` + ``logs/L2.jsonl.gz`` (W2); K1;
+0. clean build, unrecorded, outputs under ``run0`` (W0);
+1. clean build recorded with full caller capture -> ``run1`` + ``logs/L1``
+   (W1);
+2. clean build recorded with the default (divergence-only) caller capture ->
+   ``run2`` + ``logs/L2`` (W2); K1;
 3. replay of L1 with SolidWorks untouched (WR); K2; negative controls
-   (another part's script, and L1 with one request float moved 1 ulp); K2b;
+   (the control stem's script, and L1 with one request float moved 1 ulp); K2b;
+6. source-change controls: L1 replayed against a mechanically edited copy of
+   a helper the build runs (comment and docstring only; one local renamed: both
+   NOOP; one numeric literal moved: DIVERGED), and with the Generator stamp's
+   provider answering another commit's sha (NOOP: k6.cross_commit); K6;
 4. geometry digests D1/D2 of the two recorded artefacts; K3; K4;
 5. rollback walk over a copy of A1 against L1's mass-property read points; K5.
 
-``report.json`` is rewritten after every phase, and every K verdict's evidence
-is also logged (bounded, at WARN) because a failed leaf publishes only its task
-log. Only infrastructure or soundness faults exit non-zero (phase-0 build
-failure, a watchdog exit, a negative control answering NOOP, documents still
-open after a native step's own discard, an unwritable report); every other K
-failure is a recorded result.
+Profile ``full`` runs all of it; ``replay`` runs 1, 3, 3b and 6 only. Stems run
+sequentially; a seat fault in one stops the rest. ``<stem>/report.json`` is
+rewritten after every phase, ``report.json`` holds the combined summary, and
+every K verdict's evidence is also logged (bounded, at WARN) because a failed
+leaf publishes only its task log. Only infrastructure or soundness faults exit
+non-zero (a stem's first build failing, a watchdog exit, a negative control
+answering NOOP, documents still open after a native step's own discard, an
+unwritable report); every other K failure is a recorded result.
 
 ``native digest`` / ``native walk`` are the child entry points (they connect).
 ``--help`` imports neither pywin32 nor ``_session``.
@@ -26,6 +35,7 @@ failure is a recorded result.
 from __future__ import annotations
 
 import argparse
+import ast
 import contextlib
 import dataclasses
 import hashlib
@@ -34,12 +44,13 @@ import json
 import math
 import os
 import shutil
+import statistics
 import subprocess
 import sys
 import tarfile
 import time
 import traceback
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
@@ -49,9 +60,8 @@ REPO = SCRIPTS.parents[1]
 OUT = REPO / "cad" / "out" / "reports" / "replay-noop"
 COM_REPLAY = SCRIPTS / "com_replay.py"
 PREFIX = "experiment.replay_noop"
-DEFAULT_STEM = "pd_transgear_arm_plate"
-DEFAULT_CONTROL_STEM = "pd_transgear_arm"
-SCHEMA = 1
+DEFAULT_STEM_SPECS = ("pd_transgear_arm_plate:pd_transgear_arm:full",)
+SCHEMA = 2
 
 _OPEN_SILENT = 1  # swOpenDocOptions_Silent
 _DOC_PART = 1  # swDocPART
@@ -61,6 +71,8 @@ _ROLL_BEFORE = 3
 _ROLL_AFTER = 4
 _MASS_ACCURACY = 2
 _MOMENT_AT_CENTRE = 0
+# swMassPropertyAccuracyLevel_e: Lower, Medium, Higher.
+_MASS_ACCURACY_LEVELS = (0, 1, 2)
 _ORIGIN_TYPE = "OriginProfileFeature"
 
 # K3 tolerances: _assembly.assembly_geometry_digest rounding, in mm/kg units.
@@ -84,6 +96,21 @@ _CLIP = 200
 _RECORD_TIMEOUT = 900
 _REPLAY_TIMEOUT = 600
 _NATIVE_TIMEOUT = 1200
+# K6: the helper function the source-change controls edit. Every part build
+# runs it through COM: save_part_and_images orients the part isometric
+# (ShowNamedView2) before the save.
+_K6_MODULE = "_part_save"
+_K6_FUNCTION = "set_isometric_view"
+_K6_COMMENT = "# K6 control: comment-only edit."
+_K6_SUFFIX = "_k6"
+# K6 cross-commit control: the provider the Generator stamp reads (git HEAD),
+# overridden in the overlay to what another commit would stamp. Not hex, so it
+# can never equal a recorded sha.
+_K6_PROVIDER_MODULE = "_source_identity"
+_K6_PROVIDER = "_git_sha"
+_K6_FOREIGN_SHA = "k6cross"
+# Calls whose presence makes a mechanical rename unsafe (they read names).
+_INTROSPECTION = frozenset({"locals", "vars", "eval", "exec", "dir"})
 
 
 class Status(StrEnum):
@@ -98,6 +125,66 @@ class Scope(StrEnum):
 
     SEAT = "seat"
     REPORT = "report"
+
+
+class Profile(StrEnum):
+    """Which phases a stem runs."""
+
+    FULL = "full"  # 0-6: every K verdict
+    REPLAY = "replay"  # 1, 3, 3b and 6: record once, replay, controls
+
+
+class SourceEdit(StrEnum):
+    """A mechanical edit of one helper function for the K6 controls."""
+
+    COMMENT_DOCSTRING = "comment_docstring"  # a comment line, a docstring change
+    RENAME_LOCAL = "rename_local"  # one local variable renamed throughout
+    NUMERIC_LITERAL = "numeric_literal"  # one numeric literal moved by one step
+    CROSS_COMMIT = "cross_commit"  # the Generator provider returns another sha
+
+
+# The verdict each edit must replay to against the unchanged L1.
+_K6_EXPECTED = {
+    SourceEdit.COMMENT_DOCSTRING: "noop",
+    SourceEdit.RENAME_LOCAL: "noop",
+    SourceEdit.NUMERIC_LITERAL: "diverged",
+    SourceEdit.CROSS_COMMIT: "noop",
+}
+
+
+def _k6_target(edit: SourceEdit) -> tuple[str, str]:
+    """The module and top-level function an edit changes."""
+    if edit is SourceEdit.CROSS_COMMIT:
+        return _K6_PROVIDER_MODULE, _K6_PROVIDER
+    return _K6_MODULE, _K6_FUNCTION
+
+
+@dataclasses.dataclass(frozen=True)
+class StemSpec:
+    """One stem the leaf benchmarks: its part, its negative-control part and
+    its phase profile (``STEM:CONTROL_STEM[:PROFILE]`` on the command line)."""
+
+    stem: str
+    control_stem: str
+    profile: Profile = Profile.FULL
+
+    @classmethod
+    def parse(cls, text: str) -> StemSpec:
+        parts = text.split(":")
+        if len(parts) not in (2, 3) or not all(parts):
+            raise argparse.ArgumentTypeError(
+                f"{text!r}: expected STEM:CONTROL_STEM[:{'|'.join(Profile)}]"
+            )
+        try:
+            profile = Profile(parts[2]) if len(parts) == 3 else Profile.FULL
+        except ValueError as exc:
+            raise argparse.ArgumentTypeError(f"{text!r}: {exc}") from exc
+        if parts[0] == parts[1]:
+            raise argparse.ArgumentTypeError(f"{text!r}: the control is the stem")
+        return cls(parts[0], parts[1], profile)
+
+    def label(self) -> str:
+        return f"{self.stem}:{self.control_stem}:{self.profile.value}"
 
 
 class Fatal(Exception):
@@ -224,7 +311,7 @@ class ChildRun:
 
 
 class Leaf:
-    def __init__(self, stem: str, control_stem: str):
+    def __init__(self, spec: StemSpec):
         import _com_conversation as conversation
         import _telemetry
         import _watchdog
@@ -237,21 +324,27 @@ class Leaf:
             _watchdog.EXIT_MODAL_DIALOG,
             _watchdog.EXIT_SEAT_NOT_READY,
         }
-        self.stem = stem
-        self.control_stem = control_stem
-        self.script = SCRIPTS / f"build_{stem}.py"
-        self.control_script = SCRIPTS / f"build_{control_stem}.py"
-        self.part = artefact_name(stem)
-        self.logs = OUT / "logs"
-        self.a1 = OUT / "run1" / "sldprt" / self.part
-        self.a2 = OUT / "run2" / "sldprt" / self.part
+        self.spec = spec
+        self.stem = spec.stem
+        self.control_stem = spec.control_stem
+        self.profile = spec.profile
+        self.out = OUT / spec.stem
+        self.script = SCRIPTS / f"build_{spec.stem}.py"
+        self.control_script = SCRIPTS / f"build_{spec.control_stem}.py"
+        self.part = artefact_name(spec.stem)
+        self.logs = self.out / "logs"
+        self.l1 = self.logs / "L1.jsonl.gz"
+        self.l2 = self.logs / "L2.jsonl.gz"
+        self.a1 = self.out / "run1" / "sldprt" / self.part
+        self.a2 = self.out / "run2" / "sldprt" / self.part
         self.a1_sha: str | None = None
         self.fatal: list[Fatal] = []
         self.report: dict[str, Any] = {
             "schema": SCHEMA,
             "experiment": "COM-conversation no-op replay (design section 1); never merge",
-            "stem": stem,
-            "control_stem": control_stem,
+            "stem": spec.stem,
+            "control_stem": spec.control_stem,
+            "profile": spec.profile.value,
             "script": self.script.relative_to(REPO).as_posix(),
             "started_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "phases": {},
@@ -259,6 +352,7 @@ class Leaf:
             "logs": {},
             "replay": None,
             "controls": {},
+            "source_controls": {},
             "digests": {},
             "walk": None,
             "walls": {},
@@ -272,14 +366,14 @@ class Leaf:
     # -- bookkeeping -------------------------------------------------------------
 
     def save(self) -> None:
-        write_json(OUT / "report.json", self.report)
+        write_json(self.out / "report.json", self.report)
 
     @contextlib.contextmanager
     def phase(self, key: str, title: str) -> Iterator[None]:
         started = time.perf_counter()
         row: dict[str, Any] = {"title": title, "status": Status.ERROR.value}
         self.report["phases"][key] = row
-        with self.telemetry.span(f"{PREFIX}.{key}", title=title):
+        with self.telemetry.span(f"{PREFIX}.{key}", title=title, stem=self.stem):
             try:
                 yield
                 row["status"] = Status.OK.value
@@ -312,7 +406,7 @@ class Leaf:
         if len(lines) > _EVIDENCE_LINES:
             bounded.append(f"  ... {len(lines) - _EVIDENCE_LINES} more in report.json")
         self.report["evidence"][key] = bounded
-        self.telemetry.warn("\n".join([f"evidence {key}:", *bounded]))
+        self.telemetry.warn("\n".join([f"evidence {self.stem} {key}:", *bounded]))
 
     def seat_stopped(self) -> bool:
         """Whether a fault makes any further native (seat) step unsafe or moot."""
@@ -327,7 +421,7 @@ class Leaf:
     ) -> ChildRun:
         environment = self.telemetry.inject_env(dict(os.environ, PYTHONHASHSEED="0"))
         environment.update(env or {})
-        log = OUT / "children" / f"{name}.log"
+        log = self.out / "children" / f"{name}.log"
         log.parent.mkdir(parents=True, exist_ok=True)
         started = time.perf_counter()
         timed_out = False
@@ -348,7 +442,7 @@ class Leaf:
             name,
             rc,
             time.perf_counter() - started,
-            log.relative_to(OUT).as_posix(),
+            log.relative_to(self.out).as_posix(),
             timed_out,
         )
         self.telemetry.event(
@@ -376,19 +470,21 @@ class Leaf:
 
     # -- phases ------------------------------------------------------------------
 
-    def build(self, key: str, run: str, log: Path | None) -> None:
+    def build(self, key: str, run: str, log: Path | None, callers: str = "") -> None:
         argv = [
             str(COM_REPLAY),
             "record",
             str(self.script),
             "--out-root",
-            str(OUT / run),
+            str(self.out / run),
         ]
-        argv += ["--timing", str(OUT / f"{run}.timing.json")]
+        argv += ["--timing", str(self.out / f"{run}.timing.json")]
+        if callers:
+            argv += ["--callers", callers]
         if log is not None:
             argv += ["--log", str(log)]
         child = self.child(run, argv, _RECORD_TIMEOUT)
-        timing_path = OUT / f"{run}.timing.json"
+        timing_path = self.out / f"{run}.timing.json"
         timing = (
             json.loads(timing_path.read_text(encoding="utf-8"))
             if timing_path.is_file()
@@ -433,7 +529,9 @@ class Leaf:
             "with_write_back": sum(1 for c in loaded.calls if c.outs),
             "raised": sum(1 for c in loaded.calls if c.raised is not None),
             "identity_comparisons": kinds.get("eq", 0),
-            "capture_bytes_on_disk": tree_bytes(capture),
+            "capture_bytes_stored": tree_bytes(capture),
+            "callers": trailer.get("callers"),
+            "clock_seconds": trailer.get("clock_seconds"),
             "header": loaded.header.to_json(),
             "trailer": {k: v for k, v in trailer.items() if k != "types"},
             "types": sorted(trailer.get("types", {})),
@@ -443,17 +541,17 @@ class Leaf:
         self.build("W0", "run0", None)
 
     def phase1(self) -> None:
-        self.build("W1", "run1", self.logs / "L1.jsonl.gz")
+        # Full caller capture: L1 is what the replay, the controls and K1 cite.
+        self.build("W1", "run1", self.l1, "full")
         if not self.a1.is_file():
             raise RuntimeError(f"run1 produced no {self.a1}")
         self.a1_sha = sha256(self.a1)
         self.report["seat_safety"]["a1_sha256"] = self.a1_sha
 
     def phase2(self) -> None:
-        self.build("W2", "run2", self.logs / "L2.jsonl.gz")
-        comparison = self.conversation.compare_conversations(
-            self.logs / "L1.jsonl.gz", self.logs / "L2.jsonl.gz"
-        )
+        # The engine's default (divergence-only) capture: K4 judges this one.
+        self.build("W2", "run2", self.l2)
+        comparison = self.conversation.compare_conversations(self.l1, self.l2)
         self.report["verdicts"]["K1"] = {
             "pass": comparison["request_divergence"] is None,
             "criterion": "no recipe REQUEST divergence between L1 and L2 (Generator "
@@ -463,9 +561,14 @@ class Leaf:
         self.evidence("K1", render_k1(self.report["verdicts"]["K1"]))
 
     def replay(
-        self, name: str, script: Path, log: Path, scratch: str
+        self,
+        name: str,
+        script: Path,
+        log: Path,
+        scratch: str,
+        overlay: Path | None = None,
     ) -> tuple[ChildRun, dict[str, Any] | None]:
-        result = OUT / f"{scratch}.json"
+        result = self.out / f"{scratch}.json"
         argv = [
             str(COM_REPLAY),
             "replay",
@@ -473,12 +576,14 @@ class Leaf:
             "--log",
             str(log),
             "--base-outputs",
-            str(OUT / "run1"),
+            str(self.out / "run1"),
             "--scratch",
-            str(OUT / scratch),
+            str(self.out / scratch),
             "--result",
             str(result),
         ]
+        if overlay is not None:
+            argv += ["--overlay", str(overlay)]
         child = self.child(
             name, argv, _REPLAY_TIMEOUT, env={"OTEL_SERVICE_NAME": "part-replay"}
         )
@@ -488,9 +593,7 @@ class Leaf:
         return child, payload
 
     def phase3(self) -> None:
-        child, result = self.replay(
-            "replay", self.script, self.logs / "L1.jsonl.gz", "replay"
-        )
+        child, result = self.replay("replay", self.script, self.l1, "replay")
         self.report["walls"]["WR"] = child.wall_seconds
         if result is None:
             raise RuntimeError(f"replay wrote no result (exit {child.rc})")
@@ -513,16 +616,16 @@ class Leaf:
             "inert": result.get("inert"),
             "py_output_mismatches": result.get("py_output_mismatches"),
             "script_error": result.get("script_error"),
+            "substitutions": result.get("substitutions"),
         }
         self.evidence("K2", render_k2(self.report["verdicts"]["K2"], result))
 
     def phase3b(self) -> None:
-        l1 = self.logs / "L1.jsonl.gz"
         perturbed = self.logs / "L1-ulp.jsonl.gz"
-        seq = _perturb_first_float(self.conversation, l1, perturbed)
+        seq = _perturb_first_float(self.conversation, self.l1, perturbed)
         controls: dict[str, Any] = {}
         child, result = self.replay(
-            "control-script", self.control_script, l1, "replay-ctrl-script"
+            "control-script", self.control_script, self.l1, "replay-ctrl-script"
         )
         controls["script"] = {
             "child": child.to_json(),
@@ -555,11 +658,49 @@ class Leaf:
                 scope=Scope.REPORT,
             )
 
+    def phase6(self) -> None:
+        """K6: L1 replayed against mechanically edited copies of helpers the
+        build runs, imported from an overlay directory: three source edits of
+        one helper, and the Generator provider answering for another commit."""
+        import _buildgraph
+
+        closure = {Path(dep).name for dep in _buildgraph.module_deps_of(self.script)}
+        controls: dict[str, Any] = {}
+        for edit in SourceEdit:
+            module, function = _k6_target(edit)
+            target = SCRIPTS / f"{module}.py"
+            if target.name not in closure:
+                raise RuntimeError(
+                    f"{target.name} is not in {self.script.name}'s closure"
+                )
+            source = target.read_bytes().decode("utf-8")
+            edited, description = source_edit(source, function, edit)
+            overlay = self.out / "overlays" / edit.value
+            overlay.mkdir(parents=True, exist_ok=True)
+            (overlay / target.name).write_bytes(edited.encode("utf-8"))
+            child, result = self.replay(
+                f"k6-{edit.value}",
+                self.script,
+                self.l1,
+                f"replay-k6-{edit.value}",
+                overlay=overlay,
+            )
+            controls[edit.value] = _source_control(edit, description, child, result)
+        self.report["source_controls"] = controls
+        self.report["verdicts"]["K6"] = _k6_verdict(controls)
+        self.evidence("K6", render_k6(self.report["verdicts"]["K6"], controls))
+        numeric = controls[SourceEdit.NUMERIC_LITERAL.value]
+        if numeric["verdict"] == "noop":
+            raise Fatal(
+                "K6 vacuous: the numeric-literal control replayed as NOOP",
+                scope=Scope.REPORT,
+            )
+
     def phase4(self) -> None:
         if not (self.a1.is_file() and self.a2.is_file()):
             raise RuntimeError("A1/A2 missing")
         before = (sha256(self.a1), sha256(self.a2))
-        out = OUT / "digest"
+        out = self.out / "digest"
         argv = [
             str(Path(__file__)),
             "native",
@@ -608,53 +749,50 @@ class Leaf:
 
     def k4(self) -> None:
         walls = self.report["walls"]
-        l1 = self.report["logs"].get("L1.jsonl.gz")
         runs = self.report["runs"]
-        if not ({"W0", "W1", "WR"} <= set(walls) and l1):
-            raise RuntimeError(f"K4 needs W0, W1, WR and L1; have {sorted(walls)}")
-        audit = (l1["trailer"].get("escape_audit") or {}).get("seconds") or 0.0
+        l1 = self.report["logs"].get(self.l1.name)
+        l2 = self.report["logs"].get(self.l2.name)
+        if not ({"W0", "W1", "W2", "WR"} <= set(walls) and l1 and l2):
+            raise RuntimeError(f"K4 needs W0-W2, WR, L1 and L2; have {sorted(walls)}")
         w0, w1, wr = walls["W0"], walls["W1"], walls["WR"]
         window0 = (runs["run0"]["timing"] or {}).get("window_seconds")
-        window1 = (runs["run1"]["timing"] or {}).get("window_seconds")
-        archive = _archive_bytes(OUT / "run1")
-        overhead = (w1 - audit - w0) / w0
+        modes = {
+            summary["callers"]: _record_cost(
+                walls[key],
+                w0,
+                (runs[run]["timing"] or {}).get("window_seconds"),
+                window0,
+                summary,
+                _archive_bytes(self.out / run),
+            )
+            for key, run, summary in (("W1", "run1", l1), ("W2", "run2", l2))
+        }
+        default = modes[self.conversation.DEFAULT_CALLERS.value]
         self.report["verdicts"]["K4"] = {
-            "pass": wr <= 0.10 * w1 and overhead <= 0.03 and l1["bytes"] <= archive,
-            "criterion": "WR <= 10% W1; (W1 - W0) <= 3% W0; L1 bytes <= run1 archive bytes",
+            "pass": wr <= 0.10 * w1
+            and default["overhead_over_W0"] <= 0.03
+            and default["log_plus_captures_bytes"] <= default["archive_bytes"],
+            "criterion": "WR <= 10% W1; with the default caller capture (L2): "
+            "(W2 - W0) <= 3% W0 and log + gzip captures <= tar.gz of its outputs",
             "walls_basis": "parent-measured subprocess walls (each includes interpreter start, imports, connect and teardown)",
+            "archive_basis": "tar.gz of the run's outputs at _artifact_cache._PACK_LEVEL; captures gzip at the same level",
             "W0": w0,
             "W1": w1,
-            "W1_minus_escape_audit": w1 - audit,
-            "escape_audit_seconds": audit,
             "WR": wr,
             "WR_over_W1": wr / w1,
-            "record_overhead_over_W0": overhead,
-            "record_overhead_unadjusted_over_W0": (w1 - w0) / w0,
-            "window_basis": {
-                "window0": window0,
-                "window1": window1,
-                "overhead": ((window1 - audit - window0) / window0)
-                if window0 and window1
-                else None,
-                "replay_window": (self.report.get("replay") or {}).get(
-                    "window_seconds"
-                ),
-            },
-            "L1_bytes": l1["bytes"],
-            "capture_bytes_on_disk": l1["capture_bytes_on_disk"],
-            "run1_archive_bytes": archive,
-            "archive_basis": "tar.gz of run1 outputs at _artifact_cache._PACK_LEVEL",
-            "size_with_capture_pass": l1["bytes"] + l1["capture_bytes_on_disk"]
-            <= archive,
+            "window0": window0,
+            "replay_window": (self.report.get("replay") or {}).get("window_seconds"),
+            "default_callers": self.conversation.DEFAULT_CALLERS.value,
+            "by_callers": modes,
         }
         self.evidence("K4", render_k4(self.report["verdicts"]["K4"]))
 
     def phase5(self) -> None:
         if not self.a1.is_file():
             raise RuntimeError("A1 missing")
-        d1 = OUT / "digest" / "D1.json"
-        copy = OUT / "walk" / f"{self.part.removesuffix('.SLDPRT')}~walk.SLDPRT"
-        out = OUT / "walk.json"
+        d1 = self.out / "digest" / "D1.json"
+        copy = self.out / "walk" / f"{self.part.removesuffix('.SLDPRT')}~walk.SLDPRT"
+        out = self.out / "walk.json"
         argv = [
             str(Path(__file__)),
             "native",
@@ -664,7 +802,7 @@ class Leaf:
             "--copy",
             str(copy),
             "--log",
-            str(self.logs / "L1.jsonl.gz"),
+            str(self.l1),
             "--reference",
             str(d1),
             "--out",
@@ -765,6 +903,7 @@ class Leaf:
                 "claim": "Python reads of SolidWorks-written files replay identically",
                 "captured_files": len(trailer.get("captured") or {}),
                 "capture_bytes": trailer.get("capture_bytes"),
+                "capture_stored_bytes": trailer.get("capture_stored_bytes"),
                 "record_reads": len(trailer.get("reads") or []),
                 "replay_read_mismatches": replay.get("read_mismatches"),
                 "materialise_missing": replay.get("materialise_missing"),
@@ -857,6 +996,8 @@ def _replay_summary(result: dict[str, Any] | None) -> dict[str, Any]:
         "r11",
         "proxies_served",
         "live_interface_objects_at_end",
+        "substitutions",
+        "overlay",
     )
     return {key: result.get(key) for key in keep}
 
@@ -881,6 +1022,12 @@ def _walk_summary(walk: dict[str, Any] | None) -> dict[str, Any]:
         "read_points_within_tolerance": bool(points)
         and all(p.get("within") for p in points),
         "read_points_outside": [p for p in points if not p.get("within")][:50],
+        "read_point_errors": {
+            "after_rebuild": _error_distribution(points, "live_after_rebuild"),
+            "before_rebuild": _error_distribution(points, "live_before_rebuild"),
+        },
+        "recorded_spread": _recorded_spread(points),
+        "mass_settings": walk.get("mass_settings"),
         "final_digest_equals_D1": walk.get("final_digest_differences") == [],
         "final_digest_differences": (walk.get("final_digest_differences") or [])[:50],
         "walk_seconds": walk.get("walk_seconds"),
@@ -888,6 +1035,119 @@ def _walk_summary(walk: dict[str, Any] | None) -> dict[str, Any]:
         "u16": walk.get("u16"),
         "features": walk.get("features"),
     }
+
+
+def _errors(recorded: Any, live: Any) -> dict[str, float] | None:
+    """How far apart a recorded and a live read are: the largest
+    per-component relative error (the measure ``_within`` judges, relative to
+    the larger magnitude), the largest component difference relative to the
+    vector's largest component, and the largest absolute difference."""
+    xs = recorded if isinstance(recorded, list) else [recorded]
+    ys = live if isinstance(live, list) else [live]
+    if live is None or len(xs) != len(ys):
+        return None
+    deltas = [abs(x - y) for x, y in zip(xs, ys, strict=True)]
+    scales = [max(abs(x), abs(y)) for x, y in zip(xs, ys, strict=True)]
+    largest = max(scales)
+    return {
+        "component": max(
+            (d / s if s else 0.0) for d, s in zip(deltas, scales, strict=True)
+        ),
+        "vector": max(deltas) / largest if largest else 0.0,
+        "absolute": max(deltas),
+    }
+
+
+def _error_distribution(points: list[dict[str, Any]], key: str) -> dict[str, Any]:
+    """Per member: the spread of read-point errors, and the tolerance that
+    would have passed every point (per component, and per vector)."""
+    by_member: dict[str, list[dict[str, float]]] = {}
+    for point in points:
+        errors = _errors(point.get("recorded"), point.get(key))
+        if errors is not None:
+            by_member.setdefault(point["member"], []).append(errors)
+    out: dict[str, Any] = {}
+    for member, rows in sorted(by_member.items()):
+        component = [r["component"] for r in rows]
+        vector = [r["vector"] for r in rows]
+        out[member] = {
+            "count": len(rows),
+            "component_max": max(component),
+            "component_median": statistics.median(component),
+            "vector_max": max(vector),
+            "vector_median": statistics.median(vector),
+            "absolute_max": max(r["absolute"] for r in rows),
+            "rtol_to_pass_component": max(component),
+            "rtol_to_pass_vector": max(vector),
+        }
+    return out
+
+
+def _record_cost(
+    wall: float,
+    w0: float,
+    window: float | None,
+    window0: float | None,
+    summary: dict[str, Any],
+    archive: int,
+) -> dict[str, Any]:
+    """One recorded build's cost against the unrecorded W0: wall and build
+    window overheads, the recorder's own clock (time inside recorded calls,
+    split into the real COM call, caller capture, file capture and the rest of
+    the engine), and its stored bytes against its outputs' archive."""
+    audit = ((summary.get("trailer") or {}).get("escape_audit") or {}).get(
+        "seconds"
+    ) or 0.0
+    clock = summary.get("clock_seconds") or {}
+    calls = summary["calls"]
+    engine = clock.get("engine")
+    return {
+        "wall": wall,
+        "escape_audit_seconds": audit,
+        "overhead_over_W0": (wall - audit - w0) / w0,
+        "overhead_unadjusted_over_W0": (wall - w0) / w0,
+        "window": window,
+        "window_overhead_over_window0": (window - audit - window0) / window0
+        if window and window0
+        else None,
+        "calls": calls,
+        "clock_seconds": clock,
+        "engine_us_per_call": engine * 1e6 / calls
+        if engine is not None and calls
+        else None,
+        "log_bytes": summary["bytes"],
+        "capture_bytes_stored": summary["capture_bytes_stored"],
+        "log_plus_captures_bytes": summary["bytes"] + summary["capture_bytes_stored"],
+        "archive_bytes": archive,
+    }
+
+
+def _recorded_spread(points: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Recorded reads of one member that the attribution gives the same
+    feature, yet differ: the build read several model states under one name
+    (the walk can reproduce only the state after that feature)."""
+    groups: dict[tuple[str | None, str], list[dict[str, Any]]] = {}
+    for point in points:
+        groups.setdefault((point["feature"], point["member"]), []).append(point)
+    spread = []
+    for (feature, member), rows in groups.items():
+        first = rows[0]
+        worst = max(
+            (_errors(first["recorded"], row["recorded"]) or {"component": 0.0})[
+                "component"
+            ]
+            for row in rows
+        )
+        if worst > 0:
+            spread.append(
+                {
+                    "feature": feature,
+                    "member": member,
+                    "seqs": [row["seq"] for row in rows],
+                    "component_max": worst,
+                }
+            )
+    return sorted(spread, key=lambda row: -row["component_max"])[:20]
 
 
 # ---------------------------------------------------------------------------
@@ -964,10 +1224,11 @@ def render_counts(name: str, summary: dict[str, Any]) -> list[str]:
         f"{name}: {summary['calls']} calls (recipe {summary['recipe_calls']}, inert "
         f"{summary['inert_calls']}), {summary['bytes']} log bytes, captured "
         f"{len(trailer.get('captured') or {})} calls / "
-        f"{trailer.get('capture_bytes')} bytes; write-back calls "
-        f"{summary['with_write_back']}, identity ops "
+        f"{trailer.get('capture_bytes')} bytes ({summary['capture_bytes_stored']} "
+        f"stored gzip); write-back calls {summary['with_write_back']}, identity ops "
         f"{summary['identity_comparisons']}, raised {summary['raised']}, recipe "
         f"requests on inert handles {summary['recipe_requests_on_inert_handles']}",
+        f"  callers {summary.get('callers')}, clock {_clip(summary.get('clock_seconds'))}",
         f"  kinds {_clip(summary['kinds'])}",
         f"  by interface {_clip(_top(summary['calls_by_interface'], _EVIDENCE_TOP))}",
     ]
@@ -1021,6 +1282,14 @@ def render_k2(k2: dict[str, Any], result: dict[str, Any]) -> list[str]:
         f"  inert: recorded {inert.get('recorded')}, served {inert.get('served')}, "
         f"unrecorded {inert.get('unserved')}, unconsumed {inert.get('unconsumed')}",
     ]
+    substitutions = result.get("substitutions") or {}
+    for binding in substitutions.get("bindings") or []:
+        lines.append(
+            f"  masked {binding['rule']} at seq {binding['seq']}: "
+            f"{binding['recorded']!r} -> {binding['replayed']!r}; "
+            f"{substitutions.get('count')} readbacks rebound "
+            f"{_clip(substitutions.get('by_member'))}"
+        )
     for row in (inert.get("unserved_members") or [])[:5]:
         lines.append(
             f"    unrecorded inert {row['member']} x{row['count']} from {row['caller']}"
@@ -1065,30 +1334,494 @@ def render_k3(k3: dict[str, Any], u11: dict[str, Any] | None) -> list[str]:
     return lines
 
 
+def _num(value: Any, spec: str) -> str:
+    return "n/a" if value is None else format(value, spec)
+
+
 def render_k4(k4: dict[str, Any]) -> list[str]:
-    return [
+    lines = [
         f"K4 {_verdict_word(k4)}: W0 {k4['W0']:.2f}s W1 {k4['W1']:.2f}s WR "
-        f"{k4['WR']:.2f}s; WR/W1 {k4['WR_over_W1']:.3f}; record overhead "
-        f"{k4['record_overhead_over_W0']:+.4f} (unadjusted "
-        f"{k4['record_overhead_unadjusted_over_W0']:+.4f}); L1 {k4['L1_bytes']} B, "
-        f"captures {k4['capture_bytes_on_disk']} B, run1 archive "
-        f"{k4['run1_archive_bytes']} B",
-        f"  windows {_clip(k4.get('window_basis'))}",
+        f"{k4['WR']:.2f}s; WR/W1 {k4['WR_over_W1']:.3f}; window0 "
+        f"{_num(k4.get('window0'), '.2f')}s, replay window "
+        f"{_num(k4.get('replay_window'), '.2f')}s",
     ]
+    for mode, cost in (k4.get("by_callers") or {}).items():
+        default = " (default, judged)" if mode == k4.get("default_callers") else ""
+        lines += [
+            f"  callers={mode}{default}: wall {cost['wall']:.2f}s, overhead "
+            f"{cost['overhead_over_W0']:+.4f} (unadjusted "
+            f"{cost['overhead_unadjusted_over_W0']:+.4f}), window "
+            f"{_num(cost['window'], '.2f')}s ("
+            f"{_num(cost['window_overhead_over_window0'], '+.4f')}); engine "
+            f"{_num(cost['engine_us_per_call'], '.1f')} us/call over "
+            f"{cost['calls']} calls",
+            f"    clock {_clip(cost['clock_seconds'])}",
+            f"    log {cost['log_bytes']} B + gzip captures "
+            f"{cost['capture_bytes_stored']} B = {cost['log_plus_captures_bytes']} B "
+            f"vs outputs tar.gz {cost['archive_bytes']} B",
+        ]
+    return lines
 
 
 def render_k5(k5: dict[str, Any]) -> list[str]:
-    return [
+    lines = [
         f"K5 {_verdict_word(k5)} (report only): features {k5.get('features')}, "
         f"unreachable {_clip(k5.get('unreachable_features'))}, read points "
         f"{k5.get('read_point_count')} within {k5.get('read_points_within_tolerance')}, "
         f"final digest == D1 {k5.get('final_digest_equals_D1')}, walk "
         f"{k5.get('walk_seconds')}s",
+    ]
+    errors = (k5.get("read_point_errors") or {}).get("after_rebuild") or {}
+    for member, row in errors.items():
+        lines.append(
+            f"  {member} x{row['count']}: per-component rel max "
+            f"{row['component_max']:.3g} median {row['component_median']:.3g}; "
+            f"vector rel max {row['vector_max']:.3g} median "
+            f"{row['vector_median']:.3g}; abs max {row['absolute_max']:.3g}"
+        )
+    spread = k5.get("recorded_spread") or []
+    if spread:
+        lines.append(
+            f"  recorded reads differing under one feature attribution: "
+            f"{len(spread)}; worst {_clip(spread[:3])}"
+        )
+    lines += render_mass_settings(k5.get("mass_settings"))
+    lines += [
         f"  outside {_clip(k5.get('read_points_outside'))}",
         f"  final digest differences {_clip(k5.get('final_digest_differences'))}",
         f"  U1 {_clip(k5.get('u1'))}",
         f"  U16 {_clip((k5.get('u16') or {}).get('bar_kept_by_ForceRebuild3'))}",
     ]
+    return lines
+
+
+def render_mass_settings(settings: dict[str, Any] | None) -> list[str]:
+    if not settings:
+        return []
+    if settings.get("error"):
+        return [f"  mass settings probe error: {_clip(settings['error'])}"]
+    lines = [
+        "  final model re-read (worst per-component rel vs first read / vs L1's last read):"
+    ]
+    for label, row in (settings.get("reads") or {}).items():
+        first = (settings.get("versus_first") or {}).get(label) or {}
+        recorded = (settings.get("versus_recorded_final") or {}).get(label) or {}
+        level = row.get("accuracy_level")
+        lines.append(
+            f"    {label}{'' if level is None else f' (AccuracyLevel {level})'}: "
+            f"{_num(_worst(first), '.3g')} / {_num(_worst(recorded), '.3g')}"
+        )
+    return lines
+
+
+def _worst(errors: dict[str, dict[str, float] | None]) -> float | None:
+    values = [e["component"] for e in errors.values() if e is not None]
+    return max(values) if values else None
+
+
+def render_k6(k6: dict[str, Any], controls: dict[str, Any]) -> list[str]:
+    cross = k6.get("cross_commit") or {}
+    lines = [
+        f"K6 {_verdict_word(k6)}: {k6.get('target')}; edited function reaches COM "
+        f"{k6.get('edited_function_reaches_com')}; k6.cross_commit "
+        f"{'PASS' if cross.get('pass') else 'FAIL'} ({cross.get('substitution_count')} "
+        f"readbacks rebound in {_clip(cross.get('substituted_members'))})",
+    ]
+    for name, control in controls.items():
+        substitutions = control.get("substitutions") or {}
+        lines.append(
+            f"  {name}: expected {control['expected']}, got {control['verdict']} "
+            f"({control['served']}/{control['recorded']} served, loaded from overlay "
+            f"{control['loaded_from_overlay']}, Python outputs differing "
+            f"{len(control['py_output_mismatches'] or {})}, substitutions "
+            f"{substitutions.get('count')}); edit {_clip(control['edit'])}"
+        )
+        if control["verdict"] != "noop":
+            lines.append(
+                f"    {control['member']} from {control['caller']}: "
+                f"{_clip(control['reason'])}"
+            )
+    for binding in cross.get("bindings") or []:
+        lines.append(
+            f"  cross_commit binding at seq {binding['seq']}: {binding['recorded']!r} "
+            f"-> {binding['replayed']!r}"
+        )
+    return lines
+
+
+# ---------------------------------------------------------------------------
+# K6 source-change controls: mechanical, AST-verified edits of one function
+# ---------------------------------------------------------------------------
+
+
+def source_edit(
+    source: str, function: str, edit: SourceEdit
+) -> tuple[str, dict[str, Any]]:
+    """Apply one mechanical edit to the top-level ``function`` of ``source``
+    and return the edited source with what changed. Each edit is verified on
+    the AST: the comment/docstring edit leaves the docstring-free AST equal,
+    the rename equals an AST-level rename, the literal edit changes that one
+    constant, the cross-commit edit only appends a constant override of the
+    function. Raises ValueError when the function offers no safe target."""
+    tree = ast.parse(source)
+    node = _function_def(tree, function)
+    if edit is SourceEdit.COMMENT_DOCSTRING:
+        return _edit_comment_docstring(source, node)
+    if edit is SourceEdit.RENAME_LOCAL:
+        return _edit_rename_local(source, tree, node)
+    if edit is SourceEdit.CROSS_COMMIT:
+        return _edit_foreign_provider(source, tree, node)
+    return _edit_numeric_literal(source, node)
+
+
+def _edit_foreign_provider(
+    source: str, tree: ast.Module, node: ast.FunctionDef | ast.AsyncFunctionDef
+) -> tuple[str, dict[str, Any]]:
+    """Append ``def <provider>(): return <foreign sha>`` so every importer of
+    the provider (bound after the module ran) stamps another commit's sha;
+    nothing in git or the environment changes."""
+    arguments = node.args
+    if (
+        isinstance(node, ast.AsyncFunctionDef)
+        or arguments.posonlyargs
+        or arguments.args
+        or arguments.vararg
+        or arguments.kwonlyargs
+        or arguments.kwarg
+    ):
+        raise ValueError(f"{node.name} is not a synchronous zero-argument provider")
+    newline = "\r\n" if "\r\n" in source else "\n"
+    tail = "" if source.endswith(("\n", "\r")) else newline
+    edited = (
+        f"{source}{tail}{newline}{newline}"
+        f"# K6 cross-commit control: the stamp another commit writes.{newline}"
+        f"def {node.name}() -> str:  # noqa: F811{newline}"
+        f"    return {_K6_FOREIGN_SHA!r}{newline}"
+    )
+    after = ast.parse(edited)
+    override = after.body[-1]
+    returns = getattr(override, "body", [None])[0]
+    if not (
+        ast.dump(ast.Module(body=after.body[:-1], type_ignores=[])) == ast.dump(tree)
+        and isinstance(override, ast.FunctionDef)
+        and override.name == node.name
+        and isinstance(returns, ast.Return)
+        and isinstance(returns.value, ast.Constant)
+        and returns.value.value == _K6_FOREIGN_SHA
+    ):
+        raise ValueError(f"{node.name}: the override changed more than the provider")
+    return edited, {"function": node.name, "returns": _K6_FOREIGN_SHA}
+
+
+def _function_def(
+    tree: ast.Module, name: str
+) -> ast.FunctionDef | ast.AsyncFunctionDef:
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if node.name == name:
+                return node
+    raise ValueError(f"no top-level function {name}")
+
+
+def _splice(source: str, edits: list[tuple[int, int, int, int, str]]) -> str:
+    """Replace AST spans ``(line, col, end_line, end_col)`` -- 1-based lines,
+    UTF-8 byte columns -- with text, keeping every other byte (and the file's
+    newlines) as it was."""
+    lines = io.StringIO(source, newline="").readlines()
+    starts = [0]
+    for line in lines:
+        starts.append(starts[-1] + len(line))
+
+    def offset(line: int, col: int) -> int:
+        prefix = lines[line - 1].encode("utf-8")[:col].decode("utf-8")
+        return starts[line - 1] + len(prefix)
+
+    text = source
+    for line, col, end_line, end_col, replacement in sorted(edits, reverse=True):
+        start, end = offset(line, col), offset(end_line, end_col)
+        text = text[:start] + replacement + text[end:]
+    return text
+
+
+def _docstring_free(source: str) -> str:
+    tree = ast.parse(source)
+    for node in ast.walk(tree):
+        scopes = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
+        if isinstance(node, scopes) and ast.get_docstring(node, clean=False):
+            node.body = node.body[1:] or [ast.Pass()]
+    return ast.dump(tree)
+
+
+def _edit_comment_docstring(
+    source: str, node: ast.FunctionDef | ast.AsyncFunctionDef
+) -> tuple[str, dict[str, Any]]:
+    doc = ast.get_docstring(node, clean=False)
+    if not doc:
+        raise ValueError(f"{node.name} has no docstring")
+    literal = node.body[0]
+    first = (node.decorator_list[0] if node.decorator_list else node).lineno
+    newline = "\r\n" if "\r\n" in source else "\n"
+    changed = f"{doc} (K6 control: docstring-only edit.)"
+    edited = _splice(
+        source,
+        [
+            (
+                literal.lineno,
+                literal.col_offset,
+                literal.end_lineno or literal.lineno,
+                literal.end_col_offset or 0,
+                repr(changed),
+            ),
+            (first, 0, first, 0, _K6_COMMENT + newline),
+        ],
+    )
+    after = ast.get_docstring(_function_def(ast.parse(edited), node.name), clean=False)
+    if _docstring_free(edited) != _docstring_free(source) or after != changed:
+        raise ValueError(
+            f"{node.name}: the edit changed more than a comment and the docstring"
+        )
+    return edited, {
+        "function": node.name,
+        "comment_before_line": first,
+        "docstring_end": _clip(changed[-80:]),
+    }
+
+
+def _bound_otherwise(node: ast.FunctionDef | ast.AsyncFunctionDef) -> set[str]:
+    """Names that some construct other than a plain assignment binds inside
+    ``node``: renaming only their ``ast.Name`` uses would change behaviour."""
+    names: set[str] = set()
+    for inner in ast.walk(node):
+        if isinstance(inner, ast.arg):
+            names.add(inner.arg)
+        elif isinstance(inner, (ast.Global, ast.Nonlocal)):
+            names.update(inner.names)
+        elif isinstance(inner, ast.ExceptHandler) and inner.name:
+            names.add(inner.name)
+        elif isinstance(inner, ast.alias):
+            names.add((inner.asname or inner.name).split(".")[0])
+        elif isinstance(inner, (ast.MatchAs, ast.MatchStar)) and inner.name:
+            names.add(inner.name)
+        elif isinstance(inner, ast.MatchMapping) and inner.rest:
+            names.add(inner.rest)
+        elif isinstance(inner, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            names.add(inner.name)
+        elif isinstance(inner, ast.ClassDef):
+            # A class body's assignments are attributes, not locals.
+            names.add(inner.name)
+            names.update(
+                n.id
+                for n in ast.walk(inner)
+                if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store)
+            )
+    names.discard(node.name)
+    return names
+
+
+def _identifiers(tree: ast.AST) -> set[str]:
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        for field in ("id", "arg", "attr", "name", "asname", "rest"):
+            value = getattr(node, field, None)
+            if isinstance(value, str):
+                names.add(value)
+        if isinstance(node, (ast.Global, ast.Nonlocal)):
+            names.update(node.names)
+    return names
+
+
+def _edit_rename_local(
+    source: str, tree: ast.Module, node: ast.FunctionDef | ast.AsyncFunctionDef
+) -> tuple[str, dict[str, Any]]:
+    reads_names = sorted(
+        {
+            n.func.id
+            for n in ast.walk(node)
+            if isinstance(n, ast.Call)
+            and isinstance(n.func, ast.Name)
+            and n.func.id in _INTROSPECTION
+        }
+    )
+    if reads_names:
+        raise ValueError(f"{node.name} calls {reads_names}: a rename is observable")
+    blocked = _bound_otherwise(node)
+    taken = _identifiers(tree)
+    stores = sorted(
+        (
+            n
+            for n in ast.walk(node)
+            if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store)
+        ),
+        key=lambda n: (n.lineno, n.col_offset),
+    )
+    for store in stores:
+        old, new = store.id, f"{store.id}{_K6_SUFFIX}"
+        if old in blocked or new in taken:
+            continue
+        uses = [n for n in ast.walk(node) if isinstance(n, ast.Name) and n.id == old]
+        edited = _splice(
+            source,
+            [
+                (
+                    n.lineno,
+                    n.col_offset,
+                    n.end_lineno or n.lineno,
+                    n.end_col_offset or 0,
+                    new,
+                )
+                for n in uses
+            ],
+        )
+        expected = ast.parse(source)
+        for n in ast.walk(_function_def(expected, node.name)):
+            if isinstance(n, ast.Name) and n.id == old:
+                n.id = new
+        # Differs when the source text names the variable some other way,
+        # e.g. an f-string ``{x=}`` whose literal part spells the name.
+        if ast.dump(ast.parse(edited)) != ast.dump(expected):
+            continue
+        return edited, {
+            "function": node.name,
+            "from": old,
+            "to": new,
+            "occurrences": len(uses),
+        }
+    raise ValueError(f"{node.name} has no local that renames mechanically")
+
+
+def _edit_numeric_literal(
+    source: str, node: ast.FunctionDef | ast.AsyncFunctionDef
+) -> tuple[str, dict[str, Any]]:
+    constants = sorted(
+        (
+            n
+            for n in ast.walk(node)
+            if isinstance(n, ast.Constant) and type(n.value) in (int, float)
+        ),
+        key=lambda n: (n.lineno, n.col_offset),
+    )
+    if not constants:
+        raise ValueError(f"{node.name} has no numeric literal")
+    first = constants[0]
+    value = first.value
+    moved = value + 1 if isinstance(value, int) else math.nextafter(value, math.inf)
+    edited = _splice(
+        source,
+        [
+            (
+                first.lineno,
+                first.col_offset,
+                first.end_lineno or first.lineno,
+                first.end_col_offset or 0,
+                repr(moved),
+            )
+        ],
+    )
+    expected = ast.parse(source)
+    for n in ast.walk(_function_def(expected, node.name)):
+        if isinstance(n, ast.Constant) and (n.lineno, n.col_offset) == (
+            first.lineno,
+            first.col_offset,
+        ):
+            n.value = moved
+    if ast.dump(ast.parse(edited)) != ast.dump(expected):
+        raise ValueError(
+            f"{node.name}: the literal edit changed more than one constant"
+        )
+    return edited, {
+        "function": node.name,
+        "line": first.lineno,
+        "from": value,
+        "to": moved,
+    }
+
+
+def _source_control(
+    edit: SourceEdit,
+    description: dict[str, Any],
+    child: ChildRun,
+    result: dict[str, Any] | None,
+) -> dict[str, Any]:
+    result = result or {}
+    modules = (result.get("overlay") or {}).get("modules") or {}
+    module = modules.get(_k6_target(edit)[0]) or {}
+    divergence = result.get("divergence") or {}
+    return {
+        "edit": description,
+        "expected": _K6_EXPECTED[edit],
+        "verdict": result.get("verdict"),
+        "reason": result.get("reason"),
+        "served": result.get("served"),
+        "recorded": result.get("recorded"),
+        "loaded_from_overlay": module.get("from_overlay"),
+        "overlay_module": module,
+        "py_output_mismatches": result.get("py_output_mismatches"),
+        "substitutions": result.get("substitutions"),
+        "script_error": result.get("script_error"),
+        "member": divergence.get("member_actual"),
+        "caller": divergence.get("caller_actual"),
+        "divergence": divergence or None,
+        "child": child.to_json(),
+    }
+
+
+def _k6_verdict(controls: dict[str, Any]) -> dict[str, Any]:
+    """K6 passes when the behaviour-preserving edits replay as NOOP (every
+    request served, Python outputs equal), the literal edit DIVERGES, every
+    replay imported the edited module, the divergence names the edited
+    function as its caller (so the edited code ran and reached COM: the NOOP
+    controls are not vacuous), and the cross-commit control replays NOOP with
+    the recorded Generator rebound to the foreign one and read back rebound."""
+    numeric = controls[SourceEdit.NUMERIC_LITERAL.value]
+    reaches = f"{_K6_MODULE}:{_K6_FUNCTION}:" in (numeric.get("caller") or "")
+    expected = {
+        name: control["verdict"] == control["expected"]
+        and control["loaded_from_overlay"] is True
+        and (
+            control["expected"] != "noop"
+            or (
+                control["served"] == control["recorded"]
+                and not control["py_output_mismatches"]
+            )
+        )
+        for name, control in controls.items()
+    }
+    cross = controls[SourceEdit.CROSS_COMMIT.value]
+    substitutions = cross.get("substitutions") or {}
+    foreign = [
+        binding
+        for binding in substitutions.get("bindings") or []
+        if binding["recorded"] != binding["replayed"]
+        and binding["replayed"].endswith(f"@ {_K6_FOREIGN_SHA}")
+    ]
+    cross_commit = {
+        "pass": expected[SourceEdit.CROSS_COMMIT.value]
+        and bool(foreign)
+        and substitutions.get("count", 0) >= 1,
+        "criterion": f"{_K6_PROVIDER_MODULE}.{_K6_PROVIDER} answering "
+        f"{_K6_FOREIGN_SHA!r}: NOOP, every request served, Python outputs equal, "
+        "the recorded Generator bound to the foreign one and >= 1 readback rebound",
+        "bindings": foreign,
+        "substitution_count": substitutions.get("count"),
+        "substituted_members": substitutions.get("by_member"),
+    }
+    return {
+        "pass": all(expected.values()) and reaches and cross_commit["pass"],
+        "criterion": "comment/docstring and local-rename edits NOOP with every request "
+        "served and Python outputs equal; numeric-literal edit DIVERGED with the "
+        "edited function as the caller; cross_commit as stated; every replay "
+        "imported the edited module",
+        "target": f"{_K6_MODULE}.{_K6_FUNCTION}",
+        "as_expected": expected,
+        "edited_function_reaches_com": reaches,
+        "cross_commit": cross_commit,
+        "input_pins": "the header pins the engine sha, ENVIRONMENT_KEYS and external "
+        "files named in COM arguments; script and helper source are never pinned "
+        "(header.script_sha256 is informational), so changed source is replayed, "
+        "never refused as input_mismatch; the Generator stamp is the one masked "
+        "argument, bound recorded -> replayed and substituted in equal readbacks",
+        "verdicts": {name: control["verdict"] for name, control in controls.items()},
+    }
 
 
 def _perturb_first_float(conversation: Any, source: Path, target: Path) -> int:
@@ -1194,13 +1927,33 @@ def compare_digests(a: dict[str, Any], b: dict[str, Any]) -> list[str]:
     for key in ("features", "custom_properties", "equations", "errors"):
         exact(key, a.get(key), b.get(key))
     dims_a, dims_b = a.get("dimensions", []), b.get("dimensions", [])
-    exact("dimensions.names", [d[0] for d in dims_a], [d[0] for d in dims_b])
+    exact(
+        "dimensions.names",
+        [dimension_key(d[0]) for d in dims_a],
+        [dimension_key(d[0]) for d in dims_b],
+    )
     for x, y in zip(dims_a, dims_b, strict=False):
-        numeric(f"dimensions[{x[0]}]", x[1], y[1], _TOLERANCE["dimension_si"])
+        numeric(
+            f"dimensions[{dimension_key(x[0])}]",
+            x[1],
+            y[1],
+            _TOLERANCE["dimension_si"],
+        )
     return out
 
 
-def benchmark(stem: str, control_stem: str) -> int:
+def dimension_key(full_name: str) -> str:
+    """A dimension's full name ``Name@Feature@<document>.Part`` with the
+    document's name replaced: the walk's copy and A1 are the same part under
+    different file names."""
+    head, at, document = full_name.rpartition("@")
+    if not at or "@" not in head:
+        return full_name
+    _, dot, extension = document.rpartition(".")
+    return f"{head}@<document>{dot}{extension if dot else ''}"
+
+
+def benchmark(specs: Sequence[StemSpec]) -> int:
     import _telemetry
     from opentelemetry import trace
     from opentelemetry.sdk.trace import SpanProcessor
@@ -1228,57 +1981,127 @@ def benchmark(stem: str, control_stem: str) -> int:
     provider = trace.get_tracer_provider()
     if hasattr(provider, "add_span_processor"):
         provider.add_span_processor(retained)
-    leaf = Leaf(stem, control_stem)
-    code = 0
-    reason = "completed"
+    combined: dict[str, Any] = {
+        "schema": SCHEMA,
+        "experiment": "COM-conversation no-op replay (design section 1); never merge",
+        "started_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "stems": [],
+        "exit": None,
+    }
+    leaves: list[Leaf] = []
     try:
         with _telemetry.build_session("replay-noop", script="benchmark_replay_noop"):
-            with _telemetry.span(PREFIX, stem=stem, control_stem=control_stem) as root:
+            labels = ",".join(spec.label() for spec in specs)
+            with _telemetry.span(PREFIX, stems=labels) as root:
                 context = root.get_span_context()
-                leaf.report["trace_id"] = f"{context.trace_id:032x}"
-                code, reason = _run_phases(leaf)
-        leaf.report["retained_span_count"] = len(retained.completed)
+                combined["trace_id"] = f"{context.trace_id:032x}"
+                for spec in specs:
+                    leaf = Leaf(spec)
+                    leaf.report["trace_id"] = combined["trace_id"]
+                    leaves.append(leaf)
+                    _run_stem(leaf, leaves[:-1])
+                _recheck_earlier(leaves, "at_end")
+        combined["retained_span_count"] = len(retained.completed)
     finally:
-        leaf.report["exit"] = {"code": code, "reason": reason}
+        for leaf in leaves:
+            if (leaf.report.get("exit") or {}).get("code") is not None:
+                code, reason = _exit_of(leaf)
+                leaf.report["exit"] = {"code": code, "reason": reason}
+        code, reason = _combined_exit(leaves)
+        combined["exit"] = {"code": code, "reason": reason}
+        combined["stems"] = [_stem_row(leaf) for leaf in leaves]
         try:
-            leaf.save()
+            for leaf in leaves:
+                leaf.save()
+            write_json(OUT / "report.json", combined)
             retained.write()
         except Exception as exc:  # noqa: BLE001 - an unwritable report is fatal
             _telemetry.error(f"report could not be written: {exc}")
             code = code or 1
-    _log_summary(leaf, code, reason)
+    for leaf in leaves:
+        _log_summary(leaf)
+    _log_combined(combined, code)
     _telemetry.shutdown()
     return code
 
 
+def _run_stem(leaf: Leaf, earlier: list[Leaf]) -> None:
+    """One stem's phases, unless an earlier stem stopped the seat or an
+    earlier stem's artefact changed since it was recorded."""
+    import _telemetry
+
+    stopped = [other.stem for other in earlier if other.seat_stopped()]
+    if not stopped:
+        stopped = _recheck_earlier(earlier, f"before_{leaf.stem}")
+    if stopped:
+        leaf.report["exit"] = {
+            "code": None,
+            "reason": f"not run: a seat fault in {stopped} stopped later stems",
+        }
+        leaf.save()
+        return
+    started = time.perf_counter()
+    with _telemetry.span(f"{PREFIX}.stem", stem=leaf.stem, profile=leaf.profile.value):
+        code, reason = _run_phases(leaf)
+    leaf.report["exit"] = {"code": code, "reason": reason}
+    leaf.report["seconds"] = time.perf_counter() - started
+    leaf.save()
+
+
+def _recheck_earlier(leaves: list[Leaf], when: str) -> list[str]:
+    """Re-hash every earlier stem's A1: no later step may write it. Returns
+    the stems whose A1 changed (a seat fault recorded on that stem)."""
+    changed = []
+    for leaf in leaves:
+        try:
+            leaf.check_a1(when)
+        except Fatal as fault:
+            leaf.fatal.append(fault)
+            changed.append(leaf.stem)
+        leaf.save()
+    return changed
+
+
+# Phases per profile, in run order: (key, title, needs the seat).
+_PHASES = (
+    ("phase0", "clean build, unrecorded (W0)", True),
+    ("phase1", "clean build, recorded with full caller capture (L1, W1)", True),
+    ("phase2", "clean build, recorded with default caller capture (L2, W2); K1", True),
+    ("phase3", "replay of L1 with SolidWorks untouched (WR); K2", False),
+    ("phase3b", "negative controls; K2b", False),
+    ("phase6", "source-change controls; K6", False),
+    ("phase4", "geometry digests D1/D2; K3", True),
+    ("k4", "walls and sizes; K4", False),
+    ("phase5", "rollback walk on a copy of A1; K5", True),
+)
+_PROFILE_PHASES = {
+    Profile.FULL: frozenset(key for key, _, _ in _PHASES),
+    Profile.REPLAY: frozenset({"phase1", "phase3", "phase3b", "phase6"}),
+}
+
+
 def _run_phases(leaf: Leaf) -> tuple[int, str]:
-    with leaf.phase("phase0", "clean build, unrecorded (W0)"):
-        leaf.phase0()
-    if leaf.report["phases"]["phase0"]["status"] != Status.OK.value and not leaf.fatal:
-        leaf.fatal.append(Fatal("phase 0 (unrecorded clean build) failed"))
-    # (key, title, step, needs the seat)
-    steps = (
-        ("phase1", "clean build, recorded (L1, W1)", leaf.phase1, True),
-        ("phase2", "clean build, recorded (L2, W2); K1", leaf.phase2, True),
-        (
-            "phase3",
-            "replay of L1 with SolidWorks untouched (WR); K2",
-            leaf.phase3,
-            False,
-        ),
-        ("phase3b", "negative controls; K2b", leaf.phase3b, False),
-        ("phase4", "geometry digests D1/D2; K3", leaf.phase4, True),
-        ("k4", "walls and sizes; K4", leaf.k4, False),
-        ("phase5", "rollback walk on a copy of A1; K5", leaf.phase5, True),
-    )
-    for key, title, step, needs_seat in steps:
+    selected = _PROFILE_PHASES[leaf.profile]
+    first_build = True
+    for key, title, needs_seat in _PHASES:
+        if key not in selected:
+            leaf.skip(key, title, f"not in the {leaf.profile.value} profile")
+            continue
         if needs_seat and leaf.seat_stopped():
             leaf.skip(key, title, "an earlier fault made further native steps unsafe")
             continue
         with leaf.phase(key, title):
-            step()
+            getattr(leaf, key)()
+        failed = leaf.report["phases"][key]["status"] != Status.OK.value
+        if first_build and failed and not leaf.fatal:
+            leaf.fatal.append(Fatal(f"{key} (the stem's first clean build) failed"))
+        first_build = False
     with leaf.phase("assumptions", "R/U evidence map"):
         leaf.assumptions()
+    return _exit_of(leaf)
+
+
+def _exit_of(leaf: Leaf) -> tuple[int, str]:
     if leaf.fatal:
         first = leaf.fatal[0]
         watchdog = next((f.code for f in leaf.fatal if f.code != 1), None)
@@ -1286,27 +2109,64 @@ def _run_phases(leaf: Leaf) -> tuple[int, str]:
     return 0, "completed; K verdicts are results, not exit codes"
 
 
-def _log_summary(leaf: Leaf, code: int, reason: str) -> None:
-    """The farm publishes no outputs of a failed leaf: the summary rides telemetry."""
-    import _telemetry
+def _combined_exit(leaves: list[Leaf]) -> tuple[int, str]:
+    """The leaf's exit: the first stem's fault code (a watchdog code first),
+    0 when every stem ran without an infrastructure or soundness fault."""
+    exits = [(leaf.stem, *_exit_of(leaf)) for leaf in leaves]
+    faults = [(stem, code, reason) for stem, code, reason in exits if code]
+    if not faults:
+        return 0, f"{len(leaves)} stem(s) completed; K verdicts are results"
+    watchdog = next((code for _, code, _ in faults if code != 1), None)
+    return watchdog or faults[0][1], "; ".join(
+        f"{stem}: {reason}" for stem, _, reason in faults
+    )
 
-    verdicts = {
+
+def _stem_row(leaf: Leaf) -> dict[str, Any]:
+    return {
+        "stem": leaf.stem,
+        "control_stem": leaf.control_stem,
+        "profile": leaf.profile.value,
+        "report": f"{leaf.stem}/report.json",
+        "exit": leaf.report.get("exit"),
+        "seconds": leaf.report.get("seconds"),
+        "verdicts": _verdict_passes(leaf),
+        "phases": {k: row.get("status") for k, row in leaf.report["phases"].items()},
+        "walls": {k: round(v, 2) for k, v in leaf.report["walls"].items()},
+        "seat_safety_violations": leaf.report["seat_safety"]["violations"],
+    }
+
+
+def _verdict_passes(leaf: Leaf) -> dict[str, Any]:
+    return {
         key: value.get("pass")
         for key, value in leaf.report["verdicts"].items()
         if isinstance(value, dict)
     }
+
+
+def _log_summary(leaf: Leaf) -> None:
+    """The farm publishes no outputs of a failed leaf: the summary rides telemetry."""
+    import _telemetry
+
+    exit_ = leaf.report.get("exit") or {}
+    code = exit_.get("code")
+    verdicts = _verdict_passes(leaf)
     phases = {key: row.get("status") for key, row in leaf.report["phases"].items()}
     walls = {key: round(value, 2) for key, value in leaf.report["walls"].items()}
     replay = leaf.report.get("replay") or {}
     message = (
-        f"replay-noop {leaf.stem}: exit {code} ({reason}); verdicts {verdicts}; "
-        f"phases {phases}; walls {walls}; replay {replay.get('verdict')} "
+        f"replay-noop {leaf.stem} ({leaf.profile.value}): exit {code} "
+        f"({exit_.get('reason')}); verdicts {verdicts}; phases {phases}; walls "
+        f"{walls}; replay {replay.get('verdict')} "
         f"{replay.get('served')}/{replay.get('recorded')}"
     )
     _telemetry.event(
         f"{PREFIX}.summary",
-        exit_code=code,
-        reason=reason,
+        stem=leaf.stem,
+        profile=leaf.profile.value,
+        exit_code=-1 if code is None else code,
+        reason=str(exit_.get("reason")),
         verdicts=json.dumps(verdicts),
         phases=json.dumps(phases),
         walls=json.dumps(walls),
@@ -1324,6 +2184,20 @@ def _log_summary(leaf: Leaf, code: int, reason: str) -> None:
     ]
     (_telemetry.success if code == 0 else _telemetry.error)(
         "\n".join([message, *headlines, *errors])
+    )
+
+
+def _log_combined(combined: dict[str, Any], code: int) -> None:
+    import _telemetry
+
+    rows = [
+        f"  {row['stem']} ({row['profile']}): exit {(row['exit'] or {}).get('code')}, "
+        f"verdicts {row['verdicts']}, {_num(row['seconds'], '.0f')}s"
+        for row in combined["stems"]
+    ]
+    reason = (combined.get("exit") or {}).get("reason")
+    (_telemetry.success if code == 0 else _telemetry.error)(
+        "\n".join([f"replay-noop: exit {code} ({reason})", *rows])
     )
 
 
@@ -1648,6 +2522,64 @@ def _within(recorded: Any, live: Any) -> bool:
     )
 
 
+def _mass_settings(
+    model: Any, extension: Any, points: list[dict[str, Any]]
+) -> dict[str, Any]:
+    """Report-only, on the opened final model before any rollback: mass
+    properties read twice through CreateMassProperty, through
+    CreateMassProperty2 at its default and at each AccuracyLevel, and once
+    more after ForceRebuild3; each read compared with the first and with L1's
+    last recorded read of each member (the build's final state)."""
+    from _com import _early_bound
+
+    reads: dict[str, dict[str, Any]] = {}
+
+    def read(label: str, creator: str, accuracy: int | None = None) -> None:
+        interface = (
+            "IMassProperty2" if creator == "CreateMassProperty2" else "IMassProperty"
+        )
+        mass = _early_bound(getattr(extension, creator)(), interface)
+        row: dict[str, Any] = {}
+        if accuracy is not None:
+            mass.AccuracyLevel = accuracy
+        if interface == "IMassProperty2":
+            row["accuracy_level"] = int(mass.AccuracyLevel)
+        row.update({m: _plain_live(getattr(mass, m)) for m in _MASS_MEMBERS})
+        reads[label] = row
+
+    try:
+        read("CreateMassProperty", "CreateMassProperty")
+        read("CreateMassProperty again", "CreateMassProperty")
+        read("CreateMassProperty2 default", "CreateMassProperty2")
+        for level in _MASS_ACCURACY_LEVELS:
+            read(f"CreateMassProperty2 accuracy {level}", "CreateMassProperty2", level)
+        model.ForceRebuild3(False)
+        read("CreateMassProperty after ForceRebuild3", "CreateMassProperty")
+    except Exception as exc:  # noqa: BLE001 - a report-only probe records its failure
+        return {"error": f"{type(exc).__name__}: {exc}", "reads": reads}
+    final = {point["member"]: point for point in points}
+    first = reads["CreateMassProperty"]
+    return {
+        "reads": reads,
+        "recorded_creators": sorted({point["creator"] for point in points}),
+        "recorded_final": {
+            member: {k: p[k] for k in ("seq", "creator", "feature")}
+            for member, p in final.items()
+        },
+        "versus_first": {
+            label: {m: _errors(first[m], row[m]) for m in _MASS_MEMBERS}
+            for label, row in reads.items()
+        },
+        "versus_recorded_final": {
+            label: {
+                m: _errors(final[m]["recorded"], row[m]) if m in final else None
+                for m in _MASS_MEMBERS
+            }
+            for label, row in reads.items()
+        },
+    }
+
+
 async def native_walk(
     adapter: Any, a1: Path, copy: Path, log: Path, reference: Path, out: Path
 ) -> dict[str, str]:
@@ -1685,6 +2617,7 @@ async def native_walk(
                 raise RuntimeError(f"no feature after {_ORIGIN_TYPE}: {names}")
             tree = features[origin + 1 :]
             report["features"] = len(tree)
+            report["mass_settings"] = _mass_settings(model, extension, points)
             walk_started = time.perf_counter()
             started = time.perf_counter()
             first_ok = bool(manager.EditRollback(_ROLL_BEFORE, tree[0][0]))
@@ -1794,8 +2727,14 @@ def _parser() -> argparse.ArgumentParser:
     run = sub.add_parser(
         "benchmark", help="the verify:replay_noop leaf (seat held by doit)"
     )
-    run.add_argument("--stem", default=DEFAULT_STEM)
-    run.add_argument("--control-stem", default=DEFAULT_CONTROL_STEM)
+    run.add_argument(
+        "--stem",
+        dest="stems",
+        action="append",
+        type=StemSpec.parse,
+        metavar=f"STEM:CONTROL_STEM[:{'|'.join(Profile)}]",
+        help=f"repeatable; stems run in order (default {' '.join(DEFAULT_STEM_SPECS)})",
+    )
     native = sub.add_parser("native", help="child entry points (connect)")
     steps = native.add_subparsers(dest="step", required=True)
     digest = steps.add_parser("digest", help="D1/D2 geometry digests (+ U11 probe)")
@@ -1818,13 +2757,15 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("seat not held: run the canonical verify:replay_noop task")
     sys.path.insert(0, str(SCRIPTS))
     if args.command == "benchmark":
-        for script in (
-            SCRIPTS / f"build_{args.stem}.py",
-            SCRIPTS / f"build_{args.control_stem}.py",
-        ):
-            if not script.is_file():
-                parser.error(f"no build script {script.name}")
-        return benchmark(args.stem, args.control_stem)
+        specs = args.stems or [StemSpec.parse(text) for text in DEFAULT_STEM_SPECS]
+        stems = [spec.stem for spec in specs]
+        if len(set(stems)) != len(stems):
+            parser.error(f"a stem is listed twice: {stems}")
+        for spec in specs:
+            for stem in (spec.stem, spec.control_stem):
+                if not (SCRIPTS / f"build_{stem}.py").is_file():
+                    parser.error(f"no build script build_{stem}.py")
+        return benchmark(specs)
     for path in (args.out, getattr(args, "copy", None)):
         if path is not None and OUT.resolve() not in path.resolve().parents:
             parser.error(f"{path} is outside {OUT}")

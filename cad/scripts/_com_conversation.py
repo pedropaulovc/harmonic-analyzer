@@ -13,19 +13,34 @@ interposes one proxy per interface object at that boundary and either
   ``ITypeInfo``) as one :class:`Call` with canonical arguments and response, or
 * REPLAYS a recorded log with SolidWorks absent: the ``k``-th recipe request
   must equal the recorded ``k``-th recipe request exactly (after the declared
-  provenance mask) and is then answered with the recorded response. The first
-  mismatch is sticky and raised as :class:`ReplayStop`, a ``BaseException`` so
-  the adapter's ``except Exception`` fallbacks cannot swallow it.
+  provenance mask) and is then answered with the recorded response, in which a
+  string equal to a masked recorded value is served as the value this replay
+  wrote (a readback of the Generator stamp). The first mismatch is sticky and
+  raised as :class:`ReplayStop`, a ``BaseException`` so the adapter's
+  ``except Exception`` fallbacks cannot swallow it.
 
-Every call carries its :class:`Origin` and its Python caller (the nearest
-frames outside this module, pywin32 and the makepy wrappers). A call made while
-a recipe-inert module (``_buildgraph.RECIPE_INERT_MODULES``) is on the stack is
-INERT: ``check:inert`` proves such code only observes (no COM mutator before a
-save, pinned call sites whose results the build discards), so its requests are
-not part of the no-op claim. Replay serves them best-effort from the recorded
-inert calls by exact request, in any order, and answers an unrecorded one with
-``E_FAIL``; their handles come from a separate (negative) range, so inert
-activity cannot renumber the objects recipe requests name.
+Every call carries its :class:`Origin`. A call made while a function of a
+recipe-inert module (``_buildgraph.RECIPE_INERT_MODULES``) runs is INERT: for
+the recording or replay window those modules' functions are wrapped so their
+dynamic extent sets a context variable, an O(1) test per call instead of a
+stack walk. ``check:inert`` proves such code only observes (no COM mutator
+before a save, pinned call sites whose results the build discards), so its
+requests are not part of the no-op claim. Replay serves them best-effort from
+the recorded inert calls by exact request, in any order, and answers an
+unrecorded one with ``E_FAIL``; their handles come from a separate (negative)
+range, so inert activity cannot renumber the objects recipe requests name.
+A call reaching an inert function through a reference bound before the window
+opened stays RECIPE: the conservative direction (strict order), never a hidden
+request. :class:`CallerCapture` decides how much of the Python caller (the
+nearest frames outside this module, pywin32 and the makepy wrappers) a recording
+keeps; a replay names the caller of a divergence regardless.
+
+Files SolidWorks writes during the window are kept gzip-compressed beside the
+log (``<log>.files/<seq>/<rel>.gz``, digest of the uncompressed bytes) and
+restored by the replay at the same point. A replay may import changed helper
+modules from an overlay directory placed first on ``sys.path``
+(:func:`use_overlay`); the log pins only the engine, the declared environment
+and the external files COM arguments name, never Python source.
 
 pywin32 recognises its own interface objects by ``isinstance(...,
 PyIDispatchType)``; that C type cannot be subclassed, so :func:`funnel`
@@ -54,11 +69,14 @@ from __future__ import annotations
 
 import base64
 import contextlib
+import contextvars
 import datetime
 import functools
 import gc
 import gzip
 import hashlib
+import importlib
+import inspect
 import itertools
 import json
 import os
@@ -83,6 +101,9 @@ ENVIRONMENT_KEYS = ("PYTHONHASHSEED", "HARMONIC_FASTENER_ROWS", "HARMONIC_FIT_GR
 # Leading arguments of each pywin32 dispatch op that identify the member
 # (dispid, lcid, flags, return type[, arg types]); interned once per log.
 _HEADER_WIDTH = {"InvokeTypes": 5, "Invoke": 4}
+# gzip level of the kept SolidWorks-written files: _artifact_cache._PACK_LEVEL,
+# so log-plus-captures bytes compare like with like against the output archive.
+_CAPTURE_LEVEL = 6
 
 
 class Mode(StrEnum):
@@ -149,6 +170,20 @@ class Origin(StrEnum):
 class GuardMode(StrEnum):
     WARN = "warn"
     RAISE = "raise"
+
+
+class CallerCapture(StrEnum):
+    """How much of the Python caller a recording keeps per call."""
+
+    OFF = "off"  # none, and a replay names no caller either
+    DIVERGENCE_ONLY = "divergence"  # the log keeps none; a replay names its own
+    FULL = "full"  # every logged call carries its caller frames
+
+
+# The cheap default: a log carries no caller frames (a FULL lookup cost 10-11 us
+# per call offline on the real arm-plate replay stacks); a replay names its
+# own caller at a divergence.
+DEFAULT_CALLERS = CallerCapture.DIVERGENCE_ONLY
 
 
 # ---------------------------------------------------------------------------
@@ -331,6 +366,12 @@ class MaskRule:
 
 # The one declared provenance entry: the Generator custom property written by
 # _part_properties.part_properties ("harmonic-analyzer @ <git sha>[-dirty]").
+# Replay treats a mask as a substitution, not an ignore: when a masked request
+# matches, the recorded value is bound to the value this replay wrote, and a
+# later served response string EQUAL to the recorded value is served as the
+# replay's value (apply_custom_properties reads every property back and raises
+# on mismatch). Equality, never substring: a readback returns exactly what was
+# written; a longer string that merely contains it is not the masked write.
 PROVENANCE_MASK: tuple[MaskRule, ...] = (
     MaskRule("Generator", "Generator", re.compile(r"harmonic-analyzer @ \S+")),
 )
@@ -972,7 +1013,7 @@ def _site() -> str:
 class _Role(StrEnum):
     PLUMBING = "plumbing"  # this module, pywin32, makepy-generated wrappers
     INERT = "inert"  # a module in _buildgraph.RECIPE_INERT_MODULES
-    BUILD = "build"  # the repository's build code (cad/scripts)
+    BUILD = "build"  # the repository's build code (cad/scripts, an overlay)
     LIBRARY = "library"  # the adapter, asyncio, the standard library
 
 
@@ -980,9 +1021,17 @@ class _Role(StrEnum):
 # package and the makepy output (gen_py, the adapter's checked-in _generated).
 _PLUMBING_DIRS = frozenset({"win32com", "gen_py", "_generated"})
 _CALLER_FRAMES = 3
+_BUILD_FRAMES = 2
+# Frames a caller lookup examines at most (a part build's deepest recorded
+# stack was 42 frames).
+_CALLER_DEPTH = 64
 _ENGINE_PATH = os.path.normcase(__file__)
-_BUILD_PREFIX = os.path.normcase(os.path.dirname(__file__)) + os.sep
-_ROLES: dict[Any, tuple[_Role, str]] = {}
+_BUILD_PREFIXES: list[str] = [os.path.normcase(os.path.dirname(__file__)) + os.sep]
+# Role and module stem per ``co_filename``. Keyed by the file name, whose str
+# hash is cached: a code object's hash is recomputed from its constants on every
+# lookup (25 us for one large build function), which made a whole-stack walk
+# keyed by code objects cost 85 us per call.
+_FILE_ROLES: dict[str, tuple[_Role, str]] = {}
 
 
 @functools.cache
@@ -997,46 +1046,125 @@ def _inert_files() -> frozenset[str]:
     )
 
 
-def _role_of(code: Any) -> tuple[_Role, str]:
-    path = os.path.normcase(code.co_filename)
-    label = f"{Path(code.co_filename).stem}:{code.co_name}"
+def _file_role(filename: str) -> tuple[_Role, str]:
+    path = os.path.normcase(filename)
+    stem = Path(filename).stem
     if path == _ENGINE_PATH or _PLUMBING_DIRS.intersection(Path(path).parts):
-        return _Role.PLUMBING, label
+        return _Role.PLUMBING, stem
     if path in _inert_files():
-        return _Role.INERT, label
-    if path.startswith(_BUILD_PREFIX):
-        return _Role.BUILD, label
-    return _Role.LIBRARY, label
+        return _Role.INERT, stem
+    if path.startswith(tuple(_BUILD_PREFIXES)):
+        return _Role.BUILD, stem
+    return _Role.LIBRARY, stem
 
 
-def _origin_and_caller() -> tuple[Origin, str]:
-    """INERT when a recipe-inert module is anywhere on the stack (its
-    callees act for it), and the caller: the nearest non-plumbing frames as
-    ``module:function:line``, innermost first, plus the two nearest
-    build-code frames when those three are all adapter or library frames (a
-    decorator's wrapper is often the first)."""
-    origin = Origin.RECIPE
+def caller() -> str:
+    """The nearest non-plumbing frames as ``module:function:line``, innermost
+    first, plus the two nearest build-code frames when those three are all
+    adapter or library frames (a decorator's wrapper is often the first).
+    Stops as soon as that is settled, never deeper than ``_CALLER_DEPTH``."""
     callers: list[str] = []
-    build_seen = False
     build_frames: list[str] = []
+    build_seen = False
     frame = sys._getframe(1)
-    while frame is not None:
-        code = frame.f_code
-        role = _ROLES.get(code)
+    for _ in range(_CALLER_DEPTH):
+        if frame is None:
+            break
+        current, frame = frame, frame.f_back
+        code = current.f_code
+        role = _FILE_ROLES.get(code.co_filename)
         if role is None:
-            role = _ROLES[code] = _role_of(code)
-        kind = role[0]
-        if kind is _Role.INERT:
-            origin = Origin.INERT
-        if kind is not _Role.PLUMBING and len(callers) < _CALLER_FRAMES:
-            callers.append(f"{role[1]}:{frame.f_lineno}")
+            role = _FILE_ROLES[code.co_filename] = _file_role(code.co_filename)
+        kind, stem = role
+        if kind is _Role.PLUMBING:
+            continue
+        label = f"{stem}:{code.co_name}:{current.f_lineno}"
+        if len(callers) < _CALLER_FRAMES:
+            callers.append(label)
             build_seen = build_seen or kind is not _Role.LIBRARY
-        elif kind is _Role.BUILD and not build_seen and len(build_frames) < 2:
-            build_frames.append(f"{role[1]}:{frame.f_lineno}")
-        frame = frame.f_back
+            if build_seen and len(callers) == _CALLER_FRAMES:
+                break
+            continue
+        if kind is _Role.LIBRARY:
+            continue
+        build_frames.append(label)
+        if len(build_frames) == _BUILD_FRAMES:
+            break
     if build_frames:
         callers.append("... " + " < ".join(build_frames))
-    return origin, " < ".join(callers)
+    return " < ".join(callers)
+
+
+# True while a function of a recipe-inert module runs. A context variable, so an
+# asyncio task gets its own copy: one task's inert probe never tags another's.
+_IN_INERT: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "com_conversation_in_inert", default=False
+)
+
+
+def _origin() -> Origin:
+    return Origin.INERT if _IN_INERT.get() else Origin.RECIPE
+
+
+@functools.cache
+def _inert_module_names() -> tuple[str, ...]:
+    import _buildgraph
+
+    return tuple(sorted(Path(name).stem for name in _buildgraph.RECIPE_INERT_MODULES))
+
+
+def _inert_modules() -> list[Any]:
+    """The recipe-inert modules, imported (every build has them loaded)."""
+    return [importlib.import_module(name) for name in _inert_module_names()]
+
+
+def _inert_entry(function: Callable[..., Any]) -> Callable[..., Any]:
+    """``function`` with its dynamic extent marked INERT. A coroutine function
+    is marked while awaited; a generator function only while it creates its
+    generator, so its body runs RECIPE (the conservative direction)."""
+    if inspect.iscoroutinefunction(function):
+
+        @functools.wraps(function)
+        async def awaited(*args: Any, **kwargs: Any) -> Any:
+            token = _IN_INERT.set(True)
+            try:
+                return await function(*args, **kwargs)
+            finally:
+                _IN_INERT.reset(token)
+
+        return awaited
+
+    @functools.wraps(function)
+    def called(*args: Any, **kwargs: Any) -> Any:
+        token = _IN_INERT.set(True)
+        try:
+            return function(*args, **kwargs)
+        finally:
+            _IN_INERT.reset(token)
+
+    return called
+
+
+@contextlib.contextmanager
+def inert_entry_points() -> Iterator[list[str]]:
+    """Wrap every function the recipe-inert modules define, for one window.
+
+    Build code calls them as ``module.function`` (``check:inert`` pins those
+    call sites) and they call one another through their module globals, so
+    replacing the module attributes covers every route in; a reference bound
+    before the window bypasses the wrapper and its calls stay RECIPE. Yields
+    the wrapped names; restores the originals on exit."""
+    swapped: list[tuple[Any, str, Any]] = []
+    for module in _inert_modules():
+        for name, value in list(vars(module).items()):
+            if inspect.isfunction(value) and value.__module__ == module.__name__:
+                swapped.append((module, name, value))
+                setattr(module, name, _inert_entry(value))
+    try:
+        yield [f"{module.__name__}.{name}" for module, name, _ in swapped]
+    finally:
+        for module, name, value in reversed(swapped):
+            setattr(module, name, value)
 
 
 # ---------------------------------------------------------------------------
@@ -1712,13 +1840,18 @@ class Recorder:
     """Forwards every proxied operation to the real object and logs it."""
 
     def __init__(
-        self, writer: LogWriter, roots: Roots, capture_dir: Path | None = None
+        self,
+        writer: LogWriter,
+        roots: Roots,
+        capture_dir: Path | None = None,
+        callers: CallerCapture = DEFAULT_CALLERS,
     ):
         self.writer = writer
         self.roots = roots
         self.codec = Codec(roots)
         self.pw = self.codec.pw
         self.capture_dir = capture_dir
+        self.callers = callers
         self.closed = False
         self.seq = 0
         self._handles = {
@@ -1737,7 +1870,12 @@ class Recorder:
         self.internal_paths: set[str] = set()
         self.captured: dict[str, dict[str, str]] = {}
         self.capture_bytes = 0
+        self.capture_stored_bytes = 0
         self._digests: dict[str, str | None] = {}
+        # Nanoseconds inside call(): in total, inside the real COM call, in
+        # caller capture and in capture compression (the engine's own cost is
+        # calls - com).
+        self.clock: Counter[str] = Counter()
         self._thread = threading.get_ident()
 
     # -- handles ---------------------------------------------------------------
@@ -1755,8 +1893,16 @@ class Recorder:
         """A pre-window object the build inherits through the adapter."""
         return self._new_proxy(real, Origin.RECIPE)
 
+    def _caller(self) -> str:
+        if self.callers is not CallerCapture.FULL:
+            return ""
+        started = time.perf_counter_ns()
+        frames = caller()
+        self.clock["caller"] += time.perf_counter_ns() - started
+        return frames
+
     def adopt(self, real: Any) -> RecordingProxy:
-        origin, caller = _origin_and_caller()
+        origin = _origin()
         proxy = self._new_proxy(real, origin)
         if self.closed:
             return proxy
@@ -1774,7 +1920,7 @@ class Recorder:
                 _site(),
                 self.codec.encode(proxy, result=True),
                 origin=origin,
-                caller=caller,
+                caller=self._caller(),
             )
         )
         return proxy
@@ -1839,21 +1985,29 @@ class Recorder:
         }
 
     def _capture(self, seq: int, watch: dict[str, Any]) -> None:
-        """Keep a copy of every named output file the call created or changed,
-        so a replay can recreate it at the same point (even an intermediate
-        that Python deletes later, such as ``SaveBMP``'s ``.capture.bmp``)."""
+        """Keep a gzip copy of every named output file the call created or
+        changed, so a replay can recreate it at the same point (even an
+        intermediate that Python deletes later, such as ``SaveBMP``'s
+        ``.capture.bmp``); the digest is of the uncompressed bytes."""
         assert self.capture_dir is not None
+        started = time.perf_counter_ns()
         for rel, before in watch.items():
             source = self.roots.out / rel
             after = _signature(source)
             if after is None or after == before:
                 continue
-            target = self.capture_dir / str(seq) / rel
+            target = self.capture_dir / str(seq) / f"{rel}.gz"
             with _ENGINE_IO:
                 target.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copyfile(source, target)
-            self.captured.setdefault(str(seq), {})[rel] = sha256_file(target)
-            self.capture_bytes += after[0]
+                data = source.read_bytes()
+                target.write_bytes(
+                    gzip.compress(data, compresslevel=_CAPTURE_LEVEL, mtime=0)
+                )
+            digest = hashlib.sha256(data).hexdigest()
+            self.captured.setdefault(str(seq), {})[rel] = digest
+            self.capture_bytes += len(data)
+            self.capture_stored_bytes += target.stat().st_size
+        self.clock["capture"] += time.perf_counter_ns() - started
 
     # -- operations ------------------------------------------------------------
 
@@ -1861,9 +2015,11 @@ class Recorder:
         method = getattr(proxy._real, op)
         if self.closed:
             return method(*_unproxied(list(args)))
+        entered = time.perf_counter_ns()
         seq = self._next_seq()
         site = _site()
-        origin, caller = _origin_and_caller()
+        origin = _origin()
+        caller_frames = self._caller()
         foreign = threading.get_ident() != self._thread
         self.foreign_thread_calls += foreign
         canonical = [self.codec.encode(a) for a in args]
@@ -1871,10 +2027,12 @@ class Recorder:
         watch = self._watch(op, canonical, site)
         real_args, variants = self._prepare(args)
         self.depth += 1
+        com_started = time.perf_counter_ns()
         try:
             with _raw_write_back(self.pw.variant, variants):
                 raw = method(*real_args)
         except BaseException as exc:
+            self.clock["com"] += time.perf_counter_ns() - com_started
             self.depth -= 1
             outs = self._outs(variants, origin)
             if watch:
@@ -1891,10 +2049,12 @@ class Recorder:
                     outs,
                     foreign,
                     origin,
-                    caller,
+                    caller_frames,
                 )
             )
+            self.clock["calls"] += time.perf_counter_ns() - entered
             raise
+        self.clock["com"] += time.perf_counter_ns() - com_started
         self.depth -= 1
         result = self.wrap(raw, origin)
         outs = self._outs(variants, origin)
@@ -1912,9 +2072,10 @@ class Recorder:
                 outs,
                 foreign,
                 origin,
-                caller,
+                caller_frames,
             )
         )
+        self.clock["calls"] += time.perf_counter_ns() - entered
         return result
 
     def _prepare(self, args: tuple[Any, ...]) -> tuple[list[Any], list[_WriteBack]]:
@@ -1962,7 +2123,8 @@ class Recorder:
         )
         if self.closed:
             return outcome
-        origin, caller = _origin_and_caller()
+        origin = _origin()
+        caller_frames = self._caller()
         seq = self._next_seq()
         self._emit(
             Call(
@@ -1973,7 +2135,7 @@ class Recorder:
                 _site(),
                 bool(outcome),
                 origin=origin,
-                caller=caller,
+                caller=caller_frames,
             )
         )
         return outcome
@@ -1985,7 +2147,8 @@ class Recorder:
             return hash(proxy._real)
         seq = self._next_seq()
         site = _site()
-        origin, caller = _origin_and_caller()
+        origin = _origin()
+        caller_frames = self._caller()
         try:
             real_hash = hash(proxy._real)
         except Exception as exc:
@@ -1999,7 +2162,7 @@ class Recorder:
                     None,
                     _encode_exception(self.codec, exc),
                     origin=origin,
-                    caller=caller,
+                    caller=caller_frames,
                 )
             )
             raise
@@ -2007,7 +2170,14 @@ class Recorder:
         index = identities.setdefault(real_hash, len(identities))
         self._emit(
             Call(
-                seq, proxy._h, "__hash__", [], site, index, origin=origin, caller=caller
+                seq,
+                proxy._h,
+                "__hash__",
+                [],
+                site,
+                index,
+                origin=origin,
+                caller=caller_frames,
             )
         )
         return index
@@ -2021,9 +2191,9 @@ class Recorder:
 class Materialiser:
     """Recreates SolidWorks' file writes during a replay.
 
-    The recorder copied every output file a save/export call created or
-    changed into ``<log>.files/<seq>/``; after serving that call the replay
-    copies the same bytes into the scratch output root, so Python reading or
+    The recorder kept every output file a save/export call created or changed
+    as ``<log>.files/<seq>/<rel>.gz``; after serving that call the replay
+    writes the same bytes into the scratch output root, so Python reading or
     testing the file afterwards (``os.path.exists`` after ``SaveAs3``, Pillow
     converting the ``SaveBMP`` capture) sees what it saw in the recording."""
 
@@ -2040,14 +2210,18 @@ class Materialiser:
 
     def __call__(self, seq: int) -> None:
         for rel, digest in self.captured.get(str(seq), {}).items():
-            source = self.capture_dir / str(seq) / rel
+            source = self.capture_dir / str(seq) / f"{rel}.gz"
             if not source.is_file():
                 self.missing.append(f"{seq}/{rel}")
                 continue
             target = self.scratch_root / rel
             with _ENGINE_IO:
+                data = gzip.decompress(source.read_bytes())
+                if hashlib.sha256(data).hexdigest() != digest:
+                    self.missing.append(f"{seq}/{rel} (digest differs)")
+                    continue
                 target.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copyfile(source, target)
+                target.write_bytes(data)
             self.copied[rel] = digest
 
 
@@ -2078,6 +2252,7 @@ class Replayer:
         roots: Roots,
         mask: Sequence[MaskRule] = PROVENANCE_MASK,
         materialise: Callable[[int], None] | None = None,
+        callers: CallerCapture = DEFAULT_CALLERS,
     ):
         self.header = conversation.header
         self.strict = recipe_calls(conversation.calls)
@@ -2087,6 +2262,7 @@ class Replayer:
         self.mask = mask
         self.codec = Codec(roots, self)
         self.materialise = materialise
+        self.callers = callers
         self.pos = 0
         self.served = 0
         self.stop: ReplayStop | None = None
@@ -2096,6 +2272,12 @@ class Replayer:
         self.inert_served = 0
         self.inert_unserved: Counter[str] = Counter()
         self._unserved_callers: dict[str, str] = {}
+        # Masked values: recorded -> replayed (one-to-one), and the responses
+        # served with a recorded value replaced, by member.
+        self.bindings: dict[str, dict[str, Any]] = {}
+        self._bound_from: dict[str, str] = {}
+        self._substitutable: dict[str, str] = {}
+        self.substituted: Counter[str] = Counter()
 
     def proxy(self, handle: int, ptype: str | None) -> ReplayProxy:
         existing = self.proxies.get(handle)
@@ -2116,32 +2298,39 @@ class Replayer:
             self.stop = ReplayStop(verdict, divergence, reason)
         raise self.stop
 
-    def _expect(self, handle: int, op: str, canonical: list[Any], site: str) -> Call:
-        if self.stop is not None:
-            raise self.stop
-        origin, caller = _origin_and_caller()
-        if origin is Origin.INERT:
-            return self._serve_inert(handle, op, canonical, site, caller)
-        actual = {
+    def _actual(
+        self, handle: int, op: str, canonical: list[Any], site: str
+    ) -> dict[str, Any]:
+        """The replay's side of an event (a divergence, an exhausted log): the
+        only place a replay looks up its Python caller."""
+        return {
             "h": handle,
             "op": op,
             "args": canonical,
             "site": site,
-            "caller": caller,
+            "caller": "" if self.callers is CallerCapture.OFF else caller(),
             "kind": kind_of(op, canonical).value,
         }
+
+    def _expect(self, handle: int, op: str, canonical: list[Any], site: str) -> Call:
+        if self.stop is not None:
+            raise self.stop
+        if _IN_INERT.get():
+            return self._serve_inert(handle, op, canonical, site)
         if self.pos >= len(self.strict):
+            actual = self._actual(handle, op, canonical, site)
             self._halt(
                 Verdict.EXHAUSTED,
                 _divergence(
                     self.strict, self.pos, Side.LENGTH, Field.LENGTH, None, actual
                 ),
-                f"recipe request #{self.pos} ({site} from {caller or '?'}) beyond "
-                f"the {len(self.strict)} recorded",
+                f"recipe request #{self.pos} ({site} from {actual['caller'] or '?'}) "
+                f"beyond the {len(self.strict)} recorded",
             )
         expected = self.strict[self.pos]
         changed = request_field(expected, handle, op, canonical, self.mask)
         if changed is not None:
+            actual = self._actual(handle, op, canonical, site)
             self._halt(
                 Verdict.DIVERGED,
                 _divergence(
@@ -2149,14 +2338,96 @@ class Replayer:
                 ),
                 f"request {expected.seq}: expected {expected.site} got {site} "
                 f"({changed.value} differs; recorded from {expected.caller or '?'}, "
-                f"now from {caller or '?'})",
+                f"now from {actual['caller'] or '?'})",
             )
+        self._bind(expected, canonical, handle, op, site)
         self.pos += 1
         self.served += 1
         return expected
 
+    def _bind(
+        self, expected: Call, canonical: list[Any], handle: int, op: str, site: str
+    ) -> None:
+        """A matched request's masked arguments: each recorded value now stands
+        for the value this replay wrote. The binding is one-to-one for the whole
+        replay; a write that would break that is a divergence."""
+        for rule in self.mask:
+            if rule.marker not in expected.args:
+                continue
+            for recorded, replayed in zip(expected.args, canonical, strict=True):
+                if not (isinstance(recorded, str) and rule.pattern.fullmatch(recorded)):
+                    continue
+                bound = self.bindings.get(recorded)
+                owner = self._bound_from.get(replayed)
+                if bound is None and owner is None:
+                    self.bindings[recorded] = {
+                        "rule": rule.name,
+                        "recorded": recorded,
+                        "replayed": replayed,
+                        "seq": expected.seq,
+                    }
+                    self._bound_from[replayed] = recorded
+                    if replayed != recorded:
+                        self._substitutable[recorded] = replayed
+                    continue
+                if bound is not None and bound["replayed"] == replayed:
+                    continue
+                actual = self._actual(handle, op, canonical, site)
+                self._halt(
+                    Verdict.DIVERGED,
+                    _divergence(
+                        self.strict,
+                        self.pos,
+                        Side.REQUEST,
+                        Field.ARGS,
+                        expected,
+                        actual,
+                    ),
+                    f"request {expected.seq}: masked {rule.name} {replayed!r} for "
+                    f"recorded {recorded!r} breaks the one-to-one binding (bound "
+                    f"{bound['replayed'] if bound else None!r} <- {owner!r})",
+                )
+
+    def _rebound(self, value: Any, site: str) -> Any:
+        """A recorded response as this replay's masked writes make it: every
+        string equal to a bound recorded value becomes the replay's value."""
+        if not self._substitutable:
+            return value
+        if type(value) is str:
+            replayed = self._substitutable.get(value)
+            if replayed is None:
+                return value
+            self.substituted[site] += 1
+            return replayed
+        if type(value) is not dict:
+            return value
+        if "t" in value:
+            return {"t": [self._rebound(v, site) for v in value["t"]]}
+        if "l" in value:
+            return {"l": [self._rebound(v, site) for v in value["l"]]}
+        if "v" in value:
+            vt, inner = value["v"]
+            return {"v": [vt, self._rebound(inner, site)]}
+        if "d" in value:
+            return {
+                "d": [
+                    [self._rebound(k, site), self._rebound(v, site)]
+                    for k, v in value["d"]
+                ]
+            }
+        if "struct" in value:
+            rebound = dict(value)
+            if "items" in value:
+                rebound["items"] = [self._rebound(v, site) for v in value["items"]]
+            if "attrs" in value:
+                rebound["attrs"] = {
+                    k: self._rebound(v, site) for k, v in value["attrs"].items()
+                }
+            return rebound
+        return value
+
     def _serve_inert(
-        self, handle: int, op: str, canonical: list[Any], site: str, caller: str
+        self, handle: int, op: str, canonical: list[Any], site: str
     ) -> Call:
         """Best effort: the first unused recorded inert call with exactly this
         request, wherever it was recorded; else ``E_FAIL``."""
@@ -2178,7 +2449,10 @@ class Replayer:
             self.inert_served += 1
             return candidate
         self.inert_unserved[site] += 1
-        self._unserved_callers.setdefault(site, caller)
+        if site not in self._unserved_callers:
+            self._unserved_callers[site] = self._actual(handle, op, canonical, site)[
+                "caller"
+            ]
         return Call(
             -1,
             handle,
@@ -2188,7 +2462,6 @@ class Replayer:
             None,
             _UNRECORDED_INERT,
             origin=Origin.INERT,
-            caller=caller,
         )
 
     def call(self, proxy: ComProxy, op: str, args: tuple[Any, ...]) -> Any:
@@ -2199,12 +2472,16 @@ class Replayer:
             for variant, out in zip(variants, expected.outs, strict=False):
                 if out is not None:
                     via, value = out
-                    setattr(variant, via, self.codec.decode(value))
+                    setattr(
+                        variant,
+                        via,
+                        self.codec.decode(self._rebound(value, expected.site)),
+                    )
         if self.materialise is not None:
             self.materialise(expected.seq)
         if expected.raised is not None:
             raise self.codec.exception(expected.raised)
-        return self.codec.decode(expected.result)
+        return self.codec.decode(self._rebound(expected.result, expected.site))
 
     def compare(self, proxy: ComProxy, op: str, other: ComProxy) -> bool:
         expected = self._expect(proxy._h, op, [{"h": other._h}], _site())
@@ -2254,6 +2531,16 @@ class Replayer:
             "unconsumed_members": dict(unconsumed.most_common(_EXAMPLES)),
         }
 
+    def substitution_report(self) -> dict[str, Any]:
+        """Masked values this replay rebound, and the responses it rewrote."""
+        return {
+            "rule": "a served response string EQUAL to a bound recorded value is "
+            "served as the replay's value; substrings are never rewritten",
+            "bindings": list(self.bindings.values()),
+            "count": sum(self.substituted.values()),
+            "by_member": dict(self.substituted.most_common()),
+        }
+
 
 # ---------------------------------------------------------------------------
 # Adapter state at build entry (R11)
@@ -2271,9 +2558,10 @@ def _class_ref(cls: type) -> dict[str, str]:
 def replaying(adapter: Any, replayer: Replayer) -> Iterator[dict[str, Any]]:
     """Serve ``replayer``'s log to everything the build does through
     ``adapter`` (a freshly constructed one; its recorded build-entry state is
-    restored first). Yields the R11 restoration evidence."""
+    restored first), with the recipe-inert entry points wrapped exactly as in
+    the recording. Yields the R11 restoration evidence."""
     global _ACTIVE
-    with funnel():
+    with funnel(), inert_entry_points():
         evidence = restore_adapter(adapter, replayer.header.adapter_state, replayer)
         _ACTIVE = replayer
         try:
@@ -2482,26 +2770,28 @@ def recording(
     label: str | None = None,
     sw_revision: str | None = None,
     audit: bool = True,
+    callers: CallerCapture = DEFAULT_CALLERS,
 ) -> Iterator[Recorder]:
     """Record every COM operation of the build window into ``log``.
 
     Wraps the COM objects the adapter holds at entry as root proxies, installs
-    the funnel and (WARN mode) the file observer, and on exit restores the
-    adapter's original objects so teardown runs unrecorded on real ones."""
+    the funnel, the recipe-inert entry points and (WARN mode) the file
+    observer, and on exit restores the adapter's original objects so teardown
+    runs unrecorded on real ones."""
     global _ACTIVE
     writer = LogWriter(log)
     capture = capture_dir_of(log)
     if capture.exists():
         with _ENGINE_IO:
             shutil.rmtree(capture)
-    recorder = Recorder(writer, roots, capture)
+    recorder = Recorder(writer, roots, capture, callers)
     swapped: list[tuple[Any, str, Any]] = []
 
     def root(owner: Any, name: str, real: Any) -> ComProxy:
         swapped.append((owner, name, real))
         return recorder.root(real)
 
-    with funnel():
+    with funnel(), inert_entry_points() as inert_entries:
         census_entry = _wrapper_census(recorder.pw) if audit else None
         state = _describe_state(adapter, recorder.codec, root)
         header = Header(
@@ -2558,6 +2848,17 @@ def recording(
                     "captured": recorder.captured,
                     "capture_dir": capture.name,
                     "capture_bytes": recorder.capture_bytes,
+                    "capture_stored_bytes": recorder.capture_stored_bytes,
+                    "callers": recorder.callers.value,
+                    "inert_entry_points": len(inert_entries),
+                    "clock_seconds": {
+                        "in_calls": recorder.clock["calls"] / 1e9,
+                        "com": recorder.clock["com"] / 1e9,
+                        "engine": (recorder.clock["calls"] - recorder.clock["com"])
+                        / 1e9,
+                        "caller": recorder.clock["caller"] / 1e9,
+                        "capture": recorder.clock["capture"] / 1e9,
+                    },
                     "writes_outside_out": observer.outside,
                     "adopted_inside_calls": recorder.adopted_inside,
                     "adopted_outside_calls": recorder.adopted_outside,
@@ -2690,13 +2991,48 @@ def redirect_outputs(out_root: Path) -> None:
         setattr(_paths, name, out_root / sub)
 
 
+# Overlay directories (changed helper modules) placed first on sys.path by
+# use_overlay, before the build imports anything from cad/scripts.
+_OVERLAYS: list[Path] = []
+
+
+def use_overlay(directory: Path) -> None:
+    """Import modules from ``directory`` ahead of ``cad/scripts`` for this
+    process: the source-change controls replay a log against a changed copy of
+    a helper. Call before anything imports the overlaid modules (the CLI does it
+    first); :func:`overlay_report` says which ones actually came from it."""
+    path = directory.resolve()
+    _OVERLAYS.append(path)
+    sys.path.insert(0, str(path))
+    _BUILD_PREFIXES.append(os.path.normcase(str(path)) + os.sep)
+
+
+def overlay_report() -> dict[str, Any]:
+    """Per overlay module: whether the build imported it, and from where."""
+    modules: dict[str, dict[str, Any]] = {}
+    for directory in _OVERLAYS:
+        for source in sorted(directory.glob("*.py")):
+            loaded = sys.modules.get(source.stem)
+            origin = getattr(loaded, "__file__", None)
+            from_overlay = origin is not None and Path(origin).resolve() == source
+            modules[source.stem] = {
+                "overlay": str(source),
+                "sha256": sha256_file(source),
+                "imported": loaded is not None,
+                "from_overlay": from_overlay,
+                "loaded_from": origin,
+            }
+    return {"directories": [str(d) for d in _OVERLAYS], "modules": modules}
+
+
 def run_script(script: Path) -> int:
-    """Run a build script as ``__main__`` (argv[0] drives run_build's labels)."""
+    """Run a build script as ``__main__`` (argv[0] drives run_build's labels).
+    Its directory goes on ``sys.path`` after any overlay, never ahead of it."""
     import runpy
 
     sys.argv = [str(script)]
     if str(script.parent) not in sys.path:
-        sys.path.insert(0, str(script.parent))
+        sys.path.insert(len(_OVERLAYS), str(script.parent))
     try:
         runpy.run_path(str(script), run_name="__main__")
     except SystemExit as exc:
@@ -2708,7 +3044,16 @@ def run_script(script: Path) -> int:
 
 
 def check_inputs(conversation: Conversation) -> list[dict[str, Any]]:
-    """P3: the replay's environment and external files equal the record's."""
+    """P3: the replay's inputs equal the record's, except Python source.
+
+    Pinned: the engine (it decides what a request is and how a response is
+    served), the declared environment keys (process inputs part closures read,
+    design Q5), and every file outside the output root a COM argument named
+    (templates and the like: SolidWorks reads them, so new content would change
+    its answers behind an unchanged request). Never pinned: the build script and
+    the helper modules. Changed source is what a replay exists to judge, and the
+    request stream itself is the evidence; ``header.script_sha256`` is
+    informational."""
     mismatches: list[dict[str, Any]] = []
     header = conversation.header
     if header.engine != sha256_file(ENGINE_FILE):
@@ -2743,7 +3088,12 @@ def _tree_files(root: Path) -> dict[str, str]:
     }
 
 
-def record_build(script: Path, out_root: Path, log: Path | None) -> dict[str, Any]:
+def record_build(
+    script: Path,
+    out_root: Path,
+    log: Path | None,
+    callers: CallerCapture = DEFAULT_CALLERS,
+) -> dict[str, Any]:
     """Run ``script`` against the live seat with its outputs under ``out_root``.
 
     With ``log``, the build window (``build(adapter)``, after connect, discard
@@ -2774,6 +3124,7 @@ def record_build(script: Path, out_root: Path, log: Path | None) -> dict[str, An
                     log=log,
                     roots=Roots(out_root),
                     sw_revision=str(revision) if revision is not None else None,
+                    callers=callers,
                 ):
                     return await build(adapter)
             finally:
@@ -2846,7 +3197,13 @@ def replay_build(
     _AUDIT.observer = observer
     roots = Roots(scratch_out, REPO_ROOT)
     materialiser = Materialiser(conversation, capture_dir, scratch_out)
-    replayer = Replayer(conversation, roots, mask, materialiser)
+    replayer = Replayer(
+        conversation,
+        roots,
+        mask,
+        materialiser,
+        CallerCapture(conversation.trailer.get("callers", DEFAULT_CALLERS.value)),
+    )
     redirect_outputs(scratch_out)
     import _session
 
@@ -2933,7 +3290,9 @@ def replay_build(
         proxies_served=len(replayer.proxies),
         live_interface_objects_at_end=count() if count else None,
         inert=replayer.inert_report(),
+        substitutions=replayer.substitution_report(),
         recorded_total=len(conversation.calls),
+        overlay=overlay_report(),
     )
     return ReplayResult(
         verdict,

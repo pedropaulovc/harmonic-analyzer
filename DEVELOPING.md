@@ -1482,34 +1482,76 @@ supervision described above:
 ```
 
 The leaf (`cad/scripts/diagnostics/benchmark_replay_noop.py`) holds the seat
-and runs each native step as its own `run_build` subprocess with outputs
-redirected under `cad/out/reports/replay-noop/`: an unrecorded clean build of
-`pd_transgear_arm_plate` (W0), two recorded clean builds (L1/L2, W1/W2), a
+and runs each `--stem STEM:CONTROL_STEM[:PROFILE]` in turn, every native step
+its own `run_build` subprocess with outputs redirected under
+`cad/out/reports/replay-noop/<stem>/`. The `full` profile (here
+`pd_transgear_arm_plate`) runs an unrecorded clean build (W0), two recorded
+clean builds (L1 with full caller capture, L2 with the default; W1/W2), a
 SolidWorks-free replay of L1 (`com_replay.py replay`, WR) with two negative
-controls, geometry digests of both recorded artefacts, and a rollback walk over
-a copy of the first. `report.json` holds the K1-K5 verdicts with their evidence
-and the R/U assumption map; only infrastructure or soundness faults (phase-0
-failure, a watchdog exit, a negative control answering NOOP, a seat-safety
-violation) fail the leaf. The engine (`_com_conversation.py`) and the CLI stay
-out of every recipe closure; `test_com_conversation.py` (enrolled in
-`check:recipe`) checks that and the offline record/replay contract.
+controls, the source-change controls, geometry digests of both recorded
+artefacts and a rollback walk over a copy of the first. The `replay` profile
+(here `dt_crankshaft`, whose holes are raw Hole Wizard calls, and
+`pd_transgear_arm`) records once and runs the replay and both control sets.
+Stems run sequentially; before each stem every earlier stem's A1 is re-hashed,
+and a seat fault in one stem stops the rest. `<stem>/report.json` holds that
+stem's K1-K6 verdicts with their evidence and the R/U assumption map;
+`report.json` holds the combined summary. Only infrastructure or soundness
+faults (a stem's first build failing, a watchdog exit, a negative control
+answering NOOP, a seat-safety violation) fail the leaf. Budget about 6.5 min
+for the full stem and 2-4 min per replay stem: keep `-LeafTimeout 30`. The
+engine (`_com_conversation.py`) and the CLI stay out of every recipe closure;
+`test_com_conversation.py` (enrolled in `check:recipe`) checks that and the
+offline record/replay contract.
 
 K1 is a **request** verdict: the two recorded builds issue the same requests
 (only the generator-provenance argument is masked). Response differences
 (results, raised errors, byref outputs) are counted per member and never
-masked or folded into K1. Calls issued while a recipe-inert module
-(`_buildgraph.RECIPE_INERT_MODULES`, the set `check:inert` enforces) is on the
-Python stack are logged as `"g":"i"` with their own negative handle range and
-are excluded from strict ordering: replay serves them by exact request match
-and answers an unrecorded one with `E_FAIL`, which those modules already
-tolerate. This is what lets a replay process, which never connected, re-ask
-the seat identity that the recording's process cached at connect time. The
-same reordering from any other module still diverges. Every logged call
-carries its Python caller frames. After each K verdict and at the end of the
-run the leaf logs bounded evidence (first divergence with field, both sides,
-the five preceding calls, counts) at WARN, so `task.log` keeps it even when a
-later phase fails. Each native phase closes every document without saving in a
-`finally` and fails only if a document is still open after that cleanup.
+masked or folded into K1. Calls issued while a function of a recipe-inert
+module (`_buildgraph.RECIPE_INERT_MODULES`, the set `check:inert` enforces) runs
+are logged as `"g":"i"` with their own negative handle range and are excluded
+from strict ordering: replay serves them by exact request match and answers an
+unrecorded one with `E_FAIL`, which those modules already tolerate. This is
+what lets a replay process, which never connected, re-ask the seat identity
+that the recording's process cached at connect time. The same reordering from
+any other module still diverges. The tag is a context variable set by wrappers
+the engine puts on those modules' functions for the recording or replay window,
+so it costs nothing per call; a function bound before the window is not
+wrapped and its calls stay strictly ordered.
+
+Caller frames are a `CallerCapture` mode (`com_replay.py record --callers`):
+`full` stores them on every call (about 10 us per call), the default
+`divergence` names only the replay's side of a divergence, and `off` names
+none. SolidWorks-written files are captured gzip-compressed at the output
+archive's level, so K4 compares the log plus its captures with the tar.gz of
+the same run's outputs; K4 is judged on the default-mode build (W2) and reports
+the recorder's own clock (COM, caller, capture, engine) for both modes. K5's
+final digest ignores the document name inside dimension full names (the walk
+opens a copy), reports each member's read-point error distribution with the
+tolerance that would pass, and re-reads the final model through both mass
+property creators and every accuracy level.
+
+K6 replays L1 against edited copies of `_part_save.set_isometric_view`, which
+every part build runs: comment and docstring only, and one local renamed, must
+replay NOOP; one numeric literal moved must diverge with that function as the
+caller. `k6.cross_commit` replays L1 with `_source_identity._git_sha`
+overridden to another sha and must replay NOOP. The edits are mechanical and
+AST-checked, and are imported from an overlay directory
+(`com_replay.py replay --overlay DIR`) ahead of `cad/scripts`. A log's header
+pins only the engine, `ENVIRONMENT_KEYS` and the external files named in COM
+arguments, never script or helper source, so a changed recipe is replayed
+rather than refused as an input mismatch. The one masked argument, the
+`Generator` stamp (`harmonic-analyzer @ <short sha>[-dirty]`), is a
+substitution: the recorded value is bound one-to-one to the value the replay
+writes, and a served response string equal to the recorded value (the
+`GetCustomInfoValue` readback that `apply_custom_properties` verifies) is
+served as the replay's value. A substring is never rewritten. The other
+commit-derived input a part build sends to COM, `COPYRIGHT_YEAR` (the HEAD
+commit's year), is not masked: a different year diverges. After
+each K verdict and at the end of the run the leaf logs bounded evidence (first
+divergence with field, both sides, the five preceding calls, counts) at WARN,
+so `task.log` keeps it even when a later phase fails. Each native phase closes
+every document without saving in a `finally` and fails only if a document is
+still open after that cleanup.
 
 ### Readiness is not proof of a build
 

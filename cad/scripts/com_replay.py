@@ -4,15 +4,19 @@ Branch ``experiment/com-replay-20261110``: never merge. Engine and design notes:
 ``_com_conversation.py``; the native benchmark that drives this CLI:
 ``diagnostics/benchmark_replay_noop.py``.
 
-``record <script> --out-root DIR [--log P] [--timing P]``
+``record <script> --out-root DIR [--log P] [--timing P] [--callers MODE]``
     Run a part build script against the live seat (normal ``run_build``:
     connect, discard, template pin, teardown) with its outputs redirected to
-    ``DIR``. With ``--log`` the build window is recorded; without it the window
-    is only timed. Exits with the build's own exit code.
+    ``DIR``. With ``--log`` the build window is recorded, keeping the Python
+    caller of every call (``full``), none (``divergence``: a replay names its
+    own at a divergence) or none at all (``off``); without it the window is
+    only timed. Exits with the build's own exit code.
 
-``replay <script> --log P --base-outputs DIR --scratch DIR --result P``
-    Run the script with SolidWorks absent, serving the log. Exits 0 for a
-    no-op verdict, 91 for any other verdict, 1 for an infrastructure failure.
+``replay <script> --log P --base-outputs DIR --scratch DIR --result P [--overlay DIR]``
+    Run the script with SolidWorks absent, serving the log. ``--overlay``
+    imports the modules in ``DIR`` ahead of ``cad/scripts`` (a changed helper
+    replayed against the unchanged log). Exits 0 for a no-op verdict, 91 for
+    any other verdict, 1 for an infrastructure failure.
 
 ``diff <a> <b> [--result P]``
     Request divergence and per-member response differences between two logs
@@ -43,6 +47,11 @@ def _parser() -> argparse.ArgumentParser:
     record.add_argument("--out-root", type=Path, required=True)
     record.add_argument("--log", type=Path, help="record the build window here")
     record.add_argument("--timing", type=Path, help="write window/script timing JSON")
+    record.add_argument(
+        "--callers",
+        choices=("off", "divergence", "full"),
+        help="Python caller capture per recorded call (default: the engine's)",
+    )
 
     replay = sub.add_parser("replay", help="replay a log with SolidWorks absent")
     replay.add_argument("script", type=Path)
@@ -54,6 +63,11 @@ def _parser() -> argparse.ArgumentParser:
         "--capture-dir",
         type=Path,
         help="SolidWorks-written files of the log (default: beside the log)",
+    )
+    replay.add_argument(
+        "--overlay",
+        type=Path,
+        help="directory of changed helper modules imported ahead of cad/scripts",
     )
 
     diff = sub.add_parser("diff", help="request/response comparison of two logs")
@@ -76,6 +90,10 @@ def main(argv: list[str] | None = None) -> int:
             reconfigure(encoding="utf-8", errors="replace")
 
     import _com_conversation as conversation
+
+    if getattr(args, "overlay", None) is not None:
+        # Before anything below imports a module the overlay replaces.
+        conversation.use_overlay(args.overlay)
     import _telemetry
 
     if args.command == "diff":
@@ -91,7 +109,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "record":
         _telemetry.info(f"com_replay record {script.name} -> {args.out_root}")
         timing = conversation.record_build(
-            script, args.out_root.resolve(), args.log.resolve() if args.log else None
+            script,
+            args.out_root.resolve(),
+            args.log.resolve() if args.log else None,
+            conversation.CallerCapture(args.callers)
+            if args.callers
+            else conversation.DEFAULT_CALLERS,
         )
         if args.timing is not None:
             _write_json(args.timing, timing)

@@ -3309,16 +3309,28 @@ def _verify_task(name: str) -> dict[str, Any]:
         }
     if name == "replay_noop":
         # EXPERIMENT ONLY: COM-conversation record/replay no-op benchmark. The
-        # leaf runs the stem's and the control stem's real part scripts, so their
+        # leaf runs each stem's and control stem's real part scripts, so their
         # part recipes are inputs; only forced-refresh native runs are evidence.
+        # The plate runs every phase; dt_crankshaft (raw Hole Wizard through
+        # wizard_holes / wizard_hole_on_cylinder) and pd_transgear_arm record
+        # once and replay with their controls.
         script = (SCRIPTS_DIR / "diagnostics" / "benchmark_replay_noop.py").resolve()
-        stem, control_stem = "pd_transgear_arm_plate", "pd_transgear_arm"
-        cmd = [sys.executable, str(script), "benchmark", "--stem", stem,
-               "--control-stem", control_stem]
+        specs = (
+            ("pd_transgear_arm_plate", "pd_transgear_arm", "full"),
+            ("dt_crankshaft", "pd_transgear_arm_plate", "replay"),
+            ("pd_transgear_arm", "pd_transgear_arm_plate", "replay"),
+        )
+        cmd = [sys.executable, str(script), "benchmark"]
+        for spec in specs:
+            cmd += ["--stem", ":".join(spec)]
+        stems = sorted({name for stem, control, _ in specs for name in (stem, control)})
         deps = sorted({
             *_executed_closure([*cmd, str(SCRIPTS_DIR / "com_replay.py")]),
-            *_part_file_deps(SCRIPTS_DIR / f"build_{stem}.py", stem),
-            *_part_file_deps(SCRIPTS_DIR / f"build_{control_stem}.py", control_stem),
+            *(
+                dep
+                for stem in stems
+                for dep in _part_file_deps(SCRIPTS_DIR / f"build_{stem}.py", stem)
+            ),
             _submodule_assembly_dep(),
         })
         return {
