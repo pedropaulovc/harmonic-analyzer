@@ -469,9 +469,13 @@ tangent propagation:
 - **KnifeShoulderFillets**: each stub's six lateral faces and ridge round
   into the body end face, under the same title-block **R.040 MAX**; the two
   lower flanks' roots meet mitred at the sharp bottom vertex. They occupy
-  |Z| 76.20–77.22 mm; the knife-mount blocks start at |Z|≈80.07 mm, so the
-  seat and rock are unaffected. The #1625 stub-root **R0.5** figure had no
-  functional basis and is not carried.
+  |Z| 76.20–77.22 mm; the worst-case knife-mount face is at |Z| 79.95 mm, so
+  the seat and rock are unaffected (2.73 mm clear). Delegated ruling
+  (coordinator, 2026-11-09), no precedent, prompted by the owner's question
+  "why not leave default radius": knife-stub roots take the title-block
+  R.040 MAX; the #1625 **R.020 MAX** figure (R0.5 in mm) had no functional
+  basis. Awaiting owner review in
+  [#2144](https://github.com/pedropaulovc/harmonic-analyzer/issues/2144).
 
 These remove the former **RV-02** sharp-junction exception (b2c8d954,
 2026-10-18) by owner ruling 2026-11-09.
