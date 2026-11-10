@@ -206,22 +206,23 @@ def test_the_shop_row_bands_live_on_the_model_dimensions() -> None:
         assert name in spec.GLOBALS, name
 
 
-def test_every_banded_dimension_names_its_gear_or_points_at_note_one() -> None:
-    """Each blade's thickness and location name its gear; its tip depth
-    points at note 1, which ties it to the gear named at that blade."""
+def test_each_blade_names_its_gear_once_and_every_band_points_at_note_one() -> None:
+    """Each blade names its gear once, at its thickness; its location and tip
+    depth point at note 1, which ties them to the gear named there."""
     for teeth in spec.GEARS:
         assert spec.CALLOUTS_BELOW[spec.blade_width_name(teeth)].splitlines() == [
             spec.gear_number(teeth),
             spec.BLADE_NOTE_FLAG,
         ]
-        assert spec.CALLOUTS_BELOW[spec.blade_face_name(teeth)] == spec.gear_number(
-            teeth
-        )
+        assert spec.CALLOUTS_BELOW[spec.blade_face_name(teeth)] == spec.BLADE_NOTE_FLAG
         assert spec.CALLOUTS_BELOW[spec.blade_tip_name(teeth)] == spec.BLADE_NOTE_FLAG
+    named = "\n".join(spec.CALLOUTS_BELOW.values())
+    for teeth in spec.GEARS:
+        assert named.count(spec.gear_number(teeth)) == 1, teeth
     notes = spec.SHEET_NOTES.splitlines()
     assert len(notes) <= 4
     assert notes[0].startswith("1. EACH BLADE: CLEARANCE FIT IN ONE TOOTH SPACE")
-    assert "NAMED AT IT" in notes[1]
+    assert "NAMED AT ITS THICKNESS" in notes[1]
     # Words only: no dimension, no method, no narration (rule 7).
     assert not any(char.isdigit() for line in notes for char in line[2:])
     assert "PHASE" not in spec.SHEET_NOTES
@@ -329,6 +330,8 @@ def test_the_shop_kit_holds_the_comb() -> None:
     assert kit.BOM_COMPONENTS == (kit.PLATE, spec.PART_NAME)
     assert kit.BOM_ITEMS[spec.PART_NAME] == "2"
     assert "KIT_POSITION_MM" in inspect.getsource(kit_build)
-    # A loose kit item in its own removed view, lettered with its scale.
+    # A loose kit item in its own view: titled with its scale, no letter (no
+    # parent view carries a viewing mark for it).
     assert kit.BOM_DESCRIPTIONS[spec.PART_NAME] == "CONE TIP GEAR PHASING COMB"
-    assert kit.COMB_VIEW_LABEL.splitlines()[0] == "VIEW A, ITEM 2, SCALE 2:1"
+    assert kit.COMB_VIEW_LABEL.splitlines()[0] == "ITEM 2 SHOWN ALONE, SCALE 2:1"
+    assert "VIEW" not in kit.COMB_VIEW_LABEL

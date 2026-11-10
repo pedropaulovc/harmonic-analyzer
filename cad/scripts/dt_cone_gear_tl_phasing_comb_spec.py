@@ -821,16 +821,17 @@ MODEL_BANDS_MM: dict[tuple[str, str], tuple[float, float]] = {
 }
 
 # --- Sheet words ----------------------------------------------------------------
-# Every banded dimension serves one gear's tooth space. Each blade's
-# thickness and location name its gear; its tip depth points at note 1,
-# which ties it to the gear named at that blade (rule 4). Words only, no
-# narration (rule 7).
+# Every banded dimension serves one gear's tooth space. Each blade names its
+# gear once, at its thickness (rule 4); its location and tip depth point at
+# note 1, which ties the whole blade to the gear named at its thickness.
+# Words only, no narration (rule 7).
 BLADE_NOTE_NUMBER = 1
 BLADE_NOTE_FLAG = f"SEE NOTE {BLADE_NOTE_NUMBER}"
 SHEET_NOTES = "\n".join(
     (
         f"{BLADE_NOTE_NUMBER}. EACH BLADE: CLEARANCE FIT IN ONE TOOTH SPACE OF THE GEAR",
-        "   NAMED AT IT, ITS TIP BETWEEN THAT GEAR'S ROOT AND PITCH CIRCLES.",
+        "   NAMED AT ITS THICKNESS, ITS TIP BETWEEN THAT GEAR'S ROOT AND",
+        "   PITCH CIRCLES.",
     )
 )
 if len(SHEET_NOTES.splitlines()) > 4:
@@ -839,7 +840,7 @@ if len(SHEET_NOTES.splitlines()) > 4:
 BLADE_WALL_TEXT = f"BLADE WALL {inch_text(BLADE_MIN_IN * INCH, 3)} MIN"
 CALLOUTS_BELOW: dict[str, str] = {
     **{blade_width_name(t): f"{gear_number(t)}\n{BLADE_NOTE_FLAG}" for t in GEARS},
-    **{blade_face_name(t): gear_number(t) for t in GEARS},
+    **{blade_face_name(t): BLADE_NOTE_FLAG for t in GEARS},
     **{blade_tip_name(t): BLADE_NOTE_FLAG for t in GEARS},
     "PlateThick": BLADE_WALL_TEXT,
 }

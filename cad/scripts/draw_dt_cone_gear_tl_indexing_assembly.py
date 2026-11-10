@@ -137,12 +137,13 @@ COMB_CENTER_MM = (
     comb.KIT_POSITION_MM[2],
 )
 # Item 2 has no fitting here: the drive train's bonding step engages it. Its
-# view is a removed view at its own scale, so it carries a letter (rule 9).
-COMB_VIEW_LETTER = "A"
+# view stands alone at its own scale; no parent view shows item 2, so it
+# carries a title with its scale and no letter (rule 9: a letter needs its
+# viewing mark; the unlettered "EXPLODED VIEW ... / SCALE" title of
+# draw_pn_pen_assembly is the fleet's precedent).
 COMB_VIEW_LABEL = "\n".join(
     (
-        f"VIEW {COMB_VIEW_LETTER}, ITEM 2, SCALE "
-        f"{COMB_VIEW_SCALE[0]:g}:{COMB_VIEW_SCALE[1]:g}",
+        f"ITEM 2 SHOWN ALONE, SCALE {COMB_VIEW_SCALE[0]:g}:{COMB_VIEW_SCALE[1]:g}",
         "FITTED BY MHA-DT-00 STEP 1, NOT ON THE HEAD",
     )
 )

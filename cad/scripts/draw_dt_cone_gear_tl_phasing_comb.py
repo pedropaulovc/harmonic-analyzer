@@ -167,10 +167,11 @@ FRONT_KEEP = front_keep()
 
 # --- Bottom view ---------------------------------------------------------------
 # Each blade's thickness and location from the back face print as one group
-# on its blade, each naming the gear: the thickness in the inner row on one
-# side of the plate's edge view, its line just inside the blade's south end;
-# the location in the outer row on the other side, its line clear of the
-# inner row's blocks. The sides alternate blade by blade, so blocks in a row
+# on its blade, the gear named once, at the thickness: the thickness in the
+# inner row on one side of the plate's edge view, its line just inside the
+# blade's south end; the location in the outer row on the other side, its
+# line clear of the inner row's blocks. The sides alternate blade by blade,
+# so blocks in a row
 # stand two blades apart; T006's thickness stands over the edge view, off the
 # title block. The plate's thickness in the outer row over the edge view,
 # right of the plate.
@@ -179,7 +180,7 @@ FACE_LINE_INSET = 0.012
 ROW_AIR = 0.004
 _HALF_THICK = part.THICKNESS * RATIO / 2000.0
 _WIDTH_HALF = 2.0 * LINE_HEIGHT  # four lines: limits, value, gear, flag
-_FACE_HALF = 1.5 * LINE_HEIGHT  # three lines: limits, value, gear
+_FACE_HALF = 1.5 * LINE_HEIGHT  # three lines: limits, value, flag
 OVER_Y = (
     BOTTOM_CENTER_Y + _HALF_THICK + ROW_AIR + _WIDTH_HALF,
     BOTTOM_CENTER_Y + _HALF_THICK + 2.0 * ROW_AIR + 2.0 * _WIDTH_HALF + _FACE_HALF,
