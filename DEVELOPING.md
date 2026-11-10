@@ -1553,6 +1553,26 @@ so `task.log` keeps it even when a later phase fails. Each native phase closes
 every document without saving in a `finally` and fails only if a document is
 still open after that cleanup.
 
+Native measurements, 2026-11-10 (source `26431512b8`, run
+`20261110T213631656Z-d86f213189b6434583a68bc60ed280b2`, one run per part):
+
+| part | recipe requests | offline replay s | recorded clean build s |
+|---|---:|---:|---:|
+| `pd_transgear_arm_plate` | 12,302 | 3.5 | 101.5 |
+| `dt_crankshaft` | 12,434 | 3.6 | 112.4 |
+| `pd_transgear_arm` | 10,225 | 3.3 | 87.1 |
+
+K2, K2b and K6 passed on all three; K1 and K3 passed on the arm plate. K4
+failed: the default-mode recorded build was 4.3% slower than the unrecorded
+one (limit 3%; the recorder's clock attributes 1.4% to the engine, and one
+sample per condition does not separate the rest from run-to-run spread), and
+log plus compressed captures was 549 KB against a 421 KB output archive. K5
+(report only) failed its 1e-9 criterion: rolled-back mass-property reads match
+recorded intermediate reads to about 3e-10 on scalars and 3.4e-7 per
+centre-of-mass component, the same spread the recording shows between its own
+repeated reads. These are three parts with one edited helper; no assembly,
+drawing or production wiring is covered.
+
 ### Readiness is not proof of a build
 
 `farm-launch started` means the wrapper initialized its log and startup record.
