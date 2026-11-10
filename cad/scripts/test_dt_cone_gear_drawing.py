@@ -1325,25 +1325,58 @@ def test_bore_view_enlarges_every_bore_clear_of_its_neighbours() -> None:
         assert clock_box[1] >= line_top + drawing.KEYWAY_WIDTH_LINE_CLEARANCE - 1e-12, teeth
 
 
+# The front view's +X centre-mark line as printed (sheet metres): r3, the
+# template's lines with no extension; r4, T006 asked for 1.948 mm more.
+_CENTRE_LINE_R3_ENDS = {6: 0.1281, 12: 0.1224, 30: 0.1268, 60: 0.1195, 120: 0.1123}
+_CENTRE_LINE_R4_T006 = (1.948, 0.1437)
+
+
+def _printed_centre_line_end(teeth: int, extension_mm: float) -> float:
+    ratio = drawing._front_ratio(teeth)
+    rim = drawing.FRONT_CENTER[0] + spec.bore_dia_mm(teeth) * ratio / 2000.0
+    return rim + (drawing.CENTRE_MARK_LINE_BASE_MM + extension_mm) * ratio / 1000.0
+
+
+def _centre_line_text_air(teeth: int, end_x: float) -> float:
+    """Air from the +X line (rim to ``end_x`` on the bore axis) to the
+    thickness block as the shelf model bounds it."""
+    shelf_x, shelf_y = drawing.tooth_thickness_shelf(teeth)
+    block = Box(
+        shelf_x, shelf_y, shelf_x + _THICKNESS_SHELF_LENGTH, shelf_y + _THICKNESS_INK_HEIGHT
+    )
+    axis_y = drawing.FRONT_CENTER[1]
+    return segment_box_distance(Segment(drawing.FRONT_CENTER[0], axis_y, end_x, axis_y), block)
+
+
 def test_front_view_draws_the_tooth_centreline_the_clock_refers_to() -> None:
     """Machinist review of the C1-keyed sheets (rule 10): the clock's '90°
     ±.25° TO TOOTH CENTERLINE' named a line drawn nowhere. The front view's
-    bore centre mark draws its lines; its +X arm runs from the bore's rim
-    through the phase-0 tooth (gap bisectors rotate by pi/N, so a tooth
-    centres on +X, the flat's or keyway's normal) to just past the tip,
-    short of the 3 o'clock tooth's thickness dimension line."""
+    bore centre mark's +X line runs from the bore's rim through the phase-0
+    tooth (gap bisectors rotate by pi/N, so a tooth centres on +X, the
+    flat's or keyway's normal) past the tip, and stops short of the
+    thickness dimension's line, whose midpoint on the axis starts the
+    leader to the thickness text; the text keeps the printed-air check's
+    2 mm on every sheet (r4: T006's line ran 0.81 mm under the C)."""
+    # The template's lines run CENTRE_MARK_LINE_BASE_MM past the rim at each
+    # sheet's scale, and an extension adds to that (r4's T006 line).
+    for teeth, printed in _CENTRE_LINE_R3_ENDS.items():
+        assert _printed_centre_line_end(teeth, 0.0) == pytest.approx(printed, abs=0.0003)
+    extension, printed = _CENTRE_LINE_R4_T006
+    assert _printed_centre_line_end(6, extension) == pytest.approx(printed, abs=0.0003)
+    assert _centre_line_text_air(6, printed) < drawing.TOOTH_THICKNESS_TEXT_AIR
     for teeth in spec.CONFIGURATION_TEETH:
         arms = drawing.front_centre_mark_arms_mm(teeth)
-        ratio = drawing._front_ratio(teeth)
-        assert set(arms) == {0, 1, 2, 3}
-        overrun = drawing.CENTRE_LINE_OVERRUN * 1000.0 / ratio
-        assert arms[0] == arms[1] == arms[2] == pytest.approx(overrun)
-        rim_x = drawing.FRONT_CENTER[0] + spec.bore_dia_mm(teeth) * ratio / 2000.0
-        end_x = rim_x + arms[3] * ratio / 1000.0
+        assert set(arms) <= {3}, teeth
+        assert all(length > 0.0 for length in arms.values()), teeth
+        end_x = _printed_centre_line_end(teeth, arms.get(3, 0.0))
+        assert end_x == pytest.approx(drawing.front_centre_line_end_x(teeth))
         tip_x = drawing.FRONT_CENTER[0] + drawing.rendered_half_od(teeth)
-        assert end_x == pytest.approx(tip_x + drawing.CENTRE_LINE_OVERRUN)
-        assert end_x < drawing.front_keep(teeth)["ToothThickness"][0] - 0.005, teeth
-        assert end_x < drawing.tooth_thickness_shelf(teeth)[0] - 0.005, teeth
+        assert end_x >= tip_x + drawing.CENTRE_LINE_OVERRUN - 1e-9, teeth
+        line_x = drawing.front_keep(teeth)["ToothThickness"][0]
+        assert end_x <= line_x - drawing.CENTRE_LINE_DIMENSION_AIR + 1e-9, teeth
+        assert _centre_line_text_air(teeth, end_x) >= (
+            drawing.TOOTH_THICKNESS_TEXT_AIR + _THICKNESS_AIR_MARGIN
+        ), teeth
     source = inspect.getsource(drawing.build)
     assert "arms_mm=front_centre_mark_arms_mm(teeth)" in source
 

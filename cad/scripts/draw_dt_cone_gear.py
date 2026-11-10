@@ -1986,24 +1986,46 @@ def _check_exported_pdf(phase: str) -> None:
 
 # The front view's bore centre mark draws its lines (machinist review of the
 # C1-keyed sheets, rule 10: the clock's reference, the tooth centreline, was
-# drawn nowhere). Its +X arm runs from the bore's rim through the phase-0
+# drawn nowhere). Its +X line runs from the bore's rim through the phase-0
 # tooth, which the flat (keyway) is clocked to, to CENTRE_LINE_OVERRUN past
-# the tip; the other three stop CENTRE_LINE_OVERRUN past the rim. Sheet
-# metres; swCenterMarkHandle_e Up 0, Left 1, Down 2, Right 3, each arm a model
-# length from the rim (draw_dt_pinion_bracket's cross-hole mark).
+# the tip, stopping CENTRE_LINE_DIMENSION_AIR short of the thickness
+# dimension's line: that line's midpoint, on the bore axis, starts the leader
+# to the thickness text's shelf, whose block straddles the axis 6.5 mm on.
+# The template already draws every line CENTRE_MARK_LINE_BASE_MM (model) past
+# the rim (the r3 print, every sheet 2.49-2.54 mm at its own scale), and
+# ICenterMark.SetExtendedLength adds its model length to that: r4 asked T006
+# for 1.948 mm and printed the line to 143.7 mm, rim 108.15 + (2.5 + 1.948) x
+# 8, 0.81 mm under the C of CIRCULAR. Where the base already passes the tip
+# (T006) the line keeps the template's length. swCenterMarkHandle_e Right 3
+# (draw_ch_rocker_strap); the other arms keep the template's.
 CENTRE_LINE_OVERRUN = 0.0015
+CENTRE_LINE_DIMENSION_AIR = ARROW_TEXT_CLEARANCE
+CENTRE_MARK_LINE_BASE_MM = 2.5
 _CENTER_MARK_HANDLE_RIGHT = 3
-_CENTER_MARK_HANDLES = (0, 1, 2, _CENTER_MARK_HANDLE_RIGHT)
+
+
+def front_centre_line_end_x(teeth: int) -> float:
+    """Sheet x where the front view's +X centre-mark line ends."""
+    ratio = _front_ratio(teeth)
+    rim = FRONT_CENTER[0] + bore_dia_mm(teeth) * ratio / 2000.0
+    base = rim + CENTRE_MARK_LINE_BASE_MM * ratio / 1000.0
+    target = min(
+        FRONT_CENTER[0] + rendered_half_od(teeth) + CENTRE_LINE_OVERRUN,
+        front_keep(teeth)["ToothThickness"][0] - CENTRE_LINE_DIMENSION_AIR,
+    )
+    return max(base, target)
 
 
 def front_centre_mark_arms_mm(teeth: int) -> dict[int, float]:
-    """Model length of each front-view centre-mark arm past the bore's rim."""
-    overrun = CENTRE_LINE_OVERRUN * 1000.0 / _front_ratio(teeth)
-    arms = dict.fromkeys(_CENTER_MARK_HANDLES, overrun)
-    arms[_CENTER_MARK_HANDLE_RIGHT] = (
-        outside_dia_mm(teeth) - bore_dia_mm(teeth)
-    ) / 2.0 + overrun
-    return arms
+    """SetExtendedLength's model lengths for the front view's centre mark:
+    the +X line's extension past the template's, none where that suffices."""
+    ratio = _front_ratio(teeth)
+    rim = FRONT_CENTER[0] + bore_dia_mm(teeth) * ratio / 2000.0
+    extension = (front_centre_line_end_x(teeth) - rim) * 1000.0 / ratio
+    extension -= CENTRE_MARK_LINE_BASE_MM
+    if extension <= 1e-9:
+        return {}
+    return {_CENTER_MARK_HANDLE_RIGHT: extension}
 
 
 def _center_mark_bore(
@@ -2017,8 +2039,9 @@ def _center_mark_bore(
     """Centre-mark the bore on its arc.  ``IView.AutoInsertCenterMarks2``
     looks for round holes; the D is an arc and a flat (the keyed bore an arc
     and a keyway), so the arc's -X point is picked and marked directly (the
-    draw_channel_lever R3 recipe). ``arms_mm`` draws the mark's lines, each
-    that model length past the rim."""
+    draw_channel_lever R3 recipe). ``arms_mm`` extends the mark's lines by
+    handle, each that model length past the template's
+    (front_centre_mark_arms_mm); empty or None keeps the template's."""
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
     _activate_view(adapter, view, label=label)
@@ -2037,7 +2060,7 @@ def _center_mark_bore(
     draw.ClearSelection2(True)
     if mark is None:
         raise RuntimeError(f"failed to centre-mark the {label} bore")
-    if arms_mm is None:
+    if not arms_mm:
         return
     mark = _early_bound(mark, "ICenterMark")
     mark.UseDocDisplaySettings = False
@@ -2048,10 +2071,10 @@ def _center_mark_bore(
     if bool(mark.UseDocDisplaySettings) or not bool(mark.ShowLines):
         raise RuntimeError(f"{label} centre mark lost its extended lines")
     _telemetry.info(
-        f"{label} centre mark arms past the rim (model mm): "
+        f"{label} centre mark line extensions past the template's (model mm): "
         + ", ".join(
             f"{handle}={float(mark.GetExtendedLength(0, handle)) * 1000.0:.3f}"
-            for handle in arms_mm
+            for handle in range(4)
         )
     )
 
