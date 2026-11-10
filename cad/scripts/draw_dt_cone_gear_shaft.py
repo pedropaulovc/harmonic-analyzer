@@ -403,6 +403,16 @@ D_SECTION_KEEP = {
 # at the floor's extension line, 0.3449.  Its left end, 0.3157, stays clear of
 # the Ø.4825 block (~0.307).
 KEYSEAT_S_SHIFT = 0.0070
+# S's text block (value, stacked band, and the NOTE flag above them) stands
+# centred on its position, so the flag's row pushed the value DOWN: PR 1 r9
+# (9b8efb7876) measured the block 0.3170..0.3424 x 0.1747..0.1872 about
+# (0.3301, 0.182), 7.3 mm under and 5.2 mm over, its foot 0.2 mm off the
+# face (top 0.1745; r8 without the flag: value foot 0.1775).  Lifting it
+# KEYSEAT_S_FLAG_LIFT puts the foot at 0.1777, CLEAR_GAP_M plus 1.2 mm off
+# the face, and its top 0.1902, 9.9 mm under the pictorial (0.2001); the
+# block keeps its x, 2.6 mm right of the Ø.4825 text (to 0.3144) and 4.2 mm
+# left of the width's line (0.3466).
+KEYSEAT_S_FLAG_LIFT = 0.0030
 ARROWS_INSIDE = 0  # swDimensionArrowsSide_e.swDimArrowsInside
 # The keyseat width's text: KEYSEAT_WIDTH_RISE above the section centre, at
 # the keyseat side's sheet x.  A vertical dimension's line stands at its
@@ -419,16 +429,12 @@ KEYSEAT_WIDTH_RISE = 0.0283
 # clarity: the depth lacked the width's flag).  Above, not after: an
 # after-suffix would run the S line ~18 mm right, through the width's
 # dimension line at the keyseat's edge (0.3466), and the Ø.4825 block (to
-# 0.3144) holds its left (PR 2 r5, 20261110T081142602Z, as PR 1 r8).  An
-# above callout is centred on its dimension's text, set as one run (a
-# 40-character run read 110.6 mm wide in COM, 20261010T071427837Z) 8.7 mm
-# above the text position (f68549253): centred on the S text (0.3301), the
-# 6-character run spans ~0.322..0.338, 8 mm left of the width's line and
-# shelf (from 0.3466 at y 0.1888), ~6 mm under the pictorial (0.2001 from x
-# 0.3275).  One line: a line break in the above compartment never prints.
+# 0.3144) holds its left (PR 2 r5, 20261110T081142602Z, as PR 1 r8).
+# Centred on the S text, it joins S's block (KEYSEAT_S_FLAG_LIFT has the
+# r9 measurement), 4.2 mm left of the width's line and shelf (from 0.3466
+# at y 0.1888).  One line: a line break in the above compartment never
+# prints.
 SECTION_ABOVE_CALLOUTS = {"Sec1KeyseatS": f"NOTE {LAND_NOTE}"}
-ABOVE_CALLOUT_CHAR_WIDTH = 0.1106243 / 40
-ABOVE_CALLOUT_RISE = 0.0087
 
 
 def _set_dimension_suffixes(
@@ -1067,7 +1073,7 @@ def _add_d_sections(adapter: Any, side: Any, sign: int) -> list[PlacedSection]:
             keyseat_x = _keyseat_side_x(adapter, view, section, sign)
             s_x, s_y = keep[names[0]]
             away = -math.copysign(KEYSEAT_S_SHIFT, keyseat_x - section.centre[0])
-            keep[names[0]] = (s_x + away, s_y)
+            keep[names[0]] = (s_x + away, s_y + KEYSEAT_S_FLAG_LIFT)
             keep[names[1]] = (keyseat_x, section.centre[1] + KEYSEAT_WIDTH_RISE)
         dimensions = curate_view_dimensions(
             adapter,

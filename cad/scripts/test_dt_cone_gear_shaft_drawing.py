@@ -214,7 +214,8 @@ def test_the_keyseat_section_flags_the_land_note(monkeypatch):
     assert keeps == [
         {
             "Sec1KeyseatS": (
-                a_section.centre[0] - drawing.KEYSEAT_S_SHIFT, a_section.centre[1] + 0.017
+                a_section.centre[0] - drawing.KEYSEAT_S_SHIFT,
+                a_section.centre[1] + 0.017 + drawing.KEYSEAT_S_FLAG_LIFT,
             ),
             "Sec1KeyseatWidth": (
                 a_section.centre[0] + 0.0095,
@@ -905,17 +906,21 @@ def test_the_keyseat_section_cuts_land_one_clear_of_its_neighbours() -> None:
     s_x = x - drawing.KEYSEAT_S_SHIFT
     assert s_x + 0.0130 <= keyseat_x - CLEAR_GAP_M - 0.001
     assert s_x - 0.0144 >= 0.3111 + CLEAR_GAP_M
+    # With its NOTE flag above, S's block is centred on its position, the
+    # value pushed down by the flag's row: PR 1 r9 (9b8efb7876) and PR 2 r6
+    # measured 0.3170..0.3424 x 0.1747..0.1872 about (0.3301, 0.182), its
+    # foot 0.2 mm off the face (the proof refused it).  Lifted, the block
+    # clears the face, the Ø.4825 text (to 0.3144) and the width's line by
+    # CLEAR_GAP_M and stays under the pictorial's outline (0.2001).
+    s_y = y + 0.017 + drawing.KEYSEAT_S_FLAG_LIFT
+    block = (s_x - 0.0131, s_y - 0.0073, s_x + 0.0123, s_y + 0.0052)
+    assert block[1] - (y + half) >= CLEAR_GAP_M + 0.001
+    assert block[0] >= 0.3144 + CLEAR_GAP_M
+    assert block[2] <= keyseat_x - CLEAR_GAP_M
+    assert block[3] <= iso_bottom - CLEAR_GAP_M
     floor_x = x + cone_land_key.KEYSEAT_FLOOR_OFFSET_MM / 1000.0 * section.scale[0] / section.scale[1]
     assert floor_x < keyseat_x
     assert drawing.ARROWS_INSIDE == 0
-    # S's land-note flag rides above it, centred on its text: clear of the
-    # width's line at the keyseat's edge, of the Ø.4825 block (ends 0.3144,
-    # PR 2 r5 layout audit) and of the pictorial's outline bottom.
-    flag = drawing.SECTION_ABOVE_CALLOUTS["Sec1KeyseatS"]
-    flag_half = len(flag) * drawing.ABOVE_CALLOUT_CHAR_WIDTH / 2.0
-    assert s_x + flag_half <= keyseat_x - CLEAR_GAP_M - 0.001
-    assert s_x - flag_half >= 0.3144 + CLEAR_GAP_M
-    assert text_y + drawing.ABOVE_CALLOUT_RISE <= iso_bottom - CLEAR_GAP_M - 0.001
 
 
 # How far above a side-view cutting line's lower end its letter's top stands:
