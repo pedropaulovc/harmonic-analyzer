@@ -61,7 +61,6 @@ from _drawing_common import (
 )
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import set_dimension_callouts, set_reference_dimension
-from _drawing_blind_ream_callout import add_blind_ream_callout
 from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_edges import visible_view_entities
 from _drawing_finish import add_surface_finish
@@ -80,8 +79,6 @@ from _drawing_types import DRAWING_TEMPLATES
 from _drawing_sections import create_section_view
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
-from _fit_deviations import deviations
-from _gear_drawing_entities import visible_circle_edge
 from _layout_geometry import estimate_text_box
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
@@ -91,7 +88,6 @@ from _supplier_dimensions import supplier_reference_dimension
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from dt_cone_gear_shaft_spec import (
-    BOND_FLAG,
     COLLAR_DIA,
     COLLAR_DIA_FRACTION_DENOMINATOR,
     COLLAR_END_STATION,
@@ -109,12 +105,8 @@ from dt_cone_gear_shaft_spec import (
     SECTION_DIAS,
     SECTION_ENDS,
     SHAFT_LENGTH,
-    SOCKET_DEPTH,
-    SOCKET_DIA,
-    SOCKET_DIA_BAND,
-    SOCKET_PROCESS,
+    SOCKET_CALLOUT,
     SURFACE_FINISHES,
-    inch_text,
 )
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -316,32 +308,19 @@ PIVOT_FINISH_ATTACH_INSET = 0.020
 # the shaft's tip end on its +Z), projected LEFT of the side view in third
 # angle at the sheet scale, on the side view's axis, so it needs no label.
 # Its outline is the collar's Ø5/8 circle; TIP_END_VIEW_GAP leaves the axis
-# overrun and the collar circle 12 mm apart.  The socket's rim faces the
-# viewer there, so it carries a native hole callout (Codjiflo #2459
-# 4523315375): SolidWorks prints the Socket cut's own diameter, band and
-# depth, so the depth follows the model; the process joins before the depth
-# (rule 26: size, process, depth) and the bond flag goes below.  Its text
-# stands up and left of the view (the field the stepped-tip detail used to
-# take), clear of land 2's diameter text, which hangs right of its line
-# (0.0849) inside land 2.  The PR 2 r5 proof (20261110T081142602Z) measured
-# the old imported SocketDia's rows about its (0.033, 0.185) position: the
-# size row 33.9 mm wide from 0.0167, the "REAM ↧ .20" row 27.2 mm, the flag
-# row 0.1749..0.1784, the band's top 0.1941.  The callout's one row joins
-# both (~61 mm), so it moves 14 mm right: about 0.016..0.078 at 0.047, 3 mm
-# inside the frame and 7 mm left of land 2's line.  The layout proof
-# measures its box.
+# overrun and the collar circle 12 mm apart.  SocketDia is imported there,
+# where its circle faces the viewer, its text up and left of the view
+# (the field the stepped-tip detail used to take), clear of land 2's
+# diameter text, which hangs right of its line inside land 2.  The text's box
+# was measured on the PR 2 farm proof (6fda5a4): its callout rows make it
+# 43.1 mm wide, 16.3 mm left and 26.8 mm right of its position, 10.1 mm
+# under and 9.1 mm over (0.0037..0.0468 x 0.1749..0.1941 at (0.020, 0.185),
+# 9 mm through the left frame).  At x 0.033 it spans 0.0167..0.0598: 4 mm
+# inside the frame, 25 mm left of land 2's line.
 TIP_END_VIEW_GAP = 0.020
 TIP_END_VIEW_CENTER = (TIP_END_X - TIP_END_VIEW_GAP, SIDE_CENTER[1])
-SOCKET_CALLOUT_XY = (0.047, 0.185)
-# The Socket cut's dimensions the callout prints (marked, with their model
-# places): no view imports them.
-SOCKET_CALLOUT_DIMENSIONS = frozenset({"SocketDia", "SocketDepth"})
-# What the callout must print, read back: the Socket cut's diameter with
-# its band, and its depth at the model's drawing places (SolidWorks resolves
-# the depth from the cut at insertion; this only checks it).
-SOCKET_DEPTH_READBACK = inch_text(
-    SOCKET_DEPTH, DRAWING_PRECISION_BY_NAME["SocketDepth"]
-)
+TIP_END_VIEW_KEEP = {"SocketDia": (0.033, 0.185)}
+SOCKET_CALLOUTS = {"SocketDia": SOCKET_CALLOUT}
 
 
 class DSection(NamedTuple):
@@ -457,26 +436,6 @@ def _set_dimension_suffixes(
             raise RuntimeError(f"dimension suffix {text!r} did not persist: {got!r}")
     if remaining:
         raise RuntimeError(f"dimension suffixes not applied: {sorted(remaining)}")
-
-
-@_telemetry.traced("drawing.socket_callout")
-def _add_socket_callout(adapter: Any, tip_end: Any) -> Any:
-    """Call out the socket natively on its rim in the tip end view
-    (_drawing_blind_ream_callout): the Socket cut's diameter, band and depth
-    stay SolidWorks' own; REAM joins before the depth and the bond flag goes
-    below.  Returns the callout's annotation."""
-    return add_blind_ream_callout(
-        adapter,
-        tip_end,
-        edge=visible_circle_edge(adapter, tip_end, SOCKET_DIA),
-        callout_xy=SOCKET_CALLOUT_XY,
-        label="socket",
-        dia_mm=SOCKET_DIA,
-        deviations_mm=deviations(SOCKET_DIA_BAND),
-        depth_text=SOCKET_DEPTH_READBACK,
-        process=SOCKET_PROCESS,
-        below=BOND_FLAG,
-    )
 
 
 # A native "SECTION A-A / SCALE 2 : 1" caption measured 45.4 x 17.0 mm (leaf
@@ -1381,8 +1340,16 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="side",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    # The socket's native hole callout, on the view that faces its rim.
-    socket = _add_socket_callout(adapter, tip_end)
+    # The socket's diameter, native to the view that faces its circle, with
+    # its ream-and-depth callout and bond flag under it.
+    socket_annotations = curate_view_dimensions(
+        adapter,
+        tip_end,
+        keep=TIP_END_VIEW_KEEP,
+        view_label="tip end",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    set_dimension_callouts(adapter, socket_annotations, SOCKET_CALLOUTS)
     annotations = list(side_annotations)
     collar = None
     for annotation in donor_annotations:
@@ -1468,7 +1435,10 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions={
             **collar_neighbours,
             "CollarDia": collar,
-            "socket callout": socket,
+            **{
+                dimension_name(adapter, annotation): annotation
+                for annotation in socket_annotations
+            },
         },
         sign=sign,
     )

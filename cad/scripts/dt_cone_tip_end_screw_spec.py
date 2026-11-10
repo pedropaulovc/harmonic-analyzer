@@ -155,17 +155,18 @@ def inch_text(value_mm: float, places: int) -> str:
     return text[1:] if text.startswith("0.") else text
 
 
-# The hole's native callout (rules 12 and 26: size, process, depth on one
-# line; PR 2 r7 machinist review): SolidWorks prints the cut's diameter with
-# its band and its depth, END_HOLE_PROCESS joins before the depth.  Below it,
-# rule 7's two lines of words, each no wider than the size line: the fit and
-# its mate by drawing number (rule 4; the printed limits set the clearance,
-# so no REF range repeats them) and the wall shortfall as a plain fact in
-# rule 20's own form (RV-01; the hole's one wall is to the thread root).
-END_HOLE_PROCESS = "REAM"
+# Below the hole's imported diameter (its model band, four places), rules 12
+# and 26: the process and the depth (PR 2 r7 machinist review: the depth
+# belongs in the callout; dt_cone_tip_block's dowel-hole form, the depth the
+# model's at its drawing places).  Then rule 7's two lines of words: the fit
+# and its mate by drawing number (rule 4; the printed limits set the
+# clearance, so no REF range repeats them) and the wall shortfall as a plain
+# fact in rule 20's own form (RV-01; the hole's one wall is to the thread
+# root).
 END_HOLE_DEPTH_TEXT = inch_text(END_HOLE_DEPTH, END_HOLE_DEPTH_PLACES)
-END_HOLE_CALLOUT_BELOW = "\n".join(
+END_HOLE_CALLOUT = "\n".join(
     (
+        f"REAM <HOLE-DEPTH> {END_HOLE_DEPTH_TEXT}",
         f"RUNNING FIT ON {PIVOT_NUMBER}",
         f"WALL {inch_text(END_HOLE_WALL_PRINTED_IN * MM_PER_IN, 3)} MIN",
     )
@@ -181,8 +182,8 @@ STOCK_NOTE = "\n".join(
 )
 
 # Model-owned drawing controls: a plain cut-extrude, its sketch circle the
-# reamed diameter and the cut's blind depth the full-diameter depth, so the
-# drawing's native hole callout reads both.
+# reamed diameter (the sheet imports it) and the cut's blind depth the
+# full-diameter depth (its places set the callout's depth text).
 HOLE_FEATURE = "EndHoleProfile"
 HOLE_CUT = "EndHole"
 DRAWING_DIMENSIONS: dict[str, set[str]] = {

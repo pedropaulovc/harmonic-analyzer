@@ -95,7 +95,7 @@ def test_hole_wall_to_the_thread_root_is_the_declared_minor() -> None:
     (row,) = _config.parts(spec.PART_NAME)["machinist_exceptions"]
     assert row["id"] == "RV-01" and row["kind"] == "minor"
     # The exception quotes the wall row the callout prints.
-    assert spec.END_HOLE_CALLOUT_BELOW.splitlines()[-1] == "WALL .067 MIN"
+    assert spec.END_HOLE_CALLOUT.splitlines()[-1] == "WALL .067 MIN"
     assert row["where"].endswith(": WALL .067 MIN")
     assert row["reason"].startswith("Owner ruling 2026-11-09 via PR #1992")
     assert "pull/1992" in row["reason"]
@@ -107,28 +107,13 @@ def test_pivot_never_bottoms_and_always_runs_in_the_hole() -> None:
     assert spec.PIVOT_PROUD_MIN < spec.PIVOT_PROUD_MAX
 
 
-def test_hole_callout_is_size_process_depth_then_two_lines_of_words() -> None:
-    from _drawing_blind_ream_callout import printed_depth, ream_definitions
-
-    # Rules 12 and 26 (PR 2 r7 machinist review): size, process, depth on the
-    # native callout's one line, the depth SolidWorks' own (its format
-    # definitions as r7 read them on the shaft socket's plain cut); rule 7:
-    # two lines of words below.
-    native = {
-        5: "<MOD-DIAM>",
-        6: f"<HOLE-DEPTH>{spec.END_HOLE_DEPTH_TEXT}",
-        7: "",
-        8: "",
-    }
-    callout = ream_definitions(
-        native,
-        process=spec.END_HOLE_PROCESS,
-        below=spec.END_HOLE_CALLOUT_BELOW,
-        label="end screw",
-    )
-    assert callout[6].strip() == "REAM <HOLE-DEPTH>.12"
-    assert printed_depth(callout, label="end screw") == ".12"
-    assert callout[8].splitlines() == [
+def test_hole_callout_is_process_depth_then_two_lines_of_words() -> None:
+    # Rules 12 and 26 (PR 2 r7 machinist review): under the imported reamed
+    # diameter, the process and the model's depth at its places; rule 7: two
+    # lines of words.
+    assert spec.END_HOLE_DEPTH_TEXT == ".12"
+    assert spec.END_HOLE_CALLOUT.splitlines() == [
+        "REAM <HOLE-DEPTH> .12",
         "RUNNING FIT ON MHA-DT-37",
         "WALL .067 MIN",
     ]
@@ -163,19 +148,22 @@ def test_sheet_is_registered_and_enforced() -> None:
     assert sheet.source_kind == "part"
     assert sheet.artifact_stem == spec.PART_NAME
     assert drawing.MACHINIST_REVIEW is MachinistReviewMode.ENFORCE
+    # The end view, facing the hole's rim, imports its diameter; the depth
+    # rides the callout (r8: a native cut-extrude callout printed two places).
+    assert set(drawing.END_KEEP) == {"EndHoleDia"}
+    assert drawing.DIMENSION_CALLOUTS == {"EndHoleDia": spec.END_HOLE_CALLOUT}
 
 
 def test_hole_callout_stands_clear_of_the_end_view_and_inside_the_frame() -> None:
     import draw_dt_cone_tip_end_screw as drawing
 
-    # The text centres on CALLOUT_XY, left of the end view at mid height: its
-    # widest row, the size line, stays inside the frame (0.0124) and short of
-    # the head's outline; no word row is wider than the size line (24
-    # characters at ~2.48 mm, r7).
-    x, _y = drawing.CALLOUT_XY
+    # The block stands left of the end view at mid height about END_KEEP: its
+    # widest row stays inside the frame (0.0124) and short of the head's
+    # outline (~2.48 mm a character, r7).
+    x, _y = drawing.END_KEEP["EndHoleDia"]
     assert x - drawing.CALLOUT_HALF_WIDTH > 0.0124
     assert (
         x + drawing.CALLOUT_HALF_WIDTH < drawing.END_CENTER[0] - drawing.HEAD_R - 0.005
     )
-    rows = spec.END_HOLE_CALLOUT_BELOW.splitlines()
+    rows = spec.END_HOLE_CALLOUT.splitlines()
     assert max(len(row) for row in rows) * 0.00248 <= 2 * drawing.CALLOUT_HALF_WIDTH
