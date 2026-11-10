@@ -1945,19 +1945,19 @@ def test_step_10_taps_the_carrier_hub_in_situ_at_the_recorded_dro() -> None:
 
 
 def test_rail_setting_chain_uses_the_gauge_block_set_and_closes_the_stack() -> None:
-    """A3 option C (owner, 2026-11-08): the stack's stations 4.00, 8.00,
-    12.00 and 15.00, each table move one stack from the shop's 81-piece inch
-    set (none over 4 in) at the alignment row's ±.0005; the chain's computed
-    radial error (0.026 mm) closes with the shoulder and printed play."""
+    """A3 option C (owner, 2026-11-08) re-stationed for #2336: each rail is
+    set at S 4.00 and S 11.00, every table move one stack from the shop's
+    81-piece inch set at the alignment row's ±.0005; the chain's computed
+    radial error (0.018 mm, the old 4-station chain's 0.026) closes with the
+    shoulder and printed play."""
     inch = spec.trammel.INCH
-    assert spec.CHAIN_STATIONS == pytest.approx(tuple(s * inch for s in (4.0, 8.0, 12.0, 15.0)))
+    assert spec.CHAIN_STATIONS == pytest.approx(tuple(s * inch for s in (4.0, 11.0)))
     assert spec.STATION_BAND == pytest.approx(0.0005 * inch)
     assert len(spec.GAUGE_BLOCKS_TENTHS) == len(set(spec.GAUGE_BLOCKS_TENTHS)) == 81
-    assert spec.GAUGE_STACK_MAX == pytest.approx(4.0 * inch)
-    assert spec.CHAIN_STATION_RADIUS == pytest.approx(0.0258, abs=0.0005)
-    assert spec.CHAIN_RADIAL_STACK == pytest.approx(0.1583, abs=0.0005)
+    assert spec.CHAIN_STATION_RADIUS == pytest.approx(0.0184, abs=0.0005)
+    assert spec.CHAIN_RADIAL_STACK == pytest.approx(0.1509, abs=0.0005)
     assert spec.CHAIN_RADIAL_STACK <= spec.trammel.TOP_EDGE_HALF_BAND
-    assert [row[1] for row in spec.RAIL_SETTING_ROWS] == ["ORIGIN", "S 4.00", "S 8.00", "S 12.00"]
+    assert [row[:2] for row in spec.RAIL_SETTING_ROWS] == [("4.00", "ORIGIN"), ("11.00", "S 4.00")]
     for (near, far), row in zip(spec._CHAIN_LINKS, spec.RAIL_SETTING_ROWS, strict=True):
         for rail, (x_cell, y_cell) in zip((1, 2), (row[2:4], row[4:6]), strict=True):
             fx, fy = spec.trammel.rail_point(rail, far)
@@ -1966,15 +1966,64 @@ def test_rail_setting_chain_uses_the_gauge_block_set_and_closes_the_stack() -> N
             assert float(y_cell) == pytest.approx((fy - ny) / inch, abs=5e-5)
             for cell in (x_cell, y_cell):
                 blocks = spec.gauge_stack(cell)
-                assert sum(blocks) == round(abs(float(cell)) * 10000) <= 40000
+                assert sum(blocks) == round(abs(float(cell)) * 10000)
                 assert set(blocks) <= set(spec.GAUGE_BLOCKS_TENTHS)
         assert row[6:] == ("±.0005", "6H")
+    # The S 4.00 to 11.00 link's 6.9281 X is one 5-block stack.
+    assert spec.gauge_stack(spec.RAIL_SETTING_ROWS[1][4]) == (1001, 1280, 7000, 40000, 20000)
     with pytest.raises(AssertionError, match="no gauge-block stack"):
         spec.gauge_stack("11.0000")
     steps = {text.split(". ", 1)[0]: text for text in spec.ASSEMBLY_STEPS}
+    assert steps["6E"] == "6E. REPEAT STEPS 6C-6D FOR RAIL 1'S S 11.00 ROW."
     assert steps["6H"].startswith("6H. CHECK") and "±.0005" in steps["6H"]
     assert "GAUGE-BLOCK STACK" in spec.RAIL_SETTING_TITLE
     assert "INCREMENTAL" not in " ".join(spec.ASSEMBLY_STEPS)
+
+
+def test_rail_setting_baseline_answers_the_rail_angle_sensitivity() -> None:
+    """#2336: with the hub reamed in place, 0.01 degree of one rail's angle
+    moves the strap edges about 0.014 mm against the hub, so the ±.0005 links
+    over the 7 in baseline turn a rail by at most 0.005 degree. The band stays:
+    added to the outer edge's pin stack (#2314) the chain already exceeds the
+    strap's half band, so it is not slack."""
+    inch = spec.trammel.INCH
+    baseline = spec.CHAIN_STATIONS[-1] - spec.CHAIN_STATIONS[0]
+    assert baseline == pytest.approx(7.0 * inch)
+    turn = math.radians(0.01)
+    per_rail = spec._station_deviation((0.0, baseline * turn, 0.0, 0.0))
+    both = spec._station_deviation((0.0, baseline * turn, 0.0, baseline * turn))
+    assert per_rail == pytest.approx(0.0143, abs=0.0005)
+    assert both == pytest.approx(0.0176, abs=0.0005)
+    square = spec.STATION_BAND * (math.sin(spec.trammel.HALF_ALPHA) + math.cos(spec.trammel.HALF_ALPHA))
+    assert math.degrees(square / baseline) < 0.005
+    outer = spec.carrier.PIN_RELATIVE_STACK["outer"]
+    assert spec.trammel.TOP_EDGE_HALF_BAND - outer < spec.CHAIN_STATION_RADIUS
+
+
+def test_every_printed_table_setting_is_inside_the_mill_x_travel(report) -> None:
+    """#2336: the travel is the inventory's PM-30MV X, less a stated half-inch
+    margin each side of step 6's centred origin; A3's S 12.00 and 15.00 and
+    the far limits (X 14.72, 15.17) were past it."""
+    import tomllib
+    from _paths import CAD_ROOT
+
+    inch = spec.trammel.INCH
+    inventory = tomllib.loads((CAD_ROOT / "process" / "shop" / "inventory.toml").read_text(encoding="utf-8"))
+    travel_in = inventory["machines"]["PM-30MV"]["envelope"]["travel_in"]["x"]["value"]
+    assert spec.TABLE_TRAVEL_X == pytest.approx(travel_in * inch)
+    assert spec.TABLE_TRAVEL_MARGIN == pytest.approx(0.5 * inch)
+    assert spec.TABLE_REACH_X == pytest.approx(travel_in * inch / 2.0 - 0.5 * inch)
+    margins = report.table_travel_margins
+    assert set(margins) == set(spec.table_settings())
+    assert {"rail 1 S 11.00", "rail 2 S 11.00", "rail 1 SYMMETRIC", "hub", "stop pin 1"} <= set(margins)
+    assert min(margins.values()) >= 0.0
+    worst = min(margins, key=margins.get)
+    assert worst in ("rail 1 S 11.00", "rail 2 S 11.00")
+    assert margins[worst] == pytest.approx(spec.TABLE_REACH_X - 10.887 * inch, abs=0.01)
+    for retired in (12.0, 15.0):
+        assert abs(spec.trammel.rail_point(2, retired * inch)[0]) > spec.TABLE_REACH_X
+    far_x = [abs(spec.trammel.rail_point(2, s)[0]) for s, _n in spec._PASS_LIMITS if s > spec.FAR_LIMIT_FROM]
+    assert len(far_x) == 2 and min(far_x) > spec.TABLE_REACH_X
 
 
 def test_step_11_sets_the_stop_axes_before_spotting_the_riser() -> None:
@@ -2142,9 +2191,13 @@ def test_general_torque_note_covers_every_fastener_no_step_torques() -> None:
 
 
 def test_sweep_limits_are_witness_marked_and_every_pass_runs_mark_to_mark() -> None:
-    """Review jig-asm r2: each sweep limit is a pass-table row, set in X
-    only and witness-marked (step 6N-6P); every complete pass runs mark to mark."""
-    hundredth = spec.trammel.INCH / 100.0
+    """Review jig-asm r2: each sweep limit is witness-marked; every complete
+    pass runs mark to mark. #2336: the near limits are pass-table rows set
+    by DRO in X only; the far limits, past the table's X travel, are far-limit
+    rows set along each rail by a gauge stack from S 11.00 (both step 6N,
+    marked in step 6P)."""
+    inch = spec.trammel.INCH
+    hundredth = inch / 100.0
     gap = spec.leadscrew.FEED_GAP
     for name, (lo, hi) in spec.SWEEP_LIMITS.items():
         exact_lo, exact_hi = spec.trammel.PIN_TRAVEL[name]
@@ -2156,17 +2209,32 @@ def test_sweep_limits_are_witness_marked_and_every_pass_runs_mark_to_mark() -> N
             assert lo_s <= centre <= hi_s
             travel = spec.trammel.CARRIAGE_TRAVEL
             assert travel[0] - gap < centre < travel[1] + gap
-    limits = [row for row in spec.PASS_TABLE_ROWS if row[0].endswith(" LIMIT")]
-    assert sorted(float(row[1]) for row in limits) == sorted(
-        round(s / spec.trammel.INCH, 2) for pair in spec.SWEEP_LIMITS.values() for s in pair
+    near = [row for row in spec.PASS_TABLE_ROWS if row[0].endswith(" LIMIT")]
+    assert [row[:2] for row in near] == [("INNER LIMIT", "2.96"), ("OUTER LIMIT", "3.06")]
+    assert spec.FAR_LIMIT_HEADER == ("ROW", "S", "FROM", "STACK", "RANGE")
+    assert spec.FAR_LIMIT_ROWS == (
+        ("INNER LIMIT", "14.87", "S 11.00", "3.8700", "S ±.004"),
+        ("OUTER LIMIT", "15.33", "S 11.00", "4.3300", "S ±.004"),
     )
+    assert sorted(float(row[1]) for row in (*near, *spec.FAR_LIMIT_ROWS)) == sorted(
+        round(s / inch, 2) for pair in spec.SWEEP_LIMITS.values() for s in pair
+    )
+    for row in spec.FAR_LIMIT_ROWS:
+        assert float(row[3]) == pytest.approx(float(row[1]) - spec.FAR_LIMIT_FROM / inch)
+        assert set(spec.gauge_stack(row[3])) <= set(spec.GAUGE_BLOCKS_TENTHS)
+    # The station's two links and the stack, each ±.0005 on the rail, stay
+    # inside the ±.004 the far rows print.
+    assert spec._FAR_LIMIT_ERROR <= spec.LONG_TRAVEL_BAND
     # A pass row is set in X only at the long-travel row; its Y is REF.
     for row in spec.PASS_TABLE_ROWS:
         assert row[3].startswith("(") and row[5].startswith("(")
         assert row[6] == "X ±.004"
     steps = {text.split(". ", 1)[0]: text for text in spec.ASSEMBLY_STEPS}
     assert "LIMIT ROW" in steps["6N"] and "X ONLY" in steps["6N"]
-    assert "WITNESS-MARK" in steps["6P"]
+    assert "FAR LIMIT TABLE ROW AS ITS TITLE STATES" in steps["6N"]
+    assert "WITNESS-MARK" in steps["6P"] and "6Q" not in steps
+    assert "STOP TO THE BAR" in spec.FAR_LIMIT_TITLE and "SPINDLE-END FACE" in spec.FAR_LIMIT_TITLE
+    assert "(STEP 6N)" in spec.FAR_LIMIT_TITLE and "STACK FROM IT" in spec.FAR_LIMIT_TITLE
     assert "MARK TO MARK" in steps["9N"] and "MARK TO MARK" in steps["13A"]
 
 
@@ -2801,7 +2869,7 @@ def test_hold_down_clearance_prints_on_the_safe_side_of_the_kit() -> None:
 def test_every_alignment_station_is_reachable_by_both_carriages() -> None:
     """Steps 6 and HD3 bring each pin to every station: the feed carriage by
     the handwheel within its travel, both carriages wholly on their rails."""
-    for station in trammel.ALIGNMENT_STATIONS:
+    for station in spec.CHAIN_STATIONS:
         centre = station - trammel.PIN_OFFSET
         assert trammel.CARRIAGE_TRAVEL[0] <= centre <= trammel.CARRIAGE_TRAVEL[1]
         assert trammel.CARRIAGE_S_RANGE[0] <= centre <= trammel.CARRIAGE_S_RANGE[1]

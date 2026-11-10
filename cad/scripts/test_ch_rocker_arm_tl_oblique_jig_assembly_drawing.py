@@ -475,8 +475,8 @@ def test_setting_table_box_violations_reports_each_overrun() -> None:
 
 
 def test_setting_tables_stand_over_the_setting_sheets_reference_view() -> None:
-    """The rail setting and pass tables hold sheet 10's right column, the
-    reference view's room under them and no steps beside them."""
+    """The rail setting, pass and far limit tables hold sheet 10's right
+    column, the reference view's room under them and no steps beside them."""
     layout = drawing.STEPS_BY_SHEET[drawing.SETTING_SHEET]
     assert layout.tables and not layout.right
     assert drawing.SHEET_NAMES.index(drawing.SETTING_SHEET) + 1 == spec.SETTING_SHEET_NUMBER
@@ -485,7 +485,8 @@ def test_setting_tables_stand_over_the_setting_sheets_reference_view() -> None:
     assert boxes[-1][1] == pytest.approx(drawing.SETTING_TABLES_BOTTOM)
     assert all(box[1] >= room[3] + drawing.REGION_GAP - 1e-9 for box in boxes)
     assert all(_inside_sheet(box) for box in boxes)
-    assert not _overlap(*boxes)
+    assert len(boxes) == 3
+    assert not any(_overlap(a, b) for i, a in enumerate(boxes) for b in boxes[i + 1:])
     assert room[3] - room[1] >= drawing.NOTES_REFERENCE_MIN_HEIGHT
 
 

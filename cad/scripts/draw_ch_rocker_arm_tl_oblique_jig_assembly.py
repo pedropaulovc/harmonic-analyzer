@@ -1031,7 +1031,7 @@ def note_ink_height(text: str) -> float:
 
 
 # The setting tables atop the last instruction sheet's right column, in
-# place of continued steps: the rail setting table, then the pass table.
+# place of continued steps: the rail setting, pass and far limit tables.
 SETTING_SHEET = HOLDING_SHEET
 if SHEET_NAMES.index(SETTING_SHEET) + 1 != spec.SETTING_SHEET_NUMBER:
     raise AssertionError("the setting tables moved off the sheet the steps cite")
@@ -1046,6 +1046,7 @@ SETTING_TABLES = tuple(
     for title, header, rows, label in (
         (spec.RAIL_SETTING_TITLE, spec.RAIL_SETTING_HEADER, spec.RAIL_SETTING_ROWS, "rail setting table"),
         (spec.PASS_TABLE_TITLE, spec.PASS_TABLE_HEADER, spec.PASS_TABLE_ROWS, "pass table"),
+        (spec.FAR_LIMIT_TITLE, spec.FAR_LIMIT_HEADER, spec.FAR_LIMIT_ROWS, "far limit table"),
     )
 )
 if any(

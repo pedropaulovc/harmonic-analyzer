@@ -72,8 +72,9 @@ The analytic clearance check (``clearance_report``) keeps what the model
 cannot show: over ``trammel.SWEEP`` ⚙ on both passes, the clearance of every
 moving outline to the column's pleated cover (Y = +``THROAT_TO_COVER`` ⚙),
 the machine X/Y reached, each base bar's overhang past its table end, each
-carriage's margin on its rail, and every outline's margin to the four table
-edges. test_ch_rocker_arm_tl_oblique_jig_assembly.py pins the numbers.
+carriage's margin on its rail, every outline's margin to the four table
+edges, and every printed table setting's margin inside the PM-30MV's X
+travel. test_ch_rocker_arm_tl_oblique_jig_assembly.py pins the numbers.
 
 The hold-down stud envelope is an ESTIMATE, not a measurement (the
 ShopTrammelInventory reply: kit ``fixtures.clamping-kit-pm-52pcck-14mm``, its
@@ -1456,19 +1457,33 @@ PLAN_TAGS: tuple[PlanTag, ...] = (
 # --- Fitter package text -------------------------------------------------------------
 # Rail setting is an assembly control, independent of the carrier's .XXX
 # hole-table locations. Owner ruling 2026-11-08 (Pedro), A3 option C: the
-# stack's stations S 4.00, 8.00, 12.00 and 15.00 and its hub X 0, Y .5125
-# ±.0005 stay; each table move (origin to S 4.00 to 8.00 to 12.00 to 15.00
+# hub X 0, Y .5125 ±.0005 stays; each table move (origin to each station
 # along each rail, and the hub's Y from the origin) is made with an inch
 # gauge-block stack between a stop clamped on the table and a dial
 # indicator fixed to the machine, the shop table's "assembly gap, alignment
 # (test indicator)" row, ±.0005 (TL-00 round 1 review: the ±.001 stations
 # were DRO distances up to 14.85 in with no fit route). Every stack is built
-# from the shop's set (shop-equipment gauges.gauge-blocks-mitutoyo, 81-piece inch,
-# largest block 4 in), so no stack exceeds 4 in. The station error this
-# chain leaves in the cut, relative to the hub, is computed and charged below
-# (CHAIN_STATION_RADIUS).
+# from the shop's set (shop-equipment gauges.gauge-blocks-mitutoyo, 81-piece inch).
+# The station error this chain leaves in the cut, relative to the hub, is
+# computed and charged below (CHAIN_STATION_RADIUS).
+#
+# #2336 (DFM review of v48, F1): A3's stations S 12.00 and 15.00 sat at X
+# 11.877 and 14.846 from step 6's origin, past the table's X reach
+# (TABLE_REACH_X), so step 6 could not bring them under the spindle. Each
+# rail is now set at two stations, S 4.00 and S 11.00 (X 3.959 and 10.887),
+# one stack per link; the S 4.00 to 11.00 link's 6.9281 X is a 5-block stack.
+# The baseline answers the rail-angle sensitivity: with the hub reamed in
+# place, 0.01 degree of one rail's angle moves the strap edges 0.014 mm
+# against the hub (both rails alike 0.018), not the 0.47 mm the absolute
+# radius moves (trammel.RADIUS_PER_TENTH_DEG). One ±.0005 link over the 7 in
+# baseline turns a rail by at most 0.005 degree; with the near station's own
+# link the chain charges 0.018 mm, under the 4-station chain's 0.026 (its far
+# station three links on over 11 in). The band and the .0001 indicator stay:
+# the outer edge's pin stack (carrier.PIN_RELATIVE_STACK, 0.244 mm) leaves
+# this chain 0.010 mm of the strap's 0.254 half band when the two are added
+# (#2314's finding), so neither is slack.
 STATION_BAND = 0.0005 * trammel.INCH
-CHAIN_STATIONS = trammel.ALIGNMENT_STATIONS
+CHAIN_STATIONS = tuple(s * trammel.INCH for s in (4.0, 11.0))
 _CHAIN_LINKS = tuple(zip((0.0, *CHAIN_STATIONS[:-1]), CHAIN_STATIONS))
 _GAUGE_SET_KEY = "gauge-blocks-mitutoyo"
 _GAUGE_SET = tomllib.loads(
@@ -1480,6 +1495,17 @@ if not (
     and "largest block 4 in" in _GAUGE_SET["note"]
 ):
     raise AssertionError("the shop's gauge-block set moved; recheck the rail-setting stacks")
+# The PM-30MV's X travel (cad/process/shop.toml machines.pm-30mv, the
+# catalogue 23 in) is not a measurement of the installed mill: the travel
+# with the DRO scale fitted can only be smaller, and step 6's origin is the
+# table's lengthwise midpoint, centred on that travel by eye. Every table
+# setting the steps print therefore stays TABLE_TRAVEL_MARGIN inside half the
+# travel either side of the origin (clearance_report asserts it).
+TABLE_TRAVEL_X = tomllib.loads(
+    (CAD_ROOT / "process" / "shop.toml").read_text(encoding="utf-8")
+)["machines"]["pm-30mv"]["travel_mm"]["x"]
+TABLE_TRAVEL_MARGIN = 0.5 * trammel.INCH
+TABLE_REACH_X = TABLE_TRAVEL_X / 2.0 - TABLE_TRAVEL_MARGIN
 # The set's composition (its shop-equipment comment), in ten-thousandths: .1001-
 # .1009 by .0001, .101-.149 by .001, .050-.950 by .050, and 1, 2, 3, 4 in.
 GAUGE_BLOCKS_TENTHS = (
@@ -1490,7 +1516,6 @@ GAUGE_BLOCKS_TENTHS = (
 )
 if len(GAUGE_BLOCKS_TENTHS) != 81:
     raise AssertionError("the gauge-block set is not 81 pieces")
-GAUGE_STACK_MAX = max(GAUGE_BLOCKS_TENTHS) / 10000.0 * trammel.INCH
 
 
 def gauge_stack(length_in: str) -> tuple[int, ...]:
@@ -1524,8 +1549,9 @@ def gauge_stack(length_in: str) -> tuple[int, ...]:
 
 
 # The pass positions (the symmetric row and the witness-marked pass limits)
-# are DRO moves from the spindle origin up to 15.33 in: the "more than 6 in"
-# row, ±.004, set in X only; their Y is the rails' result (REF).
+# are set at the "more than 6 in" row, ±.004, their Y the rails' result
+# (REF): the symmetric row by DRO 8.86 in from the spindle origin, the far
+# limits 14.87 and 15.33 in along the rails (FAR_LIMIT_ROWS).
 LONG_TRAVEL_BAND = 0.004 * trammel.INCH
 # A limit mark short by the whole band still runs the cutter past each tip
 # land: the pin's station moves the cutter centre about 1:1 along its arc.
@@ -1617,36 +1643,62 @@ RAIL_SETTING_ROWS: tuple[tuple[str, ...], ...] = tuple(
     )
     for near, far in _CHAIN_LINKS
 )
-# Every move is one stack from the set, none over its largest block.
+# Every move is one stack from the set.
 for _row in RAIL_SETTING_ROWS:
     for _cell in _row[2:6]:
-        if abs(float(_cell)) * trammel.INCH > GAUGE_STACK_MAX:
-            raise AssertionError(f"rail-setting move {_cell} is longer than the set's largest block")
         gauge_stack(_cell)
 _HUB_Y_TEXT = _length(carrier.HUB_OFFSET_PRINTED, carrier.HUB_OFFSET_PLACES)
 gauge_stack(_HUB_Y_TEXT)
-PASS_TABLE_TITLE = (
-    "PASS TABLE (STEPS 6, 10): PIVOT PIN AXIS AT STATION S, DRO X/Y FROM THE "
-    "SPINDLE ORIGIN, SET IN X ONLY. LIMIT ROWS: THE WITNESS MARKS ENDING EACH "
-    "PASS. ( ) = REF."
+# #2336: a pass limit past the last rail-setting station is past the table's
+# X reach (X 14.72 and 15.17), so its witness mark is set along the rail from
+# that station, never under the spindle: with the pin at S FAR_LIMIT_FROM (the
+# table at that rail-setting row, the head centred as in step 6D), a stop is
+# clamped to the bar against the carriage's spindle-end face, and a gauge-block
+# stack from the stop to that face puts the pin at the limit. Along the rail
+# the mark errs by the station's links and the stack, each the alignment
+# row's ±.0005 X/Y box projected on the rail, well inside the ±.004 it prints.
+FAR_LIMIT_FROM = CHAIN_STATIONS[-1]
+_PASS_LIMITS = sorted((s, name) for name, limits in SWEEP_LIMITS.items() for s in limits)
+_FAR_LIMIT_ERROR = (
+    (len(CHAIN_STATIONS) + 1)
+    * STATION_BAND
+    * (math.sin(trammel.HALF_ALPHA) + math.cos(trammel.HALF_ALPHA))
 )
+if _FAR_LIMIT_ERROR > LONG_TRAVEL_BAND:
+    raise AssertionError("a far limit set from its station misses the limit rows' band")
+# One line: the far limit table under it leaves the setting sheet's reference
+# view its room (#2336). Step 6 zeroes the DRO at the spindle origin.
+PASS_TABLE_TITLE = "PASS TABLE (STEPS 6, 10): PIN AXIS BY DRO, X ONLY; ( ) = REF."
 PASS_TABLE_HEADER = ("ROW", "S", "RAIL 1 X", "RAIL 1 Y", "RAIL 2 X", "RAIL 2 Y", "RANGE")
 PASS_ROW_SYMMETRIC = "SYMMETRIC"
-PASS_TABLE_ROWS: tuple[tuple[str, ...], ...] = (
-    (
-        PASS_ROW_SYMMETRIC, _length(SYMMETRIC_STATION, SWEEP_LIMIT_PLACES),
-        *_xy_cells(_rail_points(SYMMETRIC_STATION), ref_y=True), _LONG_BAND_TEXT,
-    ),
-    *(
-        (
-            f"{name.upper()} LIMIT", _length(s, SWEEP_LIMIT_PLACES),
-            *_xy_cells(_rail_points(s), ref_y=True), _LONG_BAND_TEXT,
-        )
-        for s, name in sorted(
-            (s, name) for name, limits in SWEEP_LIMITS.items() for s in limits
-        )
-    ),
+# Every pass-table row is a DRO setting: clearance_report checks each is
+# inside TABLE_REACH_X.
+PASS_DRO_STATIONS: tuple[tuple[str, float], ...] = (
+    (PASS_ROW_SYMMETRIC, SYMMETRIC_STATION),
+    *((f"{name.upper()} LIMIT", s) for s, name in _PASS_LIMITS if s <= FAR_LIMIT_FROM),
 )
+PASS_TABLE_ROWS: tuple[tuple[str, ...], ...] = tuple(
+    (
+        row, _length(s, SWEEP_LIMIT_PLACES),
+        *_xy_cells(_rail_points(s), ref_y=True), _LONG_BAND_TEXT,
+    )
+    for row, s in PASS_DRO_STATIONS
+)
+FAR_LIMIT_TITLE = (
+    "FAR LIMIT TABLE (STEP 6N): PIN AT FROM, CLAMP A STOP TO THE BAR AT THE "
+    "CARRIAGE'S SPINDLE-END FACE; SET S BY THE STACK FROM IT."
+)
+FAR_LIMIT_HEADER = ("ROW", "S", "FROM", "STACK", "RANGE")
+FAR_LIMIT_ROWS: tuple[tuple[str, ...], ...] = tuple(
+    (
+        f"{name.upper()} LIMIT", _length(s, SWEEP_LIMIT_PLACES),
+        f"S {_length(FAR_LIMIT_FROM, SWEEP_LIMIT_PLACES)}",
+        _length(s - FAR_LIMIT_FROM, ALIGNMENT_PLACES), f"S ±{_length(LONG_TRAVEL_BAND, 3)}",
+    )
+    for s, name in _PASS_LIMITS if s > FAR_LIMIT_FROM
+)
+for _row in FAR_LIMIT_ROWS:
+    gauge_stack(_row[3])
 
 # Every screw by its fastener-table callout (fasteners.FASTENERS) and every
 # bought item by its BOM item number.
@@ -2093,7 +2145,7 @@ _PLAY_TIR = f"{_length(CARRIAGE_PLAY_TIR_PRINTED, CARRIAGE_PLAY_TIR_PLACES)} TIR
 # ruling 2026-11-08 (Pedro), A3 option C). Each station is set inside an X/Y
 # box of ±STATION_BAND per gauge-stack link, so square to the rail it errs by
 # up to the band times (sin + cos) of the half angle; the near station (one
-# link from the origin) and the far station (three links on) fix the rail's
+# link from the origin) and the far station (one link on, #2336) fix the rail's
 # line. On those perturbed rails the carrier is posed through each pass, the
 # hub is placed as step 10 does (A1 at its symmetric-row X, the hub by its
 # gauge stack from the same origin), and the spindle's path is compared with
@@ -2278,8 +2330,7 @@ ASSEMBLY_STEPS = (
     f"TABLE (SHEET {SETTING_SHEET_NUMBER}) AS ITS TITLE STATES.",
     "6D. CENTRE THAT STATION'S SHOULDER-SCREW HEAD UNDER THE "
     f"{ALIGNMENT_INDICATOR} BY SLIDING THE CARRIAGE IN X AND TAPPING THE BAR IN Y.",
-    f"6E. REPEAT STEPS 6C-6D FOR RAIL 1'S S {', '.join(_CHAIN_TEXT[1:-1])} AND "
-    f"{_CHAIN_TEXT[-1]} ROWS IN ORDER.",
+    f"6E. REPEAT STEPS 6C-6D FOR RAIL 1'S S {', '.join(_CHAIN_TEXT[1:])} ROW.",
     "6F. RETURN THE TABLE BY DRO TO THE ORIGIN: BOTH ORIGIN-STOP INDICATORS AT 0.",
     "6G. REPEAT STEPS 6C-6F FOR RAIL 2.",
     f"{RAIL_SETTING_CHECK}. CHECK EVERY HEAD AGAIN UNDER THE TEST INDICATOR, EACH "
@@ -2288,7 +2339,8 @@ ASSEMBLY_STEPS = (
     f"6K. TIGHTEN THE 4 HOLD-DOWN NUTS {_item(FLANGE_NUT)}.",
     f"6L. CHECK EVERY HEAD AGAIN AS IN STEP {RAIL_SETTING_CHECK}.",
     "6M. IF A HEAD FAILS, REDO STEPS 6C-6L WITH THE NUTS LOOSENED.",
-    "6N. SET EACH PASS-TABLE LIMIT ROW BY DRO AS IN STEP 6D, IN X ONLY.",
+    "6N. SET EACH PASS-TABLE LIMIT ROW BY DRO AS IN STEP 6D, IN X ONLY, AND EACH "
+    "FAR LIMIT TABLE ROW AS ITS TITLE STATES.",
     "6P. WITNESS-MARK THE BAR AT THE CARRIAGE'S SPINDLE-END FACE AT EACH LIMIT "
     "ROW, WITH THE PASS NAME, INNER OR OUTER.",
     # The foot (UNVERIFIED, #2184) between TL-28's two bounds: no thinner,
@@ -2911,12 +2963,32 @@ def stud_centres() -> dict[str, tuple[float, float]]:
     return dict(zip(names, STUD_XY, strict=True))
 
 
+def table_settings() -> dict[str, tuple[float, float]]:
+    """Machine XY under the spindle at every table setting the steps print:
+    the rail-setting stations (step 6, also each far limit's FROM), the
+    pass-table rows (steps 6N and 10), the hub (steps 10D and 20) and the
+    stop-pin axes (step 11A). Mounting and cutting stay at the origin."""
+    out = {
+        f"rail {rail} S {_length(s, SWEEP_LIMIT_PLACES)}": trammel.rail_point(rail, s)
+        for s in CHAIN_STATIONS
+        for rail in RAILS
+    }
+    out.update({
+        f"rail {rail} {row}": trammel.rail_point(rail, s)
+        for row, s in PASS_DRO_STATIONS
+        for rail in RAILS
+    })
+    out["hub"] = (0.0, carrier.HUB_OFFSET_PRINTED)
+    out.update({f"stop pin {index}": point for index, point in enumerate(STOP_PIN_DRO_POINTS, 1)})
+    return out
+
+
 @dataclass(frozen=True)
 class ClearanceReport:
     """The jig's clearances to the machine's unmodelled features (mm): the
-    column cover, the table and the rails' travel. This is NOT fixture
-    self-collision acceptance; retain the mandatory native whole-model
-    interference gates."""
+    column cover, the table, the rails' travel and the table's X travel. This
+    is NOT fixture self-collision acceptance; retain the mandatory native
+    whole-model interference gates."""
 
     cover_clearance: dict[str, float]  # item -> min gap to the column cover
     moving_x: tuple[float, float]  # machine X reached by any moving item
@@ -2926,6 +2998,7 @@ class ClearanceReport:
     bar_overhang: dict[int, float]  # rail -> its bar's far end past its table end
     carriage_margin: dict[str, tuple[float, float]]  # pass -> (near, far) on the rail
     table_edge_margins: dict[str, dict[str, float]]  # item -> edge -> min margin
+    table_travel_margins: dict[str, float]  # table setting -> margin inside TABLE_REACH_X
 
 
 def _update_min(store: dict, key, value: float) -> None:
@@ -2986,6 +3059,11 @@ def clearance_report(samples: int = SWEEP_SAMPLES) -> ClearanceReport:
         - trammel.TABLE_LENGTH / 2.0
         for rail in RAILS
     }
+    # #2336: every printed table setting lies inside the PM-30MV's X reach.
+    travel = {name: TABLE_REACH_X - abs(x) for name, (x, _y) in table_settings().items()}
+    beyond = sorted(name for name, margin in travel.items() if margin < 0.0)
+    if beyond:
+        raise AssertionError(f"table settings beyond the PM-30MV's X travel: {beyond}")
     return ClearanceReport(
         cover_clearance=cover,
         moving_x=(min(moving_xs), max(moving_xs)),
@@ -2995,6 +3073,7 @@ def clearance_report(samples: int = SWEEP_SAMPLES) -> ClearanceReport:
         bar_overhang=overhang,
         carriage_margin=margins,
         table_edge_margins=edges,
+        table_travel_margins=travel,
     )
 
 # --- Native sweep (verify.py ``pass-sweep-interference-free``) ⚙ ----------------

@@ -301,7 +301,8 @@ limits on both source-model Y dimensions without moving their nominal
 geometry, and saves the property-linked note; the drawing only reads the
 limits. This is not a general exception to rules 3 or 7. Section A-A identifies
 the cropped feature as A1. The rail-setting `STATION_BAND` belongs to the
-assembly: ±.002 on each chained link of 6 in or less, independent of the
+assembly: ±.0005 on each gauge-block link, origin to S 4.00 to S 11.00,
+every station inside the PM-30MV's X travel (#2336), independent of the
 carrier table.
 
 [`correlated_pin_budget`](../scripts/ch_rocker_arm_tl_oblique_carrier_spec.py)
