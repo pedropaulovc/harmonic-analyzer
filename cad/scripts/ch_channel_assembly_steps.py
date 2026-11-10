@@ -61,6 +61,10 @@ HA_ANCHORS_SET_REF = "MHA-HA-00 STEP 5"
 # clamped (machinist review, PR #1605), so its remedy re-sets a bracket that
 # can still move; the foot hole is transferred and the bracket screwed down
 # only once that check has passed.
+# The south bracket is set by DRO off a touch-off taken with its ear on the
+# south washer before the wave spring goes on (#2337: the spring covers the
+# washer face, so no feeler leaf can bear on it beside the spring); the
+# bracket comes off the shaft for the spring and goes back on to that zero.
 ROCKER_SEQUENCE: tuple[str, ...] = (
     "rocker-stack-accepted",
     "rocker-stack-measured",
@@ -76,12 +80,14 @@ ROCKER_SEQUENCE: tuple[str, ...] = (
     "north-ear-datum",
     "rocker-hubs-threaded",
     "south-washer-fitted",
+    "south-bracket-on-washer",
+    "south-bracket-zeroed",
+    "south-bracket-slid-off",
     "bank-spring-checked",
     "bank-spring-replaced",
     "bank-spring-fitted",
     "south-bracket-spring-set",
     "south-bracket-clamped",
-    "feeler-leaf-pulled",
     "spring-back-checked",
     "south-bracket-reset",
     "south-foot-transferred",

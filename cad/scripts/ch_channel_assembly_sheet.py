@@ -54,8 +54,9 @@ def _screw(thread: str, length_mm: float, kind: str) -> str:
 
 
 DIMENSION_CALLOUTS = {
-    # Set on a feeler gauge leaf (the right-bracket spring-set step).
-    SPRING_SET_DIMENSION: "FEELER GAUGE",
+    # Set by DRO off the right bracket's touch-off (the right-bracket
+    # spring-set step; #2337: no feeler leaf fits beside the spring).
+    SPRING_SET_DIMENSION: "SPRING SET",
     # The accepted stack caps the hubs' summed excess, so each arm stays on
     # its rod's cam plane and under its bar's foot notch (test_channel_axial_
     # budget); r10 machinist review: name what the tight band sets (rule 4).
