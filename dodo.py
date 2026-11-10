@@ -1411,6 +1411,10 @@ PACKAGE_NATIVE_PY = (SCRIPTS_DIR / "package_native.py").resolve()
 # verify:/check: task names (reused by build + release so a new gate is wired in
 # one place).
 _VERIFY_NAMES = ("soundness", "kinematics")  # need SW (spine); subsystems retired
+# EXPERIMENT BRANCH ONLY: the pool exports build/release closures, not arbitrary
+# selected roots. These leaves are explicitly on build below for canonical
+# admission. Never merge this experiment wiring into the production build graph.
+_EXPERIMENT_VERIFY_NAMES = ("feature_reconcile", "assembly_reconcile", "drawing_reconcile")
 # Offline checks REQUIRED on every build/release (fast, high-value):
 _CHECK_NAMES = (
     "math",
@@ -3272,6 +3276,78 @@ def _verify_task(name: str) -> dict[str, Any]:
             "clean": True,
             "verbosity": 2,
         }
+    if name == "feature_reconcile":
+        script = (SCRIPTS_DIR / "diagnostics" / "benchmark_feature_reconcile.py").resolve()
+        cmd = [sys.executable, str(script), "benchmark", "--trials", "3"]
+        deps = sorted({
+            *_executed_closure(cmd),
+            str((script.parent / "_feature_reconcile.py").resolve()),
+            str(PART_TEMPLATE),
+            _submodule_assembly_dep(),
+        })
+        return {
+            "name": name,
+            "file_dep": deps,
+            "targets": _canonical_targets(f"verify:{name}"),
+            "uptodate": [not _cache.forced_refresh(f"verify:{name}")],
+            "actions": [(_cached_com_action, [
+                f"verify:{name}", cmd, deps,
+                [REPORTS / "feature-reconcile"], "verify-feature-reconcile",
+            ])],
+            "clean": True,
+            "verbosity": 2,
+        }
+    if name == "assembly_reconcile":
+        # Seat-local assembly template is pinned by path+hash at runtime and is
+        # NOT a file_dep: only forced-refresh native runs are benchmark evidence.
+        script = (SCRIPTS_DIR / "diagnostics" / "benchmark_assembly_reconcile.py").resolve()
+        cmd = [sys.executable, str(script), "benchmark", "--trials", "3"]
+        deps = sorted({
+            *_executed_closure(cmd),
+            *(str((script.parent / module).resolve()) for module in (
+                "_assembly_reconcile.py", "_feature_reconcile.py", "benchmark_feature_reconcile.py")),
+            str(PART_TEMPLATE),
+            _submodule_assembly_dep(),
+        })
+        return {
+            "name": name,
+            "file_dep": deps,
+            "targets": _canonical_targets(f"verify:{name}"),
+            "uptodate": [not _cache.forced_refresh(f"verify:{name}")],
+            "actions": [(_cached_com_action, [
+                f"verify:{name}", cmd, deps,
+                [REPORTS / "assembly-reconcile"], "verify-assembly-reconcile",
+            ])],
+            "clean": True,
+            "verbosity": 2,
+        }
+    if name == "drawing_reconcile":
+        # The repository landscape .DRWDOT is a real input (resolved exactly as
+        # new_project_drawing does); drawing.py is used, so the WHOLE-submodule tier.
+        from _drawing_types import DrawingLayout
+
+        script = (SCRIPTS_DIR / "diagnostics" / "benchmark_drawing_reconcile.py").resolve()
+        cmd = [sys.executable, str(script), "benchmark", "--trials", "3"]
+        deps = sorted({
+            *_executed_closure(cmd),
+            *(str((script.parent / module).resolve()) for module in (
+                "_drawing_reconcile.py", "_feature_reconcile.py", "benchmark_feature_reconcile.py")),
+            str(PART_TEMPLATE),
+            str(DRAWING_TEMPLATES[DrawingLayout.LANDSCAPE].path.resolve()),
+            _submodule_dep(),
+        })
+        return {
+            "name": name,
+            "file_dep": deps,
+            "targets": _canonical_targets(f"verify:{name}"),
+            "uptodate": [not _cache.forced_refresh(f"verify:{name}")],
+            "actions": [(_cached_com_action, [
+                f"verify:{name}", cmd, deps,
+                [REPORTS / "drawing-reconcile"], "verify-drawing-reconcile",
+            ])],
+            "clean": True,
+            "verbosity": 2,
+        }
     if name == "kinematics":
 
         # Pass the graph's assemblies EXPLICITLY (dashed names) rather than letting
@@ -3314,7 +3390,7 @@ def task_verify():
     output. The ``verify:`` prefix marks them SolidWorks-dependent (vs the
     SolidWorks-free ``check:`` tasks).
     """
-    for name in _VERIFY_NAMES:
+    for name in (*_VERIFY_NAMES, *_EXPERIMENT_VERIFY_NAMES):
         yield _verify_task(name)
 
 
@@ -4993,6 +5069,9 @@ def task_build():
             + [f"drawing:{s}" for s in _drawing_order()]
             + [f"check:machinist_review:{s}" for s, _mode in _reviewed_drawings()]
             + [f"verify:{s}" for s in _VERIFY_NAMES]
+            # EXPERIMENT ONLY: required in the pool's exported build closure.
+            # Submit only the selected experiment leaf, never build/release.
+            + [f"verify:{s}" for s in _EXPERIMENT_VERIFY_NAMES]
             + [f"prechips:{stem}" for stem in _process_plans.TRAVELER_STEMS]
         ),
     }
@@ -5025,7 +5104,7 @@ def _canonical_subtask_names(family: str) -> list[str]:
     if family == "drawing":
         return _drawing_order()
     if family == "verify":
-        return list(_VERIFY_NAMES)
+        return [*_VERIFY_NAMES, *_EXPERIMENT_VERIFY_NAMES]
     if family == "check":
         return [
             *_check_task_names(),
@@ -5057,6 +5136,34 @@ def _canonical_targets(name: str) -> list[str]:
     if family == "verify_soundness":
         return [str(REPORTS / f"verify-soundness-{subname.replace('_', '-')}.ok")]
     if family == "verify":
+        if subname == "feature_reconcile":
+            directory = REPORTS / "feature-reconcile"
+            return [str(directory / filename) for filename in (
+                "report.json", "spans.jsonl", "baseline-manifest.json", "target-recipe.json", "baseline.SLDPRT",
+                "visual-clean.png", "visual-incremental.png",
+                *(f"trial-{trial}-{mode}.SLDPRT"
+                  for trial in range(1, 4) for mode in ("clean", "incremental", "noop")),
+            )]
+        if subname == "assembly_reconcile":
+            directory = REPORTS / "assembly-reconcile"
+            return [str(directory / filename) for filename in (
+                "report.json", "spans.jsonl", "baseline-manifest.json", "target-recipe.json",
+                "fixture-child.SLDPRT", "baseline.SLDASM", "baseline-child.SLDPRT",
+                "visual-clean.png", "visual-incremental.png",
+                *(f"trial-{trial}-{mode}{suffix}"
+                  for trial in range(1, 4) for mode in ("clean", "incremental", "noop")
+                  for suffix in (".SLDASM", "-child.SLDPRT")),
+            )]
+        if subname == "drawing_reconcile":
+            directory = REPORTS / "drawing-reconcile"
+            return [str(directory / filename) for filename in (
+                "report.json", "spans.jsonl", "baseline-manifest.json", "target-recipe.json",
+                "baseline.SLDDRW", "baseline-part.SLDPRT", "baseline.pdf",
+                *(f"trial-{trial}-{mode}{suffix}"
+                  for trial in range(1, 4) for mode in ("clean", "incremental", "noop")
+                  for suffix in (".SLDDRW", "-part.SLDPRT")),
+                *(f"trial-{trial}-{mode}.pdf" for trial in range(1, 4) for mode in ("clean", "incremental")),
+            )]
         return [str(REPORTS / f"verify-{subname}.ok")]
     if family == "check":
         if subname.startswith("machinist_review:"):
@@ -5270,7 +5377,7 @@ def canonical_target_owners(paths: Iterable[str] | None = None) -> dict[str, str
         include(f"verify_soundness:{stem}")
     for stem in DRAWINGS_BY_NAME:
         include(f"drawing:{stem}")
-    for name in _VERIFY_NAMES:
+    for name in (*_VERIFY_NAMES, *_EXPERIMENT_VERIFY_NAMES):
         include(f"verify:{name}")
     for name in _check_task_names():
         include(f"check:{name}")

@@ -1462,6 +1462,331 @@ than in their names.
 workflow identity. An unchanged Git commit does not by itself mean an unchanged
 key; compare these before reusing or resuming a run.
 
+### Experimental keyed-feature reconciliation (draft branch only)
+
+**This experiment is not a merge candidate. Do not run `build` or `release`
+on this branch.** The pool currently exports only the `build`/`release`
+dependency closures (`agent/worker.py:REQUESTED_TARGETS`). Merely registering
+an opt-in `verify:` leaf does not admit it into that graph. This draft
+therefore explicitly adds `verify:feature_reconcile`,
+`verify:assembly_reconcile` and `verify:drawing_reconcile` to the branch's
+`build` dependencies, without changing pool admission, seat settings, or any
+production part, assembly or drawing recipe. That intentional default-graph
+change must never reach main.
+Submit **only** the diagnostic leaf from a clean, pushed experiment checkout,
+using the persistent launcher supervision described above:
+
+```powershell
+./scripts/farm-run.ps1 -Worktree C:/src/ha-feature-reconcile-20261109 `
+  -PoolHome C:/src/solidworks-pool -Targets verify:feature_reconcile `
+  -LeafTimeout 30 -DisplayName 'Experimental keyed-feature benchmark' `
+  -Tag feature-reconcile-native `
+  -ForceCacheRefresh verify:feature_reconcile `
+  -ForceCacheRefreshReason 'Measure three fresh native trials, not cached timings'
+```
+
+The canonical task uses the ordinary cache-keyed COM action, seat lock, graph
+admission, and archive publication. It creates an origin-centred, dimensioned
+Front-plane circle and positive-Z blind extrusion, saves a baseline native
+part plus semantic-key manifest, then copies/reopens those exact baseline bytes
+for each parameter edit. Three trials alternate clean/incremental ordering;
+each also measures a no-op from the saved incremental result. Structural
+key/type/order/dependency/operation changes return `full_build` with **no**
+partial edit instructions; they are not an arbitrary-topology edit engine.
+
+Declared outputs under `cad/out/reports/feature-reconcile/` include
+`report.json`, `spans.jsonl`, `baseline-manifest.json`, `target-recipe.json`,
+the baseline and all nine trial native parts, plus `visual-clean.png` and
+`visual-incremental.png`. The two native isometric viewport captures are produced
+after all timed trials, without saving the source parts. Capture explicitly
+activates and checks the target document, enables its graphics updates with
+restoration, stages an isometric fitted view, and forces an immediate redraw.
+PNG validation rejects flat/gradient-only backgrounds using luminance and
+interior edge-content gates; it is not a claim of visual geometry equivalence.
+Native byte-identity checks remain mandatory. The directory is archived by the
+ordinary leaf cache, so raw benchmark OTel spans survive worker cleanup.
+The report carries trace/span IDs, per-phase wall timings, individual results
+and medians; it reports initial baseline creation separately. Native validation
+is identical before save and after close/reopen: named driving dimensions,
+exact `IBody2.GetExtremePoint` bounds, direct native volume, and baseline
+feature references resolved using `GetObjectByPersistReference3` plus native
+`ISldWorks.IsSame` (not reference-byte equality). No-op skips edits, rebuild
+and save and must preserve native bytes. Save/open warning and error bits,
+failed dimension writes, failed rebuilds, and failed readbacks are fatal.
+Feature checks retain raw/effective native type and name events. Only `ICE`
+uses the SDK-prescribed legacy `GetTypeName` underlying-kind query. The
+semantic extrusion contract accepts only documented `Boss`/`Extrusion` kinds,
+requires `IFeature.IsBase2` (the first solid is a base, not an added boss), and
+checks native non-thin, single-direction, non-reversed, blind extrusion with finite positive depth;
+a matching type label alone is not proof.
+
+These are raw **warm-seat operation** timings, including validation and save/
+reopen, not whole-build speedups. Incremental timings also include baseline
+contract validation before the first mutation, reported as its own phase rather
+than edit time. Verification, save, reopen, and each close have separate phase
+spans; trial row totals still include them all. Dedicated raw span serialization
+happens when the root benchmark span ends, outside measured trial rows. The
+post-trial visual captures are also excluded. The report excludes process
+startup, connection, farm scheduling, source acquisition, and cache publication;
+use the surrounding farm spans to study those separately. No measurements
+are claimed until a native run succeeds and its declared evidence is retained.
+
+Safe offline commands (no COM connection):
+
+```powershell
+uv run --frozen python cad/scripts/diagnostics/benchmark_feature_reconcile.py --help
+uv run --frozen python -m pytest cad/scripts/test_feature_reconcile.py -q
+uv run --frozen python cad/scripts/diagnostics/benchmark_feature_reconcile.py plan `
+  <retained-output>/reports/feature-reconcile/baseline-manifest.json `
+  <retained-output>/reports/feature-reconcile/target-recipe.json
+```
+
+The `plan` command reads the manifest's saved recipe and emits `incremental`,
+`noop`, or `full_build` without loading native bindings. Standalone benchmark
+execution is rejected unless the canonical COM seat lock is held.
+
+#### Native measurements, 2026-11-09
+
+Commit `43c0755791cacce5d5055e810b30c547f4b1bc05` passed on
+`swmaker00000a@10`, run `20261109T153914987Z-984d7dd4736f48d3b532ef168238a4e9`.
+Three trials changed a saved cylinder from 20 mm diameter and 12 mm depth to
+24 mm and 15 mm, alternating clean/incremental order.
+
+| operation | median seconds | observed range, seconds |
+|---|---:|---:|
+| clean creation, validation, save and reopen | 5.353 | 5.305 to 5.528 |
+| parameter reconciliation, validation, save and reopen | 3.379 | 3.377 to 3.435 |
+| no-op with open and readback validation | 2.938 | 2.912 to 2.961 |
+
+Reconciliation used 36.9% less operation time (1.58x speedup). The 124 retained
+OTel spans attribute the gain to authoring: median creation took 3.089 s,
+while dimension edits took 0.0179 s. Explicit rebuilds were 0.0666 s clean and
+0.0707 s incremental. Incremental baseline copy/open added 1.148 s.
+
+Both keyed features retained native identity after save/reopen. Dimensions,
+exact bounds and volume matched clean creation; no-op files stayed byte-identical.
+Structural changes returned `full_build` without edits. The two inspected
+isometric PNGs were byte-identical and passed the content checks.
+
+This proves a parameter-only, two-feature experiment, not arbitrary topology,
+assembly-mate or drawing-reference preservation. Timings exclude farm overhead:
+the enclosing farm span was 488.6 s, including 107.7 s of source acquisition and
+57.4 s of worker execution. These phase measurements do not account for the
+whole farm span and must not be summed as an exhaustive breakdown.
+Source, native evidence and earlier attempts are recorded in
+[PR #2322](https://github.com/pedropaulovc/harmonic-analyzer/pull/2322).
+
+#### Assembly mate reconciliation benchmark (draft)
+
+`verify:assembly_reconcile` (`cad/scripts/diagnostics/benchmark_assembly_reconcile.py`,
+planner `_assembly_reconcile.py`) reuses the qualified cylinder above as a
+scratch child, inserted twice with explicit `Default` assembly and child
+configurations. `base` is fixed at the origin; `mover` is fully constrained by
+`ReconcileTop`/`ReconcileRight` coincident planes and the `ReconcileDistance`
+Front-plane distance mate (aligned, mover on +Z). `FlipDimension` has no
+documented sign; attempt 2 showed `False` puts the mover at -Z for the
+mover-first/base-second plane order, so the recipe declares `True`. The
+incremental edit changes only `D1@ReconcileDistance` from 30 mm to 40 mm with
+`SetSystemValue3`; it never reinserts components or re-mates. Any other recipe
+change returns `full_build` with no edits; malformed recipes raise.
+
+Submit only this leaf, with the same launcher supervision:
+
+```powershell
+./scripts/farm-run.ps1 -Worktree C:/src/ha-feature-reconcile-20261109 `
+  -PoolHome C:/src/solidworks-pool -Targets verify:assembly_reconcile `
+  -LeafTimeout 30 -DisplayName 'Experimental assembly mate benchmark' `
+  -Tag assembly-reconcile-native `
+  -ForceCacheRefresh verify:assembly_reconcile `
+  -ForceCacheRefreshReason 'Measure three fresh native assembly trials, not cached timings'
+```
+
+There is no repository assembly template. The run resolves the seat's assembly
+template with `GetDocumentTemplate`, records the raw `swDefaultTemplateAssembly`
+preference (which can be empty), and requires an existing `.ASMDOT`. It records
+path, size and SHA-256, creates every assembly with `NewDocument` on that exact
+path, and fails if the resolved template path, size or bytes change. The raw
+default preference is observational: before/after values are retained, but
+creation never consults it after the template path is pinned.
+That template is seat-local and not in the recipe cache key, so only fresh
+forced native runs count as benchmark evidence. Before any document work,
+every native enum literal the benchmark uses is checked against the seat's
+installed `swconst.tlb`.
+
+Copy isolation: incremental and no-op trials byte-copy the source assembly and
+its child under unique per-trial names, then retarget the **closed** copy with
+`ISldWorks.ReplaceReferencedDocument`. `GetDocumentDependencies2` must report
+exactly the source child before and exactly the trial child after. After every
+open, each occurrence's `GetPathName`, its loaded model path and
+`GetSuppression2` must name the trial child, and the source child must not be
+loaded. Baseline assembly, baseline child and fixture child hashes are
+re-checked after every trial. Child hashes are recorded before and after each
+trial, but geometry is validated separately by the qualified part validator.
+
+Validation before save and after close/reopen is identical in every mode:
+one fixed and one floating resolved occurrence, mover fully constrained
+(`GetConstrainedStatus() == 3`), identity rotation plus exact signed
+translations `(0,0,0)` and `(0,0,+d)`, exactly the three named mates,
+unsuppressed with zero `GetErrorCode2` (warnings are fatal), expected
+`IMate2` type, alignment, flip, and datum-plane entities on both occurrences.
+The distance dimension's `GetFeatureOwner` must be the keyed mate. Persistent
+references resolve both components and all three mates through
+`GetObjectByPersistReference3` plus `IsSame` (falling back to the documented
+`GetSpecificFeature2` only when the result is an `IFeature`). Incremental and
+no-op identities come from the copied baseline manifest. Clean identities come
+only from the same clean build.
+
+Phase spans (`experiment.assembly_reconcile.*`) cover copy, retarget, open,
+diff, prevalidation, edit, rebuild, both validations, save, both closes,
+reopen and readback integrity. Clean creation spans include `CreateMate`
+solves and the adapter's `EditRebuild3` after each mate, so the separate
+rebuild phase is not all solver time. Fixture and baseline creation, renders
+and span serialization are outside trial rows. Outputs under
+`cad/out/reports/assembly-reconcile/` include `report.json`, `spans.jsonl`,
+manifests, the fixture, baseline and all nine trial assemblies and children,
+and untimed `visual-clean.png`/`visual-incremental.png`. Compare image hashes
+and content evidence, not tool previews. Offline commands:
+
+```powershell
+uv run --frozen python cad/scripts/diagnostics/benchmark_assembly_reconcile.py --help
+uv run --frozen python -m pytest cad/scripts/test_assembly_reconcile.py -q
+uv run --frozen python cad/scripts/diagnostics/benchmark_assembly_reconcile.py plan `
+  <retained-output>/reports/assembly-reconcile/baseline-manifest.json `
+  <retained-output>/reports/assembly-reconcile/target-recipe.json
+```
+
+Native source `f986275856c4b0dad71d10f7a7885d1290552b7e` passed on
+`swmaker000004@4`, run `20261109T165730103Z-137e9e1bf4b1422f8230e11b394c3f11`.
+Three alternating clean/incremental pairs and no-op trials produced:
+
+| assembly operation | median seconds | observed range, seconds |
+|---|---:|---:|
+| clean creation | 7.165 | 7.154 to 7.214 |
+| retained-mate reconciliation | 4.914 | 4.905 to 4.966 |
+| no-op with isolated reference retargeting and validation | 3.877 | 3.869 to 3.902 |
+
+Reconciliation used 31.4% less operation time (1.46x speedup). The 145 retained
+OTel spans attribute 3.831 s to clean creation (including per-mate solves),
+versus 0.00380 s for the retained dimension edit. Incremental reference
+retargeting took 0.0472 s, initial open 1.166 s and baseline validation 0.637 s.
+The separate explicit rebuild took 0.121 s clean and 0.102 s incremental.
+These operation times include isolation, validation, save and reopen, but
+exclude fixture creation, renders, farm scheduling and worker startup.
+
+Both occurrences and all three mates resolved directly through their persistent
+references after save/reopen. The base stayed at the origin, the fully
+constrained mover reached +40 mm on Z with identity rotation, all mates were
+healthy and child geometry stayed unchanged. No-op assembly bytes stayed
+unchanged after the separately timed reference retarget. The two native PNGs
+were inspected and byte-identical. Structural mate changes returned `full_build`
+without edit instructions.
+
+The default template preference changed from empty to the resolved template
+path during native work; the explicitly used template path, size and hash
+remained identical. That observed preference initialization explains the
+prior whole-metadata comparison failure. The enclosing farm span took 469.5 s,
+with 333.3 s source acquisition and 81.0 s worker execution; the speedup above
+is not a farm-wall-time claim. This remains a two-occurrence, three-plane-mate
+experiment on a frozen baseline, not current-main qualification or proof for
+arbitrary component replacement, mate topology or nested assemblies.
+[Native assemblies, children, manifests, report and raw spans](https://github.com/user-attachments/files/34589963/native4-assembly-evidence.zip).
+
+#### Drawing reconciliation benchmark (draft, not yet run natively)
+
+`verify:drawing_reconcile` (`cad/scripts/diagnostics/benchmark_drawing_reconcile.py`,
+planner `_drawing_reconcile.py`) draws the qualified cylinder above (diameter
+20 mm, depth 12 mm) on the repository landscape template, resolved exactly as
+`_drawing_common.new_project_drawing` does (`DRAWING_TEMPLATES[layout]`, never
+the seat default; that template is a task `file_dep`). The sheet is 1:1 in
+millimetres with two decimals. It has two keyed model views, `ReconcileFront`
+(`*Front`) and `ReconcileSide` (`*Right`), named with `IView.SetName2`.
+`InsertModelAnnotations3` imports the model dimensions as native associative
+display dimensions: `Diameter@ReconcileProfile` in the front view and
+`Depth@ReconcileBody` in the side view. One free sheet note completes the
+drawing, which is saved as `.SLDDRW` and exported to PDF. The target changes
+depth from 12 mm to 16 mm. A planner change to any view, annotation, note,
+sheet, template or part structure returns `full_build` with no edits;
+malformed recipes raise. No isometric view is drawn, so the seat-global
+shaded-raster PDF preference that `finalize_drawing` raises is never touched.
+No seat (system) preference is written; units are document properties.
+
+Submit only this leaf, with the same launcher supervision:
+
+```powershell
+./scripts/farm-run.ps1 -Worktree C:/src/ha-feature-reconcile-20261109 `
+  -PoolHome C:/src/solidworks-pool -Targets verify:drawing_reconcile `
+  -LeafTimeout 30 -DisplayName 'Experimental drawing reconciliation benchmark' `
+  -Tag drawing-reconcile-native `
+  -ForceCacheRefresh verify:drawing_reconcile `
+  -ForceCacheRefreshReason 'Measure three fresh native drawing trials, not cached timings'
+```
+
+Modes, run as three alternating clean/incremental pairs plus a no-op from
+each saved incremental result:
+
+- **clean** builds, rebuilds and saves a fresh part at the target value, then
+  creates the drawing from scratch.
+- **incremental** copies the baseline part, then the drawing, so the drawing
+  is never older than its model. It retargets the closed drawing copy with
+  `ReplaceReferencedDocument`; `GetDocumentDependencies2` must report exactly
+  the source part before and the trial part after, with non-model
+  dependencies unchanged. It then opens the part and the drawing, validates
+  the copied baseline, edits `Depth@ReconcileBody` in place with
+  `SetSystemValue3`, and rebuilds the part and drawing. It saves the part
+  first, then the drawing.
+- **no-op** copies, retargets, opens and validates, but does not edit,
+  rebuild, save or export. The retargeted drawing and part bytes must stay
+  unchanged.
+
+Phase spans (`experiment.drawing_reconcile.*`) cover copy, retarget, open,
+diff, prevalidation, `part_edit` (clean creation, rebuild and save of the
+part), `view_create` and `annotate` (clean only), rebuild,
+`validation_before_save`, save, `pdf_export`, close, reopen,
+`validation_after_reopen`, `close_after_reopen` and readback integrity.
+
+Validation is identical in every mode, both before save and after reopen:
+
+- The drawing has one sheet with the declared scale and units.
+- Both keyed views exist with their declared orientation, referenced trial
+  part, configuration and scale. `IsModelOutOfDate` must be false. Positions
+  and outlines are recorded.
+- Exactly the two keyed display dimensions appear, each in its declared view.
+  Each must be visible, not dangling, attached to at least one entity, and read
+  the target model value through `GetSystemValue3`.
+- Exactly one visible, sheet-owned note carries the declared text.
+- The automatic and template annotation inventory, such as centre marks,
+  matches the baseline's observed inventory.
+- Part geometry, keyed persistent identities, bounds and volume pass the
+  part benchmark validator.
+
+Clean and incremental drawings must have equal view outline sizes,
+dimension values, note text and inventories. View, dimension and note
+position deltas are retained as evidence. Baseline drawing, part and PDF
+hashes are checked after every trial.
+
+For every clean and incremental PDF, the report records SHA-256, page count
+and extracted text. `report.json` `pdf_comparison` holds the per-trial
+clean-versus-incremental byte/page/text equality and a text diff. The
+repository has no PDF text helper, so text comes from pypdf's
+`PageObject.extract_text`; the report records that. The report keeps the
+assembly report's top-level `median_seconds`, `trial_seconds`,
+`phase_median_seconds` and `results`. Outputs under
+`cad/out/reports/drawing-reconcile/` are `report.json`, `spans.jsonl`,
+`baseline-manifest.json`, `target-recipe.json`, `baseline.SLDDRW`,
+`baseline-part.SLDPRT`, `baseline.pdf`, every trial drawing and part, and the
+clean and incremental trial PDFs. Offline commands:
+
+```powershell
+uv run --frozen python cad/scripts/diagnostics/benchmark_drawing_reconcile.py --help
+uv run --frozen python -m pytest cad/scripts/test_drawing_reconcile.py -q
+uv run --frozen python cad/scripts/diagnostics/benchmark_drawing_reconcile.py plan `
+  <retained-output>/reports/drawing-reconcile/baseline-manifest.json `
+  <retained-output>/reports/drawing-reconcile/target-recipe.json
+```
+
+No native measurement exists yet; do not cite timings until a forced native
+run passes and its evidence is retained.
+
 ### Readiness is not proof of a build
 
 `farm-launch started` means the wrapper initialized its log and startup record.
