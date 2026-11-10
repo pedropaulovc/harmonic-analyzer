@@ -227,15 +227,27 @@ def test_swapped_manifest_face_never_passes_or_stages(tmp_path: Path) -> None:
     assert _tree(out) == before
 
 
-def test_invalid_manifest_schema_never_stages(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("corrupt", "message"),
+    [
+        ("empty", "feature manifest has no features"),
+        ("scalar", "every feature must be a table"),
+    ],
+)
+def test_invalid_manifest_schema_never_stages(
+    tmp_path: Path, corrupt: str, message: str
+) -> None:
     out = bound_output(tmp_path)
     stem = export_features.SUPPORTED_PARTS[-1]
     path = out / "features" / stem / "features.toml"
     manifest = tomllib.loads(path.read_text(encoding="utf-8"))
-    manifest["units"] = "inches"
+    if corrupt == "empty":
+        manifest["features"] = {}
+    else:
+        manifest["features"][next(iter(manifest["features"]))] = "not a table"
     path.write_text(export_features._toml(manifest), encoding="utf-8")
     stage = tmp_path / "stage"
-    with pytest.raises(features_bound.FeaturesBoundError, match="invalid feature manifest.*"):
+    with pytest.raises(features_bound.FeaturesBoundError, match=message):
         features_bound.stage_bound_features(out, stage)
     assert not stage.exists()
 

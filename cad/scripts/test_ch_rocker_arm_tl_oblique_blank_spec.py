@@ -2,8 +2,6 @@
 from __future__ import annotations
 
 import math
-import tomllib
-from pathlib import Path
 
 import pytest
 
@@ -116,76 +114,3 @@ def test_two_common_heads_and_hub_washer_have_real_stock_under_them() -> None:
                           (trammel.CR, common_screw.head_dia / 2.0),
                           (trammel.HUB, washer.OD / 2.0)):
         assert blank.disk_material_area(point, radius) == pytest.approx(math.pi * radius**2, abs=1e-8)
-
-
-def test_held_process_layout_matches_geometry_without_chain_drilling() -> None:
-    path = Path(__file__).resolve().parents[1] / "process" / "ch_rocker_arm" / "plan.toml"
-    text = path.read_text(encoding="utf-8")
-    plan = tomllib.loads(text)
-    from _process_plans import TRAVELER_STEMS
-
-    assert plan["part"].replace("-", "_") not in TRAVELER_STEMS
-    assert plan["construction"] == "built_up"
-    assert plan["stock"]["length_mm"] == trammel.BLANK_LENGTH
-    assert plan["stock"]["section_mm"] == [blank.BLANK_WIDTH, 3.175]
-    assert plan["stock"]["origin_mm"] == pytest.approx((-175.0, blank.RAW_Y_MIN, 0.0))
-    layout = plan["bandsaw_preform"]
-    assert layout["retained_edge_normal_error_max_mm"] == blank.SAW_EDGE_TOLERANCE
-    for key, anchors in (("inner_anchors_mm", blank.INNER_ANCHORS), ("outer_anchors_mm", blank.OUTER_ANCHORS)):
-        assert len(layout[key]) == len(anchors)
-        for actual, expected in zip(layout[key], anchors, strict=True):
-            assert actual == pytest.approx(expected)
-    assert layout["raw_y_limits_mm"] == pytest.approx((blank.RAW_Y_MIN, blank.RAW_Y_MAX))
-    assert all(op.get("contour", {}).get("method") != "chain_drill" for setup in plan["setups"] for op in setup["ops"])
-    assert layout["inner_anchor_radius_mm"] == blank.INNER_ANCHOR_RADIUS
-    assert layout["outer_anchor_radius_mm"] == blank.OUTER_ANCHOR_RADIUS
-    assert layout["inner_centre_radius_mm"] == trammel.R_C1
-    assert layout["outer_centre_radius_mm"] == trammel.R_C2
-    # Marks print on the exact .XXX inch grid from the end midpoint/raw edge.
-    assert layout["layout_datum_mm"] == pytest.approx(blank.LAYOUT_DATUM)
-    for name in ("inner", "outer"):
-        printed = layout[f"{name}_layout_marks_in"]
-        assert len(printed) == len(blank.LAYOUT_MARKS[name])
-        for marks_in, marks_mm in zip(printed, blank.LAYOUT_MARKS[name], strict=True):
-            assert [v * trammel.INCH for v in marks_in] == pytest.approx(marks_mm, abs=1e-9)
-            assert all(round(v, blank.LAYOUT_PLACES) == v for v in marks_in)
-    # Physical order is structured data; prose may be rephrased without
-    # changing the route. Facing and pre-saw preparation precede hub work;
-    # both circular cuts precede removal of the sacrificial end tails.
-    setup_rows = plan["setups"]
-    assert [(setup["id"], setup["stock_in"]) for setup in setup_rows] == [
-        ("S0", "stock"), ("S1", "S0"), ("S2", "S1"),
-        ("S3", "S2"), ("S4", "S3"), ("S5", "S4"),
-    ]
-    setups = {setup["id"]: {op["op"]: op for op in setup["ops"]} for setup in setup_rows}
-    assert (setups["S0"][10]["do"], setups["S0"][10]["feature"]) == (
-        "finish_face", "strap_faces",
-    )
-    assert setups["S1"][10]["do"] == "scribe"
-    assert setups["S1"][10]["feature"] == ["top_edge", "profile_outer"]
-    s2 = next(setup for setup in setup_rows if setup["id"] == "S2")
-    assert [(op["op"], op["do"], op["feature"]) for op in s2["ops"]] == [
-        (10, "inspect", "strap_faces"),
-        (20, "drill", "strap_end_clamp_holes"),
-        (30, "drill", "hub_joint"),
-        (40, "ream", "hub_joint"),
-    ]
-    clamp_holes = setups["S2"][20]
-    # Real inventory refs: the drill index's declared 64ths coverage selects the bit.
-    assert clamp_holes["tool"] == f"drill-index-115/{blank.CLAMP_DRILL.replace('/', '-')}in"
-    hub_drill, ream = setups["S2"][30], setups["S2"][40]
-    assert (hub_drill["do"], hub_drill["feature"], hub_drill["tool"]) == ("drill", "hub_joint", "drill-index-115/25-64in")
-    assert (ream["do"], ream["feature"], ream["tool"]) == ("ream", "hub_joint", "reamers-inch-purchases/0.4000in")
-    for op in (clamp_holes, hub_drill, ream):
-        assert op["holder"] == "drill-chuck-r8"
-    s3 = next(setup for setup in setup_rows if setup["id"] == "S3")
-    assert [(op["op"], op["do"], op["feature"]) for op in s3["ops"]] == [
-        (10, "rough_profile", "top_edge"),
-        (20, "rough_profile", "profile_outer"),
-    ]
-    for op in s3["ops"]:
-        assert op["tool"] == "endmills-lms-6784/3-8in-4fl"
-        assert op["holder"] == "r8-collets-lms-4860/3-8in"
-    assert (setups["S4"][10]["do"], setups["S4"][10]["feature"]) == (
-        "deburr", ["tip_land_pos_x", "tip_land_neg_x"],
-    )

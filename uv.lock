@@ -1341,7 +1341,7 @@ requires-dist = [
     { name = "opentelemetry-exporter-otlp-proto-http", specifier = ">=1.20" },
     { name = "opentelemetry-sdk", specifier = ">=1.20" },
     { name = "pillow", specifier = ">=10.0" },
-    { name = "prechips", specifier = "==0.3.0" },
+    { name = "prechips", specifier = ">=0.8,<10" },
     { name = "pypdf", specifier = ">=6.14.2" },
     { name = "pypdfium2", specifier = ">=5.11.0" },
     { name = "pywin32", marker = "sys_platform == 'win32'", specifier = ">=306" },
@@ -2580,19 +2580,11 @@ wheels = [
 
 [[package]]
 name = "prechips"
-version = "0.3.0"
+version = "0.8.0"
 source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "opentelemetry-api" },
-    { name = "opentelemetry-exporter-otlp-proto-grpc" },
-    { name = "opentelemetry-exporter-otlp-proto-http" },
-    { name = "opentelemetry-sdk" },
-    { name = "pydantic" },
-    { name = "rich" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/a0/de/9cc613eb15379ab2391f7c7a8b61da7f44ee156dda2827760843c7aaa0a8/prechips-0.3.0.tar.gz", hash = "sha256:aac3dcb329fe199aa97eb31b1c1b6fcb244da14823f7b4783d6051923676a86c", size = 1141424, upload-time = "2026-11-08T17:19:04.805Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/af/ad/de615c837981d1da5a421bfd8618009ff68429a97b6f97f04c884c361ab1/prechips-0.8.0.tar.gz", hash = "sha256:64730b3cf925193ccf9df429f7ccb36dc19448c6f9f9be2f2fa64ac62ad98330", size = 77882, upload-time = "2026-11-10T19:11:29.304Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/17/3e/a6fd7f01475a317a1751343fd7175727ba1ba00f384314074cdf62280a39/prechips-0.3.0-py3-none-any.whl", hash = "sha256:3acc4cd4b746d1edea18349069491f4122523198fb47539a5ba66cb336291663", size = 1187562, upload-time = "2026-11-08T17:19:03.026Z" },
+    { url = "https://files.pythonhosted.org/packages/69/dd/f18986a60444829c04d25f415c32df18694c4b59bff441d958b11db2cc8b/prechips-0.8.0-py3-none-any.whl", hash = "sha256:2482cf87e4ddf5685eb49dc7c18f0582c3b9fbdd39e7a04c985cf1ddfd8493a5", size = 75436, upload-time = "2026-11-10T19:11:28.19Z" },
 ]
 
 [[package]]

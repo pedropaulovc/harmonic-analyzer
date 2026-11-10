@@ -146,11 +146,7 @@ def test_sheet_carries_no_notes() -> None:
     assert spec.HOLE_CALLOUT_PROCESS == "DRILL"
 
 
-def test_prechips_solids_are_valid_fixture_solids() -> None:
-    from prechips.model import FixtureSolid
-
-    for solid in spec.PRECHIPS_SOLIDS:
-        FixtureSolid.model_validate(solid)
+def test_prechips_solids_name_the_lever_and_its_holes() -> None:
     names = {solid["name"] for solid in spec.PRECHIPS_SOLIDS}
     assert names == {"feed lever", "bolt hole 1", "bolt hole 2"}
 

@@ -50,7 +50,7 @@ What it does, in order:
      when no drawing changes remain after BUILD/REV stamp normalization.
   5. Before publication, regenerate every README-generated picture from the
      versioned staged bundle into an untracked temporary directory, and validate
-     and stage the ``release.yaml`` and migrated/enrolled plans' next-revision updates.
+     and stage the ``release.yaml`` next-revision update.
      Missing images, PDF sheets, or rendering tools fail before any tag/push.
      Requires the project's meshprobe/PDFium dependencies and Blender >= 5.2;
      no local COM is used.
@@ -265,49 +265,22 @@ class _PreparedRevisionAdvance:
 
 
 def prepare_configured_revision_advance(version: str) -> _PreparedRevisionAdvance:
-    """Stage release.yaml and migrated/enrolled plan revisions, not enrollment."""
+    """Stage the release.yaml next_revision bump until publication succeeds."""
     require_configured_revision(version)
     next_version = f"v{int(version[1:]) + 1}"
-    sources = [
-        RELEASE_VERSION_FILE,
-        *(_process_plans.plan_path(stem) for stem in _process_plans.revision_stems()),
-    ]
+    sources = [RELEASE_VERSION_FILE]
     updates: list[tuple[Path, Path]] = []
     prepared = _PreparedRevisionAdvance(updates, next_version)
     try:
         for source in sources:
             text = source.read_bytes().decode("utf-8")
-            if source == RELEASE_VERSION_FILE:
-                updated, count = re.subn(
-                    rf"(?m)^([ \t]*next_revision:[ \t]*){re.escape(version)}"
-                    r"([ \t]*(?:#[^\r\n]*)?\r?)$",
-                    rf"\g<1>{next_version}\g<2>",
-                    text,
-                )
-                field = "next_revision"
-            else:
-                sections = list(re.finditer(
-                    r"(?m)^[ \t]*\[drawing\][ \t]*(?:#[^\r\n]*)?\r?$", text
-                ))
-                if len(sections) != 1:
-                    raise RuntimeError(f"expected one [drawing] section in {source}")
-                start = sections[0].end()
-                following = re.search(r"(?m)^[ \t]*\[", text[start:])
-                end = start + following.start() if following else len(text)
-                if len(re.findall(
-                    r"(?m)^[ \t]*revision[ \t]*=", text[start:end]
-                )) != 1:
-                    raise RuntimeError(
-                        f"expected exactly one [drawing].revision line in {source}"
-                    )
-                drawing, count = re.subn(
-                    rf"""(?m)^([ \t]*revision[ \t]*=[ \t]*)(["'])"""
-                    rf"""{re.escape(version)}\2([ \t]*(?:#[^\r\n]*)?\r?)$""",
-                    rf"\g<1>\g<2>{next_version}\g<2>\g<3>",
-                    text[start:end],
-                )
-                updated = text[:start] + drawing + text[end:]
-                field = "[drawing].revision"
+            updated, count = re.subn(
+                rf"(?m)^([ \t]*next_revision:[ \t]*){re.escape(version)}"
+                r"([ \t]*(?:#[^\r\n]*)?\r?)$",
+                rf"\g<1>{next_version}\g<2>",
+                text,
+            )
+            field = "next_revision"
             if count != 1:
                 raise RuntimeError(
                     f"expected exactly one {field} = {version} line in {source}; "
@@ -527,22 +500,8 @@ def stage_comparisons(stage: Path) -> dict[str, Any]:
 
 
 def preflight(version: str, allow_dirty: bool) -> None:
-    """Fail fast on configured/plan/manifest revision drift before staging."""
+    """Fail fast on configured revision drift or an existing tag before staging."""
     require_configured_revision(version)
-    for stem in _process_plans.revision_stems():
-        try:
-            if stem in _process_plans.TRAVELER_STEMS:
-                _process_plans.check_plan_revision(
-                    stem, CAD_ROOT / "out", revision=version
-                )
-            else:
-                _process_plans.check_authored_plan_revision(stem, version)
-        except _process_plans.PlanBindError as exc:
-            raise SystemExit(f"!!  process plan {stem}: {exc}") from exc
-    try:
-        _process_plans.require_measured_release()
-    except (_process_plans.PlaceholderRelease, _process_plans.PlanBindError) as exc:
-        raise SystemExit(f"!!  {exc}") from exc
     if _git("tag", "--list", version):
         raise SystemExit(f"!!  tag {version} already exists -- pick another version")
 
@@ -1288,7 +1247,7 @@ def release_notes(version: str, facts: dict[str, Any]) -> str:
         f"- `png/` -- isometric preview renders "
         f"({facts['pngs']} images)\n"
         + (
-            "- `travelers/` -- verified strict prechips travelers: "
+            "- `travelers/` -- standalone HTML prechips travelers: "
             + ", ".join(f"`{path}`" for path in facts["travelers"])
             + "\n"
             if facts.get("travelers")
@@ -1572,8 +1531,8 @@ def main() -> int:
                 if opts.no_publish:
                     report_no_publish(version, zip_path, facts, log_path)
                     log(
-                        "--no-publish: prepared all README images; tracked images, "
-                        "next_revision and migrated/enrolled plan revisions are unchanged"
+                        "--no-publish: prepared all README images; tracked images "
+                        "and next_revision are unchanged"
                     )
                     url = None
                 else:
@@ -1593,11 +1552,8 @@ def main() -> int:
                                 "cad/scripts/trim_renders.py "
                                 f"--release-root cad/out/release/{PROJECT_SLUG}-{version}`, "
                                 f"set {RELEASE_VERSION_FILE} to "
-                                f"next_revision: {prepared.next_version}, set "
-                                "[drawing].revision to "
-                                f"{prepared.next_version} in migrated/enrolled plans "
-                                f"{', '.join(str(source) for source, _ in prepared.updates[1:]) or '(none)'}, "
-                                "and commit those revisions and generated images in one "
+                                f"next_revision: {prepared.next_version}, "
+                                "and commit that revision and the generated images in one "
                                 "generated-only follow-up PR before the next release. "
                                 "That image+revision-only PR is exempt from regular review "
                                 "and may merge immediately; any code or process changes "
@@ -1614,9 +1570,8 @@ def main() -> int:
                     _telemetry.warn(
                         "POST-RELEASE PR REQUIRED: refreshed generated README images in "
                         f"{trim_renders.DOCS_IMAGES} and advanced "
-                        f"{RELEASE_VERSION_FILE} and migrated/enrolled plans "
-                        f"{', '.join(str(source) for source, _ in prepared.updates[1:]) or '(none)'} "
-                        f"to {next_revision}. Commit revisions and images in one "
+                        f"{RELEASE_VERSION_FILE} to {next_revision}. Commit the revision "
+                        "and images in one "
                         "generated-only follow-up PR before cutting the next release. "
                         "That narrowly image+revision-only PR is exempt from regular review "
                         "and may merge immediately; code, README prose, and release-process "

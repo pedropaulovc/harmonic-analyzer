@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" data-cad-template="holes" viewBox="0 0 720 {{view.height}}" width="720" height="{{view.height}}" font-family="Arial, Helvetica, sans-serif" font-size="15">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#111"/>
+    </marker>
+  </defs>
+  <rect width="720" height="{{view.height}}" fill="#fff"/>
+
+  <!-- vise jaws (top view), authored 6 in jaws centred on the bar -->
+  <rect x="241" y="56" width="192" height="16" fill="#8a9099" stroke="#111" stroke-width="1.2"/>
+  <rect x="241" y="{{view.bottom}}" width="192" height="16" fill="#b5b9bf" stroke="#111" stroke-width="1.2"/>
+
+  <!-- CAD finished bar, C'BORE SIDE up, ZERO EDGE at back -->
+  <rect id="bar" x="{{view.x0}}" y="{{view.top}}" width="{{view.lpx}}" height="{{view.hpx}}" fill="#dfe6ee" stroke="#111" stroke-width="1.5"/>
+  <line x1="{{view.x0}}" y1="{{view.datum_y}}" x2="{{view.x1}}" y2="{{view.datum_y}}" stroke="#a33" stroke-width="3"/>
+
+  <!-- parallels and jacks under the bar -->
+  <g fill="none" stroke="#333" stroke-width="1.2" stroke-dasharray="4 3">
+    <rect x="243" y="75" width="188" height="5"/>
+    <rect x="243" y="{{view.lower_parallel_y}}" width="188" height="5"/>
+    <circle cx="{{view.jack1_x}}" cy="{{view.jack1_y}}" r="10"/>
+    <circle cx="{{view.jack2_x}}" cy="{{view.jack2_y}}" r="9"/>
+  </g>
+
+  <!-- CAD rail holes, counterbored bracket holes and slots -->
+  <g id="rail-holes" data-cad-group="rail-holes" fill="#fff" stroke="#111" stroke-width="1.2"/>
+  <g id="bracket-holes" data-cad-group="bracket-holes" fill="#fff" stroke="#111" stroke-width="1.2"/>
+  <g id="slots" data-cad-group="slots" fill="#fff" stroke="#111" stroke-width="1.2"/>
+
+  <!-- feature labels -->
+  <g id="feature-labels" data-cad-group="feature-labels"/>
+  <text x="250" y="{{view.cbore_label_y}}">C'BORE SIDE up</text>
+  <text x="{{view.rail_label_x}}" y="{{view.rail_label_y}}">{{cad.rail_range}}, Y {{cad.rail_y_in:.4f}}</text>
+  <text x="{{view.jack1_label_x}}" y="{{view.jack1_label_y}}">jack</text>
+  <text x="{{view.jack2_label_x}}" y="{{view.jack2_label_y}}" text-anchor="end">jack</text>
+
+  <!-- datum origin X0/Y0 at back-left -->
+  <g transform="translate({{view.x0}} {{view.top}})">
+    <circle cx="0" cy="0" r="7" fill="#fff" stroke="#111" stroke-width="1.2"/>
+    <path d="M0 0V-7A7 7 0 0 1 7 0Z M0 0V7A7 7 0 0 1 -7 0Z" fill="#111"/>
+  </g>
+  <text x="{{view.origin_label_x}}" y="{{view.origin_label_y}}">X0 Y0</text>
+  <text transform="translate({{view.zero_end_x}} {{view.mid_y}}) rotate(-90)" text-anchor="middle">ZERO END</text>
+  <text x="337" y="46" text-anchor="middle">fixed jaw: ZERO EDGE against it</text>
+
+  <!-- axes -->
+  <g stroke="#111" stroke-width="1.5">
+    <line x1="630" y1="22" x2="680" y2="22" marker-end="url(#arr)"/>
+    <line x1="630" y1="22" x2="630" y2="58" marker-end="url(#arr)"/>
+  </g>
+  <text x="686" y="27">+X</text>
+  <text x="640" y="60">−Y</text>
+
+  <!-- front jaw and CAD length -->
+  <text x="337" y="{{view.front_label_y}}" text-anchor="middle">front jaw · 1-3/8 parallels under bar</text>
+  <g stroke="#111" stroke-width="1">
+    <line x1="{{view.x0}}" y1="{{view.ext_top}}" x2="{{view.x0}}" y2="{{view.ext_bottom}}"/>
+    <line x1="{{view.x1}}" y1="{{view.ext_top}}" x2="{{view.x1}}" y2="{{view.ext_bottom}}"/>
+    <line x1="{{view.dim_x1}}" y1="{{view.dim_y}}" x2="{{view.dim_x2}}" y2="{{view.dim_y}}" marker-start="url(#arr)" marker-end="url(#arr)"/>
+  </g>
+  <text x="337" y="{{view.dim_label_y}}" text-anchor="middle">{{cad.length_in:.2f}}</text>
+</svg>

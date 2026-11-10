@@ -488,8 +488,6 @@ def configuration_step_paths(stem: str, out: Path = OUT) -> dict[str, Path]:
 
 def write_manifest(stem: str, step: Path, *, revision: str) -> Path:
     """Bind all labelled STEP faces and write the adjacent requirements TOML."""
-    from prechips.model import Features
-
     from _export_feature_faces import step_face_sets
 
     stem = _stem(stem)
@@ -505,7 +503,6 @@ def write_manifest(stem: str, step: Path, *, revision: str) -> Path:
     manifest["step_sha256"] = hashlib.sha256(content).hexdigest()
     manifest["cite"]["step_sha256"] = [step_cite]
     manifest["drawing"]["revision"] = revision
-    Features.model_validate(manifest)
     path = step.with_name(bundle_paths(stem)[0].name)
     partial = path.with_suffix(".toml.partial")
     partial.write_text(_toml(manifest), encoding="utf-8", newline="\n")

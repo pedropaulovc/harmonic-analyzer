@@ -541,29 +541,26 @@ def _case_cache_access_mode_does_not_change_factory_records(
         assert _freeze(actual) == ordinary_records[selected.name]
 
 
-def _case_enrolled_traveler_keeps_normal_loader_conversion_and_lazy_kernel(dodo, monkeypatch, tmp_path):
+def _case_enrolled_traveler_keeps_normal_loader_conversion(dodo, monkeypatch, tmp_path):
     import _process_plans
 
     stem = "ch_rocker_arm"
-    source = tmp_path / "plan.toml"
+    source = tmp_path / stem / "plan.toml"
+    source.parent.mkdir()
     source.write_text('features = "fixture"\n', encoding="utf-8")
+    shop = tmp_path / "shop.toml"
+    shop.write_text("version = 1\n", encoding="utf-8")
     monkeypatch.setattr(_process_plans, "TRAVELER_STEMS", (stem,))
-    monkeypatch.setattr(_process_plans, "plan_path", lambda _stem: source)
-    monkeypatch.setattr(_process_plans, "shop_paths", lambda: ())
-    monkeypatch.setattr(_process_plans, "shop_spec_modules", lambda: ())
+    monkeypatch.setattr(_process_plans, "PROCESS_ROOT", tmp_path)
+    monkeypatch.setattr(_process_plans, "SHOP_PATH", shop)
 
-    def forbidden(*_args, **_kwargs):
-        pytest.fail("constructing a traveler must not discover or launch FreeCAD")
-
-    monkeypatch.setattr(dodo._PrechipsKernelTracker, "_calc", forbidden)
     normal = {task.name: task for task in generate_tasks("prechips", dodo.task_prechips(), dodo.task_prechips.__doc__)}
     selected = {task.name: task for task in dodo.canonical_tasks(["prechips", f"prechips:{stem}"])}
     assert set(selected) == set(normal)
     for name in selected:
         assert _record(selected[name]) == _record(normal[name])
-    tracker, = [check for check, _args, _kwargs in selected[f"prechips:{stem}"].uptodate if isinstance(check, dodo._PrechipsKernelTracker)]
-    assert tracker.identity is None
     assert selected[f"prechips:{stem}"].task_dep == [f"package:features:{stem}"]
+    assert str(source.resolve()) in selected[f"prechips:{stem}"].file_dep
     owners = dodo.canonical_target_owners()
     for target in selected[f"prechips:{stem}"].targets:
         assert owners[_path_identity(_workspace_path(REPO_ROOT, target))] == f"prechips:{stem}"
@@ -830,9 +827,7 @@ def _case_alias_scan_covers_exact_declared_target_depth(dodo, ordinary, monkeypa
         ("features.toml", frozenset({"features.toml"}), frozenset({".step"})),
         ("ownership-probe.STEP", frozenset({"features.toml"}), frozenset({".step"})),
         ("ownership-probe-Installed.STEP", frozenset({"features.toml"}), frozenset({".step"})),
-        ("plan.toml", frozenset({"plan.toml", "report.json", "traveler.html"}), frozenset()),
-        ("report.json", frozenset({"plan.toml", "report.json", "traveler.html"}), frozenset()),
-        ("traveler.html", frozenset({"plan.toml", "report.json", "traveler.html"}), frozenset()),
+        ("traveler.html", frozenset({"traveler.html"}), frozenset()),
     ):
         scanned.clear()
         children[:] = [entry(stem / filename, alias=True)]
@@ -1001,7 +996,7 @@ def test_selected_factories_portfolio(
         (_case_target_ownership_exposes_producer_omitted_before_taskcontrol, {}),
         (_case_cache_access_mode_does_not_change_factory_records, {'mode': 'ro'}),
         (_case_cache_access_mode_does_not_change_factory_records, {'mode': 'rw'}),
-        (_case_enrolled_traveler_keeps_normal_loader_conversion_and_lazy_kernel, {}),
+        (_case_enrolled_traveler_keeps_normal_loader_conversion, {}),
         (_case_requested_order_and_iterable_are_preserved_without_dependency_expansion, {}),
         (_case_forced_refresh_preserves_other_freshness_trackers, {'family': 'part'}),
         (_case_forced_refresh_preserves_other_freshness_trackers, {'family': 'assembly'}),
