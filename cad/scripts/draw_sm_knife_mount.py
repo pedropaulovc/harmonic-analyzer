@@ -504,12 +504,14 @@ TAP_CALLOUT_RIM_SIDE = 1.0
 # 9.6 mm over the ream note (top y 150, right end x 84) and its top, y
 # 166.6, 5 mm under the tap callout's last row (bottom about y 172).
 BORE_FRAME_XY = (FRONT_CENTER[0] + 0.035, _front_y(BLK_TOP) + 0.019)
-# The ⌖ frame measured x 150.0..191.6 mm (farm run 20261027T154115830Z).
+# The ⌖ frame is 34.6 mm wide: a tag on it is held to its mid-width, and
+# farm build 20261110T203215.766406Z printed datum C's letter at x 165.57
+# mm, its mid-width 167.3 (the letter 1.73 left of the box's middle).
 # Datum C (Owner ruling 2026-11-10 (Pedro), #2334: the bore clocks the
 # tap's frame) hangs under its middle on datum B's shortened stem, its box
 # (about y 157..164 mm) over the block's corner-to-.811 witness (y 155) and
 # right of the .811 BASIC's witness end (x ~155).
-BORE_FRAME_SIZE = (0.0416, _GTOL_ROW)
+BORE_FRAME_SIZE = (0.0346, _GTOL_ROW)
 BORE_DATUM_C_XY = (
     BORE_FRAME_XY[0] + BORE_FRAME_SIZE[0] / 2.0,
     BORE_FRAME_XY[1] - BORE_FRAME_SIZE[1] - PIN_DATUM_B_STEM - DATUM_TAG_BOX,
