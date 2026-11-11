@@ -553,7 +553,7 @@ FITUP_NOTE_LIMITS = ((0.210, 0.075), (0.418, 0.072))
 FITUP_TRANSGEAR_KEY = "disc-cluster-assembled"
 FITUP_CHAIN_KEY = "loaded-rack-geometry-checked"
 
-# Sheet 5's DETAIL K: K's DRO setting from the arm's pin bore S, the
+# Sheet 6's DETAIL K: K's DRO setting from the arm's pin bore S, the
 # assembly's hidden KnobSettingReference chain
 # (pd_paper_drive_knob_setting_spec) on the arm and plate seen from the
 # machine front at 1:1, as the arm-plate-located step sets them front up from
@@ -605,9 +605,8 @@ KNOB_SETTING_INSTANCES = frozenset({"pd-transgear-arm-1", "pd-transgear-arm-plat
 # the .004 radius (test_the_jig_bored_k_lands_in_the_set_band_with_margin_at_both_ends).
 # The radial part of that worst case (.0008) keeps N inside the S to N set
 # band, which governs along S-N; the .004 circle bounds the rest. TRUE names
-# both, so it no longer reads as wider than DETAIL K's +.002/0 (#2417); the
-# trial mesh then moves N only inside the same circle
-# (KNOB_SETTING_CIRCLE_TEXT).
+# both, so it no longer reads as wider than DETAIL K's +.002/0 (#2417). The
+# trial mesh only reads the setting; it never moves N.
 # The knob-bore point's label inside DETAIL K. DETAIL K keeps its letter
 # (other sheets cite "MHA-PD-00 DETAIL K"), so the point takes a letter used
 # nowhere else on the package (machinist review round 7, rules 9 and 26: K
@@ -1629,30 +1628,64 @@ KNOB_END_FLOAT_RANGE = (
     knob_shaft.END_FLOAT + knob_shaft.END_FLOAT_SET_TOL,
 )
 # The reducer's backlash as an indicator reads it (#2417: a feeler leaf
-# cannot be laid between 48DP flanks): the 15T held, the disc rocked, a test
-# indicator's stylus tangent on a disc tooth's flank at its tip. The
-# circular backlash on the pitch circle over the set band at every printed
-# corner (paper_drive_mesh_check.reducer_band_meshes) moves the tip by the
-# tip radius over the pitch radius; the window is rounded inward onto the
-# shop indicator's division, the largest tip setting the floor and the
-# smallest the ceiling. It is the same budget the MHA-PD-06 and MHA-PD-08
-# GEAR DATA print as normal backlash.
+# cannot be laid between 48DP flanks). The knob shaft and the disc are
+# pressed lightly together, the shaft held and the disc rocked, with a test
+# indicator's stylus tangent on the flank, at its tip, of the disc tooth
+# next to the 15T.
+#
+# What that reads (codjiflo P2 on 27438d7: the running clearances are in the
+# shake). Pressed together, the knob journal sits on the S side of the plate
+# bore and the sleeve on the N side of the pin, so neither gives way along
+# the rock and the mesh stands at the tightest centre the two running fits
+# allow: closer than the axes by half of both diametral clearances
+# (_PRESSED_CLOSURE_MM). The tooth beside the mesh moves only as far as the
+# flanks let it, so the cluster's shift on the pin and the pin's own bending
+# are not read as shake.
+#
+# The window is every reading a build inside its drawings can give: the
+# circular backlash over the S to N set band at every printed corner
+# (paper_drive_mesh_check.reducer_mesh), at the band's bottom closed by the
+# largest clearances for the floor and at its top closed by the smallest for
+# the ceiling, moved to the tip by the tip radius over the pitch radius and
+# rounded outward onto the shop indicator's division. A reading outside it
+# therefore proves a part or the setting off its drawing, which the steps'
+# remedies then find; no build inside its drawings is refused. The floor is
+# a positive shake at the tightest centre the fits allow, which is the mesh
+# check's own gate (backlash over zero at the tight extreme); the no-tight-
+# spot turn checks the same thing all round. Delegated ruling 2026-11-10
+# (#2417, PR #2494), pending owner confirmation.
+_KNOB_JOURNAL_CLEARANCE_MM = (
+    min(plate_geometry.BORE_DIA_LIMITS) - max(knob_shaft.JOURNAL_DIA_BAND),
+    max(plate_geometry.BORE_DIA_LIMITS) - min(knob_shaft.JOURNAL_DIA_BAND),
+)
+_PRESSED_CLOSURE_MM = tuple(
+    (journal + sleeve) / 2.0
+    for journal, sleeve in zip(
+        _KNOB_JOURNAL_CLEARANCE_MM, cluster_fit.BORE_DIAMETRAL_CLEARANCE, strict=True
+    )
+)
 _REDUCER_CIRCULAR_BACKLASH_MM = (
-    min(mesh.backlash_mm[0] for mesh in mesh_check.reducer_band_meshes()),
-    max(mesh.backlash_mm[1] for mesh in mesh_check.reducer_band_meshes()),
+    mesh_check.reducer_mesh(
+        disc.CENTRE_DISTANCE_WINDOW[0] - _PRESSED_CLOSURE_MM[1]
+    ).backlash_mm[0],
+    mesh_check.reducer_mesh(
+        disc.CENTRE_DISTANCE_WINDOW[1] - _PRESSED_CLOSURE_MM[0]
+    ).backlash_mm[1],
 )
 _DISC_TIP_RADII_MM = [profile.blank_radius_mm for profile in disc.manufactured_profiles()]
 _DIAL_DIVISION_MM = KNOB_SETTING_INDICATOR_DIVISION_IN * 25.4
 REDUCER_BACKLASH_DIAL_MM = (
-    math.ceil(
-        _REDUCER_CIRCULAR_BACKLASH_MM[0] * max(_DISC_TIP_RADII_MM) / (disc.PITCH_DIA / 2.0)
-        / _DIAL_DIVISION_MM - 1e-9
-    ) * _DIAL_DIVISION_MM,
     math.floor(
-        _REDUCER_CIRCULAR_BACKLASH_MM[1] * min(_DISC_TIP_RADII_MM) / (disc.PITCH_DIA / 2.0)
+        _REDUCER_CIRCULAR_BACKLASH_MM[0] * min(_DISC_TIP_RADII_MM) / (disc.PITCH_DIA / 2.0)
         / _DIAL_DIVISION_MM + 1e-9
     ) * _DIAL_DIVISION_MM,
+    math.ceil(
+        _REDUCER_CIRCULAR_BACKLASH_MM[1] * max(_DISC_TIP_RADII_MM) / (disc.PITCH_DIA / 2.0)
+        / _DIAL_DIVISION_MM - 1e-9
+    ) * _DIAL_DIVISION_MM,
 )
+if REDUCER_BACKLASH_DIAL_MM[0] < _DIAL_DIVISION_MM - 1e-9:
+    raise AssertionError("the reducer's tightest shake reads under one indicator division")
 REDUCER_BACKLASH_DIAL_TEXT = " TO ".join(
     steps.inch_text(bound, 4) for bound in REDUCER_BACKLASH_DIAL_MM
 )
@@ -1660,11 +1693,21 @@ REDUCER_BACKLASH_DIAL_TEXT = " TO ".join(
 # once-a-turn tooth-space runout within cos 22.5 (92 %) of its peak, and each
 # move turns the 15T 1.875 turns, so its runout is sampled at other phases.
 REDUCER_DIAL_STATIONS = 8
-REDUCER_DIAL_CHECK = (
-    f"THE DISC ROCKED BY HAND SHAKES {REDUCER_BACKLASH_DIAL_TEXT} ON THE TEST "
-    "INDICATOR, ITS STYLUS TANGENT ON A DISC TOOTH'S FLANK AT THE TIP, AT "
-    f"{REDUCER_DIAL_STATIONS} STATIONS {360 // REDUCER_DIAL_STATIONS}\u00b0 APART"
-)
+
+
+def reducer_dial_check(held: str, indicator: str = "THE TEST INDICATOR") -> str:
+    """The reducer's indicator acceptance, ``held`` naming what the fitter
+    holds still (the bare shaft at the trial, the knob on the machine)."""
+    return (
+        f"CHECK: {held} PRESSED LIGHTLY TOWARD THE DISC AND HELD, THE DISC "
+        "PRESSED LIGHTLY TOWARD IT AND ROCKED BY HAND SHAKES "
+        f"{REDUCER_BACKLASH_DIAL_TEXT} ON {indicator}, ITS STYLUS TANGENT "
+        "ON THE FLANK, AT THE TIP, OF THE DISC TOOTH NEXT TO THE "
+        f"{knob_shaft.TEETH}T, AT {REDUCER_DIAL_STATIONS} PLACES "
+        f"{360 // REDUCER_DIAL_STATIONS}\u00b0 APART ROUND THE DISC."
+    )
+
+
 # The platen's screw stations (platen_spec): its front counterbores take the
 # guide screws, its through-taps the clip screws.
 GUIDE_SCREWS = len(platen.GUIDE_HOLE_X) * len(platen.GUIDE_HOLE_Y)
@@ -1765,7 +1808,7 @@ ARM_PLATE_SCREW_HOLE_TEXT = (
 ARM_PLATE_SPOT_DRILL_TEXT = (
     f"#1 (\u00d8{steps.inch_text(plate_geometry.SCREW_HOLE_DIA, 3)})"
 )
-# 9K's pilots: a #44 drill under the press ream leaves stock for both reams
+# The located step's pilots: a #44 drill under the press ream leaves stock for both reams
 # (machinist review round 8: the step named no size or place).
 PLATE_DOWEL_PILOT_DIA_MM = 2.1844  # #44 (.086)
 if PLATE_DOWEL_PILOT_DIA_MM >= min(plate_locating_interface.PRESS_HOLE_LIMITS_MM) - 0.1:
@@ -1981,18 +2024,23 @@ def _step_text(
         ),
         # #2417: the pin is already pressed (its shank, not its head, is S),
         # and the reducer is meshed on its real seats while the plate is
-        # still clamped and can be moved; it is doweled only once it reads.
+        # still clamped and undrilled; it is doweled only once it reads.
+        # The plate overlaps the arm past the disc's tips only along its edge
+        # nearest the pivot bore, so the clamps go there; the arm is clamped
+        # to the table so that fitting and lifting the trial stack cannot
+        # move the DRO's zero off S (codjiflo P2 on 27438d7), and the
+        # parallels leave the knob shaft's rear end free below the plate.
         "arm-plate-located": (
             f"CLAMP THE {n['pd-transgear-arm-plate']} PLATE ON THE "
             f"{n['pd-transgear-arm']} ARM'S REAR FACE WITH TOOLMAKER'S CLAMPS, "
-            "SCREWS OUT, THE CLAMPS OUTSIDE THE DISC'S SWEEP, A "
-            f"\u00d8{steps.inch_text(steps.inch_ceil_mm(2.0 * max(_DISC_TIP_RADII_MM), 2), 2)} "
-            "CIRCLE ON S.",
-            "SET THE ARM FRONT UP ON PARALLELS ON THE MILL TABLE, CLEAR OF THE PIN "
-            "HEAD, THE PLATE AND THE CLAMPS.",
+            "SCREWS OUT, THE CLAMPS ON THE PLATE'S EDGE NEAREST THE PIVOT BORE, "
+            "WHERE THE DISC WILL NOT REACH.",
+            "CLAMP THE ARM FRONT UP ON PARALLELS ON THE MILL TABLE, THE PIN HEAD, "
+            f"THE PLATE AND ITS CLAMPS CLEAR, WITH ROOM UNDER THE PLATE BORE FOR THE "
+            f"{n['pd-transgear-knob-shaft']} SHAFT'S REAR END.",
             "WITH A TEST INDICATOR IN THE SPINDLE, INDICATE THE ARM'S PIVOT BORE "
-            f"AND THE {n['pd-transgear-pin']} PIN'S SHANK IN ITS PIN BORE S TRUE ON "
-            f"ONE DRO AXIS ({KNOB_SETTING_TRUE}).",
+            f"AND THE {n['pd-transgear-pin']} PIN'S SHANK IN ITS PIN BORE S, CLOSE "
+            f"TO THE ARM'S FACE, TRUE ON ONE DRO AXIS ({KNOB_SETTING_TRUE}).",
             "ZERO THE DRO ON S.",
             f"MOVE THE TABLE TO THE {KNOB_SETTING_VIEW_NAME} ALONG AND ACROSS "
             "SETTINGS FROM S.",
@@ -2012,28 +2060,37 @@ def _step_text(
             f"THE FRONT, ITS {teeth} IN MESH WITH THE DISC.",
             "CHECK: TURNED BY THE SHAFT, THE DISC RUNS ONE FULL TURN WITH NO TIGHT "
             "SPOT.",
-            f"CHECK: SHAFT HELD, {REDUCER_DIAL_CHECK}.",
-            # Backlash grows with the centre distance (about .73 of a change
-            # in it), so a tight mesh moves N away from S.
-            "IF A READING IS UNDER "
-            f"{steps.inch_text(REDUCER_BACKLASH_DIAL_MM[0], 4)} OR A SPOT IS TIGHT, "
-            "LIFT THE SHAFT OUT, SLACKEN THE CLAMPS AND TAP THE PLATE AWAY FROM S "
-            "ALONG S-N; IF OVER "
-            f"{steps.inch_text(REDUCER_BACKLASH_DIAL_MM[1], 4)}, TOWARD S.",
-            f"CHECK, CLAMPS RETIGHTENED: RE-INDICATED, {KNOB_BORE_LETTER} READS "
-            f"{KNOB_SETTING_CIRCLE_TEXT} ON THE DRO.",
-            f"REPEAT {s('arm-plate-located', 10)}-{s('arm-plate-located', 14)} UNTIL "
-            f"{s('arm-plate-located', 11)} AND {s('arm-plate-located', 12)} PASS "
-            f"WITH {s('arm-plate-located', 14)} HELD.",
-            f"IF NO SETTING THAT {s('arm-plate-located', 14)} ADMITS PASSES, INSPECT "
-            f"THE {n['pd-transgear-knob-shaft']} {teeth} AND THE {n['pd-rack-pinion']} "
-            "DISC TO THEIR GEAR DATA, REPLACE THE ONE OUTSIDE IT (A NEW DISC THROUGH "
-            f"STEPS {steps.step_number('disc-cluster-assembled')}-"
-            f"{steps.step_number('disc-taps-transferred')}) AND REPEAT FROM "
-            f"{s('arm-plate-located', 4)}.",
+            reducer_dial_check("SHAFT"),
             "LIFT OFF THE SHAFT, THE RING, THE CLUSTER AND THE BUSHING.",
-            f"MATCH-DRILL 2 {PLATE_DOWEL_PILOT_TEXT} PILOTS THROUGH THE PLATE AND "
-            f"THE ARM AT {n['pd-transgear-arm-plate']}'S 2 LOCATING-HOLE PLACES.",
+            # The trial counts only if nothing moved under it: S still at the
+            # DRO's zero and N still true at its settings.
+            f"CHECK: RE-INDICATED, S READS TRUE AT THE DRO'S ZERO AND "
+            f"{KNOB_BORE_LETTER} AT ITS SETTINGS.",
+            f"IF NOT, REPEAT FROM {s('arm-plate-located', 2)}.",
+            # The plate is not moved to chase a reading: the S to N band stays
+            # the setting's limit (owner ruling on #2034 x #2011; #2144 item
+            # 5.3), and the indication's own worst case uses .0008 of its .001
+            # either side of the aim, so no move inside it is worth a division
+            # (codjiflo P2 on 27438d7; delegated ruling 2026-11-10, #2417, PR
+            # #2494). A mesh that reads outside the window with N true is a
+            # part off its drawing: a gear, or else the pin's bore, which
+            # carries the disc an inch off the arm's face.
+            f"IF {s('arm-plate-located', 11)} OR {s('arm-plate-located', 12)} "
+            f"FAILED, INSPECT THE {n['pd-transgear-knob-shaft']} {teeth} AND THE "
+            f"{n['pd-rack-pinion']} DISC TO THEIR GEAR DATA, REPLACE THE ONE "
+            "OUTSIDE IT (A NEW DISC THROUGH STEPS "
+            f"{steps.step_number('disc-cluster-assembled')}-"
+            f"{steps.step_number('disc-taps-transferred')}) AND REPEAT FROM "
+            f"{s('arm-plate-located', 9)}.",
+            "IF BOTH ARE INSIDE, UNCLAMP AND REPEAT FROM STEP "
+            f"{steps.step_number('latch-pin-pressed')} WITH A NEW "
+            f"{n['pd-transgear-arm']} ARM, {n['pd-transgear-pin']} PIN AND "
+            f"{n['pd-vn-transgear-latch-pin']} DOWEL.",
+            # Front up, the drill enters the arm, at its own pattern from S
+            # (pd_transgear_arm_plate_geometry: the matched pilots go through
+            # at the arm's pattern).
+            f"MATCH-DRILL 2 {PLATE_DOWEL_PILOT_TEXT} PILOTS THROUGH THE ARM AND "
+            f"THE PLATE AT {n['pd-transgear-arm']}'S 2 LOCATING-HOLE PLACES.",
             "UNCLAMP AND PART THE ARM AND THE PLATE.",
             f"REAM THE ARM'S 2 HOLES TO {n['pd-transgear-arm']} (PRESS).",
             f"REAM THE PLATE'S 2 HOLES TO {n['pd-transgear-arm-plate']} (SLIP).",
@@ -2070,9 +2127,11 @@ def _step_text(
             f"DOWELS AND REPEAT {s('arm-plate-fitted', 6)}-{s('arm-plate-fitted', 10)}.",
             # The doweled plate is read before the pivot is staked, the cup
             # cross-pinned or the hook drilled, so a setting the dowels lost
-            # costs only the arm's own parts.
-            "SET THE ARM FRONT UP ON PARALLELS ON THE BENCH AND REPEAT "
-            f"{s('arm-plate-located', 9)}-{s('arm-plate-located', 10)}.",
+            # costs only the arm's own parts. The uncut plate screws stand
+            # under the disc with room to spare
+            # (test_the_trial_stack_goes_together_at_the_located_step).
+            "SET THE ARM FRONT UP ON THE SAME PARALLELS ON THE MILL TABLE AND "
+            f"REPEAT {s('arm-plate-located', 9)}-{s('arm-plate-located', 10)}.",
             f"CHECK: AS {s('arm-plate-located', 11)} AND {s('arm-plate-located', 12)}, "
             "WITH THE TEST INDICATOR ON A MAGNETIC BASE.",
             "IF A CHECK FAILS, THE DOWELS HAVE NOT HELD THE TRIAL SETTING: REPEAT "
@@ -2339,41 +2398,70 @@ def _step_text(
             # The final confirmation reads the doweled reducer as the trial
             # (arm-plate-located) and the doweled re-read (arm-plate-fitted)
             # did, now on the machine (#2417).
-            f"CHECK: KNOB HELD, {REDUCER_DIAL_CHECK}, WITH A TEST INDICATOR ON A "
-            "MAGNETIC BASE.",
+            reducer_dial_check("KNOB", "A TEST INDICATOR ON A MAGNETIC BASE"),
             # The mesh was proven before the dowels and re-read on them before
-            # anything irreversible, so what can still fail here is the plate's
-            # seat (its screws were refitted at the cut) or a tooth damaged or
-            # fouled since; neither needs the arm rebuilt (#2417, replacing the
-            # delegated ruling 2026-11-07's whole-transgear rebuild). Releasing
-            # the cross-pin still renews the shaft, cup and pin (owner ruling
-            # 2026-11-08, pending owner confirmation, #2144).
-            f"IF A CHECK FAILS, {knob_stack_off}",
-            "CHECK: PUSHED AND ROCKED BY HAND, THE PLATE HAS NO SHAKE ON ITS "
-            "DOWELS AND ITS SCREWS ARE TIGHT.",
-            f"IF IT FAILS, {knob_pin_out}",
-            f"REFIT THE PLATE AS {s('arm-plate-fitted', 11)}, THEN REPEAT STEP "
-            f"{steps.step_number('knob-stack-fitted')} WITH A NEW "
-            f"{n['pd-transgear-knob-shaft']} SHAFT, {n['pd-transgear-knob-cup']} CUP "
-            f"AND {n['pd-vn-transgear-knob-cup-pin']} PIN, THEN FROM STEP {pose}.",
-            f"IF IT PASSES, CLEAN THE {teeth} AND THE DISC TEETH AND REPEAT "
-            f"{s('fitup-pose-set', 2)}-{s('fitup-pose-set', 9)}.",
+            # anything irreversible, so what usually fails here is the plate's
+            # seat (its screws were refitted at the cut) or a tooth fouled or
+            # damaged since: those are tried first and cost a clean, a knob
+            # stack or a disc (delegated ruling 2026-11-10, #2417, PR #2494,
+            # pending owner confirmation). A fault that is the same all round
+            # is in the arm's setting, and still takes the whole-transgear
+            # rebuild (delegated ruling 2026-11-07 (Main), no precedent; owner
+            # review #2144; pending owner confirmation), now from the latch
+            # pin with the cluster reused. Releasing the cross-pin or the
+            # stake renews every part they fix (owner ruling 2026-11-08,
+            # pending owner confirmation, #2144).
+            "IF A CHECK FAILS, CHECK THAT, PUSHED AND ROCKED BY HAND, THE PLATE "
+            "HAS NO SHAKE ON ITS DOWELS AND ITS SCREWS ARE TIGHT.",
+            f"IF THE PLATE IS SOUND, CLEAN THE {teeth} AND THE DISC TEETH AND "
+            f"REPEAT {s('fitup-pose-set', 2)}-{s('fitup-pose-set', 9)}.",
             "IF A CHECK STILL FAILS, TURN THE DISC ONE FULL TURN BY THE COLLAR: A "
             f"FAULT THAT RECURS EVERY KNOB TURN IS ON A {teeth} TOOTH, ONE THAT "
-            "RECURS ONCE A DISC TURN ON A DISC TOOTH.",
-            f"FOR A {teeth} TOOTH, {knob_pin_out}",
-            f"REPEAT STEP {steps.step_number('knob-stack-fitted')} WITH A NEW "
-            f"{n['pd-transgear-knob-shaft']} SHAFT, {n['pd-transgear-knob-cup']} CUP "
-            f"AND {n['pd-vn-transgear-knob-cup-pin']} PIN, THEN FROM STEP {pose}.",
+            "RECURS ONCE A DISC TURN ON A DISC TOOTH, ONE THAT IS THE SAME ALL "
+            "ROUND IN THE ARM'S SETTING.",
+            knob_stack_off,
             "FOR A DISC TOOTH, STRIP THE CLUSTER "
             f"({s('disc-cluster-hung', 4)} BACK TO {s('disc-cluster-hung', 1)}), "
             "KEEPING ITS SHIMS, AND SLIDE THE HUB AND DISC OFF THE "
             f"{n['pd-transgear-feed-pinion']} D-FLAT AS ONE.",
+            # A new disc's thickness is its own, so the old screws' cut tips
+            # no longer sit in their window under its rear face: new screws,
+            # cut again (codjiflo P2 on 27438d7).
             f"REPEAT STEPS {steps.step_number('disc-cluster-assembled')}-"
             f"{steps.step_number('disc-taps-transferred')} WITH A NEW "
-            f"{n['pd-rack-pinion']} DISC ON THE SAME HUB AND SCREWS, THEN STEPS "
+            f"{n['pd-rack-pinion']} DISC AND NEW {n['pd-vn-transgear-disc-screw']} "
+            f"SCREWS ON THE SAME HUB, THEN STEPS "
+            f"{steps.step_number('disc-screws-cut')}, "
             f"{steps.step_number('disc-cluster-hung')}-"
             f"{steps.step_number('disc-cluster-shimmed')} AND FROM STEP {pose}.",
+            f"FOR A LOOSE PLATE OR A {teeth} TOOTH, {knob_pin_out}",
+            f"REFIT A LOOSE PLATE AS {s('arm-plate-fitted', 11)}.",
+            f"REPEAT STEP {steps.step_number('knob-stack-fitted')} WITH A NEW "
+            f"{n['pd-transgear-knob-shaft']} SHAFT, {n['pd-transgear-knob-cup']} CUP "
+            f"AND {n['pd-vn-transgear-knob-cup-pin']} PIN, THEN FROM STEP {pose}.",
+            "FOR THE ARM'S SETTING, REMOVE THE CLUSTER "
+            f"({s('disc-cluster-hung', 4)} BACK TO {s('disc-cluster-hung', 1)}), "
+            f"KEEPING ITS SHIMS, AND THE {n['pd-latch-hook']} HOOK.",
+            pivot_unscrewed,
+            pivot_tap_chased,
+            f"REBUILD FROM STEP {steps.step_number('latch-pin-pressed')} WITH A NEW "
+            f"{n['pd-transgear-arm']} ARM, {n['pd-transgear-arm-plate']} PLATE, "
+            f"{n['pd-transgear-pin']} PIN, {n['pd-transgear-pivot-spacer']} SPACER, "
+            f"{n['pd-transgear-knob-shaft']} SHAFT, {n['pd-transgear-knob-cup']} CUP, "
+            f"{n['pd-latch-hook']} HOOK, {n['pd-vn-transgear-latch-pin']} DOWEL, "
+            f"{TRANSGEAR_QUANTITIES['pd-vn-transgear-arm-plate-locating-pin']} "
+            f"{n['pd-vn-transgear-arm-plate-locating-pin']} DOWELS, "
+            f"{TRANSGEAR_QUANTITIES['pd-vn-transgear-arm-plate-screw']} "
+            f"{n['pd-vn-transgear-arm-plate-screw']} SCREWS, "
+            f"{n['pd-vn-transgear-pivot-screw']} SCREW AND "
+            f"{n['pd-vn-transgear-knob-cup-pin']} PIN.",
+            f"SKIP STEPS {steps.step_number('disc-screws-cut')}-"
+            f"{steps.step_number('oil-hole-drilled')}, "
+            f"{steps.step_number('collar-pins-pressed')}-"
+            f"{steps.step_number('pilot-faced-to-fit')} AND "
+            f"{s('latch-hook-fitted', 1)}-{s('latch-hook-fitted', 4)} (THE CLUSTER, "
+            "THE COLLAR AND THE BAR'S HOOK TAPS ARE REUSED) AND, AT "
+            f"{s('hanger-pivoted', 8)}, STAKE FRESH METAL BESIDE THE OLD STAKES.",
         ),
         "collar-rear-faced-to-fit": (
             f"IN STEP {pose}'S POSE, {held_back}, FIT THE COLLAR AS "
@@ -4174,7 +4262,7 @@ def _place_exploded_sheet(
 
 
 def _place_knob_setting_view(adapter: Any) -> None:
-    """Sheet 5's DETAIL K: the arm and plate from the machine front at
+    """Sheet 6's DETAIL K: the arm and plate from the machine front at
     1:1, cropped on S-K's midpoint, carrying the assembly's set band S to N
     and its two K setting dimensions from S (pd_paper_drive_knob_setting_spec)
     that the arm-plate-located step cites."""
