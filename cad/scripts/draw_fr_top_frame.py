@@ -1475,20 +1475,21 @@ DATUM_BOTTOM_KEEP = {
     "GussetRunE": (0.1522, 0.087),
     "DStation": (0.184, 0.0738),
 }
-# The width's callout rows go above its value, so the leader from the
-# line's right end to the value passes under them.  They are two (a
-# callout's two lines of words, rule 7): one row's 57 mm would end 1.4 mm
-# short of F1's symbol.
-DATUM_BOTTOM_CALLOUTS_ABOVE = {"BarWidth": "CROSSBAR\nAT UNDERSIDE"}
+# The width's callout row goes above its value, so the leader from the
+# line's right end to the value passes under it.  It stays one row: farm
+# run 20261111T074741252Z printed nothing of a two-row callout above the
+# value (layout audit text-unmatched 'CROSSBAR\nAT UNDERSIDE'; the sheet
+# showed .99 ±.03 alone).
+DATUM_BOTTOM_CALLOUTS_ABOVE = {"BarWidth": "CROSSBAR AT UNDERSIDE"}
 DATUM_BOTTOM_CALLOUTS = {"GussetRunE": "4X 45° GUSSET"}
-# The width's three rows stand right of its line, 2.7 mm off its right
-# extension line (x 149.5), the value's underline (y 194.9) on the line's
-# own height and the top row's caps (y 209.5) 7 mm under the elevation's
-# rail (y 216.5), between the F targets' symbols.  The gusset run's two
-# rows stand right of its line, their underline (y 78.6) 3.1 mm over the
-# station's value.
+# The width's two rows stand right of its line, the value's underline (y
+# 194.9) on the line's own height.  The callout's 57.0 mm row (x 149.6 to
+# 206.6, y 200.5 to 204.0) ends 2.3 mm off F1's symbol (centre 215.9,
+# 199.4, radius 7.0) and 12.5 under the elevation's rail (y 216.5).  The
+# gusset run's two rows stand right of its line, their underline (y 78.6)
+# 3.1 mm over the station's value.
 DATUM_BOTTOM_TEXT_OFFSETS = {
-    "BarWidth": (0.1685, 0.20323),
+    "BarWidth": (0.1781, 0.20046),
     "GussetRunE": (0.180, 0.0842),
 }
 # Each target symbol's centre from its point, sheet m: on the underside E1

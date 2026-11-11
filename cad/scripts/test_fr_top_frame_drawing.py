@@ -2873,9 +2873,13 @@ def test_cast_datum_target_symbols_stand_clear_on_sheet_seven() -> None:
     # Datum D's width rows stand in the band over the underside, between the
     # two F symbols and under the elevation's rail, not in a window (rule
     # 14, machinist review of fad41f8525).
+    # The callout stays one row (farm run 20261111T074741252Z printed nothing
+    # of two rows above a value), at the width farm run 20261111T023438415Z
+    # measured for it.
     rows = (*drawing.DATUM_BOTTOM_CALLOUTS_ABOVE["BarWidth"].splitlines(), ".99 ±.03")
+    assert rows == ("CROSSBAR AT UNDERSIDE", ".99 ±.03")
     wx, wy = drawing.DATUM_BOTTOM_TEXT_OFFSETS["BarWidth"]
-    half_w = max(map(len, rows)) * _ROW_CHAR / 2.0
+    half_w = 0.0569868 / 2.0
     half_h = len(rows) * _ROW_PITCH / 2.0
     block = (wx - half_w, wy - half_h, wx + half_w, wy + half_h - _ROW_SLACK)
     assert block[1] - underside[3] >= ink
@@ -4325,7 +4329,7 @@ def test_datum_d_hangs_on_the_as_cast_crossbar_width_on_sheet_seven(monkeypatch)
     assert "BarWidth" in spec.DRAWING_DIMENSIONS["BarProfile"]
     assert "BarWidth" in spec.AS_CAST_DIMENSIONS["BarProfile"]
     assert spec.DRAWING_PRECISION_BY_NAME["BarWidth"] == 2
-    assert drawing.DATUM_BOTTOM_CALLOUTS_ABOVE == {"BarWidth": "CROSSBAR\nAT UNDERSIDE"}
+    assert drawing.DATUM_BOTTOM_CALLOUTS_ABOVE == {"BarWidth": "CROSSBAR AT UNDERSIDE"}
     # The bar's sides reach the underside between each pocket's end and the
     # plan gussets; there the model stands them the nominal .99 apart.
     assert (part.BAR_X1 - part.BAR_X0) / 25.4 == pytest.approx(0.99)
