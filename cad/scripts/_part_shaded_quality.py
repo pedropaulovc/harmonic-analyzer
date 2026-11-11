@@ -12,7 +12,6 @@ carry it in their recipe closure.
 
 from __future__ import annotations
 
-import math
 from typing import Any
 
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
@@ -62,12 +61,20 @@ def set_precise_shaded_quality(adapter: Any, *, label: str) -> None:
         extension.GetUserPreferenceDouble(deviation, option),
         extension.GetUserPreferenceToggle(edge_length, option),
     )
+    # SolidWorks stores the deviation on its own slider grid: farm r9c asked
+    # for the reported minimum and read back 1.0119e-05. So accept the
+    # readback within 5 % of the minimum, and require it finer than before.
     if (
         after[0] != custom
-        or not math.isclose(after[1], minimum, rel_tol=1e-9)
+        or not after[1] <= minimum * 1.05
+        or not after[1] < current
         or after[2] is not True
     ):
-        raise RuntimeError(f"{label} shaded image quality did not persist: {after!r}")
+        raise RuntimeError(
+            f"{label} shaded image quality did not persist: {after!r} "
+            f"(requested deviation {minimum!r} of range {minimum!r}..{maximum!r}, "
+            f"was {current!r})"
+        )
     _telemetry.info(
         f"{label} precise shaded tessellation",
         shaded_quality_before=before,
