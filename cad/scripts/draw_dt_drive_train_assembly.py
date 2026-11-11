@@ -377,6 +377,10 @@ SETTING_BANDS = {
 ASSEMBLED_SCALE = (1.0, 3.0)
 ASSEMBLED_ISO_SCALE = (1.0, 3.0)
 REFERENCE_ISO_SCALE = (1.0, 8.0)
+# Sheet 7's reference isometric only carries the title block's links (the
+# package's isometric is sheet 1's), so it prints small: #2470's two-cure
+# tip bonds needed seven more step lines in the left field over it.
+SEQUENCE_ISO_SCALE = (1.0, 24.0)
 # At 1:3 the bank and rig explodes filled about a fifth of their sheets (Fable
 # review of baseline-5). The bank still filled a small fraction of its sheet at
 # 1:2 (r9 Fable review), and at 2:3 its ~169 x 141 mm outline plus the balloon
@@ -430,12 +434,13 @@ def package_sheet_scales(
     """Every sheet's scale: each cluster sheet at its cluster view's scale and
     the full-detail sheet at the scale its view fitted.
 
-    The other sheets carry only the 1:8 reference isometric, except sheet 1's
-    assembled views.
+    The other sheets carry only the 1:8 reference isometric (sheet 7's at
+    SEQUENCE_ISO_SCALE), except sheet 1's assembled views.
     """
     return {
         **{name: REFERENCE_ISO_SCALE for name in SHEET_NAMES},
         SHEET_NAMES[0]: ASSEMBLED_SCALE,
+        SHEET_NAMES[SEQUENCE_SHEET - 1]: SEQUENCE_ISO_SCALE,
         **{SHEET_NAMES[number - 1]: cluster_scales[c] for c, number in CLUSTER_SHEETS.items()},
         SHEET_NAMES[FULL_DETAIL_SHEET - 1]: full_detail_scale,
         SHEET_NAMES[BANK_SETTINGS_SHEET - 1]: BANK_SETTING_SCALE,
@@ -607,15 +612,21 @@ ISO_RIGHT_FIELD = (
 # #2248) lowered it 3 mm and closed its gap to the other sheets'
 # REFERENCE_ISO_GAP; PR 2 machinist review round 10's end-screw lock check
 # (3F) lowered it one NOTE_LINE_PITCH more (run 20261110T140136846Z: caption
-# ink 20.2-23.8 mm up, outline 27.8-78.2 mm).
-SEQUENCE_ISO_CENTER = (0.115, 0.0485)
+# ink 20.2-23.8 mm up, outline 27.8-78.2 mm).  #2470's two-cure tip bonds
+# print it at SEQUENCE_ISO_SCALE (1:24, a third of 1:8): its outline keeps
+# the 23.8 mm foot the caption was proved under and rises a third as far.
+# Both scales are 1:N, so the outline shrinks by their denominators' ratio.
+SEQUENCE_ISO_HALF_OUTLINE = (
+    REFERENCE_ISO_HALF_OUTLINE * REFERENCE_ISO_SCALE[1] / SEQUENCE_ISO_SCALE[1]
+)
+SEQUENCE_ISO_CENTER = (0.115, 0.0238 + SEQUENCE_ISO_HALF_OUTLINE)
 SEQUENCE_ISO_GAP = REFERENCE_ISO_GAP
 REFERENCE_ISO_CAPTION_XY = (0.330, 0.082)
 SEQUENCE_LEFT_FIELD = (
     NOTE_FIELD_LEFT[0],
     NOTE_FIELD_LEFT[1],
     NOTE_FIELD_LEFT[2],
-    SEQUENCE_ISO_CENTER[1] + REFERENCE_ISO_HALF_OUTLINE + SEQUENCE_ISO_GAP,
+    SEQUENCE_ISO_CENTER[1] + SEQUENCE_ISO_HALF_OUTLINE + SEQUENCE_ISO_GAP,
 )
 # Sheet 14: the setting, pedestal recheck and feeler stack tables stack down
 # the left from NOTE_FIELD_LEFT's top (SETTING_TABLE_LEFT); the cone station
@@ -1034,7 +1045,7 @@ def _nearest_leaf(setting: float) -> float:
 def _feeler_stack_rows() -> tuple[tuple[str, str, str], ...]:
     settings = (
         # Rubric sample round 13 (#4): the cone set's feelers are leaves too.
-        (STACK_FEELER, (STACK_FEELER,), _step_ref("cone-gears-stacked", "P")),
+        (STACK_FEELER, (STACK_FEELER,), _step_ref("cone-gears-stacked", "Q")),
         (PINION_SEAT_FEELER, (PINION_SEAT_FEELER,), _step_ref("crank-mesh-checked", "F")),
         (
             FITUP.DRUM_END_SHIM,
@@ -1237,7 +1248,7 @@ CHANNEL_RODS_SET_AT = _step_ref("cylinder-stack-accepted", "B")
 # key defines TNNN for MHA-DT-03 only (review of 5994f29c83, rule 4).
 CRANK_CHAIN_WHEEL = str(_config.parts("pd-transgear-removable")["number"])
 PLATEN_NUMBER = str(_config.parts("pd-platen")["number"])
-# Step 1P's phasing comb is a shop tool in the cone-gear indexing kit, never
+# Steps 1R and 1V's phasing comb is a shop tool in the cone-gear indexing kit, never
 # a BOM row (owner rulings 2026-11-09 and 2026-11-10); the code key names it
 # and its blade (machinist review of bd81283964: an undefined tool and word).
 PHASING_COMB = str(_config.parts("dt-cone-gear-tl-phasing-comb")["number"])
@@ -1288,7 +1299,7 @@ CONE_CRANK_STEPS = _note_text(
         # gears close; the wrap counts 1B's placeholder at its width.  Codjiflo
         # review of PR 2: the tip's stations come only from closed faces (T018
         # on T024, T012 on T018, MHA-DT-37's leaves on T012; the spigot never
-        # bottoms), so 1E and 1R push MHA-DT-37 through that chain to T024.
+        # bottoms), so 1E and 1U push MHA-DT-37 through that chain to T024.
         "1. SEAT MHA-DT-VN-71 IN THE MHA-DT-04 KEYSEAT, TO ITS COLLAR END.",
         "1A. SLIDE MHA-DT-07 ON MHA-DT-VN-71 AGAINST THE MHA-DT-04 COLLAR.",
         "1B. SLIDE T120 TO T030 ({keyed_gears}X MHA-DT-03) ON, T120 FIRST.",
@@ -1304,22 +1315,40 @@ CONE_CRANK_STEPS = _note_text(
         "1L. PRESS MHA-DT-38 ON THE MHA-DT-37 PIVOT, AGAINST ITS LEAVES.",
         "1M. CHECK THAT MHA-DT-38 DOES NOT TURN OR SLIDE BY HAND.",
         "1N. IF IT DOES, BOND IT ON WITH LOCTITE 638 PER THE SHEET 1 NOTE.",
+        # #2470: T024 slides back along its coated land onto the feeler, so
+        # its squeeze-out reaches T030's back face, the leaf and the key's
+        # back end, the faces that must stay free for the stack float: they
+        # are waxed first so the compound cannot hold them.
+        f"1P. WAX T030'S BACK FACE, THE KEY'S BACK END AND THE {inch_text(STACK_FEELER, FEELER_PLACES)} FEELER.",
         # T024 pressed onto the feeler on T030 closes the keyed stack onto the
         # collar, so the feeler sets the stack float (cone_stack_end_play).
-        f"1P. BOND T024 ON MHA-DT-04, {inch_text(STACK_FEELER, FEELER_PLACES)} FEELER ON T030, PER THE SHEET 1 NOTE.",
-        "1Q. BOND T012 AND T018 ON THE MHA-DT-37 SPIGOT PER THE SHEET 1 NOTE.",
-        "1R. BOND MHA-DT-37 IN MHA-DT-04, T018 ON T024, PER THE SHEET 1 NOTE.",
+        f"1Q. BOND T024 ON MHA-DT-04, {inch_text(STACK_FEELER, FEELER_PLACES)} FEELER ON T030, PER THE SHEET 1 NOTE.",
         # Owner ruling 2026-11-10: one comb blade drops in one tooth space of
         # each gear.  T030's keyway centreline runs through its phase-0 tooth
         # (dt_cone_gear_spec), and its blade takes the space beside that tooth,
         # 180/30 deg off the key; the comb goes on only one way round, so the
         # step names the key and the other blades take the bonded gears'
-        # spaces at the same time (dt_cone_gear_tl_phasing_comb_spec).  Sheet
-        # 7's left field has no line to spare, so the step stays one line; the
+        # spaces at the same time (dt_cone_gear_tl_phasing_comb_spec).  The
         # sheet 14 code key names the comb and its blades (code_key_text).
-        f"1S. ENGAGE {PHASING_COMB} AT ONCE, T030'S BLADE BESIDE THE KEY.",
-        # The sheet 1 note's cure and hand acceptance close the bonds.
-        f"1T. REMOVE {PHASING_COMB} AND THE FEELER ONCE THE BONDS GRAB.",
+        # #2470: the bonds cure in two rounds so no joint waits on the others
+        # inside the fixture time: T024 alone first (the comb's other blades
+        # stand over air), then the spigot's three joints once T024 has cured,
+        # since pushing T018 onto T024 loads it.
+        f"1R. ENGAGE {PHASING_COMB} AT ONCE, T030'S BLADE BESIDE THE KEY.",
+        f"1S. REMOVE {PHASING_COMB} AND THE FEELER ONCE THE BOND GRABS.",
+        "1T. AFTER T024'S 24 H CURE, BOND T012 AND T018 ON THE MHA-DT-37 SPIGOT PER THE SHEET 1 NOTE.",
+        "1U. BOND MHA-DT-37 IN MHA-DT-04, T018 ON T024, PER THE SHEET 1 NOTE.",
+        f"1V. ENGAGE {PHASING_COMB} AT ONCE, T030'S BLADE BESIDE THE KEY.",
+        # #2470: the coated spigot seals the blind socket's air in as it
+        # enters; held home, the compressed air cannot back T018 off T024
+        # before the bonds grab.
+        "1W. HOLD MHA-DT-37 HOME, T018 ON T024, UNTIL THE BONDS GRAB.",
+        f"1X. REMOVE {PHASING_COMB}.",
+        # #2470: phase is what the comb set, so the cured cluster is accepted
+        # on it; a bonded slip fit has nothing to adjust, so the remedy parts
+        # the bonds (drawing-guidelines: about 250 C releases 638).
+        f"1Y. ONCE CURED, CHECK THAT {PHASING_COMB} DROPS INTO ALL FIVE GEARS.",
+        "1Z. IF IT DOES NOT, PART THE TIP BONDS AT 250 DEG C AND REDO FROM 1P.",
         # U37c cut-to-fit acceptance survives the taller post and longer stock:
         # MHA-DT-VN-61's registry/spec own the selected screw and reference length.
         # Each screw is cut against its own matched post/platform hole, never
@@ -2049,7 +2078,7 @@ CONSUMABLES_NOTES = _note_text(
         "UNLESS ITS STEP GIVES ANOTHER SETTING.",
         # Rule 23 (rubric d9f8b0c): one package note may carry the bond's
         # degrease, apply and cure rules; the bonds are part-spec steps.
-        # Round 13: every bond cites the note (1N-1R, 2P, 4B, 6B, 12-14), so the
+        # Round 13: every bond cites the note (1N-1U, 2P, 4B, 6B, 12-14), so the
         # note names no step range; the station it sets at once is 12A's.
         "LOCTITE 638 BONDS: DEGREASE BOTH PARTS; COAT THE "
         "INSERTED PART, NEVER A BLIND SEAT; KEEP IT OFF RUNNING LANDS; SET STEP "
@@ -2631,8 +2660,9 @@ def code_key_text(rows: Sequence[tuple[int, str]], cylinder_gears: int) -> str:
     """The package's labelled code key (owner ruling 2026-11-08, Pedro): the
     MHA-DT-03 codes as the model configures them, by station front to back
     (``rows``, from the placed cone gears), two columns, GEAR 0 to the last of
-    the ``cylinder_gears`` MHA-DT-12, counted from the front, and step 1P's
-    phasing comb and its blades (a shop tool on its own print, no BOM row)."""
+    the ``cylinder_gears`` MHA-DT-12, counted from the front, and steps 1R
+    and 1V's phasing comb and its blades (a shop tool on its own print, no
+    BOM row)."""
     code = rows[0][1]
     digits = "N" * (len(code) - 1)
     half = (len(rows) + 1) // 2
@@ -3878,9 +3908,10 @@ def _reference_iso(
     caption: str,
     label: str,
     center: tuple[float, float] = REFERENCE_ISO_CENTER,
+    scale: tuple[float, float] = REFERENCE_ISO_SCALE,
 ) -> Any:
     """A small collapsed isometric: every sheet needs a view for its title block."""
-    view = place_view(adapter, str(SOURCE), "*Isometric", *center, scale=REFERENCE_ISO_SCALE)
+    view = place_view(adapter, str(SOURCE), "*Isometric", *center, scale=scale)
     set_hidden_lines_removed(adapter, view)
     set_high_quality_shaded_with_edges(adapter, view, label=label)
     _configure_view(adapter, view, exploded=False, label=label)
@@ -4210,6 +4241,7 @@ def _place_sequence_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
         caption="FINISHED ASSEMBLY",
         label="sequence reference isometric",
         center=SEQUENCE_ISO_CENTER,
+        scale=SEQUENCE_ISO_SCALE,
     )
     return _stack_sheet_note_fields(adapter, facts, SEQUENCE_SHEET)
 

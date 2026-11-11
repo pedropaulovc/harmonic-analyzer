@@ -87,29 +87,47 @@ def test_the_cone_stack_step_prints_measured_limits() -> None:
     assert "IF IT IS SHORT, REMAKE ITS THINNEST GEAR" in stack
 
 
-def test_the_tip_is_measured_dry_then_bonded_on_the_feeler() -> None:
+def test_the_tip_is_measured_dry_then_bonded_on_the_feeler_in_two_cures() -> None:
     """Owner decision C1 keyed (2026-11-09, PR #1992): the stack is measured
     dry, MHA-DT-38 is pressed on the loose MHA-DT-37, and only then is T024
     bonded one STACK_FEELER off T030 with the bonded gears phased to T030 by
     the MHA-DT-03-TL-02 phasing comb, T030's blade beside the key (owner
-    rulings 2026-11-09 and 2026-11-10)."""
+    rulings 2026-11-09 and 2026-11-10).  #2470: T024 is bonded and phased
+    alone, with the faces its squeeze-out reaches waxed first, and cures
+    before the spigot's three joints are made and phased, the spigot held
+    home in its blind socket; the cured cluster is accepted on the comb."""
     stack = _step_body("cone-gears-stacked")
+    feeler = sheet.inch_text(cone_stack_end_play.STACK_FEELER, sheet.FEELER_PLACES)
     order = (
         "SLIDE T024 ON MHA-DT-04 AGAINST T030, DRY, NO FEELER",
         "SLIDE T012 AND T018 ON THE MHA-DT-37 SPIGOT, DRY",
         "PUSH MHA-DT-37 INTO THE MHA-DT-04 SOCKET UNTIL T018 BEARS ON T024",
         "ACCEPT",
         "PRESS MHA-DT-38 ON THE MHA-DT-37 PIVOT",
-        f"BOND T024 ON MHA-DT-04, "
-        f"{sheet.inch_text(cone_stack_end_play.STACK_FEELER, sheet.FEELER_PLACES)} FEELER ON T030",
-        "BOND T012 AND T018 ON THE MHA-DT-37 SPIGOT",
+        f"WAX T030'S BACK FACE, THE KEY'S BACK END AND THE {feeler} FEELER",
+        f"BOND T024 ON MHA-DT-04, {feeler} FEELER ON T030",
+        "1R. ENGAGE MHA-DT-03-TL-02 AT ONCE, T030'S BLADE BESIDE THE KEY",
+        "REMOVE MHA-DT-03-TL-02 AND THE FEELER ONCE THE BOND GRABS",
+        "AFTER T024'S 24 H CURE, BOND T012 AND T018 ON THE MHA-DT-37 SPIGOT",
         "BOND MHA-DT-37 IN MHA-DT-04, T018 ON T024,",
-        "ENGAGE MHA-DT-03-TL-02 AT ONCE, T030'S BLADE BESIDE THE KEY",
-        "REMOVE MHA-DT-03-TL-02 AND THE FEELER",
+        "1V. ENGAGE MHA-DT-03-TL-02 AT ONCE, T030'S BLADE BESIDE THE KEY",
+        "HOLD MHA-DT-37 HOME, T018 ON T024, UNTIL THE BONDS GRAB",
+        "1X. REMOVE MHA-DT-03-TL-02.",
+        "ONCE CURED, CHECK THAT MHA-DT-03-TL-02 DROPS INTO ALL FIVE GEARS",
+        "IF IT DOES NOT, PART THE TIP BONDS AT 250 DEG C AND REDO FROM 1P",
     )
     positions = [stack.find(phrase) for phrase in order]
     assert -1 not in positions, positions
     assert positions == sorted(positions)
+
+    # One bond before the first comb; T012, T018 and the spigot before the
+    # second ("BOND T0..." or "BOND MHA-...", never "THE BOND GRABS").
+    def bonds(text: str) -> int:
+        return text.count("BOND T0") + text.count("BOND MHA-")
+
+    first, second = positions[7], positions[11]
+    assert bonds(stack[positions[6] : first]) == 1
+    assert bonds(stack[first:second]) == 2
 
 
 def test_the_end_screw_sets_the_end_play_after_the_pivot_runs_free() -> None:
