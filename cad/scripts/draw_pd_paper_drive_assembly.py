@@ -2042,7 +2042,7 @@ def _step_text(
         ),
         "latch-pin-pressed": (
             f"PRESS THE {n['pd-vn-transgear-latch-pin']} DOWEL, CHAMFERED END FIRST, "
-            f"INTO THE {n['pd-transgear-arm']} ARM'S REAMED HOLE TO THE HOLE FLOOR, "
+            f"INTO THE {n['pd-transgear-arm']} ARM'S REAMED HOLE TO ITS FLOOR, "
             f"{pin_window} PROUD.",
             _press_remedy(
                 "DOWEL", f"{n['pd-transgear-arm']} ARM", "latch-pin-pressed"
@@ -2073,7 +2073,7 @@ def _step_text(
             f"AND THE {n['pd-transgear-pin']} PIN'S SHANK IN ITS PIN BORE S, AT "
             f"THE HEIGHT THE DISC WILL RUN, TRUE ON ONE DRO AXIS ({KNOB_SETTING_TRUE}).",
             "ZERO THE DRO ON S.",
-            f"MOVE THE TABLE TO THE {KNOB_SETTING_VIEW_NAME} ALONG AND ACROSS "
+            f"SET THE TABLE TO {KNOB_SETTING_VIEW_NAME}'S ALONG AND ACROSS "
             "SETTINGS FROM S.",
             f"TAP THE PLATE UNTIL ITS KNOB BORE {KNOB_BORE_LETTER} INDICATES TRUE.",
             "TIGHTEN THE CLAMPS.",
