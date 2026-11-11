@@ -15,14 +15,17 @@ pd-latch-hook:
   # read 2026-11-10); 400 F 62-63, 450 F 61-62, 500 F 59-60 HRC (Kevin
   # Cashen, https://cashenblades.com/2021/02/08/1095/, ASM, Carpenter and
   # Crucible data, read 2026-11-10). The oven's +/-25 F swing about 450 F
-  # gives about 56-62 HRC across the two sheets, inside 55-62.
+  # gives about 56-62 HRC across the two sheets, and an oven that only
+  # reaches 400 F gives 60-63: all inside 55-63.
   # Function: releasing the latch flexes the arm 5.2 mm along the pin at the
   # pin hole, a 236 MPa peak at the arm's root (0.115 % strain; 250 MPa on
   # .034 sheet). Soft 1095 yields near 525 MPa (cold drawn; annealed is
   # lower), so a 2x overpull would set an unhardened leaf; at 55 HRC (tensile
   # about 1,900 MPa by the 3.45 x HB rule) the flex is a small fraction of
   # yield. The hardness keeps the leaf from taking a set and the pin hole's
-  # bearing edge from wearing; 62 MAX keeps it tempered (as-quenched 64-66).
+  # bearing edge from wearing. 63 MAX: as-quenched 1095 is 64-66 HRC, so a
+  # part over 63 missed its temper. The files check 55 MIN; the 65 file
+  # biting is the kit's nearest check on the top, the logged temper the rest.
   # Park's AAA fully hardened 1/8 in 1095 and canola did not (Larrin
   # Thomas, https://knifesteelnerds.com/2021/07/19/which-quenching-oil-is-best-for-knives/),
   # so the quench is AAA. Shop kit: Pedro's approved heat-treat kit
@@ -31,10 +34,10 @@ pd-latch-hook:
   # anti-scale-atp-641, machines.tempering-oven,
   # gauges.oven-thermometer-taylor-5932, gauges.hardness-files), recorded in
   # cad/process/shop/inventory.toml up to 02fdd651e0.
-  finish: hardened and tempered after drilling, 55-62 HRC
+  finish: hardened and tempered after drilling, 55-63 HRC
   quantity: 1
   tolerance_class: machined_block
-  process: ".032 in annealed 1095 sheet: cut the blank to the flat pattern, bend the ear 90 degrees, drill the screw holes from the formed ear, roll the arm and form the tab annealed; fit to the support bar (its taps spotted through the screw holes), clamp the hanger at full feed mesh, transfer the latch pin's centre to the strip and drill the pin hole on the mark; remove; harden: brush on ATP-641, heat in the fire-brick chamber with the MAP torch to non-magnetic plus one shade (1450-1475 F) and soak 5 min, then quench in Park's AAA oil, arm tip first and straight down; temper at once in the tempering oven on the steel block at 450 F read on the oven thermometer, 2 h, air cool, then 2 h again; check on the base's edge that the 55 HRC file skates; reinstall"
+  process: ".032 in annealed 1095 sheet: cut the blank to the flat pattern, bend the ear 90 degrees, drill the screw holes from the formed ear, roll the arm and form the tab annealed; fit to the support bar (its taps spotted through the screw holes), clamp the hanger at full feed mesh, transfer the latch pin's centre to the strip and drill the pin hole on the mark; remove; harden: brush on ATP-641, heat in the fire-brick chamber with the MAP torch to non-magnetic plus one shade (1450-1475 F) and soak 5 min, then quench in Park's AAA oil, arm tip first and straight down; temper at once in the tempering oven on the steel block at 450 F read on the oven thermometer, 2 h, air cool, then 2 h again; check on the base's edge that the 55 HRC file skates and the 65 HRC file bites; reinstall"
   drawing_unit: in
   machinist_exceptions:
     - id: "RV-01"
