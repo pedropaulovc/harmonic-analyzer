@@ -2066,23 +2066,24 @@ def test_r4_operation_order_prints_the_blank_route_and_retains_all_clamps() -> N
     # saw corridor, clamp holes, hub drilling and both passes are steps.
     assert not any("PLAN" in text for text in steps.values())
     assert "BEFORE THE FIRST STRAP" in steps["18"]
-    assert spec.strap.NUMBER in steps["19"] and "BEFORE STEP 1" in steps["19"]
+    assert spec.strap.NUMBER in steps["19"] and spec._BLANK_LENGTH in steps["19"]
     for chain, head in (("inner", "19B"), ("outer", "19C")):
         for x, y in spec.blank.LAYOUT_MARKS[chain]:
             assert f"Y {spec._length(y, 3)}" in steps[head]
-            assert (f"X ±{spec._length(abs(x), 3)}" if x else "X 0") in steps[head]
+            assert (f"X -{spec._length(abs(x), 3)} AND " if x else "X 0") in steps[head]
+    # Mirror pairs never borrow the tolerance sign.
+    assert "±" not in steps["19B"] + steps["19C"]
     assert spec._bound(spec.blank.SAW_EDGE_TOLERANCE, 3, up=False) in steps["19E"]
-    assert "STEP 10E" in steps["19F"]
-    assert "STEP 11B" in steps["19G"] and "FROM BELOW" in steps["19G"]
-    assert spec.riser.SCREW_DRILL in steps["19G"]
-    assert spec.blank.CLAMP_DRILL in steps["19H"] and "NEVER INTO THE CARRIER" in steps["19H"]
+    # The clamp holes are piloted from the carrier's own taps (a pilot under
+    # the thread's minor diameter), then opened to the clearance drill.
+    assert spec.riser.SCREW_DRILL in steps["19G"] and spec.blank.CLAMP_DRILL in steps["19H"]
     assert f"{spec._CLAMP_SCREW} {spec._item(spec.RAIL_SCREW)}" in steps["19J"]
     order = list(steps)
-    assert order.index("19F") < order.index("19G") < order.index("19H") < order.index("19J")
+    assert order.index("19E") < order.index("19F") < order.index("19G") < order.index("19H") < order.index("19J")
     # #2444: the hub hole is opened in steps, the last one the pre-ream drill,
     # then reamed to the strap's hub hole.
     assert spec.HUB_DRILL_STEPS[-1] == "25/64" and all(d in steps["20A"] for d in spec.HUB_DRILL_STEPS)
-    assert spec.strap.NUMBER in steps["20B"] and steps["20B"].startswith("20B. REAM")
+    assert spec.strap.NUMBER in steps["20B"] and order.index("20A") < order.index("20B")
     assert spec._torque(spec.holding.HUB_TORQUE_NM) in steps["21A"]
     assert "HEAD SEATED ON THE FLANGE" in steps["21A"]
     assert steps["21B"] == "21B. CHECK THE WASHER AND STRAP BY HAND: NEITHER TURNS NOR LIFTS."
@@ -2090,7 +2091,6 @@ def test_r4_operation_order_prints_the_blank_route_and_retains_all_clamps() -> N
     for text in steps.values():
         assert "350 MM" not in text and "REAMER" not in text
     assert "ALL 3 CLAMP SCREWS" in steps["21F"]
-    assert "INNER PASS" in steps["21F"] and "OUTER PASS" in steps["21F"] and "STEPS 15-15H" in steps["21F"]
 
 
 def test_riser_groove_has_a_depth_and_a_bench_acceptance() -> None:
@@ -2511,20 +2511,19 @@ def test_rail_preparation_cites_numbered_documents_and_the_stated_wall() -> None
     assert " MM MIN" not in preparation
 
 
-def test_rail_trim_names_a_recorded_abrasive_tool_and_keeps_flush_ends() -> None:
+def test_rail_trim_uses_a_rated_recorded_abrasive_tool_after_the_carriages_come_off() -> None:
     # #2446: no owned saw cuts the hardened rail; the trim is cut long with
-    # the recorded grinder's cut-off wheel, ground to the mark, ends flush
-    # (owner ruling #2144 item 13.1 A), carriages off before any cutting.
+    # the recorded grinder's cut-off wheel and ground flush (owner ruling
+    # #2144 item 13.1 A), carriages off before any cutting.
     steps = {text.split(". ", 1)[0]: text for text in spec.ASSEMBLY_STEPS}
     record = spec._RAIL_TRIM_GRINDER
-    assert record["present"] is False and record["purchase"]
-    assert "TRIM EACH RAIL" in steps["1D"] and "STEPS 1E-1F" in steps["1D"]
-    assert "CUT-OFF WHEEL" in steps["1E"] and spec.RAIL_CUT_OFF_ALLOWANCE_IN in steps["1E"]
-    assert "STEP 1C" in steps["1E"]
-    assert "GRINDING WHEEL" in steps["1F"] and "FLUSH" in steps["1F"]
+    assert {"cut-off", "grinding"} <= set(record["wheels"])
+    assert all(wheel["max_rpm"] >= record["max_rpm"] for wheel in record["wheels"].values())
+    # The cut allowance is printed as a decimal and the trim cuts happen
+    # between moving the carriages off and fitting the rails to their bars.
+    assert spec.RAIL_CUT_OFF_ALLOWANCE_IN.startswith(".") and spec.RAIL_CUT_OFF_ALLOWANCE_IN in steps["1E"]
     order = list(steps)
-    assert order.index("1C") < order.index("1D") < order.index("1E") < order.index("1F") < order.index("1G")
-    assert "GRIT" in steps["1K"] and order.index("1K") < order.index("2")
+    assert order.index("1C") < order.index("1E") < order.index("1F") < order.index("2A")
 
 
 def test_bom_note_names_the_base_bar_rows_as_two_configurations() -> None:

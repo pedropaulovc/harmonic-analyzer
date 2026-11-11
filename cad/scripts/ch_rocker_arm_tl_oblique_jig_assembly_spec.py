@@ -1511,14 +1511,15 @@ _RAIL_TRIM_GRINDER = tomllib.loads(
 if not (
     _RAIL_TRIM_GRINDER["kind"] == "angle_grinder"
     and {"cut-off", "grinding"} <= set(_RAIL_TRIM_GRINDER["wheels"])
+    # Every wheel's rating is required and over the grinder's speed: an
+    # under-rated abrasive wheel bursts.
     and all(
         wheel["max_rpm"] >= _RAIL_TRIM_GRINDER["max_rpm"]
         for wheel in _RAIL_TRIM_GRINDER["wheels"].values()
-        if "max_rpm" in wheel
     )
 ):
     raise AssertionError("the rail-trim grinder record moved; recheck step 1's trim")
-RAIL_CUT_OFF_ALLOWANCE_IN = "1/16"
+RAIL_CUT_OFF_ALLOWANCE_IN = ".06"
 # The PM-30MV's X travel (cad/process/shop.toml machines.pm-30mv, the
 # catalogue 23 in) is not a measurement of the installed mill: the travel
 # with the DRO scale fitted can only be smaller, and step 6's origin is the
@@ -1583,7 +1584,7 @@ if LONG_TRAVEL_BAND >= trammel.RUN_OUT:
     raise AssertionError("a pass-limit mark within its band can stop short of the land")
 ALIGNMENT_PLACES = 4
 ALIGNMENT_INDICATOR = ".0001 SPINDLE TEST INDICATOR"
-# The tables print on the last instruction sheet (the drawing asserts it).
+# The tables print on sheet 10, the strap holding sheet (the drawing asserts it).
 SETTING_SHEET_NUMBER = 10
 ASSEMBLED_CAPTION = (
     "SHOWN: INNER PASS, SHOULDER SCREWS IN A1/B1, AT THE SYMMETRIC POSITION "
@@ -2554,14 +2555,15 @@ _GROOVE = (
 # and the lower raw edge, on the .XXX grid its proof charges); the saw corridor
 # is blank_spec.SAW_EDGE_TOLERANCE, rounded down to the printed places.
 def _layout_chain(marks: tuple[tuple[float, float], ...]) -> str:
-    """A chain's marks, mirror pairs as ``X ±a Y b``, in X order from 0."""
+    """A chain's marks in X order from 0, a mirror pair as ``X -a AND a AT
+    Y b``: never ``±``, which the sequence keeps for tolerances."""
     pairs: dict[float, float] = {}
     for x, y in marks:
         if pairs.setdefault(abs(x), y) != y:
             raise AssertionError("a layout chain is no longer symmetric about X 0")
     return ", ".join(
-        ("X 0" if not x else "X ±" + _length(x, blank.LAYOUT_PLACES))
-        + f" Y {_length(y, blank.LAYOUT_PLACES)}"
+        ("X 0" if not x else f"X -{_length(x, blank.LAYOUT_PLACES)} AND {_length(x, blank.LAYOUT_PLACES)}")
+        + f" AT Y {_length(y, blank.LAYOUT_PLACES)}"
         for x, y in sorted(pairs.items())
     )
 
@@ -2613,8 +2615,8 @@ OPERATION_STEPS = (
     f"AT BOTH PASS ENDS: {_GROOVE[1]}.",
     f"18B. IF A GROOVE IS SHALLOW, DEEPEN IT TO {_GROOVE[0]} AS IN STEP 18.",
     "18C. IF A GROOVE IS DEEP, REDO STEPS 11-11E AND 18 ON A NEW RISER.",
-    f"19. LOAD ONLY STRAP BLANKS CUT SQUARE TO {_BLANK_LENGTH} LONG AND FACED TO "
-    f"THE {strap.NUMBER} THICKNESS BEFORE STEP 1.",
+    f"19. PREPARE EACH STRAP BLANK CUT SQUARE TO {_BLANK_LENGTH} LONG AND FACED "
+    f"TO THE {strap.NUMBER} THICKNESS BEFORE STEP 1: THE JIG THEN FILLS THE TABLE.",
     "19A. MARK X 0 ON THE BLANK MIDWAY BETWEEN ITS SQUARE ENDS AND Y 0 ALONG "
     "ITS LOWER RAW EDGE.",
     "19B. MARK THE INNER CHAIN FROM X 0, Y 0, ANY POINT OFF THE BLANK ON THE "

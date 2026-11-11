@@ -464,6 +464,7 @@ name = "4-1/2 x 1/4 x 7/8 in Type 27 metal grinding wheel"
 sku = "57245"
 source = "https://www.harborfreight.com/4-12-in-x-14-in-x-78-in-type-27-metal-grinding-wheel-57245.html"
 purchase = "Harbor Freight 57245, HERCULES, $4.99 (listing read live 2026-11-11)"
+max_rpm = 13580
 
 # --- workholding ------------------------------------------------------------
 

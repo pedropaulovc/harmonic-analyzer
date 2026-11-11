@@ -8,7 +8,7 @@ ch-rocker-arm-tl-oblique-pivot-block:
   finish: as machined
   quantity: 1
   tolerance_class: machined_block
-  process: "Centred rail-2 block, 1.64 x 1.58 x .96; shoulder axis .82 from either end, centred on the HGH15CA 26 x 26 pattern. Keep carriage counterbore floors .570 above the bottom; pivot seat bored .3760-.3765 with a flat floor, .359 deep from top, with a 5/16-18 tapped through hole below."
+  process: "Centred rail-2 block, 1.64 x 1.58 x .96; shoulder axis .82 from either end, centred on the HGH15CA 26 x 26 pattern. Keep carriage counterbore floors .570 above the bottom; pivot seat bored .3755-.3765 with a flat floor, .359 deep from top, with a 5/16-18 tapped through hole below."
   machinist_exceptions:
     - id: "RV-01"
       kind: "minor"

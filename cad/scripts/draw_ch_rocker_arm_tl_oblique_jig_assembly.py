@@ -107,8 +107,8 @@ STEPS_SHEET = "ASSEMBLY STEPS"
 FIT_SHEET = "PIVOT AND FEED FIT"
 OPERATION_SHEET = "OPERATION AND HOLD DOWNS"
 HOLDING_SHEET = "STRAP HOLDING AND PREPARATION"
-# The strap's preparation, drilling and cutting steps (#2443: the retired
-# MHA-CH-06 plan's route, now printed) continue the sequence on their own sheet.
+# The fifth instruction sheet: the greedy flow carries the sequence's tail
+# (today steps 19J-21G, the strap's hub and cuts; #2443) onto it.
 CUTTING_SHEET = "STRAP CUTTING"
 PIVOT_SHEET = "PLAIN PIVOTS EXPLODED"
 LINEAR_MOTION_SHEET = "LINEAR MOTION FROM ABOVE"
@@ -1035,8 +1035,9 @@ def note_ink_height(text: str) -> float:
     return NOTE_INK_FIRST_LINE_M + (lines - 1) * NOTE_INK_PITCH_M if lines else 0.0
 
 
-# The setting tables atop the last instruction sheet's right column, in
-# place of continued steps: the rail setting, pass and far limit tables.
+# The setting tables atop the strap holding sheet's right column (sheet 10,
+# the next to last instruction sheet), in place of continued steps: the rail
+# setting, pass and far limit tables.
 SETTING_SHEET = HOLDING_SHEET
 if SHEET_NAMES.index(SETTING_SHEET) + 1 != spec.SETTING_SHEET_NUMBER:
     raise AssertionError("the setting tables moved off the sheet the steps cite")
