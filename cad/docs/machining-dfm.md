@@ -906,14 +906,34 @@ to face and set the 7.0565 channel pitch (`ch_rocker_arm_spec.HUB_LENGTH`,
 ### Frame (T1 — cast top frame)
 
 Owner ruling 2026-11-10 (#2333, option a): `fr-top-frame` is a bought one-off
-gray-iron sand casting (ASTM A48 class 25 minimum) poured from a 3D-printed
-pattern and machined on its seats only. The casting questions the ruling left
-open (draft, as-cast bands, boss tops, the set-screw boss, datum D, cast datum
-targets) are on #2333; the row below changes no geometry.
+gray-iron sand casting (ASTM A48 class 25B minimum) poured from a 3D-printed
+pattern and machined on its seats only. Owner rulings B1–B6 and D1–D6 of the
+same date are in the model and on the print:
+
+- **B1/D1/D4 draft.** 2° on every as-cast wall. It is taken out (2° ±1°) on
+  the flange's outer and window rims, the hub-rib and land strips flush with
+  them, the corner and hub boss barrels and the set-screw boss face, and added
+  (2° +1°/−0) on every other wall.
+- **B2 as-cast band.** ±.03 on every dimension with an as-cast end; machined
+  features keep the title block.
+- **B3 boss tops.** The four boss tops are faced seats with a native finish
+  symbol; the boss bottom prints 1.69 ±.03 below the faced top.
+- **B4 set-screw boss.** Full rail height, cast face .95 ±.03 from the bore
+  axis on the faced top, spot face .83.
+- **B5 datum D.** The median plane of the as-cast crossbar sides, .99 ±.03
+  wide on the faced underside.
+- **B6/D2 cast datums.** Targets E1–E3 on three boss bottoms, F1–F2 on the
+  two rear boss barrels and G1 on the rear-west barrel. The socket table's
+  origin is the F|G corner and its coordinates are BASIC; the hanger holes
+  are located .XXX from the socket axes and ⌖ .010 | D.
+- **D3 webs.** Thickness ±.03, median ⌖ .06 | A | B; datum B is the 4X socket
+  pattern.
+- **D5 counterbore floor.** .62 from the socket axis (was .65).
+- **D6 sockets.** ⌖ Ø.06 | E | F | G over ⌖ Ø.010 | A.
 
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
-| **`fr-top-frame`** | gray-iron casting, about 23.8 lb as cast (17.7 lb finished; 17.28 × 10.59 × 1.93 in), `[[stock]]` casting row and `services.gray-iron-foundry`; shop-printed pattern `tools.top-frame-casting-pattern` | inverted-T rails (.32 flange, .51 web, 1.117 pocket, R.12 roots) and four Ø1.77 bosses .18 proud, all as cast; **machined:** the faced top (63.3 in²) and faced underside (23.7 in², datum A and both knife seats), 4 Ø1.004 sockets bored from solid bosses, 4 Ø1.083 cap recesses, the Ø.520 gooseneck bore, and the drilled, tapped and reamed holes | flat parting at the faced top plane leaves no undercut except the gooseneck set-screw boss top (0.16 in²); 144 in² of cast walls carry no draft; the title-block ±.01 cannot be held on as-cast faces, and at ±.03 the keeper 2-56 tap drill wall falls from .087 to .047 (floor .060); solid bosses are the heaviest sections (modulus .35 vs .18 for a rail), so feed them from the boss tops | facing: both knife seats lie inside one 3.5 in face-mill setup with the hole-table Y0 edge at the column (.07 to spare at the 7.5 in throat) and both keeper seats with .49; holes 8.60 (knife) and 9.705 (socket) from that edge need the part turned 180°, so each station and socket row is picked up from the first | stress-relieved casting from the foundry; face the top off three boss bottoms, turn over onto it and face the underside to the 1.437 grip, centre the socket pattern on the cast bosses and transfer-bore the base from it (#2386) |
+| **`fr-top-frame`** | gray-iron casting, ASTM A48 class 25B, about 23.8 lb as cast (18.0 lb finished; 17.35 × 10.59 × 1.93 in), poured by an outside foundry from a shop-printed pattern: the casting `[[stock]]` row in `cad/config/shop-equipment.toml` | inverted-T rails (.32 flange, .51 web on the underside, 1.117 pocket, R.12 roots) and four Ø1.77 bosses (on the faced top) .18 proud, as cast with 2° draft and ±.03; **machined:** the faced top (64.5 in²) and faced underside (23.5 in², datum A and both knife seats), the four boss tops, the rim breaks round the faced top and the boss tops, 4 Ø1.004 sockets bored from solid bosses, 4 Ø1.083 cap recesses and their mouth chamfers, the Ø.520 gooseneck bore, the set-screw spot face, the 4 cross-screw counterbores, and the drilled, tapped and reamed holes | flat parting at the faced top plane with no undercut along the pull (STL audit: 0.0 in², every plane wall and barrel at 2.00°); at the as-cast limits the binding walls are the keeper 2-56 tap drill wall .0807 (target .080, floor .060), the counterbore-to-cap-recess ligament .088, the dowel ream to the crossbar side .105 (.098 at its mouth) and the socket to its barrel .247, and the set-screw spot face keeps .031 of stock; solid bosses are the heaviest sections, so feed them from the boss tops | facing: both knife seats lie inside one 3.5 in face-mill setup with the rear boss barrels at the column (.07 to spare at the 7.5 in throat) and both keeper seats with .49; holes 8.60 (knife) and 9.705 (socket) from that edge need the part turned 180°, so each station and socket row is picked up from the first | stress-relieved casting from the foundry; stand it on the three E boss bottoms against F1–F2 and G1 and face the top and the boss tops, turn over onto the faced top and face the underside to the 1.437 grip (datum A), bore the socket pattern within Ø.06 of E, F and G and transfer-bore the base from it (#2386) |
 
 ---
 

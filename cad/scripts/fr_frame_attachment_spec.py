@@ -47,8 +47,11 @@ TOP_AXIS_HEIGHT_PLACES = 3
 # fillister head (HEAD_H 4.572) sits below the Ø.35 mouth's lowest barrel point
 # at every printed corner, and the floor stands far enough outboard to keep
 # drawing-guidelines.md rule 17 (walls and webs)'s .080 to the cap recess at its .XX band (build_fr_top_frame proves
-# both; at 128.1 the ligament was 1.80, codex review of 080fda97).
-TOP_SCREW_SEAT_Z = 128.524  # 5.060 (.65 off the column line once it snaps to 4.410)
+# both; at 128.1 the ligament was 1.80, codex review of 080fda97).  Owner
+# ruling 2026-11-10 (#2333, B1): the as-cast barrel narrows 2° (+-1°) below
+# its top plane, so the floor moved .03 deeper, .65 -> .62, to keep the head
+# under the mouth at the 3° barrel.
+TOP_SCREW_SEAT_Z = 127.762  # 5.030 (.62 off the column line once it snaps to 4.410)
 TOP_SCREW_COUNTERBORE_DIAMETER = 8.89  # .35
 # The base keeps its spotface seat at the same diameter.
 SCREW_SPOTFACE_DIAMETER = 8.89  # .35

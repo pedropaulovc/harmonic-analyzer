@@ -18,11 +18,44 @@ printed inch value; stations other subsystems own (the knife line, the
 summing axis, the keeper fit-up) flow through unsnapped.
 
 Owner ruling 2026-11-10 (#2333, option a): the frame is a one-off gray-iron
-sand casting poured from a 3D-printed pattern and machined on its seats only:
-the faced top and underside planes, the tube sockets, cap recesses and
-gooseneck bore, and the drilled, tapped and reamed holes.  Every other face
+sand casting (ASTM A48 CLASS 25B) poured from a 3D-printed pattern and
+machined on its seats only.  Machined: the faced top and underside planes,
+the four corner-boss tops, the tube sockets, cap recesses and their mouth
+chamfers, the gooseneck bore, the set-screw spot face, the cross-screw
+counterbores, and the drilled, tapped and reamed holes.  Every other face
 stays as cast.  The registry row (``cad/config/parts/fr-top-frame.yaml``)
 carries the material and process.
+
+Owner rulings B1-B6 and D1-D6 (#2333, 2026-11-10) make the model the casting:
+
+* B1, draft: every drag face takes ``DRAFT_DEG``.  Added draft (the nominal
+  at the face's end far from the faced top, the wall thickening toward the
+  top) on the rail webs, the crossbar web and side walls, the plan gussets,
+  junction lands, hub rib, hub V-gussets and the set-screw boss's side walls.
+  Taken-out draft (the nominal on the faced top plane) on the corner-boss
+  barrels.  Machined faces take none.
+* D1: the faces B1 does not name take their draft taken out
+  (``DRAFT_TAKEN_OUT_ON_UNNAMED_FACES``): both .32 flange rims, with the
+  hub-rib and junction-land strips flush with them, and the set-screw boss
+  face keep their nominal on the faced top; the hub boss barrel keeps its
+  Ø1.18 on the underside plane.
+* B2: every printed dimension with an as-cast end carries ``AS_CAST_BAND``
+  natively; machined-to-machined dimensions keep the title block.
+* B3: the four corner-boss tops are machined seats (``SURFACE_FINISHES``).
+* B4: the set-screw boss runs the full rail height, flush with the faced top.
+* B5: datum D, the crossbar's median plane, stays as cast.
+* B6: the casting is set up on native datum targets E1-E3 (boss bottoms),
+  F1-F2 (rear lower barrels) and G1.
+* D2: G1 stands on the west rear lower barrel and the hole table's origin
+  is the F-G (west, rear) corner.  The socket coordinates are basic under
+  one composite frame; the hanger holes leave the table for the socket axes.
+* D3: each rail web's median plane holds ``RAIL_WEB_POSITION_ZONE`` to its
+  socket axes (datum B, the four-socket pattern).
+* D4: added draft prints +1°/-0, taken-out draft ±1°
+  (``DRAFT_ADDED_DEVIATIONS_DEG``, ``DRAFT_TAKEN_OUT_DEVIATIONS_DEG``).
+* D5: the cross-screw counterbore floors stand .62 from the socket axis
+  (``fr_frame_attachment_spec.TOP_SCREW_SEAT_Z``).
+* D6: the composite frame's upper tier is ``SOCKET_PATTERN_LOCATION_ZONE``.
 """
 
 from __future__ import annotations
@@ -37,6 +70,7 @@ from _package_units import drawing_unit
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm, printed_deviations
 from _title_block_units import render_number
 from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _hole_spec import (
     CLEARANCE_MM,
     THREAD_MAJOR_MM,
@@ -114,18 +148,66 @@ GOOSENECK_BORE_DIA = 13.208  # .520
 # the bore runs RING_HEIGHT + HUB_BOSS_DROP (build_fr_top_frame's HubBoss).
 HUB_BOSS_DROP = 7.874  # .31 boss bottom local -26.1239
 
+# --- As-cast band and draft (owner rulings B1-B3, D1, D4; #2333) ---------------
+#
+# B2: a printed dimension with an as-cast end prints this symmetric band,
+# authored on its model dimension (``_drawing_tolerances``); every proof that
+# reads an as-cast limit charges it.  B1: drag faces take 2°.
+# Owner ruling 2026-11-10 (#2333, D4): where the draft is added the angle
+# prints +1°/-0 (a wall only ever thickens toward the top), where it is taken
+# out ±1° (the faced-top outline is nominal).  Every proof uses the angle
+# extreme that binds it.
+AS_CAST_BAND = 0.762  # ±.03
+DRAFT_DEG = 2.0
+DRAFT_ADDED_DEVIATIONS_DEG = (1.0, 0.0)  # (upper, lower)
+DRAFT_TAKEN_OUT_DEVIATIONS_DEG = (1.0, 1.0)  # (upper, lower) magnitudes
+DRAFT_DEG_MIN = DRAFT_DEG - DRAFT_TAKEN_OUT_DEVIATIONS_DEG[1]  # 1°
+DRAFT_DEG_MAX = DRAFT_DEG + DRAFT_TAKEN_OUT_DEVIATIONS_DEG[0]  # 3°
+DRAFT_ADDED_DEG_MIN = DRAFT_DEG - DRAFT_ADDED_DEVIATIONS_DEG[1]  # 2°
+DRAFT_TAN = tan(radians(DRAFT_DEG))
+DRAFT_ANGLE_PLACES = 0
+# Owner ruling 2026-11-10 (#2333, D1): the faces B1 leaves unnamed -- the .32
+# flange's outer and window rims with the hub-rib and junction-land strips
+# flush with them, the hub boss barrel and the set-screw boss face -- take
+# their draft TAKEN OUT: each keeps its nominal on the faced plane it meets
+# (the hub barrel's Ø1.18 on the underside).  ``build_fr_top_frame`` models
+# and proves this sense only, and refuses the other.
+DRAFT_TAKEN_OUT_ON_UNNAMED_FACES = True
+
+# Stations the removed rail sections cut at.  The model stands each section's
+# as-cast widths on construction lines at these stations, so the dimension a
+# section imports lands on the profile it cuts (``draw_fr_top_frame`` cuts
+# E-E and M-M at the first and holds H-H to the second).
+SIDE_SECTION_Z = -56.0
+RAIL_SECTION_X = 44.4
+
+# --- Cast datum targets (owner rulings B6 and D2, #2333) ----------------------
+#
+# The casting is fixtured on six cast points for its first cut: E1-E3 on three
+# corner-boss bottoms, F1 and F2 on the two rear barrels' rear generators and
+# G1 on the rear-west barrel's west generator.  A barrel target stands this
+# far over the boss bottom, mid-height on the band that hangs below the
+# faced underside (the cross-screw counterbore opens the barrel above it);
+# a boss-bottom target this far from its socket axis, mid-width on the
+# bottom's ring.  Both print BASIC at DATUM_TARGET_PLACES.
+# ``build_fr_top_frame.CAST_DATUM_TARGETS`` places the six.
+DATUM_TARGET_BARREL_HEIGHT = 3.302  # .13
+DATUM_TARGET_BOTTOM_RADIUS = 16.002  # .63
+DATUM_TARGET_PLACES = 2
+
 # --- Gooseneck set-screw boss (east-rail hub) ---------------------------------
 #
 # User ruling 2026-10-12 (option (a), no jam nut): the MHA-FR-VN-52 square-head
 # cup-point set screw that pinches the gooseneck's bare leg enters the hub through a cast
-# boss on the hub pad's outer face -- square-sided and blended into the rail
-# under the top flange, as the ch19 img04 hub shows it -- spot-faced square
-# to the tap. The spot face starts the thread square on a machined face (the
-# head stands proud of it: the cup point bites the post first); it prints .XX
-# from the bore axis the screw pinches across.
+# boss on the hub pad's outer face, spot-faced square to the tap. The spot
+# face starts the thread square on a machined face (the head stands proud of
+# it: the cup point bites the post first); it prints .XX from the bore axis
+# the screw pinches across.  Owner ruling B4 (#2333): the boss runs the full
+# rail height, flush with the faced top, and its cast face (taken-out draft,
+# nominal at the top) stands .95 from the bore axis, .12 over the spot face.
 HUB_SET_SPOT_FROM_AXIS = 21.082  # .83
 HUB_SET_SPOT_PLACES = 2
-HUB_SET_BOSS_FROM_AXIS = 22.098  # .87 cast face: .04 stock over the spot face
+HUB_SET_BOSS_FROM_AXIS = 24.13  # .95 cast face at the faced top
 HUB_SET_SPOT_DIA = 9.906  # .39 clears the 1/4 square head's 8.98 diagonal at its .XX minimum
 HUB_SET_BOSS_W = 18.034  # .71 along the rail, centred on the tap (spot land: build)
 SET_SCREW_THREAD = "1/4-20"
@@ -256,13 +338,26 @@ HANGER_PIN_HOLE_DEPTH_TOL = KNIFE_DOWEL.PRESS_DEPTH_TOL  # 0.254
 # The keeper seats carry no frame: rule 5 names flatness on a clamp face
 # over-specification and no user ruling accepts one (codex review of
 # 06d0bbc59); the faced top (RV-03) carries them.
+# Owner rulings B6, D2, D3 and D6 (#2333): the four tube sockets (datum B, the 4X
+# pattern) are located BASIC from the casting's target frame E|F|G by a
+# composite position, the pattern within Ø.06 of the cast datums and the
+# sockets among themselves within Ø.010 to the faced underside A; each rail
+# web's median plane stands within .06 of its socket-axis line (⌖.06|A|B).
 GEOMETRIC_TOLERANCES_IN: dict[str, str] = {
     "knife-hanger crossbar centring": ".010",
     "knife-hanger press ream perpendicularity": ".001",
+    "tube socket pattern location": ".06",
+    "tube socket pattern refinement": ".010",
+    "rail web position": ".06",
 }
 GEOMETRIC_TOLERANCES_MM: dict[str, float] = {
     key: float(value) * IN for key, value in GEOMETRIC_TOLERANCES_IN.items()
 }
+SOCKET_PATTERN_LOCATION_ZONE = GEOMETRIC_TOLERANCES_MM["tube socket pattern location"]
+SOCKET_PATTERN_REFINEMENT_ZONE = GEOMETRIC_TOLERANCES_MM[
+    "tube socket pattern refinement"
+]
+RAIL_WEB_POSITION_ZONE = GEOMETRIC_TOLERANCES_MM["rail web position"]
 HANGER_CROSSBAR_CENTER_ZONE = float(
     GEOMETRIC_TOLERANCES_MM["knife-hanger crossbar centring"]
 )
@@ -449,17 +544,36 @@ SET_SCREW_TORQUE_MAX_NM = 1.0
 #   the set-screw spot face (a clamp face) neither run nor locate, so they
 #   carry no symbol (machinist review r1, 2026-10-18; drawing-guidelines.md
 #   rule 6).
+# * Owner ruling B3 (#2333): the four corner-boss tops are machined seats,
+#   .18 above the faced top, so the cap recess, the boss height above the
+#   rail and the cross-screw axis below the boss top are machined-to-machined.
 #
 # SEAT grade throughout: nothing runs on these surfaces continuously, so the
 # commercial machine finish is what the fit needs. Each controlled face has
 # a native model symbol; each drawing family appears once with a target label.
 SOCKET_BORE_TARGET = "TUBE SOCKET BORES, 4X"
+BOSS_TOP_TARGET = "BOSS TOPS, 4X"
 SURFACE_FINISHES = tuple(
     SurfaceFinishControl(
         f"socket_{rail}_{end}",
         SEAT_UM,
         CylinderFace(BORE_DIA, contains_x_mm=x, contains_z_mm=z),
         production_method=SOCKET_BORE_TARGET,
+        display_unit=UNIT,
+    )
+    for rail, x in (("east", GOOSENECK_X), ("west", COLUMN_X))
+    for end, z in (("front", FRONT_COLUMN_Z), ("rear", REAR_COLUMN_Z))
+) + tuple(
+    SurfaceFinishControl(
+        f"boss_top_{rail}_{end}",
+        SEAT_UM,
+        PlanarFace(
+            (0.0, 1.0, 0.0),
+            HALF_H + BOSS_ABOVE,
+            contains_x_mm=x,
+            contains_z_mm=z,
+        ),
+        production_method=BOSS_TOP_TARGET,
         display_unit=UNIT,
     )
     for rail, x in (("east", GOOSENECK_X), ("west", COLUMN_X))
@@ -472,36 +586,35 @@ SURFACE_FINISHES = tuple(
 # The hole sizes remain associative callouts; named Hole Wizard placement
 # dimensions expose the stations without duplicating those sizes.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "OuterProfile": {"Width", "Depth", "WinWidth", "WinDepth"},
-    "WebProfile": {
-        "WebOuterWidth",
-        "WebOuterDepth",
-        "WebInnerWidth",
-        "WebInnerDepth",
-    },
+    # The rim rectangle prints as references; the flange widths size the
+    # window and the web thicknesses the web's inner rectangle, each on a
+    # construction line across its rail.
+    "OuterProfile": {"Width", "Depth", "SideFlangeWidth", "FrFlangeWidth"},
+    "WebProfile": {"SideWebT", "FrWebT"},
     # The rail height is the same finished thickness as the grip: the web
     # ring's own depth, printed in the geometry front view as a reference.
-    "WebRing": {"RingHeight"},
+    "WebRing": {"RingHeight", "WebRingDraft"},
+    "TopFlange": {"FlangeT", "TopFlangeDraft"},
     "Crossbar": {"HangerGrip"},
+    # DStation: datum D's median from the G plane (owner ruling D2).
+    "BarProfile": {"BarWidth", "GussetRunE", "LandEnd", "DStation"},
+    "BarPocketProfile": {"PocketLength", "PocketFromSocket", "CrossbarWebT"},
+    "BarPockets": {"PocketDepth"},
     "BossUpProfile": {"C0Dia"},
-    "BossesUpper": {"BossTopExtent"},
-    "BossesLower": {"BossBottomExtent"},
+    "BossesUpper": {"BossesUpperDraft"},
+    "BossesLower": {"BossBelowTop"},
     "BoreProfile": {"B0X", "B0Z", "B0Dia"},
     "CounterboreRearProfile": {"CB1Dia"},
-    "BarProfile": {
-        "BarAnchorX",
-        "BarAnchorZ",
-        "BarFootSpan",
-        "GussetRunE",
-        "BarSideE",
-    },
+    "HubGussetPlateProfile": {"GussetT"},
+    "HubGussetProfile": {"GussetSpan"},
     "HubBossProfile": {"HubDia"},
-    "HubBoss": {"HubBossExtent"},
+    "HubBoss": {"HubBossDrop"},
     "RibProfile": {"RibWidth"},
-    "SetBossProfile": {"SetBossWidth"},
+    "SetBossProfile": {"SetBossWidth", "SetBossFace"},
     "SetSpotProfile": {"SetSpotDia"},
     "GooseneckTap": {"SetTapZ"},
     "GooseneckProfile": {"GnDia", "GnX", "GnZ"},
+    "TRootFillets": {"RootR"},
     # The hanger-hole and keeper-tap placement dims (StudFrontX ...,
     # KeeperFrontX ...) are NOT marked: a Hole Wizard placement sketch
     # measures from the origin -- mid-air on the print -- so sheet 3
@@ -516,6 +629,43 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "CapRecesses": {"CapRecessDepth"},
     "HangerPinProfile": {"HangerPinHoleDia"},
     "HangerPinHoles": {"HangerPinHoleDepth"},
+}
+
+# Owner ruling B2 (#2333): the model dimensions with an as-cast end.  The
+# build authors ``AS_CAST_BAND`` on each (``_drawing_tolerances``), printed
+# at the dimension's own places.
+AS_CAST_DIMENSIONS: dict[str, tuple[str, ...]] = {
+    "OuterProfile": ("SideFlangeWidth", "FrFlangeWidth"),
+    "WebProfile": ("SideWebT", "FrWebT"),
+    "TopFlange": ("FlangeT",),
+    "BarProfile": ("BarWidth", "GussetRunE", "LandEnd", "DStation"),
+    "BarPocketProfile": ("PocketLength", "PocketFromSocket", "CrossbarWebT"),
+    "BarPockets": ("PocketDepth",),
+    "BossUpProfile": ("C0Dia",),
+    "BossesLower": ("BossBelowTop",),
+    "HubGussetPlateProfile": ("GussetT",),
+    "HubGussetProfile": ("GussetSpan",),
+    "HubBossProfile": ("HubDia",),
+    "HubBoss": ("HubBossDrop",),
+    "RibProfile": ("RibWidth",),
+    "SetBossProfile": ("SetBossWidth", "SetBossFace"),
+    "TRootFillets": ("RootR",),
+}
+# Owner ruling 2026-11-10 (#2333, D4): each drafted feature's own draft-angle
+# dimension and the band it prints, (upper, lower) magnitudes in degrees.
+# The set-screw boss is one extrude: its B1-added side walls set its band,
+# which its D1 taken-out face then holds inside its own ±1°.
+DRAFT_ANGLE_DIMENSIONS: dict[str, tuple[str, tuple[float, float]]] = {
+    "WebRing": ("WebRingDraft", DRAFT_ADDED_DEVIATIONS_DEG),
+    "HubRib": ("HubRibDraft", DRAFT_ADDED_DEVIATIONS_DEG),
+    "Crossbar": ("CrossbarDraft", DRAFT_ADDED_DEVIATIONS_DEG),
+    "BarPockets": ("BarPocketsDraft", DRAFT_ADDED_DEVIATIONS_DEG),
+    "HubGussetPlate": ("HubGussetPlateDraft", DRAFT_ADDED_DEVIATIONS_DEG),
+    "SetBoss": ("SetBossDraft", DRAFT_ADDED_DEVIATIONS_DEG),
+    "TopFlange": ("TopFlangeDraft", DRAFT_TAKEN_OUT_DEVIATIONS_DEG),
+    "BossesUpper": ("BossesUpperDraft", DRAFT_TAKEN_OUT_DEVIATIONS_DEG),
+    "BossesLower": ("BossesLowerDraft", DRAFT_TAKEN_OUT_DEVIATIONS_DEG),
+    "HubBoss": ("HubBossDraft", DRAFT_TAKEN_OUT_DEVIATIONS_DEG),
 }
 
 
@@ -540,22 +690,47 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # reference at the grip's places), and the dowel press ream holds its own
 # +.0005/0 band at four places.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "OuterProfile": {"Width": 3, "Depth": 2, "WinWidth": 3, "WinDepth": 2},
-    "WebRing": {"RingHeight": HANGER_GRIP_PLACES},
+    "OuterProfile": {
+        "Width": 3,
+        "Depth": 2,
+        "SideFlangeWidth": 2,
+        "FrFlangeWidth": 2,
+    },
+    "WebProfile": {"SideWebT": 2, "FrWebT": 2},
+    "WebRing": {"RingHeight": HANGER_GRIP_PLACES, "WebRingDraft": DRAFT_ANGLE_PLACES},
+    "TopFlange": {
+        "FlangeT": FLANGE_THICKNESS_PLACES,
+        "TopFlangeDraft": DRAFT_ANGLE_PLACES,
+    },
     "Crossbar": {"HangerGrip": HANGER_GRIP_PLACES},
     "BossUpProfile": {"C0Dia": 2},
+    "BossesUpper": {"BossesUpperDraft": DRAFT_ANGLE_PLACES},
+    "BossesLower": {"BossBelowTop": 2},
     "BoreProfile": {"B0Dia": 3},
     "CounterboreRearProfile": {"CB1Dia": 2},
-    "BarProfile": {"GussetRunE": 2},
+    "BarProfile": {
+        "BarWidth": HANGER_CROSSBAR_WIDTH_PLACES,
+        "GussetRunE": 2,
+        "LandEnd": 2,
+        "DStation": 2,
+    },
+    "BarPocketProfile": {"PocketLength": 2, "PocketFromSocket": 2, "CrossbarWebT": 2},
+    # The pocket is the .XXX grip less the .32 flange: it prints the grip's
+    # places, and its as-cast band prints at them.
+    "BarPockets": {"PocketDepth": HANGER_GRIP_PLACES},
+    "HubGussetPlateProfile": {"GussetT": 2},
+    "HubGussetProfile": {"GussetSpan": 2},
     "HubBossProfile": {"HubDia": 2},
+    "HubBoss": {"HubBossDrop": 2},
     "RibProfile": {"RibWidth": 2},
-    "SetBossProfile": {"SetBossWidth": 2},
+    "SetBossProfile": {"SetBossWidth": 2, "SetBossFace": 2},
     "SetSpotProfile": {"SetSpotDia": 2},
     "GooseneckProfile": {"GnDia": 3},  # a drill diameter: .520
     "CapRecessProfile": {"CapRecessDia": 3},
     "CapRecesses": {"CapRecessDepth": 3},
     "HangerPinProfile": {"HangerPinHoleDia": HANGER_PIN_HOLE_DIA_PLACES},
     "HangerPinHoles": {"HangerPinHoleDepth": HANGER_PIN_HOLE_DEPTH_PLACES},
+    "TRootFillets": {"RootR": 2},
 }
 
 # The drawing reads this flat view back off the sheet: a dimension name is
@@ -590,29 +765,14 @@ for _feature, _dimensions in DRAWING_PRECISION.items():
 # own contract, instead of as a literal in the drawing script.  Keyed by the
 # recipe's own dimension label.
 DRAWING_REFERENCE_PRECISION: dict[str, int] = {
-    # Sheet 1, GEOMETRY: envelope, windows, T-rail section H-H and side
-    # section E-E with the crossbar T and its pockets -- cast stock under the
-    # title block's general band.  The X-direction envelope and windows stand
-    # off the 15.512 socket pitch and the knife line, so they print .XXX as
-    # those stations flow through.  The webs print .XX: the keeper receiver
-    # and cross-tap walls keep the .060 floor at the ±.01
-    # (KEEPER_TAP_*_WALL_MARGIN reads it).  The pocket depth is the .XXX grip
-    # less the flange, a reference.
-    "overall casting width": 3,
+    # Sheet 2, GEOMETRY: the overall envelope (as-cast ends, references), the
+    # faced top's rim break in H-H and the crossbar flange's thickness in
+    # M-M, a reference to the rails' own FlangeT.  Every other size on that
+    # sheet is a model dimension with its ±.03 (AS_CAST_DIMENSIONS).
+    "overall casting width": 2,
     "overall casting depth": 2,
-    "side flange width": 2,
-    "left window clear width": 3,
-    "right window clear width": 3,
-    "crossbar flange width": HANGER_CROSSBAR_WIDTH_PLACES,
-    "rail web thickness": 2,
-    "front rear flange width": 2,
-    "top flange thickness": FLANGE_THICKNESS_PLACES,
     "top rim chamfer": 2,
-    "T rail root radius": 2,
-    "side rail web thickness": 2,
-    "crossbar web thickness": 2,
     "crossbar flange thickness": FLANGE_THICKNESS_PLACES,
-    "crossbar pocket depth": 3,
     # Sheet 2, HOLES-SOCKETS: the socket pitches are the setup datums the
     # column plan is drilled from, stated as MHA-FR-01 states them.
     "socket horizontal pitch": 3,
@@ -620,12 +780,9 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     # Hole stations baseline from socket axes (X from the left pair, Z from
     # the upper pair).  The knife line, summing axis and keeper fit-up are
     # other subsystems' stations: they print .XXX as they flow through.
-    # "crossbar median D" locates datum D from the left bosses' tangent,
-    # the Y edge of sheet 3's boss-corner origin (one origin per view; owner
-    # rulings 2026-11-07: the corner where the Ø1.77 boss ODs touch), and
-    # the position frame holds the hanger axes BASIC zero on D; keeper
-    # coordinates are reference-only guides to assembly-transferred taps.
-    "crossbar median D from left boss tangent": 3,
+    # The position frame holds the hanger axes BASIC zero on D (sheet 7
+    # carries D's width and station); keeper coordinates are reference-only
+    # guides to assembly-transferred taps.
     "front hanger z from upper sockets": 3,
     "rear hanger z from upper sockets": 3,
     "keeper x from left sockets": 3,
@@ -648,20 +805,16 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     # The hub station is the summing axis's (SUMMING_Z): it flows through.
     "hub from left front socket": 3,
     "set screw axis from rail top": 2,
-    "hub boss underside drop": 2,
-    "hub gusset feather span": 2,
     "hub gusset ramp angle": 1,
     "set-screw spot face from bore axis": HUB_SET_SPOT_PLACES,
     "set-screw thread length": 3,
-    "set-screw boss face from bore axis": 2,
-    # Sheet 6, UNDERSIDE: junction lands and knife-hanger section F-F.  The
-    # native finished-top grip and ream depth are imported; the ream's
-    # station from the screw axis is measured.
-    "land end from crossbar face": 2,
-    "crossbar pocket length": 2,
-    "crossbar pocket from front socket": 2,
-    "underside gusset thickness": 2,
+    # Sheet 6, UNDERSIDE: knife-hanger section F-F.  The native finished-top
+    # grip and ream depth are imported; the ream's station from the screw
+    # axis is measured.
     "dowel hole from hanger axis": HANGER_PIN_X_PLACES,
+    # Sheet 7, CAST-DATUMS: the datum targets' BASIC locations.
+    "boss bottom target from socket axis": DATUM_TARGET_PLACES,
+    "barrel target above boss bottom": DATUM_TARGET_PLACES,
 }
 
 # Use the canonical printed-band reader, not the unrounded inch grades.

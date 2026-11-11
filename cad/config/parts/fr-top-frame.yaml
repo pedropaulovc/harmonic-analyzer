@@ -3,21 +3,46 @@ fr-top-frame:
   # Owner ruling 2026-11-10 (#2333, option a): a one-off gray-iron sand
   # casting poured from a 3D-printed pattern and machined on its seats only.
   # It supersedes the ferrous_noncritical family's low-carbon-steel
-  # alternative and the "solid stock or casting" process. The A48 class is
-  # the minimum tensile class, so a class 30 heat also conforms.
-  material: GRAY IRON, ASTM A48 CLASS 25
-  material_specification: GRAY IRON, ASTM A48 CLASS 25
+  # alternative and the "solid stock or casting" process. ASTM A48 class 25B:
+  # the class is the minimum tensile and test bar B covers the controlling
+  # section, the .51 webs; a class 30B heat also conforms.
+  material: GRAY IRON, ASTM A48 CLASS 25B
+  material_specification: GRAY IRON, ASTM A48 CLASS 25B
   finish: ALKYD PRIME/GREEN ENAMEL;MASK SEATS/BORES/THREADS;LIGHT OIL BARE METAL
   quantity: 1
   tolerance_class: machined_block
   drawing_unit: in
-  process: "gray iron casting from a 3D-printed pattern, machined on the seats: the faced top and underside planes, tube sockets, cap recesses, gooseneck bore and the drilled, tapped and reamed holes"
+  # Owner rulings 2026-11-10 (#2333), all in the model and on the print.
+  # tolerance_class stays machined_block: the title block serves the machined
+  # features, and every as-cast dimension carries its own ±.03.
+  #   B1  2° draft on every as-cast wall, added except where D1 takes it out
+  #   B2  ±.03 on every dimension with an as-cast end
+  #   B3  the four boss tops are faced seats (native finish symbol); the
+  #       boss bottom prints 1.69 ±.03 below the faced top
+  #   B4  the set-screw boss runs the rail's full height; its cast face
+  #       stands .95 ±.03 from the bore axis on the faced top
+  #   B5  datum D is the median plane of the as-cast crossbar sides, .99 ±.03
+  #       wide on the faced underside
+  #   B6  six cast datum targets: E1-E3 on three boss bottoms, F1-F2 on the
+  #       two rear boss barrels, G1 on the rear-west boss barrel
+  #   D1  draft is taken out on the flange's outer and window rims, the
+  #       hub-rib and land strips flush with them, the corner and hub boss
+  #       barrels and the set-screw boss face
+  #   D2  G1 on the west barrel; the socket table's origin is the F|G corner
+  #       and its coordinates are BASIC; the hanger holes leave the table,
+  #       .XXX from the socket axes and ⌖ .010 | D
+  #   D3  web thickness ±.03 and web median ⌖ .06 | A | B; datum B is the 4X
+  #       socket pattern
+  #   D4  draft angle 2° +1°/-0 where added, 2° ±1° where taken out
+  #   D5  cross-screw counterbore floor .62 from the socket axis (was .65)
+  #   D6  the sockets' composite frame: ⌖ Ø.06 | E | F | G over ⌖ Ø.010 | A
+  process: "gray iron casting from a 3D-printed pattern, machined on the seats: the faced top and underside planes, the four boss tops, the rim breaks round the faced top and the boss tops, tube sockets, cap recesses and their mouth chamfers, gooseneck bore, set-screw spot face, cross-screw counterbores and the drilled, tapped and reamed holes"
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"
       where: "the knife-hanger crossbar centring frame"
       finding: "position frames over-specified (rule 5)"
-      reason: "owner ruling 2026-10-24 (ASME Y14.5-2018) and owner ruling 2026-10-24 T+H3: the crossbar centring frame bounds the hanger axes' shift off the crossbar median while retaining the screw/ream and side webs (owner-accepted knife-edge-system control); #290 restates it in decimal inch, and owner ruling 2026-11-06 restates it on the shop row: the hanger holes ⌖ .010 | D. Owner ruling 2026-11-08 (Pedro), #2144 item 11.3: the -X reams and their position frames are deleted (the earlier frames to the +X reams as datums B front and C rear, and owner ruling 2026-11-06's 2X ⌖ Ø.004 | A | D, SEP REQT pair frame); each remaining ream is located .300 ±.005 from its #10 hole's axis (section F-F) and refined by RV-05's ⊥, and the MHA-SM-00 gauge bar, not the crossbar, sets the knife mounts' yaw"
+      reason: "owner ruling 2026-10-24 (ASME Y14.5-2018) and owner ruling 2026-10-24 T+H3: the crossbar centring frame bounds the hanger axes' shift off the crossbar median while retaining the screw/ream and side webs (owner-accepted knife-edge-system control); #290 restates it in decimal inch, and owner ruling 2026-11-06 restates it on the shop row: the hanger holes ⌖ .010 | D. Owner ruling 2026-11-08 (Pedro), #2144 item 11.3: the -X reams and their position frames are deleted (the earlier frames that took the +X reams as datums, and owner ruling 2026-11-06's 2X ⌖ Ø.004 | A | D, SEP REQT pair frame); each remaining ream is located .300 ±.005 from its #10 hole's axis (section F-F) and refined by RV-05's ⊥, and the MHA-SM-00 gauge bar, not the crossbar, sets the knife mounts' yaw. Owner ruling 2026-11-10 (#2333, B5): D is the median plane of the as-cast crossbar sides, .99 ±.03 wide on the faced underside and 9.18 ±.03 from the G plane (sheet 7)"
     - id: "RV-02"
       kind: "accept"
       where: "sheet 3 general note 'INSIDE CORNERS R.12 MAX UNLESS NOTED'"
@@ -48,3 +73,13 @@ fr-top-frame:
       where: "the faced underside's knife-mount seat patches carry no flatness control"
       finding: "seat flatness unspecified for the knife-mount dowel slip-tilt fit (rules 1, 5)"
       reason: "owner preference 2026-10-27 (no FCF on face-milled seats): the knife-mount slip-tilt proof (build_sm_summing_assembly, #2016) charges an assumed .0004 seat conformity over the .540 minimum seat, which a face-milled seat drawn flat by the bolt holds; the fit binds only past about .0008 (the ream and the MHA-SM-02 hole each at ⊥ Ø.001)"
+    - id: "RV-09"
+      kind: "accept"
+      where: "the 4X tube sockets' composite position frame (⌖ Ø.06 | E | F | G over ⌖ Ø.010 | A, the pattern datum B, sheet 3) and the six cast datum targets E1-E3, F1-F2 and G1 with their BASIC locations (sheet 7)"
+      finding: "position frame, datum targets and BASIC coordinates over-specified for a one-off casting (rules 1, 5)"
+      reason: "owner rulings 2026-11-10 (#2333, B6, D2 and D6): the first setup stands on three cast boss bottoms and against three cast barrel points, and the upper tier centres the socket pattern on the cast bosses within Ø.06, so the socket wall holds .247 minimum at the boss bottom (.383 at the faced top, less the barrel's ±.03, its steepest 3° draft and the zone's radius); the lower tier keeps the four axes mutually located within Ø.010 and square to the faced underside for MHA-FR-01's columns, and the BASIC table from the F|G corner is what that frame controls (owner-accepted)"
+    - id: "RV-10"
+      kind: "accept"
+      where: "the rail webs' position frames (2X ⌖ .06 | A | B, sections H-H and E-E)"
+      finding: "position frames on as-cast webs over-specified (rule 5)"
+      reason: "owner ruling 2026-11-10 (#2333, D3): each rail web's median stays within ±.03 of its socket-axis line, which is what leaves the keeper 2-56 tap drill its .0807 minimum wall (target .080) and the T flange undersides their printed shelf once the web thickness takes the as-cast ±.03 (owner-accepted)"

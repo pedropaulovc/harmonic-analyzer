@@ -259,3 +259,10 @@ section_mm = [31.75, 15.875]
 length_mm = 101.6
 on_hand = false
 cite = ["Owner ruling 2026-11-10 (Pedro), https://github.com/pedropaulovc/harmonic-analyzer/issues/2334"]
+
+[[stock]]
+form = "casting"
+material = "gray iron, ASTM A48 class 25B (a class 30B heat also conforms)"
+note = "Owner ruling 2026-11-10 (#2333, option a): a one-off gray-iron sand casting, poured by an outside jobbing foundry (a candidate service, not chosen or quoted) from a pattern the shop 3D-prints in sections from the finished-part model. The pattern carries the 2 degree draft (owner rulings B1 and D1), the machining stock and the foundry's shrink allowance (about 1/8 in per ft for gray iron), and parts on the faced top plane with the four boss tops in the cope; the foundry stress relieves the casting and returns it cleaned, risers and gates removed. The shop machines the seats. Allocation: fr-top-frame (MHA-FR-02). About 23.8 lb as cast (18.0 lb finished) and 17.35 x 10.59 x 1.93 in finished envelope, estimated from the finished model with the sockets and gooseneck bore cast solid and .16 in stock on the faced top and boss tops, .12 in on the faced underside, not a foundry figure. Not quoted or ordered."
+on_hand = false
+cite = ["https://github.com/pedropaulovc/harmonic-analyzer/issues/2333"]
