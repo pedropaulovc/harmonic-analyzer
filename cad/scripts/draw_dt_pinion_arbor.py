@@ -416,7 +416,15 @@ PIN_HOLE_CALLOUT_X = (
 # #1685: the 38.0's head-end tail ran under the pin hole's leader); each is
 # set inside, where its span has room (the bond zone's 8 mm takes its two
 # 3.6 mm arrowheads).
-ARROWS_INSIDE = ("PinStationFromHeadRear", "FrontJournalLen", "BondZoneDia")
+ARROWS_INSIDE = (
+    "PinStationFromHeadRear",
+    "FrontJournalLen",
+    "BondZoneDia",
+    # #2360 (r1 sheet 7454ba6d): outside, the relief's upper arrow tail rose
+    # through the chained 2.60 line above the shaft; the 7.1 mm relief takes
+    # both arrowheads, as the 8 mm bond zone does.
+    "BondReliefDia",
+)
 # #2360: the relief between the bond lands.  Its two lengths chain off the
 # front land's crown end in one row just above the shaft, under detail A's
 # label and left of the front land's length (the rows below the shaft would
