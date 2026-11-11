@@ -18,7 +18,11 @@ MECHANISM_Z_SHIFT = 3.0875877804265315
 FORMER_DRUM_X = -54.7
 DRUM_X = FORMER_DRUM_X + MECHANISM_X_SHIFT
 
-FORMER_CHANNEL_Z0 = -67.1
+# #1038 re-pitch (owner ruling 2026-11-11, pitch .300 in, bank centred):
+# station 9, the lever/rocker hub-bank mid at Z -0.504, stays put, so
+# station 0 moves 9 x (7.62 - 7.0565) = 5.0715 to the front (-67.1 before).
+# channels.station_z0_mm restates CHANNEL_Z0.
+FORMER_CHANNEL_Z0 = -72.1715
 CHANNEL_Z0 = FORMER_CHANNEL_Z0 + MECHANISM_Z_SHIFT
 
 # The rocker support and frame columns retain their pre-cascade locations.

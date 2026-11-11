@@ -172,14 +172,15 @@ SURFACE_FINISHES = (
 HOLE_SPEC = HoleSpec("tapped", ANCHOR_9489T111.thread_size)
 HOLE_X = 39.85
 HOLE_COUNT = 20
-CHANNEL_Z0 = -67.1
-CHANNEL_PITCH = 7.0565
+CHANNEL_Z0 = -72.1715  # _cone_axis_constants.FORMER_CHANNEL_Z0 (#1038 re-pitch)
+CHANNEL_PITCH = 7.62  # machine channels.station_pitch_mm, .300
 # The spring stations sit on the channel arm plane, the cam plane
 # (rocker_bank_layout.ARM_MID_DZ = cam_plane.CAM_MID_DZ). Restated,
 # like CHANNEL_Z0/CHANNEL_PITCH, not imported: this spec is read by
 # _interference_contracts, so an import would put the gear-train and channel
-# config into every assembly's closure. test_sm_summing_lever_drawing pins it.
-HOLE_Z_OFFSET = -3.52825
+# config into every assembly's closure. test_sm_summing_lever_drawing and
+# test_station_pitch_lockstep pin it (-CHANNEL_PITCH / 2).
+HOLE_Z_OFFSET = -3.81
 # The whole coefficient plate now supplies the spring tap's 1.5D engagement
 # at its printed .XX band. Its top and underside remain the
 # existing spring-eye and jam-nut seats; there is no separate pad or step.

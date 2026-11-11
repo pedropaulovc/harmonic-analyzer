@@ -49,7 +49,7 @@ def on_xx_grid(value_mm: float) -> float:
 SHAFT_DIA = 7.9375
 # Origin to back-crown root: the back rim prints 8.93 (226.822) from the head
 # rear face at -0.66 (#290; was 226.25, 0.088 longer).
-SHAFT_LEN = 226.162
+SHAFT_LEN = 236.83  # back rim 9.35 in; #1038 re-pitch seed; S3 proves it
 # Only the two short lands that run in the MHA-DT-14 strap bores (REAM_SLIDE)
 # carry the running band and the Ra 1.6 finish (U39).  Everything else,
 # the MHA-DT-01 drum bond zone included, is 5/16 -.0004/-.0038 in: the drum's

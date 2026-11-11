@@ -62,14 +62,14 @@ UNIT = drawing_unit("parts/ch-fulcrum-keeper", _config.parts("ch-fulcrum-keeper"
 # to the end hubs. Literals rather than machine config, so the frame does not
 # re-key on machine/channels.yaml; build_ch_channel_assembly asserts the
 # result equals rocker_bank_layout.STACK_MID_Z. ---
-_STATION_PITCH = 7.0565  # machine channels.station_pitch_mm
+_STATION_PITCH = 7.62  # machine channels.station_pitch_mm, .300
 _BANK_COUNT = 20  # the full lever bank (never follows active_count)
 FULCRUM_KEEPER_CENTRE_Z = (
     CHANNEL_Z0 - _STATION_PITCH / 2.0 + _STATION_PITCH * (_BANK_COUNT - 1) / 2.0
 )  # -0.504
 # Lug mid-plane off the centre, on the .005 in grid so the shaft's flat
 # stations (2 x this apart) print .XX: 2.955 in, inner face at 70.993.
-KEEPER_Z_OFF = 75.057  # 2.955
+KEEPER_Z_OFF = 80.772  # 3.180 in (was 2.955); #1038 re-pitch seed; S4/S5a proves it
 
 # --- Nominal geometry (mm; inch in the comments). Shaft axis 25.2 above the
 # rail top face (y=1036.2 -> 1061.4, the 2026-08-02 top-frame contract). ---

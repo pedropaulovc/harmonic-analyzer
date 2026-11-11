@@ -69,7 +69,7 @@ TIP_END_X = TIP_ARC_CX + TIP_RADIUS  # 180.511 tip from the fulcrum axis
 # the levers stack hub-to-hub on the fulcrum shaft at the station pitch; the
 # 19 `lever-bushing` spacers are retired. OD near the old bushing's O12.
 HUB_DIA = 11.938  # .47
-HUB_LENGTH = 7.0565  # == machine channels.station_pitch_mm (asserted by the build)
+HUB_LENGTH = 7.62  # == channels.station_pitch_mm (build + lockstep test); .3000
 if not BAR_TALL < HUB_DIA:
     raise AssertionError("the arm must stay under the hub")
 

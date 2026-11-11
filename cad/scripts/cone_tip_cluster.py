@@ -75,7 +75,7 @@ STEM_PLACES = 4
 # limits (.XX lengths, two face widths, the end recess's range) the spigot
 # must keep air at the socket floor and at least 1.5 D in the socket: .71
 # and .20 do (the shaft spec proves both).
-SPIGOT_LENGTH_MM = 18.034  # .71
+SPIGOT_LENGTH_MM = 19.05  # .75 in; #1038 re-pitch seed; S2a proves it
 SOCKET_DEPTH_MM = 5.08  # .20
 SPIGOT_SOCKET_ENGAGEMENT_MIN_MM = 1.5 * STEM_DIA_MM
 

@@ -215,5 +215,6 @@ if PIN_INSTALLED_LENGTH != _bar.BAR_WIDTH:
     raise AssertionError("the installed pin must be flush with both bar faces")
 if _bar.LEVER_THICKNESS != _lever.LEVER_THICKNESS:
     raise AssertionError("the bar's restated lever thickness drifted")
-if not math.isclose(_lever.HUB_LENGTH, 7.0565):
+# Re-run at the .300 pitch (#1038 re-pitch): neighbour_clearance_min 0.6858.
+if not math.isclose(_lever.HUB_LENGTH, 7.62):
     raise AssertionError("the station pitch moved; re-run the #1038 gap budget")
