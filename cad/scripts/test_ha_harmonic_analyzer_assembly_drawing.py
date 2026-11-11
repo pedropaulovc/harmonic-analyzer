@@ -421,11 +421,21 @@ def test_steps_sheet_text_clears_the_title_block() -> None:
     assert drawing.STEPS_COLUMN_BOTTOM_Y > landscape.title_block_top_m
     for block in (*drawing.STEP_COLUMNS, drawing.ASSEMBLY_CHECKS):
         assert max(map(len, block.splitlines())) <= drawing.STEPS_LINE_WIDTH
-    # Sheet 4 carries two columns, sheet 5 the third and the checks.
+    # Sheet 4 carries two columns, sheet 5 the rest; the checks sit in sheet
+    # 5's right half, below any step column there.
+    count = len(drawing.STEP_COLUMNS)
     assert drawing.STEP_COLUMN_SHEETS == (
-        drawing.SHEET_NAMES[3], drawing.SHEET_NAMES[3], drawing.SHEET_NAMES[4]
+        drawing.SHEET_NAMES[3],
+        drawing.SHEET_NAMES[3],
+        *(drawing.SHEET_NAMES[4],) * (count - 2),
     )
-    assert drawing.CHECKS_XY == (drawing.STEPS_RIGHT_X, drawing.STEPS_TOP_Y)
+    assert drawing.CHECKS_XY[0] == drawing.STEPS_RIGHT_X
+    for block, sheet, (x, y) in zip(
+        drawing.STEP_COLUMNS, drawing.STEP_COLUMN_SHEETS, drawing.STEP_COLUMN_XY
+    ):
+        if sheet == drawing.SHEET_NAMES[4] and x == drawing.CHECKS_XY[0]:
+            block_bottom = y - drawing.NOTE_LINE_PITCH * len(block.splitlines())
+            assert drawing.CHECKS_XY[1] < block_bottom
 
 
 def test_a_blank_line_separates_each_numbered_step() -> None:
