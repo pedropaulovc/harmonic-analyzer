@@ -541,8 +541,14 @@ ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW\nSCALE 2:1"
 # body/pilot are deliberately long. The assembly prints these same phrases.
 # The knob-wheel front face is set FIT_UP_OFFSET_TARGET forward of the crank
 # wheel's front face, within FIT_UP_OFFSET_SET_TOL at setting (§13.2 procedure (4)).
+# The band is read with a straightedge across both wheels and feelers, and a
+# miss costs a facing cut or a new collar, so it takes what the chain plane's
+# budget leaves (#2420): the re-check's band is the largest .001 band
+# Tsubaki's ±1 admits in service (pd_paper_drive_assembly_steps
+# .OFFSET_ACCEPT_TOL, .009), and the setting keeps the former .002 inside it
+# for the refit between the two readings: .009 - .002 = .007.
 FIT_UP_OFFSET_TARGET = 0.0508  # .002
-FIT_UP_OFFSET_SET_TOL = 0.0508  # .002
+FIT_UP_OFFSET_SET_TOL = 0.1778  # .007
 FIT_UP_OFFSET_SET_TEXT = (
     f"{inch_text(FIT_UP_OFFSET_TARGET, 3)} \u00b1{inch_text(FIT_UP_OFFSET_SET_TOL, 3)}"
 )
@@ -615,18 +621,24 @@ if NUT_RELIEF_RADIAL_AIR <= 0.0:
 
 # --- The chain plane in service (contract §13.2, R9-2 / R9-17) ----------------
 # Tsubaki's ±1 sprocket offset at every printed corner, floats included.  The
-# contract's enumeration sets the pair (knob against crank, mid-planes) at
-# CHAIN_SET_RANGE; in service the crank shaft's end play and the knob's end
-# float move the knob wheel forward. R9-70 adds the wheel's own float under the
-# thumbnut, forward only (the collar body is its rear stop), and K-1 sets the
-# knob's end float on a feeler at fit-up, so it no longer carries the
-# journal, ring and hub-to-boss bands (contract: 0..0.35).  R9-71: the
-# MHA-PD-VN-63 spring holds the arm on the MHA-PD-20 spacer, which is pressed on the
+# fit-up sets the pair (knob against crank, mid-planes) at CHAIN_SET_RANGE:
+# the setting band on the front faces, then half the MHA-PD-09 plate band
+# either way (#2420; it was the contract's enumerated -0.3103..+0.05, which
+# the .002 ±.002 setting sat inside).  In service the crank shaft's end play
+# and the knob's end float move the knob wheel forward. R9-70 adds the wheel's
+# own float under the thumbnut, forward only (the collar body is its rear
+# stop), and K-1 sets the knob's end float on a feeler at fit-up, so it no
+# longer carries the journal, ring and hub-to-boss bands (contract: 0..0.35).
+# R9-71: the MHA-PD-VN-63 spring holds the arm on the MHA-PD-20 spacer, which is pressed on the
 # MHA-PD-VN-57 shoulder, so the hanger has no end play and its tilt is fixed in
 # the bar's frame, where the fit-up reads it:
-# -0.3103 - 0.25 - 0.25 - 0.15 = -0.9603 .. +0.05.
+# -0.2786 - 0.25 - 0.254 - 0.1524 = -0.935 .. +0.177.
 CHAIN_OFFSET_LIMIT = 1.0
-CHAIN_SET_RANGE = (-0.3103, 0.05)
+_HALF_PLATE_SPREAD = (max(PLATE_BAND) - min(PLATE_BAND)) / 2.0
+CHAIN_SET_RANGE = (
+    -(FIT_UP_OFFSET_TARGET + FIT_UP_OFFSET_SET_TOL) - _HALF_PLATE_SPREAD,
+    FIT_UP_OFFSET_SET_TOL - FIT_UP_OFFSET_TARGET + _HALF_PLATE_SPREAD,
+)
 CRANK_END_PLAY_MAX = 0.25
 HANGER_AXIAL_PLAY_MAX = 0.0
 KNOB_END_FLOAT_MAX = END_FLOAT + END_FLOAT_SET_TOL  # 0.25

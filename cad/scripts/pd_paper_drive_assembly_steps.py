@@ -217,7 +217,11 @@ RACK_ROOT_CLEARANCE_FLOOR = mesh_check.RACK_ROOT_CLEARANCE_FLOOR_MM
 # take the knob wheel held back on its collar seat ("fitup-pose-set"): it floats
 # KNOB_FLOAT_RANGE forward under the nut; reading it floated forward
 # would set and accept the pair up to that float off.
-OFFSET_ACCEPT_TOL = 0.1016  # .004
+# The re-check takes the largest .001 band the chain plane's ±1 mm leaves at
+# the forward end, where every float adds (#2420), in mm: 1 - 0.0508 target
+# - 0.05 half plate - 0.25 crank end play - 0.254 knob end float - 0.1524
+# wheel float = 0.2428 (.0096), so .009.
+OFFSET_ACCEPT_TOL = 0.2286  # .009
 # What the acceptance passes, in service: the seated front faces within the
 # accepted band, the mid-planes a half plate band either way (both chain
 # wheels are MHA-PD-09 plates); then the crank's end play, the knob's end
