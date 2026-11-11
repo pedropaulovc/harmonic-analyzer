@@ -10,10 +10,14 @@ the closed-form sum of the printed and fitted terms below, each booked at the
 end that closes or opens the mesh. Everything is read from part specs and
 config. The native assembly interference gate checks the real flanks.
 
-The standard check books the centre at mid-face. Because the axes cross in
-plan, the centre closes toward the 64T's south face and opens toward its
-north face; ``station_checks`` reports that per face station, closed form,
-NOT gated (the margin it shows awaits an owner ruling, #2481).
+The standard check books the centre at mid-face and the 64T's tooth at the
+station where the cutter's centre plane crosses its axis. Because the axes
+cross in plan, the centre closes toward the 64T's south face and opens toward
+its north face; because the teeth are straight, each tooth space also shifts
+sideways off its radial line away from the crossing station, which thickens
+the tooth on the pitch circle and raises the root. ``station_checks`` reports
+both per face station, closed form, NOT gated (the margin it shows awaits an
+owner ruling, #2481).
 """
 from __future__ import annotations
 
@@ -150,24 +154,71 @@ def centre_at_station(station_mm: float) -> float:
     return math.hypot(FRAME_DY, plan)
 
 
+def _gap_arc_on_pitch_circle(shift_mm: float) -> float:
+    """Arc the straight tooth space takes from the pitch circle where its
+    transverse section sits ``shift_mm`` off the radial line (straight_gash:
+    (X, Y/cos(beta) + shift))."""
+    form, cos_beta = gear64.TOOTH_SPACE_FORM, math.cos(_BETA)
+
+    def azimuth(side: int) -> float:
+        def point(u: float) -> tuple[float, float]:
+            x, y = form.flank_point(u, side)
+            return x, y / cos_beta + shift_mm
+
+        low, high = form.flank_parameter_min, form.flank_parameter_max
+        if not math.hypot(*point(low)) < R64 < math.hypot(*point(high)):
+            raise AssertionError("the 64T pitch circle must cross the cutter flank")
+        for _ in range(80):
+            middle = (low + high) / 2.0
+            if math.hypot(*point(middle)) < R64:
+                low = middle
+            else:
+                high = middle
+        x, y = point((low + high) / 2.0)
+        return math.atan2(y, x)
+
+    return R64 * (azimuth(1) - azimuth(-1))
+
+
+def straight_tooth_thickening(station_mm: float) -> float:
+    """Normal circular thickness a straight 64T tooth gains on the pitch
+    circle at a face station (mm north of mid-face), over its thickness at the
+    crossing station that ``standard_check`` books."""
+    height = gear64.FACE_WIDTH / 2.0 + station_mm
+    shift = (height - gear64.TOOTH_SPACE_CROSSING) * math.tan(_BETA)
+    return (_gap_arc_on_pitch_circle(0.0) - _gap_arc_on_pitch_circle(shift)) * math.cos(_BETA)
+
+
+def straight_root_rise(station_mm: float) -> float:
+    """Radial rise of a straight tooth space's root at a face station."""
+    height = gear64.FACE_WIDTH / 2.0 + station_mm
+    shift = (height - gear64.TOOTH_SPACE_CROSSING) * math.tan(_BETA)
+    return math.hypot(gear64.ROOT_DIA / 2.0, shift) - gear64.ROOT_DIA / 2.0
+
+
 @dataclass(frozen=True)
 class StationCheck:
     station_mm: float
     centre_shift_mm: float
+    tooth_thickening_mm: float  # straight 64T tooth, normal circular, booked below
     backlash_min_mm: float  # every printed corner pair, both centre-range ends
-    interference_margin_mm: float  # at the closed end
+    interference_margin_mm: float  # at the closed end; crossing-station tooth form
     root_clearance_mm: float  # at the closed end
 
     def text(self) -> str:
         return (
             f"station {self.station_mm:+.3f} mm: centre {self.centre_shift_mm:+.4f}, "
+            f"straight tooth +{self.tooth_thickening_mm:.4f}, "
             f"backlash min {self.backlash_min_mm:.4f}, interference margin "
             f"{self.interference_margin_mm:.3f}, root clearance {self.root_clearance_mm:.3f}"
         )
 
 
 def station_checks() -> tuple[StationCheck, ...]:
-    """The standard check's corners at each face station's centre (reported only)."""
+    """The standard check's corners at each face station's centre and straight
+    tooth (reported only). Backlash loses the tooth's thickening and root
+    clearance the root's rise; the interference margin keeps the
+    crossing-station tooth form."""
     grow = EQUIVALENT_RADIUS_GROWTH_64
     alpha = math.radians(gear64.CUTTER_PRESSURE_ANGLE_DEG)
     pins = [plane_gear(profile, pinion.MODULE_MM) for _, profile in pinion.STOCK_PROFILE_CORNERS]
@@ -176,13 +227,16 @@ def station_checks() -> tuple[StationCheck, ...]:
     for station in FACE_STATIONS_MM:
         shift = centre_at_station(station) - FRAME_C2C
         closed = CENTRE_RANGE_MM[0] + grow + shift
+        thickening = straight_tooth_thickening(station)
         rows.append(StationCheck(
             station,
             shift,
+            thickening,
             min(backlash(a, b, c + grow + shift, alpha)
-                for a in pins for b in gears for c in CENTRE_RANGE_MM),
+                for a in pins for b in gears for c in CENTRE_RANGE_MM) - thickening,
             min(interference_margin(a, b, closed, alpha) for a in pins for b in gears),
-            min(root_clearance(a, b, closed) for a in pins for b in gears),
+            min(root_clearance(a, b, closed) for a in pins for b in gears)
+            - straight_root_rise(station),
         ))
     return tuple(rows)
 

@@ -1085,6 +1085,13 @@ plane to cross the gear axis 1.778 mm (.07 in) north of the south (collar) face.
 or spiral-capable head is needed. The printed tooth data are unchanged; approval is conditional
 on the straight model passing the drive-train interference and soundness gates.
 
+The tilt sense sets the hand, and every other printed number is the same for a left-hand gear.
+With the cutter on the vertical spindle's stub arbor (cutter plane horizontal) and the head at
+the left end of the table, raise the head's nose 13° and cut on the operator's side of the
+blank. Putting the head at the right end, or the cutter behind the blank, cuts a left-hand gear;
+doing both cuts a right-hand one again. Check the first scribed pass and the finished gear:
+stood on either face, the teeth nearest you rise to the right.
+
 Set each crank gear up for tooth cutting within 0.05 mm TIR of its finished bore
 (`cad/config/tolerances/crank_mesh.yaml`, `tooth_cutting_runout_tir_mm`, read by both gear specs). This is a
 setup allowance, not a gear accuracy grade.

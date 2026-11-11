@@ -18,6 +18,8 @@ Pending exception rulings (#971):
 """
 from __future__ import annotations
 
+import math
+
 import pytest
 
 import alignment_mesh_check
@@ -75,14 +77,29 @@ def test_crossed_crank_mesh_passes_the_standard_checks() -> None:
 
 def test_crank_mesh_station_report_resolves_the_centre_across_the_face() -> None:
     """Reported, not gated (#2481): the axes cross in plan, so the centre
-    closes toward the 64T's south face. Mid-face is standard_check's centre."""
+    closes toward the 64T's south face. Mid-face is standard_check's centre.
+    The straight tooth thickens away from the cutter's crossing station."""
+    import dt_crank_drive_gear_spec as gear64
+
     rows = crank_mesh_stack.station_checks()
     assert [row.station_mm for row in rows] == list(crank_mesh_stack.FACE_STATIONS_MM)
     shifts = [row.centre_shift_mm for row in rows]
     assert shifts == sorted(shifts) and shifts[0] < 0.0 < shifts[-1]
     middle = rows[len(rows) // 2]
     assert middle.centre_shift_mm == pytest.approx(0.0, abs=1e-12)
-    assert middle.backlash_min_mm == pytest.approx(
+    assert middle.backlash_min_mm + middle.tooth_thickening_mm == pytest.approx(
         crank_mesh_stack.standard_check().backlash_min_mm
     )
+    # Independent first-order estimate: the space sits s off its radial line,
+    # so the pitch circle meets it s^2/2R deeper, where the normal gap is
+    # 2 tan(alpha) narrower per unit depth.
+    beta = math.radians(gear64.TOOTH_INCLINATION_DEG)
+    for row in rows:
+        s = (gear64.FACE_WIDTH / 2.0 + row.station_mm - gear64.TOOTH_SPACE_CROSSING) * math.tan(beta)
+        estimate = 2.0 * math.tan(math.radians(gear64.CUTTER_PRESSURE_ANGLE_DEG)) * s * s / gear64.PITCH_DIA
+        assert row.tooth_thickening_mm == pytest.approx(estimate, rel=0.1, abs=2e-4)
+    crossing = gear64.TOOTH_SPACE_CROSSING - gear64.FACE_WIDTH / 2.0
+    assert crank_mesh_stack.straight_tooth_thickening(crossing) == pytest.approx(0.0, abs=1e-12)
+    assert crank_mesh_stack.straight_root_rise(crossing) == pytest.approx(0.0, abs=1e-12)
+    assert rows[-1].tooth_thickening_mm > rows[0].tooth_thickening_mm > 0.0
     assert "REPORTED, not gated; #2481" in crank_mesh_stack.stack_text()

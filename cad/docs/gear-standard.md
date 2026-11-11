@@ -301,10 +301,15 @@ The pitch change from 49.82 to 48 scales every standard diameter by +3.79%.
   ([BS-0](https://www.precisionmatthews.com/products/dividinghead-bs-0))
   tilted 13°, so no lead gearing or spiral-capable head is needed. The cutter
   centre plane crosses the gear axis 1.778 mm (.07 in) north of the south
-  face. The previous crank pair was also crossed, so the inclined setup is not
-  new. The printed tooth data and the error-budget and mesh numbers are
-  unchanged; the ruling is conditional on the straight model passing the
-  drive-train interference and soundness gates.
+  face. The tilt sense sets the hand
+  ([machining-dfm.md](machining-dfm.md#crossed-crank-pair-normal-24dp-pa20)).
+  The previous crank pair was also crossed, so the inclined setup is not
+  new. The printed tooth data, the error budget and the mid-face mesh check
+  are unchanged. Away from the station where the cutter crosses the axis a
+  straight tooth is thicker on the pitch circle than the helix was, by up to
+  0.017 mm at the north face; `crank_mesh_stack.station_checks` books it per
+  face station (#2481). The ruling is conditional on the straight model
+  passing the drive-train interference and soundness gates.
 - The meshes are not conjugate. Drawing each gear as its cutter's form removes
   the earlier mismatch between range cutters and ideal profiles, at the price
   of some transmission error in each mesh, which the model does not quantify.
