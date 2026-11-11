@@ -282,7 +282,7 @@ def test_the_spring_set_is_dro_set_off_an_indicator_zero_on_the_washer() -> None
     import tomllib
 
     from _paths import CAD_ROOT
-    from _process_plans import PROCESS_ROOT
+    from _process_plans import SHOP_PATH
 
     explode = drawing.explode
     washer, spring = drawing.item(explode.WASHER), drawing.item(explode.BANK_SPRING)
@@ -308,7 +308,7 @@ def test_the_spring_set_is_dro_set_off_an_indicator_zero_on_the_washer() -> None
     # and the DRO over the move) is inside detail A's band, on the shop's own
     # indicator (shop.toml gauges.dti) and the DRO's vendor-stated accuracy
     # (shop-equipment.toml dro.pm-30mv).
-    shop = tomllib.loads((PROCESS_ROOT / "shop.toml").read_text(encoding="utf-8"))
+    shop = tomllib.loads(SHOP_PATH.read_text(encoding="utf-8"))
     equipment = tomllib.loads(
         (CAD_ROOT / "config" / "shop-equipment.toml").read_text(encoding="utf-8")
     )
