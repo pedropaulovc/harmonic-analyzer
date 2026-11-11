@@ -459,6 +459,10 @@ def test_station_s_is_defined_in_one_line_before_the_steps_use_it() -> None:
     assert drawing.INSTRUCTION_LINES.index(spec.STATION_KEY) < drawing.INSTRUCTION_LINES.index(
         spec.ASSEMBLY_STEPS[0]
     )
+    # The pass table names the axis the key names, on one line.
+    title = drawing._wrapped((spec.PASS_TABLE_TITLE,), width=drawing.STEPS_LINE_WIDTH)
+    assert "SHOULDER-SCREW AXIS" in spec.STATION_KEY and "SHOULDER-SCREW AXIS" in title
+    assert "\n" not in title and "PIN" not in title
     # S 0 is the spindle origin on both rails.
     assert spec.trammel.rail_point(1, 0.0) == spec.trammel.rail_point(2, 0.0) == (0.0, 0.0)
 

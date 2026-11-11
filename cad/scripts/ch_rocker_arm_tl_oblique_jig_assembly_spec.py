@@ -1676,8 +1676,10 @@ _FAR_LIMIT_ERROR = (
 if _FAR_LIMIT_ERROR > LONG_TRAVEL_BAND:
     raise AssertionError("a far limit set from its station misses the limit rows' band")
 # One line: the far limit table under it leaves the setting sheet's reference
-# view its room (#2336). Step 6 zeroes the DRO at the spindle origin.
-PASS_TABLE_TITLE = "PASS TABLE (STEPS 6, 10): PIN AXIS BY DRO, X ONLY; ( ) = REF."
+# view its room (#2336). Step 6 zeroes the DRO at the spindle origin. The
+# axis is named as the S key names it (#2490 machinist review r7: 'PIN AXIS'
+# could be read as the stop pins').
+PASS_TABLE_TITLE = "PASS TABLE (STEPS 6, 10): SHOULDER-SCREW AXIS, X BY DRO; ( ) = REF."
 PASS_TABLE_HEADER = ("ROW", "S", "RAIL 1 X", "RAIL 1 Y", "RAIL 2 X", "RAIL 2 Y", "RANGE")
 PASS_ROW_SYMMETRIC = "SYMMETRIC"
 # Every pass-table row is a DRO setting: clearance_report checks each is
