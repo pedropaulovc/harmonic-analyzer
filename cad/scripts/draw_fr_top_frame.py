@@ -1547,7 +1547,7 @@ def _datum_elevation_xy(x: float, y: float) -> tuple[float, float]:
 #
 # The added draft's band is the tighter one (the title block's angle row is
 # ±1°), so its callout states the wall its 2° minimum holds, in rule 3's
-# form and from the build's own proof (fr_top_frame_callouts): the MHA-CH-07
+# form, the package's wall target (fr_top_frame_callouts): the MHA-CH-07
 # keeper's tap drill in the rail web keeps .0807 in at 2° and .0636 at 1°
 # (machinist review of 518e3d01e1: a tight band whose function prints
 # nowhere is a rule 4 blocker; of 7dfc6b6c5f: a reason in any other form is

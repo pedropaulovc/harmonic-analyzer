@@ -3506,16 +3506,21 @@ def test_one_draft_angle_prints_for_each_band_on_sheet_sevens_elevation() -> Non
     # rule 3 gives the form: the wall, with its value.  Rule 7 allows a
     # callout two lines of words, so the faces share the first (machinist
     # reviews of 518e3d01e1 and 7dfc6b6c5f).  The taken-out band is the title
-    # block's own and gives no reason.  The wall's text comes off the build's
-    # proof, in a module only the drawing imports (the drawing itself owns no
-    # stated limit, test_drawing_specification_purity).
+    # block's own and gives no reason.  The wall's text is the package's
+    # thin-wall target, composed in a module only the drawing imports (the
+    # drawing itself owns no stated limit, test_drawing_specification_purity;
+    # a library module reads no builder, test_buildgraph), and the builder
+    # proves both of the tap's walls hold it.
     import fr_top_frame_callouts as stated_walls
 
     assert stated_walls.ADDED_DRAFT_WALL_CALLOUT == "HOLDS 2-56 TAP WALL .080 MIN"
-    assert stated_walls.KEEPER_TAP_WALL_HELD == part.KEEPER_TAP_DRILL_WALL_MARGIN
     for recipe_input in (part, spec):
         source = Path(recipe_input.__file__).read_text(encoding="utf-8")
         assert "fr_top_frame_callouts" not in source, recipe_input.__name__
+    held = min(part.KEEPER_TAP_DRILL_WALL_MARGIN, part.KEEPER_TAP_THREAD_WALL_MARGIN)
+    assert math.floor(round(held / spec.IN * 1000.0, 6)) / 1000.0 == pytest.approx(
+        WALL_TARGET_MM / spec.IN
+    )
     reason = {
         "WebRingDraft": [stated_walls.ADDED_DRAFT_WALL_CALLOUT],
         "BossesUpperDraft": [],
