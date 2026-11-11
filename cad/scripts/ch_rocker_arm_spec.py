@@ -164,7 +164,7 @@ BOTTOM_EDGE_BELOW_PIVOT = _rocker_interface.ARM_DEPTH - TOP_EDGE_ABOVE_PIVOT  # 
 
 # Integral pivot hub (2026-09-02 photo re-derive, ch14 p.28 page002_img02 +
 # ch17 p.40): every arm carries its own round boss on both faces at the
-# pivot; neighbouring hubs touch face to face and SET the 7.0565 station
+# pivot; neighbouring hubs touch face to face and SET the 7.62 (.300) station
 # pitch -- there are no loose spacer bushings (the 19 `pivot-bushing` parts
 # are retired).
 #
@@ -217,7 +217,7 @@ if HUB_DIA < HUB_DIA_MIN:
         f"hub Ø{inch_text(HUB_DIA, 3)} is under its drawing-guidelines.md rule 17 (walls and webs) "
         f"wall floor Ø{inch_text(HUB_DIA_MIN, 3)}"
     )
-HUB_LENGTH = 7.0565  # == machine channels.station_pitch_mm (asserted by the build); .2778
+HUB_LENGTH = 7.62  # == machine channels.station_pitch_mm (asserted by the build); .3000
 # (upper, lower) on the printed hub length (#743 PR2): a hub may only come out
 # long, and the 20-arm stack's acceptance (rocker_bank_layout.STACK_L20_ACCEPT)
 # caps the sum, as the cylinder gears' overall thickness does.

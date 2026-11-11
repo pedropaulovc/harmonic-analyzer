@@ -29,7 +29,9 @@ T006_NORTH_FACE = T006_CENTER_STATION + CONE_FACE_STATION_REFERENCE / 2.0
 # The pivot's station north of T006: 23.0 plus TIP_END_EXTENSION_MM.  The
 # extension was 7.5, then 7.5 + 0.50 when the retired MHA-DT-VN-54 collar's
 # body moved north; the C1 keyed tip (owner decision 2026-11-09, PR #1992)
-# keeps the swing-platform pivot where it is, so the 8.0 is a literal now
-# and PIVOT_STATION stays bit-identical.
+# keeps the swing-platform pivot where it is, so the 8.0 is a literal now and
+# the pivot's station north of T006 is unchanged.  PIVOT_STATION itself
+# follows T006, 19 seat pitches out: the #1038 re-pitch moved it by
+# 19 x (7.452801 - 6.875612) = +10.97.
 TIP_END_EXTENSION_MM = 8.0
 PIVOT_STATION = T006_NORTH_FACE + 23.0 + TIP_END_EXTENSION_MM

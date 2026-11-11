@@ -120,7 +120,7 @@ def leaf_pair(setting: float) -> tuple[float, ...]:
 # trapped between the straps' inner faces, and at the drilling set-up it sits
 # hard on the back strap, so the back stop sets its station (61.55 from the
 # MHA-DT-22 head shoulder, ruling (c)'s bond station).
-DRUM_LEN = 143.256  # 5.64 in
+DRUM_LEN = 153.924  # 6.06 in; #1038 re-pitch seed; S3 proves it
 DRUM_LEN_PLACES = 2  # FaceWidth prints .XX (dt_alignment_pinion_spec)
 DRUM_LEN_UNIT = "in"  # dt_alignment_pinion_spec.UNIT, by the same lockstep
 DRUM_LEN_BAND = printed_band_mm(DRUM_LEN_PLACES, unit=DRUM_LEN_UNIT)  # .01 in

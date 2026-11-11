@@ -29,7 +29,7 @@ SUPPORT_WORLD_Z = ROCKER_SUPPORT_Z
 # (ch_pivot_bracket_sides checks it; user ruling 2026-10-14, #1371 machinist
 # review). 7.12, not the 7.106 minimum: on the .02 in grid the centred 5.00
 # cavity and 6.50 pockets locate at .XX off the end faces (1.06, .31).
-SUPPORT_HALF_MACHINE_Z = 90.424  # 3.56
+SUPPORT_HALF_MACHINE_Z = 96.52  # 3.80 in; #1038 re-pitch seed; S5b proves it
 
 # The casting's four 5/16 foot clearances are fixed in its local frame. Turning
 # it +90 degrees about machine Y maps local +/-2.375 to machine Z and local

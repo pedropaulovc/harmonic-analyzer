@@ -188,5 +188,5 @@ if KEYSEAT_EDGE_DEPTH_MIN_MM < limits(KEY_SIZE_MM, KEY_STOCK_BAND)[1] / 2.0:
 # of both .XX lengths (the shaft spec's KEY_NORTH_MARGIN_MM).
 KEY_END_SET_MM = 1.27  # .05
 KEY_END_SET_PLACES = 2
-KEY_LENGTH_MM = 114.808  # 4.52
+KEY_LENGTH_MM = 123.444  # 4.86 in; #1038 re-pitch seed; S2a proves it
 KEY_LENGTH_PLACES = 2
