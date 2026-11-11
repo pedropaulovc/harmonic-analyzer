@@ -633,8 +633,8 @@ sections:
         - 'ch. 12 p.18 top-down: cone converges on the drum toward the small end; side view cone midline ≈ level'
         - high
       - - Cone plan incline
-        - 13.0011073536895° = arcsin(1.5875/7.0565), converging +X→−X toward the drum
-        - 'Current cone_incline.yaml exact-tracking derivation: radius step = 3·25.4/48 = 1.5875 mm; channel grid remains 7.0565 mm with drum-seat input 7.232865856630. The former 49.82DP step 1.5295, seat 7.2204 and approximately 12.5188° incline are superseded reconstruction choices; the Appendix C derivation remains historical provenance.'
+        - 12.0246991805658° = arcsin(1.5875/7.62), converging +X→−X toward the drum
+        - 'Current cone_incline.yaml exact-tracking derivation on the .300 in (7.62 mm) channel grid (owner ruling 2026-11-11, #1038): radius step = 3·25.4/48 = 1.5875 mm, drum-seat input 7.7836081768034. The former 7.0565 mm grid (13.0011073536895°, seat 7.232865856630) and the 49.82DP step 1.5295, seat 7.2204 and approximately 12.5188° incline are superseded; the Appendix C derivation remains historical provenance.'
         - low
       - - Cone mesh grid (X_PITCH)
         - 'every cone gear pitch section crosses x = −92.703856638 at the reference contact azimuth; X_PITCH follows drum x −60.393602135 and the retained placement contract, not a finite-tool tooth-tip boundary'
