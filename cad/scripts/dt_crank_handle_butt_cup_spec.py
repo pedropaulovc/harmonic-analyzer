@@ -85,9 +85,10 @@ FLOOR_HOLE_DIA = 4.0894  # .161
 # The body's bottom edge, broken 45 degrees (owner ruling A on #1661): the
 # MHA-DT-08 counterbore floor's corner is rounded up to R.012, so the leg's
 # lower limit clears it and the cup still seats on the floor, face flush.
-# Modelled at the middle; printed as BODY_CHAMFER +/- its tolerance.
-BODY_CHAMFER = 0.4064  # .016
-BODY_CHAMFER_TOL = 0.1016  # .004
+# Modelled at the middle of the title block's .XXX +/-.005 (#2314): .017 is
+# the shortest three-place leg whose lower limit still clears the R.012.
+BODY_CHAMFER = 0.4318  # .017
+BODY_CHAMFER_TOL = printed_band_mm(3, unit=UNIT)
 BODY_CHAMFER_MIN = round(BODY_CHAMFER - BODY_CHAMFER_TOL, 6)
 BODY_CHAMFER_MAX = round(BODY_CHAMFER + BODY_CHAMFER_TOL, 6)
 

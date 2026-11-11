@@ -829,17 +829,6 @@
           "number": "MHA-CH-VN-57"
         }
       ]
-    },
-    {
-      "sourceStem": "vn-boss-hook-jam-nut",
-      "sourceNumber": "MHA-VN-072",
-      "identities": [
-        {
-          "parent": "sm-summing",
-          "stem": "sm-vn-boss-hook-jam-nut",
-          "number": "MHA-SM-VN-55"
-        }
-      ]
     }
   ],
   "toolingVendors": [
@@ -1074,7 +1063,7 @@
       "status": "archive-only"
     }
   ],
-  "currentRegistryMapSha256": "a6d21f9b3d9fad5381cfca00fe085023f254d722ac03dfcabc94ef44bb6de3e3",
+  "currentRegistryMapSha256": "7722706a74644185ab93daea49425ed1af3b2cc21a58adbd393ae1f69e8c25e0",
   "nativeIdentities": [
     {
       "sourceStem": "ch-rocker-arm-tl-oblique-feed-lever",
@@ -1363,16 +1352,6 @@
         {
           "stem": "pd-platen",
           "number": "MHA-PD-02"
-        }
-      ]
-    },
-    {
-      "sourceStem": "ch-anchor-jam-nut",
-      "sourceNumber": "MHA-CH-014",
-      "identities": [
-        {
-          "stem": "ch-anchor-jam-nut",
-          "number": "MHA-CH-14"
         }
       ]
     },

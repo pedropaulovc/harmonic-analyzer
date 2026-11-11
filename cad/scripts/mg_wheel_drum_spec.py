@@ -14,7 +14,6 @@ from mg_wheel_drum_geom import (  # noqa: F401 (re-export)
     DRUM_BORE_BAND,
     DRUM_BORE_PLACES,
     DRUM_LEN,
-    DRUM_LEN_BAND,
     DRUM_LEN_PLACES,
     DRUM_OD,
     DRUM_OD_PLACES,
@@ -23,7 +22,8 @@ from mg_wheel_drum_geom import (  # noqa: F401 (re-export)
 
 # Marked model dimensions and the places the model authors on them
 # (drawing-simplicity-policy.md `How the repository implements the guidelines`): the reamed bore at four places (its +.0005
-# band), the length at three (its -.004 band), the O.D. on the title block's
+# band), the length at three on the title block's .XXX row (its stated
+# function: the stack on the wheel spigot), the O.D. on the title block's
 # .XX row (the geom's WALL_WORST holds the wall under it).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "RingProfile": {"DrumOd", "DrumBore"},

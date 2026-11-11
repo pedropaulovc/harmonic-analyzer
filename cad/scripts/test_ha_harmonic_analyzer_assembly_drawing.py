@@ -15,7 +15,6 @@ import ha_harmonic_analyzer_assembly_sheet as notes
 import ha_harmonic_analyzer_assembly_spec as spec
 import ha_harmonic_analyzer_assembly_steps as steps
 import joint_retention
-import ch_vn_spring_hook_spec
 import ms_measuring_stick_assembly_spec as ms
 from _assembly_contract import assembly_contract
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -229,19 +228,6 @@ def test_steps_cover_the_sequence_and_print_no_setting_values() -> None:
     assert not re.search(r"\b(NORTH|SOUTH|EAST|WEST)\b|O'CLOCK", printed)
 
 
-def test_the_forked_driver_fits_the_jam_nut_and_its_anchor() -> None:
-    """Rule 1: the shop has no jig the package does not tell the builder to
-    make, so the anchor steps size the driver that runs the slotted jam nut."""
-    import ch_anchor_jam_nut_spec as nut
-
-    made = notes.step_lines("channel-anchors-set")[0]
-    assert "MAKE A FORKED DRIVER" in made
-    assert notes.DRIVER_BLADE_THICK_MAX * 25.4 < nut.SLOT_WIDTH
-    assert notes.DRIVER_BLADE_WIDTH * 25.4 <= nut.OD_MIN
-    assert notes.DRIVER_SLOT_WIDTH * 25.4 > nut.THREAD_MAJOR
-    assert notes.DRIVER_SLOT_DEPTH * 25.4 > ch_vn_spring_hook_spec.PROTRUSION_MAX_MM
-
-
 def test_every_adjustable_clamp_step_checks_that_it_holds() -> None:
     """Rule 23: an adjustable clamp counts only with a step that sets it and
     checks it holds."""
@@ -399,11 +385,8 @@ def test_the_parked_nib_is_set_on_the_paper_before_the_line_check() -> None:
 def test_integration_joints_point_at_their_integration_steps() -> None:
     rows = {joint.id: joint for joint in joint_retention.JOINTS}
     anchor = rows["ha-harmonic-analyzer/channel-anchor-in-summing-plate"]
-    nut = rows["ha-harmonic-analyzer/channel-anchor-jam-nut-on-anchor"]
-    step = steps.step_ref("channel-anchors-set")
-    assert anchor.installed_at == anchor.lock_step == nut.installed_at == step
-    assert anchor.lock is joint_retention.Lock.JAM_NUT
-    assert anchor.lock_part == nut.member == "ch_anchor_jam_nut"
+    assert anchor.installed_at == steps.step_ref("channel-anchors-set")
+    assert anchor.lock is joint_retention.Lock.NONE
     bracket = rows["ha-harmonic-analyzer/magnifying-bracket-screws"]
     assert bracket.installed_at == steps.step_ref("magnifier-bracket-screwed")
 
@@ -421,11 +404,21 @@ def test_steps_sheet_text_clears_the_title_block() -> None:
     assert drawing.STEPS_COLUMN_BOTTOM_Y > landscape.title_block_top_m
     for block in (*drawing.STEP_COLUMNS, drawing.ASSEMBLY_CHECKS):
         assert max(map(len, block.splitlines())) <= drawing.STEPS_LINE_WIDTH
-    # Sheet 4 carries two columns, sheet 5 the third and the checks.
+    # Sheet 4 carries two columns, sheet 5 the rest; the checks sit in sheet
+    # 5's right half, below any step column there.
+    count = len(drawing.STEP_COLUMNS)
     assert drawing.STEP_COLUMN_SHEETS == (
-        drawing.SHEET_NAMES[3], drawing.SHEET_NAMES[3], drawing.SHEET_NAMES[4]
+        drawing.SHEET_NAMES[3],
+        drawing.SHEET_NAMES[3],
+        *(drawing.SHEET_NAMES[4],) * (count - 2),
     )
-    assert drawing.CHECKS_XY == (drawing.STEPS_RIGHT_X, drawing.STEPS_TOP_Y)
+    assert drawing.CHECKS_XY[0] == drawing.STEPS_RIGHT_X
+    for block, sheet, (x, y) in zip(
+        drawing.STEP_COLUMNS, drawing.STEP_COLUMN_SHEETS, drawing.STEP_COLUMN_XY
+    ):
+        if sheet == drawing.SHEET_NAMES[4] and x == drawing.CHECKS_XY[0]:
+            block_bottom = y - drawing.NOTE_LINE_PITCH * len(block.splitlines())
+            assert drawing.CHECKS_XY[1] < block_bottom
 
 
 def test_a_blank_line_separates_each_numbered_step() -> None:

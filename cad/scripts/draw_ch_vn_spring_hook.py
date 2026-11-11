@@ -1,13 +1,14 @@
 """Create the manufacturing drawing for the modified McMaster 9489T111 anchor.
 
 The anchor is purchased by SKU but is NOT installed as supplied: the captive
-hex nut is discarded (the MHA-CH-14 round jam nut locks it) and the shank is cut to
-cross the summing-lever plate and carry that nut, so the sheet carries the
+hex nut is discarded (nothing torques the hook, #2326) and the shank is cut so
+its full thread crosses the summing-lever plate, so the sheet carries the
 same two cutting controls as the counter anchor (``draw_boss_hook``) -- the
 finished overall length to the eye crown and the restored 45 deg deburr at the
 new end. The sheet prints decimal inch (``drawing_unit: in``). The length band
 is the title block's .XX; ``ch_vn_spring_hook_spec`` shows the shortest
-in-band part still keeps two full threads past the nut.
+in-band part, backed out its full turn, still keeps full thread through the
+plate.
 
 Run with SolidWorks open::
 
@@ -33,7 +34,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import set_dimension_callouts, set_dimension_precision
+from _drawing_dimensions import set_dimension_precision
 from _drawing_hidden_sketches import curate_view_dimensions as curate_stock_dimensions
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -72,8 +73,8 @@ SPEC = DRAWINGS_BY_NAME["ch_vn_spring_hook"]
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 SOURCE = SPEC.source
 OUTPUTS = DrawingOutputs(**SPEC.outputs)
-# The finished part is 30.7 x 12.7 mm (1.21 in overall) since its shank carries
-# the MHA-CH-14 jam nut under the coefficient plate: 5:1 keeps the front view
+# The finished part is 25.4 x 12.7 mm (1.00 in overall), its shank cut to keep
+# full thread through the coefficient plate: 5:1 keeps the front view
 # inside the counter anchor's 4:1 sheet band, raised so the cut end's deburr
 # dimensions clear the notes.  The deburr is dimensioned on the front view
 # itself, as on the counter anchor: machinist review r7 found a 20:1 detail for
@@ -82,41 +83,60 @@ SHEET_SCALE = (5.0, 1.0)
 ISO_SCALE = (3.0, 1.0)
 # The view centres on its outline. The settled 31.3 mm part (run 0c4519c5
 # read y 0.1014..0.2711 at centre 0.18625, a 0.0848 half-height) stood centred
-# at 0.1805 with its cut end at 0.1023; the 30.734 mm inch part is 2.83 mm
-# shorter on the sheet, so the centre drops half that to keep the cut end, and
-# every deburr placement below, where it was. Its outline then spans about
-# 0.0957..0.2625, inside the B sheet's 12.7 mm top zone border (y 0.2667) and
-# clear of the 0.0651 notes band.
-FRONT_CENTER = (0.100, 0.1791)
+# at 0.1805 with its cut end at 0.1023; each shorter part drops the centre by
+# half its on-sheet shortening to keep the cut end there. The deburr ink below
+# was settled on the 30.734 mm part centred at 0.1791 (cut end 0.1032). The
+# 25.400 mm part, 26.67 mm shorter on the sheet than that one, centres at
+# 0.1664, 0.6 mm above the strict half-shortening (0.16577), so its cut end
+# stands about 0.1038 and the outline spans about 0.1038..0.2308, clear of the
+# 0.0651 notes band; CHAMFER_VERTEX carries that 0.6 mm to the deburr texts.
+FRONT_CENTER = (0.100, 0.1664)
 ISO_CENTER = (0.310, 0.209)
 # The settled isometric outline is 0.0543 half-height about its centre (run
 # 80ff6d1a read y 0.1587..0.2673 at centre 0.213, 0.6 mm past the border);
 # centred at 0.209 its top is 0.2633 and its bottom 0.1547.
-# Deburr texts. The 45 deg angle's vertex is where the chamfer meets the cut
-# end, (106.5, 103.2) mm; SolidWorks runs the angle's arc through its text and
-# breaks it at the text box. Parked at radius 22.3 next to the 45 deg ray it
-# sat on its own chamfer extension line and arc arrowhead (machinist b344192,
-# rule 14), so the text is centred on the bisector (22.5 deg) at radius 26.
-# Settled native ink (runs fa43a1a5, ae121732; run boxes at SolidWorks'
-# widths): the 45 deg's arrowheads stand 3.6 and 4.8 mm off its text, its
-# extension lines 6.0 and 7.2 mm, its lower arrowhead 4.5 mm off the width
-# block, and no own line runs inside any control's text. The width block
-# drops 2 mm (its MIN row stood 1.5 mm under that arrowhead) and still stands
-# right of the shank, clear of its own extension lines (review r8: centred
-# under the 2.3 mm leg they were struck) and ~6 mm above the notes. The
-# shared layout audit, not a sheet check, guards the settled ink.
+# Deburr texts, settled on the 30.734 mm part with its .018 leg (FRONT_CENTER
+# keeps its cut end where runs fa43a1a5, ae121732 read it, above), whose 45
+# deg vertex -- where the chamfer meets the cut end -- stood at (106.5, 103.2)
+# mm; SolidWorks runs the angle's arc through its text
+# and breaks it at the text box. Parked at radius 22.3 next to the 45 deg ray
+# it sat on its own chamfer extension line and arc arrowhead (machinist
+# b344192, rule 14), so the text is centred on the bisector (22.5 deg) at
+# radius 26. Settled native ink (run boxes at SolidWorks' widths): the 45
+# deg's arrowheads stand 3.6 and 4.8 mm off its text, its extension lines 6.0
+# and 7.2 mm, its lower arrowhead 4.5 mm off the width block, and no own line
+# runs inside any control's text. The width block stands right of the shank,
+# clear of its own extension lines (review r8: centred under the 2.3 mm leg
+# they were struck) and ~6 mm above the notes. A longer trim grows the
+# centred outline at the cut end, which drops by half the growth, a lower
+# FRONT_CENTER drops it by as much, and a longer leg moves the vertex inboard;
+# the deburr texts follow the vertex so that settled ink keeps its
+# clearances. The shared layout audit, not a sheet check, guards the ink.
+_SETTLED_OVERALL_MM = 30.734
+_SETTLED_FRONT_CENTER_Y = 0.1791
+_SETTLED_CUT_END_Y = 0.1032
+_SHEET_PER_MODEL_MM = SHEET_SCALE[0] / SHEET_SCALE[1] / 1000.0
+_CUT_END_DROP = (FINISHED_OVERALL_MM - _SETTLED_OVERALL_MM) * _SHEET_PER_MODEL_MM / 2.0 + (
+    _SETTLED_FRONT_CENTER_Y - FRONT_CENTER[1]
+)
+CHAMFER_VERTEX = (
+    FRONT_CENTER[0] + (SUPPLIER_THREAD_MAJOR_MM / 2.0 - CHAMFER_WIDTH_MM) * _SHEET_PER_MODEL_MM,
+    _SETTLED_CUT_END_Y - _CUT_END_DROP,
+)
+_ANGLE_TEXT_RADIUS = 0.026
+_ANGLE_TEXT_BEARING = math.radians(CHAMFER_ANGLE_DEG / 2.0)
 FRONT_KEEP = {
     "FinishedOverall": (0.042, FRONT_CENTER[1]),
-    "ChamferWidth": (0.168, 0.098),
-    "ChamferAngle": (0.1305, 0.1132),
+    "ChamferWidth": (0.168, 0.098 - _CUT_END_DROP),
+    "ChamferAngle": (
+        CHAMFER_VERTEX[0] + _ANGLE_TEXT_RADIUS * math.cos(_ANGLE_TEXT_BEARING),
+        CHAMFER_VERTEX[1] + _ANGLE_TEXT_RADIUS * math.sin(_ANGLE_TEXT_BEARING),
+    ),
 }
-# The deburr band is tighter than the title block on both sides (review r8
-# read it as a plain lead-in): its minimum leg brings the cut end under the
-# #6-32 tap drill so the cut thread starts in the lever's tap, and its
-# maximum, at the steepest angle, is charged to the full threads the shank
-# keeps past the jam nut.  Rule 7 allows one reason line per feature, so the
-# callout names both mates on one line (RV-01 accepts the band itself).
-CHAMFER_CALLOUT = {"ChamferWidth": "STARTS IN MHA-SM-03; THREAD PAST MHA-CH-14"}
+# The deburr prints under the title block's .XX (#2314), so like the overall
+# and the counter anchor's deburr it carries no reason (rule 7): its stack
+# (short leg under the #6-32 tap drill, long leg charged below the plate so
+# full thread spans it) is ch_vn_spring_hook_spec's.
 EXPECTED_CONTROLS = {
     "FinishedOverall": (
         FINISHED_OVERALL_MM / 1000,
@@ -148,15 +168,16 @@ def _verify_controls(annotations: list[Any]) -> None:
 def _supplier_references(adapter: Any, front: Any) -> list[tuple[str, dict[str, Any]]]:
     """The one sourcing reference: the #6-32 thread on its nominal-major carrier.
 
-    A replacement anchor must take the lever's tap and the jam nut, so the
-    thread is kept. The eye sizes and the as-supplied lengths are not
+    A replacement anchor must take the lever's tap, so the thread is kept.
+    The eye sizes and the as-supplied lengths are not
     replacement criteria -- the 0.66 spring wire links the 6.35 eye with ~10x
     margin, and the finished overall already fixes the length the stock must
     give -- and the SKU names the catalogue part.
     """
     refs = []
+    # Beside the thread's top (y 0.147 at 5:1), below the neck and the eye.
     annotations = curate_stock_dimensions(
-        adapter, front, keep={"SupplierThreadMajor": (0.166, 0.175)},
+        adapter, front, keep={"SupplierThreadMajor": (0.166, 0.147)},
         view_label="supplier thread nominal major, not helical geometry",
         dimensions_by_feature=SUPPLIER_THREAD_DIMENSIONS,
     )
@@ -287,7 +308,6 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     set_dimension_precision(adapter, annotations, DIMENSION_PRECISION)
-    set_dimension_callouts(adapter, annotations, CHAMFER_CALLOUT)
     _verify_controls(annotations)
     refs = _supplier_references(adapter, front)
     # Footer notes belong to the sheet. The curates leave the front view

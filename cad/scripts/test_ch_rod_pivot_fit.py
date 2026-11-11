@@ -220,9 +220,8 @@ def test_the_assembly_press_allowance_is_this_joint() -> None:
     channel's table stays off the pin spec); they must be the nominal pin, the fork's reamed
     hole and the two tines, and name channel j's pin with channel j's rod
     only. The channel's only other press pairs are the bar pins', and its
-    thread pairs are the two apex set screws' in the bracket ears, the two
-    fulcrum set screws' modelled thread in their keepers and each anchor's
-    thread in its jam nut."""
+    thread pairs are the two apex set screws' in the bracket ears and the two
+    fulcrum set screws' modelled thread in their keepers."""
     import _ch_channel_interference as ic
 
     pin_dia, hole_dia, engaged = ic.ROD_PIVOT_PIN_PRESS
@@ -244,11 +243,7 @@ def test_the_assembly_press_allowance_is_this_joint() -> None:
         frozenset((f"ch-vn-fulcrum-set-screw-{n}", f"ch-fulcrum-keeper-{n}"))
         for n in (1, 2)
     }
-    anchor_nut_pairs = {
-        frozenset((f"ch-vn-spring-hook-{n}", f"ch-anchor-jam-nut-{n}"))
-        for n in range(1, 21)
-    }
-    assert set(pairs) == rod_pairs | bar_pairs | set_screw_pairs | anchor_nut_pairs
+    assert set(pairs) == rod_pairs | bar_pairs | set_screw_pairs
     nominal = math.pi / 4.0 * (pin_dia**2 - hole_dia**2) * engaged
     assert all(pairs[pair] == pytest.approx(1.10 * nominal) for pair in rod_pairs)
     # The arm the pin runs in is never a press pair.

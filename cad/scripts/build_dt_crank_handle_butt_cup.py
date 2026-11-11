@@ -49,12 +49,10 @@ from _sketch import (
 from _drawing_dimension_insert import add_diametric_linear_dimension
 from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
-from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _fit_deviations import deviations
 from dt_crank_handle_butt_cup_notes import ISOMETRIC_VIEW_NOTE
 from dt_crank_handle_butt_cup_spec import (
     BODY_CHAMFER,
-    BODY_CHAMFER_TOL,
     BODY_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
@@ -65,7 +63,6 @@ from dt_crank_handle_butt_cup_spec import (
     POCKET_FLOOR_CORNER_R_BAND,
     POCKET_FLOOR_CORNER_R_MAX,
     POCKET_FLOOR_CORNER_R_TOL_TYPE,
-    UNIT,
 )
 
 PART_NAME = "dt-crank-handle-butt-cup"
@@ -287,14 +284,6 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven butt cup (equations neutral)", V_CUP, 0.005 * V_CUP
     )
 
-    # The model-owned band (drawing-simplicity-policy.md `How the repository
-    # implements the guidelines`): the bottom chamfer that clears the
-    # MHA-DT-08 floor corner.  The body diameter that holds the pocket wall and
-    # the pocket depth that keeps the MHA-DT-32 head below the face print at
-    # .XXX under the title block's band; the pocket is bored to suit the head.
-    set_dimension_symmetric_tolerance(
-        adapter, "CupProfile", "BodyChamfer", BODY_CHAMFER_TOL, display_unit=UNIT
-    )
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)
     await report_mass_properties(adapter)

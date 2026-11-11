@@ -38,3 +38,8 @@ machinist_exceptions:
     where: "sheet 4, integration step 6 (GOOSENECK AND LEVEL): MHA-FR-VN-52 tightened on the MHA-SM-01 gooseneck post, NO LOCK; RE-SET IF IT DRIFTS"
     finding: "MHA-FR-VN-52 gooseneck set screw carries no mechanical lock (rule 23, lock threaded joints exposed to operating loads)"
     reason: "user ruling 2026-10-12 on PR #1348 (Q5, option (a), no jam nut): the cup point sets the gooseneck post's slid-to-level height, adjustable by design with periodic re-set, so the screw stays bare in the hub boss's spot-faced tap (joint_retention ruling U-MHA-FR-VN-52-no-lock)"
+  - id: "U-MHA-CH-VN-51-no-lock"
+    kind: "accept"
+    where: "sheet 4, integration steps 5A-5D (channel-anchors-set): the 20 MHA-CH-VN-51 anchors threaded bare into the MHA-SM-03 plate taps, neck seated then backed off up to 1 turn to clock the eye, no lock part"
+    finding: "threaded adjuster under the channel-spring pull held by a plain thread, no lock (rule 23)"
+    reason: "Owner ruling 2026-11-09 (Pedro), #2326: \"these jam nuts dont actually exist in real device and must be removed ; there is no torque load on hooks so theres no need for nuts\". The spring pulls along the shank axis, which the full coefficient-plate thread carries at every calibration pose (joint_retention ruling U-MHA-CH-VN-51-no-lock). This accepts only these 20 anchors' missing lock."

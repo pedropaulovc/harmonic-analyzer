@@ -135,13 +135,13 @@ THREAD_SIZE = "#4-40"
 # The threaded section is modelled as a plain cylinder at the basic #4 major
 # diameter, the fleet convention for a stock screw in a tap-drill-modelled hole.
 THREAD_MODEL_DIA = THREAD_MAJOR_MM[THREAD_SIZE]
-# .39 +.00/-.02: the shortest thread section less the relief and 1.5 pitches
+# .38 at the title block's .XX +/-.01 (#2314; the limits of the former .39
+# +.00/-.02): the shortest thread section less the relief and 1.5 pitches
 # of die run-in still carries full thread across the arm's 5/16-in stock
 # thickness, so the ARM governs the worst-case engagement, not the screw (the
 # shorter thread of U33b left the MHA-DT-32 machinist review short).  The tip
 # is cut proud of the arm's inboard face and filed flush at assembly (below).
-THREAD_LENGTH = 9.906  # .39
-THREAD_LENGTH_BAND = (0.0, -0.508)  # +.00/-.02
+THREAD_LENGTH = 9.652  # .38
 # 45-degree thread-start chamfer on the tip, inside the thread depth.  Like the
 # relief lead, the model holds the 45 degrees by equation and the print gives
 # the axial leg with an "X 45 DEG" callout.  It prints as the single limit
@@ -210,28 +210,26 @@ RELIEF_WIDTH = 2.286  # .09
 # leaves no sharp inside corner.  It keeps the lead inside the #4-40 thread
 # major, i.e. inside the arm's tapped hole, so the whole seat annulus that
 # bears on the arm face stays flat.  The 45 degrees is enforced in the model by
-# an equation, and the lead's axial size prints with an "X 45 DEG" callout and
-# its own band (MHA-DT-32 re-review: a loose lead could print as nothing).
+# an equation, and the lead's axial size prints with an "X 45 DEG" callout at
+# three places (MHA-DT-32 re-review: a loose lead could print as nothing).
 RELIEF_LEAD = 0.3048  # .012
-# The model owns the band (drawing-simplicity-policy.md `How the repository
-# implements the guidelines`; Codex P2 on #1139): the ReliefLead dimension
-# carries +/-.004 and the drawing imports it, so the sheet prints the model's
-# nominal and band and a model edit cannot leave the print behind (#2172: a
-# note typed the limits from these constants).  The limits below feed only the
-# worst-case checks.
-RELIEF_LEAD_TOL = 0.1016  # .004
+# The title block's .XXX +/-.005 (#2314): the longest lead still stays inside
+# the thread major (SEAT_FLAT_INNER_DIA_MAX below) and the shortest relief
+# keeps its die run-out floor.  The limits below feed only the worst-case
+# checks.
+RELIEF_LEAD_TOL = _GENERAL_3PL
 RELIEF_LEAD_LIMITS = (
     round(RELIEF_LEAD - RELIEF_LEAD_TOL, 6),
     round(RELIEF_LEAD + RELIEF_LEAD_TOL, 6),
 )
 CHAMFER_CALLOUT = "X 45 DEG"
-# Each band tighter than the title block's names what it serves at its
-# callout (#290 review of 29af6f44d, rule 4): the relief lead stays inside
-# the arm's tapped thread, so the seat annulus stays flat.  The tip chamfer's
+# Each functional size names what it serves at its callout (#290 review of
+# 29af6f44d, rule 4): the three-place relief lead stays inside the arm's
+# tapped thread, so the seat annulus stays flat.  The tip chamfer's
 # single limit is the thread start (#290 review of d72bdd039: functional
 # words, not the die).  The relief prints at the title block's band and says
-# what it clears.  The 45-degree lead's own native dimension prints its band
-# in detail A (#2172), with words only as its callout (#290 review of
+# what it clears.  The 45-degree lead's own native dimension prints in
+# detail A (#2172), with words only as its callout (#290 review of
 # b28d38a16 took the lead off the relief's Ø callout).
 # Rows of 18 characters at most keep each block clear of the extension lines
 # beside it (farm r8 of f5256bf3d).
@@ -266,7 +264,8 @@ def _limits(nominal: float, band: tuple[float, float]) -> tuple[float, float]:
 
 
 SHOULDER_DIA_MIN, SHOULDER_DIA_MAX = _limits(SHOULDER_DIA, SHOULDER_DIA_BAND)
-THREAD_LENGTH_MIN, THREAD_LENGTH_MAX = _limits(THREAD_LENGTH, THREAD_LENGTH_BAND)
+THREAD_LENGTH_MIN = round(THREAD_LENGTH - _GENERAL_2PL, 6)
+THREAD_LENGTH_MAX = round(THREAD_LENGTH + _GENERAL_2PL, 6)
 # The handle's printed bore is a reference over this running clearance
 # (MHA-DT-08), so the reamer's band reaches the checks only here.
 _BORE_LOWER, _BORE_UPPER = deviations(PIVOT_BORE_BAND)
@@ -520,8 +519,8 @@ for _ok, _what in (
         raise AssertionError(f"MHA-DT-32: {_what}")
 
 # Axial locations read from the TIP, the one faced end (MHA-DT-32 re-reviews,
-# 2026-09-29): the seat face is the thread length, with its own band for the
-# engagement check.  The under-head face is the fitted shoulder length from
+# 2026-09-29): the seat face is the thread length, whose .XX band the
+# engagement check reads.  The under-head face is the fitted shoulder length from
 # the seat, a reference (the shoulder is turned to suit the bonded handle), and
 # the head face the reference overall, for stock cut-off.  The head length, the
 # slot depth, the relief width, the relief lead's and the tip chamfer's legs are
@@ -546,9 +545,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # Decimal places ARE the tolerance (drawing-guidelines.md rule 3 (decimal
 # places carry the tolerance)): the head diameter and length (the cup-floor
 # bearing and recess), the shoulder's running band, the relief diameter, the
-# relief lead's band and the tip chamfer's single limit at three; every other
+# relief lead and the tip chamfer's single limit at three; every other
 # size at two, the relief width for the 1.5D engagement rule and the thread
-# length with its own +.00/-.02 band; the fitted shoulder length and the
+# length at the title block's .XX band; the fitted shoulder length and the
 # overall are references.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ScrewProfile": {
