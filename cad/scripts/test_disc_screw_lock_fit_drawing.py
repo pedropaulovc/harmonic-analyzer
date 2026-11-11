@@ -190,7 +190,14 @@ def test_fit_up_adjustments_are_complete_and_ordered_before_installation() -> No
     )
     assert face is not None
     assert guide.LOCK_GAP_FIT[0] < float(face.group(1)) * IN < guide.LOCK_GAP_FIT[1]
-    assert f"IF A GAP IS STILL OVER {high}, REPEAT " in lock_step
+    # Machinist review of 492f8b4a70: an all-in-window read exits to the next
+    # step, the lift needs the locks off, and a faced rail goes back to the read.
+    after = steps.SEQUENCE[seq.index("lock-seats-faced") + 1]
+    assert f"AT EVERY LOCK, GO TO STEP {steps.step_number(after)}." in lock_step
+    assert "WITH THE LOCKS REMOVED, LIFT THE PLATEN" in lock_step
+    assert lock_step.endswith(
+        f"REPEAT FROM STEP {steps.step_number('lock-seats-faced')}."
+    )
     assert re.search(rf"\bIF A GAP IS UNDER {low}, REPLACE THAT GUIDE\b", lock_step)
     assert "OVER THE WINDOW, REPLACE" not in lock_step
 

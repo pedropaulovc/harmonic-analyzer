@@ -1886,6 +1886,7 @@ def _step_text(
     # reading less the window's middle, and only an over-faced rail (under
     # the window) is replaced.
     lock_gap_target = steps.inch_text(sum(platen_guide.LOCK_GAP_FIT) / 2.0, 3)
+    after_lock_seats = steps.SEQUENCE[steps.SEQUENCE.index("lock-seats-faced") + 1]
     teeth = f"{KNOB_TEETH}T"
     knob = sprocket_name(sprocket.KNOB_CONFIG)
     crank = sprocket_name(sprocket.CRANK_CONFIG)
@@ -2026,19 +2027,22 @@ def _step_text(
             "ON THE SCREWS.",
             "TIGHTEN THE LOCK SCREWS.",
         ),
+        # The read branches three ways (machinist review of 492f8b4a70: the
+        # in-window case had no exit and the platen lift read as
+        # unconditional); a faced rail goes back to the read.
         "lock-seats-faced": (
             "WITH THE LOCK SCREWS TIGHT, READ THE GAP BETWEEN EACH LOCK'S FRONT "
             "FACE AND THE BAR'S BACK FACE WITH FEELERS.",
+            f"IF THE GAP IS {lock_gap} AT EVERY LOCK, GO TO STEP "
+            f"{steps.step_number(after_lock_seats)}.",
+            f"IF A GAP IS UNDER {lock_gap_min}, REPLACE THAT GUIDE AND REPEAT FROM "
+            f"STEP {steps.step_number('guides-screwed')}.",
             f"IF A GAP IS OVER {lock_gap_max}, REMOVE THE LOCKS.",
-            "LIFT THE PLATEN OFF THE BAR.",
+            "WITH THE LOCKS REMOVED, LIFT THE PLATEN OFF THE BAR.",
             f"FACE THE {n['pd-platen-guide']} GUIDE'S BACK FACE UNDER EACH LOCK "
             f"THAT READ OVER {lock_gap_max} BY ITS GAP LESS {lock_gap_target}.",
             f"REFIT PER {s('platen-hung', 9)}-{s('guide-locks-set', 2)}.",
-            f"CHECK: THE GAP IS {lock_gap} AT EVERY LOCK.",
-            f"IF A GAP IS STILL OVER {lock_gap_max}, REPEAT "
-            f"{s('lock-seats-faced', 1)}-{s('lock-seats-faced', 5)}.",
-            f"IF A GAP IS UNDER {lock_gap_min}, REPLACE THAT GUIDE AND REPEAT FROM "
-            f"STEP {steps.step_number('guides-screwed')}.",
+            f"REPEAT FROM STEP {steps.step_number('lock-seats-faced')}.",
         ),
         "latch-pin-pressed": (
             f"PRESS THE {n['pd-vn-transgear-latch-pin']} DOWEL, CHAMFERED END FIRST, "
