@@ -74,16 +74,20 @@ def test_thread_relief_is_cut_under_the_die_root() -> None:
     """Rule 16 (2026-10-24 ENFORCE blocker): the thread running to the shank
     step gets a relief of at least one pitch, the vertical rod's form."""
     assert (spec.RELIEF_DIA, spec.RELIEF_WIDTH, spec.RELIEF_ROOT_R) == pytest.approx(
-        (0.073 * 25.4, 0.043 * 25.4, 0.008 * 25.4)
+        (0.071 * 25.4, 0.043 * 25.4, 0.008 * 25.4)
     )
-    assert spec.RELIEF_DIA <= spec.THREAD_ROOT_2A_MIN < spec.THREAD_BASIC_MINOR
+    # #2399: the neck's Ø has a floor; its title-block band (.066-.076) stays
+    # wholly under the die's root.
+    low, high = spec.RELIEF_DIA_LIMITS
+    assert (low, high) == pytest.approx((0.066 * 25.4, 0.076 * 25.4))
+    assert high <= spec.THREAD_ROOT_2A_MIN < spec.THREAD_BASIC_MINOR
     assert spec.RELIEF_WIDTH >= spec.THREAD_PITCH
     assert 2.0 * spec.RELIEF_ROOT_R < spec.RELIEF_WIDTH_MIN
     assert spec.FULL_THREAD_FROM_STEP_MAX == spec.RELIEF_WIDTH
-    # The Ø and root radius print as single MAX limits at their model values;
-    # the width as a LIMIT pair whose MIN holds rule 16's one pitch.
+    # The root radius prints as a single MAX limit at its model value; the
+    # width as a LIMIT pair whose MIN holds rule 16's one pitch; the Ø on the
+    # title block, no single limit (a MAX alone accepted any thinner neck).
     assert spec.SINGLE_LIMITS == {
-        ("PinProfile", "ReliefDia"): (spec.RELIEF_DIA, spec.TOL_TYPE_MAX),
         ("ReliefRoots", "ReliefRootR"): (spec.RELIEF_ROOT_R, spec.TOL_TYPE_MAX),
     }
     assert spec.LIMIT_PAIRS == {
@@ -241,7 +245,9 @@ def test_callouts_are_part_authored_and_only_read_by_the_sheet() -> None:
         encoding="utf-8"
     )
     authored = callouts.authored_by_name()
-    assert set(authored) == {"PinDia", "ReliefRootR", "PinLength"}
+    assert set(authored) == {"PinDia", "ReliefDia", "ReliefRootR", "PinLength"}
+    # The neck's Ø states the function that needs its third place.
+    assert "THREAD MINOR" in authored["ReliefDia"][callouts.CALLOUT_BELOW]
     assert authored["PinLength"] == {
         callouts.TEXT_PREFIX: "(",
         callouts.TEXT_SUFFIX: ")",

@@ -225,6 +225,44 @@ def test_the_axle_press_goes_to_the_plain_end_window_as_a_first_setting() -> Non
     assert "GOVERN" not in notes.STEP_TEXT[steps.AXLE_CHECKED_KEY]
 
 
+def test_the_axle_presses_push_on_the_step_through_a_sleeve() -> None:
+    """#2399: a press on the threaded end drives the interference through the
+    relief neck. Both presses that drive the axle in push on its shank step
+    through one sleeve that clears the thread and dome and lands on the
+    step's flat."""
+    from _printed_tolerance import (
+        drilled_oversize_mm,
+        edge_break_chamfer_mm,
+        edge_break_radius_mm,
+    )
+
+    spec = mg_wheel_axle_spec
+    inch = 25.4
+    # The sleeve's bore at the title block's drilled limit still lands inside
+    # the step's flat, a full edge break in.
+    bore_max = notes.PRESS_SLEEVE_BORE + drilled_oversize_mm(unit=spec.UNIT)
+    edge_break = max(
+        edge_break_radius_mm(unit=spec.UNIT), edge_break_chamfer_mm(unit=spec.UNIT)
+    )
+    flat = spec.PIN_DIA - spec.PIN_DIA_TOL - 2.0 * edge_break
+    assert spec.THREAD_MAJOR < notes.PRESS_SLEEVE_BORE < bore_max < flat
+    assert notes.PRESS_SLEEVE_OD > spec.PIN_DIA + spec.PIN_DIA_TOL
+    longest_tip = spec.THREAD_LEN + spec.THREAD_LEN_BAND[0] + spec.DOME_H
+    assert notes.PRESS_SLEEVE_LENGTH > longest_tip
+    # The top press force on the step stays inside the module's bearing
+    # limit; on the neck it would be several times the yield.
+    assert (
+        notes.STEP_BEARING_MAX_KSI <= notes.BEARING_YIELD_FACTOR * notes.AXLE_YIELD_KSI
+    )
+    neck = math.pi / 4.0 * (spec.RELIEF_DIA_LIMITS[1] / inch) ** 2
+    assert notes.PRESS_FORCE_MAX_KIP / neck > 3.0 * notes.AXLE_YIELD_KSI
+    # Both presses that drive the axle in name the sleeve; the re-press
+    # points back to the first press's step.
+    assert notes.PRESS_SLEEVE in notes.STEP_TEXT[steps.AXLE_PRESSED_KEY]
+    further = notes.STEP_TEXT["axle-pressed-further"]
+    assert f"STEP {steps.step_number(steps.AXLE_PRESSED_KEY)} SLEEVE" in further
+
+
 def test_the_drum_press_accepts_the_recess_window_the_wheel_lengths_prove() -> None:
     """Delegated ruling (assembly-step moves): the drum press step carries
     the drum face's window below the spigot end (DRUM_RECESS)."""

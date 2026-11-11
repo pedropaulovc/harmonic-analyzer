@@ -18,6 +18,7 @@ from mg_wheel_axle_spec import (
     MM_PER_IN,
     PIN_DIA,
     PIN_DIA_TOL,
+    THREAD,
 )
 
 TEXT_PREFIX = 1  # swDimensionTextPrefix
@@ -66,11 +67,18 @@ PIN_DIA_CALLOUT = "\n".join(
 # One radius prints for both roots (one fillet feature): its count rides
 # above the value.
 RELIEF_ROOTS_CALLOUT = "2X"
+# #2399: the neck's Ø rides the title block's .XXX (.066-.076); its one
+# function, staying under the die's root so the die runs out in the groove,
+# names the third place (rule 3; machinist review r2 asked for the reason).
+RELIEF_DIA_CALLOUT = f"CLEARS {THREAD} THREAD MINOR"
 
 # lane -> (feature, dimension) -> text.
 CALLOUTS: dict[int, dict[tuple[str, str], str]] = {
     CALLOUT_ABOVE: {("ReliefRoots", "ReliefRootR"): RELIEF_ROOTS_CALLOUT},
-    CALLOUT_BELOW: {("PinProfile", "PinDia"): PIN_DIA_CALLOUT},
+    CALLOUT_BELOW: {
+        ("PinProfile", "PinDia"): PIN_DIA_CALLOUT,
+        ("PinProfile", "ReliefDia"): RELIEF_DIA_CALLOUT,
+    },
 }
 if any("\n" in text for text in CALLOUTS[CALLOUT_ABOVE].values()):
     raise AssertionError("an above-callout with a line break never prints")

@@ -31,6 +31,11 @@ from mg_magnifier_assembly_spec import (
     UNIT,
 )
 from _title_block_units import LENGTH_UNITS, render_number
+from _printed_tolerance import (
+    drilled_oversize_mm,
+    edge_break_chamfer_mm,
+    edge_break_radius_mm,
+)
 from sh_vn_music_wire_lever_spec import BOM_DESCRIPTION as _WIRE_BOM_DESCRIPTION
 from mg_magnifying_wheel_geom import DRUM_RECESS as _DRUM_RECESS
 from mg_magnifying_wheel_geom import SPOKE_COUNT as _SPOKE_COUNT
@@ -243,6 +248,67 @@ BOND_NOTE = (
     f"ACCEPT: {_DRUM} DOES NOT TURN BY HAND."
 )
 
+# #2399: the axle presses in plain end first, so the press would push on its
+# threaded end and drive the band's interference (.0003-.0012) through the
+# relief neck (Ø.066-.076, .0034-.0045 sq in), which yields under 250 lbf in
+# annealed drill rod (about 55 ksi), short of any press in the band. The press
+# pushes on the shank step instead, through a sleeve over the thread: its
+# drilled bore clears the thread's major Ø and stays on the step's flat inside
+# the shank's title-block edge break, its OD covers the step, and it stands
+# past the dome at the thread's longest. Its drill prints as a US customary
+# size (drawing-guidelines.md, What the shop holds).
+PRESS_SLEEVE_DRILL = "#32"
+PRESS_SLEEVE_BORE = 2.9464  # .116, a #32 drill
+PRESS_SLEEVE_OD = 6.35  # .25
+PRESS_SLEEVE_LENGTH = 12.7  # .50
+_AXLE_EDGE_BREAK = max(
+    edge_break_radius_mm(unit=_axle.UNIT), edge_break_chamfer_mm(unit=_axle.UNIT)
+)
+_SLEEVE_BORE_MAX = PRESS_SLEEVE_BORE + drilled_oversize_mm(unit=UNIT)
+_STEP_FLAT_DIA_MIN = _axle.PIN_DIA - _axle.PIN_DIA_TOL - 2.0 * _AXLE_EDGE_BREAK
+if not (
+    _axle.THREAD_MAJOR < PRESS_SLEEVE_BORE
+    and _SLEEVE_BORE_MAX < _STEP_FLAT_DIA_MIN
+    and PRESS_SLEEVE_OD > _axle.PIN_DIA + _axle.PIN_DIA_TOL
+    and PRESS_SLEEVE_LENGTH > _axle.THREAD_LEN + _axle.THREAD_LEN_BAND[0] + _axle.DOME_H
+):
+    raise AssertionError("the press sleeve does not bear on the axle step alone")
+# The step's bearing at the press's top force [hand estimate, #2399]: an oiled
+# steel press (friction .10) at the band's top interference, the bar's hub
+# pressure capped near 40 ksi by its yield, over the bar's whole depth (about
+# .88 kip). The worst annulus (the sleeve's bore at the drilled limit, the
+# step's flat inside a full edge break) carries it at about 83 ksi, under the
+# 1.8 x yield static bearing on a finished face takes (AISC 360-16 J7), so at
+# worst the step's rim coins; the step locates nothing (the wheel hub
+# overhangs it, mg_wheel_group.STEP_INSIDE_HUB; the press is accepted at the
+# thread end past the nuts).
+PRESS_FRICTION_OILED = 0.10
+PRESS_HUB_PRESSURE_KSI = 40.0
+AXLE_YIELD_KSI = 55.0  # annealed O1/W1 drill rod
+BEARING_YIELD_FACTOR = 1.8  # AISC 360-16 J7, bearing on a finished surface
+PRESS_FORCE_MAX_KIP = (
+    PRESS_FRICTION_OILED
+    * PRESS_HUB_PRESSURE_KSI
+    * math.pi
+    * ((_axle.PIN_DIA + _axle.PIN_DIA_TOL) / _INCH)
+    * (_axle.BAR_DEPTH / _INCH)
+)
+STEP_BEARING_AREA_MIN_SQIN = (
+    math.pi
+    / 4.0
+    * ((_STEP_FLAT_DIA_MIN / _INCH) ** 2 - (_SLEEVE_BORE_MAX / _INCH) ** 2)
+)
+STEP_BEARING_MAX_KSI = PRESS_FORCE_MAX_KIP / STEP_BEARING_AREA_MIN_SQIN
+if STEP_BEARING_MAX_KSI > BEARING_YIELD_FACTOR * AXLE_YIELD_KSI:
+    raise AssertionError(
+        f"the press sleeve bears {STEP_BEARING_MAX_KSI:.0f} ksi on the axle step"
+    )
+PRESS_SLEEVE = (
+    f"A STEEL SLEEVE OVER THE THREAD ({PRESS_SLEEVE_DRILL} DRILLED BORE, "
+    f"{render_number(PRESS_SLEEVE_OD / _INCH, UNIT, 2)} OD, "
+    f"{render_number(PRESS_SLEEVE_LENGTH / _INCH, UNIT, 2)} LONG)"
+)
+
 # One line per step key (mg_magnifier_assembly_steps.SEQUENCE); each step does
 # one thing, a check and its remedy are separate steps (rule 22). Settings are
 # named, never valued: their values print as the model dimensions on sheet 1.
@@ -274,11 +340,14 @@ STEP_TEXT = {
     # a depth rod reads there (owner ruling 2026-11-06 Q1), printed in the
     # check from the spec's constants and read where DETAIL B draws the nuts.
     # Farm rounds 1-3 gated it as a callout on DETAIL A, which draws no nut,
-    # and r3 read two acceptances; Main chose option A on 2026-11-08.
+    # and r3 read two acceptances; Main chose option A on 2026-11-08. The
+    # press goes in oiled and pushes only on the shank step, through
+    # PRESS_SLEEVE (#2399).
     _steps.AXLE_PRESSED_KEY: (
-        f"PRESS {_AXLE} INTO {_BAR}, THREADED END OUT, TO A FIRST SETTING: ITS "
-        f"PLAIN END {BACK_END_SUNK_TEXT} BELOW THE FAR FACE OF {_BAR} (CALIPER "
-        "DEPTH ROD)."
+        f"PRESS {_AXLE} INTO {_BAR} WITH LIGHT MACHINE OIL ON ITS PLAIN END, "
+        "THREADED END OUT, ON ITS SHOULDER ONLY, "
+        f"THROUGH {PRESS_SLEEVE}, TO A FIRST SETTING: ITS PLAIN END "
+        f"{BACK_END_SUNK_TEXT} BELOW THE FAR FACE OF {_BAR} (CALIPER DEPTH ROD)."
     ),
     _steps.AXLE_HELD_KEY: f"CHECK {_AXLE} DOES NOT TURN OR SLIDE BY HAND.",
     "axle-pressed-out": f"IF IT DOES, OR {_AXLE} SLID IN BY HAND, PRESS {_AXLE} OUT.",
@@ -300,7 +369,8 @@ STEP_TEXT = {
     ),
     "axle-pressed-further": (
         f"IF {_step(_steps.AXLE_CHECKED_KEY)} READ OVER THE MAX, PRESS {_AXLE} IN "
-        "BY THE EXCESS."
+        "BY THE EXCESS, ON ITS SHOULDER THROUGH THE "
+        f"{_step(_steps.AXLE_PRESSED_KEY)} SLEEVE."
     ),
     "axle-pressed-back": (
         f"IF {_step(_steps.AXLE_CHECKED_KEY)} READ UNDER THE MIN, PRESS {_AXLE} "

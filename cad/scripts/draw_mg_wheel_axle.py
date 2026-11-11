@@ -10,10 +10,11 @@ journal's Ra 63 uin, both lengths from the shank step (origin circles on
 the step), the "(2.20)" overall reference, the dome R and the thread
 callout; detail A, a cropped 10:1 *Front model view turned like the side view
 (draw_mg_magnifying_vertical_rod's detail-A recipe), carries the relief's
-width (a LIMIT pair), its Ø and its two root radii (single MAX limits). A 3:1 shaded
-isometric shows the cosmetic thread. No general notes: every requirement
-rides its own callout, and every callout is authored on the part
-(mg_wheel_axle_callouts); this sheet only reads them back (#1942).
+width (a LIMIT pair), its Ø (on the title block) and its two root radii (a
+single MAX limit). A 3:1 shaded isometric shows the cosmetic thread. No
+general notes: every requirement rides its own callout, and every callout is
+authored on the part (mg_wheel_axle_callouts); this sheet only reads them
+back (#1942).
 
 Run with SolidWorks open::
 
@@ -226,9 +227,12 @@ DETAIL_KEEP = {
     # mouth; its text stands over the radius's block, so the radius's leader
     # meets neither the line nor the text on either side of the line (run
     # 20261027T064924192Z: at 0.3 the leader crossed this line, rule 14).
+    # #2399: its function rides one callout row under the value, so the text
+    # stands 5 mm higher than the bare MAX did, the row ~4 mm over the
+    # radius's block and the value ~3 mm under the overall row.
     "ReliefDia": (
         _detail_xy(0.0, STEP_Y + 0.7)[0],
-        _DETAIL_TOP + 0.015,
+        _DETAIL_TOP + 0.020,
     ),
     # "2X / R.008 MAX" up-left over the crop, under the Ø's text: the ~21 mm
     # block ends just left of the step-side root's centre, so its leader drops
@@ -701,8 +705,8 @@ def _pin_stock_reference(adapter: Any, named: dict[str, Any]) -> None:
 
 
 def _assert_relief_limits(named: dict[str, Any]) -> None:
-    """Each relief size imported with its part's native tolerance: the Ø
-    and root radius single limits, the width's LIMIT pair."""
+    """Each relief size imported with its part's native tolerance: the root
+    radius's single limit, the width's LIMIT pair."""
     for (_feature, name), (limit, tol_type) in SINGLE_LIMITS.items():
         dimension = _early_bound(_display(named[name]).GetDimension2(0), "IDimension")
         tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
