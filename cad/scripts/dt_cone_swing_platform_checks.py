@@ -98,7 +98,8 @@ _POST_WEST_NORMAL_CLEAR = _POST_WEST_HALF / math.hypot(
 # The south-east chamfer runs past the foot too: its line bounds the plate
 # there like the three straight edges.
 _POST_CHAMFER_NORMAL_CLEAR = abs(
-    (SE_CHAMFER_EAST_XZ[0] - SE_CHAMFER_SOUTH_XZ[0]) * (POST_LOCAL_Z - SE_CHAMFER_SOUTH_XZ[1])
+    (SE_CHAMFER_EAST_XZ[0] - SE_CHAMFER_SOUTH_XZ[0])
+    * (POST_LOCAL_Z - SE_CHAMFER_SOUTH_XZ[1])
     - (SE_CHAMFER_EAST_XZ[1] - SE_CHAMFER_SOUTH_XZ[1]) * (0.0 - SE_CHAMFER_SOUTH_XZ[0])
 ) / math.dist(SE_CHAMFER_SOUTH_XZ, SE_CHAMFER_EAST_XZ)
 POST_FOOT_CONTAINMENT = (
