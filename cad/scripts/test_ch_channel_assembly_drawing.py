@@ -281,7 +281,8 @@ def test_the_spring_set_is_dro_set_off_an_indicator_zero_on_the_washer() -> None
     review, PR #1605)."""
     import tomllib
 
-    from _process_plans import PROCESS_ROOT
+    from _paths import CAD_ROOT
+    from _process_plans import SHOP_PATH
 
     explode = drawing.explode
     washer, spring = drawing.item(explode.WASHER), drawing.item(explode.BANK_SPRING)
@@ -305,19 +306,21 @@ def test_the_spring_set_is_dro_set_off_an_indicator_zero_on_the_washer() -> None
         assert "FEELER" not in _step_body(key), key
     # The set error (two indicator nulls on one face, half a division each,
     # and the DRO over the move) is inside detail A's band, on the shop's own
-    # indicator and the DRO's vendor-stated accuracy.
-    inventory = tomllib.loads(
-        (PROCESS_ROOT / "shop" / "inventory.toml").read_text(encoding="utf-8")
+    # indicator (shop.toml gauges.dti) and the DRO's vendor-stated accuracy
+    # (shop-equipment.toml dro.pm-30mv).
+    shop = tomllib.loads(SHOP_PATH.read_text(encoding="utf-8"))
+    equipment = tomllib.loads(
+        (CAD_ROOT / "config" / "shop-equipment.toml").read_text(encoding="utf-8")
     )
     (stated,) = [
         float(match.group(1))
-        for cite in inventory["machines"]["PM-30MV"]["cite"]
+        for cite in equipment["dro"]["pm-30mv"]["cite"]
         if cite.startswith("DRO accuracy")
         for match in [re.search(r"(\.\d+)” Accuracy", cite)]
         if match
     ]
     assert drawing.DRO_ACCURACY_MM == pytest.approx(stated * 25.4)
-    division = inventory["gauges"]["dti"]["resolution_in"]["value"] * 25.4
+    division = shop["gauges"]["dti"]["resolution_mm"]
     assert drawing.INDICATOR_DIVISION_MM == pytest.approx(division)
     assert drawing.SPRING_SET_ERROR_MM == pytest.approx(division + stated * 25.4)
     assert drawing.SPRING_SET_ERROR_MM < bank.ROCKER_SPRING_SET_BAND
