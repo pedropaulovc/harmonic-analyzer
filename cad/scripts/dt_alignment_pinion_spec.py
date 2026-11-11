@@ -113,17 +113,10 @@ BORE_DIA = 7.9375  # 5/16 arbor through-bore (build_dt_pinion_arbor.py)
 # Slip fit bonded with Loctite 638, not a press: a press over the full drum
 # bore is a seizing risk for a novice (U27, U6 precedent).  The bore is
 # REAM_SLIDE, cut by the owned .3135 over reamer.  The drum sits on
-# MHA-DT-22's two bond lands, not its journal lands (U39: 5/16 -.0004/-.0038
-# in), so the diametral clearance runs from .0014 in (the drum slides on by
-# hand) up to the drum's upper deviation minus the arbor's lower one (.0053
-# in), inside the 0.25 mm bond gap the 638 technical data sheet allows.
-# #2360 (owner, 2026-11-11): the 5.64 bore is longer than the reamer reaches,
-# so it is reamed from both ends, and the arbor is relieved between its bond
-# lands (dt_pinion_arbor_geometry.BOND_RELIEF_*) so only the drum's two ends
-# bear.  No coaxiality is printed between the reamed halves: the mesh would
-# accept far more than the assembly allows, and the assembly's limit (the
-# arbor's back journal, .3121 max, must pass where the halves meet: a step
-# of .0014 in at the worst pair) is exactly what the hand slide tests.
+# MHA-DT-22's bond zone, not its journal lands (U39: 5/16 -.0004/-.0038 in),
+# so the diametral clearance runs from .0014 in (the drum slides on by hand)
+# up to the drum's upper deviation minus the arbor's lower one (.0053 in),
+# inside the 0.25 mm bond gap the 638 technical data sheet allows.
 ARBOR_BORE_BAND = REAM_SLIDE  # (upper, lower) deviations
 RETAINING_COMPOUND = "LOCTITE 638"
 RETAINING_COMPOUND_MAX_GAP_MM = 0.25
@@ -306,9 +299,7 @@ OUTSIDE_DIA_CALLOUT = f"MESHES WITH\n{MESH_MATE}"
 # part's matched-fit acceptance, in plain words (rule 26), so it rides the
 # bore's callout, not a general note (Codex P2 on #832).
 _ARBOR = _config.parts("dt-pinion-arbor")
-ARBOR_BORE_CALLOUT = (
-    f"REAM THRU FROM BOTH ENDS\nSLIDING FIT ON ARBOR {_ARBOR['number']}\nSLIDES ON BY HAND"
-)
+ARBOR_BORE_CALLOUT = f"REAM THRU\nSLIDING FIT ON ARBOR {_ARBOR['number']}\nSLIDES ON BY HAND"
 # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the bond to MHA-DT-22 is an assembly step (dt_pinion_arbor_spec
 # ASSEMBLY_STEP owns the drum joint), not a part note.  The one note is a
 # do-not-cut requirement, so it is leadered to the teeth on the side view and

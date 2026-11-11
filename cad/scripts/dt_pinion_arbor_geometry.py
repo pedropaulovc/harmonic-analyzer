@@ -366,18 +366,16 @@ if (
 # meet within the back journal's .0014 in worst-case diametral clearance;
 # the drum sheet's SLIDES ON BY HAND is that check, made before bonding.
 #
-# The relief is located from the front land's crown end, so its stations
-# chain off a printed edge (the sheet has no room for another row of
-# stations from the head rear face); every link is .XX.  The front land is
-# the longer: the operator's torque enters at the head and reaches the drum
-# through it.  The relief's front shoulder stands clear of the front land's
-# diameter block on the sheet, its back shoulder 15 mm ahead of the bond-zone
+# The relief's front shoulder is located from the head rear face, the sheet's
+# datum for every station (drawing-guidelines rules 10/11; machinist review
+# of 7454ba6d gated a chain off the front land), and its length is its own
+# size, as each journal's is.  Both at .XX.  The front land is the longer:
+# the operator's torque enters at the head and reaches the drum through it.
+# The relief's front shoulder stands clear of the front land's diameter
+# block on the sheet, its back shoulder 15 mm ahead of the bond-zone
 # diameter's witness (BOND_ZONE_DIA_FROM_HEAD_REAR).
-FRONT_BOND_LAND_LEN = 40.386  # 1.59, front journal crown end to relief
+BOND_RELIEF_FROM_HEAD_REAR = 106.68  # 4.20
 BOND_RELIEF_LEN = 66.04  # 2.60
-BOND_RELIEF_FROM_HEAD_REAR = (
-    FRONT_JOURNAL_FROM_HEAD_REAR + JOURNAL_LEN + FRONT_BOND_LAND_LEN
-)
 BOND_RELIEF_Z = HEAD_REAR_Z + BOND_RELIEF_FROM_HEAD_REAR
 # Ø.28 at the title block's .XX: from the drum's .3135 minimum bore to the
 # relief's .29 maximum the radial air is .0118 in (0.30 mm), ten times the
@@ -392,21 +390,21 @@ if BOND_RELIEF_RADIAL_AIR < BOND_RELIEF_MIN_RADIAL_AIR:
         f"under {BOND_RELIEF_MIN_RADIAL_AIR}"
     )
 # Each drum end's bonded overlap, every printed band at its short corner: the
-# relief's shoulders chain off the front land (station, land length, bond
-# land length; then the relief length), the drum from its station and length.
-FRONT_BOND_OVERLAP_MIN = (BOND_RELIEF_FROM_HEAD_REAR - 3.0 * LINEAR_XX_BAND) - (
+# relief's front shoulder from the head rear face, its back shoulder that
+# plus the relief length; the drum from its station and length.
+FRONT_BOND_OVERLAP_MIN = (BOND_RELIEF_FROM_HEAD_REAR - LINEAR_XX_BAND) - (
     DRUM_STATION + DRUM_STATION_BAND
 )
 BACK_BOND_OVERLAP_MIN = (
     DRUM_STATION - DRUM_STATION_BAND + DRUM_LEN + DRUM_LEN_BAND[1]
-) - (BOND_RELIEF_FROM_HEAD_REAR + BOND_RELIEF_LEN + 4.0 * LINEAR_XX_BAND)
+) - (BOND_RELIEF_FROM_HEAD_REAR + BOND_RELIEF_LEN + 2.0 * LINEAR_XX_BAND)
 # Each land lies wholly inside one reamed half (the halves meet at the drum's
 # mid-length, give or take the reamer's reach), so no land straddles the step.
 _DRUM_MID = DRUM_STATION + DRUM_LEN / 2.0
 if not (
-    BOND_RELIEF_FROM_HEAD_REAR + 3.0 * LINEAR_XX_BAND < _DRUM_MID - DRUM_STATION_BAND
+    BOND_RELIEF_FROM_HEAD_REAR + LINEAR_XX_BAND < _DRUM_MID - DRUM_STATION_BAND
     and _DRUM_MID + DRUM_STATION_BAND
-    < BOND_RELIEF_FROM_HEAD_REAR + BOND_RELIEF_LEN - 4.0 * LINEAR_XX_BAND
+    < BOND_RELIEF_FROM_HEAD_REAR + BOND_RELIEF_LEN - 2.0 * LINEAR_XX_BAND
 ):
     raise AssertionError("the bond relief must span the drum's mid-length")
 # Torque: either land alone holds twice a hard hand twist on the MHA-DT-15

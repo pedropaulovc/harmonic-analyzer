@@ -54,6 +54,7 @@ from dt_pinion_arbor_spec import (
     BACK_JOURNAL_FROM_HEAD_REAR,
     BACK_JOURNAL_Z,
     BOND_RELIEF_DIA,
+    BOND_RELIEF_FROM_HEAD_REAR,
     BOND_RELIEF_LEN,
     BOND_RELIEF_Z,
     CROSS_HOLE_DIA,
@@ -62,7 +63,6 @@ from dt_pinion_arbor_spec import (
     DRAWING_NOTES,
     DRUM_STATION,
     EXPOSED_SHAFT_LEN,
-    FRONT_BOND_LAND_LEN,
     FRONT_JOURNAL_FROM_HEAD_REAR,
     FRONT_JOURNAL_Z,
     HEAD_CAP_R,
@@ -544,15 +544,15 @@ async def _add_bond_relief(adapter) -> list[tuple[str, str]]:
 
     One Top-plane profile, revolved as a cut about its own axis line: a
     rectangle from the relief's diameter out past the shaft flank, on the
-    sketch's -x side (the sheet's upper flank, so the chained lengths above
-    the shaft stand on short extension lines).  The axis starts at the front
-    land's crown end, so the relief's front shoulder is the printed bond-land
-    length from that edge, and the relief's length and diameter follow.
+    sketch's -x side (the sheet's upper flank, where the relief length stands
+    on short extension lines).  The axis starts at the head rear face, the
+    sheet's station datum, so the relief's front shoulder is printed from it
+    like every other station, and the relief's length and diameter follow.
     """
     from solidworks_mcp.adapters.base import RevolveParameters
 
     feature_name = "BondReliefProfile"
-    land_end_v = -(FRONT_JOURNAL_Z + JOURNAL_LEN)
+    datum_v = -HEAD_REAR_Z
     front_v = -BOND_RELIEF_Z
     back_v = -(BOND_RELIEF_Z + BOND_RELIEF_LEN)
     reach = SHAFT_R + SPLIT_OVERHANG
@@ -561,7 +561,7 @@ async def _add_bond_relief(adapter) -> list[tuple[str, str]]:
     set_sketch_direct_db(adapter, True)
     axis = check(
         f"{feature_name} axis",
-        await adapter.add_centerline(0.0, land_end_v, 0.0, back_v),
+        await adapter.add_centerline(0.0, datum_v, 0.0, back_v),
     )
     set_sketch_direct_db(adapter, False)
     inner, back, outer, front = await add_line_chain(
@@ -573,10 +573,25 @@ async def _add_bond_relief(adapter) -> list[tuple[str, str]]:
             (-reach, front_v),
         ],
     )
+    # The station's witness: a construction mirror of the relief floor on the
+    # +x side (the sheet's lower flank), so the 4.20 reads to the shoulder
+    # from the stations' rows below the shaft without its extension line
+    # crossing the part, as each journal's station does.
+    set_sketch_direct_db(adapter, True)
+    witness = check(
+        f"{feature_name} station witness",
+        await adapter.add_line(BOND_RELIEF_R, front_v, BOND_RELIEF_R, back_v),
+    )
+    set_sketch_direct_db(adapter, False)
+    segment = _early_bound(adapter._sketch_entities[witness], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError(f"{witness}: failed to become construction geometry")
     for line, relation in (
         (axis, "vertical"),
         (inner, "vertical"),
         (outer, "vertical"),
+        (witness, "vertical"),
         (back, "horizontal"),
         (front, "horizontal"),
     ):
@@ -584,21 +599,29 @@ async def _add_bond_relief(adapter) -> list[tuple[str, str]]:
             f"{feature_name} {line} {relation}",
             await adapter.add_sketch_constraint(line, None, relation),
         )
-    check(
-        f"{feature_name} axis ends level with the back shoulder",
-        await adapter.add_sketch_constraint(f"{axis}.end", f"{inner}.end", "horizontal_points"),
-    )
+    for first, second, relation in (
+        (f"{axis}.end", f"{inner}.end", "horizontal_points"),
+        (f"{witness}.start", f"{inner}.start", "horizontal_points"),
+        (f"{witness}.end", f"{inner}.end", "horizontal_points"),
+    ):
+        check(
+            f"{feature_name} {first} {relation} {second}",
+            await adapter.add_sketch_constraint(first, second, relation),
+        )
     await anchor_point_to_origin(
-        adapter, f"{axis}.start", 0.0, land_end_v, f"{feature_name} front land end"
+        adapter, f"{axis}.start", 0.0, datum_v, f"{feature_name} head rear face"
     )
     dims.record(None, None)
     check(
-        f"{feature_name} front bond land",
+        f"{feature_name} front shoulder station",
         await adapter.add_sketch_dimension(
-            f"{axis}.start", f"{inner}.start", "vertical_distance", FRONT_BOND_LAND_LEN
+            f"{axis}.start",
+            f"{witness}.start",
+            "vertical_distance",
+            BOND_RELIEF_FROM_HEAD_REAR,
         ),
     )
-    dims.record("FrontBondLandLen", '"FrontBondLandLen"')
+    dims.record("BondReliefFromHeadRear", '"BondReliefFromHeadRear"')
     check(
         f"{feature_name} length",
         await adapter.add_sketch_dimension(
@@ -610,6 +633,13 @@ async def _add_bond_relief(adapter) -> list[tuple[str, str]]:
         f"{feature_name} outer reach",
         await adapter.add_sketch_dimension(
             f"{axis}.end", f"{outer}.start", "horizontal_distance", reach
+        ),
+    )
+    dims.record(None, None)
+    check(
+        f"{feature_name} station witness on the relief floor",
+        await adapter.add_sketch_dimension(
+            f"{axis}.end", f"{witness}.end", "horizontal_distance", BOND_RELIEF_R
         ),
     )
     dims.record(None, None)
@@ -663,7 +693,7 @@ async def build(adapter) -> dict[str, str]:
         "DrumStationFromHeadRear": DRUM_STATION,
         "PinStationFromHeadRear": PIN_STATION_FROM_HEAD_REAR,
         "PinHoleDia": PIN_HOLE_DIA,
-        "FrontBondLandLen": FRONT_BOND_LAND_LEN,
+        "BondReliefFromHeadRear": BOND_RELIEF_FROM_HEAD_REAR,
         "BondReliefLen": BOND_RELIEF_LEN,
         "BondReliefDia": BOND_RELIEF_DIA,
     }

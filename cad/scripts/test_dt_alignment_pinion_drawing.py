@@ -211,13 +211,7 @@ def test_printed_thickness_corners_keep_finite_actual_cutter_support() -> None:
 def test_fit_bore_callout_names_its_process() -> None:
     import draw_dt_alignment_pinion as draw
 
-    # #2360: the bore is longer than the reamer reaches, so it is reamed from
-    # both ends; the arbor's relief leaves only the two ends bearing.
-    import dt_pinion_arbor_geometry as arbor
-
-    first = draw.DIMENSION_CALLOUTS["ArborBoreDia"].splitlines()[0]
-    assert first.startswith("REAM THRU") and "BOTH ENDS" in first
-    assert arbor.FRONT_BOND_OVERLAP_MIN > 0.0 and arbor.BACK_BOND_OVERLAP_MIN > 0.0
+    assert draw.DIMENSION_CALLOUTS["ArborBoreDia"].splitlines()[0] == "REAM THRU"
 
 
 def test_diagnostic_home_clocking_uses_engaged_pose_and_native_row_handedness() -> None:

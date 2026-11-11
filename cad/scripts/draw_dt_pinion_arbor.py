@@ -425,18 +425,26 @@ ARROWS_INSIDE = (
     # both arrowheads, as the 8 mm bond zone does.
     "BondReliefDia",
 )
-# #2360: the relief between the bond lands.  Its two lengths chain off the
-# front land's crown end in one row just above the shaft, under detail A's
-# label and left of the front land's length (the rows below the shaft would
-# cross the front Ra symbol or run through the front land's diameter block).
-# Its plain .XX diameter stands on the relief just aft of its front shoulder
-# and hangs below the shaft, between the bond-zone and front-land blocks and
-# over the 7.83 row.
-RELIEF_CHAIN_Y = 0.178
+# #2360: the relief between the bond lands.  Its front shoulder's station
+# from the head rear face (machinist review of 7454ba6d: a chain off the
+# front land left the back shoulder four links from the datum) runs in the
+# stations' rows below the shaft, between the 1.82 and 7.83 rows and under
+# the front land's Ra symbol (tip ~0.124): the line ~2.8 mm under the text
+# position runs at ~0.1185, 6 mm over the 7.83's, its text left of the Ra
+# in the open run under the front land's diameter block.  The relief's
+# length stands above the shaft, under detail A's label, as the journals'
+# lengths do.  Its plain .XX diameter hangs below the shaft, over the
+# station row, its line and text right of the bond-zone block (underline
+# ends at x 0.1786 on the r1 sheet of 7454ba6d) and its shelf left of the
+# station's shoulder witness: the r1 text began 2 mm right of its line and
+# its shelf ran 14.2 mm.
+RELIEF_LEN_Y = 0.178
+RELIEF_STATION_TEXT_XY = (0.228, 0.1213)
 RELIEF_FRONT_X = _sheet_x(BOND_RELIEF_Z)
 RELIEF_BACK_X = _sheet_x(BOND_RELIEF_Z + BOND_RELIEF_LEN)
-FRONT_LAND_END_X = _sheet_x(FRONT_JOURNAL_Z + JOURNAL_LEN)
-RELIEF_DIA_FROM_FRONT_SHOULDER = 6.0
+BOND_ZONE_UNDERLINE_END_X = 0.1786
+RELIEF_DIA_SHELF = 0.0142
+RELIEF_DIA_FROM_FRONT_SHOULDER = 19.0
 RELIEF_DIA_XY = (_sheet_x(BOND_RELIEF_Z + RELIEF_DIA_FROM_FRONT_SHOULDER), 0.127)
 PRINCIPAL_KEEP = {
     "FrontJournalLen": (0.252, 0.188),
@@ -448,8 +456,8 @@ PRINCIPAL_KEEP = {
     "BondZoneDia": BOND_ZONE_TEXT_XY,
     "BackStubDia": BACK_STUB_TEXT_XY,
     "BackJournalDia": (BACK_JOURNAL_TEXT_X, BACK_JOURNAL_DIA_Y),
-    "FrontBondLandLen": ((FRONT_LAND_END_X + RELIEF_FRONT_X) / 2.0, RELIEF_CHAIN_Y),
-    "BondReliefLen": ((RELIEF_FRONT_X + RELIEF_BACK_X) / 2.0, RELIEF_CHAIN_Y),
+    "BondReliefFromHeadRear": RELIEF_STATION_TEXT_XY,
+    "BondReliefLen": ((RELIEF_FRONT_X + RELIEF_BACK_X) / 2.0, RELIEF_LEN_Y),
     "BondReliefDia": RELIEF_DIA_XY,
     # y 0.140, not 0.130: lifts the dimension line to y ~0.1372 so its head-end
     # witness stops at ~0.1362, leaving room for the front Ra's shoulder to

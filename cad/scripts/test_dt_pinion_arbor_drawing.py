@@ -469,39 +469,43 @@ def test_bond_relief_clears_the_drum_and_leaves_two_bonded_ends() -> None:
     assert geometry.BOND_RELIEF_RADIAL_AIR >= geometry.BOND_RELIEF_MIN_RADIAL_AIR
     for overlap in (geometry.FRONT_BOND_OVERLAP_MIN, geometry.BACK_BOND_OVERLAP_MIN):
         assert geometry.bond_torque_capacity(overlap) >= 2.0 * geometry.HAND_TORQUE_NM
-    # The relief's front shoulder is the printed bond-land length from the
-    # front journal's crown end.
-    assert relief_front == pytest.approx(
-        spec.FRONT_JOURNAL_FROM_HEAD_REAR + spec.JOURNAL_LEN + spec.FRONT_BOND_LAND_LEN
-    )
+    # Both shoulders read from the head rear face, the sheet's station datum:
+    # the front one directly, the back one through the relief's own length.
+    assert spec.DRAWING_DIMENSIONS["BondReliefProfile"] >= {
+        "BondReliefFromHeadRear",
+        "BondReliefLen",
+    }
 
 
 def test_bond_relief_dimensions_sit_in_open_sheet_space() -> None:
-    """The chained relief lengths stand just above the shaft, under detail A's
-    label; the relief's diameter hangs below, clear of both diameter blocks
-    either side and over the 7.83 row."""
+    """The relief's station runs in the station rows below the shaft, between
+    the 1.82 and 7.83 rows and under the front Ra symbol; its length stands
+    just above the shaft, under detail A's label; its diameter hangs below,
+    clear of both diameter blocks and of the station's shoulder witness."""
+    x, y = drawing.PRINCIPAL_KEEP["BondReliefFromHeadRear"]
+    front_row_y = drawing.PRINCIPAL_KEEP["FrontJournalFromHeadRear"][1]
+    back_row_y = drawing.PRINCIPAL_KEEP["BackJournalFromHeadRear"][1]
+    assert back_row_y + 0.006 <= y <= front_row_y - 0.015
+    ra_x, ra_y = drawing.FRONT_RA_XY
+    assert y < ra_y
+    assert drawing.RELIEF_FRONT_X + 0.010 < x < ra_x + drawing.RA_SYMBOL_EXTENT[0] - 0.020
     shaft_top = drawing.PRINCIPAL_CENTER[1] + spec.SHAFT_DIA / 2000.0
     label_bottom = drawing.DETAIL_LABEL_XY[1] - 0.008
-    for name in ("FrontBondLandLen", "BondReliefLen"):
-        x, y = drawing.PRINCIPAL_KEEP[name]
-        assert shaft_top + 0.003 <= y <= label_bottom - 0.004
-    assert drawing.RELIEF_BACK_X < drawing.PRINCIPAL_KEEP["BondReliefLen"][0] < drawing.RELIEF_FRONT_X
-    assert (
-        drawing.RELIEF_FRONT_X
-        < drawing.PRINCIPAL_KEEP["FrontBondLandLen"][0]
-        < drawing.FRONT_LAND_END_X
-    )
+    len_x, len_y = drawing.PRINCIPAL_KEEP["BondReliefLen"]
+    assert shaft_top + 0.003 <= len_y <= label_bottom - 0.004
+    assert drawing.RELIEF_BACK_X < len_x < drawing.RELIEF_FRONT_X
     dia_x, dia_y = drawing.PRINCIPAL_KEEP["BondReliefDia"]
-    assert drawing.RELIEF_BACK_X < dia_x < drawing.RELIEF_FRONT_X
+    # The relief's dimension line drops between the bond-zone block and the
+    # station's shoulder witness, its shelf clear of that witness.
+    assert drawing.BOND_ZONE_UNDERLINE_END_X + 0.002 <= dia_x
+    assert dia_x + drawing.RELIEF_DIA_SHELF <= drawing.RELIEF_FRONT_X - 0.004
     journal_width, journal_height = drawing._diameter_block_size(drawing.JOURNAL_CALLOUT)
     bond_width, bond_height = drawing._diameter_block_size(drawing.BOND_ZONE_CALLOUT)
     bond_x, bond_y = drawing.PRINCIPAL_KEEP["BondZoneDia"]
     front_x, front_y = drawing.PRINCIPAL_KEEP["FrontJournalDia"]
-    # The relief's dimension line drops between the two blocks.
-    assert bond_x + bond_width + 0.005 <= dia_x <= front_x - journal_width - 0.005
-    # Its text sits under both blocks and over the 7.83 row.
+    # Its text sits under both blocks, over the station row's line.
     assert dia_y + 0.004 <= min(bond_y - bond_height / 2.0, front_y - journal_height / 2.0)
-    assert dia_y - 0.006 >= drawing.PRINCIPAL_KEEP["BackJournalFromHeadRear"][1]
+    assert dia_y - 0.004 >= y
 
 
 
